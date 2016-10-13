@@ -114,6 +114,9 @@ public:
     /// This type expression contains a DynamicSelf type.
     HasDynamicSelf       = 0x100,
 
+    /// This type contains an Error type.
+    HasError             = 0x200,
+
     IsNotMaterializable  = (HasInOut | IsLValue)
   };
 
@@ -148,6 +151,9 @@ public:
   
   /// Is a type with these properties an lvalue?
   bool isLValue() const { return Bits & IsLValue; }
+
+  /// Does this type contain an error?
+  bool hasError() const { return Bits & HasError; }
 
   /// Is a type with these properties materializable: that is, is it a
   /// first-class value type?
@@ -258,6 +264,15 @@ class alignas(1 << TypeAlignInBits) TypeBase {
   }
 
 protected:
+  struct ErrorTypeBitfields {
+    unsigned : NumTypeBaseBits;
+
+    /// Whether there is an original type.
+    unsigned HasOriginalType : 1;
+  };
+  enum { NumErrorTypeBits = NumTypeBaseBits + 1 };
+  static_assert(NumErrorTypeBits <= 32, "fits in an unsigned");
+
   struct AnyFunctionTypeBitfields {
     unsigned : NumTypeBaseBits;
 
@@ -300,6 +315,7 @@ protected:
   
   union {
     TypeBaseBitfields TypeBaseBits;
+    ErrorTypeBitfields ErrorTypeBits;
     AnyFunctionTypeBitfields AnyFunctionTypeBits;
     TypeVariableTypeBitfields TypeVariableTypeBits;
     SILFunctionTypeBitfields SILFunctionTypeBits;
@@ -418,6 +434,10 @@ public:
     return getRecursiveProperties().hasTypeVariable();
   }
 
+  /// \brief Determine where this type is a type variable or a dependent
+  /// member root in a type variable.
+  bool isTypeVariableOrMember();
+
   /// \brief Determine whether this type involves a UnresolvedType.
   bool hasUnresolvedType() const {
     return getRecursiveProperties().hasUnresolvedType();
@@ -494,6 +514,11 @@ public:
     return getRecursiveProperties().hasUnboundGeneric();
   }
 
+  /// Determine whether this type contains an error type.
+  bool hasError() const {
+    return getRecursiveProperties().hasError();
+  }
+
   /// \brief Check if this type is a valid type for the LHS of an assignment.
   /// This mainly means isLValueType(), but empty tuples and tuples of empty
   /// tuples also qualify.
@@ -553,12 +578,6 @@ public:
   /// For example, the types Vector<Int> and Vector<Int>.Element are both
   /// specialized, but the type Vector is not.
   bool isSpecialized();
-
-  /// Retrieve the complete set of generic arguments for a specialized type.
-  ///
-  /// \param scratch Scratch space to use when the complete list needs to be
-  /// stitched together from multiple lists of generic arguments.
-  ArrayRef<Type> getAllGenericArgs(SmallVectorImpl<Type> &scratch);
 
   /// Gather all of the substitutions used to produce the given specialized type
   /// from its unspecialized type.
@@ -928,10 +947,31 @@ public:
 class ErrorType : public TypeBase {
   friend class ASTContext;
   // The Error type is always canonical.
-  ErrorType(ASTContext &C) 
-    : TypeBase(TypeKind::Error, &C, RecursiveTypeProperties()) { }
+  ErrorType(ASTContext &C, Type originalType)
+      : TypeBase(TypeKind::Error, &C, RecursiveTypeProperties::HasError) {
+    if (originalType) {
+      ErrorTypeBits.HasOriginalType = true;
+      *reinterpret_cast<Type *>(this + 1) = originalType;
+    } else {
+      ErrorTypeBits.HasOriginalType = false;
+    }
+  }
+
 public:
   static Type get(const ASTContext &C);
+
+  /// Produce an error type which records the original type we were trying to
+  /// substitute when we ran into a problem.
+  static Type get(Type originalType);
+
+  /// Retrieve the original type that this error type replaces, or none if
+  /// there is no such type.
+  Type getOriginalType() const {
+    if (ErrorTypeBits.HasOriginalType)
+      return *reinterpret_cast<const Type *>(this + 1);
+
+    return Type();
+  }
 
   // Implement isa/cast/dyncast/etc.
   static bool classof(const TypeBase *T) {
@@ -4124,10 +4164,8 @@ class DependentMemberType : public TypeBase {
       Base(base), NameOrAssocType(assocType) { }
 
 public:
-  static DependentMemberType *get(Type base, Identifier name,
-                                  const ASTContext &ctx);
-  static DependentMemberType *get(Type base, AssociatedTypeDecl *assocType,
-                                  const ASTContext &ctx);
+  static DependentMemberType *get(Type base, Identifier name);
+  static DependentMemberType *get(Type base, AssociatedTypeDecl *assocType);
 
   /// Retrieve the base type.
   Type getBase() const { return Base; }
@@ -4157,7 +4195,7 @@ public:
 BEGIN_CAN_TYPE_WRAPPER(DependentMemberType, Type)
   static CanDependentMemberType get(CanType base, AssociatedTypeDecl *assocType,
                                     const ASTContext &C) {
-    return CanDependentMemberType(DependentMemberType::get(base, assocType, C));
+    return CanDependentMemberType(DependentMemberType::get(base, assocType));
   }
 
   PROXY_CAN_TYPE_SIMPLE_GETTER(getBase)
@@ -4309,10 +4347,6 @@ public:
   static TypeVariableType *getNew(const ASTContext &C, unsigned ID,
                                   Args &&...args);
   
-  /// \brief If possible, retrieve the TypeBase object that was opened to create
-  /// this type variable.
-  TypeBase *getBaseBeingSubstituted();
-
   /// \brief Retrieve the implementation data corresponding to this type
   /// variable.
   ///
@@ -4345,9 +4379,24 @@ public:
 };
 DEFINE_EMPTY_CAN_TYPE_WRAPPER(TypeVariableType, Type)
 
+inline bool TypeBase::isTypeVariableOrMember() {
+  if (is<TypeVariableType>())
+    return true;
+
+  if (auto depMemTy = getAs<DependentMemberType>())
+    return depMemTy->getBase()->isTypeVariableOrMember();
+
+  return false;
+}
 
 inline bool TypeBase::isTypeParameter() {
-  return is<GenericTypeParamType>() || is<DependentMemberType>();
+  if (is<GenericTypeParamType>())
+    return true;
+
+  if (auto depMemTy = getAs<DependentMemberType>())
+    return depMemTy->getBase()->isTypeParameter();
+
+  return false;
 }
 
 inline bool TypeBase::isExistentialType() {
@@ -4545,7 +4594,7 @@ inline TupleTypeElt::TupleTypeElt(Type ty, Identifier name, bool isVariadic,
     : Name(name), ElementType(ty),
       Flags(isVariadic, isAutoClosure, isEscaping) {
   assert(!isVariadic ||
-         isa<ErrorType>(ty.getPointer()) ||
+         ty->hasError() ||
          isa<ArraySliceType>(ty.getPointer()) ||
          (isa<BoundGenericType>(ty.getPointer()) &&
           ty->castTo<BoundGenericType>()->getGenericArgs().size() == 1));
@@ -4563,7 +4612,7 @@ inline Type TupleTypeElt::getVarargBaseTy(Type VarArgT) {
     // It's the stdlib Array<T>.
     return BGT->getGenericArgs()[0];
   }
-  assert(isa<ErrorType>(T));
+  assert(T->hasError());
   return T;
 }
 
@@ -4582,8 +4631,6 @@ inline Identifier SubstitutableType::getName() const {
     return Archetype->getName();
   if (auto GenericParam = dyn_cast<GenericTypeParamType>(this))
     return GenericParam->getName();
-  if (auto DepMem = dyn_cast<DependentMemberType>(this))
-    return DepMem->getName();
 
   llvm_unreachable("Not a substitutable type");
 }

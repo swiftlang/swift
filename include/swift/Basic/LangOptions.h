@@ -141,6 +141,11 @@ namespace swift {
     /// \brief Enable experimental nested generic types feature.
     bool EnableExperimentalNestedGenericTypes = false;
 
+    /// \brief Staging flag for class resilience, which we do not want to enable
+    /// fully until more code is in place, to allow the standard library to be
+    /// tested with value type resilience only.
+    bool EnableClassResilience = false;
+
     /// Should we check the target OSs of serialized modules to see that they're
     /// new enough?
     bool EnableTargetOSChecking = true;
@@ -220,6 +225,11 @@ namespace swift {
 
     ArrayRef<std::string> getCustomConditionalCompilationFlags() const {
       return CustomConditionalCompilationFlags;
+    }
+
+    /// Whether our effective Swift version is in the Swift 3 family
+    bool isSwiftVersion3() const {
+      return EffectiveLanguageVersion.isVersion3();
     }
 
     /// Returns true if the 'os' platform condition argument represents

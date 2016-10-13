@@ -1,5 +1,3 @@
-// REQUIRES: rdar23493035
-
 // RUN: rm -rf %t && mkdir -p %t
 // RUN: %target-swiftc_driver -driver-print-jobs -module-name=ThisModule -wmo -num-threads 4 %S/Inputs/main.swift %s -emit-module -o test.swiftmodule | %FileCheck -check-prefix=MODULE %s
 // RUN: echo "{\"%s\": {\"assembly\": \"/build/multi-threaded.s\"}, \"%S/Inputs/main.swift\": {\"assembly\": \"/build/main.s\"}}" > %t/ofms.json

@@ -374,7 +374,7 @@ void TypeChecker::checkInheritanceClause(Decl *decl,
     auto inheritedTy = inherited.getType();
 
     // If this is an error type, ignore it.
-    if (inheritedTy->is<ErrorType>())
+    if (inheritedTy->hasError())
       continue;
 
     // Retrieve the interface type for this inherited type.
@@ -693,7 +693,7 @@ static void setBoundVarsTypeError(Pattern *pattern, ASTContext &ctx) {
   pattern->forEachVariable([&](VarDecl *var) {
     // Don't change the type of a variable that we've been able to
     // compute a type for.
-    if (var->hasType() && !var->getType()->is<ErrorType>())
+    if (var->hasType() && !var->getType()->hasError())
       return;
 
     var->overwriteType(ErrorType::get(ctx));
@@ -728,11 +728,9 @@ TypeChecker::handleSILGenericParams(GenericParamList *genericParams,
 
   for (unsigned i = 0, e = nestedList.size(); i < e; i++) {
     auto genericParams = nestedList.rbegin()[i];
-    bool invalid = false;
     auto *genericSig = validateGenericSignature(genericParams, DC, parentSig,
-                                                nullptr, invalid);
-    if (invalid)
-      return std::make_pair(nullptr, nullptr);
+                                                /*allowConcreteGenericParams=*/true,
+                                                nullptr);
 
     revertGenericParamList(genericParams);
 
@@ -740,7 +738,7 @@ TypeChecker::handleSILGenericParams(GenericParamList *genericParams,
     checkGenericParamList(&builder, genericParams, parentSig, parentEnv,
                           nullptr);
     parentSig = genericSig;
-    parentEnv = builder.getGenericEnvironment(genericSig->getGenericParams());
+    parentEnv = builder.getGenericEnvironment();
     finalizeGenericParamList(genericParams, parentSig, parentEnv, DC);
   }
 
@@ -1278,7 +1276,7 @@ void TypeChecker::computeDefaultAccessibility(ExtensionDecl *ED) {
   Accessibility maxAccess = Accessibility::Public;
 
   if (!ED->getExtendedType().isNull() &&
-      !ED->getExtendedType()->is<ErrorType>()) {
+      !ED->getExtendedType()->hasError()) {
     if (NominalTypeDecl *nominal = ED->getExtendedType()->getAnyNominal()) {
       validateDecl(nominal);
       maxAccess = std::max(nominal->getFormalAccess(),
@@ -2619,7 +2617,7 @@ static void checkEnumRawValues(TypeChecker &TC, EnumDecl *ED) {
 
   if (ED->getGenericEnvironmentOfContext() != nullptr)
     rawTy = ArchetypeBuilder::mapTypeIntoContext(ED, rawTy);
-  if (rawTy->is<ErrorType>())
+  if (rawTy->hasError())
     return;
 
   AutomaticEnumValueKind valueKind;
@@ -2811,7 +2809,7 @@ static void checkVarBehavior(VarDecl *decl, TypeChecker &TC) {
     return;
   
   // Don't try to check the behavior if we already encountered an error.
-  if (decl->getType()->is<ErrorType>())
+  if (decl->getType()->hasError())
     return;
   
   auto behavior = decl->getMutableBehavior() ;
@@ -2993,8 +2991,7 @@ static void checkVarBehavior(VarDecl *decl, TypeChecker &TC) {
           FunctionType::get(TC.Context.TheEmptyTupleType, storageTy);
         Type valueTy = DependentMemberType::get(
                                           behaviorProto->getSelfInterfaceType(),
-                                          valueReqt,
-                                          TC.Context);
+                                          valueReqt);
         
         auto expectedParameterizedInitStorageTy =
           FunctionType::get(valueTy, storageTy);
@@ -3653,7 +3650,7 @@ public:
         if (PBD->getPattern(i)->hasType() &&
             !PBD->getInit(i) &&
             PBD->getPattern(i)->hasStorage() &&
-            !PBD->getPattern(i)->getType()->is<ErrorType>()) {
+            !PBD->getPattern(i)->getType()->hasError()) {
 
           // If we have a type-adjusting attribute (like ownership), apply it now.
           if (auto var = PBD->getSingleVar())
@@ -4657,7 +4654,7 @@ public:
     // 'Self' is only a dynamic self on class methods and
     // protocol requirements.
     auto declaredType = dc->getDeclaredTypeOfContext();
-    if (declaredType->is<ErrorType>())
+    if (declaredType->hasError())
       return false;
 
     auto nominal = declaredType->getAnyNominal();
@@ -4702,8 +4699,8 @@ public:
     // Check that member operators reference the type of 'Self'.
     if (FD->getNumParameterLists() != 2 || FD->isInvalid()) return;
 
-    auto selfNominal =
-      FD->getDeclContext()->getAsNominalTypeOrNominalTypeExtensionContext();
+    auto *DC = FD->getDeclContext();
+    auto selfNominal = DC->getAsNominalTypeOrNominalTypeExtensionContext();
     if (!selfNominal) return;
 
     // Check the parameters for a reference to 'Self'.
@@ -4725,12 +4722,13 @@ public:
       if (isProtocol) {
         // For a protocol, is it the 'Self' type parameter?
         if (auto genericParam = paramType->getAs<GenericTypeParamType>())
-          if (genericParam->getDepth() == 0 && genericParam->getIndex() == 0)
+          if (genericParam->isEqual(DC->getSelfInterfaceType()))
             return;
 
         // ... or the 'Self' archetype?
         if (auto archetype = paramType->getAs<ArchetypeType>())
-          if (archetype->getSelfProtocol() == selfNominal) return;
+          if (archetype->isEqual(DC->getSelfTypeInContext()))
+            return;
       }
     }
 
@@ -4818,43 +4816,38 @@ public:
     if (auto gp = FD->getGenericParams()) {
       gp->setOuterParameters(FD->getDeclContext()->getGenericParamsOfContext());
 
-      if (TC.validateGenericFuncSignature(FD)) {
-        auto *env = TC.markInvalidGenericSignature(FD);
-        FD->setGenericEnvironment(env);
-      } else {
-        // Create a fresh archetype builder.
-        ArchetypeBuilder builder =
-          TC.createArchetypeBuilder(FD->getModuleContext());
-        auto *parentSig = FD->getDeclContext()->getGenericSignatureOfContext();
-        auto *parentEnv = FD->getDeclContext()->getGenericEnvironmentOfContext();
-        TC.checkGenericParamList(&builder, gp, parentSig, parentEnv, nullptr);
+      TC.validateGenericFuncSignature(FD);
 
-        // Infer requirements from parameter patterns.
-        for (auto pattern : FD->getParameterLists()) {
-          builder.inferRequirements(pattern, gp);
-        }
+      // Create a fresh archetype builder.
+      ArchetypeBuilder builder =
+        TC.createArchetypeBuilder(FD->getModuleContext());
+      auto *parentSig = FD->getDeclContext()->getGenericSignatureOfContext();
+      auto *parentEnv = FD->getDeclContext()->getGenericEnvironmentOfContext();
+      TC.checkGenericParamList(&builder, gp, parentSig, parentEnv, nullptr);
 
-        // Infer requirements from the result type.
-        if (!FD->getBodyResultTypeLoc().isNull()) {
-          builder.inferRequirements(FD->getBodyResultTypeLoc(), gp);
-        }
-
-        // Revert the types within the signature so it can be type-checked with
-        // archetypes below.
-        TC.revertGenericFuncSignature(FD);
-
-        // Assign archetypes.
-        auto *sig = FD->getGenericSignature();
-        auto *env = builder.getGenericEnvironment(sig->getGenericParams());
-        FD->setGenericEnvironment(env);
-
-        TC.finalizeGenericParamList(gp, sig, env, FD);
+      // Infer requirements from parameter patterns.
+      for (auto pattern : FD->getParameterLists()) {
+        builder.inferRequirements(pattern, gp);
       }
+
+      // Infer requirements from the result type.
+      if (!FD->getBodyResultTypeLoc().isNull()) {
+        builder.inferRequirements(FD->getBodyResultTypeLoc(), gp);
+      }
+
+      // Revert the types within the signature so it can be type-checked with
+      // archetypes below.
+      TC.revertGenericFuncSignature(FD);
+
+      // Assign archetypes.
+      auto *sig = FD->getGenericSignature();
+      auto *env = builder.getGenericEnvironment();
+      FD->setGenericEnvironment(env);
+
+      TC.finalizeGenericParamList(gp, sig, env, FD);
     } else if (FD->getDeclContext()->getGenericSignatureOfContext()) {
-      if (TC.validateGenericFuncSignature(FD)) {
-        auto *env = TC.markInvalidGenericSignature(FD);
-        FD->setGenericEnvironment(env);
-      } else if (!FD->hasType()) {
+      TC.validateGenericFuncSignature(FD);
+      if (!FD->hasType()) {
         // Revert all of the types within the signature of the function.
         TC.revertGenericFuncSignature(FD);
         FD->setGenericEnvironment(
@@ -5297,7 +5290,7 @@ public:
 
     {
       Type baseTy = base->getInterfaceType();
-      if (baseTy->is<ErrorType>())
+      if (baseTy->hasError())
         return false;
 
       Optional<InFlightDiagnostic> activeDiag;
@@ -5927,7 +5920,6 @@ public:
     // These can't appear on overridable declarations.
     UNINTERESTING_ATTR(AutoClosure)
     UNINTERESTING_ATTR(NoEscape)
-    UNINTERESTING_ATTR(Escaping)
 
     UNINTERESTING_ATTR(Prefix)
     UNINTERESTING_ATTR(Postfix)
@@ -6375,7 +6367,7 @@ public:
       if (auto extendedTy = ED->getExtendedType()) {
         if (!extendedTy->is<NominalType>() &&
             !extendedTy->is<BoundGenericType>() &&
-            !extendedTy->is<ErrorType>()) {
+            !extendedTy->hasError()) {
           // FIXME: Redundant diagnostic test here?
           TC.diagnose(ED->getStartLoc(), diag::non_nominal_extension,
                       extendedTy);
@@ -6484,7 +6476,7 @@ public:
           TC.diagnose(CD->getLoc(), diag::cfclass_convenience_init);
         }
 
-        if (!extClass && !extType->is<ErrorType>()) {
+        if (!extClass && !extType->hasError()) {
           auto ConvenienceLoc =
             CD->getAttrs().getAttribute<ConvenienceAttr>()->getLocation();
 
@@ -6521,41 +6513,34 @@ public:
       // Write up generic parameters and check the generic parameter list.
       gp->setOuterParameters(CD->getDeclContext()->getGenericParamsOfContext());
 
-      if (TC.validateGenericFuncSignature(CD)) {
-        auto *env = TC.markInvalidGenericSignature(CD);
-        CD->setGenericEnvironment(env);
-      } else {
-        ArchetypeBuilder builder =
-          TC.createArchetypeBuilder(CD->getModuleContext());
-        auto *parentSig = CD->getDeclContext()->getGenericSignatureOfContext();
-        auto *parentEnv = CD->getDeclContext()->getGenericEnvironmentOfContext();
-        TC.checkGenericParamList(&builder, gp, parentSig, parentEnv, nullptr);
+      TC.validateGenericFuncSignature(CD);
 
-        // Infer requirements from the parameters of the constructor.
-        builder.inferRequirements(CD->getParameterList(1), gp);
+      auto builder = TC.createArchetypeBuilder(CD->getModuleContext());
+      auto *parentSig = CD->getDeclContext()->getGenericSignatureOfContext();
+      auto *parentEnv = CD->getDeclContext()->getGenericEnvironmentOfContext();
+      TC.checkGenericParamList(&builder, gp, parentSig, parentEnv, nullptr);
 
-        // Revert the types within the signature so it can be type-checked with
-        // archetypes below.
-        TC.revertGenericFuncSignature(CD);
+      // Infer requirements from the parameters of the constructor.
+      builder.inferRequirements(CD->getParameterList(1), gp);
 
-        // Assign archetypes.
-        auto *sig = CD->getGenericSignature();
-        auto *env = builder.getGenericEnvironment(sig->getGenericParams());
-        CD->setGenericEnvironment(env);
+      // Revert the types within the signature so it can be type-checked with
+      // archetypes below.
+      TC.revertGenericFuncSignature(CD);
 
-        TC.finalizeGenericParamList(gp, sig, env, CD);
-      }
+      // Assign archetypes.
+      auto *sig = CD->getGenericSignature();
+      auto *env = builder.getGenericEnvironment();
+      CD->setGenericEnvironment(env);
+
+      TC.finalizeGenericParamList(gp, sig, env, CD);
     } else if (CD->getDeclContext()->getGenericSignatureOfContext()) {
-      if (TC.validateGenericFuncSignature(CD)) {
-        auto *env = TC.markInvalidGenericSignature(CD);
-        CD->setGenericEnvironment(env);
-      } else {
-        // Revert all of the types within the signature of the constructor.
-        TC.revertGenericFuncSignature(CD);
+      TC.validateGenericFuncSignature(CD);
 
-        CD->setGenericEnvironment(
-            CD->getDeclContext()->getGenericEnvironmentOfContext());
-      }
+      // Revert all of the types within the signature of the constructor.
+      TC.revertGenericFuncSignature(CD);
+
+      CD->setGenericEnvironment(
+          CD->getDeclContext()->getGenericEnvironmentOfContext());
     }
 
     {
@@ -7517,7 +7502,7 @@ static Type checkExtensionGenericParams(
 
   // Local function used to infer requirements from the extended type.
   TypeLoc extendedTypeInfer;
-  auto inferExtendedTypeReqs = [&](ArchetypeBuilder &builder) -> bool {
+  auto inferExtendedTypeReqs = [&](ArchetypeBuilder &builder) {
     if (extendedTypeInfer.isNull()) {
       if (isa<ProtocolDecl>(nominal)) {
         // Simple case: protocols don't form bound generic types.
@@ -7534,28 +7519,20 @@ static Type checkExtensionGenericParams(
       }
     }
     
-    return builder.inferRequirements(extendedTypeInfer, genericParams);
+    builder.inferRequirements(extendedTypeInfer, genericParams);
   };
 
   ext->setIsBeingTypeChecked(true);
   SWIFT_DEFER { ext->setIsBeingTypeChecked(false); };
 
   // Validate the generic type signature.
-  bool invalid = false;
   auto *parentSig = ext->getDeclContext()->getGenericSignatureOfContext();
   auto *parentEnv = ext->getDeclContext()->getGenericEnvironmentOfContext();
-  GenericSignature *sig = tc.validateGenericSignature(
-      genericParams,
-      ext->getDeclContext(),
-      parentSig,
-      inferExtendedTypeReqs, invalid);
+  auto *sig = tc.validateGenericSignature(genericParams,
+                                          ext->getDeclContext(), parentSig,
+                                          /*allowConcreteGenericParams=*/true,
+                                          inferExtendedTypeReqs);
   ext->setGenericSignature(sig);
-
-  if (invalid) {
-    auto *env = tc.markInvalidGenericSignature(ext);
-    ext->setGenericEnvironment(env);
-    return nullptr;
-  }
 
   // Validate the generic parameters for the last time.
   tc.revertGenericParamList(genericParams);
@@ -7563,7 +7540,7 @@ static Type checkExtensionGenericParams(
   tc.checkGenericParamList(&builder, genericParams, parentSig, parentEnv, nullptr);
   inferExtendedTypeReqs(builder);
 
-  auto *env = builder.getGenericEnvironment(sig->getGenericParams());
+  auto *env = builder.getGenericEnvironment();
   ext->setGenericEnvironment(env);
 
   tc.finalizeGenericParamList(genericParams, sig, env, ext);
@@ -7611,7 +7588,7 @@ void TypeChecker::validateExtension(ExtensionDecl *ext) {
   // within a generic type.
   auto extendedType = ext->getExtendedType();
 
-  if (extendedType.isNull() || extendedType->is<ErrorType>())
+  if (extendedType.isNull() || extendedType->hasError())
     return;
 
   if (auto unbound = extendedType->getAs<UnboundGenericType>()) {

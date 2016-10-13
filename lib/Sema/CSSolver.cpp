@@ -200,8 +200,8 @@ Solution ConstraintSystem::finalize(
   }
 
   // Remember the defaulted type variables.
-  solution.DefaultedTypeVariables.insert(DefaultedTypeVariables.begin(),
-                                         DefaultedTypeVariables.end());
+  solution.DefaultedConstraints.insert(DefaultedConstraints.begin(),
+                                       DefaultedConstraints.end());
 
   return solution;
 }
@@ -260,8 +260,8 @@ void ConstraintSystem::applySolution(const Solution &solution) {
   }
 
   // Register the defaulted type variables.
-  DefaultedTypeVariables.append(solution.DefaultedTypeVariables.begin(),
-                                solution.DefaultedTypeVariables.end());
+  DefaultedConstraints.append(solution.DefaultedConstraints.begin(),
+                              solution.DefaultedConstraints.end());
 
   // Register any fixes produced along this path.
   Fixes.append(solution.Fixes.begin(), solution.Fixes.end());
@@ -447,7 +447,7 @@ ConstraintSystem::SolverScope::SolverScope(ConstraintSystem &cs)
   numDisjunctionChoices = cs.DisjunctionChoices.size();
   numOpenedTypes = cs.OpenedTypes.size();
   numOpenedExistentialTypes = cs.OpenedExistentialTypes.size();
-  numDefaultedTypeVariables = cs.DefaultedTypeVariables.size();
+  numDefaultedConstraints = cs.DefaultedConstraints.size();
   numGeneratedConstraints = cs.solverState->generatedConstraints.size();
   PreviousScore = cs.CurrentScore;
 
@@ -505,7 +505,7 @@ ConstraintSystem::SolverScope::~SolverScope() {
   truncate(cs.OpenedExistentialTypes, numOpenedExistentialTypes);
 
   // Remove any defaulted type variables.
-  truncate(cs.DefaultedTypeVariables, numDefaultedTypeVariables);
+  truncate(cs.DefaultedConstraints, numDefaultedConstraints);
   
   // Reset the previous score.
   cs.CurrentScore = PreviousScore;
@@ -546,14 +546,17 @@ namespace {
     /// The defaulted protocol associated with this binding.
     Optional<ProtocolDecl *> DefaultedProtocol;
 
-    /// Whether this is a binding that comes from a 'Defaultable' constraint.
-    bool IsDefaultableBinding = false;
+    /// If this is a binding that comes from a \c Defaultable constraint,
+    /// the locator of that constraint.
+    ConstraintLocator *DefaultableBinding = nullptr;
 
     PotentialBinding(Type type, AllowedBindingKind kind,
                      Optional<ProtocolDecl *> defaultedProtocol = None,
-                     bool isDefaultableBinding = false)
+                     ConstraintLocator *defaultableBinding = nullptr)
       : BindingType(type), Kind(kind), DefaultedProtocol(defaultedProtocol),
-        IsDefaultableBinding(isDefaultableBinding) { }
+        DefaultableBinding(defaultableBinding) { }
+
+    bool isDefaultableBinding() const { return DefaultableBinding != nullptr; }
   };
 
   struct PotentialBindings {
@@ -710,7 +713,7 @@ static PotentialBindings getPotentialBindings(ConstraintSystem &cs,
     if (binding.Kind == AllowedBindingKind::Supertypes &&
         !binding.BindingType->hasTypeVariable() &&
         !binding.DefaultedProtocol &&
-        !binding.IsDefaultableBinding &&
+        !binding.isDefaultableBinding() &&
         allowJoinMeet) {
       if (lastSupertypeIndex) {
         // Can we compute a join?
@@ -781,14 +784,6 @@ static PotentialBindings getPotentialBindings(ConstraintSystem &cs,
 
     case ConstraintKind::ConformsTo: 
     case ConstraintKind::SelfObjectOfProtocol: {
-      // FIXME: Can we always assume that the type variable is the lower bound?
-      TypeVariableType *lowerTypeVar = nullptr;
-      cs.getFixedTypeRecursive(constraint->getFirstType(), lowerTypeVar,
-                               /*wantRValue=*/false);
-      if (lowerTypeVar != typeVar) {
-        continue;
-      }
-
       // If there is a default literal type for this protocol, it's a
       // potential binding.
       auto defaultType = tc.getDefaultType(constraint->getProtocol(), cs.DC);
@@ -1060,7 +1055,8 @@ static PotentialBindings getPotentialBindings(ConstraintSystem &cs,
       continue;
 
     ++result.NumDefaultableBindings;
-    addPotentialBinding({type, AllowedBindingKind::Exact, None, true});
+    addPotentialBinding({type, AllowedBindingKind::Exact, None,
+                         constraint->getLocator()});
   }
 
   // Determine if the bindings only constrain the type variable from above with
@@ -1154,7 +1150,7 @@ static bool tryTypeVariableBindings(
     for (const auto &binding : bindings) {
       // If this is a defaultable binding and we have found any solutions,
       // don't explore the default binding.
-      if (binding.IsDefaultableBinding && anySolved)
+      if (binding.isDefaultableBinding() && anySolved)
         continue;
 
       auto type = binding.BindingType;
@@ -1222,8 +1218,8 @@ static bool tryTypeVariableBindings(
                        typeVar->getImpl().getLocator());
 
       // If this was from a defaultable binding note that.
-      if (binding.IsDefaultableBinding) {
-        cs.DefaultedTypeVariables.push_back(typeVar);
+      if (binding.isDefaultableBinding()) {
+        cs.DefaultedConstraints.push_back(binding.DefaultableBinding);
       }
 
       if (!cs.solveRec(solutions, allowFreeTypeVariables))
@@ -1246,7 +1242,7 @@ static bool tryTypeVariableBindings(
     // Enumerate the supertypes of each of the types we tried.
     for (auto binding : bindings) {
       const auto type = binding.BindingType;
-      if (type->is<ErrorType>())
+      if (type->hasError())
         continue;
 
       // After our first pass, note that we've explored these
@@ -1562,13 +1558,13 @@ void ConstraintSystem::shrink(Expr *expr) {
     /// \returns ErrorType on failure, properly constructed type otherwise.
     Type extractElementType(Type collection) {
       auto &ctx = CS.getASTContext();
-      if (collection.isNull() || collection->is<ErrorType>())
+      if (collection.isNull() || collection->hasError())
         return ErrorType::get(ctx);
 
       auto base = collection.getPointer();
       auto isInvalidType = [](Type type) -> bool {
         return type.isNull() || type->hasUnresolvedType() ||
-               type->is<ErrorType>();
+               type->hasError();
       };
 
       // Array type.
@@ -1651,7 +1647,7 @@ void ConstraintSystem::shrink(Expr *expr) {
                                                   TypeResolutionOptions());
 
             // Looks like coercion type is invalid, let's skip this sub-tree.
-            if (coercionType->is<ErrorType>())
+            if (coercionType->hasError())
               return nullptr;
 
             // Visit collection expression inline.
@@ -1680,7 +1676,7 @@ void ConstraintSystem::shrink(Expr *expr) {
         auto elementType = extractElementType(contextualType);
         // If we couldn't deduce element type for the collection, let's
         // not attempt to solve it.
-        if (elementType->is<ErrorType>())
+        if (elementType->hasError())
           return;
 
         contextualType = elementType;

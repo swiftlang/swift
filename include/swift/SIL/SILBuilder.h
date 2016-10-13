@@ -195,8 +195,9 @@ public:
   //===--------------------------------------------------------------------===//
 
   static SILType getPartialApplyResultType(SILType Ty, unsigned ArgCount,
-                                           SILModule &M,
-                                           ArrayRef<Substitution> subs);
+                                         SILModule &M,
+                                         ArrayRef<Substitution> subs,
+                                         ParameterConvention calleeConvention);
 
   //===--------------------------------------------------------------------===//
   // CFG Manipulation
@@ -256,35 +257,30 @@ public:
   }
 
   AllocRefInst *createAllocRef(SILLocation Loc, SILType ObjectType,
-                               bool objc, bool canAllocOnStack) {
-    // AllocRefInsts expand to function calls and can therefore not be
-    // counted towards the function prologue.
-    assert(!Loc.isInPrologue());
-    return insert(AllocRefInst::create(getSILDebugLocation(Loc), F, ObjectType,
-                                       objc, canAllocOnStack,
-                                       {}, {}, OpenedArchetypes));
-  }
-
-  AllocRefInst *createAllocRef(SILLocation Loc, SILType ObjectType,
-                               bool canAllocOnStack,
+                               bool objc, bool canAllocOnStack,
                                ArrayRef<SILType> ElementTypes,
                                ArrayRef<SILValue> ElementCountOperands) {
     // AllocRefInsts expand to function calls and can therefore not be
     // counted towards the function prologue.
     assert(!Loc.isInPrologue());
     return insert(AllocRefInst::create(getSILDebugLocation(Loc),
-                                       F, ObjectType, false, canAllocOnStack,
+                                       F, ObjectType, objc, canAllocOnStack,
                                        ElementTypes, ElementCountOperands,
                                        OpenedArchetypes));
   }
 
   AllocRefDynamicInst *createAllocRefDynamic(SILLocation Loc, SILValue operand,
-                                             SILType type, bool objc) {
+                                             SILType type, bool objc,
+                                    ArrayRef<SILType> ElementTypes,
+                                    ArrayRef<SILValue> ElementCountOperands) {
     // AllocRefDynamicInsts expand to function calls and can therefore
     // not be counted towards the function prologue.
     assert(!Loc.isInPrologue());
-    return insert(AllocRefDynamicInst::create(getSILDebugLocation(Loc), operand,
-                                              type, objc, F, OpenedArchetypes));
+    return insert(AllocRefDynamicInst::create(getSILDebugLocation(Loc), F,
+                                              operand, type, objc,
+                                              ElementTypes,
+                                              ElementCountOperands,
+                                              OpenedArchetypes));
   }
 
   AllocValueBufferInst *

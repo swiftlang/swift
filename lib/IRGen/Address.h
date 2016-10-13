@@ -37,10 +37,6 @@ public:
   Address(llvm::Value *addr, Alignment align) : Addr(addr), Align(align) {
     assert(addr != nullptr && "building an invalid address");
   }
-  Address(llvm::ilist_iterator<llvm::Argument> addr, Alignment align)
-      : Address(&*addr, align) {}
-  Address(llvm::ilist_iterator<llvm::Instruction> addr, Alignment align)
-      : Address(&*addr, align) {}
 
   llvm::Value *operator->() const {
     assert(isValid());

@@ -52,9 +52,9 @@ SILBasicBlock *SILGenFunction::createBasicBlock(FunctionSection section) {
   case FunctionSection::Ordinary: {
     // The end of the ordinary section is just the end of the function
     // unless postmatter blocks exist.
-    SILBasicBlock *afterBB =
-        (StartOfPostmatter ? &*std::prev(StartOfPostmatter->getIterator())
-                           : nullptr);
+    SILBasicBlock *afterBB = (StartOfPostmatter != F.end())
+                                 ? &*std::prev(StartOfPostmatter)
+                                 : nullptr;
     return new (F.getModule()) SILBasicBlock(&F, afterBB);
   }
 
@@ -62,7 +62,8 @@ SILBasicBlock *SILGenFunction::createBasicBlock(FunctionSection section) {
     // The end of the postmatter section is always the end of the function.
     // Register the new block as the start of the postmatter if needed.
     SILBasicBlock *newBB = new (F.getModule()) SILBasicBlock(&F, nullptr);
-    if (!StartOfPostmatter) StartOfPostmatter = newBB;
+    if (StartOfPostmatter == F.end())
+      StartOfPostmatter = newBB->getIterator();
     return newBB;
   }
 
@@ -73,8 +74,9 @@ SILBasicBlock *SILGenFunction::createBasicBlock(FunctionSection section) {
 void SILGenFunction::eraseBasicBlock(SILBasicBlock *block) {
   assert(block->pred_empty() && "erasing block with predecessors");
   assert(block->empty() && "erasing block with content");
-  if (block == StartOfPostmatter) {
-    StartOfPostmatter = &*std::next(block->getIterator());
+  SILFunction::iterator blockIt = block->getIterator();
+  if (blockIt == StartOfPostmatter) {
+    StartOfPostmatter = next_or_end(blockIt, F.end());
   }
   block->eraseFromParent();
 }

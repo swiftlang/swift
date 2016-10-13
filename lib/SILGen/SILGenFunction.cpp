@@ -34,12 +34,9 @@ using namespace Lowering;
 //===----------------------------------------------------------------------===//
 
 SILGenFunction::SILGenFunction(SILGenModule &SGM, SILFunction &F)
-  : SGM(SGM), F(F),
-    B(*this, createBasicBlock()),
-    OpenedArchetypesTracker(F),
-    CurrentSILLoc(F.getLocation()),
-    Cleanups(*this)
-{
+    : SGM(SGM), F(F), StartOfPostmatter(F.end()), B(*this, createBasicBlock()),
+      OpenedArchetypesTracker(F), CurrentSILLoc(F.getLocation()),
+      Cleanups(*this) {
   B.setCurrentDebugScope(F.getDebugScope());
   B.setOpenedArchetypesTracker(&OpenedArchetypesTracker);
 }
@@ -428,7 +425,8 @@ SILGenFunction::emitClosureValue(SILLocation loc, SILDeclRef constant,
   SILType closureTy =
     SILGenBuilder::getPartialApplyResultType(functionRef->getType(),
                                              capturedArgs.size(), SGM.M,
-                                             subs);
+                                             subs,
+                                             ParameterConvention::Direct_Owned);
   auto toClosure =
     B.createPartialApply(loc, functionRef, functionTy,
                          subs, forwardedArgs, closureTy);
@@ -840,7 +838,8 @@ void SILGenFunction::emitCurryThunk(ValueDecl *vd,
   // Partially apply the next uncurry level and return the result closure.
   auto closureTy =
     SILGenBuilder::getPartialApplyResultType(toFn->getType(), curriedArgs.size(),
-                                             SGM.M, subs);
+                                             SGM.M, subs,
+                                             ParameterConvention::Direct_Owned);
   SILInstruction *toClosure =
     B.createPartialApply(vd, toFn, toTy, subs, curriedArgs, closureTy);
   if (resultTy != closureTy)
@@ -873,8 +872,8 @@ SILGenBuilder::SILGenBuilder(SILGenFunction &gen, SILBasicBlock *insertBB,
                              SmallVectorImpl<SILInstruction *> *insertedInsts)
   : SILBuilder(insertBB, insertedInsts), SGM(gen.SGM) {}
 SILGenBuilder::SILGenBuilder(SILGenFunction &gen, SILBasicBlock *insertBB,
-                             SILInstruction *insertInst)
-    : SILBuilder(insertBB, insertInst->getIterator()), SGM(gen.SGM) {}
+                             SILBasicBlock::iterator insertInst)
+    : SILBuilder(insertBB, insertInst), SGM(gen.SGM) {}
 
 MetatypeInst *SILGenBuilder::createMetatype(SILLocation loc, SILType metatype) {
   auto theMetatype = metatype.castTo<MetatypeType>();

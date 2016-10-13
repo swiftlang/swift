@@ -117,7 +117,7 @@ namespace {
     llvm::StringMap<SourceLoc> ForwardRefLocalValues;
 
     /// A callback to be invoked every time a type was deserialized.
-    llvm::function_ref<void(Type)> ParsedTypeCallback;
+    std::function<void(Type)> ParsedTypeCallback;
 
 
     bool performTypeLocChecking(TypeLoc &T, bool IsSILType,
@@ -2547,7 +2547,8 @@ bool SILParser::parseSILInstruction(SILBasicBlock *BB, SILBuilder &B) {
     }
     break;
   }
-  case ValueKind::AllocRefInst: {
+  case ValueKind::AllocRefInst:
+  case ValueKind::AllocRefDynamicInst: {
     bool IsObjC = false;
     bool OnStack = false;
     SmallVector<SILType, 2> ElementTypes;
@@ -2580,6 +2581,12 @@ bool SILParser::parseSILInstruction(SILBasicBlock *BB, SILBuilder &B) {
       }
       P.parseToken(tok::r_square, diag::expected_in_attribute_list);
     }
+    SILValue Metadata;
+    if (Opcode == ValueKind::AllocRefDynamicInst) {
+      if (parseTypedValueRef(Metadata, B) ||
+          P.parseToken(tok::comma, diag::expected_tok_in_sil_instr, ","))
+        return true;
+    }
 
     SILType ObjectType;
     if (parseSILType(ObjectType))
@@ -2588,29 +2595,20 @@ bool SILParser::parseSILInstruction(SILBasicBlock *BB, SILBuilder &B) {
     if (parseSILDebugLocation(InstLoc, B))
       return true;
 
-    if (ElementTypes.size() == 0) {
-      ResultVal = B.createAllocRef(InstLoc, ObjectType, IsObjC, OnStack);
-    } else {
-      if (IsObjC) {
-        P.diagnose(P.Tok, diag::sil_objc_with_tail_elements);
+    if (IsObjC && ElementTypes.size() != 0) {
+      P.diagnose(P.Tok, diag::sil_objc_with_tail_elements);
+      return true;
+    }
+    if (Opcode == ValueKind::AllocRefDynamicInst) {
+      if (OnStack)
         return true;
-      }
-      ResultVal = B.createAllocRef(InstLoc, ObjectType, OnStack,
+
+      ResultVal = B.createAllocRefDynamic(InstLoc, Metadata, ObjectType,
+                                          IsObjC, ElementTypes, ElementCounts);
+    } else {
+      ResultVal = B.createAllocRef(InstLoc, ObjectType, IsObjC, OnStack,
                                    ElementTypes, ElementCounts);
     }
-    break;
-  }
-  case ValueKind::AllocRefDynamicInst: {
-    SILType Ty;
-    bool isObjC = false;
-    if (parseSILOptional(isObjC, *this, "objc") ||
-        parseTypedValueRef(Val, B) ||
-        P.parseToken(tok::comma, diag::expected_tok_in_sil_instr, ",") ||
-        parseSILType(Ty) ||
-        parseSILDebugLocation(InstLoc, B))
-      return true;
-
-    ResultVal = B.createAllocRefDynamic(InstLoc, Val, Ty, isObjC);
     break;
   }
 
@@ -3739,9 +3737,18 @@ bool SILParser::parseCallInstruction(SILLocation InstLoc,
   UnresolvedValueName FnName;
   SmallVector<UnresolvedValueName, 4> ArgNames;
 
+  auto PartialApplyConvention = ParameterConvention::Direct_Owned;
   bool IsNonThrowingApply = false;
-  if (parseSILOptional(IsNonThrowingApply, *this, "nothrow"))
-    return true;
+  StringRef AttrName;
+  
+  if (parseSILOptional(AttrName, *this)) {
+    if (AttrName.equals("nothrow"))
+      IsNonThrowingApply = true;
+    else if (AttrName.equals("callee_guaranteed"))
+      PartialApplyConvention = ParameterConvention::Direct_Guaranteed;
+    else
+      return true;
+  }
   
   if (parseValueName(FnName))
     return true;
@@ -3840,7 +3847,8 @@ bool SILParser::parseCallInstruction(SILLocation InstLoc,
     }
 
     SILType closureTy =
-      SILBuilder::getPartialApplyResultType(Ty, ArgNames.size(), SILMod, subs);
+      SILBuilder::getPartialApplyResultType(Ty, ArgNames.size(), SILMod, subs,
+                                            PartialApplyConvention);
     // FIXME: Why the arbitrary order difference in IRBuilder type argument?
     ResultVal = B.createPartialApply(InstLoc, FnVal, FnTy,
                                      subs, Args, closureTy);

@@ -46,8 +46,7 @@ func initCallToAllocInit(i i: CInt) {
 }
 
 // CHECK: linkonce_odr hidden {{.*}} @_TFCSo1BCfT3intVs5Int32_GSQS__
-// CHECK: load i8*, i8** @"\01L_selector(allocWithZone:)"
-// CHECK: call [[OPAQUE:%.*]]* bitcast (void ()* @objc_msgSend
+// CHECK: call [[OPAQUE:%.*]]* @objc_allocWithZone
 
 // Indexed subscripting
 // CHECK: define hidden void @_TF7objc_ir19indexedSubscriptingFT1bCSo1B3idxSi1aCSo1A_T_

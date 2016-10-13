@@ -1025,20 +1025,6 @@ public:
     return SeparatorLoc;
   }
 
-  /// Set during deserialization; used to print out the requirements accurately
-  /// for the generated interface.
-  StringRef getAsWrittenString() const {
-    return AsWrittenString;
-  }
-  void setAsWrittenString(StringRef Str) {
-    AsWrittenString = Str;
-  }
-
-  /// Further analyze the written string, if it's not empty, to collect the first
-  /// type, the second type and the requirement kind.
-  Optional<std::tuple<StringRef, StringRef, RequirementReprKind>>
-  getAsAnalyzedWrittenString() const;
-
   SourceRange getSourceRange() const {
     return SourceRange(Types[0].getSourceRange().Start,
                        Types[1].getSourceRange().End);
@@ -1048,7 +1034,6 @@ public:
       void dump() const LLVM_ATTRIBUTE_USED,
       "only for use within the debugger");
   void print(raw_ostream &OS) const;
-  void printAsWritten(raw_ostream &OS) const;
 };
   
 /// GenericParamList - A list of generic parameters that is part of a generic
@@ -3282,6 +3267,11 @@ public:
   /// This is true of imported Objective-C classes.
   bool usesObjCGenericsModel() const {
     return isObjC() && hasClangNode() && isGenericContext();
+  }
+  
+  /// True if the class is known to be implemented in Swift.
+  bool hasKnownSwiftImplementation() const {
+    return !hasClangNode();
   }
 };
 

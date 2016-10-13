@@ -738,39 +738,6 @@ bool swift::typeCheckCompletionDecl(Decl *D) {
   return true;
 }
 
-bool swift::isConvertibleTo(Type Ty1, Type Ty2, DeclContext &DC) {
-  auto &Ctx = DC.getASTContext();
-
-  // We try to reuse the type checker associated with the ast context first.
-  if (Ctx.getLazyResolver()) {
-    TypeChecker *TC = static_cast<TypeChecker*>(Ctx.getLazyResolver());
-    return TC->isConvertibleTo(Ty1, Ty2, &DC);
-  } else {
-    DiagnosticEngine Diags(Ctx.SourceMgr);
-    return (new TypeChecker(Ctx, Diags))->isConvertibleTo(Ty1, Ty2, &DC);
-  }
-}
-
-Type swift::lookUpTypeInContext(DeclContext *DC, StringRef Name) {
-  auto &Ctx = DC->getASTContext();
-  auto ReturnResult = [](UnqualifiedLookup &Lookup) {
-    if (auto Result = Lookup.getSingleTypeResult())
-      return Result->getDeclaredType();
-    return Type();
-  };
-  if (Ctx.getLazyResolver()) {
-    UnqualifiedLookup Lookup(DeclName(Ctx.getIdentifier(Name)), DC,
-                             Ctx.getLazyResolver(), false, SourceLoc(), true);
-    return ReturnResult(Lookup);
-  } else {
-    DiagnosticEngine Diags(Ctx.SourceMgr);
-    LazyResolver *Resolver = new TypeChecker(Ctx, Diags);
-    UnqualifiedLookup Lookup(DeclName(Ctx.getIdentifier(Name)), DC,
-                             Resolver, false, SourceLoc(), true);
-    return ReturnResult(Lookup);
-  }
-}
-
 static Optional<Type> getTypeOfCompletionContextExpr(
                         TypeChecker &TC,
                         DeclContext *DC,
@@ -797,7 +764,7 @@ static Optional<Type> getTypeOfCompletionContextExpr(
 
   // Try to recover if we've made any progress.
   if (parsedExpr && !isa<ErrorExpr>(parsedExpr) && parsedExpr->getType() &&
-      !parsedExpr->getType()->is<ErrorType>() &&
+      !parsedExpr->getType()->hasError() &&
       parsedExpr->getType().getCanonicalTypeOrNull() != originalType) {
     return parsedExpr->getType();
   }
@@ -1416,7 +1383,7 @@ private:
         continue;
       }
 
-      auto *VersionSpec = dyn_cast<VersionConstraintAvailabilitySpec>(Spec);
+      auto *VersionSpec = dyn_cast<PlatformVersionConstraintAvailabilitySpec>(Spec);
       if (!VersionSpec)
         continue;
 
@@ -1440,7 +1407,7 @@ private:
       return AvailabilityContext::alwaysAvailable();
     }
 
-    auto *VersionSpec = cast<VersionConstraintAvailabilitySpec>(Spec);
+    auto *VersionSpec = cast<PlatformVersionConstraintAvailabilitySpec>(Spec);
     return AvailabilityContext(VersionRange::allGTE(VersionSpec->getVersion()));
   }
 

@@ -197,14 +197,6 @@ private:
 };
 } // namespace ide
 
-class ArchetypeTransformer {
-  struct Implementation;
-  Implementation &Impl;
-public:
-  ArchetypeTransformer(DeclContext *DC, Type Ty);
-  llvm::function_ref<Type(Type)> getTransformerFunc();
-  ~ArchetypeTransformer();
-};
 } // namespace swift
 
 #endif // SWIFT_IDE_UTILS_H

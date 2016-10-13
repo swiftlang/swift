@@ -652,7 +652,7 @@ static bool validateTypedPattern(TypeChecker &TC, DeclContext *DC,
                                  TypeResolutionOptions options,
                                  GenericTypeResolver *resolver) {
   if (TP->hasType())
-    return TP->getType()->is<ErrorType>();
+    return TP->getType()->hasError();
 
   TypeLoc &TL = TP->getTypeLoc();
   bool hadError = TC.validateType(TL, DC, options, resolver);
@@ -737,7 +737,7 @@ static bool validateParameterType(ParamDecl *decl, DeclContext *DC,
                                   GenericTypeResolver *resolver,
                                   TypeChecker &TC) {
   if (auto ty = decl->getTypeLoc().getType())
-    return ty->is<ErrorType>();
+    return ty->hasError();
 
   // If the element is a variadic parameter, resolve the parameter type as if
   // it were in non-parameter position, since we want functions to be
@@ -1057,7 +1057,7 @@ bool TypeChecker::coercePatternToType(Pattern *&P, DeclContext *dc, Type type,
     TypedPattern *TP = cast<TypedPattern>(P);
     bool hadError = validateTypedPattern(*this, dc, TP, options, resolver);
     if (!hadError) {
-      if (!type->isEqual(TP->getType()) && !type->is<ErrorType>()) {
+      if (!type->isEqual(TP->getType()) && !type->hasError()) {
         if (options & TR_OverrideType) {
           TP->overwriteType(type);
         } else {
@@ -1140,7 +1140,7 @@ bool TypeChecker::coercePatternToType(Pattern *&P, DeclContext *dc, Type type,
   // TODO: permit implicit conversions?
   case PatternKind::Tuple: {
     TuplePattern *TP = cast<TuplePattern>(P);
-    bool hadError = type->is<ErrorType>();
+    bool hadError = type->hasError();
     
     // Sometimes a paren is just a paren. If the tuple pattern has a single
     // element, we can reduce it to a paren pattern.
@@ -1289,7 +1289,7 @@ bool TypeChecker::coercePatternToType(Pattern *&P, DeclContext *dc, Type type,
                              IP->getLoc(),
                              IP->getLoc(),IP->getCastTypeLoc().getSourceRange(),
                              [](Type) { return false; },
-                             /*suppressDiagnostics=*/ type->is<ErrorType>());
+                             /*suppressDiagnostics=*/ type->hasError());
     switch (castKind) {
     case CheckedCastKind::Unresolved:
       return false;
@@ -1348,7 +1348,7 @@ bool TypeChecker::coercePatternToType(Pattern *&P, DeclContext *dc, Type type,
                                       EEP->getLoc());
       }
       if (!elt) {
-        if (!type->is<ErrorType>()) {
+        if (!type->hasError()) {
           // Lowercasing of Swift.Optional's cases is handled in the
           // standard library itself, not through the clang importer,
           // so we have to do this check here. Additionally, .Some
@@ -1508,7 +1508,7 @@ bool TypeChecker::coercePatternToType(Pattern *&P, DeclContext *dc, Type type,
 bool TypeChecker::coerceParameterListToType(ParameterList *P, ClosureExpr *CE,
                                             AnyFunctionType *FN) {
   Type paramListType = FN->getInput();
-  bool hadError = paramListType->is<ErrorType>();
+  bool hadError = paramListType->hasError();
 
   // Sometimes a scalar type gets applied to a single-argument parameter list.
   auto handleParameter = [&](ParamDecl *param, Type ty) -> bool {
@@ -1522,7 +1522,7 @@ bool TypeChecker::coerceParameterListToType(ParameterList *P, ClosureExpr *CE,
       // Now that we've type checked the explicit argument type, see if it
       // agrees with the contextual type.
       if (!hadError && !ty->isEqual(param->getTypeLoc().getType()) &&
-          !ty->is<ErrorType>())
+          !ty->hasError())
         param->overwriteType(ty);
     }
 

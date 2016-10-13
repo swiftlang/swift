@@ -155,15 +155,6 @@ public:
     TC.checkNoEscapeAttr(cast<ParamDecl>(D), attr);
   }
 
-  void visitEscapingAttr(EscapingAttr *attr) {
-    auto *PD = cast<ParamDecl>(D);
-    auto *FTy = PD->getType()->getAs<FunctionType>();
-    if (FTy == 0) {
-      TC.diagnose(attr->getLocation(), diag::escaping_function_type);
-      attr->setInvalid();
-    }
-  }
-
   void visitTransparentAttr(TransparentAttr *attr);
   void visitMutationAttr(DeclAttribute *attr);
   void visitMutatingAttr(MutatingAttr *attr) { visitMutationAttr(attr); }
@@ -742,7 +733,6 @@ public:
     IGNORED_ATTR(WarnUnqualifiedAccess)
     IGNORED_ATTR(ShowInInterface)
     IGNORED_ATTR(DiscardableResult)
-    IGNORED_ATTR(Escaping)
 
     // FIXME: We actually do have things to enforce for versioned API.
     IGNORED_ATTR(Versioned)
@@ -1287,7 +1277,7 @@ void AttributeChecker::visitRequiredAttr(RequiredAttr *attr) {
       return;
     }
   } else {
-    if (!parentTy->is<ErrorType>()) {
+    if (!parentTy->hasError()) {
       TC.diagnose(ctor, diag::required_initializer_nonclass, parentTy)
         .highlight(attr->getLocation());
     }
@@ -1312,7 +1302,7 @@ static bool hasThrowingFunctionParameter(CanType type) {
   }
 
   // Suppress diagnostics in the presence of errors.
-  if (isa<ErrorType>(type)) {
+  if (type->hasError()) {
     return true;
   }
 
@@ -1441,7 +1431,7 @@ void AttributeChecker::visitSpecializeAttr(SpecializeAttr *attr) {
     auto &tl = attr->getTypeLocs()[paramIdx];
 
     auto ty = TC.resolveType(tl.getTypeRepr(), DC, None);
-    if (ty && !ty->is<ErrorType>()) {
+    if (ty && !ty->hasError()) {
       if (ty->getCanonicalType()->hasArchetype()) {
         TC.diagnose(attr->getLocation(),
                     diag::cannot_partially_specialize_generic_function);

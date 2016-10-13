@@ -739,20 +739,45 @@ bool Parser::parseNewDeclAttribute(DeclAttributes &Attributes, SourceLoc AtLoc,
       // we will synthesize:
       //  @available(iOS, introduced: 8.0)
       //  @available(OSX, introduced: 10.10)
+      //
+      // Similarly if we have a language version spec in the spec
+      // list, create an implicit AvailableAttr with the specified
+      // version as the introduced argument. For example, if we have
+      //   @available(swift 3.1)
+      // we will synthesize
+      //   @available(swift, introduced: 3.1)
+
       for (auto *Spec : Specs) {
-        auto *VersionSpec = dyn_cast<VersionConstraintAvailabilitySpec>(Spec);
-        if (!VersionSpec)
+        PlatformKind Platform;
+        clang::VersionTuple Version;
+        PlatformAgnosticAvailabilityKind PlatformAgnostic;
+
+        if (auto *PlatformVersionSpec =
+            dyn_cast<PlatformVersionConstraintAvailabilitySpec>(Spec)) {
+          Platform = PlatformVersionSpec->getPlatform();
+          Version = PlatformVersionSpec->getVersion();
+          PlatformAgnostic = PlatformAgnosticAvailabilityKind::None;
+
+        } else if (auto *LanguageVersionSpec =
+                   dyn_cast<LanguageVersionConstraintAvailabilitySpec>(Spec)) {
+          Platform = PlatformKind::none;
+          Version = LanguageVersionSpec->getVersion();
+          PlatformAgnostic =
+            PlatformAgnosticAvailabilityKind::SwiftVersionSpecific;
+
+        } else {
           continue;
+        }
 
         Attributes.add(new (Context)
                        AvailableAttr(AtLoc, AttrRange,
-                                     VersionSpec->getPlatform(),
+                                     Platform,
                                      /*Message=*/StringRef(),
                                      /*Renamed=*/StringRef(),
-                                     /*Introduced=*/VersionSpec->getVersion(),
+                                     /*Introduced=*/Version,
                                      /*Deprecated=*/clang::VersionTuple(),
                                      /*Obsoleted=*/clang::VersionTuple(),
-                                     UnconditionalAvailabilityKind::None,
+                                     PlatformAgnostic,
                                      /*Implicit=*/true));
       }
 
@@ -769,7 +794,7 @@ bool Parser::parseNewDeclAttribute(DeclAttributes &Attributes, SourceLoc AtLoc,
 
     StringRef Message, Renamed;
     clang::VersionTuple Introduced, Deprecated, Obsoleted;
-    auto Unconditional = UnconditionalAvailabilityKind::None;
+    auto PlatformAgnostic = PlatformAgnosticAvailabilityKind::None;
     bool AnyAnnotations = false;
     int ParamIndex = 0;
 
@@ -860,12 +885,12 @@ bool Parser::parseNewDeclAttribute(DeclAttributes &Attributes, SourceLoc AtLoc,
 
       case IsDeprecated:
         if (!findAttrValueDelimiter()) {
-          if (Unconditional != UnconditionalAvailabilityKind::None) {
+          if (PlatformAgnostic != PlatformAgnosticAvailabilityKind::None) {
             diagnose(Tok, diag::attr_availability_unavailable_deprecated,
                      AttrName);
           }
 
-          Unconditional = UnconditionalAvailabilityKind::Deprecated;
+          PlatformAgnostic = PlatformAgnosticAvailabilityKind::Deprecated;
           break;
         }
         SWIFT_FALLTHROUGH;
@@ -903,12 +928,12 @@ bool Parser::parseNewDeclAttribute(DeclAttributes &Attributes, SourceLoc AtLoc,
       }
 
       case IsUnavailable:
-        if (Unconditional != UnconditionalAvailabilityKind::None) {
+        if (PlatformAgnostic != PlatformAgnosticAvailabilityKind::None) {
           diagnose(Tok, diag::attr_availability_unavailable_deprecated,
                    AttrName);
         }
 
-        Unconditional = UnconditionalAvailabilityKind::Unavailable;
+        PlatformAgnostic = PlatformAgnosticAvailabilityKind::Unavailable;
         break;
 
       case IsInvalid:
@@ -934,6 +959,22 @@ bool Parser::parseNewDeclAttribute(DeclAttributes &Attributes, SourceLoc AtLoc,
 
     if (!DiscardAttribute) {
       auto PlatformKind = platformFromString(Platform);
+
+      // Treat 'swift' as a valid version-qualifying token, when
+      // at least some versions were mentioned and no other
+      // platform-agnostic availability spec has been provided.
+      bool SomeVersion = (!Introduced.empty() ||
+                          !Deprecated.empty() ||
+                          !Obsoleted.empty());
+      if (!PlatformKind.hasValue() &&
+          Platform == "swift" &&
+          SomeVersion &&
+          PlatformAgnostic == PlatformAgnosticAvailabilityKind::None) {
+        PlatformKind = PlatformKind::none;
+        PlatformAgnostic =
+          PlatformAgnosticAvailabilityKind::SwiftVersionSpecific;
+      }
+
       if (PlatformKind.hasValue()) {
         Attributes.add(new (Context)
                        AvailableAttr(AtLoc, AttrRange,
@@ -942,7 +983,7 @@ bool Parser::parseNewDeclAttribute(DeclAttributes &Attributes, SourceLoc AtLoc,
                                         Introduced,
                                         Deprecated,
                                         Obsoleted,
-                                        Unconditional,
+                                        PlatformAgnostic,
                                         /*Implicit=*/false));
       } else {
         // Not a known platform. Just drop the attribute.
@@ -1249,8 +1290,11 @@ bool Parser::parseDeclAttribute(DeclAttributes &Attributes, SourceLoc AtLoc) {
     diagnose(Tok, diag::type_attribute_applied_to_decl);
   else
     diagnose(Tok, diag::unknown_attribute, Tok.getText());
-  // Recover by eating @foo when foo is not known.
+
+  // Recover by eating @foo(...) when foo is not known.
   consumeToken();
+  if (Tok.is(tok::l_paren))
+    skipSingle();
 
   return true;
 }
@@ -1312,15 +1356,16 @@ bool Parser::parseTypeAttribute(TypeAttributes &Attributes, bool justChecking) {
       }
     }
     
-    // Recover by eating @foo when foo is not known.
+    // Recover by eating @foo(...) when foo is not known.
     consumeToken();
-      
-    // Recovery by eating "@foo=bar" if present.
-    if (consumeIf(tok::equal)) {
-      if (Tok.is(tok::identifier) ||
-          Tok.is(tok::integer_literal) ||
-          Tok.is(tok::floating_literal))
-        consumeToken();
+    if (Tok.is(tok::l_paren) && getEndOfPreviousLoc() == Tok.getLoc()) {
+      ParserPosition LParenPosition = getParserPosition();
+      skipSingle();
+      // If we found '->', or 'throws' after paren, it's likely a parameter
+      // of function type.
+      if (Tok.isAny(tok::arrow, tok::kw_throws, tok::kw_rethrows,
+                    tok::kw_throw))
+        backtrackToPosition(LParenPosition);
     }
     return true;
   }
@@ -1524,9 +1569,7 @@ bool Parser::parseTypeAttribute(TypeAttributes &Attributes, bool justChecking) {
 ///     '@' attribute
 /// \endverbatim
 bool Parser::parseDeclAttributeList(DeclAttributes &Attributes,
-                                    bool &FoundCCToken,
-                                    bool StopAtTypeAttributes,
-                                    bool InParam) {
+                                    bool &FoundCCToken) {
   FoundCCToken = false;
   while (Tok.is(tok::at_sign)) {
     if (peekToken().is(tok::code_complete)) {
@@ -1535,25 +1578,7 @@ bool Parser::parseDeclAttributeList(DeclAttributes &Attributes,
       FoundCCToken = true;
       continue;
     }
-    SourceLoc AtLoc = Tok.getLoc();
-
-    // If StopAtTypeAttributes is true, then we sniff to see if the following
-    // attribute is a type attribute.  If so, we stop here, instead of producing
-    // an error on it.
-    if (StopAtTypeAttributes) {
-      Token next = peekToken();
-      auto Kind = TypeAttributes::getAttrKindFromString(next.getText());
-
-      // noescape/autoclosure are valid as a decl attribute and type attribute
-      // (in parameter lists) but we disambiguate them as a decl attribute.
-      if (Kind == TAK_noescape || Kind == TAK_autoclosure)
-        Kind = TAK_Count;
-
-      if (Kind != TAK_Count)
-        return false;
-    }
-
-    consumeToken();
+    SourceLoc AtLoc = consumeToken();
     if (parseDeclAttribute(Attributes, AtLoc))
       return true;
   }
@@ -1570,7 +1595,7 @@ bool Parser::parseDeclAttributeList(DeclAttributes &Attributes,
 ///     attribute-list-clause attribute-list
 ///   attribute-list-clause:
 ///     '@' attribute
-///     '@' attribute ','? attribute-list-clause
+///     '@' attribute attribute-list-clause
 /// \endverbatim
 bool Parser::parseTypeAttributeListPresent(TypeAttributes &Attributes) {
   Attributes.AtLoc = Tok.getLoc();
@@ -1635,7 +1660,7 @@ static void diagnoseOperatorFixityAttributes(Parser &P,
   }
 }
 
-static bool isKeywordPossibleDeclStart(const Token &Tok) {
+bool swift::isKeywordPossibleDeclStart(const Token &Tok) {
   switch (Tok.getKind()) {
   case tok::at_sign:
   case tok::kw_associatedtype:
@@ -2403,11 +2428,12 @@ ParserStatus Parser::parseInheritance(SmallVectorImpl<TypeLoc> &Inherited,
         if (usesDeprecatedCompositionSyntax) {
           // Provide fixits to remove the composition, leaving the types intact.
           auto compositionRange = Composition->getCompositionRange();
+          auto token = Lexer::getTokenAtLocation(SourceMgr, compositionRange.End);
           diagnose(Composition->getSourceLoc(),
                    diag::disallowed_protocol_composition)
             .highlight({Composition->getStartLoc(), compositionRange.End})
             .fixItRemove({Composition->getSourceLoc(), compositionRange.Start})
-            .fixItRemove(startsWithGreater(L->getTokenAt(compositionRange.End))
+            .fixItRemove(startsWithGreater(token)
                          ? compositionRange.End
                          : SourceLoc());
         } else {
@@ -2476,7 +2502,7 @@ parseIdentifierDeclName(Parser &P, Identifier &Result, SourceLoc &L,
                         tok ResyncT1, tok ResyncT2, Diag<DiagArgTypes...> ID,
                         ArgTypes... Args) {
   return parseIdentifierDeclName(P, Result, L, ResyncT1, ResyncT2,
-                                 tok::unknown, tok::unknown,
+                                 tok::NUM_TOKENS, tok::NUM_TOKENS,
                                  TokenProperty::None,
                                  Diagnostic(ID, Args...));
 }
@@ -2487,7 +2513,7 @@ parseIdentifierDeclName(Parser &P, Identifier &Result, SourceLoc &L,
                         tok ResyncT1, tok ResyncT2, tok ResyncT3,
                         Diag<DiagArgTypes...> ID, ArgTypes... Args) {
   return parseIdentifierDeclName(P, Result, L, ResyncT1, ResyncT2, ResyncT3,
-                                 tok::unknown, TokenProperty::None,
+                                 tok::NUM_TOKENS, TokenProperty::None,
                                  Diagnostic(ID, Args...));
 }
 
@@ -2507,8 +2533,8 @@ static ParserStatus
 parseIdentifierDeclName(Parser &P, Identifier &Result, SourceLoc &L,
                         tok ResyncT1, tok ResyncT2, TokenProperty ResyncP1,
                         Diag<DiagArgTypes...> ID, ArgTypes... Args) {
-  return parseIdentifierDeclName(P, Result, L, ResyncT1, ResyncT2, tok::unknown,
-                                 tok::unknown,
+  return parseIdentifierDeclName(P, Result, L, ResyncT1, ResyncT2,
+                                 tok::NUM_TOKENS, tok::NUM_TOKENS,
                                  ResyncP1, Diagnostic(ID, Args...));
 }
 

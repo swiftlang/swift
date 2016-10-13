@@ -820,7 +820,10 @@ void TypeChecker::synthesizeAccessorsForStorage(AbstractStorageDecl *storage,
   // If the decl is stored, convert it to StoredWithTrivialAccessors
   // by synthesizing the full set of accessors.
   if (!storage->hasAccessorFunctions()) {
-    addTrivialAccessorsToStorage(storage, *this);
+    if (storage->getAttrs().hasAttribute<NSManagedAttr>())
+      maybeAddAccessorsToVariable(cast<VarDecl>(storage), *this);
+    else
+      addTrivialAccessorsToStorage(storage, *this);
     return;
   }
 

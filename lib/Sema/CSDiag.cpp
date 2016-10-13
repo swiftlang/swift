@@ -29,7 +29,7 @@ using namespace swift;
 using namespace constraints;
 
 static bool isUnresolvedOrTypeVarType(Type ty) {
-  return ty->is<TypeVariableType>() || ty->is<UnresolvedType>();
+  return ty->isTypeVariableOrMember() || ty->is<UnresolvedType>();
 }
 
 /// Given a subpath of an old locator, compute its summary flags.
@@ -3082,7 +3082,7 @@ namespace {
           //   Init.init(Init.init(<builtinliteral>))
           // preserve the type info to prevent this from happening.
           if (isa<LiteralExpr>(expr) && !isa<InterpolatedStringLiteralExpr>(expr) &&
-              !(expr->getType() && expr->getType()->is<ErrorType>()))
+              !(expr->getType() && expr->getType()->hasError()))
             return { false, expr };
 
           // If a ClosureExpr's parameter list has types on the decls, then
@@ -3160,7 +3160,7 @@ namespace {
       
       if (!PossiblyInvalidDecls.empty())
         for (auto D : PossiblyInvalidDecls)
-          D->setInvalid(D->getType()->is<ErrorType>());
+          D->setInvalid(D->getType()->hasError());
       
       // Done, don't do redundant work on destruction.
       ExprTypes.clear();
@@ -3200,7 +3200,7 @@ namespace {
 
       if (!PossiblyInvalidDecls.empty())
         for (auto D : PossiblyInvalidDecls)
-          D->setInvalid(D->getType()->is<ErrorType>());
+          D->setInvalid(D->getType()->hasError());
     }
   };
 }
@@ -3287,7 +3287,7 @@ static Type replaceArchetypesAndTypeVarsWithUnresolved(Type ty) {
  auto &ctx = ty->getASTContext();
 
   return ty.transform([&](Type type) -> Type {
-    if (type->is<TypeVariableType>() ||
+    if (type->isTypeVariableOrMember() ||
         type->is<ArchetypeType>() ||
         type->isTypeParameter())
       return ctx.TheUnresolvedType;
@@ -3453,7 +3453,8 @@ typeCheckArbitrarySubExprIndependently(Expr *subExpr, TCCOptions options) {
     // in.  Reset them to UnresolvedTypes for safe measures.
     for (auto param : *CE->getParameters()) {
       auto VD = param;
-      if (VD->getType()->hasTypeVariable() || VD->getType()->is<ErrorType>())
+      if (VD->getType()->hasTypeVariable() || VD->getType()->hasError() ||
+          VD->getType()->getCanonicalType()->hasError())
         VD->overwriteType(CS->getASTContext().TheUnresolvedType);
     }
   }
@@ -4074,10 +4075,11 @@ bool FailureDiagnosis::diagnoseContextualConversionError() {
 
   // When converting from T to [T] or UnsafePointer<T>, we can offer fixit to wrap
   // the expr with brackets.
-  if (auto *contextDecl = contextualType->getAnyNominal()) {
+  auto *genericType = contextualType->getAs<BoundGenericType>();
+  if (genericType) {
+    auto *contextDecl = genericType->getDecl();
     if (contextDecl == CS->TC.Context.getArrayDecl()) {
-      SmallVector<Type, 4> scratch;
-      for (Type arg : contextualType->getAllGenericArgs(scratch)) {
+      for (Type arg : genericType->getGenericArgs()) {
         if (arg->isEqual(exprType)) {
           diagnose(expr->getLoc(), diagID, exprType, contextualType).
             fixItInsert(expr->getStartLoc(), "[").fixItInsert(
@@ -4090,8 +4092,7 @@ bool FailureDiagnosis::diagnoseContextualConversionError() {
                contextDecl == CS->TC.Context.getUnsafeMutablePointerDecl() ||
                contextDecl == CS->TC.Context.getUnsafeRawPointerDecl() ||
                contextDecl == CS->TC.Context.getUnsafeMutableRawPointerDecl()) {
-      SmallVector<Type, 4> scratch;
-      for (Type arg : contextualType->getAllGenericArgs(scratch)) {
+      for (Type arg : genericType->getGenericArgs()) {
         if (arg->isEqual(exprType) && expr->getType()->isLValueType()) {
           diagnose(expr->getLoc(), diagID, exprType, contextualType).
             fixItInsert(expr->getStartLoc(), "&");
@@ -5278,6 +5279,10 @@ bool FailureDiagnosis::visitApplyExpr(ApplyExpr *callExpr) {
                               argLabels))
     return true;
 
+  // Diagnose some simple and common errors.
+  if (calleeInfo.diagnoseSimpleErrors(callExpr))
+    return true;
+
   // Force recheck of the arg expression because we allowed unresolved types
   // before, and that turned out not to help, and now we want any diagnoses
   // from disallowing them.
@@ -5285,10 +5290,6 @@ bool FailureDiagnosis::visitApplyExpr(ApplyExpr *callExpr) {
                                                 calleeInfo, TCC_ForceRecheck);
   if (!argExpr)
     return true; // already diagnosed.
-  
-  // Diagnose some simple and common errors.
-  if (calleeInfo.diagnoseSimpleErrors(callExpr))
-    return true;
   
   // A common error is to apply an operator that only has inout forms (e.g. +=)
   // to non-lvalues (e.g. a local let).  Produce a nice diagnostic for this
@@ -5770,7 +5771,8 @@ bool FailureDiagnosis::visitClosureExpr(ClosureExpr *CE) {
     //
     // Handle this by rewriting the arguments to UnresolvedType().
     for (auto VD : *CE->getParameters()) {
-      if (VD->getType()->hasTypeVariable() || VD->getType()->is<ErrorType>())
+      if (VD->getType()->hasTypeVariable() || VD->getType()->hasError() ||
+          VD->getType()->getCanonicalType()->hasError())
         VD->overwriteType(CS->getASTContext().TheUnresolvedType);
     }
   }
@@ -6385,10 +6387,8 @@ bool FailureDiagnosis::visitIdentityExpr(IdentityExpr *E) {
   
   // If we have a paren expr and our contextual type is a ParenType, remove the
   // paren expr sugar.
-  if (isa<ParenExpr>(E) && contextualType)
-    if (auto *PT = dyn_cast<ParenType>(contextualType.getPointer()))
-      contextualType = PT->getUnderlyingType();
-  
+  if (contextualType)
+    contextualType = contextualType->getWithoutParens();
   if (!typeCheckChildIndependently(E->getSubExpr(), contextualType,
                                    CS->getContextualTypePurpose()))
     return true;
@@ -6569,13 +6569,12 @@ static void noteArchetypeSource(const TypeLoc &loc, ArchetypeType *archetype,
         return Type();
 
       Type preferred = genericArgs[genericParam->getIndex()];
-      if (!preferred || preferred->is<ErrorType>())
+      if (!preferred || preferred->hasError())
         return Type();
 
       // ...but only if they were actually resolved by the constraint system
       // despite the failure.
-      TypeVariableType *unused;
-      Type maybeFixedType = cs.getFixedTypeRecursive(preferred, unused,
+      Type maybeFixedType = cs.getFixedTypeRecursive(preferred,
                                                      /*wantRValue*/true);
       if (maybeFixedType->hasTypeVariable() ||
           maybeFixedType->hasUnresolvedType()) {

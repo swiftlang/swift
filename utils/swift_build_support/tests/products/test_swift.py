@@ -54,7 +54,8 @@ class SwiftTestCase(unittest.TestCase):
             darwin_deployment_version_osx="10.9",
             benchmark=False,
             benchmark_num_onone_iterations=3,
-            benchmark_num_o_iterations=3)
+            benchmark_num_o_iterations=3,
+            enable_sil_ownership=False)
 
         # Setup shell
         shell.dry_run = True
@@ -263,4 +264,15 @@ class SwiftTestCase(unittest.TestCase):
         self.assertEqual(
             ['-DSWIFT_BENCHMARK_NUM_ONONE_ITERATIONS=10',
              '-DSWIFT_BENCHMARK_NUM_O_ITERATIONS=25'],
+            swift.cmake_options)
+
+    def test_sil_ownership_flags(self):
+        self.args.enable_sil_ownership = True
+        swift = Swift(
+            args=self.args,
+            toolchain=self.toolchain,
+            source_dir='/path/to/src',
+            build_dir='/path/to/build')
+        self.assertEqual(
+            ['-DSWIFT_STDLIB_ENABLE_SIL_OWNERSHIP=TRUE'],
             swift.cmake_options)

@@ -81,6 +81,8 @@ public:
     return Layout.getByteOffset();
   }
 
+  unsigned getStructIndex() const { return Layout.getStructIndex(); }
+
   unsigned getNonFixedElementIndex() const {
     return Layout.getNonFixedElementIndex();
   }

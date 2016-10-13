@@ -15,3 +15,9 @@ extension OtherResilientProtocol {
     set { x = newValue }
   }
 }
+
+public protocol ResilientBaseProtocol {
+  func requirement() -> Int
+}
+
+public protocol ResilientDerivedProtocol : ResilientBaseProtocol {}

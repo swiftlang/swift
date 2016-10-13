@@ -168,7 +168,7 @@ printTypeInterface(ModuleDecl *M, Type Ty, ASTPrinter &Printer,
   }
   Ty = Ty->getRValueType();
   if (auto ND = Ty->getNominalOrBoundGenericNominal()) {
-    PrintOptions Options = PrintOptions::printTypeInterface(Ty.getPointer(), M);
+    PrintOptions Options = PrintOptions::printTypeInterface(Ty.getPointer());
     ND->print(Printer, Options);
     printTypeNameToString(Ty, TypeName);
     return false;
@@ -574,8 +574,7 @@ void swift::ide::printSubmoduleInterface(
                                         Decls.back().first == ET.first, true};
                 if (ET.second)
                   AdjustedOptions.
-                    initArchetypeTransformerForSynthesizedExtensions(NTD,
-                                                               pAnalyzer.get());
+                    initArchetypeTransformerForSynthesizedExtensions(NTD);
                 ET.first->print(Printer, AdjustedOptions);
                 if (ET.second)
                   AdjustedOptions.
@@ -607,8 +606,7 @@ void swift::ide::printSubmoduleInterface(
                   Printer << "\n";
                 if (ET.second)
                   AdjustedOptions.
-                    initArchetypeTransformerForSynthesizedExtensions(NTD,
-                                                               pAnalyzer.get());
+                    initArchetypeTransformerForSynthesizedExtensions(NTD);
                 ET.first->print(Printer, AdjustedOptions);
                 if (ET.second)
                   AdjustedOptions.

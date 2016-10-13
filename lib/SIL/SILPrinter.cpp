@@ -30,6 +30,7 @@
 #include "swift/SIL/SILVTable.h"
 #include "swift/AST/Decl.h"
 #include "swift/AST/Expr.h"
+#include "swift/AST/GenericEnvironment.h"
 #include "swift/AST/Module.h"
 #include "swift/AST/PrintOptions.h"
 #include "swift/AST/Types.h"
@@ -838,8 +839,7 @@ public:
     printDebugVar(AVI->getVarInfo());
   }
 
-  void visitAllocRefInst(AllocRefInst *ARI) {
-    *this << "alloc_ref ";
+  void printAllocRefInstBase(AllocRefInstBase *ARI) {
     if (ARI->isObjC())
       *this << "[objc] ";
     if (ARI->canAllocOnStack())
@@ -850,14 +850,18 @@ public:
       *this << "[tail_elems " << Types[Idx] << " * "
             << getIDAndType(Counts[Idx].get()) << "] ";
     }
+  }
+
+  void visitAllocRefInst(AllocRefInst *ARI) {
+    *this << "alloc_ref ";
+    printAllocRefInstBase(ARI);
     *this << ARI->getType();
   }
 
   void visitAllocRefDynamicInst(AllocRefDynamicInst *ARDI) {
     *this << "alloc_ref_dynamic ";
-    if (ARDI->isObjC())
-      *this << "[objc] ";
-    *this << getIDAndType(ARDI->getOperand());
+    printAllocRefInstBase(ARDI);
+    *this << getIDAndType(ARDI->getMetatypeOperand());
     *this << ", " << ARDI->getType();
   }
 
@@ -907,10 +911,26 @@ public:
     *this << ", normal " << getID(AI->getNormalBB());
     *this << ", error " << getID(AI->getErrorBB());
   }
-  
-  
+
   void visitPartialApplyInst(PartialApplyInst *CI) {
     *this << "partial_apply ";
+    switch (CI->getFunctionType()->getCalleeConvention()) {
+    case ParameterConvention::Direct_Owned:
+      // Default; do nothing.
+      break;
+    case ParameterConvention::Direct_Guaranteed:
+      *this << "[callee_guaranteed] ";
+      break;
+    
+    // Should not apply to callees.
+    case ParameterConvention::Direct_Unowned:
+    case ParameterConvention::Direct_Deallocating:
+    case ParameterConvention::Indirect_In:
+    case ParameterConvention::Indirect_Inout:
+    case ParameterConvention::Indirect_In_Guaranteed:
+    case ParameterConvention::Indirect_InoutAliasable:
+      llvm_unreachable("unexpected callee convention!");
+    }
     *this << getID(CI->getCallee());
     printSubstitutions(CI->getSubstitutions());
     *this << '(';
@@ -1816,20 +1836,25 @@ void SILFunction::print(SILPrintContext &PrintCtx) const {
     llvm::SmallString<16> disambiguatedNameBuf;
     unsigned disambiguatedNameCounter = 1;
     for (auto *paramTy : sig->getGenericParams()) {
-      auto *archetypeTy = mapTypeIntoContext(paramTy)->getAs<ArchetypeType>();
-      assert(archetypeTy);
-
-      Identifier name = archetypeTy->getName();
+      auto sugaredTy = env->getSugaredType(paramTy);
+      Identifier name = sugaredTy->getName();
       while (!UsedNames.insert(name).second) {
         disambiguatedNameBuf.clear();
         {
           llvm::raw_svector_ostream names(disambiguatedNameBuf);
-          names << archetypeTy->getName() << disambiguatedNameCounter++;
+          names << sugaredTy->getName() << disambiguatedNameCounter++;
         }
         name = getASTContext().getIdentifier(disambiguatedNameBuf);
       }
-      if (name != archetypeTy->getName())
-        Aliases[CanType(archetypeTy)] = name;
+      if (name != sugaredTy->getName()) {
+        Aliases[paramTy->getCanonicalType()] = name;
+
+        // Also for the archetype
+        auto archetypeTy = env->mapTypeIntoContext(paramTy)
+            ->getAs<ArchetypeType>();
+        if (archetypeTy)
+          Aliases[archetypeTy->getCanonicalType()] = name;
+      }
     }
   }
 

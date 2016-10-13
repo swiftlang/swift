@@ -41,9 +41,9 @@ struct GG<T : PP> {}
 // sequence FileCheck directives while using CHECK-DAG as the outer
 // label, and the declaration order is unpredictable.
 //
-// CHECK-DAG: class CC<T : PP> {
+// CHECK-DAG: class CC<T> where T : PP {
 // CHECK-DAG: @_specialize(RR, SS)
-// CHECK-DAG: @inline(never) func foo<U : QQ>(_ u: U, g: GG<T>) -> (U, GG<T>)
+// CHECK-DAG: @inline(never) func foo<U>(_ u: U, g: GG<T>) -> (U, GG<T>) where U : QQ
 class CC<T : PP> {
   @inline(never)
   @_specialize(RR, SS)

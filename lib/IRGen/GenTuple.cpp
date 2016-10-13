@@ -129,6 +129,11 @@ namespace {
       llvm_unreachable("bad element layout kind");
     }
 
+    unsigned getElementStructIndex(IRGenModule &IGM, unsigned fieldNo) const {
+      const TupleFieldInfo &field = asImpl().getFields()[fieldNo];
+      return field.getStructIndex();
+    }
+
     void initializeFromParams(IRGenFunction &IGF, Explosion &params,
                               Address src, SILType T) const override {
       llvm_unreachable("unexploded tuple as argument?");
@@ -405,4 +410,9 @@ Optional<Size> irgen::getFixedTupleElementOffset(IRGenModule &IGM,
                                                  unsigned fieldNo) {
   // Macro happens to work with IGM, too.
   FOR_TUPLE_IMPL(IGM, tupleType, getFixedElementOffset, fieldNo);
+}
+
+unsigned irgen::getTupleElementStructIndex(IRGenModule &IGM, SILType tupleType,
+                                           unsigned fieldNo) {
+  FOR_TUPLE_IMPL(IGM, tupleType, getElementStructIndex, fieldNo);
 }

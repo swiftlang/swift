@@ -1137,7 +1137,6 @@ extension rdar17391625derived {
 public protocol rdar27671033P {}
 struct rdar27671033S<Key, Value> {}
 extension rdar27671033S : rdar27671033P where Key == String { // expected-error {{extension of type 'rdar27671033S' with constraints cannot have an inheritance clause}}
-  // expected-error@-1 {{same-type requirement makes generic parameter 'Key' non-generic}}
   let d = rdar27671033S<Int, Int>() // expected-error {{extensions may not contain stored properties}}
 }
 

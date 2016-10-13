@@ -1013,17 +1013,13 @@ public:
   bool isProtocolExtensionUsable(DeclContext *dc, Type type,
                                  ExtensionDecl *protocolExtension) override;
 
-  GenericEnvironment *markInvalidGenericSignature(DeclContext *dc);
-
   /// Configure the interface type of a function declaration.
   void configureInterfaceType(AbstractFunctionDecl *func);
 
   /// Validate the signature of a generic function.
   ///
   /// \param func The generic function.
-  ///
-  /// \returns true if an error occurred, or false otherwise.
-  bool validateGenericFuncSignature(AbstractFunctionDecl *func);
+  void validateGenericFuncSignature(AbstractFunctionDecl *func);
 
   /// Revert the signature of a generic function to its pre-type-checked state,
   /// so that it can be type checked again when we have resolved its generic
@@ -1046,9 +1042,7 @@ public:
   ///
   /// \param inferRequirements When non-empty, callback that will be invoked
   /// to perform any additional requirement inference that contributes to the
-  /// generic signature. Returns true if an error occurred.
-  ///
-  /// \param invalid Will be set true if an error occurs during validation.
+  /// generic signature.
   ///
   /// \returns the generic signature that captures the generic
   /// parameters and inferred requirements.
@@ -1056,8 +1050,8 @@ public:
                       GenericParamList *genericParams,
                       DeclContext *dc,
                       GenericSignature *outerSignature,
-                      std::function<bool(ArchetypeBuilder &)> inferRequirements,
-                      bool &invalid);
+                      bool allowConcreteGenericParams,
+                      std::function<void(ArchetypeBuilder &)> inferRequirements);
 
   /// Perform any final semantic checks on the given generic parameter list.
   void finalizeGenericParamList(GenericParamList *genericParams,
@@ -1068,13 +1062,11 @@ public:
   /// Validate the signature of a generic type.
   ///
   /// \param nominal The generic type.
-  ///
-  /// \returns true if an error occurred, or false otherwise.
-  bool validateGenericTypeSignature(GenericTypeDecl *nominal);
+  void validateGenericTypeSignature(GenericTypeDecl *nominal);
 
   /// Check the generic parameters in the given generic parameter list (and its
   /// parent generic parameter lists) according to the given resolver.
-  bool checkGenericParamList(ArchetypeBuilder *builder,
+  void checkGenericParamList(ArchetypeBuilder *builder,
                              GenericParamList *genericParams,
                              GenericSignature *parentSig,
                              GenericEnvironment *parentEnv,
@@ -1088,14 +1080,14 @@ public:
   /// \param noteLoc The location at which any notes will be printed.
   /// \param owner The type that owns the generic signature.
   /// \param genericSig The actual generic signature.
-  /// \param genericArgs The generic arguments.
+  /// \param substitutions Substitutions from interface types of the signature.
   ///
   /// \returns true if an error occurred, false otherwise.
   bool checkGenericArguments(DeclContext *dc, SourceLoc loc,
                              SourceLoc noteLoc,
                              Type owner,
                              GenericSignature *genericSig,
-                             ArrayRef<Type> genericArgs);
+                             const TypeSubstitutionMap &substitutions);
 
   /// Resolve the superclass of the given class.
   void resolveSuperclass(ClassDecl *classDecl) override;

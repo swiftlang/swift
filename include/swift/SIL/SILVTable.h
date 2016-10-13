@@ -86,6 +86,7 @@ public:
                                [&](Pair &entry) -> bool {
       if (predicate(entry)) {
         entry.second->decrementRefCount();
+        removeFromVTableCache(entry);
         return true;
       }
       return false;
@@ -99,6 +100,9 @@ public:
   /// Print the vtable.
   void print(llvm::raw_ostream &OS, bool Verbose = false) const;
   void dump() const;
+
+private:
+  void removeFromVTableCache(Pair &entry);
 };
 
 } // end swift namespace

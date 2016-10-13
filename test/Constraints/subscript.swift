@@ -93,3 +93,16 @@ struct SR718 {
 
 SR718()[a: Int()] // expected-error {{cannot convert value of type 'Int' to expected argument type 'UInt'}}
 
+// rdar://problem/25601561 - Qol: Bad diagnostic for failed assignment from Any to more specific type
+
+struct S_r25601561 {
+  func value() -> Any? { return "hi" }
+}
+
+class C_r25601561 {
+  var a: [S_r25601561?] = []
+  func test(i: Int) -> String {
+    let s: String = a[i]!.value()! // expected-error {{cannot convert value of type 'Any' to specified type 'String'}}
+    return s
+  }
+}

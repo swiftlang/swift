@@ -83,6 +83,14 @@ namespace irgen {
   Address emitTailProjection(IRGenFunction &IGF, llvm::Value *Base,
                                   SILType ClassType, SILType TailType);
 
+  typedef llvm::ArrayRef<std::pair<SILType, llvm::Value *>> TailArraysRef;
+
+  /// Adds the size for tail allocated arrays to \p size and returns the new
+  /// size value.
+  llvm::Value *appendSizeForTailAllocatedArrays(IRGenFunction &IGF,
+                                                llvm::Value *size,
+                                                TailArraysRef TailArrays);
+
   /// Emit an allocation of a class.
   /// The \p StackAllocSize is an in- and out-parameter. The passed value
   /// specifies the maximum object size for stack allocation. A negative value
@@ -90,14 +98,13 @@ namespace irgen {
   /// The returned \p StackAllocSize value is the actual size if the object is
   /// allocated on the stack or -1, if the object is allocated on the heap.
   llvm::Value *emitClassAllocation(IRGenFunction &IGF, SILType selfType,
-                  bool objc, int &StackAllocSize,
-                  llvm::ArrayRef<std::pair<SILType, llvm::Value *>> TailArrays);
+                  bool objc, int &StackAllocSize, TailArraysRef TailArrays);
 
   /// Emit an allocation of a class using a metadata value.
   llvm::Value *emitClassAllocationDynamic(IRGenFunction &IGF, 
                                           llvm::Value *metadata,
                                           SILType selfType,
-                                          bool objc);
+                                          bool objc, TailArraysRef TailArrays);
 
   /// Emit class deallocation.
   void emitClassDeallocation(IRGenFunction &IGF, SILType selfType,

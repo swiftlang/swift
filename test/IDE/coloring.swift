@@ -545,6 +545,13 @@ func foo1() {
 // CHECK: <kw>_</kw> = (<kw>_</kw>: <int>0</int>, <kw>_</kw>: <int>2</int>)
 }
 
+func foo2(O1 : Int?, O2: Int?, O3: Int?) {
+  guard let _ = O1, var _ = O2, let _ = O3 else { }
+// CHECK:  <kw>guard</kw> <kw>let</kw> <kw>_</kw> = O1, <kw>var</kw> <kw>_</kw> = O2, <kw>let</kw> <kw>_</kw> = O3 <kw>else</kw> { }
+  if let _ = O1, var _ = O2, let _ = O3 {}
+// CHECK: <kw>if</kw> <kw>let</kw> <kw>_</kw> = O1, <kw>var</kw> <kw>_</kw> = O2, <kw>let</kw> <kw>_</kw> = O3 {}
+}
+
 // Keep this as the last test
 /**
   Trailing off ...

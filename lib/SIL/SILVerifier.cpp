@@ -677,27 +677,33 @@ public:
     }
   }
 
-  void checkAllocRefInst(AllocRefInst *AI) {
-    requireReferenceValue(AI, "Result of alloc_ref");
-    require(AI->isObjC() || AI->getType().getClassOrBoundGenericClass(),
-            "alloc_ref must allocate class");
-    verifyOpenedArchetype(AI, AI->getType().getSwiftRValueType());
-    auto Types = AI->getTailAllocatedTypes();
-    auto Counts = AI->getTailAllocatedCounts();
+  void checkAllocRefBase(AllocRefInstBase *ARI) {
+    requireReferenceValue(ARI, "Result of alloc_ref");
+    verifyOpenedArchetype(ARI, ARI->getType().getSwiftRValueType());
+    auto Types = ARI->getTailAllocatedTypes();
+    auto Counts = ARI->getTailAllocatedCounts();
     unsigned NumTypes = Types.size();
     require(NumTypes == Counts.size(), "Mismatching types and counts");
+    require(NumTypes == 0 || !ARI->isObjC(),
+            "Can't tail allocate with ObjC class");
     for (unsigned Idx = 0; Idx < NumTypes; ++Idx) {
-      verifyOpenedArchetype(AI, Types[Idx].getSwiftRValueType());
+      verifyOpenedArchetype(ARI, Types[Idx].getSwiftRValueType());
       require(Counts[Idx].get()->getType().is<BuiltinIntegerType>(),
               "count needs integer type");
     }
   }
 
+  void checkAllocRefInst(AllocRefInst *AI) {
+    require(AI->isObjC() || AI->getType().getClassOrBoundGenericClass(),
+            "alloc_ref must allocate class");
+    checkAllocRefBase(AI);
+  }
+
   void checkAllocRefDynamicInst(AllocRefDynamicInst *ARDI) {
-    requireReferenceValue(ARDI, "Result of alloc_ref_dynamic");
-    require(ARDI->getOperand()->getType().is<AnyMetatypeType>(),
+    SILValue Metadata = ARDI->getMetatypeOperand();
+    require(Metadata->getType().is<AnyMetatypeType>(),
             "operand of alloc_ref_dynamic must be of metatype type");
-    auto metaTy = ARDI->getOperand()->getType().castTo<AnyMetatypeType>();
+    auto metaTy = Metadata->getType().castTo<AnyMetatypeType>();
     require(metaTy->hasRepresentation(),
             "operand of alloc_ref_dynamic must have a metatype representation");
     if (ARDI->isObjC()) {
@@ -707,7 +713,7 @@ public:
       require(metaTy->getRepresentation() == MetatypeRepresentation::Thick,
               "alloc_ref_dynamic requires operand of thick metatype");
     }
-    verifyOpenedArchetype(ARDI, ARDI->getType().getSwiftRValueType());
+    checkAllocRefBase(ARDI);
   }
 
   /// Check the substitutions passed to an apply or partial_apply.
@@ -989,6 +995,57 @@ public:
                 "result type of result function type does not match original "
                 "function");
       }
+    }
+    
+    // TODO: Impose additional constraints when partial_apply when the
+    // -disable-sil-partial-apply flag is enabled. We want to reduce
+    // partial_apply to being only a means of associating a closure invocation
+    // function with its context.
+    //
+    // When we reach that point, we should be able to more deeply redesign
+    // PartialApplyInst to simplify the representation to carry a single
+    // argument.
+    if (PAI->getModule().getOptions().DisableSILPartialApply) {
+      // Should only be one context argument.
+      require(PAI->getArguments().size() == 1,
+              "partial_apply should have a single context argument");
+      
+      // Callee should already have the thin convention, and result should be
+      // thick.
+      require(resultInfo->getRepresentation() ==
+                SILFunctionTypeRepresentation::Thick,
+              "partial_apply result should have thick convention");
+      require(PAI->getCallee()->getType().castTo<SILFunctionType>()
+                ->getRepresentation() ==
+              SILFunctionTypeRepresentation::Thin,
+              "partial_apply callee should have thin convention");
+      
+      // TODO: Check that generic signature matches box's generic signature,
+      // once we have boxes with generic signatures.
+      require(!PAI->getCalleeFunction()->getGenericEnvironment(),
+              "partial_apply context must capture generic environment for "
+              "callee");
+      
+      // Result's callee convention should match context argument's convention.
+      require(substTy->getParameters().back().getConvention()
+                == resultInfo->getCalleeConvention(),
+              "partial_apply context argument must have the same convention "
+              "as the resulting function's callee convention");
+      
+      auto isSwiftRefcounted = [](SILType t) -> bool {
+        if (t.is<SILBoxType>())
+          return true;
+        if (t.getSwiftRValueType() == t.getASTContext().TheNativeObjectType)
+          return true;
+        if (auto clas = t.getClassOrBoundGenericClass())
+          // Must be a class defined in Swift.
+          return clas->hasKnownSwiftImplementation();
+        return false;
+      };
+      
+      // The context argument must be a swift-refcounted box or class.
+      require(isSwiftRefcounted(PAI->getArguments().front()->getType()),
+              "partial_apply context argument must be swift-refcounted");
     }
   }
 
@@ -1434,8 +1491,9 @@ public:
       if (auto dynamicSelf = dyn_cast<DynamicSelfType>(formalObjectType)) {
         formalObjectType = dynamicSelf->getSelfType()->getCanonicalType();
       }
-      return ((loweredOptionalKind == formalOptionalKind) &&
-              loweredObjectType == formalObjectType);
+      return loweredOptionalKind == formalOptionalKind &&
+             isLoweringOf(SILType::getPrimitiveAddressType(loweredObjectType),
+                          formalObjectType);
     }
 
     // Metatypes preserve their instance type through lowering.
@@ -3546,15 +3604,27 @@ void SILModule::verify() const {
     g.verify();
   }
 
-  // Check all vtables.
+  // Check all vtables and the vtable cache.
   llvm::DenseSet<ClassDecl*> vtableClasses;
+  unsigned EntriesSZ = 0;
   for (const SILVTable &vt : getVTables()) {
     if (!vtableClasses.insert(vt.getClass()).second) {
       llvm::errs() << "Vtable redefined: " << vt.getClass()->getName() << "!\n";
       assert(false && "triggering standard assertion failure routine");
     }
     vt.verify(*this);
+    // Check if there is a cache entry for each vtable entry
+    for (auto entry : vt.getEntries()) {
+      if (VTableEntryCache.find({&vt, entry.first}) == VTableEntryCache.end()) {
+        llvm::errs() << "Vtable entry for function: " << entry.second->getName()
+                     << "not in cache!\n";
+        assert(false && "triggering standard assertion failure routine");
+      }
+      EntriesSZ++;
+    }
   }
+  assert(EntriesSZ == VTableEntryCache.size() &&
+         "Cache size is not equal to true number of VTable entries");
 
   // Check all witness tables.
   DEBUG(llvm::dbgs() << "*** Checking witness tables for duplicates ***\n");

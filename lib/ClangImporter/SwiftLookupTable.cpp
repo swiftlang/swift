@@ -14,12 +14,14 @@
 // modules.
 //
 //===----------------------------------------------------------------------===//
+#include "ImporterImpl.h"
 #include "SwiftLookupTable.h"
 #include "swift/Basic/STLExtras.h"
 #include "swift/Basic/Version.h"
 #include "clang/AST/DeclObjC.h"
 #include "clang/Lex/MacroInfo.h"
 #include "clang/Lex/Preprocessor.h"
+#include "clang/Sema/Sema.h"
 #include "clang/Serialization/ASTBitCodes.h"
 #include "clang/Serialization/ASTReader.h"
 #include "clang/Serialization/ASTWriter.h"
@@ -32,6 +34,7 @@
 #include "llvm/Support/OnDiskHashTable.h"
 
 using namespace swift;
+using namespace importer;
 using namespace llvm::support;
 
 /// Determine whether the new declarations matches an existing declaration.
@@ -112,6 +115,92 @@ considerReplacingExistingMacro(const clang::MacroInfo *newMacro,
   if (existingModule->isSubModuleOf(newModule))
     return MacroConflictAction::Replace;
   return MacroConflictAction::AddAsAlternative;
+}
+
+namespace swift {
+/// Module file extension writer for the Swift lookup tables.
+class SwiftLookupTableWriter : public clang::ModuleFileExtensionWriter {
+  clang::ASTWriter &Writer;
+
+  ASTContext &swiftCtx;
+  const PlatformAvailability &availability;
+  const bool inferImportAsMember;
+
+public:
+  SwiftLookupTableWriter(clang::ModuleFileExtension *extension,
+                         clang::ASTWriter &writer, ASTContext &ctx,
+                         const PlatformAvailability &avail, bool inferIAM)
+      : ModuleFileExtensionWriter(extension), Writer(writer), swiftCtx(ctx),
+        availability(avail), inferImportAsMember(inferIAM) {}
+
+  void writeExtensionContents(clang::Sema &sema,
+                              llvm::BitstreamWriter &stream) override;
+
+  void populateTable(SwiftLookupTable &table, NameImporter &);
+};
+
+/// Module file extension reader for the Swift lookup tables.
+class SwiftLookupTableReader : public clang::ModuleFileExtensionReader {
+  clang::ASTReader &Reader;
+  clang::serialization::ModuleFile &ModuleFile;
+  std::function<void()> OnRemove;
+
+  void *SerializedTable;
+  ArrayRef<clang::serialization::DeclID> Categories;
+  void *GlobalsAsMembersTable;
+
+  SwiftLookupTableReader(clang::ModuleFileExtension *extension,
+                         clang::ASTReader &reader,
+                         clang::serialization::ModuleFile &moduleFile,
+                         std::function<void()> onRemove, void *serializedTable,
+                         ArrayRef<clang::serialization::DeclID> categories,
+                         void *globalsAsMembersTable)
+      : ModuleFileExtensionReader(extension), Reader(reader),
+        ModuleFile(moduleFile), OnRemove(onRemove),
+        SerializedTable(serializedTable), Categories(categories),
+        GlobalsAsMembersTable(globalsAsMembersTable) {}
+
+public:
+  /// Create a new lookup table reader for the given AST reader and stream
+  /// position.
+  static std::unique_ptr<SwiftLookupTableReader>
+  create(clang::ModuleFileExtension *extension, clang::ASTReader &reader,
+         clang::serialization::ModuleFile &moduleFile,
+         std::function<void()> onRemove, const llvm::BitstreamCursor &stream);
+
+  ~SwiftLookupTableReader();
+
+  /// Retrieve the AST reader associated with this lookup table reader.
+  clang::ASTReader &getASTReader() const { return Reader; }
+
+  /// Retrieve the module file associated with this lookup table reader.
+  clang::serialization::ModuleFile &getModuleFile() { return ModuleFile; }
+
+  /// Retrieve the set of base names that are stored in the on-disk hash table.
+  SmallVector<StringRef, 4> getBaseNames();
+
+  /// Retrieve the set of entries associated with the given base name.
+  ///
+  /// \returns true if we found anything, false otherwise.
+  bool lookup(StringRef baseName,
+              SmallVectorImpl<SwiftLookupTable::FullTableEntry> &entries);
+
+  /// Retrieve the declaration IDs of the categories.
+  ArrayRef<clang::serialization::DeclID> categories() const {
+    return Categories;
+  }
+
+  /// Retrieve the set of contexts that have globals-as-members
+  /// injected into them.
+  SmallVector<SwiftLookupTable::StoredContext, 4> getGlobalsAsMembersContexts();
+
+  /// Retrieve the set of global declarations that are going to be
+  /// imported as members into the given context.
+  ///
+  /// \returns true if we found anything, false otherwise.
+  bool lookupGlobalsAsMembers(SwiftLookupTable::StoredContext context,
+                              SmallVectorImpl<uintptr_t> &entries);
+};
 }
 
 bool SwiftLookupTable::contextRequiresName(ContextKind kind) {
@@ -979,9 +1068,11 @@ namespace {
 void SwiftLookupTableWriter::writeExtensionContents(
        clang::Sema &sema,
        llvm::BitstreamWriter &stream) {
+  NameImporter nameImporter(swiftCtx, availability, sema, inferImportAsMember);
+
   // Populate the lookup table.
   SwiftLookupTable table(nullptr);
-  PopulateTable(sema, table);
+  populateTable(table, nameImporter);
 
   SmallVector<uint64_t, 64> ScratchRecord;
 
@@ -1396,3 +1487,87 @@ bool SwiftLookupTableReader::lookupGlobalsAsMembers(
   entries = std::move(*known);
   return true;
 }
+
+clang::ModuleFileExtensionMetadata
+SwiftNameLookupExtension::getExtensionMetadata() const {
+  clang::ModuleFileExtensionMetadata metadata;
+  metadata.BlockName = "swift.lookup";
+  metadata.MajorVersion = SWIFT_LOOKUP_TABLE_VERSION_MAJOR;
+  metadata.MinorVersion = SWIFT_LOOKUP_TABLE_VERSION_MINOR;
+  metadata.UserInfo =
+      version::getSwiftFullVersion(swiftCtx.LangOpts.EffectiveLanguageVersion);
+  return metadata;
+}
+
+llvm::hash_code
+SwiftNameLookupExtension::hashExtension(llvm::hash_code code) const {
+  return llvm::hash_combine(code, StringRef("swift.lookup"),
+                            SWIFT_LOOKUP_TABLE_VERSION_MAJOR,
+                            SWIFT_LOOKUP_TABLE_VERSION_MINOR,
+                            inferImportAsMember);
+}
+
+void SwiftLookupTableWriter::populateTable(SwiftLookupTable &table,
+                                           NameImporter &nameImporter) {
+  auto &sema = nameImporter.getClangSema();
+  for (auto decl : sema.Context.getTranslationUnitDecl()->noload_decls()) {
+    // Skip anything from an AST file.
+    if (decl->isFromASTFile())
+      continue;
+
+    // Skip non-named declarations.
+    auto named = dyn_cast<clang::NamedDecl>(decl);
+    if (!named)
+      continue;
+
+    // Add this entry to the lookup table.
+    addEntryToLookupTable(table, named, nameImporter);
+  }
+
+  // Add macros to the lookup table.
+  addMacrosToLookupTable(sema.Context, sema.getPreprocessor(), table, swiftCtx);
+
+  // Finalize the lookup table, which may fail.
+  finalizeLookupTable(sema.Context, sema.getPreprocessor(), table, swiftCtx);
+};
+
+std::unique_ptr<clang::ModuleFileExtensionWriter>
+SwiftNameLookupExtension::createExtensionWriter(clang::ASTWriter &writer) {
+  return std::unique_ptr<clang::ModuleFileExtensionWriter>(
+      new SwiftLookupTableWriter(this, writer, swiftCtx, availability,
+                                 inferImportAsMember));
+}
+
+std::unique_ptr<clang::ModuleFileExtensionReader>
+SwiftNameLookupExtension::createExtensionReader(
+    const clang::ModuleFileExtensionMetadata &metadata,
+    clang::ASTReader &reader, clang::serialization::ModuleFile &mod,
+    const llvm::BitstreamCursor &stream) {
+  // Make sure we have a compatible block. Since these values are part
+  // of the hash, it should never be wrong.
+  assert(metadata.BlockName == "swift.lookup");
+  assert(metadata.MajorVersion == SWIFT_LOOKUP_TABLE_VERSION_MAJOR);
+  assert(metadata.MinorVersion == SWIFT_LOOKUP_TABLE_VERSION_MINOR);
+
+  // Check whether we already have an entry in the set of lookup tables.
+  auto &entry = lookupTables[mod.ModuleName];
+  if (entry) return nullptr;
+
+  // Local function used to remove this entry when the reader goes away.
+  std::string moduleName = mod.ModuleName;
+  auto onRemove = [this, moduleName]() {
+    lookupTables.erase(moduleName);
+  };
+
+  // Create the reader.
+  auto tableReader = SwiftLookupTableReader::create(this, reader, mod, onRemove,
+                                                    stream);
+  if (!tableReader) return nullptr;
+
+  // Create the lookup table.
+  entry.reset(new SwiftLookupTable(tableReader.get()));
+
+  // Return the new reader.
+  return std::move(tableReader);
+}
+

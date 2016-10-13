@@ -1868,19 +1868,26 @@ alloc_ref_dynamic
 `````````````````
 ::
 
-  sil-instruction ::= 'alloc_ref_dynamic' ('[' 'objc' ']')? sil-operand ',' sil-type
+  sil-instruction ::= 'alloc_ref_dynamic'
+                        ('[' 'objc' ']')?
+                        ('[' 'tail_elems' sil-type '*' sil-operand ']')*
+                        sil-operand ',' sil-type
 
   %1 = alloc_ref_dynamic %0 : $@thick T.Type, $T
   %1 = alloc_ref_dynamic [objc] %0 : $@objc_metatype T.Type, $T
+  %1 = alloc_ref_dynamic [tail_elems $E * %2 : Builtin.Word] %0 : $@thick T.Type, $T
   // $T must be a class type
   // %1 has type $T
+  // $E is the type of the tail-allocated elements
+  // %2 must be of a builtin integer type
 
 Allocates an object of class type ``T`` or a subclass thereof. The
 dynamic type of the resulting object is specified via the metatype
 value ``%0``. The object will be initialized with retain count 1; its
-state will be otherwise uninitialized. The optional ``objc`` attribute
-indicates that the object should be allocated using Objective-C's
-allocation methods (``+allocWithZone:``).
+state will be otherwise uninitialized.
+
+The optional ``tail_elems`` and ``objc`` attributes have the same effect as
+for ``alloc_ref``. See ``alloc_ref`` for details.
 
 alloc_box
 `````````
@@ -2949,10 +2956,11 @@ partial_apply
 `````````````
 ::
 
-  sil-instruction ::= 'partial_apply' sil-value
+  sil-instruction ::= 'partial_apply' callee-ownership-attr? sil-value
                         sil-apply-substitution-list?
                         '(' (sil-value (',' sil-value)*)? ')'
                         ':' sil-type
+  callee-ownership-attr ::= '[callee_guaranteed]'
 
   %c = partial_apply %0(%1, %2, ...) : $(Z..., A, B, ...) -> R
   // Note that the type of the callee '%0' is specified *after* the arguments
@@ -2988,6 +2996,11 @@ TODO: The instruction, when applied to a generic function,
 currently implicitly performs abstraction difference transformations enabled
 by the given substitutions, such as promoting address-only arguments and returns
 to register arguments. This should be fixed.
+
+By default, ``partial_apply`` creates a closure whose invocation takes ownership
+of the context, meaning that a call implicitly releases the closure. The
+``[callee_guaranteed]`` change this to a caller-guaranteed model, where the
+caller promises not to release the closure while the function is being called.
 
 This instruction is used to implement both curry thunks and closures. A
 curried function in Swift::

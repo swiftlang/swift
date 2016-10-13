@@ -48,6 +48,8 @@ namespace irgen {
                                             SILType tupleType,
                                             unsigned fieldNo);
 
+  unsigned getTupleElementStructIndex(IRGenModule &IGM, SILType tupleType,
+                                      unsigned fieldNo);
 } // end namespace irgen
 } // end namespace swift
 

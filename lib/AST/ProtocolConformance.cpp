@@ -388,9 +388,10 @@ SpecializedProtocolConformance::getTypeWitnessSubstAndDecl(
     auto conforms = conformingModule->lookupConformance(specializedType, proto,
                                                         resolver);
     assert((conforms ||
-            specializedType->is<TypeVariableType>() ||
+            specializedType->isTypeVariableOrMember() ||
             specializedType->isTypeParameter() ||
-            specializedType->is<ErrorType>()) &&
+            specializedType->hasError() ||
+            specializedType->getCanonicalType()->hasError()) &&
            "Improperly checked substitution");
     conformances.push_back(conforms ? *conforms 
                                     : ProtocolConformanceRef(proto));

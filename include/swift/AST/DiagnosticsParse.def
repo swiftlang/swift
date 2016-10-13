@@ -1380,6 +1380,12 @@ ERROR(avail_query_version_comparison_not_needed,
 ERROR(availability_query_wildcard_required, none,
       "must handle potential future platforms with '*'", ())
 
+ERROR(availability_swift_must_occur_alone, none,
+      "'swift' version-availability must be specified alone", ())
+
+ERROR(pound_available_swift_not_allowed, none,
+      "Swift language version checks not allowed in #available(...)", ())
+
 ERROR(availability_query_repeated_platform, none,
       "version for '%0' already specified", (StringRef))
 

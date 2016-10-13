@@ -70,7 +70,7 @@ public:
 
   using const_reverse_iterator = typename VectorT::const_reverse_iterator;
   const_reverse_iterator rbegin() const { return Vector.rbegin(); }
-  const_reverse_iterator rend() const { return Vector.rbegin(); }
+  const_reverse_iterator rend() const { return Vector.rend(); }
   llvm::iterator_range<const_reverse_iterator> getReverseRange() const {
     return {rbegin(), rend()};
   }

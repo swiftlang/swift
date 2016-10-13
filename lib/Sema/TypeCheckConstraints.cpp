@@ -55,29 +55,6 @@ void TypeVariableType::Implementation::print(llvm::raw_ostream &OS) {
   getTypeVariable()->print(OS, PrintOptions());
 }
 
-TypeBase *TypeVariableType::getBaseBeingSubstituted() {
-  auto impl = this->getImpl();
-  auto archetype = impl.getArchetype();
-  
-  if (archetype)
-    return archetype;
-
-  if (auto locator = impl.getLocator())
-    if (auto anchor = locator->getAnchor())
-      if (auto anchorType = anchor->getType())
-        if (!(anchorType->getAs<TypeVariableType>() ||
-              anchorType->getAs<AnyFunctionType>()))
-          return anchorType.getPointer();
-  
-  if (auto proto = impl.literalConformanceProto) {
-    return proto->getType()->
-           getAs<MetatypeType>()->
-           getInstanceType().getPointer();
-  }
-
-  return this;
-}
-
 SavedTypeVariableBinding::SavedTypeVariableBinding(TypeVariableType *typeVar)
   : TypeVarAndOptions(typeVar, typeVar->getImpl().Options),
     ParentOrFixed(typeVar->getImpl().ParentOrFixed) { }
@@ -245,7 +222,7 @@ static unsigned getNumArgs(ValueDecl *value) {
 }
 
 static bool matchesDeclRefKind(ValueDecl *value, DeclRefKind refKind) {
-  if (value->getType()->is<ErrorType>())
+  if (value->getType()->hasError())
     return true;
 
   switch (refKind) {
@@ -1635,7 +1612,7 @@ getTypeOfExpressionWithoutApplying(Expr *&expr, DeclContext *dc,
   // Attempt to solve the constraint system.
   SmallVector<Solution, 4> viable;
   const Type originalType = expr->getType();
-  const bool needClearType = originalType && originalType->is<ErrorType>();
+  const bool needClearType = originalType && originalType->hasError();
   const auto recoverOriginalType = [&] () {
     if (needClearType)
       expr->setType(originalType);
@@ -1656,7 +1633,7 @@ getTypeOfExpressionWithoutApplying(Expr *&expr, DeclContext *dc,
   auto &solution = viable[0];
   Type exprType = solution.simplifyType(*this, expr->getType());
 
-  assert(exprType && !exprType->is<ErrorType>() && "erroneous solution?");
+  assert(exprType && !exprType->hasError() && "erroneous solution?");
   assert(!exprType->hasTypeVariable() &&
          "free type variable with FreeTypeVariableBinding::GenericParameters?");
 
@@ -1904,7 +1881,7 @@ bool TypeChecker::typeCheckBinding(Pattern *&pattern, Expr *&initializer,
     contextualPurpose = CTP_Initialization;
 
     // If we already had an error, don't repeat the problem.
-    if (contextualType.getType()->is<ErrorType>())
+    if (contextualType.getType()->hasError())
       return true;
 
     // Only provide a TypeLoc if it makes sense to allow diagnostics.
@@ -1926,7 +1903,7 @@ bool TypeChecker::typeCheckBinding(Pattern *&pattern, Expr *&initializer,
     pattern->forEachVariable([&](VarDecl *var) {
       // Don't change the type of a variable that we've been able to
       // compute a type for.
-      if (var->hasType() && !var->getType()->is<ErrorType>())
+      if (var->hasType() && !var->getType()->hasError())
         return;
 
       var->overwriteType(ErrorType::get(Context));
@@ -2156,7 +2133,7 @@ Type ConstraintSystem::computeAssignDestType(Expr *dest, SourceLoc equalLoc) {
   }
 
   Type destTy = simplifyType(dest->getType());
-  if (destTy->is<ErrorType>() || destTy->getRValueType()->is<UnresolvedType>())
+  if (destTy->hasError() || destTy->getRValueType()->is<UnresolvedType>())
     return Type();
 
   // If we have already resolved a concrete lvalue destination type, return it.
@@ -2260,7 +2237,7 @@ bool TypeChecker::typeCheckStmtCondition(StmtCondition &cond, DeclContext *dc,
       elt.getPattern()->forEachVariable([&](VarDecl *var) {
         // Don't change the type of a variable that we've been able to
         // compute a type for.
-        if (var->hasType() && !var->getType()->is<ErrorType>())
+        if (var->hasType() && !var->getType()->hasError())
           return;
         var->overwriteType(ErrorType::get(Context));
         var->setInvalid();
@@ -2470,7 +2447,7 @@ Expr *TypeChecker::coerceToMaterializable(Expr *expr) {
   if (auto tryExpr = dyn_cast<AnyTryExpr>(expr)) {
     auto sub = coerceToMaterializable(tryExpr->getSubExpr());
     tryExpr->setSubExpr(sub);
-    if (isa<OptionalTryExpr>(tryExpr) && !sub->getType()->is<ErrorType>())
+    if (isa<OptionalTryExpr>(tryExpr) && !sub->getType()->hasError())
       tryExpr->setType(OptionalType::get(sub->getType()));
     else
       tryExpr->setType(sub->getType());
@@ -2670,10 +2647,10 @@ void Solution::dump(raw_ostream &out) const {
     }
   }
 
-  if (!DefaultedTypeVariables.empty()) {
-    out << "\nDefaulted type variables: ";
-    interleave(DefaultedTypeVariables, [&](TypeVariableType *typeVar) {
-      out << "$T" << typeVar->getID();
+  if (!DefaultedConstraints.empty()) {
+    out << "\nDefaulted constraints: ";
+    interleave(DefaultedConstraints, [&](ConstraintLocator *locator) {
+      locator->dump(sm, out);
     }, [&] {
       out << ", ";
     });
@@ -2828,10 +2805,10 @@ void ConstraintSystem::print(raw_ostream &out) {
     }
   }
 
-  if (!DefaultedTypeVariables.empty()) {
-    out << "\nDefaulted type variables: ";
-    interleave(DefaultedTypeVariables, [&](TypeVariableType *typeVar) {
-      out << "$T" << typeVar->getID();
+  if (!DefaultedConstraints.empty()) {
+    out << "\nDefaulted constraints: ";
+    interleave(DefaultedConstraints, [&](ConstraintLocator *locator) {
+      locator->dump(&getTypeChecker().Context.SourceMgr, out);
     }, [&] {
       out << ", ";
     });

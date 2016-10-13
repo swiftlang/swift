@@ -76,6 +76,7 @@ public:
   }
 
   void dump() const;
+  void print(raw_ostream &os, const PrintOptions &opts) const;
 };
 
 } // end namespace swift

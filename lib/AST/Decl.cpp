@@ -471,7 +471,7 @@ bool Decl::isWeakImported(Module *fromModule) const {
     return clangDecl->isWeakImported();
   }
 
-  // FIXME: Implement using AvailableAttr::getMinVersionAvailability().
+  // FIXME: Implement using AvailableAttr::getVersionAvailability().
   return false;
 }
 
@@ -1209,7 +1209,7 @@ bool AbstractStorageDecl::hasFixedLayout() const {
 
   if (dc->isTypeContext()) {
     auto declaredType = dc->getDeclaredTypeOfContext();
-    if (declaredType->is<ErrorType>())
+    if (declaredType->hasError())
       return true;
     return declaredType->getAnyNominal()->hasFixedLayout();
   }
@@ -1653,7 +1653,7 @@ void ValueDecl::setType(Type T) {
 
 void ValueDecl::overwriteType(Type T) {
   TypeAndAccess.setPointer(T);
-  if (!T.isNull() && T->is<ErrorType>())
+  if (!T.isNull() && T->hasError())
     setInvalid();
 }
 
@@ -1672,8 +1672,7 @@ Type ValueDecl::getInterfaceType() const {
     auto &ctx = getASTContext();
     InterfaceTy = DependentMemberType::get(
                     selfTy,
-                    const_cast<AssociatedTypeDecl *>(assocType),
-                    ctx);
+                    const_cast<AssociatedTypeDecl *>(assocType));
     InterfaceTy = MetatypeType::get(InterfaceTy, ctx);
     return InterfaceTy;
   }
@@ -1927,14 +1926,14 @@ ValueDecl::getFormalAccessScope(const DeclContext *useDC) const {
 
 Type TypeDecl::getDeclaredType() const {
   if (auto TAD = dyn_cast<TypeAliasDecl>(this)) {
-    if (TAD->hasType() && TAD->getType()->is<ErrorType>())
+    if (TAD->hasType() && TAD->getType()->hasError())
       return TAD->getType();
 
     return TAD->getAliasType();
   }
   if (auto typeParam = dyn_cast<AbstractTypeParamDecl>(this)) {
     auto type = typeParam->getType();
-    if (type->is<ErrorType>())
+    if (type->hasError())
       return type;
 
     return type->castTo<MetatypeType>()->getInstanceType();
@@ -1947,7 +1946,7 @@ Type TypeDecl::getDeclaredType() const {
 
 Type TypeDecl::getDeclaredInterfaceType() const {
   Type interfaceType = getInterfaceType();
-  if (interfaceType.isNull() || interfaceType->is<ErrorType>())
+  if (interfaceType.isNull() || interfaceType->hasError())
     return interfaceType;
 
   return interfaceType->castTo<MetatypeType>()->getInstanceType();
@@ -2040,7 +2039,7 @@ void NominalTypeDecl::computeType() {
   // If we still don't have a declared type, don't crash -- there's a weird
   // circular declaration issue in the code.
   Type declaredTy = getDeclaredType();
-  if (!declaredTy || declaredTy->is<ErrorType>()) {
+  if (!declaredTy || declaredTy->hasError()) {
     setType(ErrorType::get(ctx));
     return;
   }
@@ -2072,7 +2071,7 @@ static Type computeNominalType(NominalTypeDecl *decl, DeclTypeKind kind) {
       Ty = dc->getDeclaredInterfaceType();
       break;
     }
-    if (!Ty || Ty->is<ErrorType>())
+    if (!Ty || Ty->hasError())
       return Ty;
   }
 
@@ -2813,7 +2812,7 @@ ProtocolDecl::findProtocolSelfReferences(const ValueDecl *value,
     return SelfReferenceKind::None();
 
   // Skip invalid declarations.
-  if (type->is<ErrorType>())
+  if (type->hasError())
     return SelfReferenceKind::None();
 
   if (isa<AbstractFunctionDecl>(value)) {
@@ -3784,7 +3783,7 @@ ParamDecl *ParamDecl::createUnboundSelf(SourceLoc loc, DeclContext *DC,
   // If we have a valid selfType (i.e. we're not in the parser before we
   // know such things, or we're nested inside an invalid extension),
   // configure it.
-  if (selfType && !selfType->is<ErrorType>()) {
+  if (selfType && !selfType->hasError()) {
     if (isStaticMethod)
       selfType = MetatypeType::get(selfType);
     
@@ -3883,7 +3882,7 @@ Type ParamDecl::getVarargBaseTy(Type VarArgT) {
     // It's the stdlib Array<T>.
     return BGT->getGenericArgs()[0];
   }
-  assert(isa<ErrorType>(T));
+  assert(T->hasError());
   return T;
 }
 
@@ -3958,7 +3957,7 @@ void SubscriptDecl::setIndices(ParameterList *p) {
 
 Type SubscriptDecl::getIndicesType() const {
   const auto type = getType();
-  if (type->is<ErrorType>())
+  if (type->hasError())
     return type;
   return type->castTo<AnyFunctionType>()->getInput();
 }
@@ -4053,7 +4052,7 @@ static Type getSelfTypeForContainer(AbstractFunctionDecl *theMethod,
 
   // If the self type couldn't be computed, or is the result of an
   // upstream error, return an error type.
-  if (!selfTy || selfTy->is<ErrorType>())
+  if (!selfTy || selfTy->hasError())
     return ErrorType::get(dc->getASTContext());
 
   // 'static' functions have 'self' of type metatype<T>.
@@ -4474,7 +4473,7 @@ Type FuncDecl::getResultType() const {
     return nullptr;
 
   Type resultTy = getType();
-  if (resultTy->is<ErrorType>())
+  if (resultTy->hasError())
     return resultTy;
 
   for (unsigned i = 0, e = getNumParameterLists(); i != e; ++i)
@@ -4629,7 +4628,7 @@ bool EnumElementDecl::computeType() {
   EnumDecl *ED = getParentEnum();
   Type resultTy = ED->getDeclaredTypeInContext();
 
-  if (resultTy->is<ErrorType>()) {
+  if (resultTy->hasError()) {
     setType(resultTy);
     return false;
   }
@@ -4655,7 +4654,7 @@ Type EnumElementDecl::getArgumentInterfaceType() const {
     return nullptr;
 
   auto interfaceType = getInterfaceType();
-  if (interfaceType->is<ErrorType>()) {
+  if (interfaceType->hasError()) {
     return interfaceType;
   }
 

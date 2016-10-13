@@ -342,7 +342,7 @@ public:
     if (!base->isTypeParameter())
       return Type();
     // TODO: look up protocol?
-    return DependentMemberType::get(base, Ctx.getIdentifier(member), Ctx);
+    return DependentMemberType::get(base, Ctx.getIdentifier(member));
   }
 
   Type createUnownedStorageType(Type base) {
