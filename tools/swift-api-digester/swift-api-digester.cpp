@@ -44,6 +44,7 @@
 #include "swift/AST/PrettyStackTrace.h"
 #include "swift/AST/USRGeneration.h"
 #include "swift/Basic/ColorUtils.h"
+#include "swift/Basic/Fallthrough.h"
 #include "swift/Basic/JSONSerialization.h"
 #include "swift/Basic/LLVMInitialize.h"
 #include "swift/Basic/STLExtras.h"
@@ -361,7 +362,6 @@ public:
   ArrayRef<TypeAttrKind> getTypeAttributes() const;
   SDKNodeDecl *getClosestParentDecl() const;
   static bool classof(const SDKNode *N);
-  static bool areTypesSame(const SDKNodeType *Left, const SDKNodeType *Right);
 };
 
 bool SDKNodeType::classof(const SDKNode *N) {
@@ -463,27 +463,6 @@ void SDKNode::postorderVisit(NodePtr Root, SDKNodeVisitor &Visitor) {
     postorderVisit(Child.get(), Visitor);
   Visitor.Ancestors.pop_back();
   Visitor.visit(Root);
-}
-
-bool SDKNode::operator==(const SDKNode &Other) const {
-  if (getKind() != Other.getKind())
-    return false;
-
-  // Using type's equal algorithm
-  if (auto *T1 = dyn_cast<SDKNodeType>(this)) {
-    return SDKNodeType::areTypesSame(T1, (&Other)->getAs<SDKNodeType>());
-  }
-
-  if (getPrintedName() == Other.getPrintedName() &&
-      Children.size() == Other.Children.size()) {
-    for (unsigned long I = 0; I < Children.size(); I ++) {
-      if ((*Children[I]) == (*Other.Children[I]))
-        continue;
-      return false;
-    }
-    return true;
-  }
-  return false;
 }
 
 class SDKNodeVectorViewer {
@@ -649,17 +628,6 @@ SDKNodeDecl *SDKNodeType::getClosestParentDecl() const {
   auto *Result = getParent();
   for (; !isa<SDKNodeDecl>(Result); Result = Result->getParent());
   return Result->getAs<SDKNodeDecl>();
-}
-
-bool SDKNodeType::areTypesSame(const SDKNodeType *Left,
-                               const SDKNodeType *Right) {
-  if (Left->getTypeAttributes().size() != Right->getTypeAttributes().size())
-    return false;
-  for (auto L : Left->getTypeAttributes()) {
-    if (!contains(Right->getTypeAttributes(), L))
-      return false;
-  }
-  return Left->getPrintedName() == Right->getPrintedName();
 }
 
 class SDKNodeTypeDecl : public SDKNodeDecl {
@@ -838,6 +806,49 @@ NodeUniquePtr SDKNode::constructSDKNode(llvm::yaml::MappingNode *Node) {
     Result->addChild(std::move(C));
   }
   return Result;
+}
+
+bool SDKNode::operator==(const SDKNode &Other) const {
+  if (getKind() != Other.getKind())
+    return false;
+
+  switch(getKind()) {
+    case SDKNodeKind::TypeNominal:
+    case SDKNodeKind::TypeFunc: {
+      auto Left = this->getAs<SDKNodeType>();
+      auto Right = (&Other)->getAs<SDKNodeType>();
+      return Left->getTypeAttributes().equals(Right->getTypeAttributes())
+        && Left->getPrintedName() == Right->getPrintedName();
+    }
+
+    case SDKNodeKind::Function:
+    case SDKNodeKind::Constructor:
+    case SDKNodeKind::Getter:
+    case SDKNodeKind::Setter: {
+      auto Left = this->getAs<SDKNodeAbstractFunc>();
+      auto Right = (&Other)->getAs<SDKNodeAbstractFunc>();
+      if (Left->isMutating() ^ Right->isMutating())
+        return false;
+      if (Left->isThrowing() ^ Right->isThrowing())
+        return false;
+      SWIFT_FALLTHROUGH;
+    }
+    case SDKNodeKind::TypeDecl:
+    case SDKNodeKind::Var:
+    case SDKNodeKind::TypeAlias:
+    case SDKNodeKind::Root:
+    case SDKNodeKind::Nil: {
+      if (getPrintedName() == Other.getPrintedName() &&
+          Children.size() == Other.Children.size()) {
+        for (unsigned I = 0; I < Children.size(); ++ I) {
+          if (*Children[I] != *Other.Children[I])
+            return false;
+        }
+        return true;
+      }
+      return false;
+    }
+  }
 }
 
 // The pretty printer of a tree of SDKNode
@@ -1867,6 +1878,16 @@ void detectThrowing(NodePtr L, NodePtr R) {
   }
 }
 
+void detectMutating(NodePtr L, NodePtr R) {
+  assert(L->getKind() == R->getKind());
+  if (auto LF = dyn_cast<SDKNodeAbstractFunc>(L)) {
+    auto RF = R->getAs<SDKNodeAbstractFunc>();
+    if (!LF->isMutating() && RF->isMutating()) {
+      LF->annotate(NodeAnnotation::NowMutating);
+    }
+  }
+}
+
 static void detectRename(NodePtr L, NodePtr R) {
   assert(L->getKind() == R->getKind());
   if (isa<SDKNodeDecl>(L) && L->getPrintedName() != R->getPrintedName()) {
@@ -1922,6 +1943,7 @@ public:
     SDKNodeKind Kind = Left->getKind();
     assert(Left->getKind() != SDKNodeKind::Nil &&
            Right->getKind() != SDKNodeKind::Nil);
+    assert(Kind == SDKNodeKind::Root || *Left != *Right);
 
     Left->annotate(NodeAnnotation::Updated);
     Right->annotate(NodeAnnotation::Updated);
@@ -1929,6 +1951,7 @@ public:
     UpdateMap->foundMatch(Left, Right);
     detectRename(Left, Right);
     detectThrowing(Left, Right);
+    detectMutating(Left, Right);
 
     switch(Kind) {
     case SDKNodeKind::Root:
@@ -2639,6 +2662,17 @@ class DiagnosisEmitter : public SDKNodeVisitor {
     static void theme(raw_ostream &OS) { OS << "Renamed Decls"; };
   };
 
+  struct DeclAttrDiag {
+    DeclKind Kind;
+    StringRef DeclName;
+    StringRef AttrName;
+    DeclAttrDiag(DeclKind Kind, StringRef DeclName, StringRef AttrName) :
+      Kind(Kind), DeclName(DeclName), AttrName(AttrName) {}
+    bool operator<(DeclAttrDiag Other) const;
+    void output() const;
+    static void theme(raw_ostream &OS) { OS << "Decl Attribute changes"; };
+  };
+
   struct DeclTypeChangeDiag {
     DeclKind Kind;
     StringRef DeclName;
@@ -2656,6 +2690,7 @@ class DiagnosisEmitter : public SDKNodeVisitor {
   };
 
   std::set<SDKNodeDecl*> AddedDecls;
+  DiagBag<DeclAttrDiag> AttrChangedDecls;
   DiagBag<DeclTypeChangeDiag> TypeChangedDecls;
   DiagBag<RenamedDeclDiag> RenamedDecls;
   DiagBag<MovedDeclDiag> MovedDecls;
@@ -2754,6 +2789,18 @@ void DiagnosisEmitter::DeclTypeChangeDiag::output() const {
                << printName(TypeNameAfter) << "\n";
 }
 
+
+bool DiagnosisEmitter::DeclAttrDiag::operator<(DeclAttrDiag Other) const {
+  if (Kind != Other.Kind)
+    return Kind < Other.Kind;
+  return DeclName.compare_lower(Other.DeclName);
+}
+
+void DiagnosisEmitter::DeclAttrDiag::output() const {
+  llvm::outs() << Kind << "" << printName(DeclName) << " is now " <<
+    printDiagKeyword(AttrName) << "\n";
+}
+
 void DiagnosisEmitter::diagnosis(NodePtr LeftRoot, NodePtr RightRoot,
                                  UpdatedNodesMap &UpdateMap) {
   DiagnosisEmitter Emitter(UpdateMap);
@@ -2782,6 +2829,16 @@ void DiagnosisEmitter::visitDecl(SDKNodeDecl *Node) {
     RenamedDecls.Diags.emplace_back(Node->getDeclKind(), Count->getDeclKind(),
                                     Node->getFullyQualifiedName(),
                                     Count->getFullyQualifiedName());
+  }
+  if (Node->isAnnotatedAs(NodeAnnotation::NowMutating)) {
+    AttrChangedDecls.Diags.emplace_back(Node->getDeclKind(),
+                                        Node->getFullyQualifiedName(),
+                                        InsertToBuffer("mutating"));
+  }
+  if (Node->isAnnotatedAs(NodeAnnotation::NowThrowing)) {
+    AttrChangedDecls.Diags.emplace_back(Node->getDeclKind(),
+                                        Node->getFullyQualifiedName(),
+                                        InsertToBuffer("throwing"));
   }
 }
 void DiagnosisEmitter::visitType(SDKNodeType *Node) {
