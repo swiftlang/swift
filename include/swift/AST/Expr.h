@@ -2055,8 +2055,7 @@ public:
   SourceLoc getLParenLoc() const { return LParenLoc; }
   SourceLoc getRParenLoc() const { return RParenLoc; }
 
-  SourceLoc getStartLoc() const;
-  SourceLoc getEndLoc() const;
+  SourceRange getSourceRange() const;
 
   /// \brief Whether this expression has a trailing closure as its argument.
   bool hasTrailingClosure() const { return TupleExprBits.HasTrailingClosure; }
