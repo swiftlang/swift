@@ -1051,10 +1051,15 @@ struct GraphTraits<LoopRegionFunctionInfoGrapherWrapper *>
 
   static NodeRef getEntryNode(GraphType *F) { return &F->Data[0]; }
 
-  using nodes_iterator = std::vector<LoopRegionWrapper>::iterator;
+  using nodes_iterator =
+          pointer_iterator<std::vector<LoopRegionWrapper>::iterator>;
 
-  static nodes_iterator nodes_begin(GraphType *F) { return F->Data.begin(); }
-  static nodes_iterator nodes_end(GraphType *F) { return F->Data.end(); }
+  static nodes_iterator nodes_begin(GraphType *F) {
+    return nodes_iterator(F->Data.begin());
+  }
+  static nodes_iterator nodes_end(GraphType *F) {
+    return nodes_iterator(F->Data.end());
+  }
   static unsigned size(GraphType *F) { return F->Data.size(); }
 };
 

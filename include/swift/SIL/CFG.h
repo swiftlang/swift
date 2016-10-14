@@ -91,9 +91,13 @@ template <> struct GraphTraits<swift::SILFunction*>
 
   static NodeRef getEntryNode(GraphType F) { return &F->front(); }
 
-  typedef swift::SILFunction::iterator nodes_iterator;
-  static nodes_iterator nodes_begin(GraphType F) { return F->begin(); }
-  static nodes_iterator nodes_end(GraphType F) { return F->end(); }
+  typedef pointer_iterator<swift::SILFunction::iterator> nodes_iterator;
+  static nodes_iterator nodes_begin(GraphType F) {
+    return nodes_iterator(F->begin());
+  }
+  static nodes_iterator nodes_end(GraphType F) {
+    return nodes_iterator(F->end());
+  }
   static unsigned size(GraphType F) { return F->size(); }
 };
 
@@ -104,9 +108,13 @@ template <> struct GraphTraits<Inverse<swift::SILFunction*> >
 
   static NodeRef getEntryNode(GraphType F) { return &F.Graph->front(); }
 
-  typedef swift::SILFunction::iterator nodes_iterator;
-  static nodes_iterator nodes_begin(GraphType F) { return F.Graph->begin(); }
-  static nodes_iterator nodes_end(GraphType F) { return F.Graph->end(); }
+  typedef pointer_iterator<swift::SILFunction::iterator> nodes_iterator;
+  static nodes_iterator nodes_begin(GraphType F) {
+    return nodes_iterator(F.Graph->begin());
+  }
+  static nodes_iterator nodes_end(GraphType F) {
+    return nodes_iterator(F.Graph->end());
+  }
   static unsigned size(GraphType F) { return F.Graph->size(); }
 };
 

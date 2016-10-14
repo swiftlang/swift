@@ -751,11 +751,13 @@ namespace llvm {
 
     static NodeRef getEntryNode(GraphType F) { return nullptr; }
 
-    typedef CGForDotView::iterator nodes_iterator;
+    typedef pointer_iterator<CGForDotView::iterator> nodes_iterator;
     static nodes_iterator nodes_begin(GraphType OCG) {
-      return OCG->Nodes.begin();
+      return nodes_iterator(OCG->Nodes.begin());
     }
-    static nodes_iterator nodes_end(GraphType OCG) { return OCG->Nodes.end(); }
+    static nodes_iterator nodes_end(GraphType OCG) {
+      return nodes_iterator(OCG->Nodes.end());
+    }
     static unsigned size(GraphType CG) { return CG->Nodes.size(); }
   };
 

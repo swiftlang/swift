@@ -794,11 +794,13 @@ namespace llvm {
 
     static NodeRef getEntryNode(GraphType F) { return nullptr; }
 
-    typedef CallGraph::iterator nodes_iterator;
+    typedef pointer_iterator<CallGraph::iterator> nodes_iterator;
     static nodes_iterator nodes_begin(GraphType CG) {
-      return CG->Nodes.begin();
+      return nodes_iterator(CG->Nodes.begin());
     }
-    static nodes_iterator nodes_end(GraphType CG) { return CG->Nodes.end(); }
+    static nodes_iterator nodes_end(GraphType CG) {
+      return nodes_iterator(CG->Nodes.end());
+    }
     static unsigned size(GraphType CG) { return CG->Nodes.size(); }
   };
 
