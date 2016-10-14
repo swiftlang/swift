@@ -112,6 +112,10 @@ protocol Fooable {
   var foo: Foo { get }
 }
 
+// The extension below once caused infinite recursion.
+struct S<T> // expected-error{{expected '{' in struct}}
+extension S // expected-error{{expected '{' in extension}}
+
 let a = b ; let b = a // expected-error{{could not infer type for 'a'}} 
 // expected-error@-1 {{'a' used within its own type}}
 // FIXME: That second error is bogus.
