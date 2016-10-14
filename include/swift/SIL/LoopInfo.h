@@ -63,6 +63,7 @@ class SILLoopInfo {
   using SILLoopInfoBase = llvm::LoopInfoBase<SILBasicBlock, SILLoop>;
 
   SILLoopInfoBase LI;
+  DominanceInfo *Dominance;
 
   void operator=(const SILLoopInfo &) = delete;
   SILLoopInfo(const SILLoopInfo &) = delete;
