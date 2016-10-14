@@ -1,25 +1,25 @@
-//===--- swift-api-digester.cpp - API change detector -------===//
-////
-//// This source file is part of the Swift.org open source project
-////
-//// Copyright (c) 2014 - 2016 Apple Inc. and the Swift project authors
-//// Licensed under Apache License v2.0 with Runtime Library Exception
-////
-//// See http://swift.org/LICENSE.txt for license information
-//// See http://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
-////
-////===----------------------------------------------------------------------===//
+//===--- swift-api-digester.cpp - API change detector ---------------------===//
+//
+// This source file is part of the Swift.org open source project
+//
+// Copyright (c) 2014 - 2016 Apple Inc. and the Swift project authors
+// Licensed under Apache License v2.0 with Runtime Library Exception
+//
+// See http://swift.org/LICENSE.txt for license information
+// See http://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
+//
+//===----------------------------------------------------------------------===//
 
 // swift-api-digester is a test utility to detect source-breaking API changes
-// during the evolution of a swift library. The tool works on two phases:
-// (1) dumping library contents as a json file, and (2) comparing two json
+// during the evolution of a Swift library. The tool works on two phases:
+// (1) dumping library contents as a JSON file, and (2) comparing two JSON
 // files textually to report interesting changes.
 //
 // During phase (1), the api-digester looks up every declarations inside
 // a module and outputs a singly-rooted tree that encloses interesting
 // details of the API level.
 //
-// During phase (2), api-digester applies structure-information comparision
+// During phase (2), api-digester applies structure-information comparison
 // algorithms on two given singly root trees, trying to figure out, as
 // precise as possible, the branches/leaves in the trees that differ from
 // each other. Further analysis decides whether the changed leaves/branches
@@ -78,7 +78,7 @@ ModuleNames("module", llvm::cl::ZeroOrMore, llvm::cl::desc("Names of modules"));
 
 static llvm::cl::opt<std::string>
 ModuleList("module-list-file",
-           llvm::cl::desc("File containing new-line separated list of modules"));
+           llvm::cl::desc("File containing a new-line separated list of modules"));
 
 static llvm::cl::opt<std::string>
 OutputFile("o", llvm::cl::desc("Output file"));
@@ -114,21 +114,21 @@ Action(llvm::cl::desc("Mode:"), llvm::cl::init(ActionType::None),
       llvm::cl::values(
           clEnumValN(ActionType::DumpSDK,
                      "dump-sdk",
-                     "Dump SDK content to json file"),
+                     "Dump SDK content to JSON file"),
           clEnumValN(ActionType::DumpSwiftModules,
                      "dump-swift",
                      "dump swift modules in SDK"),
           clEnumValN(ActionType::CompareSDKs,
                      "compare-sdk",
-                     "Compare SDK content in json file"),
+                     "Compare SDK content in JSON file"),
           clEnumValN(ActionType::DiagnoseSDKs,
                      "diagnose-sdk",
-                     "Diagnose SDK content in json file"),
+                     "Diagnose SDK content in JSON file"),
           clEnumValEnd));
 
 static llvm::cl::list<std::string>
 SDKJsonPaths("input-paths",
-            llvm::cl::desc("The SDK contents under conparison"));
+            llvm::cl::desc("The SDK contents under comparison"));
 
 static llvm::cl::list<std::string>
 ApisPrintUsrs("api-usrs",
@@ -142,7 +142,7 @@ IgnoreRemovedDeclUSRs("ignored-usrs",
 
 static llvm::cl::opt<std::string>
 SwiftVersion("swift-version",
-             llvm::cl::desc("The swift compiler version to invoke"));
+             llvm::cl::desc("The Swift compiler version to invoke"));
 }
 
 namespace {
@@ -196,7 +196,6 @@ public:
 struct MatchedNodeListener {
   virtual void foundMatch(NodePtr Left, NodePtr Right) = 0;
   virtual void foundRemoveAddMatch(NodePtr Removed, NodePtr Added) {}
-  virtual bool isMatched(NodePtr Left, NodePtr Right) {return false;};
   virtual ~MatchedNodeListener() = default;
 };
 
@@ -209,7 +208,7 @@ struct NodeMatcher {
 #define KEY(NAME) static const char* Key_##NAME = #NAME;
 #include "DigesterEnums.def"
 
-// The node kind apparing in the tree that describes the content of the SDK
+// The node kind appearing in the tree that describes the content of the SDK
 enum class SDKNodeKind {
 #define NODE_KIND(NAME) NAME,
 #include "DigesterEnums.def"
@@ -301,9 +300,7 @@ public:
   StringRef getPrintedName() const { return PrintedName; }
   void removeChild(ChildIt CI) { Children.erase(CI); }
   ChildIt getChildBegin() const { return Children.begin(); }
-  ChildIt getChildEnd() const { return Children.end(); }
   void annotate(NodeAnnotation Anno) { Annotations.insert(Anno); }
-  bool isName(StringRef N) const { return getName() == N; }
   NodePtr getParent() const { return Parent; };
   unsigned getChildrenCount() const { return Children.size(); }
   NodePtr childAt(unsigned I) const;
@@ -470,28 +467,28 @@ class SDKNodeVectorViewer {
   llvm::function_ref<bool(NodePtr)> Selector;
   typedef ArrayRef<SDKNode*>::const_iterator VectorIt;
   VectorIt getNext(VectorIt Start);
-  class ViwerIterator;
+  class ViewerIterator;
 
 public:
   SDKNodeVectorViewer(ArrayRef<SDKNode*> Collection,
                       llvm::function_ref<bool(NodePtr)> Selector) :
                         Collection(Collection),
                         Selector(Selector) {}
-  ViwerIterator begin();
-  ViwerIterator end();
+  ViewerIterator begin();
+  ViewerIterator end();
 };
 
-class SDKNodeVectorViewer::ViwerIterator :
+class SDKNodeVectorViewer::ViewerIterator :
     public std::iterator<std::input_iterator_tag, VectorIt> {
   SDKNodeVectorViewer &Viewer;
   VectorIt P;
 public:
-  ViwerIterator(SDKNodeVectorViewer &Viewer, VectorIt P) : Viewer(Viewer), P(P) {}
-  ViwerIterator(const ViwerIterator& mit) : Viewer(mit.Viewer), P(mit.P) {}
-  ViwerIterator& operator++();
-  ViwerIterator operator++(int) {ViwerIterator tmp(*this); operator++(); return tmp;}
-  bool operator==(const ViwerIterator& rhs) {return P==rhs.P;}
-  bool operator!=(const ViwerIterator& rhs) {return P!=rhs.P;}
+  ViewerIterator(SDKNodeVectorViewer &Viewer, VectorIt P) : Viewer(Viewer), P(P) {}
+  ViewerIterator(const ViewerIterator& mit) : Viewer(mit.Viewer), P(mit.P) {}
+  ViewerIterator& operator++();
+  ViewerIterator operator++(int) {ViewerIterator tmp(*this); operator++(); return tmp;}
+  bool operator==(const ViewerIterator& rhs) {return P==rhs.P;}
+  bool operator!=(const ViewerIterator& rhs) {return P!=rhs.P;}
   const NodePtr& operator*() {return *P;}
 };
 
@@ -503,18 +500,18 @@ SDKNodeVectorViewer::getNext(VectorIt Start) {
   return Collection.end();
 }
 
-SDKNodeVectorViewer::ViwerIterator&
-SDKNodeVectorViewer::ViwerIterator::operator++() {
+SDKNodeVectorViewer::ViewerIterator&
+SDKNodeVectorViewer::ViewerIterator::operator++() {
   P = Viewer.getNext(P + 1);
   return *this;
 }
 
-SDKNodeVectorViewer::ViwerIterator SDKNodeVectorViewer::begin() {
-  return ViwerIterator(*this, getNext(Collection.begin()));
+SDKNodeVectorViewer::ViewerIterator SDKNodeVectorViewer::begin() {
+  return ViewerIterator(*this, getNext(Collection.begin()));
 }
 
-SDKNodeVectorViewer::ViwerIterator SDKNodeVectorViewer::end() {
-  return ViwerIterator(*this, Collection.end());
+SDKNodeVectorViewer::ViewerIterator SDKNodeVectorViewer::end() {
+  return ViewerIterator(*this, Collection.end());
 }
 
 class SDKNodeDecl;
@@ -867,15 +864,6 @@ public:
   SDKNodeDumpVisitor() {};
 };
 
-class DumpMatchListener : public MatchedNodeListener {
-  void foundMatch(NodePtr Left, NodePtr Right) override {
-    llvm::outs() << Left->getName() << "->" << Right->getName() << "\n";
-  };
-  bool isMatched(NodePtr Left, NodePtr Right) override {
-    return true;
-  };
-};
-
 static StringRef getPrintedName(Type Ty) {
   std::string S;
   llvm::raw_string_ostream OS(S);
@@ -1008,7 +996,7 @@ case SDKNodeKind::X:                                                           \
 }
 
 // Recursively construct a node that represents a type, for instance,
-// representing the the return value type of a function decl.
+// representing the return value type of a function decl.
 static NodeUniquePtr constructTypeNode(Type T) {
   NodeUniquePtr Root = SDKNodeInitInfo(T).createSDKNode(SDKNodeKind::TypeNominal);
 
@@ -1182,7 +1170,7 @@ public:
     RootNode = std::move(Pair.second);
   }
 
-  // Serialize the content of all roots to a given file using json format.
+  // Serialize the content of all roots to a given file using JSON format.
   void serialize(StringRef Filename) {
     std::error_code EC;
     llvm::raw_fd_ostream fs(Filename, EC, llvm::sys::fs::F_None);
@@ -1190,7 +1178,7 @@ public:
   }
 
   // After collecting decls, either from imported modules or from a previously
-  // serialized json file, using this function to get the root of the SDK.
+  // serialized JSON file, using this function to get the root of the SDK.
   NodePtr getSDKRoot() {
     return RootNode.get();
   }
@@ -1261,7 +1249,7 @@ public:
 namespace swift {
   namespace json {
   // In the namespace of swift::json, we define several functions so that the
-  // json serializer will know how to interpret and dump types defined in this
+  // JSON serializer will know how to interpret and dump types defined in this
   // file.
   template<>
     struct ScalarEnumerationTraits<SDKNodeKind> {
@@ -1395,7 +1383,7 @@ parseJsonEmit(StringRef FileName) {
   llvm::ErrorOr<std::unique_ptr<llvm::MemoryBuffer>> FileBufOrErr =
   llvm::MemoryBuffer::getFileOrSTDIN(FileName);
   if (!FileBufOrErr) {
-    llvm_unreachable("Failed to read json file");
+    llvm_unreachable("Failed to read JSON file");
   }
   StringRef Buffer = FileBufOrErr->get()->getBuffer();
   llvm::SourceMgr SM;
@@ -1712,7 +1700,7 @@ class SameNameNodeMatcher : public NodeMatcher {
     PrintedNameAndUSR,
   };
 
-  // Given two sdk nodes, figure out the reason for why they have the same name.
+  // Given two SDK nodes, figure out the reason for why they have the same name.
   Optional<NameMatchKind> getNameMatchKind(SDKNode *L, SDKNode *R) {
     if (L->getKind() != R->getKind())
       return None;
@@ -1751,7 +1739,7 @@ class SameNameNodeMatcher : public NodeMatcher {
     }
   }
 
-  // Given a list and a priority, find the best matched candidate sdk node.
+  // Given a list and a priority, find the best matched candidate SDK node.
   SDKNode* findBestNameMatch(ArrayRef<NameMatchCandidate> Candidates,
                              ArrayRef<NameMatchKind> Kinds) {
     for (auto Kind : Kinds)
@@ -1902,7 +1890,7 @@ static void detectRename(NodePtr L, NodePtr R) {
 // This is first pass on two given SDKNode trees. This pass removes the common part
 // of two versions of SDK, leaving only the changed part.
 class PrunePass : public MatchedNodeListener, public SDKTreeDiffPass {
-  static void removeCommomChildren(NodePtr Left, NodePtr Right) {
+  static void removeCommonChildren(NodePtr Left, NodePtr Right) {
     llvm::SmallPtrSet<NodePtr, 16> LeftToRemove;
     llvm::SmallPtrSet<NodePtr, 16> RightToRemove;
     for (auto &LC : Left->getChildren()) {
@@ -1959,7 +1947,7 @@ public:
       // If the matched nodes are both modules, remove the contained
       // type decls that are identical. If the matched nodes are both type decls,
       // remove the contained function decls that are identical.
-      removeCommomChildren(Left, Right);
+      removeCommonChildren(Left, Right);
       NodeVector LeftChildren;
       NodeVector RightChildren;
       Left->collectChildren(LeftChildren);
@@ -1975,7 +1963,7 @@ public:
     case SDKNodeKind::TypeAlias:
     case SDKNodeKind::TypeFunc:
     case SDKNodeKind::TypeNominal: {
-      // If mactched nodes are both function/var/TypeAlias decls, mapping their
+      // If matched nodes are both function/var/TypeAlias decls, mapping their
       // parameters sequentially.
       SequentialNodeMatcher(Left->getChildren(),
                             Right->getChildren(), *this).match();
@@ -2096,8 +2084,6 @@ private:
   TypeMemberDiffFinder &operator=(const TypeMemberDiffFinder &) = delete;
 
 };
-
-typedef std::unique_ptr<NodePairVector> RenamedNodes;
 
 // Given a condition, search whether a node satisfies that condition exists
 // in a tree.
@@ -2233,12 +2219,12 @@ public:
   }
 };
 
-// DiffItem describes how an element in sdk evolves in a way that migrator can
-// read conveniently. Each DiffItem corresponds to one json element and contains
+// DiffItem describes how an element in SDK evolves in a way that migrator can
+// read conveniently. Each DiffItem corresponds to one JSON element and contains
 // sub fields explaining how migrator can assist client code to cope with such
-// sdk change. For instance, the following first json element describes an unwrap
+// SDK change. For instance, the following first JSON element describes an unwrap
 // optional change in the first parameter of function "c:@F@CTTextTabGetOptions".
-// Similarly, the second json element describes a type parameter down cast in the
+// Similarly, the second JSON element describes a type parameter down cast in the
 // second parameter of function "c:objc(cs)NSXMLDocument(im)insertChildren:atIndex:".
 // We keep both usrs because in the future this may support auto-rename.
 class DiffItem {
@@ -3391,13 +3377,13 @@ static int prepareForDump(const char *Main,
   }
 
   if (Modules.empty()) {
-    llvm::errs() << "Need to specifiy -include-all or -module <name>\n";
+    llvm::errs() << "Need to specify -include-all or -module <name>\n";
     return 1;
   }
   return 0;
 }
 
-static void readIgnoredUsrs(llvm::StringSet<> &IgoredUsrs) {
+static void readIgnoredUsrs(llvm::StringSet<> &IgnoredUsrs) {
   StringRef Path = options::IgnoreRemovedDeclUSRs;
   if (Path.empty())
     return;
@@ -3405,7 +3391,7 @@ static void readIgnoredUsrs(llvm::StringSet<> &IgoredUsrs) {
     llvm::errs() << Path << " does not exist.\n";
     return;
   }
-  readFileLineByLine(Path, IgoredUsrs);
+  readFileLineByLine(Path, IgnoredUsrs);
 }
 
 int main(int argc, char *argv[]) {
