@@ -688,7 +688,7 @@ llvm::DISubprogram *IRGenDebugInfo::emitFunction(
   bool IsLocalToUnit = Fn ? Fn->hasInternalLinkage() : true;
   bool IsDefinition = true;
   bool IsOptimized = Opts.Optimize;
-  unsigned Flags = 0;
+  llvm::DINode::DIFlags Flags = llvm::DINode::FlagZero;
 
   // Mark everything that is not visible from the source code (i.e.,
   // does not have a Swift name) as artificial, so the debugger can
@@ -899,7 +899,7 @@ void IRGenDebugInfo::emitVariableDeclaration(
   assert(DITy && "could not determine debug type of variable");
 
   unsigned Line = Loc.Line;
-  unsigned Flags = 0;
+  llvm::DINode::DIFlags Flags = llvm::DINode::FlagZero;
   if (Artificial || DITy->isArtificial() || DITy == InternalType)
     Flags |= llvm::DINode::FlagArtificial;
 
@@ -1034,7 +1034,8 @@ StringRef IRGenDebugInfo::getMangledName(DebugTypeInfo DbgTy) {
 llvm::DIDerivedType *
 IRGenDebugInfo::createMemberType(DebugTypeInfo DbgTy, StringRef Name,
                                  unsigned &OffsetInBits, llvm::DIScope *Scope,
-                                 llvm::DIFile *File, unsigned Flags) {
+                                 llvm::DIFile *File,
+                                 llvm::DINode::DIFlags Flags) {
   unsigned SizeOfByte = CI.getTargetInfo().getCharWidth();
   auto *Ty = getOrCreateType(DbgTy);
   auto *DITy = DBuilder.createMemberType(
@@ -1048,7 +1049,8 @@ IRGenDebugInfo::createMemberType(DebugTypeInfo DbgTy, StringRef Name,
 
 llvm::DINodeArray IRGenDebugInfo::getTupleElements(
     TupleType *TupleTy, llvm::DIScope *Scope, llvm::DIFile *File,
-    unsigned Flags, DeclContext *DeclContext, unsigned &SizeInBits) {
+    llvm::DINode::DIFlags Flags, DeclContext *DeclContext,
+    unsigned &SizeInBits) {
   SmallVector<llvm::Metadata *, 16> Elements;
   unsigned OffsetInBits = 0;
   auto genericSig = IGM.getSILTypes().getCurGenericContext();
@@ -1068,7 +1070,8 @@ llvm::DINodeArray IRGenDebugInfo::getTupleElements(
 llvm::DINodeArray
 IRGenDebugInfo::getStructMembers(NominalTypeDecl *D, Type BaseTy,
                                  llvm::DIScope *Scope, llvm::DIFile *File,
-                                 unsigned Flags, unsigned &SizeInBits) {
+                                 llvm::DINode::DIFlags Flags,
+                                 unsigned &SizeInBits) {
   SmallVector<llvm::Metadata *, 16> Elements;
   unsigned OffsetInBits = 0;
   for (VarDecl *VD : D->getStoredProperties()) {
@@ -1090,7 +1093,7 @@ IRGenDebugInfo::getStructMembers(NominalTypeDecl *D, Type BaseTy,
 llvm::DICompositeType *IRGenDebugInfo::createStructType(
     DebugTypeInfo DbgTy, NominalTypeDecl *Decl, Type BaseTy,
     llvm::DIScope *Scope, llvm::DIFile *File, unsigned Line,
-    unsigned SizeInBits, unsigned AlignInBits, unsigned Flags,
+    unsigned SizeInBits, unsigned AlignInBits, llvm::DINode::DIFlags Flags,
     llvm::DIType *DerivedFrom, unsigned RuntimeLang, StringRef UniqueID) {
   StringRef Name = Decl->getName().str();
 
@@ -1122,7 +1125,7 @@ llvm::DINodeArray IRGenDebugInfo::getEnumElements(DebugTypeInfo DbgTy,
                                                   EnumDecl *ED,
                                                   llvm::DIScope *Scope,
                                                   llvm::DIFile *File,
-                                                  unsigned Flags) {
+                                                  llvm::DINode::DIFlags Flags) {
   SmallVector<llvm::Metadata *, 16> Elements;
 
   for (auto *ElemDecl : ED->getAllElements()) {
@@ -1162,7 +1165,8 @@ llvm::DINodeArray IRGenDebugInfo::getEnumElements(DebugTypeInfo DbgTy,
 
 llvm::DICompositeType *IRGenDebugInfo::createEnumType(
     DebugTypeInfo DbgTy, EnumDecl *Decl, StringRef MangledName,
-    llvm::DIScope *Scope, llvm::DIFile *File, unsigned Line, unsigned Flags) {
+    llvm::DIScope *Scope, llvm::DIFile *File, unsigned Line,
+    llvm::DINode::DIFlags Flags) {
   unsigned SizeOfByte = CI.getTargetInfo().getCharWidth();
   unsigned SizeInBits = DbgTy.size.getValue() * SizeOfByte;
   unsigned AlignInBits = DbgTy.align.getValue() * SizeOfByte;
@@ -1212,7 +1216,7 @@ uint64_t IRGenDebugInfo::getSizeOfBasicType(DebugTypeInfo DbgTy) {
 
 llvm::DIType *IRGenDebugInfo::createPointerSizedStruct(
     llvm::DIScope *Scope, StringRef Name, llvm::DIFile *File, unsigned Line,
-    unsigned Flags, StringRef MangledName) {
+    llvm::DINode::DIFlags Flags, StringRef MangledName) {
   if (Opts.DebugInfoKind > IRGenDebugInfoKind::ASTTypes) {
     auto FwdDecl = DBuilder.createForwardDecl(
         llvm::dwarf::DW_TAG_structure_type, Name, Scope, File, Line,
@@ -1229,7 +1233,8 @@ llvm::DIType *IRGenDebugInfo::createPointerSizedStruct(
 
 llvm::DIType *IRGenDebugInfo::createPointerSizedStruct(
     llvm::DIScope *Scope, StringRef Name, llvm::DIType *PointeeTy,
-    llvm::DIFile *File, unsigned Line, unsigned Flags, StringRef MangledName) {
+    llvm::DIFile *File, unsigned Line, llvm::DINode::DIFlags Flags,
+    StringRef MangledName) {
   unsigned PtrSize = CI.getTargetInfo().getPointerWidth(0);
   unsigned PtrAlign = CI.getTargetInfo().getPointerAlign(0);
   auto PtrTy = DBuilder.createPointerType(PointeeTy, PtrSize, PtrAlign);
@@ -1245,7 +1250,8 @@ llvm::DIType *IRGenDebugInfo::createPointerSizedStruct(
 
 llvm::DIType *IRGenDebugInfo::createDoublePointerSizedStruct(
     llvm::DIScope *Scope, StringRef Name, llvm::DIType *PointeeTy,
-    llvm::DIFile *File, unsigned Line, unsigned Flags, StringRef MangledName) {
+    llvm::DIFile *File, unsigned Line, llvm::DINode::DIFlags Flags,
+    StringRef MangledName) {
   unsigned PtrSize = CI.getTargetInfo().getPointerWidth(0);
   unsigned PtrAlign = CI.getTargetInfo().getPointerAlign(0);
   llvm::Metadata *Elements[] = {
@@ -1264,7 +1270,8 @@ llvm::DIType *IRGenDebugInfo::createDoublePointerSizedStruct(
 llvm::DIType *
 IRGenDebugInfo::createFunctionPointer(DebugTypeInfo DbgTy, llvm::DIScope *Scope,
                                       unsigned SizeInBits, unsigned AlignInBits,
-                                      unsigned Flags, StringRef MangledName) {
+                                      llvm::DINode::DIFlags Flags,
+                                      StringRef MangledName) {
   auto FwdDecl = llvm::TempDINode(DBuilder.createReplaceableCompositeType(
       llvm::dwarf::DW_TAG_subroutine_type, MangledName, Scope, MainFile, 0,
       llvm::dwarf::DW_LANG_Swift, SizeInBits, AlignInBits, Flags, MangledName));
@@ -1313,7 +1320,8 @@ IRGenDebugInfo::createFunctionPointer(DebugTypeInfo DbgTy, llvm::DIScope *Scope,
 llvm::DIType *IRGenDebugInfo::createTuple(DebugTypeInfo DbgTy,
                                           llvm::DIScope *Scope,
                                           unsigned SizeInBits,
-                                          unsigned AlignInBits, unsigned Flags,
+                                          unsigned AlignInBits,
+                                          llvm::DINode::DIFlags Flags,
                                           StringRef MangledName) {
   TypeBase *BaseTy = DbgTy.getType();
   auto *TupleTy = BaseTy->castTo<TupleType>();
@@ -1343,7 +1351,8 @@ llvm::DIType *
 IRGenDebugInfo::createOpaqueStruct(llvm::DIScope *Scope, StringRef Name,
                                    llvm::DIFile *File, unsigned Line,
                                    unsigned SizeInBits, unsigned AlignInBits,
-                                   unsigned Flags, StringRef MangledName) {
+                                   llvm::DINode::DIFlags Flags,
+                                   StringRef MangledName) {
   return DBuilder.createStructType(
       Scope, Name, File, Line, SizeInBits, AlignInBits, Flags,
       /* DerivedFrom */ nullptr,
@@ -1364,7 +1373,7 @@ llvm::DIType *IRGenDebugInfo::createType(DebugTypeInfo DbgTy,
   uint64_t SizeInBits = DbgTy.size.getValue() * SizeOfByte;
   uint64_t AlignInBits = DbgTy.align.getValue() * SizeOfByte;
   unsigned Encoding = 0;
-  unsigned Flags = 0;
+  llvm::DINode::DIFlags Flags = llvm::DINode::FlagZero;
 
   TypeBase *BaseTy = DbgTy.getType();
 
