@@ -1727,7 +1727,6 @@ namespace {
       if (arrayElementTy->isTypeVariableOrMember()) {
         CS.addConstraint(ConstraintKind::Defaultable, arrayElementTy,
                          tc.Context.TheAnyType, locator);
-        CS.ArrayElementTypes[expr] = arrayElementTy;
       }
 
       return arrayTy;
@@ -1870,11 +1869,6 @@ namespace {
         CS.addConstraint(ConstraintKind::Defaultable, dictionaryValueTy,
                          tc.Context.TheAnyType, locator);
       }
-
-      // Record key/value type variables.
-      if (dictionaryKeyTy->isTypeVariableOrMember() ||
-          dictionaryValueTy->isTypeVariableOrMember())
-        CS.DictionaryElementTypes[expr] = {dictionaryKeyTy, dictionaryValueTy};
 
       return dictionaryTy;
     }

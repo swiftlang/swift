@@ -998,15 +998,6 @@ public:
   /// The locators of \c Defaultable constraints whose defaults were used.
   SmallVector<ConstraintLocator *, 8> DefaultedConstraints;
 
-  /// The types used to describe the element type of the given array
-  /// literal.
-  llvm::SmallDenseMap<ArrayExpr *, Type> ArrayElementTypes;
-
-  /// The types used to describe the key and value types of the given
-  /// dictionary literal.
-  llvm::SmallDenseMap<DictionaryExpr *, std::pair<Type, Type>>
-    DictionaryElementTypes;
-
 private:
   /// \brief Describe the candidate expression for partial solving.
   /// This class used by shrink & solve methods which apply
