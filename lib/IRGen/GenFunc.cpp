@@ -925,7 +925,7 @@ static llvm::Function *emitPartialApplicationForwarder(IRGenModule &IGM,
 
   // If there's a data pointer required, grab it and load out the
   // extra, previously-curried parameters.
-  } else if (!layout->isKnownEmpty()) {
+  } else {
     unsigned origParamI = outType->getParameters().size();
     assert(layout->getElements().size() == conventions.size()
            && "conventions don't match context layout");
@@ -1017,7 +1017,7 @@ static llvm::Function *emitPartialApplicationForwarder(IRGenModule &IGM,
     // If the parameters can live independent of the context, release it now
     // so we can tail call. The safety of this assumes that neither this release
     // nor any of the loads can throw.
-    if (consumesContext && !dependsOnContextLifetime)
+    if (consumesContext && !dependsOnContextLifetime && rawData)
       subIGF.emitNativeStrongRelease(rawData);
   }
 
@@ -1357,7 +1357,7 @@ void irgen::emitFunctionPartialApplication(IRGenFunction &IGF,
                                                        layout);
 
   llvm::Value *data;
-  if (layout.isKnownEmpty()) {
+  if (args.empty() && layout.isKnownEmpty()) {
     data = IGF.IGM.RefCountedNull;
   } else {
     // Allocate a new object.

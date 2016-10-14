@@ -102,6 +102,13 @@ HeapNonFixedOffsets::HeapNonFixedOffsets(IRGenFunction &IGF,
       case ElementLayout::Kind::NonFixed:
         // Start calculating non-fixed offsets from the end of the first fixed
         // field.
+        if (i == 0) {
+          totalAlign = elt.getType().getAlignmentMask(IGF, eltTy);
+          offset = totalAlign;
+          Offsets.push_back(totalAlign);
+          break;
+        }
+
         assert(i > 0 && "shouldn't begin with a non-fixed field");
         auto &prevElt = layout.getElement(i-1);
         auto prevType = layout.getElementTypes()[i-1];
