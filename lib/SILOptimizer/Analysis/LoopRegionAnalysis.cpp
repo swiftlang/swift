@@ -1034,7 +1034,6 @@ alledge_iterator LoopRegionWrapper::end() {
 
 namespace llvm {
 template <> struct GraphTraits<LoopRegionWrapper> {
-  using NodeType = LoopRegionWrapper;
   using ChildIteratorType = alledge_iterator;
   typedef LoopRegionWrapper *NodeRef;
 

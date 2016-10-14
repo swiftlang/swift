@@ -732,7 +732,6 @@ namespace llvm {
   /// GraphTraits specialization so the CGForDotView can be
   /// iterable by generic graph iterators.
   template <> struct GraphTraits<CGForDotView::Node *> {
-    typedef CGForDotView::Node NodeType;
     typedef CGForDotView::child_iterator ChildIteratorType;
     typedef CGForDotView::Node *NodeRef;
 

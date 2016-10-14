@@ -775,7 +775,6 @@ namespace llvm {
   /// CallGraph GraphTraits specialization so the CallGraph can be
   /// iterable by generic graph iterators.
   template <> struct GraphTraits<CallGraph::Node *> {
-    typedef CallGraph::Node NodeType;
     typedef CallGraph::child_iterator ChildIteratorType;
     typedef CallGraph::Node *NodeRef;
 
