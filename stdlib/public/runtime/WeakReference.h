@@ -121,7 +121,9 @@ class WeakReferenceBits {
 class WeakReference {
   union {
     std::atomic<WeakReferenceBits> nativeValue;
+#if SWIFT_OBJC_INTEROP
     id nonnativeValue;
+#endif
   };
 
   void destroyOldNativeBits(WeakReferenceBits oldBits) {

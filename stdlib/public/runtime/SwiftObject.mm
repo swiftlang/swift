@@ -26,7 +26,6 @@
 #include "swift/Basic/Demangle.h"
 #include "swift/Basic/LLVM.h"
 #include "swift/Basic/Lazy.h"
-#include "swift/Runtime/Errors.h"
 #include "swift/Runtime/Heap.h"
 #include "swift/Runtime/HeapObject.h"
 #include "swift/Runtime/Metadata.h"

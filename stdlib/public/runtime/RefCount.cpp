@@ -11,7 +11,6 @@
 //===----------------------------------------------------------------------===//
 
 #include "swift/Runtime/HeapObject.h"
-#include "swift/Runtime/Errors.h"
 
 #define relaxed std::memory_order_relaxed
 #define acquire std::memory_order_acquire

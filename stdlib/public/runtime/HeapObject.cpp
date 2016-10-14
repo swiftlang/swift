@@ -15,7 +15,6 @@
 //===----------------------------------------------------------------------===//
 
 #include "swift/Basic/Lazy.h"
-#include "swift/Runtime/Errors.h"
 #include "swift/Runtime/HeapObject.h"
 #include "swift/Runtime/Heap.h"
 #include "swift/Runtime/Metadata.h"
@@ -319,7 +318,7 @@ void SWIFT_RT_ENTRY_IMPL(swift_release_n)(HeapObject *object, uint32_t n)
 }
 
 void swift::swift_setDeallocating(HeapObject *object) {
-  object->refCounts.decrementFromOneAndDeinitNonAtomic();
+  object->refCounts.decrementFromOneNonAtomic();
 }
 
 SWIFT_RT_ENTRY_VISIBILITY

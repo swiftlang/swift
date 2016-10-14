@@ -30,7 +30,6 @@
 #include <unistd.h>
 #endif
 #include <stdarg.h>
-#include "swift/Runtime/Errors.h"
 #include "swift/Runtime/Debug.h"
 #include "swift/Runtime/Mutex.h"
 #include "swift/Basic/Demangle.h"

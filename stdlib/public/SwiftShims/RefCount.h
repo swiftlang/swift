@@ -35,6 +35,7 @@ typedef struct {
 #include "llvm/Support/Compiler.h"
 #include "swift/Basic/type_traits.h"
 #include "swift/Runtime/Config.h"
+#include "swift/Runtime/Debug.h"
 
 /*
   An object conceptually has three refcounts. These refcounts 
@@ -693,10 +694,10 @@ class RefCounts {
   // object as deiniting.
   //
   // Precondition: the reference count must be 1
-  void decrementFromOneAndDeinitNonAtomic() {
+  void decrementFromOneNonAtomic() {
     auto bits = refCounts.load(relaxed);
     if (bits.hasSideTable())
-      abort();
+      return bits.getSideTable()->decrementFromOneNonAtomic();
     
     assert(!bits.getIsDeiniting());
     assert(bits.getStrongExtraRefCount() == 0 && "Expect a refcount of 1");
@@ -710,7 +711,8 @@ class RefCounts {
   uint32_t getCount() const {
     auto bits = refCounts.load(relaxed);
     if (bits.hasSideTable())
-      abort();
+      return bits.getSideTable()->getCount();
+    
     assert(!bits.getIsDeiniting());  // FIXME: can we assert this?
     return bits.getStrongExtraRefCount() + 1;
   }
@@ -720,7 +722,8 @@ class RefCounts {
   bool isUniquelyReferenced() const {
     auto bits = refCounts.load(relaxed);
     if (bits.hasSideTable())
-      abort();
+      return false;  // FIXME: implement side table path if useful
+    
     assert(!bits.getIsDeiniting());
     return bits.getStrongExtraRefCount() == 0;
   }
@@ -730,7 +733,8 @@ class RefCounts {
   bool isUniquelyReferencedOrPinned() const {
     auto bits = refCounts.load(relaxed);
     if (bits.hasSideTable())
-      abort();
+      return false;  // FIXME: implement side table path if useful
+    
     assert(!bits.getIsDeiniting());
     return (bits.getStrongExtraRefCount() == 0 || bits.getIsPinned());
     
@@ -980,9 +984,12 @@ class HeapObjectSideTableEntry {
     : object(newObject), refCounts()
   { }
 
+#pragma clang diagnostic push
+#pragma clang diagnostic ignored "-Winvalid-offsetof"
   static ptrdiff_t refCountsOffset() {
     return offsetof(HeapObjectSideTableEntry, refCounts);
   }
+#pragma clang diagnostic pop
 
   HeapObject* tryRetain() {
     if (refCounts.tryIncrement())
@@ -1010,12 +1017,21 @@ class HeapObjectSideTableEntry {
     return refCounts.doDecrement<clearPinnedFlag, performDeinit>(dec);
   }
 
+  void decrementFromOneNonAtomic() {
+    // FIXME: can there be a non-atomic implementation?
+    decrementStrong<DontClearPinnedFlag, DontPerformDeinit>(1);
+  }
+  
   bool isDeiniting() const {
     return refCounts.isDeiniting();
   }
 
   bool tryIncrement() {
     return refCounts.tryIncrement();
+  }
+
+  uint32_t getCount() const {
+    return refCounts.getCount();
   }
 
   // UNOWNED
@@ -1128,7 +1144,8 @@ template <>
 template <ClearPinnedFlag clearPinnedFlag, PerformDeinit performDeinit>
 inline bool RefCounts<SideTableRefCountBits>::
 doDecrementSideTable(SideTableRefCountBits oldbits, uint32_t dec) {
-  abort();
+  swift::crash("side table refcount must not have "
+               "a side table entry of its own");
 }
 
 
