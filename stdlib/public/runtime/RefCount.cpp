@@ -78,7 +78,7 @@ template bool RefCounts<SideTableRefCountBits>::tryIncrementSlow(SideTableRefCou
 
 
 // Return an object's side table, allocating it if necessary.
-// Returns nil if the object is deiniting.
+// Returns null if the object is deiniting.
 // SideTableRefCountBits specialization intentionally does not exist.
 template <>
 HeapObjectSideTableEntry* RefCounts<InlineRefCountBits>::allocateSideTable()
@@ -92,7 +92,7 @@ HeapObjectSideTableEntry* RefCounts<InlineRefCountBits>::allocateSideTable()
   } 
   else if (oldbits.getIsDeiniting()) {
     // Already past the start of deinit. Do nothing.
-    return nil;
+    return nullptr;
   }
 
   // Preflight passed. Allocate a side table.
@@ -112,7 +112,7 @@ HeapObjectSideTableEntry* RefCounts<InlineRefCountBits>::allocateSideTable()
     }
     else if (oldbits.getIsDeiniting()) {
       // Already past the start of deinit. Do nothing.
-      return nil;
+      return nullptr;
     }
     
     // FIXME: barriers?
@@ -132,7 +132,7 @@ HeapObjectSideTableEntry* RefCounts<InlineRefCountBits>::formWeakReference()
   if (side)
     return side->incrementWeak();
   else
-    return nil;
+    return nullptr;
 }
 
 // namespace swift
