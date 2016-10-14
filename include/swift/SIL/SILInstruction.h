@@ -1667,6 +1667,8 @@ static inline llvm::hash_code hash_value(StringLiteralInst::Encoding E) {
   return llvm::hash_value(size_t(E));
 }
 
+// *NOTE* When serializing, we can only represent up to 4 values here. If more
+// qualifiers are added, SIL serialization must be updated.
 enum class LoadOwnershipQualifier {
   Unqualified, Take, Copy, Trivial
 };
@@ -1697,6 +1699,8 @@ public:
   }
 };
 
+// *NOTE* When serializing, we can only represent up to 4 values here. If more
+// qualifiers are added, SIL serialization must be updated.
 enum class StoreOwnershipQualifier {
   Unqualified, Init, Assign, Trivial
 };
