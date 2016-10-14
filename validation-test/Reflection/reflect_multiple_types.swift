@@ -147,9 +147,7 @@ reflect(object: obj)
 // CHECK-64:           (field name=native offset=0
 // CHECK-64:             (reference kind=strong refcounting=native))
 // CHECK-64:           (field name=cocoa offset=0
-// CHECK-64:             (struct size=8 alignment=8 stride=8 num_extra_inhabitants=2147483647
-// CHECK-64:               (field name=cocoaDictionary offset=0
-// CHECK-64:                 (reference kind=strong refcounting=unknown))))))))
+// CHECK-64:             (reference kind=strong refcounting=native))))))
 // CHECK-64:   (field name=t04 offset=64
 // CHECK-64:     (struct size=8 alignment=8 stride=8 num_extra_inhabitants=0
 // CHECK-64:       (field name=_value offset=0
@@ -193,9 +191,7 @@ reflect(object: obj)
 // CHECK-64:           (field name=native offset=0
 // CHECK-64:             (reference kind=strong refcounting=native))
 // CHECK-64:           (field name=cocoa offset=0
-// CHECK-64:             (struct size=8 alignment=8 stride=8 num_extra_inhabitants=2147483647
-// CHECK-64:               (field name=cocoaSet offset=0
-// CHECK-64:                 (reference kind=strong refcounting=unknown))))))))
+// CHECK-64:             (reference kind=strong refcounting=native))))))
 // CHECK-64:   (field name=t16 offset=160
 // CHECK-64:     (struct size=24 alignment=8 stride=24 num_extra_inhabitants=0
 // CHECK-64:       (field name=_core offset=0

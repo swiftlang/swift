@@ -31,9 +31,7 @@ reflect(object: obj)
 // CHECK-64:           (field name=native offset=0
 // CHECK-64:             (reference kind=strong refcounting=native))
 // CHECK-64:           (field name=cocoa offset=0
-// CHECK-64:             (struct size=8 alignment=8 stride=8 num_extra_inhabitants=2147483647
-// CHECK-64:               (field name=cocoaSet offset=0
-// CHECK-64:                 (reference kind=strong refcounting=unknown)))))))))
+// CHECK-64:             (reference kind=strong refcounting=native)))))))
 
 // CHECK-32: Reflecting an object.
 // CHECK-32: Instance pointer in child address space: 0x{{[0-9a-fA-F]+}}
@@ -49,9 +47,7 @@ reflect(object: obj)
 // CHECK-32:           (field name=native offset=0
 // CHECK-32:             (reference kind=strong refcounting=native))
 // CHECK-32:           (field name=cocoa offset=0
-// CHECK-32:             (struct size=4 alignment=4 stride=4 num_extra_inhabitants=4096
-// CHECK-32:               (field name=cocoaSet offset=0
-// CHECK-32:                 (reference kind=strong refcounting=unknown)))))))))
+// CHECK-32:             (reference kind=strong refcounting=native)))))))
 
 doneReflecting()
 
