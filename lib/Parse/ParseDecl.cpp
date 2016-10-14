@@ -5523,6 +5523,11 @@ Parser::parseDeclOperator(ParseDeclOptions Flags, DeclAttributes &Attributes) {
   
   Identifier Name = Context.getIdentifier(Tok.getText());
   SourceLoc NameLoc = consumeToken();
+    
+  if (Attributes.hasAttribute<PostfixAttr>()) {
+    if (!Name.empty() && (Name.get()[0] == '?' || Name.get()[0] == '!'))
+      diagnose(NameLoc, diag::expected_operator_name_after_operator);      
+  }
   
   auto Result = parseDeclOperatorImpl(OperatorLoc, Name, NameLoc, Attributes);
 
