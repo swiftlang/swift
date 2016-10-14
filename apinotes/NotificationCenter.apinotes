@@ -4,4 +4,4 @@ Classes:
     Methods:
       - Selector:        'widgetController'
         MethodKind:      Class
-        FactoryAsInit:   C
+        SwiftName:       'widgetController()'
