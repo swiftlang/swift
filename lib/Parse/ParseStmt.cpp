@@ -1044,7 +1044,7 @@ static void validateAvailabilitySpecList(Parser &P,
 
   if (Specs.size() == 1 &&
       isa<LanguageVersionConstraintAvailabilitySpec>(Specs[0])) {
-    // @avalable(swift N) is allowed only in isolation; it cannot
+    // @available(swift N) is allowed only in isolation; it cannot
     // be combined with other availability specs in a single list.
     return;
   }

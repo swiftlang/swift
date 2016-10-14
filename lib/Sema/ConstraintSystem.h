@@ -158,12 +158,6 @@ class TypeVariableType::Implementation {
   friend class constraints::SavedTypeVariableBinding;
 
 public:
-  
-  /// \brief If this type variable is an opened literal expression, keep track
-  /// of the associated literal conformance for optimization and diagnostic
-  /// purposes.
-  ProtocolDecl *literalConformanceProto = nullptr;
-  
   explicit Implementation(constraints::ConstraintLocator *locator,
                           unsigned options)
     : Options(options), locator(locator),
