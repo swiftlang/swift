@@ -43,8 +43,7 @@ int apinotes_main(ArrayRef<const char *> Args) {
                                "binary-to-yaml",
                                "Convert binary format to YAML"),
                     clEnumValN(api_notes::ActionType::Dump,
-                            "dump", "Parse and dump the output"),
-                    clEnumValEnd),
+                            "dump", "Parse and dump the output")),
          cl::cat(APINotesCategory));
 
   static cl::opt<std::string>

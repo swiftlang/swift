@@ -207,8 +207,7 @@ Action(llvm::cl::desc("Mode:"), llvm::cl::init(ActionType::None),
                       "Reconstruct type from mangled name"),
            clEnumValN(ActionType::PrintModuleGroups,
                       "print-module-groups",
-                      "Print group names in a module"),
-           clEnumValEnd));
+                      "Print group names in a module")));
 
 static llvm::cl::opt<std::string>
 SourceFilename("source-filename", llvm::cl::desc("Name of the source file"));
@@ -469,8 +468,7 @@ AccessibilityFilter(
         clEnumValN(Accessibility::Internal, "accessibility-filter-internal",
             "Print internal and public declarations"),
         clEnumValN(Accessibility::Public, "accessibility-filter-public",
-            "Print public declarations"),
-        clEnumValEnd));
+            "Print public declarations")));
 
 static llvm::cl::opt<bool>
 SynthesizeExtension("synthesize-extension",

@@ -1082,8 +1082,7 @@ static llvm::cl::opt<LongLineBehavior> LLBehavior(
         clEnumValN(LongLineBehavior::None, "none", "Print everything"),
         clEnumValN(LongLineBehavior::Truncate, "truncate",
                    "Truncate long lines"),
-        clEnumValN(LongLineBehavior::Wrap, "wrap", "Wrap long lines"),
-        clEnumValEnd));
+        clEnumValN(LongLineBehavior::Wrap, "wrap", "Wrap long lines")));
 
 static llvm::cl::opt<bool> RemoveUseListComments(
     "view-loop-regions-remove-use-list-comments", llvm::cl::init(false),
