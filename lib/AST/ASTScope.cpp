@@ -1873,6 +1873,8 @@ SmallVector<ValueDecl *, 4> ASTScope::getLocalBindings() const {
     break;
 
   case ASTScopeKind::PatternInitializer:
+    // FIXME: This causes recursion that we cannot yet handle.
+#if false
     // 'self' is available within the pattern initializer of a 'lazy' variable.
     if (auto singleVar = patternBinding.decl->getSingleVar()) {
       if (singleVar->getAttrs().hasAttribute<LazyAttr>() &&
@@ -1890,6 +1892,7 @@ SmallVector<ValueDecl *, 4> ASTScope::getLocalBindings() const {
             result.push_back(self);
       }
     }
+#endif
     break;
 
   case ASTScopeKind::Closure:

@@ -37,10 +37,11 @@ extension P2 {
   }
 }
 
+#if false
 // Lazy properties
 class LazyProperties {
   init() {
-    lazy var localvar = 42  // expected-error {{lazy is only valid for members of a struct or class}} {{5-10=}}
+    lazy var localvar = 42  // FIXME: should error {{lazy is only valid for members of a struct or class}} {{5-10=}}
     localvar += 1
     _ = localvar
   }
@@ -57,6 +58,7 @@ class LazyProperties {
 
   lazy var prop5: Int = { self.value + 1 }()
 }
+#endif
 
 // Protocol extensions.
 // Extending via a superclass constraint.
