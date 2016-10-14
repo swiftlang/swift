@@ -102,6 +102,9 @@ FrameworkPaths("F", llvm::cl::desc("add a directory to the framework search path
 static llvm::cl::list<std::string>
 ModuleInputPaths("I", llvm::cl::desc("add a module for input"));
 
+static llvm::cl::list<std::string>
+CCSystemFrameworkPaths("iframework", llvm::cl::desc("add a directory to the clang importer system framework search path"));
+
 static llvm::cl::opt<bool>
 AbortOnModuleLoadFailure("abort-on-module-fail",
                         llvm::cl::desc("Abort if a module failed to load"));
@@ -3366,6 +3369,10 @@ static int prepareForDump(const char *Main,
   }
   InitInvok.setFrameworkSearchPaths(options::FrameworkPaths);
   InitInvok.setImportSearchPaths(options::ModuleInputPaths);
+  for (auto CCFrameworkPath : options::CCSystemFrameworkPaths) {
+    InitInvok.getClangImporterOptions().ExtraArgs.push_back("-iframework");
+    InitInvok.getClangImporterOptions().ExtraArgs.push_back(CCFrameworkPath);
+  }
 
   if (!options::ModuleList.empty()) {
     if (readFileLineByLine(options::ModuleList, Modules))
