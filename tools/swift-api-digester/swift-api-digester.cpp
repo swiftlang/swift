@@ -1943,6 +1943,7 @@ public:
     SDKNodeKind Kind = Left->getKind();
     assert(Left->getKind() != SDKNodeKind::Nil &&
            Right->getKind() != SDKNodeKind::Nil);
+    assert(Kind == SDKNodeKind::Root || *Left != *Right);
 
     Left->annotate(NodeAnnotation::Updated);
     Right->annotate(NodeAnnotation::Updated);
