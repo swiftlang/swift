@@ -671,8 +671,7 @@ func r24251022() {
 func overloadSetResultType(_ a : Int, b : Int) -> Int {
   // https://twitter.com/_jlfischer/status/712337382175952896
   // TODO: <rdar://problem/27391581> QoI: Nonsensical "binary operator '&&' cannot be applied to two 'Bool' operands"
-  return a == b && 1 == 2  // expected-error {{binary operator '&&' cannot be applied to two 'Bool' operands}}
-  // expected-note @-1 {{expected an argument list of type '(Bool, @autoclosure () throws -> Bool)'}}
+  return a == b && 1 == 2  // expected-error {{cannot convert return expression of type 'Bool' to return type 'Int'}}
 }
 
 // <rdar://problem/21523291> compiler error message for mutating immutable field is incorrect
@@ -733,9 +732,8 @@ class Foo23752537 {
 extension Foo23752537 {
   func isEquivalent(other: Foo23752537) {
     // TODO: <rdar://problem/27391581> QoI: Nonsensical "binary operator '&&' cannot be applied to two 'Bool' operands"
-    // expected-error @+1 {{binary operator '&&' cannot be applied to two 'Bool' operands}}
+    // expected-error @+1 {{unexpected non-void return value in void function}}
     return (self.title != other.title && self.message != other.message)
-    // expected-note @-1 {{expected an argument list of type '(Bool, @autoclosure () throws -> Bool)'}}
   }
 }
 
@@ -815,3 +813,11 @@ r27212391(a: 1, 3, y: 5)    // expected-error {{missing argument label 'x' in ca
 r27212391(1, x: 3, y: 5)    // expected-error {{missing argument label 'a' in call}}
 r27212391(a: 1, y: 3, x: 5) // expected-error {{argument 'x' must precede argument 'y'}}
 r27212391(a: 1, 3, x: 5)    // expected-error {{argument 'x' must precede unnamed argument #2}}
+
+// SR-1255
+func foo1255_1() {
+  return true || false // expected-error {{unexpected non-void return value in void function}}
+}
+func foo1255_2() -> Int {
+  return true || false // expected-error {{cannot convert return expression of type 'Bool' to return type 'Int'}}
+}
