@@ -62,14 +62,24 @@ static Optional<Type> checkTypeOfBinding(ConstraintSystem &cs,
     return None;
 
   // If the type is a type variable itself, don't permit the binding.
-  // FIXME: This is a hack. We need to be smarter about whether there's enough
-  // structure in the type to produce an interesting binding, or not.
   if (auto bindingTypeVar = type->getRValueType()->getAs<TypeVariableType>()) {
-    if (isNilLiteral &&
-        bindingTypeVar->getImpl().literalConformanceProto &&
-        bindingTypeVar->getImpl().literalConformanceProto->isSpecificProtocol(
-          KnownProtocolKind::ExpressibleByNilLiteral))
-      *isNilLiteral = true;
+    if (isNilLiteral) {
+      *isNilLiteral = false;
+
+      // Look for a literal-conformance constraint on the type variable.
+      SmallVector<Constraint *, 8> constraints;
+      cs.getConstraintGraph().gatherConstraints(bindingTypeVar, constraints);
+      for (auto constraint : constraints) {
+        if (constraint->getKind() == ConstraintKind::LiteralConformsTo &&
+            constraint->getProtocol()->isSpecificProtocol(
+              KnownProtocolKind::ExpressibleByNilLiteral) &&
+            cs.simplifyType(constraint->getFirstType())
+              ->isEqual(bindingTypeVar)) {
+          *isNilLiteral = true;
+          break;
+        }
+      }
+    }
     
     return None;
   }
@@ -667,6 +677,7 @@ static bool shouldBindToValueType(Constraint *constraint)
   case ConstraintKind::Equal:
   case ConstraintKind::BindParam:
   case ConstraintKind::ConformsTo:
+  case ConstraintKind::LiteralConformsTo:
   case ConstraintKind::CheckedCast:
   case ConstraintKind::SelfObjectOfProtocol:
   case ConstraintKind::ApplicableFunction:
@@ -782,8 +793,19 @@ static PotentialBindings getPotentialBindings(ConstraintSystem &cs,
       result.InvolvesTypeVariables = true;
       continue;
 
-    case ConstraintKind::ConformsTo: 
+    case ConstraintKind::LiteralConformsTo:
+        // If there is a 'nil' literal constraint, we might need optional
+        // supertype bindings.
+        if (constraint->getProtocol()->isSpecificProtocol(
+              KnownProtocolKind::ExpressibleByNilLiteral))
+          addOptionalSupertypeBindings = true;
+
+        SWIFT_FALLTHROUGH;
+
+    case ConstraintKind::ConformsTo:
     case ConstraintKind::SelfObjectOfProtocol: {
+      // FIXME: Only for LiteralConformsTo?
+
       // If there is a default literal type for this protocol, it's a
       // potential binding.
       auto defaultType = tc.getDefaultType(constraint->getProtocol(), cs.DC);
@@ -908,13 +930,17 @@ static PotentialBindings getPotentialBindings(ConstraintSystem &cs,
     // Check whether we can perform this binding.
     // FIXME: this has a super-inefficient extraneous simplifyType() in it.
     bool isNilLiteral = false;
-    if (auto boundType = checkTypeOfBinding(cs, typeVar, type, &isNilLiteral)) {
+    bool *isNilLiteralPtr = nullptr;
+    if (!addOptionalSupertypeBindings && kind == AllowedBindingKind::Supertypes)
+      isNilLiteralPtr = &isNilLiteral;
+    if (auto boundType = checkTypeOfBinding(cs, typeVar, type,
+                                            isNilLiteralPtr)) {
       type = *boundType;
       if (type->hasTypeVariable())
         result.InvolvesTypeVariables = true;
     } else {
       // If the bound is a 'nil' literal type, add optional supertype bindings.
-      if (isNilLiteral && kind == AllowedBindingKind::Supertypes) {
+      if (isNilLiteral) {
         addOptionalSupertypeBindings = true;
         continue;
       }

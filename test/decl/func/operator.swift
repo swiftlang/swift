@@ -148,8 +148,8 @@ postfix prefix infix func ++(x: Double) {} // expected-error {{'prefix' contradi
 infix prefix func +-+(x: Int, y: Int) {} // expected-error {{'infix' modifier is not required or allowed on func declarations}} {{1-7=}} expected-error{{'prefix' contradicts previous modifier 'infix'}} {{7-14=}}
 
 // Don't allow one to define a postfix '!'; it's built into the
-// language.
-postfix operator!  // expected-error {{cannot declare a custom postfix '!' operator}}
+// language. Also illegal to have any postfix operator starting with '!'.
+postfix operator !  // expected-error {{cannot declare a custom postfix '!' operator}} expected-error {{expected operator name in operator declaration}}
 prefix operator &  // expected-error {{cannot declare a custom prefix '&' operator}}
 
 // <rdar://problem/14607026> Restrict use of '<' and '>' as prefix/postfix operator names

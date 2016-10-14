@@ -481,19 +481,15 @@ Base=1 as Base=1  // expected-error {{cannot assign to immutable expression of t
 
 // <rdar://problem/18634543> Parser hangs at swift::Parser::parseType
 public enum TestA {
-  // expected-error @+2 {{expected ',' separator}}
   // expected-error @+1{{expected '{' in body of function declaration}}
   public static func convertFromExtenndition( // expected-error {{expected parameter name followed by ':'}}
-    // expected-error@+2 {{expected ',' separator}}
     // expected-error@+1{{expected parameter name followed by ':'}}
     s._core.count != 0, "Can't form a Character from an empty String")
 }
 
 public enum TestB {
-  // expected-error@+2 {{expected ',' separator}}
   // expected-error@+1{{expected '{' in body of function declaration}}
   public static func convertFromExtenndition( // expected-error {{expected parameter name followed by ':'}}
-    // expected-error@+2 {{expected ',' separator}}
     // expected-error@+1 {{expected parameter name followed by ':'}}
     s._core.count ?= 0, "Can't form a Character from an empty String")
 }
@@ -527,10 +523,9 @@ case let (jeb):
 // rdar://19605164
 // expected-error@+2{{use of undeclared type 'S'}}
 struct Foo19605164 {
-func a(s: S[{{g) -> Int {}  // expected-note {{to match this opening '('}}
-// expected-error@+3 {{expected parameter name followed by ':'}}
-// expected-error@+2 2 {{expected ',' separator}}
-// expected-error@+1 {{expected ')' in parameter}}
+func a(s: S[{{g) -> Int {}
+// expected-error@+2 {{expected parameter name followed by ':'}}
+// expected-error@+1 {{expected ',' separator}}
 }}}
 #endif
   
@@ -659,7 +654,7 @@ func r21712891(s : String) -> String {
   let a = s.startIndex..<s.startIndex
   _ = a
   // The specific errors produced don't actually matter, but we need to reject this.
-  return "\(s[a)"  // expected-error 3 {{}}
+  return "\(s[a)"  // expected-error {{expected ']' in expression list}} expected-note {{to match this opening '['}}
 }
 
 

@@ -1286,15 +1286,27 @@ CalleeCandidateInfo::evaluateCloseness(DeclContext *dc, Type candArgListType,
   bool mismatchesAreNearMisses = true;
 
   CalleeCandidateInfo::FailedArgumentInfo failureInfo;
-  
+
+  // Local function which extracts type from the parameter container.
+  auto getType = [](const CallArgParam &param) -> Type {
+    // If parameter is marked as @autoclosure, we are
+    // only interested in it's resulting type.
+    if (param.isAutoClosure()) {
+      if (auto fnType = param.Ty->getAs<AnyFunctionType>())
+        return fnType->getResult();
+    }
+
+    return param.Ty;
+  };
+
   for (unsigned i = 0, e = paramBindings.size(); i != e; ++i) {
     // Bindings specify the arguments that source the parameter.  The only case
     // this returns a non-singular value is when there are varargs in play.
     auto &bindings = paramBindings[i];
-    auto paramType = candArgs[i].Ty;
+    auto paramType = getType(candArgs[i]);
     
     for (auto argNo : bindings) {
-      auto argType = actualArgs[argNo].Ty;
+      auto argType = getType(actualArgs[argNo]);
       auto rArgType = argType->getRValueType();
       
       // If the argument has an unresolved type, then we're not actually
@@ -2920,7 +2932,8 @@ bool FailureDiagnosis::diagnoseGeneralConversionFailure(Constraint *constraint){
   // If simplification has turned this into the same types, then this isn't the
   // broken constraint that we're looking for.
   if (fromType->isEqual(toType) &&
-      constraint->getKind() != ConstraintKind::ConformsTo)
+      constraint->getKind() != ConstraintKind::ConformsTo &&
+      constraint->getKind() != ConstraintKind::LiteralConformsTo)
     return false;
   
   
@@ -5263,7 +5276,7 @@ bool FailureDiagnosis::visitApplyExpr(ApplyExpr *callExpr) {
       argType = tupleTy;
     }
   }
-  
+
   // Get the expression result of type checking the arguments to the call
   // independently, so we have some idea of what we're working with.
   //

@@ -614,24 +614,6 @@ static ConstraintSystem::SolutionKind
 matchCallArguments(ConstraintSystem &cs, TypeMatchKind kind,
                    Type argType, Type paramType,
                    ConstraintLocatorBuilder locator) {
-  
-  // In the empty existential parameter case, we don't need to decompose the
-  // arguments.
-  if (paramType->isEmptyExistentialComposition()) {
-    if (argType->is<InOutType>())
-      return ConstraintSystem::SolutionKind::Error;
-
-    // If the param type is an empty existential composition, the function can
-    // only have one argument. Check if exactly one argument was passed to this
-    // function, otherwise we obviously have a mismatch
-    if (auto tupleArgType = dyn_cast<TupleType>(argType.getPointer())) {
-      if (tupleArgType->getNumElements() != 1) {
-        return ConstraintSystem::SolutionKind::Error;
-      }
-    }
-    return ConstraintSystem::SolutionKind::Solved;
-  }
-
   // Extract the parameters.
   ValueDecl *callee;
   unsigned calleeLevel;
@@ -652,6 +634,16 @@ matchCallArguments(ConstraintSystem &cs, TypeMatchKind kind,
                                       cs.shouldAttemptFixes(), listener,
                                       parameterBindings))
     return ConstraintSystem::SolutionKind::Error;
+
+  // In the empty existential parameter case,
+  // it's sufficient to simply match call arguments.
+  if (paramType->isEmptyExistentialComposition()) {
+    // Argument of the existential type can't be inout.
+    if (argType->is<InOutType>())
+      return ConstraintSystem::SolutionKind::Error;
+
+    return ConstraintSystem::SolutionKind::Solved;
+  }
 
   // Check the argument types for each of the parameters.
   unsigned subflags = ConstraintSystem::TMF_GenerateConstraints;
@@ -2288,6 +2280,7 @@ ConstraintSystem::SolutionKind ConstraintSystem::simplifyConformsToConstraint(
       return SolutionKind::Solved;
     break;
   case ConstraintKind::ConformsTo:
+  case ConstraintKind::LiteralConformsTo:
     // Check whether this type conforms to the protocol.
     if (TC.conformsToProtocol(type, protocol, DC,
                               ConformanceCheckFlags::InExpression))
@@ -3467,6 +3460,7 @@ static TypeMatchKind getTypeMatchKind(ConstraintKind kind) {
     llvm_unreachable("Overload binding constraints don't involve type matches");
 
   case ConstraintKind::ConformsTo:
+  case ConstraintKind::LiteralConformsTo:
   case ConstraintKind::SelfObjectOfProtocol:
     llvm_unreachable("Conformance constraints don't involve type matches");
 
@@ -4126,6 +4120,7 @@ ConstraintSystem::simplifyConstraint(const Constraint &constraint) {
     return SolutionKind::Solved;
 
   case ConstraintKind::ConformsTo:
+  case ConstraintKind::LiteralConformsTo:
   case ConstraintKind::SelfObjectOfProtocol:
     return simplifyConformsToConstraint(
              constraint.getFirstType(),
