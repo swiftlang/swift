@@ -731,7 +731,7 @@ static bool isStrictInoutSubtypeConstraint(Constraint *constraint) {
   if (!iot)
     return false;
 
-  return iot->getObjectType()->getAs<TypeVariableType>() == nullptr;
+  return !iot->getObjectType()->isTypeVariableOrMember();
 }
 
 bool ConstraintGraph::contractEdges() {
