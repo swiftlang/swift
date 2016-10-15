@@ -938,10 +938,10 @@ bool StructExtractInst::isFieldOnlyNonTrivialField() const {
 
 
 TermInst::SuccessorListTy TermInst::getSuccessors() {
-  #define TERMINATOR(TYPE, PARENT, EFFECT, RELEASING) \
-    if (auto I = dyn_cast<TYPE>(this)) \
-      return I->getSuccessors();
-  #include "swift/SIL/SILNodes.def"
+#define TERMINATOR(TYPE, PARENT, TEXTUALNAME, EFFECT, RELEASING)               \
+  if (auto I = dyn_cast<TYPE>(this))                                           \
+    return I->getSuccessors();
+#include "swift/SIL/SILNodes.def"
 
   llvm_unreachable("not a terminator?!");
 }
