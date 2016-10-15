@@ -18,3 +18,5 @@ Func Float80.abs(_:) has been moved to Func abs(_:)
 
 ==================================================== Type Changes ====================================================
 Func UnsafePointer.withMemoryRebound(to:capacity:_:) has 3rd parameter type change from (UnsafeMutablePointer<T>) throws -> Result to (UnsafePointer<T>) throws -> Result
+
+==================================================== Decl Attribute changes ====================================================

@@ -614,24 +614,6 @@ static ConstraintSystem::SolutionKind
 matchCallArguments(ConstraintSystem &cs, TypeMatchKind kind,
                    Type argType, Type paramType,
                    ConstraintLocatorBuilder locator) {
-  
-  // In the empty existential parameter case, we don't need to decompose the
-  // arguments.
-  if (paramType->isEmptyExistentialComposition()) {
-    if (argType->is<InOutType>())
-      return ConstraintSystem::SolutionKind::Error;
-
-    // If the param type is an empty existential composition, the function can
-    // only have one argument. Check if exactly one argument was passed to this
-    // function, otherwise we obviously have a mismatch
-    if (auto tupleArgType = dyn_cast<TupleType>(argType.getPointer())) {
-      if (tupleArgType->getNumElements() != 1) {
-        return ConstraintSystem::SolutionKind::Error;
-      }
-    }
-    return ConstraintSystem::SolutionKind::Solved;
-  }
-
   // Extract the parameters.
   ValueDecl *callee;
   unsigned calleeLevel;
@@ -652,6 +634,16 @@ matchCallArguments(ConstraintSystem &cs, TypeMatchKind kind,
                                       cs.shouldAttemptFixes(), listener,
                                       parameterBindings))
     return ConstraintSystem::SolutionKind::Error;
+
+  // In the empty existential parameter case,
+  // it's sufficient to simply match call arguments.
+  if (paramType->isEmptyExistentialComposition()) {
+    // Argument of the existential type can't be inout.
+    if (argType->is<InOutType>())
+      return ConstraintSystem::SolutionKind::Error;
+
+    return ConstraintSystem::SolutionKind::Solved;
+  }
 
   // Check the argument types for each of the parameters.
   unsigned subflags = ConstraintSystem::TMF_GenerateConstraints;
@@ -1186,6 +1178,31 @@ ConstraintSystem::matchTypes(Type type1, Type type2, TypeMatchKind kind,
   if (kind != TypeMatchKind::ConformsTo && desugar1->isEqual(desugar2))
     return SolutionKind::Solved;
 
+  // Local function that should be used to produce the return value whenever
+  // this function was unable to resolve the constraint. It should be used
+  // within \c matchTypes() as
+  //
+  //   return formUnsolvedResult();
+  //
+  // along any unsolved path. No other returns should produce
+  // SolutionKind::Unsolved or inspect TMF_GenerateConstraints.
+  auto formUnsolvedResult = [&] {
+    // If we're supposed to generate constraints (i.e., this is a
+    // newly-generated constraint), do so now.
+    if (flags & TMF_GenerateConstraints) {
+      // Add a new constraint between these types. We consider the current
+      // type-matching problem to the "solved" by this addition, because
+      // this new constraint will be solved at a later point.
+      // Obviously, this must not happen at the top level, or the
+      // algorithm would not terminate.
+      addConstraint(getConstraintKind(kind), type1, type2,
+                    getConstraintLocator(locator));
+      return SolutionKind::Solved;
+    }
+
+    return SolutionKind::Unsolved;
+  };
+
   // If either (or both) types are type variables, unify the type variables.
   if (typeVar1 || typeVar2) {
     switch (kind) {
@@ -1204,24 +1221,8 @@ ConstraintSystem::matchTypes(Type type1, Type type2, TypeMatchKind kind,
         // If exactly one of the type variables can bind to an lvalue, we
         // can't merge these two type variables.
         if (rep1->getImpl().canBindToLValue()
-              != rep2->getImpl().canBindToLValue()) {
-          if (flags & TMF_GenerateConstraints) {
-            if (kind == TypeMatchKind::BindToPointerType) {
-              increaseScore(ScoreKind::SK_ScalarPointerConversion);
-            }
-
-            // Add a new constraint between these types. We consider the current
-            // type-matching problem to the "solved" by this addition, because
-            // this new constraint will be solved at a later point.
-            // Obviously, this must not happen at the top level, or the
-            // algorithm would not terminate.
-            addConstraint(getConstraintKind(kind), rep1, rep2,
-                          getConstraintLocator(locator));
-            return SolutionKind::Solved;
-          }
-
-          return SolutionKind::Unsolved;
-        }
+              != rep2->getImpl().canBindToLValue())
+          return formUnsolvedResult();
 
         // Merge the equivalence classes corresponding to these two variables.
         mergeEquivalenceClasses(rep1, rep2);
@@ -1254,8 +1255,7 @@ ConstraintSystem::matchTypes(Type type1, Type type2, TypeMatchKind kind,
 
         // A constraint that binds any pointer to a void pointer is
         // ineffective, since any pointer can be converted to a void pointer.
-        if (kind == TypeMatchKind::BindToPointerType && desugar2->isVoid() &&
-            (flags & TMF_GenerateConstraints)) {
+        if (kind == TypeMatchKind::BindToPointerType && desugar2->isVoid()) {
           // Bind type1 to Void only as a last resort.
           addConstraint(ConstraintKind::Defaultable, typeVar1, type2,
                         getConstraintLocator(locator));
@@ -1309,7 +1309,8 @@ ConstraintSystem::matchTypes(Type type1, Type type2, TypeMatchKind kind,
           return SolutionKind::Solved;
         }
       }
-      return SolutionKind::Unsolved;
+
+      return formUnsolvedResult();
     }
 
     case TypeMatchKind::ArgumentTupleConversion:
@@ -1331,22 +1332,13 @@ ConstraintSystem::matchTypes(Type type1, Type type2, TypeMatchKind kind,
     case TypeMatchKind::ArgumentConversion:
     case TypeMatchKind::OperatorArgumentTupleConversion:
     case TypeMatchKind::OperatorArgumentConversion:
-      if (flags & TMF_GenerateConstraints) {
-        // Add a new constraint between these types. We consider the current
-        // type-matching problem to the "solved" by this addition, because
-        // this new constraint will be solved at a later point.
-        // Obviously, this must not happen at the top level, or the algorithm
-        // would not terminate.
-        addConstraint(getConstraintKind(kind), type1, type2,
-                      getConstraintLocator(locator));
-        return SolutionKind::Solved;
-      }
-
       // We couldn't solve this constraint. If only one of the types is a type
       // variable, perhaps we can do something with it below.
-      if (typeVar1 && typeVar2)
-        return typeVar1 == typeVar2 ? SolutionKind::Solved
-                                    : SolutionKind::Unsolved;
+      if (typeVar1 && typeVar2) {
+        if (typeVar1 == typeVar2) return SolutionKind::Solved;
+
+        return formUnsolvedResult();
+      }
         
       break;
     }
@@ -1363,18 +1355,7 @@ ConstraintSystem::matchTypes(Type type1, Type type2, TypeMatchKind kind,
       return ::matchCallArguments(*this, kind, type1, type2, locator);
     }
 
-    if (flags & TMF_GenerateConstraints) {
-      // Add a new constraint between these types. We consider the current
-      // type-matching problem to the "solved" by this addition, because
-      // this new constraint will be solved at a later point.
-      // Obviously, this must not happen at the top level, or the algorithm
-      // would not terminate.
-      addConstraint(getConstraintKind(kind), type1, type2,
-                    getConstraintLocator(locator));
-      return SolutionKind::Solved;
-    }
-
-    return SolutionKind::Unsolved;
+    return formUnsolvedResult();
   }
 
   // Decompose parallel structure.
@@ -2075,8 +2056,7 @@ commit_to_conversions:
 
   if (conversionsOrFixes.empty()) {
     // If one of the types is a type variable, we leave this unsolved.
-    if (typeVar1 || typeVar2)
-      return SolutionKind::Unsolved;
+    if (typeVar1 || typeVar2) return formUnsolvedResult();
 
     return SolutionKind::Error;
   }
@@ -2288,6 +2268,7 @@ ConstraintSystem::SolutionKind ConstraintSystem::simplifyConformsToConstraint(
       return SolutionKind::Solved;
     break;
   case ConstraintKind::ConformsTo:
+  case ConstraintKind::LiteralConformsTo:
     // Check whether this type conforms to the protocol.
     if (TC.conformsToProtocol(type, protocol, DC,
                               ConformanceCheckFlags::InExpression))
@@ -3467,6 +3448,7 @@ static TypeMatchKind getTypeMatchKind(ConstraintKind kind) {
     llvm_unreachable("Overload binding constraints don't involve type matches");
 
   case ConstraintKind::ConformsTo:
+  case ConstraintKind::LiteralConformsTo:
   case ConstraintKind::SelfObjectOfProtocol:
     llvm_unreachable("Conformance constraints don't involve type matches");
 
@@ -4126,6 +4108,7 @@ ConstraintSystem::simplifyConstraint(const Constraint &constraint) {
     return SolutionKind::Solved;
 
   case ConstraintKind::ConformsTo:
+  case ConstraintKind::LiteralConformsTo:
   case ConstraintKind::SelfObjectOfProtocol:
     return simplifyConformsToConstraint(
              constraint.getFirstType(),

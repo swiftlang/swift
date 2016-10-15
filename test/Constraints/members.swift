@@ -580,3 +580,13 @@ enum SomeErrorType {
   }
 }
 
+// SR-2193: QoI: better diagnostic when a decl exists, but is not a type
+
+enum SR_2193_Error: Error {
+  case Boom
+}
+
+do {
+  throw SR_2193_Error.Boom
+} catch let e as SR_2193_Error.Boom { // expected-error {{enum element 'Boom' is not a member type of 'SR_2193_Error'}}
+}

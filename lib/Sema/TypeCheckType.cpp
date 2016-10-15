@@ -843,11 +843,43 @@ static Type diagnoseUnknownType(TypeChecker &tc, DeclContext *dc,
     tc.diagnose(comp->getIdLoc(), diag::no_module_type,
                 comp->getIdentifier(), moduleType->getModule()->getName());
   } else {
-    tc.diagnose(comp->getIdLoc(), diag::invalid_member_type,
-                comp->getIdentifier(), parentType)
-      .highlight(parentRange);
-  }
+    // Situation where class tries to inherit from itself, such
+    // would produce an assertion when trying to lookup members of the class.
+    auto lazyResolver = tc.Context.getLazyResolver();
+    if (auto superClass = parentType->getSuperclass(lazyResolver)) {
+      if (superClass->isEqual(parentType)) {
+        auto decl = parentType->castTo<NominalType>()->getDecl();
+        tc.diagnose(decl->getLoc(), diag::circular_class_inheritance,
+                    decl->getNameStr());
+        return ErrorType::get(tc.Context);
+      }
+    }
 
+    LookupResult memberLookup;
+    // Let's try to lookup given identifier as a member of the parent type,
+    // this allows for more precise diagnostic, which distinguishes between
+    // identifier not found as a member type vs. not found at all.
+    NameLookupOptions memberLookupOptions = lookupOptions;
+    memberLookupOptions |= NameLookupFlags::IgnoreAccessibility;
+    memberLookupOptions |= NameLookupFlags::KnownPrivate;
+    memberLookupOptions -= NameLookupFlags::OnlyTypes;
+
+    memberLookup = tc.lookupMember(dc, parentType, comp->getIdentifier(),
+                                   memberLookupOptions);
+
+    // Looks like this is not a member type, but simply a member of parent type.
+    if (!memberLookup.empty()) {
+      auto &member = memberLookup[0];
+      tc.diagnose(comp->getIdLoc(), diag::invalid_member_reference,
+                  member->getDescriptiveKind(), comp->getIdentifier(),
+                  parentType)
+          .highlight(parentRange);
+    } else {
+      tc.diagnose(comp->getIdLoc(), diag::invalid_member_type,
+                  comp->getIdentifier(), parentType)
+          .highlight(parentRange);
+    }
+  }
   return ErrorType::get(tc.Context);
 }
 

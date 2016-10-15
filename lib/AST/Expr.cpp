@@ -1314,18 +1314,32 @@ SequenceExpr *SequenceExpr::create(ASTContext &ctx, ArrayRef<Expr*> elements) {
   return ::new(Buffer) SequenceExpr(elements);
 }
 
-SourceLoc TupleExpr::getStartLoc() const {
-  if (LParenLoc.isValid()) return LParenLoc;
-  if (getNumElements() == 0) return SourceLoc();
-  return getElement(0)->getStartLoc();
-}
-
-SourceLoc TupleExpr::getEndLoc() const {
-  if (hasTrailingClosure() || RParenLoc.isInvalid()) {
-    if (getNumElements() == 0) return SourceLoc();
-    return getElements().back()->getEndLoc();
+SourceRange TupleExpr::getSourceRange() const {
+  SourceLoc start = SourceLoc();
+  SourceLoc end = SourceLoc();
+  if (LParenLoc.isValid()) {
+    start = LParenLoc;
+  } else if (getNumElements() == 0) {
+    return { SourceLoc(), SourceLoc() };
+  } else {
+    start = getElement(0)->getStartLoc();
   }
-  return RParenLoc;
+  
+  if (hasTrailingClosure() || RParenLoc.isInvalid()) {
+    if (getNumElements() == 0) {
+      return { SourceLoc(), SourceLoc() };
+    } else {
+      end = getElements().back()->getEndLoc();
+    }
+  } else {
+    end = RParenLoc;
+  }
+  
+  if (start.isValid() && end.isValid()) {
+    return { start, end };
+  } else {
+    return { SourceLoc(), SourceLoc() };
+  }
 }
 
 TupleExpr::TupleExpr(SourceLoc LParenLoc, ArrayRef<Expr *> SubExprs,

@@ -55,6 +55,14 @@ class FunctionRefInst;
 
 template <typename ImplClass> class SILClonerWithScopes;
 
+// An enum class for SILInstructions that enables exhaustive switches over
+// instructions.
+enum class SILInstructionKind : std::underlying_type<ValueKind>::type {
+#define INST(Id, Parent, TextualName, MemoryBehavior, ReleasingBehavior)       \
+  Id = static_cast<std::underlying_type<ValueKind>::type>(ValueKind::Id),
+#include "SILNodes.def"
+};
+
 /// This is the root class for all instructions that can be used as the contents
 /// of a Swift SILBasicBlock.
 class SILInstruction : public ValueBase,public llvm::ilist_node<SILInstruction>{
@@ -4444,7 +4452,7 @@ public:
 //===----------------------------------------------------------------------===//
 
 enum class TermKind {
-#define TERMINATOR(Id, Parent, MemBehavior, MayRelease) Id,
+#define TERMINATOR(Id, Parent, TextualName, MemBehavior, MayRelease) Id,
 #include "SILNodes.def"
 };
 
@@ -4453,10 +4461,10 @@ struct ValueKindAsTermKind {
 
   ValueKindAsTermKind(ValueKind V) {
     switch (V) {
-#define TERMINATOR(Id, Parent, MemBehavior, MayRelease)                 \
-      case ValueKind::Id:                                               \
-        K = TermKind::Id;                                               \
-        break;
+#define TERMINATOR(Id, Parent, TextualName, MemBehavior, MayRelease)           \
+  case ValueKind::Id:                                                          \
+    K = TermKind::Id;                                                          \
+    break;
 #include "SILNodes.def"
     default:
       llvm_unreachable("Not a terminator kind?!");

@@ -468,25 +468,6 @@ namespace {
                                             FunctionRefKind::Compound,
                                             locator));
 
-        if (!archetype) {
-          // If the nested type is not an archetype (because it was constrained
-          // to a concrete type by a requirement), return the fresh type
-          // variable now, and let binding occur during overload resolution.
-          return memberTypeVar;
-        }
-                                
-        // FIXME: Would be better to walk the requirements of the protocol
-        // of which the associated type is a member.
-        if (auto superclass = member->getSuperclass()) {
-          CS.addConstraint(ConstraintKind::Subtype, memberTypeVar,
-                           superclass, locator);
-        }
-
-        for (auto proto : member->getConformingProtocols()) {
-          CS.addConstraint(ConstraintKind::ConformsTo, memberTypeVar,
-                           proto->getDeclaredType(), locator);
-        }
-
         return memberTypeVar;
       });
     }

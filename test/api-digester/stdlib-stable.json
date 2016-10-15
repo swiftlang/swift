@@ -984,6 +984,7 @@
           "usr": "s:FesRxs23BidirectionalCollectionxzwx11SubSequencerS_7popLastFT_GSqWx8Iterator7Element__",
           "location": "",
           "moduleName": "Swift",
+          "mutating": true,
           "children": [
             {
               "kind": "TypeNominal",
@@ -1007,6 +1008,7 @@
           "usr": "s:FesRxs23BidirectionalCollectionxzwx11SubSequencerS_10removeLastFT_Wx8Iterator7Element_",
           "location": "",
           "moduleName": "Swift",
+          "mutating": true,
           "children": [
             {
               "kind": "TypeNominal",
@@ -1023,6 +1025,7 @@
           "usr": "s:FesRxs23BidirectionalCollectionxzwx11SubSequencerS_10removeLastFSiT_",
           "location": "",
           "moduleName": "Swift",
+          "mutating": true,
           "children": [
             {
               "kind": "TypeNominal",
@@ -1806,6 +1809,7 @@
           "usr": "s:FVs10Dictionary11updateValueFTq_6forKeyx_GSqq__",
           "location": "",
           "moduleName": "Swift",
+          "mutating": true,
           "children": [
             {
               "kind": "TypeNominal",
@@ -1846,6 +1850,7 @@
           "usr": "s:FVs10Dictionary6removeFT2atGVs15DictionaryIndexxq___T3keyx5valueq__",
           "location": "",
           "moduleName": "Swift",
+          "mutating": true,
           "children": [
             {
               "kind": "TypeNominal",
@@ -1905,6 +1910,7 @@
           "usr": "s:FVs10Dictionary11removeValueFT6forKeyx_GSqq__",
           "location": "",
           "moduleName": "Swift",
+          "mutating": true,
           "children": [
             {
               "kind": "TypeNominal",
@@ -1940,6 +1946,7 @@
           "usr": "s:FVs10Dictionary9removeAllFT15keepingCapacitySb_T_",
           "location": "",
           "moduleName": "Swift",
+          "mutating": true,
           "children": [
             {
               "kind": "TypeNominal",
@@ -2745,6 +2752,7 @@
           "usr": "s:FVs10Dictionary8popFirstFT_GSqT3keyx5valueq___",
           "location": "",
           "moduleName": "Swift",
+          "mutating": true,
           "children": [
             {
               "kind": "TypeNominal",
@@ -2787,6 +2795,7 @@
           "usr": "s:Fes0_Rxs8Hashablexs20_AnyHashableProtocolrVs10Dictionary11updateValueuRd__S_rFTq_6forKeyqd___GSqq__",
           "location": "",
           "moduleName": "Swift",
+          "mutating": true,
           "children": [
             {
               "kind": "TypeNominal",
@@ -2827,6 +2836,7 @@
           "usr": "s:Fes0_Rxs8Hashablexs20_AnyHashableProtocolrVs10Dictionary11removeValueuRd__S_rFT6forKeyqd___GSqq__",
           "location": "",
           "moduleName": "Swift",
+          "mutating": true,
           "children": [
             {
               "kind": "TypeNominal",
@@ -3529,6 +3539,7 @@
           "usr": "s:FPs10SetAlgebra6insertFwx7ElementT8insertedSb17memberAfterInsertwxS0__",
           "location": "",
           "moduleName": "Swift",
+          "mutating": true,
           "children": [
             {
               "kind": "TypeNominal",
@@ -3562,6 +3573,7 @@
           "usr": "s:FPs10SetAlgebra6removeFwx7ElementGSqwxS0__",
           "location": "",
           "moduleName": "Swift",
+          "mutating": true,
           "children": [
             {
               "kind": "TypeNominal",
@@ -3590,6 +3602,7 @@
           "usr": "s:FPs10SetAlgebra6updateFT4withwx7Element_GSqwxS0__",
           "location": "",
           "moduleName": "Swift",
+          "mutating": true,
           "children": [
             {
               "kind": "TypeNominal",
@@ -3618,6 +3631,7 @@
           "usr": "s:FPs10SetAlgebra9formUnionFxT_",
           "location": "",
           "moduleName": "Swift",
+          "mutating": true,
           "children": [
             {
               "kind": "TypeNominal",
@@ -3646,6 +3660,7 @@
           "usr": "s:FPs10SetAlgebra16formIntersectionFxT_",
           "location": "",
           "moduleName": "Swift",
+          "mutating": true,
           "children": [
             {
               "kind": "TypeNominal",
@@ -3674,6 +3689,7 @@
           "usr": "s:FPs10SetAlgebra23formSymmetricDifferenceFxT_",
           "location": "",
           "moduleName": "Swift",
+          "mutating": true,
           "children": [
             {
               "kind": "TypeNominal",
@@ -3893,6 +3909,7 @@
           "usr": "s:FPs10SetAlgebra8subtractFxT_",
           "location": "",
           "moduleName": "Swift",
+          "mutating": true,
           "children": [
             {
               "kind": "TypeNominal",
@@ -3991,6 +4008,7 @@
           "usr": "s:FEsPs10SetAlgebra8subtractFxT_",
           "location": "",
           "moduleName": "Swift",
+          "mutating": true,
           "children": [
             {
               "kind": "TypeNominal",
@@ -6385,6 +6403,7 @@
           "usr": "s:FVs33RangeReplaceableRandomAccessSlice15replaceSubrangeuRd__s10CollectionwxPs13IndexableBase8_ElementzWd__8Iterator7Element_rFTGVs5RangewxPS1_5Index_4withqd___T_",
           "location": "",
           "moduleName": "Swift",
+          "mutating": true,
           "children": [
             {
               "kind": "TypeNominal",
@@ -6432,6 +6451,7 @@
           "usr": "s:FVs33RangeReplaceableRandomAccessSlice6insertFTwxPs13IndexableBase8_Element2atwxPS0_5Index_T_",
           "location": "",
           "moduleName": "Swift",
+          "mutating": true,
           "children": [
             {
               "kind": "TypeNominal",
@@ -6465,6 +6485,7 @@
           "usr": "s:FVs33RangeReplaceableRandomAccessSlice6insertuRd__s10CollectionwxPs13IndexableBase8_ElementzWd__8Iterator7Element_rFT10contentsOfqd__2atwxPS1_5Index_T_",
           "location": "",
           "moduleName": "Swift",
+          "mutating": true,
           "children": [
             {
               "kind": "TypeNominal",
@@ -6505,6 +6526,7 @@
           "usr": "s:FVs33RangeReplaceableRandomAccessSlice6removeFT2atwxPs13IndexableBase5Index_wxPS0_8_Element",
           "location": "",
           "moduleName": "Swift",
+          "mutating": true,
           "children": [
             {
               "kind": "TypeNominal",
@@ -6533,6 +6555,7 @@
           "usr": "s:FVs33RangeReplaceableRandomAccessSlice14removeSubrangeFGVs5RangewxPs13IndexableBase5Index_T_",
           "location": "",
           "moduleName": "Swift",
+          "mutating": true,
           "children": [
             {
               "kind": "TypeNominal",
@@ -10434,6 +10457,7 @@
               "usr": "s:FSps7pointeex",
               "location": "",
               "moduleName": "Swift",
+              "mutating": true,
               "children": [
                 {
                   "kind": "TypeNominal",
@@ -11111,6 +11135,7 @@
           "usr": "s:FVs21StrideThroughIterator4nextFT_GSqx_",
           "location": "",
           "moduleName": "Swift",
+          "mutating": true,
           "children": [
             {
               "kind": "TypeNominal",
@@ -11704,6 +11729,7 @@
           "usr": "s:FVs21RangeReplaceableSlice15replaceSubrangeuRd__s10Collectionwx8_ElementzWd__8Iterator7Element_rFTGVs5Rangewx5Index_4withqd___T_",
           "location": "",
           "moduleName": "Swift",
+          "mutating": true,
           "children": [
             {
               "kind": "TypeNominal",
@@ -11751,6 +11777,7 @@
           "usr": "s:FVs21RangeReplaceableSlice6insertFTwx8_Element2atwx5Index_T_",
           "location": "",
           "moduleName": "Swift",
+          "mutating": true,
           "children": [
             {
               "kind": "TypeNominal",
@@ -11784,6 +11811,7 @@
           "usr": "s:FVs21RangeReplaceableSlice6insertuRd__s10Collectionwx8_ElementzWd__8Iterator7Element_rFT10contentsOfqd__2atwx5Index_T_",
           "location": "",
           "moduleName": "Swift",
+          "mutating": true,
           "children": [
             {
               "kind": "TypeNominal",
@@ -11824,6 +11852,7 @@
           "usr": "s:FVs21RangeReplaceableSlice6removeFT2atwx5Index_wx8_Element",
           "location": "",
           "moduleName": "Swift",
+          "mutating": true,
           "children": [
             {
               "kind": "TypeNominal",
@@ -11852,6 +11881,7 @@
           "usr": "s:FVs21RangeReplaceableSlice14removeSubrangeFGVs5Rangewx5Index_T_",
           "location": "",
           "moduleName": "Swift",
+          "mutating": true,
           "children": [
             {
               "kind": "TypeNominal",
@@ -12107,6 +12137,7 @@
           "usr": "s:FVs15IteratorOverOne4nextFT_GSqx_",
           "location": "",
           "moduleName": "Swift",
+          "mutating": true,
           "children": [
             {
               "kind": "TypeNominal",
@@ -15504,6 +15535,7 @@
           "usr": "s:FSf5roundFOs25FloatingPointRoundingRuleT_",
           "location": "",
           "moduleName": "Swift",
+          "mutating": true,
           "children": [
             {
               "kind": "TypeNominal",
@@ -15525,6 +15557,7 @@
           "usr": "s:FSf6negateFT_T_",
           "location": "",
           "moduleName": "Swift",
+          "mutating": true,
           "children": [
             {
               "kind": "TypeNominal",
@@ -15541,6 +15574,7 @@
           "usr": "s:FSf3addFSfT_",
           "location": "",
           "moduleName": "Swift",
+          "mutating": true,
           "children": [
             {
               "kind": "TypeNominal",
@@ -15562,6 +15596,7 @@
           "usr": "s:FSf8subtractFSfT_",
           "location": "",
           "moduleName": "Swift",
+          "mutating": true,
           "children": [
             {
               "kind": "TypeNominal",
@@ -15583,6 +15618,7 @@
           "usr": "s:FSf8multiplyFT2bySf_T_",
           "location": "",
           "moduleName": "Swift",
+          "mutating": true,
           "children": [
             {
               "kind": "TypeNominal",
@@ -15604,6 +15640,7 @@
           "usr": "s:FSf6divideFT2bySf_T_",
           "location": "",
           "moduleName": "Swift",
+          "mutating": true,
           "children": [
             {
               "kind": "TypeNominal",
@@ -15625,6 +15662,7 @@
           "usr": "s:FSf13formRemainderFT10dividingBySf_T_",
           "location": "",
           "moduleName": "Swift",
+          "mutating": true,
           "children": [
             {
               "kind": "TypeNominal",
@@ -15646,6 +15684,7 @@
           "usr": "s:FSf23formTruncatingRemainderFT10dividingBySf_T_",
           "location": "",
           "moduleName": "Swift",
+          "mutating": true,
           "children": [
             {
               "kind": "TypeNominal",
@@ -15667,6 +15706,7 @@
           "usr": "s:FSf14formSquareRootFT_T_",
           "location": "",
           "moduleName": "Swift",
+          "mutating": true,
           "children": [
             {
               "kind": "TypeNominal",
@@ -15683,6 +15723,7 @@
           "usr": "s:FSf10addProductFTSfSf_T_",
           "location": "",
           "moduleName": "Swift",
+          "mutating": true,
           "children": [
             {
               "kind": "TypeNominal",
@@ -18941,6 +18982,7 @@
           "usr": "s:FVs15LazyMapIterator4nextFT_GSqq__",
           "location": "",
           "moduleName": "Swift",
+          "mutating": true,
           "children": [
             {
               "kind": "TypeNominal",
@@ -19342,6 +19384,7 @@
           "usr": "s:FPs25RangeReplaceableIndexable15replaceSubrangeuRd__s10Collectionwx8_ElementzWd__8Iterator7Element_rFTGVs5Rangewx5Index_4withqd___T_",
           "location": "",
           "moduleName": "Swift",
+          "mutating": true,
           "children": [
             {
               "kind": "TypeNominal",
@@ -19389,6 +19432,7 @@
           "usr": "s:FPs25RangeReplaceableIndexable6insertFTwx8_Element2atwx5Index_T_",
           "location": "",
           "moduleName": "Swift",
+          "mutating": true,
           "children": [
             {
               "kind": "TypeNominal",
@@ -19422,6 +19466,7 @@
           "usr": "s:FPs25RangeReplaceableIndexable6insertuRd__s10Collectionwx8_ElementzWd__8Iterator7Element_rFT10contentsOfqd__2atwx5Index_T_",
           "location": "",
           "moduleName": "Swift",
+          "mutating": true,
           "children": [
             {
               "kind": "TypeNominal",
@@ -19462,6 +19507,7 @@
           "usr": "s:FPs25RangeReplaceableIndexable6removeFT2atwx5Index_wx8_Element",
           "location": "",
           "moduleName": "Swift",
+          "mutating": true,
           "children": [
             {
               "kind": "TypeNominal",
@@ -19490,6 +19536,7 @@
           "usr": "s:FPs25RangeReplaceableIndexable14removeSubrangeFGVs5Rangewx5Index_T_",
           "location": "",
           "moduleName": "Swift",
+          "mutating": true,
           "children": [
             {
               "kind": "TypeNominal",
@@ -20657,6 +20704,7 @@
           "usr": "s:FPs16IteratorProtocol4nextFT_GSqwx7Element_",
           "location": "",
           "moduleName": "Swift",
+          "mutating": true,
           "children": [
             {
               "kind": "TypeNominal",
@@ -21776,6 +21824,7 @@
           "usr": "s:FSd5roundFOs25FloatingPointRoundingRuleT_",
           "location": "",
           "moduleName": "Swift",
+          "mutating": true,
           "children": [
             {
               "kind": "TypeNominal",
@@ -21797,6 +21846,7 @@
           "usr": "s:FSd6negateFT_T_",
           "location": "",
           "moduleName": "Swift",
+          "mutating": true,
           "children": [
             {
               "kind": "TypeNominal",
@@ -21813,6 +21863,7 @@
           "usr": "s:FSd3addFSdT_",
           "location": "",
           "moduleName": "Swift",
+          "mutating": true,
           "children": [
             {
               "kind": "TypeNominal",
@@ -21834,6 +21885,7 @@
           "usr": "s:FSd8subtractFSdT_",
           "location": "",
           "moduleName": "Swift",
+          "mutating": true,
           "children": [
             {
               "kind": "TypeNominal",
@@ -21855,6 +21907,7 @@
           "usr": "s:FSd8multiplyFT2bySd_T_",
           "location": "",
           "moduleName": "Swift",
+          "mutating": true,
           "children": [
             {
               "kind": "TypeNominal",
@@ -21876,6 +21929,7 @@
           "usr": "s:FSd6divideFT2bySd_T_",
           "location": "",
           "moduleName": "Swift",
+          "mutating": true,
           "children": [
             {
               "kind": "TypeNominal",
@@ -21897,6 +21951,7 @@
           "usr": "s:FSd13formRemainderFT10dividingBySd_T_",
           "location": "",
           "moduleName": "Swift",
+          "mutating": true,
           "children": [
             {
               "kind": "TypeNominal",
@@ -21918,6 +21973,7 @@
           "usr": "s:FSd23formTruncatingRemainderFT10dividingBySd_T_",
           "location": "",
           "moduleName": "Swift",
+          "mutating": true,
           "children": [
             {
               "kind": "TypeNominal",
@@ -21939,6 +21995,7 @@
           "usr": "s:FSd14formSquareRootFT_T_",
           "location": "",
           "moduleName": "Swift",
+          "mutating": true,
           "children": [
             {
               "kind": "TypeNominal",
@@ -21955,6 +22012,7 @@
           "usr": "s:FSd10addProductFTSdSd_T_",
           "location": "",
           "moduleName": "Swift",
+          "mutating": true,
           "children": [
             {
               "kind": "TypeNominal",
@@ -24005,6 +24063,7 @@
           "usr": "s:FPs26RangeReplaceableCollection15replaceSubrangeuRd__s10CollectionWx8Iterator7Element_zWd__S1_S2__rFTGVs5Rangewx5Index_4withqd___T_",
           "location": "",
           "moduleName": "Swift",
+          "mutating": true,
           "children": [
             {
               "kind": "TypeNominal",
@@ -24052,6 +24111,7 @@
           "usr": "s:FPs26RangeReplaceableCollection15reserveCapacityFwx13IndexDistanceT_",
           "location": "",
           "moduleName": "Swift",
+          "mutating": true,
           "children": [
             {
               "kind": "TypeNominal",
@@ -24148,6 +24208,7 @@
           "usr": "s:FPs26RangeReplaceableCollection6appendFWx8Iterator7Element_T_",
           "location": "",
           "moduleName": "Swift",
+          "mutating": true,
           "children": [
             {
               "kind": "TypeNominal",
@@ -24169,6 +24230,7 @@
           "usr": "s:FPs26RangeReplaceableCollection6appenduRd__s8SequenceWx8Iterator7Element_zWd__8IteratorS2__rFT10contentsOfqd___T_",
           "location": "",
           "moduleName": "Swift",
+          "mutating": true,
           "children": [
             {
               "kind": "TypeNominal",
@@ -24197,6 +24259,7 @@
           "usr": "s:FPs26RangeReplaceableCollection6insertFTWx8Iterator7Element_2atwx5Index_T_",
           "location": "",
           "moduleName": "Swift",
+          "mutating": true,
           "children": [
             {
               "kind": "TypeNominal",
@@ -24230,6 +24293,7 @@
           "usr": "s:FPs26RangeReplaceableCollection6insertuRd__s10CollectionWx8Iterator7Element_zWd__S1_S2__rFT10contentsOfqd__2atwx5Index_T_",
           "location": "",
           "moduleName": "Swift",
+          "mutating": true,
           "children": [
             {
               "kind": "TypeNominal",
@@ -24270,6 +24334,7 @@
           "usr": "s:FPs26RangeReplaceableCollection6removeFT2atwx5Index_Wx8Iterator7Element_",
           "location": "",
           "moduleName": "Swift",
+          "mutating": true,
           "children": [
             {
               "kind": "TypeNominal",
@@ -24298,6 +24363,7 @@
           "usr": "s:FPs26RangeReplaceableCollection11removeFirstFT_Wx8Iterator7Element_",
           "location": "",
           "moduleName": "Swift",
+          "mutating": true,
           "children": [
             {
               "kind": "TypeNominal",
@@ -24314,6 +24380,7 @@
           "usr": "s:FPs26RangeReplaceableCollection11removeFirstFSiT_",
           "location": "",
           "moduleName": "Swift",
+          "mutating": true,
           "children": [
             {
               "kind": "TypeNominal",
@@ -24335,6 +24402,7 @@
           "usr": "s:FPs26RangeReplaceableCollection9removeAllFT15keepingCapacitySb_T_",
           "location": "",
           "moduleName": "Swift",
+          "mutating": true,
           "children": [
             {
               "kind": "TypeNominal",
@@ -24424,6 +24492,7 @@
           "usr": "s:FEsPs26RangeReplaceableCollection6appendFWx8Iterator7Element_T_",
           "location": "",
           "moduleName": "Swift",
+          "mutating": true,
           "children": [
             {
               "kind": "TypeNominal",
@@ -24445,6 +24514,7 @@
           "usr": "s:FEsPs26RangeReplaceableCollection6appenduRd__s8SequenceWx8Iterator7Element_zWd__8IteratorS2__rFT10contentsOfqd___T_",
           "location": "",
           "moduleName": "Swift",
+          "mutating": true,
           "children": [
             {
               "kind": "TypeNominal",
@@ -24473,6 +24543,7 @@
           "usr": "s:FEsPs26RangeReplaceableCollection6insertFTWx8Iterator7Element_2atwx5Index_T_",
           "location": "",
           "moduleName": "Swift",
+          "mutating": true,
           "children": [
             {
               "kind": "TypeNominal",
@@ -24506,6 +24577,7 @@
           "usr": "s:FEsPs26RangeReplaceableCollection6insertuRd__s10CollectionWx8Iterator7Element_zWd__S1_S2__rFT10contentsOfqd__2atwx5Index_T_",
           "location": "",
           "moduleName": "Swift",
+          "mutating": true,
           "children": [
             {
               "kind": "TypeNominal",
@@ -24546,6 +24618,7 @@
           "usr": "s:FEsPs26RangeReplaceableCollection6removeFT2atwx5Index_Wx8Iterator7Element_",
           "location": "",
           "moduleName": "Swift",
+          "mutating": true,
           "children": [
             {
               "kind": "TypeNominal",
@@ -24574,6 +24647,7 @@
           "usr": "s:FEsPs26RangeReplaceableCollection14removeSubrangeFGVs5Rangewx5Index_T_",
           "location": "",
           "moduleName": "Swift",
+          "mutating": true,
           "children": [
             {
               "kind": "TypeNominal",
@@ -24609,6 +24683,7 @@
           "usr": "s:FEsPs26RangeReplaceableCollection11removeFirstFSiT_",
           "location": "",
           "moduleName": "Swift",
+          "mutating": true,
           "children": [
             {
               "kind": "TypeNominal",
@@ -24630,6 +24705,7 @@
           "usr": "s:FEsPs26RangeReplaceableCollection11removeFirstFT_Wx8Iterator7Element_",
           "location": "",
           "moduleName": "Swift",
+          "mutating": true,
           "children": [
             {
               "kind": "TypeNominal",
@@ -24646,6 +24722,7 @@
           "usr": "s:FEsPs26RangeReplaceableCollection9removeAllFT15keepingCapacitySb_T_",
           "location": "",
           "moduleName": "Swift",
+          "mutating": true,
           "children": [
             {
               "kind": "TypeNominal",
@@ -24667,6 +24744,7 @@
           "usr": "s:FEsPs26RangeReplaceableCollection15reserveCapacityFwx13IndexDistanceT_",
           "location": "",
           "moduleName": "Swift",
+          "mutating": true,
           "children": [
             {
               "kind": "TypeNominal",
@@ -24695,6 +24773,7 @@
           "usr": "s:FesRxs26RangeReplaceableCollectionxzwx11SubSequencerS_11removeFirstFT_Wx8Iterator7Element_",
           "location": "",
           "moduleName": "Swift",
+          "mutating": true,
           "children": [
             {
               "kind": "TypeNominal",
@@ -24711,6 +24790,7 @@
           "usr": "s:FesRxs26RangeReplaceableCollectionxzwx11SubSequencerS_11removeFirstFSiT_",
           "location": "",
           "moduleName": "Swift",
+          "mutating": true,
           "children": [
             {
               "kind": "TypeNominal",
@@ -24732,6 +24812,7 @@
           "usr": "s:FesRxs26RangeReplaceableCollectionwx5Indexs10StrideableWxS0_6Stride_s13SignedIntegerrS_15replaceSubrangeuRd__s10CollectionWx8Iterator7Element_zWd__S5_S6__rFTGVs14CountableRangewxS0__4withqd___T_",
           "location": "",
           "moduleName": "Swift",
+          "mutating": true,
           "children": [
             {
               "kind": "TypeNominal",
@@ -24779,6 +24860,7 @@
           "usr": "s:FesRxs26RangeReplaceableCollectionwx5Indexs10StrideableWxS0_6Stride_s13SignedIntegerrS_14removeSubrangeFGVs14CountableRangewxS0__T_",
           "location": "",
           "moduleName": "Swift",
+          "mutating": true,
           "children": [
             {
               "kind": "TypeNominal",
@@ -24814,6 +24896,7 @@
           "usr": "s:FEsPs26RangeReplaceableCollection15replaceSubrangeuRd__s10CollectionWx8Iterator7Element_zWd__S1_S2__rFTGVs11ClosedRangewx5Index_4withqd___T_",
           "location": "",
           "moduleName": "Swift",
+          "mutating": true,
           "children": [
             {
               "kind": "TypeNominal",
@@ -24861,6 +24944,7 @@
           "usr": "s:FEsPs26RangeReplaceableCollection14removeSubrangeFGVs11ClosedRangewx5Index_T_",
           "location": "",
           "moduleName": "Swift",
+          "mutating": true,
           "children": [
             {
               "kind": "TypeNominal",
@@ -24896,6 +24980,7 @@
           "usr": "s:FesRxs26RangeReplaceableCollectionwx5Indexs10StrideableWxS0_6Stride_s13SignedIntegerrS_15replaceSubrangeuRd__s10CollectionWx8Iterator7Element_zWd__S5_S6__rFTGVs20CountableClosedRangewxS0__4withqd___T_",
           "location": "",
           "moduleName": "Swift",
+          "mutating": true,
           "children": [
             {
               "kind": "TypeNominal",
@@ -24943,6 +25028,7 @@
           "usr": "s:FesRxs26RangeReplaceableCollectionwx5Indexs10StrideableWxS0_6Stride_s13SignedIntegerrS_14removeSubrangeFGVs20CountableClosedRangewxS0__T_",
           "location": "",
           "moduleName": "Swift",
+          "mutating": true,
           "children": [
             {
               "kind": "TypeNominal",
@@ -24978,6 +25064,7 @@
           "usr": "s:FesRxs23BidirectionalCollectionxs26RangeReplaceableCollectionrS0_10removeLastFT_WxPs10Collection8Iterator7Element_",
           "location": "",
           "moduleName": "Swift",
+          "mutating": true,
           "children": [
             {
               "kind": "TypeNominal",
@@ -24994,6 +25081,7 @@
           "usr": "s:FesRxs23BidirectionalCollectionxs26RangeReplaceableCollectionrS0_10removeLastFSiT_",
           "location": "",
           "moduleName": "Swift",
+          "mutating": true,
           "children": [
             {
               "kind": "TypeNominal",
@@ -25015,6 +25103,7 @@
           "usr": "s:FesRxs23BidirectionalCollectionxs26RangeReplaceableCollectionxzwxPS_11SubSequencerS0_10removeLastFT_WxPs10Collection8Iterator7Element_",
           "location": "",
           "moduleName": "Swift",
+          "mutating": true,
           "children": [
             {
               "kind": "TypeNominal",
@@ -25031,6 +25120,7 @@
           "usr": "s:FesRxs23BidirectionalCollectionxs26RangeReplaceableCollectionxzwxPS_11SubSequencerS0_10removeLastFSiT_",
           "location": "",
           "moduleName": "Swift",
+          "mutating": true,
           "children": [
             {
               "kind": "TypeNominal",
@@ -30934,6 +31024,7 @@
           "usr": "s:FVs41MutableRangeReplaceableBidirectionalSlice15replaceSubrangeuRd__s10CollectionwxPs13IndexableBase8_ElementzWd__8Iterator7Element_rFTGVs5RangewxPS1_5Index_4withqd___T_",
           "location": "",
           "moduleName": "Swift",
+          "mutating": true,
           "children": [
             {
               "kind": "TypeNominal",
@@ -30981,6 +31072,7 @@
           "usr": "s:FVs41MutableRangeReplaceableBidirectionalSlice6insertFTwxPs13IndexableBase8_Element2atwxPS0_5Index_T_",
           "location": "",
           "moduleName": "Swift",
+          "mutating": true,
           "children": [
             {
               "kind": "TypeNominal",
@@ -31014,6 +31106,7 @@
           "usr": "s:FVs41MutableRangeReplaceableBidirectionalSlice6insertuRd__s10CollectionwxPs13IndexableBase8_ElementzWd__8Iterator7Element_rFT10contentsOfqd__2atwxPS1_5Index_T_",
           "location": "",
           "moduleName": "Swift",
+          "mutating": true,
           "children": [
             {
               "kind": "TypeNominal",
@@ -31054,6 +31147,7 @@
           "usr": "s:FVs41MutableRangeReplaceableBidirectionalSlice6removeFT2atwxPs13IndexableBase5Index_wxPS0_8_Element",
           "location": "",
           "moduleName": "Swift",
+          "mutating": true,
           "children": [
             {
               "kind": "TypeNominal",
@@ -31082,6 +31176,7 @@
           "usr": "s:FVs41MutableRangeReplaceableBidirectionalSlice14removeSubrangeFGVs5RangewxPs13IndexableBase5Index_T_",
           "location": "",
           "moduleName": "Swift",
+          "mutating": true,
           "children": [
             {
               "kind": "TypeNominal",
@@ -36514,6 +36609,7 @@
           "usr": "s:FVs4UTF86decodeuRxs16IteratorProtocolwx7ElementzVs5UInt8rFRxOs21UnicodeDecodingResult",
           "location": "",
           "moduleName": "Swift",
+          "mutating": true,
           "children": [
             {
               "kind": "TypeNominal",
@@ -36754,6 +36850,7 @@
           "usr": "s:FVs5UTF166decodeuRxs16IteratorProtocolwx7ElementzVs6UInt16rFRxOs21UnicodeDecodingResult",
           "location": "",
           "moduleName": "Swift",
+          "mutating": true,
           "children": [
             {
               "kind": "TypeNominal",
@@ -38569,6 +38666,7 @@
               "usr": "s:FVs14CVaListPointers5valueSv",
               "location": "",
               "moduleName": "Swift",
+              "mutating": true,
               "children": [
                 {
                   "kind": "TypeNominal",
@@ -38645,6 +38743,7 @@
           "usr": "s:FVs16IndexingIterator4nextFT_GSqwx8_Element_",
           "location": "",
           "moduleName": "Swift",
+          "mutating": true,
           "children": [
             {
               "kind": "TypeNominal",
@@ -38826,6 +38925,7 @@
           "usr": "s:FVs5UTF326decodeuRxs16IteratorProtocolwx7ElementzVs6UInt32rFRxOs21UnicodeDecodingResult",
           "location": "",
           "moduleName": "Swift",
+          "mutating": true,
           "children": [
             {
               "kind": "TypeNominal",
@@ -40570,6 +40670,7 @@
           "usr": "s:FesRxs9OptionSetxzwx7ElementrS_6insertFwxS0_T8insertedSb17memberAfterInsertwxS0__",
           "location": "",
           "moduleName": "Swift",
+          "mutating": true,
           "children": [
             {
               "kind": "TypeNominal",
@@ -40617,6 +40718,7 @@
           "usr": "s:FesRxs9OptionSetxzwx7ElementrS_6removeFwxS0_GSqwxS0__",
           "location": "",
           "moduleName": "Swift",
+          "mutating": true,
           "children": [
             {
               "kind": "TypeNominal",
@@ -40659,6 +40761,7 @@
           "usr": "s:FesRxs9OptionSetxzwx7ElementrS_6updateFT4withwxS0__GSqwxS0__",
           "location": "",
           "moduleName": "Swift",
+          "mutating": true,
           "children": [
             {
               "kind": "TypeNominal",
@@ -40724,6 +40827,7 @@
           "usr": "s:FesRxs9OptionSetwx8RawValues17BitwiseOperationsrS_9formUnionFxT_",
           "location": "",
           "moduleName": "Swift",
+          "mutating": true,
           "children": [
             {
               "kind": "TypeNominal",
@@ -40752,6 +40856,7 @@
           "usr": "s:FesRxs9OptionSetwx8RawValues17BitwiseOperationsrS_16formIntersectionFxT_",
           "location": "",
           "moduleName": "Swift",
+          "mutating": true,
           "children": [
             {
               "kind": "TypeNominal",
@@ -40780,6 +40885,7 @@
           "usr": "s:FesRxs9OptionSetwx8RawValues17BitwiseOperationsrS_23formSymmetricDifferenceFxT_",
           "location": "",
           "moduleName": "Swift",
+          "mutating": true,
           "children": [
             {
               "kind": "TypeNominal",
@@ -41637,6 +41743,7 @@
           "usr": "s:FVs40MutableRangeReplaceableRandomAccessSlice15replaceSubrangeuRd__s10CollectionwxPs16MutableIndexable8_ElementzWd__8Iterator7Element_rFTGVs5RangewxPS1_5Index_4withqd___T_",
           "location": "",
           "moduleName": "Swift",
+          "mutating": true,
           "children": [
             {
               "kind": "TypeNominal",
@@ -41684,6 +41791,7 @@
           "usr": "s:FVs40MutableRangeReplaceableRandomAccessSlice6insertFTwxPs16MutableIndexable8_Element2atwxPS0_5Index_T_",
           "location": "",
           "moduleName": "Swift",
+          "mutating": true,
           "children": [
             {
               "kind": "TypeNominal",
@@ -41717,6 +41825,7 @@
           "usr": "s:FVs40MutableRangeReplaceableRandomAccessSlice6insertuRd__s10CollectionwxPs16MutableIndexable8_ElementzWd__8Iterator7Element_rFT10contentsOfqd__2atwxPS1_5Index_T_",
           "location": "",
           "moduleName": "Swift",
+          "mutating": true,
           "children": [
             {
               "kind": "TypeNominal",
@@ -41757,6 +41866,7 @@
           "usr": "s:FVs40MutableRangeReplaceableRandomAccessSlice6removeFT2atwxPs16MutableIndexable5Index_wxPS0_8_Element",
           "location": "",
           "moduleName": "Swift",
+          "mutating": true,
           "children": [
             {
               "kind": "TypeNominal",
@@ -41785,6 +41895,7 @@
           "usr": "s:FVs40MutableRangeReplaceableRandomAccessSlice14removeSubrangeFGVs5RangewxPs16MutableIndexable5Index_T_",
           "location": "",
           "moduleName": "Swift",
+          "mutating": true,
           "children": [
             {
               "kind": "TypeNominal",
@@ -46232,6 +46343,7 @@
           "usr": "s:FVs11SetIterator4nextFT_GSqx_",
           "location": "",
           "moduleName": "Swift",
+          "mutating": true,
           "children": [
             {
               "kind": "TypeNominal",
@@ -46531,6 +46643,7 @@
           "usr": "s:FPs12UnicodeCodec6decodeuRd__s16IteratorProtocolwx8CodeUnitzwd__7ElementrFRqd__Os21UnicodeDecodingResult",
           "location": "",
           "moduleName": "Swift",
+          "mutating": true,
           "children": [
             {
               "kind": "TypeNominal",
@@ -48984,6 +49097,7 @@
           "usr": "s:FVs13EmptyIterator4nextFT_GSqx_",
           "location": "",
           "moduleName": "Swift",
+          "mutating": true,
           "children": [
             {
               "kind": "TypeNominal",
@@ -49080,6 +49194,7 @@
           "usr": "s:FVs14UnfoldSequence4nextFT_GSqx_",
           "location": "",
           "moduleName": "Swift",
+          "mutating": true,
           "children": [
             {
               "kind": "TypeNominal",
@@ -51298,6 +51413,7 @@
           "location": "",
           "moduleName": "Swift",
           "throwing": true,
+          "mutating": true,
           "children": [
             {
               "kind": "TypeNominal",
@@ -51349,6 +51465,7 @@
           "location": "",
           "moduleName": "Swift",
           "throwing": true,
+          "mutating": true,
           "children": [
             {
               "kind": "TypeNominal",
@@ -51400,6 +51517,7 @@
           "location": "",
           "moduleName": "Swift",
           "throwing": true,
+          "mutating": true,
           "children": [
             {
               "kind": "TypeNominal",
@@ -51535,6 +51653,7 @@
           "usr": "s:FesRxs17MutableCollectionxs22RandomAccessCollectionWxPs10Collection8Iterator7Element_s10ComparablerS_4sortFT_T_",
           "location": "",
           "moduleName": "Swift",
+          "mutating": true,
           "children": [
             {
               "kind": "TypeNominal",
@@ -51551,6 +51670,7 @@
           "usr": "s:FesRxs17MutableCollectionxs22RandomAccessCollectionrS_4sortFT2byFTWxPs10Collection8Iterator7Element_WxS2_S3___Sb_T_",
           "location": "",
           "moduleName": "Swift",
+          "mutating": true,
           "children": [
             {
               "kind": "TypeNominal",
@@ -51599,6 +51719,7 @@
           "usr": "s:FesRxs23BidirectionalCollectionxs17MutableCollectionrS0_7reverseFT_T_",
           "location": "",
           "moduleName": "Swift",
+          "mutating": true,
           "children": [
             {
               "kind": "TypeNominal",
@@ -52246,6 +52367,7 @@
               "usr": "s:FVs20ManagedBufferPointers6headerx",
               "location": "",
               "moduleName": "Swift",
+              "mutating": true,
               "children": [
                 {
                   "kind": "TypeNominal",
@@ -52537,6 +52659,7 @@
           "usr": "s:FVs20ManagedBufferPointer17isUniqueReferenceFT_Sb",
           "location": "",
           "moduleName": "Swift",
+          "mutating": true,
           "children": [
             {
               "kind": "TypeNominal",
@@ -54262,6 +54385,7 @@
           "usr": "s:FVs28MutableRangeReplaceableSlice15replaceSubrangeuRd__s10CollectionwxPs16MutableIndexable8_ElementzWd__8Iterator7Element_rFTGVs5RangewxPS1_5Index_4withqd___T_",
           "location": "",
           "moduleName": "Swift",
+          "mutating": true,
           "children": [
             {
               "kind": "TypeNominal",
@@ -54309,6 +54433,7 @@
           "usr": "s:FVs28MutableRangeReplaceableSlice6insertFTwxPs16MutableIndexable8_Element2atwxPS0_5Index_T_",
           "location": "",
           "moduleName": "Swift",
+          "mutating": true,
           "children": [
             {
               "kind": "TypeNominal",
@@ -54342,6 +54467,7 @@
           "usr": "s:FVs28MutableRangeReplaceableSlice6insertuRd__s10CollectionwxPs16MutableIndexable8_ElementzWd__8Iterator7Element_rFT10contentsOfqd__2atwxPS1_5Index_T_",
           "location": "",
           "moduleName": "Swift",
+          "mutating": true,
           "children": [
             {
               "kind": "TypeNominal",
@@ -54382,6 +54508,7 @@
           "usr": "s:FVs28MutableRangeReplaceableSlice6removeFT2atwxPs16MutableIndexable5Index_wxPS0_8_Element",
           "location": "",
           "moduleName": "Swift",
+          "mutating": true,
           "children": [
             {
               "kind": "TypeNominal",
@@ -54410,6 +54537,7 @@
           "usr": "s:FVs28MutableRangeReplaceableSlice14removeSubrangeFGVs5RangewxPs16MutableIndexable5Index_T_",
           "location": "",
           "moduleName": "Swift",
+          "mutating": true,
           "children": [
             {
               "kind": "TypeNominal",
@@ -55865,6 +55993,7 @@
           "usr": "s:FVs15ContiguousArray15reserveCapacityFSiT_",
           "location": "",
           "moduleName": "Swift",
+          "mutating": true,
           "children": [
             {
               "kind": "TypeNominal",
@@ -55886,6 +56015,7 @@
           "usr": "s:FVs15ContiguousArray6appendFxT_",
           "location": "",
           "moduleName": "Swift",
+          "mutating": true,
           "children": [
             {
               "kind": "TypeNominal",
@@ -55907,6 +56037,7 @@
           "usr": "s:FVs15ContiguousArray6appenduRd__s8SequencexzWd__8Iterator7Element_rFT10contentsOfqd___T_",
           "location": "",
           "moduleName": "Swift",
+          "mutating": true,
           "children": [
             {
               "kind": "TypeNominal",
@@ -55935,6 +56066,7 @@
           "usr": "s:FVs15ContiguousArray6appenduRd__s10CollectionxzWd__8Iterator7Element_rFT10contentsOfqd___T_",
           "location": "",
           "moduleName": "Swift",
+          "mutating": true,
           "children": [
             {
               "kind": "TypeNominal",
@@ -55963,6 +56095,7 @@
           "usr": "s:FVs15ContiguousArray6insertFTx2atSi_T_",
           "location": "",
           "moduleName": "Swift",
+          "mutating": true,
           "children": [
             {
               "kind": "TypeNominal",
@@ -55989,6 +56122,7 @@
           "usr": "s:FVs15ContiguousArray6removeFT2atSi_x",
           "location": "",
           "moduleName": "Swift",
+          "mutating": true,
           "children": [
             {
               "kind": "TypeNominal",
@@ -56010,6 +56144,7 @@
           "usr": "s:FVs15ContiguousArray9removeAllFT15keepingCapacitySb_T_",
           "location": "",
           "moduleName": "Swift",
+          "mutating": true,
           "children": [
             {
               "kind": "TypeNominal",
@@ -56215,6 +56350,7 @@
           "location": "",
           "moduleName": "Swift",
           "throwing": true,
+          "mutating": true,
           "children": [
             {
               "kind": "TypeNominal",
@@ -56258,6 +56394,7 @@
           "usr": "s:FVs15ContiguousArray15replaceSubrangeuRd__s10CollectionxzWd__8Iterator7Element_rFTGVs5RangeSi_4withqd___T_",
           "location": "",
           "moduleName": "Swift",
+          "mutating": true,
           "children": [
             {
               "kind": "TypeNominal",
@@ -56298,6 +56435,7 @@
           "usr": "s:FVs15ContiguousArray7popLastFT_GSqx_",
           "location": "",
           "moduleName": "Swift",
+          "mutating": true,
           "children": [
             {
               "kind": "TypeNominal",
@@ -60456,6 +60594,7 @@
               "usr": "s:ZFOs11CommandLines9argumentsGSaSS_",
               "location": "",
               "moduleName": "Swift",
+              "mutating": true,
               "children": [
                 {
                   "kind": "TypeNominal",
@@ -60509,6 +60648,7 @@
           "usr": "s:FVs27UnsafeBufferPointerIterator4nextFT_GSqx_",
           "location": "",
           "moduleName": "Swift",
+          "mutating": true,
           "children": [
             {
               "kind": "TypeNominal",
@@ -62055,6 +62195,7 @@
           "usr": "s:FVs18EnumeratedIterator4nextFT_GSqT6offsetSi7elementwx7Element__",
           "location": "",
           "moduleName": "Swift",
+          "mutating": true,
           "children": [
             {
               "kind": "TypeNominal",
@@ -64128,6 +64269,7 @@
                   "usr": "s:FVSc9UTF16Views5valueSc",
                   "location": "",
                   "moduleName": "Swift",
+                  "mutating": true,
                   "children": [
                     {
                       "kind": "TypeNominal",
@@ -67831,6 +67973,7 @@
           "usr": "s:FVs19ClosedRangeIterator4nextFT_GSqx_",
           "location": "",
           "moduleName": "Swift",
+          "mutating": true,
           "children": [
             {
               "kind": "TypeNominal",
@@ -70075,6 +70218,7 @@
           "usr": "s:FSa15reserveCapacityFSiT_",
           "location": "",
           "moduleName": "Swift",
+          "mutating": true,
           "children": [
             {
               "kind": "TypeNominal",
@@ -70096,6 +70240,7 @@
           "usr": "s:FSa6appendFxT_",
           "location": "",
           "moduleName": "Swift",
+          "mutating": true,
           "children": [
             {
               "kind": "TypeNominal",
@@ -70117,6 +70262,7 @@
           "usr": "s:FSa6appenduRd__s8SequencexzWd__8Iterator7Element_rFT10contentsOfqd___T_",
           "location": "",
           "moduleName": "Swift",
+          "mutating": true,
           "children": [
             {
               "kind": "TypeNominal",
@@ -70145,6 +70291,7 @@
           "usr": "s:FSa6appenduRd__s10CollectionxzWd__8Iterator7Element_rFT10contentsOfqd___T_",
           "location": "",
           "moduleName": "Swift",
+          "mutating": true,
           "children": [
             {
               "kind": "TypeNominal",
@@ -70173,6 +70320,7 @@
           "usr": "s:FSa6insertFTx2atSi_T_",
           "location": "",
           "moduleName": "Swift",
+          "mutating": true,
           "children": [
             {
               "kind": "TypeNominal",
@@ -70199,6 +70347,7 @@
           "usr": "s:FSa6removeFT2atSi_x",
           "location": "",
           "moduleName": "Swift",
+          "mutating": true,
           "children": [
             {
               "kind": "TypeNominal",
@@ -70220,6 +70369,7 @@
           "usr": "s:FSa9removeAllFT15keepingCapacitySb_T_",
           "location": "",
           "moduleName": "Swift",
+          "mutating": true,
           "children": [
             {
               "kind": "TypeNominal",
@@ -70425,6 +70575,7 @@
           "location": "",
           "moduleName": "Swift",
           "throwing": true,
+          "mutating": true,
           "children": [
             {
               "kind": "TypeNominal",
@@ -70468,6 +70619,7 @@
           "usr": "s:FSa15replaceSubrangeuRd__s10CollectionxzWd__8Iterator7Element_rFTGVs5RangeSi_4withqd___T_",
           "location": "",
           "moduleName": "Swift",
+          "mutating": true,
           "children": [
             {
               "kind": "TypeNominal",
@@ -70508,6 +70660,7 @@
           "usr": "s:FSa7popLastFT_GSqx_",
           "location": "",
           "moduleName": "Swift",
+          "mutating": true,
           "children": [
             {
               "kind": "TypeNominal",
@@ -70740,6 +70893,7 @@
           "usr": "s:FVs12Zip2Iterator4nextFT_GSqTwx7Elementw_S0___",
           "location": "",
           "moduleName": "Swift",
+          "mutating": true,
           "children": [
             {
               "kind": "TypeNominal",
@@ -70786,6 +70940,7 @@
           "usr": "s:FVs18LazyFilterIterator4nextFT_GSqwx7Element_",
           "location": "",
           "moduleName": "Swift",
+          "mutating": true,
           "children": [
             {
               "kind": "TypeNominal",
@@ -71139,6 +71294,7 @@
           "usr": "s:FVs16IteratorSequence4nextFT_GSqwx7Element_",
           "location": "",
           "moduleName": "Swift",
+          "mutating": true,
           "children": [
             {
               "kind": "TypeNominal",
@@ -71848,6 +72004,7 @@
           "usr": "s:FVs34RangeReplaceableBidirectionalSlice15replaceSubrangeuRd__s10CollectionwxPs13IndexableBase8_ElementzWd__8Iterator7Element_rFTGVs5RangewxPS1_5Index_4withqd___T_",
           "location": "",
           "moduleName": "Swift",
+          "mutating": true,
           "children": [
             {
               "kind": "TypeNominal",
@@ -71895,6 +72052,7 @@
           "usr": "s:FVs34RangeReplaceableBidirectionalSlice6insertFTwxPs13IndexableBase8_Element2atwxPS0_5Index_T_",
           "location": "",
           "moduleName": "Swift",
+          "mutating": true,
           "children": [
             {
               "kind": "TypeNominal",
@@ -71928,6 +72086,7 @@
           "usr": "s:FVs34RangeReplaceableBidirectionalSlice6insertuRd__s10CollectionwxPs13IndexableBase8_ElementzWd__8Iterator7Element_rFT10contentsOfqd__2atwxPS1_5Index_T_",
           "location": "",
           "moduleName": "Swift",
+          "mutating": true,
           "children": [
             {
               "kind": "TypeNominal",
@@ -71968,6 +72127,7 @@
           "usr": "s:FVs34RangeReplaceableBidirectionalSlice6removeFT2atwxPs13IndexableBase5Index_wxPS0_8_Element",
           "location": "",
           "moduleName": "Swift",
+          "mutating": true,
           "children": [
             {
               "kind": "TypeNominal",
@@ -71996,6 +72156,7 @@
           "usr": "s:FVs34RangeReplaceableBidirectionalSlice14removeSubrangeFGVs5RangewxPs13IndexableBase5Index_T_",
           "location": "",
           "moduleName": "Swift",
+          "mutating": true,
           "children": [
             {
               "kind": "TypeNominal",
@@ -72939,6 +73100,7 @@
           "usr": "s:FVs14JoinedIterator4nextFT_GSqWx7Element8IteratorS0___",
           "location": "",
           "moduleName": "Swift",
+          "mutating": true,
           "children": [
             {
               "kind": "TypeNominal",
@@ -73531,6 +73693,7 @@
           "usr": "s:FesRxs10Collectionxzwx11SubSequencerS_8popFirstFT_GSqWx8Iterator7Element__",
           "location": "",
           "moduleName": "Swift",
+          "mutating": true,
           "children": [
             {
               "kind": "TypeNominal",
@@ -74184,6 +74347,7 @@
           "usr": "s:FesRxs10Collectionxzwx11SubSequencerS_11removeFirstFT_Wx8Iterator7Element_",
           "location": "",
           "moduleName": "Swift",
+          "mutating": true,
           "children": [
             {
               "kind": "TypeNominal",
@@ -74200,6 +74364,7 @@
           "usr": "s:FesRxs10Collectionxzwx11SubSequencerS_11removeFirstFSiT_",
           "location": "",
           "moduleName": "Swift",
+          "mutating": true,
           "children": [
             {
               "kind": "TypeNominal",
@@ -76646,6 +76811,7 @@
           "usr": "s:FVs7Float805roundFOs25FloatingPointRoundingRuleT_",
           "location": "",
           "moduleName": "Swift",
+          "mutating": true,
           "children": [
             {
               "kind": "TypeNominal",
@@ -76667,6 +76833,7 @@
           "usr": "s:FVs7Float806negateFT_T_",
           "location": "",
           "moduleName": "Swift",
+          "mutating": true,
           "children": [
             {
               "kind": "TypeNominal",
@@ -76683,6 +76850,7 @@
           "usr": "s:FVs7Float803addFS_T_",
           "location": "",
           "moduleName": "Swift",
+          "mutating": true,
           "children": [
             {
               "kind": "TypeNominal",
@@ -76704,6 +76872,7 @@
           "usr": "s:FVs7Float808subtractFS_T_",
           "location": "",
           "moduleName": "Swift",
+          "mutating": true,
           "children": [
             {
               "kind": "TypeNominal",
@@ -76725,6 +76894,7 @@
           "usr": "s:FVs7Float808multiplyFT2byS__T_",
           "location": "",
           "moduleName": "Swift",
+          "mutating": true,
           "children": [
             {
               "kind": "TypeNominal",
@@ -76746,6 +76916,7 @@
           "usr": "s:FVs7Float806divideFT2byS__T_",
           "location": "",
           "moduleName": "Swift",
+          "mutating": true,
           "children": [
             {
               "kind": "TypeNominal",
@@ -76767,6 +76938,7 @@
           "usr": "s:FVs7Float8013formRemainderFT10dividingByS__T_",
           "location": "",
           "moduleName": "Swift",
+          "mutating": true,
           "children": [
             {
               "kind": "TypeNominal",
@@ -76788,6 +76960,7 @@
           "usr": "s:FVs7Float8023formTruncatingRemainderFT10dividingByS__T_",
           "location": "",
           "moduleName": "Swift",
+          "mutating": true,
           "children": [
             {
               "kind": "TypeNominal",
@@ -76809,6 +76982,7 @@
           "usr": "s:FVs7Float8014formSquareRootFT_T_",
           "location": "",
           "moduleName": "Swift",
+          "mutating": true,
           "children": [
             {
               "kind": "TypeNominal",
@@ -76825,6 +76999,7 @@
           "usr": "s:FVs7Float8010addProductFTS_S__T_",
           "location": "",
           "moduleName": "Swift",
+          "mutating": true,
           "children": [
             {
               "kind": "TypeNominal",
@@ -78324,6 +78499,7 @@
           "usr": "s:FVs3Set6insertFxT8insertedSb17memberAfterInsertx_",
           "location": "",
           "moduleName": "Swift",
+          "mutating": true,
           "children": [
             {
               "kind": "TypeNominal",
@@ -78371,6 +78547,7 @@
           "usr": "s:FVs3Set6updateFT4withx_GSqx_",
           "location": "",
           "moduleName": "Swift",
+          "mutating": true,
           "children": [
             {
               "kind": "TypeNominal",
@@ -78413,6 +78590,7 @@
           "usr": "s:FVs3Set6removeFxGSqx_",
           "location": "",
           "moduleName": "Swift",
+          "mutating": true,
           "children": [
             {
               "kind": "TypeNominal",
@@ -78455,6 +78633,7 @@
           "usr": "s:FVs3Set6removeFT2atGVs8SetIndexx__x",
           "location": "",
           "moduleName": "Swift",
+          "mutating": true,
           "children": [
             {
               "kind": "TypeNominal",
@@ -78497,6 +78676,7 @@
           "usr": "s:FVs3Set9removeAllFT15keepingCapacitySb_T_",
           "location": "",
           "moduleName": "Swift",
+          "mutating": true,
           "children": [
             {
               "kind": "TypeNominal",
@@ -78518,6 +78698,7 @@
           "usr": "s:FVs3Set11removeFirstFT_x",
           "location": "",
           "moduleName": "Swift",
+          "mutating": true,
           "children": [
             {
               "kind": "TypeNominal",
@@ -78925,6 +79106,7 @@
           "usr": "s:FVs3Set9formUnionuRd__s8SequencexzWd__8Iterator7Element_rFqd__T_",
           "location": "",
           "moduleName": "Swift",
+          "mutating": true,
           "children": [
             {
               "kind": "TypeNominal",
@@ -78995,6 +79177,7 @@
           "usr": "s:FVs3Set8subtractuRd__s8SequencexzWd__8Iterator7Element_rFqd__T_",
           "location": "",
           "moduleName": "Swift",
+          "mutating": true,
           "children": [
             {
               "kind": "TypeNominal",
@@ -79065,6 +79248,7 @@
           "usr": "s:FVs3Set16formIntersectionuRd__s8SequencexzWd__8Iterator7Element_rFqd__T_",
           "location": "",
           "moduleName": "Swift",
+          "mutating": true,
           "children": [
             {
               "kind": "TypeNominal",
@@ -79135,6 +79319,7 @@
           "usr": "s:FVs3Set23formSymmetricDifferenceuRd__s8SequencexzWd__8Iterator7Element_rFqd__T_",
           "location": "",
           "moduleName": "Swift",
+          "mutating": true,
           "children": [
             {
               "kind": "TypeNominal",
@@ -79654,6 +79839,7 @@
           "usr": "s:FVs3Set8popFirstFT_GSqx_",
           "location": "",
           "moduleName": "Swift",
+          "mutating": true,
           "children": [
             {
               "kind": "TypeNominal",
@@ -79684,6 +79870,7 @@
           "usr": "s:FVs3Set8subtractFGS_x_T_",
           "location": "",
           "moduleName": "Swift",
+          "mutating": true,
           "children": [
             {
               "kind": "TypeNominal",
@@ -79992,6 +80179,7 @@
           "usr": "s:FVs3Set23formSymmetricDifferenceFGS_x_T_",
           "location": "",
           "moduleName": "Swift",
+          "mutating": true,
           "children": [
             {
               "kind": "TypeNominal",
@@ -80027,6 +80215,7 @@
           "usr": "s:FesRxs8Hashablexs20_AnyHashableProtocolrVs3Set6insertuRd__S_rFqd__T8insertedSb17memberAfterInsertqd___",
           "location": "",
           "moduleName": "Swift",
+          "mutating": true,
           "children": [
             {
               "kind": "TypeNominal",
@@ -80074,6 +80263,7 @@
           "usr": "s:FesRxs8Hashablexs20_AnyHashableProtocolrVs3Set6updateuRd__S_rFT4withqd___GSqqd___",
           "location": "",
           "moduleName": "Swift",
+          "mutating": true,
           "children": [
             {
               "kind": "TypeNominal",
@@ -80116,6 +80306,7 @@
           "usr": "s:FesRxs8Hashablexs20_AnyHashableProtocolrVs3Set6removeuRd__S_rFqd__GSqqd___",
           "location": "",
           "moduleName": "Swift",
+          "mutating": true,
           "children": [
             {
               "kind": "TypeNominal",
@@ -81100,6 +81291,7 @@
           "usr": "s:FPs16TextOutputStream5writeFSST_",
           "location": "",
           "moduleName": "Swift",
+          "mutating": true,
           "children": [
             {
               "kind": "TypeNominal",
@@ -85023,6 +85215,7 @@
           "usr": "s:FPs13FloatingPoint3addFxT_",
           "location": "",
           "moduleName": "Swift",
+          "mutating": true,
           "children": [
             {
               "kind": "TypeNominal",
@@ -85067,6 +85260,7 @@
           "usr": "s:FPs13FloatingPoint6negateFT_T_",
           "location": "",
           "moduleName": "Swift",
+          "mutating": true,
           "children": [
             {
               "kind": "TypeNominal",
@@ -85111,6 +85305,7 @@
           "usr": "s:FPs13FloatingPoint8subtractFxT_",
           "location": "",
           "moduleName": "Swift",
+          "mutating": true,
           "children": [
             {
               "kind": "TypeNominal",
@@ -85167,6 +85362,7 @@
           "usr": "s:FPs13FloatingPoint8multiplyFT2byx_T_",
           "location": "",
           "moduleName": "Swift",
+          "mutating": true,
           "children": [
             {
               "kind": "TypeNominal",
@@ -85223,6 +85419,7 @@
           "usr": "s:FPs13FloatingPoint6divideFT2byx_T_",
           "location": "",
           "moduleName": "Swift",
+          "mutating": true,
           "children": [
             {
               "kind": "TypeNominal",
@@ -85279,6 +85476,7 @@
           "usr": "s:FPs13FloatingPoint13formRemainderFT10dividingByx_T_",
           "location": "",
           "moduleName": "Swift",
+          "mutating": true,
           "children": [
             {
               "kind": "TypeNominal",
@@ -85335,6 +85533,7 @@
           "usr": "s:FPs13FloatingPoint23formTruncatingRemainderFT10dividingByx_T_",
           "location": "",
           "moduleName": "Swift",
+          "mutating": true,
           "children": [
             {
               "kind": "TypeNominal",
@@ -85379,6 +85578,7 @@
           "usr": "s:FPs13FloatingPoint14formSquareRootFT_T_",
           "location": "",
           "moduleName": "Swift",
+          "mutating": true,
           "children": [
             {
               "kind": "TypeNominal",
@@ -85435,6 +85635,7 @@
           "usr": "s:FPs13FloatingPoint10addProductFTxx_T_",
           "location": "",
           "moduleName": "Swift",
+          "mutating": true,
           "children": [
             {
               "kind": "TypeNominal",
@@ -85656,6 +85857,7 @@
           "usr": "s:FPs13FloatingPoint5roundFOs25FloatingPointRoundingRuleT_",
           "location": "",
           "moduleName": "Swift",
+          "mutating": true,
           "children": [
             {
               "kind": "TypeNominal",
@@ -86368,6 +86570,7 @@
           "usr": "s:FEsPs13FloatingPoint5roundFT_T_",
           "location": "",
           "moduleName": "Swift",
+          "mutating": true,
           "children": [
             {
               "kind": "TypeNominal",
@@ -89159,6 +89362,7 @@
               "usr": "s:FSSs5utf16VSS9UTF16View",
               "location": "",
               "moduleName": "Swift",
+              "mutating": true,
               "children": [
                 {
                   "kind": "TypeNominal",
@@ -89794,6 +89998,7 @@
               "usr": "s:FSSs4utf8VSS8UTF8View",
               "location": "",
               "moduleName": "Swift",
+              "mutating": true,
               "children": [
                 {
                   "kind": "TypeNominal",
@@ -90420,6 +90625,7 @@
               "usr": "s:FVSS13CharacterView15replaceSubrangeuRxs10CollectionWx8Iterator7Element_zVs9CharacterrFTGVs5RangeVS_5Index_4withx_T_",
               "location": "",
               "moduleName": "Swift",
+              "mutating": true,
               "children": [
                 {
                   "kind": "TypeNominal",
@@ -90460,6 +90666,7 @@
               "usr": "s:FVSS13CharacterView15reserveCapacityFSiT_",
               "location": "",
               "moduleName": "Swift",
+              "mutating": true,
               "children": [
                 {
                   "kind": "TypeNominal",
@@ -90481,6 +90688,7 @@
               "usr": "s:FVSS13CharacterView6appendFVs9CharacterT_",
               "location": "",
               "moduleName": "Swift",
+              "mutating": true,
               "children": [
                 {
                   "kind": "TypeNominal",
@@ -90502,6 +90710,7 @@
               "usr": "s:FVSS13CharacterView6appenduRxs8SequenceWx8Iterator7Element_zVs9CharacterrFT10contentsOfx_T_",
               "location": "",
               "moduleName": "Swift",
+              "mutating": true,
               "children": [
                 {
                   "kind": "TypeNominal",
@@ -90595,6 +90804,7 @@
               "usr": "s:FSSs10charactersVSS13CharacterView",
               "location": "",
               "moduleName": "Swift",
+              "mutating": true,
               "children": [
                 {
                   "kind": "TypeNominal",
@@ -90623,6 +90833,7 @@
           "usr": "s:FSS21withMutableCharactersurFFRVSS13CharacterViewxx",
           "location": "",
           "moduleName": "Swift",
+          "mutating": true,
           "children": [
             {
               "kind": "TypeNominal",
@@ -91002,6 +91213,7 @@
           "usr": "s:FSS5writeFSST_",
           "location": "",
           "moduleName": "Swift",
+          "mutating": true,
           "children": [
             {
               "kind": "TypeNominal",
@@ -91192,6 +91404,7 @@
           "usr": "s:FSS6appendFSST_",
           "location": "",
           "moduleName": "Swift",
+          "mutating": true,
           "children": [
             {
               "kind": "TypeNominal",
@@ -92263,6 +92476,7 @@
           "usr": "s:FSS15reserveCapacityFSiT_",
           "location": "",
           "moduleName": "Swift",
+          "mutating": true,
           "children": [
             {
               "kind": "TypeNominal",
@@ -92284,6 +92498,7 @@
           "usr": "s:FSS6appendFVs9CharacterT_",
           "location": "",
           "moduleName": "Swift",
+          "mutating": true,
           "children": [
             {
               "kind": "TypeNominal",
@@ -92305,6 +92520,7 @@
           "usr": "s:FSS6appenduRxs8SequenceWx8Iterator7Element_zVs9CharacterrFT10contentsOfx_T_",
           "location": "",
           "moduleName": "Swift",
+          "mutating": true,
           "children": [
             {
               "kind": "TypeNominal",
@@ -92333,6 +92549,7 @@
           "usr": "s:FSS15replaceSubrangeuRxs10CollectionWx8Iterator7Element_zVs9CharacterrFTGVs5RangeVVSS13CharacterView5Index_4withx_T_",
           "location": "",
           "moduleName": "Swift",
+          "mutating": true,
           "children": [
             {
               "kind": "TypeNominal",
@@ -92373,6 +92590,7 @@
           "usr": "s:FSS15replaceSubrangeFTGVs5RangeVVSS13CharacterView5Index_4withSS_T_",
           "location": "",
           "moduleName": "Swift",
+          "mutating": true,
           "children": [
             {
               "kind": "TypeNominal",
@@ -92406,6 +92624,7 @@
           "usr": "s:FSS15replaceSubrangeuRxs10CollectionWx8Iterator7Element_zVs9CharacterrFTGVs11ClosedRangeVVSS13CharacterView5Index_4withx_T_",
           "location": "",
           "moduleName": "Swift",
+          "mutating": true,
           "children": [
             {
               "kind": "TypeNominal",
@@ -92446,6 +92665,7 @@
           "usr": "s:FSS15replaceSubrangeFTGVs11ClosedRangeVVSS13CharacterView5Index_4withSS_T_",
           "location": "",
           "moduleName": "Swift",
+          "mutating": true,
           "children": [
             {
               "kind": "TypeNominal",
@@ -92479,6 +92699,7 @@
           "usr": "s:FSS6insertFTVs9Character2atVVSS13CharacterView5Index_T_",
           "location": "",
           "moduleName": "Swift",
+          "mutating": true,
           "children": [
             {
               "kind": "TypeNominal",
@@ -92505,6 +92726,7 @@
           "usr": "s:FSS6insertuRxs10CollectionWx8Iterator7Element_zVs9CharacterrFT10contentsOfx2atVVSS13CharacterView5Index_T_",
           "location": "",
           "moduleName": "Swift",
+          "mutating": true,
           "children": [
             {
               "kind": "TypeNominal",
@@ -92538,6 +92760,7 @@
           "usr": "s:FSS6removeFT2atVVSS13CharacterView5Index_Vs9Character",
           "location": "",
           "moduleName": "Swift",
+          "mutating": true,
           "children": [
             {
               "kind": "TypeNominal",
@@ -92559,6 +92782,7 @@
           "usr": "s:FSS14removeSubrangeFGVs5RangeVVSS13CharacterView5Index_T_",
           "location": "",
           "moduleName": "Swift",
+          "mutating": true,
           "children": [
             {
               "kind": "TypeNominal",
@@ -92587,6 +92811,7 @@
           "usr": "s:FSS14removeSubrangeFGVs11ClosedRangeVVSS13CharacterView5Index_T_",
           "location": "",
           "moduleName": "Swift",
+          "mutating": true,
           "children": [
             {
               "kind": "TypeNominal",
@@ -92615,6 +92840,7 @@
           "usr": "s:FSS9removeAllFT15keepingCapacitySb_T_",
           "location": "",
           "moduleName": "Swift",
+          "mutating": true,
           "children": [
             {
               "kind": "TypeNominal",
@@ -92943,6 +93169,7 @@
                   "usr": "s:FVVSS17UnicodeScalarView8Iterator4nextFT_GSqSc_",
                   "location": "",
                   "moduleName": "Swift",
+                  "mutating": true,
                   "children": [
                     {
                       "kind": "TypeNominal",
@@ -93145,6 +93372,7 @@
               "usr": "s:FVSS17UnicodeScalarView15reserveCapacityFSiT_",
               "location": "",
               "moduleName": "Swift",
+              "mutating": true,
               "children": [
                 {
                   "kind": "TypeNominal",
@@ -93166,6 +93394,7 @@
               "usr": "s:FVSS17UnicodeScalarView6appendFScT_",
               "location": "",
               "moduleName": "Swift",
+              "mutating": true,
               "children": [
                 {
                   "kind": "TypeNominal",
@@ -93187,6 +93416,7 @@
               "usr": "s:FVSS17UnicodeScalarView6appenduRxs8SequenceWx8Iterator7Element_zScrFT10contentsOfx_T_",
               "location": "",
               "moduleName": "Swift",
+              "mutating": true,
               "children": [
                 {
                   "kind": "TypeNominal",
@@ -93215,6 +93445,7 @@
               "usr": "s:FVSS17UnicodeScalarView15replaceSubrangeuRxs10CollectionWx8Iterator7Element_zScrFTGVs5RangeVS_5Index_4withx_T_",
               "location": "",
               "moduleName": "Swift",
+              "mutating": true,
               "children": [
                 {
                   "kind": "TypeNominal",
@@ -93403,6 +93634,7 @@
               "usr": "s:FSSs14unicodeScalarsVSS17UnicodeScalarView",
               "location": "",
               "moduleName": "Swift",
+              "mutating": true,
               "children": [
                 {
                   "kind": "TypeNominal",
@@ -95485,6 +95717,7 @@
           "usr": "s:FVs16StrideToIterator4nextFT_GSqx_",
           "location": "",
           "moduleName": "Swift",
+          "mutating": true,
           "children": [
             {
               "kind": "TypeNominal",
@@ -95657,6 +95890,7 @@
           "usr": "s:FVs18DictionaryIterator4nextFT_GSqT3keyx5valueq___",
           "location": "",
           "moduleName": "Swift",
+          "mutating": true,
           "children": [
             {
               "kind": "TypeNominal",
@@ -98421,6 +98655,7 @@
           "usr": "s:FVs10ArraySlice15reserveCapacityFSiT_",
           "location": "",
           "moduleName": "Swift",
+          "mutating": true,
           "children": [
             {
               "kind": "TypeNominal",
@@ -98442,6 +98677,7 @@
           "usr": "s:FVs10ArraySlice6appendFxT_",
           "location": "",
           "moduleName": "Swift",
+          "mutating": true,
           "children": [
             {
               "kind": "TypeNominal",
@@ -98463,6 +98699,7 @@
           "usr": "s:FVs10ArraySlice6appenduRd__s8SequencexzWd__8Iterator7Element_rFT10contentsOfqd___T_",
           "location": "",
           "moduleName": "Swift",
+          "mutating": true,
           "children": [
             {
               "kind": "TypeNominal",
@@ -98491,6 +98728,7 @@
           "usr": "s:FVs10ArraySlice6appenduRd__s10CollectionxzWd__8Iterator7Element_rFT10contentsOfqd___T_",
           "location": "",
           "moduleName": "Swift",
+          "mutating": true,
           "children": [
             {
               "kind": "TypeNominal",
@@ -98519,6 +98757,7 @@
           "usr": "s:FVs10ArraySlice6insertFTx2atSi_T_",
           "location": "",
           "moduleName": "Swift",
+          "mutating": true,
           "children": [
             {
               "kind": "TypeNominal",
@@ -98545,6 +98784,7 @@
           "usr": "s:FVs10ArraySlice6removeFT2atSi_x",
           "location": "",
           "moduleName": "Swift",
+          "mutating": true,
           "children": [
             {
               "kind": "TypeNominal",
@@ -98566,6 +98806,7 @@
           "usr": "s:FVs10ArraySlice9removeAllFT15keepingCapacitySb_T_",
           "location": "",
           "moduleName": "Swift",
+          "mutating": true,
           "children": [
             {
               "kind": "TypeNominal",
@@ -98771,6 +99012,7 @@
           "location": "",
           "moduleName": "Swift",
           "throwing": true,
+          "mutating": true,
           "children": [
             {
               "kind": "TypeNominal",
@@ -98814,6 +99056,7 @@
           "usr": "s:FVs10ArraySlice15replaceSubrangeuRd__s10CollectionxzWd__8Iterator7Element_rFTGVs5RangeSi_4withqd___T_",
           "location": "",
           "moduleName": "Swift",
+          "mutating": true,
           "children": [
             {
               "kind": "TypeNominal",
@@ -101290,6 +101533,7 @@
           "usr": "s:FVs15FlattenIterator4nextFT_GSqWx7Element8IteratorS0___",
           "location": "",
           "moduleName": "Swift",
+          "mutating": true,
           "children": [
             {
               "kind": "TypeNominal",
