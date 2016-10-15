@@ -10,7 +10,7 @@ Classes:
   Methods:
   - Selector: printInfo
     MethodKind: Class
-    FactoryAsInit: C
+    SwiftName: 'printInfo()'
 - Name: UIPrintInteractionController
   Properties:
   - Name: 'sharedPrintController'

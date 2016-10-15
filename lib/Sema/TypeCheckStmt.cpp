@@ -155,7 +155,8 @@ namespace {
       ASTContext &ctx = Function.getAsDeclContext()->getASTContext();
 
       if (ShouldDump) {
-        llvm::errs() << llvm::format("%0.1f", elapsed * 1000) << "ms\t";
+        // Round up to the nearest 100th of a millisecond.
+        llvm::errs() << llvm::format("%0.2f", ceil(elapsed * 100000) / 100) << "ms\t";
         Function.getLoc().print(llvm::errs(), ctx.SourceMgr);
 
         if (auto *AFD = Function.getAbstractFunctionDecl()) {
@@ -390,7 +391,7 @@ public:
     }
 
     Type ResultTy = TheFunc->getBodyResultType();
-    if (!ResultTy || ResultTy->is<ErrorType>())
+    if (!ResultTy || ResultTy->hasError())
       return nullptr;
 
     if (!RS->hasResult()) {
@@ -1003,7 +1004,7 @@ bool TypeChecker::typeCheckCatchPattern(CatchStmt *S, DeclContext *DC) {
 }
 
 static bool isDiscardableType(Type type) {
-  return (type->is<ErrorType>() ||
+  return (type->hasError() ||
           type->isUninhabited() ||
           type->lookThroughAllAnyOptionalTypes()->isVoid());
 }
@@ -1211,7 +1212,7 @@ static void checkDefaultArguments(TypeChecker &tc, ParameterList *params,
   for (auto &param : *params) {
     ++nextArgIndex;
     if (!param->getDefaultValue() || !param->hasType() ||
-        param->getType()->is<ErrorType>())
+        param->getType()->hasError())
       continue;
     
     Expr *e = param->getDefaultValue();

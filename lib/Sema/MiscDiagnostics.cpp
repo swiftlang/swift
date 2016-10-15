@@ -299,12 +299,17 @@ static void diagSyntacticUseRestrictions(TypeChecker &TC, const Expr *E,
 
         // The argument is either a ParenExpr or TupleExpr.
         ArrayRef<Expr*> arguments;
+        SmallVector<Expr *, 1> Scratch;
         if (auto *TE = dyn_cast<TupleExpr>(Arg))
           arguments = TE->getElements();
-        else if (auto *PE = dyn_cast<ParenExpr>(Arg))
-          arguments = PE->getSubExpr();
-        else
-          arguments = Call->getArg();
+        else if (auto *PE = dyn_cast<ParenExpr>(Arg)) {
+          Scratch.push_back(PE->getSubExpr());
+          arguments = makeArrayRef(Scratch);
+        }
+        else {
+          Scratch.push_back(Call->getArg());
+          arguments = makeArrayRef(Scratch);
+        }
 
         // Check each argument.
         for (auto arg : arguments) {
@@ -346,14 +351,14 @@ static void diagSyntacticUseRestrictions(TypeChecker &TC, const Expr *E,
       /// Diagnose a '_' that isn't on the immediate LHS of an assignment.
       if (auto *DAE = dyn_cast<DiscardAssignmentExpr>(E)) {
         if (!CorrectDiscardAssignmentExprs.count(DAE) &&
-            !DAE->getType()->is<ErrorType>())
+            !DAE->getType()->hasError())
           TC.diagnose(DAE->getLoc(), diag::discard_expr_outside_of_assignment);
       }
 
       // Diagnose an '&' that isn't in an argument lists.
       if (auto *IOE = dyn_cast<InOutExpr>(E)) {
         if (!IOE->isImplicit() && !AcceptableInOutExprs.count(IOE) &&
-            !IOE->getType()->is<ErrorType>())
+            !IOE->getType()->hasError())
           TC.diagnose(IOE->getLoc(), diag::inout_expr_outside_of_call)
             .highlight(IOE->getSubExpr()->getSourceRange());
       }
@@ -1837,16 +1842,16 @@ bool TypeChecker::diagnoseExplicitUnavailability(
   SourceLoc Loc = R.Start;
   auto Name = D->getFullName();
 
-  switch (Attr->getUnconditionalAvailability()) {
-  case UnconditionalAvailabilityKind::Deprecated:
+  switch (Attr->getPlatformAgnosticAvailability()) {
+  case PlatformAgnosticAvailabilityKind::Deprecated:
     break;
 
-  case UnconditionalAvailabilityKind::None:
-  case UnconditionalAvailabilityKind::Unavailable:
-  case UnconditionalAvailabilityKind::UnavailableInCurrentSwift:
-  case UnconditionalAvailabilityKind::UnavailableInSwift: {
-    bool inSwift = (Attr->getUnconditionalAvailability() ==
-                    UnconditionalAvailabilityKind::UnavailableInSwift);
+  case PlatformAgnosticAvailabilityKind::None:
+  case PlatformAgnosticAvailabilityKind::Unavailable:
+  case PlatformAgnosticAvailabilityKind::SwiftVersionSpecific:
+  case PlatformAgnosticAvailabilityKind::UnavailableInSwift: {
+    bool inSwift = (Attr->getPlatformAgnosticAvailability() ==
+                    PlatformAgnosticAvailabilityKind::UnavailableInSwift);
 
     if (!Attr->Rename.empty()) {
       SmallString<32> newNameBuf;
@@ -1862,9 +1867,10 @@ bool TypeChecker::diagnoseExplicitUnavailability(
                              newName);
         attachRenameFixIts(diag);
       } else {
+        EncodedDiagnosticMessage EncodedMessage(Attr->Message);
         auto diag = diagnose(Loc, diag::availability_decl_unavailable_rename_msg,
                              Name, replaceKind.hasValue(), rawReplaceKind,
-                             newName, Attr->Message);
+                             newName, EncodedMessage.Message);
         attachRenameFixIts(diag);
       }
     } else if (Attr->Message.empty()) {
@@ -1882,22 +1888,27 @@ bool TypeChecker::diagnoseExplicitUnavailability(
   }
   }
 
-  auto MinVersion = Context.LangOpts.getMinPlatformVersion();
-  switch (Attr->getMinVersionAvailability(MinVersion)) {
-  case MinVersionComparison::Available:
-  case MinVersionComparison::PotentiallyUnavailable:
+  switch (Attr->getVersionAvailability(Context)) {
+  case AvailableVersionComparison::Available:
+  case AvailableVersionComparison::PotentiallyUnavailable:
     llvm_unreachable("These aren't considered unavailable");
 
-  case MinVersionComparison::Unavailable:
-    diagnose(D, diag::availability_marked_unavailable, Name)
+  case AvailableVersionComparison::Unavailable:
+    if (Attr->isLanguageVersionSpecific()
+        && Attr->Introduced.hasValue())
+      diagnose(D, diag::availability_introduced_in_swift, Name,
+               *Attr->Introduced).highlight(Attr->getRange());
+    else
+      diagnose(D, diag::availability_marked_unavailable, Name)
         .highlight(Attr->getRange());
     break;
 
-  case MinVersionComparison::Obsoleted:
+  case AvailableVersionComparison::Obsoleted:
     // FIXME: Use of the platformString here is non-awesome for application
     // extensions.
     diagnose(D, diag::availability_obsoleted, Name,
-             Attr->prettyPlatformString(),
+             (Attr->isLanguageVersionSpecific() ?
+              "Swift" : Attr->prettyPlatformString()),
              *Attr->Obsoleted).highlight(Attr->getRange());
     break;
   }
@@ -1981,9 +1992,12 @@ public:
     return E;
   }
 
-private:
   bool diagAvailability(const ValueDecl *D, SourceRange R,
-                        const ApplyExpr *call = nullptr);
+                        const ApplyExpr *call = nullptr,
+                        bool AllowPotentiallyUnavailableProtocol = false,
+                        bool SignalOnPotentialUnavailability = true);
+
+private:
   bool diagnoseIncDecRemoval(const ValueDecl *D, SourceRange R,
                              const AvailableAttr *Attr);
   bool diagnoseMemoryLayoutMigration(const ValueDecl *D, SourceRange R,
@@ -2119,11 +2133,12 @@ private:
 };
 }
 
-
 /// Diagnose uses of unavailable declarations. Returns true if a diagnostic
 /// was emitted.
 bool AvailabilityWalker::diagAvailability(const ValueDecl *D, SourceRange R,
-                                          const ApplyExpr *call) {
+                                          const ApplyExpr *call,
+                                          bool AllowPotentiallyUnavailableProtocol,
+                                          bool SignalOnPotentialUnavailability) {
   if (!D)
     return false;
 
@@ -2140,11 +2155,15 @@ bool AvailabilityWalker::diagAvailability(const ValueDecl *D, SourceRange R,
   // Diagnose for deprecation
   TC.diagnoseIfDeprecated(R, DC, D, call);
 
-  // Diagnose for potential unavailability
+  if (AllowPotentiallyUnavailableProtocol && isa<ProtocolDecl>(D))
+    return false;
+
+  // Diagnose (and possibly signal) for potential unavailability
   auto maybeUnavail = TC.checkDeclarationAvailability(D, R.Start, DC);
   if (maybeUnavail.hasValue()) {
     TC.diagnosePotentialUnavailability(D, R, DC, maybeUnavail.getValue());
-    return true;
+    if (SignalOnPotentialUnavailability)
+      return true;
   }
   return false;
 }
@@ -2272,7 +2291,7 @@ bool AvailabilityWalker::diagnoseMemoryLayoutMigration(const ValueDecl *D,
   StringRef Suffix = ">.";
   if (isValue) {
     auto valueType = subject->getType()->getRValueType();
-    if (!valueType || valueType->is<ErrorType>()) {
+    if (!valueType || valueType->hasError()) {
       // If we don't have a suitable argument, we cannot emit a fix-it.
       return true;
     }
@@ -2698,7 +2717,7 @@ markBaseOfAbstractStorageDeclStore(Expr *base, ConcreteDeclRef decl) {
 void VarDeclUsageChecker::markStoredOrInOutExpr(Expr *E, unsigned Flags) {
   // Sema leaves some subexpressions null, which seems really unfortunate.  It
   // should replace them with ErrorExpr.
-  if (E == nullptr || !E->getType() || E->getType()->is<ErrorType>()) {
+  if (E == nullptr || !E->getType() || E->getType()->hasError()) {
     sawError = true;
     return;
   }
@@ -2766,7 +2785,7 @@ void VarDeclUsageChecker::markStoredOrInOutExpr(Expr *E, unsigned Flags) {
 std::pair<bool, Expr *> VarDeclUsageChecker::walkToExprPre(Expr *E) {
   // Sema leaves some subexpressions null, which seems really unfortunate.  It
   // should replace them with ErrorExpr.
-  if (E == nullptr || !E->getType() || E->getType()->is<ErrorType>()) {
+  if (E == nullptr || !E->getType() || E->getType()->hasError()) {
     sawError = true;
     return { false, E };
   }
@@ -3167,7 +3186,7 @@ static void checkStmtConditionTrailingClosure(TypeChecker &TC, const Expr *E) {
       auto argsExpr = E->getArg();
       auto argsTy = argsExpr->getType();
       // Ignore invalid argument type. Some diagnostics are already emitted.
-      if (!argsTy || argsTy->is<ErrorType>()) return;
+      if (!argsTy || argsTy->hasError()) return;
 
       if (auto TSE = dyn_cast<TupleShuffleExpr>(argsExpr))
         argsExpr = TSE->getSubExpr();
@@ -3672,12 +3691,12 @@ checkImplicitPromotionsInCondition(const StmtConditionElement &cond,
   }
 }
 
-static void diagnoseOptionalToAnyCoercion(TypeChecker &TC, const Expr *E,
-                                          const DeclContext *DC) {
+static void diagnoseUnintendedOptionalBehavior(TypeChecker &TC, const Expr *E,
+                                               const DeclContext *DC) {
   if (!E || isa<ErrorExpr>(E) || !E->getType())
     return;
 
-  class OptionalToAnyCoercionWalker : public ASTWalker {
+  class UnintendedOptionalBehaviorWalker : public ASTWalker {
     TypeChecker &TC;
     SmallPtrSet<Expr *, 4> ErasureCoercedToAny;
 
@@ -3707,16 +3726,47 @@ static void diagnoseOptionalToAnyCoercion(TypeChecker &TC, const Expr *E,
               .highlight(subExpr->getSourceRange())
               .fixItInsertAfter(subExpr->getEndLoc(), " as Any");
         }
-      }
+      } else if (auto *literal = dyn_cast<InterpolatedStringLiteralExpr>(E)) {
+        // Warn about interpolated segments that contain optionals.
+        for (auto &segment : literal->getSegments()) {
+          // Allow explicit casts.
+          if (auto paren = dyn_cast<ParenExpr>(segment)) {
+            if (isa<ExplicitCastExpr>(paren->getSubExpr())) {
+              continue;
+            }
+          }
 
+          // Bail out if we don't have an optional.
+          if (!segment->getType()->getOptionalObjectType()) {
+            continue;
+          }
+
+          TC.diagnose(segment->getStartLoc(),
+                      diag::optional_in_string_interpolation_segment)
+              .highlight(segment->getSourceRange());
+
+          // Suggest 'String(describing: <expr>)'.
+          auto segmentStart = segment->getStartLoc().getAdvancedLoc(1);
+          TC.diagnose(segment->getLoc(),
+                      diag::silence_optional_in_interpolation_segment_call)
+            .highlight(segment->getSourceRange())
+            .fixItInsert(segmentStart, "String(describing: ")
+            .fixItInsert(segment->getEndLoc(), ")");
+
+          // Suggest inserting a default value. 
+          TC.diagnose(segment->getLoc(), diag::default_optional_to_any)
+            .highlight(segment->getSourceRange())
+            .fixItInsert(segment->getEndLoc(), " ?? <#default value#>");
+        }
+      }
       return { true, E };
     }
 
   public:
-    OptionalToAnyCoercionWalker(TypeChecker &tc) : TC(tc) { }
+    UnintendedOptionalBehaviorWalker(TypeChecker &tc) : TC(tc) { }
   };
 
-  OptionalToAnyCoercionWalker Walker(TC);
+  UnintendedOptionalBehaviorWalker Walker(TC);
   const_cast<Expr *>(E)->walk(Walker);
 }
 
@@ -3732,7 +3782,7 @@ void swift::performSyntacticExprDiagnostics(TypeChecker &TC, const Expr *E,
   diagSyntacticUseRestrictions(TC, E, DC, isExprStmt);
   diagRecursivePropertyAccess(TC, E, DC);
   diagnoseImplicitSelfUseInClosure(TC, E, DC);
-  diagnoseOptionalToAnyCoercion(TC, E, DC);
+  diagnoseUnintendedOptionalBehavior(TC, E, DC);
   if (!TC.getLangOpts().DisableAvailabilityChecking)
     diagAvailability(TC, E, const_cast<DeclContext*>(DC));
   if (TC.Context.LangOpts.EnableObjCInterop)
@@ -3888,10 +3938,7 @@ static OmissionTypeName getTypeNameForOmission(Type type) {
     }
 
     // Look through parentheses.
-    if (auto parenTy = dyn_cast<ParenType>(type.getPointer())) {
-      type = parenTy->getUnderlyingType();
-      continue;
-    }
+    type = type->getWithoutParens();
 
     // Look through optionals.
     if (auto optObjectTy = type->getAnyOptionalObjectType()) {
@@ -4090,4 +4137,21 @@ Optional<Identifier> TypeChecker::omitNeedlessWords(VarDecl *var) {
   }
 
   return None;
+}
+
+
+/// Run the Availability-diagnostics algorithm otherwise used in an expr
+/// context, but for non-expr contexts such as TypeDecls referenced from
+/// TypeReprs.
+bool swift::diagnoseDeclAvailability(const ValueDecl *Decl,
+                                     TypeChecker &TC,
+                                     DeclContext *DC,
+                                     SourceRange R,
+                                     bool AllowPotentiallyUnavailableProtocol,
+                                     bool SignalOnPotentialUnavailability)
+{
+  AvailabilityWalker AW(TC, DC);
+  return AW.diagAvailability(Decl, R, nullptr,
+                             AllowPotentiallyUnavailableProtocol,
+                             SignalOnPotentialUnavailability);
 }

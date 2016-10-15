@@ -29,8 +29,9 @@ TupleInst *SILBuilder::createTuple(SILLocation loc, ArrayRef<SILValue> elts) {
 }
 
 SILType SILBuilder::getPartialApplyResultType(SILType origTy, unsigned argCount,
-                                              SILModule &M,
-                                              ArrayRef<Substitution> subs) {
+                                        SILModule &M,
+                                        ArrayRef<Substitution> subs,
+                                        ParameterConvention calleeConvention) {
   CanSILFunctionType FTI = origTy.castTo<SILFunctionType>();
   if (!subs.empty())
     FTI = FTI->substGenericArgs(M, M.getSwiftModule(), subs);
@@ -59,7 +60,7 @@ SILType SILBuilder::getPartialApplyResultType(SILType origTy, unsigned argCount,
   }
 
   auto appliedFnType = SILFunctionType::get(nullptr, extInfo,
-                                            ParameterConvention::Direct_Owned,
+                                            calleeConvention,
                                             newParams,
                                             results,
                                             FTI->getOptionalErrorResult(),

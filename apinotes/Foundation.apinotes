@@ -157,7 +157,7 @@ Classes:
   Methods:
   - Selector: 'notificationCenterForType:'
     MethodKind: Class
-    FactoryAsInit: C
+    SwiftName: 'forType(_:)'
 - Name: NSHTTPCookie
   SwiftName: HTTPCookie
 - Name: NSHTTPCookieStorage
@@ -209,10 +209,6 @@ Classes:
 - Name: NSProcessInfo
   SwiftName: ProcessInfo
   Methods:
-  - Selector: processInfo
-    MethodKind: Class
-    NullabilityOfRet: N
-    FactoryAsInit: C
   - Selector: 'isOperatingSystemAtLeastVersion:'
     SwiftName: isOperatingSystemAtLeast(_:)
     MethodKind: Instance

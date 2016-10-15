@@ -671,8 +671,7 @@ func r24251022() {
 func overloadSetResultType(_ a : Int, b : Int) -> Int {
   // https://twitter.com/_jlfischer/status/712337382175952896
   // TODO: <rdar://problem/27391581> QoI: Nonsensical "binary operator '&&' cannot be applied to two 'Bool' operands"
-  return a == b && 1 == 2  // expected-error {{binary operator '&&' cannot be applied to two 'Bool' operands}}
-  // expected-note @-1 {{expected an argument list of type '(Bool, @autoclosure () throws -> Bool)'}}
+  return a == b && 1 == 2  // expected-error {{cannot convert return expression of type 'Bool' to return type 'Int'}}
 }
 
 // <rdar://problem/21523291> compiler error message for mutating immutable field is incorrect
@@ -733,9 +732,8 @@ class Foo23752537 {
 extension Foo23752537 {
   func isEquivalent(other: Foo23752537) {
     // TODO: <rdar://problem/27391581> QoI: Nonsensical "binary operator '&&' cannot be applied to two 'Bool' operands"
-    // expected-error @+1 {{binary operator '&&' cannot be applied to two 'Bool' operands}}
+    // expected-error @+1 {{unexpected non-void return value in void function}}
     return (self.title != other.title && self.message != other.message)
-    // expected-note @-1 {{expected an argument list of type '(Bool, @autoclosure () throws -> Bool)'}}
   }
 }
 
@@ -815,3 +813,37 @@ r27212391(a: 1, 3, y: 5)    // expected-error {{missing argument label 'x' in ca
 r27212391(1, x: 3, y: 5)    // expected-error {{missing argument label 'a' in call}}
 r27212391(a: 1, y: 3, x: 5) // expected-error {{argument 'x' must precede argument 'y'}}
 r27212391(a: 1, 3, x: 5)    // expected-error {{argument 'x' must precede unnamed argument #2}}
+
+// SR-1255
+func foo1255_1() {
+  return true || false // expected-error {{unexpected non-void return value in void function}}
+}
+func foo1255_2() -> Int {
+  return true || false // expected-error {{cannot convert return expression of type 'Bool' to return type 'Int'}}
+}
+
+// SR-2505: "Call arguments did not match up" assertion
+
+func sr_2505(_ a: Any) {} // expected-note {{}}
+sr_2505()          // expected-error {{missing argument for parameter #1 in call}}
+sr_2505(a: 1)      // expected-error {{extraneous argument label 'a:' in call}}
+sr_2505(1, 2)      // expected-error {{extra argument in call}}
+sr_2505(a: 1, 2)   // expected-error {{extra argument in call}}
+
+struct C_2505 {
+  init(_ arg: Any) {
+  }
+}
+
+protocol P_2505 {
+}
+
+extension C_2505 {
+  init<T>(from: [T]) where T: P_2505 {
+  }
+}
+
+class C2_2505: P_2505 {
+}
+
+let c_2505 = C_2505(arg: [C2_2505()]) // expected-error {{argument labels '(arg:)' do not match any available overloads}} expected-note {{overloads for 'C_2505' exist}}

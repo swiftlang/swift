@@ -230,6 +230,9 @@ static llvm::cl::opt<std::string>
 Triple("target", llvm::cl::desc("target triple"));
 
 static llvm::cl::opt<std::string>
+SwiftVersion("swift-version", llvm::cl::desc("Swift version"));
+
+static llvm::cl::opt<std::string>
 ModuleCachePath("module-cache-path", llvm::cl::desc("Clang module cache path"));
 
 static llvm::cl::opt<std::string>
@@ -242,6 +245,9 @@ ImportPaths("I", llvm::cl::desc("add a directory to the import search path"));
 
 static llvm::cl::list<std::string>
 FrameworkPaths("F", llvm::cl::desc("add a directory to the framework search path"));
+
+static llvm::cl::list<std::string>
+SystemFrameworkPaths("iframework", llvm::cl::desc("add a directory to the system framework search path"));
 
 static llvm::cl::opt<std::string>
 ResourceDir("resource-dir",
@@ -1966,7 +1972,7 @@ public:
       OS.indent(IndentLevel * 2);
       OS << Decl::getKindName(VD->getKind()) << "Decl '''"
          << VD->getName().str() << "''' ";
-      VD->getType().print(OS, Options);
+      VD->getInterfaceType().print(OS, Options);
       OS << "\n";
     }
     IndentLevel++;
@@ -2716,7 +2722,7 @@ int main(int argc, char *argv[]) {
 
   if (options::Action == ActionType::DumpCompletionCache) {
     if (options::InputFilenames.empty()) {
-      llvm::errs() << "-dump-completin-cache requires an input file\n";
+      llvm::errs() << "-dump-completion-cache requires an input file\n";
       return 1;
     }
 
@@ -2769,10 +2775,22 @@ int main(int argc, char *argv[]) {
   InitInvok.setSDKPath(options::SDK);
   if (!options::Triple.empty())
     InitInvok.setTargetTriple(options::Triple);
+  if (!options::SwiftVersion.empty()) {
+    if (auto swiftVersion =
+          version::Version::parseVersionString(options::SwiftVersion,
+                                               SourceLoc(), nullptr)) {
+      InitInvok.getLangOptions().EffectiveLanguageVersion = *swiftVersion;
+    }
+  }
   InitInvok.getClangImporterOptions().ModuleCachePath =
     options::ModuleCachePath;
   InitInvok.setImportSearchPaths(options::ImportPaths);
   InitInvok.setFrameworkSearchPaths(options::FrameworkPaths);
+  for (const auto &systemFrameworkPath : options::SystemFrameworkPaths) {
+    auto &extraArgs = InitInvok.getClangImporterOptions().ExtraArgs;
+    extraArgs.push_back("-iframework");
+    extraArgs.push_back(systemFrameworkPath);
+  }
   InitInvok.getFrontendOptions().EnableSourceImport |=
     options::EnableSourceImport;
   InitInvok.getFrontendOptions().ImplicitObjCHeaderPath =

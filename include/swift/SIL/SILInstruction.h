@@ -55,6 +55,14 @@ class FunctionRefInst;
 
 template <typename ImplClass> class SILClonerWithScopes;
 
+// An enum class for SILInstructions that enables exhaustive switches over
+// instructions.
+enum class SILInstructionKind : std::underlying_type<ValueKind>::type {
+#define INST(Id, Parent, TextualName, MemoryBehavior, ReleasingBehavior)       \
+  Id = static_cast<std::underlying_type<ValueKind>::type>(ValueKind::Id),
+#include "SILNodes.def"
+};
+
 /// This is the root class for all instructions that can be used as the contents
 /// of a Swift SILBasicBlock.
 class SILInstruction : public ValueBase,public llvm::ilist_node<SILInstruction>{
@@ -673,15 +681,18 @@ public:
   }
 };
 
-/// AllocRefInst - This represents the primitive allocation of an instance
-/// of a reference type. Aside from the reference count, the instance is
-/// returned uninitialized.
-/// Optionally, the allocated instance contains space for one or more tail-
-/// allocated arrays.
-class AllocRefInst final
+/// The base class for AllocRefInst and AllocRefDynamicInst.
+class AllocRefInstBase
     : public AllocationInst,
       public StackPromotable {
-  friend class SILBuilder;
+protected:
+
+  AllocRefInstBase(ValueKind Kind,
+                   SILDebugLocation DebugLoc,
+                   SILType ObjectType,
+                   bool objc, bool canBeOnStack,
+                   ArrayRef<SILType> ElementTypes,
+                   ArrayRef<SILValue> AllOperands);
 
   // Number of tail-allocated arrays.
   unsigned short NumTailTypes;
@@ -700,19 +711,6 @@ class AllocRefInst final
     return reinterpret_cast<const SILType*>(Operands.asArray().end());
   }
 
-  AllocRefInst(SILDebugLocation DebugLoc, SILFunction &F,
-               SILType ObjectType,
-               bool objc, bool canBeOnStack,
-               ArrayRef<SILType> ElementTypes,
-               ArrayRef<SILValue> AllOperands);
-
-  static AllocRefInst *create(SILDebugLocation DebugLoc, SILFunction &F,
-                              SILType ObjectType,
-                              bool objc, bool canBeOnStack,
-                              ArrayRef<SILType> ElementTypes,
-                              ArrayRef<SILValue> ElementCountOperands,
-                              SILOpenedArchetypesState &OpenedArchetypes);
-
 public:
   ArrayRef<SILType> getTailAllocatedTypes() const {
     return {getTypeStorage(), NumTailTypes};
@@ -721,7 +719,7 @@ public:
   MutableArrayRef<SILType> getTailAllocatedTypes() {
     return {getTypeStorage(), NumTailTypes};
   }
-
+  
   ArrayRef<Operand> getTailAllocatedCounts() const {
     return getAllOperands().slice(0, NumTailTypes);
   }
@@ -737,7 +735,38 @@ public:
   MutableArrayRef<Operand> getAllOperands() {
     return Operands.asArray();
   }
+  
+  /// Whether to use Objective-C's allocation mechanism (+allocWithZone:).
+  bool isObjC() const { return ObjC; }
+};
 
+/// AllocRefInst - This represents the primitive allocation of an instance
+/// of a reference type. Aside from the reference count, the instance is
+/// returned uninitialized.
+/// Optionally, the allocated instance contains space for one or more tail-
+/// allocated arrays.
+class AllocRefInst final : public AllocRefInstBase {
+  friend class SILBuilder;
+
+  AllocRefInst(SILDebugLocation DebugLoc, SILFunction &F,
+               SILType ObjectType,
+               bool objc, bool canBeOnStack,
+               ArrayRef<SILType> ElementTypes,
+               ArrayRef<SILValue> AllOperands)
+      : AllocRefInstBase(ValueKind::AllocRefInst, DebugLoc, ObjectType, objc,
+                         canBeOnStack, ElementTypes, AllOperands) {
+    static_assert(sizeof(AllocRefInst) == sizeof(AllocRefInstBase),
+                  "subclass has extra storage");
+  }
+
+  static AllocRefInst *create(SILDebugLocation DebugLoc, SILFunction &F,
+                              SILType ObjectType,
+                              bool objc, bool canBeOnStack,
+                              ArrayRef<SILType> ElementTypes,
+                              ArrayRef<SILValue> ElementCountOperands,
+                              SILOpenedArchetypesState &OpenedArchetypes);
+
+public:
   ArrayRef<Operand> getTypeDependentOperands() const {
     return getAllOperands().slice(NumTailTypes);
   }
@@ -745,9 +774,6 @@ public:
   MutableArrayRef<Operand> getTypeDependentOperands() {
     return getAllOperands().slice(NumTailTypes);
   }
-
-  /// Whether to use Objective-C's allocation mechanism (+allocWithZone:).
-  bool isObjC() const { return ObjC; }
 
   static bool classof(const ValueBase *V) {
     return V->getKind() == ValueKind::AllocRefInst;
@@ -758,27 +784,46 @@ public:
 /// an instance of a reference type whose runtime type is provided by
 /// the given metatype value. Aside from the reference count, the
 /// instance is returned uninitialized.
-class AllocRefDynamicInst final
-    : public UnaryInstructionWithTypeDependentOperandsBase<
-                                  ValueKind::AllocRefDynamicInst,
-                                  AllocRefDynamicInst,
-                                  AllocationInst,
-                                  true> {
+/// Optionally, the allocated instance contains space for one or more tail-
+/// allocated arrays.
+class AllocRefDynamicInst final : public AllocRefInstBase {
   friend class SILBuilder;
 
-  bool ObjC;
-
-  AllocRefDynamicInst(SILDebugLocation DebugLoc, SILValue operand,
-                      ArrayRef<SILValue> TypeDependentOperands, SILType ty,
-                      bool objc);
+  AllocRefDynamicInst(SILDebugLocation DebugLoc,
+                      SILType ty,
+                      bool objc,
+                      ArrayRef<SILType> ElementTypes,
+                      ArrayRef<SILValue> AllOperands)
+      : AllocRefInstBase(ValueKind::AllocRefDynamicInst, DebugLoc,
+                         ty, objc, false,
+                         ElementTypes, AllOperands) {
+    static_assert(sizeof(AllocRefInst) == sizeof(AllocRefInstBase),
+                  "subclass has extra storage");
+  }
 
   static AllocRefDynamicInst *
-  create(SILDebugLocation DebugLoc, SILValue operand, SILType ty, bool objc,
-         SILFunction &F, SILOpenedArchetypesState &OpenedArchetypes);
+  create(SILDebugLocation DebugLoc, SILFunction &F,
+         SILValue metatypeOperand, SILType ty, bool objc,
+         ArrayRef<SILType> ElementTypes,
+         ArrayRef<SILValue> ElementCountOperands,
+         SILOpenedArchetypesState &OpenedArchetypes);
 
 public:
-  /// Whether to use Objective-C's allocation mechanism (+allocWithZone:).
-  bool isObjC() const { return ObjC; }
+  SILValue getMetatypeOperand() const {
+    return getAllOperands()[NumTailTypes].get();
+  }
+
+  ArrayRef<Operand> getTypeDependentOperands() const {
+    return getAllOperands().slice(NumTailTypes + 1);
+  }
+
+  MutableArrayRef<Operand> getTypeDependentOperands() {
+    return getAllOperands().slice(NumTailTypes + 1);
+  }
+
+  static bool classof(const ValueBase *V) {
+    return V->getKind() == ValueKind::AllocRefDynamicInst;
+  }
 };
 
 /// AllocValueBufferInst - Allocate memory in a value buffer.
@@ -1292,7 +1337,7 @@ class PartialApplyInst
                                   SILOpenedArchetypesState &OpenedArchetypes);
 
 public:
-  /// Return the ast level function type of this partial apply.
+  /// Return the result function type of this partial apply.
   CanSILFunctionType getFunctionType() const {
     return getType().castTo<SILFunctionType>();
   }
@@ -4407,7 +4452,7 @@ public:
 //===----------------------------------------------------------------------===//
 
 enum class TermKind {
-#define TERMINATOR(Id, Parent, MemBehavior, MayRelease) Id,
+#define TERMINATOR(Id, Parent, TextualName, MemBehavior, MayRelease) Id,
 #include "SILNodes.def"
 };
 
@@ -4416,10 +4461,10 @@ struct ValueKindAsTermKind {
 
   ValueKindAsTermKind(ValueKind V) {
     switch (V) {
-#define TERMINATOR(Id, Parent, MemBehavior, MayRelease)                 \
-      case ValueKind::Id:                                               \
-        K = TermKind::Id;                                               \
-        break;
+#define TERMINATOR(Id, Parent, TextualName, MemBehavior, MayRelease)           \
+  case ValueKind::Id:                                                          \
+    K = TermKind::Id;                                                          \
+    break;
 #include "SILNodes.def"
     default:
       llvm_unreachable("Not a terminator kind?!");

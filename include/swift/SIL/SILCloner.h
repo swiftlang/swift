@@ -78,7 +78,7 @@ protected:
   void visit##CLASS(CLASS *I) {                                       \
     llvm_unreachable("SILCloner visiting non-instruction?");          \
   }
-#define INST(CLASS, PARENT, MEMBEHAVIOR, RELEASINGBEHAVIOR) \
+#define INST(CLASS, PARENT, TEXTUALNAME, MEMBEHAVIOR, RELEASINGBEHAVIOR)       \
   void visit##CLASS(CLASS *I);
 #include "swift/SIL/SILNodes.def"
 
@@ -473,22 +473,16 @@ template<typename ImplClass>
 void
 SILCloner<ImplClass>::visitAllocRefInst(AllocRefInst *Inst) {
   getBuilder().setCurrentDebugScope(getOpScope(Inst->getDebugScope()));
-  SILInstruction *NewInst = nullptr;
-  if (Inst->isObjC()) {
-    NewInst = getBuilder().createAllocRef(getOpLocation(Inst->getLoc()),
-                                          getOpType(Inst->getType()),
-                                          true, Inst->canAllocOnStack());
-  } else {
-    auto CountArgs = getOpValueArray<8>(OperandValueArrayRef(Inst->getTailAllocatedCounts()));
-    SmallVector<SILType, 4> ElemTypes;
-    for (SILType OrigElemType : Inst->getTailAllocatedTypes()) {
-      ElemTypes.push_back(getOpType(OrigElemType));
-    }
-    NewInst = getBuilder().createAllocRef(getOpLocation(Inst->getLoc()),
-                                          getOpType(Inst->getType()),
-                                          Inst->canAllocOnStack(),
-                                          ElemTypes, CountArgs);
+  auto CountArgs = getOpValueArray<8>(OperandValueArrayRef(Inst->
+                                                    getTailAllocatedCounts()));
+  SmallVector<SILType, 4> ElemTypes;
+  for (SILType OrigElemType : Inst->getTailAllocatedTypes()) {
+    ElemTypes.push_back(getOpType(OrigElemType));
   }
+  auto *NewInst = getBuilder().createAllocRef(getOpLocation(Inst->getLoc()),
+                                      getOpType(Inst->getType()),
+                                      Inst->isObjC(), Inst->canAllocOnStack(),
+                                      ElemTypes, CountArgs);
   doPostProcess(Inst, NewInst);
 }
 
@@ -496,11 +490,19 @@ template<typename ImplClass>
 void
 SILCloner<ImplClass>::visitAllocRefDynamicInst(AllocRefDynamicInst *Inst) {
   getBuilder().setCurrentDebugScope(getOpScope(Inst->getDebugScope()));
-  doPostProcess(Inst,
-    getBuilder().createAllocRefDynamic(getOpLocation(Inst->getLoc()),
-                                       getOpValue(Inst->getOperand()),
-                                       getOpType(Inst->getType()),
-                                       Inst->isObjC()));
+  auto CountArgs = getOpValueArray<8>(OperandValueArrayRef(Inst->
+                                                  getTailAllocatedCounts()));
+  SmallVector<SILType, 4> ElemTypes;
+  for (SILType OrigElemType : Inst->getTailAllocatedTypes()) {
+    ElemTypes.push_back(getOpType(OrigElemType));
+  }
+  auto *NewInst = getBuilder().createAllocRefDynamic(
+                                      getOpLocation(Inst->getLoc()),
+                                      getOpValue(Inst->getMetatypeOperand()),
+                                      getOpType(Inst->getType()),
+                                      Inst->isObjC(),
+                                      ElemTypes, CountArgs);
+  doPostProcess(Inst, NewInst);
 }
 
 template<typename ImplClass>

@@ -40,7 +40,7 @@ class SourceManager {
     int LineOffset;
   };
   std::map<const char *, VirtualFile> VirtualFiles;
-  mutable std::pair<const char *, const VirtualFile*> CachedVFile = {};
+  mutable std::pair<const char *, const VirtualFile*> CachedVFile = {nullptr, nullptr};
 
 public:
   llvm::SourceMgr &getLLVMSourceMgr() {

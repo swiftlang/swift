@@ -591,7 +591,7 @@ public func runRaceTest<RT : RaceTestWithPerTrialData>(
 
   let racingThreadBody = {
     (tid: Int) -> Void in
-    for t in 0..<trials {
+    for _ in 0..<trials {
       let stopNow = _workerThreadOneTrial(tid, sharedState)
       if stopNow { break }
     }

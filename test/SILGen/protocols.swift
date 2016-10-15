@@ -82,16 +82,12 @@ func use_subscript_archetype_lvalue_get<T : SubscriptableGetSet>(_ generic: inou
 }
 // CHECK-LABEL: sil hidden @{{.*}}use_subscript_archetype_lvalue_get
 // CHECK: bb0(%0 : $*T, %1 : $Int):
-// CHECK: [[INOUTBOX:%[0-9]+]] = alloc_box $T, var, name "generic"
-// CHECK: [[PB:%.*]] = project_box [[INOUTBOX]]
 // CHECK: [[GUARANTEEDSTACK:%[0-9]+]] = alloc_stack $T
-// CHECK: copy_addr [[PB]] to [initialization]
+// CHECK: copy_addr %0 to [initialization] [[GUARANTEEDSTACK]] : $*T
 // CHECK: [[METH:%[0-9]+]] = witness_method $T, #SubscriptableGetSet.subscript!getter.1
 // CHECK-NEXT: [[APPLYRESULT:%[0-9]+]] = apply [[METH]]<T>(%1, [[GUARANTEEDSTACK]])
 // CHECK-NEXT: destroy_addr [[GUARANTEEDSTACK]] : $*T
 // CHECK-NEXT: dealloc_stack [[GUARANTEEDSTACK]] : $*T
-// CHECK-NEXT: copy_addr [[PB]] to %0 : $*T
-// CHECK-NEXT: strong_release [[INOUTBOX]] : $@box T
 // CHECK: return [[APPLYRESULT]]
 
 
@@ -100,11 +96,8 @@ func use_subscript_archetype_lvalue_set<T : SubscriptableGetSet>(_ generic: inou
 }
 // CHECK-LABEL: sil hidden @{{.*}}use_subscript_archetype_lvalue_set
 // CHECK: bb0(%0 : $*T, %1 : $Int):
-// CHECK: [[INOUTBOX:%[0-9]+]] = alloc_box $T
-// CHECK: [[PB:%.*]] = project_box [[INOUTBOX]]
 // CHECK: [[METH:%[0-9]+]] = witness_method $T, #SubscriptableGetSet.subscript!setter.1
-// CHECK-NEXT: apply [[METH]]<T>(%1, %1, [[PB]])
-// CHECK: strong_release [[INOUTBOX]]
+// CHECK-NEXT: apply [[METH]]<T>(%1, %1, %0)
 
 
 //===----------------------------------------------------------------------===//
@@ -195,11 +188,8 @@ func use_property_archetype_lvalue_set<T : PropertyWithGetterSetter>(_ generic: 
 }
 // CHECK-LABEL: sil hidden @{{.*}}use_property_archetype_lvalue_set
 // CHECK: bb0(%0 : $*T, %1 : $Int):
-// CHECK: [[INOUTBOX:%[0-9]+]] = alloc_box $T
-// CHECK: [[PB:%.*]] = project_box [[INOUTBOX]]
 // CHECK: [[METH:%[0-9]+]] = witness_method $T, #PropertyWithGetterSetter.b!setter.1
-// CHECK-NEXT: apply [[METH]]<T>(%1, [[PB]])
-// CHECK: strong_release [[INOUTBOX]]
+// CHECK-NEXT: apply [[METH]]<T>(%1, %0)
 
 //===----------------------------------------------------------------------===//
 // Calling Initializers
@@ -383,12 +373,9 @@ func testExistentialPropertyRead<T: ExistentialProperty>(_ t: inout T) {
     let b = t.p.b
 }
 // CHECK-LABEL: sil hidden @_TF9protocols27testExistentialPropertyRead
-// CHECK:      [[T:%.*]] = alloc_box $T
-// CHECK:      [[PB:%.*]] = project_box [[T]]
-// CHECK:      copy_addr %0 to [initialization] [[PB]] : $*T
 // CHECK:      [[P_TEMP:%.*]] = alloc_stack $PropertyWithGetterSetter
 // CHECK:      [[T_TEMP:%.*]] = alloc_stack $T
-// CHECK:      copy_addr [[PB]] to [initialization] [[T_TEMP]] : $*T
+// CHECK:      copy_addr %0 to [initialization] [[T_TEMP]] : $*T
 // CHECK:      [[P_GETTER:%.*]] = witness_method $T, #ExistentialProperty.p!getter.1 :
 // CHECK-NEXT: apply [[P_GETTER]]<T>([[P_TEMP]], [[T_TEMP]])
 // CHECK-NEXT: destroy_addr [[T_TEMP]]
@@ -410,15 +397,13 @@ func modifyProperty<T : PropertyWithGetterSetter>(_ x: inout T) {
   modify(&x.b)
 }
 // CHECK-LABEL: sil hidden @_TF9protocols14modifyPropertyuRxS_24PropertyWithGetterSetterrFRxT_
-// CHECK:      [[SELF_BOX:%.*]] = alloc_box $T
-// CHECK:      [[SELF:%.*]] = project_box %1 : $@box T
 // CHECK:      [[MODIFY_FN:%.*]] = function_ref @_TF9protocols6modifyFRSiT_
 // CHECK:      [[WITNESS_FN:%.*]] = witness_method $T, #PropertyWithGetterSetter.b!materializeForSet.1
 // CHECK:      [[RESULT:%.*]] = apply [[WITNESS_FN]]<T>
 // CHECK:      [[TEMPORARY:%.*]] = tuple_extract [[RESULT]]
 // CHECK:      [[CALLBACK:%.*]] = tuple_extract [[RESULT]]
 // CHECK:      [[TEMPORARY_ADDR_TMP:%.*]] = pointer_to_address [[TEMPORARY]] : $Builtin.RawPointer to [strict] $*Int
-// CHECK:      [[TEMPORARY_ADDR:%.*]] = mark_dependence [[TEMPORARY_ADDR_TMP]] : $*Int on [[SELF]] : $*T
+// CHECK:      [[TEMPORARY_ADDR:%.*]] = mark_dependence [[TEMPORARY_ADDR_TMP]] : $*Int on %0 : $*T
 // CHECK:      apply [[MODIFY_FN]]([[TEMPORARY_ADDR]])
 // CHECK:      switch_enum [[CALLBACK]] : $Optional<Builtin.RawPointer>, case #Optional.some!enumelt.1: bb1, case #Optional.none!enumelt: bb2
 // CHECK:    bb1([[CALLBACK_ADDR:%.*]] : $Builtin.RawPointer):

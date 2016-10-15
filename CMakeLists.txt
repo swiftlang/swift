@@ -8,6 +8,12 @@ if(POLICY CMP0054)
   cmake_policy(SET CMP0054 NEW)
 endif()
 
+# Enable the IN_LIST operator, as in:
+# `if(<element_variable> IN_LIST <list_variable>)`
+if(POLICY CMP0057)
+  cmake_policy(SET CMP0057 NEW)
+endif()
+
 # Add path for custom CMake modules.
 list(APPEND CMAKE_MODULE_PATH
     "${CMAKE_CURRENT_SOURCE_DIR}/cmake/modules")
@@ -269,6 +275,10 @@ option(SWIFT_STDLIB_ENABLE_RESILIENCE
     "Build the standard libraries and overlays with resilience enabled; see docs/LibraryEvolution.rst"
     FALSE)
 
+option(SWIFT_STDLIB_ENABLE_SIL_OWNERSHIP
+  "Build the standard libraries and overlays with sil ownership enabled."
+  FALSE)
+
 option(SWIFT_STDLIB_SIL_SERIALIZE_ALL
     "Build the standard libraries and overlays serializing all method bodies"
     TRUE)
@@ -413,6 +423,12 @@ include_directories(BEFORE
 #  endif()
 set(SWIFT_DARWIN_VARIANTS "^(macosx|iphoneos|iphonesimulator|appletvos|appletvsimulator|watchos|watchsimulator)")
 
+# A convenient list to match Darwin SDKs. Example:
+#  if("${SWIFT_HOST_VARIANT_SDK}" IN_LIST SWIFT_APPLE_PLATFORMS)
+#    ...
+#  endif()
+set(SWIFT_APPLE_PLATFORMS "IOS" "IOS_SIMULATOR" "TVOS" "TVOS_SIMULATOR" "WATCHOS" "WATCHOS_SIMULATOR" "OSX")
+
 # Configuration flags passed to all of our invocations of gyb.  Try to
 # avoid making up new variable names here if you can find a CMake
 # variable that will do the job.
@@ -491,11 +507,10 @@ function(is_sdk_requested name result_var_name)
   if("${SWIFT_HOST_VARIANT_SDK}" STREQUAL "${name}")
     set("${result_var_name}" "TRUE" PARENT_SCOPE)
   else()
-    list(FIND SWIFT_SDKS "${name}" sdk_index)
-    if(${sdk_index} EQUAL -1)
-      set("${result_var_name}" "FALSE" PARENT_SCOPE)
-    else()
+    if("${name}" IN_LIST SWIFT_SDKS)
       set("${result_var_name}" "TRUE" PARENT_SCOPE)
+    else()
+      set("${result_var_name}" "FALSE" PARENT_SCOPE)
     endif()
   endif()
 endfunction()

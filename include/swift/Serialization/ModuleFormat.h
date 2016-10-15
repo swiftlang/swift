@@ -54,7 +54,7 @@ const uint16_t VERSION_MAJOR = 0;
 /// in source control, you should also update the comment to briefly
 /// describe what change you made. The content of this comment isn't important;
 /// it just ensures a conflict if two people change the module format.
-const uint16_t VERSION_MINOR = 270; // Last change: parameter type flags
+const uint16_t VERSION_MINOR = 275; // Last change: remove some unused bits
 
 using DeclID = PointerEmbeddedInt<unsigned, 31>;
 using DeclIDField = BCFixed<31>;
@@ -769,12 +769,11 @@ namespace decls_block {
 
   using GenericTypeParamDeclLayout = BCRecordLayout<
     GENERIC_TYPE_PARAM_DECL,
-    IdentifierIDField, // name
-    DeclContextIDField,// context decl
-    BCFixed<1>,  // implicit flag
-    BCVBR<4>,    // depth
-    BCVBR<4>,    // index
-    BCArray<TypeIDField> // inherited types
+    IdentifierIDField,  // name
+    DeclContextIDField, // context decl
+    BCFixed<1>,         // implicit flag
+    BCVBR<4>,           // depth
+    BCVBR<4>            // index
   >;
 
   using AssociatedTypeDeclLayout = BCRecordLayout<
@@ -1095,21 +1094,16 @@ namespace decls_block {
     DeclIDField // Typealias
   >;
 
-  // Subtlety here: GENERIC_ENVIRONMENT is serialized for both Decls and
-  // SILFunctions.
-  //
-  // For Decls, the interface type is non-canonical, so it points back
-  // to the GenericParamListDecl. This allows us to use the serialized
-  // GENERIC_ENVIRONMENT records to form the GenericSignature, as well.
-  // The type is canonicalized when forming the actual GenericEnvironment
-  // instance.
-  //
-  // For SILFunctions, the interface type below is always canonical,
-  // since SILFunctions never point back to any original
-  // GenericTypeParamDecls.
   using GenericEnvironmentLayout = BCRecordLayout<
     GENERIC_ENVIRONMENT,
-    TypeIDField,                 // interface type
+    TypeIDField,                 // sugared interface type
+    TypeIDField                  // contextual type
+  >;
+
+  using SILGenericEnvironmentLayout = BCRecordLayout<
+    SIL_GENERIC_ENVIRONMENT,
+    IdentifierIDField,           // generic parameter name
+    TypeIDField,                 // canonical interface type
     TypeIDField                  // contextual type
   >;
 
@@ -1117,19 +1111,7 @@ namespace decls_block {
     GENERIC_REQUIREMENT,
     GenericRequirementKindField, // requirement kind
     TypeIDField,                 // types involved (two for conformance,
-    TypeIDField,                 // same-type; one for value witness marker)
-    BCBlob                       // as written string
-  >;
-
-  /// Placeholder that marks the last generic requirement in the generic
-  /// parameters list.
-  ///
-  /// Used as a buffer between the generic parameter list's requirements and
-  /// the generic signature's requirements for nominal type declarations.
-  /// FIXME: Expected to go away once the latter is no longer serialized.
-  using LastGenericRequirementLayout = BCRecordLayout<
-    LAST_GENERIC_REQUIREMENT,
-    BCFixed<1>                 // dummy
+    TypeIDField                  // same-type; one for value witness marker)
   >;
 
   /// Specifies the private discriminator string for a private declaration. This

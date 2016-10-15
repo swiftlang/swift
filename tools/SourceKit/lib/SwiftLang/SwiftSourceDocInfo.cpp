@@ -383,18 +383,8 @@ static Type findBaseTypeForReplacingArchetype(const ValueDecl *VD, const Type Ty
     getAsNominalTypeOrNominalTypeExtensionContext();
   if (!NTD)
     return Type();
-  Type Result;
 
-  // Walk the type tree to find the a sub-type who's convertible to the
-  // found nominal.
-  Ty.visit([&](Type T) {
-    if (!Result && (T->getAnyNominal() == NTD ||
-                    isConvertibleTo(T, NTD->getDeclaredType(),
-                                    *VD->getDeclContext()))) {
-      Result = T;
-    }
-  });
-  return Result;
+  return Ty->getRValueType()->getRValueInstanceType();
 }
 
 static void printAnnotatedDeclaration(const ValueDecl *VD,
@@ -403,7 +393,7 @@ static void printAnnotatedDeclaration(const ValueDecl *VD,
   AnnotatedDeclarationPrinter Printer(OS);
   PrintOptions PO = PrintOptions::printQuickHelpDeclaration();
   if (BaseTy)
-    PO.setArchetypeSelfTransformForQuickHelp(BaseTy, VD->getDeclContext());
+    PO.setArchetypeSelfTransformForQuickHelp(BaseTy);
 
   // If it's implicit, try to find an overridden ValueDecl that's not implicit.
   // This will ensure we can properly annotate TypeRepr with a usr
@@ -423,7 +413,7 @@ void SwiftLangSupport::printFullyAnnotatedDeclaration(const ValueDecl *VD,
   FullyAnnotatedDeclarationPrinter Printer(OS);
   PrintOptions PO = PrintOptions::printQuickHelpDeclaration();
   if (BaseTy)
-    PO.setArchetypeSelfTransformForQuickHelp(BaseTy, VD->getDeclContext());
+    PO.setArchetypeSelfTransformForQuickHelp(BaseTy);
 
   // If it's implicit, try to find an overridden ValueDecl that's not implicit.
   // This will ensure we can properly annotate TypeRepr with a usr
@@ -438,6 +428,7 @@ void SwiftLangSupport::
 printFullyAnnotatedSynthesizedDeclaration(const swift::ValueDecl *VD,
                                           swift::NominalTypeDecl *Target,
                                           llvm::raw_ostream &OS) {
+  // FIXME: Mutable global variable - gross!
   static llvm::SmallDenseMap<swift::ValueDecl*,
     std::unique_ptr<swift::SynthesizedExtensionAnalyzer>> TargetToAnalyzerMap;
   FullyAnnotatedDeclarationPrinter Printer(OS);
@@ -447,8 +438,7 @@ printFullyAnnotatedSynthesizedDeclaration(const swift::ValueDecl *VD,
       new SynthesizedExtensionAnalyzer(Target, PO));
     TargetToAnalyzerMap.insert({Target, std::move(Analyzer)});
   }
-  auto *Analyzer = TargetToAnalyzerMap.find(Target)->getSecond().get();
-  PO.initArchetypeTransformerForSynthesizedExtensions(Target, Analyzer);
+  PO.initArchetypeTransformerForSynthesizedExtensions(Target);
   VD->print(Printer, PO);
 }
 
@@ -654,7 +644,7 @@ static bool passCursorInfoForDecl(const ValueDecl *VD,
   unsigned TypenameBegin = SS.size();
   if (VD->hasType()) {
     llvm::raw_svector_ostream OS(SS);
-    VD->getType().print(OS);
+    VD->getInterfaceType().print(OS);
   }
   unsigned TypenameEnd = SS.size();
 
@@ -750,7 +740,7 @@ static bool passCursorInfoForDecl(const ValueDecl *VD,
         PO.ArgAndParamPrinting = PrintOptions::ArgAndParamPrintingMode::ArgumentOnly;
         XMLEscapingPrinter Printer(OS);
         if (BaseType)
-          PO.setArchetypeSelfTransform(BaseType, VD->getDeclContext());
+          PO.setArchetypeSelfTransform(BaseType);
         RelatedDecl->print(Printer, PO);
       } else {
         llvm::SmallString<128> Buf;
@@ -968,7 +958,8 @@ static void resolveCursor(SwiftLangSupport &Lang,
                                 CompInvok, Receiver);
       } else {
         ValueDecl *VD = SemaTok.CtorTyRef ? SemaTok.CtorTyRef : SemaTok.ValueD;
-        bool Failed = passCursorInfoForDecl(VD, MainModule, SemaTok.Ty,
+        bool Failed = passCursorInfoForDecl(VD, MainModule,
+                                            SemaTok.ContainerType,
                                             SemaTok.ContainerType,
                                             SemaTok.IsRef, BufferID, Lang,
                                             CompInvok, PreviousASTSnaps,
@@ -1139,8 +1130,12 @@ resolveCursorFromUSR(SwiftLangSupport &Lang, StringRef InputFile, StringRef USR,
         passCursorInfoForModule(M, Lang.getIFaceGenContexts(), CompInvok,
                                 Receiver);
       } else if (auto *VD = dyn_cast<ValueDecl>(D)) {
+        auto *DC = VD->getDeclContext();
+        Type selfTy;
+        if (DC->isTypeContext())
+          selfTy = DC->getSelfTypeInContext();
         bool Failed =
-            passCursorInfoForDecl(VD, MainModule, VD->getType(), Type(),
+            passCursorInfoForDecl(VD, MainModule, selfTy, Type(),
                                   /*isRef=*/false, BufferID, Lang, CompInvok,
                                   PreviousASTSnaps, Receiver);
         if (Failed) {

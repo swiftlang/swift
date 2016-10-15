@@ -214,9 +214,9 @@ getSubstitutions(ModuleDecl &mod,
       }
 
       // Each witness marker starts a new substitution.
-      currentReplacement = req.getFirstType().subst(&mod, subs, SubstOptions());
+      currentReplacement = req.getFirstType().subst(&mod, subs);
       if (!currentReplacement)
-        currentReplacement = ErrorType::get(ctx);
+        currentReplacement = ErrorType::get(req.getFirstType());
 
       break;
     }

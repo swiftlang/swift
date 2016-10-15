@@ -501,7 +501,6 @@ void Serializer::writeBlockInfoBlock() {
   BLOCK_RECORD(sil_block, SIL_DEFAULT_WITNESS_TABLE);
   BLOCK_RECORD(sil_block, SIL_DEFAULT_WITNESS_TABLE_ENTRY);
   BLOCK_RECORD(sil_block, SIL_DEFAULT_WITNESS_TABLE_NO_ENTRY);
-  BLOCK_RECORD(sil_block, SIL_GENERIC_OUTER_PARAMS);
   BLOCK_RECORD(sil_block, SIL_INST_WITNESS_METHOD);
   BLOCK_RECORD(sil_block, SIL_SPECIALIZE_ATTR);
 
@@ -528,9 +527,9 @@ void Serializer::writeBlockInfoBlock() {
   BLOCK_RECORD_WITH_NAMESPACE(sil_block,
                               decls_block::GENERIC_REQUIREMENT);
   BLOCK_RECORD_WITH_NAMESPACE(sil_block,
-                              decls_block::LAST_GENERIC_REQUIREMENT);
-  BLOCK_RECORD_WITH_NAMESPACE(sil_block,
                               decls_block::GENERIC_ENVIRONMENT);
+  BLOCK_RECORD_WITH_NAMESPACE(sil_block,
+                              decls_block::SIL_GENERIC_ENVIRONMENT);
 
   BLOCK(SIL_INDEX_BLOCK);
   BLOCK_RECORD(sil_index_block, SIL_FUNC_NAMES);
@@ -950,8 +949,7 @@ void Serializer::writeGenericRequirements(ArrayRef<Requirement> requirements) {
       Out, ScratchRecord, reqAbbrCode,
       getRawStableRequirementKind(req.getKind()),
       addTypeRef(req.getFirstType()),
-      addTypeRef(req.getSecondType()),
-      StringRef());
+      addTypeRef(req.getSecondType()));
   }
 }
 
@@ -971,56 +969,35 @@ bool Serializer::writeGenericParams(const GenericParamList *genericParams) {
                                    addDeclRef(next));
   }
 
-  abbrCode = DeclTypeAbbrCodes[GenericRequirementLayout::Code];
-  SmallString<64> ReqStr;
-  for (auto next : genericParams->getRequirements()) {
-    ReqStr.clear();
-    llvm::raw_svector_ostream ReqOS(ReqStr);
-    next.printAsWritten(ReqOS);
-    switch (next.getKind()) {
-    case RequirementReprKind::TypeConstraint:
-      GenericRequirementLayout::emitRecord(
-                                      Out, ScratchRecord, abbrCode,
-                                      GenericRequirementKind::Conformance,
-                                      addTypeRef(next.getSubject()),
-                                      addTypeRef(next.getConstraint()),
-                                      ReqOS.str());
-      break;
-    case RequirementReprKind::SameType:
-      GenericRequirementLayout::emitRecord(
-                                      Out, ScratchRecord, abbrCode,
-                                      GenericRequirementKind::SameType,
-                                      addTypeRef(next.getFirstType()),
-                                      addTypeRef(next.getSecondType()),
-                                      ReqOS.str());
-      break;
-    }
-  }
-
-  abbrCode = DeclTypeAbbrCodes[LastGenericRequirementLayout::Code];
-  uint8_t dummy = 0;
-  LastGenericRequirementLayout::emitRecord(Out, ScratchRecord, abbrCode, dummy);
   return true;
 }
 
-void Serializer::writeGenericEnvironment(GenericSignature *sig,
-                                         GenericEnvironment *env,
+void Serializer::writeGenericEnvironment(GenericEnvironment *env,
                                   const std::array<unsigned, 256> &abbrCodes) {
   using namespace decls_block;
 
   if (env == nullptr)
     return;
 
-  auto envAbbrCode = abbrCodes[GenericEnvironmentLayout::Code];
-
-  // Iterate over the signature's generic parameters, for stable
-  // iteration order.
-  for (auto *paramTy : sig->getGenericParams()) {
+  for (auto *paramTy : env->getGenericParams()) {
     auto contextTy = env->mapTypeIntoContext(paramTy);
-    GenericEnvironmentLayout::emitRecord(
-      Out, ScratchRecord, envAbbrCode,
-      addTypeRef(paramTy),
-      addTypeRef(contextTy));
+    auto *decl = paramTy->getDecl();
+
+    if (decl && decl->getDeclContext()->isModuleScopeContext()) {
+      auto envAbbrCode = abbrCodes[SILGenericEnvironmentLayout::Code];
+      auto nameID = addIdentifierRef(decl->getName());
+      SILGenericEnvironmentLayout::emitRecord(
+        Out, ScratchRecord, envAbbrCode,
+        nameID,
+        addTypeRef(paramTy->getCanonicalType()),
+        addTypeRef(contextTy));
+    } else {
+      auto envAbbrCode = abbrCodes[GenericEnvironmentLayout::Code];
+      GenericEnvironmentLayout::emitRecord(
+        Out, ScratchRecord, envAbbrCode,
+        addTypeRef(paramTy),
+        addTypeRef(contextTy));
+    }
   }
 }
 
@@ -2088,8 +2065,7 @@ void Serializer::writeDecl(const Decl *D) {
     }
 
     writeGenericParams(extension->getGenericParams());
-    writeGenericEnvironment(extension->getGenericSignature(),
-                            extension->getGenericEnvironment(),
+    writeGenericEnvironment(extension->getGenericEnvironment(),
                             DeclTypeAbbrCodes);
     writeGenericRequirements(extension->getGenericRequirements());
     writeMembers(extension->getMembers(), isClassExtension);
@@ -2224,8 +2200,7 @@ void Serializer::writeDecl(const Decl *D) {
                                 typeAlias->isImplicit(),
                                 rawAccessLevel);
     writeGenericParams(typeAlias->getGenericParams());
-    writeGenericEnvironment(typeAlias->getGenericSignature(),
-                            typeAlias->getGenericEnvironment(),
+    writeGenericEnvironment(typeAlias->getGenericEnvironment(),
                             DeclTypeAbbrCodes);
     writeGenericRequirements(typeAlias->getGenericRequirements());
     break;
@@ -2237,18 +2212,13 @@ void Serializer::writeDecl(const Decl *D) {
 
     auto contextID = addDeclContextRef(genericParam->getDeclContext());
 
-    SmallVector<TypeID, 4> inheritedTypes;
-    for (auto inherited : genericParam->getInherited())
-      inheritedTypes.push_back(addTypeRef(inherited.getType()));
-
     unsigned abbrCode = DeclTypeAbbrCodes[GenericTypeParamDeclLayout::Code];
     GenericTypeParamDeclLayout::emitRecord(Out, ScratchRecord, abbrCode,
                                 addIdentifierRef(genericParam->getName()),
                                 contextID,
                                 genericParam->isImplicit(),
                                 genericParam->getDepth(),
-                                genericParam->getIndex(),
-                                inheritedTypes);
+                                genericParam->getIndex());
     break;
   }
 
@@ -2301,8 +2271,7 @@ void Serializer::writeDecl(const Decl *D) {
 
 
     writeGenericParams(theStruct->getGenericParams());
-    writeGenericEnvironment(theStruct->getGenericSignature(),
-                            theStruct->getGenericEnvironment(),
+    writeGenericEnvironment(theStruct->getGenericEnvironment(),
                             DeclTypeAbbrCodes);
     writeGenericRequirements(theStruct->getGenericRequirements());
     writeMembers(theStruct->getMembers(), false);
@@ -2338,8 +2307,7 @@ void Serializer::writeDecl(const Decl *D) {
                             inheritedTypes);
 
     writeGenericParams(theEnum->getGenericParams());
-    writeGenericEnvironment(theEnum->getGenericSignature(),
-                            theEnum->getGenericEnvironment(),
+    writeGenericEnvironment(theEnum->getGenericEnvironment(),
                             DeclTypeAbbrCodes);
     writeGenericRequirements(theEnum->getGenericRequirements());
     writeMembers(theEnum->getMembers(), false);
@@ -2378,8 +2346,7 @@ void Serializer::writeDecl(const Decl *D) {
                             inheritedTypes);
 
     writeGenericParams(theClass->getGenericParams());
-    writeGenericEnvironment(theClass->getGenericSignature(),
-                            theClass->getGenericEnvironment(),
+    writeGenericEnvironment(theClass->getGenericEnvironment(),
                             DeclTypeAbbrCodes);
     writeGenericRequirements(theClass->getGenericRequirements());
     writeMembers(theClass->getMembers(), true);
@@ -2417,8 +2384,7 @@ void Serializer::writeDecl(const Decl *D) {
                                protocolsAndInherited);
 
     writeGenericParams(proto->getGenericParams());
-    writeGenericEnvironment(proto->getGenericSignature(),
-                            proto->getGenericEnvironment(),
+    writeGenericEnvironment(proto->getGenericEnvironment(),
                             DeclTypeAbbrCodes);
     writeGenericRequirements(proto->getGenericRequirements());
     writeMembers(proto->getMembers(), true);
@@ -2521,8 +2487,7 @@ void Serializer::writeDecl(const Decl *D) {
                            nameComponents);
 
     writeGenericParams(fn->getGenericParams());
-    writeGenericEnvironment(fn->getGenericSignature(),
-                            fn->getGenericEnvironment(),
+    writeGenericEnvironment(fn->getGenericEnvironment(),
                             DeclTypeAbbrCodes);
 
     // Write the body parameters.
@@ -2641,8 +2606,7 @@ void Serializer::writeDecl(const Decl *D) {
                                   nameComponents);
 
     writeGenericParams(ctor->getGenericParams());
-    writeGenericEnvironment(ctor->getGenericSignature(),
-                            ctor->getGenericEnvironment(),
+    writeGenericEnvironment(ctor->getGenericEnvironment(),
                             DeclTypeAbbrCodes);
 
     assert(ctor->getParameterLists().size() == 2);
@@ -3303,7 +3267,6 @@ void Serializer::writeAllDeclsAndTypes() {
   registerDeclTypeAbbr<GenericParamListLayout>();
   registerDeclTypeAbbr<GenericParamLayout>();
   registerDeclTypeAbbr<GenericRequirementLayout>();
-  registerDeclTypeAbbr<LastGenericRequirementLayout>();
   registerDeclTypeAbbr<GenericEnvironmentLayout>();
 
   registerDeclTypeAbbr<ForeignErrorConventionLayout>();
@@ -3790,7 +3753,14 @@ static void writeDeclCommentTable(
 
   DeclCommentTableWriter Writer(GroupContext);
 
-  ArrayRef<const FileUnit *> files = SF ? SF : M->getFiles();
+  ArrayRef<const FileUnit *> files;
+  SmallVector<const FileUnit *, 1> Scratch;
+  if (SF) {
+    Scratch.push_back(SF);
+    files = llvm::makeArrayRef(Scratch);
+  } else {
+    files = M->getFiles();
+  }
   for (auto nextFile : files) {
     Writer.resetSourceOrder();
     const_cast<FileUnit *>(nextFile)->walk(Writer);
@@ -3828,9 +3798,12 @@ namespace {
                                                     key_type_ref key,
                                                     data_type_ref data) {
       llvm::SmallString<32> scratch;
-      uint32_t keyLength = key.getString(scratch).size();
+      auto keyLength = key.getString(scratch).size();
+      assert(keyLength <= std::numeric_limits<uint16_t>::max() &&
+             "selector too long");
       size_t entrySize = sizeof(uint32_t) + 1 + sizeof(uint32_t);
-      uint32_t dataLength = entrySize * data.size();
+      uint16_t dataLength = entrySize * data.size();
+      assert(dataLength / entrySize == data.size() && "too many methods");
 
       endian::Writer<little> writer(out);
       writer.write<uint16_t>(keyLength);
@@ -3839,7 +3812,11 @@ namespace {
     }
 
     void EmitKey(raw_ostream &out, key_type_ref key, unsigned len) {
+#ifndef NDEBUG
+      uint64_t start = out.tell();
+#endif
       out << key;
+      assert((out.tell() - start == len) && "measured key length incorrectly");
     }
 
     void EmitData(raw_ostream &out, key_type_ref key, data_type_ref data,
@@ -3949,7 +3926,14 @@ void Serializer::writeAST(ModuleOrSourceFile DC) {
 
   Optional<DeclID> entryPointClassID;
 
-  ArrayRef<const FileUnit *> files = SF ? SF : M->getFiles();
+  ArrayRef<const FileUnit *> files;
+  SmallVector<const FileUnit *, 1> Scratch;
+  if (SF) {
+    Scratch.push_back(SF);
+    files = llvm::makeArrayRef(Scratch);
+  } else {
+    files = M->getFiles();
+  }
   for (auto nextFile : files) {
     if (nextFile->hasEntryPoint())
       entryPointClassID = addDeclRef(nextFile->getMainClass());

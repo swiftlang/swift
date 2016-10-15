@@ -259,12 +259,12 @@ internal class _ContiguousArrayStorageBase
       "Concrete subclasses must implement _withVerbatimBridgedUnsafeBuffer")
   }
 
-  internal func _getNonVerbatimBridgedCount(_ dummy: Void) -> Int {
+  internal func _getNonVerbatimBridgedCount() -> Int {
     _sanityCheckFailure(
       "Concrete subclasses must implement _getNonVerbatimBridgedCount")
   }
 
-  internal func _getNonVerbatimBridgedHeapBuffer(_ dummy: Void) ->
+  internal func _getNonVerbatimBridgedHeapBuffer() ->
     _HeapBuffer<Int, AnyObject> {
     _sanityCheckFailure(
       "Concrete subclasses must implement _getNonVerbatimBridgedHeapBuffer")

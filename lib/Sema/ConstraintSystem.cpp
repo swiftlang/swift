@@ -93,7 +93,7 @@ void ConstraintSystem::assignFixedType(TypeVariableType *typeVar, Type type,
   if (!updateState)
     return;
 
-  if (!type->is<TypeVariableType>()) {
+  if (!type->isTypeVariableOrMember()) {
     // If this type variable represents a literal, check whether we picked the
     // default literal type. First, find the corresponding protocol.
     ProtocolDecl *literalProtocol = nullptr;
@@ -136,9 +136,8 @@ void ConstraintSystem::setMustBeMaterializableRecursive(Type type)
   assert(type->isMaterializable() &&
          "argument to setMustBeMaterializableRecursive may not be inherently "
          "non-materializable");
-  TypeVariableType *typeVar = nullptr;
-  type = getFixedTypeRecursive(type, typeVar, /*wantRValue=*/false);
-  if (typeVar) {
+  type = getFixedTypeRecursive(type, /*wantRValue=*/false);
+  if (auto typeVar = type->getAs<TypeVariableType>()) {
     typeVar->getImpl().setMustBeMaterializable(getSavedBindings());
   } else if (auto *tupleTy = type->getAs<TupleType>()) {
     for (auto elt : tupleTy->getElementTypes()) {
@@ -469,25 +468,6 @@ namespace {
                                             FunctionRefKind::Compound,
                                             locator));
 
-        if (!archetype) {
-          // If the nested type is not an archetype (because it was constrained
-          // to a concrete type by a requirement), return the fresh type
-          // variable now, and let binding occur during overload resolution.
-          return memberTypeVar;
-        }
-                                
-        // FIXME: Would be better to walk the requirements of the protocol
-        // of which the associated type is a member.
-        if (auto superclass = member->getSuperclass()) {
-          CS.addConstraint(ConstraintKind::Subtype, memberTypeVar,
-                           superclass, locator);
-        }
-
-        for (auto proto : member->getConformingProtocols()) {
-          CS.addConstraint(ConstraintKind::ConformsTo, memberTypeVar,
-                           proto->getDeclaredType(), locator);
-        }
-
         return memberTypeVar;
       });
     }
@@ -562,7 +542,7 @@ namespace {
         // dependency that isn't being diagnosed properly.
         if (!unboundDecl->getGenericSignature()) {
           cs.TC.diagnose(unboundDecl, diag::circular_reference);
-          return ErrorType::get(cs.getASTContext());
+          return ErrorType::get(type);
         }
         
         
@@ -736,22 +716,7 @@ Type ConstraintSystem::openBindingType(Type type,
   return result;
 }
 
-static Type getFixedTypeRecursiveHelper(ConstraintSystem &cs,
-                                        TypeVariableType *typeVar,
-                                        bool wantRValue) {
-  while (auto fixed = cs.getFixedType(typeVar)) {
-    if (wantRValue)
-      fixed = fixed->getRValueType();
-
-    typeVar = fixed->getAs<TypeVariableType>();
-    if (!typeVar)
-      return fixed;
-  }
-  return nullptr;
-}
-
-Type ConstraintSystem::getFixedTypeRecursive(Type type, 
-                                             TypeVariableType *&typeVar,
+Type ConstraintSystem::getFixedTypeRecursive(Type type,
                                              bool wantRValue,
                                              bool retainParens) {
   if (wantRValue)
@@ -759,19 +724,22 @@ Type ConstraintSystem::getFixedTypeRecursive(Type type,
 
   if (retainParens) {
     if (auto parenTy = dyn_cast<ParenType>(type.getPointer())) {
-      type = getFixedTypeRecursive(parenTy->getUnderlyingType(), typeVar,
+      type = getFixedTypeRecursive(parenTy->getUnderlyingType(),
                                    wantRValue, retainParens);
       return ParenType::get(getASTContext(), type);
     }
   }
 
-  auto desugar = type->getDesugaredType();
-  typeVar = desugar->getAs<TypeVariableType>();
-  if (typeVar) {
-    if (auto fixed = getFixedTypeRecursiveHelper(*this, typeVar, wantRValue)) {
+  while (auto typeVar = type->getAs<TypeVariableType>()) {
+    if (auto fixed = getFixedType(typeVar)) {
+      if (wantRValue)
+        fixed = fixed->getRValueType();
+
       type = fixed;
-      typeVar = nullptr;
+      continue;
     }
+
+    break;
   }
   return type;
 }
@@ -1044,20 +1012,19 @@ void ConstraintSystem::openGeneric(
        ConstraintLocatorBuilder locator,
        llvm::DenseMap<CanType, TypeVariableType *> &replacements) {
   auto locatorPtr = getConstraintLocator(locator);
-
   auto *genericEnv = innerDC->getGenericEnvironmentOfContext();
 
   // Create the type variables for the generic parameters.
   for (auto gp : params) {
     auto contextTy = genericEnv->mapTypeIntoContext(gp);
-    if (auto *archetype = contextTy->getAs<ArchetypeType>()) {
-      auto typeVar = createTypeVariable(getConstraintLocator(
-                                          locator.withPathElement(
-                                            LocatorPathElt(archetype))),
-                                        TVO_PrefersSubtypeBinding |
-                                        TVO_MustBeMaterializable);
-      replacements[gp->getCanonicalType()] = typeVar;
-    }
+    if (auto *archetype = contextTy->getAs<ArchetypeType>())
+      locatorPtr = getConstraintLocator(
+          locator.withPathElement(LocatorPathElt(archetype)));
+
+    auto typeVar = createTypeVariable(locatorPtr,
+                                      TVO_PrefersSubtypeBinding |
+                                      TVO_MustBeMaterializable);
+    replacements[gp->getCanonicalType()] = typeVar;
   }
 
   GetTypeVariable getTypeVariable{*this, locator};
@@ -1182,9 +1149,7 @@ ConstraintSystem::getTypeOfMemberReference(
     const DeclRefExpr *base,
     llvm::DenseMap<CanType, TypeVariableType *> *replacementsPtr) {
   // Figure out the instance type used for the base.
-  TypeVariableType *baseTypeVar = nullptr;
-  Type baseObjTy = getFixedTypeRecursive(baseTy, baseTypeVar, 
-                                         /*wantRValue=*/true);
+  Type baseObjTy = getFixedTypeRecursive(baseTy, /*wantRValue=*/true);
   bool isInstance = true;
   if (auto baseMeta = baseObjTy->getAs<AnyMetatypeType>()) {
     baseObjTy = baseMeta->getInstanceType();
@@ -1327,7 +1292,7 @@ ConstraintSystem::getTypeOfMemberReference(
       if (!isClassBoundExistential &&
           !selfTy->hasReferenceSemantics() &&
           baseTy->is<LValueType>() &&
-          !selfTy->is<ErrorType>())
+          !selfTy->hasError())
         selfTy = InOutType::get(selfTy);
 
       openedType = FunctionType::get(selfTy, openedType);

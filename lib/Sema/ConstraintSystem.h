@@ -158,12 +158,6 @@ class TypeVariableType::Implementation {
   friend class constraints::SavedTypeVariableBinding;
 
 public:
-  
-  /// \brief If this type variable is an opened literal expression, keep track
-  /// of the associated literal conformance for optimization and diagnostic
-  /// purposes.
-  ProtocolDecl *literalConformanceProto = nullptr;
-  
   explicit Implementation(constraints::ConstraintLocator *locator,
                           unsigned options)
     : Options(options), locator(locator),
@@ -598,8 +592,8 @@ public:
   llvm::SmallDenseMap<ConstraintLocator *, ArchetypeType *>
     OpenedExistentialTypes;
 
-  /// The type variables that were bound via a Defaultable constraint.
-  llvm::SmallPtrSet<TypeVariableType *, 8> DefaultedTypeVariables;
+  /// The locators of \c Defaultable constraints whose defaults were used.
+  llvm::SmallPtrSet<ConstraintLocator *, 8> DefaultedConstraints;
 
   /// \brief Simplify the given type by substituting all occurrences of
   /// type variables for their fixed types.
@@ -1001,20 +995,8 @@ private:
     OpenedExistentialTypes;
 
 public:
-  /// The type variables that were bound via a Defaultable constraint.
-  SmallVector<TypeVariableType *, 8> DefaultedTypeVariables;
-
-  /// The type variable used to describe the element type of the given array
-  /// literal.
-  llvm::SmallDenseMap<ArrayExpr *, TypeVariableType *>
-    ArrayElementTypeVariables;
-
-
-  /// The type variables used to describe the key and value types of the given
-  /// dictionary literal.
-  llvm::SmallDenseMap<DictionaryExpr *,
-                      std::pair<TypeVariableType *, TypeVariableType *>>
-    DictionaryElementTypeVariables;
+  /// The locators of \c Defaultable constraints whose defaults were used.
+  SmallVector<ConstraintLocator *, 8> DefaultedConstraints;
 
 private:
   /// \brief Describe the candidate expression for partial solving.
@@ -1177,8 +1159,8 @@ public:
     /// The length of \c OpenedExistentialTypes.
     unsigned numOpenedExistentialTypes;
 
-    /// The length of \c DefaultedTypeVariables.
-    unsigned numDefaultedTypeVariables;
+    /// The length of \c DefaultedConstraints.
+    unsigned numDefaultedConstraints;
 
     /// The previous score.
     Score PreviousScore;
@@ -1519,15 +1501,11 @@ public:
   ///
   /// \param type The type to simplify.
   ///
-  /// \param typeVar Will receive the type variable at which simplification 
-  /// stopped, which has no fixed type.
-  ///
   /// \param wantRValue Whether this routine should look through
   /// lvalues at each step.
   ///
   /// param retainParens Whether to retain parentheses.
-  Type getFixedTypeRecursive(Type type, TypeVariableType *&typeVar,
-                             bool wantRValue,
+  Type getFixedTypeRecursive(Type type, bool wantRValue,
                              bool retainParens = false);
 
   /// \brief Assign a fixed type to the given type variable.

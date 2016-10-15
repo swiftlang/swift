@@ -66,7 +66,7 @@ if(SWIFT_BUILT_STANDALONE)
     endif()
   endforeach()
   if("${clang_headers_location}" STREQUAL "")
-    message(FATAL_ERROR "Clang headers were not found")
+    message(FATAL_ERROR "Clang headers were not found in any of the following locations: ${clang_headers_locations}")
   endif()
 else() # NOT SWIFT_BUILT_STANDALONE
   set(clang_headers_location "${LLVM_LIBRARY_DIR}/clang/${CLANG_VERSION}")

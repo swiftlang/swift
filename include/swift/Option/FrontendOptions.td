@@ -163,8 +163,11 @@ def disable_arc_opts : Flag<["-"], "disable-arc-opts">,
 def enable_guaranteed_closure_contexts : Flag<["-"], "enable-guaranteed-closure-contexts">,
   HelpText<"Use @guaranteed convention for closure context">;
 
+def disable_sil_partial_apply : Flag<["-"], "disable-sil-partial-apply">,
+  HelpText<"Disable use of partial_apply in SIL generation">;
+
 def remove_runtime_asserts : Flag<["-"], "remove-runtime-asserts">,
-HelpText<"Remove runtime asserts.">;
+  HelpText<"Remove runtime asserts.">;
 
 def disable_access_control : Flag<["-"], "disable-access-control">,
   HelpText<"Don't respect access control restrictions">;
@@ -223,6 +226,9 @@ def dump_clang_diagnostics : Flag<["-"], "dump-clang-diagnostics">,
 
 def emit_verbose_sil : Flag<["-"], "emit-verbose-sil">,
   HelpText<"Emit locations during SIL emission">;
+
+def enable_sil_ownership : Flag<["-"], "enable-sil-ownership">,
+  HelpText<"Enable the SIL Ownership Model">;
 
 def enable_experimental_property_behaviors :
   Flag<["-"], "enable-experimental-property-behaviors">,
@@ -330,6 +336,10 @@ def dump_api_path : Separate<["-"], "dump-api-path">,
 def enable_resilience : Flag<["-"], "enable-resilience">,
    HelpText<"Compile the module to export resilient interfaces for all "
             "public declarations by default">;
+
+def enable_class_resilience : Flag<["-"], "enable-class-resilience">,
+   HelpText<"Compile the module to export resilient interfaces for all "
+            "public classes by default (doesn't work yet)">;
 
 def group_info_path : Separate<["-"], "group-info-path">,
   HelpText<"The path to collect the group information of the compiled module">;

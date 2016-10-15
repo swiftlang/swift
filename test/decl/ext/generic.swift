@@ -132,8 +132,7 @@ func genericClassNotEquatable<T>(_ gc: GenericClass<T>, x: T, y: T) {
 }
 
 
-// FIXME: Future direction
-extension Array where Element == String { } // expected-error{{same-type requirement makes generic parameter 'Element' non-generic}}
+extension Array where Element == String { }
 
 extension GenericClass : P3 where T : P3 { } // expected-error{{extension of type 'GenericClass' with constraints cannot have an inheritance clause}}
 

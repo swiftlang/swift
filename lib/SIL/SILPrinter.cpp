@@ -30,6 +30,7 @@
 #include "swift/SIL/SILVTable.h"
 #include "swift/AST/Decl.h"
 #include "swift/AST/Expr.h"
+#include "swift/AST/GenericEnvironment.h"
 #include "swift/AST/Module.h"
 #include "swift/AST/PrintOptions.h"
 #include "swift/AST/Types.h"
@@ -730,6 +731,17 @@ public:
     }
   }
 
+  void printInstOpCode(SILInstruction *I) {
+    // If we have a SILInstruction, print out the opcode.
+    switch (SILInstructionKind(I->getKind())) {
+#define INST(Id, Parent, TextualName, MemoryBehavior, ReleasingBehavior)       \
+  case SILInstructionKind::Id:                                                 \
+    *this << #TextualName " ";                                                 \
+    break;
+#include "swift/SIL/SILNodes.def"
+    }
+  }
+
   void print(SILValue V, bool PrintScopes = false) {
     // Lazily print any debug locations used in this value.
     if (PrintScopes)
@@ -751,7 +763,11 @@ public:
       *this << Name << " = ";
     }
 
-    // Print the value.
+    // First if we have a SILInstruction, print the opcode.
+    if (auto *I = dyn_cast<SILInstruction>(V))
+      printInstOpCode(I);
+
+    // Then print the value.
     visit(V);
 
     bool printedSlashes = false;
@@ -834,12 +850,11 @@ public:
   }
 
   void visitAllocStackInst(AllocStackInst *AVI) {
-    *this << "alloc_stack " << AVI->getElementType();
+    *this << AVI->getElementType();
     printDebugVar(AVI->getVarInfo());
   }
 
-  void visitAllocRefInst(AllocRefInst *ARI) {
-    *this << "alloc_ref ";
+  void printAllocRefInstBase(AllocRefInstBase *ARI) {
     if (ARI->isObjC())
       *this << "[objc] ";
     if (ARI->canAllocOnStack())
@@ -850,24 +865,25 @@ public:
       *this << "[tail_elems " << Types[Idx] << " * "
             << getIDAndType(Counts[Idx].get()) << "] ";
     }
+  }
+
+  void visitAllocRefInst(AllocRefInst *ARI) {
+    printAllocRefInstBase(ARI);
     *this << ARI->getType();
   }
 
   void visitAllocRefDynamicInst(AllocRefDynamicInst *ARDI) {
-    *this << "alloc_ref_dynamic ";
-    if (ARDI->isObjC())
-      *this << "[objc] ";
-    *this << getIDAndType(ARDI->getOperand());
+    printAllocRefInstBase(ARDI);
+    *this << getIDAndType(ARDI->getMetatypeOperand());
     *this << ", " << ARDI->getType();
   }
 
   void visitAllocValueBufferInst(AllocValueBufferInst *AVBI) {
-    *this << "alloc_value_buffer " << AVBI->getValueType()
-       << " in " << getIDAndType(AVBI->getOperand());
+    *this << AVBI->getValueType() << " in " << getIDAndType(AVBI->getOperand());
   }
 
   void visitAllocBoxInst(AllocBoxInst *ABI) {
-    *this << "alloc_box " << ABI->getElementType();
+    *this << ABI->getElementType();
     printDebugVar(ABI->getVarInfo());
   }
 
@@ -883,7 +899,6 @@ public:
   }
 
   void visitApplyInst(ApplyInst *AI) {
-    *this << "apply ";
     if (AI->isNonThrowing())
       *this << "[nothrow] ";
     *this << getID(AI->getCallee());
@@ -896,7 +911,6 @@ public:
   }
 
   void visitTryApplyInst(TryApplyInst *AI) {
-    *this << "try_apply ";
     *this << getID(AI->getCallee());
     printSubstitutions(AI->getSubstitutions());
     *this << '(';
@@ -907,10 +921,25 @@ public:
     *this << ", normal " << getID(AI->getNormalBB());
     *this << ", error " << getID(AI->getErrorBB());
   }
-  
-  
+
   void visitPartialApplyInst(PartialApplyInst *CI) {
-    *this << "partial_apply ";
+    switch (CI->getFunctionType()->getCalleeConvention()) {
+    case ParameterConvention::Direct_Owned:
+      // Default; do nothing.
+      break;
+    case ParameterConvention::Direct_Guaranteed:
+      *this << "[callee_guaranteed] ";
+      break;
+    
+    // Should not apply to callees.
+    case ParameterConvention::Direct_Unowned:
+    case ParameterConvention::Direct_Deallocating:
+    case ParameterConvention::Indirect_In:
+    case ParameterConvention::Indirect_Inout:
+    case ParameterConvention::Indirect_In_Guaranteed:
+    case ParameterConvention::Indirect_InoutAliasable:
+      llvm_unreachable("unexpected callee convention!");
+    }
     *this << getID(CI->getCallee());
     printSubstitutions(CI->getSubstitutions());
     *this << '(';
@@ -921,13 +950,12 @@ public:
   }
 
   void visitFunctionRefInst(FunctionRefInst *FRI) {
-    *this << "function_ref ";
     FRI->getReferencedFunction()->printName(PrintState.OS);
     *this << " : " << FRI->getType();
   }
   
   void visitBuiltinInst(BuiltinInst *BI) {
-    *this << "builtin " << QuotedString(BI->getName().str());
+    *this << QuotedString(BI->getName().str());
     printSubstitutions(BI->getSubstitutions());
     *this << "(";
     
@@ -942,7 +970,6 @@ public:
   }
   
   void visitAllocGlobalInst(AllocGlobalInst *AGI) {
-    *this << "alloc_global ";
     if (AGI->getReferencedGlobal()) {
       AGI->getReferencedGlobal()->printName(PrintState.OS);
     } else {
@@ -951,7 +978,6 @@ public:
   }
   
   void visitGlobalAddrInst(GlobalAddrInst *GAI) {
-    *this << "global_addr ";
     if (GAI->getReferencedGlobal()) {
       GAI->getReferencedGlobal()->printName(PrintState.OS);
     } else {
@@ -962,10 +988,10 @@ public:
 
   void visitIntegerLiteralInst(IntegerLiteralInst *ILI) {
     const auto &lit = ILI->getValue();
-    *this << "integer_literal " << ILI->getType() << ", " << lit;
+    *this << ILI->getType() << ", " << lit;
   }
   void visitFloatLiteralInst(FloatLiteralInst *FLI) {
-    *this << "float_literal " << FLI->getType() << ", 0x";
+    *this << FLI->getType() << ", 0x";
     APInt bits = FLI->getBits();
     *this << bits.toString(16, /*Signed*/ false);
     llvm::SmallString<12> decimal;
@@ -981,22 +1007,17 @@ public:
     llvm_unreachable("bad string literal encoding");
   }
   void visitStringLiteralInst(StringLiteralInst *SLI) {
-    *this << "string_literal " << getStringEncodingName(SLI->getEncoding())
-       << QuotedString(SLI->getValue());
+    *this << getStringEncodingName(SLI->getEncoding())
+          << QuotedString(SLI->getValue());
   }
-  void visitLoadInst(LoadInst *LI) {
-    *this << "load " << getIDAndType(LI->getOperand());
-  }
+  void visitLoadInst(LoadInst *LI) { *this << getIDAndType(LI->getOperand()); }
   void visitStoreInst(StoreInst *SI) {
-    *this << "store " << getID(SI->getSrc()) << " to "
-       << getIDAndType(SI->getDest());
+    *this << getID(SI->getSrc()) << " to " << getIDAndType(SI->getDest());
   }
   void visitAssignInst(AssignInst *AI) {
-    *this << "assign " << getID(AI->getSrc()) << " to "
-       << getIDAndType(AI->getDest());
+    *this << getID(AI->getSrc()) << " to " << getIDAndType(AI->getDest());
   }
   void visitMarkUninitializedInst(MarkUninitializedInst *MU) {
-    *this << "mark_uninitialized ";
     switch (MU->getKind()) {
     case MarkUninitializedInst::Var: *this << "[var] "; break;
     case MarkUninitializedInst::RootSelf:  *this << "[rootself] "; break;
@@ -1010,8 +1031,7 @@ public:
     *this << getIDAndType(MU->getOperand());
   }
   void visitMarkUninitializedBehaviorInst(MarkUninitializedBehaviorInst *MU) {
-    *this << "mark_uninitialized_behavior "
-          << getID(MU->getInitStorageFunc());
+    *this << getID(MU->getInitStorageFunc());
     printSubstitutions(MU->getInitStorageSubstitutions());
     *this << '(' << getID(MU->getStorage()) << ") : "
           << MU->getInitStorageFunc()->getType() << ", "
@@ -1021,52 +1041,46 @@ public:
           << MU->getSetterFunc()->getType();
   }
   void visitMarkFunctionEscapeInst(MarkFunctionEscapeInst *MFE) {
-    *this << "mark_function_escape ";
     interleave(MFE->getElements(),
-               [&](SILValue Var) {
-                 *this << getIDAndType(Var);
-               },
+               [&](SILValue Var) { *this << getIDAndType(Var); },
                [&] { *this << ", "; });
   }
 
   void visitDebugValueInst(DebugValueInst *DVI) {
-    *this << "debug_value " << getIDAndType(DVI->getOperand());
+    *this << getIDAndType(DVI->getOperand());
     printDebugVar(DVI->getVarInfo());
   }
 
   void visitDebugValueAddrInst(DebugValueAddrInst *DVAI) {
-    *this << "debug_value_addr " << getIDAndType(DVAI->getOperand());
+    *this << getIDAndType(DVAI->getOperand());
     printDebugVar(DVAI->getVarInfo());
   }
 
   void visitLoadUnownedInst(LoadUnownedInst *LI) {
-    *this << "load_unowned ";
     if (LI->isTake())
       *this << "[take] ";
     *this << getIDAndType(LI->getOperand());
   }
   void visitStoreUnownedInst(StoreUnownedInst *SI) {
-    *this << "store_unowned " << getID(SI->getSrc()) << " to ";
+    *this << getID(SI->getSrc()) << " to ";
     if (SI->isInitializationOfDest())
       *this << "[initialization] ";
     *this << getIDAndType(SI->getDest());
   }
 
   void visitLoadWeakInst(LoadWeakInst *LI) {
-    *this << "load_weak ";
     if (LI->isTake())
       *this << "[take] ";
     *this << getIDAndType(LI->getOperand());
   }
   void visitStoreWeakInst(StoreWeakInst *SI) {
-    *this << "store_weak " << getID(SI->getSrc()) << " to ";
+    *this << getID(SI->getSrc()) << " to ";
     if (SI->isInitializationOfDest())
       *this << "[initialization] ";
     *this << getIDAndType(SI->getDest());
   }
 
   void visitCopyAddrInst(CopyAddrInst *CI) {
-    *this << "copy_addr ";
     if (CI->isTakeOfSrc())
       *this << "[take] ";
     *this << getID(CI->getSrc()) << " to ";
@@ -1076,162 +1090,148 @@ public:
   }
 
   void visitBindMemoryInst(BindMemoryInst *BI) {
-    *this << "bind_memory ";
     *this << getIDAndType(BI->getBase()) << ", ";
     *this << getIDAndType(BI->getIndex()) << " to ";
     *this << BI->getBoundType();
   }
   
-  void printUncheckedConversionInst(ConversionInst *CI, SILValue operand,
-                                    StringRef name) {
-    *this << name << " " << getIDAndType(operand) << " to " << CI->getType();
-  }
-
   void visitUnconditionalCheckedCastInst(UnconditionalCheckedCastInst *CI) {
-    *this << "unconditional_checked_cast "
-       << getIDAndType(CI->getOperand())
-       << " to " << CI->getType();
+    *this << getIDAndType(CI->getOperand()) << " to " << CI->getType();
   }
   
   void visitCheckedCastBranchInst(CheckedCastBranchInst *CI) {
-    *this << "checked_cast_br ";
-    if (CI->isExact()) *this << "[exact] ";
+    if (CI->isExact())
+      *this << "[exact] ";
     *this << getIDAndType(CI->getOperand())
        << " to " << CI->getCastType() << ", "
        << getID(CI->getSuccessBB()) << ", " << getID(CI->getFailureBB());
   }
 
   void visitUnconditionalCheckedCastAddrInst(UnconditionalCheckedCastAddrInst *CI) {
-    *this << "unconditional_checked_cast_addr "
-       << getCastConsumptionKindName(CI->getConsumptionKind())
-       << ' '    << CI->getSourceType() << " in " << getIDAndType(CI->getSrc())
-       << " to " << CI->getTargetType() << " in " << getIDAndType(CI->getDest());
+    *this << getCastConsumptionKindName(CI->getConsumptionKind()) << ' '
+          << CI->getSourceType() << " in " << getIDAndType(CI->getSrc())
+          << " to " << CI->getTargetType() << " in "
+          << getIDAndType(CI->getDest());
   }
   
   void visitCheckedCastAddrBranchInst(CheckedCastAddrBranchInst *CI) {
-    *this << "checked_cast_addr_br "
-       << getCastConsumptionKindName(CI->getConsumptionKind())
-       << ' '    << CI->getSourceType() << " in " << getIDAndType(CI->getSrc())
-       << " to " << CI->getTargetType() << " in " << getIDAndType(CI->getDest())
-       << ", " << getID(CI->getSuccessBB()) << ", " << getID(CI->getFailureBB());
+    *this << getCastConsumptionKindName(CI->getConsumptionKind()) << ' '
+          << CI->getSourceType() << " in " << getIDAndType(CI->getSrc())
+          << " to " << CI->getTargetType() << " in "
+          << getIDAndType(CI->getDest()) << ", " << getID(CI->getSuccessBB())
+          << ", " << getID(CI->getFailureBB());
   }
-  
+
+  void printUncheckedConversionInst(ConversionInst *CI, SILValue operand) {
+    *this << getIDAndType(operand) << " to " << CI->getType();
+  }
+
   void visitConvertFunctionInst(ConvertFunctionInst *CI) {
-    printUncheckedConversionInst(CI, CI->getOperand(), "convert_function");
+    printUncheckedConversionInst(CI, CI->getOperand());
   }
   void visitThinFunctionToPointerInst(ThinFunctionToPointerInst *CI) {
-    printUncheckedConversionInst(CI, CI->getOperand(),
-                                 "thin_function_to_pointer");
+    printUncheckedConversionInst(CI, CI->getOperand());
   }
   void visitPointerToThinFunctionInst(PointerToThinFunctionInst *CI) {
-    printUncheckedConversionInst(CI, CI->getOperand(),
-                                 "pointer_to_thin_function");
+    printUncheckedConversionInst(CI, CI->getOperand());
   }
   void visitUpcastInst(UpcastInst *CI) {
-    printUncheckedConversionInst(CI, CI->getOperand(), "upcast");
+    printUncheckedConversionInst(CI, CI->getOperand());
   }
   void visitAddressToPointerInst(AddressToPointerInst *CI) {
-    printUncheckedConversionInst(CI, CI->getOperand(), "address_to_pointer");
+    printUncheckedConversionInst(CI, CI->getOperand());
   }
   void visitPointerToAddressInst(PointerToAddressInst *CI) {
-    *this << "pointer_to_address " << getIDAndType(CI->getOperand()) << " to ";
+    *this << getIDAndType(CI->getOperand()) << " to ";
     if (CI->isStrict())
       *this << "[strict] ";
     *this << CI->getType();
   }
   void visitUncheckedRefCastInst(UncheckedRefCastInst *CI) {
-    printUncheckedConversionInst(CI, CI->getOperand(), "unchecked_ref_cast");
+    printUncheckedConversionInst(CI, CI->getOperand());
   }
   void visitUncheckedRefCastAddrInst(UncheckedRefCastAddrInst *CI) {
-    *this << "unchecked_ref_cast_addr "
-       << ' '    << CI->getSourceType() << " in " << getIDAndType(CI->getSrc())
-       << " to " << CI->getTargetType() << " in " << getIDAndType(CI->getDest());
+    *this << ' ' << CI->getSourceType() << " in " << getIDAndType(CI->getSrc())
+          << " to " << CI->getTargetType() << " in "
+          << getIDAndType(CI->getDest());
   }
   void visitUncheckedAddrCastInst(UncheckedAddrCastInst *CI) {
-    printUncheckedConversionInst(CI, CI->getOperand(), "unchecked_addr_cast");
+    printUncheckedConversionInst(CI, CI->getOperand());
   }
   void visitUncheckedTrivialBitCastInst(UncheckedTrivialBitCastInst *CI) {
-    printUncheckedConversionInst(CI, CI->getOperand(), "unchecked_trivial_bit_cast");
+    printUncheckedConversionInst(CI, CI->getOperand());
   }
   void visitUncheckedBitwiseCastInst(UncheckedBitwiseCastInst *CI) {
-    printUncheckedConversionInst(CI, CI->getOperand(),
-                                 "unchecked_bitwise_cast");
+    printUncheckedConversionInst(CI, CI->getOperand());
   }
   void visitRefToRawPointerInst(RefToRawPointerInst *CI) {
-    printUncheckedConversionInst(CI, CI->getOperand(), "ref_to_raw_pointer");
+    printUncheckedConversionInst(CI, CI->getOperand());
   }
   void visitRawPointerToRefInst(RawPointerToRefInst *CI) {
-    printUncheckedConversionInst(CI, CI->getOperand(), "raw_pointer_to_ref");
+    printUncheckedConversionInst(CI, CI->getOperand());
   }
   void visitRefToUnownedInst(RefToUnownedInst *CI) {
-    printUncheckedConversionInst(CI, CI->getOperand(), "ref_to_unowned");
+    printUncheckedConversionInst(CI, CI->getOperand());
   }
   void visitUnownedToRefInst(UnownedToRefInst *CI) {
-    printUncheckedConversionInst(CI, CI->getOperand(), "unowned_to_ref");
+    printUncheckedConversionInst(CI, CI->getOperand());
   }
   void visitRefToUnmanagedInst(RefToUnmanagedInst *CI) {
-    printUncheckedConversionInst(CI, CI->getOperand(), "ref_to_unmanaged");
+    printUncheckedConversionInst(CI, CI->getOperand());
   }
   void visitUnmanagedToRefInst(UnmanagedToRefInst *CI) {
-    printUncheckedConversionInst(CI, CI->getOperand(), "unmanaged_to_ref");
+    printUncheckedConversionInst(CI, CI->getOperand());
   }
   void visitThinToThickFunctionInst(ThinToThickFunctionInst *CI) {
-    printUncheckedConversionInst(CI, CI->getOperand(),"thin_to_thick_function");
+    printUncheckedConversionInst(CI, CI->getOperand());
   }
   void visitThickToObjCMetatypeInst(ThickToObjCMetatypeInst *CI) {
-    printUncheckedConversionInst(CI, CI->getOperand(),"thick_to_objc_metatype");
+    printUncheckedConversionInst(CI, CI->getOperand());
   }
   void visitObjCToThickMetatypeInst(ObjCToThickMetatypeInst *CI) {
-    printUncheckedConversionInst(CI, CI->getOperand(),"objc_to_thick_metatype");
+    printUncheckedConversionInst(CI, CI->getOperand());
   }
   void visitObjCMetatypeToObjectInst(ObjCMetatypeToObjectInst *CI) {
-    printUncheckedConversionInst(CI, CI->getOperand(),
-                                 "objc_metatype_to_object");
+    printUncheckedConversionInst(CI, CI->getOperand());
   }
   void visitObjCExistentialMetatypeToObjectInst(
                                       ObjCExistentialMetatypeToObjectInst *CI) {
-    printUncheckedConversionInst(CI, CI->getOperand(),
-                                 "objc_existential_metatype_to_object");
+    printUncheckedConversionInst(CI, CI->getOperand());
   }
   void visitObjCProtocolInst(ObjCProtocolInst *CI) {
-    *this << "objc_protocol #" << CI->getProtocol()->getName()
-       << " : " << CI->getType();
+    *this << "#" << CI->getProtocol()->getName() << " : " << CI->getType();
   }
   
   void visitRefToBridgeObjectInst(RefToBridgeObjectInst *I) {
-    *this << "ref_to_bridge_object " << getIDAndType(I->getConverted())
-       << ", " << getIDAndType(I->getBitsOperand());
+    *this << getIDAndType(I->getConverted()) << ", "
+          << getIDAndType(I->getBitsOperand());
   }
   
   void visitBridgeObjectToRefInst(BridgeObjectToRefInst *I) {
-    printUncheckedConversionInst(I, I->getOperand(), "bridge_object_to_ref");
+    printUncheckedConversionInst(I, I->getOperand());
   }
   void visitBridgeObjectToWordInst(BridgeObjectToWordInst *I) {
-    printUncheckedConversionInst(I, I->getOperand(), "bridge_object_to_word");
+    printUncheckedConversionInst(I, I->getOperand());
   }
 
   void visitIsNonnullInst(IsNonnullInst *I) {
-    *this << "is_nonnull " << getIDAndType(I->getOperand());
-  }
-  
-  void visitRetainValueInst(RetainValueInst *I) {
-    visitRefCountingInst(I, "retain_value");
+    *this << getIDAndType(I->getOperand());
   }
 
-  void visitReleaseValueInst(ReleaseValueInst *I) {
-    visitRefCountingInst(I, "release_value");
-  }
+  void visitRetainValueInst(RetainValueInst *I) { visitRefCountingInst(I); }
+
+  void visitReleaseValueInst(ReleaseValueInst *I) { visitRefCountingInst(I); }
 
   void visitAutoreleaseValueInst(AutoreleaseValueInst *I) {
-    visitRefCountingInst(I, "autorelease_value");
+    visitRefCountingInst(I);
   }
 
   void visitSetDeallocatingInst(SetDeallocatingInst *I) {
-    visitRefCountingInst(I, "set_deallocating");
+    visitRefCountingInst(I);
   }
 
   void visitStructInst(StructInst *SI) {
-    *this << "struct " << SI->getType() << " (";
+    *this << SI->getType() << " (";
     interleave(SI->getElements(),
                [&](const SILValue &V) { *this << getIDAndType(V); },
                [&] { *this << ", "; });
@@ -1239,7 +1239,6 @@ public:
   }
 
   void visitTupleInst(TupleInst *TI) {
-    *this << "tuple ";
     
     // Check to see if the type of the tuple can be inferred accurately from the
     // elements.
@@ -1269,68 +1268,60 @@ public:
   }
   
   void visitEnumInst(EnumInst *UI) {
-    *this << "enum " << UI->getType() << ", "
-       << SILDeclRef(UI->getElement(), SILDeclRef::Kind::EnumElement);
+    *this << UI->getType() << ", "
+          << SILDeclRef(UI->getElement(), SILDeclRef::Kind::EnumElement);
     if (UI->hasOperand()) {
       *this << ", " << getIDAndType(UI->getOperand());
     }
   }
 
   void visitInitEnumDataAddrInst(InitEnumDataAddrInst *UDAI) {
-    *this << "init_enum_data_addr "
-       << getIDAndType(UDAI->getOperand()) << ", "
-       << SILDeclRef(UDAI->getElement(), SILDeclRef::Kind::EnumElement);
+    *this << getIDAndType(UDAI->getOperand()) << ", "
+          << SILDeclRef(UDAI->getElement(), SILDeclRef::Kind::EnumElement);
   }
   
   void visitUncheckedEnumDataInst(UncheckedEnumDataInst *UDAI) {
-    *this << "unchecked_enum_data "
-       << getIDAndType(UDAI->getOperand()) << ", "
-       << SILDeclRef(UDAI->getElement(), SILDeclRef::Kind::EnumElement);
+    *this << getIDAndType(UDAI->getOperand()) << ", "
+          << SILDeclRef(UDAI->getElement(), SILDeclRef::Kind::EnumElement);
   }
   
   void visitUncheckedTakeEnumDataAddrInst(UncheckedTakeEnumDataAddrInst *UDAI) {
-    *this << "unchecked_take_enum_data_addr "
-       << getIDAndType(UDAI->getOperand()) << ", "
-       << SILDeclRef(UDAI->getElement(), SILDeclRef::Kind::EnumElement);
+    *this << getIDAndType(UDAI->getOperand()) << ", "
+          << SILDeclRef(UDAI->getElement(), SILDeclRef::Kind::EnumElement);
   }
   
   void visitInjectEnumAddrInst(InjectEnumAddrInst *IUAI) {
-    *this << "inject_enum_addr "
-       << getIDAndType(IUAI->getOperand()) << ", "
-       << SILDeclRef(IUAI->getElement(), SILDeclRef::Kind::EnumElement);
+    *this << getIDAndType(IUAI->getOperand()) << ", "
+          << SILDeclRef(IUAI->getElement(), SILDeclRef::Kind::EnumElement);
   }
   
   void visitTupleExtractInst(TupleExtractInst *EI) {
-    *this << "tuple_extract " << getIDAndType(EI->getOperand()) << ", "
-          << EI->getFieldNo();
+    *this << getIDAndType(EI->getOperand()) << ", " << EI->getFieldNo();
   }
   void visitTupleElementAddrInst(TupleElementAddrInst *EI) {
-    *this << "tuple_element_addr " << getIDAndType(EI->getOperand()) << ", "
-          << EI->getFieldNo();
+    *this << getIDAndType(EI->getOperand()) << ", " << EI->getFieldNo();
   }
   void visitStructExtractInst(StructExtractInst *EI) {
-    *this << "struct_extract " << getIDAndType(EI->getOperand()) << ", #";
+    *this << getIDAndType(EI->getOperand()) << ", #";
     printFullContext(EI->getField()->getDeclContext(), PrintState.OS);
     *this << EI->getField()->getName().get();
   }
   void visitStructElementAddrInst(StructElementAddrInst *EI) {
-    *this << "struct_element_addr " << getIDAndType(EI->getOperand()) << ", #";
+    *this << getIDAndType(EI->getOperand()) << ", #";
     printFullContext(EI->getField()->getDeclContext(), PrintState.OS);
     *this << EI->getField()->getName().get();
   }
   void visitRefElementAddrInst(RefElementAddrInst *EI) {
-    *this << "ref_element_addr " << getIDAndType(EI->getOperand()) << ", #";
+    *this << getIDAndType(EI->getOperand()) << ", #";
     printFullContext(EI->getField()->getDeclContext(), PrintState.OS);
     *this << EI->getField()->getName().get();
   }
 
   void visitRefTailAddrInst(RefTailAddrInst *RTAI) {
-    *this << "ref_tail_addr " << getIDAndType(RTAI->getOperand()) << ", "
-          << RTAI->getTailType();
+    *this << getIDAndType(RTAI->getOperand()) << ", " << RTAI->getTailType();
   }
 
-  void printMethodInst(MethodInst *I, SILValue Operand, StringRef Name) {
-    *this << Name << " ";
+  void printMethodInst(MethodInst *I, SILValue Operand) {
     if (I->isVolatile())
       *this << "[volatile] ";
     
@@ -1338,19 +1329,18 @@ public:
   }
   
   void visitClassMethodInst(ClassMethodInst *AMI) {
-    printMethodInst(AMI, AMI->getOperand(), "class_method");
+    printMethodInst(AMI, AMI->getOperand());
     *this << " : " << AMI->getMember().getDecl()->getInterfaceType();
     *this << " , ";
     *this << AMI->getType();
   }
   void visitSuperMethodInst(SuperMethodInst *AMI) {
-    printMethodInst(AMI, AMI->getOperand(), "super_method");
+    printMethodInst(AMI, AMI->getOperand());
     *this << " : " << AMI->getMember().getDecl()->getInterfaceType();
     *this << " , ";
     *this << AMI->getType();
   }
   void visitWitnessMethodInst(WitnessMethodInst *WMI) {
-    *this << "witness_method ";
     if (WMI->isVolatile())
       *this << "[volatile] ";
     *this << "$" << WMI->getLookupType() << ", " << WMI->getMember();
@@ -1361,186 +1351,161 @@ public:
     *this << " : " << WMI->getType();
   }
   void visitDynamicMethodInst(DynamicMethodInst *DMI) {
-    printMethodInst(DMI, DMI->getOperand(), "dynamic_method");
+    printMethodInst(DMI, DMI->getOperand());
     *this << " : " << DMI->getMember().getDecl()->getInterfaceType();
     *this << ", ";
     *this << DMI->getType();
   }
   void visitOpenExistentialAddrInst(OpenExistentialAddrInst *OI) {
-    *this << "open_existential_addr " << getIDAndType(OI->getOperand())
-       << " to " << OI->getType();
+    *this << getIDAndType(OI->getOperand()) << " to " << OI->getType();
   }
   void visitOpenExistentialRefInst(OpenExistentialRefInst *OI) {
-    *this << "open_existential_ref " << getIDAndType(OI->getOperand())
-       << " to " << OI->getType();
+    *this << getIDAndType(OI->getOperand()) << " to " << OI->getType();
   }
   void visitOpenExistentialMetatypeInst(OpenExistentialMetatypeInst *OI) {
-    *this << "open_existential_metatype " << getIDAndType(OI->getOperand())
-       << " to " << OI->getType();
+    *this << getIDAndType(OI->getOperand()) << " to " << OI->getType();
   }
   void visitOpenExistentialBoxInst(OpenExistentialBoxInst *OI) {
-    *this << "open_existential_box " << getIDAndType(OI->getOperand())
-       << " to " << OI->getType();
+    *this << getIDAndType(OI->getOperand()) << " to " << OI->getType();
   }
   void visitInitExistentialAddrInst(InitExistentialAddrInst *AEI) {
-    *this << "init_existential_addr " << getIDAndType(AEI->getOperand()) << ", $"
+    *this << getIDAndType(AEI->getOperand()) << ", $"
           << AEI->getFormalConcreteType();
   }
   void visitInitExistentialRefInst(InitExistentialRefInst *AEI) {
-    *this << "init_existential_ref " << getIDAndType(AEI->getOperand())
-       << " : $" << AEI->getFormalConcreteType()
-       << ", " << AEI->getType();
+    *this << getIDAndType(AEI->getOperand()) << " : $"
+          << AEI->getFormalConcreteType() << ", " << AEI->getType();
   }
   void visitInitExistentialMetatypeInst(InitExistentialMetatypeInst *AEI) {
-    *this << "init_existential_metatype " << getIDAndType(AEI->getOperand())
-       << ", " << AEI->getType();
+    *this << getIDAndType(AEI->getOperand()) << ", " << AEI->getType();
   }
   void visitAllocExistentialBoxInst(AllocExistentialBoxInst *AEBI) {
-    *this << "alloc_existential_box " << AEBI->getExistentialType()
-       << ", $" << AEBI->getFormalConcreteType();
+    *this << AEBI->getExistentialType() << ", $"
+          << AEBI->getFormalConcreteType();
   }
   void visitDeinitExistentialAddrInst(DeinitExistentialAddrInst *DEI) {
-    *this << "deinit_existential_addr " << getIDAndType(DEI->getOperand());
+    *this << getIDAndType(DEI->getOperand());
   }
   void visitDeallocExistentialBoxInst(DeallocExistentialBoxInst *DEI) {
-    *this << "dealloc_existential_box " << getIDAndType(DEI->getOperand())
-       << ", $" << DEI->getConcreteType();
+    *this << getIDAndType(DEI->getOperand()) << ", $" << DEI->getConcreteType();
   }
   void visitProjectBlockStorageInst(ProjectBlockStorageInst *PBSI) {
-    *this << "project_block_storage " << getIDAndType(PBSI->getOperand());
+    *this << getIDAndType(PBSI->getOperand());
   }
   void visitInitBlockStorageHeaderInst(InitBlockStorageHeaderInst *IBSHI) {
-    *this << "init_block_storage_header " << getIDAndType(IBSHI->getBlockStorage())
-       << ", invoke " << getID(IBSHI->getInvokeFunction());
+    *this << getIDAndType(IBSHI->getBlockStorage()) << ", invoke "
+          << getID(IBSHI->getInvokeFunction());
     printSubstitutions(IBSHI->getSubstitutions());
     *this << " : " << IBSHI->getInvokeFunction()->getType()
           << ", type " << IBSHI->getType();
   }
   void visitValueMetatypeInst(ValueMetatypeInst *MI) {
-    *this << "value_metatype " << MI->getType() << ", "
-       << getIDAndType(MI->getOperand());
+    *this << MI->getType() << ", " << getIDAndType(MI->getOperand());
   }
   void visitExistentialMetatypeInst(ExistentialMetatypeInst *MI) {
-    *this << "existential_metatype " << MI->getType() << ", "
-       << getIDAndType(MI->getOperand());
+    *this << MI->getType() << ", " << getIDAndType(MI->getOperand());
   }
-  void visitMetatypeInst(MetatypeInst *MI) {
-    *this << "metatype " << MI->getType();
-  }
-  
+  void visitMetatypeInst(MetatypeInst *MI) { *this << MI->getType(); }
+
   void visitFixLifetimeInst(FixLifetimeInst *RI) {
-    *this << "fix_lifetime " << getIDAndType(RI->getOperand());
+    *this << getIDAndType(RI->getOperand());
   }
   void visitMarkDependenceInst(MarkDependenceInst *MDI) {
-    *this << "mark_dependence " << getIDAndType(MDI->getValue())
-       << " on " << getIDAndType(MDI->getBase());
+    *this << getIDAndType(MDI->getValue()) << " on "
+          << getIDAndType(MDI->getBase());
   }
   void visitCopyBlockInst(CopyBlockInst *RI) {
-    *this << "copy_block " << getIDAndType(RI->getOperand());
+    *this << getIDAndType(RI->getOperand());
   }
-  void visitRefCountingInst(RefCountingInst *I, StringRef InstName) {
-    *this << InstName << " ";
+  void visitRefCountingInst(RefCountingInst *I) {
     if (I->isNonAtomic())
       *this << "[nonatomic] ";
     *this << getIDAndType(I->getOperand(0));
   }
-  void visitStrongRetainInst(StrongRetainInst *RI) {
-    visitRefCountingInst(RI, "strong_retain");
-  }
+  void visitStrongRetainInst(StrongRetainInst *RI) { visitRefCountingInst(RI); }
   void visitStrongReleaseInst(StrongReleaseInst *RI) {
-    visitRefCountingInst(RI, "strong_release");
+    visitRefCountingInst(RI);
   }
-  void visitStrongPinInst(StrongPinInst *PI) {
-    visitRefCountingInst(PI, "strong_pin");
-  }
-  void visitStrongUnpinInst(StrongUnpinInst *UI) {
-    visitRefCountingInst(UI, "strong_unpin");
-  }
+  void visitStrongPinInst(StrongPinInst *PI) { visitRefCountingInst(PI); }
+  void visitStrongUnpinInst(StrongUnpinInst *UI) { visitRefCountingInst(UI); }
   void visitStrongRetainUnownedInst(StrongRetainUnownedInst *RI) {
-    visitRefCountingInst(RI, "strong_retain_unowned");
+    visitRefCountingInst(RI);
   }
   void visitUnownedRetainInst(UnownedRetainInst *RI) {
-    visitRefCountingInst(RI, "unowned_retain");
+    visitRefCountingInst(RI);
   }
   void visitUnownedReleaseInst(UnownedReleaseInst *RI) {
-    visitRefCountingInst(RI, "unowned_release");
+    visitRefCountingInst(RI);
   }
   void visitIsUniqueInst(IsUniqueInst *CUI) {
-    *this << "is_unique " << getIDAndType(CUI->getOperand());
+    *this << getIDAndType(CUI->getOperand());
   }
   void visitIsUniqueOrPinnedInst(IsUniqueOrPinnedInst *CUI) {
-    *this << "is_unique_or_pinned " << getIDAndType(CUI->getOperand());
+    *this << getIDAndType(CUI->getOperand());
   }
   void visitDeallocStackInst(DeallocStackInst *DI) {
-    *this << "dealloc_stack " << getIDAndType(DI->getOperand());
+    *this << getIDAndType(DI->getOperand());
   }
   void visitDeallocRefInst(DeallocRefInst *DI) {
-    *this << "dealloc_ref ";
     if (DI->canAllocOnStack())
       *this << "[stack] ";
     *this << getIDAndType(DI->getOperand());
   }
   void visitDeallocPartialRefInst(DeallocPartialRefInst *DPI) {
-    *this << "dealloc_partial_ref ";
     *this << getIDAndType(DPI->getInstance());
     *this << ", ";
     *this << getIDAndType(DPI->getMetatype());
   }
   void visitDeallocValueBufferInst(DeallocValueBufferInst *DVBI) {
-    *this << "dealloc_value_buffer " << DVBI->getValueType()
-       << " in " << getIDAndType(DVBI->getOperand());
+    *this << DVBI->getValueType() << " in " << getIDAndType(DVBI->getOperand());
   }
   void visitDeallocBoxInst(DeallocBoxInst *DI) {
-    *this << "dealloc_box " << getIDAndType(DI->getOperand());
+    *this << getIDAndType(DI->getOperand());
   }
   void visitDestroyAddrInst(DestroyAddrInst *DI) {
-    *this << "destroy_addr " << getIDAndType(DI->getOperand());
+    *this << getIDAndType(DI->getOperand());
   }
   void visitProjectValueBufferInst(ProjectValueBufferInst *PVBI) {
-    *this << "project_value_buffer " << PVBI->getValueType()
-       << " in " << getIDAndType(PVBI->getOperand());
+    *this << PVBI->getValueType() << " in " << getIDAndType(PVBI->getOperand());
   }
   void visitProjectBoxInst(ProjectBoxInst *PBI) {
-    *this << "project_box " << getIDAndType(PBI->getOperand());
+    *this << getIDAndType(PBI->getOperand());
   }
   void visitProjectExistentialBoxInst(ProjectExistentialBoxInst *PEBI) {
-    *this << "project_existential_box " << PEBI->getValueType()
-    << " in " << getIDAndType(PEBI->getOperand());
+    *this << PEBI->getValueType() << " in " << getIDAndType(PEBI->getOperand());
   }
 
   void visitCondFailInst(CondFailInst *FI) {
-    *this << "cond_fail " << getIDAndType(FI->getOperand());
+    *this << getIDAndType(FI->getOperand());
   }
   
   void visitIndexAddrInst(IndexAddrInst *IAI) {
-    *this << "index_addr " << getIDAndType(IAI->getBase()) << ", "
-       << getIDAndType(IAI->getIndex());
+    *this << getIDAndType(IAI->getBase()) << ", "
+          << getIDAndType(IAI->getIndex());
   }
 
   void visitTailAddrInst(TailAddrInst *TAI) {
-    *this << "tail_addr " << getIDAndType(TAI->getBase()) << ", "
+    *this << getIDAndType(TAI->getBase()) << ", "
           << getIDAndType(TAI->getIndex()) << ", " << TAI->getTailType();
   }
 
   void visitIndexRawPointerInst(IndexRawPointerInst *IAI) {
-    *this << "index_raw_pointer " << getIDAndType(IAI->getBase()) << ", "
-    << getIDAndType(IAI->getIndex());
-  }
-  
-  void visitUnreachableInst(UnreachableInst *UI) {
-    *this << "unreachable";
+    *this << getIDAndType(IAI->getBase()) << ", "
+          << getIDAndType(IAI->getIndex());
   }
 
+  void visitUnreachableInst(UnreachableInst *UI) {}
+
   void visitReturnInst(ReturnInst *RI) {
-    *this << "return " << getIDAndType(RI->getOperand());
+    *this << getIDAndType(RI->getOperand());
   }
   
   void visitThrowInst(ThrowInst *TI) {
-    *this << "throw " << getIDAndType(TI->getOperand());
+    *this << getIDAndType(TI->getOperand());
   }
 
   void visitSwitchValueInst(SwitchValueInst *SII) {
-    *this << "switch_value " << getIDAndType(SII->getOperand());
+    *this << getIDAndType(SII->getOperand());
     for (unsigned i = 0, e = SII->getNumCases(); i < e; ++i) {
       SILValue value;
       SILBasicBlock *dest;
@@ -1565,11 +1530,9 @@ public:
   }
   
   void visitSwitchEnumInst(SwitchEnumInst *SOI) {
-    *this << "switch_enum ";
     printSwitchEnumInst(SOI);
   }
   void visitSwitchEnumAddrInst(SwitchEnumAddrInst *SOI) {
-    *this << "switch_enum_addr ";
     printSwitchEnumInst(SOI);
   }
   
@@ -1590,16 +1553,13 @@ public:
   }
 
   void visitSelectEnumInst(SelectEnumInst *SEI) {
-    *this << "select_enum ";
     printSelectEnumInst(SEI);
   }
   void visitSelectEnumAddrInst(SelectEnumAddrInst *SEI) {
-    *this << "select_enum_addr ";
     printSelectEnumInst(SEI);
   }
 
   void visitSelectValueInst(SelectValueInst *SVI) {
-    *this << "select_value ";
     *this << getIDAndType(SVI->getOperand());
 
     for (unsigned i = 0, e = SVI->getNumCases(); i < e; ++i) {
@@ -1616,8 +1576,7 @@ public:
   }
   
   void visitDynamicMethodBranchInst(DynamicMethodBranchInst *DMBI) {
-    *this << "dynamic_method_br " << getIDAndType(DMBI->getOperand()) << ", "
-          << DMBI->getMember()
+    *this << getIDAndType(DMBI->getOperand()) << ", " << DMBI->getMember()
           << ", " << getID(DMBI->getHasMethodBB()) << ", "
           << getID(DMBI->getNoMethodBB());
   }
@@ -1633,13 +1592,12 @@ public:
   }
   
   void visitBranchInst(BranchInst *UBI) {
-    *this << "br " << getID(UBI->getDestBB());
+    *this << getID(UBI->getDestBB());
     printBranchArgs(UBI->getArgs());
   }
 
   void visitCondBranchInst(CondBranchInst *CBI) {
-    *this << "cond_br " << getID(CBI->getCondition()) << ", "
-       << getID(CBI->getTrueBB());
+    *this << getID(CBI->getCondition()) << ", " << getID(CBI->getTrueBB());
     printBranchArgs(CBI->getTrueArgs());
     *this << ", " << getID(CBI->getFalseBB());
     printBranchArgs(CBI->getFalseArgs());
@@ -1816,20 +1774,25 @@ void SILFunction::print(SILPrintContext &PrintCtx) const {
     llvm::SmallString<16> disambiguatedNameBuf;
     unsigned disambiguatedNameCounter = 1;
     for (auto *paramTy : sig->getGenericParams()) {
-      auto *archetypeTy = mapTypeIntoContext(paramTy)->getAs<ArchetypeType>();
-      assert(archetypeTy);
-
-      Identifier name = archetypeTy->getName();
+      auto sugaredTy = env->getSugaredType(paramTy);
+      Identifier name = sugaredTy->getName();
       while (!UsedNames.insert(name).second) {
         disambiguatedNameBuf.clear();
         {
           llvm::raw_svector_ostream names(disambiguatedNameBuf);
-          names << archetypeTy->getName() << disambiguatedNameCounter++;
+          names << sugaredTy->getName() << disambiguatedNameCounter++;
         }
         name = getASTContext().getIdentifier(disambiguatedNameBuf);
       }
-      if (name != archetypeTy->getName())
-        Aliases[CanType(archetypeTy)] = name;
+      if (name != sugaredTy->getName()) {
+        Aliases[paramTy->getCanonicalType()] = name;
+
+        // Also for the archetype
+        auto archetypeTy = env->mapTypeIntoContext(paramTy)
+            ->getAs<ArchetypeType>();
+        if (archetypeTy)
+          Aliases[archetypeTy->getCanonicalType()] = name;
+      }
     }
   }
 

@@ -1041,13 +1041,28 @@ static void validateAvailabilitySpecList(Parser &P,
                                          ArrayRef<AvailabilitySpec *> Specs) {
   llvm::SmallSet<PlatformKind, 4> Platforms;
   bool HasOtherPlatformSpec = false;
+
+  if (Specs.size() == 1 &&
+      isa<LanguageVersionConstraintAvailabilitySpec>(Specs[0])) {
+    // @available(swift N) is allowed only in isolation; it cannot
+    // be combined with other availability specs in a single list.
+    return;
+  }
+
   for (auto *Spec : Specs) {
     if (isa<OtherPlatformAvailabilitySpec>(Spec)) {
       HasOtherPlatformSpec = true;
       continue;
     }
 
-    auto *VersionSpec = cast<VersionConstraintAvailabilitySpec>(Spec);
+    if (auto *LangSpec =
+        dyn_cast<LanguageVersionConstraintAvailabilitySpec>(Spec)) {
+      P.diagnose(LangSpec->getSwiftLoc(),
+                 diag::availability_swift_must_occur_alone);
+      continue;
+    }
+
+    auto *VersionSpec = cast<PlatformVersionConstraintAvailabilitySpec>(Spec);
     bool Inserted = Platforms.insert(VersionSpec->getPlatform()).second;
     if (!Inserted) {
       // Rule out multiple version specs referring to the same platform.
@@ -1081,6 +1096,15 @@ ParserResult<PoundAvailableInfo> Parser::parseStmtConditionPoundAvailable() {
 
   SmallVector<AvailabilitySpec *, 5> Specs;
   ParserStatus Status = parseAvailabilitySpecList(Specs);
+
+  for (auto *Spec : Specs) {
+    if (auto *Lang =
+        dyn_cast<LanguageVersionConstraintAvailabilitySpec>(Spec)) {
+      diagnose(Lang->getSwiftLoc(),
+               diag::pound_available_swift_not_allowed);
+      Status.setIsParseError();
+    }
+  }
 
   SourceLoc RParenLoc;
   if (parseMatchingToken(tok::r_paren, RParenLoc,

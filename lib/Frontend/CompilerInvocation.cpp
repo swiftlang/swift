@@ -787,6 +787,9 @@ static bool ParseLangArgs(LangOptions &Opts, ArgList &Args,
   Opts.EnableExperimentalNestedGenericTypes |=
     Args.hasArg(OPT_enable_experimental_nested_generic_types);
 
+  Opts.EnableClassResilience |=
+    Args.hasArg(OPT_enable_class_resilience);
+
   Opts.DisableAvailabilityChecking |=
       Args.hasArg(OPT_disable_availability_checking);
   if (FrontendOpts.InputKind == InputFileKind::IFK_SIL)
@@ -1127,6 +1130,9 @@ static bool ParseSILArgs(SILOptions &Opts, ArgList &Args,
   Opts.EmitProfileCoverageMapping |= Args.hasArg(OPT_profile_coverage_mapping);
   Opts.EnableGuaranteedClosureContexts |=
     Args.hasArg(OPT_enable_guaranteed_closure_contexts);
+  Opts.DisableSILPartialApply |=
+    Args.hasArg(OPT_disable_sil_partial_apply);
+  Opts.EnableSILOwnership |= Args.hasArg(OPT_enable_sil_ownership);
 
   if (Args.hasArg(OPT_debug_on_sil)) {
     // Derive the name of the SIL file for debugging from

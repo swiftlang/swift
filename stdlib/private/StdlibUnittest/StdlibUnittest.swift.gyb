@@ -206,7 +206,7 @@ public func expectOptionalEqual<T>(
   if (actual == nil) || !equal(expected, actual!) {
     expectationFailure(
       "expected: \"\(expected)\" (of type \(String(reflecting: type(of: expected))))\n"
-      + "actual: \"\(actual)\" (of type \(String(reflecting: type(of: actual))))",
+      + "actual: \"\(actual.debugDescription)\" (of type \(String(reflecting: type(of: actual))))",
       trace: ${trace})
   }
 }
@@ -214,8 +214,8 @@ public func expectOptionalEqual<T>(
 public func expectEqual<T : Equatable>(_ expected: T?, _ actual: T?, ${TRACE}) {
   if expected != actual {
     expectationFailure(
-      "expected: \"\(expected)\" (of type \(String(reflecting: type(of: expected))))\n"
-      + "actual: \"\(actual)\" (of type \(String(reflecting: type(of: actual))))",
+      "expected: \"\(expected.debugDescription)\" (of type \(String(reflecting: type(of: expected))))\n"
+      + "actual: \"\(actual.debugDescription)\" (of type \(String(reflecting: type(of: actual))))",
       trace: ${trace})
   }
 }
@@ -225,7 +225,7 @@ public func expectNotEqual<T : Equatable>(
 ) {
   if expected == actual {
     expectationFailure(
-      "unexpected value: \"\(actual)\" (of type \(String(reflecting: type(of: actual))))",
+      "unexpected value: \"\(actual.debugDescription)\" (of type \(String(reflecting: type(of: actual))))",
       trace: ${trace})
   }
 }
@@ -249,7 +249,7 @@ public func expectOptionalEqual${Generic}(
   if (actual == nil) || expected != actual! {
     expectationFailure(
       "expected: \"\(expected)\" (of type \(String(reflecting: type(of: expected))))"
-      + "actual: \"\(actual)\" (of type \(String(reflecting: type(of: actual))))",
+      + "actual: \"\(actual.debugDescription)\" (of type \(String(reflecting: type(of: actual))))",
       trace: ${trace})
   }
 }
@@ -525,7 +525,7 @@ public func expectFalse(_ actual: Bool, ${TRACE}) {
 public func expectNil<T>(_ value: T?, ${TRACE}) {
   if value != nil {
     expectationFailure(
-      "expected optional to be nil\nactual: \"\(value)\"", trace: ${trace})
+      "expected optional to be nil\nactual: \"\(value!)\"", trace: ${trace})
   }
 }
 

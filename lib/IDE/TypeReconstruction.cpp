@@ -105,6 +105,10 @@ static TypeBase *GetTemplateArgument(TypeBase *type, size_t arg_idx) {
       return ArchetypeBuilder::mapTypeIntoContext(
           paramDecl->getDeclContext(), paramType).getPointer();
     } break;
+    case TypeKind::Protocol: {
+      return swift_can_type->castTo<ProtocolType>()->getDecl()
+          ->getSelfTypeInContext().getPointer();
+    }
     default:
       break;
     }
@@ -239,6 +243,10 @@ public:
       }
     } else if (_type == LookupKind::SwiftModule)
       _module->lookupValue(path, name, kind, result);
+    else if (_type == LookupKind::Extension) {
+      auto results = _extension._decl->lookupDirect(DeclName(name));
+      result.append(results.begin(), results.end());
+    }
     return;
   }
 
@@ -869,19 +877,6 @@ static void VisitNodeAssociatedTypeRef(
         Type nested;
         if (archetype->hasNestedType(identifier))
           nested = archetype->getNestedTypeValue(identifier);
-        else if (ProtocolDecl *self_protocol = archetype->getSelfProtocol()) {
-          for (auto self_member: self_protocol->getMembers()) {
-            if (AssociatedTypeDecl *associated_decl = llvm::dyn_cast_or_null<AssociatedTypeDecl>(self_member)) {
-              if (associated_decl->hasName()) {
-                llvm::StringRef decl_name = associated_decl->getNameStr();
-                if (decl_name == ident->getText()) {
-                  nested = associated_decl->getDeclaredType();
-                  break;
-                }
-              }
-            }
-          }
-        }
         if (nested) {
           result._types.push_back(nested);
           result._module = type_result._module;
@@ -1239,6 +1234,7 @@ static void VisitNodeExtension(
     case Demangle::Node::Kind::Class:
     case Demangle::Node::Kind::Enum:
     case Demangle::Node::Kind::Structure:
+    case Demangle::Node::Kind::Protocol:
       nodes.push_back((*pos));
       VisitNode(ast, nodes, type_result, generic_context);
       break;
@@ -1329,6 +1325,8 @@ static void VisitNodeFunction(
     case Demangle::Node::Kind::Enum:
     case Demangle::Node::Kind::Module:
     case Demangle::Node::Kind::Structure:
+    case Demangle::Node::Kind::Protocol:
+    case Demangle::Node::Kind::Extension:
       nodes.push_back((*pos));
       VisitNode(ast, nodes, decl_scope_result, generic_context);
       break;
@@ -1963,39 +1961,6 @@ static void VisitNodeQualifiedArchetype(
   }
 }
 
-static void VisitNodeSelfTypeRef(
-    ASTContext *ast, std::vector<Demangle::NodePointer> &nodes,
-    Demangle::NodePointer &cur_node, VisitNodeResult &result,
-    const VisitNodeResult &generic_context) { // set by GenericType case
-  nodes.push_back(cur_node->getFirstChild());
-  VisitNodeResult type_result;
-  VisitNode(ast, nodes, type_result, generic_context);
-  if (type_result.HasSingleType()) {
-    Type supposed_protocol_type(type_result.GetFirstType());
-    ProtocolType *protocol_type = supposed_protocol_type->getAs<ProtocolType>();
-    ProtocolDecl *protocol_decl =
-        protocol_type ? protocol_type->getDecl() : nullptr;
-    if (protocol_decl) {
-      ArchetypeType::AssocTypeOrProtocolType assoc_protocol_type(protocol_decl);
-      if (ast) {
-        CanTypeWrapper<ArchetypeType> self_type = ArchetypeType::getNew(
-            *ast, nullptr, assoc_protocol_type, ast->getIdentifier("Self"),
-            {supposed_protocol_type}, Type(), false);
-        if (self_type.getPointer())
-          result._types.push_back(Type(self_type));
-        else
-          result._error = "referent type cannot be made into an archetype";
-      } else {
-        result._error = "invalid ASTContext";
-      }
-    } else {
-      result._error = "referent type does not resolve to a protocol";
-    }
-  } else {
-    result._error = "couldn't resolve referent type";
-  }
-}
-
 static void VisitNodeTupleElement(
     ASTContext *ast, std::vector<Demangle::NodePointer> &nodes,
     Demangle::NodePointer &cur_node, VisitNodeResult &result,
@@ -2257,10 +2222,6 @@ static void visitNodeImpl(
 
   case Demangle::Node::Kind::QualifiedArchetype:
     VisitNodeQualifiedArchetype(ast, nodes, node, result, genericContext);
-    break;
-
-  case Demangle::Node::Kind::SelfTypeRef:
-    VisitNodeSelfTypeRef(ast, nodes, node, result, genericContext);
     break;
 
   case Demangle::Node::Kind::TupleElement:

@@ -88,7 +88,8 @@ private:
       // Skip superclass fields if superclass is resilient.
       // FIXME: Needs runtime support to ensure the field offset vector is
       // populated correctly.
-      if (!IGM.isResilient(superclassDecl, ResilienceExpansion::Maximal)) {
+      if (!IGM.Context.LangOpts.EnableClassResilience ||
+          !IGM.isResilient(superclassDecl, ResilienceExpansion::Maximal)) {
         addClassMembers(superclassDecl, superclass);
       }
     }

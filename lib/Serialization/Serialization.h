@@ -416,8 +416,7 @@ public:
                         const std::array<unsigned, 256> &abbrCodes);
 
   /// Writes a generic environment.
-  void writeGenericEnvironment(GenericSignature *sig,
-                               GenericEnvironment *env,
+  void writeGenericEnvironment(GenericEnvironment *env,
                          const std::array<unsigned, 256> &abbrCodes);
 
 };

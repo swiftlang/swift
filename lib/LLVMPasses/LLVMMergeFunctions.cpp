@@ -1980,6 +1980,9 @@ void SwiftMergeFunctions::mergeWithParams(const FunctionInfos &FInfos,
                                            FirstF->getLinkage(),
                                            FirstF->getName() + "_merged");
   NewFunction->copyAttributesFrom(FirstF);
+  // NOTE: this function is not externally available, do ensure that we reset
+  // the DLL storage
+  NewFunction->setDLLStorageClass(GlobalValue::DefaultStorageClass);
   NewFunction->setLinkage(GlobalValue::InternalLinkage);
 
   // Insert the new function after the last function in the equivalence class.

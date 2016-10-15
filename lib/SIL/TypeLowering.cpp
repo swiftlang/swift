@@ -121,6 +121,10 @@ CaptureKind TypeConverter::getDeclCaptureKind(CapturedValue capture) {
       if (var->isLet() && !getTypeLowering(var->getType()).isAddressOnly())
         return CaptureKind::Constant;
 
+      if (var->getType()->is<InOutType>()) {
+        return CaptureKind::StorageAddress;
+      }
+
       // If we're capturing into a non-escaping closure, we can generally just
       // capture the address of the value as no-escape.
       return capture.isNoEscape() ?
@@ -1678,11 +1682,10 @@ TypeConverter::getEffectiveGenericEnvironment(AnyFunctionRef fn,
                                               CaptureInfo captureInfo) {
   auto dc = fn.getAsDeclContext();
 
-  if (dc->getParent()->isLocalContext() &&
-      !captureInfo.hasGenericParamCaptures())
-    return nullptr;
+  if (getEffectiveGenericSignature(fn, captureInfo))
+    return dc->getGenericEnvironmentOfContext();
 
-  return dc->getGenericEnvironmentOfContext();
+  return nullptr;
 }
 
 CanGenericSignature
@@ -1694,8 +1697,11 @@ TypeConverter::getEffectiveGenericSignature(AnyFunctionRef fn,
       !captureInfo.hasGenericParamCaptures())
     return nullptr;
 
-  if (auto sig = dc->getGenericSignatureOfContext())
+  if (auto sig = dc->getGenericSignatureOfContext()) {
+    if (sig->areAllParamsConcrete())
+      return nullptr;
     return sig->getCanonicalSignature();
+  }
 
   return nullptr;
 }
@@ -1785,14 +1791,23 @@ CanAnyFunctionType TypeConverter::makeConstantInterfaceType(SILDeclRef c) {
     return getFunctionInterfaceTypeWithCaptures(funcTy, func);
   }
 
-  case SILDeclRef::Kind::Allocator:
   case SILDeclRef::Kind::EnumElement:
     return cast<AnyFunctionType>(vd->getInterfaceType()->getCanonicalType());
   
-  case SILDeclRef::Kind::Initializer:
-    return cast<AnyFunctionType>(cast<ConstructorDecl>(vd)
-                           ->getInitializerInterfaceType()->getCanonicalType());
-  
+  case SILDeclRef::Kind::Allocator: {
+    auto *cd = cast<ConstructorDecl>(vd);
+    auto funcTy = cast<AnyFunctionType>(
+                                   cd->getInterfaceType()->getCanonicalType());
+    return getFunctionInterfaceTypeWithCaptures(funcTy, cd);
+  }
+
+  case SILDeclRef::Kind::Initializer: {
+    auto *cd = cast<ConstructorDecl>(vd);
+    auto funcTy = cast<AnyFunctionType>(
+                         cd->getInitializerInterfaceType()->getCanonicalType());
+    return getFunctionInterfaceTypeWithCaptures(funcTy, cd);
+  }
+
   case SILDeclRef::Kind::Destroyer:
   case SILDeclRef::Kind::Deallocator:
     return getDestructorInterfaceType(cast<DestructorDecl>(vd),
@@ -1856,7 +1871,8 @@ TypeConverter::getConstantGenericEnvironment(SILDeclRef c) {
   case SILDeclRef::Kind::Destroyer:
   case SILDeclRef::Kind::Deallocator: {
     auto *afd = cast<AbstractFunctionDecl>(vd);
-    return afd->getGenericEnvironmentOfContext();
+    auto captureInfo = getLoweredLocalCaptures(afd);
+    return getEffectiveGenericEnvironment(afd, captureInfo);
   }
   case SILDeclRef::Kind::GlobalAccessor:
   case SILDeclRef::Kind::GlobalGetter: {
@@ -1990,17 +2006,32 @@ getMaterializeForSetCallbackType(AbstractStorageDecl *storage,
     }
   }
 
+  CanType canSelfType;
+  CanType canSelfMetatypeType;
+  if (genericSig) {
+    canSelfType = genericSig->getCanonicalTypeInContext(
+        selfType, *M.getSwiftModule());
+    canSelfMetatypeType = genericSig->getCanonicalTypeInContext(
+        selfMetatypeType, *M.getSwiftModule());
+  } else {
+    canSelfType = selfType->getCanonicalType();
+    canSelfMetatypeType = selfMetatypeType->getCanonicalType();
+  }
+
   // Create the SILFunctionType for the callback.
   SILParameterInfo params[] = {
     { ctx.TheRawPointerType, ParameterConvention::Direct_Unowned },
     { ctx.TheUnsafeValueBufferType, ParameterConvention::Indirect_Inout },
-    { selfType->getCanonicalType(), ParameterConvention::Indirect_Inout },
-    { selfMetatypeType->getCanonicalType(), ParameterConvention::Direct_Unowned },
+    { canSelfType, ParameterConvention::Indirect_Inout },
+    { canSelfMetatypeType, ParameterConvention::Direct_Unowned },
   };
   ArrayRef<SILResultInfo> results = {};
   auto extInfo = 
     SILFunctionType::ExtInfo()
       .withRepresentation(SILFunctionTypeRepresentation::Thin);
+
+  if (genericSig && genericSig->areAllParamsConcrete())
+    genericSig = nullptr;
 
   return SILFunctionType::get(genericSig, extInfo,
                    /*callee*/ ParameterConvention::Direct_Unowned,

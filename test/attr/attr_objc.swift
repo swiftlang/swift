@@ -1442,7 +1442,7 @@ class infer_instanceVar2<
     GP_Class_ObjC : Class_ObjC1,
     GP_Protocol_Class : Protocol_Class1,
     GP_Protocol_ObjC : Protocol_ObjC1> : ObjCBase {
-// CHECK-LABEL: class infer_instanceVar2<{{.*}}> : ObjCBase {
+// CHECK-LABEL: class infer_instanceVar2<{{.*}}> : ObjCBase where {{.*}} {
   override init() {}
 
   var var_GP_Unconstrained: GP_Unconstrained

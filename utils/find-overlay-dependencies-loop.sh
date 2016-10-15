@@ -29,7 +29,7 @@ esac
 
 # Don't update XCTest, handle spaces in directories
 for f in ./stdlib/public/SDK/*/; do
-  name=`basename "${f}"`
+  name=$(basename "${f}")
   if [[ "${name}" == "XCTest" ]]; then
     continue
   fi

@@ -630,7 +630,8 @@ TypeBase::gatherAllSubstitutions(Module *module,
 
     // If the type is a type variable or is dependent, just fill in empty
     // conformances.
-    if (replacement->is<TypeVariableType>() || replacement->isTypeParameter())
+    if (replacement->isTypeVariableOrMember() ||
+        replacement->isTypeParameter())
       return ProtocolConformanceRef(proto);
 
     // Otherwise, find the conformance.
@@ -743,6 +744,11 @@ Module::lookupConformance(Type type, ProtocolDecl *protocol,
     return None;
   }
 
+  // Type variables have trivial conformances.
+  if (type->isTypeVariableOrMember()) {
+    return ProtocolConformanceRef(protocol);
+  }
+
   // UnresolvedType is a placeholder for an unknown type used when generating
   // diagnostics.  We consider it to conform to all protocols, since the
   // intended type might have.
@@ -807,7 +813,7 @@ Module::lookupConformance(Type type, ProtocolDecl *protocol,
                                                         explicitConformanceDC);
       
       for (auto sub : substitutions) {
-        if (sub.getReplacement()->is<ErrorType>())
+        if (sub.getReplacement()->hasError())
           return None;
       }
 

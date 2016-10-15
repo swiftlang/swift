@@ -463,10 +463,12 @@ static ValueDecl *importMacro(ClangImporter::Implementation &impl,
         auto firstMacroInfo = impl.getClangPreprocessor().getMacroInfo(firstID);
         auto secondMacroInfo = impl.getClangPreprocessor().getMacroInfo(
                                                                       secondID);
-        auto firstIdentifier = impl.importMacroName(firstID, firstMacroInfo,
-                                                    impl.getClangASTContext());
-        auto secondIdentifier = impl.importMacroName(secondID, secondMacroInfo,
-                                                    impl.getClangASTContext());
+        auto firstIdentifier = importMacroName(firstID, firstMacroInfo,
+                                               impl.getClangASTContext(),
+                                               impl.SwiftContext);
+        auto secondIdentifier = importMacroName(secondID, secondMacroInfo,
+                                               impl.getClangASTContext(),
+                                               impl.SwiftContext);
         impl.importMacro(firstIdentifier, firstMacroInfo);
         impl.importMacro(secondIdentifier, secondMacroInfo);
         auto firstIterator = impl.ImportedMacroConstants.find(firstMacroInfo);

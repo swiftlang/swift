@@ -253,32 +253,13 @@ private:
 };
 }
 
+using LookupTableMap = llvm::StringMap<std::unique_ptr<SwiftLookupTable>>;
+
 /// \brief Implementation of the Clang importer.
 class LLVM_LIBRARY_VISIBILITY ClangImporter::Implementation 
   : public LazyMemberLoader
 {
   friend class ClangImporter;
-
-  class SwiftNameLookupExtension : public clang::ModuleFileExtension {
-    Implementation &Impl;
-
-  public:
-    SwiftNameLookupExtension(Implementation &impl) : Impl(impl) { }
-
-    clang::ModuleFileExtensionMetadata getExtensionMetadata() const override;
-    llvm::hash_code hashExtension(llvm::hash_code code) const override;
-
-    std::unique_ptr<clang::ModuleFileExtensionWriter>
-    createExtensionWriter(clang::ASTWriter &writer) override;
-
-    std::unique_ptr<clang::ModuleFileExtensionReader>
-    createExtensionReader(const clang::ModuleFileExtensionMetadata &metadata,
-                          clang::ASTReader &reader,
-                          clang::serialization::ModuleFile &mod,
-                          const llvm::BitstreamCursor &stream) override;
-
-  };
-  friend class SwiftNameLookupExtension;
 
 public:
   Implementation(ASTContext &ctx, const ClangImporterOptions &opts);
@@ -305,7 +286,7 @@ private:
   /// Annoyingly, we list this table early so that it gets torn down after
   /// the underlying Clang instances that reference it
   /// (through the Swift name lookup module file extension).
-  llvm::StringMap<std::unique_ptr<SwiftLookupTable>> LookupTables;
+  LookupTableMap LookupTables;
 
   /// \brief A count of the number of load module operations.
   /// FIXME: Horrible, horrible hack for \c loadModule().
@@ -395,9 +376,6 @@ public:
   llvm::DenseMap<std::pair<ObjCSelector, char>, unsigned>
     ActiveSelectors;
 
-  /// Whether we should suppress the import of the given Clang declaration.
-  static bool shouldSuppressDeclImport(const clang::Decl *decl);
-
 private:
   /// \brief Generation number that is used for crude versioning.
   ///
@@ -409,8 +387,6 @@ private:
     SwiftContext.bumpGeneration();
   }
 
-  importer::EnumInfoCache enumInfoCache;
-
 public:
   /// \brief Keep track of subscript declarations based on getter/setter
   /// pairs.
@@ -420,15 +396,16 @@ public:
   /// properties.
   llvm::DenseMap<const clang::FunctionDecl *, VarDecl *> FunctionsAsProperties;
 
-  importer::EnumInfo getEnumInfo(const clang::EnumDecl *decl,
-                                 clang::Preprocessor *ppOverride = nullptr) {
-    return enumInfoCache.getEnumInfo(
-        SwiftContext, decl, ppOverride ? *ppOverride : getClangPreprocessor());
+  importer::EnumInfo getEnumInfo(const clang::EnumDecl *decl) {
+    return getNameImporter().getEnumInfo(decl);
   }
-  importer::EnumKind getEnumKind(const clang::EnumDecl *decl,
-                                 clang::Preprocessor *ppOverride = nullptr) {
-    return getEnumInfo(decl, ppOverride).getKind();
+  importer::EnumKind getEnumKind(const clang::EnumDecl *decl) {
+    return getNameImporter().getEnumKind(decl);
   }
+
+  // TODO: drop this accessor as soon as we further de-couple the swift name
+  // lookup tables from the Impl.
+  LookupTableMap &getLookupTables() { return LookupTables; }
 
 private:
   class EnumConstantDenseMapInfo {
@@ -556,6 +533,17 @@ private:
 public:
   importer::PlatformAvailability platformAvailability;
 
+private:
+  /// For importing names. This is initialized by the ClangImporter::create()
+  /// after having set up a suitable Clang instance.
+  std::unique_ptr<importer::NameImporter> nameImporter = nullptr;
+
+public:
+  importer::NameImporter &getNameImporter() {
+    assert(nameImporter && "haven't finished initialization");
+    return *nameImporter;
+  }
+
   /// Tracks top level decls from the bridging header.
   std::vector<clang::Decl *> BridgeHeaderTopLevelDecls;
   std::vector<llvm::PointerUnion<clang::ImportDecl *, ImportDecl *>>
@@ -568,21 +556,6 @@ public:
 
   void addBridgeHeaderTopLevelDecls(clang::Decl *D);
   bool shouldIgnoreBridgeHeaderTopLevelDecl(clang::Decl *D);
-
-  /// Add the given named declaration as an entry to the given Swift name
-  /// lookup table, including any of its child entries.
-  void addEntryToLookupTable(clang::Sema &clangSema, SwiftLookupTable &table,
-                             clang::NamedDecl *named);
-
-  /// Add the macros from the given Clang preprocessor to the given
-  /// Swift name lookup table.
-  void addMacrosToLookupTable(clang::ASTContext &clangCtx,
-                              clang::Preprocessor &pp, SwiftLookupTable &table);
-
-  /// Finalize a lookup table, handling any as-yet-unresolved entries
-  /// and emitting diagnostics if necessary.
-  void finalizeLookupTable(clang::ASTContext &clangCtx,
-                           clang::Preprocessor &pp, SwiftLookupTable &table);
 
 public:
   void registerExternalDecl(Decl *D) {
@@ -648,13 +621,9 @@ public:
   /// \param D The Clang declaration whose name should be imported.
   importer::ImportedName
   importFullName(const clang::NamedDecl *D,
-                 importer::ImportNameOptions options = None,
-                 clang::Sema *clangSemaOverride = nullptr);
-
-  /// Imports the name of the given Clang macro into Swift.
-  Identifier importMacroName(const clang::IdentifierInfo *clangIdentifier,
-                             const clang::MacroInfo *macro,
-                             clang::ASTContext &clangCtx);
+                 importer::ImportNameOptions options = None) {
+    return getNameImporter().importName(D, options);
+  }
 
   /// Print an imported name as a string suitable for the swift_name attribute,
   /// or the 'Rename' field of AvailableAttr.
@@ -999,11 +968,10 @@ public:
   /// Attempt to infer a default argument for a parameter with the
   /// given Clang \c type, \c baseName, and optionality.
   static DefaultArgumentKind
-  inferDefaultArgument(ASTContext &, importer::EnumInfoCache &,
-                       clang::Preprocessor &pp, clang::QualType type,
-                       OptionalTypeKind clangOptionality, Identifier baseName,
-                       unsigned numParams, StringRef argumentLabel,
-                       bool isFirstParameter, bool isLastParameter);
+  inferDefaultArgument(clang::QualType type, OptionalTypeKind clangOptionality,
+                       Identifier baseName, unsigned numParams,
+                       StringRef argumentLabel, bool isFirstParameter,
+                       bool isLastParameter, importer::NameImporter &);
 
   /// \brief Import the type of an Objective-C method.
   ///
@@ -1175,6 +1143,53 @@ public:
   void dumpSwiftLookupTables();
 };
 
+namespace importer {
+
+/// Add the given named declaration as an entry to the given Swift name
+/// lookup table, including any of its child entries.
+void addEntryToLookupTable(SwiftLookupTable &table, clang::NamedDecl *named,
+                           importer::NameImporter &);
+
+/// Add the macros from the given Clang preprocessor to the given
+/// Swift name lookup table.
+void addMacrosToLookupTable(clang::ASTContext &clangCtx,
+                            clang::Preprocessor &pp, SwiftLookupTable &table,
+                            ASTContext &SwiftContext);
+
+/// Finalize a lookup table, handling any as-yet-unresolved entries
+/// and emitting diagnostics if necessary.
+void finalizeLookupTable(clang::ASTContext &clangCtx, clang::Preprocessor &pp,
+                         SwiftLookupTable &table, ASTContext &SwiftContext);
+
+/// Whether we should suppress the import of the given Clang declaration.
+bool shouldSuppressDeclImport(const clang::Decl *decl);
+
+class SwiftNameLookupExtension : public clang::ModuleFileExtension {
+  LookupTableMap &lookupTables;
+  ASTContext &swiftCtx;
+  const PlatformAvailability &availability;
+  const bool inferImportAsMember;
+
+public:
+  SwiftNameLookupExtension(LookupTableMap &tables, ASTContext &ctx,
+                           const PlatformAvailability &avail, bool inferIAM)
+      : lookupTables(tables), swiftCtx(ctx), availability(avail),
+        inferImportAsMember(inferIAM) {}
+
+  clang::ModuleFileExtensionMetadata getExtensionMetadata() const override;
+  llvm::hash_code hashExtension(llvm::hash_code code) const override;
+
+  std::unique_ptr<clang::ModuleFileExtensionWriter>
+  createExtensionWriter(clang::ASTWriter &writer) override;
+
+  std::unique_ptr<clang::ModuleFileExtensionReader>
+  createExtensionReader(const clang::ModuleFileExtensionMetadata &metadata,
+                        clang::ASTReader &reader,
+                        clang::serialization::ModuleFile &mod,
+                        const llvm::BitstreamCursor &stream) override;
+};
+
+}
 }
 
 #endif

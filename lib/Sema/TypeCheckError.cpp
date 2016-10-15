@@ -392,7 +392,7 @@ public:
   Classification classifyApply(ApplyExpr *E) {
     // An apply expression is a potential throw site if the function throws.
     // But if the expression didn't type-check, suppress diagnostics.
-    if (!E->getType() || E->getType()->is<ErrorType>())
+    if (!E->getType() || E->getType()->hasError())
       return Classification::forInvalidCode();
     auto type = E->getFn()->getType();
     if (!type) return Classification::forInvalidCode();
@@ -408,7 +408,7 @@ public:
 
     // If any of the arguments didn't type check, fail.
     for (auto arg : args) {
-      if (!arg->getType() || arg->getType()->is<ErrorType>())
+      if (!arg->getType() || arg->getType()->hasError())
         return Classification::forInvalidCode();
     }
 
@@ -790,7 +790,7 @@ private:
   /// 'rethrows' function to throw.
   static Classification classifyArgumentByType(Type paramType,
                                                PotentialReason reason) {
-    if (!paramType || paramType->is<ErrorType>())
+    if (!paramType || paramType->hasError())
       return Classification::forInvalidCode();
     if (auto fnType = paramType->getAs<AnyFunctionType>()) {
       if (fnType->throws()) {

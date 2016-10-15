@@ -180,6 +180,14 @@ inline void set_union_for_each(const Container1 &C1, const Container2 &C2,
   set_union_for_each(C1.begin(), C1.end(), C2.begin(), C2.end(), f);
 }
 
+/// Takes an iterator and an iterator pointing to the end of the iterator range.
+/// If the iterator already points to the end of its range, simply return it,
+/// otherwise return the next element.
+template <typename Iterator>
+inline Iterator next_or_end(Iterator it, Iterator end) {
+  return (it == end) ? end : std::next(it);
+}
+
 /// @}
 
 /// A range of iterators.

@@ -950,7 +950,7 @@ APInt IntegerLiteralExpr::getValue(StringRef Text, unsigned BitWidth) {
 
 APInt IntegerLiteralExpr::getValue() const {
   assert(!getType().isNull() && "Semantic analysis has not completed");
-  assert(!getType()->is<ErrorType>() && "Should have a valid type");
+  assert(!getType()->hasError() && "Should have a valid type");
   return getIntegerLiteralValue(
       isNegative(), getDigitsText(),
       getType()->castTo<BuiltinIntegerType>()->getGreatestWidth());
@@ -980,7 +980,7 @@ APFloat FloatLiteralExpr::getValue(StringRef Text,
 
 llvm::APFloat FloatLiteralExpr::getValue() const {
   assert(!getType().isNull() && "Semantic analysis has not completed");
-  assert(!getType()->is<ErrorType>() && "Should have a valid type");
+  assert(!getType()->hasError() && "Should have a valid type");
 
   return getFloatLiteralValue(isNegative(), getDigitsText(),
                   getType()->castTo<BuiltinFloatType>()->getAPFloatSemantics());
@@ -1314,18 +1314,32 @@ SequenceExpr *SequenceExpr::create(ASTContext &ctx, ArrayRef<Expr*> elements) {
   return ::new(Buffer) SequenceExpr(elements);
 }
 
-SourceLoc TupleExpr::getStartLoc() const {
-  if (LParenLoc.isValid()) return LParenLoc;
-  if (getNumElements() == 0) return SourceLoc();
-  return getElement(0)->getStartLoc();
-}
-
-SourceLoc TupleExpr::getEndLoc() const {
-  if (hasTrailingClosure() || RParenLoc.isInvalid()) {
-    if (getNumElements() == 0) return SourceLoc();
-    return getElements().back()->getEndLoc();
+SourceRange TupleExpr::getSourceRange() const {
+  SourceLoc start = SourceLoc();
+  SourceLoc end = SourceLoc();
+  if (LParenLoc.isValid()) {
+    start = LParenLoc;
+  } else if (getNumElements() == 0) {
+    return { SourceLoc(), SourceLoc() };
+  } else {
+    start = getElement(0)->getStartLoc();
   }
-  return RParenLoc;
+  
+  if (hasTrailingClosure() || RParenLoc.isInvalid()) {
+    if (getNumElements() == 0) {
+      return { SourceLoc(), SourceLoc() };
+    } else {
+      end = getElements().back()->getEndLoc();
+    }
+  } else {
+    end = RParenLoc;
+  }
+  
+  if (start.isValid() && end.isValid()) {
+    return { start, end };
+  } else {
+    return { SourceLoc(), SourceLoc() };
+  }
 }
 
 TupleExpr::TupleExpr(SourceLoc LParenLoc, ArrayRef<Expr *> SubExprs,
@@ -1773,14 +1787,14 @@ void AbstractClosureExpr::setParameterList(ParameterList *P) {
 
 
 Type AbstractClosureExpr::getResultType() const {
-  if (getType()->is<ErrorType>())
+  if (getType()->hasError())
     return getType();
 
   return getType()->castTo<FunctionType>()->getResult();
 }
 
 bool AbstractClosureExpr::isBodyThrowing() const {
-  if (getType()->is<ErrorType>())
+  if (getType()->hasError())
     return false;
 
   return getType()->castTo<FunctionType>()->getExtInfo().throws();
@@ -1857,10 +1871,13 @@ TypeExpr::TypeExpr(Type Ty)
 // The type of a TypeExpr is always a metatype type.  Return the instance
 // type or null if not set yet.
 Type TypeExpr::getInstanceType() const {
-  if (!getType() || getType()->is<ErrorType>())
+  if (!getType())
     return Type();
-  
-  return getType()->castTo<MetatypeType>()->getInstanceType();
+
+  if (auto metaType = getType()->getAs<MetatypeType>())
+    return metaType->getInstanceType();
+
+  return ErrorType::get(getType()->getASTContext());
 }
 
 

@@ -1601,7 +1601,8 @@ bool SimplifyCFG::simplifySwitchEnumUnreachableBlocks(SwitchEnumInst *SEI) {
     .createUncheckedEnumData(SEI->getLoc(), SEI->getOperand(), Element, Ty);
 
   assert(Dest->bbarg_size() == 1 && "Expected only one argument!");
-  ArrayRef<SILValue> Args = { UED };
+  SmallVector<SILValue, 1> Args;
+  Args.push_back(UED);
   SILBuilderWithScope(SEI).createBranch(SEI->getLoc(), Dest, Args);
 
   addToWorklist(SEI->getParent());
@@ -3419,6 +3420,16 @@ bool SimplifyCFG::simplifyProgramTerminationBlock(SILBasicBlock *BB) {
   bool Changed = false;
   llvm::SmallPtrSet<SILInstruction *, 4> InstsToRemove;
   for (auto &I : *BB) {
+    // We can only remove the instructions below from the ARC-inert BB
+    // We *can't* replace copy_addr with move instructions:
+    // If the copy_addr was [take] [initialization]:
+    //   * previous passes would have replaced it with moves
+    // If the copy_addr contains [initialization]:
+    //   * nothing we can do - the target address is invalid
+    // Else, i.e. the copy_addr was [take] assignment, it is not always safe:
+    // The type being operated on might contain weak references,
+    // or other side references - We'll corrupt the weak reference table
+    // if we fail to release the old value.
     if (!isa<StrongReleaseInst>(I) && !isa<UnownedReleaseInst>(I) && 
         !isa<ReleaseValueInst>(I) && !isa<DestroyAddrInst>(I))
       continue;

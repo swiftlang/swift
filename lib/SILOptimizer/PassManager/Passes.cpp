@@ -89,7 +89,6 @@ bool swift::runSILDiagnosticPasses(SILModule &Module) {
   // Otherwise run the rest of diagnostics.
   PM.addCapturePromotion();
   PM.addAllocBoxToStack();
-  PM.addInOutDeshadowing();
   PM.addNoReturnFolding();
   PM.addDefiniteInitialization();
 

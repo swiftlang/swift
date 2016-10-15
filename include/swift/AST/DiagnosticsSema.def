@@ -547,6 +547,9 @@ ERROR(invalid_member_type,none,
 ERROR(invalid_member_type_suggest,none,
       "%0 does not have a member type named %1; did you mean %2?",
       (Type, Identifier, Identifier))
+ERROR(invalid_member_reference,none,
+      "%0 %1 is not a member type of %2",
+      (DescriptiveDeclKind, Identifier, Type))
 ERROR(invalid_member_type_alias,none,
       "typealias %0 is too complex to be used as a generic constraint; "
       "use an associatedtype instead", (Identifier))
@@ -1950,8 +1953,6 @@ ERROR(noescape_implied_by_autoclosure,none,
 ERROR(noescape_conflicts_escaping_autoclosure,none,
       "@noescape conflicts with @autoclosure(escaping)", ())
 
-ERROR(escaping_function_type,none,
-      "@escaping may only be applied to parameters of function type", ())
 ERROR(escaping_non_function_parameter,none,
       "@escaping attribute may only be used in function parameter position", ())
 
@@ -2411,6 +2412,12 @@ NOTE(force_optional_to_any,none,
      "force-unwrap the value to avoid this warning", ())
 NOTE(silence_optional_to_any,none,
      "explicitly cast to Any with 'as Any' to silence this warning", ())
+WARNING(optional_in_string_interpolation_segment,none,
+        "string interpolation produces a debug description for an optional "
+        "value; did you mean to make this explicit?",
+        ())
+NOTE(silence_optional_in_interpolation_segment_call,none,
+     "use 'String(describing:)' to silence this warning", ())
 
 ERROR(invalid_noescape_use,none,
       "non-escaping %select{value|parameter}1 %0 may only be called",
@@ -3103,6 +3110,10 @@ ERROR(availability_decl_unavailable_in_swift_msg, none,
 
 NOTE(availability_marked_unavailable, none,
   "%0 has been explicitly marked unavailable here", (DeclName))
+
+NOTE(availability_introduced_in_swift, none,
+     "%0 was introduced in Swift %1",
+    (DeclName, clang::VersionTuple))
 
 NOTE(availability_obsoleted, none,
      "%0 was obsoleted in %1 %2",

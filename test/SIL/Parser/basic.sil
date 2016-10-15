@@ -737,6 +737,17 @@ bb0(%0 : $Builtin.Word, %1 : $Builtin.Word):
   return %3 : $()
 }
 
+// CHECK-LABEL: sil @test_tail_elems_dynamic
+sil @test_tail_elems_dynamic : $@convention(thin) (Builtin.Word, Builtin.Word, @thick Class1.Type) -> () {
+bb0(%0 : $Builtin.Word, %1 : $Builtin.Word, %2 : $@thick Class1.Type):
+  // CHECK: alloc_ref_dynamic  [tail_elems $Val * %0 : $Builtin.Word] [tail_elems $Aleph * %1 : $Builtin.Word] %2 : $@thick Class1
+  %3 = alloc_ref_dynamic [tail_elems $Val * %0 : $Builtin.Word] [tail_elems $Aleph * %1 : $Builtin.Word] %2 : $@thick Class1.Type, $Class1
+  // CHECK: dealloc_ref %3 : $Class1
+  dealloc_ref %3 : $Class1
+  %4 = tuple ()
+  return %4 : $()
+}
+
 // CHECK-LABEL: sil @test_tail_addr
 sil @test_tail_addr : $@convention(thin) (@owned Class1, Builtin.Word) -> @owned Class1 {
 bb0(%0 : $Class1, %1 : $Builtin.Word):

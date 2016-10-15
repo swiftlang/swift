@@ -17,14 +17,20 @@
 #ifndef SWIFT_IMPORT_NAME_H
 #define SWIFT_IMPORT_NAME_H
 
+#include "ImportEnumInfo.h"
 #include "SwiftLookupTable.h"
+#include "swift/Basic/StringExtras.h"
 #include "swift/AST/ASTContext.h"
 #include "swift/AST/Decl.h"
 #include "swift/AST/ForeignErrorConvention.h"
+#include "clang/Sema/Sema.h"
+
+// TODO: remove when we drop import name options
+#include "clang/AST/Decl.h"
 
 namespace swift {
 namespace importer {
-class EnumInfoCache;
+struct PlatformAvailability;
 
 /// Information about imported error parameters.
 struct ImportedErrorInfo {
@@ -50,6 +56,8 @@ enum class ImportedAccessorKind {
 
 /// Describes a name that was imported from Clang.
 struct ImportedName {
+  // TODO: pare down in conjunction with ImportName refactoring
+
   /// The imported name.
   DeclName Imported;
 
@@ -129,6 +137,13 @@ struct ImportedName {
 /// in "Notification", or it there would be nothing left.
 StringRef stripNotification(StringRef name);
 
+/// Imports the name of the given Clang macro into Swift.
+Identifier importMacroName(const clang::IdentifierInfo *clangIdentifier,
+                           const clang::MacroInfo *macro,
+                           clang::ASTContext &clangCtx,
+                           ASTContext &SwiftContext);
+
+// TODO: I'd like to remove the following
 /// Flags that control the import of names in importFullName.
 enum class ImportNameFlags {
   /// Suppress the factory-method-as-initializer transformation.
@@ -136,19 +151,103 @@ enum class ImportNameFlags {
   /// Produce the Swift 2 name of the given entity.
   Swift2Name = 0x02,
 };
+enum { NumImportNameFlags = 2 };
 
 /// Options that control the import of names in importFullName.
 typedef OptionSet<ImportNameFlags> ImportNameOptions;
 
-/// The below is a work in progress to make import naming less stateful and tied
-/// to the Impl. In it's current form, it is rather unwieldy.
-// TODO: refactor into convenience class, multi-versioned, etc.
-ImportedName importFullName(const clang::NamedDecl *, ASTContext &SwiftContext,
-                            clang::Sema &clangSema,
-                            EnumInfoCache &enumInfoCache,
-                            PlatformAvailability &platformAvailability,
-                            ImportNameOptions options,
-                            bool inferImportAsMember);
+/// Class to determine the Swift name of foreign entities. Currently fairly
+/// stateless and borrows from the ClangImporter::Implementation, but in the
+/// future will be more self-contained and encapsulated.
+class NameImporter {
+  ASTContext &swiftCtx;
+  const PlatformAvailability &availability;
+
+  clang::Sema &clangSema;
+  EnumInfoCache enumInfos;
+  StringScratchSpace scratch;
+
+  const bool inferImportAsMember;
+
+  // TODO: remove when we drop the options (i.e. import all names)
+  using CacheKeyType =
+      llvm::PointerIntPair<const clang::NamedDecl *, NumImportNameFlags>;
+
+  /// Cache for repeated calls
+  llvm::DenseMap<CacheKeyType, ImportedName> importNameCache;
+
+public:
+  NameImporter(ASTContext &ctx, const PlatformAvailability &avail,
+               clang::Sema &cSema, bool inferIAM)
+      : swiftCtx(ctx), availability(avail), clangSema(cSema),
+        enumInfos(swiftCtx, clangSema.getPreprocessor()),
+        inferImportAsMember(inferIAM) {}
+
+  /// Determine the Swift name for a clang decl
+  ImportedName importName(const clang::NamedDecl *decl,
+                          ImportNameOptions options);
+
+  ASTContext &getContext() { return swiftCtx; }
+  const LangOptions &getLangOpts() const { return swiftCtx.LangOpts; }
+
+  Identifier getIdentifier(StringRef name) {
+    return swiftCtx.getIdentifier(name);
+  }
+
+  StringScratchSpace &getScratch() { return scratch; }
+
+  bool isInferImportAsMember() const { return inferImportAsMember; }
+
+  EnumInfo getEnumInfo(const clang::EnumDecl *decl) {
+    return enumInfos.getEnumInfo(decl);
+  }
+  EnumKind getEnumKind(const clang::EnumDecl *decl) {
+    return enumInfos.getEnumKind(decl);
+  }
+
+  clang::Sema &getClangSema() { return clangSema; }
+  clang::ASTContext &getClangContext() { return getClangSema().getASTContext(); }
+
+private:
+  bool enableObjCInterop() const { return swiftCtx.LangOpts.EnableObjCInterop; }
+
+  bool useSwift2Name(ImportNameOptions options) const {
+    return options.contains(ImportNameFlags::Swift2Name);
+  }
+
+  /// Look for a method that will import to have the same name as the
+  /// given method after importing the Nth parameter as an elided error
+  /// parameter.
+  bool hasErrorMethodNameCollision(const clang::ObjCMethodDecl *method,
+                                   unsigned paramIndex,
+                                   StringRef suffixToStrip);
+
+  /// Test to see if there is a value with the same name as 'proposedName' in
+  /// the same module as the decl
+  bool hasNamingConflict(const clang::NamedDecl *decl,
+                         const clang::IdentifierInfo *proposedName,
+                         const clang::TypedefNameDecl *cfTypedef,
+                         clang::Sema &clangSema);
+
+  Optional<ImportedErrorInfo>
+  considerErrorImport(const clang::ObjCMethodDecl *clangDecl,
+                      StringRef &baseName,
+                      SmallVectorImpl<StringRef> &paramNames,
+                      ArrayRef<const clang::ParmVarDecl *> params,
+                      bool isInitializer, bool hasCustomName);
+
+  /// Whether we should import this as Swift Private
+  bool shouldBeSwiftPrivate(const clang::NamedDecl *, clang::Sema &clangSema);
+
+  EffectiveClangContext determineEffectiveContext(const clang::NamedDecl *,
+                                                  const clang::DeclContext *,
+                                                  ImportNameOptions options,
+                                                  clang::Sema &clangSema);
+
+  ImportedName importNameImpl(const clang::NamedDecl *,
+                              ImportNameOptions options);
+};
+
 }
 }
 

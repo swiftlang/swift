@@ -42,7 +42,7 @@ enum ArithmeticError : Error {
 }
 
 // CHECK: @_specialize(Int)
-// CHECK: public func divideNum<T : SignedInteger>(num: T, den: T) throws -> T
+// CHECK: public func divideNum<T>(num: T, den: T) throws -> T where T : SignedInteger
 @_specialize(Int)
 public func divideNum<T : SignedInteger>(num: T, den: T) throws -> T
 

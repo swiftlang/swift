@@ -10,28 +10,19 @@
 ;
 ;===----------------------------------------------------------------------===;
 ;;; Directory Local Variables
-;;; See Info node `(emacs) Directory Variables' for more information.
+;;; For more information see (info "(emacs) Directory Variables")
 
 ((nil
   (tab-width . 2)
   (fill-column . 80)
-  (eval .
-        ;; Load the Swift project's settings.  To suppress this action
-        ;; you can put "(provide 'swift-project-settings)" in your
-        ;; .emacs
+  (eval let* ((x (dir-locals-find-file default-directory))
+              (this-directory (if (listp x) (car x)
+                                (file-name-directory x))))
         (unless (featurep 'swift-project-settings)
-          ;; Make sure the project's own utils directory is in the
-          ;; load path, but don't override any one the user might have
-          ;; set up.
-          (add-to-list
-           'load-path
-           (concat
-            (let ((dlff (dir-locals-find-file default-directory)))
-              (if (listp dlff) (car dlff) (file-name-directory dlff)))
-            "utils")
-           :append)
-            ;; Load our project's settings -- indirectly brings in swift-mode
+          (add-to-list 'load-path  (concat this-directory "utils") :append)
+          (let ((swift-project-directory this-directory))
           (require 'swift-project-settings)))
+        (set (make-local-variable 'swift-project-directory) this-directory))
   (c-file-style . "swift")
   )
  (c++-mode
@@ -44,6 +35,8 @@
   (whitespace-style . (face lines indentation:space))
   (eval . (whitespace-mode)))
  (swift-mode
+  (swift-find-executable-fn . swift-project-executable-find)
+  (swift-syntax-check-fn . swift-project-swift-syntax-check)
   (whitespace-style . (face lines indentation:space))
   (eval . (whitespace-mode))
   (swift-basic-offset . 2)

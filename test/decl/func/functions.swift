@@ -82,7 +82,7 @@ func parseError3(_ a: unknown_type, b: ) {} // expected-error {{use of undeclare
 
 func parseError4(_ a: , b: ) {} // expected-error 2{{expected parameter type following ':'}}
 
-func parseError5(_ a: b: ) {} // expected-error {{use of undeclared type 'b'}}  expected-error 2 {{expected ',' separator}} {{24-24=,}} {{24-24=,}} expected-error {{expected parameter name followed by ':'}}
+func parseError5(_ a: b: ) {} // expected-error {{use of undeclared type 'b'}}  expected-error {{expected ',' separator}} {{24-24=,}} expected-error {{expected parameter name followed by ':'}}
 
 func parseError6(_ a: unknown_type, b: ) {} // expected-error {{use of undeclared type 'unknown_type'}}  expected-error {{expected parameter type following ':'}}
 
@@ -90,7 +90,7 @@ func parseError7(_ a: Int, goo b: unknown_type) {} // expected-error {{use of un
 
 public func foo(_ a: Bool = true) -> (b: Bar, c: Bar) {} // expected-error {{use of undeclared type 'Bar'}}
 
-func parenPatternInArg((a): Int) -> Int { // expected-error {{expected parameter name followed by ':'}} expected-error {{expected ',' separator}}
+func parenPatternInArg((a): Int) -> Int { // expected-error {{expected parameter name followed by ':'}}
   return a  // expected-error {{use of unresolved identifier 'a'}}
 }
 parenPatternInArg(0)  // expected-error {{argument passed to call that takes no arguments}}
@@ -144,6 +144,12 @@ func var_inout_error(inout var x : Int) {} // expected-error {{parameter may not
 
 // Unnamed parameters require the name "_":
 func unnamed(Int) { } // expected-error{{unnamed parameters must be written with the empty name '_'}}{{14-14=_: }}
+
+func typeAttrBeforeParamDecl(@convention(c) _: () -> Void) {} // expected-error{{attribute can only be applied to types, not declarations}}
+
+// FIXME: Bad diagnostics
+func bareTypeWithAttr(@convention(c) () -> Void) {} // expected-error{{attribute can only be applied to types, not declarations}}
+// expected-error @-1 {{unnamed parameters must be written with the empty name '_'}} {{38-38=_: }}
 
 // Test fixits on curried functions.
 func testCurryFixits() {

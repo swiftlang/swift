@@ -1755,10 +1755,8 @@ substSelfTypeIntoProtocolRequirementType(SILModule &M,
         continue;
 
       // Substitute the constrained types.
-      auto first = reqt.getFirstType().subst(subs, SubstFlags::IgnoreMissing)
-          ->getCanonicalType();
-      auto second = reqt.getSecondType().subst(subs, SubstFlags::IgnoreMissing)
-          ->getCanonicalType();
+      auto first = reqt.getFirstType().subst(subs)->getCanonicalType();
+      auto second = reqt.getSecondType().subst(subs)->getCanonicalType();
 
       if (!first->isTypeParameter()) {
         assert(second->isTypeParameter());
@@ -1773,19 +1771,16 @@ substSelfTypeIntoProtocolRequirementType(SILModule &M,
   }
 
   // Substitute away `Self` in parameter and result types.
-  auto input = reqtTy->getInput().subst(subs, SubstFlags::IgnoreMissing)
-    ->getCanonicalType();
-  auto result = reqtTy->getResult().subst(subs, SubstFlags::IgnoreMissing)
-    ->getCanonicalType();
+  auto input = reqtTy->getInput().subst(subs)->getCanonicalType();
+  auto result = reqtTy->getResult().subst(subs)->getCanonicalType();
 
   // The result might be fully concrete, if the witness had no generic
   // signature, and the requirement had no additional generic parameters
   // beyond `Self`.
   if (!allParams.empty()) {
-    auto invalid = builder.finalize(SourceLoc());
-    assert(!invalid && "invalid requirements should not be seen in SIL");
+    builder.finalize(SourceLoc());
 
-    auto *sig = builder.getGenericSignature(allParams);
+    auto *sig = builder.getGenericSignature();
 
     return cast<GenericFunctionType>(
       GenericFunctionType::get(sig, input, result, reqtTy->getExtInfo())
@@ -1805,6 +1800,7 @@ getSubstitutedGenericEnvironment(SILModule &M,
     return reqtEnv;
   }
 
+  SmallVector<GenericTypeParamType *, 4> genericParamTypes;
   TypeSubstitutionMap witnessContextParams;
 
   auto selfTy = conformance->getProtocol()->getSelfInterfaceType()
@@ -1814,8 +1810,14 @@ getSubstitutedGenericEnvironment(SILModule &M,
   // the conformance (which might not be the same as the generic
   // context of the witness, if the witness is defined in a
   // superclass, concrete extension or protocol extension).
-  if (auto *outerEnv = conformance->getGenericEnvironment())
+  if (auto *outerEnv = conformance->getGenericEnvironment()) {
     witnessContextParams = outerEnv->getInterfaceToArchetypeMap();
+    for (auto *paramTy : outerEnv->getGenericParams())
+      genericParamTypes.push_back(paramTy);
+  }
+
+  for (auto *paramTy : reqtEnv->getGenericParams().slice(1))
+    genericParamTypes.push_back(paramTy);
 
   // Inner generic parameters come from the requirement and
   // also map to the archetypes of the requirement.
@@ -1829,7 +1831,8 @@ getSubstitutedGenericEnvironment(SILModule &M,
   }
 
   if (!witnessContextParams.empty())
-    return GenericEnvironment::get(M.getASTContext(), witnessContextParams);
+    return GenericEnvironment::get(M.getASTContext(), genericParamTypes,
+                                   witnessContextParams);
 
   return nullptr;
 }

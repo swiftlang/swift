@@ -35,10 +35,9 @@
 
 func method(@#^KEYWORD1^#) {}
 
-// KEYWORD1:                  Begin completions, 3 items
+// KEYWORD1:                  Begin completions, 2 items
 // KEYWORD1-NEXT:             Keyword/None:                       autoclosure[#Param Attribute#]; name=autoclosure{{$}}
 // KEYWORD1-NEXT:             Keyword/None:                       noescape[#Param Attribute#]; name=noescape{{$}}
-// KEYWORD1-NEXT:             Keyword/None:                       escaping[#Param Attribute#]; name=escaping{{$}}
 // KEYWORD1-NEXT:             End completions
 
 @#^KEYWORD2^#
@@ -86,7 +85,7 @@ struct S{}
 
 @#^KEYWORD_LAST^#
 
-// KEYWORD_LAST:                  Begin completions, 21 items
+// KEYWORD_LAST:                  Begin completions, 20 items
 // KEYWORD_LAST-NEXT:             Keyword/None:                       available[#Declaration Attribute#]; name=available{{$}}
 // KEYWORD_LAST-NEXT:             Keyword/None:                       objc[#Declaration Attribute#]; name=objc{{$}}
 // KEYWORD_LAST-NEXT:             Keyword/None:                       noreturn[#Declaration Attribute#]; name=noreturn{{$}}
@@ -107,5 +106,4 @@ struct S{}
 // KEYWORD_LAST-NEXT:             Keyword/None:                       warn_unqualified_access[#Declaration Attribute#]; name=warn_unqualified_access
 // KEYWORD_LAST-NEXT:             Keyword/None:                       discardableResult[#Declaration Attribute#]; name=discardableResult
 // KEYWORD_LAST-NEXT:             Keyword/None:                       GKInspectable[#Declaration Attribute#]; name=GKInspectable{{$}}
-// KEYWORD_LAST-NEXT:             Keyword/None:                       escaping[#Declaration Attribute#]; name=escaping{{$}}
 // KEYWORD_LAST-NEXT:             End completions

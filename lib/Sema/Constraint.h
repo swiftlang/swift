@@ -81,6 +81,9 @@ enum class ConstraintKind : char {
   /// \brief The first type must conform to the second type (which is a
   /// protocol type).
   ConformsTo,
+  /// \brief The first type describes a literal that conforms to the second
+  /// type, which is one of the known expressible-by-literal protocols.
+  LiteralConformsTo,
   /// A checked cast from the first type to the second.
   CheckedCast,
   /// \brief The first type can act as the Self type of the second type (which
@@ -473,6 +476,7 @@ public:
     case ConstraintKind::OperatorArgumentTupleConversion:
     case ConstraintKind::OperatorArgumentConversion:
     case ConstraintKind::ConformsTo:
+    case ConstraintKind::LiteralConformsTo:
     case ConstraintKind::CheckedCast:
     case ConstraintKind::SelfObjectOfProtocol:
     case ConstraintKind::ApplicableFunction:

@@ -2508,6 +2508,7 @@ internal struct _HashedContainerStorageHeader {
 /// Enough bytes are allocated to hold the bitmap for marking valid entries,
 /// keys, and values. The data layout starts with the bitmap, followed by the
 /// keys, followed by the values.
+@_versioned
 final internal class _Native${Self}StorageImpl<${TypeParameters}> {
   // Note: It is intended that ${TypeParameters}
   // (without : Hashable) is used here - this storage must work
@@ -3229,6 +3230,7 @@ final internal class _Native${Self}StorageKeyNSEnumerator<
 /// is also a proper `NS${Self}` subclass, which is returned to Objective-C
 /// during bridging.  `${Self}Index` points directly to
 /// `_Native${Self}Storage`.
+@_versioned
 final internal class _Native${Self}StorageOwner<${TypeParametersDecl}>
   : _SwiftNativeNS${Self}, _NS${Self}Core {
 
@@ -3564,7 +3566,10 @@ final internal class _Native${Self}StorageOwner<${TypeParametersDecl}>
 }
 
 #if _runtime(_ObjC)
+@_versioned
+@_fixed_layout
 internal struct _Cocoa${Self}Storage : _HashStorage {
+  @_versioned
   internal var cocoa${Self}: _NS${Self}
 
   internal typealias Index = _Cocoa${Self}Index
@@ -3695,6 +3700,8 @@ internal struct _Cocoa${Self}Storage : _HashStorage {
 internal struct _Cocoa${Self}Storage {}
 #endif
 
+@_versioned
+@_fixed_layout
 internal enum _Variant${Self}Storage<${TypeParametersDecl}> : _HashStorage {
 
   internal typealias NativeStorage = _Native${Self}Storage<${TypeParameters}>
@@ -4408,6 +4415,7 @@ internal enum _Variant${Self}Storage<${TypeParametersDecl}> : _HashStorage {
   }
 }
 
+@_versioned
 internal struct _Native${Self}Index<${TypeParametersDecl}> :
   Comparable {
 
@@ -4418,6 +4426,8 @@ internal struct _Native${Self}Index<${TypeParametersDecl}> :
   // the new model.
   @_versioned
   internal var nativeStorage: NativeStorage
+
+  @_versioned
   internal var offset: Int
 
   @_versioned
@@ -4799,6 +4809,7 @@ final internal class _Cocoa${Self}Iterator : IteratorProtocol {
 final internal class _Cocoa${Self}Iterator {}
 #endif
 
+@_versioned
 internal enum ${Self}IteratorRepresentation<${TypeParametersDecl}> {
   internal typealias _Iterator = ${Self}Iterator<${TypeParameters}>
   internal typealias _NativeStorageOwner =
