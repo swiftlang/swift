@@ -17,6 +17,11 @@ module SwiftShims {
   export *
 }
 
+module _SwiftObjectiveCOverlayShims {
+  header "ObjectiveCOverlayShims.h"
+  export *
+}
+
 module _SwiftOSOverlayShims {
   header "OSOverlayShims.h"
   export *

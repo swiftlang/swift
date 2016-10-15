@@ -15,6 +15,7 @@ set(sources
   UnicodeShims.h
   Visibility.h
 
+  ObjectiveCOverlayShims.h
   OSOverlayShims.h
   XCTestOverlayShims.h
 
