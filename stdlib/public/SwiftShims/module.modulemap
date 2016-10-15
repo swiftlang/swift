@@ -16,3 +16,8 @@ module SwiftShims {
   header "Visibility.h"
   export *
 }
+
+module _SwiftXCTestOverlayShims {
+  header "XCTestOverlayShims.h"
+  export *
+}
