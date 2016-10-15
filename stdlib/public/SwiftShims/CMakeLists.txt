@@ -17,6 +17,7 @@ set(sources
 
   ObjectiveCOverlayShims.h
   OSOverlayShims.h
+  SafariServicesOverlayShims.h
   XCTestOverlayShims.h
 
   module.modulemap

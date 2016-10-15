@@ -27,6 +27,11 @@ module _SwiftOSOverlayShims {
   export *
 }
 
+module _SwiftSafariServicesOverlayShims {
+  header "SafariServicesOverlayShims.h"
+  export *
+}
+
 module _SwiftXCTestOverlayShims {
   header "XCTestOverlayShims.h"
   export *
