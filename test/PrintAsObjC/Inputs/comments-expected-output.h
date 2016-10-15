@@ -103,6 +103,16 @@ SWIFT_CLASS("_TtC8comments5Brief")
 @end
 
 
+SWIFT_CLASS("_TtC8comments15ClosingComments")
+@interface ClosingComments
+/**
+  Some comment. */
+*/
+- (void)closingComment;
+- (nonnull instancetype)init OBJC_DESIGNATED_INITIALIZER;
+@end
+
+
 SWIFT_CLASS("_TtC8comments16ClosureContainer")
 @interface ClosureContainer
 /**

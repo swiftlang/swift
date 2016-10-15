@@ -107,6 +107,14 @@ public enum A012_AttachToEntities {
 // CHECK: {{.*}}DocCommentAsXML=[<Function file="{{.*}}" line="{{.*}}" column="{{.*}}"><Name>f3()</Name><USR>s:FC14swift_ide_test5Brief2f3FT_T_</USR><Declaration>public func f3()</Declaration><Abstract><Para>Aaa.</Para></Abstract><Discussion><Para>Bbb.</Para></Discussion></Function>]
 }
 
+@objc public class ClosingComments {
+// CHECK: {{.*}}DocCommentAsXML=none
+
+  /// Some comment. */
+  public func closingComment() {}
+// CHECK: DocCommentAsXML=[<Function file="{{.*}}" line="{{.*}}" column="{{.*}}"><Name>closingComment()</Name><USR>s:F14swift_ide_test28codeListingWithOtherLanguageFT_T_</USR><Declaration>public func closingComment()</Declaration><Abstract><Para>Some comment. */</Para></Function>]
+}
+
 @objc public class ClosureContainer {
 /// Partially applies a binary operator.
 ///
