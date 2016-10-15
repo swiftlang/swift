@@ -19,6 +19,7 @@ set(sources
   OSOverlayShims.h
   SafariServicesOverlayShims.h
   XCTestOverlayShims.h
+  XPCOverlayShims.h
 
   module.modulemap
   )

@@ -36,3 +36,8 @@ module _SwiftXCTestOverlayShims {
   header "XCTestOverlayShims.h"
   export *
 }
+
+module _SwiftXPCOverlayShims {
+  header "XPCOverlayShims.h"
+  export *
+}
