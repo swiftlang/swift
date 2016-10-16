@@ -1961,7 +1961,6 @@ bool SILParser::parseSILInstruction(SILBasicBlock *BB, SILBuilder &B) {
        parseTypedValueRef(Val, AddrLoc, B) || parseSILDebugLocation(InstLoc, B))
      return true;
 
-   SILType Type = Val->getType();
    ResultVal = B.createLoad(InstLoc, Val, Qualifier);
    break;
  }
