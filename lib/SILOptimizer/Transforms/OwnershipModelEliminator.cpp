@@ -1,4 +1,4 @@
-//===- OwnershipModelEliminator.cpp - Eliminate SILOwnership Instructions -===//
+//===--- OwnershipModelEliminator.cpp - Eliminate SILOwnership Instr. -----===//
 //
 // This source file is part of the Swift.org open source project
 //
@@ -13,7 +13,7 @@
 ///  \file
 ///
 ///  This file contains a small pass that lowers SIL ownership instructions to
-///  their constituant operations. This will enable us to separate
+///  their constituent operations. This will enable us to separate
 ///  implementation
 ///  of Semantic ARC in SIL and SILGen from ensuring that all of the optimizer
 ///  passes respect Semantic ARC. This is done by running this pass right after
