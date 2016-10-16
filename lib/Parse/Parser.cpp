@@ -697,7 +697,7 @@ Parser::parseList(tok RightK, SourceLoc LeftLoc, SourceLoc &RightLoc,
       break;
     }
     // If we're in a comma-separated list, the next token is at the
-    // beginning of a new line and can never start a element, break.
+    // beginning of a new line and can never start an element, break.
     if (SeparatorK == tok::comma && Tok.isAtStartOfLine() &&
         (Tok.is(tok::r_brace) || isStartOfDecl() || isStartOfStmt())) {
       break;
