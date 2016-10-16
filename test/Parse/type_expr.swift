@@ -1,5 +1,5 @@
-// RUN: %target-parse-verify-swift
-// RUN: %target-parse-verify-swift -enable-astscope-lookup
+// RUN: %target-parse-verify-swift -swift-version 4
+// RUN: %target-parse-verify-swift -enable-astscope-lookup -swift-version 4
 
 // Types in expression contexts must be followed by a member access or
 // constructor call.
@@ -234,7 +234,5 @@ func compositionType() {
   _ = (P1 & Int).self // expected-error {{non-protocol type 'Int' cannot be used within a protocol composition}}
   _ = (P1? & P2).self // expected-error {{non-protocol type 'P1?' cannot be used within a protocol composition}}
 
-  // FIXME: Inconsistency. as per https://bugs.swift.org/browse/SR-2843,
-  // In Swift3 `typealias P = P1 & P2.Type` is parsed as (metatype (type_composite P1, P2))
   _ = (P1 & P2.Type).self // expected-error {{non-protocol type 'P2.Type' cannot be used within a protocol composition}}
 }
