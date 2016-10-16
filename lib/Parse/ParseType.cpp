@@ -399,95 +399,14 @@ ParserResult<TypeRepr> Parser::parseTypeIdentifier() {
 ///
 ///   type-composition:
 ///     type-identifier ('&' type-identifier)*
-///     'protocol' '<' type-composition-list-deprecated? '>'
+///     type-composition-deprecated
 ///
 ///   type-composition-list-deprecated:
 ///     type-identifier (',' type-identifier)*
 ParserResult<TypeRepr> Parser::parseTypeIdentifierOrTypeComposition() {
-  
-  // Handle deprecated case
-  if (Tok.getKind() == tok::kw_protocol && startsWithLess(peekToken())) {
-    SourceLoc ProtocolLoc = consumeToken(tok::kw_protocol);
-    SourceLoc LAngleLoc = consumeStartingLess();
-    
-    // Parse the type-composition-list.
+  if (Tok.is(tok::kw_protocol) && startsWithLess(peekToken()))
+    return parseOldStyleProtocolComposition();
 
-    ParserStatus Status;
-    SmallVector<TypeRepr *, 4> Protocols;
-    bool IsEmpty = startsWithGreater(Tok);
-    if (!IsEmpty) {
-      do {
-        // Parse the type-identifier.
-        ParserResult<TypeRepr> Protocol = parseTypeIdentifier();
-        Status |= Protocol;
-        if (auto *ident = dyn_cast_or_null<IdentTypeRepr>(
-                                                       Protocol.getPtrOrNull()))
-          Protocols.push_back(ident);
-      } while (consumeIf(tok::comma));
-    }
-
-    // Check for the terminating '>'.
-    SourceLoc RAngleLoc = PreviousLoc;
-    if (startsWithGreater(Tok)) {
-      RAngleLoc = consumeStartingGreater();
-    } else {
-      if (Status.isSuccess()) {
-        diagnose(Tok, diag::expected_rangle_protocol);
-        diagnose(LAngleLoc, diag::opening_angle);
-        Status.setIsParseError();
-      }
-      
-      // Skip until we hit the '>'.
-      RAngleLoc = skipUntilGreaterInTypeList(/*protocolComposition=*/true);
-    }
-
-    auto composition = CompositionTypeRepr::create(
-      Context, Protocols, ProtocolLoc, {LAngleLoc, RAngleLoc});
-
-    if (Status.isSuccess()) {
-      // Only if we have complete protocol<...> construct, diagnose deprecated.
-
-      SmallString<32> replacement;
-      if (Protocols.empty()) {
-        replacement = "Any";
-      } else {
-        auto extractText = [&](TypeRepr *Ty) -> StringRef {
-          auto SourceRange = Ty->getSourceRange();
-          return SourceMgr.extractText(
-            Lexer::getCharSourceRangeFromSourceRange(SourceMgr, SourceRange));
-        };
-        auto Begin = Protocols.begin();
-        replacement += extractText(*Begin);
-        while (++Begin != Protocols.end()) {
-          replacement += " & ";
-          replacement += extractText(*Begin);
-        }
-      }
-
-      // Copy trailing content after '>' to the replacement string.
-      // FIXME: lexer should smartly separate '>' and trailing contents like '?'.
-      StringRef TrailingContent = L->getTokenAt(RAngleLoc).getRange().str().
-        substr(1);
-      if (!TrailingContent.empty()) {
-        if (Protocols.size() > 1) {
-          replacement.insert(replacement.begin(), '(');
-          replacement += ")";
-        }
-        replacement += TrailingContent;
-      }
-
-      // Replace 'protocol<T1, T2>' with 'T1 & T2'
-      diagnose(ProtocolLoc,
-        IsEmpty              ? diag::deprecated_any_composition :
-        Protocols.size() > 1 ? diag::deprecated_protocol_composition :
-                               diag::deprecated_protocol_composition_single)
-        .highlight(composition->getSourceRange())
-        .fixItReplace(composition->getSourceRange(), replacement);
-    }
-
-    return makeParserResult(Status, composition);
-  }
-  
   SourceLoc FirstTypeLoc = Tok.getLoc();
   
   // Parse the first type
@@ -521,6 +440,93 @@ ParserResult<CompositionTypeRepr> Parser::parseAnyType() {
     ::createEmptyComposition(Context, consumeToken(tok::kw_Any)));
 }
 
+/// parseOldStyleProtocolComposition
+///   type-composition-deprecated:
+///     'protocol' '<' type-composition-list-deprecated? '>'
+///
+///   type-composition-list-deprecated:
+///     type-identifier (',' type-identifier)*
+ParserResult<TypeRepr> Parser::parseOldStyleProtocolComposition() {
+  assert(Tok.is(tok::kw_protocol) && startsWithLess(peekToken()));
+
+  SourceLoc ProtocolLoc = consumeToken();
+  SourceLoc LAngleLoc = consumeStartingLess();
+
+  // Parse the type-composition-list.
+  ParserStatus Status;
+  SmallVector<TypeRepr *, 4> Protocols;
+  bool IsEmpty = startsWithGreater(Tok);
+  if (!IsEmpty) {
+    do {
+      // Parse the type-identifier.
+      ParserResult<TypeRepr> Protocol = parseTypeIdentifier();
+      Status |= Protocol;
+      if (auto *ident =
+            dyn_cast_or_null<IdentTypeRepr>(Protocol.getPtrOrNull()))
+        Protocols.push_back(ident);
+    } while (consumeIf(tok::comma));
+  }
+
+  // Check for the terminating '>'.
+  SourceLoc RAngleLoc = PreviousLoc;
+  if (startsWithGreater(Tok)) {
+    RAngleLoc = consumeStartingGreater();
+  } else {
+    if (Status.isSuccess()) {
+      diagnose(Tok, diag::expected_rangle_protocol);
+      diagnose(LAngleLoc, diag::opening_angle);
+      Status.setIsParseError();
+    }
+    
+    // Skip until we hit the '>'.
+    RAngleLoc = skipUntilGreaterInTypeList(/*protocolComposition=*/true);
+  }
+
+  auto composition = ProtocolCompositionTypeRepr::create(
+    Context, Protocols, ProtocolLoc, {LAngleLoc, RAngleLoc});
+
+  if (Status.isSuccess()) {
+    // Only if we have complete protocol<...> construct, diagnose deprecated.
+    SmallString<32> replacement;
+    if (Protocols.empty()) {
+      replacement = "Any";
+    } else {
+      auto extractText = [&](IdentTypeRepr *Ty) -> StringRef {
+        auto SourceRange = Ty->getSourceRange();
+        return SourceMgr.extractText(
+          Lexer::getCharSourceRangeFromSourceRange(SourceMgr, SourceRange));
+      };
+      auto Begin = Protocols.begin();
+      replacement += extractText(*Begin);
+      while (++Begin != Protocols.end()) {
+        replacement += " & ";
+        replacement += extractText(*Begin);
+      }
+    }
+
+    // Copy trailing content after '>' to the replacement string.
+    // FIXME: lexer should smartly separate '>' and trailing contents like '?'.
+    StringRef TrailingContent = L->getTokenAt(RAngleLoc).getRange().str().
+      substr(1);
+    if (!TrailingContent.empty()) {
+      if (Protocols.size() > 1) {
+        replacement.insert(replacement.begin(), '(');
+        replacement += ")";
+      }
+      replacement += TrailingContent;
+    }
+
+    // Replace 'protocol<T1, T2>' with 'T1 & T2'
+    diagnose(ProtocolLoc,
+      IsEmpty              ? diag::deprecated_any_composition :
+      Protocols.size() > 1 ? diag::deprecated_protocol_composition :
+                             diag::deprecated_protocol_composition_single)
+      .highlight(composition->getSourceRange())
+      .fixItReplace(composition->getSourceRange(), replacement);
+  }
+
+  return makeParserResult(Status, composition);
+}
 
 /// parseTypeTupleBody
 ///   type-tuple:

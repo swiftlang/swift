@@ -846,6 +846,7 @@ public:
 
   ParserResult<TypeRepr> parseTypeIdentifier();
   ParserResult<TypeRepr> parseTypeIdentifierOrTypeComposition();
+  ParserResult<TypeRepr> parseOldStyleProtocolComposition();
   ParserResult<CompositionTypeRepr> parseAnyType();
 
   ParserResult<TupleTypeRepr> parseTypeTupleBody();
