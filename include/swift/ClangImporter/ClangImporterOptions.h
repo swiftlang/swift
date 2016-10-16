@@ -70,6 +70,10 @@ public:
 
   /// If true ignore the swift bridged attribute.
   bool DisableSwiftBridgeAttr = false;
+
+  /// When set, don't validate module system headers. If a header is modified
+  /// and this is not set, clang will rebuild the module.
+  bool DisableModulesValidateSystemHeaders = false;
 };
 
 } // end namespace swift

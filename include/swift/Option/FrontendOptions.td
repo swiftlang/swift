@@ -227,6 +227,9 @@ def disable_sil_linking : Flag<["-"], "disable-sil-linking">,
 def dump_clang_diagnostics : Flag<["-"], "dump-clang-diagnostics">,
   HelpText<"Dump Clang diagnostics to stderr">;
 
+def disable_modules_validate_system_headers : Flag<["-"], "disable-modules-validate-system-headers">,
+  HelpText<"Disable modules validate system headers in the clang importer">;
+
 def emit_verbose_sil : Flag<["-"], "emit-verbose-sil">,
   HelpText<"Emit locations during SIL emission">;
 

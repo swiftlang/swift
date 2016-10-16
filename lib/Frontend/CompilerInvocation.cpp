@@ -965,6 +965,8 @@ static bool ParseClangImporterArgs(ClangImporterOptions &Opts,
 
   Opts.DisableSwiftBridgeAttr |= Args.hasArg(OPT_disable_swift_bridge_attr);
 
+  Opts.DisableModulesValidateSystemHeaders |= Args.hasArg(OPT_disable_modules_validate_system_headers);
+
   return false;
 }
 
