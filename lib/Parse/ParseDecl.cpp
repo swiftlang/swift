@@ -2415,10 +2415,10 @@ ParserStatus Parser::parseInheritance(SmallVectorImpl<TypeLoc> &Inherited,
     bool usesDeprecatedCompositionSyntax = Tok.is(tok::kw_protocol) && startsWithLess(peekToken());
     bool isAny = Tok.is(tok::kw_Any); // We allow (redundant) inheritance from Any
 
-    auto ParsedTypeResult = parseTypeIdentifierOrTypeComposition();
+    auto ParsedTypeResult = parseTypeSimpleOrComposition();
     Status |= ParsedTypeResult;
 
-    // Cannot inherit from composition
+    // Recover and emit nice diagnostic for composition.
     if (auto Composition = dyn_cast_or_null<CompositionTypeRepr>(
           ParsedTypeResult.getPtrOrNull())) {
       // Record the protocols inside the composition.

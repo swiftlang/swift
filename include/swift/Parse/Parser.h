@@ -837,6 +837,11 @@ public:
   parseTypeIdentifierWithRecovery(Diag<> MessageID,
                                   Diag<TypeLoc> NonIdentifierTypeMessageID);
 
+  ParserResult<TypeRepr> parseTypeSimpleOrComposition();
+  ParserResult<TypeRepr>
+    parseTypeSimpleOrComposition(Diag<> MessageID,
+                                 bool HandleCodeCompletion = true);
+
   ParserResult<TypeRepr> parseTypeSimple();
   ParserResult<TypeRepr> parseTypeSimple(Diag<> MessageID,
                                          bool HandleCodeCompletion = true);
@@ -845,7 +850,6 @@ public:
                              SourceLoc &RAngleLoc);
 
   ParserResult<TypeRepr> parseTypeIdentifier();
-  ParserResult<TypeRepr> parseTypeIdentifierOrTypeComposition();
   ParserResult<TypeRepr> parseOldStyleProtocolComposition();
   ParserResult<CompositionTypeRepr> parseAnyType();
 
