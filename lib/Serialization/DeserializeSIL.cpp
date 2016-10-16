@@ -1278,7 +1278,6 @@ bool SILDeserializer::readSILInstruction(SILFunction *Fn, SILBasicBlock *BB,
   UNARY_INSTRUCTION(DeinitExistentialAddr)
   UNARY_INSTRUCTION(DestroyAddr)
   UNARY_INSTRUCTION(IsNonnull)
-  UNARY_INSTRUCTION(Load)
   UNARY_INSTRUCTION(Return)
   UNARY_INSTRUCTION(Throw)
   UNARY_INSTRUCTION(FixLifetime)
@@ -1294,6 +1293,15 @@ bool SILDeserializer::readSILInstruction(SILFunction *Fn, SILBasicBlock *BB,
   UNARY_INSTRUCTION(IsUniqueOrPinned)
 #undef UNARY_INSTRUCTION
 #undef REFCOUNTING_INSTRUCTION
+
+  case ValueKind::LoadInst: {
+    auto Ty = MF->getType(TyID);
+    auto Qualifier = LoadOwnershipQualifier(Attr);
+    ResultVal = Builder.createLoad(
+        Loc, getLocalValue(ValID, getSILType(Ty, (SILValueCategory)TyCategory)),
+        Qualifier);
+    break;
+  }
 
   case ValueKind::LoadUnownedInst: {
     auto Ty = MF->getType(TyID);
@@ -1324,9 +1332,9 @@ bool SILDeserializer::readSILInstruction(SILFunction *Fn, SILBasicBlock *BB,
     auto Ty = MF->getType(TyID);
     SILType addrType = getSILType(Ty, (SILValueCategory)TyCategory);
     SILType ValType = addrType.getObjectType();
-    ResultVal = Builder.createStore(Loc,
-                    getLocalValue(ValID, ValType),
-                    getLocalValue(ValID2, addrType));
+    auto Qualifier = StoreOwnershipQualifier(Attr);
+    ResultVal = Builder.createStore(Loc, getLocalValue(ValID, ValType),
+                                    getLocalValue(ValID2, addrType), Qualifier);
     break;
   }
   case ValueKind::StoreUnownedInst: {
