@@ -137,3 +137,16 @@ typealias C2 = protocol<P1, Any> // expected-warning {{'protocol<...>' compositi
 typealias D = protocol<P1> // expected-warning {{'protocol<...>' composition syntax is deprecated and not needed here}} {{15-27=P1}}
 typealias E = protocol<Any> // expected-warning {{'protocol<...>' composition syntax is deprecated and not needed here}} {{15-28=Any}}
 typealias F = protocol<Any, Any> // expected-warning {{'protocol<...>' composition syntax is deprecated and not needed here}} {{15-33=Any}}
+
+typealias T01 = P1.Protocol & P2 // expected-error {{non-protocol type 'P1.Protocol' cannot be used within a protocol composition}}
+typealias T02 = P1.Type & P2 // expected-error {{non-protocol type 'P1.Type' cannot be used within a protocol composition}}
+typealias T03 = P1? & P2 // expected-error {{non-protocol type 'P1?' cannot be used within a protocol composition}}
+typealias T04 = P1 & P2! // expected-error {{non-protocol type 'P2!' cannot be used within a protocol composition}} expected-error {{implicitly unwrapped optionals}} {{24-25=?}}
+typealias T05 = P1 & P2 -> P3 // expected-error {{single argument function types require parentheses}} {{17-17=(}} {{24-24=)}}
+typealias T06 = P1 -> P2 & P3 // expected-error {{single argument function types require parentheses}} {{17-17=(}} {{19-19=)}}
+
+struct S01: P5 & P6 {} // expected-error {{protocol composition is neither allowed nor needed here}} {{none}}
+struct S02: P5? & P6 {} // expected-error {{inheritance from non-named type 'P5?'}}
+struct S03: Optional<P5> & P6 {} // expected-error {{inheritance from non-protocol type 'Optional<P5>'}} expected-error {{protocol composition is neither allowed nor needed here}}
+struct S04<T : P5 & (P6)> {} // expected-error {{inheritance from non-named type '(P6)'}}
+struct S05<T> where T : P5? & P6 {} // expected-error {{inheritance from non-named type 'P5?'}}

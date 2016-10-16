@@ -2412,10 +2412,13 @@ ParserStatus Parser::parseInheritance(SmallVectorImpl<TypeLoc> &Inherited,
       continue;
     }
 
-    bool usesDeprecatedCompositionSyntax = Tok.is(tok::kw_protocol) && startsWithLess(peekToken());
+    bool usesDeprecatedCompositionSyntax =
+      Tok.is(tok::kw_protocol) && startsWithLess(peekToken());
     bool isAny = Tok.is(tok::kw_Any); // We allow (redundant) inheritance from Any
 
-    auto ParsedTypeResult = parseTypeSimpleOrComposition();
+    auto ParsedTypeResult = parseTypeForInheritance(
+        diag::expected_identifier_for_type,
+        diag::expected_ident_type_in_inheritance);
     Status |= ParsedTypeResult;
 
     // Recover and emit nice diagnostic for composition.

@@ -824,18 +824,19 @@ public:
   ParserResult<TypeRepr> parseType(Diag<> MessageID,
                                    bool HandleCodeCompletion = true);
 
-  /// \brief Parse any type, but diagnose all types except type-identifier.
+  /// \brief Parse any type, but diagnose all types except type-identifier or
+  /// type-composition with non-type-identifier.
   ///
-  /// In some places the grammar allows type-identifier, but when it is not
-  /// ambiguous, we want to parse any type for recovery purposes.
+  /// In some places the grammar allows only type-identifier, but when it is
+  /// not ambiguous, we want to parse any type for recovery purposes.
   ///
   /// \param MessageID a generic diagnostic for a syntax error in the type
   /// \param NonIdentifierTypeMessageID a diagnostic for a non-identifier type
   ///
-  /// \returns null, IdentTypeRepr or ErrorTypeRepr.
+  /// \returns null, IdentTypeRepr, CompositionTypeRepr or ErrorTypeRepr.
   ParserResult<TypeRepr>
-  parseTypeIdentifierWithRecovery(Diag<> MessageID,
-                                  Diag<TypeLoc> NonIdentifierTypeMessageID);
+  parseTypeForInheritance(Diag<> MessageID,
+                          Diag<TypeLoc> NonIdentifierTypeMessageID);
 
   ParserResult<TypeRepr> parseTypeSimpleOrComposition();
   ParserResult<TypeRepr>

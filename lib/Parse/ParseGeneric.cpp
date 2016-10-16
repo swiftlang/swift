@@ -71,7 +71,8 @@ Parser::parseGenericParameters(SourceLoc LAngleLoc) {
       ParserResult<TypeRepr> Ty;
       
       if (Tok.isAny(tok::identifier, tok::code_complete, tok::kw_protocol, tok::kw_Any)) {
-        Ty = parseTypeSimpleOrComposition();
+        Ty = parseTypeForInheritance(diag::expected_identifier_for_type,
+                                     diag::expected_ident_type_in_inheritance);
       } else if (Tok.is(tok::kw_class)) {
         diagnose(Tok, diag::unexpected_class_constraint);
         diagnose(Tok, diag::suggest_anyobject, Name)
@@ -267,7 +268,9 @@ ParserStatus Parser::parseGenericWhereClause(
       SourceLoc ColonLoc = consumeToken();
 
       // Parse the protocol or composition.
-      ParserResult<TypeRepr> Protocol = parseTypeSimpleOrComposition();
+      ParserResult<TypeRepr> Protocol = parseTypeForInheritance(
+          diag::expected_identifier_for_type,
+          diag::expected_ident_type_in_inheritance);
       
       if (Protocol.isNull()) {
         Status.setIsParseError();
