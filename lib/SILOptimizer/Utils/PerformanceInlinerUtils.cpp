@@ -1,4 +1,4 @@
-//===--- PerformanceInlinerUtils.cpp - Peformance inliner utilities. ------===//
+//===--- PerformanceInlinerUtils.cpp - Performance inliner utilities. -----===//
 //
 // This source file is part of the Swift.org open source project
 //
