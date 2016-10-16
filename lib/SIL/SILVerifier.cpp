@@ -3490,12 +3490,12 @@ public:
 
 /// verify - Run the SIL verifier to make sure that the SILFunction follows
 /// invariants.
-void SILFunction::verify(bool SingleFunction) const {
+void SILFunction::verify(bool SingleFunction, bool EnforceSILOwnership) const {
 #ifndef NDEBUG
   // Please put all checks in visitSILFunction in SILVerifier, not here. This
   // ensures that the pretty stack trace in the verifier is included with the
   // back trace when the verifier crashes.
-  SILVerifier(*this, SingleFunction).verify();
+  SILVerifier(*this, SingleFunction, EnforceSILOwnership).verify();
 #endif
 }
 
@@ -3625,7 +3625,7 @@ void SILGlobalVariable::verify() const {
 }
 
 /// Verify the module.
-void SILModule::verify() const {
+void SILModule::verify(bool EnforceSILOwnership) const {
 #ifndef NDEBUG
   // Uniquing set to catch symbol name collisions.
   llvm::StringSet<> symbolNames;
@@ -3636,7 +3636,7 @@ void SILModule::verify() const {
       llvm::errs() << "Symbol redefined: " << f.getName() << "!\n";
       assert(false && "triggering standard assertion failure routine");
     }
-    f.verify(/*SingleFunction=*/ false);
+    f.verify(/*SingleFunction=*/false, EnforceSILOwnership);
   }
 
   // Check all globals.
