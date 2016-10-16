@@ -59,12 +59,6 @@ ParserResult<TypeRepr> Parser::parseTypeSimple(Diag<> MessageID,
   consumeIf(tok::kw_inout, InOutLoc);
 
   switch (Tok.getKind()) {
-  case tok::kw_protocol:
-    if (startsWithLess(peekToken())) {
-      ty = parseOldStyleProtocolComposition();
-      break;
-    }
-    SWIFT_FALLTHROUGH;
   case tok::kw_Self:
   case tok::kw_Any:
   case tok::identifier:
@@ -93,6 +87,12 @@ ParserResult<TypeRepr> Parser::parseTypeSimple(Diag<> MessageID,
   case tok::l_square:
     ty = parseTypeCollection();
     break;
+  case tok::kw_protocol:
+    if (startsWithLess(peekToken())) {
+      ty = parseOldStyleProtocolComposition();
+      break;
+    }
+    SWIFT_FALLTHROUGH;
   default:
     diagnose(Tok, MessageID);
     if (Tok.isKeyword() && !Tok.isAtStartOfLine()) {
