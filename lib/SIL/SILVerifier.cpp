@@ -102,6 +102,7 @@ class SILVerifier : public SILVerifierBase<SILVerifier> {
   const SILInstruction *CurInstruction = nullptr;
   DominanceInfo *Dominance = nullptr;
   bool SingleFunction = true;
+  bool EnforceSILOwnership;
 
   SILVerifier(const SILVerifier&) = delete;
   void operator=(const SILVerifier&) = delete;
@@ -406,9 +407,11 @@ public:
     }
   }
 
-  SILVerifier(const SILFunction &F, bool SingleFunction=true)
-    : M(F.getModule().getSwiftModule()), F(F), TC(F.getModule().Types),
-      OpenedArchetypes(F), Dominance(nullptr), SingleFunction(SingleFunction) {
+  SILVerifier(const SILFunction &F, bool SingleFunction = true,
+              bool EnforceSILOwnership = false)
+      : M(F.getModule().getSwiftModule()), F(F), TC(F.getModule().Types),
+        OpenedArchetypes(F), Dominance(nullptr), SingleFunction(SingleFunction),
+        EnforceSILOwnership(EnforceSILOwnership) {
     if (F.isExternalDeclaration())
       return;
       
@@ -1113,7 +1116,9 @@ public:
     // Ownership semantic checks.
     switch (LI->getOwnershipQualifier()) {
     case LoadOwnershipQualifier::Unqualified:
-      // Nothing to do here.
+      // We should not see loads with unqualified ownership when SILOwnership is
+      // enabled.
+      require(!EnforceSILOwnership, "Invalid load with unqualified ownership");
       break;
     case LoadOwnershipQualifier::Copy:
     case LoadOwnershipQualifier::Take:
@@ -1142,7 +1147,9 @@ public:
     // Perform ownership checks.
     switch (SI->getOwnershipQualifier()) {
     case StoreOwnershipQualifier::Unqualified:
-      // Nothing to do here.
+      // We should not see loads with unqualified ownership when SILOwnership is
+      // enabled.
+      require(!EnforceSILOwnership, "Invalid load with unqualified ownership");
       break;
     case StoreOwnershipQualifier::Init:
     case StoreOwnershipQualifier::Assign:
