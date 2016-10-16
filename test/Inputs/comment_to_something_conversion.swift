@@ -109,10 +109,9 @@ public enum A012_AttachToEntities {
 
 @objc public class ClosingComments {
 // CHECK: {{.*}}DocCommentAsXML=none
-
   /// Some comment. */
   public func closingComment() {}
-// CHECK: DocCommentAsXML=[<Function file="{{.*}}" line="{{.*}}" column="{{.*}}"><Name>closingComment()</Name><USR>s:F14swift_ide_test28codeListingWithOtherLanguageFT_T_</USR><Declaration>public func closingComment()</Declaration><Abstract><Para>Some comment. */</Para></Function>]
+// CHECK: DocCommentAsXML=[<Function file="{{.*}}" line="{{.*}}" column="{{.*}}"><Name>closingComment()</Name><USR>s:FC14swift_ide_test15ClosingComments14closingCommentFT_T_</USR><Declaration>public func closingComment()</Declaration><Abstract><Para>Some comment. */</Para></Abstract></Function>]
 }
 
 @objc public class ClosureContainer {

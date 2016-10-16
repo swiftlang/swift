@@ -8,9 +8,7 @@
 
 // REQUIRES: objc_interop
 
-// CHECK: /**
-// CHECK-NEXT: What a nightmare!
-// CHECK: */
+// CHECK: /// What a nightmare!
 // CHECK-LABEL: double (^ _Nonnull block_nightmare(SWIFT_NOESCAPE float (^ _Nonnull x)(NSInteger)))(char);
 
 /// What a nightmare!
