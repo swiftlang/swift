@@ -1,4 +1,4 @@
-//===- OwnershipModelEliminator.cpp - Eliminate SILOwnership Instructions -===//
+//===--- OwnershipModelEliminator.cpp - Eliminate SILOwnership Instr. -----===//
 //
 // This source file is part of the Swift.org open source project
 //
