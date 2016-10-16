@@ -144,6 +144,9 @@ typealias T03 = P1? & P2 // expected-error {{non-protocol type 'P1?' cannot be u
 typealias T04 = P1 & P2! // expected-error {{non-protocol type 'P2!' cannot be used within a protocol composition}} expected-error {{implicitly unwrapped optionals}} {{24-25=?}}
 typealias T05 = P1 & P2 -> P3 // expected-error {{single argument function types require parentheses}} {{17-17=(}} {{24-24=)}}
 typealias T06 = P1 -> P2 & P3 // expected-error {{single argument function types require parentheses}} {{17-17=(}} {{19-19=)}}
+typealias T07 = P1 & protocol<P2, P3> // expected-warning {{protocol<...>' composition syntax is deprecated; join the protocols using '&'}} {{22-38=P2 & P3}}
+func fT07(x: T07) -> P1 & P2 & P3 { return x } // OK, 'P1 & protocol<P2, P3>' is parsed as 'P1 & P2 & P3'.
+let _: P1 & P2 & P3 -> P1 & P2 & P3 = fT07 // expected-error {{single argument function types require parentheses}} {{8-8=(}} {{20-20=)}}
 
 struct S01: P5 & P6 {} // expected-error {{protocol composition is neither allowed nor needed here}} {{none}}
 struct S02: P5? & P6 {} // expected-error {{inheritance from non-named type 'P5?'}}
