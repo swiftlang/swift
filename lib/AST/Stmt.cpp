@@ -309,8 +309,13 @@ SourceRange StmtConditionElement::getSourceRange() const {
       Start = IntroducerLoc;
     else
       Start = getPattern()->getStartLoc();
-
-    return SourceRange(Start, getInitializer()->getEndLoc());
+    
+    SourceLoc End = getInitializer()->getEndLoc();
+    if (Start.isValid() && End.isValid()) {
+      return SourceRange(Start, End);
+    } else {
+      return SourceRange();
+    }
   }
 }
 
@@ -321,9 +326,18 @@ SourceLoc StmtConditionElement::getStartLoc() const {
   case StmtConditionElement::CK_Availability:
     return getAvailability()->getStartLoc();
   case StmtConditionElement::CK_PatternBinding:
+    SourceLoc Start;
     if (IntroducerLoc.isValid())
-      return IntroducerLoc;
-    return getPattern()->getStartLoc();
+      Start = IntroducerLoc;
+    else
+      Start = getPattern()->getStartLoc();
+    
+    SourceLoc End = getInitializer()->getEndLoc();
+    if (Start.isValid() && End.isValid()) {
+      return Start;
+    } else {
+      return SourceLoc();
+    }
   }
 }
 
@@ -334,7 +348,18 @@ SourceLoc StmtConditionElement::getEndLoc() const {
   case StmtConditionElement::CK_Availability:
     return getAvailability()->getEndLoc();
   case StmtConditionElement::CK_PatternBinding:
-    return getInitializer()->getEndLoc();
+    SourceLoc Start;
+    if (IntroducerLoc.isValid())
+      Start = IntroducerLoc;
+    else
+      Start = getPattern()->getStartLoc();
+  
+    SourceLoc End = getInitializer()->getEndLoc();
+    if (Start.isValid() && End.isValid()) {
+      return End;
+    } else {
+      return SourceLoc();
+    }
   }
 }
 
