@@ -1100,6 +1100,7 @@ public:
     require(ILI->getType().is<BuiltinIntegerType>(),
             "invalid integer literal type");
   }
+
   void checkLoadInst(LoadInst *LI) {
     require(LI->getType().isObject(), "Result of load must be an object");
     require(LI->getType().isLoadable(LI->getModule()),
@@ -1108,6 +1109,24 @@ public:
             "Load operand must be an address");
     require(LI->getOperand()->getType().getObjectType() == LI->getType(),
             "Load operand type and result type mismatch");
+
+    // Ownership semantic checks.
+    switch (LI->getOwnershipQualifier()) {
+    case LoadOwnershipQualifier::Unqualified:
+      // Nothing to do here.
+      break;
+    case LoadOwnershipQualifier::Copy:
+    case LoadOwnershipQualifier::Take:
+      // TODO: Could probably make this a bit stricter.
+      require(!LI->getType().isTrivial(LI->getModule()),
+              "load [copy] or load [take] can only be applied to non-trivial "
+              "types");
+      break;
+    case LoadOwnershipQualifier::Trivial:
+      require(LI->getType().isTrivial(LI->getModule()),
+              "A load with trivial ownership must load a trivial type");
+      break;
+    }
   }
 
   void checkStoreInst(StoreInst *SI) {
@@ -1119,6 +1138,24 @@ public:
             "Must store to an address dest");
     require(SI->getDest()->getType().getObjectType() == SI->getSrc()->getType(),
             "Store operand type and dest type mismatch");
+
+    // Perform ownership checks.
+    switch (SI->getOwnershipQualifier()) {
+    case StoreOwnershipQualifier::Unqualified:
+      // Nothing to do here.
+      break;
+    case StoreOwnershipQualifier::Init:
+    case StoreOwnershipQualifier::Assign:
+      // TODO: Could probably make this a bit stricter.
+      require(!SI->getSrc()->getType().isTrivial(SI->getModule()),
+              "store [init] or store [assign] can only be applied to "
+              "non-trivial types");
+      break;
+    case StoreOwnershipQualifier::Trivial:
+      require(SI->getSrc()->getType().isTrivial(SI->getModule()),
+              "A store with trivial ownership must store a trivial type");
+      break;
+    }
   }
 
   void checkAssignInst(AssignInst *AI) {
