@@ -1622,8 +1622,8 @@ namespace {
                                       TypeResolutionOptions options);
     Type resolveTupleType(TupleTypeRepr *repr,
                           TypeResolutionOptions options);
-    Type resolveProtocolCompositionType(ProtocolCompositionTypeRepr *repr,
-                                        TypeResolutionOptions options);
+    Type resolveCompositionType(CompositionTypeRepr *repr,
+                                TypeResolutionOptions options);
     Type resolveMetatypeType(MetatypeTypeRepr *repr,
                              TypeResolutionOptions options);
     Type resolveProtocolType(ProtocolTypeRepr *repr,
@@ -1730,10 +1730,8 @@ Type TypeResolver::resolveType(TypeRepr *repr, TypeResolutionOptions options) {
   case TypeReprKind::Named:
     llvm_unreachable("NamedTypeRepr only shows up as an element of Tuple");
 
-  case TypeReprKind::ProtocolComposition:
-    return resolveProtocolCompositionType(
-             cast<ProtocolCompositionTypeRepr>(repr),
-             options);
+  case TypeReprKind::Composition:
+    return resolveCompositionType(cast<CompositionTypeRepr>(repr), options);
 
   case TypeReprKind::Metatype:
     return resolveMetatypeType(cast<MetatypeTypeRepr>(repr), options);
@@ -2616,11 +2614,10 @@ Type TypeResolver::resolveTupleType(TupleTypeRepr *repr,
   return TupleType::get(elements, Context);
 }
 
-Type TypeResolver::resolveProtocolCompositionType(
-                                         ProtocolCompositionTypeRepr *repr,
-                                         TypeResolutionOptions options) {
+Type TypeResolver::resolveCompositionType(CompositionTypeRepr *repr,
+                                          TypeResolutionOptions options) {
   SmallVector<Type, 4> ProtocolTypes;
-  for (auto tyR : repr->getProtocols()) {
+  for (auto tyR : repr->getTypes()) {
     Type ty = TC.resolveType(tyR, DC, withoutContext(options), Resolver);
     if (!ty || ty->hasError()) return ty;
 

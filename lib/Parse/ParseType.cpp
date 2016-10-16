@@ -411,8 +411,9 @@ ParserResult<TypeRepr> Parser::parseTypeIdentifierOrTypeComposition() {
     SourceLoc LAngleLoc = consumeStartingLess();
     
     // Parse the type-composition-list.
+
     ParserStatus Status;
-    SmallVector<IdentTypeRepr *, 4> Protocols;
+    SmallVector<TypeRepr *, 4> Protocols;
     bool IsEmpty = startsWithGreater(Tok);
     if (!IsEmpty) {
       do {
@@ -440,7 +441,7 @@ ParserResult<TypeRepr> Parser::parseTypeIdentifierOrTypeComposition() {
       RAngleLoc = skipUntilGreaterInTypeList(/*protocolComposition=*/true);
     }
 
-    auto composition = ProtocolCompositionTypeRepr::create(
+    auto composition = CompositionTypeRepr::create(
       Context, Protocols, ProtocolLoc, {LAngleLoc, RAngleLoc});
 
     if (Status.isSuccess()) {
@@ -450,7 +451,7 @@ ParserResult<TypeRepr> Parser::parseTypeIdentifierOrTypeComposition() {
       if (Protocols.empty()) {
         replacement = "Any";
       } else {
-        auto extractText = [&](IdentTypeRepr *Ty) -> StringRef {
+        auto extractText = [&](TypeRepr *Ty) -> StringRef {
           auto SourceRange = Ty->getSourceRange();
           return SourceMgr.extractText(
             Lexer::getCharSourceRangeFromSourceRange(SourceMgr, SourceRange));
@@ -494,7 +495,7 @@ ParserResult<TypeRepr> Parser::parseTypeIdentifierOrTypeComposition() {
   if (!Tok.isContextualPunctuator("&"))
     return FirstType;
   
-  SmallVector<IdentTypeRepr *, 4> Protocols;
+  SmallVector<TypeRepr *, 4> Protocols;
   ParserStatus Status;
 
   // If it is not 'Any', add it to the protocol list
@@ -511,12 +512,12 @@ ParserResult<TypeRepr> Parser::parseTypeIdentifierOrTypeComposition() {
       Protocols.push_back(ident);
   };
   
-  return makeParserResult(Status, ProtocolCompositionTypeRepr::create(
+  return makeParserResult(Status, CompositionTypeRepr::create(
     Context, Protocols, FirstTypeLoc, {FirstAmpersandLoc, PreviousLoc}));
 }
 
-ParserResult<ProtocolCompositionTypeRepr> Parser::parseAnyType() {
-  return makeParserResult(ProtocolCompositionTypeRepr
+ParserResult<CompositionTypeRepr> Parser::parseAnyType() {
+  return makeParserResult(CompositionTypeRepr
     ::createEmptyComposition(Context, consumeToken(tok::kw_Any)));
 }
 
