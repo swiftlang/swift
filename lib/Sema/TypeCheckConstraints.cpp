@@ -1232,13 +1232,11 @@ TypeExpr *PreCheckExpression::simplifyTypeExpr(Expr *E) {
 
       auto lhsExpr = binaryExpr->getArg()->getElement(0);
       if (auto *lhs = dyn_cast<TypeExpr>(lhsExpr)) {
-        if (auto *repr = dyn_cast<IdentTypeRepr>(lhs->getTypeRepr()))
-          Types.push_back(repr);
-      }
-      // If the lhs is another binary expression, we have a multi element
-      // composition: 'A & B & C' is parsed as ((A & B) & C); we get
-      // the protocols from the lhs here
-      else if (isa<BinaryExpr>(lhsExpr)) {
+        Types.push_back(lhs->getTypeRepr());
+      } else if (isa<BinaryExpr>(lhsExpr)) {
+        // If the lhs is another binary expression, we have a multi element
+        // composition: 'A & B & C' is parsed as ((A & B) & C); we get
+        // the protocols from the lhs here
         if (auto expr = simplifyTypeExpr(lhsExpr))
           if (auto *repr = dyn_cast<CompositionTypeRepr>(expr->getTypeRepr()))
             // add the protocols to our list
@@ -1253,13 +1251,11 @@ TypeExpr *PreCheckExpression::simplifyTypeExpr(Expr *E) {
       // Add the rhs which is just a TypeExpr
       auto *rhs = dyn_cast<TypeExpr>(binaryExpr->getArg()->getElement(1));
       if (!rhs) return nullptr;
-
-      if (auto *repr = dyn_cast<IdentTypeRepr>(rhs->getTypeRepr()))
-        Types.push_back(repr);
+      Types.push_back(rhs->getTypeRepr());
 
       auto CompRepr = new (TC.Context) CompositionTypeRepr(
           TC.Context.AllocateCopy(Types),
-          binaryExpr->getLoc(), binaryExpr->getSourceRange());
+          lhsExpr->getStartLoc(), binaryExpr->getSourceRange());
       return new (TC.Context) TypeExpr(TypeLoc(CompRepr, Type()));
     }
   }
