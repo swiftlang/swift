@@ -2015,6 +2015,11 @@ private:
   /// true.
   bool diagnoseAmbiguousMultiStatementClosure(ClosureExpr *closure);
 
+  /// Check the associated constraint system to see if it has any archetypes
+  /// not properly resolved or missing. If so, diagnose the problem with
+  /// an error and return true.
+  bool diagnoseArchetypeAmbiguity();
+
   /// Emit an error message about an unbound generic parameter existing, and
   /// emit notes referring to the target of a diagnostic, e.g., the function
   /// or parameter being used.
@@ -6815,6 +6820,82 @@ diagnoseAmbiguousMultiStatementClosure(ClosureExpr *closure) {
   return true;
 }
 
+/// Check the associated constraint system to see if it has any archetypes
+/// not properly resolved or missing. If so, diagnose the problem with
+/// an error and return true.
+bool FailureDiagnosis::diagnoseArchetypeAmbiguity() {
+  using Archetype = std::tuple<ArchetypeType *, ConstraintLocator *, unsigned>;
+
+  llvm::SmallVector<Archetype, 2> unboundParams;
+  // Check out all of the type variables lurking in the system.  If any are
+  // unbound archetypes, then the problem is that it couldn't be resolved.
+  for (auto tv : CS->getTypeVariables()) {
+    auto &impl = tv->getImpl();
+
+    if (impl.hasRepresentativeOrFixed())
+      continue;
+
+    // If this is a conversion to a type variable used to form an archetype,
+    // Then diagnose this as a generic parameter that could not be resolved.
+    auto archetype = impl.getArchetype();
+
+    // Only diagnose archetypes that don't have a parent, i.e., ones
+    // that correspond to generic parameters.
+    if (!archetype || archetype->getParent())
+      continue;
+
+    // Number of constraints related to particular unbound parameter
+    // is significant indicator of the problem, because if there are
+    // no constraints associated with it, that means it can't ever be resolved,
+    // such helps to diagnose situations like: struct S<A, B> { init(_ a: A) {}}
+    // because type B would have no constraints associated with it.
+    unsigned numConstraints = 0;
+    {
+      llvm::SmallVector<Constraint *, 2> constraints;
+      CS->getConstraintGraph().gatherConstraints(tv, constraints);
+
+      for (auto constraint : constraints) {
+        // We are not interested in ConformsTo constraints because
+        // such constraints specify restrictions on the archetypes themselves.
+        if (constraint->getKind() == ConstraintKind::ConformsTo)
+          continue;
+
+        // Some of the bind constraints specify relations between
+        // parent type and it's member fields/types, we are not
+        // interested in that, since it's not related to archetype resolution.
+        if (constraint->getKind() == ConstraintKind::Bind) {
+          if (auto locator = constraint->getLocator()) {
+            auto anchor = locator->getAnchor();
+            if (anchor && isa<UnresolvedDotExpr>(anchor))
+              continue;
+          }
+        }
+
+        numConstraints++;
+      }
+    }
+
+    auto locator = impl.getLocator();
+    unboundParams.push_back(
+        std::make_tuple(archetype, locator, numConstraints));
+  }
+
+  // We've found unbound generic parameters, let's diagnose
+  // based on the number of constraints each one is related to.
+  if (!unboundParams.empty()) {
+    // Let's prioritize archetypes that don't have any constraints associated.
+    std::stable_sort(unboundParams.begin(), unboundParams.end(),
+                     [](Archetype a, Archetype b) {
+                       return std::get<2>(a) < std::get<2>(b);
+                     });
+
+    auto param = unboundParams.front();
+    diagnoseUnboundArchetype(std::get<0>(param), std::get<1>(param));
+    return true;
+  }
+
+  return false;
+}
 
 /// Emit an error message about an unbound generic parameter existing, and
 /// emit notes referring to the target of a diagnostic, e.g., the function
@@ -6909,26 +6990,10 @@ void FailureDiagnosis::diagnoseUnboundArchetype(ArchetypeType *archetype,
 
 /// Emit an ambiguity diagnostic about the specified expression.
 void FailureDiagnosis::diagnoseAmbiguity(Expr *E) {
-
-  // Check out all of the type variables lurking in the system.  If any are
-  // unbound archetypes, then the problem is that it couldn't be resolved.
-  for (auto tv : CS->getTypeVariables()) {
-    if (tv->getImpl().hasRepresentativeOrFixed())
-      continue;
-    
-    
-    // If this is a conversion to a type variable used to form an archetype,
-    // Then diagnose this as a generic parameter that could not be resolved.
-    auto archetype = tv->getImpl().getArchetype();
-    
-    // Only diagnose archetypes that don't have a parent, i.e., ones
-    // that correspond to generic parameters.
-    if (archetype && !archetype->getParent()) {
-      diagnoseUnboundArchetype(archetype, tv->getImpl().getLocator());
-      return;
-    }
-    continue;
-  }
+  // First, let's try to diagnose any problems related to ambiguous
+  // archetypes (generic parameters) present in the constraint system.
+  if (diagnoseArchetypeAmbiguity())
+    return;
 
   // Unresolved/Anonymous ClosureExprs are common enough that we should give
   // them tailored diagnostics.

@@ -868,3 +868,35 @@ func test2208() {
   foo.bar(value: result) // expected-error {{cannot convert value of type 'Int' to expected argument type 'UInt'}}
   foo.bar(value: UInt(result)) // Ok
 }
+
+// SR-2164: Erroneous diagnostic when unable to infer generic type
+
+struct SR_2164<A, B> { // expected-note 3 {{'B' declared as parameter to type 'SR_2164'}} expected-note 2 {{'A' declared as parameter to type 'SR_2164'}} expected-note * {{generic type 'SR_2164' declared here}}
+  init(a: A) {}
+  init(b: B) {}
+  init(c: Int) {}
+  init(_ d: A) {}
+  init(e: A?) {}
+}
+
+struct SR_2164_Array<A, B> { // expected-note {{'B' declared as parameter to type 'SR_2164_Array'}} expected-note * {{generic type 'SR_2164_Array' declared here}}
+  init(_ a: [A]) {}
+}
+
+struct SR_2164_Dict<A: Hashable, B> { // expected-note {{'B' declared as parameter to type 'SR_2164_Dict'}} expected-note * {{generic type 'SR_2164_Dict' declared here}}
+  init(a: [A: Double]) {}
+}
+
+SR_2164(a: 0) // expected-error {{generic parameter 'B' could not be inferred}} expected-note {{explicitly specify the generic arguments to fix this issue}}
+SR_2164(b: 1) // expected-error {{generic parameter 'A' could not be inferred}} expected-note {{explicitly specify the generic arguments to fix this issue}}
+SR_2164(c: 2) // expected-error {{generic parameter 'A' could not be inferred}} expected-note {{explicitly specify the generic arguments to fix this issue}}
+SR_2164(3) // expected-error {{generic parameter 'B' could not be inferred}} expected-note {{explicitly specify the generic arguments to fix this issue}}
+SR_2164_Array([4]) // expected-error {{generic parameter 'B' could not be inferred}} expected-note {{explicitly specify the generic arguments to fix this issue}}
+SR_2164(e: 5) // expected-error {{generic parameter 'B' could not be inferred}} expected-note {{explicitly specify the generic arguments to fix this issue}}
+SR_2164_Dict(a: ["pi": 3.14]) // expected-error {{generic parameter 'B' could not be inferred}} expected-note {{explicitly specify the generic arguments to fix this issue}}
+SR_2164<Int>(a: 0) // expected-error {{generic type 'SR_2164' specialized with too few type parameters (got 1, but expected 2)}}
+SR_2164<Int>(b: 1) // expected-error {{generic type 'SR_2164' specialized with too few type parameters (got 1, but expected 2)}}
+let _ = SR_2164<Int, Bool>(a: 0)    // Ok
+let _ = SR_2164<Int, Bool>(b: true) // Ok
+SR_2164<Int, Bool, Float>(a: 0) // expected-error {{generic type 'SR_2164' specialized with too many type parameters (got 3, but expected 2)}}
+SR_2164<Int, Bool, Float>(b: 0) // expected-error {{generic type 'SR_2164' specialized with too many type parameters (got 3, but expected 2)}}
