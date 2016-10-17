@@ -48,6 +48,12 @@ TEST(SourceLoc, AssignExpr) {
       C.Ctx.getIdentifier("bb"),
       DeclNameLoc(start.getAdvancedLoc(3)),
       /*implicit*/false);
+  auto destImplicit = new (C.Ctx) UnresolvedDotExpr(
+      destBase,
+      start.getAdvancedLoc(2),
+      C.Ctx.getIdentifier("bb"),
+      DeclNameLoc(start.getAdvancedLoc(3)),
+      /*implicit*/true);
 
   auto sourceBase = new (C.Ctx) UnresolvedDeclRefExpr(
       C.Ctx.getIdentifier("cc"),
@@ -59,6 +65,13 @@ TEST(SourceLoc, AssignExpr) {
       C.Ctx.getIdentifier("dd"),
       DeclNameLoc(start.getAdvancedLoc(11)),
       /*implicit*/false);
+  auto sourceImplicit = new (C.Ctx) UnresolvedDotExpr(
+      sourceBase,
+      start.getAdvancedLoc(10),
+      C.Ctx.getIdentifier("dd"),
+      DeclNameLoc(start.getAdvancedLoc(11)),
+      /*implicit*/true);
+
 
   auto invalid = new (C.Ctx) UnresolvedDeclRefExpr(
       C.Ctx.getIdentifier("invalid"),
@@ -74,8 +87,30 @@ TEST(SourceLoc, AssignExpr) {
   EXPECT_EQ(SourceRange(start, start.getAdvancedLoc(11)),
             complete->getSourceRange());
 
+  // Implicit dest should not change the source range.
+  auto completeImplDest = new (C.Ctx) AssignExpr( destImplicit
+                                                , start.getAdvancedLoc(6)
+                                                , source, /*implicit*/false);
+  EXPECT_EQ(start, completeImplDest->getStartLoc());
+  EXPECT_EQ(start.getAdvancedLoc(6), completeImplDest->getEqualLoc());
+  EXPECT_EQ(start.getAdvancedLoc(6), completeImplDest->getLoc());
+  EXPECT_EQ(start.getAdvancedLoc(11), completeImplDest->getEndLoc());
+  EXPECT_EQ(SourceRange(start, start.getAdvancedLoc(11)),
+            completeImplDest->getSourceRange());
+
+  // Implicit source should not change the source range.
+  auto completeImplSrc = new (C.Ctx) AssignExpr( dest, start.getAdvancedLoc(6)
+                                               , sourceImplicit
+                                               , /*implicit*/false);
+  EXPECT_EQ(start, completeImplSrc->getStartLoc());
+  EXPECT_EQ(start.getAdvancedLoc(6), completeImplSrc->getEqualLoc());
+  EXPECT_EQ(start.getAdvancedLoc(6), completeImplSrc->getLoc());
+  EXPECT_EQ(start.getAdvancedLoc(11), completeImplSrc->getEndLoc());
+  EXPECT_EQ(SourceRange(start, start.getAdvancedLoc(11)),
+            completeImplSrc->getSourceRange());
+
   auto invalidSource = new (C.Ctx) AssignExpr(dest, SourceLoc(), invalid,
-                                              /*implicit*/true);
+                                              /*implicit*/false);
   EXPECT_EQ(start, invalidSource->getStartLoc());
   EXPECT_EQ(SourceLoc(), invalidSource->getEqualLoc());
   EXPECT_EQ(SourceLoc(), invalidSource->getLoc());
@@ -84,7 +119,7 @@ TEST(SourceLoc, AssignExpr) {
             invalidSource->getSourceRange());
 
   auto invalidDest = new (C.Ctx) AssignExpr(invalid, SourceLoc(), source,
-                                            /*implicit*/true);
+                                            /*implicit*/false);
   EXPECT_EQ(start.getAdvancedLoc(8), invalidDest->getStartLoc());
   EXPECT_EQ(SourceLoc(), invalidDest->getEqualLoc());
   EXPECT_EQ(SourceLoc(), invalidDest->getLoc());
@@ -93,7 +128,7 @@ TEST(SourceLoc, AssignExpr) {
             invalidDest->getSourceRange());
 
   auto invalidAll = new (C.Ctx) AssignExpr(invalid, SourceLoc(), invalid,
-                                           /*implicit*/true);
+                                           /*implicit*/false);
   EXPECT_EQ(SourceLoc(), invalidAll->getStartLoc());
   EXPECT_EQ(SourceLoc(), invalidAll->getEqualLoc());
   EXPECT_EQ(SourceLoc(), invalidAll->getLoc());
