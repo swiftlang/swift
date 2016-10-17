@@ -3038,6 +3038,31 @@ bb0(%0 : $BBB):
   return %11 : $()
 }
 
+// Check that both applies can be devirtualized by means of propagating the concrete
+// type of the existential into witness_method and apply instructions.
+// CHECK-LABEL: sil @silcombine_devirt_both_applies_of_witness_method
+// CHECK-NOT: open_existential_ref
+// CHECK-NOT: witness_method
+// CHECK: [[FR1:%.*]] = function_ref @_TTWC4nix23XXXS_3PPPS_FS1_3foofT_T_
+// CHECK: apply [[FR1]](%0)
+// CHECK: [[FR2:%.*]] = function_ref @_TTWC4nix23XXXS_3PPPS_FS1_3foofT_T_
+// CHECK: apply [[FR2]](%0)
+// CHECK: return
+sil @silcombine_devirt_both_applies_of_witness_method : $@convention(thin) (@owned XXX) -> () {
+bb0(%0 : $XXX):
+  strong_retain %0 : $XXX
+  %3 = init_existential_ref %0 : $XXX : $XXX, $PPP
+  %5 = open_existential_ref %3 : $PPP to $@opened("0AC9A62E-926E-11E6-8BF5-685B35C48C83") PPP
+  %6 = witness_method $@opened("0AC9A62E-926E-11E6-8BF5-685B35C48C83") PPP, #PPP.foo!1, %5 : $@opened("0AC9A62E-926E-11E6-8BF5-685B35C48C83") PPP : $@convention(witness_method) <τ_0_0 where τ_0_0 : PPP> (@guaranteed τ_0_0) -> ()
+  %7 = apply %6<@opened("0AC9A62E-926E-11E6-8BF5-685B35C48C83") PPP>(%5) : $@convention(witness_method) <τ_0_0 where τ_0_0 : PPP> (@guaranteed τ_0_0) -> ()
+  %8 = apply %6<@opened("0AC9A62E-926E-11E6-8BF5-685B35C48C83") PPP>(%5) : $@convention(witness_method) <τ_0_0 where τ_0_0 : PPP> (@guaranteed τ_0_0) -> ()
+  strong_release %3 : $PPP
+  %9 = tuple ()
+  strong_release %0 : $XXX
+  %11 = tuple ()
+  return %11 : $()
+}
+
 sil @_TTWC4nix23XXXS_3PPPS_FS1_3foofT_T_ : $@convention(witness_method) (@guaranteed XXX) -> ()
 
 sil_witness_table XXX: PPP module nix2 {
