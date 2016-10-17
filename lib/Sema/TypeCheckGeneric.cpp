@@ -852,7 +852,7 @@ void TypeChecker::validateGenericTypeSignature(GenericTypeDecl *typeDecl) {
   auto *parentEnv = dc->getGenericEnvironmentOfContext();
   checkGenericParamList(&builder, gp, parentSig, parentEnv, nullptr);
 
-  auto *env = builder.getGenericEnvironment();
+  auto *env = builder.getGenericEnvironment(sig);
   typeDecl->setGenericEnvironment(env);
 
   finalizeGenericParamList(gp, sig, env, typeDecl);

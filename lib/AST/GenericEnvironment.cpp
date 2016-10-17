@@ -20,13 +20,14 @@
 using namespace swift;
 
 GenericEnvironment::GenericEnvironment(
-    ArrayRef<GenericTypeParamType *> genericParamTypes,
-    TypeSubstitutionMap interfaceToArchetypeMap) {
+    GenericSignature *signature,
+    TypeSubstitutionMap interfaceToArchetypeMap)
+  : Signature(signature)
+{
 
   assert(!interfaceToArchetypeMap.empty());
-
-  for (auto *paramTy : genericParamTypes)
-    GenericParams.push_back(paramTy);
+  assert(interfaceToArchetypeMap.size() == signature->getGenericParams().size()
+         && "incorrect number of parameters");
 
   // Build a mapping in both directions, making sure to canonicalize the
   // interface type where it is used as a key, so that substitution can
@@ -80,7 +81,7 @@ Type GenericEnvironment::mapTypeIntoContext(GenericTypeParamType *type) const {
 
 GenericTypeParamType *GenericEnvironment::getSugaredType(
     GenericTypeParamType *type) const {
-  for (auto *sugaredType : GenericParams)
+  for (auto *sugaredType : getGenericParams())
     if (sugaredType->isEqual(type))
       return sugaredType;
 
@@ -97,9 +98,9 @@ GenericEnvironment::getForwardingSubstitutions(
   };
 
   SmallVector<Substitution, 4> result;
-  sig->getSubstitutions(*M, InterfaceToArchetypeMap,
-                        lookupConformanceFn, result);
-  return sig->getASTContext().AllocateCopy(result);
+  getGenericSignature()->getSubstitutions(*M, InterfaceToArchetypeMap,
+                                          lookupConformanceFn, result);
+  return getGenericSignature()->getASTContext().AllocateCopy(result);
 }
 
 SubstitutionMap GenericEnvironment::
@@ -107,7 +108,7 @@ getSubstitutionMap(ModuleDecl *mod,
                    GenericSignature *sig,
                    ArrayRef<Substitution> subs) const {
   SubstitutionMap result;
-  getSubstitutionMap(mod, sig, subs, result);
+  getSubstitutionMap(mod, getGenericSignature(), subs, result);
   return result;
 }
 
@@ -116,7 +117,7 @@ getSubstitutionMap(ModuleDecl *mod,
                    GenericSignature *sig,
                    ArrayRef<Substitution> subs,
                    SubstitutionMap &result) const {
-  for (auto depTy : sig->getAllDependentTypes()) {
+  for (auto depTy : getGenericSignature()->getAllDependentTypes()) {
 
     // Map the interface type to a context type.
     auto contextTy = depTy.subst(mod, InterfaceToArchetypeMap, SubstOptions());
@@ -130,7 +131,7 @@ getSubstitutionMap(ModuleDecl *mod,
     result.addConformances(CanType(archetype), sub.getConformances());
   }
 
-  for (auto reqt : sig->getRequirements()) {
+  for (auto reqt : getGenericSignature()->getRequirements()) {
     if (reqt.getKind() != RequirementKind::SameType)
       continue;
 

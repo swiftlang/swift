@@ -245,7 +245,8 @@ private:
   bool writeGenericParams(const GenericParamList *genericParams);
 
   /// Writes a set of generic requirements.
-  void writeGenericRequirements(ArrayRef<Requirement> requirements);
+  void writeGenericRequirements(ArrayRef<Requirement> requirements,
+                                const std::array<unsigned, 256> &abbrCodes);
 
   /// Writes a list of protocol conformances.
   void writeConformances(ArrayRef<ProtocolConformanceRef> conformances,
@@ -430,8 +431,8 @@ public:
 
   /// Writes a generic environment.
   void writeGenericEnvironment(GenericEnvironment *env,
-                         const std::array<unsigned, 256> &abbrCodes);
-
+                               const std::array<unsigned, 256> &abbrCodes,
+                               bool SILMode);
 };
 } // end namespace serialization
 } // end namespace swift

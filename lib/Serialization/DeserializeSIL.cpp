@@ -493,7 +493,10 @@ SILFunction *SILDeserializer::readSILFunction(DeclID FID,
   GenericEnvironment *genericEnv = nullptr;
   if (!declarationOnly) {
     SmallVector<GenericTypeParamType *, 4> genericParamTypes;
-    genericEnv = MF->readGenericEnvironment(genericParamTypes, SILCursor);
+    auto signature = fn->getLoweredFunctionType()->getGenericSignature();
+    genericEnv = MF->readGenericEnvironment(
+        genericParamTypes, SILCursor,
+        signature ? signature->getRequirements() : ArrayRef<Requirement>());
   }
 
   // If the next entry is the end of the block, then this function has

@@ -19,6 +19,7 @@
 
 #include "swift/AST/ProtocolConformance.h"
 #include "swift/AST/SubstitutionMap.h"
+#include "swift/AST/GenericSignature.h"
 
 namespace swift {
 
@@ -28,13 +29,17 @@ class GenericTypeParamType;
 /// Describes the mapping between archetypes and interface types for the
 /// generic parameters of a DeclContext.
 class GenericEnvironment final {
-  SmallVector<GenericTypeParamType *, 4> GenericParams;
+  GenericSignature *Signature;
   TypeSubstitutionMap ArchetypeToInterfaceMap;
   TypeSubstitutionMap InterfaceToArchetypeMap;
 
 public:
+  GenericSignature *getGenericSignature() const {
+    return Signature;
+  }
+
   ArrayRef<GenericTypeParamType *> getGenericParams() const {
-    return GenericParams;
+    return Signature->getGenericParams();
   }
 
   const TypeSubstitutionMap &getArchetypeToInterfaceMap() const {
@@ -45,12 +50,12 @@ public:
     return InterfaceToArchetypeMap;
   }
 
-  GenericEnvironment(ArrayRef<GenericTypeParamType *> genericParamTypes,
+  GenericEnvironment(GenericSignature *signature,
                      TypeSubstitutionMap interfaceToArchetypeMap);
 
   static
   GenericEnvironment * get(ASTContext &ctx,
-                           ArrayRef<GenericTypeParamType *> genericParamTypes,
+                           GenericSignature *signature,
                            TypeSubstitutionMap interfaceToArchetypeMap);
 
   /// Make vanilla new/delete illegal.

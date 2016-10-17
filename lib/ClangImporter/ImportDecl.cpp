@@ -6883,7 +6883,7 @@ buildGenericSignature(GenericParamList *genericParams,
   }
 
   auto *sig = builder.getGenericSignature();
-  auto *env = builder.getGenericEnvironment();
+  auto *env = builder.getGenericEnvironment(sig);
 
   return std::make_pair(sig, env);
 }

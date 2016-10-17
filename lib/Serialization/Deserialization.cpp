@@ -782,10 +782,11 @@ GenericParamList *ModuleFile::maybeReadGenericParams(DeclContext *DC,
 }
 
 void ModuleFile::readGenericRequirements(
-                   SmallVectorImpl<Requirement> &requirements) {
+                   SmallVectorImpl<Requirement> &requirements,
+                   llvm::BitstreamCursor &Cursor) {
   using namespace decls_block;
 
-  BCOffsetRAII lastRecordOffset(DeclTypeCursor);
+  BCOffsetRAII lastRecordOffset(Cursor);
   SmallVector<uint64_t, 8> scratch;
   StringRef blobData;
 
@@ -793,12 +794,12 @@ void ModuleFile::readGenericRequirements(
     lastRecordOffset.reset();
     bool shouldContinue = true;
 
-    auto entry = DeclTypeCursor.advance(AF_DontPopBlockAtEnd);
+    auto entry = Cursor.advance(AF_DontPopBlockAtEnd);
     if (entry.Kind != llvm::BitstreamEntry::Record)
       break;
 
     scratch.clear();
-    unsigned recordID = DeclTypeCursor.readRecord(entry.ID, scratch, &blobData);
+    unsigned recordID = Cursor.readRecord(entry.ID, scratch, &blobData);
     switch (recordID) {
     case GENERIC_REQUIREMENT: {
       uint8_t rawKind;
@@ -851,26 +852,33 @@ void ModuleFile::readGenericRequirements(
 
 GenericEnvironment *ModuleFile::readGenericEnvironment(
     SmallVectorImpl<GenericTypeParamType *> &paramTypes,
-    llvm::BitstreamCursor &Cursor) {
+    llvm::BitstreamCursor &Cursor,
+    Optional<ArrayRef<Requirement>> optRequirements) {
   using namespace decls_block;
 
-  BCOffsetRAII lastRecordOffset(Cursor);
   SmallVector<uint64_t, 8> scratch;
   StringRef blobData;
 
   TypeSubstitutionMap interfaceToArchetypeMap;
 
-  while (true) {
-    lastRecordOffset.reset();
-    bool shouldContinue = true;
+  {
+    // we only want to be tracking the offset for this part of the function,
+    // since loading the generic signature (a) may read the record we reject,
+    // and (b) shouldn't have its progress erased. (That function also does its
+    // own internal tracking.)
+    BCOffsetRAII lastRecordOffset(Cursor);
 
-    auto entry = Cursor.advance(AF_DontPopBlockAtEnd);
-    if (entry.Kind != llvm::BitstreamEntry::Record)
-      break;
+    while (true) {
+      lastRecordOffset.reset();
+      bool shouldContinue = true;
 
-    scratch.clear();
-    unsigned recordID = Cursor.readRecord(entry.ID, scratch, &blobData);
-    switch (recordID) {
+      auto entry = Cursor.advance(AF_DontPopBlockAtEnd);
+      if (entry.Kind != llvm::BitstreamEntry::Record)
+        break;
+
+      scratch.clear();
+      unsigned recordID = Cursor.readRecord(entry.ID, scratch, &blobData);
+      switch (recordID) {
     case GENERIC_ENVIRONMENT: {
       uint64_t rawTypeIDs[2];
       GenericEnvironmentLayout::readRecord(scratch,
@@ -880,7 +888,7 @@ GenericEnvironment *ModuleFile::readGenericEnvironment(
       auto contextTy = getType(rawTypeIDs[1]);
 
       auto result = interfaceToArchetypeMap.insert(
-          std::make_pair(paramTy, contextTy));
+        std::make_pair(paramTy, contextTy));
 
       assert(result.second);
       paramTypes.push_back(paramTy);
@@ -903,10 +911,10 @@ GenericEnvironment *ModuleFile::readGenericEnvironment(
                                                         paramTy->getDepth(),
                                                         paramTy->getIndex());
       paramTy = paramDecl->getDeclaredInterfaceType()
-          ->castTo<GenericTypeParamType>();
+        ->castTo<GenericTypeParamType>();
 
       auto result = interfaceToArchetypeMap.insert(
-          std::make_pair(paramTy, contextTy));
+        std::make_pair(paramTy, contextTy));
 
       assert(result.second);
       paramTypes.push_back(paramTy);
@@ -916,16 +924,35 @@ GenericEnvironment *ModuleFile::readGenericEnvironment(
       // This record is not part of the GenericEnvironment.
       shouldContinue = false;
       break;
-    }
+      }
 
-    if (!shouldContinue)
-      break;
+      if (!shouldContinue)
+        break;
+    }
   }
 
-  if (interfaceToArchetypeMap.empty())
+  if (paramTypes.empty())
     return nullptr;
 
-  return GenericEnvironment::get(getContext(), paramTypes,
+  ArrayRef<Requirement> requirements;
+  SmallVector<Requirement, 4> stackRequirements;
+  if (optRequirements) {
+    requirements = optRequirements.getValue();
+  } else {
+    // Read the generic requirements.
+    readGenericRequirements(stackRequirements, Cursor);
+    requirements = stackRequirements;
+  }
+
+  // We need to construct a new signature (even if the caller has one), so that
+  // the sugar for the parameters is stored. Without this, generic types cannot
+  // round-trip via textual SIL.
+  auto signature = GenericSignature::get(paramTypes, requirements);
+
+  assert(!interfaceToArchetypeMap.empty() &&
+         "no archetypes in generic function?");
+
+  return GenericEnvironment::get(getContext(), signature,
                                  interfaceToArchetypeMap);
 }
 
@@ -939,13 +966,7 @@ ModuleFile::maybeReadGenericSignature() {
   if (env == nullptr)
     return std::make_pair(nullptr, nullptr);
 
-  // Read the generic requirements.
-  SmallVector<Requirement, 4> requirements;
-  readGenericRequirements(requirements);
-
-  auto sig = GenericSignature::get(paramTypes, requirements);
-
-  return std::make_pair(sig, env);
+  return std::make_pair(env->getGenericSignature(), env);
 }
 
 bool ModuleFile::readMembers(SmallVectorImpl<Decl *> &Members) {
@@ -1313,7 +1334,7 @@ Decl *ModuleFile::resolveCrossReference(Module *M, uint32_t pathLen) {
         for (TypeID paramID : genericParamIDs) {
           params.push_back(getType(paramID)->castTo<GenericTypeParamType>());
         }
-        readGenericRequirements(requirements);
+        readGenericRequirements(requirements, DeclTypeCursor);
 
         genericSig = GenericSignature::getCanonical(params, requirements);
       }
@@ -3921,7 +3942,7 @@ Type ModuleFile::getType(TypeID TID) {
     
     // Read the generic requirements.
     SmallVector<Requirement, 4> requirements;
-    readGenericRequirements(requirements);
+    readGenericRequirements(requirements, DeclTypeCursor);
     auto info = GenericFunctionType::ExtInfo(*rep, throws);
 
     auto sig = GenericSignature::get(genericParams, requirements);
@@ -4057,7 +4078,7 @@ Type ModuleFile::getType(TypeID TID) {
 
     // Read the generic requirements, if any.
     SmallVector<Requirement, 4> requirements;
-    readGenericRequirements(requirements);
+    readGenericRequirements(requirements, DeclTypeCursor);
 
     GenericSignature *genericSig = nullptr;
     if (!genericParamTypes.empty() || !requirements.empty())
@@ -4240,7 +4261,7 @@ void ModuleFile::finishNormalConformance(NormalProtocolConformance *conformance,
 
       // Generic requirements.
       SmallVector<Requirement, 4> requirements;
-      readGenericRequirements(requirements);
+      readGenericRequirements(requirements, DeclTypeCursor);
 
       // Form the generic signature for the synthetic environment.
       syntheticSig = GenericSignature::get(genericParams, requirements);
@@ -4250,7 +4271,7 @@ void ModuleFile::finishNormalConformance(NormalProtocolConformance *conformance,
       ArchetypeBuilder builder(*getAssociatedModule(), ctx.Diags);
       builder.addGenericSignature(syntheticSig, nullptr);
       builder.finalize(SourceLoc());
-      syntheticEnv = builder.getGenericEnvironment();
+      syntheticEnv = builder.getGenericEnvironment(syntheticSig);
     }
 
     // Requirement -> synthetic map.

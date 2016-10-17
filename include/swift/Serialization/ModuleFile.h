@@ -440,15 +440,20 @@ private:
                                      GenericParamList *outerParams = nullptr);
 
   /// Reads a set of requirements from \c DeclTypeCursor.
-  void readGenericRequirements(SmallVectorImpl<Requirement> &requirements);
+  void readGenericRequirements(SmallVectorImpl<Requirement> &requirements,
+                               llvm::BitstreamCursor &Cursor);
 
   /// Reads a GenericEnvironment from \c DeclTypeCursor.
+  ///
+  /// The optional requirements are used to construct the signature without
+  /// attempting to deserialize any requirements, such as when reading SIL.
   ///
   /// Also returns the set of generic parameters read, in order, to help with
   /// forming a GenericSignature.
   GenericEnvironment *readGenericEnvironment(
       SmallVectorImpl<GenericTypeParamType *> &paramTypes,
-      llvm::BitstreamCursor &Cursor);
+      llvm::BitstreamCursor &Cursor,
+      Optional<ArrayRef<Requirement>> optRequirements = None);
 
   /// Reads a GenericEnvironment followed by requirements from \c DeclTypeCursor.
   ///
