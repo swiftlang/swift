@@ -1811,6 +1811,7 @@ bool irgen::hasPolymorphicParameters(CanSILFunctionType ty) {
   case SILFunctionTypeRepresentation::Thick:
   case SILFunctionTypeRepresentation::Thin:
   case SILFunctionTypeRepresentation::Method:
+  case SILFunctionTypeRepresentation::Closure:
     return ty->isPolymorphic();
 
   case SILFunctionTypeRepresentation::CFunctionPointer:

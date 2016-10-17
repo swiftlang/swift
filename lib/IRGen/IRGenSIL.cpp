@@ -1939,6 +1939,7 @@ static CallEmission getCallEmissionForLoweredValue(IRGenSILFunction &IGF,
     case SILFunctionType::Representation::Thin:
     case SILFunctionType::Representation::CFunctionPointer:
     case SILFunctionType::Representation::Method:
+    case SILFunctionType::Representation::Closure:
     case SILFunctionType::Representation::ObjCMethod:
     case SILFunctionType::Representation::WitnessMethod:
     case SILFunctionType::Representation::Thick: {
@@ -2152,6 +2153,7 @@ getPartialApplicationFunction(IRGenSILFunction &IGF, SILValue v,
     case SILFunctionTypeRepresentation::Thick:
     case SILFunctionTypeRepresentation::Thin:
     case SILFunctionTypeRepresentation::Method:
+    case SILFunctionTypeRepresentation::Closure:
       break;
     }
     return std::make_tuple(lv.getStaticFunction().getFunction(),
@@ -2165,6 +2167,7 @@ getPartialApplicationFunction(IRGenSILFunction &IGF, SILValue v,
     switch (fnType->getRepresentation()) {
     case SILFunctionType::Representation::Thin:
     case SILFunctionType::Representation::Method:
+    case SILFunctionType::Representation::Closure:
     case SILFunctionType::Representation::ObjCMethod:
       break;
     case SILFunctionType::Representation::WitnessMethod: {

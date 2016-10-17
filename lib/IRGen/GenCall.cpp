@@ -150,7 +150,7 @@ llvm::CallingConv::ID irgen::expandCallingConv(IRGenModule &IGM,
 
   case SILFunctionTypeRepresentation::Method:
   case SILFunctionTypeRepresentation::WitnessMethod:
-    SWIFT_FALLTHROUGH;
+  case SILFunctionTypeRepresentation::Closure:
   case SILFunctionTypeRepresentation::Thin:
   case SILFunctionTypeRepresentation::Thick:
     return getFreestandingConvention(IGM);
@@ -733,6 +733,7 @@ llvm::Type *SignatureExpansion::expandExternalSignatureTypes() {
   case SILFunctionTypeRepresentation::Thick:
   case SILFunctionTypeRepresentation::Method:
   case SILFunctionTypeRepresentation::WitnessMethod:
+  case SILFunctionTypeRepresentation::Closure:
     llvm_unreachable("not a C representation");
   }
 
@@ -965,6 +966,7 @@ void SignatureExpansion::expandParameters() {
       case SILFunctionType::Representation::WitnessMethod:
       case SILFunctionType::Representation::ObjCMethod:
       case SILFunctionType::Representation::Thin:
+      case SILFunctionType::Representation::Closure:
         return FnType->hasErrorResult();
 
       case SILFunctionType::Representation::Thick:
@@ -1858,6 +1860,7 @@ void CallEmission::setArgs(Explosion &arg, WitnessMetadata *witnessMetadata) {
     Args.rbegin()[0] = witnessMetadata->SelfWitnessTable;
     SWIFT_FALLTHROUGH;
 
+  case SILFunctionTypeRepresentation::Closure:
   case SILFunctionTypeRepresentation::Method:
   case SILFunctionTypeRepresentation::Thin:
   case SILFunctionTypeRepresentation::Thick: {

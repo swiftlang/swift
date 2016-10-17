@@ -2166,6 +2166,11 @@ enum class FunctionTypeRepresentation : uint8_t {
 ///
 /// This is a superset of FunctionTypeRepresentation. The common representations
 /// must share an enum value.
+///
+/// TODO: The overlap of SILFunctionTypeRepresentation and
+/// FunctionTypeRepresentation is a total hack necessitated by the way SIL
+/// TypeLowering is currently written. We ought to refactor TypeLowering so that
+/// it is not necessary to distinguish these cases.
 enum class SILFunctionTypeRepresentation : uint8_t {
   /// A freestanding thick function.
   Thick = uint8_t(FunctionTypeRepresentation::Swift),
@@ -2194,6 +2199,9 @@ enum class SILFunctionTypeRepresentation : uint8_t {
   
   /// A Swift protocol witness.
   WitnessMethod,
+  
+  /// A closure invocation function that has not been bound to a context.
+  Closure,
 };
 
 /// Can this calling convention result in a function being called indirectly
@@ -2204,6 +2212,7 @@ inline bool canBeCalledIndirectly(SILFunctionTypeRepresentation rep) {
   case SILFunctionTypeRepresentation::Thin:
   case SILFunctionTypeRepresentation::CFunctionPointer:
   case SILFunctionTypeRepresentation::Block:
+  case SILFunctionTypeRepresentation::Closure:
     return false;
   case SILFunctionTypeRepresentation::ObjCMethod:
   case SILFunctionTypeRepresentation::Method:
@@ -2225,6 +2234,7 @@ getSILFunctionLanguage(SILFunctionTypeRepresentation rep) {
   case SILFunctionTypeRepresentation::Thin:
   case SILFunctionTypeRepresentation::Method:
   case SILFunctionTypeRepresentation::WitnessMethod:
+  case SILFunctionTypeRepresentation::Closure:
     return SILFunctionLanguage::Swift;
   }
 }
@@ -2304,6 +2314,7 @@ public:
       case SILFunctionTypeRepresentation::Block:
       case SILFunctionTypeRepresentation::Thin:
       case SILFunctionTypeRepresentation::CFunctionPointer:
+      case SILFunctionTypeRepresentation::Closure:
         return false;
       case SILFunctionTypeRepresentation::ObjCMethod:
       case SILFunctionTypeRepresentation::Method:
@@ -2323,6 +2334,7 @@ public:
       case SILFunctionTypeRepresentation::ObjCMethod:
       case SILFunctionTypeRepresentation::WitnessMethod:
       case SILFunctionTypeRepresentation::CFunctionPointer:
+      case SILFunctionTypeRepresentation::Closure:
         return false;
       }
     }
@@ -3025,6 +3037,7 @@ public:
       case Representation::Block:
       case Representation::Thin:
       case Representation::CFunctionPointer:
+      case Representation::Closure:
         return false;
       case Representation::ObjCMethod:
       case Representation::Method:
@@ -3040,6 +3053,7 @@ public:
       case Representation::Thin:
       case Representation::CFunctionPointer:
       case Representation::ObjCMethod:
+      case Representation::Closure:
         return false;
       case Representation::Method:
       case Representation::WitnessMethod:
@@ -3058,6 +3072,7 @@ public:
       case Representation::ObjCMethod:
       case Representation::Method:
       case Representation::WitnessMethod:
+      case Representation::Closure:
         return false;
       }
     }
