@@ -204,6 +204,12 @@ extension BidirectionalCollection where SubSequence == BidirectionalSlice<Self> 
 
 extension BidirectionalCollection where SubSequence == Self {
   /// Removes and returns the last element of the collection.
+  /// 
+  /// popLast() should generally be preferred over removeLast() 
+  /// since it is safer to use. 
+  /// 
+  /// You should only opt for removeLast() if you are certain the collection 
+  /// is not empty and performance is an issue.
   ///
   /// - Returns: The last element of the collection if the collection has one
   ///   or more elements; otherwise, `nil`.
