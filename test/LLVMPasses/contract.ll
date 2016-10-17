@@ -19,6 +19,7 @@ declare void @noread_user(%swift.refcounted*) readnone
 declare void @user(%swift.refcounted*)
 declare void @noread_user_bridged(%swift.bridge*) readnone
 declare void @user_bridged(%swift.bridge*)
+declare void @__swift_endBorrow(i8*, i8*)
 
 ; CHECK-LABEL: define{{( protected)?}} void @fixlifetime_removal(i8*) {
 ; CHECK-NOT: call void @__swift_fixLifetime
@@ -26,6 +27,14 @@ define void @fixlifetime_removal(i8*) {
 entry:
   %1 = bitcast i8* %0 to %swift.refcounted*
   call void @__swift_fixLifetime(%swift.refcounted* %1)
+  ret void
+}
+
+; CHECK-LABEL: define{{( protected)?}} void @endBorrow_removal(i8*, i8*) {
+; CHECK-NOT: call void @__swift_endBorrow
+define void @endBorrow_removal(i8*, i8*) {
+entry:
+  call void @__swift_endBorrow(i8* %0, i8* %1)
   ret void
 }
 
