@@ -225,7 +225,10 @@ extension BidirectionalCollection where SubSequence == Self {
 
   /// Removes and returns the last element of the collection.
   ///
-  /// The collection must not be empty.
+  /// You should only use this if you are certain the collection 
+  /// is not empty and performance is an issue.
+  /// 
+  /// Otherwise opt for popLast() since it is safer.
   ///
   /// - Returns: The last element of the collection.
   ///
