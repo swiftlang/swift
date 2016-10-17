@@ -2911,6 +2911,10 @@ namespace {
       case SILFunctionType::Representation::WitnessMethod:
         printField("representation", "witness_method");
         break;
+
+      case SILFunctionType::Representation::Closure:
+        printField("representation", "closure");
+        break;
       }
 
       printFlag(T->isAutoClosure(), "autoclosure");
