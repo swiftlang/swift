@@ -2150,7 +2150,6 @@ extension UnsignedInteger {
 extension UnsignedInteger where Self : FixedWidthInteger {
   @_transparent
   public init<T : BinaryInteger>(_ source: T) {
-    // FIXME(integers): uncomment checks
     _precondition(source >= 0,
       "negative value is not representable")
     let requiredBits = source.minimumSignedRepresentationBitWidth - 1
@@ -2161,7 +2160,6 @@ extension UnsignedInteger where Self : FixedWidthInteger {
 
   @_transparent
   public init?<T : BinaryInteger>(exactly source: T) {
-    // FIXME(integers): uncomment the check
     _precondition(source >= 0,
       "Negative value is not representable")
     let requiredBits = source.minimumSignedRepresentationBitWidth - 1
@@ -2206,11 +2204,10 @@ extension SignedInteger {
 extension SignedInteger where Self : FixedWidthInteger {
   @_transparent
   public init<T : BinaryInteger>(_ source: T) {
-    // FIXME(integers): uncomment the check
-    //let requiredBits = source.minimumSignedRepresentationBitWidth
-    //_precondition(
-      //requiredBits <= Self.bitWidth,
-      //"Not enough bits to represent a signed value")
+    let requiredBits = source.minimumSignedRepresentationBitWidth
+    _precondition(
+      requiredBits <= Self.bitWidth,
+      "Not enough bits to represent a signed value")
     self.init(extendingOrTruncating: source)
   }
 
@@ -2302,10 +2299,12 @@ public struct ${Self}
 // FIXME(integers): workaround for a problem where enums don't compile without
 //                  `== (Int, Int)`
 %   if Self in ['Int']:
+  @_transparent
   public func isEqual(to other: ${Self}) -> Bool {
     return Bool(Builtin.cmp_eq_Int${bits}(_value, other._value))
   }
 %   else:
+  @_transparent
   public static func == (lhs: ${Self}, rhs: ${Self}) -> Bool {
     return Bool(Builtin.cmp_eq_Int${bits}(lhs._value, rhs._value))
   }
