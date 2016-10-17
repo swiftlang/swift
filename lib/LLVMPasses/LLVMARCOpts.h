@@ -25,68 +25,8 @@
 namespace swift {
 
 enum RT_Kind {
-  /// An instruction with this classification is known to not access (read or
-  /// write) memory.
-  RT_NoMemoryAccessed,
-
-  /// void swift_retain(SwiftHeapObject *object)
-  RT_Retain,
-
-  /// void swift_retain_n(SwiftHeapObject *object)
-  RT_RetainN,
-
-  /// void swift::swift_retainUnowned(HeapObject *object)
-  RT_RetainUnowned,
-  
-  /// void swift_checkUnowned(HeapObject *object)
-  RT_CheckUnowned,
-  
-  /// void swift_release(SwiftHeapObject *object)
-  RT_Release,
-
-  /// void swift_release_n(SwiftHeapObject *object)
-  RT_ReleaseN,
-
-  /// SwiftHeapObject *swift_allocObject(SwiftHeapMetadata *metadata,
-  ///                                    size_t size, size_t alignment)
-  RT_AllocObject,
-
-  /// void objc_release(%objc_object* %P)
-  RT_ObjCRelease,
-
-  /// %objc_object* objc_retain(%objc_object* %P)
-  RT_ObjCRetain,
-
-  /// void swift_unknownRetain(%swift.refcounted* %P)
-  RT_UnknownRetain,
-
-  /// void swift_unknownRetain_n(%swift.refcounted* %P)
-  RT_UnknownRetainN,
-
-  /// void swift_unknownRelease(%swift.refcounted* %P)
-  RT_UnknownRelease,
-
-  /// void swift_unknownRelease_n(%swift.refcounted* %P)
-  RT_UnknownReleaseN,
-
-  /// void __swift_fixLifetime(%swift.refcounted* %P)
-  RT_FixLifetime,
-
-  /// void swift_bridgeRetain(%swift.refcounted* %P)
-  RT_BridgeRetain,
-
-  /// void swift_bridgeRetain_n(%swift.refcounted* %P)
-  RT_BridgeRetainN,
-
-  /// void swift_bridgeRelease(%swift.refcounted* %P)
-  RT_BridgeRelease,
-
-  /// void swift_bridgeRelease_n(%swift.refcounted* %P)
-  RT_BridgeReleaseN,
-
-  /// This is not a runtime function that we support.  Maybe it is not a call,
-  /// or is a call to something we don't care about.
-  RT_Unknown,
+#define KIND(Name, MemBehavior) RT_ ## Name,
+#include "LLVMSwift.def"
 };
 
 /// classifyInstruction - Take a look at the specified instruction and classify
