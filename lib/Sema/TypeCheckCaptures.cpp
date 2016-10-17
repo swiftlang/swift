@@ -536,6 +536,12 @@ public:
     // Casting to an ObjC class doesn't require the metadata of its type
     // parameters, if any.
     if (auto cast = dyn_cast<CheckedCastExpr>(E)) {
+      // If we failed to resolve the written type, we've emitted an
+      // earlier diagnostic and should bail.
+      auto toTy = cast->getCastTypeLoc().getType();
+      if (!toTy || toTy->hasError())
+        return false;
+
       if (auto clas = dyn_cast_or_null<ClassDecl>(
                          cast->getCastTypeLoc().getType()->getAnyNominal())) {
         if (clas->usesObjCGenericsModel()) {
