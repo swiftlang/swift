@@ -456,11 +456,11 @@ func stringliterals(_ d: [String: Int]) {
     "something else")"
   // expected-error @-2 {{unterminated string literal}} expected-error @-1 {{unterminated string literal}}
 
-  // FIXME: bad diagnostics.
-  // expected-warning @+1 {{initialization of variable 'x2' was never used; consider replacing with assignment to '_' or removing it}}
-  /* expected-error {{unterminated string literal}} expected-error {{expected ',' separator}} expected-error {{expected ',' separator}} expected-note {{to match this opening '('}}  */ var x2 : () = ("hello" + "
-  ; // expected-error {{expected expression in list of expressions}}
-} // expected-error {{expected ')' in expression list}}
+  // expected-warning @+2 {{initialization of variable 'x2' was never used; consider replacing with assignment to '_' or removing it}}
+  // expected-error @+1 {{unterminated string literal}}
+  var x2 : () = ("hello" + "
+  ;
+}
 
 func testSingleQuoteStringLiterals() {
   _ = 'abc' // expected-error{{single-quoted string literal found, use '"'}}{{7-12="abc"}}
@@ -689,13 +689,13 @@ func dictionaryLiterals() {
 func invalidDictionaryLiteral() {
   // FIXME: lots of unnecessary diagnostics.
 
-  var a = [1: ; // expected-error {{expected value in dictionary literal}} expected-error 2{{expected ',' separator}} {{14-14=,}} {{14-14=,}} expected-error {{expected key expression in dictionary literal}} expected-error {{expected ']' in container literal expression}} expected-note {{to match this opening '['}}
-  var b = [1: ;] // expected-error {{expected value in dictionary literal}} expected-error 2{{expected ',' separator}} {{14-14=,}} {{14-14=,}} expected-error {{expected key expression in dictionary literal}}
-  var c = [1: "one" ;] // expected-error {{expected key expression in dictionary literal}} expected-error 2{{expected ',' separator}} {{20-20=,}} {{20-20=,}}
-  var d = [1: "one", ;] // expected-error {{expected key expression in dictionary literal}} expected-error {{expected ',' separator}} {{21-21=,}}
+  var a = [1: ; // expected-error {{expected value in dictionary literal}}
+  var b = [1: ;] // expected-error {{expected value in dictionary literal}}
+  var c = [1: "one" ;] // expected-error {{expected key expression in dictionary literal}} expected-error {{expected ',' separator}} {{20-20=,}}
+  var d = [1: "one", ;] // expected-error {{expected key expression in dictionary literal}}
   var e = [1: "one", 2] // expected-error {{expected ':' in dictionary literal}}
-  var f = [1: "one", 2 ;] // expected-error 2{{expected ',' separator}} {{23-23=,}} {{23-23=,}} expected-error 1{{expected key expression in dictionary literal}} expected-error {{expected ':' in dictionary literal}}
-  var g = [1: "one", 2: ;] // expected-error {{expected value in dictionary literal}} expected-error 2{{expected ',' separator}} {{24-24=,}} {{24-24=,}} expected-error {{expected key expression in dictionary literal}}
+  var f = [1: "one", 2 ;] // expected-error {{expected ':' in dictionary literal}}
+  var g = [1: "one", 2: ;] // expected-error {{expected value in dictionary literal}}
 }
 
     
@@ -735,8 +735,7 @@ func testNilCoalescePrecedence(cond: Bool, a: Int?, r: CountableClosedRange<Int>
 
   // ?? should have lower precedence than range and arithmetic operators.
   let r1 = r ?? (0...42) // ok
-  let r2 = (r ?? 0)...42 // not ok: expected-error {{binary operator '??' cannot be applied to operands of type 'CountableClosedRange<Int>?' and 'Int'}}
-  // expected-note @-1 {{overloads for '??' exist with these partially matching parameter lists:}}
+  let r2 = (r ?? 0)...42 // not ok: expected-error {{cannot convert value of type 'Int' to expected argument type 'CountableClosedRange<Int>'}}
   let r3 = r ?? 0...42 // parses as the first one, not the second.
   
   

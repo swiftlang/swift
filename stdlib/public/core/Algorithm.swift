@@ -106,8 +106,9 @@ public struct EnumeratedIterator<
   /// Once `nil` has been returned, all subsequent calls return `nil`.
   public mutating func next() -> Element? {
     guard let b = _base.next() else { return nil }
-    defer { _count += 1 }
-    return (offset: _count, element: b)
+    let result = (offset: _count, element: b)
+    _count += 1 
+    return result
   }
 }
 

@@ -55,6 +55,14 @@ class FunctionRefInst;
 
 template <typename ImplClass> class SILClonerWithScopes;
 
+// An enum class for SILInstructions that enables exhaustive switches over
+// instructions.
+enum class SILInstructionKind : std::underlying_type<ValueKind>::type {
+#define INST(Id, Parent, TextualName, MemoryBehavior, ReleasingBehavior)       \
+  Id = static_cast<std::underlying_type<ValueKind>::type>(ValueKind::Id),
+#include "SILNodes.def"
+};
+
 /// This is the root class for all instructions that can be used as the contents
 /// of a Swift SILBasicBlock.
 class SILInstruction : public ValueBase,public llvm::ilist_node<SILInstruction>{
@@ -1658,11 +1666,19 @@ static inline llvm::hash_code hash_value(StringLiteralInst::Encoding E) {
   return llvm::hash_value(size_t(E));
 }
 
+// *NOTE* When serializing, we can only represent up to 4 values here. If more
+// qualifiers are added, SIL serialization must be updated.
+enum class LoadOwnershipQualifier {
+  Unqualified, Take, Copy, Trivial
+};
+
 /// LoadInst - Represents a load from a memory location.
 class LoadInst
   : public UnaryInstructionBase<ValueKind::LoadInst>
 {
   friend class SILBuilder;
+
+  LoadOwnershipQualifier OwnershipQualifier;
 
   /// Constructs a LoadInst.
   ///
@@ -1670,9 +1686,22 @@ class LoadInst
   ///
   /// \param LValue The SILValue representing the lvalue (address) to
   ///        use for the load.
-  LoadInst(SILDebugLocation DebugLoc, SILValue LValue)
+  LoadInst(SILDebugLocation DebugLoc, SILValue LValue,
+           LoadOwnershipQualifier Q = LoadOwnershipQualifier::Unqualified)
       : UnaryInstructionBase(DebugLoc, LValue,
-                             LValue->getType().getObjectType()) {}
+                             LValue->getType().getObjectType()),
+        OwnershipQualifier(Q) {}
+
+public:
+  LoadOwnershipQualifier getOwnershipQualifier() const {
+    return OwnershipQualifier;
+  }
+};
+
+// *NOTE* When serializing, we can only represent up to 4 values here. If more
+// qualifiers are added, SIL serialization must be updated.
+enum class StoreOwnershipQualifier {
+  Unqualified, Init, Assign, Trivial
 };
 
 /// StoreInst - Represents a store from a memory location.
@@ -1681,8 +1710,10 @@ class StoreInst : public SILInstruction {
 
 private:
   FixedOperandList<2> Operands;
+  StoreOwnershipQualifier OwnershipQualifier;
 
-  StoreInst(SILDebugLocation DebugLoc, SILValue Src, SILValue Dest);
+  StoreInst(SILDebugLocation DebugLoc, SILValue Src, SILValue Dest,
+            StoreOwnershipQualifier Qualifier);
 
 public:
   enum {
@@ -1700,6 +1731,10 @@ public:
 
   static bool classof(const ValueBase *V) {
     return V->getKind() == ValueKind::StoreInst;
+  }
+
+  StoreOwnershipQualifier getOwnershipQualifier() const {
+    return OwnershipQualifier;
   }
 };
 
@@ -4443,7 +4478,7 @@ public:
 //===----------------------------------------------------------------------===//
 
 enum class TermKind {
-#define TERMINATOR(Id, Parent, MemBehavior, MayRelease) Id,
+#define TERMINATOR(Id, Parent, TextualName, MemBehavior, MayRelease) Id,
 #include "SILNodes.def"
 };
 
@@ -4452,10 +4487,10 @@ struct ValueKindAsTermKind {
 
   ValueKindAsTermKind(ValueKind V) {
     switch (V) {
-#define TERMINATOR(Id, Parent, MemBehavior, MayRelease)                 \
-      case ValueKind::Id:                                               \
-        K = TermKind::Id;                                               \
-        break;
+#define TERMINATOR(Id, Parent, TextualName, MemBehavior, MayRelease)           \
+  case ValueKind::Id:                                                          \
+    K = TermKind::Id;                                                          \
+    break;
 #include "SILNodes.def"
     default:
       llvm_unreachable("Not a terminator kind?!");

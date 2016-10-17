@@ -445,15 +445,19 @@ public:
         getSILDebugLocation(Loc), text.toStringRef(Out), encoding, F));
   }
 
-  LoadInst *createLoad(SILLocation Loc, SILValue LV) {
+  LoadInst *createLoad(
+      SILLocation Loc, SILValue LV,
+      LoadOwnershipQualifier Qualifier = LoadOwnershipQualifier::Unqualified) {
     assert(LV->getType().isLoadable(F.getModule()));
     return insert(new (F.getModule())
-                      LoadInst(getSILDebugLocation(Loc), LV));
+                      LoadInst(getSILDebugLocation(Loc), LV, Qualifier));
   }
 
-  StoreInst *createStore(SILLocation Loc, SILValue Src, SILValue DestAddr) {
-    return insert(new (F.getModule())
-                      StoreInst(getSILDebugLocation(Loc), Src, DestAddr));
+  StoreInst *createStore(SILLocation Loc, SILValue Src, SILValue DestAddr,
+                         StoreOwnershipQualifier Qualifier =
+                             StoreOwnershipQualifier::Unqualified) {
+    return insert(new (F.getModule()) StoreInst(getSILDebugLocation(Loc), Src,
+                                                DestAddr, Qualifier));
   }
   AssignInst *createAssign(SILLocation Loc, SILValue Src, SILValue DestAddr) {
     return insert(new (F.getModule())

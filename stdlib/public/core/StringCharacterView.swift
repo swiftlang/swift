@@ -54,14 +54,22 @@ extension String {
   public struct CharacterView {
     internal var _core: _StringCore
 
+    /// The offset of this view's `_core` from an original core. This works
+    /// around the fact that `_StringCore` is always zero-indexed.
+    /// `_coreOffset` should be subtracted from `UnicodeScalarIndex._position`
+    /// before that value is used as a `_core` index.
+    internal var _coreOffset: Int
+
     /// Creates a view of the given string.
     public init(_ text: String) {
       self._core = text._core
+      self._coreOffset = 0
     }
     
     public // @testable
-    init(_ _core: _StringCore) {
+    init(_ _core: _StringCore, coreOffset: Int = 0) {
       self._core = _core
+      self._coreOffset = coreOffset
     }
   }
 
@@ -139,7 +147,7 @@ extension String {
 extension String.CharacterView : BidirectionalCollection {
   internal typealias UnicodeScalarView = String.UnicodeScalarView
   internal var unicodeScalars: UnicodeScalarView {
-    return UnicodeScalarView(_core)
+    return UnicodeScalarView(_core, coreOffset: _coreOffset)
   }
   
   /// A position in a string's `CharacterView` instance.
@@ -246,7 +254,7 @@ extension String.CharacterView : BidirectionalCollection {
     from start: UnicodeScalarView.Index
   ) -> Int {
     var start = start
-    let end = UnicodeScalarView.Index(_position: _core.count)
+    let end = unicodeScalars.endIndex
     if start == end {
       return 0
     }
@@ -288,7 +296,7 @@ extension String.CharacterView : BidirectionalCollection {
   internal func _measureExtendedGraphemeClusterBackward(
     from end: UnicodeScalarView.Index
   ) -> Int {
-    let start = UnicodeScalarView.Index(_position: 0)
+    let start = unicodeScalars.startIndex
     if start == end {
       return 0
     }
@@ -363,8 +371,8 @@ extension String.CharacterView : RangeReplaceableCollection {
     with newElements: C
   ) where C : Collection, C.Iterator.Element == Character {
     let rawSubRange: Range<Int> =
-      bounds.lowerBound._base._position
-      ..< bounds.upperBound._base._position
+      bounds.lowerBound._base._position - _coreOffset
+      ..< bounds.upperBound._base._position - _coreOffset
     let lazyUTF16 = newElements.lazy.flatMap { $0.utf16 }
     _core.replaceSubrange(rawSubRange, with: lazyUTF16)
   }
@@ -436,10 +444,9 @@ extension String.CharacterView {
   /// - Complexity: O(*n*) if the underlying string is bridged from
   ///   Objective-C, where *n* is the length of the string; otherwise, O(1).
   public subscript(bounds: Range<Index>) -> String.CharacterView {
-    let unicodeScalarRange =
-      bounds.lowerBound._base..<bounds.upperBound._base
-    return String.CharacterView(
-      String(_core).unicodeScalars[unicodeScalarRange]._core)
+    let unicodeScalarRange = bounds.lowerBound._base..<bounds.upperBound._base
+    return String.CharacterView(unicodeScalars[unicodeScalarRange]._core,
+      coreOffset: unicodeScalarRange.lowerBound._position)
   }
 }
 

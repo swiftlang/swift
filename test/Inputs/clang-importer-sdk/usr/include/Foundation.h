@@ -740,7 +740,7 @@ NSSet *setToSet(NSSet *dict);
 @end
 
 @interface NSProcessInfo : NSObject
-+ (nonnull NSProcessInfo *)processInfo;
+@property (class, readonly, strong, nonnull) NSProcessInfo *processInfo;
 @end
 
 @interface NSString(FoundationExts)

@@ -245,6 +245,9 @@ ImportPaths("I", llvm::cl::desc("add a directory to the import search path"));
 static llvm::cl::list<std::string>
 FrameworkPaths("F", llvm::cl::desc("add a directory to the framework search path"));
 
+static llvm::cl::list<std::string>
+SystemFrameworkPaths("iframework", llvm::cl::desc("add a directory to the system framework search path"));
+
 static llvm::cl::opt<std::string>
 ResourceDir("resource-dir",
             llvm::cl::desc("The directory that holds the compiler resource files"));
@@ -2717,7 +2720,7 @@ int main(int argc, char *argv[]) {
 
   if (options::Action == ActionType::DumpCompletionCache) {
     if (options::InputFilenames.empty()) {
-      llvm::errs() << "-dump-completin-cache requires an input file\n";
+      llvm::errs() << "-dump-completion-cache requires an input file\n";
       return 1;
     }
 
@@ -2781,6 +2784,11 @@ int main(int argc, char *argv[]) {
     options::ModuleCachePath;
   InitInvok.setImportSearchPaths(options::ImportPaths);
   InitInvok.setFrameworkSearchPaths(options::FrameworkPaths);
+  for (const auto &systemFrameworkPath : options::SystemFrameworkPaths) {
+    auto &extraArgs = InitInvok.getClangImporterOptions().ExtraArgs;
+    extraArgs.push_back("-iframework");
+    extraArgs.push_back(systemFrameworkPath);
+  }
   InitInvok.getFrontendOptions().EnableSourceImport |=
     options::EnableSourceImport;
   InitInvok.getFrontendOptions().ImplicitObjCHeaderPath =

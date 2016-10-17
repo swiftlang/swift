@@ -82,7 +82,7 @@ bool SourceManager::openVirtualFile(SourceLoc loc, StringRef name,
 
   CharSourceRange range = CharSourceRange(*this, loc, end);
   VirtualFiles[end.Value.getPointer()] = { range, name, lineOffset };
-  CachedVFile = {};
+  CachedVFile = {nullptr, nullptr};
   return true;
 }
 
@@ -99,7 +99,7 @@ void SourceManager::closeVirtualFile(SourceLoc end) {
 #endif
     return;
   }
-  CachedVFile = {};
+  CachedVFile = {nullptr, nullptr};
 
   CharSourceRange oldRange = virtualFile->Range;
   virtualFile->Range = CharSourceRange(*this, virtualFile->Range.getStart(),
