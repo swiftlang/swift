@@ -136,19 +136,6 @@ func reftype_arg(_ a: Ref) {
     // CHECK: return
 }
 
-// CHECK-LABEL: sil hidden @_TF8lifetime17reftype_inout_arg
-func reftype_inout_arg(_ a: inout Ref) {
-    // CHECK: bb0([[A:%[0-9]+]] : $*Ref):
-    // -- initialize local box for inout
-    // CHECK: [[A_LOCAL:%.*]] = alloc_box $Ref
-    // CHECK: [[PB:%.*]] = project_box [[A_LOCAL]]
-    // CHECK: copy_addr [[A]] to [initialization] [[PB]]
-    // -- write back to inout
-    // CHECK: copy_addr [[PB]] to [[A]]
-    // CHECK: strong_release [[A_LOCAL]]
-    // CHECK: return
-}
-
 // CHECK-LABEL: sil hidden @_TF8lifetime26reftype_call_ignore_returnFT_T_
 func reftype_call_ignore_return() {
     reftype_func()
@@ -205,13 +192,9 @@ func reftype_call_with_arg(_ a: Ref) {
 func reftype_reassign(_ a: inout Ref, b: Ref) {
     var b = b
     // CHECK: bb0([[AADDR:%[0-9]+]] : $*Ref, [[B1:%[0-9]+]] : $Ref):
-    // CHECK: [[A_LOCAL:%[0-9]+]] = alloc_box $Ref
-    // CHECK: [[PBA:%.*]] = project_box [[A_LOCAL]]
-    // CHECK: copy_addr [[AADDR]] to [initialization] [[PBA]]
     // CHECK: [[BADDR:%[0-9]+]] = alloc_box $Ref
     // CHECK: [[PBB:%.*]] = project_box [[BADDR]]
     a = b
-    // CHECK: copy_addr [[PBB]] to [[PBA]]
     // CHECK: release
 
     // CHECK: return

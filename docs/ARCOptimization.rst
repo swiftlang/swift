@@ -861,3 +861,69 @@ Now imagine that we move the strong_retain before the is_unique. Then we have::
 Thus is_unique is guaranteed to return false introducing a copy that was not
 needed. We wish to avoid that if it is at all possible.
 
+Deinit Model
+============
+
+The semantics around deinits in swift are a common area of confusion. This
+section is not attempting to state where the deinit model may be in the future,
+but is just documenting where things are today in the hopes of improving
+clarity.
+
+The following characteristics of deinits are important to the optimizer:
+
+1. deinits run on the same thread and are not asynchronous like Java
+   finalizers.
+2. deinits are not sequenced with regards to each other or code in normal
+   control flow.
+3. If the optimizer takes advantage of the lack of sequencing it must do so in a
+   way that preserves memory safety.
+
+Consider the following pseudo-Swift example::
+
+  class D {}
+  class D1 : D {}
+  class D2 : D {}
+
+  var GLOBAL_D : D = D1()
+
+  class C { deinit { GLOBAL_D = D2 } }
+
+  func main() {
+    let c = C()
+    let d = GLOBAL_D
+    useC(c)
+    useD(d)
+  }
+
+  main()
+
+Assume that useC does not directly in any way touch an instance of class D
+except via the destructor.
+
+Since memory operations in normal control flow are not sequenced with respect to
+deinits, there are two correct programs here that the optimizer can produce: the
+original and the one where useC(c) and GLOBAL_D are swapped, i.e.::
+
+  func main() {
+    let c = C()
+    useC(c)
+    let d = GLOBAL_D
+    useD(d)
+  }
+
+In the first program, d would be an instance of class D1. In the second, it
+would be an instance of class D2. Notice how in both programs though, no
+deinitialized object is accessed. On the other hand, imagine if we had split
+main like so::
+
+  func main() {
+    let c = C()
+    let d = unsafe_unowned_load(GLOBAL_D)
+    useC(c)
+    let owned_d = retain(d)
+    useD(owned_d)
+  }
+
+In this case, we would be passing off to useD a deallocated instance of class D1
+which would be undefined behavior. An optimization that produced such code would
+be a miscompile.

@@ -94,16 +94,7 @@ Type Solution::computeSubstitutions(
   }
 
   // Produce the concrete form of the opened type.
-  auto type = openedType.transform([&](Type type) -> Type {
-    if (auto tv = dyn_cast<TypeVariableType>(type.getPointer())) {
-      auto archetype = tv->getImpl().getArchetype();
-      auto simplified = getFixedType(tv);
-      return SubstitutedType::get(archetype, simplified,
-                                  tc.Context);
-    }
-
-    return type;
-  });
+  Type type = simplifyType(tc, openedType);
 
   auto mod = getConstraintSystem().DC->getParentModule();
   GenericSignature *sig;
@@ -2669,11 +2660,8 @@ namespace {
       expr->setType(arrayTy);
 
       // If the array element type was defaulted, note that in the expression.
-      auto elementTypeVariable = cs.ArrayElementTypeVariables.find(expr);
-      if (elementTypeVariable != cs.ArrayElementTypeVariables.end()) {
-        if (solution.DefaultedTypeVariables.count(elementTypeVariable->second))
-          expr->setIsTypeDefaulted();
-      }
+      if (solution.DefaultedConstraints.count(cs.getConstraintLocator(expr)))
+        expr->setIsTypeDefaulted();
 
       return expr;
     }
@@ -2747,14 +2735,8 @@ namespace {
 
       // If the dictionary key or value type was defaulted, note that in the
       // expression.
-      auto elementTypeVariable = cs.DictionaryElementTypeVariables.find(expr);
-      if (elementTypeVariable != cs.DictionaryElementTypeVariables.end()) {
-        if (solution.DefaultedTypeVariables.count(
-              elementTypeVariable->second.first) ||
-            solution.DefaultedTypeVariables.count(
-              elementTypeVariable->second.second))
-          expr->setIsTypeDefaulted();
-      }
+      if (solution.DefaultedConstraints.count(cs.getConstraintLocator(expr)))
+        expr->setIsTypeDefaulted();
 
       return expr;
     }
@@ -5111,6 +5093,7 @@ maybeDiagnoseUnsupportedFunctionConversion(TypeChecker &tc, Expr *expr,
 
 static CollectionUpcastConversionExpr::ConversionPair
 buildElementConversion(ExprRewriter &rewriter,
+                       SourceLoc srcLoc,
                        Type srcCollectionType,
                        Type destCollectionType,
                        ConstraintLocatorBuilder locator,
@@ -5123,7 +5106,7 @@ buildElementConversion(ExprRewriter &rewriter,
 
   // Build the conversion.
   ASTContext &ctx = rewriter.getConstraintSystem().getASTContext();
-  auto opaque = new (ctx) OpaqueValueExpr(SourceLoc(), srcType);
+  auto opaque = new (ctx) OpaqueValueExpr(srcLoc, srcType);
   auto conversion =
     rewriter.coerceToType(opaque, destType,
            locator.withPathElement(
@@ -5283,8 +5266,8 @@ Expr *ExprRewriter::coerceToType(Expr *expr, Type toType,
       }
 
       // Build the value conversion.
-      auto conv =
-        buildElementConversion(*this, expr->getType(), toType, locator, 0);
+      auto conv = buildElementConversion(*this, expr->getLoc(), expr->getType(),
+                                         toType, locator, 0);
 
       // Form the upcast.
       return new (tc.Context) CollectionUpcastConversionExpr(expr, toType,
@@ -5325,10 +5308,10 @@ Expr *ExprRewriter::coerceToType(Expr *expr, Type toType,
       }
 
       // Build the key and value conversions.
-      auto keyConv =
-        buildElementConversion(*this, expr->getType(), toType, locator, 0);
-      auto valueConv =
-        buildElementConversion(*this, expr->getType(), toType, locator, 1);
+      auto keyConv = buildElementConversion(
+          *this, expr->getLoc(), expr->getType(), toType, locator, 0);
+      auto valueConv = buildElementConversion(
+          *this, expr->getLoc(), expr->getType(), toType, locator, 1);
 
       // If the source key and value types are object types, this is an upcast.
       // Otherwise, it's bridged.
@@ -5348,8 +5331,8 @@ Expr *ExprRewriter::coerceToType(Expr *expr, Type toType,
       }
 
       // Build the value conversion.
-      auto conv =
-        buildElementConversion(*this, expr->getType(), toType, locator, 0);
+      auto conv = buildElementConversion(*this, expr->getLoc(), expr->getType(),
+                                         toType, locator, 0);
 
       return new (tc.Context) CollectionUpcastConversionExpr(expr, toType,
                                                              {}, conv);

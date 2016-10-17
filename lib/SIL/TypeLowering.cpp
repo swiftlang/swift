@@ -121,6 +121,10 @@ CaptureKind TypeConverter::getDeclCaptureKind(CapturedValue capture) {
       if (var->isLet() && !getTypeLowering(var->getType()).isAddressOnly())
         return CaptureKind::Constant;
 
+      if (var->getType()->is<InOutType>()) {
+        return CaptureKind::StorageAddress;
+      }
+
       // If we're capturing into a non-escaping closure, we can generally just
       // capture the address of the value as no-escape.
       return capture.isNoEscape() ?
@@ -1787,14 +1791,23 @@ CanAnyFunctionType TypeConverter::makeConstantInterfaceType(SILDeclRef c) {
     return getFunctionInterfaceTypeWithCaptures(funcTy, func);
   }
 
-  case SILDeclRef::Kind::Allocator:
   case SILDeclRef::Kind::EnumElement:
     return cast<AnyFunctionType>(vd->getInterfaceType()->getCanonicalType());
   
-  case SILDeclRef::Kind::Initializer:
-    return cast<AnyFunctionType>(cast<ConstructorDecl>(vd)
-                           ->getInitializerInterfaceType()->getCanonicalType());
-  
+  case SILDeclRef::Kind::Allocator: {
+    auto *cd = cast<ConstructorDecl>(vd);
+    auto funcTy = cast<AnyFunctionType>(
+                                   cd->getInterfaceType()->getCanonicalType());
+    return getFunctionInterfaceTypeWithCaptures(funcTy, cd);
+  }
+
+  case SILDeclRef::Kind::Initializer: {
+    auto *cd = cast<ConstructorDecl>(vd);
+    auto funcTy = cast<AnyFunctionType>(
+                         cd->getInitializerInterfaceType()->getCanonicalType());
+    return getFunctionInterfaceTypeWithCaptures(funcTy, cd);
+  }
+
   case SILDeclRef::Kind::Destroyer:
   case SILDeclRef::Kind::Deallocator:
     return getDestructorInterfaceType(cast<DestructorDecl>(vd),
@@ -1858,7 +1871,8 @@ TypeConverter::getConstantGenericEnvironment(SILDeclRef c) {
   case SILDeclRef::Kind::Destroyer:
   case SILDeclRef::Kind::Deallocator: {
     auto *afd = cast<AbstractFunctionDecl>(vd);
-    return afd->getGenericEnvironmentOfContext();
+    auto captureInfo = getLoweredLocalCaptures(afd);
+    return getEffectiveGenericEnvironment(afd, captureInfo);
   }
   case SILDeclRef::Kind::GlobalAccessor:
   case SILDeclRef::Kind::GlobalGetter: {

@@ -2096,9 +2096,14 @@ static void collectRequirements(ArchetypeBuilder &builder,
   });
 }
 
-GenericSignature *ArchetypeBuilder::getGenericSignature(
-    ArrayRef<GenericTypeParamType *> genericParamTypes) {
+GenericSignature *ArchetypeBuilder::getGenericSignature() {
   // Collect the requirements placed on the generic parameter types.
+  SmallVector<GenericTypeParamType *, 4> genericParamTypes;
+  for (auto pair : Impl->PotentialArchetypes) {
+    auto paramTy = pair.second->getGenericParam();
+    genericParamTypes.push_back(paramTy);
+  }
+
   SmallVector<Requirement, 4> requirements;
   collectRequirements(*this, genericParamTypes, requirements);
 
@@ -2106,17 +2111,16 @@ GenericSignature *ArchetypeBuilder::getGenericSignature(
   return sig;
 }
 
-GenericEnvironment *ArchetypeBuilder::getGenericEnvironment(
-    ArrayRef<GenericTypeParamType *> genericParamTypes) {
+GenericEnvironment *ArchetypeBuilder::getGenericEnvironment() {
+  SmallVector<GenericTypeParamType *, 4> genericParamTypes;
   TypeSubstitutionMap interfaceToArchetypeMap;
 
-  for (auto paramTy : genericParamTypes) {
-    auto known = Impl->PotentialArchetypes.find(
-                   GenericTypeParamKey::forType(paramTy));
-    assert(known != Impl->PotentialArchetypes.end());
+  for (auto pair : Impl->PotentialArchetypes) {
+    auto paramTy = pair.second->getGenericParam();
+    genericParamTypes.push_back(paramTy);
 
-    auto archetypeTy = known->second->getType(*this).getAsArchetype();
-    auto concreteTy = known->second->getType(*this).getAsConcreteType();
+    auto archetypeTy = pair.second->getType(*this).getAsArchetype();
+    auto concreteTy = pair.second->getType(*this).getAsConcreteType();
     if (archetypeTy)
       interfaceToArchetypeMap[paramTy] = archetypeTy;
     else if (concreteTy)
@@ -2125,6 +2129,7 @@ GenericEnvironment *ArchetypeBuilder::getGenericEnvironment(
       llvm_unreachable("broken generic parameter");
   }
 
-  return GenericEnvironment::get(Context, interfaceToArchetypeMap);
+  return GenericEnvironment::get(Context, genericParamTypes,
+                                 interfaceToArchetypeMap);
 }
 

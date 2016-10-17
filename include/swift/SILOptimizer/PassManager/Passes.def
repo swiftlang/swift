@@ -133,8 +133,6 @@ PASS(HighLevelLICM, "high-level-licm",
      "High Level Loop invariant code motion")
 PASS(IVInfoPrinter, "iv-info-printer",
      "Display induction variable information")
-PASS(InOutDeshadowing, "inout-deshadow",
-     "Remove inout argument shadow variables")
 PASS(InstCount, "inst-count",
      "Count all instructions in the module using llvm Statistics")
 PASS(JumpThreadSimplifyCFG, "simplify-cfg",
@@ -176,6 +174,9 @@ PASS(MoveCondFailToPreds, "move-cond-fail-to-preds",
      "profitable")
 PASS(NoReturnFolding, "noreturn-folding",
      "Add 'unreachable' after noreturn calls")
+PASS(OwnershipModelEliminator, "ownership-model-eliminator",
+     "Eliminate SIL ownership constructs that are not supported by the whole"
+     " compiler from the IR")
 PASS(RCIdentityDumper, "rc-id-dumper",
      "Dump the RCIdentity of all values in a function")
 // TODO: It makes no sense to have early inliner, late inliner, and

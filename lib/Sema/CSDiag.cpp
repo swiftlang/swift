@@ -29,7 +29,7 @@ using namespace swift;
 using namespace constraints;
 
 static bool isUnresolvedOrTypeVarType(Type ty) {
-  return ty->is<TypeVariableType>() || ty->is<UnresolvedType>();
+  return ty->isTypeVariableOrMember() || ty->is<UnresolvedType>();
 }
 
 /// Given a subpath of an old locator, compute its summary flags.
@@ -1286,15 +1286,27 @@ CalleeCandidateInfo::evaluateCloseness(DeclContext *dc, Type candArgListType,
   bool mismatchesAreNearMisses = true;
 
   CalleeCandidateInfo::FailedArgumentInfo failureInfo;
-  
+
+  // Local function which extracts type from the parameter container.
+  auto getType = [](const CallArgParam &param) -> Type {
+    // If parameter is marked as @autoclosure, we are
+    // only interested in it's resulting type.
+    if (param.isAutoClosure()) {
+      if (auto fnType = param.Ty->getAs<AnyFunctionType>())
+        return fnType->getResult();
+    }
+
+    return param.Ty;
+  };
+
   for (unsigned i = 0, e = paramBindings.size(); i != e; ++i) {
     // Bindings specify the arguments that source the parameter.  The only case
     // this returns a non-singular value is when there are varargs in play.
     auto &bindings = paramBindings[i];
-    auto paramType = candArgs[i].Ty;
+    auto paramType = getType(candArgs[i]);
     
     for (auto argNo : bindings) {
-      auto argType = actualArgs[argNo].Ty;
+      auto argType = getType(actualArgs[argNo]);
       auto rArgType = argType->getRValueType();
       
       // If the argument has an unresolved type, then we're not actually
@@ -2920,7 +2932,8 @@ bool FailureDiagnosis::diagnoseGeneralConversionFailure(Constraint *constraint){
   // If simplification has turned this into the same types, then this isn't the
   // broken constraint that we're looking for.
   if (fromType->isEqual(toType) &&
-      constraint->getKind() != ConstraintKind::ConformsTo)
+      constraint->getKind() != ConstraintKind::ConformsTo &&
+      constraint->getKind() != ConstraintKind::LiteralConformsTo)
     return false;
   
   
@@ -3287,7 +3300,7 @@ static Type replaceArchetypesAndTypeVarsWithUnresolved(Type ty) {
  auto &ctx = ty->getASTContext();
 
   return ty.transform([&](Type type) -> Type {
-    if (type->is<TypeVariableType>() ||
+    if (type->isTypeVariableOrMember() ||
         type->is<ArchetypeType>() ||
         type->isTypeParameter())
       return ctx.TheUnresolvedType;
@@ -5263,7 +5276,7 @@ bool FailureDiagnosis::visitApplyExpr(ApplyExpr *callExpr) {
       argType = tupleTy;
     }
   }
-  
+
   // Get the expression result of type checking the arguments to the call
   // independently, so we have some idea of what we're working with.
   //
@@ -6387,10 +6400,8 @@ bool FailureDiagnosis::visitIdentityExpr(IdentityExpr *E) {
   
   // If we have a paren expr and our contextual type is a ParenType, remove the
   // paren expr sugar.
-  if (isa<ParenExpr>(E) && contextualType)
-    if (auto *PT = dyn_cast<ParenType>(contextualType.getPointer()))
-      contextualType = PT->getUnderlyingType();
-  
+  if (contextualType)
+    contextualType = contextualType->getWithoutParens();
   if (!typeCheckChildIndependently(E->getSubExpr(), contextualType,
                                    CS->getContextualTypePurpose()))
     return true;
@@ -6576,8 +6587,7 @@ static void noteArchetypeSource(const TypeLoc &loc, ArchetypeType *archetype,
 
       // ...but only if they were actually resolved by the constraint system
       // despite the failure.
-      TypeVariableType *unused;
-      Type maybeFixedType = cs.getFixedTypeRecursive(preferred, unused,
+      Type maybeFixedType = cs.getFixedTypeRecursive(preferred,
                                                      /*wantRValue*/true);
       if (maybeFixedType->hasTypeVariable() ||
           maybeFixedType->hasUnresolvedType()) {

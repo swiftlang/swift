@@ -1245,7 +1245,10 @@ public:
   parseAvailabilitySpecList(SmallVectorImpl<AvailabilitySpec *> &Specs);
 
   ParserResult<AvailabilitySpec> parseAvailabilitySpec();
-  ParserResult<VersionConstraintAvailabilitySpec> parseVersionConstraintSpec();
+  ParserResult<PlatformVersionConstraintAvailabilitySpec>
+  parsePlatformVersionConstraintSpec();
+  ParserResult<LanguageVersionConstraintAvailabilitySpec>
+  parseLanguageVersionConstraintSpec();
 };
 
 /// Describes a parsed declaration name.
@@ -1314,6 +1317,9 @@ DeclName formDeclName(ASTContext &ctx,
 
 /// Parse a stringified Swift declaration name, e.g. "init(frame:)".
 DeclName parseDeclName(ASTContext &ctx, StringRef name);
+
+/// Whether a given token can be the start of a decl.
+bool isKeywordPossibleDeclStart(const Token &Tok);
 
 } // end namespace swift
 

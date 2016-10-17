@@ -1,0 +1,22 @@
+// RUN: %target-sil-opt -module-name Swift %s
+// REQUIRES: asserts
+//
+// Make sure that we properly verify the lowering of optional value
+// metatypes. This shouldn't crash.
+//
+// rdar://28536812
+
+enum Optional<T> {
+case none
+case some(T)
+}
+
+sil @foo : $@convention(thin) () -> () {
+  %0 = enum $Optional<@thick Any.Type>, #Optional.none!enumelt
+  %1 = alloc_stack $Optional<@thick Any.Type>
+  store %0 to %1 : $*Optional<@thick Any.Type>
+  %2 = value_metatype $@thick Optional<Any.Type>.Type, %1 : $*Optional<@thick Any.Type>
+  dealloc_stack %1 : $*Optional<@thick Any.Type>
+  %3 = tuple()
+  return %3 : $()
+}

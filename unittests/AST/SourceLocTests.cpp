@@ -48,6 +48,12 @@ TEST(SourceLoc, AssignExpr) {
       C.Ctx.getIdentifier("bb"),
       DeclNameLoc(start.getAdvancedLoc(3)),
       /*implicit*/false);
+  auto destImplicit = new (C.Ctx) UnresolvedDotExpr(
+      destBase,
+      start.getAdvancedLoc(2),
+      C.Ctx.getIdentifier("bb"),
+      DeclNameLoc(start.getAdvancedLoc(3)),
+      /*implicit*/true);
 
   auto sourceBase = new (C.Ctx) UnresolvedDeclRefExpr(
       C.Ctx.getIdentifier("cc"),
@@ -59,6 +65,13 @@ TEST(SourceLoc, AssignExpr) {
       C.Ctx.getIdentifier("dd"),
       DeclNameLoc(start.getAdvancedLoc(11)),
       /*implicit*/false);
+  auto sourceImplicit = new (C.Ctx) UnresolvedDotExpr(
+      sourceBase,
+      start.getAdvancedLoc(10),
+      C.Ctx.getIdentifier("dd"),
+      DeclNameLoc(start.getAdvancedLoc(11)),
+      /*implicit*/true);
+
 
   auto invalid = new (C.Ctx) UnresolvedDeclRefExpr(
       C.Ctx.getIdentifier("invalid"),
@@ -74,8 +87,30 @@ TEST(SourceLoc, AssignExpr) {
   EXPECT_EQ(SourceRange(start, start.getAdvancedLoc(11)),
             complete->getSourceRange());
 
+  // Implicit dest should not change the source range.
+  auto completeImplDest = new (C.Ctx) AssignExpr( destImplicit
+                                                , start.getAdvancedLoc(6)
+                                                , source, /*implicit*/false);
+  EXPECT_EQ(start, completeImplDest->getStartLoc());
+  EXPECT_EQ(start.getAdvancedLoc(6), completeImplDest->getEqualLoc());
+  EXPECT_EQ(start.getAdvancedLoc(6), completeImplDest->getLoc());
+  EXPECT_EQ(start.getAdvancedLoc(11), completeImplDest->getEndLoc());
+  EXPECT_EQ(SourceRange(start, start.getAdvancedLoc(11)),
+            completeImplDest->getSourceRange());
+
+  // Implicit source should not change the source range.
+  auto completeImplSrc = new (C.Ctx) AssignExpr( dest, start.getAdvancedLoc(6)
+                                               , sourceImplicit
+                                               , /*implicit*/false);
+  EXPECT_EQ(start, completeImplSrc->getStartLoc());
+  EXPECT_EQ(start.getAdvancedLoc(6), completeImplSrc->getEqualLoc());
+  EXPECT_EQ(start.getAdvancedLoc(6), completeImplSrc->getLoc());
+  EXPECT_EQ(start.getAdvancedLoc(11), completeImplSrc->getEndLoc());
+  EXPECT_EQ(SourceRange(start, start.getAdvancedLoc(11)),
+            completeImplSrc->getSourceRange());
+
   auto invalidSource = new (C.Ctx) AssignExpr(dest, SourceLoc(), invalid,
-                                              /*implicit*/true);
+                                              /*implicit*/false);
   EXPECT_EQ(start, invalidSource->getStartLoc());
   EXPECT_EQ(SourceLoc(), invalidSource->getEqualLoc());
   EXPECT_EQ(SourceLoc(), invalidSource->getLoc());
@@ -84,7 +119,7 @@ TEST(SourceLoc, AssignExpr) {
             invalidSource->getSourceRange());
 
   auto invalidDest = new (C.Ctx) AssignExpr(invalid, SourceLoc(), source,
-                                            /*implicit*/true);
+                                            /*implicit*/false);
   EXPECT_EQ(start.getAdvancedLoc(8), invalidDest->getStartLoc());
   EXPECT_EQ(SourceLoc(), invalidDest->getEqualLoc());
   EXPECT_EQ(SourceLoc(), invalidDest->getLoc());
@@ -93,10 +128,62 @@ TEST(SourceLoc, AssignExpr) {
             invalidDest->getSourceRange());
 
   auto invalidAll = new (C.Ctx) AssignExpr(invalid, SourceLoc(), invalid,
-                                           /*implicit*/true);
+                                           /*implicit*/false);
   EXPECT_EQ(SourceLoc(), invalidAll->getStartLoc());
   EXPECT_EQ(SourceLoc(), invalidAll->getEqualLoc());
   EXPECT_EQ(SourceLoc(), invalidAll->getLoc());
   EXPECT_EQ(SourceLoc(), invalidAll->getEndLoc());
   EXPECT_EQ(SourceRange(), invalidAll->getSourceRange());
+}
+
+TEST(SourceLoc, TupleExpr) {
+  TestContext C;
+  
+  // In a TupleExpr, if the parens are both invalid, then you can only have a
+  // valid range iff both the first element and last element have valid ranges.
+  // Source ranges also have the property:
+  //   Start.isValid() == End.isValid()
+  // For example, given the buffer "one", of the form:
+  // (tuple_expr
+  //   (declref_expr range=[test.swift:1:0 - line:1:2] ...)
+  //   (declref_expr range=invalid ...))
+  // the range of this TupleExpr is SourceLoc() (invalid).
+  //       v invalid                v invalid
+  //       (     one,         two   )
+  //       valid ^    invalid ^
+  // COL:  xxxxxx012xxxxxxxxxxxxxxxxx
+  // but the SourceRange of 'one' is 1:0 - 1:2.
+  
+  //                                                012
+  auto bufferID = C.Ctx.SourceMgr.addMemBufferCopy("one");
+  SourceLoc start = C.Ctx.SourceMgr.getLocForBufferStart(bufferID);
+  
+  auto one = new (C.Ctx) UnresolvedDeclRefExpr(
+      C.Ctx.getIdentifier("one"),
+      DeclRefKind::Ordinary,
+      DeclNameLoc(start));
+  
+  auto two = new (C.Ctx) UnresolvedDeclRefExpr(
+      C.Ctx.getIdentifier("two"),
+      DeclRefKind::Ordinary,
+      DeclNameLoc());
+  
+  // the tuple from the example
+  SmallVector<Expr *, 2> subExprsRight({ one, two });
+  SmallVector<Identifier, 2> subExprNamesRight(2, Identifier());
+  auto rightInvalidTuple = TupleExpr::createImplicit(C.Ctx, subExprsRight, subExprNamesRight);
+  
+  EXPECT_EQ(start, one->getStartLoc());
+  EXPECT_EQ(SourceLoc(), rightInvalidTuple->getStartLoc());
+  EXPECT_EQ(SourceLoc(), rightInvalidTuple->getEndLoc());
+  EXPECT_EQ(SourceRange(), rightInvalidTuple->getSourceRange());
+
+  SmallVector<Expr *, 2> subExprsLeft({ two, one });
+  SmallVector<Identifier, 2> subExprNamesLeft(2, Identifier());
+  auto leftInvalidTuple = TupleExpr::createImplicit(C.Ctx, subExprsLeft, subExprNamesLeft);
+  
+  EXPECT_EQ(start, one->getStartLoc());
+  EXPECT_EQ(SourceLoc(), leftInvalidTuple->getStartLoc());
+  EXPECT_EQ(SourceLoc(), leftInvalidTuple->getEndLoc());
+  EXPECT_EQ(SourceRange(), leftInvalidTuple->getSourceRange());
 }

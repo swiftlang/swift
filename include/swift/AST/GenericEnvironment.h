@@ -28,10 +28,15 @@ class GenericTypeParamType;
 /// Describes the mapping between archetypes and interface types for the
 /// generic parameters of a DeclContext.
 class GenericEnvironment final {
+  SmallVector<GenericTypeParamType *, 4> GenericParams;
   TypeSubstitutionMap ArchetypeToInterfaceMap;
   TypeSubstitutionMap InterfaceToArchetypeMap;
 
 public:
+  ArrayRef<GenericTypeParamType *> getGenericParams() const {
+    return GenericParams;
+  }
+
   const TypeSubstitutionMap &getArchetypeToInterfaceMap() const {
     return ArchetypeToInterfaceMap;
   }
@@ -40,10 +45,13 @@ public:
     return InterfaceToArchetypeMap;
   }
 
-  explicit GenericEnvironment(TypeSubstitutionMap interfaceToArchetypeMap);
+  GenericEnvironment(ArrayRef<GenericTypeParamType *> genericParamTypes,
+                     TypeSubstitutionMap interfaceToArchetypeMap);
 
-  static GenericEnvironment *get(ASTContext &ctx,
-                                 TypeSubstitutionMap interfaceToArchetypeMap);
+  static
+  GenericEnvironment * get(ASTContext &ctx,
+                           ArrayRef<GenericTypeParamType *> genericParamTypes,
+                           TypeSubstitutionMap interfaceToArchetypeMap);
 
   /// Make vanilla new/delete illegal.
   void *operator new(size_t Bytes) = delete;
@@ -61,6 +69,9 @@ public:
 
   /// Map a generic parameter type to a contextual type.
   Type mapTypeIntoContext(GenericTypeParamType *type) const;
+
+  /// Get the sugared form of a generic parameter type.
+  GenericTypeParamType *getSugaredType(GenericTypeParamType *type) const;
 
   /// Derive a contextual type substitution map from a substitution array.
   /// This is just like GenericSignature::getSubstitutionMap(), except

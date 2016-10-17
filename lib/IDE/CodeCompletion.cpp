@@ -302,7 +302,7 @@ static bool shouldHideDeclFromCompletionResults(const ValueDecl *D) {
   return false;
 }
 
-typedef llvm::function_ref<bool(ValueDecl*, DeclVisibilityKind)> DeclFilter;
+typedef std::function<bool(ValueDecl*, DeclVisibilityKind)> DeclFilter;
 DeclFilter DefaultFilter = [] (ValueDecl* VD, DeclVisibilityKind Kind) {return true;};
 DeclFilter KeyPathFilter = [](ValueDecl* decl, DeclVisibilityKind) -> bool {
   return isa<TypeDecl>(decl) ||
@@ -3312,6 +3312,12 @@ public:
             return;
         }
       }
+
+      // If the right-hand side and result type are both type parameters, we're
+      // not providing a useful completion.
+      if (expr->getType()->isTypeParameter() &&
+          CCE.getType()->isTypeParameter())
+        return;
 
       addInfixOperatorCompletion(op, expr->getType(), CCE.getType());
     }

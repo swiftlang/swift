@@ -1,0 +1,179 @@
+#!/usr/bin/env python
+#
+# -*- python -*-
+#
+# Runs a .gyb scale-testing file repeatedly through swiftc while varying a
+# scaling variable 'N', collects json stats from the compiler, transforms the
+# problem to log-space and runs a linear regression to estimate the exponent on
+# the stat's growth curve relative to N.
+#
+# The estimate will be more accurate as N increases, so if you get a
+# not-terribly-convincing estimate, try increasing --begin and --end to larger
+# values.
+#
+
+import gyb, os, os.path, subprocess
+
+def find_which(p):
+    for d in os.environ["PATH"].split(os.pathsep):
+        full = os.path.join(d,p)
+        if os.path.isfile(full) and os.access(full, os.X_OK):
+            return full
+    return p
+
+# Evidently the debug-symbol reader in dtrace is sufficiently slow and/or buggy
+# that attempting to inject probes into a binary w/ debuginfo is asking for a
+# failed run (possibly racing with probe insertion, or probing the stabs
+# entries, see rdar://problem/7037927 or rdar://problem/11490861 respectively),
+# so we sniff the presence of debug symbols here.
+def has_debuginfo(swiftc):
+    swiftc = find_which(swiftc)
+    for line in subprocess.check_output(["dwarfdump", "--file-stats", swiftc]).splitlines():
+        if '%' not in line:
+            continue
+        fields = line.split()
+        if fields[8] != '0.00%' or fields[10] != '0.00%':
+            return True
+    return False
+
+
+def write_input_file(args, ast, d, n):
+    ifile = os.path.join(d, "in%d.swift" % n)
+    with open(ifile,'w+') as f:
+        f.write(gyb.execute_template(ast, '', N=n))
+    return ifile
+
+
+def run_once(args, ast, rng):
+    import sys, shutil, tempfile, json
+    r = {}
+    try:
+        d = tempfile.mkdtemp()
+        inputs = [write_input_file(args, ast, d, i) for i in rng]
+        primary = inputs[-1]
+        ofile = os.path.join(d, "out.o")
+        mode = "-c"
+        if args.parse:
+            mode = "-parse"
+        command = [args.swiftc_binary,
+                   "-frontend", mode,
+                   "-o", ofile,
+                   "-primary-file", primary] + inputs
+        if args.dtrace:
+            trace = os.path.join(d, "trace.txt")
+            script = "pid$target:swiftc:*%s*:entry { @[probefunc] = count() }" % args.select
+            subprocess.check_call(
+                ["sudo", "dtrace", "-q",
+                 "-o", trace,
+                 "-b", "256",
+                 "-n", script,
+                 "-c", " ".join(command)])
+            r = {fields[0]: int(fields[1]) for fields in
+                 [line.split() for line in open(trace)]
+                 if len(fields) == 2}
+        else:
+            stats = os.path.join(d, "stats.json")
+            subprocess.check_call(
+                command + ["-Xllvm", "-stats",
+                           "-Xllvm", "-stats-json",
+                           "-Xllvm", "-info-output-file=" + stats])
+            with open(stats) as f:
+                r = json.load(f)
+    finally:
+        shutil.rmtree(d)
+
+    return {k:v for (k,v) in r.items() if args.select in k}
+
+
+def run_many(args):
+
+    if args.dtrace and has_debuginfo(args.swiftc_binary):
+        print ""
+        print "**************************************************"
+        print ""
+        print "dtrace is unreliable on binaries w/ debug symbols"
+        print "please run 'strip -S %s'" % args.swiftc_binary
+        print "or pass a different --swiftc-binary"
+        print ""
+        print "**************************************************"
+        print ""
+        exit(1)
+
+    ast = gyb.parse_template(args.file.name, args.file.read())
+    rng = range(args.begin, args.end, args.step)
+    if args.multi_file:
+        return (rng, [run_once(args, ast, rng[0:i+1]) for i in range(len(rng))])
+    else:
+        return (rng, [run_once(args, ast, [r]) for r in rng])
+
+
+def report(args, rng, runs):
+    import numpy as np
+    bad = False
+    keys = set.intersection(*[set(j.keys()) for j in runs])
+    A = np.vstack([np.log(rng), np.ones(len(rng))]).T
+    rows = []
+    for k in keys:
+        vals = [r[k] for r in runs]
+        bounded = [max(v, 1) for v in vals]
+        b, a = np.linalg.lstsq(A, np.log(bounded))[0]
+        b = 0 if np.isclose(b, 0) else b
+        rows.append((b, k, vals))
+    rows.sort()
+    tolerance = 1.2
+    for (b, k, vals) in rows:
+        if b >= tolerance:
+            bad = True
+        if not args.quiet or b >= tolerance:
+            print "O(n^%1.1f) : %s" % (b, k)
+            if args.values:
+                print "                = ", vals
+    return bad
+
+
+def main():
+    import argparse, sys
+    parser = argparse.ArgumentParser()
+    parser.add_argument(
+        'file', type=argparse.FileType(),
+        help='Path to GYB template file (defaults to stdin)', nargs='?',
+        default=sys.stdin)
+    parser.add_argument(
+        '--values', action='store_true',
+        default=False, help='print stat values')
+    parser.add_argument(
+        '--quiet', action='store_true',
+        default=False, help='only print superlinear stats')
+    parser.add_argument(
+        '--parse', action='store_true',
+        default=False, help='only run compiler with -parse')
+    parser.add_argument(
+        '--dtrace', action='store_true',
+        default=False, help='use dtrace to sample all functions')
+    parser.add_argument(
+        '--multi-file', action='store_true',
+        default=False, help='vary number of input files as well')
+    parser.add_argument(
+        '--begin', type=int,
+        default=10, help='first value for N')
+    parser.add_argument(
+        '--end', type=int,
+        default=100, help='last value for N')
+    parser.add_argument(
+        '--step', type=int,
+        default=10, help='step value for N')
+    parser.add_argument(
+        '--swiftc-binary',
+        default="swiftc", help='swift binary to execute')
+    parser.add_argument(
+        '--select',
+        default="", help='substring of counters/symbols to restrict attention to')
+
+    args = parser.parse_args(sys.argv[1:])
+    (rng, runs) = run_many(args)
+    if report(args, rng, runs):
+        exit(1)
+    exit(0)
+
+if __name__ == '__main__':
+    main()

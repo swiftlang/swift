@@ -784,6 +784,9 @@ public:
                             clang::ObjCInterfaceDecl *classDecl,
                             bool forInstance);
 
+  /// Whether our effective Swift version is in the Swift 3 family
+  bool isSwiftVersion3() const { return LangOpts.isSwiftVersion3(); }
+
 private:
   friend class Decl;
   Optional<RawComment> getRawComment(const Decl *D);

@@ -10,8 +10,8 @@
 //
 //===----------------------------------------------------------------------===//
 
-#ifndef SIL_TypeLowering_h
-#define SIL_TypeLowering_h
+#ifndef SWIFT_SIL_TYPELOWERING_H
+#define SWIFT_SIL_TYPELOWERING_H
 
 #include "swift/AST/CaptureInfo.h"
 #include "swift/ABI/MetadataValues.h"

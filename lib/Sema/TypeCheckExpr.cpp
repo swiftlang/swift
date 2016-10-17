@@ -54,8 +54,7 @@ static void substituteInputSugarArgumentType(Type argTy, CanType resultTy,
 
   // If this type is parenthesized, remove the parens.  We don't want to
   // propagate parens from arguments to the result type.
-  if (auto *PT = dyn_cast<ParenType>(argTy.getPointer()))
-    argTy = PT->getUnderlyingType();
+  argTy = argTy->getWithoutParens();
   
   // If this is the first match against the sugar type we found, use it.
   if (!resultSugarTy) {

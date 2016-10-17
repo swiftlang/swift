@@ -16,6 +16,8 @@ We use multiple approaches to test the Swift toolchain.
 
 * LLVM lit-based testsuites for the compiler, runtime and the standard library.
 
+* Unit tests for sub-tools.
+
 * A selection of open source projects written in Swift.
 
 The LLVM lit-based testsuite
@@ -36,11 +38,13 @@ The LLVM lit-based testsuite
 Testsuite subsets
 -----------------
 
-The testsuite is split into three subsets:
+The testsuite is split into four subsets:
 
 * Primary testsuite, located under ``swift/test``.
 
 * Validation testsuite, located under ``swift/validation-test``.
+
+* Unit tests, located under ``swift/unittests``.
 
 * Long tests, which are marked with ``REQUIRES: long_test``.
 
@@ -90,6 +94,11 @@ Besides ``check-swift``, other targets are also available. Here's the full list:
 * ``check-swift-all``
 
   Runs all tests (primary, validation, and long).
+
+* ``SwiftUnitTests``
+
+  Builds all unit tests.  Executables are located under
+  ``${SWIFT_BUILD_ROOT}/unittests`` and must be run individually.
 
 For every target above, there are variants for different optimizations:
 

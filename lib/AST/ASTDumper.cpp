@@ -1215,8 +1215,11 @@ public:
       for (auto *Query : C.getAvailability()->getQueries()) {
         OS << '\n';
         switch (Query->getKind()) {
-        case AvailabilitySpecKind::VersionConstraint:
-          cast<VersionConstraintAvailabilitySpec>(Query)->print(OS, Indent + 2);
+        case AvailabilitySpecKind::PlatformVersionConstraint:
+          cast<PlatformVersionConstraintAvailabilitySpec>(Query)->print(OS, Indent + 2);
+          break;
+        case AvailabilitySpecKind::LanguageVersionConstraint:
+          cast<LanguageVersionConstraintAvailabilitySpec>(Query)->print(OS, Indent + 2);
           break;
         case AvailabilitySpecKind::OtherPlatform:
           cast<OtherPlatformAvailabilitySpec>(Query)->print(OS, Indent + 2);
@@ -2753,22 +2756,25 @@ namespace {
       OS << ")";
     }
 
+    void printMetatypeRepresentation(MetatypeRepresentation representation) {
+      OS << " ";
+      switch (representation) {
+      case MetatypeRepresentation::Thin:
+        OS << "@thin";
+        break;
+      case MetatypeRepresentation::Thick:
+        OS << "@thick";
+        break;
+      case MetatypeRepresentation::ObjC:
+        OS << "@objc";
+        break;
+      }
+    }
+
     void visitMetatypeType(MetatypeType *T, StringRef label) {
       printCommon(T, label, "metatype_type");
-      if (T->hasRepresentation()) {
-        OS << " ";
-        switch (T->getRepresentation()) {
-        case MetatypeRepresentation::Thin:
-          OS << "@thin";
-          break;
-        case MetatypeRepresentation::Thick:
-          OS << "@thick";
-          break;
-        case MetatypeRepresentation::ObjC:
-          OS << "@objc";
-          break;
-        }
-      }
+      if (T->hasRepresentation())
+        printMetatypeRepresentation(T->getRepresentation());
       printRec(T->getInstanceType());
       OS << ")";
     }
@@ -2776,6 +2782,8 @@ namespace {
     void visitExistentialMetatypeType(ExistentialMetatypeType *T,
                                       StringRef label) {
       printCommon(T, label, "existential_metatype_type");
+      if (T->hasRepresentation())
+        printMetatypeRepresentation(T->getRepresentation());
       printRec(T->getInstanceType());
       OS << ")";
     }
@@ -3082,4 +3090,7 @@ void GenericEnvironment::dump() const {
     pair.first->dump();
     pair.second->dump();
   }
+  llvm::errs() << "Generic parameters:\n";
+  for (auto paramTy : getGenericParams())
+    paramTy->dump();
 }

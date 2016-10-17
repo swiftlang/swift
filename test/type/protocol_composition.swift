@@ -123,9 +123,11 @@ func testConversion() {
 }
 
 // Test the parser's splitting of >= into > and =.
-var x : protocol<P5>= 17 // expected-warning {{'protocol<...>' composition syntax is deprecated and not needed here}} {{9-22=(P5)=}}
+var x : protocol<P5>= 17 // expected-warning {{'protocol<...>' composition syntax is deprecated and not needed here}} {{9-22=P5=}}
+var y : protocol<P5, P7>= 17 // expected-warning {{'protocol<...>' composition syntax is deprecated; join the protocols using '&'}} {{9-26=(P5 & P7)=}}
 
-typealias A = protocol<> // expected-warning {{'protocol<>' syntax is deprecated; use 'Any' instead}} {{15-25=Any}}
+typealias A1 = protocol<> // expected-warning {{'protocol<>' syntax is deprecated; use 'Any' instead}} {{16-26=Any}}
+typealias A2 = protocol<>? // expected-warning {{'protocol<>' syntax is deprecated; use 'Any' instead}} {{16-27=Any?}}
 typealias B1 = protocol<P1,P2> // expected-warning {{'protocol<...>' composition syntax is deprecated; join the protocols using '&'}} {{16-31=P1 & P2}}
 typealias B2 = protocol<P1, P2> // expected-warning {{'protocol<...>' composition syntax is deprecated; join the protocols using '&'}} {{16-32=P1 & P2}}
 typealias B3 = protocol<P1 ,P2> // expected-warning {{'protocol<...>' composition syntax is deprecated; join the protocols using '&'}} {{16-32=P1 & P2}}
@@ -133,3 +135,5 @@ typealias B4 = protocol<P1 , P2> // expected-warning {{'protocol<...>' compositi
 typealias C1 = protocol<Any, P1> // expected-warning {{'protocol<...>' composition syntax is deprecated and not needed here}} {{16-33=P1}}
 typealias C2 = protocol<P1, Any> // expected-warning {{'protocol<...>' composition syntax is deprecated and not needed here}} {{16-33=P1}}
 typealias D = protocol<P1> // expected-warning {{'protocol<...>' composition syntax is deprecated and not needed here}} {{15-27=P1}}
+typealias E = protocol<Any> // expected-warning {{'protocol<...>' composition syntax is deprecated and not needed here}} {{15-28=Any}}
+typealias F = protocol<Any, Any> // expected-warning {{'protocol<...>' composition syntax is deprecated and not needed here}} {{15-33=Any}}

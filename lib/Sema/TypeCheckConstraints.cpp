@@ -55,29 +55,6 @@ void TypeVariableType::Implementation::print(llvm::raw_ostream &OS) {
   getTypeVariable()->print(OS, PrintOptions());
 }
 
-TypeBase *TypeVariableType::getBaseBeingSubstituted() {
-  auto impl = this->getImpl();
-  auto archetype = impl.getArchetype();
-  
-  if (archetype)
-    return archetype;
-
-  if (auto locator = impl.getLocator())
-    if (auto anchor = locator->getAnchor())
-      if (auto anchorType = anchor->getType())
-        if (!(anchorType->getAs<TypeVariableType>() ||
-              anchorType->getAs<AnyFunctionType>()))
-          return anchorType.getPointer();
-  
-  if (auto proto = impl.literalConformanceProto) {
-    return proto->getType()->
-           getAs<MetatypeType>()->
-           getInstanceType().getPointer();
-  }
-
-  return this;
-}
-
 SavedTypeVariableBinding::SavedTypeVariableBinding(TypeVariableType *typeVar)
   : TypeVarAndOptions(typeVar, typeVar->getImpl().Options),
     ParentOrFixed(typeVar->getImpl().ParentOrFixed) { }
@@ -2670,10 +2647,10 @@ void Solution::dump(raw_ostream &out) const {
     }
   }
 
-  if (!DefaultedTypeVariables.empty()) {
-    out << "\nDefaulted type variables: ";
-    interleave(DefaultedTypeVariables, [&](TypeVariableType *typeVar) {
-      out << "$T" << typeVar->getID();
+  if (!DefaultedConstraints.empty()) {
+    out << "\nDefaulted constraints: ";
+    interleave(DefaultedConstraints, [&](ConstraintLocator *locator) {
+      locator->dump(sm, out);
     }, [&] {
       out << ", ";
     });
@@ -2828,10 +2805,10 @@ void ConstraintSystem::print(raw_ostream &out) {
     }
   }
 
-  if (!DefaultedTypeVariables.empty()) {
-    out << "\nDefaulted type variables: ";
-    interleave(DefaultedTypeVariables, [&](TypeVariableType *typeVar) {
-      out << "$T" << typeVar->getID();
+  if (!DefaultedConstraints.empty()) {
+    out << "\nDefaulted constraints: ";
+    interleave(DefaultedConstraints, [&](ConstraintLocator *locator) {
+      locator->dump(&getTypeChecker().Context.SourceMgr, out);
     }, [&] {
       out << ", ";
     });

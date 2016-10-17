@@ -588,8 +588,6 @@ func supportStructure(_ b: inout Bridge, name: String) throws {
 // CHECK-NEXT: apply [[SETTER]]([[T0]], [[INDEX]], [[B]])
 // CHECK-NEXT: dealloc_stack [[TEMP]]
 // CHECK-NEXT: release_value [[INDEX]] : $String
-// CHECK-NEXT: copy_addr
-// CHECK-NEXT: strong_release
 // CHECK-NEXT: tuple ()
 // CHECK-NEXT: return
 
@@ -606,8 +604,6 @@ func supportStructure(_ b: inout Bridge, name: String) throws {
 // CHECK-NEXT: dealloc_stack [[TEMP]]
 // CHECK-NEXT: release_value [[INDEX]] : $String
 // CHECK-NEXT: release_value [[INDEX]] : $String
-// CHECK-NEXT: copy_addr
-// CHECK-NEXT: strong_release
 // CHECK-NEXT: throw [[ERROR]]
 
 struct OwnedBridge {
@@ -635,15 +631,11 @@ func supportStructure(_ b: inout OwnedBridge, name: String) throws {
 // CHECK:    [[BB_NORMAL]]
 // CHECK-NEXT: strong_release [[OWNER]] : $Builtin.UnknownObject
 // CHECK-NEXT: release_value [[INDEX]] : $String
-// CHECK-NEXT: copy_addr
-// CHECK-NEXT: strong_release
 // CHECK-NEXT: tuple ()
 // CHECK-NEXT: return
 // CHECK:    [[BB_ERROR]]([[ERROR:%.*]] : $Error):
 // CHECK-NEXT: strong_release [[OWNER]] : $Builtin.UnknownObject
 // CHECK-NEXT: release_value [[INDEX]] : $String
-// CHECK-NEXT: copy_addr
-// CHECK-NEXT: strong_release
 // CHECK-NEXT: throw [[ERROR]]
 
 struct PinnedBridge {
@@ -671,8 +663,6 @@ func supportStructure(_ b: inout PinnedBridge, name: String) throws {
 // CHECK:    [[BB_NORMAL]]
 // CHECK-NEXT: strong_unpin [[OWNER]] : $Optional<Builtin.NativeObject>
 // CHECK-NEXT: release_value [[INDEX]] : $String
-// CHECK-NEXT: copy_addr
-// CHECK-NEXT: strong_release
 // CHECK-NEXT: tuple ()
 // CHECK-NEXT: return
 // CHECK:    [[BB_ERROR]]([[ERROR:%.*]] : $Error):
@@ -680,8 +670,6 @@ func supportStructure(_ b: inout PinnedBridge, name: String) throws {
 // CHECK-NEXT: strong_unpin [[OWNER]] : $Optional<Builtin.NativeObject>
 // CHECK-NEXT: release_value [[OWNER]]
 // CHECK-NEXT: release_value [[INDEX]] : $String
-// CHECK-NEXT: copy_addr
-// CHECK-NEXT: strong_release
 // CHECK-NEXT: throw [[ERROR]]
 
 // ! peepholes its argument with getSemanticsProvidingExpr().

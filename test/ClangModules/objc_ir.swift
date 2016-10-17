@@ -46,8 +46,7 @@ func initCallToAllocInit(i i: CInt) {
 }
 
 // CHECK: linkonce_odr hidden {{.*}} @_TFCSo1BCfT3intVs5Int32_GSQS__
-// CHECK: load i8*, i8** @"\01L_selector(allocWithZone:)"
-// CHECK: call [[OPAQUE:%.*]]* bitcast (void ()* @objc_msgSend
+// CHECK: call [[OPAQUE:%.*]]* @objc_allocWithZone
 
 // Indexed subscripting
 // CHECK: define hidden void @_TF7objc_ir19indexedSubscriptingFT1bCSo1B3idxSi1aCSo1A_T_
@@ -83,7 +82,7 @@ func propertyAccess(b b: B) {
 // CHECK: define hidden [[B]]* @_TF7objc_ir8downcastFT1aCSo1A_CSo1B(
 func downcast(a a: A) -> B {
   // CHECK: [[CLASS:%.*]] = load %objc_class*, %objc_class** @"OBJC_CLASS_REF_$_B"
-  // CHECK: [[T0:%.*]] = call %objc_class* @rt_swift_getInitializedObjCClass(%objc_class* [[CLASS]])
+  // CHECK: [[T0:%.*]] = call %objc_class* @swift_rt_swift_getInitializedObjCClass(%objc_class* [[CLASS]])
   // CHECK: [[T1:%.*]] = bitcast %objc_class* [[T0]] to i8*
   // CHECK: call i8* @swift_dynamicCastObjCClassUnconditional(i8* [[A:%.*]], i8* [[T1]]) [[NOUNWIND:#[0-9]+]]
   return a as! B
@@ -134,7 +133,7 @@ func protocolCompositionMetatype(p: Impl) -> (FooProto & AnotherProto).Type {
   // CHECK: [[RAW_RESULT:%.+]] = call i8* @processComboType(i8* {{%.+}})
   // CHECK: [[CASTED_RESULT:%.+]] = bitcast i8* [[RAW_RESULT]] to %objc_class*
   // CHECK: [[SWIFT_RESULT:%.+]] = call %swift.type* @swift_getObjCClassMetadata(%objc_class* [[CASTED_RESULT]])
-  // CHECK: call void bitcast (void (%swift.refcounted*)* @rt_swift_release to void (%C7objc_ir4Impl*)*)(%C7objc_ir4Impl* %0)
+  // CHECK: call void bitcast (void (%swift.refcounted*)* @swift_rt_swift_release to void (%C7objc_ir4Impl*)*)(%C7objc_ir4Impl* %0)
   // CHECK: ret %swift.type* [[SWIFT_RESULT]]
   let type = processComboType(type(of: p))
   return type
@@ -147,7 +146,7 @@ func protocolCompositionMetatype2(p: Impl) -> (FooProto & AnotherProto).Type {
   // CHECK: [[RAW_RESULT:%.+]] = call i8* @processComboType2(i8* {{%.+}})
   // CHECK: [[CASTED_RESULT:%.+]] = bitcast i8* [[RAW_RESULT]] to %objc_class*
   // CHECK: [[SWIFT_RESULT:%.+]] = call %swift.type* @swift_getObjCClassMetadata(%objc_class* [[CASTED_RESULT]])
-  // CHECK: call void bitcast (void (%swift.refcounted*)* @rt_swift_release to void (%C7objc_ir4Impl*)*)(%C7objc_ir4Impl* %0)
+  // CHECK: call void bitcast (void (%swift.refcounted*)* @swift_rt_swift_release to void (%C7objc_ir4Impl*)*)(%C7objc_ir4Impl* %0)
   // CHECK: ret %swift.type* [[SWIFT_RESULT]]
   let type = processComboType2(type(of: p))
   return type

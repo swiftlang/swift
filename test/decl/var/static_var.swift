@@ -256,11 +256,11 @@ protocol ProtosEvilTwin {
 extension ProtoAdopter : ProtosEvilTwin {}
 
 // rdar://18990358
-public struct Foo { // expected-note {{in declaration of 'Foo'}}
+public struct Foo { // expected-note {{to match this opening '{'}}}
   public static let S { a // expected-error{{computed property must have an explicit type}}
     // expected-error@-1{{type annotation missing in pattern}}
     // expected-error@-2{{'let' declarations cannot be computed properties}}
     // expected-error@-3{{use of unresolved identifier 'a'}}
 }
 
-// expected-error@+1 {{expected declaration}}
+// expected-error@+1 {{expected '}' in struct}}

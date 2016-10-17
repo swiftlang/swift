@@ -2055,8 +2055,7 @@ public:
   SourceLoc getLParenLoc() const { return LParenLoc; }
   SourceLoc getRParenLoc() const { return RParenLoc; }
 
-  SourceLoc getStartLoc() const;
-  SourceLoc getEndLoc() const;
+  SourceRange getSourceRange() const;
 
   /// \brief Whether this expression has a trailing closure as its argument.
   bool hasTrailingClosure() const { return TupleExprBits.HasTrailingClosure; }
@@ -4249,11 +4248,13 @@ public:
   SourceLoc getLoc() const { return EqualLoc; }
   SourceLoc getStartLoc() const {
     if (!isFolded()) return EqualLoc;
-    return (Dest->isImplicit() ? Src->getStartLoc() : Dest->getStartLoc());
+    return ( Dest->getStartLoc().isValid()
+           ? Dest->getStartLoc()
+           : Src->getStartLoc());
   }
   SourceLoc getEndLoc() const {
     if (!isFolded()) return EqualLoc;
-    return (Src->isImplicit() ? Dest->getEndLoc() : Src->getEndLoc());
+    return (Src->getEndLoc().isValid() ? Src->getEndLoc() : Dest->getEndLoc());
   }
   
   /// True if the node has been processed by binary expression folding.

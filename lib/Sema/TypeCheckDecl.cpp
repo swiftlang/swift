@@ -738,7 +738,7 @@ TypeChecker::handleSILGenericParams(GenericParamList *genericParams,
     checkGenericParamList(&builder, genericParams, parentSig, parentEnv,
                           nullptr);
     parentSig = genericSig;
-    parentEnv = builder.getGenericEnvironment(genericSig->getGenericParams());
+    parentEnv = builder.getGenericEnvironment();
     finalizeGenericParamList(genericParams, parentSig, parentEnv, DC);
   }
 
@@ -4841,7 +4841,7 @@ public:
 
       // Assign archetypes.
       auto *sig = FD->getGenericSignature();
-      auto *env = builder.getGenericEnvironment(sig->getGenericParams());
+      auto *env = builder.getGenericEnvironment();
       FD->setGenericEnvironment(env);
 
       TC.finalizeGenericParamList(gp, sig, env, FD);
@@ -6529,7 +6529,7 @@ public:
 
       // Assign archetypes.
       auto *sig = CD->getGenericSignature();
-      auto *env = builder.getGenericEnvironment(sig->getGenericParams());
+      auto *env = builder.getGenericEnvironment();
       CD->setGenericEnvironment(env);
 
       TC.finalizeGenericParamList(gp, sig, env, CD);
@@ -7540,7 +7540,7 @@ static Type checkExtensionGenericParams(
   tc.checkGenericParamList(&builder, genericParams, parentSig, parentEnv, nullptr);
   inferExtendedTypeReqs(builder);
 
-  auto *env = builder.getGenericEnvironment(sig->getGenericParams());
+  auto *env = builder.getGenericEnvironment();
   ext->setGenericEnvironment(env);
 
   tc.finalizeGenericParamList(genericParams, sig, env, ext);

@@ -1,7 +1,7 @@
 set(TRANSFORMS_SOURCES
+  Transforms/ARCCodeMotion.cpp
   Transforms/AllocBoxToStack.cpp
   Transforms/ArrayCountPropagation.cpp
-  Transforms/ARCCodeMotion.cpp
   Transforms/ArrayElementValuePropagation.cpp
   Transforms/CSE.cpp
   Transforms/ConditionForwarding.cpp
@@ -13,6 +13,7 @@ set(TRANSFORMS_SOURCES
   Transforms/FunctionSignatureOpts.cpp
   Transforms/GenericSpecializer.cpp
   Transforms/MergeCondFail.cpp
+  Transforms/OwnershipModelEliminator.cpp
   Transforms/PerformanceInliner.cpp
   Transforms/RedundantLoadElimination.cpp
   Transforms/RedundantOverflowCheckRemoval.cpp

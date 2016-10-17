@@ -605,13 +605,8 @@ func pinUnpin(_ object : Builtin.NativeObject) {
 // NativeObject
 // CHECK-LABEL: sil hidden @_TF8builtins8isUnique
 // CHECK: bb0(%0 : $*Optional<Builtin.NativeObject>):
-// CHECK-NEXT: [[BOX:%.*]] = alloc_box $Optional<Builtin.NativeObject>
-// CHECK-NEXT: [[PB:%.*]] = project_box [[BOX]]
-// CHECK-NEXT: copy_addr %0 to [initialization] [[PB]] : $*Optional<Builtin.NativeObject>
-// CHECK: [[BUILTIN:%.*]] = is_unique [[PB]] : $*Optional<Builtin.NativeObject>
-// CHECK: copy_addr [[PB]] to %0 : $*Optional<Builtin.NativeObject>
-// CHECK-NEXT: strong_release [[BOX]] : $@box Optional<Builtin.NativeObject>
-// CHECK-NEXT: return
+// CHECK: [[BUILTIN:%.*]] = is_unique %0 : $*Optional<Builtin.NativeObject>
+// CHECK: return
 func isUnique(_ ref: inout Builtin.NativeObject?) -> Bool {
   return _getBool(Builtin.isUnique(&ref))
 }
@@ -619,13 +614,8 @@ func isUnique(_ ref: inout Builtin.NativeObject?) -> Bool {
 // NativeObject nonNull
 // CHECK-LABEL: sil hidden @_TF8builtins8isUnique
 // CHECK: bb0(%0 : $*Builtin.NativeObject):
-// CHECK-NEXT: [[BOX:%.*]] = alloc_box $Builtin.NativeObject
-// CHECK-NEXT: [[PB:%.*]] = project_box [[BOX]]
-// CHECK: copy_addr %0 to [initialization] [[PB]] : $*Builtin.NativeObject
-// CHECK: [[BUILTIN:%.*]] = is_unique [[PB]] : $*Builtin.NativeObject
-// CHECK: copy_addr [[PB]] to %0 : $*Builtin.NativeObject
-// CHECK-NEXT: strong_release [[BOX]] : $@box Builtin.NativeObject
-// CHECK-NEXT: return
+// CHECK: [[BUILTIN:%.*]] = is_unique %0 : $*Builtin.NativeObject
+// CHECK: return
 func isUnique(_ ref: inout Builtin.NativeObject) -> Bool {
   return _getBool(Builtin.isUnique(&ref))
 }
@@ -633,13 +623,8 @@ func isUnique(_ ref: inout Builtin.NativeObject) -> Bool {
 // NativeObject pinned
 // CHECK-LABEL: sil hidden @_TF8builtins16isUniqueOrPinned
 // CHECK: bb0(%0 : $*Optional<Builtin.NativeObject>):
-// CHECK-NEXT: [[BOX:%.*]] = alloc_box $Optional<Builtin.NativeObject>
-// CHECK-NEXT: [[PB:%.*]] = project_box [[BOX]]
-// CHECK: copy_addr %0 to [initialization] [[PB]] : $*Optional<Builtin.NativeObject>
-// CHECK: [[BUILTIN:%.*]] = is_unique_or_pinned [[PB]] : $*Optional<Builtin.NativeObject>
-// CHECK: copy_addr [[PB]] to %0 : $*Optional<Builtin.NativeObject>
-// CHECK-NEXT: strong_release [[BOX]] : $@box Optional<Builtin.NativeObject>
-// CHECK-NEXT: return
+// CHECK: [[BUILTIN:%.*]] = is_unique_or_pinned %0 : $*Optional<Builtin.NativeObject>
+// CHECK: return
 func isUniqueOrPinned(_ ref: inout Builtin.NativeObject?) -> Bool {
   return _getBool(Builtin.isUniqueOrPinned(&ref))
 }
@@ -647,13 +632,8 @@ func isUniqueOrPinned(_ ref: inout Builtin.NativeObject?) -> Bool {
 // NativeObject pinned nonNull
 // CHECK-LABEL: sil hidden @_TF8builtins16isUniqueOrPinned
 // CHECK: bb0(%0 : $*Builtin.NativeObject):
-// CHECK-NEXT: [[BOX:%.*]] = alloc_box $Builtin.NativeObject
-// CHECK-NEXT: [[PB:%.*]] = project_box [[BOX]]
-// CHECK: copy_addr %0 to [initialization] [[PB]] : $*Builtin.NativeObject
-// CHECK: [[BUILTIN:%.*]] = is_unique_or_pinned [[PB]] : $*Builtin.NativeObject
-// CHECK: copy_addr [[PB]] to %0 : $*Builtin.NativeObject
-// CHECK-NEXT: strong_release [[BOX]] : $@box Builtin.NativeObject
-// CHECK-NEXT: return
+// CHECK: [[BUILTIN:%.*]] = is_unique_or_pinned %0 : $*Builtin.NativeObject
+// CHECK: return
 func isUniqueOrPinned(_ ref: inout Builtin.NativeObject) -> Bool {
   return _getBool(Builtin.isUniqueOrPinned(&ref))
 }
@@ -661,13 +641,8 @@ func isUniqueOrPinned(_ ref: inout Builtin.NativeObject) -> Bool {
 // UnknownObject (ObjC)
 // CHECK-LABEL: sil hidden @_TF8builtins8isUnique
 // CHECK: bb0(%0 : $*Optional<Builtin.UnknownObject>):
-// CHECK-NEXT: [[BOX:%.*]] = alloc_box $Optional<Builtin.UnknownObject>
-// CHECK-NEXT: [[PB:%.*]] = project_box [[BOX]]
-// CHECK: copy_addr %0 to [initialization] [[PB]] : $*Optional<Builtin.UnknownObject>
-// CHECK: [[BUILTIN:%.*]] = is_unique [[PB]] : $*Optional<Builtin.UnknownObject>
-// CHECK: copy_addr [[PB]] to %0 : $*Optional<Builtin.UnknownObject>
-// CHECK-NEXT: strong_release [[BOX]] : $@box Optional<Builtin.UnknownObject>
-// CHECK-NEXT: return
+// CHECK: [[BUILTIN:%.*]] = is_unique %0 : $*Optional<Builtin.UnknownObject>
+// CHECK: return
 func isUnique(_ ref: inout Builtin.UnknownObject?) -> Bool {
   return _getBool(Builtin.isUnique(&ref))
 }
@@ -675,13 +650,8 @@ func isUnique(_ ref: inout Builtin.UnknownObject?) -> Bool {
 // UnknownObject (ObjC) nonNull
 // CHECK-LABEL: sil hidden @_TF8builtins8isUnique
 // CHECK: bb0(%0 : $*Builtin.UnknownObject):
-// CHECK-NEXT: [[BOX:%.*]] = alloc_box $Builtin.UnknownObject
-// CHECK-NEXT: [[PB:%.*]] = project_box [[BOX]]
-// CHECK: copy_addr %0 to [initialization] [[PB]] : $*Builtin.UnknownObject
-// CHECK: [[BUILTIN:%.*]] = is_unique [[PB]] : $*Builtin.UnknownObject
-// CHECK: copy_addr [[PB]] to %0 : $*Builtin.UnknownObject
-// CHECK-NEXT: strong_release [[BOX]] : $@box Builtin.UnknownObject
-// CHECK-NEXT: return
+// CHECK: [[BUILTIN:%.*]] = is_unique %0 : $*Builtin.UnknownObject
+// CHECK: return
 func isUnique(_ ref: inout Builtin.UnknownObject) -> Bool {
   return _getBool(Builtin.isUnique(&ref))
 }
@@ -689,13 +659,8 @@ func isUnique(_ ref: inout Builtin.UnknownObject) -> Bool {
 // UnknownObject (ObjC) pinned nonNull
 // CHECK-LABEL: sil hidden @_TF8builtins16isUniqueOrPinned
 // CHECK: bb0(%0 : $*Builtin.UnknownObject):
-// CHECK-NEXT: [[BOX:%.*]] = alloc_box $Builtin.UnknownObject
-// CHECK-NEXT: [[PB:%.*]] = project_box [[BOX]]
-// CHECK: copy_addr %0 to [initialization] [[PB]] : $*Builtin.UnknownObject
-// CHECK: [[BUILTIN:%.*]] = is_unique_or_pinned [[PB]] : $*Builtin.UnknownObject
-// CHECK: copy_addr [[PB]] to %0 : $*Builtin.UnknownObject
-// CHECK-NEXT: strong_release [[BOX]] : $@box Builtin.UnknownObject
-// CHECK-NEXT: return
+// CHECK: [[BUILTIN:%.*]] = is_unique_or_pinned %0 : $*Builtin.UnknownObject
+// CHECK: return
 func isUniqueOrPinned(_ ref: inout Builtin.UnknownObject) -> Bool {
   return _getBool(Builtin.isUniqueOrPinned(&ref))
 }
@@ -703,13 +668,8 @@ func isUniqueOrPinned(_ ref: inout Builtin.UnknownObject) -> Bool {
 // BridgeObject nonNull
 // CHECK-LABEL: sil hidden @_TF8builtins8isUnique
 // CHECK: bb0(%0 : $*Builtin.BridgeObject):
-// CHECK-NEXT: [[BOX:%.*]] = alloc_box $Builtin.BridgeObject
-// CHECK-NEXT: [[PB:%.*]] = project_box [[BOX]]
-// CHECK: copy_addr %0 to [initialization] [[PB]] : $*Builtin.BridgeObject
-// CHECK: [[BUILTIN:%.*]] = is_unique [[PB]] : $*Builtin.BridgeObject
-// CHECK: copy_addr [[PB]] to %0 : $*Builtin.BridgeObject
-// CHECK-NEXT: strong_release [[BOX]] : $@box Builtin.BridgeObject
-// CHECK-NEXT: return
+// CHECK: [[BUILTIN:%.*]] = is_unique %0 : $*Builtin.BridgeObject
+// CHECK: return
 func isUnique(_ ref: inout Builtin.BridgeObject) -> Bool {
   return _getBool(Builtin.isUnique(&ref))
 }
@@ -717,13 +677,8 @@ func isUnique(_ ref: inout Builtin.BridgeObject) -> Bool {
 // BridgeObject pinned nonNull
 // CHECK-LABEL: sil hidden @_TF8builtins16isUniqueOrPinned
 // CHECK: bb0(%0 : $*Builtin.BridgeObject):
-// CHECK-NEXT: [[BOX:%.*]] = alloc_box $Builtin.BridgeObject
-// CHECK-NEXT: [[PB:%.*]] = project_box [[BOX]]
-// CHECK: copy_addr %0 to [initialization] [[PB]] : $*Builtin.BridgeObject
-// CHECK: [[BUILTIN:%.*]] = is_unique_or_pinned [[PB]] : $*Builtin.BridgeObject
-// CHECK: copy_addr [[PB]] to %0 : $*Builtin.BridgeObject
-// CHECK-NEXT: strong_release [[BOX]] : $@box Builtin.BridgeObject
-// CHECK-NEXT: return
+// CHECK: [[BUILTIN:%.*]] = is_unique_or_pinned %0 : $*Builtin.BridgeObject
+// CHECK: return
 func isUniqueOrPinned(_ ref: inout Builtin.BridgeObject) -> Bool {
   return _getBool(Builtin.isUniqueOrPinned(&ref))
 }
@@ -731,14 +686,8 @@ func isUniqueOrPinned(_ ref: inout Builtin.BridgeObject) -> Bool {
 // BridgeObject nonNull native
 // CHECK-LABEL: sil hidden @_TF8builtins15isUnique_native
 // CHECK: bb0(%0 : $*Builtin.BridgeObject):
-// CHECK-NEXT: [[BOX:%.*]] = alloc_box $Builtin.BridgeObject
-// CHECK-NEXT: [[PB:%.*]] = project_box [[BOX]]
-// CHECK: copy_addr %0 to [initialization] [[PB]] : $*Builtin.BridgeObject
-// CHECK: [[CAST:%.*]] = unchecked_addr_cast [[PB]] : $*Builtin.BridgeObject to $*Builtin.NativeObject
-// CHECK: [[BUILTIN:%.*]] = is_unique [[CAST]] : $*Builtin.NativeObject
-// CHECK: copy_addr [[PB]] to %0 : $*Builtin.BridgeObject
-// CHECK-NEXT: strong_release [[BOX]] : $@box Builtin.BridgeObject
-// CHECK-NEXT: return
+// CHECK: [[CAST:%.*]] = unchecked_addr_cast %0 : $*Builtin.BridgeObject to $*Builtin.NativeObject
+// CHECK: return
 func isUnique_native(_ ref: inout Builtin.BridgeObject) -> Bool {
   return _getBool(Builtin.isUnique_native(&ref))
 }
@@ -746,14 +695,9 @@ func isUnique_native(_ ref: inout Builtin.BridgeObject) -> Bool {
 // BridgeObject pinned nonNull native
 // CHECK-LABEL: sil hidden @_TF8builtins23isUniqueOrPinned_native
 // CHECK: bb0(%0 : $*Builtin.BridgeObject):
-// CHECK-NEXT: [[BOX:%.*]] = alloc_box $Builtin.BridgeObject
-// CHECK-NEXT: [[PB:%.*]] = project_box [[BOX]]
-// CHECK: copy_addr %0 to [initialization] [[PB]] : $*Builtin.BridgeObject
-// CHECK: [[CAST:%.*]] = unchecked_addr_cast [[PB]] : $*Builtin.BridgeObject to $*Builtin.NativeObject
+// CHECK: [[CAST:%.*]] = unchecked_addr_cast %0 : $*Builtin.BridgeObject to $*Builtin.NativeObject
 // CHECK: [[BUILTIN:%.*]] = is_unique_or_pinned [[CAST]] : $*Builtin.NativeObject
-// CHECK: copy_addr [[PB]] to %0 : $*Builtin.BridgeObject
-// CHECK-NEXT: strong_release [[BOX]] : $@box Builtin.BridgeObject
-// CHECK-NEXT: return
+// CHECK: return
 func isUniqueOrPinned_native(_ ref: inout Builtin.BridgeObject) -> Bool {
   return _getBool(Builtin.isUniqueOrPinned_native(&ref))
 }
