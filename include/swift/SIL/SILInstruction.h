@@ -1739,6 +1739,50 @@ public:
   }
 };
 
+/// Represents a load of a borrowed value. Must be paired with an end_borrow
+/// instruction in its use-def list.
+class LoadBorrowInst : public UnaryInstructionBase<ValueKind::LoadBorrowInst> {
+  friend class SILBuilder;
+
+  LoadBorrowInst(SILDebugLocation DebugLoc, SILValue LValue)
+      : UnaryInstructionBase(DebugLoc, LValue,
+                             LValue->getType().getObjectType()) {}
+};
+
+/// Represents the end of a borrow scope for a value or address from another
+/// value or address.
+///
+/// The semantics of the instruction here is that the "dest" SILValue can not be
+/// used after this instruction and the "src" SILValue must stay alive up to
+/// EndBorrowInst.
+class EndBorrowInst : public SILInstruction {
+  friend class SILBuilder;
+
+public:
+  enum {
+    /// The source of the value being borrowed.
+    Src,
+    /// The destination of the borrowed value.
+    Dest
+  };
+
+private:
+  FixedOperandList<2> Operands;
+  EndBorrowInst(SILDebugLocation DebugLoc, SILValue Src, SILValue Dest);
+
+public:
+  SILValue getSrc() const { return Operands[Src].get(); }
+
+  SILValue getDest() const { return Operands[Dest].get(); }
+
+  ArrayRef<Operand> getAllOperands() const { return Operands.asArray(); }
+  MutableArrayRef<Operand> getAllOperands() { return Operands.asArray(); }
+
+  static bool classof(const ValueBase *V) {
+    return V->getKind() == ValueKind::EndBorrowInst;
+  }
+};
+
 /// AssignInst - Represents an abstract assignment to a memory location, which
 /// may either be an initialization or a store sequence.  This is only valid in
 /// Raw SIL.

@@ -226,6 +226,7 @@ InlineCost swift::instructionInlineCost(SILInstruction &I) {
     case ValueKind::DebugValueAddrInst:
     case ValueKind::StringLiteralInst:
     case ValueKind::FixLifetimeInst:
+    case ValueKind::EndBorrowInst:
     case ValueKind::MarkDependenceInst:
     case ValueKind::FunctionRefInst:
     case ValueKind::AllocGlobalInst:
@@ -350,6 +351,7 @@ InlineCost swift::instructionInlineCost(SILInstruction &I) {
     case ValueKind::InjectEnumAddrInst:
     case ValueKind::IsNonnullInst:
     case ValueKind::LoadInst:
+    case ValueKind::LoadBorrowInst:
     case ValueKind::LoadUnownedInst:
     case ValueKind::LoadWeakInst:
     case ValueKind::OpenExistentialAddrInst:
