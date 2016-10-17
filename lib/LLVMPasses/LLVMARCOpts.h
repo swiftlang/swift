@@ -42,77 +42,38 @@ inline RT_Kind classifyInstruction(const llvm::Instruction &I) {
   if (F == 0) return RT_Unknown;
 
   return llvm::StringSwitch<RT_Kind>(F->getName())
-    .Case("swift_retain", RT_Retain)
-    .Case("swift_retain_n", RT_RetainN)
-    .Case("swift_release", RT_Release)
-    .Case("swift_release_n", RT_ReleaseN)
-    .Case("swift_allocObject", RT_AllocObject)
-    .Case("objc_release", RT_ObjCRelease)
-    .Case("objc_retain", RT_ObjCRetain)
-    .Case("swift_retainUnowned", RT_RetainUnowned)
-    .Case("swift_checkUnowned", RT_CheckUnowned)
-    .Case("swift_bridgeObjectRetain", RT_BridgeRetain)
-    .Case("swift_bridgeObjectRetain_n", RT_BridgeRetainN)
-    .Case("swift_bridgeObjectRelease", RT_BridgeRelease)
-    .Case("swift_bridgeObjectRelease_n", RT_BridgeReleaseN)
-    .Case("swift_unknownRetain", RT_UnknownRetain)
-    .Case("swift_unknownRetain_n", RT_UnknownRetainN)
-    .Case("swift_unknownRelease", RT_UnknownRelease)
-    .Case("swift_unknownRelease_n", RT_UnknownReleaseN)
-    .Case("__swift_fixLifetime", RT_FixLifetime)
+#define SWIFT_FUNC(Name, MemBehavior, TextualName) \
+    .Case("swift_" #TextualName, RT_ ## Name)
+#define OBJC_FUNC(Name, MemBehavior, TextualName) \
+    .Case("objc_" #TextualName, RT_ ## Name)
+#define SWIFT_INTERNAL_FUNC_NEVER_NONATOMIC(Name, MemBehavior, TextualName) \
+    .Case("__swift_" #TextualName, RT_ ## Name)
+#include "LLVMSwift.def"
+
 #if defined(SWIFT_WRAPPER_PREFIX)
-    .Case(SWIFT_WRAPPER_NAME("swift_retain"), RT_Retain)
-    .Case(SWIFT_WRAPPER_NAME("swift_retain_n"), RT_RetainN)
-    .Case(SWIFT_WRAPPER_NAME("swift_release"), RT_Release)
-    .Case(SWIFT_WRAPPER_NAME("swift_release_n"), RT_ReleaseN)
-    .Case(SWIFT_WRAPPER_NAME("swift_allocObject"), RT_AllocObject)
-    .Case(SWIFT_WRAPPER_NAME("objc_release"), RT_ObjCRelease)
-    .Case(SWIFT_WRAPPER_NAME("objc_retain"), RT_ObjCRetain)
-    .Case(SWIFT_WRAPPER_NAME("swift_retainUnowned"), RT_RetainUnowned)
-    .Case(SWIFT_WRAPPER_NAME("swift_checkUnowned"), RT_CheckUnowned)
-    .Case(SWIFT_WRAPPER_NAME("swift_bridgeObjectRetain"), RT_BridgeRetain)
-    .Case(SWIFT_WRAPPER_NAME("swift_bridgeObjectRetain_n"), RT_BridgeRetainN)
-    .Case(SWIFT_WRAPPER_NAME("swift_bridgeObjectRelease"), RT_BridgeRelease)
-    .Case(SWIFT_WRAPPER_NAME("swift_bridgeObjectRelease_n"), RT_BridgeReleaseN)
-    .Case(SWIFT_WRAPPER_NAME("swift_unknownRetain"), RT_UnknownRetain)
-    .Case(SWIFT_WRAPPER_NAME("swift_unknownRetain_n"), RT_UnknownRetainN)
-    .Case(SWIFT_WRAPPER_NAME("swift_unknownRelease"), RT_UnknownRelease)
-    .Case(SWIFT_WRAPPER_NAME("swift_unknownRelease_n"), RT_UnknownReleaseN)
+#define SWIFT_FUNC(Name, MemBehavior, TextualName) \
+    .Case(SWIFT_WRAPPER_NAME("swift_" #TextualName), RT_ ## Name)
+#define OBJC_FUNC(Name, MemBehavior, TextualName) \
+    .Case(SWIFT_WRAPPER_NAME("objc_" #TextualName), RT_ ## Name)
+#define SWIFT_INTERNAL_FUNC_NEVER_NONATOMIC(Name, MemBehavior, TextualName)
+#include "LLVMSwift.def"
 #endif
+
     // Support non-atomic versions of reference counting entry points.
-    .Case("swift_nonatomic_retain", RT_Retain)
-    .Case("swift_nonatomic_retain_n", RT_RetainN)
-    .Case("swift_nonatomic_release", RT_Release)
-    .Case("swift_nonatomic_release_n", RT_ReleaseN)
-    .Case("objc_nonatomic_release", RT_ObjCRelease)
-    .Case("objc_nonatomic_retain", RT_ObjCRetain)
-    .Case("swift_nonatomic_retainUnowned", RT_RetainUnowned)
-    .Case("swift_nonatomic_checkUnowned", RT_CheckUnowned)
-    .Case("swift_nonatomic_bridgeObjectRetain", RT_BridgeRetain)
-    .Case("swift_nonatomic_bridgeObjectRetain_n", RT_BridgeRetainN)
-    .Case("swift_nonatomic_bridgeObjectRelease", RT_BridgeRelease)
-    .Case("swift_nonatomic_bridgeObjectRelease_n", RT_BridgeReleaseN)
-    .Case("swift_nonatomic_unknownRetain", RT_UnknownRetain)
-    .Case("swift_nonatomic_unknownRetain_n", RT_UnknownRetainN)
-    .Case("swift_nonatomic_unknownRelease", RT_UnknownRelease)
-    .Case("swift_nonatomic_unknownRelease_n", RT_UnknownReleaseN)
+#define SWIFT_FUNC(Name, MemBehavior, TextualName) \
+    .Case("swift_nonatomic_" #TextualName, RT_ ## Name)
+#define OBJC_FUNC(Name, MemBehavior, TextualName) \
+    .Case("objc_nonatomic_" #TextualName, RT_ ## Name)
+#define SWIFT_INTERNAL_FUNC_NEVER_NONATOMIC(Name, MemBehavior, TextualName)
+#include "LLVMSwift.def"
+
 #if defined(SWIFT_WRAPPER_PREFIX)
-    .Case(SWIFT_WRAPPER_NAME("swift_nonatomic_retain"), RT_Retain)
-    .Case(SWIFT_WRAPPER_NAME("swift_nonatomic_retain_n"), RT_RetainN)
-    .Case(SWIFT_WRAPPER_NAME("swift_nonatomic_release"), RT_Release)
-    .Case(SWIFT_WRAPPER_NAME("swift_nonatomic_release_n"), RT_ReleaseN)
-    .Case(SWIFT_WRAPPER_NAME("objc_nonatomic_release"), RT_ObjCRelease)
-    .Case(SWIFT_WRAPPER_NAME("objc_nonatomic_retain"), RT_ObjCRetain)
-    .Case(SWIFT_WRAPPER_NAME("swift_nonatomic_retainUnowned"), RT_RetainUnowned)
-    .Case(SWIFT_WRAPPER_NAME("swift_nonatomic_checkUnowned"), RT_CheckUnowned)
-    .Case(SWIFT_WRAPPER_NAME("swift_nonatomic_bridgeObjectRetain"), RT_BridgeRetain)
-    .Case(SWIFT_WRAPPER_NAME("swift_nonatomic_bridgeObjectRetain_n"), RT_BridgeRetainN)
-    .Case(SWIFT_WRAPPER_NAME("swift_nonatomic_bridgeObjectRelease"), RT_BridgeRelease)
-    .Case(SWIFT_WRAPPER_NAME("swift_nonatomic_bridgeObjectRelease_n"), RT_BridgeReleaseN)
-    .Case(SWIFT_WRAPPER_NAME("swift_nonatomic_unknownRetain"), RT_UnknownRetain)
-    .Case(SWIFT_WRAPPER_NAME("swift_nonatomic_unknownRetain_n"), RT_UnknownRetainN)
-    .Case(SWIFT_WRAPPER_NAME("swift_nonatomic_unknownRelease"), RT_UnknownRelease)
-    .Case(SWIFT_WRAPPER_NAME("swift_nonatomic_unknownRelease_n"), RT_UnknownReleaseN)
+#define SWIFT_FUNC(Name, MemBehavior, TextualName) \
+    .Case(SWIFT_WRAPPER_NAME("swift_nonatomic_" #TextualName), RT_ ## Name)
+#define OBJC_FUNC(Name, MemBehavior, TextualName) \
+    .Case(SWIFT_WRAPPER_NAME("objc_nonatomic_" #TextualName), RT_ ## Name)
+#define SWIFT_INTERNAL_FUNC_NEVER_NONATOMIC(Name, MemBehavior, TextualName)
+#include "LLVMSwift.def"
 #endif
     .Default(RT_Unknown);
 }
