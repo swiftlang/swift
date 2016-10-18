@@ -141,7 +141,7 @@ TEST(SourceLoc, TupleExpr) {
       DeclNameLoc());
   
   auto four = new (C.Ctx) UnresolvedDeclRefExpr(
-      C.Ctx.getIdentifier("three"),
+      C.Ctx.getIdentifier("four"),
       DeclRefKind::Ordinary,
       DeclNameLoc(start.getAdvancedLoc(4)));
   
