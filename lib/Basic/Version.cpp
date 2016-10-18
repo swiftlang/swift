@@ -310,17 +310,9 @@ Version::operator clang::VersionTuple() const
   }
 }
 
-bool
-Version::isValidEffectiveLanguageVersion() const
-{
-  // Whitelist of backward-compatibility versions that we permit passing as
-  // -swift-version <vers>
-  char const *whitelist[] = {
-    "3",
-    "4",
-  };
-  for (auto const i : whitelist) {
-    auto v = parseVersionString(i, SourceLoc(), nullptr);
+bool Version::isValidEffectiveLanguageVersion() const {
+  for (auto verStr : getValidEffectiveVersions()) {
+    auto v = parseVersionString(verStr, SourceLoc(), nullptr);
     assert(v.hasValue());
     if (v == *this)
       return true;

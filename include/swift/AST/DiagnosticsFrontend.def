@@ -99,6 +99,8 @@ ERROR(error_no_source_location_scope_map,none,
 
 NOTE(note_swift_version_major, none,
      "use major version, as in '-swift-version %0'", (unsigned))
+NOTE(note_valid_swift_versions, none,
+     "valid arguments to '-swift-version' are %0", (StringRef))
 
 ERROR(error_mode_cannot_emit_dependencies,none,
   "this mode does not support emitting dependency files", ())

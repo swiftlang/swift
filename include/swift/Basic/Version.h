@@ -127,6 +127,12 @@ public:
   /// Returns a version from the currently defined SWIFT_VERSION_MAJOR and
   /// SWIFT_VERSION_MINOR.
   static Version getCurrentLanguageVersion();
+
+  // Whitelist of backward-compatibility versions that we permit passing as
+  // -swift-version <vers>
+  static std::array<StringRef, 2> getValidEffectiveVersions() {
+    return {{"3", "4"}};
+  };
 };
 
 bool operator>=(const Version &lhs, const Version &rhs);
