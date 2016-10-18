@@ -437,7 +437,7 @@ struct ASTNodeBase {};
           }
 
           // Otherwise, the archetype needs to be from this scope.
-          if (GenericEnv.empty()) {
+          if (GenericEnv.empty() || !GenericEnv.back()) {
             Out << "AST verification error: archetype outside of generic "
                    "context: " << archetype->getString() << "\n";
             return true;
