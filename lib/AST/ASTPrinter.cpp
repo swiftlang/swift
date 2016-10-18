@@ -3496,7 +3496,7 @@ public:
   }
 
   void visitNameAliasType(NameAliasType *T) {
-    if (Options.PrintForSIL) {
+    if (Options.PrintForSIL || Options.PrintNameAliasUnderlyingType) {
       visit(T->getSinglyDesugaredType());
       return;
     }
