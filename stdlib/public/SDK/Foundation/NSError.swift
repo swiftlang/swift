@@ -10,8 +10,36 @@
 //
 //===----------------------------------------------------------------------===//
 
+@_exported import Foundation // Clang module
 import CoreFoundation
 import Darwin
+
+//===----------------------------------------------------------------------===//
+// NSError (as an out parameter).
+//===----------------------------------------------------------------------===//
+
+public typealias NSErrorPointer = AutoreleasingUnsafeMutablePointer<NSError?>?
+
+// Note: NSErrorPointer becomes ErrorPointer in Swift 3.
+public typealias ErrorPointer = NSErrorPointer
+
+public // COMPILER_INTRINSIC
+let _nilObjCError: Error = _GenericObjCError.nilError
+
+@_silgen_name("swift_convertNSErrorToError")
+public // COMPILER_INTRINSIC
+func _convertNSErrorToError(_ error: NSError?) -> Error {
+  if let error = error {
+    return error
+  }
+  return _nilObjCError
+}
+
+@_silgen_name("swift_convertErrorToNSError")
+public // COMPILER_INTRINSIC
+func _convertErrorToNSError(_ error: Error) -> NSError {
+  return unsafeDowncast(_bridgeErrorToNSError(error), to: NSError.self)
+}
 
 /// Describes an error that provides localized messages describing why
 /// an error occurred and provides more information about the error.
