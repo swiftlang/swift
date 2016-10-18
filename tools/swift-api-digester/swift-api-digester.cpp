@@ -2814,7 +2814,7 @@ bool DiagnosisEmitter::DeclAttrDiag::operator<(DeclAttrDiag Other) const {
 }
 
 void DiagnosisEmitter::DeclAttrDiag::output() const {
-  llvm::outs() << Kind << "" << printName(DeclName) << " is now " <<
+  llvm::outs() << Kind << " " << printName(DeclName) << " is now " <<
     printDiagKeyword(AttrName) << "\n";
 }
 

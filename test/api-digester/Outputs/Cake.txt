@@ -9,4 +9,4 @@
 Constructor S1.init(_:) has 1st parameter type change from Int to Double
 
 ==================================================== Decl Attribute changes ====================================================
-FuncS1.foo1() is now mutating
+Func S1.foo1() is now mutating
