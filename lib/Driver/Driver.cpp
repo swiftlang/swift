@@ -356,9 +356,34 @@ static bool populateOutOfDateMap(InputInfoMap &map, StringRef argsHashStr,
     map[inputPair.second] = iter->getValue();
   }
 
-  // If a file was removed, we've lost its dependency info. Rebuild everything.
-  // FIXME: Can we do better?
-  return numInputsFromPrevious != previousInputs.size();
+  if (numInputsFromPrevious == previousInputs.size()) {
+    return false;
+  } else {
+    // If a file was removed, we've lost its dependency info. Rebuild everything.
+    // FIXME: Can we do better?
+    if (ShowIncrementalBuildDecisions) {
+      llvm::StringSet<> inputArgs;
+      for (auto &inputPair : inputs) {
+        inputArgs.insert(inputPair.second->getValue());
+      }
+
+      SmallVector<StringRef, 8> missingInputs;
+      for (auto &previousInput : previousInputs) {
+        auto previousInputArg = previousInput.getKey();
+        if (inputArgs.find(previousInputArg) == inputArgs.end()) {
+          missingInputs.push_back(previousInputArg);
+        }
+      }
+
+      llvm::outs() << "Incremental compilation has been disabled, because "
+                   << "the following inputs were used in the previous "
+                   << "compilation, but not in the current compilation:\n";
+      for (auto &missing : missingInputs) {
+        llvm::outs() << "\t" << missing << "\n";
+      }
+    }
+    return true;
+  }
 }
 
 std::unique_ptr<Compilation> Driver::buildCompilation(
