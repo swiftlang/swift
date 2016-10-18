@@ -4858,7 +4858,11 @@ void TypeChecker::checkConformancesInContext(DeclContext *dc,
       if (!value) continue;
       if (isa<TypeDecl>(value)) continue;
       if (!value->getFullName()) continue;
-      
+
+      // If this declaration overrides another declaration, the signature is
+      // fixed; don't complain about near misses.
+      if (value->getOverriddenDecl()) continue;
+
       // If this member is a witness to any @objc requirement, ignore it.
       if (!findWitnessedObjCRequirements(value, /*anySingleRequirement=*/true)
             .empty())
