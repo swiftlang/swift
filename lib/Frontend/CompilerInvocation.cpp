@@ -319,7 +319,8 @@ static bool ParseFrontendArgs(FrontendOptions &Opts, ArgList &Args,
     // treat the input as SIL.
     StringRef Input(Opts.InputFilenames[0]);
     TreatAsSIL = llvm::sys::path::extension(Input).endswith(SIL_EXTENSION);
-  } else if (Opts.PrimaryInput.hasValue() && Opts.PrimaryInput->isFilename()) {
+  } else if (!TreatAsSIL && Opts.PrimaryInput.hasValue() &&
+             Opts.PrimaryInput->isFilename()) {
     // If we have a primary input and it's a filename with extension "sil",
     // treat the input as SIL.
     StringRef Input(Opts.InputFilenames[Opts.PrimaryInput->Index]);
