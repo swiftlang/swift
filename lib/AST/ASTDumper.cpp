@@ -2438,9 +2438,9 @@ public:
     OS << ')';
   }
 
-  void visitProtocolCompositionTypeRepr(ProtocolCompositionTypeRepr *T) {
+  void visitCompositionTypeRepr(CompositionTypeRepr *T) {
     printCommon(T, "type_composite");
-    for (auto elem : T->getProtocols()) {
+    for (auto elem : T->getTypes()) {
       OS << '\n';
       printRec(elem);
     }
