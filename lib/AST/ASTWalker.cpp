@@ -1540,9 +1540,8 @@ bool Traversal::visitNamedTypeRepr(NamedTypeRepr *T) {
   return false;
 }
 
-bool Traversal::visitProtocolCompositionTypeRepr(
-       ProtocolCompositionTypeRepr *T) {
-  for (auto elem : T->getProtocols()) {
+bool Traversal::visitCompositionTypeRepr(CompositionTypeRepr *T) {
+  for (auto elem : T->getTypes()) {
     if (doIt(elem))
       return true;
   }

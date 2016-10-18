@@ -668,6 +668,7 @@ public:
   Optional<uint8_t> getSelfIndexOptional() const { return SelfIndex; }
   bool hasSelfIndex() const { return SelfIndex.hasValue(); }
   static bool classof(const SDKNode *N);
+  static StringRef getTypeRoleDescription(unsigned Index);
 };
 
 bool SDKNodeAbstractFunc::classof(const SDKNode *N) {
@@ -689,10 +690,9 @@ public:
                                                        SDKNodeKind::Function) {}
   SDKNode *getReturnType() { return (*getChildBegin()).get(); }
   static bool classof(const SDKNode *N);
-  static StringRef getTypeRoleDescription(unsigned Index);
 };
 
-StringRef SDKNodeFunction::getTypeRoleDescription(unsigned Index) {
+StringRef SDKNodeAbstractFunc::getTypeRoleDescription(unsigned Index) {
   if (Index == 0) {
     return InsertToBuffer("return");
   } else if (Index == 1) {
@@ -2814,7 +2814,7 @@ bool DiagnosisEmitter::DeclAttrDiag::operator<(DeclAttrDiag Other) const {
 }
 
 void DiagnosisEmitter::DeclAttrDiag::output() const {
-  llvm::outs() << Kind << "" << printName(DeclName) << " is now " <<
+  llvm::outs() << Kind << " " << printName(DeclName) << " is now " <<
     printDiagKeyword(AttrName) << "\n";
 }
 
@@ -2867,10 +2867,11 @@ void DiagnosisEmitter::visitType(SDKNodeType *Node) {
     auto *Count = UpdateMap.findUpdateCounterpart(Node)->getAs<SDKNodeType>();
     StringRef Descriptor;
     switch (Parent->getKind()) {
+    case SDKNodeKind::Constructor:
     case SDKNodeKind::Function:
     case SDKNodeKind::Var:
-      Descriptor = Parent->getKind() == SDKNodeKind::Function ?
-        SDKNodeFunction::getTypeRoleDescription(Parent->getChildIndex(Node)) :
+      Descriptor = isa<SDKNodeAbstractFunc>(Parent) ?
+        SDKNodeAbstractFunc::getTypeRoleDescription(Parent->getChildIndex(Node)) :
         InsertToBuffer("declared");
       TypeChangedDecls.Diags.emplace_back(Parent->getDeclKind(),
                                           Parent->getFullyQualifiedName(),

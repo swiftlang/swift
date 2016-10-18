@@ -369,6 +369,21 @@ func <#test1#> () {}
 ///
 /// - parameter x: A number
 /// - parameter y: Another number
+/// - PaRamEteR z-hyphen-q: Another number
+/// - parameter : A strange number...
+/// - parameternope1: Another number
+/// - parameter nope2
+/// - parameter: nope3
+/// -parameter nope4: Another number
+/// * parameter nope5: Another number
+///  - parameter nope6: Another number
+///  - Parameters: nope7
+/// - seealso: yes
+///   - seealso: yes
+/// - seealso:
+/// -seealso: nope
+/// - seealso : nope
+/// - seealso nope
 /// - returns: `x + y`
 func foo(x: Int, y: Int) -> Int { return x + y }
 // CHECK: <doc-comment-line>/// Brief.
@@ -377,6 +392,21 @@ func foo(x: Int, y: Int) -> Int { return x + y }
 // CHECK: </doc-comment-line><doc-comment-line>///
 // CHECK: </doc-comment-line><doc-comment-line>/// - <doc-comment-field>parameter</doc-comment-field> x: A number
 // CHECK: </doc-comment-line><doc-comment-line>/// - <doc-comment-field>parameter</doc-comment-field> y: Another number
+// CHECK: </doc-comment-line><doc-comment-line>/// - <doc-comment-field>PaRamEteR</doc-comment-field> z-hyphen-q: Another number
+// CHECK: </doc-comment-line><doc-comment-line>/// - <doc-comment-field>parameter</doc-comment-field> : A strange number...
+// CHECK: </doc-comment-line><doc-comment-line>/// - parameternope1: Another number
+// CHECK: </doc-comment-line><doc-comment-line>/// - parameter nope2
+// CHECK: </doc-comment-line><doc-comment-line>/// - parameter: nope3
+// CHECK: </doc-comment-line><doc-comment-line>/// -parameter nope4: Another number
+// CHECK: </doc-comment-line><doc-comment-line>/// * parameter nope5: Another number
+// CHECK: </doc-comment-line><doc-comment-line>///  - parameter nope6: Another number
+// CHECK: </doc-comment-line><doc-comment-line>///  - Parameters: nope7
+// CHECK: </doc-comment-line><doc-comment-line>/// - <doc-comment-field>seealso</doc-comment-field>: yes
+// CHECK: </doc-comment-line><doc-comment-line>///   - <doc-comment-field>seealso</doc-comment-field>: yes
+// CHECK: </doc-comment-line><doc-comment-line>/// - <doc-comment-field>seealso</doc-comment-field>:
+// CHECK: </doc-comment-line><doc-comment-line>/// -seealso: nope
+// CHECK: </doc-comment-line><doc-comment-line>/// - seealso : nope
+// CHECK: </doc-comment-line><doc-comment-line>/// - seealso nope
 // CHECK: </doc-comment-line><doc-comment-line>/// - <doc-comment-field>returns</doc-comment-field>: `x + y`
 // CHECK: </doc-comment-line><kw>func</kw> foo(x: <type>Int</type>, y: <type>Int</type>) -> <type>Int</type> { <kw>return</kw> x + y }
 
