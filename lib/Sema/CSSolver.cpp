@@ -793,18 +793,21 @@ static PotentialBindings getPotentialBindings(ConstraintSystem &cs,
       result.InvolvesTypeVariables = true;
       continue;
 
-    case ConstraintKind::LiteralConformsTo:
-        // If there is a 'nil' literal constraint, we might need optional
-        // supertype bindings.
-        if (constraint->getProtocol()->isSpecificProtocol(
-              KnownProtocolKind::ExpressibleByNilLiteral))
-          addOptionalSupertypeBindings = true;
-
-        SWIFT_FALLTHROUGH;
-
     case ConstraintKind::ConformsTo:
-    case ConstraintKind::SelfObjectOfProtocol: {
-      // FIXME: Only for LiteralConformsTo?
+    case ConstraintKind::SelfObjectOfProtocol:
+      // Swift 3 allowed the use of default types for normal conformances
+      // to expressible-by-literal protocols.
+      if (tc.Context.LangOpts.EffectiveLanguageVersion[0] >= 4)
+        continue;
+
+      SWIFT_FALLTHROUGH;
+        
+    case ConstraintKind::LiteralConformsTo: {
+      // If there is a 'nil' literal constraint, we might need optional
+      // supertype bindings.
+      if (constraint->getProtocol()->isSpecificProtocol(
+            KnownProtocolKind::ExpressibleByNilLiteral))
+        addOptionalSupertypeBindings = true;
 
       // If there is a default literal type for this protocol, it's a
       // potential binding.
