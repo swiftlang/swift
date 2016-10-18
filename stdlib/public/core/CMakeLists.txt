@@ -213,6 +213,12 @@ if(SWIFT_CHECK_ESSENTIAL_STDLIB)
   target_link_libraries(swift_stdlib_essential ${RUNTIME_DEPENDENCY})
 endif()
 
+
+set(shared_only_libs)
+if(SWIFT_BUILD_STATIC_STDLIB AND "${SWIFT_HOST_VARIANT_SDK}" STREQUAL "LINUX")
+   list(APPEND shared_only_libs swiftImageInspectionShared)
+endif()
+
 add_swift_library(swiftCore ${SWIFT_STDLIB_LIBRARY_BUILD_TYPES} IS_STDLIB IS_STDLIB_CORE
   ${SWIFTLIB_SOURCES}
   # The copy_shim_headers target dependency is required to let the
@@ -228,5 +234,6 @@ add_swift_library(swiftCore ${SWIFT_STDLIB_LIBRARY_BUILD_TYPES} IS_STDLIB IS_STD
   LINK_FLAGS ${swift_core_link_flags}
   PRIVATE_LINK_LIBRARIES ${swift_core_private_link_libraries}
   INCORPORATE_OBJECT_LIBRARIES swiftRuntime swiftStdlibStubs
+  INCORPORATE_OBJECT_LIBRARIES_SHARED_ONLY ${shared_only_libs}
   FRAMEWORK_DEPENDS ${swift_core_framework_depends}
   INSTALL_IN_COMPONENT stdlib)

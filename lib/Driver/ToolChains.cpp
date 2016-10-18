@@ -952,6 +952,12 @@ toolchains::Darwin::constructInvocation(const LinkJobAction &job,
   assert(context.Output.getPrimaryOutputType() == types::TY_Image &&
          "Invalid linker output type.");
 
+  if (context.Args.hasFlag(options::OPT_static_executable,
+                           options::OPT_no_static_executable,
+                           false)) {
+    llvm::report_fatal_error("-static-executable is not supported on Darwin");
+  }
+
   const Driver &D = getDriver();
   const llvm::Triple &Triple = getTriple();
 
@@ -1357,9 +1363,26 @@ toolchains::GenericUnix::constructInvocation(const LinkJobAction &job,
 
   // Link the standard library.
   Arguments.push_back("-L");
-  if (context.Args.hasFlag(options::OPT_static_stdlib,
-                            options::OPT_no_static_stdlib,
-                            false)) {
+  if (context.Args.hasFlag(options::OPT_static_executable,
+                           options::OPT_no_static_executable,
+                           false)) {
+    SmallString<128> StaticRuntimeLibPath;
+    getRuntimeStaticLibraryPath(StaticRuntimeLibPath, context.Args, *this);
+    Arguments.push_back(context.Args.MakeArgString(StaticRuntimeLibPath));
+
+    SmallString<128> linkFilePath = StaticRuntimeLibPath;
+    llvm::sys::path::append(linkFilePath, "static-executable-args.lnk");
+    auto linkFile = linkFilePath.str();
+
+    if (llvm::sys::fs::is_regular_file(linkFile)) {
+      Arguments.push_back(context.Args.MakeArgString(Twine("@") + linkFile));
+    } else {
+      llvm::report_fatal_error("-static-executable not supported on this platform");
+    }
+  }
+  else if (context.Args.hasFlag(options::OPT_static_stdlib,
+                                options::OPT_no_static_stdlib,
+                                false)) {
     SmallString<128> StaticRuntimeLibPath;
     getRuntimeStaticLibraryPath(StaticRuntimeLibPath, context.Args, *this);
     Arguments.push_back(context.Args.MakeArgString(StaticRuntimeLibPath));
@@ -1384,6 +1407,7 @@ toolchains::GenericUnix::constructInvocation(const LinkJobAction &job,
   }
   else {
     Arguments.push_back(context.Args.MakeArgString(RuntimeLibPath));
+    Arguments.push_back("-lswiftCore");
   }
 
 
@@ -1404,8 +1428,6 @@ toolchains::GenericUnix::constructInvocation(const LinkJobAction &job,
         Twine("-u", llvm::getInstrProfRuntimeHookVarName())));
   }
 
-  // Always add the stdlib
-  Arguments.push_back("-lswiftCore");
 
   // Add any autolinking scripts to the arguments
   for (const Job *Cmd : context.Inputs) {
