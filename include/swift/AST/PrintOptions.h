@@ -327,6 +327,10 @@ struct PrintOptions {
   /// formatting.
   bool PrintOriginalSourceText = false;
 
+  /// When printing a name alias type, whether print the underlying type instead
+  /// of the alias.
+  bool PrintNameAliasUnderlyingType = false;
+
   /// \brief Print dependent types as references into this generic environment.
   GenericEnvironment *GenericEnv = nullptr;
 
