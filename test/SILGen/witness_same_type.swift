@@ -1,4 +1,5 @@
 // RUN: %target-swift-frontend -emit-silgen %s | %FileCheck %s
+// RUN: %target-swift-frontend -emit-ir %s
 
 protocol Fooable {
   associatedtype Bar
@@ -10,7 +11,7 @@ struct X {}
 
 // Ensure that the protocol witness for requirements with same-type constraints
 // is set correctly. <rdar://problem/16369105>
-// CHECK-LABEL: sil hidden [transparent] [thunk] @_TTWV17witness_same_type3FooS_7FooableS_FS1_3foo{{.*}} : $@convention(witness_method) <T where T : Fooable> (@in T, @in_guaranteed Foo) -> @out X
+// CHECK-LABEL: sil hidden [transparent] [thunk] @_TTWV17witness_same_type3FooS_7FooableS_FS1_3foouRd__S1_wx3Barzwd__S2_rfT1xqd___wxS2_ : $@convention(witness_method) <T where T : Fooable, T.Bar == X> (@in T, @in_guaranteed Foo) -> @out X
 struct Foo: Fooable {
   typealias Bar = X
 
