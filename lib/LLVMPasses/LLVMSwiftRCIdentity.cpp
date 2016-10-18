@@ -57,6 +57,7 @@ SwiftRCIdentity::stripReferenceForwarding(llvm::Value *Val) {
   case RT_RetainUnowned:
   case RT_CheckUnowned:
   case RT_ObjCRelease:
+  case RT_EndBorrow:
     break;
   // ObjC forwards references.
   case RT_ObjCRetain:

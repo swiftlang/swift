@@ -52,6 +52,7 @@ bool swift::hasNonTrivialNonDebugUse(SILArgument *Arg) {
 static bool isSpecializableRepresentation(SILFunctionTypeRepresentation Rep) {
   switch (Rep) {
   case SILFunctionTypeRepresentation::Method:
+  case SILFunctionTypeRepresentation::Closure:
   case SILFunctionTypeRepresentation::Thin:
   case SILFunctionTypeRepresentation::Thick:
   case SILFunctionTypeRepresentation::CFunctionPointer:

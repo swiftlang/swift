@@ -6,9 +6,8 @@
 // See http://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
 
 // RUN: not --crash %target-swift-frontend %s -parse
-protocol P{
-protocol A
-typealias e=b
-typealias e
-typealias e=A
-typealias b
+protocol a{
+protocol b
+typealias c=d
+typealias c
+typealias c=b

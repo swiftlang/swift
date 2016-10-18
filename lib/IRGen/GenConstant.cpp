@@ -84,7 +84,8 @@ static llvm::Constant *emitConstantValue(IRGenModule &IGM, SILValue operand) {
     llvm_unreachable("Unsupported SILInstruction in static initializer!");
 }
 
-static template <typename InstTy, typename NextIndexFunc>
+namespace {
+template <typename InstTy, typename NextIndexFunc>
 llvm::Constant *emitConstantStructOrTuple(IRGenModule &IGM, InstTy inst,
                                           NextIndexFunc nextIndex) {
   auto type = inst->getType();
@@ -118,6 +119,7 @@ llvm::Constant *emitConstantStructOrTuple(IRGenModule &IGM, InstTy inst,
 
   return llvm::ConstantStruct::get(sTy, elts);
 }
+} // end anonymous namespace
 
 llvm::Constant *irgen::emitConstantStruct(IRGenModule &IGM, StructInst *SI) {
   // The only way to get a struct's stored properties (which we need to map to

@@ -6,6 +6,4 @@
 // See http://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
 
 // RUN: not --crash %target-swift-frontend %s -parse
-class B<I
-func g<T{enum A:T
-enum S<b:B<T.j>
+func a<b{enum c:b

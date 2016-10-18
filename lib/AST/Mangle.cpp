@@ -1032,6 +1032,9 @@ void Mangler::mangleType(Type type, unsigned uncurryLevel) {
     case SILFunctionTypeRepresentation::Method:
       Buffer << "Cm";
       break;
+    case SILFunctionTypeRepresentation::Closure:
+      Buffer << "Ck";
+      break;
     case SILFunctionTypeRepresentation::WitnessMethod:
       Buffer << "Cw";
       break;

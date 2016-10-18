@@ -1939,6 +1939,7 @@ static CallEmission getCallEmissionForLoweredValue(IRGenSILFunction &IGF,
     case SILFunctionType::Representation::Thin:
     case SILFunctionType::Representation::CFunctionPointer:
     case SILFunctionType::Representation::Method:
+    case SILFunctionType::Representation::Closure:
     case SILFunctionType::Representation::ObjCMethod:
     case SILFunctionType::Representation::WitnessMethod:
     case SILFunctionType::Representation::Thick: {
@@ -2152,6 +2153,7 @@ getPartialApplicationFunction(IRGenSILFunction &IGF, SILValue v,
     case SILFunctionTypeRepresentation::Thick:
     case SILFunctionTypeRepresentation::Thin:
     case SILFunctionTypeRepresentation::Method:
+    case SILFunctionTypeRepresentation::Closure:
       break;
     }
     return std::make_tuple(lv.getStaticFunction().getFunction(),
@@ -2165,6 +2167,7 @@ getPartialApplicationFunction(IRGenSILFunction &IGF, SILValue v,
     switch (fnType->getRepresentation()) {
     case SILFunctionType::Representation::Thin:
     case SILFunctionType::Representation::Method:
+    case SILFunctionType::Representation::Closure:
     case SILFunctionType::Representation::ObjCMethod:
       break;
     case SILFunctionType::Representation::WitnessMethod: {
@@ -3128,16 +3131,39 @@ void IRGenSILFunction::visitRefTailAddrInst(RefTailAddrInst *i) {
 void IRGenSILFunction::visitLoadInst(swift::LoadInst *i) {
   Explosion lowered;
   Address source = getLoweredAddress(i->getOperand());
-  const TypeInfo &type = getTypeInfo(i->getType().getObjectType());
-  cast<LoadableTypeInfo>(type).loadAsTake(*this, source, lowered);
+  SILType objType = i->getType().getObjectType();
+  const auto &typeInfo = cast<LoadableTypeInfo>(getTypeInfo(objType));
+
+  switch (i->getOwnershipQualifier()) {
+  case LoadOwnershipQualifier::Unqualified:
+  case LoadOwnershipQualifier::Trivial:
+  case LoadOwnershipQualifier::Take:
+    typeInfo.loadAsTake(*this, source, lowered);
+    break;
+  case LoadOwnershipQualifier::Copy:
+    typeInfo.loadAsCopy(*this, source, lowered);
+    break;
+  }
+
   setLoweredExplosion(i, lowered);
 }
 
 void IRGenSILFunction::visitStoreInst(swift::StoreInst *i) {
   Explosion source = getLoweredExplosion(i->getSrc());
   Address dest = getLoweredAddress(i->getDest());
-  auto &type = getTypeInfo(i->getSrc()->getType().getObjectType());
-  cast<LoadableTypeInfo>(type).initialize(*this, source, dest);
+  SILType objType = i->getSrc()->getType().getObjectType();
+
+  const auto &typeInfo = cast<LoadableTypeInfo>(getTypeInfo(objType));
+  switch (i->getOwnershipQualifier()) {
+  case StoreOwnershipQualifier::Unqualified:
+  case StoreOwnershipQualifier::Init:
+  case StoreOwnershipQualifier::Trivial:
+    typeInfo.initialize(*this, source, dest);
+    break;
+  case StoreOwnershipQualifier::Assign:
+    typeInfo.assign(*this, source, dest);
+    break;
+  }
 }
 
 void IRGenSILFunction::visitDebugValueInst(DebugValueInst *i) {
