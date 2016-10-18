@@ -119,3 +119,18 @@ class C7a : P7 {
   // expected-note@-4{{make 'method(foo:)' private to silence this warning}}
 }
 
+// Don't complain about near-misses that satisfy other protocol
+// requirements.
+@objc protocol P8 {
+  @objc optional func foo(exactMatch: Int)
+}
+
+@objc protocol P9 : P8 {
+  @objc optional func foo(nearMatch: Int)
+}
+
+class C8Super : P8 { }
+
+class C9Sub : C8Super, P9 {
+  func foo(exactMatch: Int) { }
+}
