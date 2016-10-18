@@ -196,7 +196,8 @@ using InputInfoMap = Driver::InputInfoMap;
 
 static bool populateOutOfDateMap(InputInfoMap &map, StringRef argsHashStr,
                                  const InputFileList &inputs,
-                                 StringRef buildRecordPath) {
+                                 StringRef buildRecordPath,
+                                 bool ShowIncrementalBuildDecisions) {
   // Treat a missing file as "no previous build".
   auto buffer = llvm::MemoryBuffer::getFile(buildRecordPath);
   if (!buffer)
@@ -260,6 +261,7 @@ static bool populateOutOfDateMap(InputInfoMap &map, StringRef argsHashStr,
 
   // FIXME: LLVM's YAML support does incremental parsing in such a way that
   // for-range loops break.
+  SmallString<64> CompilationRecordSwiftVersion;
   for (auto i = topLevelMap->begin(), e = topLevelMap->end(); i != e; ++i) {
     auto *key = cast<yaml::ScalarNode>(i->getKey());
     StringRef keyStr = key->getValue(scratch);
@@ -274,7 +276,8 @@ static bool populateOutOfDateMap(InputInfoMap &map, StringRef argsHashStr,
       // swift::version::Version::getCurrentLanguageVersion() here because any
       // -swift-version argument is handled in the argsHashStr check that
       // follows.
-      versionValid = (value->getValue(scratch)
+      CompilationRecordSwiftVersion = value->getValue(scratch);
+      versionValid = (CompilationRecordSwiftVersion
                       == version::getSwiftFullVersion(
                         version::Version::getCurrentLanguageVersion()));
 
@@ -325,8 +328,22 @@ static bool populateOutOfDateMap(InputInfoMap &map, StringRef argsHashStr,
     }
   }
 
-  if (!versionValid || !optionsMatch)
+  if (!versionValid) {
+    if (ShowIncrementalBuildDecisions) {
+      auto v = version::getSwiftFullVersion(
+          version::Version::getCurrentLanguageVersion());
+      llvm::outs() << "Incremental compilation has been disabled, due to a "
+                   << "compiler version mismatch.\n"
+                   << "\tCompiling with: " << v << "\n"
+                   << "\tPreviously compiled with: "
+                   << CompilationRecordSwiftVersion << "\n";
+    }
     return true;
+  }
+
+  if (!optionsMatch) {
+    return true;
+  }
 
   size_t numInputsFromPrevious = 0;
   for (auto &inputPair : inputs) {
@@ -460,7 +477,8 @@ std::unique_ptr<Compilation> Driver::buildCompilation(
 
       } else {
         if (populateOutOfDateMap(outOfDateMap, ArgsHash, Inputs,
-                                 buildRecordPath)) {
+                                 buildRecordPath,
+                                 ShowIncrementalBuildDecisions)) {
           // FIXME: Distinguish errors from "file removed", which is benign.
         } else {
           rebuildEverything = false;

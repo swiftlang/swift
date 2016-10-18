@@ -387,9 +387,6 @@ public:
 
 Size getHeapHeaderSize(IRGenModule &IGM);
 
-void addHeapHeaderToLayout(IRGenModule &IGM, Size &size, Alignment &align,
-                           SmallVectorImpl<llvm::Type*> &fieldTypes);
-
 /// Different policies for accessing a physical field.
 enum class FieldAccess : uint8_t {
   /// Instance variable offsets are constant.

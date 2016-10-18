@@ -110,6 +110,7 @@ Type TypeConverter::getLoweredBridgedType(AbstractionPattern pattern,
   case SILFunctionTypeRepresentation::Thin:
   case SILFunctionTypeRepresentation::Method:
   case SILFunctionTypeRepresentation::WitnessMethod:
+  case SILFunctionTypeRepresentation::Closure:
     // No bridging needed for native CCs.
     return t;
   case SILFunctionTypeRepresentation::CFunctionPointer:
@@ -185,6 +186,7 @@ Type TypeConverter::getLoweredCBridgedType(AbstractionPattern pattern,
     case SILFunctionType::Representation::Method:
     case SILFunctionType::Representation::ObjCMethod:
     case SILFunctionType::Representation::WitnessMethod:
+    case SILFunctionType::Representation::Closure:
       return t;
     case SILFunctionType::Representation::Thick: {
       // Thick functions (TODO: conditionally) get bridged to blocks.

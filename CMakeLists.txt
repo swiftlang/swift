@@ -566,23 +566,6 @@ if("${SWIFT_HOST_VARIANT_SDK}" STREQUAL "LINUX")
     set(SWIFT_PRIMARY_VARIANT_ARCH_default "${SWIFT_HOST_VARIANT_ARCH}")
   endif()
 
-  # Compatible cross-compile SDKS for LINUX: ANDROID (arch always armv7)
-  is_sdk_requested(ANDROID swift_build_android)
-  if("${SWIFT_ANDROID_NDK_PATH}" STREQUAL "")
-    set(swift_can_crosscompile_stdlib_android FALSE)
-  else()
-    set(swift_can_crosscompile_stdlib_android TRUE)
-  endif()
-
-  if(swift_build_android AND ${swift_can_crosscompile_stdlib_android})
-    configure_sdk_unix(ANDROID "Android" "android" "android" "armv7" "armv7-none-linux-androideabi" "${SWIFT_ANDROID_SDK_PATH}")
-    # If we're not building for the host, the cross-compiled target should be the 'primary variant'.
-    if("${swift_build_linux}" STREQUAL "FALSE")
-      set(SWIFT_PRIMARY_VARIANT_SDK_default "ANDROID")
-      set(SWIFT_PRIMARY_VARIANT_ARCH_default "armv7")
-    endif()
-  endif()
-
 elseif("${SWIFT_HOST_VARIANT_SDK}" STREQUAL "FREEBSD")
   
   set(CMAKE_EXECUTABLE_FORMAT "ELF")
@@ -725,6 +708,28 @@ if("${SWIFT_PRIMARY_VARIANT_SDK}" STREQUAL "")
 endif()
 if("${SWIFT_PRIMARY_VARIANT_ARCH}" STREQUAL "")
   set(SWIFT_PRIMARY_VARIANT_ARCH "${SWIFT_PRIMARY_VARIANT_ARCH_default}")
+endif()
+
+# Should we cross-compile the standard library for Android?
+is_sdk_requested(ANDROID swift_build_android)
+if(swift_build_android AND NOT "${SWIFT_ANDROID_NDK_PATH}" STREQUAL "")
+  configure_sdk_unix(ANDROID "Android" "android" "android" "armv7" "armv7-none-linux-androideabi" "${SWIFT_ANDROID_SDK_PATH}")
+
+  if (NOT ("${CMAKE_SYSTEM_NAME}" STREQUAL "Darwin" OR "${CMAKE_SYSTEM_NAME}" STREQUAL "Linux"))
+    message(FATAL_ERROR "A Darwin or Linux host is required to build the Swift runtime for Android")
+  elseif(("${CMAKE_SYSTEM_NAME}" STREQUAL "Darwin" AND NOT swift_build_osx) OR
+         ("${CMAKE_SYSTEM_NAME}" STREQUAL "Linux" AND NOT swift_build_linux))
+    set(SWIFT_PRIMARY_VARIANT_SDK_default "ANDROID")
+    set(SWIFT_PRIMARY_VARIANT_ARCH_default "armv7")
+  endif()
+
+  if("${CMAKE_SYSTEM_NAME}" STREQUAL "Darwin")
+    set(_swift_android_prebuilt_suffix "darwin-x86_64")
+  elseif("${CMAKE_SYSTEM_NAME}" STREQUAL "Linux")
+    set(_swift_android_prebuilt_suffix "linux-x86_64")
+  endif()
+  set(SWIFT_ANDROID_PREBUILT_PATH
+      "${SWIFT_ANDROID_NDK_PATH}/toolchains/arm-linux-androideabi-${SWIFT_ANDROID_NDK_GCC_VERSION}/prebuilt/${_swift_android_prebuilt_suffix}")
 endif()
 
 # Should we cross-compile the standard library for Windows?

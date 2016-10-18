@@ -1420,9 +1420,14 @@ SourceRange ASTScope::getSourceRangeImpl() const {
     return typeDecl->getSourceRange();
 
   case ASTScopeKind::ExtensionGenericParams: {
-    // The generic parameters of an extension are available from the trailing
+    // The generic parameters of an extension are available from the ':' of
+    // the inheritance clause (if available), or else that from the
     // 'where' (if present) or from the start of the body.
+    // FIXME: Approximating the ':' with the start of the first inherited entry.
     SourceLoc startLoc;
+    if (!extension->getInherited().empty() &&
+        extension->getInherited().front().getSourceRange().Start.isValid())
+      startLoc = extension->getInherited().front().getSourceRange().Start;
     if (auto trailingWhere = extension->getTrailingWhereClause())
       startLoc = trailingWhere->getWhereLoc();
     else
@@ -1807,7 +1812,13 @@ SmallVector<ValueDecl *, 4> ASTScope::getLocalBindings() const {
     // No local declarations.
     break;
 
-  case ASTScopeKind::ExtensionGenericParams:
+  case ASTScopeKind::ExtensionGenericParams: {
+    // If the source range containing the extension parameters is empty,
+    // do nothing.
+    SourceRange range = getSourceRangeImpl();
+    if (range.Start == range.End)
+      break;
+
     // Bind this extension, if we haven't done so already.
     if (!extension->getExtendedType())
       if (auto resolver = extension->getASTContext().getLazyResolver())
@@ -1821,6 +1832,7 @@ SmallVector<ValueDecl *, 4> ASTScope::getLocalBindings() const {
         result.push_back(param);
     }
     break;
+  }
 
   case ASTScopeKind::GenericParams:
     result.push_back(genericParams.params->getParams()[genericParams.index]);
@@ -1873,6 +1885,8 @@ SmallVector<ValueDecl *, 4> ASTScope::getLocalBindings() const {
     break;
 
   case ASTScopeKind::PatternInitializer:
+    // FIXME: This causes recursion that we cannot yet handle.
+#if false
     // 'self' is available within the pattern initializer of a 'lazy' variable.
     if (auto singleVar = patternBinding.decl->getSingleVar()) {
       if (singleVar->getAttrs().hasAttribute<LazyAttr>() &&
@@ -1890,6 +1904,7 @@ SmallVector<ValueDecl *, 4> ASTScope::getLocalBindings() const {
             result.push_back(self);
       }
     }
+#endif
     break;
 
   case ASTScopeKind::Closure:

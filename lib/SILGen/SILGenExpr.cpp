@@ -1141,6 +1141,7 @@ static ManagedValue convertFunctionRepresentation(SILGenFunction &SGF,
                        SGF.getLoweredType(destTy).castTo<SILFunctionType>());
       break;
     case SILFunctionType::Representation::Method:
+    case SILFunctionType::Representation::Closure:
     case SILFunctionType::Representation::ObjCMethod:
     case SILFunctionType::Representation::WitnessMethod:
       llvm_unreachable("should not do function conversion from method rep");
@@ -1168,6 +1169,7 @@ static ManagedValue convertFunctionRepresentation(SILGenFunction &SGF,
     case SILFunctionType::Representation::Block:
       llvm_unreachable("should not try block-to-block repr change");
     case SILFunctionType::Representation::Method:
+    case SILFunctionType::Representation::Closure:
     case SILFunctionType::Representation::ObjCMethod:
     case SILFunctionType::Representation::WitnessMethod:
       llvm_unreachable("should not do function conversion from method rep");

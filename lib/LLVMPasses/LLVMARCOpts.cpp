@@ -102,6 +102,7 @@ static bool canonicalizeInputFunction(Function &F, ARCEntryPointBuilder &B,
       case RT_BridgeRelease:
       case RT_AllocObject:
       case RT_FixLifetime:
+      case RT_EndBorrow:
       case RT_NoMemoryAccessed:
       case RT_RetainUnowned:
       case RT_CheckUnowned:
@@ -368,6 +369,7 @@ static bool performLocalReleaseMotion(CallInst &Release, BasicBlock &BB,
     }
 
     case RT_FixLifetime:
+    case RT_EndBorrow:
     case RT_RetainUnowned:
     case RT_CheckUnowned:
     case RT_Unknown:
@@ -441,6 +443,7 @@ static bool performLocalRetainMotion(CallInst &Retain, BasicBlock &BB,
       break;
 
     case RT_FixLifetime: // This only stops release motion. Retains can move over it.
+    case RT_EndBorrow:
       break;
 
     case RT_Retain:
@@ -588,6 +591,7 @@ static DtorKind analyzeDestructor(Value *P) {
       case RT_NoMemoryAccessed:
       case RT_AllocObject:
       case RT_FixLifetime:
+      case RT_EndBorrow:
       case RT_CheckUnowned:
         // Skip over random instructions that don't touch memory in the caller.
         continue;
@@ -717,6 +721,7 @@ static bool performStoreOnlyObjectElimination(CallInst &Allocation,
     case RT_Release:
     case RT_Retain:
     case RT_FixLifetime:
+    case RT_EndBorrow:
     case RT_CheckUnowned:
       // It is perfectly fine to eliminate various retains and releases of this
       // object: we are zapping all accesses or none.
