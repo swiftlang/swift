@@ -220,7 +220,7 @@ class RefCountBitsT {
   // Layout of bits.
   // field value = (bits & mask) >> shift
   
-# define MaskForField(name) (((1UL<<name##BitCount)-1) << name##Shift)
+# define MaskForField(name) (((1ULL<<name##BitCount)-1) << name##Shift)
 # define ShiftAfterField(name) (name##Shift + name##BitCount)
 
   enum : uint64_t {
