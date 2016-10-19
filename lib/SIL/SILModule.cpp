@@ -429,15 +429,16 @@ SILFunction *SILModule::getOrCreateFunction(
                              inlineStrategy, EK, InsertBefore, DebugScope, DC);
 }
 
-ArrayRef<SILType> ValueBase::getTypes() const {
+SmallVector<SILType, 1> ValueBase::getTypes() const {
   // No results.
   if (TypeOrTypeList.isNull())
-    return ArrayRef<SILType>();
+    return SmallVector<SILType, 1>();
   // Arbitrary list of results.
   if (auto *TypeList = TypeOrTypeList.dyn_cast<SILTypeList*>())
-    return ArrayRef<SILType>(TypeList->Types, TypeList->NumTypes);
+    return SmallVector<SILType, 1>(TypeList->Types,
+                                   TypeList->Types + TypeList->NumTypes);
   // Single result.
-  return TypeOrTypeList.get<SILType>();
+  return SmallVector<SILType, 1>(1, TypeOrTypeList.get<SILType>());
 }
 
 

@@ -75,7 +75,7 @@ public:
 
   ValueKind getKind() const { return Kind; }
 
-  ArrayRef<SILType> getTypes() const;
+  SmallVector<SILType, 1> getTypes() const;
 
   /// True if the "value" is actually a value that can be used by other
   /// instructions.
