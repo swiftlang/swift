@@ -4848,18 +4848,6 @@ void TypeChecker::checkConformancesInContext(DeclContext *dc,
   // If there were any unsatisfied requirements, check whether there
   // are any near-matches we should diagnose.
   if (!unsatisfiedReqs.empty() && !anyInvalid) {
-    // Collect the set of witnesses that came from this context.
-    llvm::SmallPtrSet<ValueDecl *, 16> knownWitnesses;
-    for (auto conformance : conformances) {
-      conformance->forEachValueWitness(
-        nullptr,
-        [&](ValueDecl *req, ConcreteDeclRef witness) {
-          // If there is a witness, record it if it's within this context.
-          if (witness.getDecl() && witness.getDecl()->getDeclContext() == dc)
-            knownWitnesses.insert(witness.getDecl());
-         });
-    }
-
     // Find all of the members that aren't used to satisfy
     // requirements, and check whether they are close to an
     // unsatisfied or defaulted requirement.
@@ -4869,8 +4857,16 @@ void TypeChecker::checkConformancesInContext(DeclContext *dc,
       auto value = dyn_cast<ValueDecl>(member);
       if (!value) continue;
       if (isa<TypeDecl>(value)) continue;
-      if (knownWitnesses.count(value) > 0) continue;
       if (!value->getFullName()) continue;
+
+      // If this declaration overrides another declaration, the signature is
+      // fixed; don't complain about near misses.
+      if (value->getOverriddenDecl()) continue;
+
+      // If this member is a witness to any @objc requirement, ignore it.
+      if (!findWitnessedObjCRequirements(value, /*anySingleRequirement=*/true)
+            .empty())
+        continue;
 
       // Find the unsatisfied requirements with the nearest-matching
       // names.

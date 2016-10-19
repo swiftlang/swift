@@ -867,7 +867,7 @@ static void getWitnessMethodSubstitutions(ApplySite AI, SILFunction *F,
 }
 
 /// Check if an upcast is legal.
-/// THe logic in this function is heavily based on the checks in
+/// The logic in this function is heavily based on the checks in
 /// the SILVerifier.
 bool swift::isLegalUpcast(SILType FromTy, SILType ToTy) {
   if (ToTy.is<MetatypeType>()) {

@@ -871,7 +871,7 @@ SILCombiner::propagateConcreteTypeOfInitExistential(FullApplySite AI,
       return nullptr;
   }
 
-  // The lookup type is not a opened existential type, 
+  // The lookup type is not an opened existential type,
   // thus it cannot be made more concrete.
   if (!WMI->getLookupType()->isOpenedExistential())
     return nullptr;

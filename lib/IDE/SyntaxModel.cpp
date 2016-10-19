@@ -24,6 +24,7 @@
 #include "swift/Parse/Token.h"
 #include "swift/Config.h"
 #include "swift/Subsystems.h"
+#include "clang/Basic/CharInfo.h"
 #include "llvm/ADT/StringSwitch.h"
 #include "llvm/Support/MemoryBuffer.h"
 #include <vector>
@@ -274,17 +275,6 @@ static const char *const RegexStrURL =
   "tn3270|urn|vemmi|wais|xcdoc|z39\\.50r|z39\\.50s)://"
   "([a-zA-Z0-9\\-_.]+/)?[a-zA-Z0-9;/?:@\\&=+$,\\-_.!~*'()%#]+";
 
-#define MARKUP_SIMPLE_FIELD(Id, Keyword, XMLKind) \
-  #Keyword "|"
-static const char *const RegexStrDocCommentField =
-  "^[ ]*- ("
-#include "swift/Markup/SimpleFields.def"
-  "returns):";
-
-static const char *const RegexStrParameter = "^[ ]?- (parameter) [^:]*:";
-
-static const char *const RegexStrDocCommentParametersHeading = "^[ ]?- (Parameters):";
-
 static const char *const RegexStrMailURL =
   "(mailto|im):[a-zA-Z0-9\\-_]+@[a-zA-Z0-9\\-_\\.!%]+";
 
@@ -298,7 +288,6 @@ class ModelASTWalker : public ASTWalker {
   std::vector<StructureElement> SubStructureStack;
   SourceLoc LastLoc;
   static const std::regex &getURLRegex(StringRef Protocol);
-  static const std::regex &getDocCommentRegex(unsigned Index);
 
   Optional<SyntaxNode> parseFieldNode(StringRef Text, StringRef OrigText,
                                       SourceLoc OrigLoc);
@@ -387,24 +376,6 @@ const std::regex &ModelASTWalker::getURLRegex(StringRef Pro) {
     return Regexes[1];
   else
     return Regexes[2];
-}
-
-const std::regex &ModelASTWalker::getDocCommentRegex(unsigned Index) {
-  static const std::regex Regexes[3] =  {
-    std::regex {
-      RegexStrParameter,
-      std::regex::egrep | std::regex::icase | std::regex::optimize
-    },
-    std::regex {
-      RegexStrDocCommentParametersHeading,
-      std::regex::egrep | std::regex::icase | std::regex::optimize
-    },
-    std::regex {
-      RegexStrDocCommentField,
-      std::regex::egrep | std::regex::icase | std::regex::optimize
-    }
-  };
-  return Regexes[Index];
 }
 
 SyntaxStructureKind syntaxStructureKindFromNominalTypeDecl(NominalTypeDecl *N) {
@@ -1469,27 +1440,86 @@ bool ModelASTWalker::searchForURL(CharSourceRange Range) {
   return true;
 }
 
+namespace {
+class DocFieldParser {
+  const char *ptr;
+  const char *end;
+
+  bool advanceIf(char c) {
+    if (ptr == end || c != *ptr)
+      return false;
+    ++ptr;
+    return true;
+  }
+  bool advanceIf(llvm::function_ref<bool(char)> predicate) {
+    if (ptr == end || !predicate(*ptr))
+      return false;
+    ++ptr;
+    return true;
+  }
+
+public:
+  DocFieldParser(StringRef text) : ptr(text.begin()), end(text.end()) {
+    assert(text.rtrim().find('\n') == StringRef::npos &&
+           "expected single line");
+  }
+
+  // Case-insensitively match one of the following patterns:
+  // ^[ ]?- (parameter) [^:]*:
+  // ^[ ]?- (Parameters):
+  // ^[ ]*- (...MarkupSimpleFields.def...|returns):
+  Optional<StringRef> parseFieldName() {
+    unsigned numSpaces = 0;
+    while (advanceIf(' '))
+      ++numSpaces;
+    if (!advanceIf('-') || !advanceIf(' '))
+      return None;
+
+    if (ptr == end || !clang::isIdentifierBody(*ptr))
+      return None;
+    const char *identStart = ptr++;
+    while (advanceIf([](char c) { return clang::isIdentifierBody(c); }))
+      ;
+    StringRef ident(identStart, ptr - identStart);
+
+    if (ident.equals_lower("parameter")) {
+      if (numSpaces > 1 || !advanceIf(' '))
+        return None;
+      while (advanceIf([](char c) { return c != ':'; }))
+        ;
+      if (!advanceIf(':'))
+        return None;
+      return ident;
+
+    } else if (advanceIf(':')) {
+      if (ident.equals_lower("parameters") && numSpaces > 1)
+        return None;
+      auto lowerIdent = ident.lower();
+      bool isField = llvm::StringSwitch<bool>(lowerIdent)
+#define MARKUP_SIMPLE_FIELD(Id, Keyword, XMLKind) .Case(#Keyword, true)
+#include "swift/Markup/SimpleFields.def"
+                         .Case("parameters", true)
+                         .Case("returns", true)
+                         .Default(false);
+      if (isField)
+        return ident;
+    }
+
+    return None;
+  }
+};
+} // end anonymous namespace
+
 Optional<SyntaxNode> ModelASTWalker::parseFieldNode(StringRef Text,
                                                     StringRef OrigText,
                                                     SourceLoc OrigLoc) {
   Optional<SyntaxNode> Node;
-#ifdef SWIFT_HAVE_WORKING_STD_REGEX
-  std::match_results<StringRef::iterator> Matches;
-  for (unsigned i = 0; i != 3; ++i) {
-    auto &Rx = getDocCommentRegex(i);
-    bool HadMatch = std::regex_search(Text.begin(), Text.end(), Matches, Rx);
-    if (HadMatch)
-      break;
+  DocFieldParser parser(Text);
+  if (auto ident = parser.parseFieldName()) {
+    auto loc = OrigLoc.getAdvancedLoc(ident->data() - OrigText.data());
+    CharSourceRange range(loc, ident->size());
+    Node = Optional<SyntaxNode>({SyntaxNodeKind::DocCommentField, range});
   }
-  if (Matches.empty())
-    return None;
-
-  auto &Match = Matches[1];
-  StringRef MatchStr(Match.first, Match.second - Match.first);
-  auto Loc = OrigLoc.getAdvancedLoc(MatchStr.data() - OrigText.data());
-  CharSourceRange Range(Loc, MatchStr.size());
-  Node = Optional<SyntaxNode>({ SyntaxNodeKind::DocCommentField, Range });
-#endif
   return Node;
 }
 
