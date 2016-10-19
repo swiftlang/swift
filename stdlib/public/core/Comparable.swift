@@ -173,44 +173,45 @@ public protocol Comparable : Equatable {
   static func > (lhs: Self, rhs: Self) -> Bool
 }
 
-/// Returns a Boolean value indicating whether the value of the first argument
-/// is greater than that of the second argument.
-///
-/// This is the default implementation of the greater-than operator (`>`) for
-/// any type that conforms to `Comparable`.
-///
-/// - Parameters:
-///   - lhs: A value to compare.
-///   - rhs: Another value to compare.
-public func > <T : Comparable>(lhs: T, rhs: T) -> Bool {
-  return rhs < lhs
-}
+extension Comparable {
+  /// Returns a Boolean value indicating whether the value of the first argument
+  /// is greater than that of the second argument.
+  ///
+  /// This is the default implementation of the greater-than operator (`>`) for
+  /// any type that conforms to `Comparable`.
+  ///
+  /// - Parameters:
+  ///   - lhs: A value to compare.
+  ///   - rhs: Another value to compare.
+  public static func > (lhs: Self, rhs: Self) -> Bool {
+    return rhs < lhs
+  }
 
-/// Returns a Boolean value indicating whether the value of the first argument
-/// is less than or equal to that of the second argument.
-///
-/// This is the default implementation of the less-than-or-equal-to
-/// operator (`<=`) for any type that conforms to `Comparable`.
-///
-/// - Parameters:
-///   - lhs: A value to compare.
-///   - rhs: Another value to compare.
-public func <= <T : Comparable>(lhs: T, rhs: T) -> Bool {
-  return !(rhs < lhs)
-}
+  /// Returns a Boolean value indicating whether the value of the first argument
+  /// is less than or equal to that of the second argument.
+  ///
+  /// This is the default implementation of the less-than-or-equal-to
+  /// operator (`<=`) for any type that conforms to `Comparable`.
+  ///
+  /// - Parameters:
+  ///   - lhs: A value to compare.
+  ///   - rhs: Another value to compare.
+  public static func <= (lhs: Self, rhs: Self) -> Bool {
+    return !(rhs < lhs)
+  }
 
-/// Returns a Boolean value indicating whether the value of the first argument
-/// is greater than or equal to that of the second argument.
-///
-/// This is the default implementation of the greater-than-or-equal-to operator
-/// (`>=`) for any type that conforms to `Comparable`.
-///
-/// - Parameters:
-///   - lhs: A value to compare.
-///   - rhs: Another value to compare.
-/// - Returns: `true` if `lhs` is greater than or equal to `rhs`; otherwise,
-///   `false`.
-public func >= <T : Comparable>(lhs: T, rhs: T) -> Bool {
-  return !(lhs < rhs)
+  /// Returns a Boolean value indicating whether the value of the first argument
+  /// is greater than or equal to that of the second argument.
+  ///
+  /// This is the default implementation of the greater-than-or-equal-to operator
+  /// (`>=`) for any type that conforms to `Comparable`.
+  ///
+  /// - Parameters:
+  ///   - lhs: A value to compare.
+  ///   - rhs: Another value to compare.
+  /// - Returns: `true` if `lhs` is greater than or equal to `rhs`; otherwise,
+  ///   `false`.
+  public static func >= (lhs: Self, rhs: Self) -> Bool {
+    return !(lhs < rhs)
+  }
 }
-
