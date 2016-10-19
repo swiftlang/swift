@@ -242,7 +242,7 @@ extension Bool {
   ///     } else {
   ///         print("Major error: \(error)")
   ///     }
-  ///     // Prints "No major errors detected")
+  ///     // Prints "No major errors detected"
   ///
   /// In this example, `lhs` tests whether `error` is an empty string.
   /// Evaluation of the `||` operator is one of the following:
