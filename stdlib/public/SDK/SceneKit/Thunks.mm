@@ -10,12 +10,19 @@
 //
 //===----------------------------------------------------------------------===//
 
-@_exported import SafariServices // Clang module
+#import <SceneKit/SceneKit.h>
 
-@_silgen_name("_swift_SafariServices_isSafariServicesAvailable")
-internal func _isSafariServicesAvailable() -> Bool
+#include "swift/Runtime/Config.h"
 
-@available(OSX, introduced: 10.11)
-public func SFSafariServicesAvailable() -> Bool {
-  return _isSafariServicesAvailable()
+SWIFT_CC(swift)
+extern "C" NS_RETURNS_RETAINED _Nullable id
+SCN_Swift_SCNSceneSource_entryWithIdentifier(
+    id NS_RELEASES_ARGUMENT _Nonnull self_,
+    NSString *NS_RELEASES_ARGUMENT _Nonnull uid, Class _Nonnull entryClass) {
+  SCNSceneSource *sceneSource = self_;
+  id Result = [[sceneSource entryWithIdentifier:uid withClass:entryClass] retain];
+  [self_ release];
+  [uid release];
+  return Result;
 }
+

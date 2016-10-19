@@ -72,11 +72,10 @@ extension GKEntity {
   }
 }
 
-@objc
-internal protocol _SwiftGKStateMachineLike {
-  @objc(stateForClass:)
-  func state(forClass: AnyClass) -> AnyObject?
-}
+@_silgen_name("GK_Swift_GKStateMachine_stateForClass")
+internal func GK_Swift_GKStateMachine_stateForClass(
+  _ self_: AnyObject,
+  _ stateClass: AnyObject) -> AnyObject?
 
 @available(iOS, introduced: 9.0)
 @available(OSX, introduced: 10.11)
@@ -86,9 +85,8 @@ extension GKStateMachine {
   /// - Parameter forClass: the type of the state you want to get
   public func state<StateType : GKState>(
     forClass stateClass: StateType.Type) -> StateType? {
-    // FIXME: GameplayKit marked state(forClass:) unavailable, which means we
-    // can't use it from SwiftPrivate. Bounce through perform(_:with:) instead.
-    return self.perform(#selector(_SwiftGKStateMachineLike.state(forClass:)), with: stateClass)?.takeUnretainedValue() as! StateType?
+    return GK_Swift_GKStateMachine_stateForClass(
+      self, stateClass) as! StateType?
   }
 }
 

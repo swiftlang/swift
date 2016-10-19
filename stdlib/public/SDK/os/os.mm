@@ -395,7 +395,9 @@ _os_log_encode(const char *format, va_list args, int saved_errno, os_log_buffer_
   return true;
 }
 
-__attribute__((__visibility__("default")))
+#include "swift/Runtime/Config.h"
+
+SWIFT_CC(swift) __attribute__((__visibility__("default")))
 extern "C" void
 _swift_os_log(void *dso, os_log_t oslog, os_log_type_t type, const char *format, va_list args)
 {
@@ -411,4 +413,10 @@ _swift_os_log(void *dso, os_log_t oslog, os_log_type_t type, const char *format,
   if (_os_log_encode(format, args, save_errno, &context)) {
     _os_log_impl(dso, oslog, type, format, (uint8_t *)buffer, context.content_sz);
   }
+}
+
+SWIFT_CC(swift) __attribute__((__visibility__("default")))
+extern "C" os_log_t
+_swift_os_log_default(void) {
+  return OS_LOG_DEFAULT;
 }

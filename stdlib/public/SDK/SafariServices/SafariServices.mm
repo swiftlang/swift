@@ -1,4 +1,4 @@
-//===--- SafariServicesOverlayShims.h -------------------------------------===//
+//===----------------------------------------------------------------------===//
 //
 // This source file is part of the Swift.org open source project
 //
@@ -10,14 +10,10 @@
 //
 //===----------------------------------------------------------------------===//
 
-#ifndef SWIFT_STDLIB_SHIMS_SAFARISERVICES_OVERLAY_H
-#define SWIFT_STDLIB_SHIMS_SAFARISERVICES_OVERLAY_H
-
 #import <SafariServices/SFSwiftOverlaySupport.h>
+#include "swift/Runtime/Config.h"
 
-static inline bool _swift_SafariServices_isSafariServicesAvailable() {
-  return NULL != &_SFSafariServicesAvailable;
+SWIFT_CC(swift)
+extern "C" bool _swift_SafariServices_isSafariServicesAvailable() {
+  return nullptr != &_SFSafariServicesAvailable;
 }
-
-#endif // SWIFT_STDLIB_SHIMS_SAFARISERVICES_OVERLAY_H
-

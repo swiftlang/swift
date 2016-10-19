@@ -10,12 +10,15 @@
 //
 //===----------------------------------------------------------------------===//
 
-@_exported import SafariServices // Clang module
+#import <GameplayKit/GameplayKit.h>
 
-@_silgen_name("_swift_SafariServices_isSafariServicesAvailable")
-internal func _isSafariServicesAvailable() -> Bool
+#include "swift/Runtime/Config.h"
 
-@available(OSX, introduced: 10.11)
-public func SFSafariServicesAvailable() -> Bool {
-  return _isSafariServicesAvailable()
+extern "C" SWIFT_CC(swift) NS_RETURNS_RETAINED GKState * _Nullable
+GK_Swift_GKStateMachine_stateForClass(id NS_RELEASES_ARGUMENT __nonnull self_,
+                                      Class __nonnull stateClass) {
+  GKStateMachine *stateMachine = self_;
+  id state = [[stateMachine stateForClass:stateClass] retain];
+  [self_ release];
+  return state;
 }

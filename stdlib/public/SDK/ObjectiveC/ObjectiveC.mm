@@ -10,12 +10,23 @@
 //
 //===----------------------------------------------------------------------===//
 
-@_exported import SafariServices // Clang module
+#include <objc/objc-api.h>
 
-@_silgen_name("_swift_SafariServices_isSafariServicesAvailable")
-internal func _isSafariServicesAvailable() -> Bool
+#include "swift/Runtime/Config.h"
 
-@available(OSX, introduced: 10.11)
-public func SFSafariServicesAvailable() -> Bool {
-  return _isSafariServicesAvailable()
+OBJC_EXPORT
+void *objc_autoreleasePoolPush(void);
+
+OBJC_EXPORT
+void objc_autoreleasePoolPop(void *);
+
+SWIFT_CC(swift) SWIFT_RUNTIME_STDLIB_INTERFACE
+extern "C" void *_swift_objc_autoreleasePoolPush(void) {
+  return objc_autoreleasePoolPush();
 }
+
+SWIFT_CC(swift) SWIFT_RUNTIME_STDLIB_INTERFACE
+extern "C" void _swift_objc_autoreleasePoolPop(void *context) {
+  return objc_autoreleasePoolPop(context);
+}
+

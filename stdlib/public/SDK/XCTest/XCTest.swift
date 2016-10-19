@@ -13,14 +13,16 @@
 @_exported import XCTest // Clang module
 
 import CoreGraphics
-import _SwiftXCTestOverlayShims
+
+/// Returns the current test case, so we can use free functions instead of methods for the overlay.
+@_silgen_name("_XCTCurrentTestCaseBridge") func _XCTCurrentTestCaseBridge() -> XCTestCase
 
 // --- Failure Formatting ---
 
 /// Register the failure, expected or unexpected, of the current test case.
 func _XCTRegisterFailure(_ expected: Bool, _ condition: String, _ message: @autoclosure () -> String, _ file: StaticString, _ line: UInt) -> Void {
   // Call the real _XCTFailureHandler.
-  let test = _XCTCurrentTestCase()
+  let test = _XCTCurrentTestCaseBridge()
   _XCTPreformattedFailureHandler(test, expected, file.description, line, condition, message())
 }
 
@@ -40,6 +42,9 @@ func _XCTFailureDescription(_ assertionType: _XCTAssertionType, _ formatIndex: U
 }
 
 // --- Exception Support ---
+
+@_silgen_name("_XCTRunThrowableBlockBridge")
+func _XCTRunThrowableBlockBridge(_: @convention(block) () -> Void) -> NSDictionary
 
 /// The Swift-style result of evaluating a block which may throw an exception.
 enum _XCTThrowableBlockResult {
@@ -65,13 +70,13 @@ func _XCTRunThrowableBlock(_ block: () throws -> Void) -> _XCTThrowableBlockResu
   if let blockError = blockErrorOptional {
     return .failedWithError(error: blockError)
   } else if d.count > 0 {
-    let t: String = d["type"]!
+    let t: String = d["type"] as! String
     
     if t == "objc" {
       return .failedWithException(
-        className: d["className"]!,
-        name: d["name"]!,
-        reason: d["reason"]!)
+        className: d["className"] as! String,
+        name: d["name"] as! String,
+        reason: d["reason"] as! String)
     } else {
       return .failedWithUnknownException
     }
