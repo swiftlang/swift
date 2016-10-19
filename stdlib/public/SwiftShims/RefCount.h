@@ -275,7 +275,7 @@ class RefCountBitsT {
   // RefCountBits uses always_inline everywhere
   // to improve performance of debug builds.
   
- private:
+  private:
   LLVM_ATTRIBUTE_ALWAYS_INLINE
   bool getUseSlowRC() const {
     return bool(GetField(UseSlowRC));
@@ -315,7 +315,7 @@ class RefCountBitsT {
     return (int64_t(bits) >= 0);
   }
 
- public:
+  public:
 
   LLVM_ATTRIBUTE_ALWAYS_INLINE
   RefCountBitsT() = default;
@@ -472,7 +472,7 @@ class SideTableRefCountBits : public RefCountBitsT<RefCountNotInline>
 {
   uint32_t weakBits;
 
- public:
+  public:
   LLVM_ATTRIBUTE_ALWAYS_INLINE
   SideTableRefCountBits() = default;
 
@@ -549,7 +549,7 @@ class RefCounts {
   LLVM_ATTRIBUTE_NOINLINE
   bool tryIncrementSlow(RefCountBits oldbits);
 
- public:
+  public:
   enum Initialized_t { Initialized };
 
   // RefCounts must be trivially constructible to avoid ObjC++
@@ -623,7 +623,7 @@ class RefCounts {
       bool fast = newbits.incrementStrongExtraRefCount(1);
       if (!fast)
         return tryIncrementAndPinSlow();
-    } while (! refCounts.compare_exchange_weak(oldbits, newbits, relaxed));
+    } while (!refCounts.compare_exchange_weak(oldbits, newbits, relaxed));
     return true;
   }
 
@@ -655,7 +655,7 @@ class RefCounts {
       bool fast = newbits.incrementStrongExtraRefCount(1);
       if (!fast)
         return tryIncrementSlow(oldbits);
-    } while (! refCounts.compare_exchange_weak(oldbits, newbits, relaxed));
+    } while (!refCounts.compare_exchange_weak(oldbits, newbits, relaxed));
     return true;
   }
 
@@ -777,7 +777,7 @@ class RefCounts {
     // FIXME: make sure no-assert build optimizes this
   }
 
- private:
+  private:
 
   // Second slow path of doDecrement, where the
   // object may have a side table entry.
@@ -815,8 +815,8 @@ class RefCounts {
         if (clearPinnedFlag)
           newbits.setIsPinned(false);
       }
-    } while (! refCounts.compare_exchange_weak(oldbits, newbits,
-                                               release, relaxed));
+    } while (!refCounts.compare_exchange_weak(oldbits, newbits,
+                                              release, relaxed));
     if (performDeinit && deinitNow) {
       std::atomic_thread_fence(acquire);
       _swift_release_dealloc(getHeapObject());
@@ -848,7 +848,7 @@ class RefCounts {
     return false;  // don't deinit
   }
   
- private:
+  private:
 
   // This is independently specialized below for inline and out-of-line use.
   template <ClearPinnedFlag clearPinnedFlag, PerformDeinit performDeinit>
@@ -857,7 +857,7 @@ class RefCounts {
 
   // UNOWNED
   
- public:
+  public:
   // Increment the unowned reference count.
   void incrementUnowned(uint32_t inc) {
     auto oldbits = refCounts.load(relaxed);
@@ -896,8 +896,8 @@ class RefCounts {
         performFree = false;
       }
       // FIXME: underflow check?
-    } while (! refCounts.compare_exchange_weak(oldbits, newbits,
-                                               release, relaxed));
+    } while (!refCounts.compare_exchange_weak(oldbits, newbits,
+                                              release, relaxed));
     return performFree;
   }
 
@@ -914,7 +914,7 @@ class RefCounts {
 
   // WEAK
   
- public:
+  public:
   // Returns the object's side table entry (creating it if necessary) with
   // its weak ref count incremented.
   // Returns nullptr if the object is already deiniting.
@@ -960,7 +960,7 @@ class RefCounts {
   }
 
 
- private:
+  private:
   HeapObject *getHeapObject() const;
   
   HeapObjectSideTableEntry* allocateSideTable();
@@ -979,7 +979,7 @@ class HeapObjectSideTableEntry {
   std::atomic<HeapObject*> object;
   SideTableRefCounts refCounts;
 
- public:
+  public:
   HeapObjectSideTableEntry(HeapObject *newObject)
     : object(newObject), refCounts()
   { }
