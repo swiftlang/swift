@@ -1349,10 +1349,10 @@ public func _setDownCast<BaseValue, DerivedValue>(_ source: Set<BaseValue>)
   && _isClassOrObjCExistential(DerivedValue.self) {
     switch source._variantStorage {
     case _VariantSetStorage.native(let storage):
-      let bridgingStorage = storage.bridgingStorage()
+      let bridged = storage.bridged()
       return Set(
         _immutableCocoaSet:
-        unsafeBitCast(bridgingStorage, to: _NSSet.self))
+        unsafeBitCast(bridged, to: _NSSet.self))
 
     case _VariantSetStorage.cocoa(let cocoaStorage):
       return Set(
@@ -2304,7 +2304,7 @@ public func _dictionaryDownCast<BaseKey, BaseValue, DerivedKey, DerivedValue>(
     case .native(let storage):
       // Note: it is safe to treat the storage as immutable here because
       // Dictionary will not mutate storage with reference count greater than 1.
-      let nativeStorage = storage.bridgingStorage()
+      let nativeStorage = storage.bridged()
       return Dictionary(
         _immutableCocoaDictionary:
         unsafeBitCast(nativeStorage, to: _NSDictionary.self))
@@ -3077,6 +3077,7 @@ internal struct _Native${Self}Storage<${TypeParameters}> {
   @_transparent
   internal func moveInitializeEntry(from: Storage, at: Int, toEntryAt: Int) {
     _sanityCheck(!isInitializedEntry(at: toEntryAt))
+    defer { _fixLifetime(self) }
 
     (_keys + toEntryAt).initialize(to: (from._keys + at).move())
     (_values + toEntryAt).initialize(to: (from._values + at).move())
@@ -3090,8 +3091,7 @@ internal struct _Native${Self}Storage<${TypeParameters}> {
     _sanityCheck(isInitializedEntry(at: i))
     defer { _fixLifetime(self) }
 
-    let res = (_values + i).pointee
-    return res
+    return (_values + i).pointee
   }
 
   @_transparent
@@ -3184,7 +3184,7 @@ extension _Native${Self}Storage
   }
 
 #if _runtime(_ObjC)
-  func bridgingStorage() -> _NS${Self}Core {
+  func bridged() -> _NS${Self}Core {
     // We can zero-cost bridge if our keys are verbatim
     // or if we're the empty singleton.
     if (_isBridgedVerbatimToObjectiveC(Key.self) &&
@@ -5118,7 +5118,7 @@ extension ${Self} {
   public func _bridgeToObjectiveCImpl() -> _NS${Self}Core {
     switch _variantStorage {
     case _Variant${Self}Storage.native(let storage):
-      return storage.bridgingStorage()
+      return storage.bridged()
     case _Variant${Self}Storage.cocoa(let cocoaStorage):
       return cocoaStorage.cocoa${Self}
     }
