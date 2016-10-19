@@ -127,7 +127,7 @@ public struct StaticString
     _ body: (UnsafeBufferPointer<UInt8>) -> R) -> R {
     if hasPointerRepresentation {
       return body(UnsafeBufferPointer(
-        start: utf8Start, count: Int(utf8CodeUnitCount)))
+        start: utf8Start, count: utf8CodeUnitCount))
     } else {
       var buffer: UInt64 = 0
       var i = 0

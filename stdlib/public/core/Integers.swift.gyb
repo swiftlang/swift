@@ -2024,7 +2024,7 @@ extension FixedWidthInteger {
   @_transparent
   public static func ${x.operator}=(_ lhs: inout Self, _ rhs: Self) {
     let (result, overflow) = lhs.${x.name}WithOverflow(${callLabel}rhs)
-    _precondition(overflow != .none, "Overflow in ${x.operator}=")
+    _precondition(overflow == .none, "Overflow in ${x.operator}=")
     lhs = result
   }
 
@@ -2312,6 +2312,7 @@ public struct ${Self}
   }
 % end
 
+  @_transparent
   public static func < (lhs: ${Self}, rhs: ${Self}) -> Bool {
     return Bool(Builtin.cmp_${u}lt_Int${bits}(lhs._value, rhs._value))
   }
