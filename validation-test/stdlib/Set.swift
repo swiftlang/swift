@@ -138,7 +138,9 @@ func isNativeSet<T : Hashable>(_ s: Set<T>) -> Bool {
 #if _runtime(_ObjC)
 func isNativeNSSet(_ s: NSSet) -> Bool {
   let className: NSString = NSStringFromClass(type(of: s)) as NSString
-  return className.range(of: "NativeSetBridgingStorage").length > 0
+  return ["_SwiftDeferredNSSet", "NativeSetBuffer"].contains {
+    className.range(of: $0).length > 0
+  }
 }
 
 func isCocoaNSSet(_ s: NSSet) -> Bool {

@@ -35,7 +35,9 @@ func isCocoaDictionary<KeyTy : Hashable, ValueTy>(
 
 func isNativeNSDictionary(_ d: NSDictionary) -> Bool {
   let className: NSString = NSStringFromClass(type(of: d)) as NSString
-  return className.range(of: "_NativeDictionaryBridgingStorage").length > 0
+  return ["_SwiftDeferredNSDictionary", "NativeDictionaryBuffer"].contains {
+    className.range(of: $0).length > 0
+  }
 }
 
 func isCocoaNSDictionary(_ d: NSDictionary) -> Bool {
