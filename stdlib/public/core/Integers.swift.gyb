@@ -1683,11 +1683,11 @@ extension BinaryInteger {
   }
 }
 
-#if false
 //===----------------------------------------------------------------------===//
 //===--- Ambiguity breakers -----------------------------------------------===//
-// These two versions of the operators are not ordered with respect to
-// one another:
+// These two versions of the operators are not ordered with respect to one
+// another, but the compiler choses the second one, and that results in infinte
+// recursion.
 //
 //     <T : Comparable>(T, T) -> Bool
 //     <T : BinaryInteger, U : BinaryInteger>(T, U) -> Bool
@@ -1695,28 +1695,30 @@ extension BinaryInteger {
 // so we define:
 //
 //     <T : BinaryInteger>(T, T) -> Bool
+//
 //===----------------------------------------------------------------------===//
 
-@_transparent
-public func != <T : BinaryInteger>(lhs: T, rhs: T) -> Bool {
-  return !(lhs == rhs)
-}
+extension BinaryInteger {
+  @_transparent
+  public static func != (lhs: Self, rhs: Self) -> Bool {
+    return !(lhs == rhs)
+  }
 
-@inline(__always)
-public func <= <T : BinaryInteger>(lhs: T, rhs: T) -> Bool {
-  return !(rhs < lhs)
-}
+  @inline(__always)
+  public static func <= (lhs: Self, rhs: Self) -> Bool {
+    return !(rhs < lhs)
+  }
 
-@inline(__always)
-public func >= <T : BinaryInteger>(lhs: T, rhs: T) -> Bool {
-  return !(lhs < rhs)
-}
+  @inline(__always)
+  public static func >= (lhs: Self, rhs: Self) -> Bool {
+    return !(lhs < rhs)
+  }
 
-@inline(__always)
-public func > <T : BinaryInteger>(lhs: T, rhs: T) -> Bool {
-  return rhs < lhs
+  @inline(__always)
+  public static func > (lhs: Self, rhs: Self) -> Bool {
+    return rhs < lhs
+  }
 }
-#endif
 
 //===----------------------------------------------------------------------===//
 //===--- FixedWidthInteger ------------------------------------------------===//
