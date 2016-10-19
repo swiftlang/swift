@@ -949,6 +949,12 @@ toolchains::Darwin::constructInvocation(const LinkJobAction &job,
   assert(context.Output.getPrimaryOutputType() == types::TY_Image &&
          "Invalid linker output type.");
 
+  if (context.Args.hasFlag(options::OPT_static_executable,
+                           options::OPT_no_static_executable,
+                           false)) {
+    llvm::report_fatal_error("-static-executable is not supported on Darwin");
+  }
+
   const Driver &D = getDriver();
   const llvm::Triple &Triple = getTriple();
 
@@ -1354,9 +1360,38 @@ toolchains::GenericUnix::constructInvocation(const LinkJobAction &job,
 
   // Link the standard library.
   Arguments.push_back("-L");
-  if (context.Args.hasFlag(options::OPT_static_stdlib,
-                            options::OPT_no_static_stdlib,
-                            false)) {
+  if (context.Args.hasFlag(options::OPT_static_executable,
+                           options::OPT_no_static_executable,
+                           false)) {
+    SmallString<128> StaticRuntimeLibPath;
+    getRuntimeStaticLibraryPath(StaticRuntimeLibPath, context.Args, *this);
+    Arguments.push_back(context.Args.MakeArgString(StaticRuntimeLibPath));
+
+    SmallString<128> StaticStubObjectPath = StaticRuntimeLibPath;
+    llvm::sys::path::append(StaticStubObjectPath, "static_stub.o");
+    auto ObjectPath = StaticStubObjectPath.str();
+
+    if (llvm::sys::fs::is_regular_file(ObjectPath)) {
+      // FIXME: It would be better if these were extracted from static_stub.o
+      // using  `swift-autolink-extract'
+      Arguments.push_back(context.Args.MakeArgString(ObjectPath));
+      Arguments.push_back("-static");
+      Arguments.push_back("-Xlinker");
+      Arguments.push_back("--defsym=__swift2_protocol_conformances_start=.swift2_protocol_conformances_start");
+      Arguments.push_back("-Xlinker");
+      Arguments.push_back("--defsym=__swift2_type_metadata_start=.swift2_type_metadata_start");
+      Arguments.push_back("-lswiftCore");
+      Arguments.push_back("-licui18n");
+      Arguments.push_back("-licuuc");
+      Arguments.push_back("-licudata");
+      Arguments.push_back("-lpthread");
+    } else {
+      llvm::report_fatal_error("-static-executable not supported on this platform");
+    }
+  }
+  else if (context.Args.hasFlag(options::OPT_static_stdlib,
+                                options::OPT_no_static_stdlib,
+                                false)) {
     SmallString<128> StaticRuntimeLibPath;
     getRuntimeStaticLibraryPath(StaticRuntimeLibPath, context.Args, *this);
     Arguments.push_back(context.Args.MakeArgString(StaticRuntimeLibPath));

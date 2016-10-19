@@ -50,6 +50,7 @@ set(swift_runtime_sources
     ProtocolConformance.cpp
     ReflectionNative.cpp
     RuntimeEntrySymbols.cpp
+    SectionData.cpp
     SwiftObjectNative.cpp)
 
 # Acknowledge that the following sources are known.
@@ -59,6 +60,7 @@ set(LLVM_OPTIONAL_SOURCES
     MutexPThread.cpp
     MutexWin32.cpp
     CygwinPort.cpp
+    static_stub.c
     ${swift_runtime_sources}
     ${swift_runtime_objc_sources}
     ${swift_runtime_leaks_sources})
@@ -137,3 +139,15 @@ foreach(sdk ${ELFISH_SDKS})
 endforeach()
 
 add_custom_target(section_magic ALL DEPENDS ${object_target_list})
+
+if(SWIFT_BUILD_STATIC_STDLIB)
+  foreach(sdk ${SWIFT_SDKS})
+    if("${sdk}" STREQUAL "LINUX")
+      add_library(static_stub OBJECT static_stub.c)
+      swift_install_in_component(stdlib
+        FILES "${CMAKE_CURRENT_BINARY_DIR}/CMakeFiles/static_stub.dir/static_stub.c${CMAKE_C_OUTPUT_EXTENSION}"
+        RENAME "static_stub.o"
+        DESTINATION "lib/swift_static/linux")
+    endif()
+  endforeach()
+endif()

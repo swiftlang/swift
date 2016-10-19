@@ -282,6 +282,12 @@ def no_static_stdlib: Flag<["-"], "no-static-stdlib">,
   Flags<[HelpHidden]>,
   HelpText<"Don't statically link the Swift standard library">;
 
+def static_executable : Flag<["-"], "static-executable">,
+  HelpText<"Statically link the executable">;
+def no_static_executable : Flag<["-"], "no-static-executable">,
+  Flags<[HelpHidden]>,
+  HelpText<"Don't statically link the executable">;
+
 def use_ld : Joined<["-"], "use-ld=">,
   Flags<[DoesNotAffectIncrementalBuild]>,
   HelpText<"Specifies the linker to be used">;
