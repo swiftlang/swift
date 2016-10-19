@@ -2614,7 +2614,7 @@ Type TypeResolver::resolveTupleType(TupleTypeRepr *repr,
   return TupleType::get(elements, Context);
 }
 
-/// Restore Swift3 behavior of ambiguous compostion for source compatibility.
+/// Restore Swift3 behavior of ambiguous composition for source compatibility.
 ///
 /// Currently, 'P1 & P2.Type' is parsed as (composition P1, (metatype P2))
 /// In Swift3, that was (metatype (composition P1, P2)).
@@ -2674,7 +2674,7 @@ static TypeRepr *fixCompositionWithPostfix(TypeChecker &TC,
   SmallVector<TypeRepr *, 4> Protocols(Types.begin(), Types.end() - 1);
   Protocols.push_back(LastType);
 
-  // Emit fix-it to enclose compostion part into parentheses.
+  // Emit fix-it to enclose composition part into parentheses.
   TypeRepr *InnerMost = Postfixes.back();
   TC.diagnose(InnerMost->getLoc(), diag::protocol_composition_with_postfix,
       isa<ProtocolTypeRepr>(InnerMost) ? ".Protocol" :
