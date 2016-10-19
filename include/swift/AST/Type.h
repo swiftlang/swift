@@ -538,6 +538,19 @@ namespace llvm {
       return swift::CanType((swift::TypeBase*)P);
     }
   };
+
+  template<>
+  class PointerLikeTypeTraits<swift::CanGenericSignature> {
+  public:
+    static inline swift::CanGenericSignature getFromVoidPointer(void *P) {
+      return swift::CanGenericSignature((swift::GenericSignature*)P);
+    }
+    static inline void *getAsVoidPointer(swift::CanGenericSignature S) {
+      return (void*)S.getPointer();
+    }
+    enum { NumLowBitsAvailable = swift::TypeAlignInBits };
+  };
+  
 } // end namespace llvm
 
 #endif
