@@ -15,8 +15,8 @@
 //
 //===----------------------------------------------------------------------===//
 
-#ifndef __SWIFT_IRGEN_TARGET_INFO_H__
-#define __SWIFT_IRGEN_TARGET_INFO_H__
+#ifndef SWIFT_IRGEN_SWIFTTARGETINFO_H
+#define SWIFT_IRGEN_SWIFTTARGETINFO_H
 
 #include "swift/Basic/LLVM.h"
 #include "swift/Basic/ClusteredBitVector.h"
