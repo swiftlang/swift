@@ -112,16 +112,6 @@ bool swift::requiresForeignEntryPoint(ValueDecl *vd) {
   return vd->getAttrs().hasAttribute<DynamicAttr>();
 }
 
-static unsigned getFuncNaturalUncurryLevel(AnyFunctionRef AFR) {
-  assert(AFR.getParameterLists().size() >= 1 && "no arguments for func?!");
-  unsigned Level = AFR.getParameterLists().size() - 1;
-  // Functions with captures have an extra uncurry level for the capture
-  // context.
-  if (AFR.getCaptureInfo().hasLocalCaptures())
-    Level += 1;
-  return Level;
-}
-
 static unsigned getNaturalUncurryLevelAndKind(ValueDecl *vd,
                                               SILDeclRef::Kind &kind,
                                               bool setKind) {
@@ -147,7 +137,7 @@ static unsigned getNaturalUncurryLevelAndKind(ValueDecl *vd,
   switch (vd->getKind()) {
   case DeclKind::Func:
     setOrCheck(Kind::Func, none, none);
-    return getFuncNaturalUncurryLevel(cast<FuncDecl>(vd));
+    return AnyFunctionRef(cast<FuncDecl>(vd)).getNaturalUncurryLevel();
   case DeclKind::Constructor:
     setOrCheck(Kind::Allocator, Kind::Initializer, none);
     return 1;
@@ -210,9 +200,7 @@ SILDeclRef::SILDeclRef(SILDeclRef::Loc loc, ResilienceExpansion expansion,
     kind = theKind;
   } else if (auto *ACE = loc.dyn_cast<AbstractClosureExpr *>()) {
     kind = Kind::Func;
-    assert(ACE->getParameterLists().size() >= 1 &&
-           "no param patterns for function?!");
-    naturalUncurryLevel = getFuncNaturalUncurryLevel(ACE);
+    naturalUncurryLevel = AnyFunctionRef(ACE).getNaturalUncurryLevel();
   } else {
     llvm_unreachable("impossible SILDeclRef loc");
   }
