@@ -62,10 +62,13 @@ public extension NSGradient {
 
 // Fix the ARGV type of NSApplicationMain, which nonsensically takes
 // argv as a const char**.
-@_silgen_name("NSApplicationMain")
 public func NSApplicationMain(
   _ argc: Int32, _ argv: UnsafeMutablePointer<UnsafeMutablePointer<CChar>?>
-) -> Int32
+) -> Int32 {
+  return argv.withMemoryRebound(to: UnsafePointer<CChar>.self, capacity: Int(argc)) {
+    __NSApplicationMain(argc, $0)
+  }
+}
 
 extension NSColor : _ExpressibleByColorLiteral {
   public required convenience init(colorLiteralRed red: Float, green: Float,
