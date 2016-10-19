@@ -43,7 +43,6 @@ protocol Racoon {
 
 enum OuterEnum {
   protocol C {} // expected-error{{protocol 'C' cannot be nested inside another declaration}}
-  // expected-note@-1{{'C' previously declared here}}
-  case C(C) // expected-error{{invalid redeclaration of 'C'}}
+  case C(C)
 }
 
