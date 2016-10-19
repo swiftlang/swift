@@ -5124,16 +5124,27 @@ extension ${Self} {
     }
   }
 
+  /// Gets the native Dictionary hidden inside this NSDictionary
+  /// or returns nil.
   public static func _bridgeFromObjectiveCAdoptingNativeStorageOf(
     _ s: AnyObject
   ) -> ${Self}<${TypeParameters}>? {
-    if let bridgingStorage =
-        s as AnyObject as? _SwiftDeferredNS${Self}<${TypeParameters}> {
-      // If `NS${Self}` is actually native storage of `${Self}` with key
-      // and value types that the requested ones match exactly, then just
-      // re-wrap the native storage.
-      return ${Self}<${TypeParameters}>(_nativeStorage: bridgingStorage.nativeStorage)
+
+    // Try all three NSSelf impls that we currently provide.
+
+    if let deferredStorage = s as? _SwiftDeferredNS${Self}<${TypeParameters}> {
+      return ${Self}(_nativeStorage: deferredStorage.nativeStorage)
     }
+
+    if let nativeBuffer = s as? _Native${Self}Buffer<${TypeParameters}> {
+      return ${Self}(_nativeStorage: 
+          _Native${Self}Storage(_buffer: nativeBuffer))
+    }
+
+    if s === _RawNative${Self}Buffer.empty {
+      return ${Self}()
+    }
+    
     // FIXME: what if `s` is native storage, but for different key/value type?
     return nil
   }
