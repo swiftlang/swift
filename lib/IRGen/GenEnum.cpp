@@ -113,14 +113,14 @@
 #include "llvm/Analysis/CFG.h"
 #include "clang/CodeGen/SwiftCallingConv.h"
 
-#include "IRGenModule.h"
-#include "LoadableTypeInfo.h"
-#include "NonFixedTypeInfo.h"
-#include "ResilientTypeInfo.h"
 #include "GenMeta.h"
 #include "GenProto.h"
 #include "GenType.h"
 #include "IRGenDebugInfo.h"
+#include "IRGenModule.h"
+#include "LoadableTypeInfo.h"
+#include "NonFixedTypeInfo.h"
+#include "ResilientTypeInfo.h"
 #include "ScalarTypeInfo.h"
 #include "StructLayout.h"
 
