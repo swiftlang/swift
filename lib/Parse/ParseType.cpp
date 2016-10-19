@@ -142,7 +142,7 @@ ParserResult<TypeRepr> Parser::parseTypeSimple(Diag<> MessageID,
   }
 
   // If we parsed an inout modifier, prepend it.
-  if (InOutLoc.isValid())
+  if (InOutLoc.isValid() && ty.isNonNull())
     ty = makeParserResult(new (Context) InOutTypeRepr(ty.get(),
                                                       InOutLoc));
 
