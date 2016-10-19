@@ -961,6 +961,7 @@ static PotentialBindings getPotentialBindings(ConstraintSystem &cs,
 
     // Don't deduce IUO types.
     Type alternateType;
+    bool adjustedIUO = false;
     if (kind == AllowedBindingKind::Supertypes &&
         constraint->getKind() >= ConstraintKind::Conversion &&
         constraint->getKind() <= ConstraintKind::OperatorArgumentConversion) {
@@ -969,6 +970,7 @@ static PotentialBindings getPotentialBindings(ConstraintSystem &cs,
           cs.lookThroughImplicitlyUnwrappedOptionalType(innerType)) {
         type = OptionalType::get(objectType);
         alternateType = objectType;
+        adjustedIUO = true;
       }
     }
 
@@ -995,7 +997,7 @@ static PotentialBindings getPotentialBindings(ConstraintSystem &cs,
     }
 
     if (exactTypes.insert(type->getCanonicalType()).second)
-      addPotentialBinding({type, kind, None});
+      addPotentialBinding({type, kind, None}, /*allowJoinMeet=*/!adjustedIUO);
     if (alternateType &&
         exactTypes.insert(alternateType->getCanonicalType()).second)
       addPotentialBinding({alternateType, kind, None}, /*allowJoinMeet=*/false);
