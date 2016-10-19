@@ -446,7 +446,7 @@ Parser::parseTypeSimpleOrComposition(Diag<> MessageID,
     if (auto Comp = dyn_cast<CompositionTypeRepr>(T)) {
       // Accept protocol<P1, P2> & P3; explode it.
       auto TyRs = Comp->getTypes();
-      if (!TyRs.empty()) // If empty, is 'Any'; igone.
+      if (!TyRs.empty()) // If empty, is 'Any'; ignore.
         Types.append(TyRs.begin(), TyRs.end());
       return;
     }
