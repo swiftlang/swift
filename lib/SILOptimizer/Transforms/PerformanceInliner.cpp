@@ -450,6 +450,14 @@ bool SILPerformanceInliner::isProfitableInColdBlock(FullApplySite AI,
   if (Callee->getInlineStrategy() == AlwaysInline)
     return true;
 
+  if (!AI.getSubstitutions().empty()) {
+    // Only inline generics if it definitively clear that it should be done.
+    auto ShouldInlineGeneric = shouldInlineGeneric(AI);
+    if (ShouldInlineGeneric.hasValue())
+      return ShouldInlineGeneric.getValue();
+    return false;
+  }
+
   int CalleeCost = 0;
 
   for (SILBasicBlock &Block : *Callee) {
