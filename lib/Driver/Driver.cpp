@@ -342,6 +342,10 @@ static bool populateOutOfDateMap(InputInfoMap &map, StringRef argsHashStr,
   }
 
   if (!optionsMatch) {
+    if (ShowIncrementalBuildDecisions) {
+      llvm::outs() << "Incremental compilation has been disabled, because "
+                   << "different arguments were passed to the compiler.\n";
+    }
     return true;
   }
 
