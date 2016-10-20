@@ -1033,6 +1033,10 @@ public:
     *this << getIDAndType(LI->getOperand());
   }
 
+  void visitLoadBorrowInst(LoadBorrowInst *LBI) {
+    *this << getIDAndType(LBI->getOperand());
+  }
+
   void printStoreOwnershipQualifier(StoreOwnershipQualifier Qualifier) {
     switch (Qualifier) {
     case StoreOwnershipQualifier::Unqualified:
@@ -1055,9 +1059,15 @@ public:
     *this << getIDAndType(SI->getDest());
   }
 
+  void visitEndBorrowInst(EndBorrowInst *EBI) {
+    *this << getID(EBI->getDest()) << " from " << getID(EBI->getSrc()) << " : "
+          << EBI->getDest()->getType() << ", " << EBI->getSrc()->getType();
+  }
+
   void visitAssignInst(AssignInst *AI) {
     *this << getID(AI->getSrc()) << " to " << getIDAndType(AI->getDest());
   }
+
   void visitMarkUninitializedInst(MarkUninitializedInst *MU) {
     switch (MU->getKind()) {
     case MarkUninitializedInst::Var: *this << "[var] "; break;
