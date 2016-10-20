@@ -24,7 +24,7 @@ internal enum _SipHashDetail {
   @_versioned
   @inline(__always)
   internal static func _rotate(_ x: UInt64, leftBy amount: Int) -> UInt64 {
-    return (x << UInt64(amount)) | (x >> ((64 - amount) as UInt64))
+    return (x << UInt64(amount)) | (x >> UInt64(64 - amount))
   }
 
   @_versioned

@@ -106,7 +106,7 @@ extension Strideable {
     after current: (index: Int?, value: Self),
     from start: Self, by distance: Self.Stride
   ) -> (index: Int?, value: Self) {
-    return (nil, current.value + distance)
+    return (nil, current.value.advanced(by: distance))
   }
 }
 
@@ -116,12 +116,13 @@ extension Strideable where Stride : FloatingPoint {
     from start: Self, by distance: Self.Stride
   ) -> (index: Int?, value: Self) {
     if let i = current.index {
-      return (i + 1, start + Stride(i + 1) * distance)
+      return (i + 1, start.advanced(by: Stride(i + 1) * distance))
     }
     // If current.index == nil, either we're just starting out (in which case
     // the next index is 1), or we should proceed without an index just as
     // though this floating point specialization doesn't exist.
-    return (current.value == start ? 1 : nil, current.value + distance)
+    return (current.value == start ? 1 : nil,
+            current.value.advanced(by: distance))
   }
 }
 
