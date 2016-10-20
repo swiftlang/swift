@@ -1005,9 +1005,16 @@ extension Arithmetic {
   }
 }
 
-% for Protocol in binaryArithmetic:
+% for Protocol in ['Arithmetic', 'BinaryInteger', 'FloatingPoint']:
+% # Explicitly providing these operations for BinaryInteger and FloatingPoint
+% # protocols because Strideable conformance creates ambiguity if the
+% # operationsare only defined for Arithmetic
 extension ${Protocol} {
-%   for x in binaryArithmetic[Protocol]:
+%   if Protocol in ['Arithmetic', 'FloatingPoint']:
+%       ops = binaryArithmetic['Arithmetic']
+%   else:
+%       ops = binaryArithmetic['Arithmetic'] + binaryArithmetic['BinaryInteger']
+%   for x in ops:
 %     callLabel = x.firstArg + ': ' if not x.firstArg == '_' else ''
 ${operationComment(x.operator)}
   // FIXME(integers): revisit the doc comment

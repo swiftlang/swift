@@ -491,47 +491,48 @@ public func == <Pointee>(
 ///   handle misaligned pointers.
 ///
 /// - Note: This is an unsigned comparison unlike Strideable's implementation.
-@_transparent
-public func < <Pointee>(lhs: ${Self}<Pointee>, rhs: ${Self}<Pointee>) -> Bool {
-  return Bool(Builtin.cmp_ult_RawPointer(lhs._rawValue, rhs._rawValue))
-}
+extension ${Self} {
+  @_transparent
+  public static func < (lhs: ${Self}<Pointee>, rhs: ${Self}<Pointee>) -> Bool {
+    return Bool(Builtin.cmp_ult_RawPointer(lhs._rawValue, rhs._rawValue))
+  }
 
-/// - Note: The following family of operator overloads are redundant
-///   with Strideable. However, optimizer improvements are needed
-///   before they can be removed without affecting performance.
-@_transparent
-public func + <Pointee>(lhs: ${Self}<Pointee>, rhs: Int) -> ${Self}<Pointee> {
-  return ${Self}(Builtin.gep_Word(
-    lhs._rawValue, rhs._builtinWordValue, Pointee.self))
-}
+  /// - Note: The following family of operator overloads are redundant
+  ///   with Strideable. However, optimizer improvements are needed
+  ///   before they can be removed without affecting performance.
+  @_transparent
+  public static func + (lhs: ${Self}<Pointee>, rhs: Int) -> ${Self}<Pointee> {
+    return ${Self}(Builtin.gep_Word(
+      lhs._rawValue, rhs._builtinWordValue, Pointee.self))
+  }
 
-@_transparent
-public func + <Pointee>(lhs: Int,
-           rhs: ${Self}<Pointee>) -> ${Self}<Pointee> {
-  return rhs + lhs
-}
+  @_transparent
+  public static func + (lhs: Int, rhs: ${Self}<Pointee>) -> ${Self}<Pointee> {
+    return rhs + lhs
+  }
 
-@_transparent
-public func - <Pointee>(lhs: ${Self}<Pointee>, rhs: Int) -> ${Self}<Pointee> {
-  return lhs + -rhs
-}
+  @_transparent
+  public static func - (lhs: ${Self}<Pointee>, rhs: Int) -> ${Self}<Pointee> {
+    return lhs + -rhs
+  }
 
-@_transparent
-public func - <Pointee>(lhs: ${Self}<Pointee>, rhs: ${Self}<Pointee>) -> Int {
-  return
-    Int(Builtin.sub_Word(Builtin.ptrtoint_Word(lhs._rawValue),
-                         Builtin.ptrtoint_Word(rhs._rawValue)))
-    / MemoryLayout<Pointee>.stride
-}
+  @_transparent
+  public static func - (lhs: ${Self}<Pointee>, rhs: ${Self}<Pointee>) -> Int {
+    return
+      Int(Builtin.sub_Word(Builtin.ptrtoint_Word(lhs._rawValue),
+                           Builtin.ptrtoint_Word(rhs._rawValue)))
+      / MemoryLayout<Pointee>.stride
+  }
 
-@_transparent
-public func += <Pointee>(lhs: inout ${Self}<Pointee>, rhs: Int) {
-  lhs = lhs + rhs
-}
+  @_transparent
+  public static func += (lhs: inout ${Self}<Pointee>, rhs: Int) {
+    lhs = lhs + rhs
+  }
 
-@_transparent
-public func -= <Pointee>(lhs: inout ${Self}<Pointee>, rhs: Int) {
-  lhs = lhs - rhs
+  @_transparent
+  public static func -= (lhs: inout ${Self}<Pointee>, rhs: Int) {
+    lhs = lhs - rhs
+  }
 }
 
 extension ${Self} {
