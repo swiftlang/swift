@@ -780,7 +780,9 @@ static PotentialBindings getPotentialBindings(ConstraintSystem &cs,
 
     case ConstraintKind::Defaultable:
       // Do these in a separate pass.
-      defaultableConstraints.push_back(constraint);
+      if (cs.getFixedTypeRecursive(constraint->getFirstType(), true)
+            ->getAs<TypeVariableType>() == typeVar)
+        defaultableConstraints.push_back(constraint);
       continue;
 
     case ConstraintKind::Disjunction:
