@@ -45,6 +45,11 @@ struct OwnershipModelEliminatorVisitor
   bool visitValueBase(ValueBase *V) { return false; }
   bool visitLoadInst(LoadInst *LI);
   bool visitStoreInst(StoreInst *SI);
+  bool visitLoadBorrowInst(LoadBorrowInst *LBI);
+  bool visitEndBorrowInst(EndBorrowInst *EBI) {
+    EBI->eraseFromParent();
+    return true;
+  }
 };
 
 } // end anonymous namespace
@@ -107,6 +112,20 @@ bool OwnershipModelEliminatorVisitor::visitStoreInst(StoreInst *SI) {
 
   // Then remove the qualified store.
   SI->eraseFromParent();
+  return true;
+}
+
+bool
+OwnershipModelEliminatorVisitor::visitLoadBorrowInst(LoadBorrowInst *LBI) {
+  // Break down the load borrow into an unqualified load.
+  B.setInsertionPoint(LBI);
+  B.setCurrentDebugScope(LBI->getDebugScope());
+  auto *UnqualifiedLoad = B.createLoad(LBI->getLoc(), LBI->getOperand());
+
+  // Then remove the qualified load and use the unqualified load as the def of
+  // all of LI's uses.
+  LBI->replaceAllUsesWith(UnqualifiedLoad);
+  LBI->eraseFromParent();
   return true;
 }
 
