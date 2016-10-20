@@ -2799,11 +2799,6 @@ for host in "${ALL_HOSTS[@]}"; do
         continue
     fi
 
-    # Skip this if we're cross compiling and it's the local host.
-    if [[ $(has_cross_compile_hosts) ]] && [[ ${host} == ${LOCAL_HOST} ]]; then
-        continue
-    fi
-
     # Calculate the directory to install products in to.
     host_install_destdir=$(get_host_install_destdir ${host})
     host_install_prefix=$(get_host_install_prefix ${host})
