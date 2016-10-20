@@ -2101,22 +2101,6 @@ ${operatorComment('&' + x.operator)}
 //===--- UnsignedInteger --------------------------------------------------===//
 //===----------------------------------------------------------------------===//
 
-/// This protocol is an implementation detail of `UnsignedInteger`;
-/// do not use it directly.
-@_show_in_interface
-public protocol _DisallowMixedSignArithmetic : BinaryInteger {
-  // Used to create a deliberate ambiguity in cases like UInt(1) +
-  // Int(1), which would otherwise compile due to the arithmetic
-  // operators defined for Strideable types (unsigned types are
-  // Strideable).
-  associatedtype _DisallowMixedSignArithmetic : SignedInteger = Int
-}
-
-/// An integer type that can represent only nonnegative values.
-public protocol UnsignedInteger : _DisallowMixedSignArithmetic, BinaryInteger {
-  associatedtype Magnitude : BinaryInteger
-}
-
 extension UnsignedInteger {
   /// The magnitude of this value.
   ///
