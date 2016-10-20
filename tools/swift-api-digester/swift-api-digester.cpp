@@ -1112,6 +1112,15 @@ static bool shouldIgnore(Decl *D) {
       return true;
     if (VD->getName().empty())
       return true;
+    switch (VD->getFormalAccess()) {
+    case Accessibility::Internal:
+    case Accessibility::Private:
+    case Accessibility::FilePrivate:
+      return true;
+    case Accessibility::Public:
+    case Accessibility::Open:
+      break;
+    }
   }
 
   if (auto *ClangD = D->getClangDecl()) {
