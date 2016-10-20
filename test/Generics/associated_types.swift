@@ -160,7 +160,7 @@ protocol A {
 }
 
 protocol B : A {
-  associatedtype e : A = C<Self> // expected-note {{default type 'C<C<a>>' for associated type 'e' (from protocol 'B') does not conform to 'A'}}
+  associatedtype e : A = C<Self>
 }
 
 extension B {
@@ -168,8 +168,14 @@ extension B {
   }
 }
 
-struct C<a : B> : B { // expected-error {{type 'C<a>' does not conform to protocol 'B'}}
+struct C<a : B> : B {
 }
+
+struct CC : B {
+  typealias e = CC
+}
+
+C<CC>().c()
 
 // SR-511
 protocol sr511 {
