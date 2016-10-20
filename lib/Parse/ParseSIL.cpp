@@ -1965,6 +1965,16 @@ bool SILParser::parseSILInstruction(SILBasicBlock *BB, SILBuilder &B) {
    break;
  }
 
+ case ValueKind::LoadBorrowInst: {
+   SourceLoc AddrLoc;
+
+   if (parseTypedValueRef(Val, AddrLoc, B) || parseSILDebugLocation(InstLoc, B))
+     return true;
+
+   ResultVal = B.createLoadBorrow(InstLoc, Val);
+   break;
+ }
+
  case ValueKind::LoadUnownedInst:
  case ValueKind::LoadWeakInst: {
    bool isTake = false;
@@ -2413,6 +2423,36 @@ bool SILParser::parseSILInstruction(SILBasicBlock *BB, SILBuilder &B) {
 
     ResultVal = B.createStore(InstLoc, getLocalValue(From, ValType, InstLoc, B),
                               AddrVal, Qualifier);
+    break;
+  }
+
+  case ValueKind::EndBorrowInst: {
+    UnresolvedValueName BorrowDestName, BorrowSourceName;
+    SourceLoc ToLoc, BorrowDestLoc;
+    Identifier ToToken;
+    SILType BorrowDestTy, BorrowSourceTy;
+
+    if (parseValueName(BorrowDestName) ||
+        parseSILIdentifier(ToToken, ToLoc, diag::expected_tok_in_sil_instr,
+                           "from") ||
+        parseValueName(BorrowSourceName) ||
+        P.parseToken(tok::colon, diag::expected_sil_colon_value_ref) ||
+        parseSILType(BorrowDestTy) ||
+        P.parseToken(tok::comma, diag::expected_tok_in_sil_instr, ",") ||
+        parseSILType(BorrowSourceTy) || parseSILDebugLocation(InstLoc, B))
+      return true;
+
+    if (ToToken.str() != "from") {
+      P.diagnose(ToLoc, diag::expected_tok_in_sil_instr, "from");
+      return true;
+    }
+
+    SILValue BorrowDest =
+        getLocalValue(BorrowDestName, BorrowDestTy, InstLoc, B);
+    SILValue BorrowSource =
+        getLocalValue(BorrowSourceName, BorrowSourceTy, InstLoc, B);
+
+    ResultVal = B.createEndBorrow(InstLoc, BorrowDest, BorrowSource);
     break;
   }
 

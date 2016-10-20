@@ -1,18 +1,4 @@
-cmake_minimum_required(VERSION 2.8.12)
-
-if(POLICY CMP0051)
-  cmake_policy(SET CMP0051 NEW)
-endif()
-
-if(POLICY CMP0054)
-  cmake_policy(SET CMP0054 NEW)
-endif()
-
-# Enable the IN_LIST operator, as in:
-# `if(<element_variable> IN_LIST <list_variable>)`
-if(POLICY CMP0057)
-  cmake_policy(SET CMP0057 NEW)
-endif()
+cmake_minimum_required(VERSION 3.4.3)
 
 # Add path for custom CMake modules.
 list(APPEND CMAKE_MODULE_PATH
@@ -104,9 +90,6 @@ option(SWIFT_STDLIB_ASSERTIONS
 
 option(SWIFT_BUILD_RUNTIME_WITH_HOST_COMPILER
        "Use the host compiler and not the internal clang to build the swift runtime"
-       FALSE)
-option(SWIFT_BUILD_RUNTIME_WITH_HOST_LIBLTO
-       "Use the host liblto and not the internal liblto to build the swift runtime"
        FALSE)
 
 set(SWIFT_ANALYZE_CODE_COVERAGE FALSE CACHE STRING

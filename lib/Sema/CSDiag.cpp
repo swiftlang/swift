@@ -6703,9 +6703,11 @@ diagnoseAmbiguousMultiStatementClosure(ClosureExpr *closure) {
     llvm::SaveAndRestore<DeclContext*> SavedDC(CS->DC, closure);
     
     // Otherwise, we're ok to type check the subexpr.
-    auto returnedExpr =
-      typeCheckChildIndependently(RS->getResult(),
-                                  TCC_AllowUnresolvedTypeVariables);
+    Expr *returnedExpr = nullptr;
+    if (RS->hasResult())
+      returnedExpr =
+        typeCheckChildIndependently(RS->getResult(),
+                                    TCC_AllowUnresolvedTypeVariables);
     
     // If we found a type, presuppose it was the intended result and insert a
     // fixit hint.

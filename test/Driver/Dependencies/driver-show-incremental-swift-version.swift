@@ -18,7 +18,7 @@
 
 // RUN: echo '{version: "bogus", inputs: {"./main.swift": [443865900, 0], "./other.swift": [443865900, 0]}}' > %t/main~buildrecord.swiftdeps
 // RUN: cd %t && %swiftc_driver -driver-use-frontend-path %S/Inputs/update-dependencies.py -c ./main.swift ./other.swift -module-name main -incremental -v -driver-show-incremental -output-file-map %t/output.json | %FileCheck --check-prefix CHECK-VERSION-MISMATCH %s
-// CHECK-VERSION-MISMATCH: Incremental compilation has been disabled
+// CHECK-VERSION-MISMATCH: Incremental compilation has been disabled{{.*}}compiler version mismatch
 // CHECK-VERSION-MISMATCH: Compiling with:
 // CHECK-VERSION-MISMATCH: Previously compiled with: bogus
 // CHECK-VERSION-MISMATCH-NOT: Queuing main.swift (initial)

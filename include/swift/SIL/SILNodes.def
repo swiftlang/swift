@@ -94,6 +94,8 @@ ABSTRACT_VALUE(SILInstruction, ValueBase)
 
   // Accessing memory
   INST(LoadInst, SILInstruction, load, MayRead, DoesNotRelease)
+  INST(LoadBorrowInst, SILInstruction, load_borrow, MayRead, DoesNotRelease)
+  INST(EndBorrowInst, SILInstruction, end_borrow, MayHaveSideEffects, DoesNotRelease)
   INST(LoadUnownedInst, SILInstruction, load_unowned, MayRead, DoesNotRelease)
   INST(LoadWeakInst, SILInstruction, load_weak, MayRead, DoesNotRelease)
   INST(StoreInst, SILInstruction, store, MayWrite, DoesNotRelease)

@@ -283,6 +283,10 @@ namespace {
       return true;
     }
 
+    bool visitLoadBorrowInst(const LoadBorrowInst *RHS) { return true; }
+
+    bool visitEndBorrowInst(const EndBorrowInst *RHS) { return true; }
+
     bool visitStoreInst(const StoreInst *RHS) {
       auto *X = cast<StoreInst>(LHS);
       return (X->getSrc() == RHS->getSrc() && X->getDest() == RHS->getDest());

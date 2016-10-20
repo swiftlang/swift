@@ -103,6 +103,9 @@ public:
   /// Whether this version is in the Swift 3 family
   bool isVersion3() const { return !empty() && Components[0] == 3; }
 
+  /// Return this Version struct with minor and sub-minor components stripped
+  Version asMajorVersion() const;
+
   /// Parse a version in the form used by the _compiler_version \#if condition.
   static Version parseCompilerVersionString(StringRef VersionString,
                                             SourceLoc Loc,
@@ -124,6 +127,12 @@ public:
   /// Returns a version from the currently defined SWIFT_VERSION_MAJOR and
   /// SWIFT_VERSION_MINOR.
   static Version getCurrentLanguageVersion();
+
+  // Whitelist of backward-compatibility versions that we permit passing as
+  // -swift-version <vers>
+  static std::array<StringRef, 2> getValidEffectiveVersions() {
+    return {{"3", "4"}};
+  };
 };
 
 bool operator>=(const Version &lhs, const Version &rhs);

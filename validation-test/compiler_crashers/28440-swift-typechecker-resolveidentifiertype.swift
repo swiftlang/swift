@@ -7,4 +7,5 @@
 
 // RUN: not --crash %target-swift-frontend %s -parse
 // REQUIRES: asserts
-typealias f=(let a{let a={var:f.t
+typealias f=(
+let a{let a={var:f.t

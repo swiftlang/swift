@@ -4479,12 +4479,13 @@ combineBaseNameAndFirstArgument(Identifier baseName,
 /// Compute the scope between two potentially-matching names, which is
 /// effectively the sum of the edit distances between the corresponding
 /// argument labels.
-static unsigned scorePotentiallyMatchingNames(DeclName lhs, DeclName rhs,
-                                              bool isFunc,
-                                              unsigned limit) {
+static Optional<unsigned> scorePotentiallyMatchingNames(DeclName lhs,
+                                                        DeclName rhs,
+                                                        bool isFunc,
+                                                        unsigned limit) {
   // If there are a different number of argument labels, we're done.
   if (lhs.getArgumentNames().size() != rhs.getArgumentNames().size())
-    return limit;
+    return None;
 
   // Score the base name match. If there is a first argument for a
   // function, include its text along with the base name's text.
@@ -4506,14 +4507,14 @@ static unsigned scorePotentiallyMatchingNames(DeclName lhs, DeclName rhs,
 
     score = lhsFirstName.edit_distance(rhsFirstName.str(), true, limit);
   }
-  if (score >= limit) return limit;
+  if (score > limit) return None;
 
   // Compute the edit distance between matching argument names.
   for (unsigned i = isFunc ? 1 : 0; i < lhs.getArgumentNames().size(); ++i) {
     score += scoreIdentifiers(lhs.getArgumentNames()[i],
                               rhs.getArgumentNames()[i],
                               limit - score);
-    if (score >= limit) return limit;
+    if (score > limit) return None;
   }
 
   return score;
@@ -4532,8 +4533,10 @@ static Optional<DeclName> omitNeedlessWords(TypeChecker &tc, ValueDecl *value) {
 }
 
 /// Determine the score between two potentially-matching declarations.
-static unsigned scorePotentiallyMatching(TypeChecker &tc, ValueDecl *req,
-                                         ValueDecl *witness, unsigned limit) {
+static Optional<unsigned> scorePotentiallyMatching(TypeChecker &tc,
+                                                   ValueDecl *req,
+                                                   ValueDecl *witness,
+                                                   unsigned limit) {
   DeclName reqName = req->getFullName();
   DeclName witnessName = witness->getFullName();
 
@@ -4663,12 +4666,12 @@ static bool shouldWarnAboutPotentialWitness(ValueDecl *req,
   }
 
   // If the score is relatively high, don't warn: this is probably
-  // unrelated.  Allow about one typo for every two properly-typed
+  // unrelated.  Allow about one typo for every four properly-typed
   // characters, which prevents completely-wacky suggestions in many
   // cases.
   unsigned reqNameLen = getNameLength(req->getFullName());
   unsigned witnessNameLen = getNameLength(witness->getFullName());
-  if (score > (std::min(reqNameLen, witnessNameLen) + 1) / 3)
+  if (score > (std::min(reqNameLen, witnessNameLen)) / 4)
     return false;
 
   return true;
@@ -4848,18 +4851,6 @@ void TypeChecker::checkConformancesInContext(DeclContext *dc,
   // If there were any unsatisfied requirements, check whether there
   // are any near-matches we should diagnose.
   if (!unsatisfiedReqs.empty() && !anyInvalid) {
-    // Collect the set of witnesses that came from this context.
-    llvm::SmallPtrSet<ValueDecl *, 16> knownWitnesses;
-    for (auto conformance : conformances) {
-      conformance->forEachValueWitness(
-        nullptr,
-        [&](ValueDecl *req, ConcreteDeclRef witness) {
-          // If there is a witness, record it if it's within this context.
-          if (witness.getDecl() && witness.getDecl()->getDeclContext() == dc)
-            knownWitnesses.insert(witness.getDecl());
-         });
-    }
-
     // Find all of the members that aren't used to satisfy
     // requirements, and check whether they are close to an
     // unsatisfied or defaulted requirement.
@@ -4869,8 +4860,16 @@ void TypeChecker::checkConformancesInContext(DeclContext *dc,
       auto value = dyn_cast<ValueDecl>(member);
       if (!value) continue;
       if (isa<TypeDecl>(value)) continue;
-      if (knownWitnesses.count(value) > 0) continue;
       if (!value->getFullName()) continue;
+
+      // If this declaration overrides another declaration, the signature is
+      // fixed; don't complain about near misses.
+      if (value->getOverriddenDecl()) continue;
+
+      // If this member is a witness to any @objc requirement, ignore it.
+      if (!findWitnessedObjCRequirements(value, /*anySingleRequirement=*/true)
+            .empty())
+        continue;
 
       // Find the unsatisfied requirements with the nearest-matching
       // names.
@@ -4882,16 +4881,17 @@ void TypeChecker::checkConformancesInContext(DeclContext *dc,
 
         // Score this particular optional requirement.
         auto score = scorePotentiallyMatching(*this, req, value, bestScore);
+        if (!score) continue;
 
         // If the score is better than the best we've seen, update the best
         // and clear out the list.
-        if (score < bestScore) {
+        if (*score < bestScore) {
           bestOptionalReqs.clear();
-          bestScore = score;
+          bestScore = *score;
         }
 
         // If this score matches the (possible new) best score, record it.
-        if (score == bestScore && bestScore < UINT_MAX)
+        if (*score == bestScore)
           bestOptionalReqs.push_back(req);
       }
 

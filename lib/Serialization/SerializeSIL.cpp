@@ -1001,6 +1001,7 @@ void SILSerializer::writeSILInstruction(const SILInstruction &SI) {
   case ValueKind::DestroyAddrInst:
   case ValueKind::IsNonnullInst:
   case ValueKind::LoadInst:
+  case ValueKind::LoadBorrowInst:
   case ValueKind::LoadUnownedInst:
   case ValueKind::LoadWeakInst:
   case ValueKind::MarkUninitializedInst:
@@ -1256,6 +1257,22 @@ void SILSerializer::writeSILInstruction(const SILInstruction &SI) {
              S.addTypeRef(CI->getDest()->getType().getSwiftRValueType()),
              (unsigned)CI->getDest()->getType().getCategory(),
              llvm::makeArrayRef(listOfValues));
+    break;
+  }
+
+  case ValueKind::EndBorrowInst: {
+    unsigned abbrCode = SILAbbrCodes[SILTwoOperandsLayout::Code];
+    unsigned Attr = 0;
+    auto *EBI = cast<EndBorrowInst>(&SI);
+    SILValue Src = EBI->getSrc();
+    SILValue Dest = EBI->getDest();
+
+    SILTwoOperandsLayout::emitRecord(
+        Out, ScratchRecord, abbrCode, (unsigned)SI.getKind(), Attr,
+        S.addTypeRef(Src->getType().getSwiftRValueType()),
+        (unsigned)Src->getType().getCategory(), addValueRef(Src),
+        S.addTypeRef(Dest->getType().getSwiftRValueType()),
+        (unsigned)Dest->getType().getCategory(), addValueRef(Dest));
     break;
   }
 

@@ -1322,14 +1322,26 @@ SourceRange TupleExpr::getSourceRange() const {
   } else if (getNumElements() == 0) {
     return { SourceLoc(), SourceLoc() };
   } else {
-    start = getElement(0)->getStartLoc();
+    // Scan forward for the first valid source loc.
+    for (Expr *expr : getElements()) {
+      start = expr->getStartLoc();
+      if (start.isValid()) {
+        break;
+      }
+    }
   }
   
   if (hasTrailingClosure() || RParenLoc.isInvalid()) {
     if (getNumElements() == 0) {
       return { SourceLoc(), SourceLoc() };
     } else {
-      end = getElements().back()->getEndLoc();
+      // Scan backwards for a valid source loc.
+      for (Expr *expr : reversed(getElements())) {
+        end = expr->getEndLoc();
+        if (end.isValid()) {
+          break;
+        }
+      }
     }
   } else {
     end = RParenLoc;

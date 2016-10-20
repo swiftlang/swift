@@ -597,7 +597,7 @@ void SILGenModule::preEmitFunction(SILDeclRef constant,
 
   DEBUG(llvm::dbgs() << "lowering ";
         F->printName(llvm::dbgs());
-        llvm::dbgs() << " : $";
+        llvm::dbgs() << " : ";
         F->getLoweredType().print(llvm::dbgs());
         llvm::dbgs() << '\n';
         if (astNode) {

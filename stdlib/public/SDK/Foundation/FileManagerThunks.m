@@ -17,19 +17,19 @@ NS_Swift_NSFileManager_replaceItemAtURL_withItemAtURL_backupItemName_options(
     NSFileManager *NS_RELEASES_ARGUMENT _Nonnull self_,
     NSURL *NS_RELEASES_ARGUMENT _Nonnull originalItemURL,
     NSURL *NS_RELEASES_ARGUMENT _Nonnull newItemURL,
-    NSString *NS_RELEASES_ARGUMENT _Nonnull backupItemName, NSUInteger options,
+    NSString *NS_RELEASES_ARGUMENT _Nullable backupItemName, NSUInteger options,
     NSError *_Nullable *_Nullable error) {
 
   NSURL *result = nil;
-  [self_ replaceItemAtURL:originalItemURL
-            withItemAtURL:originalItemURL
-           backupItemName:backupItemName
-                  options:(NSFileManagerItemReplacementOptions)options
-         resultingItemURL:&result
-                    error:error];
+  BOOL success = [self_ replaceItemAtURL:originalItemURL
+                           withItemAtURL:newItemURL
+                          backupItemName:backupItemName
+                                 options:(NSFileManagerItemReplacementOptions)options
+                        resultingItemURL:&result
+                                   error:error];
   [self_ release];
   [originalItemURL release];
   [newItemURL release];
   [backupItemName release];
-  return [result retain];
+  return success ? [result retain] : nil;
 }
