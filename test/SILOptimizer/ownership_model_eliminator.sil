@@ -56,3 +56,17 @@ bb0(%0 : $*Builtin.NativeObject, %1 : $Builtin.NativeObject, %2 : $*Builtin.Int3
   %9999 = tuple()
   return %9999 : $()
 }
+
+// CHECK-LABEL: sil @borrow : $@convention(thin) (@in Builtin.NativeObject) -> () {
+// CHECK: bb0([[ARG:%[0-9]+]] : $*Builtin.NativeObject):
+// CHECK: [[BORROWED_VALUE:%[0-9]+]] = load [[ARG]] : $*Builtin.NativeObject
+// CHECK: unchecked_ref_cast [[BORROWED_VALUE]]
+// CHECK-NOT: end_borrow
+sil @borrow : $@convention(thin) (@in Builtin.NativeObject) -> () {
+bb0(%0 : $*Builtin.NativeObject):
+  %1 = load_borrow %0 : $*Builtin.NativeObject
+  %2 = unchecked_ref_cast %1 : $Builtin.NativeObject to $Builtin.NativeObject
+  end_borrow %1 from %0 : $Builtin.NativeObject, $*Builtin.NativeObject
+  %3 = tuple()
+  return %3 : $()
+}
