@@ -2101,6 +2101,11 @@ ${operatorComment('&' + x.operator)}
 //===--- UnsignedInteger --------------------------------------------------===//
 //===----------------------------------------------------------------------===//
 
+/// An integer type that can represent only nonnegative values.
+public protocol UnsignedInteger : BinaryInteger {
+  associatedtype Magnitude : BinaryInteger
+}
+
 extension UnsignedInteger {
   /// The magnitude of this value.
   ///
