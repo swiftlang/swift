@@ -906,7 +906,7 @@ static PotentialBindings getPotentialBindings(ConstraintSystem &cs,
       if (auto secondTyvar = second->getAs<TypeVariableType>()) {
         if (cs.getRepresentative(firstTyvar) ==
             cs.getRepresentative(secondTyvar)) {
-          break;
+          continue;
         }
       }
     }
