@@ -194,6 +194,20 @@ class Driver::InputInfoMap
 };
 using InputInfoMap = Driver::InputInfoMap;
 
+static bool failedToReadOutOfDateMap(bool ShowIncrementalBuildDecisions,
+                                     StringRef buildRecordPath,
+                                     StringRef reason = "") {
+  if (ShowIncrementalBuildDecisions) {
+    llvm::outs() << "Incremental compilation has been disabled due to "
+                 << "malformed build record file '" << buildRecordPath << "'.";
+    if (!reason.empty()) {
+      llvm::outs() << " " << reason;
+    }
+    llvm::outs() << "\n";
+  }
+  return true;
+}
+
 static bool populateOutOfDateMap(InputInfoMap &map, StringRef argsHashStr,
                                  const InputFileList &inputs,
                                  StringRef buildRecordPath,
@@ -211,11 +225,13 @@ static bool populateOutOfDateMap(InputInfoMap &map, StringRef argsHashStr,
 
   auto I = stream.begin();
   if (I == stream.end() || !I->getRoot())
-    return true;
+    return failedToReadOutOfDateMap(ShowIncrementalBuildDecisions,
+                                    buildRecordPath);
 
   auto *topLevelMap = dyn_cast<yaml::MappingNode>(I->getRoot());
   if (!topLevelMap)
-    return true;
+    return failedToReadOutOfDateMap(ShowIncrementalBuildDecisions,
+                                    buildRecordPath);
   SmallString<64> scratch;
 
   llvm::StringMap<InputInfo> previousInputs;
@@ -269,8 +285,12 @@ static bool populateOutOfDateMap(InputInfoMap &map, StringRef argsHashStr,
     using compilation_record::TopLevelKey;
     if (keyStr == compilation_record::getName(TopLevelKey::Version)) {
       auto *value = dyn_cast<yaml::ScalarNode>(i->getValue());
-      if (!value)
-        return true;
+      if (!value) {
+        auto reason = ("Malformed value for key '" + keyStr + "'.")
+          .toStringRef(scratch);
+        return failedToReadOutOfDateMap(ShowIncrementalBuildDecisions,
+                                        buildRecordPath, reason);
+      }
 
       // NB: We check against
       // swift::version::Version::getCurrentLanguageVersion() here because any
@@ -289,8 +309,12 @@ static bool populateOutOfDateMap(InputInfoMap &map, StringRef argsHashStr,
 
     } else if (keyStr == compilation_record::getName(TopLevelKey::BuildTime)) {
       auto *value = dyn_cast<yaml::SequenceNode>(i->getValue());
-      if (!value)
-        return true;
+      if (!value) {
+        auto reason = ("Malformed value for key '" + keyStr + "'.")
+          .toStringRef(scratch);
+        return failedToReadOutOfDateMap(ShowIncrementalBuildDecisions,
+                                        buildRecordPath, reason);
+      }
       llvm::sys::TimeValue timeVal;
       if (readTimeValue(i->getValue(), timeVal))
         return true;
@@ -298,8 +322,12 @@ static bool populateOutOfDateMap(InputInfoMap &map, StringRef argsHashStr,
 
     } else if (keyStr == compilation_record::getName(TopLevelKey::Inputs)) {
       auto *inputMap = dyn_cast<yaml::MappingNode>(i->getValue());
-      if (!inputMap)
-        return true;
+      if (!inputMap) {
+        auto reason = ("Malformed value for key '" + keyStr + "'.")
+          .toStringRef(scratch);
+        return failedToReadOutOfDateMap(ShowIncrementalBuildDecisions,
+                                        buildRecordPath, reason);
+      }
 
       // FIXME: LLVM's YAML support does incremental parsing in such a way that
       // for-range loops break.
