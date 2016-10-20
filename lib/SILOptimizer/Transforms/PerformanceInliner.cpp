@@ -116,6 +116,11 @@ class SILPerformanceInliner {
   }
 
   SILFunction *getEligibleFunction(FullApplySite AI);
+  bool isProfitableToInline(FullApplySite AI,
+                            Weight CallerWeight,
+                            ConstantTracker &callerTracker,
+                            int &NumCallerBlocks,
+                            bool IsGeneric);
 
   bool isProfitableToInlineNonGeneric(FullApplySite AI,
                             Weight CallerWeight,
@@ -239,19 +244,12 @@ SILFunction *SILPerformanceInliner::getEligibleFunction(FullApplySite AI) {
   return Callee;
 }
 
-/// Return true if inlining this call site is profitable.
-bool SILPerformanceInliner::isProfitableToInlineNonGeneric(FullApplySite AI,
+bool SILPerformanceInliner::isProfitableToInline(FullApplySite AI,
                                               Weight CallerWeight,
                                               ConstantTracker &callerTracker,
-                                              int &NumCallerBlocks) {
-  assert(AI.getSubstitutions().empty() &&
-         "Expected a non-generic apply");
-
+                                              int &NumCallerBlocks,
+                                              bool IsGeneric) {
   SILFunction *Callee = AI.getReferencedFunction();
-
-  if (Callee->getInlineStrategy() == AlwaysInline)
-    return true;
-
   SILLoopInfo *LI = LA->get(Callee);
   ShortestPathAnalysis *SPA = getSPA(Callee, LI);
   assert(SPA->isValid());
@@ -367,6 +365,23 @@ bool SILPerformanceInliner::isProfitableToInlineNonGeneric(FullApplySite AI,
         ", c-bb=" << NumCallerBlocks << "} " << Callee->getName() << '\n';
   );
   return true;
+}
+
+/// Return true if inlining this call site is profitable.
+bool SILPerformanceInliner::isProfitableToInlineNonGeneric(FullApplySite AI,
+                                              Weight CallerWeight,
+                                              ConstantTracker &callerTracker,
+                                              int &NumCallerBlocks) {
+  assert(AI.getSubstitutions().empty() &&
+         "Expected a non-generic apply");
+
+  SILFunction *Callee = AI.getReferencedFunction();
+
+  if (Callee->getInlineStrategy() == AlwaysInline)
+    return true;
+
+  return isProfitableToInline(AI, CallerWeight, callerTracker, NumCallerBlocks,
+                              /* IsGeneric */ false);
 }
 
 /// Return true if inlining this call site into a cold block is profitable.
