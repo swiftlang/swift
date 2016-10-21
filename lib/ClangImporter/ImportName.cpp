@@ -1081,6 +1081,18 @@ bool NameImporter::hasErrorMethodNameCollision(
                                enableObjCInterop());
 }
 
+/// Whether we should suppress this factory method being imported as an
+/// initializer. We want to do this when explicitly directed to, or when
+/// importing a property accessor.
+static bool suppressFactoryMethodAsInit(const clang::ObjCMethodDecl *method,
+                                        ImportNameOptions options,
+                                        CtorInitializerKind initKind) {
+  return (method->isPropertyAccessor() ||
+          options.contains(ImportNameFlags::SuppressFactoryMethodAsInit)) &&
+         (initKind == CtorInitializerKind::Factory ||
+          initKind == CtorInitializerKind::ConvenienceFactory);
+}
+
 ImportedName NameImporter::importNameImpl(const clang::NamedDecl *D,
                                           ImportNameOptions options) {
   ImportedName result;
@@ -1195,9 +1207,7 @@ ImportedName NameImporter::importNameImpl(const clang::NamedDecl *D,
         // If this swift_name attribute maps a factory method to an
         // initializer and we were asked not to do so, ignore the
         // custom name.
-        if (options.contains(ImportNameFlags::SuppressFactoryMethodAsInit) &&
-            (result.InitKind == CtorInitializerKind::Factory ||
-             result.InitKind == CtorInitializerKind::ConvenienceFactory)) {
+        if (suppressFactoryMethodAsInit(method, options, result.InitKind)) {
           skipCustomName = true;
         } else {
           // Note that this is an initializer.
@@ -1328,9 +1338,7 @@ ImportedName NameImporter::importNameImpl(const clang::NamedDecl *D,
     // If we would import a factory method as an initializer but were
     // asked not to, don't consider this as an initializer.
     if (isInitializer &&
-        options.contains(ImportNameFlags::SuppressFactoryMethodAsInit) &&
-        (result.InitKind == CtorInitializerKind::Factory ||
-         result.InitKind == CtorInitializerKind::ConvenienceFactory)) {
+        suppressFactoryMethodAsInit(objcMethod, options, result.InitKind)) {
       isInitializer = false;
     }
 
