@@ -271,4 +271,13 @@ struct _InternalStruct {
 typedef struct __attribute__((objc_bridge(id))) __FooCFType *FooCFTypeRef;
 void FooCFTypeRelease(FooCFTypeRef);
 
+
+#define __AVAILABILITY_INTERNAL_DEPRECATED_MSG(_msg)  __attribute__((deprecated(_msg)))
+#define AB_DEPRECATED(msg) __AVAILABILITY_INTERNAL_DEPRECATED_MSG(msg)
+
+typedef CF_ENUM(long, ABAuthorizationStatus) {
+    kABAuthorizationStatusNotDetermined = 0,    // deprecated, use CNAuthorizationStatusNotDetermined
+    kABAuthorizationStatusRestricted,           // deprecated, use CNAuthorizationStatusRestricted
+} AB_DEPRECATED("use CNAuthorizationStatus");
+
 #endif /* ! __FOO_H__ */
