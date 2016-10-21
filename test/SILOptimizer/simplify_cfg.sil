@@ -1246,6 +1246,48 @@ bb7:
   br bb1
 }
 
+sil @unknown2 : $@convention(thin) () -> ()
+
+// CHECK-LABEL: no_checked_cast_br_threading_with_alloc_ref_stack
+// CHECK: checked_cast_br
+// CHECK: apply
+// CHECK: apply
+// CHECK: checked_cast_br
+// CHECK: apply
+// CHECK: apply
+// CHECK: return
+sil @no_checked_cast_br_threading_with_alloc_ref_stack : $@convention(method) (@guaranteed Base) -> () {
+bb0(%0 : $Base):
+  %fu = function_ref @unknown : $@convention(thin) () -> ()
+  %fu2 = function_ref @unknown2 : $@convention(thin) () -> ()
+  checked_cast_br [exact] %0 : $Base to $Base, bb1, bb2
+
+bb1(%1 : $Base):
+  apply %fu() : $@convention(thin) () -> ()
+  br bb3
+
+bb2:
+  apply %fu2() : $@convention(thin) () -> ()
+  br bb3
+
+bb3:
+  %a = alloc_ref [stack] $Base
+  checked_cast_br [exact] %0 : $Base to $Base, bb4, bb5
+
+bb4(%2 : $Base):
+  apply %fu() : $@convention(thin) () -> ()
+  br bb6
+
+bb5:
+  apply %fu2() : $@convention(thin) () -> ()
+  br bb6
+
+bb6:
+  dealloc_ref [stack] %a : $Base
+  %r = tuple()
+  return %r : $()
+}
+
 
 // CHECK-LABEL: sil @jumpthread_switch_enum
 // CHECK-NOT: switch_enum
