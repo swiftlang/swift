@@ -949,7 +949,7 @@ processPartialApplyInst(PartialApplyInst *PAI, IndicesSet &PromotableIndices,
       // alloc_box. This makes sure that the project_box dominates the
       // partial_apply.
       if (!Addr)
-        Addr = getOrCreateProjectBox(ABI);
+        Addr = getOrCreateProjectBox(ABI, 0);
 
       auto &typeLowering = M.getTypeLowering(Addr->getType());
       Args.push_back(

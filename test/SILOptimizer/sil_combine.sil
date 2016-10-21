@@ -143,7 +143,7 @@ bb0:
 sil @removeTriviallyDeadInstructions : $@convention(thin) (@owned B) -> () {
 bb0(%0 : $B):
   %1 = alloc_box $B
-  %1a = project_box %1 : $@box B
+  %1a = project_box %1 : $@box B, 0
   %2 = store %0 to %1a : $*B
   %3 = load %1a : $*B
   %4 = strong_retain %3 : $B

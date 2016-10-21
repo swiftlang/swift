@@ -4409,12 +4409,18 @@ class ProjectBoxInst :
                               SILInstruction, /*HasResult*/ true> {
   friend SILBuilder;
 
-  ProjectBoxInst(SILDebugLocation DebugLoc, SILType valueType,
-                 SILValue operand)
-      : UnaryInstructionBase(DebugLoc, operand, valueType.getAddressType()) {}
+  unsigned Index;
+
+  ProjectBoxInst(SILDebugLocation DebugLoc,
+                 SILValue operand,
+                 unsigned fieldIndex,
+                 SILType fieldTy)
+      : UnaryInstructionBase(DebugLoc, operand, fieldTy.getAddressType()),
+        Index(fieldIndex) {}
+
 
 public:
-  SILType getValueType() const { return getType().getObjectType(); }
+  unsigned getFieldIndex() const { return Index; }
 };
 
 /// Project out the address of the value in an existential box.
@@ -4426,9 +4432,6 @@ class ProjectExistentialBoxInst :
   ProjectExistentialBoxInst(SILDebugLocation DebugLoc, SILType valueType,
                             SILValue operand)
       : UnaryInstructionBase(DebugLoc, operand, valueType.getAddressType()) {}
-  
-public:
-  SILType getValueType() const { return getType().getObjectType(); }
 };
 
 //===----------------------------------------------------------------------===//

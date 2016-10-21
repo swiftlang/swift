@@ -3846,7 +3846,7 @@ ManagedValue SILGenFunction::emitInjectEnum(SILLocation loc,
   if (element->isIndirect() ||
       element->getParentEnum()->isIndirect()) {
     auto *box = B.createAllocBox(loc, payloadTL.getLoweredType());
-    auto *addr = B.createProjectBox(loc, box);
+    auto *addr = B.createProjectBox(loc, box, 0);
 
     CleanupHandle initCleanup = enterDestroyCleanup(box);
     Cleanups.setCleanupState(initCleanup, CleanupState::Dormant);

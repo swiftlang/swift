@@ -130,7 +130,7 @@ bool canCastValueToABICompatibleType(SILModule &M,
 /// Returns a project_box if it is the next instruction after \p ABI and
 /// and has \p ABI as operand. Otherwise it creates a new project_box right
 /// after \p ABI and returns it.
-ProjectBoxInst *getOrCreateProjectBox(AllocBoxInst *ABI);
+ProjectBoxInst *getOrCreateProjectBox(AllocBoxInst *ABI, unsigned Index);
 
 /// Replace an apply with an instruction that produces the same value,
 /// then delete the apply and the instructions that produce its callee

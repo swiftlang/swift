@@ -3396,6 +3396,7 @@ public:
   CanType getBoxedType() const;
   // In SILType.h
   SILType getBoxedAddressType() const;
+  SILType getFieldType(unsigned index) const;
 
   static bool classof(const TypeBase *T) {
     return T->getKind() == TypeKind::SILBox;
