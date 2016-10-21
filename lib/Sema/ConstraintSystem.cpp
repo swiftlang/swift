@@ -359,16 +359,7 @@ bool ConstraintSystem::addConstraint(Constraint *constraint) {
     return true;
 
   case SolutionKind::Unsolved:
-    // We couldn't solve this constraint; add it to the pile.
-    InactiveConstraints.push_back(constraint);
-
-    // Add this constraint to the constraint graph.
-    CG.addConstraint(constraint);
-
-    if (solverState) {
-      solverState->generatedConstraints.push_back(constraint);
-    }
-
+    addUnsolvedConstraint(constraint);
     return false;
   }
 }

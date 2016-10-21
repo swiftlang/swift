@@ -1463,6 +1463,20 @@ public:
     addConstraint(constraint);
   }
 
+  /// \brief Add a newly-generated constraint that is known not to be solvable
+  /// right now.
+  void addUnsolvedConstraint(Constraint *constraint) {
+    // We couldn't solve this constraint; add it to the pile.
+    InactiveConstraints.push_back(constraint);
+
+    // Add this constraint to the constraint graph.
+    CG.addConstraint(constraint);
+
+    // Record this as a newly-generated constraint.
+    if (solverState)
+      solverState->generatedConstraints.push_back(constraint);
+  }
+
   /// \brief Remove an inactive constraint from the current constraint graph.
   void removeInactiveConstraint(Constraint *constraint) {
     CG.removeConstraint(constraint);

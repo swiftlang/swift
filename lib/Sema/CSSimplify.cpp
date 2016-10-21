@@ -1196,8 +1196,11 @@ ConstraintSystem::matchTypes(Type type1, Type type2, TypeMatchKind kind,
       // this new constraint will be solved at a later point.
       // Obviously, this must not happen at the top level, or the
       // algorithm would not terminate.
-      addConstraint(getConstraintKind(kind), type1, type2,
-                    getConstraintLocator(locator));
+      addUnsolvedConstraint(Constraint::create(*this,
+                                               getConstraintKind(kind),
+                                               type1, type2, DeclName(),
+                                               FunctionRefKind::Compound,
+                                               getConstraintLocator(locator)));
       return SolutionKind::Solved;
     }
 
@@ -3672,7 +3675,9 @@ ConstraintSystem::simplifyRestrictedConstraint(ConversionRestrictionKind restric
                                         getConstraintLocator(locator));
         
         Constraint *disjunctionChoices[] = {int8Con, uint8Con, voidCon};
-        addDisjunctionConstraint(disjunctionChoices, locator);
+        addUnsolvedConstraint(
+          Constraint::createDisjunction(*this, disjunctionChoices,
+                                        getConstraintLocator(locator)));
         return SolutionKind::Solved;
       }
 
