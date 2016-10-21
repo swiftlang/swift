@@ -82,11 +82,6 @@ Constraint::Constraint(ConstraintKind Kind, Type First, Type Second,
     assert(Member && "Member constraint has no member");
     break;
 
-  case ConstraintKind::Class:
-    assert(!Member && "Type property cannot have a member");
-    assert(Second.isNull() && "Type property with second type");
-    break;
-
   case ConstraintKind::Defaultable:
     assert(!First.isNull());
     assert(!Second.isNull());
@@ -185,10 +180,6 @@ Constraint *Constraint::clone(ConstraintSystem &cs) const {
   case ConstraintKind::Defaultable:
     return create(cs, getKind(), getFirstType(), getSecondType(),
                   getMember(), getFunctionRefKind(), getLocator());
-
-  case ConstraintKind::Class:
-    return create(cs, getKind(), getFirstType(), Type(), DeclName(),
-                  FunctionRefKind::Compound, getLocator());
 
   case ConstraintKind::Disjunction:
     return createDisjunction(cs, getNestedConstraints(), getLocator());
@@ -299,10 +290,6 @@ void Constraint::print(llvm::raw_ostream &Out, SourceManager *sm) const {
     break;
   case ConstraintKind::TypeMember:
     Out << "[." << Types.Member << ": type] == ";
-    break;
-  case ConstraintKind::Class:
-    Out << " is a class";
-    skipSecond = true;
     break;
   case ConstraintKind::Defaultable:
     Out << " can default to ";
@@ -481,7 +468,6 @@ gatherReferencedTypeVars(Constraint *constraint,
     SWIFT_FALLTHROUGH;
 
   case ConstraintKind::BindOverload:
-  case ConstraintKind::Class:
   case ConstraintKind::ConformsTo:
   case ConstraintKind::LiteralConformsTo:
   case ConstraintKind::SelfObjectOfProtocol:
