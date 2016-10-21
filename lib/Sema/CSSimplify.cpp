@@ -3322,39 +3322,53 @@ ConstraintSystem::simplifyDynamicTypeOfConstraint(const Constraint &constraint) 
 }
 
 ConstraintSystem::SolutionKind
-ConstraintSystem::simplifyApplicableFnConstraint(const Constraint &constraint) {
+ConstraintSystem::simplifyApplicableFnConstraint(
+                                           Type type1,
+                                           Type type2,
+                                           TypeMatchOptions flags,
+                                           ConstraintLocatorBuilder locator) {
 
   // By construction, the left hand side is a type that looks like the
   // following: $T1 -> $T2.
-  Type type1 = constraint.getFirstType();
   assert(type1->is<FunctionType>());
 
   // Drill down to the concrete type on the right hand side.
-  Type type2 = getFixedTypeRecursive(constraint.getSecondType(),
-                                     /*wantRValue=*/true);
+  type2 = getFixedTypeRecursive(type2, /*wantRValue=*/true);
   auto desugar2 = type2->getDesugaredType();
 
   // Try to look through ImplicitlyUnwrappedOptional<T>: the result is always an
   // r-value.
   if (auto objTy = lookThroughImplicitlyUnwrappedOptionalType(desugar2)) {
-    type2 = objTy;
+    type2 = getFixedTypeRecursive(objTy, /*wantRValue=*/true);
     desugar2 = type2->getDesugaredType();
   }
 
-  // Force the right-hand side to be an rvalue.
-  TypeMatchOptions flags = TMF_GenerateConstraints;
+  TypeMatchOptions subflags = getDefaultDecompositionOptions(flags);
 
   // If the types are obviously equivalent, we're done.
   if (type1.getPointer() == desugar2)
     return SolutionKind::Solved;
 
+  // Local function to form an unsolved result.
+  auto formUnsolved = [&] {
+    if (flags.contains(TMF_GenerateConstraints)) {
+      addUnsolvedConstraint(
+        Constraint::create(*this, ConstraintKind::ApplicableFunction, type1,
+                           type2, DeclName(), FunctionRefKind::Compound,
+                           getConstraintLocator(locator)));
+      return SolutionKind::Solved;
+    }
+    
+    return SolutionKind::Unsolved;
+
+  };
+
   // If right-hand side is a type variable, the constraint is unsolved.
   if (desugar2->isTypeVariableOrMember())
-    return SolutionKind::Unsolved;
+    return formUnsolved();
 
   // Strip the 'ApplyFunction' off the locator.
   // FIXME: Perhaps ApplyFunction can go away entirely?
-  ConstraintLocatorBuilder locator = constraint.getLocator();
   SmallVector<LocatorPathElt, 2> parts;
   Expr *anchor = locator.getLocatorParts(parts);
   assert(!parts.empty() && "Nonsensical applicable-function locator");
@@ -3380,7 +3394,7 @@ retry:
 
     // The argument type must be convertible to the input type.
     if (matchTypes(func1->getInput(), func2->getInput(),
-                   ArgConv, flags,
+                   ArgConv, subflags,
                    outerLocator.withPathElement(
                      ConstraintLocator::ApplyArgument))
           == SolutionKind::Error)
@@ -3389,7 +3403,7 @@ retry:
     // The result types are equivalent.
     if (matchTypes(func1->getResult(), func2->getResult(),
                    TypeMatchKind::BindType,
-                   flags,
+                   subflags,
                    locator.withPathElement(ConstraintLocator::FunctionResult))
           == SolutionKind::Error)
       return SolutionKind::Error;
@@ -3405,9 +3419,12 @@ retry:
 
   // For a metatype, perform a construction.
   if (auto meta2 = dyn_cast<AnyMetatypeType>(desugar2)) {
+    auto instance2 = getFixedTypeRecursive(meta2->getInstanceType(), true);
+    if (instance2->isTypeVariableOrMember())
+      return formUnsolved();
+
     // Construct the instance from the input arguments.
-    return simplifyConstructionConstraint(meta2->getInstanceType(), func1,
-                                          flags,
+    return simplifyConstructionConstraint(instance2, func1, subflags,
                                           FunctionRefKind::SingleApply,
                                           getConstraintLocator(outerLocator));
   }
@@ -4078,24 +4095,13 @@ ConstraintSystem::simplifyFixConstraint(Fix fix, Type type1, Type type2,
   }
 }
 
-void ConstraintSystem::addConstraint(ConstraintKind kind, Type first,
-                                     Type second,
-                                     ConstraintLocatorBuilder locator,
-                                     bool isFavored) {
+ConstraintSystem::SolutionKind
+ConstraintSystem::addConstraintImpl(ConstraintKind kind, Type first,
+                                    Type second,
+                                    ConstraintLocatorBuilder locator,
+                                    bool isFavored) {
   assert(first && "Missing first type");
   assert(second && "Missing second type");
-
-  // Local function to record failures if necessary.
-  auto failed = [&] {
-    // Add a failing constraint, if needed.
-    if (shouldAddNewFailingConstraint()) {
-      auto c = Constraint::create(*this, kind, first, second, DeclName(),
-                                  FunctionRefKind::Compound,
-                                  getConstraintLocator(locator));
-      if (isFavored) c->setFavored();
-      addNewFailingConstraint(c);
-    }
-  };
 
   TypeMatchOptions subflags = TMF_GenerateConstraints;
   switch (kind) {
@@ -4108,17 +4114,11 @@ void ConstraintSystem::addConstraint(ConstraintKind kind, Type first,
   case ConstraintKind::ArgumentTupleConversion:
   case ConstraintKind::OperatorArgumentTupleConversion:
   case ConstraintKind::OperatorArgumentConversion:
-    switch (matchTypes(first, second, getTypeMatchKind(kind), subflags,
-                       locator)) {
-    case SolutionKind::Error:
-      return failed();
+    return matchTypes(first, second, getTypeMatchKind(kind), subflags,
+                      locator);
 
-    case SolutionKind::Unsolved:
-      llvm_unreachable("should have generated constraints");
-
-    case SolutionKind::Solved:
-      return;
-    }
+  case ConstraintKind::ApplicableFunction:
+    return simplifyApplicableFnConstraint(first, second, subflags, locator);
 
   case ConstraintKind::Bind: // FIXME: This should go through matchTypes() above
 
@@ -4129,8 +4129,32 @@ void ConstraintSystem::addConstraint(ConstraintKind kind, Type first,
                                 getConstraintLocator(locator));
     if (isFavored) c->setFavored();
     addConstraint(c);
-    break;
+    return SolutionKind::Solved;
   }
+  }
+}
+
+void ConstraintSystem::addConstraint(ConstraintKind kind, Type first,
+                                     Type second,
+                                     ConstraintLocatorBuilder locator,
+                                     bool isFavored) {
+  switch (addConstraintImpl(kind, first, second, locator, isFavored)) {
+  case SolutionKind::Error:
+    // Add a failing constraint, if needed.
+    if (shouldAddNewFailingConstraint()) {
+      auto c = Constraint::create(*this, kind, first, second, DeclName(),
+                                  FunctionRefKind::Compound,
+                                  getConstraintLocator(locator));
+      if (isFavored) c->setFavored();
+      addNewFailingConstraint(c);
+    }
+    return;
+
+  case SolutionKind::Unsolved:
+    llvm_unreachable("should have generated constraints");
+
+  case SolutionKind::Solved:
+    return;
   }
 }
 
@@ -4172,7 +4196,9 @@ ConstraintSystem::simplifyConstraint(const Constraint &constraint) {
   }
 
   case ConstraintKind::ApplicableFunction:
-    return simplifyApplicableFnConstraint(constraint);
+    return simplifyApplicableFnConstraint(constraint.getFirstType(),
+                                          constraint.getSecondType(),
+                                          None, constraint.getLocator());
 
   case ConstraintKind::DynamicTypeOf:
     return simplifyDynamicTypeOfConstraint(constraint);

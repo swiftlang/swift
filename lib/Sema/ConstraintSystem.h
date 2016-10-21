@@ -2039,7 +2039,11 @@ private:
   SolutionKind simplifyOptionalObjectConstraint(const Constraint &constraint);
 
   /// \brief Attempt to simplify the ApplicableFunction constraint.
-  SolutionKind simplifyApplicableFnConstraint(const Constraint &constraint);
+  SolutionKind simplifyApplicableFnConstraint(
+                                      Type type1,
+                                      Type type2,
+                                      TypeMatchOptions flags,
+                                      ConstraintLocatorBuilder locator);
 
   /// \brief Attempt to simplify the given DynamicTypeOf constraint.
   SolutionKind simplifyDynamicTypeOfConstraint(const Constraint &constraint);
@@ -2091,6 +2095,11 @@ public:
   SolutionKind simplifyConstraint(const Constraint &constraint);
 
 private:
+  /// \brief Add a constraint to the constraint system.
+  SolutionKind addConstraintImpl(ConstraintKind kind, Type first, Type second,
+                                 ConstraintLocatorBuilder locator,
+                                 bool isFavored);
+
   /// \brief Solve the system of constraints after it has already been
   /// simplified.
   ///
