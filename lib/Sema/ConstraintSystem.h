@@ -2024,6 +2024,7 @@ private:
 
   /// Attempt to simplify a checked-cast constraint.
   SolutionKind simplifyCheckedCastConstraint(Type fromType, Type toType,
+                                             TypeMatchOptions flags,
                                              ConstraintLocatorBuilder locator);
 
   /// \brief Attempt to simplify the given member constraint.

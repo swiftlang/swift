@@ -2144,8 +2144,7 @@ ConstraintSystem::simplifyConstructionConstraint(
     Type valueType, FunctionType *fnType, TypeMatchOptions flags,
     FunctionRefKind functionRefKind, ConstraintLocator *locator) {
   // Desugar the value type.
-  auto desugarValueType = getFixedTypeRecursive(valueType, true)
-                            ->getDesugaredType();
+  auto desugarValueType = valueType->getDesugaredType();
 
   Type argType = fnType->getInput();
   Type resultType = fnType->getResult();
@@ -2370,7 +2369,23 @@ static CheckedCastKind getCheckedCastKind(ConstraintSystem *cs,
 ConstraintSystem::SolutionKind
 ConstraintSystem::simplifyCheckedCastConstraint(
                     Type fromType, Type toType,
+                    TypeMatchOptions flags,
                     ConstraintLocatorBuilder locator) {
+  TypeMatchOptions subflags = getDefaultDecompositionOptions(flags);
+
+  /// Form an unresolved result.
+  auto formUnsolved = [&] {
+    if (flags.contains(TMF_GenerateConstraints)) {
+      addUnsolvedConstraint(
+        Constraint::create(*this, ConstraintKind::CheckedCast, fromType,
+                           toType, DeclName(), FunctionRefKind::Compound,
+                           getConstraintLocator(locator)));
+      return SolutionKind::Solved;
+    }
+
+    return SolutionKind::Unsolved;
+  };
+
   do {
     // Dig out the fixed type to which this type refers.
     fromType = getFixedTypeRecursive(fromType, /*wantRValue=*/true);
@@ -2378,7 +2393,7 @@ ConstraintSystem::simplifyCheckedCastConstraint(
     // If we hit a type variable without a fixed type, we can't
     // solve this yet.
     if (fromType->isTypeVariableOrMember())
-      return SolutionKind::Unsolved;
+      return formUnsolved();
 
     // Dig out the fixed type to which this type refers.
     toType = getFixedTypeRecursive(toType, /*wantRValue=*/true);
@@ -2386,7 +2401,7 @@ ConstraintSystem::simplifyCheckedCastConstraint(
     // If we hit a type variable without a fixed type, we can't
     // solve this yet.
     if (toType->isTypeVariableOrMember())
-      return SolutionKind::Unsolved;
+      return formUnsolved();
 
     Type origFromType = fromType;
     Type origToType = toType;
@@ -2414,6 +2429,9 @@ ConstraintSystem::simplifyCheckedCastConstraint(
       }
     }
 
+    // We've decomposed the types further, so adopt the subflags.
+    flags = subflags;
+
     // If nothing changed, we're done.
     if (fromType.getPointer() == origFromType.getPointer() &&
         toType.getPointer() == origToType.getPointer())
@@ -2435,14 +2453,12 @@ ConstraintSystem::simplifyCheckedCastConstraint(
                                                               toBaseType)) {
       // The class we're bridging through must be a subtype of the type we're
       // coming from.
-      addConstraint(ConstraintKind::Subtype, classType, fromBaseType,
-                    getConstraintLocator(locator));
-      return SolutionKind::Solved;
+      return matchTypes(classType, fromBaseType, TypeMatchKind::Subtype,
+                        subflags, locator);
     }
 
-    addConstraint(ConstraintKind::Subtype, toBaseType, fromBaseType,
-                  getConstraintLocator(locator));
-    return SolutionKind::Solved;
+    return matchTypes(toBaseType, fromBaseType, TypeMatchKind::Subtype,
+                      subflags, locator);
   }
   case CheckedCastKind::DictionaryDowncast: {
     Type fromKeyType, fromValueType;
@@ -2462,8 +2478,7 @@ ConstraintSystem::simplifyCheckedCastConstraint(
     }
 
     // Perform subtype check on the possibly-bridged-through key type.
-    TypeMatchOptions subflags = TMF_GenerateConstraints;
-    auto result = matchTypes(toKeyType, fromKeyType, TypeMatchKind::Subtype, 
+    auto result = matchTypes(toKeyType, fromKeyType, TypeMatchKind::Subtype,
                              subflags, locator);
     if (result == SolutionKind::Error)
       return result;
@@ -2482,7 +2497,7 @@ ConstraintSystem::simplifyCheckedCastConstraint(
       return result;
 
     case SolutionKind::Unsolved:
-      return SolutionKind::Unsolved;
+      return SolutionKind::Solved;
 
     case SolutionKind::Error:
       return SolutionKind::Error;
@@ -2501,13 +2516,13 @@ ConstraintSystem::simplifyCheckedCastConstraint(
                                                               toBaseType)) {
       // The class we're bridging through must be a subtype of the type we're
       // coming from.
-      addConstraint(ConstraintKind::Subtype, classType, fromBaseType,
-                    getConstraintLocator(locator));
+      addConstraint(ConstraintKind::Subtype, classType,
+                    fromBaseType, locator);
       return SolutionKind::Solved;
     }
 
-    addConstraint(ConstraintKind::Subtype, toBaseType, fromBaseType,
-                  getConstraintLocator(locator));
+    addConstraint(ConstraintKind::Subtype, toBaseType,
+                  fromBaseType, locator);
     return SolutionKind::Solved;
   }
       
@@ -4144,6 +4159,9 @@ ConstraintSystem::addConstraintImpl(ConstraintKind kind, Type first,
     return simplifyConformsToConstraint(first, second, kind, locator,
                                         subflags);
 
+  case ConstraintKind::CheckedCast:
+    return simplifyCheckedCastConstraint(first, second, subflags, locator);
+
   case ConstraintKind::Bind: // FIXME: This should go through matchTypes() above
 
   default: {
@@ -4254,6 +4272,7 @@ ConstraintSystem::simplifyConstraint(const Constraint &constraint) {
   case ConstraintKind::CheckedCast: {
     auto result = simplifyCheckedCastConstraint(constraint.getFirstType(),
                                                 constraint.getSecondType(),
+                                                None,
                                                 constraint.getLocator());
     // NOTE: simplifyCheckedCastConstraint() may return Unsolved, e.g. if the
     // subexpression's type is unresolved. Don't record the fix until we
