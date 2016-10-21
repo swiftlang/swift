@@ -550,3 +550,65 @@ SILType::canUseExistentialRepresentation(SILModule &M,
     return is<ExistentialMetatypeType>();
   }
 }
+
+//
+// SILBoxType implementation
+//
+
+/// TODO: Transitional factory to present the single-type SILBoxType::get
+/// interface.
+CanSILBoxType SILBoxType::get(CanType boxedType) {
+  // TODO: SILBoxTypes should be keyed by layout and generic arguments instead
+  // of by a single boxed type.
+  ASTContext &ctx = boxedType->getASTContext();
+  auto &SILBoxTypes = ctx.getSILBoxTypes();
+  auto found = SILBoxTypes.find(boxedType);
+  if (found != SILBoxTypes.end())
+    return CanSILBoxType(found->second);
+  
+  // We know that we'll allocate the SILBoxType with a single substitution in
+  // this case.
+  void *mem = ctx.Allocate(totalSizeToAlloc<Substitution>(1),
+                           alignof(SILBoxType));
+  
+  auto singleGenericParamSignature = ctx.getSingleGenericParameterSignature();
+  auto boxTy = ::new (mem) SILBoxType(ctx,
+              SILLayout::get(ctx, singleGenericParamSignature,
+                             SILField(CanType(singleGenericParamSignature
+                                                ->getGenericParams()[0]),
+                             /*mutable*/ true)),
+              Substitution(boxedType, {}));
+  SILBoxTypes.insert({boxedType, boxTy});
+  return CanSILBoxType(boxTy);
+}
+
+SILBoxType::SILBoxType(ASTContext &C,
+                       SILLayout *Layout, ArrayRef<Substitution> Params)
+  : TypeBase(TypeKind::SILBox, &C,
+             getRecursivePropertiesFromSubstitutions(Params)),
+    Layout(Layout),
+    NumGenericArgs(Params.size())
+{
+  auto paramsBuf = getTrailingObjects<Substitution>();
+  for (unsigned i = 0; i < NumGenericArgs; ++i)
+    ::new (paramsBuf + i) Substitution(Params[i]);
+}
+
+RecursiveTypeProperties SILBoxType::
+getRecursivePropertiesFromSubstitutions(ArrayRef<Substitution> Params) {
+  RecursiveTypeProperties props;
+  for (auto &param : Params) {
+    props |= param.getReplacement()->getRecursiveProperties();
+  }
+  return props;
+}
+
+/// TODO: Transitional accessor for single-type boxes.
+CanType SILBoxType::getBoxedType() const {
+  auto layout = getLayout();
+  assert(layout->getFields().size() == 1
+         && layout->getGenericSignature()->getGenericParams().size() == 1
+         && layout->getFields()[0].getLoweredType()->is<GenericTypeParamType>()
+         && "is not a single-field box");
+  return CanType(getGenericArgs()[0].getReplacement());
+}
