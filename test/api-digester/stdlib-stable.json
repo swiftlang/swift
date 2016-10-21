@@ -700,50 +700,6 @@
         },
         {
           "kind": "Var",
-          "name": "summary",
-          "printedName": "summary",
-          "declKind": "Var",
-          "usr": "s:vSP7summarySS",
-          "location": "",
-          "moduleName": "Swift",
-          "children": [
-            {
-              "kind": "TypeNominal",
-              "name": "String",
-              "printedName": "String"
-            },
-            {
-              "kind": "Getter",
-              "name": "_",
-              "printedName": "_()",
-              "declKind": "Func",
-              "usr": "s:FSPg7summarySS",
-              "location": "",
-              "moduleName": "Swift",
-              "children": [
-                {
-                  "kind": "TypeNominal",
-                  "name": "String",
-                  "printedName": "String"
-                },
-                {
-                  "kind": "TypeNominal",
-                  "name": "UnsafePointer",
-                  "printedName": "UnsafePointer<Pointee>",
-                  "children": [
-                    {
-                      "kind": "TypeNominal",
-                      "name": "Archetype",
-                      "printedName": "Pointee"
-                    }
-                  ]
-                }
-              ]
-            }
-          ]
-        },
-        {
-          "kind": "Var",
           "name": "customPlaygroundQuickLook",
           "printedName": "customPlaygroundQuickLook",
           "declKind": "Var",
@@ -5505,80 +5461,6 @@
           ]
         },
         {
-          "kind": "Var",
-          "name": "signBitIndex",
-          "printedName": "signBitIndex",
-          "declKind": "Var",
-          "usr": "s:vVs6UInt3212signBitIndexSi",
-          "location": "",
-          "moduleName": "Swift",
-          "children": [
-            {
-              "kind": "TypeNominal",
-              "name": "Int",
-              "printedName": "Int"
-            },
-            {
-              "kind": "Getter",
-              "name": "_",
-              "printedName": "_()",
-              "declKind": "Func",
-              "usr": "s:FVs6UInt32g12signBitIndexSi",
-              "location": "",
-              "moduleName": "Swift",
-              "children": [
-                {
-                  "kind": "TypeNominal",
-                  "name": "Int",
-                  "printedName": "Int"
-                },
-                {
-                  "kind": "TypeNominal",
-                  "name": "UInt32",
-                  "printedName": "UInt32"
-                }
-              ]
-            }
-          ]
-        },
-        {
-          "kind": "Var",
-          "name": "countTrailingZeros",
-          "printedName": "countTrailingZeros",
-          "declKind": "Var",
-          "usr": "s:vVs6UInt3218countTrailingZerosSi",
-          "location": "",
-          "moduleName": "Swift",
-          "children": [
-            {
-              "kind": "TypeNominal",
-              "name": "Int",
-              "printedName": "Int"
-            },
-            {
-              "kind": "Getter",
-              "name": "_",
-              "printedName": "_()",
-              "declKind": "Func",
-              "usr": "s:FVs6UInt32g18countTrailingZerosSi",
-              "location": "",
-              "moduleName": "Swift",
-              "children": [
-                {
-                  "kind": "TypeNominal",
-                  "name": "Int",
-                  "printedName": "Int"
-                },
-                {
-                  "kind": "TypeNominal",
-                  "name": "UInt32",
-                  "printedName": "UInt32"
-                }
-              ]
-            }
-          ]
-        },
-        {
           "kind": "Constructor",
           "name": "init",
           "printedName": "init(_:)",
@@ -9759,80 +9641,6 @@
           ]
         },
         {
-          "kind": "Var",
-          "name": "signBitIndex",
-          "printedName": "signBitIndex",
-          "declKind": "Var",
-          "usr": "s:vVs6UInt6412signBitIndexSi",
-          "location": "",
-          "moduleName": "Swift",
-          "children": [
-            {
-              "kind": "TypeNominal",
-              "name": "Int",
-              "printedName": "Int"
-            },
-            {
-              "kind": "Getter",
-              "name": "_",
-              "printedName": "_()",
-              "declKind": "Func",
-              "usr": "s:FVs6UInt64g12signBitIndexSi",
-              "location": "",
-              "moduleName": "Swift",
-              "children": [
-                {
-                  "kind": "TypeNominal",
-                  "name": "Int",
-                  "printedName": "Int"
-                },
-                {
-                  "kind": "TypeNominal",
-                  "name": "UInt64",
-                  "printedName": "UInt64"
-                }
-              ]
-            }
-          ]
-        },
-        {
-          "kind": "Var",
-          "name": "countTrailingZeros",
-          "printedName": "countTrailingZeros",
-          "declKind": "Var",
-          "usr": "s:vVs6UInt6418countTrailingZerosSi",
-          "location": "",
-          "moduleName": "Swift",
-          "children": [
-            {
-              "kind": "TypeNominal",
-              "name": "Int",
-              "printedName": "Int"
-            },
-            {
-              "kind": "Getter",
-              "name": "_",
-              "printedName": "_()",
-              "declKind": "Func",
-              "usr": "s:FVs6UInt64g18countTrailingZerosSi",
-              "location": "",
-              "moduleName": "Swift",
-              "children": [
-                {
-                  "kind": "TypeNominal",
-                  "name": "Int",
-                  "printedName": "Int"
-                },
-                {
-                  "kind": "TypeNominal",
-                  "name": "UInt64",
-                  "printedName": "UInt64"
-                }
-              ]
-            }
-          ]
-        },
-        {
           "kind": "Constructor",
           "name": "init",
           "printedName": "init(_:)",
@@ -11002,50 +10810,6 @@
                   "kind": "TypeNominal",
                   "name": "Mirror",
                   "printedName": "Mirror"
-                },
-                {
-                  "kind": "TypeNominal",
-                  "name": "UnsafeMutablePointer",
-                  "printedName": "UnsafeMutablePointer<Pointee>",
-                  "children": [
-                    {
-                      "kind": "TypeNominal",
-                      "name": "Archetype",
-                      "printedName": "Pointee"
-                    }
-                  ]
-                }
-              ]
-            }
-          ]
-        },
-        {
-          "kind": "Var",
-          "name": "summary",
-          "printedName": "summary",
-          "declKind": "Var",
-          "usr": "s:vSp7summarySS",
-          "location": "",
-          "moduleName": "Swift",
-          "children": [
-            {
-              "kind": "TypeNominal",
-              "name": "String",
-              "printedName": "String"
-            },
-            {
-              "kind": "Getter",
-              "name": "_",
-              "printedName": "_()",
-              "declKind": "Func",
-              "usr": "s:FSpg7summarySS",
-              "location": "",
-              "moduleName": "Swift",
-              "children": [
-                {
-                  "kind": "TypeNominal",
-                  "name": "String",
-                  "printedName": "String"
                 },
                 {
                   "kind": "TypeNominal",
@@ -12338,125 +12102,6 @@
       "moduleName": "Swift",
       "children": [
         {
-          "kind": "TypeDecl",
-          "name": "Representation",
-          "printedName": "Representation",
-          "declKind": "Enum",
-          "usr": "s:OVs9Character14Representation",
-          "location": "",
-          "moduleName": "Swift",
-          "children": [
-            {
-              "kind": "Var",
-              "name": "large",
-              "printedName": "large",
-              "declKind": "EnumElement",
-              "usr": "s:FOVs9Character14Representation5largeFMS0_FGVs11_HeapBufferVs18_StringBufferIVarsVs6UInt16_S0_",
-              "location": "",
-              "moduleName": "Swift",
-              "children": [
-                {
-                  "kind": "TypeFunc",
-                  "name": "Function",
-                  "printedName": "(Character.Representation.Type) -> (_StringBuffer._Storage) -> Character.Representation",
-                  "children": [
-                    {
-                      "kind": "TypeFunc",
-                      "name": "Function",
-                      "printedName": "(_StringBuffer._Storage) -> Character.Representation",
-                      "children": [
-                        {
-                          "kind": "TypeNominal",
-                          "name": "Representation",
-                          "printedName": "Character.Representation"
-                        },
-                        {
-                          "kind": "TypeNominal",
-                          "name": "Paren",
-                          "printedName": "(_StringBuffer._Storage)",
-                          "children": [
-                            {
-                              "kind": "TypeNominal",
-                              "name": "_Storage",
-                              "printedName": "_StringBuffer._Storage"
-                            }
-                          ]
-                        }
-                      ]
-                    },
-                    {
-                      "kind": "TypeNominal",
-                      "name": "Metatype",
-                      "printedName": "Character.Representation.Type",
-                      "children": [
-                        {
-                          "kind": "TypeNominal",
-                          "name": "Representation",
-                          "printedName": "Character.Representation"
-                        }
-                      ]
-                    }
-                  ]
-                }
-              ]
-            },
-            {
-              "kind": "Var",
-              "name": "small",
-              "printedName": "small",
-              "declKind": "EnumElement",
-              "usr": "s:FOVs9Character14Representation5smallFMS0_FBi63_S0_",
-              "location": "",
-              "moduleName": "Swift",
-              "children": [
-                {
-                  "kind": "TypeFunc",
-                  "name": "Function",
-                  "printedName": "(Character.Representation.Type) -> (Int63) -> Character.Representation",
-                  "children": [
-                    {
-                      "kind": "TypeFunc",
-                      "name": "Function",
-                      "printedName": "(Int63) -> Character.Representation",
-                      "children": [
-                        {
-                          "kind": "TypeNominal",
-                          "name": "Representation",
-                          "printedName": "Character.Representation"
-                        },
-                        {
-                          "kind": "TypeNominal",
-                          "name": "Paren",
-                          "printedName": "(Int63)",
-                          "children": [
-                            {
-                              "kind": "TypeNominal",
-                              "name": "Int63",
-                              "printedName": "Int63"
-                            }
-                          ]
-                        }
-                      ]
-                    },
-                    {
-                      "kind": "TypeNominal",
-                      "name": "Metatype",
-                      "printedName": "Character.Representation.Type",
-                      "children": [
-                        {
-                          "kind": "TypeNominal",
-                          "name": "Representation",
-                          "printedName": "Character.Representation"
-                        }
-                      ]
-                    }
-                  ]
-                }
-              ]
-            }
-          ]
-        },
-        {
           "kind": "Constructor",
           "name": "init",
           "printedName": "init(_:)",
@@ -12567,59 +12212,6 @@
                   "kind": "TypeNominal",
                   "name": "Int",
                   "printedName": "Int"
-                },
-                {
-                  "kind": "TypeNominal",
-                  "name": "Character",
-                  "printedName": "Character"
-                }
-              ]
-            }
-          ]
-        },
-        {
-          "kind": "TypeAlias",
-          "name": "UTF16View",
-          "printedName": "UTF16View",
-          "declKind": "TypeAlias",
-          "usr": "s:Vs9Character9UTF16View",
-          "location": "",
-          "moduleName": "Swift",
-          "children": [
-            {
-              "kind": "TypeNominal",
-              "name": "UTF16View",
-              "printedName": "String.UTF16View"
-            }
-          ]
-        },
-        {
-          "kind": "Var",
-          "name": "utf16",
-          "printedName": "utf16",
-          "declKind": "Var",
-          "usr": "s:vVs9Character5utf16VSS9UTF16View",
-          "location": "",
-          "moduleName": "Swift",
-          "children": [
-            {
-              "kind": "TypeNominal",
-              "name": "UTF16View",
-              "printedName": "Character.UTF16View"
-            },
-            {
-              "kind": "Getter",
-              "name": "_",
-              "printedName": "_()",
-              "declKind": "Func",
-              "usr": "s:FVs9Characterg5utf16VSS9UTF16View",
-              "location": "",
-              "moduleName": "Swift",
-              "children": [
-                {
-                  "kind": "TypeNominal",
-                  "name": "UTF16View",
-                  "printedName": "Character.UTF16View"
                 },
                 {
                   "kind": "TypeNominal",
@@ -18866,15 +18458,6 @@
       ]
     },
     {
-      "kind": "TypeDecl",
-      "name": "SetIndexRepresentation",
-      "printedName": "SetIndexRepresentation",
-      "declKind": "Enum",
-      "usr": "s:Os22SetIndexRepresentation",
-      "location": "",
-      "moduleName": "Swift"
-    },
-    {
       "kind": "Function",
       "name": "withExtendedLifetime",
       "printedName": "withExtendedLifetime(_:_:)",
@@ -19247,15 +18830,6 @@
           "printedName": "inout T?"
         }
       ]
-    },
-    {
-      "kind": "TypeDecl",
-      "name": "SetIteratorRepresentation",
-      "printedName": "SetIteratorRepresentation",
-      "declKind": "Enum",
-      "usr": "s:Os25SetIteratorRepresentation",
-      "location": "",
-      "moduleName": "Swift"
     },
     {
       "kind": "TypeAlias",
@@ -23916,39 +23490,6 @@
               ]
             }
           ]
-        }
-      ]
-    },
-    {
-      "kind": "Function",
-      "name": "swift_objc_class_unknownGetInstanceExtents",
-      "printedName": "swift_objc_class_unknownGetInstanceExtents(_:)",
-      "declKind": "Func",
-      "usr": "s:Fs42swift_objc_class_unknownGetInstanceExtentsFPMPs9AnyObject_T8negativeSu8positiveSu_",
-      "location": "",
-      "moduleName": "Swift",
-      "children": [
-        {
-          "kind": "TypeNominal",
-          "name": "Tuple",
-          "printedName": "(negative: UInt, positive: UInt)",
-          "children": [
-            {
-              "kind": "TypeNominal",
-              "name": "UInt",
-              "printedName": "UInt"
-            },
-            {
-              "kind": "TypeNominal",
-              "name": "UInt",
-              "printedName": "UInt"
-            }
-          ]
-        },
-        {
-          "kind": "TypeNominal",
-          "name": "AnyClass",
-          "printedName": "AnyClass"
         }
       ]
     },
@@ -32651,23 +32192,6 @@
           ]
         },
         {
-          "kind": "Function",
-          "name": "unwrappedOrError",
-          "printedName": "unwrappedOrError()",
-          "declKind": "Func",
-          "usr": "s:FSq16unwrappedOrErrorFzT_x",
-          "location": "",
-          "moduleName": "Swift",
-          "throwing": true,
-          "children": [
-            {
-              "kind": "TypeNominal",
-              "name": "Archetype",
-              "printedName": "Wrapped"
-            }
-          ]
-        },
-        {
           "kind": "Var",
           "name": "debugDescription",
           "printedName": "debugDescription",
@@ -36794,15 +36318,6 @@
     },
     {
       "kind": "TypeDecl",
-      "name": "DictionaryIndexRepresentation",
-      "printedName": "DictionaryIndexRepresentation",
-      "declKind": "Enum",
-      "usr": "s:Os29DictionaryIndexRepresentation",
-      "location": "",
-      "moduleName": "Swift"
-    },
-    {
-      "kind": "TypeDecl",
       "name": "UTF16",
       "printedName": "UTF16",
       "declKind": "Struct",
@@ -38625,70 +38140,6 @@
       "children": [
         {
           "kind": "Var",
-          "name": "value",
-          "printedName": "value",
-          "declKind": "Var",
-          "usr": "s:vVs14CVaListPointer5valueSv",
-          "location": "",
-          "moduleName": "Swift",
-          "children": [
-            {
-              "kind": "TypeNominal",
-              "name": "UnsafeMutableRawPointer",
-              "printedName": "UnsafeMutableRawPointer"
-            },
-            {
-              "kind": "Getter",
-              "name": "_",
-              "printedName": "_()",
-              "declKind": "Func",
-              "usr": "s:FVs14CVaListPointerg5valueSv",
-              "location": "",
-              "moduleName": "Swift",
-              "children": [
-                {
-                  "kind": "TypeNominal",
-                  "name": "UnsafeMutableRawPointer",
-                  "printedName": "UnsafeMutableRawPointer"
-                },
-                {
-                  "kind": "TypeNominal",
-                  "name": "CVaListPointer",
-                  "printedName": "CVaListPointer"
-                }
-              ]
-            },
-            {
-              "kind": "Setter",
-              "name": "_",
-              "printedName": "_()",
-              "declKind": "Func",
-              "usr": "s:FVs14CVaListPointers5valueSv",
-              "location": "",
-              "moduleName": "Swift",
-              "mutating": true,
-              "children": [
-                {
-                  "kind": "TypeNominal",
-                  "name": "Void",
-                  "printedName": "()"
-                },
-                {
-                  "kind": "TypeNominal",
-                  "name": "InOut",
-                  "printedName": "inout CVaListPointer"
-                },
-                {
-                  "kind": "TypeNominal",
-                  "name": "UnsafeMutableRawPointer",
-                  "printedName": "UnsafeMutableRawPointer"
-                }
-              ]
-            }
-          ]
-        },
-        {
-          "kind": "Var",
           "name": "debugDescription",
           "printedName": "debugDescription",
           "declKind": "Var",
@@ -38837,44 +38288,7 @@
       "declKind": "Struct",
       "usr": "s:Vs15DictionaryIndex",
       "location": "",
-      "moduleName": "Swift",
-      "children": [
-        {
-          "kind": "Function",
-          "name": "successor",
-          "printedName": "successor()",
-          "declKind": "Func",
-          "usr": "s:FVs15DictionaryIndex9successorFT_GS_xq__",
-          "location": "",
-          "moduleName": "Swift",
-          "children": [
-            {
-              "kind": "TypeNominal",
-              "name": "DictionaryIndex",
-              "printedName": "DictionaryIndex<Key, Value>",
-              "children": [
-                {
-                  "kind": "TypeNominal",
-                  "name": "Archetype",
-                  "printedName": "Key",
-                  "children": [
-                    {
-                      "kind": "TypeNominal",
-                      "name": "Hashable",
-                      "printedName": "Hashable"
-                    }
-                  ]
-                },
-                {
-                  "kind": "TypeNominal",
-                  "name": "Archetype",
-                  "printedName": "Value"
-                }
-              ]
-            }
-          ]
-        }
-      ]
+      "moduleName": "Swift"
     },
     {
       "kind": "TypeDecl",
@@ -40412,85 +39826,7 @@
       "declKind": "Struct",
       "usr": "s:Vs8SetIndex",
       "location": "",
-      "moduleName": "Swift",
-      "children": [
-        {
-          "kind": "TypeAlias",
-          "name": "Key",
-          "printedName": "Key",
-          "declKind": "TypeAlias",
-          "usr": "s:Vs8SetIndex3Key",
-          "location": "",
-          "moduleName": "Swift",
-          "children": [
-            {
-              "kind": "TypeNominal",
-              "name": "Archetype",
-              "printedName": "Element",
-              "children": [
-                {
-                  "kind": "TypeNominal",
-                  "name": "Hashable",
-                  "printedName": "Hashable"
-                }
-              ]
-            }
-          ]
-        },
-        {
-          "kind": "TypeAlias",
-          "name": "Value",
-          "printedName": "Value",
-          "declKind": "TypeAlias",
-          "usr": "s:Vs8SetIndex5Value",
-          "location": "",
-          "moduleName": "Swift",
-          "children": [
-            {
-              "kind": "TypeNominal",
-              "name": "Archetype",
-              "printedName": "Element",
-              "children": [
-                {
-                  "kind": "TypeNominal",
-                  "name": "Hashable",
-                  "printedName": "Hashable"
-                }
-              ]
-            }
-          ]
-        },
-        {
-          "kind": "Function",
-          "name": "successor",
-          "printedName": "successor()",
-          "declKind": "Func",
-          "usr": "s:FVs8SetIndex9successorFT_GS_x_",
-          "location": "",
-          "moduleName": "Swift",
-          "children": [
-            {
-              "kind": "TypeNominal",
-              "name": "SetIndex",
-              "printedName": "SetIndex<Element>",
-              "children": [
-                {
-                  "kind": "TypeNominal",
-                  "name": "Archetype",
-                  "printedName": "Element",
-                  "children": [
-                    {
-                      "kind": "TypeNominal",
-                      "name": "Hashable",
-                      "printedName": "Hashable"
-                    }
-                  ]
-                }
-              ]
-            }
-          ]
-        }
-      ]
+      "moduleName": "Swift"
     },
     {
       "kind": "TypeDecl",
@@ -43628,43 +42964,6 @@
                   "kind": "TypeNominal",
                   "name": "Mirror",
                   "printedName": "Mirror"
-                },
-                {
-                  "kind": "TypeNominal",
-                  "name": "UnsafeMutableRawPointer",
-                  "printedName": "UnsafeMutableRawPointer"
-                }
-              ]
-            }
-          ]
-        },
-        {
-          "kind": "Var",
-          "name": "summary",
-          "printedName": "summary",
-          "declKind": "Var",
-          "usr": "s:vSv7summarySS",
-          "location": "",
-          "moduleName": "Swift",
-          "children": [
-            {
-              "kind": "TypeNominal",
-              "name": "String",
-              "printedName": "String"
-            },
-            {
-              "kind": "Getter",
-              "name": "_",
-              "printedName": "_()",
-              "declKind": "Func",
-              "usr": "s:FSvg7summarySS",
-              "location": "",
-              "moduleName": "Swift",
-              "children": [
-                {
-                  "kind": "TypeNominal",
-                  "name": "String",
-                  "printedName": "String"
                 },
                 {
                   "kind": "TypeNominal",
@@ -47868,213 +47167,6 @@
           ]
         },
         {
-          "kind": "TypeDecl",
-          "name": "LegacyChildren",
-          "printedName": "LegacyChildren",
-          "declKind": "Struct",
-          "usr": "s:VVs6Mirror14LegacyChildren",
-          "location": "",
-          "moduleName": "Swift",
-          "children": [
-            {
-              "kind": "TypeAlias",
-              "name": "Indices",
-              "printedName": "Indices",
-              "declKind": "TypeAlias",
-              "usr": "s:VVs6Mirror14LegacyChildren7Indices",
-              "location": "",
-              "moduleName": "Swift",
-              "children": [
-                {
-                  "kind": "TypeNominal",
-                  "name": "CountableRange",
-                  "printedName": "CountableRange<Int>",
-                  "children": [
-                    {
-                      "kind": "TypeNominal",
-                      "name": "Int",
-                      "printedName": "Int"
-                    }
-                  ]
-                }
-              ]
-            },
-            {
-              "kind": "Constructor",
-              "name": "init",
-              "printedName": "init(_:)",
-              "declKind": "Constructor",
-              "usr": "s:FVVs6Mirror14LegacyChildrencFPs7_Mirror_S0_",
-              "location": "",
-              "moduleName": "Swift",
-              "children": [
-                {
-                  "kind": "TypeNominal",
-                  "name": "LegacyChildren",
-                  "printedName": "Mirror.LegacyChildren"
-                },
-                {
-                  "kind": "TypeNominal",
-                  "name": "_Mirror",
-                  "printedName": "_Mirror"
-                }
-              ]
-            },
-            {
-              "kind": "Var",
-              "name": "startIndex",
-              "printedName": "startIndex",
-              "declKind": "Var",
-              "usr": "s:vVVs6Mirror14LegacyChildren10startIndexSi",
-              "location": "",
-              "moduleName": "Swift",
-              "children": [
-                {
-                  "kind": "TypeNominal",
-                  "name": "Int",
-                  "printedName": "Int"
-                },
-                {
-                  "kind": "Getter",
-                  "name": "_",
-                  "printedName": "_()",
-                  "declKind": "Func",
-                  "usr": "s:FVVs6Mirror14LegacyChildreng10startIndexSi",
-                  "location": "",
-                  "moduleName": "Swift",
-                  "children": [
-                    {
-                      "kind": "TypeNominal",
-                      "name": "Int",
-                      "printedName": "Int"
-                    },
-                    {
-                      "kind": "TypeNominal",
-                      "name": "LegacyChildren",
-                      "printedName": "Mirror.LegacyChildren"
-                    }
-                  ]
-                }
-              ]
-            },
-            {
-              "kind": "Var",
-              "name": "endIndex",
-              "printedName": "endIndex",
-              "declKind": "Var",
-              "usr": "s:vVVs6Mirror14LegacyChildren8endIndexSi",
-              "location": "",
-              "moduleName": "Swift",
-              "children": [
-                {
-                  "kind": "TypeNominal",
-                  "name": "Int",
-                  "printedName": "Int"
-                },
-                {
-                  "kind": "Getter",
-                  "name": "_",
-                  "printedName": "_()",
-                  "declKind": "Func",
-                  "usr": "s:FVVs6Mirror14LegacyChildreng8endIndexSi",
-                  "location": "",
-                  "moduleName": "Swift",
-                  "children": [
-                    {
-                      "kind": "TypeNominal",
-                      "name": "Int",
-                      "printedName": "Int"
-                    },
-                    {
-                      "kind": "TypeNominal",
-                      "name": "LegacyChildren",
-                      "printedName": "Mirror.LegacyChildren"
-                    }
-                  ]
-                }
-              ]
-            },
-            {
-              "kind": "TypeAlias",
-              "name": "Index",
-              "printedName": "Index",
-              "declKind": "TypeAlias",
-              "usr": "s:VVs6Mirror14LegacyChildren5Index",
-              "location": "",
-              "moduleName": "Swift",
-              "children": [
-                {
-                  "kind": "TypeNominal",
-                  "name": "Int",
-                  "printedName": "Int"
-                }
-              ]
-            },
-            {
-              "kind": "TypeAlias",
-              "name": "SubSequence",
-              "printedName": "SubSequence",
-              "declKind": "TypeAlias",
-              "usr": "s:VVs6Mirror14LegacyChildren11SubSequence",
-              "location": "",
-              "moduleName": "Swift",
-              "children": [
-                {
-                  "kind": "TypeNominal",
-                  "name": "RandomAccessSlice",
-                  "printedName": "RandomAccessSlice<Mirror.LegacyChildren>",
-                  "children": [
-                    {
-                      "kind": "TypeNominal",
-                      "name": "LegacyChildren",
-                      "printedName": "Mirror.LegacyChildren"
-                    }
-                  ]
-                }
-              ]
-            },
-            {
-              "kind": "TypeAlias",
-              "name": "IndexDistance",
-              "printedName": "IndexDistance",
-              "declKind": "TypeAlias",
-              "usr": "s:VVs6Mirror14LegacyChildren13IndexDistance",
-              "location": "",
-              "moduleName": "Swift",
-              "children": [
-                {
-                  "kind": "TypeNominal",
-                  "name": "Int",
-                  "printedName": "Int"
-                }
-              ]
-            },
-            {
-              "kind": "TypeAlias",
-              "name": "Iterator",
-              "printedName": "Iterator",
-              "declKind": "TypeAlias",
-              "usr": "s:VVs6Mirror14LegacyChildren8Iterator",
-              "location": "",
-              "moduleName": "Swift",
-              "children": [
-                {
-                  "kind": "TypeNominal",
-                  "name": "IndexingIterator",
-                  "printedName": "IndexingIterator<Mirror.LegacyChildren>",
-                  "children": [
-                    {
-                      "kind": "TypeNominal",
-                      "name": "LegacyChildren",
-                      "printedName": "Mirror.LegacyChildren"
-                    }
-                  ]
-                }
-              ]
-            }
-          ]
-        },
-        {
           "kind": "Constructor",
           "name": "init",
           "printedName": "init(_:subjectClass:ancestor:legacy:)",
@@ -48252,38 +47344,6 @@
                   "printedName": "Mirror"
                 }
               ]
-            }
-          ]
-        }
-      ]
-    },
-    {
-      "kind": "Var",
-      "name": "kCFStringEncodingASCII",
-      "printedName": "kCFStringEncodingASCII",
-      "declKind": "Var",
-      "usr": "s:vs22kCFStringEncodingASCIIVs6UInt32",
-      "location": "",
-      "moduleName": "Swift",
-      "children": [
-        {
-          "kind": "TypeNominal",
-          "name": "_swift_shims_CFStringEncoding",
-          "printedName": "_swift_shims_CFStringEncoding"
-        },
-        {
-          "kind": "Getter",
-          "name": "_",
-          "printedName": "_()",
-          "declKind": "Func",
-          "usr": "s:Fsg22kCFStringEncodingASCIIVs6UInt32",
-          "location": "",
-          "moduleName": "Swift",
-          "children": [
-            {
-              "kind": "TypeNominal",
-              "name": "_swift_shims_CFStringEncoding",
-              "printedName": "_swift_shims_CFStringEncoding"
             }
           ]
         }
@@ -64216,314 +63276,6 @@
               "printedName": "Int"
             }
           ]
-        },
-        {
-          "kind": "TypeDecl",
-          "name": "UTF16View",
-          "printedName": "UTF16View",
-          "declKind": "Struct",
-          "usr": "s:VSc9UTF16View",
-          "location": "",
-          "moduleName": "Swift",
-          "children": [
-            {
-              "kind": "Var",
-              "name": "value",
-              "printedName": "value",
-              "declKind": "Var",
-              "usr": "s:vVSc9UTF16View5valueSc",
-              "location": "",
-              "moduleName": "Swift",
-              "children": [
-                {
-                  "kind": "TypeNominal",
-                  "name": "UnicodeScalar",
-                  "printedName": "UnicodeScalar"
-                },
-                {
-                  "kind": "Getter",
-                  "name": "_",
-                  "printedName": "_()",
-                  "declKind": "Func",
-                  "usr": "s:FVSc9UTF16Viewg5valueSc",
-                  "location": "",
-                  "moduleName": "Swift",
-                  "children": [
-                    {
-                      "kind": "TypeNominal",
-                      "name": "UnicodeScalar",
-                      "printedName": "UnicodeScalar"
-                    },
-                    {
-                      "kind": "TypeNominal",
-                      "name": "UTF16View",
-                      "printedName": "UnicodeScalar.UTF16View"
-                    }
-                  ]
-                },
-                {
-                  "kind": "Setter",
-                  "name": "_",
-                  "printedName": "_()",
-                  "declKind": "Func",
-                  "usr": "s:FVSc9UTF16Views5valueSc",
-                  "location": "",
-                  "moduleName": "Swift",
-                  "mutating": true,
-                  "children": [
-                    {
-                      "kind": "TypeNominal",
-                      "name": "Void",
-                      "printedName": "()"
-                    },
-                    {
-                      "kind": "TypeNominal",
-                      "name": "InOut",
-                      "printedName": "inout UnicodeScalar.UTF16View"
-                    },
-                    {
-                      "kind": "TypeNominal",
-                      "name": "UnicodeScalar",
-                      "printedName": "UnicodeScalar"
-                    }
-                  ]
-                }
-              ]
-            },
-            {
-              "kind": "Constructor",
-              "name": "init",
-              "printedName": "init(value:)",
-              "declKind": "Constructor",
-              "usr": "s:FVSc9UTF16ViewcFT5valueSc_S_",
-              "location": "",
-              "moduleName": "Swift",
-              "children": [
-                {
-                  "kind": "TypeNominal",
-                  "name": "UTF16View",
-                  "printedName": "UnicodeScalar.UTF16View"
-                },
-                {
-                  "kind": "TypeNominal",
-                  "name": "UnicodeScalar",
-                  "printedName": "UnicodeScalar"
-                }
-              ]
-            },
-            {
-              "kind": "TypeAlias",
-              "name": "Indices",
-              "printedName": "Indices",
-              "declKind": "TypeAlias",
-              "usr": "s:VSc9UTF16View7Indices",
-              "location": "",
-              "moduleName": "Swift",
-              "children": [
-                {
-                  "kind": "TypeNominal",
-                  "name": "CountableRange",
-                  "printedName": "CountableRange<Int>",
-                  "children": [
-                    {
-                      "kind": "TypeNominal",
-                      "name": "Int",
-                      "printedName": "Int"
-                    }
-                  ]
-                }
-              ]
-            },
-            {
-              "kind": "Var",
-              "name": "startIndex",
-              "printedName": "startIndex",
-              "declKind": "Var",
-              "usr": "s:vVSc9UTF16View10startIndexSi",
-              "location": "",
-              "moduleName": "Swift",
-              "children": [
-                {
-                  "kind": "TypeNominal",
-                  "name": "Int",
-                  "printedName": "Int"
-                },
-                {
-                  "kind": "Getter",
-                  "name": "_",
-                  "printedName": "_()",
-                  "declKind": "Func",
-                  "usr": "s:FVSc9UTF16Viewg10startIndexSi",
-                  "location": "",
-                  "moduleName": "Swift",
-                  "children": [
-                    {
-                      "kind": "TypeNominal",
-                      "name": "Int",
-                      "printedName": "Int"
-                    },
-                    {
-                      "kind": "TypeNominal",
-                      "name": "UTF16View",
-                      "printedName": "UnicodeScalar.UTF16View"
-                    }
-                  ]
-                }
-              ]
-            },
-            {
-              "kind": "Var",
-              "name": "endIndex",
-              "printedName": "endIndex",
-              "declKind": "Var",
-              "usr": "s:vVSc9UTF16View8endIndexSi",
-              "location": "",
-              "moduleName": "Swift",
-              "children": [
-                {
-                  "kind": "TypeNominal",
-                  "name": "Int",
-                  "printedName": "Int"
-                },
-                {
-                  "kind": "Getter",
-                  "name": "_",
-                  "printedName": "_()",
-                  "declKind": "Func",
-                  "usr": "s:FVSc9UTF16Viewg8endIndexSi",
-                  "location": "",
-                  "moduleName": "Swift",
-                  "children": [
-                    {
-                      "kind": "TypeNominal",
-                      "name": "Int",
-                      "printedName": "Int"
-                    },
-                    {
-                      "kind": "TypeNominal",
-                      "name": "UTF16View",
-                      "printedName": "UnicodeScalar.UTF16View"
-                    }
-                  ]
-                }
-              ]
-            },
-            {
-              "kind": "TypeAlias",
-              "name": "Index",
-              "printedName": "Index",
-              "declKind": "TypeAlias",
-              "usr": "s:VSc9UTF16View5Index",
-              "location": "",
-              "moduleName": "Swift",
-              "children": [
-                {
-                  "kind": "TypeNominal",
-                  "name": "Int",
-                  "printedName": "Int"
-                }
-              ]
-            },
-            {
-              "kind": "TypeAlias",
-              "name": "SubSequence",
-              "printedName": "SubSequence",
-              "declKind": "TypeAlias",
-              "usr": "s:VSc9UTF16View11SubSequence",
-              "location": "",
-              "moduleName": "Swift",
-              "children": [
-                {
-                  "kind": "TypeNominal",
-                  "name": "RandomAccessSlice",
-                  "printedName": "RandomAccessSlice<UnicodeScalar.UTF16View>",
-                  "children": [
-                    {
-                      "kind": "TypeNominal",
-                      "name": "UTF16View",
-                      "printedName": "UnicodeScalar.UTF16View"
-                    }
-                  ]
-                }
-              ]
-            },
-            {
-              "kind": "TypeAlias",
-              "name": "IndexDistance",
-              "printedName": "IndexDistance",
-              "declKind": "TypeAlias",
-              "usr": "s:VSc9UTF16View13IndexDistance",
-              "location": "",
-              "moduleName": "Swift",
-              "children": [
-                {
-                  "kind": "TypeNominal",
-                  "name": "Int",
-                  "printedName": "Int"
-                }
-              ]
-            },
-            {
-              "kind": "TypeAlias",
-              "name": "Iterator",
-              "printedName": "Iterator",
-              "declKind": "TypeAlias",
-              "usr": "s:VSc9UTF16View8Iterator",
-              "location": "",
-              "moduleName": "Swift",
-              "children": [
-                {
-                  "kind": "TypeNominal",
-                  "name": "IndexingIterator",
-                  "printedName": "IndexingIterator<UnicodeScalar.UTF16View>",
-                  "children": [
-                    {
-                      "kind": "TypeNominal",
-                      "name": "UTF16View",
-                      "printedName": "UnicodeScalar.UTF16View"
-                    }
-                  ]
-                }
-              ]
-            }
-          ]
-        },
-        {
-          "kind": "Var",
-          "name": "utf16",
-          "printedName": "utf16",
-          "declKind": "Var",
-          "usr": "s:vSc5utf16VSc9UTF16View",
-          "location": "",
-          "moduleName": "Swift",
-          "children": [
-            {
-              "kind": "TypeNominal",
-              "name": "UTF16View",
-              "printedName": "UnicodeScalar.UTF16View"
-            },
-            {
-              "kind": "Getter",
-              "name": "_",
-              "printedName": "_()",
-              "declKind": "Func",
-              "usr": "s:FScg5utf16VSc9UTF16View",
-              "location": "",
-              "moduleName": "Swift",
-              "children": [
-                {
-                  "kind": "TypeNominal",
-                  "name": "UTF16View",
-                  "printedName": "UnicodeScalar.UTF16View"
-                },
-                {
-                  "kind": "TypeNominal",
-                  "name": "UnicodeScalar",
-                  "printedName": "UnicodeScalar"
-                }
-              ]
-            }
-          ]
         }
       ]
     },
@@ -79658,27 +78410,6 @@
           ]
         },
         {
-          "kind": "Function",
-          "name": "makeDescription",
-          "printedName": "makeDescription(isDebug:)",
-          "declKind": "Func",
-          "usr": "s:FVs3SetP33_69BD46AE5A11D8B70E9CADC1ECE9CF7615makeDescriptionFT7isDebugSb_SS",
-          "location": "",
-          "moduleName": "Swift",
-          "children": [
-            {
-              "kind": "TypeNominal",
-              "name": "String",
-              "printedName": "String"
-            },
-            {
-              "kind": "TypeNominal",
-              "name": "Bool",
-              "printedName": "Bool"
-            }
-          ]
-        },
-        {
           "kind": "Var",
           "name": "description",
           "printedName": "description",
@@ -83111,15 +81842,6 @@
       "printedName": "CustomLeafReflectable",
       "declKind": "Protocol",
       "usr": "s:Ps21CustomLeafReflectable",
-      "location": "",
-      "moduleName": "Swift"
-    },
-    {
-      "kind": "TypeDecl",
-      "name": "DictionaryIteratorRepresentation",
-      "printedName": "DictionaryIteratorRepresentation",
-      "declKind": "Enum",
-      "usr": "s:Os32DictionaryIteratorRepresentation",
       "location": "",
       "moduleName": "Swift"
     },
@@ -89446,22 +88168,6 @@
               "moduleName": "Swift",
               "children": [
                 {
-                  "kind": "TypeAlias",
-                  "name": "Buffer",
-                  "printedName": "Buffer",
-                  "declKind": "TypeAlias",
-                  "usr": "s:VVSS8UTF8View5Index6Buffer",
-                  "location": "",
-                  "moduleName": "Swift",
-                  "children": [
-                    {
-                      "kind": "TypeNominal",
-                      "name": "_UTF8Chunk",
-                      "printedName": "_StringCore._UTF8Chunk"
-                    }
-                  ]
-                },
-                {
                   "kind": "Constructor",
                   "name": "init",
                   "printedName": "init(_:within:)",
@@ -90141,59 +88847,6 @@
                   "kind": "TypeNominal",
                   "name": "String",
                   "printedName": "String"
-                }
-              ]
-            },
-            {
-              "kind": "TypeAlias",
-              "name": "UnicodeScalarView",
-              "printedName": "UnicodeScalarView",
-              "declKind": "TypeAlias",
-              "usr": "s:VSS13CharacterView17UnicodeScalarView",
-              "location": "",
-              "moduleName": "Swift",
-              "children": [
-                {
-                  "kind": "TypeNominal",
-                  "name": "UnicodeScalarView",
-                  "printedName": "String.UnicodeScalarView"
-                }
-              ]
-            },
-            {
-              "kind": "Var",
-              "name": "unicodeScalars",
-              "printedName": "unicodeScalars",
-              "declKind": "Var",
-              "usr": "s:vVSS13CharacterView14unicodeScalarsVSS17UnicodeScalarView",
-              "location": "",
-              "moduleName": "Swift",
-              "children": [
-                {
-                  "kind": "TypeNominal",
-                  "name": "UnicodeScalarView",
-                  "printedName": "String.CharacterView.UnicodeScalarView"
-                },
-                {
-                  "kind": "Getter",
-                  "name": "_",
-                  "printedName": "_()",
-                  "declKind": "Func",
-                  "usr": "s:FVSS13CharacterViewg14unicodeScalarsVSS17UnicodeScalarView",
-                  "location": "",
-                  "moduleName": "Swift",
-                  "children": [
-                    {
-                      "kind": "TypeNominal",
-                      "name": "UnicodeScalarView",
-                      "printedName": "String.CharacterView.UnicodeScalarView"
-                    },
-                    {
-                      "kind": "TypeNominal",
-                      "name": "CharacterView",
-                      "printedName": "String.CharacterView"
-                    }
-                  ]
                 }
               ]
             },
@@ -95626,43 +94279,6 @@
         },
         {
           "kind": "Var",
-          "name": "summary",
-          "printedName": "summary",
-          "declKind": "Var",
-          "usr": "s:vSV7summarySS",
-          "location": "",
-          "moduleName": "Swift",
-          "children": [
-            {
-              "kind": "TypeNominal",
-              "name": "String",
-              "printedName": "String"
-            },
-            {
-              "kind": "Getter",
-              "name": "_",
-              "printedName": "_()",
-              "declKind": "Func",
-              "usr": "s:FSVg7summarySS",
-              "location": "",
-              "moduleName": "Swift",
-              "children": [
-                {
-                  "kind": "TypeNominal",
-                  "name": "String",
-                  "printedName": "String"
-                },
-                {
-                  "kind": "TypeNominal",
-                  "name": "UnsafeRawPointer",
-                  "printedName": "UnsafeRawPointer"
-                }
-              ]
-            }
-          ]
-        },
-        {
-          "kind": "Var",
           "name": "customPlaygroundQuickLook",
           "printedName": "customPlaygroundQuickLook",
           "declKind": "Var",
@@ -96015,39 +94631,6 @@
               ]
             }
           ]
-        }
-      ]
-    },
-    {
-      "kind": "Function",
-      "name": "swift_class_getInstanceExtents",
-      "printedName": "swift_class_getInstanceExtents(_:)",
-      "declKind": "Func",
-      "usr": "s:Fs30swift_class_getInstanceExtentsFPMPs9AnyObject_T8negativeSu8positiveSu_",
-      "location": "",
-      "moduleName": "Swift",
-      "children": [
-        {
-          "kind": "TypeNominal",
-          "name": "Tuple",
-          "printedName": "(negative: UInt, positive: UInt)",
-          "children": [
-            {
-              "kind": "TypeNominal",
-              "name": "UInt",
-              "printedName": "UInt"
-            },
-            {
-              "kind": "TypeNominal",
-              "name": "UInt",
-              "printedName": "UInt"
-            }
-          ]
-        },
-        {
-          "kind": "TypeNominal",
-          "name": "AnyClass",
-          "printedName": "AnyClass"
         }
       ]
     },

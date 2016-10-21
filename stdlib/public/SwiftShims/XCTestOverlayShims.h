@@ -1,4 +1,4 @@
-//===----------------------------------------------------------------------===//
+//===--- XCTestOverlayShims.h -------------------------------------------*-===//
 //
 // This source file is part of the Swift.org open source project
 //
@@ -10,10 +10,17 @@
 //
 //===----------------------------------------------------------------------===//
 
-@_exported import SafariServices // Clang module
-import _SwiftSafariServicesOverlayShims
+#ifndef SWIFT_STDLIB_SHIMS_XCTEST_OVERLAY_H
+#define SWIFT_STDLIB_SHIMS_XCTEST_OVERLAY_H
 
-@available(OSX, introduced: 10.11)
-public func SFSafariServicesAvailable() -> Bool {
-  return _swift_SafariServices_isSafariServicesAvailable()
-}
+@import Foundation;
+
+@class XCTestCase;
+
+XCTestCase * _Nonnull _XCTCurrentTestCase(void);
+
+NSDictionary<NSString *, NSString *> * _Nonnull
+_XCTRunThrowableBlockBridge(void (^ _Nonnull NS_NOESCAPE block)());
+
+#endif // SWIFT_STDLIB_SHIMS_XCTEST_OVERLAY_H
+

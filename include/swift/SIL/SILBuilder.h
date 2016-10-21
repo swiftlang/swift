@@ -453,12 +453,25 @@ public:
                       LoadInst(getSILDebugLocation(Loc), LV, Qualifier));
   }
 
+  LoadBorrowInst *createLoadBorrow(SILLocation Loc, SILValue LV) {
+    assert(LV->getType().isLoadable(F.getModule()));
+    return insert(new (F.getModule())
+                      LoadBorrowInst(getSILDebugLocation(Loc), LV));
+  }
+
   StoreInst *createStore(SILLocation Loc, SILValue Src, SILValue DestAddr,
                          StoreOwnershipQualifier Qualifier =
                              StoreOwnershipQualifier::Unqualified) {
     return insert(new (F.getModule()) StoreInst(getSILDebugLocation(Loc), Src,
                                                 DestAddr, Qualifier));
   }
+
+  EndBorrowInst *createEndBorrow(SILLocation Loc, SILValue Src,
+                                 SILValue DestAddr) {
+    return insert(new (F.getModule())
+                      EndBorrowInst(getSILDebugLocation(Loc), Src, DestAddr));
+  }
+
   AssignInst *createAssign(SILLocation Loc, SILValue Src, SILValue DestAddr) {
     return insert(new (F.getModule())
                       AssignInst(getSILDebugLocation(Loc), Src, DestAddr));

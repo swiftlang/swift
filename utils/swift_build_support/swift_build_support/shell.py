@@ -123,6 +123,8 @@ def capture(command, stderr=None, env=None, dry_run=None, echo=True,
             "command terminated with a non-zero exit status " +
             str(e.returncode) + ", aborting")
     except OSError as e:
+        if optional:
+            return None
         diagnostics.fatal(
             "could not execute '" + quote_command(command) +
             "': " + e.strerror)

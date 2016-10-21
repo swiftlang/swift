@@ -310,27 +310,22 @@ Version::operator clang::VersionTuple() const
   }
 }
 
-bool
-Version::isValidEffectiveLanguageVersion() const
-{
-  // Whitelist of backward-compatibility versions that we permit passing as
-  // -swift-version <vers>
-  char const *whitelist[] = {
-    // Swift 3 family
-    "3",
-    "3.0",
-
-    // Swift 4 family
-    "4",
-    "4.0",
-  };
-  for (auto const i : whitelist) {
-    auto v = parseVersionString(i, SourceLoc(), nullptr);
+bool Version::isValidEffectiveLanguageVersion() const {
+  for (auto verStr : getValidEffectiveVersions()) {
+    auto v = parseVersionString(verStr, SourceLoc(), nullptr);
     assert(v.hasValue());
     if (v == *this)
       return true;
   }
   return false;
+}
+
+Version Version::asMajorVersion() const {
+  if (empty())
+    return {};
+  Version res;
+  res.Components.push_back(Components[0]);
+  return res;
 }
 
 bool operator>=(const class Version &lhs,

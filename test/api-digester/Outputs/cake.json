@@ -62,6 +62,49 @@
           ]
         }
       ]
+    },
+    {
+      "kind": "TypeDecl",
+      "name": "C1",
+      "printedName": "C1",
+      "declKind": "Class",
+      "usr": "s:C4cake2C1",
+      "location": "",
+      "moduleName": "cake",
+      "children": [
+        {
+          "kind": "Function",
+          "name": "foo1",
+          "printedName": "foo1()",
+          "declKind": "Func",
+          "usr": "s:FC4cake2C14foo1FT_T_",
+          "location": "",
+          "moduleName": "cake",
+          "children": [
+            {
+              "kind": "TypeNominal",
+              "name": "Void",
+              "printedName": "()"
+            }
+          ]
+        },
+        {
+          "kind": "Constructor",
+          "name": "init",
+          "printedName": "init()",
+          "declKind": "Constructor",
+          "usr": "s:FC4cake2C1cFT_S0_",
+          "location": "",
+          "moduleName": "cake",
+          "children": [
+            {
+              "kind": "TypeNominal",
+              "name": "C1",
+              "printedName": "C1"
+            }
+          ]
+        }
+      ]
     }
   ]
 }

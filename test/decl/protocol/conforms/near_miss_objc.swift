@@ -144,3 +144,12 @@ class C10Super {
 class C10Sub : C10Super, P8 {
   override func foo(nearMatch: Int) { }
 }
+
+// Be more strict about near misses than we had previously.
+@objc protocol P11 {
+  @objc optional func foo(wibble: Int)
+}
+
+class C11 : P11 {
+  func f(waggle: Int) { } // no warning
+}

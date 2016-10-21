@@ -1496,6 +1496,24 @@ eval COMMON_CMAKE_OPTIONS=(${COMMON_CMAKE_OPTIONS})
 eval EXTRA_CMAKE_OPTIONS=(${EXTRA_CMAKE_OPTIONS})
 eval BUILD_ARGS=(${BUILD_ARGS})
 
+if [[ -n "${DISTCC}" ]]; then
+    if [[ "$(uname -s)" == "Darwin" ]] ; then
+        # These are normally deduced by CMake, but when the compiler is set to
+        # distcc which is installed elsewhere, we need to set them explicitly.
+        COMMON_CMAKE_OPTIONS=(
+            "${COMMON_CMAKE_OPTIONS[@]}" "-DCMAKE_AR=$(xcrun_find_tool ar)"
+            "-DCMAKE_LINKER=$(xcrun_find_tool ld)"
+            "-DCMAKE_NM=$(xcrun_find_tool nm)"
+            "-DCMAKE_OBJDUMP=$(xcrun_find_tool objdump)"
+            "-DCMAKE_RANLIB=$(xcrun_find_tool ranlib)"
+            "-DCMAKE_STRIP=$(xcrun_find_tool strip)"
+        )
+    fi
+fi
+
+eval CMAKE_BUILD=("${DISTCC_PUMP}" "${CMAKE}" "--build")
+
+
 if [[ "${CMAKE_GENERATOR}" == "Xcode" ]]; then
     BUILD_TARGET_FLAG="-target"
 fi
@@ -2485,10 +2503,10 @@ for host in "${ALL_HOSTS[@]}"; do
 
                 # Xcode can't restart itself if it turns out we need to reconfigure.
                 # Do an advance build to handle that.
-                call ${DISTCC_PUMP} "${CMAKE}" --build "${build_dir}" $(cmake_config_opt ${product})
+                call "${CMAKE_BUILD[@]}" "${build_dir}" $(cmake_config_opt ${product})
             fi
 
-            call ${DISTCC_PUMP} "${CMAKE}" --build "${build_dir}" $(cmake_config_opt ${product}) -- "${BUILD_ARGS[@]}" ${build_targets[@]}
+            call "${CMAKE_BUILD[@]}" "${build_dir}" $(cmake_config_opt ${product}) -- "${BUILD_ARGS[@]}" ${build_targets[@]}
         fi
     done
 done
@@ -2728,11 +2746,11 @@ for host in "${ALL_HOSTS[@]}"; do
 
         trap "tests_busted ${product} ''" ERR
         build_dir=$(build_directory ${host} ${product})
-        build_cmd=("${CMAKE}" --build "${build_dir}" $(cmake_config_opt ${product}) -- "${BUILD_ARGS[@]}")
+        build_cmd=("${CMAKE_BUILD[@]}" "${build_dir}" $(cmake_config_opt ${product}) -- "${BUILD_ARGS[@]}")
 
         if [[ "${executable_target}" != "" ]]; then
             echo "--- Building tests for ${product} ---"
-            call ${DISTCC_PUMP} "${build_cmd[@]}" ${BUILD_TARGET_FLAG} "${executable_target}"
+            call "${build_cmd[@]}" ${BUILD_TARGET_FLAG} "${executable_target}"
         fi
 
         # We can only run tests built for the host machine, because
@@ -2751,7 +2769,7 @@ for host in "${ALL_HOSTS[@]}"; do
                 # NOTE: In dry-run mode, build_dir might not exist yet. In that
                 #       case, -n query will fail. So, in dry-run mode,
                 #       we don't expand test script.
-                if [[ ! "${DRY_RUN}" && "${CMAKE_GENERATOR}" == Ninja ]] && !( "${build_cmd[@]}" --version 2>&1 | grep -i -q llbuild ); then
+                if [[ ! "${DRY_RUN}" && "${CMAKE_GENERATOR}" == Ninja ]] && !( "${build_cmd[@]}" --version 2>&1 | grep -i -q llbuild ) && [[ -z "${DISTCC_PUMP}" ]]; then
                     # Ninja buffers command output to avoid scrambling the output
                     # of parallel jobs, which is awesome... except that it
                     # interferes with the progress meter when testing.  Instead of
@@ -2778,11 +2796,6 @@ LIPO_SRC_DIRS=()
 for host in "${ALL_HOSTS[@]}"; do
     # Skip this pass when the only action to execute can't match.
     if ! [[ $(should_execute_host_actions_for_phase ${host} install) ]]; then
-        continue
-    fi
-
-    # Skip this if we're cross compiling and it's the local host.
-    if [[ $(has_cross_compile_hosts) ]] && [[ ${host} == ${LOCAL_HOST} ]]; then
         continue
     fi
 
@@ -3014,7 +3027,7 @@ for host in "${ALL_HOSTS[@]}"; do
         echo "--- Installing ${product} ---"
         build_dir=$(build_directory ${host} ${product})
 
-        call env DESTDIR="${host_install_destdir}" "${CMAKE}" --build "${build_dir}" -- ${INSTALL_TARGETS}
+        call env DESTDIR="${host_install_destdir}" "${CMAKE_BUILD[@]}" "${build_dir}" -- ${INSTALL_TARGETS}
     done
 
     if [[ "${DARWIN_INSTALL_EXTRACT_SYMBOLS}" ]] && [[ $(host_has_darwin_symbols ${host}) ]]; then

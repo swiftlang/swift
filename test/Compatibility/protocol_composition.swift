@@ -13,7 +13,7 @@ protocol P2 {
 
 // BEGIN swift3.swift
 
-// Warning for mitakingly accepted protocol composition production.
+// Warning for mistakenly accepted protocol composition production.
 func foo(x: P1 & Any & P2.Type?) {
   // expected-warning @-1 {{protocol composition with postfix '.Type' is ambiguous and will be rejected in future version of Swift}} {{13-13=(}} {{26-26=)}}
   let _: (P1 & P2).Type? = x

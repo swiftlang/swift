@@ -1134,6 +1134,26 @@ public:
     }
   }
 
+  void checkLoadBorrowInst(LoadBorrowInst *LBI) {
+    require(LBI->getType().isObject(), "Result of load must be an object");
+    require(LBI->getType().isLoadable(LBI->getModule()),
+            "Load must have a loadable type");
+    require(LBI->getOperand()->getType().isAddress(),
+            "Load operand must be an address");
+    require(LBI->getOperand()->getType().getObjectType() == LBI->getType(),
+            "Load operand type and result type mismatch");
+  }
+
+  void checkEndBorrowInst(EndBorrowInst *EBI) {
+    // We allow for end_borrow to express relationships in between addresses and
+    // values, but we require that the types are the same ignoring value
+    // category.
+    require(EBI->getDest()->getType().getObjectType() ==
+                EBI->getSrc()->getType().getObjectType(),
+            "end_borrow can only relate the same types ignoring value "
+            "category");
+  }
+
   void checkStoreInst(StoreInst *SI) {
     require(SI->getSrc()->getType().isObject(),
             "Can't store from an address source");
