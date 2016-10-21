@@ -506,7 +506,6 @@ namespace {
                             Type paramTy,
                             Expr *arg,
                             Type argTy,
-                            Expr *otherArg = nullptr,
                             Type otherArgTy = Type()) {
     // Determine the argument type.
     argTy = argTy->getLValueOrInOutObjectType();
@@ -925,9 +924,9 @@ namespace {
       
       return
         (isFavoredParamAndArg(CS, firstParamTy, firstArg, firstArgTy,
-                              secondArg, secondArgTy) ||
+                              secondArgTy) ||
          isFavoredParamAndArg(CS, secondParamTy, secondArg, secondArgTy,
-                              firstArg, firstArgTy)) &&
+                              firstArgTy)) &&
          firstParamTy->isEqual(secondParamTy) &&
         (!contextualTy || contextualTy->isEqual(resultTy));
     };

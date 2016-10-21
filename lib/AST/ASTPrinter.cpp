@@ -3496,7 +3496,7 @@ public:
   }
 
   void visitNameAliasType(NameAliasType *T) {
-    if (Options.PrintForSIL) {
+    if (Options.PrintForSIL || Options.PrintNameAliasUnderlyingType) {
       visit(T->getSinglyDesugaredType());
       return;
     }
@@ -3716,6 +3716,9 @@ public:
       case SILFunctionType::Representation::WitnessMethod:
         Printer << "witness_method";
         break;
+      case SILFunctionType::Representation::Closure:
+        Printer << "closure";
+        break;
       }
       Printer << ")";
       Printer.printStructurePost(PrintStructureKind::BuiltinAttribute);
@@ -3733,7 +3736,6 @@ public:
       Printer.callPrintStructurePre(PrintStructureKind::BuiltinAttribute);
       Printer.printAttrName("@convention");
       Printer << "(";
-      // TODO: coalesce into a single convention attribute.
       switch (info.getRepresentation()) {
       case SILFunctionType::Representation::Thick:
         llvm_unreachable("thick is not printed");
@@ -3754,6 +3756,9 @@ public:
         break;
       case SILFunctionType::Representation::WitnessMethod:
         Printer << "witness_method";
+        break;
+      case SILFunctionType::Representation::Closure:
+        Printer << "closure";
         break;
       }
       Printer << ")";

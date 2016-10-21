@@ -196,7 +196,8 @@ using InputInfoMap = Driver::InputInfoMap;
 
 static bool populateOutOfDateMap(InputInfoMap &map, StringRef argsHashStr,
                                  const InputFileList &inputs,
-                                 StringRef buildRecordPath) {
+                                 StringRef buildRecordPath,
+                                 bool ShowIncrementalBuildDecisions) {
   // Treat a missing file as "no previous build".
   auto buffer = llvm::MemoryBuffer::getFile(buildRecordPath);
   if (!buffer)
@@ -260,6 +261,7 @@ static bool populateOutOfDateMap(InputInfoMap &map, StringRef argsHashStr,
 
   // FIXME: LLVM's YAML support does incremental parsing in such a way that
   // for-range loops break.
+  SmallString<64> CompilationRecordSwiftVersion;
   for (auto i = topLevelMap->begin(), e = topLevelMap->end(); i != e; ++i) {
     auto *key = cast<yaml::ScalarNode>(i->getKey());
     StringRef keyStr = key->getValue(scratch);
@@ -274,7 +276,8 @@ static bool populateOutOfDateMap(InputInfoMap &map, StringRef argsHashStr,
       // swift::version::Version::getCurrentLanguageVersion() here because any
       // -swift-version argument is handled in the argsHashStr check that
       // follows.
-      versionValid = (value->getValue(scratch)
+      CompilationRecordSwiftVersion = value->getValue(scratch);
+      versionValid = (CompilationRecordSwiftVersion
                       == version::getSwiftFullVersion(
                         version::Version::getCurrentLanguageVersion()));
 
@@ -325,8 +328,26 @@ static bool populateOutOfDateMap(InputInfoMap &map, StringRef argsHashStr,
     }
   }
 
-  if (!versionValid || !optionsMatch)
+  if (!versionValid) {
+    if (ShowIncrementalBuildDecisions) {
+      auto v = version::getSwiftFullVersion(
+          version::Version::getCurrentLanguageVersion());
+      llvm::outs() << "Incremental compilation has been disabled, due to a "
+                   << "compiler version mismatch.\n"
+                   << "\tCompiling with: " << v << "\n"
+                   << "\tPreviously compiled with: "
+                   << CompilationRecordSwiftVersion << "\n";
+    }
     return true;
+  }
+
+  if (!optionsMatch) {
+    if (ShowIncrementalBuildDecisions) {
+      llvm::outs() << "Incremental compilation has been disabled, because "
+                   << "different arguments were passed to the compiler.\n";
+    }
+    return true;
+  }
 
   size_t numInputsFromPrevious = 0;
   for (auto &inputPair : inputs) {
@@ -339,9 +360,34 @@ static bool populateOutOfDateMap(InputInfoMap &map, StringRef argsHashStr,
     map[inputPair.second] = iter->getValue();
   }
 
-  // If a file was removed, we've lost its dependency info. Rebuild everything.
-  // FIXME: Can we do better?
-  return numInputsFromPrevious != previousInputs.size();
+  if (numInputsFromPrevious == previousInputs.size()) {
+    return false;
+  } else {
+    // If a file was removed, we've lost its dependency info. Rebuild everything.
+    // FIXME: Can we do better?
+    if (ShowIncrementalBuildDecisions) {
+      llvm::StringSet<> inputArgs;
+      for (auto &inputPair : inputs) {
+        inputArgs.insert(inputPair.second->getValue());
+      }
+
+      SmallVector<StringRef, 8> missingInputs;
+      for (auto &previousInput : previousInputs) {
+        auto previousInputArg = previousInput.getKey();
+        if (inputArgs.find(previousInputArg) == inputArgs.end()) {
+          missingInputs.push_back(previousInputArg);
+        }
+      }
+
+      llvm::outs() << "Incremental compilation has been disabled, because "
+                   << "the following inputs were used in the previous "
+                   << "compilation, but not in the current compilation:\n";
+      for (auto &missing : missingInputs) {
+        llvm::outs() << "\t" << missing << "\n";
+      }
+    }
+    return true;
+  }
 }
 
 std::unique_ptr<Compilation> Driver::buildCompilation(
@@ -460,7 +506,8 @@ std::unique_ptr<Compilation> Driver::buildCompilation(
 
       } else {
         if (populateOutOfDateMap(outOfDateMap, ArgsHash, Inputs,
-                                 buildRecordPath)) {
+                                 buildRecordPath,
+                                 ShowIncrementalBuildDecisions)) {
           // FIXME: Distinguish errors from "file removed", which is benign.
         } else {
           rebuildEverything = false;

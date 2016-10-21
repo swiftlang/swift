@@ -551,7 +551,7 @@ public:
 
   /// \brief Run the SIL verifier to make sure that all Functions follow
   /// invariants.
-  void verify() const;
+  void verify(bool EnforceSILOwnership = false) const;
 
   /// Pretty-print the module.
   void dump(bool Verbose = false) const;

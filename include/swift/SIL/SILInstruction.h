@@ -1667,11 +1667,19 @@ static inline llvm::hash_code hash_value(StringLiteralInst::Encoding E) {
   return llvm::hash_value(size_t(E));
 }
 
+// *NOTE* When serializing, we can only represent up to 4 values here. If more
+// qualifiers are added, SIL serialization must be updated.
+enum class LoadOwnershipQualifier {
+  Unqualified, Take, Copy, Trivial
+};
+
 /// LoadInst - Represents a load from a memory location.
 class LoadInst
   : public UnaryInstructionBase<ValueKind::LoadInst>
 {
   friend class SILBuilder;
+
+  LoadOwnershipQualifier OwnershipQualifier;
 
   /// Constructs a LoadInst.
   ///
@@ -1679,9 +1687,22 @@ class LoadInst
   ///
   /// \param LValue The SILValue representing the lvalue (address) to
   ///        use for the load.
-  LoadInst(SILDebugLocation DebugLoc, SILValue LValue)
+  LoadInst(SILDebugLocation DebugLoc, SILValue LValue,
+           LoadOwnershipQualifier Q = LoadOwnershipQualifier::Unqualified)
       : UnaryInstructionBase(DebugLoc, LValue,
-                             LValue->getType().getObjectType()) {}
+                             LValue->getType().getObjectType()),
+        OwnershipQualifier(Q) {}
+
+public:
+  LoadOwnershipQualifier getOwnershipQualifier() const {
+    return OwnershipQualifier;
+  }
+};
+
+// *NOTE* When serializing, we can only represent up to 4 values here. If more
+// qualifiers are added, SIL serialization must be updated.
+enum class StoreOwnershipQualifier {
+  Unqualified, Init, Assign, Trivial
 };
 
 /// StoreInst - Represents a store from a memory location.
@@ -1690,8 +1711,10 @@ class StoreInst : public SILInstruction {
 
 private:
   FixedOperandList<2> Operands;
+  StoreOwnershipQualifier OwnershipQualifier;
 
-  StoreInst(SILDebugLocation DebugLoc, SILValue Src, SILValue Dest);
+  StoreInst(SILDebugLocation DebugLoc, SILValue Src, SILValue Dest,
+            StoreOwnershipQualifier Qualifier);
 
 public:
   enum {
@@ -1709,6 +1732,54 @@ public:
 
   static bool classof(const ValueBase *V) {
     return V->getKind() == ValueKind::StoreInst;
+  }
+
+  StoreOwnershipQualifier getOwnershipQualifier() const {
+    return OwnershipQualifier;
+  }
+};
+
+/// Represents a load of a borrowed value. Must be paired with an end_borrow
+/// instruction in its use-def list.
+class LoadBorrowInst : public UnaryInstructionBase<ValueKind::LoadBorrowInst> {
+  friend class SILBuilder;
+
+  LoadBorrowInst(SILDebugLocation DebugLoc, SILValue LValue)
+      : UnaryInstructionBase(DebugLoc, LValue,
+                             LValue->getType().getObjectType()) {}
+};
+
+/// Represents the end of a borrow scope for a value or address from another
+/// value or address.
+///
+/// The semantics of the instruction here is that the "dest" SILValue can not be
+/// used after this instruction and the "src" SILValue must stay alive up to
+/// EndBorrowInst.
+class EndBorrowInst : public SILInstruction {
+  friend class SILBuilder;
+
+public:
+  enum {
+    /// The source of the value being borrowed.
+    Src,
+    /// The destination of the borrowed value.
+    Dest
+  };
+
+private:
+  FixedOperandList<2> Operands;
+  EndBorrowInst(SILDebugLocation DebugLoc, SILValue Src, SILValue Dest);
+
+public:
+  SILValue getSrc() const { return Operands[Src].get(); }
+
+  SILValue getDest() const { return Operands[Dest].get(); }
+
+  ArrayRef<Operand> getAllOperands() const { return Operands.asArray(); }
+  MutableArrayRef<Operand> getAllOperands() { return Operands.asArray(); }
+
+  static bool classof(const ValueBase *V) {
+    return V->getKind() == ValueKind::EndBorrowInst;
   }
 };
 
@@ -5229,6 +5300,7 @@ public:
     case SILFunctionTypeRepresentation::Method:
     case SILFunctionTypeRepresentation::ObjCMethod:
     case SILFunctionTypeRepresentation::WitnessMethod:
+    case SILFunctionTypeRepresentation::Closure:
       return true;
     case SILFunctionTypeRepresentation::Block:
     case SILFunctionTypeRepresentation::Thick:

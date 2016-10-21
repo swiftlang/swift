@@ -43,16 +43,6 @@ Size irgen::getHeapHeaderSize(IRGenModule &IGM) {
   return IGM.getPointerSize() + Size(8);
 }
 
-/// Add the fields for the standard heap header to the given layout.
-void irgen::addHeapHeaderToLayout(IRGenModule &IGM,
-                                  Size &size, Alignment &align,
-                                  SmallVectorImpl<llvm::Type*> &fields) {
-  assert(size.isZero() && align.isOne() && fields.empty());
-  size = getHeapHeaderSize(IGM);
-  align = IGM.getPointerAlignment();
-  fields.push_back(IGM.RefCountedStructTy);
-}
-
 /// Perform structure layout on the given types.
 StructLayout::StructLayout(IRGenModule &IGM, CanType astTy,
                            LayoutKind layoutKind,

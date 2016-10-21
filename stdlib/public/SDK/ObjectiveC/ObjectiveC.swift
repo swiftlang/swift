@@ -12,6 +12,7 @@
 
 @_exported
 import ObjectiveC
+import _SwiftObjectiveCOverlayShims
 
 //===----------------------------------------------------------------------===//
 // Objective-C Primitive Types
@@ -180,18 +181,12 @@ typealias Zone = NSZone
 // @autoreleasepool substitute
 //===----------------------------------------------------------------------===//
 
-@_silgen_name("_swift_objc_autoreleasePoolPush")
-func __pushAutoreleasePool() -> OpaquePointer
-
-@_silgen_name("_swift_objc_autoreleasePoolPop")
-func __popAutoreleasePool(_ pool: OpaquePointer)
-
 public func autoreleasepool<Result>(
   invoking body: () throws -> Result
 ) rethrows -> Result {
-  let pool = __pushAutoreleasePool()
+  let pool = _swift_objc_autoreleasePoolPush()
   defer {
-    __popAutoreleasePool(pool)
+    _swift_objc_autoreleasePoolPop(pool)
   }
   return try body()
 }

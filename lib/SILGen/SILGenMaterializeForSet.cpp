@@ -160,31 +160,22 @@ public:
 
   static MaterializeForSetEmitter
   forWitnessThunk(SILGenModule &SGM,
-                  ProtocolConformance *conformance,
-                  SILLinkage linkage,
+                  ProtocolConformance *conformance, SILLinkage linkage,
+                  Type selfInterfaceType, Type selfType,
+                  GenericEnvironment *genericEnv,
                   FuncDecl *requirement, FuncDecl *witness,
                   ArrayRef<Substitution> witnessSubs) {
-    Type selfInterfaceType, selfType;
-    if (conformance) {
-      selfInterfaceType = conformance->getInterfaceType();
-      selfType = conformance->getType();
-    } else {
-      auto *proto = cast<ProtocolDecl>(requirement->getDeclContext());
-      selfInterfaceType = proto->getSelfInterfaceType();
-      selfType = proto->getSelfTypeInContext();
-    }
-
     MaterializeForSetEmitter emitter(SGM, linkage, witness, witnessSubs,
                                      selfInterfaceType, selfType);
 
     if (conformance) {
       if (auto signature = conformance->getGenericSignature())
         emitter.GenericSig = signature->getCanonicalSignature();
-      emitter.GenericEnv = conformance->getGenericEnvironment();
+      emitter.GenericEnv = genericEnv;
     } else {
       auto signature = requirement->getGenericSignatureOfContext();
       emitter.GenericSig = signature->getCanonicalSignature();
-      emitter.GenericEnv = requirement->getGenericEnvironmentOfContext();
+      emitter.GenericEnv = genericEnv;
     }
 
     emitter.RequirementStorage = requirement->getAccessorStorageDecl();
@@ -816,14 +807,17 @@ MaterializeForSetEmitter::createSetterCallback(SILFunction &F,
 bool SILGenFunction::
 maybeEmitMaterializeForSetThunk(ProtocolConformance *conformance,
                                 SILLinkage linkage,
+                                Type selfInterfaceType,
+                                Type selfType,
+                                GenericEnvironment *genericEnv,
                                 FuncDecl *requirement,
                                 FuncDecl *witness,
                                 ArrayRef<Substitution> witnessSubs) {
 
   MaterializeForSetEmitter emitter
     = MaterializeForSetEmitter::forWitnessThunk(
-        SGM, conformance, linkage, requirement, witness,
-        witnessSubs);
+        SGM, conformance, linkage, selfInterfaceType, selfType,
+        genericEnv, requirement, witness, witnessSubs);
 
   if (!emitter.shouldOpenCode())
     return false;

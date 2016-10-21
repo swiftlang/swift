@@ -1506,6 +1506,9 @@ ERROR(protocol_composition_not_protocol,none,
       "non-protocol type %0 cannot be used within a protocol composition", (Type))
 ERROR(objc_protocol_inherits_non_objc_protocol,none,
       "@objc protocol %0 cannot refine non-@objc protocol %1", (Type, Type))
+WARNING(protocol_composition_with_postfix,none,
+        "protocol composition with postfix '%0' is ambiguous "
+        "and will be rejected in future version of Swift", (StringRef))
 
 ERROR(requires_conformance_nonprotocol,none,
       "type %0 constrained to non-protocol type %1", (TypeLoc, TypeLoc))

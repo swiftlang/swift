@@ -1482,6 +1482,58 @@ bool SILParser::parseSILDebugLocation(SILLocation &L, SILBuilder &B,
   return false;
 }
 
+static bool parseLoadOwnershipQualifier(LoadOwnershipQualifier &Result,
+                                        SILParser &P) {
+  StringRef Str;
+  // If we do not parse '[' ... ']', we have unqualified. Set value and return.
+  if (!parseSILOptional(Str, P)) {
+    Result = LoadOwnershipQualifier::Unqualified;
+    return false;
+  }
+
+  // Then try to parse one of our other qualifiers. We do not support parsing
+  // unqualified here so we use that as our fail value.
+  auto Tmp = llvm::StringSwitch<LoadOwnershipQualifier>(Str)
+                 .Case("take", LoadOwnershipQualifier::Take)
+                 .Case("copy", LoadOwnershipQualifier::Copy)
+                 .Case("trivial", LoadOwnershipQualifier::Trivial)
+                 .Default(LoadOwnershipQualifier::Unqualified);
+
+  // Thus return true (following the conventions in this file) if we fail.
+  if (Tmp == LoadOwnershipQualifier::Unqualified)
+    return true;
+
+  // Otherwise, assign Result and return false.
+  Result = Tmp;
+  return false;
+}
+
+static bool parseStoreOwnershipQualifier(StoreOwnershipQualifier &Result,
+                                         SILParser &P) {
+  StringRef Str;
+  // If we do not parse '[' ... ']', we have unqualified. Set value and return.
+  if (!parseSILOptional(Str, P)) {
+    Result = StoreOwnershipQualifier::Unqualified;
+    return false;
+  }
+
+  // Then try to parse one of our other qualifiers. We do not support parsing
+  // unqualified here so we use that as our fail value.
+  auto Tmp = llvm::StringSwitch<StoreOwnershipQualifier>(Str)
+                 .Case("init", StoreOwnershipQualifier::Init)
+                 .Case("assign", StoreOwnershipQualifier::Assign)
+                 .Case("trivial", StoreOwnershipQualifier::Trivial)
+                 .Default(StoreOwnershipQualifier::Unqualified);
+
+  // Thus return true (following the conventions in this file) if we fail.
+  if (Tmp == StoreOwnershipQualifier::Unqualified)
+    return true;
+
+  // Otherwise, assign Result and return false.
+  Result = Tmp;
+  return false;
+}
+
 /// sil-instruction-def ::= (sil-value-name '=')? sil-instruction
 ///                         (',' sil-scope-ref)? (',' sil-loc)?
 bool SILParser::parseSILInstruction(SILBasicBlock *BB, SILBuilder &B) {
@@ -1872,7 +1924,6 @@ bool SILParser::parseSILInstruction(SILBasicBlock *BB, SILBuilder &B) {
     UNARY_INSTRUCTION(IsUnique)
     UNARY_INSTRUCTION(IsUniqueOrPinned)
     UNARY_INSTRUCTION(DestroyAddr)
-    UNARY_INSTRUCTION(Load)
     UNARY_INSTRUCTION(CondFail)
     REFCOUNTING_INSTRUCTION(StrongPin)
     REFCOUNTING_INSTRUCTION(StrongRetain)
@@ -1899,6 +1950,28 @@ bool SILParser::parseSILInstruction(SILBasicBlock *BB, SILBuilder &B) {
      ResultVal = B.createDebugValue(InstLoc, Val, VarInfo);
    else
      ResultVal = B.createDebugValueAddr(InstLoc, Val, VarInfo);
+   break;
+ }
+
+ case ValueKind::LoadInst: {
+   LoadOwnershipQualifier Qualifier;
+   SourceLoc AddrLoc;
+
+   if (parseLoadOwnershipQualifier(Qualifier, *this) ||
+       parseTypedValueRef(Val, AddrLoc, B) || parseSILDebugLocation(InstLoc, B))
+     return true;
+
+   ResultVal = B.createLoad(InstLoc, Val, Qualifier);
+   break;
+ }
+
+ case ValueKind::LoadBorrowInst: {
+   SourceLoc AddrLoc;
+
+   if (parseTypedValueRef(Val, AddrLoc, B) || parseSILDebugLocation(InstLoc, B))
+     return true;
+
+   ResultVal = B.createLoadBorrow(InstLoc, Val);
    break;
  }
 
@@ -2317,8 +2390,73 @@ bool SILParser::parseSILInstruction(SILBasicBlock *BB, SILBuilder &B) {
     break;
   }
 
+  case ValueKind::StoreInst: {
+    UnresolvedValueName From;
+    SourceLoc ToLoc, AddrLoc;
+    Identifier ToToken;
+    SILValue AddrVal;
+    StoreOwnershipQualifier Qualifier;
+    if (parseValueName(From) ||
+        parseSILIdentifier(ToToken, ToLoc, diag::expected_tok_in_sil_instr,
+                           "to"))
+      return true;
+
+    if (parseStoreOwnershipQualifier(Qualifier, *this))
+      return true;
+
+    if (parseTypedValueRef(AddrVal, AddrLoc, B) ||
+        parseSILDebugLocation(InstLoc, B))
+      return true;
+
+    if (ToToken.str() != "to") {
+      P.diagnose(ToLoc, diag::expected_tok_in_sil_instr, "to");
+      return true;
+    }
+
+    if (!AddrVal->getType().isAddress()) {
+      P.diagnose(AddrLoc, diag::sil_operand_not_address, "destination",
+                 OpcodeName);
+      return true;
+    }
+
+    SILType ValType = AddrVal->getType().getObjectType();
+
+    ResultVal = B.createStore(InstLoc, getLocalValue(From, ValType, InstLoc, B),
+                              AddrVal, Qualifier);
+    break;
+  }
+
+  case ValueKind::EndBorrowInst: {
+    UnresolvedValueName BorrowDestName, BorrowSourceName;
+    SourceLoc ToLoc, BorrowDestLoc;
+    Identifier ToToken;
+    SILType BorrowDestTy, BorrowSourceTy;
+
+    if (parseValueName(BorrowDestName) ||
+        parseSILIdentifier(ToToken, ToLoc, diag::expected_tok_in_sil_instr,
+                           "from") ||
+        parseValueName(BorrowSourceName) ||
+        P.parseToken(tok::colon, diag::expected_sil_colon_value_ref) ||
+        parseSILType(BorrowDestTy) ||
+        P.parseToken(tok::comma, diag::expected_tok_in_sil_instr, ",") ||
+        parseSILType(BorrowSourceTy) || parseSILDebugLocation(InstLoc, B))
+      return true;
+
+    if (ToToken.str() != "from") {
+      P.diagnose(ToLoc, diag::expected_tok_in_sil_instr, "from");
+      return true;
+    }
+
+    SILValue BorrowDest =
+        getLocalValue(BorrowDestName, BorrowDestTy, InstLoc, B);
+    SILValue BorrowSource =
+        getLocalValue(BorrowSourceName, BorrowSourceTy, InstLoc, B);
+
+    ResultVal = B.createEndBorrow(InstLoc, BorrowDest, BorrowSource);
+    break;
+  }
+
   case ValueKind::AssignInst:
-  case ValueKind::StoreInst:
   case ValueKind::StoreUnownedInst:
   case ValueKind::StoreWeakInst: {
     UnresolvedValueName from;

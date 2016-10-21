@@ -6,6 +6,4 @@
 // See http://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
 
 // RUN: not --crash %target-swift-frontend %s -parse
-// REQUIRES: asserts
-.h={return
-class c
+func a<T{{var _=[T:b}class b<A>

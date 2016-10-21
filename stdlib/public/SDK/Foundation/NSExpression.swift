@@ -10,23 +10,13 @@
 //
 //===----------------------------------------------------------------------===//
 
-#include <objc/objc-api.h>
+@_exported import Foundation // Clang module
 
-#include "swift/Runtime/Config.h"
-
-OBJC_EXPORT
-void *objc_autoreleasePoolPush(void);
-
-OBJC_EXPORT
-void objc_autoreleasePoolPop(void *);
-
-SWIFT_CC(swift) SWIFT_RUNTIME_STDLIB_INTERFACE
-extern "C" void *_swift_objc_autoreleasePoolPush(void) {
-  return objc_autoreleasePoolPush();
+extension NSExpression {
+  // + (NSExpression *) expressionWithFormat:(NSString *)expressionFormat, ...;
+  public
+  convenience init(format expressionFormat: String, _ args: CVarArg...) {
+    let va_args = getVaList(args)
+    self.init(format: expressionFormat, arguments: va_args)
+  }
 }
-
-SWIFT_CC(swift) SWIFT_RUNTIME_STDLIB_INTERFACE
-extern "C" void _swift_objc_autoreleasePoolPop(void *context) {
-  return objc_autoreleasePoolPop(context);
-}
-

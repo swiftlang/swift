@@ -328,7 +328,7 @@ let f: (Int, Int) -> Void = { x in }  // expected-error {{contextual closure typ
 // Make sure that behavior related to allowing trailing closures to match functions
 // with Any as a final parameter is the same after the changes made by SR-2505, namely:
 // that we continue to select function that does _not_ have Any as a final parameter in
-// presence of other posibilities.
+// presence of other possibilities.
 
 protocol SR_2505_Initable { init() }
 struct SR_2505_II : SR_2505_Initable {}

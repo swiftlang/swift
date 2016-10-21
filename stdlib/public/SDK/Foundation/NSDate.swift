@@ -10,19 +10,17 @@
 //
 //===----------------------------------------------------------------------===//
 
-#import <SceneKit/SceneKit.h>
+@_exported import Foundation // Clang module
 
-#include "swift/Runtime/Config.h"
+extension NSDate : CustomPlaygroundQuickLookable {
+  var summary: String {
+    let df = DateFormatter()
+    df.dateStyle = .medium
+    df.timeStyle = .short
+    return df.string(from: self as Date)
+  }
 
-SWIFT_CC(swift)
-extern "C" NS_RETURNS_RETAINED _Nullable id
-SCN_Swift_SCNSceneSource_entryWithIdentifier(
-    id NS_RELEASES_ARGUMENT _Nonnull self_,
-    NSString *NS_RELEASES_ARGUMENT _Nonnull uid, Class _Nonnull entryClass) {
-  SCNSceneSource *sceneSource = self_;
-  id Result = [[sceneSource entryWithIdentifier:uid withClass:entryClass] retain];
-  [self_ release];
-  [uid release];
-  return Result;
+  public var customPlaygroundQuickLook: PlaygroundQuickLook {
+    return .text(summary)
+  }
 }
-

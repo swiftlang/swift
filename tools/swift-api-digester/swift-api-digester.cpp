@@ -668,6 +668,7 @@ public:
   Optional<uint8_t> getSelfIndexOptional() const { return SelfIndex; }
   bool hasSelfIndex() const { return SelfIndex.hasValue(); }
   static bool classof(const SDKNode *N);
+  static StringRef getTypeRoleDescription(unsigned Index);
 };
 
 bool SDKNodeAbstractFunc::classof(const SDKNode *N) {
@@ -689,10 +690,9 @@ public:
                                                        SDKNodeKind::Function) {}
   SDKNode *getReturnType() { return (*getChildBegin()).get(); }
   static bool classof(const SDKNode *N);
-  static StringRef getTypeRoleDescription(unsigned Index);
 };
 
-StringRef SDKNodeFunction::getTypeRoleDescription(unsigned Index) {
+StringRef SDKNodeAbstractFunc::getTypeRoleDescription(unsigned Index) {
   if (Index == 0) {
     return InsertToBuffer("return");
   } else if (Index == 1) {
@@ -808,45 +808,17 @@ NodeUniquePtr SDKNode::constructSDKNode(llvm::yaml::MappingNode *Node) {
   return Result;
 }
 
-/// This is for caching the comparison results between two SDKNodes.
-class SDKNodeEqualContext {
-  using NodePtrAndEqual = llvm::DenseMap<const SDKNode*, bool>;
-  llvm::DenseMap<const SDKNode*, llvm::DenseMap<const SDKNode*, bool>> Data;
-
-public:
-  Optional<bool> getEquality(const SDKNode* Left, const SDKNode* Right) {
-    auto &Map = Data.insert({Left, NodePtrAndEqual()}).first->getSecond();
-    if (Map.count(Right))
-      return Map[Right];
-    return None;
-  }
-
-  void addEquality(const SDKNode* Left, const SDKNode* Right, const bool Value) {
-    Data.insert(std::make_pair(Left, NodePtrAndEqual())).first->getSecond().
-      insert({Right, Value});
-  }
-};
-
 bool SDKNode::operator==(const SDKNode &Other) const {
-  static SDKNodeEqualContext EqualCache;
-  if (auto Cached = EqualCache.getEquality(this, &Other)) {
-    return Cached.getValue();
-  }
-  auto Exit = [&](const bool Result) {
-    EqualCache.addEquality(this, &Other, Result);
-    return Result;
-  };
-
   if (getKind() != Other.getKind())
-    return Exit(false);
+    return false;
 
   switch(getKind()) {
     case SDKNodeKind::TypeNominal:
     case SDKNodeKind::TypeFunc: {
       auto Left = this->getAs<SDKNodeType>();
       auto Right = (&Other)->getAs<SDKNodeType>();
-      return Exit(Left->getTypeAttributes().equals(Right->getTypeAttributes())
-        && Left->getPrintedName() == Right->getPrintedName());
+      return Left->getTypeAttributes().equals(Right->getTypeAttributes())
+        && Left->getPrintedName() == Right->getPrintedName();
     }
 
     case SDKNodeKind::Function:
@@ -856,9 +828,9 @@ bool SDKNode::operator==(const SDKNode &Other) const {
       auto Left = this->getAs<SDKNodeAbstractFunc>();
       auto Right = (&Other)->getAs<SDKNodeAbstractFunc>();
       if (Left->isMutating() ^ Right->isMutating())
-        return Exit(false);
+        return false;
       if (Left->isThrowing() ^ Right->isThrowing())
-        return Exit(false);
+        return false;
       SWIFT_FALLTHROUGH;
     }
     case SDKNodeKind::TypeDecl:
@@ -870,11 +842,11 @@ bool SDKNode::operator==(const SDKNode &Other) const {
           Children.size() == Other.Children.size()) {
         for (unsigned I = 0; I < Children.size(); ++ I) {
           if (*Children[I] != *Other.Children[I])
-            return Exit(false);
+            return false;
         }
-        return Exit(true);
+        return true;
       }
-      return Exit(false);
+      return false;
     }
   }
 }
@@ -1112,6 +1084,15 @@ static bool shouldIgnore(Decl *D) {
       return true;
     if (VD->getName().empty())
       return true;
+    switch (VD->getFormalAccess()) {
+    case Accessibility::Internal:
+    case Accessibility::Private:
+    case Accessibility::FilePrivate:
+      return true;
+    case Accessibility::Public:
+    case Accessibility::Open:
+      break;
+    }
   }
 
   if (auto *ClangD = D->getClangDecl()) {
@@ -2814,7 +2795,7 @@ bool DiagnosisEmitter::DeclAttrDiag::operator<(DeclAttrDiag Other) const {
 }
 
 void DiagnosisEmitter::DeclAttrDiag::output() const {
-  llvm::outs() << Kind << "" << printName(DeclName) << " is now " <<
+  llvm::outs() << Kind << " " << printName(DeclName) << " is now " <<
     printDiagKeyword(AttrName) << "\n";
 }
 
@@ -2867,10 +2848,11 @@ void DiagnosisEmitter::visitType(SDKNodeType *Node) {
     auto *Count = UpdateMap.findUpdateCounterpart(Node)->getAs<SDKNodeType>();
     StringRef Descriptor;
     switch (Parent->getKind()) {
+    case SDKNodeKind::Constructor:
     case SDKNodeKind::Function:
     case SDKNodeKind::Var:
-      Descriptor = Parent->getKind() == SDKNodeKind::Function ?
-        SDKNodeFunction::getTypeRoleDescription(Parent->getChildIndex(Node)) :
+      Descriptor = isa<SDKNodeAbstractFunc>(Parent) ?
+        SDKNodeAbstractFunc::getTypeRoleDescription(Parent->getChildIndex(Node)) :
         InsertToBuffer("declared");
       TypeChangedDecls.Diags.emplace_back(Parent->getDeclKind(),
                                           Parent->getFullyQualifiedName(),

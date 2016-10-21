@@ -1278,11 +1278,11 @@ bool SILDeserializer::readSILInstruction(SILFunction *Fn, SILBasicBlock *BB,
   UNARY_INSTRUCTION(DeinitExistentialAddr)
   UNARY_INSTRUCTION(DestroyAddr)
   UNARY_INSTRUCTION(IsNonnull)
-  UNARY_INSTRUCTION(Load)
   UNARY_INSTRUCTION(Return)
   UNARY_INSTRUCTION(Throw)
   UNARY_INSTRUCTION(FixLifetime)
   UNARY_INSTRUCTION(CopyBlock)
+  UNARY_INSTRUCTION(LoadBorrow)
   REFCOUNTING_INSTRUCTION(StrongPin)
   REFCOUNTING_INSTRUCTION(StrongUnpin)
   REFCOUNTING_INSTRUCTION(StrongRetain)
@@ -1294,6 +1294,15 @@ bool SILDeserializer::readSILInstruction(SILFunction *Fn, SILBasicBlock *BB,
   UNARY_INSTRUCTION(IsUniqueOrPinned)
 #undef UNARY_INSTRUCTION
 #undef REFCOUNTING_INSTRUCTION
+
+  case ValueKind::LoadInst: {
+    auto Ty = MF->getType(TyID);
+    auto Qualifier = LoadOwnershipQualifier(Attr);
+    ResultVal = Builder.createLoad(
+        Loc, getLocalValue(ValID, getSILType(Ty, (SILValueCategory)TyCategory)),
+        Qualifier);
+    break;
+  }
 
   case ValueKind::LoadUnownedInst: {
     auto Ty = MF->getType(TyID);
@@ -1324,9 +1333,18 @@ bool SILDeserializer::readSILInstruction(SILFunction *Fn, SILBasicBlock *BB,
     auto Ty = MF->getType(TyID);
     SILType addrType = getSILType(Ty, (SILValueCategory)TyCategory);
     SILType ValType = addrType.getObjectType();
-    ResultVal = Builder.createStore(Loc,
-                    getLocalValue(ValID, ValType),
-                    getLocalValue(ValID2, addrType));
+    auto Qualifier = StoreOwnershipQualifier(Attr);
+    ResultVal = Builder.createStore(Loc, getLocalValue(ValID, ValType),
+                                    getLocalValue(ValID2, addrType), Qualifier);
+    break;
+  }
+  case ValueKind::EndBorrowInst: {
+    SILValue BorrowSource, BorrowDest;
+    BorrowSource = getLocalValue(
+        ValID, getSILType(MF->getType(TyID), (SILValueCategory)TyCategory));
+    BorrowDest = getLocalValue(
+        ValID2, getSILType(MF->getType(TyID2), (SILValueCategory)TyCategory2));
+    ResultVal = Builder.createEndBorrow(Loc, BorrowSource, BorrowDest);
     break;
   }
   case ValueKind::StoreUnownedInst: {

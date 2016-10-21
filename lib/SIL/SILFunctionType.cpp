@@ -998,6 +998,7 @@ static CanSILFunctionType getNativeSILFunctionType(SILModule &M,
   case SILFunctionType::Representation::ObjCMethod:
   case SILFunctionType::Representation::Thick:
   case SILFunctionType::Representation::Method:
+  case SILFunctionType::Representation::Closure:
   case SILFunctionType::Representation::WitnessMethod: {
     switch (kind) {
     case SILDeclRef::Kind::Initializer:
@@ -2306,6 +2307,7 @@ TypeConverter::getBridgedFunctionType(AbstractionPattern pattern,
   case SILFunctionTypeRepresentation::Thick:
   case SILFunctionTypeRepresentation::Thin:
   case SILFunctionTypeRepresentation::Method:
+  case SILFunctionTypeRepresentation::Closure:
   case SILFunctionTypeRepresentation::WitnessMethod:
     // No bridging needed for native functions.
     if (t->getExtInfo() == extInfo)
@@ -2461,6 +2463,7 @@ TypeConverter::getLoweredASTFunctionType(CanAnyFunctionType fnType,
   case SILFunctionTypeRepresentation::Thin:
   case SILFunctionTypeRepresentation::Thick:
   case SILFunctionTypeRepresentation::Method:
+  case SILFunctionTypeRepresentation::Closure:
   case SILFunctionTypeRepresentation::WitnessMethod:
     // Native functions don't need bridging.
     break;

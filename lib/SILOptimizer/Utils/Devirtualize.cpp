@@ -866,6 +866,73 @@ static void getWitnessMethodSubstitutions(ApplySite AI, SILFunction *F,
                                 origSubs, NewSubs);
 }
 
+/// Check if an upcast is legal.
+/// The logic in this function is heavily based on the checks in
+/// the SILVerifier.
+bool swift::isLegalUpcast(SILType FromTy, SILType ToTy) {
+  if (ToTy.is<MetatypeType>()) {
+    CanType InstTy(ToTy.castTo<MetatypeType>()->getInstanceType());
+    if (!FromTy.is<MetatypeType>())
+      return false;
+    CanType OpInstTy(FromTy.castTo<MetatypeType>()->getInstanceType());
+    auto InstClass = InstTy->getClassOrBoundGenericClass();
+    if (!InstClass)
+      return false;
+
+    bool CanBeUpcasted =
+        InstClass->usesObjCGenericsModel()
+            ? InstClass->getDeclaredTypeInContext()->isBindableToSuperclassOf(
+                  OpInstTy, nullptr)
+            : InstTy->isExactSuperclassOf(OpInstTy, nullptr);
+
+    return CanBeUpcasted;
+  }
+
+  // Upcast from Optional<B> to Optional<A> is legal as long as B is a
+  // subclass of A.
+  if (ToTy.getSwiftRValueType().getAnyOptionalObjectType() &&
+      FromTy.getSwiftRValueType().getAnyOptionalObjectType()) {
+    ToTy = SILType::getPrimitiveObjectType(
+        ToTy.getSwiftRValueType().getAnyOptionalObjectType());
+    FromTy = SILType::getPrimitiveObjectType(
+        FromTy.getSwiftRValueType().getAnyOptionalObjectType());
+  }
+
+  auto ToClass = ToTy.getClassOrBoundGenericClass();
+  if (!ToClass)
+    return false;
+  bool CanBeUpcasted =
+      ToClass->usesObjCGenericsModel()
+          ? ToClass->getDeclaredTypeInContext()->isBindableToSuperclassOf(
+                FromTy.getSwiftRValueType(), nullptr)
+          : ToTy.isExactSuperclassOf(FromTy);
+
+  return CanBeUpcasted;
+}
+
+/// Check if we can pass/convert all arguments of the original apply
+/// as required by the found devirtualized method.
+static bool
+canPassOrConvertAllArguments(ApplySite AI,
+                             CanSILFunctionType SubstCalleeCanType) {
+  for (unsigned ArgN = 0, ArgE = AI.getNumArguments(); ArgN != ArgE; ++ArgN) {
+    SILValue A = AI.getArgument(ArgN);
+    auto ParamType = SubstCalleeCanType->getSILArgumentType(
+      SubstCalleeCanType->getNumSILArguments() - AI.getNumArguments() + ArgN);
+    // Check if we can cast the provided argument into the required
+    // parameter type.
+    auto FromTy = A->getType();
+    auto ToTy = ParamType;
+    // If types are the same, no conversion will be required.
+    if (FromTy == ToTy)
+      continue;
+    // Otherwise, it should be possible to upcast the arguments.
+    if (!isLegalUpcast(FromTy, ToTy))
+      return false;
+  }
+  return true;
+}
+
 /// Generate a new apply of a function_ref to replace an apply of a
 /// witness_method when we've determined the actual function we'll end
 /// up calling.
@@ -889,6 +956,11 @@ static ApplySite devirtualizeWitnessMethod(ApplySite AI, SILFunction *F,
   auto CalleeCanType = F->getLoweredFunctionType();
   auto SubstCalleeCanType = CalleeCanType->substGenericArgs(
     Module, Module.getSwiftModule(), NewSubs);
+
+  // Bail if some of the arguments cannot be converted into
+  // types required by the found devirtualized method.
+  if (!canPassOrConvertAllArguments(AI, SubstCalleeCanType))
+    return ApplySite();
 
   // Collect arguments from the apply instruction.
   auto Arguments = SmallVector<SILValue, 4>();

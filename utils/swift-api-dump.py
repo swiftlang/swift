@@ -1,23 +1,24 @@
 #!/usr/bin/env python
 
-# This tool dumps imported Swift APIs to help validate changes in the projection
-# of (Objective-)C APIs into Swift, which is a function of the (Objective-)C
-# APIs, any API notes added on top of those APIs, and the Clang importer
-# itself. One can execute it to dump the API of a given module within a
-# particular SDK, e.g., UIKit from the iOS SDK as seen in Swift 3 compatibility
-# mode:
+# This tool dumps imported Swift APIs to help validate changes in the
+# projection of (Objective-)C APIs into Swift, which is a function of the
+# (Objective-)C APIs, any API notes added on top of those APIs, and the
+# Clang importer itself. One can execute it to dump the API of a given
+# module within a particular SDK, e.g., UIKit from the iOS SDK as seen in
+# Swift 3 compatibility mode:
 #
-#   /path/to/bin/dir/swift-api-dump.py -swift-version 3 -o output-dir -m UIKit -s iphoneos
+#   /path/to/bin/dir/swift-api-dump.py -swift-version 3 -o output-dir \
+#       -m UIKit -s iphoneos
 #
-# The "-m" argument can be omitted, in which case the script will collect all of
-# the frameworks in the named SDK(s) and dump their APIs.
+# The "-m" argument can be omitted, in which case the script will collect
+# all of the frameworks in the named SDK(s) and dump their APIs.
 #
 # One can supply multiple SDKs, written as a list. For example, to
 # dump the API for all frameworks across macOS, iOS, watchOS, and tvOS,
 # in Swift 4, use:
 #
-#  /path/to/bin/dir/swift-api-dump.py -swift-version 4 -o output-dir -s macosx iphoneos \
-#      watchos appletvos
+#  /path/to/bin/dir/swift-api-dump.py -swift-version 4 -o output-dir \
+#      -s macosx iphoneos watchos appletvos
 #
 
 from __future__ import print_function
@@ -93,7 +94,8 @@ def create_parser():
                         help='Print extra information.')
     parser.add_argument('-F', '--framework-dir', action='append',
                         help='Add additional framework directories')
-    parser.add_argument('-iframework', '--system-framework-dir', action='append',
+    parser.add_argument('-iframework', '--system-framework-dir',
+                        action='append',
                         help='Add additional system framework directories')
     parser.add_argument('-I', '--include-dir', action='append',
                         help='Add additional include directories')
