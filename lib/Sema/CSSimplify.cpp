@@ -4138,6 +4138,12 @@ ConstraintSystem::addConstraintImpl(ConstraintKind kind, Type first,
   case ConstraintKind::DynamicTypeOf:
     return simplifyDynamicTypeOfConstraint(first, second, subflags, locator);
 
+  case ConstraintKind::ConformsTo:
+  case ConstraintKind::LiteralConformsTo:
+  case ConstraintKind::SelfObjectOfProtocol:
+    return simplifyConformsToConstraint(first, second, kind, locator,
+                                        subflags);
+
   case ConstraintKind::Bind: // FIXME: This should go through matchTypes() above
 
   default: {
@@ -4149,6 +4155,12 @@ ConstraintSystem::addConstraintImpl(ConstraintKind kind, Type first,
     addConstraint(c);
     return SolutionKind::Solved;
   }
+
+  case ConstraintKind::ValueMember:
+  case ConstraintKind::UnresolvedValueMember:
+  case ConstraintKind::TypeMember:
+  case ConstraintKind::BindOverload:
+    llvm_unreachable("Use the correct addConstraint()");
   }
 }
 
