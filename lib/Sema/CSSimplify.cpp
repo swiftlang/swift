@@ -1604,12 +1604,8 @@ ConstraintSystem::matchTypes(Type type1, Type type2, TypeMatchKind kind,
       // resolution, so we can consider them immediately solved.
       auto addSolvedRestrictedConstraint
         = [&](ConversionRestrictionKind restriction) -> SolutionKind {
-          auto constraint = Constraint::createRestricted(*this,
-                                                   ConstraintKind::Subtype,
-                                                   restriction,
-                                                   type1, type2,
-                                                   getConstraintLocator(locator));
-          addConstraint(constraint);
+          addRestrictedConstraint(ConstraintKind::Subtype, restriction,
+                                  type1, type2, locator);
           return SolutionKind::Solved;
         };
       
@@ -2093,8 +2089,7 @@ commit_to_conversions:
         Constraint::createFixed(*this, constraintKind, fix, type1, type2,
                                 fixedLocator));
     }
-    addConstraint(Constraint::createDisjunction(*this, constraints,
-                                                fixedLocator));
+    addDisjunctionConstraint(constraints, fixedLocator);
     return SolutionKind::Solved;
   }
 
@@ -3177,12 +3172,10 @@ ConstraintSystem::simplifyMemberConstraint(const Constraint &constraint) {
         return SolutionKind::Error;
       
       // Look through one level of optional.
-      addConstraint(Constraint::create(*this, ConstraintKind::TypeMember,
-                                       baseObjTy->getOptionalObjectType(),
-                                       constraint.getSecondType(),
-                                       constraint.getMember(),
-                                       constraint.getFunctionRefKind(),
-                                       constraint.getLocator()));
+      addTypeMemberConstraint(baseObjTy->getOptionalObjectType(),
+                              constraint.getMember(),
+                              constraint.getSecondType(),
+                              constraint.getLocator());
       return SolutionKind::Solved;
     }
     return SolutionKind::Error;
@@ -3707,11 +3700,7 @@ ConstraintSystem::simplifyRestrictedConstraint(ConversionRestrictionKind restric
                                         getConstraintLocator(locator));
         
         Constraint *disjunctionChoices[] = {int8Con, uint8Con, voidCon};
-        auto disjunction = Constraint::createDisjunction(*this,
-                                                 disjunctionChoices,
-                                                 getConstraintLocator(locator));
-        
-        addConstraint(disjunction);
+        addDisjunctionConstraint(disjunctionChoices, locator);
         return SolutionKind::Solved;
       }
 
@@ -3843,13 +3832,8 @@ ConstraintSystem::simplifyRestrictedConstraint(ConversionRestrictionKind restric
     auto constraintLocator = getConstraintLocator(locator);
     auto tv = createTypeVariable(constraintLocator, TVO_PrefersSubtypeBinding);
     
-    addConstraint(
-      Constraint::create(*this,
-                         ConstraintKind::ConformsTo,
-                         tv, hashableProtocol->getDeclaredType(),
-                         DeclName(),
-                         FunctionRefKind::Compound,
-                         constraintLocator));
+    addConstraint(ConstraintKind::ConformsTo, tv,
+                  hashableProtocol->getDeclaredType(), constraintLocator);
 
     return matchTypes(type1, tv, TypeMatchKind::Conversion, subFlags,
                       locator);

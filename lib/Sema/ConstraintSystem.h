@@ -1401,11 +1401,32 @@ public:
     addConstraint(c);
   }
 
+  void addRestrictedConstraint(ConstraintKind kind,
+                               ConversionRestrictionKind restriction,
+                               Type first, Type second,
+                               ConstraintLocatorBuilder locator) {
+    addConstraint(Constraint::createRestricted(*this, kind, restriction,
+                                               first, second,
+                                               getConstraintLocator(locator)));
+  }
+
   /// Add a constraint that binds an overload set to a specific choice.
   void addBindOverloadConstraint(Type boundTy, OverloadChoice choice,
                                  ConstraintLocator *locator) {
     addConstraint(Constraint::createBindOverload(*this, boundTy, choice, 
                                                  locator));
+  }
+
+  /// \brief Add a value member constraint to the constraint system.
+  void addTypeMemberConstraint(Type baseTy, DeclName name, Type memberTy,
+                               ConstraintLocatorBuilder locator) {
+    assert(baseTy);
+    assert(memberTy);
+    assert(name);
+    addConstraint(Constraint::create(*this, ConstraintKind::TypeMember,
+                                     baseTy, memberTy, name,
+                                     FunctionRefKind::Compound,
+                                     getConstraintLocator(locator)));
   }
 
   /// \brief Add a value member constraint to the constraint system.
@@ -1442,7 +1463,22 @@ public:
                                      baseTy, Type(), DeclName(),
                                      FunctionRefKind::Compound, locator));
   }
-  
+
+  /// \brief Add a disjunction constraint.
+  void addDisjunctionConstraint(ArrayRef<Constraint *> constraints,
+                                ConstraintLocatorBuilder locator,
+                                RememberChoice_t rememberChoice = ForgetChoice,
+                                bool isFavored = false) {
+    auto constraint =
+      Constraint::createDisjunction(*this, constraints,
+                                    getConstraintLocator(locator),
+                                    rememberChoice);
+    if (isFavored)
+      constraint->setFavored();
+
+    addConstraint(constraint);
+  }
+
   /// \brief Remove an inactive constraint from the current constraint graph.
   void removeInactiveConstraint(Constraint *constraint) {
     CG.removeConstraint(constraint);

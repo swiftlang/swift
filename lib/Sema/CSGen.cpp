@@ -641,9 +641,7 @@ namespace {
         fallbackConstraintsDisjunction
       };
       
-      CS.addConstraint(Constraint::createDisjunction(CS,
-                                                     aggregateConstraints,
-                                                     csLoc));
+      CS.addDisjunctionConstraint(aggregateConstraints, csLoc);
       break;
     }
   }
@@ -1202,21 +1200,12 @@ namespace {
         auto returnTyV = CS.createTypeVariable(locator, /*options=*/0);
         auto methodTy = FunctionType::get(segmentTyV, returnTyV);
 
-        CS.addConstraint(Constraint::create(CS, ConstraintKind::Conversion,
-                                            segment->getType(),
-                                            segmentTyV,
-                                            Identifier(),
-                                            FunctionRefKind::Compound,
-                                            locator));
+        CS.addConstraint(ConstraintKind::Conversion, segment->getType(),
+                         segmentTyV, locator);
 
         DeclName segmentName(C, C.Id_init, { C.Id_stringInterpolationSegment });
-        CS.addConstraint(Constraint::create(CS, ConstraintKind::ValueMember,
-                                            tvMeta,
-                                            methodTy,
-                                            segmentName,
-                                            FunctionRefKind::DoubleApply,
-                                            locator));
-
+        CS.addValueMemberConstraint(tvMeta, segmentName, methodTy,
+                                    FunctionRefKind::DoubleApply, locator);
       }
       
       return tv;
@@ -2530,9 +2519,7 @@ namespace {
                                   toType, locator);
         coerceConstraint->setFavored();
         auto constraints = { coerceConstraint, downcastConstraint };
-        CS.addConstraint(Constraint::createDisjunction(CS, constraints,
-                                                       locator,
-                                                       RememberChoice));
+        CS.addDisjunctionConstraint(constraints, locator, RememberChoice);
       } else {
         // The source type can be explicitly converted to the destination type.
         CS.addConstraint(ConstraintKind::ExplicitConversion, fromType, toType,
@@ -3138,8 +3125,7 @@ bool swift::isExtensionApplied(DeclContext &DC, Type BaseTy,
       return;
     }
     // Add constraints accordingly.
-    CS.addConstraint(Constraint::create(CS, Kind, First, Second, DeclName(),
-                                        FunctionRefKind::Compound, Loc));
+    CS.addConstraint(Kind, First, Second, Loc);
   };
 
   // For every requirement, add a constraint.
@@ -3187,9 +3173,7 @@ static bool canSatisfy(Type T1, Type T2, DeclContext &DC, ConstraintKind Kind,
     T1 = T1.transform(Trans);
     T2 = T2.transform(Trans);
   }
-  CS.addConstraint(Constraint::create(CS, Kind, T1, T2, DeclName(),
-                                      FunctionRefKind::Compound,
-                                      CS.getConstraintLocator(nullptr)));
+  CS.addConstraint(Kind, T1, T2, CS.getConstraintLocator(nullptr));
   SmallVector<Solution, 4> Solutions;
   return AllowFreeVariables ?
           !CS.solve(Solutions, FreeTypeVariableBinding::Allow) :
