@@ -76,7 +76,9 @@ class ShellTestCase(unittest.TestCase):
                           allow_non_zero_exit=True), "foo\n")
 
         with self.assertRaises(SystemExit):
-            shell.capture(["**not-a-command**"], optional=True)
+            shell.capture(["**not-a-command**"], optional=False)
+
+        self.assertIsNone(shell.capture(["**not-a-command**"], optional=True))
 
     def test_rmtree(self):
         shell.dry_run = False

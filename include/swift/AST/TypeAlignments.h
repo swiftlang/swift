@@ -40,6 +40,7 @@ namespace swift {
   class ProtocolDecl;
   class ProtocolConformance;
   class Stmt;
+  class Substitution;
   class TypeVariableType;
   class TypeBase;
   class ValueDecl;
