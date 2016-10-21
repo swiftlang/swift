@@ -841,7 +841,13 @@ bool SDKNode::operator==(const SDKNode &Other) const {
     }
     case SDKNodeKind::TypeDecl:
     case SDKNodeKind::Var:
-    case SDKNodeKind::TypeAlias:
+    case SDKNodeKind::TypeAlias: {
+      auto Left = this->getAs<SDKNodeDecl>();
+      auto Right = (&Other)->getAs<SDKNodeDecl>();
+      if (Left->isStatic() ^ Right->isStatic())
+        return false;
+      SWIFT_FALLTHROUGH;
+    }
     case SDKNodeKind::Root:
     case SDKNodeKind::Nil: {
       if (getPrintedName() == Other.getPrintedName() &&
@@ -1876,7 +1882,7 @@ public:
   }
 };
 
-void detectThrowing(NodePtr L, NodePtr R) {
+static void detectThrowing(NodePtr L, NodePtr R) {
   assert(L->getKind() == R->getKind());
   if (auto LF = dyn_cast<SDKNodeAbstractFunc>(L)) {
     auto RF = R->getAs<SDKNodeAbstractFunc>();
@@ -1886,7 +1892,7 @@ void detectThrowing(NodePtr L, NodePtr R) {
   }
 }
 
-void detectMutating(NodePtr L, NodePtr R) {
+static void detectMutating(NodePtr L, NodePtr R) {
   assert(L->getKind() == R->getKind());
   if (auto LF = dyn_cast<SDKNodeAbstractFunc>(L)) {
     auto RF = R->getAs<SDKNodeAbstractFunc>();
@@ -1904,6 +1910,15 @@ static void detectRename(NodePtr L, NodePtr R) {
     L->addAnnotateComment(NodeAnnotation::RenameOldName, L->getPrintedName());
     L->annotate(NodeAnnotation::RenameNewName);
     L->addAnnotateComment(NodeAnnotation::RenameNewName, R->getPrintedName());
+  }
+}
+
+static void detectStaticUpdate(NodePtr L, NodePtr R) {
+  assert(L->getKind() == R->getKind());
+  if (auto LD = dyn_cast<SDKNodeDecl>(L)) {
+    if (LD->isStatic() ^ R->getAs<SDKNodeDecl>()->isStatic()) {
+      L->annotate(NodeAnnotation::StaticChange);
+    }
   }
 }
 
@@ -1960,6 +1975,7 @@ public:
     detectRename(Left, Right);
     detectThrowing(Left, Right);
     detectMutating(Left, Right);
+    detectStaticUpdate(Left, Right);
 
     switch(Kind) {
     case SDKNodeKind::Root:
@@ -2845,6 +2861,11 @@ void DiagnosisEmitter::visitDecl(SDKNodeDecl *Node) {
     AttrChangedDecls.Diags.emplace_back(Node->getDeclKind(),
                                         Node->getFullyQualifiedName(),
                                         InsertToBuffer("throwing"));
+  }
+  if (Node->isAnnotatedAs(NodeAnnotation::StaticChange)) {
+    AttrChangedDecls.Diags.emplace_back(Node->getDeclKind(),
+                                        Node->getFullyQualifiedName(),
+                  InsertToBuffer(Node->isStatic() ? "not static" : "static"));
   }
 }
 void DiagnosisEmitter::visitType(SDKNodeType *Node) {
