@@ -55,8 +55,6 @@ func autoreleasepool(invoking code: () -> Void) {
 }
 #endif
 
-// FIXME: On FreeBSD, code in this file doesn't compile
-#if !os(FreeBSD)
 /// Race tests that need a fresh set of data for every trial should implement
 /// this protocol.
 ///
@@ -722,5 +720,3 @@ public func runRaceTest(
   runRaceTest(ClosureBasedRaceTest.self, operations: operations,
     timeoutInSeconds: timeoutInSeconds, threads: threads)
 }
-
-#endif
