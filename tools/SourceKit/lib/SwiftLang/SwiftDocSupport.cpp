@@ -503,6 +503,25 @@ static void reportRelated(ASTContext &Ctx,
   }
 }
 
+static ArrayRef<const DeclAttribute*>
+getDeclAttributes(const Decl *D, std::vector<const DeclAttribute*> &Scratch) {
+  for (auto Attr : D->getAttrs()) {
+    Scratch.push_back(Attr);
+  }
+  // For enum elements, inherit their parent enum decls' deprecated attributes.
+  if (auto *DE = dyn_cast<EnumElementDecl>(D)) {
+    for (auto Attr : DE->getParentEnum()->getAttrs()) {
+      if (auto Avail = dyn_cast<AvailableAttr>(Attr)) {
+        if (Avail->Deprecated || Avail->isUnconditionallyDeprecated()) {
+          Scratch.push_back(Attr);
+        }
+      }
+    }
+  }
+
+  return llvm::makeArrayRef(Scratch);
+}
+
 // Only reports @available.
 // FIXME: Handle all attributes.
 static void reportAttributes(ASTContext &Ctx,
@@ -517,8 +536,9 @@ static void reportAttributes(ASTContext &Ctx,
   static UIdent PlatformOSXAppExt("source.availability.platform.osx_app_extension");
   static UIdent PlatformtvOSAppExt("source.availability.platform.tvos_app_extension");
   static UIdent PlatformWatchOSAppExt("source.availability.platform.watchos_app_extension");
+  std::vector<const DeclAttribute*> Scratch;
 
-  for (auto Attr : D->getAttrs()) {
+  for (auto Attr : getDeclAttributes(D, Scratch)) {
     if (auto Av = dyn_cast<AvailableAttr>(Attr)) {
       UIdent PlatformUID;
       switch (Av->Platform) {
