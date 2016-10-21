@@ -3275,10 +3275,27 @@ ConstraintSystem::simplifyDefaultableConstraint(const Constraint &constraint) {
 
 
 ConstraintSystem::SolutionKind
-ConstraintSystem::simplifyDynamicTypeOfConstraint(const Constraint &constraint) {
+ConstraintSystem::simplifyDynamicTypeOfConstraint(
+                                        Type type1, Type type2,
+                                        TypeMatchOptions flags,
+                                        ConstraintLocatorBuilder locator) {
+  TypeMatchOptions subflags = getDefaultDecompositionOptions(flags);
+
+  // Local function to form an unsolved result.
+  auto formUnsolved = [&] {
+    if (flags.contains(TMF_GenerateConstraints)) {
+      addUnsolvedConstraint(
+        Constraint::create(*this, ConstraintKind::DynamicTypeOf, type1, type2,
+                           DeclName(), FunctionRefKind::Compound,
+                           getConstraintLocator(locator)));
+      return SolutionKind::Solved;
+    }
+
+    return SolutionKind::Unsolved;
+  };
+
   // Solve forward.
-  Type type2 = getFixedTypeRecursive(constraint.getSecondType(),
-                                     /*wantRValue=*/ true);
+  type2 = getFixedTypeRecursive(type2, /*wantRValue=*/ true);
   if (!type2->isTypeVariableOrMember()) {
     Type dynamicType2;
     if (type2->isAnyExistentialType()) {
@@ -3286,34 +3303,32 @@ ConstraintSystem::simplifyDynamicTypeOfConstraint(const Constraint &constraint) 
     } else {
       dynamicType2 = MetatypeType::get(type2);
     }
-    return matchTypes(constraint.getFirstType(), dynamicType2,
-                      TypeMatchKind::BindType, TMF_GenerateConstraints,
-                      constraint.getLocator());
+    return matchTypes(type1, dynamicType2, TypeMatchKind::BindType, subflags,
+                      locator);
   }
 
   // Okay, can't solve forward.  See what we can do backwards.
-  Type type1 = getFixedTypeRecursive(constraint.getFirstType(), true);
-
+  type1 = getFixedTypeRecursive(type1, true);
   if (type1->isTypeVariableOrMember())
-    return SolutionKind::Unsolved;
+    return formUnsolved();
 
   // If we have an existential metatype, that's good enough to solve
   // the constraint.
   if (auto metatype1 = type1->getAs<ExistentialMetatypeType>())
     return matchTypes(metatype1->getInstanceType(), type2,
                       TypeMatchKind::BindType,
-                      TMF_GenerateConstraints, constraint.getLocator());
+                      subflags, locator);
 
   // If we have a normal metatype, we can't solve backwards unless we
   // know what kind of object it is.
   if (auto metatype1 = type1->getAs<MetatypeType>()) {
     Type instanceType1 = getFixedTypeRecursive(metatype1->getInstanceType(),
                                                true);
-    if (!instanceType1->isTypeVariableOrMember()) {
-      return matchTypes(instanceType1, type2,
-                        TypeMatchKind::BindType,
-                        TMF_GenerateConstraints, constraint.getLocator());
-    }
+    if (instanceType1->isTypeVariableOrMember())
+      return formUnsolved();
+
+    return matchTypes(instanceType1, type2, TypeMatchKind::BindType, subflags,
+                      locator);
   }
 
   // It's definitely not either kind of metatype, so we can
@@ -4120,6 +4135,9 @@ ConstraintSystem::addConstraintImpl(ConstraintKind kind, Type first,
   case ConstraintKind::ApplicableFunction:
     return simplifyApplicableFnConstraint(first, second, subflags, locator);
 
+  case ConstraintKind::DynamicTypeOf:
+    return simplifyDynamicTypeOfConstraint(first, second, subflags, locator);
+
   case ConstraintKind::Bind: // FIXME: This should go through matchTypes() above
 
   default: {
@@ -4201,7 +4219,10 @@ ConstraintSystem::simplifyConstraint(const Constraint &constraint) {
                                           None, constraint.getLocator());
 
   case ConstraintKind::DynamicTypeOf:
-    return simplifyDynamicTypeOfConstraint(constraint);
+    return simplifyDynamicTypeOfConstraint(constraint.getFirstType(),
+                                           constraint.getSecondType(),
+                                           None,
+                                           constraint.getLocator());
 
   case ConstraintKind::BindOverload:
     resolveOverload(constraint.getLocator(), constraint.getFirstType(),
