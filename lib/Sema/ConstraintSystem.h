@@ -1402,8 +1402,7 @@ public:
   /// Add a constraint that binds an overload set to a specific choice.
   void addBindOverloadConstraint(Type boundTy, OverloadChoice choice,
                                  ConstraintLocator *locator) {
-    addConstraint(Constraint::createBindOverload(*this, boundTy, choice, 
-                                                 locator));
+    resolveOverload(locator, boundTy, choice);
   }
 
   /// \brief Add a value member constraint to the constraint system.
