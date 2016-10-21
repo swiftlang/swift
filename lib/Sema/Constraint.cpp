@@ -507,6 +507,12 @@ Constraint *Constraint::create(ConstraintSystem &cs, ConstraintKind kind,
     second->getTypeVariables(typeVars);
   uniqueTypeVariables(typeVars);
 
+  // Conformance constraints expect a protocol on the right-hand side, always.
+  assert((kind != ConstraintKind::ConformsTo &&
+          kind != ConstraintKind::LiteralConformsTo &&
+          kind != ConstraintKind::SelfObjectOfProtocol) ||
+         second->is<ProtocolType>());
+
   // Create the constraint.
   unsigned size = totalSizeToAlloc<TypeVariableType*>(typeVars.size());
   void *mem = cs.getAllocator().Allocate(size, alignof(Constraint));

@@ -363,9 +363,6 @@ enum class TypeMatchKind : char {
   /// \brief Require the types to match exactly, but strips lvalueness from
   /// a type when binding to a type variable.
   SameType,
-  /// \brief Require that the first type conform to the second type (which
-  /// must be a protocol).
-  ConformsTo,
   /// \brief Require the first type to be a subtype of the second type
   /// (or be an exact match or trivial subtype).
   Subtype,
@@ -1499,14 +1496,13 @@ public:
   /// Whether we should add a new constraint to capture a failure.
   bool shouldAddNewFailingConstraint() const {
     // Only do this at the top level.
-    return !solverState;
+    return !failedConstraint;
   }
 
   /// Add a new constraint that we know fails.
   void addNewFailingConstraint(Constraint *constraint) {
     assert(shouldAddNewFailingConstraint());
-    if (!failedConstraint)
-      failedConstraint = constraint;
+    failedConstraint = constraint;
   }
 
   /// \brief Add a newly-generated constraint that is known not to be solvable

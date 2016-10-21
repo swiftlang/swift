@@ -673,7 +673,6 @@ matchCallArguments(ConstraintSystem &cs, TypeMatchKind kind,
   case TypeMatchKind::BindParamType:
   case TypeMatchKind::BindToPointerType:
   case TypeMatchKind::SameType:
-  case TypeMatchKind::ConformsTo:
   case TypeMatchKind::Subtype:
     llvm_unreachable("Not a call argument constraint");
   }
@@ -789,7 +788,6 @@ ConstraintSystem::matchTupleTypes(TupleType *tuple1, TupleType *tuple2,
   case TypeMatchKind::BindToPointerType:
   case TypeMatchKind::SameType:
   case TypeMatchKind::Subtype:
-  case TypeMatchKind::ConformsTo:
     llvm_unreachable("Not a conversion");
   }
 
@@ -897,9 +895,6 @@ static bool matchFunctionRepresentations(FunctionTypeRepresentation rep1,
   case TypeMatchKind::SameType:
     return rep1 != rep2;
 
-  case TypeMatchKind::ConformsTo:
-    llvm_unreachable("Not sure if we can end up here");
-
   case TypeMatchKind::Subtype:
   case TypeMatchKind::Conversion:
   case TypeMatchKind::ExplicitConversion:
@@ -949,9 +944,6 @@ ConstraintSystem::matchFunctionTypes(FunctionType *func1, FunctionType *func2,
   case TypeMatchKind::SameType:
     subKind = kind;
     break;
-
-  case TypeMatchKind::ConformsTo:
-    llvm_unreachable("Not sure if we can end up here");
 
   case TypeMatchKind::Subtype:
   case TypeMatchKind::Conversion:
@@ -1073,14 +1065,47 @@ ConstraintSystem::matchExistentialTypes(Type type1, Type type2,
                                         ConstraintKind kind,
                                         TypeMatchOptions flags,
                                         ConstraintLocatorBuilder locator) {
-  if (type1->is<InOutType>()) {
+  // FIXME: Fees like a hack.
+  if (type1->is<InOutType>())
     return SolutionKind::Error;
+
+  // Conformance to 'Any' always holds.
+  if (type2->isEmptyExistentialComposition())
+    return SolutionKind::Solved;
+
+  // If the first type is a type variable or member thereof, there's nothing
+  // we can do now.
+  if (type1->isTypeVariableOrMember()) {
+    if (flags.contains(TMF_GenerateConstraints)) {
+      addUnsolvedConstraint(
+        Constraint::createRestricted(*this, kind,
+                                     ConversionRestrictionKind::Existential,
+                                     type1, type2,
+                                     getConstraintLocator(locator)));
+      return SolutionKind::Solved;
+    }
+
+    return SolutionKind::Unsolved;
   }
+
+  TypeMatchOptions subflags = getDefaultDecompositionOptions(flags);
+
+  // Handle existential metatypes.
+  if (auto meta1 = type1->getAs<MetatypeType>()) {
+    if (auto meta2 = type2->getAs<ExistentialMetatypeType>()) {
+      return matchExistentialTypes(meta1->getInstanceType(),
+                                   meta2->getInstanceType(), kind, subflags,
+                                   locator.withPathElement(
+                                     ConstraintLocator::InstanceType));
+    }
+  }
+
+  if (!type2->isAnyExistentialType())
+    return SolutionKind::Error;
 
   SmallVector<ProtocolDecl *, 4> protocols;
   type2->getAnyExistentialTypeProtocols(protocols);
 
-  TypeMatchOptions subflags = getDefaultDecompositionOptions(flags);
   for (auto proto : protocols) {
     switch (simplifyConformsToConstraint(type1, proto, kind, locator,
                                          subflags)) {
@@ -1108,9 +1133,6 @@ static ConstraintKind getConstraintKind(TypeMatchKind kind) {
 
   case TypeMatchKind::SameType:
     return ConstraintKind::Equal;
-
-  case TypeMatchKind::ConformsTo:
-    return ConstraintKind::ConformsTo;
 
   case TypeMatchKind::Subtype:
     return ConstraintKind::Subtype;
@@ -1188,7 +1210,7 @@ ConstraintSystem::matchTypes(Type type1, Type type2, TypeMatchKind kind,
   TypeVariableType *typeVar2 = desugar2->getAs<TypeVariableType>();
 
   // If the types are obviously equivalent, we're done.
-  if (kind != TypeMatchKind::ConformsTo && desugar1->isEqual(desugar2))
+  if (desugar1->isEqual(desugar2))
     return SolutionKind::Solved;
 
   // Local function that should be used to produce the return value whenever
@@ -1342,7 +1364,6 @@ ConstraintSystem::matchTypes(Type type1, Type type2, TypeMatchKind kind,
       }
       SWIFT_FALLTHROUGH;
 
-    case TypeMatchKind::ConformsTo:
     case TypeMatchKind::Subtype:
     case TypeMatchKind::ExplicitConversion:
     case TypeMatchKind::ArgumentConversion:
@@ -1893,28 +1914,18 @@ ConstraintSystem::matchTypes(Type type1, Type type2, TypeMatchKind kind,
   // equivalent to a conformance relationship on the instance types.
   // This applies to nested metatype levels, so if A : P then
   // A.Type : P.Type.
-  if (concrete && kind >= TypeMatchKind::ConformsTo) {
-    if (auto meta1 = type1->getAs<MetatypeType>()) {
-      if (auto meta2 = type2->getAs<ExistentialMetatypeType>()) {
-        return matchTypes(meta1->getInstanceType(),
-                          meta2->getInstanceType(),
-                          TypeMatchKind::ConformsTo, subflags,
-                          locator.withPathElement(
-                                  ConstraintLocator::InstanceType));
-      }
-    }
+  if (concrete && kind >= TypeMatchKind::Subtype &&
+      type1->is<MetatypeType>() && type2->is<ExistentialMetatypeType>()) {
+    conversionsOrFixes.push_back(
+      ConversionRestrictionKind::MetatypeToExistentialMetatype);
   }
   
   // Instance type check for the above. We are going to check conformance once
   // we hit commit_to_conversions below, but we have to add a token restriction
   // to ensure we wrap the metatype value in a metatype erasure.
-  if (concrete && type2->isExistentialType()) {
-    if (kind == TypeMatchKind::ConformsTo) {
-      conversionsOrFixes.push_back(ConversionRestrictionKind::
-                                   MetatypeToExistentialMetatype);
-    } else if (kind >= TypeMatchKind::Subtype) {
-      conversionsOrFixes.push_back(ConversionRestrictionKind::Existential);
-    }
+  if (concrete && type2->isExistentialType() &&
+      kind >= TypeMatchKind::Subtype) {
+    conversionsOrFixes.push_back(ConversionRestrictionKind::Existential);
   }
 
   // A value of type T can be converted to type U? if T is convertible to U.
@@ -2115,9 +2126,6 @@ commit_to_conversions:
 
   // Handle restrictions.
   if (auto restriction = conversionsOrFixes[0].getRestriction()) {
-    ConstraintRestrictions.push_back(
-        std::make_tuple(type1, type2, *restriction));
-
     if (flags.contains(TMF_UnwrappingOptional)) {
       subflags |= TMF_UnwrappingOptional;
     }
@@ -2686,7 +2694,9 @@ performMemberLookup(ConstraintKind constraintKind, DeclName memberName,
     return result;
   }
 
-  
+  if (instanceTy->isTypeParameter())
+    return MemberLookupResult();
+
   // Okay, start building up the result list.
   MemberLookupResult result;
   result.OverallResult = MemberLookupResult::HasResults;
@@ -3592,9 +3602,13 @@ ConstraintSystem::simplifyRestrictedConstraintImpl(
   //     T : S ===> T.Type $< S.Type
   case ConversionRestrictionKind::MetatypeToExistentialMetatype:
     addContextualScore();
-    return matchExistentialTypes(type1, type2,
-                                 ConstraintKind::ConformsTo,
-                                 subflags, locator);
+
+    return matchExistentialTypes(
+             type1->castTo<MetatypeType>()->getInstanceType(),
+             type2->castTo<ExistentialMetatypeType>()->getInstanceType(),
+             ConstraintKind::ConformsTo,
+             subflags,
+             locator.withPathElement(ConstraintLocator::InstanceType));
 
   // for $< in { <, <c, <oc }:
   //   T $< U ===> T $< U?
