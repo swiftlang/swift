@@ -1384,14 +1384,8 @@ public:
 
   /// \brief Add a constraint to the constraint system.
   void addConstraint(ConstraintKind kind, Type first, Type second,
-                     ConstraintLocator *locator, bool isFavored = false) {
-    assert(first && "Missing first type");
-    assert(second && "Missing second type");
-    auto c = Constraint::create(*this, kind, first, second, DeclName(),
-                                FunctionRefKind::Compound, locator);
-    if (isFavored) c->setFavored();
-    addConstraint(c);
-  }
+                     ConstraintLocatorBuilder locator,
+                     bool isFavored = false);
 
   /// Add a new constraint with a restriction on its application.
   void addRestrictedConstraint(ConstraintKind kind,

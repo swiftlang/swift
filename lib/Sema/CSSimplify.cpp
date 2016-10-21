@@ -4030,7 +4030,8 @@ bool ConstraintSystem::recordFix(Fix fix, ConstraintLocatorBuilder locator) {
 
 ConstraintSystem::SolutionKind
 ConstraintSystem::simplifyFixConstraint(Fix fix, Type type1, Type type2,
-                                        TypeMatchKind matchKind, TypeMatchOptions flags,
+                                        TypeMatchKind matchKind,
+                                        TypeMatchOptions flags,
                                         ConstraintLocatorBuilder locator) {
   if (recordFix(fix, locator))
     return SolutionKind::Error;
@@ -4063,6 +4064,62 @@ ConstraintSystem::simplifyFixConstraint(Fix fix, Type type1, Type type2,
   }
 }
 
+void ConstraintSystem::addConstraint(ConstraintKind kind, Type first,
+                                     Type second,
+                                     ConstraintLocatorBuilder locator,
+                                     bool isFavored) {
+  assert(first && "Missing first type");
+  assert(second && "Missing second type");
+
+  // Local function to record failures if necessary.
+  auto failed = [&] {
+    // Add a failing constraint, if needed.
+    if (shouldAddNewFailingConstraint()) {
+      auto c = Constraint::create(*this, kind, first, second, DeclName(),
+                                  FunctionRefKind::Compound,
+                                  getConstraintLocator(locator));
+      if (isFavored) c->setFavored();
+      addNewFailingConstraint(c);
+    }
+  };
+
+  TypeMatchOptions subflags = TMF_GenerateConstraints;
+  switch (kind) {
+  case ConstraintKind::Equal:
+  case ConstraintKind::BindParam:
+  case ConstraintKind::Subtype:
+  case ConstraintKind::Conversion:
+  case ConstraintKind::ExplicitConversion:
+  case ConstraintKind::ArgumentConversion:
+  case ConstraintKind::ArgumentTupleConversion:
+  case ConstraintKind::OperatorArgumentTupleConversion:
+  case ConstraintKind::OperatorArgumentConversion:
+    switch (matchTypes(first, second, getTypeMatchKind(kind), subflags,
+                       locator)) {
+    case SolutionKind::Error:
+      return failed();
+
+    case SolutionKind::Unsolved:
+      llvm_unreachable("should have generated constraints");
+
+    case SolutionKind::Solved:
+      return;
+    }
+
+  case ConstraintKind::Bind: // FIXME: This should go through matchTypes() above
+
+  default: {
+    // FALLBACK CASE: do the slow thing.
+    auto c = Constraint::create(*this, kind, first, second, DeclName(),
+                                FunctionRefKind::Compound,
+                                getConstraintLocator(locator));
+    if (isFavored) c->setFavored();
+    addConstraint(c);
+    break;
+  }
+  }
+}
+
 ConstraintSystem::SolutionKind
 ConstraintSystem::simplifyConstraint(const Constraint &constraint) {
   switch (constraint.getKind()) {
@@ -4076,16 +4133,14 @@ ConstraintSystem::simplifyConstraint(const Constraint &constraint) {
   case ConstraintKind::ArgumentTupleConversion:
   case ConstraintKind::OperatorArgumentTupleConversion:
   case ConstraintKind::OperatorArgumentConversion: {
-    // For relational constraints, match up the types.
+    // Relational constraints.
     auto matchKind = getTypeMatchKind(constraint.getKind());
 
-    // If there is a fix associated with this constraint, apply it before
-    // we continue.
+    // If there is a fix associated with this constraint, apply it.
     if (auto fix = constraint.getFix()) {
       return simplifyFixConstraint(*fix, constraint.getFirstType(),
                                    constraint.getSecondType(), matchKind,
-                                   TMF_GenerateConstraints,
-                                   constraint.getLocator());
+                                   None, constraint.getLocator());
     }
 
     // If there is a restriction on this constraint, apply it directly rather
