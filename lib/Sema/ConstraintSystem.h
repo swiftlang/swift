@@ -1393,14 +1393,11 @@ public:
     addConstraint(c);
   }
 
+  /// Add a new constraint with a restriction on its application.
   void addRestrictedConstraint(ConstraintKind kind,
                                ConversionRestrictionKind restriction,
                                Type first, Type second,
-                               ConstraintLocatorBuilder locator) {
-    addConstraint(Constraint::createRestricted(*this, kind, restriction,
-                                               first, second,
-                                               getConstraintLocator(locator)));
-  }
+                               ConstraintLocatorBuilder locator);
 
   /// Add a constraint that binds an overload set to a specific choice.
   void addBindOverloadConstraint(Type boundTy, OverloadChoice choice,
@@ -2002,11 +1999,21 @@ private:
 
   /// \brief Simplify a conversion constraint by applying the given
   /// reduction rule, which is known to apply at the outermost level.
-  SolutionKind simplifyRestrictedConstraint(ConversionRestrictionKind restriction,
-                                            Type type1, Type type2,
-                                            TypeMatchKind matchKind,
-                                            TypeMatchOptions flags,
-                                            ConstraintLocatorBuilder locator);
+  SolutionKind simplifyRestrictedConstraintImpl(
+                 ConversionRestrictionKind restriction,
+                 Type type1, Type type2,
+                 TypeMatchKind matchKind,
+                 TypeMatchOptions flags,
+                 ConstraintLocatorBuilder locator);
+
+  /// \brief Simplify a conversion constraint by applying the given
+  /// reduction rule, which is known to apply at the outermost level.
+  SolutionKind simplifyRestrictedConstraint(
+                 ConversionRestrictionKind restriction,
+                 Type type1, Type type2,
+                 TypeMatchKind matchKind,
+                 TypeMatchOptions flags,
+                 ConstraintLocatorBuilder locator);
 
 public: // FIXME: Public for use by static functions.
   /// \brief Simplify a conversion constraint with a fix applied to it.
