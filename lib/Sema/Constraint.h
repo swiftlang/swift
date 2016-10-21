@@ -115,11 +115,6 @@ enum class ConstraintKind : char {
   /// \brief The first type has a type member with the given name, and the
   /// type of that member, when referenced as a type, is the second type.
   TypeMember,
-  /// \brief The first type must be an archetype.
-  Archetype,
-  /// \brief The first type is a class or an archetype of a class-bound
-  /// protocol.
-  Class,
   /// \brief The first type can be defaulted to the second (which currently
   /// cannot be dependent).  This is more like a type property than a
   /// relational constraint.
@@ -141,7 +136,8 @@ enum class ConstraintClassification : char {
   /// it a reference type.
   Member,
 
-  /// \brief A property of a single type, such as whether it is an archetype.
+  /// \brief A property of a single type, such as whether it is defaultable to
+  /// a particular type.
   TypeProperty,
 
   /// \brief A disjunction constraint.
@@ -489,8 +485,6 @@ public:
     case ConstraintKind::TypeMember:
       return ConstraintClassification::Member;
 
-    case ConstraintKind::Archetype:
-    case ConstraintKind::Class:
     case ConstraintKind::DynamicTypeOf:
     case ConstraintKind::Defaultable:
       return ConstraintClassification::TypeProperty;

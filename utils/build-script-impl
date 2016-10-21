@@ -240,6 +240,7 @@ KNOWN_SETTINGS=(
     clang-profile-instr-use            ""        "If set, profile file to use for clang PGO"
     coverage-db                        ""        "If set, coverage database to use when prioritizing testing"
     build-toolchain-only               ""        "If set, only build the necessary tools to build an external toolchain"
+    skip-local-host-install            ""        "If we are cross-compiling multiple targets, skip an install pass locally if the hosts match"
 )
 
 # Centralized access point for traced command invocation.
@@ -2799,8 +2800,8 @@ for host in "${ALL_HOSTS[@]}"; do
         continue
     fi
 
-    # Skip this if we're cross compiling and it's the local host.
-    if [[ $(has_cross_compile_hosts) ]] && [[ ${host} == ${LOCAL_HOST} ]]; then
+    # Skip this pass if flag is set and we are cross compiling and it's the local host.
+    if [[ "${SKIP_LOCAL_HOST_INSTALL}" ]] && [[ $(has_cross_compile_hosts) ]] && [[ ${host} == ${LOCAL_HOST} ]]; then
         continue
     fi
 

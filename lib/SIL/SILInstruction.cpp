@@ -983,6 +983,10 @@ bool SILInstruction::isTriviallyDuplicatable() const {
   if (isa<AllocStackInst>(this) || isa<DeallocStackInst>(this)) {
     return false;
   }
+  if (auto *ARI = dyn_cast<AllocRefInst>(this)) {
+    if (ARI->canAllocOnStack())
+      return false;
+  }
 
   if (isa<OpenExistentialAddrInst>(this) ||
       isa<OpenExistentialRefInst>(this) ||

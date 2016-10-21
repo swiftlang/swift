@@ -21,6 +21,7 @@ add_swift_library(swiftSIL STATIC
   SILGlobalVariable.cpp
   SILInstruction.cpp
   SILInstructions.cpp
+  SILLayout.cpp
   SILLocation.cpp
   SILModule.cpp
   SILOpenedArchetypesTracker.cpp

@@ -333,9 +333,7 @@ ConstraintLocator *ConstraintSystem::getConstraintLocator(
   return getConstraintLocator(anchor, path, builder.getSummaryFlags());
 }
 
-bool ConstraintSystem::addConstraint(Constraint *constraint,
-                                     bool isExternallySolved,
-                                     bool simplifyExisting) {
+bool ConstraintSystem::addConstraint(Constraint *constraint) {
   switch (simplifyConstraint(*constraint)) {
   case SolutionKind::Error:
     if (!failedConstraint) {
@@ -344,9 +342,7 @@ bool ConstraintSystem::addConstraint(Constraint *constraint,
 
     if (solverState) {
       solverState->retiredConstraints.push_front(constraint);
-      if (!simplifyExisting) {
-        solverState->generatedConstraints.push_back(constraint);
-      }
+      solverState->generatedConstraints.push_back(constraint);
     }
 
     return false;
@@ -357,30 +353,13 @@ bool ConstraintSystem::addConstraint(Constraint *constraint,
     // Record solved constraint.
     if (solverState) {
       solverState->retiredConstraints.push_front(constraint);
-      if (!simplifyExisting)
-        solverState->generatedConstraints.push_back(constraint);
-    }
-
-    // Remove the constraint from the constraint graph.
-    if (simplifyExisting)
-      CG.removeConstraint(constraint);
-    
-    return true;
-
-  case SolutionKind::Unsolved:
-    // We couldn't solve this constraint; add it to the pile.
-    if (!isExternallySolved) {
-      InactiveConstraints.push_back(constraint);        
-    }
-
-    // Add this constraint to the constraint graph.
-    if (!simplifyExisting)
-      CG.addConstraint(constraint);
-
-    if (!simplifyExisting && solverState) {
       solverState->generatedConstraints.push_back(constraint);
     }
 
+    return true;
+
+  case SolutionKind::Unsolved:
+    addUnsolvedConstraint(constraint);
     return false;
   }
 }
@@ -395,10 +374,8 @@ ConstraintSystem::getMemberType(TypeVariableType *baseTypeVar,
     // retain the associated type throughout.
     auto loc = getConstraintLocator(locator);
     auto memberTypeVar = createTypeVariable(loc, options);
-    addConstraint(Constraint::create(*this, ConstraintKind::TypeMember,
-                                     baseTypeVar, memberTypeVar, 
-                                     assocType->getName(), 
-                                     FunctionRefKind::Compound, loc));
+    addTypeMemberConstraint(baseTypeVar, assocType->getName(),
+                            memberTypeVar, loc);
     return memberTypeVar;
   });
 }
@@ -431,11 +408,8 @@ namespace {
                            Locator.withPathElement(member));
           auto memberTypeVar = CS.createTypeVariable(locator,
                                                      TVO_PrefersSubtypeBinding);
-          CS.addConstraint(Constraint::create(CS, ConstraintKind::TypeMember,
-                                              baseTypeVar, memberTypeVar,
-                                              member->getName(),
-                                              FunctionRefKind::Compound,
-                                              locator));
+          CS.addTypeMemberConstraint(baseTypeVar, member->getName(),
+                                     memberTypeVar, locator);
           return memberTypeVar;
         }
                                 
@@ -462,11 +436,8 @@ namespace {
                                                    TVO_PrefersSubtypeBinding);
 
         // Bind the member's type variable as a type member of the base.
-        CS.addConstraint(Constraint::create(CS, ConstraintKind::TypeMember,
-                                            baseTypeVar, memberTypeVar, 
-                                            member->getName(),
-                                            FunctionRefKind::Compound,
-                                            locator));
+        CS.addTypeMemberConstraint(baseTypeVar, member->getName(),
+                                   memberTypeVar, locator);
 
         return memberTypeVar;
       });
@@ -1441,13 +1412,8 @@ void ConstraintSystem::addOverloadSet(Type boundType,
     overloads.push_back(Constraint::createBindOverload(*this, boundType, choice,
                                                        locator));
   }
-  
-  auto disjunction = Constraint::createDisjunction(*this, overloads, locator);
-  
-  if (favoredChoice)
-    disjunction->setFavored();
-  
-  addConstraint(disjunction);
+
+  addDisjunctionConstraint(overloads, locator, ForgetChoice, favoredChoice);
 }
 
 void ConstraintSystem::resolveOverload(ConstraintLocator *locator,
