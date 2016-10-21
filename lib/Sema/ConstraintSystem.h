@@ -1783,8 +1783,6 @@ public:
 public:
   /// \brief Flags that direct type matching.
   enum TypeMatchFlags {
-    TMF_None = 0,
-
     /// \brief Indicates that we are in a context where we should be
     /// generating constraints for any unsolvable problems.
     ///
@@ -1804,12 +1802,16 @@ public:
     TMF_UnwrappingOptional = 0x8,
   };
 
+  /// Options that govern how type matching should proceed.
+  typedef OptionSet<TypeMatchFlags> TypeMatchOptions;
+
 private:
   /// \brief Subroutine of \c matchTypes(), which matches up two tuple types.
   ///
   /// \returns the result of performing the tuple-to-tuple conversion.
   SolutionKind matchTupleTypes(TupleType *tuple1, TupleType *tuple2,
-                                         TypeMatchKind kind, unsigned flags,
+                                         TypeMatchKind kind,
+                               TypeMatchOptions flags,
                                          ConstraintLocatorBuilder locator);
 
   /// \brief Subroutine of \c matchTypes(), which matches a scalar type to
@@ -1817,7 +1819,8 @@ private:
   ///
   /// \returns the result of performing the scalar-to-tuple conversion.
   SolutionKind matchScalarToTupleTypes(Type type1, TupleType *tuple2,
-                                       TypeMatchKind kind, unsigned flags,
+                                       TypeMatchKind kind,
+                                       TypeMatchOptions flags,
                                        ConstraintLocatorBuilder locator);
 
   /// \brief Subroutine of \c matchTypes(), which extracts a scalar value from
@@ -1825,19 +1828,20 @@ private:
   ///
   /// \returns the result of performing the tuple-to-scalar conversion.
   SolutionKind matchTupleToScalarTypes(TupleType *tuple1, Type type2,
-                                       TypeMatchKind kind, unsigned flags,
+                                       TypeMatchKind kind,
+                                       TypeMatchOptions flags,
                                        ConstraintLocatorBuilder locator);
 
   /// \brief Subroutine of \c matchTypes(), which matches up two function
   /// types.
   SolutionKind matchFunctionTypes(FunctionType *func1, FunctionType *func2,
-                                  TypeMatchKind kind, unsigned flags,
+                                  TypeMatchKind kind, TypeMatchOptions flags,
                                   ConstraintLocatorBuilder locator);
 
   /// \brief Subroutine of \c matchTypes(), which matches up a value to a
   /// superclass.
   SolutionKind matchSuperclassTypes(Type type1, Type type2,
-                                    TypeMatchKind kind, unsigned flags,
+                                    TypeMatchKind kind, TypeMatchOptions flags,
                                     ConstraintLocatorBuilder locator);
 
   /// \brief Subroutine of \c matchTypes(), which matches up two types that
@@ -1853,7 +1857,8 @@ private:
   /// but when matching the instance type of a metatype with the instance type
   /// of an existential metatype, since we want an actual conformance check.
   SolutionKind matchExistentialTypes(Type type1, Type type2,
-                                     ConstraintKind kind, unsigned flags,
+                                     ConstraintKind kind,
+                                     TypeMatchOptions flags,
                                      ConstraintLocatorBuilder locator);
 
 public: // FIXME: public due to statics in CSSimplify.cpp
@@ -1875,7 +1880,8 @@ public: // FIXME: public due to statics in CSSimplify.cpp
   ///
   /// \returns the result of attempting to solve this constraint.
   SolutionKind matchTypes(Type type1, Type type2, TypeMatchKind kind,
-                          unsigned flags, ConstraintLocatorBuilder locator);
+                          TypeMatchOptions flags,
+                          ConstraintLocatorBuilder locator);
 
 public:
   /// \brief Resolve the given overload set to the given choice.
@@ -1937,7 +1943,7 @@ private:
   /// occurred.
   SolutionKind simplifyConstructionConstraint(Type valueType, 
                                               FunctionType *fnType,
-                                              unsigned flags,
+                                              TypeMatchOptions flags,
                                               FunctionRefKind functionRefKind,
                                               ConstraintLocator *locator);
 
@@ -1951,7 +1957,8 @@ private:
   SolutionKind simplifyConformsToConstraint(Type type, ProtocolDecl *protocol,
                                             ConstraintKind kind,
                                             ConstraintLocatorBuilder locator,
-                                            unsigned flags);
+                                            TypeMatchOptions flags);
+
   /// \brief Attempt to simplify the given conformance constraint.
   ///
   /// \param type The type being testing.
@@ -1965,7 +1972,7 @@ private:
   SolutionKind simplifyConformsToConstraint(Type type, Type protocol,
                                             ConstraintKind kind,
                                             ConstraintLocatorBuilder locator,
-                                            unsigned flags);
+                                            TypeMatchOptions flags);
 
   /// Attempt to simplify a checked-cast constraint.
   SolutionKind simplifyCheckedCastConstraint(Type fromType, Type toType,
@@ -1998,7 +2005,7 @@ private:
   SolutionKind simplifyRestrictedConstraint(ConversionRestrictionKind restriction,
                                             Type type1, Type type2,
                                             TypeMatchKind matchKind,
-                                            unsigned flags,
+                                            TypeMatchOptions flags,
                                             ConstraintLocatorBuilder locator);
 
 public: // FIXME: Public for use by static functions.
@@ -2006,7 +2013,7 @@ public: // FIXME: Public for use by static functions.
   SolutionKind simplifyFixConstraint(Fix fix,
                                      Type type1, Type type2,
                                      TypeMatchKind matchKind,
-                                     unsigned flags,
+                                     TypeMatchOptions flags,
                                      ConstraintLocatorBuilder locator);
 
 public:
