@@ -447,7 +447,7 @@ public:
 
   /// Retrieve the alternative declaration for the given imported
   /// Swift declaration.
-  TinyPtrVector<ValueDecl *> getAlternateDecls(Decl *decl) {
+  ArrayRef<ValueDecl *> getAlternateDecls(Decl *decl) {
     auto known = AlternateDecls.find(decl);
     if (known == AlternateDecls.end()) return {};
     return known->second;

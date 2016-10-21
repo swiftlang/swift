@@ -132,3 +132,10 @@ func testCF(_ a: __PrivCFType, b: __PrivCFSub, c: __PrivInt) {
 extension __PrivCFType {}
 extension __PrivCFSub {}
 _ = 1 as __PrivInt
+
+#if !IRGEN
+func testRawNames() {
+  let _ = Foo.__fooWithOneArg(0) // expected-error {{'__fooWithOneArg' is unavailable: use object construction 'Foo(__oneArg:)'}}
+  let _ = Foo.__foo // expected-error{{'__foo' is unavailable: use object construction 'Foo(__:)'}}
+}
+#endif
