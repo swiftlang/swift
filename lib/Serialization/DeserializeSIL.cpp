@@ -765,7 +765,7 @@ bool SILDeserializer::readSILInstruction(SILFunction *Fn, SILBasicBlock *BB,
     break;
   }
 
-  ValueBase *ResultVal;
+  SILInstruction *ResultVal;
   switch ((ValueKind)OpCode) {
   case ValueKind::SILArgument:
   case ValueKind::SILUndef:

@@ -279,9 +279,9 @@ namespace {
     bool parseSILInstruction(SILBasicBlock *BB, SILBuilder &B);
     bool parseCallInstruction(SILLocation InstLoc,
                               ValueKind Opcode, SILBuilder &B,
-                              ValueBase *&ResultVal);
+                              SILInstruction *&ResultVal);
     bool parseSILFunctionRef(SILLocation InstLoc,
-                             SILBuilder &B, ValueBase *&ResultVal);
+                             SILBuilder &B, SILInstruction *&ResultVal);
 
     bool parseSILBasicBlock(SILBuilder &B);
     
@@ -1588,7 +1588,7 @@ bool SILParser::parseSILInstruction(SILBasicBlock *BB, SILBuilder &B) {
   
   // Validate the opcode name, and do opcode-specific parsing logic based on the
   // opcode we find.
-  ValueBase *ResultVal;
+  SILInstruction *ResultVal;
   switch (Opcode) {
   case ValueKind::SILArgument:
   case ValueKind::SILUndef:
@@ -3736,7 +3736,7 @@ bool SILParser::parseSILInstruction(SILBasicBlock *BB, SILBuilder &B) {
 
 bool SILParser::parseCallInstruction(SILLocation InstLoc,
                                      ValueKind Opcode, SILBuilder &B,
-                                     ValueBase *&ResultVal) {
+                                     SILInstruction *&ResultVal) {
   UnresolvedValueName FnName;
   SmallVector<UnresolvedValueName, 4> ArgNames;
 
@@ -3895,7 +3895,7 @@ bool SILParser::parseCallInstruction(SILLocation InstLoc,
 }
 
 bool SILParser::parseSILFunctionRef(SILLocation InstLoc,
-                                    SILBuilder &B, ValueBase *&ResultVal) {
+                                    SILBuilder &B, SILInstruction *&ResultVal) {
   Identifier Name;
   SILType Ty;
   SourceLoc Loc = P.Tok.getLoc();
