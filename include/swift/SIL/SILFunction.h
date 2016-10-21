@@ -176,6 +176,17 @@ private:
   ///    method itself. In this case we need to create a vtable stub for it.
   bool Zombie = false;
 
+  /// True if SILOwnership is enabled for this function. It is always false when
+  /// the SILOption HasQualifiedOwnership is not set. When the SILOption
+  /// HasQualifiedOwnership /is/ set, this value is initialized to true. Once
+  /// the
+  /// OwnershipModelEliminator runs on the function, it is set to false.
+  ///
+  /// This enables the verifier to easily prove that before the Ownership Model
+  /// Eliminator runs on a function, we only see a non-semantic-arc world and
+  /// after the pass runs, we only see a semantic-arc world.
+  Optional<bool> HasQualifiedOwnership;
+
   SILFunction(SILModule &module, SILLinkage linkage,
               StringRef mangledName, CanSILFunctionType loweredType,
               GenericEnvironment *genericEnv,
@@ -280,6 +291,30 @@ public:
   
   /// Returns true if this function is dead, but kept in the module's zombie list.
   bool isZombie() const { return Zombie; }
+
+  /// Returns true if this function has qualified ownership instructions in it.
+  Optional<bool> hasQualifiedOwnership() const {
+    if (HasQualifiedOwnership.hasValue())
+      return HasQualifiedOwnership.getValue();
+    return None;
+  }
+
+  /// Returns true if this function has unqualified ownership instructions in
+  /// it.
+  Optional<bool> hasUnqualifedOwnership() const {
+    if (HasQualifiedOwnership.hasValue())
+      return !HasQualifiedOwnership.getValue();
+    return None;
+  }
+
+  /// Sets the HasQualifiedOwnership flag to false. This signals to SIL that no
+  /// ownership instructions should be in this function any more.
+  void setUnqualifiedOwnership() {
+    assert(
+        HasQualifiedOwnership.hasValue() &&
+        "Should never set unqualified ownership when SILOwnership is disabled");
+    HasQualifiedOwnership = false;
+  }
 
   /// Returns the calling convention used by this entry point.
   SILFunctionTypeRepresentation getRepresentation() const {

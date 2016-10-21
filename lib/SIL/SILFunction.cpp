@@ -71,35 +71,21 @@ SILFunction *SILFunction::create(SILModule &M, SILLinkage linkage,
   return fn;
 }
 
-SILFunction::SILFunction(SILModule &Module, SILLinkage Linkage,
-                         StringRef Name, CanSILFunctionType LoweredType,
+SILFunction::SILFunction(SILModule &Module, SILLinkage Linkage, StringRef Name,
+                         CanSILFunctionType LoweredType,
                          GenericEnvironment *genericEnv,
-                         Optional<SILLocation> Loc,
-                         IsBare_t isBareSILFunction,
-                         IsTransparent_t isTrans,
-                         IsFragile_t isFragile,
-                         IsThunk_t isThunk,
-                         ClassVisibility_t classVisibility,
+                         Optional<SILLocation> Loc, IsBare_t isBareSILFunction,
+                         IsTransparent_t isTrans, IsFragile_t isFragile,
+                         IsThunk_t isThunk, ClassVisibility_t classVisibility,
                          Inline_t inlineStrategy, EffectsKind E,
                          SILFunction *InsertBefore,
-                         const SILDebugScope *DebugScope,
-                         DeclContext *DC)
-  : Module(Module),
-    Name(Name),
-    LoweredType(LoweredType),
-    GenericEnv(genericEnv),
-    DeclCtx(DC),
-    DebugScope(DebugScope),
-    Bare(isBareSILFunction),
-    Transparent(isTrans),
-    Fragile(isFragile),
-    Thunk(isThunk),
-    ClassVisibility(classVisibility),
-    GlobalInitFlag(false),
-    InlineStrategy(inlineStrategy),
-    Linkage(unsigned(Linkage)),
-    KeepAsPublic(false),
-    EffectsKindAttr(E) {
+                         const SILDebugScope *DebugScope, DeclContext *DC)
+    : Module(Module), Name(Name), LoweredType(LoweredType),
+      GenericEnv(genericEnv), DeclCtx(DC), DebugScope(DebugScope),
+      Bare(isBareSILFunction), Transparent(isTrans), Fragile(isFragile),
+      Thunk(isThunk), ClassVisibility(classVisibility), GlobalInitFlag(false),
+      InlineStrategy(inlineStrategy), Linkage(unsigned(Linkage)),
+      KeepAsPublic(false), EffectsKindAttr(E), HasQualifiedOwnership() {
   if (InsertBefore)
     Module.functions.insert(SILModule::iterator(InsertBefore), this);
   else
@@ -110,6 +96,12 @@ SILFunction::SILFunction(SILModule &Module, SILLinkage Linkage,
   // Set our BB list to have this function as its parent. This enables us to
   // splice efficiently basic blocks in between functions.
   BlockList.Parent = this;
+
+  // If SILOwnership is not enabled, HasQualifiedOwnership is None. If
+  // SILOwnership is enabled, we always initialize functions to have
+  // SILOwnership initially.
+  if (Module.getOptions().EnableSILOwnership)
+    HasQualifiedOwnership = true;
 }
 
 SILFunction::~SILFunction() {

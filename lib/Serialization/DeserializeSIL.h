@@ -10,9 +10,10 @@
 //
 //===----------------------------------------------------------------------===//
 
-#include "swift/Serialization/ModuleFile.h"
 #include "SILFormat.h"
+#include "swift/SIL/InstructionUtils.h"
 #include "swift/SIL/SILModule.h"
+#include "swift/Serialization/ModuleFile.h"
 #include "swift/Serialization/SerializedSILLoader.h"
 
 #include "llvm/ADT/DenseMap.h"
@@ -83,6 +84,7 @@ namespace swift {
     /// Read a SIL instruction within a given SIL basic block.
     bool readSILInstruction(SILFunction *Fn, SILBasicBlock *BB,
                             SILBuilder &Builder,
+                            FunctionOwnershipEvaluator &OwnershipEvaluator,
                             unsigned RecordKind,
                             SmallVectorImpl<uint64_t> &scratch);
 

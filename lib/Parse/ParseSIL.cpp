@@ -10,22 +10,23 @@
 //
 //===----------------------------------------------------------------------===//
 
-#include "swift/Basic/Defer.h"
-#include "swift/Basic/Fallthrough.h"
 #include "swift/AST/ArchetypeBuilder.h"
 #include "swift/AST/GenericEnvironment.h"
 #include "swift/AST/NameLookup.h"
-#include "swift/Parse/Parser.h"
+#include "swift/Basic/Defer.h"
+#include "swift/Basic/Fallthrough.h"
 #include "swift/Parse/Lexer.h"
+#include "swift/Parse/Parser.h"
 #include "swift/SIL/AbstractionPattern.h"
+#include "swift/SIL/InstructionUtils.h"
 #include "swift/SIL/SILArgument.h"
 #include "swift/SIL/SILBuilder.h"
 #include "swift/SIL/SILDebugScope.h"
 #include "swift/SIL/SILModule.h"
 #include "swift/SIL/SILUndef.h"
 #include "swift/Subsystems.h"
-#include "llvm/Support/SaveAndRestore.h"
 #include "llvm/ADT/StringSwitch.h"
+#include "llvm/Support/SaveAndRestore.h"
 using namespace swift;
 
 //===----------------------------------------------------------------------===//
@@ -103,6 +104,8 @@ namespace {
     SILParserTUState &TUState;
     SILFunction *F = nullptr;
     GenericEnvironment *GenericEnv = nullptr;
+    FunctionOwnershipEvaluator OwnershipEvaluator;
+
   private:
     /// HadError - Have we seen an error parsing this function?
     bool HadError = false;
@@ -3983,6 +3986,11 @@ bool SILParser::parseSILBasicBlock(SILBuilder &B) {
   do {
     if (parseSILInstruction(BB, B))
       return true;
+    // Evaluate how the just parsed instruction effects this functions Ownership
+    // Qualification. For more details, see the comment on the
+    // FunctionOwnershipEvaluator class.
+    if (!OwnershipEvaluator.evaluate(*BB->rbegin()))
+      return true;
   } while (isStartOfSILInstruction());
 
   return false;
@@ -4078,6 +4086,7 @@ bool Parser::parseDeclSIL() {
       }
       
       // Parse the basic block list.
+      FunctionState.OwnershipEvaluator.reset(FunctionState.F);
       SILOpenedArchetypesTracker OpenedArchetypesTracker(*FunctionState.F);
       SILBuilder B(*FunctionState.F);
       // Track the archetypes just like SILGen. This
