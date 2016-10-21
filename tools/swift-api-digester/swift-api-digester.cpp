@@ -808,45 +808,17 @@ NodeUniquePtr SDKNode::constructSDKNode(llvm::yaml::MappingNode *Node) {
   return Result;
 }
 
-/// This is for caching the comparison results between two SDKNodes.
-class SDKNodeEqualContext {
-  using NodePtrAndEqual = llvm::DenseMap<const SDKNode*, bool>;
-  llvm::DenseMap<const SDKNode*, llvm::DenseMap<const SDKNode*, bool>> Data;
-
-public:
-  Optional<bool> getEquality(const SDKNode* Left, const SDKNode* Right) {
-    auto &Map = Data.insert({Left, NodePtrAndEqual()}).first->getSecond();
-    if (Map.count(Right))
-      return Map[Right];
-    return None;
-  }
-
-  void addEquality(const SDKNode* Left, const SDKNode* Right, const bool Value) {
-    Data.insert(std::make_pair(Left, NodePtrAndEqual())).first->getSecond().
-      insert({Right, Value});
-  }
-};
-
 bool SDKNode::operator==(const SDKNode &Other) const {
-  static SDKNodeEqualContext EqualCache;
-  if (auto Cached = EqualCache.getEquality(this, &Other)) {
-    return Cached.getValue();
-  }
-  auto Exit = [&](const bool Result) {
-    EqualCache.addEquality(this, &Other, Result);
-    return Result;
-  };
-
   if (getKind() != Other.getKind())
-    return Exit(false);
+    return false;
 
   switch(getKind()) {
     case SDKNodeKind::TypeNominal:
     case SDKNodeKind::TypeFunc: {
       auto Left = this->getAs<SDKNodeType>();
       auto Right = (&Other)->getAs<SDKNodeType>();
-      return Exit(Left->getTypeAttributes().equals(Right->getTypeAttributes())
-        && Left->getPrintedName() == Right->getPrintedName());
+      return Left->getTypeAttributes().equals(Right->getTypeAttributes())
+        && Left->getPrintedName() == Right->getPrintedName();
     }
 
     case SDKNodeKind::Function:
@@ -856,9 +828,9 @@ bool SDKNode::operator==(const SDKNode &Other) const {
       auto Left = this->getAs<SDKNodeAbstractFunc>();
       auto Right = (&Other)->getAs<SDKNodeAbstractFunc>();
       if (Left->isMutating() ^ Right->isMutating())
-        return Exit(false);
+        return false;
       if (Left->isThrowing() ^ Right->isThrowing())
-        return Exit(false);
+        return false;
       SWIFT_FALLTHROUGH;
     }
     case SDKNodeKind::TypeDecl:
@@ -870,11 +842,11 @@ bool SDKNode::operator==(const SDKNode &Other) const {
           Children.size() == Other.Children.size()) {
         for (unsigned I = 0; I < Children.size(); ++ I) {
           if (*Children[I] != *Other.Children[I])
-            return Exit(false);
+            return false;
         }
-        return Exit(true);
+        return true;
       }
-      return Exit(false);
+      return false;
     }
   }
 }
