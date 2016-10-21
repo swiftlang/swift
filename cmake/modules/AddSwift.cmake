@@ -984,6 +984,9 @@ function(_add_swift_library_single target name)
      "${SWIFT_SDK_${SWIFTLIB_SINGLE_SDK}_OBJECT_FORMAT}" STREQUAL "ELF")
     list(APPEND link_flags "-fuse-ld=gold")
   endif()
+  if("${SWIFTLIB_SINGLE_SDK}" STREQUAL "FREEBSD")
+    list(APPEND link_flags "-fuse-ld=gold")
+  endif()
   if(SWIFT_ENABLE_LLD_LINKER OR
      ("${SWIFTLIB_SINGLE_SDK}" STREQUAL "WINDOWS" AND
       NOT "${CMAKE_SYSTEM_NAME}" STREQUAL "WINDOWS"))
