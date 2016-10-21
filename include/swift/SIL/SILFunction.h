@@ -729,8 +729,7 @@ public:
 
   /// verify - Run the IR verifier to make sure that the SILFunction follows
   /// invariants.
-  void verify(bool SingleFunction = true,
-              bool EnforceSILOwnership = false) const;
+  void verify(bool SingleFunction = true) const;
 
   /// Pretty-print the SILFunction.
   void dump(bool Verbose) const;

@@ -102,7 +102,6 @@ class SILVerifier : public SILVerifierBase<SILVerifier> {
   const SILInstruction *CurInstruction = nullptr;
   DominanceInfo *Dominance = nullptr;
   bool SingleFunction = true;
-  bool EnforceSILOwnership;
 
   SILVerifier(const SILVerifier&) = delete;
   void operator=(const SILVerifier&) = delete;
@@ -129,6 +128,12 @@ public:
   }
 #define require(condition, complaint) \
   _require(bool(condition), complaint ": " #condition)
+#define requireTrueOrNone(condition, complaint)                                \
+  _require(!condition.hasValue() || bool(condition.getValue()),                \
+           complaint ": " #condition)
+#define requireFalseOrNone(condition, complaint)                               \
+  _require(!condition.hasValue() || !bool(condition.getValue()),               \
+           complaint ": " #condition)
 
   template <class T> typename CanTypeWrapperTraits<T>::type
   _requireObjectType(SILType type, const Twine &valueDescription,
@@ -407,11 +412,10 @@ public:
     }
   }
 
-  SILVerifier(const SILFunction &F, bool SingleFunction = true,
-              bool EnforceSILOwnership = false)
+  SILVerifier(const SILFunction &F, bool SingleFunction = true)
       : M(F.getModule().getSwiftModule()), F(F), TC(F.getModule().Types),
-        OpenedArchetypes(F), Dominance(nullptr), SingleFunction(SingleFunction),
-        EnforceSILOwnership(EnforceSILOwnership) {
+        OpenedArchetypes(F), Dominance(nullptr),
+        SingleFunction(SingleFunction) {
     if (F.isExternalDeclaration())
       return;
       
@@ -1118,16 +1122,24 @@ public:
     case LoadOwnershipQualifier::Unqualified:
       // We should not see loads with unqualified ownership when SILOwnership is
       // enabled.
-      require(!EnforceSILOwnership, "Invalid load with unqualified ownership");
+      requireFalseOrNone(
+          F.hasQualifiedOwnership(),
+          "Load with unqualified ownership in a qualified function");
       break;
     case LoadOwnershipQualifier::Copy:
     case LoadOwnershipQualifier::Take:
+      requireTrueOrNone(
+          F.hasQualifiedOwnership(),
+          "Load with qualified ownership in an unqualified function");
       // TODO: Could probably make this a bit stricter.
       require(!LI->getType().isTrivial(LI->getModule()),
               "load [copy] or load [take] can only be applied to non-trivial "
               "types");
       break;
     case LoadOwnershipQualifier::Trivial:
+      requireTrueOrNone(
+          F.hasQualifiedOwnership(),
+          "Load with qualified ownership in an unqualified function");
       require(LI->getType().isTrivial(LI->getModule()),
               "A load with trivial ownership must load a trivial type");
       break;
@@ -1135,6 +1147,9 @@ public:
   }
 
   void checkLoadBorrowInst(LoadBorrowInst *LBI) {
+    requireTrueOrNone(
+        F.hasQualifiedOwnership(),
+        "Inst with qualified ownership in a function that is not qualified");
     require(LBI->getType().isObject(), "Result of load must be an object");
     require(LBI->getType().isLoadable(LBI->getModule()),
             "Load must have a loadable type");
@@ -1145,6 +1160,9 @@ public:
   }
 
   void checkEndBorrowInst(EndBorrowInst *EBI) {
+    requireTrueOrNone(
+        F.hasQualifiedOwnership(),
+        "Inst with qualified ownership in a function that is not qualified");
     // We allow for end_borrow to express relationships in between addresses and
     // values, but we require that the types are the same ignoring value
     // category.
@@ -1169,16 +1187,23 @@ public:
     case StoreOwnershipQualifier::Unqualified:
       // We should not see loads with unqualified ownership when SILOwnership is
       // enabled.
-      require(!EnforceSILOwnership, "Invalid load with unqualified ownership");
+      requireFalseOrNone(F.hasQualifiedOwnership(),
+                         "Invalid load with unqualified ownership");
       break;
     case StoreOwnershipQualifier::Init:
     case StoreOwnershipQualifier::Assign:
+      requireTrueOrNone(
+          F.hasQualifiedOwnership(),
+          "Inst with qualified ownership in a function that is not qualified");
       // TODO: Could probably make this a bit stricter.
       require(!SI->getSrc()->getType().isTrivial(SI->getModule()),
               "store [init] or store [assign] can only be applied to "
               "non-trivial types");
       break;
     case StoreOwnershipQualifier::Trivial:
+      requireTrueOrNone(
+          F.hasQualifiedOwnership(),
+          "Inst with qualified ownership in a function that is not qualified");
       require(SI->getSrc()->getType().isTrivial(SI->getModule()),
               "A store with trivial ownership must store a trivial type");
       break;
@@ -3510,12 +3535,12 @@ public:
 
 /// verify - Run the SIL verifier to make sure that the SILFunction follows
 /// invariants.
-void SILFunction::verify(bool SingleFunction, bool EnforceSILOwnership) const {
+void SILFunction::verify(bool SingleFunction) const {
 #ifndef NDEBUG
   // Please put all checks in visitSILFunction in SILVerifier, not here. This
   // ensures that the pretty stack trace in the verifier is included with the
   // back trace when the verifier crashes.
-  SILVerifier(*this, SingleFunction, EnforceSILOwnership).verify();
+  SILVerifier(*this, SingleFunction).verify();
 #endif
 }
 
@@ -3645,7 +3670,7 @@ void SILGlobalVariable::verify() const {
 }
 
 /// Verify the module.
-void SILModule::verify(bool EnforceSILOwnership) const {
+void SILModule::verify() const {
 #ifndef NDEBUG
   // Uniquing set to catch symbol name collisions.
   llvm::StringSet<> symbolNames;
@@ -3656,7 +3681,7 @@ void SILModule::verify(bool EnforceSILOwnership) const {
       llvm::errs() << "Symbol redefined: " << f.getName() << "!\n";
       assert(false && "triggering standard assertion failure routine");
     }
-    f.verify(/*SingleFunction=*/false, EnforceSILOwnership);
+    f.verify(/*SingleFunction=*/false);
   }
 
   // Check all globals.
