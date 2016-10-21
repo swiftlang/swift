@@ -1411,22 +1411,51 @@ public:
     assert(baseTy);
     assert(memberTy);
     assert(name);
-    addConstraint(Constraint::create(*this, ConstraintKind::TypeMember,
-                                     baseTy, memberTy, name,
-                                     FunctionRefKind::Compound,
-                                     getConstraintLocator(locator)));
+    switch (simplifyMemberConstraint(ConstraintKind::TypeMember, baseTy, name,
+                                     memberTy, FunctionRefKind::Compound,
+                                     TMF_GenerateConstraints, locator)) {
+    case SolutionKind::Unsolved:
+      llvm_unreachable("Unsolved result when generating constraints!");
+
+    case SolutionKind::Solved:
+      break;
+
+    case SolutionKind::Error:
+      if (shouldAddNewFailingConstraint()) {
+        addNewFailingConstraint(
+          Constraint::create(*this, ConstraintKind::TypeMember, baseTy,
+                             memberTy, name, FunctionRefKind::Compound,
+                             getConstraintLocator(locator)));
+      }
+      break;
+    }
   }
 
   /// \brief Add a value member constraint to the constraint system.
   void addValueMemberConstraint(Type baseTy, DeclName name, Type memberTy,
                                 FunctionRefKind functionRefKind,
-                                ConstraintLocator *locator) {
+                                ConstraintLocatorBuilder locator) {
     assert(baseTy);
     assert(memberTy);
     assert(name);
-    addConstraint(Constraint::create(*this, ConstraintKind::ValueMember,
-                                     baseTy, memberTy, name, functionRefKind,
-                                     locator));
+    switch (simplifyMemberConstraint(ConstraintKind::ValueMember, baseTy, name,
+                                     memberTy, functionRefKind,
+                                     TMF_GenerateConstraints, locator)) {
+    case SolutionKind::Unsolved:
+      llvm_unreachable("Unsolved result when generating constraints!");
+
+    case SolutionKind::Solved:
+      break;
+
+    case SolutionKind::Error:
+      if (shouldAddNewFailingConstraint()) {
+        addNewFailingConstraint(
+          Constraint::create(*this, ConstraintKind::ValueMember, baseTy,
+                             memberTy, name, functionRefKind,
+                             getConstraintLocator(locator)));
+      }
+      break;
+    }
   }
 
   /// \brief Add a value member constraint for an UnresolvedMemberRef
@@ -1434,14 +1463,28 @@ public:
   void addUnresolvedValueMemberConstraint(Type baseTy, DeclName name,
                                           Type memberTy,
                                           FunctionRefKind functionRefKind,
-                                          ConstraintLocator *locator) {
+                                          ConstraintLocatorBuilder locator) {
     assert(baseTy);
     assert(memberTy);
     assert(name);
-    addConstraint(Constraint::create(*this,
-                                     ConstraintKind::UnresolvedValueMember,
-                                     baseTy, memberTy, name, functionRefKind,
-                                     locator));
+    switch (simplifyMemberConstraint(ConstraintKind::UnresolvedValueMember,
+                                     baseTy, name, memberTy, functionRefKind,
+                                     TMF_GenerateConstraints, locator)) {
+    case SolutionKind::Unsolved:
+      llvm_unreachable("Unsolved result when generating constraints!");
+
+    case SolutionKind::Solved:
+      break;
+
+    case SolutionKind::Error:
+      if (shouldAddNewFailingConstraint()) {
+        addNewFailingConstraint(
+          Constraint::create(*this, ConstraintKind::UnresolvedValueMember,
+                             baseTy, memberTy, name, functionRefKind,
+                             getConstraintLocator(locator)));
+      }
+      break;
+    }
   }
 
   /// \brief Add a disjunction constraint.
@@ -1457,6 +1500,19 @@ public:
       constraint->setFavored();
 
     addConstraint(constraint);
+  }
+
+  /// Whether we should add a new constraint to capture a failure.
+  bool shouldAddNewFailingConstraint() const {
+    // Only do this at the top level.
+    return !solverState;
+  }
+
+  /// Add a new constraint that we know fails.
+  void addNewFailingConstraint(Constraint *constraint) {
+    assert(shouldAddNewFailingConstraint());
+    if (!failedConstraint)
+      failedConstraint = constraint;
   }
 
   /// \brief Add a newly-generated constraint that is known not to be solvable
@@ -1981,7 +2037,12 @@ private:
                                              ConstraintLocatorBuilder locator);
 
   /// \brief Attempt to simplify the given member constraint.
-  SolutionKind simplifyMemberConstraint(const Constraint &constraint);
+  SolutionKind simplifyMemberConstraint(ConstraintKind kind,
+                                        Type baseType, DeclName member,
+                                        Type memberType,
+                                        FunctionRefKind functionRefKind,
+                                        TypeMatchOptions flags,
+                                        ConstraintLocatorBuilder locator);
 
   
   /// \brief Attempt to simplify the optional object constraint.

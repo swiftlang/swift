@@ -3131,10 +3131,16 @@ retry_after_fail:
 
 
 ConstraintSystem::SolutionKind
-ConstraintSystem::simplifyMemberConstraint(const Constraint &constraint) {
+ConstraintSystem::simplifyMemberConstraint(ConstraintKind kind,
+                                           Type baseTy, DeclName member,
+                                           Type memberTy,
+                                           FunctionRefKind functionRefKind,
+                                           TypeMatchOptions flags,
+                                           ConstraintLocatorBuilder locatorB) {
   // Resolve the base type, if we can. If we can't resolve the base type,
   // then we can't solve this constraint.
-  Type baseTy = simplifyType(constraint.getFirstType());
+  // FIXME: simplifyType() call here could be getFixedTypeRecursive?
+  baseTy = simplifyType(baseTy);
   Type baseObjTy = baseTy->getRValueType();
 
   // Try to look through ImplicitlyUnwrappedOptional<T>; the result is
@@ -3149,19 +3155,26 @@ ConstraintSystem::simplifyMemberConstraint(const Constraint &constraint) {
       baseTy = objTy;
   }
 
+  auto locator = getConstraintLocator(locatorB);
   MemberLookupResult result =
-    performMemberLookup(constraint.getKind(), constraint.getMember(),
-                        baseTy, constraint.getFunctionRefKind(),
-                        constraint.getLocator(),
+    performMemberLookup(kind, member, baseTy, functionRefKind, locator,
                         /*includeInaccessibleMembers*/false);
   
-  Type memberTy = constraint.getSecondType();
-
   switch (result.OverallResult) {
   case MemberLookupResult::Unsolved:
+    // If requested, generate a constraint.
+    if (flags.contains(TMF_GenerateConstraints)) {
+      addUnsolvedConstraint(
+        Constraint::create(*this, kind, baseTy, memberTy, member,
+                           functionRefKind, locator));
+      return SolutionKind::Solved;
+    }
+
     return SolutionKind::Unsolved;
+
   case MemberLookupResult::ErrorAlreadyDiagnosed:
     return SolutionKind::Error;
+
   case MemberLookupResult::HasResults:
     // Keep going!
     break;
@@ -3169,7 +3182,7 @@ ConstraintSystem::simplifyMemberConstraint(const Constraint &constraint) {
 
   // If we found viable candidates, then we're done!
   if (!result.ViableCandidates.empty()) {
-    addOverloadSet(memberTy, result.ViableCandidates, constraint.getLocator(),
+    addOverloadSet(memberTy, result.ViableCandidates, locator,
                    result.getFavoredChoice());
     
     return SolutionKind::Solved;
@@ -3184,7 +3197,7 @@ ConstraintSystem::simplifyMemberConstraint(const Constraint &constraint) {
   // If the lookup found no hits at all (either viable or unviable), diagnose it
   // as such and try to recover in various ways.
 
-  if (constraint.getKind() == ConstraintKind::TypeMember) {
+  if (kind == ConstraintKind::TypeMember) {
     // If the base type was an optional, try to look through it.
     if (shouldAttemptFixes() && baseObjTy->getOptionalObjectType()) {
       // Determine whether or not we want to provide an optional chaining fixit or
@@ -3197,16 +3210,15 @@ ConstraintSystem::simplifyMemberConstraint(const Constraint &constraint) {
       auto fixKind = optionalChain ? FixKind::OptionalChaining : FixKind::ForceOptional;
 
       // Note the fix.
-      if (recordFix(fixKind, constraint.getLocator()))
+      if (recordFix(fixKind, locator))
         return SolutionKind::Error;
       
       // Look through one level of optional.
       addTypeMemberConstraint(baseObjTy->getOptionalObjectType(),
-                              constraint.getMember(),
-                              constraint.getSecondType(),
-                              constraint.getLocator());
+                              member, memberTy, locator);
       return SolutionKind::Solved;
     }
+
     return SolutionKind::Error;
   }
   
@@ -3229,15 +3241,12 @@ ConstraintSystem::simplifyMemberConstraint(const Constraint &constraint) {
     auto fixKind = optionalChain ? FixKind::OptionalChaining : FixKind::ForceOptional;
 
     // Note the fix.
-    if (recordFix(fixKind, constraint.getLocator()))
+    if (recordFix(fixKind, locator))
       return SolutionKind::Error;
     
     // Look through one level of optional.
     addValueMemberConstraint(baseObjTy->getOptionalObjectType(),
-                             constraint.getMember(),
-                             constraint.getSecondType(),
-                             constraint.getFunctionRefKind(),
-                             constraint.getLocator());
+                             member, memberTy, functionRefKind, locator);
     return SolutionKind::Solved;
   }
   return SolutionKind::Error;
@@ -4137,7 +4146,13 @@ ConstraintSystem::simplifyConstraint(const Constraint &constraint) {
   case ConstraintKind::ValueMember:
   case ConstraintKind::UnresolvedValueMember:
   case ConstraintKind::TypeMember:
-    return simplifyMemberConstraint(constraint);
+    return simplifyMemberConstraint(constraint.getKind(),
+                                    constraint.getFirstType(),
+                                    constraint.getMember(),
+                                    constraint.getSecondType(),
+                                    constraint.getFunctionRefKind(),
+                                    TMF_GenerateConstraints,
+                                    constraint.getLocator());
 
   case ConstraintKind::Defaultable:
     return simplifyDefaultableConstraint(constraint);
