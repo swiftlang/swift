@@ -688,7 +688,6 @@ static bool shouldBindToValueType(Constraint *constraint)
   case ConstraintKind::ValueMember:
   case ConstraintKind::UnresolvedValueMember:
   case ConstraintKind::TypeMember:
-  case ConstraintKind::Archetype:
   case ConstraintKind::Class:
   case ConstraintKind::Defaultable:
   case ConstraintKind::Disjunction:
@@ -776,7 +775,6 @@ static PotentialBindings getPotentialBindings(ConstraintSystem &cs,
       break;
 
     case ConstraintKind::DynamicTypeOf:
-    case ConstraintKind::Archetype:
     case ConstraintKind::Class:
       // Constraints from which we can't do anything.
       // FIXME: Record this somehow?

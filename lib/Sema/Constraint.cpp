@@ -82,7 +82,6 @@ Constraint::Constraint(ConstraintKind Kind, Type First, Type Second,
     assert(Member && "Member constraint has no member");
     break;
 
-  case ConstraintKind::Archetype:
   case ConstraintKind::Class:
     assert(!Member && "Type property cannot have a member");
     assert(Second.isNull() && "Type property with second type");
@@ -187,7 +186,6 @@ Constraint *Constraint::clone(ConstraintSystem &cs) const {
     return create(cs, getKind(), getFirstType(), getSecondType(),
                   getMember(), getFunctionRefKind(), getLocator());
 
-  case ConstraintKind::Archetype:
   case ConstraintKind::Class:
     return create(cs, getKind(), getFirstType(), Type(), DeclName(),
                   FunctionRefKind::Compound, getLocator());
@@ -301,10 +299,6 @@ void Constraint::print(llvm::raw_ostream &Out, SourceManager *sm) const {
     break;
   case ConstraintKind::TypeMember:
     Out << "[." << Types.Member << ": type] == ";
-    break;
-  case ConstraintKind::Archetype:
-    Out << " is an archetype";
-    skipSecond = true;
     break;
   case ConstraintKind::Class:
     Out << " is a class";
@@ -486,7 +480,6 @@ gatherReferencedTypeVars(Constraint *constraint,
     constraint->getSecondType()->getTypeVariables(typeVars);
     SWIFT_FALLTHROUGH;
 
-  case ConstraintKind::Archetype:
   case ConstraintKind::BindOverload:
   case ConstraintKind::Class:
   case ConstraintKind::ConformsTo:

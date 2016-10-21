@@ -1448,14 +1448,6 @@ public:
                                      locator));
   }
 
-  /// \brief Add an archetype constraint.
-  void addArchetypeConstraint(Type baseTy, ConstraintLocator *locator) {
-    assert(baseTy);
-    addConstraint(Constraint::create(*this, ConstraintKind::Archetype,
-                                     baseTy, Type(), DeclName(),
-                                     FunctionRefKind::Compound, locator));
-  }
-
   /// \brief Add a disjunction constraint.
   void addDisjunctionConstraint(ArrayRef<Constraint *> constraints,
                                 ConstraintLocatorBuilder locator,
@@ -1990,9 +1982,6 @@ private:
 
   /// \brief Attempt to simplify the given DynamicTypeOf constraint.
   SolutionKind simplifyDynamicTypeOfConstraint(const Constraint &constraint);
-
-  /// \brief Attempt to simplify the given archetype constraint.
-  SolutionKind simplifyArchetypeConstraint(const Constraint &constraint);
 
   /// \brief Attempt to simplify the given class constraint.
   SolutionKind simplifyClassConstraint(const Constraint &constraint);

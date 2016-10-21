@@ -3217,20 +3217,6 @@ ConstraintSystem::simplifyMemberConstraint(const Constraint &constraint) {
 }
 
 ConstraintSystem::SolutionKind
-ConstraintSystem::simplifyArchetypeConstraint(const Constraint &constraint) {
-  // Resolve the base type, if we can. If we can't resolve the base type,
-  // then we can't solve this constraint.
-  Type baseTy = getFixedTypeRecursive(constraint.getFirstType(), true);
-  if (baseTy->isTypeVariableOrMember())
-    return SolutionKind::Unsolved;
-
-  if (baseTy->is<ArchetypeType>())
-    return SolutionKind::Solved;
-
-  return SolutionKind::Error;
-}
-
-ConstraintSystem::SolutionKind
 ConstraintSystem::simplifyClassConstraint(const Constraint &constraint){
   auto baseTy = getFixedTypeRecursive(constraint.getFirstType(), true);
   if (baseTy->isTypeVariableOrMember())
@@ -3458,7 +3444,6 @@ static TypeMatchKind getTypeMatchKind(ConstraintKind kind) {
   case ConstraintKind::OptionalObject:
     llvm_unreachable("optional object constraints don't involve type matches");
       
-  case ConstraintKind::Archetype:
   case ConstraintKind::Class:
   case ConstraintKind::Defaultable:
     llvm_unreachable("Type properties don't involve type matches");
@@ -4129,9 +4114,6 @@ ConstraintSystem::simplifyConstraint(const Constraint &constraint) {
   case ConstraintKind::TypeMember:
     return simplifyMemberConstraint(constraint);
 
-  case ConstraintKind::Archetype:
-    return simplifyArchetypeConstraint(constraint);
-  
   case ConstraintKind::Class:
     return simplifyClassConstraint(constraint);
 
