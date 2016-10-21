@@ -333,9 +333,7 @@ ConstraintLocator *ConstraintSystem::getConstraintLocator(
   return getConstraintLocator(anchor, path, builder.getSummaryFlags());
 }
 
-bool ConstraintSystem::addConstraint(Constraint *constraint,
-                                     bool isExternallySolved,
-                                     bool simplifyExisting) {
+bool ConstraintSystem::addConstraint(Constraint *constraint) {
   switch (simplifyConstraint(*constraint)) {
   case SolutionKind::Error:
     if (!failedConstraint) {
@@ -344,9 +342,7 @@ bool ConstraintSystem::addConstraint(Constraint *constraint,
 
     if (solverState) {
       solverState->retiredConstraints.push_front(constraint);
-      if (!simplifyExisting) {
-        solverState->generatedConstraints.push_back(constraint);
-      }
+      solverState->generatedConstraints.push_back(constraint);
     }
 
     return false;
@@ -357,27 +353,19 @@ bool ConstraintSystem::addConstraint(Constraint *constraint,
     // Record solved constraint.
     if (solverState) {
       solverState->retiredConstraints.push_front(constraint);
-      if (!simplifyExisting)
-        solverState->generatedConstraints.push_back(constraint);
+      solverState->generatedConstraints.push_back(constraint);
     }
 
-    // Remove the constraint from the constraint graph.
-    if (simplifyExisting)
-      CG.removeConstraint(constraint);
-    
     return true;
 
   case SolutionKind::Unsolved:
     // We couldn't solve this constraint; add it to the pile.
-    if (!isExternallySolved) {
-      InactiveConstraints.push_back(constraint);        
-    }
+    InactiveConstraints.push_back(constraint);
 
     // Add this constraint to the constraint graph.
-    if (!simplifyExisting)
-      CG.addConstraint(constraint);
+    CG.addConstraint(constraint);
 
-    if (!simplifyExisting && solverState) {
+    if (solverState) {
       solverState->generatedConstraints.push_back(constraint);
     }
 

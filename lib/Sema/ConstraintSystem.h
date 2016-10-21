@@ -1379,16 +1379,8 @@ public:
   /// \brief Add a newly-allocated constraint after attempting to simplify
   /// it.
   ///
-  /// \param isExternallySolved Whether this constraint is being solved
-  /// as an eager simplification, outside of the simplify() loop.
-  ///
-  /// \param simplifyExisting Whether we're simplifying an existing
-  /// constraint rather than introducing a new constraint.
-  ///
   /// \returns true if this constraint was solved.
-  bool addConstraint(Constraint *constraint,
-                     bool isExternallySolved = false,
-                     bool simplifyExisting = false);
+  bool addConstraint(Constraint *constraint);
 
   /// \brief Add a constraint to the constraint system.
   void addConstraint(ConstraintKind kind, Type first, Type second,
