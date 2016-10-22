@@ -265,6 +265,7 @@ struct SDKNodeInitInfo {
   StringRef ModuleName;
   bool IsThrowing = false;
   bool IsMutating = false;
+  bool IsStatic = false;
   Optional<uint8_t> SelfIndex;
   std::vector<SDKDeclAttrKind> DeclAttrs;
   std::vector<TypeAttrKind> TypeAttrs;
@@ -326,12 +327,14 @@ class SDKNodeDecl : public SDKNode {
   StringRef Location;
   StringRef ModuleName;
   std::vector<SDKDeclAttrKind> DeclAttributes;
+  bool IsStatic;
   bool hasDeclAttribute(SDKDeclAttrKind DAKind) const;
 
 protected:
   SDKNodeDecl(SDKNodeInitInfo Info, SDKNodeKind Kind) : SDKNode(Info, Kind),
-                      DKind(Info.DKind), Usr(Info.USR), Location(Info.Location),
-                  ModuleName(Info.ModuleName), DeclAttributes(Info.DeclAttrs) {}
+    DKind(Info.DKind), Usr(Info.USR), Location(Info.Location),
+    ModuleName(Info.ModuleName), DeclAttributes(Info.DeclAttrs),
+    IsStatic(Info.IsStatic) {}
 
 public:
   StringRef getUsr() const { return Usr; }
@@ -346,6 +349,7 @@ public:
   StringRef getFullyQualifiedName();
   bool isSDKPrivate();
   bool isDeprecated();
+  bool isStatic() const { return IsStatic; };
 };
 
 class SDKNodeType : public SDKNode {
@@ -774,6 +778,8 @@ NodeUniquePtr SDKNode::constructSDKNode(llvm::yaml::MappingNode *Node) {
       Info.IsThrowing = true;
     } else if (Key == Key_mutating) {
       Info.IsMutating = true;
+    } else if (Key == Key_static) {
+      Info.IsStatic = true;
     } else if (Key == Key_typeAttributes) {
       auto *Seq = cast<llvm::yaml::SequenceNode>(Pair.getValue());
       for (auto It = Seq->begin(); It != Seq->end(); ++ It) {
@@ -981,7 +987,7 @@ SDKNodeInitInfo::SDKNodeInitInfo(ValueDecl *VD) :
     USR(calculateUsr(VD)), Location(calculateLocation(VD)),
     ModuleName(VD->getModuleContext()->getName().str()),
     IsThrowing(isFuncThrowing(VD)), IsMutating(isFuncMutating(VD)),
-    SelfIndex(getSelfIndex(VD)) {
+    IsStatic(VD->isStatic()), SelfIndex(getSelfIndex(VD)) {
   if (VD->getAttrs().getDeprecated(VD->getASTContext()))
     DeclAttrs.push_back(SDKDeclAttrKind::DAK_deprecated);
 }
@@ -1317,6 +1323,8 @@ namespace swift {
           out.mapRequired(Key_usr, Usr);
           out.mapRequired(Key_location, Location);
           out.mapRequired(Key_moduleName, ModuleName);
+          if (auto isStatic = D->isStatic())
+            out.mapRequired(Key_static, isStatic);
 
           if (auto F = dyn_cast<SDKNodeAbstractFunc>(value.get())) {
             if (bool isThrowing = F->isThrowing())

@@ -17,9 +17,10 @@
           "name": "foo1",
           "printedName": "foo1()",
           "declKind": "Func",
-          "usr": "s:FV4cake2S14foo1FT_T_",
+          "usr": "s:ZFV4cake2S14foo1FT_T_",
           "location": "",
           "moduleName": "cake",
+          "static": true,
           "children": [
             {
               "kind": "TypeNominal",
@@ -77,9 +78,10 @@
           "name": "foo1",
           "printedName": "foo1()",
           "declKind": "Func",
-          "usr": "s:FC4cake2C14foo1FT_T_",
+          "usr": "s:ZFC4cake2C14foo1FT_T_",
           "location": "",
           "moduleName": "cake",
+          "static": true,
           "children": [
             {
               "kind": "TypeNominal",

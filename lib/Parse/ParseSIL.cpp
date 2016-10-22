@@ -10,22 +10,23 @@
 //
 //===----------------------------------------------------------------------===//
 
-#include "swift/Basic/Defer.h"
-#include "swift/Basic/Fallthrough.h"
 #include "swift/AST/ArchetypeBuilder.h"
 #include "swift/AST/GenericEnvironment.h"
 #include "swift/AST/NameLookup.h"
-#include "swift/Parse/Parser.h"
+#include "swift/Basic/Defer.h"
+#include "swift/Basic/Fallthrough.h"
 #include "swift/Parse/Lexer.h"
+#include "swift/Parse/Parser.h"
 #include "swift/SIL/AbstractionPattern.h"
+#include "swift/SIL/InstructionUtils.h"
 #include "swift/SIL/SILArgument.h"
 #include "swift/SIL/SILBuilder.h"
 #include "swift/SIL/SILDebugScope.h"
 #include "swift/SIL/SILModule.h"
 #include "swift/SIL/SILUndef.h"
 #include "swift/Subsystems.h"
-#include "llvm/Support/SaveAndRestore.h"
 #include "llvm/ADT/StringSwitch.h"
+#include "llvm/Support/SaveAndRestore.h"
 using namespace swift;
 
 //===----------------------------------------------------------------------===//
@@ -103,6 +104,8 @@ namespace {
     SILParserTUState &TUState;
     SILFunction *F = nullptr;
     GenericEnvironment *GenericEnv = nullptr;
+    FunctionOwnershipEvaluator OwnershipEvaluator;
+
   private:
     /// HadError - Have we seen an error parsing this function?
     bool HadError = false;
@@ -279,9 +282,9 @@ namespace {
     bool parseSILInstruction(SILBasicBlock *BB, SILBuilder &B);
     bool parseCallInstruction(SILLocation InstLoc,
                               ValueKind Opcode, SILBuilder &B,
-                              ValueBase *&ResultVal);
+                              SILInstruction *&ResultVal);
     bool parseSILFunctionRef(SILLocation InstLoc,
-                             SILBuilder &B, ValueBase *&ResultVal);
+                             SILBuilder &B, SILInstruction *&ResultVal);
 
     bool parseSILBasicBlock(SILBuilder &B);
     
@@ -1588,7 +1591,7 @@ bool SILParser::parseSILInstruction(SILBasicBlock *BB, SILBuilder &B) {
   
   // Validate the opcode name, and do opcode-specific parsing logic based on the
   // opcode we find.
-  ValueBase *ResultVal;
+  SILInstruction *ResultVal;
   switch (Opcode) {
   case ValueKind::SILArgument:
   case ValueKind::SILUndef:
@@ -3736,7 +3739,7 @@ bool SILParser::parseSILInstruction(SILBasicBlock *BB, SILBuilder &B) {
 
 bool SILParser::parseCallInstruction(SILLocation InstLoc,
                                      ValueKind Opcode, SILBuilder &B,
-                                     ValueBase *&ResultVal) {
+                                     SILInstruction *&ResultVal) {
   UnresolvedValueName FnName;
   SmallVector<UnresolvedValueName, 4> ArgNames;
 
@@ -3895,7 +3898,7 @@ bool SILParser::parseCallInstruction(SILLocation InstLoc,
 }
 
 bool SILParser::parseSILFunctionRef(SILLocation InstLoc,
-                                    SILBuilder &B, ValueBase *&ResultVal) {
+                                    SILBuilder &B, SILInstruction *&ResultVal) {
   Identifier Name;
   SILType Ty;
   SourceLoc Loc = P.Tok.getLoc();
@@ -3982,6 +3985,11 @@ bool SILParser::parseSILBasicBlock(SILBuilder &B) {
 
   do {
     if (parseSILInstruction(BB, B))
+      return true;
+    // Evaluate how the just parsed instruction effects this functions Ownership
+    // Qualification. For more details, see the comment on the
+    // FunctionOwnershipEvaluator class.
+    if (!OwnershipEvaluator.evaluate(*BB->rbegin()))
       return true;
   } while (isStartOfSILInstruction());
 
@@ -4078,6 +4086,7 @@ bool Parser::parseDeclSIL() {
       }
       
       // Parse the basic block list.
+      FunctionState.OwnershipEvaluator.reset(FunctionState.F);
       SILOpenedArchetypesTracker OpenedArchetypesTracker(*FunctionState.F);
       SILBuilder B(*FunctionState.F);
       // Track the archetypes just like SILGen. This

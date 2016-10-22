@@ -85,6 +85,7 @@ namespace swift {
   class Substitution;
   class TypeCheckerDebugConsumer;
   class DocComment;
+  class SILBoxType;
 
   enum class KnownProtocolKind : uint8_t;
 
@@ -155,6 +156,8 @@ public:
 
   ~ConstraintCheckerArenaRAII();
 };
+
+class SILLayout; // From SIL
 
 /// \brief Describes either a nominal type declaration or an extension
 /// declaration.
@@ -784,6 +787,10 @@ public:
                             clang::ObjCInterfaceDecl *classDecl,
                             bool forInstance);
 
+  /// Retrieve a generic signature with a single unconstrained type parameter,
+  /// like `<T>`.
+  CanGenericSignature getSingleGenericParameterSignature() const;
+  
   /// Whether our effective Swift version is in the Swift 3 family
   bool isSwiftVersion3() const { return LangOpts.isSwiftVersion3(); }
 
@@ -821,6 +828,12 @@ private:
 
   friend class ArchetypeType;
   friend class ArchetypeBuilder::PotentialArchetype;
+
+  /// Provide context-level uniquing for SIL lowered type layouts.
+  friend SILLayout;
+  llvm::FoldingSet<SILLayout> *&getSILLayouts();
+  friend SILBoxType;
+  llvm::DenseMap<CanType, SILBoxType *> &getSILBoxTypes();
 };
 
 /// Retrieve information about the given Objective-C method for

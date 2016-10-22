@@ -72,6 +72,10 @@ EnableResilience("enable-resilience",
                                 "interfaces for all public declarations by "
                                 "default"));
 
+static llvm::cl::opt<bool>
+EnableSILOwnershipOpt("enable-sil-ownership",
+                 llvm::cl::desc("Compile the module with sil-ownership initially enabled for all functions"));
+
 static llvm::cl::opt<std::string>
 ResourceDir("resource-dir",
     llvm::cl::desc("The directory that holds the compiler resource files"));
@@ -227,7 +231,7 @@ int main(int argc, char **argv) {
   SILOpts.AssertConfig = AssertConfId;
   if (OptimizationGroup != OptGroup::Diagnostics)
     SILOpts.Optimization = SILOptions::SILOptMode::Optimize;
-
+  SILOpts.EnableSILOwnership = EnableSILOwnershipOpt;
 
   // Load the input file.
   llvm::ErrorOr<std::unique_ptr<llvm::MemoryBuffer>> FileBufOrErr =

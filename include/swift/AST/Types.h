@@ -20,6 +20,7 @@
 #include "swift/AST/DeclContext.h"
 #include "swift/AST/Ownership.h"
 #include "swift/AST/Requirement.h"
+#include "swift/AST/Substitution.h"
 #include "swift/AST/Type.h"
 #include "swift/AST/TypeAlignments.h"
 #include "swift/AST/Identifier.h"
@@ -63,7 +64,6 @@ namespace swift {
   class ModuleDecl;
   class ProtocolConformance;
   enum class SILArgumentConvention : uint8_t;
-  class Substitution;
   enum OptionalTypeKind : unsigned;
   enum PointerTypeKind : unsigned;
 
@@ -3354,23 +3354,38 @@ public:
 DEFINE_EMPTY_CAN_TYPE_WRAPPER(SILFunctionType, Type)
 
 class SILBoxType;
+class SILLayout; // From SIL
 typedef CanTypeWrapper<SILBoxType> CanSILBoxType;
 
 /// The SIL-only type @box T, which represents a reference to a (non-class)
-/// refcounted heap allocation containing a value of type T.
-class SILBoxType : public TypeBase {
-  CanType BoxedType;
+/// refcounted value referencing an aggregate with a given lowered layout.
+class SILBoxType final : public TypeBase,
+                         private llvm::TrailingObjects<SILBoxType,Substitution>{
+  friend TrailingObjects;
+  
+  SILLayout *Layout;
+  unsigned NumGenericArgs;
 
-  SILBoxType(CanType BoxedType)
-    : TypeBase(TypeKind::SILBox,
-               &BoxedType->getASTContext(),
-               BoxedType->getRecursiveProperties()),
-      BoxedType(BoxedType) {}
+  static RecursiveTypeProperties
+  getRecursivePropertiesFromSubstitutions(ArrayRef<Substitution> Args);
+
+  SILBoxType(ASTContext &C,
+             SILLayout *Layout, ArrayRef<Substitution> Args);
 
 public:
-  static CanSILBoxType get(CanType BoxedType);
+  SILLayout *getLayout() const { return Layout; }
+  ArrayRef<Substitution> getGenericArgs() const {
+    return llvm::makeArrayRef(getTrailingObjects<Substitution>(),
+                              NumGenericArgs);
+  }
 
-  CanType getBoxedType() const { return BoxedType; }
+  // TODO: SILBoxTypes should be explicitly constructed in terms of specific
+  // layouts. As a staging mechanism, we expose the old single-boxed-type
+  // interface.
+  // These functions are implemented in the SIL library instead of the AST.
+  
+  static CanSILBoxType get(CanType BoxedType);
+  CanType getBoxedType() const;
   // In SILType.h
   SILType getBoxedAddressType() const;
 

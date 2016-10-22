@@ -2047,22 +2047,14 @@ bool TypeChecker::typeCheckForEachBinding(DeclContext *dc, ForEachStmt *stmt) {
       
         // Determine the iterator type of the sequence.
         iteratorType = cs.createTypeVariable(Locator, /*options=*/0);
-        cs.addConstraint(Constraint::create(
-                           cs, ConstraintKind::TypeMember,
-                           SequenceType, iteratorType,
-                           tc.Context.Id_Iterator,
-                           FunctionRefKind::Compound,
-                           iteratorLocator));
+        cs.addTypeMemberConstraint(SequenceType, tc.Context.Id_Iterator,
+                                   iteratorType, iteratorLocator);
 
         // Determine the element type of the iterator.
         // FIXME: Should look up the type witness.
         elementType = cs.createTypeVariable(Locator, /*options=*/0);
-        cs.addConstraint(Constraint::create(
-                           cs, ConstraintKind::TypeMember,
-                           iteratorType, elementType,
-                           tc.Context.Id_Element,
-                           FunctionRefKind::Compound,
-                           elementLocator));
+        cs.addTypeMemberConstraint(iteratorType, tc.Context.Id_Element,
+                                   elementType, elementLocator);
       }
       
 
