@@ -12,9 +12,10 @@
 
 #define DEBUG_TYPE "sil-inst-utils"
 #include "swift/SIL/InstructionUtils.h"
+#include "swift/Basic/NullablePtr.h"
+#include "swift/SIL/Projection.h"
 #include "swift/SIL/SILArgument.h"
 #include "swift/SIL/SILBasicBlock.h"
-#include "swift/SIL/Projection.h"
 
 using namespace swift;
 
@@ -220,4 +221,87 @@ SILValue swift::stripExpectIntrinsic(SILValue V) {
   if (BI->getIntrinsicInfo().ID != llvm::Intrinsic::expect)
     return V;
   return BI->getArguments()[0];
+}
+
+namespace {
+
+enum class OwnershipQualifiedKind {
+  NotApplicable,
+  Qualified,
+  Unqualified,
+};
+
+} // end anonymous namespace
+
+static OwnershipQualifiedKind
+getOwnershipQualifiedKind(const SILInstruction &I) {
+  switch (I.getKind()) {
+  case ValueKind::LoadInst:
+    if (cast<LoadInst>(I).getOwnershipQualifier() ==
+        LoadOwnershipQualifier::Unqualified)
+      return OwnershipQualifiedKind::Unqualified;
+    return OwnershipQualifiedKind::Qualified;
+  case ValueKind::StoreInst:
+    if (cast<StoreInst>(I).getOwnershipQualifier() ==
+        StoreOwnershipQualifier::Unqualified)
+      return OwnershipQualifiedKind::Unqualified;
+    return OwnershipQualifiedKind::Qualified;
+  case ValueKind::LoadBorrowInst:
+  case ValueKind::EndBorrowInst:
+    return OwnershipQualifiedKind::Qualified;
+  default:
+    return OwnershipQualifiedKind::NotApplicable;
+  }
+}
+
+bool FunctionOwnershipEvaluator::evaluate(const SILInstruction &I) {
+  assert(I.getFunction() == F.get() && "Can not evaluate function ownership "
+                                       "implications of an instruction that "
+                                       "does not belong to the instruction "
+                                       "that we are evaluating");
+
+  // If SIL ownership is not enabled in this module, just return true. There is
+  // no further work to do here.
+  if (!I.getModule().getOptions().EnableSILOwnership)
+    return true;
+
+  switch (getOwnershipQualifiedKind(I)) {
+  case OwnershipQualifiedKind::Unqualified: {
+    // If we already know that the function has unqualified ownership, just
+    // return early.
+    if (!F.get()->hasQualifiedOwnership().getValue())
+      return true;
+
+    // Ok, so we know at this point that we have qualified ownership. If we have
+    // seen any instructions with qualified ownership, we have an error since
+    // the function mixes qualified and unqualified instructions.
+    if (HasOwnershipQualifiedInstruction)
+      return false;
+
+    // Otherwise, set the function to have unqualified ownership. This will
+    // ensure that no more Qualified instructions can be added to the given
+    // function.
+    F.get()->setUnqualifiedOwnership();
+    return true;
+  }
+  case OwnershipQualifiedKind::Qualified: {
+    // First check if our function has unqualified ownership. If we already do
+    // have unqualified ownership, then we know that we have already seen an
+    // unqualified ownership instruction. This means the function has both
+    // qualified and unqualified instructions. =><=.
+    if (!F.get()->hasQualifiedOwnership().getValue())
+      return false;
+
+    // Ok, at this point we know that we are still qualified. Since functions
+    // start as qualified, we need to set the HasOwnershipQualifiedInstructions
+    // so we do not need to look back through the function if we see an
+    // unqualified instruction later on.
+    HasOwnershipQualifiedInstruction = true;
+    return true;
+  }
+  case OwnershipQualifiedKind::NotApplicable: {
+    // Not Applicable instr
+    return true;
+  }
+  }
 }

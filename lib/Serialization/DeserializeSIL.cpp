@@ -538,6 +538,7 @@ SILFunction *SILDeserializer::readSILFunction(DeclID FID,
   LocalValues.clear();
   ForwardLocalValues.clear();
 
+  FunctionOwnershipEvaluator OwnershipEvaluator(fn);
   SILOpenedArchetypesTracker OpenedArchetypesTracker(*fn);
   SILBuilder Builder(*fn);
   // Track the archetypes just like SILGen. This
@@ -571,7 +572,8 @@ SILFunction *SILDeserializer::readSILFunction(DeclID FID,
         return fn;
 
       // Handle a SILInstruction record.
-      if (readSILInstruction(fn, CurrentBB, Builder, kind, scratch)) {
+      if (readSILInstruction(fn, CurrentBB, Builder, OwnershipEvaluator, kind,
+                             scratch)) {
         DEBUG(llvm::dbgs() << "readSILInstruction returns error.\n");
         MF->error();
         return fn;
@@ -657,10 +659,10 @@ static SILDeclRef getSILDeclRef(ModuleFile *MF,
   return DRef;
 }
 
-bool SILDeserializer::readSILInstruction(SILFunction *Fn, SILBasicBlock *BB,
-                                         SILBuilder &Builder,
-                                         unsigned RecordKind,
-                                         SmallVectorImpl<uint64_t> &scratch) {
+bool SILDeserializer::readSILInstruction(
+    SILFunction *Fn, SILBasicBlock *BB, SILBuilder &Builder,
+    FunctionOwnershipEvaluator &OwnershipEvaluator, unsigned RecordKind,
+    SmallVectorImpl<uint64_t> &scratch) {
   // Return error if Basic Block is null.
   if (!BB)
     return true;
@@ -1885,6 +1887,12 @@ bool SILDeserializer::readSILInstruction(SILFunction *Fn, SILBasicBlock *BB,
   case ValueKind::MarkUninitializedBehaviorInst:
     llvm_unreachable("todo");
   }
+
+  // Evaluate ResultVal's ownership. If we find that as a result of ResultVal,
+  // we are mixing qualified and unqualified ownership instructions, bail.
+  if (!OwnershipEvaluator.evaluate(*ResultVal))
+    return true;
+
   if (ResultVal->hasValue()) {
     LastValueID = LastValueID + 1;
     setLocalValue(ResultVal, LastValueID);
