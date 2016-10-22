@@ -29,6 +29,7 @@
 #include "swift/SIL/SILFunction.h"
 #include "swift/SIL/SILGlobalVariable.h"
 #include "swift/SIL/Notifications.h"
+#include "swift/SIL/SILLayout.h"
 #include "swift/SIL/SILType.h"
 #include "swift/SIL/SILVTable.h"
 #include "swift/SIL/SILWitnessTable.h"
@@ -91,6 +92,7 @@ private:
   friend class SILDefaultWitnessTable;
   friend class SILFunction;
   friend class SILGlobalVariable;
+  friend class SILLayout;
   friend class SILType;
   friend class SILVTable;
   friend class SILUndef;
@@ -551,7 +553,7 @@ public:
 
   /// \brief Run the SIL verifier to make sure that all Functions follow
   /// invariants.
-  void verify(bool EnforceSILOwnership = false) const;
+  void verify() const;
 
   /// Pretty-print the module.
   void dump(bool Verbose = false) const;

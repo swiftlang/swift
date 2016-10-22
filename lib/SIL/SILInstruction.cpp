@@ -280,7 +280,8 @@ namespace {
     }
 
     bool visitLoadInst(const LoadInst *RHS) {
-      return true;
+      auto LHSQualifier = cast<LoadInst>(LHS)->getOwnershipQualifier();
+      return LHSQualifier == RHS->getOwnershipQualifier();
     }
 
     bool visitLoadBorrowInst(const LoadBorrowInst *RHS) { return true; }
@@ -289,7 +290,8 @@ namespace {
 
     bool visitStoreInst(const StoreInst *RHS) {
       auto *X = cast<StoreInst>(LHS);
-      return (X->getSrc() == RHS->getSrc() && X->getDest() == RHS->getDest());
+      return X->getSrc() == RHS->getSrc() && X->getDest() == RHS->getDest() &&
+        X->getOwnershipQualifier() == RHS->getOwnershipQualifier();
     }
 
     bool visitBindMemoryInst(const BindMemoryInst *RHS) {

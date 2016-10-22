@@ -228,6 +228,9 @@ struct ASTContext::Implementation {
   /// an Objective-C class.
   llvm::DenseMap<std::pair<const clang::ObjCInterfaceDecl *, char>,
                  std::unique_ptr<InheritedNameSet>> AllPropertiesObjC;
+  
+  /// The single-parameter generic signature with no constraints, <T>.
+  CanGenericSignature SingleGenericParameterSignature;
 
   /// \brief Structure that captures data that is segregated into different
   /// arenas.
@@ -354,6 +357,8 @@ struct ASTContext::Implementation {
     }
     llvm_unreachable("bad AllocationArena");
   }
+  
+  llvm::FoldingSet<SILLayout> *SILLayouts = nullptr;
 };
 
 ASTContext::Implementation::Implementation()
@@ -3150,20 +3155,6 @@ CanSILBlockStorageType SILBlockStorageType::get(CanType captureType) {
   return CanSILBlockStorageType(storageTy);
 }
 
-CanSILBoxType SILBoxType::get(CanType boxType) {
-  ASTContext &ctx = boxType->getASTContext();
-  auto found = ctx.Impl.SILBoxTypes.find(boxType);
-  if (found != ctx.Impl.SILBoxTypes.end())
-    return CanSILBoxType(found->second);
-  
-  void *mem = ctx.Allocate(sizeof(SILBlockStorageType),
-                           alignof(SILBlockStorageType));
-  
-  auto storageTy = new (mem) SILBoxType(boxType);
-  ctx.Impl.SILBoxTypes.insert({boxType, storageTy});
-  return CanSILBoxType(storageTy);
-}
-
 CanSILFunctionType SILFunctionType::get(GenericSignature *genericSig,
                                     ExtInfo ext, ParameterConvention callee,
                                     ArrayRef<SILParameterInfo> params,
@@ -4032,4 +4023,23 @@ const InheritedNameSet *ASTContext::getAllPropertyNames(
   }
 
   return known->second.get();
+}
+
+CanGenericSignature ASTContext::getSingleGenericParameterSignature() const {
+  if (auto theSig = Impl.SingleGenericParameterSignature)
+    return theSig;
+  
+  auto param = GenericTypeParamType::get(0, 0, *this);
+  auto sig = GenericSignature::get(param, {});
+  auto canonicalSig = CanGenericSignature(sig);
+  Impl.SingleGenericParameterSignature = canonicalSig;
+  return canonicalSig;
+}
+
+llvm::FoldingSet<SILLayout> *&ASTContext::getSILLayouts() {
+  return Impl.SILLayouts;
+}
+
+llvm::DenseMap<CanType, SILBoxType *> &ASTContext::getSILBoxTypes() {
+  return Impl.SILBoxTypes;
 }
