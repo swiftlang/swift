@@ -271,7 +271,8 @@ static ApplySite replaceWithSpecializedCallee(ApplySite AI,
       } else {
         // An argument is converted from indirect to direct. Instead of the
         // address we pass the loaded value.
-        SILValue Val = Builder.createLoad(Loc, Op.get());
+        SILValue Val = Builder.createLoad(Loc, Op.get(),
+                                          LoadOwnershipQualifier::Unqualified);
         Arguments.push_back(Val);
       }
     } else {
@@ -296,7 +297,8 @@ static ApplySite replaceWithSpecializedCallee(ApplySite AI,
       SILArgument *Arg =
         ResultBB->replaceBBArg(0, StoreResultTo->getType().getObjectType());
       // Store the direct result to the original result address.
-      Builder.createStore(Loc, Arg, StoreResultTo);
+      Builder.createStore(Loc, Arg, StoreResultTo,
+                          StoreOwnershipQualifier::Unqualified);
     }
     return NewTAI;
   }
@@ -305,7 +307,8 @@ static ApplySite replaceWithSpecializedCallee(ApplySite AI,
     if (StoreResultTo) {
       // Store the direct result to the original result address.
       fixUsedVoidType(A, Loc, Builder);
-      Builder.createStore(Loc, NewAI, StoreResultTo);
+      Builder.createStore(Loc, NewAI, StoreResultTo,
+                          StoreOwnershipQualifier::Unqualified);
     }
     A->replaceAllUsesWith(NewAI);
     return NewAI;
@@ -401,7 +404,8 @@ static SILFunction *createReabstractionThunk(const ReabstractionInfo &ReInfo,
         SILType Ty = SpecArg->getType().getAddressType();
         SILArgument *NewArg = new (M) SILArgument(EntryBB, Ty,
                                                   SpecArg->getDecl());
-        auto *ArgVal = Builder.createLoad(Loc, NewArg);
+        auto *ArgVal = Builder.createLoad(Loc, NewArg,
+                                          LoadOwnershipQualifier::Unqualified);
         Arguments.push_back(ArgVal);
       }
     } else {
@@ -433,7 +437,8 @@ static SILFunction *createReabstractionThunk(const ReabstractionInfo &ReInfo,
   }
   if (ReturnValueAddr) {
     // Need to store the direct results to the original indirect address.
-    Builder.createStore(Loc, ReturnValue, ReturnValueAddr);
+    Builder.createStore(Loc, ReturnValue, ReturnValueAddr,
+                        StoreOwnershipQualifier::Unqualified);
     SILType VoidTy = OrigPAI->getSubstCalleeType()->getSILResult();
     assert(VoidTy.isVoid());
     ReturnValue = Builder.createTuple(Loc, VoidTy, { });

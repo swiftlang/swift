@@ -178,7 +178,7 @@ emitElementAddress(unsigned EltNo, SILLocation Loc, SILBuilder &B) const {
       if (auto *NTD =
              cast_or_null<NominalTypeDecl>(PointeeType->getAnyNominal())) {
         if (isa<ClassDecl>(NTD) && Ptr->getType().isAddress())
-          Ptr = B.createLoad(Loc, Ptr);
+          Ptr = B.createLoad(Loc, Ptr, LoadOwnershipQualifier::Unqualified);
         for (auto *VD : NTD->getStoredProperties()) {
           auto FieldType = VD->getType()->getCanonicalType();
           unsigned NumFieldElements = getElementCountRec(FieldType, false);
@@ -372,7 +372,8 @@ static SILValue scalarizeLoad(LoadInst *LI,
   SmallVector<SILValue, 4> ElementTmps;
   
   for (unsigned i = 0, e = ElementAddrs.size(); i != e; ++i) {
-    auto *SubLI = B.createLoad(LI->getLoc(), ElementAddrs[i]);
+    auto *SubLI = B.createLoad(LI->getLoc(), ElementAddrs[i],
+                               LoadOwnershipQualifier::Unqualified);
     ElementTmps.push_back(SubLI);
   }
   
@@ -855,7 +856,8 @@ void ElementUseCollector::collectUses(SILValue Pointer, unsigned BaseEltNo) {
         getScalarizedElements(SI->getOperand(0), ElementTmps, SI->getLoc(), B);
         
         for (unsigned i = 0, e = ElementAddrs.size(); i != e; ++i)
-          B.createStore(SI->getLoc(), ElementTmps[i], ElementAddrs[i]);
+          B.createStore(SI->getLoc(), ElementTmps[i], ElementAddrs[i],
+                        StoreOwnershipQualifier::Unqualified);
         SI->eraseFromParent();
         continue;
       }

@@ -257,7 +257,8 @@ SILCombiner::visitUncheckedAddrCastInst(UncheckedAddrCastInst *UADCI) {
     UI++;
 
     // Insert a new load from our source and bitcast that as appropriate.
-    LoadInst *NewLoad = Builder.createLoad(Loc, Op);
+    LoadInst *NewLoad =
+        Builder.createLoad(Loc, Op, LoadOwnershipQualifier::Unqualified);
     auto *BitCast = Builder.createUncheckedBitCast(Loc, NewLoad,
                                                     OutputTy.getObjectType());
     // Replace all uses of the old load with the new bitcasted result and erase
@@ -321,11 +322,13 @@ SILCombiner::visitUncheckedRefCastAddrInst(UncheckedRefCastAddrInst *URCI) {
  
   SILLocation Loc = URCI->getLoc();
   Builder.setCurrentDebugScope(URCI->getDebugScope());
-  LoadInst *load = Builder.createLoad(Loc, URCI->getSrc());
+  LoadInst *load = Builder.createLoad(Loc, URCI->getSrc(),
+                                      LoadOwnershipQualifier::Unqualified);
   auto *cast = Builder.tryCreateUncheckedRefCast(Loc, load,
                                                  DestTy.getObjectType());
   assert(cast && "SILBuilder cannot handle reference-castable types");
-  Builder.createStore(Loc, cast, URCI->getDest());
+  Builder.createStore(Loc, cast, URCI->getDest(),
+                      StoreOwnershipQualifier::Unqualified);
 
   return eraseInstFromFunction(*URCI);
 }

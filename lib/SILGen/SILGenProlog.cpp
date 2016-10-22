@@ -366,7 +366,7 @@ static void emitCaptureArguments(SILGenFunction &gen, CapturedValue capture,
     // temporary within the closure to provide this address.
     if (VD->isSettable(VD->getDeclContext())) {
       auto addr = gen.emitTemporaryAllocation(VD, ty);
-      gen.B.createStore(VD, val, addr);
+      gen.B.createStore(VD, val, addr, StoreOwnershipQualifier::Unqualified);
       val = addr;
     }
 

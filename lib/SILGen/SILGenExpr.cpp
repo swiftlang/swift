@@ -3243,7 +3243,8 @@ public:
   RValue get(SILGenFunction &gen, SILLocation loc,
              ManagedValue base, SGFContext c) && override {
     // Load the value at +0.
-    SILValue owned = gen.B.createLoad(loc, base.getUnmanagedValue());
+    SILValue owned = gen.B.createLoad(loc, base.getUnmanagedValue(),
+                                      LoadOwnershipQualifier::Unqualified);
     // Convert it to unowned.
     auto refType = owned->getType().getSwiftRValueType();
     auto unownedType = SILType::getPrimitiveObjectType(

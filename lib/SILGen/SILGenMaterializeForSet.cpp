@@ -317,7 +317,8 @@ public:
     // load+materialize in some cases, but it's not really important.
     SILValue selfValue = self.getValue();
     if (selfValue->getType().isAddress()) {
-      selfValue = gen.B.createLoad(loc, selfValue);
+      selfValue =
+          gen.B.createLoad(loc, selfValue, LoadOwnershipQualifier::Unqualified);
     }
 
     // Do a derived-to-base conversion if necessary.
@@ -629,7 +630,8 @@ SILValue MaterializeForSetEmitter::emitUsingAddressor(SILGenFunction &gen,
   } else {
     SILValue allocatedCallbackBuffer =
       gen.B.createAllocValueBuffer(loc, owner.getType(), callbackBuffer);
-    gen.B.createStore(loc, owner.forward(gen), allocatedCallbackBuffer);
+    gen.B.createStore(loc, owner.forward(gen), allocatedCallbackBuffer,
+                      StoreOwnershipQualifier::Unqualified);
 
     callback = createAddressorCallback(gen.F, owner.getType(), addressorKind);
   }
@@ -648,7 +650,8 @@ MaterializeForSetEmitter::createAddressorCallback(SILFunction &F,
                             SILValue self) {
     auto ownerAddress =
       gen.B.createProjectValueBuffer(loc, ownerType, callbackStorage);
-    auto owner = gen.B.createLoad(loc, ownerAddress);
+    auto owner = gen.B.createLoad(loc, ownerAddress,
+                                  LoadOwnershipQualifier::Unqualified);
 
     switch (addressorKind) {
     case AddressorKind::NotAddressor:
@@ -760,7 +763,8 @@ MaterializeForSetEmitter::createSetterCallback(SILFunction &F,
       SILValue indicesV =
         gen.B.createProjectValueBuffer(loc, indicesTy, callbackBuffer);
       if (indicesTL->isLoadable())
-        indicesV = gen.B.createLoad(loc, indicesV);
+        indicesV = gen.B.createLoad(loc, indicesV,
+                                    LoadOwnershipQualifier::Unqualified);
       ManagedValue mIndices =
         gen.emitManagedRValueWithCleanup(indicesV, *indicesTL);
 
@@ -780,7 +784,7 @@ MaterializeForSetEmitter::createSetterCallback(SILFunction &F,
     value = gen.B.createPointerToAddress(
       loc, value, valueTL.getLoweredType().getAddressType(), /*isStrict*/ true);
     if (valueTL.isLoadable())
-      value = gen.B.createLoad(loc, value);
+      value = gen.B.createLoad(loc, value, LoadOwnershipQualifier::Unqualified);
     ManagedValue mValue = gen.emitManagedRValueWithCleanup(value, valueTL);
     RValue rvalue(gen, loc, lvalue.getSubstFormalType(), mValue);
 
