@@ -697,31 +697,22 @@ void Lexer::lexOperatorIdentifier() {
       break;
   } while (advanceIfValidContinuationOfOperator(CurPtr, BufferEnd));
 
+  if (CurPtr-TokStart > 2) {
+    // If there is a "//" or "/*" in the middle of an identifier token, 
+    // it starts a comment.
+    for (auto Ptr = TokStart+1; Ptr != CurPtr-1; ++Ptr) {
+      if (Ptr[0] == '/' && (Ptr[1] == '/' || Ptr[1] == '*')) {
+        CurPtr = Ptr;
+        break;
+      }
+    }
+  }
+
   // Decide between the binary, prefix, and postfix cases.
   // It's binary if either both sides are bound or both sides are not bound.
   // Otherwise, it's postfix if left-bound and prefix if right-bound.
   bool leftBound = isLeftBound(TokStart, BufferStart);
   bool rightBound = isRightBound(CurPtr, leftBound, CodeCompletionPtr);
-
-  if (CurPtr-TokStart > 2) {
-    // If there is a "//" in the middle of an identifier token, it starts
-    // a single-line comment.
-    auto Pos = StringRef(TokStart, CurPtr-TokStart).find("//");
-    if (Pos != StringRef::npos) {
-      CurPtr = TokStart+Pos;
-      // Next token is a comment, which counts as whitespace.
-      rightBound = false;
-    }
-
-    // If there is a "/*" in the middle of an identifier token, it starts
-    // a multi-line comment.
-    Pos = StringRef(TokStart, CurPtr-TokStart).find("/*");
-    if (Pos != StringRef::npos) {
-      CurPtr = TokStart+Pos;
-      // Next token is a comment, which counts as whitespace.
-      rightBound = false;
-    }
-  }
 
   // Match various reserved words.
   if (CurPtr-TokStart == 1) {
