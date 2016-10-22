@@ -174,7 +174,7 @@ Constraint *Constraint::clone(ConstraintSystem &cs) const {
   case ConstraintKind::ValueMember:
   case ConstraintKind::UnresolvedValueMember:
   case ConstraintKind::TypeMember:
-    return create(cs, getKind(), getFirstType(), Type(), getMember(), 
+    return create(cs, getKind(), getFirstType(), getSecondType(), getMember(),
                   getFunctionRefKind(), getLocator());
 
   case ConstraintKind::Defaultable:
