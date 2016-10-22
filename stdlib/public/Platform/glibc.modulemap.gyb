@@ -37,7 +37,8 @@ module SwiftGlibc [system] {
       header "${GLIBC_INCLUDE_PATH}/complex.h"
       export *
     }
-% if CMAKE_SDK != "FREEBSD":
+% end
+% if CMAKE_SDK in ["LINUX", "CYGWIN"]:
     module pty {
       header "${GLIBC_INCLUDE_PATH}/pty.h"
       export *
@@ -47,6 +48,15 @@ module SwiftGlibc [system] {
       export *
     }
 % end
+% if CMAKE_SDK == "FREEBSD":
+    module pty {
+      header "${GLIBC_INCLUDE_PATH}/libutil.h"
+      export *
+    }
+    module utmp {
+      header "${GLIBC_INCLUDE_PATH}/utmpx.h"
+      export *
+    }
 % end
 
 % if CMAKE_SDK in ["LINUX", "ANDROID", "CYGWIN"]:
