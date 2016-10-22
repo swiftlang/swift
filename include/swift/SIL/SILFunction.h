@@ -301,7 +301,7 @@ public:
 
   /// Returns true if this function has unqualified ownership instructions in
   /// it.
-  Optional<bool> hasUnqualifedOwnership() const {
+  Optional<bool> hasUnqualifiedOwnership() const {
     if (HasQualifiedOwnership.hasValue())
       return !HasQualifiedOwnership.getValue();
     return None;
