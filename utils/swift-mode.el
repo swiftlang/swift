@@ -166,8 +166,8 @@
        '(swift-font-lock-keywords) ))
 
 (defconst swift-doc-comment-detail-re
-  (let ((just-space "[ \t\n]*")
-        (not-just-space ".*?[^ \t\n].*")
+  (let* ((just-space "[ \t\n]*")
+        (not-just-space "[ \t]*[^ \t\n].*")
         (eol "\\(?:$\\)")
         (continue "\n\\1"))
     
