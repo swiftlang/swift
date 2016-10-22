@@ -2431,7 +2431,7 @@ bool SILParser::parseSILInstruction(SILBasicBlock *BB, SILBuilder &B) {
 
   case ValueKind::EndBorrowInst: {
     UnresolvedValueName BorrowDestName, BorrowSourceName;
-    SourceLoc ToLoc, BorrowDestLoc;
+    SourceLoc ToLoc;
     Identifier ToToken;
     SILType BorrowDestTy, BorrowSourceTy;
 
