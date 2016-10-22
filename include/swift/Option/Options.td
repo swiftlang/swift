@@ -333,23 +333,23 @@ def AssertConfig : Separate<["-"], "assert-config">,
 def code_formatting_Group : OptionGroup<"<code formatting options>">;
 
 def use_tabs : Flag<["-"], "use-tabs">, Group<code_formatting_Group>,
-  Flags<[SwiftFormatOption]>,
+  Flags<[NoInteractiveOption, NoBatchOption, SwiftFormatOption]>,
   HelpText<"Use tabs for indentation.">;
 
 def in_place : Flag<["-"], "in-place">, Group<code_formatting_Group>,
-  Flags<[SwiftFormatOption]>,
+  Flags<[NoInteractiveOption, NoBatchOption, SwiftFormatOption]>,
   HelpText<"Overwrite input file with formatted file.">;
 
 def tab_width : Separate<["-"], "tab-width">, Group<code_formatting_Group>,
-  Flags<[SwiftFormatOption]>,
+  Flags<[NoInteractiveOption, NoBatchOption, SwiftFormatOption]>,
   HelpText<"Width of tab character.">, MetaVarName<"<n>">;
 
 def indent_width : Separate<["-"], "indent-width">, Group<code_formatting_Group>,
-  Flags<[SwiftFormatOption]>,
+  Flags<[NoInteractiveOption, NoBatchOption, SwiftFormatOption]>,
   HelpText<"Number of characters to indent.">, MetaVarName<"<n>">;
 
 def line_range : Separate<["-"], "line-range">, Group<code_formatting_Group>,
-  Flags<[SwiftFormatOption]>,
+  Flags<[NoInteractiveOption, NoBatchOption, SwiftFormatOption]>,
   HelpText<"<start line>:<end line>. Formats a range of lines (1-based). "
            "Can only be used with one input file.">, MetaVarName<"<n:n>">;
 
