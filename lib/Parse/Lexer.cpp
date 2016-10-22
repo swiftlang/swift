@@ -703,6 +703,26 @@ void Lexer::lexOperatorIdentifier() {
   bool leftBound = isLeftBound(TokStart, BufferStart);
   bool rightBound = isRightBound(CurPtr, leftBound, CodeCompletionPtr);
 
+  if (CurPtr-TokStart > 2) {
+    // If there is a "//" in the middle of an identifier token, it starts
+    // a single-line comment.
+    auto Pos = StringRef(TokStart, CurPtr-TokStart).find("//");
+    if (Pos != StringRef::npos) {
+      CurPtr = TokStart+Pos;
+      // Next token is a comment, which counts as whitespace.
+      rightBound = false;
+    }
+
+    // If there is a "/*" in the middle of an identifier token, it starts
+    // a multi-line comment.
+    Pos = StringRef(TokStart, CurPtr-TokStart).find("/*");
+    if (Pos != StringRef::npos) {
+      CurPtr = TokStart+Pos;
+      // Next token is a comment, which counts as whitespace.
+      rightBound = false;
+    }
+  }
+
   // Match various reserved words.
   if (CurPtr-TokStart == 1) {
     switch (TokStart[0]) {
@@ -771,27 +791,9 @@ void Lexer::lexOperatorIdentifier() {
       return formToken(tok::unknown, TokStart);
     }
   } else {
-    // If there is a "//" in the middle of an identifier token, it starts
-    // a single-line comment.
-    auto Pos = StringRef(TokStart, CurPtr-TokStart).find("//");
-    if (Pos != StringRef::npos) {
-      CurPtr = TokStart+Pos;
-      // Next token is a comment, which counts as whitespace.
-      rightBound = false;
-    }
-
-    // If there is a "/*" in the middle of an identifier token, it starts
-    // a multi-line comment.
-    Pos = StringRef(TokStart, CurPtr-TokStart).find("/*");
-    if (Pos != StringRef::npos) {
-      CurPtr = TokStart+Pos;
-      // Next token is a comment, which counts as whitespace.
-      rightBound = false;
-    }
-
     // Verify there is no "*/" in the middle of the identifier token, we reject
     // it as potentially ending a block comment.
-    Pos = StringRef(TokStart, CurPtr-TokStart).find("*/");
+    auto Pos = StringRef(TokStart, CurPtr-TokStart).find("*/");
     if (Pos != StringRef::npos) {
       diagnose(TokStart+Pos, diag::lex_unexpected_block_comment_end);
       return formToken(tok::unknown, TokStart);
