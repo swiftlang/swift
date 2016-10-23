@@ -45,6 +45,8 @@ struct OwnershipModelEliminatorVisitor
   bool visitValueBase(ValueBase *V) { return false; }
   bool visitLoadInst(LoadInst *LI);
   bool visitStoreInst(StoreInst *SI);
+  bool visitCopyValueInst(CopyValueInst *CVI);
+  bool visitDestroyValueInst(DestroyValueInst *DVI);
   bool visitLoadBorrowInst(LoadBorrowInst *LBI);
   bool visitEndBorrowInst(EndBorrowInst *EBI) {
     EBI->eraseFromParent();
@@ -126,6 +128,23 @@ OwnershipModelEliminatorVisitor::visitLoadBorrowInst(LoadBorrowInst *LBI) {
   // all of LI's uses.
   LBI->replaceAllUsesWith(UnqualifiedLoad);
   LBI->eraseFromParent();
+  return true;
+}
+
+bool OwnershipModelEliminatorVisitor::visitCopyValueInst(CopyValueInst *CVI) {
+  B.setInsertionPoint(CVI);
+  B.setCurrentDebugScope(CVI->getDebugScope());
+  B.createRetainValue(CVI->getLoc(), CVI->getOperand(), Atomicity::Atomic);
+  CVI->replaceAllUsesWith(CVI->getOperand());
+  CVI->eraseFromParent();
+  return true;
+}
+
+bool OwnershipModelEliminatorVisitor::visitDestroyValueInst(DestroyValueInst *DVI) {
+  B.setInsertionPoint(DVI);
+  B.setCurrentDebugScope(DVI->getDebugScope());
+  B.createReleaseValue(DVI->getLoc(), DVI->getOperand(), Atomicity::Atomic);
+  DVI->eraseFromParent();
   return true;
 }
 

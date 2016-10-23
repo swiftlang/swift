@@ -63,3 +63,15 @@ bb0(%0 : $*Builtin.NativeObject):
   %3 = tuple()
   return %3 : $()
 }
+
+// CHECK-LABEL: sil @copy_value_destroy_value : $@convention(thin) (@owned Builtin.NativeObject) -> @owned Builtin.NativeObject {
+// CHECK: bb0([[ARG1:%.*]] : $Builtin.NativeObject):
+// CHECK: retain_value [[ARG1]]
+// CHECK: release_value [[ARG1]]
+// CHECK: return [[ARG1]]
+sil @copy_value_destroy_value : $@convention(thin) (@owned Builtin.NativeObject) -> @owned Builtin.NativeObject {
+bb0(%0 : $Builtin.NativeObject):
+  %1 = copy_value %0 : $Builtin.NativeObject
+  destroy_value %0 : $Builtin.NativeObject
+  return %1 : $Builtin.NativeObject
+}
