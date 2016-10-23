@@ -1269,6 +1269,14 @@ public:
     *this << getIDAndType(I->getOperand());
   }
 
+  void visitCopyValueInst(CopyValueInst *I) {
+    *this << getIDAndType(I->getOperand());
+  }
+
+  void visitDestroyValueInst(DestroyValueInst *I) {
+    *this << getIDAndType(I->getOperand());
+  }
+
   void visitRetainValueInst(RetainValueInst *I) { visitRefCountingInst(I); }
 
   void visitReleaseValueInst(ReleaseValueInst *I) { visitRefCountingInst(I); }
