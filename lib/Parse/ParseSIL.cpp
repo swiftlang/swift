@@ -2519,13 +2519,6 @@ bool SILParser::parseSILInstruction(SILBasicBlock *BB, SILBuilder &B) {
 
     SILType ValType = addrVal->getType().getObjectType();
 
-    if (Opcode == ValueKind::StoreInst) {
-      ResultVal = B.createStore(InstLoc,
-                                getLocalValue(from, ValType, InstLoc, B),
-                                addrVal);
-      break;
-    }
-
     assert(Opcode == ValueKind::AssignInst);
     ResultVal = B.createAssign(InstLoc,
                                getLocalValue(from, ValType, InstLoc, B),
