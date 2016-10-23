@@ -3776,9 +3776,7 @@ ConstraintSystem::simplifyRestrictedConstraintImpl(
                                         getConstraintLocator(locator));
         
         Constraint *disjunctionChoices[] = {int8Con, uint8Con, voidCon};
-        addUnsolvedConstraint(
-          Constraint::createDisjunction(*this, disjunctionChoices,
-                                        getConstraintLocator(locator)));
+        addDisjunctionConstraint(disjunctionChoices, locator);
         return SolutionKind::Solved;
       }
 

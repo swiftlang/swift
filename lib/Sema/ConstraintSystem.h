@@ -1858,9 +1858,8 @@ private:
   ///
   /// \returns the result of performing the tuple-to-tuple conversion.
   SolutionKind matchTupleTypes(TupleType *tuple1, TupleType *tuple2,
-                                         TypeMatchKind kind,
-                               TypeMatchOptions flags,
-                                         ConstraintLocatorBuilder locator);
+                               TypeMatchKind kind, TypeMatchOptions flags,
+                               ConstraintLocatorBuilder locator);
 
   /// \brief Subroutine of \c matchTypes(), which matches a scalar type to
   /// a tuple type.
