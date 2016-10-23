@@ -2246,6 +2246,27 @@ which are not represented as box allocations.
 It is produced by SILGen, and is only valid in Raw SIL.  It is rewritten as
 appropriate by the definitive initialization pass.
 
+mark_uninitialized_behavior
+```````````````````````````
+::
+
+   init-case ::= sil-value sil-apply-substitution-list? '(' sil-value ')' ':' sil-type
+   set-case ::= sil-value sil-apply-substitution-list? '(' sil-value ')' ':' sil-type
+   sil-instruction ::= 'mark_uninitialized_behavior' init-case set-case
+
+   mark_uninitialized_behavior %init<Subs>(%storage) : $T -> U,
+                               %set<Subs>(%self) : $V -> W
+
+Indicates that a logical property is uninitialized at this point and needs to be
+initialized by the end of the function and before any escape point for this
+instruction. Assignments to the property trigger the behavior's ``init`` or
+``set`` logic based on the logical initialization state of the property.
+
+It is expected that the ``init-case`` is passed some sort of storage and the
+``set`` case is passed ``self``.
+
+This is only valid in Raw SIL.
+
 copy_addr
 `````````
 ::
