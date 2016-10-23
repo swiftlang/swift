@@ -1,0 +1,45 @@
+#!/usr/bin/env bash
+
+#
+# Generate the static-stdlib-args.lnk used by the -static-stdlib option for
+# 'GenericUnix' (eg linux) plaforms. If libicu is built locally then include
+# libicudata
+#
+
+SDK=$1
+OUTPUTFILE=$2
+ICU_STATIC_LIB=$3
+
+
+if [ "${ICU_STATIC_LIB}" == "TRUE" ]; then
+    read -d '' ICU_LIBS <<EOF
+-licui18n
+-licuuc
+-licudata
+EOF
+else
+    read -d '' ICU_LIBS <<EOF
+-licui18n
+-licuuc
+EOF
+fi
+
+
+if [ -z "${OUTPUTFILE}" ]; then
+    echo $0: No outputfile specified
+    exit 1
+fi
+
+    cat >$OUTPUTFILE <<EOF
+-ldl
+-lpthread
+-lswiftCore
+-lswiftImageInspectionShared
+$ICU_LIBS
+-Xlinker
+-export-dynamic
+-Xlinker
+--exclude-libs
+-Xlinker
+ALL
+EOF

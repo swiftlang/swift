@@ -1386,24 +1386,15 @@ toolchains::GenericUnix::constructInvocation(const LinkJobAction &job,
     SmallString<128> StaticRuntimeLibPath;
     getRuntimeStaticLibraryPath(StaticRuntimeLibPath, context.Args, *this);
     Arguments.push_back(context.Args.MakeArgString(StaticRuntimeLibPath));
-    // The following libraries are required to build a satisfactory
-    // static program
-    Arguments.push_back("-ldl");
-    Arguments.push_back("-lpthread");
-    Arguments.push_back("-lbsd");
-    Arguments.push_back("-licui18n");
-    Arguments.push_back("-licuuc");
-    // The runtime uses dlopen to look for the protocol conformances.
-    // Therefore, we need to ensure they appear in the dynamic table.
-    // This happens automatically for dynamically-linked programs, but
-    // in this case we have to take additional measures.
-    Arguments.push_back("-Xlinker");
-    Arguments.push_back("-export-dynamic");
-    Arguments.push_back("-Xlinker");
-    Arguments.push_back("--exclude-libs");
-    Arguments.push_back("-Xlinker");
-    Arguments.push_back("ALL");
 
+    SmallString<128> linkFilePath = StaticRuntimeLibPath;
+    llvm::sys::path::append(linkFilePath, "static-stdlib-args.lnk");
+    auto linkFile = linkFilePath.str();
+    if (llvm::sys::fs::is_regular_file(linkFile)) {
+      Arguments.push_back(context.Args.MakeArgString(Twine("@") + linkFile));
+    } else {
+      llvm::report_fatal_error(linkFile + " not found");
+    }
   }
   else {
     Arguments.push_back(context.Args.MakeArgString(RuntimeLibPath));
