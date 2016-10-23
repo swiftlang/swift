@@ -576,6 +576,8 @@ public:
 
   SILFunctionConventions getFunctionConventions(CanSILFunctionType funcTy);
 
+  bool useLoweredAddresses() const { return loweredAddresses; }
+
   bool isSILIndirect(SILParameterInfo param) const {
     return isIndirectSILParam(param, loweredAddresses);
   }
