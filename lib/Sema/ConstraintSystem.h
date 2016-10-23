@@ -2055,7 +2055,9 @@ private:
                                          ConstraintLocatorBuilder locator);
 
   /// \brief Attempt to simplify the given defaultable constraint.
-  SolutionKind simplifyDefaultableConstraint(const Constraint &c);
+  SolutionKind simplifyDefaultableConstraint(Type first, Type second,
+                                             TypeMatchOptions flags,
+                                             ConstraintLocatorBuilder locator);
 
   /// \brief Simplify a conversion constraint by applying the given
   /// reduction rule, which is known to apply at the outermost level.

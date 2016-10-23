@@ -2567,7 +2567,7 @@ ConstraintSystem::simplifyOptionalObjectConstraint(
                                            TypeMatchOptions flags,
                                            ConstraintLocatorBuilder locator) {
   // Resolve the optional type.
-  Type optLValueTy = getFixedTypeRecursive(first, /*wantRValue=*/false)
+  Type optLValueTy = getFixedTypeRecursive(first, /*wantRValue=*/false);
   Type optTy = optLValueTy->getRValueType();
   if (optTy.getPointer() != optLValueTy.getPointer())
     optTy = getFixedTypeRecursive(optTy, /*wantRValue=*/false);
@@ -3288,11 +3288,23 @@ ConstraintSystem::simplifyMemberConstraint(ConstraintKind kind,
 }
 
 ConstraintSystem::SolutionKind
-ConstraintSystem::simplifyDefaultableConstraint(const Constraint &constraint) {
-  auto baseTy = getFixedTypeRecursive(constraint.getFirstType(), true);
+ConstraintSystem::simplifyDefaultableConstraint(
+                                            Type first, Type second,
+                                            TypeMatchOptions flags,
+                                            ConstraintLocatorBuilder locator) {
+  first = getFixedTypeRecursive(first, true);
 
-  if (baseTy->isTypeVariableOrMember())
+  if (first->isTypeVariableOrMember()) {
+    if (flags.contains(TMF_GenerateConstraints)) {
+      addUnsolvedConstraint(
+        Constraint::create(*this, ConstraintKind::Defaultable, first, second,
+                           DeclName(), FunctionRefKind::Compound,
+                           getConstraintLocator(locator)));
+      return SolutionKind::Solved;
+    }
+
     return SolutionKind::Unsolved;
+  }
 
   // Otherwise, any type is fine.
   return SolutionKind::Solved;
@@ -4173,9 +4185,10 @@ ConstraintSystem::addConstraintImpl(ConstraintKind kind, Type first,
   case ConstraintKind::OptionalObject:
     return simplifyOptionalObjectConstraint(first, second, subflags, locator);
 
-  case ConstraintKind::Bind: // FIXME: This should go through matchTypes() above
+  case ConstraintKind::Defaultable:
+    return simplifyDefaultableConstraint(first, second, subflags, locator);
 
-  default: {
+  case ConstraintKind::Bind: { // FIXME: This should go through matchTypes() above
     // FALLBACK CASE: do the slow thing.
     auto c = Constraint::create(*this, kind, first, second, DeclName(),
                                 FunctionRefKind::Compound,
@@ -4189,6 +4202,7 @@ ConstraintSystem::addConstraintImpl(ConstraintKind kind, Type first,
   case ConstraintKind::UnresolvedValueMember:
   case ConstraintKind::TypeMember:
   case ConstraintKind::BindOverload:
+  case ConstraintKind::Disjunction:
     llvm_unreachable("Use the correct addConstraint()");
   }
 }
@@ -4316,7 +4330,10 @@ ConstraintSystem::simplifyConstraint(const Constraint &constraint) {
                                     constraint.getLocator());
 
   case ConstraintKind::Defaultable:
-    return simplifyDefaultableConstraint(constraint);
+    return simplifyDefaultableConstraint(constraint.getFirstType(),
+                                         constraint.getSecondType(),
+                                         TMF_GenerateConstraints,
+                                         constraint.getLocator());
 
   case ConstraintKind::Disjunction:
     // Disjunction constraints are never solved here.
