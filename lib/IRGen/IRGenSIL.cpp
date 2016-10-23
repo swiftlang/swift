@@ -806,7 +806,9 @@ public:
   void visitLoadWeakInst(LoadWeakInst *i);
   void visitStoreWeakInst(StoreWeakInst *i);
   void visitRetainValueInst(RetainValueInst *i);
+  void visitCopyValueInst(CopyValueInst *i);
   void visitReleaseValueInst(ReleaseValueInst *i);
+  void visitDestroyValueInst(DestroyValueInst *i);
   void visitAutoreleaseValueInst(AutoreleaseValueInst *i);
   void visitSetDeallocatingInst(SetDeallocatingInst *i);
   void visitStructInst(StructInst *i);
@@ -2956,6 +2958,14 @@ void IRGenSILFunction::visitRetainValueInst(swift::RetainValueInst *i) {
   out.claimAll();
 }
 
+void IRGenSILFunction::visitCopyValueInst(swift::CopyValueInst *i) {
+  Explosion in = getLoweredExplosion(i->getOperand());
+  Explosion out;
+  cast<LoadableTypeInfo>(getTypeInfo(i->getOperand()->getType()))
+      .copy(*this, in, out, irgen::Atomicity::Atomic);
+  setLoweredExplosion(i, out);
+}
+
 // TODO: Implement this more generally for arbitrary values. Currently the
 // SIL verifier restricts it to single-refcounted-pointer types.
 void IRGenSILFunction::visitAutoreleaseValueInst(swift::AutoreleaseValueInst *i)
@@ -3005,6 +3015,12 @@ void IRGenSILFunction::visitReleaseValueInst(swift::ReleaseValueInst *i) {
   cast<LoadableTypeInfo>(getTypeInfo(i->getOperand()->getType()))
       .consume(*this, in, i->isAtomic() ? irgen::Atomicity::Atomic
                                         : irgen::Atomicity::NonAtomic);
+}
+
+void IRGenSILFunction::visitDestroyValueInst(swift::DestroyValueInst *i) {
+  Explosion in = getLoweredExplosion(i->getOperand());
+  cast<LoadableTypeInfo>(getTypeInfo(i->getOperand()->getType()))
+      .consume(*this, in, irgen::Atomicity::Atomic);
 }
 
 void IRGenSILFunction::visitStructInst(swift::StructInst *i) {

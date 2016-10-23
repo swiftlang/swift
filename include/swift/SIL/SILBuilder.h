@@ -747,6 +747,16 @@ public:
                                                        operand, atomicity));
   }
 
+  CopyValueInst *createCopyValue(SILLocation Loc, SILValue operand) {
+    return insert(new (F.getModule())
+                      CopyValueInst(getSILDebugLocation(Loc), operand));
+  }
+
+  DestroyValueInst *createDestroyValue(SILLocation Loc, SILValue operand) {
+    return insert(new (F.getModule())
+                      DestroyValueInst(getSILDebugLocation(Loc), operand));
+  }
+
   AutoreleaseValueInst *createAutoreleaseValue(SILLocation Loc,
                                                SILValue operand,
                                                Atomicity atomicity) {
