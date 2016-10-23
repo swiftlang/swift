@@ -1,4 +1,4 @@
-// RUN: %target-swift-frontend %s -emit-silgen | %FileCheck %s
+// RUN: %target-sil-opt %s | %target-sil-opt | %FileCheck %s
 
 sil_stage raw // CHECK: sil_stage raw
 
@@ -1080,10 +1080,15 @@ sil @test_mark_fn_escape : $() -> () {
 sil @test_copy_release_value : $(Val) -> (Val) {
 bb0(%0 : $Val):
   retain_value %0 : $Val
+  %1 = copy_value %0 : $Val
   release_value %0 : $Val
-  return %0 : $Val
+  destroy_value %0 : $Val
+  return %1 : $Val
 // CHECK:      retain_value [[T0:%.*]] : $Val
+// CHECK-NEXT: [[COPY_RESULT:%.*]] = copy_value [[T0]] : $Val
 // CHECK-NEXT: release_value [[T0]] : $Val
+// CHECK-NEXT: destroy_value [[T0]] : $Val
+// CHECK-NEXT: return [[COPY_RESULT]]
 }
 
 // CHECK-LABEL: sil @test_autorelease_value

@@ -1927,6 +1927,8 @@ bool SILParser::parseSILInstruction(SILBasicBlock *BB, SILBuilder &B) {
     UNARY_INSTRUCTION(IsUnique)
     UNARY_INSTRUCTION(IsUniqueOrPinned)
     UNARY_INSTRUCTION(DestroyAddr)
+    UNARY_INSTRUCTION(CopyValue)
+    UNARY_INSTRUCTION(DestroyValue)
     UNARY_INSTRUCTION(CondFail)
     REFCOUNTING_INSTRUCTION(StrongPin)
     REFCOUNTING_INSTRUCTION(StrongRetain)
@@ -2336,7 +2338,8 @@ bool SILParser::parseSILInstruction(SILBasicBlock *BB, SILBuilder &B) {
         || parseValueName(SelfName)
         || P.parseToken(tok::r_paren, diag::expected_tok_in_sil_instr, ")")
         || P.parseToken(tok::colon, diag::expected_tok_in_sil_instr, ":")
-        || parseSILType(SetterTy, SetterSig, SetterEnv))
+        || parseSILType(SetterTy, SetterSig, SetterEnv)
+        || parseSILDebugLocation(InstLoc, B))
       return true;
     
     // Resolve the types of the operands.
@@ -2431,7 +2434,7 @@ bool SILParser::parseSILInstruction(SILBasicBlock *BB, SILBuilder &B) {
 
   case ValueKind::EndBorrowInst: {
     UnresolvedValueName BorrowDestName, BorrowSourceName;
-    SourceLoc ToLoc, BorrowDestLoc;
+    SourceLoc ToLoc;
     Identifier ToToken;
     SILType BorrowDestTy, BorrowSourceTy;
 
@@ -2518,13 +2521,6 @@ bool SILParser::parseSILInstruction(SILBasicBlock *BB, SILBuilder &B) {
     }
 
     SILType ValType = addrVal->getType().getObjectType();
-
-    if (Opcode == ValueKind::StoreInst) {
-      ResultVal = B.createStore(InstLoc,
-                                getLocalValue(from, ValType, InstLoc, B),
-                                addrVal);
-      break;
-    }
 
     assert(Opcode == ValueKind::AssignInst);
     ResultVal = B.createAssign(InstLoc,
