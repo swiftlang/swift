@@ -2562,13 +2562,25 @@ ConstraintSystem::simplifyCheckedCastConstraint(
 }
 
 ConstraintSystem::SolutionKind
-ConstraintSystem::simplifyOptionalObjectConstraint(const Constraint &constraint)
-{
+ConstraintSystem::simplifyOptionalObjectConstraint(
+                                           Type first, Type second,
+                                           TypeMatchOptions flags,
+                                           ConstraintLocatorBuilder locator) {
   // Resolve the optional type.
-  Type optLValueTy = simplifyType(constraint.getFirstType());
+  Type optLValueTy = getFixedTypeRecursive(first, /*wantRValue=*/false)
   Type optTy = optLValueTy->getRValueType();
-  
+  if (optTy.getPointer() != optLValueTy.getPointer())
+    optTy = getFixedTypeRecursive(optTy, /*wantRValue=*/false);
+
   if (optTy->isTypeVariableOrMember()) {
+    if (flags.contains(TMF_GenerateConstraints)) {
+      addUnsolvedConstraint(
+        Constraint::create(*this, ConstraintKind::OptionalObject, optLValueTy,
+                           second, DeclName(), FunctionRefKind::Compound,
+                           getConstraintLocator(locator)));
+      return SolutionKind::Solved;
+    }
+
     return SolutionKind::Unsolved;
   }
   
@@ -2582,9 +2594,7 @@ ConstraintSystem::simplifyOptionalObjectConstraint(const Constraint &constraint)
     objectTy = LValueType::get(objectTy);
 
   // Equate it to the other type in the constraint.
-  addConstraint(ConstraintKind::Bind, objectTy, constraint.getSecondType(),
-                constraint.getLocator());
-  
+  addConstraint(ConstraintKind::Bind, objectTy, second, locator);
   return SolutionKind::Solved;
 }
 
@@ -4160,6 +4170,9 @@ ConstraintSystem::addConstraintImpl(ConstraintKind kind, Type first,
   case ConstraintKind::CheckedCast:
     return simplifyCheckedCastConstraint(first, second, subflags, locator);
 
+  case ConstraintKind::OptionalObject:
+    return simplifyOptionalObjectConstraint(first, second, subflags, locator);
+
   case ConstraintKind::Bind: // FIXME: This should go through matchTypes() above
 
   default: {
@@ -4286,7 +4299,10 @@ ConstraintSystem::simplifyConstraint(const Constraint &constraint) {
   }
 
   case ConstraintKind::OptionalObject:
-    return simplifyOptionalObjectConstraint(constraint);
+    return simplifyOptionalObjectConstraint(constraint.getFirstType(),
+                                            constraint.getSecondType(),
+                                            TMF_GenerateConstraints,
+                                            constraint.getLocator());
       
   case ConstraintKind::ValueMember:
   case ConstraintKind::UnresolvedValueMember:

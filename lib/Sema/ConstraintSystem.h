@@ -2036,7 +2036,10 @@ private:
 
   
   /// \brief Attempt to simplify the optional object constraint.
-  SolutionKind simplifyOptionalObjectConstraint(const Constraint &constraint);
+  SolutionKind simplifyOptionalObjectConstraint(
+                                          Type first, Type second,
+                                          TypeMatchOptions flags,
+                                          ConstraintLocatorBuilder locator);
 
   /// \brief Attempt to simplify the ApplicableFunction constraint.
   SolutionKind simplifyApplicableFnConstraint(
