@@ -1892,7 +1892,7 @@ bool SILDeserializer::readSILInstruction(
 
   // Evaluate ResultVal's ownership. If we find that as a result of ResultVal,
   // we are mixing qualified and unqualified ownership instructions, bail.
-  if (!OwnershipEvaluator.evaluate(*ResultVal))
+  if (!OwnershipEvaluator.evaluate(ResultVal))
     return true;
 
   if (ResultVal->hasValue()) {
