@@ -2336,7 +2336,8 @@ bool SILParser::parseSILInstruction(SILBasicBlock *BB, SILBuilder &B) {
         || parseValueName(SelfName)
         || P.parseToken(tok::r_paren, diag::expected_tok_in_sil_instr, ")")
         || P.parseToken(tok::colon, diag::expected_tok_in_sil_instr, ":")
-        || parseSILType(SetterTy, SetterSig, SetterEnv))
+        || parseSILType(SetterTy, SetterSig, SetterEnv)
+        || parseSILDebugLocation(InstLoc, B))
       return true;
     
     // Resolve the types of the operands.

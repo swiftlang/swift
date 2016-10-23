@@ -67,6 +67,7 @@
 
    ;; SIL Instructions - Accessing Memory.
    `(,(regexp-opt '("load" "store" "assign"  "mark_uninitialized"
+                    "mark_uninitialized_behavior"
                     "mark_function_escape" "copy_addr" "destroy_addr"
                     "index_addr" "index_raw_pointer" "bind_memory" "to")
                   'words) . font-lock-keyword-face)
