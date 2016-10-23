@@ -269,16 +269,11 @@ bool FunctionOwnershipEvaluator::evaluate(SILInstruction *I) {
          "does not belong to the instruction "
          "that we are evaluating");
 
-  // If SIL ownership is not enabled in this module, just return true. There is
-  // no further work to do here.
-  if (!I->getModule().getOptions().EnableSILOwnership)
-    return true;
-
   switch (OwnershipQualifiedKindVisitor().visit(I)) {
   case OwnershipQualifiedKind::Unqualified: {
     // If we already know that the function has unqualified ownership, just
     // return early.
-    if (!F.get()->hasQualifiedOwnership().getValue())
+    if (!F.get()->hasQualifiedOwnership())
       return true;
 
     // Ok, so we know at this point that we have qualified ownership. If we have
@@ -298,7 +293,7 @@ bool FunctionOwnershipEvaluator::evaluate(SILInstruction *I) {
     // have unqualified ownership, then we know that we have already seen an
     // unqualified ownership instruction. This means the function has both
     // qualified and unqualified instructions. =><=.
-    if (!F.get()->hasQualifiedOwnership().getValue())
+    if (!F.get()->hasQualifiedOwnership())
       return false;
 
     // Ok, at this point we know that we are still qualified. Since functions

@@ -517,6 +517,8 @@ ERROR(sil_dbg_unknown_key,none,
       "unknown key '%0' in debug variable declaration", (StringRef))
 ERROR(sil_objc_with_tail_elements,none,
       "alloc_ref [objc] cannot have tail allocated elements", ())
+ERROR(found_unqualified_instruction_in_qualified_function,none,
+      "found unqualified instruction in qualified function '%0'", (StringRef))
 
 // SIL Basic Blocks
 ERROR(expected_sil_block_name,none,
