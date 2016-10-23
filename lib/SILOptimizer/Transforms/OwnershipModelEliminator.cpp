@@ -41,6 +41,11 @@ struct OwnershipModelEliminatorVisitor
   SILBuilder &B;
 
   OwnershipModelEliminatorVisitor(SILBuilder &B) : B(B) {}
+  void beforeVisit(ValueBase *V) {
+    auto *I = cast<SILInstruction>(V);
+    B.setInsertionPoint(I);
+    B.setCurrentDebugScope(I->getDebugScope());
+  }
 
   bool visitValueBase(ValueBase *V) { return false; }
   bool visitLoadInst(LoadInst *LI);
@@ -66,8 +71,6 @@ bool OwnershipModelEliminatorVisitor::visitLoadInst(LoadInst *LI) {
 
   // Otherwise, we need to break down the load inst into its unqualified
   // components.
-  B.setInsertionPoint(LI);
-  B.setCurrentDebugScope(LI->getDebugScope());
   auto *UnqualifiedLoad = B.createLoad(LI->getLoc(), LI->getOperand());
 
   // If we have a copy, insert a retain_value. All other copies do not require
@@ -93,9 +96,6 @@ bool OwnershipModelEliminatorVisitor::visitStoreInst(StoreInst *SI) {
     return false;
 
   // Otherwise, we need to break down the store.
-  B.setInsertionPoint(SI);
-  B.setCurrentDebugScope(SI->getDebugScope());
-
   if (Qualifier != StoreOwnershipQualifier::Assign) {
     // If the ownership qualifier is not an assign, we can just emit an
     // unqualified store.
@@ -120,8 +120,6 @@ bool OwnershipModelEliminatorVisitor::visitStoreInst(StoreInst *SI) {
 bool
 OwnershipModelEliminatorVisitor::visitLoadBorrowInst(LoadBorrowInst *LBI) {
   // Break down the load borrow into an unqualified load.
-  B.setInsertionPoint(LBI);
-  B.setCurrentDebugScope(LBI->getDebugScope());
   auto *UnqualifiedLoad = B.createLoad(LBI->getLoc(), LBI->getOperand());
 
   // Then remove the qualified load and use the unqualified load as the def of
@@ -132,8 +130,6 @@ OwnershipModelEliminatorVisitor::visitLoadBorrowInst(LoadBorrowInst *LBI) {
 }
 
 bool OwnershipModelEliminatorVisitor::visitCopyValueInst(CopyValueInst *CVI) {
-  B.setInsertionPoint(CVI);
-  B.setCurrentDebugScope(CVI->getDebugScope());
   B.createRetainValue(CVI->getLoc(), CVI->getOperand(), Atomicity::Atomic);
   CVI->replaceAllUsesWith(CVI->getOperand());
   CVI->eraseFromParent();
@@ -141,8 +137,6 @@ bool OwnershipModelEliminatorVisitor::visitCopyValueInst(CopyValueInst *CVI) {
 }
 
 bool OwnershipModelEliminatorVisitor::visitDestroyValueInst(DestroyValueInst *DVI) {
-  B.setInsertionPoint(DVI);
-  B.setCurrentDebugScope(DVI->getDebugScope());
   B.createReleaseValue(DVI->getLoc(), DVI->getOperand(), Atomicity::Atomic);
   DVI->eraseFromParent();
   return true;
