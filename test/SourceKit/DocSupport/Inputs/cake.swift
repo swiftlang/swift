@@ -60,3 +60,13 @@ public protocol P3 {
 public struct S2 : P3 {
   public typealias T = S2
 }
+
+public extension C1 {
+  public enum C1Cases : Int {
+  case case1
+  }
+}
+
+public class C2 : C1 {
+  public func C2foo() {}
+}
