@@ -690,9 +690,6 @@ namespace {
       case LoweringStyle::Shallow:
         Fn = &TypeLowering::emitReleaseValue;
         break;
-      case LoweringStyle::Deep:
-        Fn = &TypeLowering::emitLoweredReleaseValueDeep;
-        break;
       case LoweringStyle::DeepNoEnum:
         Fn = &TypeLowering::emitLoweredReleaseValueDeepNoEnum;
         break;
@@ -773,97 +770,9 @@ namespace {
   /// A lowering for loadable but non-trivial enum types.
   class LoadableEnumTypeLowering final : public NonTrivialLoadableTypeLowering {
   public:
-    /// A non-trivial case of the enum.
-    class NonTrivialElement {
-      /// The non-trivial element.
-      EnumElementDecl *element;
-      
-      /// Its type lowering.
-      const TypeLowering *lowering;
-      
-    public:
-      NonTrivialElement(EnumElementDecl *element, const TypeLowering &lowering)
-        : element(element), lowering(&lowering) {}
-      
-      const TypeLowering &getLowering() const { return *lowering; }
-      EnumElementDecl *getElement() const { return element; }
-    };
-    
-  private:
-
-    using SimpleOperationTy = void (*)(SILBuilder &B, SILLocation loc, SILValue value,
-                                       const TypeLowering &valueLowering,
-                                       SILBasicBlock *dest);
-
-    /// Emit a value semantics operation for each nontrivial case of the enum.
-    template <typename T>
-    void ifNonTrivialElement(SILBuilder &B, SILLocation loc, SILValue value,
-                             const T &operation) const {
-      SmallVector<std::pair<EnumElementDecl*,SILBasicBlock*>, 4> nonTrivialBBs;
-      
-      auto &M = B.getFunction().getModule();
-
-      // Create all the blocks up front, so we can set up our switch_enum.
-      auto nonTrivialElts = getNonTrivialElements(M);
-      for (auto &elt : nonTrivialElts) {
-        auto bb = new (M) SILBasicBlock(&B.getFunction());
-        auto argTy = elt.getLowering().getLoweredType();
-        new (M) SILArgument(bb, argTy);
-        nonTrivialBBs.push_back({elt.getElement(), bb});
-      }
-
-      // If we are appending to the end of a block being constructed, then we
-      // create a new basic block to continue cons'ing up code.  If we're
-      // emitting this operation into the middle of existing code, we split the
-      // block.
-      SILBasicBlock *doneBB = B.splitBlockForFallthrough();
-      B.createSwitchEnum(loc, value, doneBB, nonTrivialBBs);
-      
-      for (size_t i = 0; i < nonTrivialBBs.size(); ++i) {
-        SILBasicBlock *bb = nonTrivialBBs[i].second;
-        const TypeLowering &lowering = nonTrivialElts[i].getLowering();
-        B.emitBlock(bb);
-        operation(B, loc, bb->getBBArgs()[0], lowering, doneBB);
-      }
-      
-      B.emitBlock(doneBB);
-    }
-    
-    /// A reference to the lazily-allocated array of non-trivial enum cases.
-    mutable ArrayRef<NonTrivialElement> NonTrivialElements = {};
-    
-  public:
     LoadableEnumTypeLowering(CanType type)
       : NonTrivialLoadableTypeLowering(SILType::getPrimitiveObjectType(type),
-                                       IsNotReferenceCounted)
-    {
-    }
-    
-    ArrayRef<NonTrivialElement> getNonTrivialElements(SILModule &M) const {
-      SILType silTy = getLoweredType();
-      EnumDecl *enumDecl = silTy.getEnumOrBoundGenericEnum();
-      assert(enumDecl);
-      
-      if (NonTrivialElements.data() == nullptr) {
-        SmallVector<NonTrivialElement, 4> elts;
-        
-        for (auto elt : enumDecl->getAllElements()) {
-          if (!elt->hasArgumentType()) continue;
-          SILType substTy = silTy.getEnumElementType(elt, M);
-          elts.push_back(NonTrivialElement{elt,
-                                     M.Types.getTypeLowering(substTy)});
-        }
-        
-        auto isDependent = IsDependent_t(silTy.hasTypeParameter());
-        
-        auto buf = operator new(sizeof(NonTrivialElement) * elts.size(),
-                                M.Types, isDependent);
-        memcpy(buf, elts.data(), sizeof(NonTrivialElement) * elts.size());
-        NonTrivialElements = {reinterpret_cast<NonTrivialElement*>(buf),
-                              elts.size()};
-      }
-      return NonTrivialElements;
-    }
+                                       IsNotReferenceCounted) {}
 
     void emitRetainValue(SILBuilder &B, SILLocation loc,
                        SILValue value) const override {
@@ -873,17 +782,7 @@ namespace {
     void emitLoweredRetainValue(SILBuilder &B, SILLocation loc,
                               SILValue value,
                               LoweringStyle style) const override {
-      if (style == LoweringStyle::Shallow ||
-          style == LoweringStyle::DeepNoEnum) {
-        B.createRetainValue(loc, value, Atomicity::Atomic);
-      } else {
-        ifNonTrivialElement(B, loc, value,
-          [&](SILBuilder &B, SILLocation loc, SILValue child,
-              const TypeLowering &childLowering, SILBasicBlock *dest) {
-            childLowering.emitLoweredCopyChildValue(B, loc, child, style);
-            B.createBranch(loc, dest);
-          });
-      }
+      B.createRetainValue(loc, value, Atomicity::Atomic);
     }
     
     void emitReleaseValue(SILBuilder &B, SILLocation loc,
@@ -897,15 +796,7 @@ namespace {
       assert(style != LoweringStyle::Shallow &&
              "This method should never be called when performing a shallow "
              "destroy value.");
-      if (style == LoweringStyle::DeepNoEnum)
-        B.emitReleaseValueAndFold(loc, value);
-      else
-        ifNonTrivialElement(B, loc, value,
-          [&](SILBuilder &B, SILLocation loc, SILValue child,
-             const TypeLowering &childLowering, SILBasicBlock *dest) {
-             childLowering.emitLoweredDestroyChildValue(B, loc, child, style);
-             B.createBranch(loc, dest);
-          });
+      B.emitReleaseValueAndFold(loc, value);
     }
   };
 
