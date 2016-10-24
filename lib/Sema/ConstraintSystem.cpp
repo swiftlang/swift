@@ -333,37 +333,6 @@ ConstraintLocator *ConstraintSystem::getConstraintLocator(
   return getConstraintLocator(anchor, path, builder.getSummaryFlags());
 }
 
-bool ConstraintSystem::addConstraint(Constraint *constraint) {
-  switch (simplifyConstraint(*constraint)) {
-  case SolutionKind::Error:
-    if (!failedConstraint) {
-      failedConstraint = constraint;
-    }
-
-    if (solverState) {
-      solverState->retiredConstraints.push_front(constraint);
-      solverState->generatedConstraints.push_back(constraint);
-    }
-
-    return false;
-
-  case SolutionKind::Solved:
-    // This constraint has already been solved; there is nothing more
-    // to do.
-    // Record solved constraint.
-    if (solverState) {
-      solverState->retiredConstraints.push_front(constraint);
-      solverState->generatedConstraints.push_back(constraint);
-    }
-
-    return true;
-
-  case SolutionKind::Unsolved:
-    addUnsolvedConstraint(constraint);
-    return false;
-  }
-}
-
 TypeVariableType *
 ConstraintSystem::getMemberType(TypeVariableType *baseTypeVar, 
                                 AssociatedTypeDecl *assocType,
