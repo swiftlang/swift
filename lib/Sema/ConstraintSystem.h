@@ -1518,6 +1518,30 @@ public:
                                TypeVariableType *typeVar2,
                                bool updateWorkList = true);
 
+  /// \brief Flags that direct type matching.
+  enum TypeMatchFlags {
+    /// \brief Indicates that we are in a context where we should be
+    /// generating constraints for any unsolvable problems.
+    ///
+    /// This flag is automatically introduced when type matching destructures
+    /// a type constructor (tuple, function type, etc.), solving that
+    /// constraint while potentially generating others.
+    TMF_GenerateConstraints = 0x01,
+
+    /// Indicates that we are applying a fix.
+    TMF_ApplyingFix = 0x02,
+
+    /// Indicates we're matching an operator parameter.
+    TMF_ApplyingOperatorParameter = 0x4,
+
+    /// Indicates we're unwrapping an optional type for a value-to-optional
+    /// conversion.
+    TMF_UnwrappingOptional = 0x8,
+  };
+
+  /// Options that govern how type matching should proceed.
+  typedef OptionSet<TypeMatchFlags> TypeMatchOptions;
+
   /// \brief Retrieve the fixed type corresponding to the given type variable,
   /// or a null type if there is no fixed type.
   Type getFixedType(TypeVariableType *typeVar) {
@@ -1535,6 +1559,27 @@ public:
   ///
   /// param retainParens Whether to retain parentheses.
   Type getFixedTypeRecursive(Type type, bool wantRValue,
+                             bool retainParens = false) {
+    TypeMatchOptions flags = None;
+    return getFixedTypeRecursive(type, flags, wantRValue, retainParens);
+  }
+
+  /// Retrieve the fixed type corresponding to a given type variable,
+  /// recursively, until we hit something that isn't a type variable
+  /// or a type variable that doesn't have a fixed type.
+  ///
+  /// \param type The type to simplify.
+  ///
+  /// \param flags When simplifying one of the types that is part of a
+  /// constraint we are examining, the set of flags that governs the
+  /// simplification. The set of flags may be both queried and mutated.
+  ///
+  /// \param wantRValue Whether this routine should look through
+  /// lvalues at each step.
+  ///
+  /// param retainParens Whether to retain parentheses.
+  Type getFixedTypeRecursive(Type type, TypeMatchOptions &flags,
+                             bool wantRValue,
                              bool retainParens = false);
 
   /// Determine whether the given type variable occurs within the given type.
@@ -1785,32 +1830,6 @@ public:
   /// destination of an assignment statement.
   Type computeAssignDestType(Expr *dest, SourceLoc equalLoc);
 
-public:
-  /// \brief Flags that direct type matching.
-  enum TypeMatchFlags {
-    /// \brief Indicates that we are in a context where we should be
-    /// generating constraints for any unsolvable problems.
-    ///
-    /// This flag is automatically introduced when type matching destructures
-    /// a type constructor (tuple, function type, etc.), solving that
-    /// constraint while potentially generating others.
-    TMF_GenerateConstraints = 0x01,
-
-    /// Indicates that we are applying a fix.
-    TMF_ApplyingFix = 0x02,
-    
-    /// Indicates we're matching an operator parameter.
-    TMF_ApplyingOperatorParameter = 0x4,
-    
-    /// Indicates we're unwrapping an optional type for a value-to-optional
-    /// conversion.
-    TMF_UnwrappingOptional = 0x8,
-  };
-
-  /// Options that govern how type matching should proceed.
-  typedef OptionSet<TypeMatchFlags> TypeMatchOptions;
-
-private:
   /// \brief Subroutine of \c matchTypes(), which matches up two tuple types.
   ///
   /// \returns the result of performing the tuple-to-tuple conversion.
@@ -1898,6 +1917,21 @@ public:
   /// The resulting types can be compared canonically, so long as additional
   /// type equivalence requirements aren't introduced between comparisons.
   Type simplifyType(Type type);
+
+  /// \brief Simplify a type, by replacing type variables with either their
+  /// fixed types (if available) or their representatives.
+  ///
+  /// \param flags If the simplified type has changed, this will be updated
+  /// to include \c TMF_GenerateConstraints.
+  ///
+  /// The resulting types can be compared canonically, so long as additional
+  /// type equivalence requirements aren't introduced between comparisons.
+  Type simplifyType(Type type, TypeMatchOptions &flags) {
+    Type result = simplifyType(type);
+    if (result.getPointer() != type.getPointer())
+      flags |= TMF_GenerateConstraints;
+    return result;
+  }
 
   /// Given a ValueMember, UnresolvedValueMember, or TypeMember constraint,
   /// perform a lookup into the specified base type to find a candidate list.
