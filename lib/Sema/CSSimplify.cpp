@@ -4156,6 +4156,7 @@ ConstraintSystem::addConstraintImpl(ConstraintKind kind, Type first,
   TypeMatchOptions subflags = TMF_GenerateConstraints;
   switch (kind) {
   case ConstraintKind::Equal:
+  case ConstraintKind::Bind:
   case ConstraintKind::BindParam:
   case ConstraintKind::Subtype:
   case ConstraintKind::Conversion:
@@ -4187,16 +4188,6 @@ ConstraintSystem::addConstraintImpl(ConstraintKind kind, Type first,
 
   case ConstraintKind::Defaultable:
     return simplifyDefaultableConstraint(first, second, subflags, locator);
-
-  case ConstraintKind::Bind: { // FIXME: This should go through matchTypes() above
-    // FALLBACK CASE: do the slow thing.
-    auto c = Constraint::create(*this, kind, first, second, DeclName(),
-                                FunctionRefKind::Compound,
-                                getConstraintLocator(locator));
-    if (isFavored) c->setFavored();
-    addConstraint(c);
-    return SolutionKind::Solved;
-  }
 
   case ConstraintKind::ValueMember:
   case ConstraintKind::UnresolvedValueMember:
