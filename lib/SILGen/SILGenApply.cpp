@@ -3032,7 +3032,7 @@ namespace {
       auto contexts = getRValueEmissionContexts(loweredSubstArgType, param);
 
       // If no abstraction is required, try to honor the emission contexts.
-      if (loweredSubstArgType.getSwiftRValueType() == param.getType()) {
+      if (!contexts.RequiresReabstraction) {
         auto loc = arg.getLocation();
         ManagedValue result =
           std::move(arg).getAsSingleValue(SGF, contexts.ForEmission);
@@ -3110,16 +3110,20 @@ namespace {
                     AbstractionPattern origParamType,
                     SILParameterInfo param) {
       ManagedValue value;
-      
-      switch (getSILFunctionLanguage(Rep)) {
-      case SILFunctionLanguage::Swift:
-        value = emitSubstToOrigArgument(std::move(arg), loweredSubstArgType,
-                                        origParamType, param);
-        break;
-      case SILFunctionLanguage::C:
-        value = emitNativeToBridgedArgument(std::move(arg), loweredSubstArgType,
-                                            origParamType, param);
-        break;
+      auto contexts = getRValueEmissionContexts(loweredSubstArgType, param);
+      if (contexts.RequiresReabstraction) {
+        switch (getSILFunctionLanguage(Rep)) {
+        case SILFunctionLanguage::Swift:
+          value = emitSubstToOrigArgument(std::move(arg), loweredSubstArgType,
+                                          origParamType, param);
+          break;
+        case SILFunctionLanguage::C:
+          value = emitNativeToBridgedArgument(
+              std::move(arg), loweredSubstArgType, origParamType, param);
+          break;
+        }
+      } else {
+        value = std::move(arg).getAsSingleValue(SGF, contexts.ForEmission);
       }
       Args.push_back(value);
     }
@@ -3395,12 +3399,16 @@ namespace {
       SGFContext ForEmission;
       /// The context for reabstracting the r-value.
       SGFContext ForReabstraction;
+      /// If the context requires reabstraction
+      bool RequiresReabstraction;
     };
     static EmissionContexts getRValueEmissionContexts(SILType loweredArgType,
                                                       SILParameterInfo param) {
+      bool requiresReabstraction =
+          loweredArgType.getSwiftRValueType() != param.getType();
       // If the parameter is consumed, we have to emit at +1.
       if (param.isConsumed()) {
-        return { SGFContext(), SGFContext() };
+        return {SGFContext(), SGFContext(), requiresReabstraction};
       }
 
       // Otherwise, we can emit the final value at +0 (but only with a
@@ -3413,12 +3421,12 @@ namespace {
 
       // If the r-value doesn't require reabstraction, the final context
       // is the emission context.
-      if (loweredArgType.getSwiftRValueType() == param.getType()) {
-        return { finalContext, SGFContext() };
+      if (!requiresReabstraction) {
+        return {finalContext, SGFContext(), requiresReabstraction};
       }
 
       // Otherwise, the final context is the reabstraction context.
-      return { SGFContext(), finalContext };
+      return {SGFContext(), finalContext, requiresReabstraction};
     }
   };
 }
