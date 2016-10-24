@@ -109,6 +109,13 @@ areConservativelyCompatibleArgumentLabels(ValueDecl *decl,
                              listener, unusedParamBindings);
 }
 
+/// Determine the default type-matching options to use when decomposing a
+/// constraint into smaller constraints.
+static ConstraintSystem::TypeMatchOptions getDefaultDecompositionOptions(
+         ConstraintSystem::TypeMatchOptions flags) {
+  return flags | ConstraintSystem::TMF_GenerateConstraints;
+}
+
 bool constraints::
 matchCallArguments(ArrayRef<CallArgParam> args,
                    ArrayRef<CallArgParam> params,
@@ -646,7 +653,8 @@ matchCallArguments(ConstraintSystem &cs, TypeMatchKind kind,
   }
 
   // Check the argument types for each of the parameters.
-  unsigned subflags = ConstraintSystem::TMF_GenerateConstraints;
+  ConstraintSystem::TypeMatchOptions subflags =
+    ConstraintSystem::TMF_GenerateConstraints;
   TypeMatchKind subKind;
   switch (kind) {
   case TypeMatchKind::ArgumentTupleConversion:
@@ -665,7 +673,6 @@ matchCallArguments(ConstraintSystem &cs, TypeMatchKind kind,
   case TypeMatchKind::BindParamType:
   case TypeMatchKind::BindToPointerType:
   case TypeMatchKind::SameType:
-  case TypeMatchKind::ConformsTo:
   case TypeMatchKind::Subtype:
     llvm_unreachable("Not a call argument constraint");
   }
@@ -713,9 +720,9 @@ matchCallArguments(ConstraintSystem &cs, TypeMatchKind kind,
 
 ConstraintSystem::SolutionKind
 ConstraintSystem::matchTupleTypes(TupleType *tuple1, TupleType *tuple2,
-                                  TypeMatchKind kind, unsigned flags,
+                                  TypeMatchKind kind, TypeMatchOptions flags,
                                   ConstraintLocatorBuilder locator) {
-  unsigned subFlags = flags | TMF_GenerateConstraints;
+  TypeMatchOptions subflags = getDefaultDecompositionOptions(flags);
 
   // Equality and subtyping have fairly strict requirements on tuple matching,
   // requiring element names to either match up or be disjoint.
@@ -744,7 +751,7 @@ ConstraintSystem::matchTupleTypes(TupleType *tuple1, TupleType *tuple2,
         return SolutionKind::Error;
 
       // Compare the element types.
-      switch (matchTypes(elt1.getType(), elt2.getType(), kind, subFlags,
+      switch (matchTypes(elt1.getType(), elt2.getType(), kind, subflags,
                          locator.withPathElement(
                            LocatorPathElt::getTupleElement(i)))) {
       case SolutionKind::Error:
@@ -781,7 +788,6 @@ ConstraintSystem::matchTupleTypes(TupleType *tuple1, TupleType *tuple2,
   case TypeMatchKind::BindToPointerType:
   case TypeMatchKind::SameType:
   case TypeMatchKind::Subtype:
-  case TypeMatchKind::ConformsTo:
     llvm_unreachable("Not a conversion");
   }
 
@@ -814,7 +820,7 @@ ConstraintSystem::matchTupleTypes(TupleType *tuple1, TupleType *tuple2,
     // Match up the types.
     const auto &elt1 = tuple1->getElement(idx1);
     const auto &elt2 = tuple2->getElement(idx2);
-    switch (matchTypes(elt1.getType(), elt2.getType(), subKind, subFlags,
+    switch (matchTypes(elt1.getType(), elt2.getType(), subKind, subflags,
                        locator.withPathElement(
                          LocatorPathElt::getTupleElement(idx1)))) {
     case SolutionKind::Error:
@@ -834,7 +840,7 @@ ConstraintSystem::matchTupleTypes(TupleType *tuple1, TupleType *tuple2,
 
     for (unsigned idx1 : variadicArguments) {
       switch (matchTypes(tuple1->getElementType(idx1), eltType2, subKind,
-                         subFlags,
+                         subflags,
                          locator.withPathElement(
                            LocatorPathElt::getTupleElement(idx1)))) {
       case SolutionKind::Error:
@@ -852,25 +858,27 @@ ConstraintSystem::matchTupleTypes(TupleType *tuple1, TupleType *tuple2,
 
 ConstraintSystem::SolutionKind
 ConstraintSystem::matchScalarToTupleTypes(Type type1, TupleType *tuple2,
-                                          TypeMatchKind kind, unsigned flags,
+                                          TypeMatchKind kind, TypeMatchOptions flags,
                                           ConstraintLocatorBuilder locator) {
   int scalarFieldIdx = tuple2->getElementForScalarInit();
   assert(scalarFieldIdx >= 0 && "Invalid tuple for scalar-to-tuple");
   const auto &elt = tuple2->getElement(scalarFieldIdx);
   auto scalarFieldTy = elt.isVararg()? elt.getVarargBaseTy() : elt.getType();
-  return matchTypes(type1, scalarFieldTy, kind, flags,
+  TypeMatchOptions subflags = getDefaultDecompositionOptions(flags);
+  return matchTypes(type1, scalarFieldTy, kind, subflags,
                     locator.withPathElement(ConstraintLocator::ScalarToTuple));
 }
 
 ConstraintSystem::SolutionKind
 ConstraintSystem::matchTupleToScalarTypes(TupleType *tuple1, Type type2,
-                                          TypeMatchKind kind, unsigned flags,
+                                          TypeMatchKind kind, TypeMatchOptions flags,
                                           ConstraintLocatorBuilder locator) {
   assert(tuple1->getNumElements() == 1 && "Wrong number of elements");
   assert(!tuple1->getElement(0).isVararg() && "Should not be variadic");
 
+  TypeMatchOptions subflags = getDefaultDecompositionOptions(flags);
   return matchTypes(tuple1->getElementType(0),
-                    type2, kind, flags,
+                    type2, kind, subflags,
                     locator.withPathElement(
                       LocatorPathElt::getTupleElement(0)));
 }
@@ -887,9 +895,6 @@ static bool matchFunctionRepresentations(FunctionTypeRepresentation rep1,
   case TypeMatchKind::SameType:
     return rep1 != rep2;
 
-  case TypeMatchKind::ConformsTo:
-    llvm_unreachable("Not sure if we can end up here");
-
   case TypeMatchKind::Subtype:
   case TypeMatchKind::Conversion:
   case TypeMatchKind::ExplicitConversion:
@@ -903,7 +908,7 @@ static bool matchFunctionRepresentations(FunctionTypeRepresentation rep1,
 
 ConstraintSystem::SolutionKind
 ConstraintSystem::matchFunctionTypes(FunctionType *func1, FunctionType *func2,
-                                     TypeMatchKind kind, unsigned flags,
+                                     TypeMatchKind kind, TypeMatchOptions flags,
                                      ConstraintLocatorBuilder locator) {
   // An @autoclosure function type can be a subtype of a
   // non-@autoclosure function type.
@@ -940,9 +945,6 @@ ConstraintSystem::matchFunctionTypes(FunctionType *func1, FunctionType *func2,
     subKind = kind;
     break;
 
-  case TypeMatchKind::ConformsTo:
-    llvm_unreachable("Not sure if we can end up here");
-
   case TypeMatchKind::Subtype:
   case TypeMatchKind::Conversion:
   case TypeMatchKind::ExplicitConversion:
@@ -954,13 +956,13 @@ ConstraintSystem::matchFunctionTypes(FunctionType *func1, FunctionType *func2,
     break;
   }
 
-  unsigned subFlags = flags | TMF_GenerateConstraints;
+  TypeMatchOptions subflags = getDefaultDecompositionOptions(flags);
 
   increaseScore(ScoreKind::SK_FunctionConversion);
 
   // Input types can be contravariant (or equal).
   SolutionKind result = matchTypes(func2->getInput(), func1->getInput(),
-                                   subKind, subFlags,
+                                   subKind, subflags,
                                    locator.withPathElement(
                                      ConstraintLocator::FunctionArgument));
   if (result == SolutionKind::Error)
@@ -968,15 +970,18 @@ ConstraintSystem::matchFunctionTypes(FunctionType *func1, FunctionType *func2,
 
   // Result type can be covariant (or equal).
   return matchTypes(func1->getResult(), func2->getResult(), subKind,
-                     subFlags,
+                     subflags,
                      locator.withPathElement(
                        ConstraintLocator::FunctionResult));
 }
 
 ConstraintSystem::SolutionKind
 ConstraintSystem::matchSuperclassTypes(Type type1, Type type2,
-                                       TypeMatchKind kind, unsigned flags,
+                                       TypeMatchKind kind,
+                                       TypeMatchOptions flags,
                                        ConstraintLocatorBuilder locator) {
+  TypeMatchOptions subflags = getDefaultDecompositionOptions(flags);
+
   auto classDecl2 = type2->getClassOrBoundGenericClass();
   bool done = false;
   for (auto super1 = TC.getSuperClassOf(type1);
@@ -986,7 +991,7 @@ ConstraintSystem::matchSuperclassTypes(Type type1, Type type2,
       continue;
 
     return matchTypes(super1, type2, TypeMatchKind::SameType,
-                      TMF_GenerateConstraints, locator);
+                      subflags, locator);
   }
 
   return SolutionKind::Error;
@@ -995,6 +1000,8 @@ ConstraintSystem::matchSuperclassTypes(Type type1, Type type2,
 ConstraintSystem::SolutionKind
 ConstraintSystem::matchDeepEqualityTypes(Type type1, Type type2,
                                          ConstraintLocatorBuilder locator) {
+  TypeMatchOptions subflags = TMF_GenerateConstraints;
+
   // Handle nominal types that are not directly generic.
   if (auto nominal1 = type1->getAs<NominalType>()) {
     auto nominal2 = type2->castTo<NominalType>();
@@ -1007,7 +1014,7 @@ ConstraintSystem::matchDeepEqualityTypes(Type type1, Type type2,
 
     // Match up the parents, exactly.
     return matchTypes(nominal1->getParent(), nominal2->getParent(),
-                      TypeMatchKind::SameType, TMF_GenerateConstraints,
+                      TypeMatchKind::SameType, subflags,
                       locator.withPathElement(ConstraintLocator::ParentType));
   }
 
@@ -1019,7 +1026,7 @@ ConstraintSystem::matchDeepEqualityTypes(Type type1, Type type2,
          "Mismatched parents of bound generics");
   if (bound1->getParent()) {
     switch (matchTypes(bound1->getParent(), bound2->getParent(),
-                       TypeMatchKind::SameType, TMF_GenerateConstraints,
+                       TypeMatchKind::SameType, subflags,
                        locator.withPathElement(ConstraintLocator::ParentType))){
     case SolutionKind::Error:
       return SolutionKind::Error;
@@ -1038,7 +1045,7 @@ ConstraintSystem::matchDeepEqualityTypes(Type type1, Type type2,
   }
   for (unsigned i = 0, n = args1.size(); i != n; ++i) {
     switch (matchTypes(args1[i], args2[i], TypeMatchKind::SameType,
-                       TMF_GenerateConstraints,
+                       subflags,
                        locator.withPathElement(
                          LocatorPathElt::getGenericArgument(i)))) {
     case SolutionKind::Error:
@@ -1055,24 +1062,55 @@ ConstraintSystem::matchDeepEqualityTypes(Type type1, Type type2,
 
 ConstraintSystem::SolutionKind
 ConstraintSystem::matchExistentialTypes(Type type1, Type type2,
-                                        ConstraintKind kind, unsigned flags,
+                                        ConstraintKind kind,
+                                        TypeMatchOptions flags,
                                         ConstraintLocatorBuilder locator) {
-  if (type1->is<InOutType>()) {
+  // FIXME: Fees like a hack.
+  if (type1->is<InOutType>())
     return SolutionKind::Error;
+
+  // Conformance to 'Any' always holds.
+  if (type2->isEmptyExistentialComposition())
+    return SolutionKind::Solved;
+
+  // If the first type is a type variable or member thereof, there's nothing
+  // we can do now.
+  if (type1->isTypeVariableOrMember()) {
+    if (flags.contains(TMF_GenerateConstraints)) {
+      addUnsolvedConstraint(
+        Constraint::createRestricted(*this, kind,
+                                     ConversionRestrictionKind::Existential,
+                                     type1, type2,
+                                     getConstraintLocator(locator)));
+      return SolutionKind::Solved;
+    }
+
+    return SolutionKind::Unsolved;
   }
+
+  TypeMatchOptions subflags = getDefaultDecompositionOptions(flags);
+
+  // Handle existential metatypes.
+  if (auto meta1 = type1->getAs<MetatypeType>()) {
+    if (auto meta2 = type2->getAs<ExistentialMetatypeType>()) {
+      return matchExistentialTypes(meta1->getInstanceType(),
+                                   meta2->getInstanceType(), kind, subflags,
+                                   locator.withPathElement(
+                                     ConstraintLocator::InstanceType));
+    }
+  }
+
+  if (!type2->isAnyExistentialType())
+    return SolutionKind::Error;
 
   SmallVector<ProtocolDecl *, 4> protocols;
   type2->getAnyExistentialTypeProtocols(protocols);
 
   for (auto proto : protocols) {
-    switch (simplifyConformsToConstraint(type1, proto, kind, locator, flags)) {
+    switch (simplifyConformsToConstraint(type1, proto, kind, locator,
+                                         subflags)) {
       case SolutionKind::Solved:
-        break;
-
       case SolutionKind::Unsolved:
-        // Add the constraint.
-        addConstraint(kind, type1, proto->getDeclaredType(),
-                      getConstraintLocator(locator));
         break;
 
       case SolutionKind::Error:
@@ -1095,9 +1133,6 @@ static ConstraintKind getConstraintKind(TypeMatchKind kind) {
 
   case TypeMatchKind::SameType:
     return ConstraintKind::Equal;
-
-  case TypeMatchKind::ConformsTo:
-    return ConstraintKind::ConformsTo;
 
   case TypeMatchKind::Subtype:
     return ConstraintKind::Subtype;
@@ -1157,7 +1192,7 @@ static bool allowsBridgingFromObjC(TypeChecker &tc, DeclContext *dc,
 
 ConstraintSystem::SolutionKind
 ConstraintSystem::matchTypes(Type type1, Type type2, TypeMatchKind kind,
-                             unsigned flags,
+                             TypeMatchOptions flags,
                              ConstraintLocatorBuilder locator) {
   // If we have type variables that have been bound to fixed types, look through
   // to the fixed type.
@@ -1175,7 +1210,7 @@ ConstraintSystem::matchTypes(Type type1, Type type2, TypeMatchKind kind,
   TypeVariableType *typeVar2 = desugar2->getAs<TypeVariableType>();
 
   // If the types are obviously equivalent, we're done.
-  if (kind != TypeMatchKind::ConformsTo && desugar1->isEqual(desugar2))
+  if (desugar1->isEqual(desugar2))
     return SolutionKind::Solved;
 
   // Local function that should be used to produce the return value whenever
@@ -1189,14 +1224,17 @@ ConstraintSystem::matchTypes(Type type1, Type type2, TypeMatchKind kind,
   auto formUnsolvedResult = [&] {
     // If we're supposed to generate constraints (i.e., this is a
     // newly-generated constraint), do so now.
-    if (flags & TMF_GenerateConstraints) {
+    if (flags.contains(TMF_GenerateConstraints)) {
       // Add a new constraint between these types. We consider the current
       // type-matching problem to the "solved" by this addition, because
       // this new constraint will be solved at a later point.
       // Obviously, this must not happen at the top level, or the
       // algorithm would not terminate.
-      addConstraint(getConstraintKind(kind), type1, type2,
-                    getConstraintLocator(locator));
+      addUnsolvedConstraint(Constraint::create(*this,
+                                               getConstraintKind(kind),
+                                               type1, type2, DeclName(),
+                                               FunctionRefKind::Compound,
+                                               getConstraintLocator(locator)));
       return SolutionKind::Solved;
     }
 
@@ -1326,7 +1364,6 @@ ConstraintSystem::matchTypes(Type type1, Type type2, TypeMatchKind kind,
       }
       SWIFT_FALLTHROUGH;
 
-    case TypeMatchKind::ConformsTo:
     case TypeMatchKind::Subtype:
     case TypeMatchKind::ExplicitConversion:
     case TypeMatchKind::ArgumentConversion:
@@ -1359,7 +1396,8 @@ ConstraintSystem::matchTypes(Type type1, Type type2, TypeMatchKind kind,
   }
 
   // Decompose parallel structure.
-  unsigned subFlags = (flags | TMF_GenerateConstraints) & ~TMF_ApplyingFix;
+  TypeMatchOptions subflags =
+    getDefaultDecompositionOptions(flags) - TMF_ApplyingFix;
   if (desugar1->getKind() == desugar2->getKind()) {
     switch (desugar1->getKind()) {
 #define SUGARED_TYPE(id, parent) case TypeKind::id:
@@ -1463,7 +1501,7 @@ ConstraintSystem::matchTypes(Type type1, Type type2, TypeMatchKind kind,
         subKind = std::min(kind, TypeMatchKind::Subtype);
       
       return matchTypes(meta1->getInstanceType(), meta2->getInstanceType(),
-                        subKind, subFlags,
+                        subKind, subflags,
                         locator.withPathElement(
                           ConstraintLocator::InstanceType));
     }
@@ -1493,7 +1531,7 @@ ConstraintSystem::matchTypes(Type type1, Type type2, TypeMatchKind kind,
         return SolutionKind::Error;
       return matchTypes(cast<LValueType>(desugar1)->getObjectType(),
                         cast<LValueType>(desugar2)->getObjectType(),
-                        TypeMatchKind::SameType, subFlags,
+                        TypeMatchKind::SameType, subflags,
                         locator.withPathElement(
                           ConstraintLocator::ArrayElementType));
     
@@ -1505,7 +1543,7 @@ ConstraintSystem::matchTypes(Type type1, Type type2, TypeMatchKind kind,
       
       return matchTypes(cast<InOutType>(desugar1)->getObjectType(),
                         cast<InOutType>(desugar2)->getObjectType(),
-                        TypeMatchKind::SameType, subFlags,
+                        TypeMatchKind::SameType, subflags,
                   locator.withPathElement(ConstraintLocator::ArrayElementType));
 
     case TypeKind::UnboundGeneric:
@@ -1604,12 +1642,8 @@ ConstraintSystem::matchTypes(Type type1, Type type2, TypeMatchKind kind,
       // resolution, so we can consider them immediately solved.
       auto addSolvedRestrictedConstraint
         = [&](ConversionRestrictionKind restriction) -> SolutionKind {
-          auto constraint = Constraint::createRestricted(*this,
-                                                   ConstraintKind::Subtype,
-                                                   restriction,
-                                                   type1, type2,
-                                                   getConstraintLocator(locator));
-          addConstraint(constraint);
+          addRestrictedConstraint(ConstraintKind::Subtype, restriction,
+                                  type1, type2, locator);
           return SolutionKind::Solved;
         };
       
@@ -1685,7 +1719,7 @@ ConstraintSystem::matchTypes(Type type1, Type type2, TypeMatchKind kind,
     // an implicit closure.
     if (auto function2 = type2->getAs<FunctionType>()) {
       if (function2->isAutoClosure())
-        return matchTypes(type1, function2->getResult(), kind, subFlags,
+        return matchTypes(type1, function2->getResult(), kind, subflags,
                           locator.withPathElement(ConstraintLocator::Load));
     }
 
@@ -1694,7 +1728,7 @@ ConstraintSystem::matchTypes(Type type1, Type type2, TypeMatchKind kind,
       if (type1->isPotentiallyBridgedValueType() &&
           type1->getAnyNominal() 
             != TC.Context.getImplicitlyUnwrappedOptionalDecl() &&
-          !(flags & TMF_ApplyingOperatorParameter)) {
+          !flags.contains(TMF_ApplyingOperatorParameter)) {
         
         auto isBridgeableTargetType = type2->isBridgeableObjectType();
         
@@ -1781,7 +1815,7 @@ ConstraintSystem::matchTypes(Type type1, Type type2, TypeMatchKind kind,
                                      ConversionRestrictionKind::InoutToPointer);
           }
           
-          if (!(flags & TMF_ApplyingOperatorParameter) &&
+          if (!flags.contains(TMF_ApplyingOperatorParameter) &&
               // Operators cannot use these implicit conversions.
               (kind == TypeMatchKind::ArgumentConversion ||
                kind == TypeMatchKind::ArgumentTupleConversion)) {
@@ -1870,7 +1904,7 @@ ConstraintSystem::matchTypes(Type type1, Type type2, TypeMatchKind kind,
     // If the RHS is an inout type, the LHS must be an @lvalue type.
     if (auto *iot = type2->getAs<InOutType>()) {
       return matchTypes(type1, LValueType::get(iot->getObjectType()),
-                        kind, subFlags,
+                        kind, subflags,
                         locator.withPathElement(
                                 ConstraintLocator::ArrayElementType));
     }
@@ -1880,28 +1914,18 @@ ConstraintSystem::matchTypes(Type type1, Type type2, TypeMatchKind kind,
   // equivalent to a conformance relationship on the instance types.
   // This applies to nested metatype levels, so if A : P then
   // A.Type : P.Type.
-  if (concrete && kind >= TypeMatchKind::ConformsTo) {
-    if (auto meta1 = type1->getAs<MetatypeType>()) {
-      if (auto meta2 = type2->getAs<ExistentialMetatypeType>()) {
-        return matchTypes(meta1->getInstanceType(),
-                          meta2->getInstanceType(),
-                          TypeMatchKind::ConformsTo, subFlags,
-                          locator.withPathElement(
-                                  ConstraintLocator::InstanceType));
-      }
-    }
+  if (concrete && kind >= TypeMatchKind::Subtype &&
+      type1->is<MetatypeType>() && type2->is<ExistentialMetatypeType>()) {
+    conversionsOrFixes.push_back(
+      ConversionRestrictionKind::MetatypeToExistentialMetatype);
   }
   
   // Instance type check for the above. We are going to check conformance once
   // we hit commit_to_conversions below, but we have to add a token restriction
   // to ensure we wrap the metatype value in a metatype erasure.
-  if (concrete && type2->isExistentialType()) {
-    if (kind == TypeMatchKind::ConformsTo) {
-      conversionsOrFixes.push_back(ConversionRestrictionKind::
-                                   MetatypeToExistentialMetatype);
-    } else if (kind >= TypeMatchKind::Subtype) {
-      conversionsOrFixes.push_back(ConversionRestrictionKind::Existential);
-    }
+  if (concrete && type2->isExistentialType() &&
+      kind >= TypeMatchKind::Subtype) {
+    conversionsOrFixes.push_back(ConversionRestrictionKind::Existential);
   }
 
   // A value of type T can be converted to type U? if T is convertible to U.
@@ -1977,7 +2001,7 @@ ConstraintSystem::matchTypes(Type type1, Type type2, TypeMatchKind kind,
     if (auto *iot = dyn_cast<InOutType>(desugar1)) {
       if (auto *lvt = dyn_cast<LValueType>(desugar2)) {
         return matchTypes(iot->getObjectType(), lvt->getObjectType(),
-                          TypeMatchKind::BindType, subFlags,
+                          TypeMatchKind::BindType, subflags,
                           locator.withPathElement(
                             ConstraintLocator::ArrayElementType));
       }
@@ -1997,7 +2021,7 @@ commit_to_conversions:
   // If we should attempt fixes, add those to the list. They'll only be visited
   // if there are no other possible solutions.
   if (shouldAttemptFixes() && !typeVar1 && !typeVar2 &&
-      !(flags & TMF_ApplyingFix) && kind >= TypeMatchKind::Conversion) {
+      !flags.contains(TMF_ApplyingFix) && kind >= TypeMatchKind::Conversion) {
     Type objectType1 = type1->getRValueObjectType();
 
     // If we have an optional type, try to force-unwrap it.
@@ -2093,8 +2117,7 @@ commit_to_conversions:
         Constraint::createFixed(*this, constraintKind, fix, type1, type2,
                                 fixedLocator));
     }
-    addConstraint(Constraint::createDisjunction(*this, constraints,
-                                                fixedLocator));
+    addDisjunctionConstraint(constraints, fixedLocator);
     return SolutionKind::Solved;
   }
 
@@ -2103,29 +2126,25 @@ commit_to_conversions:
 
   // Handle restrictions.
   if (auto restriction = conversionsOrFixes[0].getRestriction()) {
-    ConstraintRestrictions.push_back(
-        std::make_tuple(type1, type2, *restriction));
-
-    if (flags & TMF_UnwrappingOptional) {
-      subFlags |= TMF_UnwrappingOptional;
+    if (flags.contains(TMF_UnwrappingOptional)) {
+      subflags |= TMF_UnwrappingOptional;
     }
     
     return simplifyRestrictedConstraint(*restriction, type1, type2,
-                                        kind, subFlags, locator);
+                                        kind, subflags, locator);
   }
 
   // Handle fixes.
   auto fix = *conversionsOrFixes[0].getFix();
-  return simplifyFixConstraint(fix, type1, type2, kind, subFlags, locator);
+  return simplifyFixConstraint(fix, type1, type2, kind, subflags, locator);
 }
 
 ConstraintSystem::SolutionKind
 ConstraintSystem::simplifyConstructionConstraint(
-    Type valueType, FunctionType *fnType, unsigned flags,
+    Type valueType, FunctionType *fnType, TypeMatchOptions flags,
     FunctionRefKind functionRefKind, ConstraintLocator *locator) {
   // Desugar the value type.
-  auto desugarValueType = getFixedTypeRecursive(valueType, true)
-                            ->getDesugaredType();
+  auto desugarValueType = valueType->getDesugaredType();
 
   Type argType = fnType->getInput();
   Type resultType = fnType->getResult();
@@ -2164,7 +2183,7 @@ ConstraintSystem::simplifyConstructionConstraint(
       return SolutionKind::Error;
 
     return matchTypes(argType, valueType, TypeMatchKind::Conversion,
-                      flags|TMF_GenerateConstraints, locator);
+                      getDefaultDecompositionOptions(flags), locator);
   }
 
   case TypeKind::Enum:
@@ -2235,7 +2254,7 @@ ConstraintSystem::SolutionKind ConstraintSystem::simplifyConformsToConstraint(
                                  Type protocol,
                                  ConstraintKind kind,
                                  ConstraintLocatorBuilder locator,
-                                 unsigned flags) {
+                                 TypeMatchOptions flags) {
   if (auto proto = protocol->getAs<ProtocolType>()) {
     return simplifyConformsToConstraint(type, proto->getDecl(), kind,
                                         locator, flags);
@@ -2249,14 +2268,24 @@ ConstraintSystem::SolutionKind ConstraintSystem::simplifyConformsToConstraint(
                                  ProtocolDecl *protocol,
                                  ConstraintKind kind,
                                  ConstraintLocatorBuilder locator,
-                                 unsigned flags) {
+                                 TypeMatchOptions flags) {
   // Dig out the fixed type to which this type refers.
   type = getFixedTypeRecursive(type, /*wantRValue=*/true);
 
   // If we hit a type variable without a fixed type, we can't
   // solve this yet.
-  if (type->isTypeVariableOrMember())
+  if (type->isTypeVariableOrMember()) {
+    // If we're supposed to generate constraints, do so.
+    if (flags.contains(TMF_GenerateConstraints)) {
+      addUnsolvedConstraint(
+        Constraint::create(*this, kind, type, protocol->getDeclaredType(),
+                           DeclName(), FunctionRefKind::Compound,
+                           getConstraintLocator(locator)));
+      return SolutionKind::Solved;
+    }
+
     return SolutionKind::Unsolved;
+  }
 
   // For purposes of argument type matching, existential types don't need to
   // conform -- they only need to contain the protocol, so check that
@@ -2285,11 +2314,13 @@ ConstraintSystem::SolutionKind ConstraintSystem::simplifyConformsToConstraint(
   OptionalTypeKind optionalKind;
   if (auto optionalObjectType = type->getAnyOptionalObjectType(optionalKind)) {
     if (optionalKind == OTK_Optional) {
+      TypeMatchOptions subflags = getDefaultDecompositionOptions(flags);
       // The underlying type of an optional may conform to the protocol if the
       // optional doesn't; suggest forcing if that's the case.
       auto result = simplifyConformsToConstraint(
         optionalObjectType, protocol, kind,
-        locator.withPathElement(LocatorPathElt::getGenericArgument(0)), flags);
+        locator.withPathElement(LocatorPathElt::getGenericArgument(0)),
+        subflags);
       if (result == SolutionKind::Solved) {
         if (recordFix(FixKind::ForceOptional, getConstraintLocator(locator))) {
           return SolutionKind::Error;
@@ -2338,7 +2369,23 @@ static CheckedCastKind getCheckedCastKind(ConstraintSystem *cs,
 ConstraintSystem::SolutionKind
 ConstraintSystem::simplifyCheckedCastConstraint(
                     Type fromType, Type toType,
+                    TypeMatchOptions flags,
                     ConstraintLocatorBuilder locator) {
+  TypeMatchOptions subflags = getDefaultDecompositionOptions(flags);
+
+  /// Form an unresolved result.
+  auto formUnsolved = [&] {
+    if (flags.contains(TMF_GenerateConstraints)) {
+      addUnsolvedConstraint(
+        Constraint::create(*this, ConstraintKind::CheckedCast, fromType,
+                           toType, DeclName(), FunctionRefKind::Compound,
+                           getConstraintLocator(locator)));
+      return SolutionKind::Solved;
+    }
+
+    return SolutionKind::Unsolved;
+  };
+
   do {
     // Dig out the fixed type to which this type refers.
     fromType = getFixedTypeRecursive(fromType, /*wantRValue=*/true);
@@ -2346,7 +2393,7 @@ ConstraintSystem::simplifyCheckedCastConstraint(
     // If we hit a type variable without a fixed type, we can't
     // solve this yet.
     if (fromType->isTypeVariableOrMember())
-      return SolutionKind::Unsolved;
+      return formUnsolved();
 
     // Dig out the fixed type to which this type refers.
     toType = getFixedTypeRecursive(toType, /*wantRValue=*/true);
@@ -2354,7 +2401,7 @@ ConstraintSystem::simplifyCheckedCastConstraint(
     // If we hit a type variable without a fixed type, we can't
     // solve this yet.
     if (toType->isTypeVariableOrMember())
-      return SolutionKind::Unsolved;
+      return formUnsolved();
 
     Type origFromType = fromType;
     Type origToType = toType;
@@ -2382,6 +2429,9 @@ ConstraintSystem::simplifyCheckedCastConstraint(
       }
     }
 
+    // We've decomposed the types further, so adopt the subflags.
+    flags = subflags;
+
     // If nothing changed, we're done.
     if (fromType.getPointer() == origFromType.getPointer() &&
         toType.getPointer() == origToType.getPointer())
@@ -2403,14 +2453,12 @@ ConstraintSystem::simplifyCheckedCastConstraint(
                                                               toBaseType)) {
       // The class we're bridging through must be a subtype of the type we're
       // coming from.
-      addConstraint(ConstraintKind::Subtype, classType, fromBaseType,
-                    getConstraintLocator(locator));
-      return SolutionKind::Solved;
+      return matchTypes(classType, fromBaseType, TypeMatchKind::Subtype,
+                        subflags, locator);
     }
 
-    addConstraint(ConstraintKind::Subtype, toBaseType, fromBaseType,
-                  getConstraintLocator(locator));
-    return SolutionKind::Solved;
+    return matchTypes(toBaseType, fromBaseType, TypeMatchKind::Subtype,
+                      subflags, locator);
   }
   case CheckedCastKind::DictionaryDowncast: {
     Type fromKeyType, fromValueType;
@@ -2430,9 +2478,8 @@ ConstraintSystem::simplifyCheckedCastConstraint(
     }
 
     // Perform subtype check on the possibly-bridged-through key type.
-    unsigned subFlags = TMF_GenerateConstraints;
-    auto result = matchTypes(toKeyType, fromKeyType, TypeMatchKind::Subtype, 
-                             subFlags, locator);
+    auto result = matchTypes(toKeyType, fromKeyType, TypeMatchKind::Subtype,
+                             subflags, locator);
     if (result == SolutionKind::Error)
       return result;
 
@@ -2445,12 +2492,12 @@ ConstraintSystem::simplifyCheckedCastConstraint(
 
     // Perform subtype check on the possibly-bridged-through value type.
     switch (matchTypes(toValueType, fromValueType, TypeMatchKind::Subtype, 
-                       subFlags, locator)) {
+                       subflags, locator)) {
     case SolutionKind::Solved:
       return result;
 
     case SolutionKind::Unsolved:
-      return SolutionKind::Unsolved;
+      return SolutionKind::Solved;
 
     case SolutionKind::Error:
       return SolutionKind::Error;
@@ -2469,13 +2516,13 @@ ConstraintSystem::simplifyCheckedCastConstraint(
                                                               toBaseType)) {
       // The class we're bridging through must be a subtype of the type we're
       // coming from.
-      addConstraint(ConstraintKind::Subtype, classType, fromBaseType,
-                    getConstraintLocator(locator));
+      addConstraint(ConstraintKind::Subtype, classType,
+                    fromBaseType, locator);
       return SolutionKind::Solved;
     }
 
-    addConstraint(ConstraintKind::Subtype, toBaseType, fromBaseType,
-                  getConstraintLocator(locator));
+    addConstraint(ConstraintKind::Subtype, toBaseType,
+                  fromBaseType, locator);
     return SolutionKind::Solved;
   }
       
@@ -2515,13 +2562,25 @@ ConstraintSystem::simplifyCheckedCastConstraint(
 }
 
 ConstraintSystem::SolutionKind
-ConstraintSystem::simplifyOptionalObjectConstraint(const Constraint &constraint)
-{
+ConstraintSystem::simplifyOptionalObjectConstraint(
+                                           Type first, Type second,
+                                           TypeMatchOptions flags,
+                                           ConstraintLocatorBuilder locator) {
   // Resolve the optional type.
-  Type optLValueTy = simplifyType(constraint.getFirstType());
+  Type optLValueTy = getFixedTypeRecursive(first, /*wantRValue=*/false);
   Type optTy = optLValueTy->getRValueType();
-  
+  if (optTy.getPointer() != optLValueTy.getPointer())
+    optTy = getFixedTypeRecursive(optTy, /*wantRValue=*/false);
+
   if (optTy->isTypeVariableOrMember()) {
+    if (flags.contains(TMF_GenerateConstraints)) {
+      addUnsolvedConstraint(
+        Constraint::create(*this, ConstraintKind::OptionalObject, optLValueTy,
+                           second, DeclName(), FunctionRefKind::Compound,
+                           getConstraintLocator(locator)));
+      return SolutionKind::Solved;
+    }
+
     return SolutionKind::Unsolved;
   }
   
@@ -2535,9 +2594,7 @@ ConstraintSystem::simplifyOptionalObjectConstraint(const Constraint &constraint)
     objectTy = LValueType::get(objectTy);
 
   // Equate it to the other type in the constraint.
-  addConstraint(ConstraintKind::Bind, objectTy, constraint.getSecondType(),
-                constraint.getLocator());
-  
+  addConstraint(ConstraintKind::Bind, objectTy, second, locator);
   return SolutionKind::Solved;
 }
 
@@ -2662,7 +2719,9 @@ performMemberLookup(ConstraintKind constraintKind, DeclName memberName,
     return result;
   }
 
-  
+  if (instanceTy->isTypeParameter())
+    return MemberLookupResult();
+
   // Okay, start building up the result list.
   MemberLookupResult result;
   result.OverallResult = MemberLookupResult::HasResults;
@@ -3107,10 +3166,16 @@ retry_after_fail:
 
 
 ConstraintSystem::SolutionKind
-ConstraintSystem::simplifyMemberConstraint(const Constraint &constraint) {
+ConstraintSystem::simplifyMemberConstraint(ConstraintKind kind,
+                                           Type baseTy, DeclName member,
+                                           Type memberTy,
+                                           FunctionRefKind functionRefKind,
+                                           TypeMatchOptions flags,
+                                           ConstraintLocatorBuilder locatorB) {
   // Resolve the base type, if we can. If we can't resolve the base type,
   // then we can't solve this constraint.
-  Type baseTy = simplifyType(constraint.getFirstType());
+  // FIXME: simplifyType() call here could be getFixedTypeRecursive?
+  baseTy = simplifyType(baseTy);
   Type baseObjTy = baseTy->getRValueType();
 
   // Try to look through ImplicitlyUnwrappedOptional<T>; the result is
@@ -3125,19 +3190,26 @@ ConstraintSystem::simplifyMemberConstraint(const Constraint &constraint) {
       baseTy = objTy;
   }
 
+  auto locator = getConstraintLocator(locatorB);
   MemberLookupResult result =
-    performMemberLookup(constraint.getKind(), constraint.getMember(),
-                        baseTy, constraint.getFunctionRefKind(),
-                        constraint.getLocator(),
+    performMemberLookup(kind, member, baseTy, functionRefKind, locator,
                         /*includeInaccessibleMembers*/false);
   
-  Type memberTy = constraint.getSecondType();
-
   switch (result.OverallResult) {
   case MemberLookupResult::Unsolved:
+    // If requested, generate a constraint.
+    if (flags.contains(TMF_GenerateConstraints)) {
+      addUnsolvedConstraint(
+        Constraint::create(*this, kind, baseTy, memberTy, member,
+                           functionRefKind, locator));
+      return SolutionKind::Solved;
+    }
+
     return SolutionKind::Unsolved;
+
   case MemberLookupResult::ErrorAlreadyDiagnosed:
     return SolutionKind::Error;
+
   case MemberLookupResult::HasResults:
     // Keep going!
     break;
@@ -3145,7 +3217,7 @@ ConstraintSystem::simplifyMemberConstraint(const Constraint &constraint) {
 
   // If we found viable candidates, then we're done!
   if (!result.ViableCandidates.empty()) {
-    addOverloadSet(memberTy, result.ViableCandidates, constraint.getLocator(),
+    addOverloadSet(memberTy, result.ViableCandidates, locator,
                    result.getFavoredChoice());
     
     return SolutionKind::Solved;
@@ -3160,7 +3232,7 @@ ConstraintSystem::simplifyMemberConstraint(const Constraint &constraint) {
   // If the lookup found no hits at all (either viable or unviable), diagnose it
   // as such and try to recover in various ways.
 
-  if (constraint.getKind() == ConstraintKind::TypeMember) {
+  if (kind == ConstraintKind::TypeMember) {
     // If the base type was an optional, try to look through it.
     if (shouldAttemptFixes() && baseObjTy->getOptionalObjectType()) {
       // Determine whether or not we want to provide an optional chaining fixit or
@@ -3173,18 +3245,15 @@ ConstraintSystem::simplifyMemberConstraint(const Constraint &constraint) {
       auto fixKind = optionalChain ? FixKind::OptionalChaining : FixKind::ForceOptional;
 
       // Note the fix.
-      if (recordFix(fixKind, constraint.getLocator()))
+      if (recordFix(fixKind, locator))
         return SolutionKind::Error;
       
       // Look through one level of optional.
-      addConstraint(Constraint::create(*this, ConstraintKind::TypeMember,
-                                       baseObjTy->getOptionalObjectType(),
-                                       constraint.getSecondType(),
-                                       constraint.getMember(),
-                                       constraint.getFunctionRefKind(),
-                                       constraint.getLocator()));
+      addTypeMemberConstraint(baseObjTy->getOptionalObjectType(),
+                              member, memberTy, locator);
       return SolutionKind::Solved;
     }
+
     return SolutionKind::Error;
   }
   
@@ -3207,56 +3276,35 @@ ConstraintSystem::simplifyMemberConstraint(const Constraint &constraint) {
     auto fixKind = optionalChain ? FixKind::OptionalChaining : FixKind::ForceOptional;
 
     // Note the fix.
-    if (recordFix(fixKind, constraint.getLocator()))
+    if (recordFix(fixKind, locator))
       return SolutionKind::Error;
     
     // Look through one level of optional.
     addValueMemberConstraint(baseObjTy->getOptionalObjectType(),
-                             constraint.getMember(),
-                             constraint.getSecondType(),
-                             constraint.getFunctionRefKind(),
-                             constraint.getLocator());
+                             member, memberTy, functionRefKind, locator);
     return SolutionKind::Solved;
   }
   return SolutionKind::Error;
 }
 
 ConstraintSystem::SolutionKind
-ConstraintSystem::simplifyArchetypeConstraint(const Constraint &constraint) {
-  // Resolve the base type, if we can. If we can't resolve the base type,
-  // then we can't solve this constraint.
-  Type baseTy = getFixedTypeRecursive(constraint.getFirstType(), true);
-  if (baseTy->isTypeVariableOrMember())
-    return SolutionKind::Unsolved;
+ConstraintSystem::simplifyDefaultableConstraint(
+                                            Type first, Type second,
+                                            TypeMatchOptions flags,
+                                            ConstraintLocatorBuilder locator) {
+  first = getFixedTypeRecursive(first, true);
 
-  if (baseTy->is<ArchetypeType>())
-    return SolutionKind::Solved;
-
-  return SolutionKind::Error;
-}
-
-ConstraintSystem::SolutionKind
-ConstraintSystem::simplifyClassConstraint(const Constraint &constraint){
-  auto baseTy = getFixedTypeRecursive(constraint.getFirstType(), true);
-  if (baseTy->isTypeVariableOrMember())
-    return SolutionKind::Unsolved;
-
-  if (baseTy->getClassOrBoundGenericClass())
-    return SolutionKind::Solved;
-
-  if (auto archetype = baseTy->getAs<ArchetypeType>()) {
-    if (archetype->requiresClass())
+  if (first->isTypeVariableOrMember()) {
+    if (flags.contains(TMF_GenerateConstraints)) {
+      addUnsolvedConstraint(
+        Constraint::create(*this, ConstraintKind::Defaultable, first, second,
+                           DeclName(), FunctionRefKind::Compound,
+                           getConstraintLocator(locator)));
       return SolutionKind::Solved;
-  }
-  return SolutionKind::Error;
-}
+    }
 
-ConstraintSystem::SolutionKind
-ConstraintSystem::simplifyDefaultableConstraint(const Constraint &constraint) {
-  auto baseTy = getFixedTypeRecursive(constraint.getFirstType(), true);
-
-  if (baseTy->isTypeVariableOrMember())
     return SolutionKind::Unsolved;
+  }
 
   // Otherwise, any type is fine.
   return SolutionKind::Solved;
@@ -3264,10 +3312,27 @@ ConstraintSystem::simplifyDefaultableConstraint(const Constraint &constraint) {
 
 
 ConstraintSystem::SolutionKind
-ConstraintSystem::simplifyDynamicTypeOfConstraint(const Constraint &constraint) {
+ConstraintSystem::simplifyDynamicTypeOfConstraint(
+                                        Type type1, Type type2,
+                                        TypeMatchOptions flags,
+                                        ConstraintLocatorBuilder locator) {
+  TypeMatchOptions subflags = getDefaultDecompositionOptions(flags);
+
+  // Local function to form an unsolved result.
+  auto formUnsolved = [&] {
+    if (flags.contains(TMF_GenerateConstraints)) {
+      addUnsolvedConstraint(
+        Constraint::create(*this, ConstraintKind::DynamicTypeOf, type1, type2,
+                           DeclName(), FunctionRefKind::Compound,
+                           getConstraintLocator(locator)));
+      return SolutionKind::Solved;
+    }
+
+    return SolutionKind::Unsolved;
+  };
+
   // Solve forward.
-  Type type2 = getFixedTypeRecursive(constraint.getSecondType(),
-                                     /*wantRValue=*/ true);
+  type2 = getFixedTypeRecursive(type2, /*wantRValue=*/ true);
   if (!type2->isTypeVariableOrMember()) {
     Type dynamicType2;
     if (type2->isAnyExistentialType()) {
@@ -3275,34 +3340,32 @@ ConstraintSystem::simplifyDynamicTypeOfConstraint(const Constraint &constraint) 
     } else {
       dynamicType2 = MetatypeType::get(type2);
     }
-    return matchTypes(constraint.getFirstType(), dynamicType2,
-                      TypeMatchKind::BindType, TMF_GenerateConstraints,
-                      constraint.getLocator());
+    return matchTypes(type1, dynamicType2, TypeMatchKind::BindType, subflags,
+                      locator);
   }
 
   // Okay, can't solve forward.  See what we can do backwards.
-  Type type1 = getFixedTypeRecursive(constraint.getFirstType(), true);
-
+  type1 = getFixedTypeRecursive(type1, true);
   if (type1->isTypeVariableOrMember())
-    return SolutionKind::Unsolved;
+    return formUnsolved();
 
   // If we have an existential metatype, that's good enough to solve
   // the constraint.
   if (auto metatype1 = type1->getAs<ExistentialMetatypeType>())
     return matchTypes(metatype1->getInstanceType(), type2,
                       TypeMatchKind::BindType,
-                      TMF_GenerateConstraints, constraint.getLocator());
+                      subflags, locator);
 
   // If we have a normal metatype, we can't solve backwards unless we
   // know what kind of object it is.
   if (auto metatype1 = type1->getAs<MetatypeType>()) {
     Type instanceType1 = getFixedTypeRecursive(metatype1->getInstanceType(),
                                                true);
-    if (!instanceType1->isTypeVariableOrMember()) {
-      return matchTypes(instanceType1, type2,
-                        TypeMatchKind::BindType,
-                        TMF_GenerateConstraints, constraint.getLocator());
-    }
+    if (instanceType1->isTypeVariableOrMember())
+      return formUnsolved();
+
+    return matchTypes(instanceType1, type2, TypeMatchKind::BindType, subflags,
+                      locator);
   }
 
   // It's definitely not either kind of metatype, so we can
@@ -3311,39 +3374,53 @@ ConstraintSystem::simplifyDynamicTypeOfConstraint(const Constraint &constraint) 
 }
 
 ConstraintSystem::SolutionKind
-ConstraintSystem::simplifyApplicableFnConstraint(const Constraint &constraint) {
+ConstraintSystem::simplifyApplicableFnConstraint(
+                                           Type type1,
+                                           Type type2,
+                                           TypeMatchOptions flags,
+                                           ConstraintLocatorBuilder locator) {
 
   // By construction, the left hand side is a type that looks like the
   // following: $T1 -> $T2.
-  Type type1 = constraint.getFirstType();
   assert(type1->is<FunctionType>());
 
   // Drill down to the concrete type on the right hand side.
-  Type type2 = getFixedTypeRecursive(constraint.getSecondType(),
-                                     /*wantRValue=*/true);
+  type2 = getFixedTypeRecursive(type2, /*wantRValue=*/true);
   auto desugar2 = type2->getDesugaredType();
 
   // Try to look through ImplicitlyUnwrappedOptional<T>: the result is always an
   // r-value.
   if (auto objTy = lookThroughImplicitlyUnwrappedOptionalType(desugar2)) {
-    type2 = objTy;
+    type2 = getFixedTypeRecursive(objTy, /*wantRValue=*/true);
     desugar2 = type2->getDesugaredType();
   }
 
-  // Force the right-hand side to be an rvalue.
-  unsigned flags = TMF_GenerateConstraints;
+  TypeMatchOptions subflags = getDefaultDecompositionOptions(flags);
 
   // If the types are obviously equivalent, we're done.
   if (type1.getPointer() == desugar2)
     return SolutionKind::Solved;
 
+  // Local function to form an unsolved result.
+  auto formUnsolved = [&] {
+    if (flags.contains(TMF_GenerateConstraints)) {
+      addUnsolvedConstraint(
+        Constraint::create(*this, ConstraintKind::ApplicableFunction, type1,
+                           type2, DeclName(), FunctionRefKind::Compound,
+                           getConstraintLocator(locator)));
+      return SolutionKind::Solved;
+    }
+    
+    return SolutionKind::Unsolved;
+
+  };
+
   // If right-hand side is a type variable, the constraint is unsolved.
   if (desugar2->isTypeVariableOrMember())
-    return SolutionKind::Unsolved;
+    return formUnsolved();
 
   // Strip the 'ApplyFunction' off the locator.
   // FIXME: Perhaps ApplyFunction can go away entirely?
-  ConstraintLocatorBuilder locator = constraint.getLocator();
   SmallVector<LocatorPathElt, 2> parts;
   Expr *anchor = locator.getLocatorParts(parts);
   assert(!parts.empty() && "Nonsensical applicable-function locator");
@@ -3369,7 +3446,7 @@ retry:
 
     // The argument type must be convertible to the input type.
     if (matchTypes(func1->getInput(), func2->getInput(),
-                   ArgConv, flags,
+                   ArgConv, subflags,
                    outerLocator.withPathElement(
                      ConstraintLocator::ApplyArgument))
           == SolutionKind::Error)
@@ -3378,7 +3455,7 @@ retry:
     // The result types are equivalent.
     if (matchTypes(func1->getResult(), func2->getResult(),
                    TypeMatchKind::BindType,
-                   flags,
+                   subflags,
                    locator.withPathElement(ConstraintLocator::FunctionResult))
           == SolutionKind::Error)
       return SolutionKind::Error;
@@ -3394,9 +3471,12 @@ retry:
 
   // For a metatype, perform a construction.
   if (auto meta2 = dyn_cast<AnyMetatypeType>(desugar2)) {
+    auto instance2 = getFixedTypeRecursive(meta2->getInstanceType(), true);
+    if (instance2->isTypeVariableOrMember())
+      return formUnsolved();
+
     // Construct the instance from the input arguments.
-    return simplifyConstructionConstraint(meta2->getInstanceType(), func1,
-                                          flags,
+    return simplifyConstructionConstraint(instance2, func1, subflags,
                                           FunctionRefKind::SingleApply,
                                           getConstraintLocator(outerLocator));
   }
@@ -3463,8 +3543,6 @@ static TypeMatchKind getTypeMatchKind(ConstraintKind kind) {
   case ConstraintKind::OptionalObject:
     llvm_unreachable("optional object constraints don't involve type matches");
       
-  case ConstraintKind::Archetype:
-  case ConstraintKind::Class:
   case ConstraintKind::Defaultable:
     llvm_unreachable("Type properties don't involve type matches");
 
@@ -3508,16 +3586,27 @@ static Type getBaseTypeForPointer(ConstraintSystem &cs, TypeBase *type) {
   return pointeeTy;
 }
 
+void ConstraintSystem::addRestrictedConstraint(
+                             ConstraintKind kind,
+                             ConversionRestrictionKind restriction,
+                             Type first, Type second,
+                             ConstraintLocatorBuilder locator) {
+  (void)simplifyRestrictedConstraint(restriction, first, second,
+                                     getTypeMatchKind(kind),
+                                     TMF_GenerateConstraints, locator);
+}
+
 /// Given that we have a conversion constraint between two types, and
 /// that the given constraint-reduction rule applies between them at
 /// the top level, apply it and generate any necessary recursive
 /// constraints.
 ConstraintSystem::SolutionKind
-ConstraintSystem::simplifyRestrictedConstraint(ConversionRestrictionKind restriction,
-                                               Type type1, Type type2,
-                                               TypeMatchKind matchKind,
-                                               unsigned flags,
-                                               ConstraintLocatorBuilder locator) {
+ConstraintSystem::simplifyRestrictedConstraintImpl(
+                                         ConversionRestrictionKind restriction,
+                                         Type type1, Type type2,
+                                         TypeMatchKind matchKind,
+                                         TypeMatchOptions flags,
+                                         ConstraintLocatorBuilder locator) {
   // Add to the score based on context.
   auto addContextualScore = [&] {
     // Okay, we need to perform one or more conversions.  If this
@@ -3535,7 +3624,7 @@ ConstraintSystem::simplifyRestrictedConstraint(ConversionRestrictionKind restric
     flags |= TMF_ApplyingOperatorParameter;
   }
 
-  unsigned subFlags = flags | TMF_GenerateConstraints;
+  TypeMatchOptions subflags = getDefaultDecompositionOptions(flags);
 
   switch (restriction) {
   // for $< in { <, <c, <oc }:
@@ -3543,31 +3632,29 @@ ConstraintSystem::simplifyRestrictedConstraint(ConversionRestrictionKind restric
   case ConversionRestrictionKind::TupleToTuple:
     return matchTupleTypes(type1->castTo<TupleType>(),
                            type2->castTo<TupleType>(),
-                           matchKind, subFlags, locator);
+                           matchKind, subflags, locator);
 
   //   T <c U ===> T <c (U)
   case ConversionRestrictionKind::ScalarToTuple:
-    return matchScalarToTupleTypes(type1,
-                                   type2->castTo<TupleType>(),
-                                   matchKind, subFlags, locator);
+    return matchScalarToTupleTypes(type1, type2->castTo<TupleType>(),
+                                   matchKind, subflags, locator);
 
   // for $< in { <, <c, <oc }:
   //   T $< U ===> (T) $< U
   case ConversionRestrictionKind::TupleToScalar:
-    return matchTupleToScalarTypes(type1->castTo<TupleType>(),
-                                   type2,
-                                   matchKind, subFlags, locator);
+    return matchTupleToScalarTypes(type1->castTo<TupleType>(), type2,
+                                   matchKind, subflags, locator);
 
   case ConversionRestrictionKind::DeepEquality:
     return matchDeepEqualityTypes(type1, type2, locator);
 
   case ConversionRestrictionKind::Superclass:
     addContextualScore();
-    return matchSuperclassTypes(type1, type2, matchKind, subFlags, locator);
+    return matchSuperclassTypes(type1, type2, matchKind, subflags, locator);
 
   case ConversionRestrictionKind::LValueToRValue:
     return matchTypes(type1->getRValueType(), type2,
-                      matchKind, subFlags, locator);
+                      matchKind, subflags, locator);
 
   // for $< in { <, <c, <oc }:
   //   T $< U, U : P_i ===> T $< protocol<P_i...>
@@ -3575,7 +3662,7 @@ ConstraintSystem::simplifyRestrictedConstraint(ConversionRestrictionKind restric
     addContextualScore();
     return matchExistentialTypes(type1, type2,
                                  ConstraintKind::SelfObjectOfProtocol,
-                                 subFlags, locator);
+                                 subflags, locator);
 
   // for $< in { <, <c, <oc }:
   //   for T protocol,
@@ -3584,9 +3671,13 @@ ConstraintSystem::simplifyRestrictedConstraint(ConversionRestrictionKind restric
   //     T : S ===> T.Type $< S.Type
   case ConversionRestrictionKind::MetatypeToExistentialMetatype:
     addContextualScore();
-    return matchExistentialTypes(type1, type2,
-                                 ConstraintKind::ConformsTo,
-                                 subFlags, locator);
+
+    return matchExistentialTypes(
+             type1->castTo<MetatypeType>()->getInstanceType(),
+             type2->castTo<ExistentialMetatypeType>()->getInstanceType(),
+             ConstraintKind::ConformsTo,
+             subflags,
+             locator.withPathElement(ConstraintLocator::InstanceType));
 
   // for $< in { <, <c, <oc }:
   //   T $< U ===> T $< U?
@@ -3598,7 +3689,7 @@ ConstraintSystem::simplifyRestrictedConstraint(ConversionRestrictionKind restric
     auto generic2 = type2->castTo<BoundGenericType>();
     assert(generic2->getDecl()->classifyAsOptionalType());
     return matchTypes(type1, generic2->getGenericArgs()[0],
-                      matchKind, (subFlags | TMF_UnwrappingOptional), locator);
+                      matchKind, (subflags | TMF_UnwrappingOptional), locator);
   }
 
   // for $< in { <, <c, <oc }:
@@ -3618,7 +3709,7 @@ ConstraintSystem::simplifyRestrictedConstraint(ConversionRestrictionKind restric
     assert(generic2->getDecl()->classifyAsOptionalType());
     return matchTypes(generic1->getGenericArgs()[0],
                       generic2->getGenericArgs()[0],
-                      matchKind, subFlags,
+                      matchKind, subflags,
                       locator.withPathElement(
                         LocatorPathElt::getGenericArgument(0)));
   }
@@ -3641,7 +3732,7 @@ ConstraintSystem::simplifyRestrictedConstraint(ConversionRestrictionKind restric
     Type valueType1 = boundGenericType1->getGenericArgs()[0];
     increaseScore(SK_ForceUnchecked);
     return matchTypes(valueType1, type2,
-                      matchKind, subFlags,
+                      matchKind, subflags,
                       locator.withPathElement(
                         LocatorPathElt::getGenericArgument(0)));
   }
@@ -3673,7 +3764,7 @@ ConstraintSystem::simplifyRestrictedConstraint(ConversionRestrictionKind restric
 
     return matchTypes(baseType1, baseType2,
                       TypeMatchKind::BindToPointerType,
-                      subFlags, locator);
+                      subflags, locator);
   }
       
   // String ===> UnsafePointer<[U]Int8>
@@ -3689,7 +3780,7 @@ ConstraintSystem::simplifyRestrictedConstraint(ConversionRestrictionKind restric
     baseType2 = getFixedTypeRecursive(baseType2, false, false);
     // If we haven't resolved the element type, generate constraints.
     if (baseType2->isTypeVariableOrMember()) {
-      if (flags & TMF_GenerateConstraints) {
+      if (flags.contains(TMF_GenerateConstraints)) {
         auto int8Con = Constraint::create(*this, ConstraintKind::Bind,
                                        baseType2, TC.getInt8Type(DC),
                                        DeclName(),
@@ -3707,11 +3798,7 @@ ConstraintSystem::simplifyRestrictedConstraint(ConversionRestrictionKind restric
                                         getConstraintLocator(locator));
         
         Constraint *disjunctionChoices[] = {int8Con, uint8Con, voidCon};
-        auto disjunction = Constraint::createDisjunction(*this,
-                                                 disjunctionChoices,
-                                                 getConstraintLocator(locator));
-        
-        addConstraint(disjunction);
+        addDisjunctionConstraint(disjunctionChoices, locator);
         return SolutionKind::Solved;
       }
 
@@ -3719,7 +3806,7 @@ ConstraintSystem::simplifyRestrictedConstraint(ConversionRestrictionKind restric
     }
     
     if (!isStringCompatiblePointerBaseType(TC, DC, baseType2)) {
-      return SolutionKind::Unsolved;
+      return SolutionKind::Error;
     }
     return SolutionKind::Solved;
   }
@@ -3737,7 +3824,7 @@ ConstraintSystem::simplifyRestrictedConstraint(ConversionRestrictionKind restric
 
     return matchTypes(baseType1, baseType2,
                       TypeMatchKind::BindToPointerType,
-                      subFlags, locator);
+                      subflags, locator);
   }
       
   // T <p U ===> UnsafeMutablePointer<T> <a UnsafeMutablePointer<U>
@@ -3750,7 +3837,7 @@ ConstraintSystem::simplifyRestrictedConstraint(ConversionRestrictionKind restric
     
     return matchTypes(baseType1, baseType2,
                       TypeMatchKind::BindToPointerType,
-                      subFlags, locator);
+                      subflags, locator);
   }
     
   // T < U or T is bridged to V where V < U ===> Array<T> <c Array<U>
@@ -3765,7 +3852,7 @@ ConstraintSystem::simplifyRestrictedConstraint(ConversionRestrictionKind restric
     return matchTypes(baseType1,
                       baseType2,
                       matchKind,
-                      subFlags,
+                      subflags,
                       locator.withPathElement(
                     ConstraintLocator::PathElement::getGenericArgument(0)));
   }
@@ -3785,13 +3872,13 @@ ConstraintSystem::simplifyRestrictedConstraint(ConversionRestrictionKind restric
     increaseScore(SK_CollectionUpcastConversion);
     // The source key and value types must be subtypes of the destination
     // key and value types, respectively.
-    auto result = matchTypes(key1, key2, subMatchKind, subFlags,
+    auto result = matchTypes(key1, key2, subMatchKind, subflags,
                              locator.withPathElement(
                     ConstraintLocator::PathElement::getGenericArgument(0)));
     if (result == SolutionKind::Error)
       return result;
 
-    switch (matchTypes(value1, value2, subMatchKind, subFlags,
+    switch (matchTypes(value1, value2, subMatchKind, subflags,
                        locator.withPathElement(
                   ConstraintLocator::PathElement::getGenericArgument(1)))) {
     case SolutionKind::Solved:
@@ -3817,7 +3904,7 @@ ConstraintSystem::simplifyRestrictedConstraint(ConversionRestrictionKind restric
     return matchTypes(baseType1,
                       baseType2,
                       matchKind,
-                      subFlags,
+                      subflags,
                       locator.withPathElement(
                     ConstraintLocator::PathElement::getGenericArgument(0)));
   }
@@ -3843,15 +3930,10 @@ ConstraintSystem::simplifyRestrictedConstraint(ConversionRestrictionKind restric
     auto constraintLocator = getConstraintLocator(locator);
     auto tv = createTypeVariable(constraintLocator, TVO_PrefersSubtypeBinding);
     
-    addConstraint(
-      Constraint::create(*this,
-                         ConstraintKind::ConformsTo,
-                         tv, hashableProtocol->getDeclaredType(),
-                         DeclName(),
-                         FunctionRefKind::Compound,
-                         constraintLocator));
+    addConstraint(ConstraintKind::ConformsTo, tv,
+                  hashableProtocol->getDeclaredType(), constraintLocator);
 
-    return matchTypes(type1, tv, TypeMatchKind::Conversion, subFlags,
+    return matchTypes(type1, tv, TypeMatchKind::Conversion, subflags,
                       locator);
   }
 
@@ -3873,7 +3955,7 @@ ConstraintSystem::simplifyRestrictedConstraint(ConversionRestrictionKind restric
       return SolutionKind::Error;
     }
 
-    return matchTypes(objcClass, type2, TypeMatchKind::Subtype, subFlags,
+    return matchTypes(objcClass, type2, TypeMatchKind::Subtype, subflags,
                       locator);
   }
 
@@ -3937,11 +4019,11 @@ ConstraintSystem::simplifyRestrictedConstraint(ConversionRestrictionKind restric
     }
 
     // Make sure we have the bridged value type.
-    if (matchTypes(type2, bridgedValueType, TypeMatchKind::SameType, subFlags,
+    if (matchTypes(type2, bridgedValueType, TypeMatchKind::SameType, subflags,
                    locator) == ConstraintSystem::SolutionKind::Error)
       return ConstraintSystem::SolutionKind::Error;
 
-    return matchTypes(type1, objcClass, TypeMatchKind::Subtype, subFlags,
+    return matchTypes(type1, objcClass, TypeMatchKind::Subtype, subflags,
                       locator);
   }
 
@@ -3957,7 +4039,7 @@ ConstraintSystem::simplifyRestrictedConstraint(ConversionRestrictionKind restric
       = nativeClass->getAttrs().getAttribute<ObjCBridgedAttr>()->getObjCClass();
 
     return matchTypes(bridgedObjCClass->getDeclaredInterfaceType(),
-                      type2, TypeMatchKind::Subtype, subFlags, locator);
+                      type2, TypeMatchKind::Subtype, subflags, locator);
   }
 
   // T < U' and U a toll-free-bridged to U' ===> T <c U
@@ -3973,11 +4055,33 @@ ConstraintSystem::simplifyRestrictedConstraint(ConversionRestrictionKind restric
 
     return matchTypes(type1,
                       bridgedObjCClass->getDeclaredInterfaceType(),
-                      TypeMatchKind::Subtype, subFlags, locator);
+                      TypeMatchKind::Subtype, subflags, locator);
   }
   }
   
   llvm_unreachable("bad conversion restriction");
+}
+
+ConstraintSystem::SolutionKind
+ConstraintSystem::simplifyRestrictedConstraint(
+                                       ConversionRestrictionKind restriction,
+                                       Type type1, Type type2,
+                                       TypeMatchKind matchKind,
+                                       TypeMatchOptions flags,
+                                       ConstraintLocatorBuilder locator) {
+  switch (simplifyRestrictedConstraintImpl(restriction, type1, type2,
+                                           matchKind, flags, locator)) {
+  case SolutionKind::Solved:
+    ConstraintRestrictions.push_back(
+      std::make_tuple(type1, type2, restriction));
+    return SolutionKind::Solved;
+
+  case SolutionKind::Unsolved:
+    return SolutionKind::Unsolved;
+
+  case SolutionKind::Error:
+    return SolutionKind::Error;
+  }
 }
 
 bool ConstraintSystem::recordFix(Fix fix, ConstraintLocatorBuilder locator) {
@@ -4007,22 +4111,24 @@ bool ConstraintSystem::recordFix(Fix fix, ConstraintLocatorBuilder locator) {
 
 ConstraintSystem::SolutionKind
 ConstraintSystem::simplifyFixConstraint(Fix fix, Type type1, Type type2,
-                                        TypeMatchKind matchKind, unsigned flags,
+                                        TypeMatchKind matchKind,
+                                        TypeMatchOptions flags,
                                         ConstraintLocatorBuilder locator) {
   if (recordFix(fix, locator))
     return SolutionKind::Error;
 
   // Try with the fix.
-  unsigned subFlags = flags | TMF_ApplyingFix | TMF_GenerateConstraints;
+  TypeMatchOptions subflags =
+    getDefaultDecompositionOptions(flags) | TMF_ApplyingFix;
   switch (fix.getKind()) {
   case FixKind::None:
-    return matchTypes(type1, type2, matchKind, subFlags, locator);
+    return matchTypes(type1, type2, matchKind, subflags, locator);
 
   case FixKind::ForceOptional:
   case FixKind::OptionalChaining:
     // Assume that '!' was applied to the first type.
     return matchTypes(type1->getRValueObjectType()->getOptionalObjectType(),
-                      type2, matchKind, subFlags, locator);
+                      type2, matchKind, subflags, locator);
 
   case FixKind::ForceDowncast:
     // These work whenever they are suggested.
@@ -4032,10 +4138,87 @@ ConstraintSystem::simplifyFixConstraint(Fix fix, Type type1, Type type2,
     // Assume that '&' was applied to the first type, turning an lvalue into
     // an inout.
     return matchTypes(InOutType::get(type1->getRValueType()), type2,
-                      matchKind, subFlags, locator);
+                      matchKind, subflags, locator);
 
   case FixKind::CoerceToCheckedCast:
     llvm_unreachable("handled elsewhere");
+  }
+}
+
+ConstraintSystem::SolutionKind
+ConstraintSystem::addConstraintImpl(ConstraintKind kind, Type first,
+                                    Type second,
+                                    ConstraintLocatorBuilder locator,
+                                    bool isFavored) {
+  assert(first && "Missing first type");
+  assert(second && "Missing second type");
+
+  TypeMatchOptions subflags = TMF_GenerateConstraints;
+  switch (kind) {
+  case ConstraintKind::Equal:
+  case ConstraintKind::Bind:
+  case ConstraintKind::BindParam:
+  case ConstraintKind::Subtype:
+  case ConstraintKind::Conversion:
+  case ConstraintKind::ExplicitConversion:
+  case ConstraintKind::ArgumentConversion:
+  case ConstraintKind::ArgumentTupleConversion:
+  case ConstraintKind::OperatorArgumentTupleConversion:
+  case ConstraintKind::OperatorArgumentConversion:
+    return matchTypes(first, second, getTypeMatchKind(kind), subflags,
+                      locator);
+
+  case ConstraintKind::ApplicableFunction:
+    return simplifyApplicableFnConstraint(first, second, subflags, locator);
+
+  case ConstraintKind::DynamicTypeOf:
+    return simplifyDynamicTypeOfConstraint(first, second, subflags, locator);
+
+  case ConstraintKind::ConformsTo:
+  case ConstraintKind::LiteralConformsTo:
+  case ConstraintKind::SelfObjectOfProtocol:
+    return simplifyConformsToConstraint(first, second, kind, locator,
+                                        subflags);
+
+  case ConstraintKind::CheckedCast:
+    return simplifyCheckedCastConstraint(first, second, subflags, locator);
+
+  case ConstraintKind::OptionalObject:
+    return simplifyOptionalObjectConstraint(first, second, subflags, locator);
+
+  case ConstraintKind::Defaultable:
+    return simplifyDefaultableConstraint(first, second, subflags, locator);
+
+  case ConstraintKind::ValueMember:
+  case ConstraintKind::UnresolvedValueMember:
+  case ConstraintKind::TypeMember:
+  case ConstraintKind::BindOverload:
+  case ConstraintKind::Disjunction:
+    llvm_unreachable("Use the correct addConstraint()");
+  }
+}
+
+void ConstraintSystem::addConstraint(ConstraintKind kind, Type first,
+                                     Type second,
+                                     ConstraintLocatorBuilder locator,
+                                     bool isFavored) {
+  switch (addConstraintImpl(kind, first, second, locator, isFavored)) {
+  case SolutionKind::Error:
+    // Add a failing constraint, if needed.
+    if (shouldAddNewFailingConstraint()) {
+      auto c = Constraint::create(*this, kind, first, second, DeclName(),
+                                  FunctionRefKind::Compound,
+                                  getConstraintLocator(locator));
+      if (isFavored) c->setFavored();
+      addNewFailingConstraint(c);
+    }
+    return;
+
+  case SolutionKind::Unsolved:
+    llvm_unreachable("should have generated constraints");
+
+  case SolutionKind::Solved:
+    return;
   }
 }
 
@@ -4052,55 +4235,40 @@ ConstraintSystem::simplifyConstraint(const Constraint &constraint) {
   case ConstraintKind::ArgumentTupleConversion:
   case ConstraintKind::OperatorArgumentTupleConversion:
   case ConstraintKind::OperatorArgumentConversion: {
-    // For relational constraints, match up the types.
+    // Relational constraints.
     auto matchKind = getTypeMatchKind(constraint.getKind());
 
-    // If there is a fix associated with this constraint, apply it before
-    // we continue.
+    // If there is a fix associated with this constraint, apply it.
     if (auto fix = constraint.getFix()) {
       return simplifyFixConstraint(*fix, constraint.getFirstType(),
                                    constraint.getSecondType(), matchKind,
-                                   TMF_GenerateConstraints,
-                                   constraint.getLocator());
+                                   None, constraint.getLocator());
     }
-
 
     // If there is a restriction on this constraint, apply it directly rather
     // than going through the general \c matchTypes() machinery.
     if (auto restriction = constraint.getRestriction()) {
-      SolutionKind result = simplifyRestrictedConstraint(*restriction,
-                                                         constraint.getFirstType(),
-                                                         constraint.getSecondType(),
-                                                         matchKind,
-                                                         0,
-                                                         constraint.getLocator());
-
-      // If we actually solved something, record what we did.
-      switch(result) {
-      case SolutionKind::Error:
-      case SolutionKind::Unsolved:
-        break;
-
-      case SolutionKind::Solved:
-        ConstraintRestrictions.push_back(
-              std::make_tuple(constraint.getFirstType(),
-                              constraint.getSecondType(), *restriction));
-        break;
-      }
-
-      return result;
+      return simplifyRestrictedConstraint(*restriction,
+                                          constraint.getFirstType(),
+                                          constraint.getSecondType(),
+                                          matchKind, None,
+                                          constraint.getLocator());
     }
 
     return matchTypes(constraint.getFirstType(), constraint.getSecondType(),
-                      matchKind,
-                      TMF_None, constraint.getLocator());
+                      matchKind, None, constraint.getLocator());
   }
 
   case ConstraintKind::ApplicableFunction:
-    return simplifyApplicableFnConstraint(constraint);
+    return simplifyApplicableFnConstraint(constraint.getFirstType(),
+                                          constraint.getSecondType(),
+                                          None, constraint.getLocator());
 
   case ConstraintKind::DynamicTypeOf:
-    return simplifyDynamicTypeOfConstraint(constraint);
+    return simplifyDynamicTypeOfConstraint(constraint.getFirstType(),
+                                           constraint.getSecondType(),
+                                           None,
+                                           constraint.getLocator());
 
   case ConstraintKind::BindOverload:
     resolveOverload(constraint.getLocator(), constraint.getFirstType(),
@@ -4115,11 +4283,12 @@ ConstraintSystem::simplifyConstraint(const Constraint &constraint) {
              constraint.getSecondType(),
              constraint.getKind(),
              constraint.getLocator(),
-             TMF_None);
+             None);
 
   case ConstraintKind::CheckedCast: {
     auto result = simplifyCheckedCastConstraint(constraint.getFirstType(),
                                                 constraint.getSecondType(),
+                                                None,
                                                 constraint.getLocator());
     // NOTE: simplifyCheckedCastConstraint() may return Unsolved, e.g. if the
     // subexpression's type is unresolved. Don't record the fix until we
@@ -4135,21 +4304,27 @@ ConstraintSystem::simplifyConstraint(const Constraint &constraint) {
   }
 
   case ConstraintKind::OptionalObject:
-    return simplifyOptionalObjectConstraint(constraint);
+    return simplifyOptionalObjectConstraint(constraint.getFirstType(),
+                                            constraint.getSecondType(),
+                                            TMF_GenerateConstraints,
+                                            constraint.getLocator());
       
   case ConstraintKind::ValueMember:
   case ConstraintKind::UnresolvedValueMember:
   case ConstraintKind::TypeMember:
-    return simplifyMemberConstraint(constraint);
-
-  case ConstraintKind::Archetype:
-    return simplifyArchetypeConstraint(constraint);
-  
-  case ConstraintKind::Class:
-    return simplifyClassConstraint(constraint);
+    return simplifyMemberConstraint(constraint.getKind(),
+                                    constraint.getFirstType(),
+                                    constraint.getMember(),
+                                    constraint.getSecondType(),
+                                    constraint.getFunctionRefKind(),
+                                    TMF_GenerateConstraints,
+                                    constraint.getLocator());
 
   case ConstraintKind::Defaultable:
-    return simplifyDefaultableConstraint(constraint);
+    return simplifyDefaultableConstraint(constraint.getFirstType(),
+                                         constraint.getSecondType(),
+                                         TMF_GenerateConstraints,
+                                         constraint.getLocator());
 
   case ConstraintKind::Disjunction:
     // Disjunction constraints are never solved here.

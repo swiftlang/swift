@@ -38,3 +38,19 @@ SILBasicBlock *ValueBase::getParentBB() {
     return Arg->getParent();
   return nullptr;
 }
+
+SILFunction *ValueBase::getFunction() {
+  if (auto Inst = dyn_cast<SILInstruction>(this))
+    return Inst->getFunction();
+  if (auto Arg = dyn_cast<SILArgument>(this))
+    return Arg->getFunction();
+  return nullptr;
+}
+
+SILModule *ValueBase::getModule() {
+  if (auto Inst = dyn_cast<SILInstruction>(this))
+    return &Inst->getModule();
+  if (auto Arg = dyn_cast<SILArgument>(this))
+    return &Arg->getModule();
+  return nullptr;
+}

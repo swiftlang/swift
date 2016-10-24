@@ -305,7 +305,7 @@ bb0(%0 : $Agg1):
 sil @store_promotion : $@convention(thin) (@owned B) -> () {
 bb0(%0 : $B):
   %1 = alloc_box $B
-  %1a = project_box %1 : $@box B
+  %1a = project_box %1 : $@box B, 0
   %2 = store %0 to %1a : $*B
   %3 = load %1a : $*B
   %4 = load %1a : $*B
@@ -940,8 +940,8 @@ bb10:                                             // Preds: bb7 bb8 bb9
 // CHECK: return [[TP]]
 sil @test_project_box : $@convention(thin) (@box Builtin.Int32) -> (Builtin.Int32, Builtin.Int32) {
 bb0(%0 : $@box Builtin.Int32):
-  %2 = project_box %0 : $@box Builtin.Int32
-  %3 = project_box %0 : $@box Builtin.Int32
+  %2 = project_box %0 : $@box Builtin.Int32, 0
+  %3 = project_box %0 : $@box Builtin.Int32, 0
   %4 = load %2 : $*Builtin.Int32
   %5 = load %3 : $*Builtin.Int32
 

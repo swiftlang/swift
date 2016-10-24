@@ -41,10 +41,17 @@ struct OwnershipModelEliminatorVisitor
   SILBuilder &B;
 
   OwnershipModelEliminatorVisitor(SILBuilder &B) : B(B) {}
+  void beforeVisit(ValueBase *V) {
+    auto *I = cast<SILInstruction>(V);
+    B.setInsertionPoint(I);
+    B.setCurrentDebugScope(I->getDebugScope());
+  }
 
   bool visitValueBase(ValueBase *V) { return false; }
   bool visitLoadInst(LoadInst *LI);
   bool visitStoreInst(StoreInst *SI);
+  bool visitCopyValueInst(CopyValueInst *CVI);
+  bool visitDestroyValueInst(DestroyValueInst *DVI);
   bool visitLoadBorrowInst(LoadBorrowInst *LBI);
   bool visitEndBorrowInst(EndBorrowInst *EBI) {
     EBI->eraseFromParent();
@@ -64,8 +71,6 @@ bool OwnershipModelEliminatorVisitor::visitLoadInst(LoadInst *LI) {
 
   // Otherwise, we need to break down the load inst into its unqualified
   // components.
-  B.setInsertionPoint(LI);
-  B.setCurrentDebugScope(LI->getDebugScope());
   auto *UnqualifiedLoad = B.createLoad(LI->getLoc(), LI->getOperand());
 
   // If we have a copy, insert a retain_value. All other copies do not require
@@ -91,9 +96,6 @@ bool OwnershipModelEliminatorVisitor::visitStoreInst(StoreInst *SI) {
     return false;
 
   // Otherwise, we need to break down the store.
-  B.setInsertionPoint(SI);
-  B.setCurrentDebugScope(SI->getDebugScope());
-
   if (Qualifier != StoreOwnershipQualifier::Assign) {
     // If the ownership qualifier is not an assign, we can just emit an
     // unqualified store.
@@ -118,14 +120,25 @@ bool OwnershipModelEliminatorVisitor::visitStoreInst(StoreInst *SI) {
 bool
 OwnershipModelEliminatorVisitor::visitLoadBorrowInst(LoadBorrowInst *LBI) {
   // Break down the load borrow into an unqualified load.
-  B.setInsertionPoint(LBI);
-  B.setCurrentDebugScope(LBI->getDebugScope());
   auto *UnqualifiedLoad = B.createLoad(LBI->getLoc(), LBI->getOperand());
 
   // Then remove the qualified load and use the unqualified load as the def of
   // all of LI's uses.
   LBI->replaceAllUsesWith(UnqualifiedLoad);
   LBI->eraseFromParent();
+  return true;
+}
+
+bool OwnershipModelEliminatorVisitor::visitCopyValueInst(CopyValueInst *CVI) {
+  B.createRetainValue(CVI->getLoc(), CVI->getOperand(), Atomicity::Atomic);
+  CVI->replaceAllUsesWith(CVI->getOperand());
+  CVI->eraseFromParent();
+  return true;
+}
+
+bool OwnershipModelEliminatorVisitor::visitDestroyValueInst(DestroyValueInst *DVI) {
+  B.createReleaseValue(DVI->getLoc(), DVI->getOperand(), Atomicity::Atomic);
+  DVI->eraseFromParent();
   return true;
 }
 
@@ -137,8 +150,8 @@ namespace {
 
 struct OwnershipModelEliminator : SILFunctionTransform {
   void run() override {
-    bool MadeChange = false;
     SILFunction *F = getFunction();
+    bool MadeChange = false;
     SILBuilder B(*F);
     OwnershipModelEliminatorVisitor Visitor(B);
 
@@ -158,6 +171,10 @@ struct OwnershipModelEliminator : SILFunctionTransform {
       // that analysis.
       invalidateAnalysis(SILAnalysis::InvalidationKind::Instructions);
     }
+
+    // Now that we have lowered to unqualified ownership, set the unqualified
+    // ownership flag on the function.
+    F->setUnqualifiedOwnership();
   }
 
   StringRef getName() override { return "Ownership Model Eliminator"; }

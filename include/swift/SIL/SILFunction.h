@@ -176,6 +176,13 @@ private:
   ///    method itself. In this case we need to create a vtable stub for it.
   bool Zombie = false;
 
+  /// True if SILOwnership is enabled for this function.
+  ///
+  /// This enables the verifier to easily prove that before the Ownership Model
+  /// Eliminator runs on a function, we only see a non-semantic-arc world and
+  /// after the pass runs, we only see a semantic-arc world.
+  bool HasQualifiedOwnership = true;
+
   SILFunction(SILModule &module, SILLinkage linkage,
               StringRef mangledName, CanSILFunctionType loweredType,
               GenericEnvironment *genericEnv,
@@ -280,6 +287,19 @@ public:
   
   /// Returns true if this function is dead, but kept in the module's zombie list.
   bool isZombie() const { return Zombie; }
+
+  /// Returns true if this function has qualified ownership instructions in it.
+  bool hasQualifiedOwnership() const { return HasQualifiedOwnership; }
+
+  /// Returns true if this function has unqualified ownership instructions in
+  /// it.
+  bool hasUnqualifiedOwnership() const { return !HasQualifiedOwnership; }
+
+  /// Sets the HasQualifiedOwnership flag to false. This signals to SIL that no
+  /// ownership instructions should be in this function any more.
+  void setUnqualifiedOwnership() {
+    HasQualifiedOwnership = false;
+  }
 
   /// Returns the calling convention used by this entry point.
   SILFunctionTypeRepresentation getRepresentation() const {
@@ -694,8 +714,7 @@ public:
 
   /// verify - Run the IR verifier to make sure that the SILFunction follows
   /// invariants.
-  void verify(bool SingleFunction = true,
-              bool EnforceSILOwnership = false) const;
+  void verify(bool SingleFunction = true) const;
 
   /// Pretty-print the SILFunction.
   void dump(bool Verbose) const;

@@ -767,7 +767,7 @@ static void diagnoseSwiftVersion(Optional<version::Version> &vers, Arg *verArg,
   diags.diagnose(SourceLoc(), diag::error_invalid_arg_value,
                  verArg->getAsString(Args), verArg->getValue());
 
-  // Check for an unneeded minor version, otherwise just list valid verions
+  // Check for an unneeded minor version, otherwise just list valid versions
   if (vers.hasValue() && !vers.getValue().empty() &&
       vers.getValue().asMajorVersion().isValidEffectiveLanguageVersion()) {
     diags.diagnose(SourceLoc(), diag::note_swift_version_major,

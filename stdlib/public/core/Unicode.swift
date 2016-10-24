@@ -22,6 +22,7 @@ import SwiftShims
 /// of a decoding error.
 /// 
 /// - SeeAlso: `UnicodeCodec.decode(next:)`
+@_fixed_layout
 public enum UnicodeDecodingResult : Equatable {
   /// A decoded Unicode scalar value.
   case scalarValue(UnicodeScalar)

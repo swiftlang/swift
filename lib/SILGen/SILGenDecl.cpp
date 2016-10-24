@@ -286,7 +286,7 @@ public:
     // it using a box.
     AllocBoxInst *allocBox =
         SGF.B.createAllocBox(decl, lType, {decl->isLet(), ArgNo});
-    SILValue addr = SGF.B.createProjectBox(decl, allocBox);
+    SILValue addr = SGF.B.createProjectBox(decl, allocBox, 0);
 
     // Mark the memory as uninitialized, so DI will track it for us.
     if (NeedsMarkUninit)
@@ -723,7 +723,7 @@ emitEnumMatch(ManagedValue value, EnumElementDecl *ElementDecl,
 
   // If the payload is indirect, project it out of the box.
   if (ElementDecl->isIndirect() || ElementDecl->getParentEnum()->isIndirect()) {
-    SILValue boxedValue = SGF.B.createProjectBox(loc, eltMV.getValue());
+    SILValue boxedValue = SGF.B.createProjectBox(loc, eltMV.getValue(), 0);
     auto &boxedTL = SGF.getTypeLowering(boxedValue->getType());
     if (boxedTL.isLoadable())
       boxedValue = SGF.B.createLoad(loc, boxedValue);

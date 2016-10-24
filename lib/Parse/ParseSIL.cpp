@@ -10,22 +10,23 @@
 //
 //===----------------------------------------------------------------------===//
 
-#include "swift/Basic/Defer.h"
-#include "swift/Basic/Fallthrough.h"
 #include "swift/AST/ArchetypeBuilder.h"
 #include "swift/AST/GenericEnvironment.h"
 #include "swift/AST/NameLookup.h"
-#include "swift/Parse/Parser.h"
+#include "swift/Basic/Defer.h"
+#include "swift/Basic/Fallthrough.h"
 #include "swift/Parse/Lexer.h"
+#include "swift/Parse/Parser.h"
 #include "swift/SIL/AbstractionPattern.h"
+#include "swift/SIL/InstructionUtils.h"
 #include "swift/SIL/SILArgument.h"
 #include "swift/SIL/SILBuilder.h"
 #include "swift/SIL/SILDebugScope.h"
 #include "swift/SIL/SILModule.h"
 #include "swift/SIL/SILUndef.h"
 #include "swift/Subsystems.h"
-#include "llvm/Support/SaveAndRestore.h"
 #include "llvm/ADT/StringSwitch.h"
+#include "llvm/Support/SaveAndRestore.h"
 using namespace swift;
 
 //===----------------------------------------------------------------------===//
@@ -103,6 +104,8 @@ namespace {
     SILParserTUState &TUState;
     SILFunction *F = nullptr;
     GenericEnvironment *GenericEnv = nullptr;
+    FunctionOwnershipEvaluator OwnershipEvaluator;
+
   private:
     /// HadError - Have we seen an error parsing this function?
     bool HadError = false;
@@ -1752,9 +1755,24 @@ bool SILParser::parseSILInstruction(SILBasicBlock *BB, SILBuilder &B) {
 
   case ValueKind::ProjectBoxInst: {
     if (parseTypedValueRef(Val, B) ||
-        parseSILDebugLocation(InstLoc, B))
+        P.parseToken(tok::comma, diag::expected_tok_in_sil_instr, ","))
       return true;
-    ResultVal = B.createProjectBox(InstLoc, Val);
+    
+    if (!P.Tok.is(tok::integer_literal)) {
+      P.diagnose(P.Tok, diag::expected_tok_in_sil_instr, "integer");
+      return true;
+    }
+    
+    unsigned Index;
+    bool error = P.Tok.getText().getAsInteger(0, Index);
+    assert(!error && "project_box index did not parse as integer?!");
+    (void)error;
+
+    P.consumeToken(tok::integer_literal);
+    if (parseSILDebugLocation(InstLoc, B))
+      return true;
+    
+    ResultVal = B.createProjectBox(InstLoc, Val, Index);
     break;
   }
       
@@ -1924,6 +1942,8 @@ bool SILParser::parseSILInstruction(SILBasicBlock *BB, SILBuilder &B) {
     UNARY_INSTRUCTION(IsUnique)
     UNARY_INSTRUCTION(IsUniqueOrPinned)
     UNARY_INSTRUCTION(DestroyAddr)
+    UNARY_INSTRUCTION(CopyValue)
+    UNARY_INSTRUCTION(DestroyValue)
     UNARY_INSTRUCTION(CondFail)
     REFCOUNTING_INSTRUCTION(StrongPin)
     REFCOUNTING_INSTRUCTION(StrongRetain)
@@ -2333,7 +2353,8 @@ bool SILParser::parseSILInstruction(SILBasicBlock *BB, SILBuilder &B) {
         || parseValueName(SelfName)
         || P.parseToken(tok::r_paren, diag::expected_tok_in_sil_instr, ")")
         || P.parseToken(tok::colon, diag::expected_tok_in_sil_instr, ":")
-        || parseSILType(SetterTy, SetterSig, SetterEnv))
+        || parseSILType(SetterTy, SetterSig, SetterEnv)
+        || parseSILDebugLocation(InstLoc, B))
       return true;
     
     // Resolve the types of the operands.
@@ -2428,7 +2449,7 @@ bool SILParser::parseSILInstruction(SILBasicBlock *BB, SILBuilder &B) {
 
   case ValueKind::EndBorrowInst: {
     UnresolvedValueName BorrowDestName, BorrowSourceName;
-    SourceLoc ToLoc, BorrowDestLoc;
+    SourceLoc ToLoc;
     Identifier ToToken;
     SILType BorrowDestTy, BorrowSourceTy;
 
@@ -2515,13 +2536,6 @@ bool SILParser::parseSILInstruction(SILBasicBlock *BB, SILBuilder &B) {
     }
 
     SILType ValType = addrVal->getType().getObjectType();
-
-    if (Opcode == ValueKind::StoreInst) {
-      ResultVal = B.createStore(InstLoc,
-                                getLocalValue(from, ValType, InstLoc, B),
-                                addrVal);
-      break;
-    }
 
     assert(Opcode == ValueKind::AssignInst);
     ResultVal = B.createAssign(InstLoc,
@@ -3983,6 +3997,15 @@ bool SILParser::parseSILBasicBlock(SILBuilder &B) {
   do {
     if (parseSILInstruction(BB, B))
       return true;
+    // Evaluate how the just parsed instruction effects this functions Ownership
+    // Qualification. For more details, see the comment on the
+    // FunctionOwnershipEvaluator class.
+    SILInstruction *ParsedInst = &*BB->rbegin();
+    if (!OwnershipEvaluator.evaluate(ParsedInst)) {
+      P.diagnose(ParsedInst->getLoc().getSourceLoc(),
+                 diag::found_unqualified_instruction_in_qualified_function,
+                 F->getName());
+    }
   } while (isStartOfSILInstruction());
 
   return false;
@@ -4078,6 +4101,7 @@ bool Parser::parseDeclSIL() {
       }
       
       // Parse the basic block list.
+      FunctionState.OwnershipEvaluator.reset(FunctionState.F);
       SILOpenedArchetypesTracker OpenedArchetypesTracker(*FunctionState.F);
       SILBuilder B(*FunctionState.F);
       // Track the archetypes just like SILGen. This

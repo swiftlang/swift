@@ -122,22 +122,17 @@ Parser::parseGenericParameters(SourceLoc LAngleLoc) {
   
   // Parse the closing '>'.
   SourceLoc RAngleLoc;
-  if (!startsWithGreater(Tok)) {
+  if (startsWithGreater(Tok)) {
+    RAngleLoc = consumeStartingGreater();
+  } else {
     if (!Invalid) {
       diagnose(Tok, diag::expected_rangle_generics_param);
       diagnose(LAngleLoc, diag::opening_angle);
-      
       Invalid = true;
     }
-    
+
     // Skip until we hit the '>'.
-    skipUntilGreaterInTypeList();
-    if (startsWithGreater(Tok))
-      RAngleLoc = consumeStartingGreater();
-    else
-      Invalid = true;
-  } else {
-    RAngleLoc = consumeStartingGreater();
+    RAngleLoc = skipUntilGreaterInTypeList();
   }
 
   if (GenericParams.empty() || Invalid) {

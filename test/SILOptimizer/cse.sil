@@ -111,7 +111,7 @@ bb0:
 sil @removeTriviallyDeadInstructions : $@convention(thin) (@owned B) -> () {
 bb0(%0 : $B):
   %1 = alloc_box $B
-  %1a = project_box %1 : $@box B
+  %1a = project_box %1 : $@box B, 0
   %2 = store %0 to %1a : $*B
   %3 = load %1a : $*B
   %4 = strong_retain %3 : $B
@@ -424,8 +424,8 @@ bb0(%0 : $*Interval):
 // CHECK: return
 sil @project_box_test : $(@box Builtin.Int32) -> Builtin.Int32 {
 bb0(%0 : $@box Builtin.Int32):
-  %1 = project_box %0 : $@box Builtin.Int32
-  %2 = project_box %0 : $@box Builtin.Int32
+  %1 = project_box %0 : $@box Builtin.Int32, 0
+  %2 = project_box %0 : $@box Builtin.Int32, 0
   %3 = function_ref @sadd_with_address : $@convention(thin) (@inout Builtin.Int32, @inout Builtin.Int32) -> (Builtin.Int32)
   %4 = apply %3(%1, %2) : $@convention(thin) (@inout Builtin.Int32, @inout Builtin.Int32) -> (Builtin.Int32)
   return %4 : $(Builtin.Int32)

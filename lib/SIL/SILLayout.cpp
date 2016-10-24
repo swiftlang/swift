@@ -1,4 +1,4 @@
-//===--- SILLayout.cpp - Defines SIL-level aggregate layouts ----*- C++ -*-===//
+//===--- SILLayout.cpp - Defines SIL-level aggregate layouts --------------===//
 //
 // This source file is part of the Swift.org open source project
 //

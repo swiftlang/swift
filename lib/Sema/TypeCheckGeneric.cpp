@@ -206,7 +206,7 @@ Type CompleteGenericTypeResolver::resolveDependentMemberType(
   // concrete type, or resolve its components down to another dependent member.
   if (auto alias = nestedPA->getTypeAliasDecl()) {
     return TC.substMemberTypeWithBase(DC->getParentModule(), alias,
-                                      baseTy, true);
+                                      baseTy);
   }
   
   Identifier name = ref->getIdentifier();
