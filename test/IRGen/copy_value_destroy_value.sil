@@ -1,4 +1,5 @@
 // RUN: %target-swift-frontend -parse-sil -emit-ir %s | %FileCheck %s
+// REQUIRES: OS=macosx
 
 // Make sure that we are using type lowering and that we are handling the return
 // value correctly.
