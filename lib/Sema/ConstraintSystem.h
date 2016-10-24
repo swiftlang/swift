@@ -1490,7 +1490,7 @@ public:
     if (isFavored)
       constraint->setFavored();
 
-    addConstraint(constraint);
+    addUnsolvedConstraint(constraint);
   }
 
   /// Whether we should add a new constraint to capture a failure.

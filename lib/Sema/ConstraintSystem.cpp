@@ -1389,6 +1389,12 @@ void ConstraintSystem::addOverloadSet(Type boundType,
                                       OverloadChoice *favoredChoice) {
   assert(!choices.empty() && "Empty overload set");
 
+  // If there is a single choice, add the bind overload directly.
+  if (choices.size() == 1) {
+    addBindOverloadConstraint(boundType, choices.front(), locator);
+    return;
+  }
+
   SmallVector<Constraint *, 4> overloads;
   
   // As we do for other favored constraints, if a favored overload has been
