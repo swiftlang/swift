@@ -3985,8 +3985,12 @@ bool SILParser::parseSILBasicBlock(SILBuilder &B) {
     // Evaluate how the just parsed instruction effects this functions Ownership
     // Qualification. For more details, see the comment on the
     // FunctionOwnershipEvaluator class.
-    if (!OwnershipEvaluator.evaluate(&*BB->rbegin()))
-      return true;
+    SILInstruction *ParsedInst = &*BB->rbegin();
+    if (!OwnershipEvaluator.evaluate(ParsedInst)) {
+      P.diagnose(ParsedInst->getLoc().getSourceLoc(),
+                 diag::found_unqualified_instruction_in_qualified_function,
+                 F->getName());
+    }
   } while (isStartOfSILInstruction());
 
   return false;
