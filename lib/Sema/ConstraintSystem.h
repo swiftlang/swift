@@ -1373,12 +1373,6 @@ public:
   /// emits an error message.
   void diagnoseFailureForExpr(Expr *expr);
 
-  /// \brief Add a newly-allocated constraint after attempting to simplify
-  /// it.
-  ///
-  /// \returns true if this constraint was solved.
-  bool addConstraint(Constraint *constraint);
-
   /// \brief Add a constraint to the constraint system.
   void addConstraint(ConstraintKind kind, Type first, Type second,
                      ConstraintLocatorBuilder locator,
@@ -1490,7 +1484,7 @@ public:
     if (isFavored)
       constraint->setFavored();
 
-    addConstraint(constraint);
+    addUnsolvedConstraint(constraint);
   }
 
   /// Whether we should add a new constraint to capture a failure.
@@ -1858,9 +1852,8 @@ private:
   ///
   /// \returns the result of performing the tuple-to-tuple conversion.
   SolutionKind matchTupleTypes(TupleType *tuple1, TupleType *tuple2,
-                                         TypeMatchKind kind,
-                               TypeMatchOptions flags,
-                                         ConstraintLocatorBuilder locator);
+                               TypeMatchKind kind, TypeMatchOptions flags,
+                               ConstraintLocatorBuilder locator);
 
   /// \brief Subroutine of \c matchTypes(), which matches a scalar type to
   /// a tuple type.
@@ -2024,6 +2017,7 @@ private:
 
   /// Attempt to simplify a checked-cast constraint.
   SolutionKind simplifyCheckedCastConstraint(Type fromType, Type toType,
+                                             TypeMatchOptions flags,
                                              ConstraintLocatorBuilder locator);
 
   /// \brief Attempt to simplify the given member constraint.
@@ -2036,16 +2030,28 @@ private:
 
   
   /// \brief Attempt to simplify the optional object constraint.
-  SolutionKind simplifyOptionalObjectConstraint(const Constraint &constraint);
+  SolutionKind simplifyOptionalObjectConstraint(
+                                          Type first, Type second,
+                                          TypeMatchOptions flags,
+                                          ConstraintLocatorBuilder locator);
 
   /// \brief Attempt to simplify the ApplicableFunction constraint.
-  SolutionKind simplifyApplicableFnConstraint(const Constraint &constraint);
+  SolutionKind simplifyApplicableFnConstraint(
+                                      Type type1,
+                                      Type type2,
+                                      TypeMatchOptions flags,
+                                      ConstraintLocatorBuilder locator);
 
   /// \brief Attempt to simplify the given DynamicTypeOf constraint.
-  SolutionKind simplifyDynamicTypeOfConstraint(const Constraint &constraint);
+  SolutionKind simplifyDynamicTypeOfConstraint(
+                                         Type type1, Type type2,
+                                         TypeMatchOptions flags,
+                                         ConstraintLocatorBuilder locator);
 
   /// \brief Attempt to simplify the given defaultable constraint.
-  SolutionKind simplifyDefaultableConstraint(const Constraint &c);
+  SolutionKind simplifyDefaultableConstraint(Type first, Type second,
+                                             TypeMatchOptions flags,
+                                             ConstraintLocatorBuilder locator);
 
   /// \brief Simplify a conversion constraint by applying the given
   /// reduction rule, which is known to apply at the outermost level.
@@ -2091,6 +2097,11 @@ public:
   SolutionKind simplifyConstraint(const Constraint &constraint);
 
 private:
+  /// \brief Add a constraint to the constraint system.
+  SolutionKind addConstraintImpl(ConstraintKind kind, Type first, Type second,
+                                 ConstraintLocatorBuilder locator,
+                                 bool isFavored);
+
   /// \brief Solve the system of constraints after it has already been
   /// simplified.
   ///

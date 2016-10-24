@@ -3985,7 +3985,7 @@ bool SILParser::parseSILBasicBlock(SILBuilder &B) {
     // Evaluate how the just parsed instruction effects this functions Ownership
     // Qualification. For more details, see the comment on the
     // FunctionOwnershipEvaluator class.
-    if (!OwnershipEvaluator.evaluate(*BB->rbegin()))
+    if (!OwnershipEvaluator.evaluate(&*BB->rbegin()))
       return true;
   } while (isStartOfSILInstruction());
 

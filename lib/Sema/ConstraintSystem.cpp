@@ -333,37 +333,6 @@ ConstraintLocator *ConstraintSystem::getConstraintLocator(
   return getConstraintLocator(anchor, path, builder.getSummaryFlags());
 }
 
-bool ConstraintSystem::addConstraint(Constraint *constraint) {
-  switch (simplifyConstraint(*constraint)) {
-  case SolutionKind::Error:
-    if (!failedConstraint) {
-      failedConstraint = constraint;
-    }
-
-    if (solverState) {
-      solverState->retiredConstraints.push_front(constraint);
-      solverState->generatedConstraints.push_back(constraint);
-    }
-
-    return false;
-
-  case SolutionKind::Solved:
-    // This constraint has already been solved; there is nothing more
-    // to do.
-    // Record solved constraint.
-    if (solverState) {
-      solverState->retiredConstraints.push_front(constraint);
-      solverState->generatedConstraints.push_back(constraint);
-    }
-
-    return true;
-
-  case SolutionKind::Unsolved:
-    addUnsolvedConstraint(constraint);
-    return false;
-  }
-}
-
 TypeVariableType *
 ConstraintSystem::getMemberType(TypeVariableType *baseTypeVar, 
                                 AssociatedTypeDecl *assocType,
@@ -1388,6 +1357,12 @@ void ConstraintSystem::addOverloadSet(Type boundType,
                                       ConstraintLocator *locator,
                                       OverloadChoice *favoredChoice) {
   assert(!choices.empty() && "Empty overload set");
+
+  // If there is a single choice, add the bind overload directly.
+  if (choices.size() == 1) {
+    addBindOverloadConstraint(boundType, choices.front(), locator);
+    return;
+  }
 
   SmallVector<Constraint *, 4> overloads;
   

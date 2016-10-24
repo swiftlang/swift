@@ -1349,6 +1349,22 @@ public:
             "Source value should be an object value");
   }
 
+  void checkCopyValueInst(CopyValueInst *I) {
+    require(I->getOperand()->getType().isObject(),
+            "Source value should be an object value");
+    requireTrueOrNone(F.hasQualifiedOwnership(),
+                      "copy_value is only valid in functions with qualified "
+                      "ownership");
+  }
+
+  void checkDestroyValueInst(DestroyValueInst *I) {
+    require(I->getOperand()->getType().isObject(),
+            "Source value should be an object value");
+    requireTrueOrNone(F.hasQualifiedOwnership(),
+                      "destroy_value is only valid in functions with qualified "
+                      "ownership");
+  }
+
   void checkReleaseValueInst(ReleaseValueInst *I) {
     require(I->getOperand()->getType().isObject(),
             "Source value should be an object value");

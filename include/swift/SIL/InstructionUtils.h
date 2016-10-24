@@ -112,7 +112,7 @@ public:
     F = NewF;
     HasOwnershipQualifiedInstruction = false;
   }
-  bool evaluate(const SILInstruction &I);
+  bool evaluate(SILInstruction *I);
 };
 
 } // end namespace swift
