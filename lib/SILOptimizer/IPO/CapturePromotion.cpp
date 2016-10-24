@@ -536,7 +536,7 @@ ClosureCloner::visitStrongReleaseInst(StrongReleaseInst *Inst) {
       SILFunction &F = getBuilder().getFunction();
       auto &typeLowering = F.getModule().getTypeLowering(I->second->getType());
       SILBuilderWithPostProcess<ClosureCloner, 1> B(this, Inst);
-      typeLowering.emitReleaseValue(B, Inst->getLoc(), I->second);
+      typeLowering.emitDestroyValue(B, Inst->getLoc(), I->second);
       return;
     }
   }

@@ -238,7 +238,7 @@ public:
   /// Emit a lowered 'release_value' operation.
   ///
   /// This type must be loadable.
-  virtual void emitLoweredReleaseValue(SILBuilder &B, SILLocation loc,
+  virtual void emitLoweredDestroyValue(SILBuilder &B, SILLocation loc,
                                        SILValue value,
                                        LoweringStyle loweringStyle) const = 0;
 
@@ -246,24 +246,24 @@ public:
                                     SILValue value,
                                     LoweringStyle loweringStyle) const {
     if (loweringStyle != LoweringStyle::Shallow)
-      return emitLoweredReleaseValue(B, loc, value, loweringStyle);
-    return emitReleaseValue(B, loc, value);
+      return emitLoweredDestroyValue(B, loc, value, loweringStyle);
+    return emitDestroyValue(B, loc, value);
   }
 
   /// Emit a lowered 'release_value' operation.
   ///
   /// This type must be loadable.
-  void emitLoweredReleaseValueShallow(SILBuilder &B, SILLocation loc,
+  void emitLoweredDestroyValueShallow(SILBuilder &B, SILLocation loc,
                                       SILValue value) const {
-    emitLoweredReleaseValue(B, loc, value, LoweringStyle::Shallow);
+    emitLoweredDestroyValue(B, loc, value, LoweringStyle::Shallow);
   }
 
   /// Emit a lowered 'release_value' operation.
   ///
   /// This type must be loadable.
-  void emitLoweredReleaseValueDeepNoEnum(SILBuilder &B, SILLocation loc,
+  void emitLoweredDestroyValueDeepNoEnum(SILBuilder &B, SILLocation loc,
                                          SILValue value) const {
-    emitLoweredReleaseValue(B, loc, value, LoweringStyle::DeepNoEnum);
+    emitLoweredDestroyValue(B, loc, value, LoweringStyle::DeepNoEnum);
   }
 
   /// Given a primitively loaded value of this type (which must be
@@ -274,30 +274,30 @@ public:
   /// example, it performs an unowned_release on a value of [unknown]
   /// type.  It is therefore not necessarily the right thing to do on
   /// a semantic load.
-  virtual void emitReleaseValue(SILBuilder &B, SILLocation loc,
+  virtual void emitDestroyValue(SILBuilder &B, SILLocation loc,
                                 SILValue value) const = 0;
 
   /// Emit a lowered 'retain_value' operation.
   ///
   /// This type must be loadable.
-  virtual void emitLoweredRetainValue(SILBuilder &B, SILLocation loc,
+  virtual void emitLoweredCopyValue(SILBuilder &B, SILLocation loc,
                                     SILValue value,
                                     LoweringStyle style) const = 0;
 
   /// Emit a lowered 'retain_value' operation.
   ///
   /// This type must be loadable.
-  void emitLoweredRetainValueShallow(SILBuilder &B, SILLocation loc,
+  void emitLoweredCopyValueShallow(SILBuilder &B, SILLocation loc,
                                    SILValue value) const {
-    emitLoweredRetainValue(B, loc, value, LoweringStyle::Shallow);
+    emitLoweredCopyValue(B, loc, value, LoweringStyle::Shallow);
   }
 
   /// Emit a lowered 'retain_value' operation.
   ///
   /// This type must be loadable.
   void emitLoweredRetainValueDeepNoEnum(SILBuilder &B, SILLocation loc,
-                                      SILValue value) const {
-    emitLoweredRetainValue(B, loc, value, LoweringStyle::DeepNoEnum);
+                                        SILValue value) const {
+    emitLoweredCopyValue(B, loc, value, LoweringStyle::DeepNoEnum);
   }
 
   /// Given a primitively loaded value of this type (which must be
@@ -307,16 +307,16 @@ public:
   /// with exactly the same semantics.  For example, it performs an
   /// unowned_retain on a value of [unknown] type.  It is therefore
   /// not necessarily the right thing to do on a semantic load.
-  virtual void emitRetainValue(SILBuilder &B, SILLocation loc,
+  virtual void emitCopyValue(SILBuilder &B, SILLocation loc,
                              SILValue value) const = 0;
 
   void emitLoweredCopyChildValue(SILBuilder &B, SILLocation loc,
                                  SILValue value,
                                  LoweringStyle style) const {
     if (style != LoweringStyle::Shallow) {
-      emitLoweredRetainValue(B, loc, value, style);
+      emitLoweredCopyValue(B, loc, value, style);
     } else {
-      emitRetainValue(B, loc, value);
+      emitCopyValue(B, loc, value);
     }
   }
 

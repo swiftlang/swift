@@ -2422,7 +2422,7 @@ RValue SILGenFunction::emitApply(
 
     case ResultConvention::Unowned:
       // Unretained. Retain the value.
-      resultTL.emitRetainValue(B, loc, result);
+      resultTL.emitCopyValue(B, loc, result);
       break;
     }
 

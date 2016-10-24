@@ -1489,7 +1489,7 @@ public:
   void emitRetainValueOperation(SILLocation Loc, SILValue v) {
     assert(!v->getType().isAddress());
     auto &lowering = getTypeLowering(v->getType());
-    return lowering.emitRetainValue(*this, Loc, v);
+    lowering.emitCopyValue(*this, Loc, v);
   }
 
   /// Convenience function for calling TypeLowering.emitRelease on the type
@@ -1497,7 +1497,7 @@ public:
   void emitReleaseValueOperation(SILLocation Loc, SILValue v) {
     assert(!v->getType().isAddress());
     auto &lowering = getTypeLowering(v->getType());
-    lowering.emitReleaseValue(*this, Loc, v);
+    lowering.emitDestroyValue(*this, Loc, v);
   }
 
   SILValue emitTupleExtract(SILLocation Loc, SILValue Operand, unsigned FieldNo,
