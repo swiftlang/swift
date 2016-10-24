@@ -2684,30 +2684,22 @@ public func ${x.operator}= <
 //===--- end of FIXME(integers) -------------------------------------------===//
 
 //===----------------------------------------------------------------------===//
-// FIXME(integers): Remove these operators in favour of the generic ones on
-//                  Arithmetic
-//===----------------------------------------------------------------------===//
-#if false
 extension ${Self} {
 // Operations with potentially-static overflow checking
 //
 // FIXME: must use condfail in these operators, rather than
 // overflowChecked, pending <rdar://problem/16271923> so that we don't
 // foil static checking for numeric overflows.
-% for op, method, label in [
-%    ('+', 'adding', ''),
-%    ('*', 'multiplied', 'by: '),
-%    ('-','subtracting', ''),
-%    ('/', 'divided', 'by: '),
-%    ('%', 'remainder', 'dividingBy: ')
-%  ]:
+% for op in ['+', '*', '-', '/', '%']:
+  @available(swift, obsoleted: 4.0)
   @_transparent
   public static func ${op} (lhs: ${Self}, rhs: ${Self}) -> ${Self} {
-    return lhs.${method}(${label}rhs)
+    var lhs = lhs
+    lhs ${op}= rhs
+    return lhs
   }
 % end
 }
-#endif
 //===--- end of FIXME(integers) -------------------------------------------===//
 
 % end # end of concrete FixedWidthInteger section
