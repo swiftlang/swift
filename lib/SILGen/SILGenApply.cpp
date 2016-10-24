@@ -4764,10 +4764,8 @@ RValue SILGenFunction::emitLiteral(LiteralExpr *literal, SGFContext C) {
     switch (magicLiteral->getKind()) {
     case MagicIdentifierLiteralExpr::File: {
       StringRef value = "";
-      if (loc.isValid()) {
-        unsigned bufferID = ctx.SourceMgr.findBufferContainingLoc(loc);
-        value = ctx.SourceMgr.getIdentifierForBuffer(bufferID);
-      }
+      if (loc.isValid())
+        value = ctx.SourceMgr.getBufferIdentifierForLoc(loc);
       builtinLiteralArgs = emitStringLiteral(*this, literal, value, C,
                                              magicLiteral->getStringEncoding());
       builtinInit = magicLiteral->getBuiltinInitializer();
