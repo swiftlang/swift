@@ -1755,9 +1755,24 @@ bool SILParser::parseSILInstruction(SILBasicBlock *BB, SILBuilder &B) {
 
   case ValueKind::ProjectBoxInst: {
     if (parseTypedValueRef(Val, B) ||
-        parseSILDebugLocation(InstLoc, B))
+        P.parseToken(tok::comma, diag::expected_tok_in_sil_instr, ","))
       return true;
-    ResultVal = B.createProjectBox(InstLoc, Val);
+    
+    if (!P.Tok.is(tok::integer_literal)) {
+      P.diagnose(P.Tok, diag::expected_tok_in_sil_instr, "integer");
+      return true;
+    }
+    
+    unsigned Index;
+    bool error = P.Tok.getText().getAsInteger(0, Index);
+    assert(!error && "project_box index did not parse as integer?!");
+    (void)error;
+
+    P.consumeToken(tok::integer_literal);
+    if (parseSILDebugLocation(InstLoc, B))
+      return true;
+    
+    ResultVal = B.createProjectBox(InstLoc, Val, Index);
     break;
   }
       

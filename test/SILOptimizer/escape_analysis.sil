@@ -398,10 +398,10 @@ sil @call_copy_addr_content : $@convention(thin) () -> () {
 sil @test_partial_apply : $@convention(thin) (Int64, @owned X, @owned Y) -> Int64 {
 bb0(%0 : $Int64, %1 : $X, %2 : $Y):
   %3 = alloc_box $Int64
-  %4 = project_box %3 : $@box Int64
+  %4 = project_box %3 : $@box Int64, 0
   store %0 to %4 : $*Int64
   %6 = alloc_box $Y
-  %7 = project_box %6 : $@box Y
+  %7 = project_box %6 : $@box Y, 0
   store %2 to %7 : $*Y
   %9 = function_ref @closure1 : $@convention(thin) (@owned X, @owned @box Int64, @owned @box Y) -> Int64
   strong_retain %3 : $@box Int64
@@ -429,8 +429,8 @@ bb0(%0 : $Int64, %1 : $X, %2 : $Y):
 // CHECK-NEXT:  End
 sil @closure1 : $@convention(thin) (@owned X, @owned @box Int64, @owned @box Y) -> Int64 {
 bb0(%0 : $X, %1 : $@box Int64, %2 : $@box Y):
-  %3 = project_box %1 : $@box Int64
-  %4 = project_box %2 : $@box Y
+  %3 = project_box %1 : $@box Int64, 0
+  %4 = project_box %2 : $@box Y, 0
   %5 = load %3 : $*Int64
   %6 = function_ref @closure2 : $@convention(thin) (@owned X, @owned @box Y) -> ()
   %7 = partial_apply %6(%2) : $@convention(thin) (@owned X, @owned @box Y) -> ()
@@ -449,7 +449,7 @@ bb0(%0 : $X, %1 : $@box Int64, %2 : $@box Y):
 // CHECK-NEXT:  End
 sil @closure2 : $@convention(thin) (@owned X, @owned @box Y) -> () {
 bb0(%0 : $X, %1 : $@box Y):
-  %2 = project_box %1 : $@box Y
+  %2 = project_box %1 : $@box Y, 0
   %3 = load %2 : $*Y
   %4 = ref_element_addr %3 : $Y, #Y.x
   store %0 to %4 : $*X
@@ -470,7 +470,7 @@ bb0(%0 : $X, %1 : $@box Y):
 sil @test_escaped_box : $@convention(thin) (Int64) -> Int64 {
 bb0(%0 : $Int64):
   %1 = alloc_box $Int64
-  %2 = project_box %1 : $@box Int64
+  %2 = project_box %1 : $@box Int64, 0
   store %0 to %2 : $*Int64
 
   %4 = function_ref @let_box_escape : $@convention(thin) (@owned @box Int64) -> Int64
@@ -491,7 +491,7 @@ bb0(%0 : $Int64):
 // CHECK-NEXT:  End
 sil @let_box_escape : $@convention(thin) (@owned @box Int64) -> Int64 {
 bb0(%0 : $@box Int64):
-  %1 = project_box %0 : $@box Int64
+  %1 = project_box %0 : $@box Int64, 0
   %2 = load %1 : $*Int64
 
   %3 = function_ref @takebox : $@convention(thin) (@owned @box Int64) -> ()
@@ -513,7 +513,7 @@ sil @takebox :  $@convention(thin) (@owned @box Int64) -> ()
 sil @test_escaped_partial_apply : $@convention(thin) (Int64) -> () {
 bb0(%0 : $Int64):
   %1 = alloc_box $Int64
-  %2 = project_box %1 : $@box Int64
+  %2 = project_box %1 : $@box Int64, 0
   store %0 to %2 : $*Int64
   %4 = function_ref @closure3 : $@convention(thin) (@owned @box Int64) -> Int64
   strong_retain %1 : $@box Int64
@@ -533,7 +533,7 @@ bb0(%0 : $Int64):
 // CHECK-NEXT:  End
 sil @closure3 : $@convention(thin) (@owned @box Int64) -> Int64 {
 bb0(%0 : $@box Int64):
-  %1 = project_box %0 : $@box Int64
+  %1 = project_box %0 : $@box Int64, 0
   %2 = load %1 : $*Int64
   strong_release %0 : $@box Int64
   return %2 : $Int64
@@ -750,7 +750,7 @@ sil @unknown_throwing_func : $@convention(thin) (@owned X) -> (@owned X, @error 
 sil @test_release_of_partial_apply_with_box : $@convention(thin) (@owned Y) -> () {
 bb0(%0 : $Y):
   %1 = alloc_box $Y
-  %2 = project_box %1 : $@box Y
+  %2 = project_box %1 : $@box Y, 0
   store %0 to %2 : $*Y
   %3 = function_ref @take_y_box : $@convention(thin) (@owned @box Y) -> ()
   %4 = partial_apply %3(%1) : $@convention(thin) (@owned @box Y) -> ()

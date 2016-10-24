@@ -1226,17 +1226,13 @@ public:
     return insert(new (F.getModule()) ProjectValueBufferInst(
         getSILDebugLocation(Loc), valueType, operand));
   }
-  ProjectBoxInst *createProjectBox(SILLocation Loc, SILValue boxOperand) {
-    auto valueTy =
-        boxOperand->getType().castTo<SILBoxType>()->getBoxedAddressType();
+  ProjectBoxInst *createProjectBox(SILLocation Loc, SILValue boxOperand,
+                                   unsigned index) {
+    auto boxTy = boxOperand->getType().castTo<SILBoxType>();
+    auto fieldTy = boxTy->getFieldType(index);
 
     return insert(new (F.getModule()) ProjectBoxInst(
-        getSILDebugLocation(Loc), valueTy, boxOperand));
-  }
-  ProjectBoxInst *createProjectBox(SILLocation Loc, SILType valueTy,
-                                   SILValue boxOperand) {
-    return insert(new (F.getModule()) ProjectBoxInst(
-        getSILDebugLocation(Loc), valueTy, boxOperand));
+        getSILDebugLocation(Loc), boxOperand, index, fieldTy));
   }
   ProjectExistentialBoxInst *createProjectExistentialBox(SILLocation Loc,
                                                          SILType valueTy,

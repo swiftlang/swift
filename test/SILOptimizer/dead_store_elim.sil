@@ -198,7 +198,7 @@ bb0:
 sil @store_after_store : $@convention(thin) (@owned B) -> () {
 bb0(%0 : $B):
   %1 = alloc_box $B
-  %1a = project_box %1 : $@box B
+  %1a = project_box %1 : $@box B, 0
   %2 = store %0 to %1a : $*B
   %3 = store %0 to %1a : $*B
   %4 = tuple()

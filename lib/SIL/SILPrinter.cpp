@@ -1528,10 +1528,11 @@ public:
     *this << PVBI->getValueType() << " in " << getIDAndType(PVBI->getOperand());
   }
   void visitProjectBoxInst(ProjectBoxInst *PBI) {
-    *this << getIDAndType(PBI->getOperand());
+    *this << getIDAndType(PBI->getOperand()) << ", " << PBI->getFieldIndex();
   }
   void visitProjectExistentialBoxInst(ProjectExistentialBoxInst *PEBI) {
-    *this << PEBI->getValueType() << " in " << getIDAndType(PEBI->getOperand());
+    *this << PEBI->getType().getObjectType()
+          << " in " << getIDAndType(PEBI->getOperand());
   }
 
   void visitCondFailInst(CondFailInst *FI) {
