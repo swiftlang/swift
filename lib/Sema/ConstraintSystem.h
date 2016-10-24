@@ -1373,12 +1373,6 @@ public:
   /// emits an error message.
   void diagnoseFailureForExpr(Expr *expr);
 
-  /// \brief Add a newly-allocated constraint after attempting to simplify
-  /// it.
-  ///
-  /// \returns true if this constraint was solved.
-  bool addConstraint(Constraint *constraint);
-
   /// \brief Add a constraint to the constraint system.
   void addConstraint(ConstraintKind kind, Type first, Type second,
                      ConstraintLocatorBuilder locator,
@@ -1490,7 +1484,7 @@ public:
     if (isFavored)
       constraint->setFavored();
 
-    addConstraint(constraint);
+    addUnsolvedConstraint(constraint);
   }
 
   /// Whether we should add a new constraint to capture a failure.
