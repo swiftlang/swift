@@ -866,6 +866,14 @@ public:
   Type getTypeOfMember(ModuleDecl *module, Type memberType,
                        const DeclContext *memberDC);
 
+  /// Get the type of a superclass member as seen from the subclass,
+  /// substituting generic parameters, dynamic Self return, and the
+  /// 'self' argument type as appropriate.
+  Type adjustSuperclassMemberDeclType(const ValueDecl *decl,
+                                      const ValueDecl *parentDecl,
+                                      Type memberType,
+                                      LazyResolver *resolver);
+
   /// Return T if this type is Optional<T>; otherwise, return the null type.
   Type getOptionalObjectType();
 

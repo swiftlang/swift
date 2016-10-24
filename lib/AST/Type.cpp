@@ -3053,12 +3053,54 @@ Type TypeBase::getTypeOfMember(Module *module, Type memberType,
     return memberType;
 
   // Compute the set of member substitutions to apply.
-  TypeSubstitutionMap substitutions = getMemberSubstitutions(memberDC);
+  auto substitutions = getMemberSubstitutions(memberDC);
   if (substitutions.empty())
     return memberType;
 
   // Perform the substitutions.
   return memberType.subst(module, substitutions, None);
+}
+
+Type TypeBase::adjustSuperclassMemberDeclType(const ValueDecl *decl,
+                                              const ValueDecl *parentDecl,
+                                              Type memberType,
+                                              LazyResolver *resolver) {
+  auto *DC = parentDecl->getDeclContext();
+  auto superclass = getSuperclassForDecl(
+      DC->getAsClassOrClassExtensionContext(), resolver);
+  auto subs = superclass->getMemberSubstitutions(DC);
+
+  if (auto *parentFunc = dyn_cast<AbstractFunctionDecl>(parentDecl)) {
+    if (auto *func = dyn_cast<AbstractFunctionDecl>(decl)) {
+      auto *genericParams = func->getGenericParams();
+      auto *parentParams = parentFunc->getGenericParams();
+      if (genericParams && parentParams &&
+          genericParams->size() == parentParams->size()) {
+        for (unsigned i = 0, e = genericParams->size(); i < e; i++) {
+          auto paramTy = parentParams->getParams()[i]->getDeclaredInterfaceType()
+              ->getCanonicalType().getPointer();
+          subs[paramTy] = genericParams->getParams()[i]
+              ->getDeclaredInterfaceType();
+        }
+      }
+    }
+  }
+
+  auto type = memberType.subst(parentDecl->getModuleContext(), subs);
+
+  if (isa<AbstractFunctionDecl>(parentDecl)) {
+    type = type->replaceSelfParameterType(this);
+    if (auto func = dyn_cast<FuncDecl>(parentDecl)) {
+      if (func->hasDynamicSelf()) {
+        type = type->replaceCovariantResultType(this,
+                                                func->getNumParameterLists());
+      }
+    } else if (isa<ConstructorDecl>(parentDecl)) {
+      type = type->replaceCovariantResultType(this, /*uncurryLevel=*/2);
+    }
+  }
+
+  return type;
 }
 
 Identifier DependentMemberType::getName() const {
