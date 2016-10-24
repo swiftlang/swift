@@ -877,7 +877,7 @@ Entities
 
   entity-spec ::= ENTITY-KIND 'A' INDEX      // default argument generator
   entity-spec ::= ENTITY-KIND 'i'            // non-local variable initializer
-  entity-spec ::= type decl-name 'F'         // function (shortcut for 'fe')
+  entity-spec ::= function-signature decl-name 'F'  // function (shortcut for 'fe')
   entity-spec ::= type decl-name ENTITY-KIND 'e'
   entity-spec ::= type decl-name ENTITY-KIND FUNC-KIND
 
@@ -956,11 +956,7 @@ Types
 ::
 
   nominal-type ::= substitution
-  nominal-type ::= context decl-name nominal-type-kind
-
-  nominal-type-kind ::= 'C'                  // class
-  nominal-type-kind ::= 'O'                  // enum
-  nominal-type-kind ::= 'V'                  // struct
+  nominal-type ::= context decl-name 'n'     // nominal type (class, enum, struct)
 
   nominal-type ::= known-nominal-type
 
@@ -993,22 +989,22 @@ Types
   type ::= type 'Bv' NATURAL                 // Builtin.Vec<n>x<type>
   type ::= 'Bw'                              // Builtin.Word
   type ::= context identifier 'a'            // Type alias (DWARF only)
-  type ::= type type 'c' THROWS-ANNOTATION?  // function type
-  type ::= type type 'cu' THROWS-ANNOTATION?  // uncurried function type  
+  type ::= function-signature 'C' THROWS-ANNOTATION?  // function type
+  type ::= function-signature 'cu' THROWS-ANNOTATION?  // uncurried function type  
 
   THROWS-ANNOTATION ::= 'z'                  // 'throws' annotation on function types
 
-  type ::= type type 'cb'                    // objc block function type
-  type ::= type type 'cc'                    // C function pointer type
+  type ::= function-signature 'cb'           // objc block function type
+  type ::= function-signature 'cc'           // C function pointer type
   type ::= type '_' type* 'G'                // generic type application
-  type ::= type type 'K'                     // @auto_closure function type
+  type ::= function-signature 'K'            // @auto_closure function type
   type ::= type 'm'                          // metatype without representation
   type ::= type 'Xm'                         // existential metatype without representation
   type ::= type 'Xo'                         // @unowned type
   type ::= type 'Xu'                         // @unowned(unsafe) type
   type ::= type 'Xw'                         // @weak type
   type ::= impl-function-type 'XF'           // function implementation type
-  type ::= type type 'Xf'                    // @thin function type
+  type ::= function-signature 'Xf'           // @thin function type
   type ::= type 'Xb'                         // SIL @box type
   type ::= type 'XM' METATYPE-REPR           // metatype with representation
   type ::= type 'Xp' METATYPE-REPR           // existential metatype with representation
@@ -1022,13 +1018,15 @@ Types
   type ::= nominal-type
   type ::= protocol '_' protocol* 'p'        // protocol type
   type ::= 'pp'                              // empty protocol type
-  type ::= type 'z'                          // inout
   type ::= tuple
   type ::= type generic-signature 'u'        // generic type
   type ::= 'x'                               // generic param, depth=0, idx=0
   type ::= 'q' GENERIC-PARAM-INDEX           // dependent generic parameter
   type ::= type assoc-type-name 'qa'         // associated type of non-generic param
   type ::= assoc-type
+
+  function-signature ::= type '_' param-type* // result and parameters
+  param-type ::= type identifier? 'z'?        // parameter with optional label and inout convention
 
   tuple ::= tuple-element '_' tuple_element* 't'  // tuple
   tuple ::= tuple-element '_' tuple_element* 'z'  // variadic tuple
@@ -1130,7 +1128,7 @@ Property behaviors are implemented using private protocol conformances.
   req-spec ::= type 'Rb' GENERIC-PARAM-INDEX     // base class requirement, type is a nominal class or a substitution
   req-spec ::= type 'Rs' GENERIC-PARAM-INDEX     // same-type requirement
 
-  GENERIC-PARAM-INDEX ::= '_'                // depth = 0,   idx = 0
+  GENERIC-PARAM-INDEX ::= 'x'                // depth = 0,   idx = 0
   GENERIC-PARAM-INDEX ::= INDEX              // depth = 0,   idx = N+1
   GENERIC-PARAM-INDEX ::= 'd' INDEX INDEX    // depth = M+1, idx = N
 
@@ -1140,8 +1138,8 @@ The ``<GENERIC-PARAM-COUNT>`` describes the number of generic parameters at
 each depth of the signature. As a special case, no ``<GENERIC-PARAM-COUNT>``
 values indicates a single generic parameter at the outermost depth::
 
-  q_q_cru                           // <T_0_0> T_0_0 -> T_0_0
-  q_qd_0_cr_0_u                     // <T_0_0><T_1_0, T_1_1> T_0_0 -> T_1_1
+  x_xCru                           // <T_0_0> T_0_0 -> T_0_0
+  d_0__xCr_0_u                     // <T_0_0><T_1_0, T_1_1> T_0_0 -> T_1_1
 
 A generic signature must only preceed an operator character which is different
 from any character in a ``<GENERIC-PARAM-COUNT>``.
@@ -1215,8 +1213,8 @@ A maximum of 26 words in a mangling can be used for substitutions.
 
 ::
 
-  identifier ::= '00' natural identifier-start-char identifier-char*
-  identifier ::= '00' 'o' operator-fixity natural identifier-char*
+  identifier ::= '00' natural '_' identifier-char*
+  identifier ::= '00' 'o' operator-fixity natural '_' identifier-char*
 
 Identifiers that contain non-ASCII characters are encoded using the Punycode
 algorithm specified in RFC 3492, with the modifications that ``_`` is used
@@ -1297,7 +1295,20 @@ Function Specializations
 
 ::
 
-  specialization ::= type+ 'TSg' PASSID      // Generic specialization
+  specialization ::= type '_' type* 'TSg' PASSID      // Generic specialization
+
+The types are the replacement types of the substitution list.
+
+::
+
+  specialization ::= function-signature generic-signature 'TSp' PASSID      // Partial generic specialization
+
+A type in the ``<function-signature>`` of a partial generic specialization
+can be ``Sn`` which means that the parameter type is the same as in the
+original function's signature.
+
+::
+
   specialization ::= spec-arg* 'TSf' PASSID (ARG-SPEC-KIND '_')+  // Function signature specialization kind
 
 The ``<ARG-SPEC-KIND>`` describes how arguments are specialized.
