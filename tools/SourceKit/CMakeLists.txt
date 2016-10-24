@@ -20,6 +20,14 @@ configure_file(
 set(SOURCEKIT_DEPLOYMENT_OS "${SWIFT_HOST_VARIANT}")
 set(SOURCEKIT_DEPLOYMENT_TARGET "${SWIFT_SDK_${SWIFT_HOST_VARIANT_SDK}_DEPLOYMENT_VERSION}")
 
+swift_is_installing_component(sourcekit-inproc SOURCEKIT_INSTALLING_INPROC)
+
+if("${CMAKE_SYSTEM_NAME}" STREQUAL "Darwin")
+  set(CMAKE_OSX_SYSROOT "${SWIFT_SDK_${SWIFT_HOST_VARIANT_SDK}_PATH}")
+  set(CMAKE_OSX_ARCHITECTURES "${SWIFT_HOST_VARIANT_ARCH}")
+  set(CMAKE_OSX_DEPLOYMENT_TARGET "")
+endif()
+
 function(add_sourcekit_symbol_exports target_name export_file)
   # Makefile.rules contains special cases for different platforms.
   # We restrict ourselves to Darwin for the time being.
@@ -458,10 +466,6 @@ if("${CMAKE_SYSTEM_NAME}" STREQUAL "Darwin")
     string(REGEX MATCH "[0-9]+\\.[0-9]+" SOURCEKIT_DEPLOYMENT_TARGET ${SOURCEKIT_DEPLOYMENT_TARGET})
   endif()
 
-  # Choose a deployment OS if none was set.
-  set(SOURCEKIT_DEPLOYMENT_OS "macosx" CACHE STRING
-      "Deployment OS for SourceKit [macosx, iphoneos, iphonesimulator].")
-
   # Sadly there are two OS naming conventions.
   # xcrun SDK name:   macosx iphoneos iphonesimulator (+ "internal" or version)
   # -mOS-version-min: macosx ios      ios-simulator
@@ -481,10 +485,6 @@ if("${CMAKE_SYSTEM_NAME}" STREQUAL "Darwin")
   else()
     message(FATAL_ERROR "Can't understand SOURCEKIT_DEPLOYMENT_OS '${SOURCEKIT_DEPLOYMENT_OS}';")
   endif()
-
-  # Determine deployment flags for the C/C++ compiler and linker.
-  set(SOURCEKIT_GLOBAL_DEPLOYMENT_TARGET_FLAGS
-    "-m${version_min_os}-version-min=${SOURCEKIT_DEPLOYMENT_TARGET}")
 
   # Add deployment target to C/C++ compiler and linker flags.
   # FIXME: CMAKE_OSX_DEPLOYMENT_TARGET falls over when used for iOS versions.

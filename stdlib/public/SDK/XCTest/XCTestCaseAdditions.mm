@@ -126,36 +126,15 @@ fail:
 @end
 
 
-// Swift's memory management expectations are different than Objective-C; it
-// expects everything to be +1 rather than +0. So we need to bridge the
-// _XCTCurrentTestCase function to return a +1 object.
-
-XCT_EXPORT XCTestCase *_XCTCurrentTestCase(void);
-
-XCT_EXPORT SWIFT_CC(swift) NS_RETURNS_RETAINED
-XCTestCase *_XCTCurrentTestCaseBridge(void);
-
-NS_RETURNS_RETAINED XCTestCase *_XCTCurrentTestCaseBridge(void)
-{
-    return [_XCTCurrentTestCase() retain];
-}
-
-
 // Since Swift doesn't natively support exceptions, but Objective-C code can
 // still throw them, use a helper to evaluate a block that may result in an
 // exception being thrown that passes back the most important information about
 // it.
 //
 // If no exception is thrown by the block, returns an empty dictionary.
-//
-// Note that this function needs Swift calling conventions, hence the use of
-// NS_RETURNS_RETAINED and Block_release. (The argument should also be marked
-// NS_RELEASES_ARGUMENT, but clang doesn't realize that a block parameter
-// should be treated as an Objective-C parameter here.)
 
-XCT_EXPORT NS_RETURNS_RETAINED NSDictionary *_XCTRunThrowableBlockBridge(void (^block)());
+XCT_EXPORT NSDictionary *_XCTRunThrowableBlockBridge(void (^block)());
 
-SWIFT_CC(swift) NS_RETURNS_RETAINED
 NSDictionary *_XCTRunThrowableBlockBridge(void (^block)())
 {
     NSDictionary *result;

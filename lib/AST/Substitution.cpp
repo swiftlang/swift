@@ -85,6 +85,7 @@ Substitution Substitution::subst(Module *module,
         proto->isSpecificProtocol(KnownProtocolKind::AnyObject)) {
       auto classDecl
         = substReplacement->getClassOrBoundGenericClass();
+      assert(classDecl);
       SmallVector<ProtocolConformance *, 1> lookupResults;
       classDecl->lookupConformance(classDecl->getParentModule(),
                                    proto, lookupResults);

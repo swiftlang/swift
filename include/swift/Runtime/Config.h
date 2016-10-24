@@ -219,7 +219,7 @@
 #define SWIFT_RT_ENTRY_IMPL_VISIBILITY LLVM_LIBRARY_VISIBILITY
 
 // Prefix of wrappers generated for runtime functions.
-#define SWIFT_WRAPPER_PREFIX "rt_"
+#define SWIFT_WRAPPER_PREFIX "swift_rt_"
 
 #else
 

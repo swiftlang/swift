@@ -1044,7 +1044,7 @@ static void validateAvailabilitySpecList(Parser &P,
 
   if (Specs.size() == 1 &&
       isa<LanguageVersionConstraintAvailabilitySpec>(Specs[0])) {
-    // @avalable(swift N) is allowed only in isolation; it cannot
+    // @available(swift N) is allowed only in isolation; it cannot
     // be combined with other availability specs in a single list.
     return;
   }
@@ -2213,7 +2213,7 @@ ParserResult<Stmt> Parser::parseStmtForCStyle(SourceLoc ForLoc,
   // If we're missing a semicolon, try to recover.
   if (Tok.isNot(tok::semi)) {
     // Provide a reasonable default location for the first semicolon.
-    Semi1Loc = Tok.getLoc();
+    Semi1Loc = PreviousLoc;
 
     if (auto *BS = ConvertClosureToBraceStmt(First.getPtrOrNull(), Context)) {
       // We have seen:

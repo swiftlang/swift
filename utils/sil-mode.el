@@ -50,6 +50,9 @@
                     "destroyer" "globalaccessor" "objc") 'words) .
                     font-lock-keyword-face)
 
+   ;; Highlight attributes written in [...].
+   '("\\[\\(.+\\)\\]" 1 font-lock-keyword-face)
+
    ;; SIL Instructions - Allocation/Deallocation.
    `(,(regexp-opt '("alloc_stack" "alloc_ref" "alloc_ref_dynamic" "alloc_box"
                     "alloc_value_buffer" "alloc_global"
@@ -67,6 +70,10 @@
                     "mark_function_escape" "copy_addr" "destroy_addr"
                     "index_addr" "index_raw_pointer" "bind_memory" "to")
                   'words) . font-lock-keyword-face)
+
+   ;; SIL Instructions - Borrowing
+   '("load_borrow" . font-lock-keyword-face)
+   '("\\(end_borrow\\) %[[:alnum:]] \\(from\\)" (1 font-lock-keyword-face) (2 font-lock-keyword-face))
 
    ;; SIL Instructions - Reference Counting.
    `(,(regexp-opt '("strong_retain"

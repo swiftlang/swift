@@ -538,6 +538,7 @@ SILFunction *SILDeserializer::readSILFunction(DeclID FID,
   LocalValues.clear();
   ForwardLocalValues.clear();
 
+  FunctionOwnershipEvaluator OwnershipEvaluator(fn);
   SILOpenedArchetypesTracker OpenedArchetypesTracker(*fn);
   SILBuilder Builder(*fn);
   // Track the archetypes just like SILGen. This
@@ -571,7 +572,8 @@ SILFunction *SILDeserializer::readSILFunction(DeclID FID,
         return fn;
 
       // Handle a SILInstruction record.
-      if (readSILInstruction(fn, CurrentBB, Builder, kind, scratch)) {
+      if (readSILInstruction(fn, CurrentBB, Builder, OwnershipEvaluator, kind,
+                             scratch)) {
         DEBUG(llvm::dbgs() << "readSILInstruction returns error.\n");
         MF->error();
         return fn;
@@ -657,10 +659,10 @@ static SILDeclRef getSILDeclRef(ModuleFile *MF,
   return DRef;
 }
 
-bool SILDeserializer::readSILInstruction(SILFunction *Fn, SILBasicBlock *BB,
-                                         SILBuilder &Builder,
-                                         unsigned RecordKind,
-                                         SmallVectorImpl<uint64_t> &scratch) {
+bool SILDeserializer::readSILInstruction(
+    SILFunction *Fn, SILBasicBlock *BB, SILBuilder &Builder,
+    FunctionOwnershipEvaluator &OwnershipEvaluator, unsigned RecordKind,
+    SmallVectorImpl<uint64_t> &scratch) {
   // Return error if Basic Block is null.
   if (!BB)
     return true;
@@ -765,7 +767,7 @@ bool SILDeserializer::readSILInstruction(SILFunction *Fn, SILBasicBlock *BB,
     break;
   }
 
-  ValueBase *ResultVal;
+  SILInstruction *ResultVal;
   switch ((ValueKind)OpCode) {
   case ValueKind::SILArgument:
   case ValueKind::SILUndef:
@@ -1278,11 +1280,11 @@ bool SILDeserializer::readSILInstruction(SILFunction *Fn, SILBasicBlock *BB,
   UNARY_INSTRUCTION(DeinitExistentialAddr)
   UNARY_INSTRUCTION(DestroyAddr)
   UNARY_INSTRUCTION(IsNonnull)
-  UNARY_INSTRUCTION(Load)
   UNARY_INSTRUCTION(Return)
   UNARY_INSTRUCTION(Throw)
   UNARY_INSTRUCTION(FixLifetime)
   UNARY_INSTRUCTION(CopyBlock)
+  UNARY_INSTRUCTION(LoadBorrow)
   REFCOUNTING_INSTRUCTION(StrongPin)
   REFCOUNTING_INSTRUCTION(StrongUnpin)
   REFCOUNTING_INSTRUCTION(StrongRetain)
@@ -1294,6 +1296,15 @@ bool SILDeserializer::readSILInstruction(SILFunction *Fn, SILBasicBlock *BB,
   UNARY_INSTRUCTION(IsUniqueOrPinned)
 #undef UNARY_INSTRUCTION
 #undef REFCOUNTING_INSTRUCTION
+
+  case ValueKind::LoadInst: {
+    auto Ty = MF->getType(TyID);
+    auto Qualifier = LoadOwnershipQualifier(Attr);
+    ResultVal = Builder.createLoad(
+        Loc, getLocalValue(ValID, getSILType(Ty, (SILValueCategory)TyCategory)),
+        Qualifier);
+    break;
+  }
 
   case ValueKind::LoadUnownedInst: {
     auto Ty = MF->getType(TyID);
@@ -1324,9 +1335,18 @@ bool SILDeserializer::readSILInstruction(SILFunction *Fn, SILBasicBlock *BB,
     auto Ty = MF->getType(TyID);
     SILType addrType = getSILType(Ty, (SILValueCategory)TyCategory);
     SILType ValType = addrType.getObjectType();
-    ResultVal = Builder.createStore(Loc,
-                    getLocalValue(ValID, ValType),
-                    getLocalValue(ValID2, addrType));
+    auto Qualifier = StoreOwnershipQualifier(Attr);
+    ResultVal = Builder.createStore(Loc, getLocalValue(ValID, ValType),
+                                    getLocalValue(ValID2, addrType), Qualifier);
+    break;
+  }
+  case ValueKind::EndBorrowInst: {
+    SILValue BorrowSource, BorrowDest;
+    BorrowSource = getLocalValue(
+        ValID, getSILType(MF->getType(TyID), (SILValueCategory)TyCategory));
+    BorrowDest = getLocalValue(
+        ValID2, getSILType(MF->getType(TyID2), (SILValueCategory)TyCategory2));
+    ResultVal = Builder.createEndBorrow(Loc, BorrowSource, BorrowDest);
     break;
   }
   case ValueKind::StoreUnownedInst: {
@@ -1867,6 +1887,12 @@ bool SILDeserializer::readSILInstruction(SILFunction *Fn, SILBasicBlock *BB,
   case ValueKind::MarkUninitializedBehaviorInst:
     llvm_unreachable("todo");
   }
+
+  // Evaluate ResultVal's ownership. If we find that as a result of ResultVal,
+  // we are mixing qualified and unqualified ownership instructions, bail.
+  if (!OwnershipEvaluator.evaluate(*ResultVal))
+    return true;
+
   if (ResultVal->hasValue()) {
     LastValueID = LastValueID + 1;
     setLocalValue(ResultVal, LastValueID);

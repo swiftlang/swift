@@ -52,9 +52,8 @@ if #available(OSX 10.12, iOS 10.0, tvOS 10.0, watchOS 3.0, *) {
     expectEqual(node.attributeValues["test"], attrVal)
   }
 
-  SpriteKitTests.test("SKWarpGeometryGrid/1") {
+  SpriteKitTests.test("SKWarpGeometryGrid/init") {
     var warpGrid = SKWarpGeometryGrid(columns: 1, rows: 1)
-    expectEqual(warpGrid.numberOfColumns, 1)
 
     expectEqual(warpGrid.sourcePosition(at: 0).x, 0.0)
     warpGrid = warpGrid.replacingBySourcePositions(positions: [float2(1.0), float2(2.0), float2(3.0), float2(4.0)])
@@ -77,17 +76,11 @@ if #available(OSX 10.12, iOS 10.0, tvOS 10.0, watchOS 3.0, *) {
     expectEqual(warpGrid.sourcePosition(at: 0).x, 2.0)
   }
 
-  SpriteKitTests.test("SKWarpGeometryGrid/2") {
-    var warpGrid = SKWarpGeometryGrid(columns: 3, rows: 4)
-    expectEqual(warpGrid.numberOfColumns, 3)
-
-    expectEqual(warpGrid.sourcePosition(at: 0).x, 0.0)
-    warpGrid = warpGrid.replacingBySourcePositions(positions: [float2(30.0)])
-    expectEqual(warpGrid.sourcePosition(at: 0).x, 30.0)
-
-    expectEqual(warpGrid.destPosition(at: 0).x, 0.0)
-    warpGrid = warpGrid.replacingByDestinationPositions(positions: [float2(30.0)])
-    expectEqual(warpGrid.destPosition(at: 0).x, 30.0)
+  SpriteKitTests.test("SKWarpGeometryGrid/properties") {
+    func checkTheAPIsAreAvailable(grid: SKWarpGeometryGrid) {
+      _ = grid.replacingBySourcePositions(positions: [])
+      _ = grid.replacingByDestinationPositions(positions: [])
+    }
   }
 }
 

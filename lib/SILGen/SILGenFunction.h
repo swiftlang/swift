@@ -1122,6 +1122,9 @@ public:
                                 SILValue buffer, SILValue callbackStorage);
   bool maybeEmitMaterializeForSetThunk(ProtocolConformance *conformance,
                                        SILLinkage linkage,
+                                       Type selfInterfaceType,
+                                       Type selfType,
+                                       GenericEnvironment *genericEnv,
                                        FuncDecl *requirement,
                                        FuncDecl *witness,
                                        ArrayRef<Substitution> witnessSubs);

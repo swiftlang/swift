@@ -131,7 +131,6 @@ func nested_closure_in_generic<T>(_ x:T) -> T {
 
 // CHECK-LABEL: sil hidden @_TF16generic_closures16local_properties
 func local_properties<T>(_ t: inout T) {
-  // CHECK: [[TBOX:%[0-9]+]] = alloc_box $T
   var prop: T {
     get {
       return t
@@ -141,11 +140,11 @@ func local_properties<T>(_ t: inout T) {
     }
   }
 
-  // CHECK: [[GETTER_REF:%[0-9]+]] = function_ref [[GETTER_CLOSURE:@_TFF16generic_closures16local_properties.*]] : $@convention(thin) <τ_0_0> (@owned @box τ_0_0) -> @out τ_0_0
+  // CHECK: [[GETTER_REF:%[0-9]+]] = function_ref [[GETTER_CLOSURE:@_TFF16generic_closures16local_properties.*]] : $@convention(thin) <τ_0_0> (@inout_aliasable τ_0_0) -> @out τ_0_0
   // CHECK: apply [[GETTER_REF]]
   t = prop
 
-  // CHECK: [[SETTER_REF:%[0-9]+]] = function_ref [[SETTER_CLOSURE:@_TFF16generic_closures16local_properties.*]] : $@convention(thin) <τ_0_0> (@in τ_0_0, @owned @box τ_0_0) -> ()
+  // CHECK: [[SETTER_REF:%[0-9]+]] = function_ref [[SETTER_CLOSURE:@_TFF16generic_closures16local_properties.*]] : $@convention(thin) <τ_0_0> (@in τ_0_0, @inout_aliasable τ_0_0) -> ()
   // CHECK: apply [[SETTER_REF]]
   prop = t
 
@@ -158,7 +157,7 @@ func local_properties<T>(_ t: inout T) {
     }
   }
 
-  // CHECK: [[GETTER2_REF:%[0-9]+]] = function_ref [[GETTER2_CLOSURE:@_TFF16generic_closures16local_properties.*]] : $@convention(thin) <τ_0_0> (@owned @box τ_0_0) -> @out τ_0_0
+  // CHECK: [[GETTER2_REF:%[0-9]+]] = function_ref [[GETTER2_CLOSURE:@_TFF16generic_closures16local_properties.*]] : $@convention(thin) <τ_0_0> (@inout_aliasable τ_0_0) -> @out τ_0_0
   // CHECK: apply [[GETTER2_REF]]
   t = prop2
 

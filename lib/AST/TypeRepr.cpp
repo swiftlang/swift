@@ -200,17 +200,16 @@ TypeRepr *CloneVisitor::visitNamedTypeRepr(NamedTypeRepr *T) {
                                  T->getNameLoc(), T->getUnderscoreLoc());
 }
 
-TypeRepr *CloneVisitor::visitProtocolCompositionTypeRepr(
-                          ProtocolCompositionTypeRepr *T) {
+TypeRepr *CloneVisitor::visitCompositionTypeRepr(CompositionTypeRepr *T) {
   // Clone the protocols.
-  auto protocols = Ctx.Allocate<IdentTypeRepr*>(T->getProtocols().size());
-  for (unsigned argI : indices(protocols)) {
-    protocols[argI] = cast<IdentTypeRepr>(visit(T->getProtocols()[argI]));
+  auto types = Ctx.Allocate<TypeRepr*>(T->getTypes().size());
+  for (unsigned argI : indices(types)) {
+    types[argI] = cast<TypeRepr>(visit(T->getTypes()[argI]));
   }
 
-  return new (Ctx) ProtocolCompositionTypeRepr(protocols,
-                                               T->getStartLoc(),
-                                               T->getCompositionRange());
+  return new (Ctx) CompositionTypeRepr(types,
+                                       T->getStartLoc(),
+                                       T->getCompositionRange());
 }
 
 TypeRepr *CloneVisitor::visitMetatypeTypeRepr(MetatypeTypeRepr *T) {
@@ -249,9 +248,9 @@ void TypeRepr::visitTopLevelTypeReprs(
   }
 
   // Recurse into protocol compositions.
-  if (auto composition = dyn_cast<ProtocolCompositionTypeRepr>(typeRepr)) {
-    for (auto ident : composition->getProtocols())
-      ident->visitTopLevelTypeReprs(visitor);
+  if (auto composition = dyn_cast<CompositionTypeRepr>(typeRepr)) {
+    for (auto type: composition->getTypes())
+      type->visitTopLevelTypeReprs(visitor);
     return;
   }
 }
@@ -445,27 +444,27 @@ void NamedTypeRepr::printImpl(ASTPrinter &Printer,
   printTypeRepr(Ty, Printer, Opts);
 }
 
-ProtocolCompositionTypeRepr *
-ProtocolCompositionTypeRepr::create(ASTContext &C,
-                                    ArrayRef<IdentTypeRepr *> Protocols,
-                                    SourceLoc FirstTypeLoc,
-                                    SourceRange CompositionRange) {
-  return new (C) ProtocolCompositionTypeRepr(C.AllocateCopy(Protocols),
-                                             FirstTypeLoc, CompositionRange);
+CompositionTypeRepr *
+CompositionTypeRepr::create(ASTContext &C,
+                            ArrayRef<TypeRepr *> Types,
+                            SourceLoc FirstTypeLoc,
+                            SourceRange CompositionRange) {
+  return new (C) CompositionTypeRepr(C.AllocateCopy(Types),
+                                     FirstTypeLoc, CompositionRange);
 }
 
-void ProtocolCompositionTypeRepr::printImpl(ASTPrinter &Printer,
-                                            const PrintOptions &Opts) const {
-  if (Protocols.empty()) {
+void CompositionTypeRepr::printImpl(ASTPrinter &Printer,
+                                    const PrintOptions &Opts) const {
+  if (Types.empty()) {
     Printer << "Any";
   } else {
     bool First = true;
-    for (auto Proto : Protocols) {
+    for (auto T : Types) {
       if (First)
         First = false;
       else
         Printer << " & ";
-      printTypeRepr(Proto, Printer, Opts);
+      printTypeRepr(T, Printer, Opts);
     }
   }
 }

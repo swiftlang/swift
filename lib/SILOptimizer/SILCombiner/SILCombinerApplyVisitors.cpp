@@ -871,12 +871,17 @@ SILCombiner::propagateConcreteTypeOfInitExistential(FullApplySite AI,
       return nullptr;
   }
 
-  // Obtain the protocol whose which should be used by the conformance.
+  // The lookup type is not an opened existential type,
+  // thus it cannot be made more concrete.
+  if (!WMI->getLookupType()->isOpenedExistential())
+    return nullptr;
+
+  // Obtain the protocol which should be used by the conformance.
   auto *PD = WMI->getLookupProtocol();
 
   // Propagate the concrete type into a callee-operand, which is a
   // witness_method instruction.
-  auto PropagateIntoOperand = [this, &WMI](CanType ConcreteType,
+  auto PropagateIntoOperand = [this, &WMI, &AI](CanType ConcreteType,
                                            ProtocolConformanceRef Conformance) {
     // Keep around the dependence on the open instruction unless we've
     // actually eliminated the use.
@@ -885,8 +890,15 @@ SILCombiner::propagateConcreteTypeOfInitExistential(FullApplySite AI,
                                                 Conformance, WMI->getMember(),
                                                 WMI->getType(),
                                                 WMI->isVolatile());
-    replaceInstUsesWith(*WMI, NewWMI);
-    eraseInstFromFunction(*WMI);
+    // Replace only uses of the witness_method in the apply that is going to
+    // be changed.
+    MutableArrayRef<Operand> Operands = AI.getInstruction()->getAllOperands();
+    for (auto &Op : Operands) {
+      if (Op.get() == WMI)
+         Op.set(NewWMI); 
+    }
+    if (WMI->use_empty())
+      eraseInstFromFunction(*WMI);
   };
 
   // Try to perform the propagation.

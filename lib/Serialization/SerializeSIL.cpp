@@ -1001,6 +1001,7 @@ void SILSerializer::writeSILInstruction(const SILInstruction &SI) {
   case ValueKind::DestroyAddrInst:
   case ValueKind::IsNonnullInst:
   case ValueKind::LoadInst:
+  case ValueKind::LoadBorrowInst:
   case ValueKind::LoadUnownedInst:
   case ValueKind::LoadWeakInst:
   case ValueKind::MarkUninitializedInst:
@@ -1018,7 +1019,9 @@ void SILSerializer::writeSILInstruction(const SILInstruction &SI) {
   case ValueKind::ReturnInst:
   case ValueKind::ThrowInst: {
     unsigned Attr = 0;
-    if (auto *LWI = dyn_cast<LoadWeakInst>(&SI))
+    if (auto *LI = dyn_cast<LoadInst>(&SI))
+      Attr = unsigned(LI->getOwnershipQualifier());
+    else if (auto *LWI = dyn_cast<LoadWeakInst>(&SI))
       Attr = LWI->isTake();
     else if (auto *LUI = dyn_cast<LoadUnownedInst>(&SI))
       Attr = LUI->isTake();
@@ -1257,6 +1260,22 @@ void SILSerializer::writeSILInstruction(const SILInstruction &SI) {
     break;
   }
 
+  case ValueKind::EndBorrowInst: {
+    unsigned abbrCode = SILAbbrCodes[SILTwoOperandsLayout::Code];
+    unsigned Attr = 0;
+    auto *EBI = cast<EndBorrowInst>(&SI);
+    SILValue Src = EBI->getSrc();
+    SILValue Dest = EBI->getDest();
+
+    SILTwoOperandsLayout::emitRecord(
+        Out, ScratchRecord, abbrCode, (unsigned)SI.getKind(), Attr,
+        S.addTypeRef(Src->getType().getSwiftRValueType()),
+        (unsigned)Src->getType().getCategory(), addValueRef(Src),
+        S.addTypeRef(Dest->getType().getSwiftRValueType()),
+        (unsigned)Dest->getType().getCategory(), addValueRef(Dest));
+    break;
+  }
+
   case ValueKind::AssignInst:
   case ValueKind::CopyAddrInst:
   case ValueKind::StoreInst:
@@ -1273,6 +1292,7 @@ void SILSerializer::writeSILInstruction(const SILInstruction &SI) {
       operand = cast<StoreUnownedInst>(&SI)->getDest();
       value = cast<StoreUnownedInst>(&SI)->getSrc();
     } else if (SI.getKind() == ValueKind::StoreInst) {
+      Attr = unsigned(cast<StoreInst>(&SI)->getOwnershipQualifier());
       operand = cast<StoreInst>(&SI)->getDest();
       value = cast<StoreInst>(&SI)->getSrc();
     } else if (SI.getKind() == ValueKind::AssignInst) {

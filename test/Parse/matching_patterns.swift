@@ -308,7 +308,7 @@ case (_?)?: break
 
 // <rdar://problem/20365753> Bogus diagnostic "refutable pattern match can fail"
 let (responseObject: Int?) = op1
-// expected-error @-1 2 {{expected ',' separator}} {{25-25=,}} {{25-25=,}}
+// expected-error @-1 {{expected ',' separator}} {{25-25=,}}
 // expected-error @-2 {{expected pattern}}
 
 

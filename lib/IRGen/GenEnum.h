@@ -10,8 +10,8 @@
 //
 //===----------------------------------------------------------------------===//
 
-#ifndef __SWIFT_IRGen_GenEnum_H__
-#define __SWIFT_IRGen_GenEnum_H__
+#ifndef SWIFT_IRGEN_GENENUM_H
+#define SWIFT_IRGEN_GENENUM_H
 
 #include "TypeInfo.h"
 

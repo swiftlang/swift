@@ -2412,17 +2412,21 @@ ParserStatus Parser::parseInheritance(SmallVectorImpl<TypeLoc> &Inherited,
       continue;
     }
 
-    bool usesDeprecatedCompositionSyntax = Tok.is(tok::kw_protocol) && startsWithLess(peekToken());
+    bool usesDeprecatedCompositionSyntax =
+      Tok.is(tok::kw_protocol) && startsWithLess(peekToken());
     bool isAny = Tok.is(tok::kw_Any); // We allow (redundant) inheritance from Any
 
-    auto ParsedTypeResult = parseTypeIdentifierOrTypeComposition();
+    auto ParsedTypeResult = parseTypeForInheritance(
+        diag::expected_identifier_for_type,
+        diag::expected_ident_type_in_inheritance);
     Status |= ParsedTypeResult;
 
-    // Cannot inherit from composition
-    if (auto Composition = dyn_cast_or_null<ProtocolCompositionTypeRepr>(ParsedTypeResult.getPtrOrNull())) {
+    // Recover and emit nice diagnostic for composition.
+    if (auto Composition = dyn_cast_or_null<CompositionTypeRepr>(
+          ParsedTypeResult.getPtrOrNull())) {
       // Record the protocols inside the composition.
-      Inherited.append(Composition->getProtocols().begin(),
-                       Composition->getProtocols().end());
+      Inherited.append(Composition->getTypes().begin(),
+                       Composition->getTypes().end());
       // We can inherit from Any
       if (!isAny) {
         if (usesDeprecatedCompositionSyntax) {
@@ -5523,6 +5527,11 @@ Parser::parseDeclOperator(ParseDeclOptions Flags, DeclAttributes &Attributes) {
   
   Identifier Name = Context.getIdentifier(Tok.getText());
   SourceLoc NameLoc = consumeToken();
+    
+  if (Attributes.hasAttribute<PostfixAttr>()) {
+    if (!Name.empty() && (Name.get()[0] == '?' || Name.get()[0] == '!'))
+      diagnose(NameLoc, diag::expected_operator_name_after_operator);      
+  }
   
   auto Result = parseDeclOperatorImpl(OperatorLoc, Name, NameLoc, Attributes);
 

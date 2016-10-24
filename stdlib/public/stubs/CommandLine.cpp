@@ -120,10 +120,23 @@ extern "C" char ** _swift_stdlib_getUnsafeArgvArgc(int *outArgLen) {
     return _swift_stdlib_ProcessOverrideUnsafeArgv;
   }
 
-  char argPtr[8192]; // or use ARG_MAX? 8192 is used in LLDB though..
-  size_t argPtrSize = sizeof(argPtr);
+  char *argPtr = NULL; // or use ARG_MAX? 8192 is used in LLDB though..
   int mib[4] = { CTL_KERN, KERN_PROC, KERN_PROC_ARGS, getpid() };
-  if (sysctl(mib, 4, argPtr, &argPtrSize, NULL, 0) != 0)
+  size_t argPtrSize = 0;
+  for (int i = 0; i < 3 && !argPtr; i++) { // give up after 3 tries
+    if (sysctl(mib, 4, NULL, &argPtrSize, NULL, 0) != -1) {
+      argPtr = (char *)malloc(argPtrSize);
+      if (sysctl(mib, 4, argPtr, &argPtrSize, NULL, 0) == -1) {
+        free(argPtr);
+        argPtr = NULL;
+        if (errno != ENOMEM)
+          break;
+      }
+    } else {
+      break;
+    }
+  }
+  if (!argPtr)
     swift::fatalError(0, "fatal error: could not retrieve commandline "
                          "arguments: sysctl: %s.\n", strerror(errno));
 
@@ -137,6 +150,8 @@ extern "C" char ** _swift_stdlib_getUnsafeArgvArgc(int *outArgLen) {
   char **outBuf = (char **)calloc(argvec.size() + 1, sizeof(char *));
   std::copy(argvec.begin(), argvec.end(), outBuf);
   outBuf[argvec.size()] = nullptr;
+
+  free(argPtr);
     
   return outBuf;
 }

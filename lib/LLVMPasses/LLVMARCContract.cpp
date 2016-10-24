@@ -273,9 +273,10 @@ bool SwiftARCContractImpl::run() {
       case RT_UnknownReleaseN:
       case RT_BridgeReleaseN:
         llvm_unreachable("These are only created by LLVMARCContract !");
-      // Delete all fix lifetime instructions. After llvm-ir they have no use
-      // and show up as calls in the final binary.
+      // Delete all fix lifetime and end borrow instructions. After llvm-ir they
+      // have no use and show up as calls in the final binary.
       case RT_FixLifetime:
+      case RT_EndBorrow:
         Inst.eraseFromParent();
         ++NumNoopDeleted;
         continue;

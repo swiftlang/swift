@@ -10,22 +10,23 @@
 //
 //===----------------------------------------------------------------------===//
 
-#include "swift/Basic/Defer.h"
-#include "swift/Basic/Fallthrough.h"
 #include "swift/AST/ArchetypeBuilder.h"
 #include "swift/AST/GenericEnvironment.h"
 #include "swift/AST/NameLookup.h"
-#include "swift/Parse/Parser.h"
+#include "swift/Basic/Defer.h"
+#include "swift/Basic/Fallthrough.h"
 #include "swift/Parse/Lexer.h"
+#include "swift/Parse/Parser.h"
 #include "swift/SIL/AbstractionPattern.h"
+#include "swift/SIL/InstructionUtils.h"
 #include "swift/SIL/SILArgument.h"
 #include "swift/SIL/SILBuilder.h"
 #include "swift/SIL/SILDebugScope.h"
 #include "swift/SIL/SILModule.h"
 #include "swift/SIL/SILUndef.h"
 #include "swift/Subsystems.h"
-#include "llvm/Support/SaveAndRestore.h"
 #include "llvm/ADT/StringSwitch.h"
+#include "llvm/Support/SaveAndRestore.h"
 using namespace swift;
 
 //===----------------------------------------------------------------------===//
@@ -103,6 +104,8 @@ namespace {
     SILParserTUState &TUState;
     SILFunction *F = nullptr;
     GenericEnvironment *GenericEnv = nullptr;
+    FunctionOwnershipEvaluator OwnershipEvaluator;
+
   private:
     /// HadError - Have we seen an error parsing this function?
     bool HadError = false;
@@ -279,9 +282,9 @@ namespace {
     bool parseSILInstruction(SILBasicBlock *BB, SILBuilder &B);
     bool parseCallInstruction(SILLocation InstLoc,
                               ValueKind Opcode, SILBuilder &B,
-                              ValueBase *&ResultVal);
+                              SILInstruction *&ResultVal);
     bool parseSILFunctionRef(SILLocation InstLoc,
-                             SILBuilder &B, ValueBase *&ResultVal);
+                             SILBuilder &B, SILInstruction *&ResultVal);
 
     bool parseSILBasicBlock(SILBuilder &B);
     
@@ -1141,7 +1144,6 @@ bool SILParser::parseTypedValueRef(SILValue &Result, SourceLoc &Loc,
   return false;
 }
 
-
 /// getInstructionKind - This method maps the string form of a SIL instruction
 /// opcode to an enum.
 bool SILParser::parseSILOpcode(ValueKind &Opcode, SourceLoc &OpcodeLoc,
@@ -1151,144 +1153,10 @@ bool SILParser::parseSILOpcode(ValueKind &Opcode, SourceLoc &OpcodeLoc,
   // Parse this textually to avoid Swift keywords (like 'return') from
   // interfering with opcode recognition.
   Opcode = llvm::StringSwitch<ValueKind>(OpcodeName)
-    .Case("alloc_box", ValueKind::AllocBoxInst)
-    .Case("alloc_existential_box", ValueKind::AllocExistentialBoxInst)
-    .Case("address_to_pointer", ValueKind::AddressToPointerInst)
-    .Case("alloc_stack", ValueKind::AllocStackInst)
-    .Case("alloc_ref", ValueKind::AllocRefInst)
-    .Case("alloc_ref_dynamic", ValueKind::AllocRefDynamicInst)
-    .Case("alloc_value_buffer", ValueKind::AllocValueBufferInst)
-    .Case("bind_memory", ValueKind::BindMemoryInst)
-    .Case("value_metatype", ValueKind::ValueMetatypeInst)
-    .Case("witness_method", ValueKind::WitnessMethodInst)
-    .Case("apply", ValueKind::ApplyInst)
-    .Case("assign", ValueKind::AssignInst)
-    .Case("autorelease_value", ValueKind::AutoreleaseValueInst)
-    .Case("br", ValueKind::BranchInst)
-    .Case("builtin", ValueKind::BuiltinInst)
-    .Case("bridge_object_to_ref", ValueKind::BridgeObjectToRefInst)
-    .Case("bridge_object_to_word", ValueKind::BridgeObjectToWordInst)
-    .Case("checked_cast_br", ValueKind::CheckedCastBranchInst)
-    .Case("checked_cast_addr_br", ValueKind::CheckedCastAddrBranchInst)
-    .Case("class_method", ValueKind::ClassMethodInst)
-    .Case("cond_br", ValueKind::CondBranchInst)
-    .Case("cond_fail", ValueKind::CondFailInst)
-    .Case("convert_function", ValueKind::ConvertFunctionInst)
-    .Case("copy_addr", ValueKind::CopyAddrInst)
-    .Case("copy_block", ValueKind::CopyBlockInst)
-    .Case("dealloc_box", ValueKind::DeallocBoxInst)
-    .Case("dealloc_existential_box", ValueKind::DeallocExistentialBoxInst)
-    .Case("dealloc_ref", ValueKind::DeallocRefInst)
-    .Case("dealloc_partial_ref", ValueKind::DeallocPartialRefInst)
-    .Case("dealloc_stack", ValueKind::DeallocStackInst)
-    .Case("dealloc_value_buffer", ValueKind::DeallocValueBufferInst)
-    .Case("debug_value", ValueKind::DebugValueInst)
-    .Case("debug_value_addr", ValueKind::DebugValueAddrInst)
-    .Case("deinit_existential_addr", ValueKind::DeinitExistentialAddrInst)
-    .Case("destroy_addr", ValueKind::DestroyAddrInst)
-    .Case("release_value", ValueKind::ReleaseValueInst)
-    .Case("dynamic_method", ValueKind::DynamicMethodInst)
-    .Case("dynamic_method_br", ValueKind::DynamicMethodBranchInst)
-    .Case("enum", ValueKind::EnumInst)
-    .Case("fix_lifetime", ValueKind::FixLifetimeInst)
-    .Case("float_literal", ValueKind::FloatLiteralInst)
-    .Case("index_addr", ValueKind::IndexAddrInst)
-    .Case("index_raw_pointer", ValueKind::IndexRawPointerInst)
-    .Case("init_block_storage_header", ValueKind::InitBlockStorageHeaderInst)
-    .Case("init_enum_data_addr", ValueKind::InitEnumDataAddrInst)
-    .Case("init_existential_addr", ValueKind::InitExistentialAddrInst)
-    .Case("init_existential_metatype", ValueKind::InitExistentialMetatypeInst)
-    .Case("init_existential_ref", ValueKind::InitExistentialRefInst)
-    .Case("inject_enum_addr", ValueKind::InjectEnumAddrInst)
-    .Case("integer_literal", ValueKind::IntegerLiteralInst)
-    .Case("is_nonnull", ValueKind::IsNonnullInst)
-    .Case("is_unique", ValueKind::IsUniqueInst)
-    .Case("is_unique_or_pinned", ValueKind::IsUniqueOrPinnedInst)
-    .Case("function_ref", ValueKind::FunctionRefInst)
-    .Case("load", ValueKind::LoadInst)
-    .Case("load_unowned", ValueKind::LoadUnownedInst)
-    .Case("load_weak", ValueKind::LoadWeakInst)
-    .Case("mark_dependence", ValueKind::MarkDependenceInst)
-    .Case("mark_uninitialized", ValueKind::MarkUninitializedInst)
-    .Case("mark_uninitialized_behavior",
-          ValueKind::MarkUninitializedBehaviorInst)
-    .Case("mark_function_escape", ValueKind::MarkFunctionEscapeInst)
-    .Case("metatype", ValueKind::MetatypeInst)
-    .Case("objc_existential_metatype_to_object",
-          ValueKind::ObjCExistentialMetatypeToObjectInst)
-    .Case("objc_metatype_to_object", ValueKind::ObjCMetatypeToObjectInst)
-    .Case("objc_protocol", ValueKind::ObjCProtocolInst)
-    .Case("objc_to_thick_metatype", ValueKind::ObjCToThickMetatypeInst)
-    .Case("open_existential_addr", ValueKind::OpenExistentialAddrInst)
-    .Case("open_existential_box", ValueKind::OpenExistentialBoxInst)
-    .Case("open_existential_metatype", ValueKind::OpenExistentialMetatypeInst)
-    .Case("open_existential_ref", ValueKind::OpenExistentialRefInst)
-    .Case("partial_apply", ValueKind::PartialApplyInst)
-    .Case("pointer_to_address", ValueKind::PointerToAddressInst)
-    .Case("pointer_to_thin_function", ValueKind::PointerToThinFunctionInst)
-    .Case("project_block_storage", ValueKind::ProjectBlockStorageInst)
-    .Case("project_box", ValueKind::ProjectBoxInst)
-    .Case("project_existential_box", ValueKind::ProjectExistentialBoxInst)
-    .Case("project_value_buffer", ValueKind::ProjectValueBufferInst)
-    .Case("existential_metatype", ValueKind::ExistentialMetatypeInst)
-    .Case("raw_pointer_to_ref", ValueKind::RawPointerToRefInst)
-    .Case("ref_element_addr", ValueKind::RefElementAddrInst)
-    .Case("ref_tail_addr", ValueKind::RefTailAddrInst)
-    .Case("ref_to_bridge_object", ValueKind::RefToBridgeObjectInst)
-    .Case("ref_to_raw_pointer", ValueKind::RefToRawPointerInst)
-    .Case("ref_to_unmanaged", ValueKind::RefToUnmanagedInst)
-    .Case("ref_to_unowned", ValueKind::RefToUnownedInst)
-    .Case("retain_value", ValueKind::RetainValueInst)
-    .Case("alloc_global", ValueKind::AllocGlobalInst)
-    .Case("global_addr", ValueKind::GlobalAddrInst)
-    .Case("strong_pin", ValueKind::StrongPinInst)
-    .Case("strong_release", ValueKind::StrongReleaseInst)
-    .Case("strong_retain", ValueKind::StrongRetainInst)
-    .Case("strong_retain_unowned", ValueKind::StrongRetainUnownedInst)
-    .Case("strong_unpin", ValueKind::StrongUnpinInst)
-    .Case("return", ValueKind::ReturnInst)
-    .Case("select_enum", ValueKind::SelectEnumInst)
-    .Case("select_enum_addr", ValueKind::SelectEnumAddrInst)
-    .Case("select_value", ValueKind::SelectValueInst)
-    .Case("set_deallocating", ValueKind::SetDeallocatingInst)
-    .Case("store", ValueKind::StoreInst)
-    .Case("store_unowned", ValueKind::StoreUnownedInst)
-    .Case("store_weak", ValueKind::StoreWeakInst)
-    .Case("string_literal", ValueKind::StringLiteralInst)
-    .Case("struct", ValueKind::StructInst)
-    .Case("struct_element_addr", ValueKind::StructElementAddrInst)
-    .Case("struct_extract", ValueKind::StructExtractInst)
-    .Case("super_method", ValueKind::SuperMethodInst)
-    .Case("switch_enum", ValueKind::SwitchEnumInst)
-    .Case("switch_enum_addr",
-          ValueKind::SwitchEnumAddrInst)
-    .Case("switch_value", ValueKind::SwitchValueInst)
-    .Case("tail_addr", ValueKind::TailAddrInst)
-    .Case("try_apply", ValueKind::TryApplyInst)
-    .Case("unchecked_enum_data", ValueKind::UncheckedEnumDataInst)
-    .Case("unchecked_addr_cast", ValueKind::UncheckedAddrCastInst)
-    .Case("unchecked_trivial_bit_cast", ValueKind::UncheckedTrivialBitCastInst)
-    .Case("unchecked_bitwise_cast", ValueKind::UncheckedBitwiseCastInst)
-    .Case("unchecked_ref_cast", ValueKind::UncheckedRefCastInst)
-    .Case("unchecked_ref_cast_addr", ValueKind::UncheckedRefCastAddrInst)
-    .Case("unchecked_take_enum_data_addr", ValueKind::UncheckedTakeEnumDataAddrInst)
-    .Case("thick_to_objc_metatype", ValueKind::ThickToObjCMetatypeInst)
-    .Case("thin_function_to_pointer", ValueKind::ThinFunctionToPointerInst)
-    .Case("thin_to_thick_function", ValueKind::ThinToThickFunctionInst)
-    .Case("throw", ValueKind::ThrowInst)
-    .Case("tuple", ValueKind::TupleInst)
-    .Case("tuple_element_addr", ValueKind::TupleElementAddrInst)
-    .Case("tuple_extract", ValueKind::TupleExtractInst)
-    .Case("unconditional_checked_cast", ValueKind::UnconditionalCheckedCastInst)
-    .Case("unconditional_checked_cast_addr",
-          ValueKind::UnconditionalCheckedCastAddrInst)
-    .Case("unmanaged_to_ref", ValueKind::UnmanagedToRefInst)
-    .Case("unowned_retain", ValueKind::UnownedRetainInst)
-    .Case("unowned_release", ValueKind::UnownedReleaseInst)
-    .Case("unowned_to_ref", ValueKind::UnownedToRefInst)
-    .Case("unreachable", ValueKind::UnreachableInst)
-    .Case("upcast", ValueKind::UpcastInst)
-    .Default(ValueKind::SILArgument);
+#define INST(Id, Parent, TextualName, MemBehavior, MayRelease)                 \
+  .Case(#TextualName, ValueKind::Id)
+#include "swift/SIL/SILNodes.def"
+               .Default(ValueKind::SILArgument);
 
   if (Opcode != ValueKind::SILArgument) {
     P.consumeToken();
@@ -1617,6 +1485,58 @@ bool SILParser::parseSILDebugLocation(SILLocation &L, SILBuilder &B,
   return false;
 }
 
+static bool parseLoadOwnershipQualifier(LoadOwnershipQualifier &Result,
+                                        SILParser &P) {
+  StringRef Str;
+  // If we do not parse '[' ... ']', we have unqualified. Set value and return.
+  if (!parseSILOptional(Str, P)) {
+    Result = LoadOwnershipQualifier::Unqualified;
+    return false;
+  }
+
+  // Then try to parse one of our other qualifiers. We do not support parsing
+  // unqualified here so we use that as our fail value.
+  auto Tmp = llvm::StringSwitch<LoadOwnershipQualifier>(Str)
+                 .Case("take", LoadOwnershipQualifier::Take)
+                 .Case("copy", LoadOwnershipQualifier::Copy)
+                 .Case("trivial", LoadOwnershipQualifier::Trivial)
+                 .Default(LoadOwnershipQualifier::Unqualified);
+
+  // Thus return true (following the conventions in this file) if we fail.
+  if (Tmp == LoadOwnershipQualifier::Unqualified)
+    return true;
+
+  // Otherwise, assign Result and return false.
+  Result = Tmp;
+  return false;
+}
+
+static bool parseStoreOwnershipQualifier(StoreOwnershipQualifier &Result,
+                                         SILParser &P) {
+  StringRef Str;
+  // If we do not parse '[' ... ']', we have unqualified. Set value and return.
+  if (!parseSILOptional(Str, P)) {
+    Result = StoreOwnershipQualifier::Unqualified;
+    return false;
+  }
+
+  // Then try to parse one of our other qualifiers. We do not support parsing
+  // unqualified here so we use that as our fail value.
+  auto Tmp = llvm::StringSwitch<StoreOwnershipQualifier>(Str)
+                 .Case("init", StoreOwnershipQualifier::Init)
+                 .Case("assign", StoreOwnershipQualifier::Assign)
+                 .Case("trivial", StoreOwnershipQualifier::Trivial)
+                 .Default(StoreOwnershipQualifier::Unqualified);
+
+  // Thus return true (following the conventions in this file) if we fail.
+  if (Tmp == StoreOwnershipQualifier::Unqualified)
+    return true;
+
+  // Otherwise, assign Result and return false.
+  Result = Tmp;
+  return false;
+}
+
 /// sil-instruction-def ::= (sil-value-name '=')? sil-instruction
 ///                         (',' sil-scope-ref)? (',' sil-loc)?
 bool SILParser::parseSILInstruction(SILBasicBlock *BB, SILBuilder &B) {
@@ -1671,7 +1591,7 @@ bool SILParser::parseSILInstruction(SILBasicBlock *BB, SILBuilder &B) {
   
   // Validate the opcode name, and do opcode-specific parsing logic based on the
   // opcode we find.
-  ValueBase *ResultVal;
+  SILInstruction *ResultVal;
   switch (Opcode) {
   case ValueKind::SILArgument:
   case ValueKind::SILUndef:
@@ -2007,7 +1927,6 @@ bool SILParser::parseSILInstruction(SILBasicBlock *BB, SILBuilder &B) {
     UNARY_INSTRUCTION(IsUnique)
     UNARY_INSTRUCTION(IsUniqueOrPinned)
     UNARY_INSTRUCTION(DestroyAddr)
-    UNARY_INSTRUCTION(Load)
     UNARY_INSTRUCTION(CondFail)
     REFCOUNTING_INSTRUCTION(StrongPin)
     REFCOUNTING_INSTRUCTION(StrongRetain)
@@ -2034,6 +1953,28 @@ bool SILParser::parseSILInstruction(SILBasicBlock *BB, SILBuilder &B) {
      ResultVal = B.createDebugValue(InstLoc, Val, VarInfo);
    else
      ResultVal = B.createDebugValueAddr(InstLoc, Val, VarInfo);
+   break;
+ }
+
+ case ValueKind::LoadInst: {
+   LoadOwnershipQualifier Qualifier;
+   SourceLoc AddrLoc;
+
+   if (parseLoadOwnershipQualifier(Qualifier, *this) ||
+       parseTypedValueRef(Val, AddrLoc, B) || parseSILDebugLocation(InstLoc, B))
+     return true;
+
+   ResultVal = B.createLoad(InstLoc, Val, Qualifier);
+   break;
+ }
+
+ case ValueKind::LoadBorrowInst: {
+   SourceLoc AddrLoc;
+
+   if (parseTypedValueRef(Val, AddrLoc, B) || parseSILDebugLocation(InstLoc, B))
+     return true;
+
+   ResultVal = B.createLoadBorrow(InstLoc, Val);
    break;
  }
 
@@ -2452,8 +2393,73 @@ bool SILParser::parseSILInstruction(SILBasicBlock *BB, SILBuilder &B) {
     break;
   }
 
+  case ValueKind::StoreInst: {
+    UnresolvedValueName From;
+    SourceLoc ToLoc, AddrLoc;
+    Identifier ToToken;
+    SILValue AddrVal;
+    StoreOwnershipQualifier Qualifier;
+    if (parseValueName(From) ||
+        parseSILIdentifier(ToToken, ToLoc, diag::expected_tok_in_sil_instr,
+                           "to"))
+      return true;
+
+    if (parseStoreOwnershipQualifier(Qualifier, *this))
+      return true;
+
+    if (parseTypedValueRef(AddrVal, AddrLoc, B) ||
+        parseSILDebugLocation(InstLoc, B))
+      return true;
+
+    if (ToToken.str() != "to") {
+      P.diagnose(ToLoc, diag::expected_tok_in_sil_instr, "to");
+      return true;
+    }
+
+    if (!AddrVal->getType().isAddress()) {
+      P.diagnose(AddrLoc, diag::sil_operand_not_address, "destination",
+                 OpcodeName);
+      return true;
+    }
+
+    SILType ValType = AddrVal->getType().getObjectType();
+
+    ResultVal = B.createStore(InstLoc, getLocalValue(From, ValType, InstLoc, B),
+                              AddrVal, Qualifier);
+    break;
+  }
+
+  case ValueKind::EndBorrowInst: {
+    UnresolvedValueName BorrowDestName, BorrowSourceName;
+    SourceLoc ToLoc, BorrowDestLoc;
+    Identifier ToToken;
+    SILType BorrowDestTy, BorrowSourceTy;
+
+    if (parseValueName(BorrowDestName) ||
+        parseSILIdentifier(ToToken, ToLoc, diag::expected_tok_in_sil_instr,
+                           "from") ||
+        parseValueName(BorrowSourceName) ||
+        P.parseToken(tok::colon, diag::expected_sil_colon_value_ref) ||
+        parseSILType(BorrowDestTy) ||
+        P.parseToken(tok::comma, diag::expected_tok_in_sil_instr, ",") ||
+        parseSILType(BorrowSourceTy) || parseSILDebugLocation(InstLoc, B))
+      return true;
+
+    if (ToToken.str() != "from") {
+      P.diagnose(ToLoc, diag::expected_tok_in_sil_instr, "from");
+      return true;
+    }
+
+    SILValue BorrowDest =
+        getLocalValue(BorrowDestName, BorrowDestTy, InstLoc, B);
+    SILValue BorrowSource =
+        getLocalValue(BorrowSourceName, BorrowSourceTy, InstLoc, B);
+
+    ResultVal = B.createEndBorrow(InstLoc, BorrowDest, BorrowSource);
+    break;
+  }
+
   case ValueKind::AssignInst:
-  case ValueKind::StoreInst:
   case ValueKind::StoreUnownedInst:
   case ValueKind::StoreWeakInst: {
     UnresolvedValueName from;
@@ -3733,7 +3739,7 @@ bool SILParser::parseSILInstruction(SILBasicBlock *BB, SILBuilder &B) {
 
 bool SILParser::parseCallInstruction(SILLocation InstLoc,
                                      ValueKind Opcode, SILBuilder &B,
-                                     ValueBase *&ResultVal) {
+                                     SILInstruction *&ResultVal) {
   UnresolvedValueName FnName;
   SmallVector<UnresolvedValueName, 4> ArgNames;
 
@@ -3892,7 +3898,7 @@ bool SILParser::parseCallInstruction(SILLocation InstLoc,
 }
 
 bool SILParser::parseSILFunctionRef(SILLocation InstLoc,
-                                    SILBuilder &B, ValueBase *&ResultVal) {
+                                    SILBuilder &B, SILInstruction *&ResultVal) {
   Identifier Name;
   SILType Ty;
   SourceLoc Loc = P.Tok.getLoc();
@@ -3979,6 +3985,11 @@ bool SILParser::parseSILBasicBlock(SILBuilder &B) {
 
   do {
     if (parseSILInstruction(BB, B))
+      return true;
+    // Evaluate how the just parsed instruction effects this functions Ownership
+    // Qualification. For more details, see the comment on the
+    // FunctionOwnershipEvaluator class.
+    if (!OwnershipEvaluator.evaluate(*BB->rbegin()))
       return true;
   } while (isStartOfSILInstruction());
 
@@ -4075,6 +4086,7 @@ bool Parser::parseDeclSIL() {
       }
       
       // Parse the basic block list.
+      FunctionState.OwnershipEvaluator.reset(FunctionState.F);
       SILOpenedArchetypesTracker OpenedArchetypesTracker(*FunctionState.F);
       SILBuilder B(*FunctionState.F);
       // Track the archetypes just like SILGen. This

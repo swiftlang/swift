@@ -14,6 +14,13 @@ set(sources
   SwiftStdint.h
   UnicodeShims.h
   Visibility.h
+
+  ObjectiveCOverlayShims.h
+  OSOverlayShims.h
+  SafariServicesOverlayShims.h
+  XCTestOverlayShims.h
+  XPCOverlayShims.h
+
   module.modulemap
   )
 set(output_dir "${SWIFTLIB_DIR}/shims")

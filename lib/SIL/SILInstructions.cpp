@@ -656,8 +656,16 @@ uint64_t StringLiteralInst::getCodeUnitCount() {
   return Length;
 }
 
-StoreInst::StoreInst(SILDebugLocation Loc, SILValue Src, SILValue Dest)
-    : SILInstruction(ValueKind::StoreInst, Loc), Operands(this, Src, Dest) {}
+StoreInst::StoreInst(
+    SILDebugLocation Loc, SILValue Src, SILValue Dest,
+    StoreOwnershipQualifier Qualifier = StoreOwnershipQualifier::Unqualified)
+    : SILInstruction(ValueKind::StoreInst, Loc), Operands(this, Src, Dest),
+      OwnershipQualifier(Qualifier) {}
+
+EndBorrowInst::EndBorrowInst(SILDebugLocation DebugLoc, SILValue Src,
+                             SILValue Dest)
+    : SILInstruction(ValueKind::EndBorrowInst, DebugLoc),
+      Operands(this, Src, Dest) {}
 
 AssignInst::AssignInst(SILDebugLocation Loc, SILValue Src, SILValue Dest)
     : SILInstruction(ValueKind::AssignInst, Loc), Operands(this, Src, Dest) {}
@@ -938,10 +946,10 @@ bool StructExtractInst::isFieldOnlyNonTrivialField() const {
 
 
 TermInst::SuccessorListTy TermInst::getSuccessors() {
-  #define TERMINATOR(TYPE, PARENT, EFFECT, RELEASING) \
-    if (auto I = dyn_cast<TYPE>(this)) \
-      return I->getSuccessors();
-  #include "swift/SIL/SILNodes.def"
+#define TERMINATOR(TYPE, PARENT, TEXTUALNAME, EFFECT, RELEASING)               \
+  if (auto I = dyn_cast<TYPE>(this))                                           \
+    return I->getSuccessors();
+#include "swift/SIL/SILNodes.def"
 
   llvm_unreachable("not a terminator?!");
 }

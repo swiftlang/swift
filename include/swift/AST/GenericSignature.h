@@ -99,7 +99,8 @@ public:
 /// Describes the generic signature of a particular declaration, including
 /// both the generic type parameters and the requirements placed on those
 /// generic parameters.
-class GenericSignature final : public llvm::FoldingSetNode,
+class alignas(1 << TypeAlignInBits) GenericSignature final
+  : public llvm::FoldingSetNode,
     private llvm::TrailingObjects<GenericSignature, GenericTypeParamType *,
                                   Requirement> {
   friend TrailingObjects;

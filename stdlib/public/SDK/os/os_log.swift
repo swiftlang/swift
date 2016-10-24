@@ -12,6 +12,7 @@
 
 @_exported import os
 @_exported import os.log
+import _SwiftOSOverlayShims
 
 @available(OSX 10.12, iOS 10.0, watchOS 3.0, tvOS 10.0, *)
 public func os_log(
@@ -59,12 +60,6 @@ extension OSLog {
 		self.init(__subsystem: subsystem, category: category)
 	}
 }
-
-@_silgen_name("_swift_os_log")
-internal func _swift_os_log(_ dso: UnsafeRawPointer!, _ log: OSLog, _ type: OSLogType, _ format: UnsafePointer<Int8>!, _ args: CVaListPointer)
-
-@_silgen_name("_swift_os_log_default")
-internal func _swift_os_log_default() -> OSLog
 
 @available(*, unavailable, renamed: "OSLogType.default")
 public var OS_LOG_TYPE_DEFAULT: OSLogType {

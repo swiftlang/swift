@@ -1,5 +1,5 @@
-// RUN: %target-parse-verify-swift
-// RUN: %target-parse-verify-swift -enable-astscope-lookup
+// RUN: %target-parse-verify-swift -swift-version 4
+// RUN: %target-parse-verify-swift -enable-astscope-lookup -swift-version 4
 
 // Types in expression contexts must be followed by a member access or
 // constructor call.
@@ -220,4 +220,19 @@ func testFunctionCollectionTypes() {
   let _ = (Int) -> Int // expected-error{{expected member name or constructor call after type name}} expected-note{{add arguments after the type to construct a value of the type}} expected-note{{use '.self' to reference the type object}}
   let _ = 2 + () -> Int // expected-error{{expected type before '->'}}
   let _ = () -> (Int, Int).2 // expected-error{{expected type after '->'}}
+}
+
+protocol P1 {}
+protocol P2 {}
+protocol P3 {}
+func compositionType() {
+  let _ = P1 & P2 // expected-error {{expected member name or constructor call after type name}} expected-note{{use '.self'}} {{18-18=.self}} FIXME(don't emit this): expected-note{{add arguments}} {{18-18=()}} 
+  _ = P1 & P2.self // expected-error {{binary operator '&' cannot be applied to operands of type 'P1.Protocol' and 'P2.Protocol'}} expected-note {{overloads for '&' exist }}
+  _ = (P1 & P2).self // Ok.
+  _ = (P1 & (P2)).self // FIXME: OK? while `typealias P = P1 & (P2)` is rejected.
+  _ = (P1 & (P2, P3)).self // expected-error {{non-protocol type '(P2, P3)' cannot be used within a protocol composition}}
+  _ = (P1 & Int).self // expected-error {{non-protocol type 'Int' cannot be used within a protocol composition}}
+  _ = (P1? & P2).self // expected-error {{non-protocol type 'P1?' cannot be used within a protocol composition}}
+
+  _ = (P1 & P2.Type).self // expected-error {{non-protocol type 'P2.Type' cannot be used within a protocol composition}}
 }

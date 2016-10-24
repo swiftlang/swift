@@ -20,6 +20,7 @@
 #include "swift/AST/DeclContext.h"
 #include "swift/AST/Ownership.h"
 #include "swift/AST/Requirement.h"
+#include "swift/AST/Substitution.h"
 #include "swift/AST/Type.h"
 #include "swift/AST/TypeAlignments.h"
 #include "swift/AST/Identifier.h"
@@ -63,7 +64,6 @@ namespace swift {
   class ModuleDecl;
   class ProtocolConformance;
   enum class SILArgumentConvention : uint8_t;
-  class Substitution;
   enum OptionalTypeKind : unsigned;
   enum PointerTypeKind : unsigned;
 
@@ -991,8 +991,6 @@ class UnresolvedType : public TypeBase {
     : TypeBase(TypeKind::Unresolved, &C,
        RecursiveTypeProperties(RecursiveTypeProperties::HasUnresolvedType)) { }
 public:
-  static Type get(const ASTContext &C);
-  
   // Implement isa/cast/dyncast/etc.
   static bool classof(const TypeBase *T) {
     return T->getKind() == TypeKind::Unresolved;
@@ -2166,6 +2164,11 @@ enum class FunctionTypeRepresentation : uint8_t {
 ///
 /// This is a superset of FunctionTypeRepresentation. The common representations
 /// must share an enum value.
+///
+/// TODO: The overlap of SILFunctionTypeRepresentation and
+/// FunctionTypeRepresentation is a total hack necessitated by the way SIL
+/// TypeLowering is currently written. We ought to refactor TypeLowering so that
+/// it is not necessary to distinguish these cases.
 enum class SILFunctionTypeRepresentation : uint8_t {
   /// A freestanding thick function.
   Thick = uint8_t(FunctionTypeRepresentation::Swift),
@@ -2194,6 +2197,9 @@ enum class SILFunctionTypeRepresentation : uint8_t {
   
   /// A Swift protocol witness.
   WitnessMethod,
+  
+  /// A closure invocation function that has not been bound to a context.
+  Closure,
 };
 
 /// Can this calling convention result in a function being called indirectly
@@ -2204,6 +2210,7 @@ inline bool canBeCalledIndirectly(SILFunctionTypeRepresentation rep) {
   case SILFunctionTypeRepresentation::Thin:
   case SILFunctionTypeRepresentation::CFunctionPointer:
   case SILFunctionTypeRepresentation::Block:
+  case SILFunctionTypeRepresentation::Closure:
     return false;
   case SILFunctionTypeRepresentation::ObjCMethod:
   case SILFunctionTypeRepresentation::Method:
@@ -2225,6 +2232,7 @@ getSILFunctionLanguage(SILFunctionTypeRepresentation rep) {
   case SILFunctionTypeRepresentation::Thin:
   case SILFunctionTypeRepresentation::Method:
   case SILFunctionTypeRepresentation::WitnessMethod:
+  case SILFunctionTypeRepresentation::Closure:
     return SILFunctionLanguage::Swift;
   }
 }
@@ -2304,6 +2312,7 @@ public:
       case SILFunctionTypeRepresentation::Block:
       case SILFunctionTypeRepresentation::Thin:
       case SILFunctionTypeRepresentation::CFunctionPointer:
+      case SILFunctionTypeRepresentation::Closure:
         return false;
       case SILFunctionTypeRepresentation::ObjCMethod:
       case SILFunctionTypeRepresentation::Method:
@@ -2323,6 +2332,7 @@ public:
       case SILFunctionTypeRepresentation::ObjCMethod:
       case SILFunctionTypeRepresentation::WitnessMethod:
       case SILFunctionTypeRepresentation::CFunctionPointer:
+      case SILFunctionTypeRepresentation::Closure:
         return false;
       }
     }
@@ -3025,6 +3035,7 @@ public:
       case Representation::Block:
       case Representation::Thin:
       case Representation::CFunctionPointer:
+      case Representation::Closure:
         return false;
       case Representation::ObjCMethod:
       case Representation::Method:
@@ -3040,6 +3051,7 @@ public:
       case Representation::Thin:
       case Representation::CFunctionPointer:
       case Representation::ObjCMethod:
+      case Representation::Closure:
         return false;
       case Representation::Method:
       case Representation::WitnessMethod:
@@ -3058,6 +3070,7 @@ public:
       case Representation::ObjCMethod:
       case Representation::Method:
       case Representation::WitnessMethod:
+      case Representation::Closure:
         return false;
       }
     }
@@ -3341,23 +3354,38 @@ public:
 DEFINE_EMPTY_CAN_TYPE_WRAPPER(SILFunctionType, Type)
 
 class SILBoxType;
+class SILLayout; // From SIL
 typedef CanTypeWrapper<SILBoxType> CanSILBoxType;
 
 /// The SIL-only type @box T, which represents a reference to a (non-class)
-/// refcounted heap allocation containing a value of type T.
-class SILBoxType : public TypeBase {
-  CanType BoxedType;
+/// refcounted value referencing an aggregate with a given lowered layout.
+class SILBoxType final : public TypeBase,
+                         private llvm::TrailingObjects<SILBoxType,Substitution>{
+  friend TrailingObjects;
+  
+  SILLayout *Layout;
+  unsigned NumGenericArgs;
 
-  SILBoxType(CanType BoxedType)
-    : TypeBase(TypeKind::SILBox,
-               &BoxedType->getASTContext(),
-               BoxedType->getRecursiveProperties()),
-      BoxedType(BoxedType) {}
+  static RecursiveTypeProperties
+  getRecursivePropertiesFromSubstitutions(ArrayRef<Substitution> Args);
+
+  SILBoxType(ASTContext &C,
+             SILLayout *Layout, ArrayRef<Substitution> Args);
 
 public:
-  static CanSILBoxType get(CanType BoxedType);
+  SILLayout *getLayout() const { return Layout; }
+  ArrayRef<Substitution> getGenericArgs() const {
+    return llvm::makeArrayRef(getTrailingObjects<Substitution>(),
+                              NumGenericArgs);
+  }
 
-  CanType getBoxedType() const { return BoxedType; }
+  // TODO: SILBoxTypes should be explicitly constructed in terms of specific
+  // layouts. As a staging mechanism, we expose the old single-boxed-type
+  // interface.
+  // These functions are implemented in the SIL library instead of the AST.
+  
+  static CanSILBoxType get(CanType BoxedType);
+  CanType getBoxedType() const;
   // In SILType.h
   SILType getBoxedAddressType() const;
 
