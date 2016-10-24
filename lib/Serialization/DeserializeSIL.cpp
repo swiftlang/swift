@@ -380,13 +380,13 @@ SILFunction *SILDeserializer::readSILFunction(DeclID FID,
   DeclID clangNodeOwnerID;
   TypeID funcTyID;
   unsigned rawLinkage, isTransparent, isFragile, isThunk, isGlobal,
-    inlineStrategy, effect, numSpecAttrs;
+      inlineStrategy, effect, numSpecAttrs, hasQualifiedOwnership;
   ArrayRef<uint64_t> SemanticsIDs;
   // TODO: read fragile
   SILFunctionLayout::readRecord(scratch, rawLinkage, isTransparent, isFragile,
                                 isThunk, isGlobal, inlineStrategy, effect,
-                                numSpecAttrs, funcTyID, clangNodeOwnerID,
-                                SemanticsIDs);
+                                numSpecAttrs, hasQualifiedOwnership, funcTyID,
+                                clangNodeOwnerID, SemanticsIDs);
 
   if (funcTyID == 0) {
     DEBUG(llvm::dbgs() << "SILFunction typeID is 0.\n");
@@ -454,6 +454,8 @@ SILFunction *SILDeserializer::readSILFunction(DeclID FID,
     for (auto ID : SemanticsIDs) {
       fn->addSemanticsAttr(MF->getIdentifier(ID).str());
     }
+    if (!hasQualifiedOwnership)
+      fn->setUnqualifiedOwnership();
 
     if (Callback) Callback->didDeserialize(MF->getAssociatedModule(), fn);
   }
@@ -538,7 +540,6 @@ SILFunction *SILDeserializer::readSILFunction(DeclID FID,
   LocalValues.clear();
   ForwardLocalValues.clear();
 
-  FunctionOwnershipEvaluator OwnershipEvaluator(fn);
   SILOpenedArchetypesTracker OpenedArchetypesTracker(*fn);
   SILBuilder Builder(*fn);
   // Track the archetypes just like SILGen. This
@@ -572,8 +573,7 @@ SILFunction *SILDeserializer::readSILFunction(DeclID FID,
         return fn;
 
       // Handle a SILInstruction record.
-      if (readSILInstruction(fn, CurrentBB, Builder, OwnershipEvaluator, kind,
-                             scratch)) {
+      if (readSILInstruction(fn, CurrentBB, Builder, kind, scratch)) {
         DEBUG(llvm::dbgs() << "readSILInstruction returns error.\n");
         MF->error();
         return fn;
@@ -659,10 +659,10 @@ static SILDeclRef getSILDeclRef(ModuleFile *MF,
   return DRef;
 }
 
-bool SILDeserializer::readSILInstruction(
-    SILFunction *Fn, SILBasicBlock *BB, SILBuilder &Builder,
-    FunctionOwnershipEvaluator &OwnershipEvaluator, unsigned RecordKind,
-    SmallVectorImpl<uint64_t> &scratch) {
+bool SILDeserializer::readSILInstruction(SILFunction *Fn, SILBasicBlock *BB,
+                                         SILBuilder &Builder,
+                                         unsigned RecordKind,
+                                         SmallVectorImpl<uint64_t> &scratch) {
   // Return error if Basic Block is null.
   if (!BB)
     return true;
@@ -1900,11 +1900,6 @@ bool SILDeserializer::readSILInstruction(
     llvm_unreachable("todo");
   }
 
-  // Evaluate ResultVal's ownership. If we find that as a result of ResultVal,
-  // we are mixing qualified and unqualified ownership instructions, bail.
-  if (!OwnershipEvaluator.evaluate(ResultVal))
-    return true;
-
   if (ResultVal->hasValue()) {
     LastValueID = LastValueID + 1;
     setLocalValue(ResultVal, LastValueID);
@@ -1973,12 +1968,12 @@ bool SILDeserializer::hasSILFunction(StringRef Name,
   DeclID clangOwnerID;
   TypeID funcTyID;
   unsigned rawLinkage, isTransparent, isFragile, isThunk, isGlobal,
-    inlineStrategy, effect, numSpecAttrs;
+    inlineStrategy, effect, numSpecAttrs, hasQualifiedOwnership;
   ArrayRef<uint64_t> SemanticsIDs;
   SILFunctionLayout::readRecord(scratch, rawLinkage, isTransparent, isFragile,
                                 isThunk, isGlobal, inlineStrategy, effect,
-                                numSpecAttrs, funcTyID, clangOwnerID,
-                                SemanticsIDs);
+                                numSpecAttrs, hasQualifiedOwnership, funcTyID,
+                                clangOwnerID, SemanticsIDs);
   auto linkage = fromStableSILLinkage(rawLinkage);
   if (!linkage) {
     DEBUG(llvm::dbgs() << "invalid linkage code " << rawLinkage
