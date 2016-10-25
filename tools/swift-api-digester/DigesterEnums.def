@@ -55,6 +55,7 @@ NODE_ANNOTATION(RenameOldName)
 NODE_ANNOTATION(RenameNewName)
 NODE_ANNOTATION(NowThrowing)
 NODE_ANNOTATION(NowMutating)
+NODE_ANNOTATION(StaticChange)
 
 DECL_ATTR(deprecated)
 
