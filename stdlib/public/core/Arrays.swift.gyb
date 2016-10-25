@@ -1214,8 +1214,8 @@ extension ${Self} : RangeReplaceableCollection, _ArrayProtocol {
   @inline(never)
   internal mutating func _copyToNewBuffer(oldCount: Int) {
     let newCount = oldCount + 1
-    var newBuffer = _forceCreateUniqueMutableBuffer(
-      &_buffer, countForNewBuffer: oldCount, minNewCapacity: newCount)
+    var newBuffer = _buffer._forceCreateUniqueMutableBuffer(
+      countForNewBuffer: oldCount, minNewCapacity: newCount)
     _buffer._arrayOutOfPlaceUpdate(
       &newBuffer, oldCount, 0, _IgnorePointer())
   }
@@ -1681,8 +1681,8 @@ internal func _arrayOutOfPlaceReplace<B, C>(
 
   let growth = insertCount - bounds.count
   let newCount = source.count + growth
-  var newBuffer = _forceCreateUniqueMutableBuffer(
-    &source, newCount: newCount, requiredCapacity: newCount)
+  var newBuffer = source._forceCreateUniqueMutableBuffer(
+    newCount: newCount, requiredCapacity: newCount)
 
   source._arrayOutOfPlaceUpdate(
     &newBuffer,
@@ -1823,58 +1823,60 @@ public func += <
 
 //===--- generic helpers --------------------------------------------------===//
 
-/// Create a unique mutable buffer that has enough capacity to hold 'newCount'
-/// elements and at least 'requiredCapacity' elements. Set the count of the new
-/// buffer to 'newCount'. The content of the buffer is uninitialized.
-/// The formula used to compute the new buffers capacity is:
-///   max(requiredCapacity, source.capacity)  if newCount <= source.capacity
-///   max(requiredCapacity, _growArrayCapacity(source.capacity)) otherwise
-@inline(never)
-internal func _forceCreateUniqueMutableBuffer<_Buffer : _ArrayBufferProtocol>(
-  _ source: inout _Buffer, newCount: Int, requiredCapacity: Int
-) -> _ContiguousArrayBuffer<_Buffer.Element> {
-  return _forceCreateUniqueMutableBufferImpl(
-    &source, countForBuffer: newCount, minNewCapacity: newCount,
-    requiredCapacity: requiredCapacity)
-}
+extension _ArrayBufferProtocol {
+  /// Create a unique mutable buffer that has enough capacity to hold 'newCount'
+  /// elements and at least 'requiredCapacity' elements. Set the count of the new
+  /// buffer to 'newCount'. The content of the buffer is uninitialized.
+  /// The formula used to compute the new buffers capacity is:
+  ///   max(requiredCapacity, source.capacity)  if newCount <= source.capacity
+  ///   max(requiredCapacity, _growArrayCapacity(source.capacity)) otherwise
+  @inline(never)
+  internal func _forceCreateUniqueMutableBuffer(
+    newCount: Int, requiredCapacity: Int
+  ) -> _ContiguousArrayBuffer<Element> {
+    return _forceCreateUniqueMutableBufferImpl(
+      countForBuffer: newCount, minNewCapacity: newCount,
+      requiredCapacity: requiredCapacity)
+  }
 
-/// Create a unique mutable buffer that has enough capacity to hold
-/// 'minNewCapacity' elements and set the count of the new buffer to
-/// 'countForNewBuffer'. The content of the buffer uninitialized.
-/// The formula used to compute the new buffers capacity is:
-///   max(minNewCapacity, source.capacity) if minNewCapacity <= source.capacity
-///   max(minNewCapacity, _growArrayCapacity(source.capacity)) otherwise
-@inline(never)
-internal
-func _forceCreateUniqueMutableBuffer<_Buffer : _ArrayBufferProtocol>(
-  _ source: inout _Buffer, countForNewBuffer: Int, minNewCapacity: Int
-) -> _ContiguousArrayBuffer<_Buffer.Element> {
-  return _forceCreateUniqueMutableBufferImpl(
-    &source, countForBuffer: countForNewBuffer, minNewCapacity: minNewCapacity,
-    requiredCapacity: minNewCapacity)
-}
+  /// Create a unique mutable buffer that has enough capacity to hold
+  /// 'minNewCapacity' elements and set the count of the new buffer to
+  /// 'countForNewBuffer'. The content of the buffer uninitialized.
+  /// The formula used to compute the new buffers capacity is:
+  ///   max(minNewCapacity, source.capacity) if minNewCapacity <= source.capacity
+  ///   max(minNewCapacity, _growArrayCapacity(source.capacity)) otherwise
+  @inline(never)
+  internal func _forceCreateUniqueMutableBuffer(
+    countForNewBuffer: Int, minNewCapacity: Int
+  ) -> _ContiguousArrayBuffer<Element> {
+    return _forceCreateUniqueMutableBufferImpl(
+      countForBuffer: countForNewBuffer, minNewCapacity: minNewCapacity,
+      requiredCapacity: minNewCapacity)
+  }
 
-/// Create a unique mutable buffer that has enough capacity to hold
-/// 'minNewCapacity' elements and at least 'requiredCapacity' elements and set
-/// the count of the new buffer to 'countForBuffer'. The content of the buffer
-/// uninitialized.
-/// The formula used to compute the new capacity is:
-///  max(requiredCapacity, source.capacity) if minNewCapacity <= source.capacity
-///  max(requiredCapacity, _growArrayCapacity(source.capacity))  otherwise
-internal func _forceCreateUniqueMutableBufferImpl<_Buffer : _ArrayBufferProtocol>(
-  _ source: inout _Buffer, countForBuffer: Int, minNewCapacity: Int,
-  requiredCapacity: Int
-) -> _ContiguousArrayBuffer<_Buffer.Element> {
-  _sanityCheck(countForBuffer >= 0)
-  _sanityCheck(requiredCapacity >= countForBuffer)
-  _sanityCheck(minNewCapacity >= countForBuffer)
+  /// Create a unique mutable buffer that has enough capacity to hold
+  /// 'minNewCapacity' elements and at least 'requiredCapacity' elements and set
+  /// the count of the new buffer to 'countForBuffer'. The content of the buffer
+  /// uninitialized.
+  /// The formula used to compute the new capacity is:
+  ///  max(requiredCapacity, source.capacity) if minNewCapacity <= source.capacity
+  ///  max(requiredCapacity, _growArrayCapacity(source.capacity))  otherwise
+  internal func _forceCreateUniqueMutableBufferImpl(
+    countForBuffer: Int, minNewCapacity: Int,
+    requiredCapacity: Int
+  ) -> _ContiguousArrayBuffer<Element> {
+    _sanityCheck(countForBuffer >= 0)
+    _sanityCheck(requiredCapacity >= countForBuffer)
+    _sanityCheck(minNewCapacity >= countForBuffer)
 
-  let minimumCapacity = max(
-    requiredCapacity, minNewCapacity > source.capacity
-      ? _growArrayCapacity(source.capacity) : source.capacity)
+    // FIXME(Typechecker): Swift. prefix shouldn't be necessary (rdar://problem/28947708)
+    let minimumCapacity = Swift.max(requiredCapacity,
+      minNewCapacity > capacity
+         ? _growArrayCapacity(capacity) : capacity)
 
-  return _ContiguousArrayBuffer(
-    _uninitializedCount: countForBuffer, minimumCapacity: minimumCapacity)
+    return _ContiguousArrayBuffer(
+      _uninitializedCount: countForBuffer, minimumCapacity: minimumCapacity)
+  }
 }
 
 internal protocol _PointerFunction {
@@ -1993,8 +1995,8 @@ internal func _outlinedMakeUniqueBuffer<_Buffer>(
     return
   }
 
-  var newBuffer = _forceCreateUniqueMutableBuffer(
-    &buffer, newCount: bufferCount, requiredCapacity: bufferCount)
+  var newBuffer = buffer._forceCreateUniqueMutableBuffer(
+    newCount: bufferCount, requiredCapacity: bufferCount)
   buffer._arrayOutOfPlaceUpdate(&newBuffer, bufferCount, 0, _IgnorePointer())
 }
 
@@ -2014,8 +2016,8 @@ internal func _arrayReserve<_Buffer>(
     return
   }
 
-  var newBuffer = _forceCreateUniqueMutableBuffer(
-    &buffer, newCount: count, requiredCapacity: requiredCapacity)
+  var newBuffer = buffer._forceCreateUniqueMutableBuffer(
+    newCount: count, requiredCapacity: requiredCapacity)
   buffer._arrayOutOfPlaceUpdate(&newBuffer, count, 0, _IgnorePointer())
 }
 
