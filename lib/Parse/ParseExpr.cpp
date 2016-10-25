@@ -1430,8 +1430,9 @@ ParserResult<Expr> Parser::parseExprPostfix(Diag<> ID, bool isExprBasic) {
         SourceLoc nameLoc = consumeToken(tok::integer_literal);
         
         // Don't allow '.<integer literal>' following a numeric literal
-        // expression.
-        if (Result.isNonNull() && isa<NumberLiteralExpr>(Result.get())) {
+        // expression (unless in #if env, for 1.2.3.4 version numbers)
+        if (!InPoundIfEnvironment &&
+            Result.isNonNull() && isa<NumberLiteralExpr>(Result.get())) {
           diagnose(nameLoc, diag::numeric_literal_numeric_member)
             .highlight(Result.get()->getSourceRange());
           continue;
