@@ -720,3 +720,4 @@ public func runRaceTest(
   runRaceTest(ClosureBasedRaceTest.self, operations: operations,
     timeoutInSeconds: timeoutInSeconds, threads: threads)
 }
+
