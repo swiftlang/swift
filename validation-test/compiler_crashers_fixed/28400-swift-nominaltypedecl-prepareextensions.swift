@@ -5,8 +5,7 @@
 // See http://swift.org/LICENSE.txt for license information
 // See http://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
 
-// RUN: not --crash %target-swift-frontend %s -parse
-// REQUIRES: asserts
+// RUN: %target-swift-frontend %s -parse
 // Discovered by https://github.com/airspeedswift (airspeedswift)
 
 let s1: Set<Int>? = []
