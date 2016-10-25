@@ -358,7 +358,8 @@ void SILSerializer::writeSILFunction(const SILFunction &F, bool DeclOnly) {
       (unsigned)F.isTransparent(), (unsigned)F.isFragile(),
       (unsigned)F.isThunk(), (unsigned)F.isGlobalInit(),
       (unsigned)F.getInlineStrategy(), (unsigned)F.getEffectsKind(),
-      (unsigned)numSpecAttrs, FnID, clangNodeOwnerID, SemanticsIDs);
+      (unsigned)numSpecAttrs, (unsigned)F.hasQualifiedOwnership(), FnID,
+      clangNodeOwnerID, SemanticsIDs);
 
   if (NoBody)
     return;
