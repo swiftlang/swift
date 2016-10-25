@@ -122,6 +122,7 @@ public:
   } InVarOrLetPattern = IVOLP_NotInVarOrLet;
 
   bool InPoundLineEnvironment = false;
+  bool InPoundIfEnvironment = false;
 
   LocalContext *CurLocalContext = nullptr;
 
