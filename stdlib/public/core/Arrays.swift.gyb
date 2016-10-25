@@ -1216,8 +1216,8 @@ extension ${Self} : RangeReplaceableCollection, _ArrayProtocol {
     let newCount = oldCount + 1
     var newBuffer = _forceCreateUniqueMutableBuffer(
       &_buffer, countForNewBuffer: oldCount, minNewCapacity: newCount)
-    _arrayOutOfPlaceUpdate(
-      &_buffer, &newBuffer, oldCount, 0, _IgnorePointer())
+    _buffer._arrayOutOfPlaceUpdate(
+      &newBuffer, oldCount, 0, _IgnorePointer())
   }
 
   @_semantics("array.make_mutable")
@@ -1684,8 +1684,8 @@ internal func _arrayOutOfPlaceReplace<B, C>(
   var newBuffer = _forceCreateUniqueMutableBuffer(
     &source, newCount: newCount, requiredCapacity: newCount)
 
-  _arrayOutOfPlaceUpdate(
-    &source, &newBuffer,
+  source._arrayOutOfPlaceUpdate(
+    &newBuffer,
     bounds.lowerBound - source.startIndex, insertCount,
     _InitializeMemoryFromCollection(newValues)
   )
@@ -1882,82 +1882,81 @@ internal protocol _PointerFunction {
   func call(_: UnsafeMutablePointer<Element>, count: Int)
 }
 
-/// Initialize the elements of dest by copying the first headCount
-/// items from source, calling initializeNewElements on the next
-/// uninitialized element, and finally by copying the last N items
-/// from source into the N remaining uninitialized elements of dest.
-///
-/// As an optimization, may move elements out of source rather than
-/// copying when it isUniquelyReferenced.
-@inline(never)
-internal func _arrayOutOfPlaceUpdate<_Buffer, Initializer>(
-  _ source: inout _Buffer,
-  _ dest: inout _ContiguousArrayBuffer<_Buffer.Element>,
-  _ headCount: Int, // Count of initial source elements to copy/move
-  _ newCount: Int,  // Number of new elements to insert
-  _ initializeNewElements: Initializer
-) where
-  _Buffer : _ArrayBufferProtocol,
-  Initializer : _PointerFunction,
-  Initializer.Element == _Buffer.Element,
-  _Buffer.Index == Int {
+extension _ArrayBufferProtocol where Index == Int {
+  /// Initialize the elements of dest by copying the first headCount
+  /// items from source, calling initializeNewElements on the next
+  /// uninitialized element, and finally by copying the last N items
+  /// from source into the N remaining uninitialized elements of dest.
+  ///
+  /// As an optimization, may move elements out of source rather than
+  /// copying when it isUniquelyReferenced.
+  @inline(never)
+  internal mutating func _arrayOutOfPlaceUpdate<Initializer>(
+    _ dest: inout _ContiguousArrayBuffer<Element>,
+    _ headCount: Int, // Count of initial source elements to copy/move
+    _ newCount: Int,  // Number of new elements to insert
+    _ initializeNewElements: Initializer
+  ) where
+    Initializer : _PointerFunction,
+    Initializer.Element == Element {
 
-  _sanityCheck(headCount >= 0)
-  _sanityCheck(newCount >= 0)
+    _sanityCheck(headCount >= 0)
+    _sanityCheck(newCount >= 0)
 
-  // Count of trailing source elements to copy/move
-  let tailCount = dest.count - headCount - newCount
-  _sanityCheck(headCount + tailCount <= source.count)
+    // Count of trailing source elements to copy/move
+    let sourceCount = self.count
+    let tailCount = dest.count - headCount - newCount
+    _sanityCheck(headCount + tailCount <= sourceCount)
 
-  let sourceCount = source.count
-  let oldCount = sourceCount - headCount - tailCount
-  let destStart = dest.firstElementAddress
-  let newStart = destStart + headCount
-  let newEnd = newStart + newCount
+    let oldCount = sourceCount - headCount - tailCount
+    let destStart = dest.firstElementAddress
+    let newStart = destStart + headCount
+    let newEnd = newStart + newCount
 
-  // Check to see if we have storage we can move from
-  if let backing = source.requestUniqueMutableBackingBuffer(
-    minimumCapacity: sourceCount) {
+    // Check to see if we have storage we can move from
+    if let backing = requestUniqueMutableBackingBuffer(
+      minimumCapacity: sourceCount) {
 
-    let sourceStart = source.firstElementAddress
-    let oldStart = sourceStart + headCount
+      let sourceStart = firstElementAddress
+      let oldStart = sourceStart + headCount
 
-    // Destroy any items that may be lurking in a _SliceBuffer before
-    // its real first element
-    let backingStart = backing.firstElementAddress
-    let sourceOffset = sourceStart - backingStart
-    backingStart.deinitialize(count: sourceOffset)
+      // Destroy any items that may be lurking in a _SliceBuffer before
+      // its real first element
+      let backingStart = backing.firstElementAddress
+      let sourceOffset = sourceStart - backingStart
+      backingStart.deinitialize(count: sourceOffset)
 
-    // Move the head items
-    destStart.moveInitialize(from: sourceStart, count: headCount)
+      // Move the head items
+      destStart.moveInitialize(from: sourceStart, count: headCount)
 
-    // Destroy unused source items
-    oldStart.deinitialize(count: oldCount)
+      // Destroy unused source items
+      oldStart.deinitialize(count: oldCount)
 
-    initializeNewElements.call(newStart, count: newCount)
+      initializeNewElements.call(newStart, count: newCount)
 
-    // Move the tail items
-    newEnd.moveInitialize(from: oldStart + oldCount, count: tailCount)
+      // Move the tail items
+      newEnd.moveInitialize(from: oldStart + oldCount, count: tailCount)
 
-    // Destroy any items that may be lurking in a _SliceBuffer after
-    // its real last element
-    let backingEnd = backingStart + backing.count
-    let sourceEnd = sourceStart + sourceCount
-    sourceEnd.deinitialize(count: backingEnd - sourceEnd)
-    backing.count = 0
+      // Destroy any items that may be lurking in a _SliceBuffer after
+      // its real last element
+      let backingEnd = backingStart + backing.count
+      let sourceEnd = sourceStart + sourceCount
+      sourceEnd.deinitialize(count: backingEnd - sourceEnd)
+      backing.count = 0
+    }
+    else {
+      let headStart = startIndex
+      let headEnd = headStart + headCount
+      let newStart = _copyContents(
+        subRange: headStart..<headEnd,
+        initializing: destStart)
+      initializeNewElements.call(newStart, count: newCount)
+      let tailStart = headEnd + oldCount
+      let tailEnd = endIndex
+      self._copyContents(subRange: tailStart..<tailEnd, initializing: newEnd)
+    }
+    self = Self(_buffer: dest, shiftedToStartIndex: startIndex)
   }
-  else {
-    let headStart = source.startIndex
-    let headEnd = headStart + headCount
-    let newStart = source._copyContents(
-      subRange: headStart..<headEnd,
-      initializing: destStart)
-    initializeNewElements.call(newStart, count: newCount)
-    let tailStart = headEnd + oldCount
-    let tailEnd = source.endIndex
-    source._copyContents(subRange: tailStart..<tailEnd, initializing: newEnd)
-  }
-  source = _Buffer(_buffer: dest, shiftedToStartIndex: source.startIndex)
 }
 
 internal struct _InitializePointer<T> : _PointerFunction {
@@ -1996,7 +1995,7 @@ internal func _outlinedMakeUniqueBuffer<_Buffer>(
 
   var newBuffer = _forceCreateUniqueMutableBuffer(
     &buffer, newCount: bufferCount, requiredCapacity: bufferCount)
-  _arrayOutOfPlaceUpdate(&buffer, &newBuffer, bufferCount, 0, _IgnorePointer())
+  buffer._arrayOutOfPlaceUpdate(&newBuffer, bufferCount, 0, _IgnorePointer())
 }
 
 internal func _arrayReserve<_Buffer>(
@@ -2017,7 +2016,7 @@ internal func _arrayReserve<_Buffer>(
 
   var newBuffer = _forceCreateUniqueMutableBuffer(
     &buffer, newCount: count, requiredCapacity: requiredCapacity)
-  _arrayOutOfPlaceUpdate(&buffer, &newBuffer, count, 0, _IgnorePointer())
+  buffer._arrayOutOfPlaceUpdate(&newBuffer, count, 0, _IgnorePointer())
 }
 
 /// Append items from `newItems` to `buffer`.
