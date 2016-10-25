@@ -1662,17 +1662,12 @@ Type ConstraintSystem::lookThroughImplicitlyUnwrappedOptionalType(Type type) {
   return Type();
 }
 
-Type ConstraintSystem::simplifyType(Type type,
-       llvm::SmallPtrSet<TypeVariableType *, 16> &substituting) {
+Type ConstraintSystem::simplifyType(Type type) {
   return type.transform([&](Type type) -> Type {
     if (auto tvt = dyn_cast<TypeVariableType>(type.getPointer())) {
       tvt = getRepresentative(tvt);
       if (auto fixed = getFixedType(tvt)) {
-        if (substituting.insert(tvt).second) {
-          auto result = simplifyType(fixed, substituting);
-          substituting.erase(tvt);
-          return result;
-        }
+        return simplifyType(fixed);
       }
       
       return tvt;
