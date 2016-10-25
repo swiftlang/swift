@@ -58,6 +58,8 @@ enum class ConstraintKind : char {
   /// type is an lvalue type with the same object type. Otherwise, the two
   /// types must be the same type.
   BindParam,
+  /// \brief Binds the first type to the element type of the second type.
+  BindToPointerType,
   /// \brief The first type is a subtype of the second type, i.e., a value
   /// of the type of the first type can be used wherever a value of the
   /// second type is expected.
@@ -464,6 +466,7 @@ public:
     case ConstraintKind::Bind:
     case ConstraintKind::Equal:
     case ConstraintKind::BindParam:
+    case ConstraintKind::BindToPointerType:
     case ConstraintKind::Subtype:
     case ConstraintKind::Conversion:
     case ConstraintKind::ExplicitConversion:

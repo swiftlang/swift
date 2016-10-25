@@ -676,6 +676,7 @@ static bool shouldBindToValueType(Constraint *constraint)
   case ConstraintKind::Bind:
   case ConstraintKind::Equal:
   case ConstraintKind::BindParam:
+  case ConstraintKind::BindToPointerType:
   case ConstraintKind::ConformsTo:
   case ConstraintKind::LiteralConformsTo:
   case ConstraintKind::CheckedCast:
@@ -757,6 +758,7 @@ static PotentialBindings getPotentialBindings(ConstraintSystem &cs,
     case ConstraintKind::Bind:
     case ConstraintKind::Equal:
     case ConstraintKind::BindParam:
+    case ConstraintKind::BindToPointerType:
     case ConstraintKind::Subtype:
     case ConstraintKind::Conversion:
     case ConstraintKind::ExplicitConversion:
