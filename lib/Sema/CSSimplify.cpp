@@ -1208,17 +1208,6 @@ static bool allowsBridgingFromObjC(TypeChecker &tc, DeclContext *dc,
   return true;
 }
 
-/// Determine whether the given type variables occurs in the given type.
-static bool typeVarOccursInType(TypeVariableType *typeVar, Type type) {
-  SmallVector<TypeVariableType *, 4> typeVars;
-  type->getTypeVariables(typeVars);
-  for (auto referencedTypeVar : typeVars) {
-    if (referencedTypeVar == typeVar) return true;
-  }
-
-  return false;
-}
-
 ConstraintSystem::SolutionKind
 ConstraintSystem::matchTypes(Type type1, Type type2, ConstraintKind kind,
                              TypeMatchOptions flags,
