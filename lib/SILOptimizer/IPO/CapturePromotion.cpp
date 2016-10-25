@@ -862,7 +862,7 @@ constructClonedFunction(PartialApplyInst *PAI, FunctionRefInst *FRI,
   auto ApplySubs = PAI->getSubstitutions();
 
   SubstitutionMap InterfaceSubs;
-  if (auto genericSig = F->getLoweredFunctionType()->getGenericSignature())
+  if (auto genericSig = PAI->getOrigCalleeType()->getGenericSignature())
     InterfaceSubs = genericSig->getSubstitutionMap(ApplySubs);
 
   // Create the Cloned Name for the function.
