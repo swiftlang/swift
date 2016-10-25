@@ -1,6 +1,7 @@
 set(sourcekitdAPI_sources
   CodeCompletionResultsArray.cpp
   CompactArray.cpp
+  DocStructureArray.cpp
   DocSupportAnnotationArray.cpp
   Requests.cpp
   sourcekitdAPI-Common.cpp
