@@ -246,10 +246,11 @@ SILFunction *SILPerformanceInliner::getEligibleFunction(FullApplySite AI) {
 }
 
 /// Return true if inlining this call site is profitable.
-bool SILPerformanceInliner::isProfitableToInlineNonGeneric(FullApplySite AI,
-                                              Weight CallerWeight,
-                                              ConstantTracker &callerTracker,
-                                              int &NumCallerBlocks) {
+bool SILPerformanceInliner::
+isProfitableToInlineNonGeneric(FullApplySite AI,
+                               Weight CallerWeight,
+                               ConstantTracker &callerTracker,
+                               int &NumCallerBlocks) {
   assert(AI.getSubstitutions().empty() &&
          "Expected a non-generic apply");
 
@@ -376,10 +377,11 @@ bool SILPerformanceInliner::isProfitableToInlineNonGeneric(FullApplySite AI,
 }
 
 /// Return true if inlining this call site is profitable.
-bool SILPerformanceInliner::isProfitableToInlineGeneric(FullApplySite AI,
-                                              Weight CallerWeight,
-                                              ConstantTracker &callerTracker,
-                                              int &NumCallerBlocks) {
+bool SILPerformanceInliner::
+isProfitableToInlineGeneric(FullApplySite AI,
+                            Weight CallerWeight,
+                            ConstantTracker &callerTracker,
+                            int &NumCallerBlocks) {
   assert(!AI.getSubstitutions().empty() &&
          "Expected a generic apply");
 
