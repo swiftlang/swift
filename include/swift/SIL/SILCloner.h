@@ -1739,8 +1739,8 @@ void SILCloner<ImplClass>::visitProjectBoxInst(ProjectBoxInst *Inst) {
   getBuilder().setCurrentDebugScope(getOpScope(Inst->getDebugScope()));
   doPostProcess(Inst,
     getBuilder().createProjectBox(getOpLocation(Inst->getLoc()),
-                                  getOpType(Inst->getValueType()),
-                                  getOpValue(Inst->getOperand())));
+                                  getOpValue(Inst->getOperand()),
+                                  Inst->getFieldIndex()));
 }
 
 template<typename ImplClass>
@@ -1749,7 +1749,7 @@ void SILCloner<ImplClass>::visitProjectExistentialBoxInst(
   getBuilder().setCurrentDebugScope(getOpScope(Inst->getDebugScope()));
   doPostProcess(Inst,
       getBuilder().createProjectExistentialBox(getOpLocation(Inst->getLoc()),
-                                               getOpType(Inst->getValueType()),
+                                               getOpType(Inst->getType()),
                                                getOpValue(Inst->getOperand())));
 }
 

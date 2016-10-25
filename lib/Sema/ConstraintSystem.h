@@ -349,46 +349,6 @@ namespace constraints {
 
 struct ResolvedOverloadSetListItem;
 
-/// \brief The kind of type matching to perform in matchTypes().
-enum class TypeMatchKind : char {
-  /// \brief Bind the types together directly.
-  BindType,
-  /// \brief Binds to a pointer element type.
-  BindToPointerType,
-  /// \brief Bind the type of a function parameter to the type of a reference
-  /// to it from within the function body. The param type is an inout type iff
-  /// the reference type is an lvalue type with the same object type.
-  /// Otherwise, the two types must be the same type.
-  BindParamType,
-  /// \brief Require the types to match exactly, but strips lvalueness from
-  /// a type when binding to a type variable.
-  SameType,
-  /// \brief Require the first type to be a subtype of the second type
-  /// (or be an exact match or trivial subtype).
-  Subtype,
-  /// \brief Requires the first type to be convertible to the second type,
-  /// which includes exact matches and both forms of subtyping.
-  Conversion,
-  /// \brief Requires the first type to be explicitly convertible to the second
-  /// type, which includes all forms of conversion included in Conversion, in
-  /// addition to bridging conversions.
-  ExplicitConversion,
-  /// \brief Requires the first type to be the element of an argument tuple
-  /// that is convertible to the second type, which represents the corresponding
-  /// element of the parameter tuple.
-  ArgumentConversion,
-  /// Requires the first type to be an argument type (tuple) that can be
-  /// converted to the second type, which represents the parameter type (tuple).
-  ArgumentTupleConversion,
-  /// \brief Requires the first type to be convertible to the second type,
-  /// which includes exact matches, both forms of subtyping, and inserting
-  /// address-of to convert implicit lvalues to inout arguments.  This is
-  /// used by assignment operators.
-  OperatorArgumentConversion,
-  /// Like \c ArgumentTupleConversion, but for operators.
-  OperatorArgumentTupleConversion,
-};
-
 /// \brief The result of comparing two constraint systems that are a solutions
 /// to the given set of constraints.
 enum class SolutionCompareResult {
@@ -1852,7 +1812,7 @@ private:
   ///
   /// \returns the result of performing the tuple-to-tuple conversion.
   SolutionKind matchTupleTypes(TupleType *tuple1, TupleType *tuple2,
-                               TypeMatchKind kind, TypeMatchOptions flags,
+                               ConstraintKind kind, TypeMatchOptions flags,
                                ConstraintLocatorBuilder locator);
 
   /// \brief Subroutine of \c matchTypes(), which matches a scalar type to
@@ -1860,7 +1820,7 @@ private:
   ///
   /// \returns the result of performing the scalar-to-tuple conversion.
   SolutionKind matchScalarToTupleTypes(Type type1, TupleType *tuple2,
-                                       TypeMatchKind kind,
+                                       ConstraintKind kind,
                                        TypeMatchOptions flags,
                                        ConstraintLocatorBuilder locator);
 
@@ -1869,20 +1829,20 @@ private:
   ///
   /// \returns the result of performing the tuple-to-scalar conversion.
   SolutionKind matchTupleToScalarTypes(TupleType *tuple1, Type type2,
-                                       TypeMatchKind kind,
+                                       ConstraintKind kind,
                                        TypeMatchOptions flags,
                                        ConstraintLocatorBuilder locator);
 
   /// \brief Subroutine of \c matchTypes(), which matches up two function
   /// types.
   SolutionKind matchFunctionTypes(FunctionType *func1, FunctionType *func2,
-                                  TypeMatchKind kind, TypeMatchOptions flags,
+                                  ConstraintKind kind, TypeMatchOptions flags,
                                   ConstraintLocatorBuilder locator);
 
   /// \brief Subroutine of \c matchTypes(), which matches up a value to a
   /// superclass.
   SolutionKind matchSuperclassTypes(Type type1, Type type2,
-                                    TypeMatchKind kind, TypeMatchOptions flags,
+                                    ConstraintKind kind, TypeMatchOptions flags,
                                     ConstraintLocatorBuilder locator);
 
   /// \brief Subroutine of \c matchTypes(), which matches up two types that
@@ -1920,7 +1880,7 @@ public: // FIXME: public due to statics in CSSimplify.cpp
   /// the specific types being matched.
   ///
   /// \returns the result of attempting to solve this constraint.
-  SolutionKind matchTypes(Type type1, Type type2, TypeMatchKind kind,
+  SolutionKind matchTypes(Type type1, Type type2, ConstraintKind kind,
                           TypeMatchOptions flags,
                           ConstraintLocatorBuilder locator);
 
@@ -2058,7 +2018,7 @@ private:
   SolutionKind simplifyRestrictedConstraintImpl(
                  ConversionRestrictionKind restriction,
                  Type type1, Type type2,
-                 TypeMatchKind matchKind,
+                 ConstraintKind matchKind,
                  TypeMatchOptions flags,
                  ConstraintLocatorBuilder locator);
 
@@ -2067,7 +2027,7 @@ private:
   SolutionKind simplifyRestrictedConstraint(
                  ConversionRestrictionKind restriction,
                  Type type1, Type type2,
-                 TypeMatchKind matchKind,
+                 ConstraintKind matchKind,
                  TypeMatchOptions flags,
                  ConstraintLocatorBuilder locator);
 
@@ -2075,7 +2035,7 @@ public: // FIXME: Public for use by static functions.
   /// \brief Simplify a conversion constraint with a fix applied to it.
   SolutionKind simplifyFixConstraint(Fix fix,
                                      Type type1, Type type2,
-                                     TypeMatchKind matchKind,
+                                     ConstraintKind matchKind,
                                      TypeMatchOptions flags,
                                      ConstraintLocatorBuilder locator);
 

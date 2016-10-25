@@ -85,7 +85,7 @@ SILFunction::SILFunction(SILModule &Module, SILLinkage Linkage, StringRef Name,
       Bare(isBareSILFunction), Transparent(isTrans), Fragile(isFragile),
       Thunk(isThunk), ClassVisibility(classVisibility), GlobalInitFlag(false),
       InlineStrategy(inlineStrategy), Linkage(unsigned(Linkage)),
-      KeepAsPublic(false), EffectsKindAttr(E), HasQualifiedOwnership() {
+      KeepAsPublic(false), EffectsKindAttr(E) {
   if (InsertBefore)
     Module.functions.insert(SILModule::iterator(InsertBefore), this);
   else
@@ -96,12 +96,6 @@ SILFunction::SILFunction(SILModule &Module, SILLinkage Linkage, StringRef Name,
   // Set our BB list to have this function as its parent. This enables us to
   // splice efficiently basic blocks in between functions.
   BlockList.Parent = this;
-
-  // If SILOwnership is not enabled, HasQualifiedOwnership is None. If
-  // SILOwnership is enabled, we always initialize functions to have
-  // SILOwnership initially.
-  if (Module.getOptions().EnableSILOwnership)
-    HasQualifiedOwnership = true;
 }
 
 SILFunction::~SILFunction() {

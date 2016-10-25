@@ -1773,7 +1773,7 @@ emitEnumElementDispatch(ArrayRef<RowToSpecialize> rows,
       // If the payload is boxed, project it.
 
       if (elt->isIndirect() || elt->getParentEnum()->isIndirect()) {
-        SILValue boxedValue = SGF.B.createProjectBox(loc, origCMV.getValue());
+        SILValue boxedValue = SGF.B.createProjectBox(loc, origCMV.getValue(), 0);
         eltTL = &SGF.getTypeLowering(boxedValue->getType());
         if (eltTL->isLoadable())
           boxedValue = SGF.B.createLoad(loc, boxedValue);

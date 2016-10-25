@@ -151,10 +151,6 @@ namespace {
 struct OwnershipModelEliminator : SILFunctionTransform {
   void run() override {
     SILFunction *F = getFunction();
-    // We should only run this when SILOwnership is enabled.
-    assert(F->getModule().getOptions().EnableSILOwnership &&
-           "Can not run ownership model eliminator when SIL ownership is not "
-           "enabled");
     bool MadeChange = false;
     SILBuilder B(*F);
     OwnershipModelEliminatorVisitor Visitor(B);

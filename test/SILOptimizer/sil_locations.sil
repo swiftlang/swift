@@ -10,7 +10,7 @@ sil @fromLiteral : $@convention(thin) (Builtin.Int128, @thin Int64.Type) -> Int6
 sil [transparent] @test_add : $@convention(thin) (Int64) -> Int64 {
 bb0(%0 : $Int64):
   %1 = alloc_box $Int64
-  %1a = project_box %1 : $@box Int64
+  %1a = project_box %1 : $@box Int64, 0
   store %0 to %1a : $*Int64
   %3 = function_ref @plus : $@convention(thin) (Int64, Int64) -> Int64
   %4 = load %1a : $*Int64
@@ -26,7 +26,7 @@ bb0(%0 : $Int64):
 sil @inline_test_add : $@convention(thin) (Int64) -> Int64 {
 bb0(%0 : $Int64):
   %1 = alloc_box $Int64
-  %1a = project_box %1 : $@box Int64
+  %1a = project_box %1 : $@box Int64, 0
   store %0 to %1a : $*Int64
   %3 = function_ref @plus : $@convention(thin) (Int64, Int64) -> Int64
   %4 = function_ref @test_add : $@convention(thin) (Int64) -> Int64

@@ -855,17 +855,14 @@ public:
                                     bool isGenericSignature,
                                     GenericTypeResolver *resolver);
 
-  /// \brief Substitute the given base type into the type of the given member,
-  /// producing the effective type that the member will have.
+  /// \brief Substitute the given base type into the type of the given nested type,
+  /// producing the effective type that the nested type will have.
   ///
   /// \param module The module in which the substitution will be performed.
   /// \param member The member whose type projection is being computed.
   /// \param baseTy The base type that will be substituted for the 'Self' of the
   /// member.
-  /// \param isTypeReference Whether this is a reference to a type declaration
-  /// within a type context.
-  Type substMemberTypeWithBase(Module *module, const ValueDecl *member,
-                               Type baseTy, bool isTypeReference);
+  Type substMemberTypeWithBase(Module *module, const TypeDecl *member, Type baseTy);
 
   /// \brief Retrieve the superclass type of the given type, or a null type if
   /// the type has no supertype.

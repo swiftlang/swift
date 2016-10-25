@@ -86,12 +86,10 @@ bool swift::runSILDiagnosticPasses(SILModule &Module) {
     return Ctx.hadError();
   }
 
-  // If SILOwnership is enabled, run the ownership model eliminator.
-  if (Module.getOptions().EnableSILOwnership) {
-    PM.addOwnershipModelEliminator();
-    PM.runOneIteration();
-    PM.resetAndRemoveTransformations();
-  }
+  // Lower all ownership instructions right after SILGen for now.
+  PM.addOwnershipModelEliminator();
+  PM.runOneIteration();
+  PM.resetAndRemoveTransformations();
 
   // Otherwise run the rest of diagnostics.
   PM.addCapturePromotion();

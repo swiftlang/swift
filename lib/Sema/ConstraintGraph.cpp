@@ -692,21 +692,22 @@ unsigned ConstraintGraph::computeConnectedComponents(
 /// edge in the graph.
 static bool shouldContractEdge(ConstraintKind kind) {
   switch (kind) {
-    case ConstraintKind::Bind:
-    case ConstraintKind::BindParam:
-    case ConstraintKind::Equal:
-    case ConstraintKind::BindOverload:
+  case ConstraintKind::Bind:
+  case ConstraintKind::BindParam:
+  case ConstraintKind::BindToPointerType:
+  case ConstraintKind::Equal:
+  case ConstraintKind::BindOverload:
 
-    // We currently only allow subtype contractions for the purpose of 
-    // parameter binding constraints.
-    // TODO: We do this because of how inout parameter bindings are handled
-    // for implicit closure parameters. We should consider adjusting our
-    // current approach to unlock more opportunities for subtype contractions.
-    case ConstraintKind::Subtype:
-      return true;
+  // We currently only allow subtype contractions for the purpose of 
+  // parameter binding constraints.
+  // TODO: We do this because of how inout parameter bindings are handled
+  // for implicit closure parameters. We should consider adjusting our
+  // current approach to unlock more opportunities for subtype contractions.
+  case ConstraintKind::Subtype:
+    return true;
 
-    default:
-      return false;
+  default:
+    return false;
   }
 }
 

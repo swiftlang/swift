@@ -583,15 +583,17 @@ CanSILBoxType SILBoxType::get(CanType boxedType) {
 }
 
 SILBoxType::SILBoxType(ASTContext &C,
-                       SILLayout *Layout, ArrayRef<Substitution> Params)
+                       SILLayout *Layout, ArrayRef<Substitution> Args)
   : TypeBase(TypeKind::SILBox, &C,
-             getRecursivePropertiesFromSubstitutions(Params)),
+             getRecursivePropertiesFromSubstitutions(Args)),
     Layout(Layout),
-    NumGenericArgs(Params.size())
+    NumGenericArgs(Args.size())
 {
+  // Check that the generic args are reasonable for the box's signature.
+  assert((Layout->getGenericSignature()->getSubstitutionMap(Args), true));
   auto paramsBuf = getTrailingObjects<Substitution>();
   for (unsigned i = 0; i < NumGenericArgs; ++i)
-    ::new (paramsBuf + i) Substitution(Params[i]);
+    ::new (paramsBuf + i) Substitution(Args[i]);
 }
 
 RecursiveTypeProperties SILBoxType::
@@ -605,10 +607,7 @@ getRecursivePropertiesFromSubstitutions(ArrayRef<Substitution> Params) {
 
 /// TODO: Transitional accessor for single-type boxes.
 CanType SILBoxType::getBoxedType() const {
-  auto layout = getLayout();
-  assert(layout->getFields().size() == 1
-         && layout->getGenericSignature()->getGenericParams().size() == 1
-         && layout->getFields()[0].getLoweredType()->is<GenericTypeParamType>()
+  assert(getLayout()->getFields().size() == 1
          && "is not a single-field box");
-  return CanType(getGenericArgs()[0].getReplacement());
+  return getFieldType(0).getSwiftRValueType();
 }

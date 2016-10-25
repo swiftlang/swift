@@ -232,7 +232,6 @@ public:
 
   enum class LoweringStyle {
     Shallow,
-    Deep,
     DeepNoEnum
   };
 
@@ -257,14 +256,6 @@ public:
   void emitLoweredReleaseValueShallow(SILBuilder &B, SILLocation loc,
                                       SILValue value) const {
     emitLoweredReleaseValue(B, loc, value, LoweringStyle::Shallow);
-  }
-
-  /// Emit a lowered 'release_value' operation.
-  ///
-  /// This type must be loadable.
-  void emitLoweredReleaseValueDeep(SILBuilder &B, SILLocation loc,
-                                   SILValue value) const {
-    emitLoweredReleaseValue(B, loc, value, LoweringStyle::Deep);
   }
 
   /// Emit a lowered 'release_value' operation.
@@ -299,14 +290,6 @@ public:
   void emitLoweredRetainValueShallow(SILBuilder &B, SILLocation loc,
                                    SILValue value) const {
     emitLoweredRetainValue(B, loc, value, LoweringStyle::Shallow);
-  }
-
-  /// Emit a lowered 'retain_value' operation.
-  ///
-  /// This type must be loadable.
-  void emitLoweredRetainValueDeep(SILBuilder &B, SILLocation loc,
-                                SILValue value) const {
-    emitLoweredRetainValue(B, loc, value, LoweringStyle::Deep);
   }
 
   /// Emit a lowered 'retain_value' operation.
