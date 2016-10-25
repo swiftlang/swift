@@ -279,8 +279,8 @@ void SILGenFunction::emitValueConstructor(ConstructorDecl *ctor) {
       selfValue = B.createLoad(cleanupLoc, selfLV);
       
       // Emit a retain of the loaded value, since we return it +1.
-      lowering.emitRetainValue(B, cleanupLoc, selfValue);
-      
+      lowering.emitCopyValue(B, cleanupLoc, selfValue);
+
       // Inject the self value into an optional if the constructor is failable.
       if (ctor->getFailability() != OTK_None) {
         selfValue = B.createEnum(ctor, selfValue,

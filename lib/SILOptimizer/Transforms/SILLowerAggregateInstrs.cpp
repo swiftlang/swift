@@ -107,7 +107,7 @@ static bool expandCopyAddr(CopyAddrInst *CA) {
     //   retain_value %new : $*T
     IsTake_t IsTake = CA->isTakeOfSrc();
     if (IsTake_t::IsNotTake == IsTake) {
-      TL.emitLoweredRetainValue(Builder, CA->getLoc(), New,
+      TL.emitLoweredCopyValue(Builder, CA->getLoc(), New,
                               TypeLowering::LoweringStyle::DeepNoEnum);
     }
 
@@ -116,7 +116,7 @@ static bool expandCopyAddr(CopyAddrInst *CA) {
     //   *or*
     // release_value %old : $*T
     if (Old) {
-      TL.emitLoweredReleaseValue(Builder, CA->getLoc(), Old,
+      TL.emitLoweredDestroyValue(Builder, CA->getLoc(), Old,
                                  TypeLowering::LoweringStyle::DeepNoEnum);
     }
   }
@@ -146,7 +146,7 @@ static bool expandDestroyAddr(DestroyAddrInst *DA) {
     // If we have a type with reference semantics, emit a load/strong release.
     LoadInst *LI = Builder.createLoad(DA->getLoc(), Addr);
     auto &TL = Module.getTypeLowering(Type);
-    TL.emitLoweredReleaseValue(Builder, DA->getLoc(), LI,
+    TL.emitLoweredDestroyValue(Builder, DA->getLoc(), LI,
                                TypeLowering::LoweringStyle::DeepNoEnum);
   }
 
@@ -168,7 +168,7 @@ static bool expandReleaseValue(ReleaseValueInst *DV) {
          "release_value should never be called on a non-loadable type.");
 
   auto &TL = Module.getTypeLowering(Type);
-  TL.emitLoweredReleaseValue(Builder, DV->getLoc(), Value,
+  TL.emitLoweredDestroyValue(Builder, DV->getLoc(), Value,
                              TypeLowering::LoweringStyle::DeepNoEnum);
 
   DEBUG(llvm::dbgs() << "    Expanding Destroy Value: " << *DV);
@@ -191,9 +191,9 @@ static bool expandRetainValue(RetainValueInst *CV) {
          "types.");
 
   auto &TL = Module.getTypeLowering(Type);
-  TL.emitLoweredRetainValue(Builder, CV->getLoc(), Value,
+  TL.emitLoweredCopyValue(Builder, CV->getLoc(), Value,
                           TypeLowering::LoweringStyle::DeepNoEnum);
-  
+
   DEBUG(llvm::dbgs() << "    Expanding Copy Value: " << *CV);
 
   ++NumExpand;

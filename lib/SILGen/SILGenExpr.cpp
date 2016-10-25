@@ -59,7 +59,7 @@ ManagedValue SILGenFunction::emitManagedRetain(SILLocation loc,
     return ManagedValue::forUnmanaged(v);
   assert(!lowering.isAddressOnly() && "cannot retain an unloadable type");
 
-  lowering.emitRetainValue(B, loc, v);
+  lowering.emitCopyValue(B, loc, v);
   return emitManagedRValueWithCleanup(v, lowering);
 }
 
@@ -1356,7 +1356,7 @@ ManagedValue SILGenFunction::getManagedValue(SILLocation loc,
 
   // If it's an object, retain and enter a release cleanup.
   if (valueTy.isObject()) {
-    valueTL.emitRetainValue(B, loc, value.getValue());
+    valueTL.emitCopyValue(B, loc, value.getValue());
     return emitManagedRValueWithCleanup(value.getValue(), valueTL);
   }
 
