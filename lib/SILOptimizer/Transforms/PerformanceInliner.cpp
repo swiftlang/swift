@@ -14,6 +14,7 @@
 #include "swift/SILOptimizer/PassManager/Passes.h"
 #include "swift/SILOptimizer/PassManager/Transforms.h"
 #include "swift/SILOptimizer/Utils/PerformanceInlinerUtils.h"
+#include "swift/Strings.h"
 #include "llvm/ADT/Statistic.h"
 #include "llvm/Support/Debug.h"
 #include "llvm/Support/CommandLine.h"
@@ -25,6 +26,10 @@ STATISTIC(NumFunctionsInlined, "Number of functions inlined");
 llvm::cl::opt<bool> PrintShortestPathInfo(
     "print-shortest-path-info", llvm::cl::init(false),
     llvm::cl::desc("Print shortest-path information for inlining"));
+
+llvm::cl::opt<bool> EnableSILInliningOfGenerics(
+    "sil-inline-generics", llvm::cl::init(false),
+    llvm::cl::desc("Enable inlining of generics"));
 
 //===----------------------------------------------------------------------===//
 //                           Performance Inliner
@@ -118,9 +123,14 @@ class SILPerformanceInliner {
   SILFunction *getEligibleFunction(FullApplySite AI);
 
   bool isProfitableToInlineNonGeneric(FullApplySite AI,
-                            Weight CallerWeight,
-                            ConstantTracker &constTracker,
-                            int &NumCallerBlocks);
+                                      Weight CallerWeight,
+                                      ConstantTracker &constTracker,
+                                      int &NumCallerBlocks);
+
+  bool isProfitableToInlineGeneric(FullApplySite AI,
+                                   Weight CallerWeight,
+                                   ConstantTracker &constTracker,
+                                   int &NumCallerBlocks);
 
   bool isProfitableInColdBlock(FullApplySite AI, SILFunction *Callee);
 
@@ -191,10 +201,6 @@ SILFunction *SILPerformanceInliner::getEligibleFunction(FullApplySite AI) {
     return nullptr;
   }
 
-  // We don't support this yet.
-  if (AI.hasSubstitutions())
-    return nullptr;
-
   SILFunction *Caller = AI.getFunction();
 
   // We don't support inlining a function that binds dynamic self because we
@@ -240,10 +246,11 @@ SILFunction *SILPerformanceInliner::getEligibleFunction(FullApplySite AI) {
 }
 
 /// Return true if inlining this call site is profitable.
-bool SILPerformanceInliner::isProfitableToInlineNonGeneric(FullApplySite AI,
-                                              Weight CallerWeight,
-                                              ConstantTracker &callerTracker,
-                                              int &NumCallerBlocks) {
+bool SILPerformanceInliner::
+isProfitableToInlineNonGeneric(FullApplySite AI,
+                               Weight CallerWeight,
+                               ConstantTracker &callerTracker,
+                               int &NumCallerBlocks) {
   assert(AI.getSubstitutions().empty() &&
          "Expected a non-generic apply");
 
@@ -369,6 +376,37 @@ bool SILPerformanceInliner::isProfitableToInlineNonGeneric(FullApplySite AI,
   return true;
 }
 
+/// Return true if inlining this call site is profitable.
+bool SILPerformanceInliner::
+isProfitableToInlineGeneric(FullApplySite AI,
+                            Weight CallerWeight,
+                            ConstantTracker &callerTracker,
+                            int &NumCallerBlocks) {
+  assert(!AI.getSubstitutions().empty() &&
+         "Expected a generic apply");
+
+  if (!EnableSILInliningOfGenerics)
+    return false;
+
+  SILFunction *Callee = AI.getReferencedFunction();
+
+  // Do not inline @_semantics functions when compiling the stdlib,
+  // because they need to be preserved, so that the optimizer
+  // can properly optimize a user code later.
+  auto ModuleName = Callee->getModule().getSwiftModule()->getName().str();
+  if (Callee->hasSemanticsAttrThatStartsWith("array.") &&
+      (ModuleName == STDLIB_NAME || ModuleName == SWIFT_ONONE_SUPPORT))
+    return false;
+
+  // Always inline generic functions which are marked as
+  // AlwaysInline or transparent.
+  if (Callee->getInlineStrategy() == AlwaysInline
+      || Callee->isTransparent())
+    return true;
+
+  return false;
+}
+
 /// Return true if inlining this call site into a cold block is profitable.
 bool SILPerformanceInliner::isProfitableInColdBlock(FullApplySite AI,
                                                     SILFunction *Callee) {
@@ -482,8 +520,13 @@ void SILPerformanceInliner::collectAppliesToInline(
         // The actual weight including a possible weight correction.
         Weight W(BlockWeight, WeightCorrections.lookup(AI));
 
-        bool IsProfitableToInline = isProfitableToInlineNonGeneric(
-            AI, W, constTracker, NumCallerBlocks);
+        bool IsGenericApply = !AI.getSubstitutions().empty();
+        bool IsProfitableToInline =
+            IsGenericApply ? isProfitableToInlineGeneric(AI, W, constTracker,
+                                                         NumCallerBlocks)
+                           : isProfitableToInlineNonGeneric(AI, W, constTracker,
+                                                            NumCallerBlocks);
+
         if (IsProfitableToInline)
           InitialCandidates.push_back(AI);
       }
