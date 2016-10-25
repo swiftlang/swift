@@ -123,14 +123,14 @@ class SILPerformanceInliner {
   SILFunction *getEligibleFunction(FullApplySite AI);
 
   bool isProfitableToInlineNonGeneric(FullApplySite AI,
-                            Weight CallerWeight,
-                            ConstantTracker &constTracker,
-                            int &NumCallerBlocks);
+                                      Weight CallerWeight,
+                                      ConstantTracker &constTracker,
+                                      int &NumCallerBlocks);
 
   bool isProfitableToInlineGeneric(FullApplySite AI,
-                            Weight CallerWeight,
-                            ConstantTracker &constTracker,
-                            int &NumCallerBlocks);
+                                   Weight CallerWeight,
+                                   ConstantTracker &constTracker,
+                                   int &NumCallerBlocks);
 
   bool isProfitableInColdBlock(FullApplySite AI, SILFunction *Callee);
 
