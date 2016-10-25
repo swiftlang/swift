@@ -35,6 +35,8 @@ Swift 3.1
   satisfying a predicate.  `drop(while:)` requests the remaining 
   subsequence after dropping the longest subsequence satisfying a
   predicate.
+  
+**Add new entries to the top of this file, not here!**
 
 Swift 3.0
 ---------
@@ -718,8 +720,6 @@ public func project(function f: FunctionType) -> (p0: CGPoint, p1: CGPoint) -> (
     ```swift
     person.valueForKeyPath(#keyPath(Person.bestFriend.lastName))
     ```
-
-**Add new entries to the top of this file, not here!**
 
 Swift 2.2
 ---------
