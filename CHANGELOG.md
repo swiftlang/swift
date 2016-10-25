@@ -32,10 +32,10 @@ Swift 3.1
 
   The `Sequence` protocol adds two new members `prefix(while:)` and
   `drop(while:)` for common utility. `prefix(while:)` requests the longest subsequence
-  satisfying a predicate.  `drop(while:)` requests the remaining 
+  satisfying a predicate.  `drop(while:)` requests the remaining
   subsequence after dropping the longest subsequence satisfying a
   predicate.
-  
+
 **Add new entries to the top of this file, not here!**
 
 Swift 3.0
@@ -58,9 +58,9 @@ Swift 3.0
 * [SE-0125][]:
 
   The functions `isUniquelyReferenced()` and `isUniquelyReferencedNonObjC()`
-  have been removed. Call the function `isKnownUniquelyReferenced()` instead. 
-  
-  Classes using `isUniquelyReferenced()` needed to inherit from `NonObjectiveCBase`. The `NonObjectiveCBase` class has been removed. 
+  have been removed. Call the function `isKnownUniquelyReferenced()` instead.
+
+  Classes using `isUniquelyReferenced()` needed to inherit from `NonObjectiveCBase`. The `NonObjectiveCBase` class has been removed.
 
   The method `ManagedBufferPointer.holdsUniqueReference` has been renamed to
   `ManagedBufferPointer.isUniqueReference`.
@@ -132,9 +132,9 @@ Swift 3.0
   to `UnsafePointer<U>` has been disallowed. `Unsafe[Mutable]RawPointer`
   provides an API for untyped memory access, and an API for binding memory
   to a type. Binding memory allows for safe conversion between pointer types.
-  
+
   For detailed instructions on how to migrate your code to the new API refer to the [UnsafeRawPointer migration guide](https://swift.org/migration-guide/se-0107-migrate.html). See also: See `bindMemory(to:capacity:)`, `assumingMemoryBound(to:)`, and
-  `withMemoryRebound(to:capacity:)`. 
+  `withMemoryRebound(to:capacity:)`.
 
 * [SE-0096][]:
 
@@ -209,7 +209,7 @@ using the `.dynamicType` member to retrieve the type of an expression should mig
 
 * [SE-0025][]:
 
-  The access level formerly known as `private` is now called `fileprivate`. A Swift 3 declaration marked `private` can no longer be accessed outside its lexical scope (essentially its enclosing curly braces `{}`). A `private` declaration at the top level of a file can be accessed anywhere within the same file, as it could in Swift 2. 
+  The access level formerly known as `private` is now called `fileprivate`. A Swift 3 declaration marked `private` can no longer be accessed outside its lexical scope (essentially its enclosing curly braces `{}`). A `private` declaration at the top level of a file can be accessed anywhere within the same file, as it could in Swift 2.
 
 * [SE-0131][]:
 
@@ -330,9 +330,9 @@ using the `.dynamicType` member to retrieve the type of an expression should mig
 
 * [SE-0112][]:
 
-  The `NSError` type now bridges to the Swift `Error` protocol type (formerly `ErrorProtocol` in Swift 3, `ErrorType` in Swift 2) 
-  in Objective-C APIs. `NSError` now bridges like other Objective-C types, e.g., `NSString` bridges to `String`.  
-  
+  The `NSError` type now bridges to the Swift `Error` protocol type (formerly `ErrorProtocol` in Swift 3, `ErrorType` in Swift 2)
+  in Objective-C APIs. `NSError` now bridges like other Objective-C types, e.g., `NSString` bridges to `String`.
+
   For
   example, the `UIApplicationDelegate` method
   `applicate(_:didFailToRegisterForRemoteNotificationsWithError:)`
@@ -352,8 +352,8 @@ using the `.dynamicType` member to retrieve the type of an expression should mig
 
   Error types imported from Cocoa[Touch] maintain all of
   the information in the corresponding `NSError`. You no longer `catch let as NSError` to extract, for example, the user-info
-  dictionary. 
-  
+  dictionary.
+
   Specific error types now contain typed accessors for
   their common user-info keys. For example:
 
@@ -513,7 +513,7 @@ using the `.dynamicType` member to retrieve the type of an expression should mig
 
   Enum elements can no longer be accessed as instance members in instance methods.
 
-  * As part of the changes for [SE-0055][] (see below), the *pointee* types of imported pointers (e.g. the `id` in `id *`) are no longer assumed to always be `_Nullable` even if annotated otherwise. 
+  * As part of the changes for [SE-0055][] (see below), the *pointee* types of imported pointers (e.g. the `id` in `id *`) are no longer assumed to always be `_Nullable` even if annotated otherwise.
   * An implicit or explicit annotation of `_Null_unspecified` on a pointee type still imports as `Optional`.
 
 * [SE-0055][]:
@@ -561,7 +561,7 @@ using the `.dynamicType` member to retrieve the type of an expression should mig
   ```
 
   Comments can no longer appear between a unary operator and its argument.
-  
+
   ```swift
   foo/* comment */! // no longer works
   ```
@@ -607,11 +607,11 @@ using the `.dynamicType` member to retrieve the type of an expression should mig
 
 * The "none" members of imported NS_OPTIONS option sets are marked as unavailable when they are imported.  Use `[]` to make an empty option set, instead of a None member.
 
-* [SE-0043][] 
+* [SE-0043][]
 
   Adds the ability to declare variables in multiple patterns in cases.
 
-* [SE-0005][] 
+* [SE-0005][]
 
   Allows the Clang importer to import ObjC symbols using substantially different Swift-like naming paradigms:
 
@@ -619,24 +619,24 @@ using the `.dynamicType` member to retrieve the type of an expression should mig
   * Redundant type names are pruned (`documentForURL(_: NSURL)` becomes `document(for: URL)`). Selectors are guaranteed to never be empty, to be transformed into Swift keywords, to be vacuously named (like `get`, `set`, `with`, `for`). Additional pruning rules preserve readability and sense.
   * Common arguments are sensibly defaulted where the Objective-C API strongly hints at the need for a default argument. (For example,  nullable trailing closures default to `nil`, option sets to `[]`, and `NSDictionary` parameters to `[:]`.) First argument labels are added for defaulted arguments.
   * Boolean properties are prepended with `is`, and read as assertions on the receiver.
-  * Non-type values, including enumerators, are lowerecased.
+  * Non-type values, including enumerators, are lowercased.
   * Classes that implement `compare(_:) -> NSComparisonResult` automatically import as `Comparable`.
 
-* [SE-0040][] 
+* [SE-0040][]
 
   Attributes change from using `=` in parameters lists
   to using `:`, aligning with function call syntax.
-  
+
   ```
   // before
   @available(*, unavailable, renamed="MyRenamedProtocol")
-  
+
   // after
   @available(*, unavailable, renamed: "MyRenamedProtocol")
   ```
 
-* [SE-0048][] 
- 
+* [SE-0048][]
+
   Generic typealiases are now supported. For example:
 
   ```swift
@@ -645,10 +645,10 @@ using the `.dynamicType` member to retrieve the type of an expression should mig
   typealias MatchingTriple<T> = (T, T, T)
   typealias BackwardTriple<T1, T2, T3> = (T3, T2, T1)
   ```
-  
+
   etc.
 
-* [SE-0049][] 
+* [SE-0049][]
 
   The `@noescape` attribute is extended to be a more general type attribute. You can now declare values of `@noescape` function type, e.g. in manually curried function signatures.  You can now also declare local variables of `@noescape` type, and use `@noescape` in `typealiases`.  For example, this is now valid code:
 
@@ -659,7 +659,7 @@ using the `.dynamicType` member to retrieve the type of an expression should mig
   }
   ```
 
-* [SE-0034][] 
+* [SE-0034][]
 
   The `#line` directive (which resets the logical
   source location for diagnostics and debug information) is renamed to `#sourceLocation`.
@@ -695,7 +695,7 @@ public func project(function f: FunctionType) -> (p0: CGPoint, p1: CGPoint) -> (
         }
     }
     ```
-    
+
 * Throwing closure arguments of a rethrowing function may now be optional. For example:
 
     ```swift
