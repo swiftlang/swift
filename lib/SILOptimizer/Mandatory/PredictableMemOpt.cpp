@@ -738,8 +738,8 @@ bool AllocOptimize::promoteDestroyAddr(DestroyAddrInst *DAI) {
   
   DEBUG(llvm::dbgs() << "  *** Promoting destroy_addr: " << *DAI << "\n");
   DEBUG(llvm::dbgs() << "      To value: " << *NewVal << "\n");
-  
-  SILBuilderWithScope(DAI).emitReleaseValueOperation(DAI->getLoc(), NewVal);
+
+  SILBuilderWithScope(DAI).emitDestroyValueOperation(DAI->getLoc(), NewVal);
   DAI->eraseFromParent();
   return true;
 }
