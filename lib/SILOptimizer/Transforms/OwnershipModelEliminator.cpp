@@ -151,6 +151,10 @@ namespace {
 struct OwnershipModelEliminator : SILFunctionTransform {
   void run() override {
     SILFunction *F = getFunction();
+
+    // Set F to have unqualified ownership.
+    F->setUnqualifiedOwnership();
+
     bool MadeChange = false;
     SILBuilder B(*F);
     OwnershipModelEliminatorVisitor Visitor(B);
@@ -171,10 +175,6 @@ struct OwnershipModelEliminator : SILFunctionTransform {
       // that analysis.
       invalidateAnalysis(SILAnalysis::InvalidationKind::Instructions);
     }
-
-    // Now that we have lowered to unqualified ownership, set the unqualified
-    // ownership flag on the function.
-    F->setUnqualifiedOwnership();
   }
 
   StringRef getName() override { return "Ownership Model Eliminator"; }
