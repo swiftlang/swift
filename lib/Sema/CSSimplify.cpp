@@ -1208,6 +1208,17 @@ static bool allowsBridgingFromObjC(TypeChecker &tc, DeclContext *dc,
   return true;
 }
 
+/// Determine whether the given type variables occurs in the given type.
+static bool typeVarOccursInType(TypeVariableType *typeVar, Type type) {
+  SmallVector<TypeVariableType *, 4> typeVars;
+  type->getTypeVariables(typeVars);
+  for (auto referencedTypeVar : typeVars) {
+    if (referencedTypeVar == typeVar) return true;
+  }
+
+  return false;
+}
+
 ConstraintSystem::SolutionKind
 ConstraintSystem::matchTypes(Type type1, Type type2, ConstraintKind kind,
                              TypeMatchOptions flags,
@@ -1287,6 +1298,11 @@ ConstraintSystem::matchTypes(Type type1, Type type2, ConstraintKind kind,
       // Provide a fixed type for the type variable.
       bool wantRvalue = kind == ConstraintKind::Equal;
       if (typeVar1) {
+        // Simplify the right-hand type and perform the "occurs" check.
+        type2 = simplifyType(type2);
+        if (typeVarOccursInType(typeVar1, type2))
+          return formUnsolvedResult();
+
         // If we want an rvalue, get the rvalue.
         if (wantRvalue)
           type2 = type2->getRValueType();
@@ -1310,7 +1326,7 @@ ConstraintSystem::matchTypes(Type type1, Type type2, ConstraintKind kind,
 
         // A constraint that binds any pointer to a void pointer is
         // ineffective, since any pointer can be converted to a void pointer.
-        if (kind == ConstraintKind::BindToPointerType && desugar2->isVoid()) {
+        if (kind == ConstraintKind::BindToPointerType && type2->isVoid()) {
           // Bind type1 to Void only as a last resort.
           addConstraint(ConstraintKind::Defaultable, typeVar1, type2,
                         getConstraintLocator(locator));
@@ -1326,6 +1342,11 @@ ConstraintSystem::matchTypes(Type type1, Type type2, ConstraintKind kind,
         
         return SolutionKind::Solved;
       }
+
+        // Simplify the left-hand type and perform the "occurs" check.
+        type1 = simplifyType(type1);
+        if (typeVarOccursInType(typeVar2, type1))
+          return formUnsolvedResult();
 
       // If we want an rvalue, get the rvalue.
       if (wantRvalue)
@@ -1344,14 +1365,24 @@ ConstraintSystem::matchTypes(Type type1, Type type2, ConstraintKind kind,
 
     case ConstraintKind::BindParam: {
       if (typeVar2 && !typeVar1) {
-        if (auto *iot = dyn_cast<InOutType>(desugar1)) {
+        // Simplify the left-hand type and perform the "occurs" check.
+        type1 = simplifyType(type1);
+        if (typeVarOccursInType(typeVar2, type1))
+          return formUnsolvedResult();
+
+        if (auto *iot = type1->getAs<InOutType>()) {
           assignFixedType(typeVar2, LValueType::get(iot->getObjectType()));
         } else {
           assignFixedType(typeVar2, type1);
         }
         return SolutionKind::Solved;
       } else if (typeVar1 && !typeVar2) {
-        if (auto *lvt = dyn_cast<LValueType>(desugar2)) {
+        // Simplify the right-hand type and perform the "occurs" check.
+        type2 = simplifyType(type2);
+        if (typeVarOccursInType(typeVar1, type2))
+          return formUnsolvedResult();
+
+        if (auto *lvt = type2->getAs<LValueType>()) {
           assignFixedType(typeVar1, InOutType::get(lvt->getObjectType()));
         } else {
           assignFixedType(typeVar1, type2);
