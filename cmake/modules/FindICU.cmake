@@ -27,6 +27,7 @@ endforeach()
 
 foreach(sdk ANDROID;FREEBSD;LINUX;WINDOWS)
   foreach(MODULE ${ICU_FIND_COMPONENTS})
+    string(TOUPPER "${MODULE}" MODULE)
     if("${SWIFT_${sdk}_ICU_${MODULE}_INCLUDE}" STREQUAL "")
       set(SWIFT_${sdk}_ICU_${MODULE}_INCLUDE ${ICU_${MODULE}_INCLUDE_DIRS})
     endif()
