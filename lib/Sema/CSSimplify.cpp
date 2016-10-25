@@ -1127,8 +1127,10 @@ ConstraintSystem::matchExistentialTypes(Type type1, Type type2,
 static ConstraintKind getConstraintKind(TypeMatchKind kind) {
   switch (kind) {
   case TypeMatchKind::BindType:
-  case TypeMatchKind::BindToPointerType:
     return ConstraintKind::Bind;
+
+  case TypeMatchKind::BindToPointerType:
+    return ConstraintKind::BindToPointerType;
 
   case TypeMatchKind::BindParamType:
     return ConstraintKind::BindParam;
@@ -3506,6 +3508,8 @@ static TypeMatchKind getTypeMatchKind(ConstraintKind kind) {
   case ConstraintKind::Bind: return TypeMatchKind::BindType;
   case ConstraintKind::Equal: return TypeMatchKind::SameType;
   case ConstraintKind::BindParam: return TypeMatchKind::BindParamType;
+  case ConstraintKind::BindToPointerType:
+    return TypeMatchKind::BindToPointerType;
   case ConstraintKind::Subtype: return TypeMatchKind::Subtype;
   case ConstraintKind::Conversion: return TypeMatchKind::Conversion;
   case ConstraintKind::ExplicitConversion:
@@ -4160,6 +4164,7 @@ ConstraintSystem::addConstraintImpl(ConstraintKind kind, Type first,
   case ConstraintKind::Equal:
   case ConstraintKind::Bind:
   case ConstraintKind::BindParam:
+  case ConstraintKind::BindToPointerType:
   case ConstraintKind::Subtype:
   case ConstraintKind::Conversion:
   case ConstraintKind::ExplicitConversion:
@@ -4230,6 +4235,7 @@ ConstraintSystem::simplifyConstraint(const Constraint &constraint) {
   case ConstraintKind::Bind:
   case ConstraintKind::Equal:
   case ConstraintKind::BindParam:
+  case ConstraintKind::BindToPointerType:
   case ConstraintKind::Subtype:
   case ConstraintKind::Conversion:
   case ConstraintKind::ExplicitConversion:
