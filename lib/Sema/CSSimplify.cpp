@@ -602,7 +602,9 @@ getCalleeDeclAndArgs(ConstraintSystem &cs,
         // References to instance members on a metatype stay at level 0.
         // Everything else is level 1.
         if (!(function->isInstanceMember() &&
-              cs.simplifyType(choice->getBaseType())->is<AnyMetatypeType>()))
+              cs.getFixedTypeRecursive(choice->getBaseType(),
+                                       /*wantRValue=*/true)
+                ->is<AnyMetatypeType>()))
           level = 1;
       } else if (isa<SubscriptDecl>(decl)) {
         // Subscript level 1 == the indices.
