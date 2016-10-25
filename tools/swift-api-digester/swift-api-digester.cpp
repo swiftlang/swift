@@ -208,8 +208,24 @@ struct NodeMatcher {
   virtual ~NodeMatcher() = default;
 };
 
-#define KEY(NAME) static const char* Key_##NAME = #NAME;
+enum class KeyKind {
+#define KEY(NAME) KK_##NAME,
 #include "DigesterEnums.def"
+};
+
+static KeyKind parseKeyKind(StringRef Content) {
+  return llvm::StringSwitch<KeyKind>(Content)
+#define KEY(NAME) .Case(#NAME, KeyKind::KK_##NAME)
+#include "DigesterEnums.def"
+  ;
+}
+
+static StringRef getKeyContent(KeyKind Kind) {
+  switch (Kind) {
+#define KEY(NAME) case KeyKind::KK_##NAME: return InsertToBuffer(#NAME);
+#include "DigesterEnums.def"
+  }
+}
 
 // The node kind appearing in the tree that describes the content of the SDK
 enum class SDKNodeKind {
@@ -751,36 +767,49 @@ NodeUniquePtr SDKNode::constructSDKNode(llvm::yaml::MappingNode *Node) {
   NodeOwnedVector Children;
 
   for (auto Pair : *Node) {
-    auto Key = GetScalarString(Pair.getKey());
-    if (Key == Key_kind) {
+    switch(parseKeyKind(GetScalarString(Pair.getKey()))) {
+    case KeyKind::KK_kind:
       Kind = llvm::StringSwitch<SDKNodeKind>(GetScalarString(Pair.getValue()))
 #define NODE_KIND(NAME) .Case(#NAME, SDKNodeKind::NAME)
 #include "DigesterEnums.def"
       ;
-    } else if (Key == Key_name) {
+      break;
+    case KeyKind::KK_name:
       Info.Name = GetScalarString(Pair.getValue());
-    } else if (Key == Key_selfIndex) {
+      break;
+    case KeyKind::KK_selfIndex:
       Info.SelfIndex = std::stoi(cast<llvm::yaml::ScalarNode>(Pair.getValue())->
                                  getRawValue());
-    } else if (Key == Key_usr) {
+      break;
+    case KeyKind::KK_usr:
       Info.USR = GetScalarString(Pair.getValue());
-    } else if (Key == Key_location) {
+      break;
+
+    case KeyKind::KK_location:
       Info.Location = GetScalarString(Pair.getValue());
-    } else if (Key == Key_children) {
+      break;
+    case KeyKind::KK_children:
       for (auto &Mapping : *cast<llvm::yaml::SequenceNode>(Pair.getValue())) {
         Children.push_back(constructSDKNode(cast<llvm::yaml::MappingNode>(&Mapping)));
       }
-    } else if (Key == Key_printedName) {
+      break;
+    case KeyKind::KK_printedName:
       Info.PrintedName = GetScalarString(Pair.getValue());
-    } else if (Key == Key_moduleName) {
+      break;
+    case KeyKind::KK_moduleName:
       Info.ModuleName = GetScalarString(Pair.getValue());
-    } else if (Key == Key_throwing) {
+      break;
+    case KeyKind::KK_throwing:
       Info.IsThrowing = true;
-    } else if (Key == Key_mutating) {
+      break;
+    case KeyKind::KK_mutating:
       Info.IsMutating = true;
-    } else if (Key == Key_static) {
+      break;
+    case KeyKind::KK_static:
       Info.IsStatic = true;
-    } else if (Key == Key_typeAttributes) {
+      break;
+
+    case KeyKind::KK_typeAttributes: {
       auto *Seq = cast<llvm::yaml::SequenceNode>(Pair.getValue());
       for (auto It = Seq->begin(); It != Seq->end(); ++ It) {
         Info.TypeAttrs.push_back(
@@ -789,7 +818,9 @@ NodeUniquePtr SDKNode::constructSDKNode(llvm::yaml::MappingNode *Node) {
 #include "swift/AST/Attr.def"
           .Case("Count", TypeAttrKind::TAK_Count));
       }
-    } else if (Key == Key_declAttributes) {
+      break;
+    }
+    case KeyKind::KK_declAttributes: {
       auto *Seq = cast<llvm::yaml::SequenceNode>(Pair.getValue());
       for (auto It = Seq->begin(); It != Seq->end(); ++ It) {
         Info.DeclAttrs.push_back(
@@ -798,13 +829,14 @@ NodeUniquePtr SDKNode::constructSDKNode(llvm::yaml::MappingNode *Node) {
 #include "DigesterEnums.def"
           );
       }
-    } else if (Key == Key_declKind) {
+      break;
+    }
+    case KeyKind::KK_declKind:
       Info.DKind = llvm::StringSwitch<DeclKind>(GetScalarString(Pair.getValue()))
 #define DECL(X, PARENT) .Case(#X, DeclKind::X)
 #include "swift/AST/DeclNodes.def"
       ;
-    } else {
-      llvm_unreachable("Cannot parse key.");
+      break;
     }
   };
   NodeUniquePtr Result = Info.createSDKNode(Kind);
@@ -1315,9 +1347,10 @@ namespace swift {
         auto Name = value->getName();
         auto PrintedName = value->getPrintedName();
 
-        out.mapRequired(Key_kind, Kind);
-        out.mapRequired(Key_name, Name);
-        out.mapRequired(Key_printedName, PrintedName);
+        out.mapRequired(getKeyContent(KeyKind::KK_kind).data(), Kind);
+        out.mapRequired(getKeyContent(KeyKind::KK_name).data(), Name);
+        out.mapRequired(getKeyContent(KeyKind::KK_printedName).data(),
+                        PrintedName);
 
         if (auto D = dyn_cast<SDKNodeDecl>(value.get())) {
           DeclKind DK = D->getDeclKind();
@@ -1325,34 +1358,40 @@ namespace swift {
           StringRef Location = D->getLocation();
           StringRef ModuleName = D->getModuleName();
 
-          out.mapRequired(Key_declKind, DK);
-          out.mapRequired(Key_usr, Usr);
-          out.mapRequired(Key_location, Location);
-          out.mapRequired(Key_moduleName, ModuleName);
+          out.mapRequired(getKeyContent(KeyKind::KK_declKind).data(), DK);
+          out.mapRequired(getKeyContent(KeyKind::KK_usr).data(), Usr);
+          out.mapRequired(getKeyContent(KeyKind::KK_location).data(), Location);
+          out.mapRequired(getKeyContent(KeyKind::KK_moduleName).data(),
+                          ModuleName);
           if (auto isStatic = D->isStatic())
-            out.mapRequired(Key_static, isStatic);
+            out.mapRequired(getKeyContent(KeyKind::KK_static).data(), isStatic);
 
           if (auto F = dyn_cast<SDKNodeAbstractFunc>(value.get())) {
             if (bool isThrowing = F->isThrowing())
-              out.mapRequired(Key_throwing, isThrowing);
+              out.mapRequired(getKeyContent(KeyKind::KK_throwing).data(),
+                              isThrowing);
             if (bool isMutating = F->isMutating())
-              out.mapRequired(Key_mutating, isMutating);
+              out.mapRequired(getKeyContent(KeyKind::KK_mutating).data(),
+                              isMutating);
             if (F->hasSelfIndex()) {
               auto Index = F->getSelfIndex();
-              out.mapRequired(Key_selfIndex, Index);
+              out.mapRequired(getKeyContent(KeyKind::KK_selfIndex).data(),
+                              Index);
             }
           }
           auto Attributes = D->getDeclAttributes();
           if (!Attributes.empty())
-            out.mapRequired(Key_declAttributes, Attributes);
+            out.mapRequired(getKeyContent(KeyKind::KK_declAttributes).data(),
+                            Attributes);
         } else if (auto T = dyn_cast<SDKNodeType>(value.get())) {
           auto Attributes = T->getTypeAttributes();
           if (!Attributes.empty())
-            out.mapRequired(Key_typeAttributes, Attributes);
+            out.mapRequired(getKeyContent(KeyKind::KK_typeAttributes).data(),
+                            Attributes);
         }
         if (!value->isLeaf()) {
           ArrayRef<NodeUniquePtr> Children = value->getChildren();
-          out.mapRequired(Key_children, Children);
+          out.mapRequired(getKeyContent(KeyKind::KK_children).data(), Children);
         }
       }
     };
