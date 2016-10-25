@@ -432,12 +432,12 @@ function set_build_options_for_host() {
                     ;;
                 linux-armv6)
                     SWIFT_HOST_VARIANT_ARCH="armv6"
-                    SWIFT_HOST_TRIPLE="armv6-linux-gnueabihf"
+                    SWIFT_HOST_TRIPLE="armv6-unknown-linux-gnueabihf"
                     llvm_target_arch="ARM"
                     ;;
                 linux-armv7)
                     SWIFT_HOST_VARIANT_ARCH="armv7"
-                    SWIFT_HOST_TRIPLE="armv7-linux-gnueabihf"
+                    SWIFT_HOST_TRIPLE="armv7-unknown-linux-gnueabihf"
                     llvm_target_arch="ARM"
                     ;;
                 linux-aarch64)
