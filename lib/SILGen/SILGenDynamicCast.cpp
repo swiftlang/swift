@@ -175,7 +175,7 @@ namespace {
         // If we're using the scalar strategy, handle the consumption rules.
         if (Strategy != CastStrategy::Address &&
             shouldDestroyOnFailure(consumption)) {
-          SGF.B.emitReleaseValueOperation(Loc, scalarOperandValue);
+          SGF.B.emitDestroyValueOperation(Loc, scalarOperandValue);
         }
 
         handleFalse();

@@ -1496,17 +1496,17 @@ public:
   PointerUnion<CopyAddrInst *, DestroyAddrInst *>
   emitDestroyAddr(SILLocation Loc, SILValue Operand);
 
-  /// Convenience function for calling emitRetain on the type lowering
+  /// Convenience function for calling emitCopy on the type lowering
   /// for the non-address value.
-  void emitRetainValueOperation(SILLocation Loc, SILValue v) {
+  SILValue emitCopyValueOperation(SILLocation Loc, SILValue v) {
     assert(!v->getType().isAddress());
     auto &lowering = getTypeLowering(v->getType());
-    lowering.emitCopyValue(*this, Loc, v);
+    return lowering.emitCopyValue(*this, Loc, v);
   }
 
-  /// Convenience function for calling TypeLowering.emitRelease on the type
+  /// Convenience function for calling TypeLowering.emitDestroy on the type
   /// lowering for the non-address value.
-  void emitReleaseValueOperation(SILLocation Loc, SILValue v) {
+  void emitDestroyValueOperation(SILLocation Loc, SILValue v) {
     assert(!v->getType().isAddress());
     auto &lowering = getTypeLowering(v->getType());
     lowering.emitDestroyValue(*this, Loc, v);

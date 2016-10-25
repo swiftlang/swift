@@ -99,7 +99,7 @@ static void fixupReferenceCounts(SILBasicBlock::iterator I, SILLocation Loc,
   // consumed by the closure body.
   for (auto &CaptureArg : CaptureArgs)
     if (!CaptureArg->getType().isAddress())
-      B.emitRetainValueOperation(Loc, CaptureArg);
+      B.emitCopyValueOperation(Loc, CaptureArg);
 }
 
 /// \brief Removes instructions that create the callee value if they are no
