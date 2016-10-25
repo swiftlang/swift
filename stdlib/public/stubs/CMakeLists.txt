@@ -18,8 +18,10 @@ set(LLVM_OPTIONAL_SOURCES
     ${swift_stubs_objc_sources}
     ${swift_stubs_unicode_normalization_sources})
 
-find_package(ICU REQUIRED COMPONENTS uc)
-set(ICU_UC_LIBRARY "")
+if(NOT CMAKE_SYSTEM_NAME STREQUAL "Darwin")
+  find_package(ICU REQUIRED COMPONENTS uc)
+  set(ICU_UC_LIBRARY "")
+endif()
 
 set(swift_stubs_c_compile_flags ${SWIFT_RUNTIME_CORE_CXX_FLAGS})
 list(APPEND swift_stubs_c_compile_flags -DswiftCore_EXPORTS)
