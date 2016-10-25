@@ -1982,43 +1982,37 @@ internal struct _IgnorePointer<T> : _PointerFunction {
   }
 }
 
-@_versioned
-@inline(never)
-internal func _outlinedMakeUniqueBuffer<_Buffer>(
-  _ buffer: inout _Buffer, bufferCount: Int
-) where
-  _Buffer : _ArrayBufferProtocol,
-  _Buffer.Index == Int {
+extension _ArrayBufferProtocol where Index == Int {
+  @_versioned
+  @inline(never)
+  internal func _outlinedMakeUniqueBuffer(bufferCount: Int) {
 
-  if _fastPath(
-      buffer.requestUniqueMutableBackingBuffer(minimumCapacity: bufferCount) != nil) {
-    return
+    if _fastPath(
+        requestUniqueMutableBackingBuffer(minimumCapacity: bufferCount) != nil) {
+      return
+    }
+
+    var newBuffer = _forceCreateUniqueMutableBuffer(
+      newCount: bufferCount, requiredCapacity: bufferCount)
+    _arrayOutOfPlaceUpdate(&newBuffer, bufferCount, 0, _IgnorePointer())
   }
 
-  var newBuffer = buffer._forceCreateUniqueMutableBuffer(
-    newCount: bufferCount, requiredCapacity: bufferCount)
-  buffer._arrayOutOfPlaceUpdate(&newBuffer, bufferCount, 0, _IgnorePointer())
-}
+  internal func _arrayReserve(_ minimumCapacity: Int) {
 
-internal func _arrayReserve<_Buffer>(
-  _ buffer: inout _Buffer, _ minimumCapacity: Int
-) where
-  _Buffer : _ArrayBufferProtocol,
-  _Buffer.Index == Int {
+    let count = self.count
+    let requiredCapacity = max(count, minimumCapacity)
 
-  let count = buffer.count
-  let requiredCapacity = max(count, minimumCapacity)
+    if _fastPath(
+        buffer.requestUniqueMutableBackingBuffer(
+          minimumCapacity: requiredCapacity) != nil
+    ) {
+      return
+    }
 
-  if _fastPath(
-      buffer.requestUniqueMutableBackingBuffer(
-        minimumCapacity: requiredCapacity) != nil
-  ) {
-    return
+    var newBuffer = _forceCreateUniqueMutableBuffer(
+      newCount: count, requiredCapacity: requiredCapacity)
+    _arrayOutOfPlaceUpdate(&newBuffer, count, 0, _IgnorePointer())
   }
-
-  var newBuffer = buffer._forceCreateUniqueMutableBuffer(
-    newCount: count, requiredCapacity: requiredCapacity)
-  buffer._arrayOutOfPlaceUpdate(&newBuffer, count, 0, _IgnorePointer())
 }
 
 /// Append items from `newItems` to `buffer`.
