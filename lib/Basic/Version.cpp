@@ -293,15 +293,18 @@ bool operator>=(const class Version &lhs,
   if (lhs.empty())
     return true;
 
-  auto n = std::min(lhs.size(), rhs.size());
+  auto n = std::max(lhs.size(), rhs.size());
 
   for (size_t i = 0; i < n; ++i) {
-    if (lhs[i] < rhs[i])
+    auto lv = i < lhs.size() ? lhs[i] : 0;
+    auto rv = i < rhs.size() ? rhs[i] : 0;
+    if (lv < rv)
       return false;
-    else if (lhs[i] > rhs[i])
+    else if (lv > rv)
       return true;
   }
-  return lhs.size() >= rhs.size();
+  // Equality
+  return true;
 }
 
 std::pair<unsigned, unsigned> getSwiftNumericVersion() {
