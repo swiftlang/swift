@@ -106,6 +106,8 @@ precommitTests = [
   "Array2D": run_Array2D,
   "ArrayAppend": run_ArrayAppend,
   "ArrayAppendReserved": run_ArrayAppendReserved,
+  "ArrayAppendSequence": run_ArrayAppendSequence,
+  "ArrayAppendArray": run_ArrayAppendArray,
   "ArrayInClass": run_ArrayInClass,
   "ArrayLiteral": run_ArrayLiteral,
   "ArrayOfGenericPOD": run_ArrayOfGenericPOD,
