@@ -1348,29 +1348,31 @@ public:
   void checkRetainValueInst(RetainValueInst *I) {
     require(I->getOperand()->getType().isObject(),
             "Source value should be an object value");
+    require(F.hasUnqualifiedOwnership(),
+            "retain_value is only in functions with unqualified ownership");
   }
 
   void checkCopyValueInst(CopyValueInst *I) {
     require(I->getOperand()->getType().isObject(),
             "Source value should be an object value");
-    requireTrueAndSILOwnership(
-        this, F.hasQualifiedOwnership(),
-        "copy_value is only valid in functions with qualified "
-        "ownership");
+    require(F.hasQualifiedOwnership(),
+            "copy_value is only valid in functions with qualified "
+            "ownership");
   }
 
   void checkDestroyValueInst(DestroyValueInst *I) {
     require(I->getOperand()->getType().isObject(),
             "Source value should be an object value");
-    requireTrueAndSILOwnership(
-        this, F.hasQualifiedOwnership(),
-        "destroy_value is only valid in functions with qualified "
-        "ownership");
+    require(F.hasQualifiedOwnership(),
+            "destroy_value is only valid in functions with qualified "
+            "ownership");
   }
 
   void checkReleaseValueInst(ReleaseValueInst *I) {
     require(I->getOperand()->getType().isObject(),
             "Source value should be an object value");
+    require(F.hasUnqualifiedOwnership(),
+            "release_value is only in functions with unqualified ownership");
   }
   
   void checkAutoreleaseValueInst(AutoreleaseValueInst *I) {
@@ -1676,9 +1678,13 @@ public:
 
   void checkStrongRetainInst(StrongRetainInst *RI) {
     requireReferenceValue(RI->getOperand(), "Operand of strong_retain");
+    require(F.hasUnqualifiedOwnership(),
+            "strong_retain is only in functions with unqualified ownership");
   }
   void checkStrongReleaseInst(StrongReleaseInst *RI) {
     requireReferenceValue(RI->getOperand(), "Operand of release");
+    require(F.hasUnqualifiedOwnership(),
+            "strong_release is only in functions with unqualified ownership");
   }
   void checkStrongRetainUnownedInst(StrongRetainUnownedInst *RI) {
     auto unownedType = requireObjectType(UnownedStorageType, RI->getOperand(),

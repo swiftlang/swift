@@ -749,12 +749,14 @@ public:
 
   RetainValueInst *createRetainValue(SILLocation Loc, SILValue operand,
                                      Atomicity atomicity) {
+    assert(isParsing || F.hasUnqualifiedOwnership());
     return insert(new (F.getModule()) RetainValueInst(getSILDebugLocation(Loc),
                                                       operand, atomicity));
   }
 
   ReleaseValueInst *createReleaseValue(SILLocation Loc, SILValue operand,
                                        Atomicity atomicity) {
+    assert(isParsing || F.hasUnqualifiedOwnership());
     return insert(new (F.getModule()) ReleaseValueInst(getSILDebugLocation(Loc),
                                                        operand, atomicity));
   }
@@ -1128,11 +1130,13 @@ public:
   }
   StrongRetainInst *createStrongRetain(SILLocation Loc, SILValue Operand,
                                        Atomicity atomicity) {
+    assert(isParsing || F.hasUnqualifiedOwnership());
     return insert(new (F.getModule()) StrongRetainInst(getSILDebugLocation(Loc),
                                                        Operand, atomicity));
   }
   StrongReleaseInst *createStrongRelease(SILLocation Loc, SILValue Operand,
                                          Atomicity atomicity) {
+    assert(isParsing || F.hasUnqualifiedOwnership());
     return insert(new (F.getModule()) StrongReleaseInst(
         getSILDebugLocation(Loc), Operand, atomicity));
   }
