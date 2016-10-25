@@ -77,6 +77,29 @@ void ConstraintSystem::mergeEquivalenceClasses(TypeVariableType *typeVar1,
   }
 }
 
+/// Determine whether the given type variables occurs in the given type.
+bool ConstraintSystem::typeVarOccursInType(TypeVariableType *typeVar,
+                                           Type type,
+                                           bool *involvesOtherTypeVariables) {
+  SmallVector<TypeVariableType *, 4> typeVars;
+  type->getTypeVariables(typeVars);
+  bool result = false;
+  for (auto referencedTypeVar : typeVars) {
+    if (referencedTypeVar == typeVar) {
+      result = true;
+      if (!involvesOtherTypeVariables || *involvesOtherTypeVariables)
+        break;
+
+      continue;
+    }
+
+    if (involvesOtherTypeVariables)
+      *involvesOtherTypeVariables = true;
+  }
+
+  return result;
+}
+
 void ConstraintSystem::assignFixedType(TypeVariableType *typeVar, Type type,
                                        bool updateState) {
   

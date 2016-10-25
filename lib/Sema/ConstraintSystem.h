@@ -1532,6 +1532,15 @@ public:
                              bool wantRValue,
                              bool retainParens = false);
 
+  /// Determine whether the given type variable occurs within the given type.
+  ///
+  /// This routine assumes that the type has already been fully simplified.
+  ///
+  /// \param involvesOtherTypeVariables if non-null, records whether any other
+  /// type variables are present in the type.
+  static bool typeVarOccursInType(TypeVariableType *typeVar, Type type,
+                                  bool *involvesOtherTypeVariables = nullptr);
+
   /// \brief Assign a fixed type to the given type variable.
   ///
   /// \param typeVar The type variable to bind.
