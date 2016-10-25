@@ -702,16 +702,10 @@ static Type getStrippedType(const ASTContext &context, Type type,
       }
       ++idx;
     }
-    
+
     if (!anyChanged)
       return type;
-    
-    // An unlabeled 1-element tuple type is represented as a parenthesized
-    // type.
-    if (elements.size() == 1 && !elements[0].isVararg() && 
-        !elements[0].hasName())
-      return ParenType::get(context, elements[0].getType());
-    
+
     return TupleType::get(elements, context);
   });
 }
