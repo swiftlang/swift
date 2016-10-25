@@ -1591,7 +1591,7 @@ extension ${Self} {
   ) rethrows -> R {
     let count = self.count
     // Ensure unique storage
-    _outlinedMakeUniqueBuffer(&_buffer, bufferCount: count)
+    _buffer._outlinedMakeUniqueBuffer(bufferCount: count)
 
     // Ensure that body can't invalidate the storage or its bounds by
     // moving self into a temporary working array.
@@ -1985,7 +1985,7 @@ internal struct _IgnorePointer<T> : _PointerFunction {
 extension _ArrayBufferProtocol where Index == Int {
   @_versioned
   @inline(never)
-  internal func _outlinedMakeUniqueBuffer(bufferCount: Int) {
+  internal mutating func _outlinedMakeUniqueBuffer(bufferCount: Int) {
 
     if _fastPath(
         requestUniqueMutableBackingBuffer(minimumCapacity: bufferCount) != nil) {
@@ -1997,13 +1997,14 @@ extension _ArrayBufferProtocol where Index == Int {
     _arrayOutOfPlaceUpdate(&newBuffer, bufferCount, 0, _IgnorePointer())
   }
 
-  internal func _arrayReserve(_ minimumCapacity: Int) {
+  internal mutating func _arrayReserve(_ minimumCapacity: Int) {
 
     let count = self.count
-    let requiredCapacity = max(count, minimumCapacity)
+    // FIXME(Typechecker): shouldn't need Swift. here
+    let requiredCapacity = Swift.max(count, minimumCapacity)
 
     if _fastPath(
-        buffer.requestUniqueMutableBackingBuffer(
+        requestUniqueMutableBackingBuffer(
           minimumCapacity: requiredCapacity) != nil
     ) {
       return
@@ -2033,7 +2034,7 @@ internal func _arrayAppendSequence<Buffer, S>(
 
   // This will force uniqueness
   var count = buffer.count
-  _arrayReserve(&buffer, count + 1)
+  buffer._arrayReserve(count + 1)
   while true {
     let capacity = buffer.capacity
     let base = buffer.firstElementAddress
@@ -2047,7 +2048,7 @@ internal func _arrayAppendSequence<Buffer, S>(
     if nextItem == nil {
       return
     }
-    _arrayReserve(&buffer, _growArrayCapacity(capacity))
+    buffer._arrayReserve(_growArrayCapacity(capacity))
   }
 }
 
