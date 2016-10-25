@@ -1666,29 +1666,26 @@ internal struct _InitializeMemoryFromCollection<
   var newValues: C
 }
 
-// FIXME(ABI)#14 : add argument labels.
-@inline(never)
-internal func _arrayOutOfPlaceReplace<B, C>(
-  _ source: inout B,
-  _ bounds: Range<Int>,
-  _ newValues: C,
-  _ insertCount: Int
-) where
-  B : _ArrayBufferProtocol,
-  C : Collection,
-  C.Iterator.Element == B.Element,
-  B.Index == Int {
+extension _ArrayBufferProtocol where Index == Int {
+  // FIXME(ABI)#14 : add argument labels.
+  @inline(never)
+  internal mutating func _arrayOutOfPlaceReplace<C : Collection>(
+    _ bounds: Range<Int>,
+    _ newValues: C,
+    _ insertCount: Int
+  ) where C.Iterator.Element == Element {
 
-  let growth = insertCount - bounds.count
-  let newCount = source.count + growth
-  var newBuffer = source._forceCreateUniqueMutableBuffer(
-    newCount: newCount, requiredCapacity: newCount)
+    let growth = insertCount - bounds.count
+    let newCount = count + growth
+    var newBuffer = _forceCreateUniqueMutableBuffer(
+      newCount: newCount, requiredCapacity: newCount)
 
-  source._arrayOutOfPlaceUpdate(
-    &newBuffer,
-    bounds.lowerBound - source.startIndex, insertCount,
-    _InitializeMemoryFromCollection(newValues)
-  )
+    _arrayOutOfPlaceUpdate(
+      &newBuffer,
+      bounds.lowerBound - startIndex, insertCount,
+      _InitializeMemoryFromCollection(newValues)
+    )
+  }  
 }
 
 /// A _debugPrecondition check that `i` has exactly reached the end of
@@ -1767,7 +1764,7 @@ extension ${Self} {
       self._buffer.replace(
         subRange: subrange, with: insertCount, elementsOf: newElements)
     } else {
-      _arrayOutOfPlaceReplace(&self._buffer, subrange, newElements, insertCount)
+      _buffer._arrayOutOfPlaceReplace(subrange, newElements, insertCount)
     }
   }
 }
