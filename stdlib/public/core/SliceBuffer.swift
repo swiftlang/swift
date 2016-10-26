@@ -101,8 +101,8 @@ internal struct _SliceBuffer<Element>
 
     let start = subRange.lowerBound - startIndex + hiddenElementCount
     let end = subRange.upperBound - startIndex + hiddenElementCount
-    native.replace(
-      subRange: start..<end,
+    native.replaceSubrange(
+      start..<end,
       with: insertCount,
       elementsOf: newValues)
 
@@ -153,8 +153,8 @@ internal struct _SliceBuffer<Element>
         let myCount = count
 
         if _slowPath(backingCount > myCount + offset) {
-          native.replace(
-            subRange: (myCount+offset)..<backingCount,
+          native.replaceSubrange(
+            (myCount+offset)..<backingCount,
             with: 0,
             elementsOf: EmptyCollection())
         }

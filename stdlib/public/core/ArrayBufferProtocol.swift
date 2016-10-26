@@ -72,8 +72,8 @@ internal protocol _ArrayBufferProtocol
   ///
   /// - Precondition: This buffer is backed by a uniquely-referenced
   /// `_ContiguousArrayBuffer`.
-  mutating func replace<C>(
-    subRange: Range<Int>,
+  mutating func replaceSubrange<C>(
+    _ subRange: Range<Int>,
     with newCount: Int,
     elementsOf newValues: C
   ) where C : Collection, C.Iterator.Element == Element
@@ -132,8 +132,8 @@ extension _ArrayBufferProtocol where Index == Int {
     return firstElementAddress
   }
 
-  internal mutating func replace<C>(
-    subRange: Range<Int>,
+  internal mutating func replaceSubrange<C>(
+    _ subRange: Range<Int>,
     with newCount: Int,
     elementsOf newValues: C
   ) where C : Collection, C.Iterator.Element == Element {

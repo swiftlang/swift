@@ -1761,8 +1761,8 @@ extension ${Self} {
     if _buffer.requestUniqueMutableBackingBuffer(
       minimumCapacity: oldCount + growth) != nil {
 
-      _buffer.replace(
-        subRange: subrange, with: insertCount, elementsOf: newElements)
+      _buffer.replaceSubrange(
+        subrange, with: insertCount, elementsOf: newElements)
     } else {
       _buffer._arrayOutOfPlaceReplace(subrange, with: newElements, count: insertCount)
     }
