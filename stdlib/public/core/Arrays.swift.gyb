@@ -1667,7 +1667,6 @@ internal struct _InitializeMemoryFromCollection<
 }
 
 extension _ArrayBufferProtocol {
-  // FIXME(ABI)#14 : add argument labels.
   @inline(never)
   internal mutating func _arrayOutOfPlaceReplace<C : Collection>(
     _ bounds: Range<Int>,
