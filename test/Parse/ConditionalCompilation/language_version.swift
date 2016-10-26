@@ -43,8 +43,16 @@
 #if swift("") // expected-error {{unexpected platform condition argument: expected a unary comparison, such as '>=2.2'}}
 #endif
 
-// We won't expect three version components to work for now.
-#if swift(>=2.2.1) // expected-error {{expected named member of numeric literal}}
+#if swift(>=2.2.1)
+#endif
+
+// Check that an extra .0 doesn't make a version "bigger"; NB this test only
+// tests the fix on 3.0.1, but that's the swift version the fix was backported
+// to. On master, the fix is tested by language_version_explicit.swift
+#if swift(>=3.0.1.0)
+#else
+  // This shouldn't emit any diagnostics.
+  asdf asdf asdf asdf
 #endif
 
 #if swift(>=2.0, *) // expected-error {{expected only one argument to platform condition}}

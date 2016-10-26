@@ -128,6 +128,7 @@ public:
   bool ArgumentIsParameter = false;
 
   bool InPoundLineEnvironment = false;
+  bool InPoundIfEnvironment = false;
 
   LocalContext *CurLocalContext = nullptr;
 
