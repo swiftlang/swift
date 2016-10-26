@@ -17,7 +17,7 @@ if(SWIFT_BUILD_SOURCEKIT)
 endif()
 
 
-is_sdk_requested("${SWIFT_HOST_VARIANT_SDK}" SWIFT_HOST_SDK_REQUESTED)
-if(SWIFT_BUILD_STDLIB AND SWIFT_HOST_SDK_REQUESTED)
-  add_swift_tool_subdirectory(swift-reflection-dump)
-endif()
+#is_sdk_requested("${SWIFT_HOST_VARIANT_SDK}" SWIFT_HOST_SDK_REQUESTED)
+#if(SWIFT_BUILD_STDLIB AND SWIFT_HOST_SDK_REQUESTED)
+#  add_swift_tool_subdirectory(swift-reflection-dump)
+#endif()
