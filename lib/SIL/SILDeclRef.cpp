@@ -155,7 +155,7 @@ static unsigned getNaturalUncurryLevelAndKind(ValueDecl *vd,
     assertNoSet();
     setOrCheck(Kind::GlobalAccessor, Kind::GlobalGetter,
                Kind::StoredPropertyInitializer);
-    auto var = cast<VarDecl>(vd);
+    auto *var = cast<VarDecl>(vd);
     assert(!var->getDeclContext()->isLocalContext() &&
            "can't reference local var as global var");
     assert(var->hasStorage() && "can't reference computed var as global var");

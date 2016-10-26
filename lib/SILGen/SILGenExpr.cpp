@@ -439,7 +439,7 @@ emitRValueForDecl(SILLocation loc, ConcreteDeclRef declRef, Type ncRefType,
   // sort.
 
   unsigned uncurryLevel = 0;
-  if (auto fd = dyn_cast<FuncDecl>(decl))
+  if (auto *fd = dyn_cast<FuncDecl>(decl))
     uncurryLevel = AnyFunctionRef(fd).getNaturalUncurryLevel();
   auto silDeclRef = SILDeclRef(decl, ResilienceExpansion::Minimal, uncurryLevel);
 
