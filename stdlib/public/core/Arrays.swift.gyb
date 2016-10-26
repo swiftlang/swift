@@ -1301,7 +1301,7 @@ extension ${Self} : RangeReplaceableCollection, _ArrayProtocol {
       self.reserveCapacity(
         Swift.max(newCount, _growArrayCapacity(capacity)))
       }
-    _arrayAppendSequence(&self._buffer, newElements)
+    _buffer._arrayAppendSequence(newElements)
   }
 
   // An overload of `append(contentsOf:)` that uses the += that is optimized for
@@ -2011,40 +2011,37 @@ extension _ArrayBufferProtocol {
       newCount: count, requiredCapacity: requiredCapacity)
     _arrayOutOfPlaceUpdate(&newBuffer, count, 0, _IgnorePointer())
   }
-}
 
-/// Append items from `newItems` to `buffer`.
-internal func _arrayAppendSequence<Buffer, S>(
-  _ buffer: inout Buffer, _ newItems: S
-) where
-  Buffer : _ArrayBufferProtocol,
-  S : Sequence,
-  S.Iterator.Element == Buffer.Element {
+  /// Append items from `newItems` to a buffer.
+  internal mutating func _arrayAppendSequence<S : Sequence>(
+    _ newItems: S
+  ) where S.Iterator.Element == Element {
 
-  var stream = newItems.makeIterator()
-  var nextItem = stream.next()
+    var stream = newItems.makeIterator()
+    var nextItem = stream.next()
 
-  if nextItem == nil {
-    return
-  }
-
-  // This will force uniqueness
-  var count = buffer.count
-  buffer._arrayReserve(count + 1)
-  while true {
-    let capacity = buffer.capacity
-    let base = buffer.firstElementAddress
-
-    while (nextItem != nil) && count < capacity {
-      (base + count).initialize(to: nextItem!)
-      count += 1
-      nextItem = stream.next()
-    }
-    buffer.count = count
     if nextItem == nil {
       return
     }
-    buffer._arrayReserve(_growArrayCapacity(capacity))
+
+    // This will force uniqueness
+    var count = self.count
+    self._arrayReserve(count + 1)
+    while true {
+      let capacity = self.capacity
+      let base = self.firstElementAddress
+
+      while (nextItem != nil) && count < capacity {
+        (base + count).initialize(to: nextItem!)
+        count += 1
+        nextItem = stream.next()
+      }
+      self.count = count
+      if nextItem == nil {
+        return
+      }
+      self._arrayReserve(_growArrayCapacity(capacity))
+    }
   }
 }
 
