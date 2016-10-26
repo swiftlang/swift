@@ -85,7 +85,7 @@ static ManagedValue emitBuiltinRelease(SILGenFunction &gen,
   // The value was produced at +1, so to produce an unbalanced
   // release we need to leave the cleanup intact and then do a *second*
   // release.
-  gen.B.createReleaseValue(loc, args[0].getValue(), Atomicity::Atomic);
+  gen.B.createDestroyValue(loc, args[0].getValue());
   return ManagedValue::forUnmanaged(gen.emitEmptyTuple(loc));    
 }
 

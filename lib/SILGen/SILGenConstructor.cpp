@@ -672,7 +672,7 @@ void SILGenFunction::emitClassConstructorInitializer(ConstructorDecl *ctor) {
     }
     
     // We have to do a retain because we are returning the pointer +1.
-    selfArg = B.emitCopyValueOperation(cleanupLoc, selfArg);
+    B.emitCopyValueOperation(cleanupLoc, selfArg);
 
     // Inject the self value into an optional if the constructor is failable.
     if (ctor->getFailability() != OTK_None) {
