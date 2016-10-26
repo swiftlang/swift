@@ -1676,7 +1676,7 @@ extension _ArrayBufferProtocol {
   ) where C.Iterator.Element == Element {
 
     let growth = insertCount - bounds.count
-    let newCount = count + growth
+    let newCount = self.count + growth
     var newBuffer = _forceCreateUniqueMutableBuffer(
       newCount: newCount, requiredCapacity: newCount)
 
@@ -1866,7 +1866,6 @@ extension _ArrayBufferProtocol {
     _sanityCheck(requiredCapacity >= countForBuffer)
     _sanityCheck(minNewCapacity >= countForBuffer)
 
-    // FIXME(Typechecker): Swift. prefix shouldn't be necessary (rdar://problem/28947708)
     let minimumCapacity = Swift.max(requiredCapacity,
       minNewCapacity > capacity
          ? _growArrayCapacity(capacity) : capacity)
@@ -1996,8 +1995,7 @@ extension _ArrayBufferProtocol {
 
   internal mutating func _arrayReserve(_ minimumCapacity: Int) {
 
-    let count = self.count
-    // FIXME(Typechecker): shouldn't need Swift. here
+    let oldCount = self.count
     let requiredCapacity = Swift.max(count, minimumCapacity)
 
     if _fastPath(
@@ -2008,8 +2006,9 @@ extension _ArrayBufferProtocol {
     }
 
     var newBuffer = _forceCreateUniqueMutableBuffer(
-      newCount: count, requiredCapacity: requiredCapacity)
-    _arrayOutOfPlaceUpdate(&newBuffer, count, 0, _IgnorePointer())
+      newCount: oldCount, requiredCapacity: requiredCapacity)
+
+    _arrayOutOfPlaceUpdate(&newBuffer, oldCount, 0, _IgnorePointer())
   }
 
   /// Append items from `newItems` to a buffer.
@@ -2025,22 +2024,22 @@ extension _ArrayBufferProtocol {
     }
 
     // This will force uniqueness
-    var count = self.count
-    self._arrayReserve(count + 1)
+    var newCount = self.count
+    _arrayReserve(newCount + 1)
     while true {
-      let capacity = self.capacity
+      let currentCapacity = self.capacity
       let base = self.firstElementAddress
 
-      while (nextItem != nil) && count < capacity {
-        (base + count).initialize(to: nextItem!)
-        count += 1
+      while (nextItem != nil) && newCount < currentCapacity {
+        (base + newCount).initialize(to: nextItem!)
+        newCount += 1
         nextItem = stream.next()
       }
-      self.count = count
+      self.count = newCount
       if nextItem == nil {
         return
       }
-      self._arrayReserve(_growArrayCapacity(capacity))
+      self._arrayReserve(_growArrayCapacity(currentCapacity))
     }
   }
 }

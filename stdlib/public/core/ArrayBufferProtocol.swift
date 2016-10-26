@@ -73,7 +73,7 @@ internal protocol _ArrayBufferProtocol
   /// - Precondition: This buffer is backed by a uniquely-referenced
   /// `_ContiguousArrayBuffer`.
   mutating func replaceSubrange<C>(
-    _ subRange: Range<Int>,
+    _ subrange: Range<Int>,
     with newCount: Int,
     elementsOf newValues: C
   ) where C : Collection, C.Iterator.Element == Element
@@ -134,32 +134,32 @@ extension _ArrayBufferProtocol {
   }
 
   internal mutating func replaceSubrange<C>(
-    _ subRange: Range<Int>,
+    _ subrange: Range<Int>,
     with newCount: Int,
     elementsOf newValues: C
   ) where C : Collection, C.Iterator.Element == Element {
     _sanityCheck(startIndex == 0, "_SliceBuffer should override this function.")
     let oldCount = self.count
-    let eraseCount = subRange.count
+    let eraseCount = subrange.count
 
     let growth = newCount - eraseCount
     self.count = oldCount + growth
 
     let elements = self.subscriptBaseAddress
-    let oldTailIndex = subRange.upperBound
+    let oldTailIndex = subrange.upperBound
     let oldTailStart = elements + oldTailIndex
     let newTailIndex = oldTailIndex + growth
     let newTailStart = oldTailStart + growth
-    let tailCount = oldCount - subRange.upperBound
+    let tailCount = oldCount - subrange.upperBound
 
     if growth > 0 {
       // Slide the tail part of the buffer forwards, in reverse order
       // so as not to self-clobber.
       newTailStart.moveInitialize(from: oldTailStart, count: tailCount)
 
-      // Assign over the original subRange
+      // Assign over the original subrange
       var i = newValues.startIndex
-      for j in CountableRange(subRange) {
+      for j in CountableRange(subrange) {
         elements[j] = newValues[i]
         newValues.formIndex(after: &i)
       }
@@ -171,8 +171,8 @@ extension _ArrayBufferProtocol {
       _expectEnd(i, newValues)
     }
     else { // We're not growing the buffer
-      // Assign all the new elements into the start of the subRange
-      var i = subRange.lowerBound
+      // Assign all the new elements into the start of the subrange
+      var i = subrange.lowerBound
       var j = newValues.startIndex
       for _ in 0..<newCount {
         elements[i] = newValues[j]
@@ -202,7 +202,7 @@ extension _ArrayBufferProtocol {
         // Assign over the start of the replaced range with the tail
         newTailStart.moveAssign(from: oldTailStart, count: tailCount)
 
-        // Destroy elements remaining after the tail in subRange
+        // Destroy elements remaining after the tail in subrange
         (newTailStart + tailCount).deinitialize(
           count: shrinkage - tailCount)
       }
