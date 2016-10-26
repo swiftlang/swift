@@ -12,6 +12,7 @@
 
 #include "DictionaryKeys.h"
 #include "sourcekitd/CodeCompletionResultsArray.h"
+#include "sourcekitd/DocStructureArray.h"
 #include "sourcekitd/DocSupportAnnotationArray.h"
 #include "sourcekitd/TokenAnnotationsArray.h"
 
@@ -1703,35 +1704,25 @@ class SKEditorConsumer : public EditorConsumer {
   ResponseBuilder RespBuilder;
 
   ResponseBuilder::Dictionary Dict;
+  DocStructureArrayBuilder DocStructure;
   TokenAnnotationsArrayBuilder SyntaxMap;
   TokenAnnotationsArrayBuilder SemanticAnnotations;
 
-  struct StructureNode {
-    ResponseBuilder::Dictionary Dict;
-    ResponseBuilder::Array SubStructures;
-    ResponseBuilder::Array Elements;
-
-    explicit StructureNode(ResponseBuilder::Dictionary Dict) : Dict(Dict) {}
-  };
-  std::vector<StructureNode> Structures;
   ResponseBuilder::Array Diags;
   sourcekitd_response_t Error = nullptr;
 
   bool EnableSyntaxMap;
+  bool EnableStructure;
   bool EnableDiagnostics;
   bool SyntacticOnly;
 
 public:
-  SKEditorConsumer(bool EnableSyntaxMap,
-                   bool EnableStructure, bool EnableDiagnostics,
-                   bool SyntacticOnly)
-  : EnableSyntaxMap(EnableSyntaxMap),
-    EnableDiagnostics(EnableDiagnostics),
-    SyntacticOnly(SyntacticOnly) {
+  SKEditorConsumer(bool EnableSyntaxMap, bool EnableStructure,
+                   bool EnableDiagnostics, bool SyntacticOnly)
+      : EnableSyntaxMap(EnableSyntaxMap), EnableStructure(EnableStructure),
+        EnableDiagnostics(EnableDiagnostics), SyntacticOnly(SyntacticOnly) {
 
     Dict = RespBuilder.getDictionary();
-    if (EnableStructure)
-      Structures.push_back(StructureNode{Dict});
   }
 
   SKEditorConsumer(ResponseReceiver RespReceiver, bool EnableSyntaxMap,
@@ -1931,6 +1922,10 @@ sourcekitd_response_t SKEditorConsumer::createResponse() {
         CustomBufferKind::TokenAnnotationsArray,
         SemanticAnnotations.createBuffer());
   }
+  if (EnableStructure) {
+    Dict.setCustomBuffer(KeySubStructure, CustomBufferKind::DocStructureArray,
+                         DocStructure.createBuffer());
+  }
 
   return RespBuilder.createResponse();
 }
@@ -1977,76 +1972,26 @@ SKEditorConsumer::beginDocumentSubStructure(unsigned Offset,
                                             StringRef SelectorName,
                                             ArrayRef<StringRef> InheritedTypes,
                                             ArrayRef<UIdent> Attrs) {
-  if (Structures.empty())
-    return true;
-
-  auto &Parent = Structures.back();
-  if (Parent.SubStructures.isNull())
-    Parent.SubStructures = Parent.Dict.setArray(KeySubStructure);
-  auto Node = Parent.SubStructures.appendDictionary();
-  Node.set(KeyOffset, Offset);
-  Node.set(KeyLength, Length);
-  Node.set(KeyKind, Kind);
-  if (AccessLevel.isValid())
-    Node.set(KeyAccessibility, AccessLevel);
-  if (SetterAccessLevel.isValid())
-    Node.set(KeySetterAccessibility, SetterAccessLevel);
-  Node.set(KeyNameOffset, NameOffset);
-  Node.set(KeyNameLength, NameLength);
-  if (BodyOffset != 0 || BodyLength !=0) {
-    Node.set(KeyBodyOffset, BodyOffset);
-    Node.set(KeyBodyLength, BodyLength);
+  if (EnableStructure) {
+    DocStructure.beginSubStructure(
+        Offset, Length, Kind, AccessLevel, SetterAccessLevel, NameOffset,
+        NameLength, BodyOffset, BodyLength, DisplayName, TypeName, RuntimeName,
+        SelectorName, InheritedTypes, Attrs);
   }
-
-  if (!DisplayName.empty())
-    Node.set(KeyName, DisplayName);
-
-  if (!TypeName.empty())
-    Node.set(KeyTypeName,TypeName);
-
-  if (!RuntimeName.empty())
-    Node.set(KeyRuntimeName, RuntimeName);
-
-  if (!SelectorName.empty())
-    Node.set(KeySelectorName, SelectorName);
-
-  if (!InheritedTypes.empty()) {
-    auto TypeArray = Node.setArray(KeyInheritedTypes);
-    for (const StringRef &TypeName : InheritedTypes) {
-      TypeArray.appendDictionary().set(KeyName, TypeName);
-    }
-  }
-  if (!Attrs.empty()) {
-    auto AttrArray = Node.setArray(KeyAttributes);
-    for (auto Attr : Attrs) {
-      auto AttrDict = AttrArray.appendDictionary();
-      AttrDict.set(KeyAttribute, Attr);
-    }
-  }
-  Structures.push_back(StructureNode{Node});
   return true;
 }
 
 bool SKEditorConsumer::endDocumentSubStructure() {
-  if (!Structures.empty())
-    Structures.pop_back();
-
+  if (EnableStructure)
+    DocStructure.endSubStructure();
   return true;
 }
 
 bool SKEditorConsumer::handleDocumentSubStructureElement(UIdent Kind,
                                                          unsigned Offset,
                                                          unsigned Length) {
-  if (Structures.empty())
-    return true;
-
-  auto &Parent = Structures.back();
-  if (Parent.Elements.isNull())
-    Parent.Elements = Parent.Dict.setArray(KeyElements);
-  auto Node = Parent.Elements.appendDictionary();
-  Node.set(KeyKind, Kind);
-  Node.set(KeyOffset, Offset);
-  Node.set(KeyLength, Length);
+  if (EnableStructure)
+    DocStructure.addElement(Kind, Offset, Length);
   return true;
 }
 
