@@ -1671,8 +1671,8 @@ extension _ArrayBufferProtocol where Index == Int {
   @inline(never)
   internal mutating func _arrayOutOfPlaceReplace<C : Collection>(
     _ bounds: Range<Int>,
-    _ newValues: C,
-    _ insertCount: Int
+    with newValues: C,
+    count insertCount: Int
   ) where C.Iterator.Element == Element {
 
     let growth = insertCount - bounds.count
@@ -1758,13 +1758,13 @@ extension ${Self} {
     let insertCount = numericCast(newElements.count) as Int
     let growth = insertCount - eraseCount
 
-    if self._buffer.requestUniqueMutableBackingBuffer(
+    if _buffer.requestUniqueMutableBackingBuffer(
       minimumCapacity: oldCount + growth) != nil {
 
-      self._buffer.replace(
+      _buffer.replace(
         subRange: subrange, with: insertCount, elementsOf: newElements)
     } else {
-      _buffer._arrayOutOfPlaceReplace(subrange, newElements, insertCount)
+      _buffer._arrayOutOfPlaceReplace(subrange, with: newElements, count: insertCount)
     }
   }
 }
