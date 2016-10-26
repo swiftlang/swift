@@ -581,7 +581,7 @@ internal func _copyCollectionToContiguousArray<
     source.formIndex(after: &i)
     p += 1
   }
-  _expectEnd(i, source)
+  _expectEnd(of: source, is: i)
   return ContiguousArray(_buffer: result)
 }
 
