@@ -27,7 +27,7 @@
 #include "llvm/Support/Debug.h"
 #include "llvm/Support/GraphWriter.h"
 #include "llvm/Support/ManagedStatic.h"
-#include "llvm/Support/TimeValue.h"
+#include "llvm/Support/Chrono.h"
 
 using namespace swift;
 
@@ -315,7 +315,7 @@ void SILPassManager::runPassOnFunction(SILFunctionTransform *SFT,
     F->dump(getOptions().EmitVerboseSIL);
   }
 
-  llvm::sys::TimeValue StartTime = llvm::sys::TimeValue::now();
+  llvm::sys::TimePoint<> StartTime = std::chrono::system_clock::now();
   Mod->registerDeleteNotificationHandler(SFT);
   if (breakBeforeRunning(F->getName(), SFT->getName()))
     LLVM_BUILTIN_DEBUGTRAP;
@@ -324,8 +324,7 @@ void SILPassManager::runPassOnFunction(SILFunctionTransform *SFT,
   Mod->removeDeleteNotificationHandler(SFT);
 
   if (SILPrintPassTime) {
-    auto Delta =
-        llvm::sys::TimeValue::now().nanoseconds() - StartTime.nanoseconds();
+    auto Delta = (std::chrono::system_clock::now() - StartTime).count();
     llvm::dbgs() << Delta << " (" << SFT->getName() << "," << F->getName()
                  << ")\n";
   }
@@ -439,7 +438,7 @@ void SILPassManager::runModulePass(SILModuleTransform *SMT) {
     printModule(Mod, Options.EmitVerboseSIL);
   }
 
-  llvm::sys::TimeValue StartTime = llvm::sys::TimeValue::now();
+  llvm::sys::TimePoint<> StartTime = std::chrono::system_clock::now();
   assert(analysesUnlocked() && "Expected all analyses to be unlocked!");
   Mod->registerDeleteNotificationHandler(SMT);
   SMT->run();
@@ -447,8 +446,7 @@ void SILPassManager::runModulePass(SILModuleTransform *SMT) {
   assert(analysesUnlocked() && "Expected all analyses to be unlocked!");
 
   if (SILPrintPassTime) {
-    auto Delta = llvm::sys::TimeValue::now().nanoseconds() -
-      StartTime.nanoseconds();
+    auto Delta = (std::chrono::system_clock::now() - StartTime).count();
     llvm::dbgs() << Delta << " (" << SMT->getName() << ",Module)\n";
   }
 

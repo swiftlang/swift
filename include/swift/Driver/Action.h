@@ -19,7 +19,7 @@
 #include "llvm/ADT/ArrayRef.h"
 #include "llvm/ADT/Optional.h"
 #include "llvm/ADT/StringSwitch.h"
-#include "llvm/Support/TimeValue.h"
+#include "llvm/Support/Chrono.h"
 
 namespace llvm {
 namespace opt {
@@ -137,14 +137,14 @@ public:
       NewlyAdded
     };
     Status status = UpToDate;
-    llvm::sys::TimeValue previousModTime;
+    llvm::sys::TimePoint<> previousModTime;
 
     InputInfo() = default;
-    InputInfo(Status stat, llvm::sys::TimeValue time)
+    InputInfo(Status stat, llvm::sys::TimePoint<> time)
         : status(stat), previousModTime(time) {}
 
     static InputInfo makeNewlyAdded() {
-      return InputInfo(Status::NewlyAdded, llvm::sys::TimeValue::MaxTime());
+      return InputInfo(Status::NewlyAdded, llvm::sys::TimePoint<>::max());
     }
   };
 

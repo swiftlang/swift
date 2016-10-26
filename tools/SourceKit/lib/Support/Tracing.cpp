@@ -14,7 +14,6 @@
 
 #include "swift/Frontend/Frontend.h"
 
-#include "llvm/Support/TimeValue.h"
 #include "llvm/Support/YAMLTraits.h"
 
 using namespace SourceKit;

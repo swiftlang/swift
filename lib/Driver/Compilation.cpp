@@ -30,6 +30,7 @@
 #include "llvm/ADT/TinyPtrVector.h"
 #include "llvm/Option/Arg.h"
 #include "llvm/Option/ArgList.h"
+#include "llvm/Support/Chrono.h"
 #include "llvm/Support/FileSystem.h"
 #include "llvm/Support/Path.h"
 #include "llvm/Support/raw_ostream.h"
@@ -47,7 +48,7 @@ Compilation::Compilation(DiagnosticEngine &Diags, OutputLevel Level,
                          std::unique_ptr<InputArgList> InputArgs,
                          std::unique_ptr<DerivedArgList> TranslatedArgs,
                          InputFileList InputsWithTypes,
-                         StringRef ArgsHash, llvm::sys::TimeValue StartTime,
+                         StringRef ArgsHash, llvm::sys::TimePoint<> StartTime,
                          unsigned NumberOfParallelCommands,
                          bool EnableIncrementalBuild,
                          bool SkipTaskExecution,
@@ -158,7 +159,7 @@ static void checkForOutOfDateInputs(DiagnosticEngine &diags,
                                     const InputInfoMap &inputs) {
   for (const auto &inputPair : inputs) {
     auto recordedModTime = inputPair.second.previousModTime;
-    if (recordedModTime == llvm::sys::TimeValue::MaxTime())
+    if (recordedModTime == llvm::sys::TimePoint<>::max())
       continue;
 
     const char *input = inputPair.first->getValue();
@@ -178,7 +179,7 @@ static void checkForOutOfDateInputs(DiagnosticEngine &diags,
 }
 
 static void writeCompilationRecord(StringRef path, StringRef argsHash,
-                                   llvm::sys::TimeValue buildTime,
+                                   llvm::sys::TimePoint<> buildTime,
                                    const InputInfoMap &inputs) {
   std::error_code error;
   llvm::raw_fd_ostream out(path, error, llvm::sys::fs::F_None);
@@ -188,8 +189,12 @@ static void writeCompilationRecord(StringRef path, StringRef argsHash,
     return;
   }
 
-  auto writeTimeValue = [](llvm::raw_ostream &out, llvm::sys::TimeValue time) {
-    out << "[" << time.seconds() << ", " << time.nanoseconds() << "]";
+  auto writeTimeValue = [](llvm::raw_ostream &out,
+                           llvm::sys::TimePoint<> time) {
+    auto seconds = llvm::sys::toTimeT(time);
+    auto nanoseconds = (time.time_since_epoch() %
+                        std::chrono::seconds(1)).count();
+    out << "[" << seconds << ", " << nanoseconds << "]";
   };
 
   using compilation_record::TopLevelKey;
