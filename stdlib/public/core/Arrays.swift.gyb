@@ -1746,14 +1746,14 @@ extension ${Self} {
     _precondition(subrange.lowerBound >= self._buffer.startIndex,
       "${Self} replace: subrange start is negative")
 % else:
-    _precondition(subrange.lowerBound >= self._buffer.startIndex,
+    _precondition(subrange.lowerBound >= _buffer.startIndex,
       "${Self} replace: subrange start is before the startIndex")
 % end
 
-    _precondition(subrange.upperBound <= self._buffer.endIndex,
+    _precondition(subrange.upperBound <= _buffer.endIndex,
       "${Self} replace: subrange extends past the end")
 
-    let oldCount = self._buffer.count
+    let oldCount = _buffer.count
     let eraseCount = subrange.count
     let insertCount = numericCast(newElements.count) as Int
     let growth = insertCount - eraseCount
