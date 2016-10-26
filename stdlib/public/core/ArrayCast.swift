@@ -30,24 +30,7 @@ public func _arrayDownCastIndirect<SourceValue, TargetValue>(
 public func _arrayForceCast<SourceElement, TargetElement>(
   _ source: Array<SourceElement>
 ) -> Array<TargetElement> {
-#if _runtime(_ObjC)
-  if _isClassOrObjCExistential(SourceElement.self)
-  && _isClassOrObjCExistential(TargetElement.self) {
-    let src = source._buffer
-    if let native = src.requestNativeBuffer() {
-      if native.storesOnlyElementsOfType(TargetElement.self) {
-        // A native buffer that is known to store only elements of the
-        // TargetElement can be used directly
-        return Array(_buffer: src.cast(toBufferOf: TargetElement.self))
-      }
-      // Other native buffers must use deferred element type checking
-      return Array(_buffer:
-        src.downcast(toBufferWithDeferredTypeCheckOf: TargetElement.self))
-    }
-    return Array(_immutableCocoaArray: source._buffer._asCocoaArray())
-  }
-#endif
-  return source.map { $0 as! TargetElement }
+  return _arrayConditionalCast(source)!
 }
 
 internal struct _UnwrappingFailed : Error {}

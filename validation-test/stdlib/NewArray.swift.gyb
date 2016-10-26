@@ -304,32 +304,6 @@ func testSlice() {
   b[b.startIndex..<b.endIndex].qsort(<)
   printSequence(b)                // CHECK-NEXT: [0, 1, 2, 3, 5, 6, 7, 8, 9, 41]
   printSequence(c)                // CHECK-NEXT: [0, 1, 2, 3, 41, 5, 6, 7, 8, 9]
-
-#if _runtime(_ObjC)
-  // Now a bridged slice
-  var a = Array<NSString>(
-    _ArrayBuffer(nsArray: nsArrayOfStrings()._buffer._asCocoaArray()))
-
-  printSequence(a)                // CHECK-objc-NEXT: [foo, bar, baz]
-
-  var aSlice = a[1..<3]           // CHECK-objc-NEXT: [bar, baz]
-  printSequence(aSlice)
-
-  // Writing into aSlice works
-  aSlice[1] = "buzz"              // CHECK-objc-NEXT: [buzz, baz]
-  printSequence(aSlice)
-
-  // ...and doesn't affect a
-  printSequence(a)                // CHECK-objc-NEXT: [foo, bar, baz]
-
-  // Appending to aSlice works...
-  aSlice.append("fodder")
-  print("<\(aSlice.count)>")      // CHECK-objc-NEXT: <3>
-  printSequence(aSlice)           // CHECK-objc-NEXT: [buzz, baz, fodder]
-
-  // And doesn't change a
-  printSequence(a)                // CHECK-objc-NEXT: [foo, bar, baz]
-#endif
 }
 testSlice()
 
