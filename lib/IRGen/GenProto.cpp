@@ -143,12 +143,17 @@ PolymorphicConvention::PolymorphicConvention(IRGenModule &IGM,
   : IGM(IGM), M(*IGM.getSwiftModule()), FnType(fnType) {
   initGenerics();
 
+  auto rep = fnType->getRepresentation();
+
   if (fnType->isPseudogeneric()) {
+    // Protocol witnesses still get Self metadata no matter what. The type
+    // parameters of Self are pseudogeneric, though.
+    if (rep == SILFunctionTypeRepresentation::WitnessMethod)
+      considerWitnessSelf(fnType);
+
     addPseudogenericFulfillments();
     return;
   }
-
-  auto rep = fnType->getRepresentation();
 
   if (rep == SILFunctionTypeRepresentation::WitnessMethod) {
     // Protocol witnesses always derive all polymorphic parameter
