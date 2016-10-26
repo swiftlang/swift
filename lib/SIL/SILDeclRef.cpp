@@ -122,6 +122,16 @@ static unsigned getFuncNaturalUncurryLevel(AnyFunctionRef AFR) {
   return Level;
 }
 
+static void setUncurryLevel(SILDeclRef &declRef, unsigned requested,
+                            unsigned natural) {
+  declRef.uncurryLevel = requested == SILDeclRef::ConstructAtNaturalUncurryLevel
+                             ? natural
+                             : requested;
+  assert(declRef.uncurryLevel <= natural &&
+         "can't emit SILDeclRef below natural uncurry level");
+  declRef.isCurried = declRef.uncurryLevel != natural;
+}
+
 SILDeclRef::SILDeclRef(ValueDecl *vd, SILDeclRef::Kind kind,
                        ResilienceExpansion expansion,
                        unsigned atUncurryLevel, bool isForeign)
@@ -167,13 +177,7 @@ SILDeclRef::SILDeclRef(ValueDecl *vd, SILDeclRef::Kind kind,
     llvm_unreachable("Unhandled ValueDecl for SILDeclRef");
   }
   
-  assert((atUncurryLevel == ConstructAtNaturalUncurryLevel
-          || atUncurryLevel <= naturalUncurryLevel)
-         && "can't emit SILDeclRef below natural uncurry level");
-  uncurryLevel = atUncurryLevel == ConstructAtNaturalUncurryLevel
-    ? naturalUncurryLevel
-    : atUncurryLevel;
-  isCurried = uncurryLevel != naturalUncurryLevel;
+  setUncurryLevel(*this, uncurryLevel, naturalUncurryLevel);
 }
 
 SILDeclRef::SILDeclRef(SILDeclRef::Loc baseLoc,
@@ -224,16 +228,8 @@ SILDeclRef::SILDeclRef(SILDeclRef::Loc baseLoc,
     llvm_unreachable("impossible SILDeclRef loc");
   }
 
-  // Set the uncurry level.
-  assert((atUncurryLevel == ConstructAtNaturalUncurryLevel
-          || atUncurryLevel <= naturalUncurryLevel)
-         && "can't emit SILDeclRef below natural uncurry level");
-  uncurryLevel = atUncurryLevel == ConstructAtNaturalUncurryLevel
-    ? naturalUncurryLevel
-    : atUncurryLevel;
+  setUncurryLevel(*this, atUncurryLevel, naturalUncurryLevel);
   Expansion = (unsigned) expansion;
-  
-  isCurried = uncurryLevel != naturalUncurryLevel;  
   isForeign = asForeign;
 }
 
