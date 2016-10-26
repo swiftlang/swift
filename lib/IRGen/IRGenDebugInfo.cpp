@@ -1760,8 +1760,7 @@ llvm::DIType *IRGenDebugInfo::createType(DebugTypeInfo DbgTy,
           llvm::errs() << "\n");
     MangledName = "<unknown>";
   }
-  return DBuilder.createBasicType(MangledName, SizeInBits, AlignInBits,
-                                  Encoding);
+  return DBuilder.createBasicType(MangledName, SizeInBits, Encoding);
 }
 
 /// Determine if there exists a name mangling for the given type.
