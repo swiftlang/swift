@@ -594,36 +594,6 @@ RuntimeFoundationWrappers.test("_stdlib_NSStringUppercaseString/NoLeak") {
   expectEqual(0, nsStringCanaryCount)
 }
 
-RuntimeFoundationWrappers.test("_stdlib_CFStringCreateCopy/NoLeak") {
-  nsStringCanaryCount = 0
-  autoreleasepool {
-    let a = NSStringCanary()
-    expectEqual(1, nsStringCanaryCount)
-    _stdlib_binary_CFStringCreateCopy(a)
-  }
-  expectEqual(0, nsStringCanaryCount)
-}
-
-RuntimeFoundationWrappers.test("_stdlib_CFStringGetLength/NoLeak") {
-  nsStringCanaryCount = 0
-  autoreleasepool {
-    let a = NSStringCanary()
-    expectEqual(1, nsStringCanaryCount)
-    _stdlib_binary_CFStringGetLength(a)
-  }
-  expectEqual(0, nsStringCanaryCount)
-}
-
-RuntimeFoundationWrappers.test("_stdlib_CFStringGetCharactersPtr/NoLeak") {
-  nsStringCanaryCount = 0
-  autoreleasepool {
-    let a = NSStringCanary()
-    expectEqual(1, nsStringCanaryCount)
-    _stdlib_binary_CFStringGetCharactersPtr(a)
-  }
-  expectEqual(0, nsStringCanaryCount)
-}
-
 RuntimeFoundationWrappers.test("bridgedNSArray") {
   var c = [NSObject]()
   autoreleasepool {

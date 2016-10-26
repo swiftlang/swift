@@ -735,30 +735,28 @@ StringTests.test("stringCoreReserve")
 #if _runtime(_ObjC)
   for k in 0...5 {
     var base: String
-    var startedNative: Bool
     let shared: String = "X"
 
     switch k {
-    case 0: (base, startedNative) = (String(), true)
-    case 1: (base, startedNative) = (asciiString("x".characters), true)
-    case 2: (base, startedNative) = ("Ξ", true)
-    case 3: (base, startedNative) = ("x" as NSString as String, false)
-    case 4: (base, startedNative) = ("x" as NSMutableString as String, false)
-    case 5: (base, startedNative) = (shared, true)
+    case 0: base = String()
+    case 1: base = asciiString("x".characters)
+    case 2: base = "Ξ"
+    case 3: base = "x" as NSString as String
+    case 4: base = "x" as NSMutableString as String
+    case 5: base = shared
     default:
       fatalError("case unhandled!")
     }
-    expectEqual(!base._core.hasCocoaBuffer, startedNative)
-    
+
     var originalBuffer = base.bufferID
-    let startedUnique = startedNative && base._core._owner != nil
+    let startedUnique = base._core._owner != nil
       && isKnownUniquelyReferenced(&base._core._owner!)
     
     base._core.reserveCapacity(0)
     // Now it's unique
     
     // If it was already native and unique, no reallocation
-    if startedUnique && startedNative {
+    if startedUnique {
       expectEqual(originalBuffer, base.bufferID)
     }
     else {
