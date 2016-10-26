@@ -2001,16 +2001,22 @@ public:
   }
 
   virtual void foundMatch(NodePtr Left, NodePtr Right) override {
+    Left->annotate(NodeAnnotation::Updated);
+    Right->annotate(NodeAnnotation::Updated);
+    // Push the updated node to the map for future reference.
+    UpdateMap->foundMatch(Left, Right);
+
+    if (Left->getKind() != Right->getKind()) {
+      assert(isa<SDKNodeType>(Left) && isa<SDKNodeType>(Right) &&
+        "only type nodes can match across kinds.");
+      return;
+    }
     assert(Left->getKind() == Right->getKind());
     SDKNodeKind Kind = Left->getKind();
     assert(Left->getKind() != SDKNodeKind::Nil &&
            Right->getKind() != SDKNodeKind::Nil);
     assert(Kind == SDKNodeKind::Root || *Left != *Right);
 
-    Left->annotate(NodeAnnotation::Updated);
-    Right->annotate(NodeAnnotation::Updated);
-    // Push the updated node to the map for future reference.
-    UpdateMap->foundMatch(Left, Right);
     detectRename(Left, Right);
     detectThrowing(Left, Right);
     detectMutating(Left, Right);

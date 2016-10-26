@@ -7,6 +7,7 @@
 
 ==================================================== Type Changes ====================================================
 Constructor S1.init(_:) has 1st parameter type change from Int to Double
+Func C1.foo2(_:) has 1st parameter type change from Int to () -> ()
 
 ==================================================== Decl Attribute changes ====================================================
 Func C1.foo1() is now not static
