@@ -180,28 +180,25 @@ SILDeclRef::SILDeclRef(ValueDecl *vd, SILDeclRef::Kind kind,
   setUncurryLevel(*this, uncurryLevel, naturalUncurryLevel);
 }
 
-SILDeclRef::SILDeclRef(SILDeclRef::Loc baseLoc,
-                       ResilienceExpansion expansion,
-                       unsigned atUncurryLevel, bool asForeign) 
- : isDirectReference(0), defaultArgIndex(0)
+SILDeclRef::SILDeclRef(SILDeclRef::Loc loc, ResilienceExpansion expansion,
+                       unsigned atUncurryLevel, bool isForeign)
+ : loc(loc), Expansion(unsigned(expansion)), isForeign(isForeign),
+   isDirectReference(0), defaultArgIndex(0)
 {
   unsigned naturalUncurryLevel;
-  if (ValueDecl *vd = baseLoc.dyn_cast<ValueDecl*>()) {
+  if (ValueDecl *vd = loc.dyn_cast<ValueDecl*>()) {
     if (FuncDecl *fd = dyn_cast<FuncDecl>(vd)) {
       // Map FuncDecls directly to Func SILDeclRefs.
-      loc = fd;
       kind = Kind::Func;
       naturalUncurryLevel = getFuncNaturalUncurryLevel(fd);
     }
     // Map ConstructorDecls to the Allocator SILDeclRef of the constructor.
-    else if (ConstructorDecl *cd = dyn_cast<ConstructorDecl>(vd)) {
-      loc = cd;
+    else if (isa<ConstructorDecl>(vd)) {
       kind = Kind::Allocator;
       naturalUncurryLevel = 1;
     }
     // Map EnumElementDecls to the EnumElement SILDeclRef of the element.
     else if (EnumElementDecl *ed = dyn_cast<EnumElementDecl>(vd)) {
-      loc = ed;
       kind = Kind::EnumElement;
       naturalUncurryLevel = ed->hasArgumentType() ? 1 : 0;
     }
@@ -210,16 +207,14 @@ SILDeclRef::SILDeclRef(SILDeclRef::Loc baseLoc,
       llvm_unreachable("must create SILDeclRef for VarDecl with explicit kind");
     }
     // Map DestructorDecls to the Deallocator of the destructor.
-    else if (auto dtor = dyn_cast<DestructorDecl>(vd)) {
-      loc = dtor;
+    else if (isa<DestructorDecl>(vd)) {
       kind = Kind::Deallocator;
       naturalUncurryLevel = 0;
     }
     else {
       llvm_unreachable("invalid loc decl for SILDeclRef!");
     }
-  } else if (auto *ACE = baseLoc.dyn_cast<AbstractClosureExpr *>()) {
-    loc = ACE;
+  } else if (auto *ACE = loc.dyn_cast<AbstractClosureExpr *>()) {
     kind = Kind::Func;
     assert(ACE->getParameterLists().size() >= 1 &&
            "no param patterns for function?!");
@@ -229,8 +224,6 @@ SILDeclRef::SILDeclRef(SILDeclRef::Loc baseLoc,
   }
 
   setUncurryLevel(*this, atUncurryLevel, naturalUncurryLevel);
-  Expansion = (unsigned) expansion;
-  isForeign = asForeign;
 }
 
 Optional<AnyFunctionRef> SILDeclRef::getAnyFunctionRef() const {
