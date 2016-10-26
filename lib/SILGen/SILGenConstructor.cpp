@@ -187,10 +187,8 @@ void SILGenFunction::emitValueConstructor(ConstructorDecl *ctor) {
   assert(!selfTy.getClassOrBoundGenericClass()
          && "can't emit a class ctor here");
 
-  // Self is a curried argument and thus comes last.
-  unsigned N = ctor->getParameterList(1)->size() + 1;
   // Allocate the local variable for 'self'.
-  emitLocalVariableWithCleanup(selfDecl, false, N)->finishInitialization(*this);
+  emitLocalVariableWithCleanup(selfDecl, false)->finishInitialization(*this);
   
   // Mark self as being uninitialized so that DI knows where it is and how to
   // check for it.
