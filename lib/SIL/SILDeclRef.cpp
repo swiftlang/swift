@@ -162,8 +162,22 @@ static unsigned getNaturalUncurryLevelAndKind(ValueDecl *vd,
     (void)var;
     return 0;
   }
-  default:
-    llvm_unreachable("unhandled kind of ValueDecl for SILDeclRef");
+
+  case DeclKind::GenericTypeParam:
+  case DeclKind::AssociatedType:
+  case DeclKind::TypeAlias:
+  case DeclKind::Enum:
+  case DeclKind::Struct:
+  case DeclKind::Protocol:
+  case DeclKind::Module:
+  case DeclKind::Param:
+  case DeclKind::Subscript:
+    llvm_unreachable("invalid kind of ValueDecl for SILDeclRef");
+
+#define VALUE_DECL(...)
+#define DECL(Id, Parent) case DeclKind::Id:
+#include "swift/AST/DeclNodes.def"
+    llvm_unreachable("impossible value decl");
   }
 }
 
