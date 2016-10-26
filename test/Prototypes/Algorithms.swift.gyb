@@ -374,8 +374,8 @@ public func == <C1: Collection, C2: Collection>(
 %   Self = "Concatenated" + Collection
 
 /// A concatenation of two collections with the same element type.
-public struct ${Self}<C1 : ${Collection}, C2: ${Collection}
-  where C1.Iterator.Element == C2.Iterator.Element>: ${Collection} {
+public struct ${Self}<C1 : ${Collection}, C2: ${Collection}>: ${Collection} 
+  where C1.Iterator.Element == C2.Iterator.Element {
 
   init(_base1: C1, base2: C2) {
     self._base1 = _base1
@@ -488,8 +488,8 @@ public struct ${Self}<C1 : ${Collection}, C2: ${Collection}
 /// first collection and then the elements of the second collection.
 func concatenate<
   C1 : ${Collection}, C2 : ${Collection}
-  where C1.Iterator.Element == C2.Iterator.Element
->(_ first: C1, _ second: C2) -> ${Self}<C1, C2> {
+>(_ first: C1, _ second: C2) -> ${Self}<C1, C2>
+where C1.Iterator.Element == C2.Iterator.Element {
   return ${Self}(_base1: first, base2: second)
 }
 
@@ -499,22 +499,23 @@ func concatenate<
 //===----------------------------------------------------------------------===//
 
 /// A position in a rotated collection.
-public struct RotatedCollectionIndex<
-  Base : Collection where Base.SubSequence: Collection
-> : Comparable {
+public struct RotatedCollectionIndex<Base : Collection> : Comparable
+where Base.SubSequence: Collection {
   internal let _index:
     ConcatenatedCollectionIndex<Base.SubSequence, Base.SubSequence>
 }
 
-public func < <Base: Collection where Base.SubSequence: Collection>(
+public func < <Base: Collection>(
   lhs: RotatedCollectionIndex<Base>, rhs: RotatedCollectionIndex<Base>
-) -> Bool {
+) -> Bool
+where Base.SubSequence: Collection {
   return lhs._index < rhs._index
 }
 
-public func == <Base: Collection where Base.SubSequence: Collection>(
+public func == <Base: Collection>(
   lhs: RotatedCollectionIndex<Base>, rhs: RotatedCollectionIndex<Base>
-) -> Bool {
+) -> Bool
+where Base.SubSequence: Collection {
   return lhs._index == rhs._index
 }
 
@@ -524,8 +525,9 @@ public func == <Base: Collection where Base.SubSequence: Collection>(
 
 /// A rotated view onto a `${Collection}`.
 public struct ${Self}<
-  Base : ${Collection} where Base.SubSequence: ${Collection}
-> : ${Collection} {
+  Base : ${Collection}
+> : ${Collection}
+where Base.SubSequence: ${Collection} {
   let _concatenation: Concatenated${Collection}<
     Base.SubSequence, Base.SubSequence>
 
