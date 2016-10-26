@@ -1954,6 +1954,11 @@ extension FixedWidthInteger {
 
   % for x in maskingShifts:
 
+  @_transparent
+  public static func ${x.operator}= (lhs: inout Self, rhs: Self) {
+    lhs = lhs ${x.operator} rhs
+  }
+
 ${operatorComment(x.operator)}
   public static func ${x.operator} <
     Other : BinaryInteger
@@ -2376,6 +2381,11 @@ public struct ${Self}
   public static func ${x.operator}(_ lhs: ${Self}, _ rhs: ${Self}) -> ${Self} {
     return ${Self}(
       Builtin.${x.llvmName}_Int${bits}(lhs._value, rhs._value))
+  }
+
+  @_transparent
+  public static func ${x.operator}=(_ lhs: inout ${Self}, _ rhs: ${Self}) {
+    lhs = lhs ${x.operator} rhs
   }
 % end
 
