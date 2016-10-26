@@ -202,7 +202,8 @@ void SILGenFunction::emitValueConstructor(ConstructorDecl *ctor) {
   }
   
   // Emit the prolog.
-  emitProlog(ctor->getParameterList(1), ctor->getResultType(), ctor);
+  emitProlog(ctor->getParameterList(1), ctor->getResultType(), ctor,
+             ctor->hasThrows());
   emitConstructorMetatypeArg(*this, ctor);
 
   // Create a basic block to jump to for the implicit 'self' return.
@@ -563,7 +564,7 @@ void SILGenFunction::emitClassConstructorInitializer(ConstructorDecl *ctor) {
   // Emit the prolog for the non-self arguments.
   // FIXME: Handle self along with the other body patterns.
   emitProlog(ctor->getParameterList(1),
-             TupleType::getEmpty(F.getASTContext()), ctor);
+             TupleType::getEmpty(F.getASTContext()), ctor, ctor->hasThrows());
 
   SILType selfTy = getLoweredLoadableType(selfDecl->getType());
   SILValue selfArg = new (SGM.M) SILArgument(F.begin(), selfTy, selfDecl);
