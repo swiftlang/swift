@@ -1666,7 +1666,7 @@ internal struct _InitializeMemoryFromCollection<
   var newValues: C
 }
 
-extension _ArrayBufferProtocol where Index == Int {
+extension _ArrayBufferProtocol {
   // FIXME(ABI)#14 : add argument labels.
   @inline(never)
   internal mutating func _arrayOutOfPlaceReplace<C : Collection>(
@@ -1881,7 +1881,7 @@ internal protocol _PointerFunction {
   func call(_: UnsafeMutablePointer<Element>, count: Int)
 }
 
-extension _ArrayBufferProtocol where Index == Int {
+extension _ArrayBufferProtocol {
   /// Initialize the elements of dest by copying the first headCount
   /// items from source, calling initializeNewElements on the next
   /// uninitialized element, and finally by copying the last N items
@@ -1952,7 +1952,7 @@ extension _ArrayBufferProtocol where Index == Int {
       initializeNewElements.call(newStart, count: newCount)
       let tailStart = headEnd + oldCount
       let tailEnd = endIndex
-      self._copyContents(subRange: tailStart..<tailEnd, initializing: newEnd)
+      _copyContents(subRange: tailStart..<tailEnd, initializing: newEnd)
     }
     self = Self(_buffer: dest, shiftedToStartIndex: startIndex)
   }
@@ -1979,7 +1979,7 @@ internal struct _IgnorePointer<T> : _PointerFunction {
   }
 }
 
-extension _ArrayBufferProtocol where Index == Int {
+extension _ArrayBufferProtocol {
   @_versioned
   @inline(never)
   internal mutating func _outlinedMakeUniqueBuffer(bufferCount: Int) {
@@ -2019,8 +2019,7 @@ internal func _arrayAppendSequence<Buffer, S>(
 ) where
   Buffer : _ArrayBufferProtocol,
   S : Sequence,
-  S.Iterator.Element == Buffer.Element,
-  Buffer.Index == Int {
+  S.Iterator.Element == Buffer.Element {
 
   var stream = newItems.makeIterator()
   var nextItem = stream.next()

@@ -124,9 +124,10 @@ internal protocol _ArrayBufferProtocol
   var identity: UnsafeRawPointer { get }
 
   var startIndex: Int { get }
+  var endIndex: Int { get }
 }
 
-extension _ArrayBufferProtocol where Index == Int {
+extension _ArrayBufferProtocol {
 
   internal var subscriptBaseAddress: UnsafeMutablePointer<Element> {
     return firstElementAddress
@@ -175,7 +176,7 @@ extension _ArrayBufferProtocol where Index == Int {
       var j = newValues.startIndex
       for _ in 0..<newCount {
         elements[i] = newValues[j]
-        formIndex(after: &i)
+        i += 1
         newValues.formIndex(after: &j)
       }
       _expectEnd(j, newValues)
