@@ -44,13 +44,13 @@ def write_input_file(args, ast, d, n):
     return ifile
 
 
-def run_once(args, ast, rng):
+def run_once_with_primary(args, ast, rng, primary_idx):
     import sys, shutil, tempfile, json
     r = {}
     try:
         d = tempfile.mkdtemp()
         inputs = [write_input_file(args, ast, d, i) for i in rng]
-        primary = inputs[-1]
+        primary = inputs[primary_idx]
         ofile = os.path.join(d, "out.o")
         mode = "-c"
         if args.parse:
@@ -73,10 +73,10 @@ def run_once(args, ast, rng):
                  if len(fields) == 2}
         else:
             stats = os.path.join(d, "stats.json")
-            subprocess.check_call(
-                command + ["-Xllvm", "-stats",
-                           "-Xllvm", "-stats-json",
-                           "-Xllvm", "-info-output-file=" + stats])
+            argv = command + ["-Xllvm", "-stats",
+                              "-Xllvm", "-stats-json",
+                              "-Xllvm", "-info-output-file=" + stats]
+            subprocess.check_call(argv)
             with open(stats) as f:
                 r = json.load(f)
     finally:
@@ -84,6 +84,20 @@ def run_once(args, ast, rng):
 
     return {k:v for (k,v) in r.items() if args.select in k}
 
+
+def run_once(args, ast, rng):
+    if args.sum_multi:
+        cumulative = {}
+        for i in range(len(rng)):
+            tmp = run_once_with_primary(args, ast, rng, i)
+            for (k, v) in tmp.items():
+                if k in cumulative:
+                    cumulative[k] += v
+                else:
+                    cumulative[k] = v
+        return cumulative
+    else:
+        return run_once_with_primary(args, ast, rng, -1)
 
 def run_many(args):
 
@@ -101,8 +115,8 @@ def run_many(args):
 
     ast = gyb.parse_template(args.file.name, args.file.read())
     rng = range(args.begin, args.end, args.step)
-    if args.multi_file:
-        return (rng, [run_once(args, ast, rng[0:i+1]) for i in range(len(rng))])
+    if args.multi_file or args.sum_multi:
+        return (rng, [run_once(args, ast, range(i)) for i in rng])
     else:
         return (rng, [run_once(args, ast, [r]) for r in rng])
 
@@ -153,6 +167,9 @@ def main():
     parser.add_argument(
         '--multi-file', action='store_true',
         default=False, help='vary number of input files as well')
+    parser.add_argument(
+        '--sum-multi', action='store_true',
+        default=False, help='simulate a multi-primary run and sum stats')
     parser.add_argument(
         '--begin', type=int,
         default=10, help='first value for N')
