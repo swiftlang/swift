@@ -230,9 +230,11 @@ function(_add_variant_c_compile_flags)
   endif()
 
   if("${CFLAGS_SDK}" STREQUAL "ANDROID")
+    # FIXME: Instead of hardcoding paths in the Android NDK, these paths should
+    #        be passed in via ENV, as with the Windows build.
     list(APPEND result
-        "-I${SWIFT_ANDROID_NDK_PATH}/sources/cxx-stl/llvm-libc++/libcxx/include"
-        "-I${SWIFT_ANDROID_NDK_PATH}/sources/cxx-stl/llvm-libc++abi/libcxxabi/include"
+        "-I${SWIFT_ANDROID_NDK_PATH}/sources/cxx-stl/llvm-libc++/include"
+        "-I${SWIFT_ANDROID_NDK_PATH}/sources/cxx-stl/llvm-libc++abi/include"
         "-I${SWIFT_ANDROID_NDK_PATH}/sources/android/support/include")
   endif()
 
@@ -1368,7 +1370,13 @@ function(add_swift_library name)
         set(swiftlib_private_link_libraries_targets
             ${swiftlib_module_dependency_targets})
         foreach(lib ${SWIFTLIB_PRIVATE_LINK_LIBRARIES})
-          if(TARGET "${lib}${VARIANT_SUFFIX}")
+          if("${lib}" STREQUAL "ICU_UC")
+            list(APPEND swiftlib_private_link_libraries_targets
+                 "${SWIFT_${sdk}_ICU_UC}")
+          elseif("${lib}" STREQUAL "ICU_I18N")
+            list(APPEND swiftlib_private_link_libraries_targets
+                 "${SWIFT_${sdk}_ICU_I18N}")
+          elseif(TARGET "${lib}${VARIANT_SUFFIX}")
             list(APPEND swiftlib_private_link_libraries_targets
                 "${lib}${VARIANT_SUFFIX}")
           else()

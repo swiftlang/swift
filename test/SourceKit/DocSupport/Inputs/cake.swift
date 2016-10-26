@@ -70,3 +70,7 @@ public extension C1 {
 public class C2 : C1 {
   public func C2foo() {}
 }
+
+public extension Prot {
+  subscript(index: Int) -> Int { return 0 }
+}

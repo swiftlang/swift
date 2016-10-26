@@ -743,10 +743,10 @@ ParserResult<Expr> Parser::parseExprSuper(bool isExprBasic) {
                                             /*Implicit=*/false))
     : cast<Expr>(new (Context) ErrorExpr(superLoc));
   
-  if (Tok.is(tok::period)) {
+  if (Tok.isAny(tok::period, tok::period_prefix)) {
     // 'super.' must be followed by a member or initializer ref.
 
-    SourceLoc dotLoc = consumeToken(tok::period);
+    SourceLoc dotLoc = consumeToken();
     
     if (Tok.is(tok::code_complete)) {
       if (CodeCompletion) {

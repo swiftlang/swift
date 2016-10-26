@@ -781,7 +781,7 @@ namespace {
     SILValue getOwnedScalar(Source source, const TypeLowering &srcTL) {
       assert(!source.isAddress());
       if (!source.shouldTake())
-        srcTL.emitRetainValue(B, Loc, source.Value);
+        srcTL.emitCopyValue(B, Loc, source.Value);
       return source.Value;
     }
 
@@ -1217,7 +1217,7 @@ emitIndirectConditionalCastWithScalar(SILBuilder &B, Module *M,
     SILValue succValue =
       new (B.getModule()) SILArgument(scalarSuccBB, targetValueType);
     if (!shouldTakeOnSuccess(consumption))
-      targetTL.emitRetainValue(B, loc, succValue);
+      targetTL.emitCopyValue(B, loc, succValue);
     targetTL.emitStoreOfCopy(B, loc, succValue, dest, IsInitialization);
     B.createBranch(loc, indirectSuccBB);
   }
@@ -1225,7 +1225,7 @@ emitIndirectConditionalCastWithScalar(SILBuilder &B, Module *M,
   // Emit the failure block.
   if (shouldDestroyOnFailure(consumption)) {
     B.setInsertionPoint(scalarFailBB);
-    srcTL.emitReleaseValue(B, loc, srcValue);
+    srcTL.emitDestroyValue(B, loc, srcValue);
     B.createBranch(loc, indirectFailBB);
   }
 }

@@ -116,6 +116,11 @@
 ;; we do something.  This hack causes the file to be re-mode-ed.
 (set-auto-mode)
 
+(defun swift-project-comment-end ()
+  "If comment-end is non-empty returns it, stripped of leading whitespace.  Returns nil otherwise"
+  (replace-regexp-in-string 
+   "\\` +" ""
+   (if (and comment-end (> (length comment-end) 0)) comment-end v1)))
 
 (define-skeleton swift-header
   "Insert the Swift header at the top of a file
@@ -146,13 +151,17 @@ Swift header should look like.
   " "
   ;; v3 is t if there was a short description
   '(setq v3 (> (length str) 0))
+
+  '(setq v4 (or (swift-project-comment-end) v1))
   
   ;; Generate dashes to fill out the rest of the top line
   (make-string (max (- 65 (+ (if v3 (+ 3 (length str)) 0) (length v2))) 3) ?-)
-  "===" v1 "\n"
+  "===" v4 "\n"
 
-  ;; Use whatever comment character is usual for the current mode in place of "//"
-  (replace-regexp-in-string "//" v1 
+    ;; Use whatever comment character is usual for the current mode in place of "//"
+  (replace-regexp-in-string 
+   "//$" v4
+   (replace-regexp-in-string "^//" v1 
 "//
 // This source file is part of the Swift.org open source project
 //
@@ -163,20 +172,24 @@ Swift header should look like.
 // See http://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
 //
 //===----------------------------------------------------------------------===//
-")
+"))
   ;; if there was a short description, add a section for a longer
   ;; description and leave the cursor there
   (when v3
-    (replace-regexp-in-string "//" v1 
+    (replace-regexp-in-string 
+     "//$" v4
+     (replace-regexp-in-string "^//" v1 
 "//
-//  "))
+//  ")))
   (when v3 '_)
   (when v3
-    (replace-regexp-in-string "//" v1 "
+    (replace-regexp-in-string 
+     "//$" v4
+     (replace-regexp-in-string "^//" v1 "
 //
 //===----------------------------------------------------------------------===//
 ")
-    ))
+    )))
 
 (define-skeleton swift-divider
   "Insert a Swift //===--- ... ---===// divider
@@ -194,11 +207,7 @@ Swift header should look like.
   ;; in the project's README file.
   '(setq v1 (replace-regexp-in-string " +\\'" "" (or comment-start "//")))
   
-  ;; v2 is either comment-end stripped of leading whitespace, or if it
-  ;; is non-empty, v1 all over again
-  '(setq v2
-         (replace-regexp-in-string "\\` +" ""
-          (if (and comment-end (> (length comment-end) 0)) comment-end v1)))
+  '(setq v2 (or (swift-project-comment-end) v1))
   
   v1 "===--- "
   str & " " | -1
@@ -211,7 +220,7 @@ Swift header should look like.
    ?-)
   
   "===" v2
-  )
+)
 
 (defvar swift-project-auto-insert-alist
   ;; Currently we match any file and insert the Swift header.  We can

@@ -898,7 +898,7 @@ static SILValue emitObjCUnconsumedArgument(SILGenFunction &gen,
     return tmp;
   }
 
-  lowering.emitRetainValue(gen.B, loc, arg);
+  lowering.emitCopyValue(gen.B, loc, arg);
   return arg;
 }
 

@@ -14,6 +14,7 @@
 
 import TestsUtils
 
+// Append single element
 @inline(never)
 public func run_ArrayAppend(_ N: Int) {
   for _ in 0..<N {
@@ -26,6 +27,7 @@ public func run_ArrayAppend(_ N: Int) {
   }
 }
 
+// Append single element with reserve
 @inline(never)
 public func run_ArrayAppendReserved(_ N: Int) {
   for _ in 0..<N {
@@ -35,6 +37,39 @@ public func run_ArrayAppendReserved(_ N: Int) {
        for _ in 0..<40000 {
          nums.append(1)
        }
+    }
+  }
+}
+
+// Append a sequence. Length of sequence unknown so
+// can't pre-reserve capacity. Should be comparable
+// to append single elements.
+@inline(never)
+public func run_ArrayAppendSequence(_ N: Int) {
+  let seq = stride(from: 0, to: 10_000, by: 1)
+  for _ in 0..<N {
+    for _ in 0..<10 {
+      var nums = [Int]()
+      for _ in 0..<4 {
+        nums.append(contentsOf: seq)
+      }
+    }
+  }
+}
+
+// Append another array. Length of sequence known so
+// can pre-reserve capacity.
+@inline(never)
+public func run_ArrayAppendArray(_ N: Int) {
+  let other = Array(repeating: 1, count: 10_000)
+  for _ in 0..<N {
+    for _ in 0..<10 {
+      var nums = [Int]()
+      for _ in 0..<4 {
+        // note, this uses += rather than append(contentsOf:),
+        // to ensure operator doesn't introduce inefficiency
+        nums += other
+      }
     }
   }
 }

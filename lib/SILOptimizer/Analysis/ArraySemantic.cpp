@@ -665,7 +665,7 @@ bool swift::ArraySemanticsCall::replaceByValue(SILValue V) {
   SILBuilderWithScope Builder(SemanticsCall);
   auto &ValLowering = Builder.getModule().getTypeLowering(V->getType());
   if (hasGetElementDirectResult()) {
-    ValLowering.emitRetainValue(Builder, SemanticsCall->getLoc(), V);
+    ValLowering.emitCopyValue(Builder, SemanticsCall->getLoc(), V);
     SemanticsCall->replaceAllUsesWith(V);
   } else {
     auto Dest = SemanticsCall->getArgument(0);
@@ -675,7 +675,7 @@ bool swift::ArraySemanticsCall::replaceByValue(SILValue V) {
     if (!ASI)
       return false;
 
-    ValLowering.emitRetainValue(Builder, SemanticsCall->getLoc(), V);
+    ValLowering.emitCopyValue(Builder, SemanticsCall->getLoc(), V);
     ValLowering.emitStoreOfCopy(Builder, SemanticsCall->getLoc(), V, Dest,
                                 IsInitialization_t::IsInitialization);
   }

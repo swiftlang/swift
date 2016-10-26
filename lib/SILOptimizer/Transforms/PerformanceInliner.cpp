@@ -14,6 +14,7 @@
 #include "swift/SILOptimizer/PassManager/Passes.h"
 #include "swift/SILOptimizer/PassManager/Transforms.h"
 #include "swift/SILOptimizer/Utils/PerformanceInlinerUtils.h"
+#include "swift/Strings.h"
 #include "llvm/ADT/Statistic.h"
 #include "llvm/Support/Debug.h"
 #include "llvm/Support/CommandLine.h"
@@ -25,6 +26,10 @@ STATISTIC(NumFunctionsInlined, "Number of functions inlined");
 llvm::cl::opt<bool> PrintShortestPathInfo(
     "print-shortest-path-info", llvm::cl::init(false),
     llvm::cl::desc("Print shortest-path information for inlining"));
+
+llvm::cl::opt<bool> EnableSILInliningOfGenerics(
+  "sil-inline-generics", llvm::cl::init(false),
+  llvm::cl::desc("Enable inlining of generics"));
 
 //===----------------------------------------------------------------------===//
 //                           Performance Inliner
@@ -117,12 +122,18 @@ class SILPerformanceInliner {
 
   SILFunction *getEligibleFunction(FullApplySite AI);
 
-  bool isProfitableToInlineNonGeneric(FullApplySite AI,
+  bool isProfitableToInline(FullApplySite AI,
                             Weight CallerWeight,
-                            ConstantTracker &constTracker,
-                            int &NumCallerBlocks);
+                            ConstantTracker &callerTracker,
+                            int &NumCallerBlocks,
+                            bool IsGeneric);
 
-  bool isProfitableInColdBlock(FullApplySite AI, SILFunction *Callee);
+  bool decideInWarmBlock(FullApplySite AI,
+                         Weight CallerWeight,
+                         ConstantTracker &callerTracker,
+                         int &NumCallerBlocks);
+
+  bool decideInColdBlock(FullApplySite AI, SILFunction *Callee);
 
   void visitColdBlocks(SmallVectorImpl<FullApplySite> &AppliesToInline,
                        SILBasicBlock *root, DominanceInfo *DT);
@@ -239,19 +250,12 @@ SILFunction *SILPerformanceInliner::getEligibleFunction(FullApplySite AI) {
   return Callee;
 }
 
-/// Return true if inlining this call site is profitable.
-bool SILPerformanceInliner::isProfitableToInlineNonGeneric(FullApplySite AI,
-                                              Weight CallerWeight,
-                                              ConstantTracker &callerTracker,
-                                              int &NumCallerBlocks) {
-  assert(AI.getSubstitutions().empty() &&
-         "Expected a non-generic apply");
-
+bool SILPerformanceInliner::isProfitableToInline(FullApplySite AI,
+                                                 Weight CallerWeight,
+                                                 ConstantTracker &callerTracker,
+                                                 int &NumCallerBlocks,
+                                                 bool IsGeneric) {
   SILFunction *Callee = AI.getReferencedFunction();
-
-  if (Callee->getInlineStrategy() == AlwaysInline)
-    return true;
-
   SILLoopInfo *LI = LA->get(Callee);
   ShortestPathAnalysis *SPA = getSPA(Callee, LI);
   assert(SPA->isValid());
@@ -369,9 +373,80 @@ bool SILPerformanceInliner::isProfitableToInlineNonGeneric(FullApplySite AI,
   return true;
 }
 
+/// Checks if a given generic apply should be inlined unconditionally, i.e.
+/// without any complex analysis using e.g. a cost model.
+/// It returns true if a function should be inlined.
+/// It returns false if a function should not be inlined.
+/// It returns None if the decision cannot be made without a more complex
+/// analysis. 
+static Optional<bool> shouldInlineGeneric(FullApplySite AI) {
+  assert(!AI.getSubstitutions().empty() &&
+         "Expected a generic apply");
+
+  if (!EnableSILInliningOfGenerics)
+    return false;
+
+  // If all substitutions are concrete, then there is no need to perform the
+  // generic inlining. Let the generic specializer create a specialized
+  // function and then decide if it is beneficial to inline it.
+  if (!hasUnboundGenericTypes(AI.getSubstitutions()))
+    return false;
+
+  SILFunction *Callee = AI.getReferencedFunction();
+
+  // Do not inline @_semantics functions when compiling the stdlib,
+  // because they need to be preserved, so that the optimizer
+  // can properly optimize a user code later.
+  auto ModuleName = Callee->getModule().getSwiftModule()->getName().str();
+  if (Callee->hasSemanticsAttrThatStartsWith("array.") &&
+      (ModuleName == STDLIB_NAME || ModuleName == SWIFT_ONONE_SUPPORT))
+    return false;
+
+  // Always inline generic functions which are marked as
+  // AlwaysInline or transparent.
+  if (Callee->getInlineStrategy() == AlwaysInline || Callee->isTransparent())
+    return true;
+
+  // Only inline if we decided to inline or we are asked to inline all
+  // generic functions.
+  return None;
+}
+
+bool SILPerformanceInliner::
+decideInWarmBlock(FullApplySite AI,
+                  Weight CallerWeight,
+                  ConstantTracker &callerTracker,
+                  int &NumCallerBlocks) {
+  if (!AI.getSubstitutions().empty()) {
+    // Only inline generics if definitively clear that it should be done.
+    auto ShouldInlineGeneric = shouldInlineGeneric(AI);
+    if (ShouldInlineGeneric.hasValue())
+      return ShouldInlineGeneric.getValue();
+
+    return false;
+  }
+
+  SILFunction *Callee = AI.getReferencedFunction();
+
+  if (Callee->getInlineStrategy() == AlwaysInline)
+    return true;
+
+  return isProfitableToInline(AI, CallerWeight, callerTracker, NumCallerBlocks,
+                              /* IsGeneric */ false);
+}
+
 /// Return true if inlining this call site into a cold block is profitable.
-bool SILPerformanceInliner::isProfitableInColdBlock(FullApplySite AI,
-                                                    SILFunction *Callee) {
+bool SILPerformanceInliner::decideInColdBlock(FullApplySite AI,
+                                              SILFunction *Callee) {
+  if (!AI.getSubstitutions().empty()) {
+    // Only inline generics if definitively clear that it should be done.
+    auto ShouldInlineGeneric = shouldInlineGeneric(AI);
+    if (ShouldInlineGeneric.hasValue())
+      return ShouldInlineGeneric.getValue();
+
+    return false;
+  }
+
   if (Callee->getInlineStrategy() == AlwaysInline)
     return true;
 
@@ -482,9 +557,7 @@ void SILPerformanceInliner::collectAppliesToInline(
         // The actual weight including a possible weight correction.
         Weight W(BlockWeight, WeightCorrections.lookup(AI));
 
-        bool IsProfitableToInline = isProfitableToInlineNonGeneric(
-            AI, W, constTracker, NumCallerBlocks);
-        if (IsProfitableToInline)
+        if (decideInWarmBlock(AI, W, constTracker, NumCallerBlocks))
           InitialCandidates.push_back(AI);
       }
     }
@@ -591,7 +664,7 @@ void SILPerformanceInliner::visitColdBlocks(
         continue;
 
       auto *Callee = getEligibleFunction(AI);
-      if (Callee && isProfitableInColdBlock(AI, Callee)) {
+      if (Callee && decideInColdBlock(AI, Callee)) {
         AppliesToInline.push_back(AI);
       }
     }

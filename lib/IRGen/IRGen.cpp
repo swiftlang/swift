@@ -381,32 +381,25 @@ static bool performLLVM(IRGenOptions &Opts, DiagnosticEngine &Diags,
     HashGlobal->setInitializer(HashConstant);
   }
 
-  llvm::SmallString<0> Buffer;
-  std::unique_ptr<raw_pwrite_stream> RawOS;
+  Optional<raw_fd_ostream> RawOS;
   if (!OutputFilename.empty()) {
     // Try to open the output file.  Clobbering an existing file is fine.
     // Open in binary mode if we're doing binary output.
     llvm::sys::fs::OpenFlags OSFlags = llvm::sys::fs::F_None;
     std::error_code EC;
-    auto *FDOS = new raw_fd_ostream(OutputFilename, EC, OSFlags);
-    RawOS.reset(FDOS);
-    if (FDOS->has_error() || EC) {
+    RawOS.emplace(OutputFilename, EC, OSFlags);
+    if (RawOS->has_error() || EC) {
       if (DiagMutex)
         DiagMutex->lock();
       Diags.diagnose(SourceLoc(), diag::error_opening_output,
                      OutputFilename, EC.message());
       if (DiagMutex)
         DiagMutex->unlock();
-      FDOS->clear_error();
+      RawOS->clear_error();
       return true;
     }
-
-    // Most output kinds want a formatted output stream.  It's not clear
-    // why writing an object file does.
-    //if (Opts.OutputKind != IRGenOutputKind::LLVMBitcode)
-    //  FormattedOS.setStream(*RawOS, formatted_raw_ostream::PRESERVE_STREAM);
   } else {
-    RawOS.reset(new raw_svector_ostream(Buffer));
+    assert(Opts.OutputKind == IRGenOutputKind::Module && "no output specified");
   }
 
   performLLVMOptimizations(Opts, Module, TargetMachine);

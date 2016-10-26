@@ -54,6 +54,7 @@ KNOWN_SETTINGS=(
     lldb-extra-xcodebuild-args  ""               "extra command line args to pass to lldb xcodebuild"
     lldb-test-cc                ""               "CC to use for building LLDB testsuite test inferiors.  Defaults to just-built, in-tree clang.  If set to 'host-toolchain', sets it to same as host-cc."
     lldb-test-with-curses       ""               "run test lldb test runner using curses terminal control"
+    lldb-test-swift-only        ""               "when running lldb tests, only include Swift-specific tests"
     lldb-no-debugserver         ""               "delete debugserver after building it, and don't try to codesign it"
     lldb-use-system-debugserver ""               "don't try to codesign debugserver, and use the system's debugserver instead"
     llvm-build-type             "Debug"          "the CMake build variant for LLVM and Clang (Debug, RelWithDebInfo, Release, MinSizeRel).  Defaults to Debug."
@@ -431,12 +432,12 @@ function set_build_options_for_host() {
                     ;;
                 linux-armv6)
                     SWIFT_HOST_VARIANT_ARCH="armv6"
-                    SWIFT_HOST_TRIPLE="armv6-linux-gnueabihf"
+                    SWIFT_HOST_TRIPLE="armv6-unknown-linux-gnueabihf"
                     llvm_target_arch="ARM"
                     ;;
                 linux-armv7)
                     SWIFT_HOST_VARIANT_ARCH="armv7"
-                    SWIFT_HOST_TRIPLE="armv7-linux-gnueabihf"
+                    SWIFT_HOST_TRIPLE="armv7-unknown-linux-gnueabihf"
                     llvm_target_arch="ARM"
                     ;;
                 linux-aarch64)
@@ -2628,6 +2629,13 @@ for host in "${ALL_HOSTS[@]}"; do
                     fi
                 fi
 
+                # Handle test subdirectory clause
+                if [[ "${LLDB_TEST_SWIFT_ONLY}" ]]; then
+                    LLDB_TEST_SUBDIR_CLAUSE="--test-subdir lang/swift"
+                else
+                    LLDB_TEST_SUBDIR_CLAUSE=""
+                fi
+
                 # figure out which C/C++ compiler we should use for building test inferiors.
                 if [[ "${LLDB_TEST_CC}" == "host-toolchain" ]]; then
                     # Use the host toolchain: i.e. the toolchain specified by HOST_CC
@@ -2642,7 +2650,14 @@ for host in "${ALL_HOSTS[@]}"; do
                 
                 call mkdir -p "${results_dir}"
                 with_pushd "${results_dir}" \
-                    call env SWIFTCC="$(build_directory $LOCAL_HOST swift)/bin/swiftc" SWIFTLIBS="${swift_build_dir}/lib/swift" "${LLDB_SOURCE_DIR}"/test/dotest.py --executable "${lldb_executable}" --rerun-all-issues ${LLDB_DOTEST_CC_OPTS} ${LLDB_FORMATTER_OPTS}
+                           call env SWIFTCC="$(build_directory $LOCAL_HOST swift)/bin/swiftc" \
+                           SWIFTLIBS="${swift_build_dir}/lib/swift" \
+                           "${LLDB_SOURCE_DIR}"/test/dotest.py \
+                           --executable "${lldb_executable}" \
+                           --rerun-all-issues \
+                           ${LLDB_TEST_SUBDIR_CLAUSE} \
+                           ${LLDB_DOTEST_CC_OPTS} \
+                           ${LLDB_FORMATTER_OPTS}
                 continue
                 ;;
             llbuild)
