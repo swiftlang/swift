@@ -141,3 +141,9 @@ protocol PPPP {
 func compare<T: PPPP>(v: T, u: T!) -> Bool {
   return v ++++ u
 }
+
+func sr2752(x: String?, y: String?) {
+  _ = x.map { xx in
+    y.map { _ in "" } ?? "\(xx)"
+  }
+}
