@@ -215,25 +215,19 @@ extension String {
     /// collection.
     public struct Iterator : IteratorProtocol {
       init(_ _base: _StringCore) {
-        if _base.hasContiguousStorage {
-            self._baseSet = true
-          if _base.isASCII {
-            self._ascii = true
-            self._asciiBase = UnsafeBufferPointer(
-              start: _base._baseAddress?.assumingMemoryBound(
-                to: UTF8.CodeUnit.self),
-              count: _base.count).makeIterator()
-          } else {
-            self._ascii = false
-            self._base = UnsafeBufferPointer<UInt16>(
-              start: _base._baseAddress?.assumingMemoryBound(
-                to: UTF16.CodeUnit.self),
-              count: _base.count).makeIterator()
-          }
+        self._baseSet = true
+        if _base.isASCII {
+          self._ascii = true
+          self._asciiBase = UnsafeBufferPointer(
+            start: _base._baseAddress.assumingMemoryBound(
+              to: UTF8.CodeUnit.self),
+            count: _base.count).makeIterator()
         } else {
           self._ascii = false
-          self._baseSet = false
-          self._iterator = _base.makeIterator()
+          self._base = UnsafeBufferPointer<UInt16>(
+            start: _base._baseAddress.assumingMemoryBound(
+              to: UTF16.CodeUnit.self),
+            count: _base.count).makeIterator()
         }
       }
 

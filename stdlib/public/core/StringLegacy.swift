@@ -1,3 +1,4 @@
+
 //===----------------------------------------------------------------------===//
 //
 // This source file is part of the Swift.org open source project
@@ -158,15 +159,11 @@ extension String {
         prefixASCIIBuffer.baseAddress!,
         prefixASCIIBuffer.count)) == 0
     }
-    if selfCore.hasContiguousStorage && prefixCore.hasContiguousStorage {
-      let lhsStr = _NSContiguousString(selfCore)
-      let rhsStr = _NSContiguousString(prefixCore)
-      return lhsStr._unsafeWithNotEscapedSelfPointerPair(rhsStr) {
-        return _stdlib_NSStringHasPrefixNFDPointer($0, $1)
-      }
+    let lhsStr = _NSContiguousString(selfCore)
+    let rhsStr = _NSContiguousString(prefixCore)
+    return lhsStr._unsafeWithNotEscapedSelfPointerPair(rhsStr) {
+      return _stdlib_NSStringHasPrefixNFDPointer($0, $1)
     }
-    return _stdlib_NSStringHasPrefixNFD(
-      self._bridgeToObjectiveCImpl(), prefix._bridgeToObjectiveCImpl())
   }
 
   /// Returns a Boolean value indicating whether the string ends with the
@@ -217,15 +214,11 @@ extension String {
         suffixASCIIBuffer.baseAddress!,
         suffixASCIIBuffer.count)) == 0
     }
-    if selfCore.hasContiguousStorage && suffixCore.hasContiguousStorage {
-      let lhsStr = _NSContiguousString(selfCore)
-      let rhsStr = _NSContiguousString(suffixCore)
-      return lhsStr._unsafeWithNotEscapedSelfPointerPair(rhsStr) {
-        return _stdlib_NSStringHasSuffixNFDPointer($0, $1)
-      }
+    let lhsStr = _NSContiguousString(selfCore)
+    let rhsStr = _NSContiguousString(suffixCore)
+    return lhsStr._unsafeWithNotEscapedSelfPointerPair(rhsStr) {
+      return _stdlib_NSStringHasSuffixNFDPointer($0, $1)
     }
-    return _stdlib_NSStringHasSuffixNFD(
-      self._bridgeToObjectiveCImpl(), suffix._bridgeToObjectiveCImpl())
   }
 }
 #else

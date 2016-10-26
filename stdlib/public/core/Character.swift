@@ -183,7 +183,7 @@ public struct Character :
     }
     else {
       if let native = s._core.nativeBuffer,
-         native.start == s._core._baseAddress! {
+         native.start == s._core._baseAddress {
         _representation = .large(native._storage)
         return
       }

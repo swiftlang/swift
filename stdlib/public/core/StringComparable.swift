@@ -1,3 +1,4 @@
+
 //===----------------------------------------------------------------------===//
 //
 // This source file is part of the Swift.org open source project
@@ -73,17 +74,13 @@ extension String {
     // Note: this operation should be consistent with equality comparison of
     // Character.
 #if _runtime(_ObjC)
-    if self._core.hasContiguousStorage && rhs._core.hasContiguousStorage {
-      let lhsStr = _NSContiguousString(self._core)
-      let rhsStr = _NSContiguousString(rhs._core)
-      let res = lhsStr._unsafeWithNotEscapedSelfPointerPair(rhsStr) {
-        return Int(
-            _stdlib_compareNSStringDeterministicUnicodeCollationPointer($0, $1))
-      }
-      return res
+    let lhsStr = _NSContiguousString(self._core)
+    let rhsStr = _NSContiguousString(rhs._core)
+    let res = lhsStr._unsafeWithNotEscapedSelfPointerPair(rhsStr) {
+      return Int(
+          _stdlib_compareNSStringDeterministicUnicodeCollationPointer($0, $1))
     }
-    return Int(_stdlib_compareNSStringDeterministicUnicodeCollation(
-      _bridgeToObjectiveCImpl(), rhs._bridgeToObjectiveCImpl()))
+    return res
 #else
     switch (_core.isASCII, rhs._core.isASCII) {
     case (true, false):

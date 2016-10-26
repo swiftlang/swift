@@ -77,9 +77,6 @@ public class _SwiftNativeNSString {}
 /// An `NSString` built around a slice of contiguous Swift `String` storage.
 public final class _NSContiguousString : _SwiftNativeNSString, _NSStringCore {
   public init(_ _core: _StringCore) {
-    _sanityCheck(
-      _core.hasContiguousStorage,
-      "_NSContiguousString requires contiguous storage")
     self._core = _core
     super.init()
   }
@@ -183,11 +180,6 @@ extension String {
   /// Same as `_bridgeToObjectiveC()`, but located inside the core standard
   /// library.
   public func _stdlib_binary_bridgeToObjectiveCImpl() -> AnyObject {
-    if let ns = _core.cocoaBuffer,
-        _swift_stdlib_CFStringGetLength(ns) == _core.count {
-      return ns
-    }
-    _sanityCheck(_core.hasContiguousStorage)
     return _NSContiguousString(_core)
   }
 
