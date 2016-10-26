@@ -1288,6 +1288,7 @@ ConstraintSystem::matchTypes(Type type1, Type type2, ConstraintKind kind,
       bool wantRvalue = kind == ConstraintKind::Equal;
       if (typeVar1) {
         // Simplify the right-hand type and perform the "occurs" check.
+        typeVar1 = getRepresentative(typeVar1);
         type2 = simplifyType(type2);
         if (typeVarOccursInType(typeVar1, type2))
           return formUnsolvedResult();
@@ -1332,10 +1333,11 @@ ConstraintSystem::matchTypes(Type type1, Type type2, ConstraintKind kind,
         return SolutionKind::Solved;
       }
 
-        // Simplify the left-hand type and perform the "occurs" check.
-        type1 = simplifyType(type1);
-        if (typeVarOccursInType(typeVar2, type1))
-          return formUnsolvedResult();
+      // Simplify the left-hand type and perform the "occurs" check.
+      typeVar2 = getRepresentative(typeVar2);
+      type1 = simplifyType(type1);
+      if (typeVarOccursInType(typeVar2, type1))
+        return formUnsolvedResult();
 
       // If we want an rvalue, get the rvalue.
       if (wantRvalue)
@@ -1355,6 +1357,7 @@ ConstraintSystem::matchTypes(Type type1, Type type2, ConstraintKind kind,
     case ConstraintKind::BindParam: {
       if (typeVar2 && !typeVar1) {
         // Simplify the left-hand type and perform the "occurs" check.
+        typeVar2 = getRepresentative(typeVar2);
         type1 = simplifyType(type1);
         if (typeVarOccursInType(typeVar2, type1))
           return formUnsolvedResult();
@@ -1367,6 +1370,7 @@ ConstraintSystem::matchTypes(Type type1, Type type2, ConstraintKind kind,
         return SolutionKind::Solved;
       } else if (typeVar1 && !typeVar2) {
         // Simplify the right-hand type and perform the "occurs" check.
+        typeVar1 = getRepresentative(typeVar1);
         type2 = simplifyType(type2);
         if (typeVarOccursInType(typeVar1, type2))
           return formUnsolvedResult();
