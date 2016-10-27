@@ -187,10 +187,8 @@ void SILGenFunction::emitValueConstructor(ConstructorDecl *ctor) {
   assert(!selfTy.getClassOrBoundGenericClass()
          && "can't emit a class ctor here");
 
-  // Self is a curried argument and thus comes last.
-  unsigned N = ctor->getParameterList(1)->size() + 1;
   // Allocate the local variable for 'self'.
-  emitLocalVariableWithCleanup(selfDecl, false, N)->finishInitialization(*this);
+  emitLocalVariableWithCleanup(selfDecl, false)->finishInitialization(*this);
   
   // Mark self as being uninitialized so that DI knows where it is and how to
   // check for it.
@@ -204,7 +202,8 @@ void SILGenFunction::emitValueConstructor(ConstructorDecl *ctor) {
   }
   
   // Emit the prolog.
-  emitProlog(ctor->getParameterList(1), ctor->getResultType(), ctor);
+  emitProlog(ctor->getParameterList(1), ctor->getResultType(), ctor,
+             ctor->hasThrows());
   emitConstructorMetatypeArg(*this, ctor);
 
   // Create a basic block to jump to for the implicit 'self' return.
@@ -565,7 +564,7 @@ void SILGenFunction::emitClassConstructorInitializer(ConstructorDecl *ctor) {
   // Emit the prolog for the non-self arguments.
   // FIXME: Handle self along with the other body patterns.
   emitProlog(ctor->getParameterList(1),
-             TupleType::getEmpty(F.getASTContext()), ctor);
+             TupleType::getEmpty(F.getASTContext()), ctor, ctor->hasThrows());
 
   SILType selfTy = getLoweredLoadableType(selfDecl->getType());
   SILValue selfArg = new (SGM.M) SILArgument(F.begin(), selfTy, selfDecl);
