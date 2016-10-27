@@ -1556,9 +1556,10 @@ void Lexer::getStringLiteralSegments(
     // String interpolation.
 
     // Push the current segment.
-    Segments.push_back(
-        StringSegment::getLiteral(getSourceLoc(SegmentStartPtr),
-                                  BytesPtr-SegmentStartPtr-2));
+    int length = BytesPtr - SegmentStartPtr - 2;
+    if (length > 0)
+      Segments.push_back(
+          StringSegment::getLiteral(getSourceLoc(SegmentStartPtr), length));
 
     // Find the closing ')'.
     const char *End = skipToEndOfInterpolatedExpression(BytesPtr,
@@ -1577,9 +1578,10 @@ void Lexer::getStringLiteralSegments(
     SegmentStartPtr = BytesPtr = End;
   }
 
-  Segments.push_back(
-      StringSegment::getLiteral(getSourceLoc(SegmentStartPtr),
-                                Bytes.end()-SegmentStartPtr));
+  int length = Bytes.end() - SegmentStartPtr;
+  if (length > 0 || Segments.empty())
+    Segments.push_back(
+        StringSegment::getLiteral(getSourceLoc(SegmentStartPtr), length));
 }
 
 
