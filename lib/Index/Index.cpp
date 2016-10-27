@@ -23,9 +23,37 @@
 using namespace swift;
 using namespace swift::index;
 
+
+static bool
+printArtificialName(const swift::ValueDecl *VD, llvm::raw_ostream &OS) {
+  auto *FD = dyn_cast<FuncDecl>(VD);
+  if (!FD)
+    return true;
+  switch (FD->getAccessorKind()) {
+  case AccessorKind::IsGetter:
+    OS << FD->getAccessorStorageDecl()->getFullName() << ".get()";
+    return false;
+  case AccessorKind::IsSetter:
+    OS << FD->getAccessorStorageDecl()->getFullName() << ".set(_:)";
+    return false;
+  case AccessorKind::IsDidSet:
+    OS << FD->getAccessorStorageDecl()->getFullName() << ".didSet()";
+    return false;
+  case AccessorKind::IsWillSet:
+    OS << FD->getAccessorStorageDecl()->getFullName() << ".willSet()";
+    return false;
+
+  case AccessorKind::NotAccessor:
+  case AccessorKind::IsMaterializeForSet:
+  case AccessorKind::IsAddressor:
+  case AccessorKind::IsMutableAddressor:
+    return true;
+  }
+}
+
 static bool printDisplayName(const swift::ValueDecl *D, llvm::raw_ostream &OS) {
   if (!D->hasName())
-    return true;
+    return printArtificialName(D, OS);
 
   OS << D->getFullName();
   return false;
