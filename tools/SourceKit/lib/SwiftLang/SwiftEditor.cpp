@@ -1447,7 +1447,7 @@ private:
   bool containClosure(Expr *E) {
     if (E->getStartLoc().isInvalid())
       return false;
-    EditorPlaceholderExpr *Found;
+    EditorPlaceholderExpr *Found = nullptr;
     ClosureInfo Info;
     ClosureTypeWalker ClosureWalker(SM, Info);
     PlaceholderFinder Finder(E->getStartLoc(), Found);
