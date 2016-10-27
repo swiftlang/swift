@@ -228,23 +228,23 @@ static StringRef getKeyContent(KeyKind Kind) {
 }
 
 // The node kind appearing in the tree that describes the content of the SDK
-enum class SDKNodeKind {
+enum class SDKNodeKind: uint8_t {
 #define NODE_KIND(NAME) NAME,
 #include "DigesterEnums.def"
 };
 
-enum class NodeAnnotation {
+enum class NodeAnnotation: uint8_t{
 #define NODE_ANNOTATION(NAME) NAME,
 #include "DigesterEnums.def"
 };
 
-enum class KnownTypeKind {
+enum class KnownTypeKind: uint8_t {
 #define KNOWN_TYPE(NAME) NAME,
 #include "DigesterEnums.def"
   Unknown,
 };
 
-enum class SDKDeclAttrKind {
+enum class SDKDeclAttrKind: uint8_t {
 #define DECL_ATTR(Name) DAK_##Name,
 #include "DigesterEnums.def"
 };
@@ -283,6 +283,7 @@ struct SDKNodeInitInfo {
   bool IsMutating = false;
   bool IsStatic = false;
   Optional<uint8_t> SelfIndex;
+  Ownership Ownership = Ownership::Strong;
   std::vector<SDKDeclAttrKind> DeclAttrs;
   std::vector<TypeAttrKind> TypeAttrs;
   SDKNodeInitInfo() = default;
@@ -344,13 +345,14 @@ class SDKNodeDecl : public SDKNode {
   StringRef ModuleName;
   std::vector<SDKDeclAttrKind> DeclAttributes;
   bool IsStatic;
+  uint8_t Ownership;
   bool hasDeclAttribute(SDKDeclAttrKind DAKind) const;
 
 protected:
   SDKNodeDecl(SDKNodeInitInfo Info, SDKNodeKind Kind) : SDKNode(Info, Kind),
     DKind(Info.DKind), Usr(Info.USR), Location(Info.Location),
     ModuleName(Info.ModuleName), DeclAttributes(Info.DeclAttrs),
-    IsStatic(Info.IsStatic) {}
+    IsStatic(Info.IsStatic), Ownership(uint8_t(Info.Ownership)) {}
 
 public:
   StringRef getUsr() const { return Usr; }
@@ -358,6 +360,7 @@ public:
   StringRef getModuleName() const {return ModuleName;}
   void addDeclAttribute(SDKDeclAttrKind DAKind);
   ArrayRef<SDKDeclAttrKind> getDeclAttributes() const;
+  swift::Ownership getOwnership() const { return swift::Ownership(Ownership); }
   bool isObjc() const { return Usr.startswith("c:"); }
   static bool classof(const SDKNode *N);
   DeclKind getDeclKind() const { return DKind; }
@@ -762,6 +765,10 @@ NodeUniquePtr SDKNode::constructSDKNode(llvm::yaml::MappingNode *Node) {
     auto WithQuote = cast<llvm::yaml::ScalarNode>(N)->getRawValue();
     return WithQuote.substr(1, WithQuote.size() - 2);
   };
+
+  static auto getAsInt = [&](llvm::yaml::Node *N) -> int {
+    return std::stoi(cast<llvm::yaml::ScalarNode>(N)->getRawValue());
+  };
   SDKNodeKind Kind;
   SDKNodeInitInfo Info;
   NodeOwnedVector Children;
@@ -778,8 +785,7 @@ NodeUniquePtr SDKNode::constructSDKNode(llvm::yaml::MappingNode *Node) {
       Info.Name = GetScalarString(Pair.getValue());
       break;
     case KeyKind::KK_selfIndex:
-      Info.SelfIndex = std::stoi(cast<llvm::yaml::ScalarNode>(Pair.getValue())->
-                                 getRawValue());
+      Info.SelfIndex = getAsInt(Pair.getValue());
       break;
     case KeyKind::KK_usr:
       Info.USR = GetScalarString(Pair.getValue());
@@ -807,6 +813,10 @@ NodeUniquePtr SDKNode::constructSDKNode(llvm::yaml::MappingNode *Node) {
       break;
     case KeyKind::KK_static:
       Info.IsStatic = true;
+      break;
+    case KeyKind::KK_ownership:
+      Info.Ownership = swift::Ownership(getAsInt(Pair.getValue()));
+      assert(Info.Ownership != swift::Ownership::Strong && "Stong is implied.");
       break;
 
     case KeyKind::KK_typeAttributes: {
@@ -1013,6 +1023,13 @@ static Optional<uint8_t> getSelfIndex(ValueDecl *VD) {
   return None;
 }
 
+static Ownership getOwnership(ValueDecl *VD) {
+  if (auto OA = VD->getAttrs().getAttribute<OwnershipAttr>()) {
+    return OA->get();
+  }
+  return Ownership::Strong;
+}
+
 SDKNodeInitInfo::SDKNodeInitInfo(Type Ty) : Name(getTypeName(Ty)),
                                             PrintedName(getPrintedName(Ty)) {
   if (isFunctionTypeNoEscape(Ty))
@@ -1025,7 +1042,8 @@ SDKNodeInitInfo::SDKNodeInitInfo(ValueDecl *VD) :
     USR(calculateUsr(VD)), Location(calculateLocation(VD)),
     ModuleName(VD->getModuleContext()->getName().str()),
     IsThrowing(isFuncThrowing(VD)), IsMutating(isFuncMutating(VD)),
-    IsStatic(VD->isStatic()), SelfIndex(getSelfIndex(VD)) {
+    IsStatic(VD->isStatic()), SelfIndex(getSelfIndex(VD)),
+    Ownership(getOwnership(VD)) {
   if (VD->getAttrs().getDeprecated(VD->getASTContext()))
     DeclAttrs.push_back(SDKDeclAttrKind::DAK_deprecated);
 }
@@ -1383,6 +1401,11 @@ namespace swift {
           if (!Attributes.empty())
             out.mapRequired(getKeyContent(KeyKind::KK_declAttributes).data(),
                             Attributes);
+          // Strong reference is implied, no need for serialization.
+          if (D->getOwnership() != Ownership::Strong) {
+            uint8_t Raw = uint8_t(D->getOwnership());
+            out.mapRequired(getKeyContent(KeyKind::KK_ownership).data(), Raw);
+          }
         } else if (auto T = dyn_cast<SDKNodeType>(value.get())) {
           auto Attributes = T->getTypeAttributes();
           if (!Attributes.empty())
