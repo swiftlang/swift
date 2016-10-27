@@ -77,16 +77,31 @@ void ConstraintSystem::mergeEquivalenceClasses(TypeVariableType *typeVar1,
   }
 }
 
+/// Determine whether the given type variables occurs in the given type.
+bool ConstraintSystem::typeVarOccursInType(TypeVariableType *typeVar,
+                                           Type type,
+                                           bool *involvesOtherTypeVariables) {
+  SmallVector<TypeVariableType *, 4> typeVars;
+  type->getTypeVariables(typeVars);
+  bool result = false;
+  for (auto referencedTypeVar : typeVars) {
+    if (referencedTypeVar == typeVar) {
+      result = true;
+      if (!involvesOtherTypeVariables || *involvesOtherTypeVariables)
+        break;
+
+      continue;
+    }
+
+    if (involvesOtherTypeVariables)
+      *involvesOtherTypeVariables = true;
+  }
+
+  return result;
+}
+
 void ConstraintSystem::assignFixedType(TypeVariableType *typeVar, Type type,
                                        bool updateState) {
-  
-  // If the type to be fixed is an optional type that wraps the type parameter
-  // itself, we do not want to go through with the assignment. To do so would
-  // force the type variable to be adjacent to itself.
-  if (auto optValueType = type->getOptionalObjectType()) {
-    if (optValueType->isEqual(typeVar))
-      return;
-  }
   
   typeVar->getImpl().assignFixedType(type, getSavedBindings());
 
@@ -1662,17 +1677,12 @@ Type ConstraintSystem::lookThroughImplicitlyUnwrappedOptionalType(Type type) {
   return Type();
 }
 
-Type ConstraintSystem::simplifyType(Type type,
-       llvm::SmallPtrSet<TypeVariableType *, 16> &substituting) {
+Type ConstraintSystem::simplifyType(Type type) {
   return type.transform([&](Type type) -> Type {
     if (auto tvt = dyn_cast<TypeVariableType>(type.getPointer())) {
       tvt = getRepresentative(tvt);
       if (auto fixed = getFixedType(tvt)) {
-        if (substituting.insert(tvt).second) {
-          auto result = simplifyType(fixed, substituting);
-          substituting.erase(tvt);
-          return result;
-        }
+        return simplifyType(fixed);
       }
       
       return tvt;

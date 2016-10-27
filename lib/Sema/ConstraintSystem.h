@@ -1532,6 +1532,15 @@ public:
                              bool wantRValue,
                              bool retainParens = false);
 
+  /// Determine whether the given type variable occurs within the given type.
+  ///
+  /// This routine assumes that the type has already been fully simplified.
+  ///
+  /// \param involvesOtherTypeVariables if non-null, records whether any other
+  /// type variables are present in the type.
+  static bool typeVarOccursInType(TypeVariableType *typeVar, Type type,
+                                  bool *involvesOtherTypeVariables = nullptr);
+
   /// \brief Assign a fixed type to the given type variable.
   ///
   /// \param typeVar The type variable to bind.
@@ -1883,10 +1892,7 @@ public:
   ///
   /// The resulting types can be compared canonically, so long as additional
   /// type equivalence requirements aren't introduced between comparisons.
-  Type simplifyType(Type type){
-    llvm::SmallPtrSet<TypeVariableType *, 16> substituting;
-   return simplifyType(type, substituting);
-  }
+  Type simplifyType(Type type);
 
   /// Given a ValueMember, UnresolvedValueMember, or TypeMember constraint,
   /// perform a lookup into the specified base type to find a candidate list.
@@ -1902,22 +1908,7 @@ public:
                                          ConstraintLocator *memberLocator,
                                          bool includeInaccessibleMembers);
 
-private:
-
-  /// \brief Simplify a type, by replacing type variables with either their
-  /// fixed types (if available) or their representatives.
-  ///
-  /// \param type the type to be simplified.
-  ///
-  /// \param substituting the set of type variables that we're already
-  /// substituting for. These type variables will not be substituted again,
-  /// to avoid infinite recursion.
-  ///
-  /// The resulting types can be compared canonically, so long as additional
-  /// type equivalence requirements aren't introduced between comparisons.
-  Type simplifyType(Type type,
-                    llvm::SmallPtrSet<TypeVariableType *, 16> &substituting);
-  
+private:  
   /// \brief Attempt to simplify the given construction constraint.
   ///
   /// \param valueType The type being constructed.

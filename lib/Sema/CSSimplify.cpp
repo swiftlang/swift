@@ -1187,6 +1187,21 @@ ConstraintSystem::matchTypes(Type type1, Type type2, TypeMatchKind kind,
   if (kind != TypeMatchKind::ConformsTo && desugar1->isEqual(desugar2))
     return SolutionKind::Solved;
 
+  auto formUnsolvedResult = [&] {
+    if (flags & TMF_GenerateConstraints) {
+      // Add a new constraint between these types. We consider the current
+      // type-matching problem to the "solved" by this addition, because
+      // this new constraint will be solved at a later point.
+      // Obviously, this must not happen at the top level, or the algorithm
+      // would not terminate.
+      addConstraint(getConstraintKind(kind), type1, type2,
+		    getConstraintLocator(locator));
+      return SolutionKind::Solved;
+    }
+
+    return SolutionKind::Unsolved;
+  };
+
   // If either (or both) types are type variables, unify the type variables.
   if (typeVar1 || typeVar2) {
     switch (kind) {
@@ -1232,6 +1247,12 @@ ConstraintSystem::matchTypes(Type type1, Type type2, TypeMatchKind kind,
       // Provide a fixed type for the type variable.
       bool wantRvalue = kind == TypeMatchKind::SameType;
       if (typeVar1) {
+        // Simplify the right-hand type and perform the "occurs" check.
+        typeVar1 = getRepresentative(typeVar1);
+        type2 = simplifyType(type2);
+        if (typeVarOccursInType(typeVar1, type2))
+          return formUnsolvedResult();
+
         // If we want an rvalue, get the rvalue.
         if (wantRvalue)
           type2 = type2->getRValueType();
@@ -1273,6 +1294,12 @@ ConstraintSystem::matchTypes(Type type1, Type type2, TypeMatchKind kind,
         return SolutionKind::Solved;
       }
 
+      // Simplify the left-hand type and perform the "occurs" check.
+      typeVar2 = getRepresentative(typeVar2);
+      type1 = simplifyType(type1);
+      if (typeVarOccursInType(typeVar2, type1))
+        return formUnsolvedResult();
+
       // If we want an rvalue, get the rvalue.
       if (wantRvalue)
         type1 = type1->getRValueType();
@@ -1290,14 +1317,26 @@ ConstraintSystem::matchTypes(Type type1, Type type2, TypeMatchKind kind,
 
     case TypeMatchKind::BindParamType: {
       if (typeVar2 && !typeVar1) {
-        if (auto *iot = dyn_cast<InOutType>(desugar1)) {
+        // Simplify the left-hand type and perform the "occurs" check.
+        typeVar2 = getRepresentative(typeVar2);
+        type1 = simplifyType(type1);
+        if (typeVarOccursInType(typeVar2, type1))
+          return formUnsolvedResult();
+
+        if (auto *iot = type1->getAs<InOutType>()) {
           assignFixedType(typeVar2, LValueType::get(iot->getObjectType()));
         } else {
           assignFixedType(typeVar2, type1);
         }
         return SolutionKind::Solved;
       } else if (typeVar1 && !typeVar2) {
-        if (auto *lvt = dyn_cast<LValueType>(desugar2)) {
+        // Simplify the right-hand type and perform the "occurs" check.
+        typeVar1 = getRepresentative(typeVar1);
+        type2 = simplifyType(type2);
+        if (typeVarOccursInType(typeVar1, type2))
+          return formUnsolvedResult();
+
+        if (auto *lvt = type2->getAs<LValueType>()) {
           assignFixedType(typeVar1, InOutType::get(lvt->getObjectType()));
         } else {
           assignFixedType(typeVar1, type2);
