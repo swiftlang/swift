@@ -1,6 +1,6 @@
 // REQUIRES: objc_interop
 
-// RUN: %target-swift-frontend -I %S/../Inputs/custom-modules %s -emit-ir | %FileCheck %s
+// RUN: %target-swift-frontend -assume-parsing-unqualified-ownership-sil -I %S/../Inputs/custom-modules %s -emit-ir | %FileCheck %s
 
 sil_stage raw
 

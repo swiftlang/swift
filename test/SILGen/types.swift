@@ -9,10 +9,10 @@ class C {
     // CHECK: bb0([[X:%[0-9]+]] : $Int, [[THIS:%[0-9]+]] : $C):
     member = x
 
-    // CHECK-NOT: strong_retain
+    // CHECK-NOT: copy_value
     // CHECK: [[FN:%[0-9]+]] = class_method %1 : $C, #C.member!setter.1
     // CHECK: apply [[FN]](%0, %1) : $@convention(method) (Int, @guaranteed C) -> ()
-    // CHECK-NOT: strong_release
+    // CHECK-NOT: destroy_value
 
 
   }

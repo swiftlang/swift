@@ -62,14 +62,14 @@ func opt_to_class(_ obj: AnyObject) {
   // CHECK-NEXT: [[OPTBOX:%[0-9]+]] = alloc_box $Optional<@callee_owned () -> ()>
   // CHECK-NEXT: [[PBOPT:%.*]] = project_box [[OPTBOX]]
   // CHECK-NEXT: [[EXISTVAL:%[0-9]+]] = load [[PBOBJ]] : $*AnyObject
-  // CHECK-NEXT: strong_retain [[EXISTVAL]] : $AnyObject
+  // CHECK-NEXT: copy_value [[EXISTVAL]] : $AnyObject
   // CHECK-NEXT: [[OBJ_SELF:%[0-9]*]] = open_existential_ref [[EXIST:%[0-9]+]]
   // CHECK-NEXT: [[OPTTEMP:%.*]] = alloc_stack $Optional<@callee_owned () -> ()>
   // CHECK-NEXT: dynamic_method_br [[OBJ_SELF]] : $@opened({{.*}}) AnyObject, #X.f!1.foreign, [[HASBB:[a-zA-z0-9]+]], [[NOBB:[a-zA-z0-9]+]]
 
   // Has method BB:
   // CHECK: [[HASBB]]([[UNCURRIED:%[0-9]+]] : $@convention(objc_method) (@opened({{.*}}) AnyObject) -> ()):
-  // CHECK-NEXT: strong_retain [[OBJ_SELF]]
+  // CHECK-NEXT: copy_value [[OBJ_SELF]]
   // CHECK-NEXT: [[PARTIAL:%[0-9]+]] = partial_apply [[UNCURRIED]]([[OBJ_SELF]]) : $@convention(objc_method) (@opened({{.*}}) AnyObject) -> ()
   // CHECK-NEXT: [[THUNK_PAYLOAD:%.*]] = init_enum_data_addr [[OPTIONAL:%[0-9]+]]
   // CHECK-NEXT: store [[PARTIAL]] to [[THUNK_PAYLOAD]]
@@ -89,10 +89,10 @@ func opt_to_class(_ obj: AnyObject) {
   var of: (() -> ())! = obj.f
 
   // Exit
-  // CHECK-NEXT: strong_release [[OBJ_SELF]] : $@opened({{".*"}}) AnyObject
-  // CHECK-NEXT: strong_release [[OPTBOX]] : $@box Optional<@callee_owned () -> ()>
-  // CHECK-NEXT: strong_release [[EXISTBOX]] : $@box AnyObject
-  // CHECK-NEXT: strong_release %0
+  // CHECK-NEXT: destroy_value [[OBJ_SELF]] : $@opened({{".*"}}) AnyObject
+  // CHECK-NEXT: destroy_value [[OPTBOX]] : $@box Optional<@callee_owned () -> ()>
+  // CHECK-NEXT: destroy_value [[EXISTBOX]] : $@box AnyObject
+  // CHECK-NEXT: destroy_value %0
   // CHECK-NEXT: [[RESULT:%[0-9]+]] = tuple ()
   // CHECK-NEXT: return [[RESULT]] : $()
 }
@@ -131,12 +131,12 @@ func opt_to_property(_ obj: AnyObject) {
   // CHECK-NEXT: [[INT_BOX:%[0-9]+]] = alloc_box $Int
   // CHECK-NEXT: project_box [[INT_BOX]]
   // CHECK-NEXT: [[OBJ:%[0-9]+]] = load [[PBOBJ]] : $*AnyObject
-  // CHECK-NEXT: strong_retain [[OBJ]] : $AnyObject
+  // CHECK-NEXT: copy_value [[OBJ]] : $AnyObject
   // CHECK-NEXT: [[RAWOBJ_SELF:%[0-9]+]] = open_existential_ref [[OBJ]] : $AnyObject
   // CHECK-NEXT: [[OPTTEMP:%.*]] = alloc_stack $Optional<Int>
   // CHECK-NEXT: dynamic_method_br [[RAWOBJ_SELF]] : $@opened({{.*}}) AnyObject, #X.value!getter.1.foreign, bb1, bb2
   // CHECK: bb1([[METHOD:%[0-9]+]] : $@convention(objc_method) (@opened({{.*}}) AnyObject) -> Int):
-  // CHECK-NEXT: strong_retain [[RAWOBJ_SELF]]
+  // CHECK-NEXT: copy_value [[RAWOBJ_SELF]]
   // CHECK-NEXT: [[BOUND_METHOD:%[0-9]+]] = partial_apply [[METHOD]]([[RAWOBJ_SELF]]) : $@convention(objc_method) (@opened({{.*}}) AnyObject) -> Int
   // CHECK-NEXT: [[VALUE:%[0-9]+]] = apply [[BOUND_METHOD]]() : $@callee_owned () -> Int
   // CHECK-NEXT: [[VALUETEMP:%.*]] = init_enum_data_addr [[OPTTEMP]]
@@ -160,14 +160,14 @@ func direct_to_subscript(_ obj: AnyObject, i: Int) {
   // CHECK-NEXT: alloc_box $Int
   // CHECK-NEXT: project_box
   // CHECK-NEXT: [[OBJ:%[0-9]+]] = load [[PBOBJ]] : $*AnyObject
-  // CHECK-NEXT: strong_retain [[OBJ]] : $AnyObject
+  // CHECK-NEXT: copy_value [[OBJ]] : $AnyObject
   // CHECK-NEXT: [[OBJ_REF:%[0-9]+]] = open_existential_ref [[OBJ]] : $AnyObject to $@opened({{.*}}) AnyObject
   // CHECK-NEXT: [[I:%[0-9]+]] = load [[PBI]] : $*Int
   // CHECK-NEXT: [[OPTTEMP:%.*]] = alloc_stack $Optional<Int>
   // CHECK-NEXT: dynamic_method_br [[OBJ_REF]] : $@opened({{.*}}) AnyObject, #X.subscript!getter.1.foreign, bb1, bb2
 
   // CHECK: bb1([[GETTER:%[0-9]+]] : $@convention(objc_method) (Int, @opened({{.*}}) AnyObject) -> Int):
-  // CHECK-NEXT: strong_retain [[OBJ_REF]]
+  // CHECK-NEXT: copy_value [[OBJ_REF]]
   // CHECK-NEXT: [[GETTER_WITH_SELF:%[0-9]+]] = partial_apply [[GETTER]]([[OBJ_REF]]) : $@convention(objc_method) (Int, @opened({{.*}}) AnyObject) -> Int
   // CHECK-NEXT: [[RESULT:%[0-9]+]] = apply [[GETTER_WITH_SELF]]([[I]]) : $@callee_owned (Int) -> Int
   // CHECK-NEXT: [[RESULTTEMP:%.*]] = init_enum_data_addr [[OPTTEMP]]
@@ -189,14 +189,14 @@ func opt_to_subscript(_ obj: AnyObject, i: Int) {
   // CHECK-NEXT: [[PBI:%.*]] = project_box [[I_BOX]]
   // CHECK-NEXT: store [[I]] to [[PBI]] : $*Int
   // CHECK-NEXT: [[OBJ:%[0-9]+]] = load [[PBOBJ]] : $*AnyObject
-  // CHECK-NEXT: strong_retain [[OBJ]] : $AnyObject
+  // CHECK-NEXT: copy_value [[OBJ]] : $AnyObject
   // CHECK-NEXT: [[OBJ_REF:%[0-9]+]] = open_existential_ref [[OBJ]] : $AnyObject to $@opened({{.*}}) AnyObject
   // CHECK-NEXT: [[I:%[0-9]+]] = load [[PBI]] : $*Int
   // CHECK-NEXT: [[OPTTEMP:%.*]] = alloc_stack $Optional<Int>
   // CHECK-NEXT: dynamic_method_br [[OBJ_REF]] : $@opened({{.*}}) AnyObject, #X.subscript!getter.1.foreign, bb1, bb2
 
   // CHECK: bb1([[GETTER:%[0-9]+]] : $@convention(objc_method) (Int, @opened({{.*}}) AnyObject) -> Int):
-  // CHECK-NEXT: strong_retain [[OBJ_REF]]
+  // CHECK-NEXT: copy_value [[OBJ_REF]]
   // CHECK-NEXT: [[GETTER_WITH_SELF:%[0-9]+]] = partial_apply [[GETTER]]([[OBJ_REF]]) : $@convention(objc_method) (Int, @opened({{.*}}) AnyObject) -> Int
   // CHECK-NEXT: [[RESULT:%[0-9]+]] = apply [[GETTER_WITH_SELF]]([[I]]) : $@callee_owned (Int) -> Int
   // CHECK-NEXT: [[RESULTTEMP:%.*]] = init_enum_data_addr [[OPTTEMP]]
@@ -214,10 +214,10 @@ func downcast(_ obj: AnyObject) -> X {
   // CHECK-NEXT: [[PBOBJ:%[0-9]+]] = project_box [[OBJ_BOX]]
   // CHECK: store [[OBJ]] to [[PBOBJ]] : $*AnyObject
   // CHECK-NEXT: [[OBJ:%[0-9]+]] = load [[PBOBJ]] : $*AnyObject
-  // CHECK-NEXT: strong_retain [[OBJ]] : $AnyObject
+  // CHECK-NEXT: copy_value [[OBJ]] : $AnyObject
   // CHECK-NEXT: [[X:%[0-9]+]] = unconditional_checked_cast [[OBJ]] : $AnyObject to $X
-  // CHECK-NEXT: strong_release [[OBJ_BOX]] : $@box AnyObject
-  // CHECK-NEXT: strong_release %0
+  // CHECK-NEXT: destroy_value [[OBJ_BOX]] : $@box AnyObject
+  // CHECK-NEXT: destroy_value %0
   // CHECK-NEXT: return [[X]] : $X
   return obj as! X
 }

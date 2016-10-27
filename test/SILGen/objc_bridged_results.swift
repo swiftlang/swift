@@ -14,7 +14,7 @@ func testNonnull(_ obj: Test) -> [Any] {
   // CHECK: [[CONVERT:%[0-9]+]] = function_ref @_TZFE10FoundationSa36_unconditionallyBridgeFromObjectiveCfGSqCSo7NSArray_GSax_
   // CHECK: [[ARRAY_META:%[0-9]+]] = metatype $@thin Array<Any>.Type
   // CHECK: [[RESULT:%[0-9]+]] = apply [[CONVERT]]<Any>([[COCOA_VAL]], [[ARRAY_META]])
-  // CHECK: strong_release %0 : $Test
+  // CHECK: destroy_value %0 : $Test
   // CHECK: return [[RESULT]] : $Array<Any>
   return obj.nonnullArray
 } // CHECK: {{^}$}}
@@ -41,7 +41,7 @@ func testNullable(_ obj: Test) -> [Any]? {
   // CHECK: br [[FINISH]]([[RESULT_NONE]] : $Optional<Array<Any>>)
   
   // CHECK: [[FINISH]]([[RESULT:%[0-9]+]] : $Optional<Array<Any>>):
-  // CHECK: strong_release %0 : $Test
+  // CHECK: destroy_value %0 : $Test
   // CHECK: return [[RESULT]] : $Optional<Array<Any>>
   return obj.nullableArray
 } // CHECK: {{^}$}}
@@ -67,7 +67,7 @@ func testNullUnspecified(_ obj: Test) -> [Any]! {
   // CHECK: br [[FINISH]]([[RESULT_NONE]] : $Optional<Array<Any>>)
 
   // CHECK: [[FINISH]]([[RESULT:%[0-9]+]] : $Optional<Array<Any>>):
-  // CHECK: strong_release %0 : $Test
+  // CHECK: destroy_value %0 : $Test
   // CHECK: return [[RESULT]] : $Optional<Array<Any>>
   return obj.nullUnspecifiedArray
 } // CHECK: {{^}$}}
@@ -80,7 +80,7 @@ func testNonnullDictionary(_ obj: Test) -> [AnyHashable: Any] {
   // CHECK: [[CONVERT:%[0-9]+]] = function_ref @_TZFE10FoundationVs10Dictionary36_unconditionallyBridgeFromObjectiveCfGSqCSo12NSDictionary_GS0_xq__
   // CHECK: [[DICT_META:%[0-9]+]] = metatype $@thin Dictionary<AnyHashable, Any>.Type
   // CHECK: [[RESULT:%[0-9]+]] = apply [[CONVERT]]<AnyHashable, Any>([[COCOA_VAL]], [[DICT_META]])
-  // CHECK: strong_release %0 : $Test
+  // CHECK: destroy_value %0 : $Test
   // CHECK: return [[RESULT]] : $Dictionary<AnyHashable, Any>
   return obj.nonnullDictionary
 } // CHECK: {{^}$}}
@@ -92,7 +92,7 @@ func testNonnullSet(_ obj: Test) -> Set<AnyHashable> {
   // CHECK: [[CONVERT:%[0-9]+]] = function_ref @_TZFE10FoundationVs3Set36_unconditionallyBridgeFromObjectiveCfGSqCSo5NSSet_GS0_x_
   // CHECK: [[SET_META:%[0-9]+]] = metatype $@thin Set<AnyHashable>.Type
   // CHECK: [[RESULT:%[0-9]+]] = apply [[CONVERT]]<AnyHashable>([[COCOA_VAL]], [[SET_META]])
-  // CHECK: strong_release %0 : $Test
+  // CHECK: destroy_value %0 : $Test
   // CHECK: return [[RESULT]] : $Set<AnyHashable>
   return obj.nonnullSet
 } // CHECK: {{^}$}}
@@ -104,7 +104,7 @@ func testNonnullString(_ obj: Test) -> String {
   // CHECK: [[CONVERT:%[0-9]+]] = function_ref @_TZFE10FoundationSS36_unconditionallyBridgeFromObjectiveCfGSqCSo8NSString_SS
   // CHECK: [[STRING_META:%[0-9]+]] = metatype $@thin String.Type
   // CHECK: [[RESULT:%[0-9]+]] = apply [[CONVERT]]([[COCOA_VAL]], [[STRING_META]]) : $@convention(method) (@owned Optional<NSString>, @thin String.Type) -> @owned String
-  // CHECK: strong_release %0 : $Test
+  // CHECK: destroy_value %0 : $Test
   // CHECK: return [[RESULT]] : $String
   return obj.nonnullString
 } // CHECK: {{^}$}}
@@ -133,7 +133,7 @@ func testNonnullSubscript(_ obj: Test) -> [Any] {
   // CHECK: [[CONVERT:%[0-9]+]] = function_ref @_TZFE10FoundationSa36_unconditionallyBridgeFromObjectiveCfGSqCSo7NSArray_GSax_
   // CHECK: [[ARRAY_META:%[0-9]+]] = metatype $@thin Array<Any>.Type,
   // CHECK: [[RESULT:%[0-9]+]] = apply [[CONVERT]]<Any>([[COCOA_VAL]], [[ARRAY_META]])
-  // CHECK: strong_release %0 : $Test
+  // CHECK: destroy_value %0 : $Test
   // CHECK: return [[RESULT]] : $Array<Any>
   return obj[0]
 } // CHECK: {{^}$}}

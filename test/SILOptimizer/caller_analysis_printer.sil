@@ -1,4 +1,4 @@
-// RUN: %target-sil-opt -enable-sil-verify-all %s -caller-analysis-printer -o /dev/null | %FileCheck --check-prefix=CHECK %s
+// RUN: %target-sil-opt -assume-parsing-unqualified-ownership-sil -enable-sil-verify-all %s -caller-analysis-printer -o /dev/null | %FileCheck --check-prefix=CHECK %s
 
 // CHECK: Function dead_func has caller: false, partial applied args = 0
 // CHECK: Function call_top has caller: false, partial applied args = 0

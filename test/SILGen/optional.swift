@@ -39,7 +39,7 @@ func testAddrOnlyCallResult<T>(_ f: (() -> T)?) {
 // CHECK:    bb1:
 // CHECK-NEXT: [[T1:%.*]] = unchecked_take_enum_data_addr [[PBF]]
 // CHECK-NEXT: [[T0:%.*]] = load [[T1]]
-// CHECK-NEXT: strong_retain
+// CHECK-NEXT: copy_value
 //   ...evaluate the rest of the suffix...
 // CHECK-NEXT: apply [[T0]]([[TEMP]])
 //   ...and coerce to T?
@@ -47,9 +47,9 @@ func testAddrOnlyCallResult<T>(_ f: (() -> T)?) {
 // CHECK-NEXT: br bb2
 //   Continuation block.
 // CHECK:    bb2
-// CHECK-NEXT: strong_release [[X]]
-// CHECK-NEXT: strong_release [[F]]
-// CHECK-NEXT: release_value %0
+// CHECK-NEXT: destroy_value [[X]]
+// CHECK-NEXT: destroy_value [[F]]
+// CHECK-NEXT: destroy_value %0
 // CHECK-NEXT: [[T0:%.*]] = tuple ()
 // CHECK-NEXT: return [[T0]] : $()
 
@@ -79,7 +79,7 @@ func tuple_bind(_ x: (Int, String)?) -> String? {
   // CHECK:   cond_br {{%.*}}, [[NONNULL:bb[0-9]+]], [[NULL:bb[0-9]+]]
   // CHECK: [[NONNULL]]:
   // CHECK:   [[STRING:%.*]] = tuple_extract {{%.*}} : $(Int, String), 1
-  // CHECK-NOT: release_value [[STRING]]
+  // CHECK-NOT: destroy_value [[STRING]]
 }
 
 // rdar://21883752 - We were crashing on this function because the deallocation happened

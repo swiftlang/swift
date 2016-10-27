@@ -44,7 +44,7 @@ func convProtocolMetatypeToObject(_ f: @escaping () -> NSBurrito.Protocol) {
 // CHECK-LABEL: sil shared [transparent] [reabstraction_thunk] @_TTRXFo__dXMtP24function_conversion_objc9NSBurrito__XFo__oCSo8Protocol_ : $@convention(thin) (@owned @callee_owned () -> @thin NSBurrito.Protocol) -> @owned Protocol
 // CHECK:         apply %0() : $@callee_owned () -> @thin NSBurrito.Protocol
 // CHECK:         objc_protocol #NSBurrito : $Protocol
-// CHECK:         strong_retain
+// CHECK:         copy_value
 // CHECK:         return
 
 // ==== Representation conversions

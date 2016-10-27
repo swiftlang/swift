@@ -74,8 +74,8 @@ class F : E { }
 // CHECK-NEXT: [[ESELFW:%[0-9]+]] = unchecked_ref_cast [[ESELF]] : $E to $F
 // CHECK-NEXT: store [[ESELFW]] to [[SELF]] : $*F
 // CHECK-NEXT: [[SELFP:%[0-9]+]] = load [[SELF]] : $*F
-// CHECK-NEXT: strong_retain [[SELFP]] : $F
-// CHECK-NEXT: strong_release [[SELF_BOX]] : $@box F
+// CHECK-NEXT: copy_value [[SELFP]] : $F
+// CHECK-NEXT: destroy_value [[SELF_BOX]] : $@box F
 // CHECK-NEXT: return [[SELFP]] : $F
 
 

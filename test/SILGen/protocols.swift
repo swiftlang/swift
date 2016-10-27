@@ -248,7 +248,7 @@ class ClassWithGetter : PropertyWithGetter {
 // CHECK-NEXT: [[CCOPY_LOADED:%.*]] = load [[CCOPY]]
 // CHECK-NEXT: [[FUN:%.*]] = class_method [[CCOPY_LOADED]] : $ClassWithGetter, #ClassWithGetter.a!getter.1 : (ClassWithGetter) -> () -> Int , $@convention(method) (@guaranteed ClassWithGetter) -> Int
 // CHECK-NEXT: apply [[FUN]]([[CCOPY_LOADED]])
-// CHECK-NEXT: strong_release [[CCOPY_LOADED]]
+// CHECK-NEXT: destroy_value [[CCOPY_LOADED]]
 // CHECK-NEXT: dealloc_stack [[CCOPY]]
 // CHECK-NEXT: return
 
@@ -274,7 +274,7 @@ class ClassWithGetterSetter : PropertyWithGetterSetter, PropertyWithGetter {
 // CHECK-NEXT: [[CCOPY_LOADED:%.*]] = load [[CCOPY]]
 // CHECK-NEXT: [[FUN:%.*]] = class_method [[CCOPY_LOADED]] : $ClassWithGetterSetter, #ClassWithGetterSetter.b!getter.1 : (ClassWithGetterSetter) -> () -> Int , $@convention(method) (@guaranteed ClassWithGetterSetter) -> Int
 // CHECK-NEXT: apply [[FUN]]([[CCOPY_LOADED]])
-// CHECK-NEXT: strong_release [[CCOPY_LOADED]]
+// CHECK-NEXT: destroy_value [[CCOPY_LOADED]]
 // CHECK-NEXT: dealloc_stack [[CCOPY]]
 // CHECK-NEXT: return
 
@@ -290,10 +290,10 @@ class ClassWithStoredProperty : PropertyWithGetter {
   // CHECK-LABEL: sil hidden @{{.*}}ClassWithStoredProperty{{.*}}methodUsingProperty
   // CHECK: bb0([[ARG:%.*]] : $ClassWithStoredProperty):
   // CHECK-NEXT: debug_value [[ARG]]
-  // CHECK-NOT: strong_retain
+  // CHECK-NOT: copy_value
   // CHECK-NEXT: [[FUN:%.*]] = class_method [[ARG]] : $ClassWithStoredProperty, #ClassWithStoredProperty.a!getter.1 : (ClassWithStoredProperty) -> () -> Int , $@convention(method) (@guaranteed ClassWithStoredProperty) -> Int
   // CHECK-NEXT: [[RESULT:%.*]] = apply [[FUN]]([[ARG]])
-  // CHECK-NOT: strong_release
+  // CHECK-NOT: destroy_value
   // CHECK-NEXT: return [[RESULT]] : $Int
 }
 
@@ -359,7 +359,7 @@ struct StructWithStoredClassProperty : PropertyWithGetter {
 // CHECK-NEXT: function_ref
 // CHECK-NEXT: [[FUN:%.*]] = function_ref @_TFV9protocols29StructWithStoredClassPropertyg1aSi : $@convention(method) (@guaranteed StructWithStoredClassProperty) -> Int
 // CHECK-NEXT: apply [[FUN]]([[CCOPY_LOADED]])
-// CHECK-NEXT: release_value [[CCOPY_LOADED]]
+// CHECK-NEXT: destroy_value [[CCOPY_LOADED]]
 // CHECK-NEXT: dealloc_stack [[CCOPY]]
 // CHECK-NEXT: return
 

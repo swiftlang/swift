@@ -50,7 +50,7 @@ class SwiftGizmo : Gizmo {
   // Objective-C deallocation deinit thunk (i.e., -dealloc).
   // CHECK-LABEL: sil hidden [thunk] @_TToFC12objc_dealloc10SwiftGizmoD : $@convention(objc_method) (SwiftGizmo) -> ()
   // CHECK: bb0([[SELF:%[0-9]+]] : $SwiftGizmo):
-  // CHECK:   strong_retain
+  // CHECK:   copy_value
 
   // CHECK:   [[GIZMO_DTOR:%[0-9]+]] = function_ref @_TFC12objc_dealloc10SwiftGizmoD : $@convention(method) (@owned SwiftGizmo) -> ()
   // CHECK:   [[RESULT:%[0-9]+]] = apply [[GIZMO_DTOR]]([[SELF]]) : $@convention(method) (@owned SwiftGizmo) -> ()

@@ -69,14 +69,14 @@ func test3() {
   // CHECK-NEXT: [[STR:%[0-9]+]] = apply [[GETFN]]()
   let o = getAString()
   
-  // CHECK-NOT: release_value
+  // CHECK-NOT: destroy_value
 
   // CHECK: [[USEFN:%[0-9]+]] = function_ref{{.*}}useAString
-  // CHECK-NEXT: retain_value [[STR]]
+  // CHECK-NEXT: copy_value [[STR]]
   // CHECK-NEXT: [[USE:%[0-9]+]] = apply [[USEFN]]([[STR]])
   useAString(o)
   
-  // CHECK: release_value [[STR]]
+  // CHECK: destroy_value [[STR]]
 }
 
 
@@ -97,7 +97,7 @@ func testAddressOnlyStructString<T>(_ a : T) -> String {
   // CHECK: apply [[PRODFN]]<T>([[TMPSTRUCT]],
   // CHECK-NEXT: [[STRADDR:%[0-9]+]] = struct_element_addr [[TMPSTRUCT]] : $*AddressOnlyStruct<T>, #AddressOnlyStruct.str
   // CHECK-NEXT: [[STRVAL:%[0-9]+]] = load [[STRADDR]]
-  // CHECK-NEXT: retain_value [[STRVAL]]
+  // CHECK-NEXT: copy_value [[STRVAL]]
   // CHECK-NEXT: destroy_addr [[TMPSTRUCT]]
   // CHECK-NEXT: dealloc_stack [[TMPSTRUCT]]
   // CHECK: return [[STRVAL]]
@@ -384,7 +384,7 @@ struct StructMemberTest {
   var s : AnotherStruct
   var t : (Int, AnotherStruct)
 
-  // rdar://15867140 - Accessing the int member here should not retain the
+  // rdar://15867140 - Accessing the int member here should not copy_value the
   // whole struct.
   func testIntMemberLoad() -> Int {
     return i
@@ -393,10 +393,10 @@ struct StructMemberTest {
   // CHECK: bb0(%0 : $StructMemberTest):
   // CHECK:  debug_value %0 : $StructMemberTest, let, name "self"
   // CHECK:  %2 = struct_extract %0 : $StructMemberTest, #StructMemberTest.i
-  // CHECK-NOT:  release_value %0 : $StructMemberTest
+  // CHECK-NOT:  destroy_value %0 : $StructMemberTest
   // CHECK:  return %2 : $Int
 
-  // Accessing the int member in s should not retain the whole struct.
+  // Accessing the int member in s should not copy_value the whole struct.
   func testRecursiveIntMemberLoad() -> Int {
     return s.i
   }
@@ -405,7 +405,7 @@ struct StructMemberTest {
   // CHECK:  debug_value %0 : $StructMemberTest, let, name "self"
   // CHECK:  %2 = struct_extract %0 : $StructMemberTest, #StructMemberTest.s
   // CHECK:  %3 = struct_extract %2 : $AnotherStruct, #AnotherStruct.i
-  // CHECK-NOT:  release_value %0 : $StructMemberTest
+  // CHECK-NOT:  destroy_value %0 : $StructMemberTest
   // CHECK:  return %3 : $Int
   
   func testTupleMemberLoad() -> Int {
@@ -463,7 +463,7 @@ struct LetPropertyStruct {
 // CHECK:   store %0 to [[A]] : $*LetPropertyStruct
 // CHECK:   [[STRUCT:%[0-9]+]] = load [[A]] : $*LetPropertyStruct
 // CHECK:   [[PROP:%[0-9]+]] = struct_extract [[STRUCT]] : $LetPropertyStruct, #LetPropertyStruct.lp
-// CHECK:   strong_release [[ABOX]] : $@box LetPropertyStruct
+// CHECK:   destroy_value [[ABOX]] : $@box LetPropertyStruct
 // CHECK:   return [[PROP]] : $Int
 func testLetPropertyAccessOnLValueBase(_ a : LetPropertyStruct) -> Int {
   var a = a

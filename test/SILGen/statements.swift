@@ -249,7 +249,7 @@ label1:
     // CHECK: apply
     foo()
 
-    // CHECK: strong_release
+    // CHECK: destroy_value
     // CHECK: br [[FALSE:bb[0-9]+]]
     break label1
     use(x)  // expected-warning {{will never be executed}}
@@ -357,7 +357,7 @@ func test_do() {
     bar(1)
 
     // CHECK-NOT: br bb
-    // CHECK: strong_release [[OBJ]]
+    // CHECK: destroy_value [[OBJ]]
     // CHECK-NOT: br bb
   }
 
@@ -390,7 +390,7 @@ func test_do_labeled() {
     // CHECK: cond_br {{%.*}}, bb2, bb3
     if (global_cond) {
       // CHECK: bb2:
-      // CHECK: strong_release [[OBJ]]
+      // CHECK: destroy_value [[OBJ]]
       // CHECK: br bb1
       continue lbl
     }
@@ -405,7 +405,7 @@ func test_do_labeled() {
     // CHECK: cond_br {{%.*}}, bb4, bb5
     if (global_cond) {
       // CHECK: bb4:
-      // CHECK: strong_release [[OBJ]]
+      // CHECK: destroy_value [[OBJ]]
       // CHECK: br bb6
       break lbl
     }
@@ -416,7 +416,7 @@ func test_do_labeled() {
     // CHECK: apply [[BAR]](
     bar(3)
 
-    // CHECK: strong_release [[OBJ]]
+    // CHECK: destroy_value [[OBJ]]
     // CHECK: br bb6
   }
 
@@ -506,7 +506,7 @@ func defer_mutable(_ x: Int) {
   // CHECK-NOT: [[BOX]]
   // CHECK: function_ref @_TFF10statements13defer_mutableFSiT_L_6$deferfT_T_ : $@convention(thin) (@inout_aliasable Int) -> ()
   // CHECK-NOT: [[BOX]]
-  // CHECK: strong_release [[BOX]]
+  // CHECK: destroy_value [[BOX]]
   defer { _ = x }
 }
 
@@ -573,14 +573,14 @@ func testRequireOptional1(_ a : Int?) -> Int {
 // CHECK-LABEL: sil hidden @_TF10statements20testRequireOptional2FGSqSS_SS
 // CHECK: bb0(%0 : $Optional<String>):
 // CHECK-NEXT:   debug_value %0 : $Optional<String>, let, name "a"
-// CHECK-NEXT:   retain_value %0 : $Optional<String>
+// CHECK-NEXT:   copy_value %0 : $Optional<String>
 // CHECK-NEXT:   switch_enum %0 : $Optional<String>, case #Optional.some!enumelt.1: bb1, default bb2
 func testRequireOptional2(_ a : String?) -> String {
   guard let t = a else { abort() }
 
   // CHECK:  bb1(%4 : $String):
   // CHECK-NEXT:   debug_value %4 : $String, let, name "t"
-  // CHECK-NEXT:   release_value %0 : $Optional<String>
+  // CHECK-NEXT:   destroy_value %0 : $Optional<String>
   // CHECK-NEXT:   return %4 : $String
 
   // CHECK:        bb2:
@@ -619,7 +619,7 @@ func test_as_pattern(_ y : BaseClass) -> DerivedClass {
 
   // CHECK: bb{{.*}}([[PTR:%[0-9]+]] : $DerivedClass):
   // CHECK-NEXT: debug_value [[PTR]] : $DerivedClass, let, name "result"
-  // CHECK-NEXT: strong_release %0 : $BaseClass
+  // CHECK-NEXT: destroy_value %0 : $BaseClass
   // CHECK-NEXT: return [[PTR]] : $DerivedClass
   return result
 }
