@@ -10,4 +10,4 @@ protocol P {
 extension Foo: P {}
 
 // SIL-LABEL: sil hidden [transparent] [thunk] @_TTWuRxs9AnyObjectrGCSo3Foo{{.*}} @pseudogeneric
-// IR-LABEL: define hidden void @_TTWuRxs9AnyObjectrGCSo3Foo{{.*}}(%CSo3Foo** noalias nocapture dereferenceable(8), %swift.type*{{( %Self)?}}, i8**{{( %SelfWitnessTable)?}})
+// IR-LABEL: define hidden void @_TTWuRxs9AnyObjectrGCSo3Foo{{.*}}(%CSo3Foo** noalias nocapture dereferenceable({{4|8}}), %swift.type*{{( %Self)?}}, i8**{{( %SelfWitnessTable)?}})
