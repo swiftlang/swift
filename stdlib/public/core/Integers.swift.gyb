@@ -2694,6 +2694,10 @@ public func ${x.operator}= <
 //===--- end of FIXME(integers) -------------------------------------------===//
 
 //===----------------------------------------------------------------------===//
+// FIXME(integers): short term solution until the overload resolution is fast
+// with the generic arithmetic operators.
+
+#if false
 extension ${Self} {
 // Operations with potentially-static overflow checking
 //
@@ -2710,6 +2714,7 @@ extension ${Self} {
   }
 % end
 }
+#endif
 //===--- end of FIXME(integers) -------------------------------------------===//
 
 % end # end of concrete FixedWidthInteger section
