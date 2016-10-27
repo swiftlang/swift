@@ -23,8 +23,8 @@ func typeInference_Comparable<C : Comparable>(v: C) {
     expectType(ClosedRange<C>.self, &range)
   }
   do {
-    let r1: Range<C>       = v...v // expected-error {{no '...' candidates produce the expected contextual result type 'Range<C>'}} expected-note {{}}
-    let r2: ClosedRange<C> = v..<v // expected-error {{no '..<' candidates produce the expected contextual result type 'ClosedRange<C>'}} expected-note {{}}
+    let r1: Range<C>       = v...v // expected-error {{cannot convert value of type 'ClosedRange<C>' to specified type 'Range<C>'}}
+    let r2: ClosedRange<C> = v..<v // expected-error {{cannot convert value of type 'Range<C>' to specified type 'ClosedRange<C>'}}
     let r3: CountableRange<C>       = v..<v // expected-error {{type 'C' does not conform to protocol '_Strideable'}}
     let r4: CountableClosedRange<C> = v...v // expected-error {{type 'C' does not conform to protocol '_Strideable'}}
     let r5: CountableRange<C>       = v...v // expected-error {{type 'C' does not conform to protocol '_Strideable'}}
@@ -42,8 +42,8 @@ func typeInference_Strideable<S : Strideable>(v: S) {
     expectType(ClosedRange<S>.self, &range)
   }
   do {
-    let r1: Range<S>       = v...v // expected-error {{no '...' candidates produce the expected contextual result type 'Range<S>'}} expected-note {{}}
-    let r2: ClosedRange<S> = v..<v // expected-error {{no '..<' candidates produce the expected contextual result type 'ClosedRange<S>'}} expected-note {{}}
+    let r1: Range<S>       = v...v // expected-error {{cannot convert value of type 'ClosedRange<S>' to specified type 'Range<S>'}}
+    let r2: ClosedRange<S> = v..<v // expected-error {{cannot convert value of type 'Range<S>' to specified type 'ClosedRange<S>'}}
     let r3: CountableRange<S>       = v..<v // expected-error {{type 'S.Stride' does not conform to protocol 'SignedInteger'}}
     let r4: CountableClosedRange<S> = v...v // expected-error {{type 'S.Stride' does not conform to protocol 'SignedInteger'}}
     let r5: CountableRange<S>       = v...v // expected-error {{type 'S.Stride' does not conform to protocol 'SignedInteger'}}
@@ -62,16 +62,16 @@ func typeInference_StrideableWithSignedIntegerStride<S : Strideable>(v: S)
     expectType(CountableClosedRange<S>.self, &range)
   }
   do {
-    let range: Range<S> = v..<v
+    let _: Range<S> = v..<v
   }
   do {
-    let range: ClosedRange<S> = v...v
+    let _: ClosedRange<S> = v...v
   }
   do {
-    let r1: Range<S>       = v...v // expected-error {{no '...' candidates produce the expected contextual result type 'Range<S>'}} expected-note {{}}
-    let r2: ClosedRange<S> = v..<v // expected-error {{no '..<' candidates produce the expected contextual result type 'ClosedRange<S>'}} expected-note {{}}
-    let r3: CountableRange<S>       = v...v // expected-error {{no '...' candidates produce the expected contextual result type 'CountableRange<S>'}} expected-note {{}}
-    let r4: CountableClosedRange<S> = v..<v // expected-error {{no '..<' candidates produce the expected contextual result type 'CountableClosedRange<S>'}} expected-note {{}}
+    let _: Range<S>       = v...v // expected-error {{cannot convert value of type 'CountableClosedRange<S>' to specified type 'Range<S>'}}
+    let _: ClosedRange<S> = v..<v // expected-error {{cannot convert value of type 'CountableRange<S>' to specified type 'ClosedRange<S>'}}
+    let _: CountableRange<S>       = v...v // expected-error {{cannot convert value of type 'CountableClosedRange<S>' to specified type 'CountableRange<S>'}}
+    let _: CountableClosedRange<S> = v..<v // expected-error {{cannot convert value of type 'CountableRange<S>' to specified type 'CountableClosedRange<S>'}}
   }
 }
 
