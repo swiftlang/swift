@@ -167,7 +167,7 @@ extension _ArrayBufferProtocol where Index == Int {
         (elements + j).initialize(to: newValues[i])
         newValues.formIndex(after: &i)
       }
-      _expectEnd(i, newValues)
+      _expectEnd(of: newValues, is: i)
     }
     else { // We're not growing the buffer
       // Assign all the new elements into the start of the subRange
@@ -178,7 +178,7 @@ extension _ArrayBufferProtocol where Index == Int {
         formIndex(after: &i)
         newValues.formIndex(after: &j)
       }
-      _expectEnd(j, newValues)
+      _expectEnd(of: newValues, is: j)
 
       // If the size didn't change, we're done.
       if growth == 0 {
