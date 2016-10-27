@@ -454,8 +454,6 @@ SILFunction *SILDeserializer::readSILFunction(DeclID FID,
     for (auto ID : SemanticsIDs) {
       fn->addSemanticsAttr(MF->getIdentifier(ID).str());
     }
-    if (!hasQualifiedOwnership)
-      fn->setUnqualifiedOwnership();
 
     if (Callback) Callback->didDeserialize(MF->getAssociatedModule(), fn);
   }
@@ -519,6 +517,9 @@ SILFunction *SILDeserializer::readSILFunction(DeclID FID,
   if (isEmptyFunction || declarationOnly) {
     return fn;
   }
+
+  if (!hasQualifiedOwnership)
+    fn->setUnqualifiedOwnership();
 
   NumDeserializedFunc++;
 
