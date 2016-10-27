@@ -34,7 +34,7 @@ printArtificialName(const swift::ValueDecl *VD, llvm::raw_ostream &OS) {
     OS << FD->getAccessorStorageDecl()->getFullName() << ".get()";
     return false;
   case AccessorKind::IsSetter:
-    OS << FD->getAccessorStorageDecl()->getFullName() << ".set(_:)";
+    OS << FD->getAccessorStorageDecl()->getFullName() << ".set()";
     return false;
   case AccessorKind::IsDidSet:
     OS << FD->getAccessorStorageDecl()->getFullName() << ".didSet()";

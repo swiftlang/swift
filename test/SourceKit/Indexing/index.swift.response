@@ -543,7 +543,7 @@
             },
             {
               key.kind: source.lang.swift.decl.function.accessor.setter,
-              key.name: "value.set(_:)",
+              key.name: "value.set()",
               key.usr: "s:FC5index16ComputedPropertys5valueSi",
               key.line: 65,
               key.column: 5
@@ -702,7 +702,7 @@
             },
             {
               key.kind: source.lang.swift.decl.function.accessor.setter,
-              key.name: "subscript(_:).set(_:)",
+              key.name: "subscript(_:).set()",
               key.usr: "s:FC5index3CC2s9subscriptFSiSi",
               key.line: 85,
               key.column: 5,
@@ -1430,7 +1430,7 @@
             },
             {
               key.kind: source.lang.swift.decl.function.accessor.setter,
-              key.name: "S1.set(_:)",
+              key.name: "S1.set()",
               key.usr: "s:FP5index20rdar18640140Protocols2S1Si",
               key.line: 194,
               key.column: 5
