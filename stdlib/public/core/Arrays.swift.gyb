@@ -1656,7 +1656,7 @@ internal struct _InitializeMemoryFromCollection<
       newValues.formIndex(after: &q)
       p += 1
     }
-    _expectEnd(q, newValues)
+    _expectEnd(of: newValues, is: q)
   }
 
   init(_ newValues: C) {
@@ -1694,8 +1694,7 @@ internal func _arrayOutOfPlaceReplace<B, C>(
 /// A _debugPrecondition check that `i` has exactly reached the end of
 /// `s`.  This test is never used to ensure memory safety; that is
 /// always guaranteed by measuring `s` once and re-using that value.
-// FIXME(ABI)#15 : add argument labels.
-internal func _expectEnd<C : Collection>(_ i: C.Index, _ s: C) {
+internal func _expectEnd<C : Collection>(of s: C, is i: C.Index) {
   _debugPrecondition(
     i == s.endIndex,
     "invalid Collection: count differed in successive traversals")

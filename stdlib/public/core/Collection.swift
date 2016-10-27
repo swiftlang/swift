@@ -1281,7 +1281,7 @@ extension Collection {
       formIndex(after: &i)
     }
 
-    _expectEnd(i, self)
+    _expectEnd(of: self, is: i)
     return Array(result)
   }
 
