@@ -522,6 +522,21 @@ ManagedValue Transform::transform(ManagedValue v,
                                     ctxt);
   }
 
+  // - T : Hashable to AnyHashable
+  if (isa<StructType>(outputSubstType) &&
+      outputSubstType->getAnyNominal() ==
+        SGF.getASTContext().getAnyHashableDecl()) {
+    auto *protocol = SGF.getASTContext().getProtocol(
+        KnownProtocolKind::Hashable);
+    auto conformance = SGF.SGM.M.getSwiftModule()->lookupConformance(
+        inputSubstType, protocol, nullptr);
+    auto result = SGF.emitAnyHashableErasure(Loc, v, inputSubstType,
+                                             *conformance, ctxt);
+    if (result.isInContext())
+      return ManagedValue::forInContext();
+    return std::move(result).getAsSingleValue(SGF, Loc);
+  }
+
   // Should have handled the conversion in one of the cases above.
   llvm_unreachable("Unhandled transform?");
 }
@@ -722,7 +737,7 @@ static ManagedValue manageParam(SILGenFunction &gen,
   // must retain them even if we're in a context that can accept a +0 value.
   case ParameterConvention::Direct_Unowned:
     gen.getTypeLowering(paramValue->getType())
-          .emitRetainValue(gen.B, loc, paramValue);
+        .emitCopyValue(gen.B, loc, paramValue);
     SWIFT_FALLTHROUGH;
   case ParameterConvention::Direct_Owned:
     return gen.emitManagedRValueWithCleanup(paramValue);
@@ -2104,7 +2119,7 @@ void ResultPlanner::execute(ArrayRef<SILValue> innerDirectResults,
                        "reabstraction of returns_inner_pointer function");
       SWIFT_FALLTHROUGH;
     case ResultConvention::Unowned:
-      resultTL.emitRetainValue(Gen.B, Loc, resultValue);
+      resultTL.emitCopyValue(Gen.B, Loc, resultValue);
       return Gen.emitManagedRValueWithCleanup(resultValue, resultTL);
     }
     llvm_unreachable("bad result convention!");

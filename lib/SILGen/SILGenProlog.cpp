@@ -410,9 +410,9 @@ static void emitCaptureArguments(SILGenFunction &gen, CapturedValue capture,
 
 void SILGenFunction::emitProlog(AnyFunctionRef TheClosure,
                                 ArrayRef<ParameterList*> paramPatterns,
-                                Type resultType) {
-  unsigned ArgNo =
-    emitProlog(paramPatterns, resultType, TheClosure.getAsDeclContext());
+                                Type resultType, bool throws) {
+  unsigned ArgNo = emitProlog(paramPatterns, resultType,
+                              TheClosure.getAsDeclContext(), throws);
 
   // Emit the capture argument variables. These are placed last because they
   // become the first curry level of the SIL function.
@@ -457,10 +457,13 @@ static void emitIndirectResultParameters(SILGenFunction &gen, Type resultType,
   auto arg =
     new (gen.SGM.M) SILArgument(gen.F.begin(), resultTI.getLoweredType(), var);
   (void) arg;
+
+  
 }
 
-unsigned SILGenFunction::emitProlog(ArrayRef<ParameterList*> paramLists,
-                                    Type resultType, DeclContext *DC) {
+unsigned SILGenFunction::emitProlog(ArrayRef<ParameterList *> paramLists,
+                                    Type resultType, DeclContext *DC,
+                                    bool throws) {
   // Create the indirect result parameters.
   emitIndirectResultParameters(*this, resultType, DC);
 
@@ -473,6 +476,21 @@ unsigned SILGenFunction::emitProlog(ArrayRef<ParameterList*> paramLists,
     for (auto &param : *paramList)
       emitter.emitParam(param);
   }
-  return emitter.getNumArgs();
+
+  // Record the ArgNo of the artificial $error inout argument. 
+  unsigned ArgNo = emitter.getNumArgs();
+  if (throws) {
+    RegularLocation Loc{SourceLoc()};
+    if (auto *AFD = dyn_cast<AbstractFunctionDecl>(DC))
+      Loc = AFD->getThrowsLoc();
+    else if (auto *ACE = dyn_cast<AbstractClosureExpr>(DC))
+      Loc = ACE->getLoc();
+    auto NativeErrorTy = SILType::getExceptionType(getASTContext());
+    ManagedValue Undef = emitUndef(Loc, NativeErrorTy);
+    B.createDebugValue(Loc, Undef.getValue(),
+                       {"$error", /*Constant*/ false, ++ArgNo});
+  }
+
+  return ArgNo;
 }
 

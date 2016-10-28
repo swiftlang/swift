@@ -387,8 +387,8 @@ extension _ArrayBuffer {
       }
       else {
         var refCopy = self
-        refCopy.replace(
-          subRange: i..<(i + 1),
+        refCopy.replaceSubrange(
+          i..<(i + 1),
           with: 1,
           elementsOf: CollectionOfOne(newValue))
       }

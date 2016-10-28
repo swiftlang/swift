@@ -402,3 +402,8 @@ func testFixItNested() {
     FullyGeneric<Any>()
   )
 }
+
+// rdar://problem/26845038
+func occursCheck26845038(a: [Int]) {
+  _ = Array(a)[0]
+}

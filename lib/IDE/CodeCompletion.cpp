@@ -1652,7 +1652,9 @@ private:
       return true;
     bool isImplicitlyCurriedIM = isImplicitlyCurriedInstanceMethod(D);
     for (auto expectedType : ExpectedTypes) {
-      if (expectedType && expectedType->is<AnyFunctionType>() &&
+      if (expectedType &&
+          expectedType->lookThroughAllAnyOptionalTypes()
+              ->is<AnyFunctionType>() &&
           calculateTypeRelationForDecl(D, expectedType, isImplicitlyCurriedIM,
                                        /*UseFuncResult=*/false) >=
               CodeCompletionResult::ExpectedTypeRelation::Convertible) {

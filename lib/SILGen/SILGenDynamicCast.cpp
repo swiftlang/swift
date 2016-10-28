@@ -175,7 +175,7 @@ namespace {
         // If we're using the scalar strategy, handle the consumption rules.
         if (Strategy != CastStrategy::Address &&
             shouldDestroyOnFailure(consumption)) {
-          SGF.B.emitReleaseValueOperation(Loc, scalarOperandValue);
+          SGF.B.emitDestroyValueOperation(Loc, scalarOperandValue);
         }
 
         handleFalse();
@@ -233,7 +233,7 @@ namespace {
                                         SGFContext ctx) {
       // Retain the result if this is copy-on-success.
       if (!shouldTakeOnSuccess(consumption))
-        origTargetTL.emitRetainValue(SGF.B, Loc, value);
+        origTargetTL.emitCopyValue(SGF.B, Loc, value);
 
       // Enter a cleanup for the +1 result.
       ManagedValue result

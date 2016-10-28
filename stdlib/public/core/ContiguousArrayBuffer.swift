@@ -291,6 +291,7 @@ internal struct _ContiguousArrayBuffer<Element> : _ArrayBufferProtocol {
   }
 
   @_versioned
+  @inline(__always)
   internal func getElement(_ i: Int) -> Element {
     _sanityCheck(i >= 0 && i < count, "Array index out of range")
     return firstElementAddress[i]
@@ -299,9 +300,11 @@ internal struct _ContiguousArrayBuffer<Element> : _ArrayBufferProtocol {
   /// Get or set the value of the ith element.
   @_versioned
   internal subscript(i: Int) -> Element {
+    @inline(__always)
     get {
       return getElement(i)
     }
+    @inline(__always)
     nonmutating set {
       _sanityCheck(i >= 0 && i < count, "Array index out of range")
 
@@ -316,6 +319,7 @@ internal struct _ContiguousArrayBuffer<Element> : _ArrayBufferProtocol {
   }
 
   /// The number of elements the buffer stores.
+  @_versioned
   internal var count: Int {
     get {
       return _storage.countAndCapacity.count
@@ -581,7 +585,7 @@ internal func _copyCollectionToContiguousArray<
     source.formIndex(after: &i)
     p += 1
   }
-  _expectEnd(i, source)
+  _expectEnd(of: source, is: i)
   return ContiguousArray(_buffer: result)
 }
 

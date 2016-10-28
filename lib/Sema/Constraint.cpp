@@ -53,6 +53,7 @@ Constraint::Constraint(ConstraintKind Kind, Type First, Type Second,
   case ConstraintKind::Bind:
   case ConstraintKind::Equal:
   case ConstraintKind::BindParam:
+  case ConstraintKind::BindToPointerType:
   case ConstraintKind::Subtype:
   case ConstraintKind::Conversion:
   case ConstraintKind::ExplicitConversion:
@@ -150,6 +151,7 @@ Constraint *Constraint::clone(ConstraintSystem &cs) const {
   case ConstraintKind::Bind:
   case ConstraintKind::Equal:
   case ConstraintKind::BindParam:
+  case ConstraintKind::BindToPointerType:
   case ConstraintKind::Subtype:
   case ConstraintKind::Conversion:
   case ConstraintKind::ExplicitConversion:
@@ -219,6 +221,7 @@ void Constraint::print(llvm::raw_ostream &Out, SourceManager *sm) const {
   case ConstraintKind::Bind: Out << " bind "; break;
   case ConstraintKind::Equal: Out << " equal "; break;
   case ConstraintKind::BindParam: Out << " bind param "; break;
+  case ConstraintKind::BindToPointerType: Out << " bind to pointer "; break;
   case ConstraintKind::Subtype: Out << " subtype "; break;
   case ConstraintKind::Conversion: Out << " conv "; break;
   case ConstraintKind::ExplicitConversion: Out << " expl conv "; break;
@@ -449,6 +452,7 @@ gatherReferencedTypeVars(Constraint *constraint,
   case ConstraintKind::ApplicableFunction:
   case ConstraintKind::Bind:
   case ConstraintKind::BindParam:
+  case ConstraintKind::BindToPointerType:
   case ConstraintKind::ArgumentConversion:
   case ConstraintKind::Conversion:
   case ConstraintKind::ExplicitConversion:

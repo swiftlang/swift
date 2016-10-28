@@ -51,8 +51,20 @@ class SILBuilder {
   /// only by SILGen or SIL deserializers.
   SILOpenedArchetypesTracker *OpenedArchetypesTracker = nullptr;
 
+  /// True if this SILBuilder is being used for parsing.
+  ///
+  /// This is important since in such a case, we want to not perform any
+  /// Ownership Verification in SILBuilder. This functionality is very useful
+  /// for determining if qualified or unqualified instructions are being created
+  /// in appropriate places, but prevents us from inferring ownership
+  /// qualification of functions when parsing. The ability to perform this
+  /// inference is important since otherwise, we would need to update all SIL
+  /// test cases while bringing up SIL ownership.
+  bool isParsing = false;
+
 public:
-  SILBuilder(SILFunction &F) : F(F), BB(0) {}
+  SILBuilder(SILFunction &F, bool isParsing = false)
+      : F(F), BB(0), isParsing(isParsing) {}
 
   SILBuilder(SILFunction &F, SmallVectorImpl<SILInstruction *> *InsertedInstrs)
       : F(F), BB(0), InsertedInstrs(InsertedInstrs) {}
@@ -1484,20 +1496,20 @@ public:
   PointerUnion<CopyAddrInst *, DestroyAddrInst *>
   emitDestroyAddr(SILLocation Loc, SILValue Operand);
 
-  /// Convenience function for calling emitRetain on the type lowering
+  /// Convenience function for calling emitCopy on the type lowering
   /// for the non-address value.
-  void emitRetainValueOperation(SILLocation Loc, SILValue v) {
+  SILValue emitCopyValueOperation(SILLocation Loc, SILValue v) {
     assert(!v->getType().isAddress());
     auto &lowering = getTypeLowering(v->getType());
-    return lowering.emitRetainValue(*this, Loc, v);
+    return lowering.emitCopyValue(*this, Loc, v);
   }
 
-  /// Convenience function for calling TypeLowering.emitRelease on the type
+  /// Convenience function for calling TypeLowering.emitDestroy on the type
   /// lowering for the non-address value.
-  void emitReleaseValueOperation(SILLocation Loc, SILValue v) {
+  void emitDestroyValueOperation(SILLocation Loc, SILValue v) {
     assert(!v->getType().isAddress());
     auto &lowering = getTypeLowering(v->getType());
-    lowering.emitReleaseValue(*this, Loc, v);
+    lowering.emitDestroyValue(*this, Loc, v);
   }
 
   SILValue emitTupleExtract(SILLocation Loc, SILValue Operand, unsigned FieldNo,

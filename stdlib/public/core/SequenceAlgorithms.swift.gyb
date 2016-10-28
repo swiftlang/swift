@@ -683,10 +683,10 @@ extension Sequence {
   ///
   ///     let possibleNumbers = ["1", "2", "three", "///4///", "5"]
   /// 
-  ///     let mapped: [Int?] = numbers.map { str in Int(str) }
+  ///     let mapped: [Int?] = possibleNumbers.map { str in Int(str) }
   ///     // [1, 2, nil, nil, 5]
   /// 
-  ///     let flatMapped: [Int] = numbers.flatMap { str in Int(str) }
+  ///     let flatMapped: [Int] = possibleNumbers.flatMap { str in Int(str) }
   ///     // [1, 2, 5]
   ///
   /// - Parameter transform: A closure that accepts an element of this

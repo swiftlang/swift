@@ -152,7 +152,7 @@ namespace {
     }
 
     void emitRelease(SILGenFunction &gen, SILLocation loc) const override {
-      gen.B.emitReleaseValueOperation(loc, NativeError);
+      gen.B.emitDestroyValueOperation(loc, NativeError);
     }
   };
 

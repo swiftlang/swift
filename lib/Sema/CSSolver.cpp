@@ -348,9 +348,8 @@ bool ConstraintSystem::simplify(bool ContinueAfterFailures) {
 
       if (solverState)
         solverState->retiredConstraints.push_front(constraint);
-      else
-        CG.removeConstraint(constraint);
 
+      CG.removeConstraint(constraint);
       break;
 
     case SolutionKind::Solved:
@@ -637,27 +636,6 @@ namespace {
   };
 }
 
-/// Determine whether the given type variables occurs in the given type.
-static bool typeVarOccursInType(ConstraintSystem &cs, TypeVariableType *typeVar,
-                                Type type, bool &involvesOtherTypeVariables) {
-  SmallVector<TypeVariableType *, 4> typeVars;
-  type->getTypeVariables(typeVars);
-  bool result = false;
-  for (auto referencedTypeVar : typeVars) {
-    if (cs.getRepresentative(referencedTypeVar) == typeVar) {
-      result = true;
-      if (involvesOtherTypeVariables)
-        break;
-
-      continue;
-    }
-
-    involvesOtherTypeVariables = true;
-  }
-
-  return result;
-}
-
 /// \brief Return whether a relational constraint between a type variable and a
 /// trivial wrapper type (autoclosure, unary tuple) should result in the type
 /// variable being potentially bound to the value type, as opposed to the
@@ -676,6 +654,7 @@ static bool shouldBindToValueType(Constraint *constraint)
   case ConstraintKind::Bind:
   case ConstraintKind::Equal:
   case ConstraintKind::BindParam:
+  case ConstraintKind::BindToPointerType:
   case ConstraintKind::ConformsTo:
   case ConstraintKind::LiteralConformsTo:
   case ConstraintKind::CheckedCast:
@@ -757,6 +736,7 @@ static PotentialBindings getPotentialBindings(ConstraintSystem &cs,
     case ConstraintKind::Bind:
     case ConstraintKind::Equal:
     case ConstraintKind::BindParam:
+    case ConstraintKind::BindToPointerType:
     case ConstraintKind::Subtype:
     case ConstraintKind::Conversion:
     case ConstraintKind::ExplicitConversion:
@@ -780,7 +760,9 @@ static PotentialBindings getPotentialBindings(ConstraintSystem &cs,
 
     case ConstraintKind::Defaultable:
       // Do these in a separate pass.
-      defaultableConstraints.push_back(constraint);
+      if (cs.getFixedTypeRecursive(constraint->getFirstType(), true)
+            ->getAs<TypeVariableType>() == typeVar)
+        defaultableConstraints.push_back(constraint);
       continue;
 
     case ConstraintKind::Disjunction:
@@ -859,9 +841,10 @@ static PotentialBindings getPotentialBindings(ConstraintSystem &cs,
       // If this variable is in the left-hand side, it is fully bound.
       // FIXME: Can we avoid simplification here by walking the graph? Is it
       // worthwhile?
-      if (typeVarOccursInType(cs, typeVar,
-                              cs.simplifyType(constraint->getFirstType()),
-                              result.InvolvesTypeVariables)) {
+      if (ConstraintSystem::typeVarOccursInType(
+            typeVar,
+            cs.simplifyType(constraint->getFirstType()),
+            &result.InvolvesTypeVariables)) {
         result.FullyBound = true;
       }
       continue;
@@ -873,18 +856,20 @@ static PotentialBindings getPotentialBindings(ConstraintSystem &cs,
       // If our type variable shows up in the base type, there's
       // nothing to do.
       // FIXME: Can we avoid simplification here?
-      if (typeVarOccursInType(cs, typeVar, 
-                              cs.simplifyType(constraint->getFirstType()),
-                              result.InvolvesTypeVariables)) {
+      if (ConstraintSystem::typeVarOccursInType(
+            typeVar,
+            cs.simplifyType(constraint->getFirstType()),
+            &result.InvolvesTypeVariables)) {
         continue;
       }
       
       // If the type variable is in the list of member type
       // variables, it is fully bound.
       // FIXME: Can we avoid simplification here?
-      if (typeVarOccursInType(cs, typeVar, 
-                              cs.simplifyType(constraint->getSecondType()),
-                              result.InvolvesTypeVariables)) {
+      if (ConstraintSystem::typeVarOccursInType(
+            typeVar,
+            cs.simplifyType(constraint->getSecondType()),
+            &result.InvolvesTypeVariables)) {
         result.FullyBound = true;
       }
       continue;
@@ -920,9 +905,11 @@ static PotentialBindings getPotentialBindings(ConstraintSystem &cs,
     } else {
       // Can't infer anything.
       if (!result.InvolvesTypeVariables)
-        typeVarOccursInType(cs, typeVar, first, result.InvolvesTypeVariables);
+        ConstraintSystem::typeVarOccursInType(typeVar, first,
+                                              &result.InvolvesTypeVariables);
       if (!result.InvolvesTypeVariables)
-        typeVarOccursInType(cs, typeVar, second, result.InvolvesTypeVariables);
+        ConstraintSystem::typeVarOccursInType(typeVar, second,
+                                              &result.InvolvesTypeVariables);
       continue;
     }
 

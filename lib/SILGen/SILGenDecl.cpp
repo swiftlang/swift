@@ -209,7 +209,7 @@ public:
     if (v->getType().isAddress())
       gen.B.emitDestroyAddrAndFold(l, v);
     else
-      gen.B.emitReleaseValueOperation(l, v);
+      gen.B.emitDestroyValueOperation(l, v);
   }
 };
 } // end anonymous namespace
@@ -1308,7 +1308,7 @@ void SILGenFunction::destroyLocalVariable(SILLocation silLoc, VarDecl *vd) {
   // whether we have an address or not.
   SILValue Val = loc.value;
   if (!Val->getType().isAddress())
-    B.emitReleaseValueOperation(silLoc, Val);
+    B.emitDestroyValueOperation(silLoc, Val);
   else
     B.emitDestroyAddrAndFold(silLoc, Val);
 }
@@ -1889,7 +1889,8 @@ SILGenModule::emitProtocolWitness(ProtocolConformance *conformance,
   // Lower the witness thunk type with the requirement's abstraction level.
   auto witnessSILFnType = getNativeSILFunctionType(M,
                                                    AbstractionPattern(reqtOrigTy),
-                                                   reqtSubstTy);
+                                                   reqtSubstTy,
+                                                   witness);
 
   // Mangle the name of the witness thunk.
   std::string nameBuffer;

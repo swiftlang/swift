@@ -1,5 +1,4 @@
 // RUN: not %target-swift-frontend %s -parse
-// REQUIRES: asserts
 
 public protocol I {
   associatedtype X : Equatable

@@ -79,8 +79,8 @@ internal struct _SliceBuffer<Element>
   /// - Precondition: This buffer is backed by a uniquely-referenced
   ///   `_ContiguousArrayBuffer` and
   ///   `insertCount <= numericCast(newValues.count)`.
-  internal mutating func replace<C>(
-    subRange: Range<Int>,
+  internal mutating func replaceSubrange<C>(
+    _ subrange: Range<Int>,
     with insertCount: Int,
     elementsOf newValues: C
   ) where C : Collection, C.Iterator.Element == Element {
@@ -90,7 +90,7 @@ internal struct _SliceBuffer<Element>
 
     _sanityCheck(_hasNativeBuffer && isUniquelyReferenced())
 
-    let eraseCount = subRange.count
+    let eraseCount = subrange.count
     let growth = insertCount - eraseCount
     let oldCount = count
 
@@ -99,10 +99,10 @@ internal struct _SliceBuffer<Element>
 
     _sanityCheck(native.count + growth <= native.capacity)
 
-    let start = subRange.lowerBound - startIndex + hiddenElementCount
-    let end = subRange.upperBound - startIndex + hiddenElementCount
-    native.replace(
-      subRange: start..<end,
+    let start = subrange.lowerBound - startIndex + hiddenElementCount
+    let end = subrange.upperBound - startIndex + hiddenElementCount
+    native.replaceSubrange(
+      start..<end,
       with: insertCount,
       elementsOf: newValues)
 
@@ -153,8 +153,8 @@ internal struct _SliceBuffer<Element>
         let myCount = count
 
         if _slowPath(backingCount > myCount + offset) {
-          native.replace(
-            subRange: (myCount+offset)..<backingCount,
+          native.replaceSubrange(
+            (myCount+offset)..<backingCount,
             with: 0,
             elementsOf: EmptyCollection())
         }

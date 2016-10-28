@@ -238,15 +238,16 @@ namespace sil_block {
 
   using SILFunctionLayout =
       BCRecordLayout<SIL_FUNCTION, SILLinkageField,
-                     BCFixed<1>, // transparent
-                     BCFixed<1>, // fragile
-                     BCFixed<2>, // thunk/reabstraction_thunk
-                     BCFixed<1>, // global_init
-                     BCFixed<2>, // inlineStrategy
-                     BCFixed<2>, // side effect info.
-                     BCFixed<2>, // number of specialize attributes
-                     TypeIDField,// SILFunctionType
-                     DeclIDField,// ClangNode owner
+                     BCFixed<1>,  // transparent
+                     BCFixed<1>,  // fragile
+                     BCFixed<2>,  // thunk/reabstraction_thunk
+                     BCFixed<1>,  // global_init
+                     BCFixed<2>,  // inlineStrategy
+                     BCFixed<2>,  // side effect info.
+                     BCFixed<2>,  // number of specialize attributes
+                     BCFixed<1>,  // has qualified ownership
+                     TypeIDField, // SILFunctionType
+                     DeclIDField, // ClangNode owner
                      BCArray<IdentifierIDField> // Semantics Attribute
                      // followed by specialize attributes
                      // followed by generic param list, if any

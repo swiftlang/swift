@@ -1031,6 +1031,7 @@ static CanSILFunctionType getNativeSILFunctionType(SILModule &M,
 CanSILFunctionType swift::getNativeSILFunctionType(SILModule &M,
                                        AbstractionPattern origType,
                                        CanAnyFunctionType substInterfaceType,
+                                       Optional<SILDeclRef> constant,
                                        SILDeclRef::Kind kind) {
   AnyFunctionType::ExtInfo extInfo;
 
@@ -1043,7 +1044,7 @@ CanSILFunctionType swift::getNativeSILFunctionType(SILModule &M,
     extInfo = substInterfaceType->getExtInfo();
   }
   return ::getNativeSILFunctionType(M, origType, substInterfaceType,
-                                    extInfo, None, kind);
+                                    extInfo, constant, kind);
 }
 
 //===----------------------------------------------------------------------===//
@@ -2066,6 +2067,7 @@ SILConstantInfo TypeConverter::getConstantOverrideInfo(SILDeclRef derived,
   // Build the SILFunctionType for the vtable thunk.
   CanSILFunctionType fnTy = getNativeSILFunctionType(M, basePattern,
                                                      overrideLoweredInterfaceTy,
+                                                     derived,
                                                      derived.kind);
 
   {
