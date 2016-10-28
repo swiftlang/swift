@@ -1320,6 +1320,24 @@ RValue RValueEmitter::visitErasureExpr(ErasureExpr *E, SGFContext C) {
   return RValue(SGF, E, mv);
 }
 
+RValue SILGenFunction::emitAnyHashableErasure(SILLocation loc,
+                                              ManagedValue value,
+                                              CanType type,
+                                              ProtocolConformanceRef conformance,
+                                              SGFContext C) {
+  // Ensure that the intrinsic function exists.
+  auto convertFn = SGM.getConvertToAnyHashable(loc);
+  if (!convertFn)
+    return emitUndefRValue(
+        loc, getASTContext().getAnyHashableDecl()->getDeclaredType());
+
+  // Construct the substitution for T: Hashable.
+  ProtocolConformanceRef conformances[] = { conformance };
+  Substitution sub(type, getASTContext().AllocateCopy(conformances));
+
+  return emitApplyOfLibraryIntrinsic(loc, convertFn, sub, value, C);
+}
+
 RValue RValueEmitter::visitAnyHashableErasureExpr(AnyHashableErasureExpr *E,
                                                   SGFContext C) {
   // Ensure that the intrinsic function exists.
