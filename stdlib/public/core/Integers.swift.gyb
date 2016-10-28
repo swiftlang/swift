@@ -2033,12 +2033,20 @@ extension FixedWidthInteger {
 
 % for x in binaryArithmetic['Arithmetic']:
 %   callLabel = x.firstArg + ': ' if not x.firstArg == '_' else ''
+// FIXME(integers): penging optimizer work on handling the case where the
+// boolean value is wrapped into a two-case enum and then immediately
+// unwrapped. <rdar://problem/29004429>
+// Uncomment this block and remove the corresponding one from the concrete
+// types once the optimizer is ready.
+#if false
   @_transparent
   public static func ${x.operator}=(_ lhs: inout Self, _ rhs: Self) {
     let (result, overflow) = lhs.${x.name}WithOverflow(${callLabel}rhs)
     _precondition(overflow == .none, "Overflow in ${x.operator}=")
     lhs = result
   }
+#endif
+// end of FIXME(integers)
 
 ${unsafeOperationComment(x.operator)}
   @_transparent
@@ -2318,8 +2326,32 @@ public struct ${Self}
     return Bool(Builtin.cmp_${u}lt_Int${bits}(lhs._value, rhs._value))
   }
 
+
+// FIXME(integers): penging optimizer work on handling the case where the
+// boolean value is wrapped into a two-case enum and then immediately
+// unwrapped. <rdar://problem/29004429>
+// See corresponding definitions in the FixedWidthInteger extension.
+%       for x in binaryArithmetic['Arithmetic']:
+  @_transparent
+  public static func ${x.operator}=(_ lhs: inout ${Self}, _ rhs: ${Self}) {
+    let (result, overflow) =
+%   if x.kind == '/':
+      (Builtin.${u}${x.llvmName}_Int${bits}(lhs._value, rhs._value),
+      false._value)
+%   else:
+  // !!! This implementation is incorrect for division and modulo, as it does
+  // not catch division by zero.
+      Builtin.${u}${x.llvmName}_with_overflow_Int${bits}(
+        lhs._value, rhs._value, true._value)
+%   end
+      Builtin.condfail(overflow)
+      lhs = ${Self}(result)
+  }
+%       end
+// end of FIXME(integers)
+
 %       for x in [op for ops in binaryArithmetic.values() for op in ops]:
-%         callLabel = x.firstArg + ': ' if not x.firstArg == '_' else ''
+
   @_transparent
   public func ${x.name}WithOverflow(
     ${x.firstArg} other: ${Self}
