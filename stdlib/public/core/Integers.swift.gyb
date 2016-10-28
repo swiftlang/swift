@@ -2163,9 +2163,11 @@ extension UnsignedInteger where Self : FixedWidthInteger {
   public init<T : BinaryInteger>(_ source: T) {
     _precondition(source >= 0,
       "negative value is not representable")
-    let requiredBits = source.minimumSignedRepresentationBitWidth - 1
-    _precondition(requiredBits <= Self.bitWidth,
-      "Not enough bits to represent an unsigned value")
+    // FIXME(integers): uncomment the check when the ctlz instruction gets the
+    // necessary optimizations. <rdar://problem/29004328>
+    /*let requiredBits = source.minimumSignedRepresentationBitWidth - 1*/
+    /*_precondition(requiredBits <= Self.bitWidth,*/
+      /*"Not enough bits to represent an unsigned value")*/
     self.init(extendingOrTruncating: source)
   }
 
@@ -2215,10 +2217,12 @@ extension SignedInteger {
 extension SignedInteger where Self : FixedWidthInteger {
   @_transparent
   public init<T : BinaryInteger>(_ source: T) {
-    let requiredBits = source.minimumSignedRepresentationBitWidth
-    _precondition(
-      requiredBits <= Self.bitWidth,
-      "Not enough bits to represent a signed value")
+    // FIXME(integers): uncomment the check when the ctlz instruction gets the
+    // necessary optimizations. <rdar://problem/29004328>
+    /*let requiredBits = source.minimumSignedRepresentationBitWidth*/
+    /*_precondition(*/
+      /*requiredBits <= Self.bitWidth,*/
+      /*"Not enough bits to represent a signed value")*/
     self.init(extendingOrTruncating: source)
   }
 
