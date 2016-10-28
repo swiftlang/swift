@@ -619,11 +619,11 @@ public protocol Sequence {
   /// in the same order.
   func _copyToContiguousArray() -> ContiguousArray<Iterator.Element>
 
-  /// Copy a Sequence into an array, returning one past the last
-  /// element initialized.
-  @discardableResult
-  func _copyContents(initializing ptr: UnsafeMutablePointer<Iterator.Element>)
-    -> UnsafeMutablePointer<Iterator.Element>
+  /// Copy `self` into an unsafe buffer, returning a partially-consumed 
+  /// iterator with any elements that didn't fit remaining.
+  func _copyContents(
+    initializing ptr: UnsafeMutableBufferPointer<Iterator.Element>
+  ) -> Iterator?
 }
 
 /// A default makeIterator() function for `IteratorProtocol` instances that
@@ -1368,19 +1368,23 @@ extension Sequence {
 }
 
 extension Sequence {
-  @discardableResult
   public func _copyContents(
-    initializing ptr: UnsafeMutablePointer<Iterator.Element>
-  ) -> UnsafeMutablePointer<Iterator.Element> {
-    var p = UnsafeMutablePointer<Iterator.Element>(ptr)
-    for x in IteratorSequence(self.makeIterator()) {
+    initializing buf: UnsafeMutableBufferPointer<Iterator.Element>
+  ) -> Iterator? {
+    var it = self.makeIterator()
+    // FIXME: decide if a nil buffer base pointer is valid or an error
+    guard let base = buf.baseAddress else { return it }
+    for p in base..<(base + buf.count) {
+      // FIXME: decide if underflow is an error that should trap
+      guard let x = it.next() else { break }
       p.initialize(to: x)
-      p += 1
     }
-    return p
+    return it
   }
 }
 
+// FIXME(ABI) #167(Recursive Protocol Constraints): IteratorSequence
+// shouldn't be necessary, iterators should be sequences.
 // Pending <rdar://problem/14011860> and <rdar://problem/14396120>,
 // pass an IteratorProtocol through IteratorSequence to give it "Sequence-ness"
 /// A sequence built around an iterator of type `Base`.

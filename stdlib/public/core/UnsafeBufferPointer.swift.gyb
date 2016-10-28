@@ -290,6 +290,24 @@ extension Unsafe${Mutable}BufferPointer : CustomDebugStringConvertible {
 }
 %end
 
+
+extension UnsafeMutableBufferPointer {
+  /// Initializes memory in the buffer starting with the elements of `source`.
+  /// Returns an iterator to any elements of `source` that didn't fit in the 
+  /// buffer.
+  ///
+  /// - Precondition: The memory at `self..<self + count` is
+  ///   uninitialized.
+  ///
+  /// - Postcondition: The `Pointee`s at `self..<self + count` are
+  ///   initialized.
+  public func initialize<S: Sequence>(from source: S) -> S.Iterator?
+    where S.Iterator.Element == Iterator.Element {
+    return source._copyContents(initializing: self)
+  }
+}
+
+
 @available(*, unavailable, renamed: "UnsafeBufferPointerIterator")
 public struct UnsafeBufferPointerGenerator<Element> {}
 

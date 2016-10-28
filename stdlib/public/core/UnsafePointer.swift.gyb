@@ -628,9 +628,15 @@ public struct ${Self}<Pointee>
   ///
   /// - Parameter source: A collection of elements of the pointer's `Pointee`
   ///   type.
+  // This is fundamentally unsafe since collections can underreport their count.
+  @available(*, deprecated, message: "it will be removed in Swift 4.0.  Please use 'UnsafeMutableBufferPointer.initialize(from:)' instead")
   public func initialize<C : Collection>(from source: C)
     where C.Iterator.Element == Pointee {
-    source._copyContents(initializing: self)
+    let buf = UnsafeMutableBufferPointer(start: self, count: numericCast(source.count))
+    if var remaining = source._copyContents(initializing: buf),
+       remaining.next() != nil {
+      fatalError("Would have overwritten memory with more elements than expected")
+    }    
   }
 
   /// Replaces the memory referenced by this pointer with the values
