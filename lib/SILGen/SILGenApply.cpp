@@ -63,8 +63,7 @@ replaceSelfTypeForDynamicLookup(ASTContext &ctx,
 
   // If the method returns Self, substitute AnyObject for the result type.
   SmallVector<SILResultInfo, 4> newResults;
-  newResults.append(fnType->getAllResults().begin(),
-                    fnType->getAllResults().end());
+  newResults.append(fnType->getResults().begin(), fnType->getResults().end());
   if (auto fnDecl = dyn_cast<FuncDecl>(methodName.getDecl())) {
     if (fnDecl->hasDynamicSelf()) {
       auto anyObjectTy = ctx.getProtocol(KnownProtocolKind::AnyObject)
@@ -696,7 +695,7 @@ static Callee prepareArchetypeCallee(SILGenFunction &gen, SILLocation loc,
       return;
 
     auto selfParameter = getSelfParameter();
-    assert(selfParameter.isIndirect());
+    assert(gen.silConv.isSILIndirect(selfParameter));
     (void)selfParameter;
 
     SILLocation selfLoc = selfValue.getLocation();
@@ -1664,7 +1663,8 @@ SILValue SILGenFunction::emitApplyWithRethrow(SILLocation loc,
                                               ArrayRef<Substitution> subs,
                                               ArrayRef<SILValue> args) {
   CanSILFunctionType silFnType = substFnType.castTo<SILFunctionType>();
-  SILType resultType = silFnType->getSILResult();
+  SILFunctionConventions fnConv(silFnType, SGM.M);
+  SILType resultType = fnConv.getSILResultType();
 
   if (!silFnType->hasErrorResult()) {
     return B.createApply(loc, fn, substFnType, resultType, subs, args);
@@ -1677,8 +1677,8 @@ SILValue SILGenFunction::emitApplyWithRethrow(SILLocation loc,
   // Emit the rethrow logic.
   {
     B.emitBlock(errorBB);
-    SILValue error = errorBB->createPHIArgument(
-        silFnType->getErrorResult().getSILType(), ValueOwnershipKind::Owned);
+    SILValue error = errorBB->createPHIArgument(fnConv.getSILErrorType(),
+                                                ValueOwnershipKind::Owned);
 
     B.createBuiltin(loc, SGM.getASTContext().getIdentifier("willThrow"),
                     SGM.Types.getEmptyTupleType(), {}, {error});
@@ -1781,6 +1781,7 @@ static SILValue emitRawApply(SILGenFunction &gen,
                              CanSILFunctionType substFnType,
                              ApplyOptions options,
                              ArrayRef<SILValue> indirectResultAddrs) {
+  SILFunctionConventions substFnConv(substFnType, gen.SGM.M);
   // Get the callee value.
   SILValue fnValue = substFnType->isCalleeConsumed()
     ? fn.forward(gen)
@@ -1790,30 +1791,31 @@ static SILValue emitRawApply(SILGenFunction &gen,
 
   // Add the buffers for the indirect results if needed.
 #ifndef NDEBUG
-  assert(indirectResultAddrs.size() == substFnType->getNumIndirectResults());
-  for (auto i : indices(indirectResultAddrs)) {
-    assert(indirectResultAddrs[i]->getType() ==
-            substFnType->getIndirectResults()[i].getSILType());
+  assert(indirectResultAddrs.size() == substFnConv.getNumIndirectSILResults());
+  unsigned resultIdx = 0;
+  for (auto indResultTy : substFnConv.getIndirectSILResultTypes()) {
+    assert(indResultTy == indirectResultAddrs[resultIdx++]->getType());
   }
 #endif
   argValues.append(indirectResultAddrs.begin(), indirectResultAddrs.end());
 
-  auto inputTypes = substFnType->getParameters();
-  assert(inputTypes.size() == args.size());
+  auto inputParams = substFnType->getParameters();
+  assert(inputParams.size() == args.size());
 
   // Gather the arguments.
   for (auto i : indices(args)) {
-    auto argValue = (inputTypes[i].isConsumed() ? args[i].forward(gen)
-                                                : args[i].getValue());
+    auto argValue = (inputParams[i].isConsumed() ? args[i].forward(gen)
+                                                 : args[i].getValue());
 #ifndef NDEBUG
-    if (argValue->getType() != inputTypes[i].getSILType()) {
+    auto inputTy = substFnConv.getSILType(inputParams[i]);
+    if (argValue->getType() != inputTy) {
       auto &out = llvm::errs();
       out << "TYPE MISMATCH IN ARGUMENT " << i << " OF APPLY AT ";
       printSILLocationDescription(out, loc, gen.getASTContext());
       out << "  argument value: ";
       argValue->print(out);
       out << "  parameter type: ";
-      inputTypes[i].print(out);
+      inputTy.print(out);
       out << "\n";
       abort();
     }
@@ -1821,7 +1823,7 @@ static SILValue emitRawApply(SILGenFunction &gen,
     argValues.push_back(argValue);
   }
 
-  auto resultType = substFnType->getSILResult();
+  auto resultType = substFnConv.getSILResultType();
   auto calleeType = SILType::getPrimitiveObjectType(substFnType);
 
   // If we don't have an error result, we can make a simple 'apply'.
@@ -1850,7 +1852,7 @@ static SILValue emitRawApply(SILGenFunction &gen,
   // Be sure to use a CleanupLocation so that unreachable code diagnostics don't
   // trigger.
   for (auto i : indices(args)) {
-    if (!inputTypes[i].isGuaranteed() || args[i].isPlusZeroRValueOrTrivial())
+    if (!inputParams[i].isGuaranteed() || args[i].isPlusZeroRValueOrTrivial())
       continue;
 
     SILValue argValue = args[i].forward(gen);
@@ -2187,9 +2189,9 @@ ResultPlanPtr ResultPlanBuilder::build(Initialization *init,
 
     // If the result is indirect, and we have an address to emit into, and
     // there are no abstraction differences, then just do it.
-    if (initAddr && result.isIndirect() &&
-        !hasAbstractionDifference(Rep, initAddr->getType(),
-                                  result.getSILType())) {
+    if (initAddr && result.isFormalIndirect()
+        && !hasAbstractionDifference(Rep, initAddr->getType(),
+                                     result.getFormalSILType())) {
       IndirectResultAddrs.push_back(initAddr);
       return ResultPlanPtr(new InPlaceInitializationResultPlan(init));
     }
@@ -2204,8 +2206,8 @@ ResultPlanPtr ResultPlanBuilder::build(Initialization *init,
 
   // Create a temporary if the result is indirect.
   std::unique_ptr<TemporaryInitialization> temporary;
-  if (result.isIndirect()) {
-    auto &resultTL = Gen.getTypeLowering(result.getSILType());
+  if (Gen.silConv.isSILIndirect(result)) {
+    auto &resultTL = Gen.getTypeLowering(result.getType());
     temporary = Gen.emitTemporary(Loc, resultTL);
     IndirectResultAddrs.push_back(temporary->getAddress());
   }
@@ -2259,7 +2261,7 @@ ResultPlanPtr ResultPlanBuilder::buildForTuple(Initialization *init,
 }
 
 static bool hasUnownedInnerPointerResult(CanSILFunctionType fnType) {
-  for (auto result : fnType->getAllResults()) {
+  for (auto result : fnType->getResults()) {
     if (result.getConvention() == ResultConvention::UnownedInnerPointer)
       return true;
   }
@@ -2275,7 +2277,7 @@ computeResultPlan(SILGenFunction *SGF, CanSILFunctionType substFnType,
                   SmallVectorImpl<SILValue> &indirectResultAddrs) {
   auto origResultTypeForPlan = origResultType;
   auto substResultTypeForPlan = substResultType;
-  ArrayRef<SILResultInfo> allResults = substFnType->getAllResults();
+  ArrayRef<SILResultInfo> allResults = substFnType->getResults();
   SILResultInfo optResult;
 
   // The plan needs to be built using the formal result type
@@ -2298,9 +2300,8 @@ computeResultPlan(SILGenFunction *SGF, CanSILFunctionType substFnType,
     // type; we need to make our own make SILResultInfo array.
     case ForeignErrorConvention::NilResult: {
       assert(allResults.size() == 1);
-      SILType objectType =
-          allResults[0].getSILType().getAnyOptionalObjectType();
-      optResult = allResults[0].getWithType(objectType.getSwiftRValueType());
+      CanType objectType = allResults[0].getType().getAnyOptionalObjectType();
+      optResult = allResults[0].getWithType(objectType);
       allResults = optResult;
       break;
     }
@@ -2395,15 +2396,17 @@ RValue SILGenFunction::emitApply(
                                           indirectResultAddrs);
 
   // Explode the direct results.
+  SILFunctionConventions substFnConv(substFnType, SGM.M);
   SmallVector<ManagedValue, 4> directResults;
   auto addManagedDirectResult = [&](SILValue result, SILResultInfo resultInfo) {
-    auto &resultTL = getTypeLowering(resultInfo.getSILType());
+    auto &resultTL = getTypeLowering(resultInfo.getType());
 
     switch (resultInfo.getConvention()) {
     case ResultConvention::Indirect:
-      llvm_unreachable("indirect direct result?");
+      assert(!substFnConv.isSILIndirect(resultInfo)
+             && "indirect direct result?");
+      break;
 
-    // For owned results, the value is already retained.
     case ResultConvention::Owned:
       break;
 
@@ -2431,16 +2434,18 @@ RValue SILGenFunction::emitApply(
     directResults.push_back(emitManagedRValueWithCleanup(result, resultTL));
   };
 
-  auto formalDirectResults = substFnType->getDirectResults();
-  if (formalDirectResults.empty()) {
+  auto directSILResults = substFnConv.getDirectSILResults();
+  if (directSILResults.empty()) {
     // Nothing to do.
-  } else if (formalDirectResults.size() == 1) {
-    addManagedDirectResult(rawDirectResult, formalDirectResults[0]);
+  } else if (substFnConv.getNumDirectSILResults() == 1) {
+    addManagedDirectResult(rawDirectResult, *directSILResults.begin());
   } else {
-    for (auto i : indices(formalDirectResults)) {
-      auto elt = B.createTupleExtract(loc, rawDirectResult, i,
-                                      formalDirectResults[i].getSILType());
-      addManagedDirectResult(elt, formalDirectResults[i]);
+    unsigned eltIdx = 0;
+    for (auto directResult : directSILResults) {
+      auto elt = B.createTupleExtract(loc, rawDirectResult, eltIdx,
+                                      substFnConv.getSILType(directResult));
+      addManagedDirectResult(elt, directResult);
+      ++eltIdx;
     }
   }
 
@@ -2932,7 +2937,7 @@ namespace {
       // it's not already there.  (Note that this potentially includes
       // conventions which pass indirectly without transferring
       // ownership, like Itanium C++.)
-      if (param.isIndirect()) {
+      if (SGF.silConv.isSILIndirect(param)) {
         if (specialDest) {
           emitIndirectInto(std::move(arg), origParamType,
                            loweredSubstParamType, *specialDest);
@@ -3063,7 +3068,8 @@ namespace {
       }
 
       // Otherwise, simultaneously emit and reabstract.
-      return std::move(arg).materialize(SGF, origParamType, param.getSILType());
+      return std::move(arg).materialize(SGF, origParamType,
+                                        SGF.getSILType(param));
     }
 
     void emitIndirectInto(ArgumentSource &&arg,
@@ -3301,7 +3307,7 @@ namespace {
         .getAsSingleValue(SGF, argExpr);
       
       // Early exit if we already exactly match the parameter type.
-      if (emittedArg.getType() == param.getSILType()) {
+      if (emittedArg.getType() == SGF.getSILType(param)) {
         return emittedArg;
       }
       
@@ -3357,23 +3363,22 @@ namespace {
       // Bind the optional value if we started with an optional.
       bool nativeIsOptional = (bool)emittedArg.getType().getSwiftRValueType()
         ->getAnyOptionalObjectType();
-      bool bridgedIsOptional = (bool)param.getSILType().getSwiftRValueType()
-        ->getAnyOptionalObjectType();
+      bool bridgedIsOptional =
+          (bool)param.getType()->getAnyOptionalObjectType();
       if (nativeIsOptional && bridgedIsOptional) {
-        return SGF.emitOptionalToOptional(argExpr,
-                                          emittedArg, param.getSILType(),
-                                          doBridge);
+        return SGF.emitOptionalToOptional(argExpr, emittedArg,
+                                          SGF.getSILType(param), doBridge);
       } else if (!nativeIsOptional && bridgedIsOptional) {
-        auto paramObjTy = param.getSILType().getAnyOptionalObjectType();
+        auto paramObjTy = SGF.getSILType(param).getAnyOptionalObjectType();
         auto transformed = doBridge(SGF, argExpr, emittedArg,
                                     paramObjTy);
         // Inject into optional.
         auto opt = SGF.B.createEnum(argExpr, transformed.getValue(),
                                     SGF.getASTContext().getOptionalSomeDecl(),
-                                    param.getSILType());
+                                    SGF.getSILType(param));
         return ManagedValue(opt, transformed.getCleanup());
       } else {
-        return doBridge(SGF, argExpr, emittedArg, param.getSILType());
+        return doBridge(SGF, argExpr, emittedArg, SGF.getSILType(param));
       }
     }
     
@@ -3945,10 +3950,11 @@ namespace {
     ArrayRef<SILParameterInfo> Params;
     unsigned ClaimedForeignSelf = -1;
     SILFunctionTypeRepresentation Rep;
+    SILFunctionConventions fnConv;
 
-    ParamLowering(CanSILFunctionType fnType)
-      : Params(fnType->getParameters()),
-        Rep(fnType->getRepresentation()) {}
+    ParamLowering(CanSILFunctionType fnType, SILGenFunction &gen)
+        : Params(fnType->getParameters()), Rep(fnType->getRepresentation()),
+          fnConv(fnType, gen.SGM.M) {}
 
     ClaimedParamsRef
     claimParams(AbstractionPattern origParamType, CanType substParamType,
@@ -3992,8 +3998,8 @@ namespace {
       assert(Params.size() >= captures.size()
              && "more captures than params?!");
       for (unsigned i = 0; i < captures.size(); ++i) {
-        assert(Params[i + firstCapture].getSILType()
-               == captures[i].getType()
+        assert(fnConv.getSILType(Params[i + firstCapture])
+                   == captures[i].getType()
                && "capture doesn't match param type");
       }
 #endif
@@ -4321,7 +4327,7 @@ namespace {
           assert(uncurriedSites.size() == 1);
         }
 
-        assert(substFnType->getNumAllResults() == 1);
+        assert(substFnType->getNumResults() == 1);
         ManagedValue resultMV =
           gen.emitInjectEnum(uncurriedLoc, std::move(payload),
                              gen.getLoweredType(formalResultType),
@@ -4338,7 +4344,7 @@ namespace {
         CanFunctionType formalApplyType;
         args.reserve(uncurriedSites.size());
         {
-          ParamLowering paramLowering(substFnType);
+          ParamLowering paramLowering(substFnType, gen);
 
           assert(!foreignError ||
                  uncurriedSites.size() == 1 ||
@@ -4482,11 +4488,11 @@ namespace {
           for (auto arg : uncurriedArgs) {
             consumedArgs.push_back(arg.forward(gen));
           }
+          SILFunctionConventions substConv(substFnType, gen.SGM.M);
           auto resultVal =
-            gen.B.createBuiltin(uncurriedLoc.getValue(), builtinName,
-                                substFnType->getSILResult(),
-                                callee.getSubstitutions(),
-                                consumedArgs);
+              gen.B.createBuiltin(uncurriedLoc.getValue(), builtinName,
+                                  substConv.getSILResultType(),
+                                  callee.getSubstitutions(), consumedArgs);
           result = RValue(gen, *uncurriedLoc, formalApplyType.getResult(),
                           gen.emitManagedRValueWithCleanup(resultVal));
         }
@@ -4505,7 +4511,7 @@ namespace {
         auto functionMV = std::move(result).getAsSingleValue(gen, loc);
 
         auto substFnType = functionMV.getType().castTo<SILFunctionType>();
-        ParamLowering paramLowering(substFnType);
+        ParamLowering paramLowering(substFnType, gen);
 
         SmallVector<ManagedValue, 4> siteArgs;
         SmallVector<InOutArgument, 2> inoutArgs;
@@ -4695,7 +4701,7 @@ static RValue emitApplyAllocatingInitializer(SILGenFunction &SGF,
     // Determine the self metatype type.
     CanSILFunctionType substFnType =
       initConstant.SILFnType->substGenericArgs(SGF.SGM.M, subs);
-    SILType selfParamMetaTy = substFnType->getSelfParameter().getSILType();
+    SILType selfParamMetaTy = SGF.getSILType(substFnType->getSelfParameter());
 
     if (overriddenSelfType) {
       // If the 'self' type has been overridden, form a metatype to the
@@ -5090,7 +5096,7 @@ ArgumentSource SILGenFunction::prepareAccessorBaseArg(SILLocation loc,
 
     // If the parameter is indirect, we need to drop the value into
     // temporary memory.
-    if (selfParam.isIndirect()) {
+    if (silConv.isSILIndirect(selfParam)) {
       // It's usually a really bad idea to materialize when we're
       // about to pass a value to an inout argument, because it's a
       // really easy way to silently drop modifications (e.g. from a

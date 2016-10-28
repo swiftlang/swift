@@ -1268,12 +1268,12 @@ void EscapeAnalysis::analyzeInstruction(SILInstruction *I,
         break;
     }
 
-    if (FAS.getReferencedFunction() &&
-        FAS.getReferencedFunction()->hasSemanticsAttr(
-            "self_no_escaping_closure") &&
-        ((FAS.hasIndirectResults() && FAS.getNumArguments() == 3) ||
-         (!FAS.hasIndirectResults() && FAS.getNumArguments() == 2)) &&
-        FAS.hasSelfArgument()) {
+    if (FAS.getReferencedFunction()
+        && FAS.getReferencedFunction()->hasSemanticsAttr(
+               "self_no_escaping_closure")
+        && ((FAS.hasIndirectSILResults() && FAS.getNumArguments() == 3)
+            || (!FAS.hasIndirectSILResults() && FAS.getNumArguments() == 2))
+        && FAS.hasSelfArgument()) {
       // The programmer has guaranteed that the closure will not capture the
       // self pointer passed to it or anything that is transitively reachable
       // from the pointer.
@@ -1283,12 +1283,12 @@ void EscapeAnalysis::analyzeInstruction(SILInstruction *I,
       return;
     }
 
-    if (FAS.getReferencedFunction() &&
-        FAS.getReferencedFunction()->hasSemanticsAttr(
-            "pair_no_escaping_closure") &&
-        ((FAS.hasIndirectResults() && FAS.getNumArguments() == 4) ||
-         (!FAS.hasIndirectResults() && FAS.getNumArguments() == 3)) &&
-        FAS.hasSelfArgument()) {
+    if (FAS.getReferencedFunction()
+        && FAS.getReferencedFunction()->hasSemanticsAttr(
+               "pair_no_escaping_closure")
+        && ((FAS.hasIndirectSILResults() && FAS.getNumArguments() == 4)
+            || (!FAS.hasIndirectSILResults() && FAS.getNumArguments() == 3))
+        && FAS.hasSelfArgument()) {
       // The programmer has guaranteed that the closure will not capture the
       // self pointer passed to it or anything that is transitively reachable
       // from the pointer.

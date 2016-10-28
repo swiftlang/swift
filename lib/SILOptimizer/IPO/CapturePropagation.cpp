@@ -170,13 +170,13 @@ void CapturePropagationCloner::cloneBlocks(
   // Create the entry basic block with the function arguments.
   SILBasicBlock *OrigEntryBB = &*OrigF->begin();
   SILBasicBlock *ClonedEntryBB = CloneF.createBasicBlock();
-  CanSILFunctionType CloneFTy = CloneF.getLoweredFunctionType();
+  auto cloneConv = CloneF.getConventions();
 
   // Only clone the arguments that remain in the new function type. The trailing
   // arguments are now propagated through the partial apply.
   assert(!IsCloningConstant && "incorrect mode");
   unsigned ParamIdx = 0;
-  for (unsigned NewParamEnd = CloneFTy->getNumSILArguments();
+  for (unsigned NewParamEnd = cloneConv.getNumSILArguments();
        ParamIdx != NewParamEnd; ++ParamIdx) {
 
     SILArgument *Arg = OrigEntryBB->getArgument(ParamIdx);

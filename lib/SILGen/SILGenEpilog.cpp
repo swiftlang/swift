@@ -25,9 +25,13 @@ void SILGenFunction::prepareEpilog(Type resultType, bool isThrowing,
   // If we have any direct results, receive them via BB arguments.
   // But callers can disable this by passing a null result type.
   if (resultType) {
-    NeedsReturn = (F.getLoweredFunctionType()->getNumAllResults() != 0);
-    for (auto directResult : F.getLoweredFunctionType()->getDirectResults()) {
-      SILType resultType = F.mapTypeIntoContext(directResult.getSILType());
+    auto fnConv = F.getConventions();
+    // Set NeedsReturn for indirect or direct results. This ensures that SILGen
+    // emits unreachable if there is no source level return.
+    NeedsReturn = (fnConv.funcTy->getNumResults() != 0);
+    for (auto directResult : fnConv.getDirectSILResults()) {
+      SILType resultType =
+          F.mapTypeIntoContext(fnConv.getSILType(directResult));
       epilogBB->createPHIArgument(resultType, ValueOwnershipKind::Owned);
     }
   }
@@ -162,8 +166,7 @@ SILGenFunction::emitEpilogBB(SILLocation TopLevel) {
   // block.
   SILValue returnValue;
   if (!directResults.empty()) {
-    assert(directResults.size()
-             == F.getLoweredFunctionType()->getNumDirectResults());
+    assert(directResults.size() == F.getConventions().getNumDirectSILResults());
     returnValue = buildReturnValue(*this, TopLevel, directResults);
   }
 

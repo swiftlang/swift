@@ -152,7 +152,7 @@ bool ReleaseDevirtualizer::createDeallocCall(SILType AllocType,
   if (DeallocType->isPolymorphic())
     DeallocType = DeallocType->substGenericArgs(M, AllocSubsts);
 
-  SILType ReturnType = DeallocType->getSILResult();
+  SILType ReturnType = Dealloc->getConventions().getSILResultType();
   SILType DeallocSILType = SILType::getPrimitiveObjectType(DeallocType);
 
   SILBuilder B(ReleaseInst);

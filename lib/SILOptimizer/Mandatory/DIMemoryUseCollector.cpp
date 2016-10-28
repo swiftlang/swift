@@ -725,11 +725,11 @@ void ElementUseCollector::collectUses(SILValue Pointer, unsigned BaseEltNo) {
     // Note that partial_apply instructions always close over their argument.
     //
     if (auto *Apply = dyn_cast<ApplyInst>(User)) {
-      auto FTI = Apply->getSubstCalleeType();
+      auto substConv = Apply->getSubstCalleeConv();
       unsigned ArgumentNumber = UI->getOperandNumber()-1;
 
       // If this is an out-parameter, it is like a store.
-      unsigned NumIndirectResults = FTI->getNumIndirectResults();
+      unsigned NumIndirectResults = substConv.getNumIndirectSILResults();
       if (ArgumentNumber < NumIndirectResults) {
         assert(!InStructSubElement && "We're initializing sub-members?");
         addElementUses(BaseEltNo, PointeeType, User,
@@ -741,8 +741,8 @@ void ElementUseCollector::collectUses(SILValue Pointer, unsigned BaseEltNo) {
         ArgumentNumber -= NumIndirectResults;
       }
 
-      auto ParamConvention = FTI->getParameters()[ArgumentNumber]
-        .getConvention();
+      auto ParamConvention =
+          substConv.getParameters()[ArgumentNumber].getConvention();
 
       switch (ParamConvention) {
       case ParameterConvention::Direct_Owned:

@@ -571,26 +571,28 @@ void IRGenDebugInfo::createParameterType(
   Parameters.push_back(getOrCreateType(DbgTy));
 }
 
-llvm::DITypeRefArray
-IRGenDebugInfo::createParameterTypes(SILType SILTy, DeclContext *DeclCtx) {
-  if (!SILTy)
-    return nullptr;
-  return createParameterTypes(SILTy.castTo<SILFunctionType>(), DeclCtx);
-}
-
+// This is different from SILFunctionType::getAllResultsType() in some subtle
+// ways.
 static SILType getResultTypeForDebugInfo(CanSILFunctionType fnTy) {
-  if (fnTy->getNumAllResults() == 1) {
-    return fnTy->getAllResults()[0].getSILType();
-  } else if (!fnTy->getNumIndirectResults()) {
-    return fnTy->getSILResult();
+  if (fnTy->getNumResults() == 1) {
+    return fnTy->getResults()[0].getFormalSILType();
+  } else if (!fnTy->getNumIndirectFormalResults()) {
+    return fnTy->getDirectFormalResultsType();
   } else {
     SmallVector<TupleTypeElt, 4> eltTys;
-    for (auto &result : fnTy->getAllResults()) {
+    for (auto &result : fnTy->getResults()) {
       eltTys.push_back(result.getType());
     }
     return SILType::getPrimitiveAddressType(
       CanType(TupleType::get(eltTys, fnTy->getASTContext())));
   }
+}
+
+llvm::DITypeRefArray
+IRGenDebugInfo::createParameterTypes(SILType SILTy, DeclContext *DeclCtx) {
+  if (!SILTy)
+    return nullptr;
+  return createParameterTypes(SILTy.castTo<SILFunctionType>(), DeclCtx);
 }
 
 llvm::DITypeRefArray
@@ -607,7 +609,7 @@ IRGenDebugInfo::createParameterTypes(CanSILFunctionType FnTy,
   // type. We currently represent a function with one n-tuple argument
   // as an n-ary function.
   for (auto Param : FnTy->getParameters())
-    createParameterType(Parameters, Param.getSILType(), DeclCtx);
+    createParameterType(Parameters, IGM.silConv.getSILType(Param), DeclCtx);
 
   return DBuilder.getOrCreateTypeArray(Parameters);
 }

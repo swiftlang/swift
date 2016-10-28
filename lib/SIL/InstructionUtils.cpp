@@ -404,7 +404,7 @@ void ConformanceCollector::collect(swift::SILInstruction *I) {
         CanSILFunctionType SubstFnTy = AS.getSubstCalleeType();
 
         scanFuncParams(OrigFnTy->getParameters(), SubstFnTy->getParameters());
-        scanFuncParams(OrigFnTy->getAllResults(), SubstFnTy->getAllResults());
+        scanFuncParams(OrigFnTy->getResults(), SubstFnTy->getResults());
 
         if (OrigFnTy->getRepresentation() ==
             SILFunctionType::Representation::WitnessMethod) {

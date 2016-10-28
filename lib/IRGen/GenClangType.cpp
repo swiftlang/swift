@@ -537,7 +537,7 @@ clang::CanQualType GenClangType::visitSILFunctionType(CanSILFunctionType type) {
   }
   
   // Convert the return and parameter types.
-  auto allResults = type->getAllResults();
+  auto allResults = type->getResults();
   assert(allResults.size() <= 1 && "multiple results with C convention");
   clang::QualType resultType;
   if (allResults.empty()) {
@@ -726,14 +726,14 @@ clang::CanQualType IRGenModule::getClangType(SILType type) {
 }
 
 clang::CanQualType IRGenModule::getClangType(SILParameterInfo params) {
-  auto clangType = getClangType(params.getSILType());
+  auto clangType = getClangType(params.getFormalSILType());
   // @block_storage types must be @inout_aliasable and have
   // special lowering
-  if (!params.getSILType().is<SILBlockStorageType>()) {
+  if (!params.getFormalSILType().is<SILBlockStorageType>()) {
     if (params.isIndirectMutating()) {
       return getClangASTContext().getPointerType(clangType);
     }
-    if (params.isIndirect()) {
+    if (params.isFormalIndirect()) {
       auto constTy =
         getClangASTContext().getCanonicalType(clangType.withConst());
       return getClangASTContext().getPointerType(constTy);

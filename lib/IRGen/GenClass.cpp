@@ -766,14 +766,16 @@ static bool getInstanceSizeByMethod(IRGenFunction &IGF,
 
   // Check that it returns two size_t's and takes no other arguments.
   auto fnType = silFn->getLoweredFunctionType();
+  auto fnConv = silFn->getConventions();
   if (fnType->getParameters().size() != 1)
     return false;
-  if (fnType->getNumDirectResults() != 2 ||
-      fnType->getNumIndirectResults() != 0)
+  if (fnConv.getNumDirectSILResults() != 2
+      || fnConv.getNumIndirectSILResults() != 0)
     return false;
-  auto results = fnType->getDirectResults();
-  if (results[0].getConvention() != ResultConvention::Unowned ||
-      results[1].getConvention() != ResultConvention::Unowned)
+  if ((fnConv.getDirectSILResults().begin()->getConvention()
+       != ResultConvention::Unowned)
+      || (std::next(fnConv.getDirectSILResults().begin())->getConvention()
+          != ResultConvention::Unowned))
     return false;
   llvm::Function *llvmFn =
     IGF.IGM.getAddrOfSILFunction(silFn, NotForDefinition);

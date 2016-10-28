@@ -180,6 +180,7 @@ static bool useCaptured(Operand *UI) {
 }
 
 static bool partialApplyEscapes(SILValue V, bool examineApply) {
+  SILModuleConventions modConv(*V->getModule());
   for (auto UI : V->getUses()) {
     auto *User = UI->getUser();
 
@@ -212,7 +213,7 @@ static bool partialApplyEscapes(SILValue V, bool examineApply) {
       auto params = partialApply->getSubstCalleeType()
         ->getParameters();
       params = params.slice(params.size() - args.size(), args.size());
-      if (params[UI->getOperandNumber()-1].isIndirect()) {
+      if (modConv.isSILIndirect(params[UI->getOperandNumber() - 1])) {
         if (partialApplyEscapes(partialApply, /*examineApply = */ true))
           return true;
         continue;
@@ -246,19 +247,19 @@ static size_t getArgIndexForOperand(Operand *O) {
   assert(OperandIndex != 0 && "Operand cannot be the applied function!");
 
   // The applied function is the first operand.
-  auto ArgIndex = OperandIndex - 1;
+  auto ArgIndex = OperandIndex - ApplyInst::getArgumentOperandNumber();
 
   if (auto *Apply = dyn_cast<ApplyInst>(O->getUser())) {
-    assert(Apply->getSubstCalleeType()->getNumSILArguments() ==
-             Apply->getArguments().size() &&
-           "Expected all arguments to be supplied!");
+    assert(Apply->getSubstCalleeConv().getNumSILArguments()
+               == Apply->getArguments().size()
+           && "Expected all arguments to be supplied!");
     (void) Apply;
   } else {
     auto *PartialApply = cast<PartialApplyInst>(O->getUser());
-    auto FnType = PartialApply->getSubstCalleeType();
+    auto fnConv = PartialApply->getSubstCalleeConv();
     auto ArgCount = PartialApply->getArguments().size();
-    assert(ArgCount <= FnType->getParameters().size());
-    ArgIndex += (FnType->getNumSILArguments() - ArgCount);
+    assert(ArgCount <= fnConv.getNumParameters());
+    ArgIndex += (fnConv.getNumSILArguments() - ArgCount);
   }
 
   return ArgIndex;
@@ -272,7 +273,7 @@ static SILArgument *getParameterForOperand(SILFunction *F, Operand *O) {
 
   auto &Entry = F->front();
   size_t ArgIndex = getArgIndexForOperand(O);
-  assert(ArgIndex > F->FnType->getParameters().size());
+  assert(ArgIndex >= F->getConventions().getSILArgIndexOfFirstParam());
 
   return Entry.getArgument(ArgIndex);
 }
@@ -545,10 +546,10 @@ SILFunction *PromotedParamCloner::initCloned(SILFunction *Orig,
 
   // Generate a new parameter list with deleted parameters removed.
   SILFunctionType *OrigFTI = Orig->getLoweredFunctionType();
-  unsigned Index = OrigFTI->getNumIndirectResults();
+  unsigned Index = Orig->getConventions().getSILArgIndexOfFirstParam();
   for (auto &param : OrigFTI->getParameters()) {
     if (count(PromotedArgIndices, Index)) {
-      auto boxTy = param.getType()->castTo<SILBoxType>();
+      auto boxTy = param.getFormalSILType().castTo<SILBoxType>();
       assert(boxTy->getLayout()->getFields().size() == 1
              && "promoting compound box not implemented");
       SILType paramTy;
@@ -568,14 +569,11 @@ SILFunction *PromotedParamCloner::initCloned(SILFunction *Orig,
 
   // Create the new function type for the cloned function with some of
   // the parameters promoted.
-  auto ClonedTy =
-    SILFunctionType::get(OrigFTI->getGenericSignature(),
-                         OrigFTI->getExtInfo(),
-                         OrigFTI->getCalleeConvention(),
-                         ClonedInterfaceArgTys,
-                         OrigFTI->getAllResults(),
-                         OrigFTI->getOptionalErrorResult(),
-                         M.getASTContext());
+  auto ClonedTy = SILFunctionType::get(
+      OrigFTI->getGenericSignature(), OrigFTI->getExtInfo(),
+      OrigFTI->getCalleeConvention(), ClonedInterfaceArgTys,
+      OrigFTI->getResults(), OrigFTI->getOptionalErrorResult(),
+      M.getASTContext());
 
   assert((Orig->isTransparent() || Orig->isBare() || Orig->getLocation())
          && "SILFunction missing location");

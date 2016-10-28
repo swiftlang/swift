@@ -3237,7 +3237,7 @@ void Serializer::writeType(Type ty) {
       unsigned conv = getRawStableParameterConvention(param.getConvention());
       variableData.push_back(TypeID(conv));
     }
-    for (auto result : fnTy->getAllResults()) {
+    for (auto result : fnTy->getResults()) {
       variableData.push_back(addTypeRef(result.getType()));
       unsigned conv = getRawStableResultConvention(result.getConvention());
       variableData.push_back(TypeID(conv));
@@ -3259,14 +3259,10 @@ void Serializer::writeType(Type ty) {
       getRawStableParameterConvention(fnTy->getCalleeConvention());
 
     unsigned abbrCode = DeclTypeAbbrCodes[SILFunctionTypeLayout::Code];
-    SILFunctionTypeLayout::emitRecord(Out, ScratchRecord, abbrCode,
-          stableCalleeConvention,
-          stableRepresentation,
-          fnTy->isPseudogeneric(),
-          fnTy->hasErrorResult(),
-          fnTy->getParameters().size(),
-          fnTy->getNumAllResults(),
-          variableData);
+    SILFunctionTypeLayout::emitRecord(
+        Out, ScratchRecord, abbrCode, stableCalleeConvention,
+        stableRepresentation, fnTy->isPseudogeneric(), fnTy->hasErrorResult(),
+        fnTy->getParameters().size(), fnTy->getNumResults(), variableData);
     if (sig)
       writeGenericRequirements(sig->getRequirements(),
                                DeclTypeAbbrCodes);

@@ -970,7 +970,8 @@ namespace {
         auto substCallbackFnType = origCallbackFnType->substGenericArgs(
             M, substitutions);
         auto substCallbackType = SILType::getPrimitiveObjectType(substCallbackFnType);
-        auto metatypeType = substCallbackFnType->getParameters().back().getSILType();
+        auto metatypeType =
+            gen.getSILType(substCallbackFnType->getParameters().back());
 
         // We need to borrow the base here.  We can't just consume it
         // because we're in conditionally-executed code (and because

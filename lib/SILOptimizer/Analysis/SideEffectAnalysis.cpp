@@ -208,8 +208,9 @@ bool SideEffectAnalysis::getSemanticEffects(FunctionEffects &FE,
       if (!ASC.mayHaveBridgedObjectElementType()) {
         SelfEffects.Reads = true;
         SelfEffects.Releases |= !ASC.hasGuaranteedSelf();
-        for (auto i : indices(((ApplyInst *)ASC)->getOrigCalleeType()
-                                                ->getIndirectResults())) {
+        for (auto i : range(((ApplyInst *)ASC)
+                                ->getOrigCalleeConv()
+                                .getNumIndirectSILResults())) {
           assert(!ASC.hasGetElementDirectResult());
           FE.ParamEffects[i].Writes = true;
         }
@@ -364,7 +365,7 @@ void SideEffectAnalysis::analyzeInstruction(FunctionInfo *FInfo,
       auto Params = PAI->getSubstCalleeType()->getParameters();
       Params = Params.slice(Params.size() - Args.size(), Args.size());
       for (unsigned Idx : indices(Args)) {
-        if (isIndirectParameter(Params[Idx].getConvention()))
+        if (isIndirectFormalParameter(Params[Idx].getConvention()))
           FInfo->FE.getEffectsOn(Args[Idx])->Reads = true;
       }
       return;

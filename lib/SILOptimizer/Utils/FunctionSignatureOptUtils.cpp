@@ -75,7 +75,7 @@ bool swift::canSpecializeFunction(SILFunction *F) {
     return false;
 
   // For now ignore functions with indirect results.
-  if (F->getLoweredFunctionType()->hasIndirectResults())
+  if (F->getConventions().hasIndirectSILResults())
     return false;
 
   // Do not specialize the signature of always inline functions. We

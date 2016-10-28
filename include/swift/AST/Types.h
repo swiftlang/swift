@@ -66,7 +66,6 @@ namespace swift {
   class ModuleDecl;
   class ModuleType;
   class ProtocolConformance;
-  struct SILArgumentConvention;
   enum OptionalTypeKind : unsigned;
   enum PointerTypeKind : unsigned;
   struct ValueOwnershipKind;
@@ -312,7 +311,6 @@ protected:
     unsigned ExtInfo : 16;
     unsigned CalleeConvention : 3;
     unsigned HasErrorResult : 1;
-    unsigned HasCombinedResults : 1;
   };
   enum { NumSILFunctionTypeBits = NumTypeBaseBits + 16+5 };
   static_assert(NumSILFunctionTypeBits <= 32, "fits in an unsigned");
@@ -2713,7 +2711,7 @@ enum class ParameterConvention {
   Direct_Guaranteed,
 };
 
-inline bool isIndirectParameter(ParameterConvention conv) {
+inline bool isIndirectFormalParameter(ParameterConvention conv) {
   switch (conv) {
   case ParameterConvention::Indirect_In:
   case ParameterConvention::Indirect_Inout:
@@ -2780,8 +2778,8 @@ public:
   ParameterConvention getConvention() const {
     return Convention;
   }
-  bool isIndirect() const {
-    return isIndirectParameter(getConvention());
+  bool isFormalIndirect() const {
+    return isIndirectFormalParameter(getConvention());
   }
 
   bool isIndirectInGuaranteed() const {
@@ -2808,7 +2806,10 @@ public:
     return isGuaranteedParameter(getConvention());
   }
 
-  SILType getSILType() const; // in SILType.h
+  /// The formal SIL type determines reabstraction but may not correspond to
+  /// actual SIL argument types. Opaque values are formally indirect but
+  /// passed directly in canonical SIL.
+  SILType getFormalSILType() const; // in SILType.h
 
   /// Return a version of this parameter info with the type replaced.
   SILParameterInfo getWithType(CanType type) const {
@@ -2878,7 +2879,8 @@ enum class ResultConvention {
   Autoreleased,
 };
 
-inline bool isIndirectResult(ResultConvention convention) {
+// Is this result passed indirectly for the purpos of reabstraction.
+inline bool isIndirectFormalResult(ResultConvention convention) {
   return convention == ResultConvention::Indirect;
 }
 
@@ -2898,18 +2900,18 @@ public:
   ResultConvention getConvention() const {
     return TypeAndConvention.getInt();
   }
-  SILType getSILType() const; // in SILType.h
+  SILType getFormalSILType() const; // in SILType.h
 
   /// Return a version of this result info with the type replaced.
   SILResultInfo getWithType(CanType type) const {
     return SILResultInfo(type, getConvention());
   }
 
-  bool isIndirect() const {
-    return isIndirectResult(getConvention());
+  bool isFormalIndirect() const {
+    return isIndirectFormalResult(getConvention());
   }
-  bool isDirect() const {
-    return !isIndirectResult(getConvention());
+  bool isFormalDirect() const {
+    return !isIndirectFormalResult(getConvention());
   }
 
   /// Transform this SILResultInfo by applying the user-provided
@@ -2950,6 +2952,7 @@ public:
   
 class SILFunctionType;
 typedef CanTypeWrapper<SILFunctionType> CanSILFunctionType;
+class SILFunctionConventions;
 
 /// SILFunctionType - The lowered type of a function value, suitable
 /// for use by SIL.
@@ -3094,80 +3097,57 @@ public:
 
 private:
   unsigned NumParameters;
-  unsigned NumDirectResults : 16;
-  unsigned NumIndirectResults : 16;
+  unsigned NumResults : 16;               // Not including the ErrorResult.
+  unsigned NumIndirectFormalResults : 16; // Subset of NumResults.
 
   // The layout of a SILFunctionType in memory is:
   //   SILFunctionType
   //   SILParameterInfo[NumParameters]
-  //   SILResultInfo[NumDirectResults + NumIndirectResults]
-  //   SILResultInfo[NumDirectResults]?   // if hasCombinedResults()
-  //   SILResultInfo[NumIndirectResults]? // if hasCombinedResults()
-  //   SILResultInfo?                     // if hasErrorResult()
-  //   CanType?                           // if NumDirectResults > 1
+  //   SILResultInfo[NumResults]
+  //   SILResultInfo?                 // if hasErrorResult()
+  //   CanType?                       // if NumResults > 1, formal result cache
+  //   CanType?                       // if NumResults > 1, all result cache
 
   CanGenericSignature GenericSig;
-
-  bool hasCombinedResults() const {
-    return SILFunctionTypeBits.HasCombinedResults;
-  }
 
   MutableArrayRef<SILParameterInfo> getMutableParameters() {
     return {getTrailingObjects<SILParameterInfo>(), NumParameters};
   }
 
-  MutableArrayRef<SILResultInfo> getMutableAllResults() {
-    auto ptr = reinterpret_cast<SILResultInfo*>(getMutableParameters().end());
-    return MutableArrayRef<SILResultInfo>(ptr, getNumAllResults());
+  MutableArrayRef<SILResultInfo> getMutableResults() {
+    auto *ptr = reinterpret_cast<SILResultInfo *>(getMutableParameters().end());
+    return MutableArrayRef<SILResultInfo>(ptr, getNumResults());
   }
 
-  MutableArrayRef<SILResultInfo> getMutableDirectResults() {
-    assert(hasCombinedResults());
-    auto ptr = getMutableAllResults().end();
-    return MutableArrayRef<SILResultInfo>(ptr, NumDirectResults);
-  }
-
-  MutableArrayRef<SILResultInfo> getMutableIndirectResults() {
-    assert(hasCombinedResults());
-    auto ptr = getMutableDirectResults().end();
-    return MutableArrayRef<SILResultInfo>(ptr, NumIndirectResults);
-  }
-
-  SILResultInfo *getEndOfNormalResults() {
-    if (!hasCombinedResults()) {
-      return getMutableAllResults().end();
-    } else {
-      return getMutableIndirectResults().end();
-    }
-  }
+  SILResultInfo *getEndOfNormalResults() { return getMutableResults().end(); }
 
   SILResultInfo &getMutableErrorResult() {
     assert(hasErrorResult());
     return *getEndOfNormalResults();
   }
 
-  bool hasSILResultCache() const {
-    return NumDirectResults > 1;
+  bool hasResultCache() const { return NumResults > 1; }
+
+  CanType &getMutableFormalResultsCache() const {
+    assert(hasResultCache());
+    auto *ptr = const_cast<SILFunctionType *>(this)->getEndOfNormalResults()
+                + size_t(hasErrorResult());
+    return *reinterpret_cast<CanType*>(ptr);
   }
 
-  CanType &getMutableSILResultCache() const {
-    assert(hasSILResultCache());
-    auto ptr = const_cast<SILFunctionType*>(this)->getEndOfNormalResults()
-                 + size_t(hasErrorResult());
-    return *reinterpret_cast<CanType*>(ptr);
+  CanType &getMutableAllResultsCache() const {
+    assert(hasResultCache());
+    auto *ptr = const_cast<SILFunctionType *>(this)->getEndOfNormalResults()
+                + size_t(hasErrorResult());
+    return *(reinterpret_cast<CanType *>(ptr) + 1);
   }
 
   SILFunctionType(GenericSignature *genericSig, ExtInfo ext,
                   ParameterConvention calleeConvention,
                   ArrayRef<SILParameterInfo> params,
-                  ArrayRef<SILResultInfo> allResults,
-                  ArrayRef<SILResultInfo> directResults,
-                  ArrayRef<SILResultInfo> indirectResults,
-                  Optional<SILResultInfo> errorResult,
-                  const ASTContext &ctx,
+                  ArrayRef<SILResultInfo> normalResults,
+                  Optional<SILResultInfo> errorResult, const ASTContext &ctx,
                   RecursiveTypeProperties properties);
-
-  static SILType getParameterSILType(const SILParameterInfo &param);// SILType.h
 
 public:
   static CanSILFunctionType get(GenericSignature *genericSig,
@@ -3178,31 +3158,16 @@ public:
                                 Optional<SILResultInfo> interfaceErrorResult,
                                 const ASTContext &ctx);
 
-  /// Get the result type of an apply that calls this function.
-  SILType getSILResult();
-
-  /// Get the total number of arguments for a full apply in SIL of
-  /// this function type.  This is also the total number of SILArguments
-  /// in the entry block.
-  unsigned getNumSILArguments() const {
-    return NumIndirectResults + NumParameters;
-  }
-
-  /// Return the SIL argument convention of apply/entry argument at
-  /// the given index.
-  SILArgumentConvention getSILArgumentConvention(unsigned index) const;
-
-  /// Return the SIL type of the apply/entry argument at the given index.
-  SILType getSILArgumentType(unsigned index) const;
-
-  /// Given that this function type uses a C-language convention, return
-  /// its semantic result type.
+  /// Given that this function type uses a C-language convention, return its
+  /// formal semantic result type.
   ///
   /// C functions represented in SIL are always in one of three cases:
   ///   - no results at all; this corresponds to a void result type;
   ///   - a single direct result and no indirect results; or
   ///   - a single indirect result and no direct results.
-  SILType getCSemanticResult();
+  ///
+  /// If the result is formally indirect, return the empty tuple.
+  SILType getFormalCSemanticResult();
 
   /// Return the convention under which the callee is passed, if this
   /// is a thick non-block callee.
@@ -3213,54 +3178,96 @@ public:
     return getCalleeConvention() == ParameterConvention::Direct_Owned;
   }
 
-  /// Return the array of all results.  This may contain inter-mingled
+  /// Return the array of all result information. This may contain inter-mingled
   /// direct and indirect results.
-  ArrayRef<SILResultInfo> getAllResults() const {
-    return const_cast<SILFunctionType*>(this)->getMutableAllResults();
+  ArrayRef<SILResultInfo> getResults() const {
+    return const_cast<SILFunctionType *>(this)->getMutableResults();
   }
-  unsigned getNumAllResults() const {
-    return NumDirectResults + NumIndirectResults;
-  }
+  unsigned getNumResults() const { return NumResults; }
 
   /// Given that this function type has exactly one result, return it.
   /// This is a common situation when working with a function with a known
   /// signature.  It is *not* safe to assume that C functions satisfy
   /// this, because void functions have zero results.
   SILResultInfo getSingleResult() const {
-    assert(getNumAllResults() == 1);
-    return getAllResults()[0];
+    assert(getNumResults() == 1);
+    return getResults()[0];
   }
 
-  /// Return the array of direct results.
-  ArrayRef<SILResultInfo> getDirectResults() const {
-    if (!NumDirectResults) {
-      return {};
-    } else if (hasCombinedResults()) {
-      return const_cast<SILFunctionType*>(this)->getMutableDirectResults();
-    } else {
-      return getAllResults();
+  /// Given that this function type has exactly one formally direct result,
+  /// return it. Some formal calling conventions only apply when a single
+  /// direct result is present.
+  SILResultInfo getSingleDirectFormalResult() const {
+    assert(getNumDirectFormalResults() == 1);
+    for (auto &result : getResults()) {
+      if (!result.isFormalIndirect())
+        return result;
     }
-  }
-  unsigned getNumDirectResults() const {
-    return NumDirectResults;
+    llvm_unreachable("Missing indirect result");
   }
 
-  /// Return the array of indirect results.
-  ArrayRef<SILResultInfo> getIndirectResults() const {
-    if (!NumIndirectResults) {
-      return {};
-    } else if (hasCombinedResults()) {
-      return const_cast<SILFunctionType*>(this)->getMutableIndirectResults();
-    } else {
-      return getAllResults();
+  // Get the number of results that require a formal indirect calling
+  // convention regardless of whether SIL requires address types. Even if the
+  // substituted SIL types match, a formal direct argument may not be passed
+  // to a formal indirect parameter and vice-versa. Hence, the formally
+  // indirect property, not the SIL indirect property, should be consulted to
+  // determine whether function reabstraction is necesary.
+  unsigned getNumIndirectFormalResults() const {
+    return NumIndirectFormalResults;
+  }
+  /// Does this function have any formally indirect results?
+  bool hasIndirectFormalResults() const {
+    return getNumIndirectFormalResults() != 0;
+  }
+  unsigned getNumDirectFormalResults() const {
+    return NumResults - NumIndirectFormalResults;
+  }
+
+  struct IndirectFormalResultFilter {
+    bool operator()(SILResultInfo result) const {
+      return result.isFormalIndirect();
     }
+  };
+  using IndirectFormalResultIter =
+      llvm::filter_iterator<const SILResultInfo *, IndirectFormalResultFilter>;
+  using IndirectFormalResultRange = IteratorRange<IndirectFormalResultIter>;
+
+  /// A range of SILResultInfo for all formally indirect results.
+  IndirectFormalResultRange getIndirectFormalResults() const {
+    auto filter =
+        llvm::make_filter_range(getResults(), IndirectFormalResultFilter());
+    return makeIteratorRange(filter.begin(), filter.end());
   }
-  unsigned getNumIndirectResults() const {
-    return NumIndirectResults;
+
+  struct DirectFormalResultFilter {
+    bool operator()(SILResultInfo result) const {
+      return !result.isFormalIndirect();
+    }
+  };
+  using DirectFormalResultIter =
+      llvm::filter_iterator<const SILResultInfo *, DirectFormalResultFilter>;
+  using DirectFormalResultRange = IteratorRange<DirectFormalResultIter>;
+
+  /// A range of SILResultInfo for all formally direct results.
+  DirectFormalResultRange getDirectFormalResults() const {
+    auto filter =
+        llvm::make_filter_range(getResults(), DirectFormalResultFilter());
+    return makeIteratorRange(filter.begin(), filter.end());
   }
-  bool hasIndirectResults() const {
-    return NumIndirectResults != 0;
-  }
+
+  /// Get a single non-address SILType that represents all formal direct
+  /// results. The actual SIL result type of an apply instruction that calls
+  /// this function depends on the current SIL stage and is known by
+  /// SILFunctionConventions. It may be a wider tuple that includes formally
+  /// indirect results.
+  SILType getDirectFormalResultsType();
+
+  /// Get a single non-address SILType for all SIL results regardless of whether
+  /// they are formally indirect. The actual SIL result type of an apply
+  /// instruction that calls this function depends on the current SIL stage and
+  /// is known by SILFunctionConventions. It may be a narrower tuple that omits
+  /// formally indirect results.
+  SILType getAllResultsType();
 
   /// Does this function have a blessed Swift-native error result?
   bool hasErrorResult() const {
@@ -3276,7 +3283,11 @@ public:
       return None;
     }
   }
-  
+
+  /// Returns the number of function parameters, not including any formally
+  /// indirect results.
+  unsigned getNumParameters() const { return NumParameters; }
+
   ArrayRef<SILParameterInfo> getParameters() const {
     return const_cast<SILFunctionType*>(this)->getMutableParameters();
   }
@@ -3287,12 +3298,6 @@ public:
     return getParameters().back();
   }
 
-  using ParameterSILTypeArrayRef
-    = ArrayRefView<SILParameterInfo, SILType, getParameterSILType>;  
-  ParameterSILTypeArrayRef getParameterSILTypes() const {
-    return ParameterSILTypeArrayRef(getParameters());
-  }
-  
   bool isPolymorphic() const { return GenericSig != nullptr; }
   CanGenericSignature getGenericSignature() const { return GenericSig; }
 
@@ -3330,7 +3335,7 @@ public:
 
   void Profile(llvm::FoldingSetNodeID &ID) {
     Profile(ID, getGenericSignature(), getExtInfo(), getCalleeConvention(),
-            getParameters(), getAllResults(), getOptionalErrorResult());
+            getParameters(), getResults(), getOptionalErrorResult());
   }
   static void Profile(llvm::FoldingSetNodeID &ID,
                       GenericSignature *genericSig,

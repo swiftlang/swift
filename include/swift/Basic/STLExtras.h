@@ -196,6 +196,8 @@ inline Iterator prev_or_begin(Iterator it, Iterator begin) {
 /// @}
 
 /// A range of iterators.
+/// TODO: Add `llvm::iterator_range::empty()`, then remove this helper, along
+/// with the superfluous FilterIterator and TransformIterator.
 template<typename Iterator>
 class IteratorRange {
   Iterator First, Last;

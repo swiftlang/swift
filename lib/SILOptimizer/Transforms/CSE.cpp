@@ -1010,7 +1010,9 @@ static bool tryToCSEOpenExtCall(OpenExistentialAddrInst *From,
   }
 
   auto FnTy = ToAI->getSubstCalleeSILType();
-  auto ResTy = FnTy.castTo<SILFunctionType>()->getSILResult();
+  SILFunctionConventions fnConv(FnTy.castTo<SILFunctionType>(),
+                                Builder.getModule());
+  auto ResTy = fnConv.getSILResultType();
 
   ApplyInst *NAI = Builder.createApply(ToAI->getLoc(), ToWMI, FnTy, ResTy,
                                        ToAI->getSubstitutions(), Args,

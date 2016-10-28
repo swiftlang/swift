@@ -154,6 +154,8 @@ emitApplyWithRethrow(SILBuilder &Builder,
                      void (*EmitCleanup)(SILBuilder&, SILLocation)) {
 
   auto &F = Builder.getFunction();
+  SILFunctionConventions fnConv(CanSILFuncTy, Builder.getModule());
+
   SILBasicBlock *ErrorBB = F.createBasicBlock();
   SILBasicBlock *NormalBB = F.createBasicBlock();
   Builder.createTryApply(Loc,
@@ -166,8 +168,8 @@ emitApplyWithRethrow(SILBuilder &Builder,
   {
     // Emit the rethrow logic.
     Builder.emitBlock(ErrorBB);
-    SILValue Error = ErrorBB->createPHIArgument(
-        CanSILFuncTy->getErrorResult().getSILType(), ValueOwnershipKind::Owned);
+    SILValue Error = ErrorBB->createPHIArgument(fnConv.getSILErrorType(),
+                                                ValueOwnershipKind::Owned);
 
     Builder.createBuiltin(Loc,
                           Builder.getASTContext().getIdentifier("willThrow"),
@@ -182,8 +184,8 @@ emitApplyWithRethrow(SILBuilder &Builder,
   // result value.
   Builder.clearInsertionPoint();
   Builder.emitBlock(NormalBB);
-  return Builder.getInsertionBB()->createPHIArgument(
-      CanSILFuncTy->getSILResult(), ValueOwnershipKind::Owned);
+  return Builder.getInsertionBB()->createPHIArgument(fnConv.getSILResultType(),
+                                                     ValueOwnershipKind::Owned);
 }
 
 /// Emits code to invoke the specified nonpolymorphic CalleeFunc using the
@@ -224,6 +226,7 @@ class EagerDispatch {
   const SILSpecializeAttr &SA;
 #endif
   const ReabstractionInfo &ReInfo;
+  const SILFunctionConventions substConv;
 
   SILBuilder Builder;
   SILLocation Loc;
@@ -233,8 +236,10 @@ public:
   // original generic function.
   EagerDispatch(SILFunction *GenericFunc, const SILSpecializeAttr &SA,
                 const ReabstractionInfo &ReInfo)
-      : GenericFunc(GenericFunc), ReInfo(ReInfo), Builder(*GenericFunc),
-        Loc(GenericFunc->getLocation()) {
+      : GenericFunc(GenericFunc), ReInfo(ReInfo),
+        substConv(ReInfo.getSubstitutedType(), GenericFunc->getModule()),
+        Builder(*GenericFunc), Loc(GenericFunc->getLocation()) {
+
     Builder.setCurrentDebugScope(GenericFunc->getDebugScope());
   }
 
@@ -315,8 +320,8 @@ void EagerDispatch::emitDispatchTo(SILFunction *NewFunc) {
   if (NewFunc->isNoReturnFunction())
     Builder.createUnreachable(Loc);
   else {
-    auto GenResultTy = GenericFunc->mapTypeIntoContext(
-      GenericFunc->getLoweredFunctionType()->getSILResult());
+    auto resultTy = GenericFunc->getConventions().getSILResultType();
+    auto GenResultTy = GenericFunc->mapTypeIntoContext(resultTy);
     auto CastResult = Builder.createUncheckedBitCast(Loc, Result, GenResultTy);
     addReturnValue(Builder.getInsertionBB(), CastResult);
   }
@@ -370,11 +375,13 @@ emitTypeCheck(SILBasicBlock *FailedTypeCheckBB, SubstitutableType *ParamTy,
 /// Cast a generic argument to its specialized type.
 SILValue EagerDispatch::emitArgumentCast(SILFunctionArgument *OrigArg,
                                          unsigned Idx) {
-
-  auto CastTy = ReInfo.getSubstitutedType()->getSILArgumentType(Idx);
-  assert(CastTy.isAddress() ==
-         (OrigArg->isIndirectResult()
-          || OrigArg->getKnownParameterInfo().isIndirect()) && "bad arg type");
+  SILFunctionConventions substConv(ReInfo.getSubstitutedType(),
+                                   Builder.getModule());
+  auto CastTy = substConv.getSILArgumentType(Idx);
+  assert(CastTy.isAddress()
+             == (OrigArg->isIndirectResult()
+                 || substConv.isSILIndirect(OrigArg->getKnownParameterInfo()))
+         && "bad arg type");
 
   if (CastTy.isAddress())
     return Builder.createUncheckedAddrCast(Loc, OrigArg, CastTy);
@@ -392,32 +399,41 @@ SILValue EagerDispatch::emitArgumentCast(SILFunctionArgument *OrigArg,
 SILValue EagerDispatch::
 emitArgumentConversion(SmallVectorImpl<SILValue> &CallArgs) {
   auto OrigArgs = GenericFunc->begin()->getFunctionArguments();
-  assert(OrigArgs.size() == ReInfo.getNumArguments() && "signature mismatch");
-  
+  assert(OrigArgs.size() == substConv.getNumSILArguments()
+         && "signature mismatch");
+
   CallArgs.reserve(OrigArgs.size());
   SILValue StoreResultTo;
   for (auto *OrigArg : OrigArgs) {
-    unsigned Idx = OrigArg->getIndex();
+    unsigned ArgIdx = OrigArg->getIndex();
 
-    auto CastArg = emitArgumentCast(OrigArg, Idx);
+    auto CastArg = emitArgumentCast(OrigArg, ArgIdx);
     DEBUG(dbgs() << "  Cast generic arg: "; CastArg->print(dbgs()));
 
-    if (ReInfo.isArgConverted(OrigArg->getIndex())) {
-      if (ReInfo.isResultIndex(Idx)) {
+    if (ArgIdx < substConv.getSILArgIndexOfFirstParam()) {
+      // Handle result arguments.
+      unsigned formalIdx =
+          substConv.getIndirectFormalResultIndexForSILArg(ArgIdx);
+      if (ReInfo.isFormalResultConverted(formalIdx)) {
         // The result is converted from indirect to direct. We need to insert
         // a store later.
         assert(!StoreResultTo);
         StoreResultTo = CastArg;
-      } else {
+        continue;
+      }
+    } else {
+      // Handle arguments for formal parameters.
+      unsigned paramIdx = ArgIdx - substConv.getSILArgIndexOfFirstParam();
+      if (ReInfo.isParamConverted(paramIdx)) {
         // An argument is converted from indirect to direct. Instead of the
         // address we pass the loaded value.
         SILValue Val = Builder.createLoad(Loc, CastArg,
                                           LoadOwnershipQualifier::Unqualified);
         CallArgs.push_back(Val);
+        continue;
       }
-    } else {
-      CallArgs.push_back(CastArg);
     }
+    CallArgs.push_back(CastArg);
   }
   return StoreResultTo;
 }
