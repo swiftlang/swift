@@ -1666,6 +1666,7 @@ namespace {
       case SILFunctionType::Representation::WitnessMethod:
       case SILFunctionType::Representation::ObjCMethod:
       case SILFunctionType::Representation::CFunctionPointer:
+      case SILFunctionType::Representation::Closure:
         // A thin function looks like a plain pointer.
         // FIXME: Except for extra inhabitants?
         return emitDirectMetadataRef(C.TheRawPointerType);
@@ -1845,6 +1846,7 @@ namespace {
       case SILFunctionType::Representation::WitnessMethod:
       case SILFunctionType::Representation::ObjCMethod:
       case SILFunctionType::Representation::CFunctionPointer:
+      case SILFunctionType::Representation::Closure:
         // A thin function looks like a plain pointer.
         // FIXME: Except for extra inhabitants?
         return emitFromValueWitnessTable(C.TheRawPointerType);

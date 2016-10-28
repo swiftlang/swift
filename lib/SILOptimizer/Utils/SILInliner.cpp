@@ -226,6 +226,7 @@ InlineCost swift::instructionInlineCost(SILInstruction &I) {
     case ValueKind::DebugValueAddrInst:
     case ValueKind::StringLiteralInst:
     case ValueKind::FixLifetimeInst:
+    case ValueKind::EndBorrowInst:
     case ValueKind::MarkDependenceInst:
     case ValueKind::FunctionRefInst:
     case ValueKind::AllocGlobalInst:
@@ -324,6 +325,7 @@ InlineCost swift::instructionInlineCost(SILInstruction &I) {
     case ValueKind::CopyBlockInst:
     case ValueKind::CopyAddrInst:
     case ValueKind::RetainValueInst:
+    case ValueKind::CopyValueInst:
     case ValueKind::DeallocBoxInst:
     case ValueKind::DeallocExistentialBoxInst:
     case ValueKind::DeallocRefInst:
@@ -336,6 +338,7 @@ InlineCost swift::instructionInlineCost(SILInstruction &I) {
     case ValueKind::ProjectBoxInst:
     case ValueKind::ProjectExistentialBoxInst:
     case ValueKind::ReleaseValueInst:
+    case ValueKind::DestroyValueInst:
     case ValueKind::AutoreleaseValueInst:
     case ValueKind::DynamicMethodBranchInst:
     case ValueKind::DynamicMethodInst:
@@ -350,6 +353,7 @@ InlineCost swift::instructionInlineCost(SILInstruction &I) {
     case ValueKind::InjectEnumAddrInst:
     case ValueKind::IsNonnullInst:
     case ValueKind::LoadInst:
+    case ValueKind::LoadBorrowInst:
     case ValueKind::LoadUnownedInst:
     case ValueKind::LoadWeakInst:
     case ValueKind::OpenExistentialAddrInst:

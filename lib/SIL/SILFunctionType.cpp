@@ -998,6 +998,7 @@ static CanSILFunctionType getNativeSILFunctionType(SILModule &M,
   case SILFunctionType::Representation::ObjCMethod:
   case SILFunctionType::Representation::Thick:
   case SILFunctionType::Representation::Method:
+  case SILFunctionType::Representation::Closure:
   case SILFunctionType::Representation::WitnessMethod: {
     switch (kind) {
     case SILDeclRef::Kind::Initializer:
@@ -1030,6 +1031,7 @@ static CanSILFunctionType getNativeSILFunctionType(SILModule &M,
 CanSILFunctionType swift::getNativeSILFunctionType(SILModule &M,
                                        AbstractionPattern origType,
                                        CanAnyFunctionType substInterfaceType,
+                                       Optional<SILDeclRef> constant,
                                        SILDeclRef::Kind kind) {
   AnyFunctionType::ExtInfo extInfo;
 
@@ -1042,7 +1044,7 @@ CanSILFunctionType swift::getNativeSILFunctionType(SILModule &M,
     extInfo = substInterfaceType->getExtInfo();
   }
   return ::getNativeSILFunctionType(M, origType, substInterfaceType,
-                                    extInfo, None, kind);
+                                    extInfo, constant, kind);
 }
 
 //===----------------------------------------------------------------------===//
@@ -2040,10 +2042,14 @@ SILConstantInfo TypeConverter::getConstantOverrideInfo(SILDeclRef derived,
   auto selfInterfaceTy = derivedInterfaceTy.getInput()->getRValueInstanceType();
 
   auto overrideInterfaceTy =
-      selfInterfaceTy->getTypeOfMember(M.getSwiftModule(), baseInterfaceTy,
-                                       base.getDecl()->getDeclContext());
+      selfInterfaceTy->adjustSuperclassMemberDeclType(
+          derived.getDecl(), base.getDecl(), baseInterfaceTy,
+          /*resolver=*/nullptr);
 
-  // Copy generic signature from derived to the override type
+  // Copy generic signature from derived to the override type, to handle
+  // the case where the base member is not generic (because the base class
+  // is concrete) but the derived member is generic (because the derived
+  // class is generic).
   if (auto derivedInterfaceFnTy = derivedInterfaceTy->getAs<GenericFunctionType>()) {
     auto overrideInterfaceFnTy = overrideInterfaceTy->castTo<AnyFunctionType>();
     overrideInterfaceTy =
@@ -2051,23 +2057,6 @@ SILConstantInfo TypeConverter::getConstantOverrideInfo(SILDeclRef derived,
                                  overrideInterfaceFnTy->getInput(),
                                  overrideInterfaceFnTy->getResult(),
                                  overrideInterfaceFnTy->getExtInfo());
-  }
-
-  // Replace occurrences of 'Self' in the signature with the derived type.
-  // FIXME: these should all be modeled with a DynamicSelfType.
-  overrideInterfaceTy =
-      overrideInterfaceTy->replaceSelfParameterType(selfInterfaceTy);
-  
-  bool hasDynamicSelf = false;
-  if (auto funcDecl = dyn_cast<FuncDecl>(derived.getDecl()))
-    hasDynamicSelf = funcDecl->hasDynamicSelf();
-  else if (isa<ConstructorDecl>(derived.getDecl()))
-    hasDynamicSelf = true;
-  
-  if (hasDynamicSelf) {
-    overrideInterfaceTy =
-        overrideInterfaceTy->replaceCovariantResultType(selfInterfaceTy,
-                                                        base.uncurryLevel + 1);
   }
 
   // Lower the formal AST type.
@@ -2078,6 +2067,7 @@ SILConstantInfo TypeConverter::getConstantOverrideInfo(SILDeclRef derived,
   // Build the SILFunctionType for the vtable thunk.
   CanSILFunctionType fnTy = getNativeSILFunctionType(M, basePattern,
                                                      overrideLoweredInterfaceTy,
+                                                     derived,
                                                      derived.kind);
 
   {
@@ -2306,6 +2296,7 @@ TypeConverter::getBridgedFunctionType(AbstractionPattern pattern,
   case SILFunctionTypeRepresentation::Thick:
   case SILFunctionTypeRepresentation::Thin:
   case SILFunctionTypeRepresentation::Method:
+  case SILFunctionTypeRepresentation::Closure:
   case SILFunctionTypeRepresentation::WitnessMethod:
     // No bridging needed for native functions.
     if (t->getExtInfo() == extInfo)
@@ -2461,6 +2452,7 @@ TypeConverter::getLoweredASTFunctionType(CanAnyFunctionType fnType,
   case SILFunctionTypeRepresentation::Thin:
   case SILFunctionTypeRepresentation::Thick:
   case SILFunctionTypeRepresentation::Method:
+  case SILFunctionTypeRepresentation::Closure:
   case SILFunctionTypeRepresentation::WitnessMethod:
     // Native functions don't need bridging.
     break;

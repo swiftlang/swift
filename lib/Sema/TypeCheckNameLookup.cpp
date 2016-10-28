@@ -369,8 +369,7 @@ LookupTypeResult TypeChecker::lookupMemberType(DeclContext *dc,
 
     // Substitute the base into the member's type.
     auto memberType = substMemberTypeWithBase(dc->getParentModule(),
-                                              typeDecl, type,
-                                              /*isTypeReference=*/true);
+                                              typeDecl, type);
 
     // FIXME: It is not clear why this substitution can fail, but the
     // standard library won't build without this check.

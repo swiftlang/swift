@@ -634,41 +634,41 @@ private:
   friend class TypeRepr;
 };
 
-/// \brief A protocol composite type.
+/// \brief A type composite type.
 /// \code
 ///   Foo & Bar
 /// \endcode
-class ProtocolCompositionTypeRepr : public TypeRepr {
-  ArrayRef<IdentTypeRepr *> Protocols;
+class CompositionTypeRepr : public TypeRepr {
+  ArrayRef<TypeRepr *> Types;
   SourceLoc FirstTypeLoc;
   SourceRange CompositionRange;
 
 public:
-  ProtocolCompositionTypeRepr(ArrayRef<IdentTypeRepr *> Protocols,
-                              SourceLoc FirstTypeLoc,
-                              SourceRange CompositionRange)
-    : TypeRepr(TypeReprKind::ProtocolComposition), Protocols(Protocols),
+  CompositionTypeRepr(ArrayRef<TypeRepr *> Types,
+                      SourceLoc FirstTypeLoc,
+                      SourceRange CompositionRange)
+    : TypeRepr(TypeReprKind::Composition), Types(Types),
     FirstTypeLoc(FirstTypeLoc), CompositionRange(CompositionRange) {
   }
 
-  ArrayRef<IdentTypeRepr *> getProtocols() const { return Protocols; }
+  ArrayRef<TypeRepr *> getTypes() const { return Types; }
   SourceLoc getSourceLoc() const { return FirstTypeLoc; }
   SourceRange getCompositionRange() const { return CompositionRange; }
 
-  static ProtocolCompositionTypeRepr *create(ASTContext &C,
-                                             ArrayRef<IdentTypeRepr*> Protocols,
-                                             SourceLoc FirstTypeLoc,
-                                             SourceRange CompositionRange);
+  static CompositionTypeRepr *create(ASTContext &C,
+                                     ArrayRef<TypeRepr*> Protocols,
+                                     SourceLoc FirstTypeLoc,
+                                     SourceRange CompositionRange);
   
-  static ProtocolCompositionTypeRepr *createEmptyComposition(ASTContext &C,
-                                                             SourceLoc AnyLoc) {
-    return ProtocolCompositionTypeRepr::create(C, {}, AnyLoc, {AnyLoc, AnyLoc});
+  static CompositionTypeRepr *createEmptyComposition(ASTContext &C,
+                                                     SourceLoc AnyLoc) {
+    return CompositionTypeRepr::create(C, {}, AnyLoc, {AnyLoc, AnyLoc});
   }
   
   static bool classof(const TypeRepr *T) {
-    return T->getKind() == TypeReprKind::ProtocolComposition;
+    return T->getKind() == TypeReprKind::Composition;
   }
-  static bool classof(const ProtocolCompositionTypeRepr *T) { return true; }
+  static bool classof(const CompositionTypeRepr *T) { return true; }
 
 private:
   SourceLoc getStartLocImpl() const { return FirstTypeLoc; }
@@ -812,7 +812,7 @@ inline bool TypeRepr::isSimple() const {
   case TypeReprKind::Dictionary:
   case TypeReprKind::Optional:
   case TypeReprKind::ImplicitlyUnwrappedOptional:
-  case TypeReprKind::ProtocolComposition:
+  case TypeReprKind::Composition:
   case TypeReprKind::Tuple:
   case TypeReprKind::Fixed:
   case TypeReprKind::Array:

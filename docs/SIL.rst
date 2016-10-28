@@ -2166,6 +2166,48 @@ requires ``release`` or other cleanup, that value must be loaded before being
 stored over and cleaned up. It is undefined behavior to store to an address
 that points to deallocated storage.
 
+load_borrow
+```````````
+
+::
+
+   sil-instruction ::= 'load_borrow' sil-value
+
+   %1 = load_borrow %0 : $*T
+   // $T must be a loadable type
+
+Loads the value ``%1`` from the memory location ``%0``. The ``load_borrow``
+instruction creates a borrowed scope in which a read-only borrow value ``%1``
+can be used to read the value stored in ``%0``. The end of scope is deliminated
+by an ``end_borrow`` instruction. All ``load_borrow`` instructions must be
+paired with exactly one ``end_borrow`` instruction along any path through the
+program. Until ``end_borrow``, it is illegal to invalidate or store to ``%0``.
+
+end_borrow
+``````````
+
+::
+
+   sil-instruction ::= 'end_borrow' sil-value 'from' sil-value : sil-type, sil-type
+
+   end_borrow %1 from %0 : $T, $T
+   end_borrow %1 from %0 : $T, $*T
+   end_borrow %1 from %0 : $*T, $T
+   end_borrow %1 from %0 : $*T, $*T
+   // We allow for end_borrow to be specified in between values and addresses
+   // all of the same type T.
+
+Ends the scope for which the SILValue ``%1`` is borrowed from the SILValue
+``%0``. Must be paired with at most 1 borrowing instruction (like
+``load_borrow``) along any path through the program. In the region in between
+the borrow instruction and the ``end_borrow``, the original SILValue can not be
+modified. This means that:
+
+1. If ``%0`` is an address, ``%0`` can not be written to.
+2. If ``%0`` is a non-trivial value, ``%0`` can not be destroyed.
+
+We require that ``%1`` and ``%0`` have the same type ignoring SILValueCategory.
+
 assign
 ``````
 ::
@@ -2245,6 +2287,27 @@ which are not represented as box allocations.
 
 It is produced by SILGen, and is only valid in Raw SIL.  It is rewritten as
 appropriate by the definitive initialization pass.
+
+mark_uninitialized_behavior
+```````````````````````````
+::
+
+   init-case ::= sil-value sil-apply-substitution-list? '(' sil-value ')' ':' sil-type
+   set-case ::= sil-value sil-apply-substitution-list? '(' sil-value ')' ':' sil-type
+   sil-instruction ::= 'mark_uninitialized_behavior' init-case set-case
+
+   mark_uninitialized_behavior %init<Subs>(%storage) : $T -> U,
+                               %set<Subs>(%self) : $V -> W
+
+Indicates that a logical property is uninitialized at this point and needs to be
+initialized by the end of the function and before any escape point for this
+instruction. Assignments to the property trigger the behavior's ``init`` or
+``set`` logic based on the logical initialization state of the property.
+
+It is expected that the ``init-case`` is passed some sort of storage and the
+``set`` case is passed ``self``.
+
+This is only valid in Raw SIL.
 
 copy_addr
 `````````
@@ -3170,6 +3233,32 @@ For aggregate types, especially enums, it is typically both easier
 and more efficient to reason about aggregate copies than it is to
 reason about copies of the subobjects.
 
+copy_value
+``````````
+
+::
+
+   sil-instruction ::= 'copy_value' sil-operand
+
+   %1 = copy_value %0 : $A
+
+Performs a copy of a loadable value as if by the value's type lowering and
+returns the copy. The returned copy semantically is a value that is completely
+independent of the operand. In terms of specific types:
+
+1. For trivial types, this is equivalent to just propagating through the trivial
+   value.
+2. For reference types, this is equivalent to performing a ``strong_retain``
+   operation and returning the reference.
+3. For ``@unowned`` types, this is equivalent to performing an
+   ``unowned_retain`` and returning the operand.
+4. For aggregate types, this is equivalent to recursively performing a
+   ``copy_value`` on its components, forming a new aggregate from the copied
+   components, and then returning the new aggregate.
+
+In ownership qualified functions, a ``copy_value`` produces a +1 value that must
+be consumed at most once along any path through the program.
+
 release_value
 `````````````
 
@@ -3178,6 +3267,29 @@ release_value
   sil-instruction ::= 'release_value' sil-operand
 
   release_value %0 : $A
+
+Destroys a loadable value, by releasing any retainable pointers within it.
+
+This is defined to be equivalent to storing the operand into a stack
+allocation and using 'destroy_addr' to destroy the object there.
+
+For trivial types, this is a no-op.  For reference types, this is
+equivalent to a ``strong_release``.  For ``@unowned`` types, this is
+equivalent to an ``unowned_release``.  In each of these cases, those
+are the preferred forms.
+
+For aggregate types, especially enums, it is typically both easier
+and more efficient to reason about aggregate destroys than it is to
+reason about destroys of the subobjects.
+
+destroy_value
+`````````````
+
+::
+
+  sil-instruction ::= 'destroy_value' sil-operand
+
+  destroy_value %0 : $A
 
 Destroys a loadable value, by releasing any retainable pointers within it.
 

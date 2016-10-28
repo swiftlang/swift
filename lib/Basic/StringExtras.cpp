@@ -28,7 +28,8 @@ using namespace swift;
 using namespace camel_case;
 
 bool swift::canBeArgumentLabel(StringRef identifier) {
-  if (identifier == "var" || identifier == "let" || identifier == "inout")
+  if (identifier == "var" || identifier == "let" || identifier == "inout" ||
+      identifier == "$")
     return false;
 
   return true;
@@ -669,7 +670,7 @@ static StringRef omitNeedlessWords(StringRef name,
                             NameRole::Partial, allPropertyNames, scratch);
       if (shortenedNameWord == newShortenedNameWord &&
           shortenedNameWord.back() == 'e') {
-        shortenedNameWord.drop_back();
+        (void)shortenedNameWord.drop_back();
         newShortenedNameWord =
           omitNeedlessWords(shortenedNameWord, typeName.CollectionElement,
                             NameRole::Partial, allPropertyNames, scratch);

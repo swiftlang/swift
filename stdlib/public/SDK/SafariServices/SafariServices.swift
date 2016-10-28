@@ -11,11 +11,9 @@
 //===----------------------------------------------------------------------===//
 
 @_exported import SafariServices // Clang module
-
-@_silgen_name("_swift_SafariServices_isSafariServicesAvailable")
-internal func _isSafariServicesAvailable() -> Bool
+import _SwiftSafariServicesOverlayShims
 
 @available(OSX, introduced: 10.11)
 public func SFSafariServicesAvailable() -> Bool {
-  return _isSafariServicesAvailable()
+  return _swift_SafariServices_isSafariServicesAvailable()
 }

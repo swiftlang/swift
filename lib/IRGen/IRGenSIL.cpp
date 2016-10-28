@@ -313,6 +313,7 @@ public:
 
   /// All alloc_ref instructions which allocate the object on the stack.
   llvm::SmallPtrSet<SILInstruction *, 8> StackAllocs;
+
   /// With closure captures it is actually possible to have two function
   /// arguments that both have the same name. Until this is fixed, we need to
   /// also hash the ArgNo here.
@@ -759,8 +760,7 @@ public:
 
   void visitSILBasicBlock(SILBasicBlock *BB);
 
-  void emitFunctionArgDebugInfo(SILBasicBlock *BB);
-
+  void emitErrorResultVar(SILResultInfo ErrorInfo, DebugValueInst *DbgValue);
   void emitDebugInfoForAllocStack(AllocStackInst *i, const TypeInfo &type,
                                   llvm::Value *addr);
   void visitAllocStackInst(AllocStackInst *i);
@@ -798,12 +798,17 @@ public:
   void visitMarkFunctionEscapeInst(MarkFunctionEscapeInst *i) {
     llvm_unreachable("mark_function_escape is not valid in canonical SIL");
   }
+  void visitLoadBorrowInst(LoadBorrowInst *i) {
+    llvm_unreachable("unimplemented");
+  }
   void visitDebugValueInst(DebugValueInst *i);
   void visitDebugValueAddrInst(DebugValueAddrInst *i);
   void visitLoadWeakInst(LoadWeakInst *i);
   void visitStoreWeakInst(StoreWeakInst *i);
   void visitRetainValueInst(RetainValueInst *i);
+  void visitCopyValueInst(CopyValueInst *i);
   void visitReleaseValueInst(ReleaseValueInst *i);
+  void visitDestroyValueInst(DestroyValueInst *i);
   void visitAutoreleaseValueInst(AutoreleaseValueInst *i);
   void visitSetDeallocatingInst(SetDeallocatingInst *i);
   void visitStructInst(StructInst *i);
@@ -853,6 +858,9 @@ public:
   void visitInitBlockStorageHeaderInst(InitBlockStorageHeaderInst *i);
   
   void visitFixLifetimeInst(FixLifetimeInst *i);
+  void visitEndBorrowInst(EndBorrowInst *i) {
+    llvm_unreachable("unimplemented");
+  }
   void visitMarkDependenceInst(MarkDependenceInst *i);
   void visitCopyBlockInst(CopyBlockInst *i);
   void visitStrongPinInst(StrongPinInst *i);
@@ -1462,52 +1470,12 @@ void IRGenSILFunction::estimateStackSize() {
   }
 }
 
-/// Determine the number of source-level Swift of a function or closure.
-static unsigned countArgs(DeclContext *DC) {
-  unsigned N = 0;
-  if (auto *Fn = dyn_cast<AbstractFunctionDecl>(DC)) {
-    for (auto *PL : Fn->getParameterLists())
-      N += PL->size();
-    
-  } else if (auto *Closure = dyn_cast<AbstractClosureExpr>(DC))
-    N += Closure->getParameters()->size();
-  else
-    llvm_unreachable("unhandled declcontext type");
-  return N;
-}
-
-void IRGenSILFunction::emitFunctionArgDebugInfo(SILBasicBlock *BB) {
-  // Emit the artificial error result argument.
-  auto FnTy = CurSILFn->getLoweredFunctionType();
-  if (FnTy->hasErrorResult() && CurSILFn->getDeclContext()) {
-    auto ErrorInfo = FnTy->getErrorResult();
-    auto ErrorResultSlot = getErrorResultSlot(ErrorInfo.getSILType());
-    DebugTypeInfo DTI(ErrorInfo.getType(),
-                      ErrorResultSlot->getType(),
-                      IGM.getPointerSize(),
-                      IGM.getPointerAlignment(),
-                      nullptr);
-    StringRef Name("$error");
-    // We just need any number that is guaranteed to be larger than every
-    // other argument. It is only used for sorting.
-    unsigned ArgNo =
-        countArgs(CurSILFn->getDeclContext()) + 1 + BB->getBBArgs().size();
-    auto Storage = emitShadowCopy(ErrorResultSlot.getAddress(), getDebugScope(),
-                                  Name, ArgNo);
-    IGM.DebugInfo->emitVariableDeclaration(
-        Builder, Storage, DTI, getDebugScope(), nullptr, Name, ArgNo,
-        IndirectValue, ArtificialValue);
-  }
-}
-
-
 void IRGenSILFunction::visitSILBasicBlock(SILBasicBlock *BB) {
   // Insert into the lowered basic block.
   llvm::BasicBlock *llBB = getLoweredBB(BB).bb;
   Builder.SetInsertPoint(llBB);
 
   bool InEntryBlock = BB->pred_empty();
-  bool ArgsEmitted = false;
 
   // Set this block as the dominance point.  This implicitly communicates
   // with the dominance resolver configured in emitSILFunction.
@@ -1577,22 +1545,6 @@ void IRGenSILFunction::visitSILBasicBlock(SILBasicBlock *BB) {
         // Use an artificial (line 0) location.
         IGM.DebugInfo->setCurrentLoc(Builder, DS);
 
-      // Function argument handling.
-      if (InEntryBlock && !ArgsEmitted) {
-        if (!I.getLoc().isInPrologue() && I.getLoc().getSourceLoc().isValid()) {
-          // This is the first non-prologue instruction in the entry
-          // block.  The function prologue is where the stack frame is
-          // set up and storage for local variables and function
-          // arguments is initialized.  We need to emit the debug info
-          // for the function arguments after the function prologue,
-          // after the initialization.
-          if (!DS)
-            DS = CurSILFn->getDebugScope();
-          PrologueLocation AutoRestore(IGM.DebugInfo, Builder);
-          emitFunctionArgDebugInfo(BB);
-          ArgsEmitted = true;
-        }
-      }
       if (isa<TermInst>(&I))
         emitDebugVariableRangeExtension(BB);
     }
@@ -1939,6 +1891,7 @@ static CallEmission getCallEmissionForLoweredValue(IRGenSILFunction &IGF,
     case SILFunctionType::Representation::Thin:
     case SILFunctionType::Representation::CFunctionPointer:
     case SILFunctionType::Representation::Method:
+    case SILFunctionType::Representation::Closure:
     case SILFunctionType::Representation::ObjCMethod:
     case SILFunctionType::Representation::WitnessMethod:
     case SILFunctionType::Representation::Thick: {
@@ -2152,6 +2105,7 @@ getPartialApplicationFunction(IRGenSILFunction &IGF, SILValue v,
     case SILFunctionTypeRepresentation::Thick:
     case SILFunctionTypeRepresentation::Thin:
     case SILFunctionTypeRepresentation::Method:
+    case SILFunctionTypeRepresentation::Closure:
       break;
     }
     return std::make_tuple(lv.getStaticFunction().getFunction(),
@@ -2165,6 +2119,7 @@ getPartialApplicationFunction(IRGenSILFunction &IGF, SILValue v,
     switch (fnType->getRepresentation()) {
     case SILFunctionType::Representation::Thin:
     case SILFunctionType::Representation::Method:
+    case SILFunctionType::Representation::Closure:
     case SILFunctionType::Representation::ObjCMethod:
       break;
     case SILFunctionType::Representation::WitnessMethod: {
@@ -2947,6 +2902,14 @@ void IRGenSILFunction::visitRetainValueInst(swift::RetainValueInst *i) {
   out.claimAll();
 }
 
+void IRGenSILFunction::visitCopyValueInst(swift::CopyValueInst *i) {
+  Explosion in = getLoweredExplosion(i->getOperand());
+  Explosion out;
+  cast<LoadableTypeInfo>(getTypeInfo(i->getOperand()->getType()))
+      .copy(*this, in, out, irgen::Atomicity::Atomic);
+  setLoweredExplosion(i, out);
+}
+
 // TODO: Implement this more generally for arbitrary values. Currently the
 // SIL verifier restricts it to single-refcounted-pointer types.
 void IRGenSILFunction::visitAutoreleaseValueInst(swift::AutoreleaseValueInst *i)
@@ -2996,6 +2959,12 @@ void IRGenSILFunction::visitReleaseValueInst(swift::ReleaseValueInst *i) {
   cast<LoadableTypeInfo>(getTypeInfo(i->getOperand()->getType()))
       .consume(*this, in, i->isAtomic() ? irgen::Atomicity::Atomic
                                         : irgen::Atomicity::NonAtomic);
+}
+
+void IRGenSILFunction::visitDestroyValueInst(swift::DestroyValueInst *i) {
+  Explosion in = getLoweredExplosion(i->getOperand());
+  cast<LoadableTypeInfo>(getTypeInfo(i->getOperand()->getType()))
+      .consume(*this, in, irgen::Atomicity::Atomic);
 }
 
 void IRGenSILFunction::visitStructInst(swift::StructInst *i) {
@@ -3163,13 +3132,35 @@ void IRGenSILFunction::visitStoreInst(swift::StoreInst *i) {
   }
 }
 
+/// Emit the artificial error result argument.
+void IRGenSILFunction::emitErrorResultVar(SILResultInfo ErrorInfo,
+                                          DebugValueInst *DbgValue) {
+  auto ErrorResultSlot = getErrorResultSlot(ErrorInfo.getSILType());
+  SILDebugVariable Var = DbgValue->getVarInfo();
+  auto Storage = emitShadowCopy(ErrorResultSlot.getAddress(), getDebugScope(),
+                                Var.Name, Var.ArgNo);
+  DebugTypeInfo DTI(ErrorInfo.getType(), ErrorResultSlot->getType(),
+                    IGM.getPointerSize(), IGM.getPointerAlignment(), nullptr);
+  IGM.DebugInfo->emitVariableDeclaration(Builder, Storage, DTI, getDebugScope(),
+                                         nullptr, Var.Name, Var.ArgNo,
+                                         IndirectValue, ArtificialValue);
+}
+
 void IRGenSILFunction::visitDebugValueInst(DebugValueInst *i) {
   if (!IGM.DebugInfo)
     return;
 
   auto SILVal = i->getOperand();
-  if (isa<SILUndef>(SILVal))
+  if (isa<SILUndef>(SILVal)) {
+    // We cannot track the location of inlined error arguments because it has no
+    // representation in SIL.
+    if (!i->getDebugScope()->InlinedCallSite &&
+        i->getVarInfo().Name == "$error") {
+      auto funcTy = CurSILFn->getLoweredFunctionType();
+      emitErrorResultVar(funcTy->getErrorResult(), i);
+    }
     return;
+  }
 
   StringRef Name = getVarName(i);
   DebugTypeInfo DbgTy;

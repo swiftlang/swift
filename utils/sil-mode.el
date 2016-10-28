@@ -50,6 +50,9 @@
                     "destroyer" "globalaccessor" "objc") 'words) .
                     font-lock-keyword-face)
 
+   ;; Highlight attributes written in [...].
+   '("\\[\\(.+\\)\\]" 1 font-lock-keyword-face)
+
    ;; SIL Instructions - Allocation/Deallocation.
    `(,(regexp-opt '("alloc_stack" "alloc_ref" "alloc_ref_dynamic" "alloc_box"
                     "alloc_value_buffer" "alloc_global"
@@ -64,9 +67,14 @@
 
    ;; SIL Instructions - Accessing Memory.
    `(,(regexp-opt '("load" "store" "assign"  "mark_uninitialized"
+                    "mark_uninitialized_behavior"
                     "mark_function_escape" "copy_addr" "destroy_addr"
                     "index_addr" "index_raw_pointer" "bind_memory" "to")
                   'words) . font-lock-keyword-face)
+
+   ;; SIL Instructions - Borrowing
+   '("load_borrow" . font-lock-keyword-face)
+   '("\\(end_borrow\\) %[[:alnum:]] \\(from\\)" (1 font-lock-keyword-face) (2 font-lock-keyword-face))
 
    ;; SIL Instructions - Reference Counting.
    `(,(regexp-opt '("strong_retain"
@@ -99,7 +107,7 @@
    `(,(regexp-opt '("retain_value" "release_value" "tuple" "tuple_extract"
                     "tuple_element_addr" "struct" "struct_extract"
                     "struct_element_addr" "ref_element_addr"
-                    "autorelease_value")
+                    "autorelease_value" "copy_value" "destroy_value")
                   'words) . font-lock-keyword-face)
    ;; Enums. *NOTE* We do not include enum itself here since enum is a
    ;; swift declaration as well handled at the top.

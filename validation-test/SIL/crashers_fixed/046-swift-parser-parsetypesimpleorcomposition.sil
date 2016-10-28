@@ -1,0 +1,3 @@
+// RUN: not %target-sil-opt %s
+// REQUIRES: asserts
+{struct R{func o:inout p<

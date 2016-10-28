@@ -1889,8 +1889,11 @@ bool CalleeCandidateInfo::diagnoseSimpleErrors(const Expr *E) {
       CS->TC.diagnose(loc, diag::candidate_inaccessible, decl->getName(),
                       decl->getFormalAccess());
     }
-    for (auto cand : candidates)
-      CS->TC.diagnose(cand.getDecl(),diag::decl_declared_here, decl->getName());
+    for (auto cand : candidates) {
+      if (auto decl = cand.getDecl()) {
+        CS->TC.diagnose(decl, diag::decl_declared_here, decl->getFullName());
+      }
+    }
     
     return true;
   }
@@ -2247,7 +2250,8 @@ bool FailureDiagnosis::diagnoseGeneralMemberFailure(Constraint *constraint) {
   assert(isMemberConstraint(constraint));
   
   auto memberName = constraint->getMember();
-  
+  auto isInitializer = memberName.isSimpleName(CS->TC.Context.Id_init);
+
   // Get the referenced base expression from the failed constraint, along with
   // the SourceRange for the member ref.  In "x.y", this returns the expr for x
   // and the source range for y.
@@ -2340,12 +2344,21 @@ bool FailureDiagnosis::diagnoseGeneralMemberFailure(Constraint *constraint) {
       .highlight(anchor->getSourceRange()).highlight(memberRange);
     return true;
   }
-  
-  MemberLookupResult result =
-    CS->performMemberLookup(constraint->getKind(), constraint->getMember(),
-                            baseTy, constraint->getFunctionRefKind(),
-                            constraint->getLocator(),
-                            /*includeInaccessibleMembers*/true);
+
+  // If this is initializer/constructor lookup we are dealing this.
+  if (isInitializer) {
+    // Let's check what is the base type we are trying to look it up on
+    // because only MetatypeType is viable to find constructor on, as per
+    // rules in ConstraintSystem::performMemberLookup.
+    if (!baseTy->is<AnyMetatypeType>()) {
+      baseTy = MetatypeType::get(baseTy, CS->getASTContext());
+    }
+  }
+
+  MemberLookupResult result = CS->performMemberLookup(
+      constraint->getKind(), memberName, baseTy,
+      constraint->getFunctionRefKind(), constraint->getLocator(),
+      /*includeInaccessibleMembers*/ true);
 
   switch (result.OverallResult) {
   case MemberLookupResult::Unsolved:      
@@ -2361,46 +2374,70 @@ bool FailureDiagnosis::diagnoseGeneralMemberFailure(Constraint *constraint) {
   case MemberLookupResult::HasResults:
     break;
   }
-  
-  // If this is a failing lookup, it has no viable candidates here.
-  if (result.ViableCandidates.empty()) {
-    // Diagnose 'super.init', which can only appear inside another initializer,
-    // specially.
-    if (result.UnviableCandidates.empty() &&
-        memberName.isSimpleName(CS->TC.Context.Id_init) &&
-        !baseObjTy->is<MetatypeType>()) {
-      if (auto ctorRef = dyn_cast<UnresolvedDotExpr>(expr)) {
-        if (isa<SuperRefExpr>(ctorRef->getBase())) {
-          diagnose(anchor->getLoc(),
-                   diag::super_initializer_not_in_initializer);
-          return true;
-        }
-        
-        // Suggest inserting a call to 'type(of:)' to construct another object
-        // of the same dynamic type.
-        SourceRange fixItRng = ctorRef->getNameLoc().getSourceRange();
-        
-        // Surround the caller in `type(of:)`.
-        diagnose(anchor->getLoc(), diag::init_not_instance_member)
-          .fixItInsert(fixItRng.Start, "type(of: ")
-          .fixItInsertAfter(fixItRng.End, ")");
-        return true;
+
+  // Since the lookup was allowing inaccessible members, let's check
+  // if it found anything of that sort, which is easy to diagnose.
+  bool allUnavailable = !CS->TC.getLangOpts().DisableAvailabilityChecking;
+  for (auto &member : result.ViableCandidates) {
+    if (!member.isDecl()) {
+      // if there is no declaration, this choice is implicitly available.
+      allUnavailable = false;
+      continue;
+    }
+
+    auto decl = member.getDecl();
+    // Check availability of the found choice.
+    if (!decl->getAttrs().isUnavailable(CS->getASTContext()))
+      allUnavailable = false;
+
+    if (decl->isAccessibleFrom(CS->DC))
+      continue;
+
+    if (auto *CD = dyn_cast<ConstructorDecl>(decl)) {
+      CS->TC.diagnose(anchor->getLoc(), diag::init_candidate_inaccessible,
+                      CD->getResultType(), decl->getFormalAccess());
+    } else {
+      CS->TC.diagnose(anchor->getLoc(), diag::candidate_inaccessible,
+                      decl->getName(), decl->getFormalAccess());
+    }
+
+    for (auto &candidate : result.ViableCandidates) {
+      if (auto decl = candidate.getDecl()) {
+        CS->TC.diagnose(decl, diag::decl_declared_here, decl->getFullName());
       }
     }
 
+    return true;
+  }
+
+  // Diagnose 'super.init', which can only appear inside another initializer,
+  // specially.
+  if (result.UnviableCandidates.empty() && isInitializer &&
+      !baseObjTy->is<MetatypeType>()) {
+    if (auto ctorRef = dyn_cast<UnresolvedDotExpr>(expr)) {
+      if (isa<SuperRefExpr>(ctorRef->getBase())) {
+        diagnose(anchor->getLoc(), diag::super_initializer_not_in_initializer);
+        return true;
+      }
+
+      // Suggest inserting a call to 'type(of:)' to construct another object
+      // of the same dynamic type.
+      SourceRange fixItRng = ctorRef->getNameLoc().getSourceRange();
+
+      // Surround the caller in `type(of:)`.
+      diagnose(anchor->getLoc(), diag::init_not_instance_member)
+          .fixItInsert(fixItRng.Start, "type(of: ")
+          .fixItInsertAfter(fixItRng.End, ")");
+      return true;
+    }
+  }
+
+  if (result.ViableCandidates.empty()) {
     // FIXME: Dig out the property DeclNameLoc.
     diagnoseUnviableLookupResults(result, baseObjTy, anchor, memberName,
                                   DeclNameLoc(memberRange.Start),
                                   anchor->getLoc());
     return true;
-  }
-  
-  
-  bool allUnavailable = !CS->TC.getLangOpts().DisableAvailabilityChecking;
-  for (auto match : result.ViableCandidates) {
-    if (!match.isDecl() ||
-        !match.getDecl()->getAttrs().isUnavailable(CS->getASTContext()))
-      allUnavailable = false;
   }
   
   if (allUnavailable) {
@@ -5192,6 +5229,8 @@ bool FailureDiagnosis::visitApplyExpr(ApplyExpr *callExpr) {
       callExpr->setFn(operatorRef);
   };
 
+  auto fnType = fnExpr->getType()->getRValueType();
+
   // If we have a contextual type, and if we have an ambiguously typed function
   // result from our previous check, we re-type-check it using this contextual
   // type to inform the result type of the callee.
@@ -5204,14 +5243,33 @@ bool FailureDiagnosis::visitApplyExpr(ApplyExpr *callExpr) {
       (isUnresolvedOrTypeVarType(fnExpr->getType()) ||
        (fnExpr->getType()->is<AnyFunctionType>() &&
         fnExpr->getType()->hasUnresolvedType()))) {
+    // FIXME: Prevent typeCheckChildIndependently from transforming expressions,
+    // because if we try to typecheck OSR expression with contextual type,
+    // it'll end up converting it into DeclRefExpr based on contextual info,
+    // instead let's try to get a type without applying and filter callee
+    // candidates later on.
     CalleeListener listener(CS->getContextualType());
-    fnExpr = typeCheckChildIndependently(callExpr->getFn(), Type(),
-                                         CTP_CalleeResult, TCC_ForceRecheck,
-                                         &listener);
-    if (!fnExpr) return true;
+
+    if (auto OSR = dyn_cast<OverloadSetRefExpr>(fnExpr)) {
+      assert(!OSR->getReferencedDecl() && "unexpected declaration reference");
+
+      ConcreteDeclRef decl = nullptr;
+      Optional<Type> type = CS->TC.getTypeOfExpressionWithoutApplying(
+          fnExpr, CS->DC, decl, FreeTypeVariableBinding::UnresolvedType,
+          &listener);
+
+      if (type.hasValue())
+        fnType = type.getValue()->getRValueType();
+    } else {
+      fnExpr = typeCheckChildIndependently(callExpr->getFn(), Type(),
+                                           CTP_CalleeResult, TCC_ForceRecheck,
+                                           &listener);
+      if (!fnExpr)
+        return true;
+
+      fnType = fnExpr->getType()->getRValueType();
+    }
   }
-  
-  auto fnType = fnExpr->getType()->getRValueType();
 
   // If we resolved a concrete expression for the callee, and it has
   // non-function/non-metatype type, then we cannot call it!
@@ -5254,7 +5312,37 @@ bool FailureDiagnosis::visitApplyExpr(ApplyExpr *callExpr) {
   // Collect a full candidate list of callees based on the partially type
   // checked function.
   CalleeCandidateInfo calleeInfo(fnExpr, hasTrailingClosure, CS);
-  
+
+  // Filter list of the candidates based on the known function type.
+  if (auto fn = fnType->getAs<AnyFunctionType>()) {
+    using Closeness = CalleeCandidateInfo::ClosenessResultTy;
+
+    auto isGenericType = [](Type type) -> bool {
+      if (type->hasError() || type->hasTypeVariable() ||
+          type->hasUnresolvedType())
+        return false;
+
+      return type->isCanonical() && type->isUnspecializedGeneric();
+    };
+
+    calleeInfo.filterList([&](UncurriedCandidate candidate) -> Closeness {
+      auto resultType = candidate.getResultType();
+      if (!resultType)
+        return {CC_GeneralMismatch, {}};
+
+      // FIXME: Handle matching of the generic types properly.
+      // Currently we don't filter result types containing generic parametes
+      // because there is no easy way to do that, and candidate set is going
+      // to be pruned by matching of the argument types later on anyway, so
+      // it's better to over report than to be too conservative.
+      if ((isGenericType(resultType) && isGenericType(fn->getResult())) ||
+          resultType->isEqual(fn->getResult()))
+        return {CC_ExactMatch, {}};
+
+      return {CC_GeneralMismatch, {}};
+    });
+  }
+
   // Filter the candidate list based on the argument we may or may not have.
   calleeInfo.filterContextualMemberList(callExpr->getArg());
 
@@ -5396,7 +5484,23 @@ bool FailureDiagnosis::visitApplyExpr(ApplyExpr *callExpr) {
     // conversion failure.
     if (calleeInfo.closeness == CC_ExactMatch)
       return false;
-    
+
+    // If this is not a specific structural problem we can diagnose,
+    // let's check if this is contextual type conversion error.
+    if (CS->getContextualType() &&
+        calleeInfo.closeness == CC_ArgumentMismatch) {
+      CalleeCandidateInfo candidates(fnExpr, hasTrailingClosure, CS);
+
+      // Filter original list of choices based on the deduced type of
+      // argument expression after force re-check.
+      candidates.filterContextualMemberList(argTuple);
+
+      // One of the candidates matches exactly, which means that
+      // this is a contextual type conversion failure, we can't diagnose here.
+      if (candidates.closeness == CC_ExactMatch)
+        return false;
+    }
+
     if (!lhsType->isEqual(rhsType)) {
       diagnose(callExpr->getLoc(), diag::cannot_apply_binop_to_args,
                overloadName, lhsType, rhsType)
@@ -6666,9 +6770,11 @@ diagnoseAmbiguousMultiStatementClosure(ClosureExpr *closure) {
     llvm::SaveAndRestore<DeclContext*> SavedDC(CS->DC, closure);
     
     // Otherwise, we're ok to type check the subexpr.
-    auto returnedExpr =
-      typeCheckChildIndependently(RS->getResult(),
-                                  TCC_AllowUnresolvedTypeVariables);
+    Expr *returnedExpr = nullptr;
+    if (RS->hasResult())
+      returnedExpr =
+        typeCheckChildIndependently(RS->getResult(),
+                                    TCC_AllowUnresolvedTypeVariables);
     
     // If we found a type, presuppose it was the intended result and insert a
     // fixit hint.

@@ -279,12 +279,18 @@ namespace {
     }
 
     bool visitLoadInst(const LoadInst *RHS) {
-      return true;
+      auto LHSQualifier = cast<LoadInst>(LHS)->getOwnershipQualifier();
+      return LHSQualifier == RHS->getOwnershipQualifier();
     }
+
+    bool visitLoadBorrowInst(const LoadBorrowInst *RHS) { return true; }
+
+    bool visitEndBorrowInst(const EndBorrowInst *RHS) { return true; }
 
     bool visitStoreInst(const StoreInst *RHS) {
       auto *X = cast<StoreInst>(LHS);
-      return (X->getSrc() == RHS->getSrc() && X->getDest() == RHS->getDest());
+      return X->getSrc() == RHS->getSrc() && X->getDest() == RHS->getDest() &&
+        X->getOwnershipQualifier() == RHS->getOwnershipQualifier();
     }
 
     bool visitBindMemoryInst(const BindMemoryInst *RHS) {
@@ -977,6 +983,10 @@ SILInstruction *SILInstruction::clone(SILInstruction *InsertPt) {
 bool SILInstruction::isTriviallyDuplicatable() const {
   if (isa<AllocStackInst>(this) || isa<DeallocStackInst>(this)) {
     return false;
+  }
+  if (auto *ARI = dyn_cast<AllocRefInst>(this)) {
+    if (ARI->canAllocOnStack())
+      return false;
   }
 
   if (isa<OpenExistentialAddrInst>(this) ||

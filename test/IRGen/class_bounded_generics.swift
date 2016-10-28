@@ -261,3 +261,15 @@ func class_bounded_metatype<T: SomeSwiftClass>(_ t : T) {
 class WeakRef<T: AnyObject> {
   weak var value: T?
 }
+
+class A<T> {
+  required init() {}
+}
+
+class M<T, S: A<T>> {
+  private var s: S
+  init() {
+    // Don't crash generating the reference to 's'.
+    s = S.init()
+  }
+}

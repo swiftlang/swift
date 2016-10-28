@@ -380,13 +380,13 @@ SILFunction *SILDeserializer::readSILFunction(DeclID FID,
   DeclID clangNodeOwnerID;
   TypeID funcTyID;
   unsigned rawLinkage, isTransparent, isFragile, isThunk, isGlobal,
-    inlineStrategy, effect, numSpecAttrs;
+      inlineStrategy, effect, numSpecAttrs, hasQualifiedOwnership;
   ArrayRef<uint64_t> SemanticsIDs;
   // TODO: read fragile
   SILFunctionLayout::readRecord(scratch, rawLinkage, isTransparent, isFragile,
                                 isThunk, isGlobal, inlineStrategy, effect,
-                                numSpecAttrs, funcTyID, clangNodeOwnerID,
-                                SemanticsIDs);
+                                numSpecAttrs, hasQualifiedOwnership, funcTyID,
+                                clangNodeOwnerID, SemanticsIDs);
 
   if (funcTyID == 0) {
     DEBUG(llvm::dbgs() << "SILFunction typeID is 0.\n");
@@ -454,6 +454,8 @@ SILFunction *SILDeserializer::readSILFunction(DeclID FID,
     for (auto ID : SemanticsIDs) {
       fn->addSemanticsAttr(MF->getIdentifier(ID).str());
     }
+    if (!hasQualifiedOwnership)
+      fn->setUnqualifiedOwnership();
 
     if (Callback) Callback->didDeserialize(MF->getAssociatedModule(), fn);
   }
@@ -765,7 +767,7 @@ bool SILDeserializer::readSILInstruction(SILFunction *Fn, SILBasicBlock *BB,
     break;
   }
 
-  ValueBase *ResultVal;
+  SILInstruction *ResultVal;
   switch ((ValueKind)OpCode) {
   case ValueKind::SILArgument:
   case ValueKind::SILUndef:
@@ -800,7 +802,6 @@ bool SILDeserializer::readSILInstruction(SILFunction *Fn, SILBasicBlock *BB,
   ONETYPE_ONEOPERAND_INST(ExistentialMetatype)
   ONETYPE_ONEOPERAND_INST(AllocValueBuffer)
   ONETYPE_ONEOPERAND_INST(ProjectValueBuffer)
-  ONETYPE_ONEOPERAND_INST(ProjectBox)
   ONETYPE_ONEOPERAND_INST(ProjectExistentialBox)
   ONETYPE_ONEOPERAND_INST(DeallocValueBuffer)
 #undef ONETYPE_ONEOPERAND_INST
@@ -843,6 +844,17 @@ bool SILDeserializer::readSILInstruction(SILFunction *Fn, SILBasicBlock *BB,
   ONEOPERAND_ONETYPE_INST(PointerToThinFunction)
   ONEOPERAND_ONETYPE_INST(ProjectBlockStorage)
 #undef ONEOPERAND_ONETYPE_INST
+
+  case ValueKind::ProjectBoxInst: {
+    assert(RecordKind == SIL_ONE_TYPE_ONE_OPERAND &&
+           "Layout should be OneTypeOneOperand.");
+    ResultVal = Builder.createProjectBox(Loc,
+                  getLocalValue(ValID,
+                    getSILType(MF->getType(TyID2),
+                               (SILValueCategory)TyCategory2)),
+                  TyID);
+    break;
+  }
 
   case ValueKind::PointerToAddressInst: {
     assert(RecordKind == SIL_ONE_TYPE_ONE_OPERAND &&
@@ -1272,6 +1284,8 @@ bool SILDeserializer::readSILInstruction(SILFunction *Fn, SILBasicBlock *BB,
 
   UNARY_INSTRUCTION(CondFail)
   REFCOUNTING_INSTRUCTION(RetainValue)
+  UNARY_INSTRUCTION(CopyValue)
+  UNARY_INSTRUCTION(DestroyValue)
   REFCOUNTING_INSTRUCTION(ReleaseValue)
   REFCOUNTING_INSTRUCTION(AutoreleaseValue)
   REFCOUNTING_INSTRUCTION(SetDeallocating)
@@ -1282,6 +1296,7 @@ bool SILDeserializer::readSILInstruction(SILFunction *Fn, SILBasicBlock *BB,
   UNARY_INSTRUCTION(Throw)
   UNARY_INSTRUCTION(FixLifetime)
   UNARY_INSTRUCTION(CopyBlock)
+  UNARY_INSTRUCTION(LoadBorrow)
   REFCOUNTING_INSTRUCTION(StrongPin)
   REFCOUNTING_INSTRUCTION(StrongUnpin)
   REFCOUNTING_INSTRUCTION(StrongRetain)
@@ -1335,6 +1350,15 @@ bool SILDeserializer::readSILInstruction(SILFunction *Fn, SILBasicBlock *BB,
     auto Qualifier = StoreOwnershipQualifier(Attr);
     ResultVal = Builder.createStore(Loc, getLocalValue(ValID, ValType),
                                     getLocalValue(ValID2, addrType), Qualifier);
+    break;
+  }
+  case ValueKind::EndBorrowInst: {
+    SILValue BorrowSource, BorrowDest;
+    BorrowSource = getLocalValue(
+        ValID, getSILType(MF->getType(TyID), (SILValueCategory)TyCategory));
+    BorrowDest = getLocalValue(
+        ValID2, getSILType(MF->getType(TyID2), (SILValueCategory)TyCategory2));
+    ResultVal = Builder.createEndBorrow(Loc, BorrowSource, BorrowDest);
     break;
   }
   case ValueKind::StoreUnownedInst: {
@@ -1875,6 +1899,7 @@ bool SILDeserializer::readSILInstruction(SILFunction *Fn, SILBasicBlock *BB,
   case ValueKind::MarkUninitializedBehaviorInst:
     llvm_unreachable("todo");
   }
+
   if (ResultVal->hasValue()) {
     LastValueID = LastValueID + 1;
     setLocalValue(ResultVal, LastValueID);
@@ -1943,12 +1968,12 @@ bool SILDeserializer::hasSILFunction(StringRef Name,
   DeclID clangOwnerID;
   TypeID funcTyID;
   unsigned rawLinkage, isTransparent, isFragile, isThunk, isGlobal,
-    inlineStrategy, effect, numSpecAttrs;
+    inlineStrategy, effect, numSpecAttrs, hasQualifiedOwnership;
   ArrayRef<uint64_t> SemanticsIDs;
   SILFunctionLayout::readRecord(scratch, rawLinkage, isTransparent, isFragile,
                                 isThunk, isGlobal, inlineStrategy, effect,
-                                numSpecAttrs, funcTyID, clangOwnerID,
-                                SemanticsIDs);
+                                numSpecAttrs, hasQualifiedOwnership, funcTyID,
+                                clangOwnerID, SemanticsIDs);
   auto linkage = fromStableSILLinkage(rawLinkage);
   if (!linkage) {
     DEBUG(llvm::dbgs() << "invalid linkage code " << rawLinkage

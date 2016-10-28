@@ -33,7 +33,7 @@ ManagedValue ManagedValue::copy(SILGenFunction &gen, SILLocation l) {
   assert(!lowering.isTrivial() && "trivial value has cleanup?");
   
   if (!lowering.isAddressOnly()) {
-    lowering.emitRetainValue(gen.B, l, getValue());
+    lowering.emitCopyValue(gen.B, l, getValue());
     return gen.emitManagedRValueWithCleanup(getValue(), lowering);
   }
   
@@ -51,7 +51,7 @@ void ManagedValue::copyInto(SILGenFunction &gen, SILValue dest, SILLocation L) {
                          IsNotTake, IsInitialization);
     return;
   }
-  lowering.emitRetainValue(gen.B, L, getValue());
+  lowering.emitCopyValue(gen.B, L, getValue());
   gen.B.createStore(L, getValue(), dest);
 }
 
@@ -65,7 +65,7 @@ ManagedValue ManagedValue::copyUnmanaged(SILGenFunction &gen, SILLocation loc) {
   
   SILValue result;
   if (!lowering.isAddressOnly()) {
-    lowering.emitRetainValue(gen.B, loc, getValue());
+    lowering.emitCopyValue(gen.B, loc, getValue());
     result = getValue();
   } else {
     result = gen.emitTemporaryAllocation(loc, getType());

@@ -1,4 +1,4 @@
-//===----------------------------------------------------------------------===//
+//===--- XCTestOverlayShims.h -----------------------------------*- C++ -*-===//
 //
 // This source file is part of the Swift.org open source project
 //
@@ -10,10 +10,17 @@
 //
 //===----------------------------------------------------------------------===//
 
-#import <SafariServices/SFSwiftOverlaySupport.h>
-#include "swift/Runtime/Config.h"
+#ifndef SWIFT_STDLIB_SHIMS_XCTEST_OVERLAY_H
+#define SWIFT_STDLIB_SHIMS_XCTEST_OVERLAY_H
 
-SWIFT_CC(swift)
-extern "C" bool _swift_SafariServices_isSafariServicesAvailable() {
-  return nullptr != &_SFSafariServicesAvailable;
-}
+@import Foundation;
+
+@class XCTestCase;
+
+XCTestCase * _Nonnull _XCTCurrentTestCase(void);
+
+NSDictionary<NSString *, NSString *> * _Nonnull
+_XCTRunThrowableBlockBridge(void (^ _Nonnull NS_NOESCAPE block)());
+
+#endif // SWIFT_STDLIB_SHIMS_XCTEST_OVERLAY_H
+

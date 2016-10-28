@@ -536,7 +536,7 @@ ClosureCloner::visitStrongReleaseInst(StrongReleaseInst *Inst) {
       SILFunction &F = getBuilder().getFunction();
       auto &typeLowering = F.getModule().getTypeLowering(I->second->getType());
       SILBuilderWithPostProcess<ClosureCloner, 1> B(this, Inst);
-      typeLowering.emitReleaseValue(B, Inst->getLoc(), I->second);
+      typeLowering.emitDestroyValue(B, Inst->getLoc(), I->second);
       return;
     }
   }
@@ -862,7 +862,7 @@ constructClonedFunction(PartialApplyInst *PAI, FunctionRefInst *FRI,
   auto ApplySubs = PAI->getSubstitutions();
 
   SubstitutionMap InterfaceSubs;
-  if (auto genericSig = F->getLoweredFunctionType()->getGenericSignature())
+  if (auto genericSig = PAI->getOrigCalleeType()->getGenericSignature())
     InterfaceSubs = genericSig->getSubstitutionMap(ApplySubs);
 
   // Create the Cloned Name for the function.
@@ -949,7 +949,7 @@ processPartialApplyInst(PartialApplyInst *PAI, IndicesSet &PromotableIndices,
       // alloc_box. This makes sure that the project_box dominates the
       // partial_apply.
       if (!Addr)
-        Addr = getOrCreateProjectBox(ABI);
+        Addr = getOrCreateProjectBox(ABI, 0);
 
       auto &typeLowering = M.getTypeLowering(Addr->getType());
       Args.push_back(

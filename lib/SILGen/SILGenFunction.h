@@ -709,14 +709,18 @@ public:
   //===--------------------------------------------------------------------===//
   // Memory management
   //===--------------------------------------------------------------------===//
-  
+
+  /// Emit debug info for the artificial error inout argument.
+  void emitErrorArgument(SILLocation Loc, unsigned ArgNo);
+
   /// emitProlog - Generates prolog code to allocate and clean up mutable
   /// storage for closure captures and local arguments.
   void emitProlog(AnyFunctionRef TheClosure,
-                  ArrayRef<ParameterList*> paramPatterns, Type resultType);
+                  ArrayRef<ParameterList *> paramPatterns, Type resultType,
+                  bool throws);
   /// returns the number of variables in paramPatterns.
-  unsigned emitProlog(ArrayRef<ParameterList*> paramPatterns,
-                      Type resultType, DeclContext *DeclCtx);
+  unsigned emitProlog(ArrayRef<ParameterList *> paramPatterns, Type resultType,
+                      DeclContext *DeclCtx, bool throws);
 
   /// Create SILArguments in the entry block that bind all the values
   /// of the given pattern suitably for being forwarded.
@@ -1122,6 +1126,9 @@ public:
                                 SILValue buffer, SILValue callbackStorage);
   bool maybeEmitMaterializeForSetThunk(ProtocolConformance *conformance,
                                        SILLinkage linkage,
+                                       Type selfInterfaceType,
+                                       Type selfType,
+                                       GenericEnvironment *genericEnv,
                                        FuncDecl *requirement,
                                        FuncDecl *witness,
                                        ArrayRef<Substitution> witnessSubs);

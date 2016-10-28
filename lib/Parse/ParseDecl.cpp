@@ -2412,17 +2412,21 @@ ParserStatus Parser::parseInheritance(SmallVectorImpl<TypeLoc> &Inherited,
       continue;
     }
 
-    bool usesDeprecatedCompositionSyntax = Tok.is(tok::kw_protocol) && startsWithLess(peekToken());
+    bool usesDeprecatedCompositionSyntax =
+      Tok.is(tok::kw_protocol) && startsWithLess(peekToken());
     bool isAny = Tok.is(tok::kw_Any); // We allow (redundant) inheritance from Any
 
-    auto ParsedTypeResult = parseTypeIdentifierOrTypeComposition();
+    auto ParsedTypeResult = parseTypeForInheritance(
+        diag::expected_identifier_for_type,
+        diag::expected_ident_type_in_inheritance);
     Status |= ParsedTypeResult;
 
-    // Cannot inherit from composition
-    if (auto Composition = dyn_cast_or_null<ProtocolCompositionTypeRepr>(ParsedTypeResult.getPtrOrNull())) {
+    // Recover and emit nice diagnostic for composition.
+    if (auto Composition = dyn_cast_or_null<CompositionTypeRepr>(
+          ParsedTypeResult.getPtrOrNull())) {
       // Record the protocols inside the composition.
-      Inherited.append(Composition->getProtocols().begin(),
-                       Composition->getProtocols().end());
+      Inherited.append(Composition->getTypes().begin(),
+                       Composition->getTypes().end());
       // We can inherit from Any
       if (!isAny) {
         if (usesDeprecatedCompositionSyntax) {
@@ -3997,6 +4001,7 @@ ParserStatus Parser::parseDeclVar(ParseDeclOptions Flags,
       diagnose(Tok, diag::static_var_decl_global_scope, StaticSpelling)
           .fixItRemove(StaticLoc);
       StaticLoc = SourceLoc();
+      StaticSpelling = StaticSpellingKind::None;
     } else if (Flags.contains(PD_InStruct) || Flags.contains(PD_InEnum) ||
                Flags.contains(PD_InProtocol)) {
       if (StaticSpelling == StaticSpellingKind::KeywordClass)
@@ -4371,6 +4376,7 @@ Parser::parseDeclFunc(SourceLoc StaticLoc, StaticSpellingKind StaticSpelling,
       diagnose(Tok, diag::static_func_decl_global_scope, StaticSpelling)
           .fixItRemove(StaticLoc);
       StaticLoc = SourceLoc();
+      StaticSpelling = StaticSpellingKind::None;
     } else if (Flags.contains(PD_InStruct) || Flags.contains(PD_InEnum) ||
                Flags.contains(PD_InProtocol)) {
       if (StaticSpelling == StaticSpellingKind::KeywordClass) {

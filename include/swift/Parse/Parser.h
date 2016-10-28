@@ -122,6 +122,7 @@ public:
   } InVarOrLetPattern = IVOLP_NotInVarOrLet;
 
   bool InPoundLineEnvironment = false;
+  bool InPoundIfEnvironment = false;
 
   LocalContext *CurLocalContext = nullptr;
 
@@ -349,17 +350,24 @@ public:
   class BacktrackingScope {
     Parser &P;
     ParserPosition PP;
+    DiagnosticTransaction DT;
     bool Backtrack = true;
 
   public:
-    BacktrackingScope(Parser &P) : P(P), PP(P.getParserPosition()) {}
+    BacktrackingScope(Parser &P)
+      : P(P), PP(P.getParserPosition()), DT(P.Diags) {}
 
     ~BacktrackingScope() {
-      if (Backtrack)
+      if (Backtrack) {
         P.backtrackToPosition(PP);
+        DT.abort();
+      }
     }
 
-    void cancelBacktrack() { Backtrack = false; }
+    void cancelBacktrack() {
+      Backtrack = false;
+      DT.commit();
+    }
   };
 
   /// RAII object that, when it is destructed, restores the parser and lexer to
@@ -824,18 +832,24 @@ public:
   ParserResult<TypeRepr> parseType(Diag<> MessageID,
                                    bool HandleCodeCompletion = true);
 
-  /// \brief Parse any type, but diagnose all types except type-identifier.
+  /// \brief Parse any type, but diagnose all types except type-identifier or
+  /// type-composition with non-type-identifier.
   ///
-  /// In some places the grammar allows type-identifier, but when it is not
-  /// ambiguous, we want to parse any type for recovery purposes.
+  /// In some places the grammar allows only type-identifier, but when it is
+  /// not ambiguous, we want to parse any type for recovery purposes.
   ///
   /// \param MessageID a generic diagnostic for a syntax error in the type
   /// \param NonIdentifierTypeMessageID a diagnostic for a non-identifier type
   ///
-  /// \returns null, IdentTypeRepr or ErrorTypeRepr.
+  /// \returns null, IdentTypeRepr, CompositionTypeRepr or ErrorTypeRepr.
   ParserResult<TypeRepr>
-  parseTypeIdentifierWithRecovery(Diag<> MessageID,
-                                  Diag<TypeLoc> NonIdentifierTypeMessageID);
+  parseTypeForInheritance(Diag<> MessageID,
+                          Diag<TypeLoc> NonIdentifierTypeMessageID);
+
+  ParserResult<TypeRepr> parseTypeSimpleOrComposition();
+  ParserResult<TypeRepr>
+    parseTypeSimpleOrComposition(Diag<> MessageID,
+                                 bool HandleCodeCompletion = true);
 
   ParserResult<TypeRepr> parseTypeSimple();
   ParserResult<TypeRepr> parseTypeSimple(Diag<> MessageID,
@@ -845,8 +859,8 @@ public:
                              SourceLoc &RAngleLoc);
 
   ParserResult<TypeRepr> parseTypeIdentifier();
-  ParserResult<TypeRepr> parseTypeIdentifierOrTypeComposition();
-  ParserResult<ProtocolCompositionTypeRepr> parseAnyType();
+  ParserResult<TypeRepr> parseOldStyleProtocolComposition();
+  ParserResult<CompositionTypeRepr> parseAnyType();
 
   ParserResult<TupleTypeRepr> parseTypeTupleBody();
   ParserResult<TypeRepr> parseTypeArray(TypeRepr *Base);

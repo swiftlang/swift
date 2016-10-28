@@ -1759,7 +1759,7 @@ Parser::evaluateConditionalCompilationExpr(Expr *condition) {
 ParserResult<Stmt> Parser::parseStmtIfConfig(BraceItemListKind Kind) {
   StructureMarkerRAII ParsingDecl(*this, Tok.getLoc(),
                                   StructureMarkerKind::IfConfig);
-
+  llvm::SaveAndRestore<bool> S(InPoundIfEnvironment, true);
   ConditionalCompilationExprState ConfigState;
   bool foundActive = false;
   SmallVector<IfConfigStmtClause, 4> Clauses;
@@ -2213,7 +2213,7 @@ ParserResult<Stmt> Parser::parseStmtForCStyle(SourceLoc ForLoc,
   // If we're missing a semicolon, try to recover.
   if (Tok.isNot(tok::semi)) {
     // Provide a reasonable default location for the first semicolon.
-    Semi1Loc = Tok.getLoc();
+    Semi1Loc = PreviousLoc;
 
     if (auto *BS = ConvertClosureToBraceStmt(First.getPtrOrNull(), Context)) {
       // We have seen:

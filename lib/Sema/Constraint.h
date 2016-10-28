@@ -58,6 +58,8 @@ enum class ConstraintKind : char {
   /// type is an lvalue type with the same object type. Otherwise, the two
   /// types must be the same type.
   BindParam,
+  /// \brief Binds the first type to the element type of the second type.
+  BindToPointerType,
   /// \brief The first type is a subtype of the second type, i.e., a value
   /// of the type of the first type can be used wherever a value of the
   /// second type is expected.
@@ -115,11 +117,6 @@ enum class ConstraintKind : char {
   /// \brief The first type has a type member with the given name, and the
   /// type of that member, when referenced as a type, is the second type.
   TypeMember,
-  /// \brief The first type must be an archetype.
-  Archetype,
-  /// \brief The first type is a class or an archetype of a class-bound
-  /// protocol.
-  Class,
   /// \brief The first type can be defaulted to the second (which currently
   /// cannot be dependent).  This is more like a type property than a
   /// relational constraint.
@@ -141,7 +138,8 @@ enum class ConstraintClassification : char {
   /// it a reference type.
   Member,
 
-  /// \brief A property of a single type, such as whether it is an archetype.
+  /// \brief A property of a single type, such as whether it is defaultable to
+  /// a particular type.
   TypeProperty,
 
   /// \brief A disjunction constraint.
@@ -468,6 +466,7 @@ public:
     case ConstraintKind::Bind:
     case ConstraintKind::Equal:
     case ConstraintKind::BindParam:
+    case ConstraintKind::BindToPointerType:
     case ConstraintKind::Subtype:
     case ConstraintKind::Conversion:
     case ConstraintKind::ExplicitConversion:
@@ -489,8 +488,6 @@ public:
     case ConstraintKind::TypeMember:
       return ConstraintClassification::Member;
 
-    case ConstraintKind::Archetype:
-    case ConstraintKind::Class:
     case ConstraintKind::DynamicTypeOf:
     case ConstraintKind::Defaultable:
       return ConstraintClassification::TypeProperty;

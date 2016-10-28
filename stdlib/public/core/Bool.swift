@@ -26,7 +26,7 @@
 ///     print(containsTen)
 ///     // Prints "false"
 ///
-///     let (a, b) == (100, 101)
+///     let (a, b) = (100, 101)
 ///     let aFirst = a < b
 ///     print(aFirst)
 ///     // Prints "true"
@@ -242,7 +242,7 @@ extension Bool {
   ///     } else {
   ///         print("Major error: \(error)")
   ///     }
-  ///     // Prints "No major errors detected")
+  ///     // Prints "No major errors detected"
   ///
   /// In this example, `lhs` tests whether `error` is an empty string.
   /// Evaluation of the `||` operator is one of the following:

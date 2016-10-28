@@ -59,7 +59,7 @@ ManagedValue SILGenFunction::emitManagedRetain(SILLocation loc,
     return ManagedValue::forUnmanaged(v);
   assert(!lowering.isAddressOnly() && "cannot retain an unloadable type");
 
-  lowering.emitRetainValue(B, loc, v);
+  lowering.emitCopyValue(B, loc, v);
   return emitManagedRValueWithCleanup(v, lowering);
 }
 
@@ -1141,6 +1141,7 @@ static ManagedValue convertFunctionRepresentation(SILGenFunction &SGF,
                        SGF.getLoweredType(destTy).castTo<SILFunctionType>());
       break;
     case SILFunctionType::Representation::Method:
+    case SILFunctionType::Representation::Closure:
     case SILFunctionType::Representation::ObjCMethod:
     case SILFunctionType::Representation::WitnessMethod:
       llvm_unreachable("should not do function conversion from method rep");
@@ -1168,6 +1169,7 @@ static ManagedValue convertFunctionRepresentation(SILGenFunction &SGF,
     case SILFunctionType::Representation::Block:
       llvm_unreachable("should not try block-to-block repr change");
     case SILFunctionType::Representation::Method:
+    case SILFunctionType::Representation::Closure:
     case SILFunctionType::Representation::ObjCMethod:
     case SILFunctionType::Representation::WitnessMethod:
       llvm_unreachable("should not do function conversion from method rep");
@@ -1354,7 +1356,7 @@ ManagedValue SILGenFunction::getManagedValue(SILLocation loc,
 
   // If it's an object, retain and enter a release cleanup.
   if (valueTy.isObject()) {
-    valueTL.emitRetainValue(B, loc, value.getValue());
+    valueTL.emitCopyValue(B, loc, value.getValue());
     return emitManagedRValueWithCleanup(value.getValue(), valueTL);
   }
 

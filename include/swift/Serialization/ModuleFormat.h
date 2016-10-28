@@ -54,7 +54,7 @@ const uint16_t VERSION_MAJOR = 0;
 /// in source control, you should also update the comment to briefly
 /// describe what change you made. The content of this comment isn't important;
 /// it just ensures a conflict if two people change the module format.
-const uint16_t VERSION_MINOR = 276; // Last change: add load inst, store inst
+const uint16_t VERSION_MINOR = 280; // Last change: function qualified ownership
 
 using DeclID = PointerEmbeddedInt<unsigned, 31>;
 using DeclIDField = BCFixed<31>;
@@ -140,6 +140,7 @@ enum class SILFunctionTypeRepresentation : uint8_t {
   Method = FirstSIL,
   ObjCMethod,
   WitnessMethod,
+  Closure,
 };
 using SILFunctionTypeRepresentationField = BCFixed<4>;
 

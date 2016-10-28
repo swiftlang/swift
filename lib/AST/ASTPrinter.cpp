@@ -907,12 +907,14 @@ class PrintAST : public ASTVisitor<PrintAST> {
         DC = DC->getParent()->getInnermostTypeContext();
       assert(DC);
 
-      // Get the substitutions from our base type.
-      auto subMap = Options.TransformContext->getTypeBase()
-          ->getMemberSubstitutions(DC);
-      auto *M = DC->getParentModule();
 
-      T = T.subst(M, subMap, SubstFlags::DesugarMemberTypes);
+      if (Options.TransformContext->getTypeBase()->canTreatContextAsMember(DC)) {
+        // Get the substitutions from our base type.
+        auto subMap = Options.TransformContext->getTypeBase()
+          ->getMemberSubstitutions(DC);
+        auto *M = DC->getParentModule();
+        T = T.subst(M, subMap, SubstFlags::DesugarMemberTypes);
+      }
     }
 
     printType(T);
@@ -3496,7 +3498,7 @@ public:
   }
 
   void visitNameAliasType(NameAliasType *T) {
-    if (Options.PrintForSIL) {
+    if (Options.PrintForSIL || Options.PrintNameAliasUnderlyingType) {
       visit(T->getSinglyDesugaredType());
       return;
     }
@@ -3716,6 +3718,9 @@ public:
       case SILFunctionType::Representation::WitnessMethod:
         Printer << "witness_method";
         break;
+      case SILFunctionType::Representation::Closure:
+        Printer << "closure";
+        break;
       }
       Printer << ")";
       Printer.printStructurePost(PrintStructureKind::BuiltinAttribute);
@@ -3733,7 +3738,6 @@ public:
       Printer.callPrintStructurePre(PrintStructureKind::BuiltinAttribute);
       Printer.printAttrName("@convention");
       Printer << "(";
-      // TODO: coalesce into a single convention attribute.
       switch (info.getRepresentation()) {
       case SILFunctionType::Representation::Thick:
         llvm_unreachable("thick is not printed");
@@ -3754,6 +3758,9 @@ public:
         break;
       case SILFunctionType::Representation::WitnessMethod:
         Printer << "witness_method";
+        break;
+      case SILFunctionType::Representation::Closure:
+        Printer << "closure";
         break;
       }
       Printer << ")";

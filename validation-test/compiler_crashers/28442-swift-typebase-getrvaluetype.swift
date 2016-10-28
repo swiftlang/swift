@@ -7,5 +7,4 @@
 
 // RUN: not --crash %target-swift-frontend %s -parse
 // REQUIRES: asserts
-.h={return
-class c
+var f={var f=[]f.init

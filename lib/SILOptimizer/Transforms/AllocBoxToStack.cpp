@@ -732,7 +732,7 @@ specializePartialApply(PartialApplyInst *PartialApply,
     // alloc_box. This makes sure that the project_box dominates the
     // partial_apply.
     if (!promoted)
-      promoted = getOrCreateProjectBox(box);
+      promoted = getOrCreateProjectBox(box, 0);
 
     Args.push_back(promoted);
 

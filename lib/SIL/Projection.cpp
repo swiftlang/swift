@@ -263,7 +263,7 @@ Projection::createAddressProjection(SILBuilder &B, SILLocation Loc,
   case ProjectionKind::TailElems:
     return B.createRefTailAddr(Loc, Base, getCastType(BaseTy));
   case ProjectionKind::Box:
-    return B.createProjectBox(Loc, Base);
+    return B.createProjectBox(Loc, Base, getIndex());
   case ProjectionKind::Upcast:
     return B.createUpcast(Loc, Base, getCastType(BaseTy));
   case ProjectionKind::RefCast:

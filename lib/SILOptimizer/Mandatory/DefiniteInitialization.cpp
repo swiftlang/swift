@@ -98,7 +98,7 @@ static void LowerAssignInstruction(SILBuilder &B, AssignInst *Inst,
     SILValue IncomingVal = B.createLoad(Loc, Inst->getDest());
     B.createStore(Inst->getLoc(), Src, Inst->getDest());
 
-    B.emitReleaseValueOperation(Loc, IncomingVal);
+    B.emitDestroyValueOperation(Loc, IncomingVal);
   }
 
   Inst->eraseFromParent();
@@ -1774,7 +1774,7 @@ void LifetimeChecker::processUninitializedRelease(SILInstruction *Release,
     // since the pointer it contains will be manually cleaned up.
     auto *ABI = dyn_cast<AllocBoxInst>(Release->getOperand(0));
     if (ABI)
-      Pointer = getOrCreateProjectBox(ABI);
+      Pointer = getOrCreateProjectBox(ABI, 0);
 
     if (!consumed) {
       if (Pointer->getType().isAddress())

@@ -54,6 +54,7 @@ KNOWN_SETTINGS=(
     lldb-extra-xcodebuild-args  ""               "extra command line args to pass to lldb xcodebuild"
     lldb-test-cc                ""               "CC to use for building LLDB testsuite test inferiors.  Defaults to just-built, in-tree clang.  If set to 'host-toolchain', sets it to same as host-cc."
     lldb-test-with-curses       ""               "run test lldb test runner using curses terminal control"
+    lldb-test-swift-only        ""               "when running lldb tests, only include Swift-specific tests"
     lldb-no-debugserver         ""               "delete debugserver after building it, and don't try to codesign it"
     lldb-use-system-debugserver ""               "don't try to codesign debugserver, and use the system's debugserver instead"
     llvm-build-type             "Debug"          "the CMake build variant for LLVM and Clang (Debug, RelWithDebInfo, Release, MinSizeRel).  Defaults to Debug."
@@ -240,6 +241,7 @@ KNOWN_SETTINGS=(
     clang-profile-instr-use            ""        "If set, profile file to use for clang PGO"
     coverage-db                        ""        "If set, coverage database to use when prioritizing testing"
     build-toolchain-only               ""        "If set, only build the necessary tools to build an external toolchain"
+    skip-local-host-install            ""        "If we are cross-compiling multiple targets, skip an install pass locally if the hosts match"
 )
 
 # Centralized access point for traced command invocation.
@@ -430,12 +432,12 @@ function set_build_options_for_host() {
                     ;;
                 linux-armv6)
                     SWIFT_HOST_VARIANT_ARCH="armv6"
-                    SWIFT_HOST_TRIPLE="armv6-linux-gnueabihf"
+                    SWIFT_HOST_TRIPLE="armv6-unknown-linux-gnueabihf"
                     llvm_target_arch="ARM"
                     ;;
                 linux-armv7)
                     SWIFT_HOST_VARIANT_ARCH="armv7"
-                    SWIFT_HOST_TRIPLE="armv7-linux-gnueabihf"
+                    SWIFT_HOST_TRIPLE="armv7-unknown-linux-gnueabihf"
                     llvm_target_arch="ARM"
                     ;;
                 linux-aarch64)
@@ -1496,6 +1498,24 @@ eval COMMON_CMAKE_OPTIONS=(${COMMON_CMAKE_OPTIONS})
 eval EXTRA_CMAKE_OPTIONS=(${EXTRA_CMAKE_OPTIONS})
 eval BUILD_ARGS=(${BUILD_ARGS})
 
+if [[ -n "${DISTCC}" ]]; then
+    if [[ "$(uname -s)" == "Darwin" ]] ; then
+        # These are normally deduced by CMake, but when the compiler is set to
+        # distcc which is installed elsewhere, we need to set them explicitly.
+        COMMON_CMAKE_OPTIONS=(
+            "${COMMON_CMAKE_OPTIONS[@]}" "-DCMAKE_AR=$(xcrun_find_tool ar)"
+            "-DCMAKE_LINKER=$(xcrun_find_tool ld)"
+            "-DCMAKE_NM=$(xcrun_find_tool nm)"
+            "-DCMAKE_OBJDUMP=$(xcrun_find_tool objdump)"
+            "-DCMAKE_RANLIB=$(xcrun_find_tool ranlib)"
+            "-DCMAKE_STRIP=$(xcrun_find_tool strip)"
+        )
+    fi
+fi
+
+eval CMAKE_BUILD=("${DISTCC_PUMP}" "${CMAKE}" "--build")
+
+
 if [[ "${CMAKE_GENERATOR}" == "Xcode" ]]; then
     BUILD_TARGET_FLAG="-target"
 fi
@@ -2485,10 +2505,10 @@ for host in "${ALL_HOSTS[@]}"; do
 
                 # Xcode can't restart itself if it turns out we need to reconfigure.
                 # Do an advance build to handle that.
-                call ${DISTCC_PUMP} "${CMAKE}" --build "${build_dir}" $(cmake_config_opt ${product})
+                call "${CMAKE_BUILD[@]}" "${build_dir}" $(cmake_config_opt ${product})
             fi
 
-            call ${DISTCC_PUMP} "${CMAKE}" --build "${build_dir}" $(cmake_config_opt ${product}) -- "${BUILD_ARGS[@]}" ${build_targets[@]}
+            call "${CMAKE_BUILD[@]}" "${build_dir}" $(cmake_config_opt ${product}) -- "${BUILD_ARGS[@]}" ${build_targets[@]}
         fi
     done
 done
@@ -2609,6 +2629,13 @@ for host in "${ALL_HOSTS[@]}"; do
                     fi
                 fi
 
+                # Handle test subdirectory clause
+                if [[ "${LLDB_TEST_SWIFT_ONLY}" ]]; then
+                    LLDB_TEST_SUBDIR_CLAUSE="--test-subdir lang/swift"
+                else
+                    LLDB_TEST_SUBDIR_CLAUSE=""
+                fi
+
                 # figure out which C/C++ compiler we should use for building test inferiors.
                 if [[ "${LLDB_TEST_CC}" == "host-toolchain" ]]; then
                     # Use the host toolchain: i.e. the toolchain specified by HOST_CC
@@ -2623,7 +2650,14 @@ for host in "${ALL_HOSTS[@]}"; do
                 
                 call mkdir -p "${results_dir}"
                 with_pushd "${results_dir}" \
-                    call env SWIFTCC="$(build_directory $LOCAL_HOST swift)/bin/swiftc" SWIFTLIBS="${swift_build_dir}/lib/swift" "${LLDB_SOURCE_DIR}"/test/dotest.py --executable "${lldb_executable}" --rerun-all-issues ${LLDB_DOTEST_CC_OPTS} ${LLDB_FORMATTER_OPTS}
+                           call env SWIFTCC="$(build_directory $LOCAL_HOST swift)/bin/swiftc" \
+                           SWIFTLIBS="${swift_build_dir}/lib/swift" \
+                           "${LLDB_SOURCE_DIR}"/test/dotest.py \
+                           --executable "${lldb_executable}" \
+                           --rerun-all-issues \
+                           ${LLDB_TEST_SUBDIR_CLAUSE} \
+                           ${LLDB_DOTEST_CC_OPTS} \
+                           ${LLDB_FORMATTER_OPTS}
                 continue
                 ;;
             llbuild)
@@ -2728,11 +2762,11 @@ for host in "${ALL_HOSTS[@]}"; do
 
         trap "tests_busted ${product} ''" ERR
         build_dir=$(build_directory ${host} ${product})
-        build_cmd=("${CMAKE}" --build "${build_dir}" $(cmake_config_opt ${product}) -- "${BUILD_ARGS[@]}")
+        build_cmd=("${CMAKE_BUILD[@]}" "${build_dir}" $(cmake_config_opt ${product}) -- "${BUILD_ARGS[@]}")
 
         if [[ "${executable_target}" != "" ]]; then
             echo "--- Building tests for ${product} ---"
-            call ${DISTCC_PUMP} "${build_cmd[@]}" ${BUILD_TARGET_FLAG} "${executable_target}"
+            call "${build_cmd[@]}" ${BUILD_TARGET_FLAG} "${executable_target}"
         fi
 
         # We can only run tests built for the host machine, because
@@ -2751,7 +2785,7 @@ for host in "${ALL_HOSTS[@]}"; do
                 # NOTE: In dry-run mode, build_dir might not exist yet. In that
                 #       case, -n query will fail. So, in dry-run mode,
                 #       we don't expand test script.
-                if [[ ! "${DRY_RUN}" && "${CMAKE_GENERATOR}" == Ninja ]] && !( "${build_cmd[@]}" --version 2>&1 | grep -i -q llbuild ); then
+                if [[ ! "${DRY_RUN}" && "${CMAKE_GENERATOR}" == Ninja ]] && !( "${build_cmd[@]}" --version 2>&1 | grep -i -q llbuild ) && [[ -z "${DISTCC_PUMP}" ]]; then
                     # Ninja buffers command output to avoid scrambling the output
                     # of parallel jobs, which is awesome... except that it
                     # interferes with the progress meter when testing.  Instead of
@@ -2778,6 +2812,11 @@ LIPO_SRC_DIRS=()
 for host in "${ALL_HOSTS[@]}"; do
     # Skip this pass when the only action to execute can't match.
     if ! [[ $(should_execute_host_actions_for_phase ${host} install) ]]; then
+        continue
+    fi
+
+    # Skip this pass if flag is set and we are cross compiling and it's the local host.
+    if [[ "${SKIP_LOCAL_HOST_INSTALL}" ]] && [[ $(has_cross_compile_hosts) ]] && [[ ${host} == ${LOCAL_HOST} ]]; then
         continue
     fi
 
@@ -3009,7 +3048,7 @@ for host in "${ALL_HOSTS[@]}"; do
         echo "--- Installing ${product} ---"
         build_dir=$(build_directory ${host} ${product})
 
-        call env DESTDIR="${host_install_destdir}" "${CMAKE}" --build "${build_dir}" -- ${INSTALL_TARGETS}
+        call env DESTDIR="${host_install_destdir}" "${CMAKE_BUILD[@]}" "${build_dir}" -- ${INSTALL_TARGETS}
     done
 
     if [[ "${DARWIN_INSTALL_EXTRACT_SYMBOLS}" ]] && [[ $(host_has_darwin_symbols ${host}) ]]; then

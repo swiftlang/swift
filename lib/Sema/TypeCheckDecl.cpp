@@ -5014,32 +5014,6 @@ public:
 
   void visitModuleDecl(ModuleDecl *) { }
 
-  /// Adjust the type of the given declaration to appear as if it were
-  /// in the given subclass of its actual declared class.
-  static Type adjustSuperclassMemberDeclType(TypeChecker &TC,
-                                             const ValueDecl *decl,
-                                             Type subclass) {
-    ClassDecl *superclassDecl =
-      decl->getDeclContext()->getDeclaredTypeInContext()
-        ->getClassOrBoundGenericClass();
-    auto superclass = subclass;
-    while (superclass->getClassOrBoundGenericClass() != superclassDecl)
-      superclass = TC.getSuperClassOf(superclass);
-    auto type = TC.substMemberTypeWithBase(decl->getModuleContext(), decl,
-                                           superclass,
-                                           /*isTypeReference=*/false);
-    if (auto func = dyn_cast<FuncDecl>(decl)) {
-      if (func->hasDynamicSelf()) {
-        type = type->replaceCovariantResultType(subclass,
-                                                func->getNumParameterLists());
-      }
-    } else if (isa<ConstructorDecl>(decl)) {
-      type = type->replaceCovariantResultType(subclass, /*uncurryLevel=*/2);
-    }
-
-    return type;
-  }
-
   /// Perform basic checking to determine whether a declaration can override a
   /// declaration in a superclass.
   static bool areOverrideCompatibleSimple(ValueDecl *decl,
@@ -5093,15 +5067,15 @@ public:
 
   static bool
   diagnoseMismatchedOptionals(TypeChecker &TC,
-                              const Decl *member,
+                              const ValueDecl *member,
                               const ParameterList *params,
                               TypeLoc resultTL,
                               const ValueDecl *parentMember,
                               Type owningTy,
                               bool treatIUOResultAsError) {
     bool emittedError = false;
-    Type plainParentTy = adjustSuperclassMemberDeclType(TC, parentMember,
-                                                        owningTy);
+    Type plainParentTy = owningTy->adjustSuperclassMemberDeclType(
+        member, parentMember, parentMember->getInterfaceType(), &TC);
     const auto *parentTy = plainParentTy->castTo<AnyFunctionType>();
     if (isa<AbstractFunctionDecl>(parentMember))
       parentTy = parentTy->getResult()->castTo<AnyFunctionType>();
@@ -5538,8 +5512,8 @@ public:
 
         // Check whether the types are identical.
         // FIXME: It's wrong to use the uncurried types here for methods.
-        auto parentDeclTy = adjustSuperclassMemberDeclType(TC, parentDecl,
-                                                           owningTy);
+        auto parentDeclTy = owningTy->adjustSuperclassMemberDeclType(
+            decl, parentDecl, parentDecl->getInterfaceType(), &TC);
         parentDeclTy = parentDeclTy->getUnlabeledType(TC.Context);
         if (method) {
           parentDeclTy = parentDeclTy->castTo<AnyFunctionType>()->getResult();
@@ -5807,8 +5781,8 @@ public:
         }
       } else if (auto property = dyn_cast_or_null<VarDecl>(abstractStorage)) {
         auto propertyTy = property->getInterfaceType();
-        auto parentPropertyTy = adjustSuperclassMemberDeclType(TC, matchDecl,
-                                                               superclass);
+        auto parentPropertyTy = superclass->adjustSuperclassMemberDeclType(
+            decl, matchDecl, matchDecl->getInterfaceType(), &TC);
         
         if (!propertyTy->canOverride(parentPropertyTy,
                                      OverrideMatchMode::Strict,

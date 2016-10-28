@@ -71,7 +71,8 @@ Parser::parseGenericParameters(SourceLoc LAngleLoc) {
       ParserResult<TypeRepr> Ty;
       
       if (Tok.isAny(tok::identifier, tok::code_complete, tok::kw_protocol, tok::kw_Any)) {
-        Ty = parseTypeIdentifierOrTypeComposition();
+        Ty = parseTypeForInheritance(diag::expected_identifier_for_type,
+                                     diag::expected_ident_type_in_inheritance);
       } else if (Tok.is(tok::kw_class)) {
         diagnose(Tok, diag::unexpected_class_constraint);
         diagnose(Tok, diag::suggest_anyobject, Name)
@@ -121,22 +122,17 @@ Parser::parseGenericParameters(SourceLoc LAngleLoc) {
   
   // Parse the closing '>'.
   SourceLoc RAngleLoc;
-  if (!startsWithGreater(Tok)) {
+  if (startsWithGreater(Tok)) {
+    RAngleLoc = consumeStartingGreater();
+  } else {
     if (!Invalid) {
       diagnose(Tok, diag::expected_rangle_generics_param);
       diagnose(LAngleLoc, diag::opening_angle);
-      
       Invalid = true;
     }
-    
+
     // Skip until we hit the '>'.
-    skipUntilGreaterInTypeList();
-    if (startsWithGreater(Tok))
-      RAngleLoc = consumeStartingGreater();
-    else
-      Invalid = true;
-  } else {
-    RAngleLoc = consumeStartingGreater();
+    RAngleLoc = skipUntilGreaterInTypeList();
   }
 
   if (GenericParams.empty() || Invalid) {
@@ -267,7 +263,9 @@ ParserStatus Parser::parseGenericWhereClause(
       SourceLoc ColonLoc = consumeToken();
 
       // Parse the protocol or composition.
-      ParserResult<TypeRepr> Protocol = parseTypeIdentifierOrTypeComposition();
+      ParserResult<TypeRepr> Protocol = parseTypeForInheritance(
+          diag::expected_identifier_for_type,
+          diag::expected_ident_type_in_inheritance);
       
       if (Protocol.isNull()) {
         Status.setIsParseError();

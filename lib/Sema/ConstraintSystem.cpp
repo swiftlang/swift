@@ -77,16 +77,31 @@ void ConstraintSystem::mergeEquivalenceClasses(TypeVariableType *typeVar1,
   }
 }
 
+/// Determine whether the given type variables occurs in the given type.
+bool ConstraintSystem::typeVarOccursInType(TypeVariableType *typeVar,
+                                           Type type,
+                                           bool *involvesOtherTypeVariables) {
+  SmallVector<TypeVariableType *, 4> typeVars;
+  type->getTypeVariables(typeVars);
+  bool result = false;
+  for (auto referencedTypeVar : typeVars) {
+    if (referencedTypeVar == typeVar) {
+      result = true;
+      if (!involvesOtherTypeVariables || *involvesOtherTypeVariables)
+        break;
+
+      continue;
+    }
+
+    if (involvesOtherTypeVariables)
+      *involvesOtherTypeVariables = true;
+  }
+
+  return result;
+}
+
 void ConstraintSystem::assignFixedType(TypeVariableType *typeVar, Type type,
                                        bool updateState) {
-  
-  // If the type to be fixed is an optional type that wraps the type parameter
-  // itself, we do not want to go through with the assignment. To do so would
-  // force the type variable to be adjacent to itself.
-  if (auto optValueType = type->getOptionalObjectType()) {
-    if (optValueType->isEqual(typeVar))
-      return;
-  }
   
   typeVar->getImpl().assignFixedType(type, getSavedBindings());
 
@@ -333,58 +348,6 @@ ConstraintLocator *ConstraintSystem::getConstraintLocator(
   return getConstraintLocator(anchor, path, builder.getSummaryFlags());
 }
 
-bool ConstraintSystem::addConstraint(Constraint *constraint,
-                                     bool isExternallySolved,
-                                     bool simplifyExisting) {
-  switch (simplifyConstraint(*constraint)) {
-  case SolutionKind::Error:
-    if (!failedConstraint) {
-      failedConstraint = constraint;
-    }
-
-    if (solverState) {
-      solverState->retiredConstraints.push_front(constraint);
-      if (!simplifyExisting) {
-        solverState->generatedConstraints.push_back(constraint);
-      }
-    }
-
-    return false;
-
-  case SolutionKind::Solved:
-    // This constraint has already been solved; there is nothing more
-    // to do.
-    // Record solved constraint.
-    if (solverState) {
-      solverState->retiredConstraints.push_front(constraint);
-      if (!simplifyExisting)
-        solverState->generatedConstraints.push_back(constraint);
-    }
-
-    // Remove the constraint from the constraint graph.
-    if (simplifyExisting)
-      CG.removeConstraint(constraint);
-    
-    return true;
-
-  case SolutionKind::Unsolved:
-    // We couldn't solve this constraint; add it to the pile.
-    if (!isExternallySolved) {
-      InactiveConstraints.push_back(constraint);        
-    }
-
-    // Add this constraint to the constraint graph.
-    if (!simplifyExisting)
-      CG.addConstraint(constraint);
-
-    if (!simplifyExisting && solverState) {
-      solverState->generatedConstraints.push_back(constraint);
-    }
-
-    return false;
-  }
-}
-
 TypeVariableType *
 ConstraintSystem::getMemberType(TypeVariableType *baseTypeVar, 
                                 AssociatedTypeDecl *assocType,
@@ -395,10 +358,8 @@ ConstraintSystem::getMemberType(TypeVariableType *baseTypeVar,
     // retain the associated type throughout.
     auto loc = getConstraintLocator(locator);
     auto memberTypeVar = createTypeVariable(loc, options);
-    addConstraint(Constraint::create(*this, ConstraintKind::TypeMember,
-                                     baseTypeVar, memberTypeVar, 
-                                     assocType->getName(), 
-                                     FunctionRefKind::Compound, loc));
+    addTypeMemberConstraint(baseTypeVar, assocType->getName(),
+                            memberTypeVar, loc);
     return memberTypeVar;
   });
 }
@@ -431,11 +392,8 @@ namespace {
                            Locator.withPathElement(member));
           auto memberTypeVar = CS.createTypeVariable(locator,
                                                      TVO_PrefersSubtypeBinding);
-          CS.addConstraint(Constraint::create(CS, ConstraintKind::TypeMember,
-                                              baseTypeVar, memberTypeVar,
-                                              member->getName(),
-                                              FunctionRefKind::Compound,
-                                              locator));
+          CS.addTypeMemberConstraint(baseTypeVar, member->getName(),
+                                     memberTypeVar, locator);
           return memberTypeVar;
         }
                                 
@@ -462,11 +420,8 @@ namespace {
                                                    TVO_PrefersSubtypeBinding);
 
         // Bind the member's type variable as a type member of the base.
-        CS.addConstraint(Constraint::create(CS, ConstraintKind::TypeMember,
-                                            baseTypeVar, memberTypeVar, 
-                                            member->getName(),
-                                            FunctionRefKind::Compound,
-                                            locator));
+        CS.addTypeMemberConstraint(baseTypeVar, member->getName(),
+                                   memberTypeVar, locator);
 
         return memberTypeVar;
       });
@@ -1418,6 +1373,12 @@ void ConstraintSystem::addOverloadSet(Type boundType,
                                       OverloadChoice *favoredChoice) {
   assert(!choices.empty() && "Empty overload set");
 
+  // If there is a single choice, add the bind overload directly.
+  if (choices.size() == 1) {
+    addBindOverloadConstraint(boundType, choices.front(), locator);
+    return;
+  }
+
   SmallVector<Constraint *, 4> overloads;
   
   // As we do for other favored constraints, if a favored overload has been
@@ -1441,13 +1402,8 @@ void ConstraintSystem::addOverloadSet(Type boundType,
     overloads.push_back(Constraint::createBindOverload(*this, boundType, choice,
                                                        locator));
   }
-  
-  auto disjunction = Constraint::createDisjunction(*this, overloads, locator);
-  
-  if (favoredChoice)
-    disjunction->setFavored();
-  
-  addConstraint(disjunction);
+
+  addDisjunctionConstraint(overloads, locator, ForgetChoice, favoredChoice);
 }
 
 void ConstraintSystem::resolveOverload(ConstraintLocator *locator,
@@ -1637,17 +1593,12 @@ Type ConstraintSystem::lookThroughImplicitlyUnwrappedOptionalType(Type type) {
   return Type();
 }
 
-Type ConstraintSystem::simplifyType(Type type,
-       llvm::SmallPtrSet<TypeVariableType *, 16> &substituting) {
+Type ConstraintSystem::simplifyType(Type type) {
   return type.transform([&](Type type) -> Type {
     if (auto tvt = dyn_cast<TypeVariableType>(type.getPointer())) {
       tvt = getRepresentative(tvt);
       if (auto fixed = getFixedType(tvt)) {
-        if (substituting.insert(tvt).second) {
-          auto result = simplifyType(fixed, substituting);
-          substituting.erase(tvt);
-          return result;
-        }
+        return simplifyType(fixed);
       }
       
       return tvt;

@@ -130,3 +130,20 @@ func testTernaryWithNil(b: Bool, s: String, i: Int) {
   let t4 = b ? nil : 1
   let _: Double = t4 // expected-error{{value of type 'Int?'}}
 }
+
+// inference with IUOs
+infix operator ++++
+
+protocol PPPP {
+  static func ++++(x: Self, y: Self) -> Bool
+}
+
+func compare<T: PPPP>(v: T, u: T!) -> Bool {
+  return v ++++ u
+}
+
+func sr2752(x: String?, y: String?) {
+  _ = x.map { xx in
+    y.map { _ in "" } ?? "\(xx)"
+  }
+}

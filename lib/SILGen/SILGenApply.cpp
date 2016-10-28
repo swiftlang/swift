@@ -2341,7 +2341,8 @@ RValue SILGenFunction::emitApply(
     case ParameterConvention::Direct_Owned:
       // If the callee will consume the 'self' parameter, let's retain it so we
       // can keep it alive.
-      B.emitRetainValueOperation(loc, lifetimeExtendedSelf);
+      lifetimeExtendedSelf =
+          B.emitCopyValueOperation(loc, lifetimeExtendedSelf);
       break;
     case ParameterConvention::Direct_Guaranteed:
     case ParameterConvention::Direct_Unowned:
@@ -2422,7 +2423,7 @@ RValue SILGenFunction::emitApply(
 
     case ResultConvention::Unowned:
       // Unretained. Retain the value.
-      resultTL.emitRetainValue(B, loc, result);
+      resultTL.emitCopyValue(B, loc, result);
       break;
     }
 
@@ -3039,7 +3040,7 @@ namespace {
       auto contexts = getRValueEmissionContexts(loweredSubstArgType, param);
 
       // If no abstraction is required, try to honor the emission contexts.
-      if (loweredSubstArgType.getSwiftRValueType() == param.getType()) {
+      if (!contexts.RequiresReabstraction) {
         auto loc = arg.getLocation();
         ManagedValue result =
           std::move(arg).getAsSingleValue(SGF, contexts.ForEmission);
@@ -3117,16 +3118,20 @@ namespace {
                     AbstractionPattern origParamType,
                     SILParameterInfo param) {
       ManagedValue value;
-      
-      switch (getSILFunctionLanguage(Rep)) {
-      case SILFunctionLanguage::Swift:
-        value = emitSubstToOrigArgument(std::move(arg), loweredSubstArgType,
-                                        origParamType, param);
-        break;
-      case SILFunctionLanguage::C:
-        value = emitNativeToBridgedArgument(std::move(arg), loweredSubstArgType,
-                                            origParamType, param);
-        break;
+      auto contexts = getRValueEmissionContexts(loweredSubstArgType, param);
+      if (contexts.RequiresReabstraction) {
+        switch (getSILFunctionLanguage(Rep)) {
+        case SILFunctionLanguage::Swift:
+          value = emitSubstToOrigArgument(std::move(arg), loweredSubstArgType,
+                                          origParamType, param);
+          break;
+        case SILFunctionLanguage::C:
+          value = emitNativeToBridgedArgument(
+              std::move(arg), loweredSubstArgType, origParamType, param);
+          break;
+        }
+      } else {
+        value = std::move(arg).getAsSingleValue(SGF, contexts.ForEmission);
       }
       Args.push_back(value);
     }
@@ -3400,12 +3405,16 @@ namespace {
       SGFContext ForEmission;
       /// The context for reabstracting the r-value.
       SGFContext ForReabstraction;
+      /// If the context requires reabstraction
+      bool RequiresReabstraction;
     };
     static EmissionContexts getRValueEmissionContexts(SILType loweredArgType,
                                                       SILParameterInfo param) {
+      bool requiresReabstraction =
+          loweredArgType.getSwiftRValueType() != param.getType();
       // If the parameter is consumed, we have to emit at +1.
       if (param.isConsumed()) {
-        return { SGFContext(), SGFContext() };
+        return {SGFContext(), SGFContext(), requiresReabstraction};
       }
 
       // Otherwise, we can emit the final value at +0 (but only with a
@@ -3418,12 +3427,12 @@ namespace {
 
       // If the r-value doesn't require reabstraction, the final context
       // is the emission context.
-      if (loweredArgType.getSwiftRValueType() == param.getType()) {
-        return { finalContext, SGFContext() };
+      if (!requiresReabstraction) {
+        return {finalContext, SGFContext(), requiresReabstraction};
       }
 
       // Otherwise, the final context is the reabstraction context.
-      return { SGFContext(), finalContext };
+      return {SGFContext(), finalContext, requiresReabstraction};
     }
   };
 }
@@ -3846,7 +3855,7 @@ ManagedValue SILGenFunction::emitInjectEnum(SILLocation loc,
   if (element->isIndirect() ||
       element->getParentEnum()->isIndirect()) {
     auto *box = B.createAllocBox(loc, payloadTL.getLoweredType());
-    auto *addr = B.createProjectBox(loc, box);
+    auto *addr = B.createProjectBox(loc, box, 0);
 
     CleanupHandle initCleanup = enterDestroyCleanup(box);
     Cleanups.setCleanupState(initCleanup, CleanupState::Dormant);
@@ -4764,10 +4773,8 @@ RValue SILGenFunction::emitLiteral(LiteralExpr *literal, SGFContext C) {
     switch (magicLiteral->getKind()) {
     case MagicIdentifierLiteralExpr::File: {
       StringRef value = "";
-      if (loc.isValid()) {
-        unsigned bufferID = ctx.SourceMgr.findBufferContainingLoc(loc);
-        value = ctx.SourceMgr.getIdentifierForBuffer(bufferID);
-      }
+      if (loc.isValid())
+        value = ctx.SourceMgr.getBufferIdentifierForLoc(loc);
       builtinLiteralArgs = emitStringLiteral(*this, literal, value, C,
                                              magicLiteral->getStringEncoding());
       builtinInit = magicLiteral->getBuiltinInitializer();
@@ -5426,7 +5433,7 @@ static SILValue emitDynamicPartialApply(SILGenFunction &gen,
   // Retain 'self' because the partial apply will take ownership.
   // We can't simply forward 'self' because the partial apply is conditional.
   if (!self->getType().isAddress())
-    gen.B.emitRetainValueOperation(loc, self);
+    self = gen.B.emitCopyValueOperation(loc, self);
 
   SILValue result = gen.B.createPartialApply(loc, method, method->getType(), {},
                                              self, partialApplyTy);

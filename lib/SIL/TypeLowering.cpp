@@ -495,12 +495,12 @@ namespace {
     void emitDestroyAddress(SILBuilder &B, SILLocation loc,
                             SILValue addr) const override {
       SILValue value = B.createLoad(loc, addr);
-      emitReleaseValue(B, loc, value);
+      emitDestroyValue(B, loc, value);
     }
 
     void emitDestroyRValue(SILBuilder &B, SILLocation loc,
                            SILValue value) const override {
-      emitReleaseValue(B, loc, value);
+      emitDestroyValue(B, loc, value);
     }
 
     void emitCopyInto(SILBuilder &B, SILLocation loc,
@@ -533,24 +533,25 @@ namespace {
       // Trivial
     }
 
-    void emitLoweredReleaseValue(SILBuilder &B, SILLocation loc,
-                                 SILValue value,
+    void emitLoweredDestroyValue(SILBuilder &B, SILLocation loc, SILValue value,
                                  LoweringStyle loweringStyle) const override {
       // Trivial
     }
 
-    void emitLoweredRetainValue(SILBuilder &B, SILLocation loc,
-                              SILValue value,
-                              LoweringStyle style) const override {
+    SILValue emitLoweredCopyValue(SILBuilder &B, SILLocation loc,
+                                  SILValue value,
+                                  LoweringStyle style) const override {
       // Trivial
+      return value;
     }
 
-    void emitRetainValue(SILBuilder &B, SILLocation loc,
-                       SILValue value) const override {
+    SILValue emitCopyValue(SILBuilder &B, SILLocation loc,
+                           SILValue value) const override {
       // Trivial
+      return value;
     }
 
-    void emitReleaseValue(SILBuilder &B, SILLocation loc,
+    void emitDestroyValue(SILBuilder &B, SILLocation loc,
                           SILValue value) const override {
       // Trivial
     }
@@ -565,7 +566,8 @@ namespace {
     SILValue emitLoadOfCopy(SILBuilder &B, SILLocation loc,
                             SILValue addr, IsTake_t isTake) const override {
       SILValue value = B.createLoad(loc, addr);
-      if (!isTake) emitRetainValue(B, loc, value);
+      if (!isTake)
+        emitCopyValue(B, loc, value);
       return value;
     }
 
@@ -575,7 +577,8 @@ namespace {
       SILValue oldValue;
       if (!isInit) oldValue = B.createLoad(loc, addr);
       B.createStore(loc, newValue, addr);
-      if (!isInit) emitReleaseValue(B, loc, oldValue);
+      if (!isInit)
+        emitDestroyValue(B, loc, oldValue);
     }
   };
 
@@ -614,6 +617,9 @@ namespace {
       : NonTrivialLoadableTypeLowering(SILType::getPrimitiveObjectType(type),
                                        IsNotReferenceCounted) {
     }
+
+    virtual SILValue rebuildAggregate(SILBuilder &B, SILLocation loc,
+                                      ArrayRef<SILValue> values) const = 0;
 
     ArrayRef<Child> getChildren(SILModule &M) const {
       if (Children.data() == nullptr) {
@@ -657,44 +663,49 @@ namespace {
         });
     }
 
-    void emitRetainValue(SILBuilder &B, SILLocation loc,
-                       SILValue aggValue) const override {
+    SILValue emitCopyValue(SILBuilder &B, SILLocation loc,
+                           SILValue aggValue) const override {
       B.createRetainValue(loc, aggValue, Atomicity::Atomic);
+      return aggValue;
     }
 
-    void emitLoweredRetainValue(SILBuilder &B, SILLocation loc,
-                              SILValue aggValue,
-                              LoweringStyle style) const override {
+    SILValue emitLoweredCopyValue(SILBuilder &B, SILLocation loc,
+                                  SILValue aggValue,
+                                  LoweringStyle style) const override {
+      llvm::SmallVector<SILValue, 8> loweredChildValues;
       for (auto &child : getChildren(B.getModule())) {
         auto &childLowering = child.getLowering();
         SILValue childValue = asImpl().emitRValueProject(B, loc, aggValue,
                                                          child.getIndex(),
                                                          childLowering);
         if (!childLowering.isTrivial()) {
-          childLowering.emitLoweredCopyChildValue(B, loc, childValue, style);
+          SILValue loweredChildValue = childLowering.emitLoweredCopyChildValue(
+              B, loc, childValue, style);
+          loweredChildValues.push_back(loweredChildValue);
+        } else {
+          loweredChildValues.push_back(childValue);
         }
       }
+
+      return rebuildAggregate(B, loc, loweredChildValues);
     }
 
-    void emitReleaseValue(SILBuilder &B, SILLocation loc,
+    void emitDestroyValue(SILBuilder &B, SILLocation loc,
                           SILValue aggValue) const override {
       B.emitReleaseValueAndFold(loc, aggValue);
     }
 
-    void emitLoweredReleaseValue(SILBuilder &B, SILLocation loc,
+    void emitLoweredDestroyValue(SILBuilder &B, SILLocation loc,
                                  SILValue aggValue,
                                  LoweringStyle loweringStyle) const override {
       SimpleOperationTy Fn;
 
       switch(loweringStyle) {
       case LoweringStyle::Shallow:
-        Fn = &TypeLowering::emitReleaseValue;
-        break;
-      case LoweringStyle::Deep:
-        Fn = &TypeLowering::emitLoweredReleaseValueDeep;
+        Fn = &TypeLowering::emitDestroyValue;
         break;
       case LoweringStyle::DeepNoEnum:
-        Fn = &TypeLowering::emitLoweredReleaseValueDeepNoEnum;
+        Fn = &TypeLowering::emitLoweredDestroyValueDeepNoEnum;
         break;
       }
 
@@ -717,7 +728,7 @@ namespace {
     }
 
     SILValue rebuildAggregate(SILBuilder &B, SILLocation loc,
-                              ArrayRef<SILValue> values) const {
+                              ArrayRef<SILValue> values) const override {
       return B.createTuple(loc, getLoweredType(), values);
     }
   
@@ -752,7 +763,7 @@ namespace {
     }
 
     SILValue rebuildAggregate(SILBuilder &B, SILLocation loc,
-                              ArrayRef<SILValue> values) const {
+                              ArrayRef<SILValue> values) const override {
       return B.createStruct(loc, getLoweredType(), values);
     }
         
@@ -773,139 +784,33 @@ namespace {
   /// A lowering for loadable but non-trivial enum types.
   class LoadableEnumTypeLowering final : public NonTrivialLoadableTypeLowering {
   public:
-    /// A non-trivial case of the enum.
-    class NonTrivialElement {
-      /// The non-trivial element.
-      EnumElementDecl *element;
-      
-      /// Its type lowering.
-      const TypeLowering *lowering;
-      
-    public:
-      NonTrivialElement(EnumElementDecl *element, const TypeLowering &lowering)
-        : element(element), lowering(&lowering) {}
-      
-      const TypeLowering &getLowering() const { return *lowering; }
-      EnumElementDecl *getElement() const { return element; }
-    };
-    
-  private:
-
-    using SimpleOperationTy = void (*)(SILBuilder &B, SILLocation loc, SILValue value,
-                                       const TypeLowering &valueLowering,
-                                       SILBasicBlock *dest);
-
-    /// Emit a value semantics operation for each nontrivial case of the enum.
-    template <typename T>
-    void ifNonTrivialElement(SILBuilder &B, SILLocation loc, SILValue value,
-                             const T &operation) const {
-      SmallVector<std::pair<EnumElementDecl*,SILBasicBlock*>, 4> nonTrivialBBs;
-      
-      auto &M = B.getFunction().getModule();
-
-      // Create all the blocks up front, so we can set up our switch_enum.
-      auto nonTrivialElts = getNonTrivialElements(M);
-      for (auto &elt : nonTrivialElts) {
-        auto bb = new (M) SILBasicBlock(&B.getFunction());
-        auto argTy = elt.getLowering().getLoweredType();
-        new (M) SILArgument(bb, argTy);
-        nonTrivialBBs.push_back({elt.getElement(), bb});
-      }
-
-      // If we are appending to the end of a block being constructed, then we
-      // create a new basic block to continue cons'ing up code.  If we're
-      // emitting this operation into the middle of existing code, we split the
-      // block.
-      SILBasicBlock *doneBB = B.splitBlockForFallthrough();
-      B.createSwitchEnum(loc, value, doneBB, nonTrivialBBs);
-      
-      for (size_t i = 0; i < nonTrivialBBs.size(); ++i) {
-        SILBasicBlock *bb = nonTrivialBBs[i].second;
-        const TypeLowering &lowering = nonTrivialElts[i].getLowering();
-        B.emitBlock(bb);
-        operation(B, loc, bb->getBBArgs()[0], lowering, doneBB);
-      }
-      
-      B.emitBlock(doneBB);
-    }
-    
-    /// A reference to the lazily-allocated array of non-trivial enum cases.
-    mutable ArrayRef<NonTrivialElement> NonTrivialElements = {};
-    
-  public:
     LoadableEnumTypeLowering(CanType type)
       : NonTrivialLoadableTypeLowering(SILType::getPrimitiveObjectType(type),
-                                       IsNotReferenceCounted)
-    {
-    }
-    
-    ArrayRef<NonTrivialElement> getNonTrivialElements(SILModule &M) const {
-      SILType silTy = getLoweredType();
-      EnumDecl *enumDecl = silTy.getEnumOrBoundGenericEnum();
-      assert(enumDecl);
-      
-      if (NonTrivialElements.data() == nullptr) {
-        SmallVector<NonTrivialElement, 4> elts;
-        
-        for (auto elt : enumDecl->getAllElements()) {
-          if (!elt->hasArgumentType()) continue;
-          SILType substTy = silTy.getEnumElementType(elt, M);
-          elts.push_back(NonTrivialElement{elt,
-                                     M.Types.getTypeLowering(substTy)});
-        }
-        
-        auto isDependent = IsDependent_t(silTy.hasTypeParameter());
-        
-        auto buf = operator new(sizeof(NonTrivialElement) * elts.size(),
-                                M.Types, isDependent);
-        memcpy(buf, elts.data(), sizeof(NonTrivialElement) * elts.size());
-        NonTrivialElements = {reinterpret_cast<NonTrivialElement*>(buf),
-                              elts.size()};
-      }
-      return NonTrivialElements;
-    }
+                                       IsNotReferenceCounted) {}
 
-    void emitRetainValue(SILBuilder &B, SILLocation loc,
-                       SILValue value) const override {
+    SILValue emitCopyValue(SILBuilder &B, SILLocation loc,
+                           SILValue value) const override {
       B.createRetainValue(loc, value, Atomicity::Atomic);
+      return value;
     }
 
-    void emitLoweredRetainValue(SILBuilder &B, SILLocation loc,
-                              SILValue value,
+    SILValue emitLoweredCopyValue(SILBuilder &B, SILLocation loc, SILValue value,
                               LoweringStyle style) const override {
-      if (style == LoweringStyle::Shallow ||
-          style == LoweringStyle::DeepNoEnum) {
-        B.createRetainValue(loc, value, Atomicity::Atomic);
-      } else {
-        ifNonTrivialElement(B, loc, value,
-          [&](SILBuilder &B, SILLocation loc, SILValue child,
-              const TypeLowering &childLowering, SILBasicBlock *dest) {
-            childLowering.emitLoweredCopyChildValue(B, loc, child, style);
-            B.createBranch(loc, dest);
-          });
-      }
+      B.createRetainValue(loc, value, Atomicity::Atomic);
+      return value;
     }
-    
-    void emitReleaseValue(SILBuilder &B, SILLocation loc,
+
+    void emitDestroyValue(SILBuilder &B, SILLocation loc,
                           SILValue value) const override {
       B.emitReleaseValueAndFold(loc, value);
     }
 
-    void emitLoweredReleaseValue(SILBuilder &B, SILLocation loc,
-                                 SILValue value,
+    void emitLoweredDestroyValue(SILBuilder &B, SILLocation loc, SILValue value,
                                  LoweringStyle style) const override {
       assert(style != LoweringStyle::Shallow &&
              "This method should never be called when performing a shallow "
              "destroy value.");
-      if (style == LoweringStyle::DeepNoEnum)
-        B.emitReleaseValueAndFold(loc, value);
-      else
-        ifNonTrivialElement(B, loc, value,
-          [&](SILBuilder &B, SILLocation loc, SILValue child,
-             const TypeLowering &childLowering, SILBasicBlock *dest) {
-             childLowering.emitLoweredDestroyChildValue(B, loc, child, style);
-             B.createBranch(loc, dest);
-          });
+      B.emitReleaseValueAndFold(loc, value);
     }
   };
 
@@ -914,16 +819,15 @@ namespace {
     LeafLoadableTypeLowering(SILType type, IsReferenceCounted_t isRefCounted)
       : NonTrivialLoadableTypeLowering(type, isRefCounted) {}
 
-    void emitLoweredRetainValue(SILBuilder &B, SILLocation loc,
-                              SILValue value,
-                              LoweringStyle style) const override {
-      emitRetainValue(B, loc, value);
+    SILValue emitLoweredCopyValue(SILBuilder &B, SILLocation loc,
+                                  SILValue value,
+                                  LoweringStyle style) const override {
+      return emitCopyValue(B, loc, value);
     }
 
-    void emitLoweredReleaseValue(SILBuilder &B, SILLocation loc,
-                                 SILValue value,
+    void emitLoweredDestroyValue(SILBuilder &B, SILLocation loc, SILValue value,
                                  LoweringStyle style) const override {
-      emitReleaseValue(B, loc, value);
+      emitDestroyValue(B, loc, value);
     }
   };
 
@@ -934,13 +838,14 @@ namespace {
     ReferenceTypeLowering(SILType type)
       : LeafLoadableTypeLowering(type, IsReferenceCounted) {}
 
-    void emitRetainValue(SILBuilder &B, SILLocation loc,
-                       SILValue value) const override {
+    SILValue emitCopyValue(SILBuilder &B, SILLocation loc,
+                           SILValue value) const override {
       if (!isa<FunctionRefInst>(value))
         B.createStrongRetain(loc, value, Atomicity::Atomic);
+      return value;
     }
 
-    void emitReleaseValue(SILBuilder &B, SILLocation loc,
+    void emitDestroyValue(SILBuilder &B, SILLocation loc,
                           SILValue value) const override {
       B.emitStrongReleaseAndFold(loc, value);
     }
@@ -952,12 +857,13 @@ namespace {
     LoadableUnownedTypeLowering(SILType type)
       : LeafLoadableTypeLowering(type, IsReferenceCounted) {}
 
-    void emitRetainValue(SILBuilder &B, SILLocation loc,
-                       SILValue value) const override {
+    SILValue emitCopyValue(SILBuilder &B, SILLocation loc,
+                           SILValue value) const override {
       B.createUnownedRetain(loc, value, Atomicity::Atomic);
+      return value;
     }
 
-    void emitReleaseValue(SILBuilder &B, SILLocation loc,
+    void emitDestroyValue(SILBuilder &B, SILLocation loc,
                           SILValue value) const override {
       B.createUnownedRelease(loc, value, Atomicity::Atomic);
     }
@@ -997,24 +903,23 @@ namespace {
       B.emitDestroyAddrAndFold(loc, value);
     }
 
-    void emitRetainValue(SILBuilder &B, SILLocation loc,
-                       SILValue value) const override {
+    SILValue emitCopyValue(SILBuilder &B, SILLocation loc,
+                           SILValue value) const override {
       llvm_unreachable("type is not loadable!");
     }
 
-    void emitLoweredRetainValue(SILBuilder &B, SILLocation loc,
-                              SILValue value,
-                              LoweringStyle style) const override {
+    SILValue emitLoweredCopyValue(SILBuilder &B, SILLocation loc,
+                                  SILValue value,
+                                  LoweringStyle style) const override {
       llvm_unreachable("type is not loadable!");
     }
 
-    void emitReleaseValue(SILBuilder &B, SILLocation loc,
+    void emitDestroyValue(SILBuilder &B, SILLocation loc,
                           SILValue value) const override {
       llvm_unreachable("type is not loadable!");
     }
 
-    void emitLoweredReleaseValue(SILBuilder &B, SILLocation loc,
-                                 SILValue value,
+    void emitLoweredDestroyValue(SILBuilder &B, SILLocation loc, SILValue value,
                                  LoweringStyle style) const override {
       llvm_unreachable("type is not loadable!");
     }

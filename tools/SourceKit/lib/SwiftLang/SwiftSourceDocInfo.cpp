@@ -644,7 +644,9 @@ static bool passCursorInfoForDecl(const ValueDecl *VD,
   unsigned TypenameBegin = SS.size();
   if (VD->hasType()) {
     llvm::raw_svector_ostream OS(SS);
-    VD->getInterfaceType().print(OS);
+    PrintOptions Options;
+    Options.PrintNameAliasUnderlyingType = true;
+    VD->getInterfaceType().print(OS, Options);
   }
   unsigned TypenameEnd = SS.size();
 
@@ -656,7 +658,7 @@ static bool passCursorInfoForDecl(const ValueDecl *VD,
   unsigned MangledTypeEnd = SS.size();
 
   unsigned MangledContainerTypeStart = SS.size();
-  if (ContainerTy) {
+  if (ContainerTy && !ContainerTy->hasArchetype()) {
     llvm::raw_svector_ostream OS(SS);
     SwiftLangSupport::printTypeUSR(ContainerTy, OS);
   }

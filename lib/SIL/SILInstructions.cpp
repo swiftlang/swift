@@ -662,6 +662,11 @@ StoreInst::StoreInst(
     : SILInstruction(ValueKind::StoreInst, Loc), Operands(this, Src, Dest),
       OwnershipQualifier(Qualifier) {}
 
+EndBorrowInst::EndBorrowInst(SILDebugLocation DebugLoc, SILValue Src,
+                             SILValue Dest)
+    : SILInstruction(ValueKind::EndBorrowInst, DebugLoc),
+      Operands(this, Src, Dest) {}
+
 AssignInst::AssignInst(SILDebugLocation Loc, SILValue Src, SILValue Dest)
     : SILInstruction(ValueKind::AssignInst, Loc), Operands(this, Src, Dest) {}
 

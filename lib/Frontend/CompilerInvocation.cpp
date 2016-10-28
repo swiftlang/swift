@@ -319,7 +319,8 @@ static bool ParseFrontendArgs(FrontendOptions &Opts, ArgList &Args,
     // treat the input as SIL.
     StringRef Input(Opts.InputFilenames[0]);
     TreatAsSIL = llvm::sys::path::extension(Input).endswith(SIL_EXTENSION);
-  } else if (Opts.PrimaryInput.hasValue() && Opts.PrimaryInput->isFilename()) {
+  } else if (!TreatAsSIL && Opts.PrimaryInput.hasValue() &&
+             Opts.PrimaryInput->isFilename()) {
     // If we have a primary input and it's a filename with extension "sil",
     // treat the input as SIL.
     StringRef Input(Opts.InputFilenames[Opts.PrimaryInput->Index]);
@@ -760,6 +761,26 @@ static bool ParseFrontendArgs(FrontendOptions &Opts, ArgList &Args,
   return false;
 }
 
+static void diagnoseSwiftVersion(Optional<version::Version> &vers, Arg *verArg,
+                                 ArgList &Args, DiagnosticEngine &diags) {
+  // General invalid version error
+  diags.diagnose(SourceLoc(), diag::error_invalid_arg_value,
+                 verArg->getAsString(Args), verArg->getValue());
+
+  // Check for an unneeded minor version, otherwise just list valid versions
+  if (vers.hasValue() && !vers.getValue().empty() &&
+      vers.getValue().asMajorVersion().isValidEffectiveLanguageVersion()) {
+    diags.diagnose(SourceLoc(), diag::note_swift_version_major,
+                   vers.getValue()[0]);
+  } else {
+    // Note valid versions instead
+    auto validVers = version::Version::getValidEffectiveVersions();
+    auto versStr =
+        "'" + llvm::join(validVers.begin(), validVers.end(), "', '") + "'";
+    diags.diagnose(SourceLoc(), diag::note_valid_swift_versions, versStr);
+  }
+}
+
 static bool ParseLangArgs(LangOptions &Opts, ArgList &Args,
                           DiagnosticEngine &Diags,
                           const FrontendOptions &FrontendOpts) {
@@ -772,8 +793,7 @@ static bool ParseLangArgs(LangOptions &Opts, ArgList &Args,
         vers.getValue().isValidEffectiveLanguageVersion()) {
       Opts.EffectiveLanguageVersion = vers.getValue();
     } else {
-      Diags.diagnose(SourceLoc(), diag::error_invalid_arg_value,
-                     A->getAsString(Args), A->getValue());
+      diagnoseSwiftVersion(vers, A, Args, Diags);
     }
   }
 

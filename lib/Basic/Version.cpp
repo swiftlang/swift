@@ -310,27 +310,26 @@ Version::operator clang::VersionTuple() const
   }
 }
 
-bool
-Version::isValidEffectiveLanguageVersion() const
-{
-  // Whitelist of backward-compatibility versions that we permit passing as
-  // -swift-version <vers>
-  char const *whitelist[] = {
-    // Swift 3 family
-    "3",
-    "3.0",
-
-    // Swift 4 family
-    "4",
-    "4.0",
-  };
-  for (auto const i : whitelist) {
-    auto v = parseVersionString(i, SourceLoc(), nullptr);
+bool Version::isValidEffectiveLanguageVersion() const {
+  for (auto verStr : getValidEffectiveVersions()) {
+    auto v = parseVersionString(verStr, SourceLoc(), nullptr);
     assert(v.hasValue());
-    if (v == *this)
+    // In this case, use logical-equality _and_ precision-equality. We do not
+    // want to permit users requesting effective language versions more precise
+    // than our whitelist (eg. we permit 3 but not 3.0 or 3.0.0), since
+    // accepting such an argument promises more than we're able to deliver.
+    if (v == *this && v.getValue().size() == size())
       return true;
   }
   return false;
+}
+
+Version Version::asMajorVersion() const {
+  if (empty())
+    return {};
+  Version res;
+  res.Components.push_back(Components[0]);
+  return res;
 }
 
 bool operator>=(const class Version &lhs,
@@ -341,23 +340,27 @@ bool operator>=(const class Version &lhs,
   if (lhs.empty())
     return true;
 
-  auto n = std::min(lhs.size(), rhs.size());
+  auto n = std::max(lhs.size(), rhs.size());
 
   for (size_t i = 0; i < n; ++i) {
-    if (lhs[i] < rhs[i])
+    auto lv = i < lhs.size() ? lhs[i] : 0;
+    auto rv = i < rhs.size() ? rhs[i] : 0;
+    if (lv < rv)
       return false;
-    else if (lhs[i] > rhs[i])
+    else if (lv > rv)
       return true;
   }
-  return lhs.size() >= rhs.size();
+  // Equality
+  return true;
 }
 
 bool operator==(const class Version &lhs,
                 const class Version &rhs) {
-  if (lhs.size() != rhs.size())
-    return false;
-  for (size_t i = 0; i < lhs.size(); ++i) {
-    if (lhs[i] != rhs[i])
+  auto n = std::max(lhs.size(), rhs.size());
+  for (size_t i = 0; i < n; ++i) {
+    auto lv = i < lhs.size() ? lhs[i] : 0;
+    auto rv = i < rhs.size() ? rhs[i] : 0;
+    if (lv != rv)
       return false;
   }
   return true;

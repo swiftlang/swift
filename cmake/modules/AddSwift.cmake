@@ -122,7 +122,7 @@ function(_add_variant_c_compile_link_flags)
     list(APPEND result
       "--sysroot=${SWIFT_ANDROID_SDK_PATH}"
       # Use the linker included in the Android NDK.
-      "-B" "${SWIFT_ANDROID_NDK_PATH}/toolchains/arm-linux-androideabi-${SWIFT_ANDROID_NDK_GCC_VERSION}/prebuilt/linux-x86_64/arm-linux-androideabi/bin/")
+      "-B" "${SWIFT_ANDROID_PREBUILT_PATH}/arm-linux-androideabi/bin/")
   endif()
 
   if("${CFLAGS_SDK}" STREQUAL "WINDOWS")
@@ -230,9 +230,11 @@ function(_add_variant_c_compile_flags)
   endif()
 
   if("${CFLAGS_SDK}" STREQUAL "ANDROID")
+    # FIXME: Instead of hardcoding paths in the Android NDK, these paths should
+    #        be passed in via ENV, as with the Windows build.
     list(APPEND result
-        "-I${SWIFT_ANDROID_NDK_PATH}/sources/cxx-stl/llvm-libc++/libcxx/include"
-        "-I${SWIFT_ANDROID_NDK_PATH}/sources/cxx-stl/llvm-libc++abi/libcxxabi/include"
+        "-I${SWIFT_ANDROID_NDK_PATH}/sources/cxx-stl/llvm-libc++/include"
+        "-I${SWIFT_ANDROID_NDK_PATH}/sources/cxx-stl/llvm-libc++abi/include"
         "-I${SWIFT_ANDROID_NDK_PATH}/sources/android/support/include")
   endif()
 
@@ -315,7 +317,7 @@ function(_add_variant_link_flags)
   elseif("${LFLAGS_SDK}" STREQUAL "ANDROID")
     list(APPEND result
         "-ldl"
-        "-L${SWIFT_ANDROID_NDK_PATH}/toolchains/arm-linux-androideabi-${SWIFT_ANDROID_NDK_GCC_VERSION}/prebuilt/linux-x86_64/lib/gcc/arm-linux-androideabi/${SWIFT_ANDROID_NDK_GCC_VERSION}.x"
+        "-L${SWIFT_ANDROID_PREBUILT_PATH}/lib/gcc/arm-linux-androideabi/${SWIFT_ANDROID_NDK_GCC_VERSION}.x"
         "${SWIFT_ANDROID_NDK_PATH}/sources/cxx-stl/llvm-libc++/libs/armeabi-v7a/libc++_shared.so")
   else()
     list(APPEND result "-lobjc")
@@ -578,10 +580,7 @@ function(_add_swift_library_single target name)
     if("${SWIFTLIB_SINGLE_SDK}" STREQUAL "IOS" OR "${SWIFTLIB_SINGLE_SDK}" STREQUAL "TVOS" OR "${SWIFTLIB_SINGLE_SDK}" STREQUAL "WATCHOS")
       list(APPEND SWIFTLIB_SINGLE_C_COMPILE_FLAGS "-fembed-bitcode")
       list(APPEND SWIFTLIB_SINGLE_SWIFT_COMPILE_FLAGS "-embed-bitcode")
-      list(APPEND SWIFTLIB_SINGLE_LINK_FLAGS "-Xlinker" "-bitcode_bundle" "-Xlinker" "-bitcode_hide_symbols")
-      if (NOT SWIFT_BUILD_RUNTIME_WITH_HOST_LIBLTO)
-        list(APPEND SWIFTLIB_SINGLE_LINK_FLAGS "-Xlinker" "-lto_library" "-Xlinker" "${LLVM_LIBRARY_DIR}/libLTO.dylib")
-      endif()
+      list(APPEND SWIFTLIB_SINGLE_LINK_FLAGS "-Xlinker" "-bitcode_bundle" "-Xlinker" "-bitcode_hide_symbols" "-Xlinker" "-lto_library" "-Xlinker" "${LLVM_LIBRARY_DIR}/libLTO.dylib")
     endif()
   endif()
 
@@ -1371,7 +1370,13 @@ function(add_swift_library name)
         set(swiftlib_private_link_libraries_targets
             ${swiftlib_module_dependency_targets})
         foreach(lib ${SWIFTLIB_PRIVATE_LINK_LIBRARIES})
-          if(TARGET "${lib}${VARIANT_SUFFIX}")
+          if("${lib}" STREQUAL "ICU_UC")
+            list(APPEND swiftlib_private_link_libraries_targets
+                 "${SWIFT_${sdk}_ICU_UC}")
+          elseif("${lib}" STREQUAL "ICU_I18N")
+            list(APPEND swiftlib_private_link_libraries_targets
+                 "${SWIFT_${sdk}_ICU_I18N}")
+          elseif(TARGET "${lib}${VARIANT_SUFFIX}")
             list(APPEND swiftlib_private_link_libraries_targets
                 "${lib}${VARIANT_SUFFIX}")
           else()
