@@ -474,7 +474,7 @@ static bool isValidIdentifierContinuationCodePoint(uint32_t c) {
 static bool isValidIdentifierStartCodePoint(uint32_t c) {
   if (!isValidIdentifierContinuationCodePoint(c))
     return false;
-  if (c < 0x80 && (isDigit(c) || c == '$'))
+  if (c < 0x80 && isDigit(c))
     return false;
 
   // N1518: Recommendations for extended identifier characters for C and C++
@@ -819,10 +819,15 @@ void Lexer::lexDollarIdent() {
     }
   }
 
-  // It's always an error to see a standalone $
   if (CurPtr == tokStart + 1) {
-    diagnose(tokStart, diag::expected_dollar_numeric);
-    return formToken(tok::unknown, tokStart);
+    // It is always an error to see a standalone '$' when not in Swift 3
+    // compatibility mode.
+    if (!LangOpts.isSwiftVersion3()) {
+      // Offer to replace '$' with '`$`'.
+      diagnose(tokStart, diag::standalone_dollar_identifier)
+        .fixItReplaceChars(getSourceLoc(tokStart), getSourceLoc(CurPtr), "`$`");
+    }
+    return formToken(tok::identifier, tokStart);
   }
 
   // We reserve $nonNumeric for persistent bindings in the debugger.
