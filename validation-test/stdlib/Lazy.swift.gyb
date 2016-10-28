@@ -640,10 +640,10 @@ tests.test("LazySequence/Sequence") {
 func expectSequencePassthrough<
   S : Sequence,
   Base : Sequence
-  where
-  S : LazySequenceProtocol, Base : LoggingType,
-  Base.Iterator.Element == S.Iterator.Element
->(_ s: S, base: Base, arbitraryElement: S.Iterator.Element, count: Int) {
+>(_ s: S, base: Base, arbitraryElement: S.Iterator.Element, count: Int)
+  where                                                                
+  S : LazySequenceProtocol, Base : LoggingType,                        
+  Base.Iterator.Element == S.Iterator.Element {                          
   let baseType = type(of: base)
 
   SequenceLog.makeIterator.expectIncrement(baseType) { _ = s.makeIterator() }
@@ -658,12 +658,12 @@ func expectSequencePassthrough<
   }
 
   SequenceLog._copyContents.expectIncrement(baseType) { () -> Void in
-    let buf = UnsafeMutablePointer<S.Iterator.Element>.allocate(capacity: count)
-
-    let end = s._copyContents(initializing: buf)
-    expectTrue(end <= buf + count)
-    buf.deinitialize(count: end - buf)
-    buf.deallocate(capacity: count)
+    let ptr = UnsafeMutablePointer<S.Iterator.Element>.allocate(capacity: count)
+    let buf = UnsafeMutableBufferPointer(start: ptr, count: count)
+    var remainders = s._copyContents(initializing: buf)
+    expectTrue(remainders == nil || remainders!.next() == nil)
+    ptr.deinitialize(count: count)
+    ptr.deallocate(capacity: count)
   }
 }
 

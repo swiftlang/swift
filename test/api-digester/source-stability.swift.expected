@@ -7,6 +7,9 @@ Protocol IndexableBase has been removed (deprecated)
 Protocol MutableIndexable has been removed (deprecated)
 Protocol RandomAccessIndexable has been removed (deprecated)
 Protocol RangeReplaceableIndexable has been removed (deprecated)
+Func Array.append(contentsOf:) has been removed
+Func ArraySlice.append(contentsOf:) has been removed
+Func ContiguousArray.append(contentsOf:) has been removed
 
 ==================================================== Moved Decls ====================================================
 // rdar://28456614 Swift 3 breaking change: static function 'abs' removed from Double/Float/Float80/CGFloat

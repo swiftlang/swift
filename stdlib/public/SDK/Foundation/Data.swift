@@ -551,7 +551,9 @@ public struct Data : ReferenceConvertible, Equatable, Hashable, RandomAccessColl
             }
             
             if replacementCount != 0 {
-                newElements._copyContents(initializing: bytes + start)
+                let buf = UnsafeMutableBufferPointer(start: bytes + start, count: numericCast(newElements.count))
+                // FIXME: is this guaranteed to return no residual elements?
+                let _ = newElements._copyContents(initializing: buf)
             }
         }
     }

@@ -207,7 +207,7 @@ tests.test("${TestedType}: dispatch to wrapped, SequenceLog") {
     var result = Array(repeating: OpaqueValue(0), count: 10)
     Log._copyContents.expectIncrement(Base.self) {
       result.withUnsafeMutableBufferPointer {
-        _ = s._copyContents(initializing: $0.baseAddress!)
+        _ = s._copyContents(initializing: $0)
       }
     }
   }

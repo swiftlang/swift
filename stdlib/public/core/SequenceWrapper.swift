@@ -119,8 +119,8 @@ extension Sequence
   /// element initialized.
   @discardableResult
   public func _copyContents(
-    initializing ptr: UnsafeMutablePointer<Base.Iterator.Element>
-  ) -> UnsafeMutablePointer<Base.Iterator.Element> {
-    return _base._copyContents(initializing: ptr)
+    initializing buf: UnsafeMutableBufferPointer<Base.Iterator.Element>
+  ) -> Base.Iterator? {
+    return _base._copyContents(initializing: buf)
   }
 }

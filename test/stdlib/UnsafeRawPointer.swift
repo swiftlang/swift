@@ -62,7 +62,8 @@ UnsafeMutableRawPointerExtraTestSuite.test("bindMemory") {
     p1.deallocate(bytes: sizeInBytes, alignedTo: MemoryLayout<Int>.alignment)
   }
   let ptrI = p1.bindMemory(to: Int.self, capacity: 3)
-  ptrI.initialize(from: 1...3)
+  let bufI = UnsafeMutableBufferPointer(start: ptrI, count: 3)
+  bufI.initialize(from: 1...3)
   let ptrU = p1.bindMemory(to: UInt.self, capacity: 3)
   expectEqual(1, ptrU[0])
   expectEqual(2, ptrU[1])
