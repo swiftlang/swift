@@ -1322,7 +1322,7 @@ RValue RValueEmitter::visitErasureExpr(ErasureExpr *E, SGFContext C) {
 
 RValue SILGenFunction::emitAnyHashableErasure(SILLocation loc,
                                               ManagedValue value,
-                                              CanType type,
+                                              Type type,
                                               ProtocolConformanceRef conformance,
                                               SGFContext C) {
   // Ensure that the intrinsic function exists.
@@ -1340,21 +1340,14 @@ RValue SILGenFunction::emitAnyHashableErasure(SILLocation loc,
 
 RValue RValueEmitter::visitAnyHashableErasureExpr(AnyHashableErasureExpr *E,
                                                   SGFContext C) {
-  // Ensure that the intrinsic function exists.
-  auto convertFn = SGF.SGM.getConvertToAnyHashable(E);
-  if (!convertFn) return SGF.emitUndefRValue(E, E->getType());
-
-  // Construct the substitution for T: Hashable.
-  ProtocolConformanceRef conformances[] = { E->getConformance() };
-  Substitution sub(E->getSubExpr()->getType(),
-                   SGF.getASTContext().AllocateCopy(conformances));
-
   // Emit the source value into a temporary.
   auto sourceOrigType = AbstractionPattern::getOpaque();
   auto source =
     SGF.emitMaterializedRValueAsOrig(E->getSubExpr(), sourceOrigType);
 
-  return SGF.emitApplyOfLibraryIntrinsic(E, convertFn, sub, source, C);
+  return SGF.emitAnyHashableErasure(E, source,
+                                    E->getSubExpr()->getType(),
+                                    E->getConformance(), C);
 }
 
 /// Treating this as a successful operation, turn a CMV into a +1 MV.
