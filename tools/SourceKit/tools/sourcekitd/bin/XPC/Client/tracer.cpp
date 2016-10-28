@@ -21,12 +21,12 @@
 #include "llvm/Support/Mutex.h"
 #include "llvm/Support/Path.h"
 #include "llvm/Support/raw_ostream.h"
-#include "llvm/Support/Chrono.h"
 #include "llvm/Support/YAMLTraits.h"
 
 #include <xpc/xpc.h>
 
 #include <algorithm>
+#include <chrono>
 #include <deque>
 #include <functional>
 #include <iomanip>
@@ -92,7 +92,7 @@ static void fsAddFileWithRevision(path_t &Path,
 typedef SourceKit::trace::OperationKind OperationKind;
 
 struct OperationInfo {
-  sys::TimePoint<> StartedAt;
+  std::chrono::system_clock::time_point StartedAt;
   OperationKind Kind;
   std::string SwiftArgs;
   trace::StringPairs OpArgs;

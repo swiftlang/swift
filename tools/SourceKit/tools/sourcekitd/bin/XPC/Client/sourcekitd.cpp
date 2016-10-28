@@ -17,7 +17,7 @@
 
 #include "llvm/Support/ErrorHandling.h"
 #include "llvm/Support/Mutex.h"
-#include "llvm/Support/Chrono.h"
+#include <chrono>
 #include <xpc/xpc.h>
 #include <dispatch/dispatch.h>
 
