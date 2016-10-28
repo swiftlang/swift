@@ -8,7 +8,7 @@
 // XFAIL: linux
 
 import ctypes_bits_exported
-// MISSING: could not build Objective-C module 'ctypes_bits_exported'
+// MISSING: could not build module 'ctypes_bits_exported'
 
 // From bits submodule
 public var x : DWORD = MY_INT

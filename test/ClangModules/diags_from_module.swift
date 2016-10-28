@@ -7,7 +7,7 @@ import Module
 
 // CHECK: Another.h:2:4: error: Module should have been built without -DFOO
 // CHECK: Sub2.h:2:9: error: could not build module 'Another'
-// CHECK: diags_from_module.swift:[[@LINE-4]]:8: error: could not build Objective-C module 'Module'
+// CHECK: diags_from_module.swift:[[@LINE-4]]:8: error: could not build module 'Module'
 
 // RUN: %target-swift-frontend -parse %s -F %S/Inputs/frameworks 2> %tw.err.txt
 // RUN: %FileCheck -input-file=%tw.err.txt %s -check-prefix=CHECK-WARN
