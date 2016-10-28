@@ -1808,6 +1808,9 @@ for host in "${ALL_HOSTS[@]}"; do
 
     case "${COMPILER_VENDOR}" in
         none)
+            swift_cmake_options=(
+                -DSWIFT_VERSION="${SWIFT_USER_VISIBLE_VERSION}"
+            )
             ;;
         apple)
             llvm_cmake_options=(
