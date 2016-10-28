@@ -31,16 +31,16 @@ printArtificialName(const swift::ValueDecl *VD, llvm::raw_ostream &OS) {
     return true;
   switch (FD->getAccessorKind()) {
   case AccessorKind::IsGetter:
-    OS << FD->getAccessorStorageDecl()->getFullName() << ".get()";
+    OS << FD->getAccessorStorageDecl()->getFullName() << " get";
     return false;
   case AccessorKind::IsSetter:
-    OS << FD->getAccessorStorageDecl()->getFullName() << ".set()";
+    OS << FD->getAccessorStorageDecl()->getFullName() << " set";
     return false;
   case AccessorKind::IsDidSet:
-    OS << FD->getAccessorStorageDecl()->getFullName() << ".didSet()";
+    OS << FD->getAccessorStorageDecl()->getFullName() << " didSet";
     return false;
   case AccessorKind::IsWillSet:
-    OS << FD->getAccessorStorageDecl()->getFullName() << ".willSet()";
+    OS << FD->getAccessorStorageDecl()->getFullName() << " willSet";
     return false;
 
   case AccessorKind::NotAccessor:
