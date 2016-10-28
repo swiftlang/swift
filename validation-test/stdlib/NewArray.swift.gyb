@@ -45,13 +45,8 @@ protocol MyArrayProtocol
   var _owner: AnyObject? { get }
 
   var capacity: Int { get }
-
-  func += <
-    S : Sequence
-    where
-    S.Iterator.Element == Iterator.Element
-  >(lhs: inout Self, rhs: S)
 }
+
 extension MyArrayProtocol {
   var _bufferID: _BufferID {
     return unsafeBitCast(_owner, to: _BufferID.self)
@@ -456,8 +451,8 @@ func testIsEmptyFirstLast${A}() {
   print("<\(${A}(3..<43).first!)>")  // CHECK-NEXT: <3>
   print("<\(${A}(3..<43).last!)>")   // CHECK-NEXT: <42>
 
-  print("<\(${A}<Int>().first)>")    // CHECK-NEXT: nil
-  print("<\(${A}<Int>().last)>")     // CHECK-NEXT: nil
+  print("<\(${A}<Int>().first.debugDescription)>")    // CHECK-NEXT: nil
+  print("<\(${A}<Int>().last.debugDescription)>")     // CHECK-NEXT: nil
   
   var a = ${A}(LifetimeTracked(0)..<LifetimeTracked(10))
   print(a.removeLast().value)     // CHECK-NEXT: 9
