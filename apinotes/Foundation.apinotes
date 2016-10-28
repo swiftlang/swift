@@ -663,6 +663,9 @@ Classes:
   - Selector: 'URLForPublishingUbiquitousItemAtURL:expirationDate:error:'
     SwiftName: url(forPublishingUbiquitousItemAt:expiration:)
     MethodKind: Instance
+  - Selector: 'enumeratorAtURL:includingPropertiesForKeys:options:errorHandler:'
+    MethodKind: Instance
+    SwiftPrivate: true
 - Name: NSFileVersion
   Methods:
   - Selector: 'versionOfItemAtURL:forPersistentIdentifier:'
