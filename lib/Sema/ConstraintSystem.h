@@ -1457,6 +1457,13 @@ public:
   void addNewFailingConstraint(Constraint *constraint) {
     assert(shouldAddNewFailingConstraint());
     failedConstraint = constraint;
+    failedConstraint->setActive(false);
+
+    // Record this as a newly-generated constraint.
+    if (solverState) {
+      solverState->generatedConstraints.push_back(constraint);
+      solverState->retiredConstraints.push_back(constraint);
+    }
   }
 
   /// \brief Add a newly-generated constraint that is known not to be solvable
