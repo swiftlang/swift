@@ -72,6 +72,13 @@ enum class SILStage {
   /// dataflow errors, and some instructions must be canonicalized to simpler
   /// forms.
   Canonical,
+
+  /// \brief Lowered SIL, which has been prepared for IRGen and will no longer
+  /// be passed to SIL transform passes.
+  ///
+  /// Lowered SIL requires explicit storage for all address-only and resilient
+  /// types.
+  Lowered,
 };
 
 /// \brief A SIL module. The SIL module owns all of the SILFunctions generated

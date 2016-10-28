@@ -62,7 +62,7 @@ public:
 #define PASSPIPELINE(NAME, DESCRIPTION)                                        \
   static SILPassPipelinePlan get##NAME##PassPipeline();
 #define PASSPIPELINE_WITH_OPTIONS(NAME, DESCRIPTION)                           \
-  static SILPassPipelinePlan get##NAME##PassPipeline(SILOptions Options);
+  static SILPassPipelinePlan get##NAME##PassPipeline(const SILOptions &Options);
 #include "swift/SILOptimizer/PassManager/PassPipeline.def"
 
   static SILPassPipelinePlan getPassPipelineForKinds(ArrayRef<PassKind> Kinds);
