@@ -1212,7 +1212,7 @@ public:
 
   RValue emitAnyHashableErasure(SILLocation loc,
                                 ManagedValue value,
-                                CanType type,
+                                Type type,
                                 ProtocolConformanceRef conformance,
                                 SGFContext C);
 
