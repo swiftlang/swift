@@ -816,7 +816,8 @@ NodeUniquePtr SDKNode::constructSDKNode(llvm::yaml::MappingNode *Node) {
       break;
     case KeyKind::KK_ownership:
       Info.Ownership = swift::Ownership(getAsInt(Pair.getValue()));
-      assert(Info.Ownership != swift::Ownership::Strong && "Stong is implied.");
+      assert(Info.Ownership != swift::Ownership::Strong &&
+             "Strong is implied.");
       break;
 
     case KeyKind::KK_typeAttributes: {

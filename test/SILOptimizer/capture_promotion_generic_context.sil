@@ -7,7 +7,7 @@ import Builtin
 typealias Int = Builtin.Int32
 
 // rdar://problem/28945854: When a nongeneric closure was formed inside a
-// generic function, the capture promotion pass would erronenously try to
+// generic function, the capture promotion pass would erroneously try to
 // apply the generic caller's substitutions to the nongeneric callee, violating
 // invariants.
 
