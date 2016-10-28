@@ -259,6 +259,7 @@ bool swift::immediate::IRGenImportedModules(
       hadError = true;
       break;
     }
+    runSILLoweringPasses(*SILMod);
 
     // FIXME: We shouldn't need to use the global context here, but
     // something is persisting across calls to performIRGeneration.
