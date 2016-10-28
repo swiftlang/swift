@@ -176,6 +176,33 @@ static SILInstruction *constantFoldIntrinsic(BuiltinInst *BI,
     return Op1;
   }
 
+  case llvm::Intrinsic::ctlz: {
+    assert(BI->getArguments().size() == 2 && "Ctlz should have 2 args.");
+    OperandValueArrayRef Args = BI->getArguments();
+
+    // Fold for integer constant arguments.
+    auto *LHS = dyn_cast<IntegerLiteralInst>(Args[0]);
+    if (!LHS) {
+      return nullptr;
+    }
+    APInt LHSI = LHS->getValue();
+    unsigned LZ = 0;
+    // Check corner-case of source == zero
+    if (LHSI.getLimitedValue() == 0) {
+      auto *RHS = dyn_cast<IntegerLiteralInst>(Args[1]);
+      if (!RHS || RHS->getValue().getBoolValue() != 0) {
+        // Undefined
+        return nullptr;
+      }
+      LZ = LHSI.getBitWidth();
+    } else {
+      LZ = LHSI.countLeadingZeros();
+    }
+    APInt LZAsAPInt = APInt(LHSI.getBitWidth(), LZ);
+    SILBuilderWithScope B(BI);
+    return B.createIntegerLiteral(BI->getLoc(), LHS->getType(), LZAsAPInt);
+  }
+
   case llvm::Intrinsic::sadd_with_overflow:
   case llvm::Intrinsic::uadd_with_overflow:
   case llvm::Intrinsic::ssub_with_overflow:
