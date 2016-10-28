@@ -21,6 +21,13 @@ internal func NS_Swift_NSFileManager_replaceItemAtURL_withItemAtURL_backupItemNa
     _ options: FileManager.ItemReplacementOptions,
     _ error: NSErrorPointer) -> NSURL?
 
+@_silgen_name("NS_Swift_NSFileManager_enumeratorAt_includingPropertiesForKeys_options_errorHandler")
+internal func NS_Swift_NSFileManager_enumeratorAt_includingPropertiesForKeys_options_errorHandler(
+    _ self_ : AnyObject,
+    _ url: AnyObject,
+    _ keys: NSArray?,
+    _ options: FileManager.DirectoryEnumerationOptions,
+    _ errorHandler: @escaping @convention(block) (NSURL, NSError) -> Bool) -> FileManager.DirectoryEnumerator?
 
 extension FileManager {
     /*
@@ -45,4 +52,16 @@ extension FileManager {
         }
         throw error!
     }
+    
+    @available(OSX 10.6, iOS 4.0, *)
+    public func enumerator(at url: URL, includingPropertiesForKeys keys: [URLResourceKey]?, options mask: FileManager.DirectoryEnumerationOptions = [], errorHandler handler: ((URL, Error) -> Bool)? = nil) -> FileManager.DirectoryEnumerator? {
+        return NS_Swift_NSFileManager_enumeratorAt_includingPropertiesForKeys_options_errorHandler(self, url as NSURL, keys as NSArray?, mask, { (url, error) in
+            var errorResult = true;
+            if let h = handler {
+                errorResult = h(url as URL, error)
+            }
+            return errorResult
+        })
+    }
+
 }

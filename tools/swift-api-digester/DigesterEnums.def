@@ -73,6 +73,7 @@ KEY(static)
 KEY(typeAttributes)
 KEY(declAttributes)
 KEY(declKind)
+KEY(ownership)
 
 KNOWN_TYPE(Optional)
 KNOWN_TYPE(ImplicitlyUnwrappedOptional)

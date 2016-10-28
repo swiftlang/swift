@@ -1453,9 +1453,8 @@ ParserResult<Expr> Parser::parseExprPostfix(Diag<> ID, bool isExprBasic) {
 
       // Handle the deprecated 'x.dynamicType' and migrate it to `type(of: x)`
       if (Tok.getText() == "dynamicType") {
-        BacktrackingScope backtrackScope(*this);
         auto range = Result.get()->getSourceRange();
-        auto dynamicTypeExprRange = SourceRange(TokLoc, consumeToken());
+        auto dynamicTypeExprRange = SourceRange(TokLoc, Tok.getLoc());
         diagnose(TokLoc, diag::expr_dynamictype_deprecated)
           .highlight(dynamicTypeExprRange)
           .fixItReplace(dynamicTypeExprRange, ")")

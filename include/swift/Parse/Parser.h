@@ -350,17 +350,24 @@ public:
   class BacktrackingScope {
     Parser &P;
     ParserPosition PP;
+    DiagnosticTransaction DT;
     bool Backtrack = true;
 
   public:
-    BacktrackingScope(Parser &P) : P(P), PP(P.getParserPosition()) {}
+    BacktrackingScope(Parser &P)
+      : P(P), PP(P.getParserPosition()), DT(P.Diags) {}
 
     ~BacktrackingScope() {
-      if (Backtrack)
+      if (Backtrack) {
         P.backtrackToPosition(PP);
+        DT.abort();
+      }
     }
 
-    void cancelBacktrack() { Backtrack = false; }
+    void cancelBacktrack() {
+      Backtrack = false;
+      DT.commit();
+    }
   };
 
   /// RAII object that, when it is destructed, restores the parser and lexer to

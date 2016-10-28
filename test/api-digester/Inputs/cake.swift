@@ -8,4 +8,6 @@ public struct S1 {
 
 public class C1 {
 	open class func foo1() {}
+	public weak var Ins : C1?
+	public unowned var Ins2 : C1 = C1()
 }

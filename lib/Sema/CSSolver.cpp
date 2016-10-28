@@ -348,9 +348,8 @@ bool ConstraintSystem::simplify(bool ContinueAfterFailures) {
 
       if (solverState)
         solverState->retiredConstraints.push_front(constraint);
-      else
-        CG.removeConstraint(constraint);
 
+      CG.removeConstraint(constraint);
       break;
 
     case SolutionKind::Solved:

@@ -347,8 +347,9 @@ func feedCat() throws -> Int {
   }
 }
 // CHECK-LABEL: sil hidden @_TF6errors7feedCatFzT_Si : $@convention(thin) () -> (Int, @error Error)
-// CHECK:   %0 = function_ref @_TF6errors13preferredFoodFzT_OS_7CatFood : $@convention(thin) () -> (CatFood, @error Error)
-// CHECK:   try_apply %0() : $@convention(thin) () -> (CatFood, @error Error), normal bb1, error bb5
+// CHECK: debug_value undef : $Error, var, name "$error", argno 1
+// CHECK:   %1 = function_ref @_TF6errors13preferredFoodFzT_OS_7CatFood : $@convention(thin) () -> (CatFood, @error Error)
+// CHECK:   try_apply %1() : $@convention(thin) () -> (CatFood, @error Error), normal bb1, error bb5
 // CHECK: bb1([[VAL:%.*]] : $CatFood):
 // CHECK:   switch_enum [[VAL]] : $CatFood, case #CatFood.Canned!enumelt: bb2, case #CatFood.Dry!enumelt: bb3
 // CHECK: bb5([[ERROR:%.*]] : $Error)
@@ -366,6 +367,7 @@ func getHungryCat(_ food: CatFood) throws -> Cat {
 // errors.getHungryCat  throws (errors.CatFood) -> errors.Cat
 // CHECK-LABEL: sil hidden @_TF6errors12getHungryCatFzOS_7CatFoodCS_3Cat : $@convention(thin) (CatFood) -> (@owned Cat, @error Error)
 // CHECK: bb0(%0 : $CatFood):
+// CHECK:   debug_value undef : $Error, var, name "$error", argno 2
 // CHECK:   switch_enum %0 : $CatFood, case #CatFood.Canned!enumelt: bb1, case #CatFood.Dry!enumelt: bb3
 // CHECK: bb1:
 // CHECK:   [[FN:%.*]] = function_ref @_TF6errors10make_a_catFzT_CS_3Cat : $@convention(thin) () -> (@owned Cat, @error Error)
@@ -385,6 +387,7 @@ func test_variadic(_ cat: Cat) throws {
   try take_many_cats(make_a_cat(), cat, make_a_cat(), make_a_cat())
 }
 // CHECK-LABEL: sil hidden @_TF6errors13test_variadicFzCS_3CatT_
+// CHECK:       debug_value undef : $Error, var, name "$error", argno 2
 // CHECK:       [[TAKE_FN:%.*]] = function_ref @_TF6errors14take_many_catsFztGSaCS_3Cat__T_ : $@convention(thin) (@owned Array<Cat>) -> @error Error
 // CHECK:       [[N:%.*]] = integer_literal $Builtin.Word, 4
 // CHECK:       [[T0:%.*]] = function_ref @_TFs27_allocateUninitializedArray
