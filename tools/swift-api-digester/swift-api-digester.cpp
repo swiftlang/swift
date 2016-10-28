@@ -293,7 +293,7 @@ struct SDKNodeInitInfo {
 };
 
 class SDKNode {
-  typedef std::vector<NodeUniquePtr>::const_iterator ChildIt;
+  typedef std::vector<NodeUniquePtr>::iterator ChildIt;
   StringRef Name;
   StringRef PrintedName;
   unsigned TheKind : 4;
@@ -320,7 +320,7 @@ public:
   bool isNameValid() const { return Name != "_"; }
   StringRef getPrintedName() const { return PrintedName; }
   void removeChild(ChildIt CI) { Children.erase(CI); }
-  ChildIt getChildBegin() const { return Children.begin(); }
+  ChildIt getChildBegin() { return Children.begin(); }
   void annotate(NodeAnnotation Anno) { Annotations.insert(Anno); }
   NodePtr getParent() const { return Parent; };
   unsigned getChildrenCount() const { return Children.size(); }
@@ -491,7 +491,7 @@ void SDKNode::postorderVisit(NodePtr Root, SDKNodeVisitor &Visitor) {
 class SDKNodeVectorViewer {
   ArrayRef<SDKNode*> Collection;
   llvm::function_ref<bool(NodePtr)> Selector;
-  typedef ArrayRef<SDKNode*>::const_iterator VectorIt;
+  typedef ArrayRef<SDKNode*>::iterator VectorIt;
   VectorIt getNext(VectorIt Start);
   class ViewerIterator;
 
