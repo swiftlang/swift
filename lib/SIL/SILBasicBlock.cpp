@@ -139,6 +139,28 @@ SILFunctionArgument *SILBasicBlock::insertFunctionArgument(arg_iterator Iter,
   return new (getModule()) SILFunctionArgument(this, Iter, Ty, OwnershipKind, D);
 }
 
+SILFunctionArgument *SILBasicBlock::replaceFunctionArgument(
+    unsigned i, SILType Ty, ValueOwnershipKind Kind, const ValueDecl *D) {
+  assert(isEntry() && "Function Arguments can only be in the entry block");
+  SILModule &M = getParent()->getModule();
+  if (Ty.isTrivial(M))
+    Kind = ValueOwnershipKind::Trivial;
+
+  assert(ArgumentList[i]->use_empty() && "Expected no uses of the old arg!");
+
+  // Notify the delete handlers that this argument is being deleted.
+  M.notifyDeleteHandlers(ArgumentList[i]);
+
+  SILFunctionArgument *NewArg = new (M) SILFunctionArgument(Ty, Kind, D);
+  NewArg->setParent(this);
+
+  // TODO: When we switch to malloc/free allocation we'll be leaking memory
+  // here.
+  ArgumentList[i] = NewArg;
+
+  return NewArg;
+}
+
 /// Replace the ith BB argument with a new one with type Ty (and optional
 /// ValueDecl D).
 SILPHIArgument *SILBasicBlock::replacePHIArgument(unsigned i, SILType Ty,
