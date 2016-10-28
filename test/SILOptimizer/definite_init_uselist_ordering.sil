@@ -1,0 +1,53 @@
+// RUN: %target-sil-opt -definite-init-visit-debuginfo-locs -enable-sil-verify-all %s -definite-init -verify
+
+sil_stage canonical
+
+import Builtin
+
+// Make sure that no matter the order in which we parse the following sil, we
+// ignore the strong_retain and give the same message.
+class MultipleInitBase {
+  init()
+  init(i: Builtin.Int32)
+  deinit
+}
+
+class MultipleInitDerived : MultipleInitBase {
+  override init()
+  deinit
+  override init(i: Builtin.Int32)
+}
+
+sil_scope 0 { loc "test/SILOptimizer/definite_init_uselist_ordering.sil":1073:72 parent @return_before_strongretain : $@convention(method) (@owned MultipleInitDerived) -> @owned MultipleInitDerived }
+
+sil hidden @return_before_strongretain : $@convention(method) (@owned MultipleInitDerived) -> @owned MultipleInitDerived {
+bb0(%0 : $MultipleInitDerived):
+  %1 = alloc_stack $MultipleInitDerived, let, name "self"
+  %2 = mark_uninitialized [derivedself] %1 : $*MultipleInitDerived
+  store %0 to %2 : $*MultipleInitDerived
+  %4 = load %2 : $*MultipleInitDerived
+  br bb1
+
+bb2:
+  destroy_addr %2 : $*MultipleInitDerived
+  dealloc_stack %1 : $*MultipleInitDerived
+  return %4 : $MultipleInitDerived, loc "test/SILOptimizer/definite_init_uselist_ordering.sil":1098:3, scope 0 // expected-error {{super.init isn't called on all paths before returning from initializer}}
+
+bb1:
+  strong_retain %4 : $MultipleInitDerived, loc "test/SILOptimizer/definite_init_uselist_ordering.sil":1097:3, scope 0
+  br bb2
+}
+
+sil_scope 1 { loc "test/SILOptimizer/definite_init_uselist_ordering.sil":1093:72 parent @strongretain_before_return : $@convention(method) (@owned MultipleInitDerived) -> @owned MultipleInitDerived }
+
+sil hidden @strongretain_before_return : $@convention(method) (@owned MultipleInitDerived) -> @owned MultipleInitDerived {
+bb0(%0 : $MultipleInitDerived):
+  %1 = alloc_stack $MultipleInitDerived, let, name "self", loc "test/SILOptimizer/definite_init_uselist_ordering.sil":1105:8, scope 1
+  %2 = mark_uninitialized [derivedself] %1 : $*MultipleInitDerived, loc "test/SILOptimizer/definite_init_uselist_ordering.sil":1106:8, scope 1
+  store %0 to %2 : $*MultipleInitDerived, loc "test/SILOptimizer/definite_init_uselist_ordering.sil":1107:3, scope 1
+  %4 = load %2 : $*MultipleInitDerived, loc "test/SILOptimizer/definite_init_uselist_ordering.sil":1108:3, scope 1
+  strong_retain %4 : $MultipleInitDerived, loc "test/SILOptimizer/definite_init_uselist_ordering.sil":1109:3, scope 1
+  destroy_addr %2 : $*MultipleInitDerived, loc "test/SILOptimizer/definite_init_uselist_ordering.sil":1109:3, scope 1
+  dealloc_stack %1 : $*MultipleInitDerived, loc "test/SILOptimizer/definite_init_uselist_ordering.sil":1109:3, scope 1
+  return %4 : $MultipleInitDerived, loc "test/SILOptimizer/definite_init_uselist_ordering.sil":1109:3, scope 1 // expected-error {{super.init isn't called on all paths before returning from initializer}}
+}
