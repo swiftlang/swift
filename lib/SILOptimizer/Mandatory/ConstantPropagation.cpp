@@ -229,6 +229,50 @@ static SILInstruction *constantFoldCompare(BuiltinInst *BI,
     return B.createIntegerLiteral(BI->getLoc(), BI->getType(), Res);
   }
 
+  if (RHS) {
+    int Result = 1;
+    switch (ID) {
+    default: break;
+    case BuiltinValueKind::ICMP_ULT:
+      // Unsigned is never < 0.
+      if (!RHS->getValue())
+        Result = 0;
+      break;
+    case BuiltinValueKind::ICMP_UGE:
+      // Unsigned is always >= 0.
+      if (!RHS->getValue())
+        Result = -1;
+      break;
+    }
+    if (Result < 1) {
+      APInt Res(1, Result);
+      SILBuilderWithScope B(BI);
+      return B.createIntegerLiteral(BI->getLoc(), BI->getType(), Res);
+    }
+  }
+
+  if (LHS) {
+    int Result = 1;
+    switch (ID) {
+    case BuiltinValueKind::ICMP_ULE:
+      // 0 is always <= an unsigned value.
+      if (!LHS->getValue())
+        Result = -1;
+      break;
+    case BuiltinValueKind::ICMP_UGT:
+      // 0 is never > an unsigned value.
+      if (!LHS->getValue())
+        Result = 0;
+      break;
+    }
+    if (Result < 1) {
+      APInt Res(1, Result);
+      SILBuilderWithScope B(BI);
+      return B.createIntegerLiteral(BI->getLoc(), BI->getType(), Res);
+    }
+  }
+
+
   return nullptr;
 }
 
