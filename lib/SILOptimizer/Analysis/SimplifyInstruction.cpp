@@ -524,6 +524,17 @@ static SILValue simplifyBuiltin(BuiltinInst *BI) {
         return val3;
     }
   }
+  break;
+  case BuiltinValueKind::Shl:
+  case BuiltinValueKind::AShr:
+  case BuiltinValueKind::LShr:
+    auto *RHS = dyn_cast<IntegerLiteralInst>(Args[1]);
+    if (RHS && !RHS->getValue()) {
+      // Shifting a value by 0 bits is equivalent to the value itself.
+      auto LHS = Args[0];
+      return LHS;
+    }
+    break;
   }
   return SILValue();
 }
