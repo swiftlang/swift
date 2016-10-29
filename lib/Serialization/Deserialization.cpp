@@ -998,8 +998,7 @@ bool ModuleFile::readDefaultWitnessTable(ProtocolDecl *proto) {
     assert(witness && "unable to deserialize next witness");
     assert(requirement->getDeclContext() == proto);
 
-    // FIXME: substitutions
-    proto->setDefaultWitness(requirement, ConcreteDeclRef(witness));
+    proto->setDefaultWitness(requirement, witness);
   }
 
   return false;
@@ -4214,7 +4213,10 @@ void ModuleFile::finishNormalConformance(NormalProtocolConformance *conformance,
     assert(second || first->getAttrs().hasAttribute<OptionalAttr>() ||
            first->getAttrs().isUnavailable(ctx));
     (void) ctx;
-    witnesses.insert(std::make_pair(first, second));
+    if (second)
+      witnesses.insert(std::make_pair(first, second));
+    else
+      witnesses.insert(std::make_pair(first, Witness()));
   }
   assert(rawIDIter <= rawIDs.end() && "read too much");
 

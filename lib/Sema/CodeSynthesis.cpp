@@ -1138,17 +1138,6 @@ static FuncDecl *completeLazyPropertyGetter(VarDecl *VD, VarDecl *Storage,
   return Get;
 }
 
-static ArrayRef<Substitution>
-getForwardingSubstitutions(DeclContext *DC) {
-  if (auto *env = DC->getGenericEnvironmentOfContext()) {
-    auto *sig = DC->getGenericSignatureOfContext();
-    return env->getForwardingSubstitutions(
-        DC->getParentModule(), sig);
-  }
-
-  return { };
-}
-
 void TypeChecker::completePropertyBehaviorStorage(VarDecl *VD,
                                VarDecl *BehaviorStorage,
                                FuncDecl *DefaultInitStorage,
@@ -1283,14 +1272,13 @@ void TypeChecker::completePropertyBehaviorStorage(VarDecl *VD,
   addTrivialAccessorsToStorage(Storage, *this);
   
   // Add the witnesses to the conformance.
-  auto MemberSubs = getForwardingSubstitutions(DC);
-  BehaviorConformance->setWitness(BehaviorStorage,
-                                 ConcreteDeclRef(Context, Storage, MemberSubs));
+  // FIXME: Dropping substitution.
+  BehaviorConformance->setWitness(BehaviorStorage, Storage);
   BehaviorConformance->setWitness(BehaviorStorage->getGetter(),
-                    ConcreteDeclRef(Context, Storage->getGetter(), MemberSubs));
+                                  Storage->getGetter());
   if (BehaviorStorage->isSettable(DC))
     BehaviorConformance->setWitness(BehaviorStorage->getSetter(),
-                    ConcreteDeclRef(Context, Storage->getSetter(), MemberSubs));
+                                    Storage->getSetter());
 }
 
 void TypeChecker::completePropertyBehaviorParameter(VarDecl *VD,
@@ -1445,9 +1433,8 @@ void TypeChecker::completePropertyBehaviorParameter(VarDecl *VD,
   addMemberToContextIfNeeded(Parameter, DC);
 
   // Add the witnesses to the conformance.
-  auto MemberSubs = getForwardingSubstitutions(DC);
-  BehaviorConformance->setWitness(BehaviorParameter,
-                               ConcreteDeclRef(Context, Parameter, MemberSubs));
+  // FIXME: Should compute substitutions.
+  BehaviorConformance->setWitness(BehaviorParameter, Parameter);
 }
 
 void TypeChecker::completePropertyBehaviorAccessors(VarDecl *VD,
