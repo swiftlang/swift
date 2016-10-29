@@ -214,7 +214,7 @@ bb0:
   %12 = integer_literal $Builtin.Int32, 12
   %14 = builtin "cmp_ne_Int32"(%11 : $Builtin.Int32, %12 : $Builtin.Int32) : $Builtin.Int1
   %16 = builtin "cmp_sgt_Int32"(%12 : $Builtin.Int32, %11 : $Builtin.Int32) : $Builtin.Int1
-  %18 = builtin "cmp_ult_Int32"(%12 : $Builtin.Int32, %11 : $Builtin.Int32) : $Builtin.Int1
+  %17 = builtin "cmp_ult_Int32"(%12 : $Builtin.Int32, %11 : $Builtin.Int32) : $Builtin.Int1
   %5 = tuple ()
   return %5 : $()
 // CHECK-LABEL: sil @testFoldingIntBinaryPredicates
@@ -223,6 +223,31 @@ bb0:
 // CHECK-NEXT: integer_literal $Builtin.Int1, -1
 // CHECK-NEXT: integer_literal $Builtin.Int1, 0
 // CHECK-NEXT: integer_literal $Builtin.Int1, -1
+// CHECK-NEXT: tuple
+// CHECK-NEXT: return
+}
+
+sil @testFoldingUnsignedIntComparisons : $@convention(thin) (Builtin.Int32) -> () {
+bb0(%0 : $Builtin.Int32):
+  %2 = integer_literal $Builtin.Int1, 0
+  %3 = integer_literal $Builtin.Int32, 0
+  // unsigned value is never less then 0
+  %18 = builtin "cmp_ult_Int32"(%0 : $Builtin.Int32, %3 : $Builtin.Int32) : $Builtin.Int1
+  // unsigned value is always >= 0
+  %19 = builtin "cmp_uge_Int32"(%0 : $Builtin.Int32, %3 : $Builtin.Int32) : $Builtin.Int1
+  // 0 is always <= an unsigned value
+  %20 = builtin "cmp_ule_Int32"(%3 : $Builtin.Int32, %0 : $Builtin.Int32) : $Builtin.Int1
+  // 0 is never greater than an unsigned value
+  %21 = builtin "cmp_ugt_Int32"(%3 : $Builtin.Int32, %0 : $Builtin.Int32) : $Builtin.Int1
+  %5 = tuple ()
+  return %5 : $()
+// CHECK-LABEL: sil @testFoldingUnsignedIntComparisons
+// CHECK: bb0
+// CHECK-NEXT: integer_literal $Builtin.Int1, 0
+// CHECK-NEXT: integer_literal $Builtin.Int1, 0
+// CHECK-NEXT: integer_literal $Builtin.Int1, -1
+// CHECK-NEXT: integer_literal $Builtin.Int1, -1
+// CHECK-NEXT: integer_literal $Builtin.Int1, 0
 // CHECK-NEXT: tuple
 // CHECK-NEXT: return
 }
