@@ -75,12 +75,12 @@ class TestFileManager : TestFileManagerSuper {
     
     func testDirectoryEnumerator_error() {
         let fm = FileManager.default
-        let nonexistantURL = URL(fileURLWithPath: "\(NSTemporaryDirectory())/nonexistant")
+        let nonexistentURL = URL(fileURLWithPath: "\(NSTemporaryDirectory())/nonexistent")
         
         var invoked = false
-        let e = fm.enumerator(at: nonexistantURL, includingPropertiesForKeys: []) { (url, err) in
+        let e = fm.enumerator(at: nonexistentURL, includingPropertiesForKeys: []) { (url, err) in
             invoked = true
-            expectEqual(nonexistantURL, url)
+            expectEqual(nonexistentURL, url)
             expectEqual((err as NSError).code, NSFileReadNoSuchFileError)
             return true
         }
@@ -93,9 +93,9 @@ class TestFileManager : TestFileManagerSuper {
 
     func testDirectoryEnumerator_error_noHandler() {
         let fm = FileManager.default
-        let nonexistantURL = URL(fileURLWithPath: "\(NSTemporaryDirectory())/nonexistant")
+        let nonexistentURL = URL(fileURLWithPath: "\(NSTemporaryDirectory())/nonexistent")
         
-        let e = fm.enumerator(at: nonexistantURL, includingPropertiesForKeys: [])
+        let e = fm.enumerator(at: nonexistentURL, includingPropertiesForKeys: [])
         let url = e?.nextObject()
         expectTrue(url == nil)
         

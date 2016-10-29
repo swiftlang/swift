@@ -2178,7 +2178,7 @@ load_borrow
 
 Loads the value ``%1`` from the memory location ``%0``. The ``load_borrow``
 instruction creates a borrowed scope in which a read-only borrow value ``%1``
-can be used to read the value stored in ``%0``. The end of scope is deliminated
+can be used to read the value stored in ``%0``. The end of scope is delimited
 by an ``end_borrow`` instruction. All ``load_borrow`` instructions must be
 paired with exactly one ``end_borrow`` instruction along any path through the
 program. Until ``end_borrow``, it is illegal to invalidate or store to ``%0``.
