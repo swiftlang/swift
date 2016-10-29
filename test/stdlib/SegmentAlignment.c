@@ -6,7 +6,7 @@
 // REQUIRES: CPU=armv7
 
 // Verify 16K segment alignment on 32-bit iOS device.
-// The linker sets this automatically on iOS 8+, 
+// The linker sets this automatically on iOS 8+,
 // but we deploy to iOS 7.
 
 #include <stdio.h>
@@ -31,9 +31,9 @@ void Test(void)
 
         unsigned long size;
         const struct mach_header *mhdr = _dyld_get_image_header(i);
-        uint8_t *textAddress = 
+        uint8_t *textAddress =
             getsegmentdata((HeaderType *)mhdr, "__TEXT", &size);
-        uint8_t *dataAddress = 
+        uint8_t *dataAddress =
             getsegmentdata((HeaderType *)mhdr, "__DATA", &size);
 
         printf("%s %p %p\n", name, textAddress, dataAddress);

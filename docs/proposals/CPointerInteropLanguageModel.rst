@@ -16,7 +16,7 @@ confusing jumble.
 
 The best solution to this is to burn the user model into the language, giving
 function applications special powers to provide the user model for pointers. We
-then provide only one set of plain pointer types, with 
+then provide only one set of plain pointer types, with
 special intrinsic behavior when used as function arguments.
 
 The Pointer Types
@@ -176,7 +176,7 @@ You can call it as any of::
 
 A type checker limitation prevents array literals from being passed directly
 to ``UnsafeRawPointer`` arguments without type annotation. As a
-workaround, you can bind the array literal to a constant, as above, or 
+workaround, you can bind the array literal to a constant, as above, or
 specify the array type with ``as``::
 
   zang([1.0, 2.0, 3.0] as [Double])

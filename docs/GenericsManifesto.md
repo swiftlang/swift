@@ -202,7 +202,7 @@ protocol Sequence {
 }
 ```
 
-### Default generic arguments 
+### Default generic arguments
 
 Generic parameters could be given the ability to provide default arguments, which would be used in cases where the type argument is not specified and type inference could not determine the type argument. For example:
 
@@ -250,7 +250,7 @@ extension P {
 }
 
 class C : P {
-  // gets the protocol extension's 
+  // gets the protocol extension's
 }
 
 class D : C {
@@ -325,7 +325,7 @@ Variadic generics would allow us to abstract over a set of generic parameters. T
 public struct ZipIterator<... Iterators : IteratorProtocol> : Iterator {  // zero or more type parameters, each of which conforms to IteratorProtocol
   public typealias Element = (Iterators.Element...)                       // a tuple containing the element types of each iterator in Iterators
 
-  var (...iterators): (Iterators...)    // zero or more stored properties, one for each type in Iterators 
+  var (...iterators): (Iterators...)    // zero or more stored properties, one for each type in Iterators
   var reachedEnd = false
 
   public mutating func next() -> Element? {
@@ -343,7 +343,7 @@ public struct ZipIterator<... Iterators : IteratorProtocol> : Iterator {  // zer
 public struct ZipSequence<...Sequences : Sequence> : Sequence {
   public typealias Iterator = ZipIterator<Sequences.Iterator...>   // get the zip iterator with the iterator types of our Sequences
 
-  var (...sequences): (Sequences...)    // zero or more stored properties, one for each type in Sequences 
+  var (...sequences): (Sequences...)    // zero or more stored properties, one for each type in Sequences
 
   // details ...
 }
@@ -352,7 +352,7 @@ public struct ZipSequence<...Sequences : Sequence> : Sequence {
 Such a design could also work for function parameters, so we can pack together multiple function arguments with different types, e.g.,
 
 ```Swift
-public func zip<... Sequences : SequenceType>(... sequences: Sequences...) 
+public func zip<... Sequences : SequenceType>(... sequences: Sequences...)
             -> ZipSequence<Sequences...> {
   return ZipSequence(sequences...)
 }
@@ -453,7 +453,7 @@ func containsAll<S: Sequence where Sequence.Iterator.Element == Element>(element
 One could move the `where` clause to the end of the signature, so that the most important parts—name, generic parameter, parameters, result type—precede it:
 
 ```Swift
-func containsAll<S: Sequence>(elements: S) -> Bool 
+func containsAll<S: Sequence>(elements: S) -> Bool
        where Sequence.Iterator.Element == Element
 ```
 
@@ -616,7 +616,7 @@ The actual requested feature here is the ability to say "Any type that conforms 
 
 More importantly, modeling `Sequence` with generic parameters rather than associated types is tantalizing but wrong: you don't want a type conforming to `Sequence` in multiple ways, or (among other things) your `for..in` loops stop working, and you lose the ability to dynamically cast down to an existential `Sequence` without binding the `Element` type (again, see "Generalized existentials"). Use cases similar to the `ConstructibleFromValue` protocol above seem too few to justify the potential for confusion between associated types and generic parameters of protocols; we're better off not having the latter.
 
-### Private conformances 
+### Private conformances
 
 Right now, a protocol conformance can be no less visible than the minimum of the conforming type's access and the protocol's access. Therefore, a public type conforming to a public protocol must provide the conformance publicly. One could imagine removing that restriction, so that one could introduce a private conformance:
 

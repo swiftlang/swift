@@ -119,7 +119,7 @@ To address the problems with the current declaration type checker, we propose a 
   }
 
   struct X<T> : P {
-    
+
   }
 
   func foo(_ x: X<Int>.Assoc) { }

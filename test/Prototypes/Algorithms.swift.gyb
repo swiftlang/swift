@@ -64,7 +64,7 @@ extension MutableCollectionAlgorithms {
   ) -> (Index, Index) {
     _sanityCheck(!lhs.isEmpty)
     _sanityCheck(!rhs.isEmpty)
-    
+
     var p = lhs.lowerBound
     var q = rhs.lowerBound
     repeat {
@@ -75,7 +75,7 @@ extension MutableCollectionAlgorithms {
     while p != lhs.upperBound && q != rhs.upperBound
     return (p, q)
   }
-  
+
   @inline(__always)
   internal mutating func _swapSubrangePrefixes(
     _ lhs: Range<Index>, with rhs: Range<Index>
@@ -84,7 +84,7 @@ extension MutableCollectionAlgorithms {
       ? (lhs.lowerBound, rhs.lowerBound)
       : _swapNonemptySubrangePrefixes(lhs, rhs)
   }
-  
+
   /// Rotates the elements of the collection so that the element
   /// at `middle` ends up first.
   ///
@@ -142,7 +142,7 @@ extension MutableCollectionAlgorithms {
       //   s    s1       m    m1/e       s   s1/m   m1      e
       //
       let (s1, m1) = _swapNonemptySubrangePrefixes(s..<m, m..<e)
-      
+
       if m1 == e {
         // Left-hand case: we have moved element j into position.  if
         // we haven't already, we can capture the return value which
@@ -152,11 +152,11 @@ extension MutableCollectionAlgorithms {
         // comparison once the return value is known.  I'm not sure
         // it's a worthwhile optimization, though.
         if ret == e { ret = s1 }
-        
+
         // If both regions were the same size, we're done.
         if s1 == m { break }
       }
-      
+
       // Now we have a smaller problem that is also a rotation, so we
       // can adjust our bounds and repeat.
       //
@@ -166,7 +166,7 @@ extension MutableCollectionAlgorithms {
       s = s1
       if s == m { m = m1 }
     }
-    
+
     return ret
   }
 }
@@ -176,7 +176,7 @@ extension MutableCollection where Self: BidirectionalCollection {
   // This could be internal, but until we have pinned accessors for
   // slices, every mutating algorithm needs a version that takes
   // indices in order to get performance.
-  
+
   /// Reverses the elements in the given subrange in place.
   ///
   ///     var characters: [Character] = ["^", "C", "a", "f", "é", "$""]
@@ -198,7 +198,7 @@ extension MutableCollection where Self: BidirectionalCollection {
       formIndex(before: &l)
     }
   }
-  
+
   @inline(__always)
   @discardableResult
   internal mutating func _reverseUntil(_ limit: Index) -> (Index, Index) {
@@ -211,7 +211,7 @@ extension MutableCollection where Self: BidirectionalCollection {
     }
     return (f, l)
   }
-  
+
   /// Rotates the elements of the collection so that the element
   /// at `middle` ends up first.
   ///
@@ -267,7 +267,7 @@ extension MutableCollection where Self: RandomAccessCollection,
     }
     self[i] = tmp
   }
-  
+
   /// Rotates the elements of the collection so that the element
   /// at `middle` ends up first.
   ///
@@ -280,19 +280,19 @@ extension MutableCollection where Self: RandomAccessCollection,
   {
     if middle == startIndex { return endIndex }
     if middle == endIndex { return startIndex }
-    
+
     // The distance to move an element that is moving ->
     let plus = distance(from: startIndex, to: middle)
     // The distance to move an element that is moving <-
     let minus = distance(from: endIndex, to: middle)
     // The new pivot point, aka the destination for the first element
     let pivot = index(startIndex, offsetBy: -minus)
-    
+
     // If the difference moving forward and backward are relative primes,
     // the entire rotation will be completed in one cycle. Otherwise, repeat
     // cycle, moving the start point forward with each cycle.
     let cycles = _gcd(numericCast(plus), -numericCast(minus))
-    
+
     for cycle in 1...cycles {
       _rotateCycle(start: index(startIndex, offsetBy: numericCast(cycle))) {
         index($0, offsetBy: $0 < pivot ? plus : minus)
@@ -374,7 +374,7 @@ public func == <C1: Collection, C2: Collection>(
 %   Self = "Concatenated" + Collection
 
 /// A concatenation of two collections with the same element type.
-public struct ${Self}<C1 : ${Collection}, C2: ${Collection}>: ${Collection} 
+public struct ${Self}<C1 : ${Collection}, C2: ${Collection}>: ${Collection}
   where C1.Iterator.Element == C2.Iterator.Element {
 
   init(_base1: C1, base2: C2) {
@@ -601,8 +601,8 @@ extension ${Collection} where SubSequence: ${Collection} {
 //===----------------------------------------------------------------------===//
 
 extension BidirectionalCollection
-  where Self : MutableCollectionAlgorithms, 
-  SubSequence : BidirectionalCollection, 
+  where Self : MutableCollectionAlgorithms,
+  SubSequence : BidirectionalCollection,
   SubSequence.Index == Self.Index {
 
   @discardableResult
@@ -614,7 +614,7 @@ extension BidirectionalCollection
       choosingStartGroupBy: p
     )
   }
-  
+
   mutating func stablyPartitionSubrange(
     _ bounds: Range<Index>,
     choosingStartGroupBy p: (Iterator.Element) -> Bool
@@ -625,7 +625,7 @@ extension BidirectionalCollection
       choosingStartGroupBy: p
     )
   }
-  
+
   mutating func _stablyPartitionSubrange(
     _ bounds: Range<Index>,
     distance n: IndexDistance,
@@ -643,20 +643,20 @@ extension BidirectionalCollection
     // divide and conquer.
     let d = n / numericCast(2)
     let m = index(start, offsetBy: d)
-    
+
     // TTTTTTTTT s FFFFFFF m ?????????????
     let s = _stablyPartitionSubrange(
       start..<m, distance: d, choosingStartGroupBy: p)
-    
+
     // TTTTTTTTT s FFFFFFF m TTTTTTT e FFFFFFFF
     let e = _stablyPartitionSubrange(
       m..<end, distance: n - d, choosingStartGroupBy: p)
-    
+
     // TTTTTTTTT s TTTTTTT m  FFFFFFF e FFFFFFFF
     return self.rotateSubrange(s..<e, shiftingToStart: m)
   }
 }
-  
+
 extension Collection {
   func stablyPartitioned(
     choosingStartGroupBy p: (Iterator.Element) -> Bool
@@ -667,7 +667,7 @@ extension Collection {
   }
 }
 
-extension LazyCollectionProtocol 
+extension LazyCollectionProtocol
   where Iterator.Element == Elements.Iterator.Element {
   func stablyPartitioned(
     choosingStartGroupBy p: (Iterator.Element) -> Bool
@@ -688,7 +688,7 @@ extension Collection {
         ) rethrows -> Index {
         var n = distance(from: startIndex, to: endIndex)
         var r = startIndex..<endIndex
-        
+
         while n > 0 {
             let half = n / 2
             let mid = index(r.lowerBound, offsetBy: half)
@@ -713,7 +713,7 @@ var suite = TestSuite("Algorithms")
 suite.test("reverseSubrange") {
   for l in 0..<10 {
     let a = Array(0..<l)
-    
+
     for p in a.startIndex...a.endIndex {
       let prefix = a.prefix(upTo: p)
       for q in p...l {
@@ -731,7 +731,7 @@ suite.test("reverseSubrange") {
 suite.test("rotate") {
   for l in 0..<11 {
     let a = Array(0..<l)
-    
+
     for p in a.startIndex...a.endIndex {
       let prefix = a.prefix(upTo: p)
       for q in p...l {
@@ -760,7 +760,7 @@ suite.test("rotate") {
 suite.test("rotateRandomAccess") {
   for l in 0..<11 {
     let a = Array(0..<l)
-    
+
     for p in a.startIndex...a.endIndex {
       let prefix = a.prefix(upTo: p)
       for q in p...l {
@@ -809,18 +809,18 @@ suite.test("concatenate") {
 suite.test("stablePartition") {
   for l in 0..<13 {
     let a = Array(0..<l)
-    
+
     for p in a.startIndex...a.endIndex {
       let prefix = a.prefix(upTo: p)
       for q in p...l {
         let suffix = a.suffix(from: q)
 
         let subrange = a[p..<q]
-        
+
         for modulus in 1...5 {
           let f = { $0 % modulus == 0 }
           let notf = { !f($0) }
-          
+
           var b = a
           var r = b.stablyPartitionSubrange(p..<q, choosingStartGroupBy: f)
           expectEqual(b.prefix(upTo:p), prefix)
@@ -836,7 +836,7 @@ suite.test("stablePartition") {
           expectEqual(b[r..<q], ArraySlice(subrange.filter(f)))
         }
       }
-      
+
       for modulus in 1...5 {
         let f = { $0 % modulus == 0 }
         let notf = { !f($0) }

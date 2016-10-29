@@ -24,7 +24,7 @@ sil @user : $@convention(thin) (Builtin.NativeObject) -> ()
 //
 // Thus it is a simple loop without any interior basic blocks.
 //
-// We generate test retain release pairs at 
+// We generate test retain release pairs at
 % for i in range(16):
 
 // CHECK-LABEL: sil @loop_form_1_${i} : $@convention(thin) (Builtin.NativeObject) -> () {

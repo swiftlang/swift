@@ -80,7 +80,7 @@ RangeReplaceableTestSuite.test("removeAll/dispatch") {
 
 RangeReplaceableTestSuite.test("replaceSubrange/countableRange") {
   for test in replaceRangeTests {
-    var c = 
+    var c =
       MinimalRangeReplaceableRandomAccessCollectionWithStrideableIndex(elements: test.collection)
     let rangeToReplace = test.rangeSelection.countableRange(in: c)
     let newElements =
@@ -96,7 +96,7 @@ RangeReplaceableTestSuite.test("replaceSubrange/countableRange") {
 RangeReplaceableTestSuite.test("replaceSubrange/countableClosedRange") {
   for test in replaceRangeTests {
     guard let closedExpected = test.closedExpected else { continue }
-    var c = 
+    var c =
       MinimalRangeReplaceableRandomAccessCollectionWithStrideableIndex(elements: test.collection)
     let rangeToReplace = test.rangeSelection.countableClosedRange(in: c)
     let newElements =
@@ -117,7 +117,7 @@ RangeReplaceableTestSuite.test("removeSubrange/${rangeType}") {
 %   else:
   for test in removeRangeTests {
 %   end
-    var c = 
+    var c =
       MinimalRangeReplaceableRandomAccessCollectionWithStrideableIndex(elements: test.collection)
     let rangeToRemove = test.rangeSelection.${rangeType}(in: c)
     c.removeSubrange(rangeToRemove)

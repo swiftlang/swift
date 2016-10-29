@@ -433,7 +433,7 @@ Runtime.test("casting AnyObject to class metatypes") {
     var a: Any = SomeClass()
     expectTrue(a as? Any.Type == nil)
     expectTrue(a as? AnyClass == nil)
-    
+
     a = SomeClass.self
     expectTrue(a as? Any.Type == SomeClass.self)
     expectTrue(a as? AnyClass == SomeClass.self)
@@ -1407,8 +1407,8 @@ Reflection.test("Double") {
   }
 }
 
-// A struct type and class type whose NominalTypeDescriptor.FieldNames 
-// data is exactly eight bytes long. FieldNames data of exactly 
+// A struct type and class type whose NominalTypeDescriptor.FieldNames
+// data is exactly eight bytes long. FieldNames data of exactly
 // 4 or 8 or 16 bytes was once miscompiled on arm64.
 struct EightByteFieldNamesStruct {
   let abcdef = 42

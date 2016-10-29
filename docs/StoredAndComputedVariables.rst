@@ -11,7 +11,7 @@ Stored and Computed Variables
 Variables are declared using the ``var`` keyword. These declarations are valid
 at the top level, within types, and within code bodies, and are respectively
 known as *global variables,* *member variables,* and *local variables.*
-Member variables are commonly referred to as *properties.* 
+Member variables are commonly referred to as *properties.*
 
 Every variable declaration can be classified as either *stored* or *computed.*
 Member variables inherited from a superclass obey slightly different rules.
@@ -187,7 +187,7 @@ in the usual way::
       return .Black
     }
   }
-  
+
   class Colorful : Base {
     var color : Color
   }
@@ -199,7 +199,7 @@ The new stored variable may have observing accessors::
 
   class MemoryColorful : Base {
     var oldColors : Array<Color> = []
-  
+
     var color : Color {
       willSet {
         oldColors.append(color)
@@ -239,7 +239,7 @@ A subclass may override the superclass's variable with a new computed variable::
       }
     }
   }
-  
+
   class BrightlyColored : ColorBase {
     var color : Color {
       get {
@@ -265,7 +265,7 @@ member variable::
 
   class TrackingColored : ColorBase {
     var prevColor : Color?
-    
+
     var color : Color {
       willSet {
         prevColor = color

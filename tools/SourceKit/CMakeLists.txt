@@ -49,13 +49,13 @@ function(add_sourcekit_symbol_exports target_name export_file)
         break()
       endif()
     endforeach()
-  
+
     # Force re-linking when the exports file changes. Actually, it
     # forces recompilation of the source file. The LINK_DEPENDS target
     # property only works for makefile-based generators.
     set_property(SOURCE ${first_source_file} APPEND PROPERTY
       OBJECT_DEPENDS ${CMAKE_CURRENT_BINARY_DIR}/symbol.exports)
-  
+
     set_property(TARGET ${target_name} APPEND_STRING PROPERTY
                  LINK_FLAGS " -Wl,-exported_symbols_list,${CMAKE_CURRENT_BINARY_DIR}/symbol.exports")
 
@@ -221,7 +221,7 @@ endmacro()
 # Usage:
 #   add_sourcekit_executable(name     # Name of the executable
 #     [DEPENDS dep1 ...]              # Libraries this executable depends on
-#     [LLVM_COMPONENT_DEPENDS comp1 ...]   # LLVM components this executable 
+#     [LLVM_COMPONENT_DEPENDS comp1 ...]   # LLVM components this executable
 #                                     # depends on
 #     [EXCLUDE_FROM_ALL]              # Whether to exclude this executable from
 #                                     # the ALL_BUILD target
@@ -406,7 +406,7 @@ macro(add_sourcekit_xpc_service name framework_target)
     set(xpc_bin_dir "${xpc_contents_dir}")
   endif()
 
-  set(XPCSERVICE_NAME ${name})  
+  set(XPCSERVICE_NAME ${name})
   set(XPCSERVICE_IDENTIFIER "com.apple.${name}.${SOURCEKIT_VERSION_STRING}")
   set(XPCSERVICE_BUNDLE_VERSION "${SOURCEKIT_VERSION_STRING}")
   set(XPCSERVICE_SHORT_VERSION_STRING "1.0")
@@ -435,7 +435,7 @@ macro(add_sourcekit_xpc_service name framework_target)
   target_link_libraries(${name} ${SOURCEKITXPC_DEPENDS})
   swift_common_llvm_config(${name} ${SOURCEKITXPC_LLVM_COMPONENT_DEPENDS})
   target_link_libraries(${name} ${LLVM_COMMON_LIBS})
-  
+
   add_dependencies(${framework_target} ${name})
 
   if (SOURCEKIT_DEPLOYMENT_OS MATCHES "^macosx")
@@ -457,7 +457,7 @@ endmacro()
 
 if("${CMAKE_SYSTEM_NAME}" STREQUAL "Darwin")
   # Choose a deployment target if none was set.
-  set(SOURCEKIT_DEPLOYMENT_TARGET "" CACHE STRING 
+  set(SOURCEKIT_DEPLOYMENT_TARGET "" CACHE STRING
       "Deployment target for SourceKit.")
   if (NOT SOURCEKIT_DEPLOYMENT_TARGET)
     execute_process(COMMAND sw_vers -productVersion
@@ -489,7 +489,7 @@ if("${CMAKE_SYSTEM_NAME}" STREQUAL "Darwin")
   # Add deployment target to C/C++ compiler and linker flags.
   # FIXME: CMAKE_OSX_DEPLOYMENT_TARGET falls over when used for iOS versions.
   if (XCODE)
-    if (${SOURCEKIT_DEPLOYMENT_OS} MATCHES "^macosx") 
+    if (${SOURCEKIT_DEPLOYMENT_OS} MATCHES "^macosx")
       set(CMAKE_XCODE_ATTRIBUTE_MACOSX_DEPLOYMENT_TARGET ${SOURCEKIT_DEPLOYMENT_TARGET})
     else()
       set(CMAKE_XCODE_ATTRIBUTE_IPHONEOS_DEPLOYMENT_TARGET ${SOURCEKIT_DEPLOYMENT_TARGET})

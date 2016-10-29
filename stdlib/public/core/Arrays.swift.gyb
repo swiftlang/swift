@@ -672,10 +672,10 @@ public struct ${Self}<Element>
   public subscript(index: Int) -> Element {
     get {
       // This call may be hoisted or eliminated by the optimizer.  If
-      // there is an inout violation, this value may be stale so needs to be 
+      // there is an inout violation, this value may be stale so needs to be
       // checked again below.
       let wasNativeTypeChecked = _hoistableIsNativeTypeChecked()
-      
+
       // Make sure the index is in range and wasNativeTypeChecked is
       // still valid.
       let token = _checkSubscript(
@@ -687,7 +687,7 @@ public struct ${Self}<Element>
     }
     mutableAddressWithPinnedNativeOwner {
       _makeMutableAndUniqueOrPinned() // makes the array native, too
-      _checkSubscript_native(index)   
+      _checkSubscript_native(index)
       return (_getElementAddress(index), Builtin.tryPin(_getOwner_native()))
     }
   }
@@ -770,7 +770,7 @@ public struct ${Self}<Element>
       // We are hiding the access to '_buffer.owner' behind
       // _getOwner() to help the compiler hoist uniqueness checks in
       // the case of class or Objective-C existential typed array
-      // elements. 
+      // elements.
       return _getOwnerWithSemanticLabel_native()
     }
 #endif
@@ -1018,12 +1018,12 @@ extension ${Self} : RangeReplaceableCollection, _ArrayProtocol {
   ///     func cacheImagesWithNames(names: [String]) {
   ///         // custom image loading and caching
   ///      }
-  /// 
+  ///
   ///     let namedHues: [String: Int] = ["Vermillion": 18, "Magenta": 302,
   ///             "Gold": 50, "Cerise": 320]
   ///     let colorNames = Array(namedHues.keys)
   ///     cacheImagesWithNames(colorNames)
-  /// 
+  ///
   ///     print(colorNames)
   ///     // Prints "["Gold", "Cerise", "Magenta", "Vermillion"]"
   ///
@@ -1110,11 +1110,11 @@ extension ${Self} : RangeReplaceableCollection, _ArrayProtocol {
   internal static func _adoptStorage(
     _ storage: _ContiguousArrayStorage<Element>, count: Int
   ) -> (Array, UnsafeMutablePointer<Element>) {
-    
+
     let innerBuffer = _ContiguousArrayBuffer<Element>(
       count: count,
       storage: storage)
-    
+
     return (
       Array(
         _buffer: _Buffer(_buffer: innerBuffer, shiftedToStartIndex: 0)),
@@ -1684,7 +1684,7 @@ extension _ArrayBufferProtocol {
       bounds.lowerBound - startIndex, insertCount,
       _InitializeMemoryFromCollection(newValues)
     )
-  }  
+  }
 }
 
 /// A _debugPrecondition check that `i` has exactly reached the end of
