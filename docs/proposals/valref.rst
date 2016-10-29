@@ -473,7 +473,7 @@ __ https://doc.rust-lang.org/book/box-syntax-and-patterns.html
 ==============================================
 
 It is *possible* to build a struct with reference semantics. For
-example, 
+example,
 
 ..parsed-literal::
 
@@ -556,7 +556,7 @@ example:
 * ``var`` is only one character different from ``val``.  Is that too
   confusable?  Syntax highlighting can help, but it might not be enough.
 
-  * What about ``let`` as a replacement for ``var``?  
+  * What about ``let`` as a replacement for ``var``?
     There's always the dreaded ``auto``.
 
   * Should we drop ``let``\ /``var``\ /``auto`` for ivars, because it

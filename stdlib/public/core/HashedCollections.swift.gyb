@@ -263,7 +263,7 @@ internal func _stdlib_NSObject_isEqual(_ lhs: AnyObject, _ rhs: AnyObject) -> Bo
 //===--- Hacks and workarounds --------------------------------------------===//
 
 // FIXME(ABI)#158 (Performance)
-// There used to be a now-fixed optimizer bug that prevented using 
+// There used to be a now-fixed optimizer bug that prevented using
 // UnsafePointer<Unmanaged<AnyObject>> in Dictionary implementation.
 // rdar://problem/16861508
 /// Like `UnsafeMutablePointer<Unmanaged<AnyObject>>`, or `id
@@ -613,7 +613,7 @@ public struct Set<Element : Hashable> :
   public mutating func update(with newMember: Element) -> Element? {
     return _variantStorage.updateValue(newMember, forKey: newMember)
   }
-  
+
   /// Removes the specified element from the set.
   ///
   /// This example removes the element `"sugar"` from a set of ingredients.
@@ -732,7 +732,7 @@ public struct Set<Element : Hashable> :
   ///     var emptySet = Set<Int>()
   ///     print(emptySet.isEmpty)
   ///     // Prints "true"
-  /// 
+  ///
   ///     emptySet = []
   ///     print(emptySet.isEmpty)
   ///     // Prints "true"
@@ -1098,7 +1098,7 @@ public struct Set<Element : Hashable> :
   }
 
   /// The hash value for the set.
-  /// 
+  ///
   /// Two sets that are equal will always have equal hash values.
   ///
   /// Hash values are not guaranteed to be equal across different executions of
@@ -2366,7 +2366,7 @@ public func _dictionaryDownCastConditional<
 >(
   _ source: Dictionary<BaseKey, BaseValue>
 ) -> Dictionary<DerivedKey, DerivedValue>? {
-  
+
   var result = Dictionary<DerivedKey, DerivedValue>()
   for (k, v) in source {
     guard let k1 = k as? DerivedKey, let v1 = v as? DerivedValue
@@ -2587,11 +2587,11 @@ final internal class _Native${Self}StorageImpl<${TypeParameters}> {
         numWordsForBitmap._builtinWordValue, UInt.self,
         capacity._builtinWordValue, Key.self)
 %end
-    
+
     // We can initialize by assignment because _HashedContainerStorageHeader
     // is a trivial type, i.e. contains no references.
     storage._body = _HashedContainerStorageHeader(capacity: capacity)
- 
+
     let initializedEntries = _UnsafeBitMap(
         storage: storage._initializedHashtableEntriesBitMapStorage,
         bitCount: capacity)
@@ -3656,7 +3656,7 @@ internal struct _Cocoa${Self}Storage : _HashStorage {
 
   @inline(__always)
   internal func maybeGet(_ key: Key) -> Value? {
-      
+
 %if Self == 'Set':
   return cocoaSet.member(key)
 %elif Self == 'Dictionary':
@@ -4040,7 +4040,7 @@ internal enum _Variant${Self}Storage<${TypeParametersDecl}> : _HashStorage {
     _ value: Value, forKey key: Key
   ) -> Value? {
     var (i, found) = asNative._find(key, startBucket: asNative._bucket(key))
-    
+
     let minCapacity = found
       ? asNative.capacity
       : NativeStorage.minimumCapacity(

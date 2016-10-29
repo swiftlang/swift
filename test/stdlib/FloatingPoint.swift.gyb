@@ -386,10 +386,10 @@ FloatingPoint.test("${Self}.addingProduct") {
 }
 
 FloatingPoint.test("${Self}/LosslessStringConvertible") {
-  let instances = [ 
+  let instances = [
     1.0, -1.0,
     0.0, -0.0,
-    ${Self}.infinity, -${Self}.infinity 
+    ${Self}.infinity, -${Self}.infinity
   ]
 
   checkLosslessStringConvertible(instances)
@@ -514,7 +514,7 @@ func checkFloatingPointComparison_${FloatSelf}(
   //===--- TRACE boilerplate ----------------------------------------------===//
   // @autoclosure _ message: () -> String = "",
   showFrame: Bool = true,
-  stackTrace: SourceLocStack = SourceLocStack(),  
+  stackTrace: SourceLocStack = SourceLocStack(),
   file: String = #file, line: UInt = #line
 ) {
   let newTrace = stackTrace.pushIf(showFrame, file: file, line: line)

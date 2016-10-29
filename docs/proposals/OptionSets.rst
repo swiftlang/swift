@@ -60,21 +60,21 @@ There are a few reasons this doesn't fly in C:
         NSAlignMaxYInward   = 1ULL << 3,
         NSAlignWidthInward  = 1ULL << 4,
         NSAlignHeightInward = 1ULL << 5,
-        
+
         NSAlignMinXOutward   = 1ULL << 8,
         NSAlignMinYOutward   = 1ULL << 9,
         NSAlignMaxXOutward   = 1ULL << 10,
         NSAlignMaxYOutward   = 1ULL << 11,
         NSAlignWidthOutward  = 1ULL << 12,
         NSAlignHeightOutward = 1ULL << 13,
-        
+
         NSAlignMinXNearest   = 1ULL << 16,
         NSAlignMinYNearest   = 1ULL << 17,
         NSAlignMaxXNearest   = 1ULL << 18,
         NSAlignMaxYNearest   = 1ULL << 19,
         NSAlignWidthNearest  = 1ULL << 20,
         NSAlignHeightNearest = 1ULL << 21,
-        
+
         NSAlignRectFlipped = 1ULL << 63, // pass this if the rect is in a flipped coordinate system. This allows 0.5 to be treated in a visually consistent way.
 
         // convenience combinations
@@ -264,7 +264,7 @@ bitwise operations can be applied to them.
   // Swift, under this proposal
   struct MyOptions : OptionSet {
     var Foo, Bar, Bas : Bool = false
-    
+
     static func Foobar() -> MyOptions {
       return MyOptions(Foo: true, Bar: true)
     }
@@ -273,7 +273,7 @@ bitwise operations can be applied to them.
   var x: MyOptions = .Foobar() | MyOptions(Bas: true)
 
 This nonuniformity could potentially be addressed by introducing additional
-implicit decls, such as adding implicit static properties corresponding to each 
+implicit decls, such as adding implicit static properties corresponding to each
 individual option::
 
   // Swift

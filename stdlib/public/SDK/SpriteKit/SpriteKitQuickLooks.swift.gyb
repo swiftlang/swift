@@ -17,7 +17,7 @@
 extension ${Self} : CustomPlaygroundQuickLookable {
   public var customPlaygroundQuickLook: PlaygroundQuickLook {
     // this code comes straight from the quicklooks
-      
+
     let data = (self as AnyObject)._copyImageData?()
     // we could send a Raw, but I don't want to make a copy of the
     // bytes for no good reason make an NSImage out of them and

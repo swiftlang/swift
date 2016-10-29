@@ -492,7 +492,7 @@ public protocol RangeReplaceableCollection
   /// Removes and returns the first element of the collection.
   ///
   /// The collection must not be empty.
-  /// 
+  ///
   ///     var bugs = ["Aphid", "Bumblebee", "Cicada", "Damselfly", "Earwig"]
   ///     bugs.removeFirst()
   ///     print(bugs)
@@ -1182,7 +1182,7 @@ extension RangeReplaceableCollection {
   ) where C : Collection, C.Iterator.Element == Iterator.Element {
     Builtin.unreachable()
   }
-  
+
   @available(*, unavailable, renamed: "remove(at:)")
   public mutating func removeAtIndex(_ i: Index) -> Iterator.Element {
     Builtin.unreachable()

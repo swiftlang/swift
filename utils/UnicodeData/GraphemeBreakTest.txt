@@ -9,9 +9,9 @@
 # Default Grapheme Break Test
 #
 # Format:
-# <string> (# <comment>)? 
-#  <string> contains hex Unicode code points, with 
-#	÷ wherever there is a break opportunity, and 
+# <string> (# <comment>)?
+#  <string> contains hex Unicode code points, with
+#	÷ wherever there is a break opportunity, and
 #	× wherever there is not.
 #  <comment> the format can change, but currently it shows:
 #	- the sample character name

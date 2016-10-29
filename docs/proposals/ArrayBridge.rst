@@ -14,10 +14,10 @@
 
 =====================================
  Bridging Swift Arrays to/from Cocoa
-=====================================   
+=====================================
 
 :Authors: Chris Lattner, Joe Groff, Dave Abrahams
-          
+
 :Summary: Unifying a fast C-style array with a Cocoa class cluster
           that can represent arbitrarily complex data structures is
           challenging.  In a space where no approach satisfies all

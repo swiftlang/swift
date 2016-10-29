@@ -230,7 +230,7 @@ def import_cf_types : Flag<["-"], "import-cf-types">,
 
 def solver_memory_threshold : Separate<["-"], "solver-memory-threshold">,
   Flags<[FrontendOption, HelpHidden, DoesNotAffectIncrementalBuild]>,
-  HelpText<"Set the upper bound for memory consumption, in bytes, by the constraint solver">;   
+  HelpText<"Set the upper bound for memory consumption, in bytes, by the constraint solver">;
 
 def disable_swift_bridge_attr : Flag<["-"], "disable-swift-bridge-attr">,
   Flags<[FrontendOption, HelpHidden]>,

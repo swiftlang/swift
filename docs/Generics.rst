@@ -20,7 +20,7 @@ might be expressed as::
       T value;
       Node *next;
     };
-  
+
     Node *first;
   };
 
@@ -35,7 +35,7 @@ such as a simple, linear search algorithm::
     for (typename List<T>::Node *result = list.first; result; result = result->next)
       if (result->value == value)
         return result;
-    
+
     return 0;
   }
 
@@ -259,7 +259,7 @@ As previously noted, protocols can contain both function requirements (which are
 in effect requirements for instance methods) and associated type
 requirements. Protocols can also contain operators, properties, and subscript
 operators::
-  
+
   protocol RandomAccessContainer : Collection {
     var count: Int
     func == (lhs: Self, rhs: Self)
@@ -284,16 +284,16 @@ example, given::
   }
 
 One could write a Circle struct such as::
-  
+
   struct Circle {
     var center : Point
     var radius : Int
-    
+
     func draw() {
       // draw it
     }
   }
-  
+
 Circle provides a draw() method with the same input and result types as required
 by the Shape protocol. Therefore, Circle conforms to Shape.
 
@@ -304,7 +304,7 @@ also know how to "draw!"::
 
   struct Cowboy {
     var gun : SixShooter
-  
+
     func draw() {
       // draw!
     }
@@ -382,7 +382,7 @@ meet if it wants to conform to the protocol. There is a natural tension here,
 then, between larger protocols that make it easier to write generic algorithms,
 and smaller protocols that make it easier to write conforming types. For
 example, should a Numeric protocol implement all operations, e.g.,::
-  
+
   protocol Numeric {
     func +(lhs : Self, rhs : Self) -> Self
     func -(lhs : Self, rhs : Self) -> Self
@@ -404,7 +404,7 @@ algorithms)? Both of the protocols express the same thing (semantically),
 because one can use the core operations (binary +, unary -) to implement the
 other algorithms. However, it's far easier to allow the protocol itself to
 provide default implementations::
-  
+
   protocol Numeric {
     func +(lhs : Self, rhs : Self) -> Self
     func -(lhs : Self, rhs : Self) -> Self { return lhs + -rhs }
@@ -452,7 +452,7 @@ to implement. We can now see how Self types interact with subtype
 polymorphism. For example, say we have two values of type Comparable, and we try
 to compare them::
 
-  var x : Comparable = ... 
+  var x : Comparable = ...
   var y : Comparable = ...
   if x.isEqual(y) { // well-typed?
   }
@@ -465,7 +465,7 @@ mode (aborting, throwing an exception, etc.) if the dynamic type check fails.
 
 To express types that meet the requirements of several protocols, one can just
 create a new protocol aggregating those protocols::
-  
+
   protocol SerializableDocument : Document, Serializable { }
   var doc : SerializableDocument
   print(doc.title()) // okay: title() is part of the Document protocol, so we can call it
@@ -508,13 +508,13 @@ polymorphism.
 
 Protocols provide a natural way to express the constraints of a generic function
 in Swift. For example, one could define a generic linked list as::
-  
+
   struct ListNode<T> {
     var Value : T
     enum NextNode { case Node : ListNode<T>, End }
     var Next : NextNode
   }
-  
+
   struct List<T > {
     var First : ListNode<T>::NextNode
   }
@@ -553,12 +553,12 @@ able to constrain associated types. To do so, we introduce the notion of a
 "where" clause, which follows the signature of the generic type or
 function. For example, let's generalize our find algorithm to work on any
 ordered collection::
-  
+
   protocol OrderedCollection : Collection {
     func size() -> Int
     func getAt(_ index : Int) -> Element // Element is an associated type
   }
-  
+
   func find<C : OrderedCollection where C.Element : Comparable>(
          _ collection : C, value : C.Element) -> Int
   {
@@ -676,7 +676,7 @@ language (generic functions can be "virtual").
 
 The translation model is fairly simple. Consider the generic find() we
 implemented for lists, above::
-  
+
   func find<T : Comparable>(_ list : List<T>, value : T) -> Int {
     var index = 0
     var current = list.First
@@ -766,7 +766,7 @@ Overloading
 
 Generic functions can be overloaded based entirely on constraints. For example,
 consider a binary search algorithm::
-  
+
    func binarySearch<
       C : EnumerableCollection where C.Element : Comparable
    >(_ collection : C, value : C.Element)
@@ -778,17 +778,17 @@ consider a binary search algorithm::
 
    protocol RandomAccessEnumerator : Enumerator {
      // splits a range in half, returning both halves
-     func split() -> (Enumerator, Enumerator) 
+     func split() -> (Enumerator, Enumerator)
    }
 
    func binarySearch<
-      C : EnumerableCollection 
-       where C.Element : Comparable, 
+      C : EnumerableCollection
+       where C.Element : Comparable,
                  C.EnumeratorType: RandomAccessEnumerator
    >(_ collection : C, value : C.Element)
      -> C.EnumeratorType
    {
-     // We can perform log(N) comparisons and log(N) range splits, 
+     // We can perform log(N) comparisons and log(N) range splits,
      // so this is logarithmic time
    }
 
@@ -806,7 +806,7 @@ minimal requirements::
     C : EnumerableCollection where C.Element : Ordered
   >(
     _ collection : C, value : C.Element
-  ) -> C.EnumeratorType 
+  ) -> C.EnumeratorType
   {
     binarySearch(collection, value)
   }
@@ -876,7 +876,7 @@ which can be interpreted as either::
       (integer_literal 10)))
 
 or::
-  
+
   (constructor Matrix<Double>
     (tuple
       (integer_literal 10)

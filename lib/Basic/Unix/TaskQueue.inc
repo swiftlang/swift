@@ -185,7 +185,7 @@ bool Task::execute() {
   if (Pid == 0)
     return true;
 #endif
-  
+
   return false;
 }
 

@@ -1,4 +1,4 @@
 framework module LinkFramework {
-  umbrella header "LinkFramework.h" 
+  umbrella header "LinkFramework.h"
   export *
 }
