@@ -185,7 +185,7 @@ bb9:
 // CHECK: bb10:
 bb10:
   %90 = tuple ()
-// CHECK: return 
+// CHECK: return
   return %90 : $()
 }
 

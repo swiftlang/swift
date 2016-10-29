@@ -202,7 +202,7 @@ bb2:                                              // Preds: bb0
 // CHECK: throw %{{.*}}
 
 // Generic with specialized dispatch. No more [specialize] attribute.
-// 
+//
 // CHECK-LABEL: sil @_TF16eager_specialize9divideNumuRxs13SignedIntegerrFzTx3denx_x : $@convention(thin) <T where T : SignedInteger> (@in T, @in T) -> (@out T, @error Error) {
 // CHECK: bb0(%0 : $*T, %1 : $*T, %2 : $*T):
 // CHECK:   %3 = metatype $@thick T.Type

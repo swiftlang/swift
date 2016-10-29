@@ -25,7 +25,7 @@ bb0:
  %zero1 = integer_literal $Builtin.Int1, 0
  %ctlz = builtin "int_ctlz_Int64"(%zero64 : $Builtin.Int64, %zero1 : $Builtin.Int1) : $Builtin.Int64
  return %ctlz : $Builtin.Int64
- 
+
 // CHECK-LABEL: sil @count_leading_zeros_corner_case
 // CHECK-NOT: integer_literal $Builtin.Int64, 0
 // CHECK-NOT: integer_literal $Builtin.Int1, 0
@@ -40,7 +40,7 @@ bb0:
  %zero1 = integer_literal $Builtin.Int1, 0
  %ctlz = builtin "int_ctlz_Int64"(%zero64 : $Builtin.Int64, %zero1 : $Builtin.Int1) : $Builtin.Int64
  return %ctlz : $Builtin.Int64
- 
+
 // CHECK-LABEL: sil @count_leading_zeros
 // CHECK-NOT: integer_literal $Builtin.Int64, 2
 // CHECK-NOT: integer_literal $Builtin.Int1, 0

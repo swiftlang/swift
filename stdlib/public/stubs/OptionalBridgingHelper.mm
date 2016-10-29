@@ -94,6 +94,6 @@ id _swift_Foundation_getOptionalNilSentinelObject(const Metadata *Wrapped) {
     ++depth;
     Wrapped = cast<EnumMetadata>(Wrapped)->getGenericArgs()[0];
   }
-  
+
   return objc_retain(getSentinelForDepth(depth));
 }

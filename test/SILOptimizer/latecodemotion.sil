@@ -1329,7 +1329,7 @@ bb3:
 // CHECK: br bb3
 // CHECK: bb3:
 // CHECK-NOT: strong_release
-// CHECK: return 
+// CHECK: return
 sil @hoist_release_across_local_memory_use : $@convention(thin) (Builtin.NativeObject) ->() {
 bb0(%0 : $Builtin.NativeObject):
   %1 = alloc_stack $A

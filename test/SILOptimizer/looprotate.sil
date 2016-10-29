@@ -113,7 +113,7 @@ bb3 (%23 : $Builtin.Int32) :
 
 // The following function used to crash the compiler, because loop rotate
 // could not properly handle the reference from witness_method to the
-// archetype opened by open_existential_addr 
+// archetype opened by open_existential_addr
 // CHECK-LABEL: sil @looprotate_with_opened_archetype
 // CHECK: return
 sil @looprotate_with_opened_archetype : $@convention(thin) (Int32, @in P) -> Int32 {
