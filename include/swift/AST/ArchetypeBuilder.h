@@ -49,7 +49,6 @@ class ProtocolConformance;
 class ProtocolDecl;
 class Requirement;
 class RequirementRepr;
-class SILModule;
 class SourceLoc;
 class Type;
 class TypeRepr;
@@ -336,18 +335,6 @@ public:
 
   /// Dump all of the requirements to the given output stream.
   void dump(llvm::raw_ostream &out);
-
-  // In SILFunction.cpp:
-  
-  /// \brief Resolve the given dependent type using our context archetypes.
-  ///
-  /// Given an arbitrary type, this will substitute dependent type parameters
-  /// structurally with their corresponding archetypes and resolve dependent
-  /// member types to the appropriate associated types. It will reabstract
-  /// dependent types according to the abstraction level of their associated
-  /// type requirements.
-  SILType substDependentType(SILModule &M,
-                             SILType type);
 };
 
 class ArchetypeBuilder::PotentialArchetype {
