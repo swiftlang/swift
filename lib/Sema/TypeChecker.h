@@ -1795,6 +1795,10 @@ public:
                           AssociatedTypeDecl *assocType) override;
   void resolveWitness(const NormalProtocolConformance *conformance,
                       ValueDecl *requirement) override;
+  ProtocolConformance *resolveInheritedConformance(
+                         const NormalProtocolConformance *conformance,
+                         ProtocolDecl *inherited) override;
+
   Type resolveMemberType(DeclContext *dc, Type type,
                          Identifier name) override;
 

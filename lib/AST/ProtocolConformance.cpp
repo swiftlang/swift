@@ -30,6 +30,28 @@
 
 using namespace swift;
 
+Witness::Witness(ValueDecl *decl, ArrayRef<Substitution> substitutions,
+                 GenericSignature *syntheticSig,
+                 GenericEnvironment *syntheticEnv,
+                 SubstitutionMap reqToSynthesizedEnvMap) {
+  auto &ctx = decl->getASTContext();
+
+  auto declRef = ConcreteDeclRef(ctx, decl, substitutions);
+  auto storedMem = ctx.Allocate(sizeof(StoredWitness), alignof(StoredWitness));
+  auto stored =
+    new (storedMem) StoredWitness{declRef, syntheticSig, syntheticEnv,
+                                  std::move(reqToSynthesizedEnvMap)};
+  ctx.addDestructorCleanup(*stored);
+
+  storage = stored;
+}
+
+void Witness::dump() const { dump(llvm::errs()); }
+
+void Witness::dump(llvm::raw_ostream &out) const {
+  // FIXME: Implement!
+}
+
 ProtocolConformanceRef::ProtocolConformanceRef(ProtocolDecl *protocol,
                                                ProtocolConformance *conf) {
   assert(protocol != nullptr &&
@@ -164,8 +186,8 @@ ProtocolConformance::getTypeWitnessByName(Type type,
   return conformance->getTypeWitness(assocType, resolver).getReplacement();
 }
 
-ConcreteDeclRef ProtocolConformance::getWitness(ValueDecl *requirement,
-                                               LazyResolver *resolver) const {
+Witness ProtocolConformance::getWitness(ValueDecl *requirement,
+                                        LazyResolver *resolver) const {
   CONFORMANCE_SUBCLASS_DISPATCH(getWitness, (requirement, resolver))
 }
 
@@ -289,9 +311,8 @@ void NormalProtocolConformance::setTypeWitness(
 }
 
   /// Retrieve the value witness corresponding to the given requirement.
-ConcreteDeclRef NormalProtocolConformance::getWitness(
-                  ValueDecl *requirement, 
-                  LazyResolver *resolver) const {
+Witness NormalProtocolConformance::getWitness(ValueDecl *requirement,
+                                              LazyResolver *resolver) const {
   assert(!isa<AssociatedTypeDecl>(requirement) && "Request type witness");
   if (Resolver)
     resolveLazyInfo();
@@ -307,12 +328,12 @@ ConcreteDeclRef NormalProtocolConformance::getWitness(
   } else {
     assert((!isComplete() || isInvalid()) &&
            "Resolver did not resolve requirement");
-    return ConcreteDeclRef();
+    return Witness();
   }
 }
 
 void NormalProtocolConformance::setWitness(ValueDecl *requirement,
-                                           ConcreteDeclRef witness) const {
+                                           Witness witness) const {
   assert(!isa<AssociatedTypeDecl>(requirement) && "Request type witness");
   assert(getProtocol() == cast<ProtocolDecl>(requirement->getDeclContext()) &&
          "requirement in wrong protocol");
@@ -406,7 +427,7 @@ SpecializedProtocolConformance::getTypeWitnessSubstAndDecl(
   return TypeWitnesses[assocType];
 }
 
-ConcreteDeclRef
+Witness
 SpecializedProtocolConformance::getWitness(ValueDecl *requirement,
                                            LazyResolver *resolver) const {
   // FIXME: Apply substitutions here!
@@ -537,7 +558,7 @@ ProtocolConformance::getInheritedConformance(ProtocolDecl *protocol) const {
     // For a normal conformance, do the inheritance lookup.
     break;
   }
-  
+
   // Search for the inherited conformance among our immediate parents.
   auto &inherited = getInheritedConformances();
   auto known = inherited.find(protocol);
@@ -550,7 +571,12 @@ ProtocolConformance::getInheritedConformance(ProtocolDecl *protocol) const {
     if (inheritedMapping.first->inheritsFrom(protocol))
       return inheritedMapping.second->getInheritedConformance(protocol);
 
-  llvm_unreachable("Can't find the inherited conformance.");
+  // The conformance must not be complete; resolve the inherited conformance
+  // and try again.
+  assert(!isComplete() && "Missing inherited mapping in conformance");
+  assert(C.getLazyResolver() && "Need a lazy resolver");
+  return C.getLazyResolver()->resolveInheritedConformance(
+    getRootNormalConformance(), protocol);
 }
 
 #pragma mark Protocol conformance lookup
