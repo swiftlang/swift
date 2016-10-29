@@ -945,6 +945,94 @@ static void profileArchetypeConstraints(
               Type ty,
               llvm::FoldingSetNodeID &ID,
               llvm::DenseMap<ArchetypeType*, unsigned> &seen) {
+  // Helper.
+  class ProfileType : public CanTypeVisitor<ProfileType> {
+    llvm::FoldingSetNodeID &ID;
+    llvm::DenseMap<ArchetypeType *, unsigned> &seen;
+
+  public:
+    ProfileType(llvm::FoldingSetNodeID &ID,
+                llvm::DenseMap<ArchetypeType *, unsigned> &seen)
+        : ID(ID), seen(seen) {}
+
+#define TYPE_WITHOUT_ARCHETYPE(KIND)                                           \
+  void visit##KIND##Type(Can##KIND##Type type) {                               \
+    llvm_unreachable("does not contain an archetype");                         \
+  }
+
+    TYPE_WITHOUT_ARCHETYPE(Builtin)
+
+    void visitNominalType(CanNominalType type) {
+      if (type.getParent())
+        profileArchetypeConstraints(type.getParent(), ID, seen);
+      ID.AddPointer(type->getDecl());
+    }
+
+    void visitTupleType(CanTupleType type) {
+      ID.AddInteger(type->getNumElements());
+      for (auto &elt : type->getElements()) {
+        ID.AddInteger(elt.isVararg());
+        profileArchetypeConstraints(elt.getType(), ID, seen);
+      }
+    }
+
+    void visitReferenceStorageType(CanReferenceStorageType type) {
+      profileArchetypeConstraints(type.getReferentType(), ID, seen);
+    }
+
+    void visitAnyMetatypeType(CanAnyMetatypeType type) {
+      profileArchetypeConstraints(type.getInstanceType(), ID, seen);
+    }
+
+    TYPE_WITHOUT_ARCHETYPE(Module)
+
+    void visitDynamicSelfType(CanDynamicSelfType type) {
+      profileArchetypeConstraints(type.getSelfType(), ID, seen);
+    }
+
+    void visitArchetypeType(CanArchetypeType type) {
+      profileArchetypeConstraints(type, ID, seen);
+    }
+
+    TYPE_WITHOUT_ARCHETYPE(GenericTypeParam)
+
+    void visitDependentMemberType(CanDependentMemberType type) {
+      ID.AddPointer(type->getAssocType());
+      profileArchetypeConstraints(type.getBase(), ID, seen);
+    }
+
+    void visitAnyFunctionType(CanAnyFunctionType type) {
+      ID.AddInteger(type->getExtInfo().getFuncAttrKey());
+      profileArchetypeConstraints(type.getInput(), ID, seen);
+      profileArchetypeConstraints(type.getResult(), ID, seen);
+    }
+
+    TYPE_WITHOUT_ARCHETYPE(SILFunction)
+    TYPE_WITHOUT_ARCHETYPE(SILBlockStorage)
+    TYPE_WITHOUT_ARCHETYPE(SILBox)
+    TYPE_WITHOUT_ARCHETYPE(ProtocolComposition)
+
+    void visitLValueType(CanLValueType type) {
+      profileArchetypeConstraints(type.getObjectType(), ID, seen);
+    }
+
+    void visitInOutType(CanInOutType type) {
+      profileArchetypeConstraints(type.getObjectType(), ID, seen);
+    }
+
+    TYPE_WITHOUT_ARCHETYPE(UnboundGeneric)
+
+    void visitBoundGenericType(CanBoundGenericType type) {
+      if (type.getParent())
+        profileArchetypeConstraints(type.getParent(), ID, seen);
+      ID.AddPointer(type->getDecl());
+      for (auto arg : type.getGenericArgs()) {
+        profileArchetypeConstraints(arg, ID, seen);
+      }
+    }
+#undef TYPE_WITHOUT_ARCHETYPE
+  };
+
   // End recursion if we found a concrete associated type.
   auto arch = ty->getAs<ArchetypeType>();
   if (!arch) {
@@ -960,92 +1048,6 @@ static void profileArchetypeConstraints(
     // When there are archetypes, recurse to profile the type itself.
     ID.AddInteger(1);
     ID.AddInteger(static_cast<unsigned>(concreteTy->getKind()));
-    class ProfileType : public CanTypeVisitor<ProfileType> {
-      llvm::FoldingSetNodeID &ID;
-      llvm::DenseMap<ArchetypeType*, unsigned> &seen;
-
-    public:
-      ProfileType(llvm::FoldingSetNodeID &ID,
-                  llvm::DenseMap<ArchetypeType*, unsigned> &seen)
-        : ID(ID), seen(seen) { }
-
-#define TYPE_WITHOUT_ARCHETYPE(KIND)                       \
-      void visit##KIND##Type(Can##KIND##Type type) {       \
-        llvm_unreachable("does not contain an archetype"); \
-      }
-
-      TYPE_WITHOUT_ARCHETYPE(Builtin)
-
-      void visitNominalType(CanNominalType type) {
-        if (type.getParent())
-          profileArchetypeConstraints(type.getParent(), ID, seen);
-        ID.AddPointer(type->getDecl());
-      }
-
-      void visitTupleType(CanTupleType type) {
-        ID.AddInteger(type->getNumElements());
-        for (auto &elt : type->getElements()) {
-          ID.AddInteger(elt.isVararg());
-          profileArchetypeConstraints(elt.getType(), ID, seen);
-        }
-      }
-
-      void visitReferenceStorageType(CanReferenceStorageType type) {
-        profileArchetypeConstraints(type.getReferentType(), ID, seen);
-      }
-
-      void visitAnyMetatypeType(CanAnyMetatypeType type) {
-        profileArchetypeConstraints(type.getInstanceType(), ID, seen);
-      }
-
-      TYPE_WITHOUT_ARCHETYPE(Module)
-
-      void visitDynamicSelfType(CanDynamicSelfType type) {
-        profileArchetypeConstraints(type.getSelfType(), ID, seen);
-      }
-
-      void visitArchetypeType(CanArchetypeType type) {
-        profileArchetypeConstraints(type, ID, seen);
-      }
-
-      TYPE_WITHOUT_ARCHETYPE(GenericTypeParam)
-
-      void visitDependentMemberType(CanDependentMemberType type) {
-        ID.AddPointer(type->getAssocType());
-        profileArchetypeConstraints(type.getBase(), ID, seen);
-      }
-
-      void visitAnyFunctionType(CanAnyFunctionType type) {
-        ID.AddInteger(type->getExtInfo().getFuncAttrKey());
-        profileArchetypeConstraints(type.getInput(), ID, seen);
-        profileArchetypeConstraints(type.getResult(), ID, seen);
-      }
-
-      TYPE_WITHOUT_ARCHETYPE(SILFunction)
-      TYPE_WITHOUT_ARCHETYPE(SILBlockStorage)
-      TYPE_WITHOUT_ARCHETYPE(SILBox)
-      TYPE_WITHOUT_ARCHETYPE(ProtocolComposition)
-
-      void visitLValueType(CanLValueType type) {
-        profileArchetypeConstraints(type.getObjectType(), ID, seen);
-      }
-
-      void visitInOutType(CanInOutType type) {
-        profileArchetypeConstraints(type.getObjectType(), ID, seen);
-      }
-
-      TYPE_WITHOUT_ARCHETYPE(UnboundGeneric)
-
-      void visitBoundGenericType(CanBoundGenericType type) {
-        if (type.getParent())
-          profileArchetypeConstraints(type.getParent(), ID, seen);
-        ID.AddPointer(type->getDecl());
-        for (auto arg : type.getGenericArgs()) {
-          profileArchetypeConstraints(arg, ID, seen);
-        }
-      }
-#undef TYPE_WITHOUT_ARCHETYPE
-    };
 
     ProfileType(ID, seen).visit(concreteTy);
     return;
@@ -1063,9 +1065,11 @@ static void profileArchetypeConstraints(
   
   // The archetype's superclass constraint.
   auto superclass = arch->getSuperclass();
-  auto superclassPtr = superclass ? superclass->getCanonicalType().getPointer()
-                                  : nullptr;
-  ID.AddPointer(superclassPtr);
+  if (superclass) {
+    ProfileType(ID, seen).visit(superclass->getCanonicalType());
+  } else {
+    ID.AddPointer(nullptr);
+  }
 
   // The archetype's protocol constraints.
   for (auto proto : arch->getConformsTo()) {
