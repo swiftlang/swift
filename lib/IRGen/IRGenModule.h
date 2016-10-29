@@ -953,10 +953,8 @@ public:
   Address getAddrOfObjCISAMask();
 
   StringRef mangleType(CanType type, SmallVectorImpl<char> &buffer);
- 
-  // Get the ArchetypeBuilder for the currently active generic context. Crashes
-  // if there is no generic context.
-  ArchetypeBuilder &getContextArchetypes();
+
+  SILType mapTypeIntoContext(SILType type);
 
   ConstantReference
   getAddrOfLLVMVariableOrGOTEquivalent(LinkEntity entity, Alignment alignment,

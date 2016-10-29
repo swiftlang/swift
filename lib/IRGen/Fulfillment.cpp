@@ -328,7 +328,8 @@ bool FulfillmentMap::Everything
                    ::hasLimitedInterestingConformances(CanType type) const {
   return false;
 }
-GenericSignature::ConformsToArray
+
+ArrayRef<ProtocolDecl *>
 FulfillmentMap::Everything::getInterestingConformances(CanType type) const{
   return {};
 }

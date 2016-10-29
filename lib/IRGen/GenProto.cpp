@@ -87,7 +87,7 @@ protected:
 
   FulfillmentMap Fulfillments;
 
-  GenericSignature::ConformsToArray getConformsTo(Type t) {
+  ArrayRef<ProtocolDecl *> getConformsTo(Type t) {
     return Generics->getConformsTo(t, M);
   }
 
@@ -293,7 +293,7 @@ bool PolymorphicConvention::considerType(CanType type, IsExact_t isExact,
     bool hasLimitedInterestingConformances(CanType type) const override {
       return true;
     }
-    GenericSignature::ConformsToArray
+    ArrayRef<ProtocolDecl *>
     getInterestingConformances(CanType type) const override {
       return Self.getConformsTo(type);
     }
@@ -1282,7 +1282,7 @@ public:
           bool hasLimitedInterestingConformances(CanType type) const override {
             return false;
           }
-          GenericSignature::ConformsToArray
+          ArrayRef<ProtocolDecl *>
           getInterestingConformances(CanType type) const override {
             llvm_unreachable("no limits");
           }

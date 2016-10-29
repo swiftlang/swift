@@ -215,9 +215,9 @@ struct ASTContext::Implementation {
                            ArchetypeBuilder::PotentialArchetype *>>
     LazyArchetypes;
 
-  /// \brief Stored archetype builders.
+  /// \brief Stored canonical generic environments.
   llvm::DenseMap<std::pair<GenericSignature *, ModuleDecl *>,
-                 std::unique_ptr<ArchetypeBuilder>> ArchetypeBuilders;
+                 GenericEnvironment *> GenericEnvironments;
 
   /// The set of property names that show up in the defining module of a
   /// class.
@@ -1268,24 +1268,26 @@ void ASTContext::getVisibleTopLevelClangModules(
     collectAllModules(Modules);
 }
 
-ArchetypeBuilder *ASTContext::getOrCreateArchetypeBuilder(
-                    CanGenericSignature sig,
-                    ModuleDecl *mod) {
-  // Check whether we already have an archetype builder for this
+GenericEnvironment *
+ASTContext::getCanonicalGenericEnvironment(CanGenericSignature sig,
+                                           ModuleDecl *mod) {
+  // Check whether we already have a generic environment for this
   // signature and module.
-  auto known = Impl.ArchetypeBuilders.find({sig, mod});
-  if (known != Impl.ArchetypeBuilders.end())
-    return known->second.get();
+  auto known = Impl.GenericEnvironments.find({sig, mod});
+  if (known != Impl.GenericEnvironments.end())
+    return known->second;
 
   // Create a new archetype builder with the given signature.
-  auto builder = new ArchetypeBuilder(*mod, Diags);
-  builder->addGenericSignature(sig, nullptr,
-                               /*treatRequirementsAsExplicit=*/true);
-  
-  // Store this archetype builder.
-  Impl.ArchetypeBuilders[{sig, mod}]
-    = std::unique_ptr<ArchetypeBuilder>(builder);
-  return builder;
+  ArchetypeBuilder builder(*mod, Diags);
+  builder.addGenericSignature(sig, nullptr,
+                              /*treatRequirementsAsExplicit=*/true);
+
+  // Get the generic environment from the builder.
+  auto *env = builder.getGenericEnvironment();
+
+  // Store this generic environment.
+  Impl.GenericEnvironments[{sig, mod}] = env;
+  return env;
 }
 
 Module *

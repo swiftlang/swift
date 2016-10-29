@@ -139,8 +139,8 @@ class alignas(1 << TypeAlignInBits) GenericSignature final
   static ASTContext &getASTContext(ArrayRef<GenericTypeParamType *> params,
                                    ArrayRef<Requirement> requirements);
 
-  /// Retrieve the archetype builder for the given generic signature.
-  ArchetypeBuilder *getArchetypeBuilder(ModuleDecl &mod);
+  /// Retrieve the canonical generic environment for this generic signature.
+  GenericEnvironment *getCanonicalGenericEnvironment(ModuleDecl &mod);
 
 public:
   /// Create a new generic signature with the given type parameters and
@@ -233,10 +233,9 @@ public:
   /// Determine the superclass bound on the given dependent type.
   Type getSuperclassBound(Type type, ModuleDecl &mod);
 
-  using ConformsToArray = SmallVector<ProtocolDecl *, 2>;
   /// Determine the set of protocols to which the given dependent type
   /// must conform.
-  ConformsToArray getConformsTo(Type type, ModuleDecl &mod);
+  ArrayRef<ProtocolDecl *> getConformsTo(Type type, ModuleDecl &mod);
 
   /// Determine whether the given dependent type is equal to a concrete type.
   bool isConcreteType(Type type, ModuleDecl &mod);
