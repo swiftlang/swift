@@ -15,16 +15,17 @@
 #include "DIMemoryUseCollector.h"
 #include "swift/AST/DiagnosticEngine.h"
 #include "swift/AST/DiagnosticsSIL.h"
+#include "swift/Basic/Fallthrough.h"
 #include "swift/SIL/SILArgument.h"
 #include "swift/SIL/SILBuilder.h"
+#include "swift/SILOptimizer/PassManager/Transforms.h"
 #include "swift/SILOptimizer/Utils/CFG.h"
 #include "swift/SILOptimizer/Utils/Local.h"
-#include "swift/SILOptimizer/PassManager/Transforms.h"
-#include "swift/Basic/Fallthrough.h"
-#include "llvm/ADT/Statistic.h"
-#include "llvm/Support/Debug.h"
+#include "llvm/ADT/STLExtras.h"
 #include "llvm/ADT/SmallBitVector.h"
+#include "llvm/ADT/Statistic.h"
 #include "llvm/ADT/StringExtras.h"
+#include "llvm/Support/Debug.h"
 
 using namespace swift;
 
@@ -487,7 +488,7 @@ namespace {
 
     // Keep track of whether we've emitted an error.  We only emit one error per
     // location as a policy decision.
-    std::vector<SourceLoc> EmittedErrorLocs;
+    std::vector<SILLocation> EmittedErrorLocs;
     SmallPtrSet<SILBasicBlock*, 16> BlocksReachableFromEntry;
     
   public:
@@ -649,14 +650,16 @@ bool LifetimeChecker::shouldEmitError(SILInstruction *Inst) {
   // dead code.
   if (!isBlockIsReachableFromEntry(Inst->getParent()))
     return false;
-  
+
   // Check to see if we've already emitted an error at this location.  If so,
   // swallow the error.
-  for (auto L : EmittedErrorLocs)
-    if (L == Inst->getLoc().getSourceLoc())
-      return false;
+  SILLocation InstLoc = Inst->getLoc();
+  if (llvm::any_of(EmittedErrorLocs, [&](SILLocation L) -> bool {
+        return L.getSourceLoc() == InstLoc.getSourceLoc();
+      }))
+    return false;
 
-  EmittedErrorLocs.push_back(Inst->getLoc().getSourceLoc());
+  EmittedErrorLocs.push_back(InstLoc);
   return true;
 }
 
