@@ -219,6 +219,13 @@ private:
                                           ProtocolDecl *RootProtocol,
                                           Identifier ParamName);
 
+  /// \brief Resolve the given dependent type using our context archetypes.
+  ///
+  /// Given an arbitrary type, this will substitute dependent type parameters
+  /// structurally with their corresponding archetypes and resolve dependent
+  /// member types to the appropriate associated types.
+  Type substDependentType(Type type);
+
 public:
   /// \brief Add a new generic parameter for which there may be requirements.
   void addGenericParameter(GenericTypeParamDecl *GenericParam);
@@ -304,13 +311,6 @@ public:
   ///
   /// For any type that cannot refer to an archetype, this routine returns null.
   PotentialArchetype *resolveArchetype(Type type);
-
-  /// \brief Resolve the given dependent type using our context archetypes.
-  ///
-  /// Given an arbitrary type, this will substitute dependent type parameters
-  /// structurally with their corresponding archetypes and resolve dependent
-  /// member types to the appropriate associated types.
-  Type substDependentType(Type type);
 
   /// Map an interface type to a contextual type.
   static Type mapTypeIntoContext(const DeclContext *dc, Type type);
