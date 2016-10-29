@@ -261,22 +261,32 @@ SILType doSubstDependentSILType(SILModule &M,
   
 } // end anonymous namespace
 
-SILType SILFunction::mapTypeIntoContext(SILType type) const {
-  return doSubstDependentSILType(getModule(),
-    [&](CanType t) { return mapTypeIntoContext(t)->getCanonicalType(); },
-    type);
-}
-
 SILType ArchetypeBuilder::substDependentType(SILModule &M, SILType type) {
   return doSubstDependentSILType(M,
     [&](CanType t) { return substDependentType(t)->getCanonicalType(); },
     type);
 }
 
+SILType SILFunction::mapTypeIntoContext(SILType type) const {
+  if (getGenericEnvironment() == nullptr)
+    return type;
+  return type.subst(getModule(), getModule().getSwiftModule(),
+                    getGenericEnvironment()->getInterfaceToArchetypeMap(),
+                    getLoweredFunctionType()->getGenericSignature());
+}
+
 Type SILFunction::mapTypeOutOfContext(Type type) const {
   return ArchetypeBuilder::mapTypeOutOfContext(getModule().getSwiftModule(),
                                                getGenericEnvironment(),
                                                type);
+}
+
+SILType SILFunction::mapTypeOutOfContext(SILType type) const {
+  if (getGenericEnvironment() == nullptr)
+    return type;
+  return type.subst(getModule(), getModule().getSwiftModule(),
+                    getGenericEnvironment()->getArchetypeToInterfaceMap(),
+                    getLoweredFunctionType()->getGenericSignature());
 }
 
 bool SILFunction::isNoReturnFunction() const {

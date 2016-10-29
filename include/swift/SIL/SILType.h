@@ -128,7 +128,8 @@ public:
 
   ///  Apply a substitution to the type to produce another lowered SIL type.
   static SILType substType(SILModule &silModule, ModuleDecl *astModule,
-                           const TypeSubstitutionMap &subs, SILType SrcTy);
+                           const TypeSubstitutionMap &subs, SILType SrcTy,
+                           CanGenericSignature genericSig=CanGenericSignature());
 
   ///  Apply a substitution to the function type.
   static CanSILFunctionType substFuncType(SILModule &silModule,
@@ -448,7 +449,8 @@ public:
                            ArrayRef<Substitution> Subs) const;
 
   SILType subst(SILModule &silModule, ModuleDecl *astModule,
-                const TypeSubstitutionMap &subs) const;
+                const TypeSubstitutionMap &subs,
+                CanGenericSignature genericSig=CanGenericSignature()) const;
 
   /// If this is a specialized generic type, return all substitutions used to
   /// generate it.
@@ -548,6 +550,7 @@ NON_SIL_TYPE(LValue)
 CanSILFunctionType getNativeSILFunctionType(SILModule &M,
                         Lowering::AbstractionPattern orig,
                         CanAnyFunctionType substInterface,
+                        CanGenericSignature genericSig,
                         Optional<SILDeclRef> constant = None,
                         SILDeclRef::Kind kind = SILDeclRef::Kind::Func);
 

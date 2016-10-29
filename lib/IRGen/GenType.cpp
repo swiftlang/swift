@@ -660,27 +660,23 @@ TypeConverter::~TypeConverter() {
 void TypeConverter::pushGenericContext(CanGenericSignature signature) {
   if (!signature)
     return;
-  
-  // Push the generic context down to the SIL TypeConverter, so we can share
-  // archetypes with SIL.
-  IGM.getSILTypes().pushGenericContext(signature);
+  assert(!CurGenericContext);
+  CurGenericContext = signature;
 }
 
 void TypeConverter::popGenericContext(CanGenericSignature signature) {
   if (!signature)
     return;
-
-  // Pop the SIL TypeConverter's generic context too.
-  IGM.getSILTypes().popGenericContext(signature);
-  
+  assert(signature == CurGenericContext);
+  CurGenericContext = CanGenericSignature();
   Types.DependentCache.clear();
 }
 
 ArchetypeBuilder &TypeConverter::getArchetypes() {
+  assert(CurGenericContext);
   auto moduleDecl = IGM.getSwiftModule();
-  auto genericSig = IGM.getSILTypes().getCurGenericContext();
   return *moduleDecl->getASTContext()
-      .getOrCreateArchetypeBuilder(genericSig, moduleDecl);
+      .getOrCreateArchetypeBuilder(CurGenericContext, moduleDecl);
 }
 
 ArchetypeBuilder &IRGenModule::getContextArchetypes() {

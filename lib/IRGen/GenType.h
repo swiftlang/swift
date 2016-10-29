@@ -81,6 +81,7 @@ public:
 private:
   llvm::DenseMap<ProtocolDecl*, const ProtocolInfo*> Protocols;
   const TypeInfo *FirstType;
+  CanGenericSignature CurGenericContext;
   
   const ProtocolInfo *FirstProtocol;
   const LoadableTypeInfo *NativeObjectTI = nullptr;

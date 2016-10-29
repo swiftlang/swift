@@ -448,6 +448,8 @@ public:
 private:
   CanType getTypeInContext(CanType type) const;
 
+  SILType getTypeInContext(SILType type) const;
+
   CanType getArgTypeInContext(unsigned paramIndex) const;
 
   /// Fulfill local type data from any extra information associated with
@@ -476,8 +478,13 @@ CanType EmitPolymorphicParameters::getTypeInContext(CanType type) const {
   return Fn.mapTypeIntoContext(type)->getCanonicalType();
 }
 
+SILType EmitPolymorphicParameters::getTypeInContext(SILType type) const {
+  return Fn.mapTypeIntoContext(type);
+}
+
 CanType EmitPolymorphicParameters::getArgTypeInContext(unsigned paramIndex) const {
-  return getTypeInContext(FnType->getParameters()[paramIndex].getType());
+  return getTypeInContext(FnType->getParameters()[paramIndex].getSILType())
+      .getSwiftRValueType();
 }
 
 void EmitPolymorphicParameters::bindExtraSource(const MetadataSource &source,
