@@ -316,7 +316,7 @@ bb6:
 // CHECK:   return
 sil @no_forwarding_additional_successor : $@convention(thin) (E3) -> () {
 bb0(%0 : $E3):
-  switch_enum %0 : $E3, case #E3.A!enumelt: bb1, case #E3.B!enumelt: bb2, case #E3.C!enumelt: bb6 
+  switch_enum %0 : $E3, case #E3.A!enumelt: bb1, case #E3.B!enumelt: bb2, case #E3.C!enumelt: bb6
 
 bb1:
   %1 = enum $E, #E.A!enumelt

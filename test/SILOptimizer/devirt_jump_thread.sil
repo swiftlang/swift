@@ -49,7 +49,7 @@ bb0(%0 : $Int32, %1 : $FooClass):
   return %3 : $Int32                                // id: %6
 }
 
-// Check that checked_cast_br instructions resulting from devirtualization 
+// Check that checked_cast_br instructions resulting from devirtualization
 // get jump-threaded.
 //
 // CHECK-LABEL: sil @_TF18devirt_jump_thread26jumpthread_checked_cast_brFCS_8FooClassSi
@@ -275,7 +275,7 @@ bb6:                                              // Preds: bb1
 
 
 // Check that checked_cast_br in bb1 does not get jump threaded
-// because bb1 contains some instructions that cannot be cloned, e.g. class_method 
+// because bb1 contains some instructions that cannot be cloned, e.g. class_method
 // referring to an objc method.
 //
 // CHECK-LABEL: sil @_TF18devirt_jump_thread6dont_jump_thread_objc_methodFCS_8FooClassSi
@@ -350,7 +350,7 @@ sil_vtable FooClass {
 }
 
 class C {
-   deinit 
+   deinit
    init()
 }
 
