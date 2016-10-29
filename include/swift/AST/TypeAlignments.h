@@ -22,6 +22,8 @@
 #ifndef SWIFT_TYPEALIGNMENTS_H
 #define SWIFT_TYPEALIGNMENTS_H
 
+#include <cstddef>
+
 namespace swift {
   class AbstractStorageDecl;
   class ArchetypeType;
