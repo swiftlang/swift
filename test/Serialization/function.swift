@@ -17,7 +17,7 @@ func useEq<T: EqualOperator>(_ x: T, y: T) -> Bool {
 // SIL:   [[RAW:%.+]] = global_addr @_Tv8function3rawSi : $*Int
 // SIL:   [[ZERO:%.+]] = function_ref @_TF8def_func7getZeroFT_Si : $@convention(thin) () -> Int
 // SIL:   [[RESULT:%.+]] = apply [[ZERO]]() : $@convention(thin) () -> Int
-// SIL:   store [[RESULT]] to [[RAW]] : $*Int
+// SIL:   store [[RESULT]] to [trivial] [[RAW]] : $*Int
 var raw = getZero()
 
 // Check that 'raw' is an Int

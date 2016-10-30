@@ -365,7 +365,7 @@ class D: C {
   // CHECK-NOT:     [[SELF_ADDR]]
   // CHECK:         [[SUPER2:%.*]] = apply {{.*}}([[SUPER1]])
   // CHECK-NEXT:    [[SELF2:%.*]] = unchecked_ref_cast [[SUPER2]]
-  // CHECK-NEXT:    store [[SELF2]] to [[SELF_ADDR]]
+  // CHECK-NEXT:    store [[SELF2]] to [init] [[SELF_ADDR]]
   // CHECK-NOT:     [[SELF_ADDR]]
   // CHECK-NOT:     [[SELF1]]
   // CHECK-NOT:     [[SUPER1]]
@@ -482,7 +482,7 @@ class LetFieldClass {
   // CHECK-NEXT: [[KRAKEN_ADDR:%.*]] = ref_element_addr [[CLS]] : $LetFieldClass, #LetFieldClass.letk
   // CHECK-NEXT: [[KRAKEN2:%.*]] = load [[KRAKEN_ADDR]]
   // CHECK-NEXT: copy_value [[KRAKEN2]]
-  // CHECK-NEXT: store [[KRAKEN2]] to [[PB]]
+  // CHECK-NEXT: store [[KRAKEN2]] to [init] [[PB]]
   // CHECK: [[DESTROY_SHIP_FUN:%.*]] = function_ref @_TF15guaranteed_self11destroyShipFCS_6KrakenT_ : $@convention(thin) (@owned Kraken) -> ()
   // CHECK-NEXT: [[KRAKEN_COPY:%.*]] = load [[PB]]
   // CHECK-NEXT: copy_value [[KRAKEN_COPY]]
@@ -515,7 +515,7 @@ class LetFieldClass {
   // CHECK-NEXT: [[PB:%.*]] = project_box [[KRAKEN_BOX]]
   // CHECK-NEXT: [[KRAKEN_GETTER_FUN:%.*]] = class_method [[CLS]] : $LetFieldClass, #LetFieldClass.vark!getter.1 : (LetFieldClass) -> () -> Kraken , $@convention(method) (@guaranteed LetFieldClass) -> @owned Kraken
   // CHECK-NEXT: [[KRAKEN2:%.*]] = apply [[KRAKEN_GETTER_FUN]]([[CLS]])
-  // CHECK-NEXT: store [[KRAKEN2]] to [[PB]]
+  // CHECK-NEXT: store [[KRAKEN2]] to [init] [[PB]]
   // CHECK: [[DESTROY_SHIP_FUN:%.*]] = function_ref @_TF15guaranteed_self11destroyShipFCS_6KrakenT_ : $@convention(thin) (@owned Kraken) -> ()
   // CHECK-NEXT: [[KRAKEN_COPY:%.*]] = load [[PB]]
   // CHECK-NEXT: copy_value [[KRAKEN_COPY]]

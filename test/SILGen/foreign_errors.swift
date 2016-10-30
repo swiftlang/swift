@@ -20,7 +20,7 @@ func test0() throws {
   // CHECK: [[ERR_TEMP1:%.*]] = alloc_stack $@sil_unmanaged Optional<NSError>
   // CHECK: [[T0:%.*]] = load [[ERR_TEMP0]]
   // CHECK: [[T1:%.*]] = ref_to_unmanaged [[T0]]
-  // CHECK: store [[T1]] to [[ERR_TEMP1]]
+  // CHECK: store [[T1]] to [trivial] [[ERR_TEMP1]]
   // CHECK: address_to_pointer [[ERR_TEMP1]]
 
   //   Call the method.
@@ -73,7 +73,7 @@ extension NSObject {
 // CHECK:   [[OBJCERR:%.*]] = enum $Optional<NSError>, #Optional.some!enumelt.1, [[T1]] : $NSError
 // CHECK:   [[SETTER:%.*]] = function_ref @_TFVs33AutoreleasingUnsafeMutablePointers7pointeex :
 // CHECK:   [[TEMP:%.*]] = alloc_stack $Optional<NSError>
-// CHECK:   store [[OBJCERR]] to [[TEMP]]
+// CHECK:   store [[OBJCERR]] to [init] [[TEMP]]
 // CHECK:   apply [[SETTER]]<Optional<NSError>>([[TEMP]], [[UNWRAPPED_OUT]])
 // CHECK:   dealloc_stack [[TEMP]]
 // CHECK:   br bb5
@@ -107,7 +107,7 @@ extension NSObject {
 // CHECK:   [[OBJCERR:%.*]] = enum $Optional<NSError>, #Optional.some!enumelt.1, [[T1]] : $NSError
 // CHECK:   [[SETTER:%.*]] = function_ref @_TFVs33AutoreleasingUnsafeMutablePointers7pointeex :
 // CHECK:   [[TEMP:%.*]] = alloc_stack $Optional<NSError>
-// CHECK:   store [[OBJCERR]] to [[TEMP]]
+// CHECK:   store [[OBJCERR]] to [init] [[TEMP]]
 // CHECK:   apply [[SETTER]]<Optional<NSError>>([[TEMP]], [[UNWRAPPED_OUT]])
 // CHECK:   dealloc_stack [[TEMP]]
 // CHECK:   br bb5

@@ -34,7 +34,7 @@ func getObjectUID<T: ObjectUID>(x: T) -> (Int, Int, Int, Int) {
   // CHECK: [[X:%.*]] = load [[PB]]
   // CHECK: copy_value [[X]]
   // CHECK: [[X_TMP:%.*]] = alloc_stack
-  // CHECK: store [[X]] to [[X_TMP]]
+  // CHECK: store [[X]] to [init] [[X_TMP]]
   // CHECK: [[GET_UID:%.*]] = witness_method $T, #UID.uid!1
   // CHECK: [[UID:%.*]] = apply [[GET_UID]]<T>([[X_TMP]])
   // CHECK: [[X2:%.*]] = load [[X_TMP]]
@@ -48,7 +48,7 @@ func getObjectUID<T: ObjectUID>(x: T) -> (Int, Int, Int, Int) {
   // CHECK: [[X:%.*]] = load [[PB]]
   // CHECK: copy_value [[X]]
   // CHECK: [[X_TMP:%.*]] = alloc_stack
-  // CHECK: store [[X]] to [[X_TMP]]
+  // CHECK: store [[X]] to [init] [[X_TMP]]
   // CHECK: [[GET_UID:%.*]] = witness_method $T, #UID.uid!1
   // CHECK: [[UID:%.*]] = apply [[GET_UID]]<T>([[X_TMP]])
   // CHECK: [[X2:%.*]] = load [[X_TMP]]
@@ -64,7 +64,7 @@ func getObjectUID<T: ObjectUID>(x: T) -> (Int, Int, Int, Int) {
   // CHECK: [[X:%.*]] = load [[PB]]
   // CHECK: copy_value [[X]]
   // CHECK: [[X_TMP:%.*]] = alloc_stack
-  // CHECK: store [[X]] to [[X_TMP]]
+  // CHECK: store [[X]] to [init] [[X_TMP]]
   // CHECK: [[GET_UID:%.*]] = witness_method $T, #UID.uid!1
   // CHECK: [[UID:%.*]] = apply [[GET_UID]]<T>([[X_TMP]])
   // CHECK: [[X2:%.*]] = load [[X_TMP]]
@@ -86,7 +86,7 @@ func getBaseObjectUID<T: UID where T: Base>(x: T) -> (Int, Int, Int) {
   // CHECK: [[X:%.*]] = load [[PB]]
   // CHECK: copy_value [[X]]
   // CHECK: [[X_TMP:%.*]] = alloc_stack
-  // CHECK: store [[X]] to [[X_TMP]]
+  // CHECK: store [[X]] to [init] [[X_TMP]]
   // CHECK: [[GET_UID:%.*]] = witness_method $T, #UID.uid!1
   // CHECK: [[UID:%.*]] = apply [[GET_UID]]<T>([[X_TMP]])
   // CHECK: [[X2:%.*]] = load [[X_TMP]]
@@ -100,7 +100,7 @@ func getBaseObjectUID<T: UID where T: Base>(x: T) -> (Int, Int, Int) {
   // CHECK: [[X:%.*]] = load [[PB]]
   // CHECK: copy_value [[X]]
   // CHECK: [[X_TMP:%.*]] = alloc_stack
-  // CHECK: store [[X]] to [[X_TMP]]
+  // CHECK: store [[X]] to [init] [[X_TMP]]
   // CHECK: [[GET_UID:%.*]] = witness_method $T, #UID.uid!1
   // CHECK: [[UID:%.*]] = apply [[GET_UID]]<T>([[X_TMP]])
   // CHECK: [[X2:%.*]] = load [[X_TMP]]

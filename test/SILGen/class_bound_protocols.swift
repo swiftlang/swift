@@ -28,7 +28,7 @@ func class_bound_generic<T : ClassBound>(x: T) -> T {
   // CHECK: bb0([[X:%.*]] : $T):
   // CHECK:   [[X_ADDR:%.*]] = alloc_box $T
   // CHECK:   [[PB:%.*]] = project_box [[X_ADDR]]
-  // CHECK:   store [[X]] to [[PB]]
+  // CHECK:   store [[X]] to [init] [[PB]]
   return x
   // CHECK:   [[X1:%.*]] = load [[PB]]
   // CHECK:   copy_value [[X1]]
@@ -41,7 +41,7 @@ func class_bound_generic_2<T : ClassBound & NotClassBound>(x: T) -> T {
   // CHECK: bb0([[X:%.*]] : $T):
   // CHECK:   [[X_ADDR:%.*]] = alloc_box $T
   // CHECK:   [[PB:%.*]] = project_box [[X_ADDR]]
-  // CHECK:   store [[X]] to [[PB]]
+  // CHECK:   store [[X]] to [init] [[PB]]
   return x
   // CHECK:   [[X1:%.*]] = load [[PB]]
   // CHECK:   copy_value [[X1]]
@@ -54,7 +54,7 @@ func class_bound_protocol(x: ClassBound) -> ClassBound {
   // CHECK: bb0([[X:%.*]] : $ClassBound):
   // CHECK:   [[X_ADDR:%.*]] = alloc_box $ClassBound
   // CHECK:   [[PB:%.*]] = project_box [[X_ADDR]]
-  // CHECK:   store [[X]] to [[PB]]
+  // CHECK:   store [[X]] to [init] [[PB]]
   return x
   // CHECK:   [[X1:%.*]] = load [[PB]]
   // CHECK:   copy_value [[X1]]
@@ -68,7 +68,7 @@ func class_bound_protocol_composition(x: ClassBound & NotClassBound)
   // CHECK: bb0([[X:%.*]] : $ClassBound & NotClassBound):
   // CHECK:   [[X_ADDR:%.*]] = alloc_box $ClassBound & NotClassBound
   // CHECK:   [[PB:%.*]] = project_box [[X_ADDR]]
-  // CHECK:   store [[X]] to [[PB]]
+  // CHECK:   store [[X]] to [init] [[PB]]
   return x
   // CHECK:   [[X1:%.*]] = load [[PB]]
   // CHECK:   copy_value [[X1]]
@@ -97,7 +97,8 @@ func class_bound_to_unbound_existential_upcast
   return x
   // CHECK: [[X_OPENED:%.*]] = open_existential_ref %1 : $ClassBound & NotClassBound to [[OPENED_TYPE:\$@opened(.*) ClassBound & NotClassBound]]
   // CHECK: [[PAYLOAD_ADDR:%.*]] = init_existential_addr %0 : $*NotClassBound, [[OPENED_TYPE]]
-  // CHECK: store [[X_OPENED]] to [[PAYLOAD_ADDR]]
+  // CHECK: [[X_OPENED_COPY:%.*]] = copy_value [[X_OPENED]]
+  // CHECK: store [[X_OPENED_COPY]] to [[PAYLOAD_ADDR]]
 }
 
 // CHECK-LABEL: sil hidden @_TF21class_bound_protocols18class_bound_method

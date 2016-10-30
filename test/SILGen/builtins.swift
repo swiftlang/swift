@@ -157,7 +157,7 @@ func assign_gen<T>(_ x: T, y: Builtin.RawPointer) {
 func init_pod(_ x: Builtin.Int64, y: Builtin.RawPointer) {
   // CHECK: [[ADDR:%.*]] = pointer_to_address {{%.*}} to [strict] $*Builtin.Int64
   // CHECK-NOT: load [[ADDR]]
-  // CHECK: store {{%.*}} to [[ADDR]]
+  // CHECK: store {{%.*}} to [trivial] [[ADDR]]
   // CHECK-NOT: destroy_value [[ADDR]]
   Builtin.initialize(x, y)
 }
@@ -166,7 +166,7 @@ func init_pod(_ x: Builtin.Int64, y: Builtin.RawPointer) {
 func init_obj(_ x: Builtin.NativeObject, y: Builtin.RawPointer) {
   // CHECK: [[ADDR:%.*]] = pointer_to_address {{%.*}} to [strict] $*Builtin.NativeObject
   // CHECK-NOT: load [[ADDR]]
-  // CHECK: store [[SRC:%.*]] to [[ADDR]]
+  // CHECK: store [[SRC:%.*]] to [init] [[ADDR]]
   // CHECK-NOT: destroy_value [[SRC]]
   Builtin.initialize(x, y)
 }
@@ -548,7 +548,7 @@ func reinterpretAddrOnlyToTrivial<T>(_ t: T) -> Int {
 // CHECK-LABEL: sil hidden @_TF8builtins27reinterpretAddrOnlyLoadable
 func reinterpretAddrOnlyLoadable<T>(_ a: Int, _ b: T) -> (T, Int) {
   // CHECK: [[BUF:%.*]] = alloc_stack $Int
-  // CHECK: store {{%.*}} to [[BUF]]
+  // CHECK: store {{%.*}} to [trivial] [[BUF]]
   // CHECK: [[RES1:%.*]] = unchecked_addr_cast [[BUF]] : $*Int to $*T
   // CHECK: copy_addr [[RES1]] to [initialization]
   return (Builtin.reinterpretCast(a) as T,

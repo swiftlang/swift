@@ -201,7 +201,7 @@ func uncaptured_locals(_ x: Int) -> (Int, Int) {
   // CHECK: bb0([[XARG:%[0-9]+]] : $Int):
   // CHECK:   [[XADDR:%[0-9]+]] = alloc_box $Int
   // CHECK:   [[PB:%.*]] = project_box [[XADDR]]
-  // CHECK:   store [[XARG]] to [[PB]]
+  // CHECK:   store [[XARG]] to [trivial] [[PB]]
 
   var y = zero
   // CHECK:   [[YADDR:%[0-9]+]] = alloc_box $Int
@@ -316,7 +316,7 @@ func closeOverLetLValue() {
 // CHECK-LABEL: sil shared @_TFF8closures18closeOverLetLValueFT_T_U_FT_Si
 // CHECK: bb0(%0 : $ClassWithIntProperty):
 // CHECK-NEXT: [[TMP:%.*]] = alloc_stack $ClassWithIntProperty, let, name "a", argno 1
-// CHECK-NEXT: store %0 to [[TMP]] : $*ClassWithIntProperty
+// CHECK-NEXT: store %0 to [init] [[TMP]] : $*ClassWithIntProperty
 // CHECK-NEXT: {{.*}} = load [[TMP]] : $*ClassWithIntProperty
 // CHECK-NEXT: {{.*}} = ref_element_addr {{.*}} : $ClassWithIntProperty, #ClassWithIntProperty.x
 // CHECK-NEXT: {{.*}} = load {{.*}} : $*Int
@@ -513,7 +513,7 @@ class SuperSub : SuperBase {
 // -- TODO: A lot of fussy r/r traffic and owned/unowned conversions here.
 // -- strong +1, unowned +1
 // CHECK:         unowned_retain [[UNOWNED_SELF]]
-// CHECK:         store [[UNOWNED_SELF]] to [[PB]]
+// CHECK:         store [[UNOWNED_SELF]] to [init] [[PB]]
 // CHECK:         [[UNOWNED_SELF:%.*]] = load [[PB]]
 // -- strong +2, unowned +1
 // CHECK:         strong_retain_unowned [[UNOWNED_SELF]]

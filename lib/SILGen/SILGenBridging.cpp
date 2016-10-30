@@ -104,8 +104,8 @@ emitBridgeNativeToObjectiveC(SILGenFunction &gen,
   if (witnessFnTy.castTo<SILFunctionType>()->getParameters()[0].isIndirect()
       && !swiftValue.getType().isAddress()) {
     auto tmp = gen.emitTemporaryAllocation(loc, swiftValue.getType());
-    gen.B.createStore(loc, swiftValue.getValue(), tmp,
-                      StoreOwnershipQualifier::Unqualified);
+    gen.B.emitStoreValueOperation(loc, swiftValue.getValue(), tmp,
+                                  StoreOwnershipQualifier::Init);
     swiftValue = ManagedValue::forUnmanaged(tmp);
   }
 
@@ -433,8 +433,8 @@ ManagedValue SILGenFunction::emitFuncToBlock(SILLocation loc,
   // Store the function to the block without claiming it, so that it still
   // gets cleaned up in scope. Copying the block will create an independent
   // reference.
-  B.createStore(loc, fn.getValue(), capture,
-                StoreOwnershipQualifier::Unqualified);
+  B.emitStoreValueOperation(loc, fn.getValue(), capture,
+                            StoreOwnershipQualifier::Init);
   auto invokeFn = B.createFunctionRef(loc, thunk);
   
   auto stackBlock = B.createInitBlockStorageHeader(loc, storage, invokeFn,
