@@ -12,7 +12,7 @@ class A {
   // CHECK-LABEL: sil hidden [thunk] @_TToFC14objc_metatypes1A3foo
   dynamic func foo(_ m: ObjCClass.Type) -> ObjCClass.Type {
     // CHECK: bb0([[M:%[0-9]+]] : $@objc_metatype ObjCClass.Type, [[SELF:%[0-9]+]] : $A):
-    // CHECK:   strong_retain [[SELF]] : $A
+    // CHECK:   copy_value [[SELF]] : $A
     // CHECK:   [[M_AS_THICK:%[0-9]+]] = objc_to_thick_metatype [[M]] : $@objc_metatype ObjCClass.Type to $@thick ObjCClass.Type
 
     // CHECK:   [[NATIVE_FOO:%[0-9]+]] = function_ref @_TFC14objc_metatypes1A3foo

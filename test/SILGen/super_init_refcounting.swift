@@ -12,9 +12,9 @@ class Bar: Foo {
   // CHECK:         [[PB:%.*]] = project_box [[SELF_VAR]]
   // CHECK:         [[SELF_MUI:%.*]] =  mark_uninitialized [derivedself] [[PB]]
   // CHECK:         [[ORIG_SELF:%.*]] = load [[SELF_MUI]]
-  // CHECK-NOT:     strong_retain [[ORIG_SELF]]
+  // CHECK-NOT:     copy_value [[ORIG_SELF]]
   // CHECK:         [[ORIG_SELF_UP:%.*]] = upcast [[ORIG_SELF]]
-  // CHECK-NOT:     strong_retain [[ORIG_SELF_UP]]
+  // CHECK-NOT:     copy_value [[ORIG_SELF_UP]]
   // CHECK:         [[SUPER_INIT:%[0-9]+]] = function_ref @_TFC22super_init_refcounting3FoocfT_S0_ : $@convention(method) (@owned Foo) -> @owned Foo
   // CHECK:         [[NEW_SELF:%.*]] = apply [[SUPER_INIT]]([[ORIG_SELF_UP]])
   // CHECK:         [[NEW_SELF_DOWN:%.*]] = unchecked_ref_cast [[NEW_SELF]]
@@ -30,7 +30,7 @@ extension Foo {
   // CHECK:         [[PB:%.*]] = project_box [[SELF_VAR]]
   // CHECK:         [[SELF_MUI:%.*]] =  mark_uninitialized [delegatingself] [[PB]]
   // CHECK:         [[ORIG_SELF:%.*]] = load [[SELF_MUI]]
-  // CHECK-NOT:     strong_retain [[ORIG_SELF]]
+  // CHECK-NOT:     copy_value [[ORIG_SELF]]
   // CHECK:         [[SUPER_INIT:%.*]] = class_method
   // CHECK:         [[NEW_SELF:%.*]] = apply [[SUPER_INIT]]([[ORIG_SELF]])
   // CHECK:         store [[NEW_SELF]] to [[SELF_MUI]]
@@ -42,8 +42,8 @@ extension Foo {
 class Zim: Foo {
   var foo = Foo()
   // CHECK-LABEL: sil hidden @_TFC22super_init_refcounting3Zimc
-  // CHECK-NOT:     strong_retain
-  // CHECK-NOT:     strong_release
+  // CHECK-NOT:     copy_value
+  // CHECK-NOT:     destroy_value
   // CHECK:         function_ref @_TFC22super_init_refcounting3FoocfT_S0_ : $@convention(method) (@owned Foo) -> @owned Foo
 }
 
@@ -55,8 +55,8 @@ class Zang: Foo {
     super.init()
   }
   // CHECK-LABEL: sil hidden @_TFC22super_init_refcounting4Zangc
-  // CHECK-NOT:     strong_retain
-  // CHECK-NOT:     strong_release
+  // CHECK-NOT:     copy_value
+  // CHECK-NOT:     destroy_value
   // CHECK:         function_ref @_TFC22super_init_refcounting3FoocfT_S0_ : $@convention(method) (@owned Foo) -> @owned Foo
 }
 

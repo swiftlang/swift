@@ -1,4 +1,4 @@
-// RUN: %target-swift-frontend -emit-object -O %s
+// RUN: %target-swift-frontend -assume-parsing-unqualified-ownership-sil -emit-object -O %s
 
 // This is a compile-only test. It checks that the compiler does not crash for
 // a (not executed) bitcast with different sizes. This appears in the

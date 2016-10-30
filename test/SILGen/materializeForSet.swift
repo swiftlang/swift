@@ -78,7 +78,7 @@ extension Derived : Abstractable {}
 // CHECK-NEXT: [[RESULT:%.*]] = apply [[FN]]([[SELF]])
 // CHECK-NEXT: store [[RESULT]] to [[TEMP]]
 // CHECK-NEXT: [[RESULT:%.*]] = load [[TEMP]]
-// CHECK-NEXT: strong_retain [[RESULT]]
+// CHECK-NEXT: copy_value [[RESULT]]
 // CHECK-NEXT: function_ref
 // CHECK-NEXT: [[REABSTRACTOR:%.*]] = function_ref @_TTRXFo__dSi_XFo__iSi_ : $@convention(thin) (@owned @callee_owned () -> Int) -> @out Int
 // CHECK-NEXT: [[T1:%.*]] = partial_apply [[REABSTRACTOR]]([[RESULT]])
@@ -114,7 +114,7 @@ extension Derived : Abstractable {}
 // CHECK-NEXT: [[SELF:%.*]] = upcast [[T0]] : $Derived to $Base
 // CHECK-NEXT: [[ADDR:%.*]] = ref_element_addr [[SELF]] : $Base, #Base.finalStoredFunction
 // CHECK-NEXT: [[RESULT:%.*]] = load [[ADDR]]
-// CHECK-NEXT: strong_retain [[RESULT]]
+// CHECK-NEXT: copy_value [[RESULT]]
 // CHECK-NEXT: function_ref
 // CHECK-NEXT: [[REABSTRACTOR:%.*]] = function_ref @_TTRXFo__dSi_XFo__iSi_ : $@convention(thin) (@owned @callee_owned () -> Int) -> @out Int
 // CHECK-NEXT: [[T1:%.*]] = partial_apply [[REABSTRACTOR]]([[RESULT]])
@@ -150,7 +150,7 @@ extension Derived : Abstractable {}
 // CHECK-NEXT: [[VALUE:%.*]] = apply [[GETTER]]([[SELF]]) : $@convention(method) (@thick Base.Type) -> @owned @callee_owned () -> Int
 // CHECK-NEXT: store [[VALUE]] to [[OUT]] : $*@callee_owned () -> Int
 // CHECK-NEXT: [[VALUE:%.*]] = load [[OUT]] : $*@callee_owned () -> Int
-// CHECK-NEXT: strong_retain [[VALUE]] : $@callee_owned () -> Int
+// CHECK-NEXT: copy_value [[VALUE]] : $@callee_owned () -> Int
 // CHECK:      [[REABSTRACTOR:%.*]] = function_ref @_TTRXFo__dSi_XFo__iSi_ : $@convention(thin) (@owned @callee_owned () -> Int) -> @out Int
 // CHECK-NEXT: [[NEWVALUE:%.*]] = partial_apply [[REABSTRACTOR]]([[VALUE]])
 // CHECK-NEXT: store [[NEWVALUE]] to [[RESULT_ADDR]] : $*@callee_owned () -> @out Int

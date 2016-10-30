@@ -451,6 +451,9 @@ ClosureCloner::initCloned(SILFunction *Orig, IsFragile_t Fragile,
       Orig->getEffectsKind(), Orig, Orig->getDebugScope());
   for (auto &Attr : Orig->getSemanticsAttrs())
     Fn->addSemanticsAttr(Attr);
+  if (Orig->hasUnqualifiedOwnership()) {
+    Fn->setUnqualifiedOwnership();
+  }
   Fn->setDeclCtx(Orig->getDeclContext());
   return Fn;
 }

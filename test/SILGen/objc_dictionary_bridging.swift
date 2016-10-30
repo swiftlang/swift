@@ -32,7 +32,7 @@ import gizmo
 
     // CHECK:   [[CONVERTER:%[0-9]+]] = function_ref @_TFE10FoundationVs10Dictionary19_bridgeToObjectiveCfT_CSo12NSDictionary
     // CHECK-NEXT:   [[NSDICT:%[0-9]+]] = apply [[CONVERTER]]<Foo, Foo>([[DICT]]) : $@convention(method) <τ_0_0, τ_0_1 where τ_0_0 : Hashable> (@guaranteed Dictionary<τ_0_0, τ_0_1>) -> @owned NSDictionary
-    // CHECK-NEXT:   release_value [[DICT]]
+    // CHECK-NEXT:   destroy_value [[DICT]]
     // CHECK-NEXT:   return [[NSDICT]] : $NSDictionary
   }
 
@@ -46,7 +46,7 @@ import gizmo
   
   // CHECK:   [[CONVERTER:%[0-9]+]] = function_ref @_TFE10FoundationVs10Dictionary19_bridgeToObjectiveCfT_CSo12NSDictionary
   // CHECK:   [[NSDICT:%[0-9]+]] = apply [[CONVERTER]]<Foo, Foo>([[DICT]]) : $@convention(method) <τ_0_0, τ_0_1 where τ_0_0 : Hashable> (@guaranteed Dictionary<τ_0_0, τ_0_1>) -> @owned NSDictionary
-  // CHECK:   release_value [[DICT]]
+  // CHECK:   destroy_value [[DICT]]
   // CHECK:   return [[NSDICT]] : $NSDictionary
 
   // Property setter

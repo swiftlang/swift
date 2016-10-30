@@ -1,9 +1,9 @@
 // RUN: rm -rf %t && mkdir -p %t
-// RUN: %target-swift-frontend -sdk %S/Inputs -primary-file %s -emit-ir | %FileCheck %s
+// RUN: %target-swift-frontend -assume-parsing-unqualified-ownership-sil -sdk %S/Inputs -primary-file %s -emit-ir | %FileCheck %s
 
 // RUN: mkdir -p %t/Empty.framework/Modules/Empty.swiftmodule
-// RUN: %target-swift-frontend -emit-module-path %t/Empty.framework/Modules/Empty.swiftmodule/%target-swiftmodule-name %S/../Inputs/empty.swift -module-name Empty
-// RUN: %target-swift-frontend -sdk %S/Inputs -primary-file %s -F %t -DIMPORT_EMPTY -emit-ir > %t.ll
+// RUN: %target-swift-frontend -assume-parsing-unqualified-ownership-sil -emit-module-path %t/Empty.framework/Modules/Empty.swiftmodule/%target-swiftmodule-name %S/../Inputs/empty.swift -module-name Empty
+// RUN: %target-swift-frontend -assume-parsing-unqualified-ownership-sil -sdk %S/Inputs -primary-file %s -F %t -DIMPORT_EMPTY -emit-ir > %t.ll
 // RUN: %FileCheck %s < %t.ll
 // RUN: %FileCheck -check-prefix=NEGATIVE %s < %t.ll
 
