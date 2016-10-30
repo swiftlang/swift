@@ -9,35 +9,37 @@
 // See http://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
 //
 //===----------------------------------------------------------------------===//
-//
-// Promotes captures from 'inout' (i.e. by-reference) to by-value
-// ==============================================================
-//
-// Swift's closure model is that all local variables are capture by reference.
-// This produces a very simple programming model which is great to use, but
-// relies on the optimizer to promote by-ref captures to by-value (i.e. by-copy)
-// captures for decent performance. Consider this simple example:
-//
-//   func foo(a : () -> ()) {} // assume this has an unknown body
-//
-//   func bar() {
-//     var x = 42
-//
-//     foo({ print(x) })
-//   }
-//
-// Since x is captured by-ref by the closure, x must live on the heap. By
-// looking at bar without any knowledge of foo, we can know that it is safe to
-// promote this to a by-value capture, allowing x to live on the stack under the
-// following conditions:
-//
-// 1. If x is not modified in the closure body and is only loaded.
-// 2. If we can prove that all mutations to x occur before the closure is
-//    formed.
-//
-// Under these conditions if x is loadable then we can even load the given value
-// and pass it as a scalar instead of an address.
-//
+///
+/// \file
+///
+/// Promotes captures from 'inout' (i.e. by-reference) to by-value
+/// ==============================================================
+///
+/// Swift's closure model is that all local variables are capture by reference.
+/// This produces a very simple programming model which is great to use, but
+/// relies on the optimizer to promote by-ref captures to by-value (i.e. by-copy)
+/// captures for decent performance. Consider this simple example:
+///
+///   func foo(a : () -> ()) {} // assume this has an unknown body
+///
+///   func bar() {
+///     var x = 42
+///
+///     foo({ print(x) })
+///   }
+///
+/// Since x is captured by-ref by the closure, x must live on the heap. By
+/// looking at bar without any knowledge of foo, we can know that it is safe to
+/// promote this to a by-value capture, allowing x to live on the stack under the
+/// following conditions:
+///
+/// 1. If x is not modified in the closure body and is only loaded.
+/// 2. If we can prove that all mutations to x occur before the closure is
+///    formed.
+///
+/// Under these conditions if x is loadable then we can even load the given value
+/// and pass it as a scalar instead of an address.
+///
 //===----------------------------------------------------------------------===//
 
 #define DEBUG_TYPE "sil-capture-promotion"
@@ -449,6 +451,9 @@ ClosureCloner::initCloned(SILFunction *Orig, IsFragile_t Fragile,
       Orig->getEffectsKind(), Orig, Orig->getDebugScope());
   for (auto &Attr : Orig->getSemanticsAttrs())
     Fn->addSemanticsAttr(Attr);
+  if (Orig->hasUnqualifiedOwnership()) {
+    Fn->setUnqualifiedOwnership();
+  }
   Fn->setDeclCtx(Orig->getDeclContext());
   return Fn;
 }

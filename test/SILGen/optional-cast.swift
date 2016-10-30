@@ -20,9 +20,9 @@ class B : A {}
 // CHECK-NEXT: store [[T0]] to [[X_VALUE]] : $*B
 // CHECK-NEXT: inject_enum_addr [[PB]] : $*Optional<B>, #Optional.some
 // CHECK-NEXT: br [[CONT:bb[0-9]+]]
-//   If not, release the A and inject nothing into x.
+//   If not, destroy_value the A and inject nothing into x.
 // CHECK:    [[NOT_B]]:
-// CHECK-NEXT: strong_release [[VAL]]
+// CHECK-NEXT: destroy_value [[VAL]]
 // CHECK-NEXT: inject_enum_addr [[PB]] : $*Optional<B>, #Optional.none
 // CHECK-NEXT: br [[CONT]]
 //   Finish the present path.
@@ -30,8 +30,8 @@ class B : A {}
 // CHECK-NEXT: br [[CONT2:bb[0-9]+]]
 //   Finish.
 // CHECK:    [[CONT2]]:
-// CHECK-NEXT: strong_release [[X]]
-// CHECK-NEXT: release_value %0
+// CHECK-NEXT: destroy_value [[X]]
+// CHECK-NEXT: destroy_value %0
 //   Finish the not-present path.
 // CHECK:    [[NOT_PRESENT]]:
 // CHECK-NEXT: inject_enum_addr [[PB]] {{.*}}none
@@ -45,7 +45,7 @@ func foo(_ y : A?) {
 // CHECK-NEXT: [[PB:%.*]] = project_box [[X]]
 
 // Check for some(...)
-// CHECK-NEXT: retain_value %0
+// CHECK-NEXT: copy_value %0
 // CHECK:      [[T1:%.*]] = select_enum %0
 // CHECK-NEXT: cond_br [[T1]], [[P:bb.*]], [[NIL_DEPTH2:bb[0-9]+]]
 //   If so, drill down another level and check for some(some(...)).
@@ -74,7 +74,7 @@ func foo(_ y : A?) {
 // CHECK-NEXT: br [[SWITCH_OB2:bb[0-9]+]](
 //   If not, inject nothing into an optional.
 // CHECK:    [[NOT_B]]:
-// CHECK-NEXT: strong_release [[VAL]]
+// CHECK-NEXT: destroy_value [[VAL]]
 // CHECK-NEXT: enum $Optional<B>, #Optional.none!enumelt
 // CHECK-NEXT: br [[SWITCH_OB2]](
 //   Switch out on the value in [[OB2]].
@@ -88,8 +88,8 @@ func foo(_ y : A?) {
 // CHECK-NEXT: enum $Optional<Optional<Optional<B>>>, #Optional.some!enumelt.1,
 // CHECK: br [[DONE_DEPTH2:bb[0-9]+]]
 // CHECK:    [[DONE_DEPTH2]]
-// CHECK-NEXT: strong_release [[X]]
-// CHECK-NEXT: release_value %0
+// CHECK-NEXT: destroy_value [[X]]
+// CHECK-NEXT: destroy_value %0
 // CHECK:      return
 //   On various failure paths, set OOB := nil.
 // CHECK:    [[NIL_DEPTH1]]:
@@ -107,7 +107,7 @@ func bar(_ y : A????) {
 // CHECK-LABEL: sil hidden @_TF4main3baz
 // CHECK:      [[X:%.*]] = alloc_box $Optional<B>, var, name "x"
 // CHECK-NEXT: [[PB:%.*]] = project_box [[X]]
-// CHECK-NEXT: retain_value %0
+// CHECK-NEXT: copy_value %0
 // CHECK:      [[T1:%.*]] = select_enum %0
 // CHECK: [[VAL:%.*]] = unchecked_enum_data %0
 // CHECK-NEXT: [[X_VALUE:%.*]] = init_enum_data_addr [[PB]] : $*Optional<B>, #Optional.some
@@ -167,7 +167,7 @@ public struct TestAddressOnlyStruct<T> {
 // CHECK-NEXT: [[PB:%.*]] = project_box [[X]]
 // CHECK-NEXT: [[CAST:%.*]] = unchecked_addr_cast [[PB]] : $*Optional<Int> to $*Optional<Int>
 // CHECK-NEXT: store %0 to [[CAST]] : $*Optional<Int>
-// CHECK-NEXT: strong_release [[X]] : $@box Optional<Int>
+// CHECK-NEXT: destroy_value [[X]] : $@box Optional<Int>
 func testContextualInitOfNonAddrOnlyType(_ a : Int?) {
   var x: Int! = a
 }

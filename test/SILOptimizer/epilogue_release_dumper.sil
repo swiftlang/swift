@@ -1,4 +1,4 @@
-// RUN: %target-sil-opt -enable-sil-verify-all -sil-epilogue-retain-release-dumper %s | %FileCheck %s
+// RUN: %target-sil-opt -assume-parsing-unqualified-ownership-sil -enable-sil-verify-all -sil-epilogue-retain-release-dumper %s | %FileCheck %s
 
 import Builtin
 import Swift
@@ -10,14 +10,14 @@ import Swift
 
 class foo {
   var a: Int
-   deinit 
+   deinit
   init()
 }
 
 class bar {
   var start: foo
   var end: foo
-   deinit 
+   deinit
   init()
 }
 
@@ -336,7 +336,7 @@ bb0(%0 : $foo):
 }
 
 // CHECK-LABEL: START: sil @retain_with_interfering_uses
-// CHECK-NOT: retain_value 
+// CHECK-NOT: retain_value
 // CHECK: END: sil @retain_with_interfering_uses
 sil @retain_with_interfering_uses : $@convention(thin) (@owned baz) -> @owned baz {
 bb0(%0 : $baz):
@@ -373,7 +373,7 @@ bb3(%3 : $foo):
 }
 
 // CHECK-LABEL: START: sil @exploded_retain
-// CHECK-NOT: strong_retain 
+// CHECK-NOT: strong_retain
 // CHECK: END: sil @exploded_retain
 sil @exploded_retain : $@convention(thin) (@owned boo) -> @owned boo {
 bb0(%0 : $boo):

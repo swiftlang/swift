@@ -13,7 +13,7 @@ sil_stage raw
 
 import Builtin
 import Swift
-import gizmo 
+import gizmo
 
 class SwiftGizmo : Gizmo {
   init(red: Float, green: Float, blue: Float) { }

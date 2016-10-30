@@ -69,7 +69,7 @@ tests.test("${Collection}/Up/${Key0}=>${Key1}") {
     ${DynamicKey}(17) as ${Key0}]
 
   let upcasted = source as ${Collection}<${Key1}>
-  
+
   expectEqual(source.count, upcasted.count)
   for x in source {
     expectTrue(upcasted.contains(x))
@@ -85,17 +85,17 @@ tests.test("${Collection}/Down/${method}/${Key1}=>${Key0}") {
     ${DynamicKey}(17) as ${Key1}]
 
 %             if method == 'Direct':
-  
+
   guard let downcasted = expectNotNil(source as? ${Collection}<${Key0}>)
   else { return }
-  
+
 %             else:
-  
+
   guard let downcasted = expectNotNil(cast(source, to: ${Collection}<${Key0}>.self))
   else { return }
-  
+
 %             end
-  
+
   expectEqual(source.count, downcasted.count)
   for x in downcasted {
     expectTrue(source.contains(x))
@@ -125,18 +125,18 @@ tests.test(
   let upcasted = source as [${Key1}:${Value1}]
 %   else:
   let upcasted_ = source as Any as? [${Key1}:${Value1}]
-  
+
   guard let upcasted = expectNotNil(upcasted_) else { return }
 %   end
 
   expectEqual(source.count, upcasted.count)
-  
+
   for (k0, v0) in source {
     guard let v1 = expectNotNil(upcasted[k0]) else { continue }
-    
+
     guard let dv0 = expectNotNil(
       cast(v0, to: ${DynamicValue}.self)) else { continue }
-    
+
     guard let dv1 = expectNotNil(
       cast(v1, to: ${DynamicValue}.self)) else { continue }
 
@@ -160,13 +160,13 @@ tests.test(
   else { return }
 
   expectEqual(source.count, downcasted.count)
-  
+
   for (k0, v0) in downcasted {
     guard let v1 = expectNotNil(source[k0]) else { continue }
-    
+
     guard let dv0 = expectNotNil(
       cast(v0, to: ${DynamicValue}.self)) else { continue }
-    
+
     guard let dv1 = expectNotNil(
       cast(v1, to: ${DynamicValue}.self)) else { continue }
 

@@ -103,7 +103,7 @@ the Swift type system:
   An equality constraint requires two types to be identical. For
   example, the constraint ``T0 == T1`` effectively ensures that ``T0`` and
   ``T1`` get the same concrete type binding. There are two different
-  flavors of equality constraints: 
+  flavors of equality constraints:
 
     - Exact equality constraints, or  "binding", written ``T0 := X``
       for some type variable ``T0`` and type ``X``, which requires
@@ -153,7 +153,7 @@ the Swift type system:
   second, i.e., for ``x as T``.
 
 **Applicable function**
-  An applicable function requires that both types are function types 
+  An applicable function requires that both types are function types
   with the same input and output types. It is used when the function
   type on the left-hand side is being split into its input and output
   types for function application purposes. Note, that it does not
@@ -201,7 +201,7 @@ The process of constraint generation produces a constraint system
 that relates the types of the various subexpressions within an
 expression. Programmatically, constraint generation walks an
 expression from the leaves up to the root, assigning a type (which
-often involves type variables) to each subexpression as it goes. 
+often involves type variables) to each subexpression as it goes.
 
 Constraint generation is driven by the syntax of the
 expression, and each different kind of expression---function
@@ -224,7 +224,7 @@ and types generated from the primary expression kinds are:
   section. Additionally, when the name refers to a generic function or
   a generic type, the declaration reference may introduce new type
   variables; see the `Polymorphic Types`_ section for more information.
- 
+
 **Member reference**
   A member reference expression ``a.b`` is assigned the type ``T0``
   for a fresh type variable ``T0``. In addition, the expression
@@ -351,7 +351,7 @@ variable (call it ``T0``) for the type of the reference to an
 overloaded declaration. Then, a disjunction constraint is introduced,
 in which each term binds that type variable (via an exact equality
 constraint) to the type produced by one of the overloads in the
-overload set. In our negate example, the disjunction is 
+overload set. In our negate example, the disjunction is
 ``T0 := (Int) -> Int or T0 := (Double) -> Double``. The constraint
 solver, discussed in the later section on `Constraint Solving`_,
 explores both possible bindings, and the overloaded reference resolves
@@ -572,7 +572,7 @@ produce derived constraint systems that explore the solution space.
 Overload Selection
 '''''''''''''''''''''''''''''''''''''''''''''''''''''
 Overload selection is the simplest way to make an assumption. For an
-overload set that introduced a disjunction constraint 
+overload set that introduced a disjunction constraint
 ``T0 := A1 or T0 := A2 or ... or T0 := AN`` into the constraint
 system, each term in the disjunction will be visited separately. Each
 solver state binds the type variable ``T0`` and explores
@@ -598,7 +598,7 @@ placed on it that relate it to concrete types, e.g., ``T0 <c Int`` or
 starting point to make educated guesses for the type ``T0``.
 
 To determine an appropriate guess, the relational constraints placed
-on the type variable are categorized. Given a relational constraint of the form 
+on the type variable are categorized. Given a relational constraint of the form
 ``T0 <? A`` (where ``<?`` is one of ``<``, ``<t``, or ``<c``), where
 ``A`` is some concrete type, ``A`` is said to be  "above"
 ``T0``. Similarly, given a constraint of the form ``B <? T0`` for a

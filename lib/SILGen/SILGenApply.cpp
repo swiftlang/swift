@@ -2341,8 +2341,7 @@ RValue SILGenFunction::emitApply(
     case ParameterConvention::Direct_Owned:
       // If the callee will consume the 'self' parameter, let's retain it so we
       // can keep it alive.
-      lifetimeExtendedSelf =
-          B.emitCopyValueOperation(loc, lifetimeExtendedSelf);
+      B.emitCopyValueOperation(loc, lifetimeExtendedSelf);
       break;
     case ParameterConvention::Direct_Guaranteed:
     case ParameterConvention::Direct_Unowned:
@@ -5433,7 +5432,7 @@ static SILValue emitDynamicPartialApply(SILGenFunction &gen,
   // Retain 'self' because the partial apply will take ownership.
   // We can't simply forward 'self' because the partial apply is conditional.
   if (!self->getType().isAddress())
-    self = gen.B.emitCopyValueOperation(loc, self);
+    gen.B.emitCopyValueOperation(loc, self);
 
   SILValue result = gen.B.createPartialApply(loc, method, method->getType(), {},
                                              self, partialApplyTy);

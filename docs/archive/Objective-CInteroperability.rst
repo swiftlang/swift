@@ -146,7 +146,7 @@ Guidelines:
 .. [#] If you explicitly want to expose a Swift method to Objective-C, but it
    is not part of an existing protocol, you can mark the method as "API" and
    include the ``[objc]`` attribute::
-   
+
      // Note: This syntax is not final!
      func [API, objc] accessibilityDescription {
        return "\(self.givenName) \(self.familyName)"
@@ -436,7 +436,7 @@ Arguments
 
   Objective-C currently requires that the first argument be ``self`` and the
   second be ``_cmd``. The explicit arguments to a method come after ``_cmd``.
-  
+
   Swift only requires that the first argument be ``self``. The explicit
   arguments come after ``self``.
 
@@ -497,21 +497,21 @@ Overloading
 
     // 1. foo:baz:
     func foo(Int bar, Int baz);
-  
+
     // 2. foo:qux:
     func foo(Int bar, Int qux);
-  
+
     // 3. foo:qux: (same as above)
     func foo(Int bar) qux(Int quux);
-  
+
     // 4. foo:baz: (but different type!)
     func foo(Int bar, UnicodeScalar baz);
-  
+
     a.foo(1, 2)      // ambiguous in Swift (#1 or #2?)
     a.foo(1, baz=2)  // calls #1
     a.foo(1, qux=2)  // calls #2/3 (the same method)
     a.foo(1, 'C')    // calls #4, not ambiguous in Swift!
-  
+
     [a foo:1 baz:2]; // ambiguous in Objective-C (#1 or #4?)
     [a foo:1 qux:2]; // calls #2/3 (the same method)
 
@@ -533,7 +533,7 @@ Note: the answer might be "Swift objects can't generally be referenced with
 ``isa`` Pointers
 ----------------
   The first word of every Objective-C object is a pointer to its class.
-  
+
   We might want to use a more compact representation for Swift objects...
 
 ...but we can't; see below.

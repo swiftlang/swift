@@ -9,12 +9,12 @@ class Hoozit : Gizmo {
   func typical(_ x: Int, y: Gizmo) -> Gizmo { return y }
   // CHECK-LABEL: sil hidden [thunk] @_TToFC11objc_thunks6Hoozit7typical{{.*}} : $@convention(objc_method) (Int, Gizmo, Hoozit) -> @autoreleased Gizmo {
   // CHECK: bb0([[X:%.*]] : $Int, [[Y:%.*]] : $Gizmo, [[THIS:%.*]] : $Hoozit):
-  // CHECK-NEXT:   retain [[Y]]
-  // CHECK-NEXT:   retain [[THIS]]
+  // CHECK-NEXT:   copy_value [[Y]]
+  // CHECK-NEXT:   copy_value [[THIS]]
   // CHECK-NEXT:   // function_ref
   // CHECK-NEXT:   [[NATIVE:%.*]] = function_ref @_TFC11objc_thunks6Hoozit7typical{{.*}} : $@convention(method) (Int, @owned Gizmo, @guaranteed Hoozit) -> @owned Gizmo
   // CHECK-NEXT:   [[RES:%.*]] = apply [[NATIVE]]([[X]], [[Y]], [[THIS]]) {{.*}} line:[[@LINE-7]]:8:auto_gen
-  // CHECK-NEXT:   strong_release [[THIS]] : $Hoozit
+  // CHECK-NEXT:   destroy_value [[THIS]] : $Hoozit
   // CHECK-NEXT:   return [[RES]] : $Gizmo{{.*}} line:[[@LINE-9]]:8:auto_gen
   // CHECK-NEXT: }
 
@@ -25,7 +25,7 @@ class Hoozit : Gizmo {
   // CHECK-NEXT:   // function_ref
   // CHECK-NEXT:   [[NATIVE:%.*]] = function_ref @_TFC11objc_thunks6Hoozit4fork{{.*}} : $@convention(method) (@guaranteed Hoozit) -> ()
   // CHECK-NEXT:   apply [[NATIVE]]([[THIS]])
-  // CHECK-NEXT:   strong_release [[THIS]]
+  // CHECK-NEXT:   destroy_value [[THIS]]
   // CHECK-NEXT:   return
   // CHECK-NEXT: }
 
@@ -43,11 +43,11 @@ class Hoozit : Gizmo {
   func copyFoo() -> Gizmo { return self }
   // CHECK-LABEL: sil hidden [thunk] @_TToFC11objc_thunks6Hoozit7copyFoo{{.*}} : $@convention(objc_method) (Hoozit) -> @owned Gizmo
   // CHECK: bb0([[THIS:%.*]] : $Hoozit):
-  // CHECK-NEXT:   retain [[THIS]]
+  // CHECK-NEXT:   copy_value [[THIS]]
   // CHECK-NEXT:   // function_ref
   // CHECK-NEXT:   [[NATIVE:%.*]] = function_ref @_TFC11objc_thunks6Hoozit7copyFoo{{.*}} : $@convention(method) (@guaranteed Hoozit) -> @owned Gizmo
   // CHECK-NEXT:   [[RES:%.*]] = apply [[NATIVE]]([[THIS]])
-  // CHECK:        release [[THIS]]
+  // CHECK:        destroy_value [[THIS]]
   // CHECK-NEXT:   return [[RES]]
   // CHECK-NEXT: }
 
@@ -56,11 +56,11 @@ class Hoozit : Gizmo {
   func initFoo() -> Gizmo { return self }
   // CHECK-LABEL: sil hidden [thunk] @_TToFC11objc_thunks6Hoozit7initFoo{{.*}} : $@convention(objc_method) (Hoozit) -> @autoreleased Gizmo
   // CHECK: bb0([[THIS:%.*]] : $Hoozit):
-  // CHECK-NEXT:   retain [[THIS]]
+  // CHECK-NEXT:   copy_value [[THIS]]
   // CHECK-NEXT:   // function_ref
   // CHECK-NEXT:   [[NATIVE:%.*]] = function_ref @_TFC11objc_thunks6Hoozit7initFoo{{.*}} : $@convention(method) (@guaranteed Hoozit) -> @owned Gizmo
   // CHECK-NEXT:   [[RES:%.*]] = apply [[NATIVE]]([[THIS]])
-  // CHECK-NEXT:   release [[THIS]]
+  // CHECK-NEXT:   destroy_value [[THIS]]
   // CHECK-NEXT:   return [[RES]]
   // CHECK-NEXT: }
 
@@ -68,11 +68,11 @@ class Hoozit : Gizmo {
   // -- getter
   // CHECK-LABEL: sil hidden [transparent] [thunk] @_TToFC11objc_thunks6Hoozitg15typicalPropertyCSo5Gizmo : $@convention(objc_method) (Hoozit) -> @autoreleased Gizmo {
   // CHECK: bb0(%0 : $Hoozit):
-  // CHECK-NEXT:   strong_retain %0
+  // CHECK-NEXT:   copy_value %0
   // CHECK-NEXT:   // function_ref objc_thunks.Hoozit.typicalProperty.getter
   // CHECK-NEXT:   [[GETIMPL:%.*]] = function_ref @_TFC11objc_thunks6Hoozitg15typicalPropertyCSo5Gizmo
   // CHECK-NEXT:   [[RES:%.*]] = apply [[GETIMPL]](%0)
-  // CHECK-NEXT:   strong_release %0
+  // CHECK-NEXT:   destroy_value %0
   // CHECK-NEXT:   return [[RES]] : $Gizmo
   // CHECK-NEXT: }
   
@@ -81,14 +81,14 @@ class Hoozit : Gizmo {
   // CHECK-NEXT:   debug_value %0
   // CHECK-NEXT:   [[ADDR:%.*]] = ref_element_addr %0 : {{.*}}, #Hoozit.typicalProperty
   // CHECK-NEXT:   [[RES:%.*]] = load [[ADDR]] {{.*}}
-  // CHECK-NEXT:   strong_retain [[RES]] : $Gizmo
+  // CHECK-NEXT:   copy_value [[RES]] : $Gizmo
   // CHECK-NEXT:   return [[RES]]
 
   // -- setter
   // CHECK-LABEL: sil hidden [transparent] [thunk] @_TToFC11objc_thunks6Hoozits15typicalPropertyCSo5Gizmo : $@convention(objc_method) (Gizmo, Hoozit) -> () {
   // CHECK: bb0([[VALUE:%.*]] : $Gizmo, [[THIS:%.*]] : $Hoozit):
-  // CHECK-NEXT:   retain [[VALUE]] : $Gizmo
-  // CHECK-NEXT:   retain [[THIS]] : $Hoozit
+  // CHECK-NEXT:   copy_value [[VALUE]] : $Gizmo
+  // CHECK-NEXT:   copy_value [[THIS]] : $Hoozit
   // CHECK-NEXT:   // function_ref objc_thunks.Hoozit.typicalProperty.setter
   // CHECK-NEXT:   [[FR:%.*]] = function_ref @_TFC11objc_thunks6Hoozits15typicalPropertyCSo5Gizmo
   // CHECK-NEXT:   [[RES:%.*]] = apply [[FR]](%0, %1)
@@ -104,11 +104,11 @@ class Hoozit : Gizmo {
   // -- getter
   // CHECK-LABEL: sil hidden [transparent] [thunk] @_TToFC11objc_thunks6Hoozitg12copyPropertyCSo5Gizmo : $@convention(objc_method) (Hoozit) -> @owned Gizmo {
   // CHECK: bb0(%0 : $Hoozit):
-  // CHECK-NEXT:   strong_retain %0
+  // CHECK-NEXT:   copy_value %0
   // CHECK-NEXT:   // function_ref objc_thunks.Hoozit.copyProperty.getter
   // CHECK-NEXT:   [[FR:%.*]] = function_ref @_TFC11objc_thunks6Hoozitg12copyPropertyCSo5Gizmo
   // CHECK-NEXT:   [[RES:%.*]] = apply [[FR]](%0)
-  // CHECK-NEXT:   strong_release %0
+  // CHECK-NEXT:   destroy_value %0
   // CHECK-NEXT:   return [[RES]]
   // CHECK-NEXT: }
 
@@ -116,18 +116,18 @@ class Hoozit : Gizmo {
   // CHECK: bb0(%0 : $Hoozit):
   // CHECK:        [[ADDR:%.*]] = ref_element_addr %0 : {{.*}}, #Hoozit.copyProperty
   // CHECK-NEXT:   [[RES:%.*]] = load [[ADDR]]
-  // CHECK-NEXT:   retain [[RES]] 
+  // CHECK-NEXT:   copy_value [[RES]] 
   // CHECK-NEXT:   return [[RES]]
 
   // -- setter is normal
   // CHECK-LABEL: sil hidden [transparent] [thunk] @_TToFC11objc_thunks6Hoozits12copyPropertyCSo5Gizmo : $@convention(objc_method) (Gizmo, Hoozit) -> () {
   // CHECK: bb0([[VALUE:%.*]] : $Gizmo, [[THIS:%.*]] : $Hoozit):
-  // CHECK-NEXT:   retain [[VALUE]]
-  // CHECK-NEXT:   retain [[THIS]]
+  // CHECK-NEXT:   copy_value [[VALUE]]
+  // CHECK-NEXT:   copy_value [[THIS]]
   // CHECK-NEXT:   // function_ref objc_thunks.Hoozit.copyProperty.setter
   // CHECK-NEXT:   [[FR:%.*]] = function_ref @_TFC11objc_thunks6Hoozits12copyPropertyCSo5Gizmo
   // CHECK-NEXT:   [[RES:%.*]] = apply [[FR]](%0, %1)
-  // CHECK-NEXT:   strong_release [[THIS]]
+  // CHECK-NEXT:   destroy_value [[THIS]]
   // CHECK-NEXT:   return [[RES]]
 
   // CHECK-LABEL: sil hidden [transparent] @_TFC11objc_thunks6Hoozits12copyPropertyCSo5Gizmo
@@ -139,11 +139,11 @@ class Hoozit : Gizmo {
   // -- getter
   // CHECK-LABEL: sil hidden [thunk] @_TToFC11objc_thunks6Hoozitg10roPropertyCSo5Gizmo : $@convention(objc_method) (Hoozit) -> @autoreleased Gizmo {
   // CHECK: bb0([[THIS:%.*]] : $Hoozit):
-  // CHECK-NEXT:   retain [[THIS]]
+  // CHECK-NEXT:   copy_value [[THIS]]
   // CHECK-NEXT:   // function_ref
   // CHECK-NEXT:   [[NATIVE:%.*]] = function_ref @_TFC11objc_thunks6Hoozitg10roPropertyCSo5Gizmo : $@convention(method) (@guaranteed Hoozit) -> @owned Gizmo
   // CHECK-NEXT:   [[RES:%.*]] = apply [[NATIVE]]([[THIS]])
-  // CHECK-NEXT:   release [[THIS]] : $Hoozit
+  // CHECK-NEXT:   destroy_value [[THIS]] : $Hoozit
   // CHECK-NEXT:   return [[RES]] : $Gizmo
   // CHECK-NEXT: }
 
@@ -162,12 +162,12 @@ class Hoozit : Gizmo {
   // -- setter
   // CHECK-LABEL: sil hidden [thunk] @_TToFC11objc_thunks6Hoozits10rwPropertyCSo5Gizmo : $@convention(objc_method) (Gizmo, Hoozit) -> () {
   // CHECK: bb0([[VALUE:%.*]] : $Gizmo, [[THIS:%.*]] : $Hoozit):
-  // CHECK-NEXT:   retain [[VALUE]]
-  // CHECK-NEXT:   retain [[THIS]]
+  // CHECK-NEXT:   copy_value [[VALUE]]
+  // CHECK-NEXT:   copy_value [[THIS]]
   // CHECK-NEXT:   // function_ref
   // CHECK-NEXT:   [[NATIVE:%.*]] = function_ref @_TFC11objc_thunks6Hoozits10rwPropertyCSo5Gizmo : $@convention(method) (@owned Gizmo, @guaranteed Hoozit) -> ()
   // CHECK-NEXT:   apply [[NATIVE]]([[VALUE]], [[THIS]])
-  // CHECK-NEXT:   release [[THIS]]
+  // CHECK-NEXT:   destroy_value [[THIS]]
   // CHECK-NEXT:   return
   // CHECK-NEXT: }
 
@@ -180,11 +180,11 @@ class Hoozit : Gizmo {
   // -- getter
   // CHECK-LABEL: sil hidden [thunk] @_TToFC11objc_thunks6Hoozitg14copyRWPropertyCSo5Gizmo : $@convention(objc_method) (Hoozit) -> @owned Gizmo {
   // CHECK: bb0([[THIS:%.*]] : $Hoozit):
-  // CHECK-NEXT:   retain [[THIS]]
+  // CHECK-NEXT:   copy_value [[THIS]]
   // CHECK-NEXT:   // function_ref
   // CHECK-NEXT:   [[NATIVE:%.*]] = function_ref @_TFC11objc_thunks6Hoozitg14copyRWPropertyCSo5Gizmo : $@convention(method) (@guaranteed Hoozit) -> @owned Gizmo
   // CHECK-NEXT:   [[RES:%.*]] = apply [[NATIVE]]([[THIS]])
-  // CHECK-NEXT:   release [[THIS]]
+  // CHECK-NEXT:   destroy_value [[THIS]]
   // CHECK-NOT:    return
   // CHECK-NEXT:   return [[RES]]
   // CHECK-NEXT: }
@@ -192,12 +192,12 @@ class Hoozit : Gizmo {
   // -- setter is normal
   // CHECK-LABEL: sil hidden [thunk] @_TToFC11objc_thunks6Hoozits14copyRWPropertyCSo5Gizmo : $@convention(objc_method) (Gizmo, Hoozit) -> () {
   // CHECK: bb0([[VALUE:%.*]] : $Gizmo, [[THIS:%.*]] : $Hoozit):
-  // CHECK-NEXT:   retain [[VALUE]]
-  // CHECK-NEXT:   retain [[THIS]]
+  // CHECK-NEXT:   copy_value [[VALUE]]
+  // CHECK-NEXT:   copy_value [[THIS]]
   // CHECK-NEXT:   // function_ref
   // CHECK-NEXT:   [[NATIVE:%.*]] = function_ref @_TFC11objc_thunks6Hoozits14copyRWPropertyCSo5Gizmo : $@convention(method) (@owned Gizmo, @guaranteed Hoozit) -> ()
   // CHECK-NEXT:   apply [[NATIVE]]([[VALUE]], [[THIS]])
-  // CHECK-NEXT:   release [[THIS]]
+  // CHECK-NEXT:   destroy_value [[THIS]]
   // CHECK-NEXT:   return
   // CHECK-NEXT: }
 
@@ -205,23 +205,23 @@ class Hoozit : Gizmo {
   // -- getter
   // CHECK-LABEL: sil hidden [transparent] [thunk] @_TToFC11objc_thunks6Hoozitg12initPropertyCSo5Gizmo : $@convention(objc_method) (Hoozit) -> @autoreleased Gizmo {
   // CHECK: bb0([[THIS:%.*]] : $Hoozit):
-  // CHECK-NEXT:   retain [[THIS]]
+  // CHECK-NEXT:   copy_value [[THIS]]
   // CHECK-NEXT:   // function_ref
   // CHECK-NEXT:   [[NATIVE:%.*]] = function_ref @_TFC11objc_thunks6Hoozitg12initPropertyCSo5Gizmo : $@convention(method) (@guaranteed Hoozit) -> @owned Gizmo
   // CHECK-NEXT:   [[RES:%.*]] = apply [[NATIVE]]([[THIS]])
-  // CHECK-NEXT:   release [[THIS]]
+  // CHECK-NEXT:   destroy_value [[THIS]]
   // CHECK-NEXT:   return [[RES]]
   // CHECK-NEXT: }
 
   // -- setter
   // CHECK-LABEL: sil hidden [transparent] [thunk] @_TToFC11objc_thunks6Hoozits12initPropertyCSo5Gizmo : $@convention(objc_method) (Gizmo, Hoozit) -> () {
   // CHECK: bb0([[VALUE:%.*]] : $Gizmo, [[THIS:%.*]] : $Hoozit):
-  // CHECK-NEXT:   retain [[VALUE]]
-  // CHECK-NEXT:   retain [[THIS]]
+  // CHECK-NEXT:   copy_value [[VALUE]]
+  // CHECK-NEXT:   copy_value [[THIS]]
   // CHECK-NEXT:   // function_ref
   // CHECK-NEXT:   [[NATIVE:%.*]] = function_ref @_TFC11objc_thunks6Hoozits12initPropertyCSo5Gizmo : $@convention(method) (@owned Gizmo, @guaranteed Hoozit) -> ()
   // CHECK-NEXT:   apply [[NATIVE]]([[VALUE]], [[THIS]])
-  // CHECK-NEXT:   release [[THIS]]
+  // CHECK-NEXT:   destroy_value [[THIS]]
   // CHECK-NEXT:   return
   // CHECK-NEXT: }
 
@@ -232,23 +232,23 @@ class Hoozit : Gizmo {
   // -- getter
   // CHECK-LABEL: sil hidden [thunk] @_TToFC11objc_thunks6Hoozitg12propComputedCSo5Gizmo : $@convention(objc_method) (Hoozit) -> @autoreleased Gizmo {
   // CHECK: bb0([[THIS:%.*]] : $Hoozit):
-  // CHECK-NEXT:   retain [[THIS]]
+  // CHECK-NEXT:   copy_value [[THIS]]
   // CHECK-NEXT:   // function_ref
   // CHECK-NEXT:   [[NATIVE:%.*]] = function_ref @_TFC11objc_thunks6Hoozitg12propComputedCSo5Gizmo : $@convention(method) (@guaranteed Hoozit) -> @owned Gizmo
   // CHECK-NEXT:   [[RES:%.*]] = apply [[NATIVE]]([[THIS]])
-  // CHECK-NEXT:   release [[THIS]]
+  // CHECK-NEXT:   destroy_value [[THIS]]
   // CHECK-NEXT:   return [[RES]]
   // CHECK-NEXT: }
 
   // -- setter
   // CHECK-LABEL: sil hidden [thunk] @_TToFC11objc_thunks6Hoozits12propComputedCSo5Gizmo : $@convention(objc_method) (Gizmo, Hoozit) -> () {
   // CHECK: bb0([[VALUE:%.*]] : $Gizmo, [[THIS:%.*]] : $Hoozit):
-  // CHECK-NEXT:   retain [[VALUE]]
-  // CHECK-NEXT:   retain [[THIS]]
+  // CHECK-NEXT:   copy_value [[VALUE]]
+  // CHECK-NEXT:   copy_value [[THIS]]
   // CHECK-NEXT:   // function_ref
   // CHECK-NEXT:   [[NATIVE:%.*]] = function_ref @_TFC11objc_thunks6Hoozits12propComputedCSo5Gizmo : $@convention(method) (@owned Gizmo, @guaranteed Hoozit) -> ()
   // CHECK-NEXT:   apply [[NATIVE]]([[VALUE]], [[THIS]])
-  // CHECK-NEXT:   release [[THIS]]
+  // CHECK-NEXT:   destroy_value [[THIS]]
   // CHECK-NEXT:   return
   // CHECK-NEXT: }
 
@@ -277,10 +277,10 @@ class Hoozit : Gizmo {
   // Getter
   // CHECK-LABEL: sil hidden [thunk] @_TToFC11objc_thunks6Hoozitg9subscript{{.*}} : $@convention(objc_method) (Int, Hoozit) -> @autoreleased Hoozit
   // CHECK: bb0([[I:%[0-9]+]] : $Int, [[SELF:%[0-9]+]] : $Hoozit):
-  // CHECK-NEXT:   strong_retain [[SELF]] : $Hoozit
+  // CHECK-NEXT:   copy_value [[SELF]] : $Hoozit
   // CHECK: [[NATIVE:%[0-9]+]] = function_ref @_TFC11objc_thunks6Hoozitg9subscript{{.*}} : $@convention(method) (Int, @guaranteed Hoozit) -> @owned Hoozit
   // CHECK-NEXT: [[RESULT:%[0-9]+]] = apply [[NATIVE]]([[I]], [[SELF]]) : $@convention(method) (Int, @guaranteed Hoozit) -> @owned Hoozit
-  // CHECK-NEXT: strong_release [[SELF]]
+  // CHECK-NEXT: destroy_value [[SELF]]
   // CHECK-NEXT: return [[RESULT]] : $Hoozit
   get {
     return self
@@ -289,11 +289,11 @@ class Hoozit : Gizmo {
   // Setter
   // CHECK-LABEL: sil hidden [thunk] @_TToFC11objc_thunks6Hoozits9subscript{{.*}} : $@convention(objc_method) (Hoozit, Int, Hoozit) -> ()
   // CHECK: bb0([[SELF:%[0-9]+]] : $Hoozit, [[I:%[0-9]+]] : $Int, [[VALUE:%[0-9]+]] : $Hoozit):
-  // CHECK-NEXT: strong_retain [[SELF]] : $Hoozit
-  // CHECK_NEXT: strong_retain [[VALUE]] : $Hoozit
+  // CHECK-NEXT: copy_value [[SELF]] : $Hoozit
+  // CHECK_NEXT: copy_value [[VALUE]] : $Hoozit
   // CHECK: [[NATIVE:%[0-9]+]] = function_ref @_TFC11objc_thunks6Hoozits9subscript{{.*}} : $@convention(method) (@owned Hoozit, Int, @guaranteed Hoozit) -> ()
   // CHECK-NEXT: [[RESULT:%[0-9]+]] = apply [[NATIVE]]([[SELF]], [[I]], [[VALUE]]) : $@convention(method) (@owned Hoozit, Int, @guaranteed Hoozit) -> ()
-  // CHECK-NEXT: strong_release [[VALUE]]
+  // CHECK-NEXT: destroy_value [[VALUE]]
   // CHECK-NEXT: return [[RESULT]] : $()
   set {}
   }
@@ -302,11 +302,11 @@ class Hoozit : Gizmo {
 class Wotsit<T> : Gizmo {
   // CHECK-LABEL: sil hidden [thunk] @_TToFC11objc_thunks6Wotsit5plain{{.*}} : $@convention(objc_method) <T> (Wotsit<T>) -> () {
   // CHECK: bb0([[SELF:%.*]] : $Wotsit<T>):
-  // CHECK-NEXT: strong_retain [[SELF]] : $Wotsit<T>
+  // CHECK-NEXT: copy_value [[SELF]] : $Wotsit<T>
   // CHECK-NEXT: // function_ref
   // CHECK-NEXT: [[NATIVE:%.*]] = function_ref @_TFC11objc_thunks6Wotsit5plain{{.*}} : $@convention(method) <τ_0_0> (@guaranteed Wotsit<τ_0_0>) -> ()
   // CHECK-NEXT: [[RESULT:%.*]] = apply [[NATIVE]]<T>([[SELF]]) : $@convention(method) <τ_0_0> (@guaranteed Wotsit<τ_0_0>) -> ()
-  // CHECK-NEXT: strong_release [[SELF]] : $Wotsit<T>
+  // CHECK-NEXT: destroy_value [[SELF]] : $Wotsit<T>
   // CHECK-NEXT: return [[RESULT]] : $()
   // CHECK-NEXT: }
   func plain() { }
@@ -322,15 +322,15 @@ class Wotsit<T> : Gizmo {
 
   // CHECK-LABEL: sil hidden [thunk] @_TToFC11objc_thunks6Wotsitg11descriptionSS : $@convention(objc_method) <T> (Wotsit<T>) -> @autoreleased NSString {
   // CHECK: bb0([[SELF:%.*]] : $Wotsit<T>):
-  // CHECK-NEXT:   strong_retain [[SELF]] : $Wotsit<T>
+  // CHECK-NEXT:   copy_value [[SELF]] : $Wotsit<T>
   // CHECK-NEXT:   // function_ref
   // CHECK-NEXT:   [[NATIVE:%.*]] = function_ref @_TFC11objc_thunks6Wotsitg11descriptionSS : $@convention(method) <τ_0_0> (@guaranteed Wotsit<τ_0_0>) -> @owned String
   // CHECK-NEXT:   [[RESULT:%.*]] = apply [[NATIVE:%.*]]<T>([[SELF]]) : $@convention(method) <τ_0_0> (@guaranteed Wotsit<τ_0_0>) -> @owned String
-  // CHECK-NEXT:   strong_release [[SELF]] : $Wotsit<T>
+  // CHECK-NEXT:   destroy_value [[SELF]] : $Wotsit<T>
   // CHECK-NEXT:   // function_ref
   // CHECK-NEXT:   [[BRIDGE:%.*]] = function_ref @_TFE10FoundationSS19_bridgeToObjectiveCfT_CSo8NSString
   // CHECK-NEXT:   [[NSRESULT:%.*]] = apply [[BRIDGE]]([[RESULT]]) : $@convention(method) (@guaranteed String) -> @owned NSString
-  // CHECK-NEXT:   release_value [[RESULT]]
+  // CHECK-NEXT:   destroy_value [[RESULT]]
   // CHECK-NEXT:   return [[NSRESULT]] : $NSString
   // CHECK-NEXT: }
   override var description : String {
@@ -365,13 +365,13 @@ extension Hoozit {
     // CHECK: [[NONNULL:%[0-9]+]] = is_nonnull [[NEW_SELF]] : $Hoozit
     // CHECK-NEXT: cond_br [[NONNULL]], [[NONNULL_BB:bb[0-9]+]], [[NULL_BB:bb[0-9]+]]
     // CHECK: [[NULL_BB]]:
-    // CHECK-NEXT: strong_release [[X_BOX]] : $@box X
+    // CHECK-NEXT: destroy_value [[X_BOX]] : $@box X
     // CHECK-NEXT: br [[EPILOG_BB:bb[0-9]+]]
 
     // CHECK: [[NONNULL_BB]]:
     // CHECK:   [[OTHER_REF:%[0-9]+]] = function_ref @_TF11objc_thunks5otherFT_T_ : $@convention(thin) () -> ()
     // CHECK-NEXT: apply [[OTHER_REF]]() : $@convention(thin) () -> ()
-    // CHECK-NEXT: strong_release [[X_BOX]] : $@box X
+    // CHECK-NEXT: destroy_value [[X_BOX]] : $@box X
     // CHECK-NEXT: br [[EPILOG_BB]]
     
     // CHECK: [[EPILOG_BB]]:

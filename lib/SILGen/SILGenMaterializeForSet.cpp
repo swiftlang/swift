@@ -657,7 +657,7 @@ MaterializeForSetEmitter::createAddressorCallback(SILFunction &F,
 
     case AddressorKind::Owning:
     case AddressorKind::NativeOwning:
-      gen.B.createStrongRelease(loc, owner, Atomicity::Atomic);
+      gen.B.createDestroyValue(loc, owner);
       break;
 
     case AddressorKind::NativePinning:

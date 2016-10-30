@@ -19,12 +19,12 @@ from gyb_foundation_support import ObjectiveCBridgeableImplementationForNSValue
 
 // UITableView extensions
 public extension IndexPath {
-    
+
     /// Initialize for use with `UITableView` or `UICollectionView`.
     public init(row: Int, section: Int) {
         self.init(indexes: [section, row])
     }
-    
+
     /// The section of this index path, when used with `UITableView`.
     ///
     /// - precondition: The index path must have exactly two elements.
@@ -38,7 +38,7 @@ public extension IndexPath {
             self[0] = newValue
         }
     }
-    
+
     /// The row of this index path, when used with `UITableView`.
     ///
     /// - precondition: The index path must have exactly two elements.
@@ -56,7 +56,7 @@ public extension IndexPath {
 
 // UICollectionView extensions
 public extension IndexPath {
-    
+
     /// Initialize for use with `UITableView` or `UICollectionView`.
     public init(item: Int, section: Int) {
         self.init(indexes: [section, item])
@@ -77,7 +77,7 @@ public extension IndexPath {
     }}
 
 public extension URLResourceValues {
-    
+
     /// Returns a dictionary of UIImage objects keyed by size.
     @available(iOS 8.0, *)
     public var thumbnailDictionary : [URLThumbnailSizeKey : UIImage]? {

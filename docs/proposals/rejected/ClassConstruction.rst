@@ -33,10 +33,10 @@ of its subclasses.  This leads to a soundness problem:
   @interface Subclass : Superclass
   - (void)subclassMethod
   @end
-    
+
   @implementation Subclass : Superclass
   char\* **name**\ ;                      // never initialized
-    
+
   - (void)print { printf(\ **name**\ ); } // oops
   @end
 
@@ -150,7 +150,7 @@ Here are the proposed rules:
      It allows superclasses to break their subclasses by adding
      ``init`` methods.
 
-     
+
 Summary
 =======
 

@@ -20,9 +20,9 @@ func if_no_else() {
   if let x = foo() {
   // CHECK: [[YES]]([[VAL:%[0-9]+]] : $String):
   // CHECK:   [[A:%.*]] = function_ref @_TF16if_while_binding
-  // CHECK:   retain_value [[VAL]]
+  // CHECK:   copy_value [[VAL]]
   // CHECK:   apply [[A]]([[VAL]])
-  // CHECK:   release_value [[VAL]]
+  // CHECK:   destroy_value [[VAL]]
   // CHECK:   br [[CONT]]
     a(x)
   }
@@ -39,9 +39,9 @@ func if_else_chain() {
   // CHECK: [[YESX]]([[VAL:%[0-9]+]] : $String):
   // CHECK:   debug_value [[VAL]] : $String, let, name "x"
   // CHECK:   [[A:%.*]] = function_ref @_TF16if_while_binding
-  // CHECK:   retain_value [[VAL]]
+  // CHECK:   copy_value [[VAL]]
   // CHECK:   apply [[A]]([[VAL]])
-  // CHECK:   release_value [[VAL]]
+  // CHECK:   destroy_value [[VAL]]
   // CHECK:   br [[CONT_X:bb[0-9]+]]
     a(x)
   // CHECK: [[NOX]]:
@@ -79,12 +79,12 @@ func while_loop() {
   // CHECK: [[YES]]([[Y:%[0-9]+]] : $String):
       a(y)
       break
-      // CHECK: release_value [[Y]]
-      // CHECK: release_value [[X]]
+      // CHECK: destroy_value [[Y]]
+      // CHECK: destroy_value [[X]]
       // CHECK:     br [[LOOP_EXIT]]
     }
   // CHECK: [[NO]]:
-  // CHECK:   release_value [[X]]
+  // CHECK:   destroy_value [[X]]
   // CHECK:   br [[LOOP_ENTRY]]
   }
   // CHECK: [[LOOP_EXIT]]:
@@ -111,7 +111,7 @@ func while_loop() {
 // CHECK:         dealloc_stack [[X]]
 // CHECK:         br [[COND]]
 // CHECK:       [[DONE]]:
-// CHECK:         strong_release %0
+// CHECK:         destroy_value %0
 func while_loop_generic<T>(_ source: () -> T?) {
   while let x = source() {
   }
@@ -130,15 +130,15 @@ func while_loop_multi() {
   // CHECK:   switch_enum {{.*}}, case #Optional.some!enumelt.1: [[LOOP_BODY:bb.*]], default [[LOOP_EXIT2a:bb[0-9]+]]
 
   // CHECK: [[LOOP_EXIT2a]]:
-  // CHECK: release_value [[A]]
+  // CHECK: destroy_value [[A]]
   // CHECK: br [[LOOP_EXIT0]]
 
   // CHECK: [[LOOP_BODY]]([[B:%[0-9]+]] : $String):
   while let a = foo(), let b = bar() {
     // CHECK:   debug_value [[B]] : $String, let, name "b"
     // CHECK:   debug_value [[A]] : $String, let, name "c"
-    // CHECK:   release_value [[B]]
-    // CHECK:   release_value [[A]]
+    // CHECK:   destroy_value [[B]]
+    // CHECK:   destroy_value [[A]]
     // CHECK:   br [[LOOP_ENTRY]]
     let c = a
   }
@@ -159,15 +159,15 @@ func if_multi() {
 
   // CHECK: [[IF_EXIT1a]]:
   // CHECK:   dealloc_box {{.*}} $@box String
-  // CHECK:   release_value [[A]]
+  // CHECK:   destroy_value [[A]]
   // CHECK:   br [[IF_DONE]]
 
   // CHECK: [[IF_BODY]]([[BVAL:%[0-9]+]] : $String):
   if let a = foo(), var b = bar() {
     // CHECK:   store [[BVAL]] to [[PB]] : $*String
     // CHECK:   debug_value {{.*}} : $String, let, name "c"
-    // CHECK:   strong_release [[B]]
-    // CHECK:   release_value [[A]]
+    // CHECK:   destroy_value [[B]]
+    // CHECK:   destroy_value [[A]]
     // CHECK:   br [[IF_DONE]]
     let c = a
   }
@@ -187,15 +187,15 @@ func if_multi_else() {
   
     // CHECK: [[IF_EXIT1a]]:
     // CHECK:   dealloc_box {{.*}} $@box String
-    // CHECK:   release_value [[A]]
+    // CHECK:   destroy_value [[A]]
     // CHECK:   br [[ELSE]]
 
   // CHECK: [[IF_BODY]]([[BVAL:%[0-9]+]] : $String):
   if let a = foo(), var b = bar() {
     // CHECK:   store [[BVAL]] to [[PB]] : $*String
     // CHECK:   debug_value {{.*}} : $String, let, name "c"
-    // CHECK:   strong_release [[B]]
-    // CHECK:   release_value [[A]]
+    // CHECK:   destroy_value [[B]]
+    // CHECK:   destroy_value [[A]]
     // CHECK:   br [[IF_DONE:bb[0-9]+]]
     let c = a
   } else {
@@ -219,20 +219,20 @@ func if_multi_where() {
   // CHECK:   switch_enum {{.*}}, case #Optional.some!enumelt.1: [[CHECK_WHERE:bb.*]], default [[IF_EXIT1a:bb[0-9]+]]
   // CHECK: [[IF_EXIT1a]]:
   // CHECK:   dealloc_box {{.*}} $@box String
-  // CHECK:   release_value [[A]]
+  // CHECK:   destroy_value [[A]]
   // CHECK:   br [[ELSE]]
 
   // CHECK: [[CHECK_WHERE]]([[B:%[0-9]+]] : $String):
   // CHECK:   function_ref Swift.Bool._getBuiltinLogicValue () -> Builtin.Int1
   // CHECK:   cond_br {{.*}}, [[IF_BODY:bb[0-9]+]], [[IF_EXIT3:bb[0-9]+]]
   // CHECK: [[IF_EXIT3]]:
-  // CHECK:   strong_release [[BBOX]]
-  // CHECK:   release_value [[A]]
+  // CHECK:   destroy_value [[BBOX]]
+  // CHECK:   destroy_value [[A]]
   // CHECK:   br [[IF_DONE:bb[0-9]+]]
   if let a = foo(), var b = bar(), a == b {
     // CHECK: [[IF_BODY]]:
-    // CHECK:   strong_release [[BBOX]]
-    // CHECK:   release_value [[A]]
+    // CHECK:   destroy_value [[BBOX]]
+    // CHECK:   destroy_value [[A]]
     // CHECK:   br [[IF_DONE]]
     let c = a
   }
@@ -262,7 +262,7 @@ func if_leading_boolean(_ a : Int) {
 // CHECK: [[SUCCESS]]([[B:%[0-9]+]] : $String):
   // CHECK-NEXT:   debug_value [[B:%[0-9]+]] : $String, let, name "b"
   // CHECK-NEXT:   debug_value [[B:%[0-9]+]] : $String, let, name "c"
-  // CHECK-NEXT:   release_value [[B]]
+  // CHECK-NEXT:   destroy_value [[B]]
   // CHECK-NEXT:   br [[IFDONE]]
   if a == a, let b = foo() {
     let c = b
@@ -281,7 +281,7 @@ class DerivedClass : BaseClass {}
 func testAsPatternInIfLet(_ a : BaseClass?) {
   // CHECK: bb0(%0 : $Optional<BaseClass>):
   // CHECK-NEXT:   debug_value %0 : $Optional<BaseClass>, let, name "a"
-  // CHECK-NEXT:   retain_value %0 : $Optional<BaseClass>
+  // CHECK-NEXT:   copy_value %0 : $Optional<BaseClass>
   // CHECK-NEXT:   switch_enum %0 : $Optional<BaseClass>, case #Optional.some!enumelt.1: [[OPTPRESENTBB:bb[0-9]+]], default [[NILBB:bb[0-9]+]]
   
   // CHECK:      [[OPTPRESENTBB]](%4 : $BaseClass):
@@ -292,7 +292,7 @@ func testAsPatternInIfLet(_ a : BaseClass?) {
   // CHECK:    br [[MERGE:bb[0-9]+]](
 
   // CHECK: [[ISBASEBB]]:
-  // CHECK:    strong_release %4 : $BaseClass
+  // CHECK:    destroy_value %4 : $BaseClass
   // CHECK: = enum $Optional<DerivedClass>, #Optional.none!enumelt
   // CHECK: br [[MERGE]](
 
@@ -301,12 +301,12 @@ func testAsPatternInIfLet(_ a : BaseClass?) {
 
   // CHECK:      [[ISDERIVEDBB]]([[DERIVEDVAL:%[0-9]+]] : $DerivedClass):
   // CHECK-NEXT:   debug_value [[DERIVEDVAL]] : $DerivedClass
-  // CHECK-NEXT:   strong_release [[DERIVEDVAL]] : $DerivedClass
+  // CHECK-NEXT:   destroy_value [[DERIVEDVAL]] : $DerivedClass
   // CHECK-NEXT:   br [[NILBB]]
    
   
   // CHECK:      [[NILBB]]:
-  // CHECK-NEXT:   release_value %0 : $Optional<BaseClass>
+  // CHECK-NEXT:   destroy_value %0 : $Optional<BaseClass>
   // CHECK-NEXT:   tuple ()
   // CHECK-NEXT:   return
   if case let b as DerivedClass = a {

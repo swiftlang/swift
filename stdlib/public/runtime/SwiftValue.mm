@@ -200,7 +200,7 @@ _SwiftValue *swift::bridgeAnythingToSwiftValueObject(OpaqueValue *src,
     srcType->vw_initializeWithTake(payload, src);
   else
     srcType->vw_initializeWithCopy(payload, src);
-  
+
   return instance;
 }
 
@@ -264,7 +264,7 @@ swift::findSwiftValueConformances(const ProtocolDescriptorList &protocols,
 - (id)copyWithZone:(NSZone *)zone {
   // Instances are immutable, so we can just retain.
   return objc_retain(self);
-  
+
   /* TODO: If we're able to become a SwiftObject subclass in the future,
    * change to this:
    swift_retain((HeapObject*)self);
@@ -347,7 +347,7 @@ static NSString *getValueDescription(_SwiftValue *self) {
   const Metadata *type;
   const OpaqueValue *value;
   std::tie(type, value) = getValueFromSwiftValue(self);
-  
+
   // Copy the value, since it will be consumed by getSummary.
   ValueBuffer copyBuf;
   auto copy = type->vw_initializeBufferWithCopy(&copyBuf,
@@ -372,7 +372,7 @@ static NSString *getValueDescription(_SwiftValue *self) {
 - (NSString *)_swiftTypeName {
   TwoWordPair<const char *, uintptr_t> typeName
     = swift_getTypeName(getSwiftValueTypeMetadata(self), true);
-  
+
   return [NSString stringWithUTF8String: typeName.first];
 }
 - (const OpaqueValue *)_swiftValue {

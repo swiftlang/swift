@@ -78,16 +78,16 @@ convention:
 
 - Methods default to *not* producing errors unless they are explicitly
   marked.
-  
+
 - The control flow within a function is still mostly explicit: a
   maintainer can tell exactly which statements can produce an error,
   and a simple inspection reveals how the function reacts to the
   error.
-  
+
 - Throwing an error provides similar performance to allocating an
   error and returning it -- it isn't an expensive, table-based stack
   unwinding process.
-  
+
 - Cocoa APIs using standard ``NSError`` patterns can be imported into
   this world automatically.  Other common patterns (e.g. ``CFError``,
   ``errno``) can be added to the model in future versions of Swift.
@@ -180,7 +180,7 @@ allowed to throw is rejected by the compiler.
 It isn't possible to overload functions solely based on whether the
 functions throw.  That is, this is not legal::
 
-  func foo() { 
+  func foo() {
   func foo() throws {
 
 A throwing method cannot override a non-throwing method or satisfy a
@@ -299,7 +299,7 @@ generalized ``do`` statement::
     // a conditionally-executed catch clause
 
   } catch _ {
-    // a catch-all clause.  
+    // a catch-all clause.
   }
 
 As with ``switch`` statements, Swift makes an effort to understand

@@ -262,7 +262,7 @@ linked list::
 
  class Node {
      constructor(Int) { next = this; prev = this }
-     
+
      // link two circular lists into one big cycle.
      func join(_ otherNode : Node) -> () { ... }
 
@@ -274,8 +274,8 @@ We can measure the length of a cycle in these nodes as follows::
 
  cycle_length(someNode, (x: [inout] Node){ x = x.next })
 
-This is why so many generic algorithms seem to work on both 
-``class``\ es and non-``class``\ es: ``class`` *identities* 
+This is why so many generic algorithms seem to work on both
+``class``\ es and non-``class``\ es: ``class`` *identities*
 work just fine as values.
 
 The Role of Moves
@@ -333,7 +333,7 @@ How to Build an Interesting Type with Value Semantics
 =====================================================
 
 Suppose we want to build a variable-sized data structure ``X`` with
-(mutable) value semantics?  How do we do it?  
+(mutable) value semantics?  How do we do it?
 
 If we make ``X` a ``class``, we automatically get reference semantics, so
 its value must be copied before each mutation, which is tedious and

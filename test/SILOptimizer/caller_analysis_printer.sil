@@ -1,4 +1,4 @@
-// RUN: %target-sil-opt -enable-sil-verify-all %s -caller-analysis-printer -o /dev/null | %FileCheck --check-prefix=CHECK %s
+// RUN: %target-sil-opt -assume-parsing-unqualified-ownership-sil -enable-sil-verify-all %s -caller-analysis-printer -o /dev/null | %FileCheck --check-prefix=CHECK %s
 
 // CHECK: Function dead_func has caller: false, partial applied args = 0
 // CHECK: Function call_top has caller: false, partial applied args = 0
@@ -56,7 +56,7 @@ bb0:
   %2 = tuple ()
   return %2 : $()
 }
-   
+
 sil hidden @mutual_recursive_func1 : $@convention(thin) () -> () {
 bb0:
   %0 = function_ref @mutual_recursive_func2 : $@convention(thin) () -> ()
@@ -90,7 +90,7 @@ bb1:
 bb2:
   %3 = apply %0() : $@convention(thin) () -> ()
   br bb3
-bb3:  
+bb3:
   %4 = tuple ()
   return %4 : $()
 }

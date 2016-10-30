@@ -101,18 +101,18 @@ func physical_struct_lvalue(_ c: Int) {
 
    // CHECK: [[FN:%[0-9]+]] = class_method %0 : $Ref, #Ref.y!setter.1
    // CHECK: apply [[FN]](%1, %0) : $@convention(method) (Int, @guaranteed Ref) -> ()
-   // CHECK: strong_release %0 : $Ref
+   // CHECK: destroy_value %0 : $Ref
   }
 
 
 // CHECK-LABEL: sil hidden  @_TF10properties24physical_subclass_lvalue
  func physical_subclass_lvalue(_ r: RefSubclass, a: Int) {
     r.y = a
-   // strong_retain %0 : $RefSubclass
+   // copy_value %0 : $RefSubclass
    // CHECK: [[R_SUP:%[0-9]+]] = upcast %0 : $RefSubclass to $Ref
    // CHECK: [[FN:%[0-9]+]] = class_method [[R_SUP]] : $Ref, #Ref.y!setter.1 : (Ref) -> (Int) -> () , $@convention(method) (Int, @guaranteed Ref) -> ()
    // CHECK: apply [[FN]](%1, [[R_SUP]]) :
-   // CHECK: strong_release [[R_SUP]]
+   // CHECK: destroy_value [[R_SUP]]
     r.w = a
 
    // CHECK: [[FN:%[0-9]+]] = class_method %0 : $RefSubclass, #RefSubclass.w!setter.1
@@ -194,7 +194,7 @@ func logical_struct_in_reftype_set(_ value: inout Val, z1: Int) {
   // CHECK: [[VAL_REF_VAL_PROP_MAT:%.*]] = mark_dependence [[T1]] : $*Val on [[VAL_REF]]
   // CHECK: [[V_R_VP_Z_TUPLE_MAT:%[0-9]+]] = alloc_stack $(Int, Int)
   // CHECK: [[LD:%[0-9]+]] = load [[VAL_REF_VAL_PROP_MAT]]
-  // CHECK: retain_value [[LD]]
+  // CHECK: copy_value [[LD]]
   // -- val.ref.val_prop.z_tuple
   // CHECK: [[GET_Z_TUPLE_METHOD:%[0-9]+]] = function_ref @_TFV10properties3Valg7z_tupleT
   // CHECK: [[A0:%.*]] = tuple_element_addr [[V_R_VP_Z_TUPLE_MAT]] : {{.*}}, 0
@@ -241,7 +241,7 @@ func tuple_in_logical_struct_set(_ value: inout Val, z1: Int) {
   value.z_tuple.1 = z1
   // CHECK: [[Z_TUPLE_MATERIALIZED:%[0-9]+]] = alloc_stack $(Int, Int)
   // CHECK: [[VAL1:%[0-9]+]] = load [[VAL]]
-  // CHECK: retain_value [[VAL1]]
+  // CHECK: copy_value [[VAL1]]
   // CHECK: [[Z_GET_METHOD:%[0-9]+]] = function_ref @_TFV10properties3Valg7z_tupleT
   // CHECK: [[A0:%.*]] = tuple_element_addr [[Z_TUPLE_MATERIALIZED]] : {{.*}}, 0
   // CHECK: [[A1:%.*]] = tuple_element_addr [[Z_TUPLE_MATERIALIZED]] : {{.*}}, 1
@@ -673,12 +673,12 @@ func propertyWithDidSetTakingOldValue() {
 // CHECK-NEXT:  %5 = load %3 : $*Int
 // CHECK-NEXT:  debug_value %5 : $Int
 // CHECK-NEXT:  assign %0 to %3 : $*Int
-// CHECK-NEXT:  strong_retain %1 : $@box Int
+// CHECK-NEXT:  copy_value %1 : $@box Int
 // CHECK-NEXT:  mark_function_escape %3
 // CHECK-NEXT:  // function_ref
 // CHECK-NEXT:  %10 = function_ref @_TFF10properties32propertyWithDidSetTakingOldValueFT_T_WL_1pSi : $@convention(thin) (Int, @owned @box Int) -> ()
 // CHECK-NEXT:  %11 = apply %10(%5, %1) : $@convention(thin) (Int, @owned @box Int) -> ()
-// CHECK-NEXT:  strong_release %1 : $@box Int
+// CHECK-NEXT:  destroy_value %1 : $@box Int
 // CHECK-NEXT:  %13 = tuple ()
 // CHECK-NEXT:  return %13 : $()
 // CHECK-NEXT:}
@@ -888,19 +888,19 @@ class r19254812Derived: r19254812Base{
     use(pi)
   }
   
-// Accessing the "pi" property should not retain/release self.
+// Accessing the "pi" property should not copy_value/release self.
 // CHECK-LABEL: sil hidden @_TFC10properties16r19254812Derivedc
 // CHECK: [[SELFMUI:%[0-9]+]] = mark_uninitialized [derivedself] 
 
-// Initialization of the pi field: no retains/releases.
+// Initialization of the pi field: no copy_values/releases.
 // CHECK:  [[SELF:%[0-9]+]] = load [[SELFMUI]] : $*r19254812Derived
 // CHECK-NEXT:  [[PIPTR:%[0-9]+]] = ref_element_addr [[SELF]] : $r19254812Derived, #r19254812Derived.pi
 // CHECK-NEXT:  assign {{.*}} to [[PIPTR]] : $*Double
 
-// CHECK-NOT: strong_release
-// CHECK-NOT: strong_retain
+// CHECK-NOT: destroy_value
+// CHECK-NOT: copy_value
 
-// Load of the pi field: no retains/releases.
+// Load of the pi field: no copy_values/releases.
 // CHECK:  [[SELF:%[0-9]+]] = load [[SELFMUI]] : $*r19254812Derived
 // CHECK-NEXT:  [[PIPTR:%[0-9]+]] = ref_element_addr [[SELF]] : $r19254812Derived, #r19254812Derived.pi
 // CHECK-NEXT:  {{.*}} = load [[PIPTR]] : $*Double
@@ -915,14 +915,14 @@ class RedundantSelfRetains {
     f = RedundantSelfRetains()
   }
   
-  // <rdar://problem/19275047> Extraneous retains/releases of self are bad
+  // <rdar://problem/19275047> Extraneous copy_values/releases of self are bad
   func testMethod1() {
     f = RedundantSelfRetains()
   }
   // CHECK-LABEL: sil hidden @_TFC10properties20RedundantSelfRetains11testMethod1
   // CHECK: bb0(%0 : $RedundantSelfRetains):
 
-  // CHECK-NOT: strong_retain
+  // CHECK-NOT: copy_value
   
   // CHECK: [[FPTR:%[0-9]+]] = ref_element_addr %0 : $RedundantSelfRetains, #RedundantSelfRetains.f
   // CHECK-NEXT: assign {{.*}} to [[FPTR]] : $*RedundantSelfRetains
@@ -936,15 +936,15 @@ class RedundantRetains {
 
 func testRedundantRetains() {
   let a = RedundantRetains()
-  a.field = 4  // no retain/release of a necessary here.
+  a.field = 4  // no copy_value/release of a necessary here.
 }
 
 // CHECK-LABEL: sil hidden @_TF10properties20testRedundantRetainsFT_T_ : $@convention(thin) () -> () {
 // CHECK: [[A:%[0-9]+]] = apply
-// CHECK-NOT: strong_retain
-// CHECK: strong_release [[A]] : $RedundantRetains
-// CHECK-NOT: strong_retain
-// CHECK-NOT: strong_release
+// CHECK-NOT: copy_value
+// CHECK: destroy_value [[A]] : $RedundantRetains
+// CHECK-NOT: copy_value
+// CHECK-NOT: destroy_value
 // CHECK: return
 
 struct AddressOnlyNonmutatingSet<T> {
@@ -1034,8 +1034,8 @@ public class DerivedClassWithPublicProperty : BaseClassWithInternalProperty {
 
 // CHECK-LABEL: sil [transparent] [fragile] @_TFC10properties30DerivedClassWithPublicPropertyg1xT_
 // CHECK:       bb0([[SELF:%.*]] : $DerivedClassWithPublicProperty):
-// CHECK:         strong_retain [[SELF]] : $DerivedClassWithPublicProperty
+// CHECK:         copy_value [[SELF]] : $DerivedClassWithPublicProperty
 // CHECK-NEXT:    [[SUPER:%.*]] = upcast [[SELF]] : $DerivedClassWithPublicProperty to $BaseClassWithInternalProperty
 // CHECK-NEXT:    [[METHOD:%.*]] = super_method [[SELF]] : $DerivedClassWithPublicProperty, #BaseClassWithInternalProperty.x!getter.1 : (BaseClassWithInternalProperty) -> () -> () , $@convention(method) (@guaranteed BaseClassWithInternalProperty) -> ()
 // CHECK-NEXT:    [[RESULT:%.*]] = apply [[METHOD]]([[SUPER]]) : $@convention(method) (@guaranteed BaseClassWithInternalProperty) -> ()
-// CHECK-NEXT:    strong_release [[SUPER]] : $BaseClassWithInternalProperty
+// CHECK-NEXT:    destroy_value [[SUPER]] : $BaseClassWithInternalProperty

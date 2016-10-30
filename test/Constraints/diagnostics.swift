@@ -851,7 +851,7 @@ let c_2505 = C_2505(arg: [C2_2505()]) // expected-error {{argument labels '(arg:
 // Diagnostic message for initialization with binary operations as right side
 let foo1255_3: String = 1 + 2 + 3 // expected-error {{cannot convert value of type 'Int' to specified type 'String'}}
 let foo1255_4: Dictionary<String, String> = ["hello": 1 + 2] // expected-error {{cannot convert value of type 'Int' to expected dictionary value type 'String'}}
-let foo1255_5: Dictionary<String, String> = [(1 + 2): "wolrd"] // expected-error {{cannot convert value of type 'Int' to expected dictionary key type 'String'}}
+let foo1255_5: Dictionary<String, String> = [(1 + 2): "world"] // expected-error {{cannot convert value of type 'Int' to expected dictionary key type 'String'}}
 let foo1255_6: [String] = [1 + 2 + 3] // expected-error {{cannot convert value of type 'Int' to expected element type 'String'}}
 
 // SR-2208

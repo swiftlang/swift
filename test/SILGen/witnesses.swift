@@ -167,15 +167,15 @@ final class ConformingClass : X {
   func selfTypes(x: ConformingClass) -> ConformingClass { return x }
   // CHECK-LABEL: sil hidden [transparent] [thunk] @_TTWC9witnesses15ConformingClassS_1XS_FS1_9selfTypes{{.*}} : $@convention(witness_method) (@in ConformingClass, @inout ConformingClass) -> @out ConformingClass {
   // CHECK:       bb0(%0 : $*ConformingClass, %1 : $*ConformingClass, %2 : $*ConformingClass):
-  // -- load and retain 'self' from inout witness 'self' parameter
+  // -- load and copy_value 'self' from inout witness 'self' parameter
   // CHECK-NEXT:    %3 = load %2 : $*ConformingClass
-  // CHECK-NEXT:    strong_retain %3 : $ConformingClass
+  // CHECK-NEXT:    copy_value %3 : $ConformingClass
   // CHECK-NEXT:    %5 = load %1 : $*ConformingClass
   // CHECK:         %6 = function_ref @_TFC9witnesses15ConformingClass9selfTypes 
   // CHECK-NEXT:    %7 = apply %6(%5, %3) : $@convention(method) (@owned ConformingClass, @guaranteed ConformingClass) -> @owned ConformingClass
   // CHECK-NEXT:    store %7 to %0 : $*ConformingClass
   // CHECK-NEXT:    %9 = tuple ()
-  // CHECK-NEXT:    strong_release %3
+  // CHECK-NEXT:    destroy_value %3
   // CHECK-NEXT:    return %9 : $()
   // CHECK-NEXT:  }
   func loadable(x: Loadable) -> Loadable { return x }
@@ -188,11 +188,11 @@ func <~>(_ x: ConformingClass, y: ConformingClass) -> ConformingClass { return x
 extension ConformingClass : ClassBounded { }
 // CHECK-LABEL: sil hidden [transparent] [thunk] @_TTWC9witnesses15ConformingClassS_12ClassBoundedS_FS1_9selfTypes{{.*}} : $@convention(witness_method) (@owned ConformingClass, @guaranteed ConformingClass) -> @owned ConformingClass {
 // CHECK:  bb0([[C0:%.*]] : $ConformingClass, [[C1:%.*]] : $ConformingClass):
-// CHECK-NEXT:    strong_retain [[C1]]
+// CHECK-NEXT:    copy_value [[C1]]
 // CHECK-NEXT:    function_ref
 // CHECK-NEXT:    [[FUN:%.*]] = function_ref @_TFC9witnesses15ConformingClass9selfTypes
 // CHECK-NEXT:    [[RESULT:%.*]] = apply [[FUN]]([[C0]], [[C1]]) : $@convention(method) (@owned ConformingClass, @guaranteed ConformingClass) -> @owned ConformingClass
-// CHECK-NEXT:    strong_release [[C1]]
+// CHECK-NEXT:    destroy_value [[C1]]
 // CHECK-NEXT:    return [[RESULT]] : $ConformingClass
 // CHECK-NEXT:  }
 
@@ -459,7 +459,7 @@ class PropertyRequirementWitnessFromBase : PropertyRequirementBase, PropertyRequ
   // CHECK-NEXT: [[CAR:%.*]] = tuple_extract [[RES]] : $({{.*}}), 0
   // CHECK-NEXT: [[CADR:%.*]] = tuple_extract [[RES]] : $({{.*}}), 1
   // CHECK-NEXT: [[TUPLE:%.*]] = tuple ([[CAR]] : {{.*}}, [[CADR]] : {{.*}})
-  // CHECK-NEXT: strong_release
+  // CHECK-NEXT: destroy_value
   // CHECK-NEXT: return [[TUPLE]]
 
   // CHECK-LABEL: sil hidden [transparent] [thunk] @_TTWC9witnesses34PropertyRequirementWitnessFromBaseS_19PropertyRequirementS_ZFS1_m6heightSi : {{.*}} {
@@ -477,7 +477,7 @@ class PropertyRequirementWitnessFromBase : PropertyRequirementBase, PropertyRequ
   // CHECK-NEXT: tuple_extract
   // CHECK-NEXT: tuple_extract
   // CHECK-NEXT: [[RES:%.*]] = tuple
-  // CHECK-NEXT: strong_release
+  // CHECK-NEXT: destroy_value
   // CHECK-NEXT: return [[RES]]
 }
 
@@ -498,7 +498,7 @@ class CrashableBase {
 // CHECK-NEXT: [[FN:%.*]] = class_method [[BASE]] : $CrashableBase, #CrashableBase.crash!1 : (CrashableBase) -> () -> () , $@convention(method) (@guaranteed CrashableBase) -> ()
 // CHECK-NEXT: apply [[FN]]([[BASE]]) : $@convention(method) (@guaranteed CrashableBase) -> ()
 // CHECK-NEXT: [[RESULT:%.*]] = tuple ()
-// CHECK-NEXT: strong_release [[SELF]] : $GenericCrashable<T>
+// CHECK-NEXT: destroy_value [[SELF]] : $GenericCrashable<T>
 // CHECK-NEXT: dealloc_stack [[BOX]] : $*GenericCrashable<T>
 // CHECK-NEXT: return [[RESULT]] : $()
 

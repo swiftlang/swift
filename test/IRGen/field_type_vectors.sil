@@ -1,10 +1,10 @@
-// RUN: %target-swift-frontend %s -emit-ir | %FileCheck %s
+// RUN: %target-swift-frontend -assume-parsing-unqualified-ownership-sil %s -emit-ir | %FileCheck %s
 
 // REQUIRES: CPU=x86_64
 
 import Swift
 
-// CHECK-LABEL: @_TMnV18field_type_vectors3Foo = hidden constant 
+// CHECK-LABEL: @_TMnV18field_type_vectors3Foo = hidden constant
 // CHECK:         %swift.type** (%swift.type*)* [[FOO_TYPES_ACCESSOR:@[A-Za-z0-9_]*]]
 struct Foo {
   var x: Int

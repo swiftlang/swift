@@ -31,7 +31,7 @@ func class_bound_generic<T : ClassBound>(x: T) -> T {
   // CHECK:   store [[X]] to [[PB]]
   return x
   // CHECK:   [[X1:%.*]] = load [[PB]]
-  // CHECK:   retain [[X1]]
+  // CHECK:   copy_value [[X1]]
   // CHECK:   return [[X1]]
 }
 
@@ -44,7 +44,7 @@ func class_bound_generic_2<T : ClassBound & NotClassBound>(x: T) -> T {
   // CHECK:   store [[X]] to [[PB]]
   return x
   // CHECK:   [[X1:%.*]] = load [[PB]]
-  // CHECK:   retain [[X1]]
+  // CHECK:   copy_value [[X1]]
   // CHECK:   return [[X1]]
 }
 
@@ -57,7 +57,7 @@ func class_bound_protocol(x: ClassBound) -> ClassBound {
   // CHECK:   store [[X]] to [[PB]]
   return x
   // CHECK:   [[X1:%.*]] = load [[PB]]
-  // CHECK:   retain [[X1]]
+  // CHECK:   copy_value [[X1]]
   // CHECK:   return [[X1]]
 }
 
@@ -71,7 +71,7 @@ func class_bound_protocol_composition(x: ClassBound & NotClassBound)
   // CHECK:   store [[X]] to [[PB]]
   return x
   // CHECK:   [[X1:%.*]] = load [[PB]]
-  // CHECK:   retain [[X1]]
+  // CHECK:   copy_value [[X1]]
   // CHECK:   return [[X1]]
 }
 

@@ -460,7 +460,7 @@ fixed_fixed_conversion_function = gyb.parse_template("fixed_fixed_conversion_fun
 %       else: # Smaller size input, unsigned to signed or unsigned to unsigned.
   result = (Builtin.${srcExt}_Int${srcBits}_Int${bits}(src), false._value)
 %       end
-% 
+%
 % if not safelyConvertible:
   ${error_check}
 % end
@@ -487,11 +487,11 @@ extension ${Self} {
         )
     }
   }
-    
+
 % if safelyConvertible:
   @available(*, message: "Converting ${Src} to ${Self} will always succeed.")
 % end
-  @_transparent 
+  @_transparent
   public init?(exactly value: ${Src}) {
     ${gyb.execute_template(
         fixed_fixed_conversion_function,

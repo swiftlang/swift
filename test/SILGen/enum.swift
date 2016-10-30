@@ -36,7 +36,7 @@ func Optionable_cases(_ x: Int) {
   // CHECK:       [[FN:%.*]] = function_ref @_TFOs10Optionable4mereFMS_FSiS_
   // CHECK-NEXT:  [[METATYPE:%.*]] = metatype $@thin Optionable.Type
   // CHECK-NEXT:  [[CTOR:%.*]] = apply [[FN]]([[METATYPE]])
-  // CHECK-NEXT:  strong_release [[CTOR]]
+  // CHECK-NEXT:  destroy_value [[CTOR]]
   _ = Optionable.mere
 
   // CHECK-NEXT:  [[METATYPE:%.*]] = metatype $@thin Optionable.Type
@@ -70,7 +70,7 @@ func AddressOnly_cases(_ s: S) {
   // CHECK:       [[FN:%.*]] = function_ref @_TFOs11AddressOnly4mereFMS_FPs1P_S_
   // CHECK-NEXT:  [[METATYPE:%.*]] = metatype $@thin AddressOnly.Type
   // CHECK-NEXT:  [[CTOR:%.*]] = apply [[FN]]([[METATYPE]])
-  // CHECK-NEXT:  strong_release [[CTOR]]
+  // CHECK-NEXT:  destroy_value [[CTOR]]
   _ = AddressOnly.mere
 
   // CHECK-NEXT:  [[METATYPE:%.*]] = metatype $@thin AddressOnly.Type

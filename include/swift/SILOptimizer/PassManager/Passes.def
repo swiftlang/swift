@@ -25,7 +25,7 @@
 
 /// PASS_RANGE(RANGE_ID, START, END)
 ///   Pass IDs between PassKind::START and PassKind::END, inclusive,
-///   fall within the set known as 
+///   fall within the set known as
 #ifndef PASS_RANGE
 #define PASS_RANGE(Id, First, Last)
 #endif

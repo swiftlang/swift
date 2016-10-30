@@ -13,7 +13,7 @@ struct Foo<T, U> {
 // CHECK-LABEL: sil hidden @_TF20property_abstraction4getF
 // CHECK:         bb0([[X_ORIG:%.*]] : $Foo<Int, Int>):
 // CHECK:         [[F_ORIG:%.*]] = struct_extract [[X_ORIG]] : $Foo<Int, Int>, #Foo.f
-// CHECK:         strong_retain [[F_ORIG]]
+// CHECK:         copy_value [[F_ORIG]]
 // CHECK:         [[REABSTRACT_FN:%.*]] = function_ref @_TTR
 // CHECK:         [[F_SUBST:%.*]] = partial_apply [[REABSTRACT_FN]]([[F_ORIG]])
 // CHECK:         return [[F_SUBST]]

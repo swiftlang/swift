@@ -11,7 +11,7 @@
 ;===----------------------------------------------------------------------===;
 ;
 ;  Emacs-lisp support for automatically formatting things according to this
-;  project's conventions.  To prevent this file from being automatically 
+;  project's conventions.  To prevent this file from being automatically
 ;  loaded, add (provide 'swift-project-settings) to your .emacs
 ;
 ;===----------------------------------------------------------------------===;
@@ -118,7 +118,7 @@
 
 (defun swift-project-comment-end ()
   "If comment-end is non-empty returns it, stripped of leading whitespace.  Returns nil otherwise"
-  (replace-regexp-in-string 
+  (replace-regexp-in-string
    "\\` +" ""
    (if (and comment-end (> (length comment-end) 0)) comment-end v1)))
 
@@ -153,15 +153,15 @@ Swift header should look like.
   '(setq v3 (> (length str) 0))
 
   '(setq v4 (or (swift-project-comment-end) v1))
-  
+
   ;; Generate dashes to fill out the rest of the top line
   (make-string (max (- 65 (+ (if v3 (+ 3 (length str)) 0) (length v2))) 3) ?-)
   "===" v4 "\n"
 
     ;; Use whatever comment character is usual for the current mode in place of "//"
-  (replace-regexp-in-string 
+  (replace-regexp-in-string
    "//$" v4
-   (replace-regexp-in-string "^//" v1 
+   (replace-regexp-in-string "^//" v1
 "//
 // This source file is part of the Swift.org open source project
 //
@@ -176,14 +176,14 @@ Swift header should look like.
   ;; if there was a short description, add a section for a longer
   ;; description and leave the cursor there
   (when v3
-    (replace-regexp-in-string 
+    (replace-regexp-in-string
      "//$" v4
-     (replace-regexp-in-string "^//" v1 
+     (replace-regexp-in-string "^//" v1
 "//
 //  ")))
   (when v3 '_)
   (when v3
-    (replace-regexp-in-string 
+    (replace-regexp-in-string
      "//$" v4
      (replace-regexp-in-string "^//" v1 "
 //
@@ -206,19 +206,19 @@ Swift header should look like.
   ;; When there's no comment syntax defined, we use "//"; precedent is
   ;; in the project's README file.
   '(setq v1 (replace-regexp-in-string " +\\'" "" (or comment-start "//")))
-  
+
   '(setq v2 (or (swift-project-comment-end) v1))
-  
+
   v1 "===--- "
   str & " " | -1
   '(setq v3 (length str))
-  
+
   ;; Generate dashes to fill out the rest of the top line
   (make-string
    (max 3
         (- 77 (current-column) (length v2)))
    ?-)
-  
+
   "===" v2
 )
 
@@ -258,7 +258,7 @@ takes precedence for files in the Swift project"
 (push `(swift-stdlibunittest-stackframe "^\\(?:\\(?:stdout\\|stderr\\)>>> *\\)?#[0-9]+: \\(.+\\):\\([0-9]+\\)\\(?: +.*\\)?$"
               1 2 ,(not :column) ,(not :just-a-warning))
       compilation-error-regexp-alist-alist)
-    
+
 (push 'swift-stdlibunittest-failure compilation-error-regexp-alist)
 (push `(swift-stdlibunittest-failure "^\\(?:\\(?:stdout\\|stderr\\)>>> *\\)?check failed at \\(.*?\\), line \\([0-9]+\\)$"
               1 2 ,(not :column) ,(not :just-a-warning))
@@ -293,14 +293,14 @@ itself, and is used as the value of swift-find-executable-fn"
   (if (file-name-absolute-p command) command
     (let* ((utility (concat swift-project-directory "utils/" command))
            (newest (and (file-executable-p utility) utility)))
-      (dolist (x (file-expand-wildcards 
-               (concat (funcall swift-project-build-directory-fn swift-project-directory) 
+      (dolist (x (file-expand-wildcards
+               (concat (funcall swift-project-build-directory-fn swift-project-directory)
                        "*/swift-*/bin/" command)))
         (when (and (file-executable-p x) (or (null newest) (file-newer-than-file-p x newest)))
           (setq newest x)))
       (or newest (executable-find command)))))
 
-(defvar swift-project-sdk-path 
+(defvar swift-project-sdk-path
   (substring (shell-command-to-string "xcrun --show-sdk-path") 0 -1)
   "The path to the swift SDK to use for syntax checking, etc.")
 
@@ -315,9 +315,9 @@ itself, and is used as the value of swift-find-executable-fn"
   "Given the name of a .gyb file, return the name of the temporary file we'll use for its expanded result."
   (file-name-sans-extension
    (expand-file-name
-    (subst-char-in-string 
+    (subst-char-in-string
      ?/ ?! (replace-regexp-in-string
-            "!" "!!" 
+            "!" "!!"
             (if (file-name-absolute-p input-file-name) input-file-name
               (expand-file-name input-file-name))))
     (swift-project-gyb-temp-file-directory))))
@@ -347,16 +347,16 @@ Given any other file name, just return that name."
 (defun swift-project-stdlib-compile-order (filename)
   "Return an integer representing where in the required
 compilation order the given file should appear."
-  (save-match-data 
-    (if (string-match 
+  (save-match-data
+    (if (string-match
          (concat "\\<" (regexp-quote (replace-regexp-in-string "^\\(?:.*[/!]\\)?\\([^.]*\\).*" "\\1" filename)) "\\>")
          swift-project-stdlib-compile-order)
         (match-beginning 0) 0)))
 
 (defconst swift-project-common-swiftc-args
-  (list "-parse" "-sdk" swift-project-sdk-path 
+  (list "-parse" "-sdk" swift-project-sdk-path
         "-F" (concat (file-name-as-directory swift-project-sdk-path) "../../../Developer/Library/Frameworks")
-        "-D" "INTERNAL_CHECKS_ENABLED" 
+        "-D" "INTERNAL_CHECKS_ENABLED"
         "-no-link-objc-runtime")
   "The common arguments we'll pass to swiftc for syntax-checking
 everything in the Swift project" )
@@ -394,8 +394,8 @@ of other files that are compiled along with it."
 of arguments that are passed to swiftc when compiling it."
   (cond ((string-match-p "^stdlib/public/core/" relative-file)
          swift-project-stdlib-swiftc-args)
-        ((string-match-p 
-          "^stdlib/\(public/SwiftOnoneSupport\|internal\|private/SwiftPrivate\(PthreadExtras\|LibcExtras\)?\)/" 
+        ((string-match-p
+          "^stdlib/\(public/SwiftOnoneSupport\|internal\|private/SwiftPrivate\(PthreadExtras\|LibcExtras\)?\)/"
           relative-file)
          swift-project-stdlib-aux-swiftc-args)
         (t swift-project-single-frontend-swiftc-args)))
@@ -405,7 +405,7 @@ of arguments that are passed to swiftc when compiling it."
 current buffer, potentially along with the other .swift and .swift.gyb
 files in the same directory."
   (let ((project-relative-buffer-file (file-relative-name (buffer-file-name) swift-project-directory)))
-    (swift-project-gyb-syntax-check1 
+    (swift-project-gyb-syntax-check1
      swiftc temp-file
      (swift-project-files-to-compile-with project-relative-buffer-file)
      (swift-project-swiftc-arguments project-relative-buffer-file))))
@@ -422,11 +422,11 @@ files in the same directory."
             (setq swift-sources (cons swift-file swift-sources))
             (when (string-equal "gyb" (file-name-extension x))
               (setq gyb-targets (cons swift-file gyb-targets)))))))
-    (setq swift-sources 
-          (sort swift-sources 
+    (setq swift-sources
+          (sort swift-sources
                 (lambda (x y) (< (swift-project-stdlib-compile-order x)
                                  (swift-project-stdlib-compile-order y)))))
-    `(,(swift-project-executable-find "line-directive") 
+    `(,(swift-project-executable-find "line-directive")
       (,@gyb-targets "--" ,swiftc ,@swiftc-arguments ,@swift-sources))))
 
 (require 'flymake)

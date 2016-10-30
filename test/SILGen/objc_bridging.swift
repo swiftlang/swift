@@ -63,7 +63,7 @@ func setFoo(_ f: Foo, s: String) {
 // CHECK:    = enum $Optional<NSString>, #Optional.some!enumelt.1, [[BRIDGED]]
 // CHECK:   bb3([[OPT_BRIDGED:%.*]] : $Optional<NSString>):
 // CHECK:   apply [[SET_FOO]]([[OPT_BRIDGED]], %0)
-// CHECK:   release_value [[OPT_BRIDGED]]
+// CHECK:   destroy_value [[OPT_BRIDGED]]
 // CHECK: }
 
 // @interface Foo -(BOOL) zim; @end
@@ -181,7 +181,7 @@ func callSetBar(_ s: String) {
 // CHECK:    = enum $Optional<NSString>, #Optional.some!enumelt.1, [[BRIDGED]]
 // CHECK: bb3([[OPT_BRIDGED:%.*]] : $Optional<NSString>):
 // CHECK:   apply [[SET_BAR]]([[OPT_BRIDGED]])
-// CHECK:   release_value [[OPT_BRIDGED]]
+// CHECK:   destroy_value [[OPT_BRIDGED]]
 // CHECK: }
 
 var NSS: NSString
@@ -220,11 +220,11 @@ class Bas : NSObject {
   var strRealProp: String = "Hello"
   // CHECK-LABEL: sil hidden [transparent] [thunk] @_TToFC13objc_bridging3Basg11strRealPropSS : $@convention(objc_method) (Bas) -> @autoreleased NSString {
   // CHECK: bb0([[THIS:%.*]] : $Bas):
-  // CHECK:   strong_retain [[THIS]] : $Bas
+  // CHECK:   copy_value [[THIS]] : $Bas
   // CHECK:   // function_ref objc_bridging.Bas.strRealProp.getter
   // CHECK:   [[PROPIMPL:%.*]] = function_ref @_TFC13objc_bridging3Basg11strRealPropSS
   // CHECK:   [[PROP_COPY:%.*]] = apply [[PROPIMPL]]([[THIS]]) : $@convention(method) (@guaranteed Bas) -> @owned String
-  // CHECK:   strong_release [[THIS]]
+  // CHECK:   destroy_value [[THIS]]
   // CHECK:   [[STRING_TO_NSSTRING:%.*]] = function_ref @_TFE10FoundationSS19_bridgeToObjectiveCfT_CSo8NSString
   // CHECK:   [[NSSTR:%.*]] = apply [[STRING_TO_NSSTRING]]([[PROP_COPY]])
   // CHECK:   return [[NSSTR]]
@@ -234,7 +234,7 @@ class Bas : NSObject {
   // CHECK-LABEL: sil hidden [transparent] @_TFC13objc_bridging3Basg11strRealPropSS
   // CHECK:   [[PROP_ADDR:%.*]] = ref_element_addr %0 : {{.*}}, #Bas.strRealProp
   // CHECK:   [[PROP:%.*]] = load [[PROP_ADDR]]
-  // CHECK:   retain_value [[PROP]] : $String
+  // CHECK:   copy_value [[PROP]] : $String
 
 
   // CHECK-LABEL: sil hidden [transparent] [thunk] @_TToFC13objc_bridging3Bass11strRealPropSS : $@convention(objc_method) (NSString, Bas) -> () {
@@ -330,24 +330,24 @@ class Bas : NSObject {
 
   // CHECK-LABEL: sil hidden [thunk] @_TToFC13objc_bridging3Bas8arrayArg{{.*}} : $@convention(objc_method) (NSArray, Bas) -> ()
   // CHECK: bb0([[NSARRAY:%[0-9]+]] : $NSArray, [[SELF:%[0-9]+]] : $Bas):
-  // CHECK:   strong_retain [[NSARRAY]] : $NSArray
-  // CHECK:   strong_retain [[SELF]] : $Bas
+  // CHECK:   copy_value [[NSARRAY]] : $NSArray
+  // CHECK:   copy_value [[SELF]] : $Bas
   // CHECK:   [[CONV_FN:%[0-9]+]] = function_ref @_TZFE10FoundationSa36_unconditionallyBridgeFromObjectiveCfGSqCSo7NSArray_GSax_
   // CHECK-NEXT: [[OPT_NSARRAY:%[0-9]+]] = enum $Optional<NSArray>, #Optional.some!enumelt.1, [[NSARRAY]] : $NSArray
   // CHECK-NEXT: [[ARRAY_META:%[0-9]+]] = metatype $@thin Array<AnyObject>.Type
   // CHECK-NEXT: [[ARRAY:%[0-9]+]] = apply [[CONV_FN]]<AnyObject>([[OPT_NSARRAY]], [[ARRAY_META]])
   // CHECK:   [[SWIFT_FN:%[0-9]+]] = function_ref @_TFC13objc_bridging3Bas{{.*}} : $@convention(method) (@owned Array<AnyObject>, @guaranteed Bas) -> ()
   // CHECK:   [[RESULT:%[0-9]+]] = apply [[SWIFT_FN]]([[ARRAY]], [[SELF]]) : $@convention(method) (@owned Array<AnyObject>, @guaranteed Bas) -> ()
-  // CHECK:   strong_release [[SELF]] : $Bas
+  // CHECK:   destroy_value [[SELF]] : $Bas
   // CHECK:   return [[RESULT]] : $()
   func arrayArg(_ array: [AnyObject]) { }
   
   // CHECK-LABEL: sil hidden [thunk] @_TToFC13objc_bridging3Bas11arrayResult{{.*}} : $@convention(objc_method) (Bas) -> @autoreleased NSArray
   // CHECK: bb0([[SELF:%[0-9]+]] : $Bas):
-  // CHECK:   strong_retain [[SELF]] : $Bas
+  // CHECK:   copy_value [[SELF]] : $Bas
   // CHECK:   [[SWIFT_FN:%[0-9]+]] = function_ref @_TFC13objc_bridging3Bas11arrayResult{{.*}} : $@convention(method) (@guaranteed Bas) -> @owned Array<AnyObject>
   // CHECK:   [[ARRAY:%[0-9]+]] = apply [[SWIFT_FN]]([[SELF]]) : $@convention(method) (@guaranteed Bas) -> @owned Array<AnyObject>
-  // CHECK:   strong_release [[SELF]]
+  // CHECK:   destroy_value [[SELF]]
   // CHECK:   [[CONV_FN:%[0-9]+]] = function_ref @_TFE10FoundationSa19_bridgeToObjectiveCfT_CSo7NSArray
   // CHECK:   [[NSARRAY:%[0-9]+]] = apply [[CONV_FN]]<AnyObject>([[ARRAY]]) : $@convention(method) <τ_0_0> (@guaranteed Array<τ_0_0>) -> @owned NSArray
   // CHECK:   return [[NSARRAY]]
@@ -444,7 +444,7 @@ func getFridge(_ home: APPHouse) -> Refrigerator {
   // CHECK: [[BRIDGE_FN:%[0-9]+]] = function_ref @_TZFV10Appliances12Refrigerator36_unconditionallyBridgeFromObjectiveC
   // CHECK: [[REFRIGERATOR_META:%[0-9]+]] = metatype $@thin Refrigerator.Type
   // CHECK: [[RESULT:%[0-9]+]] = apply [[BRIDGE_FN]]([[OBJC_RESULT]], [[REFRIGERATOR_META]])
-  // CHECK: strong_release [[HOME]] : $APPHouse
+  // CHECK: destroy_value [[HOME]] : $APPHouse
   // CHECK: return [[RESULT]] : $Refrigerator
   return home.fridge
 }

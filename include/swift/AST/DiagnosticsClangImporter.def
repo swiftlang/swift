@@ -11,7 +11,7 @@
 //===----------------------------------------------------------------------===//
 //
 //  This file defines diagnostics for the Clang importer.
-//  Each diagnostic is described using one of three kinds (error, warning, or 
+//  Each diagnostic is described using one of three kinds (error, warning, or
 //  note) along with a unique identifier, category, options, and text, and is
 //  followed by a signature describing the diagnostic argument kinds.
 //

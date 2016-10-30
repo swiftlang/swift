@@ -20,7 +20,7 @@ func index1() -> Int { return 1 }
 func someValidPointer<T>() -> UnsafePointer<T> { fatalError() }
 func someValidPointer<T>() -> UnsafeMutablePointer<T> { fatalError() }
 
-// Verify that there is no unnecessary extra retain of ref.array.
+// Verify that there is no unnecessary extra copy_value of ref.array.
 // rdar://19002913
 func test0(_ ref: A) {
   ref.array[index0()] = ref.array[index1()]
@@ -45,7 +45,7 @@ func test0(_ ref: A) {
 // CHECK-NEXT: // function_ref accessors.OrdinarySub.subscript.getter : (Swift.Int) -> Swift.Int
 // CHECK-NEXT: [[T1:%.*]] = function_ref @_TFV9accessors11OrdinarySubg9subscriptFSiSi
 // CHECK-NEXT: [[VALUE:%.*]] = apply [[T1]]([[INDEX1]], [[T0]])
-// CHECK-NEXT: release_value [[T0]]
+// CHECK-NEXT: destroy_value [[T0]]
 //   Formal access to LHS.
 // CHECK-NEXT: [[STORAGE:%.*]] = alloc_stack $Builtin.UnsafeValueBuffer
 // CHECK-NEXT: [[BUFFER:%.*]] = alloc_stack $OrdinarySub
@@ -74,7 +74,7 @@ func test0(_ ref: A) {
 // CHECK-NEXT: dealloc_stack [[STORAGE]]
 // CHECK-NEXT: dealloc_stack [[TEMP]]
 //   Balance out the +1 from the function parameter.
-// CHECK-NEXT: strong_release %0
+// CHECK-NEXT: destroy_value %0
 // CHECK-NEXT: tuple ()
 // CHECK-NEXT: return
 
@@ -155,7 +155,7 @@ func test1(_ ref: B) {
 // CHECK-NEXT: dealloc_stack [[BUFFER]]
 // CHECK-NEXT: dealloc_stack [[STORAGE]]
 //   Balance out the +1 from the function parameter.
-// CHECK-NEXT: strong_release %0
+// CHECK-NEXT: destroy_value %0
 // CHECK-NEXT: tuple ()
 // CHECK-NEXT: return
 
