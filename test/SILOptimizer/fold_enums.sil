@@ -54,7 +54,7 @@ bb0(%0 : $Optional<Int32>, %1 : $Int32):
 bb1(%3 : $Int32):
   debug_value %3 : $Int32
 
-  // The operand is not %3 (= the argument of this block).	
+  // The operand is not %3 (= the argument of this block).
   %5 = enum $Optional<Int32>, #Optional.some!enumelt.1, %1 : $Int32
   br bb3(%5 : $Optional<Int32>)
 

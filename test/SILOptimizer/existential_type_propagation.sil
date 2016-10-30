@@ -222,7 +222,7 @@ sil @read_p : $@convention(thin) (@in P) -> ()
 sil @foo_witness : $@convention(witness_method) (@in_guaranteed X) -> Int64
 
 sil_witness_table hidden X: P module nix {
-  method #P.foo!1: @foo_witness	
+  method #P.foo!1: @foo_witness
 }
 
 
