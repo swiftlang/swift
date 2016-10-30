@@ -331,7 +331,7 @@ namespace sil_block {
     SIL_TRY_APPLY,
     SIL_NON_THROWING_APPLY
   };
-  
+
   using SILInstApplyLayout = BCRecordLayout<
     SIL_INST_APPLY,
     BCFixed<3>,           // ApplyKind

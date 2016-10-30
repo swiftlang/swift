@@ -401,7 +401,7 @@ class ASTScope {
     this->patternBinding.decl = decl;
     this->patternBinding.entry = entry;
   }
-  
+
   ASTScope(const ASTScope *parent, BraceStmt *braceStmt)
       : ASTScope(ASTScopeKind::BraceStmt, parent) {
     this->braceStmt.stmt = braceStmt;

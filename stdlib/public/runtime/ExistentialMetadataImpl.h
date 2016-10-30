@@ -35,7 +35,7 @@ struct LLVM_LIBRARY_VISIBILITY ExistentialBoxBase {
       bytes += stride;
     }
   }
-  
+
   template <class Container, class... A>
   static Container *initializeArrayWithCopy(Container *dest,
                                             Container *src,
@@ -50,7 +50,7 @@ struct LLVM_LIBRARY_VISIBILITY ExistentialBoxBase {
     }
     return dest;
   }
-  
+
   template <class Container, class... A>
   static Container *initializeArrayWithTakeFrontToBack(Container *dest,
                                                        Container *src,
@@ -65,7 +65,7 @@ struct LLVM_LIBRARY_VISIBILITY ExistentialBoxBase {
     }
     return dest;
   }
-  
+
   template <class Container, class... A>
   static Container *initializeArrayWithTakeBackToFront(Container *dest,
                                                        Container *src,
@@ -90,8 +90,8 @@ struct LLVM_LIBRARY_VISIBILITY OpaqueExistentialBoxBase
   static void destroy(Container *value, A... args) {
     value->getType()->vw_destroyBuffer(value->getBuffer(args...));
   }
-  
-  
+
+
   template <class Container, class... A>
   static Container *initializeWithCopy(Container *dest, Container *src,
                                        A... args) {
@@ -100,7 +100,7 @@ struct LLVM_LIBRARY_VISIBILITY OpaqueExistentialBoxBase
                                                         src->getBuffer(args...));
     return dest;
   }
-  
+
   template <class Container, class... A>
   static Container *initializeWithTake(Container *dest, Container *src,
                                        A... args) {
@@ -109,7 +109,7 @@ struct LLVM_LIBRARY_VISIBILITY OpaqueExistentialBoxBase
                                                         src->getBuffer(args...));
     return dest;
   }
-  
+
   template <class Container, class... A>
   static Container *assignWithCopy(Container *dest, Container *src,
                                    A... args) {
@@ -173,7 +173,7 @@ struct LLVM_LIBRARY_VISIBILITY OpaqueExistentialBox
     void copyTypeInto(Container *dest) const {
       this->Header.copyTypeInto(&dest->Header, NumWitnessTables);
     }
-    
+
     static size_t getContainerStride() {
       return sizeof(Container);
     }
@@ -221,7 +221,7 @@ struct LLVM_LIBRARY_VISIBILITY NonFixedOpaqueExistentialBox
     static size_t getStride(unsigned numWitnessTables) {
       return getSize(numWitnessTables);
     }
-    
+
     static size_t getContainerStride(const Metadata *self) {
       return getStride(getNumWitnessTables(self));
     }
@@ -242,7 +242,7 @@ struct LLVM_LIBRARY_VISIBILITY ClassExistentialBoxBase
   static void destroy(Container *value, A... args) {
     swift_unknownRelease(*value->getValueSlot());
   }
-  
+
   template <class Container, class... A>
   static Container *initializeWithCopy(Container *dest, Container *src,
                                        A... args) {
@@ -250,7 +250,7 @@ struct LLVM_LIBRARY_VISIBILITY ClassExistentialBoxBase
     auto newValue = *src->getValueSlot();
     *dest->getValueSlot() = newValue;
     swift_unknownRetain(newValue);
-    return dest;  
+    return dest;
   }
 
   template <class Container, class... A>
@@ -295,7 +295,7 @@ struct LLVM_LIBRARY_VISIBILITY ClassExistentialBoxBase
     return swift_getHeapObjectExtraInhabitantIndex(
                                   (HeapObject* const *) src->getValueSlot());
   }
-  
+
 };
 
 /// A box implementation class for an existential container with
@@ -313,7 +313,7 @@ struct LLVM_LIBRARY_VISIBILITY ClassExistentialBox
     }
     void **getValueSlot() { return &Header.Value; }
     void * const *getValueSlot() const { return &Header.Value; }
-    
+
     static size_t getContainerStride() { return sizeof(Container); }
   };
 
@@ -334,7 +334,7 @@ struct LLVM_LIBRARY_VISIBILITY NonFixedClassExistentialBox
     ClassExistentialContainer Header;
 
     static unsigned getNumWitnessTables(const Metadata *self) {
-      auto castSelf = static_cast<const ExistentialTypeMetadata*>(self); 
+      auto castSelf = static_cast<const ExistentialTypeMetadata*>(self);
       return castSelf->Flags.getNumWitnessTables();
     }
 
@@ -373,13 +373,13 @@ struct LLVM_LIBRARY_VISIBILITY ExistentialMetatypeBoxBase
   template <class Container, class... A>
   static void destroy(Container *value, A... args) {
   }
-  
+
   template <class Container, class... A>
   static Container *initializeWithCopy(Container *dest, Container *src,
                                        A... args) {
     src->copyTypeInto(dest, args...);
     *dest->getValueSlot() = *src->getValueSlot();
-    return dest;  
+    return dest;
   }
 
   template <class Container, class... A>
@@ -417,7 +417,7 @@ struct LLVM_LIBRARY_VISIBILITY ExistentialMetatypeBoxBase
     return swift_getHeapObjectExtraInhabitantIndex(
                                   (HeapObject* const *) src->getValueSlot());
   }
-  
+
 };
 
 /// A box implementation class for an existential metatype container
@@ -435,7 +435,7 @@ struct LLVM_LIBRARY_VISIBILITY ExistentialMetatypeBox
     }
     const Metadata **getValueSlot() { return &Header.Value; }
     const Metadata * const *getValueSlot() const { return &Header.Value; }
-    
+
     static size_t getContainerStride() { return sizeof(Container); }
   };
 
@@ -456,7 +456,7 @@ struct LLVM_LIBRARY_VISIBILITY NonFixedExistentialMetatypeBox
     ExistentialMetatypeContainer Header;
 
     static unsigned getNumWitnessTables(const Metadata *self) {
-      auto castSelf = static_cast<const ExistentialTypeMetadata*>(self); 
+      auto castSelf = static_cast<const ExistentialTypeMetadata*>(self);
       return castSelf->Flags.getNumWitnessTables();
     }
 

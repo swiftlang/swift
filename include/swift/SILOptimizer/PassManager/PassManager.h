@@ -71,7 +71,7 @@ class SILPassManager {
   /// the pass doesn't need to run, because nothing has changed since the
   /// previous run of that pass.
   typedef std::bitset<(size_t)PassKind::AllPasses_Last + 1> CompletedPasses;
-  
+
   /// A completed-passes mask for each function.
   llvm::DenseMap<SILFunction *, CompletedPasses> CompletedPassesMap;
 
@@ -142,7 +142,7 @@ public:
   /// is derived. This is used to avoid an infinite amount of functions pushed
   /// on the worklist (e.g. caused by a bug in a specializing optimization).
   void addFunctionToWorklist(SILFunction *F, SILFunction *DerivedFrom);
-  
+
   /// \brief Iterate over all analysis and notify them of the function.
   /// This function does not necessarily have to be newly created function. It
   /// is the job of the analysis to make sure no extra work is done if the
@@ -159,7 +159,7 @@ public:
     for (auto AP : Analysis)
       if (!AP->isLocked())
         AP->invalidate(F, K);
-    
+
     CurrentPassHasInvalidated = true;
     // Any change let all passes run again.
     CompletedPassesMap[F].reset();
@@ -174,7 +174,7 @@ public:
     for (auto AP : Analysis)
       if (!AP->isLocked())
         AP->invalidateForDeadFunction(F, K);
-    
+
     CurrentPassHasInvalidated = true;
     // Any change let all passes run again.
     CompletedPassesMap[F].reset();

@@ -27,23 +27,23 @@ namespace swift {
   class SourceLoc;
   class SourceRange;
   class ASTWalker;
-  
+
   struct ASTNode : public llvm::PointerUnion3<Expr*, Stmt*, Decl*> {
     // Inherit the constructors from PointerUnion.
     using PointerUnion3::PointerUnion3;
-    
+
     SourceRange getSourceRange() const;
 
     /// \brief Return the location of the start of the statement.
     SourceLoc getStartLoc() const;
-  
+
     /// \brief Return the location of the end of the statement.
     SourceLoc getEndLoc() const;
 
     void walk(ASTWalker &Walker);
     void walk(ASTWalker &&walker) { walk(walker); }
   };
-  
+
 } // namespace swift
 
 namespace llvm {

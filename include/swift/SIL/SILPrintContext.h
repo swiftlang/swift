@@ -31,7 +31,7 @@ protected:
 
   /// Dump more information in the SIL output.
   bool Verbose;
-  
+
   /// Sort all kind of tables to ease diffing.
   bool SortedSIL;
 
@@ -47,7 +47,7 @@ public:
 
   /// Returns true if the SIL output should be sorted.
   bool sortSIL() const { return SortedSIL; }
-  
+
   /// Returns true if verbose SIL should be printed.
   bool printVerbose() const { return Verbose; }
 

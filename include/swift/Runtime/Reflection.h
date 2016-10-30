@@ -18,17 +18,17 @@
 #include <cstdlib>
 
 namespace swift {
-  
+
 struct MirrorWitnessTable;
-  
+
 /// The layout of protocol<Mirror>.
 struct Mirror {
   OpaqueExistentialContainer Header;
   const MirrorWitnessTable *MirrorWitness;
 };
 
-// Swift assumes Mirror is returned in memory. 
-// Use MirrorReturn to guarantee that even on architectures 
+// Swift assumes Mirror is returned in memory.
+// Use MirrorReturn to guarantee that even on architectures
 // where Mirror would be returned in registers.
 struct MirrorReturn {
   Mirror mirror;

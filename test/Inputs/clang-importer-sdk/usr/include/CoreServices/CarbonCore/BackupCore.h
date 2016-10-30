@@ -5,7 +5,7 @@
 #include <CoreFoundation.h>
 #endif
 
-extern Boolean 
+extern Boolean
 CSBackupIsItemExcluded(
   CFURLRef   item,
   Boolean *  excludeByPath);

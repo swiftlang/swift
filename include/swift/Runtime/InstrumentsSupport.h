@@ -45,7 +45,7 @@ extern "C" void (*_swift_release_n)(HeapObject *object, uint32_t n);
 SWIFT_RUNTIME_EXPORT
 extern "C" void (*_swift_nonatomic_release)(HeapObject *object);
 
-// liboainject on iOS 8 patches the function pointers below if present. 
+// liboainject on iOS 8 patches the function pointers below if present.
 // Do not reuse these names unless you do what oainject expects you to do.
 typedef size_t AllocIndex;
 SWIFT_RUNTIME_EXPORT

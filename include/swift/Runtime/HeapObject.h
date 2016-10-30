@@ -25,16 +25,16 @@
 #include <objc/objc.h>
 #endif /* SWIFT_OBJC_INTEROP */
 
-// Bring in the definition of HeapObject 
+// Bring in the definition of HeapObject
 #include "../../../stdlib/public/SwiftShims/HeapObject.h"
 
 namespace swift {
-  
+
 struct InProcess;
 
 template <typename Runtime> struct TargetMetadata;
 using Metadata = TargetMetadata<InProcess>;
-  
+
 template <typename Runtime> struct TargetHeapMetadata;
 using HeapMetadata = TargetHeapMetadata<InProcess>;
 
@@ -97,7 +97,7 @@ template<typename A, typename B>
 struct TwoWordPair {
   A first;
   B second;
-  
+
   TwoWordPair() = default;
   TwoWordPair(A first, B second);
 
@@ -118,23 +118,23 @@ struct TwoWordPair {
       TwoWordPair value;
       Return mangled;
     } reinterpret = {*this};
-    
+
     return reinterpret.mangled;
   }
-  
+
   /*implicit*/ TwoWordPair(Return r) {
     union {
       Return mangled;
       TwoWordPair value;
     } reinterpret = {r};
-    
+
     *this = reinterpret.value;
   }
 #else
   using Return = TwoWordPair;
 #endif
 };
-  
+
 template<typename A, typename B>
 inline TwoWordPair<A,B>::TwoWordPair(A first, B second)
   : first(first), second(second)
@@ -146,7 +146,7 @@ inline TwoWordPair<A,B>::TwoWordPair(A first, B second)
   static_assert(alignof(TwoWordPair) == alignof(void*),
                 "pair must be word-aligned");
 }
-  
+
 using BoxPair = TwoWordPair<HeapObject *, OpaqueValue *>;
 
 /// Allocates a heap object that can contain a value of the given type.
@@ -166,7 +166,7 @@ extern "C" BoxPair::Return (*_swift_allocBox)(Metadata const *type)
 
 
 // Allocate plain old memory. This is the generalized entry point
-// Never returns nil. The returned memory is uninitialized. 
+// Never returns nil. The returned memory is uninitialized.
 //
 // An "alignment mask" is just the alignment (a power of 2) minus 1.
 
@@ -1074,7 +1074,7 @@ static inline void *swift_unknownUnownedTakeStrong(UnownedReference *ref) {
 #endif /* SWIFT_OBJC_INTEROP */
 
 #if SWIFT_OBJC_INTEROP
-  
+
 /// Destroy an unowned reference to an object with unknown reference counting.
 SWIFT_RUNTIME_EXPORT
 extern "C" void swift_unknownUnownedDestroy(UnownedReference *ref);
@@ -1159,7 +1159,7 @@ static inline void swift_unknownUnownedTakeAssign(UnownedReference *dest,
 SWIFT_CC(swift) SWIFT_RUNTIME_EXPORT
 extern "C"
 TwoWordPair<const char *, uintptr_t>::Return
-swift_getTypeName(const Metadata *type, bool qualified);  
+swift_getTypeName(const Metadata *type, bool qualified);
 
 } // end namespace swift
 

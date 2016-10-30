@@ -39,7 +39,7 @@ enum class Ownership : uint8_t {
   /// \brief an 'unowned(unsafe)' reference
   Unmanaged,
 };
-  
+
 } // end namespace swift
 
 #endif

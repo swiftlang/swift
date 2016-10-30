@@ -31,7 +31,7 @@ namespace swift {
   // type.  We can flip the typedef if/when the LLVM interface
   // supports LLVM containers.
   using ProcessCmdLine = std::vector<std::string>;
-  
+
 
   /// Attempt to run the script identified by the given compiler instance.
   ///

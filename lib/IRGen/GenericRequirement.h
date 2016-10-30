@@ -101,7 +101,7 @@ public:
     return Requirements;
   }
 
-  /// Does this generic type have 
+  /// Does this generic type have
   bool hasParentType() const {
     return bool(ParentType);
   }

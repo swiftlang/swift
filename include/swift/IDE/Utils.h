@@ -59,7 +59,7 @@ struct SourceCompleteResult {
   // prefix will contain the leading space characters of the line that
   // contained the '{', '(' or '[' character that was unbalanced.
   std::string IndentPrefix;
-  // Returns the indent level as an indentation count (number of indentations 
+  // Returns the indent level as an indentation count (number of indentations
   // to apply). Clients can translate this into the standard indentation that
   // is being used by the IDE (3 spaces? 1 tab?) and should use the indent
   // prefix string followed by the correct indentation.

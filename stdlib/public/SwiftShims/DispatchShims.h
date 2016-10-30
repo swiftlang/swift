@@ -122,7 +122,7 @@ void _swift_dispatch_apply_current(
 
 SWIFT_RUNTIME_STDLIB_INTERFACE
 SWIFT_DISPATCH_RETURNS_RETAINED
-__swift_shims_dispatch_data_t 
+__swift_shims_dispatch_data_t
 _swift_dispatch_data_create(
     const void *buffer,
     __swift_size_t size,

@@ -105,7 +105,7 @@ private:
     switch (kind) {
 #define FAILURE(KIND, TEXT, ARGTYS) \
     case Kind::KIND: return TEXT;
-#include "swift/Remote/FailureKinds.def"    
+#include "swift/Remote/FailureKinds.def"
     }
   }
 

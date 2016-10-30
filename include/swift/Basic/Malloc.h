@@ -30,10 +30,10 @@ namespace swift {
 // FIXME: Use C11 aligned_alloc if available.
 inline void *AlignedAlloc(size_t size, size_t align) {
   // posix_memalign only accepts alignments greater than sizeof(void*).
-  // 
+  //
   if (align < sizeof(void*))
     align = sizeof(void*);
-  
+
   void *r;
 #if defined(_WIN32)
   r = _aligned_malloc(size, align);

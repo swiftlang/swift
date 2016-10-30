@@ -503,7 +503,7 @@ public:
                                                          SILValue src) {
     return createMarkUninitialized(Loc, src, MarkUninitializedInst::RootSelf);
   }
-  
+
   MarkUninitializedBehaviorInst *
   createMarkUninitializedBehavior(SILLocation Loc,
                                   SILValue initStorageFunc,

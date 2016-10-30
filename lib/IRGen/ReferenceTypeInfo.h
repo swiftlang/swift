@@ -26,7 +26,7 @@ namespace irgen {
 class WeakTypeInfo;
 class UnownedTypeInfo;
 class TypeConverter;
-  
+
 /// \brief An abstract class designed for use when implementing a type
 /// that has reference semantics.
 class ReferenceTypeInfo : public LoadableTypeInfo {

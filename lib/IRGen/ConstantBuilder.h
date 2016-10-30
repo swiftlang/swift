@@ -75,7 +75,7 @@ protected:
   llvm::Constant *getRelativeAddressFromNextField(ConstantReference referent,
                                             llvm::IntegerType *addressTy) {
     assert(relativeAddressBase && "no relative address base set");
-    
+
     // Determine the address of the next field in the initializer.
     llvm::Constant *fieldAddr =
       llvm::ConstantExpr::getPtrToInt(relativeAddressBase, IGM.IntPtrTy);
@@ -95,7 +95,7 @@ protected:
       relative = llvm::ConstantExpr::getAdd(relative,
                                        llvm::ConstantInt::get(addressTy, 1));
     }
-    
+
     return relative;
   }
 
@@ -221,7 +221,7 @@ protected:
     Fields.push_back(value);
     NextOffset += size;
   }
-  
+
   class ReservationToken {
     size_t Index;
     ReservationToken(size_t index) : Index(index) {}

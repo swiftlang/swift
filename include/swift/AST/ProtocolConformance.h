@@ -38,7 +38,7 @@ class NormalProtocolConformance;
 class ProtocolConformance;
 class ModuleDecl;
 enum class AllocationArena;
-  
+
 /// \brief Type substitution mapping from substitutable types to their
 /// replacements.
 typedef llvm::DenseMap<TypeBase *, Type> TypeSubstitutionMap;
@@ -96,10 +96,10 @@ class alignas(1 << DeclAlignInBits) ProtocolConformance {
   /// \brief The type that conforms to the protocol, in the context of the
   /// conformance definition.
   Type ConformingType;
-  
+
   /// \brief The interface type that conforms to the protocol.
   Type ConformingInterfaceType;
-  
+
 
 protected:
   ProtocolConformance(ProtocolConformanceKind kind, Type conformingType,
@@ -116,7 +116,7 @@ public:
 
   /// Get the conforming interface type.
   Type getInterfaceType() const { return ConformingInterfaceType; }
-  
+
   /// Get the protocol being conformed to.
   ProtocolDecl *getProtocol() const;
 
@@ -193,7 +193,7 @@ public:
   }
 
   /// Retrieve the non-type witness for the given requirement.
-  ConcreteDeclRef getWitness(ValueDecl *requirement, 
+  ConcreteDeclRef getWitness(ValueDecl *requirement,
                              LazyResolver *resolver) const;
 
 private:
@@ -216,7 +216,7 @@ public:
       if (!valueReq || isa<AssociatedTypeDecl>(valueReq) ||
           valueReq->isInvalid())
         continue;
-      
+
       // Ignore accessors.
       if (auto *FD = dyn_cast<FuncDecl>(valueReq))
         if (FD->isAccessor())
@@ -236,7 +236,7 @@ public:
   /// Retrieve the complete set of protocol conformances for directly inherited
   /// protocols.
   const InheritedConformanceMap &getInheritedConformances() const;
- 
+
   /// Get the generic parameters open on the conforming type.
   GenericEnvironment *getGenericEnvironment() const;
 
@@ -261,7 +261,7 @@ public:
   /// Determine whether the witness for the given requirement
   /// is either the default definition or was otherwise deduced.
   bool usesDefaultDefinition(AssociatedTypeDecl *requirement) const;
-  
+
   // Make vanilla new/delete illegal for protocol conformances.
   void *operator new(size_t bytes) = delete;
   void operator delete(void *data) = delete;
@@ -275,18 +275,18 @@ public:
     assert(mem);
     return mem;
   }
-  
+
   /// Print a parseable and human-readable description of the identifying
   /// information of the protocol conformance.
   void printName(raw_ostream &os,
                  const PrintOptions &PO = PrintOptions()) const;
-  
+
   /// True if the conformance is for a property behavior instantiation.
   bool isBehaviorConformance() const;
-  
+
   /// Get the property declaration for a behavior conformance, if this is one.
   AbstractStorageDecl *getBehaviorDecl() const;
-  
+
   void dump() const;
   void dump(llvm::raw_ostream &out, unsigned indent = 0) const;
 
@@ -379,7 +379,7 @@ public:
   /// Get the protocol being conformed to.
   ProtocolDecl *getProtocol() const { return ProtocolAndState.getPointer(); }
 
-  /// Retrieve the location of this 
+  /// Retrieve the location of this
   SourceLoc getLoc() const { return Loc; }
 
   /// Get the declaration context that contains the conforming extension or
@@ -407,7 +407,7 @@ public:
   bool isInvalid() const {
     return ContextAndInvalid.getInt();
   }
-  
+
   /// Mark this conformance as invalid.
   void setInvalid() {
     ContextAndInvalid.setInt(true);
@@ -422,13 +422,13 @@ public:
   bool isBehaviorConformance() const {
     return ContextAndInvalid.getPointer().is<AbstractStorageDecl *>();
   }
-  
+
   /// Return the declaration using the behavior for this conformance, or null
   /// if this isn't a behavior conformance.
   AbstractStorageDecl *getBehaviorDecl() const {
     return ContextAndInvalid.getPointer().dyn_cast<AbstractStorageDecl *>();
   }
-  
+
   /// Retrieve the type witness substitution and type decl (if one exists)
   /// for the given associated type.
   std::pair<const Substitution &, TypeDecl *>
@@ -450,7 +450,7 @@ public:
   ///
   /// Note that a generic witness will only be specialized if the conformance
   /// came from the current file.
-  ConcreteDeclRef getWitness(ValueDecl *requirement, 
+  ConcreteDeclRef getWitness(ValueDecl *requirement,
                              LazyResolver *resolver) const;
 
   /// Determine whether the protocol conformance has a witness for the given
@@ -584,7 +584,7 @@ public:
                              LazyResolver *resolver) const;
 
   /// Retrieve the value witness corresponding to the given requirement.
-  ConcreteDeclRef getWitness(ValueDecl *requirement, 
+  ConcreteDeclRef getWitness(ValueDecl *requirement,
                              LazyResolver *resolver) const;
 
 
@@ -686,7 +686,7 @@ public:
   }
 
   /// Retrieve the value witness corresponding to the given requirement.
-  ConcreteDeclRef getWitness(ValueDecl *requirement, 
+  ConcreteDeclRef getWitness(ValueDecl *requirement,
                              LazyResolver *resolver) const {
     return InheritedConformance->getWitness(requirement, resolver);
   }

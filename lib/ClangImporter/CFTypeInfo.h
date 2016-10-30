@@ -14,7 +14,7 @@
 //
 //===----------------------------------------------------------------------===//
 #ifndef SWIFT_IMPORTER_CFTYPEINFO_H
-#define SWIFT_IMPORTER_CFTYPEINFO_H 
+#define SWIFT_IMPORTER_CFTYPEINFO_H
 
 #include "llvm/ADT/PointerUnion.h"
 

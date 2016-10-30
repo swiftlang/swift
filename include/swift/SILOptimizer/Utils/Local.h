@@ -259,11 +259,11 @@ public:
     /// Don't split critical edges if the frontier instructions are located on
     /// a critical edges. Instead fail.
     DontModifyCFG,
-    
+
     /// Split critical edges if the frontier instructions are located on
     /// a critical edges.
     AllowToModifyCFG,
-    
+
     /// Ignore exit edges from the lifetime region at all.
     IgnoreExitEdges
   };

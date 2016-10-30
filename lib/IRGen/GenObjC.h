@@ -60,17 +60,17 @@ namespace irgen {
     ObjCMethod(SILDeclRef method, SILType searchType, bool startAtSuper)
       : method(method), searchTypeAndSuper(searchType, startAtSuper)
     {}
-    
+
     SILDeclRef getMethod() const { return method; }
     SILType getSearchType() const { return searchTypeAndSuper.getPointer(); }
     bool shouldStartAtSuper() const { return searchTypeAndSuper.getInt(); }
-    
+
     /// FIXME: Thunk down to a Swift function value?
     llvm::Value *getExplosionValue(IRGenFunction &IGF) const {
       llvm_unreachable("thunking unapplied objc method to swift function "
                        "not yet implemented");
     }
-    
+
     /// Determine the kind of message that should be sent to this
     /// method.
     ObjCMessageKind getMessageKind() const {
@@ -184,17 +184,17 @@ namespace irgen {
   /// Get the type encoding for an ObjC property.
   void getObjCEncodingForPropertyType(IRGenModule &IGM, VarDecl *property,
                                       std::string &s);
-  
+
   /// Produces extended encoding of ObjC block signature.
   /// \returns the encoded type.
   llvm::Constant *getBlockTypeExtendedEncoding(IRGenModule &IGM,
                                                CanSILFunctionType invokeTy);
-  
+
   /// Produces extended encoding of method type.
   /// \returns the encoded type.
   llvm::Constant *getMethodTypeExtendedEncoding(IRGenModule &IGM,
                                                 AbstractFunctionDecl *method);
-  
+
   /// Build an Objective-C method descriptor for the given property's
   /// getter and setter methods.
   std::pair<llvm::Constant *, llvm::Constant *>
@@ -203,7 +203,7 @@ namespace irgen {
   /// Build an Objective-C method descriptor for the given subscript's
   /// getter and setter methods.
   std::pair<llvm::Constant *, llvm::Constant *>
-  emitObjCSubscriptMethodDescriptors(IRGenModule &IGM, 
+  emitObjCSubscriptMethodDescriptors(IRGenModule &IGM,
                                      SubscriptDecl *subscript);
 
   /// True if the FuncDecl requires an ObjC method descriptor.

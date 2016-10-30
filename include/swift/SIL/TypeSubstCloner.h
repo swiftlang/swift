@@ -127,7 +127,7 @@ protected:
                                                  Inst->getType(),
                                                  Inst->isVolatile()));
   }
-  
+
   void visitBuiltinInst(BuiltinInst *Inst) {
     auto Args = this->template getOpValueArray<8>(Inst->getArguments());
 
@@ -143,7 +143,7 @@ protected:
                                         TempSubstList, Args);
     doPostProcess(Inst, N);
   }
-  
+
   void visitApplyInst(ApplyInst *Inst) {
     auto Args = this->template getOpValueArray<8>(Inst->getArguments());
 
@@ -203,7 +203,7 @@ protected:
     for (auto &Sub : Inst->getSubstitutions()) {
       TempSubstList.push_back(asImpl().getOpSubstitution(Sub));
     }
-    
+
     Builder.createPartialApply(
       getOpLocation(Inst->getLoc()), getOpValue(CalleeVal),
         getOpType(Inst->getSubstCalleeSILType()), TempSubstList, Args,

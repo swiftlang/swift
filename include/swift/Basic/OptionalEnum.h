@@ -84,5 +84,5 @@ namespace swift {
     }
   };
 } // end namespace swift
-  
+
 #endif // SWIFT_BASIC_OPTIONALENUM_H

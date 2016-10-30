@@ -61,17 +61,17 @@ struct InProcess {
   static constexpr size_t PointerSize = sizeof(uintptr_t);
   using StoredPointer = uintptr_t;
   using StoredSize = size_t;
-  
+
   template <typename T>
   using Pointer = T*;
-  
+
   template <typename T, bool Nullable = false>
   using FarRelativeDirectPointer = FarRelativeDirectPointer<T, Nullable>;
 
   template <typename T, bool Nullable = false>
   using FarRelativeIndirectablePointer =
     FarRelativeIndirectablePointer<T, Nullable>;
-  
+
   template <typename T, bool Nullable = true>
   using RelativeDirectPointer = RelativeDirectPointer<T, Nullable>;
 };
@@ -93,16 +93,16 @@ struct External {
   using StoredSize = typename Runtime::StoredSize;
   static constexpr size_t PointerSize = Runtime::PointerSize;
   const StoredPointer PointerValue;
-  
+
   template <typename T>
   using Pointer = StoredPointer;
-  
+
   template <typename T, bool Nullable = false>
   using FarRelativeDirectPointer = StoredPointer;
 
   template <typename T, bool Nullable = false>
   using FarRelativeIndirectablePointer = StoredSize;
-  
+
   template <typename T, bool Nullable = true>
   using RelativeDirectPointer = int32_t;
 };
@@ -111,14 +111,14 @@ struct External {
 template <typename Runtime, template <typename> class Pointee>
 using TargetMetadataPointer
   = typename Runtime::template Pointer<Pointee<Runtime>>;
-  
+
 template <typename Runtime, template <typename> class Pointee>
 using ConstTargetMetadataPointer
   = typename Runtime::template Pointer<const Pointee<Runtime>>;
-  
+
 template <typename Runtime, typename T>
 using TargetPointer = typename Runtime::template Pointer<T>;
-  
+
 template <typename Runtime, template <typename> class Pointee,
           bool Nullable = true>
 using ConstTargetFarRelativeDirectPointer
@@ -135,7 +135,7 @@ using TargetFarRelativeIndirectablePointer
 
 struct HeapObject;
 struct WeakReference;
-  
+
 template <typename Runtime> struct TargetMetadata;
 using Metadata = TargetMetadata<InProcess>;
 
@@ -192,7 +192,7 @@ struct ValueWitnessTable;
 /// Flags stored in the value-witness table.
 class ValueWitnessFlags {
   typedef size_t int_type;
-  
+
   // The polarity of these bits is chosen so that, when doing struct layout, the
   // flags of the field types can be mostly bitwise-or'ed together to derive the
   // flags for the struct. (The "non-inline" and "has-extra-inhabitants" bits
@@ -251,7 +251,7 @@ public:
     return ValueWitnessFlags((Data & ~IsNonPOD) |
                                (isPOD ? 0 : IsNonPOD));
   }
-  
+
   /// True if values of this type can be taken with memcpy. Unlike C++ 'move',
   /// 'take' is a destructive operation that invalidates the source object, so
   /// most types can be taken with a simple bitwise copy. Only types with side
@@ -283,7 +283,7 @@ public:
                              (hasEnumWitnesses ? HasEnumWitnesses : 0));
   }
 };
-  
+
 /// Flags stored in a value-witness table with extra inhabitants.
 class ExtraInhabitantFlags {
   typedef size_t int_type;
@@ -291,15 +291,15 @@ class ExtraInhabitantFlags {
     NumExtraInhabitantsMask = 0x7FFFFFFFU,
   };
   int_type Data;
-  
+
   constexpr ExtraInhabitantFlags(int_type data) : Data(data) {}
 
 public:
   constexpr ExtraInhabitantFlags() : Data(0) {}
-  
+
   /// The number of extra inhabitants in the type's representation.
   int getNumExtraInhabitants() const { return Data & NumExtraInhabitantsMask; }
-  
+
   constexpr ExtraInhabitantFlags
   withNumExtraInhabitants(unsigned numExtraInhabitants) const {
     return ExtraInhabitantFlags((Data & ~NumExtraInhabitantsMask) |
@@ -327,7 +327,7 @@ typedef void destroyBuffer(ValueBuffer *buffer, const Metadata *self);
 ///   self->initializeBufferWithCopy(dest, self->projectBuffer(src), self)
 ///
 /// This operation does not need to be safe against 'dest' and 'src' aliasing.
-/// 
+///
 /// Preconditions:
 ///   'dest' is an unallocated buffer
 /// Postconditions:
@@ -340,7 +340,7 @@ typedef OpaqueValue *initializeBufferWithCopyOfBuffer(ValueBuffer *dest,
 
 /// Given an allocated or initialized buffer, derive a pointer to
 /// the object.
-/// 
+///
 /// Invariants:
 ///   'buffer' is an allocated or initialized buffer
 typedef OpaqueValue *projectBuffer(ValueBuffer *buffer,
@@ -383,7 +383,7 @@ typedef OpaqueValue *initializeBufferWithCopy(ValueBuffer *dest,
 /// the value.
 ///
 /// This operation does not need to be safe against 'dest' and 'src' aliasing.
-/// 
+///
 /// Returns the dest object.
 ///
 /// Preconditions:
@@ -400,7 +400,7 @@ typedef OpaqueValue *initializeWithCopy(OpaqueValue *dest,
 /// other.
 ///
 /// This operation must be safe against 'dest' and 'src' aliasing.
-/// 
+///
 /// Returns the dest object.
 ///
 /// Invariants:
@@ -415,7 +415,7 @@ typedef OpaqueValue *assignWithCopy(OpaqueValue *dest,
 /// uninitialized.
 ///
 /// This operation does not need to be safe against 'dest' and 'src' aliasing.
-/// 
+///
 /// Returns the dest object.
 ///
 /// Preconditions:
@@ -437,7 +437,7 @@ typedef OpaqueValue *initializeBufferWithTake(ValueBuffer *dest,
 /// bytes.
 ///
 /// This operation does not need to be safe against 'dest' and 'src' aliasing.
-/// 
+///
 /// Returns the dest object.
 ///
 /// Preconditions:
@@ -483,7 +483,7 @@ typedef OpaqueValue *assignWithTake(OpaqueValue *dest,
 typedef OpaqueValue *allocateBuffer(ValueBuffer *buffer,
                                     const Metadata *self);
 
-  
+
 /// Given an unallocated buffer and an initialized buffer, move the
 /// value from one buffer to the other, leaving the source buffer
 /// unallocated.
@@ -511,7 +511,7 @@ typedef OpaqueValue *allocateBuffer(ValueBuffer *buffer,
 typedef OpaqueValue *initializeBufferWithTakeOfBuffer(ValueBuffer *dest,
                                                       ValueBuffer *src,
                                                       const Metadata *self);
-  
+
 /// Given an initialized array of objects, destroy it.
 ///
 /// Preconditions:
@@ -520,12 +520,12 @@ typedef OpaqueValue *initializeBufferWithTakeOfBuffer(ValueBuffer *dest,
 ///   'object' is an uninitialized array of n objects
 typedef void destroyArray(OpaqueValue *array, size_t n,
                           const Metadata *self);
-  
+
 /// Given an uninitialized array and an initialized array, copy
 /// the value.
 ///
 /// This operation does not need to be safe against 'dest' and 'src' aliasing.
-/// 
+///
 /// Returns the dest object.
 ///
 /// Preconditions:
@@ -538,7 +538,7 @@ typedef OpaqueValue *initializeArrayWithCopy(OpaqueValue *dest,
                                              OpaqueValue *src,
                                              size_t n,
                                              const Metadata *self);
-  
+
 /// Given an uninitialized array and an initialized array, move
 /// the values from one to the other, leaving the source array
 /// uninitialized.
@@ -546,7 +546,7 @@ typedef OpaqueValue *initializeArrayWithCopy(OpaqueValue *dest,
 /// This operation does not need to be safe against 'dest' and 'src' fully
 /// overlapping. 'dest' may partially overlap the head of 'src', because the
 /// values are taken as if in front-to-back order.
-/// 
+///
 /// Returns the dest object.
 ///
 /// Preconditions:
@@ -559,7 +559,7 @@ typedef OpaqueValue *initializeArrayWithTakeFrontToBack(OpaqueValue *dest,
                                                         OpaqueValue *src,
                                                         size_t n,
                                                         const Metadata *self);
-  
+
 /// Given an uninitialized array and an initialized array, move
 /// the values from one to the other, leaving the source array
 /// uninitialized.
@@ -567,7 +567,7 @@ typedef OpaqueValue *initializeArrayWithTakeFrontToBack(OpaqueValue *dest,
 /// This operation does not need to be safe against 'dest' and 'src' fully
 /// overlapping. 'dest' may partially overlap the tail of 'src', because the
 /// values are taken as if in back-to-front order.
-/// 
+///
 /// Returns the dest object.
 ///
 /// Preconditions:
@@ -580,7 +580,7 @@ typedef OpaqueValue *initializeArrayWithTakeBackToFront(OpaqueValue *dest,
                                                         OpaqueValue *src,
                                                         size_t n,
                                                         const Metadata *self);
-  
+
 /// The number of bytes required to store an object of this type.
 /// This value may be zero.  This value is not necessarily a
 /// multiple of the alignment.
@@ -596,13 +596,13 @@ typedef size_t stride;
 
 /// Flags which describe extra inhabitants.
 typedef ExtraInhabitantFlags extraInhabitantFlags;
-  
+
 /// Store an extra inhabitant, named by a unique positive or zero index,
 /// into the given uninitialized storage for the type.
 typedef void storeExtraInhabitant(OpaqueValue *dest,
                                   int index,
                                   const Metadata *self);
-  
+
 /// Get the extra inhabitant index for the bit pattern stored at the given
 /// address, or return -1 if there is a valid value at the address.
 typedef int getExtraInhabitantIndex(const OpaqueValue *src,
@@ -730,7 +730,7 @@ struct ValueWitnessTable {
   size_t getAlignmentMask() const {
     return flags.getAlignmentMask();
   }
-  
+
   /// The number of extra inhabitants, that is, bit patterns that do not form
   /// valid values of the type, in this type's binary representation.
   unsigned getNumExtraInhabitants() const;
@@ -758,7 +758,7 @@ struct ValueWitnessTable {
     return reinterpret_cast<const TypeLayout *>(&size);
   }
 };
-  
+
 /// A value-witness table with extra inhabitants entry points.
 /// These entry points are available only if the HasExtraInhabitants flag bit is
 /// set in the 'flags' field.
@@ -860,7 +860,7 @@ ValueWitnessTable::_asXIVWT() const {
   assert(ExtraInhabitantsValueWitnessTable::classof(this));
   return static_cast<const ExtraInhabitantsValueWitnessTable *>(this);
 }
-  
+
 inline const EnumValueWitnessTable *
 ValueWitnessTable::_asEVWT() const {
   assert(EnumValueWitnessTable::classof(this));
@@ -994,15 +994,15 @@ static inline const FullMetadata<T> *asFullMetadata(const T *metadata) {
 // that isn't SFINAE-safe.
 namespace {
   template<typename T> struct _ResultOf;
-  
+
   template<typename R, typename...A>
   struct _ResultOf<R(A...)> {
     using type = R;
   };
 }
-  
+
 namespace heap_object_abi {
-  
+
 // The extra inhabitants and spare bits of heap object pointers.
 // These must align with the values in IRGen's SwiftTargetInfo.cpp.
 #if defined(__x86_64__)
@@ -1080,7 +1080,7 @@ static const unsigned ObjCReservedLowBits =
 #endif
 
 }
-  
+
 template <typename Runtime> struct TargetNominalTypeDescriptor;
 template <typename Runtime> struct TargetGenericMetadata;
 template <typename Runtime> struct TargetClassMetadata;
@@ -1107,7 +1107,7 @@ struct TargetMetadata {
     : Kind(static_cast<StoredPointer>(MetadataKind::Class)) {}
   constexpr TargetMetadata(MetadataKind Kind)
     : Kind(static_cast<StoredPointer>(Kind)) {}
-  
+
   /// The basic header type.
   typedef TypeMetadataHeader HeaderType;
 
@@ -1120,7 +1120,7 @@ public:
   MetadataKind getKind() const {
     return getEnumeratedMetadataKind(Kind);
   }
-  
+
   /// Set the metadata kind.
   void setKind(MetadataKind kind) {
     Kind = static_cast<StoredPointer>(kind);
@@ -1132,7 +1132,7 @@ public:
   bool isClassObject() const {
     return static_cast<MetadataKind>(getKind()) == MetadataKind::Class;
   }
-  
+
   /// Does the given metadata kind represent metadata for some kind of class?
   static bool isAnyKindOfClass(MetadataKind k) {
     switch (k) {
@@ -1157,14 +1157,14 @@ public:
     }
     assert(false && "not a metadata kind");
   }
-  
+
   /// Is this metadata for an existential type?
   bool isAnyExistentialType() const {
     switch (getKind()) {
     case MetadataKind::ExistentialMetatype:
     case MetadataKind::Existential:
       return true;
-        
+
     case MetadataKind::Metatype:
     case MetadataKind::Class:
     case MetadataKind::ObjCClassWrapper:
@@ -1182,7 +1182,7 @@ public:
     }
     assert(false && "not a metadata kind");
   }
-  
+
   /// Is this either type metadata or a class object for any kind of class?
   bool isAnyClass() const {
     return isAnyKindOfClass(getKind());
@@ -1199,7 +1199,7 @@ public:
   void setValueWitnesses(const ValueWitnessTable *table) {
     asFullMetadata(this)->ValueWitnesses = table;
   }
-  
+
   // Define forwarders for value witnesses. These invoke this metadata's value
   // witness table with itself as the 'self' parameter.
   #define FORWARD_WITNESS(WITNESS)                                         \
@@ -1227,7 +1227,7 @@ public:
   void vw_destructiveInjectEnumTag(OpaqueValue *value, unsigned tag) const {
     getValueWitnesses()->_asEVWT()->destructiveInjectEnumTag(value, tag, this);
   }
-  
+
   /// Get the nominal type descriptor if this metadata describes a nominal type,
   /// or return null if it does not.
   const ConstTargetFarRelativeDirectPointer<Runtime,
@@ -1261,18 +1261,18 @@ public:
       return RelativeDirectPointerNullPtrRef;
     }
   }
-  
+
   /// Get the generic metadata pattern from which this generic type instance was
   /// instantiated, or null if the type is not generic.
   const TargetGenericMetadata<Runtime> *getGenericPattern() const;
-  
+
   /// Get the class object for this type if it has one, or return null if the
   /// type is not a class (or not a class with a class object).
   const TargetClassMetadata<Runtime> *getClassObject() const;
-  
+
 protected:
   friend struct TargetOpaqueMetadata<Runtime>;
-  
+
   /// Metadata should not be publicly copied or moved.
   constexpr TargetMetadata(const TargetMetadata &) = default;
   TargetMetadata &operator=(const TargetMetadata &) = default;
@@ -1387,7 +1387,7 @@ struct GenericParameterDescriptor {
 
   // TODO: add meaningful descriptions of the generic requirements.
 };
-  
+
 struct ClassTypeDescriptor;
 struct StructTypeDescriptor;
 struct EnumTypeDescriptor;
@@ -1399,7 +1399,7 @@ struct TargetNominalTypeDescriptor {
   using StoredPointer = typename Runtime::StoredPointer;
   /// The mangled name of the nominal type.
   TargetRelativeDirectPointer<Runtime, const char> Name;
-  
+
   /// The following fields are kind-dependent.
   union {
     /// Information about class types.
@@ -1415,11 +1415,11 @@ struct TargetNominalTypeDescriptor {
       /// eventually need to be relative to the start of this class's
       /// metadata area.
       uint32_t FieldOffsetVectorOffset;
-      
+
       /// The field names. A doubly-null-terminated list of strings, whose
       /// length and order is consistent with that of the field offset vector.
       RelativeDirectPointer<const char, /*nullable*/ true> FieldNames;
-      
+
       /// The field type vector accessor. Returns a pointer to an array of
       /// type metadata references whose order is consistent with that of the
       /// field offset vector.
@@ -1428,9 +1428,9 @@ struct TargetNominalTypeDescriptor {
 
       /// True if metadata records for this type have a field offset vector for
       /// its stored properties.
-      bool hasFieldOffsetVector() const { return FieldOffsetVectorOffset != 0; }      
+      bool hasFieldOffsetVector() const { return FieldOffsetVectorOffset != 0; }
     } Class;
-    
+
     /// Information about struct types.
     struct {
       /// The number of stored properties in the class, not including its
@@ -1440,11 +1440,11 @@ struct TargetNominalTypeDescriptor {
       /// properties in its metadata, if any. 0 means there is no field offset
       /// vector.
       uint32_t FieldOffsetVectorOffset;
-      
+
       /// The field names. A doubly-null-terminated list of strings, whose
       /// length and order is consistent with that of the field offset vector.
       RelativeDirectPointer<const char, /*nullable*/ true> FieldNames;
-      
+
       /// The field type vector accessor. Returns a pointer to an array of
       /// type metadata references whose order is consistent with that of the
       /// field offset vector.
@@ -1455,7 +1455,7 @@ struct TargetNominalTypeDescriptor {
       /// its stored properties.
       bool hasFieldOffsetVector() const { return FieldOffsetVectorOffset != 0; }
     } Struct;
-    
+
     /// Information about enum types.
     struct {
       /// The number of non-empty cases in the enum are in the low 24 bits;
@@ -1487,13 +1487,13 @@ struct TargetNominalTypeDescriptor {
       size_t getPayloadSizeOffset() const {
         return ((NumPayloadCasesAndPayloadSizeOffset & 0xFF000000U) >> 24);
       }
-      
+
       bool hasPayloadSizeOffset() const {
         return getPayloadSizeOffset() != 0;
       }
     } Enum;
   };
-  
+
   RelativeDirectPointerIntPair<TargetGenericMetadata<Runtime>,
                                NominalTypeKind, /*Nullable*/ true>
     GenericMetadataPatternAndKind;
@@ -1534,7 +1534,7 @@ struct TargetNominalTypeDescriptor {
   /// parse the generic parameter vector in metadata records for this nominal
   /// type.
   GenericParameterDescriptor GenericParams;
-  
+
   // NOTE: GenericParams ends with a tail-allocated array, so it cannot be
   // followed by additional fields.
 };
@@ -1668,7 +1668,7 @@ public:
     assert(!isArtificialSubclass());
     return Description;
   }
-  
+
   void setDescription(const TargetNominalTypeDescriptor<Runtime> *
                       description) {
     Description = description;
@@ -1762,14 +1762,14 @@ public:
     auto asWords = reinterpret_cast<const void * const*>(this);
     return reinterpret_cast<const StoredPointer *>(asWords + offset);
   }
-  
+
   /// Get a pointer to the field type vector, if present, or null.
   const FieldType *getFieldTypes() const {
     assert(isTypeMetadata());
     auto *getter = getDescription()->Class.GetFieldTypes.get();
     if (!getter)
       return nullptr;
-    
+
     return getter(this);
   }
 
@@ -1856,7 +1856,7 @@ struct TargetForeignTypeMetadata : public TargetMetadata<Runtime> {
     /// assumed to be immutable (except for the \c Unique invasive cache
     /// field).
     InitializationFunction_t InitializationFunction;
-    
+
     /// The Swift-mangled name of the type. This is the uniquing key for the
     /// type.
     TargetPointer<Runtime, const char> Name;
@@ -1906,13 +1906,13 @@ struct TargetForeignTypeMetadata : public TargetMetadata<Runtime> {
     // If there is no initialization function, this can be a relaxed store.
     if (!hasInitializationFunction())
       asFullMetadata(this)->Unique.store(unique, std::memory_order_relaxed);
-    
+
     // Otherwise, we need a release store to publish the result of
     // initialization
     else
       asFullMetadata(this)->Unique.store(unique, std::memory_order_release);
   }
-  
+
   StoredSize getFlags() const {
     return asFullMetadata(this)->Flags;
   }
@@ -1980,7 +1980,7 @@ struct TargetValueMetadata : public TargetMetadata<Runtime> {
       || metadata->getKind() == MetadataKind::Enum
       || metadata->getKind() == MetadataKind::Optional;
   }
-  
+
   /// Retrieve the generic arguments of this type.
   ConstTargetMetadataPointer<Runtime, TargetMetadata> const *
   getGenericArgs() const {
@@ -2003,7 +2003,7 @@ struct TargetValueMetadata : public TargetMetadata<Runtime> {
   StoredPointer offsetToParentOffset() const {
     return offsetof(TargetValueMetadata<Runtime>, Parent);
   }
-  
+
 };
 using ValueMetadata = TargetValueMetadata<InProcess>;
 
@@ -2012,7 +2012,7 @@ template <typename Runtime>
 struct TargetStructMetadata : public TargetValueMetadata<Runtime> {
   using StoredPointer = typename Runtime::StoredPointer;
   using TargetValueMetadata<Runtime>::TargetValueMetadata;
-  
+
   /// Get a pointer to the field offset vector, if present, or null.
   const StoredPointer *getFieldOffsets() const {
     auto offset = this->Description->Struct.FieldOffsetVectorOffset;
@@ -2021,13 +2021,13 @@ struct TargetStructMetadata : public TargetValueMetadata<Runtime> {
     auto asWords = reinterpret_cast<const void * const*>(this);
     return reinterpret_cast<const StoredPointer *>(asWords + offset);
   }
-  
+
   /// Get a pointer to the field type vector, if present, or null.
   const FieldType *getFieldTypes() const {
     auto *getter = this->Description->Struct.GetFieldTypes.get();
     if (!getter)
       return nullptr;
-    
+
     return getter(this);
   }
 
@@ -2095,7 +2095,7 @@ struct TargetFunctionTypeMetadata : public TargetMetadata<Runtime> {
   TargetPointer<Runtime, const Argument> getArguments() const {
     return reinterpret_cast<TargetPointer<Runtime, const Argument>>(this + 1);
   }
-  
+
   StoredSize getNumArguments() const {
     return Flags.getNumArguments();
   }
@@ -2177,13 +2177,13 @@ struct TargetTupleTypeMetadata : public TargetMetadata<Runtime> {
   }
 };
 using TupleTypeMetadata = TargetTupleTypeMetadata<InProcess>;
-  
+
 /// The standard metadata for the empty tuple type.
 SWIFT_RUNTIME_EXPORT
 extern "C" const FullMetadata<TupleTypeMetadata> _TMT_;
 
 template <typename Runtime> struct TargetProtocolDescriptor;
-  
+
 /// An array of protocol descriptors with a header and tail-allocated elements.
 template <typename Runtime>
 struct TargetProtocolDescriptorList {
@@ -2196,38 +2196,38 @@ struct TargetProtocolDescriptorList {
       ConstTargetMetadataPointer<
         Runtime, TargetProtocolDescriptor> *>(this + 1);
   }
-  
+
   ConstTargetMetadataPointer<Runtime, TargetProtocolDescriptor> const *
   getProtocols() const {
     return reinterpret_cast<
       ConstTargetMetadataPointer<
         Runtime, TargetProtocolDescriptor> const *>(this + 1);
   }
-  
+
   ConstTargetMetadataPointer<Runtime, TargetProtocolDescriptor> const &
   operator[](size_t i) const {
     return getProtocols()[i];
   }
-  
+
   ConstTargetMetadataPointer<Runtime, TargetProtocolDescriptor> &
   operator[](size_t i) {
     return getProtocols()[i];
   }
 
   constexpr TargetProtocolDescriptorList() : NumProtocols(0) {}
-  
+
 protected:
   constexpr TargetProtocolDescriptorList(StoredPointer NumProtocols)
     : NumProtocols(NumProtocols) {}
 };
 using ProtocolDescriptorList = TargetProtocolDescriptorList<InProcess>;
-  
+
 /// A literal class for creating constant protocol descriptors in the runtime.
 template<typename Runtime, uintptr_t NUM_PROTOCOLS>
 struct TargetLiteralProtocolDescriptorList
   : TargetProtocolDescriptorList<Runtime> {
   const TargetProtocolDescriptorList<Runtime> *Protocols[NUM_PROTOCOLS];
-  
+
   template<typename...DescriptorPointers>
   constexpr TargetLiteralProtocolDescriptorList(DescriptorPointers...elements)
     : TargetProtocolDescriptorList<Runtime>(NUM_PROTOCOLS),
@@ -2235,7 +2235,7 @@ struct TargetLiteralProtocolDescriptorList
   {}
 };
 using LiteralProtocolDescriptorList = TargetProtocolDescriptorList<InProcess>;
-  
+
 /// A protocol descriptor. This is not type metadata, but is referenced by
 /// existential type metadata records to describe a protocol constraint.
 /// Its layout is compatible with the Objective-C runtime's 'protocol_t' record
@@ -2245,14 +2245,14 @@ struct TargetProtocolDescriptor {
   using StoredPointer = typename Runtime::StoredPointer;
   /// Unused by the Swift runtime.
   TargetPointer<Runtime, const void> _ObjC_Isa;
-  
+
   /// The mangled name of the protocol.
   TargetPointer<Runtime, const char> Name;
-  
+
   /// The list of protocols this protocol refines.
   ConstTargetMetadataPointer<Runtime, TargetProtocolDescriptorList>
   InheritedProtocols;
-  
+
   /// Unused by the Swift runtime.
   TargetPointer<Runtime, const void>
     _ObjC_InstanceMethods,
@@ -2260,10 +2260,10 @@ struct TargetProtocolDescriptor {
     _ObjC_OptionalInstanceMethods,
     _ObjC_OptionalClassMethods,
     _ObjC_InstanceProperties;
-  
+
   /// Size of the descriptor record.
   uint32_t DescriptorSize;
-  
+
   /// Additional flags.
   ProtocolDescriptorFlags Flags;
 
@@ -2307,7 +2307,7 @@ struct TargetProtocolDescriptor {
   {}
 };
 using ProtocolDescriptor = TargetProtocolDescriptor<InProcess>;
-  
+
 /// A witness table for a protocol. This type is intentionally opaque because
 /// the layout of a witness table is dependent on the protocol being
 /// represented.
@@ -2378,27 +2378,27 @@ struct TargetExistentialTypeMetadata : public TargetMetadata<Runtime> {
   ExistentialTypeFlags Flags;
   /// The protocol constraints.
   TargetProtocolDescriptorList<Runtime> Protocols;
-  
+
   /// NB: Protocols has a tail-emplaced array; additional fields cannot follow.
-  
+
   constexpr TargetExistentialTypeMetadata()
     : TargetMetadata<Runtime>(MetadataKind::Existential),
       Flags(ExistentialTypeFlags()), Protocols() {}
-  
+
   /// Get the representation form this existential type uses.
   ExistentialTypeRepresentation getRepresentation() const;
-  
+
   /// True if it's valid to take ownership of the value in the existential
   /// container if we own the container.
   bool mayTakeValue(const OpaqueValue *container) const;
-  
+
   /// Clean up an existential container whose value is uninitialized.
   void deinitExistentialContainer(OpaqueValue *container) const;
-  
+
   /// Project the value pointer from an existential container of the type
   /// described by this metadata.
   const OpaqueValue *projectValue(const OpaqueValue *container) const;
-  
+
   OpaqueValue *projectValue(OpaqueValue *container) const {
     return const_cast<OpaqueValue *>(projectValue((const OpaqueValue*)container));
   }
@@ -2406,7 +2406,7 @@ struct TargetExistentialTypeMetadata : public TargetMetadata<Runtime> {
   /// by this metadata.
   const TargetMetadata<Runtime> *
   getDynamicType(const OpaqueValue *container) const;
-  
+
   /// Get a witness table from an existential container of the type described
   /// by this metadata.
   const WitnessTable * getWitnessTable(const OpaqueValue *container,
@@ -2503,7 +2503,7 @@ struct TargetGenericMetadata {
   /// the argument pointer passed to swift_getGenericMetadata.
   TargetMetadata<Runtime> *(*CreateFunction)
   (TargetGenericMetadata<Runtime> *pattern, const void *arguments);
-  
+
   /// The size of the template in bytes.
   uint32_t MetadataSize;
 
@@ -2640,7 +2640,7 @@ using GenericWitnessTable = TargetGenericWitnessTable<InProcess>;
 ///
 /// This contains enough static information to recover type metadata from a
 /// name. It is only emitted for types that do not have an explicit protocol
-/// conformance record. 
+/// conformance record.
 ///
 /// This structure is notionally a subtype of a protocol conformance record
 /// but as we cannot change the conformance record layout we have to make do
@@ -2660,12 +2660,12 @@ private:
 
   /// Flags describing the type metadata record.
   TypeMetadataRecordFlags Flags;
-  
+
 public:
   TypeMetadataRecordKind getTypeKind() const {
     return Flags.getTypeKind();
   }
-  
+
   const TargetMetadata<Runtime> *getDirectType() const {
     switch (Flags.getTypeKind()) {
     case TypeMetadataRecordKind::Universal:
@@ -2675,7 +2675,7 @@ public:
     case TypeMetadataRecordKind::NonuniqueDirectType:
     case TypeMetadataRecordKind::UniqueDirectClass:
       break;
-        
+
     case TypeMetadataRecordKind::UniqueIndirectClass:
     case TypeMetadataRecordKind::UniqueNominalTypeDescriptor:
       assert(false && "not direct type metadata");
@@ -2692,14 +2692,14 @@ public:
 
     case TypeMetadataRecordKind::UniqueNominalTypeDescriptor:
       break;
-        
+
     case TypeMetadataRecordKind::UniqueDirectClass:
     case TypeMetadataRecordKind::UniqueIndirectClass:
     case TypeMetadataRecordKind::UniqueDirectType:
     case TypeMetadataRecordKind::NonuniqueDirectType:
       assert(false && "not generic metadata pattern");
     }
-    
+
     return this->TypeDescriptor;
   }
 
@@ -2722,7 +2722,7 @@ public:
 private:
   /// The protocol being conformed to.
   RelativeIndirectablePointer<ProtocolDescriptor> Protocol;
-  
+
   // Some description of the type that conforms to the protocol.
   union {
     /// A direct reference to the metadata.
@@ -2730,48 +2730,48 @@ private:
     /// Depending on the conformance kind, this may not be usable
     /// metadata without being first processed by the runtime.
     RelativeIndirectablePointer<TargetMetadata<Runtime>> DirectType;
-    
+
     /// An indirect reference to the metadata.
     RelativeIndirectablePointer<const TargetClassMetadata<Runtime> *>
     IndirectClass;
-    
+
     /// The nominal type descriptor for a resilient or generic type which has
     /// instances that conform to the protocol.
     RelativeIndirectablePointer<TargetNominalTypeDescriptor<Runtime>>
     TypeDescriptor;
   };
-  
-  
+
+
   // The conformance, or a generator function for the conformance.
   union {
     /// A direct reference to the witness table for the conformance.
     RelativeDirectPointer<const WitnessTable> WitnessTable;
-    
+
     /// A function that produces the witness table given an instance of the
     /// type. The function may return null if a specific instance does not
     /// conform to the protocol.
     RelativeDirectPointer<WitnessTableAccessorFn> WitnessTableAccessor;
   };
-  
+
   /// Flags describing the protocol conformance.
   ProtocolConformanceFlags Flags;
-  
+
 public:
   const ProtocolDescriptor *getProtocol() const {
     return Protocol;
   }
-  
+
   ProtocolConformanceFlags getFlags() const {
     return Flags;
   }
-  
+
   TypeMetadataRecordKind getTypeKind() const {
     return Flags.getTypeKind();
   }
   ProtocolConformanceReferenceKind getConformanceKind() const {
     return Flags.getConformanceKind();
   }
-  
+
   const TargetMetadata<Runtime> *getDirectType() const {
     switch (Flags.getTypeKind()) {
     case TypeMetadataRecordKind::Universal:
@@ -2780,7 +2780,7 @@ public:
     case TypeMetadataRecordKind::UniqueDirectType:
     case TypeMetadataRecordKind::NonuniqueDirectType:
       break;
-        
+
     case TypeMetadataRecordKind::UniqueDirectClass:
     case TypeMetadataRecordKind::UniqueIndirectClass:
     case TypeMetadataRecordKind::UniqueNominalTypeDescriptor:
@@ -2789,7 +2789,7 @@ public:
 
     return DirectType;
   }
-  
+
   // FIXME: This shouldn't exist
   const TargetClassMetadata<Runtime> *getDirectClass() const {
     switch (Flags.getTypeKind()) {
@@ -2797,7 +2797,7 @@ public:
       return nullptr;
     case TypeMetadataRecordKind::UniqueDirectClass:
       break;
-        
+
     case TypeMetadataRecordKind::UniqueDirectType:
     case TypeMetadataRecordKind::NonuniqueDirectType:
     case TypeMetadataRecordKind::UniqueNominalTypeDescriptor:
@@ -2807,9 +2807,9 @@ public:
 
     const TargetMetadata<Runtime> *metadata = DirectType;
     return static_cast<const TargetClassMetadata<Runtime>*>(metadata);
-    
+
   }
-  
+
   const TargetClassMetadata<Runtime> * const *getIndirectClass() const {
     switch (Flags.getTypeKind()) {
     case TypeMetadataRecordKind::Universal:
@@ -2817,17 +2817,17 @@ public:
 
     case TypeMetadataRecordKind::UniqueIndirectClass:
       break;
-        
+
     case TypeMetadataRecordKind::UniqueDirectType:
     case TypeMetadataRecordKind::UniqueDirectClass:
     case TypeMetadataRecordKind::NonuniqueDirectType:
     case TypeMetadataRecordKind::UniqueNominalTypeDescriptor:
       assert(false && "not indirect class object");
     }
-    
+
     return IndirectClass;
   }
-  
+
   const TargetNominalTypeDescriptor<Runtime> *
   getNominalTypeDescriptor() const {
     switch (Flags.getTypeKind()) {
@@ -2836,50 +2836,50 @@ public:
 
     case TypeMetadataRecordKind::UniqueNominalTypeDescriptor:
       break;
-        
+
     case TypeMetadataRecordKind::UniqueDirectClass:
     case TypeMetadataRecordKind::UniqueIndirectClass:
     case TypeMetadataRecordKind::UniqueDirectType:
     case TypeMetadataRecordKind::NonuniqueDirectType:
       assert(false && "not generic metadata pattern");
     }
-    
+
     return TypeDescriptor;
   }
-  
+
   /// Get the directly-referenced static witness table.
   const swift::WitnessTable *getStaticWitnessTable() const {
     switch (Flags.getConformanceKind()) {
     case ProtocolConformanceReferenceKind::WitnessTable:
       break;
-        
+
     case ProtocolConformanceReferenceKind::WitnessTableAccessor:
       assert(false && "not witness table");
     }
     return WitnessTable;
   }
-  
+
   WitnessTableAccessorFn *getWitnessTableAccessor() const {
     switch (Flags.getConformanceKind()) {
     case ProtocolConformanceReferenceKind::WitnessTableAccessor:
       break;
-        
+
     case ProtocolConformanceReferenceKind::WitnessTable:
       assert(false && "not witness table accessor");
     }
     return WitnessTableAccessor;
   }
-  
+
   /// Get the canonical metadata for the type referenced by this record, or
   /// return null if the record references a generic or universal type.
   const TargetMetadata<Runtime> *getCanonicalTypeMetadata() const;
-  
+
   /// Get the witness table for the specified type, realizing it if
   /// necessary, or return null if the conformance does not apply to the
   /// type.
   const swift::WitnessTable *
   getWitnessTable(const TargetMetadata<Runtime> *type) const;
-  
+
 #if !defined(NDEBUG) && SWIFT_OBJC_INTEROP
   void dump() const;
 #endif
@@ -3382,7 +3382,7 @@ inline int swift_getHeapObjectExtraInhabitantIndex(HeapObject * const* src) {
 
   return (int) (value >> ObjCReservedLowBits);
 }
-  
+
 /// Store an extra inhabitant of a heap object pointer to memory,
 /// in the style of a value witness.
 inline void swift_storeHeapObjectExtraInhabitant(HeapObject **dest, int index) {
@@ -3404,7 +3404,7 @@ inline constexpr unsigned swift_getHeapObjectExtraInhabitantCount() {
   return (LeastValidPointerValue >> ObjCReservedLowBits) > INT_MAX
     ? (unsigned)INT_MAX
     : (unsigned)(LeastValidPointerValue >> ObjCReservedLowBits);
-}  
+}
 
 /// Calculate the numeric index of an extra inhabitant of a function
 /// pointer in memory.
@@ -3415,7 +3415,7 @@ inline int swift_getFunctionPointerExtraInhabitantIndex(void * const* src) {
   return (value < heap_object_abi::LeastValidPointerValue
             ? (int) value : -1);
 }
-  
+
 /// Store an extra inhabitant of a function pointer to memory, in the
 /// style of a value witness.
 inline void swift_storeFunctionPointerExtraInhabitant(void **dest, int index) {
@@ -3436,7 +3436,7 @@ inline constexpr unsigned swift_getFunctionPointerExtraInhabitantCount() {
     ? (unsigned)INT_MAX
     : (unsigned)(LeastValidPointerValue);
 }
-  
+
 /// \brief Check whether a type conforms to a given native Swift protocol,
 /// visible from the named module.
 ///

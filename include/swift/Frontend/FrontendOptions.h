@@ -178,7 +178,7 @@ public:
   /// If set, dumps wall time taken to check each function body to llvm::errs().
   bool DebugTimeFunctionBodies = false;
 
-  /// If set, prints the time taken in each major compilation phase to 
+  /// If set, prints the time taken in each major compilation phase to
   /// llvm::errs().
   ///
   /// \sa swift::SharedTimer
@@ -265,7 +265,7 @@ public:
   bool actionIsImmediate() const;
 
   void forAllOutputPaths(std::function<void(const std::string &)> fn) const;
-  
+
   /// Gets the name of the specified output filename.
   /// If multiple files are specified, the last one is returned.
   StringRef getSingleOutputFilename() const {

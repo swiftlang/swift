@@ -3,7 +3,7 @@
 
 #if __cplusplus
 extern "C" {
-#endif 
+#endif
 
 #ifndef ENUM_DYLD_BOOL
 #define ENUM_DYLD_BOOL
@@ -14,6 +14,6 @@ extern "C" {
 
 #if __cplusplus
 }
-#endif 
+#endif
 
 #endif /* _MACH_O_DYLD_H_ */

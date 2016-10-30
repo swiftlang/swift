@@ -251,7 +251,7 @@ public:
 
   /// The readLock() method has the following properties:
   /// - Behaves as an atomic operation.
-  /// - Blocks the calling thread while the write lock is held by another 
+  /// - Blocks the calling thread while the write lock is held by another
   ///   thread and once the read lock is acquired by the calling thread
   ///   other threads are prevented from acquiring the write lock.
   /// - Multiple threads can hold the read lock at the same time.

@@ -217,7 +217,7 @@ public:
   }
 
   template<unsigned N> struct incomplete;
-  
+
   /// \brief One element in the path of a locator, which can include both
   /// a kind (PathElementKind) and a value used to describe specific
   /// kinds further (e.g., the position of a tuple element).
@@ -421,7 +421,7 @@ public:
 
   /// \brief Retrieve the expression that anchors this locator.
   Expr *getAnchor() const { return anchor; }
-  
+
   /// \brief Retrieve the path that extends from the anchor to a specific
   /// subcomponent.
   ArrayRef<PathElement> getPath() const {
@@ -441,12 +441,12 @@ public:
   /// \brief Produce a profile of this locator, for use in a folding set.
   static void Profile(llvm::FoldingSetNodeID &id, Expr *anchor,
                       ArrayRef<PathElement> path);
-  
+
   /// \brief Produce a profile of this locator, for use in a folding set.
   void Profile(llvm::FoldingSetNodeID &id) {
     Profile(id, anchor, getPath());
   }
-  
+
   /// \brief Produce a debugging dump of this locator.
   LLVM_ATTRIBUTE_DEPRECATED(
       void dump(SourceManager *SM) LLVM_ATTRIBUTE_USED,
@@ -495,7 +495,7 @@ private:
 
   /// \brief A set of flags summarizing interesting properties of the path.
   unsigned summaryFlags : 7;
-  
+
   friend class ConstraintSystem;
 };
 

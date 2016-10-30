@@ -118,7 +118,7 @@ private:
   /// Add a type variable related to this type variable through fixed
   /// bindings.
   void addFixedBinding(TypeVariableType *typeVar);
-  
+
   /// Remove a type variable from the fixed-binding relationship.
   void removeFixedBinding(TypeVariableType *typeVar);
 
@@ -158,7 +158,7 @@ private:
   /// are representatives of their equivalence classes.
   mutable SmallVector<TypeVariableType *, 2> EquivalenceClass;
 
-  /// A set of (name, type variable) pairs representing the member types of 
+  /// A set of (name, type variable) pairs representing the member types of
   /// the given type variable.
   llvm::SmallVector<std::pair<Identifier, TypeVariableType *>, 2> MemberTypes;
 
@@ -208,7 +208,7 @@ public:
   }
 
   /// Retrieve the node and index corresponding to the given type variable.
-  std::pair<ConstraintGraphNode &, unsigned> 
+  std::pair<ConstraintGraphNode &, unsigned>
   lookupNode(TypeVariableType *typeVar);
 
   /// Add a new constraint to the graph.

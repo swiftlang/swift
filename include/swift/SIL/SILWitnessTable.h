@@ -50,7 +50,7 @@ public:
     /// This can be null in case dead function elimination has removed the method.
     SILFunction *Witness;
   };
-  
+
   /// A witness table entry describing the witness for an associated type.
   struct AssociatedTypeWitness {
     /// The associated type required.
@@ -58,7 +58,7 @@ public:
     /// The concrete semantic type of the witness.
     CanType Witness;
   };
-  
+
   /// A witness table entry describing the witness for an associated type's
   /// protocol requirement.
   struct AssociatedTypeProtocolWitness {
@@ -70,7 +70,7 @@ public:
     /// conformance is dependent.
     ProtocolConformanceRef Witness;
   };
-  
+
   /// A witness table entry referencing the protocol conformance for a refined
   /// base protocol.
   struct BaseProtocolWitness {
@@ -79,13 +79,13 @@ public:
     /// The ProtocolConformance for the base protocol.
     ProtocolConformance *Witness;
   };
-                          
+
   /// A witness table entry for an optional requirement that is not present.
   struct MissingOptionalWitness {
     /// The witness for the optional requirement that wasn't present.
     ValueDecl *Witness;
   };
-  
+
   /// A witness table entry kind.
   enum WitnessKind {
     Invalid,
@@ -95,7 +95,7 @@ public:
     BaseProtocol,
     MissingOptional
   };
-  
+
   /// A witness table entry.
   class Entry {
     WitnessKind Kind;
@@ -106,34 +106,34 @@ public:
       BaseProtocolWitness BaseProtocol;
       MissingOptionalWitness MissingOptional;
     };
-    
+
   public:
     Entry() : Kind(WitnessKind::Invalid) {}
-    
+
     Entry(const MethodWitness &Method)
       : Kind(WitnessKind::Method), Method(Method)
     {}
-    
+
     Entry(const AssociatedTypeWitness &AssociatedType)
       : Kind(WitnessKind::AssociatedType), AssociatedType(AssociatedType)
     {}
-    
+
     Entry(const AssociatedTypeProtocolWitness &AssociatedTypeProtocol)
       : Kind(WitnessKind::AssociatedTypeProtocol),
         AssociatedTypeProtocol(AssociatedTypeProtocol)
     {}
-    
+
     Entry(const BaseProtocolWitness &BaseProtocol)
       : Kind(WitnessKind::BaseProtocol),
         BaseProtocol(BaseProtocol)
     {}
-    
+
     Entry(const MissingOptionalWitness &MissingOptional)
       : Kind(WitnessKind::MissingOptional), MissingOptional(MissingOptional) {
     }
-    
+
     WitnessKind getKind() const { return Kind; }
-    
+
     const MethodWitness &getMethodWitness() const {
       assert(Kind == WitnessKind::Method);
       return Method;
@@ -151,7 +151,7 @@ public:
       assert(Kind == WitnessKind::BaseProtocol);
       return BaseProtocol;
     }
-    
+
     const MissingOptionalWitness &getMissingOptionalWitness() const {
       assert(Kind == WitnessKind::MissingOptional);
       return MissingOptional;
@@ -165,7 +165,7 @@ public:
       Method.Witness = nullptr;
     }
   };
-  
+
 private:
   /// The module which contains the SILWitnessTable.
   SILModule &Mod;
@@ -188,7 +188,7 @@ private:
   /// whether or not entries is empty since you can have an empty witness table
   /// that is not a declaration.
   bool IsDeclaration;
- 
+
   /// Whether or not this witness table is fragile. Fragile means that the
   /// table may be serialized and "inlined" into another module.
   bool IsFragile;
@@ -217,7 +217,7 @@ public:
                                  NormalProtocolConformance *Conformance);
 
   ~SILWitnessTable();
-  
+
   /// Return the AST ProtocolConformance this witness table represents.
   NormalProtocolConformance *getConformance() const { return Conformance; }
 
@@ -234,7 +234,7 @@ public:
 
   /// Returns true if this witness table is a definition.
   bool isDefinition() const { return !isDeclaration(); }
- 
+
   /// Returns true if this witness table is fragile.
   bool isFragile() const { return IsFragile; }
 
@@ -253,10 +253,10 @@ public:
       }
     }
   }
-  
+
   /// Verify that the witness table is well-formed.
   void verify(const SILModule &M) const;
-  
+
   /// Get the linkage of the witness table.
   SILLinkage getLinkage() const { return Linkage; }
 
@@ -272,7 +272,7 @@ public:
   /// Dump the witness table to stderr.
   void dump() const;
 };
-  
+
 } // end swift namespace
 
 //===----------------------------------------------------------------------===//
@@ -280,7 +280,7 @@ public:
 //===----------------------------------------------------------------------===//
 
 namespace llvm {
-  
+
 template <>
 struct ilist_traits<::swift::SILWitnessTable> :
 public ilist_default_traits<::swift::SILWitnessTable> {
@@ -299,7 +299,7 @@ public:
   SILWitnessTable *ensureHead(SILWitnessTable*) const { return createSentinel(); }
   static void noteHead(SILWitnessTable*, SILWitnessTable*) {}
   static void deleteNode(SILWitnessTable *WT) { WT->~SILWitnessTable(); }
-  
+
 private:
   void createNode(const SILWitnessTable &);
 };

@@ -94,10 +94,10 @@ getLLVMIntrinsicIDForBuiltinWithOverflow(BuiltinValueKind ID);
 ///
 /// Returns null if the name does not identifier a known builtin value.
 ValueDecl *getBuiltinValueDecl(ASTContext &Context, Identifier Name);
-  
+
 /// \brief Returns the name of a builtin declaration given a builtin ID.
 StringRef getBuiltinName(BuiltinValueKind ID);
-  
+
 /// \brief The information identifying the builtin - its kind and types.
 struct BuiltinInfo {
   BuiltinValueKind ID;
@@ -114,7 +114,7 @@ struct IntrinsicInfo {
 
 /// decodeLLVMAtomicOrdering - turn a string like "release" into the LLVM enum.
 llvm::AtomicOrdering decodeLLVMAtomicOrdering(StringRef O);
-  
+
 }
 
 #endif

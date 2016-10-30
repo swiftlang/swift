@@ -186,7 +186,7 @@ public:
 class BackendJobAction : public JobAction {
 private:
   virtual void anchor();
-  
+
   // In case of multi-threaded compilation, the compile-action produces multiple
   // output bitcode-files. For each bitcode-file a BackendJobAction is created.
   // This index specifies which of the files to select for the input.
@@ -198,7 +198,7 @@ public:
   static bool classof(const Action *A) {
     return A->getKind() == Action::BackendJob;
   }
-  
+
   virtual int getInputIndex() const { return InputIndex; }
 };
 

@@ -33,7 +33,7 @@ class LValue;
 class ManagedValue;
 class RValue;
 class TemporaryInitialization;
-  
+
 /// Internal context information for the SILGenFunction visitor.
 ///
 /// In general, emission methods which take an SGFContext indicate
@@ -55,7 +55,7 @@ class SGFContext {
   llvm::PointerIntPair<Initialization *, 2, DesiredTransfer> state;
 public:
   SGFContext() = default;
-  
+
   enum AllowImmediatePlusZero_t {
     /// The client is okay with getting a +0 value and plans to use it
     /// immediately.
@@ -80,12 +80,12 @@ public:
     /// be mutated before the end of the statement.
     AllowGuaranteedPlusZero
   };
-  
+
   /// Creates an emitInto context that will store the result of the visited expr
   /// into the given Initialization.
   explicit SGFContext(Initialization *emitInto) : state(emitInto, PlusOne) {
   }
-  
+
   /*implicit*/
   SGFContext(AllowImmediatePlusZero_t) : state(nullptr, ImmediatePlusZero) {
   }
@@ -100,7 +100,7 @@ public:
   Initialization *getEmitInto() const {
     return state.getPointer();
   }
-  
+
   /// Return true if a ManagedValue producer is allowed to return at
   /// +0, given that it cannot guarantee that the value will be valid
   /// until the end of the current evaluation.
@@ -200,7 +200,7 @@ public:
 
   // Metatype instructions use the conformances necessary to instantiate the
   // type.
-  
+
   MetatypeInst *createMetatype(SILLocation Loc, SILType Metatype);
 
   // Generic apply instructions use the conformances necessary to form the call.
@@ -245,7 +245,7 @@ public:
   createInitExistentialMetatype(SILLocation loc, SILValue metatype,
                                 SILType existentialType,
                                 ArrayRef<ProtocolConformanceRef> conformances);
-  
+
   InitExistentialRefInst *
   createInitExistentialRef(SILLocation Loc, SILType ExistentialType,
                            CanType FormalConcreteType,
@@ -303,10 +303,10 @@ class LLVM_LIBRARY_VISIBILITY SILGenFunction
 public:
   /// The SILGenModule this function belongs to.
   SILGenModule &SGM;
-    
+
   /// The SILFunction being constructed.
   SILFunction &F;
-  
+
   /// The name of the function currently being emitted, as presented to user
   /// code by #function.
   DeclName MagicFunctionName;
@@ -347,7 +347,7 @@ public:
 
   /// \brief Is emission currently within an inout conversion?
   bool InInOutConversionScope = false;
-  
+
   /// B - The SILGenBuilder used to construct the SILFunction.  It is
   /// what maintains the notion of the current block being emitted
   /// into.
@@ -360,7 +360,7 @@ public:
     JumpDest BreakDest;
     JumpDest ContinueDest;
   };
-  
+
   std::vector<BreakContinueDest> BreakContinueDestStack;
   std::vector<PatternMatchContext*> SwitchStack;
   /// Keep track of our current nested scope.
@@ -378,7 +378,7 @@ public:
   /// The destination for throws.  The block will always be in the
   /// postmatter and takes a BB argument of the exception type.
   JumpDest ThrowDest = JumpDest::invalid();
-    
+
   /// \brief The SIL location corresponding to the AST node being processed.
   SILLocation CurrentSILLoc;
 
@@ -428,12 +428,12 @@ public:
       return Result;
     }
   };
-  
+
   /// VarLocs - Entries in this map are generated when a PatternBindingDecl is
   /// emitted. The map is queried to produce the lvalue for a DeclRefExpr to
   /// a local variable.
   llvm::DenseMap<ValueDecl*, VarLoc> VarLocs;
- 
+
   /// When rebinding 'self' during an initializer delegation, we have to be
   /// careful to preserve the object at 1 retain count during the delegation
   /// because of assumptions in framework code. This enum tracks the state of
@@ -441,15 +441,15 @@ public:
   enum SelfInitDelegationStates {
     // 'self' is a normal variable.
     NormalSelf,
-    
+
     // 'self' needs to be consumed next time it is referenced.
     WillConsumeSelf,
-    
+
     // 'self' has been consumed.
     DidConsumeSelf,
   };
   SelfInitDelegationStates SelfInitDelegationState = NormalSelf;
-  
+
   /// The metatype argument to an allocating constructor, if we're emitting one.
   SILValue AllocatorMetatype;
 
@@ -458,7 +458,7 @@ public:
   bool allowsVoidReturn() const {
     return ReturnDest.getBlock()->bbarg_empty();
   }
-  
+
   /// This location, when set, is used as an override location for magic
   /// identifier expansion (e.g. #file).  This allows default argument
   /// expansion to report the location of the call, instead of the location
@@ -470,10 +470,10 @@ public:
     if (SGM.Profiler && SGM.Profiler->hasRegionCounters())
       SGM.Profiler->emitCounterIncrement(B, N);
   }
-  
+
   SILGenFunction(SILGenModule &SGM, SILFunction &F);
   ~SILGenFunction();
-  
+
   /// Return a stable reference to the current cleanup.
   CleanupsDepth getCleanupsDepth() const {
     return Cleanups.getCleanupsDepth();
@@ -481,10 +481,10 @@ public:
   CleanupHandle getTopCleanup() const {
     return Cleanups.getTopCleanup();
   }
-  
+
   SILFunction &getFunction() { return F; }
   SILGenBuilder &getBuilder() { return B; }
-  
+
   const TypeLowering &getTypeLowering(AbstractionPattern orig, Type subst,
                                       unsigned uncurryLevel = 0) {
     return SGM.Types.getTypeLowering(orig, subst, uncurryLevel);
@@ -535,24 +535,24 @@ public:
   //===--------------------------------------------------------------------===//
   // Entry points for codegen
   //===--------------------------------------------------------------------===//
-  
+
   /// \brief Generates code for a FuncDecl.
   void emitFunction(FuncDecl *fd);
   /// \brief Emits code for a ClosureExpr.
   void emitClosure(AbstractClosureExpr *ce);
   /// Generates code for a class destroying destructor. This
-  /// emits the body code from the DestructorDecl, calls the base class 
+  /// emits the body code from the DestructorDecl, calls the base class
   /// destructor, then implicitly releases the elements of the class.
   void emitDestroyingDestructor(DestructorDecl *dd);
 
   /// Generates code for an artificial top-level function that starts an
   /// application based on a main class.
   void emitArtificialTopLevel(ClassDecl *mainClass);
-  
+
   /// Generates code for a class deallocating destructor. This
   /// calls the destroying destructor and then deallocates 'self'.
   void emitDeallocatingDestructor(DestructorDecl *dd);
-  
+
   /// Generates code for a struct constructor.
   /// This allocates the new 'self' value, emits the
   /// body code, then returns the final initialized 'self'.
@@ -598,7 +598,7 @@ public:
   void emitForeignToNativeThunk(SILDeclRef thunk);
   /// Generates a thunk from a native function to the conventions.
   void emitNativeToForeignThunk(SILDeclRef thunk);
-  
+
   /// Generate a nullary function that returns the given value.
   void emitGeneratorFunction(SILDeclRef function, Expr *value);
 
@@ -610,7 +610,7 @@ public:
   /// Generate a lazy global initializer.
   void emitLazyGlobalInitializer(PatternBindingDecl *binding,
                                  unsigned pbdEntry);
-  
+
   /// Generate a global accessor, using the given initializer token and
   /// function
   void emitGlobalAccessor(VarDecl *global,
@@ -620,7 +620,7 @@ public:
   void emitGlobalGetter(VarDecl *global,
                         SILGlobalVariable *onceToken,
                         SILFunction *onceFunc);
-  
+
   /// Generate a protocol witness entry point, invoking 'witness' at the
   /// abstraction level of 'requirement'.
   ///
@@ -633,7 +633,7 @@ public:
                            SILDeclRef witness,
                            ArrayRef<Substitution> witnessSubs,
                            IsFreeFunctionWitness_t isFree);
-  
+
   /// Convert a block to a native function with a thunk.
   ManagedValue emitBlockToFunc(SILLocation loc,
                                ManagedValue block,
@@ -643,7 +643,7 @@ public:
   ManagedValue emitFuncToBlock(SILLocation loc,
                                ManagedValue block,
                                CanSILFunctionType funcTy);
-  
+
   /// Thunk with the signature of a base class method calling a derived class
   /// method.
   ///
@@ -654,11 +654,11 @@ public:
                        AbstractionPattern inputOrigType,
                        CanAnyFunctionType inputSubstType,
                        CanAnyFunctionType outputSubstType);
-  
+
   //===--------------------------------------------------------------------===//
   // Control flow
   //===--------------------------------------------------------------------===//
-  
+
   /// emitCondition - Emit a boolean expression as a control-flow condition.
   ///
   /// \param E - The expression to be evaluated as a condition.
@@ -691,7 +691,7 @@ public:
   /// first block.  (This is clearly desirable behavior when blocks
   /// are created by different emissions; it's just a little
   /// counter-intuitive within a single emission.)
-  SILBasicBlock *createBasicBlock(SILBasicBlock *afterBB = nullptr);  
+  SILBasicBlock *createBasicBlock(SILBasicBlock *afterBB = nullptr);
 
   /// Create a new basic block at the end of the given function
   /// section.
@@ -701,7 +701,7 @@ public:
   /// out to be unneeded.
   ///
   /// This should be called instead of eraseFromParent() in order to
-  /// keep SILGen's internal bookkeeping consistent. 
+  /// keep SILGen's internal bookkeeping consistent.
   ///
   /// The block should be empty and have no predecessors.
   void eraseBasicBlock(SILBasicBlock *block);
@@ -738,7 +738,7 @@ public:
   ///                    cleanup instructions.
   void prepareEpilog(Type returnType, bool isThrowing, CleanupLocation L);
   void prepareRethrowEpilog(CleanupLocation l);
-  
+
   /// \brief Branch to and emit the epilog basic block. This will fuse
   /// the epilog to the current basic block if the epilog bb has no predecessor.
   /// The insertion point will be moved into the epilog block if it is
@@ -754,7 +754,7 @@ public:
   ///          merged with the epilog block.)
   std::pair<Optional<SILValue>, SILLocation>
     emitEpilogBB(SILLocation TopLevelLoc);
-  
+
   /// \brief Emits a standard epilog which runs top-level cleanups then returns
   /// the function return value, if any.  This can be customized by clients, who
   /// set UsesCustomEpilog to true, and optionally inject their own code into
@@ -776,11 +776,11 @@ public:
   /// emitSelfDecl - Emit a SILArgument for 'self', register it in varlocs, set
   /// up debug info, etc.  This returns the 'self' value.
   SILValue emitSelfDecl(VarDecl *selfDecl);
-  
+
   /// Emits a temporary allocation that will be deallocated automatically at the
   /// end of the current scope. Returns the address of the allocation.
   SILValue emitTemporaryAllocation(SILLocation loc, SILType ty);
-  
+
   /// Prepares a buffer to receive the result of an expression, either using the
   /// 'emit into' initialization buffer if available, or allocating a temporary
   /// allocation if not.
@@ -796,7 +796,7 @@ public:
   ManagedValue manageBufferForExprResult(SILValue buffer,
                                          const TypeLowering &bufferTL,
                                          SGFContext C);
-  
+
   //===--------------------------------------------------------------------===//
   // Type conversions for expr emission and thunks
   //===--------------------------------------------------------------------===//
@@ -858,7 +858,7 @@ public:
                                                ManagedValue addr,
                                                const TypeLowering &optTL,
                                                SGFContext C);
-  
+
   /// \brief Extract the value from an optional, which must be known to contain
   /// a value.
   ManagedValue emitUncheckedGetOptionalValueFrom(SILLocation loc,
@@ -956,7 +956,7 @@ public:
   //===--------------------------------------------------------------------===//
 
   using ASTVisitorType::visit;
-  
+
   //===--------------------------------------------------------------------===//
   // Statements
   //===--------------------------------------------------------------------===//
@@ -975,7 +975,7 @@ public:
   /// call to swift_willThrow, that will allow the debugger to place a
   /// breakpoint on throw sites.
   void emitThrow(SILLocation loc, ManagedValue exn, bool emitWillThrow = false);
-  
+
   //===--------------------------------------------------------------------===//
   // Patterns
   //===--------------------------------------------------------------------===//
@@ -994,9 +994,9 @@ public:
   //===--------------------------------------------------------------------===//
   // Expressions
   //===--------------------------------------------------------------------===//
- 
+
   RValue visit(Expr *E) = delete;
- 
+
   /// Generate SIL for the given expression, storing the final result into the
   /// specified Initialization buffer(s). This avoids an allocation and copy if
   /// the result would be allocated into temporary memory normally.
@@ -1014,10 +1014,10 @@ public:
   /// Emit an r-value into temporary memory and return the managed address.
   ManagedValue
   emitMaterializedRValueAsOrig(Expr *E, AbstractionPattern origPattern);
-  
+
   /// Emit the given expression, ignoring its result.
   void emitIgnoredExpr(Expr *E);
-  
+
   /// Emit the given expression as an r-value, then (if it is a tuple), combine
   /// it together into a single ManagedValue.
   ManagedValue emitRValueAsSingleValue(Expr *E, SGFContext C = SGFContext());
@@ -1026,7 +1026,7 @@ public:
   ManagedValue emitUndef(SILLocation loc, Type type);
   ManagedValue emitUndef(SILLocation loc, SILType type);
   RValue emitUndefRValue(SILLocation loc, Type type);
-  
+
   std::pair<ManagedValue, SILValue>
   emitUninitializedArrayAllocation(Type ArrayTy,
                                    SILValue Length,
@@ -1051,11 +1051,11 @@ public:
   }
   SILValue emitGlobalFunctionRef(SILLocation loc, SILDeclRef constant,
                                  SILConstantInfo constantInfo);
-  
+
   /// Returns a reference to a function value that dynamically dispatches
   /// the function in a runtime-modifiable way.
   SILValue emitDynamicMethodRef(SILLocation loc, SILDeclRef constant,
-                                SILConstantInfo constantInfo);  
+                                SILConstantInfo constantInfo);
 
   /// Emit the specified VarDecl as an LValue if possible, otherwise return
   /// null.
@@ -1064,7 +1064,7 @@ public:
                                  AccessKind accessKind,
                                  AccessSemantics semantics
                                    = AccessSemantics::Ordinary);
-  
+
   /// Produce an RValue for a reference to the specified declaration,
   /// with the given type and in response to the specified expression.  Try to
   /// emit into the specified SGFContext to avoid copies (when provided).
@@ -1094,13 +1094,13 @@ public:
                                 SILDeclRef function,
                                 CanType expectedType,
                                 ArrayRef<Substitution> subs);
-  
+
   ArgumentSource prepareAccessorBaseArg(SILLocation loc, ManagedValue base,
                                         CanType baseFormalType,
                                         SILDeclRef accessor);
 
   SILDeclRef getGetterDeclRef(AbstractStorageDecl *decl,
-                              bool isDirectAccessorUse);  
+                              bool isDirectAccessorUse);
   RValue emitGetAccessor(SILLocation loc, SILDeclRef getter,
                          ArrayRef<Substitution> substitutions,
                          ArgumentSource &&optionalSelfValue,
@@ -1108,7 +1108,7 @@ public:
                          RValue &&optionalSubscripts, SGFContext C);
 
   SILDeclRef getSetterDeclRef(AbstractStorageDecl *decl,
-                              bool isDirectAccessorUse);  
+                              bool isDirectAccessorUse);
   void emitSetAccessor(SILLocation loc, SILDeclRef setter,
                        ArrayRef<Substitution> substitutions,
                        ArgumentSource &&optionalSelfValue,
@@ -1116,7 +1116,7 @@ public:
                        RValue &&optionalSubscripts, RValue &&value);
 
   SILDeclRef getMaterializeForSetDeclRef(AbstractStorageDecl *decl,
-                                         bool isDirectAccessorUse);  
+                                         bool isDirectAccessorUse);
   MaterializedLValue
   emitMaterializeForSetAccessor(SILLocation loc, SILDeclRef materializeForSet,
                                 ArrayRef<Substitution> substitutions,
@@ -1153,7 +1153,7 @@ public:
   ManagedValue emitManagedRetain(SILLocation loc, SILValue v);
   ManagedValue emitManagedRetain(SILLocation loc, SILValue v,
                                  const TypeLowering &lowering);
-  
+
   ManagedValue emitManagedRValueWithCleanup(SILValue v);
   ManagedValue emitManagedRValueWithCleanup(SILValue v,
                                             const TypeLowering &lowering);
@@ -1176,16 +1176,16 @@ public:
   void emitSemanticStore(SILLocation loc, SILValue value,
                          SILValue dest, const TypeLowering &destTL,
                          IsInitialization_t isInit);
-  
+
   SILValue emitConversionFromSemanticValue(SILLocation loc,
                                            SILValue semanticValue,
                                            SILType storageType);
-  
+
   ManagedValue emitLoad(SILLocation loc, SILValue addr,
                         const TypeLowering &rvalueTL,
                         SGFContext C, IsTake_t isTake,
                         bool isGuaranteedValid = false);
-  
+
   void emitAssignToLValue(SILLocation loc, RValue &&src,
                           LValue &&dest);
   void emitAssignLValueToLValue(SILLocation loc,
@@ -1205,9 +1205,9 @@ public:
                        SILValue selfValue,
                        SILDeclRef methodConstant,
                        ArrayRef<Substitution> innerSubstitutions);
-  
+
   SILValue emitMetatypeOfValue(SILLocation loc, Expr *baseExpr);
-  
+
   void emitReturnExpr(SILLocation loc, Expr *ret);
 
   RValue emitAnyHashableErasure(SILLocation loc,
@@ -1223,7 +1223,7 @@ public:
   //
   // Helpers for emitting ApplyExpr chains.
   //
-  
+
   RValue emitApplyExpr(Expr *e, SGFContext c);
 
   /// Emit a function application, assuming that the arguments have been
@@ -1415,7 +1415,7 @@ public:
   ManagedValue emitNativeToBridgedValue(SILLocation loc, ManagedValue v,
                                         SILFunctionTypeRepresentation destRep,
                                         CanType bridgedTy);
-  
+
   /// Convert a value received as the result or argument of a function with
   /// the given calling convention to a native Swift value of the given type.
   ManagedValue emitBridgedToNativeValue(SILLocation loc, ManagedValue v,
@@ -1430,7 +1430,7 @@ public:
   /// a bridged error type representation.
   ManagedValue emitNativeToBridgedError(SILLocation loc, ManagedValue v,
                                         CanType bridgedType);
-  
+
   SILValue emitBridgeErrorForForeignError(SILLocation loc,
                                           SILValue nativeError,
                                           SILType bridgedResultType,
@@ -1517,7 +1517,7 @@ public:
   //===--------------------------------------------------------------------===//
   // Declarations
   //===--------------------------------------------------------------------===//
-  
+
   void visitDecl(Decl *D) {
     llvm_unreachable("Not yet implemented");
   }
@@ -1527,10 +1527,10 @@ public:
   void visitPatternBindingDecl(PatternBindingDecl *D);
 
   void emitPatternBinding(PatternBindingDecl *D, unsigned entry);
-  
+
   std::unique_ptr<Initialization>
   emitPatternBindingInitialization(Pattern *P, JumpDest failureDest);
-    
+
   void visitTypeAliasDecl(TypeAliasDecl *D) {
     // No lowering support needed.
   }
@@ -1546,7 +1546,7 @@ public:
 
   /// Emit an Initialization for a 'var' or 'let' decl in a pattern.
   std::unique_ptr<Initialization> emitInitializationForVarDecl(VarDecl *vd);
-  
+
   /// Emit the allocation for a local variable, provides an Initialization
   /// that can be used to initialize it, and registers cleanups in the active
   /// scope.
@@ -1578,16 +1578,16 @@ public:
 
   /// Destroy and deallocate an initialized local variable.
   void destroyLocalVariable(SILLocation L, VarDecl *D);
-  
+
   /// Deallocate an uninitialized local variable.
   void deallocateUninitializedLocalVariable(SILLocation L, VarDecl *D);
 
   /// Enter a cleanup to deallocate a stack variable.
   CleanupHandle enterDeallocStackCleanup(SILValue address);
-  
+
   /// Enter a cleanup to emit a ReleaseValue/DestroyAddr of the specified value.
   CleanupHandle enterDestroyCleanup(SILValue valueOrAddr);
-  
+
   /// Enter a cleanup to emit a DeinitExistentialAddr or DeinitExistentialBox
   /// of the specified value.
   CleanupHandle enterDeinitExistentialCleanup(SILValue valueOrAddr,
@@ -1612,14 +1612,14 @@ public:
   ManagedValue emitLValueToPointer(SILLocation loc, LValue &&lvalue,
                                    CanType pointerType, PointerTypeKind ptrKind,
                                    AccessKind accessKind);
-  
+
   /// Return forwarding substitutions for the archetypes in the current
   /// function.
   ArrayRef<Substitution> getForwardingSubstitutions();
-  
+
   /// Get the _Pointer protocol used for pointer argument operations.
   ProtocolDecl *getPointerProtocol();
-  
+
   /// Produce a substitution for invoking a pointer argument conversion
   /// intrinsic.
   Substitution getPointerSubstitution(Type pointerType);

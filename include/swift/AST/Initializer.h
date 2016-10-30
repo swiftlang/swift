@@ -43,7 +43,7 @@ class Initializer : public DeclContext {
   unsigned Kind : 1;
 protected:
   unsigned SpareBits : 31;
-  
+
   Initializer(InitializerKind kind, DeclContext *parent)
     : DeclContext(DeclContextKind::Initializer, parent),
       Kind(unsigned(kind)) {
@@ -82,14 +82,14 @@ public:
       Binding(nullptr) {
     SpareBits = 0;
   }
- 
+
 
   void setBinding(PatternBindingDecl *binding, unsigned bindingIndex) {
     setParent(binding->getDeclContext());
     Binding = binding;
     SpareBits = bindingIndex;
   }
-  
+
   PatternBindingDecl *getBinding() const { return Binding; }
 
   unsigned getBindingIndex() const { return SpareBits; }
@@ -156,7 +156,7 @@ public:
   /// the function signature is parsed before the function
   /// declaration/expression itself is built.
   void changeFunction(AbstractFunctionDecl *parent);
-  
+
   static bool classof(const DeclContext *DC) {
     if (auto init = dyn_cast<Initializer>(DC))
       return classof(init);
@@ -189,7 +189,7 @@ public:
     return false;
   }
 };
-  
+
 } // end namespace swift
 
 #endif

@@ -160,7 +160,7 @@ public:
     return OpenedArchetypesTracker;
   }
 
-  /// Lookup the instruction defining an opened archetype by first 
+  /// Lookup the instruction defining an opened archetype by first
   /// performing a quick lookup in the opened archetypes operands
   /// and then in the opened archetypes tracker.
   SILValue getOpenedArchetypeDef(Type Ty) const;

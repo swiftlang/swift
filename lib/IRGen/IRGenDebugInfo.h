@@ -139,7 +139,7 @@ public:
 
   /// Return the scope for  SWIFT_ENTRY_POINT_FUNCTION.
   llvm::DIScope *getEntryPointFn();
-  
+
   /// Emit debug info for an import declaration.
   ///
   /// The DWARF output for import decls is similar to that of a using

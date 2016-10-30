@@ -252,7 +252,7 @@ public:
                          [](const SILValue &Op1, const SILValue &Op2) -> bool {
                            return Op1 == Op2; });
   }
-  
+
   /// Returns true if the given instruction is completely identical to RHS,
   /// using \p opEqual to compare operands.
   ///
@@ -265,7 +265,7 @@ public:
         getType() != RHS->getType()) {
       return false;
     }
-    
+
     // Check operands.
     for (unsigned i = 0, e = getNumOperands(); i != e; ++i)
       if (!opEqual(getOperand(i), RHS->getOperand(i)))
@@ -719,7 +719,7 @@ public:
   MutableArrayRef<SILType> getTailAllocatedTypes() {
     return {getTypeStorage(), NumTailTypes};
   }
-  
+
   ArrayRef<Operand> getTailAllocatedCounts() const {
     return getAllOperands().slice(0, NumTailTypes);
   }
@@ -735,7 +735,7 @@ public:
   MutableArrayRef<Operand> getAllOperands() {
     return Operands.asArray();
   }
-  
+
   /// Whether to use Objective-C's allocation mechanism (+allocWithZone:).
   bool isObjC() const { return ObjC; }
 };
@@ -1052,9 +1052,9 @@ protected:
   }
 
   void setNonThrowing(bool isNonThrowing) { NonThrowing = isNonThrowing; }
-  
+
   bool isNonThrowingApply() const { return NonThrowing; }
-  
+
 public:
   /// The operand number of the first argument.
   static unsigned getArgumentOperandNumber() { return 1; }
@@ -1308,7 +1308,7 @@ public:
   static bool classof(const ValueBase *V) {
     return V->getKind() == ValueKind::ApplyInst;
   }
-  
+
   /// Returns true if the called function has an error result but is not actually
   /// throwing an error.
   bool isNonThrowing() const {
@@ -1403,14 +1403,14 @@ class BuiltinInst : public SILInstruction {
 
   /// The name of the builtin to invoke.
   Identifier Name;
-  
+
   /// The number of tail-allocated substitutions, allocated after the operand
   /// list's tail allocation.
   unsigned NumSubstitutions;
-  
+
   /// The value arguments to the builtin.
   TailAllocatedOperandList<0> Operands;
-  
+
   Substitution *getSubstitutionsStorage() {
     return reinterpret_cast<Substitution*>(Operands.asArray().end());
   }
@@ -1430,14 +1430,14 @@ public:
   /// Return the name of the builtin operation.
   Identifier getName() const { return Name; }
   void setName(Identifier I) { Name = I; }
-  
+
   /// \brief Looks up the llvm intrinsic ID and type for the builtin function.
   ///
   /// \returns Returns llvm::Intrinsic::not_intrinsic if the function is not an
   /// intrinsic. The particular intrinsic functions which correspond to the
   /// returned value are defined in llvm/Intrinsics.h.
   const IntrinsicInfo &getIntrinsicInfo() const;
-  
+
   /// \brief Looks up the lazily cached identification for the builtin function.
   const BuiltinInfo &getBuiltinInfo() const;
 
@@ -1473,7 +1473,7 @@ public:
   MutableArrayRef<Substitution> getSubstitutions() {
     return {getSubstitutionsStorage(), NumSubstitutions};
   }
-  
+
   /// The arguments to the builtin.
   ArrayRef<Operand> getAllOperands() const {
     return Operands.asArray();
@@ -1486,12 +1486,12 @@ public:
   OperandValueArrayRef getArguments() const {
     return Operands.asValueArray();
   }
-  
+
   static bool classof(const ValueBase *V) {
     return V->getKind() == ValueKind::BuiltinInst;
   }
 };
-  
+
 /// Initializes a SIL global variable. Only valid once, before any
 /// usages of the global via GlobalAddrInst.
 class AllocGlobalInst : public SILInstruction {
@@ -1510,7 +1510,7 @@ public:
 
   /// Return the referenced global variable.
   SILGlobalVariable *getReferencedGlobal() const { return Global; }
-  
+
   void setReferencedGlobal(SILGlobalVariable *v) { Global = v; }
 
   ArrayRef<Operand> getAllOperands() const { return {}; }
@@ -1525,7 +1525,7 @@ public:
 /// AllocGlobalInst.
 class GlobalAddrInst : public LiteralInst {
   friend SILBuilder;
-  
+
   SILGlobalVariable *Global;
 
   GlobalAddrInst(SILDebugLocation DebugLoc, SILGlobalVariable *Global);
@@ -1536,10 +1536,10 @@ public:
 
   /// Create a placeholder instruction with an unset global reference.
   GlobalAddrInst(SILDebugLocation DebugLoc, SILType Ty);
-  
+
   /// Return the referenced global variable.
   SILGlobalVariable *getReferencedGlobal() const { return Global; }
-  
+
   void setReferencedGlobal(SILGlobalVariable *v) { Global = v; }
 
   ArrayRef<Operand> getAllOperands() const { return {}; }
@@ -1886,7 +1886,7 @@ class MarkUninitializedBehaviorInst final : public SILInstruction,
 
   FixedOperandList<4> Operands;
   unsigned NumInitStorageSubstitutions, NumSetterSubstitutions;
-  
+
   enum {
     // The initialization function for the storage.
     InitStorageFunc,
@@ -1897,11 +1897,11 @@ class MarkUninitializedBehaviorInst final : public SILInstruction,
     // The address or reference to the parent `self` being initialized.
     Self,
   };
-  
+
   size_t numTrailingObjects(OverloadToken<Substitution>) {
     return NumInitStorageSubstitutions + NumSetterSubstitutions;
   }
-  
+
   MarkUninitializedBehaviorInst(SILDebugLocation DebugLoc,
                                 SILValue InitStorage,
                                 ArrayRef<Substitution> InitStorageSubs,
@@ -1910,7 +1910,7 @@ class MarkUninitializedBehaviorInst final : public SILInstruction,
                                 ArrayRef<Substitution> SetterSubs,
                                 SILValue Self,
                                 SILType Ty);
-  
+
   static MarkUninitializedBehaviorInst *create(SILModule &M,
                                          SILDebugLocation DebugLoc,
                                          SILValue InitStorage,
@@ -1945,7 +1945,7 @@ public:
 
   ArrayRef<Operand> getAllOperands() const { return Operands.asArray(); }
   MutableArrayRef<Operand> getAllOperands() { return Operands.asArray(); }
-  
+
   static bool classof(const ValueBase *V) {
     return V->getKind() == ValueKind::MarkUninitializedBehaviorInst;
   }
@@ -2298,7 +2298,7 @@ public:
   /// first operand. Some instructions may take additional operands that do not
   /// affect the reference identity.
   SILValue getConverted() const { return getOperand(0); }
-  
+
   static bool classof(const ValueBase *V) {
     return V->getKind() >= ValueKind::First_ConversionInst &&
       V->getKind() <= ValueKind::Last_ConversionInst;
@@ -2481,7 +2481,7 @@ class UncheckedTrivialBitCastInst final
   create(SILDebugLocation DebugLoc, SILValue Operand, SILType Ty,
          SILFunction &F, SILOpenedArchetypesState &OpenedArchetypes);
 };
-  
+
 /// Bitwise copy a value into another value of the same size or smaller.
 class UncheckedBitwiseCastInst final
   : public UnaryInstructionWithTypeDependentOperandsBase<
@@ -2515,12 +2515,12 @@ class RefToBridgeObjectInst : public ConversionInst {
         Operands(this, ConvertedValue, MaskValue) {}
 
 public:
-  
+
   SILValue getBitsOperand() const { return Operands[1].get(); }
-  
+
   ArrayRef<Operand> getAllOperands() const { return Operands.asArray(); }
   MutableArrayRef<Operand> getAllOperands() { return Operands.asArray(); }
-  
+
   static bool classof(const ValueBase *V) {
     return V->getKind() == ValueKind::RefToBridgeObjectInst;
   }
@@ -2569,7 +2569,7 @@ class RawPointerToRefInst
   RawPointerToRefInst(SILDebugLocation DebugLoc, SILValue Operand, SILType Ty)
       : UnaryInstructionBase(DebugLoc, Operand, Ty) {}
 };
-  
+
 /// RefToUnownedInst - Given a value of a reference type,
 /// convert it to an unowned reference.
 ///
@@ -2722,7 +2722,7 @@ class IsNonnullInst : public UnaryInstructionBase<ValueKind::IsNonnullInst> {
   IsNonnullInst(SILDebugLocation DebugLoc, SILValue Operand, SILType BoolTy)
       : UnaryInstructionBase(DebugLoc, Operand, BoolTy) {}
 };
-  
+
 
 /// Perform an unconditional checked cast that aborts if the cast fails.
 class UnconditionalCheckedCastInst final
@@ -3268,7 +3268,7 @@ class SelectEnumInstBase
   // Tail-allocated after the operands is an array of `NumCases`
   // EnumElementDecl* pointers, referencing the case discriminators for each
   // operand.
-  
+
   EnumElementDecl **getCaseBuf() {
     return reinterpret_cast<EnumElementDecl**>(Operands.asArray().end());
   }
@@ -3291,13 +3291,13 @@ protected:
 
 public:
   SILValue getEnumOperand() const { return getOperand(); }
-  
+
   std::pair<EnumElementDecl*, SILValue>
   getCase(unsigned i) const {
     assert(i < NumCases && "case out of bounds");
     return std::make_pair(getCaseBuf()[i], Operands[i+1].get());
   }
-  
+
   /// Return the value that will be used as the result for the specified enum
   /// case.
   SILValue getCaseResult(EnumElementDecl *D) {
@@ -3309,7 +3309,7 @@ public:
     // didn't find anything.
     return getDefaultResult();
   }
-  
+
   /// \brief If the default refers to exactly one case decl, return it.
   NullablePtr<EnumElementDecl> getUniqueCaseForDefault();
 
@@ -3326,7 +3326,7 @@ public:
   /// not to need this.
   NullablePtr<EnumElementDecl> getSingleTrueElement() const;
 };
-  
+
 /// Select one of a set of values based on the case of an enum.
 class SelectEnumInst : public SelectEnumInstBase {
   friend SILBuilder;
@@ -3891,7 +3891,7 @@ public:
   ArrayRef<ProtocolConformanceRef> getConformances() const {
     return Conformances;
   }
-  
+
   CanType getFormalConcreteType() const {
     return ConcreteType;
   }
@@ -4025,7 +4025,7 @@ class InitBlockStorageHeaderInst : public SILInstruction {
   enum { BlockStorage, InvokeFunction };
   unsigned NumSubstitutions;
   FixedOperandList<2> Operands;
-  
+
   Substitution *getSubstitutionsStorage() {
     return reinterpret_cast<Substitution*>(Operands.asArray().end());
   }
@@ -4043,7 +4043,7 @@ class InitBlockStorageHeaderInst : public SILInstruction {
     memcpy(getSubstitutionsStorage(), Subs.begin(),
            sizeof(Subs[0]) * Subs.size());
   }
-  
+
   static InitBlockStorageHeaderInst *create(SILFunction &F,
                               SILDebugLocation DebugLoc, SILValue BlockStorage,
                               SILValue InvokeFunction, SILType BlockType,
@@ -4301,7 +4301,7 @@ private:
 public:
   ArrayRef<Operand> getAllOperands() const { return Operands.asArray(); }
   MutableArrayRef<Operand> getAllOperands() { return Operands.asArray(); }
-  
+
   SILValue getInstance() const { return getOperand(0); }
   SILValue getMetatype() const { return getOperand(1); }
 
@@ -4428,7 +4428,7 @@ class ProjectExistentialBoxInst :
   public UnaryInstructionBase<ValueKind::ProjectExistentialBoxInst,
                               SILInstruction, /*HasResult*/ true> {
   friend SILBuilder;
-  
+
   ProjectExistentialBoxInst(SILDebugLocation DebugLoc, SILType valueType,
                             SILValue operand)
       : UnaryInstructionBase(DebugLoc, operand, valueType.getAddressType()) {}
@@ -5190,7 +5190,7 @@ public:
   bool isErrorSuccessorRef(SILSuccessor *successor) const {
     assert(successor == &DestBBs[0] || successor == &DestBBs[1]);
     return successor == &DestBBs[1];
-  }  
+  }
 
   SILBasicBlock *getNormalBB() { return DestBBs[NormalIdx]; }
   const SILBasicBlock *getNormalBB() const { return DestBBs[NormalIdx]; }

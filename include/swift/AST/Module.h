@@ -76,7 +76,7 @@ namespace swift {
   class ValueDecl;
   class VarDecl;
   class VisibleDeclConsumer;
-  
+
 /// Discriminator for file-units.
 enum class FileUnitKind {
   /// For a .swift source file.
@@ -129,14 +129,14 @@ class ModuleDecl : public TypeDecl, public DeclContext {
 public:
   typedef ArrayRef<std::pair<Identifier, SourceLoc>> AccessPathTy;
   typedef std::pair<ModuleDecl::AccessPathTy, ModuleDecl*> ImportedModule;
-  
+
   static bool matchesAccessPath(AccessPathTy AccessPath, DeclName Name) {
     assert(AccessPath.size() <= 1 && "can only refer to top-level decls");
-  
+
     return AccessPath.empty()
       || DeclName(AccessPath.front().first).matchesRef(Name);
   }
-  
+
   /// Arbitrarily orders ImportedModule records, for inclusion in sets and such.
   class OrderImportedModules {
   public:
@@ -686,7 +686,7 @@ public:
       return true;
     });
   }
-  
+
   template <typename Fn>
   bool forAllVisibleModules(Fn &&fn) {
     using RetTy = typename std::result_of<Fn(ModuleDecl::ImportedModule)>::type;
@@ -746,7 +746,7 @@ public:
   void *operator new(size_t Bytes, ASTContext &C,
                      unsigned Alignment = alignof(FileUnit));
 };
-  
+
 /// A file containing Swift source code.
 ///
 /// This is a .swift or .sil file (or a virtual file, such as the contents of
@@ -991,21 +991,21 @@ public:
   static bool classof(const DeclContext *DC) {
     return isa<FileUnit>(DC) && classof(cast<FileUnit>(DC));
   }
-  
+
   /// True if this is a "script mode" source file that admits top-level code.
   bool isScriptMode() const {
     switch (Kind) {
     case SourceFileKind::Main:
     case SourceFileKind::REPL:
       return true;
-      
+
     case SourceFileKind::Library:
     case SourceFileKind::SIL:
       return false;
     }
     llvm_unreachable("bad SourceFileKind");
   }
-  
+
   ClassDecl *getMainClass() const override {
     return MainClass;
   }

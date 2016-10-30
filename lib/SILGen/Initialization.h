@@ -28,7 +28,7 @@ namespace Lowering {
 
 class Initialization;
 using InitializationPtr = std::unique_ptr<Initialization>;
-  
+
 /// An abstract class for consuming a value.  This is used for initializing
 /// variables, although that is not the only way it is used.
 ///
@@ -83,7 +83,7 @@ public:
    /// If this initialization represents a single contiguous buffer, return the
   /// SILValue of that buffer's address. If not, returns an invalid SILValue.
   virtual SILValue getAddressOrNull() const = 0;
-  
+
   /// Returns the address of the single contiguous buffer represented by this
   /// initialization. Once the address has been stored to,
   /// finishInitialization must be called.
@@ -92,14 +92,14 @@ public:
     assert(address && "initialization does not represent a single buffer");
     return address;
   }
-  
-  
+
+
   /// If this initialization has an address we can directly emit into, return
   /// it.  Otherwise, return a null SILValue.
   virtual SILValue getAddressForInPlaceInitialization() const {
     return SILValue();
   }
-  
+
   /// Return true if we can get the addresses of elements with the
   /// 'splitIntoTupleElements' method.  Subclasses can override this to
   /// enable this behavior.
@@ -127,7 +127,7 @@ public:
     llvm_unreachable("Must implement if canSplitIntoTupleElements "
                      "returns true");
   }
-  
+
   /// Initialize this with the given value.  This should be an operation
   /// of last resort: it is generally better to split tuples or evaluate
   /// in-place when the initialization supports that.
@@ -152,7 +152,7 @@ public:
 private:
   Initialization(const Initialization &) = delete;
   Initialization(Initialization &&) = delete;
-  
+
   virtual void _anchor();
 };
 
@@ -162,7 +162,7 @@ class SingleBufferInitialization : public Initialization {
   llvm::TinyPtrVector<CleanupHandle::AsPointer> SplitCleanups;
 public:
   SingleBufferInitialization() {}
-  
+
   bool isSingleBuffer() const override {
     return true;
   }
@@ -171,11 +171,11 @@ public:
   SILValue getAddressForInPlaceInitialization() const override {
     return getAddress();
   }
-  
+
   bool canSplitIntoTupleElements() const override {
     return true;
   }
-  
+
   MutableArrayRef<InitializationPtr>
   splitIntoTupleElements(SILGenFunction &gen, SILLocation loc, CanType type,
                          SmallVectorImpl<InitializationPtr> &buf) override;
@@ -187,7 +187,7 @@ public:
 
   /// Overriders must call this.
   void finishInitialization(SILGenFunction &gen) override;
-  
+
   /// Emit the exploded element into a buffer at the specified address.
   static void copyOrInitValueIntoSingleBuffer(SILGenFunction &gen,
                                               SILLocation loc,
@@ -201,16 +201,16 @@ public:
                                      SmallVectorImpl<InitializationPtr> &buf,
                        TinyPtrVector<CleanupHandle::AsPointer> &splitCleanups);
 };
-  
+
 /// This is an initialization for a specific address in memory.
 class KnownAddressInitialization : public SingleBufferInitialization {
   /// The physical address of the global.
   SILValue address;
-  
+
   virtual void anchor() const;
 public:
   KnownAddressInitialization(SILValue address) : address(address) {}
-  
+
   SILValue getAddressOrNull() const override {
     return address;
   }
@@ -256,20 +256,20 @@ public:
   /// The TupleInitialization object takes ownership of Initializations pushed
   /// here.
   SmallVector<InitializationPtr, 4> SubInitializations;
-    
+
   TupleInitialization() {}
-    
+
   SILValue getAddressOrNull() const override {
     if (SubInitializations.size() == 1)
       return SubInitializations[0]->getAddressOrNull();
     else
       return SILValue();
   }
-    
+
   bool canSplitIntoTupleElements() const override {
     return true;
   }
-    
+
   MutableArrayRef<InitializationPtr>
   splitIntoTupleElements(SILGenFunction &gen, SILLocation loc, CanType type,
                          SmallVectorImpl<InitializationPtr> &buf) override {

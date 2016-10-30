@@ -151,7 +151,7 @@ public:
 
   /// Return a newly created specialized function.
   SILFunction *tryCreateSpecialization();
-  
+
   /// Try to specialize GenericFunc given a list of ParamSubs.
   /// Returns either a new or existing specialized function, or nullptr.
   SILFunction *trySpecialization() {

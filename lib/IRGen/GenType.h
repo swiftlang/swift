@@ -47,7 +47,7 @@ namespace swift {
   class UnownedStorageType;
   class WeakStorageType;
   enum IsTake_t : bool;
-  
+
 namespace irgen {
   class Alignment;
   class ProtocolInfo;
@@ -57,7 +57,7 @@ namespace irgen {
   class TypeInfo;
   class UnownedTypeInfo;
   class WeakTypeInfo;
-  
+
 /// Either a type or a forward-declaration.
 typedef llvm::PointerUnion<const TypeInfo*, llvm::Type*> TypeCacheEntry;
 
@@ -67,13 +67,13 @@ class ExemplarArchetype : public llvm::FoldingSetNode,
                           public llvm::ilist_node<ExemplarArchetype> {
 public:
   ArchetypeType * const Archetype;
-  
+
   ExemplarArchetype() : Archetype(nullptr) {}
   ExemplarArchetype(ArchetypeType *t) : Archetype(t) {}
-  
+
   void Profile(llvm::FoldingSetNodeID &ID) const;
 };
-  
+
 /// The helper class for generating types.
 class TypeConverter {
 public:
@@ -81,7 +81,7 @@ public:
 private:
   llvm::DenseMap<ProtocolDecl*, const ProtocolInfo*> Protocols;
   const TypeInfo *FirstType;
-  
+
   const ProtocolInfo *FirstProtocol;
   const LoadableTypeInfo *NativeObjectTI = nullptr;
   const LoadableTypeInfo *UnknownObjectTI = nullptr;
@@ -93,7 +93,7 @@ private:
   const LoadableTypeInfo *EmptyTI = nullptr;
 
   const TypeInfo *ResilientStructTI = nullptr;
-  
+
   llvm::DenseMap<std::pair<unsigned, unsigned>, const LoadableTypeInfo *>
     OpaqueStorageTypes;
 
@@ -137,7 +137,7 @@ private:
   const TypeInfo *convertUnmanagedStorageType(UnmanagedStorageType *T);
   const TypeInfo *convertUnownedStorageType(UnownedStorageType *T);
   const TypeInfo *convertWeakStorageType(WeakStorageType *T);
-  
+
 public:
   TypeConverter(IRGenModule &IGM);
   ~TypeConverter();
@@ -168,14 +168,14 @@ public:
   /// Enter a generic context for lowering the parameters of a generic function
   /// type.
   void pushGenericContext(CanGenericSignature signature);
-  
+
   /// Exit a generic context.
   void popGenericContext(CanGenericSignature signature);
 
   /// Get the ArchetypeBuilder for the current generic context. Fails if there
   /// is no generic context.
   ArchetypeBuilder &getArchetypes();
-  
+
 private:
   // Debugging aids.
 #ifndef NDEBUG
@@ -188,7 +188,7 @@ private:
 
   ArchetypeType *getExemplarArchetype(ArchetypeType *t);
   CanType getExemplarType(CanType t);
-  
+
   class Types_t {
     llvm::DenseMap<TypeBase*, TypeCacheEntry> IndependentCache;
     llvm::DenseMap<TypeBase*, TypeCacheEntry> DependentCache;
@@ -196,14 +196,14 @@ private:
 
     llvm::ilist<ExemplarArchetype> ExemplarArchetypeStorage;
     llvm::FoldingSet<ExemplarArchetype> ExemplarArchetypes;
-    
+
     friend TypeCacheEntry TypeConverter::getTypeEntry(CanType T);
     friend TypeCacheEntry TypeConverter::convertAnyNominalType(CanType Type,
                                                            NominalTypeDecl *D);
     friend void TypeConverter::addForwardDecl(TypeBase*, llvm::Type*);
     friend ArchetypeType *TypeConverter::getExemplarArchetype(ArchetypeType *t);
     friend void TypeConverter::popGenericContext(CanGenericSignature signature);
-    
+
 #ifndef NDEBUG
     friend CanType TypeConverter::getTypeThatLoweredTo(llvm::Type *t) const;
     friend bool TypeConverter::isExemplarArchetype(ArchetypeType *arch) const;
@@ -223,11 +223,11 @@ public:
   {
     TC.pushGenericContext(sig);
   }
-  
+
   GenericContextScope(IRGenModule &IGM, CanGenericSignature sig)
     : GenericContextScope(IGM.Types, sig)
   {}
-  
+
   ~GenericContextScope() {
     TC.popGenericContext(sig);
   }

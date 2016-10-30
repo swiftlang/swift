@@ -51,7 +51,7 @@ class InProcessMemoryReader final : public MemoryReader {
     return true;
   }
 };
- 
+
 }
 }
 

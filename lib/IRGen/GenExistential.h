@@ -51,8 +51,8 @@ namespace irgen {
                                         llvm::Value *metatype,
                                         SILType metatypeType,
                                  ArrayRef<ProtocolConformanceRef> conformances);
-  
-  
+
+
   /// Emit a class existential container from a class instance value
   /// as an explosion.
   void emitClassExistentialContainer(IRGenFunction &IGF,
@@ -69,20 +69,20 @@ namespace irgen {
                                   SILType destType,
                                   CanType formalSrcType,
                                  ArrayRef<ProtocolConformanceRef> conformances);
-  
+
   /// "Deinitialize" an existential container whose contained value is allocated
   /// but uninitialized, by deallocating the buffer owned by the container if any.
   void emitOpaqueExistentialContainerDeinit(IRGenFunction &IGF,
                                             Address container,
                                             SILType type);
-  
+
   /// Deallocate a boxed existential container with uninitialized space to hold
   /// a value of a given type.
   void emitBoxedExistentialContainerDeallocation(IRGenFunction &IGF,
                                                  Explosion &container,
                                                  SILType containerType,
                                                  CanType valueType);
-  
+
   /// Emit a projection from an existential container address to the address
   /// of its concrete value buffer.
   ///
@@ -92,7 +92,7 @@ namespace irgen {
                                           Address base,
                                           SILType baseTy,
                                           CanArchetypeType openedArchetype);
-  
+
   /// Extract the instance pointer from a class existential value.
   ///
   /// \param openedArchetype If non-null, the archetype that will capture the
@@ -127,7 +127,7 @@ namespace irgen {
   /// Emit the existential metatype of an opaque existential value.
   void emitMetatypeOfOpaqueExistential(IRGenFunction &IGF, Address addr,
                                        SILType type, Explosion &out);
-  
+
   /// Emit the existential metatype of a class existential value.
   void emitMetatypeOfClassExistential(IRGenFunction &IGF,
                                       Explosion &value, SILType metatypeType,
@@ -146,7 +146,7 @@ namespace irgen {
                                                 Address base,
                                                 SILType baseTy,
                                                 CanType openedArchetype);
-  
+
 } // end namespace irgen
 } // end namespace swift
 

@@ -93,7 +93,7 @@ public:
     });
     NumEntries = end - Entries;
   }
-                    
+
   /// Verify that the vtable is well-formed for the given class.
   void verify(const SILModule &M) const;
 

@@ -78,7 +78,7 @@ namespace irgen {
   /// extending.
   void addExtendAttribute(IRGenModule &IGM, llvm::AttributeSet &attrs,
                           unsigned index, bool signExtend);
-  
+
   /// Can a series of values be simply pairwise coerced to (or from) an
   /// explosion schema, or do they need to traffic through memory?
   bool canCoerceToSchema(IRGenModule &IGM,
@@ -100,7 +100,7 @@ namespace irgen {
 
   bool addNativeArgument(IRGenFunction &IGF, Explosion &in,
                          SILParameterInfo origParamInfo, Explosion &args);
-  
+
   /// Allocate a stack buffer of the appropriate size to bitwise-coerce a value
   /// between two LLVM types.
   std::pair<Address, Size>

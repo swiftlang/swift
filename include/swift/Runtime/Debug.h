@@ -63,7 +63,7 @@ static void CRSetCrashLogMessage(const char *) {}
 
 namespace swift {
 
-// swift::crash() halts with a crash log message, 
+// swift::crash() halts with a crash log message,
 // but otherwise tries not to disturb register state.
 
 LLVM_ATTRIBUTE_NORETURN
@@ -86,12 +86,12 @@ static inline void _failCorruptType(const Metadata *type) {
   swift::crash("Corrupt Swift type object");
 }
 
-// swift::fatalError() halts with a crash log message, 
+// swift::fatalError() halts with a crash log message,
 // but makes no attempt to preserve register state.
 LLVM_ATTRIBUTE_NORETURN
 extern void
 fatalError(uint32_t flags, const char *format, ...);
-  
+
 struct InProcess;
 
 template <typename Runtime> struct TargetMetadata;
@@ -109,8 +109,8 @@ swift_dynamicCastFailure(const Metadata *sourceType,
 // with a description of a failed cast's types.
 LLVM_ATTRIBUTE_NORETURN
 void
-swift_dynamicCastFailure(const void *sourceType, const char *sourceName, 
-                         const void *targetType, const char *targetName, 
+swift_dynamicCastFailure(const void *sourceType, const char *sourceName,
+                         const void *targetType, const char *targetName,
                          const char *message = nullptr);
 
 SWIFT_RUNTIME_EXPORT

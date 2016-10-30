@@ -182,14 +182,14 @@ public:
       asDerived().emitScalarRelease(IGF, value, Atomicity::Atomic);
     }
   }
-  
+
   void packIntoEnumPayload(IRGenFunction &IGF,
                            EnumPayload &payload,
                            Explosion &src,
                            unsigned offset) const override {
     payload.insertValue(IGF, src.claimNext(), offset);
   }
-  
+
   void unpackFromEnumPayload(IRGenFunction &IGF,
                              const EnumPayload &payload,
                              Explosion &dest,
@@ -212,7 +212,7 @@ public:
 template <class Derived, class Base>
 class PODSingleScalarTypeInfo : public SingleScalarTypeInfo<Derived, Base> {
 protected:
-  template <class StorageType, class... T> 
+  template <class StorageType, class... T>
   PODSingleScalarTypeInfo(StorageType *storage, Size size,
                           SpareBitVector spareBits,
                           Alignment align, T &&...args)

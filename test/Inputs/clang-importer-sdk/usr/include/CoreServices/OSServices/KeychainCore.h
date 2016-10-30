@@ -5,7 +5,7 @@
 #include <MacTypes.h>
 #endif
 
-extern OSStatus 
+extern OSStatus
 KCGetKeychainManagerVersion(UInt32 * returnVers);
 
 #endif

@@ -52,41 +52,41 @@ public:
       : p(requirements) {
     while (shouldSkip()) { p = p.slice(1); }
   }
-  
+
   GenericSignatureWitnessIterator &operator++() {
     checkValid();
     do { p = p.slice(1); } while (shouldSkip());
     return *this;
   }
-  
+
   GenericSignatureWitnessIterator operator++(int) {
     auto copy = *this;
     ++(*this);
     return copy;
   }
-  
+
   Type operator*() const {
     checkValid();
     return p.front().getFirstType();
   }
-  
+
   Type operator->() const {
     checkValid();
     return p.front().getFirstType();
   }
-  
+
   bool operator==(const GenericSignatureWitnessIterator &o) {
     return p.data() == o.p.data() && p.size() == o.p.size();
   }
-  
+
   bool operator!=(const GenericSignatureWitnessIterator &o) {
     return p.data() != o.p.data() || p.size() != o.p.size();
   }
-  
+
   static GenericSignatureWitnessIterator emptyRange() {
     return GenericSignatureWitnessIterator();
   }
-  
+
   // Allow the witness iterator to be used with a ranged for.
   GenericSignatureWitnessIterator begin() const {
     return *this;
@@ -135,7 +135,7 @@ class alignas(1 << TypeAlignInBits) GenericSignature final
 
   mutable llvm::PointerUnion<GenericSignature *, ASTContext *>
     CanonicalSignatureOrASTContext;
-  
+
   static ASTContext &getASTContext(ArrayRef<GenericTypeParamType *> params,
                                    ArrayRef<Requirement> requirements);
 
@@ -216,9 +216,9 @@ public:
 
   /// Determines whether this GenericSignature is canonical.
   bool isCanonical() const;
-  
+
   ASTContext &getASTContext() const;
-  
+
   /// Canonicalize the components of a generic signature.
   CanGenericSignature getCanonicalSignature() const;
 
@@ -226,7 +226,7 @@ public:
   void Profile(llvm::FoldingSetNodeID &ID) {
     Profile(ID, getGenericParams(), getRequirements());
   }
-  
+
   /// Determine whether the given dependent type is required to be a class.
   bool requiresClass(Type type, ModuleDecl &mod);
 
@@ -265,19 +265,19 @@ public:
   static void Profile(llvm::FoldingSetNodeID &ID,
                       ArrayRef<GenericTypeParamType *> genericParams,
                       ArrayRef<Requirement> requirements);
-  
+
   void print(raw_ostream &OS) const;
   void dump() const;
   std::string getAsString() const;
 };
-  
+
 inline
 CanGenericSignature::CanGenericSignature(GenericSignature *Signature)
   : Signature(Signature)
 {
   assert(!Signature || Signature->isCanonical());
 }
-  
+
 inline ArrayRef<CanTypeWrapper<GenericTypeParamType>>
 CanGenericSignature::getGenericParams() const{
   ArrayRef<GenericTypeParamType*> params = Signature->getGenericParams();

@@ -48,7 +48,7 @@ struct ArgumentDescriptor {
 
   /// Should the argument be exploded ?
   bool Explode;
-  
+
   /// This parameter is owned to guaranteed.
   bool OwnedToGuaranteed;
 
@@ -119,7 +119,7 @@ struct ArgumentDescriptor {
     //
     // This is a potentially a very profitable optimization. Ignore other
     // heuristics.
-    if (hasConvention(SILArgumentConvention::Direct_Owned) && 
+    if (hasConvention(SILArgumentConvention::Direct_Owned) &&
         ERM.hasSomeReleasesForArgument(Arg))
       return true;
 
@@ -150,7 +150,7 @@ struct ResultDescriptor {
   /// have access to the original argument's state if we modify the argument
   /// when optimizing.
   ResultDescriptor() {}
-  ResultDescriptor(SILResultInfo RI) 
+  ResultDescriptor(SILResultInfo RI)
     : ResultInfo(RI), CalleeRetain(), OwnedToGuaranteed(false) {}
 
   ResultDescriptor(const ResultDescriptor &) = delete;

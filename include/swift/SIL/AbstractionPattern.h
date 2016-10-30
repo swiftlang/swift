@@ -311,7 +311,7 @@ class AbstractionPattern {
            getKind() == Kind::PartialCurriedCFunctionAsMethodType ||
            getKind() == Kind::CFunctionAsMethodFormalParamTupleType;
   }
-  
+
   void initSwiftType(CanGenericSignature signature, CanType origType,
                      Kind kind = Kind::Type) {
     assert(signature || !origType->hasTypeParameter());
@@ -385,7 +385,7 @@ public:
            hasStoredObjCMethod());
     return CanGenericSignature(GenericSig);
   }
-  
+
   /// Return an open-coded abstraction pattern for a tuple.  The
   /// caller is responsible for ensuring that the storage for the
   /// tuple elements is valid for as long as the abstraction pattern is.
@@ -432,7 +432,7 @@ public:
     status.rawValue = OtherData;
     return status;
   }
-  
+
   /// Return an abstraction pattern for a value that is discarded after being
   /// evaluated.
   static AbstractionPattern
@@ -441,7 +441,7 @@ public:
     pattern.initSwiftType(signature, origType, Kind::Discard);
     return pattern;
   }
-  
+
 private:
   /// Return an abstraction pattern for the curried type of an
   /// Objective-C method.
@@ -454,7 +454,7 @@ private:
                            Kind::CurriedObjCMethodType, errorInfo);
     return pattern;
   }
-  
+
   static AbstractionPattern
   getCurriedCFunctionAsMethod(CanType origType,
                               const clang::Type *clangType,
@@ -534,11 +534,11 @@ private:
   /// Return a pattern corresponding to the formal parameters of the
   /// current Objective-C method.
   AbstractionPattern getObjCMethodFormalParamPattern(CanType paramType) const;
-  
+
   /// Return a pattern corresponding to the 'self' parameter of the
   /// current C function imported as a method.
   AbstractionPattern getCFunctionAsMethodSelfPattern(CanType paramType) const;
-  
+
   /// Return a pattern corresponding to the formal parameters of the
   /// current C function imported as a method.
   AbstractionPattern getCFunctionAsMethodFormalParamPattern(CanType paramType)
@@ -740,7 +740,7 @@ public:
     assert(hasStoredForeignErrorInfo());
     return EncodedForeignErrorInfo::fromOpaqueValue(OtherData);
   }
-  
+
   bool hasForeignErrorStrippingResultOptionality() const {
     switch (getKind()) {
     case Kind::Invalid:
@@ -867,7 +867,7 @@ public:
     case Kind::CurriedCFunctionAsMethodType:
     case Kind::PartialCurriedCFunctionAsMethodType:
     case Kind::ObjCMethodType:
-      llvm_unreachable("pattern is not a tuple");      
+      llvm_unreachable("pattern is not a tuple");
     case Kind::Tuple:
       return getNumTupleElements_Stored();
     case Kind::Type:

@@ -24,7 +24,7 @@ namespace swift {
   class SILBasicBlock;
   class SILFunction;
   class SILValue;
-  
+
 namespace Lowering {
   class JumpDest;
   class SILGenFunction;
@@ -33,7 +33,7 @@ namespace Lowering {
 enum class CleanupState {
   /// The cleanup is inactive but may be activated later.
   Dormant,
-  
+
   /// The cleanup is inactive and will not be activated later.
   Dead,
 
@@ -41,7 +41,7 @@ enum class CleanupState {
 
   /// The cleanup is currently active.
   Active,
-  
+
   /// The cleanup is currently active.  When it's forwarded, it should
   /// be placed in a dormant state, not a dead state.
   PersistentlyActive
@@ -50,17 +50,17 @@ enum class CleanupState {
 class LLVM_LIBRARY_VISIBILITY Cleanup {
   unsigned allocatedSize;
   CleanupState state;
-  
+
   friend class CleanupManager;
 protected:
   Cleanup() {}
   virtual ~Cleanup() {}
-  
+
 public:
   /// Return the allocated size of this object.  This is required by
   /// DiverseStack for iteration.
   size_t allocated_size() const { return allocatedSize; }
-  
+
   CleanupState getState() const { return state; }
   void setState(CleanupState newState) { state = newState; }
   bool isActive() const { return state >= CleanupState::Active; }
@@ -87,7 +87,7 @@ class LLVM_LIBRARY_VISIBILITY CleanupManager {
   friend class Scope;
 
   SILGenFunction &Gen;
-  
+
   /// Stack - Currently active cleanups in this scope tree.
   DiverseStack<Cleanup, 128> Stack;
 
@@ -102,7 +102,7 @@ class LLVM_LIBRARY_VISIBILITY CleanupManager {
   /// we can only reap the cleanup stack up to the innermost depth
   /// that we've handed out as a Scope.
   CleanupsDepth InnermostScope;
-  
+
   void popTopDeadCleanups(CleanupsDepth end);
   void emitCleanups(CleanupsDepth depth, CleanupLocation l,
                     bool popCleanups=true);
@@ -112,12 +112,12 @@ class LLVM_LIBRARY_VISIBILITY CleanupManager {
   void setCleanupState(Cleanup &cleanup, CleanupState state);
 
   friend class CleanupStateRestorationScope;
-  
+
 public:
   CleanupManager(SILGenFunction &Gen)
     : Gen(Gen), InnermostScope(Stack.stable_end()) {
   }
-  
+
   /// Return a stable reference to the last cleanup pushed.
   CleanupsDepth getCleanupsDepth() const {
     return Stack.stable_begin();
@@ -139,7 +139,7 @@ public:
   void emitBranchAndCleanups(JumpDest Dest,
                              SILLocation BranchLoc,
                              ArrayRef<SILValue> Args = {});
-  
+
   /// emitCleanupsForReturn - Emit the top-level cleanups needed prior to a
   /// return from the function.
   void emitCleanupsForReturn(CleanupLocation loc);
@@ -160,10 +160,10 @@ public:
 #ifndef NDEBUG
     CleanupsDepth oldTop = Stack.stable_begin();
 #endif
-    
+
     T &cleanup = Stack.push<T, A...>(::std::forward<A>(args)...);
     T &result = static_cast<T&>(initCleanup(cleanup, sizeof(T), state));
-    
+
 #ifndef NDEBUG
     auto newTop = Stack.begin(); ++newTop;
     assert(newTop == Stack.find(oldTop));
@@ -184,7 +184,7 @@ public:
   /// Set the state of the cleanup at the given depth.
   /// The transition must be non-trivial and legal.
   void setCleanupState(CleanupHandle depth, CleanupState state);
-  
+
   /// True if there are any active cleanups in the scope between the two
   /// cleanup handles.
   bool hasAnyActiveCleanups(CleanupsDepth from, CleanupsDepth to);

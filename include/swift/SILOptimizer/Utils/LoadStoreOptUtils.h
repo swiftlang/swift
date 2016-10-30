@@ -39,7 +39,7 @@
 #include "llvm/ADT/Hashing.h"
 #include "llvm/ADT/SmallVector.h"
 #include "llvm/Support/Debug.h"
-#include <utility> 
+#include <utility>
 
 namespace swift {
 
@@ -169,7 +169,7 @@ public:
   }
 
   /// Print the LSBase.
-  virtual void print(SILModule *Mod) { 
+  virtual void print(SILModule *Mod) {
     llvm::outs() << Base;
     Path.getValue().print(llvm::outs(), *Mod);
   }
