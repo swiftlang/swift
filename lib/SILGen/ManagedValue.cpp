@@ -52,7 +52,7 @@ void ManagedValue::copyInto(SILGenFunction &gen, SILValue dest, SILLocation L) {
     return;
   }
   lowering.emitCopyValue(gen.B, L, getValue());
-  gen.B.createStore(L, getValue(), dest);
+  gen.B.createStore(L, getValue(), dest, StoreOwnershipQualifier::Unqualified);
 }
 
 /// This is the same operation as 'copy', but works on +0 values that don't

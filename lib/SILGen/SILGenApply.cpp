@@ -719,7 +719,8 @@ static Callee prepareArchetypeCallee(SILGenFunction &gen, SILLocation loc,
       // Store the reference into a temporary.
       auto temp =
         gen.emitTemporaryAllocation(selfLoc, ref.getValue()->getType());
-      gen.B.createStore(selfLoc, ref.getValue(), temp);
+      gen.B.createStore(selfLoc, ref.getValue(), temp,
+                        StoreOwnershipQualifier::Unqualified);
 
       // If we had a cleanup, create a cleanup at the new address.
       return maybeEnterCleanupForTransformed(gen, ref, temp);
@@ -1997,7 +1998,8 @@ namespace {
 
         // If the value isn't address-only, go ahead and load.
         if (!substTL.isAddressOnly()) {
-          auto load = gen.B.createLoad(loc, value.forward(gen));
+          auto load = gen.B.createLoad(loc, value.forward(gen),
+                                       LoadOwnershipQualifier::Unqualified);
           value = gen.emitManagedRValueWithCleanup(load);
         }
 
@@ -2578,7 +2580,8 @@ static ManagedValue emitMaterializeIntoTemporary(SILGenFunction &gen,
                                                  ManagedValue object) {
   auto temporary = gen.emitTemporaryAllocation(loc, object.getType());
   bool hadCleanup = object.hasCleanup();
-  gen.B.createStore(loc, object.forward(gen), temporary);
+  gen.B.createStore(loc, object.forward(gen), temporary,
+                    StoreOwnershipQualifier::Unqualified);
 
   // The temporary memory is +0 if the value was.
   if (hadCleanup) {
@@ -3894,12 +3897,14 @@ ManagedValue SILGenFunction::emitInjectEnum(SILLocation loc,
   if (payloadMV) {
     // If the payload was indirect, we already evaluated it and
     // have a single value. Store it into the result.
-    B.createStore(loc, payloadMV.forward(*this), resultData);
+    B.createStore(loc, payloadMV.forward(*this), resultData,
+                  StoreOwnershipQualifier::Unqualified);
   } else if (payloadTL.isLoadable()) {
     // The payload of this specific enum case might be loadable
     // even if the overall enum is address-only.
     payloadMV = std::move(payload).getAsSingleValue(*this, origFormalType);
-    B.createStore(loc, payloadMV.forward(*this), resultData);
+    B.createStore(loc, payloadMV.forward(*this), resultData,
+                  StoreOwnershipQualifier::Unqualified);
   } else {
     // The payload is address-only. Evaluate it directly into
     // the enum.
@@ -5557,7 +5562,7 @@ RValue SILGenFunction::emitDynamicMemberRefExpr(DynamicMemberRefExpr *e,
   // Package up the result.
   auto optResult = optTemp;
   if (optTL.isLoadable())
-    optResult = B.createLoad(e, optResult);
+    optResult = B.createLoad(e, optResult, LoadOwnershipQualifier::Unqualified);
   return RValue(*this, e, emitManagedRValueWithCleanup(optResult, optTL));
 }
 
@@ -5650,6 +5655,6 @@ RValue SILGenFunction::emitDynamicSubscriptExpr(DynamicSubscriptExpr *e,
   // Package up the result.
   auto optResult = optTemp;
   if (optTL.isLoadable())
-    optResult = B.createLoad(e, optResult);
+    optResult = B.createLoad(e, optResult, LoadOwnershipQualifier::Unqualified);
   return RValue(*this, e, emitManagedRValueWithCleanup(optResult, optTL));
 }
