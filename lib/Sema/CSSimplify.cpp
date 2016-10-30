@@ -3016,6 +3016,11 @@ performMemberLookup(ConstraintKind constraintKind, DeclName memberName,
   // reasonable choice.
   auto addChoice = [&](ValueDecl *cand, bool isBridged,
                        bool isUnwrappedOptional) {
+    // Destructors cannot be referenced manually
+    if (isa<DestructorDecl>(cand)) {
+      result.addUnviable(cand, MemberLookupResult::UR_DestructorInaccessible);
+      return;
+    }
     // If the result is invalid, skip it.
     TC.validateDecl(cand, true);
     if (cand->isInvalid()) {

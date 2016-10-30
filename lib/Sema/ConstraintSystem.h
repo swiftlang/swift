@@ -802,6 +802,9 @@ struct MemberLookupResult {
     
     /// The member is inaccessible (e.g. a private member in another file).
     UR_Inaccessible,
+    
+    // A type's destructor cannot be referenced
+    UR_DestructorInaccessible,
   };
   
   /// This is a list of considered, but rejected, candidates, along with a

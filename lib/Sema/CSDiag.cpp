@@ -2774,6 +2774,10 @@ diagnoseUnviableLookupResults(MemberLookupResult &result, Type baseObjTy,
         
       return;
     }
+    case MemberLookupResult::UR_DestructorInaccessible: {
+      diagnose(nameLoc, diag::destructor_not_accessible);
+      return;
+    }
     }
   }
 
