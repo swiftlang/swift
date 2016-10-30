@@ -344,7 +344,7 @@ func logical_lvalue_lifetime(_ r: RefWithProp, _ i: Int, _ v: Val) {
   // CHECK: [[VADDR:%[0-9]+]] = alloc_box $Val
   // CHECK: [[PV:%[0-9]+]] = project_box [[VADDR]]
 
-  // -- Reference types need to be copy_valueed as property method args.
+  // -- Reference types need to be copy_valued as property method args.
   r.int_prop = i
   // CHECK: [[R1:%[0-9]+]] = load [[PR]]
   // CHECK: copy_value [[R1]]
