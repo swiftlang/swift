@@ -1537,7 +1537,7 @@ class ReferencedTypeFinder : private TypeVisitor<ReferencedTypeFinder> {
 
   ModuleDecl &M;
   llvm::function_ref<void(ReferencedTypeFinder &, const TypeDecl *)> Callback;
-  bool IsWithinConstrainedObjCGeneric = false;
+  bool NeedsDefinition = false;
 
   ReferencedTypeFinder(ModuleDecl &mod, decltype(Callback) callback)
     : M(mod), Callback(callback) {}
@@ -1637,6 +1637,11 @@ class ReferencedTypeFinder : private TypeVisitor<ReferencedTypeFinder> {
 
   void visitBoundGenericType(BoundGenericType *boundGeneric) {
     auto *decl = boundGeneric->getDecl();
+
+    NeedsDefinition = true;
+    Callback(*this, decl);
+    NeedsDefinition = false;
+
     bool isObjCGeneric = decl->hasClangNode();
     auto *sig = decl->getGenericSignature();
 
@@ -1644,22 +1649,17 @@ class ReferencedTypeFinder : private TypeVisitor<ReferencedTypeFinder> {
              sig->getInnermostGenericParams(),
              [&](Type argTy, GenericTypeParamType *paramTy) {
       if (isObjCGeneric && isConstrained(M, sig, paramTy))
-        IsWithinConstrainedObjCGeneric = true;
+        NeedsDefinition = true;
       visit(argTy);
-      IsWithinConstrainedObjCGeneric = false;
+      NeedsDefinition = false;
     });
-
-    // Ignore the base type; that either can't be exposed to Objective-C or
-    // was an Objective-C type to begin with. Every bound generic Swift type we
-    // care about gets mapped to a particular construct in Objective-C.
-    // (For example, Optional<NSFoo> is mapped to NSFoo *.)
   }
 
 public:
   using TypeVisitor::visit;
 
-  bool isWithinConstrainedObjCGeneric() const {
-    return IsWithinConstrainedObjCGeneric;
+  bool needsDefinition() const {
+    return NeedsDefinition;
   }
 
   static void walk(ModuleDecl &mod, Type ty, decltype(Callback) callback) {
@@ -1851,8 +1851,7 @@ public:
         if (TD == container)
           return;
 
-        if (finder.isWithinConstrainedObjCGeneric() &&
-            isa<NominalTypeDecl>(TD)) {
+        if (finder.needsDefinition() && isa<NominalTypeDecl>(TD)) {
           // We can delay individual members of classes; do so if necessary.
           if (isa<ClassDecl>(container)) {
             if (!tryRequire(TD)) {
