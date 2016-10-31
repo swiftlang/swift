@@ -1044,20 +1044,16 @@ ${operationComment(x.operator)}
 /// type support negation. To customize your type's implementation, provide
 /// your own mutating `negate()` method.
 public protocol SignedArithmetic : Arithmetic {
-  // FIXME(integers): turn negate() into a static prefix func -(_:)
   /// Returns the additive inverse of this value.
   ///
-  /// This method serves as the basis for the unary minus operator (prefixed
-  /// `-`). For example:
-  ///
   ///     let x = 21
-  ///     let y = x.negated()
+  ///     let y = -x
   ///     // y == -21
   ///
   /// - Returns: The additive inverse of this value.
   ///
   /// - SeeAlso: `negate()`
-  func negated() -> Self
+  static prefix func - (_ operand: Self) -> Self
 
   /// Replaces this value with its additive inverse.
   ///
@@ -1068,14 +1064,15 @@ public protocol SignedArithmetic : Arithmetic {
   ///     x.negate()
   ///     // x == -21
   ///
+  // FIXME(integers): SeeAlso should refer to the prefix - operator
   /// - SeeAlso: `negated()`
   mutating func negate()
 }
 
 extension SignedArithmetic {
   @_transparent
-  public func negated() -> Self {
-    var result = self
+  public static prefix func - (_ operand: Self) -> Self {
+    var result = operand
     result.negate()
     return result
   }
@@ -1112,20 +1109,13 @@ public func abs<T : SignedArithmetic>(_ x: T) -> T
 /// - Parameter x: A signed number.
 /// - Returns: The absolute value of `x`.
 public func abs<T : SignedArithmetic>(_ x: T) -> T {
-  return x < 0 ? x.negated() : x
+  return x < 0 ? -x : x
 }
 */
 
 //===----------------------------------------------------------------------===//
 //===--- Arithmetic operators ---------------------------------------------===//
 //===----------------------------------------------------------------------===//
-
-extension SignedArithmetic {
-  @_transparent
-  public static prefix func - (x: Self) -> Self {
-    return x.negated()
-  }
-}
 
 extension Arithmetic {
   @_transparent

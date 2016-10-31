@@ -542,14 +542,13 @@ public protocol FloatingPoint: Comparable, SignedArithmetic, Strideable {
   /// negation operator (prefixed `-`). For example:
   ///
   ///     let x = 21.5
-  ///     let y = x.negated()
+  ///     let y = -x
   ///     // y == -21.5
   ///
   /// - Returns: The additive inverse of this value.
   ///
   /// - SeeAlso: `negate()`
-  // FIXME(integers): make it a prefix func -
-  func negated() -> Self
+  static prefix func - (_ operand: Self) -> Self
 
   /// Replaces this value with its additive inverse.
   ///
@@ -560,6 +559,7 @@ public protocol FloatingPoint: Comparable, SignedArithmetic, Strideable {
   ///     x.negate()
   ///     // x == -21.5
   ///
+  // FIXME(integers): SeeAlso should refer to the prefix - operator
   /// - SeeAlso: `negated()`
   mutating func negate()
 
