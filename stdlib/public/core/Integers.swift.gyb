@@ -2678,11 +2678,9 @@ extension ${Self} {
 
 
 % for src_type in all_integer_types(word_bits):
-%    srcBits = src_type.bits
-%    srcSigned = src_type.is_signed
-%    Src = src_type.stdlib_name
-// FIXME(integers): consider merging with
-//                  FixedWidthInteger.init(_truncatingBits:)
+%   srcBits = src_type.bits
+%   srcSigned = src_type.is_signed
+%   Src = src_type.stdlib_name
 %   if should_define_truncating_bit_pattern_init(src_ty=src_type, dst_ty=self_type):
 extension ${Self} {
   /// Creates a new instance with the same bitwise representation as the least
@@ -2693,6 +2691,7 @@ extension ${Self} {
   ///
   /// - Parameter source: An integer to use as the source of the new value's
   ///   bit pattern.
+  @available(swift, obsoleted: 4.0, renamed: "init(extendingOrTruncating:)")
   @_transparent
   public init(truncatingBitPattern source: ${Src}) {
     let src = source._value
