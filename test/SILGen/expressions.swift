@@ -220,7 +220,7 @@ func generic_member_ref<T>(_ x: Generic<T>) -> Int {
   // CHECK: bb0([[XADDR:%[0-9]+]] : $*Generic<T>):
   return x.mono_member
   // CHECK: [[MEMBER_ADDR:%[0-9]+]] = struct_element_addr {{.*}}, #Generic.mono_member
-  // CHECK: load [[MEMBER_ADDR]]
+  // CHECK: load [trivial] [[MEMBER_ADDR]]
 }
 
 // CHECK-LABEL: sil hidden @_TF11expressions24bound_generic_member_ref
@@ -229,7 +229,7 @@ func bound_generic_member_ref(_ x: Generic<UnicodeScalar>) -> Int {
   // CHECK: bb0([[XADDR:%[0-9]+]] : $Generic<UnicodeScalar>):
   return x.mono_member
   // CHECK: [[MEMBER_ADDR:%[0-9]+]] = struct_element_addr {{.*}}, #Generic.mono_member
-  // CHECK: load [[MEMBER_ADDR]]
+  // CHECK: load [trivial] [[MEMBER_ADDR]]
 }
 
 // CHECK-LABEL: sil hidden @_TF11expressions6coerce
@@ -449,21 +449,21 @@ func if_expr(_ a: Bool, b: Bool, x: Int, y: Int, z: Int) -> Int {
     : b
     ? y
     : z
-  // CHECK:   [[A:%[0-9]+]] = load [[PBA]]
+  // CHECK:   [[A:%[0-9]+]] = load [trivial] [[PBA]]
   // CHECK:   [[ACOND:%[0-9]+]] = apply {{.*}}([[A]])
   // CHECK:   cond_br [[ACOND]], [[IF_A:bb[0-9]+]], [[ELSE_A:bb[0-9]+]]
   // CHECK: [[IF_A]]:
-  // CHECK:   [[XVAL:%[0-9]+]] = load [[PBX]]
+  // CHECK:   [[XVAL:%[0-9]+]] = load [trivial] [[PBX]]
   // CHECK:   br [[CONT_A:bb[0-9]+]]([[XVAL]] : $Int)
   // CHECK: [[ELSE_A]]:
-  // CHECK:   [[B:%[0-9]+]] = load [[PBB]]
+  // CHECK:   [[B:%[0-9]+]] = load [trivial] [[PBB]]
   // CHECK:   [[BCOND:%[0-9]+]] = apply {{.*}}([[B]])
   // CHECK:   cond_br [[BCOND]], [[IF_B:bb[0-9]+]], [[ELSE_B:bb[0-9]+]]
   // CHECK: [[IF_B]]:
-  // CHECK:   [[YVAL:%[0-9]+]] = load [[PBY]]
+  // CHECK:   [[YVAL:%[0-9]+]] = load [trivial] [[PBY]]
   // CHECK:   br [[CONT_B:bb[0-9]+]]([[YVAL]] : $Int)
   // CHECK: [[ELSE_B]]:
-  // CHECK:   [[ZVAL:%[0-9]+]] = load [[PBZ]]
+  // CHECK:   [[ZVAL:%[0-9]+]] = load [trivial] [[PBZ]]
   // CHECK:   br [[CONT_B:bb[0-9]+]]([[ZVAL]] : $Int)
   // CHECK: [[CONT_B]]([[B_RES:%[0-9]+]] : $Int):
   // CHECK:   br [[CONT_A:bb[0-9]+]]([[B_RES]] : $Int)

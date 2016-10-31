@@ -233,8 +233,7 @@ class Bas : NSObject {
 
   // CHECK-LABEL: sil hidden [transparent] @_TFC13objc_bridging3Basg11strRealPropSS
   // CHECK:   [[PROP_ADDR:%.*]] = ref_element_addr %0 : {{.*}}, #Bas.strRealProp
-  // CHECK:   [[PROP:%.*]] = load [[PROP_ADDR]]
-  // CHECK:   copy_value [[PROP]] : $String
+  // CHECK:   [[PROP:%.*]] = load [copy] [[PROP_ADDR]]
 
 
   // CHECK-LABEL: sil hidden [transparent] [thunk] @_TToFC13objc_bridging3Bass11strRealPropSS : $@convention(objc_method) (NSString, Bas) -> () {
@@ -499,7 +498,7 @@ func updateFridgeTemp(_ home: APPHouse, delta: Double) {
   // CHECK: apply [[PLUS_EQ]]([[TEMP]], [[DELTA]])
 
   // Setter
-  // CHECK: [[FRIDGE:%[0-9]+]] = load [[TEMP_FRIDGE]] : $*Refrigerator
+  // CHECK: [[FRIDGE:%[0-9]+]] = load [trivial] [[TEMP_FRIDGE]] : $*Refrigerator
   // CHECK: [[SETTER:%[0-9]+]] = class_method [volatile] [[HOME]] : $APPHouse, #APPHouse.fridge!setter.1.foreign
   // CHECK: [[BRIDGE_TO_FN:%[0-9]+]] = function_ref @_TFV10Appliances12Refrigerator19_bridgeToObjectiveCfT_CSo15APPRefrigerator
   // CHECK: [[OBJC_ARG:%[0-9]+]] = apply [[BRIDGE_TO_FN]]([[FRIDGE]])

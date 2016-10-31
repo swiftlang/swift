@@ -97,8 +97,7 @@ func testAddressOnlyStructString<T>(_ a : T) -> String {
   // CHECK: [[TMPSTRUCT:%[0-9]+]] = alloc_stack $AddressOnlyStruct<T>
   // CHECK: apply [[PRODFN]]<T>([[TMPSTRUCT]],
   // CHECK-NEXT: [[STRADDR:%[0-9]+]] = struct_element_addr [[TMPSTRUCT]] : $*AddressOnlyStruct<T>, #AddressOnlyStruct.str
-  // CHECK-NEXT: [[STRVAL:%[0-9]+]] = load [[STRADDR]]
-  // CHECK-NEXT: copy_value [[STRVAL]]
+  // CHECK-NEXT: [[STRVAL:%[0-9]+]] = load [copy] [[STRADDR]]
   // CHECK-NEXT: destroy_addr [[TMPSTRUCT]]
   // CHECK-NEXT: dealloc_stack [[TMPSTRUCT]]
   // CHECK: return [[STRVAL]]
@@ -237,7 +236,7 @@ func test_weird_property(_ v : WeirdPropertyTest, i : Int) -> Int {
   // CHECK: store %0 to [trivial] [[PB]]
 
   // The setter isn't mutating, so we need to load the box.
-  // CHECK: [[VVAL:%[0-9]+]] = load [[PB]]
+  // CHECK: [[VVAL:%[0-9]+]] = load [trivial] [[PB]]
   // CHECK: [[SETFN:%[0-9]+]] = function_ref @_TFV9let_decls17WeirdPropertyTests1pSi
   // CHECK: apply [[SETFN]](%1, [[VVAL]])
   v.p = i
@@ -342,7 +341,7 @@ func testAddressOnlyTupleArgument(_ bounds: (start: SimpleProtocol, pastEnd: Int
 // CHECK-NEXT:    %3 = tuple_element_addr %2 : $*(start: SimpleProtocol, pastEnd: Int), 0
 // CHECK-NEXT:    copy_addr [take] %0 to [initialization] %3 : $*SimpleProtocol
 // CHECK-NEXT:    %5 = tuple_element_addr %2 : $*(start: SimpleProtocol, pastEnd: Int), 1
-// CHECK-NEXT:    store %1 to %5 : $*Int
+// CHECK-NEXT:    store %1 to [trivial] %5 : $*Int
 // CHECK-NEXT:    debug_value_addr %2
 // CHECK-NEXT:    destroy_addr %2 : $*(start: SimpleProtocol, pastEnd: Int)
 // CHECK-NEXT:    dealloc_stack %2 : $*(start: SimpleProtocol, pastEnd: Int)
@@ -447,12 +446,12 @@ struct GenericStruct<T> {
   }
   
   // CHECK-LABEL: sil hidden @{{.*}}GenericStruct4getB{{.*}} : $@convention(method) <T> (@in_guaranteed GenericStruct<T>) -> Int
-  // CHECK: bb0(%0 : $*GenericStruct<T>):
-  // CHECK-NEXT: debug_value_addr %0 : $*GenericStruct<T>, let, name "self"
-  // CHECK-NEXT: %2 = struct_element_addr %0 : $*GenericStruct<T>, #GenericStruct.b
-  // CHECK-NEXT: %3 = load %2 : $*Int
-  // CHECK-NOT: destroy_addr %0 : $*GenericStruct<T>
-  // CHECK-NEXT: return %3 : $Int
+  // CHECK: bb0([[SELF_ADDR:%.*]] : $*GenericStruct<T>):
+  // CHECK-NEXT: debug_value_addr [[SELF_ADDR]] : $*GenericStruct<T>, let, name "self"
+  // CHECK-NEXT: [[PROJ_ADDR:%.*]] = struct_element_addr [[SELF_ADDR]] : $*GenericStruct<T>, #GenericStruct.b
+  // CHECK-NEXT: [[PROJ_VAL:%.*]] = load [trivial] [[PROJ_ADDR]] : $*Int
+  // CHECK-NOT: destroy_addr [[SELF]] : $*GenericStruct<T>
+  // CHECK-NEXT: return [[PROJ_VAL]] : $Int
 }
 
 
@@ -466,7 +465,7 @@ struct LetPropertyStruct {
 // CHECK:  [[ABOX:%[0-9]+]] = alloc_box $@box LetPropertyStruct
 // CHECK:  [[A:%[0-9]+]] = project_box [[ABOX]]
 // CHECK:   store %0 to [trivial] [[A]] : $*LetPropertyStruct
-// CHECK:   [[STRUCT:%[0-9]+]] = load [[A]] : $*LetPropertyStruct
+// CHECK:   [[STRUCT:%[0-9]+]] = load_borrow [[A]] : $*LetPropertyStruct
 // CHECK:   [[PROP:%[0-9]+]] = struct_extract [[STRUCT]] : $LetPropertyStruct, #LetPropertyStruct.lp
 // CHECK:   destroy_value [[ABOX]] : $@box LetPropertyStruct
 // CHECK:   return [[PROP]] : $Int

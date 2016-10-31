@@ -83,7 +83,7 @@ func arrayToPointer() {
   // CHECK: [[TAKES_MUTABLE_POINTER:%.*]] = function_ref @_TF18pointer_conversion19takesMutablePointer
   // CHECK: [[CONVERT_MUTABLE:%.*]] = function_ref @_TFs37_convertMutableArrayToPointerArgument
   // CHECK: [[OWNER:%.*]] = apply [[CONVERT_MUTABLE]]<Int, UnsafeMutablePointer<Int>>([[POINTER_BUF:%[0-9]*]],
-  // CHECK: [[POINTER:%.*]] = load [[POINTER_BUF]]
+  // CHECK: [[POINTER:%.*]] = load [trivial] [[POINTER_BUF]]
   // CHECK: apply [[TAKES_MUTABLE_POINTER]]([[POINTER]])
   // CHECK: destroy_value [[OWNER]]
 
@@ -91,7 +91,7 @@ func arrayToPointer() {
   // CHECK: [[TAKES_CONST_POINTER:%.*]] = function_ref @_TF18pointer_conversion17takesConstPointerFGSPSi_T_
   // CHECK: [[CONVERT_CONST:%.*]] = function_ref @_TFs35_convertConstArrayToPointerArgument
   // CHECK: [[OWNER:%.*]] = apply [[CONVERT_CONST]]<Int, UnsafePointer<Int>>([[POINTER_BUF:%[0-9]*]],
-  // CHECK: [[POINTER:%.*]] = load [[POINTER_BUF]]
+  // CHECK: [[POINTER:%.*]] = load [trivial] [[POINTER_BUF]]
   // CHECK: apply [[TAKES_CONST_POINTER]]([[POINTER]])
   // CHECK: destroy_value [[OWNER]]
 
@@ -99,7 +99,7 @@ func arrayToPointer() {
   // CHECK: [[TAKES_MUTABLE_RAW_POINTER:%.*]] = function_ref @_TF18pointer_conversion22takesMutableRawPointerFSvT_ :
   // CHECK: [[CONVERT_MUTABLE:%.*]] = function_ref @_TFs37_convertMutableArrayToPointerArgument
   // CHECK: [[OWNER:%.*]] = apply [[CONVERT_MUTABLE]]<Int, UnsafeMutableRawPointer>([[POINTER_BUF:%[0-9]*]],
-  // CHECK: [[POINTER:%.*]] = load [[POINTER_BUF]]
+  // CHECK: [[POINTER:%.*]] = load [trivial] [[POINTER_BUF]]
   // CHECK: apply [[TAKES_MUTABLE_RAW_POINTER]]([[POINTER]])
   // CHECK: destroy_value [[OWNER]]
 
@@ -107,7 +107,7 @@ func arrayToPointer() {
   // CHECK: [[TAKES_CONST_RAW_POINTER:%.*]] = function_ref @_TF18pointer_conversion20takesConstRawPointerFSVT_ :
   // CHECK: [[CONVERT_CONST:%.*]] = function_ref @_TFs35_convertConstArrayToPointerArgument
   // CHECK: [[OWNER:%.*]] = apply [[CONVERT_CONST]]<Int, UnsafeRawPointer>([[POINTER_BUF:%[0-9]*]],
-  // CHECK: [[POINTER:%.*]] = load [[POINTER_BUF]]
+  // CHECK: [[POINTER:%.*]] = load [trivial] [[POINTER_BUF]]
   // CHECK: apply [[TAKES_CONST_RAW_POINTER]]([[POINTER]])
   // CHECK: destroy_value [[OWNER]]
 }
@@ -118,7 +118,7 @@ func stringToPointer(_ s: String) {
   // CHECK: [[TAKES_CONST_VOID_POINTER:%.*]] = function_ref @_TF18pointer_conversion21takesConstVoidPointerFSV
   // CHECK: [[CONVERT_STRING:%.*]] = function_ref @_TFs40_convertConstStringToUTF8PointerArgument
   // CHECK: [[OWNER:%.*]] = apply [[CONVERT_STRING]]<UnsafeRawPointer>([[POINTER_BUF:%[0-9]*]],
-  // CHECK: [[POINTER:%.*]] = load [[POINTER_BUF]]
+  // CHECK: [[POINTER:%.*]] = load [trivial] [[POINTER_BUF]]
   // CHECK: apply [[TAKES_CONST_VOID_POINTER]]([[POINTER]])
   // CHECK: destroy_value [[OWNER]]
 
@@ -126,7 +126,7 @@ func stringToPointer(_ s: String) {
   // CHECK: [[TAKES_CONST_RAW_POINTER:%.*]] = function_ref @_TF18pointer_conversion20takesConstRawPointerFSV
   // CHECK: [[CONVERT_STRING:%.*]] = function_ref @_TFs40_convertConstStringToUTF8PointerArgument
   // CHECK: [[OWNER:%.*]] = apply [[CONVERT_STRING]]<UnsafeRawPointer>([[POINTER_BUF:%[0-9]*]],
-  // CHECK: [[POINTER:%.*]] = load [[POINTER_BUF]]
+  // CHECK: [[POINTER:%.*]] = load [trivial] [[POINTER_BUF]]
   // CHECK: apply [[TAKES_CONST_RAW_POINTER]]([[POINTER]])
   // CHECK: destroy_value [[OWNER]]
 }
@@ -196,14 +196,14 @@ func classInoutToPointer() {
   takesPlusZeroPointer(&c)
   // CHECK: [[TAKES_PLUS_ZERO:%.*]] = function_ref @_TF18pointer_conversion20takesPlusZeroPointerFGVs33AutoreleasingUnsafeMutablePointerCS_1C_T_
   // CHECK: [[WRITEBACK:%.*]] = alloc_stack $@sil_unmanaged C
-  // CHECK: [[OWNED:%.*]] = load [[PB]]
+  // CHECK: [[OWNED:%.*]] = load_borrow [[PB]]
   // CHECK: [[UNOWNED:%.*]] = ref_to_unmanaged [[OWNED]]
   // CHECK: store [[UNOWNED]] to [trivial] [[WRITEBACK]]
   // CHECK: [[POINTER:%.*]] = address_to_pointer [[WRITEBACK]]
   // CHECK: [[CONVERT:%.*]] = function_ref @_TFs30_convertInOutToPointerArgument
   // CHECK: apply [[CONVERT]]<AutoreleasingUnsafeMutablePointer<C>>({{%.*}}, [[POINTER]])
   // CHECK: apply [[TAKES_PLUS_ZERO]]
-  // CHECK: [[UNOWNED_OUT:%.*]] = load [[WRITEBACK]]
+  // CHECK: [[UNOWNED_OUT:%.*]] = load [trivial] [[WRITEBACK]]
   // CHECK: [[OWNED_OUT:%.*]] = unmanaged_to_ref [[UNOWNED_OUT]]
   // CHECK: [[OWNED_OUT_COPY:%.*]] = copy_value [[OWNED_OUT]]
   // CHECK: assign [[OWNED_OUT_COPY]] to [[PB]]

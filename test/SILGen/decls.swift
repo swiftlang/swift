@@ -66,7 +66,7 @@ func tuple_patterns() {
   // CHECK: [[PBI:%.*]] = project_box [[IADDR]]
   // CHECK-NOT: alloc_box $@box Float
   // CHECK: copy_addr [[AADDR]] to [initialization] [[PBI]]
-  // CHECK: [[B:%[0-9]+]] = load [[BADDR]]
+  // CHECK: [[B:%[0-9]+]] = load [trivial] [[BADDR]]
   // CHECK-NOT: store [[B]]
   var (i,_) = (a, b)
 
@@ -120,7 +120,7 @@ func load_from_global() -> Int {
   // CHECK: [[ACCESSOR:%[0-9]+]] = function_ref @_TF5declsau6globalSi
   // CHECK: [[PTR:%[0-9]+]] = apply [[ACCESSOR]]()
   // CHECK: [[ADDR:%[0-9]+]] = pointer_to_address [[PTR]]
-  // CHECK: [[VALUE:%[0-9]+]] = load [[ADDR]]
+  // CHECK: [[VALUE:%[0-9]+]] = load [trivial] [[ADDR]]
   // CHECK: return [[VALUE]]
 }
 

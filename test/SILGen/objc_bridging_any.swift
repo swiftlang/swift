@@ -476,8 +476,7 @@ class SwiftIdLover : NSObject, Anyable {
   // CHECK-LABEL: sil shared [transparent] [reabstraction_thunk] @_TTRXFo_iP___XFdCb_dPs9AnyObject___ : $@convention(c) (@inout_aliasable @block_storage @callee_owned (@in Any) -> (), AnyObject) -> ()
   // CHECK:     bb0([[BLOCK_STORAGE:%.*]] : $*@block_storage @callee_owned (@in Any) -> (), [[ANY:%.*]] : $AnyObject):
   // CHECK-NEXT:  [[BLOCK_STORAGE_ADDR:%.*]] = project_block_storage [[BLOCK_STORAGE]]
-  // CHECK-NEXT:  [[FUNCTION:%.*]] = load [[BLOCK_STORAGE_ADDR]]
-  // CHECK-NEXT:  [[FUNCTION_COPY:%.*]] = copy_value [[FUNCTION]]
+  // CHECK-NEXT:  [[FUNCTION:%.*]] = load [copy] [[BLOCK_STORAGE_ADDR]]
   // CHECK-NEXT:  [[ANY_COPY:%.*]] = copy_value [[ANY]]
   // CHECK-NEXT:  [[OPTIONAL:%.*]] = unchecked_ref_cast [[ANY_COPY]]
   // CHECK-NEXT:  // function_ref
@@ -547,8 +546,7 @@ class SwiftIdLover : NSObject, Anyable {
   // CHECK-LABEL: sil shared [transparent] [reabstraction_thunk] @_TTRXFo__iP__XFdCb__aPs9AnyObject__ : $@convention(c) (@inout_aliasable @block_storage @callee_owned () -> @out Any) -> @autoreleased AnyObject
   // CHECK:     bb0(%0 : $*@block_storage @callee_owned () -> @out Any):
   // CHECK-NEXT:  [[BLOCK_STORAGE_ADDR:%.*]] = project_block_storage %0
-  // CHECK-NEXT:  [[FUNCTION:%.*]] = load [[BLOCK_STORAGE_ADDR]]
-  // CHECK-NEXT:  copy_value [[FUNCTION]]
+  // CHECK-NEXT:  [[FUNCTION:%.*]] = load [copy] [[BLOCK_STORAGE_ADDR]]
   // CHECK-NEXT:  [[RESULT:%.*]] = alloc_stack $Any
   // CHECK-NEXT:  apply [[FUNCTION]]([[RESULT]])
   // CHECK-NEXT:  [[OPENED:%.*]] = open_existential_addr [[RESULT]] : $*Any to $*[[OPENED_TYPE:@opened.*Any]],

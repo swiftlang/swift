@@ -19,13 +19,12 @@ func reabstractFunctionInOut() {
   // CHECK: store [[THICK_ARG:%.*]] to [init] [[PB]]
   // CHECK: [[FUNC:%.*]] = function_ref @_TF17reabstract_lvalue19consumeGenericInOut
   // CHECK: [[ABSTRACTED_BOX:%.*]] = alloc_stack $@callee_owned (@in Int) -> @out Double
-  // CHECK: [[THICK_ARG:%.*]] = load [[PB]]
-  // CHECK: copy_value [[THICK_ARG]]
+  // CHECK: [[THICK_ARG:%.*]] = load [copy] [[PB]]
   // CHECK: [[THUNK1:%.*]] = function_ref @_TTRXFo_dSi_dSd_XFo_iSi_iSd_
   // CHECK: [[ABSTRACTED_ARG:%.*]] = partial_apply [[THUNK1]]([[THICK_ARG]])
   // CHECK: store [[ABSTRACTED_ARG]] to [init] [[ABSTRACTED_BOX]]
   // CHECK: apply [[FUNC]]<(Int) -> Double>([[ABSTRACTED_BOX]])
-  // CHECK: [[NEW_ABSTRACTED_ARG:%.*]] = load [[ABSTRACTED_BOX]]
+  // CHECK: [[NEW_ABSTRACTED_ARG:%.*]] = load [take] [[ABSTRACTED_BOX]]
   // CHECK: [[THUNK2:%.*]] = function_ref @_TTRXFo_iSi_iSd_XFo_dSi_dSd_
   // CHECK: [[NEW_ARG:%.*]] = partial_apply [[THUNK2]]([[NEW_ABSTRACTED_ARG]])
   var minimallyAbstracted = transform

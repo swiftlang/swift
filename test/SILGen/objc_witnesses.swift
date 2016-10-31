@@ -31,7 +31,7 @@ class Phoûx : NSObject, Fooable {
 // CHECK:      bb0([[IN_ADDR:%.*]] : 
 // CHECK:         [[STACK_SLOT:%.*]] = alloc_stack $Phoûx
 // CHECK:         copy_addr [[IN_ADDR]] to [initialization] [[STACK_SLOT]]
-// CHECK:         [[VALUE:%.*]] = load [[STACK_SLOT]]
+// CHECK:         [[VALUE:%.*]] = load [take] [[STACK_SLOT]]
 // CHECK:         class_method [[VALUE]] : $Phoûx, #Phoûx.foo!1
 
 protocol Bells {

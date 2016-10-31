@@ -67,18 +67,18 @@ class F : E { }
 // CHECK-NEXT: [[SELF_BOX:%[0-9]+]] = alloc_box $@box F
 // CHECK-NEXT: project_box [[SELF_BOX]]
 // CHECK-NEXT: [[SELF:%[0-9]+]] = mark_uninitialized [derivedself]
-// CHECK-NEXT: store [[ORIGSELF]] to [[SELF]] : $*F
-// CHECK-NEXT: [[SELFP:%[0-9]+]] = load [[SELF]] : $*F
+// CHECK-NEXT: store [[ORIGSELF]] to [init] [[SELF]] : $*F
+// SEMANTIC ARC TODO: This is incorrect. Why are we doing a +0 produce and passing off to a +1 consumer. This should be a copy. Or a mutable borrow perhaps?
+// CHECK-NEXT: [[SELFP:%[0-9]+]] = load_borrow [[SELF]] : $*F
 // CHECK-NEXT: [[E:%[0-9]]] = upcast [[SELFP]] : $F to $E
 // CHECK: [[E_CTOR:%[0-9]+]] = function_ref @_TFC19default_constructor1EcfT_S0_ : $@convention(method) (@owned E) -> @owned E
 // CHECK-NEXT: [[ESELF:%[0-9]]] = apply [[E_CTOR]]([[E]]) : $@convention(method) (@owned E) -> @owned E
 
 // CHECK-NEXT: [[ESELFW:%[0-9]+]] = unchecked_ref_cast [[ESELF]] : $E to $F
 // CHECK-NEXT: store [[ESELFW]] to [init] [[SELF]] : $*F
-// CHECK-NEXT: [[SELFP:%[0-9]+]] = load [[SELF]] : $*F
-// CHECK-NEXT: [[SELFP_COPY:%.*]] = copy_value [[SELFP]] : $F
+// CHECK-NEXT: [[SELFP:%[0-9]+]] = load [copy] [[SELF]] : $*F
 // CHECK-NEXT: destroy_value [[SELF_BOX]] : $@box F
-// CHECK-NEXT: return [[SELFP_COPY]] : $F
+// CHECK-NEXT: return [[SELFP]] : $F
 
 
 // <rdar://problem/19780343> Default constructor for a struct with optional doesn't compile

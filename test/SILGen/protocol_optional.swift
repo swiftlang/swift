@@ -18,10 +18,8 @@ func optionalMethodGeneric<T : P1>(t t : T) {
   // CHECK:   store [[T_COPY]] to [init] [[PT]] : $*T
   // CHECK:   [[OPT_BOX:%[0-9]+]] = alloc_box $@box Optional<@callee_owned (Int) -> ()>
   // CHECK:   project_box [[OPT_BOX]]
-  // CHECK:   [[T:%[0-9]+]] = load [[PT]] : $*T
-  // CHECK:   [[T_COPY:%.*]] = copy_value [[T]] : $T
+  // CHECK:   [[T:%[0-9]+]] = load [copy] [[PT]] : $*T
   // CHECK:   alloc_stack $Optional<@callee_owned (Int) -> ()>
-  // SEMANTIC ARC TODO: This should be a branch on T_COPY.
   // CHECK:   dynamic_method_br [[T]] : $T, #P1.method!1.foreign
   var methodRef = t.method
 }
@@ -37,10 +35,8 @@ func optionalPropertyGeneric<T : P1>(t t : T) {
   // CHECK:   store [[T_COPY]] to [init] [[PT]] : $*T
   // CHECK:   [[OPT_BOX:%[0-9]+]] = alloc_box $@box Optional<Int>
   // CHECK:   project_box [[OPT_BOX]]
-  // CHECK:   [[T:%[0-9]+]] = load [[PT]] : $*T
-  // CHECK:   [[T_COPY:%.*]] = copy_value [[T]] : $T
+  // CHECK:   [[T:%[0-9]+]] = load [copy] [[PT]] : $*T
   // CHECK:   alloc_stack $Optional<Int>
-  // SEMANTIC ARC TODO: This should be a dynamic_method_br on T_COPY, not T.
   // CHECK:   dynamic_method_br [[T]] : $T, #P1.prop!getter.1.foreign
   var propertyRef = t.prop
 }
@@ -56,14 +52,12 @@ func optionalSubscriptGeneric<T : P1>(t t : T) {
   // CHECK:   store [[T_COPY]] to [init] [[PT]] : $*T
   // CHECK:   [[OPT_BOX:%[0-9]+]] = alloc_box $@box Optional<Int>
   // CHECK:   project_box [[OPT_BOX]]
-  // CHECK:   [[T:%[0-9]+]] = load [[PT]] : $*T
-  // CHECK:   [[T_COPY:%.*]] = copy_value [[T]] : $T
+  // CHECK:   [[T:%[0-9]+]] = load [copy] [[PT]] : $*T
   // CHECK:   [[INTCONV:%[0-9]+]] = function_ref @_TFSiC
   // CHECK:   [[INT64:%[0-9]+]] = metatype $@thin Int.Type
   // CHECK:   [[FIVELIT:%[0-9]+]] = integer_literal $Builtin.Int2048, 5
   // CHECK:   [[FIVE:%[0-9]+]] = apply [[INTCONV]]([[FIVELIT]], [[INT64]]) : $@convention(method) (Builtin.Int2048, @thin Int.Type) -> Int
   // CHECK:   alloc_stack $Optional<Int>
-  // SEMANTIC ARC TODO: This should be a dynamic_method_br on T_COPY, not T.
   // CHECK:   dynamic_method_br [[T]] : $T, #P1.subscript!getter.1.foreign
   var subscriptRef = t[5]
 }

@@ -260,7 +260,7 @@ emitBridgeReturnValueForForeignError(SILLocation loc,
 /// which loads from the error slot and jumps to the error slot.
 void SILGenFunction::emitForeignErrorBlock(SILLocation loc,
                                            SILBasicBlock *errorBB,
-                                           ManagedValue errorSlot) {
+                                           Optional<ManagedValue> errorSlot) {
   SavedInsertionPoint savedIP(*this, errorBB, FunctionSection::Postmatter);
 
   // Load the error (taking responsibility for it).  In theory, this
@@ -268,8 +268,17 @@ void SILGenFunction::emitForeignErrorBlock(SILLocation loc,
   // conditionally claiming the value.  In practice, claiming it
   // unconditionally is fine because we want to assume it's nil in the
   // other path.
-  SILValue errorV = B.createLoad(loc, errorSlot.forward(*this),
-                                 LoadOwnershipQualifier::Unqualified);
+  SILValue errorV;
+  if (errorSlot.hasValue()) {
+    errorV = B.emitLoadValueOperation(loc, errorSlot.getValue().forward(*this),
+                                      LoadOwnershipQualifier::Take);
+  } else {
+    // If we are not provided with an errorSlot value, then we are passed the
+    // unwrapped optional error as the argument of the errorBB. This value is
+    // passed at +1 meaning that we still need to create a cleanup for errorV.
+    errorV = errorBB->getBBArg(0);
+  }
+
   ManagedValue error = emitManagedRValueWithCleanup(errorV);
 
   // Turn the error into an Error value.
@@ -385,20 +394,24 @@ emitErrorIsNonNilErrorCheck(SILGenFunction &gen, SILLocation loc,
   // If we're suppressing the check, just don't check.
   if (suppressErrorCheck) return;
 
-  SILValue optionalError = gen.B.createLoad(
-      loc, errorSlot.getValue(), LoadOwnershipQualifier::Unqualified);
+  SILValue optionalError = gen.B.emitLoadValueOperation(
+      loc, errorSlot.forward(gen), LoadOwnershipQualifier::Take);
 
   ASTContext &ctx = gen.getASTContext();
 
   // Switch on the optional error.
   SILBasicBlock *errorBB = gen.createBasicBlock(FunctionSection::Postmatter);
+  errorBB->createBBArg(optionalError->getType().unwrapAnyOptionalType());
   SILBasicBlock *contBB = gen.createBasicBlock();
   gen.B.createSwitchEnum(loc, optionalError, /*default*/ nullptr,
                          { { ctx.getOptionalSomeDecl(), errorBB },
                            { ctx.getOptionalNoneDecl(), contBB } });
 
-  // Emit the error block.  Just be lazy and reload the error there.
-  gen.emitForeignErrorBlock(loc, errorBB, errorSlot);
+  // Emit the error block. Pass in none for the errorSlot since we have passed
+  // in the errorSlot as our BB argument so we can pass ownership correctly. In
+  // emitForeignErrorBlock, we will create the appropriate cleanup for the
+  // argument.
+  gen.emitForeignErrorBlock(loc, errorBB, None);
 
   // Return the result.
   gen.B.emitBlock(contBB);

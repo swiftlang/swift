@@ -136,13 +136,13 @@ public func functionWithMyResilientTypes(_ s: MySize, f: (MySize) -> MySize) -> 
   var s2 = s
 
 // CHECK:         [[SRC_ADDR:%.*]] = struct_element_addr %1 : $*MySize, #MySize.w
-// CHECK:         [[SRC:%.*]] = load [[SRC_ADDR]] : $*Int
+// CHECK:         [[SRC:%.*]] = load [trivial] [[SRC_ADDR]] : $*Int
 // CHECK:         [[DEST_ADDR:%.*]] = struct_element_addr [[SIZE_BOX]] : $*MySize, #MySize.w
 // CHECK:         assign [[SRC]] to [[DEST_ADDR]] : $*Int
   s2.w = s.w
 
 // CHECK:         [[RESULT_ADDR:%.*]] = struct_element_addr %1 : $*MySize, #MySize.h
-// CHECK:         [[RESULT:%.*]] = load [[RESULT_ADDR]] : $*Int
+// CHECK:         [[RESULT:%.*]] = load_borrow [[RESULT_ADDR]] : $*Int
   _ = s.h
 
 // CHECK:         [[CLOSURE_COPY:%.*]] = copy_value %2
@@ -182,14 +182,15 @@ public func functionWithMyResilientTypes(_ s: MySize, f: (MySize) -> MySize) -> 
 }
 
 // CHECK-LABEL: sil hidden [transparent] @_TF17struct_resilience27internalTransparentFunctionFVS_6MySizeSi : $@convention(thin) (@in MySize) -> Int
+// CHECK: bb0([[ARG:%.*]] : $*MySize):
 @_transparent func internalTransparentFunction(_ s: MySize) -> Int {
 
   // The body of an internal transparent function will not be inlined into
   // other resilience domains, so we can access storage directly
 
-// CHECK:         [[W_ADDR:%.*]] = struct_element_addr %0 : $*MySize, #MySize.w
-// CHECK-NEXT:    [[RESULT:%.*]] = load [[W_ADDR]] : $*Int
-// CHECK-NEXT:    destroy_addr %0
+// CHECK:         [[W_ADDR:%.*]] = struct_element_addr [[ARG]] : $*MySize, #MySize.w
+// CHECK-NEXT:    [[RESULT:%.*]] = load [trivial] [[W_ADDR]] : $*Int
+// CHECK-NEXT:    destroy_addr [[ARG]]
 // CHECK-NEXT:    return [[RESULT]]
   return s.w
 }

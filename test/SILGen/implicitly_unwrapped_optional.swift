@@ -14,12 +14,10 @@ func foo(f f: (() -> ())!) {
 // CHECK:   cond_br [[T1]], bb1, bb3
 //   If it does, project and load the value out of the implicitly unwrapped
 //   optional...
-// CHECK: bb1:
-// CHECK:   [[FN0_ADDR:%.*]] = unchecked_take_enum_data_addr [[PF]]
-// CHECK:   [[FN0:%.*]] = load [[FN0_ADDR]]
+// CHECK:    bb1:
+// CHECK-NEXT: [[FN0_ADDR:%.*]] = unchecked_take_enum_data_addr [[PF]]
+// CHECK-NEXT: [[FN0:%.*]] = load [copy] [[FN0_ADDR]]
 //   .... then call it
-// CHECK:   [[FN0_COPY:%.*]] = copy_value [[FN0]]
-// SEMANTIC ARC TODO: On the next line, we should be calling FN0_COPY, not FN0
 // CHECK:   apply [[FN0]]() : $@callee_owned () -> ()
 // CHECK:   br bb2
 // CHECK: bb2(

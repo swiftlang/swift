@@ -1999,8 +1999,8 @@ namespace {
 
         // If the value isn't address-only, go ahead and load.
         if (!substTL.isAddressOnly()) {
-          auto load = gen.B.createLoad(loc, value.forward(gen),
-                                       LoadOwnershipQualifier::Unqualified);
+          auto load = substTL.emitLoad(gen.B, loc, value.forward(gen),
+                                       LoadOwnershipQualifier::Take);
           value = gen.emitManagedRValueWithCleanup(load);
         }
 
@@ -3908,14 +3908,14 @@ ManagedValue SILGenFunction::emitInjectEnum(SILLocation loc,
   if (payloadMV) {
     // If the payload was indirect, we already evaluated it and
     // have a single value. Store it into the result.
-    B.createStore(loc, payloadMV.forward(*this), resultData,
-                  StoreOwnershipQualifier::Unqualified);
+    B.emitStoreValueOperation(loc, payloadMV.forward(*this), resultData,
+                              StoreOwnershipQualifier::Init);
   } else if (payloadTL.isLoadable()) {
     // The payload of this specific enum case might be loadable
     // even if the overall enum is address-only.
     payloadMV = std::move(payload).getAsSingleValue(*this, origFormalType);
-    B.createStore(loc, payloadMV.forward(*this), resultData,
-                  StoreOwnershipQualifier::Unqualified);
+    B.emitStoreValueOperation(loc, payloadMV.forward(*this), resultData,
+                              StoreOwnershipQualifier::Init);
   } else {
     // The payload is address-only. Evaluate it directly into
     // the enum.
@@ -5573,7 +5573,7 @@ RValue SILGenFunction::emitDynamicMemberRefExpr(DynamicMemberRefExpr *e,
   // Package up the result.
   auto optResult = optTemp;
   if (optTL.isLoadable())
-    optResult = B.createLoad(e, optResult, LoadOwnershipQualifier::Unqualified);
+    optResult = optTL.emitLoad(B, e, optResult, LoadOwnershipQualifier::Take);
   return RValue(*this, e, emitManagedRValueWithCleanup(optResult, optTL));
 }
 
@@ -5666,6 +5666,6 @@ RValue SILGenFunction::emitDynamicSubscriptExpr(DynamicSubscriptExpr *e,
   // Package up the result.
   auto optResult = optTemp;
   if (optTL.isLoadable())
-    optResult = B.createLoad(e, optResult, LoadOwnershipQualifier::Unqualified);
+    optResult = optTL.emitLoad(B, e, optResult, LoadOwnershipQualifier::Take);
   return RValue(*this, e, emitManagedRValueWithCleanup(optResult, optTL));
 }

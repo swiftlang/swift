@@ -26,16 +26,14 @@ func test0(c c: C) {
 // CHECK:      [[X:%.*]] = alloc_box $@box @sil_weak Optional<C>, var, name "x"
 // CHECK-NEXT: [[PBX:%.*]] = project_box [[X]]
 //   Implicit conversion
-// CHECK-NEXT: [[TMP:%.*]] = load [[PBC]] : $*C
-// CHECK-NEXT: copy_value [[TMP]] : $C
+// CHECK-NEXT: [[TMP:%.*]] = load [copy] [[PBC]] : $*C
 // CHECK-NEXT: [[OPTVAL:%.*]] = enum $Optional<C>, #Optional.some!enumelt.1, [[TMP]] : $C
 // CHECK-NEXT: store_weak [[OPTVAL]] to [initialization] [[PBX]] : $*@sil_weak Optional<C>
 // CHECK-NEXT: destroy_value [[OPTVAL]] : $Optional<C>
 
   a.x = c
 //   Implicit conversion
-// CHECK-NEXT: [[TMP:%.*]] = load [[PBC]] : $*C
-// CHECK-NEXT: copy_value [[TMP]] : $C
+// CHECK-NEXT: [[TMP:%.*]] = load [copy] [[PBC]] : $*C
 // CHECK-NEXT: [[OPTVAL:%.*]] = enum $Optional<C>, #Optional.some!enumelt.1, [[TMP]] : $C
 
 //   Drill to a.x

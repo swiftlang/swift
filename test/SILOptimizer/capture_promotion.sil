@@ -8,7 +8,10 @@
 sil_stage raw
 
 import Builtin
-import Swift
+
+struct Int {
+  var value : Builtin.Int64
+}
 
 class Foo {
   func foo() -> Int

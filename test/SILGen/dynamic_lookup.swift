@@ -55,7 +55,7 @@ func direct_to_static_method(_ obj: AnyObject) {
   // CHECK-NEXT: [[PBOBJ:%[0-9]+]] = project_box [[OBJBOX]]
   // CHECK: [[ARG_COPY:%.*]] = copy_value [[ARG]]
   // CHECK: store [[ARG_COPY]] to [init] [[PBOBJ]] : $*AnyObject
-  // CHECK-NEXT: [[OBJCOPY:%[0-9]+]] = load [[PBOBJ]] : $*AnyObject
+  // CHECK-NEXT: [[OBJCOPY:%[0-9]+]] = load_borrow [[PBOBJ]] : $*AnyObject
   // CHECK-NEXT: [[OBJMETA:%[0-9]+]] = existential_metatype $@thick AnyObject.Type, [[OBJCOPY]] : $AnyObject
   // CHECK-NEXT: [[OPENMETA:%[0-9]+]] = open_existential_metatype [[OBJMETA]] : $@thick AnyObject.Type to $@thick (@opened([[UUID:".*"]]) AnyObject).Type
   // CHECK-NEXT: [[METHOD:%[0-9]+]] = dynamic_method [volatile] [[OPENMETA]] : $@thick (@opened([[UUID]]) AnyObject).Type, #X.staticF!1.foreign : (X.Type) -> () -> (), $@convention(objc_method) (@thick (@opened([[UUID]]) AnyObject).Type) -> ()
@@ -76,9 +76,7 @@ func opt_to_class(_ obj: AnyObject) {
   // CHECK:   store [[ARG_COPY]] to [init] [[PBOBJ]]
   // CHECK:   [[OPTBOX:%[0-9]+]] = alloc_box $@box Optional<@callee_owned () -> ()>
   // CHECK:   [[PBOPT:%.*]] = project_box [[OPTBOX]]
-  // CHECK:   [[EXISTVAL:%[0-9]+]] = load [[PBOBJ]] : $*AnyObject
-  // CHECK:   [[EXISTVAL_COPY:%.*]] = copy_value [[EXISTVAL]]
-  // SEMANTIC ARC TODO: The next line is incorrect, we should be performing an open_existential_ref on EXISTVAL_COPY, not EXISTVAL
+  // CHECK:   [[EXISTVAL:%[0-9]+]] = load [copy] [[PBOBJ]] : $*AnyObject
   // CHECK:   [[OBJ_SELF:%[0-9]*]] = open_existential_ref [[EXISTVAL]]
   // CHECK:   [[OPT_TMP:%.*]] = alloc_stack $Optional<@callee_owned () -> ()>
   // CHECK:   dynamic_method_br [[OBJ_SELF]] : $@opened({{.*}}) AnyObject, #X.f!1.foreign, [[HASBB:[a-zA-z0-9]+]], [[NOBB:[a-zA-z0-9]+]]
@@ -99,7 +97,7 @@ func opt_to_class(_ obj: AnyObject) {
 
   // Continuation block
   // CHECK: [[CONTBB]]:
-  // CHECK:   [[OPT:%.*]] = load [[OPT_TMP]]
+  // CHECK:   [[OPT:%.*]] = load [take] [[OPT_TMP]]
   // CHECK:   store [[OPT]] to [init] [[PBOPT]] : $*Optional<@callee_owned () -> ()>
   // CHECK:   dealloc_stack [[OPT_TMP]]
   var of: (() -> ())! = obj.f
@@ -129,7 +127,7 @@ func opt_to_static_method(_ obj: AnyObject) {
   // CHECK:   store [[OBJ_COPY]] to [init] [[PBOBJ]] : $*AnyObject
   // CHECK:   [[OPTBOX:%[0-9]+]] = alloc_box $@box Optional<@callee_owned () -> ()>
   // CHECK:   [[PBO:%.*]] = project_box [[OPTBOX]]
-  // CHECK:   [[OBJCOPY:%[0-9]+]] = load [[PBOBJ]] : $*AnyObject
+  // CHECK:   [[OBJCOPY:%[0-9]+]] = load_borrow [[PBOBJ]] : $*AnyObject
   // CHECK:   [[OBJMETA:%[0-9]+]] = existential_metatype $@thick AnyObject.Type, [[OBJCOPY]] : $AnyObject
   // CHECK:   [[OPENMETA:%[0-9]+]] = open_existential_metatype [[OBJMETA]] : $@thick AnyObject.Type to $@thick (@opened
   // CHECK:   [[OBJCMETA:%[0-9]+]] = thick_to_objc_metatype [[OPENMETA]]
@@ -148,11 +146,11 @@ func opt_to_property(_ obj: AnyObject) {
   // CHECK:   store [[OBJ_COPY]] to [init] [[PBOBJ]] : $*AnyObject
   // CHECK:   [[INT_BOX:%[0-9]+]] = alloc_box $@box Int
   // CHECK:   project_box [[INT_BOX]]
-  // CHECK:   [[OBJ:%[0-9]+]] = load [[PBOBJ]] : $*AnyObject
-  // CHECK:   copy_value [[OBJ]] : $AnyObject
+  // CHECK:   [[OBJ:%[0-9]+]] = load [copy] [[PBOBJ]] : $*AnyObject
   // CHECK:   [[RAWOBJ_SELF:%[0-9]+]] = open_existential_ref [[OBJ]] : $AnyObject
   // CHECK:   [[OPTTEMP:%.*]] = alloc_stack $Optional<Int>
   // CHECK:   dynamic_method_br [[RAWOBJ_SELF]] : $@opened({{.*}}) AnyObject, #X.value!getter.1.foreign, bb1, bb2
+
   // CHECK: bb1([[METHOD:%[0-9]+]] : $@convention(objc_method) (@opened({{.*}}) AnyObject) -> Int):
   // CHECK:   [[RAWOBJ_SELF_COPY:%.*]] = copy_value [[RAWOBJ_SELF]]
   // CHECK:   [[BOUND_METHOD:%[0-9]+]] = partial_apply [[METHOD]]([[RAWOBJ_SELF_COPY]]) : $@convention(objc_method) (@opened({{.*}}) AnyObject) -> Int
@@ -179,10 +177,9 @@ func direct_to_subscript(_ obj: AnyObject, i: Int) {
   // CHECK:   store [[I]] to [trivial] [[PBI]] : $*Int
   // CHECK:   alloc_box $@box Int
   // CHECK:   project_box
-  // CHECK:   [[OBJ:%[0-9]+]] = load [[PBOBJ]] : $*AnyObject
-  // CHECK:   copy_value [[OBJ]] : $AnyObject
+  // CHECK:   [[OBJ:%[0-9]+]] = load [copy] [[PBOBJ]] : $*AnyObject
   // CHECK:   [[OBJ_REF:%[0-9]+]] = open_existential_ref [[OBJ]] : $AnyObject to $@opened({{.*}}) AnyObject
-  // CHECK:   [[I:%[0-9]+]] = load [[PBI]] : $*Int
+  // CHECK:   [[I:%[0-9]+]] = load [trivial] [[PBI]] : $*Int
   // CHECK:   [[OPTTEMP:%.*]] = alloc_stack $Optional<Int>
   // CHECK:   dynamic_method_br [[OBJ_REF]] : $@opened({{.*}}) AnyObject, #X.subscript!getter.1.foreign, bb1, bb2
 
@@ -210,10 +207,9 @@ func opt_to_subscript(_ obj: AnyObject, i: Int) {
   // CHECK:   [[I_BOX:%[0-9]+]] = alloc_box $@box Int
   // CHECK:   [[PBI:%.*]] = project_box [[I_BOX]]
   // CHECK:   store [[I]] to [trivial] [[PBI]] : $*Int
-  // CHECK:   [[OBJ:%[0-9]+]] = load [[PBOBJ]] : $*AnyObject
-  // CHECK:   copy_value [[OBJ]] : $AnyObject
+  // CHECK:   [[OBJ:%[0-9]+]] = load [copy] [[PBOBJ]] : $*AnyObject
   // CHECK:   [[OBJ_REF:%[0-9]+]] = open_existential_ref [[OBJ]] : $AnyObject to $@opened({{.*}}) AnyObject
-  // CHECK:   [[I:%[0-9]+]] = load [[PBI]] : $*Int
+  // CHECK:   [[I:%[0-9]+]] = load [trivial] [[PBI]] : $*Int
   // CHECK:   [[OPTTEMP:%.*]] = alloc_stack $Optional<Int>
   // CHECK:   dynamic_method_br [[OBJ_REF]] : $@opened({{.*}}) AnyObject, #X.subscript!getter.1.foreign, bb1, bb2
 
@@ -236,8 +232,7 @@ func downcast(_ obj: AnyObject) -> X {
   // CHECK:   [[PBOBJ:%[0-9]+]] = project_box [[OBJ_BOX]]
   // CHECK:   [[OBJ_COPY:%.*]] = copy_value [[OBJ]]
   // CHECK:   store [[OBJ_COPY]] to [init] [[PBOBJ]] : $*AnyObject
-  // CHECK:   [[OBJ:%[0-9]+]] = load [[PBOBJ]] : $*AnyObject
-  // CHECK:   copy_value [[OBJ]] : $AnyObject
+  // CHECK:   [[OBJ:%[0-9]+]] = load [copy] [[PBOBJ]] : $*AnyObject
   // CHECK:   [[X:%[0-9]+]] = unconditional_checked_cast [[OBJ]] : $AnyObject to $X
   // CHECK:   destroy_value [[OBJ_BOX]] : $@box AnyObject
   // CHECK:   destroy_value %0

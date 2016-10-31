@@ -37,7 +37,7 @@ func getRawValue(ed: ErrorDomain) -> String {
 // CHECK-RAW: [[STRING_META:%[0-9]+]] = metatype $@thick String.Type
 // CHECK-RAW: [[STRING_RESULT_ADDR:%[0-9]+]] = alloc_stack $String
 // CHECK-RAW: apply [[FORCE_BRIDGE]]<String>([[STRING_RESULT_ADDR]], [[STORED_VALUE_COPY]], [[STRING_META]])
-// CHECK-RAW: [[STRING_RESULT:%[0-9]+]] = load [[STRING_RESULT_ADDR]]
+// CHECK-RAW: [[STRING_RESULT:%[0-9]+]] = load [take] [[STRING_RESULT_ADDR]]
 // CHECK-RAW: return [[STRING_RESULT]]
 
 class ObjCTest {
