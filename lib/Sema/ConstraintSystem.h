@@ -1054,14 +1054,6 @@ public:
   /// that locator.
   llvm::DenseMap<ConstraintLocator *, ArgumentLabelState> ArgumentLabels;
 
-  /// FIXME: This is a workaround for the way we perform protocol
-  /// conformance checking for generic requirements, where we re-use
-  /// the archetypes of the requirement (rather than, say, building
-  /// new archetypes) to match up with the witness. Those archetypes
-  /// can end up with references to the outer archetypes (of the
-  /// associated types), which need to be replaced.
-  TypeVariableType *SelfTypeVar = nullptr;
-
   /// \brief The set of additional attributes inferred for a FunctionType.  Note
   /// that this is not state kept as part of SolverState, so it only supports
   /// function attributes that need to be set invariant of the actual typing of
@@ -1698,11 +1690,6 @@ public:
                           FunctionRefKind functionRefKind,
                           ConstraintLocatorBuilder locator,
                           const DeclRefExpr *base = nullptr);
-
-  /// Replace the 'Self' type in the archetype with the appropriate
-  /// type variable, if needed.
-  /// FIXME: See the documentation of SelfTypeVar.
-  Type replaceSelfTypeInArchetype(ArchetypeType *archetype);
 
   /// \brief Retrieve the type of a reference to the given value declaration,
   /// as a member with a base of the given type.
