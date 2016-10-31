@@ -1,7 +1,5 @@
 // RUN: %target-swift-frontend -emit-silgen -emit-verbose-sil %s | %FileCheck %s
 
-// Test if 'transparent' attribute gets propagated correctly to apply instructions.
-
 // Test that the attribute gets set on default argument generators.
 @_transparent func transparentFuncWithDefaultArgument (x: Int = 1) -> Int {
   return x
@@ -87,7 +85,8 @@ func testProperty(z: MySt) {
 var _tr2 = MySt()
 var _tr3 = MySt()
 struct MyTranspStruct {}
-@_transparent extension MyTranspStruct {
+extension MyTranspStruct {
+  @_transparent
   init(input : MySt) {}
   mutating
   func tr1() {}
@@ -134,7 +133,8 @@ enum MyEnum {
   case twotransp
 }
 
-@_transparent extension MyEnum {
+extension MyEnum {
+  @_transparent
   func tr3() {}
 }
 

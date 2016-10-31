@@ -482,7 +482,15 @@ bool SILDeclRef::isTransparent() const {
   if (hasAutoClosureExpr())
     return true;
 
-  return hasDecl() ? getDecl()->isTransparent() : false;
+  if (hasDecl()) {
+    if (auto *AFD = dyn_cast<AbstractFunctionDecl>(getDecl()))
+      return AFD->isTransparent();
+
+    if (auto *ASD = dyn_cast<AbstractStorageDecl>(getDecl()))
+      return ASD->isTransparent();
+  }
+
+  return false;
 }
 
 /// \brief True if the function should have its body serialized.

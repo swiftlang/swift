@@ -733,10 +733,6 @@ public:
 
   bool walk(ASTWalker &walker);
 
-  /// \brief Should this declaration be treated as if annotated with transparent
-  /// attribute.
-  bool isTransparent() const;
-
   /// \brief Return whether this declaration has been determined invalid.
   bool isInvalid() const { return DeclBits.Invalid; }
   
@@ -3784,6 +3780,10 @@ protected:
   }
 public:
 
+  /// \brief Should this declaration be treated as if annotated with transparent
+  /// attribute.
+  bool isTransparent() const;
+
   /// \brief Determine whether this storage is a static member, if it
   /// is a member.  Currently only variables can be static.
   inline bool isStatic() const; // defined in this header
@@ -4595,8 +4595,13 @@ protected:
   }
 
   void setGenericParams(GenericParamList *GenericParams);
-  
+
 public:
+
+  /// \brief Should this declaration be treated as if annotated with transparent
+  /// attribute.
+  bool isTransparent() const;
+
   void setGenericSignature(GenericSignature *GenericSig) {
     assert(!this->GenericSig && "already have signature?");
     this->GenericSig = GenericSig;

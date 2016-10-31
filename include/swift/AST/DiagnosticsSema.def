@@ -930,8 +930,6 @@ ERROR(static_functions_not_mutating,none,
 
 ERROR(transparent_stored_property,none,
       "@_transparent cannot be applied to stored properties", ())
-ERROR(transparent_on_invalid_extension,none,
-      "@_transparent is only supported on struct and enum extensions", ())
 ERROR(transparent_in_protocols_not_supported,none,
       "@_transparent is not supported on declarations within protocols", ())
 ERROR(transparent_in_classes_not_supported,none,

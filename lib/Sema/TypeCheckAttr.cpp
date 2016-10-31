@@ -219,15 +219,6 @@ public:
 } // end anonymous namespace
 
 void AttributeEarlyChecker::visitTransparentAttr(TransparentAttr *attr) {
-  if (auto *ED = dyn_cast<ExtensionDecl>(D)) {
-    CanType ExtendedTy = ED->getExtendedType()->getCanonicalType();
-    const NominalTypeDecl *ExtendedNominal = ExtendedTy->getAnyNominal();
-    // Only Struct and Enum extensions can be transparent.
-    if (!isa<StructDecl>(ExtendedNominal) && !isa<EnumDecl>(ExtendedNominal))
-      return diagnoseAndRemoveAttr(attr,diag::transparent_on_invalid_extension);
-    return;
-  }
-  
   DeclContext *Ctx = D->getDeclContext();
   // Protocol declarations cannot be transparent.
   if (isa<ProtocolDecl>(Ctx))
