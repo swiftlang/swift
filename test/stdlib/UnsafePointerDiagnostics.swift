@@ -137,3 +137,8 @@ func unsafeRawBufferPointerConversions(
   _ = UnsafeMutableRawBufferPointer(start: orp, count: 1) // expected-error {{cannot convert value of type 'UnsafeRawPointer?' to expected argument type 'UnsafeMutableRawPointer?'}}
   _ = UnsafeRawBufferPointer(start: orp, count: 1)
 }
+
+func pointerInoutEquality(i: Int, p: UnsafeMutablePointer<Int>?) {
+  var i = i
+  _ = (p == &i)
+}

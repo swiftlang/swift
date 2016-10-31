@@ -38,3 +38,10 @@ var nestedClosuresWithBrokenInference = { f: Int in {} }
     // expected-error@-2 {{consecutive statements on a line must be separated by ';'}} {{44-44=;}}
     // expected-error@-3 {{expected expression}}
     // expected-error@-4 {{use of unresolved identifier 'f'}}
+
+// SR-1976/SR-3073: Inference of inout
+
+func sr1976<T>(_ closure: (inout T) -> Void) {
+}
+
+sr1976({ $0 += 2 })

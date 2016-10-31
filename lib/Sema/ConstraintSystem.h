@@ -64,8 +64,11 @@ namespace constraints {
 /// \brief A handle that holds the saved state of a type variable, which
 /// can be restored.
 class SavedTypeVariableBinding {
-  /// \brief The type variable and type variable options.
-  llvm::PointerIntPair<TypeVariableType *, 3> TypeVarAndOptions;
+  /// \brief The type variable.
+  TypeVariableType *TypeVar;
+  
+  /// \brief The type variable options.
+  unsigned TypeVarOptions : 4;
   
   /// \brief The parent or fixed type.
   llvm::PointerUnion<TypeVariableType *, TypeBase *> ParentOrFixed;
@@ -76,8 +79,8 @@ public:
   /// \brief Restore the state of the type variable to the saved state.
   void restore();
 
-  TypeVariableType *getTypeVariable() { return TypeVarAndOptions.getPointer(); }
-  unsigned getOptions() { return TypeVarAndOptions.getInt(); }
+  TypeVariableType *getTypeVariable() { return TypeVar; }
+  unsigned getOptions() { return TypeVarOptions; }
 };
 
 /// \brief A set of saved type variable bindings.
@@ -126,7 +129,10 @@ enum TypeVariableOptions {
   TVO_PrefersSubtypeBinding = 0x02,
 
   /// Whether the variable must be bound to a materializable type.
-  TVO_MustBeMaterializable = 0x04
+  TVO_MustBeMaterializable = 0x04,
+  
+  // Whether the variable can be of an inout type
+  TVO_CanBeInOut = 0x08,
 };
 
 /// \brief The implementation object for a type variable used within the
@@ -138,7 +144,7 @@ enum TypeVariableOptions {
 /// which it is assigned.
 class TypeVariableType::Implementation {
   /// Type variable options.
-  unsigned Options : 3;
+  unsigned Options : 4;
 
   /// \brief The locator that describes where this type variable was generated.
   constraints::ConstraintLocator *locator;
@@ -177,6 +183,14 @@ public:
 
   bool mustBeMaterializable() const {
     return Options & TVO_MustBeMaterializable;
+  }
+  
+  bool canBeInOut() const {
+    return Options & TVO_CanBeInOut;
+  }
+  
+  unsigned getOptions() const {
+    return Options;
   }
 
   /// \brief Retrieve the type variable associated with this implementation.

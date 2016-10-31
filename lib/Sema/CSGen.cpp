@@ -1889,7 +1889,7 @@ namespace {
 
         // Otherwise, create a fresh type variable.
         Type ty = CS.createTypeVariable(CS.getConstraintLocator(locator),
-                                        /*options=*/0);
+                                        TVO_CanBeInOut);
         
         param->overwriteType(ty);
       }
