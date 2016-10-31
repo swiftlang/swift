@@ -1812,30 +1812,6 @@ extension ${Self} {
     }
   }
 }
-
-// FIXME(ABI)#16 : remove this entrypoint.  The functionality should be provided by
-// a `+=` operator on `RangeReplaceableCollection`.
-/// Appends the elements of a sequence to ${a_Self}.
-///
-/// Use this operator to append the elements of a sequence to the end of
-/// ${a_Self} with same `Element` type. This example appends
-/// the elements of a `Range<Int>` instance to an array of integers.
-///
-///     var numbers = [1, 2, 3, 4, 5]
-///     numbers += 10...15
-///     print(numbers)
-///     // Prints "[1, 2, 3, 4, 5, 10, 11, 12, 13, 14, 15]"
-///
-/// - Parameters:
-///   - lhs: The array to append to.
-///   - rhs: A collection or finite sequence.
-///
-/// - Complexity: O(*n*), where *n* is the length of the resulting array.
-public func += <
-  S : Sequence
->(lhs: inout ${Self}<S.Iterator.Element>, rhs: S) {
-  lhs.append(contentsOf: rhs)
-}
 % end
 
 //===--- generic helpers --------------------------------------------------===//
