@@ -110,7 +110,7 @@ static bool expandCopyAddr(CopyAddrInst *CA) {
     IsTake_t IsTake = CA->isTakeOfSrc();
     if (IsTake_t::IsNotTake == IsTake) {
       TL.emitLoweredCopyValue(Builder, CA->getLoc(), New,
-                              TypeLowering::LoweringStyle::DeepNoEnum);
+                              TypeLowering::LoweringStyle::Deep);
     }
 
     // If we are not initializing:
@@ -119,7 +119,7 @@ static bool expandCopyAddr(CopyAddrInst *CA) {
     // release_value %old : $*T
     if (Old) {
       TL.emitLoweredDestroyValue(Builder, CA->getLoc(), Old,
-                                 TypeLowering::LoweringStyle::DeepNoEnum);
+                                 TypeLowering::LoweringStyle::Deep);
     }
   }
 
@@ -151,7 +151,7 @@ static bool expandDestroyAddr(DestroyAddrInst *DA) {
                                       LoadOwnershipQualifier::Unqualified);
     auto &TL = Module.getTypeLowering(Type);
     TL.emitLoweredDestroyValue(Builder, DA->getLoc(), LI,
-                               TypeLowering::LoweringStyle::DeepNoEnum);
+                               TypeLowering::LoweringStyle::Deep);
   }
 
   ++NumExpand;
@@ -173,7 +173,7 @@ static bool expandReleaseValue(ReleaseValueInst *DV) {
 
   auto &TL = Module.getTypeLowering(Type);
   TL.emitLoweredDestroyValue(Builder, DV->getLoc(), Value,
-                             TypeLowering::LoweringStyle::DeepNoEnum);
+                             TypeLowering::LoweringStyle::Deep);
 
   DEBUG(llvm::dbgs() << "    Expanding Destroy Value: " << *DV);
 
@@ -196,7 +196,7 @@ static bool expandRetainValue(RetainValueInst *CV) {
 
   auto &TL = Module.getTypeLowering(Type);
   TL.emitLoweredCopyValue(Builder, CV->getLoc(), Value,
-                          TypeLowering::LoweringStyle::DeepNoEnum);
+                          TypeLowering::LoweringStyle::Deep);
 
   DEBUG(llvm::dbgs() << "    Expanding Copy Value: " << *CV);
 
