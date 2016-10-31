@@ -1,6 +1,7 @@
 // RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=BAD_MEMBERS_1 | %FileCheck %s -check-prefix=BAD_MEMBERS_1
 // RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=BAD_MEMBERS_2 | %FileCheck %s -check-prefix=BAD_MEMBERS_2
 // RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=CLOSURE_CALLED_IN_PLACE_1 | %FileCheck %s -check-prefix=WITH_GLOBAL
+// RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=RDAR_28991372 | %FileCheck %s -check-prefix=RDAR_28991372
 
 class BadMembers1 {
   var prop: Int {
@@ -188,3 +189,10 @@ conn.handler = { (msgID, msg) in
   }
 }
 // RDAR_22769393: Begin completions
+
+struct S_RDAR_28991372 {
+  init(x: Int, y: Int) {}
+}
+
+S_RDAR_28991372(x: #^RDAR_28991372^#, y: <#T##Int#>)
+// RDAR_28991372: Begin completions
