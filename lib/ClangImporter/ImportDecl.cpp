@@ -6659,7 +6659,7 @@ void ClangImporter::Implementation::finishProtocolConformance(
         // we'll end up querying this at runtime.
         auto Attrs = func->getAttrs();
         if (Attrs.hasAttribute<OptionalAttr>()) {
-          conformance->setWitness(valueReq, ConcreteDeclRef());
+          conformance->setWitness(valueReq, Witness());
           continue;
         }
       }

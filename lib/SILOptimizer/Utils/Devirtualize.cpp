@@ -805,36 +805,73 @@ static void getWitnessMethodSubstitutions(
   // mapping to the archetypes of the caller.
   SubstitutionMap subMap;
 
-  // Take apart caller-side substitutions.
-  //
-  // Note that the Self-derived dependent types appearing on the left
-  // hand side of the map are dropped.
-  requirementSig->getSubstitutionMap(origSubs, subMap);
-
-  auto selfParamTy = conformance->getProtocol()->getSelfInterfaceType();
-  auto rootedInSelf = [&](Type t) -> bool {
-    while (auto dmt = t->getAs<DependentMemberType>()) {
-      t = dmt->getBase();
-    }
-    return t->isEqual(selfParamTy);
-  };
-
-  for (auto depTy : requirementSig->getAllDependentTypes()) {
-    if (rootedInSelf(depTy))
-      subMap.removeType(depTy->getCanonicalType());
-  }
-
   // Take apart substitutions from the conforming type.
   //
   // If `Self` maps to a bound generic type, this gives us the
   // substitutions for the concrete type's generic parameters.
   auto witnessSubs = getSubstitutionsForProtocolConformance(conformanceRef);
 
+  unsigned depth = 0;
   if (!witnessSubs.empty()) {
     auto *rootConformance = conformance->getRootNormalConformance();
+    depth = rootConformance->getGenericSignature()->getGenericParams().back()
+              ->getDepth() + 1;
     auto *witnessSig = rootConformance->getGenericSignature();
 
     witnessSig->getSubstitutionMap(witnessSubs, subMap);
+  }
+
+  // Next, take apart caller-side substitutions.
+  //
+  // Note that the Self-derived dependent types appearing on the left
+  // hand side of the map are dropped.
+  // FIXME: This won't be correct if the requirement itself adds 'Self'
+  // requirements. We should be working from the substitutions in the witness.
+  //
+  // Also note that we rebuild the generic parameters in the requirement
+  // to provide them with the required depth for the thunk itself.
+  if (requirementSig->getGenericParams().back()->getDepth() > 0) {
+    // Local function to replace generic parameters within the requirement
+    // signature with the generic parameter we want to use in the substitution
+    // map:
+    //   - If the generic parameter is 'Self', return a null type so we don't
+    //     add any substitution.
+    //   - Otherwise, reset the generic parameter's depth one level deeper than
+    //     the deepest generic parameter in the conformance.
+    //
+    // This local function is meant to be used with Type::transform();
+    auto replaceGenericParameter = [&](Type type) -> Type {
+      if (auto gp = type->getAs<GenericTypeParamType>()) {
+        if (gp->getDepth() == 0) return Type();
+        return GenericTypeParamType::get(depth, gp->getIndex(),
+                                         M.getASTContext());
+      }
+
+      return type;
+    };
+
+    // Walk through the substitutions and dependent types.
+    ArrayRef<Substitution> subs = origSubs;
+    for (auto origDepTy : requirementSig->getAllDependentTypes()) {
+      // Grab the next substitution.
+      auto sub = subs.front();
+      subs = subs.slice(1);
+
+      // Map the generic parameters in the dependent type into the witness
+      // thunk's depth.
+      auto mappedDepTy = origDepTy.transform(replaceGenericParameter);
+
+      // If the dependent type was rooted in 'Self', it will come out null;
+      // skip it.
+      if (!mappedDepTy) continue;
+
+      // Otherwise, record the replacement and conformances for the mapped
+      // type.
+      auto canTy = mappedDepTy->getCanonicalType();
+      subMap.addSubstitution(canTy, sub.getReplacement());
+      subMap.addConformances(canTy, sub.getConformances());
+    }
+    assert(subs.empty() && "Did not consume all substitutions");
   }
 
   // Now, apply both sets of substitutions computed above to the

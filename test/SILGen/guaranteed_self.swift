@@ -250,8 +250,8 @@ struct AO<T>: Fooable {
 }
 
 // Witness for nonmutating 'foo'
-// CHECK-LABEL: sil hidden [transparent] [thunk] @_TTWurGV15guaranteed_self2AOx_S_7FooableS_FS1_3foo{{.*}} : $@convention(witness_method) <T> (Int, @in_guaranteed AO<T>) -> ()
-// CHECK:       bb0({{.*}} [[SELF_ADDR:%.*]] : $*AO<T>):
+// CHECK-LABEL: sil hidden [transparent] [thunk] @_TTWurGV15guaranteed_self2AOx_S_7FooableS_FS1_3foo{{.*}} : $@convention(witness_method) <τ_0_0> (Int, @in_guaranteed AO<τ_0_0>) -> ()
+// CHECK:       bb0({{.*}} [[SELF_ADDR:%.*]] : $*AO<τ_0_0>):
 // TODO: This copy isn't necessary.
 // CHECK:         copy_addr [[SELF_ADDR]] to [initialization] [[SELF_COPY:%.*]] :
 // CHECK:         apply {{.*}} [[SELF_COPY]]
@@ -259,8 +259,8 @@ struct AO<T>: Fooable {
 // CHECK-NOT:     destroy_addr [[SELF_ADDR]]
 
 // Witness for 'bar', which is mutating in protocol but nonmutating in impl
-// CHECK-LABEL: sil hidden [transparent] [thunk] @_TTWurGV15guaranteed_self2AOx_S_7FooableS_FS1_3bar{{.*}} : $@convention(witness_method) <T> (@inout AO<T>) -> ()
-// CHECK:       bb0([[SELF_ADDR:%.*]] : $*AO<T>):
+// CHECK-LABEL: sil hidden [transparent] [thunk] @_TTWurGV15guaranteed_self2AOx_S_7FooableS_FS1_3bar{{.*}} : $@convention(witness_method) <τ_0_0> (@inout AO<τ_0_0>) -> ()
+// CHECK:       bb0([[SELF_ADDR:%.*]] : $*AO<τ_0_0>):
 // -- NB: This copy *is* necessary, unless we're willing to assume an inout
 //        parameter is not mutably aliased.
 // CHECK:         copy_addr [[SELF_ADDR]] to [initialization] [[SELF_COPY:%.*]] :

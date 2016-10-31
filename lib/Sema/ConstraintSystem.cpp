@@ -1061,29 +1061,6 @@ static void addSelfConstraint(ConstraintSystem &cs, Type objectTy, Type selfTy,
                    cs.getConstraintLocator(locator));
 }
 
-Type ConstraintSystem::replaceSelfTypeInArchetype(ArchetypeType *archetype) {
-  assert(SelfTypeVar && "Meaningless unless there is a type variable for Self");
-  if (auto parent = archetype->getParent()) {
-    // Replace Self in the parent archetype. If nothing changes, we're done.
-    Type newParent = replaceSelfTypeInArchetype(parent);
-    if (newParent->getAs<ArchetypeType>() == parent)
-      return archetype;
-
-    // We expect to get a type variable back.
-    return getMemberType(newParent->castTo<TypeVariableType>(),
-                         archetype->getAssocType(),
-                         ConstraintLocatorBuilder(nullptr),
-                         /*options=*/0);
-  }
-
-  // If the archetype is the same as for the 'Self' type variable,
-  // return the 'Self' type variable.
-  if (SelfTypeVar->getImpl().getArchetype() == archetype)
-    return SelfTypeVar;
-
-  return archetype;
-}
-
 /// Determine whether the given locator is for a witness or requirement.
 static bool isRequirementOrWitness(const ConstraintLocatorBuilder &locator) {
   if (auto last = locator.last()) {
@@ -1502,19 +1479,6 @@ void ConstraintSystem::resolveOverload(ConstraintLocator *locator,
     break;
   }
   
-  // If we have a type variable for the 'Self' of a protocol
-  // requirement that's being opened, and the resulting type has an
-  // archetype in it, replace the 'Self' archetype with the
-  // corresponding type variable.
-  // FIXME: See the comment for SelfTypeVar for information about this hack.
-  if (SelfTypeVar && refType->hasArchetype()) {
-    refType = refType.transform([&](Type type) -> Type {
-        if (auto archetype = type->getAs<ArchetypeType>()) {
-          return replaceSelfTypeInArchetype(archetype);
-        }
-        return type;
-      });
-  }
   assert(!refType->hasTypeParameter() && "Cannot have a dependent type here");
   
   // If we're binding to an init member, the 'throws' need to line up between

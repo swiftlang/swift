@@ -132,22 +132,22 @@ struct ConformingStruct : X {
   
   mutating
   func generic<C>(x: C) -> C { return x }
-  // CHECK-LABEL: sil hidden [transparent] [thunk] @_TTWV9witnesses16ConformingStructS_1XS_FS1_7generic{{.*}} : $@convention(witness_method) <A> (@in A, @inout ConformingStruct) -> @out A {
-  // CHECK:       bb0(%0 : $*A, %1 : $*A, %2 : $*ConformingStruct):
+  // CHECK-LABEL: sil hidden [transparent] [thunk] @_TTWV9witnesses16ConformingStructS_1XS_FS1_7generic{{.*}} : $@convention(witness_method) <τ_0_0> (@in τ_0_0, @inout ConformingStruct) -> @out τ_0_0 {
+  // CHECK:       bb0(%0 : $*τ_0_0, %1 : $*τ_0_0, %2 : $*ConformingStruct):
   // CHECK-NEXT:    // function_ref
   // CHECK-NEXT:    %3 = function_ref @_TFV9witnesses16ConformingStruct7generic{{.*}} : $@convention(method) <τ_0_0> (@in τ_0_0, @inout ConformingStruct) -> @out τ_0_0
-  // CHECK-NEXT:    %4 = apply %3<A>(%0, %1, %2) : $@convention(method) <τ_0_0> (@in τ_0_0, @inout ConformingStruct) -> @out τ_0_0
+  // CHECK-NEXT:    %4 = apply %3<τ_0_0>(%0, %1, %2) : $@convention(method) <τ_0_0> (@in τ_0_0, @inout ConformingStruct) -> @out τ_0_0
   // CHECK-NEXT:    %5 = tuple ()
   // CHECK-NEXT:    return %5 : $()
   // CHECK-NEXT:  }
   mutating
   func classes<C2: Classes>(x: C2) -> C2 { return x }
-  // CHECK-LABEL: sil hidden [transparent] [thunk] @_TTWV9witnesses16ConformingStructS_1XS_FS1_7classes{{.*}} : $@convention(witness_method) <A2 where A2 : Classes> (@owned A2, @inout ConformingStruct) -> @owned A2 {
-  // CHECK:       bb0(%0 : $A2, %1 : $*ConformingStruct):
+  // CHECK-LABEL: sil hidden [transparent] [thunk] @_TTWV9witnesses16ConformingStructS_1XS_FS1_7classes{{.*}} : $@convention(witness_method) <τ_0_0 where τ_0_0 : Classes> (@owned τ_0_0, @inout ConformingStruct) -> @owned τ_0_0 {
+  // CHECK:       bb0(%0 : $τ_0_0, %1 : $*ConformingStruct):
   // CHECK-NEXT:    // function_ref
   // CHECK-NEXT:    %2 = function_ref @_TFV9witnesses16ConformingStruct7classes{{.*}} : $@convention(method) <τ_0_0 where τ_0_0 : Classes> (@owned τ_0_0, @inout ConformingStruct) -> @owned τ_0_0
-  // CHECK-NEXT:    %3 = apply %2<A2>(%0, %1) : $@convention(method) <τ_0_0 where τ_0_0 : Classes> (@owned τ_0_0, @inout ConformingStruct) -> @owned τ_0_0
-  // CHECK-NEXT:    return %3 : $A2
+  // CHECK-NEXT:    %3 = apply %2<τ_0_0>(%0, %1) : $@convention(method) <τ_0_0 where τ_0_0 : Classes> (@owned τ_0_0, @inout ConformingStruct) -> @owned τ_0_0
+  // CHECK-NEXT:    return %3 : $τ_0_0
   // CHECK-NEXT:  }
 }
 func <~>(_ x: ConformingStruct, y: ConformingStruct) -> ConformingStruct { return x }
@@ -241,29 +241,29 @@ struct ConformsWithMoreGeneric : X, Y {
 
   mutating
   func generic<H>(x: H) -> H { return x }
-  // CHECK-LABEL: sil hidden [transparent] [thunk] @_TTWV9witnesses23ConformsWithMoreGenericS_1XS_FS1_7generic{{.*}} : $@convention(witness_method) <A> (@in A, @inout ConformsWithMoreGeneric) -> @out A {
-  // CHECK:       bb0(%0 : $*A, %1 : $*A, %2 : $*ConformsWithMoreGeneric):
+  // CHECK-LABEL: sil hidden [transparent] [thunk] @_TTWV9witnesses23ConformsWithMoreGenericS_1XS_FS1_7generic{{.*}} : $@convention(witness_method) <τ_0_0> (@in τ_0_0, @inout ConformsWithMoreGeneric) -> @out τ_0_0 {
+  // CHECK:       bb0(%0 : $*τ_0_0, %1 : $*τ_0_0, %2 : $*ConformsWithMoreGeneric):
   // CHECK-NEXT:    // function_ref
   // CHECK-NEXT:    %3 = function_ref @_TFV9witnesses23ConformsWithMoreGeneric7generic{{.*}} : $@convention(method) <τ_0_0> (@in τ_0_0, @inout ConformsWithMoreGeneric) -> @out τ_0_0
-  // CHECK-NEXT:    %4 = apply %3<A>(%0, %1, %2) : $@convention(method) <τ_0_0> (@in τ_0_0, @inout ConformsWithMoreGeneric) -> @out τ_0_0
+  // CHECK-NEXT:    %4 = apply %3<τ_0_0>(%0, %1, %2) : $@convention(method) <τ_0_0> (@in τ_0_0, @inout ConformsWithMoreGeneric) -> @out τ_0_0
   // CHECK-NEXT:    [[RESULT:%.*]] = tuple ()
   // CHECK-NEXT:    return [[RESULT]] : $()
   // CHECK-NEXT:  }
 
   mutating
   func classes<I>(x: I) -> I { return x }
-  // CHECK-LABEL: sil hidden [transparent] [thunk] @_TTWV9witnesses23ConformsWithMoreGenericS_1XS_FS1_7classes{{.*}} : $@convention(witness_method) <A2 where A2 : Classes> (@owned A2, @inout ConformsWithMoreGeneric) -> @owned A2 {
-  // CHECK:       bb0(%0 : $A2, %1 : $*ConformsWithMoreGeneric):
-  // CHECK-NEXT:    [[SELF_BOX:%.*]] = alloc_stack $A2
-  // CHECK-NEXT:    store %0 to [[SELF_BOX]] : $*A2
+  // CHECK-LABEL: sil hidden [transparent] [thunk] @_TTWV9witnesses23ConformsWithMoreGenericS_1XS_FS1_7classes{{.*}} : $@convention(witness_method) <τ_0_0 where τ_0_0 : Classes> (@owned τ_0_0, @inout ConformsWithMoreGeneric) -> @owned τ_0_0 {
+  // CHECK:       bb0(%0 : $τ_0_0, %1 : $*ConformsWithMoreGeneric):
+  // CHECK-NEXT:    [[SELF_BOX:%.*]] = alloc_stack $τ_0_0
+  // CHECK-NEXT:    store %0 to [[SELF_BOX]] : $*τ_0_0
   // CHECK-NEXT:    // function_ref witnesses.ConformsWithMoreGeneric.classes
   // CHECK-NEXT:    [[WITNESS_FN:%.*]] = function_ref @_TFV9witnesses23ConformsWithMoreGeneric7classes{{.*}} : $@convention(method) <τ_0_0> (@in τ_0_0, @inout ConformsWithMoreGeneric) -> @out τ_0_0
-  // CHECK-NEXT:    [[RESULT_BOX:%.*]] = alloc_stack $A2
-  // CHECK-NEXT:    [[RESULT:%.*]] = apply [[WITNESS_FN]]<A2>([[RESULT_BOX]], [[SELF_BOX]], %1) : $@convention(method) <τ_0_0> (@in τ_0_0, @inout ConformsWithMoreGeneric) -> @out τ_0_0
-  // CHECK-NEXT:    [[RESULT:%.*]] = load [[RESULT_BOX]] : $*A2
-  // CHECK-NEXT:    dealloc_stack [[RESULT_BOX]] : $*A2
-  // CHECK-NEXT:    dealloc_stack [[SELF_BOX]] : $*A2
-  // CHECK-NEXT:    return [[RESULT]] : $A2
+  // CHECK-NEXT:    [[RESULT_BOX:%.*]] = alloc_stack $τ_0_0
+  // CHECK-NEXT:    [[RESULT:%.*]] = apply [[WITNESS_FN]]<τ_0_0>([[RESULT_BOX]], [[SELF_BOX]], %1) : $@convention(method) <τ_0_0> (@in τ_0_0, @inout ConformsWithMoreGeneric) -> @out τ_0_0
+  // CHECK-NEXT:    [[RESULT:%.*]] = load [[RESULT_BOX]] : $*τ_0_0
+  // CHECK-NEXT:    dealloc_stack [[RESULT_BOX]] : $*τ_0_0
+  // CHECK-NEXT:    dealloc_stack [[SELF_BOX]] : $*τ_0_0
+  // CHECK-NEXT:    return [[RESULT]] : $τ_0_0
   // CHECK-NEXT:  }
 }
 func <~> <J: Y, K: Y>(_ x: J, y: K) -> K { return y }
@@ -423,14 +423,14 @@ protocol GenericParameterNameCollisionProtocol {
 struct GenericParameterNameCollision<T: HasAssoc> :
     GenericParameterNameCollisionProtocol {
 
-  // CHECK-LABEL: sil hidden [transparent] [thunk] @_TTW{{.*}}GenericParameterNameCollision{{.*}}GenericParameterNameCollisionProtocol{{.*}}foo{{.*}} : $@convention(witness_method) <T where T : HasAssoc><T1> (@in T1, @in_guaranteed GenericParameterNameCollision<T>) -> () {
-  // CHECK:       bb0(%0 : $*T1, %1 : $*GenericParameterNameCollision<T>):
-  // CHECK:         apply {{%.*}}<T, T1, T.Assoc>
+  // CHECK-LABEL: sil hidden [transparent] [thunk] @_TTW{{.*}}GenericParameterNameCollision{{.*}}GenericParameterNameCollisionProtocol{{.*}}foo{{.*}} : $@convention(witness_method) <τ_0_0 where τ_0_0 : HasAssoc><τ_1_0> (@in τ_1_0, @in_guaranteed GenericParameterNameCollision<τ_0_0>) -> () {
+  // CHECK:       bb0(%0 : $*τ_1_0, %1 : $*GenericParameterNameCollision<τ_0_0>):
+  // CHECK:         apply {{%.*}}<τ_0_0, τ_1_0, τ_0_0.Assoc>
   func foo<U>(_ x: U) {}
 
-  // CHECK-LABEL: sil hidden [transparent] [thunk] @_TTW{{.*}}GenericParameterNameCollision{{.*}}GenericParameterNameCollisionProtocol{{.*}}bar{{.*}} : $@convention(witness_method) <T where T : HasAssoc><T1> (@owned @callee_owned (@in T1) -> @out T.Assoc, @in_guaranteed GenericParameterNameCollision<T>) -> () {
-  // CHECK:       bb0(%0 : $@callee_owned (@in T1) -> @out T.Assoc, %1 : $*GenericParameterNameCollision<T>):
-  // CHECK:         apply {{%.*}}<T, T1, T.Assoc>
+  // CHECK-LABEL: sil hidden [transparent] [thunk] @_TTW{{.*}}GenericParameterNameCollision{{.*}}GenericParameterNameCollisionProtocol{{.*}}bar{{.*}} : $@convention(witness_method) <τ_0_0 where τ_0_0 : HasAssoc><τ_1_0> (@owned @callee_owned (@in τ_1_0) -> @out τ_0_0.Assoc, @in_guaranteed GenericParameterNameCollision<τ_0_0>) -> () {
+  // CHECK:       bb0(%0 : $@callee_owned (@in τ_1_0) -> @out τ_0_0.Assoc, %1 : $*GenericParameterNameCollision<τ_0_0>):
+  // CHECK:         apply {{%.*}}<τ_0_0, τ_1_0, τ_0_0.Assoc>
   func bar<V>(_ x: (V) -> T.Assoc) {}
 }
 
@@ -489,17 +489,17 @@ class CrashableBase {
   func crash() {}
 }
 
-// CHECK-LABEL: sil hidden [transparent] [thunk] @_TTWurGC9witnesses16GenericCrashablex_S_9CrashableS_FS1_5crashfT_T_ : $@convention(witness_method) <T> (@in_guaranteed GenericCrashable<T>) -> ()
-// CHECK:       bb0(%0 : $*GenericCrashable<T>):
-// CHECK-NEXT: [[BOX:%.*]] = alloc_stack $GenericCrashable<T>
-// CHECK-NEXT: copy_addr %0 to [initialization] [[BOX]] : $*GenericCrashable<T>
-// CHECK-NEXT: [[SELF:%.*]] = load [[BOX]] : $*GenericCrashable<T>
-// CHECK-NEXT: [[BASE:%.*]] = upcast [[SELF]] : $GenericCrashable<T> to $CrashableBase
+// CHECK-LABEL: sil hidden [transparent] [thunk] @_TTWurGC9witnesses16GenericCrashablex_S_9CrashableS_FS1_5crashfT_T_ : $@convention(witness_method) <τ_0_0> (@in_guaranteed GenericCrashable<τ_0_0>) -> ()
+// CHECK:       bb0(%0 : $*GenericCrashable<τ_0_0>):
+// CHECK-NEXT: [[BOX:%.*]] = alloc_stack $GenericCrashable<τ_0_0>
+// CHECK-NEXT: copy_addr %0 to [initialization] [[BOX]] : $*GenericCrashable<τ_0_0>
+// CHECK-NEXT: [[SELF:%.*]] = load [[BOX]] : $*GenericCrashable<τ_0_0>
+// CHECK-NEXT: [[BASE:%.*]] = upcast [[SELF]] : $GenericCrashable<τ_0_0> to $CrashableBase
 // CHECK-NEXT: [[FN:%.*]] = class_method [[BASE]] : $CrashableBase, #CrashableBase.crash!1 : (CrashableBase) -> () -> () , $@convention(method) (@guaranteed CrashableBase) -> ()
 // CHECK-NEXT: apply [[FN]]([[BASE]]) : $@convention(method) (@guaranteed CrashableBase) -> ()
 // CHECK-NEXT: [[RESULT:%.*]] = tuple ()
-// CHECK-NEXT: destroy_value [[SELF]] : $GenericCrashable<T>
-// CHECK-NEXT: dealloc_stack [[BOX]] : $*GenericCrashable<T>
+// CHECK-NEXT: destroy_value [[SELF]] : $GenericCrashable<τ_0_0>
+// CHECK-NEXT: dealloc_stack [[BOX]] : $*GenericCrashable<τ_0_0>
 // CHECK-NEXT: return [[RESULT]] : $()
 
 class GenericCrashable<T> : CrashableBase, Crashable {}

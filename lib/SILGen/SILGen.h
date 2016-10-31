@@ -315,9 +315,9 @@ public:
   SILFunction *emitProtocolWitness(ProtocolConformance *conformance,
                                    SILLinkage linkage,
                                    SILDeclRef requirement,
-                                   SILDeclRef witness,
+                                   SILDeclRef witnessRef,
                                    IsFreeFunctionWitness_t isFree,
-                                   ArrayRef<Substitution> witnessSubs);
+                                   Witness witness);
 
   /// Emit the default witness table for a resilient protocol.
   void emitDefaultWitnessTable(ProtocolDecl *protocol);
