@@ -714,8 +714,8 @@ namespace {
       case LoweringStyle::Shallow:
         Fn = &TypeLowering::emitDestroyValue;
         break;
-      case LoweringStyle::DeepNoEnum:
-        Fn = &TypeLowering::emitLoweredDestroyValueDeepNoEnum;
+      case LoweringStyle::Deep:
+        Fn = &TypeLowering::emitLoweredDestroyValueDeep;
         break;
       }
 

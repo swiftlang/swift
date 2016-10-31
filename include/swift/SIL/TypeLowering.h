@@ -230,10 +230,7 @@ public:
   virtual void emitDestroyRValue(SILBuilder &B, SILLocation loc,
                                  SILValue value) const = 0;
 
-  enum class LoweringStyle {
-    Shallow,
-    DeepNoEnum
-  };
+  enum class LoweringStyle { Shallow, Deep };
 
   /// Emit a lowered 'release_value' operation.
   ///
@@ -261,9 +258,9 @@ public:
   /// Emit a lowered 'release_value' operation.
   ///
   /// This type must be loadable.
-  void emitLoweredDestroyValueDeepNoEnum(SILBuilder &B, SILLocation loc,
-                                         SILValue value) const {
-    emitLoweredDestroyValue(B, loc, value, LoweringStyle::DeepNoEnum);
+  void emitLoweredDestroyValueDeep(SILBuilder &B, SILLocation loc,
+                                   SILValue value) const {
+    emitLoweredDestroyValue(B, loc, value, LoweringStyle::Deep);
   }
 
   /// Given a primitively loaded value of this type (which must be
@@ -295,9 +292,9 @@ public:
   /// Emit a lowered 'retain_value' operation.
   ///
   /// This type must be loadable.
-  SILValue emitLoweredCopyValueDeepNoEnum(SILBuilder &B, SILLocation loc,
-                                          SILValue value) const {
-    return emitLoweredCopyValue(B, loc, value, LoweringStyle::DeepNoEnum);
+  SILValue emitLoweredCopyValueDeep(SILBuilder &B, SILLocation loc,
+                                    SILValue value) const {
+    return emitLoweredCopyValue(B, loc, value, LoweringStyle::Deep);
   }
 
   /// Given a primitively loaded value of this type (which must be
