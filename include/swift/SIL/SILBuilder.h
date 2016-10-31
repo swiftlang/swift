@@ -459,6 +459,12 @@ public:
 
   LoadInst *createLoad(SILLocation Loc, SILValue LV,
                        LoadOwnershipQualifier Qualifier) {
+    assert((Qualifier != LoadOwnershipQualifier::Unqualified) ||
+           F.hasUnqualifiedOwnership() &&
+               "Unqualified inst in qualified function");
+    assert((Qualifier == LoadOwnershipQualifier::Unqualified) ||
+           F.hasQualifiedOwnership() &&
+               "Qualified inst in unqualified function");
     assert(LV->getType().isLoadable(F.getModule()));
     return insert(new (F.getModule())
                       LoadInst(getSILDebugLocation(Loc), LV, Qualifier));
@@ -481,6 +487,12 @@ public:
 
   StoreInst *createStore(SILLocation Loc, SILValue Src, SILValue DestAddr,
                          StoreOwnershipQualifier Qualifier) {
+    assert((Qualifier != StoreOwnershipQualifier::Unqualified) ||
+           F.hasUnqualifiedOwnership() &&
+               "Unqualified inst in qualified function");
+    assert((Qualifier == StoreOwnershipQualifier::Unqualified) ||
+           F.hasQualifiedOwnership() &&
+               "Qualified inst in unqualified function");
     return insert(new (F.getModule()) StoreInst(getSILDebugLocation(Loc), Src,
                                                 DestAddr, Qualifier));
   }
