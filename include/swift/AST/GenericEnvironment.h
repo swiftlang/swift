@@ -93,7 +93,7 @@ public:
 
   void dump() const;
 };
-  
+
 } // end namespace swift
 
 #endif // SWIFT_AST_GENERIC_ENVIRONMENT_H

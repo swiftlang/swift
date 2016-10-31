@@ -107,13 +107,13 @@ class Type {
   TypeBase *Ptr;
 public:
   /*implicit*/ Type(TypeBase *P = 0) : Ptr(P) {}
-  
+
   TypeBase *getPointer() const { return Ptr; }
-  
+
   bool isNull() const { return Ptr == 0; }
-  
+
   TypeBase *operator->() const { return Ptr; }
-  
+
   explicit operator bool() const { return Ptr != 0; }
 
   /// Walk this type.
@@ -217,7 +217,7 @@ public:
   /// join of D and A (or D and B, or D and C) because there is no common
   /// superclass. One would have to jump to an existential (e.g., \c AnyObject)
   /// to find a common type.
-  /// 
+  ///
   /// \returns the join of the two types, if there is a concrete type that can
   /// express the join, or a null type if the only join would be a more-general
   /// existential type (e.g., \c Any).
@@ -342,7 +342,7 @@ public:
   CanType getReferenceStorageReferent() const {
     return getReferenceStorageReferentImpl(*this);
   }
-  
+
   CanType getLValueOrInOutObjectType() const {
     return getLValueOrInOutObjectTypeImpl(*this);
   }
@@ -444,29 +444,29 @@ template <class X, class P>
 inline CanTypeWrapper<X> dyn_cast_or_null(CanTypeWrapper<P> type) {
   return CanTypeWrapper<X>(dyn_cast_or_null<X>(type.getPointer()));
 }
-  
+
 class GenericTypeParamType;
-  
+
 /// A reference to a canonical generic signature.
 class CanGenericSignature {
   GenericSignature *Signature;
-  
+
 public:
   CanGenericSignature() : Signature(nullptr) {}
   CanGenericSignature(std::nullptr_t) : Signature(nullptr) {}
-  
+
   // in Decl.h
   explicit CanGenericSignature(GenericSignature *Signature);
   ArrayRef<CanTypeWrapper<GenericTypeParamType>> getGenericParams() const;
-  
+
   GenericSignature *operator->() const {
     return Signature;
   }
-  
+
   operator GenericSignature *() const {
     return Signature;
   }
-  
+
   GenericSignature *getPointer() const {
     return Signature;
   }
@@ -490,7 +490,7 @@ namespace llvm {
   };
   template<> struct simplify_type< ::swift::Type>
     : public simplify_type<const ::swift::Type> {};
-  
+
   // Type hashes just like pointers.
   template<> struct DenseMapInfo<swift::Type> {
     static swift::Type getEmptyKey() {
@@ -529,7 +529,7 @@ namespace llvm {
     }
     enum { NumLowBitsAvailable = swift::TypeAlignInBits };
   };
-  
+
   template<>
   class PointerLikeTypeTraits<swift::CanType> :
     public PointerLikeTypeTraits<swift::Type> {
@@ -550,7 +550,7 @@ namespace llvm {
     }
     enum { NumLowBitsAvailable = swift::TypeAlignInBits };
   };
-  
+
 } // end namespace llvm
 
 #endif

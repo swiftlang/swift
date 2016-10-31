@@ -97,7 +97,7 @@ namespace swift {
 
     /// D'tor.
     virtual ~SILAnalysis() {}
-    
+
     /// Can be used to retrieve other analysis passes from \p PM, which this
     /// analysis depends on.
     virtual void initialize(SILPassManager *PM) { }
@@ -125,7 +125,7 @@ namespace swift {
       // analysis.
       invalidate(F, K);
     }
-    
+
     /// Notify the analysis about a newly created function.
     virtual void notifyAnalysisOfFunction(SILFunction *F) {}
 

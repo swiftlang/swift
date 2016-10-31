@@ -96,7 +96,7 @@ public:
 
     /// This type expression contains an UnresolvedType.
     HasUnresolvedType    = 0x08,
-   
+
     /// This type expression contains an InOutType other than as a
     /// function input.
     HasInOut             = 0x10,
@@ -148,7 +148,7 @@ public:
   /// Does a type with these properties structurally contain an
   /// inout, except as the parameter of a function?
   bool hasInOut() const { return Bits & HasInOut; }
-  
+
   /// Is a type with these properties an lvalue?
   bool isLValue() const { return Bits & IsLValue; }
 
@@ -205,7 +205,7 @@ public:
 inline RecursiveTypeProperties operator~(RecursiveTypeProperties::Property P) {
   return RecursiveTypeProperties(~unsigned(P));
 }
-  
+
 /// The result of a type trait check.
 enum class TypeTraitResult {
   /// The type cannot have the trait.
@@ -234,11 +234,11 @@ enum class OverrideMatchMode {
 
 /// TypeBase - Base class for all types in Swift.
 class alignas(1 << TypeAlignInBits) TypeBase {
-  
+
   friend class ASTContext;
   TypeBase(const TypeBase&) = delete;
   void operator=(const TypeBase&) = delete;
-  
+
   /// CanonicalType - This field is always set to the ASTContext for canonical
   /// types, and is otherwise lazily populated by ASTContext when the canonical
   /// form of a non-canonical type is requested.
@@ -312,7 +312,7 @@ protected:
   };
   enum { NumAnyMetatypeTypeBits = NumTypeBaseBits + 2 };
   static_assert(NumAnyMetatypeTypeBits <= 32, "fits in an unsigned");
-  
+
   union {
     TypeBaseBitfields TypeBaseBits;
     ErrorTypeBitfields ErrorTypeBits;
@@ -342,11 +342,11 @@ public:
 
   /// isCanonical - Return true if this is a canonical type.
   bool isCanonical() const { return CanonicalType.is<const ASTContext *>(); }
-  
+
   /// hasCanonicalTypeComputed - Return true if we've already computed a
   /// canonical version of this type.
   bool hasCanonicalTypeComputed() const { return !CanonicalType.isNull(); }
-  
+
   /// getCanonicalType - Return the canonical version of this type, which has
   /// sugar from all levels stripped off.
   CanType getCanonicalType();
@@ -360,17 +360,17 @@ public:
     return const_cast<ASTContext&>(*getCanonicalType()->
                                    CanonicalType.get<const ASTContext *>());
   }
-  
+
   /// isEqual - Return true if these two types are equal, ignoring sugar.
   bool isEqual(Type Other);
-  
+
   /// isSpelledLike - Return true if these two types share a sugared spelling.
   bool isSpelledLike(Type Other);
-  
+
   /// getDesugaredType - If this type is a sugared type, remove all levels of
   /// sugar until we get down to a non-sugar type.
   TypeBase *getDesugaredType();
-  
+
   /// If this type is a (potentially sugared) type of the specified kind, remove
   /// the minimal amount of sugar required to get a pointer to the type.
   template <typename T>
@@ -384,7 +384,7 @@ public:
     static_assert(!isSugaredType<T>(), "isa desugars types");
     return isa<T>(getDesugaredType());
   }
-  
+
   template <typename T>
   T *castTo() {
     static_assert(!isSugaredType<T>(), "castTo desugars types");
@@ -424,10 +424,10 @@ public:
   ///   - a class-bounded existential type
   ///   - a dynamic Self type
   bool isAnyClassReferenceType();
-  
+
   /// allowsOwnership() - Are variables of this type permitted to have
   /// ownership attributes?
-  bool allowsOwnership();  
+  bool allowsOwnership();
 
   /// \brief Determine whether this type involves a type variable.
   bool hasTypeVariable() const {
@@ -539,7 +539,7 @@ public:
   /// class-bounded existential type whose required conformances are
   /// all @objc.  Such types are compatible with ObjC.
   bool isObjCExistentialType();
-  
+
   /// Determines whether this type is an existential type with a class protocol
   /// bound.
   bool isClassExistentialType();
@@ -572,7 +572,7 @@ public:
     PointerTypeKind Ignore;
     return getAnyPointerElementType(Ignore);
   }
-  
+
   /// \brief Determine whether the given type is "specialized", meaning that
   /// it involves generic types for which generic arguments have been provided.
   /// For example, the types Vector<Int> and Vector<Int>.Element are both
@@ -615,15 +615,15 @@ public:
   /// \brief If this is a class type or a bound generic class type, returns the
   /// (possibly generic) class.
   ClassDecl *getClassOrBoundGenericClass();
-  
+
   /// \brief If this is a struct type or a bound generic struct type, returns
   /// the (possibly generic) class.
   StructDecl *getStructOrBoundGenericStruct();
-  
+
   /// \brief If this is an enum or a bound generic enum type, returns the
   /// (possibly generic) enum.
   EnumDecl *getEnumOrBoundGenericEnum();
-  
+
   /// \brief Determine whether this type may have a superclass, which holds for
   /// classes, bound generic classes, and archetypes that are only instantiable
   /// with a class type.
@@ -637,7 +637,7 @@ public:
   /// \returns The superclass of this type, or a null type if it has no
   ///          superclass.
   Type getSuperclass(LazyResolver *resolver);
-  
+
   /// \brief True if this type is the exact superclass of another type.
   ///
   /// \param ty       The potential subclass.
@@ -757,7 +757,7 @@ public:
   GenericTypeDecl *getAnyGeneric();
 
   /// getUnlabeledType - Retrieve a version of this type with all labels
-  /// removed at every level. For example, given a tuple type 
+  /// removed at every level. For example, given a tuple type
   /// \code
   /// (p : (x : int, y : int))
   /// \endcode
@@ -909,7 +909,7 @@ public:
 
   /// Whether this is the AnyObject type.
   bool isAnyObject();
-  
+
   /// Whether this is an empty existential composition ("{}").
   bool isEmptyExistentialComposition();
 
@@ -927,11 +927,11 @@ public:
 
   /// Return the name of the type as a string, for use in diagnostics only.
   std::string getString(const PrintOptions &PO = PrintOptions()) const;
-  
+
   /// Return whether this type is or can be substituted for a bridgeable
   /// object type.
   TypeTraitResult canBeClass();
-  
+
   /// Returns true if the type conforms to protocols using witnesses from the
   /// environment or from within the value. Generic parameters and existentials
   /// meet this criteria. In these cases we represent the
@@ -1012,7 +1012,7 @@ public:
 };
 DEFINE_EMPTY_CAN_TYPE_WRAPPER(UnresolvedType, Type)
 
-  
+
 /// BuiltinType - An abstract class for all the builtin types.
 class BuiltinType : public TypeBase {
 protected:
@@ -1146,30 +1146,30 @@ class BuiltinIntegerWidth {
     Least_SpecialValue = ~2U,
     /// The size of a pointer on the target system.
     PointerWidth = ~0U,
-    
+
     /// Inhabitants stolen for use as DenseMap special values.
     DenseMapEmpty = ~1U,
     DenseMapTombstone = ~2U,
   };
-  
+
   unsigned RawValue;
-  
+
   friend struct llvm::DenseMapInfo<swift::BuiltinIntegerWidth>;
-  
+
   /// Private constructor from a raw symbolic value.
   explicit BuiltinIntegerWidth(unsigned RawValue) : RawValue(RawValue) {}
 public:
   BuiltinIntegerWidth() : RawValue(0) {}
-  
+
   static BuiltinIntegerWidth fixed(unsigned bitWidth) {
     assert(bitWidth < Least_SpecialValue && "invalid bit width");
     return BuiltinIntegerWidth(bitWidth);
   }
-  
+
   static BuiltinIntegerWidth pointer() {
     return BuiltinIntegerWidth(PointerWidth);
   }
-  
+
   /// Is this a fixed width?
   bool isFixedWidth() const { return RawValue < Least_SpecialValue; }
 
@@ -1178,10 +1178,10 @@ public:
     assert(isFixedWidth() && "not fixed-width");
     return RawValue;
   }
-  
+
   /// Is this the abstract target pointer width?
   bool isPointerWidth() const { return RawValue == PointerWidth; }
-  
+
   /// Get the least supported value for the width.
   ///
   /// FIXME: This should be build-configuration-dependent.
@@ -1192,7 +1192,7 @@ public:
       return 32;
     llvm_unreachable("impossible width value");
   }
-  
+
   /// Get the greatest supported value for the width.
   ///
   /// FIXME: This should be build-configuration-dependent.
@@ -1203,7 +1203,7 @@ public:
       return 64;
     llvm_unreachable("impossible width value");
   }
-  
+
   friend bool operator==(BuiltinIntegerWidth a, BuiltinIntegerWidth b) {
     return a.RawValue == b.RawValue;
   }
@@ -1221,49 +1221,49 @@ private:
   BuiltinIntegerWidth Width;
   BuiltinIntegerType(BuiltinIntegerWidth BitWidth, const ASTContext &C)
     : BuiltinType(TypeKind::BuiltinInteger, C), Width(BitWidth) {}
-  
+
 public:
   /// Get a builtin integer type.
   static BuiltinIntegerType *get(BuiltinIntegerWidth BitWidth,
                                  const ASTContext &C);
-  
+
   /// Get a builtin integer type of fixed width.
   static BuiltinIntegerType *get(unsigned BitWidth, const ASTContext &C) {
     return get(BuiltinIntegerWidth::fixed(BitWidth), C);
   }
-  
+
   /// Get the target-pointer-width builtin integer type.
   static BuiltinIntegerType *getWordType(const ASTContext &C) {
     return get(BuiltinIntegerWidth::pointer(), C);
   }
-  
+
   /// Return the bit width of the integer.
   BuiltinIntegerWidth getWidth() const {
     return Width;
   }
-  
+
   /// Is the integer fixed-width?
   bool isFixedWidth() const {
     return Width.isFixedWidth();
   }
-  
+
   /// Is the integer fixed-width with the given width?
   bool isFixedWidth(unsigned width) const {
     return Width.isFixedWidth() && Width.getFixedWidth() == width;
   }
-  
+
   /// Get the fixed integer width. Fails if the integer has abstract width.
   unsigned getFixedWidth() const {
     return Width.getFixedWidth();
   }
-  
+
   /// Return the least supported width of the integer.
   ///
   /// FIXME: This should be build-configuration-dependent.
   unsigned getLeastWidth() const {
     return Width.getLeastWidth();
   }
-  
+
   /// Return the greatest supported width of the integer.
   ///
   /// FIXME: This should be build-configuration-dependent.
@@ -1276,7 +1276,7 @@ public:
   }
 };
 DEFINE_EMPTY_CAN_TYPE_WRAPPER(BuiltinIntegerType, BuiltinType)
-  
+
 class BuiltinFloatType : public BuiltinType {
   friend class ASTContext;
 public:
@@ -1286,12 +1286,12 @@ public:
   };
 private:
   FPKind Kind;
-  
+
   BuiltinFloatType(FPKind Kind, const ASTContext &C)
     : BuiltinType(TypeKind::BuiltinFloat, C), Kind(Kind) {}
 public:
-  
-  /// getFPKind - Get the 
+
+  /// getFPKind - Get the
   FPKind getFPKind() const {
     return Kind;
   }
@@ -1315,13 +1315,13 @@ public:
   }
 };
 DEFINE_EMPTY_CAN_TYPE_WRAPPER(BuiltinFloatType, BuiltinType)
-  
+
 /// NameAliasType - An alias type is a name for another type, just like a
 /// typedef in C.
 class NameAliasType : public TypeBase {
   friend class TypeAliasDecl;
   // NameAliasType are never canonical.
-  NameAliasType(TypeAliasDecl *d) 
+  NameAliasType(TypeAliasDecl *d)
     : TypeBase(TypeKind::NameAlias, nullptr, RecursiveTypeProperties()),
       TheDecl(d) {}
   TypeAliasDecl *const TheDecl;
@@ -1330,7 +1330,7 @@ public:
   TypeAliasDecl *getDecl() const { return TheDecl; }
 
   using TypeBase::setRecursiveProperties;
-   
+
   /// Remove one level of top-level sugar from this type.
   TypeBase *getSinglyDesugaredType();
 
@@ -1500,7 +1500,7 @@ typedef ArrayRefView<TupleTypeElt,CanType,getCanTupleEltType>
 ///
 class TupleType : public TypeBase, public llvm::FoldingSetNode {
   const ArrayRef<TupleTypeElt> Elements;
-  
+
 public:
   /// get - Return the uniqued tuple type with the specified elements.
   /// Returns a ParenType instead if there is exactly one element which
@@ -1526,16 +1526,16 @@ public:
   TupleEltTypeArrayRef getElementTypes() const {
     return TupleEltTypeArrayRef(getElements());
   }
-  
+
   /// getNamedElementId - If this tuple has an element with the specified name,
   /// return the element index, otherwise return -1.
   int getNamedElementId(Identifier I) const;
-  
+
   /// getElementForScalarInit - If a tuple of this type can be initialized with
   /// a scalar, return the element number that the scalar is assigned to.  If
   /// not, return -1.
   int getElementForScalarInit() const;
-  
+
   /// If this tuple has a varargs element to it, return the base type of the
   /// varargs element (i.e., if it is "Int...", this returns Int, not [Int]).
   /// Otherwise, this returns Type().
@@ -1549,9 +1549,9 @@ public:
   void Profile(llvm::FoldingSetNodeID &ID) {
     Profile(ID, Elements);
   }
-  static void Profile(llvm::FoldingSetNodeID &ID, 
+  static void Profile(llvm::FoldingSetNodeID &ID,
                       ArrayRef<TupleTypeElt> Elements);
-  
+
 private:
   TupleType(ArrayRef<TupleTypeElt> elements, const ASTContext *CanCtx,
             RecursiveTypeProperties properties)
@@ -1625,9 +1625,9 @@ class BoundGenericType : public TypeBase, public llvm::FoldingSetNode {
 
   /// \brief The type of the parent, in which this type is nested.
   Type Parent;
-  
+
   ArrayRef<Type> GenericArgs;
-  
+
 
 protected:
   BoundGenericType(TypeKind theKind, NominalTypeDecl *theDecl, Type parent,
@@ -1745,7 +1745,7 @@ private:
   BoundGenericStructType(StructDecl *theDecl, Type parent,
                          ArrayRef<Type> genericArgs, const ASTContext *context,
                          RecursiveTypeProperties properties)
-    : BoundGenericType(TypeKind::BoundGenericStruct, 
+    : BoundGenericType(TypeKind::BoundGenericStruct,
                        reinterpret_cast<NominalTypeDecl*>(theDecl), parent,
                        genericArgs, context, properties) {}
   friend class BoundGenericType;
@@ -1842,7 +1842,7 @@ private:
 DEFINE_EMPTY_CAN_TYPE_WRAPPER(EnumType, NominalType)
 
 /// StructType - This represents the type declared by a StructDecl.
-class StructType : public NominalType, public llvm::FoldingSetNode {  
+class StructType : public NominalType, public llvm::FoldingSetNode {
 public:
   /// getDecl() - Returns the decl which declares this type.
   StructDecl *getDecl() const {
@@ -1862,7 +1862,7 @@ public:
   static bool classof(const TypeBase *T) {
     return T->getKind() == TypeKind::Struct;
   }
-  
+
 private:
   StructType(StructDecl *TheDecl, Type Parent, const ASTContext &Ctx,
              RecursiveTypeProperties properties);
@@ -1870,7 +1870,7 @@ private:
 DEFINE_EMPTY_CAN_TYPE_WRAPPER(StructType, NominalType)
 
 /// ClassType - This represents the type declared by a ClassDecl.
-class ClassType : public NominalType, public llvm::FoldingSetNode {  
+class ClassType : public NominalType, public llvm::FoldingSetNode {
 public:
   /// getDecl() - Returns the decl which declares this type.
   ClassDecl *getDecl() const {
@@ -1890,7 +1890,7 @@ public:
   static bool classof(const TypeBase *T) {
     return T->getKind() == TypeKind::Class;
   }
-  
+
 private:
   ClassType(ClassDecl *TheDecl, Type Parent, const ASTContext &Ctx,
             RecursiveTypeProperties properties);
@@ -1914,7 +1914,7 @@ enum class MetatypeRepresentation : char {
   /// struct and enum members is completely static.
   Thin,
   /// A thick metatype refers to a complete metatype representation
-  /// that allows introspection and dynamic dispatch. 
+  /// that allows introspection and dynamic dispatch.
   ///
   /// Thick metatypes are used for class and existential metatypes,
   /// which permit dynamic behavior.
@@ -1943,7 +1943,7 @@ public:
   bool hasRepresentation() const {
     return AnyMetatypeTypeBits.Representation > 0;
   }
-  
+
   /// Retrieve the metatype representation.
   ///
   /// The metatype representation is a SIL-only property. Thin
@@ -1987,7 +1987,7 @@ public:
   static MetatypeType *get(Type T, const ASTContext &C) {
     return get(T, None, C);
   }
-  
+
   /// Return the MetatypeType for the specified type declaration with
   /// the given representation.
   ///
@@ -2002,7 +2002,7 @@ public:
   static bool classof(const TypeBase *T) {
     return T->getKind() == TypeKind::Metatype;
   }
-  
+
 private:
   MetatypeType(Type T, const ASTContext *C,
                RecursiveTypeProperties properties,
@@ -2055,7 +2055,7 @@ public:
   static bool classof(const TypeBase *T) {
     return T->getKind() == TypeKind::ExistentialMetatype;
   }
-  
+
 private:
   ExistentialMetatypeType(Type T, const ASTContext *C,
                           RecursiveTypeProperties properties,
@@ -2074,13 +2074,13 @@ BEGIN_CAN_TYPE_WRAPPER(ExistentialMetatypeType, AnyMetatypeType)
     getInstanceType().getAnyExistentialTypeProtocols(protocols);
   }
 END_CAN_TYPE_WRAPPER(ExistentialMetatypeType, AnyMetatypeType)
-  
+
 /// ModuleType - This is the type given to a module value, e.g. the "Builtin" in
 /// "Builtin.int".  This is typically given to a ModuleExpr, but can also exist
 /// on ParenExpr, for example.
 class ModuleType : public TypeBase {
   ModuleDecl *const TheModule;
-  
+
 public:
   /// get - Return the ModuleType for the specified module.
   static ModuleType *get(ModuleDecl *M);
@@ -2091,7 +2091,7 @@ public:
   static bool classof(const TypeBase *T) {
     return T->getKind() == TypeKind::Module;
   }
-  
+
 private:
   ModuleType(ModuleDecl *M, const ASTContext &Ctx)
     : TypeBase(TypeKind::Module, &Ctx, // Always canonical
@@ -2100,7 +2100,7 @@ private:
   }
 };
 DEFINE_EMPTY_CAN_TYPE_WRAPPER(ModuleType, Type)
-  
+
 /// The type given to a dynamic \c Self return type.
 ///
 /// Example:
@@ -2110,7 +2110,7 @@ DEFINE_EMPTY_CAN_TYPE_WRAPPER(ModuleType, Type)
 /// };
 /// \endcode
 ///
-/// In this example, \c Self is represented by a 
+/// In this example, \c Self is represented by a
 /// \c DynamicSelfType node whose self type is \c X.
 class DynamicSelfType : public TypeBase {
   Type SelfType;
@@ -2126,7 +2126,7 @@ public:
   static bool classof(const TypeBase *T) {
     return T->getKind() == TypeKind::DynamicSelf;
   }
-  
+
 private:
   DynamicSelfType(Type selfType, const ASTContext &ctx,
                   RecursiveTypeProperties properties)
@@ -2159,17 +2159,17 @@ enum class FunctionTypeRepresentation : uint8_t {
   /// A "thick" function that carries a context pointer to reference captured
   /// state. The default native function representation.
   Swift = 0,
-  
+
   /// A thick function that is represented as an Objective-C block.
   Block,
-  
+
   /// A "thin" function that needs no context.
   Thin,
-  
+
   /// A C function pointer, which is thin and also uses the C calling
   /// convention.
   CFunctionPointer,
-  
+
   /// The value of the greatest AST function representation.
   Last = CFunctionPointer,
 };
@@ -2186,32 +2186,32 @@ enum class FunctionTypeRepresentation : uint8_t {
 enum class SILFunctionTypeRepresentation : uint8_t {
   /// A freestanding thick function.
   Thick = uint8_t(FunctionTypeRepresentation::Swift),
-  
+
   /// A thick function that is represented as an Objective-C block.
   Block = uint8_t(FunctionTypeRepresentation::Block),
-  
+
   /// A freestanding thin function that needs no context.
   Thin = uint8_t(FunctionTypeRepresentation::Thin),
-  
+
   /// A C function pointer, which is thin and also uses the C calling
   /// convention.
   CFunctionPointer = uint8_t(FunctionTypeRepresentation::CFunctionPointer),
-  
+
   /// The value of the greatest AST function representation.
   LastAST = CFunctionPointer,
 
   /// The value of the least SIL-only function representation.
   FirstSIL = 8,
-  
+
   /// A Swift instance method.
   Method = FirstSIL,
-  
+
   /// An Objective-C method.
   ObjCMethod,
-  
+
   /// A Swift protocol witness.
   WitnessMethod,
-  
+
   /// A closure invocation function that has not been bound to a context.
   Closure,
 };
@@ -2268,7 +2268,7 @@ class AnyFunctionType : public TypeBase {
 
 public:
   using Representation = FunctionTypeRepresentation;
-  
+
   /// \brief A class which abstracts out some details necessary for
   /// making a call.
   class ExtInfo {
@@ -2289,7 +2289,7 @@ public:
     ExtInfo(unsigned Bits) : Bits(static_cast<uint16_t>(Bits)) {}
 
     friend class AnyFunctionType;
-    
+
   public:
     // Constructor with all defaults.
     ExtInfo() : Bits(0) {
@@ -2350,7 +2350,7 @@ public:
         return false;
       }
     }
-    
+
     // Note that we don't have setters. That is by design, use
     // the following with methods instead of mutating these objects.
     ExtInfo withRepresentation(Representation Rep) const {
@@ -2379,7 +2379,7 @@ public:
     uint16_t getFuncAttrKey() const {
       return Bits;
     }
-    
+
     /// Put a SIL representation in the ExtInfo.
     ///
     /// SIL type lowering transiently generates AST function types with SIL
@@ -2389,7 +2389,7 @@ public:
       return ExtInfo((Bits & ~RepresentationMask)
                      | (unsigned)Rep);
     }
-    
+
     SILFunctionTypeRepresentation getSILRepresentation() const {
       unsigned rawRep = Bits & RepresentationMask;
       return SILFunctionTypeRepresentation(rawRep);
@@ -2424,7 +2424,7 @@ public:
   Representation getRepresentation() const {
     return getExtInfo().getRepresentation();
   }
-  
+
   /// \brief True if this type allows an implicit conversion from a function
   /// argument expression of type T to a function of type () -> T.
   bool isAutoClosure() const {
@@ -2455,7 +2455,7 @@ BEGIN_CAN_TYPE_WRAPPER(AnyFunctionType, Type)
   typedef AnyFunctionType::ExtInfo ExtInfo;
   PROXY_CAN_TYPE_SIMPLE_GETTER(getInput)
   PROXY_CAN_TYPE_SIMPLE_GETTER(getResult)
-  
+
   CanAnyFunctionType withExtInfo(ExtInfo info) const {
     return CanAnyFunctionType(getPointer()->withExtInfo(info));
   }
@@ -2478,7 +2478,7 @@ public:
   static bool classof(const TypeBase *T) {
     return T->getKind() == TypeKind::Function;
   }
-  
+
 private:
   FunctionType(Type Input, Type Result,
                RecursiveTypeProperties properties,
@@ -2492,7 +2492,7 @@ BEGIN_CAN_TYPE_WRAPPER(FunctionType, AnyFunctionType)
                              const ExtInfo &info) {
     return CanFunctionType(FunctionType::get(input, result, info));
   }
-  
+
   CanFunctionType withExtInfo(ExtInfo info) const {
     return CanFunctionType(cast<FunctionType>(getPointer()->withExtInfo(info)));
   }
@@ -2569,14 +2569,14 @@ public:
   static bool classof(const TypeBase *T) {
     return T->getKind() == TypeKind::PolymorphicFunction;
   }
-  
+
 private:
   PolymorphicFunctionType(Type input, Type output,
                           GenericParamList *params,
                           const ExtInfo &Info,
                           const ASTContext &C,
                           RecursiveTypeProperties properties);
-};  
+};
 BEGIN_CAN_TYPE_WRAPPER(PolymorphicFunctionType, AnyFunctionType)
   static CanPolymorphicFunctionType get(CanType input, CanType result,
                                         GenericParamList *params,
@@ -2619,13 +2619,13 @@ public:
   GenericSignature *getGenericSignature() const {
     return Signature;
   }
-  
+
   /// Retrieve the generic parameters of this polymorphic function type.
   ArrayRef<GenericTypeParamType *> getGenericParams() const;
 
   /// Retrieve the requirements of this polymorphic function type.
   ArrayRef<Requirement> getRequirements() const;
-                              
+
   /// Substitute the given generic arguments into this generic
   /// function type and return the resulting non-generic type.
   ///
@@ -2657,11 +2657,11 @@ BEGIN_CAN_TYPE_WRAPPER(GenericFunctionType, AnyFunctionType)
     auto fnType = GenericFunctionType::get(sig, input, result, info);
     return cast<GenericFunctionType>(fnType->getCanonicalType());
   }
-  
+
   CanGenericSignature getGenericSignature() const {
     return CanGenericSignature(getPointer()->getGenericSignature());
   }
-  
+
   ArrayRef<CanTypeWrapper<GenericTypeParamType>> getGenericParams() const {
     return getGenericSignature().getGenericParams();
   }
@@ -2692,7 +2692,7 @@ enum class ParameterConvention {
   /// single-threaded aliasing may produce inconsistent results, but should
   /// remain memory safe.
   Indirect_Inout,
-  
+
   /// This argument is passed indirectly, i.e. by directly passing the address
   /// of an object in memory. The object is allowed to be aliased by other
   /// well-typed references, but is not allowed to be escaped. This is the
@@ -2902,7 +2902,7 @@ enum class ResultConvention {
   /// The validity of the return value is dependent on the 'self' parameter,
   /// so it may be invalidated if that parameter is released.
   UnownedInnerPointer,
-  
+
   /// This value has been (or may have been) returned autoreleased.
   /// The caller should make an effort to reclaim the autorelease.
   /// The type must be a class or class existential type, and this
@@ -2975,7 +2975,7 @@ public:
     return !(*this == rhs);
   }
 };
-  
+
 class SILFunctionType;
 typedef CanTypeWrapper<SILFunctionType> CanSILFunctionType;
 
@@ -3020,7 +3020,7 @@ public:
     ExtInfo(unsigned Bits) : Bits(static_cast<uint16_t>(Bits)) {}
 
     friend class SILFunctionType;
-    
+
   public:
     // Constructor with all defaults.
     ExtInfo() : Bits(0) { }
@@ -3088,7 +3088,7 @@ public:
         return false;
       }
     }
-    
+
     // Note that we don't have setters. That is by design, use
     // the following with methods instead of mutating these objects.
     ExtInfo withRepresentation(Representation Rep) const {
@@ -3298,7 +3298,7 @@ public:
       return None;
     }
   }
-  
+
   ArrayRef<SILParameterInfo> getParameters() const {
     return const_cast<SILFunctionType*>(this)->getMutableParameters();
   }
@@ -3310,11 +3310,11 @@ public:
   }
 
   using ParameterSILTypeArrayRef
-    = ArrayRefView<SILParameterInfo, SILType, getParameterSILType>;  
+    = ArrayRefView<SILParameterInfo, SILType, getParameterSILType>;
   ParameterSILTypeArrayRef getParameterSILTypes() const {
     return ParameterSILTypeArrayRef(getParameters());
   }
-  
+
   bool isPolymorphic() const { return GenericSig != nullptr; }
   CanGenericSignature getGenericSignature() const { return GenericSig; }
 
@@ -3376,7 +3376,7 @@ typedef CanTypeWrapper<SILBoxType> CanSILBoxType;
 class SILBoxType final : public TypeBase,
                          private llvm::TrailingObjects<SILBoxType,Substitution>{
   friend TrailingObjects;
-  
+
   SILLayout *Layout;
   unsigned NumGenericArgs;
 
@@ -3397,7 +3397,7 @@ public:
   // layouts. As a staging mechanism, we expose the old single-boxed-type
   // interface.
   // These functions are implemented in the SIL library instead of the AST.
-  
+
   static CanSILBoxType get(CanType BoxedType);
   CanType getBoxedType() const;
   // In SILType.h
@@ -3412,7 +3412,7 @@ DEFINE_EMPTY_CAN_TYPE_WRAPPER(SILBoxType, Type)
 
 class SILBlockStorageType;
 typedef CanTypeWrapper<SILBlockStorageType> CanSILBlockStorageType;
-  
+
 /// The SIL-only type @block_storage T, which represents the layout of an
 /// on-stack block that captures a value of type T.
 ///
@@ -3420,26 +3420,26 @@ typedef CanTypeWrapper<SILBlockStorageType> CanSILBlockStorageType;
 /// SILFunctionType, so it is only parsed and defined within the SIL library.
 class SILBlockStorageType : public TypeBase {
   CanType CaptureType;
-  
+
   SILBlockStorageType(CanType CaptureType)
     : TypeBase(TypeKind::SILBlockStorage,
                &CaptureType->getASTContext(),
                CaptureType->getRecursiveProperties()),
       CaptureType(CaptureType) {}
-  
+
 public:
   static CanSILBlockStorageType get(CanType CaptureType);
-                      
+
   CanType getCaptureType() const { return CaptureType; }
   // In SILType.h
   SILType getCaptureAddressType() const;
-  
+
   static bool classof(const TypeBase *T) {
     return T->getKind() == TypeKind::SILBlockStorage;
   }
 };
 DEFINE_EMPTY_CAN_TYPE_WRAPPER(SILBlockStorageType, Type)
-  
+
 
 /// A type with a special syntax that is always sugar for a library type.
 ///
@@ -3469,7 +3469,7 @@ public:
            T->getKind() <= TypeKind::Last_SyntaxSugarType;
   }
 };
-  
+
 /// The type [T], which is always sugar for a library type.
 class ArraySliceType : public SyntaxSugarType {
   ArraySliceType(const ASTContext &ctx, Type base,
@@ -3542,7 +3542,7 @@ protected:
   // Syntax sugar types are never canonical.
   DictionaryType(const ASTContext &ctx, Type key, Type value,
                  RecursiveTypeProperties properties)
-    : TypeBase(TypeKind::Dictionary, nullptr, properties), 
+    : TypeBase(TypeKind::Dictionary, nullptr, properties),
       Key(key), Value(value), ImplOrContext(&ctx) {}
 
 public:
@@ -3583,7 +3583,7 @@ public:
   void getAnyExistentialTypeProtocols(SmallVectorImpl<ProtocolDecl *> &protos) {
     protos.push_back(getDecl());
   }
-  
+
   // Implement isa/cast/dyncast/etc.
   static bool classof(const TypeBase *T) {
     return T->getKind() == TypeKind::Protocol;
@@ -3632,12 +3632,12 @@ END_CAN_TYPE_WRAPPER(ProtocolType, NominalType)
 /// a composition of the protocols in that list.
 class ProtocolCompositionType : public TypeBase, public llvm::FoldingSetNode {
   ArrayRef<Type> Protocols;
-  
+
 public:
   /// \brief Retrieve an instance of a protocol composition type with the
   /// given set of protocols.
   static Type get(const ASTContext &C, ArrayRef<Type> Protocols);
-  
+
   /// \brief Retrieve the set of protocols composed to create this type.
   ArrayRef<Type> getProtocols() const { return Protocols; }
 
@@ -3651,12 +3651,12 @@ public:
 
   /// True if one or more of the protocols is class.
   bool requiresClass() const;
-  
+
   // Implement isa/cast/dyncast/etc.
   static bool classof(const TypeBase *T) {
     return T->getKind() == TypeKind::ProtocolComposition;
   }
-  
+
 private:
   static ProtocolCompositionType *build(const ASTContext &C,
                                         ArrayRef<Type> Protocols);
@@ -3722,7 +3722,7 @@ BEGIN_CAN_TYPE_WRAPPER(LValueType, Type)
     return CanLValueType(LValueType::get(type));
   }
 END_CAN_TYPE_WRAPPER(LValueType, Type)
-  
+
 /// InOutType - An inout qualified type is an argument to a function passed
 /// with an explicit "Address of" operator.  It is read in and then written back
 /// to after the callee function is done.  This also models the receiver of
@@ -3730,17 +3730,17 @@ END_CAN_TYPE_WRAPPER(LValueType, Type)
 ///
 class InOutType : public TypeBase {
   Type ObjectTy;
-  
+
   InOutType(Type objectTy, const ASTContext *canonicalContext,
             RecursiveTypeProperties properties)
   : TypeBase(TypeKind::InOut, canonicalContext, properties),
     ObjectTy(objectTy) {}
-  
+
 public:
   static InOutType *get(Type type);
-  
+
   Type getObjectType() const { return ObjectTy; }
-  
+
   // Implement isa/cast/dyncast/etc.
   static bool classof(const TypeBase *type) {
     return type->getKind() == TypeKind::InOut;
@@ -3791,7 +3791,7 @@ class ArchetypeType final : public SubstitutableType,
 public:
   typedef llvm::PointerUnion<AssociatedTypeDecl *, ProtocolDecl *>
     AssocTypeOrProtocolType;
-  
+
   /// A nested type. Either a dependent associated archetype, or a concrete
   /// type (which may be a bound archetype from an outer context).
   class NestedType {
@@ -3832,7 +3832,7 @@ public:
       return cast_or_null<ArchetypeType>(TypeAndIsConcrete.getPointer());
     }
   };
-  
+
 private:
   ArrayRef<ProtocolDecl *> ConformsTo;
   Type Superclass;
@@ -3883,7 +3883,7 @@ public:
   /// \param knownID When non-empty, the known ID of the archetype. When empty,
   /// a fresh archetype with a unique ID will be opened.
   static CanTypeWrapper<ArchetypeType>
-                        getOpened(Type existential, 
+                        getOpened(Type existential,
                                   Optional<UUID> knownID = None);
 
   /// Create a new archetype that represents the opened type
@@ -3901,11 +3901,11 @@ public:
 
   /// \brief Retrieve the parent of this archetype, or null if this is a
   /// primary archetype.
-  ArchetypeType *getParent() const { 
-    return ParentOrOpened.dyn_cast<ArchetypeType *>(); 
+  ArchetypeType *getParent() const {
+    return ParentOrOpened.dyn_cast<ArchetypeType *>();
   }
 
-  /// Retrieve the opened existential type 
+  /// Retrieve the opened existential type
   Type getOpenedExistentialType() const {
     return ParentOrOpened.dyn_cast<TypeBase *>();
   }
@@ -3925,11 +3925,11 @@ public:
   ProtocolDecl *getSelfProtocol() const {
     return AssocTypeOrProto.dyn_cast<ProtocolDecl *>();
   }
-  
+
   /// getConformsTo - Retrieve the set of protocols to which this substitutable
   /// type shall conform.
   ArrayRef<ProtocolDecl *> getConformsTo() const { return ConformsTo; }
-  
+
   /// requiresClass - True if the type can only be substituted with class types.
   /// This is true if the type conforms to one or more class protocols or has
   /// a superclass constraint.
@@ -3951,11 +3951,11 @@ public:
 
   /// \brief Retrieve the nested type with the given name.
   NestedType getNestedType(Identifier Name) const;
-  
+
   Type getNestedTypeValue(Identifier Name) const {
     return getNestedType(Name).getValue();
   }
-  
+
   /// \brief Check if the archetype contains a nested type with the given name.
   bool hasNestedType(Identifier Name) const;
 
@@ -3973,8 +3973,8 @@ public:
                       MutableArrayRef<std::pair<Identifier, NestedType>> Nested);
 
   /// isPrimary - Determine whether this is the archetype for a 'primary'
-  /// archetype, e.g., 
-  bool isPrimary() const { 
+  /// archetype, e.g.,
+  bool isPrimary() const {
     return ParentOrOpened.isNull();
   }
 
@@ -3999,10 +3999,10 @@ public:
   static bool classof(const TypeBase *T) {
     return T->getKind() == TypeKind::Archetype;
   }
-  
+
   /// getIsRecursive - The archetype type refers back to itself.
   bool getIsRecursive() { return this->isRecursive; }
-  
+
 private:
   ArchetypeType(const ASTContext &Ctx, ArchetypeType *Parent,
                 AssocTypeOrProtocolType AssocTypeOrProto,
@@ -4015,7 +4015,7 @@ private:
       AssocTypeOrProto(AssocTypeOrProto), Name(Name),
       isRecursive(isRecursive) { }
 
-  ArchetypeType(const ASTContext &Ctx, 
+  ArchetypeType(const ASTContext &Ctx,
                 Type Existential,
                 ArrayRef<ProtocolDecl *> ConformsTo,
                 Type Superclass, bool isRecursive = false)
@@ -4074,7 +4074,7 @@ public:
 
   /// Get the name of the generic type parameter.
   Identifier getName() const;
-  
+
   /// The depth of this generic type parameter, i.e., the number of outer
   /// levels of generic parameter lists that enclose this type parameter.
   ///
@@ -4166,20 +4166,20 @@ class SubstitutedType : public TypeBase {
                            RecursiveTypeProperties properties)
     : TypeBase(TypeKind::Substituted, nullptr, properties),
       Original(Original), Replacement(Replacement) {}
-  
+
   Type Original;
   Type Replacement;
-  
+
 public:
   static SubstitutedType *get(Type Original, Type Replacement,
                               const ASTContext &C);
-  
+
   /// \brief Retrieve the original type that is being replaced.
   Type getOriginal() const { return Original; }
-  
+
   /// \brief Retrieve the replacement type.
   Type getReplacementType() const { return Replacement; }
-  
+
   /// Remove one level of top-level sugar from this type.
   TypeBase *getSinglyDesugaredType();
 
@@ -4222,7 +4222,7 @@ public:
   AssociatedTypeDecl *getAssocType() const {
     return NameOrAssocType.dyn_cast<AssociatedTypeDecl *>();
   }
-  
+
   /// Substitute the base type, looking up our associated type in it if it is
   /// non-dependent. Returns null if the member could not be found in the new
   /// base.
@@ -4381,15 +4381,15 @@ class TypeVariableType : public TypeBase {
   }
 
   class Implementation;
-  
+
 public:
- 
+
   /// \brief Create a new type variable whose implementation is constructed
   /// with the given arguments.
   template<typename ...Args>
   static TypeVariableType *getNew(const ASTContext &C, unsigned ID,
                                   Args &&...args);
-  
+
   /// \brief Retrieve the implementation data corresponding to this type
   /// variable.
   ///
@@ -4501,7 +4501,7 @@ inline StructDecl *CanType::getStructOrBoundGenericStruct() const {
 
   if (auto boundTy = dyn_cast<BoundGenericStructType>(*this))
     return boundTy->getDecl();
-  
+
   return nullptr;
 }
 
@@ -4515,7 +4515,7 @@ inline EnumDecl *CanType::getEnumOrBoundGenericEnum() const {
 
   if (auto boundTy = dyn_cast<BoundGenericEnumType>(*this))
     return boundTy->getDecl();
-  
+
   return nullptr;
 }
 
@@ -4529,7 +4529,7 @@ inline NominalTypeDecl *CanType::getNominalOrBoundGenericNominal() const {
 
   if (auto boundTy = dyn_cast<BoundGenericType>(*this))
     return boundTy->getDecl();
-  
+
   return nullptr;
 }
 
@@ -4549,8 +4549,8 @@ inline GenericTypeDecl *TypeBase::getAnyGeneric() {
   return getCanonicalType().getAnyGeneric();
 }
 
-  
-  
+
+
 inline bool TypeBase::isBuiltinIntegerType(unsigned n) {
   if (auto intTy = dyn_cast<BuiltinIntegerType>(getCanonicalType()))
     return intTy->getWidth().isFixedWidth()
@@ -4578,7 +4578,7 @@ inline Type TypeBase::getRValueObjectType() {
     if (tupleTy->getNumElements() == 1 && !tupleTy->getElement(0).isVararg())
       type = tupleTy->getElementType(0);
   }
-  
+
   return type;
 }
 
@@ -4710,19 +4710,19 @@ namespace llvm {
 template<>
 struct DenseMapInfo<swift::BuiltinIntegerWidth> {
   using BuiltinIntegerWidth = swift::BuiltinIntegerWidth;
-  
+
   static inline BuiltinIntegerWidth getEmptyKey() {
     return BuiltinIntegerWidth(BuiltinIntegerWidth::DenseMapEmpty);
   }
-  
+
   static inline BuiltinIntegerWidth getTombstoneKey() {
     return BuiltinIntegerWidth(BuiltinIntegerWidth::DenseMapTombstone);
   }
-  
+
   static unsigned getHashValue(BuiltinIntegerWidth w) {
     return DenseMapInfo<unsigned>::getHashValue(w.RawValue);
   }
-  
+
   static bool isEqual(BuiltinIntegerWidth a, BuiltinIntegerWidth b) {
     return a == b;
   }
@@ -4730,5 +4730,5 @@ struct DenseMapInfo<swift::BuiltinIntegerWidth> {
 
 
 }
-  
+
 #endif

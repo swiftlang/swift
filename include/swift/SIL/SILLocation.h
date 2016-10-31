@@ -404,7 +404,7 @@ public:
   SourceLoc getSourceLoc() const;
   SourceLoc getStartSourceLoc() const;
   SourceLoc getEndSourceLoc() const;
-  
+
   SourceRange getSourceRange() const {
     return { getStartSourceLoc(), getEndSourceLoc() };
   }
@@ -423,7 +423,7 @@ public:
     return isDebugInfoLoc() ? Loc.DebugInfoLoc
                             : decode(getDebugSourceLoc(), SM);
   }
-  
+
   /// Pretty-print the value.
   void dump(const SourceManager &SM) const;
   void print(raw_ostream &OS, const SourceManager &SM) const;
@@ -626,7 +626,7 @@ public:
     L.setSpecialFlags(Flags);
     return L;
   }
-  
+
 private:
   friend class SILLocation;
   static bool isKind(const SILLocation& L) {

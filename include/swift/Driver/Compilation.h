@@ -139,7 +139,7 @@ private:
   static const Job *unwrap(const std::unique_ptr<const Job> &p) {
     return p.get();
   }
-  
+
 public:
   Compilation(DiagnosticEngine &Diags, OutputLevel Level,
               std::unique_ptr<llvm::opt::InputArgList> InputArgs,
@@ -182,7 +182,7 @@ public:
   void disableIncrementalBuild() {
     EnableIncrementalBuild = false;
   }
-  
+
   bool getContinueBuildingAfterErrors() const {
     return ContinueBuildingAfterErrors;
   }

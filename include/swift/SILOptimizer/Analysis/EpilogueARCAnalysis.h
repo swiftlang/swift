@@ -79,18 +79,18 @@ private:
   RCIdentityFunctionInfo *RCFI;
 
   /// The epilogue retains or releases.
-  llvm::SmallSetVector<SILInstruction *, 1> EpilogueARCInsts; 
+  llvm::SmallSetVector<SILInstruction *, 1> EpilogueARCInsts;
 
-  /// All the retain/release block state for all the basic blocks in the function. 
+  /// All the retain/release block state for all the basic blocks in the function.
   llvm::DenseMap<SILBasicBlock *, EpilogueARCBlockState *> EpilogueARCBlockStates;
 
   /// The exit blocks of the function.
   llvm::SmallPtrSet<SILBasicBlock *, 2> ExitBlocks;
 
   /// Return true if this is a function exiting block this epilogue ARC
-  /// matcher is interested in. 
+  /// matcher is interested in.
   bool isInterestedFunctionExitingBlock(SILBasicBlock *BB) {
-    if (EpilogueARCKind::Release == Kind)  
+    if (EpilogueARCKind::Release == Kind)
       return BB->getTerminator()->isFunctionExiting();
 
     return BB->getTerminator()->isFunctionExiting() &&
@@ -137,7 +137,7 @@ public:
     return computeEpilogueARC();
   }
 
-  /// Reset the epilogue arc instructions. 
+  /// Reset the epilogue arc instructions.
   void resetEpilogueARCInsts() { EpilogueARCInsts.clear(); }
   llvm::SmallSetVector<SILInstruction *, 1> getEpilogueARCInsts() {
     return EpilogueARCInsts;
@@ -154,7 +154,7 @@ public:
 
   /// This instruction prevents looking further for epilogue retains on the
   /// current path.
-  bool mayBlockEpilogueRetain(SILInstruction *II, SILValue Ptr) { 
+  bool mayBlockEpilogueRetain(SILInstruction *II, SILValue Ptr) {
     // reference decrementing instruction prevents any retain to be identified as
     // epilogue retains.
     if (mayDecrementRefCount(II, Ptr, AA))
@@ -165,20 +165,20 @@ public:
      if (AI->getCalleeFunction() == II->getParent()->getParent())
        return true;
     return false;
-  } 
+  }
 
   /// This instruction prevents looking further for epilogue releases on the
   /// current path.
-  bool mayBlockEpilogueRelease(SILInstruction *II, SILValue Ptr) { 
+  bool mayBlockEpilogueRelease(SILInstruction *II, SILValue Ptr) {
     // Check whether this instruction read reference count, i.e. uniqueness
     // check. Moving release past that may result in additional COW.
    if (II->mayReleaseOrReadRefCount())
       return true;
     return false;
-  } 
+  }
 
   /// Does this instruction block the interested ARC instruction ?
-  bool mayBlockEpilogueARC(SILInstruction *II, SILValue Ptr) { 
+  bool mayBlockEpilogueARC(SILInstruction *II, SILValue Ptr) {
     if (Kind == EpilogueARCKind::Retain)
       return mayBlockEpilogueRetain(II, Ptr);
     return mayBlockEpilogueRelease(II, Ptr);
@@ -252,7 +252,7 @@ public:
     EpilogueARCContext CM(Kind, Arg, F, PO->get(F), AA, RC->get(F));
     // Initialize and run the data flow. Clear the epilogue arc instructions if the
     // data flow is aborted in middle.
-   if (!CM.run()) { 
+   if (!CM.run()) {
      CM.resetEpilogueARCInsts();
      return CM.getEpilogueARCInsts();
     }
@@ -293,7 +293,7 @@ public:
   }
 
   virtual void initialize(SILPassManager *PM) override;
-  
+
   virtual EpilogueARCFunctionInfo *newFunctionAnalysis(SILFunction *F) override {
     return new EpilogueARCFunctionInfo(F, PO, AA, RC);
   }

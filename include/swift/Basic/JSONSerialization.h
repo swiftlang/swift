@@ -234,10 +234,10 @@ struct has_ArrayMethodTraits
 
   template <typename U>
   static char test(SameType<Signature_size, &U::size>*);
-  
+
   template <typename U>
   static double test(...);
-  
+
 public:
   static bool const value =  (sizeof(test<ArrayTraits<T> >(nullptr)) == 1);
 };

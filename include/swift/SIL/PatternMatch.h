@@ -610,7 +610,7 @@ inline typename Apply_match<BuiltinValueKind>::Ty
 m_BuiltinInst(BuiltinValueKind Callee) {
   return Callee;
 }
-  
+
 /// Match a BuiltinInst's Callee and first argument.
 template <unsigned Index=0, typename T0>
 inline typename Apply_match<BuiltinValueKind, T0>::Ty
@@ -627,7 +627,7 @@ m_BuiltinInst(BuiltinValueKind Callee, const T0 &Op0, const Arguments &...Args) 
   return m_CombineAnd(m_BuiltinInst<Index+1>(Callee, Args...),
                       m_Argument<Index>(Op0));
 }
-  
+
 //===----------------------------------------------------------------------===//
 //                             Builtin Instructions
 //===----------------------------------------------------------------------===//

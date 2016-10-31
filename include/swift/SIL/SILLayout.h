@@ -42,39 +42,39 @@ class SILField final {
   enum : unsigned {
     IsMutable = 0x1,
   };
-  
+
   static constexpr const unsigned NumFlags = 1;
 
   llvm::PointerIntPair<CanType, NumFlags, unsigned> LoweredTypeAndFlags;
-  
+
   static unsigned getFlagsValue(bool Mutable) {
     unsigned flags = 0;
     if (Mutable) flags |= IsMutable;
-    
+
     assert(flags >> NumFlags == 0
            && "more flags than flag bits?!");
     return flags;
   }
-  
+
 public:
   SILField(CanType LoweredType, bool Mutable)
     : LoweredTypeAndFlags(LoweredType, getFlagsValue(Mutable))
   {}
-  
+
   /// Get the lowered type of the field in the aggregate.
   ///
   /// This must be a lowered SIL type. If the containing aggregate is generic,
   /// then this type specifies the abstraction pattern at which values stored
   /// in this aggregate should be lowered.
   CanType getLoweredType() const { return LoweredTypeAndFlags.getPointer(); }
-  
+
   SILType getAddressType() const {
     return SILType::getPrimitiveAddressType(getLoweredType());
   }
   SILType getObjectType() const {
     return SILType::getPrimitiveObjectType(getLoweredType());
   }
-  
+
   /// True if this field is mutable inside its aggregate.
   ///
   /// This is only effectively a constraint on shared mutable reference types,
@@ -94,27 +94,27 @@ class SILLayout final : public llvm::FoldingSetNode,
   enum : unsigned {
     IsMutable = 0x1,
   };
-  
+
   static constexpr const unsigned NumFlags = 1;
-  
+
   static unsigned getFlagsValue(bool Mutable) {
     unsigned flags = 0;
     if (Mutable)
       flags |= IsMutable;
-    
+
     assert(flags >> NumFlags == 0
            && "more flags than flag bits?!");
     return flags;
   }
-  
+
   llvm::PointerIntPair<CanGenericSignature, NumFlags, unsigned>
     GenericSigAndFlags;
-  
+
   unsigned NumFields;
-  
+
   SILLayout(CanGenericSignature Signature,
             ArrayRef<SILField> Fields);
-  
+
   SILLayout(const SILLayout &) = delete;
   SILLayout &operator=(const SILLayout &) = delete;
 public:
@@ -122,27 +122,27 @@ public:
   static SILLayout *get(ASTContext &C,
                         CanGenericSignature Generics,
                         ArrayRef<SILField> Fields);
-  
+
   /// Get the generic signature in which this layout exists.
   CanGenericSignature getGenericSignature() const {
     return GenericSigAndFlags.getPointer();
   }
-  
+
   /// True if the layout contains any mutable fields.
   bool isMutable() const {
     return GenericSigAndFlags.getInt() & IsMutable;
   }
-  
+
   /// Get the fields inside the layout.
   ArrayRef<SILField> getFields() const {
     return llvm::makeArrayRef(getTrailingObjects<SILField>(), NumFields);
   }
-  
+
   /// Produce a profile of this layout, for use in a folding set.
   static void Profile(llvm::FoldingSetNodeID &id,
                       CanGenericSignature Generics,
                       ArrayRef<SILField> Fields);
-  
+
   /// \brief Produce a profile of this locator, for use in a folding set.
   void Profile(llvm::FoldingSetNodeID &id) {
     Profile(id, getGenericSignature(), getFields());

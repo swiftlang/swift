@@ -49,7 +49,7 @@ class EscapeAnalysis : public BottomUpIPAnalysis {
     /// We use the points-to relationship also for a ref_element_addr
     /// projection (see NodeType::Content).
     PointsTo = 0,
-    
+
     /// Represents an assignment: "a = b" creates a defer-edge a -> b.
     /// A load "a = *p" is represented by a defer-edge a -> c, where c is p's
     /// content node. Similarly, A store "*p = b" is represented by c -> b.
@@ -64,7 +64,7 @@ class EscapeAnalysis : public BottomUpIPAnalysis {
     /// references, it is treated as a single "pointer" which may point to any
     /// of the referenced objects.
     Value,
-    
+
     /// Represents the "memory content" to which a pointer points to.
     /// The "content" represents all stored properties of the referenced object.
     /// We also treat the elements of a reference-counted object as a "content"
@@ -76,7 +76,7 @@ class EscapeAnalysis : public BottomUpIPAnalysis {
     /// all stored properties of an object into a single "content".
     ///
     Content,
-    
+
     /// A function argument, which is just a special case of Value type.
     Argument,
 
@@ -92,7 +92,7 @@ class EscapeAnalysis : public BottomUpIPAnalysis {
     /// The value points to a locally allocated object who's lifetime ends in
     /// the same function.
     None,
-    
+
     /// The node's value escapes through the return value.
     /// The value points to a locally allocated object which escapes via the
     /// return instruction.
@@ -132,13 +132,13 @@ public:
     /// then we should replace the single pointsTo edge with multiple edges -
     /// one for each field.
     CGNode *pointsTo = nullptr;
-    
+
     /// The outgoing defer edges.
     llvm::SmallVector<CGNode *, 8> defersTo;
-    
+
     /// The predecessor edges (points-to and defer).
     llvm::SmallVector<Predecessor, 8> Preds;
-    
+
     /// If this Content node is merged with another Content node, mergeTo is
     /// the merge destination.
     CGNode *mergeTo = nullptr;
@@ -156,18 +156,18 @@ public:
     /// and edge (e.g. this does not appear in the pointsTo Preds list), but
     /// still must point to the same Content node as all successor nodes.
     bool pointsToIsEdge = false;
-    
+
     /// Used for various worklist algorithms.
     bool isInWorkList = false;
-    
+
     /// True if the merge is finished (see mergeTo). In this state this node
     /// is completely unlinked from the graph,
     bool isMerged = false;
-    
+
     /// The type of the node (mainly distinguishes between content and value
     /// nodes).
     NodeType Type;
-    
+
     /// The constructor.
     CGNode(ValueBase *V, NodeType Type) :
         V(V), UsePoints(0), Type(Type) { }
@@ -270,13 +270,13 @@ public:
         return false;
       return true;
     }
-    
+
     friend class CGNodeMap;
     friend class ConnectionGraph;
     friend struct ::CGForDotView;
 
   public:
-    
+
     /// Returns the escape state.
     EscapeState getEscapeState() const { return State; }
 
@@ -383,7 +383,7 @@ public:
 
     /// True if this is a summary graph.
     bool isSummaryGraph;
-    
+
     /// Constructs a connection graph for a function.
     ConnectionGraph(SILFunction *F, bool isSummaryGraph) :
       F(F), isSummaryGraph(isSummaryGraph) {
@@ -396,7 +396,7 @@ public:
 
     /// Removes all nodes from the graph.
     void clear();
-    
+
     /// Allocates a node of a given type.
     CGNode *allocNode(ValueBase *V, NodeType Type) {
       CGNode *Node = new (NodeAllocator.Allocate()) CGNode(V, Type);
@@ -473,7 +473,7 @@ public:
         return Node->getMergeTarget();
       return nullptr;
     }
-    
+
     /// Re-uses a node for another SIL value.
     void setNode(ValueBase *V, CGNode *Node) {
       assert(Values2Nodes.find(V) == Values2Nodes.end());
@@ -641,7 +641,7 @@ private:
   /// The connection graphs for all functions (does not include external
   /// functions).
   llvm::DenseMap<SILFunction *, FunctionInfo *> Function2Info;
-  
+
   /// The allocator for the connection graphs in Function2ConGraph.
   llvm::SpecificBumpPtrAllocator<FunctionInfo> Allocator;
 
@@ -655,7 +655,7 @@ private:
 
   /// Callee analysis, used for determining the callees at call sites.
   BasicCalleeAnalysis *BCA;
-  
+
   /// Returns true if \p V is a "pointer" value.
   /// See EscapeAnalysis::NodeType::Value.
   bool isPointer(ValueBase *V);

@@ -32,7 +32,7 @@ namespace irgen {
   class IRGenFunction;
   class IRGenModule;
   class MemberAccessStrategy;
-  
+
   Address projectPhysicalStructMemberAddress(IRGenFunction &IGF,
                                              Address base,
                                              SILType baseType,

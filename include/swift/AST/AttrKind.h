@@ -77,7 +77,7 @@ enum class EffectsKind : uint8_t {
   Unspecified
 };
 
-  
+
 enum DeclAttrKind : unsigned {
 #define DECL_ATTR(_, NAME, ...) DAK_##NAME,
 #include "swift/AST/Attr.def"

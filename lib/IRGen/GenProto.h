@@ -50,7 +50,7 @@ namespace irgen {
   /// Set an LLVM value name for the given protocol witness table.
   void setProtocolWitnessTableName(IRGenModule &IGM, llvm::Value *value,
                                    CanType type, ProtocolDecl *protocol);
-  
+
   /// Extract the method pointer from an archetype's witness table
   /// as a function value.
   void emitWitnessMethodValue(IRGenFunction &IGF,
@@ -130,7 +130,7 @@ namespace irgen {
                                  Explosion &args,
                                  WitnessMetadata *witnessMetadata,
                                  const GetParameterFn &getParameter);
-  
+
   /// When calling a polymorphic call, pass the arguments for the
   /// generics clause.
   void emitPolymorphicArguments(IRGenFunction &IGF,

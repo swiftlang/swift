@@ -39,7 +39,7 @@ class SILInliner : public TypeSubstCloner<SILInliner> {
 public:
   friend class SILVisitor<SILInliner>;
   friend class SILCloner<SILInliner>;
-  
+
   enum class InlineKind {
     MandatoryInline,
     PerformanceInline
@@ -105,7 +105,7 @@ private:
   }
 
   InlineKind IKind;
-  
+
   SILBasicBlock *CalleeEntryBB;
 
   /// \brief The location representing the inlined instructions.

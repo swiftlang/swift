@@ -173,7 +173,7 @@ public:
   // Members that should only be used by ASTContext.cpp.
   struct Implementation;
   Implementation &Impl;
-  
+
   friend class ConstraintCheckerArenaRAII;
 public:
   ASTContext(LangOptions &langOpts, SearchPathOptions &SearchPathOpts,
@@ -256,7 +256,7 @@ public:
 
     if (LangOpts.UseMalloc)
       return AlignedAlloc(bytes, alignment);
-    
+
     return getAllocator(arena).Allocate(bytes, alignment);
   }
 
@@ -365,7 +365,7 @@ public:
   /// Retrieve the declaration of Swift.Error.
   ProtocolDecl *getErrorDecl() const;
   CanType getExceptionType() const;
-  
+
 #define KNOWN_STDLIB_TYPE_DECL(NAME, DECL_CLASS, NUM_GENERIC_PARAMS) \
   /** Retrieve the declaration of Swift.NAME. */ \
   DECL_CLASS *get##NAME##Decl() const;
@@ -376,7 +376,7 @@ public:
 
   /// Retrieve the declaration of Swift.Optional<T>.Some.
   EnumElementDecl *getOptionalSomeDecl() const;
-  
+
   /// Retrieve the declaration of Swift.Optional<T>.None.
   EnumElementDecl *getOptionalNoneDecl() const;
 
@@ -435,7 +435,7 @@ public:
 
   /// Retrieve the declaration of Swift.==(Int, Int) -> Bool.
   FuncDecl *getEqualIntDecl(LazyResolver *resolver) const;
-  
+
   /// Retrieve the declaration of Swift._unimplementedInitializer.
   FuncDecl *getUnimplementedInitializerDecl(LazyResolver *resolver) const;
 
@@ -444,7 +444,7 @@ public:
 
   // Retrieve the declaration of Swift._stdlib_isOSVersionAtLeast.
   FuncDecl *getIsOSVersionAtLeastDecl(LazyResolver *resolver) const;
-  
+
   /// Look for the declaration with the given name within the
   /// Swift module.
   void lookupInSwiftModule(StringRef name,
@@ -452,14 +452,14 @@ public:
 
   /// Retrieve a specific, known protocol.
   ProtocolDecl *getProtocol(KnownProtocolKind kind) const;
-  
+
   /// Determine whether the given nominal type is one of the standard
   /// library or Cocoa framework types that is known to be bridged by another
   /// module's overlay, for layering or implementation detail reasons.
   bool isTypeBridgedInExternalModule(NominalTypeDecl *nominal) const;
 
   /// Get the Objective-C type that a Swift type bridges to, if any.
-  /// 
+  ///
   /// \param dc The context in which bridging is occurring.
   /// \param type The Swift for which we are querying bridging behavior.
   /// \param bridgedValueType The specific value type that is bridged,
@@ -494,7 +494,7 @@ public:
   //===--------------------------------------------------------------------===//
 
   bool hadError() const;
-  
+
   //===--------------------------------------------------------------------===//
   // Type manipulation routines.
   //===--------------------------------------------------------------------===//
@@ -509,21 +509,21 @@ public:
   const CanType TheUnknownObjectType;     /// Builtin.UnknownObject
   const CanType TheRawPointerType;        /// Builtin.RawPointer
   const CanType TheUnsafeValueBufferType; /// Builtin.UnsafeValueBuffer
-  
+
   const CanType TheIEEE32Type;            /// 32-bit IEEE floating point
   const CanType TheIEEE64Type;            /// 64-bit IEEE floating point
-  
+
   // Target specific types.
   const CanType TheIEEE16Type;            /// 16-bit IEEE floating point
   const CanType TheIEEE80Type;            /// 80-bit IEEE floating point
   const CanType TheIEEE128Type;           /// 128-bit IEEE floating point
   const CanType ThePPC128Type;            /// 128-bit PowerPC 2xDouble
-  
+
   /// Retrieve a type member of the given base type variable.
   ///
   /// Note that this routine is only usable when a constraint system
   /// is active.
-  Type getTypeVariableMemberType(TypeVariableType *baseTypeVar, 
+  Type getTypeVariableMemberType(TypeVariableType *baseTypeVar,
                                  AssociatedTypeDecl *assocType);
 
   /// Adds a search path to SearchPathOpts, unless it is already present.
@@ -697,7 +697,7 @@ public:
 
   /// Record compiler-known protocol information in the AST.
   void recordKnownProtocols(ModuleDecl *Stdlib);
-  
+
   /// \brief Retrieve the substitutions for a bound generic type, if known.
   Optional<ArrayRef<Substitution>>
   getSubstitutions(TypeBase *type, DeclContext *gpContext) const;
@@ -712,7 +712,7 @@ public:
 
   /// \brief Returns memory usage of this ASTContext.
   size_t getTotalMemory() const;
-  
+
   /// \brief Returns memory used exclusively by constraint solver.
   size_t getSolverMemory() const;
 
@@ -790,7 +790,7 @@ public:
   /// Retrieve a generic signature with a single unconstrained type parameter,
   /// like `<T>`.
   CanGenericSignature getSingleGenericParameterSignature() const;
-  
+
   /// Whether our effective Swift version is in the Swift 3 family
   bool isSwiftVersion3() const { return LangOpts.isSwiftVersion3(); }
 

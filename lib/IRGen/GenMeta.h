@@ -36,7 +36,7 @@ namespace swift {
   class SILType;
   class VarDecl;
   enum class SpecialProtocol : uint8_t;
-  
+
 namespace irgen {
   class Callee;
   class ConstantReference;
@@ -137,7 +137,7 @@ namespace irgen {
   int32_t getIndexOfGenericArgument(IRGenModule &IGM,
                                     NominalTypeDecl *decl,
                                     ArchetypeType *archetype);
-  
+
   /// Given a reference to nominal type metadata of the given type,
   /// derive a reference to the parent type metadata.  There must be a
   /// parent type.
@@ -194,7 +194,7 @@ namespace irgen {
   emitClassResilientInstanceSizeAndAlignMask(IRGenFunction &IGF,
                                              ClassDecl *theClass,
                                              llvm::Value *metadata);
-  
+
   /// Given an opaque class instance pointer, produce the type
   /// metadata reference as a %type*.
   llvm::Value *emitDynamicTypeOfOpaqueHeapObject(IRGenFunction &IGF,
@@ -244,10 +244,10 @@ namespace irgen {
   /// startup.
   llvm::Value *emitProtocolDescriptorRef(IRGenFunction &IGF,
                                          ProtocolDecl *protocol);
-  
+
   llvm::Value *emitObjCMetadataRefForMetadata(IRGenFunction &IGF,
                                               llvm::Value *classPtr);
-  
+
   /// Emit the field type accessor for a nominal type's metadata. This function
   /// lazily generates the metadata for the types of all of the nominal type's
   /// fields for reflection purposes.
@@ -255,7 +255,7 @@ namespace irgen {
                              NominalTypeDecl *type,
                              llvm::Function *fn,
                              ArrayRef<FieldTypeInfo> fieldTypes);
-  
+
   /// Adjustment indices for the address points of various metadata.
   /// Size is in words.
   namespace MetadataAdjustmentIndex {
@@ -263,11 +263,11 @@ namespace irgen {
       // Class metadata has two words of head-allocated data: the destructor
       // and the value witness table.
       Class = 2,
-      
+
       // Struct and enum metadata have one word of head-allocated data:
       // the value witness table.
       ValueType = 1,
-      
+
       // Other metadata objects have no head allocation.
       None = 0,
     };
@@ -295,8 +295,8 @@ namespace irgen {
   /// Determine how the given type metadata should be accessed.
   MetadataAccessStrategy getTypeMetadataAccessStrategy(IRGenModule &IGM,
                                                        CanType type);
-  
-  /// Return the address of a function that will return type metadata 
+
+  /// Return the address of a function that will return type metadata
   /// for the given non-dependent type.
   llvm::Function *getOrCreateTypeMetadataAccessFunction(IRGenModule &IGM,
                                                         CanType type);

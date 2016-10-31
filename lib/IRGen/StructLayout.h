@@ -274,7 +274,7 @@ public:
 
   /// Return the alignment of the structure built so far.
   Alignment getAlignment() const { return CurAlignment; }
-  
+
   /// Return the spare bit mask of the structure built so far.
   const SpareBitVector &getSpareBits() const { return CurSpareBits; }
 
@@ -311,7 +311,7 @@ class StructLayout {
 
   /// The statically-known minimum bound on the size.
   Size MinimumSize;
-  
+
   /// The statically-known spare bit mask.
   SpareBitVector SpareBits;
 
@@ -322,7 +322,7 @@ class StructLayout {
   IsPOD_t IsKnownPOD;
   IsBitwiseTakable_t IsKnownBitwiseTakable;
   IsFixedSize_t IsKnownAlwaysFixedSize = IsFixedSize;
-  
+
   CanType ASTTy;
   llvm::Type *Ty;
   SmallVector<ElementLayout, 8> Elements;
@@ -361,7 +361,7 @@ public:
   /// passed in the constructor.
   ArrayRef<ElementLayout> getElements() const { return Elements; }
   const ElementLayout &getElement(unsigned i) const { return Elements[i]; }
-  
+
   llvm::Type *getType() const { return Ty; }
   Size getSize() const { return MinimumSize; }
   Alignment getAlignment() const { return MinimumAlign; }
@@ -391,15 +391,15 @@ Size getHeapHeaderSize(IRGenModule &IGM);
 enum class FieldAccess : uint8_t {
   /// Instance variable offsets are constant.
   ConstantDirect,
-  
+
   /// Instance variable offsets must be loaded from "direct offset"
   /// global variables.
   NonConstantDirect,
-  
+
   /// Instance variable offsets are kept in fields in metadata, but
   /// the offsets of those fields within the metadata are constant.
   ConstantIndirect,
-  
+
   /// Instance variable offsets are kept in fields in metadata, and
   /// the offsets of those fields within the metadata must be loaded
   /// from "indirect offset" global variables.

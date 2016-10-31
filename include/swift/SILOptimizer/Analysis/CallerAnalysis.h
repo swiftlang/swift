@@ -82,7 +82,7 @@ public:
       return minArgs;
     }
   };
-  
+
 private:
   /// Current module we are analyzing.
   SILModule &Mod;
@@ -95,17 +95,17 @@ private:
 
   /// Iterate over all the call sites in the function and update
   /// CallInfo.
-  void processFunctionCallSites(SILFunction *F); 
+  void processFunctionCallSites(SILFunction *F);
 
-  /// This function is about to become "unknown" to us. Invalidate any 
+  /// This function is about to become "unknown" to us. Invalidate any
   /// callsite information related to it.
-  void invalidateExistingCalleeRelation(SILFunction *F); 
+  void invalidateExistingCalleeRelation(SILFunction *F);
 
   void processRecomputeFunctionList() {
     for (auto &F : RecomputeFunctionList) {
       processFunctionCallSites(F);
     }
-    RecomputeFunctionList.clear(); 
+    RecomputeFunctionList.clear();
   }
 
 public:

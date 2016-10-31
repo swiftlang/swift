@@ -57,21 +57,21 @@ public:
   Optional<UUID> OpenedID;
 
   TypeAttributes() {}
-  
+
   bool isValid() const { return AtLoc.isValid(); }
-  
+
   void clearAttribute(TypeAttrKind A) {
     AttrLocs[A] = SourceLoc();
   }
-  
+
   bool has(TypeAttrKind A) const {
     return getLoc(A).isValid();
   }
-  
+
   SourceLoc getLoc(TypeAttrKind A) const {
     return AttrLocs[A];
   }
-  
+
   void setAttr(TypeAttrKind A, SourceLoc L) {
     assert(!L.isInvalid() && "Cannot clear attribute with this method");
     AttrLocs[A] = L;
@@ -92,13 +92,13 @@ public:
     for (SourceLoc elt : AttrLocs)
       if (elt.isValid())
         return false;
-    
+
     return true;
   }
-  
+
   bool hasConvention() const { return convention.hasValue(); }
   StringRef getConvention() const { return *convention; }
-  
+
   bool hasOwnership() const { return getOwnership() != Ownership::Strong; }
   Ownership getOwnership() const {
     if (has(TAK_sil_weak)) return Ownership::Weak;
@@ -106,7 +106,7 @@ public:
     if (has(TAK_sil_unmanaged)) return Ownership::Unmanaged;
     return Ownership::Strong;
   }
-  
+
   void clearOwnership() {
     clearAttribute(TAK_sil_weak);
     clearAttribute(TAK_sil_unowned);
@@ -249,7 +249,7 @@ public:
 
     /// True if this shouldn't be serialized.
     NotSerialized = 1 << 3,
-    
+
     /// True if this attribute is only valid when parsing a .sil file.
     SILOnly = 1 << 4,
 
@@ -507,10 +507,10 @@ public:
                 bool Implicit)
     : DeclAttribute(DAK_Alignment, AtLoc, Range, Implicit),
       Value(Value) {}
-  
+
   // The alignment value.
   const unsigned Value;
-  
+
   static bool classof(const DeclAttribute *DA) {
     return DA->getKind() == DAK_Alignment;
   }
@@ -533,10 +533,10 @@ public:
                                  bool Implicit)
     : DeclAttribute(DAK_SwiftNativeObjCRuntimeBase, AtLoc, Range, Implicit),
       BaseClassName(BaseClassName) {}
-  
+
   // The base class's name.
   const Identifier BaseClassName;
-  
+
   static bool classof(const DeclAttribute *DA) {
     return DA->getKind() == DAK_SwiftNativeObjCRuntimeBase;
   }
@@ -738,7 +738,7 @@ public:
                           bool implicitName);
 
   /// Create an unnamed Objective-C attribute, i.e., @objc.
-  static ObjCAttr *createUnnamed(ASTContext &Ctx, SourceLoc AtLoc, 
+  static ObjCAttr *createUnnamed(ASTContext &Ctx, SourceLoc AtLoc,
                                  SourceLoc ObjCLoc);
 
   static ObjCAttr *createUnnamedImplicit(ASTContext &Ctx);
@@ -749,8 +749,8 @@ public:
   /// Note that a nullary Objective-C attribute may represent either a
   /// selector for a zero-parameter function or some other Objective-C
   /// entity, such as a class or protocol.
-  static ObjCAttr *createNullary(ASTContext &Ctx, SourceLoc AtLoc, 
-                                 SourceLoc ObjCLoc, SourceLoc LParenLoc, 
+  static ObjCAttr *createNullary(ASTContext &Ctx, SourceLoc AtLoc,
+                                 SourceLoc ObjCLoc, SourceLoc LParenLoc,
                                  SourceLoc NameLoc, Identifier Name,
                                  SourceLoc RParenLoc);
 
@@ -760,13 +760,13 @@ public:
   /// Note that a nullary Objective-C attribute may represent either a
   /// selector for a zero-parameter function or some other Objective-C
   /// entity, such as a class or protocol.
-  static ObjCAttr *createNullary(ASTContext &Ctx, Identifier Name, 
+  static ObjCAttr *createNullary(ASTContext &Ctx, Identifier Name,
                                  bool isNameImplicit);
 
   /// Create a "selector" Objective-C attribute, which has some number
   /// of identifiers followed by colons.
-  static ObjCAttr *createSelector(ASTContext &Ctx, SourceLoc AtLoc, 
-                                  SourceLoc ObjCLoc, SourceLoc LParenLoc, 
+  static ObjCAttr *createSelector(ASTContext &Ctx, SourceLoc AtLoc,
+                                  SourceLoc ObjCLoc, SourceLoc LParenLoc,
                                   ArrayRef<SourceLoc> NameLocs,
                                   ArrayRef<Identifier> Names,
                                   SourceLoc RParenLoc);
@@ -901,7 +901,7 @@ class InlineAttr : public DeclAttribute {
   InlineKind Kind;
 public:
   InlineAttr(SourceLoc atLoc, SourceRange range, InlineKind kind)
-    : DeclAttribute(DAK_Inline, atLoc, range, /*Implicit=*/false), 
+    : DeclAttribute(DAK_Inline, atLoc, range, /*Implicit=*/false),
       Kind(kind) {}
 
   InlineAttr(InlineKind kind)

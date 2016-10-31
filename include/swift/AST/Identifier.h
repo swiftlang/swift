@@ -52,23 +52,23 @@ enum class DeclRefKind {
 class Identifier {
   friend class ASTContext;
   const char *Pointer;
-  
+
   /// Constructor, only accessible by ASTContext, which handles the uniquing.
   explicit Identifier(const char *Ptr) : Pointer(Ptr) {}
 public:
   explicit Identifier() : Pointer(nullptr) {}
-  
+
   const char *get() const { return Pointer; }
-  
+
   StringRef str() const { return Pointer; }
-  
+
   unsigned getLength() const {
     assert(Pointer != nullptr && "Tried getting length of empty identifier");
     return ::strlen(Pointer);
   }
-  
+
   bool empty() const { return Pointer == nullptr; }
-  
+
   /// isOperator - Return true if this identifier is an operator, false if it is
   /// a normal identifier.
   /// FIXME: We should maybe cache this.
@@ -83,7 +83,7 @@ public:
     // Handle the high unicode case out of line.
     return isOperatorSlow();
   }
-  
+
   /// isOperatorStartCodePoint - Return true if the specified code point is a
   /// valid start of an operator.
   static bool isOperatorStartCodePoint(uint32_t C) {
@@ -91,7 +91,7 @@ public:
     static const char OpChars[] = "/=-+*%<>!&|^~.?";
     if (C < 0x80)
       return memchr(OpChars, C, sizeof(OpChars) - 1) != 0;
-    
+
     // Unicode math, symbol, arrow, dingbat, and line/box drawing chars.
     return (C >= 0x00A1 && C <= 0x00A7)
         || C == 0x00A9 || C == 0x00AB || C == 0x00AC || C == 0x00AE
@@ -104,7 +104,7 @@ public:
         || (C >= 0x2E00 && C <= 0x2E7F) || (C >= 0x3001 && C <= 0x3003)
         || (C >= 0x3008 && C <= 0x3030);
   }
-  
+
   /// isOperatorContinuationCodePoint - Return true if the specified code point
   /// is a valid operator code point.
   static bool isOperatorContinuationCodePoint(uint32_t C) {
@@ -127,11 +127,11 @@ public:
   bool isEditorPlaceholder() const {
     return !empty() && isEditorPlaceholder(str());
   }
-  
+
   const void *getAsOpaquePointer() const {
       return static_cast<const void *>(Pointer);
   }
-  
+
   static Identifier getFromOpaquePointer(void *P) {
     return Identifier((const char*)P);
   }
@@ -146,7 +146,7 @@ public:
   bool operator!=(Identifier RHS) const { return !(*this==RHS); }
 
   bool operator<(Identifier RHS) const { return Pointer < RHS.Pointer; }
-  
+
   static Identifier getEmptyKey() {
     return Identifier((const char*)
                       llvm::DenseMapInfo<const void*>::getEmptyKey());
@@ -159,7 +159,7 @@ public:
 private:
   bool isOperatorSlow() const;
 };
-  
+
 class DeclName;
 class ObjCSelector;
 
@@ -185,7 +185,7 @@ namespace llvm {
       return LHS == RHS;
     }
   };
-  
+
   // An Identifier is "pointer like".
   template<typename T> class PointerLikeTypeTraits;
   template<>
@@ -199,11 +199,11 @@ namespace llvm {
     }
     enum { NumLowBitsAvailable = 2 };
   };
-  
+
 } // end namespace llvm
 
 namespace swift {
-  
+
 /// A declaration name, which may comprise one or more identifier pieces.
 class DeclName {
   friend class ASTContext;
@@ -216,25 +216,25 @@ class DeclName {
 
     Identifier BaseName;
     size_t NumArgs;
-    
+
     explicit CompoundDeclName(Identifier BaseName, size_t NumArgs)
       : BaseName(BaseName), NumArgs(NumArgs)
     {
       assert(NumArgs > 0 && "Should use IdentifierAndCompound");
     }
-    
+
     ArrayRef<Identifier> getArgumentNames() const {
       return {getTrailingObjects<Identifier>(), NumArgs};
     }
     MutableArrayRef<Identifier> getArgumentNames() {
       return {getTrailingObjects<Identifier>(), NumArgs};
     }
-      
+
     /// Uniquing for the ASTContext.
     static void Profile(llvm::FoldingSetNodeID &id,
                         Identifier baseName,
                         ArrayRef<Identifier> argumentNames);
-    
+
     void Profile(llvm::FoldingSetNodeID &id) {
       Profile(id, BaseName, getArgumentNames());
     }
@@ -247,22 +247,22 @@ class DeclName {
   // Either a single identifier piece stored inline (with a bit to say whether
   // it is simple or compound), or a reference to a compound declaration name.
   llvm::PointerUnion<IdentifierAndCompound, CompoundDeclName*> SimpleOrCompound;
-  
+
   DeclName(void *Opaque)
     : SimpleOrCompound(decltype(SimpleOrCompound)::getFromOpaqueValue(Opaque))
   {}
 
   void initialize(ASTContext &C, Identifier baseName,
                   ArrayRef<Identifier> argumentNames);
-  
+
 public:
   /// Build a null name.
   DeclName() : SimpleOrCompound(IdentifierAndCompound()) {}
-  
+
   /// Build a simple value name with one component.
   /*implicit*/ DeclName(Identifier simpleName)
     : SimpleOrCompound(IdentifierAndCompound(simpleName, false)) {}
-  
+
   /// Build a compound value name given a base name and a set of argument names.
   DeclName(ASTContext &C, Identifier baseName,
            ArrayRef<Identifier> argumentNames) {
@@ -272,14 +272,14 @@ public:
   /// Build a compound value name given a base name and a set of argument names
   /// extracted from a parameter list.
   DeclName(ASTContext &C, Identifier baseName, ParameterList *paramList);
-  
+
   /// Retrieve the 'base' name, i.e., the name that follows the introducer,
   /// such as the 'foo' in 'func foo(x:Int, y:Int)' or the 'bar' in
   /// 'var bar: Int'.
   Identifier getBaseName() const {
     if (auto compound = SimpleOrCompound.dyn_cast<CompoundDeclName*>())
       return compound->BaseName;
-    
+
     return SimpleOrCompound.get<IdentifierAndCompound>().getPointer();
   }
 
@@ -296,7 +296,7 @@ public:
       return true;
     return !SimpleOrCompound.get<IdentifierAndCompound>().getPointer().empty();
   }
-  
+
   /// True if this is a simple one-component name.
   bool isSimpleName() const {
     if (SimpleOrCompound.dyn_cast<CompoundDeclName*>())
@@ -312,24 +312,24 @@ public:
 
     return SimpleOrCompound.get<IdentifierAndCompound>().getInt();
   }
-  
+
   /// True if this name is a simple one-component name identical to the
   /// given identifier.
   bool isSimpleName(Identifier name) const {
     return isSimpleName() && getBaseName() == name;
   }
-  
+
   /// True if this name is a simple one-component name equal to the
   /// given string.
   bool isSimpleName(StringRef name) const {
     return isSimpleName() && getBaseName().str().equals(name);
   }
-  
+
   /// True if this name is an operator.
   bool isOperator() const {
     return getBaseName().isOperator();
   }
-  
+
   /// True if this name should be found by a decl ref or member ref under the
   /// name specified by 'refName'.
   ///
@@ -345,7 +345,7 @@ public:
     // The names don't match.
     return false;
   }
-  
+
   /// Add a DeclName to a lookup table so that it can be found by its simple
   /// name or its compound name.
   template<typename LookupTable, typename Element>
@@ -524,7 +524,7 @@ namespace llvm {
     static bool isEqual(swift::DeclName LHS, swift::DeclName RHS) {
       return LHS.getOpaqueValue() == RHS.getOpaqueValue();
     }
-  };  
+  };
 
   // ObjCSelectors hash just like pointers.
   template<> struct DenseMapInfo<swift::ObjCSelector> {

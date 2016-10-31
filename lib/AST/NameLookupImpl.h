@@ -84,7 +84,7 @@ public:
       return;
     }
   }
-  
+
   void checkParameterList(const ParameterList *params) {
     for (auto param : *params) {
       checkValueDecl(param, DeclVisibilityKind::FunctionParameter);
@@ -206,7 +206,7 @@ private:
       }
     }
   }
-  
+
   void visitSwitchStmt(SwitchStmt *S) {
     if (!isReferencePointInRange(S->getSourceRange()))
       return;
@@ -257,7 +257,7 @@ private:
       checkPattern(S->getErrorPattern(), DeclVisibilityKind::LocalVariable);
     visit(S->getBody());
   }
-  
+
 };
 
 } // end namespace namelookup

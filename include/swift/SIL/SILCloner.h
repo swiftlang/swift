@@ -58,7 +58,7 @@ public:
   void setTrackingList(SmallVectorImpl<SILInstruction*> *II) {
     getBuilder().setTrackingList(II);
   }
-  
+
   SmallVectorImpl<SILInstruction*> *getTrackingList() {
     return getBuilder().getTrackingList();
   }
@@ -114,12 +114,12 @@ protected:
   Substitution remapSubstitution(Substitution sub) {
     CanType newReplacement =
       asImpl().getOpASTType(sub.getReplacement()->getCanonicalType());
-    
+
     return Substitution(newReplacement, sub.getConformances());
   }
   ArrayRef<Substitution> getOpSubstitutions(ArrayRef<Substitution> Subs) {
     MutableArrayRef<Substitution> newSubsBuf;
-    
+
     auto copySubs = [&]{
       if (!newSubsBuf.empty())
         return;
@@ -137,10 +137,10 @@ protected:
         newSubsBuf[i] = newSub;
       }
     }
-    
+
     return Subs;
   }
-  
+
   SILType getTypeInClonedContext(SILType Ty) {
     // Substitute opened existential types, if we have any.
     if (!OpenedExistentialSubs.empty()) {
@@ -157,7 +157,7 @@ protected:
     Ty = getTypeInClonedContext(Ty);
     return asImpl().remapType(Ty);
   }
-  
+
   CanType getASTTypeInClonedContext(CanType ty) {
     // Substitute opened existential types, if we have any.
     if (!OpenedExistentialSubs.empty()) {
@@ -520,9 +520,9 @@ SILCloner<ImplClass>::visitAllocExistentialBoxInst(
                                                 AllocExistentialBoxInst *Inst) {
   auto origExistentialType = Inst->getExistentialType();
   auto origFormalType = Inst->getFormalConcreteType();
-  
+
   auto conformances =getOpConformances(origFormalType, Inst->getConformances());
-  
+
   getBuilder().setCurrentDebugScope(getOpScope(Inst->getDebugScope()));
   doPostProcess(Inst,
     getBuilder().createAllocExistentialBox(getOpLocation(Inst->getLoc()),
@@ -540,7 +540,7 @@ SILCloner<ImplClass>::visitAllocValueBufferInst(AllocValueBufferInst *Inst) {
                                         getOpType(Inst->getValueType()),
                                         getOpValue(Inst->getOperand())));
 }
-  
+
 template<typename ImplClass>
 void
 SILCloner<ImplClass>::visitBuiltinInst(BuiltinInst *Inst) {
@@ -1120,7 +1120,7 @@ SILCloner<ImplClass>::visitUnconditionalCheckedCastAddrInst(
                                                          SrcValue, SrcType,
                                                          DestValue, TargetType));
 }
-  
+
 template<typename ImplClass>
 void
 SILCloner<ImplClass>::visitRetainValueInst(RetainValueInst *Inst) {
@@ -1207,7 +1207,7 @@ SILCloner<ImplClass>::visitEnumInst(EnumInst *Inst) {
                             Inst->getElement(),
                             getOpType(Inst->getType())));
 }
-  
+
 template<typename ImplClass>
 void
 SILCloner<ImplClass>::visitInitEnumDataAddrInst(InitEnumDataAddrInst *Inst) {
@@ -1218,7 +1218,7 @@ SILCloner<ImplClass>::visitInitEnumDataAddrInst(InitEnumDataAddrInst *Inst) {
                                         Inst->getElement(),
                                         getOpType(Inst->getType())));
 }
-  
+
 template<typename ImplClass>
 void
 SILCloner<ImplClass>::visitUncheckedEnumDataInst(UncheckedEnumDataInst *Inst) {
@@ -1229,7 +1229,7 @@ SILCloner<ImplClass>::visitUncheckedEnumDataInst(UncheckedEnumDataInst *Inst) {
                                          Inst->getElement(),
                                          getOpType(Inst->getType())));
 }
-  
+
 template<typename ImplClass>
 void
 SILCloner<ImplClass>::visitUncheckedTakeEnumDataAddrInst(UncheckedTakeEnumDataAddrInst *Inst) {
@@ -1240,7 +1240,7 @@ SILCloner<ImplClass>::visitUncheckedTakeEnumDataAddrInst(UncheckedTakeEnumDataAd
                                         Inst->getElement(),
                                         getOpType(Inst->getType())));
 }
-  
+
 template<typename ImplClass>
 void
 SILCloner<ImplClass>::visitInjectEnumAddrInst(InjectEnumAddrInst *Inst) {
@@ -1250,7 +1250,7 @@ SILCloner<ImplClass>::visitInjectEnumAddrInst(InjectEnumAddrInst *Inst) {
                                       getOpValue(Inst->getOperand()),
                                       Inst->getElement()));
 }
-  
+
 template<typename ImplClass>
 void
 SILCloner<ImplClass>::visitMetatypeInst(MetatypeInst *Inst) {
@@ -1406,7 +1406,7 @@ SILCloner<ImplClass>::visitOpenExistentialAddrInst(OpenExistentialAddrInst *Inst
   // Create a new archetype for this opened existential type.
   auto archetypeTy
     = Inst->getType().getSwiftRValueType()->castTo<ArchetypeType>();
-  assert(OpenedExistentialSubs.count(archetypeTy) == 0 && 
+  assert(OpenedExistentialSubs.count(archetypeTy) == 0 &&
          "Already substituted opened existential archetype?");
   registerOpenedExistentialRemapping(
       archetypeTy,
@@ -1874,7 +1874,7 @@ void SILCloner<ImplClass>::visitCheckedCastAddrBranchInst(
                                                 DestValue, TargetType,
                                                 OpSuccBB, OpFailBB));
 }
-  
+
 template<typename ImplClass>
 void
 SILCloner<ImplClass>::visitSwitchValueInst(SwitchValueInst *Inst) {
@@ -1926,9 +1926,9 @@ visitSwitchEnumAddrInst(SwitchEnumAddrInst *Inst) {
                                       getOpValue(Inst->getOperand()),
                                       DefaultBB, CaseBBs));
 }
-  
 
-  
+
+
 template<typename ImplClass>
 void
 SILCloner<ImplClass>::visitSelectEnumInst(SelectEnumInst *Inst) {
@@ -1939,7 +1939,7 @@ SILCloner<ImplClass>::visitSelectEnumInst(SelectEnumInst *Inst) {
   for (unsigned i = 0, e = Inst->getNumCases(); i != e; ++i)
     CaseResults.push_back(std::make_pair(Inst->getCase(i).first,
                                          getOpValue(Inst->getCase(i).second)));
-  
+
   getBuilder().setCurrentDebugScope(getOpScope(Inst->getDebugScope()));
   doPostProcess(Inst,
     getBuilder().createSelectEnum(getOpLocation(Inst->getLoc()),
@@ -1958,7 +1958,7 @@ SILCloner<ImplClass>::visitSelectEnumAddrInst(SelectEnumAddrInst *Inst) {
   for (unsigned i = 0, e = Inst->getNumCases(); i != e; ++i)
     CaseResults.push_back(std::make_pair(Inst->getCase(i).first,
                                          getOpValue(Inst->getCase(i).second)));
-  
+
   getBuilder().setCurrentDebugScope(getOpScope(Inst->getDebugScope()));
   doPostProcess(Inst,
     getBuilder().createSelectEnumAddr(getOpLocation(Inst->getLoc()),

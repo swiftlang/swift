@@ -40,7 +40,7 @@ enum class PatternKind : uint8_t {
 
 /// Diagnostic printing of PatternKinds.
 llvm::raw_ostream &operator<<(llvm::raw_ostream &OS, PatternKind kind);
-  
+
 /// Pattern - Base class for all patterns in Swift.
 class alignas(8) Pattern {
   class PatternBitfields {
@@ -148,8 +148,8 @@ public:
 
   /// Return true if this pattern (or a subpattern) is refutable.
   bool isRefutablePattern() const;
-  
-  
+
+
   /// \brief Mark all vardecls in this pattern as having non-pattern initial
   /// values bound into them.
   void markHasNonPatternBindingInit() {
@@ -157,7 +157,7 @@ public:
       VD->setHasNonPatternBindingInit();
     });
   }
-  
+
   /// \brief Mark all vardecls in this pattern as having an owning statement for
   /// the pattern.
   void markOwnedByStatement(Stmt *S) {
@@ -170,7 +170,7 @@ public:
   bool hasStorage() const;
 
   static bool classof(const Pattern *P) { return true; }
-  
+
   //*** Allocation Routines ************************************************/
 
   void *operator new(size_t bytes, const ASTContext &C);
@@ -179,14 +179,14 @@ public:
   void *operator new(size_t bytes) = delete;
   void operator delete(void *data) = delete;
   void *operator new(size_t bytes, void *data) = delete;
-  
+
   void print(llvm::raw_ostream &OS,
              const PrintOptions &Options = PrintOptions()) const;
   void dump() const;
-  
+
   /// walk - This recursively walks the AST rooted at this pattern.
   Pattern *walk(ASTWalker &walker);
-  Pattern *walk(ASTWalker &&walker) { return walk(walker); }  
+  Pattern *walk(ASTWalker &&walker) { return walk(walker); }
 };
 
 /// A pattern consisting solely of grouping parentheses around a
@@ -248,7 +248,7 @@ public:
   const Pattern *getPattern() const {
     return ThePattern;
   }
-  
+
   void setPattern(Pattern *p) { ThePattern = p; }
 };
 
@@ -402,16 +402,16 @@ public:
 /// TODO: Introduce type refinement of the value being matched.
 class IsPattern : public Pattern {
   SourceLoc IsLoc;
-  
+
   Pattern *SubPattern;
-  
+
   /// The semantics of the type check (class downcast, archetype-to-concrete,
   /// etc.)
   CheckedCastKind CastKind;
-  
+
   /// The type being checked for.
   TypeLoc CastType;
-  
+
 public:
   IsPattern(SourceLoc IsLoc, TypeLoc CastTy,
              Pattern *SubPattern,
@@ -434,7 +434,7 @@ public:
   Pattern *getSubPattern() { return SubPattern; }
   const Pattern *getSubPattern() const { return SubPattern; }
   void setSubPattern(Pattern *p) { SubPattern = p; }
-  
+
   SourceLoc getLoc() const { return IsLoc; }
   SourceRange getSourceRange() const {
     SourceLoc beginLoc =
@@ -443,15 +443,15 @@ public:
       (isImplicit() ? beginLoc : CastType.getSourceRange().End);
     return { beginLoc, endLoc };
   }
-  
+
   TypeLoc &getCastTypeLoc() { return CastType; }
   TypeLoc getCastTypeLoc() const { return CastType; }
-  
+
   static bool classof(const Pattern *P) {
     return P->getKind() == PatternKind::Is;
   }
 };
-  
+
 /// A pattern that matches an enum case. If the enum value is in the matching
 /// case, then the value is extracted. If there is a subpattern, it is then
 /// matched against the associated value for the case.
@@ -462,7 +462,7 @@ class EnumElementPattern : public Pattern {
   Identifier Name;
   EnumElementDecl *ElementDecl;
   Pattern /*nullable*/ *SubPattern;
-  
+
 public:
   EnumElementPattern(TypeLoc ParentType, SourceLoc DotLoc, SourceLoc NameLoc,
                      Identifier Name, EnumElementDecl *Element,
@@ -475,11 +475,11 @@ public:
   }
 
   bool hasSubPattern() const { return SubPattern; }
-  
+
   const Pattern *getSubPattern() const {
     return SubPattern;
   }
-  
+
   Pattern *getSubPattern() {
     return SubPattern;
   }
@@ -487,14 +487,14 @@ public:
   bool isParentTypeImplicit() {
     return !ParentType.hasLocation();
   }
-  
+
   void setSubPattern(Pattern *p) { SubPattern = p; }
-  
+
   Identifier getName() const { return Name; }
-  
+
   EnumElementDecl *getElementDecl() const { return ElementDecl; }
   void setElementDecl(EnumElementDecl *d) { ElementDecl = d; }
-  
+
   SourceLoc getNameLoc() const { return NameLoc; }
   SourceLoc getLoc() const { return NameLoc; }
   SourceLoc getStartLoc() const {
@@ -506,10 +506,10 @@ public:
     return SubPattern ? SubPattern->getSourceRange().End : NameLoc;
   }
   SourceRange getSourceRange() const { return {getStartLoc(), getEndLoc()}; }
-  
+
   TypeLoc &getParentType() { return ParentType; }
   TypeLoc getParentType() const { return ParentType; }
-  
+
   static bool classof(const Pattern *P) {
     return P->getKind() == PatternKind::EnumElement;
   }
@@ -579,21 +579,21 @@ public:
 };
 
 
-  
+
 /// A pattern which matches a value obtained by evaluating an expression.
 /// The match will be tested using user-defined '~=' operator function lookup;
 /// the match succeeds if 'patternValue ~= matchedValue' produces a true value.
 class ExprPattern : public Pattern {
   llvm::PointerIntPair<Expr *, 1, bool> SubExprAndIsResolved;
-  
+
   /// An expression constructed during type-checking that produces a call to the
   /// '~=' operator comparing the match expression on the left to the matched
   /// value on the right.
   Expr *MatchExpr;
-  
+
   /// An implicit variable used to represent the RHS value of the match.
   VarDecl *MatchVar;
-  
+
 public:
   /// Construct an ExprPattern.
   ExprPattern(Expr *e, bool isResolved, Expr *matchExpr, VarDecl *matchVar,
@@ -604,44 +604,44 @@ public:
     if (implicit.hasValue() ? *implicit : e->isImplicit())
       setImplicit();
   }
-  
+
   /// Construct an unresolved ExprPattern.
   ExprPattern(Expr *e)
     : ExprPattern(e, false, nullptr, nullptr)
   {}
-  
+
   /// Construct a resolved ExprPattern.
   ExprPattern(Expr *e, Expr *matchExpr, VarDecl *matchVar)
     : ExprPattern(e, true, matchExpr, matchVar)
   {}
-  
+
   Expr *getSubExpr() const { return SubExprAndIsResolved.getPointer(); }
   void setSubExpr(Expr *e) { SubExprAndIsResolved.setPointer(e); }
-  
+
   Expr *getMatchExpr() const { return MatchExpr; }
   void setMatchExpr(Expr *e) {
     assert(isResolved() && "cannot set match fn for unresolved expr patter");
     MatchExpr = e;
   }
-  
+
   VarDecl *getMatchVar() const { return MatchVar; }
   void setMatchVar(VarDecl *v) {
     assert(isResolved() && "cannot set match var for unresolved expr patter");
     MatchVar = v;
   }
-  
+
   SourceLoc getLoc() const { return getSubExpr()->getLoc(); }
   SourceRange getSourceRange() const { return getSubExpr()->getSourceRange(); }
-  
+
   /// True if pattern resolution has been applied to the subexpression.
   bool isResolved() const { return SubExprAndIsResolved.getInt(); }
   void setResolved(bool isResolved) { SubExprAndIsResolved.setInt(isResolved); }
-  
+
   static bool classof(const Pattern *P) {
     return P->getKind() == PatternKind::Expr;
   }
 };
-  
+
 /// A pattern which introduces variable bindings. This pattern node has no
 /// semantics of its own, but has a syntactic effect on the subpattern. Bare
 /// identifiers in the subpattern create new variable bindings instead of being
@@ -659,7 +659,7 @@ public:
   }
 
   bool isLet() const { return IsLet; }
-  
+
   SourceLoc getLoc() const { return VarLoc; }
   SourceRange getSourceRange() const {
     SourceLoc EndLoc = SubPattern->getSourceRange().End;
@@ -667,17 +667,17 @@ public:
       return VarLoc;
     return {VarLoc, EndLoc};
   }
-  
+
   const Pattern *getSubPattern() const { return SubPattern; }
   Pattern *getSubPattern() { return SubPattern; }
   void setSubPattern(Pattern *p) { SubPattern = p; }
-  
+
   static bool classof(const Pattern *P) {
     return P->getKind() == PatternKind::Var;
   }
 };
 
-  
+
 inline Pattern *Pattern::getSemanticsProvidingPattern() {
   if (auto *pp = dyn_cast<ParenPattern>(this))
     return pp->getSubPattern()->getSemanticsProvidingPattern();
@@ -687,7 +687,7 @@ inline Pattern *Pattern::getSemanticsProvidingPattern() {
     return vp->getSubPattern()->getSemanticsProvidingPattern();
   return this;
 }
-  
+
 } // end namespace swift
 
 #endif

@@ -105,7 +105,7 @@ public:
   typedef __VA_ARGS__ PayloadName##PayloadType;
 
 #include "swift/Sema/TypeCheckRequestPayloads.def"
-  
+
   // Constructors.
 #define TYPE_CHECK_REQUEST_PAYLOAD(PayloadName,...)                     \
   TypeCheckRequest(Kind kind, __VA_ARGS__ payload) : TheKind(kind) {    \

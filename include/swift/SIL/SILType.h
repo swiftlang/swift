@@ -36,7 +36,7 @@ namespace Lowering {
 }
 
 } // end namespace swift
-  
+
 namespace swift {
 
 /// How an existential type container is represented.
@@ -97,7 +97,7 @@ private:
            "constructing SILType with type that should have been "
            "eliminated by SIL lowering");
   }
-  
+
   SILType(ValueType value) : value(value) {
   }
 
@@ -179,7 +179,7 @@ public:
       return CanInOutType::get(rvalueTy);
     return rvalueTy;
   }
-  
+
   /// Returns the Swift return type of a function type.
   /// The SILType must refer to a function type.
   SILType getFunctionInterfaceResultType() const {
@@ -233,7 +233,7 @@ public:
   NominalTypeDecl *getNominalOrBoundGenericNominal() const {
     return getSwiftRValueType().getNominalOrBoundGenericNominal();
   }
-  
+
   /// True if the type is an address type.
   bool isAddress() const { return getCategory() == SILValueCategory::Address; }
 
@@ -300,7 +300,7 @@ public:
   bool isAnyClassReferenceType() const {
     return getSwiftRValueType().isAnyClassReferenceType();
   }
-  
+
   /// Returns true if the referenced type is guaranteed to have a
   /// single-retainable-pointer representation.
   bool hasRetainablePointerRepresentation() const {
@@ -318,7 +318,7 @@ public:
   bool isClassExistentialType() const {
     return getSwiftRValueType()->isClassExistentialType();
   }
-  
+
   /// Returns the representation used by an existential type. If the concrete
   /// type is provided, this may return a specialized representation kind that
   /// can be used for that type. Otherwise, returns the most general
@@ -327,7 +327,7 @@ public:
   ExistentialRepresentation
   getPreferredExistentialRepresentation(SILModule &M,
                                         Type containedType = Type()) const;
-  
+
   /// Returns true if the existential type can use operations for the given
   /// existential representation when working with values of the given type,
   /// or when working with an unknown type if containedType is null.
@@ -335,12 +335,12 @@ public:
   canUseExistentialRepresentation(SILModule &M,
                                   ExistentialRepresentation repr,
                                   Type containedType = Type()) const;
-  
+
   /// True if the type contains a type parameter.
   bool hasTypeParameter() const {
     return getSwiftRValueType()->hasTypeParameter();
   }
-  
+
   /// True if the type is bridgeable to an ObjC object pointer type.
   bool isBridgeableObjectType() const {
     return getSwiftRValueType()->isBridgeableObjectType();
@@ -363,7 +363,7 @@ public:
   bool hasArchetype() const {
     return getSwiftRValueType()->hasArchetype();
   }
-  
+
   /// Returns the ASTContext for the referenced Swift type.
   const ASTContext &getASTContext() const {
     return getSwiftRValueType()->getASTContext();
@@ -392,7 +392,7 @@ public:
     if (auto optPayload = ty.getAnyOptionalObjectType()) {
       ty = optPayload;
     }
-      
+
     auto fTy = ty.getAs<SILFunctionType>();
     if (!fTy)
       return false;
@@ -466,7 +466,7 @@ public:
 
   /// Returns true if this SILType is an aggregate that contains \p Ty
   bool aggregateContainsRecord(SILType Ty, SILModule &SILMod) const;
-  
+
   /// Returns true if this SILType is an aggregate with unreferenceable storage,
   /// meaning it cannot be fully destructured in SIL.
   bool aggregateHasUnreferenceableStorage() const;
@@ -491,7 +491,7 @@ public:
   //
   // Accessors for types used in SIL instructions:
   //
-  
+
   /// Get the NativeObject type as a SILType.
   static SILType getNativeObjectType(const ASTContext &C);
   /// Get the UnknownObject type as a SILType.
@@ -520,14 +520,14 @@ public:
   void *getOpaqueValue() const {
     return value.getOpaqueValue();
   }
-  
+
   bool operator==(SILType rhs) const {
     return value.getOpaqueValue() == rhs.value.getOpaqueValue();
   }
   bool operator!=(SILType rhs) const {
     return value.getOpaqueValue() != rhs.value.getOpaqueValue();
   }
-  
+
   std::string getAsString() const;
   void dump() const;
   void print(raw_ostream &OS) const;
@@ -573,7 +573,7 @@ inline SILType SILResultInfo::getSILType() const {
   if (isIndirect()) {
     return SILType::getPrimitiveAddressType(getType());
   } else {
-    return SILType::getPrimitiveObjectType(getType());    
+    return SILType::getPrimitiveObjectType(getType());
   }
 }
 
@@ -597,7 +597,7 @@ inline SILType SILBoxType::getBoxedAddressType() const {
 static inline llvm::hash_code hash_value(SILType V) {
   return llvm::hash_value(V.getOpaqueValue());
 }
-  
+
 } // end swift namespace
 
 namespace llvm {

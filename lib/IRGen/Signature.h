@@ -27,7 +27,7 @@ namespace llvm {
 
 namespace clang {
   namespace CodeGen {
-    class CGFunctionInfo;    
+    class CGFunctionInfo;
   }
 }
 

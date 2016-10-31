@@ -54,16 +54,16 @@ CanAnyFunctionType adjustFunctionType(CanAnyFunctionType type,
 inline CanAnyFunctionType adjustFunctionType(CanAnyFunctionType t,
                                           SILFunctionType::Representation rep) {
   auto extInfo = t->getExtInfo().withSILRepresentation(rep);
-  return adjustFunctionType(t, extInfo);  
+  return adjustFunctionType(t, extInfo);
 }
 
 /// Change the given function type's representation.
 inline CanAnyFunctionType adjustFunctionType(CanAnyFunctionType t,
                                           AnyFunctionType::Representation rep) {
   auto extInfo = t->getExtInfo().withRepresentation(rep);
-  return adjustFunctionType(t, extInfo);  
+  return adjustFunctionType(t, extInfo);
 }
-  
+
 /// Given a SIL function type, return a type that is identical except
 /// for using the given ExtInfo.
 CanSILFunctionType adjustFunctionType(CanSILFunctionType type,
@@ -77,12 +77,12 @@ inline CanSILFunctionType adjustFunctionType(CanSILFunctionType t,
                                          SILFunctionType::Representation rep) {
   if (t->getRepresentation() == rep) return t;
   auto extInfo = t->getExtInfo().withRepresentation(rep);
-  
+
   return adjustFunctionType(t, extInfo,
                     extInfo.hasContext() ? DefaultThickCalleeConvention
                                          : ParameterConvention::Direct_Unowned);
 }
-  
+
 
 /// Flag used to place context-dependent TypeLowerings in their own arena which
 /// can be disposed when a generic context is exited.
@@ -90,7 +90,7 @@ enum IsDependent_t : unsigned {
   IsNotDependent = false,
   IsDependent = true
 };
-  
+
 /// Extended type information used by SIL.
 class TypeLowering {
 public:
@@ -112,11 +112,11 @@ private:
   };
   unsigned Flags;
 
-protected:  
+protected:
   TypeLowering(SILType type, IsTrivial_t isTrivial,
                IsAddressOnly_t isAddressOnly,
                IsReferenceCounted_t isRefCounted)
-    : LoweredType(type), Flags((isTrivial ? IsTrivialFlag : 0U) | 
+    : LoweredType(type), Flags((isTrivial ? IsTrivialFlag : 0U) |
                                (isAddressOnly ? IsAddressOnlyFlag : 0U) |
                                (isRefCounted ? IsReferenceCountedFlag : 0U)) {}
 
@@ -149,13 +149,13 @@ public:
   bool isLoadable() const {
     return !isAddressOnly();
   }
-  
+
   /// Returns true if the type is trivial, meaning it is a loadable
   /// value type with no reference type members that require releasing.
   bool isTrivial() const {
     return Flags & IsTrivialFlag;
   }
-  
+
   /// Returns true if the type is a scalar reference-counted reference, which
   /// can be retained and released.
   bool isReferenceCounted() const {
@@ -181,7 +181,7 @@ public:
                                        SILValueCategory::Object);
     return getLoweredType();
   }
-  
+
   /// Return the lowering for the semantic type.
   inline const TypeLowering &getSemanticTypeLowering(TypeConverter &TC) const;
 
@@ -345,10 +345,10 @@ struct SILConstantInfo {
 
   /// The SIL function type of the constant.
   CanSILFunctionType SILFnType;
-  
+
   /// The generic environment used by the constant.
   GenericEnvironment *GenericEnv;
-  
+
   SILType getSILType() const {
     return SILType::getPrimitiveObjectType(SILFnType);
   }
@@ -437,7 +437,7 @@ class TypeConverter {
     bool isCacheable() const {
       return OrigType.hasCachingKey();
     }
-    
+
     IsDependent_t isDependent() const {
       if (SubstType->hasTypeParameter())
         return IsDependent;
@@ -446,16 +446,16 @@ class TypeConverter {
   };
 
   friend struct llvm::DenseMapInfo<CachingTypeKey>;
-  
+
   TypeKey getTypeKey(AbstractionPattern origTy, CanType substTy,
                      unsigned uncurryLevel) {
     return {origTy, substTy, uncurryLevel};
   }
-  
+
   struct OverrideKey {
     SILDeclRef derived;
     SILDeclRef base;
-    
+
     friend bool operator==(const OverrideKey &lhs,
                            const OverrideKey &rhs) {
       return lhs.derived == rhs.derived
@@ -466,7 +466,7 @@ class TypeConverter {
       return !(lhs == rhs);
     }
   };
-  
+
   friend struct llvm::DenseMapInfo<OverrideKey>;
 
   /// Find a cached TypeLowering by TypeKey, or return null if one doesn't
@@ -474,28 +474,28 @@ class TypeConverter {
   const TypeLowering *find(TypeKey k);
   /// Insert a mapping into the cache.
   void insert(TypeKey k, const TypeLowering *tl);
-  
+
   /// Mapping for types independent on contextual generic parameters, which is
   /// cleared when the generic context is popped.
   llvm::DenseMap<CachingTypeKey, const TypeLowering *> IndependentTypes;
   /// Mapping for types dependent on contextual generic parameters, which is
   /// cleared when the generic context is popped.
   llvm::DenseMap<CachingTypeKey, const TypeLowering *> DependentTypes;
-  
+
   llvm::DenseMap<SILDeclRef, SILConstantInfo> ConstantTypes;
-  
+
   llvm::DenseMap<OverrideKey, SILConstantInfo> ConstantOverrideTypes;
-  
+
   llvm::DenseMap<AnyFunctionRef, CaptureInfo> LoweredCaptures;
-  
+
   /// The current generic context signature.
   CanGenericSignature CurGenericContext;
-  
+
   CanAnyFunctionType makeConstantInterfaceType(SILDeclRef constant);
-  
+
   /// Get the generic environment for a constant.
   GenericEnvironment *getConstantGenericEnvironment(SILDeclRef constant);
-  
+
   // Types converted during foreign bridging.
 #define BRIDGING_KNOWN_TYPE(BridgedModule,BridgedType) \
   Optional<CanType> BridgedType##Ty;
@@ -531,19 +531,19 @@ public:
     // Native protocols use the witness calling convention.
     return SILFunctionTypeRepresentation::WitnessMethod;
   }
-  
+
   /// Get the calling convention used to call a declaration.
   SILFunctionTypeRepresentation getDeclRefRepresentation(SILDeclRef c);
-  
+
   /// Get the method dispatch strategy for a protocol.
   static ProtocolDispatchStrategy getProtocolDispatchStrategy(ProtocolDecl *P);
-  
+
   /// True if a protocol uses witness tables for dynamic dispatch.
   static bool protocolRequiresWitnessTable(ProtocolDecl *P) {
     return ProtocolDescriptorFlags::needsWitnessTable
              (getProtocolDispatchStrategy(P));
   }
-  
+
   /// True if a type is passed indirectly at +0 when used as the "self"
   /// parameter of its own methods.
   ///
@@ -554,11 +554,11 @@ public:
     return !T->hasReferenceSemantics()
         && (T->isExistentialType() || T->is<ArchetypeType>());
   }
-  
+
   static bool isIndirectPlusZeroSelfParameter(SILType T) {
     return isIndirectPlusZeroSelfParameter(T.getSwiftRValueType());
   }
-  
+
   /// Lowers a Swift type to a SILType, and returns the SIL TypeLowering
   /// for that type.
   const TypeLowering &getTypeLowering(Type t, unsigned uncurryLevel = 0) {
@@ -620,7 +620,7 @@ public:
   /// Returns the formal type, lowered AST type, and SILFunctionType
   /// for a constant reference.
   SILConstantInfo getConstantInfo(SILDeclRef constant);
-  
+
   /// Returns the SIL type of a constant reference.
   SILType getConstantType(SILDeclRef constant) {
     return getConstantInfo(constant).getSILType();
@@ -630,11 +630,11 @@ public:
   CanSILFunctionType getConstantFunctionType(SILDeclRef constant) {
     return getConstantInfo(constant).SILFnType;
   }
-  
+
   /// Returns the SILParameterInfo for the given declaration's `self` parameter.
   /// `constant` must refer to a method.
   SILParameterInfo getConstantSelfParameter(SILDeclRef constant);
-  
+
   /// Returns the SILFunctionType the given declaration must use to override.
   /// Will be the same as getConstantFunctionType if the declaration does
   /// not override.
@@ -645,7 +645,7 @@ public:
     SILDeclRef base = constant;
     while (SILDeclRef overridden = base.getOverridden())
       base = overridden;
-    
+
     return getConstantOverrideType(constant, base);
   }
 
@@ -663,12 +663,12 @@ public:
                                  CanAnyFunctionType origLoweredType,
                                  CanAnyFunctionType substLoweredInterfaceType,
                          const Optional<ForeignErrorConvention> &foreignError);
-  
+
   /// Get the empty tuple type as a SILType.
   SILType getEmptyTupleType() {
     return getLoweredType(TupleType::getEmpty(Context));
   }
-  
+
   /// Get a function type curried with its capture context.
   CanAnyFunctionType getFunctionInterfaceTypeWithCaptures(
                                               CanAnyFunctionType funcType,
@@ -733,11 +733,11 @@ public:
   CanGenericSignature getCurGenericContext() const {
     return CurGenericContext;
   }
-  
+
   /// Pop a generic function context. See GenericContextScope for an RAII
   /// interface to this function. There must be an active generic context.
   void popGenericContext(CanGenericSignature sig);
-  
+
   /// Known types for bridging.
 #define BRIDGING_KNOWN_TYPE(BridgedModule,BridgedType) \
   CanType get##BridgedType##Type();
@@ -755,7 +755,7 @@ public:
     // Non-trivial difference requires thunk.
     NeedsThunk
   };
-  
+
   /// \brief Test if type1 is ABI compatible with type2, and can be converted
   /// with a trivial bitcast.
   ///
@@ -819,16 +819,16 @@ public:
   {
     TC.pushGenericContext(sig);
   }
-  
+
   ~GenericContextScope() {
     TC.popGenericContext(Sig);
   }
-  
+
 private:
   GenericContextScope(const GenericContextScope&) = delete;
   GenericContextScope &operator=(const GenericContextScope&) = delete;
 };
-  
+
 } // namespace Lowering
 } // namespace swift
 

@@ -504,9 +504,9 @@ public:
     TypeAccessScopeCache;
 
   // Caches whether a given declaration is "as specialized" as another.
-  llvm::DenseMap<std::pair<ValueDecl*, ValueDecl*>, bool> 
+  llvm::DenseMap<std::pair<ValueDecl*, ValueDecl*>, bool>
     specializedOverloadComparisonCache;
-  
+
   // We delay validation of C and Objective-C type-bridging functions in the
   // standard library until we encounter a declaration that requires one. This
   // flag is set to 'true' once the bridge functions have been checked.
@@ -1140,7 +1140,7 @@ public:
   /// Provide storage and accessor implementations for the given property,
   /// which must be lazy.
   void completeLazyVarImplementation(VarDecl *lazyVar);
-  
+
   /// Instantiate the storage implementation for a behavior-backed property.
   void completePropertyBehaviorStorage(VarDecl *VD,
                                VarDecl *BehaviorStorage,
@@ -1151,7 +1151,7 @@ public:
                                NormalProtocolConformance *BehaviorConformance,
                                ArrayRef<Substitution> SelfInterfaceSubs,
                                ArrayRef<Substitution> SelfContextSubs);
-  
+
   /// Instantiate the parameter implementation for a behavior-backed
   /// property.
   void completePropertyBehaviorParameter(VarDecl *VD,
@@ -1159,7 +1159,7 @@ public:
                                NormalProtocolConformance *BehaviorConformance,
                                ArrayRef<Substitution> SelfInterfaceSubs,
                                ArrayRef<Substitution> SelfContextSubs);
-  
+
   /// Instantiate the accessor implementations for a behavior-backed
   /// property.
   void completePropertyBehaviorAccessors(VarDecl *VD,
@@ -1378,7 +1378,7 @@ public:
   bool typeCheckParameterList(ParameterList *PL, DeclContext *dc,
                               TypeResolutionOptions options,
                               GenericTypeResolver *resolver = nullptr);
-  
+
   /// Coerce a pattern to the given type.
   ///
   /// \param P The pattern, which may be modified by this coercion.
@@ -1401,7 +1401,7 @@ public:
   /// \returns true if an error occurred, false otherwise.
   bool coerceParameterListToType(ParameterList *P, ClosureExpr *CE, AnyFunctionType *FN);
 
-  
+
   /// Type-check an initialized variable pattern declaration.
   bool typeCheckBinding(Pattern *&P, Expr *&Init, DeclContext *DC);
   bool typeCheckPatternBinding(PatternBindingDecl *PBD, unsigned patternNumber);

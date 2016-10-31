@@ -209,7 +209,7 @@ public:
       return Alignment(Align);
     }
   };
-  
+
 private:
   SmallVector<Element, 8> Elements;
   bool ContainsAggregate;
@@ -238,7 +238,7 @@ public:
 
   typedef SmallVectorImpl<Element>::iterator iterator;
   typedef SmallVectorImpl<Element>::const_iterator const_iterator;
-  
+
   iterator begin() { return Elements.begin(); }
   iterator end() { return Elements.end(); }
   const_iterator begin() const { return Elements.begin(); }

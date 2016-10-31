@@ -59,7 +59,7 @@ public:
 
   void visitSILBasicBlock(SILBasicBlock *BB) {
     asImpl().visitBasicBlockArguments(BB);
-      
+
     for (auto &I : *BB)
       asImpl().visit(&I);
   }

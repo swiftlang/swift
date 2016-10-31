@@ -39,7 +39,7 @@ namespace llvm {
   class FunctionType;
 }
 
-namespace swift {  
+namespace swift {
 namespace irgen {
 class TypeInfo;
 class IRGenModule;
@@ -92,7 +92,7 @@ class LinkEntity {
     /// A function.
     /// The pointer is a FuncDecl*.
     Function,
-    
+
     /// The offset to apply to a witness table or metadata object
     /// in order to find the information for a declaration.  The
     /// pointer is a ValueDecl*.
@@ -116,7 +116,7 @@ class LinkEntity {
     /// The nominal type descriptor for a nominal type.
     /// The pointer is a NominalTypeDecl*.
     NominalTypeDescriptor,
-    
+
     /// The protocol descriptor for a protocol type.
     /// The pointer is a ProtocolDecl*.
     ProtocolDescriptor,
@@ -130,7 +130,7 @@ class LinkEntity {
 
     /// A SIL function. The pointer is a SILFunction*.
     SILFunction,
-    
+
     /// A SIL global variable. The pointer is a SILGlobalVariable*.
     SILGlobalVariable,
 
@@ -151,7 +151,7 @@ class LinkEntity {
     /// The instantiation function for a generic protocol witness table.
     /// The secondary pointer is a ProtocolConformance*.
     GenericProtocolWitnessTableInstantiationFunction,
-    
+
     /// A function which returns the type metadata for the associated type
     /// of a protocol.  The secondary pointer is a ProtocolConformance*.
     /// The index of the associated type declaration is stored in the data.
@@ -204,7 +204,7 @@ class LinkEntity {
     /// A foreign type metadata candidate.
     /// The pointer is a canonical TypeBase*.
     ForeignTypeMetadataCandidate,
-    
+
     /// A type which is being mangled just for its string.
     /// The pointer is a canonical TypeBase*.
     TypeMangling,
@@ -236,7 +236,7 @@ class LinkEntity {
   static bool isTypeKind(Kind k) {
     return k >= Kind::ProtocolWitnessTableLazyAccessFunction;
   }
-  
+
   static bool isProtocolConformanceKind(Kind k) {
     return (k >= Kind::DirectProtocolWitnessTable &&
             k <= Kind::ProtocolWitnessTableLazyCacheVariable);
@@ -389,13 +389,13 @@ public:
     entity.setForType(Kind::ForeignTypeMetadataCandidate, type);
     return entity;
   }
-  
+
   static LinkEntity forNominalTypeDescriptor(NominalTypeDecl *decl) {
     LinkEntity entity;
     entity.setForDecl(Kind::NominalTypeDescriptor, decl, 0);
     return entity;
   }
-  
+
   static LinkEntity forProtocolDescriptor(ProtocolDecl *decl) {
     LinkEntity entity;
     entity.setForDecl(Kind::ProtocolDescriptor, decl, 0);
@@ -430,7 +430,7 @@ public:
     entity.Data = LINKENTITY_SET_FIELD(Kind, unsigned(Kind::SILFunction));
     return entity;
   }
-  
+
   static LinkEntity forSILGlobalVariable(SILGlobalVariable *G) {
     LinkEntity entity;
     entity.Pointer = G;
@@ -438,7 +438,7 @@ public:
     entity.Data = LINKENTITY_SET_FIELD(Kind, unsigned(Kind::SILGlobalVariable));
     return entity;
   }
-  
+
   static LinkEntity
   forDirectProtocolWitnessTable(const ProtocolConformance *C) {
     LinkEntity entity;
@@ -555,7 +555,7 @@ public:
     assert(isDeclKind(getKind()));
     return reinterpret_cast<ValueDecl*>(Pointer);
   }
-  
+
   SILFunction *getSILFunction() const {
     assert(getKind() == Kind::SILFunction);
     return reinterpret_cast<SILFunction*>(Pointer);
@@ -575,7 +575,7 @@ public:
     assert(getKind() == Kind::SILGlobalVariable);
     return reinterpret_cast<SILGlobalVariable*>(Pointer);
   }
-  
+
   const ProtocolConformance *getProtocolConformance() const {
     assert(isProtocolConformanceKind(getKind()));
     return reinterpret_cast<ProtocolConformance*>(SecondaryPointer);
@@ -653,7 +653,7 @@ class LinkInfo {
   ForDefinition_t ForDefinition;
 
 public:
-  /// Compute linkage information for the given 
+  /// Compute linkage information for the given
   static LinkInfo get(IRGenModule &IGM, const LinkEntity &entity,
                       ForDefinition_t forDefinition);
 

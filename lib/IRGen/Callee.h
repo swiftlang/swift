@@ -80,7 +80,7 @@ namespace irgen {
       result.ForeignInfo = foreignInfo;
       return result;
     }
-    
+
     SILFunctionTypeRepresentation getRepresentation() const {
       return OrigFnType->getRepresentation();
     }

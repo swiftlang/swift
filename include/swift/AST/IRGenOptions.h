@@ -101,7 +101,7 @@ public:
 
   /// \brief Whether we're generating IR for the JIT.
   unsigned UseJIT : 1;
-  
+
   /// \brief Whether we should run LLVM optimizations after IRGen.
   unsigned DisableLLVMOptzns : 1;
 
@@ -113,7 +113,7 @@ public:
 
   /// Disable frame pointer elimination?
   unsigned DisableFPElim : 1;
-  
+
   /// Special codegen for playgrounds.
   unsigned Playground : 1;
 

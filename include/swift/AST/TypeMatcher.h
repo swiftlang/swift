@@ -235,7 +235,7 @@ class TypeMatcher {
         // embedding that non-commutativity in this general matcher is icky.
         if (firstFunc->isNoEscape() != secondFunc->isNoEscape())
           return mismatch(firstFunc.getPointer(), secondFunc);
-        
+
         return this->visit(firstFunc.getInput(), secondFunc->getInput()) &&
                this->visit(firstFunc.getResult(), secondFunc->getResult());
       }

@@ -35,9 +35,9 @@ public:
   using RawType = unsigned;
 private:
   RawType Value;
-  
+
   explicit LocalTypeData(unsigned Value) : Value(Value) {}
-  
+
   /// Magic values for special kinds of index.
   enum : RawType {
     Metatype = ~0U,
@@ -45,13 +45,13 @@ private:
 
     ValueWitnessBase = 0xFFFFFF00U,
   };
-  
+
 public:
   LocalTypeData() = default;
-  
+
   // The magic values are all in the "negative" range and so do
   // not collide with reasonable index values.
-  
+
   /// A reference to the type metadata.
   static LocalTypeData forMetatype() { return LocalTypeData(Metatype); }
   /// A reference to the value witness table.
@@ -63,12 +63,12 @@ public:
   static LocalTypeData forValueWitness(ValueWitness witness) {
     return LocalTypeData((unsigned)witness + ValueWitnessBase);
   }
-  
+
   /// A reference to a protocol witness table for an archetype.
   static LocalTypeData forArchetypeProtocolWitness(unsigned index) {
     return LocalTypeData(index);
   }
-  
+
   RawType getRawValue() const {
     return Value;
   }

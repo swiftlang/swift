@@ -73,7 +73,7 @@ private:
     } Unresolved;
   };
 
-  
+
 public:
   EffectiveClangContext() : TheKind(DeclContext) {
     DC = nullptr;
@@ -289,7 +289,7 @@ private:
   friend class SwiftLookupTableReader;
   friend class SwiftLookupTableWriter;
 
-  /// Find or create the table entry for the given base name. 
+  /// Find or create the table entry for the given base name.
   llvm::DenseMap<StringRef, SmallVector<FullTableEntry, 2>>::iterator
   findOrCreate(StringRef baseName);
 

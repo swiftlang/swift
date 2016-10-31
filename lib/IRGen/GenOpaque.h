@@ -165,7 +165,7 @@ namespace irgen {
   void emitDestroyBufferCall(IRGenFunction &IGF,
                              SILType T,
                              Address buffer);
-  
+
   /// Emit a call to do a 'deallocateBuffer' operation.
   void emitDeallocateBufferCall(IRGenFunction &IGF,
                                 llvm::Value *metadata,
@@ -173,13 +173,13 @@ namespace irgen {
   void emitDeallocateBufferCall(IRGenFunction &IGF,
                                 SILType T,
                                 Address buffer);
-  
+
   /// Emit a call to the 'getExtraInhabitantIndex' operation.
   /// The type must be dynamically known to have extra inhabitant witnesses.
   llvm::Value *emitGetExtraInhabitantIndexCall(IRGenFunction &IGF,
                                                SILType T,
                                                Address srcObject);
-  
+
   /// Emit a call to the 'storeExtraInhabitant' operation.
   /// The type must be dynamically known to have extra inhabitant witnesses.
   llvm::Value *emitStoreExtraInhabitantCall(IRGenFunction &IGF,
@@ -225,7 +225,7 @@ namespace irgen {
 
   /// Emit a load of the 'hasExtraInhabitants' value witness.
   llvm::Value *emitLoadOfHasExtraInhabitants(IRGenFunction &IGF, SILType T);
-  
+
   /// Emit a load of the 'extraInhabitantCount' value witness.
   /// The type must be dynamically known to have extra inhabitant witnesses.
   llvm::Value *emitLoadOfExtraInhabitantCount(IRGenFunction &IGF, SILType T);

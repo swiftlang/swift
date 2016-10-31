@@ -53,19 +53,19 @@ public:
                                ArrayRef<ParamDecl*> params) {
     return create(C, SourceLoc(), params, SourceLoc());
   }
- 
+
   /// Create an empty parameter list.
   static ParameterList *createEmpty(const ASTContext &C,
                                     SourceLoc LParenLoc = SourceLoc(),
                                     SourceLoc RParenLoc = SourceLoc()) {
     return create(C, LParenLoc, {}, RParenLoc);
   }
-  
+
   /// Create a parameter list for a single parameter lacking location info.
   static ParameterList *createWithoutLoc(ParamDecl *decl) {
     return create(decl->getASTContext(), decl);
   }
-  
+
   /// Create an implicit 'self' decl for a method in the specified decl context.
   /// If 'static' is true, then this is self for a static method in the type.
   ///
@@ -89,14 +89,14 @@ public:
 
   SourceLoc getLParenLoc() const { return LParenLoc; }
   SourceLoc getRParenLoc() const { return RParenLoc; }
-  
+
   typedef MutableArrayRef<ParamDecl*>::iterator iterator;
   typedef ArrayRef<ParamDecl*>::iterator const_iterator;
   iterator begin() { return getArray().begin(); }
   iterator end() { return getArray().end(); }
   const_iterator begin() const { return getArray().begin(); }
   const_iterator end() const { return getArray().end(); }
-  
+
   MutableArrayRef<ParamDecl*> getArray() {
     return {getTrailingObjects<ParamDecl*>(), numParameters};
   }
@@ -107,23 +107,23 @@ public:
   size_t size() const {
     return numParameters;
   }
-  
+
   const ParamDecl *get(unsigned i) const {
     return getArray()[i];
   }
-  
+
   ParamDecl *&get(unsigned i) {
     return getArray()[i];
   }
 
   const ParamDecl *operator[](unsigned i) const { return get(i); }
   ParamDecl *&operator[](unsigned i) { return get(i); }
-  
+
   /// Change the DeclContext of any contained parameters to the specified
   /// DeclContext.
   void setDeclContextOfParamDecls(DeclContext *DC);
-  
-  
+
+
   /// Flags used to indicate how ParameterList cloning should operate.
   enum CloneFlags {
     /// The cloned ParamDecls should be marked implicit.
@@ -132,16 +132,16 @@ public:
     /// arguments as inherited, and mark unnamed arguments as named.
     Inherited = 0x02
   };
-  
+
   /// Make a duplicate copy of this parameter list.  This allocates copies of
   /// the ParamDecls, so they can be reparented into a new DeclContext.
   ParameterList *clone(const ASTContext &C,
                        OptionSet<CloneFlags> options = None) const;
-  
+
   /// Return a TupleType or ParenType for this parameter list.  This returns a
   /// null type if one of the ParamDecls does not have a type set for it yet.
   Type getType(const ASTContext &C) const;
-  
+
   /// Return a TupleType or ParenType for this parameter list written in terms
   /// of interface types.
   Type getInterfaceType(DeclContext *DC) const;
@@ -150,8 +150,8 @@ public:
   /// returns the specified result type written in terms of interface types.
   static Type getFullInterfaceType(Type resultType, ArrayRef<ParameterList*> PL,
                                    DeclContext *DC);
-  
-  
+
+
   /// Return the full source range of this parameter.
   SourceRange getSourceRange() const;
   SourceLoc getStartLoc() const { return getSourceRange().Start; }
@@ -159,7 +159,7 @@ public:
 
   void dump() const;
   void dump(raw_ostream &OS, unsigned Indent = 0) const;
-  
+
   //  void print(raw_ostream &OS) const;
 };
 

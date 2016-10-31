@@ -63,7 +63,7 @@ class ConcreteDeclRef {
     ArrayRef<Substitution> getSubstitutions() const {
       return {getTrailingObjects<Substitution>(), NumSubstitutions};
     }
-    
+
     /// Allocate a new specialized declaration reference.
     static SpecializedDeclRef *create(ASTContext &ctx, ValueDecl *decl,
                                       ArrayRef<Substitution> substitutions);
@@ -116,14 +116,14 @@ public:
   ArrayRef<Substitution> getSubstitutions() const {
     if (!isSpecialized())
       return { };
-    
+
     return Data.get<SpecializedDeclRef *>()->getSubstitutions();
   }
 
   bool operator==(ConcreteDeclRef rhs) const {
     return Data == rhs.Data;
   }
-  
+
   /// Dump a debug representation of this reference.
   void dump(raw_ostream &os);
   void dump() LLVM_ATTRIBUTE_USED;

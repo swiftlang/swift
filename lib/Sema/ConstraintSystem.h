@@ -66,7 +66,7 @@ namespace constraints {
 class SavedTypeVariableBinding {
   /// \brief The type variable and type variable options.
   llvm::PointerIntPair<TypeVariableType *, 3> TypeVarAndOptions;
-  
+
   /// \brief The parent or fixed type.
   llvm::PointerUnion<TypeVariableType *, TypeBase *> ParentOrFixed;
 
@@ -193,19 +193,19 @@ public:
   constraints::ConstraintGraphNode *getGraphNode() const { return GraphNode; }
 
   /// Set the corresponding node in the constraint graph.
-  void setGraphNode(constraints::ConstraintGraphNode *newNode) { 
-    GraphNode = newNode; 
+  void setGraphNode(constraints::ConstraintGraphNode *newNode) {
+    GraphNode = newNode;
   }
 
   /// Retrieve the index into the constraint graph's list of type variables.
-  unsigned getGraphIndex() const { 
+  unsigned getGraphIndex() const {
     assert(GraphNode && "Graph node isn't set");
-    return GraphIndex; 
+    return GraphIndex;
   }
 
   /// Set the index into the constraint graph's list of type variables.
   void setGraphIndex(unsigned newIndex) { GraphIndex = newIndex; }
-  
+
   /// \brief Check whether this type variable either has a representative that
   /// is not itself or has a fixed type binding.
   bool hasRepresentativeOrFixed() const {
@@ -408,7 +408,7 @@ enum ScoreKind {
   SK_ArrayPointerConversion,
   /// A conversion to an empty existential type ('Any' or '{}').
   SK_EmptyExistentialConversion,
-  
+
   SK_LastScoreKind = SK_EmptyExistentialConversion,
 };
 
@@ -525,7 +525,7 @@ public:
 
   /// \brief The set of type bindings.
   llvm::SmallDenseMap<TypeVariableType *, Type> typeBindings;
-  
+
   /// \brief The set of overload choices along with their types.
   llvm::SmallDenseMap<ConstraintLocator *, SelectedOverload> overloadChoices;
 
@@ -726,7 +726,7 @@ struct ResolvedOverloadSetListItem {
                      unsigned alignment
                        = alignof(ResolvedOverloadSetListItem));
 };
-  
+
 
 
 /// Identifies a specific conversion from
@@ -742,7 +742,7 @@ typedef llvm::ilist<Constraint> ConstraintList;
 enum class ConstraintSystemFlags {
   /// Whether we allow the solver to attempt fixes to the system.
   AllowFixes = 0x01,
-  
+
   /// Set if the client prefers fixits to be in the form of force unwrapping
   /// or optional chaining to return an optional.
   PreferForceUnwrapToOptional = 0x02,
@@ -757,53 +757,53 @@ struct MemberLookupResult {
     /// This result indicates that we cannot begin to solve this, because the
     /// base expression is a type variable.
     Unsolved,
-    
+
     /// This result indicates that the member reference is erroneous, but was
     /// already diagnosed.  Don't emit another error.
     ErrorAlreadyDiagnosed,
-    
+
     /// This result indicates that the lookup produced candidate lists,
     /// potentially of viable results, potentially of error candidates, and
     /// potentially empty lists, indicating that there were no matches.
     HasResults
   } OverallResult;
-  
+
   /// This is a list of viable candidates that were matched.
   ///
   SmallVector<OverloadChoice, 4> ViableCandidates;
-  
+
   /// If there is a favored candidate in the viable list, this indicates its
   /// index.
   unsigned FavoredChoice = ~0U;
-  
-  
+
+
   /// This enum tracks reasons why a candidate is not viable.
   enum UnviableReason {
     /// Argument labels don't match.
     UR_LabelMismatch,
-    
+
     /// This uses a type like Self in its signature that cannot be used on an
     /// existential box.
     UR_UnavailableInExistential,
-    
+
     /// This is an instance member being accessed through something of metatype
     /// type.
     UR_InstanceMemberOnType,
-    
+
     /// This is a static/class member being accessed through an instance.
     UR_TypeMemberOnInstance,
-    
+
     /// This is a mutating member, being used on an rvalue.
     UR_MutatingMemberOnRValue,
-    
+
     /// The getter for this subscript or computed property is mutating and we
     /// only have an rvalue base.  This is more specific than the former one.
     UR_MutatingGetterOnRValue,
-    
+
     /// The member is inaccessible (e.g. a private member in another file).
     UR_Inaccessible,
   };
-  
+
   /// This is a list of considered, but rejected, candidates, along with a
   /// reason for their rejection.
   SmallVector<std::pair<ValueDecl*, UnviableReason>, 4> UnviableCandidates;
@@ -814,23 +814,23 @@ struct MemberLookupResult {
     OverallResult = ErrorAlreadyDiagnosed;
     return *this;
   }
-  
+
   void addViable(OverloadChoice candidate) {
     ViableCandidates.push_back(candidate);
   }
-  
+
   void addUnviable(ValueDecl *VD, UnviableReason reason) {
     UnviableCandidates.push_back({VD, reason});
   }
-  
+
   OverloadChoice *getFavoredChoice() {
     if (FavoredChoice == ~0U) return nullptr;
     return &ViableCandidates[FavoredChoice];
   }
-  
+
 };
-  
-  
+
+
 /// \brief Describes a system of constraints on type variables, the
 /// solution of which assigns concrete types to each of the type variables.
 /// Constraint systems are typically generated given an (untyped) expression.
@@ -839,7 +839,7 @@ public:
   TypeChecker &TC;
   DeclContext *DC;
   ConstraintSystemOptions Options;
-  
+
   friend class Fix;
   friend class OverloadChoice;
   friend class ConstraintGraph;
@@ -866,7 +866,7 @@ private:
 
   /// \brief Counter for type variables introduced.
   unsigned TypeCounter = 0;
-  
+
   /// \brief The expression being solved has exceeded the solver's memory
   /// threshold.
   bool expressionExceededThreshold = false;
@@ -906,7 +906,7 @@ private:
   TypeLoc contextualType;
   Expr *contextualTypeNode = nullptr;
   ContextualTypePurpose contextualTypePurpose = CTP_Unused;
-  
+
   /// \brief The set of constraint restrictions used to reach the
   /// current constraint system.
   ///
@@ -1000,7 +1000,7 @@ private:
     ConstraintSystem &CS;
 
     /// Old value of DebugConstraintSolver.
-    /// FIXME: Move the "debug constraint solver" bit into the constraint 
+    /// FIXME: Move the "debug constraint solver" bit into the constraint
     /// system itself.
     bool OldDebugConstraintSolver;
 
@@ -1040,7 +1040,7 @@ public:
   ///
   /// This will be non-null when we're actively solving the constraint
   /// system, and carries temporary state related to the current path
-  /// we're exploring. 
+  /// we're exploring.
   SolverState *solverState = nullptr;
 
   struct ArgumentLabelState {
@@ -1174,8 +1174,8 @@ private:
   /// diagnostic for it and returning true.  If the fixit hint turned out to be
   /// bogus, this returns false and doesn't emit anything.
   bool applySolutionFix(Expr *expr, const Solution &solution, unsigned fixNo);
-  
-  
+
+
   /// \brief Restore the type variable bindings to what they were before
   /// we attempted to solve this constraint system.
   ///
@@ -1223,14 +1223,14 @@ public:
   ArrayRef<TypeVariableType *> getTypeVariables() const {
     return TypeVariables;
   }
-  
+
   TypeBase* getFavoredType(Expr *E) {
     return this->FavoredTypes[E];
   }
   void setFavoredType(Expr *E, TypeBase *T) {
     this->FavoredTypes[E] = T;
   }
- 
+
   void setContextualType(Expr *E, TypeLoc T, ContextualTypePurpose purpose) {
     contextualTypeNode = E;
     contextualType = T;
@@ -1255,7 +1255,7 @@ public:
   ContextualTypePurpose getContextualTypePurpose() const {
     return contextualTypePurpose;
   }
-  
+
   /// \brief Retrieve the constraint locator for the given anchor and
   /// path, uniqued.
   ConstraintLocator *
@@ -1303,7 +1303,7 @@ public:
   /// \brief Log and record the application of the fix. Return true iff any
   /// subsequent solution would be worse than the best known solution.
   bool recordFix(Fix fix, ConstraintLocatorBuilder locator);
-  
+
   /// \brief Try to salvage the constraint system by applying (speculative)
   /// fixes to the underlying expression.
   ///
@@ -1321,7 +1321,7 @@ public:
   /// invalid, emit a detailed error about the condition.
   void diagnoseAssignmentFailure(Expr *dest, Type destTy, SourceLoc equalLoc);
 
-  
+
   /// \brief Mine the active and inactive constraints in the constraint
   /// system to generate a plausible diagnosis of why the system could not be
   /// solved.
@@ -1495,11 +1495,11 @@ public:
   ///
   /// \param locator The location used to describe this member access.
   ///
-  /// \param options Options to be supplied to type variable creation if 
+  /// \param options Options to be supplied to type variable creation if
   /// a new type is created.
   ///
   /// \returns the type variable representing the member type.
-  TypeVariableType *getMemberType(TypeVariableType *baseTypeVar, 
+  TypeVariableType *getMemberType(TypeVariableType *baseTypeVar,
                                   AssociatedTypeDecl *assocType,
                                   ConstraintLocatorBuilder locator,
                                   unsigned options);
@@ -1561,7 +1561,7 @@ public:
   /// \param type The fixed type to which the type variable will be bound.
   ///
   /// \param updateState Whether to update the state based on this binding.
-  /// False when we're only assigning a type as part of reconstructing 
+  /// False when we're only assigning a type as part of reconstructing
   /// a complete solution from partial solutions.
   void assignFixedType(TypeVariableType *typeVar, Type type,
                        bool updateState = true);
@@ -1570,7 +1570,7 @@ public:
   // necessary to ensure that the type in question is materializable in a
   // viable solution.
   void setMustBeMaterializableRecursive(Type type);
-  
+
   /// \brief Determine if the type in question is an Array<T>.
   bool isArrayType(Type t);
 
@@ -1811,10 +1811,10 @@ public:
 
     /// Indicates that we are applying a fix.
     TMF_ApplyingFix = 0x02,
-    
+
     /// Indicates we're matching an operator parameter.
     TMF_ApplyingOperatorParameter = 0x4,
-    
+
     /// Indicates we're unwrapping an optional type for a value-to-optional
     /// conversion.
     TMF_UnwrappingOptional = 0x8,
@@ -1926,7 +1926,7 @@ public:
                                          ConstraintLocator *memberLocator,
                                          bool includeInaccessibleMembers);
 
-private:  
+private:
   /// \brief Attempt to simplify the given construction constraint.
   ///
   /// \param valueType The type being constructed.
@@ -1937,10 +1937,10 @@ private:
   ///
   /// \param flags Flags that indicate how the constraint should be
   /// simplified.
-  /// 
+  ///
   /// \param locator Locator describing where this construction
   /// occurred.
-  SolutionKind simplifyConstructionConstraint(Type valueType, 
+  SolutionKind simplifyConstructionConstraint(Type valueType,
                                               FunctionType *fnType,
                                               TypeMatchOptions flags,
                                               FunctionRefKind functionRefKind,
@@ -1986,7 +1986,7 @@ private:
                                         TypeMatchOptions flags,
                                         ConstraintLocatorBuilder locator);
 
-  
+
   /// \brief Attempt to simplify the optional object constraint.
   SolutionKind simplifyOptionalObjectConstraint(
                                           Type first, Type second,
@@ -2191,7 +2191,7 @@ public:
   /// expression, producing a fully type-checked expression.
   Expr *applySolutionShallow(const Solution &solution, Expr *expr,
                              bool suppressDiagnostics);
-  
+
   /// Extract the base type from an array or slice type.
   /// \param type The array type to inspect.
   /// \returns the base type of the array.
@@ -2201,18 +2201,18 @@ public:
   /// \param type The set type to inspect.
   /// \returns the base type of the set.
   Type getBaseTypeForSetType(TypeBase *type);
-  
+
   /// \brief Set whether or not the expression being solved is too complex and
   /// has exceeded the solver's memory threshold.
   void setExpressionTooComplex(bool tc) {
     expressionExceededThreshold = tc;
   }
-  
+
   /// \brief Reorder the disjunctive clauses for a given expression to
   /// increase the likelihood that a favored constraint will be successfully
   /// resolved before any others.
   void optimizeConstraints(Expr *e);
-  
+
   /// \brief Determine if the expression being solved has exceeded the solver's
   /// memory threshold.
   bool getExpressionTooComplex() {

@@ -111,7 +111,7 @@ enum class ImportTypeKind {
 
   /// \brief Import the declared type of a variable.
   Variable,
-  
+
   /// \brief Import the declared type of an audited variable.
   ///
   /// This is exactly like ImportTypeKind::Variable, except it
@@ -120,7 +120,7 @@ enum class ImportTypeKind {
 
   /// \brief Import the declared type of a struct or union field.
   RecordField,
-  
+
   /// \brief Import the result type of a function.
   ///
   /// This provides special treatment for 'void', among other things, and
@@ -256,7 +256,7 @@ private:
 using LookupTableMap = llvm::StringMap<std::unique_ptr<SwiftLookupTable>>;
 
 /// \brief Implementation of the Clang importer.
-class LLVM_LIBRARY_VISIBILITY ClangImporter::Implementation 
+class LLVM_LIBRARY_VISIBILITY ClangImporter::Implementation
   : public LazyMemberLoader
 {
   friend class ClangImporter;
@@ -580,7 +580,7 @@ public:
   clang::Preprocessor &getClangPreprocessor() const {
     return Instance->getPreprocessor();
   }
-  
+
   clang::CodeGenOptions &getClangCodeGenOpts() const {
     return Instance->getCodeGenOpts();
   }

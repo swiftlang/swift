@@ -43,14 +43,14 @@ class NecessaryBindings {
 
 public:
   NecessaryBindings() = default;
-  
+
   /// Collect the necessary bindings to invoke a function with the given
   /// signature.
   static NecessaryBindings forFunctionInvocations(IRGenModule &IGM,
                                                   CanSILFunctionType origType,
                                                   CanSILFunctionType substType,
                                                   ArrayRef<Substitution> subs);
-  
+
   /// Add whatever information is necessary to reconstruct type metadata
   /// for the given type.
   void addTypeMetadata(CanType type);

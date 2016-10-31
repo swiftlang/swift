@@ -92,7 +92,7 @@ public:
   const SILDebugScope *getInlinedScope() const {
     return InlinedCallSite ? Parent.get<const SILDebugScope*>() : this;
   }
-  
+
   /// Return the parent function of this scope. If the scope was
   /// inlined this recursively returns the function it was inlined
   /// into.

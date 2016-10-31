@@ -50,7 +50,7 @@ class DeclNameLoc {
   /// Retrieve a pointer to either the only source location that was
   /// stored or to the array of source locations that was stored.
   SourceLoc const * getSourceLocs() const {
-    if (NumArgumentLabels == 0) 
+    if (NumArgumentLabels == 0)
       return reinterpret_cast<SourceLoc const *>(&LocationInfo);
 
     return reinterpret_cast<SourceLoc const *>(LocationInfo);

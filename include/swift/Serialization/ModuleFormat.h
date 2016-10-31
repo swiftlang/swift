@@ -135,7 +135,7 @@ enum class SILFunctionTypeRepresentation : uint8_t {
   Block,
   Thin,
   CFunctionPointer,
-  
+
   FirstSIL = 8,
   Method = FirstSIL,
   ObjCMethod,
@@ -652,7 +652,7 @@ namespace decls_block {
     ARCHETYPE_NESTED_TYPES,
     BCArray<TypeIDField>
   >;
-  
+
   using ArchetypeNestedTypesAreArchetypesLayout = BCRecordLayout<
     ARCHETYPE_NESTED_TYPES_ARE_ARCHETYPES,
     BCArray<TypeIDField>
@@ -717,7 +717,7 @@ namespace decls_block {
                            // followed by generic parameter types
     // Trailed by its generic requirements, if any.
   >;
-  
+
   using SILBlockStorageTypeLayout = BCRecordLayout<
     SIL_BLOCK_STORAGE_TYPE,
     TypeIDField            // capture type
@@ -1024,7 +1024,7 @@ namespace decls_block {
     PARAMETERLIST,
     BCVBR<5>    // numparams
   >;
-  
+
   using ParameterListEltLayout = BCRecordLayout<
     PARAMETERLIST_ELT,
     DeclIDField,           // ParamDecl
@@ -1234,13 +1234,13 @@ namespace decls_block {
     BCBlob      // _silgen_name
   >;
 
-  
+
   using AlignmentDeclAttrLayout = BCRecordLayout<
     Alignment_DECL_ATTR,
     BCFixed<1>, // implicit flag
     BCFixed<31> // alignment
   >;
-  
+
   using SwiftNativeObjCRuntimeBaseDeclAttrLayout = BCRecordLayout<
     SwiftNativeObjCRuntimeBase_DECL_ATTR,
     BCFixed<1>, // implicit flag

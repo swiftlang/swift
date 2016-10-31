@@ -178,13 +178,13 @@ struct ConformanceDiagnostic {
 /// and another base class, it must 'using DeclContext::operator new;' in order
 /// to use an allocator with the correct alignment.
 class alignas(1 << DeclContextAlignInBits) DeclContext {
-  
+
   enum {
     KindBits = DeclContextAlignInBits
   };
   static_assert(unsigned(DeclContextKind::Last_DeclContextKind) < 1U<<KindBits,
                 "Not enough KindBits for DeclContextKind");
-  
+
   llvm::PointerIntPair<DeclContext*, KindBits, DeclContextKind> ParentAndKind;
 
   /// Change the parent of this context.  This should only be used
@@ -193,12 +193,12 @@ class alignas(1 << DeclContextAlignInBits) DeclContext {
   friend class Initializer; // uses setParent
   friend class AutoClosureExpr; // uses setParent
   friend class AbstractClosureExpr; // uses setParent
-  
+
   template<class A, class B, class C>
   friend struct ::llvm::cast_convert_val;
-  
+
   static DeclContext *castDeclToDeclContext(const Decl *D);
-  
+
 public:
   DeclContext(DeclContextKind Kind, DeclContext *Parent)
     : ParentAndKind(Parent, Kind) {
@@ -210,14 +210,14 @@ public:
   DeclContextKind getContextKind() const {
     return ParentAndKind.getInt();
   }
-  
+
   /// Determines whether this context is itself a local scope in a
   /// code block.  A context that appears in such a scope, like a
   /// local type declaration, does not itself become a local context.
   bool isLocalContext() const {
     return getContextKind() <= DeclContextKind::Last_LocalDeclContextKind;
   }
-  
+
   /// isModuleContext - Return true if this is a subclass of Module.
   bool isModuleContext() const {
     return getContextKind() == DeclContextKind::Module;
@@ -288,7 +288,7 @@ public:
   /// - Generic types return a bound generic type using archetypes.
   /// - Non-type contexts return a null type.
   Type getDeclaredTypeInContext() const;
-  
+
   /// Gets the type being declared by this context.
   ///
   /// - Generic types return a bound generic type using interface types.
@@ -326,7 +326,7 @@ public:
   /// \brief Retrieve the innermost archetypes of this context or any
   /// of its parents.
   GenericEnvironment *getGenericEnvironmentOfContext() const;
-  
+
   /// Returns this or the first local parent context, or nullptr if it is not
   /// contained in one.
   DeclContext *getLocalContext();
@@ -510,7 +510,7 @@ public:
   // Only allow allocation of DeclContext using the allocator in ASTContext.
   void *operator new(size_t Bytes, ASTContext &C,
                      unsigned Alignment = alignof(DeclContext));
-  
+
   // Some Decls are DeclContexts, but not all.
   static bool classof(const Decl *D);
 };
@@ -545,7 +545,7 @@ public:
 class DeclIterator {
   Decl *Current;
 
-public: 
+public:
   typedef std::forward_iterator_tag iterator_category;
   typedef Decl *value_type;
   typedef Decl *reference;
@@ -566,7 +566,7 @@ public:
   }
 
   friend bool operator==(DeclIterator lhs, DeclIterator rhs) {
-    return lhs.Current == rhs.Current; 
+    return lhs.Current == rhs.Current;
   }
 
   friend bool operator!=(DeclIterator lhs, DeclIterator rhs) {
@@ -579,7 +579,7 @@ public:
 typedef IteratorRange<DeclIterator> DeclRange;
 
 /// The kind of an \c IterableDeclContext.
-enum class IterableDeclContextKind : uint8_t {  
+enum class IterableDeclContextKind : uint8_t {
   NominalTypeDecl,
   ExtensionDecl,
 };
@@ -595,7 +595,7 @@ class IterableDeclContext {
 
   /// The last declaration in this context, used for efficient insertion,
   /// along with the kind of iterable declaration context.
-  mutable llvm::PointerIntPair<Decl *, 2, IterableDeclContextKind> 
+  mutable llvm::PointerIntPair<Decl *, 2, IterableDeclContextKind>
     LastDeclAndKind;
 
   /// Lazy member loader, if any.
@@ -642,7 +642,7 @@ public:
   /// Check whether there are lazily-loaded members.
   bool isLazy() const {
     return LazyLoader != nullptr;
-  }  
+  }
 
   /// Set the loader for lazily-loaded members.
   void setLoader(LazyMemberLoader *loader, uint64_t contextData);
@@ -661,7 +661,7 @@ private:
   /// member is an invisible addition.
   void addMemberSilently(Decl *member, Decl *hint = nullptr) const;
 };
-  
+
 } // end namespace swift
 
 namespace llvm {

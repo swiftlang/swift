@@ -76,10 +76,10 @@ inline FormalLinkage operator^(FormalLinkage lhs, FormalLinkage rhs) {
   // non-unique.  This is more efficient if we define away the
   // special case for private by representing Private as non-unique.
   if (lhs < rhs) {
-    return FormalLinkage(unsigned(rhs) | 
+    return FormalLinkage(unsigned(rhs) |
                          (unsigned(lhs) & FormalLinkage_NonUnique));
   } else {
-    return FormalLinkage(unsigned(lhs) | 
+    return FormalLinkage(unsigned(lhs) |
                          (unsigned(rhs) & FormalLinkage_NonUnique));
   }
 }

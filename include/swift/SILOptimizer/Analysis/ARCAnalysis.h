@@ -120,7 +120,7 @@ valueHasARCDecrementOrCheckInInstructionRange(SILValue Op,
 /// epilogue retains for a specific function.
 ///
 /// If we can not find the retain in the return block, we will try to find
-/// in the predecessors. 
+/// in the predecessors.
 ///
 /// The search stop when we encounter an instruction that may decrement
 /// the return'ed value, as we do not want to create a lifetime gap once the
@@ -128,7 +128,7 @@ valueHasARCDecrementOrCheckInInstructionRange(SILValue Op,
 class ConsumedResultToEpilogueRetainMatcher {
 public:
   /// The state on how retains are found in a basic block.
-  enum class FindRetainKind { 
+  enum class FindRetainKind {
     None,      ///< Did not find a retain.
     Found,     ///< Found a retain.
     Recursion, ///< Found a retain and its due to self-recursion.
@@ -146,7 +146,7 @@ private:
   RetainList EpilogueRetainInsts;
 
   /// Return true if all the successors of the EpilogueRetainInsts do not have
-  /// a retain. 
+  /// a retain.
   bool isTransitiveSuccessorsRetainFree(llvm::DenseSet<SILBasicBlock *> BBs);
 
   /// Finds matching releases in the provided block \p BB.
@@ -206,7 +206,7 @@ private:
 
   /// Return true if we have seen releases to part or all of \p Derived in
   /// \p Insts.
-  /// 
+  ///
   /// NOTE: This function relies on projections to analyze the relation
   /// between the releases values in \p Insts and \p Derived, it also bails
   /// out and return true if projection path can not be formed between Base
@@ -218,11 +218,11 @@ private:
   bool releaseArgument(ReleaseList Insts, SILValue Argument);
 
   /// Walk the basic block and find all the releases that match to function
-  /// arguments. 
+  /// arguments.
   void collectMatchingReleases(SILBasicBlock *BB);
 
   /// For every argument in the function, check to see whether all epilogue
-  /// releases are found. Clear all releases for the argument if not all 
+  /// releases are found. Clear all releases for the argument if not all
   /// epilogue releases are found.
   void processMatchingReleases();
 
@@ -246,7 +246,7 @@ public:
       // releases.
       if (X.second.size() != 1)
         continue;
-      if (*X.second.begin() == I) 
+      if (*X.second.begin() == I)
         return true;
     }
     return false;
@@ -285,7 +285,7 @@ public:
     auto I = ArgInstMap.find(Arg);
     if (I == ArgInstMap.end())
       return Releases;
-    return I->second; 
+    return I->second;
   }
 
   ReleaseList getReleasesForArgument(SILValue V) {

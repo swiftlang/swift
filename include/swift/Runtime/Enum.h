@@ -20,10 +20,10 @@
 #include "swift/Runtime/Config.h"
 
 namespace swift {
-  
+
 struct OpaqueValue;
 struct ValueWitnessTable;
-  
+
 struct InProcess;
 
 template <typename Runtime> struct TargetMetadata;
@@ -100,7 +100,7 @@ extern "C" void swift_initEnumMetadataMultiPayload(ValueWitnessTable *vwtable,
 SWIFT_RUNTIME_EXPORT
 extern "C" unsigned swift_getEnumCaseMultiPayload(const OpaqueValue *value,
                                                   const EnumMetadata *enumType);
-  
+
 /// \brief Store the tag value for the given case into a multi-payload enum,
 ///        whose associated payload (if any) has already been initialized.
 SWIFT_RUNTIME_EXPORT

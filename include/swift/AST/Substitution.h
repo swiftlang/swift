@@ -37,15 +37,15 @@ class Substitution {
 public:
   /// The replacement type.
   Type getReplacement() const { return Replacement; }
-  
+
   /// The protocol conformances for the replacement. These appear in the same
   /// order as Archetype->getConformsTo() for the substituted archetype.
   const ArrayRef<ProtocolConformanceRef> getConformances() const {
     return Conformance;
   }
-  
+
   Substitution() {}
-  
+
   Substitution(Type Replacement, ArrayRef<ProtocolConformanceRef> Conformance);
 
   bool operator!=(const Substitution &other) const { return !(*this == other); }
@@ -54,7 +54,7 @@ public:
              const PrintOptions &PO = PrintOptions()) const;
   void dump() const;
   void dump(llvm::raw_ostream &os, unsigned indent = 0) const;
-  
+
   /// Apply a substitution to this substitution's replacement type and
   /// conformances.
   Substitution subst(ModuleDecl *module,
