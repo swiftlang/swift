@@ -356,3 +356,15 @@ class C_SR_2505 : P_SR_2505 {
 }
 
 let _ = C_SR_2505().call(C_SR_2505())
+
+// <rdar://problem/28909024> Returning incorrect result type from method invocation can result in nonsense diagnostic
+extension Collection {
+  func r28909024(_ predicate: (Iterator.Element)->Bool) -> Index {
+    return startIndex
+  }
+}
+func fn_r28909024(n: Int) {
+  return (0..<10).r28909024 { // expected-error {{unexpected non-void return value in void function}}
+    _ in true
+  }
+}
