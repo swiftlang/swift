@@ -1906,6 +1906,8 @@ ERROR(property_behavior_invalid_parameter,none,
       "parameter expression provided, but property behavior %0 does not "
       "use it",
       (Identifier))
+ERROR(property_behavior_conformance_broken,none,
+      "property behavior for %0 in type %1 is broken", (DeclName, Type))
 
 //------------------------------------------------------------------------------
 // Type Check Attributes

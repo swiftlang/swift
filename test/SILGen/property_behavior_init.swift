@@ -17,6 +17,10 @@ func whack<T>(_ x: inout T) {}
 struct Foo {
   var x: Int __behavior diBehavior
 
+  // FIXME: Hack because we can't find the synthesized associated type witness
+  // during witness matching.
+  typealias Value = Int
+
   // TODO
   // var xx: (Int, Int) __behavior diBehavior
 
