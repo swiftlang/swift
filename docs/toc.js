@@ -21,9 +21,9 @@ function onload_handler() {
 function generateTOC() {
   var navbar = document.getElementById('nav');
   if (!navbar) { return; }
-  
+
   var toc_items = [];
-  
+
   var i;
   for (i = 0; i < navbar.parentNode.childNodes.length; i++) {
     var node = navbar.parentNode.childNodes[i];
@@ -33,16 +33,16 @@ function generateTOC() {
       }
       var text = godocs_nodeToText(node);
       if (!text) { continue; }
-      
+
       var textNode = document.createTextNode(text);
-      
+
       var link = document.createElement('a');
       link.href = '#' + node.id;
       link.appendChild(textNode);
-      
+
       // Then create the item itself
       var item = document.createElement('dt');
-      
+
       item.appendChild(link);
       toc_items.push(item);
     }
@@ -52,53 +52,53 @@ function generateTOC() {
       }
       var text = godocs_nodeToText(node);
       if (!text) { continue; }
-      
+
       var textNode = document.createTextNode(text);
-      
+
       var link = document.createElement('a');
       link.href = '#' + node.id;
       link.appendChild(textNode);
-      
+
       // Then create the item itself
       var item = document.createElement('dd');
-      
+
       item.appendChild(link);
       toc_items.push(item);
     }
   }
-  
+
   if (!toc_items.length) { return; }
-  
+
   var dl1 = document.createElement('dl');
   var dl2 = document.createElement('dl');
-  
+
   var split_index = (toc_items.length / 2) + 1;
   if (split_index < 8) {
     split_index = toc_items.length;
   }
-  
+
   for (i = 0; i < split_index; i++) {
     dl1.appendChild(toc_items[i]);
   }
   for (/* keep using i */; i < toc_items.length; i++) {
     dl2.appendChild(toc_items[i]);
   }
-  
+
   var tocTable = document.createElement('table');
   navbar.appendChild(tocTable);
   tocTable.className = 'unruled';
   var tocBody = document.createElement('tbody');
   tocTable.appendChild(tocBody);
-  
+
   var tocRow = document.createElement('tr');
   tocBody.appendChild(tocRow);
-  
+
   // 1st column
   var tocCell = document.createElement('td');
   tocCell.className = 'first';
   tocRow.appendChild(tocCell);
   tocCell.appendChild(dl1);
-  
+
   // 2nd column
   tocCell = document.createElement('td');
   tocRow.appendChild(tocCell);
@@ -110,7 +110,7 @@ function generateTOC() {
  */
 function godocs_nodeToText(node) {
   var TEXT_NODE = 3; // Defined in Mozilla but not MSIE :(
-  
+
   var text = '';
   for (var j = 0; j != node.childNodes.length; j++) {
     var child = node.childNodes[j];
@@ -135,11 +135,11 @@ function addTopLinks() {
   if (!top) {
     document.body.id = 'top';
   }
-  
+
   if (!document.getElementsByTagName) return; // no browser support
-  
+
   var headers = document.getElementsByTagName('h2');
-  
+
   for (var i = 0; i < headers.length; i++) {
     var span = document.createElement('span');
     span.className = 'navtop';

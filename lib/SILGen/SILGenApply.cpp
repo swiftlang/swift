@@ -719,7 +719,8 @@ static Callee prepareArchetypeCallee(SILGenFunction &gen, SILLocation loc,
       // Store the reference into a temporary.
       auto temp =
         gen.emitTemporaryAllocation(selfLoc, ref.getValue()->getType());
-      gen.B.createStore(selfLoc, ref.getValue(), temp);
+      gen.B.createStore(selfLoc, ref.getValue(), temp,
+                        StoreOwnershipQualifier::Unqualified);
 
       // If we had a cleanup, create a cleanup at the new address.
       return maybeEnterCleanupForTransformed(gen, ref, temp);
@@ -1997,7 +1998,8 @@ namespace {
 
         // If the value isn't address-only, go ahead and load.
         if (!substTL.isAddressOnly()) {
-          auto load = gen.B.createLoad(loc, value.forward(gen));
+          auto load = gen.B.createLoad(loc, value.forward(gen),
+                                       LoadOwnershipQualifier::Unqualified);
           value = gen.emitManagedRValueWithCleanup(load);
         }
 
@@ -2341,7 +2343,7 @@ RValue SILGenFunction::emitApply(
     case ParameterConvention::Direct_Owned:
       // If the callee will consume the 'self' parameter, let's retain it so we
       // can keep it alive.
-      B.emitRetainValueOperation(loc, lifetimeExtendedSelf);
+      B.emitCopyValueOperation(loc, lifetimeExtendedSelf);
       break;
     case ParameterConvention::Direct_Guaranteed:
     case ParameterConvention::Direct_Unowned:
@@ -2422,7 +2424,7 @@ RValue SILGenFunction::emitApply(
 
     case ResultConvention::Unowned:
       // Unretained. Retain the value.
-      resultTL.emitRetainValue(B, loc, result);
+      resultTL.emitCopyValue(B, loc, result);
       break;
     }
 
@@ -2578,7 +2580,8 @@ static ManagedValue emitMaterializeIntoTemporary(SILGenFunction &gen,
                                                  ManagedValue object) {
   auto temporary = gen.emitTemporaryAllocation(loc, object.getType());
   bool hadCleanup = object.hasCleanup();
-  gen.B.createStore(loc, object.forward(gen), temporary);
+  gen.B.createStore(loc, object.forward(gen), temporary,
+                    StoreOwnershipQualifier::Unqualified);
 
   // The temporary memory is +0 if the value was.
   if (hadCleanup) {
@@ -3039,7 +3042,7 @@ namespace {
       auto contexts = getRValueEmissionContexts(loweredSubstArgType, param);
 
       // If no abstraction is required, try to honor the emission contexts.
-      if (loweredSubstArgType.getSwiftRValueType() == param.getType()) {
+      if (!contexts.RequiresReabstraction) {
         auto loc = arg.getLocation();
         ManagedValue result =
           std::move(arg).getAsSingleValue(SGF, contexts.ForEmission);
@@ -3117,16 +3120,20 @@ namespace {
                     AbstractionPattern origParamType,
                     SILParameterInfo param) {
       ManagedValue value;
-      
-      switch (getSILFunctionLanguage(Rep)) {
-      case SILFunctionLanguage::Swift:
-        value = emitSubstToOrigArgument(std::move(arg), loweredSubstArgType,
-                                        origParamType, param);
-        break;
-      case SILFunctionLanguage::C:
-        value = emitNativeToBridgedArgument(std::move(arg), loweredSubstArgType,
-                                            origParamType, param);
-        break;
+      auto contexts = getRValueEmissionContexts(loweredSubstArgType, param);
+      if (contexts.RequiresReabstraction) {
+        switch (getSILFunctionLanguage(Rep)) {
+        case SILFunctionLanguage::Swift:
+          value = emitSubstToOrigArgument(std::move(arg), loweredSubstArgType,
+                                          origParamType, param);
+          break;
+        case SILFunctionLanguage::C:
+          value = emitNativeToBridgedArgument(
+              std::move(arg), loweredSubstArgType, origParamType, param);
+          break;
+        }
+      } else {
+        value = std::move(arg).getAsSingleValue(SGF, contexts.ForEmission);
       }
       Args.push_back(value);
     }
@@ -3400,12 +3407,16 @@ namespace {
       SGFContext ForEmission;
       /// The context for reabstracting the r-value.
       SGFContext ForReabstraction;
+      /// If the context requires reabstraction
+      bool RequiresReabstraction;
     };
     static EmissionContexts getRValueEmissionContexts(SILType loweredArgType,
                                                       SILParameterInfo param) {
+      bool requiresReabstraction =
+          loweredArgType.getSwiftRValueType() != param.getType();
       // If the parameter is consumed, we have to emit at +1.
       if (param.isConsumed()) {
-        return { SGFContext(), SGFContext() };
+        return {SGFContext(), SGFContext(), requiresReabstraction};
       }
 
       // Otherwise, we can emit the final value at +0 (but only with a
@@ -3418,12 +3429,12 @@ namespace {
 
       // If the r-value doesn't require reabstraction, the final context
       // is the emission context.
-      if (loweredArgType.getSwiftRValueType() == param.getType()) {
-        return { finalContext, SGFContext() };
+      if (!requiresReabstraction) {
+        return {finalContext, SGFContext(), requiresReabstraction};
       }
 
       // Otherwise, the final context is the reabstraction context.
-      return { SGFContext(), finalContext };
+      return {SGFContext(), finalContext, requiresReabstraction};
     }
   };
 }
@@ -3846,7 +3857,7 @@ ManagedValue SILGenFunction::emitInjectEnum(SILLocation loc,
   if (element->isIndirect() ||
       element->getParentEnum()->isIndirect()) {
     auto *box = B.createAllocBox(loc, payloadTL.getLoweredType());
-    auto *addr = B.createProjectBox(loc, box);
+    auto *addr = B.createProjectBox(loc, box, 0);
 
     CleanupHandle initCleanup = enterDestroyCleanup(box);
     Cleanups.setCleanupState(initCleanup, CleanupState::Dormant);
@@ -3886,12 +3897,14 @@ ManagedValue SILGenFunction::emitInjectEnum(SILLocation loc,
   if (payloadMV) {
     // If the payload was indirect, we already evaluated it and
     // have a single value. Store it into the result.
-    B.createStore(loc, payloadMV.forward(*this), resultData);
+    B.createStore(loc, payloadMV.forward(*this), resultData,
+                  StoreOwnershipQualifier::Unqualified);
   } else if (payloadTL.isLoadable()) {
     // The payload of this specific enum case might be loadable
     // even if the overall enum is address-only.
     payloadMV = std::move(payload).getAsSingleValue(*this, origFormalType);
-    B.createStore(loc, payloadMV.forward(*this), resultData);
+    B.createStore(loc, payloadMV.forward(*this), resultData,
+                  StoreOwnershipQualifier::Unqualified);
   } else {
     // The payload is address-only. Evaluate it directly into
     // the enum.
@@ -4764,10 +4777,8 @@ RValue SILGenFunction::emitLiteral(LiteralExpr *literal, SGFContext C) {
     switch (magicLiteral->getKind()) {
     case MagicIdentifierLiteralExpr::File: {
       StringRef value = "";
-      if (loc.isValid()) {
-        unsigned bufferID = ctx.SourceMgr.findBufferContainingLoc(loc);
-        value = ctx.SourceMgr.getIdentifierForBuffer(bufferID);
-      }
+      if (loc.isValid())
+        value = ctx.SourceMgr.getBufferIdentifierForLoc(loc);
       builtinLiteralArgs = emitStringLiteral(*this, literal, value, C,
                                              magicLiteral->getStringEncoding());
       builtinInit = magicLiteral->getBuiltinInitializer();
@@ -5426,7 +5437,7 @@ static SILValue emitDynamicPartialApply(SILGenFunction &gen,
   // Retain 'self' because the partial apply will take ownership.
   // We can't simply forward 'self' because the partial apply is conditional.
   if (!self->getType().isAddress())
-    gen.B.emitRetainValueOperation(loc, self);
+    gen.B.emitCopyValueOperation(loc, self);
 
   SILValue result = gen.B.createPartialApply(loc, method, method->getType(), {},
                                              self, partialApplyTy);
@@ -5551,7 +5562,7 @@ RValue SILGenFunction::emitDynamicMemberRefExpr(DynamicMemberRefExpr *e,
   // Package up the result.
   auto optResult = optTemp;
   if (optTL.isLoadable())
-    optResult = B.createLoad(e, optResult);
+    optResult = B.createLoad(e, optResult, LoadOwnershipQualifier::Unqualified);
   return RValue(*this, e, emitManagedRValueWithCleanup(optResult, optTL));
 }
 
@@ -5644,6 +5655,6 @@ RValue SILGenFunction::emitDynamicSubscriptExpr(DynamicSubscriptExpr *e,
   // Package up the result.
   auto optResult = optTemp;
   if (optTL.isLoadable())
-    optResult = B.createLoad(e, optResult);
+    optResult = B.createLoad(e, optResult, LoadOwnershipQualifier::Unqualified);
   return RValue(*this, e, emitManagedRValueWithCleanup(optResult, optTL));
 }

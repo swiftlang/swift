@@ -51,8 +51,20 @@ class SILBuilder {
   /// only by SILGen or SIL deserializers.
   SILOpenedArchetypesTracker *OpenedArchetypesTracker = nullptr;
 
+  /// True if this SILBuilder is being used for parsing.
+  ///
+  /// This is important since in such a case, we want to not perform any
+  /// Ownership Verification in SILBuilder. This functionality is very useful
+  /// for determining if qualified or unqualified instructions are being created
+  /// in appropriate places, but prevents us from inferring ownership
+  /// qualification of functions when parsing. The ability to perform this
+  /// inference is important since otherwise, we would need to update all SIL
+  /// test cases while bringing up SIL ownership.
+  bool isParsing = false;
+
 public:
-  SILBuilder(SILFunction &F) : F(F), BB(0) {}
+  SILBuilder(SILFunction &F, bool isParsing = false)
+      : F(F), BB(0), isParsing(isParsing) {}
 
   SILBuilder(SILFunction &F, SmallVectorImpl<SILInstruction *> *InsertedInstrs)
       : F(F), BB(0), InsertedInstrs(InsertedInstrs) {}
@@ -445,9 +457,8 @@ public:
         getSILDebugLocation(Loc), text.toStringRef(Out), encoding, F));
   }
 
-  LoadInst *createLoad(
-      SILLocation Loc, SILValue LV,
-      LoadOwnershipQualifier Qualifier = LoadOwnershipQualifier::Unqualified) {
+  LoadInst *createLoad(SILLocation Loc, SILValue LV,
+                       LoadOwnershipQualifier Qualifier) {
     assert(LV->getType().isLoadable(F.getModule()));
     return insert(new (F.getModule())
                       LoadInst(getSILDebugLocation(Loc), LV, Qualifier));
@@ -460,8 +471,7 @@ public:
   }
 
   StoreInst *createStore(SILLocation Loc, SILValue Src, SILValue DestAddr,
-                         StoreOwnershipQualifier Qualifier =
-                             StoreOwnershipQualifier::Unqualified) {
+                         StoreOwnershipQualifier Qualifier) {
     return insert(new (F.getModule()) StoreInst(getSILDebugLocation(Loc), Src,
                                                 DestAddr, Qualifier));
   }
@@ -737,14 +747,26 @@ public:
 
   RetainValueInst *createRetainValue(SILLocation Loc, SILValue operand,
                                      Atomicity atomicity) {
+    assert(isParsing || F.hasUnqualifiedOwnership());
     return insert(new (F.getModule()) RetainValueInst(getSILDebugLocation(Loc),
                                                       operand, atomicity));
   }
 
   ReleaseValueInst *createReleaseValue(SILLocation Loc, SILValue operand,
                                        Atomicity atomicity) {
+    assert(isParsing || F.hasUnqualifiedOwnership());
     return insert(new (F.getModule()) ReleaseValueInst(getSILDebugLocation(Loc),
                                                        operand, atomicity));
+  }
+
+  CopyValueInst *createCopyValue(SILLocation Loc, SILValue operand) {
+    return insert(new (F.getModule())
+                      CopyValueInst(getSILDebugLocation(Loc), operand));
+  }
+
+  DestroyValueInst *createDestroyValue(SILLocation Loc, SILValue operand) {
+    return insert(new (F.getModule())
+                      DestroyValueInst(getSILDebugLocation(Loc), operand));
   }
 
   AutoreleaseValueInst *createAutoreleaseValue(SILLocation Loc,
@@ -1106,11 +1128,13 @@ public:
   }
   StrongRetainInst *createStrongRetain(SILLocation Loc, SILValue Operand,
                                        Atomicity atomicity) {
+    assert(isParsing || F.hasUnqualifiedOwnership());
     return insert(new (F.getModule()) StrongRetainInst(getSILDebugLocation(Loc),
                                                        Operand, atomicity));
   }
   StrongReleaseInst *createStrongRelease(SILLocation Loc, SILValue Operand,
                                          Atomicity atomicity) {
+    assert(isParsing || F.hasUnqualifiedOwnership());
     return insert(new (F.getModule()) StrongReleaseInst(
         getSILDebugLocation(Loc), Operand, atomicity));
   }
@@ -1216,17 +1240,13 @@ public:
     return insert(new (F.getModule()) ProjectValueBufferInst(
         getSILDebugLocation(Loc), valueType, operand));
   }
-  ProjectBoxInst *createProjectBox(SILLocation Loc, SILValue boxOperand) {
-    auto valueTy =
-        boxOperand->getType().castTo<SILBoxType>()->getBoxedAddressType();
+  ProjectBoxInst *createProjectBox(SILLocation Loc, SILValue boxOperand,
+                                   unsigned index) {
+    auto boxTy = boxOperand->getType().castTo<SILBoxType>();
+    auto fieldTy = boxTy->getFieldType(index);
 
     return insert(new (F.getModule()) ProjectBoxInst(
-        getSILDebugLocation(Loc), valueTy, boxOperand));
-  }
-  ProjectBoxInst *createProjectBox(SILLocation Loc, SILType valueTy,
-                                   SILValue boxOperand) {
-    return insert(new (F.getModule()) ProjectBoxInst(
-        getSILDebugLocation(Loc), valueTy, boxOperand));
+        getSILDebugLocation(Loc), boxOperand, index, fieldTy));
   }
   ProjectExistentialBoxInst *createProjectExistentialBox(SILLocation Loc,
                                                          SILType valueTy,
@@ -1453,6 +1473,25 @@ public:
   }
 
   /// Emit a release_value instruction at the current location, attempting to
+  /// fold it locally into another nearby retain_value instruction.  This
+  /// returns the new instruction if it inserts one, otherwise it returns null.
+  ///
+  /// This instruction doesn't handle strength reduction of release_value into
+  /// a noop / strong_release / unowned_release.  For that, use the
+  /// emitReleaseValueOperation method below or use the TypeLowering API.
+  DestroyValueInst *emitDestroyValueAndFold(SILLocation Loc, SILValue Operand) {
+    auto U = emitDestroyValue(Loc, Operand);
+    if (U.isNull())
+      return nullptr;
+    if (auto *DVI = U.dyn_cast<DestroyValueInst *>())
+      return DVI;
+    auto *CVI = U.get<CopyValueInst *>();
+    CVI->replaceAllUsesWith(CVI->getOperand());
+    CVI->eraseFromParent();
+    return nullptr;
+  }
+
+  /// Emit a release_value instruction at the current location, attempting to
   /// fold it locally into another nearby retain_value instruction. Returns a
   /// pointer union initialized with a release value inst if it inserts one,
   /// otherwise returns the retain. It is expected that the caller will remove
@@ -1478,20 +1517,29 @@ public:
   PointerUnion<CopyAddrInst *, DestroyAddrInst *>
   emitDestroyAddr(SILLocation Loc, SILValue Operand);
 
-  /// Convenience function for calling emitRetain on the type lowering
+  /// Emit a destroy_value instruction at the current location, attempting to
+  /// fold it locally into another nearby copy_value instruction. Returns a
+  /// pointer union initialized with a destroy_value inst if it inserts one,
+  /// otherwise returns the copy_value. It is expected that the caller will
+  /// remove the copy_value. This allows for the caller to update any state
+  /// before the copy_value is destroyed.
+  PointerUnion<CopyValueInst *, DestroyValueInst *>
+  emitDestroyValue(SILLocation Loc, SILValue Operand);
+
+  /// Convenience function for calling emitCopy on the type lowering
   /// for the non-address value.
-  void emitRetainValueOperation(SILLocation Loc, SILValue v) {
+  SILValue emitCopyValueOperation(SILLocation Loc, SILValue v) {
     assert(!v->getType().isAddress());
     auto &lowering = getTypeLowering(v->getType());
-    return lowering.emitRetainValue(*this, Loc, v);
+    return lowering.emitCopyValue(*this, Loc, v);
   }
 
-  /// Convenience function for calling TypeLowering.emitRelease on the type
+  /// Convenience function for calling TypeLowering.emitDestroy on the type
   /// lowering for the non-address value.
-  void emitReleaseValueOperation(SILLocation Loc, SILValue v) {
+  void emitDestroyValueOperation(SILLocation Loc, SILValue v) {
     assert(!v->getType().isAddress());
     auto &lowering = getTypeLowering(v->getType());
-    lowering.emitReleaseValue(*this, Loc, v);
+    lowering.emitDestroyValue(*this, Loc, v);
   }
 
   SILValue emitTupleExtract(SILLocation Loc, SILValue Operand, unsigned FieldNo,

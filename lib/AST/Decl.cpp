@@ -1252,13 +1252,13 @@ bool ValueDecl::isDefinition() const {
   case DeclKind::Extension:
   case DeclKind::PatternBinding:
   case DeclKind::EnumCase:
-  case DeclKind::Subscript:
   case DeclKind::TopLevelCode:
   case DeclKind::InfixOperator:
   case DeclKind::PrefixOperator:
   case DeclKind::PostfixOperator:
   case DeclKind::IfConfig:
   case DeclKind::PrecedenceGroup:
+    assert(!isa<ValueDecl>(this));
     llvm_unreachable("non-value decls shouldn't get here");
 
   case DeclKind::Func:
@@ -1266,6 +1266,7 @@ bool ValueDecl::isDefinition() const {
   case DeclKind::Destructor:
     return cast<AbstractFunctionDecl>(this)->hasBody();
 
+  case DeclKind::Subscript:
   case DeclKind::Var:
   case DeclKind::Param:
   case DeclKind::Enum:

@@ -187,10 +187,8 @@ void SILGenFunction::emitValueConstructor(ConstructorDecl *ctor) {
   assert(!selfTy.getClassOrBoundGenericClass()
          && "can't emit a class ctor here");
 
-  // Self is a curried argument and thus comes last.
-  unsigned N = ctor->getParameterList(1)->size() + 1;
   // Allocate the local variable for 'self'.
-  emitLocalVariableWithCleanup(selfDecl, false, N)->finishInitialization(*this);
+  emitLocalVariableWithCleanup(selfDecl, false)->finishInitialization(*this);
   
   // Mark self as being uninitialized so that DI knows where it is and how to
   // check for it.
@@ -204,7 +202,8 @@ void SILGenFunction::emitValueConstructor(ConstructorDecl *ctor) {
   }
   
   // Emit the prolog.
-  emitProlog(ctor->getParameterList(1), ctor->getResultType(), ctor);
+  emitProlog(ctor->getParameterList(1), ctor->getResultType(), ctor,
+             ctor->hasThrows());
   emitConstructorMetatypeArg(*this, ctor);
 
   // Create a basic block to jump to for the implicit 'self' return.
@@ -276,11 +275,12 @@ void SILGenFunction::emitValueConstructor(ConstructorDecl *ctor) {
     
     if (!lowering.isAddressOnly()) {
       // Otherwise, load and return the final 'self' value.
-      selfValue = B.createLoad(cleanupLoc, selfLV);
-      
+      selfValue =
+          B.createLoad(cleanupLoc, selfLV, LoadOwnershipQualifier::Unqualified);
+
       // Emit a retain of the loaded value, since we return it +1.
-      lowering.emitRetainValue(B, cleanupLoc, selfValue);
-      
+      lowering.emitCopyValue(B, cleanupLoc, selfValue);
+
       // Inject the self value into an optional if the constructor is failable.
       if (ctor->getFailability() != OTK_None) {
         selfValue = B.createEnum(ctor, selfValue,
@@ -565,7 +565,7 @@ void SILGenFunction::emitClassConstructorInitializer(ConstructorDecl *ctor) {
   // Emit the prolog for the non-self arguments.
   // FIXME: Handle self along with the other body patterns.
   emitProlog(ctor->getParameterList(1),
-             TupleType::getEmpty(F.getASTContext()), ctor);
+             TupleType::getEmpty(F.getASTContext()), ctor, ctor->hasThrows());
 
   SILType selfTy = getLoweredLoadableType(selfDecl->getType());
   SILValue selfArg = new (SGM.M) SILArgument(F.begin(), selfTy, selfDecl);
@@ -582,7 +582,8 @@ void SILGenFunction::emitClassConstructorInitializer(ConstructorDecl *ctor) {
     if (NeedsBoxForSelf) {
       SILLocation prologueLoc = RegularLocation(ctor);
       prologueLoc.markAsPrologue();
-      B.createStore(prologueLoc, selfArg, VarLocs[selfDecl].value);
+      B.createStore(prologueLoc, selfArg, VarLocs[selfDecl].value,
+                    StoreOwnershipQualifier::Unqualified);
     } else {
       selfArg = B.createMarkUninitialized(selfDecl, selfArg, MUKind);
       VarLocs[selfDecl] = VarLoc::get(selfArg);
@@ -668,12 +669,13 @@ void SILGenFunction::emitClassConstructorInitializer(ConstructorDecl *ctor) {
       // Emit the call to super.init() right before exiting from the initializer.
       if (Expr *SI = ctor->getSuperInitCall())
         emitRValue(SI);
-      
-      selfArg = B.createLoad(cleanupLoc, VarLocs[selfDecl].value);
+
+      selfArg = B.createLoad(cleanupLoc, VarLocs[selfDecl].value,
+                             LoadOwnershipQualifier::Unqualified);
     }
     
     // We have to do a retain because we are returning the pointer +1.
-    B.emitRetainValueOperation(cleanupLoc, selfArg);
+    B.emitCopyValueOperation(cleanupLoc, selfArg);
 
     // Inject the self value into an optional if the constructor is failable.
     if (ctor->getFailability() != OTK_None) {

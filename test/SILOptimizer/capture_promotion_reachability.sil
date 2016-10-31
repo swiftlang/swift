@@ -1,4 +1,4 @@
-// RUN: %target-sil-opt -enable-sil-verify-all %s -capture-promotion | %FileCheck %s
+// RUN: %target-sil-opt -assume-parsing-unqualified-ownership-sil -enable-sil-verify-all %s -capture-promotion | %FileCheck %s
 
 sil_stage raw
 
@@ -28,11 +28,11 @@ func test_reachability_1(b: Builtin.Int1, x: Builtin.Int64, y: Builtin.Int64) {
 sil @test_reachability_1 : $@convention(thin) (Builtin.Int1, Builtin.Int64, Builtin.Int64) -> () {
 bb0(%0 : $Builtin.Int1, %1 : $Builtin.Int64, %2 : $Builtin.Int64):
   %3 = alloc_box $Builtin.Int1
-  %3a = project_box %3 : $@box Builtin.Int1
+  %3a = project_box %3 : $@box Builtin.Int1, 0
   %4 = alloc_box $Builtin.Int64
-  %4a = project_box %4 : $@box Builtin.Int64
+  %4a = project_box %4 : $@box Builtin.Int64, 0
   %5 = alloc_box $Builtin.Int64
-  %5a = project_box %5 : $@box Builtin.Int64
+  %5a = project_box %5 : $@box Builtin.Int64, 0
   store %0 to %3a : $*Builtin.Int1
   store %1 to %4a : $*Builtin.Int64
   store %2 to %5a : $*Builtin.Int64
@@ -46,7 +46,7 @@ bb1:
 
 bb2:
   %14 = alloc_box $@callee_owned () -> Builtin.Int64
-  %14a = project_box %14 : $@box @callee_owned () -> Builtin.Int64
+  %14a = project_box %14 : $@box @callee_owned () -> Builtin.Int64, 0
   // CHECK: [[CLOSURE0_PROMOTE0:%.*]] = function_ref @_TTSf2i__closure0 :
   %15 = function_ref @closure0 : $@convention(thin) (@owned @box Builtin.Int64) -> Builtin.Int64
   strong_retain %4 : $@box Builtin.Int64
@@ -77,7 +77,7 @@ bb4:
 // closure0
 sil private @closure0 : $@convention(thin) (@owned @box Builtin.Int64) -> Builtin.Int64 {
 bb0(%0 : $@box Builtin.Int64):
-  %1 = project_box %0 : $@box Builtin.Int64
+  %1 = project_box %0 : $@box Builtin.Int64, 0
   %2 = tuple ()
   %3 = load %1 : $*Builtin.Int64
   strong_release %0 : $@box Builtin.Int64
@@ -87,7 +87,7 @@ bb0(%0 : $@box Builtin.Int64):
 // closure1
 sil private @closure1 : $@convention(thin) (@owned @box Builtin.Int64) -> Builtin.Int64 {
 bb0(%0 : $@box Builtin.Int64):
-  %1 = project_box %0 : $@box Builtin.Int64
+  %1 = project_box %0 : $@box Builtin.Int64, 0
   %2 = tuple ()
   %3 = load %1 : $*Builtin.Int64
   strong_release %0 : $@box Builtin.Int64
@@ -110,16 +110,16 @@ func test_reachability_2(b: Builtin.Int1, x: Builtin.Int64, y: Builtin.Int64) {
 sil @test_reachability_2 : $@convention(thin) (Builtin.Int1, Builtin.Int64, Builtin.Int64) -> () {
 bb0(%0 : $Builtin.Int1, %1 : $Builtin.Int64, %2 : $Builtin.Int64):
   %3 = alloc_box $Builtin.Int1
-  %3a = project_box %3 : $@box Builtin.Int1
+  %3a = project_box %3 : $@box Builtin.Int1, 0
   %4 = alloc_box $Builtin.Int64
-  %4a = project_box %4 : $@box Builtin.Int64
+  %4a = project_box %4 : $@box Builtin.Int64, 0
   %5 = alloc_box $Builtin.Int64
-  %5a = project_box %5 : $@box Builtin.Int64
+  %5a = project_box %5 : $@box Builtin.Int64, 0
   store %0 to %3a : $*Builtin.Int1
   store %1 to %4a : $*Builtin.Int64
   store %2 to %5a : $*Builtin.Int64
   %9 = alloc_box $@callee_owned () -> Builtin.Int64
-  %9a = project_box %9 : $@box @callee_owned () -> Builtin.Int64
+  %9a = project_box %9 : $@box @callee_owned () -> Builtin.Int64, 0
   // CHECK: [[CLOSURE2:%.*]] = function_ref @closure2 :
   %10 = function_ref @closure2 : $@convention(thin) (@owned @box Builtin.Int64) -> Builtin.Int64
   strong_retain %4 : $@box Builtin.Int64
@@ -159,7 +159,7 @@ bb4:
 // closure2
 sil private @closure2 : $@convention(thin) (@owned @box Builtin.Int64) -> Builtin.Int64 {
 bb0(%0 : $@box Builtin.Int64):
-  %1 = project_box %0 : $@box Builtin.Int64
+  %1 = project_box %0 : $@box Builtin.Int64, 0
   %2 = tuple ()
   %3 = load %1 : $*Builtin.Int64
   strong_release %0 : $@box Builtin.Int64
@@ -169,7 +169,7 @@ bb0(%0 : $@box Builtin.Int64):
 // closure3
 sil private @closure3 : $@convention(thin) (@owned @box Builtin.Int64) -> Builtin.Int64 {
 bb0(%0 : $@box Builtin.Int64):
-  %1 = project_box %0 : $@box Builtin.Int64
+  %1 = project_box %0 : $@box Builtin.Int64, 0
   %2 = tuple ()
   %3 = load %1 : $*Builtin.Int64
   strong_release %0 : $@box Builtin.Int64
@@ -192,16 +192,16 @@ func test_reachability_3(b: Builtin.Int1, x: Builtin.Int64, y: Builtin.Int64) {
 sil @test_reachability_3 : $@convention(thin) (Builtin.Int1, Builtin.Int64, Builtin.Int64) -> () {
 bb0(%0 : $Builtin.Int1, %1 : $Builtin.Int64, %2 : $Builtin.Int64):
   %3 = alloc_box $Builtin.Int1
-  %3a = project_box %3 : $@box Builtin.Int1
+  %3a = project_box %3 : $@box Builtin.Int1, 0
   %4 = alloc_box $Builtin.Int64
-  %4a = project_box %4 : $@box Builtin.Int64
+  %4a = project_box %4 : $@box Builtin.Int64, 0
   %5 = alloc_box $Builtin.Int64
-  %5a = project_box %5 : $@box Builtin.Int64
+  %5a = project_box %5 : $@box Builtin.Int64, 0
   store %0 to %3a : $*Builtin.Int1
   store %1 to %4a : $*Builtin.Int64
   store %2 to %5a : $*Builtin.Int64
   %9 = alloc_box $@callee_owned () -> Builtin.Int64
-  %9a = project_box %9 : $@box @callee_owned () -> Builtin.Int64
+  %9a = project_box %9 : $@box @callee_owned () -> Builtin.Int64, 0
   // CHECK: [[CLOSURE4:%.*]] = function_ref @closure4 :
   %10 = function_ref @closure4 : $@convention(thin) (@owned @box Builtin.Int64) -> Builtin.Int64
   strong_retain %4 : $@box Builtin.Int64
@@ -241,7 +241,7 @@ bb4:
 // closure4
 sil private @closure4 : $@convention(thin) (@owned @box Builtin.Int64) -> Builtin.Int64 {
 bb0(%0 : $@box Builtin.Int64):
-  %1 = project_box %0 : $@box Builtin.Int64
+  %1 = project_box %0 : $@box Builtin.Int64, 0
   %2 = tuple ()
   %3 = load %1 : $*Builtin.Int64
   strong_release %0 : $@box Builtin.Int64
@@ -251,7 +251,7 @@ bb0(%0 : $@box Builtin.Int64):
 // closure5
 sil private @closure5 : $@convention(thin) (@owned @box Builtin.Int64) -> Builtin.Int64 {
 bb0(%0 : $@box Builtin.Int64):
-  %1 = project_box %0 : $@box Builtin.Int64
+  %1 = project_box %0 : $@box Builtin.Int64, 0
   %2 = tuple ()
   %3 = load %1 : $*Builtin.Int64
   strong_release %0 : $@box Builtin.Int64
@@ -272,16 +272,16 @@ func test_reachability_4(b: Builtin.Int1, x: Builtin.Int64, y: Builtin.Int64) {
 sil @test_reachability_4 : $@convention(thin) (Builtin.Int1, Builtin.Int64, Builtin.Int64) -> () {
 bb0(%0 : $Builtin.Int1, %1 : $Builtin.Int64, %2 : $Builtin.Int64):
   %3 = alloc_box $Builtin.Int1
-  %3a = project_box %3 : $@box Builtin.Int1
+  %3a = project_box %3 : $@box Builtin.Int1, 0
   %4 = alloc_box $Builtin.Int64
-  %4a = project_box %4 : $@box Builtin.Int64
+  %4a = project_box %4 : $@box Builtin.Int64, 0
   %5 = alloc_box $Builtin.Int64
-  %5a = project_box %5 : $@box Builtin.Int64
+  %5a = project_box %5 : $@box Builtin.Int64, 0
   store %0 to %3a : $*Builtin.Int1
   store %1 to %4a : $*Builtin.Int64
   store %2 to %5a : $*Builtin.Int64
   %9 = alloc_box $@callee_owned () -> Builtin.Int64
-  %9a = project_box %9 : $@box @callee_owned () -> Builtin.Int64
+  %9a = project_box %9 : $@box @callee_owned () -> Builtin.Int64, 0
   // CHECK: [[CLOSURE6:%.*]] = function_ref @closure6 :
   %10 = function_ref @closure6 : $@convention(thin) (@owned @box Builtin.Int64) -> Builtin.Int64
   strong_retain %4 : $@box Builtin.Int64
@@ -317,7 +317,7 @@ bb3:
 // closure6
 sil private @closure6 : $@convention(thin) (@owned @box Builtin.Int64) -> Builtin.Int64 {
 bb0(%0 : $@box Builtin.Int64):
-  %1 = project_box %0 : $@box Builtin.Int64
+  %1 = project_box %0 : $@box Builtin.Int64, 0
   %2 = tuple ()
   %3 = load %1 : $*Builtin.Int64
   strong_release %0 : $@box Builtin.Int64
@@ -327,7 +327,7 @@ bb0(%0 : $@box Builtin.Int64):
 // closure7
 sil private @closure7 : $@convention(thin) (@owned @box Builtin.Int64) -> Builtin.Int64 {
 bb0(%0 : $@box Builtin.Int64):
-  %1 = project_box %0 : $@box Builtin.Int64
+  %1 = project_box %0 : $@box Builtin.Int64, 0
   %2 = tuple ()
   %3 = load %1 : $*Builtin.Int64
   strong_release %0 : $@box Builtin.Int64

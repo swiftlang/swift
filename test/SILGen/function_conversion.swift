@@ -407,3 +407,25 @@ func convTupleScalar(_ f1: @escaping (Q) -> (),
 func convTupleScalarOpaque<T>(_ f: @escaping (T...) -> ()) -> ((_ args: T...) -> ())? {
   return f
 }
+
+// ==== Make sure we support AnyHashable erasure
+
+// CHECK-LABEL: sil hidden @_TF19function_conversion15convAnyHashableuRxs8HashablerFT1tx_T_
+// CHECK:         function_ref @_TFF19function_conversion15convAnyHashableuRxs8HashablerFT1tx_T_U_FTVs11AnyHashableS1__Sb
+// CHECK:         function_ref @_TTRGRxs8HashablerXFo_iVs11AnyHashableiS0__dSb_XFo_ixix_dSb_
+
+// CHECK-LABEL: sil shared [transparent] [reabstraction_thunk] @_TTRGRxs8HashablerXFo_iVs11AnyHashableiS0__dSb_XFo_ixix_dSb_ : $@convention(thin) <T where T : Hashable> (@in T, @in T, @owned @callee_owned (@in AnyHashable, @in AnyHashable) -> Bool) -> Bool
+// CHECK:         alloc_stack $AnyHashable
+// CHECK:         function_ref @_swift_convertToAnyHashable
+// CHECK:         apply {{.*}}<T>
+// CHECK:         alloc_stack $AnyHashable
+// CHECK:         function_ref @_swift_convertToAnyHashable
+// CHECK:         apply {{.*}}<T>
+// CHECK:         return
+
+
+func convAnyHashable<T : Hashable>(t: T) {
+  let fn: (T, T) -> Bool = {
+    (x: AnyHashable, y: AnyHashable) in x == y
+  }
+}

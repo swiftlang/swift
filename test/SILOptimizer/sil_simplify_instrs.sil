@@ -1,4 +1,4 @@
-// RUN: %target-sil-opt -enable-sil-verify-all %s -sil-combine | %FileCheck %s
+// RUN: %target-sil-opt -assume-parsing-unqualified-ownership-sil -enable-sil-verify-all %s -sil-combine | %FileCheck %s
 
 import Builtin
 import Swift
@@ -263,3 +263,20 @@ bb0(%0 : $BitwiseStruct1):
   %4 = tuple (%1 : $BitwiseStruct1, %3 : $BitwiseStruct1)
   return %4 : $(BitwiseStruct1, BitwiseStruct1)
 }
+
+// simplify_shifts_by_zero
+sil @simplify_shifts_by_zero : $@convention(thin) (Builtin.Int64) -> (Builtin.Int64, Builtin.Int64, Builtin.Int64) {
+bb0(%0 : $Builtin.Int64):
+  %1 = integer_literal $Builtin.Int64, 0
+  %2 = builtin "ashr_Int64"(%0 : $Builtin.Int64, %1 : $Builtin.Int64) : $Builtin.Int64
+  %3 = builtin "lshr_Int64"(%0 : $Builtin.Int64, %1 : $Builtin.Int64) : $Builtin.Int64
+  %4 = builtin "shl_Int64"(%0 : $Builtin.Int64, %1 : $Builtin.Int64) : $Builtin.Int64
+  %5 = tuple (%2 : $Builtin.Int64, %3 : $Builtin.Int64, %4 : $Builtin.Int64)
+  return %5 : $(Builtin.Int64, Builtin.Int64, Builtin.Int64)
+
+// CHECK-LABEL: sil @simplify_shifts_by_zero
+// CHECK: bb0
+// CHECK-NEXT: %1 = tuple (%0 : $Builtin.Int64, %0 : $Builtin.Int64, %0 : $Builtin.Int64)
+// CHECK-NEXT: return %1 : $(Builtin.Int64, Builtin.Int64, Builtin.Int64)
+}
+

@@ -7,6 +7,6 @@ set(ARC_SOURCES
   ARC/GlobalARCSequenceDataflow.cpp
   ARC/GlobalLoopARCSequenceDataflow.cpp
   ARC/RCStateTransition.cpp
-  ARC/RCStateTransitionVisitors.cpp  
+  ARC/RCStateTransitionVisitors.cpp
   ARC/RefCountState.cpp
   PARENT_SCOPE)

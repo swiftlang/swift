@@ -337,7 +337,7 @@ Type TypeChecker::resolveTypeInContext(
           }
 
           return substMemberTypeWithBase(parentDC->getParentModule(), typeDecl,
-                                         fromType, /*isTypeReference=*/true);
+                                         fromType);
         }
       }
 
@@ -378,7 +378,7 @@ Type TypeChecker::resolveTypeInContext(
         }
 
         return substMemberTypeWithBase(parentDC->getParentModule(), typeDecl,
-                                       fromType, /*isTypeReference=*/true);
+                                       fromType);
       }
 
       if (auto superclassTy = getSuperClassOf(fromType))
@@ -1142,8 +1142,7 @@ static Type resolveNestedIdentTypeComponent(
 
     // Otherwise, simply substitute the parent type into the member.
     memberType = TC.substMemberTypeWithBase(DC->getParentModule(), typeDecl,
-                                            parentTy,
-                                            /*isTypeReference=*/true);
+                                            parentTy);
 
     // Propagate failure.
     if (!memberType || memberType->hasError()) return memberType;
@@ -2797,21 +2796,18 @@ Type TypeResolver::buildProtocolType(
 }
 
 Type TypeChecker::substMemberTypeWithBase(Module *module,
-                                          const ValueDecl *member,
-                                          Type baseTy, bool isTypeReference) {
-  Type memberType = isTypeReference
-                      ? cast<TypeDecl>(member)->getDeclaredInterfaceType()
-                      : member->getInterfaceType();
-  if (isTypeReference) {
-    // The declared interface type for a generic type will have the type
-    // arguments; strip them off.
-    if (auto nominalTypeDecl = dyn_cast<NominalTypeDecl>(member)) {
-      if (auto boundGenericTy = memberType->getAs<BoundGenericType>()) {
-        memberType = UnboundGenericType::get(
-                       const_cast<NominalTypeDecl *>(nominalTypeDecl),
-                       boundGenericTy->getParent(),
-                       Context);
-      }
+                                          const TypeDecl *member,
+                                          Type baseTy) {
+  Type memberType = member->getDeclaredInterfaceType();
+
+  // The declared interface type for a generic type will have the type
+  // arguments; strip them off.
+  if (auto nominalTypeDecl = dyn_cast<NominalTypeDecl>(member)) {
+    if (auto boundGenericTy = memberType->getAs<BoundGenericType>()) {
+      memberType = UnboundGenericType::get(
+                     const_cast<NominalTypeDecl *>(nominalTypeDecl),
+                     boundGenericTy->getParent(),
+                     Context);
     }
   }
 

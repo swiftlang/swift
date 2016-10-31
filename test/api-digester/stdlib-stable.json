@@ -4413,6 +4413,7 @@
           "usr": "s:ZvVs6UInt323maxS_",
           "location": "",
           "moduleName": "Swift",
+          "static": true,
           "children": [
             {
               "kind": "TypeNominal",
@@ -4427,6 +4428,7 @@
               "usr": "s:ZFVs6UInt32g3maxS_",
               "location": "",
               "moduleName": "Swift",
+              "static": true,
               "children": [
                 {
                   "kind": "TypeNominal",
@@ -4457,6 +4459,7 @@
           "usr": "s:ZvVs6UInt323minS_",
           "location": "",
           "moduleName": "Swift",
+          "static": true,
           "children": [
             {
               "kind": "TypeNominal",
@@ -4471,6 +4474,7 @@
               "usr": "s:ZFVs6UInt32g3minS_",
               "location": "",
               "moduleName": "Swift",
+              "static": true,
               "children": [
                 {
                   "kind": "TypeNominal",
@@ -4607,6 +4611,7 @@
           "usr": "s:ZFVs6UInt3215addWithOverflowFTS_S__TS_8overflowSb_",
           "location": "",
           "moduleName": "Swift",
+          "static": true,
           "children": [
             {
               "kind": "TypeNominal",
@@ -4645,6 +4650,7 @@
           "usr": "s:ZFVs6UInt3220subtractWithOverflowFTS_S__TS_8overflowSb_",
           "location": "",
           "moduleName": "Swift",
+          "static": true,
           "children": [
             {
               "kind": "TypeNominal",
@@ -4683,6 +4689,7 @@
           "usr": "s:ZFVs6UInt3220multiplyWithOverflowFTS_S__TS_8overflowSb_",
           "location": "",
           "moduleName": "Swift",
+          "static": true,
           "children": [
             {
               "kind": "TypeNominal",
@@ -4721,6 +4728,7 @@
           "usr": "s:ZFVs6UInt3218divideWithOverflowFTS_S__TS_8overflowSb_",
           "location": "",
           "moduleName": "Swift",
+          "static": true,
           "children": [
             {
               "kind": "TypeNominal",
@@ -4759,6 +4767,7 @@
           "usr": "s:ZFVs6UInt3221remainderWithOverflowFTS_S__TS_8overflowSb_",
           "location": "",
           "moduleName": "Swift",
+          "static": true,
           "children": [
             {
               "kind": "TypeNominal",
@@ -5424,6 +5433,7 @@
           "usr": "s:ZvVs6UInt328allZerosS_",
           "location": "",
           "moduleName": "Swift",
+          "static": true,
           "children": [
             {
               "kind": "TypeNominal",
@@ -5438,6 +5448,7 @@
               "usr": "s:ZFVs6UInt32g8allZerosS_",
               "location": "",
               "moduleName": "Swift",
+              "static": true,
               "children": [
                 {
                   "kind": "TypeNominal",
@@ -8677,6 +8688,7 @@
           "usr": "s:ZvVs6UInt643maxS_",
           "location": "",
           "moduleName": "Swift",
+          "static": true,
           "children": [
             {
               "kind": "TypeNominal",
@@ -8691,6 +8703,7 @@
               "usr": "s:ZFVs6UInt64g3maxS_",
               "location": "",
               "moduleName": "Swift",
+              "static": true,
               "children": [
                 {
                   "kind": "TypeNominal",
@@ -8721,6 +8734,7 @@
           "usr": "s:ZvVs6UInt643minS_",
           "location": "",
           "moduleName": "Swift",
+          "static": true,
           "children": [
             {
               "kind": "TypeNominal",
@@ -8735,6 +8749,7 @@
               "usr": "s:ZFVs6UInt64g3minS_",
               "location": "",
               "moduleName": "Swift",
+              "static": true,
               "children": [
                 {
                   "kind": "TypeNominal",
@@ -8871,6 +8886,7 @@
           "usr": "s:ZFVs6UInt6415addWithOverflowFTS_S__TS_8overflowSb_",
           "location": "",
           "moduleName": "Swift",
+          "static": true,
           "children": [
             {
               "kind": "TypeNominal",
@@ -8909,6 +8925,7 @@
           "usr": "s:ZFVs6UInt6420subtractWithOverflowFTS_S__TS_8overflowSb_",
           "location": "",
           "moduleName": "Swift",
+          "static": true,
           "children": [
             {
               "kind": "TypeNominal",
@@ -8947,6 +8964,7 @@
           "usr": "s:ZFVs6UInt6420multiplyWithOverflowFTS_S__TS_8overflowSb_",
           "location": "",
           "moduleName": "Swift",
+          "static": true,
           "children": [
             {
               "kind": "TypeNominal",
@@ -8985,6 +9003,7 @@
           "usr": "s:ZFVs6UInt6418divideWithOverflowFTS_S__TS_8overflowSb_",
           "location": "",
           "moduleName": "Swift",
+          "static": true,
           "children": [
             {
               "kind": "TypeNominal",
@@ -9023,6 +9042,7 @@
           "usr": "s:ZFVs6UInt6421remainderWithOverflowFTS_S__TS_8overflowSb_",
           "location": "",
           "moduleName": "Swift",
+          "static": true,
           "children": [
             {
               "kind": "TypeNominal",
@@ -9604,6 +9624,7 @@
           "usr": "s:ZvVs6UInt648allZerosS_",
           "location": "",
           "moduleName": "Swift",
+          "static": true,
           "children": [
             {
               "kind": "TypeNominal",
@@ -9618,6 +9639,7 @@
               "usr": "s:ZFVs6UInt64g8allZerosS_",
               "location": "",
               "moduleName": "Swift",
+              "static": true,
               "children": [
                 {
                   "kind": "TypeNominal",
@@ -10174,6 +10196,7 @@
           "usr": "s:ZFSp8allocateFT8capacitySi_GSpx_",
           "location": "",
           "moduleName": "Swift",
+          "static": true,
           "children": [
             {
               "kind": "TypeNominal",
@@ -13173,6 +13196,7 @@
           "usr": "s:ZvOs12MemoryLayout4sizeSi",
           "location": "",
           "moduleName": "Swift",
+          "static": true,
           "children": [
             {
               "kind": "TypeNominal",
@@ -13187,6 +13211,7 @@
               "usr": "s:ZFOs12MemoryLayoutg4sizeSi",
               "location": "",
               "moduleName": "Swift",
+              "static": true,
               "children": [
                 {
                   "kind": "TypeNominal",
@@ -13224,6 +13249,7 @@
           "usr": "s:ZvOs12MemoryLayout6strideSi",
           "location": "",
           "moduleName": "Swift",
+          "static": true,
           "children": [
             {
               "kind": "TypeNominal",
@@ -13238,6 +13264,7 @@
               "usr": "s:ZFOs12MemoryLayoutg6strideSi",
               "location": "",
               "moduleName": "Swift",
+              "static": true,
               "children": [
                 {
                   "kind": "TypeNominal",
@@ -13275,6 +13302,7 @@
           "usr": "s:ZvOs12MemoryLayout9alignmentSi",
           "location": "",
           "moduleName": "Swift",
+          "static": true,
           "children": [
             {
               "kind": "TypeNominal",
@@ -13289,6 +13317,7 @@
               "usr": "s:ZFOs12MemoryLayoutg9alignmentSi",
               "location": "",
               "moduleName": "Swift",
+              "static": true,
               "children": [
                 {
                   "kind": "TypeNominal",
@@ -13326,6 +13355,7 @@
           "usr": "s:ZFOs12MemoryLayout4sizeFT7ofValuex_Si",
           "location": "",
           "moduleName": "Swift",
+          "static": true,
           "children": [
             {
               "kind": "TypeNominal",
@@ -13347,6 +13377,7 @@
           "usr": "s:ZFOs12MemoryLayout6strideFT7ofValuex_Si",
           "location": "",
           "moduleName": "Swift",
+          "static": true,
           "children": [
             {
               "kind": "TypeNominal",
@@ -13368,6 +13399,7 @@
           "usr": "s:ZFOs12MemoryLayout9alignmentFT7ofValuex_Si",
           "location": "",
           "moduleName": "Swift",
+          "static": true,
           "children": [
             {
               "kind": "TypeNominal",
@@ -14289,6 +14321,7 @@
           "usr": "s:ZvSf16exponentBitCountSi",
           "location": "",
           "moduleName": "Swift",
+          "static": true,
           "children": [
             {
               "kind": "TypeNominal",
@@ -14303,6 +14336,7 @@
               "usr": "s:ZFSfg16exponentBitCountSi",
               "location": "",
               "moduleName": "Swift",
+              "static": true,
               "children": [
                 {
                   "kind": "TypeNominal",
@@ -14333,6 +14367,7 @@
           "usr": "s:ZvSf19significandBitCountSi",
           "location": "",
           "moduleName": "Swift",
+          "static": true,
           "children": [
             {
               "kind": "TypeNominal",
@@ -14347,6 +14382,7 @@
               "usr": "s:ZFSfg19significandBitCountSi",
               "location": "",
               "moduleName": "Swift",
+              "static": true,
               "children": [
                 {
                   "kind": "TypeNominal",
@@ -14614,6 +14650,7 @@
           "usr": "s:ZvSf8infinitySf",
           "location": "",
           "moduleName": "Swift",
+          "static": true,
           "children": [
             {
               "kind": "TypeNominal",
@@ -14628,6 +14665,7 @@
               "usr": "s:ZFSfg8infinitySf",
               "location": "",
               "moduleName": "Swift",
+              "static": true,
               "children": [
                 {
                   "kind": "TypeNominal",
@@ -14658,6 +14696,7 @@
           "usr": "s:ZvSf3nanSf",
           "location": "",
           "moduleName": "Swift",
+          "static": true,
           "children": [
             {
               "kind": "TypeNominal",
@@ -14672,6 +14711,7 @@
               "usr": "s:ZFSfg3nanSf",
               "location": "",
               "moduleName": "Swift",
+              "static": true,
               "children": [
                 {
                   "kind": "TypeNominal",
@@ -14702,6 +14742,7 @@
           "usr": "s:ZvSf12signalingNaNSf",
           "location": "",
           "moduleName": "Swift",
+          "static": true,
           "children": [
             {
               "kind": "TypeNominal",
@@ -14716,6 +14757,7 @@
               "usr": "s:ZFSfg12signalingNaNSf",
               "location": "",
               "moduleName": "Swift",
+              "static": true,
               "children": [
                 {
                   "kind": "TypeNominal",
@@ -14746,6 +14788,7 @@
           "usr": "s:ZvSf23greatestFiniteMagnitudeSf",
           "location": "",
           "moduleName": "Swift",
+          "static": true,
           "children": [
             {
               "kind": "TypeNominal",
@@ -14760,6 +14803,7 @@
               "usr": "s:ZFSfg23greatestFiniteMagnitudeSf",
               "location": "",
               "moduleName": "Swift",
+              "static": true,
               "children": [
                 {
                   "kind": "TypeNominal",
@@ -14790,6 +14834,7 @@
           "usr": "s:ZvSf2piSf",
           "location": "",
           "moduleName": "Swift",
+          "static": true,
           "children": [
             {
               "kind": "TypeNominal",
@@ -14804,6 +14849,7 @@
               "usr": "s:ZFSfg2piSf",
               "location": "",
               "moduleName": "Swift",
+              "static": true,
               "children": [
                 {
                   "kind": "TypeNominal",
@@ -14871,6 +14917,7 @@
           "usr": "s:ZvSf20leastNormalMagnitudeSf",
           "location": "",
           "moduleName": "Swift",
+          "static": true,
           "children": [
             {
               "kind": "TypeNominal",
@@ -14885,6 +14932,7 @@
               "usr": "s:ZFSfg20leastNormalMagnitudeSf",
               "location": "",
               "moduleName": "Swift",
+              "static": true,
               "children": [
                 {
                   "kind": "TypeNominal",
@@ -14915,6 +14963,7 @@
           "usr": "s:ZvSf21leastNonzeroMagnitudeSf",
           "location": "",
           "moduleName": "Swift",
+          "static": true,
           "children": [
             {
               "kind": "TypeNominal",
@@ -14929,6 +14978,7 @@
               "usr": "s:ZFSfg21leastNonzeroMagnitudeSf",
               "location": "",
               "moduleName": "Swift",
+              "static": true,
               "children": [
                 {
                   "kind": "TypeNominal",
@@ -15865,6 +15915,7 @@
           "usr": "s:ZFSf3absFSfSf",
           "location": "",
           "moduleName": "Swift",
+          "static": true,
           "children": [
             {
               "kind": "TypeNominal",
@@ -16636,6 +16687,7 @@
           "usr": "s:ZvSu3maxSu",
           "location": "",
           "moduleName": "Swift",
+          "static": true,
           "children": [
             {
               "kind": "TypeNominal",
@@ -16650,6 +16702,7 @@
               "usr": "s:ZFSug3maxSu",
               "location": "",
               "moduleName": "Swift",
+              "static": true,
               "children": [
                 {
                   "kind": "TypeNominal",
@@ -16680,6 +16733,7 @@
           "usr": "s:ZvSu3minSu",
           "location": "",
           "moduleName": "Swift",
+          "static": true,
           "children": [
             {
               "kind": "TypeNominal",
@@ -16694,6 +16748,7 @@
               "usr": "s:ZFSug3minSu",
               "location": "",
               "moduleName": "Swift",
+              "static": true,
               "children": [
                 {
                   "kind": "TypeNominal",
@@ -16858,6 +16913,7 @@
           "usr": "s:ZFSu15addWithOverflowFTSuSu_TSu8overflowSb_",
           "location": "",
           "moduleName": "Swift",
+          "static": true,
           "children": [
             {
               "kind": "TypeNominal",
@@ -16896,6 +16952,7 @@
           "usr": "s:ZFSu20subtractWithOverflowFTSuSu_TSu8overflowSb_",
           "location": "",
           "moduleName": "Swift",
+          "static": true,
           "children": [
             {
               "kind": "TypeNominal",
@@ -16934,6 +16991,7 @@
           "usr": "s:ZFSu20multiplyWithOverflowFTSuSu_TSu8overflowSb_",
           "location": "",
           "moduleName": "Swift",
+          "static": true,
           "children": [
             {
               "kind": "TypeNominal",
@@ -16972,6 +17030,7 @@
           "usr": "s:ZFSu18divideWithOverflowFTSuSu_TSu8overflowSb_",
           "location": "",
           "moduleName": "Swift",
+          "static": true,
           "children": [
             {
               "kind": "TypeNominal",
@@ -17010,6 +17069,7 @@
           "usr": "s:ZFSu21remainderWithOverflowFTSuSu_TSu8overflowSb_",
           "location": "",
           "moduleName": "Swift",
+          "static": true,
           "children": [
             {
               "kind": "TypeNominal",
@@ -17633,6 +17693,7 @@
           "usr": "s:ZvSu8allZerosSu",
           "location": "",
           "moduleName": "Swift",
+          "static": true,
           "children": [
             {
               "kind": "TypeNominal",
@@ -17647,6 +17708,7 @@
               "usr": "s:ZFSug8allZerosSu",
               "location": "",
               "moduleName": "Swift",
+              "static": true,
               "children": [
                 {
                   "kind": "TypeNominal",
@@ -20560,6 +20622,7 @@
           "usr": "s:ZvSd16exponentBitCountSi",
           "location": "",
           "moduleName": "Swift",
+          "static": true,
           "children": [
             {
               "kind": "TypeNominal",
@@ -20574,6 +20637,7 @@
               "usr": "s:ZFSdg16exponentBitCountSi",
               "location": "",
               "moduleName": "Swift",
+              "static": true,
               "children": [
                 {
                   "kind": "TypeNominal",
@@ -20604,6 +20668,7 @@
           "usr": "s:ZvSd19significandBitCountSi",
           "location": "",
           "moduleName": "Swift",
+          "static": true,
           "children": [
             {
               "kind": "TypeNominal",
@@ -20618,6 +20683,7 @@
               "usr": "s:ZFSdg19significandBitCountSi",
               "location": "",
               "moduleName": "Swift",
+              "static": true,
               "children": [
                 {
                   "kind": "TypeNominal",
@@ -20885,6 +20951,7 @@
           "usr": "s:ZvSd8infinitySd",
           "location": "",
           "moduleName": "Swift",
+          "static": true,
           "children": [
             {
               "kind": "TypeNominal",
@@ -20899,6 +20966,7 @@
               "usr": "s:ZFSdg8infinitySd",
               "location": "",
               "moduleName": "Swift",
+              "static": true,
               "children": [
                 {
                   "kind": "TypeNominal",
@@ -20929,6 +20997,7 @@
           "usr": "s:ZvSd3nanSd",
           "location": "",
           "moduleName": "Swift",
+          "static": true,
           "children": [
             {
               "kind": "TypeNominal",
@@ -20943,6 +21012,7 @@
               "usr": "s:ZFSdg3nanSd",
               "location": "",
               "moduleName": "Swift",
+              "static": true,
               "children": [
                 {
                   "kind": "TypeNominal",
@@ -20973,6 +21043,7 @@
           "usr": "s:ZvSd12signalingNaNSd",
           "location": "",
           "moduleName": "Swift",
+          "static": true,
           "children": [
             {
               "kind": "TypeNominal",
@@ -20987,6 +21058,7 @@
               "usr": "s:ZFSdg12signalingNaNSd",
               "location": "",
               "moduleName": "Swift",
+              "static": true,
               "children": [
                 {
                   "kind": "TypeNominal",
@@ -21017,6 +21089,7 @@
           "usr": "s:ZvSd23greatestFiniteMagnitudeSd",
           "location": "",
           "moduleName": "Swift",
+          "static": true,
           "children": [
             {
               "kind": "TypeNominal",
@@ -21031,6 +21104,7 @@
               "usr": "s:ZFSdg23greatestFiniteMagnitudeSd",
               "location": "",
               "moduleName": "Swift",
+              "static": true,
               "children": [
                 {
                   "kind": "TypeNominal",
@@ -21061,6 +21135,7 @@
           "usr": "s:ZvSd2piSd",
           "location": "",
           "moduleName": "Swift",
+          "static": true,
           "children": [
             {
               "kind": "TypeNominal",
@@ -21075,6 +21150,7 @@
               "usr": "s:ZFSdg2piSd",
               "location": "",
               "moduleName": "Swift",
+              "static": true,
               "children": [
                 {
                   "kind": "TypeNominal",
@@ -21142,6 +21218,7 @@
           "usr": "s:ZvSd20leastNormalMagnitudeSd",
           "location": "",
           "moduleName": "Swift",
+          "static": true,
           "children": [
             {
               "kind": "TypeNominal",
@@ -21156,6 +21233,7 @@
               "usr": "s:ZFSdg20leastNormalMagnitudeSd",
               "location": "",
               "moduleName": "Swift",
+              "static": true,
               "children": [
                 {
                   "kind": "TypeNominal",
@@ -21186,6 +21264,7 @@
           "usr": "s:ZvSd21leastNonzeroMagnitudeSd",
           "location": "",
           "moduleName": "Swift",
+          "static": true,
           "children": [
             {
               "kind": "TypeNominal",
@@ -21200,6 +21279,7 @@
               "usr": "s:ZFSdg21leastNonzeroMagnitudeSd",
               "location": "",
               "moduleName": "Swift",
+              "static": true,
               "children": [
                 {
                   "kind": "TypeNominal",
@@ -22136,6 +22216,7 @@
           "usr": "s:ZFSd3absFSdSd",
           "location": "",
           "moduleName": "Swift",
+          "static": true,
           "children": [
             {
               "kind": "TypeNominal",
@@ -26399,6 +26480,7 @@
           "usr": "s:ZvVs5Int163maxS_",
           "location": "",
           "moduleName": "Swift",
+          "static": true,
           "children": [
             {
               "kind": "TypeNominal",
@@ -26413,6 +26495,7 @@
               "usr": "s:ZFVs5Int16g3maxS_",
               "location": "",
               "moduleName": "Swift",
+              "static": true,
               "children": [
                 {
                   "kind": "TypeNominal",
@@ -26443,6 +26526,7 @@
           "usr": "s:ZvVs5Int163minS_",
           "location": "",
           "moduleName": "Swift",
+          "static": true,
           "children": [
             {
               "kind": "TypeNominal",
@@ -26457,6 +26541,7 @@
               "usr": "s:ZFVs5Int16g3minS_",
               "location": "",
               "moduleName": "Swift",
+              "static": true,
               "children": [
                 {
                   "kind": "TypeNominal",
@@ -26593,6 +26678,7 @@
           "usr": "s:ZFVs5Int1615addWithOverflowFTS_S__TS_8overflowSb_",
           "location": "",
           "moduleName": "Swift",
+          "static": true,
           "children": [
             {
               "kind": "TypeNominal",
@@ -26631,6 +26717,7 @@
           "usr": "s:ZFVs5Int1620subtractWithOverflowFTS_S__TS_8overflowSb_",
           "location": "",
           "moduleName": "Swift",
+          "static": true,
           "children": [
             {
               "kind": "TypeNominal",
@@ -26669,6 +26756,7 @@
           "usr": "s:ZFVs5Int1620multiplyWithOverflowFTS_S__TS_8overflowSb_",
           "location": "",
           "moduleName": "Swift",
+          "static": true,
           "children": [
             {
               "kind": "TypeNominal",
@@ -26707,6 +26795,7 @@
           "usr": "s:ZFVs5Int1618divideWithOverflowFTS_S__TS_8overflowSb_",
           "location": "",
           "moduleName": "Swift",
+          "static": true,
           "children": [
             {
               "kind": "TypeNominal",
@@ -26745,6 +26834,7 @@
           "usr": "s:ZFVs5Int1621remainderWithOverflowFTS_S__TS_8overflowSb_",
           "location": "",
           "moduleName": "Swift",
+          "static": true,
           "children": [
             {
               "kind": "TypeNominal",
@@ -27436,6 +27526,7 @@
           "usr": "s:ZvVs5Int168allZerosS_",
           "location": "",
           "moduleName": "Swift",
+          "static": true,
           "children": [
             {
               "kind": "TypeNominal",
@@ -27450,6 +27541,7 @@
               "usr": "s:ZFVs5Int16g8allZerosS_",
               "location": "",
               "moduleName": "Swift",
+              "static": true,
               "children": [
                 {
                   "kind": "TypeNominal",
@@ -32488,6 +32580,7 @@
           "usr": "s:ZvVs5Int323maxS_",
           "location": "",
           "moduleName": "Swift",
+          "static": true,
           "children": [
             {
               "kind": "TypeNominal",
@@ -32502,6 +32595,7 @@
               "usr": "s:ZFVs5Int32g3maxS_",
               "location": "",
               "moduleName": "Swift",
+              "static": true,
               "children": [
                 {
                   "kind": "TypeNominal",
@@ -32532,6 +32626,7 @@
           "usr": "s:ZvVs5Int323minS_",
           "location": "",
           "moduleName": "Swift",
+          "static": true,
           "children": [
             {
               "kind": "TypeNominal",
@@ -32546,6 +32641,7 @@
               "usr": "s:ZFVs5Int32g3minS_",
               "location": "",
               "moduleName": "Swift",
+              "static": true,
               "children": [
                 {
                   "kind": "TypeNominal",
@@ -32682,6 +32778,7 @@
           "usr": "s:ZFVs5Int3215addWithOverflowFTS_S__TS_8overflowSb_",
           "location": "",
           "moduleName": "Swift",
+          "static": true,
           "children": [
             {
               "kind": "TypeNominal",
@@ -32720,6 +32817,7 @@
           "usr": "s:ZFVs5Int3220subtractWithOverflowFTS_S__TS_8overflowSb_",
           "location": "",
           "moduleName": "Swift",
+          "static": true,
           "children": [
             {
               "kind": "TypeNominal",
@@ -32758,6 +32856,7 @@
           "usr": "s:ZFVs5Int3220multiplyWithOverflowFTS_S__TS_8overflowSb_",
           "location": "",
           "moduleName": "Swift",
+          "static": true,
           "children": [
             {
               "kind": "TypeNominal",
@@ -32796,6 +32895,7 @@
           "usr": "s:ZFVs5Int3218divideWithOverflowFTS_S__TS_8overflowSb_",
           "location": "",
           "moduleName": "Swift",
+          "static": true,
           "children": [
             {
               "kind": "TypeNominal",
@@ -32834,6 +32934,7 @@
           "usr": "s:ZFVs5Int3221remainderWithOverflowFTS_S__TS_8overflowSb_",
           "location": "",
           "moduleName": "Swift",
+          "static": true,
           "children": [
             {
               "kind": "TypeNominal",
@@ -33483,6 +33584,7 @@
           "usr": "s:ZvVs5Int328allZerosS_",
           "location": "",
           "moduleName": "Swift",
+          "static": true,
           "children": [
             {
               "kind": "TypeNominal",
@@ -33497,6 +33599,7 @@
               "usr": "s:ZFVs5Int32g8allZerosS_",
               "location": "",
               "moduleName": "Swift",
+              "static": true,
               "children": [
                 {
                   "kind": "TypeNominal",
@@ -34797,6 +34900,7 @@
           "usr": "s:ZvVs4Int83maxS_",
           "location": "",
           "moduleName": "Swift",
+          "static": true,
           "children": [
             {
               "kind": "TypeNominal",
@@ -34811,6 +34915,7 @@
               "usr": "s:ZFVs4Int8g3maxS_",
               "location": "",
               "moduleName": "Swift",
+              "static": true,
               "children": [
                 {
                   "kind": "TypeNominal",
@@ -34841,6 +34946,7 @@
           "usr": "s:ZvVs4Int83minS_",
           "location": "",
           "moduleName": "Swift",
+          "static": true,
           "children": [
             {
               "kind": "TypeNominal",
@@ -34855,6 +34961,7 @@
               "usr": "s:ZFVs4Int8g3minS_",
               "location": "",
               "moduleName": "Swift",
+              "static": true,
               "children": [
                 {
                   "kind": "TypeNominal",
@@ -34991,6 +35098,7 @@
           "usr": "s:ZFVs4Int815addWithOverflowFTS_S__TS_8overflowSb_",
           "location": "",
           "moduleName": "Swift",
+          "static": true,
           "children": [
             {
               "kind": "TypeNominal",
@@ -35029,6 +35137,7 @@
           "usr": "s:ZFVs4Int820subtractWithOverflowFTS_S__TS_8overflowSb_",
           "location": "",
           "moduleName": "Swift",
+          "static": true,
           "children": [
             {
               "kind": "TypeNominal",
@@ -35067,6 +35176,7 @@
           "usr": "s:ZFVs4Int820multiplyWithOverflowFTS_S__TS_8overflowSb_",
           "location": "",
           "moduleName": "Swift",
+          "static": true,
           "children": [
             {
               "kind": "TypeNominal",
@@ -35105,6 +35215,7 @@
           "usr": "s:ZFVs4Int818divideWithOverflowFTS_S__TS_8overflowSb_",
           "location": "",
           "moduleName": "Swift",
+          "static": true,
           "children": [
             {
               "kind": "TypeNominal",
@@ -35143,6 +35254,7 @@
           "usr": "s:ZFVs4Int821remainderWithOverflowFTS_S__TS_8overflowSb_",
           "location": "",
           "moduleName": "Swift",
+          "static": true,
           "children": [
             {
               "kind": "TypeNominal",
@@ -35876,6 +35988,7 @@
           "usr": "s:ZvVs4Int88allZerosS_",
           "location": "",
           "moduleName": "Swift",
+          "static": true,
           "children": [
             {
               "kind": "TypeNominal",
@@ -35890,6 +36003,7 @@
               "usr": "s:ZFVs4Int8g8allZerosS_",
               "location": "",
               "moduleName": "Swift",
+              "static": true,
               "children": [
                 {
                   "kind": "TypeNominal",
@@ -36155,6 +36269,7 @@
           "usr": "s:ZFVs4UTF86encodeFTSc4intoFVs5UInt8T__T_",
           "location": "",
           "moduleName": "Swift",
+          "static": true,
           "children": [
             {
               "kind": "TypeNominal",
@@ -36203,6 +36318,7 @@
           "usr": "s:ZFVs4UTF814isContinuationFVs5UInt8Sb",
           "location": "",
           "moduleName": "Swift",
+          "static": true,
           "children": [
             {
               "kind": "TypeNominal",
@@ -36387,6 +36503,7 @@
           "usr": "s:ZFVs5UTF166encodeFTSc4intoFVs6UInt16T__T_",
           "location": "",
           "moduleName": "Swift",
+          "static": true,
           "children": [
             {
               "kind": "TypeNominal",
@@ -36435,6 +36552,7 @@
           "usr": "s:ZFVs5UTF165widthFScSi",
           "location": "",
           "moduleName": "Swift",
+          "static": true,
           "children": [
             {
               "kind": "TypeNominal",
@@ -36456,6 +36574,7 @@
           "usr": "s:ZFVs5UTF1613leadSurrogateFScVs6UInt16",
           "location": "",
           "moduleName": "Swift",
+          "static": true,
           "children": [
             {
               "kind": "TypeNominal",
@@ -36477,6 +36596,7 @@
           "usr": "s:ZFVs5UTF1614trailSurrogateFScVs6UInt16",
           "location": "",
           "moduleName": "Swift",
+          "static": true,
           "children": [
             {
               "kind": "TypeNominal",
@@ -36498,6 +36618,7 @@
           "usr": "s:ZFVs5UTF1615isLeadSurrogateFVs6UInt16Sb",
           "location": "",
           "moduleName": "Swift",
+          "static": true,
           "children": [
             {
               "kind": "TypeNominal",
@@ -36519,6 +36640,7 @@
           "usr": "s:ZFVs5UTF1616isTrailSurrogateFVs6UInt16Sb",
           "location": "",
           "moduleName": "Swift",
+          "static": true,
           "children": [
             {
               "kind": "TypeNominal",
@@ -36540,6 +36662,7 @@
           "usr": "s:ZFVs5UTF1616transcodedLengthu0_Rxs16IteratorProtocol_s12UnicodeCodecwx7Elementzw_8CodeUnitrFT2ofx9decodedAsMq_27repairingIllFormedSequencesSb_GSqT5countSi7isASCIISb__",
           "location": "",
           "moduleName": "Swift",
+          "static": true,
           "children": [
             {
               "kind": "TypeNominal",
@@ -37010,6 +37133,7 @@
           "usr": "s:ZvVs5Int643maxS_",
           "location": "",
           "moduleName": "Swift",
+          "static": true,
           "children": [
             {
               "kind": "TypeNominal",
@@ -37024,6 +37148,7 @@
               "usr": "s:ZFVs5Int64g3maxS_",
               "location": "",
               "moduleName": "Swift",
+              "static": true,
               "children": [
                 {
                   "kind": "TypeNominal",
@@ -37054,6 +37179,7 @@
           "usr": "s:ZvVs5Int643minS_",
           "location": "",
           "moduleName": "Swift",
+          "static": true,
           "children": [
             {
               "kind": "TypeNominal",
@@ -37068,6 +37194,7 @@
               "usr": "s:ZFVs5Int64g3minS_",
               "location": "",
               "moduleName": "Swift",
+              "static": true,
               "children": [
                 {
                   "kind": "TypeNominal",
@@ -37204,6 +37331,7 @@
           "usr": "s:ZFVs5Int6415addWithOverflowFTS_S__TS_8overflowSb_",
           "location": "",
           "moduleName": "Swift",
+          "static": true,
           "children": [
             {
               "kind": "TypeNominal",
@@ -37242,6 +37370,7 @@
           "usr": "s:ZFVs5Int6420subtractWithOverflowFTS_S__TS_8overflowSb_",
           "location": "",
           "moduleName": "Swift",
+          "static": true,
           "children": [
             {
               "kind": "TypeNominal",
@@ -37280,6 +37409,7 @@
           "usr": "s:ZFVs5Int6420multiplyWithOverflowFTS_S__TS_8overflowSb_",
           "location": "",
           "moduleName": "Swift",
+          "static": true,
           "children": [
             {
               "kind": "TypeNominal",
@@ -37318,6 +37448,7 @@
           "usr": "s:ZFVs5Int6418divideWithOverflowFTS_S__TS_8overflowSb_",
           "location": "",
           "moduleName": "Swift",
+          "static": true,
           "children": [
             {
               "kind": "TypeNominal",
@@ -37356,6 +37487,7 @@
           "usr": "s:ZFVs5Int6421remainderWithOverflowFTS_S__TS_8overflowSb_",
           "location": "",
           "moduleName": "Swift",
+          "static": true,
           "children": [
             {
               "kind": "TypeNominal",
@@ -37921,6 +38053,7 @@
           "usr": "s:ZvVs5Int648allZerosS_",
           "location": "",
           "moduleName": "Swift",
+          "static": true,
           "children": [
             {
               "kind": "TypeNominal",
@@ -37935,6 +38068,7 @@
               "usr": "s:ZFVs5Int64g8allZerosS_",
               "location": "",
               "moduleName": "Swift",
+              "static": true,
               "children": [
                 {
                   "kind": "TypeNominal",
@@ -38361,6 +38495,7 @@
           "usr": "s:ZFVs5UTF326encodeFTSc4intoFVs6UInt32T__T_",
           "location": "",
           "moduleName": "Swift",
+          "static": true,
           "children": [
             {
               "kind": "TypeNominal",
@@ -42318,6 +42453,7 @@
           "usr": "s:ZFSv8allocateFT5bytesSi9alignedToSi_Sv",
           "location": "",
           "moduleName": "Swift",
+          "static": true,
           "children": [
             {
               "kind": "TypeNominal",
@@ -45964,6 +46100,7 @@
           "usr": "s:ZFPs12UnicodeCodec6encodeFTSc4intoFwx8CodeUnitT__T_",
           "location": "",
           "moduleName": "Swift",
+          "static": true,
           "children": [
             {
               "kind": "TypeNominal",
@@ -48013,6 +48150,7 @@
           "usr": "s:ZvPs17BitwiseOperations8allZerosx",
           "location": "",
           "moduleName": "Swift",
+          "static": true,
           "children": [
             {
               "kind": "TypeNominal",
@@ -48027,6 +48165,7 @@
               "usr": "s:ZFPs17BitwiseOperationsg8allZerosx",
               "location": "",
               "moduleName": "Swift",
+              "static": true,
               "children": [
                 {
                   "kind": "TypeNominal",
@@ -52561,6 +52700,7 @@
           "usr": "s:ZFVs9Unmanaged10fromOpaqueFSVGS_x_",
           "location": "",
           "moduleName": "Swift",
+          "static": true,
           "children": [
             {
               "kind": "TypeNominal",
@@ -52612,6 +52752,7 @@
           "usr": "s:ZFVs9Unmanaged12passRetainedFxGS_x_",
           "location": "",
           "moduleName": "Swift",
+          "static": true,
           "children": [
             {
               "kind": "TypeNominal",
@@ -52654,6 +52795,7 @@
           "usr": "s:ZFVs9Unmanaged14passUnretainedFxGS_x_",
           "location": "",
           "moduleName": "Swift",
+          "static": true,
           "children": [
             {
               "kind": "TypeNominal",
@@ -56986,6 +57128,7 @@
           "usr": "s:ZvSi3maxSi",
           "location": "",
           "moduleName": "Swift",
+          "static": true,
           "children": [
             {
               "kind": "TypeNominal",
@@ -57000,6 +57143,7 @@
               "usr": "s:ZFSig3maxSi",
               "location": "",
               "moduleName": "Swift",
+              "static": true,
               "children": [
                 {
                   "kind": "TypeNominal",
@@ -57030,6 +57174,7 @@
           "usr": "s:ZvSi3minSi",
           "location": "",
           "moduleName": "Swift",
+          "static": true,
           "children": [
             {
               "kind": "TypeNominal",
@@ -57044,6 +57189,7 @@
               "usr": "s:ZFSig3minSi",
               "location": "",
               "moduleName": "Swift",
+              "static": true,
               "children": [
                 {
                   "kind": "TypeNominal",
@@ -57208,6 +57354,7 @@
           "usr": "s:ZFSi15addWithOverflowFTSiSi_TSi8overflowSb_",
           "location": "",
           "moduleName": "Swift",
+          "static": true,
           "children": [
             {
               "kind": "TypeNominal",
@@ -57246,6 +57393,7 @@
           "usr": "s:ZFSi20subtractWithOverflowFTSiSi_TSi8overflowSb_",
           "location": "",
           "moduleName": "Swift",
+          "static": true,
           "children": [
             {
               "kind": "TypeNominal",
@@ -57284,6 +57432,7 @@
           "usr": "s:ZFSi20multiplyWithOverflowFTSiSi_TSi8overflowSb_",
           "location": "",
           "moduleName": "Swift",
+          "static": true,
           "children": [
             {
               "kind": "TypeNominal",
@@ -57322,6 +57471,7 @@
           "usr": "s:ZFSi18divideWithOverflowFTSiSi_TSi8overflowSb_",
           "location": "",
           "moduleName": "Swift",
+          "static": true,
           "children": [
             {
               "kind": "TypeNominal",
@@ -57360,6 +57510,7 @@
           "usr": "s:ZFSi21remainderWithOverflowFTSiSi_TSi8overflowSb_",
           "location": "",
           "moduleName": "Swift",
+          "static": true,
           "children": [
             {
               "kind": "TypeNominal",
@@ -57967,6 +58118,7 @@
           "usr": "s:ZvSi8allZerosSi",
           "location": "",
           "moduleName": "Swift",
+          "static": true,
           "children": [
             {
               "kind": "TypeNominal",
@@ -57981,6 +58133,7 @@
               "usr": "s:ZFSig8allZerosSi",
               "location": "",
               "moduleName": "Swift",
+              "static": true,
               "children": [
                 {
                   "kind": "TypeNominal",
@@ -59468,6 +59621,7 @@
           "usr": "s:ZvOs11CommandLine4argcVs5Int32",
           "location": "",
           "moduleName": "Swift",
+          "static": true,
           "children": [
             {
               "kind": "TypeNominal",
@@ -59482,6 +59636,7 @@
               "usr": "s:ZFOs11CommandLineg4argcVs5Int32",
               "location": "",
               "moduleName": "Swift",
+              "static": true,
               "children": [
                 {
                   "kind": "TypeNominal",
@@ -59512,6 +59667,7 @@
           "usr": "s:ZvOs11CommandLine10unsafeArgvGSpGSqGSpVs4Int8___",
           "location": "",
           "moduleName": "Swift",
+          "static": true,
           "children": [
             {
               "kind": "TypeNominal",
@@ -59547,6 +59703,7 @@
               "usr": "s:ZFOs11CommandLineg10unsafeArgvGSpGSqGSpVs4Int8___",
               "location": "",
               "moduleName": "Swift",
+              "static": true,
               "children": [
                 {
                   "kind": "TypeNominal",
@@ -59598,6 +59755,7 @@
           "usr": "s:ZvOs11CommandLine9argumentsGSaSS_",
           "location": "",
           "moduleName": "Swift",
+          "static": true,
           "children": [
             {
               "kind": "TypeNominal",
@@ -59619,6 +59777,7 @@
               "usr": "s:ZFOs11CommandLineg9argumentsGSaSS_",
               "location": "",
               "moduleName": "Swift",
+              "static": true,
               "children": [
                 {
                   "kind": "TypeNominal",
@@ -59654,6 +59813,7 @@
               "usr": "s:ZFOs11CommandLines9argumentsGSaSS_",
               "location": "",
               "moduleName": "Swift",
+              "static": true,
               "mutating": true,
               "children": [
                 {
@@ -61420,6 +61580,7 @@
           "usr": "s:ZvVs5UInt83maxS_",
           "location": "",
           "moduleName": "Swift",
+          "static": true,
           "children": [
             {
               "kind": "TypeNominal",
@@ -61434,6 +61595,7 @@
               "usr": "s:ZFVs5UInt8g3maxS_",
               "location": "",
               "moduleName": "Swift",
+              "static": true,
               "children": [
                 {
                   "kind": "TypeNominal",
@@ -61464,6 +61626,7 @@
           "usr": "s:ZvVs5UInt83minS_",
           "location": "",
           "moduleName": "Swift",
+          "static": true,
           "children": [
             {
               "kind": "TypeNominal",
@@ -61478,6 +61641,7 @@
               "usr": "s:ZFVs5UInt8g3minS_",
               "location": "",
               "moduleName": "Swift",
+              "static": true,
               "children": [
                 {
                   "kind": "TypeNominal",
@@ -61614,6 +61778,7 @@
           "usr": "s:ZFVs5UInt815addWithOverflowFTS_S__TS_8overflowSb_",
           "location": "",
           "moduleName": "Swift",
+          "static": true,
           "children": [
             {
               "kind": "TypeNominal",
@@ -61652,6 +61817,7 @@
           "usr": "s:ZFVs5UInt820subtractWithOverflowFTS_S__TS_8overflowSb_",
           "location": "",
           "moduleName": "Swift",
+          "static": true,
           "children": [
             {
               "kind": "TypeNominal",
@@ -61690,6 +61856,7 @@
           "usr": "s:ZFVs5UInt820multiplyWithOverflowFTS_S__TS_8overflowSb_",
           "location": "",
           "moduleName": "Swift",
+          "static": true,
           "children": [
             {
               "kind": "TypeNominal",
@@ -61728,6 +61895,7 @@
           "usr": "s:ZFVs5UInt818divideWithOverflowFTS_S__TS_8overflowSb_",
           "location": "",
           "moduleName": "Swift",
+          "static": true,
           "children": [
             {
               "kind": "TypeNominal",
@@ -61766,6 +61934,7 @@
           "usr": "s:ZFVs5UInt821remainderWithOverflowFTS_S__TS_8overflowSb_",
           "location": "",
           "moduleName": "Swift",
+          "static": true,
           "children": [
             {
               "kind": "TypeNominal",
@@ -62515,6 +62684,7 @@
           "usr": "s:ZvVs5UInt88allZerosS_",
           "location": "",
           "moduleName": "Swift",
+          "static": true,
           "children": [
             {
               "kind": "TypeNominal",
@@ -62529,6 +62699,7 @@
               "usr": "s:ZFVs5UInt8g8allZerosS_",
               "location": "",
               "moduleName": "Swift",
+              "static": true,
               "children": [
                 {
                   "kind": "TypeNominal",
@@ -68064,6 +68235,7 @@
           "usr": "s:ZFPs18_IntegerArithmetic15addWithOverflowFTxx_Tx8overflowSb_",
           "location": "",
           "moduleName": "Swift",
+          "static": true,
           "children": [
             {
               "kind": "TypeNominal",
@@ -68123,6 +68295,7 @@
           "usr": "s:ZFPs18_IntegerArithmetic20subtractWithOverflowFTxx_Tx8overflowSb_",
           "location": "",
           "moduleName": "Swift",
+          "static": true,
           "children": [
             {
               "kind": "TypeNominal",
@@ -68182,6 +68355,7 @@
           "usr": "s:ZFPs18_IntegerArithmetic20multiplyWithOverflowFTxx_Tx8overflowSb_",
           "location": "",
           "moduleName": "Swift",
+          "static": true,
           "children": [
             {
               "kind": "TypeNominal",
@@ -68241,6 +68415,7 @@
           "usr": "s:ZFPs18_IntegerArithmetic18divideWithOverflowFTxx_Tx8overflowSb_",
           "location": "",
           "moduleName": "Swift",
+          "static": true,
           "children": [
             {
               "kind": "TypeNominal",
@@ -68300,6 +68475,7 @@
           "usr": "s:ZFPs18_IntegerArithmetic21remainderWithOverflowFTxx_Tx8overflowSb_",
           "location": "",
           "moduleName": "Swift",
+          "static": true,
           "children": [
             {
               "kind": "TypeNominal",
@@ -74783,6 +74959,7 @@
           "usr": "s:ZvVs7Float8016exponentBitCountSi",
           "location": "",
           "moduleName": "Swift",
+          "static": true,
           "children": [
             {
               "kind": "TypeNominal",
@@ -74797,6 +74974,7 @@
               "usr": "s:ZFVs7Float80g16exponentBitCountSi",
               "location": "",
               "moduleName": "Swift",
+              "static": true,
               "children": [
                 {
                   "kind": "TypeNominal",
@@ -74827,6 +75005,7 @@
           "usr": "s:ZvVs7Float8019significandBitCountSi",
           "location": "",
           "moduleName": "Swift",
+          "static": true,
           "children": [
             {
               "kind": "TypeNominal",
@@ -74841,6 +75020,7 @@
               "usr": "s:ZFVs7Float80g19significandBitCountSi",
               "location": "",
               "moduleName": "Swift",
+              "static": true,
               "children": [
                 {
                   "kind": "TypeNominal",
@@ -75050,6 +75230,7 @@
           "usr": "s:ZvVs7Float808infinityS_",
           "location": "",
           "moduleName": "Swift",
+          "static": true,
           "children": [
             {
               "kind": "TypeNominal",
@@ -75064,6 +75245,7 @@
               "usr": "s:ZFVs7Float80g8infinityS_",
               "location": "",
               "moduleName": "Swift",
+              "static": true,
               "children": [
                 {
                   "kind": "TypeNominal",
@@ -75094,6 +75276,7 @@
           "usr": "s:ZvVs7Float803nanS_",
           "location": "",
           "moduleName": "Swift",
+          "static": true,
           "children": [
             {
               "kind": "TypeNominal",
@@ -75108,6 +75291,7 @@
               "usr": "s:ZFVs7Float80g3nanS_",
               "location": "",
               "moduleName": "Swift",
+              "static": true,
               "children": [
                 {
                   "kind": "TypeNominal",
@@ -75138,6 +75322,7 @@
           "usr": "s:ZvVs7Float8012signalingNaNS_",
           "location": "",
           "moduleName": "Swift",
+          "static": true,
           "children": [
             {
               "kind": "TypeNominal",
@@ -75152,6 +75337,7 @@
               "usr": "s:ZFVs7Float80g12signalingNaNS_",
               "location": "",
               "moduleName": "Swift",
+              "static": true,
               "children": [
                 {
                   "kind": "TypeNominal",
@@ -75182,6 +75368,7 @@
           "usr": "s:ZvVs7Float8023greatestFiniteMagnitudeS_",
           "location": "",
           "moduleName": "Swift",
+          "static": true,
           "children": [
             {
               "kind": "TypeNominal",
@@ -75196,6 +75383,7 @@
               "usr": "s:ZFVs7Float80g23greatestFiniteMagnitudeS_",
               "location": "",
               "moduleName": "Swift",
+              "static": true,
               "children": [
                 {
                   "kind": "TypeNominal",
@@ -75226,6 +75414,7 @@
           "usr": "s:ZvVs7Float802piS_",
           "location": "",
           "moduleName": "Swift",
+          "static": true,
           "children": [
             {
               "kind": "TypeNominal",
@@ -75240,6 +75429,7 @@
               "usr": "s:ZFVs7Float80g2piS_",
               "location": "",
               "moduleName": "Swift",
+              "static": true,
               "children": [
                 {
                   "kind": "TypeNominal",
@@ -75307,6 +75497,7 @@
           "usr": "s:ZvVs7Float8020leastNormalMagnitudeS_",
           "location": "",
           "moduleName": "Swift",
+          "static": true,
           "children": [
             {
               "kind": "TypeNominal",
@@ -75321,6 +75512,7 @@
               "usr": "s:ZFVs7Float80g20leastNormalMagnitudeS_",
               "location": "",
               "moduleName": "Swift",
+              "static": true,
               "children": [
                 {
                   "kind": "TypeNominal",
@@ -75351,6 +75543,7 @@
           "usr": "s:ZvVs7Float8021leastNonzeroMagnitudeS_",
           "location": "",
           "moduleName": "Swift",
+          "static": true,
           "children": [
             {
               "kind": "TypeNominal",
@@ -75365,6 +75558,7 @@
               "usr": "s:ZFVs7Float80g21leastNonzeroMagnitudeS_",
               "location": "",
               "moduleName": "Swift",
+              "static": true,
               "children": [
                 {
                   "kind": "TypeNominal",
@@ -76301,6 +76495,7 @@
           "usr": "s:ZFVs7Float803absFS_S_",
           "location": "",
           "moduleName": "Swift",
+          "static": true,
           "children": [
             {
               "kind": "TypeNominal",
@@ -83337,6 +83532,7 @@
           "usr": "s:ZvPs13FloatingPoint5radixSi",
           "location": "",
           "moduleName": "Swift",
+          "static": true,
           "children": [
             {
               "kind": "TypeNominal",
@@ -83351,6 +83547,7 @@
               "usr": "s:ZFPs13FloatingPointg5radixSi",
               "location": "",
               "moduleName": "Swift",
+              "static": true,
               "children": [
                 {
                   "kind": "TypeNominal",
@@ -83388,6 +83585,7 @@
           "usr": "s:ZvPs13FloatingPoint3nanx",
           "location": "",
           "moduleName": "Swift",
+          "static": true,
           "children": [
             {
               "kind": "TypeNominal",
@@ -83402,6 +83600,7 @@
               "usr": "s:ZFPs13FloatingPointg3nanx",
               "location": "",
               "moduleName": "Swift",
+              "static": true,
               "children": [
                 {
                   "kind": "TypeNominal",
@@ -83432,6 +83631,7 @@
           "usr": "s:ZvPs13FloatingPoint12signalingNaNx",
           "location": "",
           "moduleName": "Swift",
+          "static": true,
           "children": [
             {
               "kind": "TypeNominal",
@@ -83446,6 +83646,7 @@
               "usr": "s:ZFPs13FloatingPointg12signalingNaNx",
               "location": "",
               "moduleName": "Swift",
+              "static": true,
               "children": [
                 {
                   "kind": "TypeNominal",
@@ -83476,6 +83677,7 @@
           "usr": "s:ZvPs13FloatingPoint8infinityx",
           "location": "",
           "moduleName": "Swift",
+          "static": true,
           "children": [
             {
               "kind": "TypeNominal",
@@ -83490,6 +83692,7 @@
               "usr": "s:ZFPs13FloatingPointg8infinityx",
               "location": "",
               "moduleName": "Swift",
+              "static": true,
               "children": [
                 {
                   "kind": "TypeNominal",
@@ -83520,6 +83723,7 @@
           "usr": "s:ZvPs13FloatingPoint23greatestFiniteMagnitudex",
           "location": "",
           "moduleName": "Swift",
+          "static": true,
           "children": [
             {
               "kind": "TypeNominal",
@@ -83534,6 +83738,7 @@
               "usr": "s:ZFPs13FloatingPointg23greatestFiniteMagnitudex",
               "location": "",
               "moduleName": "Swift",
+              "static": true,
               "children": [
                 {
                   "kind": "TypeNominal",
@@ -83564,6 +83769,7 @@
           "usr": "s:ZvPs13FloatingPoint2pix",
           "location": "",
           "moduleName": "Swift",
+          "static": true,
           "children": [
             {
               "kind": "TypeNominal",
@@ -83578,6 +83784,7 @@
               "usr": "s:ZFPs13FloatingPointg2pix",
               "location": "",
               "moduleName": "Swift",
+              "static": true,
               "children": [
                 {
                   "kind": "TypeNominal",
@@ -83645,6 +83852,7 @@
           "usr": "s:ZvPs13FloatingPoint8ulpOfOnex",
           "location": "",
           "moduleName": "Swift",
+          "static": true,
           "children": [
             {
               "kind": "TypeNominal",
@@ -83659,6 +83867,7 @@
               "usr": "s:ZFPs13FloatingPointg8ulpOfOnex",
               "location": "",
               "moduleName": "Swift",
+              "static": true,
               "children": [
                 {
                   "kind": "TypeNominal",
@@ -83689,6 +83898,7 @@
           "usr": "s:ZvPs13FloatingPoint20leastNormalMagnitudex",
           "location": "",
           "moduleName": "Swift",
+          "static": true,
           "children": [
             {
               "kind": "TypeNominal",
@@ -83703,6 +83913,7 @@
               "usr": "s:ZFPs13FloatingPointg20leastNormalMagnitudex",
               "location": "",
               "moduleName": "Swift",
+              "static": true,
               "children": [
                 {
                   "kind": "TypeNominal",
@@ -83733,6 +83944,7 @@
           "usr": "s:ZvPs13FloatingPoint21leastNonzeroMagnitudex",
           "location": "",
           "moduleName": "Swift",
+          "static": true,
           "children": [
             {
               "kind": "TypeNominal",
@@ -83747,6 +83959,7 @@
               "usr": "s:ZFPs13FloatingPointg21leastNonzeroMagnitudex",
               "location": "",
               "moduleName": "Swift",
+              "static": true,
               "children": [
                 {
                   "kind": "TypeNominal",
@@ -84398,6 +84611,7 @@
           "usr": "s:ZFPs13FloatingPoint7minimumFTxx_x",
           "location": "",
           "moduleName": "Swift",
+          "static": true,
           "children": [
             {
               "kind": "TypeNominal",
@@ -84438,6 +84652,7 @@
           "usr": "s:ZFPs13FloatingPoint7maximumFTxx_x",
           "location": "",
           "moduleName": "Swift",
+          "static": true,
           "children": [
             {
               "kind": "TypeNominal",
@@ -84478,6 +84693,7 @@
           "usr": "s:ZFPs13FloatingPoint16minimumMagnitudeFTxx_x",
           "location": "",
           "moduleName": "Swift",
+          "static": true,
           "children": [
             {
               "kind": "TypeNominal",
@@ -84518,6 +84734,7 @@
           "usr": "s:ZFPs13FloatingPoint16maximumMagnitudeFTxx_x",
           "location": "",
           "moduleName": "Swift",
+          "static": true,
           "children": [
             {
               "kind": "TypeNominal",
@@ -85183,6 +85400,7 @@
           "usr": "s:ZvEsPs13FloatingPoint8ulpOfOnex",
           "location": "",
           "moduleName": "Swift",
+          "static": true,
           "children": [
             {
               "kind": "TypeNominal",
@@ -85197,6 +85415,7 @@
               "usr": "s:ZFEsPs13FloatingPointg8ulpOfOnex",
               "location": "",
               "moduleName": "Swift",
+              "static": true,
               "children": [
                 {
                   "kind": "TypeNominal",
@@ -85500,6 +85719,7 @@
           "usr": "s:ZFEsPs13FloatingPoint7minimumFTxx_x",
           "location": "",
           "moduleName": "Swift",
+          "static": true,
           "children": [
             {
               "kind": "TypeNominal",
@@ -85547,6 +85767,7 @@
           "usr": "s:ZFEsPs13FloatingPoint7maximumFTxx_x",
           "location": "",
           "moduleName": "Swift",
+          "static": true,
           "children": [
             {
               "kind": "TypeNominal",
@@ -85594,6 +85815,7 @@
           "usr": "s:ZFEsPs13FloatingPoint16minimumMagnitudeFTxx_x",
           "location": "",
           "moduleName": "Swift",
+          "static": true,
           "children": [
             {
               "kind": "TypeNominal",
@@ -85641,6 +85863,7 @@
           "usr": "s:ZFEsPs13FloatingPoint16maximumMagnitudeFTxx_x",
           "location": "",
           "moduleName": "Swift",
+          "static": true,
           "children": [
             {
               "kind": "TypeNominal",
@@ -86042,6 +86265,7 @@
           "usr": "s:ZvPs19BinaryFloatingPoint16exponentBitCountSi",
           "location": "",
           "moduleName": "Swift",
+          "static": true,
           "children": [
             {
               "kind": "TypeNominal",
@@ -86056,6 +86280,7 @@
               "usr": "s:ZFPs19BinaryFloatingPointg16exponentBitCountSi",
               "location": "",
               "moduleName": "Swift",
+              "static": true,
               "children": [
                 {
                   "kind": "TypeNominal",
@@ -86093,6 +86318,7 @@
           "usr": "s:ZvPs19BinaryFloatingPoint19significandBitCountSi",
           "location": "",
           "moduleName": "Swift",
+          "static": true,
           "children": [
             {
               "kind": "TypeNominal",
@@ -86107,6 +86333,7 @@
               "usr": "s:ZFPs19BinaryFloatingPointg19significandBitCountSi",
               "location": "",
               "moduleName": "Swift",
+              "static": true,
               "children": [
                 {
                   "kind": "TypeNominal",
@@ -86327,6 +86554,7 @@
           "usr": "s:ZvEsPs19BinaryFloatingPoint5radixSi",
           "location": "",
           "moduleName": "Swift",
+          "static": true,
           "children": [
             {
               "kind": "TypeNominal",
@@ -86341,6 +86569,7 @@
               "usr": "s:ZFEsPs19BinaryFloatingPointg5radixSi",
               "location": "",
               "moduleName": "Swift",
+              "static": true,
               "children": [
                 {
                   "kind": "TypeNominal",
@@ -86464,6 +86693,7 @@
           "usr": "s:ZFCs13ManagedBuffer6createFzT15minimumCapacitySi16makingHeaderWithFzGS_xq__x_GS_xq__",
           "location": "",
           "moduleName": "Swift",
+          "static": true,
           "throwing": true,
           "children": [
             {
@@ -89663,6 +89893,7 @@
           "usr": "s:ZFSS13decodeCStringuRxs12UnicodeCodecrFTGSqGSPwx8CodeUnit__2asMx25repairingInvalidCodeUnitsSb_GSqT6resultSS11repairsMadeSb__",
           "location": "",
           "moduleName": "Swift",
+          "static": true,
           "children": [
             {
               "kind": "TypeNominal",
@@ -95599,6 +95830,7 @@
           "usr": "s:ZFPs16AbsoluteValuable3absFxx",
           "location": "",
           "moduleName": "Swift",
+          "static": true,
           "children": [
             {
               "kind": "TypeNominal",
@@ -98466,6 +98698,7 @@
           "usr": "s:ZvVs6UInt163maxS_",
           "location": "",
           "moduleName": "Swift",
+          "static": true,
           "children": [
             {
               "kind": "TypeNominal",
@@ -98480,6 +98713,7 @@
               "usr": "s:ZFVs6UInt16g3maxS_",
               "location": "",
               "moduleName": "Swift",
+              "static": true,
               "children": [
                 {
                   "kind": "TypeNominal",
@@ -98510,6 +98744,7 @@
           "usr": "s:ZvVs6UInt163minS_",
           "location": "",
           "moduleName": "Swift",
+          "static": true,
           "children": [
             {
               "kind": "TypeNominal",
@@ -98524,6 +98759,7 @@
               "usr": "s:ZFVs6UInt16g3minS_",
               "location": "",
               "moduleName": "Swift",
+              "static": true,
               "children": [
                 {
                   "kind": "TypeNominal",
@@ -98660,6 +98896,7 @@
           "usr": "s:ZFVs6UInt1615addWithOverflowFTS_S__TS_8overflowSb_",
           "location": "",
           "moduleName": "Swift",
+          "static": true,
           "children": [
             {
               "kind": "TypeNominal",
@@ -98698,6 +98935,7 @@
           "usr": "s:ZFVs6UInt1620subtractWithOverflowFTS_S__TS_8overflowSb_",
           "location": "",
           "moduleName": "Swift",
+          "static": true,
           "children": [
             {
               "kind": "TypeNominal",
@@ -98736,6 +98974,7 @@
           "usr": "s:ZFVs6UInt1620multiplyWithOverflowFTS_S__TS_8overflowSb_",
           "location": "",
           "moduleName": "Swift",
+          "static": true,
           "children": [
             {
               "kind": "TypeNominal",
@@ -98774,6 +99013,7 @@
           "usr": "s:ZFVs6UInt1618divideWithOverflowFTS_S__TS_8overflowSb_",
           "location": "",
           "moduleName": "Swift",
+          "static": true,
           "children": [
             {
               "kind": "TypeNominal",
@@ -98812,6 +99052,7 @@
           "usr": "s:ZFVs6UInt1621remainderWithOverflowFTS_S__TS_8overflowSb_",
           "location": "",
           "moduleName": "Swift",
+          "static": true,
           "children": [
             {
               "kind": "TypeNominal",
@@ -99519,6 +99760,7 @@
           "usr": "s:ZvVs6UInt168allZerosS_",
           "location": "",
           "moduleName": "Swift",
+          "static": true,
           "children": [
             {
               "kind": "TypeNominal",
@@ -99533,6 +99775,7 @@
               "usr": "s:ZFVs6UInt16g8allZerosS_",
               "location": "",
               "moduleName": "Swift",
+              "static": true,
               "children": [
                 {
                   "kind": "TypeNominal",

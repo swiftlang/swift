@@ -14,7 +14,7 @@ class A {
 // CHECK-LABEL:    sil hidden [thunk] @_TToFC8optional1A3foofT_GSqSS_ : $@convention(objc_method) (A) -> @autoreleased Optional<NSString>
 // CHECK:      [[T0:%.*]] = function_ref @_TFC8optional1A3foofT_GSqSS_
 // CHECK-NEXT: [[T1:%.*]] = apply [[T0]](%0)
-// CHECK-NEXT: strong_release
+// CHECK-NEXT: destroy_value
 // CHECK:      [[T2:%.*]] = select_enum [[T1]]
 // CHECK-NEXT: cond_br [[T2]]
 //   Something branch: project value, translate, inject into result.
@@ -22,7 +22,7 @@ class A {
 // CHECK:      [[T0:%.*]] = function_ref @_TFE10FoundationSS19_bridgeToObjectiveCfT_CSo8NSString
 // CHECK-NEXT: [[T1:%.*]] = apply [[T0]]([[STR]])
 // CHECK-NEXT: enum $Optional<NSString>, #Optional.some!enumelt.1, [[T1]]
-// CHECK-NEXT: release_value [[STR]]
+// CHECK-NEXT: destroy_value [[STR]]
 // CHECK-NEXT: br
 //   Nothing branch: inject nothing into result.
 // CHECK:      enum $Optional<NSString>, #Optional.none!enumelt
@@ -51,7 +51,7 @@ class A {
 // CHECK:      bb3([[T0:%.*]] : $Optional<String>):
 // CHECK:      [[T1:%.*]] = function_ref @_TFC8optional1A3barfT1xGSqSS__T_
 // CHECK-NEXT: [[T2:%.*]] = apply [[T1]]([[T0]], %1)
-// CHECK-NEXT: strong_release %1
+// CHECK-NEXT: destroy_value %1
 // CHECK-NEXT: return [[T2]] : $()
 }
 

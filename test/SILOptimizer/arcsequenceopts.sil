@@ -1,6 +1,6 @@
-// RUN: %target-sil-opt -enable-sil-verify-all -enable-loop-arc=0 -arc-sequence-opts %s | %FileCheck %s
-// RUN: %target-sil-opt -enable-sil-verify-all -enable-loop-arc=1 -arc-sequence-opts %s | %FileCheck -check-prefix=CHECK -check-prefix=CHECK-LOOP %s
-// RUN: %target-sil-opt -enable-sil-verify-all -arc-loop-opts  %s | %FileCheck -check-prefix=CHECK -check-prefix=CHECK-LOOP %s
+// RUN: %target-sil-opt -assume-parsing-unqualified-ownership-sil -enable-sil-verify-all -enable-loop-arc=0 -arc-sequence-opts %s | %FileCheck %s
+// RUN: %target-sil-opt -assume-parsing-unqualified-ownership-sil -enable-sil-verify-all -enable-loop-arc=1 -arc-sequence-opts %s | %FileCheck -check-prefix=CHECK -check-prefix=CHECK-LOOP %s
+// RUN: %target-sil-opt -assume-parsing-unqualified-ownership-sil -enable-sil-verify-all -arc-loop-opts  %s | %FileCheck -check-prefix=CHECK -check-prefix=CHECK-LOOP %s
 
 sil_stage canonical
 
@@ -328,7 +328,7 @@ bb1:
 // SHOULD-NOT: strong_release
 sil @simple_alias_store_use_test : $@convention(thin) (@box Builtin.Int32) -> () {
 bb0(%0 : $@box Builtin.Int32):
-  %1 = project_box %0 : $@box Builtin.Int32
+  %1 = project_box %0 : $@box Builtin.Int32, 0
   %2 = function_ref @user : $@convention(thin) (@box Builtin.Int32) -> ()
   %3 = integer_literal $Builtin.Int32, 2
   strong_retain %0 : $@box Builtin.Int32
@@ -356,7 +356,7 @@ bb0(%0 : $@box Builtin.Int32):
 sil @simple_alias_load_use_test : $@convention(thin) (@inout Builtin.Int32) -> () {
 bb0(%0 : $*Builtin.Int32):
   %1 = alloc_box $Builtin.Int32
-  %1a = project_box %1 : $@box Builtin.Int32
+  %1a = project_box %1 : $@box Builtin.Int32, 0
   %2 = function_ref @user : $@convention(thin) (@box Builtin.Int32) -> ()
   strong_retain %1 : $@box Builtin.Int32
   apply %2 (%1) : $@convention(thin) (@box Builtin.Int32) -> ()
@@ -383,7 +383,7 @@ bb0(%0 : $*Builtin.Int32):
 sil @simple_alias_load_use_test_two_release : $@convention(thin) (@inout Builtin.Int32) -> () {
 bb0(%0 : $*Builtin.Int32):
   %1 = alloc_box $Builtin.Int32
-  %1a = project_box %1 : $@box Builtin.Int32
+  %1a = project_box %1 : $@box Builtin.Int32, 0
   %2 = function_ref @user : $@convention(thin) (@box Builtin.Int32) -> ()
   strong_retain %1 : $@box Builtin.Int32
   strong_retain %1 : $@box Builtin.Int32
@@ -1386,7 +1386,7 @@ bb3:
 // CHECK: bb2:
 // CHECK: strong_retain
 // CHECK: bb3:
-// CHECK: strong_release 
+// CHECK: strong_release
 sil @switch_merge_with_bit_cast_in_branches : $@convention(thin) (@owned S) -> () {
 bb0(%0 : $S):
   cond_br undef, bb1, bb2

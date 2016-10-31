@@ -5,7 +5,6 @@
 // See http://swift.org/LICENSE.txt for license information
 // See http://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
 
-// RUN: not --crash %target-swift-frontend %s -parse
+// RUN: not --crash %target-swift-frontend %s -emit-ir
 // REQUIRES: asserts
-{class
-func g:protocol<
+class d:a{{}var f=b}protocol a{func b{{{}}}typealias d:a{{{}}}typealias b

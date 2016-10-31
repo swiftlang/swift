@@ -91,7 +91,8 @@ void TupleInitialization::copyOrInitValueInto(SILGenFunction &SGF,
     if (value->getType().isAddress()) {
       member = SGF.B.createTupleElementAddr(loc, value, i, fieldTy);
       if (!fieldTL.isAddressOnly())
-        member = SGF.B.createLoad(loc, member);
+        member =
+            SGF.B.createLoad(loc, member, LoadOwnershipQualifier::Unqualified);
     } else {
       member = SGF.B.createTupleExtract(loc, value, i, fieldTy);
     }
@@ -115,7 +116,7 @@ namespace {
   public:
     CleanupClosureConstant(SILValue closure) : closure(closure) {}
     void emit(SILGenFunction &gen, CleanupLocation l) override {
-      gen.B.emitStrongReleaseAndFold(l, closure);
+      gen.B.emitDestroyValueAndFold(l, closure);
     }
   };
 }
@@ -209,7 +210,7 @@ public:
     if (v->getType().isAddress())
       gen.B.emitDestroyAddrAndFold(l, v);
     else
-      gen.B.emitReleaseValueOperation(l, v);
+      gen.B.emitDestroyValueOperation(l, v);
   }
 };
 } // end anonymous namespace
@@ -286,7 +287,7 @@ public:
     // it using a box.
     AllocBoxInst *allocBox =
         SGF.B.createAllocBox(decl, lType, {decl->isLet(), ArgNo});
-    SILValue addr = SGF.B.createProjectBox(decl, allocBox);
+    SILValue addr = SGF.B.createProjectBox(decl, allocBox, 0);
 
     // Mark the memory as uninitialized, so DI will track it for us.
     if (NeedsMarkUninit)
@@ -712,7 +713,8 @@ emitEnumMatch(ManagedValue value, EnumElementDecl *ElementDecl,
                                                      ElementDecl, eltTy);
     // Load a loadable data value.
     if (eltTL.isLoadable())
-      eltValue = SGF.B.createLoad(loc, eltValue);
+      eltValue =
+          SGF.B.createLoad(loc, eltValue, LoadOwnershipQualifier::Unqualified);
   } else {
     // Otherwise, we're consuming this as a +1 value.
     value.forward(SGF);
@@ -723,10 +725,11 @@ emitEnumMatch(ManagedValue value, EnumElementDecl *ElementDecl,
 
   // If the payload is indirect, project it out of the box.
   if (ElementDecl->isIndirect() || ElementDecl->getParentEnum()->isIndirect()) {
-    SILValue boxedValue = SGF.B.createProjectBox(loc, eltMV.getValue());
+    SILValue boxedValue = SGF.B.createProjectBox(loc, eltMV.getValue(), 0);
     auto &boxedTL = SGF.getTypeLowering(boxedValue->getType());
     if (boxedTL.isLoadable())
-      boxedValue = SGF.B.createLoad(loc, boxedValue);
+      boxedValue = SGF.B.createLoad(loc, boxedValue,
+                                    LoadOwnershipQualifier::Unqualified);
 
     // We must treat the boxed value as +0 since it may be shared. Copy it if
     // nontrivial.
@@ -1300,7 +1303,7 @@ void SILGenFunction::destroyLocalVariable(SILLocation silLoc, VarDecl *vd) {
   // For a heap variable, the box is responsible for the value. We just need
   // to give up our retain count on it.
   if (loc.box) {
-    B.emitStrongReleaseAndFold(silLoc, loc.box);
+    B.emitDestroyValueAndFold(silLoc, loc.box);
     return;
   }
 
@@ -1308,7 +1311,7 @@ void SILGenFunction::destroyLocalVariable(SILLocation silLoc, VarDecl *vd) {
   // whether we have an address or not.
   SILValue Val = loc.value;
   if (!Val->getType().isAddress())
-    B.emitReleaseValueOperation(silLoc, Val);
+    B.emitDestroyValueOperation(silLoc, Val);
   else
     B.emitDestroyAddrAndFold(silLoc, Val);
 }
@@ -1889,7 +1892,8 @@ SILGenModule::emitProtocolWitness(ProtocolConformance *conformance,
   // Lower the witness thunk type with the requirement's abstraction level.
   auto witnessSILFnType = getNativeSILFunctionType(M,
                                                    AbstractionPattern(reqtOrigTy),
-                                                   reqtSubstTy);
+                                                   reqtSubstTy,
+                                                   witness);
 
   // Mangle the name of the witness thunk.
   std::string nameBuffer;

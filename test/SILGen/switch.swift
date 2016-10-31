@@ -432,7 +432,7 @@ class E : C {}
 
 // CHECK-LABEL: sil hidden @_TF6switch16test_isa_class_1FT1xCS_1B_T_
 func test_isa_class_1(x: B) {
-  // CHECK: strong_retain %0
+  // CHECK: copy_value %0
   switch x {
   // CHECK:   checked_cast_br [[X:%.*]] : $B to $D1, [[IS_D1:bb[0-9]+]], [[IS_NOT_D1:bb[0-9]+]]
 
@@ -442,7 +442,7 @@ func test_isa_class_1(x: B) {
 
   // CHECK: [[YES_CASE1]]:
   case is D1 where runced():
-  // CHECK:   strong_release [[CAST_D1]]
+  // CHECK:   destroy_value [[CAST_D1]]
   // CHECK:   function_ref @_TF6switch1aFT_T_
   // CHECK:   br [[CONT:bb[0-9]+]]
     a()
@@ -453,7 +453,7 @@ func test_isa_class_1(x: B) {
 
   // CHECK: [[IS_D2]]([[CAST_D2:%.*]]):
   case is D2:
-  // CHECK:   strong_release %0
+  // CHECK:   destroy_value %0
   // CHECK:   function_ref @_TF6switch1bFT_T_
   // CHECK:   br [[CONT]]
     b()
@@ -483,24 +483,24 @@ func test_isa_class_1(x: B) {
 
   // CHECK: [[IS_NOT_C]]:
   default:
-  // CHECK:   strong_release [[X]]
+  // CHECK:   destroy_value [[X]]
   // CHECK:  function_ref @_TF6switch1eFT_T_
   // CHECK:  br [[CONT]]
     e()
   }
   // CHECK: [[CONT]]:
-  // CHECK: strong_release %0
+  // CHECK: destroy_value %0
   f()
 }
 
 // CHECK-LABEL: sil hidden @_TF6switch16test_isa_class_2FT1xCS_1B_Ps9AnyObject_
 func test_isa_class_2(x: B) -> AnyObject {
-  // CHECK:   strong_retain [[X:%0]]
+  // CHECK:   copy_value [[X:%0]]
   switch x {
   // CHECK:   checked_cast_br [[X]] : $B to $D1, [[IS_D1:bb[0-9]+]], [[IS_NOT_D1:bb[0-9]+]]
 
   // CHECK: [[IS_D1]]([[CAST_D1:%.*]]):
-  // CHECK:   strong_retain [[CAST_D1]]
+  // CHECK:   copy_value [[CAST_D1]]
   // CHECK:   function_ref @_TF6switch6runcedFT_Sb
   // CHECK:   cond_br {{%.*}}, [[CASE1:bb[0-9]+]], [[NO_CASE1:bb[0-9]+]]
 
@@ -508,13 +508,13 @@ func test_isa_class_2(x: B) -> AnyObject {
   // CHECK: [[CASE1]]:
   // CHECK:   function_ref @_TF6switch1aFT_T_
   // CHECK:   [[RET:%.*]] = init_existential_ref [[CAST_D1]]
-  // CHECK:   strong_release [[X]] : $B
+  // CHECK:   destroy_value [[X]] : $B
   // CHECK:   br [[CONT:bb[0-9]+]]([[RET]] : $AnyObject)
     a()
     return y
 
   // CHECK: [[NO_CASE1]]:
-  // CHECK:   strong_release [[CAST_D1]]
+  // CHECK:   destroy_value [[CAST_D1]]
   // CHECK: [[IS_NOT_D1]]:
   // CHECK:   checked_cast_br [[X]] : $B to $D2, [[CASE2:bb[0-9]+]], [[IS_NOT_D2:bb[0-9]+]]
 
@@ -530,7 +530,7 @@ func test_isa_class_2(x: B) -> AnyObject {
   // CHECK:   checked_cast_br [[X]] : $B to $E, [[IS_E:bb[0-9]+]], [[IS_NOT_E:bb[0-9]+]]
 
   // CHECK: [[IS_E]]([[CAST_E:%.*]]):
-  // CHECK:   strong_retain [[CAST_E]]
+  // CHECK:   copy_value [[CAST_E]]
   // CHECK:   function_ref @_TF6switch6fungedFT_Sb
   // CHECK:   cond_br {{%.*}}, [[CASE3:bb[0-9]+]], [[NO_CASE3:bb[0-9]+]]
 
@@ -538,13 +538,13 @@ func test_isa_class_2(x: B) -> AnyObject {
   // CHECK: [[CASE3]]:
   // CHECK:   function_ref @_TF6switch1cFT_T_
   // CHECK:   [[RET:%.*]] = init_existential_ref [[CAST_E]]
-  // CHECK:   strong_release [[X]] : $B
+  // CHECK:   destroy_value [[X]] : $B
   // CHECK:   br [[CONT]]([[RET]] : $AnyObject)
     c()
     return y
 
   // CHECK: [[NO_CASE3]]:
-  // CHECK    strong_release [[CAST_E]]
+  // CHECK    destroy_value [[CAST_E]]
   // CHECK: [[IS_NOT_E]]:
   // CHECK:   checked_cast_br [[X]] : $B to $C, [[CASE4:bb[0-9]+]], [[IS_NOT_C:bb[0-9]+]]
   case let y as C:
@@ -565,7 +565,7 @@ func test_isa_class_2(x: B) -> AnyObject {
   }
 
   // CHECK: [[CONT]]([[T0:%.*]] : $AnyObject):
-  // CHECK:   strong_release [[X]]
+  // CHECK:   destroy_value [[X]]
   // CHECK:   return [[T0]]
 }
 
@@ -586,14 +586,14 @@ func test_union_1(u: MaybePair) {
   // CHECK:   case #MaybePair.Both!enumelt.1: [[IS_BOTH:bb[0-9]+]]
 
   // CHECK: [[IS_NEITHER]]:
-  // CHECK-NOT: release
+  // CHECK-NOT: destroy_value
   case .Neither:
   // CHECK:   function_ref @_TF6switch1aFT_T_
   // CHECK:   br [[CONT:bb[0-9]+]]
     a()
 
   // CHECK: [[IS_LEFT]]({{%.*}}):
-  // CHECK-NOT: release
+  // CHECK-NOT: destroy_value
   case (.Left):
   // CHECK:   function_ref @_TF6switch1bFT_T_
   // CHECK:   br [[CONT]]
@@ -601,14 +601,14 @@ func test_union_1(u: MaybePair) {
 
   // CHECK: [[IS_RIGHT]]([[STR:%.*]] : $String):
   case var .Right:
-  // CHECK:   release_value [[STR]] : $String
+  // CHECK:   destroy_value [[STR]] : $String
   // CHECK:   function_ref @_TF6switch1cFT_T_
   // CHECK:   br [[CONT]]
     c()
 
   // CHECK: [[IS_BOTH]]([[TUP:%.*]] : $(Int, String)):
   case .Both:
-  // CHECK:   release_value [[TUP]] : $(Int, String)
+  // CHECK:   destroy_value [[TUP]] : $(Int, String)
   // CHECK:   function_ref @_TF6switch1dFT_T_
   // CHECK:   br [[CONT]]
     d()
@@ -659,7 +659,7 @@ func test_union_2(u: MaybePair) {
 
 // CHECK-LABEL: sil hidden  @_TF6switch12test_union_3FT1uOS_9MaybePair_T_
 func test_union_3(u: MaybePair) {
-  // CHECK:   retain_value [[SUBJECT:%0]]
+  // CHECK:   copy_value [[SUBJECT:%0]]
   switch u {
   // CHECK: switch_enum [[SUBJECT]] : $MaybePair,
   // CHECK:   case #MaybePair.Neither!enumelt: [[IS_NEITHER:bb[0-9]+]],
@@ -681,14 +681,14 @@ func test_union_3(u: MaybePair) {
 
   // CHECK: [[IS_RIGHT]]([[STR:%.*]] : $String):
   case .Right:
-  // CHECK:   release_value [[STR]] : $String
+  // CHECK:   destroy_value [[STR]] : $String
   // CHECK:   function_ref @_TF6switch1cFT_T_
   // CHECK:   br [[CONT]]
     c()
 
   // CHECK: [[DEFAULT]]:
   // -- Ensure the fully-opaque value is destroyed in the default case.
-  // CHECK:   release_value [[SUBJECT]] :
+  // CHECK:   destroy_value [[SUBJECT]] :
   // CHECK:   function_ref @_TF6switch1dFT_T_
   // CHECK:   br [[CONT]]
 
@@ -699,7 +699,7 @@ func test_union_3(u: MaybePair) {
   // CHECK: [[CONT]]:
   // CHECK-NOT: switch_enum [[SUBJECT]]
   // CHECK:   function_ref @_TF6switch1eFT_T_
-  // CHECK:   release_value [[SUBJECT]]
+  // CHECK:   destroy_value [[SUBJECT]]
   e()
 }
 
@@ -815,7 +815,7 @@ func test_union_addr_only_1(u: MaybeAddressOnlyPair) {
   // CHECK:   [[STR_ADDR:%.*]] = unchecked_take_enum_data_addr [[ENUM_ADDR]] : $*MaybeAddressOnlyPair, #MaybeAddressOnlyPair.Right!enumelt.1
   // CHECK:   [[STR:%.*]] = load [[STR_ADDR]]
   case .Right(_):
-  // CHECK:   release_value [[STR]] : $String
+  // CHECK:   destroy_value [[STR]] : $String
   // CHECK:   function_ref @_TF6switch1cFT_T_
   // CHECK:   br [[CONT]]
     c()

@@ -46,8 +46,8 @@ class SomeDerivedClass : Parent {
 // CHECK-NEXT: unchecked_ref_cast
 // CHECK-NEXT: store
 // CHECK-NEXT: load
-// CHECK-NEXT: strong_retain
-// CHECK-NEXT: strong_release
+// CHECK-NEXT: copy_value
+// CHECK-NEXT: destroy_value
 // CHECK-NEXT: return
   }
 

@@ -743,10 +743,10 @@ ParserResult<Expr> Parser::parseExprSuper(bool isExprBasic) {
                                             /*Implicit=*/false))
     : cast<Expr>(new (Context) ErrorExpr(superLoc));
   
-  if (Tok.is(tok::period)) {
+  if (Tok.isAny(tok::period, tok::period_prefix)) {
     // 'super.' must be followed by a member or initializer ref.
 
-    SourceLoc dotLoc = consumeToken(tok::period);
+    SourceLoc dotLoc = consumeToken();
     
     if (Tok.is(tok::code_complete)) {
       if (CodeCompletion) {
@@ -1429,8 +1429,9 @@ ParserResult<Expr> Parser::parseExprPostfix(Diag<> ID, bool isExprBasic) {
         SourceLoc nameLoc = consumeToken(tok::integer_literal);
         
         // Don't allow '.<integer literal>' following a numeric literal
-        // expression.
-        if (Result.isNonNull() && isa<NumberLiteralExpr>(Result.get())) {
+        // expression (unless in #if env, for 1.2.3.4 version numbers)
+        if (!InPoundIfEnvironment &&
+            Result.isNonNull() && isa<NumberLiteralExpr>(Result.get())) {
           diagnose(nameLoc, diag::numeric_literal_numeric_member)
             .highlight(Result.get()->getSourceRange());
           continue;
@@ -1452,9 +1453,8 @@ ParserResult<Expr> Parser::parseExprPostfix(Diag<> ID, bool isExprBasic) {
 
       // Handle the deprecated 'x.dynamicType' and migrate it to `type(of: x)`
       if (Tok.getText() == "dynamicType") {
-        BacktrackingScope backtrackScope(*this);
         auto range = Result.get()->getSourceRange();
-        auto dynamicTypeExprRange = SourceRange(TokLoc, consumeToken());
+        auto dynamicTypeExprRange = SourceRange(TokLoc, Tok.getLoc());
         diagnose(TokLoc, diag::expr_dynamictype_deprecated)
           .highlight(dynamicTypeExprRange)
           .fixItReplace(dynamicTypeExprRange, ")")

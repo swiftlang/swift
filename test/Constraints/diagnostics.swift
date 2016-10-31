@@ -178,8 +178,7 @@ func perform<T>() {}  // expected-error {{generic parameter 'T' is not used in f
 
 // <rdar://problem/17080659> Error Message QOI - wrong return type in an overload
 func recArea(_ h: Int, w : Int) {
-  return h * w  // expected-error {{no '*' candidates produce the expected contextual result type '()'}}
-  // expected-note @-1 {{overloads for '*' exist with these result types: UInt8, Int8, UInt16, Int16, UInt32, Int32, UInt64, Int64, UInt, Int, Float, Double}}
+  return h * w  // expected-error {{unexpected non-void return value in void function}}
 }
 
 // <rdar://problem/17224804> QoI: Error In Ternary Condition is Wrong
@@ -720,7 +719,8 @@ secondArgumentNotLabeled(10, 20)
 func testImplConversion(a : Float?) -> Bool {}
 func testImplConversion(a : Int?) -> Bool {
   let someInt = 42
-  let a : Int = testImplConversion(someInt) // expected-error {{'testImplConversion' produces 'Bool', not the expected contextual result type 'Int'}}
+  let a : Int = testImplConversion(someInt) // expected-error {{argument labels '(_:)' do not match any available overloads}}
+  // expected-note @-1 {{overloads for 'testImplConversion' exist with these partially matching parameter lists: (a: Float?), (a: Int?)}}
 }
 
 // <rdar://problem/23752537> QoI: Bogus error message: Binary operator '&&' cannot be applied to two 'Bool' operands
@@ -754,7 +754,7 @@ func f23213302() {
 
 // <rdar://problem/24202058> QoI: Return of call to overloaded function in void-return context
 func rdar24202058(a : Int) {
-  return a <= 480 // expected-error {{'<=' produces 'Bool', not the expected contextual result type '()'}}
+  return a <= 480 // expected-error {{unexpected non-void return value in void function}}
 }
 
 // SR-1752: Warning about unused result with ternary operator
@@ -847,3 +847,24 @@ class C2_2505: P_2505 {
 }
 
 let c_2505 = C_2505(arg: [C2_2505()]) // expected-error {{argument labels '(arg:)' do not match any available overloads}} expected-note {{overloads for 'C_2505' exist}}
+
+// Diagnostic message for initialization with binary operations as right side
+let foo1255_3: String = 1 + 2 + 3 // expected-error {{cannot convert value of type 'Int' to specified type 'String'}}
+let foo1255_4: Dictionary<String, String> = ["hello": 1 + 2] // expected-error {{cannot convert value of type 'Int' to expected dictionary value type 'String'}}
+let foo1255_5: Dictionary<String, String> = [(1 + 2): "world"] // expected-error {{cannot convert value of type 'Int' to expected dictionary key type 'String'}}
+let foo1255_6: [String] = [1 + 2 + 3] // expected-error {{cannot convert value of type 'Int' to expected element type 'String'}}
+
+// SR-2208
+struct Foo2208 {
+  func bar(value: UInt) {}
+}
+
+func test2208() {
+  let foo = Foo2208()
+  let a: Int = 1
+  let b: Int = 2
+  let result = a / b
+  foo.bar(value: a / b)  // expected-error {{cannot convert value of type 'Int' to expected argument type 'UInt'}}
+  foo.bar(value: result) // expected-error {{cannot convert value of type 'Int' to expected argument type 'UInt'}}
+  foo.bar(value: UInt(result)) // Ok
+}

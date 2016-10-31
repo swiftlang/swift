@@ -439,7 +439,7 @@ ${orderingExplanation}
   public func lexicographicallyPrecedes<OtherSequence>(
     _ other: OtherSequence${"," if preds else ""}
 %   if preds:
-    by areInIncreasingOrder: 
+    by areInIncreasingOrder:
       (${GElement}, ${GElement}) throws -> Bool
 %   end
   ) ${rethrows_}-> Bool
@@ -516,7 +516,7 @@ extension Sequence {
   ///         case ok
   ///         case error(Int)
   ///     }
-  /// 
+  ///
   ///     let lastThreeResponses: [HTTPResponse] = [.ok, .ok, .error(404)]
   ///     let hadError = lastThreeResponses.contains { element in
   ///         if case .error = element {
@@ -643,10 +643,10 @@ extension Sequence {
   /// `flatMap` with a transformation that returns an array.
   ///
   ///     let numbers = [1, 2, 3, 4]
-  /// 
+  ///
   ///     let mapped = numbers.map { Array(count: $0, repeatedValue: $0) }
   ///     // [[1], [2, 2], [3, 3, 3], [4, 4, 4, 4]]
-  /// 
+  ///
   ///     let flatMapped = numbers.flatMap { Array(count: $0, repeatedValue: $0) }
   ///     // [1, 2, 2, 3, 3, 3, 4, 4, 4, 4]
   ///
@@ -682,11 +682,11 @@ extension Sequence {
   /// `flatMap` with a transformation that returns an optional `Int` value.
   ///
   ///     let possibleNumbers = ["1", "2", "three", "///4///", "5"]
-  /// 
-  ///     let mapped: [Int?] = numbers.map { str in Int(str) }
+  ///
+  ///     let mapped: [Int?] = possibleNumbers.map { str in Int(str) }
   ///     // [1, 2, nil, nil, 5]
-  /// 
-  ///     let flatMapped: [Int] = numbers.flatMap { str in Int(str) }
+  ///
+  ///     let flatMapped: [Int] = possibleNumbers.flatMap { str in Int(str) }
   ///     // [1, 2, 5]
   ///
   /// - Parameter transform: A closure that accepts an element of this

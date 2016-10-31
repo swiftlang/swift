@@ -349,46 +349,6 @@ namespace constraints {
 
 struct ResolvedOverloadSetListItem;
 
-/// \brief The kind of type matching to perform in matchTypes().
-enum class TypeMatchKind : char {
-  /// \brief Bind the types together directly.
-  BindType,
-  /// \brief Binds to a pointer element type.
-  BindToPointerType,
-  /// \brief Bind the type of a function parameter to the type of a reference
-  /// to it from within the function body. The param type is an inout type iff
-  /// the reference type is an lvalue type with the same object type.
-  /// Otherwise, the two types must be the same type.
-  BindParamType,
-  /// \brief Require the types to match exactly, but strips lvalueness from
-  /// a type when binding to a type variable.
-  SameType,
-  /// \brief Require the first type to be a subtype of the second type
-  /// (or be an exact match or trivial subtype).
-  Subtype,
-  /// \brief Requires the first type to be convertible to the second type,
-  /// which includes exact matches and both forms of subtyping.
-  Conversion,
-  /// \brief Requires the first type to be explicitly convertible to the second
-  /// type, which includes all forms of conversion included in Conversion, in
-  /// addition to bridging conversions.
-  ExplicitConversion,
-  /// \brief Requires the first type to be the element of an argument tuple
-  /// that is convertible to the second type, which represents the corresponding
-  /// element of the parameter tuple.
-  ArgumentConversion,
-  /// Requires the first type to be an argument type (tuple) that can be
-  /// converted to the second type, which represents the parameter type (tuple).
-  ArgumentTupleConversion,
-  /// \brief Requires the first type to be convertible to the second type,
-  /// which includes exact matches, both forms of subtyping, and inserting
-  /// address-of to convert implicit lvalues to inout arguments.  This is
-  /// used by assignment operators.
-  OperatorArgumentConversion,
-  /// Like \c ArgumentTupleConversion, but for operators.
-  OperatorArgumentTupleConversion,
-};
-
 /// \brief The result of comparing two constraint systems that are a solutions
 /// to the given set of constraints.
 enum class SolutionCompareResult {
@@ -1373,12 +1333,6 @@ public:
   /// emits an error message.
   void diagnoseFailureForExpr(Expr *expr);
 
-  /// \brief Add a newly-allocated constraint after attempting to simplify
-  /// it.
-  ///
-  /// \returns true if this constraint was solved.
-  bool addConstraint(Constraint *constraint);
-
   /// \brief Add a constraint to the constraint system.
   void addConstraint(ConstraintKind kind, Type first, Type second,
                      ConstraintLocatorBuilder locator,
@@ -1490,7 +1444,7 @@ public:
     if (isFavored)
       constraint->setFavored();
 
-    addConstraint(constraint);
+    addUnsolvedConstraint(constraint);
   }
 
   /// Whether we should add a new constraint to capture a failure.
@@ -1503,6 +1457,13 @@ public:
   void addNewFailingConstraint(Constraint *constraint) {
     assert(shouldAddNewFailingConstraint());
     failedConstraint = constraint;
+    failedConstraint->setActive(false);
+
+    // Record this as a newly-generated constraint.
+    if (solverState) {
+      solverState->generatedConstraints.push_back(constraint);
+      solverState->retiredConstraints.push_back(constraint);
+    }
   }
 
   /// \brief Add a newly-generated constraint that is known not to be solvable
@@ -1583,6 +1544,15 @@ public:
   /// param retainParens Whether to retain parentheses.
   Type getFixedTypeRecursive(Type type, bool wantRValue,
                              bool retainParens = false);
+
+  /// Determine whether the given type variable occurs within the given type.
+  ///
+  /// This routine assumes that the type has already been fully simplified.
+  ///
+  /// \param involvesOtherTypeVariables if non-null, records whether any other
+  /// type variables are present in the type.
+  static bool typeVarOccursInType(TypeVariableType *typeVar, Type type,
+                                  bool *involvesOtherTypeVariables = nullptr);
 
   /// \brief Assign a fixed type to the given type variable.
   ///
@@ -1858,16 +1828,15 @@ private:
   ///
   /// \returns the result of performing the tuple-to-tuple conversion.
   SolutionKind matchTupleTypes(TupleType *tuple1, TupleType *tuple2,
-                                         TypeMatchKind kind,
-                               TypeMatchOptions flags,
-                                         ConstraintLocatorBuilder locator);
+                               ConstraintKind kind, TypeMatchOptions flags,
+                               ConstraintLocatorBuilder locator);
 
   /// \brief Subroutine of \c matchTypes(), which matches a scalar type to
   /// a tuple type.
   ///
   /// \returns the result of performing the scalar-to-tuple conversion.
   SolutionKind matchScalarToTupleTypes(Type type1, TupleType *tuple2,
-                                       TypeMatchKind kind,
+                                       ConstraintKind kind,
                                        TypeMatchOptions flags,
                                        ConstraintLocatorBuilder locator);
 
@@ -1876,20 +1845,20 @@ private:
   ///
   /// \returns the result of performing the tuple-to-scalar conversion.
   SolutionKind matchTupleToScalarTypes(TupleType *tuple1, Type type2,
-                                       TypeMatchKind kind,
+                                       ConstraintKind kind,
                                        TypeMatchOptions flags,
                                        ConstraintLocatorBuilder locator);
 
   /// \brief Subroutine of \c matchTypes(), which matches up two function
   /// types.
   SolutionKind matchFunctionTypes(FunctionType *func1, FunctionType *func2,
-                                  TypeMatchKind kind, TypeMatchOptions flags,
+                                  ConstraintKind kind, TypeMatchOptions flags,
                                   ConstraintLocatorBuilder locator);
 
   /// \brief Subroutine of \c matchTypes(), which matches up a value to a
   /// superclass.
   SolutionKind matchSuperclassTypes(Type type1, Type type2,
-                                    TypeMatchKind kind, TypeMatchOptions flags,
+                                    ConstraintKind kind, TypeMatchOptions flags,
                                     ConstraintLocatorBuilder locator);
 
   /// \brief Subroutine of \c matchTypes(), which matches up two types that
@@ -1927,7 +1896,7 @@ public: // FIXME: public due to statics in CSSimplify.cpp
   /// the specific types being matched.
   ///
   /// \returns the result of attempting to solve this constraint.
-  SolutionKind matchTypes(Type type1, Type type2, TypeMatchKind kind,
+  SolutionKind matchTypes(Type type1, Type type2, ConstraintKind kind,
                           TypeMatchOptions flags,
                           ConstraintLocatorBuilder locator);
 
@@ -1941,10 +1910,7 @@ public:
   ///
   /// The resulting types can be compared canonically, so long as additional
   /// type equivalence requirements aren't introduced between comparisons.
-  Type simplifyType(Type type){
-    llvm::SmallPtrSet<TypeVariableType *, 16> substituting;
-   return simplifyType(type, substituting);
-  }
+  Type simplifyType(Type type);
 
   /// Given a ValueMember, UnresolvedValueMember, or TypeMember constraint,
   /// perform a lookup into the specified base type to find a candidate list.
@@ -1960,22 +1926,7 @@ public:
                                          ConstraintLocator *memberLocator,
                                          bool includeInaccessibleMembers);
 
-private:
-
-  /// \brief Simplify a type, by replacing type variables with either their
-  /// fixed types (if available) or their representatives.
-  ///
-  /// \param type the type to be simplified.
-  ///
-  /// \param substituting the set of type variables that we're already
-  /// substituting for. These type variables will not be substituted again,
-  /// to avoid infinite recursion.
-  ///
-  /// The resulting types can be compared canonically, so long as additional
-  /// type equivalence requirements aren't introduced between comparisons.
-  Type simplifyType(Type type,
-                    llvm::SmallPtrSet<TypeVariableType *, 16> &substituting);
-  
+private:  
   /// \brief Attempt to simplify the given construction constraint.
   ///
   /// \param valueType The type being constructed.
@@ -2024,6 +1975,7 @@ private:
 
   /// Attempt to simplify a checked-cast constraint.
   SolutionKind simplifyCheckedCastConstraint(Type fromType, Type toType,
+                                             TypeMatchOptions flags,
                                              ConstraintLocatorBuilder locator);
 
   /// \brief Attempt to simplify the given member constraint.
@@ -2036,23 +1988,35 @@ private:
 
   
   /// \brief Attempt to simplify the optional object constraint.
-  SolutionKind simplifyOptionalObjectConstraint(const Constraint &constraint);
+  SolutionKind simplifyOptionalObjectConstraint(
+                                          Type first, Type second,
+                                          TypeMatchOptions flags,
+                                          ConstraintLocatorBuilder locator);
 
   /// \brief Attempt to simplify the ApplicableFunction constraint.
-  SolutionKind simplifyApplicableFnConstraint(const Constraint &constraint);
+  SolutionKind simplifyApplicableFnConstraint(
+                                      Type type1,
+                                      Type type2,
+                                      TypeMatchOptions flags,
+                                      ConstraintLocatorBuilder locator);
 
   /// \brief Attempt to simplify the given DynamicTypeOf constraint.
-  SolutionKind simplifyDynamicTypeOfConstraint(const Constraint &constraint);
+  SolutionKind simplifyDynamicTypeOfConstraint(
+                                         Type type1, Type type2,
+                                         TypeMatchOptions flags,
+                                         ConstraintLocatorBuilder locator);
 
   /// \brief Attempt to simplify the given defaultable constraint.
-  SolutionKind simplifyDefaultableConstraint(const Constraint &c);
+  SolutionKind simplifyDefaultableConstraint(Type first, Type second,
+                                             TypeMatchOptions flags,
+                                             ConstraintLocatorBuilder locator);
 
   /// \brief Simplify a conversion constraint by applying the given
   /// reduction rule, which is known to apply at the outermost level.
   SolutionKind simplifyRestrictedConstraintImpl(
                  ConversionRestrictionKind restriction,
                  Type type1, Type type2,
-                 TypeMatchKind matchKind,
+                 ConstraintKind matchKind,
                  TypeMatchOptions flags,
                  ConstraintLocatorBuilder locator);
 
@@ -2061,7 +2025,7 @@ private:
   SolutionKind simplifyRestrictedConstraint(
                  ConversionRestrictionKind restriction,
                  Type type1, Type type2,
-                 TypeMatchKind matchKind,
+                 ConstraintKind matchKind,
                  TypeMatchOptions flags,
                  ConstraintLocatorBuilder locator);
 
@@ -2069,7 +2033,7 @@ public: // FIXME: Public for use by static functions.
   /// \brief Simplify a conversion constraint with a fix applied to it.
   SolutionKind simplifyFixConstraint(Fix fix,
                                      Type type1, Type type2,
-                                     TypeMatchKind matchKind,
+                                     ConstraintKind matchKind,
                                      TypeMatchOptions flags,
                                      ConstraintLocatorBuilder locator);
 
@@ -2091,6 +2055,11 @@ public:
   SolutionKind simplifyConstraint(const Constraint &constraint);
 
 private:
+  /// \brief Add a constraint to the constraint system.
+  SolutionKind addConstraintImpl(ConstraintKind kind, Type first, Type second,
+                                 ConstraintLocatorBuilder locator,
+                                 bool isFavored);
+
   /// \brief Solve the system of constraints after it has already been
   /// simplified.
   ///

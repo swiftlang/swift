@@ -73,7 +73,7 @@ METADATAKIND(ExistentialMetatype, 15)
 
 /// A foreign class, such as a Core Foundation class.
 METADATAKIND(ForeignClass, 16)
-  
+
 /// A heap-allocated local variable using statically-generated metadata.
 METADATAKIND(HeapLocalVariable, 64)
 

@@ -144,7 +144,7 @@ SequenceTypeTests.test("Demonstration/NotCustomizable") {
   let tester = SequenceLog.dispatchTester([OpaqueValue(1)])
 
   tester.nonCustomizableOperation()
-  
+
   expectNotCustomizable(tester, tester.log.nonCustomizableOperation)
 }
 
@@ -262,7 +262,7 @@ SequenceTypeTests.test("enumerated()") {
     expectType(
       EnumeratedSequence<MinimalSequence<OpaqueValue<Int>>>.self,
       &result)
-    
+
     checkSequence(
       test.expected.map {
         (offset: $0.0, element: OpaqueValue($0.1))
@@ -708,11 +708,11 @@ SequenceTypeTests.test("filter/Sequence/Semantics") {
       UnderestimatedCountBehavior.half,
       UnderestimatedCountBehavior.value(0)
     ] {
-      
+
       let s = DefaultedSequence<OpaqueValue<Int>>(
         elements: test.sequence.map(OpaqueValue.init),
         underestimatedCount: underestimatedCountBehavior)
-      
+
       let closureLifetimeTracker = LifetimeTracked(0)
       expectEqual(1, LifetimeTracked.instances)
       var timesClosureWasCalled = 0
@@ -1054,7 +1054,7 @@ SequenceTypeTests.test("zip") {
     checkSequence(
       test.expected.map { (OpaqueValue($0), OpaqueValue($1)) }, result,
       stackTrace: SourceLocStack().with(test.loc), sameValue: compareElements)
-    
+
     // Check leftovers *after* doing checkSequence(), not before, to ensure
     // that checkSequence() didn't force us to consume more elements than
     // needed.

@@ -121,7 +121,7 @@ func dont_return<T>(_ argument: T) throws -> T {
 // CHECK:      [[T0:%.*]] = function_ref @_TFC6errors3CatC{{.*}} : $@convention(method) (@thick Cat.Type) -> @owned Cat
 // CHECK-NEXT: [[T1:%.*]] = metatype $@thick Cat.Type
 // CHECK-NEXT: [[T2:%.*]] = apply [[T0]]([[T1]])
-// CHECK-NEXT: strong_release [[ERROR]] : $Error
+// CHECK-NEXT: destroy_value [[ERROR]] : $Error
 // CHECK-NEXT: br [[RETURN]]([[T2]] : $Cat)
 
 //   Landing pad.
@@ -232,12 +232,12 @@ struct DoomedStruct : Doomed {
 // CHECK-NEXT: try_apply [[T0]]([[SELF]])
 // CHECK:    bb1([[T0:%.*]] : $()):
 // CHECK:      [[T0:%.*]] = tuple ()
-// CHECK:      strong_release [[SELF]] : $DoomedClass
+// CHECK:      destroy_value [[SELF]] : $DoomedClass
 // CHECK:      dealloc_stack [[TEMP]]
 // CHECK:      return [[T0]] : $()
 // CHECK:    bb2([[T0:%.*]] : $Error):
 // CHECK:      builtin "willThrow"([[T0]] : $Error)
-// CHECK:      strong_release [[SELF]] : $DoomedClass
+// CHECK:      destroy_value [[SELF]] : $DoomedClass
 // CHECK:      dealloc_stack [[TEMP]]
 // CHECK:      throw [[T0]] : $Error
 class DoomedClass : Doomed {
@@ -264,7 +264,7 @@ struct HappyStruct : Doomed {
 // CHECK:      [[T0:%.*]] = class_method [[SELF]] : $HappyClass, #HappyClass.check!1 : (HappyClass) -> () -> () , $@convention(method) (@guaranteed HappyClass) -> ()
 // CHECK:      [[T1:%.*]] = apply [[T0]]([[SELF]])
 // CHECK:      [[T1:%.*]] = tuple ()
-// CHECK:      strong_release [[SELF]] : $HappyClass
+// CHECK:      destroy_value [[SELF]] : $HappyClass
 // CHECK:      dealloc_stack [[TEMP]]
 // CHECK:      return [[T1]] : $()
 class HappyClass : Doomed {
@@ -295,7 +295,7 @@ func testForceTry(_ fn: () -> Int) {
 // CHECK-LABEL: sil hidden @_TF6errors12testForceTryFFT_SiT_ : $@convention(thin) (@owned @callee_owned () -> Int) -> ()
 // CHECK: [[T0:%.*]] = function_ref @_TF6errors9createIntFzFT_SiT_ : $@convention(thin) (@owned @callee_owned () -> Int) -> @error Error
 // CHECK: try_apply [[T0]](%0)
-// CHECK: strong_release
+// CHECK: destroy_value
 // CHECK: return
 // CHECK: builtin "unexpectedError"
 // CHECK: unreachable
@@ -312,8 +312,8 @@ func testForceTryMultiple() {
 // CHECK: [[FN_2:%.+]] = function_ref @_TF6errors10make_a_catFzT_CS_3Cat
 // CHECK-NEXT: try_apply [[FN_2]]() : $@convention(thin) () -> (@owned Cat, @error Error), normal [[SUCCESS_2:[^ ]+]], error [[CLEANUPS_2:[^ ]+]],
 // CHECK: [[SUCCESS_2]]([[VALUE_2:%.+]] : $Cat)
-// CHECK-NEXT: strong_release [[VALUE_2]] : $Cat
-// CHECK-NEXT: strong_release [[VALUE_1]] : $Cat
+// CHECK-NEXT: destroy_value [[VALUE_2]] : $Cat
+// CHECK-NEXT: destroy_value [[VALUE_1]] : $Cat
 // CHECK-NEXT: [[VOID:%.+]] = tuple ()
 // CHECK-NEXT: return [[VOID]] : $()
 // CHECK: [[FAILURE:.+]]([[ERROR:%.+]] : $Error):
@@ -322,7 +322,7 @@ func testForceTryMultiple() {
 // CHECK: [[CLEANUPS_1]]([[ERROR:%.+]] : $Error):
 // CHECK-NEXT: br [[FAILURE]]([[ERROR]] : $Error)
 // CHECK: [[CLEANUPS_2]]([[ERROR:%.+]] : $Error):
-// CHECK-NEXT: strong_release [[VALUE_1]] : $Cat
+// CHECK-NEXT: destroy_value [[VALUE_1]] : $Cat
 // CHECK-NEXT: br [[FAILURE]]([[ERROR]] : $Error)
 // CHECK: {{^}$}}
 
@@ -347,8 +347,9 @@ func feedCat() throws -> Int {
   }
 }
 // CHECK-LABEL: sil hidden @_TF6errors7feedCatFzT_Si : $@convention(thin) () -> (Int, @error Error)
-// CHECK:   %0 = function_ref @_TF6errors13preferredFoodFzT_OS_7CatFood : $@convention(thin) () -> (CatFood, @error Error)
-// CHECK:   try_apply %0() : $@convention(thin) () -> (CatFood, @error Error), normal bb1, error bb5
+// CHECK: debug_value undef : $Error, var, name "$error", argno 1
+// CHECK:   %1 = function_ref @_TF6errors13preferredFoodFzT_OS_7CatFood : $@convention(thin) () -> (CatFood, @error Error)
+// CHECK:   try_apply %1() : $@convention(thin) () -> (CatFood, @error Error), normal bb1, error bb5
 // CHECK: bb1([[VAL:%.*]] : $CatFood):
 // CHECK:   switch_enum [[VAL]] : $CatFood, case #CatFood.Canned!enumelt: bb2, case #CatFood.Dry!enumelt: bb3
 // CHECK: bb5([[ERROR:%.*]] : $Error)
@@ -366,6 +367,7 @@ func getHungryCat(_ food: CatFood) throws -> Cat {
 // errors.getHungryCat  throws (errors.CatFood) -> errors.Cat
 // CHECK-LABEL: sil hidden @_TF6errors12getHungryCatFzOS_7CatFoodCS_3Cat : $@convention(thin) (CatFood) -> (@owned Cat, @error Error)
 // CHECK: bb0(%0 : $CatFood):
+// CHECK:   debug_value undef : $Error, var, name "$error", argno 2
 // CHECK:   switch_enum %0 : $CatFood, case #CatFood.Canned!enumelt: bb1, case #CatFood.Dry!enumelt: bb3
 // CHECK: bb1:
 // CHECK:   [[FN:%.*]] = function_ref @_TF6errors10make_a_catFzT_CS_3Cat : $@convention(thin) () -> (@owned Cat, @error Error)
@@ -385,6 +387,7 @@ func test_variadic(_ cat: Cat) throws {
   try take_many_cats(make_a_cat(), cat, make_a_cat(), make_a_cat())
 }
 // CHECK-LABEL: sil hidden @_TF6errors13test_variadicFzCS_3CatT_
+// CHECK:       debug_value undef : $Error, var, name "$error", argno 2
 // CHECK:       [[TAKE_FN:%.*]] = function_ref @_TF6errors14take_many_catsFztGSaCS_3Cat__T_ : $@convention(thin) (@owned Array<Cat>) -> @error Error
 // CHECK:       [[N:%.*]] = integer_literal $Builtin.Word, 4
 // CHECK:       [[T0:%.*]] = function_ref @_TFs27_allocateUninitializedArray
@@ -400,7 +403,7 @@ func test_variadic(_ cat: Cat) throws {
 //   Element 1.
 // CHECK-NEXT:  [[T0:%.*]] = integer_literal $Builtin.Word, 1
 // CHECK-NEXT:  [[ELT1:%.*]] = index_addr [[ELT0]] : $*Cat, [[T0]]
-// CHECK-NEXT:  strong_retain %0
+// CHECK-NEXT:  copy_value %0
 // CHECK-NEXT:  store %0 to [[ELT1]]
 //   Element 2.
 // CHECK-NEXT:  [[T0:%.*]] = integer_literal $Builtin.Word, 2
@@ -421,7 +424,7 @@ func test_variadic(_ cat: Cat) throws {
 //   Complete the call and return.
 // CHECK-NEXT:  try_apply [[TAKE_FN]]([[ARRAY]]) : $@convention(thin) (@owned Array<Cat>) -> @error Error, normal [[NORM_CALL:bb[0-9]+]], error [[ERR_CALL:bb[0-9]+]]
 // CHECK:     [[NORM_CALL]]([[T0:%.*]] : $()):
-// CHECK-NEXT:  strong_release %0 : $Cat
+// CHECK-NEXT:  destroy_value %0 : $Cat
 // CHECK-NEXT:  [[T0:%.*]] = tuple ()
 // CHECK-NEXT:  return
 //   Failure from element 0.
@@ -452,7 +455,7 @@ func test_variadic(_ cat: Cat) throws {
 // CHECK-NEXT:  br [[RETHROW]]([[ERROR]] : $Error)
 //   Rethrow.
 // CHECK:     [[RETHROW]]([[ERROR:%.*]] : $Error):
-// CHECK-NEXT:  strong_release %0 : $Cat
+// CHECK-NEXT:  destroy_value %0 : $Cat
 // CHECK-NEXT:  throw [[ERROR]]
 
 // rdar://20861374
@@ -523,7 +526,7 @@ func supportStructure<B: Buildable>(_ b: inout B, name: String) throws {
 }
 // CHECK-LABEL: sil hidden @_TF6errors16supportStructure
 // CHECK: [[SUPPORT:%.*]] = witness_method $B.Structure, #Supportable.support!1 :
-// CHECK: retain_value [[INDEX:%1]] : $String
+// CHECK: copy_value [[INDEX:%1]] : $String
 // CHECK: [[MATBUFFER:%.*]] = alloc_stack $Builtin.UnsafeValueBuffer
 // CHECK: [[BUFFER:%.*]] = alloc_stack $B.Structure
 // CHECK: [[BUFFER_CAST:%.*]] = address_to_pointer [[BUFFER]] : $*B.Structure to $Builtin.RawPointer
@@ -540,7 +543,7 @@ func supportStructure<B: Buildable>(_ b: inout B, name: String) throws {
 // CHECK: apply
 // CHECK: dealloc_stack [[BUFFER]]
 // CHECK: dealloc_stack [[MATBUFFER]]
-// CHECK: release_value [[INDEX]] : $String
+// CHECK: destroy_value [[INDEX]] : $String
 // CHECK: return
 
 // CHECK: [[BB_ERROR]]([[ERROR:%.*]] : $Error):
@@ -548,7 +551,7 @@ func supportStructure<B: Buildable>(_ b: inout B, name: String) throws {
 // CHECK: apply
 // CHECK: dealloc_stack [[BUFFER]]
 // CHECK: dealloc_stack [[MATBUFFER]]
-// CHECK: release_value [[INDEX]] : $String
+// CHECK: destroy_value [[INDEX]] : $String
 // CHECK: throw [[ERROR]]
 
 struct Pylon {
@@ -569,15 +572,15 @@ func supportStructure(_ b: inout Bridge, name: String) throws {
 }
 // CHECK:    sil hidden @_TF6errors16supportStructureFzTRVS_6Bridge4nameSS_T_ :
 // CHECK:      [[SUPPORT:%.*]] = function_ref @_TFV6errors5Pylon7support
-// CHECK:      retain_value [[INDEX:%1]] : $String
-// CHECK-NEXT: retain_value [[INDEX]] : $String
+// CHECK:      copy_value [[INDEX:%1]] : $String
+// CHECK-NEXT: copy_value [[INDEX]] : $String
 // CHECK-NEXT: [[TEMP:%.*]] = alloc_stack $Pylon
 // CHECK-NEXT: [[BASE:%.*]] = load [[B:%[0-9]*]] : $*Bridge
-// CHECK-NEXT: retain_value [[BASE]]
+// CHECK-NEXT: copy_value [[BASE]]
 // CHECK-NEXT: function_ref
 // CHECK-NEXT: [[GETTER:%.*]] = function_ref @_TFV6errors6Bridgeg9subscriptFSSVS_5Pylon :
 // CHECK-NEXT: [[T0:%.*]] = apply [[GETTER]]([[INDEX]], [[BASE]])
-// CHECK-NEXT: release_value [[BASE]]
+// CHECK-NEXT: destroy_value [[BASE]]
 // CHECK-NEXT: store [[T0]] to [[TEMP]]
 // CHECK-NEXT: try_apply [[SUPPORT]]([[TEMP]]) : {{.*}}, normal [[BB_NORMAL:bb[0-9]+]], error [[BB_ERROR:bb[0-9]+]]
 
@@ -587,7 +590,7 @@ func supportStructure(_ b: inout Bridge, name: String) throws {
 // CHECK-NEXT: [[SETTER:%.*]] = function_ref @_TFV6errors6Bridges9subscriptFSSVS_5Pylon :
 // CHECK-NEXT: apply [[SETTER]]([[T0]], [[INDEX]], [[B]])
 // CHECK-NEXT: dealloc_stack [[TEMP]]
-// CHECK-NEXT: release_value [[INDEX]] : $String
+// CHECK-NEXT: destroy_value [[INDEX]] : $String
 // CHECK-NEXT: tuple ()
 // CHECK-NEXT: return
 
@@ -595,15 +598,15 @@ func supportStructure(_ b: inout Bridge, name: String) throws {
 //   consume things during cleanup emission.  It's questionable.
 // CHECK:    [[BB_ERROR]]([[ERROR:%.*]] : $Error):
 // CHECK-NEXT: [[T0:%.*]] = load [[TEMP]]
-// CHECK-NEXT: retain_value [[T0]]
-// CHECK-NEXT: retain_value [[INDEX]] : $String
+// CHECK-NEXT: copy_value [[T0]]
+// CHECK-NEXT: copy_value [[INDEX]] : $String
 // CHECK-NEXT: function_ref
 // CHECK-NEXT: [[SETTER:%.*]] = function_ref @_TFV6errors6Bridges9subscriptFSSVS_5Pylon :
 // CHECK-NEXT: apply [[SETTER]]([[T0]], [[INDEX]], [[B]])
 // CHECK-NEXT: destroy_addr [[TEMP]]
 // CHECK-NEXT: dealloc_stack [[TEMP]]
-// CHECK-NEXT: release_value [[INDEX]] : $String
-// CHECK-NEXT: release_value [[INDEX]] : $String
+// CHECK-NEXT: destroy_value [[INDEX]] : $String
+// CHECK-NEXT: destroy_value [[INDEX]] : $String
 // CHECK-NEXT: throw [[ERROR]]
 
 struct OwnedBridge {
@@ -618,7 +621,7 @@ func supportStructure(_ b: inout OwnedBridge, name: String) throws {
 }
 // CHECK: sil hidden @_TF6errors16supportStructureFzTRVS_11OwnedBridge4nameSS_T_ :
 // CHECK:      [[SUPPORT:%.*]] = function_ref @_TFV6errors5Pylon7support
-// CHECK:      retain_value [[INDEX:%1]] : $String
+// CHECK:      copy_value [[INDEX:%1]] : $String
 // CHECK-NEXT: function_ref
 // CHECK-NEXT: [[ADDRESSOR:%.*]] = function_ref @_TFV6errors11OwnedBridgeaO9subscriptFSSVS_5Pylon :
 // CHECK-NEXT: [[T0:%.*]] = apply [[ADDRESSOR]]([[INDEX]], [[BASE:%[0-9]*]])
@@ -629,13 +632,13 @@ func supportStructure(_ b: inout OwnedBridge, name: String) throws {
 // CHECK-NEXT: [[T5:%.*]] = mark_dependence [[T4]] : $*Pylon on [[OWNER]]
 // CHECK-NEXT: try_apply [[SUPPORT]]([[T5]]) : {{.*}}, normal [[BB_NORMAL:bb[0-9]+]], error [[BB_ERROR:bb[0-9]+]]
 // CHECK:    [[BB_NORMAL]]
-// CHECK-NEXT: strong_release [[OWNER]] : $Builtin.UnknownObject
-// CHECK-NEXT: release_value [[INDEX]] : $String
+// CHECK-NEXT: destroy_value [[OWNER]] : $Builtin.UnknownObject
+// CHECK-NEXT: destroy_value [[INDEX]] : $String
 // CHECK-NEXT: tuple ()
 // CHECK-NEXT: return
 // CHECK:    [[BB_ERROR]]([[ERROR:%.*]] : $Error):
-// CHECK-NEXT: strong_release [[OWNER]] : $Builtin.UnknownObject
-// CHECK-NEXT: release_value [[INDEX]] : $String
+// CHECK-NEXT: destroy_value [[OWNER]] : $Builtin.UnknownObject
+// CHECK-NEXT: destroy_value [[INDEX]] : $String
 // CHECK-NEXT: throw [[ERROR]]
 
 struct PinnedBridge {
@@ -650,7 +653,7 @@ func supportStructure(_ b: inout PinnedBridge, name: String) throws {
 }
 // CHECK: sil hidden @_TF6errors16supportStructureFzTRVS_12PinnedBridge4nameSS_T_ :
 // CHECK:      [[SUPPORT:%.*]] = function_ref @_TFV6errors5Pylon7support
-// CHECK:      retain_value [[INDEX:%1]] : $String
+// CHECK:      copy_value [[INDEX:%1]] : $String
 // CHECK-NEXT: function_ref
 // CHECK-NEXT: [[ADDRESSOR:%.*]] = function_ref @_TFV6errors12PinnedBridgeap9subscriptFSSVS_5Pylon :
 // CHECK-NEXT: [[T0:%.*]] = apply [[ADDRESSOR]]([[INDEX]], [[BASE:%[0-9]*]])
@@ -662,14 +665,14 @@ func supportStructure(_ b: inout PinnedBridge, name: String) throws {
 // CHECK-NEXT: try_apply [[SUPPORT]]([[T5]]) : {{.*}}, normal [[BB_NORMAL:bb[0-9]+]], error [[BB_ERROR:bb[0-9]+]]
 // CHECK:    [[BB_NORMAL]]
 // CHECK-NEXT: strong_unpin [[OWNER]] : $Optional<Builtin.NativeObject>
-// CHECK-NEXT: release_value [[INDEX]] : $String
+// CHECK-NEXT: destroy_value [[INDEX]] : $String
 // CHECK-NEXT: tuple ()
 // CHECK-NEXT: return
 // CHECK:    [[BB_ERROR]]([[ERROR:%.*]] : $Error):
-// CHECK-NEXT: retain_value [[OWNER]]
+// CHECK-NEXT: copy_value [[OWNER]]
 // CHECK-NEXT: strong_unpin [[OWNER]] : $Optional<Builtin.NativeObject>
-// CHECK-NEXT: release_value [[OWNER]]
-// CHECK-NEXT: release_value [[INDEX]] : $String
+// CHECK-NEXT: destroy_value [[OWNER]]
+// CHECK-NEXT: destroy_value [[INDEX]] : $String
 // CHECK-NEXT: throw [[ERROR]]
 
 // ! peepholes its argument with getSemanticsProvidingExpr().
@@ -688,11 +691,11 @@ func testForcePeephole(_ f: () throws -> Int?) -> Int {
 // CHECK-NEXT: [[WRAPPED:%.+]] = enum $Optional<Cat>, #Optional.some!enumelt.1, [[VALUE]]
 // CHECK-NEXT: br [[DONE:[^ ]+]]([[WRAPPED]] : $Optional<Cat>)
 // CHECK: [[DONE]]([[RESULT:%.+]] : $Optional<Cat>):
-// CHECK-NEXT: release_value [[RESULT]] : $Optional<Cat>
+// CHECK-NEXT: destroy_value [[RESULT]] : $Optional<Cat>
 // CHECK-NEXT: [[VOID:%.+]] = tuple ()
 // CHECK-NEXT: return [[VOID]] : $()
 // CHECK: [[FAILURE:.+]]([[ERROR:%.*]] : $Error):
-// CHECK-NEXT: strong_release [[ERROR]]
+// CHECK-NEXT: destroy_value [[ERROR]]
 // CHECK-NEXT: [[NONE:%.+]] = enum $Optional<Cat>, #Optional.none!enumelt
 // CHECK-NEXT: br [[DONE]]([[NONE]] : $Optional<Cat>)
 // CHECK: [[CLEANUPS]]([[ERROR:%.+]] : $Error):
@@ -714,11 +717,11 @@ func testOptionalTry() {
 // CHECK-NEXT: inject_enum_addr [[PB]] : $*Optional<Cat>, #Optional.some!enumelt.1
 // CHECK-NEXT: br [[DONE:[^ ]+]],
 // CHECK: [[DONE]]:
-// CHECK-NEXT: strong_release [[BOX]] : $@box Optional<Cat>
+// CHECK-NEXT: destroy_value [[BOX]] : $@box Optional<Cat>
 // CHECK-NEXT: [[VOID:%.+]] = tuple ()
 // CHECK-NEXT: return [[VOID]] : $()
 // CHECK: [[FAILURE:.+]]([[ERROR:%.*]] : $Error):
-// CHECK-NEXT: strong_release [[ERROR]]
+// CHECK-NEXT: destroy_value [[ERROR]]
 // CHECK-NEXT: inject_enum_addr [[PB]] : $*Optional<Cat>, #Optional.none!enumelt
 // CHECK-NEXT: br [[DONE]]
 // CHECK: [[CLEANUPS]]([[ERROR:%.+]] : $Error):
@@ -747,7 +750,7 @@ func testOptionalTryVar() {
 // CHECK-NEXT: [[VOID:%.+]] = tuple ()
 // CHECK-NEXT: return [[VOID]] : $()
 // CHECK: [[FAILURE:.+]]([[ERROR:%.*]] : $Error):
-// CHECK-NEXT: strong_release [[ERROR]]
+// CHECK-NEXT: destroy_value [[ERROR]]
 // CHECK-NEXT: inject_enum_addr [[BOX]] : $*Optional<T>, #Optional.none!enumelt
 // CHECK-NEXT: br [[DONE]]
 // CHECK: [[CLEANUPS]]([[ERROR:%.+]] : $Error):
@@ -772,12 +775,12 @@ func testOptionalTryAddressOnly<T>(_ obj: T) {
 // CHECK-NEXT: dealloc_stack [[ARG_BOX]] : $*T
 // CHECK-NEXT: br [[DONE:[^ ]+]],
 // CHECK: [[DONE]]:
-// CHECK-NEXT: strong_release [[BOX]] : $@box Optional<T>
+// CHECK-NEXT: destroy_value [[BOX]] : $@box Optional<T>
 // CHECK-NEXT: destroy_addr %0 : $*T
 // CHECK-NEXT: [[VOID:%.+]] = tuple ()
 // CHECK-NEXT: return [[VOID]] : $()
 // CHECK: [[FAILURE:.+]]([[ERROR:%.*]] : $Error):
-// CHECK-NEXT: strong_release [[ERROR]]
+// CHECK-NEXT: destroy_value [[ERROR]]
 // CHECK-NEXT: inject_enum_addr [[PB]] : $*Optional<T>, #Optional.none!enumelt
 // CHECK-NEXT: br [[DONE]]
 // CHECK: [[CLEANUPS]]([[ERROR:%.+]] : $Error):
@@ -800,17 +803,17 @@ func testOptionalTryAddressOnlyVar<T>(_ obj: T) {
 // CHECK-NEXT: [[WRAPPED:%.+]] = enum $Optional<(Cat, Cat)>, #Optional.some!enumelt.1, [[TUPLE]]
 // CHECK-NEXT: br [[DONE:[^ ]+]]([[WRAPPED]] : $Optional<(Cat, Cat)>)
 // CHECK: [[DONE]]([[RESULT:%.+]] : $Optional<(Cat, Cat)>):
-// CHECK-NEXT: release_value [[RESULT]] : $Optional<(Cat, Cat)>
+// CHECK-NEXT: destroy_value [[RESULT]] : $Optional<(Cat, Cat)>
 // CHECK-NEXT: [[VOID:%.+]] = tuple ()
 // CHECK-NEXT: return [[VOID]] : $()
 // CHECK: [[FAILURE:.+]]([[ERROR:%.*]] : $Error):
-// CHECK-NEXT: strong_release [[ERROR]]
+// CHECK-NEXT: destroy_value [[ERROR]]
 // CHECK-NEXT: [[NONE:%.+]] = enum $Optional<(Cat, Cat)>, #Optional.none!enumelt
 // CHECK-NEXT: br [[DONE]]([[NONE]] : $Optional<(Cat, Cat)>)
 // CHECK: [[CLEANUPS_1]]([[ERROR:%.+]] : $Error):
 // CHECK-NEXT: br [[FAILURE]]([[ERROR]] : $Error)
 // CHECK: [[CLEANUPS_2]]([[ERROR:%.+]] : $Error):
-// CHECK-NEXT: strong_release [[VALUE_1]] : $Cat
+// CHECK-NEXT: destroy_value [[VALUE_1]] : $Cat
 // CHECK-NEXT: br [[FAILURE]]([[ERROR]] : $Error)
 // CHECK: {{^}$}}
 func testOptionalTryMultiple() {
@@ -834,7 +837,7 @@ func testOptionalTryNeverFails() {
 // CHECK-NEXT:   [[PB:%.*]] = project_box [[BOX]]
 // CHECK-NEXT:   = init_enum_data_addr [[PB]] : $*Optional<()>, #Optional.some!enumelt.1
 // CHECK-NEXT:   inject_enum_addr [[PB]] : $*Optional<()>, #Optional.some!enumelt.1
-// CHECK-NEXT:   strong_release [[BOX]] : $@box Optional<()>
+// CHECK-NEXT:   destroy_value [[BOX]] : $@box Optional<()>
 // CHECK-NEXT:   [[VOID:%.+]] = tuple ()
 // CHECK-NEXT:   return [[VOID]] : $()
 // CHECK-NEXT: {{^}$}}
@@ -865,7 +868,7 @@ func testOptionalTryNeverFailsAddressOnly<T>(_ obj: T) {
 // CHECK-NEXT:   [[BOX_DATA:%.+]] = init_enum_data_addr [[PB]] : $*Optional<T>, #Optional.some!enumelt.1
 // CHECK-NEXT:   copy_addr %0 to [initialization] [[BOX_DATA]] : $*T
 // CHECK-NEXT:   inject_enum_addr [[PB]] : $*Optional<T>, #Optional.some!enumelt.1
-// CHECK-NEXT:   strong_release [[BOX]] : $@box Optional<T>
+// CHECK-NEXT:   destroy_value [[BOX]] : $@box Optional<T>
 // CHECK-NEXT:   destroy_addr %0 : $*T
 // CHECK-NEXT:   [[VOID:%.+]] = tuple ()
 // CHECK-NEXT:   return [[VOID]] : $()

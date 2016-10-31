@@ -5,11 +5,13 @@
 // See http://swift.org/LICENSE.txt for license information
 // See http://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
 
-// RUN: not --crash %target-swift-frontend %s -parse
+// RUN: not --crash %target-swift-frontend %s -emit-ir
 // REQUIRES: asserts
-// Discovered by https://github.com/airspeedswift (airspeedswift)
-
-let s1: Set<Int>? = []
-let s2: Set<Int>? = []
-let s3: Set<Int>? = []
-let x = s1 ?? s2 ?? s3 ?? []
+class A{let f= <c
+protocol A{
+typealias e:A{}
+protocol A{
+extension{
+protocol A{func<{{}
+}typealias e:
+c

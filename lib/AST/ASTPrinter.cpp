@@ -907,12 +907,14 @@ class PrintAST : public ASTVisitor<PrintAST> {
         DC = DC->getParent()->getInnermostTypeContext();
       assert(DC);
 
-      // Get the substitutions from our base type.
-      auto subMap = Options.TransformContext->getTypeBase()
-          ->getMemberSubstitutions(DC);
-      auto *M = DC->getParentModule();
 
-      T = T.subst(M, subMap, SubstFlags::DesugarMemberTypes);
+      if (Options.TransformContext->getTypeBase()->canTreatContextAsMember(DC)) {
+        // Get the substitutions from our base type.
+        auto subMap = Options.TransformContext->getTypeBase()
+          ->getMemberSubstitutions(DC);
+        auto *M = DC->getParentModule();
+        T = T.subst(M, subMap, SubstFlags::DesugarMemberTypes);
+      }
     }
 
     printType(T);

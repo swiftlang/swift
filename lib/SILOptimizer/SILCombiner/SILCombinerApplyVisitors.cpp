@@ -225,7 +225,8 @@ void PartialApplyCombiner::releaseTemporaries() {
     for (auto *EndPoint : PAFrontier) {
       Builder.setInsertionPoint(EndPoint);
       if (!TmpType.isAddressOnly(PAI->getModule())) {
-        auto *Load = Builder.createLoad(PAI->getLoc(), Op);
+        auto *Load = Builder.createLoad(PAI->getLoc(), Op,
+                                        LoadOwnershipQualifier::Unqualified);
         Builder.createReleaseValue(PAI->getLoc(), Load, Atomicity::Atomic);
       } else {
         Builder.createDestroyAddr(PAI->getLoc(), Op);
@@ -284,7 +285,7 @@ bool PartialApplyCombiner::processSingleApply(FullApplySite AI) {
     SILValue Arg = PartialApplyArgs[i];
     if (!Arg->getType().isAddress()) {
       // Retain the argument as the callee may consume it.
-      Builder.emitRetainValueOperation(PAI->getLoc(), Arg);
+      Arg = Builder.emitCopyValueOperation(PAI->getLoc(), Arg);
       // For non consumed parameters (e.g. guaranteed), we also need to
       // insert releases after each apply instruction that we create.
       if (!ParamInfo[ParamInfo.size() - PartialApplyArgs.size() + i].
@@ -316,20 +317,20 @@ bool PartialApplyCombiner::processSingleApply(FullApplySite AI) {
   if (auto *TAI = dyn_cast<TryApplyInst>(AI)) {
     Builder.setInsertionPoint(TAI->getNormalBB()->begin());
     for (auto Arg : ToBeReleasedArgs) {
-      Builder.emitReleaseValueOperation(PAI->getLoc(), Arg);
+      Builder.emitDestroyValueOperation(PAI->getLoc(), Arg);
     }
     Builder.createStrongRelease(AI.getLoc(), PAI, Atomicity::Atomic);
     Builder.setInsertionPoint(TAI->getErrorBB()->begin());
     // Release the non-consumed parameters.
     for (auto Arg : ToBeReleasedArgs) {
-      Builder.emitReleaseValueOperation(PAI->getLoc(), Arg);
+      Builder.emitDestroyValueOperation(PAI->getLoc(), Arg);
     }
     Builder.createStrongRelease(AI.getLoc(), PAI, Atomicity::Atomic);
     Builder.setInsertionPoint(AI.getInstruction());
   } else {
     // Release the non-consumed parameters.
     for (auto Arg : ToBeReleasedArgs) {
-      Builder.emitReleaseValueOperation(PAI->getLoc(), Arg);
+      Builder.emitDestroyValueOperation(PAI->getLoc(), Arg);
     }
     Builder.createStrongRelease(AI.getLoc(), PAI, Atomicity::Atomic);
   }

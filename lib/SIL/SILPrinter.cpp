@@ -1269,6 +1269,14 @@ public:
     *this << getIDAndType(I->getOperand());
   }
 
+  void visitCopyValueInst(CopyValueInst *I) {
+    *this << getIDAndType(I->getOperand());
+  }
+
+  void visitDestroyValueInst(DestroyValueInst *I) {
+    *this << getIDAndType(I->getOperand());
+  }
+
   void visitRetainValueInst(RetainValueInst *I) { visitRefCountingInst(I); }
 
   void visitReleaseValueInst(ReleaseValueInst *I) { visitRefCountingInst(I); }
@@ -1520,10 +1528,11 @@ public:
     *this << PVBI->getValueType() << " in " << getIDAndType(PVBI->getOperand());
   }
   void visitProjectBoxInst(ProjectBoxInst *PBI) {
-    *this << getIDAndType(PBI->getOperand());
+    *this << getIDAndType(PBI->getOperand()) << ", " << PBI->getFieldIndex();
   }
   void visitProjectExistentialBoxInst(ProjectExistentialBoxInst *PEBI) {
-    *this << PEBI->getValueType() << " in " << getIDAndType(PEBI->getOperand());
+    *this << PEBI->getType().getObjectType()
+          << " in " << getIDAndType(PEBI->getOperand());
   }
 
   void visitCondFailInst(CondFailInst *FI) {

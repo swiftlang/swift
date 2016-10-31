@@ -11,7 +11,7 @@
 //===----------------------------------------------------------------------===//
 //
 //  This file defines diagnostics emitted during lexing and parsing.
-//  Each diagnostic is described using one of three kinds (error, warning, or 
+//  Each diagnostic is described using one of three kinds (error, warning, or
 //  note) along with a unique identifier, category, options, and text, and is
 //  followed by a signature describing the diagnostic argument kinds.
 //
@@ -163,7 +163,7 @@ ERROR(expected_identifier_in_decl,none,
 ERROR(expected_identifier_after_case_comma,none,
       "expected identifier after comma in enum 'case' declaration", ())
 ERROR(decl_redefinition,none,
-      "%select{declaration|definition}0 conflicts with previous value", 
+      "%select{declaration|definition}0 conflicts with previous value",
       (bool))
 ERROR(let_cannot_be_computed_property,none,
       "'let' declarations cannot be computed properties", ())
@@ -517,6 +517,8 @@ ERROR(sil_dbg_unknown_key,none,
       "unknown key '%0' in debug variable declaration", (StringRef))
 ERROR(sil_objc_with_tail_elements,none,
       "alloc_ref [objc] cannot have tail allocated elements", ())
+ERROR(found_unqualified_instruction_in_qualified_function,none,
+      "found unqualified instruction in qualified function '%0'", (StringRef))
 
 // SIL Basic Blocks
 ERROR(expected_sil_block_name,none,
@@ -992,7 +994,9 @@ ERROR(expected_dollar_numeric,none,
 ERROR(dollar_numeric_too_large,none,
       "numeric value following '$' is too large", ())
 ERROR(numeric_literal_numeric_member,none,
-   "expected named member of numeric literal", ())
+      "expected named member of numeric literal", ())
+ERROR(standalone_dollar_identifier,none,
+     "'$' is not an identifier; use backticks to escape it", ())
 
 ERROR(anon_closure_arg_not_in_closure,none,
       "anonymous closure argument not contained in a closure", ())

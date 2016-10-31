@@ -149,6 +149,17 @@ public:
   }
 };
 
+inline SILType SILBoxType::getFieldType(unsigned index) const {
+  auto fieldTy = getLayout()->getFields()[index].getLoweredType();
+  // Apply generic arguments if the layout is generic.
+  if (!getGenericArgs().empty()) {
+    auto substMap =
+      getLayout()->getGenericSignature()->getSubstitutionMap(getGenericArgs());
+    fieldTy = fieldTy.subst(substMap)->getCanonicalType();
+  }
+  return SILType::getPrimitiveAddressType(fieldTy);
+}
+
 } // end namespace swift
 
 #endif // SWIFT_SIL_LAYOUT_H

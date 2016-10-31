@@ -90,8 +90,13 @@ public:
     const char *Filename;
 
     DebugLoc(unsigned Line = 0, unsigned Column = 0,
-             const char *Filename = nullptr) : Line(Line), Column(Column),
-                                               Filename(Filename) { }
+             const char *Filename = nullptr)
+        : Line(Line), Column(Column), Filename(Filename) {}
+
+    inline bool operator==(const DebugLoc &R) const {
+      return Line == R.Line && Column == R.Column &&
+             StringRef(Filename).equals(R.Filename);
+    }
   };
 
 protected:

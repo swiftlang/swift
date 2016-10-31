@@ -753,19 +753,19 @@ bool swift::canCastValueToABICompatibleType(SILModule &M,
   return Result.hasValue();
 }
 
-ProjectBoxInst *swift::getOrCreateProjectBox(AllocBoxInst *ABI) {
+ProjectBoxInst *swift::getOrCreateProjectBox(AllocBoxInst *ABI, unsigned Index){
   SILBasicBlock::iterator Iter(ABI);
   Iter++;
   assert(Iter != ABI->getParent()->end() &&
          "alloc_box cannot be the last instruction of a block");
   SILInstruction *NextInst = &*Iter;
   if (auto *PBI = dyn_cast<ProjectBoxInst>(NextInst)) {
-    if (PBI->getOperand() == ABI)
+    if (PBI->getOperand() == ABI && PBI->getFieldIndex() == Index)
       return PBI;
   }
 
   SILBuilder B(NextInst);
-  return B.createProjectBox(ABI->getLoc(), ABI);
+  return B.createProjectBox(ABI->getLoc(), ABI, Index);
 }
 
 //===----------------------------------------------------------------------===//
@@ -1455,7 +1455,8 @@ optimizeBridgedObjCToSwiftCast(SILInstruction *Inst,
     }
 
     // Generate a load for the source argument.
-    auto *Load = Builder.createLoad(Loc, Src);
+    auto *Load =
+        Builder.createLoad(Loc, Src, LoadOwnershipQualifier::Unqualified);
     // Try to convert the source into the expected ObjC type first.
 
 
@@ -1694,7 +1695,7 @@ optimizeBridgedSwiftToObjCCast(SILInstruction *Inst,
   auto FnRef = Builder.createFunctionRef(Loc, BridgedFunc);
   if (Src->getType().isAddress() && !ParamTypes[0].isIndirect()) {
     // Create load
-    Src = Builder.createLoad(Loc, Src);
+    Src = Builder.createLoad(Loc, Src, LoadOwnershipQualifier::Unqualified);
   }
 
   // Compensate different owning conventions of the replaced cast instruction
@@ -1795,7 +1796,8 @@ optimizeBridgedSwiftToObjCCast(SILInstruction *Inst,
            "of the source operand");
     auto CastedValue = SILValue(
         (ConvTy == DestTy) ? NewI : Builder.createUpcast(Loc, NewAI, DestTy));
-    NewI = Builder.createStore(Loc, CastedValue, Dest);
+    NewI = Builder.createStore(Loc, CastedValue, Dest,
+                               StoreOwnershipQualifier::Unqualified);
   }
 
   if (Dest) {
@@ -2169,7 +2171,8 @@ optimizeCheckedCastAddrBranchInst(CheckedCastAddrBranchInst *Inst) {
           SuccessBB->createBBArg(Dest->getType().getObjectType(), nullptr);
           B.setInsertionPoint(SuccessBB->begin());
           // Store the result
-          B.createStore(Loc, SuccessBB->getBBArg(0), Dest);
+          B.createStore(Loc, SuccessBB->getBBArg(0), Dest,
+                        StoreOwnershipQualifier::Unqualified);
           EraseInstAction(Inst);
           return NewI;
         }
@@ -2477,7 +2480,8 @@ optimizeUnconditionalCheckedCastAddrInst(UnconditionalCheckedCastAddrInst *Inst)
     if (!resultTL.isAddressOnly()) {
       auto undef = SILValue(SILUndef::get(DestType.getObjectType(),
                                           Builder.getModule()));
-      Builder.createStore(Loc, undef, Dest);
+      Builder.createStore(Loc, undef, Dest,
+                          StoreOwnershipQualifier::Unqualified);
     }
     auto *TrapI = Builder.createBuiltinTrap(Loc);
     Inst->replaceAllUsesWithUndef();

@@ -810,6 +810,12 @@ public:
   /// Otherwise, it returns the type itself.
   Type getReferenceStorageReferent();
 
+  /// This is to check the pre-condition of calling
+  /// getMemberSubstitutions(const DeclContext *dc)
+  /// The function checks whether the given context can be treated as a part
+  /// of the type.
+  bool canTreatContextAsMember(const DeclContext *dc);
+
   /// Determine the set of substitutions that should be applied to a
   /// type spelled within the given DeclContext to treat it as a
   /// member of this type.
@@ -865,6 +871,14 @@ public:
   /// the resulting member type.
   Type getTypeOfMember(ModuleDecl *module, Type memberType,
                        const DeclContext *memberDC);
+
+  /// Get the type of a superclass member as seen from the subclass,
+  /// substituting generic parameters, dynamic Self return, and the
+  /// 'self' argument type as appropriate.
+  Type adjustSuperclassMemberDeclType(const ValueDecl *decl,
+                                      const ValueDecl *parentDecl,
+                                      Type memberType,
+                                      LazyResolver *resolver);
 
   /// Return T if this type is Optional<T>; otherwise, return the null type.
   Type getOptionalObjectType();
@@ -3388,6 +3402,7 @@ public:
   CanType getBoxedType() const;
   // In SILType.h
   SILType getBoxedAddressType() const;
+  SILType getFieldType(unsigned index) const;
 
   static bool classof(const TypeBase *T) {
     return T->getKind() == TypeKind::SILBox;

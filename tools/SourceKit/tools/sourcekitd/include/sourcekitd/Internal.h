@@ -47,6 +47,10 @@ enum class CustomBufferKind {
   TokenAnnotationsArray,
   DocSupportAnnotationArray,
   CodeCompletionResultsArray,
+  DocStructureArray,
+  InheritedTypesArray,
+  DocStructureElementArray,
+  AttributesArray,
 };
 
 class ResponseBuilder {

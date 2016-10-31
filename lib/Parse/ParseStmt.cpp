@@ -1759,7 +1759,7 @@ Parser::evaluateConditionalCompilationExpr(Expr *condition) {
 ParserResult<Stmt> Parser::parseStmtIfConfig(BraceItemListKind Kind) {
   StructureMarkerRAII ParsingDecl(*this, Tok.getLoc(),
                                   StructureMarkerKind::IfConfig);
-
+  llvm::SaveAndRestore<bool> S(InPoundIfEnvironment, true);
   ConditionalCompilationExprState ConfigState;
   bool foundActive = false;
   SmallVector<IfConfigStmtClause, 4> Clauses;

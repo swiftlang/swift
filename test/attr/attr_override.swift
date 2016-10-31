@@ -380,4 +380,25 @@ class MismatchOptional3 : MismatchOptionalBase {
   override func result() -> Optional<Int> { return nil } // expected-error {{cannot override instance method result type 'Int' with optional type 'Optional<Int>'}} {{none}}
 }
 
+// Make sure we remap the method's innermost generic parameters
+// to the correct depth
+class GenericBase<T> {
+  func doStuff<U>(t: T, u: U) {}
+  init<U>(t: T, u: U) {}
+}
 
+class ConcreteSub : GenericBase<Int> {
+  override func doStuff<U>(t: Int, u: U) {}
+  override init<U>(t: Int, u: U) {}
+}
+
+class ConcreteBase {
+  init<U>(t: Int, u: U) {}
+  func doStuff<U>(t: Int, u: U) {}
+
+}
+
+class GenericSub<T> : ConcreteBase {
+  override init<U>(t: Int, u: U) {}
+  override func doStuff<U>(t: Int, u: U) {}
+}

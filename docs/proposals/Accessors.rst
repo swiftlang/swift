@@ -573,7 +573,7 @@ like this::
         let pinToken = _pin()
         return (slice, pinToken)
       }
-      
+
       // `setForMutation` receives two arguments--the result of the
       // mutation to write back, and the state value returned by
       // `getForMutation`.
@@ -618,7 +618,7 @@ like this::
   var foo: T {
     get { return getValue() }
     set { setValue(newValue) }
-    
+
     // Perform a full in-out mutation. The `next` continuation is of
     // type `(inout T) -> ()` and must be called exactly once
     // with the value to hand off to the nested mutation operation.
@@ -639,7 +639,7 @@ accessors::
       next(&$0.memory)
     }
   }
-  
+
   // A pinning mutator
   mutate(next) {
     var slice = makeSlice()
@@ -648,7 +648,7 @@ accessors::
     unpin(token)
     writeBackSlice(slice)
   }
- 
+
 For various semantic and implementation efficiency reasons, we don't want to
 literally implement every access as a nesting of closures like this. Doing so
 would allow for semantic surprises (a mutate() operation never invoking its
@@ -675,7 +675,7 @@ control flow path::
     unpin(token)
     writeBackSlice(slice)
   }
-  
+
 This obviously requires more implementation infrastructure than we currently
 have, and raises language and library design issues (in particular,
 lifetime-extending combinators like ``withUnsafePointer`` would need either

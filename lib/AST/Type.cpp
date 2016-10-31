@@ -702,16 +702,10 @@ static Type getStrippedType(const ASTContext &context, Type type,
       }
       ++idx;
     }
-    
+
     if (!anyChanged)
       return type;
-    
-    // An unlabeled 1-element tuple type is represented as a parenthesized
-    // type.
-    if (elements.size() == 1 && !elements[0].isVararg() && 
-        !elements[0].hasName())
-      return ParenType::get(context, elements[0].getType());
-    
+
     return TupleType::get(elements, context);
   });
 }
@@ -2945,21 +2939,60 @@ Type Type::subst(const SubstitutionMap &substitutions,
   return substType(*this, &substitutions, substitutions.getMap(), options);
 }
 
-Type TypeBase::getSuperclassForDecl(const ClassDecl *baseClass,
-                                    LazyResolver *resolver) {
-  Type derivedType = this;
-
-  while (derivedType) {
-    auto *derivedClass = derivedType->getClassOrBoundGenericClass();
+static Type getSuperClassForDeclInternal(Type t, const ClassDecl *baseClass,
+                                         LazyResolver *resolver) {
+  while (t) {
+    auto *derivedClass = t->getClassOrBoundGenericClass();
     assert(derivedClass && "expected a class here");
 
     if (derivedClass == baseClass)
-      return derivedType;
+      return t;
 
-    derivedType = derivedType->getSuperclass(resolver);
+    t = t->getSuperclass(resolver);
+  }
+  return t;
+}
+
+Type TypeBase::getSuperclassForDecl(const ClassDecl *baseClass,
+                                    LazyResolver *resolver) {
+  if (auto result = getSuperClassForDeclInternal(Type(this), baseClass,
+                                                 resolver)) {
+    return result;
+  }
+  llvm_unreachable("no inheritance relationship between given classes");
+}
+
+bool TypeBase::canTreatContextAsMember(const DeclContext *dc) {
+  Type baseTy(getRValueType());
+
+  if (auto metaBase = baseTy->getAs<AnyMetatypeType>()) {
+    baseTy = metaBase->getInstanceType()->getRValueType();
   }
 
-  llvm_unreachable("no inheritance relationship between given classes");
+  if (!baseTy->getAnyNominal())
+    return false;
+
+  // If the context is a protocol or its extensions, the base type should conform
+  // to that protocol.
+  if (auto Prot = dc->getAsProtocolOrProtocolExtensionContext()) {
+    for (auto Conf : baseTy->getAnyNominal()->getAllConformances()) {
+      if (Conf->getProtocol() == Prot)
+        return true;
+    }
+  }
+
+  // If the context is a nominal type context or one of its extensions, the base
+  // type should be either exactly that nominal type of sub-class of that type.
+  if (auto ownerNominal = dc->getAsNominalTypeOrNominalTypeExtensionContext()) {
+    LazyResolver *resolver = dc->getASTContext().getLazyResolver();
+    if (auto *ownerClass = dyn_cast<ClassDecl>(ownerNominal))
+      baseTy = getSuperClassForDeclInternal(Type(this), ownerClass, resolver);
+    if (baseTy && baseTy->getAnyNominal() == ownerNominal)
+      return true;
+  }
+
+  // The context cannot be treated as part of the type.
+  return false;
 }
 
 TypeSubstitutionMap TypeBase::getMemberSubstitutions(const DeclContext *dc) {
@@ -3053,12 +3086,54 @@ Type TypeBase::getTypeOfMember(Module *module, Type memberType,
     return memberType;
 
   // Compute the set of member substitutions to apply.
-  TypeSubstitutionMap substitutions = getMemberSubstitutions(memberDC);
+  auto substitutions = getMemberSubstitutions(memberDC);
   if (substitutions.empty())
     return memberType;
 
   // Perform the substitutions.
   return memberType.subst(module, substitutions, None);
+}
+
+Type TypeBase::adjustSuperclassMemberDeclType(const ValueDecl *decl,
+                                              const ValueDecl *parentDecl,
+                                              Type memberType,
+                                              LazyResolver *resolver) {
+  auto *DC = parentDecl->getDeclContext();
+  auto superclass = getSuperclassForDecl(
+      DC->getAsClassOrClassExtensionContext(), resolver);
+  auto subs = superclass->getMemberSubstitutions(DC);
+
+  if (auto *parentFunc = dyn_cast<AbstractFunctionDecl>(parentDecl)) {
+    if (auto *func = dyn_cast<AbstractFunctionDecl>(decl)) {
+      auto *genericParams = func->getGenericParams();
+      auto *parentParams = parentFunc->getGenericParams();
+      if (genericParams && parentParams &&
+          genericParams->size() == parentParams->size()) {
+        for (unsigned i = 0, e = genericParams->size(); i < e; i++) {
+          auto paramTy = parentParams->getParams()[i]->getDeclaredInterfaceType()
+              ->getCanonicalType().getPointer();
+          subs[paramTy] = genericParams->getParams()[i]
+              ->getDeclaredInterfaceType();
+        }
+      }
+    }
+  }
+
+  auto type = memberType.subst(parentDecl->getModuleContext(), subs);
+
+  if (isa<AbstractFunctionDecl>(parentDecl)) {
+    type = type->replaceSelfParameterType(this);
+    if (auto func = dyn_cast<FuncDecl>(parentDecl)) {
+      if (func->hasDynamicSelf()) {
+        type = type->replaceCovariantResultType(this,
+                                                func->getNumParameterLists());
+      }
+    } else if (isa<ConstructorDecl>(parentDecl)) {
+      type = type->replaceCovariantResultType(this, /*uncurryLevel=*/2);
+    }
+  }
+
+  return type;
 }
 
 Identifier DependentMemberType::getName() const {

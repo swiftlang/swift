@@ -1374,7 +1374,8 @@ emitTupleDispatch(ArrayRef<RowToSpecialize> rows, ConsumableManagedValue src,
     if (tupleSILTy.isAddress()) {
       member = SGF.B.createTupleElementAddr(loc, v, i, fieldTy);
       if (!fieldTL.isAddressOnly())
-        member = SGF.B.createLoad(loc, member);
+        member =
+            SGF.B.createLoad(loc, member, LoadOwnershipQualifier::Unqualified);
     } else {
       member = SGF.B.createTupleExtract(loc, v, i, fieldTy);
     }
@@ -1445,7 +1446,8 @@ emitCastOperand(SILGenFunction &SGF, SILLocation loc,
     // this is easy.
     if (!hasAbstraction) {
       SGF.B.createStore(loc, src.getFinalManagedValue().forward(SGF),
-                        init->getAddress());
+                        init->getAddress(),
+                        StoreOwnershipQualifier::Unqualified);
       init->finishInitialization(SGF);
       ConsumableManagedValue result =
         { init->getManagedAddress(), src.getFinalConsumption() };
@@ -1762,7 +1764,8 @@ emitEnumElementDispatch(ArrayRef<RowToSpecialize> rows,
         
         // Load a loadable data value.
         if (eltTL->isLoadable())
-          eltValue = SGF.B.createLoad(loc, eltValue);
+          eltValue = SGF.B.createLoad(loc, eltValue,
+                                      LoadOwnershipQualifier::Unqualified);
       } else {
         eltValue = new (SGF.F.getModule()) SILArgument(caseBB, eltTy);
       }
@@ -1773,10 +1776,11 @@ emitEnumElementDispatch(ArrayRef<RowToSpecialize> rows,
       // If the payload is boxed, project it.
 
       if (elt->isIndirect() || elt->getParentEnum()->isIndirect()) {
-        SILValue boxedValue = SGF.B.createProjectBox(loc, origCMV.getValue());
+        SILValue boxedValue = SGF.B.createProjectBox(loc, origCMV.getValue(), 0);
         eltTL = &SGF.getTypeLowering(boxedValue->getType());
         if (eltTL->isLoadable())
-          boxedValue = SGF.B.createLoad(loc, boxedValue);
+          boxedValue = SGF.B.createLoad(loc, boxedValue,
+                                        LoadOwnershipQualifier::Unqualified);
 
         // The boxed value may be shared, so we always have to copy it.
         eltCMV = getManagedSubobject(SGF, boxedValue, *eltTL,

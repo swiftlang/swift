@@ -279,7 +279,7 @@ void SILGenFunction::emitCaptures(SILLocation loc,
         }
       
         // Just retain a by-val let.
-        B.emitRetainValueOperation(loc, Val);
+        B.emitCopyValueOperation(loc, Val);
       } else {
         // If we have a mutable binding for a 'let', such as 'self' in an
         // 'init' method, load it.
@@ -321,7 +321,7 @@ void SILGenFunction::emitCaptures(SILLocation loc,
         if (canGuarantee) {
           capturedArgs.push_back(ManagedValue::forUnmanaged(vl.box));
         } else {
-          B.createStrongRetain(loc, vl.box, Atomicity::Atomic);
+          B.createCopyValue(loc, vl.box);
           capturedArgs.push_back(emitManagedRValueWithCleanup(vl.box));
         }
         escapesToMark.push_back(vl.value);
@@ -338,7 +338,7 @@ void SILGenFunction::emitCaptures(SILLocation loc,
         // in-place.
         AllocBoxInst *allocBox =
           B.createAllocBox(loc, vl.value->getType().getObjectType());
-        ProjectBoxInst *boxAddress = B.createProjectBox(loc, allocBox);
+        ProjectBoxInst *boxAddress = B.createProjectBox(loc, allocBox, 0);
         B.createCopyAddr(loc, vl.value, boxAddress, IsNotTake,IsInitialization);
         capturedArgs.push_back(emitManagedRValueWithCleanup(allocBox));
       }
@@ -468,7 +468,7 @@ void SILGenFunction::emitFunction(FuncDecl *fd) {
   MagicFunctionName = SILGenModule::getMagicFunctionName(fd);
 
   Type resultTy = fd->getResultType();
-  emitProlog(fd, fd->getParameterLists(), resultTy);
+  emitProlog(fd, fd->getParameterLists(), resultTy, fd->hasThrows());
   prepareEpilog(resultTy, fd->hasThrows(), CleanupLocation(fd));
 
   emitProfilerIncrement(fd->getBody());
@@ -480,7 +480,8 @@ void SILGenFunction::emitFunction(FuncDecl *fd) {
 void SILGenFunction::emitClosure(AbstractClosureExpr *ace) {
   MagicFunctionName = SILGenModule::getMagicFunctionName(ace);
 
-  emitProlog(ace, ace->getParameters(), ace->getResultType());
+  emitProlog(ace, ace->getParameters(), ace->getResultType(),
+             ace->isBodyThrowing());
   prepareEpilog(ace->getResultType(), ace->isBodyThrowing(),
                 CleanupLocation(ace));
   if (auto *ce = dyn_cast<ClosureExpr>(ace)) {
@@ -858,7 +859,7 @@ void SILGenFunction::emitGeneratorFunction(SILDeclRef function, Expr *value) {
   // is not going to be ever used anyway.
   overrideLocationForMagicIdentifiers = SourceLoc();
 
-  emitProlog({ }, value->getType(), function.getDecl()->getDeclContext());
+  emitProlog({}, value->getType(), function.getDecl()->getDeclContext(), false);
   prepareEpilog(value->getType(), false, CleanupLocation::get(Loc));
   emitReturnExpr(Loc, value);
   emitEpilog(Loc);

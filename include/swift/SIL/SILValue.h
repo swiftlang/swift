@@ -29,6 +29,8 @@ namespace swift {
   class ValueBaseUseIterator;
   class ValueUseIterator;
   class SILBasicBlock;
+  class SILFunction;
+  class SILModule;
   class SILInstruction;
   class SILLocation;
   class DominanceInfo;
@@ -119,6 +121,14 @@ public:
   /// If this is a SILArgument or a SILInstruction get its parent basic block,
   /// otherwise return null.
   SILBasicBlock *getParentBB();
+
+  /// If this is a SILArgument or a SILInstruction get its parent function,
+  /// otherwise return null.
+  SILFunction *getFunction();
+
+  /// If this is a SILArgument or a SILInstruction get its parent module,
+  /// otherwise return null.
+  SILModule *getModule();
 };
 
 inline llvm::raw_ostream &operator<<(llvm::raw_ostream &OS,

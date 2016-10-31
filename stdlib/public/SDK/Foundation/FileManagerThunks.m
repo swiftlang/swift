@@ -33,3 +33,31 @@ NS_Swift_NSFileManager_replaceItemAtURL_withItemAtURL_backupItemName_options(
   [backupItemName release];
   return success ? [result retain] : nil;
 }
+
+extern /*"C"*/ NS_RETURNS_RETAINED id
+NS_Swift_NSFileManager_enumeratorAt_includingPropertiesForKeys_options_errorHandler(
+    NSFileManager *NS_RELEASES_ARGUMENT _Nonnull self_,
+    NSURL *NS_RELEASES_ARGUMENT _Nonnull url,
+    NSArray *NS_RELEASES_ARGUMENT _Nullable keys,
+    NSUInteger options,
+    BOOL (^_Nonnull errorHandler)(NSURL * _Nonnull url, NSError * _Nonnull error) ) {
+
+  NSDirectoryEnumerator *result = [self_ enumeratorAtURL:url
+                              includingPropertiesForKeys:keys
+                                                 options:(NSDirectoryEnumerationOptions)options
+                                            errorHandler:^(NSURL * url, NSError *error) {
+
+    NSURL *realURL = url ?: error.userInfo[NSURLErrorKey];
+    if (!realURL) {
+      NSString *path = error.userInfo[NSFilePathErrorKey];
+      realURL = [NSURL fileURLWithPath:path];
+    }
+    return errorHandler(realURL, error);
+
+  }];
+  [self_ release];
+  [url release];
+  [keys release];
+  [errorHandler release];
+  return [result retain];
+}

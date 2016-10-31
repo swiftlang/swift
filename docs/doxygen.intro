@@ -3,16 +3,16 @@
 /// @section main_intro Introduction
 /// Welcome to Swift.
 ///
-/// This documentation describes the @b internal software that makes 
+/// This documentation describes the @b internal software that makes
 /// up Swift, not the @b external use of Swift. There are no instructions
-/// here on how to use Swift, only the APIs that make up the software. For usage 
+/// here on how to use Swift, only the APIs that make up the software. For usage
 /// instructions, please see the programmer's guide or reference manual.
 ///
-/// @section main_caveat Caveat 
-/// This documentation is generated directly from the source code with doxygen. 
+/// @section main_caveat Caveat
+/// This documentation is generated directly from the source code with doxygen.
 /// Since Swift is constantly under active development, what you're about to
 /// read is out of date! However, it may still be useful since certain portions
-/// of Swift are very stable. 
+/// of Swift are very stable.
 ///
 /// @section main_changelog Change Log
 /// - Original content written 12/30/2003 by Reid Spencer for LLVM

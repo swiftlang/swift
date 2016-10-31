@@ -34,7 +34,7 @@ written in terms of methods: [#operators]_ ::
 
 When we started to look at the specifics, however, we ran into a
 familiar pattern::
-   
+
   ...
     public func union(_ b: Set<Element>) -> Set<Element>        // A ∪ B
     public mutating func unionInPlace(_ b: Set<Element>)        // A ∪= B
@@ -275,7 +275,7 @@ we can compile the statement
   x\ **.=**\ *f*\ (a₀, p₁: a₁, p₂: a₂, …p\ *n*: a\ *n*)
 
 as though it were written:
-  
+
 .. parsed-literal::
 
   x **= x.**\ *f*\ (a₀, p₁: a₁, p₂: a₂, …p\ *n*: a\ *n*)
@@ -306,10 +306,10 @@ we can compile the expression
   **x.**\ *f*\ (a₀, p₁: a₁, p₂: a₂, …p\ *n*: a\ *n*)
 
 as though it were written:
-  
+
 .. parsed-literal::
 
-  { 
+  {
     (var y: X) -> X in
     y\ **.=**\ *f*\ (a₀, p₁: a₁, p₂: a₂, …p\ *n*: a\ *n*)
     return y
@@ -328,7 +328,7 @@ we can compile
   x *op*\ **=** *expression*
 
 as though it were written:
-  
+
 .. parsed-literal::
 
   x **=** x *op* (*expression*)
@@ -340,10 +340,10 @@ or
   x *op* *expression*
 
 as though it were written:
-  
+
 .. parsed-literal::
 
-  { 
+  {
     (var y: X) -> X in
     y *op*\ **=**\ *expression*
     return y

@@ -13,7 +13,7 @@ import gizmo
 @objc class ObjCClass : BaseClassForMethodFamilies {
   func method(x: Int) {}
   func method2(r: NSRect) {}
-  
+
   override func fakeInitFamily() -> ObjCClass { return self }
 }
 sil_vtable ObjCClass {}
@@ -560,7 +560,7 @@ entry:
   // CHECK: store %swift.refcounted* null
   // CHECK: store %swift.opaque* undef
   %b = alloc_box $()
-  %ba = project_box %b : $@box ()
+  %ba = project_box %b : $@box (), 0
   %f = function_ref @partial_empty_box : $@convention(thin) (@owned @box (), @inout ()) -> ()
   %g = partial_apply %f(%b, %ba) : $@convention(thin) (@owned @box (), @inout ()) -> ()
   return undef : $()

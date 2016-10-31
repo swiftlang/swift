@@ -95,7 +95,7 @@ endfunction()
 #   ANALYZE_CODE_COVERAGE analyze_code_coverage
 #   RESULT_VAR_NAME result_var_name
 #   DEPLOYMENT_VERSION_IOS deployment_version_ios # If provided, overrides the default value of the iOS deployment target set by the Swift project for this compilation only.
-# 
+#
 # )
 function(_add_variant_c_compile_link_flags)
   set(oneValueArgs SDK ARCH BUILD_TYPE RESULT_VAR_NAME ENABLE_LTO ANALYZE_CODE_COVERAGE DEPLOYMENT_VERSION_IOS)
@@ -104,7 +104,7 @@ function(_add_variant_c_compile_link_flags)
     "${oneValueArgs}"
     ""
     ${ARGN})
-  
+
   set(result
     ${${CFLAGS_RESULT_VAR_NAME}}
     "-target" "${SWIFT_SDK_${CFLAGS_SDK}_ARCH_${CFLAGS_ARCH}_TRIPLE}")
@@ -230,9 +230,11 @@ function(_add_variant_c_compile_flags)
   endif()
 
   if("${CFLAGS_SDK}" STREQUAL "ANDROID")
+    # FIXME: Instead of hardcoding paths in the Android NDK, these paths should
+    #        be passed in via ENV, as with the Windows build.
     list(APPEND result
-        "-I${SWIFT_ANDROID_NDK_PATH}/sources/cxx-stl/llvm-libc++/libcxx/include"
-        "-I${SWIFT_ANDROID_NDK_PATH}/sources/cxx-stl/llvm-libc++abi/libcxxabi/include"
+        "-I${SWIFT_ANDROID_NDK_PATH}/sources/cxx-stl/llvm-libc++/include"
+        "-I${SWIFT_ANDROID_NDK_PATH}/sources/cxx-stl/llvm-libc++abi/include"
         "-I${SWIFT_ANDROID_NDK_PATH}/sources/android/support/include")
   endif()
 
@@ -1295,12 +1297,12 @@ function(add_swift_library name)
     message(FATAL_ERROR
         "Either SHARED, STATIC, or OBJECT_LIBRARY must be specified")
   endif()
-  
+
   if(SWIFTLIB_TARGET_LIBRARY)
     if(NOT SWIFT_BUILD_RUNTIME_WITH_HOST_COMPILER)
       list(APPEND SWIFTLIB_DEPENDS clang)
     endif()
-    
+
     # If we are building this library for targets, loop through the various
     # SDKs building the variants of this library.
     list_intersect(
@@ -1368,7 +1370,13 @@ function(add_swift_library name)
         set(swiftlib_private_link_libraries_targets
             ${swiftlib_module_dependency_targets})
         foreach(lib ${SWIFTLIB_PRIVATE_LINK_LIBRARIES})
-          if(TARGET "${lib}${VARIANT_SUFFIX}")
+          if("${lib}" STREQUAL "ICU_UC")
+            list(APPEND swiftlib_private_link_libraries_targets
+                 "${SWIFT_${sdk}_ICU_UC}")
+          elseif("${lib}" STREQUAL "ICU_I18N")
+            list(APPEND swiftlib_private_link_libraries_targets
+                 "${SWIFT_${sdk}_ICU_I18N}")
+          elseif(TARGET "${lib}${VARIANT_SUFFIX}")
             list(APPEND swiftlib_private_link_libraries_targets
                 "${lib}${VARIANT_SUFFIX}")
           else()
@@ -1667,7 +1675,7 @@ function(_add_swift_executable_single name)
   # Determine compiler flags.
   set(c_compile_flags)
   set(link_flags)
-  
+
   # Add variant-specific flags.
   _add_variant_c_compile_flags(
     SDK "${SWIFTEXE_SINGLE_SDK}"

@@ -57,11 +57,11 @@ func guardFn(_ l: D, _ r: D) -> Bool { return true }
 // CHECK:         function_ref @_TF10switch_isa7guardFnFTCS_1DS0__Sb
 // CHECK:         cond_br {{%.*}}, [[GUARD_YES:bb[0-9]+]], [[GUARD_NO:bb[0-9]+]]
 // CHECK:       [[GUARD_NO]]:
-// CHECK-NEXT:    strong_release [[R2:%.*]] : $D
-// CHECK-NEXT:    strong_release [[L2:%.*]] : $D
+// CHECK-NEXT:    destroy_value [[R2:%.*]] : $D
+// CHECK-NEXT:    destroy_value [[L2:%.*]] : $D
 // CHECK-NEXT:    br [[CONT:bb[0-9]+]]
 // CHECK:       [[L_CAST_NO]]:
-// CHECK-NEXT:    strong_release [[R2:%.*]] : $D
+// CHECK-NEXT:    destroy_value [[R2:%.*]] : $D
 // CHECK-NEXT:    br [[CONT]]
 func testSwitchTwoIsPatternsWithGuard(_ l: B, r: B) {
   switch (l, r) {

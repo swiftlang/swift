@@ -1,4 +1,4 @@
-// RUN: %target-sil-opt -enable-sil-verify-all %s -split-critical-edges | %FileCheck %s
+// RUN: %target-sil-opt -assume-parsing-unqualified-ownership-sil -enable-sil-verify-all %s -split-critical-edges | %FileCheck %s
 
 import Builtin
 import Swift
@@ -126,7 +126,7 @@ bb0(%0 : $AnyObject, %10: $Builtin.Int1):
 
 lookup1:
   %1 = alloc_box $AnyObject
-  %1a = project_box %1 : $@box AnyObject
+  %1a = project_box %1 : $@box AnyObject, 0
   store %0 to %1a : $*AnyObject
   %3 = alloc_box $Optional<() -> ()>
   %4 = load %1a : $*AnyObject
@@ -137,7 +137,7 @@ lookup1:
 
 lookup2:
   %21 = alloc_box $AnyObject
-  %21a = project_box %21 : $@box AnyObject
+  %21a = project_box %21 : $@box AnyObject, 0
   store %0 to %21a : $*AnyObject
   %23 = alloc_box $Optional<() -> ()>
   %24 = load %21a : $*AnyObject

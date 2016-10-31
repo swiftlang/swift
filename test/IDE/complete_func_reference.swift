@@ -8,11 +8,14 @@
 // RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=ANY_INT_2 > %t.results
 // RUN:%FileCheck %s -check-prefix=ANY_INT < %t.results
 // RUN:%FileCheck %s -check-prefix=ANY_INT_STATIC_CURRY < %t.results
+// RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=ANY_INT_3 | %FileCheck %s -check-prefix=ANY_INT
+// RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=ANY_INT_4 | %FileCheck %s -check-prefix=ANY_INT
 // RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=INT_ANY_0 | %FileCheck %s -check-prefix=INT_ANY
 // RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=INT_ANY_1 | %FileCheck %s -check-prefix=INT_ANY
 // RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=INT_ANY_2 > %t.results
 // RUN: %FileCheck %s -check-prefix=INT_ANY < %t.results
 // RUN: %FileCheck %s -check-prefix=INT_ANY_STATIC_CURRY < %t.results
+// RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=INT_ANY_3 > %t.results
 // RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=VOID_INT_INT_0 | %FileCheck %s -check-prefix=VOID_INT_INT
 // RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=VOID_INT_INT_1 | %FileCheck %s -check-prefix=VOID_INT_INT
 // RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=VOID_INT_INT_2 | %FileCheck %s -check-prefix=VOID_INT_INT
@@ -109,6 +112,14 @@ do {
   func take(_: @escaping (Any)->Int) {}
   take(S0.#^ANY_INT_2^#)
 }
+do {
+  func take(_: @escaping ((Any)->Int)???!) {}
+  take(S0().#^ANY_INT_3^#)
+}
+do {
+  let take: ((Any)->Int)?
+  take = S0().#^ANY_INT_4^#
+}
 
 // ANY_INT: Begin completions
 // ANY_INT-DAG: Decl{{.*}}/TypeRelation[Convertible]: anyToInt(a:);
@@ -173,6 +184,10 @@ do {
 do {
   func take(_: @escaping (Int)->Any) {}
   take(S0.#^INT_ANY_2^#)
+}
+do {
+  func take(_: @escaping ((Int)->Any)?) {}
+  take(S0.#^INT_ANY_3^#)
 }
 
 do {

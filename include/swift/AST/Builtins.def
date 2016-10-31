@@ -40,7 +40,7 @@ BUILTIN_CAST_OPERATION(BitCast , "bitcast",  "n")
 
 #undef BUILTIN_CAST_OPERATION
 
-/// Cast-or-bitcast operations have type T1 -> T2. 
+/// Cast-or-bitcast operations have type T1 -> T2.
 /// T1 and T2 may be the same size, unlike the corresponding true casts.
 #ifndef BUILTIN_CAST_OR_BITCAST_OPERATION
 #define BUILTIN_CAST_OR_BITCAST_OPERATION(Id, Name, Attrs) BUILTIN(Id, Name, Attrs)
@@ -77,7 +77,7 @@ BUILTIN_BINARY_OPERATION(FRem,    "frem",     "n", FloatOrVector)
 BUILTIN_BINARY_OPERATION(Xor,     "xor",      "n", IntegerOrVector)
 #undef BUILTIN_BINARY_OPERATION
 
-/// These builtins are analogous the similarly named llvm intrinsics. The 
+/// These builtins are analogous the similarly named llvm intrinsics. The
 /// difference between the two is that these are not expected to overflow,
 /// so we should produce a compile time error if we can statically prove
 /// that they do.
@@ -151,7 +151,7 @@ BUILTIN_BINARY_PREDICATE(FCMP_UNO, "fcmp_uno", "n", FloatOrVector)
 
 // BUILTIN_SIL_OPERATION - Operations that can be lowered to SIL instructions.
 // These have various types.
-// Since these operations will be lowered to SIL Instructions, we do not 
+// Since these operations will be lowered to SIL Instructions, we do not
 // assign any attributes on them.
 #ifndef BUILTIN_SIL_OPERATION
 #define BUILTIN_SIL_OPERATION(Id, Name, Overload) BUILTIN(Id, Name, "")
@@ -371,7 +371,7 @@ BUILTIN_RUNTIME_CALL(IsOptionalType, "isOptional", "")
 #define BUILTIN_MISC_OPERATION(Id, Name, Attrs, Overload) \
           BUILTIN(Id, Name, Attrs)
 #endif
-                       
+
 /// Sizeof has type T.Type -> Int
 BUILTIN_MISC_OPERATION(Sizeof, "sizeof", "n", Special)
 
@@ -423,10 +423,10 @@ BUILTIN_MISC_OPERATION(AssertConf, "assert_configuration", "n", Special)
 
 
 /// Special truncation builtins that check for sign and overflow errors. These
-/// take an integer as an input and return a tuple of the truncated result and 
+/// take an integer as an input and return a tuple of the truncated result and
 /// an error bit. The name of each builtin is extended with the "from"
 /// (sign-agnostic) builtin integer type and the "to" integer type.
-/// We require the source type size to be larger than the destination type size 
+/// We require the source type size to be larger than the destination type size
 /// (number of bits).
 BUILTIN_MISC_OPERATION(UToSCheckedTrunc, "u_to_s_checked_trunc", "n", Special)
 BUILTIN_MISC_OPERATION(SToSCheckedTrunc, "s_to_s_checked_trunc", "n", Special)
@@ -434,11 +434,11 @@ BUILTIN_MISC_OPERATION(SToUCheckedTrunc, "s_to_u_checked_trunc", "n", Special)
 BUILTIN_MISC_OPERATION(UToUCheckedTrunc, "u_to_u_checked_trunc", "n", Special)
 
 /// Checked conversions for signed <-> unsigned integers of the same size.
-/// Returns a tuple containing the conversion result as well as 
+/// Returns a tuple containing the conversion result as well as
 /// the sign error / overflow bit.
-BUILTIN_MISC_OPERATION(SUCheckedConversion, 
+BUILTIN_MISC_OPERATION(SUCheckedConversion,
                        "s_to_u_checked_conversion", "n", Special)
-BUILTIN_MISC_OPERATION(USCheckedConversion, 
+BUILTIN_MISC_OPERATION(USCheckedConversion,
                        "u_to_s_checked_conversion", "n", Special)
 
 /// IntToFPWithOverflow has type (Integer) -> Float

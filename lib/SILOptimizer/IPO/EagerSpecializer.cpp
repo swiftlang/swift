@@ -292,7 +292,8 @@ void EagerDispatch::emitDispatchTo(SILFunction *NewFunc) {
   auto VoidTy = Builder.getModule().Types.getEmptyTupleType();
   if (StoreResultTo) {
     // Store the direct result to the original result address.
-    Builder.createStore(Loc, Result, StoreResultTo);
+    Builder.createStore(Loc, Result, StoreResultTo,
+                        StoreOwnershipQualifier::Unqualified);
     // And return Void.
     Result = Builder.createTuple(Loc, VoidTy, { });
   }
@@ -399,7 +400,8 @@ emitArgumentConversion(SmallVectorImpl<SILValue> &CallArgs) {
       } else {
         // An argument is converted from indirect to direct. Instead of the
         // address we pass the loaded value.
-        SILValue Val = Builder.createLoad(Loc, CastArg);
+        SILValue Val = Builder.createLoad(Loc, CastArg,
+                                          LoadOwnershipQualifier::Unqualified);
         CallArgs.push_back(Val);
       }
     } else {

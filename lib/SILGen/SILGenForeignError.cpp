@@ -152,7 +152,7 @@ namespace {
     }
 
     void emitRelease(SILGenFunction &gen, SILLocation loc) const override {
-      gen.B.emitReleaseValueOperation(loc, NativeError);
+      gen.B.emitDestroyValueOperation(loc, NativeError);
     }
   };
 
@@ -268,7 +268,8 @@ void SILGenFunction::emitForeignErrorBlock(SILLocation loc,
   // conditionally claiming the value.  In practice, claiming it
   // unconditionally is fine because we want to assume it's nil in the
   // other path.
-  SILValue errorV = B.createLoad(loc, errorSlot.forward(*this));
+  SILValue errorV = B.createLoad(loc, errorSlot.forward(*this),
+                                 LoadOwnershipQualifier::Unqualified);
   ManagedValue error = emitManagedRValueWithCleanup(errorV);
 
   // Turn the error into an Error value.
@@ -384,7 +385,8 @@ emitErrorIsNonNilErrorCheck(SILGenFunction &gen, SILLocation loc,
   // If we're suppressing the check, just don't check.
   if (suppressErrorCheck) return;
 
-  SILValue optionalError = gen.B.createLoad(loc, errorSlot.getValue());
+  SILValue optionalError = gen.B.createLoad(
+      loc, errorSlot.getValue(), LoadOwnershipQualifier::Unqualified);
 
   ASTContext &ctx = gen.getASTContext();
 

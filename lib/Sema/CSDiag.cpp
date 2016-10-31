@@ -5229,6 +5229,8 @@ bool FailureDiagnosis::visitApplyExpr(ApplyExpr *callExpr) {
       callExpr->setFn(operatorRef);
   };
 
+  auto fnType = fnExpr->getType()->getRValueType();
+
   // If we have a contextual type, and if we have an ambiguously typed function
   // result from our previous check, we re-type-check it using this contextual
   // type to inform the result type of the callee.
@@ -5241,14 +5243,33 @@ bool FailureDiagnosis::visitApplyExpr(ApplyExpr *callExpr) {
       (isUnresolvedOrTypeVarType(fnExpr->getType()) ||
        (fnExpr->getType()->is<AnyFunctionType>() &&
         fnExpr->getType()->hasUnresolvedType()))) {
+    // FIXME: Prevent typeCheckChildIndependently from transforming expressions,
+    // because if we try to typecheck OSR expression with contextual type,
+    // it'll end up converting it into DeclRefExpr based on contextual info,
+    // instead let's try to get a type without applying and filter callee
+    // candidates later on.
     CalleeListener listener(CS->getContextualType());
-    fnExpr = typeCheckChildIndependently(callExpr->getFn(), Type(),
-                                         CTP_CalleeResult, TCC_ForceRecheck,
-                                         &listener);
-    if (!fnExpr) return true;
+
+    if (auto OSR = dyn_cast<OverloadSetRefExpr>(fnExpr)) {
+      assert(!OSR->getReferencedDecl() && "unexpected declaration reference");
+
+      ConcreteDeclRef decl = nullptr;
+      Optional<Type> type = CS->TC.getTypeOfExpressionWithoutApplying(
+          fnExpr, CS->DC, decl, FreeTypeVariableBinding::UnresolvedType,
+          &listener);
+
+      if (type.hasValue())
+        fnType = type.getValue()->getRValueType();
+    } else {
+      fnExpr = typeCheckChildIndependently(callExpr->getFn(), Type(),
+                                           CTP_CalleeResult, TCC_ForceRecheck,
+                                           &listener);
+      if (!fnExpr)
+        return true;
+
+      fnType = fnExpr->getType()->getRValueType();
+    }
   }
-  
-  auto fnType = fnExpr->getType()->getRValueType();
 
   // If we resolved a concrete expression for the callee, and it has
   // non-function/non-metatype type, then we cannot call it!
@@ -5291,7 +5312,37 @@ bool FailureDiagnosis::visitApplyExpr(ApplyExpr *callExpr) {
   // Collect a full candidate list of callees based on the partially type
   // checked function.
   CalleeCandidateInfo calleeInfo(fnExpr, hasTrailingClosure, CS);
-  
+
+  // Filter list of the candidates based on the known function type.
+  if (auto fn = fnType->getAs<AnyFunctionType>()) {
+    using Closeness = CalleeCandidateInfo::ClosenessResultTy;
+
+    auto isGenericType = [](Type type) -> bool {
+      if (type->hasError() || type->hasTypeVariable() ||
+          type->hasUnresolvedType())
+        return false;
+
+      return type->isCanonical() && type->isUnspecializedGeneric();
+    };
+
+    calleeInfo.filterList([&](UncurriedCandidate candidate) -> Closeness {
+      auto resultType = candidate.getResultType();
+      if (!resultType)
+        return {CC_GeneralMismatch, {}};
+
+      // FIXME: Handle matching of the generic types properly.
+      // Currently we don't filter result types containing generic parameters
+      // because there is no easy way to do that, and candidate set is going
+      // to be pruned by matching of the argument types later on anyway, so
+      // it's better to over report than to be too conservative.
+      if ((isGenericType(resultType) && isGenericType(fn->getResult())) ||
+          resultType->isEqual(fn->getResult()))
+        return {CC_ExactMatch, {}};
+
+      return {CC_GeneralMismatch, {}};
+    });
+  }
+
   // Filter the candidate list based on the argument we may or may not have.
   calleeInfo.filterContextualMemberList(callExpr->getArg());
 
@@ -5433,7 +5484,23 @@ bool FailureDiagnosis::visitApplyExpr(ApplyExpr *callExpr) {
     // conversion failure.
     if (calleeInfo.closeness == CC_ExactMatch)
       return false;
-    
+
+    // If this is not a specific structural problem we can diagnose,
+    // let's check if this is contextual type conversion error.
+    if (CS->getContextualType() &&
+        calleeInfo.closeness == CC_ArgumentMismatch) {
+      CalleeCandidateInfo candidates(fnExpr, hasTrailingClosure, CS);
+
+      // Filter original list of choices based on the deduced type of
+      // argument expression after force re-check.
+      candidates.filterContextualMemberList(argTuple);
+
+      // One of the candidates matches exactly, which means that
+      // this is a contextual type conversion failure, we can't diagnose here.
+      if (candidates.closeness == CC_ExactMatch)
+        return false;
+    }
+
     if (!lhsType->isEqual(rhsType)) {
       diagnose(callExpr->getLoc(), diag::cannot_apply_binop_to_args,
                overloadName, lhsType, rhsType)

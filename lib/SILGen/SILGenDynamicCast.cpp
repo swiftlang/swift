@@ -140,7 +140,8 @@ namespace {
         //emission.
         scalarOperandValue = operand.forward(SGF);
         if (scalarOperandValue->getType().isAddress()) {
-          scalarOperandValue = SGF.B.createLoad(Loc, scalarOperandValue);
+          scalarOperandValue = SGF.B.createLoad(
+              Loc, scalarOperandValue, LoadOwnershipQualifier::Unqualified);
         }
         SGF.B.createCheckedCastBranch(Loc, /*exact*/ false, scalarOperandValue,
                                       origTargetTL.getLoweredType(),
@@ -175,7 +176,7 @@ namespace {
         // If we're using the scalar strategy, handle the consumption rules.
         if (Strategy != CastStrategy::Address &&
             shouldDestroyOnFailure(consumption)) {
-          SGF.B.emitReleaseValueOperation(Loc, scalarOperandValue);
+          SGF.B.emitDestroyValueOperation(Loc, scalarOperandValue);
         }
 
         handleFalse();
@@ -233,7 +234,7 @@ namespace {
                                         SGFContext ctx) {
       // Retain the result if this is copy-on-success.
       if (!shouldTakeOnSuccess(consumption))
-        origTargetTL.emitRetainValue(SGF.B, Loc, value);
+        origTargetTL.emitCopyValue(SGF.B, Loc, value);
 
       // Enter a cleanup for the +1 result.
       ManagedValue result
@@ -363,7 +364,8 @@ adjustForConditionalCheckedCastOperand(SILLocation loc, ManagedValue src,
     // Okay, if all we need to do is drop the value in an address,
     // this is easy.
     if (!hasAbstraction) {
-      SGF.B.createStore(loc, src.forward(SGF), init->getAddress());
+      SGF.B.createStore(loc, src.forward(SGF), init->getAddress(),
+                        StoreOwnershipQualifier::Unqualified);
       init->finishInitialization(SGF);
       return init->getManagedAddress();
     }

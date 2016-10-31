@@ -12,7 +12,7 @@ SourceKit currently only supports the Swift language.
 //                       Linking to the SourceKit C API
 //===----------------------------------------------------------------------===//
 
-The stable C API for SourceKit is provided via the sourcekitd.framework which 
+The stable C API for SourceKit is provided via the sourcekitd.framework which
 uses an XPC service for process isolation and the libsourcekitdInProc.dylib
 library which is in-process.
 

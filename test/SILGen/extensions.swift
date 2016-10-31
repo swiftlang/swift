@@ -73,7 +73,7 @@ struct Box<T> {
 // CHECK-NEXT: dealloc_stack [[RESULT]] : $*Optional<T>
 // CHECK-NEXT: copy_addr [[SELF_PTR]] to [initialization] %0 : $*Box<T>
 // CHECK-NEXT: destroy_addr %1 : $*T
-// CHECK-NEXT: strong_release [[SELF_BOX]] : $@box Box<T>
+// CHECK-NEXT: destroy_value [[SELF_BOX]] : $@box Box<T>
 // CHECK-NEXT: [[RESULT:%.*]] = tuple ()
 // CHECK-NEXT: return [[RESULT]] : $()
 

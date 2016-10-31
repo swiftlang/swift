@@ -1,4 +1,4 @@
-// RUN: %target-sil-opt -enable-sil-verify-all %s -definite-init | %FileCheck %s
+// RUN: %target-sil-opt -assume-parsing-unqualified-ownership-sil -enable-sil-verify-all %s -definite-init | %FileCheck %s
 
 // These are all regression tests to ensure that the memory promotion pass
 // doesn't crash.
@@ -16,7 +16,7 @@ struct Triple {
 sil @TripleTest : $@convention(method) (Int, @inout Triple) -> Triple {
 bb0(%0 : $Int, %1 : $*Triple):
   %4 = alloc_box $Triple
-  %4a = project_box %4 : $@box Triple
+  %4a = project_box %4 : $@box Triple, 0
   %5 = load %1 : $*Triple
   store %5 to %4a : $*Triple
   %8 = struct_element_addr %4a : $*Triple, #Triple.b
@@ -35,10 +35,10 @@ struct Single {
 sil @SingleTest : $@convention(method) (@inout Single, Int) -> Single {
 bb0(%0 : $*Single, %1 : $Int):
   %4 = alloc_box $Single
-  %4a = project_box %4 : $@box Single
+  %4a = project_box %4 : $@box Single, 0
   %5 = load %0 : $*Single
   store %5 to %4a : $*Single
-  
+
   %8 = struct_element_addr %4a : $*Single, #Single.a
   store %1 to %8 : $*Int
 
@@ -64,7 +64,7 @@ sil @test_union_release : $@convention(thin) () -> () {
 bb0:
   %0 = tuple ()
   %1 = alloc_box $SomeUnion                       // users: %9, %8
-  %1a = project_box %1 : $@box SomeUnion
+  %1a = project_box %1 : $@box SomeUnion, 0
   %2 = function_ref @getSomeUnion : $@convention(thin) (@owned SomeClass, @thin SomeUnion.Type) -> @owned SomeUnion // user: %7
   %3 = metatype $@thin SomeUnion.Type               // user: %7
   %4 = function_ref @getSomeClass : $@convention(thin) (@thick SomeClass.Type) -> @owned SomeClass // user: %6

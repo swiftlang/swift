@@ -29,7 +29,7 @@ func test0() throws {
   //   Writeback to the first temporary.
   // CHECK: [[T0:%.*]] = load [[ERR_TEMP1]]
   // CHECK: [[T1:%.*]] = unmanaged_to_ref [[T0]]
-  // CHECK: retain_value [[T1]]
+  // CHECK: copy_value [[T1]]
   // CHECK: assign [[T1]] to [[ERR_TEMP0]]
 
   //   Pull out the boolean value and compare it to zero.
@@ -78,7 +78,7 @@ extension NSObject {
 // CHECK:   dealloc_stack [[TEMP]]
 // CHECK:   br bb5
 // CHECK: bb4:
-// CHECK:   strong_release [[ERR]] : $Error
+// CHECK:   destroy_value [[ERR]] : $Error
 // CHECK:   br bb5
 // CHECK: bb5:
 // CHECK:   [[BITS:%.*]] = integer_literal $Builtin.Int{{[18]}}, 0
@@ -112,7 +112,7 @@ extension NSObject {
 // CHECK:   dealloc_stack [[TEMP]]
 // CHECK:   br bb5
 // CHECK: bb4:
-// CHECK:   strong_release [[ERR]] : $Error
+// CHECK:   destroy_value [[ERR]] : $Error
 // CHECK:   br bb5
 // CHECK: bb5:
 // CHECK:   [[T0:%.*]] = enum $Optional<NSString>, #Optional.none!enumelt
@@ -152,13 +152,15 @@ func testArgs() throws {
   try ErrorProne.consume(nil)
 }
 // CHECK: sil hidden @_TF14foreign_errors8testArgsFzT_T_ : $@convention(thin) () -> @error Error
-// CHECK:   class_method [volatile] %0 : $@thick ErrorProne.Type, #ErrorProne.consume!1.foreign : (ErrorProne.Type) -> (Any!) throws -> () , $@convention(objc_method) (Optional<AnyObject>, Optional<AutoreleasingUnsafeMutablePointer<Optional<NSError>>>, @objc_metatype ErrorProne.Type) -> ObjCBool
+// CHECK:   debug_value undef : $Error, var, name "$error", argno 1
+// CHECK:   class_method [volatile] %1 : $@thick ErrorProne.Type, #ErrorProne.consume!1.foreign : (ErrorProne.Type) -> (Any!) throws -> () , $@convention(objc_method) (Optional<AnyObject>, Optional<AutoreleasingUnsafeMutablePointer<Optional<NSError>>>, @objc_metatype ErrorProne.Type) -> ObjCBool
 
 func testBridgedResult() throws {
   let array = try ErrorProne.collection(withCount: 0)
 }
 // CHECK: sil hidden @_TF14foreign_errors17testBridgedResultFzT_T_ : $@convention(thin) () -> @error Error {
-// CHECK:   class_method [volatile] %0 : $@thick ErrorProne.Type, #ErrorProne.collection!1.foreign : (ErrorProne.Type) -> (Int) throws -> [Any] , $@convention(objc_method) (Int, Optional<AutoreleasingUnsafeMutablePointer<Optional<NSError>>>, @objc_metatype ErrorProne.Type) -> @autoreleased Optional<NSArray>
+// CHECK:   debug_value undef : $Error, var, name "$error", argno 1
+// CHECK:   class_method [volatile] %1 : $@thick ErrorProne.Type, #ErrorProne.collection!1.foreign : (ErrorProne.Type) -> (Int) throws -> [Any] , $@convention(objc_method) (Int, Optional<AutoreleasingUnsafeMutablePointer<Optional<NSError>>>, @objc_metatype ErrorProne.Type) -> @autoreleased Optional<NSArray>
 
 // rdar://20861374
 // Clear out the self box before delegating.
@@ -213,7 +215,7 @@ func testNonNilError() throws -> Float {
 // CHECK:   [[T0:%.*]] = load [[OPTERR]]
 // CHECK:   switch_enum [[T0]] : $Optional<NSError>, case #Optional.some!enumelt.1: [[ERROR_BB:bb[0-9]+]], case #Optional.none!enumelt: [[NORMAL_BB:bb[0-9]+]]
 // CHECK: [[NORMAL_BB]]:
-// CHECK-NOT: release
+// CHECK-NOT: destroy_value
 // CHECK:   return [[RESULT]]
 // CHECK: [[ERROR_BB]]
 
@@ -230,7 +232,7 @@ func testPreservedResult() throws -> CInt {
 // CHECK:   [[T2:%.*]] = builtin "cmp_ne_Int32"([[T0]] : $[[PRIM]], [[T1]] : $[[PRIM]])
 // CHECK:   cond_br [[T2]], [[NORMAL_BB:bb[0-9]+]], [[ERROR_BB:bb[0-9]+]]
 // CHECK: [[NORMAL_BB]]:
-// CHECK-NOT: release
+// CHECK-NOT: destroy_value
 // CHECK:   return [[RESULT]]
 // CHECK: [[ERROR_BB]]
 
@@ -248,7 +250,7 @@ func testPreservedResultBridged() throws -> Int {
 // CHECK:   [[T2:%.*]] = builtin "cmp_ne_Int{{.*}}"([[T0]] : $[[PRIM]], [[T1]] : $[[PRIM]])
 // CHECK:   cond_br [[T2]], [[NORMAL_BB:bb[0-9]+]], [[ERROR_BB:bb[0-9]+]]
 // CHECK: [[NORMAL_BB]]:
-// CHECK-NOT: release
+// CHECK-NOT: destroy_value
 // CHECK:   return [[RESULT]]
 // CHECK: [[ERROR_BB]]
 
@@ -266,6 +268,6 @@ func testPreservedResultInverted() throws {
 // CHECK:   [[T2:%.*]] = builtin "cmp_ne_Int32"([[T0]] : $[[PRIM]], [[T1]] : $[[PRIM]])
 // CHECK:   cond_br [[T2]], [[ERROR_BB:bb[0-9]+]], [[NORMAL_BB:bb[0-9]+]]
 // CHECK: [[NORMAL_BB]]:
-// CHECK-NOT: release
+// CHECK-NOT: destroy_value
 // CHECK:   return {{%.+}} : $()
 // CHECK: [[ERROR_BB]]

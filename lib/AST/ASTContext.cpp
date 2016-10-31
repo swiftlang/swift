@@ -4030,7 +4030,8 @@ CanGenericSignature ASTContext::getSingleGenericParameterSignature() const {
     return theSig;
   
   auto param = GenericTypeParamType::get(0, 0, *this);
-  auto sig = GenericSignature::get(param, {});
+  auto witnessReqt = Requirement(RequirementKind::WitnessMarker, param, Type());
+  auto sig = GenericSignature::get(param, witnessReqt);;
   auto canonicalSig = CanGenericSignature(sig);
   Impl.SingleGenericParameterSignature = canonicalSig;
   return canonicalSig;

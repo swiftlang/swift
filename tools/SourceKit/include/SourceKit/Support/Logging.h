@@ -105,7 +105,7 @@ public:
 /// \endcode
 #define LOG_SECTION(NAME, LEVEL) \
   if (LogRef Log = SourceKit::Logger::make(NAME, SourceKit::Logger::Level::LEVEL))
-#define LOG_FUNC_SECTION(LEVEL) LOG_SECTION(LLVM_FUNCTION_NAME, LEVEL)
+#define LOG_FUNC_SECTION(LEVEL) LOG_SECTION(__func__, LEVEL)
 #define LOG_FUNC_SECTION_WARN LOG_FUNC_SECTION(Warning)
 
 #define LOG(NAME, LEVEL, msg) LOG_SECTION(NAME, LEVEL) \

@@ -85,7 +85,7 @@ static ManagedValue emitBuiltinRelease(SILGenFunction &gen,
   // The value was produced at +1, so to produce an unbalanced
   // release we need to leave the cleanup intact and then do a *second*
   // release.
-  gen.B.createReleaseValue(loc, args[0].getValue(), Atomicity::Atomic);
+  gen.B.createDestroyValue(loc, args[0].getValue());
   return ManagedValue::forUnmanaged(gen.emitEmptyTuple(loc));    
 }
 
@@ -592,7 +592,8 @@ emitBuiltinCastReference(SILGenFunction &gen,
     // a retain. The cast will load the reference from the source temp and
     // store it into a dest temp effectively forwarding the cleanup.
     fromAddr = gen.emitTemporaryAllocation(loc, srcVal->getType());
-    gen.B.createStore(loc, srcVal, fromAddr);
+    gen.B.createStore(loc, srcVal, fromAddr,
+                      StoreOwnershipQualifier::Unqualified);
   } else {
     // The cast loads directly from the source address.
     fromAddr = srcVal;
@@ -606,7 +607,8 @@ emitBuiltinCastReference(SILGenFunction &gen,
     return gen.emitManagedBufferWithCleanup(toAddr);
 
   // Load the destination value.
-  auto result = gen.B.createLoad(loc, toAddr);
+  auto result =
+      gen.B.createLoad(loc, toAddr, LoadOwnershipQualifier::Unqualified);
   return gen.emitManagedRValueWithCleanup(result);
 }
 
@@ -630,7 +632,8 @@ static ManagedValue emitBuiltinReinterpretCast(SILGenFunction &gen,
     // If the from value is loadable, move it to a buffer.
     if (fromTL.isLoadable()) {
       fromAddr = gen.emitTemporaryAllocation(loc, args[0].getValue()->getType());
-      gen.B.createStore(loc, args[0].getValue(), fromAddr);
+      gen.B.createStore(loc, args[0].getValue(), fromAddr,
+                        StoreOwnershipQualifier::Unqualified);
     } else {
       fromAddr = args[0].getValue();
     }
@@ -640,7 +643,8 @@ static ManagedValue emitBuiltinReinterpretCast(SILGenFunction &gen,
     // Load and retain the destination value if it's loadable. Leave the cleanup
     // on the original value since we don't know anything about it's type.
     if (toTL.isLoadable()) {
-      SILValue val = gen.B.createLoad(loc, toAddr);
+      SILValue val =
+          gen.B.createLoad(loc, toAddr, LoadOwnershipQualifier::Unqualified);
       return gen.emitManagedRetain(loc, val, toTL);
     }
     // Leave the cleanup on the original value.

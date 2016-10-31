@@ -334,7 +334,8 @@ static bool isProtocolClass(Type t) {
 static ManagedValue emitManagedLoad(SILGenFunction &gen, SILLocation loc,
                                     ManagedValue addr,
                                     const TypeLowering &addrTL) {
-  auto loadedValue = gen.B.createLoad(loc, addr.forward(gen));
+  auto loadedValue = gen.B.createLoad(loc, addr.forward(gen),
+                                      LoadOwnershipQualifier::Unqualified);
   return gen.emitManagedRValueWithCleanup(loadedValue, addrTL);
 }
 
@@ -520,6 +521,21 @@ ManagedValue Transform::transform(ManagedValue v,
     return emitTransformExistential(SGF, Loc, v,
                                     inputSubstType, outputSubstType,
                                     ctxt);
+  }
+
+  // - T : Hashable to AnyHashable
+  if (isa<StructType>(outputSubstType) &&
+      outputSubstType->getAnyNominal() ==
+        SGF.getASTContext().getAnyHashableDecl()) {
+    auto *protocol = SGF.getASTContext().getProtocol(
+        KnownProtocolKind::Hashable);
+    auto conformance = SGF.SGM.M.getSwiftModule()->lookupConformance(
+        inputSubstType, protocol, nullptr);
+    auto result = SGF.emitAnyHashableErasure(Loc, v, inputSubstType,
+                                             *conformance, ctxt);
+    if (result.isInContext())
+      return ManagedValue::forInContext();
+    return std::move(result).getAsSingleValue(SGF, Loc);
   }
 
   // Should have handled the conversion in one of the cases above.
@@ -722,7 +738,7 @@ static ManagedValue manageParam(SILGenFunction &gen,
   // must retain them even if we're in a context that can accept a +0 value.
   case ParameterConvention::Direct_Unowned:
     gen.getTypeLowering(paramValue->getType())
-          .emitRetainValue(gen.B, loc, paramValue);
+        .emitCopyValue(gen.B, loc, paramValue);
     SWIFT_FALLTHROUGH;
   case ParameterConvention::Direct_Owned:
     return gen.emitManagedRValueWithCleanup(paramValue);
@@ -2104,7 +2120,7 @@ void ResultPlanner::execute(ArrayRef<SILValue> innerDirectResults,
                        "reabstraction of returns_inner_pointer function");
       SWIFT_FALLTHROUGH;
     case ResultConvention::Unowned:
-      resultTL.emitRetainValue(Gen.B, Loc, resultValue);
+      resultTL.emitCopyValue(Gen.B, Loc, resultValue);
       return Gen.emitManagedRValueWithCleanup(resultValue, resultTL);
     }
     llvm_unreachable("bad result convention!");
@@ -2166,7 +2182,8 @@ void ResultPlanner::execute(ArrayRef<SILValue> innerDirectResults,
 
     case Operation::DirectToIndirect: {
       auto result = claimNextInnerDirectResult(op.InnerResult);
-      Gen.B.createStore(Loc, result.forward(Gen), op.OuterResultAddr);
+      Gen.B.createStore(Loc, result.forward(Gen), op.OuterResultAddr,
+                        StoreOwnershipQualifier::Unqualified);
       continue;
     }
 
@@ -2174,7 +2191,9 @@ void ResultPlanner::execute(ArrayRef<SILValue> innerDirectResults,
       auto resultAddr = op.InnerResultAddr;
       auto &resultTL = Gen.getTypeLowering(resultAddr->getType());
       auto result = Gen.emitManagedRValueWithCleanup(
-                                 Gen.B.createLoad(Loc, resultAddr), resultTL);
+          Gen.B.createLoad(Loc, resultAddr,
+                           LoadOwnershipQualifier::Unqualified),
+          resultTL);
       addOuterDirectResult(result, op.OuterResult);
       continue;
     }

@@ -20,7 +20,7 @@ func expectOverflow<T>(
   //===--- TRACE boilerplate ----------------------------------------------===//
   _ message: @autoclosure () -> String = "",
     showFrame: Bool = true,
-    stackTrace: SourceLocStack = SourceLocStack(),  
+    stackTrace: SourceLocStack = SourceLocStack(),
     file: String = #file, line: UInt = #line
 ) {
   expectTrue(
@@ -33,7 +33,7 @@ func expectNoOverflow<T>(
   //===--- TRACE boilerplate ----------------------------------------------===//
   _ message: @autoclosure () -> String = "",
     showFrame: Bool = true,
-    stackTrace: SourceLocStack = SourceLocStack(),  
+    stackTrace: SourceLocStack = SourceLocStack(),
     file: String = #file, line: UInt = #line
 ) {
   expectFalse(

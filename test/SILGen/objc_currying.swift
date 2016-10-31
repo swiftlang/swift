@@ -13,9 +13,9 @@ func curry_pod(_ x: CurryTest) -> (Int) -> Int {
 // CHECK-LABEL: sil hidden @_TF13objc_currying9curry_podFCSo9CurryTestFSiSi : $@convention(thin) (@owned CurryTest) -> @owned @callee_owned (Int) -> Int
 // CHECK:      bb0([[ARG1:%.*]] : $CurryTest):
 // CHECK:         [[THUNK:%.*]] = function_ref [[THUNK_FOO_1:@_TTOFCSo9CurryTest3podFSiSi]] : $@convention(thin) (@owned CurryTest) -> @owned @callee_owned (Int) -> Int
-// CHECK:         strong_retain [[ARG1]]
+// CHECK:         copy_value [[ARG1]]
 // CHECK:         [[FN:%.*]] = apply [[THUNK]](%0)
-// CHECK:         strong_release [[ARG1]]
+// CHECK:         destroy_value [[ARG1]]
 // CHECK:         return [[FN]]
 
 // CHECK: sil shared [thunk] [[THUNK_FOO_1]] : $@convention(thin) (@owned CurryTest) -> @owned @callee_owned (Int) -> Int
@@ -25,10 +25,10 @@ func curry_pod(_ x: CurryTest) -> (Int) -> Int {
 
 // CHECK: sil shared [thunk] [[THUNK_FOO_2]] : $@convention(method) (Int, @guaranteed CurryTest) -> Int
 // CHECK: bb0([[ARG1:%.*]] : $Int, [[ARG2:%.*]] : $CurryTest):
-// CHECK:   strong_retain [[ARG2]]
+// CHECK:   copy_value [[ARG2]]
 // CHECK:   [[METHOD:%.*]] = class_method [volatile] %1 : $CurryTest, #CurryTest.pod!1.foreign
 // CHECK:   [[RESULT:%.*]] = apply [[METHOD]](%0, %1)
-// CHECK:   strong_release [[ARG2]]
+// CHECK:   destroy_value [[ARG2]]
 // CHECK:   return [[RESULT]]
 
 func curry_bridged(_ x: CurryTest) -> (String!) -> String! {
@@ -49,7 +49,7 @@ func curry_bridged(_ x: CurryTest) -> (String!) -> String! {
 // CHECK:   [[METHOD:%.*]] = class_method [volatile] %1 : $CurryTest, #CurryTest.bridged!1.foreign
 // CHECK:   [[RES:%.*]] = apply [[METHOD]]({{%.*}}, %1) : $@convention(objc_method) (Optional<NSString>, CurryTest) -> @autoreleased Optional<NSString>
 // CHECK:   function_ref @_TZFE10FoundationSS36_unconditionallyBridgeFromObjectiveCfGSqCSo8NSString_SS
-// CHECK:   strong_release %1
+// CHECK:   destroy_value %1
 // CHECK:   return {{%.*}} : $Optional<String>
 
 func curry_returnsInnerPointer(_ x: CurryTest) -> () -> UnsafeMutableRawPointer! {
@@ -67,7 +67,7 @@ func curry_returnsInnerPointer(_ x: CurryTest) -> () -> UnsafeMutableRawPointer!
 
 // CHECK: sil shared [thunk] @_TTOFCSo9CurryTest19returnsInnerPointerfT_GSQSv_ : $@convention(method) (@guaranteed CurryTest) -> Optional<UnsafeMutableRawPointer>
 // CHECK:  bb0([[ARG1:%.*]] : 
-// CHECK:   strong_retain [[ARG1]]
+// CHECK:   copy_value [[ARG1]]
 // CHECK:   [[METHOD:%.*]] = class_method [volatile] %0 : $CurryTest, #CurryTest.returnsInnerPointer!1.foreign
 // CHECK:   [[RES:%.*]] = apply [[METHOD]](%0) : $@convention(objc_method) (CurryTest) -> @unowned_inner_pointer Optional<UnsafeMutableRawPointer>
 // CHECK:   autorelease_value %0
@@ -131,3 +131,4 @@ func curry_returnsSelf_AnyObject(_ x: AnyObject) -> () -> AnyObject! {
 func curry_returnsInnerPointer_AnyObject(_ x: AnyObject) -> () -> UnsafeMutableRawPointer! {
   return x.returnsInnerPointer!
 }
+

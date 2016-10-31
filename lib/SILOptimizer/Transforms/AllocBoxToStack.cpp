@@ -573,6 +573,9 @@ PromotedParamCloner::initCloned(SILFunction *Orig, IsFragile_t Fragile,
   for (auto &Attr : Orig->getSemanticsAttrs()) {
     Fn->addSemanticsAttr(Attr);
   }
+  if (Orig->hasUnqualifiedOwnership()) {
+    Fn->setUnqualifiedOwnership();
+  }
   Fn->setDeclCtx(Orig->getDeclContext());
   return Fn;
 }
@@ -732,7 +735,7 @@ specializePartialApply(PartialApplyInst *PartialApply,
     // alloc_box. This makes sure that the project_box dominates the
     // partial_apply.
     if (!promoted)
-      promoted = getOrCreateProjectBox(box);
+      promoted = getOrCreateProjectBox(box, 0);
 
     Args.push_back(promoted);
 

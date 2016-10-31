@@ -208,27 +208,43 @@ struct NodeMatcher {
   virtual ~NodeMatcher() = default;
 };
 
-#define KEY(NAME) static const char* Key_##NAME = #NAME;
+enum class KeyKind {
+#define KEY(NAME) KK_##NAME,
 #include "DigesterEnums.def"
+};
+
+static KeyKind parseKeyKind(StringRef Content) {
+  return llvm::StringSwitch<KeyKind>(Content)
+#define KEY(NAME) .Case(#NAME, KeyKind::KK_##NAME)
+#include "DigesterEnums.def"
+  ;
+}
+
+static StringRef getKeyContent(KeyKind Kind) {
+  switch (Kind) {
+#define KEY(NAME) case KeyKind::KK_##NAME: return InsertToBuffer(#NAME);
+#include "DigesterEnums.def"
+  }
+}
 
 // The node kind appearing in the tree that describes the content of the SDK
-enum class SDKNodeKind {
+enum class SDKNodeKind: uint8_t {
 #define NODE_KIND(NAME) NAME,
 #include "DigesterEnums.def"
 };
 
-enum class NodeAnnotation {
+enum class NodeAnnotation: uint8_t{
 #define NODE_ANNOTATION(NAME) NAME,
 #include "DigesterEnums.def"
 };
 
-enum class KnownTypeKind {
+enum class KnownTypeKind: uint8_t {
 #define KNOWN_TYPE(NAME) NAME,
 #include "DigesterEnums.def"
   Unknown,
 };
 
-enum class SDKDeclAttrKind {
+enum class SDKDeclAttrKind: uint8_t {
 #define DECL_ATTR(Name) DAK_##Name,
 #include "DigesterEnums.def"
 };
@@ -267,6 +283,7 @@ struct SDKNodeInitInfo {
   bool IsMutating = false;
   bool IsStatic = false;
   Optional<uint8_t> SelfIndex;
+  Ownership Ownership = Ownership::Strong;
   std::vector<SDKDeclAttrKind> DeclAttrs;
   std::vector<TypeAttrKind> TypeAttrs;
   SDKNodeInitInfo() = default;
@@ -276,7 +293,7 @@ struct SDKNodeInitInfo {
 };
 
 class SDKNode {
-  typedef std::vector<NodeUniquePtr>::const_iterator ChildIt;
+  typedef std::vector<NodeUniquePtr>::iterator ChildIt;
   StringRef Name;
   StringRef PrintedName;
   unsigned TheKind : 4;
@@ -303,7 +320,7 @@ public:
   bool isNameValid() const { return Name != "_"; }
   StringRef getPrintedName() const { return PrintedName; }
   void removeChild(ChildIt CI) { Children.erase(CI); }
-  ChildIt getChildBegin() const { return Children.begin(); }
+  ChildIt getChildBegin() { return Children.begin(); }
   void annotate(NodeAnnotation Anno) { Annotations.insert(Anno); }
   NodePtr getParent() const { return Parent; };
   unsigned getChildrenCount() const { return Children.size(); }
@@ -328,13 +345,14 @@ class SDKNodeDecl : public SDKNode {
   StringRef ModuleName;
   std::vector<SDKDeclAttrKind> DeclAttributes;
   bool IsStatic;
+  uint8_t Ownership;
   bool hasDeclAttribute(SDKDeclAttrKind DAKind) const;
 
 protected:
   SDKNodeDecl(SDKNodeInitInfo Info, SDKNodeKind Kind) : SDKNode(Info, Kind),
     DKind(Info.DKind), Usr(Info.USR), Location(Info.Location),
     ModuleName(Info.ModuleName), DeclAttributes(Info.DeclAttrs),
-    IsStatic(Info.IsStatic) {}
+    IsStatic(Info.IsStatic), Ownership(uint8_t(Info.Ownership)) {}
 
 public:
   StringRef getUsr() const { return Usr; }
@@ -342,6 +360,7 @@ public:
   StringRef getModuleName() const {return ModuleName;}
   void addDeclAttribute(SDKDeclAttrKind DAKind);
   ArrayRef<SDKDeclAttrKind> getDeclAttributes() const;
+  swift::Ownership getOwnership() const { return swift::Ownership(Ownership); }
   bool isObjc() const { return Usr.startswith("c:"); }
   static bool classof(const SDKNode *N);
   DeclKind getDeclKind() const { return DKind; }
@@ -472,7 +491,7 @@ void SDKNode::postorderVisit(NodePtr Root, SDKNodeVisitor &Visitor) {
 class SDKNodeVectorViewer {
   ArrayRef<SDKNode*> Collection;
   llvm::function_ref<bool(NodePtr)> Selector;
-  typedef ArrayRef<SDKNode*>::const_iterator VectorIt;
+  typedef ArrayRef<SDKNode*>::iterator VectorIt;
   VectorIt getNext(VectorIt Start);
   class ViewerIterator;
 
@@ -746,41 +765,62 @@ NodeUniquePtr SDKNode::constructSDKNode(llvm::yaml::MappingNode *Node) {
     auto WithQuote = cast<llvm::yaml::ScalarNode>(N)->getRawValue();
     return WithQuote.substr(1, WithQuote.size() - 2);
   };
+
+  static auto getAsInt = [&](llvm::yaml::Node *N) -> int {
+    return std::stoi(cast<llvm::yaml::ScalarNode>(N)->getRawValue());
+  };
   SDKNodeKind Kind;
   SDKNodeInitInfo Info;
   NodeOwnedVector Children;
 
   for (auto Pair : *Node) {
-    auto Key = GetScalarString(Pair.getKey());
-    if (Key == Key_kind) {
+    switch(parseKeyKind(GetScalarString(Pair.getKey()))) {
+    case KeyKind::KK_kind:
       Kind = llvm::StringSwitch<SDKNodeKind>(GetScalarString(Pair.getValue()))
 #define NODE_KIND(NAME) .Case(#NAME, SDKNodeKind::NAME)
 #include "DigesterEnums.def"
       ;
-    } else if (Key == Key_name) {
+      break;
+    case KeyKind::KK_name:
       Info.Name = GetScalarString(Pair.getValue());
-    } else if (Key == Key_selfIndex) {
-      Info.SelfIndex = std::stoi(cast<llvm::yaml::ScalarNode>(Pair.getValue())->
-                                 getRawValue());
-    } else if (Key == Key_usr) {
+      break;
+    case KeyKind::KK_selfIndex:
+      Info.SelfIndex = getAsInt(Pair.getValue());
+      break;
+    case KeyKind::KK_usr:
       Info.USR = GetScalarString(Pair.getValue());
-    } else if (Key == Key_location) {
+      break;
+
+    case KeyKind::KK_location:
       Info.Location = GetScalarString(Pair.getValue());
-    } else if (Key == Key_children) {
+      break;
+    case KeyKind::KK_children:
       for (auto &Mapping : *cast<llvm::yaml::SequenceNode>(Pair.getValue())) {
         Children.push_back(constructSDKNode(cast<llvm::yaml::MappingNode>(&Mapping)));
       }
-    } else if (Key == Key_printedName) {
+      break;
+    case KeyKind::KK_printedName:
       Info.PrintedName = GetScalarString(Pair.getValue());
-    } else if (Key == Key_moduleName) {
+      break;
+    case KeyKind::KK_moduleName:
       Info.ModuleName = GetScalarString(Pair.getValue());
-    } else if (Key == Key_throwing) {
+      break;
+    case KeyKind::KK_throwing:
       Info.IsThrowing = true;
-    } else if (Key == Key_mutating) {
+      break;
+    case KeyKind::KK_mutating:
       Info.IsMutating = true;
-    } else if (Key == Key_static) {
+      break;
+    case KeyKind::KK_static:
       Info.IsStatic = true;
-    } else if (Key == Key_typeAttributes) {
+      break;
+    case KeyKind::KK_ownership:
+      Info.Ownership = swift::Ownership(getAsInt(Pair.getValue()));
+      assert(Info.Ownership != swift::Ownership::Strong &&
+             "Strong is implied.");
+      break;
+
+    case KeyKind::KK_typeAttributes: {
       auto *Seq = cast<llvm::yaml::SequenceNode>(Pair.getValue());
       for (auto It = Seq->begin(); It != Seq->end(); ++ It) {
         Info.TypeAttrs.push_back(
@@ -789,7 +829,9 @@ NodeUniquePtr SDKNode::constructSDKNode(llvm::yaml::MappingNode *Node) {
 #include "swift/AST/Attr.def"
           .Case("Count", TypeAttrKind::TAK_Count));
       }
-    } else if (Key == Key_declAttributes) {
+      break;
+    }
+    case KeyKind::KK_declAttributes: {
       auto *Seq = cast<llvm::yaml::SequenceNode>(Pair.getValue());
       for (auto It = Seq->begin(); It != Seq->end(); ++ It) {
         Info.DeclAttrs.push_back(
@@ -798,13 +840,14 @@ NodeUniquePtr SDKNode::constructSDKNode(llvm::yaml::MappingNode *Node) {
 #include "DigesterEnums.def"
           );
       }
-    } else if (Key == Key_declKind) {
+      break;
+    }
+    case KeyKind::KK_declKind:
       Info.DKind = llvm::StringSwitch<DeclKind>(GetScalarString(Pair.getValue()))
 #define DECL(X, PARENT) .Case(#X, DeclKind::X)
 #include "swift/AST/DeclNodes.def"
       ;
-    } else {
-      llvm_unreachable("Cannot parse key.");
+      break;
     }
   };
   NodeUniquePtr Result = Info.createSDKNode(Kind);
@@ -841,7 +884,13 @@ bool SDKNode::operator==(const SDKNode &Other) const {
     }
     case SDKNodeKind::TypeDecl:
     case SDKNodeKind::Var:
-    case SDKNodeKind::TypeAlias:
+    case SDKNodeKind::TypeAlias: {
+      auto Left = this->getAs<SDKNodeDecl>();
+      auto Right = (&Other)->getAs<SDKNodeDecl>();
+      if (Left->isStatic() ^ Right->isStatic())
+        return false;
+      SWIFT_FALLTHROUGH;
+    }
     case SDKNodeKind::Root:
     case SDKNodeKind::Nil: {
       if (getPrintedName() == Other.getPrintedName() &&
@@ -975,6 +1024,13 @@ static Optional<uint8_t> getSelfIndex(ValueDecl *VD) {
   return None;
 }
 
+static Ownership getOwnership(ValueDecl *VD) {
+  if (auto OA = VD->getAttrs().getAttribute<OwnershipAttr>()) {
+    return OA->get();
+  }
+  return Ownership::Strong;
+}
+
 SDKNodeInitInfo::SDKNodeInitInfo(Type Ty) : Name(getTypeName(Ty)),
                                             PrintedName(getPrintedName(Ty)) {
   if (isFunctionTypeNoEscape(Ty))
@@ -987,7 +1043,8 @@ SDKNodeInitInfo::SDKNodeInitInfo(ValueDecl *VD) :
     USR(calculateUsr(VD)), Location(calculateLocation(VD)),
     ModuleName(VD->getModuleContext()->getName().str()),
     IsThrowing(isFuncThrowing(VD)), IsMutating(isFuncMutating(VD)),
-    IsStatic(VD->isStatic()), SelfIndex(getSelfIndex(VD)) {
+    IsStatic(VD->isStatic()), SelfIndex(getSelfIndex(VD)),
+    Ownership(getOwnership(VD)) {
   if (VD->getAttrs().getDeprecated(VD->getASTContext()))
     DeclAttrs.push_back(SDKDeclAttrKind::DAK_deprecated);
 }
@@ -1309,9 +1366,10 @@ namespace swift {
         auto Name = value->getName();
         auto PrintedName = value->getPrintedName();
 
-        out.mapRequired(Key_kind, Kind);
-        out.mapRequired(Key_name, Name);
-        out.mapRequired(Key_printedName, PrintedName);
+        out.mapRequired(getKeyContent(KeyKind::KK_kind).data(), Kind);
+        out.mapRequired(getKeyContent(KeyKind::KK_name).data(), Name);
+        out.mapRequired(getKeyContent(KeyKind::KK_printedName).data(),
+                        PrintedName);
 
         if (auto D = dyn_cast<SDKNodeDecl>(value.get())) {
           DeclKind DK = D->getDeclKind();
@@ -1319,34 +1377,45 @@ namespace swift {
           StringRef Location = D->getLocation();
           StringRef ModuleName = D->getModuleName();
 
-          out.mapRequired(Key_declKind, DK);
-          out.mapRequired(Key_usr, Usr);
-          out.mapRequired(Key_location, Location);
-          out.mapRequired(Key_moduleName, ModuleName);
+          out.mapRequired(getKeyContent(KeyKind::KK_declKind).data(), DK);
+          out.mapRequired(getKeyContent(KeyKind::KK_usr).data(), Usr);
+          out.mapRequired(getKeyContent(KeyKind::KK_location).data(), Location);
+          out.mapRequired(getKeyContent(KeyKind::KK_moduleName).data(),
+                          ModuleName);
           if (auto isStatic = D->isStatic())
-            out.mapRequired(Key_static, isStatic);
+            out.mapRequired(getKeyContent(KeyKind::KK_static).data(), isStatic);
 
           if (auto F = dyn_cast<SDKNodeAbstractFunc>(value.get())) {
             if (bool isThrowing = F->isThrowing())
-              out.mapRequired(Key_throwing, isThrowing);
+              out.mapRequired(getKeyContent(KeyKind::KK_throwing).data(),
+                              isThrowing);
             if (bool isMutating = F->isMutating())
-              out.mapRequired(Key_mutating, isMutating);
+              out.mapRequired(getKeyContent(KeyKind::KK_mutating).data(),
+                              isMutating);
             if (F->hasSelfIndex()) {
               auto Index = F->getSelfIndex();
-              out.mapRequired(Key_selfIndex, Index);
+              out.mapRequired(getKeyContent(KeyKind::KK_selfIndex).data(),
+                              Index);
             }
           }
           auto Attributes = D->getDeclAttributes();
           if (!Attributes.empty())
-            out.mapRequired(Key_declAttributes, Attributes);
+            out.mapRequired(getKeyContent(KeyKind::KK_declAttributes).data(),
+                            Attributes);
+          // Strong reference is implied, no need for serialization.
+          if (D->getOwnership() != Ownership::Strong) {
+            uint8_t Raw = uint8_t(D->getOwnership());
+            out.mapRequired(getKeyContent(KeyKind::KK_ownership).data(), Raw);
+          }
         } else if (auto T = dyn_cast<SDKNodeType>(value.get())) {
           auto Attributes = T->getTypeAttributes();
           if (!Attributes.empty())
-            out.mapRequired(Key_typeAttributes, Attributes);
+            out.mapRequired(getKeyContent(KeyKind::KK_typeAttributes).data(),
+                            Attributes);
         }
         if (!value->isLeaf()) {
           ArrayRef<NodeUniquePtr> Children = value->getChildren();
-          out.mapRequired(Key_children, Children);
+          out.mapRequired(getKeyContent(KeyKind::KK_children).data(), Children);
         }
       }
     };
@@ -1876,7 +1945,7 @@ public:
   }
 };
 
-void detectThrowing(NodePtr L, NodePtr R) {
+static void detectThrowing(NodePtr L, NodePtr R) {
   assert(L->getKind() == R->getKind());
   if (auto LF = dyn_cast<SDKNodeAbstractFunc>(L)) {
     auto RF = R->getAs<SDKNodeAbstractFunc>();
@@ -1886,7 +1955,7 @@ void detectThrowing(NodePtr L, NodePtr R) {
   }
 }
 
-void detectMutating(NodePtr L, NodePtr R) {
+static void detectMutating(NodePtr L, NodePtr R) {
   assert(L->getKind() == R->getKind());
   if (auto LF = dyn_cast<SDKNodeAbstractFunc>(L)) {
     auto RF = R->getAs<SDKNodeAbstractFunc>();
@@ -1904,6 +1973,15 @@ static void detectRename(NodePtr L, NodePtr R) {
     L->addAnnotateComment(NodeAnnotation::RenameOldName, L->getPrintedName());
     L->annotate(NodeAnnotation::RenameNewName);
     L->addAnnotateComment(NodeAnnotation::RenameNewName, R->getPrintedName());
+  }
+}
+
+static void detectStaticUpdate(NodePtr L, NodePtr R) {
+  assert(L->getKind() == R->getKind());
+  if (auto LD = dyn_cast<SDKNodeDecl>(L)) {
+    if (LD->isStatic() ^ R->getAs<SDKNodeDecl>()->isStatic()) {
+      L->annotate(NodeAnnotation::StaticChange);
+    }
   }
 }
 
@@ -1947,19 +2025,26 @@ public:
   }
 
   virtual void foundMatch(NodePtr Left, NodePtr Right) override {
+    Left->annotate(NodeAnnotation::Updated);
+    Right->annotate(NodeAnnotation::Updated);
+    // Push the updated node to the map for future reference.
+    UpdateMap->foundMatch(Left, Right);
+
+    if (Left->getKind() != Right->getKind()) {
+      assert(isa<SDKNodeType>(Left) && isa<SDKNodeType>(Right) &&
+        "only type nodes can match across kinds.");
+      return;
+    }
     assert(Left->getKind() == Right->getKind());
     SDKNodeKind Kind = Left->getKind();
     assert(Left->getKind() != SDKNodeKind::Nil &&
            Right->getKind() != SDKNodeKind::Nil);
     assert(Kind == SDKNodeKind::Root || *Left != *Right);
 
-    Left->annotate(NodeAnnotation::Updated);
-    Right->annotate(NodeAnnotation::Updated);
-    // Push the updated node to the map for future reference.
-    UpdateMap->foundMatch(Left, Right);
     detectRename(Left, Right);
     detectThrowing(Left, Right);
     detectMutating(Left, Right);
+    detectStaticUpdate(Left, Right);
 
     switch(Kind) {
     case SDKNodeKind::Root:
@@ -2845,6 +2930,11 @@ void DiagnosisEmitter::visitDecl(SDKNodeDecl *Node) {
     AttrChangedDecls.Diags.emplace_back(Node->getDeclKind(),
                                         Node->getFullyQualifiedName(),
                                         InsertToBuffer("throwing"));
+  }
+  if (Node->isAnnotatedAs(NodeAnnotation::StaticChange)) {
+    AttrChangedDecls.Diags.emplace_back(Node->getDeclKind(),
+                                        Node->getFullyQualifiedName(),
+                  InsertToBuffer(Node->isStatic() ? "not static" : "static"));
   }
 }
 void DiagnosisEmitter::visitType(SDKNodeType *Node) {

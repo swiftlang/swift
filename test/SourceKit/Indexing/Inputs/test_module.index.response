@@ -27,10 +27,12 @@
           key.entities: [
             {
               key.kind: source.lang.swift.decl.function.accessor.getter,
+              key.name: "getter:value",
               key.usr: "s:FC11test_module16ComputedPropertyg5valueSi"
             },
             {
               key.kind: source.lang.swift.decl.function.accessor.setter,
+              key.name: "setter:value",
               key.usr: "s:FC11test_module16ComputedPropertys5valueSi"
             }
           ]
