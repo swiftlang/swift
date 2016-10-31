@@ -230,6 +230,9 @@ def emit_verbose_sil : Flag<["-"], "emit-verbose-sil">,
 def enable_sil_ownership : Flag<["-"], "enable-sil-ownership">,
   HelpText<"Enable the SIL Ownership Model">;
 
+def assume_parsing_unqualified_ownership_sil : Flag<["-"], "assume-parsing-unqualified-ownership-sil">,
+  HelpText<"Assume unqualified SIL ownership when parsing SIL">;
+
 def enable_experimental_property_behaviors :
   Flag<["-"], "enable-experimental-property-behaviors">,
   HelpText<"Enable experimental property behaviors">;

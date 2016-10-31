@@ -527,7 +527,7 @@ struct _PVSparseVectorNodePointer<Key : Hashable, Value>
     childNodeVector[i] = newChildNode
 
     let destPointer = childNodeVector + i + 1
-    destPointer.initialize(from: 
+    destPointer.initialize(from:
       newChildNodes + i + 1, count: childNodeCount - i - 1)
     for childNode in
       UnsafeMutableBufferPointer(
@@ -559,7 +559,7 @@ struct _PVSparseVectorNodePointer<Key : Hashable, Value>
     childNodeVector[i] = newChildNode
 
     let destPointer = childNodeVector + i + 1
-    destPointer.initialize(from: 
+    destPointer.initialize(from:
       newChildNodes + i, count: childNodeCount - i - 1)
     for childNode in
       UnsafeMutableBufferPointer(
@@ -589,7 +589,7 @@ struct _PVSparseVectorNodePointer<Key : Hashable, Value>
     keyVector[i] = newKey
 
     let destPointer = keyVector + i + 1
-    destPointer.initialize(from: 
+    destPointer.initialize(from:
       newKeys + i + 1, count: layout.keyCount - i - 1)
   }
 
@@ -613,7 +613,7 @@ struct _PVSparseVectorNodePointer<Key : Hashable, Value>
     valueVector[i] = newValue
 
     let destPointer = valueVector + i + 1
-    destPointer.initialize(from: 
+    destPointer.initialize(from:
       newValues + i + 1, count: layout.keyCount - i - 1)
   }
 
@@ -635,7 +635,7 @@ struct _PVSparseVectorNodePointer<Key : Hashable, Value>
       keyVector.initialize(from: newKeys, count: i)
 
       let destPointer = keyVector + i
-      destPointer.initialize(from: 
+      destPointer.initialize(from:
         newKeys + i + 1, count: layout.keyCount - i)
     }
     do {
@@ -643,7 +643,7 @@ struct _PVSparseVectorNodePointer<Key : Hashable, Value>
       valueVector.initialize(from: newValues, count: i)
 
       let destPointer = valueVector + i
-      destPointer.initialize(from: 
+      destPointer.initialize(from:
         newValues + i + 1, count: layout.keyCount - i)
     }
   }
@@ -666,7 +666,7 @@ struct _PVSparseVectorNodePointer<Key : Hashable, Value>
       keyVector[i] = newKey
 
       let destPointer = keyVector + i + 1
-      destPointer.initialize(from: 
+      destPointer.initialize(from:
         newKeys + i, count: layout.keyCount - i - 1)
     }
     do {
@@ -676,7 +676,7 @@ struct _PVSparseVectorNodePointer<Key : Hashable, Value>
       valueVector[i] = newValue
 
       let destPointer = valueVector + i + 1
-      destPointer.initialize(from: 
+      destPointer.initialize(from:
         newValues + i, count: layout.keyCount - i - 1)
     }
   }
@@ -1353,7 +1353,7 @@ struct _PVCollisionNodePointer<Key : Hashable, Value>
     valueArray[i] = newValue
 
     let destPointer = valueArray + i + 1
-    destPointer.initialize(from: 
+    destPointer.initialize(from:
       newValues + i + 1, count: layout.keyCount - i - 1)
   }
 
@@ -1410,7 +1410,7 @@ struct _PVCollisionNodePointer<Key : Hashable, Value>
         } else {
           // Create a new node.
           let newNode = _PVCollisionNodePointer(uninitializedNodeFor: layout)
-          newNode._keyArray.initialize(from: 
+          newNode._keyArray.initialize(from:
             keyArray, count: layout.keyCount)
           newNode.copyValues(
             from: valueArray,

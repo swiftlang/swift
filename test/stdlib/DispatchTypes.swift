@@ -18,7 +18,7 @@ _ = q.label
 if #available(OSX 10.10, iOS 8.0, *) {
 	_ = DispatchQueue.global(qos: .userInteractive)
 	_ = DispatchQueue.global(qos: .background)
-	_ = DispatchQueue.global(qos: .default)	
+	_ = DispatchQueue.global(qos: .default)
 }
 
 // dispatch/source.h

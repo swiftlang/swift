@@ -37,7 +37,7 @@ func read_only_capture(_ x: Int) -> Int {
   return cap()
   // CHECK: [[CAP:%[0-9]+]] = function_ref @[[CAP_NAME:_TFF8closures17read_only_capture.*]] : $@convention(thin) (@owned @box Int) -> Int
   // CHECK: [[RET:%[0-9]+]] = apply [[CAP]]([[XBOX]])
-  // CHECK: release [[XBOX]]
+  // CHECK: destroy_value [[XBOX]]
   // CHECK: return [[RET]]
 }
 
@@ -45,7 +45,7 @@ func read_only_capture(_ x: Int) -> Int {
 // CHECK: bb0([[XBOX:%[0-9]+]] : $@box Int):
 // CHECK: [[XADDR:%[0-9]+]] = project_box [[XBOX]]
 // CHECK: [[X:%[0-9]+]] = load [[XADDR]]
-// CHECK: release [[XBOX]]
+// CHECK: destroy_value [[XBOX]]
 // CHECK: return [[X]]
 
 // CHECK-LABEL: sil hidden @_TF8closures16write_to_capture
@@ -65,8 +65,8 @@ func write_to_capture(_ x: Int) -> Int {
   // CHECK: [[SCRIB:%[0-9]+]] = function_ref @[[SCRIB_NAME:_TFF8closures16write_to_capture.*]] : $@convention(thin) (@owned @box Int) -> ()
   // CHECK: apply [[SCRIB]]([[X2BOX]])
   // CHECK: [[RET:%[0-9]+]] = load [[PB]]
-  // CHECK: release [[X2BOX]]
-  // CHECK: release [[XBOX]]
+  // CHECK: destroy_value [[X2BOX]]
+  // CHECK: destroy_value [[XBOX]]
   // CHECK: return [[RET]]
   return x2
 }
@@ -75,7 +75,7 @@ func write_to_capture(_ x: Int) -> Int {
 // CHECK: bb0([[XBOX:%[0-9]+]] : $@box Int):
 // CHECK: [[XADDR:%[0-9]+]] = project_box [[XBOX]]
 // CHECK: copy_addr {{%[0-9]+}} to [[XADDR]]
-// CHECK: release [[XBOX]]
+// CHECK: destroy_value [[XBOX]]
 // CHECK: return
 
 // CHECK-LABEL: sil hidden @_TF8closures21multiple_closure_refs
@@ -106,7 +106,7 @@ func capture_local_func(_ x: Int) -> () -> () -> Int {
   // CHECK: [[BETH_CLOSURE:%[0-9]+]] = partial_apply [[BETH_REF]]([[XBOX]])
 
   return beth
-  // CHECK: release [[XBOX]]
+  // CHECK: destroy_value [[XBOX]]
   // CHECK: return [[BETH_CLOSURE]]
 }
 // CHECK: sil shared @[[ALEPH_NAME:_TFF8closures18capture_local_funcFSiFT_FT_SiL_5alephfT_Si]]
@@ -131,7 +131,7 @@ func anon_read_only_capture(_ x: Int) -> Int {
   // -- apply expression
   // CHECK: [[RET:%[0-9]+]] = apply [[ANON]]([[PB]])
   // -- cleanup
-  // CHECK: release [[XBOX]]
+  // CHECK: destroy_value [[XBOX]]
   // CHECK: return [[RET]]
 }
 // CHECK: sil shared @[[CLOSURE_NAME]]
@@ -152,7 +152,7 @@ func small_closure_capture(_ x: Int) -> Int {
   // -- apply expression
   // CHECK: [[RET:%[0-9]+]] = apply [[ANON]]([[PB]])
   // -- cleanup
-  // CHECK: release [[XBOX]]
+  // CHECK: destroy_value [[XBOX]]
   // CHECK: return [[RET]]
 }
 // CHECK: sil shared @[[CLOSURE_NAME]]
@@ -169,10 +169,10 @@ func small_closure_capture_with_argument(_ x: Int) -> (_ y: Int) -> Int {
   return { x + $0 }
   // -- func expression
   // CHECK: [[ANON:%[0-9]+]] = function_ref @[[CLOSURE_NAME:_TFF8closures35small_closure_capture_with_argument.*]] : $@convention(thin) (Int, @owned @box Int) -> Int
-  // CHECK: retain [[XBOX]]
+  // CHECK: copy_value [[XBOX]]
   // CHECK: [[ANON_CLOSURE_APP:%[0-9]+]] = partial_apply [[ANON]]([[XBOX]])
   // -- return
-  // CHECK: release [[XBOX]]
+  // CHECK: destroy_value [[XBOX]]
   // CHECK: return [[ANON_CLOSURE_APP]]
 }
 // CHECK: sil shared @[[CLOSURE_NAME]] : $@convention(thin) (Int, @owned @box Int) -> Int
@@ -181,7 +181,7 @@ func small_closure_capture_with_argument(_ x: Int) -> (_ y: Int) -> Int {
 // CHECK: [[PLUS:%[0-9]+]] = function_ref @_TFsoi1pFTSiSi_Si{{.*}}
 // CHECK: [[LHS:%[0-9]+]] = load [[XADDR]]
 // CHECK: [[RET:%[0-9]+]] = apply [[PLUS]]([[LHS]], [[DOLLAR0]])
-// CHECK: release [[XBOX]]
+// CHECK: destroy_value [[XBOX]]
 // CHECK: return [[RET]]
 
 // CHECK-LABEL: sil hidden @_TF8closures24small_closure_no_capture
@@ -269,7 +269,7 @@ class SelfCapturedInInit : Base {
   // CHECK:         [[VAL:%.*]] = load {{%.*}} : $*SelfCapturedInInit
   // CHECK:         [[VAL:%.*]] = load {{%.*}} : $*SelfCapturedInInit
   // CHECK:         [[VAL:%.*]] = load {{%.*}} : $*SelfCapturedInInit
-  // CHECK:         strong_retain [[VAL]] : $SelfCapturedInInit
+  // CHECK:         copy_value [[VAL]] : $SelfCapturedInInit
   // CHECK:         partial_apply {{%.*}}([[VAL]]) : $@convention(thin) (@owned SelfCapturedInInit) -> @owned SelfCapturedInInit
   override init() {
     super.init()
@@ -522,17 +522,17 @@ class SuperSub : SuperBase {
 // -- strong +2, unowned +2
 // CHECK:         unowned_retain [[UNOWNED_SELF2]]
 // -- strong +1, unowned +2
-// CHECK:         strong_release [[SELF]]
+// CHECK:         destroy_value [[SELF]]
 // -- closure takes unowned ownership
 // CHECK:         [[OUTER_CLOSURE:%.*]] = partial_apply {{%.*}}([[UNOWNED_SELF2]])
 // -- call consumes closure
 // -- strong +1, unowned +1
 // CHECK:         [[INNER_CLOSURE:%.*]] = apply [[OUTER_CLOSURE]]
 // CHECK:         [[CONSUMED_RESULT:%.*]] = apply [[INNER_CLOSURE]]()
-// CHECK:         strong_release [[CONSUMED_RESULT]]
-// -- releases unowned self in box
+// CHECK:         destroy_value [[CONSUMED_RESULT]]
+// -- destroy_values unowned self in box
 // -- strong +1, unowned +0
-// CHECK:         strong_release [[OUTER_SELF_CAPTURE]]
+// CHECK:         destroy_value [[OUTER_SELF_CAPTURE]]
 // -- strong +0, unowned +0
 // CHECK:         return
 
@@ -540,11 +540,11 @@ class SuperSub : SuperBase {
 // -- strong +0, unowned +1
 // CHECK-LABEL: sil shared @_TFFC8closures24UnownedSelfNestedCapture13nestedCapture
 // -- strong +0, unowned +2
-// CHECK:         unowned_retain [[CAPTURED_SELF:%.*]] :
+// CHECK:         copy_value [[CAPTURED_SELF:%.*]] :
 // -- closure takes ownership of unowned ref
 // CHECK:         [[INNER_CLOSURE:%.*]] = partial_apply {{%.*}}([[CAPTURED_SELF]])
 // -- strong +0, unowned +1 (claimed by closure)
-// CHECK:         unowned_release [[CAPTURED_SELF]]
+// CHECK:         destroy_value [[CAPTURED_SELF]]
 // CHECK:         return [[INNER_CLOSURE]]
 
 // -- inner closure
@@ -554,7 +554,7 @@ class SuperSub : SuperBase {
 // CHECK:         strong_retain_unowned [[CAPTURED_SELF:%.*]] :
 // CHECK:         [[SELF:%.*]] = unowned_to_ref [[CAPTURED_SELF]]
 // -- strong +1, unowned +0 (claimed by return)
-// CHECK:         unowned_release [[CAPTURED_SELF]]
+// CHECK:         destroy_value [[CAPTURED_SELF]]
 // CHECK:         return [[SELF]]
 class UnownedSelfNestedCapture {
   func nestedCapture() {

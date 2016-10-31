@@ -1,4 +1,4 @@
-// RUN: %target-sil-opt -stack-promotion -enable-sil-verify-all %s | %FileCheck %s
+// RUN: %target-sil-opt -assume-parsing-unqualified-ownership-sil -stack-promotion -enable-sil-verify-all %s | %FileCheck %s
 
 sil_stage canonical
 
@@ -360,7 +360,7 @@ bb0:
 
 bb1:
   br bb2
- 
+
 bb2:
   %o1 = alloc_ref $XX
   %f1 = function_ref @xx_init : $@convention(thin) (@guaranteed XX) -> XX
@@ -389,7 +389,7 @@ bb0:
 
 bb1:
   br bb3
- 
+
 bb2:
   dealloc_stack %s1 : $*Int32
   unreachable
@@ -422,24 +422,24 @@ bb0(%0 : $Int):
   %3 = integer_literal $Builtin.Int32, 2
   %4 = struct $Int32 (%3 : $Builtin.Int32)
   %8 = metatype $@thin Array<Int>.Type
-  %9 = function_ref @init_array_with_buffer : $@convention(thin) (@owned DummyArrayStorage<Int>, Int32, @thin Array<Int>.Type) -> @owned (Array<Int>, UnsafeMutablePointer<Int>) 
-  %10 = apply %9(%2, %4, %8) : $@convention(thin) (@owned DummyArrayStorage<Int>, Int32, @thin Array<Int>.Type) -> @owned (Array<Int>, UnsafeMutablePointer<Int>) 
-  %11 = tuple_extract %10 : $(Array<Int>, UnsafeMutablePointer<Int>), 0 
-  %12 = tuple_extract %10 : $(Array<Int>, UnsafeMutablePointer<Int>), 1 
-  %13 = struct_extract %12 : $UnsafeMutablePointer<Int>, #UnsafeMutablePointer._rawValue 
-  %14 = pointer_to_address %13 : $Builtin.RawPointer to [strict] $*Int 
+  %9 = function_ref @init_array_with_buffer : $@convention(thin) (@owned DummyArrayStorage<Int>, Int32, @thin Array<Int>.Type) -> @owned (Array<Int>, UnsafeMutablePointer<Int>)
+  %10 = apply %9(%2, %4, %8) : $@convention(thin) (@owned DummyArrayStorage<Int>, Int32, @thin Array<Int>.Type) -> @owned (Array<Int>, UnsafeMutablePointer<Int>)
+  %11 = tuple_extract %10 : $(Array<Int>, UnsafeMutablePointer<Int>), 0
+  %12 = tuple_extract %10 : $(Array<Int>, UnsafeMutablePointer<Int>), 1
+  %13 = struct_extract %12 : $UnsafeMutablePointer<Int>, #UnsafeMutablePointer._rawValue
+  %14 = pointer_to_address %13 : $Builtin.RawPointer to [strict] $*Int
 
   // store the 2 elements
-  store %0 to %14 : $*Int                         
-  %16 = integer_literal $Builtin.Word, 1          
-  %17 = index_addr %14 : $*Int, %16 : $Builtin.Word 
-  store %0 to %17 : $*Int                         
+  store %0 to %14 : $*Int
+  %16 = integer_literal $Builtin.Word, 1
+  %17 = index_addr %14 : $*Int, %16 : $Builtin.Word
+  store %0 to %17 : $*Int
 
   // pass the array to a function
-  %19 = function_ref @take_array : $@convention(thin) (@owned Array<Int>) -> () 
+  %19 = function_ref @take_array : $@convention(thin) (@owned Array<Int>) -> ()
   %20 = apply %19(%11) : $@convention(thin) (@owned Array<Int>) -> ()
-  %21 = tuple ()                                  
-  return %21 : $()                                
+  %21 = tuple ()
+  return %21 : $()
 }
 
 // CHECK-LABEL: sil @dont_promote_escaping_array
@@ -455,22 +455,22 @@ bb0(%0 : $Int):
   // initialize the buffer
   %3 = integer_literal $Builtin.Int32, 2
   %4 = struct $Int32 (%3 : $Builtin.Int32)
-  %8 = metatype $@thin Array<Int>.Type            
-  %9 = function_ref @init_array_with_buffer : $@convention(thin) (@owned DummyArrayStorage<Int>, Int32, @thin Array<Int>.Type) -> @owned (Array<Int>, UnsafeMutablePointer<Int>) 
-  %10 = apply %9(%2, %4, %8) : $@convention(thin) (@owned DummyArrayStorage<Int>, Int32, @thin Array<Int>.Type) -> @owned (Array<Int>, UnsafeMutablePointer<Int>) 
-  %11 = tuple_extract %10 : $(Array<Int>, UnsafeMutablePointer<Int>), 0 
-  %12 = tuple_extract %10 : $(Array<Int>, UnsafeMutablePointer<Int>), 1 
-  %13 = struct_extract %12 : $UnsafeMutablePointer<Int>, #UnsafeMutablePointer._rawValue 
-  %14 = pointer_to_address %13 : $Builtin.RawPointer to [strict] $*Int 
+  %8 = metatype $@thin Array<Int>.Type
+  %9 = function_ref @init_array_with_buffer : $@convention(thin) (@owned DummyArrayStorage<Int>, Int32, @thin Array<Int>.Type) -> @owned (Array<Int>, UnsafeMutablePointer<Int>)
+  %10 = apply %9(%2, %4, %8) : $@convention(thin) (@owned DummyArrayStorage<Int>, Int32, @thin Array<Int>.Type) -> @owned (Array<Int>, UnsafeMutablePointer<Int>)
+  %11 = tuple_extract %10 : $(Array<Int>, UnsafeMutablePointer<Int>), 0
+  %12 = tuple_extract %10 : $(Array<Int>, UnsafeMutablePointer<Int>), 1
+  %13 = struct_extract %12 : $UnsafeMutablePointer<Int>, #UnsafeMutablePointer._rawValue
+  %14 = pointer_to_address %13 : $Builtin.RawPointer to [strict] $*Int
 
   // store the 2 elements
-  store %0 to %14 : $*Int                         
-  %16 = integer_literal $Builtin.Word, 1          
-  %17 = index_addr %14 : $*Int, %16 : $Builtin.Word 
-  store %0 to %17 : $*Int                         
+  store %0 to %14 : $*Int
+  %16 = integer_literal $Builtin.Word, 1
+  %17 = index_addr %14 : $*Int, %16 : $Builtin.Word
+  store %0 to %17 : $*Int
 
   // return the array
-  return %11 : $Array<Int>                        
+  return %11 : $Array<Int>
 }
 
 sil [_semantics "array.uninitialized"] @init_array_with_buffer : $@convention(thin) (@owned DummyArrayStorage<Int>, Int32, @thin Array<Int>.Type) -> @owned (Array<Int>, UnsafeMutablePointer<Int>)
@@ -478,9 +478,9 @@ sil [_semantics "array.withUnsafeMutableBufferPointer"] @withUnsafeMutableBuffer
 
 sil @take_array : $@convention(thin) (@owned Array<Int>) -> () {
 bb0(%0 : $Array<Int>):
-  release_value %0 : $Array<Int>                  
-  %2 = tuple ()                                   
-  return %2 : $()                                 
+  release_value %0 : $Array<Int>
+  %2 = tuple ()
+  return %2 : $()
 }
 
 // CHECK-LABEL: sil @promote_array_withUnsafeMutableBufferPointer_use

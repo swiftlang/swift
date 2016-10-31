@@ -12,8 +12,8 @@ for id in $(seq 0 $process_id_max); do
 // Make sure that we can parse the stdlib.sil deserialized from Swift.swiftmodule.
 
 // RUN: rm -f %t.*
-// RUN: %target-sil-opt -enable-sil-verify-all -sil-disable-ast-dump %platform-module-dir/Swift.swiftmodule -module-name=Swift -o %t.sil
-// RUN: %target-sil-opt -enable-sil-verify-all %t.sil -ast-verifier-process-count=$process_count -ast-verifier-process-id=$id > /dev/null
+// RUN: %target-sil-opt -assume-parsing-unqualified-ownership-sil -enable-sil-verify-all -sil-disable-ast-dump %platform-module-dir/Swift.swiftmodule -module-name=Swift -o %t.sil
+// RUN: %target-sil-opt -assume-parsing-unqualified-ownership-sil -enable-sil-verify-all %t.sil -ast-verifier-process-count=$process_count -ast-verifier-process-id=$id > /dev/null
 // REQUIRES: long_test
 // REQUIRES: nonexecutable_test
 __EOF__

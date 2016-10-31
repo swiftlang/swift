@@ -75,9 +75,9 @@ print_y()
 // CHECK: switch_enum {{%.+}} : $Optional<A>, case #Optional.some!enumelt.1: [[SOME_CASE:.+]], default
 // CHECK: [[SOME_CASE]]([[VALUE:%.+]] : $A):
 // CHECK: store [[VALUE]] to [[BOX:%.+]] : $*A
-// CHECK-NOT: release
+// CHECK-NOT: destroy_value
 // CHECK: [[SINK:%.+]] = function_ref @_TF8toplevel8markUsedurFxT_
-// CHECK-NOT: release
+// CHECK-NOT: destroy_value
 // CHECK: apply [[SINK]]<A>({{%.+}})
 class A {}
 guard var a = Optional(A()) else { trap() }

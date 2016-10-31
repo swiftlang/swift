@@ -15,16 +15,17 @@
 #include "DIMemoryUseCollector.h"
 #include "swift/AST/DiagnosticEngine.h"
 #include "swift/AST/DiagnosticsSIL.h"
+#include "swift/Basic/Fallthrough.h"
 #include "swift/SIL/SILArgument.h"
 #include "swift/SIL/SILBuilder.h"
+#include "swift/SILOptimizer/PassManager/Transforms.h"
 #include "swift/SILOptimizer/Utils/CFG.h"
 #include "swift/SILOptimizer/Utils/Local.h"
-#include "swift/SILOptimizer/PassManager/Transforms.h"
-#include "swift/Basic/Fallthrough.h"
-#include "llvm/ADT/Statistic.h"
-#include "llvm/Support/Debug.h"
+#include "llvm/ADT/STLExtras.h"
 #include "llvm/ADT/SmallBitVector.h"
+#include "llvm/ADT/Statistic.h"
 #include "llvm/ADT/StringExtras.h"
+#include "llvm/Support/Debug.h"
 
 using namespace swift;
 
@@ -67,7 +68,8 @@ static void LowerAssignInstruction(SILBuilder &B, AssignInst *Inst,
     // If this is an initialization, or the storage type is trivial, we
     // can just replace the assignment with a store.
     assert(isInitialization != PartialInitializationKind::IsReinitialization);
-    B.createStore(Loc, Src, Inst->getDest());
+    B.createStore(Loc, Src, Inst->getDest(),
+                  StoreOwnershipQualifier::Unqualified);
   } else if (isInitialization == PartialInitializationKind::IsReinitialization) {
 
     // We have a case where a convenience initializer on a class
@@ -75,8 +77,10 @@ static void LowerAssignInstruction(SILBuilder &B, AssignInst *Inst,
     // Factory initializers give us a whole new instance, so the existing
     // instance, which has not been initialized and never will be, must be
     // freed using dealloc_partial_ref.
-    SILValue Pointer = B.createLoad(Loc, Inst->getDest());
-    B.createStore(Loc, Src, Inst->getDest());
+    SILValue Pointer =
+        B.createLoad(Loc, Inst->getDest(), LoadOwnershipQualifier::Unqualified);
+    B.createStore(Loc, Src, Inst->getDest(),
+                  StoreOwnershipQualifier::Unqualified);
 
     auto MetatypeTy = CanMetatypeType::get(
         Inst->getDest()->getType().getSwiftRValueType(),
@@ -95,8 +99,10 @@ static void LowerAssignInstruction(SILBuilder &B, AssignInst *Inst,
 
     // This is basically TypeLowering::emitStoreOfCopy, except that if we have
     // a known incoming value, we can avoid the load.
-    SILValue IncomingVal = B.createLoad(Loc, Inst->getDest());
-    B.createStore(Inst->getLoc(), Src, Inst->getDest());
+    SILValue IncomingVal =
+        B.createLoad(Loc, Inst->getDest(), LoadOwnershipQualifier::Unqualified);
+    B.createStore(Inst->getLoc(), Src, Inst->getDest(),
+                  StoreOwnershipQualifier::Unqualified);
 
     B.emitDestroyValueOperation(Loc, IncomingVal);
   }
@@ -487,7 +493,7 @@ namespace {
 
     // Keep track of whether we've emitted an error.  We only emit one error per
     // location as a policy decision.
-    std::vector<SourceLoc> EmittedErrorLocs;
+    std::vector<SILLocation> EmittedErrorLocs;
     SmallPtrSet<SILBasicBlock*, 16> BlocksReachableFromEntry;
     
   public:
@@ -649,14 +655,16 @@ bool LifetimeChecker::shouldEmitError(SILInstruction *Inst) {
   // dead code.
   if (!isBlockIsReachableFromEntry(Inst->getParent()))
     return false;
-  
+
   // Check to see if we've already emitted an error at this location.  If so,
   // swallow the error.
-  for (auto L : EmittedErrorLocs)
-    if (L == Inst->getLoc().getSourceLoc())
-      return false;
+  SILLocation InstLoc = Inst->getLoc();
+  if (llvm::any_of(EmittedErrorLocs, [&](SILLocation L) -> bool {
+        return L.getSourceLoc() == InstLoc.getSourceLoc();
+      }))
+    return false;
 
-  EmittedErrorLocs.push_back(Inst->getLoc().getSourceLoc());
+  EmittedErrorLocs.push_back(InstLoc);
   return true;
 }
 
@@ -1778,7 +1786,8 @@ void LifetimeChecker::processUninitializedRelease(SILInstruction *Release,
 
     if (!consumed) {
       if (Pointer->getType().isAddress())
-        Pointer = B.createLoad(Loc, Pointer);
+        Pointer =
+            B.createLoad(Loc, Pointer, LoadOwnershipQualifier::Unqualified);
 
       auto MetatypeTy = CanMetatypeType::get(
           TheMemory.MemorySILType.getSwiftRValueType(),
@@ -1915,7 +1924,8 @@ static void updateControlVariable(SILLocation Loc,
   // If the mask is all ones, do a simple store, otherwise do a
   // load/or/store sequence to mask in the bits.
   if (!Bitmask.isAllOnesValue()) {
-    SILValue Tmp = B.createLoad(Loc, ControlVariable);
+    SILValue Tmp =
+        B.createLoad(Loc, ControlVariable, LoadOwnershipQualifier::Unqualified);
     if (!OrFn.get())
       OrFn = getBinaryFunction("or", IVType, B.getASTContext());
       
@@ -1923,7 +1933,8 @@ static void updateControlVariable(SILLocation Loc,
     MaskVal = B.createBuiltin(Loc, OrFn, IVType, {}, Args);
   }
 
-  B.createStore(Loc, MaskVal, ControlVariable);
+  B.createStore(Loc, MaskVal, ControlVariable,
+                StoreOwnershipQualifier::Unqualified);
 }
 
 /// Test a bit in the control variable at the current insertion point.
@@ -1935,7 +1946,8 @@ static SILValue testControlVariable(SILLocation Loc,
                                     Identifier &TruncateFn,
                                     SILBuilder &B) {
   if (!ControlVariable)
-    ControlVariable = B.createLoad(Loc, ControlVariableAddr);
+    ControlVariable = B.createLoad(Loc, ControlVariableAddr,
+                                   LoadOwnershipQualifier::Unqualified);
 
   SILValue CondVal = ControlVariable;
   CanBuiltinIntegerType IVType = CondVal->getType().castTo<BuiltinIntegerType>();
@@ -2007,8 +2019,9 @@ SILValue LifetimeChecker::handleConditionalInitAssign() {
   B.setInsertionPoint(&*std::next(TheMemory.MemoryInst->getIterator()));
   SILValue ControlVariableAddr = ControlVariableBox;
   auto Zero = B.createIntegerLiteral(Loc, IVType, 0);
-  B.createStore(Loc, Zero, ControlVariableAddr);
-  
+  B.createStore(Loc, Zero, ControlVariableAddr,
+                StoreOwnershipQualifier::Unqualified);
+
   Identifier OrFn;
 
   // At each initialization, mark the initialized elements live.  At each

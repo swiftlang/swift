@@ -12,7 +12,7 @@ and library facilities that enable the following uses of pointer
 arguments:
 
 - Const pointer arguments ``const int *``, including const pointers to ObjC
-  classes ``NSFoo * const *``, can be used as "in" array arguments, 
+  classes ``NSFoo * const *``, can be used as "in" array arguments,
   as ``inout`` scalar arguments, or as ``UnsafeMutablePointer`` arguments.
 - Non-const pointer arguments to C types, ``int *``, can be used as ``inout``
   array or scalar arguments, or as ``UnsafeMutablePointer`` arguments.

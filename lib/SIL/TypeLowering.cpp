@@ -494,7 +494,8 @@ namespace {
   public:
     void emitDestroyAddress(SILBuilder &B, SILLocation loc,
                             SILValue addr) const override {
-      SILValue value = B.createLoad(loc, addr);
+      SILValue value =
+          B.createLoad(loc, addr, LoadOwnershipQualifier::Unqualified);
       emitDestroyValue(B, loc, value);
     }
 
@@ -519,13 +520,13 @@ namespace {
 
     SILValue emitLoadOfCopy(SILBuilder &B, SILLocation loc, SILValue addr,
                             IsTake_t isTake) const override {
-      return B.createLoad(loc, addr);
+      return B.createLoad(loc, addr, LoadOwnershipQualifier::Unqualified);
     }
 
     void emitStoreOfCopy(SILBuilder &B, SILLocation loc,
                          SILValue value, SILValue addr,
                          IsInitialization_t isInit) const override {
-      B.createStore(loc, value, addr);
+      B.createStore(loc, value, addr, StoreOwnershipQualifier::Unqualified);
     }
 
     void emitDestroyAddress(SILBuilder &B, SILLocation loc,
@@ -565,7 +566,8 @@ namespace {
 
     SILValue emitLoadOfCopy(SILBuilder &B, SILLocation loc,
                             SILValue addr, IsTake_t isTake) const override {
-      SILValue value = B.createLoad(loc, addr);
+      SILValue value =
+          B.createLoad(loc, addr, LoadOwnershipQualifier::Unqualified);
       if (!isTake)
         emitCopyValue(B, loc, value);
       return value;
@@ -575,8 +577,9 @@ namespace {
                          SILValue newValue, SILValue addr,
                          IsInitialization_t isInit) const override {
       SILValue oldValue;
-      if (!isInit) oldValue = B.createLoad(loc, addr);
-      B.createStore(loc, newValue, addr);
+      if (!isInit)
+        oldValue = B.createLoad(loc, addr, LoadOwnershipQualifier::Unqualified);
+      B.createStore(loc, newValue, addr, StoreOwnershipQualifier::Unqualified);
       if (!isInit)
         emitDestroyValue(B, loc, oldValue);
     }
@@ -664,9 +667,11 @@ namespace {
     }
 
     SILValue emitCopyValue(SILBuilder &B, SILLocation loc,
-                           SILValue aggValue) const override {
-      B.createRetainValue(loc, aggValue, Atomicity::Atomic);
-      return aggValue;
+                           SILValue value) const override {
+      if (B.getFunction().hasQualifiedOwnership())
+        return B.createCopyValue(loc, value);
+      B.createRetainValue(loc, value, Atomicity::Atomic);
+      return value;
     }
 
     SILValue emitLoweredCopyValue(SILBuilder &B, SILLocation loc,
@@ -692,6 +697,11 @@ namespace {
 
     void emitDestroyValue(SILBuilder &B, SILLocation loc,
                           SILValue aggValue) const override {
+      if (B.getFunction().hasQualifiedOwnership()) {
+        B.emitDestroyValueAndFold(loc, aggValue);
+        return;
+      }
+
       B.emitReleaseValueAndFold(loc, aggValue);
     }
 
@@ -704,8 +714,8 @@ namespace {
       case LoweringStyle::Shallow:
         Fn = &TypeLowering::emitDestroyValue;
         break;
-      case LoweringStyle::DeepNoEnum:
-        Fn = &TypeLowering::emitLoweredDestroyValueDeepNoEnum;
+      case LoweringStyle::Deep:
+        Fn = &TypeLowering::emitLoweredDestroyValueDeep;
         break;
       }
 
@@ -790,18 +800,27 @@ namespace {
 
     SILValue emitCopyValue(SILBuilder &B, SILLocation loc,
                            SILValue value) const override {
+      if (B.getFunction().hasQualifiedOwnership())
+        return B.createCopyValue(loc, value);
       B.createRetainValue(loc, value, Atomicity::Atomic);
       return value;
     }
 
-    SILValue emitLoweredCopyValue(SILBuilder &B, SILLocation loc, SILValue value,
-                              LoweringStyle style) const override {
+    SILValue emitLoweredCopyValue(SILBuilder &B, SILLocation loc,
+                                  SILValue value,
+                                  LoweringStyle style) const override {
+      if (B.getFunction().hasQualifiedOwnership())
+        return B.createCopyValue(loc, value);
       B.createRetainValue(loc, value, Atomicity::Atomic);
       return value;
     }
 
     void emitDestroyValue(SILBuilder &B, SILLocation loc,
                           SILValue value) const override {
+      if (B.getFunction().hasQualifiedOwnership()) {
+        B.emitDestroyValueAndFold(loc, value);
+        return;
+      }
       B.emitReleaseValueAndFold(loc, value);
     }
 
@@ -810,6 +829,10 @@ namespace {
       assert(style != LoweringStyle::Shallow &&
              "This method should never be called when performing a shallow "
              "destroy value.");
+      if (B.getFunction().hasQualifiedOwnership()) {
+        B.emitDestroyValueAndFold(loc, value);
+        return;
+      }
       B.emitReleaseValueAndFold(loc, value);
     }
   };
@@ -840,13 +863,22 @@ namespace {
 
     SILValue emitCopyValue(SILBuilder &B, SILLocation loc,
                            SILValue value) const override {
-      if (!isa<FunctionRefInst>(value))
-        B.createStrongRetain(loc, value, Atomicity::Atomic);
+      if (isa<FunctionRefInst>(value))
+        return value;
+
+      if (B.getFunction().hasQualifiedOwnership())
+        return B.createCopyValue(loc, value);
+
+      B.createStrongRetain(loc, value, Atomicity::Atomic);
       return value;
     }
 
     void emitDestroyValue(SILBuilder &B, SILLocation loc,
                           SILValue value) const override {
+      if (B.getFunction().hasQualifiedOwnership()) {
+        B.emitDestroyValueAndFold(loc, value);
+        return;
+      }
       B.emitStrongReleaseAndFold(loc, value);
     }
   };
@@ -859,12 +891,19 @@ namespace {
 
     SILValue emitCopyValue(SILBuilder &B, SILLocation loc,
                            SILValue value) const override {
+      if (B.getFunction().hasQualifiedOwnership())
+        return B.createCopyValue(loc, value);
+
       B.createUnownedRetain(loc, value, Atomicity::Atomic);
       return value;
     }
 
     void emitDestroyValue(SILBuilder &B, SILLocation loc,
                           SILValue value) const override {
+      if (B.getFunction().hasQualifiedOwnership()) {
+        B.createDestroyValue(loc, value);
+        return;
+      }
       B.createUnownedRelease(loc, value, Atomicity::Atomic);
     }
   };

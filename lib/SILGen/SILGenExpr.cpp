@@ -545,7 +545,7 @@ emitRValueWithAccessor(SILGenFunction &SGF, SILLocation loc,
   case AddressorKind::Owning:
   case AddressorKind::NativeOwning:
     // Emit the release immediately.
-    SGF.B.emitStrongReleaseAndFold(loc, addressorResult.second.forward(SGF));
+    SGF.B.emitDestroyValueAndFold(loc, addressorResult.second.forward(SGF));
     break;
   case AddressorKind::NativePinning:
     // Emit the unpin immediately.
@@ -1322,7 +1322,7 @@ RValue RValueEmitter::visitErasureExpr(ErasureExpr *E, SGFContext C) {
 
 RValue SILGenFunction::emitAnyHashableErasure(SILLocation loc,
                                               ManagedValue value,
-                                              CanType type,
+                                              Type type,
                                               ProtocolConformanceRef conformance,
                                               SGFContext C) {
   // Ensure that the intrinsic function exists.
@@ -1340,21 +1340,14 @@ RValue SILGenFunction::emitAnyHashableErasure(SILLocation loc,
 
 RValue RValueEmitter::visitAnyHashableErasureExpr(AnyHashableErasureExpr *E,
                                                   SGFContext C) {
-  // Ensure that the intrinsic function exists.
-  auto convertFn = SGF.SGM.getConvertToAnyHashable(E);
-  if (!convertFn) return SGF.emitUndefRValue(E, E->getType());
-
-  // Construct the substitution for T: Hashable.
-  ProtocolConformanceRef conformances[] = { E->getConformance() };
-  Substitution sub(E->getSubExpr()->getType(),
-                   SGF.getASTContext().AllocateCopy(conformances));
-
   // Emit the source value into a temporary.
   auto sourceOrigType = AbstractionPattern::getOpaque();
   auto source =
     SGF.emitMaterializedRValueAsOrig(E->getSubExpr(), sourceOrigType);
 
-  return SGF.emitApplyOfLibraryIntrinsic(E, convertFn, sub, source, C);
+  return SGF.emitAnyHashableErasure(E, source,
+                                    E->getSubExpr()->getType(),
+                                    E->getConformance(), C);
 }
 
 /// Treating this as a successful operation, turn a CMV into a +1 MV.
@@ -3240,7 +3233,7 @@ public:
     auto strongType = SILType::getPrimitiveObjectType(
               unowned->getType().castTo<UnmanagedStorageType>().getReferentType());
     auto owned = gen.B.createUnmanagedToRef(loc, unowned, strongType);
-    gen.B.createRetainValue(loc, owned, Atomicity::Atomic);
+    gen.B.createCopyValue(loc, owned);
     auto ownedMV = gen.emitManagedRValueWithCleanup(owned);
     
     // Reassign the +1 storage with it.
@@ -3250,7 +3243,8 @@ public:
   RValue get(SILGenFunction &gen, SILLocation loc,
              ManagedValue base, SGFContext c) && override {
     // Load the value at +0.
-    SILValue owned = gen.B.createLoad(loc, base.getUnmanagedValue());
+    SILValue owned = gen.B.createLoad(loc, base.getUnmanagedValue(),
+                                      LoadOwnershipQualifier::Unqualified);
     // Convert it to unowned.
     auto refType = owned->getType().getSwiftRValueType();
     auto unownedType = SILType::getPrimitiveObjectType(

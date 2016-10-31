@@ -334,7 +334,8 @@ static bool isProtocolClass(Type t) {
 static ManagedValue emitManagedLoad(SILGenFunction &gen, SILLocation loc,
                                     ManagedValue addr,
                                     const TypeLowering &addrTL) {
-  auto loadedValue = gen.B.createLoad(loc, addr.forward(gen));
+  auto loadedValue = gen.B.createLoad(loc, addr.forward(gen),
+                                      LoadOwnershipQualifier::Unqualified);
   return gen.emitManagedRValueWithCleanup(loadedValue, addrTL);
 }
 
@@ -2181,7 +2182,8 @@ void ResultPlanner::execute(ArrayRef<SILValue> innerDirectResults,
 
     case Operation::DirectToIndirect: {
       auto result = claimNextInnerDirectResult(op.InnerResult);
-      Gen.B.createStore(Loc, result.forward(Gen), op.OuterResultAddr);
+      Gen.B.createStore(Loc, result.forward(Gen), op.OuterResultAddr,
+                        StoreOwnershipQualifier::Unqualified);
       continue;
     }
 
@@ -2189,7 +2191,9 @@ void ResultPlanner::execute(ArrayRef<SILValue> innerDirectResults,
       auto resultAddr = op.InnerResultAddr;
       auto &resultTL = Gen.getTypeLowering(resultAddr->getType());
       auto result = Gen.emitManagedRValueWithCleanup(
-                                 Gen.B.createLoad(Loc, resultAddr), resultTL);
+          Gen.B.createLoad(Loc, resultAddr,
+                           LoadOwnershipQualifier::Unqualified),
+          resultTL);
       addOuterDirectResult(result, op.OuterResult);
       continue;
     }

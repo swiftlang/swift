@@ -5331,7 +5331,7 @@ bool FailureDiagnosis::visitApplyExpr(ApplyExpr *callExpr) {
         return {CC_GeneralMismatch, {}};
 
       // FIXME: Handle matching of the generic types properly.
-      // Currently we don't filter result types containing generic parametes
+      // Currently we don't filter result types containing generic parameters
       // because there is no easy way to do that, and candidate set is going
       // to be pruned by matching of the argument types later on anyway, so
       // it's better to over report than to be too conservative.

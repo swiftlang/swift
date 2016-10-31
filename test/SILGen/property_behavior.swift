@@ -1,4 +1,8 @@
 // RUN: %target-swift-frontend -emit-silgen -enable-experimental-property-behaviors %s | %FileCheck %s
+
+// Note: CodeSynthesis is forming witnesses without proper substitutions.
+// XFAIL: *
+
 protocol behavior {
   associatedtype Value
 }

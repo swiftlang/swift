@@ -42,7 +42,7 @@ func tuple_bind(x x: (Int, String)!) -> String? {
   // CHECK:   cond_br {{%.*}}, [[NONNULL:bb[0-9]+]], [[NULL:bb[0-9]+]]
   // CHECK: [[NONNULL]]:
   // CHECK:   [[STRING:%.*]] = tuple_extract {{%.*}} : $(Int, String), 1
-  // CHECK-NOT: release_value [[STRING]]
+  // CHECK-NOT: destroy_value [[STRING]]
 }
 
 // CHECK-LABEL: sil hidden @_TF29implicitly_unwrapped_optional31tuple_bind_implicitly_unwrappedFT1xGSQTSiSS___SS

@@ -1,4 +1,4 @@
-// RUN: %target-sil-opt -enable-sil-verify-all -mandatory-inlining -emit-verbose-sil %s | %FileCheck %s
+// RUN: %target-sil-opt -assume-parsing-unqualified-ownership-sil -enable-sil-verify-all -mandatory-inlining -emit-verbose-sil %s | %FileCheck %s
 
 import Builtin
 import Swift
@@ -48,7 +48,7 @@ bb0(%0 : $Int64):
 
   // CHECK-LABEL: sil @inline_test_add : $@convention(thin) (Int64) -> Int64 {
   // CHECK: [[VAL9:%.*]] = apply                               {{.*}} line:38:9:sil
-  // CHECK: [[VAL10:%.*]] = apply                         {{.*}} line:39:9:sil 
+  // CHECK: [[VAL10:%.*]] = apply                         {{.*}} line:39:9:sil
   // CHECK: [[VAL11:%.*]] = alloc_box $Int64,             {{.*}} line:40:9:minlined
   // CHECK: [[PB11:%.*]] = project_box [[VAL11]]          {{.*}} line:40:9:minlined
   // CHECK: store [[VAL10]] to [[PB11]]                   {{.*}} line:40:9:minlined

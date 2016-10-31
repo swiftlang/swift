@@ -1,5 +1,5 @@
-// RUN: %target-sil-opt -enable-sil-verify-all -enable-loop-arc=0 -arc-sequence-opts %s | %FileCheck %s
-// RUN: %target-sil-opt -enable-sil-verify-all -enable-loop-arc=1 -arc-sequence-opts %s | %FileCheck %s
+// RUN: %target-sil-opt -assume-parsing-unqualified-ownership-sil -enable-sil-verify-all -enable-loop-arc=0 -arc-sequence-opts %s | %FileCheck %s
+// RUN: %target-sil-opt -assume-parsing-unqualified-ownership-sil -enable-sil-verify-all -enable-loop-arc=1 -arc-sequence-opts %s | %FileCheck %s
 
 sil_stage canonical
 
@@ -621,8 +621,8 @@ bb0(%0 : $SContainer):
 }
 
 // CHECK-LABEL: sil @retain_release_struct_with_single_nontrivial_retain_inner
-// CHECK-NOT: retain_value 
-// CHECK-NOT: release_value 
+// CHECK-NOT: retain_value
+// CHECK-NOT: release_value
 // CHECK: return
 sil @retain_release_struct_with_single_nontrivial_retain_inner : $@convention(thin) (SContainer) -> () {
 bb0(%0 : $SContainer):
@@ -634,8 +634,8 @@ bb0(%0 : $SContainer):
 }
 
 // CHECK-LABEL: sil @retain_release_struct_with_multiple_nontrivials_retain_outer
-// CHECK: retain_value 
-// CHECK: strong_release 
+// CHECK: retain_value
+// CHECK: strong_release
 // CHECK: return
 sil @retain_release_struct_with_multiple_nontrivials_retain_outer : $@convention(thin) (SContainer2) -> () {
 bb0(%0 : $SContainer2):
@@ -647,8 +647,8 @@ bb0(%0 : $SContainer2):
 }
 
 // CHECK-LABEL: sil @retain_release_struct_with_multiple_nontrivials_retain_inner
-// CHECK: retain_value 
-// CHECK: release_value 
+// CHECK: retain_value
+// CHECK: release_value
 // CHECK: return
 sil @retain_release_struct_with_multiple_nontrivials_retain_inner : $@convention(thin) (SContainer2) -> () {
 bb0(%0 : $SContainer2):

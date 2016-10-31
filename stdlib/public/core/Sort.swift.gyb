@@ -255,7 +255,7 @@ func _heapify<C>(
     root,
     offsetBy: elements.distance(
       from: range.lowerBound, to: range.upperBound) / 2)
-  
+
   while node != root {
     elements.formIndex(before: &node)
     _siftDown(

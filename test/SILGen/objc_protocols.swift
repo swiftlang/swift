@@ -31,30 +31,30 @@ func objc_generic<T : NSRuncing>(_ x: T) -> (NSObject, NSObject) {
   // CHECK: [[METHOD:%.*]] = witness_method [volatile] {{\$.*}},  #NSRuncing.runce!1.foreign
   // CHECK: [[RESULT1:%.*]] = apply [[METHOD]]<T>([[THIS1:%.*]]) : $@convention(objc_method) <τ_0_0 where τ_0_0 : NSRuncing> (τ_0_0) -> @autoreleased NSObject
 
-  // -- Result of copyRuncing is received retained according to -copy family
+  // -- Result of copyRuncing is received copy_valued according to -copy family
   // CHECK: [[METHOD:%.*]] = witness_method [volatile] {{\$.*}},  #NSRuncing.copyRuncing!1.foreign
   // CHECK: [[RESULT2:%.*]] = apply [[METHOD]]<T>([[THIS2:%.*]]) : $@convention(objc_method) <τ_0_0 where τ_0_0 : NSRuncing> (τ_0_0) -> @owned NSObject
 
   // -- Arguments are not consumed by objc calls
-  // CHECK: release [[THIS2]]
+  // CHECK: destroy_value [[THIS2]]
 }
 
 func objc_generic_partial_apply<T : NSRuncing>(_ x: T) {
   // CHECK:      [[FN:%.*]] = function_ref @_TTOFP14objc_protocols9NSRuncing5runceFT_CSo8NSObject
-  // CHECK-NEXT: strong_retain %0
+  // CHECK-NEXT: copy_value %0
   // CHECK-NEXT: [[METHOD:%.*]] = apply [[FN]]<T>(%0)
-  // CHECK-NEXT: strong_release [[METHOD]]
+  // CHECK-NEXT: destroy_value [[METHOD]]
   _ = x.runce
 
   // CHECK:      [[FN:%.*]] = function_ref @_TTOFP14objc_protocols9NSRuncing5runceFT_CSo8NSObject
   // CHECK-NEXT: [[METHOD:%.*]] = partial_apply [[FN]]<T>()
-  // CHECK-NEXT: strong_release [[METHOD]]
+  // CHECK-NEXT: destroy_value [[METHOD]]
   _ = T.runce
 
   // CHECK:      [[FN:%.*]] = function_ref @_TTOZFP14objc_protocols9NSRuncing5minceFT_CSo8NSObject
   // CHECK-NEXT: [[METATYPE:%.*]] = metatype $@thick T.Type
   // CHECK-NEXT: [[METHOD:%.*]] = apply [[FN]]<T>([[METATYPE]])
-  // CHECK-NEXT: strong_release [[METHOD:%.*]]
+  // CHECK-NEXT: destroy_value [[METHOD:%.*]]
   _ = T.mince
 }
 
@@ -64,10 +64,10 @@ func objc_generic_partial_apply<T : NSRuncing>(_ x: T) {
 // CHECK-NEXT: return [[METHOD]]
 
 // CHECK-LABEL: sil shared [thunk] @_TTOFP14objc_protocols9NSRuncing5runcefT_CSo8NSObject
-// CHECK:      strong_retain %0
+// CHECK:      copy_value %0
 // CHECK-NEXT: [[FN:%.*]] = witness_method $Self, #NSRuncing.runce!1.foreign
 // CHECK-NEXT: [[RESULT:%.*]] = apply [[FN]]<Self>(%0)
-// CHECK-NEXT: strong_release %0
+// CHECK-NEXT: destroy_value %0
 // CHECK-NEXT: return [[RESULT]]
 
 // CHECK-LABEL: sil shared [thunk] @_TTOZFP14objc_protocols9NSRuncing5minceFT_CSo8NSObject
@@ -88,22 +88,22 @@ func objc_protocol(_ x: NSRuncing) -> (NSObject, NSObject) {
   // CHECK: [[METHOD:%.*]] = witness_method [volatile] $[[OPENED]], #NSRuncing.runce!1.foreign
   // CHECK: [[RESULT1:%.*]] = apply [[METHOD]]<[[OPENED]]>([[THIS1]])
 
-  // -- Result of copyRuncing is received retained according to -copy family
+  // -- Result of copyRuncing is received copy_valued according to -copy family
   // CHECK: [[THIS2:%.*]] = open_existential_ref [[THIS2_ORIG:%.*]] : $NSRuncing to $[[OPENED2:@opened(.*) NSRuncing]]
   // CHECK: [[METHOD:%.*]] = witness_method [volatile] $[[OPENED2]], #NSRuncing.copyRuncing!1.foreign
   // CHECK: [[RESULT2:%.*]] = apply [[METHOD]]<[[OPENED2]]>([[THIS2:%.*]])
 
   // -- Arguments are not consumed by objc calls
-  // CHECK: release [[THIS2_ORIG]]
+  // CHECK: destroy_value [[THIS2_ORIG]]
 }
 
 func objc_protocol_partial_apply(_ x: NSRuncing) {
   // CHECK: [[THIS1:%.*]] = open_existential_ref %0 : $NSRuncing to $[[OPENED:@opened(.*) NSRuncing]]
   // CHECK: [[FN:%.*]] = function_ref @_TTOFP14objc_protocols9NSRuncing5runceFT_CSo8NSObject
-  // CHECK: strong_retain [[THIS1]]
+  // CHECK: copy_value [[THIS1]]
   // CHECK: [[RESULT:%.*]] = apply [[FN]]<[[OPENED]]>([[THIS1]])
-  // CHECK: strong_release [[RESULT]]
-  // CHECK: strong_release %0
+  // CHECK: destroy_value [[RESULT]]
+  // CHECK: destroy_value %0
   _ = x.runce
 
   // FIXME: rdar://21289579
@@ -244,8 +244,8 @@ func testInitializableExistential(_ im: Initializable.Type, i: Int) -> Initializ
 // CHECK:   [[I2_EXIST_CONTAINER:%[0-9]+]] = init_existential_ref [[I2]] : $@opened([[N]]) Initializable : $@opened([[N]]) Initializable, $Initializable
 // CHECK:   store [[I2_EXIST_CONTAINER]] to [[PB]] : $*Initializable
 // CHECK:   [[I2:%[0-9]+]] = load [[PB]] : $*Initializable
-// CHECK:   strong_retain [[I2]] : $Initializable
-// CHECK:   strong_release [[I2_BOX]] : $@box Initializable
+// CHECK:   copy_value [[I2]] : $Initializable
+// CHECK:   destroy_value [[I2_BOX]] : $@box Initializable
 // CHECK:   return [[I2]] : $Initializable
   var i2 = im.init(int: i)
   return i2

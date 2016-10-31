@@ -71,13 +71,13 @@ bool OwnershipModelEliminatorVisitor::visitLoadInst(LoadInst *LI) {
 
   // Otherwise, we need to break down the load inst into its unqualified
   // components.
-  auto *UnqualifiedLoad = B.createLoad(LI->getLoc(), LI->getOperand());
+  auto *UnqualifiedLoad = B.createLoad(LI->getLoc(), LI->getOperand(),
+                                       LoadOwnershipQualifier::Unqualified);
 
   // If we have a copy, insert a retain_value. All other copies do not require
   // more work.
   if (Qualifier == LoadOwnershipQualifier::Copy) {
-    B.createRetainValue(UnqualifiedLoad->getLoc(), UnqualifiedLoad,
-                        Atomicity::Atomic);
+    B.emitCopyValueOperation(UnqualifiedLoad->getLoc(), UnqualifiedLoad);
   }
 
   // Then remove the qualified load and use the unqualified load as the def of
@@ -99,7 +99,8 @@ bool OwnershipModelEliminatorVisitor::visitStoreInst(StoreInst *SI) {
   if (Qualifier != StoreOwnershipQualifier::Assign) {
     // If the ownership qualifier is not an assign, we can just emit an
     // unqualified store.
-    B.createStore(SI->getLoc(), SI->getSrc(), SI->getDest());
+    B.createStore(SI->getLoc(), SI->getSrc(), SI->getDest(),
+                  StoreOwnershipQualifier::Unqualified);
   } else {
     // If the ownership qualifier is [assign], then we need to eliminate the
     // old value.
@@ -107,9 +108,11 @@ bool OwnershipModelEliminatorVisitor::visitStoreInst(StoreInst *SI) {
     // 1. Load old value.
     // 2. Store new value.
     // 3. Release old value.
-    auto *Old = B.createLoad(SI->getLoc(), SI->getDest());
-    B.createStore(SI->getLoc(), SI->getSrc(), SI->getDest());
-    B.createReleaseValue(SI->getLoc(), Old, Atomicity::Atomic);
+    auto *Old = B.createLoad(SI->getLoc(), SI->getDest(),
+                             LoadOwnershipQualifier::Unqualified);
+    B.createStore(SI->getLoc(), SI->getSrc(), SI->getDest(),
+                  StoreOwnershipQualifier::Unqualified);
+    B.emitDestroyValueOperation(SI->getLoc(), Old);
   }
 
   // Then remove the qualified store.
@@ -120,7 +123,8 @@ bool OwnershipModelEliminatorVisitor::visitStoreInst(StoreInst *SI) {
 bool
 OwnershipModelEliminatorVisitor::visitLoadBorrowInst(LoadBorrowInst *LBI) {
   // Break down the load borrow into an unqualified load.
-  auto *UnqualifiedLoad = B.createLoad(LBI->getLoc(), LBI->getOperand());
+  auto *UnqualifiedLoad = B.createLoad(LBI->getLoc(), LBI->getOperand(),
+                                       LoadOwnershipQualifier::Unqualified);
 
   // Then remove the qualified load and use the unqualified load as the def of
   // all of LI's uses.
@@ -130,14 +134,18 @@ OwnershipModelEliminatorVisitor::visitLoadBorrowInst(LoadBorrowInst *LBI) {
 }
 
 bool OwnershipModelEliminatorVisitor::visitCopyValueInst(CopyValueInst *CVI) {
-  B.createRetainValue(CVI->getLoc(), CVI->getOperand(), Atomicity::Atomic);
+  // Now that we have set the unqualified ownership flag, destroy value
+  // operation will delegate to the appropriate strong_release, etc.
+  B.emitCopyValueOperation(CVI->getLoc(), CVI->getOperand());
   CVI->replaceAllUsesWith(CVI->getOperand());
   CVI->eraseFromParent();
   return true;
 }
 
 bool OwnershipModelEliminatorVisitor::visitDestroyValueInst(DestroyValueInst *DVI) {
-  B.createReleaseValue(DVI->getLoc(), DVI->getOperand(), Atomicity::Atomic);
+  // Now that we have set the unqualified ownership flag, destroy value
+  // operation will delegate to the appropriate strong_release, etc.
+  B.emitDestroyValueOperation(DVI->getLoc(), DVI->getOperand());
   DVI->eraseFromParent();
   return true;
 }

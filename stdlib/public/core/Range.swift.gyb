@@ -240,7 +240,7 @@ extension CountableRange
   ) -> CountableRange<Bound> {
     fatalError("uncallable")
   }
-  
+
   public subscript(
     _bounds: ClosedRange<Bound._DisabledRangeIndex>
   ) -> CountableRange<Bound> {

@@ -110,7 +110,7 @@ AnyHashableCasts.test("${valueExpr} as ${coercedType} as? ${castType}") {
     } else {
 %if expected:
       expectUnreachable()
-%end    
+%end
     }
   }
 }

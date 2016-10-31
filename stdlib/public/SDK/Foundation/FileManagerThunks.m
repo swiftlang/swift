@@ -41,7 +41,7 @@ NS_Swift_NSFileManager_enumeratorAt_includingPropertiesForKeys_options_errorHand
     NSArray *NS_RELEASES_ARGUMENT _Nullable keys,
     NSUInteger options,
     BOOL (^_Nonnull errorHandler)(NSURL * _Nonnull url, NSError * _Nonnull error) ) {
-    
+
   NSDirectoryEnumerator *result = [self_ enumeratorAtURL:url
                               includingPropertiesForKeys:keys
                                                  options:(NSDirectoryEnumerationOptions)options

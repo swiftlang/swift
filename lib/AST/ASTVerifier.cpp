@@ -1891,6 +1891,19 @@ struct ASTNodeBase {};
                 << "\n";
             abort();
           }
+
+          // Check the witness substitutions.
+          auto witness = normal->getWitness(req, nullptr);
+
+          if (witness.requiresSubstitution()) {
+            GenericEnv.push_back(witness.getSyntheticEnvironment());
+            for (const auto &sub : witness.getSubstitutions()) {
+              verifyChecked(sub.getReplacement());
+            }
+            assert(GenericEnv.back() == witness.getSyntheticEnvironment());
+            GenericEnv.pop_back();
+          }
+
           continue;
         }
       }

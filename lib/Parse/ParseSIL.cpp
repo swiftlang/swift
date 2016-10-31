@@ -3994,6 +3994,8 @@ bool SILParser::parseSILBasicBlock(SILBuilder &B) {
   F->getBlocks().remove(BB);
   F->getBlocks().push_back(BB);
 
+  bool AssumeUnqualifiedOwnershipWhenParsing =
+    F->getModule().getOptions().AssumeUnqualifiedOwnershipWhenParsing;
   do {
     if (parseSILInstruction(BB, B))
       return true;
@@ -4001,7 +4003,9 @@ bool SILParser::parseSILBasicBlock(SILBuilder &B) {
     // Qualification. For more details, see the comment on the
     // FunctionOwnershipEvaluator class.
     SILInstruction *ParsedInst = &*BB->rbegin();
-    if (!OwnershipEvaluator.evaluate(ParsedInst)) {
+    if (AssumeUnqualifiedOwnershipWhenParsing) {
+      F->setUnqualifiedOwnership();
+    } else if (!OwnershipEvaluator.evaluate(ParsedInst)) {
       P.diagnose(ParsedInst->getLoc().getSourceLoc(),
                  diag::found_unqualified_instruction_in_qualified_function,
                  F->getName());

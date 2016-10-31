@@ -18,7 +18,7 @@ func testEquality<A : Equatable, B : Equatable, C : Equatable>(
   //===--- TRACE boilerplate ----------------------------------------------===//
   _ message: @autoclosure () -> String = "",
   showFrame: Bool = true,
-  stackTrace: SourceLocStack = SourceLocStack(),  
+  stackTrace: SourceLocStack = SourceLocStack(),
   file: String = #file, line: UInt = #line
 ) {
   let trace = stackTrace.pushIf(showFrame, file: file, line: line)
@@ -92,7 +92,7 @@ func testOrdering<A : Comparable, B : Comparable, C : Comparable>(
   //===--- TRACE boilerplate ----------------------------------------------===//
   _ message: @autoclosure () -> String = "",
   showFrame: Bool = true,
-  stackTrace: SourceLocStack = SourceLocStack(),  
+  stackTrace: SourceLocStack = SourceLocStack(),
   file: String = #file, line: UInt = #line
 ) {
   let trace = stackTrace.pushIf(showFrame, file: file, line: line)

@@ -1,5 +1,5 @@
 // First parse this and then emit a *.sib. Then read in the *.sib, then recreate
-// RUN: %target-swift-frontend -emit-ir %s | %FileCheck %s
+// RUN: %target-swift-frontend -assume-parsing-unqualified-ownership-sil -emit-ir %s | %FileCheck %s
 
 import Builtin
 

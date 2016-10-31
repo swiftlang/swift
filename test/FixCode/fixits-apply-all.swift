@@ -15,7 +15,7 @@ func foo() -> Int {
   }
 }
 func goo(_ e: Error) {
-	
+
 }
 
 @warn_unused_result(message="test message")

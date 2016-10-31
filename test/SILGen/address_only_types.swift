@@ -174,7 +174,7 @@ func address_only_assignment_from_lv(_ dest: inout Unloadable, v: Unloadable) {
   dest = v
   // FIXME: emit into?
   // CHECK: copy_addr [[PBOX]] to %0 :
-  // CHECK: release [[VBOX]]
+  // CHECK: destroy_value [[VBOX]]
 }
 
 var global_prop : Unloadable {
@@ -215,7 +215,7 @@ func address_only_var() -> Unloadable {
   // CHECK: apply {{%.*}}([[XPB]])
   return x
   // CHECK: copy_addr [[XPB]] to [initialization] [[RET]]
-  // CHECK: release [[XBOX]]
+  // CHECK: destroy_value [[XBOX]]
   // CHECK: return
 }
 

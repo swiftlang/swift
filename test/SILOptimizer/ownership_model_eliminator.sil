@@ -12,7 +12,7 @@ sil @use_int32 : $@convention(thin) (Builtin.Int32) -> ()
 // CHECK: [[LOAD2:%[0-9]+]] = load [[ARG1]] : $*Builtin.NativeObject
 // CHECK: apply {{%[0-9]+}}([[LOAD2]])
 // CHECK: [[LOAD3:%[0-9]+]] = load [[ARG1]] : $*Builtin.NativeObject
-// CHECK: retain_value [[LOAD3]]
+// CHECK: strong_retain [[LOAD3]]
 // CHECK: apply {{%[0-9]+}}([[LOAD3]])
 // CHECK: [[LOAD4:%[0-9]+]] = load [[ARG2]] : $*Builtin.Int32
 // CHECK: apply {{%[0-9]+}}([[LOAD4]])
@@ -39,7 +39,7 @@ bb0(%0 : $*Builtin.NativeObject, %1 : $*Builtin.Int32):
 // CHECK: store [[ARG2]] to [[ARG1]] : $*Builtin.NativeObject
 // CHECK: [[OLDVAL:%[0-9]+]] = load [[ARG1]] : $*Builtin.NativeObject
 // CHECK: store [[ARG2]] to [[ARG1]] : $*Builtin.NativeObject
-// CHECK: release_value [[OLDVAL]]
+// CHECK: strong_release [[OLDVAL]]
 // CHECK: store [[ARG4]] to [[ARG3]] : $*Builtin.Int32
 sil @store : $@convention(thin) (@in Builtin.NativeObject, Builtin.NativeObject, @in Builtin.Int32, Builtin.Int32) -> () {
 bb0(%0 : $*Builtin.NativeObject, %1 : $Builtin.NativeObject, %2 : $*Builtin.Int32, %3 : $Builtin.Int32):
@@ -64,14 +64,18 @@ bb0(%0 : $*Builtin.NativeObject):
   return %3 : $()
 }
 
+sil @opaque_function : $@convention(thin) () -> ()
+
 // CHECK-LABEL: sil @copy_value_destroy_value : $@convention(thin) (@owned Builtin.NativeObject) -> @owned Builtin.NativeObject {
 // CHECK: bb0([[ARG1:%.*]] : $Builtin.NativeObject):
-// CHECK: retain_value [[ARG1]]
-// CHECK: release_value [[ARG1]]
+// CHECK: strong_retain [[ARG1]]
+// CHECK: strong_release [[ARG1]]
 // CHECK: return [[ARG1]]
 sil @copy_value_destroy_value : $@convention(thin) (@owned Builtin.NativeObject) -> @owned Builtin.NativeObject {
 bb0(%0 : $Builtin.NativeObject):
-  %1 = copy_value %0 : $Builtin.NativeObject
+  %1 = function_ref @opaque_function : $@convention(thin) () -> ()
+  %2 = copy_value %0 : $Builtin.NativeObject
+  apply %1() : $@convention(thin) () -> ()
   destroy_value %0 : $Builtin.NativeObject
-  return %1 : $Builtin.NativeObject
+  return %2 : $Builtin.NativeObject
 }

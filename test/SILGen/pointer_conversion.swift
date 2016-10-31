@@ -85,7 +85,7 @@ func arrayToPointer() {
   // CHECK: [[OWNER:%.*]] = apply [[CONVERT_MUTABLE]]<Int, UnsafeMutablePointer<Int>>([[POINTER_BUF:%[0-9]*]],
   // CHECK: [[POINTER:%.*]] = load [[POINTER_BUF]]
   // CHECK: apply [[TAKES_MUTABLE_POINTER]]([[POINTER]])
-  // CHECK: release_value [[OWNER]]
+  // CHECK: destroy_value [[OWNER]]
 
   takesConstPointer(ints)
   // CHECK: [[TAKES_CONST_POINTER:%.*]] = function_ref @_TF18pointer_conversion17takesConstPointerFGSPSi_T_
@@ -93,7 +93,7 @@ func arrayToPointer() {
   // CHECK: [[OWNER:%.*]] = apply [[CONVERT_CONST]]<Int, UnsafePointer<Int>>([[POINTER_BUF:%[0-9]*]],
   // CHECK: [[POINTER:%.*]] = load [[POINTER_BUF]]
   // CHECK: apply [[TAKES_CONST_POINTER]]([[POINTER]])
-  // CHECK: release_value [[OWNER]]
+  // CHECK: destroy_value [[OWNER]]
 
   takesMutableRawPointer(&ints)
   // CHECK: [[TAKES_MUTABLE_RAW_POINTER:%.*]] = function_ref @_TF18pointer_conversion22takesMutableRawPointerFSvT_ :
@@ -101,7 +101,7 @@ func arrayToPointer() {
   // CHECK: [[OWNER:%.*]] = apply [[CONVERT_MUTABLE]]<Int, UnsafeMutableRawPointer>([[POINTER_BUF:%[0-9]*]],
   // CHECK: [[POINTER:%.*]] = load [[POINTER_BUF]]
   // CHECK: apply [[TAKES_MUTABLE_RAW_POINTER]]([[POINTER]])
-  // CHECK: release_value [[OWNER]]
+  // CHECK: destroy_value [[OWNER]]
 
   takesConstRawPointer(ints)
   // CHECK: [[TAKES_CONST_RAW_POINTER:%.*]] = function_ref @_TF18pointer_conversion20takesConstRawPointerFSVT_ :
@@ -109,7 +109,7 @@ func arrayToPointer() {
   // CHECK: [[OWNER:%.*]] = apply [[CONVERT_CONST]]<Int, UnsafeRawPointer>([[POINTER_BUF:%[0-9]*]],
   // CHECK: [[POINTER:%.*]] = load [[POINTER_BUF]]
   // CHECK: apply [[TAKES_CONST_RAW_POINTER]]([[POINTER]])
-  // CHECK: release_value [[OWNER]]
+  // CHECK: destroy_value [[OWNER]]
 }
 
 // CHECK-LABEL: sil hidden @_TF18pointer_conversion15stringToPointerFSST_ 
@@ -120,7 +120,7 @@ func stringToPointer(_ s: String) {
   // CHECK: [[OWNER:%.*]] = apply [[CONVERT_STRING]]<UnsafeRawPointer>([[POINTER_BUF:%[0-9]*]],
   // CHECK: [[POINTER:%.*]] = load [[POINTER_BUF]]
   // CHECK: apply [[TAKES_CONST_VOID_POINTER]]([[POINTER]])
-  // CHECK: release_value [[OWNER]]
+  // CHECK: destroy_value [[OWNER]]
 
   takesConstRawPointer(s)
   // CHECK: [[TAKES_CONST_RAW_POINTER:%.*]] = function_ref @_TF18pointer_conversion20takesConstRawPointerFSV
@@ -128,7 +128,7 @@ func stringToPointer(_ s: String) {
   // CHECK: [[OWNER:%.*]] = apply [[CONVERT_STRING]]<UnsafeRawPointer>([[POINTER_BUF:%[0-9]*]],
   // CHECK: [[POINTER:%.*]] = load [[POINTER_BUF]]
   // CHECK: apply [[TAKES_CONST_RAW_POINTER]]([[POINTER]])
-  // CHECK: release_value [[OWNER]]
+  // CHECK: destroy_value [[OWNER]]
 }
 
 // CHECK-LABEL: sil hidden @_TF18pointer_conversion14inoutToPointerFT_T_ 
@@ -205,7 +205,7 @@ func classInoutToPointer() {
   // CHECK: apply [[TAKES_PLUS_ZERO]]
   // CHECK: [[UNOWNED_OUT:%.*]] = load [[WRITEBACK]]
   // CHECK: [[OWNED_OUT:%.*]] = unmanaged_to_ref [[UNOWNED_OUT]]
-  // CHECK: retain_value [[OWNED_OUT]]
+  // CHECK: copy_value [[OWNED_OUT]]
   // CHECK: assign [[OWNED_OUT]] to [[PB]]
 
   var cq: C? = C()

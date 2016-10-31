@@ -20,7 +20,7 @@ func reabstractFunctionInOut() {
   // CHECK: [[FUNC:%.*]] = function_ref @_TF17reabstract_lvalue19consumeGenericInOut
   // CHECK: [[ABSTRACTED_BOX:%.*]] = alloc_stack $@callee_owned (@in Int) -> @out Double
   // CHECK: [[THICK_ARG:%.*]] = load [[PB]]
-  // CHECK: strong_retain [[THICK_ARG]]
+  // CHECK: copy_value [[THICK_ARG]]
   // CHECK: [[THUNK1:%.*]] = function_ref @_TTRXFo_dSi_dSd_XFo_iSi_iSd_
   // CHECK: [[ABSTRACTED_ARG:%.*]] = partial_apply [[THUNK1]]([[THICK_ARG]])
   // CHECK: store [[ABSTRACTED_ARG]] to [[ABSTRACTED_BOX]]

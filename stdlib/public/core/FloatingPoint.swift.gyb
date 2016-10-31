@@ -1799,7 +1799,7 @@ extension FloatingPoint {
     if x <= y || y.isNaN { return x }
     return y
   }
-  
+
   public static func maximum(_ x: Self, _ y: Self) -> Self {
     if x.isSignalingNaN || y.isSignalingNaN {
       //  Produce a quiet NaN matching platform arithmetic behavior.
@@ -1808,7 +1808,7 @@ extension FloatingPoint {
     if x > y || y.isNaN { return x }
     return y
   }
-  
+
   public static func minimumMagnitude(_ x: Self, _ y: Self) -> Self {
     if x.isSignalingNaN || y.isSignalingNaN {
       //  Produce a quiet NaN matching platform arithmetic behavior.
@@ -1817,7 +1817,7 @@ extension FloatingPoint {
     if x.magnitude <= y.magnitude || y.isNaN { return x }
     return y
   }
-  
+
   public static func maximumMagnitude(_ x: Self, _ y: Self) -> Self {
     if x.isSignalingNaN || y.isSignalingNaN {
       //  Produce a quiet NaN matching platform arithmetic behavior.
@@ -1838,7 +1838,7 @@ extension FloatingPoint {
 }
 
 extension BinaryFloatingPoint {
-  
+
   /// The radix, or base of exponentiation, for this floating-point type.
   ///
   /// All binary floating-point types have a radix of 2. The magnitude of a
@@ -1876,12 +1876,12 @@ extension BinaryFloatingPoint {
     //  Sign, exponent, and significand all match.
     return true
   }
-  
+
 
   /*  TODO: uncomment these default implementations when it becomes possible
       to use them.
   //  TODO: The following comparison implementations are not quite correct for
-  //  the unusual case where one type has more exponent range and the other 
+  //  the unusual case where one type has more exponent range and the other
   //  uses more fractional bits, *and* the value with more exponent range is
   //  subnormal when converted to the other type. This is an extremely niche
   //  corner case, however (it cannot occur with the usual IEEE 754 floating-

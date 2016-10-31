@@ -275,8 +275,9 @@ void SILGenFunction::emitValueConstructor(ConstructorDecl *ctor) {
     
     if (!lowering.isAddressOnly()) {
       // Otherwise, load and return the final 'self' value.
-      selfValue = B.createLoad(cleanupLoc, selfLV);
-      
+      selfValue =
+          B.createLoad(cleanupLoc, selfLV, LoadOwnershipQualifier::Unqualified);
+
       // Emit a retain of the loaded value, since we return it +1.
       lowering.emitCopyValue(B, cleanupLoc, selfValue);
 
@@ -581,7 +582,8 @@ void SILGenFunction::emitClassConstructorInitializer(ConstructorDecl *ctor) {
     if (NeedsBoxForSelf) {
       SILLocation prologueLoc = RegularLocation(ctor);
       prologueLoc.markAsPrologue();
-      B.createStore(prologueLoc, selfArg, VarLocs[selfDecl].value);
+      B.createStore(prologueLoc, selfArg, VarLocs[selfDecl].value,
+                    StoreOwnershipQualifier::Unqualified);
     } else {
       selfArg = B.createMarkUninitialized(selfDecl, selfArg, MUKind);
       VarLocs[selfDecl] = VarLoc::get(selfArg);
@@ -667,12 +669,13 @@ void SILGenFunction::emitClassConstructorInitializer(ConstructorDecl *ctor) {
       // Emit the call to super.init() right before exiting from the initializer.
       if (Expr *SI = ctor->getSuperInitCall())
         emitRValue(SI);
-      
-      selfArg = B.createLoad(cleanupLoc, VarLocs[selfDecl].value);
+
+      selfArg = B.createLoad(cleanupLoc, VarLocs[selfDecl].value,
+                             LoadOwnershipQualifier::Unqualified);
     }
     
     // We have to do a retain because we are returning the pointer +1.
-    selfArg = B.emitCopyValueOperation(cleanupLoc, selfArg);
+    B.emitCopyValueOperation(cleanupLoc, selfArg);
 
     // Inject the self value into an optional if the constructor is failable.
     if (ctor->getFailability() != OTK_None) {
