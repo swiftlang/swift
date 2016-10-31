@@ -102,7 +102,7 @@ func testD(_ m: MetaHolder, dd: D.Type, d: D) {
   // CHECK: [[RESULT:%.*]] = project_box [[D2]]
   // CHECK: [[FN:%[0-9]+]] = function_ref @_TFE19protocol_extensionsPS_2P111returnsSelf{{.*}}
   // CHECK: [[DCOPY:%[0-9]+]] = alloc_stack $D
-  // CHECK: store [[D]] to [[DCOPY]] : $*D
+  // CHECK: store [[D]] to [init] [[DCOPY]] : $*D
   // CHECK: apply [[FN]]<D>([[RESULT]], [[DCOPY]]) : $@convention(method) <τ_0_0 where τ_0_0 : P1> (@in_guaranteed τ_0_0) -> @out τ_0_0
   var d2: D = d.returnsSelf()
 

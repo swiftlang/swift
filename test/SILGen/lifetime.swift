@@ -131,7 +131,7 @@ func reftype_arg(_ a: Ref) {
     // CHECK: bb0([[A:%[0-9]+]] : $Ref):
     // CHECK: [[AADDR:%[0-9]+]] = alloc_box $Ref
     // CHECK: [[PA:%[0-9]+]] = project_box [[AADDR]]
-    // CHECK: store [[A]] to [[PA]]
+    // CHECK: store [[A]] to [init] [[PA]]
     // CHECK: destroy_value [[AADDR]]
     // CHECK: return
 }
@@ -153,7 +153,7 @@ func reftype_call_store_to_local() {
     // CHECK: = function_ref @_TF8lifetime12reftype_funcFT_CS_3Ref : $@convention(thin) () -> @owned Ref
     // CHECK-NEXT: [[R:%[0-9]+]] = apply
     // CHECK-NOT: copy_value [[R]]
-    // CHECK: store [[R]] to [[PB]]
+    // CHECK: store [[R]] to [init] [[PB]]
     // CHECK-NOT: destroy_value [[R]]
     // CHECK: destroy_value [[A]]
     // CHECK-NOT: destroy_value [[R]]
@@ -177,7 +177,7 @@ func reftype_call_with_arg(_ a: Ref) {
     // CHECK: bb0([[A1:%[0-9]+]] : $Ref):
     // CHECK: [[AADDR:%[0-9]+]] = alloc_box $Ref
     // CHECK: [[PB:%.*]] = project_box [[AADDR]]
-    // CHECK: store [[A1]] to [[PB]]
+    // CHECK: store [[A1]] to [init] [[PB]]
 
     reftype_func_with_arg(a)
     // CHECK: [[RFWA:%[0-9]+]] = function_ref @_TF8lifetime21reftype_func_with_arg
@@ -246,9 +246,9 @@ struct Daleth {
   // CHECK-LABEL: sil hidden @_TFV8lifetime6DalethC{{.*}} : $@convention(method) (@owned Aleph, @owned Beth, @in Unloadable, @thin Daleth.Type) -> @out Daleth {
   // CHECK: bb0([[THIS:%.*]] : $*Daleth, [[A:%.*]] : $Aleph, [[B:%.*]] : $Beth, [[C:%.*]] : $*Unloadable, {{%.*}} : $@thin Daleth.Type):
   // CHECK-NEXT:   [[A_ADDR:%.*]] = struct_element_addr [[THIS]] : $*Daleth, #Daleth.a
-  // CHECK-NEXT:   store [[A]] to [[A_ADDR]]
+  // CHECK-NEXT:   store [[A]] to [init] [[A_ADDR]]
   // CHECK-NEXT:   [[B_ADDR:%.*]] = struct_element_addr [[THIS]] : $*Daleth, #Daleth.b
-  // CHECK-NEXT:   store [[B]] to [[B_ADDR]]
+  // CHECK-NEXT:   store [[B]] to [init] [[B_ADDR]]
   // CHECK-NEXT:   [[C_ADDR:%.*]] = struct_element_addr [[THIS]] : $*Daleth, #Daleth.c
   // CHECK-NEXT:   copy_addr [take] [[C]] to [initialization] [[C_ADDR]]
   // CHECK-NEXT:   tuple ()
@@ -299,7 +299,7 @@ struct Zayin {
   // CHECK-NEXT:   [[THIS_A0_ADDR:%.*]] = tuple_element_addr [[THIS_A_ADDR]] : {{.*}}, 0
   // CHECK-NEXT:   [[THIS_A1_ADDR:%.*]] = tuple_element_addr [[THIS_A_ADDR]] : {{.*}}, 1
   // CHECK-NEXT:   copy_addr [take] [[A0]] to [initialization] [[THIS_A0_ADDR]]
-  // CHECK-NEXT:   store [[A1]] to [[THIS_A1_ADDR]]
+  // CHECK-NEXT:   store [[A1]] to [trivial] [[THIS_A1_ADDR]]
   // CHECK-NEXT:   [[THIS_B_ADDR:%.*]] = struct_element_addr [[THIS]] : $*Zayin, #Zayin.b
   // CHECK-NEXT:   copy_addr [take] [[B]] to [initialization] [[THIS_B_ADDR]]
   // CHECK-NEXT:   tuple ()
@@ -340,7 +340,7 @@ func logical_lvalue_lifetime(_ r: RefWithProp, _ i: Int, _ v: Val) {
   // CHECK: [[PR:%[0-9]+]] = project_box [[RADDR]]
   // CHECK: [[IADDR:%[0-9]+]] = alloc_box $Int
   // CHECK: [[PI:%[0-9]+]] = project_box [[IADDR]]
-  // CHECK: store %1 to [[PI]]
+  // CHECK: store %1 to [trivial] [[PI]]
   // CHECK: [[VADDR:%[0-9]+]] = alloc_box $Val
   // CHECK: [[PV:%[0-9]+]] = project_box [[VADDR]]
 
@@ -367,7 +367,7 @@ func logical_lvalue_lifetime(_ r: RefWithProp, _ i: Int, _ v: Val) {
   // CHECK: {{.*}}([[CALLBACK_ADDR:%.*]] : 
   // CHECK: [[CALLBACK:%.*]] = pointer_to_thin_function [[CALLBACK_ADDR]] : $Builtin.RawPointer to $@convention(thin) (Builtin.RawPointer, @inout Builtin.UnsafeValueBuffer, @inout RefWithProp, @thick RefWithProp.Type) -> ()
   // CHECK: [[TEMP:%.*]] = alloc_stack $RefWithProp
-  // CHECK: store [[R2]] to [[TEMP]]
+  // CHECK: store [[R2]] to [init] [[TEMP]]
   // CHECK: apply [[CALLBACK]]({{.*}}, [[STORAGE]], [[TEMP]], {{%.*}})
 }
 
@@ -425,7 +425,7 @@ class Foo<T> {
     // CHECK: [[THIS:%[0-9]+]] = mark_uninitialized
     // CHECK: [[CHIADDR:%[0-9]+]] = alloc_box $Int
     // CHECK: [[PCHI:%[0-9]+]] = project_box [[CHIADDR]]
-    // CHECK: store [[CHI]] to [[PCHI]]
+    // CHECK: store [[CHI]] to [trivial] [[PCHI]]
 
     // CHECK: ref_element_addr {{.*}}, #Foo.z
 
@@ -618,10 +618,10 @@ class D : B {
     // CHECK: store [[THIS]] to [[THISADDR]]
     // CHECK: [[XADDR:%[0-9]+]] = alloc_box $Int
     // CHECK: [[PX:%[0-9]+]] = project_box [[XADDR]]
-    // CHECK: store [[X]] to [[PX]]
+    // CHECK: store [[X]] to [trivial] [[PX]]
     // CHECK: [[YADDR:%[0-9]+]] = alloc_box $Int
     // CHECK: [[PY:%[0-9]+]] = project_box [[YADDR]]
-    // CHECK: store [[Y]] to [[PY]]
+    // CHECK: store [[Y]] to [trivial] [[PY]]
 
     super.init(y: y)
     // CHECK: [[THIS1:%[0-9]+]] = load [[THISADDR]]

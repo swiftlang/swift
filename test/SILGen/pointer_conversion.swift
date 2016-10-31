@@ -198,7 +198,7 @@ func classInoutToPointer() {
   // CHECK: [[WRITEBACK:%.*]] = alloc_stack $@sil_unmanaged C
   // CHECK: [[OWNED:%.*]] = load [[PB]]
   // CHECK: [[UNOWNED:%.*]] = ref_to_unmanaged [[OWNED]]
-  // CHECK: store [[UNOWNED]] to [[WRITEBACK]]
+  // CHECK: store [[UNOWNED]] to [trivial] [[WRITEBACK]]
   // CHECK: [[POINTER:%.*]] = address_to_pointer [[WRITEBACK]]
   // CHECK: [[CONVERT:%.*]] = function_ref @_TFs30_convertInOutToPointerArgument
   // CHECK: apply [[CONVERT]]<AutoreleasingUnsafeMutablePointer<C>>({{%.*}}, [[POINTER]])

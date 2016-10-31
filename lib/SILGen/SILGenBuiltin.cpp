@@ -592,8 +592,8 @@ emitBuiltinCastReference(SILGenFunction &gen,
     // a retain. The cast will load the reference from the source temp and
     // store it into a dest temp effectively forwarding the cleanup.
     fromAddr = gen.emitTemporaryAllocation(loc, srcVal->getType());
-    gen.B.createStore(loc, srcVal, fromAddr,
-                      StoreOwnershipQualifier::Unqualified);
+    fromTL.emitStore(gen.B, loc, srcVal, fromAddr,
+                     StoreOwnershipQualifier::Init);
   } else {
     // The cast loads directly from the source address.
     fromAddr = srcVal;
@@ -632,8 +632,8 @@ static ManagedValue emitBuiltinReinterpretCast(SILGenFunction &gen,
     // If the from value is loadable, move it to a buffer.
     if (fromTL.isLoadable()) {
       fromAddr = gen.emitTemporaryAllocation(loc, args[0].getValue()->getType());
-      gen.B.createStore(loc, args[0].getValue(), fromAddr,
-                        StoreOwnershipQualifier::Unqualified);
+      fromTL.emitStore(gen.B, loc, args[0].getValue(), fromAddr,
+                       StoreOwnershipQualifier::Init);
     } else {
       fromAddr = args[0].getValue();
     }

@@ -50,7 +50,7 @@ struct Foo {
     // CHECK: [[SELF:%.*]] = load [[UNINIT_SELF]]
     // CHECK: [[GETTER:%.*]] = function_ref @_TFV22property_behavior_init3Foog1xSi
     // CHECK: [[VALUE:%.*]] = apply [[GETTER]]([[SELF]])
-    // CHECK: store [[VALUE]] to [[INOUT]]
+    // CHECK: store [[VALUE]] to [trivial] [[INOUT]]
     // CHECK: apply [[WHACK]]<Int>([[INOUT]])
     // CHECK: [[VALUE:%.*]] = load [[INOUT]]
     // CHECK: [[SETTER:%.*]] = function_ref @_TFV22property_behavior_init3Foos1xSi

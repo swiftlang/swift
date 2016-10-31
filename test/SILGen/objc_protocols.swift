@@ -242,7 +242,7 @@ func testInitializableExistential(_ im: Initializable.Type, i: Int) -> Initializ
 // CHECK:   [[INIT_WITNESS:%[0-9]+]] = witness_method [volatile] $@opened([[N]]) Initializable, #Initializable.init!initializer.1.foreign, [[ARCHETYPE_META]]{{.*}} : $@convention(objc_method) <τ_0_0 where τ_0_0 : Initializable> (Int, @owned τ_0_0) -> @owned τ_0_0
 // CHECK:   [[I2:%[0-9]+]] = apply [[INIT_WITNESS]]<@opened([[N]]) Initializable>([[I]], [[I2_ALLOC]]) : $@convention(objc_method) <τ_0_0 where τ_0_0 : Initializable> (Int, @owned τ_0_0) -> @owned τ_0_0
 // CHECK:   [[I2_EXIST_CONTAINER:%[0-9]+]] = init_existential_ref [[I2]] : $@opened([[N]]) Initializable : $@opened([[N]]) Initializable, $Initializable
-// CHECK:   store [[I2_EXIST_CONTAINER]] to [[PB]] : $*Initializable
+// CHECK:   store [[I2_EXIST_CONTAINER]] to [init] [[PB]] : $*Initializable
 // CHECK:   [[I2:%[0-9]+]] = load [[PB]] : $*Initializable
 // CHECK:   copy_value [[I2]] : $Initializable
 // CHECK:   destroy_value [[I2_BOX]] : $@box Initializable

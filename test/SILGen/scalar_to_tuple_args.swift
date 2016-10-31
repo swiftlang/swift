@@ -53,7 +53,7 @@ tupleWithDefaults(x: (x,x))
 // CHECK: [[MEMORY:%.*]] = tuple_extract [[ALLOC_ARRAY]] {{.*}}, 1
 // CHECK: [[ADDR:%.*]] = pointer_to_address [[MEMORY]]
 // CHECK: [[X:%.*]] = load [[X_ADDR]]
-// CHECK: store [[X]] to [[ADDR]]
+// CHECK: store [[X]] to [trivial] [[ADDR]]
 // CHECK: apply [[VARIADIC_FIRST]]([[ARRAY]])
 variadicFirst(x)
 

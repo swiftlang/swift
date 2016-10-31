@@ -10,7 +10,7 @@ throw MyError.A
 // CHECK: [[ERR:%.*]] = alloc_existential_box $Error, $MyError
 // CHECK: [[ADDR:%.*]] = project_existential_box $MyError in [[ERR]] : $Error
 // CHECK: [[T0:%.*]] = enum $MyError, #MyError.A!enumelt
-// CHECK: store [[T0]] to [[ADDR]] : $*MyError
+// CHECK: store [[T0]] to [trivial] [[ADDR]] : $*MyError
 // CHECK: builtin "willThrow"([[ERR]] : $Error)
 // CHECK: br bb2([[ERR]] : $Error)
 

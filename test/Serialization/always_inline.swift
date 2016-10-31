@@ -12,7 +12,7 @@ import def_always_inline
 // SIL: [[RAW:%.+]] = global_addr @_Tv13always_inline3rawSb : $*Bool
 // SIL: [[FUNC:%.+]] = function_ref @_TF17def_always_inline16testAlwaysInlineFT1xSb_Sb : $@convention(thin) (Bool) -> Bool
 // SIL: [[RESULT:%.+]] = apply [[FUNC]]({{%.+}}) : $@convention(thin) (Bool) -> Bool
-// SIL: store [[RESULT]] to [[RAW]] : $*Bool
+// SIL: store [[RESULT]] to [trivial] [[RAW]] : $*Bool
 var raw = testAlwaysInline(x: false)
 
 // SIL: [[FUNC2:%.+]] = function_ref @_TFV17def_always_inline22AlwaysInlineInitStructCfT1xSb_S0_ : $@convention(method) (Bool, @thin AlwaysInlineInitStruct.Type) -> AlwaysInlineInitStruct

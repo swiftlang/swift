@@ -444,10 +444,10 @@ func test_mixed_let_var() {
   case var x where runced():
     // CHECK: [[BOX:%.*]] = alloc_box $String, var, name "x"
     // CHECK: [[PBOX:%.*]] = project_box [[BOX]]
-    // CHECK: store [[VAL]] to [[PBOX]]
+    // CHECK: [[VAL_COPY:%.*]] = copy_value [[VAL]]
+    // CHECK: store [[VAL_COPY]] to [[PBOX]]
     // CHECK: [[A:%.*]] = function_ref @_TF10switch_var1aFT1xSS_T_
     // CHECK: [[X:%.*]] = load [[PBOX]]
-    // CHECK: copy_value [[X]]
     // CHECK: apply [[A]]([[X]])
     a(x: x)
   case let y where funged():
@@ -612,7 +612,7 @@ func test_multiple_patterns5() {
     // CHECK:     [[A_X:%.*]] = tuple_extract
     // CHECK:     [[A_N:%.*]] = tuple_extract
     // CHECK:     [[A_BOX:%.*]] = project_box
-    // CHECK:     store [[A_X]] to [[A_BOX]]
+    // CHECK:     store [[A_X]] to [trivial] [[A_BOX]]
     // CHECK:     [[FUNC_A:%.*]] = function_ref @_TF10switch_var3aaaFT1xRSi_T_
     // CHECK:     apply [[FUNC_A]]([[A_BOX]])
     
@@ -620,13 +620,13 @@ func test_multiple_patterns5() {
     // CHECK:     [[B_N:%.*]] = tuple_extract
     // CHECK:     [[B_X:%.*]] = tuple_extract
     // CHECK:     [[B_BOX:%.*]] = project_box
-    // CHECK:     store [[B_X]] to [[B_BOX]]
+    // CHECK:     store [[B_X]] to [trivial] [[B_BOX]]
     // CHECK:     [[FUNC_B:%.*]] = function_ref @_TF10switch_var3aaaFT1xRSi_T_
     // CHECK:     apply [[FUNC_B]]([[B_BOX]])
     
     // CHECK:   [[C]]({{%.*}} : $(Int, Int, Double)):
     // CHECK:     [[Y_BOX:%.*]] = project_box
-    // CHECK:     store [[Y_X]] to [[Y_BOX]]
+    // CHECK:     store [[Y_X]] to [trivial] [[Y_BOX]]
     // CHECK:     [[FUNC_C:%.*]] = function_ref @_TF10switch_var3aaaFT1xRSi_T_
     // CHECK:     apply [[FUNC_C]]([[Y_BOX]])
     
@@ -634,7 +634,7 @@ func test_multiple_patterns5() {
     // CHECK:     [[Z_X:%.*]] = tuple_extract
     // CHECK:     [[Z_F:%.*]] = tuple_extract
     // CHECK:     [[Z_BOX:%.*]] = project_box
-    // CHECK:     store [[Z_X]] to [[Z_BOX]]
+    // CHECK:     store [[Z_X]] to [trivial] [[Z_BOX]]
     // CHECK:     [[FUNC_Z:%.*]] = function_ref @_TF10switch_var3aaaFT1xRSi_T_
     // CHECK:     apply [[FUNC_Z]]([[Z_BOX]])
     aaa(x: &x)
