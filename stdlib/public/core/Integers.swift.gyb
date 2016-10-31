@@ -2763,7 +2763,6 @@ extension ${Self} {
 % end # end of concrete FixedWidthInteger section
 
 
-// FIXME(integers): inline manually everywhere
 /// Returns the given integer as the equivalent value in a different integer
 /// type.
 ///
