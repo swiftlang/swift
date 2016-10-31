@@ -39,6 +39,10 @@ extension delayedImmutable {
 
 class Foo {
   var x: Int __behavior delayedImmutable
+
+  // FIXME: Hack because we can't find the synthesized associated type witness
+  // during witness matching.
+  typealias Value = Int
 }
 
 var DelayedImmutable = TestSuite("DelayedImmutable")

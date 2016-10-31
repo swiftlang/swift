@@ -5436,3 +5436,18 @@ bool TypeChecker::isProtocolExtensionUsable(DeclContext *dc, Type type,
   return cs.solveSingle().hasValue();
 }
 
+void TypeChecker::recordKnownWitness(NormalProtocolConformance *conformance,
+                                     ValueDecl *req, ValueDecl *witness) {
+  // Match the witness. This should never fail, but it does allow renaming
+  // (because property behaviors rely on renaming).
+  auto match = matchWitness(*this, conformance->getProtocol(), conformance,
+                            conformance->getDeclContext(), req, witness);
+  if (match.Kind != MatchKind::ExactMatch &&
+      match.Kind != MatchKind::RenamedMatch) {
+    diagnose(witness, diag::property_behavior_conformance_broken,
+             witness->getFullName(), conformance->getType());
+    return;
+  }
+
+  conformance->setWitness(req, match.getWitness(Context));
+}
