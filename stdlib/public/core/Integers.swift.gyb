@@ -65,8 +65,10 @@ UIntMax = 'UInt%s' % int_max_bits
 
 // FIXME(integers): remove these two aliases
 /// The largest native signed integer type.
+@available(swift, obsoleted: 4.0)
 public typealias IntMax = ${IntMax}
 /// The largest native unsigned integer type.
+@available(swift, obsoleted: 4.0)
 public typealias UIntMax = ${UIntMax}
 
 infix operator &<< : BitwiseShiftPrecedence
