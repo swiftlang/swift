@@ -1540,6 +1540,7 @@ extension BinaryInteger {
 
 // FIXME(integers): without this overload enums don't compile with the
 //                  following error: "error: no overload of '==' for Int"
+// <rdar://problem/29029561>
 /// Returns a Boolean value indicating whether the two given values are equal.
 ///
 /// - Parameters:
@@ -2313,6 +2314,7 @@ public struct ${Self}
 
 // FIXME(integers): workaround for a problem where enums don't compile without
 //                  `== (Int, Int)`
+// <rdar://problem/29029561>
 %   if Self in ['Int']:
   @_transparent
   public func isEqual(to other: ${Self}) -> Bool {
