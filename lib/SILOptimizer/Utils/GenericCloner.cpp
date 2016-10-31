@@ -91,7 +91,8 @@ void GenericCloner::populateCloned() {
         // Store the new direct parameter to the alloc_stack.
         auto *NewArg =
           new (M) SILArgument(ClonedEntryBB, mappedType, OrigArg->getDecl());
-        getBuilder().createStore(Loc, NewArg, ASI);
+        getBuilder().createStore(Loc, NewArg, ASI,
+                                 StoreOwnershipQualifier::Unqualified);
 
         // Try to create a new debug_value from an existing debug_value_addr.
         for (Operand *ArgUse : OrigArg->getUses()) {
@@ -125,8 +126,9 @@ void GenericCloner::populateCloned() {
       if (ReturnValueAddr) {
         // The result is converted from indirect to direct. We have to load the
         // returned value from the alloc_stack.
-        ReturnValue = getBuilder().createLoad(ReturnValueAddr->getLoc(),
-                                              ReturnValueAddr);
+        ReturnValue =
+            getBuilder().createLoad(ReturnValueAddr->getLoc(), ReturnValueAddr,
+                                    LoadOwnershipQualifier::Unqualified);
       }
       for (AllocStackInst *ASI : reverse(AllocStacks)) {
         getBuilder().createDeallocStack(ASI->getLoc(), ASI);

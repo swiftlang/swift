@@ -31,7 +31,7 @@ func objc_generic<T : NSRuncing>(_ x: T) -> (NSObject, NSObject) {
   // CHECK: [[METHOD:%.*]] = witness_method [volatile] {{\$.*}},  #NSRuncing.runce!1.foreign
   // CHECK: [[RESULT1:%.*]] = apply [[METHOD]]<T>([[THIS1:%.*]]) : $@convention(objc_method) <τ_0_0 where τ_0_0 : NSRuncing> (τ_0_0) -> @autoreleased NSObject
 
-  // -- Result of copyRuncing is received copy_valueed according to -copy family
+  // -- Result of copyRuncing is received copy_valued according to -copy family
   // CHECK: [[METHOD:%.*]] = witness_method [volatile] {{\$.*}},  #NSRuncing.copyRuncing!1.foreign
   // CHECK: [[RESULT2:%.*]] = apply [[METHOD]]<T>([[THIS2:%.*]]) : $@convention(objc_method) <τ_0_0 where τ_0_0 : NSRuncing> (τ_0_0) -> @owned NSObject
 
@@ -88,7 +88,7 @@ func objc_protocol(_ x: NSRuncing) -> (NSObject, NSObject) {
   // CHECK: [[METHOD:%.*]] = witness_method [volatile] $[[OPENED]], #NSRuncing.runce!1.foreign
   // CHECK: [[RESULT1:%.*]] = apply [[METHOD]]<[[OPENED]]>([[THIS1]])
 
-  // -- Result of copyRuncing is received copy_valueed according to -copy family
+  // -- Result of copyRuncing is received copy_valued according to -copy family
   // CHECK: [[THIS2:%.*]] = open_existential_ref [[THIS2_ORIG:%.*]] : $NSRuncing to $[[OPENED2:@opened(.*) NSRuncing]]
   // CHECK: [[METHOD:%.*]] = witness_method [volatile] $[[OPENED2]], #NSRuncing.copyRuncing!1.foreign
   // CHECK: [[RESULT2:%.*]] = apply [[METHOD]]<[[OPENED2]]>([[THIS2:%.*]])

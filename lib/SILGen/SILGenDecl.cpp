@@ -91,7 +91,8 @@ void TupleInitialization::copyOrInitValueInto(SILGenFunction &SGF,
     if (value->getType().isAddress()) {
       member = SGF.B.createTupleElementAddr(loc, value, i, fieldTy);
       if (!fieldTL.isAddressOnly())
-        member = SGF.B.createLoad(loc, member);
+        member =
+            SGF.B.createLoad(loc, member, LoadOwnershipQualifier::Unqualified);
     } else {
       member = SGF.B.createTupleExtract(loc, value, i, fieldTy);
     }
@@ -712,7 +713,8 @@ emitEnumMatch(ManagedValue value, EnumElementDecl *ElementDecl,
                                                      ElementDecl, eltTy);
     // Load a loadable data value.
     if (eltTL.isLoadable())
-      eltValue = SGF.B.createLoad(loc, eltValue);
+      eltValue =
+          SGF.B.createLoad(loc, eltValue, LoadOwnershipQualifier::Unqualified);
   } else {
     // Otherwise, we're consuming this as a +1 value.
     value.forward(SGF);
@@ -726,7 +728,8 @@ emitEnumMatch(ManagedValue value, EnumElementDecl *ElementDecl,
     SILValue boxedValue = SGF.B.createProjectBox(loc, eltMV.getValue(), 0);
     auto &boxedTL = SGF.getTypeLowering(boxedValue->getType());
     if (boxedTL.isLoadable())
-      boxedValue = SGF.B.createLoad(loc, boxedValue);
+      boxedValue = SGF.B.createLoad(loc, boxedValue,
+                                    LoadOwnershipQualifier::Unqualified);
 
     // We must treat the boxed value as +0 since it may be shared. Copy it if
     // nontrivial.

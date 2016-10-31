@@ -13,6 +13,7 @@
 #define DEBUG_TYPE "constant-propagation"
 #include "swift/SILOptimizer/PassManager/Passes.h"
 #include "swift/AST/DiagnosticsSIL.h"
+#include "swift/SIL/PatternMatch.h"
 #include "swift/SIL/SILBuilder.h"
 #include "swift/SIL/SILInstruction.h"
 #include "swift/SILOptimizer/Utils/Local.h"
@@ -23,6 +24,7 @@
 #include "llvm/Support/Debug.h"
 #include "llvm/Support/CommandLine.h"
 using namespace swift;
+using namespace swift::PatternMatch;
 
 STATISTIC(NumInstFolded, "Number of constant folded instructions");
 
@@ -229,50 +231,22 @@ static SILInstruction *constantFoldCompare(BuiltinInst *BI,
     return B.createIntegerLiteral(BI->getLoc(), BI->getType(), Res);
   }
 
-  if (RHS) {
-    int Result = 1;
-    switch (ID) {
-    default: break;
-    case BuiltinValueKind::ICMP_ULT:
-      // Unsigned is never < 0.
-      if (!RHS->getValue())
-        Result = 0;
-      break;
-    case BuiltinValueKind::ICMP_UGE:
-      // Unsigned is always >= 0.
-      if (!RHS->getValue())
-        Result = -1;
-      break;
-    }
-    if (Result < 1) {
-      APInt Res(1, Result);
-      SILBuilderWithScope B(BI);
-      return B.createIntegerLiteral(BI->getLoc(), BI->getType(), Res);
-    }
+  SILValue Other;
+  if (match(BI, m_CombineOr(m_BuiltinInst(BuiltinValueKind::ICMP_ULT,
+                                          m_SILValue(Other), m_Zero()),
+                            m_BuiltinInst(BuiltinValueKind::ICMP_UGT,
+                                          m_Zero(), m_SILValue(Other))))) {
+    SILBuilderWithScope B(BI);
+    return B.createIntegerLiteral(BI->getLoc(), BI->getType(), APInt());
   }
 
-  if (LHS) {
-    int Result = 1;
-    switch (ID) {
-    case BuiltinValueKind::ICMP_ULE:
-      // 0 is always <= an unsigned value.
-      if (!LHS->getValue())
-        Result = -1;
-      break;
-    case BuiltinValueKind::ICMP_UGT:
-      // 0 is never > an unsigned value.
-      if (!LHS->getValue())
-        Result = 0;
-      break;
-    }
-    if (Result < 1) {
-      APInt Res(1, Result);
-      SILBuilderWithScope B(BI);
-      return B.createIntegerLiteral(BI->getLoc(), BI->getType(), Res);
-    }
+  if (match(BI, m_CombineOr(m_BuiltinInst(BuiltinValueKind::ICMP_UGE,
+                                          m_SILValue(Other), m_Zero()),
+                            m_BuiltinInst(BuiltinValueKind::ICMP_ULE,
+                                          m_Zero(), m_SILValue(Other))))) {
+    SILBuilderWithScope B(BI);
+    return B.createIntegerLiteral(BI->getLoc(), BI->getType(), APInt(1, 1));
   }
-
-
   return nullptr;
 }
 

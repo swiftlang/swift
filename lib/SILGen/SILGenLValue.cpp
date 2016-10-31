@@ -987,7 +987,8 @@ namespace {
                                             baseFormalType);
 
             baseAddress = gen.emitTemporaryAllocation(loc, base.getType());
-            gen.B.createStore(loc, base.getValue(), baseAddress);
+            gen.B.createStore(loc, base.getValue(), baseAddress,
+                              StoreOwnershipQualifier::Unqualified);
           }
           baseMetatype = gen.B.createMetatype(loc, metatypeType);
 
@@ -2118,7 +2119,8 @@ ManagedValue SILGenFunction::emitLoad(SILLocation loc, SILValue addr,
   // we can perform a +0 load of the address instead of materializing a +1
   // value.
   if (isPlusZeroOk && addrTL.getLoweredType() == rvalueTL.getLoweredType()) {
-    return ManagedValue::forUnmanaged(B.createLoad(loc, addr));
+    return ManagedValue::forUnmanaged(
+        B.createLoad(loc, addr, LoadOwnershipQualifier::Unqualified));
   }
 
   // Load the loadable value, and retain it if we aren't taking it.
@@ -2130,7 +2132,7 @@ static void emitUnloweredStoreOfCopy(SILGenBuilder &B, SILLocation loc,
                                      SILValue value, SILValue addr,
                                      IsInitialization_t isInit) {
   if (isInit)
-    B.createStore(loc, value, addr);
+    B.createStore(loc, value, addr, StoreOwnershipQualifier::Unqualified);
   else
     B.createAssign(loc, value, addr);
 }
@@ -2187,7 +2189,8 @@ static SILValue emitLoadOfSemanticRValue(SILGenFunction &gen,
       return gen.B.createLoadUnowned(loc, src, isTake);
     }
 
-    auto unownedValue = gen.B.createLoad(loc, src);
+    auto unownedValue =
+        gen.B.createLoad(loc, src, LoadOwnershipQualifier::Unqualified);
     gen.B.createStrongRetainUnowned(loc, unownedValue, Atomicity::Atomic);
     if (isTake)
       gen.B.createUnownedRelease(loc, unownedValue, Atomicity::Atomic);
@@ -2198,7 +2201,8 @@ static SILValue emitLoadOfSemanticRValue(SILGenFunction &gen,
 
   // For @unowned(unsafe) types, we need to strip the unmanaged box.
   if (auto unmanagedType = src->getType().getAs<UnmanagedStorageType>()) {
-    auto value = gen.B.createLoad(loc, src);
+    auto value =
+        gen.B.createLoad(loc, src, LoadOwnershipQualifier::Unqualified);
     auto result = gen.B.createUnmanagedToRef(loc, value,
             SILType::getPrimitiveObjectType(unmanagedType.getReferentType()));
     // SEMANTIC ARC TODO: Does this need a cleanup?
@@ -2208,7 +2212,8 @@ static SILValue emitLoadOfSemanticRValue(SILGenFunction &gen,
 
   // NSString * must be bridged to String.
   if (storageType.getSwiftRValueType() == gen.SGM.Types.getNSStringType()) {
-    auto nsstr = gen.B.createLoad(loc, src);
+    auto nsstr =
+        gen.B.createLoad(loc, src, LoadOwnershipQualifier::Unqualified);
     auto str = gen.emitBridgedToNativeValue(loc,
                                 ManagedValue::forUnmanaged(nsstr),
                                 SILFunctionTypeRepresentation::CFunctionPointer,

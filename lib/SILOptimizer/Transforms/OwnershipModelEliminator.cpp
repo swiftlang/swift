@@ -71,7 +71,8 @@ bool OwnershipModelEliminatorVisitor::visitLoadInst(LoadInst *LI) {
 
   // Otherwise, we need to break down the load inst into its unqualified
   // components.
-  auto *UnqualifiedLoad = B.createLoad(LI->getLoc(), LI->getOperand());
+  auto *UnqualifiedLoad = B.createLoad(LI->getLoc(), LI->getOperand(),
+                                       LoadOwnershipQualifier::Unqualified);
 
   // If we have a copy, insert a retain_value. All other copies do not require
   // more work.
@@ -98,7 +99,8 @@ bool OwnershipModelEliminatorVisitor::visitStoreInst(StoreInst *SI) {
   if (Qualifier != StoreOwnershipQualifier::Assign) {
     // If the ownership qualifier is not an assign, we can just emit an
     // unqualified store.
-    B.createStore(SI->getLoc(), SI->getSrc(), SI->getDest());
+    B.createStore(SI->getLoc(), SI->getSrc(), SI->getDest(),
+                  StoreOwnershipQualifier::Unqualified);
   } else {
     // If the ownership qualifier is [assign], then we need to eliminate the
     // old value.
@@ -106,8 +108,10 @@ bool OwnershipModelEliminatorVisitor::visitStoreInst(StoreInst *SI) {
     // 1. Load old value.
     // 2. Store new value.
     // 3. Release old value.
-    auto *Old = B.createLoad(SI->getLoc(), SI->getDest());
-    B.createStore(SI->getLoc(), SI->getSrc(), SI->getDest());
+    auto *Old = B.createLoad(SI->getLoc(), SI->getDest(),
+                             LoadOwnershipQualifier::Unqualified);
+    B.createStore(SI->getLoc(), SI->getSrc(), SI->getDest(),
+                  StoreOwnershipQualifier::Unqualified);
     B.emitDestroyValueOperation(SI->getLoc(), Old);
   }
 
@@ -119,7 +123,8 @@ bool OwnershipModelEliminatorVisitor::visitStoreInst(StoreInst *SI) {
 bool
 OwnershipModelEliminatorVisitor::visitLoadBorrowInst(LoadBorrowInst *LBI) {
   // Break down the load borrow into an unqualified load.
-  auto *UnqualifiedLoad = B.createLoad(LBI->getLoc(), LBI->getOperand());
+  auto *UnqualifiedLoad = B.createLoad(LBI->getLoc(), LBI->getOperand(),
+                                       LoadOwnershipQualifier::Unqualified);
 
   // Then remove the qualified load and use the unqualified load as the def of
   // all of LI's uses.

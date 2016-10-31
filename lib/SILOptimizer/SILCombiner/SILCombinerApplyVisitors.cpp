@@ -225,7 +225,8 @@ void PartialApplyCombiner::releaseTemporaries() {
     for (auto *EndPoint : PAFrontier) {
       Builder.setInsertionPoint(EndPoint);
       if (!TmpType.isAddressOnly(PAI->getModule())) {
-        auto *Load = Builder.createLoad(PAI->getLoc(), Op);
+        auto *Load = Builder.createLoad(PAI->getLoc(), Op,
+                                        LoadOwnershipQualifier::Unqualified);
         Builder.createReleaseValue(PAI->getLoc(), Load, Atomicity::Atomic);
       } else {
         Builder.createDestroyAddr(PAI->getLoc(), Op);
