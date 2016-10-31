@@ -2065,6 +2065,13 @@ private:
                                     CalleeCandidateInfo &calleeInfo,
                                     SourceLoc applyLoc);
 
+  /// Produce diagnostic for failures related to attributes associated with
+  /// candidate functions/methods e.g. mutability.
+  bool diagnoseMethodAttributeFailures(ApplyExpr *expr,
+                                       ArrayRef<Identifier> argLabels,
+                                       bool hasTrailingClosure,
+                                       CalleeCandidateInfo &candidates);
+
   bool visitExpr(Expr *E);
   bool visitIdentityExpr(IdentityExpr *E);
   bool visitTryExpr(TryExpr *E);
@@ -5272,6 +5279,87 @@ bool FailureDiagnosis::diagnoseNilLiteralComparison(
   return true;
 }
 
+bool FailureDiagnosis::diagnoseMethodAttributeFailures(
+    swift::ApplyExpr *callExpr, ArrayRef<Identifier> argLabels,
+    bool hasTrailingClosure, CalleeCandidateInfo &candidates) {
+  auto UDE = dyn_cast<UnresolvedDotExpr>(callExpr->getFn());
+  if (!UDE)
+    return false;
+
+  auto argExpr = callExpr->getArg();
+  auto argType = argExpr->getType();
+
+  // If type of the argument hasn't been established yet, we can't diagnose.
+  if (!argType || isUnresolvedOrTypeVarType(argType))
+    return false;
+
+  // Let's filter our candidate list based on that type.
+  candidates.filterList(argType, argLabels);
+
+  if (candidates.closeness == CC_ExactMatch)
+    return false;
+
+  // And if filtering didn't give an exact match, such means that problem
+  // might be related to function attributes which is best diagnosed by
+  // unviable member candidates, if any.
+  auto base = UDE->getBase();
+  auto baseType = base->getType();
+
+  // This handles following situation:
+  // struct S {
+  //   mutating func f(_ i: Int) {}
+  //   func f(_ f: Float) {}
+  // }
+  //
+  // Given struct has an overloaded method "f" with a single argument of
+  // multiple different types, one of the overloads is marked as
+  // "mutating", which means it can only be applied on LValue base type.
+  // So when struct is used like this:
+  //
+  // let answer: Int = 42
+  // S().f(answer)
+  //
+  // Constraint system generator is going to pick `f(_ f: Float)` as
+  // only possible overload candidate because "base" of the call is immutable
+  // and contextual information about argument type is not available yet.
+  // Such leads to incorrect contextual conversion failure diagnostic because
+  // type of the argument is going to resolved as (Int) no matter what.
+  // To workaround that fact and improve diagnostic of such cases we are going
+  // to try and collect all unviable candidates for a given call and check if
+  // at least one of them matches established argument type before even trying
+  // to re-check argument expression.
+  auto results = CS->performMemberLookup(
+      ConstraintKind::ValueMember, UDE->getName(), baseType,
+      UDE->getFunctionRefKind(), CS->getConstraintLocator(UDE),
+      /*includeInaccessibleMembers=*/false);
+
+  if (results.UnviableCandidates.empty())
+    return false;
+
+  SmallVector<OverloadChoice, 2> choices;
+  for (auto &unviable : results.UnviableCandidates)
+    choices.push_back(OverloadChoice(baseType, unviable.first,
+                                     /*isSpecialized=*/false,
+                                     UDE->getFunctionRefKind()));
+
+  CalleeCandidateInfo unviableCandidates(baseType, choices, hasTrailingClosure,
+                                         CS);
+
+  // Filter list of the unviable candidates based on the
+  // already established type of the argument expression.
+  unviableCandidates.filterList(argType, argLabels);
+
+  // If one of the unviable candidates matches arguments exactly,
+  // that means that actual problem is related to function attributes.
+  if (unviableCandidates.closeness == CC_ExactMatch) {
+    diagnoseUnviableLookupResults(results, baseType, base, UDE->getName(),
+                                  UDE->getNameLoc(), UDE->getLoc());
+    return true;
+  }
+
+  return false;
+}
+
 /// When initializing Unsafe[Mutable]Pointer<T> from Unsafe[Mutable]RawPointer,
 /// issue a diagnostic that refers to the API for binding memory to a type.
 static bool isCastToTypedPointer(ASTContext &Ctx, const Expr *Fn,
@@ -5445,7 +5533,15 @@ bool FailureDiagnosis::visitApplyExpr(ApplyExpr *callExpr) {
   if (diagnoseParameterErrors(calleeInfo, callExpr->getFn(),
                               callExpr->getArg(), argLabels))
     return true;
-  
+
+  // There might be a candidate with correct argument types but it's not
+  // used by constraint solver because it doesn't have correct attributes,
+  // let's try to diagnose such situation there right before type checking
+  // argument expression, because that would overwrite original argument types.
+  if (diagnoseMethodAttributeFailures(callExpr, argLabels, hasTrailingClosure,
+                                      calleeInfo))
+    return true;
+
   Type argType;  // Type of the argument list, if knowable.
   if (auto FTy = fnType->getAs<AnyFunctionType>())
     argType = FTy->getInput();
