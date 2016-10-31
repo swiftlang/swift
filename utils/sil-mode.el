@@ -117,9 +117,9 @@
                   'words) . font-lock-keyword-face)
    ;; Protocol and Protocol Composition Types
    `(,(regexp-opt '("init_existential_addr" "deinit_existential_addr"
-                    "open_existential_addr"
-                    "init_existential_ref"
-                    "open_existential_ref")
+                    "open_existential_addr" "alloc_existential_box"
+                    "init_existential_ref" "project_existential_box"
+                    "open_existential_ref" "open_existential_box")
                   'words) . font-lock-keyword-face)
    ;; Unchecked Conversions
    `(,(regexp-opt '("upcast"
