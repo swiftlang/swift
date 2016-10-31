@@ -761,7 +761,7 @@ Globals
 
 ::
 
-  global ::= type 'h'                    // standalone type (for DWARF)
+  global ::= type 'h'                    // type mangling
   global ::= type 'N'                    // type metadata (address point)
                                          // -- type starts with [BCOSTV]
   global ::= type 'Mf'                   // 'full' type metadata (start of object)
@@ -776,8 +776,8 @@ Globals
   global ::= protocol-conformance 'MA'   // metadata for remote mirrors: associated type descriptor
 
   // TODO check this::
-  global ::= .* 'PA'                     // partial application forwarder
-  global ::= .* 'PAo'                    // ObjC partial application forwarder
+  global ::= mangled-name 'PA'                     // partial application forwarder
+  global ::= mangled-name 'Po'                     // ObjC partial application forwarder
 
   global ::= type 'w' VALUE-WITNESS-KIND // value witness
   global ::= protocol-conformance 'Wa'   // protocol witness table accessor
@@ -819,8 +819,8 @@ types where the metadata itself has unknown layout.)
   global ::= global 'Td'                 // direct method reference thunk
   global ::= global 'TV'                 // vtable override thunk
   global ::= protocol-conformance entity 'TW' // protocol witness thunk
-  global ::= context identifier identifier 'TB' // property behavior initializer thunk
-  global ::= context identifier identifier 'Tb' // property behavior setter thunk
+  global ::= context identifier identifier 'TB' // property behavior initializer thunk (not used currently)
+  global ::= context identifier identifier 'Tb' // property behavior setter thunk (not used currently)
   global ::= entity specialization
   global ::= entity                      // some identifiable thing
   global ::= type type generic-signature? 'T' REABSTRACT-THUNK-TYPE   // reabstraction thunk helper function
@@ -864,37 +864,43 @@ Entities
 
 ::
 
-  entity ::= nominal-type                // named type declaration
+  entity ::= nominal-type                    // named type declaration
   entity ::= context entity-spec
 
   // The leading type is the function type
-  entity-spec ::= type 'fC'       // allocating constructor
-  entity-spec ::= type 'fc'       // non-allocating constructor
-  entity-spec ::= type 'fU' INDEX // explicit anonymous closure expression
-  entity-spec ::= type 'fu' INDEX // implicit anonymous closure
-  entity-spec ::= 'fD'            // deallocating destructor; untyped
-  entity-spec ::= 'fd'            // non-deallocating destructor; untyped
+  entity-spec ::= type 'fC'                  // allocating constructor
+  entity-spec ::= type 'fc'                  // non-allocating constructor
+  entity-spec ::= type 'fU' INDEX            // explicit anonymous closure expression
+  entity-spec ::= type 'fu' INDEX            // implicit anonymous closure
+  entity-spec ::= 'fA' INDEX                 // default argument initializer
+  entity-spec ::= 'fi'                       // non-local variable initializer
+  entity-spec ::= 'fD'                       // deallocating destructor; untyped
+  entity-spec ::= 'fd'                       // non-deallocating destructor; untyped
+  entity-spec ::= 'fE'                       // ivar destroyer; untyped
+  entity-spec ::= 'fe'                       // ivar initializer; untyped
 
-  entity-spec ::= ENTITY-KIND 'A' INDEX      // default argument generator
-  entity-spec ::= ENTITY-KIND 'i'            // non-local variable initializer
   entity-spec ::= function-signature decl-name 'F'  // function (shortcut for 'fe')
-  entity-spec ::= type decl-name ENTITY-KIND 'e'
-  entity-spec ::= type decl-name ENTITY-KIND FUNC-KIND
+  entity-spec ::= type decl-name ENTITY-KIND STATIC
+  entity-spec ::= type decl-name 'f' STATIC-ACCESSOR? ACCESSOR
 
-  ENTITY-KIND ::= 'f' STATIC?                // function (ctor, accessor, etc.)
-  ENTITY-KIND ::= 'v' STATIC?                // variable (let/var)
-  ENTITY-KIND ::= 'i' STATIC?                // subscript ('i'ndex) itself (not the individual accessors)
-  ENTITY-KIND ::= 'I' STATIC?                // initializer
+  ENTITY-KIND ::= 'f'                        // function (ctor, accessor, etc.)
+  ENTITY-KIND ::= 'v'                        // variable (let/var)
+  ENTITY-KIND ::= 'i'                        // subscript ('i'ndex) itself (not the individual accessors)
+  ENTITY-KIND ::= 'fp'                       // generic type parameter
 
   STATIC ::= 'Z'                             // entity is a static member of a type
+  STATIC ::= 'z'                             // entity is a non-static member of a type
+
+  STATIC-ACCESSOR ::= 'T'                    // accessor is a static member of a type
                                          
-  FUNC-KIND ::= 'm'                          // materializeForSet
-  FUNC-KIND ::= 's'                          // setter
-  FUNC-KIND ::= 'g'                          // getter
-  FUNC-KIND ::= 'w'                          // willSet
-  FUNC-KIND ::= 'W'                          // didSet
-  FUNC-KIND ::= 'a' ADDRESSOR-KIND           // mutable addressor
-  FUNC-KIND ::= 'l' ADDRESSOR-KIND           // non-mutable addressor
+  ACCESSOR ::= 'm'                           // materializeForSet
+  ACCESSOR ::= 's'                           // setter
+  ACCESSOR ::= 'g'                           // getter
+  ACCESSOR ::= 'G'                           // global getter
+  ACCESSOR ::= 'w'                           // willSet
+  ACCESSOR ::= 'W'                           // didSet
+  ACCESSOR ::= 'a' ADDRESSOR-KIND            // mutable addressor
+  ACCESSOR ::= 'l' ADDRESSOR-KIND            // non-mutable addressor
                                          
   ADDRESSOR-KIND ::= 'u'                     // unsafe addressor (no owner)
   ADDRESSOR-KIND ::= 'O'                     // owning addressor (non-native owner)
@@ -923,8 +929,7 @@ such as its enclosing module, function, or nominal type.
 
   context ::= module
   context ::= entity
-  context ::= entity 'E'
-  context ::= entity generic-signature 'e'
+  context ::= module entity generic-signature? 'E'
 
 An ``extension`` mangling is used whenever an entity's declaration context is
 an extension *and* the entity being extended is in a different module. In this
@@ -956,7 +961,9 @@ Types
 ::
 
   nominal-type ::= substitution
-  nominal-type ::= context decl-name 'n'     // nominal type (class, enum, struct)
+  nominal-type ::= context decl-name 'C'     // nominal class type
+  nominal-type ::= context decl-name 'O'     // nominal enum type
+  nominal-type ::= context decl-name 'V'     // nominal struct type
 
   nominal-type ::= known-nominal-type
 
@@ -986,28 +993,37 @@ Types
   type ::= 'BO'                              // Builtin.UnknownObject
   type ::= 'Bo'                              // Builtin.NativeObject
   type ::= 'Bp'                              // Builtin.RawPointer
-  type ::= type 'Bv' NATURAL                 // Builtin.Vec<n>x<type>
+  type ::= type 'Bv' NATURAL '_'             // Builtin.Vec<n>x<type>
   type ::= 'Bw'                              // Builtin.Word
-  type ::= context identifier 'a'            // Type alias (DWARF only)
-  type ::= function-signature 'C' THROWS-ANNOTATION?  // function type
-  type ::= function-signature 'cu' THROWS-ANNOTATION?  // uncurried function type  
-
-  THROWS-ANNOTATION ::= 'z'                  // 'throws' annotation on function types
-
-  type ::= function-signature 'cb'           // objc block function type
-  type ::= function-signature 'cc'           // C function pointer type
-  type ::= type '_' type* 'G'                // generic type application
-  type ::= function-signature 'K'            // @auto_closure function type
-  type ::= type 'm'                          // metatype without representation
-  type ::= type 'Xm'                         // existential metatype without representation
+  type ::= context decl-name 'a'             // Type alias (DWARF only)
+  type ::= function-signature 'c'            // function type
+  type ::= function-signature 'K'            // throwing function type
+  type ::= function-signature 'X' THROWS? FUNCTION-KIND // @thin function type
+  type ::= function-signature 'XB'           // objc block function type
+  type ::= function-signature 'XC'           // C function pointer type
+  type ::= type-list+ type 'G'               // bound generic type (one type-list per nesting level of type)
   type ::= type 'Xo'                         // @unowned type
   type ::= type 'Xu'                         // @unowned(unsafe) type
   type ::= type 'Xw'                         // @weak type
-  type ::= impl-function-type 'XF'           // function implementation type
-  type ::= function-signature 'Xf'           // @thin function type
+  type ::= impl-function-type 'XF'           // function implementation type (currently unused)
   type ::= type 'Xb'                         // SIL @box type
+  type ::= type 'XD'                         // dynamic self type
+  type ::= type 'm'                          // metatype without representation
   type ::= type 'XM' METATYPE-REPR           // metatype with representation
-  type ::= type 'Xp' METATYPE-REPR           // existential metatype with representation
+  type ::= type 'Xp'                         // existential metatype without representation
+  type ::= type 'Xm' METATYPE-REPR           // existential metatype with representation
+
+  FUNCTION-KIND ::= 'f'                      // @thin function type
+  FUNCTION-KIND ::= 'U'                      // uncurried function type (currently not used) 
+  FUNCTION-KIND ::= 'K'                      // @auto_closure function type
+  THROWS ::= 'z'                             // 'throws' annotation on function types
+
+  function-signature ::= type-list type-list // result and parameters
+
+  type-list ::= list-type '_' list-type* 'd'?  // list of types with optional variadic specifier
+  type-list ::= empty-list
+
+  list-type ::= type identifier? 'z'?        // type with optional label and inout convention
 
   METATYPE-REPR ::= 't'                      // Thin metatype representation
   METATYPE-REPR ::= 'T'                      // Thick metatype representation
@@ -1017,25 +1033,16 @@ Types
   type ::= associated-type
   type ::= nominal-type
   type ::= protocol '_' protocol* 'p'        // protocol type
-  type ::= 'pp'                              // empty protocol type
-  type ::= tuple
+  type ::= empty-list 'p'                    // empty protocol type
+  type ::= type-list 't'                     // tuple
   type ::= type generic-signature 'u'        // generic type
   type ::= 'x'                               // generic param, depth=0, idx=0
   type ::= 'q' GENERIC-PARAM-INDEX           // dependent generic parameter
   type ::= type assoc-type-name 'qa'         // associated type of non-generic param
-  type ::= assoc-type
+  type ::= assoc-type-name 'Qy' GENERIC-PARAM-INDEX  // associated type
+  type ::= assoc-type-list 'QY' GENERIC-PARAM-INDEX  // associated type at depth
 
-  function-signature ::= type '_' param-type* // result and parameters
-  param-type ::= type identifier? 'z'?        // parameter with optional label and inout convention
-
-  tuple ::= tuple-element '_' tuple_element* 't'  // tuple
-  tuple ::= tuple-element '_' tuple_element* 'z'  // variadic tuple
-  tuple ::= 'tt'                             // empty tuple
-
-  tuple-element ::= type identifier?
-
-  assoc-type ::= assoc-type-name 'Qy' GENERIC-PARAM-INDEX  // associated type
-  assoc-type ::= assoc-type-name '_' assoc-type-name* 'QY' GENERIC-PARAM-INDEX // associated type at depth
+  assoc-type-list ::= assoc-type-name '_' assoc-type-name*
 
   archetype ::= 'Q' INDEX                    // archetype with depth=0, idx=N
   archetype ::= 'Qd' INDEX INDEX             // archetype with depth=M+1, idx=N
@@ -1047,7 +1054,10 @@ Types
   associated-type ::= archetype identifier 'Qa' // associated type
   
   assoc-type-name ::= substitution
-  assoc-type-name ::= (protocol '_')? identifier
+  assoc-type-name ::= empty-list identifier  // associated type name without protocol
+  assoc-type-name ::= protocol identifier
+
+  empty-list ::= 'y'
 
 Associated types use an abbreviated mangling when the base generic parameter
 or associated type is constrained by a single protocol requirement. The
@@ -1057,45 +1067,51 @@ mangled in to disambiguate.
 
 ::
 
-  impl-function-type ::=
-    tuple tuple generic-signature? 'I'
-    IMPL-CALLEE-CONVENTION IMPL-FUNCTION-ATTRIBUTE* IMPL-CALLEE-CONVENTION* '_'
+  impl-function-type ::= type-list type-list 'I' FUNC-ATTRIBUTES
+  impl-function-type ::= type-list type-list generic-signature 'I' PSEUDO-GENERIC? FUNC-ATTRIBUTES
 
-  IMPL-CALLEE-CONVENTION ::= 't'              // thin
-  IMPL-CALLEE-CONVENTION ::= IMPL-CONVENTION  // thick, callee transferred with given convention
+  FUNC-ATTRIBUTES ::= CALLEE-CONVENTION? FUNC-REPRESENTATION PARAM-CONVENTION* RESULT-CONVENTION* ('z' RESULT-CONVENTION)
 
-  IMPL-CONVENTION ::= 'a'                     // direct, autoreleased
-  IMPL-CONVENTION ::= 'd'                     // direct, no ownership transfer
-  IMPL-CONVENTION ::= 'D'                     // direct, no ownership transfer,
-                                              // dependent on 'self' parameter
-  IMPL-CONVENTION ::= 'g'                     // direct, guaranteed
-  IMPL-CONVENTION ::= 'e'                     // direct, deallocating
-  IMPL-CONVENTION ::= 'i'                     // indirect, ownership transfer
-  IMPL-CONVENTION ::= 'l'                     // indirect, inout
-  IMPL-CONVENTION ::= 'G'                     // indirect, guaranteed
-  IMPL-CONVENTION ::= 'o'                     // direct, ownership transfer
-  IMPL-CONVENTION ::= 'z' IMPL-CONVENTION     // error result
+  PSEUDO-GENERIC ::= 'P'
 
-  IMPL-FUNCTION-ATTRIBUTE ::= 'Cb'            // compatible with C block invocation function
-  IMPL-FUNCTION-ATTRIBUTE ::= 'Cc'            // compatible with C global function
-  IMPL-FUNCTION-ATTRIBUTE ::= 'Cm'            // compatible with Swift method
-  IMPL-FUNCTION-ATTRIBUTE ::= 'CO'            // compatible with ObjC method
-  IMPL-FUNCTION-ATTRIBUTE ::= 'Cw'            // compatible with protocol witness
-  IMPL-FUNCTION-ATTRIBUTE ::= 'G'             // generic
-  IMPL-FUNCTION-ATTRIBUTE ::= 'H'             // pseudogeneric
+  CALLEE-CONVENTION ::= 'u'                  // @callee_unowned
+  CALLEE-CONVENTION ::= 'g'                  // @callee_guaranteed
+  CALLEE-CONVENTION ::= 'o'                  // @callee_owned
+
+  FUNC-REPRESENTATION ::= 'T'                // thick
+  FUNC-REPRESENTATION ::= 'F'                // thin
+  FUNC-REPRESENTATION ::= 'B'                // C block invocation function
+  FUNC-REPRESENTATION ::= 'C'                // C global function
+  FUNC-REPRESENTATION ::= 'M'                // Swift method
+  FUNC-REPRESENTATION ::= 'O'                // ObjC method
+  FUNC-REPRESENTATION ::= 'K'                // closure
+  FUNC-REPRESENTATION ::= 'W'                // protocol witness
+
+  PARAM-CONVENTION ::= 'i'                   // indirect in
+  PARAM-CONVENTION ::= 'l'                   // indirect inout
+  PARAM-CONVENTION ::= 'b'                   // indirect inout aliasable
+  PARAM-CONVENTION ::= 'n'                   // indirect in guaranteed
+  PARAM-CONVENTION ::= 'x'                   // direct owned
+  PARAM-CONVENTION ::= 'y'                   // direct unowned
+  PARAM-CONVENTION ::= 'g'                   // direct guaranteed
+  PARAM-CONVENTION ::= 'e'                   // direct deallocating
+
+  RESULT-CONVENTION ::= 'r'                  // indirect
+  RESULT-CONVENTION ::= 'o'                  // owned
+  RESULT-CONVENTION ::= 'd'                  // unowned
+  RESULT-CONVENTION ::= 'u'                  // unowned inner pointer
+  RESULT-CONVENTION ::= 'a'                  // auto-released
 
 For the most part, manglings follow the structure of formal language
 types.  However, in some cases it is more useful to encode the exact
 implementation details of a function type.
 
-The first ``<tuple>`` defines the parameter types, the second ``<tuple>``
-defines the result types. The optional ``<generic-signature>`` is used if
-the ``<IMPL-FUNCTION-ATTRIBUTE>`` has a ``G`` or ``H``.
-
-Any ``<IMPL-FUNCTION-ATTRIBUTE>`` productions must appear in the order
-in which they are specified above: e.g. a pseudogeneric C function is
-mangled with ``CcH``.  ``G`` and ``H`` are exclusive and mark the presence
-of a generic signature.
+The first ``<type-list>`` defines the parameter types, the second
+``<type-list>`` defines the result types, including the error result.
+The number of parameters and results must match with the number of
+``<PARAM-CONVENTION>`` and ``<RESULT-CONVENTION>`` characters after the
+``<FUNC-REPRESENTATION>``.
+The ``<generic-signature>`` is used if the function is polymorphic.
 
 Generics
 ~~~~~~~~
@@ -1116,17 +1132,20 @@ Property behaviors are implemented using private protocol conformances.
 
 ::
 
-  generic-signature ::= requirement* 'r' GENERIC-PARAM-COUNT*
+  generic-signature ::= requirement* 'r' GENERIC-PARAM-COUNT* 'r'
 
   GENERIC-PARAM-COUNT ::= 'z'                // zero parameters
   GENERIC-PARAM-COUNT ::= INDEX              // N+1 parameters
 
-  requirement ::= req-spec
-  requirement ::= assoc-type req-spec        // use GENERIC-PARAM-INDEX of assoc-type
-
-  req-spec ::= protocol 'Rp' GENERIC-PARAM-INDEX // protocol requirement
-  req-spec ::= type 'Rb' GENERIC-PARAM-INDEX     // base class requirement, type is a nominal class or a substitution
-  req-spec ::= type 'Rs' GENERIC-PARAM-INDEX     // same-type requirement
+  requirement ::= protocol 'R' GENERIC-PARAM-INDEX                  // protocol requirement
+  requirement ::= protocol assoc-type-name 'Rp' GENERIC-PARAM-INDEX // protocol requirement on associated type
+  requirement ::= protocol assoc-type-list 'RP' GENERIC-PARAM-INDEX // protocol requirement on associated type at depth
+  requirement ::= type 'Rb' GENERIC-PARAM-INDEX                     // base class requirement
+  requirement ::= type assoc-type-name 'Rc' GENERIC-PARAM-INDEX     // base class requirement on associated type
+  requirement ::= type assoc-type-list 'RC' GENERIC-PARAM-INDEX     // base class requirement on associated type at depth
+  requirement ::= type 'Rs' GENERIC-PARAM-INDEX                     // same-type requirement
+  requirement ::= type assoc-type-name 'Rt' GENERIC-PARAM-INDEX     // same-type requirement on associated type
+  requirement ::= type assoc-type-list 'RT' GENERIC-PARAM-INDEX     // same-type requirement on associated type at depth
 
   GENERIC-PARAM-INDEX ::= 'x'                // depth = 0,   idx = 0
   GENERIC-PARAM-INDEX ::= INDEX              // depth = 0,   idx = N+1
@@ -1150,6 +1169,7 @@ Identifiers
 ::
 
   identifier ::= NATURAL IDENTIFIER-STRING
+  identifier ::= '0' ( [0-9]* 'a-z' )* [A-Z] [0-9]* IDENTIFIER-STRING    // identifier with word substitutions
   
   IDENTIFIER-STRING ::= IDENTIFIER-START-CHAR IDENTIFIER-CHAR*
   IDENTIFIER-START-CHAR ::= [_a-zA-Z]
@@ -1160,34 +1180,7 @@ characters follow. Operator characters are mapped to letter characters as
 given. In neither case can an identifier start with a digit, so
 there's no ambiguity with the run-length.
 
-::
-
-  identifier ::= 'o' OPERATOR-FIXITY NATURAL OPERATOR-CHAR+
-
-  OPERATOR-FIXITY ::= 'p'                    // prefix operator
-  OPERATOR-FIXITY ::= 'P'                    // postfix operator
-  OPERATOR-FIXITY ::= 'i'                    // infix operator
-
-  OPERATOR-CHAR ::= 'a'                      // & 'and'
-  OPERATOR-CHAR ::= 'c'                      // @ 'commercial at'
-  OPERATOR-CHAR ::= 'd'                      // / 'divide'
-  OPERATOR-CHAR ::= 'e'                      // = 'equals'
-  OPERATOR-CHAR ::= 'g'                      // > 'greater'
-  OPERATOR-CHAR ::= 'l'                      // < 'less'
-  OPERATOR-CHAR ::= 'm'                      // * 'multiply'
-  OPERATOR-CHAR ::= 'n'                      // ! 'not'
-  OPERATOR-CHAR ::= 'o'                      // | 'or'
-  OPERATOR-CHAR ::= 'p'                      // + 'plus'
-  OPERATOR-CHAR ::= 'q'                      // ? 'question'
-  OPERATOR-CHAR ::= 'r'                      // % 'remainder'
-  OPERATOR-CHAR ::= 's'                      // - 'subtract'
-  OPERATOR-CHAR ::= 't'                      // ~ 'tilde'
-  OPERATOR-CHAR ::= 'x'                      // ^ 'xor'
-  OPERATOR-CHAR ::= 'z'                      // . 'zperiod'
-
-  identifier ::= '0' ( [0-9]* 'a-z' )* [A-Z] [0-9]* IDENTIFIER-STRING    // identifier with word substitutions
-
-If the run-length start with a ``0`` it the identifier string contains
+If the run-length start with a ``0`` the identifier string contains
 word substitutions. A word is a sub-string of an identifier.
 A word starts either with an uppercase letter ``[A-Z]`` if the preceeding
 character is not an uppercase letter. Or it starts with a lowercase letter
@@ -1214,7 +1207,6 @@ A maximum of 26 words in a mangling can be used for substitutions.
 ::
 
   identifier ::= '00' natural '_' identifier-char*
-  identifier ::= '00' 'o' operator-fixity natural '_' identifier-char*
 
 Identifiers that contain non-ASCII characters are encoded using the Punycode
 algorithm specified in RFC 3492, with the modifications that ``_`` is used
@@ -1225,12 +1217,40 @@ encoded string itself. For example, the identifier ``vergüenza`` is mangled
 to ``0012vergenza_JFa``. (The encoding in standard Punycode would be
 ``vergenza-95a``)
 
+::
+
+  identifier ::= identifier 'o' OPERATOR-FIXITY
+
+  OPERATOR-FIXITY ::= 'p'                    // prefix operator
+  OPERATOR-FIXITY ::= 'P'                    // postfix operator
+  OPERATOR-FIXITY ::= 'i'                    // infix operator
+
+  OPERATOR-CHAR ::= 'a'                      // & 'and'
+  OPERATOR-CHAR ::= 'c'                      // @ 'commercial at'
+  OPERATOR-CHAR ::= 'd'                      // / 'divide'
+  OPERATOR-CHAR ::= 'e'                      // = 'equals'
+  OPERATOR-CHAR ::= 'g'                      // > 'greater'
+  OPERATOR-CHAR ::= 'l'                      // < 'less'
+  OPERATOR-CHAR ::= 'm'                      // * 'multiply'
+  OPERATOR-CHAR ::= 'n'                      // ! 'not'
+  OPERATOR-CHAR ::= 'o'                      // | 'or'
+  OPERATOR-CHAR ::= 'p'                      // + 'plus'
+  OPERATOR-CHAR ::= 'q'                      // ? 'question'
+  OPERATOR-CHAR ::= 'r'                      // % 'remainder'
+  OPERATOR-CHAR ::= 's'                      // - 'subtract'
+  OPERATOR-CHAR ::= 't'                      // ~ 'tilde'
+  OPERATOR-CHAR ::= 'x'                      // ^ 'xor'
+  OPERATOR-CHAR ::= 'z'                      // . 'zperiod'
+
+If an identifier is followed by an ``o`` its text is interpreted as an
+operator. Each lowercase character maps to an operator character
+(``OPERATOR-CHAR``).
+
 Operators that contain non-ASCII characters are mangled by first mapping the
 ASCII operator characters to letters as for pure ASCII operator names, then
-Punycode-encoding the substituted string. The mangling then consists of
-``00o`` followed by the fixity, run length of the encoded string, and the encoded
-string itself. For example, the infix operator ``«+»`` is mangled to
-``00oi7p_qcaDc`` (``p_qcaDc`` being the encoding of the substituted
+Punycode-encoding the substituted string.
+For example, the infix operator ``«+»`` is mangled to
+``007p_qcaDcoi`` (``p_qcaDc`` being the encoding of the substituted
 string ``«p»``).
 
 Substitutions
