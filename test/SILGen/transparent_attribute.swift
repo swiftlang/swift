@@ -8,8 +8,8 @@ func useTransparentFuncWithDefaultArgument() -> Int {
   return transparentFuncWithDefaultArgument();
 
   // CHECK-LABEL: sil hidden @_TF21transparent_attribute37useTransparentFuncWithDefaultArgumentFT_Si
-  // CHECK: apply {{.*}} line:10:44
-  // CHECK: apply {{.*}} line:10:10
+  // CHECK: apply {{.*}} line:8:44
+  // CHECK: apply {{.*}} line:8:10
   // CHECK: return
   
 }
@@ -21,9 +21,9 @@ func useTransparentFuncWithoutDefaultArgument() -> Int {
   return transparentFuncWithoutDefaultArgument();
 
   // CHECK-LABEL: sil hidden @_TF21transparent_attribute40useTransparentFuncWithoutDefaultArgumentFT_Si
-  // CHECK: apply {{.*}} line:23:47
+  // CHECK: apply {{.*}} line:21:47
   // CHECK-NOT: transparent
-  // CHECK: apply {{.*}} line:23:10
+  // CHECK: apply {{.*}} line:21:10
   // CHECK: return
   
 }
@@ -40,7 +40,7 @@ func testStructWithTranspConstructor() -> StructWithTranspConstructor {
   
   // testStructWithTranspConstructor
   // CHECK-APPLY: _T21transparent_attribute31testStructWithTranspConstructorFT_VS_27StructWithTranspConstructor
-  // CHECK: apply {{.*}} line:38:10
+  // CHECK: apply {{.*}} line:36:10
   
 }
 

@@ -164,9 +164,13 @@ SIMPLE_DECL_ATTR(nonobjc, NonObjC,
 SIMPLE_DECL_ATTR(_fixed_layout, FixedLayout,
                  OnVar | OnClass | OnStruct | OnEnum | UserInaccessible, 31)
 
+SIMPLE_DECL_ATTR(_inlineable, Inlineable,
+                 OnVar | OnSubscript | OnFunc | OnConstructor | OnDestructor |
+                 UserInaccessible, 32)
+
 DECL_ATTR(_specialize, Specialize,
           OnConstructor | OnFunc | AllowMultipleAttributes | LongAttribute
-          | UserInaccessible, 32)
+          | UserInaccessible, 33)
 
 // Non-serialized attributes.
 

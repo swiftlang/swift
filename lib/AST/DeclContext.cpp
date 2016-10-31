@@ -503,21 +503,31 @@ bool DeclContext::isValidGenericContext() const {
 /// are used.
 ResilienceExpansion DeclContext::getResilienceExpansion() const {
   for (const auto *dc = this; dc->isLocalContext(); dc = dc->getParent()) {
-    if (auto *func = dyn_cast<AbstractFunctionDecl>(dc)) {
+    if (auto *AFD = dyn_cast<AbstractFunctionDecl>(dc)) {
       // If the function is not externally visible, we will not be serializing
       // its body.
-      if (!func->getDeclContext()->isLocalContext() &&
-          func->getEffectiveAccess() < Accessibility::Public)
+      if (!AFD->getDeclContext()->isLocalContext() &&
+          AFD->getEffectiveAccess() < Accessibility::Public)
         break;
 
       // Bodies of public transparent and always-inline functions are
       // serialized, so use conservative access patterns.
-      if (func->isTransparent())
+      if (AFD->isTransparent())
         return ResilienceExpansion::Minimal;
 
-      if (auto attr = func->getAttrs().getAttribute<InlineAttr>())
+      if (AFD->getAttrs().hasAttribute<InlineableAttr>())
+        return ResilienceExpansion::Minimal;
+
+      if (auto attr = AFD->getAttrs().getAttribute<InlineAttr>())
         if (attr->getKind() == InlineKind::Always)
           return ResilienceExpansion::Minimal;
+
+      // If a property or subscript is @_fragile, the accessors are
+      // @_fragile also.
+      if (auto FD = dyn_cast<FuncDecl>(AFD))
+        if (auto *ASD = FD->getAccessorStorageDecl())
+          if (ASD->getAttrs().getAttribute<InlineableAttr>())
+            return ResilienceExpansion::Minimal;
     }
   }
 
