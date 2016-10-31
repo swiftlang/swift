@@ -608,6 +608,19 @@ self.test("\(testNamePrefix).append(contentsOf:)/semantics") {
   }
 }
 
+self.test("\(testNamePrefix).OperatorPlusEquals") {
+  for test in appendContentsOfTests {
+    var c = makeWrappedCollection(test.collection)
+    let newElements =
+      MinimalCollection(elements: test.newElements.map(wrapValue))
+    c += newElements
+    expectEqualSequence(
+      test.expected,
+      c.map { extractValue($0).value },
+      stackTrace: SourceLocStack().with(test.loc))
+  }
+}
+
 //===----------------------------------------------------------------------===//
 // insert()
 //===----------------------------------------------------------------------===//
