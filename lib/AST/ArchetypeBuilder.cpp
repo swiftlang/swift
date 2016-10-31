@@ -1301,7 +1301,6 @@ bool ArchetypeBuilder::addSameTypeRequirement(Type Reqt1, Type Reqt2,
   
   // Require that at least one side of the requirement be a potential archetype.
   if (!T1 && !T2) {
-    assert(Source.getLoc().isValid() && "reintroducing invalid requirement");
     Diags.diagnose(Source.getLoc(), diag::requires_no_same_type_archetype);
     return true;
   }
@@ -1489,7 +1488,7 @@ void ArchetypeBuilder::addRequirement(const Requirement &req,
   switch (req.getKind()) {
   case RequirementKind::Superclass: {
     PotentialArchetype *pa = resolveArchetype(req.getFirstType());
-    assert(pa && "Re-introducing invalid requirement");
+    if (!pa) return;
 
     assert(req.getSecondType()->getClassOrBoundGenericClass());
     addSuperclassRequirement(pa, req.getSecondType(), source);
@@ -1498,11 +1497,7 @@ void ArchetypeBuilder::addRequirement(const Requirement &req,
 
   case RequirementKind::Conformance: {
     PotentialArchetype *pa = resolveArchetype(req.getFirstType());
-    assert(pa && "Re-introducing invalid requirement");
-    // FIXME: defensively return if assertions are disabled until we figure out
-    // how this situation can occur and fix it properly.
-    if (!pa)
-      return;
+    if (!pa) return;
 
     SmallVector<ProtocolDecl *, 4> conformsTo;
     bool existential = req.getSecondType()->isExistentialType(conformsTo);
