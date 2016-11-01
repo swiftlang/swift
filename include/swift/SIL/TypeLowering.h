@@ -746,6 +746,7 @@ public:
   /// Get the capture list from a closure, with transitive function captures
   /// flattened.
   CaptureInfo getLoweredLocalCaptures(AnyFunctionRef fn);
+  bool hasLoweredLocalCaptures(AnyFunctionRef fn);
 
   enum class ABIDifference : uint8_t {
     // No ABI differences, function can be trivially bitcast to result type.
