@@ -1527,23 +1527,6 @@ extension BinaryInteger {
 
 
 //===----------------------------------------------------------------------===//
-//===--- Homogeneous comparison -------------------------------------------===//
-//===----------------------------------------------------------------------===//
-
-// FIXME(integers): without this overload enums don't compile with the
-//                  following error: "error: no overload of '==' for Int"
-// <rdar://problem/29029561>
-/// Returns a Boolean value indicating whether the two given values are equal.
-///
-/// - Parameters:
-///   - lhs: An integer to compare.
-///   - rhs: Another integer to compare.
-@_transparent
-public func == (lhs: Int, rhs: Int) -> Bool {
-  return lhs.isEqual(to: rhs)
-}
-
-//===----------------------------------------------------------------------===//
 //===--- Heterogeneous comparison -----------------------------------------===//
 //===----------------------------------------------------------------------===//
 
@@ -2304,20 +2287,10 @@ public struct ${Self}
 
 %   end
 
-// FIXME(integers): workaround for a problem where enums don't compile without
-//                  `== (Int, Int)`
-// <rdar://problem/29029561>
-%   if Self in ['Int']:
-  @_transparent
-  public func isEqual(to other: ${Self}) -> Bool {
-    return Bool(Builtin.cmp_eq_Int${bits}(_value, other._value))
-  }
-%   else:
   @_transparent
   public static func == (lhs: ${Self}, rhs: ${Self}) -> Bool {
     return Bool(Builtin.cmp_eq_Int${bits}(lhs._value, rhs._value))
   }
-% end
 
   @_transparent
   public static func < (lhs: ${Self}, rhs: ${Self}) -> Bool {
