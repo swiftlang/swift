@@ -17,6 +17,10 @@ private func _utfRangeToNSRange(_ inRange : Range<UnicodeScalar>) -> NSRange {
     return NSMakeRange(Int(inRange.lowerBound.value), Int(inRange.upperBound.value - inRange.lowerBound.value))
 }
 
+private func _utfRangeToNSRange(_ inRange : ClosedRange<UnicodeScalar>) -> NSRange {
+    return NSMakeRange(Int(inRange.lowerBound.value), Int(inRange.upperBound.value - inRange.lowerBound.value + 1))
+}
+
 internal final class _SwiftNSCharacterSet : _SwiftNativeNSCharacterSet, _SwiftNativeFoundationType {
     internal typealias ImmutableType = NSCharacterSet
     internal typealias MutableType = NSMutableCharacterSet
@@ -104,8 +108,7 @@ public struct CharacterSet : ReferenceConvertible, Equatable, Hashable, SetAlgeb
     ///
     /// It is the caller's responsibility to ensure that the values represent valid `UnicodeScalar` values, if that is what is desired.
     public init(charactersIn range: ClosedRange<UnicodeScalar>) {
-        let halfOpenRange = range.lowerBound..<UnicodeScalar(range.upperBound.value + 1)!
-        _wrapped = _SwiftNSCharacterSet(immutableObject: NSCharacterSet(range: _utfRangeToNSRange(halfOpenRange)))
+        _wrapped = _SwiftNSCharacterSet(immutableObject: NSCharacterSet(range: _utfRangeToNSRange(range)))
     }
 
     /// Initialize with the characters in the given string.
@@ -292,8 +295,7 @@ public struct CharacterSet : ReferenceConvertible, Equatable, Hashable, SetAlgeb
     ///
     /// It is the caller's responsibility to ensure that the values represent valid `UnicodeScalar` values, if that is what is desired.
     public mutating func insert(charactersIn range: ClosedRange<UnicodeScalar>) {
-        let halfOpenRange = range.lowerBound..<UnicodeScalar(range.upperBound.value + 1)!
-        let nsRange = _utfRangeToNSRange(halfOpenRange)
+        let nsRange = _utfRangeToNSRange(range)
         _applyUnmanagedMutation {
             $0.addCharacters(in: nsRange)
         }
@@ -309,8 +311,7 @@ public struct CharacterSet : ReferenceConvertible, Equatable, Hashable, SetAlgeb
 
     /// Remove a closed range of integer values from the `CharacterSet`.
     public mutating func remove(charactersIn range: ClosedRange<UnicodeScalar>) {
-        let halfOpenRange = range.lowerBound..<UnicodeScalar(range.upperBound.value + 1)!
-        let nsRange = _utfRangeToNSRange(halfOpenRange)
+        let nsRange = _utfRangeToNSRange(range)
         _applyUnmanagedMutation {
             $0.removeCharacters(in: nsRange)
         }
