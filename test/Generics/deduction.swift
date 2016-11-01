@@ -81,7 +81,7 @@ func passFunction(_ f: (Int) -> Float, x: Int, y: Float) {
 func returnTuple<T, U>(_: T) -> (T, U) { } // expected-note {{in call to function 'returnTuple'}}
 
 func testReturnTuple(_ x: Int, y: Float) {
-  returnTuple(x) // expected-error{{generic parameter 'T' could not be inferred}}
+  returnTuple(x) // expected-error{{generic parameter 'U' could not be inferred}}
   
   var _ : (Int, Float) = returnTuple(x)
   var _ : (Float, Float) = returnTuple(y)
