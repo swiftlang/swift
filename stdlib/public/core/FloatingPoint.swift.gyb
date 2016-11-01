@@ -559,8 +559,7 @@ public protocol FloatingPoint: Comparable, SignedArithmetic, Strideable {
   ///     x.negate()
   ///     // x == -21.5
   ///
-  // FIXME(integers): SeeAlso should refer to the prefix - operator
-  /// - SeeAlso: `negated()`
+  /// - SeeAlso: The unary minus operator (`-`).
   mutating func negate()
 
   /// Returns the difference of this value and the given value, rounded to a

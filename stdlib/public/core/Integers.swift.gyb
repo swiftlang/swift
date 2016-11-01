@@ -1064,8 +1064,7 @@ public protocol SignedArithmetic : Arithmetic {
   ///     x.negate()
   ///     // x == -21
   ///
-  // FIXME(integers): SeeAlso should refer to the prefix - operator
-  /// - SeeAlso: `negated()`
+  /// - SeeAlso: The unary minus operator (`-`).
   mutating func negate()
 }
 
