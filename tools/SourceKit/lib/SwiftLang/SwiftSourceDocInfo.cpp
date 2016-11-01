@@ -666,7 +666,7 @@ static bool passCursorInfoForDecl(const ValueDecl *VD,
   unsigned MangledTypeEnd = SS.size();
 
   unsigned MangledContainerTypeStart = SS.size();
-  if (ContainerTy) {
+  if (ContainerTy && !ContainerTy->hasArchetype()) {
     llvm::raw_svector_ostream OS(SS);
     SwiftLangSupport::printTypeUSR(ContainerTy, OS);
   }
