@@ -112,14 +112,83 @@ bool swift::requiresForeignEntryPoint(ValueDecl *vd) {
   return vd->getAttrs().hasAttribute<DynamicAttr>();
 }
 
-static unsigned getFuncNaturalUncurryLevel(AnyFunctionRef AFR) {
-  assert(AFR.getParameterLists().size() >= 1 && "no arguments for func?!");
-  unsigned Level = AFR.getParameterLists().size() - 1;
-  // Functions with captures have an extra uncurry level for the capture
-  // context.
-  if (AFR.getCaptureInfo().hasLocalCaptures())
-    Level += 1;
-  return Level;
+static unsigned getNaturalUncurryLevelAndKind(ValueDecl *vd,
+                                              SILDeclRef::Kind &kind,
+                                              bool setKind) {
+
+  using Kind = SILDeclRef::Kind;
+  const Kind none = static_cast<Kind>(~0);
+
+  auto setOrCheck = [&](Kind k, Kind k2, Kind k3) {
+    if (setKind) {
+      kind = k;
+    } else {
+      assert((kind == k || kind == k2 || kind == k3) &&
+             "invalid kind of ValueDecl for this SILDeclRef::Kind");
+      (void)k2;
+      (void)k3;
+    }
+  };
+
+  auto assertNoSet = [=]() {
+    assert(!setKind && "can't set SILDeclRef::Kind for this kind of ValueDecl");
+  };
+
+  switch (vd->getKind()) {
+  case DeclKind::Func:
+    setOrCheck(Kind::Func, none, none);
+    return AnyFunctionRef(cast<FuncDecl>(vd)).getNaturalUncurryLevel();
+  case DeclKind::Constructor:
+    setOrCheck(Kind::Allocator, Kind::Initializer, none);
+    return 1;
+  case DeclKind::EnumElement:
+    setOrCheck(Kind::EnumElement, none, none);
+    return cast<EnumElementDecl>(vd)->hasArgumentType() ? 1 : 0;
+  case DeclKind::Destructor:
+    setOrCheck(Kind::Deallocator, Kind::Destroyer, none);
+    return 0;
+  case DeclKind::Class:
+    assertNoSet();
+    setOrCheck(Kind::IVarInitializer, Kind::IVarDestroyer, none);
+    return 1;
+  case DeclKind::Var: {
+    assertNoSet();
+    setOrCheck(Kind::GlobalAccessor, Kind::GlobalGetter,
+               Kind::StoredPropertyInitializer);
+    auto *var = cast<VarDecl>(vd);
+    assert(!var->getDeclContext()->isLocalContext() &&
+           "can't reference local var as global var");
+    assert(var->hasStorage() && "can't reference computed var as global var");
+    (void)var;
+    return 0;
+  }
+
+  case DeclKind::GenericTypeParam:
+  case DeclKind::AssociatedType:
+  case DeclKind::TypeAlias:
+  case DeclKind::Enum:
+  case DeclKind::Struct:
+  case DeclKind::Protocol:
+  case DeclKind::Module:
+  case DeclKind::Param:
+  case DeclKind::Subscript:
+    llvm_unreachable("invalid kind of ValueDecl for SILDeclRef");
+
+#define VALUE_DECL(...)
+#define DECL(Id, Parent) case DeclKind::Id:
+#include "swift/AST/DeclNodes.def"
+    llvm_unreachable("impossible value decl");
+  }
+}
+
+static void setUncurryLevel(SILDeclRef &declRef, unsigned requested,
+                            unsigned natural) {
+  declRef.uncurryLevel = requested == SILDeclRef::ConstructAtNaturalUncurryLevel
+                             ? natural
+                             : requested;
+  assert(declRef.uncurryLevel <= natural &&
+         "can't emit SILDeclRef below natural uncurry level");
+  declRef.isCurried = declRef.uncurryLevel != natural;
 }
 
 SILDeclRef::SILDeclRef(ValueDecl *vd, SILDeclRef::Kind kind,
@@ -128,113 +197,29 @@ SILDeclRef::SILDeclRef(ValueDecl *vd, SILDeclRef::Kind kind,
   : loc(vd), kind(kind), Expansion(unsigned(expansion)),
     isForeign(isForeign), isDirectReference(0), defaultArgIndex(0)
 {
-  unsigned naturalUncurryLevel;
-
-  // FIXME: restructure to use a "switch".
-  if (auto *func = dyn_cast<FuncDecl>(vd)) {
-    assert(kind == Kind::Func &&
-           "can only create a Func SILDeclRef for a func decl");
-    naturalUncurryLevel = getFuncNaturalUncurryLevel(func);
-  } else if (isa<ConstructorDecl>(vd)) {
-    assert((kind == Kind::Allocator || kind == Kind::Initializer)
-           && "can only create Allocator or Initializer SILDeclRef for ctor");
-    naturalUncurryLevel = 1;
-  } else if (auto *ed = dyn_cast<EnumElementDecl>(vd)) {
-    assert(kind == Kind::EnumElement
-           && "can only create EnumElement SILDeclRef for enum element");
-    naturalUncurryLevel = ed->hasArgumentType() ? 1 : 0;
-  } else if (isa<DestructorDecl>(vd)) {
-    assert((kind == Kind::Destroyer || kind == Kind::Deallocator)
-           && "can only create destroyer/deallocator SILDeclRef for dtor");
-    naturalUncurryLevel = 0;
-  } else if (isa<ClassDecl>(vd)) {
-    assert((kind == Kind::IVarInitializer || kind == Kind::IVarDestroyer) &&
-           "can only create ivar initializer/destroyer SILDeclRef for class");
-    naturalUncurryLevel = 1;
-  } else if (auto *var = dyn_cast<VarDecl>(vd)) {
-    assert((kind == Kind::GlobalAccessor ||
-            kind == Kind::GlobalGetter ||
-            kind == Kind::StoredPropertyInitializer) &&
-           "can only create GlobalAccessor, GlobalGetter or "
-           "StoredPropertyInitializer SILDeclRef for var");
-
-    naturalUncurryLevel = 0;
-    assert(!var->getDeclContext()->isLocalContext() &&
-           "can't reference local var as global var");
-    assert(var->hasStorage() && "can't reference computed var as global var");
-    (void)var;
-  } else {
-    llvm_unreachable("Unhandled ValueDecl for SILDeclRef");
-  }
-  
-  assert((atUncurryLevel == ConstructAtNaturalUncurryLevel
-          || atUncurryLevel <= naturalUncurryLevel)
-         && "can't emit SILDeclRef below natural uncurry level");
-  uncurryLevel = atUncurryLevel == ConstructAtNaturalUncurryLevel
-    ? naturalUncurryLevel
-    : atUncurryLevel;
-  isCurried = uncurryLevel != naturalUncurryLevel;
+  setUncurryLevel(*this, uncurryLevel,
+                  getNaturalUncurryLevelAndKind(vd, kind, /*setKind=*/false));
 }
 
-SILDeclRef::SILDeclRef(SILDeclRef::Loc baseLoc,
-                       ResilienceExpansion expansion,
-                       unsigned atUncurryLevel, bool asForeign) 
- : isDirectReference(0), defaultArgIndex(0)
+SILDeclRef::SILDeclRef(SILDeclRef::Loc loc, ResilienceExpansion expansion,
+                       unsigned atUncurryLevel, bool isForeign)
+ : loc(loc), Expansion(unsigned(expansion)), isForeign(isForeign),
+   isDirectReference(0), defaultArgIndex(0)
 {
   unsigned naturalUncurryLevel;
-  if (ValueDecl *vd = baseLoc.dyn_cast<ValueDecl*>()) {
-    if (FuncDecl *fd = dyn_cast<FuncDecl>(vd)) {
-      // Map FuncDecls directly to Func SILDeclRefs.
-      loc = fd;
-      kind = Kind::Func;
-      naturalUncurryLevel = getFuncNaturalUncurryLevel(fd);
-    }
-    // Map ConstructorDecls to the Allocator SILDeclRef of the constructor.
-    else if (ConstructorDecl *cd = dyn_cast<ConstructorDecl>(vd)) {
-      loc = cd;
-      kind = Kind::Allocator;
-      naturalUncurryLevel = 1;
-    }
-    // Map EnumElementDecls to the EnumElement SILDeclRef of the element.
-    else if (EnumElementDecl *ed = dyn_cast<EnumElementDecl>(vd)) {
-      loc = ed;
-      kind = Kind::EnumElement;
-      naturalUncurryLevel = ed->hasArgumentType() ? 1 : 0;
-    }
-    // VarDecl constants require an explicit kind.
-    else if (isa<VarDecl>(vd)) {
-      llvm_unreachable("must create SILDeclRef for VarDecl with explicit kind");
-    }
-    // Map DestructorDecls to the Deallocator of the destructor.
-    else if (auto dtor = dyn_cast<DestructorDecl>(vd)) {
-      loc = dtor;
-      kind = Kind::Deallocator;
-      naturalUncurryLevel = 0;
-    }
-    else {
-      llvm_unreachable("invalid loc decl for SILDeclRef!");
-    }
-  } else if (auto *ACE = baseLoc.dyn_cast<AbstractClosureExpr *>()) {
-    loc = ACE;
+  if (ValueDecl *vd = loc.dyn_cast<ValueDecl*>()) {
+    Kind theKind;
+    naturalUncurryLevel =
+        getNaturalUncurryLevelAndKind(vd, theKind, /*setKind=*/true);
+    kind = theKind;
+  } else if (auto *ACE = loc.dyn_cast<AbstractClosureExpr *>()) {
     kind = Kind::Func;
-    assert(ACE->getParameterLists().size() >= 1 &&
-           "no param patterns for function?!");
-    naturalUncurryLevel = getFuncNaturalUncurryLevel(ACE);
+    naturalUncurryLevel = AnyFunctionRef(ACE).getNaturalUncurryLevel();
   } else {
     llvm_unreachable("impossible SILDeclRef loc");
   }
 
-  // Set the uncurry level.
-  assert((atUncurryLevel == ConstructAtNaturalUncurryLevel
-          || atUncurryLevel <= naturalUncurryLevel)
-         && "can't emit SILDeclRef below natural uncurry level");
-  uncurryLevel = atUncurryLevel == ConstructAtNaturalUncurryLevel
-    ? naturalUncurryLevel
-    : atUncurryLevel;
-  Expansion = (unsigned) expansion;
-  
-  isCurried = uncurryLevel != naturalUncurryLevel;  
-  isForeign = asForeign;
+  setUncurryLevel(*this, atUncurryLevel, naturalUncurryLevel);
 }
 
 Optional<AnyFunctionRef> SILDeclRef::getAnyFunctionRef() const {

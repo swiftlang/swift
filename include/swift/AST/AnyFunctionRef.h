@@ -51,6 +51,15 @@ public:
     }
   }
 
+  /// Get the natural uncurry level for the embedded function which is the number
+  /// of parameter lists minus one. Functions with local captures have an extra
+  /// level for the capture context.
+  unsigned getNaturalUncurryLevel() const {
+    assert(getParameterLists().size() >= 1 && "no arguments for func?!");
+    unsigned Level = getParameterLists().size() - 1;
+    return getCaptureInfo().hasLocalCaptures() ? Level + 1 : Level;
+  }
+
   CaptureInfo &getCaptureInfo() const {
     if (auto *AFD = TheFunction.dyn_cast<AbstractFunctionDecl *>())
       return AFD->getCaptureInfo();
