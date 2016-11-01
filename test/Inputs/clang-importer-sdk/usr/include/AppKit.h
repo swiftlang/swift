@@ -1,4 +1,5 @@
 @import Foundation;
+@import ctypes;
 
 @protocol NSAppearanceCustomization <NSObject>
 @end
