@@ -791,6 +791,7 @@ static void getWitnessMethodSubstitutions(
     GenericSignature *requirementSig,
     GenericSignature *witnessThunkSig,
     ArrayRef<Substitution> origSubs,
+    bool isDefaultWitness,
     SmallVectorImpl<Substitution> &newSubs) {
 
   if (witnessThunkSig == nullptr)
@@ -806,19 +807,28 @@ static void getWitnessMethodSubstitutions(
   SubstitutionMap subMap;
 
   // Take apart substitutions from the conforming type.
-  //
-  // If `Self` maps to a bound generic type, this gives us the
-  // substitutions for the concrete type's generic parameters.
-  auto witnessSubs = getSubstitutionsForProtocolConformance(conformanceRef);
-
+  ArrayRef<Substitution> witnessSubs;
+  auto *rootConformance = conformance->getRootNormalConformance();
+  auto *witnessSig = rootConformance->getGenericSignature();
   unsigned depth = 0;
-  if (!witnessSubs.empty()) {
-    auto *rootConformance = conformance->getRootNormalConformance();
-    depth = rootConformance->getGenericSignature()->getGenericParams().back()
-              ->getDepth() + 1;
-    auto *witnessSig = rootConformance->getGenericSignature();
+  if (isDefaultWitness) {
+    // For default witnesses, we substitute all of Self.
+    auto gp = witnessThunkSig->getGenericParams().front()->getCanonicalType();
+    subMap.addSubstitution(gp, origSubs.front().getReplacement());
+    subMap.addConformances(gp, origSubs.front().getConformances());
 
-    witnessSig->getSubstitutionMap(witnessSubs, subMap);
+    // For default witnesses, innermost generic parameters are always at
+    // depth 1.
+    depth = 1;
+  } else {
+    // If `Self` maps to a bound generic type, this gives us the
+    // substitutions for the concrete type's generic parameters.
+    witnessSubs = getSubstitutionsForProtocolConformance(conformanceRef);
+
+    if (!witnessSubs.empty()) {
+      witnessSig->getSubstitutionMap(witnessSubs, subMap);
+      depth = witnessSig->getGenericParams().back()->getDepth() + 1;
+    }
   }
 
   // Next, take apart caller-side substitutions.
@@ -890,17 +900,15 @@ static void getWitnessMethodSubstitutions(ApplySite AI, SILFunction *F,
 
   ArrayRef<Substitution> origSubs = AI.getSubstitutions();
 
-  if (F->getLoweredFunctionType()->getRepresentation()
-          == SILFunctionTypeRepresentation::WitnessMethod &&
-      F->getLoweredFunctionType()->getDefaultWitnessMethodProtocol(
-          *Module.getSwiftModule())) {
-    // Default witness thunks use the generic signature of the requirement.
-    NewSubs.append(origSubs.begin(), origSubs.end());
-    return;
-  }
+  bool isDefaultWitness =
+    F->getLoweredFunctionType()->getRepresentation()
+      == SILFunctionTypeRepresentation::WitnessMethod &&
+    F->getLoweredFunctionType()->getDefaultWitnessMethodProtocol(
+                                                     *Module.getSwiftModule())
+      == CRef.getRequirement();
 
   getWitnessMethodSubstitutions(Module, CRef, requirementSig, witnessThunkSig,
-                                origSubs, NewSubs);
+                                origSubs, isDefaultWitness, NewSubs);
 }
 
 /// Check if an upcast is legal.
