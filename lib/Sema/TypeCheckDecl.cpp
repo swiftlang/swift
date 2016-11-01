@@ -3615,6 +3615,21 @@ public:
       }
     }
 
+    // Typecheck any accessors that were previously synthesized
+    // (that were previously only validated at point of synthesis)
+    if (auto getter = VD->getGetter()) {
+      if (getter->hasBody()) {
+        TC.typeCheckDecl(getter, true);
+        TC.typeCheckDecl(getter, false);
+      }
+    }
+    if (auto setter = VD->getSetter()) {
+      if (setter->hasBody()) {
+        TC.typeCheckDecl(setter, true);
+        TC.typeCheckDecl(setter, false);
+      }
+    }
+
     TC.checkDeclAttributes(VD);
   }
 
