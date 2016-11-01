@@ -1737,7 +1737,8 @@ SILGenModule::emitProtocolWitness(ProtocolConformance *conformance,
   // Lower the witness type with the requirement's abstraction level.
   auto witnessSILFnType = getNativeSILFunctionType(M,
                                                    AbstractionPattern(reqtOrigTy),
-                                                   reqtSubstTy);
+                                                   reqtSubstTy,
+                                                   witness);
 
   // Mangle the name of the witness thunk.
   std::string nameBuffer;

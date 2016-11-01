@@ -561,6 +561,7 @@ NON_SIL_TYPE(LValue)
 CanSILFunctionType getNativeSILFunctionType(SILModule &M,
                         Lowering::AbstractionPattern orig,
                         CanAnyFunctionType substInterface,
+                        Optional<SILDeclRef> constant = None,
                         SILDeclRef::Kind kind = SILDeclRef::Kind::Func);
 
 inline llvm::raw_ostream &operator<<(llvm::raw_ostream &OS, SILType T) {
