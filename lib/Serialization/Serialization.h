@@ -401,19 +401,32 @@ public:
 
   /// Writes a list of generic substitutions. abbrCode is needed to support
   /// usage out of decl block.
+  ///
+  /// \param genericEnv When provided, the generic environment that describes
+  /// the archetypes within the substitutions. The replacement types within
+  /// the substitution will be mapped out of the generic environment before
+  /// being written.
   void writeSubstitutions(ArrayRef<Substitution> substitutions,
-                          const std::array<unsigned, 256> &abbrCodes);
+                          const std::array<unsigned, 256> &abbrCodes,
+                          GenericEnvironment *genericEnv = nullptr);
 
   /// Write a normal protocol conformance.
   void writeNormalConformance(const NormalProtocolConformance *conformance);
 
   /// Writes a protocol conformance.
+  ///
+  /// \param genericEnv When provided, the generic environment that describes
+  /// the archetypes within the substitutions. The replacement types within
+  /// the substitution will be mapped out of the generic environment before
+  /// being written.
   void writeConformance(ProtocolConformanceRef conformance,
-                        const std::array<unsigned, 256> &abbrCodes);
+                        const std::array<unsigned, 256> &abbrCodes,
+                        GenericEnvironment *genericEnv = nullptr);
 
   /// Writes a protocol conformance.
   void writeConformance(ProtocolConformance *conformance,
-                        const std::array<unsigned, 256> &abbrCodes);
+                        const std::array<unsigned, 256> &abbrCodes,
+                        GenericEnvironment *genericEnv = nullptr);
 
   /// Writes a generic environment.
   void writeGenericEnvironment(GenericEnvironment *env,
