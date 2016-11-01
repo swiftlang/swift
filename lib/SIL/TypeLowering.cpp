@@ -1696,7 +1696,7 @@ TypeConverter::getFunctionInterfaceTypeWithCaptures(CanAnyFunctionType funcType,
 
   // If we don't have any local captures (including function captures),
   // there's no context to apply.
-  if (!theClosure.getCaptureInfo().hasLocalCaptures()) {
+  if (!hasLoweredLocalCaptures(theClosure)) {
     if (!genericSig)
       return CanFunctionType::get(funcType.getInput(),
                                   funcType.getResult(),
@@ -2019,6 +2019,11 @@ getAnyFunctionRefFromCapture(CapturedValue capture) {
   if (auto *afd = dyn_cast<AbstractFunctionDecl>(capture.getDecl()))
     return AnyFunctionRef(afd);
   return None;
+}
+
+bool
+TypeConverter::hasLoweredLocalCaptures(AnyFunctionRef fn) {
+  return !getLoweredLocalCaptures(fn).getCaptures().empty();
 }
 
 CaptureInfo
