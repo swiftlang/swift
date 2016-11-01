@@ -153,6 +153,24 @@ func passingToId<T: CP, U>(receiver: NSIdLover,
   receiver.takesId(optionalC)
 
   // TODO: Property and subscript setters
+
+}
+
+// Workaround for rdar://problem/28318984. Skip the peephole for types with
+// nontrivial SIL lowerings because we don't correctly form the substitutions
+// for a generic _bridgeAnythingToObjectiveC call.
+func zim() {}
+struct Zang {}
+// CHECK-LABEL: sil hidden @_TF17objc_bridging_any27typesWithNontrivialLoweringFT8receiverCSo9NSIdLover_T_
+func typesWithNontrivialLowering(receiver: NSIdLover) {
+  // CHECK: init_existential_addr {{%.*}} : $*Any, $() -> ()
+  receiver.takesId(zim)
+  // CHECK: init_existential_addr {{%.*}} : $*Any, $Zang.Type
+  receiver.takesId(Zang.self)
+  // CHECK: init_existential_addr {{%.*}} : $*Any, $(() -> (), Zang.Type)
+  receiver.takesId((zim, Zang.self))
+  // CHECK: apply {{%.*}}<(Int, String)>
+  receiver.takesId((0, "one"))
 }
 
 // CHECK-LABEL: sil hidden @_TF17objc_bridging_any19passingToNullableId
