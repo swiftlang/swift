@@ -2576,9 +2576,9 @@ public struct ${Self}
   }
 % end
 
-  @available(*, unavailable, message: "Use initializers instead")
+  @available(swift, obsoleted: 4.0, message: "Use initializers instead")
   public func to${U}IntMax() -> ${U}IntMax {
-    fatalError("Unavailable function")
+    return numericCast(self)
   }
 }
 %# end of concrete type: ${Self}
