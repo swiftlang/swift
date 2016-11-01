@@ -1203,6 +1203,12 @@ public:
   
   void emitReturnExpr(SILLocation loc, Expr *ret);
 
+  RValue emitAnyHashableErasure(SILLocation loc,
+                                ManagedValue value,
+                                Type type,
+                                ProtocolConformanceRef conformance,
+                                SGFContext C);
+
   /// Turn a consumable managed value into a +1 managed value.
   ManagedValue getManagedValue(SILLocation loc,
                                ConsumableManagedValue value);
