@@ -101,6 +101,7 @@ bool swift::runSILDiagnosticPasses(SILModule &Module) {
   PM.addMandatoryInlining();
   PM.addPredictableMemoryOptimizations();
   PM.addDiagnosticConstantPropagation();
+  PM.addGuaranteedARCOpts();
   PM.addDiagnoseUnreachable();
   PM.addEmitDFDiagnostics();
   // Canonical swift requires all non cond_br critical edges to be split.

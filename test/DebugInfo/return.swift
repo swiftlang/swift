@@ -18,7 +18,6 @@ public func ifelseexpr() -> Int64 {
     x.x -= 1
   }
   // CHECK:  @swift_rt_swift_release to void (%C6return1X*)*)(%C6return1X* [[X]])
-  // CHECK:  @swift_rt_swift_release to void (%C6return1X*)*)(%C6return1X* [[X]])
   // CHECK-SAME:                    , !dbg ![[RELEASE:.*]]
 
   // The ret instruction should be in the same scope as the return expression.
