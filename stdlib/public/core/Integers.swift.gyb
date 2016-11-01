@@ -2068,12 +2068,6 @@ ${unsafeOperationComment(x.operator)}
     return Self.init(_truncatingBits: UInt(Self.bitWidth._value) &- 1)
   }
 
-  public static func doubleWidthDivide(
-    _ lhs: (high: Self, low: Magnitude), _ rhs: Self)
-    -> (quotient: Self, remainder: Self) {
-    fatalError()
-  }
-
 % for x in [op for ops in binaryArithmetic.values() for op in ops]:
 %   callLabel = x.firstArg + ': ' if not x.firstArg == '_' else ''
 %   if x.kind != '/':
@@ -2476,19 +2470,43 @@ public struct ${Self}
   }
 % end
 
-%     dbits = bits*2
-  public static func doubleWidthMultiply(_ self_: ${Self}, _ other: ${Self})
+%   dbits = bits*2
+  // FIXME(integers): tests
+  public static func doubleWidthMultiply(_ lhs: ${Self}, _ rhs: ${Self})
     -> (high: ${Self}, low: ${Self}.Magnitude) {
-    let lhs = Builtin.${z}ext_Int${bits}_Int${dbits}(self_._value)
-    let rhs = Builtin.${z}ext_Int${bits}_Int${dbits}(other._value)
+    let lhs_ = Builtin.${z}ext_Int${bits}_Int${dbits}(lhs._value)
+    let rhs_ = Builtin.${z}ext_Int${bits}_Int${dbits}(rhs._value)
 
-    let res = Builtin.mul_Int${dbits}(lhs, rhs)
+    let res = Builtin.mul_Int${dbits}(lhs_, rhs_)
     let low = ${Self}.Magnitude(Builtin.truncOrBitCast_Int${dbits}_Int${bits}(res))
-    let shift: UInt8 = ${bits}
-    let shifted = Builtin.ashr_Int${dbits}(res,
-      Builtin.zextOrBitCast_Int8_Int${dbits}(shift._value))
+    let shift = Builtin.zextOrBitCast_Int8_Int${dbits}(UInt8(${bits})._value)
+    let shifted = Builtin.ashr_Int${dbits}(res, shift)
     let high = ${Self}(Builtin.truncOrBitCast_Int${dbits}_Int${bits}(shifted))
     return (high: high, low: low)
+  }
+
+  // FIXME(integers): tests
+  public static func doubleWidthDivide(
+    _ lhs: (high: ${Self}, low: Magnitude), _ rhs: ${Self})
+    -> (quotient: ${Self}, remainder: ${Self}) {
+    // FIXME(integers): handle division by zero and overflows
+    _precondition(rhs > 0, "Division by zero")
+    let lhsHigh = Builtin.${z}ext_Int${bits}_Int${dbits}(lhs.high._value)
+    let shift = Builtin.zextOrBitCast_Int8_Int${dbits}(UInt8(${bits})._value)
+    let lhsHighShifted = Builtin.shl_Int${dbits}(lhsHigh, shift)
+    let lhsLow = Builtin.zext_Int${bits}_Int${dbits}(lhs.low._value)
+    let lhs_ = Builtin.or_Int${dbits}(lhsHighShifted, lhsLow)
+    let rhs_ = Builtin.${z}ext_Int${bits}_Int${dbits}(rhs._value)
+
+    let quotient_ = Builtin.${u}div_Int${dbits}(lhs_, rhs_)
+    let remainder_ = Builtin.${u}rem_Int${dbits}(lhs_, rhs_)
+
+    let quotient = ${Self}(
+      Builtin.truncOrBitCast_Int${dbits}_Int${bits}(quotient_))
+    let remainder = ${Self}(
+      Builtin.truncOrBitCast_Int${dbits}_Int${bits}(remainder_))
+
+    return (quotient: quotient, remainder: remainder)
   }
 
 %  if bits > 8:
