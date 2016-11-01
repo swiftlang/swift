@@ -233,6 +233,15 @@ ArrayTestSuite.test("${array_type}/appendNonUnique") {
   }
 }
 
+ArrayTestSuite.test("${array_type}/appendUndercountedCollection") {
+  // test that the array safely handles a
+  // collection that understates its count
+  var i = 0
+  let l = repeatElement(42, count: 10_000).lazy.filter { _ in i += 1; return i > 10_000 }
+  var a: ${array_type}<Int> = []
+  a.append(contentsOf: l)
+}
+
 ArrayTestSuite.test("${array_type}/emptyAllocation") {
   let arr0 = ${array_type}<Int>()
   let arr1 = ${array_type}<LifetimeTracked>(repeating: LifetimeTracked(0), count: 0)
