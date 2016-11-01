@@ -362,11 +362,9 @@ SILGenFunction::emitClosureValue(SILLocation loc, SILDeclRef constant,
   auto closure = *constant.getAnyFunctionRef();
   auto captureInfo = closure.getCaptureInfo();
   auto loweredCaptureInfo = SGM.Types.getLoweredLocalCaptures(closure);
-
-  assert(((constant.uncurryLevel == 1 &&
-           captureInfo.hasLocalCaptures()) ||
-          (constant.uncurryLevel == 0 &&
-           !captureInfo.hasLocalCaptures())) &&
+  auto hasCaptures = SGM.Types.hasLoweredLocalCaptures(closure);
+  assert(((constant.uncurryLevel == 1 && hasCaptures) ||
+          (constant.uncurryLevel == 0 && !hasCaptures)) &&
          "curried local functions not yet supported");
 
   auto constantInfo = getConstantInfo(constant);
@@ -406,7 +404,7 @@ SILGenFunction::emitClosureValue(SILLocation loc, SILDeclRef constant,
         loc, captureInfo);
   }
 
-  if (!captureInfo.hasLocalCaptures() && !wasSpecialized) {
+  if (!hasCaptures && !wasSpecialized) {
     auto result = ManagedValue::forUnmanaged(functionRef);
     return emitOrigToSubstValue(loc, result,
                                 AbstractionPattern(expectedType),
@@ -435,7 +433,7 @@ SILGenFunction::emitClosureValue(SILLocation loc, SILDeclRef constant,
   //  - the original type
   auto origLoweredFormalType =
       AbstractionPattern(constantInfo.LoweredInterfaceType);
-  if (captureInfo.hasLocalCaptures()) {
+  if (hasCaptures) {
     // Get the unlowered formal type of the constant, stripping off
     // the first level of function application, which applies captures.
     origLoweredFormalType =
@@ -792,7 +790,7 @@ void SILGenFunction::emitCurryThunk(ValueDecl *vd,
 
   } else if (auto fd = dyn_cast<AbstractFunctionDecl>(vd)) {
     // Forward implicit closure context arguments.
-    bool hasCaptures = fd->getCaptureInfo().hasLocalCaptures();
+    bool hasCaptures = SGM.M.Types.hasLoweredLocalCaptures(fd);
     if (hasCaptures)
       --paramCount;
 
