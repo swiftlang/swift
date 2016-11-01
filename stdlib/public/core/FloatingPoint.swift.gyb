@@ -516,7 +516,7 @@ public protocol FloatingPoint: Comparable, SignedArithmetic, Strideable {
   ///
   /// - SeeAlso: `add(_:)`
   // FIXME(integers): revise the doc comment
-  /*static func +(_ lhs: Self, _ rhs: Self) -> Self*/
+  static func +(_ lhs: Self, _ rhs: Self) -> Self
 
   /// Adds the given value to this value in place, rounded to a representable
   /// value.
@@ -534,7 +534,7 @@ public protocol FloatingPoint: Comparable, SignedArithmetic, Strideable {
   ///
   /// - SeeAlso: `adding(_:)`
   // FIXME(integers): revise the doc comment
-  /*static func +=(_ lhs: inout Self, _ rhs: Self)*/
+  static func +=(_ lhs: inout Self, _ rhs: Self)
 
   /// Returns the additive inverse of this value.
   ///
@@ -584,8 +584,8 @@ public protocol FloatingPoint: Comparable, SignedArithmetic, Strideable {
   ///   representable value.
   ///
   /// - SeeAlso: `subtract(_:)`
-  // FIXME(integers): revise the doc comment
-  /*static func -(_ lhs: Self, _ rhs: Self) -> Self*/
+  // FIXME(integers): revise the doc comment (it also mentiones 'addition')
+  static func -(_ lhs: Self, _ rhs: Self) -> Self
 
   /// Subtracts the given value from this value in place, rounding to a
   /// representable value.
@@ -603,7 +603,7 @@ public protocol FloatingPoint: Comparable, SignedArithmetic, Strideable {
   ///
   /// - SeeAlso: `subtracting(_:)`
   // FIXME(integers): revise the doc comment
-  /*static func -=(_ lhs: inout Self, _ rhs: Self)*/
+  static func -=(_ lhs: inout Self, _ rhs: Self)
 
   /// Returns the product of this value and the given value, rounded to a
   /// representable value.
@@ -628,7 +628,7 @@ public protocol FloatingPoint: Comparable, SignedArithmetic, Strideable {
   ///
   /// - SeeAlso: `multiply(by:)`
   // FIXME(integers): revise the doc comment
-  /*static func *(_ lhs: Self, _ rhs: Self) -> Self*/
+  static func *(_ lhs: Self, _ rhs: Self) -> Self
 
   /// Multiplies this value by the given value in place, rounding to a
   /// representable value.
@@ -646,7 +646,7 @@ public protocol FloatingPoint: Comparable, SignedArithmetic, Strideable {
   ///
   /// - SeeAlso: `multiplied(by:)`
   // FIXME(integers): revise the doc comment
-  /*static func *=(_ lhs: inout Self, _ rhs: Self)*/
+  static func *=(_ lhs: inout Self, _ rhs: Self)
 
   /// Returns the quotient of this value and the given value, rounded to a
   /// representable value.
@@ -671,7 +671,7 @@ public protocol FloatingPoint: Comparable, SignedArithmetic, Strideable {
   ///
   /// - SeeAlso: `divide(by:)`
   // FIXME(integers): revise the doc comment
-  /*static func /(_ lhs: Self, _ rhs: Self) -> Self*/
+  static func /(_ lhs: Self, _ rhs: Self) -> Self
 
   /// Divides this value by the given value in place, rounding to a
   /// representable value.
@@ -689,7 +689,7 @@ public protocol FloatingPoint: Comparable, SignedArithmetic, Strideable {
   ///
   /// - SeeAlso: `divided(by:)`
   // FIXME(integers): revise the doc comment
-  /*static func /=(_ lhs: inout Self, _ rhs: Self)*/
+  static func /=(_ lhs: inout Self, _ rhs: Self)
 
   /// Returns the remainder of this value divided by the given value.
   ///
