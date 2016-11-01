@@ -205,6 +205,26 @@ bb0:
 // CHECK-NEXT: }
 }
 
+sil @testFoldingNonNegativeSignedInt : $@convention(thin) (Builtin.Int64) -> () {
+bb0(%0 : $Builtin.Int64):
+  %zero  = integer_literal $Builtin.Int64, 0
+  %non_neg = builtin "assumeNonNegative_Int64"(%0 : $Builtin.Int64) : $Builtin.Int64
+  %compare_slt = builtin "cmp_slt_Int64"(%non_neg : $Builtin.Int64, %zero : $Builtin.Int64) : $Builtin.Int1
+  %compare_sgt = builtin "cmp_sgt_Int64"(%zero : $Builtin.Int64, %non_neg : $Builtin.Int64) : $Builtin.Int1
+  %compare_sge = builtin "cmp_sge_Int64"(%non_neg : $Builtin.Int64, %zero : $Builtin.Int64) : $Builtin.Int1
+  %compare_sle = builtin "cmp_sle_Int64"(%zero : $Builtin.Int64, %non_neg : $Builtin.Int64) : $Builtin.Int1
+  %5 = tuple ()
+  return %5 : $()
+// CHECK-LABEL: sil @testFoldingNonNegativeSignedInt
+// CHECK: bb
+// CHECK-NEXT: integer_literal $Builtin.Int1, 0
+// CHECK-NEXT: integer_literal $Builtin.Int1, 0
+// CHECK-NEXT: integer_literal $Builtin.Int1, -1
+// CHECK-NEXT: integer_literal $Builtin.Int1, -1
+// CHECK-NEXT: tuple
+// CHECK-NEXT: return
+}
+
 sil @testFoldingIntBinaryPredicates : $@convention(thin) () -> () {
 bb0:
   %1 = integer_literal $Builtin.Int1, 1
