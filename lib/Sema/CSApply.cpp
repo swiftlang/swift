@@ -2153,6 +2153,8 @@ namespace {
       auto type = simplifyType(openedType);
       expr->setType(type);
 
+      if (type->is<UnresolvedType>()) return expr;
+
       Type conformingType = type;
       if (auto baseType = conformingType->getAnyOptionalObjectType()) {
         // The type may be optional due to a failable initializer in the

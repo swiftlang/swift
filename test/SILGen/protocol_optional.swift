@@ -14,7 +14,7 @@ func optionalMethodGeneric<T : P1>(t t : T) {
   // CHECK: bb0([[T:%[0-9]+]] : $T):
   // CHECK: [[TBOX:%[0-9]+]] = alloc_box $T
   // CHECK-NEXT: [[PT:%[0-9]+]] = project_box [[TBOX]]
-  // CHECK: store [[T]] to [[PT]] : $*T
+  // CHECK: store [[T]] to [init] [[PT]] : $*T
   // CHECK-NEXT: [[OPT_BOX:%[0-9]+]] = alloc_box $Optional<@callee_owned (Int) -> ()>
   // CHECK-NEXT: project_box [[OPT_BOX]]
   // CHECK-NEXT: [[T:%[0-9]+]] = load [[PT]] : $*T
@@ -30,7 +30,7 @@ func optionalPropertyGeneric<T : P1>(t t : T) {
   // CHECK: bb0([[T:%[0-9]+]] : $T):
   // CHECK: [[TBOX:%[0-9]+]] = alloc_box $T
   // CHECK-NEXT: [[PT:%[0-9]+]] = project_box [[TBOX]]
-  // CHECK: store [[T]] to [[PT]] : $*T
+  // CHECK: store [[T]] to [init] [[PT]] : $*T
   // CHECK-NEXT: [[OPT_BOX:%[0-9]+]] = alloc_box $Optional<Int>
   // CHECK-NEXT: project_box [[OPT_BOX]]
   // CHECK-NEXT: [[T:%[0-9]+]] = load [[PT]] : $*T
@@ -46,7 +46,7 @@ func optionalSubscriptGeneric<T : P1>(t t : T) {
   // CHECK: bb0([[T:%[0-9]+]] : $T):
   // CHECK: [[TBOX:%[0-9]+]] = alloc_box $T
   // CHECK-NEXT: [[PT:%[0-9]+]] = project_box [[TBOX]]
-  // CHECK: store [[T]] to [[PT]] : $*T
+  // CHECK: store [[T]] to [init] [[PT]] : $*T
   // CHECK-NEXT: [[OPT_BOX:%[0-9]+]] = alloc_box $Optional<Int>
   // CHECK-NEXT: project_box [[OPT_BOX]]
   // CHECK-NEXT: [[T:%[0-9]+]] = load [[PT]] : $*T

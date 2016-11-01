@@ -44,15 +44,16 @@ ManagedValue ManagedValue::copy(SILGenFunction &gen, SILLocation l) {
 
 /// Store a copy of this value with independent ownership into the given
 /// uninitialized address.
-void ManagedValue::copyInto(SILGenFunction &gen, SILValue dest, SILLocation L) {
+void ManagedValue::copyInto(SILGenFunction &gen, SILValue dest,
+                            SILLocation loc) {
   auto &lowering = gen.getTypeLowering(getType());
   if (lowering.isAddressOnly()) {
-    gen.B.createCopyAddr(L, getValue(), dest,
-                         IsNotTake, IsInitialization);
+    gen.B.createCopyAddr(loc, getValue(), dest, IsNotTake, IsInitialization);
     return;
   }
-  lowering.emitCopyValue(gen.B, L, getValue());
-  gen.B.createStore(L, getValue(), dest, StoreOwnershipQualifier::Unqualified);
+
+  SILValue copy = lowering.emitCopyValue(gen.B, loc, getValue());
+  lowering.emitStoreOfCopy(gen.B, loc, copy, dest, IsInitialization);
 }
 
 /// This is the same operation as 'copy', but works on +0 values that don't

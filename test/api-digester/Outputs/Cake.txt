@@ -10,6 +10,8 @@ Constructor S1.init(_:) has 1st parameter type change from Int to Double
 Func C1.foo2(_:) has 1st parameter type change from Int to () -> ()
 
 ==================================================== Decl Attribute changes ====================================================
+Var C1.CIIns1 changes from weak to strong
+Var C1.CIIns2 changes from strong to weak
 Func C1.foo1() is now not static
 Func S1.foo3() is now static
 Func S1.foo1() is now mutating

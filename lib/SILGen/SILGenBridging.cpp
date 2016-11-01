@@ -65,11 +65,9 @@ emitBridgeNativeToObjectiveC(SILGenFunction &gen,
   ArrayRef<Substitution> witnessSubstitutions = witness.getSubstitutions();
   ArrayRef<Substitution> typeSubstitutions =
       swiftValueType->gatherAllSubstitutions(gen.SGM.SwiftModule, nullptr);
-  
-  // FIXME: Methods of generic types don't have substitutions in their
-  // ConcreteDeclRefs for some reason. Furthermore,
-  // SubstitutedProtocolConformances don't substitute their witness
-  // ConcreteDeclRefs, so we need to do it ourselves.
+
+  // FIXME: Witness substitutions get dropped via serialization, so we end up
+  // trying to reconstitute them here.
   ArrayRef<Substitution> substitutions;
   SmallVector<Substitution, 4> substitutionsBuf;
   if (typeSubstitutions.empty()) {
@@ -77,25 +75,10 @@ emitBridgeNativeToObjectiveC(SILGenFunction &gen,
   } else if (witnessSubstitutions.empty()) {
     substitutions = typeSubstitutions;
   } else {
-    // FIXME: The substitutions in a witness ConcreteDeclRef really ought to
-    // be interface types. Instead, we get archetypes from a generic environment
-    // that's either the extension method's generic environment, for a witness
-    // from a nominal extension, or the conforming type's original declaration
-    // generic environment, for a witness from a protocol extension.
-    auto swiftValueTypeDecl = swiftValueType->getAnyNominal();
-    GenericEnvironment *witnessEnv;
-    GenericSignature *witnessSig;
-    
-    if (witness.getDecl()->getDeclContext()->getDeclaredTypeOfContext()
-        ->isExistentialType()) {
-      witnessEnv = swiftValueTypeDecl->getGenericEnvironment();
-      witnessSig = swiftValueTypeDecl->getGenericSignature();
-    } else {
-      witnessEnv = witness.getDecl()->getDeclContext()
-        ->getGenericEnvironmentOfContext();
-      witnessSig = witness.getDecl()->getDeclContext()
-        ->getGenericSignatureOfContext();
-    }
+    // FIXME: Substitute the type substitutions into the witness, because
+    // SpecializedProtocolConformance::getWitness() doesn't do it for us.
+    GenericEnvironment *witnessEnv = witness.getSyntheticEnvironment();
+    GenericSignature *witnessSig = witness.getSyntheticSignature();
     
     SubstitutionMap typeSubMap = witnessEnv
       ->getSubstitutionMap(gen.SGM.SwiftModule,
@@ -121,8 +104,8 @@ emitBridgeNativeToObjectiveC(SILGenFunction &gen,
   if (witnessFnTy.castTo<SILFunctionType>()->getParameters()[0].isIndirect()
       && !swiftValue.getType().isAddress()) {
     auto tmp = gen.emitTemporaryAllocation(loc, swiftValue.getType());
-    gen.B.createStore(loc, swiftValue.getValue(), tmp,
-                      StoreOwnershipQualifier::Unqualified);
+    gen.B.emitStoreValueOperation(loc, swiftValue.getValue(), tmp,
+                                  StoreOwnershipQualifier::Init);
     swiftValue = ManagedValue::forUnmanaged(tmp);
   }
 
@@ -450,8 +433,8 @@ ManagedValue SILGenFunction::emitFuncToBlock(SILLocation loc,
   // Store the function to the block without claiming it, so that it still
   // gets cleaned up in scope. Copying the block will create an independent
   // reference.
-  B.createStore(loc, fn.getValue(), capture,
-                StoreOwnershipQualifier::Unqualified);
+  B.emitStoreValueOperation(loc, fn.getValue(), capture,
+                            StoreOwnershipQualifier::Init);
   auto invokeFn = B.createFunctionRef(loc, thunk);
   
   auto stackBlock = B.createInitBlockStorageHeader(loc, storage, invokeFn,

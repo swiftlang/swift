@@ -2774,6 +2774,10 @@ diagnoseUnviableLookupResults(MemberLookupResult &result, Type baseObjTy,
         
       return;
     }
+    case MemberLookupResult::UR_DestructorInaccessible: {
+      diagnose(nameLoc, diag::destructor_not_accessible);
+      return;
+    }
     }
   }
 
@@ -5438,7 +5442,31 @@ bool FailureDiagnosis::visitApplyExpr(ApplyExpr *callExpr) {
   }
 
   auto overloadName = calleeInfo.declName;
-  
+
+  // Local function to check if the error with argument type is
+  // related to contextual type information of the enclosing expression
+  // rather than resolution of argument expression itself.
+  auto isContextualConversionFailure = [&](Expr *argExpr) -> bool {
+    // If we found an exact match, this must be a problem with a conversion from
+    // the result of the call to the expected type. Diagnose this as a
+    // conversion failure.
+    if (calleeInfo.closeness == CC_ExactMatch)
+      return true;
+
+    if (!CS->getContextualType() || calleeInfo.closeness != CC_ArgumentMismatch)
+      return false;
+
+    CalleeCandidateInfo candidates(fnExpr, hasTrailingClosure, CS);
+
+    // Filter original list of choices based on the deduced type of
+    // argument expression after force re-check.
+    candidates.filterContextualMemberList(argExpr);
+
+    // One of the candidates matches exactly, which means that
+    // this is a contextual type conversion failure, we can't diagnose here.
+    return candidates.closeness == CC_ExactMatch;
+  };
+
   // Otherwise, we have a generic failure.  Diagnose it with a generic error
   // message now.
   if (isa<BinaryExpr>(callExpr) && isa<TupleExpr>(argExpr)) {
@@ -5478,28 +5506,9 @@ bool FailureDiagnosis::visitApplyExpr(ApplyExpr *callExpr) {
         return true;
       }
     }
-    
-    // If we found an exact match, this must be a problem with a conversion from
-    // the result of the call to the expected type.  Diagnose this as a
-    // conversion failure.
-    if (calleeInfo.closeness == CC_ExactMatch)
+
+    if (isContextualConversionFailure(argTuple))
       return false;
-
-    // If this is not a specific structural problem we can diagnose,
-    // let's check if this is contextual type conversion error.
-    if (CS->getContextualType() &&
-        calleeInfo.closeness == CC_ArgumentMismatch) {
-      CalleeCandidateInfo candidates(fnExpr, hasTrailingClosure, CS);
-
-      // Filter original list of choices based on the deduced type of
-      // argument expression after force re-check.
-      candidates.filterContextualMemberList(argTuple);
-
-      // One of the candidates matches exactly, which means that
-      // this is a contextual type conversion failure, we can't diagnose here.
-      if (candidates.closeness == CC_ExactMatch)
-        return false;
-    }
 
     if (!lhsType->isEqual(rhsType)) {
       diagnose(callExpr->getLoc(), diag::cannot_apply_binop_to_args,
@@ -5527,11 +5536,8 @@ bool FailureDiagnosis::visitApplyExpr(ApplyExpr *callExpr) {
 
     return true;
   }
-  
-  // If we found an exact match, this must be a problem with a conversion from
-  // the result of the call to the expected type.  Diagnose this as a
-  // conversion failure.
-  if (calleeInfo.closeness == CC_ExactMatch)
+
+  if (isContextualConversionFailure(argExpr))
     return false;
   
   // Generate specific error messages for unary operators.

@@ -190,9 +190,9 @@ static SILInstruction *constantFoldIntrinsic(BuiltinInst *BI,
     APInt LHSI = LHS->getValue();
     unsigned LZ = 0;
     // Check corner-case of source == zero
-    if (LHSI.getLimitedValue() == 0) {
+    if (LHSI == 0) {
       auto *RHS = dyn_cast<IntegerLiteralInst>(Args[1]);
-      if (!RHS || RHS->getValue().getBoolValue() != 0) {
+      if (!RHS || RHS->getValue() != 0) {
         // Undefined
         return nullptr;
       }

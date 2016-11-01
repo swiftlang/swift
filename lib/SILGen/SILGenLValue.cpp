@@ -987,8 +987,8 @@ namespace {
                                             baseFormalType);
 
             baseAddress = gen.emitTemporaryAllocation(loc, base.getType());
-            gen.B.createStore(loc, base.getValue(), baseAddress,
-                              StoreOwnershipQualifier::Unqualified);
+            gen.B.emitStoreValueOperation(loc, base.getValue(), baseAddress,
+                                          StoreOwnershipQualifier::Init);
           }
           baseMetatype = gen.B.createMetatype(loc, metatypeType);
 
@@ -2131,10 +2131,11 @@ ManagedValue SILGenFunction::emitLoad(SILLocation loc, SILValue addr,
 static void emitUnloweredStoreOfCopy(SILGenBuilder &B, SILLocation loc,
                                      SILValue value, SILValue addr,
                                      IsInitialization_t isInit) {
-  if (isInit)
-    B.createStore(loc, value, addr, StoreOwnershipQualifier::Unqualified);
-  else
+  if (isInit) {
+    B.emitStoreValueOperation(loc, value, addr, StoreOwnershipQualifier::Init);
+  } else {
     B.createAssign(loc, value, addr);
+  }
 }
 
 SILValue SILGenFunction::emitConversionToSemanticRValue(SILLocation loc,

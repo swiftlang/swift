@@ -790,10 +790,18 @@ static CanType stripImmediateLabels(CanType type) {
 }
 
 /// Check whether the given function is non-generic.
-static bool isNonGenericIntrinsic(FuncDecl *fn, CanType &input,
+static bool isNonGenericIntrinsic(FuncDecl *fn, bool allowTypeMembers,
+                                  CanType &input,
                                   CanType &output) {
-  auto fnType = dyn_cast<FunctionType>(fn->getInterfaceType()
-                                         ->getCanonicalType());
+  CanType type = fn->getInterfaceType()->getCanonicalType();
+  if (allowTypeMembers && fn->getDeclContext()->isTypeContext()) {
+    auto fnType = dyn_cast<FunctionType>(type);
+    if (!fnType) return false;
+
+    type = fnType.getResult();
+  }
+
+  auto fnType = dyn_cast<FunctionType>(type);
   if (!fnType)
     return false;
 
@@ -823,7 +831,8 @@ FuncDecl *ASTContext::getGetBoolDecl(LazyResolver *resolver) const {
   // Look for the function.
   CanType input, output;
   auto decl = findLibraryIntrinsic(*this, "_getBool", resolver);
-  if (!decl || !isNonGenericIntrinsic(decl, input, output))
+  if (!decl ||
+      !isNonGenericIntrinsic(decl, /*allowTypeMembers=*/false, input, output))
     return nullptr;
 
   // Input must be Builtin.Int1
@@ -841,7 +850,7 @@ FuncDecl *ASTContext::getGetBoolDecl(LazyResolver *resolver) const {
   return decl;
 }
 
-FuncDecl *ASTContext::getEqualIntDecl(LazyResolver *resolver) const {
+FuncDecl *ASTContext::getEqualIntDecl() const {
   if (Impl.EqualIntDecl)
     return Impl.EqualIntDecl;
   
@@ -854,14 +863,20 @@ FuncDecl *ASTContext::getEqualIntDecl(LazyResolver *resolver) const {
   for (ValueDecl *vd : equalFuncs) {
     // All "==" decls should be functions, but who knows...
     FuncDecl *funcDecl = dyn_cast<FuncDecl>(vd);
-    if (!funcDecl || funcDecl->getDeclContext()->isTypeContext())
+    if (!funcDecl)
       continue;
-    
-    if (resolver)
+
+    if (funcDecl->getDeclContext()->isTypeContext()) {
+      auto contextTy = funcDecl->getDeclContext()->getDeclaredInterfaceType();
+      if (!contextTy->isEqual(intType)) continue;
+    }
+
+    if (auto resolver = getLazyResolver())
       resolver->resolveDeclSignature(funcDecl);
 
     CanType input, resultType;
-    if (!isNonGenericIntrinsic(funcDecl, input, resultType))
+    if (!isNonGenericIntrinsic(funcDecl, /*allowTypeMembers=*/true, input,
+                               resultType))
       continue;
     
     // Check for the signature: (Int, Int) -> Bool
@@ -889,7 +904,8 @@ ASTContext::getUnimplementedInitializerDecl(LazyResolver *resolver) const {
   CanType input, output;
   auto decl = findLibraryIntrinsic(*this, "_unimplementedInitializer",
                                    resolver);
-  if (!decl || !isNonGenericIntrinsic(decl, input, output))
+  if (!decl ||
+      !isNonGenericIntrinsic(decl, /*allowTypeMembers=*/false, input, output))
     return nullptr;
 
   // FIXME: Check inputs and outputs.
@@ -921,7 +937,8 @@ FuncDecl *ASTContext::getIsOSVersionAtLeastDecl(LazyResolver *resolver) const {
   CanType input, output;
   auto decl =
       findLibraryIntrinsic(*this, "_stdlib_isOSVersionAtLeast", resolver);
-  if (!decl || !isNonGenericIntrinsic(decl, input, output))
+  if (!decl ||
+      !isNonGenericIntrinsic(decl, /*allowTypeMembers=*/false, input, output))
     return nullptr;
 
   // Input must be (Builtin.Word, Builtin.Word, Builtin.Word)

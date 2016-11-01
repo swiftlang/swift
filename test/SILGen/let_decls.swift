@@ -233,7 +233,7 @@ func test_weird_property(_ v : WeirdPropertyTest, i : Int) -> Int {
   var v = v
   // CHECK: [[VBOX:%[0-9]+]] = alloc_box $WeirdPropertyTest
   // CHECK: [[PB:%.*]] = project_box [[VBOX]]
-  // CHECK: store %0 to [[PB]]
+  // CHECK: store %0 to [trivial] [[PB]]
 
   // The setter isn't mutating, so we need to load the box.
   // CHECK: [[VVAL:%[0-9]+]] = load [[PB]]
@@ -460,7 +460,7 @@ struct LetPropertyStruct {
 // CHECK: bb0(%0 : $LetPropertyStruct):
 // CHECK:  [[ABOX:%[0-9]+]] = alloc_box $LetPropertyStruct
 // CHECK:  [[A:%[0-9]+]] = project_box [[ABOX]]
-// CHECK:   store %0 to [[A]] : $*LetPropertyStruct
+// CHECK:   store %0 to [trivial] [[A]] : $*LetPropertyStruct
 // CHECK:   [[STRUCT:%[0-9]+]] = load [[A]] : $*LetPropertyStruct
 // CHECK:   [[PROP:%[0-9]+]] = struct_extract [[STRUCT]] : $LetPropertyStruct, #LetPropertyStruct.lp
 // CHECK:   destroy_value [[ABOX]] : $@box LetPropertyStruct

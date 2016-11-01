@@ -359,8 +359,8 @@ SILGenFunction::emitPointerToPointer(SILLocation loc,
   // The generic function currently always requires indirection, but pointers
   // are always loadable.
   auto origBuf = emitTemporaryAllocation(loc, input.getType());
-  B.createStore(loc, input.forward(*this), origBuf,
-                StoreOwnershipQualifier::Unqualified);
+  B.emitStoreValueOperation(loc, input.forward(*this), origBuf,
+                            StoreOwnershipQualifier::Init);
   auto origValue = emitManagedBufferWithCleanup(origBuf);
   
   // Invoke the conversion intrinsic to convert to the destination type.

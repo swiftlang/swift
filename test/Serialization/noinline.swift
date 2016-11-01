@@ -12,7 +12,7 @@ import def_noinline
 // SIL: [[RAW:%.+]] = global_addr @_Tv8noinline3rawSb : $*Bool
 // SIL: [[FUNC:%.+]] = function_ref @_TF12def_noinline12testNoinlineFT1xSb_Sb : $@convention(thin) (Bool) -> Bool
 // SIL: [[RESULT:%.+]] = apply [[FUNC]]({{%.+}}) : $@convention(thin) (Bool) -> Bool
-// SIL: store [[RESULT]] to [[RAW]] : $*Bool
+// SIL: store [[RESULT]] to [trivial] [[RAW]] : $*Bool
 var raw = testNoinline(x: false)
 
 // SIL: [[FUNC2:%.+]] = function_ref @_TFV12def_noinline18NoInlineInitStructCfT1xSb_S0_ : $@convention(method) (Bool, @thin NoInlineInitStruct.Type) -> NoInlineInitStruct

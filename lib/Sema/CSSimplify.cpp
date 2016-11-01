@@ -1217,12 +1217,13 @@ ConstraintSystem::matchTypes(Type type1, Type type2, ConstraintKind kind,
   bool isArgumentTupleConversion
           = kind == ConstraintKind::ArgumentTupleConversion ||
             kind == ConstraintKind::OperatorArgumentTupleConversion;
-  type1 = getFixedTypeRecursive(type1, kind == ConstraintKind::Equal,
+  type1 = getFixedTypeRecursive(type1, flags, kind == ConstraintKind::Equal,
                                 isArgumentTupleConversion);
+
   auto desugar1 = type1->getDesugaredType();
   TypeVariableType *typeVar1 = desugar1->getAs<TypeVariableType>();
 
-  type2 = getFixedTypeRecursive(type2, kind == ConstraintKind::Equal,
+  type2 = getFixedTypeRecursive(type2, flags, kind == ConstraintKind::Equal,
                                 isArgumentTupleConversion);
   auto desugar2 = type2->getDesugaredType();
   TypeVariableType *typeVar2 = desugar2->getAs<TypeVariableType>();
@@ -1289,7 +1290,7 @@ ConstraintSystem::matchTypes(Type type1, Type type2, ConstraintKind kind,
       if (typeVar1) {
         // Simplify the right-hand type and perform the "occurs" check.
         typeVar1 = getRepresentative(typeVar1);
-        type2 = simplifyType(type2);
+        type2 = simplifyType(type2, flags);
         if (typeVarOccursInType(typeVar1, type2))
           return formUnsolvedResult();
 
@@ -1335,7 +1336,7 @@ ConstraintSystem::matchTypes(Type type1, Type type2, ConstraintKind kind,
 
       // Simplify the left-hand type and perform the "occurs" check.
       typeVar2 = getRepresentative(typeVar2);
-      type1 = simplifyType(type1);
+      type1 = simplifyType(type1, flags);
       if (typeVarOccursInType(typeVar2, type1))
         return formUnsolvedResult();
 
@@ -1358,7 +1359,7 @@ ConstraintSystem::matchTypes(Type type1, Type type2, ConstraintKind kind,
       if (typeVar2 && !typeVar1) {
         // Simplify the left-hand type and perform the "occurs" check.
         typeVar2 = getRepresentative(typeVar2);
-        type1 = simplifyType(type1);
+        type1 = simplifyType(type1, flags);
         if (typeVarOccursInType(typeVar2, type1))
           return formUnsolvedResult();
 
@@ -1371,7 +1372,7 @@ ConstraintSystem::matchTypes(Type type1, Type type2, ConstraintKind kind,
       } else if (typeVar1 && !typeVar2) {
         // Simplify the right-hand type and perform the "occurs" check.
         typeVar1 = getRepresentative(typeVar1);
-        type2 = simplifyType(type2);
+        type2 = simplifyType(type2, flags);
         if (typeVarOccursInType(typeVar1, type2))
           return formUnsolvedResult();
 
@@ -2326,7 +2327,7 @@ ConstraintSystem::SolutionKind ConstraintSystem::simplifyConformsToConstraint(
                                  ConstraintLocatorBuilder locator,
                                  TypeMatchOptions flags) {
   // Dig out the fixed type to which this type refers.
-  type = getFixedTypeRecursive(type, /*wantRValue=*/true);
+  type = getFixedTypeRecursive(type, flags, /*wantRValue=*/true);
 
   // If we hit a type variable without a fixed type, we can't
   // solve this yet.
@@ -2444,7 +2445,7 @@ ConstraintSystem::simplifyCheckedCastConstraint(
 
   do {
     // Dig out the fixed type to which this type refers.
-    fromType = getFixedTypeRecursive(fromType, /*wantRValue=*/true);
+    fromType = getFixedTypeRecursive(fromType, flags, /*wantRValue=*/true);
 
     // If we hit a type variable without a fixed type, we can't
     // solve this yet.
@@ -2452,7 +2453,7 @@ ConstraintSystem::simplifyCheckedCastConstraint(
       return formUnsolved();
 
     // Dig out the fixed type to which this type refers.
-    toType = getFixedTypeRecursive(toType, /*wantRValue=*/true);
+    toType = getFixedTypeRecursive(toType, flags, /*wantRValue=*/true);
 
     // If we hit a type variable without a fixed type, we can't
     // solve this yet.
@@ -2623,7 +2624,7 @@ ConstraintSystem::simplifyOptionalObjectConstraint(
                                            TypeMatchOptions flags,
                                            ConstraintLocatorBuilder locator) {
   // Resolve the optional type.
-  Type optLValueTy = getFixedTypeRecursive(first, /*wantRValue=*/false);
+  Type optLValueTy = getFixedTypeRecursive(first, flags, /*wantRValue=*/false);
   Type optTy = optLValueTy->getRValueType();
   if (optTy.getPointer() != optLValueTy.getPointer())
     optTy = getFixedTypeRecursive(optTy, /*wantRValue=*/false);
@@ -3016,6 +3017,11 @@ performMemberLookup(ConstraintKind constraintKind, DeclName memberName,
   // reasonable choice.
   auto addChoice = [&](ValueDecl *cand, bool isBridged,
                        bool isUnwrappedOptional) {
+    // Destructors cannot be referenced manually
+    if (isa<DestructorDecl>(cand)) {
+      result.addUnviable(cand, MemberLookupResult::UR_DestructorInaccessible);
+      return;
+    }
     // If the result is invalid, skip it.
     TC.validateDecl(cand, true);
     if (cand->isInvalid()) {
@@ -3231,7 +3237,7 @@ ConstraintSystem::simplifyMemberConstraint(ConstraintKind kind,
   // Resolve the base type, if we can. If we can't resolve the base type,
   // then we can't solve this constraint.
   // FIXME: simplifyType() call here could be getFixedTypeRecursive?
-  baseTy = simplifyType(baseTy);
+  baseTy = simplifyType(baseTy, flags);
   Type baseObjTy = baseTy->getRValueType();
 
   // Try to look through ImplicitlyUnwrappedOptional<T>; the result is
@@ -3348,7 +3354,7 @@ ConstraintSystem::simplifyDefaultableConstraint(
                                             Type first, Type second,
                                             TypeMatchOptions flags,
                                             ConstraintLocatorBuilder locator) {
-  first = getFixedTypeRecursive(first, true);
+  first = getFixedTypeRecursive(first, flags, true);
 
   if (first->isTypeVariableOrMember()) {
     if (flags.contains(TMF_GenerateConstraints)) {
@@ -3388,7 +3394,7 @@ ConstraintSystem::simplifyDynamicTypeOfConstraint(
   };
 
   // Solve forward.
-  type2 = getFixedTypeRecursive(type2, /*wantRValue=*/ true);
+  type2 = getFixedTypeRecursive(type2, flags, /*wantRValue=*/true);
   if (!type2->isTypeVariableOrMember()) {
     Type dynamicType2;
     if (type2->isAnyExistentialType()) {
@@ -3401,7 +3407,7 @@ ConstraintSystem::simplifyDynamicTypeOfConstraint(
   }
 
   // Okay, can't solve forward.  See what we can do backwards.
-  type1 = getFixedTypeRecursive(type1, true);
+  type1 = getFixedTypeRecursive(type1, flags, /*wantRValue=*/true);
   if (type1->isTypeVariableOrMember())
     return formUnsolved();
 
@@ -3441,13 +3447,13 @@ ConstraintSystem::simplifyApplicableFnConstraint(
   assert(type1->is<FunctionType>());
 
   // Drill down to the concrete type on the right hand side.
-  type2 = getFixedTypeRecursive(type2, /*wantRValue=*/true);
+  type2 = getFixedTypeRecursive(type2, flags, /*wantRValue=*/true);
   auto desugar2 = type2->getDesugaredType();
 
   // Try to look through ImplicitlyUnwrappedOptional<T>: the result is always an
   // r-value.
   if (auto objTy = lookThroughImplicitlyUnwrappedOptionalType(desugar2)) {
-    type2 = getFixedTypeRecursive(objTy, /*wantRValue=*/true);
+    type2 = getFixedTypeRecursive(objTy, flags, /*wantRValue=*/true);
     desugar2 = type2->getDesugaredType();
   }
 

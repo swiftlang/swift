@@ -54,7 +54,7 @@ func test0(c c: C) {
 // CHECK-NEXT:  debug_value_addr %1 : $*@sil_weak Optional<C>, var, name "bC", argno 1
 // CHECK-NEXT:  %3 = alloc_stack $Optional<C>
 // CHECK-NEXT:  %4 = load_weak %1 : $*@sil_weak Optional<C>
-// CHECK-NEXT:  store %4 to %3 : $*Optional<C>
+// CHECK-NEXT:  store %4 to [init] %3 : $*Optional<C>
 func testClosureOverWeak() {
   weak var bC = C()
   takeClosure { bC!.f() }
@@ -68,7 +68,7 @@ class CC {
   // CHECK:  [[PB:%.*]] = project_box [[FOO]]
   // CHECK:  [[X:%.*]] = ref_element_addr %2 : $CC, #CC.x
   // CHECK:  [[VALUE:%.*]] = load_weak [[X]] : $*@sil_weak Optional<CC>
-  // CHECK:  store [[VALUE]] to [[PB]] : $*Optional<CC>
+  // CHECK:  store [[VALUE]] to [init] [[PB]] : $*Optional<CC>
   init() {
     var foo = x
   }

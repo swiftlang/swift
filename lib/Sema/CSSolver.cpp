@@ -2277,13 +2277,6 @@ bool ConstraintSystem::solveSimplified(
       DisjunctionChoices.push_back({locator, index});
     }
 
-    // Determine whether we're handling a favored constraint in subsystem.
-    const bool willBeHandlingFavoredConstraint
-      = constraint->isFavored() || HandlingFavoredConstraint;
-    llvm::SaveAndRestore<bool> handlingFavoredConstraint(
-                                 HandlingFavoredConstraint,
-                                 willBeHandlingFavoredConstraint);
-
     // Simplify this term in the disjunction.
     switch (simplifyConstraint(*constraint)) {
     case SolutionKind::Error:
