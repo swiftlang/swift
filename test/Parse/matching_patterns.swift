@@ -13,7 +13,7 @@ var x:Int
 func square(_ x: Int) -> Int { return x*x }
 
 struct A<B> {
-  struct C<D> { } // expected-error{{generic type 'C' cannot be nested in type 'A'}}
+  struct C<D> { }
 }
 
 switch x {
@@ -143,7 +143,7 @@ case .Foo: // expected-error{{enum case 'Foo' not found in type 'Int'}}
 }
 
 struct ContainsEnum {
-  enum Possible<T> { // expected-error{{generic type 'Possible' cannot be nested in type 'ContainsEnum'}}
+  enum Possible<T> {
     case Naught
     case Mere(T)
     case Twain(T, T)
@@ -151,7 +151,7 @@ struct ContainsEnum {
 
   func member(_ n: Possible<Int>) {
     switch n {
-    case ContainsEnum.Possible<Int>.Naught, // expected-error{{cannot specialize a non-generic definition}} expected-note {{while parsing this '<' as a type parameter bracket}}
+    case ContainsEnum.Possible<Int>.Naught,
          ContainsEnum.Possible.Naught,
          Possible<Int>.Naught,
          Possible.Naught,
@@ -163,7 +163,7 @@ struct ContainsEnum {
 
 func nonmemberAccessesMemberType(_ n: ContainsEnum.Possible<Int>) {
   switch n {
-  case ContainsEnum.Possible<Int>.Naught, // expected-error{{cannot specialize a non-generic definition}} expected-note {{while parsing this '<' as a type parameter bracket}}
+  case ContainsEnum.Possible<Int>.Naught,
        .Naught:
     ()
   }

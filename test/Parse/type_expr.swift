@@ -31,7 +31,7 @@ protocol Bad {
 }
 
 struct Gen<T> {
-  struct Bar { // expected-error{{nested in generic type}}
+  struct Bar {
     init() {}
     static var prop: Int { return 0 }
     static func meth() {}
@@ -106,8 +106,11 @@ func genQualifiedType() {
   let _ : () = Gen<Foo>.Bar.meth()
   _ = Gen<Foo>.Bar.instMeth
 
-  _ = Gen<Foo>.Bar
-  _ = Gen<Foo>.Bar.dynamicType // expected-error {{'.dynamicType' is deprecated. Use 'type(of: ...)' instead}} {{7-7=type(of: }} {{19-31=)}} 
+  _ = Gen<Foo>.Bar // expected-error{{expected member name or constructor call after type name}}
+                   // expected-note@-1{{add arguments after the type to construct a value of the type}}
+                   // expected-note@-2{{use '.self' to reference the type object}}
+  _ = Gen<Foo>.Bar.dynamicType // expected-error {{type 'Gen<Foo>.Bar' has no member 'dynamicType'}}
+                               // expected-error@-1 {{'.dynamicType' is deprecated. Use 'type(of: ...)' instead}} {{7-7=type(of: }} {{19-31=)}}
 }
 
 func typeOfShadowing() {
@@ -128,8 +131,10 @@ func typeOfShadowing() {
     return t
   }
 
-  _ = type(of: Gen<Foo>.Bar) // No error here.
-  _ = type(Gen<Foo>.Bar) // No error here. 
+  _ = type(of: Gen<Foo>.Bar) // expected-error{{expected member name or constructor call after type name}}
+                             // expected-note@-1{{add arguments after the type to construct a value of the type}}
+                             // expected-note@-2{{use '.self' to reference the type object}}
+  _ = type(Gen<Foo>.Bar) // expected-warning{{missing '.self' for reference to metatype of type 'Gen<Foo>.Bar'}}
   _ = type(of: Gen<Foo>.Bar.self, flag: false) // No error here.
   _ = type(fo: Foo.Bar.self) // No error here.
   _ = type(of: Foo.Bar.self, [1, 2, 3]) // No error here.

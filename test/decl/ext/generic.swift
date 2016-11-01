@@ -5,9 +5,9 @@ protocol P2 : P1 { }
 protocol P3 { }
 
 struct X<T : P1, U : P2, V> { 
-  struct Inner<A, B : P3> { } // expected-error{{generic type 'Inner' cannot be nested in type 'X'}}
+  struct Inner<A, B : P3> { }
 
-  struct NonGenericInner { } // expected-error{{nested in generic type}}
+  struct NonGenericInner { }
 }
 
 extension Int : P1 {
