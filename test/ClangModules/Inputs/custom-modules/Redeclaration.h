@@ -5,7 +5,7 @@ typedef struct CGPoint CGPoint;
 typedef CGPoint NSPoint;
 NSString *NSStringToNSString(NSString *str);
 
-struct FooStruct1 {
+struct FooStructA {
   int x;
   double y;
 };

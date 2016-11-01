@@ -17,10 +17,13 @@ enum {
   AnonConstSmall2
 };
 
+#if !defined(__have_Point)
+#define __have_Point
 struct Point {
   float x;
   float y;
 };
+#endif
 
 typedef struct {
   struct {
