@@ -275,7 +275,8 @@ RValue Transform::transform(RValue &&input,
   SmallVector<InitializationPtr, 4> eltInitsBuffer;
   MutableArrayRef<InitializationPtr> eltInits;
   auto tupleInit = ctxt.getEmitInto();
-  if (!ctxt.getEmitInto()->canSplitIntoTupleElements()) {
+  if (!ctxt.getEmitInto()
+      || !ctxt.getEmitInto()->canSplitIntoTupleElements()) {
     tupleInit = nullptr;
   } else {
     eltInits = tupleInit->splitIntoTupleElements(SGF, Loc, outputTupleType,

@@ -364,8 +364,8 @@ adjustForConditionalCheckedCastOperand(SILLocation loc, ManagedValue src,
     // Okay, if all we need to do is drop the value in an address,
     // this is easy.
     if (!hasAbstraction) {
-      SGF.B.createStore(loc, src.forward(SGF), init->getAddress(),
-                        StoreOwnershipQualifier::Unqualified);
+      SGF.B.emitStoreValueOperation(loc, src.forward(SGF), init->getAddress(),
+                                    StoreOwnershipQualifier::Init);
       init->finishInitialization(SGF);
       return init->getManagedAddress();
     }

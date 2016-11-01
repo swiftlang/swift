@@ -72,7 +72,7 @@ class F : E { }
 // CHECK-NEXT: [[ESELF:%[0-9]]] = apply [[E_CTOR]]([[E]]) : $@convention(method) (@owned E) -> @owned E
 
 // CHECK-NEXT: [[ESELFW:%[0-9]+]] = unchecked_ref_cast [[ESELF]] : $E to $F
-// CHECK-NEXT: store [[ESELFW]] to [[SELF]] : $*F
+// CHECK-NEXT: store [[ESELFW]] to [init] [[SELF]] : $*F
 // CHECK-NEXT: [[SELFP:%[0-9]+]] = load [[SELF]] : $*F
 // CHECK-NEXT: copy_value [[SELFP]] : $F
 // CHECK-NEXT: destroy_value [[SELF_BOX]] : $@box F

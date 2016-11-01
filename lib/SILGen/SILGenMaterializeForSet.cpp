@@ -630,8 +630,9 @@ SILValue MaterializeForSetEmitter::emitUsingAddressor(SILGenFunction &gen,
   } else {
     SILValue allocatedCallbackBuffer =
       gen.B.createAllocValueBuffer(loc, owner.getType(), callbackBuffer);
-    gen.B.createStore(loc, owner.forward(gen), allocatedCallbackBuffer,
-                      StoreOwnershipQualifier::Unqualified);
+    gen.B.emitStoreValueOperation(loc, owner.forward(gen),
+                                  allocatedCallbackBuffer,
+                                  StoreOwnershipQualifier::Init);
 
     callback = createAddressorCallback(gen.F, owner.getType(), addressorKind);
   }

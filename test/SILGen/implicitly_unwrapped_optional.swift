@@ -8,7 +8,7 @@ func foo(f f: (() -> ())!) {
 // CHECK:    bb0([[T0:%.*]] : $Optional<@callee_owned () -> ()>):
 // CHECK: [[F:%.*]] = alloc_box $Optional<@callee_owned () -> ()>
 // CHECK-NEXT: [[PF:%.*]] = project_box [[F]]
-// CHECK: store [[T0]] to [[PF]]
+// CHECK: store [[T0]] to [init] [[PF]]
 // CHECK:      [[T1:%.*]] = select_enum_addr [[PF]]
 // CHECK-NEXT: cond_br [[T1]], bb1, bb3
 //   If it does, project and load the value out of the implicitly unwrapped

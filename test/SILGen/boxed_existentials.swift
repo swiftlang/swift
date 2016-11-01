@@ -20,7 +20,7 @@ func test_concrete_erasure(_ x: ClericalError) -> Error {
 // CHECK-LABEL: sil hidden @_TF18boxed_existentials21test_concrete_erasureFOS_13ClericalErrorPs5Error_
 // CHECK:         [[EXISTENTIAL:%.*]] = alloc_existential_box $Error, $ClericalError
 // CHECK:         [[ADDR:%.*]] = project_existential_box $ClericalError in [[EXISTENTIAL]] : $Error
-// CHECK:         store %0 to [[ADDR]] : $*ClericalError
+// CHECK:         store %0 to [init] [[ADDR]] : $*ClericalError
 // CHECK:         return [[EXISTENTIAL]] : $Error
 
 protocol HairType {}
@@ -45,7 +45,8 @@ func test_class_composition_erasure(_ x: HairClass & Error) -> Error {
 // CHECK:         [[VALUE:%.*]] = open_existential_ref [[OLD_EXISTENTIAL:%.*]] : $Error & HairClass to $[[VALUE_TYPE:@opened\(.*\) Error & HairClass]]
 // CHECK:         [[NEW_EXISTENTIAL:%.*]] = alloc_existential_box $Error, $[[VALUE_TYPE]]
 // CHECK:         [[ADDR:%.*]] = project_existential_box $[[VALUE_TYPE]] in [[NEW_EXISTENTIAL]] : $Error
-// CHECK:         store [[VALUE]] to [[ADDR]]
+// CHECK:         [[COPIED_VALUE:%.*]] = copy_value [[VALUE]]
+// CHECK:         store [[COPIED_VALUE]] to [[ADDR]]
 // CHECK:         return [[NEW_EXISTENTIAL]]
 
 func test_property(_ x: Error) -> String {
@@ -71,7 +72,7 @@ func test_property_of_lvalue(_ x: Error) -> String {
 // CHECK:         [[VAR:%.*]] = alloc_box $Error
 // CHECK-NEXT:    [[PVAR:%.*]] = project_box [[VAR]]
 // CHECK-NEXT:    copy_value %0 : $Error
-// CHECK-NEXT:    store %0 to [[PVAR]]
+// CHECK-NEXT:    store %0 to [init] [[PVAR]]
 // CHECK-NEXT:    [[VALUE_BOX:%.*]] = load [[PVAR]]
 // CHECK-NEXT:    copy_value [[VALUE_BOX]]
 // CHECK-NEXT:    [[VALUE:%.*]] = open_existential_box [[VALUE_BOX]] : $Error to $*[[VALUE_TYPE:@opened\(.*\) Error]]

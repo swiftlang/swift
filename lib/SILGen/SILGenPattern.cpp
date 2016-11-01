@@ -1445,9 +1445,9 @@ emitCastOperand(SILGenFunction &SGF, SILLocation loc,
     // Okay, if all we need to do is drop the value in an address,
     // this is easy.
     if (!hasAbstraction) {
-      SGF.B.createStore(loc, src.getFinalManagedValue().forward(SGF),
-                        init->getAddress(),
-                        StoreOwnershipQualifier::Unqualified);
+      SGF.B.emitStoreValueOperation(
+          loc, src.getFinalManagedValue().forward(SGF), init->getAddress(),
+          StoreOwnershipQualifier::Init);
       init->finishInitialization(SGF);
       ConsumableManagedValue result =
         { init->getManagedAddress(), src.getFinalConsumption() };

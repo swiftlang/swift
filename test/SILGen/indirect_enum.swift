@@ -28,9 +28,9 @@ func TreeA_cases<T>(_ t: T, l: TreeA<T>, r: TreeA<T>) {
 // CHECK-NEXT:    [[LEFT:%.*]] = tuple_element_addr [[PB]] : $*(left: TreeA<T>, right: TreeA<T>), 0
 // CHECK-NEXT:    [[RIGHT:%.*]] = tuple_element_addr [[PB]] : $*(left: TreeA<T>, right: TreeA<T>), 1
 // CHECK-NEXT:    copy_value %1
-// CHECK-NEXT:    store %1 to [[LEFT]]
+// CHECK-NEXT:    store %1 to [init] [[LEFT]]
 // CHECK-NEXT:    copy_value %2
-// CHECK-NEXT:    store %2 to [[RIGHT]]
+// CHECK-NEXT:    store %2 to [init] [[RIGHT]]
 // CHECK-NEXT:    [[BRANCH:%.*]] = enum $TreeA<T>, #TreeA.Branch!enumelt.1, [[BOX]]
 // CHECK-NEXT:    destroy_value [[BRANCH]]
 // CHECK-NEXT:    destroy_value %2
@@ -51,7 +51,7 @@ func TreeA_reabstract(_ f: @escaping (Int) -> Int) {
 // CHECK-NEXT:    copy_value %0
 // CHECK:         [[THUNK:%.*]] = function_ref @_TTRXFo_dSi_dSi_XFo_iSi_iSi_
 // CHECK-NEXT:    [[FN:%.*]] = partial_apply [[THUNK]](%0)
-// CHECK-NEXT:    store [[FN]] to [[PB]]
+// CHECK-NEXT:    store [[FN]] to [init] [[PB]]
 // CHECK-NEXT:    [[LEAF:%.*]] = enum $TreeA<(Int) -> Int>, #TreeA.Leaf!enumelt.1, [[BOX]]
 // CHECK-NEXT:    destroy_value [[LEAF]]
 // CHECK-NEXT:    destroy_value %0
@@ -125,9 +125,9 @@ func TreeInt_cases(_ t: Int, l: TreeInt, r: TreeInt) {
 // CHECK-NEXT:    [[LEFT:%.*]] = tuple_element_addr [[PB]]
 // CHECK-NEXT:    [[RIGHT:%.*]] = tuple_element_addr [[PB]]
 // CHECK-NEXT:    copy_value %1
-// CHECK-NEXT:    store %1 to [[LEFT]]
+// CHECK-NEXT:    store %1 to [init] [[LEFT]]
 // CHECK-NEXT:    copy_value %2
-// CHECK-NEXT:    store %2 to [[RIGHT]]
+// CHECK-NEXT:    store %2 to [init] [[RIGHT]]
 // CHECK-NEXT:    [[BRANCH:%.*]] = enum $TreeInt, #TreeInt.Branch!enumelt.1, [[BOX]]
 // CHECK-NEXT:    destroy_value [[BRANCH]]
 // CHECK-NEXT:    destroy_value %2

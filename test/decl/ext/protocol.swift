@@ -414,8 +414,7 @@ func testSomeCollections(_ sc1: SomeCollection1, sc2: SomeCollection2) {
   _ = mig
 
   var ig = sc2.myGenerate()
-  ig = MyIndexedIterator(container: sc2, index: sc2.myStartIndex) // expected-error{{cannot invoke initializer for type 'MyIndexedIterator<_>' with an argument list of type '(container: SomeCollection2, index: Int)'}}
-  // expected-note @-1 {{expected an argument list of type '(container: C, index: C.Index)'}}
+  ig = MyIndexedIterator(container: sc2, index: sc2.myStartIndex) // expected-error {{cannot assign value of type 'MyIndexedIterator<SomeCollection2>' to type 'OtherIndexedIterator<SomeCollection2>'}}
   _ = ig
 }
 

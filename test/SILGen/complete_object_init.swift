@@ -15,7 +15,7 @@ class A {
 // CHECK:   [[X_META:%[0-9]+]] = metatype $@thin X.Type
 // CHECK:   [[X:%[0-9]+]] = apply [[X_INIT]]([[X_META]]) : $@convention(method) (@thin X.Type) -> X
 // CHECK:   [[INIT_RESULT:%[0-9]+]] = apply [[INIT]]([[X]], [[SELFP]]) : $@convention(method) (X, @owned A) -> @owned A
-// CHECK:   store [[INIT_RESULT]] to [[SELF]] : $*A
+// CHECK:   store [[INIT_RESULT]] to [init] [[SELF]] : $*A
 // CHECK:   [[RESULT:%[0-9]+]] = load [[SELF]] : $*A
 // CHECK:   copy_value [[RESULT]] : $A
 // CHECK:   destroy_value [[SELF_BOX]] : $@box A

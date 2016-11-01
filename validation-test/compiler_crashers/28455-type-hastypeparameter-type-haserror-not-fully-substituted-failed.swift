@@ -5,13 +5,10 @@
 // See http://swift.org/LICENSE.txt for license information
 // See http://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
 
-// RUN: not --crash %target-swift-frontend %s -parse
+// RUN: not --crash %target-swift-frontend %s -emit-ir
 // REQUIRES: asserts
-@objc protocol P{
-func a
-typealias a
-class d{protocol c:P{
-{{
+protocol A{enum S{var f=e
+typealias f:B
 }
-}
-let a
+class B<T>:d
+class d:A.B

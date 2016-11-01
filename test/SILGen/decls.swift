@@ -57,9 +57,9 @@ func tuple_patterns() {
   // CHECK: [[E:%[0-9]+]] = tuple_extract {{.*}}, 0
   // CHECK: [[F:%[0-9]+]] = tuple_extract {{.*}}, 1
   // CHECK: [[H:%[0-9]+]] = tuple_extract {{.*}}, 2
-  // CHECK: store [[E]] to [[PBE]]
-  // CHECK: store [[F]] to [[PBF]]
-  // CHECK: store [[H]] to [[PBH]]
+  // CHECK: store [[E]] to [trivial] [[PBE]]
+  // CHECK: store [[F]] to [trivial] [[PBF]]
+  // CHECK: store [[H]] to [trivial] [[PBH]]
   var (e,f,g,h) : (Int, Float, (), Double) = MRV()
 
   // CHECK: [[IADDR:%[0-9]+]] = alloc_box $Int
@@ -78,7 +78,7 @@ func tuple_patterns() {
   // CHECK: [[J_K_:%[0-9]+]] = apply
   // CHECK: [[J:%[0-9]+]] = tuple_extract {{.*}}, 0
   // CHECK: [[K:%[0-9]+]] = tuple_extract {{.*}}, 2
-  // CHECK: store [[J]] to [[PBJ]]
+  // CHECK: store [[J]] to [trivial] [[PBJ]]
   var (j,_,k,_) : (Int, Float, (), Double) = MRV()
 }
 
@@ -86,10 +86,10 @@ func tuple_patterns() {
 // CHECK: bb0(%0 : $Int, %1 : $Int):
 // CHECK: [[X:%[0-9]+]] = alloc_box $Int
 // CHECK-NEXT: [[PBX:%.*]] = project_box [[X]]
-// CHECK-NEXT: store %0 to [[PBX]]
+// CHECK-NEXT: store %0 to [trivial] [[PBX]]
 // CHECK-NEXT: [[Y:%[0-9]+]] = alloc_box $Int
 // CHECK-NEXT: [[PBY:%[0-9]+]] = project_box [[Y]]
-// CHECK-NEXT: store %1 to [[PBY]]
+// CHECK-NEXT: store %1 to [trivial] [[PBY]]
 func simple_arguments(x: Int, y: Int) -> Int {
   var x = x
   var y = y

@@ -39,7 +39,7 @@ func inOutFunc(_ f: inout ((Int) -> Int)) { }
 // CHECK:         [[F_ORIG:%.*]] = load [[F_ADDR]]
 // CHECK:         [[REABSTRACT_FN:%.*]] = function_ref @_TTR
 // CHECK:         [[F_SUBST_IN:%.*]] = partial_apply [[REABSTRACT_FN]]([[F_ORIG]])
-// CHECK:         store [[F_SUBST_IN]] to [[F_SUBST_MAT]]
+// CHECK:         store [[F_SUBST_IN]] to [init] [[F_SUBST_MAT]]
 // CHECK:         apply [[INOUTFUNC]]([[F_SUBST_MAT]])
 // CHECK:         [[F_SUBST_OUT:%.*]] = load [[F_SUBST_MAT]]
 // CHECK:         [[REABSTRACT_FN:%.*]] = function_ref @_TTR

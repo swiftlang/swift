@@ -28,7 +28,7 @@ func testAddrOnlyCallResult<T>(_ f: (() -> T)?) {
 // CHECK:    bb0([[T0:%.*]] : $Optional<@callee_owned () -> @out T>):
 // CHECK: [[F:%.*]] = alloc_box $Optional<@callee_owned () -> @out T>, var, name "f"
 // CHECK-NEXT: [[PBF:%.*]] = project_box [[F]]
-// CHECK: store [[T0]] to [[PBF]]
+// CHECK: store [[T0]] to [init] [[PBF]]
 // CHECK-NEXT: [[X:%.*]] = alloc_box $Optional<T>, var, name "x"
 // CHECK-NEXT: [[PBX:%.*]] = project_box [[X]]
 // CHECK-NEXT: [[TEMP:%.*]] = init_enum_data_addr [[PBX]]

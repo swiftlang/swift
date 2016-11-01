@@ -672,6 +672,7 @@ Type ConstraintSystem::openBindingType(Type type,
 }
 
 Type ConstraintSystem::getFixedTypeRecursive(Type type,
+                                             TypeMatchOptions &flags,
                                              bool wantRValue,
                                              bool retainParens) {
   if (wantRValue)
@@ -679,7 +680,7 @@ Type ConstraintSystem::getFixedTypeRecursive(Type type,
 
   if (retainParens) {
     if (auto parenTy = dyn_cast<ParenType>(type.getPointer())) {
-      type = getFixedTypeRecursive(parenTy->getUnderlyingType(),
+      type = getFixedTypeRecursive(parenTy->getUnderlyingType(), flags,
                                    wantRValue, retainParens);
       return ParenType::get(getASTContext(), type);
     }

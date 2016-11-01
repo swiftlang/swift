@@ -70,7 +70,7 @@ struct S2 {
     // CHECK:   [[X_META:%[0-9]+]] = metatype $@thin X.Type
     // CHECK:   [[X:%[0-9]+]] = apply [[X_INIT]]([[X_META]]) : $@convention(method) (@thin X.Type) -> X
     // CHECK:   [[X_BOX:%[0-9]+]] = alloc_stack $X
-    // CHECK:   store [[X]] to [[X_BOX]] : $*X
+    // CHECK:   store [[X]] to [trivial] [[X_BOX]] : $*X
     // CHECK:   [[SELF_BOX1:%[0-9]+]] = apply [[S2_DELEG_INIT]]<X>([[X_BOX]], [[S2_META]]) : $@convention(method) <τ_0_0> (@in τ_0_0, @thin S2.Type) -> S2
     // CHECK:   assign [[SELF_BOX1]] to [[SELF]] : $*S2
     // CHECK:   dealloc_stack [[X_BOX]] : $*X
@@ -99,7 +99,7 @@ class C1 {
 
     // CHECK:   [[DELEG_INIT:%[0-9]+]] = class_method [[SELF_FROM_BOX]] : $C1, #C1.init!initializer.1 : (C1.Type) -> (X, X) -> C1 , $@convention(method) (X, X, @owned C1) -> @owned C1
     // CHECK:   [[SELFP:%[0-9]+]] = apply [[DELEG_INIT]]([[X]], [[X]], [[SELF_FROM_BOX]]) : $@convention(method) (X, X, @owned C1) -> @owned C1
-    // CHECK:   store [[SELFP]] to [[SELF]] : $*C1
+    // CHECK:   store [[SELFP]] to [init] [[SELF]] : $*C1
     // CHECK:   [[SELFP:%[0-9]+]] = load [[SELF]] : $*C1
     // CHECK:   copy_value [[SELFP]] : $C1
     // CHECK:   destroy_value [[SELF_BOX]] : $@box C1
@@ -124,7 +124,7 @@ class C1 {
 
     // CHECK:   [[DELEG_INIT:%[0-9]+]] = class_method [[SELF]] : $C2, #C2.init!initializer.1 : (C2.Type) -> (X, X) -> C2 , $@convention(method) (X, X, @owned C2) -> @owned C2
     // CHECK:   [[REPLACE_SELF:%[0-9]+]] = apply [[DELEG_INIT]]([[X]], [[X]], [[SELF]]) : $@convention(method) (X, X, @owned C2) -> @owned C2
-    // CHECK:   store [[REPLACE_SELF]] to [[UNINIT_SELF]] : $*C2
+    // CHECK:   store [[REPLACE_SELF]] to [init] [[UNINIT_SELF]] : $*C2
     // CHECK:   [[VAR_15:%[0-9]+]] = load [[UNINIT_SELF]] : $*C2
     // CHECK:   copy_value [[VAR_15]] : $C2
     // CHECK:   destroy_value [[SELF_BOX]] : $@box C2

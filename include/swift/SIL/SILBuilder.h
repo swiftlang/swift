@@ -464,6 +464,15 @@ public:
                       LoadInst(getSILDebugLocation(Loc), LV, Qualifier));
   }
 
+  /// Convenience function for calling emitLoad on the type lowering for
+  /// non-address values.
+  SILValue emitLoadValueOperation(SILLocation Loc, SILValue LV,
+                                  LoadOwnershipQualifier Qualifier) {
+    assert(LV->getType().isLoadable(F.getModule()));
+    const auto &lowering = getTypeLowering(LV->getType());
+    return lowering.emitLoad(*this, Loc, LV, Qualifier);
+  }
+
   LoadBorrowInst *createLoadBorrow(SILLocation Loc, SILValue LV) {
     assert(LV->getType().isLoadable(F.getModule()));
     return insert(new (F.getModule())
@@ -474,6 +483,15 @@ public:
                          StoreOwnershipQualifier Qualifier) {
     return insert(new (F.getModule()) StoreInst(getSILDebugLocation(Loc), Src,
                                                 DestAddr, Qualifier));
+  }
+
+  /// Convenience function for calling emitStore on the type lowering for
+  /// non-address values.
+  void emitStoreValueOperation(SILLocation Loc, SILValue Src, SILValue DestAddr,
+                               StoreOwnershipQualifier Qualifier) {
+    assert(!Src->getType().isAddress());
+    const auto &lowering = getTypeLowering(Src->getType());
+    return lowering.emitStore(*this, Loc, Src, DestAddr, Qualifier);
   }
 
   EndBorrowInst *createEndBorrow(SILLocation Loc, SILValue Src,

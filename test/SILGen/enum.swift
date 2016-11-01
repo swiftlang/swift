@@ -84,7 +84,7 @@ func AddressOnly_cases(_ s: S) {
   // CHECK-NEXT:  [[MERE:%.*]] = alloc_stack $AddressOnly
   // CHECK-NEXT:  [[PAYLOAD:%.*]] = init_enum_data_addr [[MERE]]
   // CHECK-NEXT:  [[PAYLOAD_ADDR:%.*]] = init_existential_addr [[PAYLOAD]]
-  // CHECK-NEXT:  store %0 to [[PAYLOAD_ADDR]]
+  // CHECK-NEXT:  store %0 to [trivial] [[PAYLOAD_ADDR]]
   // CHECK-NEXT:  inject_enum_addr [[MERE]]
   // CHECK-NEXT:  destroy_addr [[MERE]]
   // CHECK-NEXT:  dealloc_stack [[MERE]]
@@ -182,7 +182,7 @@ enum Foo { case A(P, String) }
 // CHECK-NEXT:    [[LEFT:%.*]] = tuple_element_addr [[PAYLOAD]] : $*(P, String), 0
 // CHECK-NEXT:    [[RIGHT:%.*]] = tuple_element_addr [[PAYLOAD]] : $*(P, String), 1
 // CHECK-NEXT:    copy_addr [take] %1 to [initialization] [[LEFT]] : $*P
-// CHECK-NEXT:    store %2 to [[RIGHT]]
+// CHECK-NEXT:    store %2 to [init] [[RIGHT]]
 // CHECK-NEXT:    inject_enum_addr %0 : $*Foo, #Foo.A!enumelt.1
 // CHECK:         return
 // CHECK-NEXT:  }

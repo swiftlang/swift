@@ -18,7 +18,7 @@ class Bar: Foo {
   // CHECK:         [[SUPER_INIT:%[0-9]+]] = function_ref @_TFC22super_init_refcounting3FoocfT_S0_ : $@convention(method) (@owned Foo) -> @owned Foo
   // CHECK:         [[NEW_SELF:%.*]] = apply [[SUPER_INIT]]([[ORIG_SELF_UP]])
   // CHECK:         [[NEW_SELF_DOWN:%.*]] = unchecked_ref_cast [[NEW_SELF]]
-  // CHECK:         store [[NEW_SELF_DOWN]] to [[SELF_MUI]]
+  // CHECK:         store [[NEW_SELF_DOWN]] to [init] [[SELF_MUI]]
   override init() {
     super.init()
   }
@@ -33,7 +33,7 @@ extension Foo {
   // CHECK-NOT:     copy_value [[ORIG_SELF]]
   // CHECK:         [[SUPER_INIT:%.*]] = class_method
   // CHECK:         [[NEW_SELF:%.*]] = apply [[SUPER_INIT]]([[ORIG_SELF]])
-  // CHECK:         store [[NEW_SELF]] to [[SELF_MUI]]
+  // CHECK:         store [[NEW_SELF]] to [init] [[SELF_MUI]]
   convenience init(x: Int) {
     self.init()
   }

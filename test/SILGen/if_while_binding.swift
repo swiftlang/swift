@@ -164,7 +164,7 @@ func if_multi() {
 
   // CHECK: [[IF_BODY]]([[BVAL:%[0-9]+]] : $String):
   if let a = foo(), var b = bar() {
-    // CHECK:   store [[BVAL]] to [[PB]] : $*String
+    // CHECK:   store [[BVAL]] to [init] [[PB]] : $*String
     // CHECK:   debug_value {{.*}} : $String, let, name "c"
     // CHECK:   destroy_value [[B]]
     // CHECK:   destroy_value [[A]]
@@ -192,7 +192,7 @@ func if_multi_else() {
 
   // CHECK: [[IF_BODY]]([[BVAL:%[0-9]+]] : $String):
   if let a = foo(), var b = bar() {
-    // CHECK:   store [[BVAL]] to [[PB]] : $*String
+    // CHECK:   store [[BVAL]] to [init] [[PB]] : $*String
     // CHECK:   debug_value {{.*}} : $String, let, name "c"
     // CHECK:   destroy_value [[B]]
     // CHECK:   destroy_value [[A]]
@@ -248,7 +248,7 @@ func if_leading_boolean(_ a : Int) {
   // Test the boolean condition.
   
   // CHECK: debug_value %0 : $Int, let, name "a"
-  // CHECK: [[EQRESULT:%[0-9]+]] = apply {{.*}}(%0, %0) : $@convention(thin) (Int, Int) -> Bool
+  // CHECK: [[EQRESULT:%[0-9]+]] = apply {{.*}}(%0, %0{{.*}}) : $@convention({{.*}}) (Int, Int{{.*}}) -> Bool
 
   // CHECK-NEXT: [[EQRESULTI1:%[0-9]+]] = apply %2([[EQRESULT]]) : $@convention(method) (Bool) -> Builtin.Int1
   // CHECK-NEXT: cond_br [[EQRESULTI1]], [[CHECKFOO:bb[0-9]+]], [[IFDONE:bb[0-9]+]]

@@ -202,8 +202,8 @@ func logical_struct_in_reftype_set(_ value: inout Val, z1: Int) {
   // CHECK: [[V_R_VP_Z_TUPLE:%[0-9]+]] = apply [[GET_Z_TUPLE_METHOD]]([[LD]])
   // CHECK: [[T0:%.*]] = tuple_extract [[V_R_VP_Z_TUPLE]] : {{.*}}, 0
   // CHECK: [[T1:%.*]] = tuple_extract [[V_R_VP_Z_TUPLE]] : {{.*}}, 1
-  // CHECK: store [[T0]] to [[A0]]
-  // CHECK: store [[T1]] to [[A1]]
+  // CHECK: store [[T0]] to [trivial] [[A0]]
+  // CHECK: store [[T1]] to [trivial] [[A1]]
   // -- write to val.ref.val_prop.z_tuple.1
   // CHECK: [[V_R_VP_Z_TUPLE_1:%[0-9]+]] = tuple_element_addr [[V_R_VP_Z_TUPLE_MAT]] : {{.*}}, 1
   // CHECK: assign [[Z1]] to [[V_R_VP_Z_TUPLE_1]]
@@ -216,7 +216,7 @@ func logical_struct_in_reftype_set(_ value: inout Val, z1: Int) {
   // CHECK: [[WRITEBACK]]([[CALLBACK_ADDR:%.*]] : $Builtin.RawPointer):
   // CHECK: [[CALLBACK:%.*]] = pointer_to_thin_function [[CALLBACK_ADDR]] : $Builtin.RawPointer to $@convention(thin) (Builtin.RawPointer, @inout Builtin.UnsafeValueBuffer, @inout Ref, @thick Ref.Type) -> ()
   // CHECK: [[REF_MAT:%.*]] = alloc_stack $Ref
-  // CHECK: store [[VAL_REF]] to [[REF_MAT]]
+  // CHECK: store [[VAL_REF]] to [init] [[REF_MAT]]
   // CHECK: [[T0:%.*]] = metatype $@thick Ref.Type
   // CHECK: [[T1:%.*]] = address_to_pointer [[VAL_REF_VAL_PROP_MAT]]
   // CHECK: apply [[CALLBACK]]([[T1]], [[STORAGE]], [[REF_MAT]], [[T0]])
@@ -248,8 +248,8 @@ func tuple_in_logical_struct_set(_ value: inout Val, z1: Int) {
   // CHECK: [[Z_TUPLE:%[0-9]+]] = apply [[Z_GET_METHOD]]([[VAL1]])
   // CHECK: [[T0:%.*]] = tuple_extract [[Z_TUPLE]] : {{.*}}, 0
   // CHECK: [[T1:%.*]] = tuple_extract [[Z_TUPLE]] : {{.*}}, 1
-  // CHECK: store [[T0]] to [[A0]]
-  // CHECK: store [[T1]] to [[A1]]
+  // CHECK: store [[T0]] to [trivial] [[A0]]
+  // CHECK: store [[T1]] to [trivial] [[A1]]
   // CHECK: [[Z_TUPLE_1:%[0-9]+]] = tuple_element_addr [[Z_TUPLE_MATERIALIZED]] : {{.*}}, 1
   // CHECK: assign [[Z1]] to [[Z_TUPLE_1]]
   // CHECK: [[Z_TUPLE_MODIFIED:%[0-9]+]] = load [[Z_TUPLE_MATERIALIZED]]
@@ -603,7 +603,7 @@ func local_observing_property(_ arg: Int) {
 // CHECK: bb0([[ARG:%[0-9]+]] : $Int)
 // CHECK: [[BOX:%[0-9]+]] = alloc_box $Int
 // CHECK: [[PB:%.*]] = project_box [[BOX]]
-// CHECK: store [[ARG]] to [[PB]]
+// CHECK: store [[ARG]] to [trivial] [[PB]]
 
 
 
@@ -999,7 +999,7 @@ struct MutatingGetterStruct {
   // CHECK-LABEL: sil hidden @_TZFV10properties20MutatingGetterStruct4test
   // CHECK: [[X:%.*]] = alloc_box $MutatingGetterStruct, var, name "x"
   // CHECK-NEXT: [[PB:%.*]] = project_box [[X]]
-  // CHECK: store {{.*}} to [[PB]] : $*MutatingGetterStruct
+  // CHECK: store {{.*}} to [trivial] [[PB]] : $*MutatingGetterStruct
   // CHECK: apply {{%.*}}([[PB]]) : $@convention(method) (@inout MutatingGetterStruct) -> Int
   static func test() {
     var x = MutatingGetterStruct()

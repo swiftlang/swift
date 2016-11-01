@@ -2160,7 +2160,8 @@ static Optional<ObjCReason> shouldMarkAsObjC(TypeChecker &TC,
   else if (VD->getOverriddenDecl() && VD->getOverriddenDecl()->isObjC())
     return ObjCReason::OverridesObjC;
   // A witness to an @objc protocol requirement is implicitly @objc.
-  else if (!TC.findWitnessedObjCRequirements(
+  else if (VD->getDeclContext()->getAsClassOrClassExtensionContext() &&
+           !TC.findWitnessedObjCRequirements(
              VD,
              /*anySingleRequirement=*/true).empty())
     return ObjCReason::WitnessToObjC;

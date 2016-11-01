@@ -32,7 +32,7 @@ _ = AddressOnly(x: C(), p: X())
 // CHECK:   [[X_ADDR:%.*]] = struct_element_addr [[RET]] : $*AddressOnly, #AddressOnly.x
 // CHECK:   [[X_UNOWNED:%.*]] = ref_to_unowned [[X]] : $C to $@sil_unowned C
 // CHECK:   unowned_retain [[X_UNOWNED]] : $@sil_unowned C
-// CHECK:   store [[X_UNOWNED]] to [[X_ADDR]]
+// CHECK:   store [[X_UNOWNED]] to [init] [[X_ADDR]]
 // CHECK:   destroy_value [[X]]
 // CHECK: }
 
@@ -50,7 +50,7 @@ func test0(c c: C) {
 // CHECK-NEXT: [[PBX:%.*]] = project_box [[X]]
 // CHECK-NEXT: [[T2:%.*]] = ref_to_unowned %0 : $C  to $@sil_unowned C
 // CHECK-NEXT: unowned_retain [[T2]] : $@sil_unowned C
-// CHECK-NEXT: store [[T2]] to [[PBX]] : $*@sil_unowned C
+// CHECK-NEXT: store [[T2]] to [init] [[PBX]] : $*@sil_unowned C
 
   a.x = c
 // CHECK-NEXT: [[T1:%.*]] = struct_element_addr [[A]] : $*A, #A.x
@@ -78,7 +78,7 @@ func unowned_local() -> C {
   // CHECK-NEXT: [[PB:%.*]] = project_box [[uc]]
   // CHECK-NEXT: [[tmp1:%.*]] = ref_to_unowned [[c]] : $C to $@sil_unowned C
   // CHECK-NEXT: unowned_retain [[tmp1]]
-  // CHECK-NEXT: store [[tmp1]] to [[PB]]
+  // CHECK-NEXT: store [[tmp1]] to [init] [[PB]]
   unowned let uc = c
 
   // CHECK-NEXT: [[tmp2:%.*]] = load [[PB]]

@@ -889,6 +889,8 @@ bool SDKNode::operator==(const SDKNode &Other) const {
       auto Right = (&Other)->getAs<SDKNodeDecl>();
       if (Left->isStatic() ^ Right->isStatic())
         return false;
+      if (Left->getOwnership() != Right->getOwnership())
+        return false;
       SWIFT_FALLTHROUGH;
     }
     case SDKNodeKind::Root:
@@ -1945,20 +1947,13 @@ public:
   }
 };
 
-static void detectThrowing(NodePtr L, NodePtr R) {
+static void detectFuncDeclChange(NodePtr L, NodePtr R) {
   assert(L->getKind() == R->getKind());
   if (auto LF = dyn_cast<SDKNodeAbstractFunc>(L)) {
     auto RF = R->getAs<SDKNodeAbstractFunc>();
     if (!LF->isThrowing() && RF->isThrowing()) {
       LF->annotate(NodeAnnotation::NowThrowing);
     }
-  }
-}
-
-static void detectMutating(NodePtr L, NodePtr R) {
-  assert(L->getKind() == R->getKind());
-  if (auto LF = dyn_cast<SDKNodeAbstractFunc>(L)) {
-    auto RF = R->getAs<SDKNodeAbstractFunc>();
     if (!LF->isMutating() && RF->isMutating()) {
       LF->annotate(NodeAnnotation::NowMutating);
     }
@@ -1976,12 +1971,15 @@ static void detectRename(NodePtr L, NodePtr R) {
   }
 }
 
-static void detectStaticUpdate(NodePtr L, NodePtr R) {
+static void detectDeclChange(NodePtr L, NodePtr R) {
   assert(L->getKind() == R->getKind());
   if (auto LD = dyn_cast<SDKNodeDecl>(L)) {
-    if (LD->isStatic() ^ R->getAs<SDKNodeDecl>()->isStatic()) {
+    auto *RD = R->getAs<SDKNodeDecl>();
+    if (LD->isStatic() ^ RD->isStatic())
       L->annotate(NodeAnnotation::StaticChange);
-    }
+    if (LD->getOwnership() != RD->getOwnership())
+      L->annotate(NodeAnnotation::OwnershipChange);
+    detectRename(L, R);
   }
 }
 
@@ -2041,10 +2039,8 @@ public:
            Right->getKind() != SDKNodeKind::Nil);
     assert(Kind == SDKNodeKind::Root || *Left != *Right);
 
-    detectRename(Left, Right);
-    detectThrowing(Left, Right);
-    detectMutating(Left, Right);
-    detectStaticUpdate(Left, Right);
+    detectDeclChange(Left, Right);
+    detectFuncDeclChange(Left, Right);
 
     switch(Kind) {
     case SDKNodeKind::Root:
@@ -2756,9 +2752,14 @@ class DiagnosisEmitter : public SDKNodeVisitor {
   struct DeclAttrDiag {
     DeclKind Kind;
     StringRef DeclName;
-    StringRef AttrName;
-    DeclAttrDiag(DeclKind Kind, StringRef DeclName, StringRef AttrName) :
-      Kind(Kind), DeclName(DeclName), AttrName(AttrName) {}
+    StringRef AttrBefore;
+    StringRef AttrAfter;
+    DeclAttrDiag(DeclKind Kind, StringRef DeclName, StringRef AttrBefore,
+                 StringRef AttrAfter) : Kind(Kind), DeclName(DeclName),
+                                AttrBefore(AttrBefore), AttrAfter(AttrAfter) {}
+    DeclAttrDiag(DeclKind Kind, StringRef DeclName, StringRef AttrAfter) :
+      DeclAttrDiag(Kind, DeclName, StringRef(), AttrAfter) {}
+
     bool operator<(DeclAttrDiag Other) const;
     void output() const;
     static void theme(raw_ostream &OS) { OS << "Decl Attribute changes"; };
@@ -2888,8 +2889,12 @@ bool DiagnosisEmitter::DeclAttrDiag::operator<(DeclAttrDiag Other) const {
 }
 
 void DiagnosisEmitter::DeclAttrDiag::output() const {
-  llvm::outs() << Kind << " " << printName(DeclName) << " is now " <<
-    printDiagKeyword(AttrName) << "\n";
+  if (AttrBefore.empty())
+    llvm::outs() << Kind << " " << printName(DeclName) << " is now " <<
+      printDiagKeyword(AttrAfter)<< "\n";
+  else
+    llvm::outs() << Kind << " " << printName(DeclName) << " changes from " <<
+      printDiagKeyword(AttrBefore) << " to "<< printDiagKeyword(AttrAfter)<< "\n";
 }
 
 void DiagnosisEmitter::diagnosis(NodePtr LeftRoot, NodePtr RightRoot,
@@ -2935,6 +2940,21 @@ void DiagnosisEmitter::visitDecl(SDKNodeDecl *Node) {
     AttrChangedDecls.Diags.emplace_back(Node->getDeclKind(),
                                         Node->getFullyQualifiedName(),
                   InsertToBuffer(Node->isStatic() ? "not static" : "static"));
+  }
+  if (Node->isAnnotatedAs(NodeAnnotation::OwnershipChange)) {
+    auto getOwnershipDescription = [](swift::Ownership O) {
+      switch (O) {
+      case Ownership::Strong:    return InsertToBuffer("strong");
+      case Ownership::Weak:      return InsertToBuffer("weak");
+      case Ownership::Unowned:   return InsertToBuffer("unowned");
+      case Ownership::Unmanaged: return InsertToBuffer("unowned(unsafe)");
+      }
+    };
+    auto *Count = UpdateMap.findUpdateCounterpart(Node)->getAs<SDKNodeDecl>();
+    AttrChangedDecls.Diags.emplace_back(Node->getDeclKind(),
+                                        Node->getFullyQualifiedName(),
+                                  getOwnershipDescription(Node->getOwnership()),
+                                getOwnershipDescription(Count->getOwnership()));
   }
 }
 void DiagnosisEmitter::visitType(SDKNodeType *Node) {

@@ -1640,6 +1640,15 @@ public:
                          NominalTypeDecl *nominal,
                          AssociatedTypeDecl *assocType);
 
+  /// Record the witness information into the given conformance that maps
+  /// the given requirement to the given witness declaration.
+  ///
+  /// Use this routine only when the given witness is known to satisfy the
+  /// requirement, e.g., because the witness itself was synthesized. This
+  /// function is not allowed to fail.
+  void recordKnownWitness(NormalProtocolConformance *conformance,
+                          ValueDecl *req, ValueDecl *witness);
+
   /// Perform unqualified name lookup at the given source location
   /// within a particular declaration context.
   ///

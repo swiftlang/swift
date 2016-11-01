@@ -17,7 +17,7 @@ class B : A {}
 // CHECK-NEXT: checked_cast_br [[VAL]] : $A to $B, [[IS_B:bb.*]], [[NOT_B:bb[0-9]+]]
 //   If so, materialize that and inject it into x.
 // CHECK:    [[IS_B]]([[T0:%.*]] : $B):
-// CHECK-NEXT: store [[T0]] to [[X_VALUE]] : $*B
+// CHECK-NEXT: store [[T0]] to [init] [[X_VALUE]] : $*B
 // CHECK-NEXT: inject_enum_addr [[PB]] : $*Optional<B>, #Optional.some
 // CHECK-NEXT: br [[CONT:bb[0-9]+]]
 //   If not, destroy_value the A and inject nothing into x.
@@ -166,7 +166,7 @@ public struct TestAddressOnlyStruct<T> {
 // CHECK-NEXT: [[X:%.*]] = alloc_box $Optional<Int>, var, name "x"
 // CHECK-NEXT: [[PB:%.*]] = project_box [[X]]
 // CHECK-NEXT: [[CAST:%.*]] = unchecked_addr_cast [[PB]] : $*Optional<Int> to $*Optional<Int>
-// CHECK-NEXT: store %0 to [[CAST]] : $*Optional<Int>
+// CHECK-NEXT: store %0 to [trivial] [[CAST]] : $*Optional<Int>
 // CHECK-NEXT: destroy_value [[X]] : $@box Optional<Int>
 func testContextualInitOfNonAddrOnlyType(_ a : Int?) {
   var x: Int! = a

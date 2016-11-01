@@ -27,7 +27,7 @@ func make_a_cat() throws -> Cat {
 // CHECK-NEXT: [[ADDR:%.*]] = project_existential_box $HomeworkError in [[BOX]] : $Error
 // CHECK-NEXT: [[T0:%.*]] = metatype $@thin HomeworkError.Type
 // CHECK-NEXT: [[T1:%.*]] = enum $HomeworkError, #HomeworkError.TooHard!enumelt
-// CHECK-NEXT: store [[T1]] to [[ADDR]]
+// CHECK-NEXT: store [[T1]] to [init] [[ADDR]]
 // CHECK-NEXT: builtin "willThrow"
 // CHECK-NEXT: throw [[BOX]]
 func dont_make_a_cat() throws -> Cat {
@@ -39,7 +39,7 @@ func dont_make_a_cat() throws -> Cat {
 // CHECK-NEXT: [[ADDR:%.*]] = project_existential_box $HomeworkError in [[BOX]] : $Error
 // CHECK-NEXT: [[T0:%.*]] = metatype $@thin HomeworkError.Type
 // CHECK-NEXT: [[T1:%.*]] = enum $HomeworkError, #HomeworkError.TooMuch!enumelt
-// CHECK-NEXT: store [[T1]] to [[ADDR]]
+// CHECK-NEXT: store [[T1]] to [init] [[ADDR]]
 // CHECK-NEXT: builtin "willThrow"
 // CHECK-NEXT: destroy_addr %1 : $*T
 // CHECK-NEXT: throw [[BOX]]
@@ -71,7 +71,7 @@ func dont_return<T>(_ argument: T) throws -> T {
 //   Merge point for the ternary operator.  Call dont_return with the result.
 // CHECK:    [[TERNARY_CONT]]([[T0:%.*]] : $Cat):
 // CHECK-NEXT: [[ARG_TEMP:%.*]] = alloc_stack $Cat
-// CHECK-NEXT: store [[T0]] to [[ARG_TEMP]]
+// CHECK-NEXT: store [[T0]] to [init] [[ARG_TEMP]]
 // CHECK-NEXT: [[RET_TEMP:%.*]] = alloc_stack $Cat
 // CHECK-NEXT: try_apply [[DR_FN]]<Cat>([[RET_TEMP]], [[ARG_TEMP]]) : $@convention(thin) <τ_0_0> (@in τ_0_0) -> (@out τ_0_0, @error Error), normal [[DR_NORMAL:bb[0-9]+]], error [[DR_ERROR:bb[0-9]+]]
 // CHECK:    [[DR_NORMAL]]({{%.*}} : $()):
@@ -87,7 +87,7 @@ func dont_return<T>(_ argument: T) throws -> T {
 //   Catch dispatch block.
 // CHECK:    [[CATCH:bb[0-9]+]]([[ERROR:%.*]] : $Error):
 // CHECK-NEXT: [[SRC_TEMP:%.*]] = alloc_stack $Error
-// CHECK-NEXT: store [[ERROR]] to [[SRC_TEMP]]
+// CHECK-NEXT: store [[ERROR]] to [init] [[SRC_TEMP]]
 // CHECK-NEXT: [[DEST_TEMP:%.*]] = alloc_stack $HomeworkError
 // CHECK-NEXT: checked_cast_addr_br copy_on_success Error in [[SRC_TEMP]] : $*Error to HomeworkError in [[DEST_TEMP]] : $*HomeworkError, [[IS_HWE:bb[0-9]+]], [[NOT_HWE:bb[0-9]+]]
 
@@ -399,12 +399,12 @@ func test_variadic(_ cat: Cat) throws {
 // CHECK:       [[T0:%.*]] = function_ref @_TF6errors10make_a_catFzT_CS_3Cat : $@convention(thin) () -> (@owned Cat, @error Error)
 // CHECK:       try_apply [[T0]]() : $@convention(thin) () -> (@owned Cat, @error Error), normal [[NORM_0:bb[0-9]+]], error [[ERR_0:bb[0-9]+]]
 // CHECK:     [[NORM_0]]([[CAT0:%.*]] : $Cat):
-// CHECK-NEXT:  store [[CAT0]] to [[ELT0]]
+// CHECK-NEXT:  store [[CAT0]] to [init] [[ELT0]]
 //   Element 1.
 // CHECK-NEXT:  [[T0:%.*]] = integer_literal $Builtin.Word, 1
 // CHECK-NEXT:  [[ELT1:%.*]] = index_addr [[ELT0]] : $*Cat, [[T0]]
 // CHECK-NEXT:  copy_value %0
-// CHECK-NEXT:  store %0 to [[ELT1]]
+// CHECK-NEXT:  store %0 to [init] [[ELT1]]
 //   Element 2.
 // CHECK-NEXT:  [[T0:%.*]] = integer_literal $Builtin.Word, 2
 // CHECK-NEXT:  [[ELT2:%.*]] = index_addr [[ELT0]] : $*Cat, [[T0]]
@@ -412,7 +412,7 @@ func test_variadic(_ cat: Cat) throws {
 // CHECK-NEXT:  [[T0:%.*]] = function_ref @_TF6errors10make_a_catFzT_CS_3Cat : $@convention(thin) () -> (@owned Cat, @error Error)
 // CHECK-NEXT:  try_apply [[T0]]() : $@convention(thin) () -> (@owned Cat, @error Error), normal [[NORM_2:bb[0-9]+]], error [[ERR_2:bb[0-9]+]]
 // CHECK:     [[NORM_2]]([[CAT2:%.*]] : $Cat):
-// CHECK-NEXT:  store [[CAT2]] to [[ELT2]]
+// CHECK-NEXT:  store [[CAT2]] to [init] [[ELT2]]
 //   Element 3.
 // CHECK-NEXT:  [[T0:%.*]] = integer_literal $Builtin.Word, 3
 // CHECK-NEXT:  [[ELT3:%.*]] = index_addr [[ELT0]] : $*Cat, [[T0]]
@@ -420,7 +420,7 @@ func test_variadic(_ cat: Cat) throws {
 // CHECK-NEXT:  [[T0:%.*]] = function_ref @_TF6errors10make_a_catFzT_CS_3Cat : $@convention(thin) () -> (@owned Cat, @error Error)
 // CHECK-NEXT:  try_apply [[T0]]() : $@convention(thin) () -> (@owned Cat, @error Error), normal [[NORM_3:bb[0-9]+]], error [[ERR_3:bb[0-9]+]]
 // CHECK:     [[NORM_3]]([[CAT3:%.*]] : $Cat):
-// CHECK-NEXT:  store [[CAT3]] to [[ELT3]]
+// CHECK-NEXT:  store [[CAT3]] to [init] [[ELT3]]
 //   Complete the call and return.
 // CHECK-NEXT:  try_apply [[TAKE_FN]]([[ARRAY]]) : $@convention(thin) (@owned Array<Cat>) -> @error Error, normal [[NORM_CALL:bb[0-9]+]], error [[ERR_CALL:bb[0-9]+]]
 // CHECK:     [[NORM_CALL]]([[T0:%.*]] : $()):
@@ -581,7 +581,7 @@ func supportStructure(_ b: inout Bridge, name: String) throws {
 // CHECK-NEXT: [[GETTER:%.*]] = function_ref @_TFV6errors6Bridgeg9subscriptFSSVS_5Pylon :
 // CHECK-NEXT: [[T0:%.*]] = apply [[GETTER]]([[INDEX]], [[BASE]])
 // CHECK-NEXT: destroy_value [[BASE]]
-// CHECK-NEXT: store [[T0]] to [[TEMP]]
+// CHECK-NEXT: store [[T0]] to [init] [[TEMP]]
 // CHECK-NEXT: try_apply [[SUPPORT]]([[TEMP]]) : {{.*}}, normal [[BB_NORMAL:bb[0-9]+]], error [[BB_ERROR:bb[0-9]+]]
 
 // CHECK:    [[BB_NORMAL]]
@@ -713,7 +713,7 @@ func testOptionalTry() {
 // CHECK: [[FN:%.+]] = function_ref @_TF6errors10make_a_catFzT_CS_3Cat
 // CHECK-NEXT: try_apply [[FN]]() : $@convention(thin) () -> (@owned Cat, @error Error), normal [[SUCCESS:[^ ]+]], error [[CLEANUPS:[^ ]+]],
 // CHECK: [[SUCCESS]]([[VALUE:%.+]] : $Cat)
-// CHECK-NEXT: store [[VALUE]] to [[BOX_DATA]] : $*Cat
+// CHECK-NEXT: store [[VALUE]] to [init] [[BOX_DATA]] : $*Cat
 // CHECK-NEXT: inject_enum_addr [[PB]] : $*Optional<Cat>, #Optional.some!enumelt.1
 // CHECK-NEXT: br [[DONE:[^ ]+]],
 // CHECK: [[DONE]]:

@@ -120,7 +120,7 @@ func passingToId<T: CP, U>(receiver: NSIdLover,
 
   // CHECK: [[METHOD:%.*]] = class_method [volatile] [[SELF]] : $NSIdLover,
   // CHECK: [[TMP:%.*]] = alloc_stack $KnownUnbridged
-  // CHECK: store [[KNOWN_UNBRIDGED]] to [[TMP]]
+  // CHECK: store [[KNOWN_UNBRIDGED]] to [trivial] [[TMP]]
   // CHECK: [[BRIDGE_ANYTHING:%.*]] = function_ref @_TFs27_bridgeAnythingToObjectiveC
   // CHECK: [[ANYOBJECT:%.*]] = apply [[BRIDGE_ANYTHING]]<KnownUnbridged>([[TMP]])
   // CHECK: apply [[METHOD]]([[ANYOBJECT]], [[SELF]])
@@ -131,7 +131,7 @@ func passingToId<T: CP, U>(receiver: NSIdLover,
   // CHECK: [[METHOD:%.*]] = class_method [volatile] [[SELF]] : $NSIdLover,
   // CHECK: [[BRIDGE_OPTIONAL:%.*]] = function_ref @_TFSq19_bridgeToObjectiveCfT_Ps9AnyObject_
   // CHECK: [[TMP:%.*]] = alloc_stack $Optional<String>
-  // CHECK: store [[OPT_STRING]] to [[TMP]]
+  // CHECK: store [[OPT_STRING]] to [init] [[TMP]]
   // CHECK: [[ANYOBJECT:%.*]] = apply [[BRIDGE_OPTIONAL]]<String>([[TMP]])
   // CHECK: apply [[METHOD]]([[ANYOBJECT]], [[SELF]])
   receiver.takesId(optionalA)
@@ -139,7 +139,7 @@ func passingToId<T: CP, U>(receiver: NSIdLover,
   // CHECK: [[METHOD:%.*]] = class_method [volatile] [[SELF]] : $NSIdLover,
   // CHECK: [[BRIDGE_OPTIONAL:%.*]] = function_ref @_TFSq19_bridgeToObjectiveCfT_Ps9AnyObject_
   // CHECK: [[TMP:%.*]] = alloc_stack $Optional<NSString>
-  // CHECK: store [[OPT_NSSTRING]] to [[TMP]]
+  // CHECK: store [[OPT_NSSTRING]] to [init] [[TMP]]
   // CHECK: [[ANYOBJECT:%.*]] = apply [[BRIDGE_OPTIONAL]]<NSString>([[TMP]])
   // CHECK: apply [[METHOD]]([[ANYOBJECT]], [[SELF]])
   receiver.takesId(optionalB)
@@ -292,7 +292,7 @@ func passingToNullableId<T: CP, U>(receiver: NSIdLover,
 
   // CHECK: [[METHOD:%.*]] = class_method [volatile] [[SELF]] : $NSIdLover,
   // CHECK: [[TMP:%.*]] = alloc_stack $KnownUnbridged
-  // CHECK: store [[KNOWN_UNBRIDGED]] to [[TMP]]
+  // CHECK: store [[KNOWN_UNBRIDGED]] to [trivial] [[TMP]]
   // CHECK: [[BRIDGE_ANYTHING:%.*]] = function_ref @_TFs27_bridgeAnythingToObjectiveC
   // CHECK: [[ANYOBJECT:%.*]] = apply [[BRIDGE_ANYTHING]]<KnownUnbridged>([[TMP]])
   // CHECK: [[OPT_ANYOBJECT:%.*]] = enum {{.*}} [[ANYOBJECT]]
@@ -416,7 +416,7 @@ class SwiftIdLover : NSObject, Anyable {
   // CHECK-NEXT:  destroy_value %0
   // CHECK-NEXT:  [[BLOCK_STORAGE:%.*]] = alloc_stack $@block_storage @callee_owned (@in Any) -> ()
   // CHECK-NEXT:  [[BLOCK_STORAGE_ADDR:%.*]] = project_block_storage [[BLOCK_STORAGE]]
-  // CHECK-NEXT:  store [[RESULT:%.*]] to [[BLOCK_STORAGE_ADDR]]
+  // CHECK-NEXT:  store [[RESULT:%.*]] to [init] [[BLOCK_STORAGE_ADDR]]
   // CHECK:       [[THUNK_FN:%.*]] = function_ref @_TTRXFo_iP___XFdCb_dPs9AnyObject___
   // CHECK-NEXT:  [[BLOCK_HEADER:%.*]] = init_block_storage_header [[BLOCK_STORAGE]] : $*@block_storage @callee_owned (@in Any) -> (), invoke [[THUNK_FN]]
   // CHECK-NEXT:  [[BLOCK:%.*]] = copy_block [[BLOCK_HEADER]]
@@ -487,7 +487,7 @@ class SwiftIdLover : NSObject, Anyable {
   // CHECK-NEXT:  destroy_value %0
   // CHECK-NEXT:  [[BLOCK_STORAGE:%.*]] = alloc_stack $@block_storage @callee_owned () -> @out Any
   // CHECK-NEXT:  [[BLOCK_STORAGE_ADDR:%.*]] = project_block_storage [[BLOCK_STORAGE]]
-  // CHECK-NEXT:  store [[FUNCTION]] to [[BLOCK_STORAGE_ADDR]]
+  // CHECK-NEXT:  store [[FUNCTION]] to [init] [[BLOCK_STORAGE_ADDR]]
   // CHECK:       [[THUNK_FN:%.*]] = function_ref @_TTRXFo__iP__XFdCb__aPs9AnyObject__
   // CHECK-NEXT:  [[BLOCK_HEADER:%.*]] = init_block_storage_header [[BLOCK_STORAGE]] : $*@block_storage @callee_owned () -> @out Any, invoke [[THUNK_FN]]
   // CHECK-NEXT:  [[BLOCK:%.*]] = copy_block [[BLOCK_HEADER]]
@@ -541,7 +541,7 @@ extension GenericClass {
   func pseudogenericAnyErasure(x: T) -> Any {
     // CHECK: [[ANY_BUF:%.*]] = init_existential_addr %0 : $*Any, $AnyObject
     // CHECK: [[ANYOBJECT:%.*]] = init_existential_ref %1 : $T : $T, $AnyObject
-    // CHECK: store [[ANYOBJECT]] to [[ANY_BUF]]
+    // CHECK: store [[ANYOBJECT]] to [init] [[ANY_BUF]]
     return x
   }
 }

@@ -53,7 +53,7 @@ public func foo(_ x: Double) {
 
   // CHECK: [[FN:%.*]] = function_ref @IAMStruct1Rotate : $@convention(c) (@in Struct1, Double) -> Struct1
   // CHECK: [[ZVAL:%.*]] = load [[Z]]
-  // CHECK: store [[ZVAL]] to [[ZTMP:%.*]] :
+  // CHECK: store [[ZVAL]] to [trivial] [[ZTMP:%.*]] :
   // CHECK: apply [[FN]]([[ZTMP]], [[X]])
   z = z.translate(radians: x)
 
@@ -98,7 +98,7 @@ public func foo(_ x: Double) {
   // z = h(z, x)
 
   // CHECK: [[ZVAL:%.*]] = load [[Z]]
-  // CHECK: store [[ZVAL]] to [[ZTMP:%.*]] :
+  // CHECK: store [[ZVAL]] to [trivial] [[ZTMP:%.*]] :
   // CHECK: [[GET:%.*]] = function_ref @IAMStruct1GetRadius : $@convention(c) (@in Struct1) -> Double
   // CHECK: apply [[GET]]([[ZTMP]])
   _ = z.radius
@@ -197,7 +197,7 @@ public func foo(_ x: Double) {
 
 // CHECK-LABEL: sil shared [thunk] @_TTOFVSC7Struct19translatefT7radiansSd_S_
 // CHECK:       bb0([[X:%.*]] : $Double, [[SELF:%.*]] : $Struct1):
-// CHECK:         store [[SELF]] to [[TMP:%.*]] :
+// CHECK:         store [[SELF]] to [trivial] [[TMP:%.*]] :
 // CHECK:         [[CFUNC:%.*]] = function_ref @IAMStruct1Rotate
 // CHECK:         [[RET:%.*]] = apply [[CFUNC]]([[TMP]], [[X]])
 // CHECK:         return [[RET]]

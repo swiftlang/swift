@@ -529,6 +529,16 @@ namespace {
       B.createStore(loc, value, addr, StoreOwnershipQualifier::Unqualified);
     }
 
+    void emitStore(SILBuilder &B, SILLocation loc, SILValue value,
+                   SILValue addr, StoreOwnershipQualifier qual) const override {
+      B.createStore(loc, value, addr, StoreOwnershipQualifier::Trivial);
+    }
+
+    SILValue emitLoad(SILBuilder &B, SILLocation loc, SILValue addr,
+                      LoadOwnershipQualifier qual) const override {
+      return B.createLoad(loc, addr, LoadOwnershipQualifier::Trivial);
+    }
+
     void emitDestroyAddress(SILBuilder &B, SILLocation loc,
                             SILValue addr) const override {
       // Trivial
@@ -582,6 +592,16 @@ namespace {
       B.createStore(loc, newValue, addr, StoreOwnershipQualifier::Unqualified);
       if (!isInit)
         emitDestroyValue(B, loc, oldValue);
+    }
+
+    void emitStore(SILBuilder &B, SILLocation loc, SILValue value,
+                   SILValue addr, StoreOwnershipQualifier qual) const override {
+      B.createStore(loc, value, addr, qual);
+    }
+
+    SILValue emitLoad(SILBuilder &B, SILLocation loc, SILValue addr,
+                      LoadOwnershipQualifier qual) const override {
+      return B.createLoad(loc, addr, qual);
     }
   };
 
@@ -930,6 +950,16 @@ namespace {
                          SILValue newValue, SILValue addr,
                          IsInitialization_t isInit) const override {
       llvm_unreachable("calling emitStoreOfCopy on non-loadable type");
+    }
+
+    void emitStore(SILBuilder &B, SILLocation loc, SILValue value,
+                   SILValue addr, StoreOwnershipQualifier qual) const override {
+      llvm_unreachable("calling emitStore on non-loadable type");
+    }
+
+    SILValue emitLoad(SILBuilder &B, SILLocation loc, SILValue addr,
+                      LoadOwnershipQualifier qual) const override {
+      llvm_unreachable("calling emitLoad on non-loadable type");
     }
 
     void emitDestroyAddress(SILBuilder &B, SILLocation loc,

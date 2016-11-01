@@ -719,8 +719,8 @@ static Callee prepareArchetypeCallee(SILGenFunction &gen, SILLocation loc,
       // Store the reference into a temporary.
       auto temp =
         gen.emitTemporaryAllocation(selfLoc, ref.getValue()->getType());
-      gen.B.createStore(selfLoc, ref.getValue(), temp,
-                        StoreOwnershipQualifier::Unqualified);
+      gen.B.emitStoreValueOperation(selfLoc, ref.getValue(), temp,
+                                    StoreOwnershipQualifier::Init);
 
       // If we had a cleanup, create a cleanup at the new address.
       return maybeEnterCleanupForTransformed(gen, ref, temp);
@@ -2580,8 +2580,8 @@ static ManagedValue emitMaterializeIntoTemporary(SILGenFunction &gen,
                                                  ManagedValue object) {
   auto temporary = gen.emitTemporaryAllocation(loc, object.getType());
   bool hadCleanup = object.hasCleanup();
-  gen.B.createStore(loc, object.forward(gen), temporary,
-                    StoreOwnershipQualifier::Unqualified);
+  gen.B.emitStoreValueOperation(loc, object.forward(gen), temporary,
+                                StoreOwnershipQualifier::Init);
 
   // The temporary memory is +0 if the value was.
   if (hadCleanup) {

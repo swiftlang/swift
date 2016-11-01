@@ -1609,7 +1609,7 @@ namespace {
       return expr->getType();
     }
 
-    virtual Type visitTupleExpr(TupleExpr *expr) {
+    Type visitTupleExpr(TupleExpr *expr) {
       // The type of a tuple expression is simply a tuple of the types of
       // its subexpressions.
       SmallVector<TupleTypeElt, 4> elements;
@@ -3005,16 +3005,6 @@ public:
     if (Target != Expr) {
       // If expr is not the target, do the default constraint generation.
       return ConstraintGenerator::visitParenExpr(Expr);
-    }
-    // Otherwise, create a type variable saying we know nothing about this expr.
-    assert(!VT && "cannot reassign type variable.");
-    return VT = createFreeTypeVariableType(Expr);
-  }
-
-  Type visitTupleExpr(TupleExpr *Expr) override {
-    if (Target != Expr) {
-      // If expr is not the target, do the default constraint generation.
-      return ConstraintGenerator::visitTupleExpr(Expr);
     }
     // Otherwise, create a type variable saying we know nothing about this expr.
     assert(!VT && "cannot reassign type variable.");

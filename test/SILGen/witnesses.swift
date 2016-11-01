@@ -255,7 +255,7 @@ struct ConformsWithMoreGeneric : X, Y {
   // CHECK-LABEL: sil hidden [transparent] [thunk] @_TTWV9witnesses23ConformsWithMoreGenericS_1XS_FS1_7classes{{.*}} : $@convention(witness_method) <τ_0_0 where τ_0_0 : Classes> (@owned τ_0_0, @inout ConformsWithMoreGeneric) -> @owned τ_0_0 {
   // CHECK:       bb0(%0 : $τ_0_0, %1 : $*ConformsWithMoreGeneric):
   // CHECK-NEXT:    [[SELF_BOX:%.*]] = alloc_stack $τ_0_0
-  // CHECK-NEXT:    store %0 to [[SELF_BOX]] : $*τ_0_0
+  // CHECK-NEXT:    store %0 to [init] [[SELF_BOX]] : $*τ_0_0
   // CHECK-NEXT:    // function_ref witnesses.ConformsWithMoreGeneric.classes
   // CHECK-NEXT:    [[WITNESS_FN:%.*]] = function_ref @_TFV9witnesses23ConformsWithMoreGeneric7classes{{.*}} : $@convention(method) <τ_0_0> (@in τ_0_0, @inout ConformsWithMoreGeneric) -> @out τ_0_0
   // CHECK-NEXT:    [[RESULT_BOX:%.*]] = alloc_stack $τ_0_0
@@ -362,7 +362,7 @@ struct IUOFailableModel : NonFailableRefinement, IUOFailableRequirement {
   // CHECK:   [[INIT:%[0-9]+]] = function_ref @_TFV9witnesses16IUOFailableModelC{{.*}} : $@convention(method) (Int, @thin IUOFailableModel.Type) -> Optional<IUOFailableModel>
   // CHECK:   [[IUO_RESULT:%[0-9]+]] = apply [[INIT]]([[FOO]], [[META]]) : $@convention(method) (Int, @thin IUOFailableModel.Type) -> Optional<IUOFailableModel>
   // CHECK:   [[RESULT:%[0-9]+]] = unchecked_enum_data [[IUO_RESULT]]
-  // CHECK:   store [[RESULT]] to [[SELF]] : $*IUOFailableModel
+  // CHECK:   store [[RESULT]] to [trivial] [[SELF]] : $*IUOFailableModel
   // CHECK:   return
   init!(foo: Int) { return nil }
 }

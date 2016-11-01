@@ -198,6 +198,8 @@ public:
                 SILBasicBlock::iterator insertInst)
       : SILGenBuilder(gen, &*insertBB, insertInst) {}
 
+  SILGenModule &getSILGenModule() const { return SGM; }
+
   // Metatype instructions use the conformances necessary to instantiate the
   // type.
   

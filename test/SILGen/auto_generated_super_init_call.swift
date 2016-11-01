@@ -19,7 +19,7 @@ class SomeDerivedClass : Parent {
 // CHECK: [[INITCALL1:%[0-9]+]] = function_ref @_TFC30auto_generated_super_init_call6ParentcfT_S0_ : $@convention(method) (@owned Parent) -> @owned Parent
 // CHECK-NEXT: [[RES1:%[0-9]+]] = apply [[INITCALL1]]([[PARENT]])
 // CHECK-NEXT: [[DOWNCAST:%[0-9]+]] = unchecked_ref_cast [[RES1]] : $Parent to $SomeDerivedClass
-// CHECK-NEXT: store [[DOWNCAST]] to [[SELF]] : $*SomeDerivedClass 
+// CHECK-NEXT: store [[DOWNCAST]] to [init] [[SELF]] : $*SomeDerivedClass 
   }
   
   init(x: Int) {

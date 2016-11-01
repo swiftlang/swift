@@ -75,7 +75,7 @@ func callBlocks(_ x: Foo,
   // CHECK: [[FOO:%.*]] =  class_method [volatile] %0 : $Foo, #Foo.foo!1.foreign
   // CHECK: [[F_BLOCK_STORAGE:%.*]] = alloc_stack $@block_storage
   // CHECK: [[F_BLOCK_CAPTURE:%.*]] = project_block_storage [[F_BLOCK_STORAGE]]
-  // CHECK: store %1 to [[F_BLOCK_CAPTURE]]
+  // CHECK: store %1 to [init] [[F_BLOCK_CAPTURE]]
   // CHECK: [[F_BLOCK_INVOKE:%.*]] = function_ref @_TTRXFo_dSi_dSi_XFdCb_dSi_dSi_
   // CHECK: [[F_STACK_BLOCK:%.*]] = init_block_storage_header [[F_BLOCK_STORAGE]] : {{.*}}, invoke [[F_BLOCK_INVOKE]]
   // CHECK: [[F_BLOCK:%.*]] = copy_block [[F_STACK_BLOCK]]

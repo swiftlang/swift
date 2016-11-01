@@ -16,8 +16,8 @@ let FILE = #file, LINE = #line
 // CHECK: [[FILE_ADDR:%.*]] = global_addr @_Tv15source_location4FILESS
 // CHECK: [[INPLACE_FILE_VAL:%.*]] = string_literal utf16 "inplace.swift",
 // CHECK: [[INPLACE_FILE:%.*]] = apply {{.*}}([[INPLACE_FILE_VAL]],
-// CHECK: store [[INPLACE_FILE]] to [[FILE_ADDR]]
+// CHECK: store [[INPLACE_FILE]] to [init] [[FILE_ADDR]]
 // CHECK: [[LINE_ADDR:%.*]] = global_addr @_Tv15source_location4LINESi
 // CHECK: [[INPLACE_LINE_VAL:%.*]] = integer_literal $Builtin.Int{{[0-9]+}}, 20000,
 // CHECK: [[INPLACE_LINE:%.*]] = apply {{.*}}([[INPLACE_LINE_VAL]],
-// CHECK: store [[INPLACE_LINE]] to [[LINE_ADDR]]
+// CHECK: store [[INPLACE_LINE]] to [trivial] [[LINE_ADDR]]

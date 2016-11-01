@@ -13,12 +13,13 @@
 #ifndef SWIFT_SIL_TYPELOWERING_H
 #define SWIFT_SIL_TYPELOWERING_H
 
-#include "swift/AST/CaptureInfo.h"
 #include "swift/ABI/MetadataValues.h"
+#include "swift/AST/CaptureInfo.h"
 #include "swift/SIL/AbstractionPattern.h"
+#include "swift/SIL/SILDeclRef.h"
+#include "swift/SIL/SILInstruction.h"
 #include "swift/SIL/SILLocation.h"
 #include "swift/SIL/SILValue.h"
-#include "swift/SIL/SILDeclRef.h"
 #include "llvm/ADT/DenseMap.h"
 #include "llvm/ADT/Hashing.h"
 #include "llvm/ADT/SmallVector.h"
@@ -208,6 +209,21 @@ public:
                                SILValue value,
                                SILValue addr,
                                IsInitialization_t isInit) const = 0;
+
+  /// Emit a store of \p value into \p addr given the StoreOwnershipQualifier
+  /// qual.
+  ///
+  /// This abstracts over the differences in between trivial and non-trivial
+  /// types.
+  virtual void emitStore(SILBuilder &B, SILLocation loc, SILValue value,
+                         SILValue addr, StoreOwnershipQualifier qual) const = 0;
+
+  /// Emit a load from \p addr given the LoadOwnershipQualifier \p qual.
+  ///
+  /// This abstracts over the differences in between trivial and non-trivial
+  /// types.
+  virtual SILValue emitLoad(SILBuilder &B, SILLocation loc, SILValue addr,
+                            LoadOwnershipQualifier qual) const = 0;
 
   /// Put an exact copy of the value in the source address in the
   /// destination address.
