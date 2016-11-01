@@ -441,21 +441,23 @@ function(_compile_swift_files
   set("${dependency_target_out_var_name}" "${dependency_target}" PARENT_SCOPE)
 
   # This is the target to generate the .swiftmodule and .swiftdoc
-  add_custom_command_target(
-      module_dependency_target
-      COMMAND
-        "${line_directive_tool}" "${source_files}" --
-        "${swift_compiler_tool}" "${module_command}" ${swift_flags}
-        "${source_files}"
-      ${command_touch_module_outputs}
-      OUTPUT ${module_outputs}
-      DEPENDS
-        ${swift_compiler_tool_dep}
-        ${source_files} ${SWIFTFILE_DEPENDS}
-        ${swift_ide_test_dependency} ${api_notes_dependency_target}
-        ${obj_dirs_dependency_target}
-      COMMENT "Generating ${module_file}")
-  set("${dependency_module_target_out_var_name}" "${module_dependency_target}" PARENT_SCOPE)
+  if (module_file)
+    add_custom_command_target(
+        module_dependency_target
+        COMMAND
+          "${line_directive_tool}" "${source_files}" --
+          "${swift_compiler_tool}" "${module_command}" ${swift_flags}
+          "${source_files}"
+        ${command_touch_module_outputs}
+        OUTPUT ${module_outputs}
+        DEPENDS
+          ${swift_compiler_tool_dep}
+          ${source_files} ${SWIFTFILE_DEPENDS}
+          ${swift_ide_test_dependency} ${api_notes_dependency_target}
+          ${obj_dirs_dependency_target}
+        COMMENT "Generating ${module_file}")
+    set("${dependency_module_target_out_var_name}" "${module_dependency_target}" PARENT_SCOPE)
+  endif()
 
   # Make sure the build system knows the file is a generated object file.
   set_source_files_properties(${SWIFTFILE_OUTPUT}
