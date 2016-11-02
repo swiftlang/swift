@@ -956,17 +956,10 @@ GenericEnvironment *ModuleFile::readGenericEnvironment(
                                  interfaceToArchetypeMap);
 }
 
-std::pair<GenericSignature *, GenericEnvironment *>
-ModuleFile::maybeReadGenericSignature() {
+GenericEnvironment *
+ModuleFile::maybeReadGenericEnvironment() {
   SmallVector<GenericTypeParamType *, 4> paramTypes;
-
-  // Read the generic environment.
-  auto env = readGenericEnvironment(paramTypes, DeclTypeCursor);
-
-  if (env == nullptr)
-    return std::make_pair(nullptr, nullptr);
-
-  return std::make_pair(env->getGenericSignature(), env);
+  return readGenericEnvironment(paramTypes, DeclTypeCursor);
 }
 
 bool ModuleFile::readMembers(SmallVectorImpl<Decl *> &Members) {
@@ -2235,12 +2228,8 @@ Decl *ModuleFile::getDecl(DeclID DID, Optional<DeclContext *> ForcedContext) {
     declOrOffset = alias;
 
     if (genericParams) {
-      GenericSignature *sig;
-      GenericEnvironment *env;
-
-      std::tie(sig, env) = maybeReadGenericSignature();
-
-      assert(sig && "generic typealias without signature");
+      auto *env = maybeReadGenericEnvironment();
+      assert(env && "generic typealias without environment");
       alias->setGenericEnvironment(env);
     }
 
@@ -2368,11 +2357,7 @@ Decl *ModuleFile::getDecl(DeclID DID, Optional<DeclContext *> ForcedContext) {
     if (isImplicit)
       theStruct->setImplicit();
 
-    GenericSignature *sig;
-    GenericEnvironment *env;
-
-    std::tie(sig, env) = maybeReadGenericSignature();
-
+    auto *env = maybeReadGenericEnvironment();
     theStruct->setGenericEnvironment(env);
 
     theStruct->computeType();
@@ -2814,11 +2799,7 @@ Decl *ModuleFile::getDecl(DeclID DID, Optional<DeclContext *> ForcedContext) {
     if (auto genericParams = maybeReadGenericParams(DC))
       proto->setGenericParams(genericParams);
 
-    GenericSignature *sig;
-    GenericEnvironment *env;
-
-    std::tie(sig, env) = maybeReadGenericSignature();
-
+    auto *env = maybeReadGenericEnvironment();
     proto->setGenericEnvironment(env);
 
     if (isImplicit)
@@ -2994,11 +2975,7 @@ Decl *ModuleFile::getDecl(DeclID DID, Optional<DeclContext *> ForcedContext) {
     if (requiresStoredPropertyInits)
       theClass->setRequiresStoredPropertyInits(true);
 
-    GenericSignature *sig;
-    GenericEnvironment *env;
-
-    std::tie(sig, env) = maybeReadGenericSignature();
-
+    auto *env = maybeReadGenericEnvironment();
     theClass->setGenericEnvironment(env);
 
     theClass->computeType();
@@ -3054,11 +3031,7 @@ Decl *ModuleFile::getDecl(DeclID DID, Optional<DeclContext *> ForcedContext) {
       theEnum->setImplicit();
     theEnum->setRawType(getType(rawTypeID));
 
-    GenericSignature *sig;
-    GenericEnvironment *env;
-
-    std::tie(sig, env) = maybeReadGenericSignature();
-
+    auto *env = maybeReadGenericEnvironment();
     theEnum->setGenericEnvironment(env);
 
     theEnum->computeType();
@@ -3241,11 +3214,7 @@ Decl *ModuleFile::getDecl(DeclID DID, Optional<DeclContext *> ForcedContext) {
     GenericParamList *genericParams = maybeReadGenericParams(DC);
     extension->setGenericParams(genericParams);
 
-    GenericSignature *sig;
-    GenericEnvironment *env;
-
-    std::tie(sig, env) = maybeReadGenericSignature();
-
+    auto *env = maybeReadGenericEnvironment();
     extension->setGenericEnvironment(env);
 
     extension->setMemberLoader(this, DeclTypeCursor.GetCurrentBitNo());

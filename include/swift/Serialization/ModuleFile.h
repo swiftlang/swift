@@ -457,13 +457,10 @@ private:
 
   /// Reads a GenericEnvironment followed by requirements from \c DeclTypeCursor.
   ///
-  /// Returns the GenericEnvironment and the signature formed from the
-  /// generic parameters of the environment, together with the
-  /// read requirements.
+  /// Returns the GenericEnvironment.
   ///
   /// Returns nullptr if there's no generic signature here.
-  std::pair<GenericSignature *, GenericEnvironment *>
-  maybeReadGenericSignature();
+  GenericEnvironment *maybeReadGenericEnvironment();
 
   /// Populates the vector with members of a DeclContext from \c DeclTypeCursor.
   ///
