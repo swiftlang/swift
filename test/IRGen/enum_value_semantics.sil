@@ -28,6 +28,8 @@ enum SinglePayloadNontrivial {
   case c
 }
 
+sil @single_payload_nontrivial_user : $@convention(thin) (@owned SinglePayloadNontrivial) -> ()
+
 enum MultiPayloadTrivial {
   case payload1(Builtin.Int64)
   case payload2(Builtin.Int32, Builtin.Int32)
@@ -185,9 +187,11 @@ enum GenericFixedLayout<T> {
 // CHECK:   %swift.type** null
 // CHECK: }>
 
-sil @single_payload_nontrivial_copy_destroy : $(SinglePayloadNontrivial) -> () {
+sil @single_payload_nontrivial_copy_destroy : $(@owned SinglePayloadNontrivial) -> () {
 bb0(%0 : $SinglePayloadNontrivial):
   retain_value %0 : $SinglePayloadNontrivial
+  %1 = function_ref @single_payload_nontrivial_user : $@convention(thin) (@owned SinglePayloadNontrivial) -> ()
+  apply %1(%0) : $@convention(thin) (@owned SinglePayloadNontrivial) -> ()
   release_value %0 : $SinglePayloadNontrivial
   %v = tuple ()
   return %v : $()

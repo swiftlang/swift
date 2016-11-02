@@ -127,6 +127,8 @@ PASS(GlobalOpt, "global-opt",
      "Global variable optimizations")
 PASS(GlobalPropertyOpt, "global-property-opt",
      "Optimize properties")
+PASS(GuaranteedARCOpts, "guaranteed-arc-opts",
+     "Guaranteed ARC optimizations")
 PASS(HighLevelCSE, "high-level-cse",
      "Common subexpression elimination on High-level SIL")
 PASS(HighLevelLICM, "high-level-licm",
