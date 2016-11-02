@@ -434,6 +434,11 @@ public:
   void emitMarkFunctionEscapeForTopLevelCodeGlobals(SILLocation loc,
                                                 const CaptureInfo &captureInfo);
 
+  /// Get the substitutions necessary to invoke a non-member (global or local)
+  /// property.
+  ArrayRef<Substitution>
+  getNonMemberVarDeclSubstitutions(VarDecl *var);
+
 private:
   /// Emit the deallocator for a class that uses the objc allocator.
   void emitObjCAllocatorDestructor(ClassDecl *cd, DestructorDecl *dd);
