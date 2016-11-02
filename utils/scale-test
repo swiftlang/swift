@@ -72,6 +72,8 @@ def run_once_with_primary(args, ast, rng, primary_idx):
                  [line.split() for line in open(trace)]
                  if len(fields) == 2}
         else:
+            if args.debug:
+                command = ["lldb", "--"] + command
             stats = os.path.join(d, "stats.json")
             argv = command + ["-Xllvm", "-stats",
                               "-Xllvm", "-stats-json",
@@ -185,6 +187,9 @@ def main():
     parser.add_argument(
         '--select',
         default="", help='substring of counters/symbols to restrict attention to')
+    parser.add_argument(
+        '--debug', action='store_true',
+        default=False, help='invoke lldb on each scale test')
 
     args = parser.parse_args(sys.argv[1:])
     (rng, runs) = run_many(args)
