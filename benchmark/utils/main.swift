@@ -68,6 +68,10 @@ import ObjectAllocation
 import ObjectiveCBridging
 import ObjectiveCBridgingStubs
 import ObjectiveCNoBridgingStubs
+import ObserverClosure
+import ObserverForwarderStruct
+import ObserverPartiallyAppliedMethod
+import ObserverUnappliedMethod
 import OpenClose
 import Phonebook
 import PolymorphicCalls
@@ -197,6 +201,10 @@ precommitTests = [
   "ObjectiveCBridgeToNSDictionary": run_ObjectiveCBridgeToNSDictionary,
   "ObjectiveCBridgeToNSSet": run_ObjectiveCBridgeToNSSet,
   "ObjectiveCBridgeToNSString": run_ObjectiveCBridgeToNSString,
+  "ObserverClosure": run_ObserverClosure,
+  "ObserverForwarderStruct": run_ObserverForwarderStruct,
+  "ObserverPartiallyAppliedMethod": run_ObserverPartiallyAppliedMethod,
+  "ObserverUnappliedMethod": run_ObserverUnappliedMethod,
   "OpenClose": run_OpenClose,
   "Phonebook": run_Phonebook,
   "PolymorphicCalls": run_PolymorphicCalls,
