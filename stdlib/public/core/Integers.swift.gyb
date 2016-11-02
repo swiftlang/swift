@@ -1431,6 +1431,9 @@ public protocol BinaryInteger :
   /// using two's complement representation.
   ///
   /// The value of this property is always at least 1.
+  // FIXME(integers): do we still need it once the preconditions in init() and
+  // init(exactly:) changed to compare to min and max instead of counting the
+  // required number of bits.
   var minimumSignedRepresentationBitWidth: Int { get }
 
 % for x in binaryArithmetic['BinaryInteger']:
