@@ -232,21 +232,32 @@ static SILInstruction *constantFoldCompare(BuiltinInst *BI,
   }
 
   SILValue Other;
+  auto MatchNonNegative =
+      m_BuiltinInst(BuiltinValueKind::AssumeNonNegative, m_ValueBase());
   if (match(BI, m_CombineOr(m_BuiltinInst(BuiltinValueKind::ICMP_ULT,
                                           m_SILValue(Other), m_Zero()),
-                            m_BuiltinInst(BuiltinValueKind::ICMP_UGT,
-                                          m_Zero(), m_SILValue(Other))))) {
+                            m_BuiltinInst(BuiltinValueKind::ICMP_UGT, m_Zero(),
+                                          m_SILValue(Other)))) ||
+      match(BI, m_CombineOr(m_BuiltinInst(BuiltinValueKind::ICMP_SLT,
+                                          MatchNonNegative, m_Zero()),
+                            m_BuiltinInst(BuiltinValueKind::ICMP_SGT, m_Zero(),
+                                          MatchNonNegative)))) {
     SILBuilderWithScope B(BI);
     return B.createIntegerLiteral(BI->getLoc(), BI->getType(), APInt());
   }
 
   if (match(BI, m_CombineOr(m_BuiltinInst(BuiltinValueKind::ICMP_UGE,
                                           m_SILValue(Other), m_Zero()),
-                            m_BuiltinInst(BuiltinValueKind::ICMP_ULE,
-                                          m_Zero(), m_SILValue(Other))))) {
+                            m_BuiltinInst(BuiltinValueKind::ICMP_ULE, m_Zero(),
+                                          m_SILValue(Other)))) ||
+      match(BI, m_CombineOr(m_BuiltinInst(BuiltinValueKind::ICMP_SGE,
+                                          MatchNonNegative, m_Zero()),
+                            m_BuiltinInst(BuiltinValueKind::ICMP_SLE, m_Zero(),
+                                          MatchNonNegative)))) {
     SILBuilderWithScope B(BI);
     return B.createIntegerLiteral(BI->getLoc(), BI->getType(), APInt(1, 1));
   }
+
   return nullptr;
 }
 

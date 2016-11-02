@@ -2700,9 +2700,9 @@ class DiagnosisEmitter : public SDKNodeVisitor {
   struct DiagBag {
     std::vector<T> Diags;
     ~DiagBag() {
-      llvm::outs() << "\n==================================================== ";
+      llvm::outs() << "\n/* ";
       T::theme(llvm::outs());
-      llvm::outs() << " ====================================================\n";
+      llvm::outs() << " */\n";
       removeRedundantAndSort(Diags);
       std::for_each(Diags.begin(), Diags.end(), [](T &Diag) {
         Diag.output();

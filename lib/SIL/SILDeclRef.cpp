@@ -112,12 +112,127 @@ bool swift::requiresForeignEntryPoint(ValueDecl *vd) {
   return vd->getAttrs().hasAttribute<DynamicAttr>();
 }
 
+/// TODO: We should consult the cached LoweredLocalCaptures the SIL
+/// TypeConverter calculates, but that would require plumbing SILModule&
+/// through every SILDeclRef constructor. Since this is only used to determine
+/// "natural uncurry level", and "uncurry level" is a concept we'd like to
+/// phase out, it's not worth it.
+static bool hasLoweredLocalCaptures(AnyFunctionRef AFR,
+                                    llvm::DenseSet<AnyFunctionRef> &visited) {
+  if (!AFR.getCaptureInfo().hasLocalCaptures())
+    return false;
+  
+  // Scan for local, non-function captures.
+  bool functionCapturesToRecursivelyCheck = false;
+  auto addFunctionCapture = [&](AnyFunctionRef capture) {
+    if (visited.find(capture) == visited.end())
+      functionCapturesToRecursivelyCheck = true;
+  };
+  for (auto &capture : AFR.getCaptureInfo().getCaptures()) {
+    if (!capture.getDecl()->getDeclContext()->isLocalContext())
+      continue;
+    // We transitively capture a local function's captures.
+    if (auto func = dyn_cast<AbstractFunctionDecl>(capture.getDecl())) {
+      addFunctionCapture(func);
+      continue;
+    }
+    // We may either directly capture properties, or capture through their
+    // accessors.
+    if (auto var = dyn_cast<VarDecl>(capture.getDecl())) {
+      switch (var->getStorageKind()) {
+      case VarDecl::StoredWithTrivialAccessors:
+        llvm_unreachable("stored local variable with trivial accessors?");
+
+      case VarDecl::InheritedWithObservers:
+        llvm_unreachable("inherited local variable?");
+
+      case VarDecl::StoredWithObservers:
+      case VarDecl::Addressed:
+      case VarDecl::AddressedWithTrivialAccessors:
+      case VarDecl::AddressedWithObservers:
+      case VarDecl::ComputedWithMutableAddress:
+        // Directly capture storage if we're supposed to.
+        if (capture.isDirect())
+          return true;
+
+        // Otherwise, transitively capture the accessors.
+        SWIFT_FALLTHROUGH;
+
+      case VarDecl::Computed:
+        addFunctionCapture(var->getGetter());
+        if (auto setter = var->getSetter())
+          addFunctionCapture(setter);
+        continue;
+      
+      case VarDecl::Stored:
+        return true;
+      }
+    }
+    // Anything else is directly captured.
+    return true;
+  }
+  
+  // Recursively consider function captures, since we didn't have any direct
+  // captures.
+  auto captureHasLocalCaptures = [&](AnyFunctionRef capture) -> bool {
+    if (visited.insert(capture).second)
+      return hasLoweredLocalCaptures(capture, visited);
+    return false;
+  };
+  
+  if (functionCapturesToRecursivelyCheck) {
+    for (auto &capture : AFR.getCaptureInfo().getCaptures()) {
+      if (!capture.getDecl()->getDeclContext()->isLocalContext())
+        continue;
+      if (auto func = dyn_cast<AbstractFunctionDecl>(capture.getDecl())) {
+        if (captureHasLocalCaptures(func))
+          return true;
+        continue;
+      }
+      if (auto var = dyn_cast<VarDecl>(capture.getDecl())) {
+        switch (var->getStorageKind()) {
+        case VarDecl::StoredWithTrivialAccessors:
+          llvm_unreachable("stored local variable with trivial accessors?");
+          
+        case VarDecl::InheritedWithObservers:
+          llvm_unreachable("inherited local variable?");
+          
+        case VarDecl::StoredWithObservers:
+        case VarDecl::Addressed:
+        case VarDecl::AddressedWithTrivialAccessors:
+        case VarDecl::AddressedWithObservers:
+        case VarDecl::ComputedWithMutableAddress:
+          assert(!capture.isDirect() && "should have short circuited out");
+          // Otherwise, transitively capture the accessors.
+          SWIFT_FALLTHROUGH;
+          
+        case VarDecl::Computed:
+          if (captureHasLocalCaptures(var->getGetter()))
+            return true;
+          if (auto setter = var->getSetter())
+            if (captureHasLocalCaptures(setter))
+              return true;
+          continue;
+        
+        case VarDecl::Stored:
+          llvm_unreachable("should have short circuited out");
+        }
+      }
+      llvm_unreachable("should have short circuited out");
+    }
+  }
+  
+  return false;
+}
+
 static unsigned getFuncNaturalUncurryLevel(AnyFunctionRef AFR) {
   assert(AFR.getParameterLists().size() >= 1 && "no arguments for func?!");
   unsigned Level = AFR.getParameterLists().size() - 1;
   // Functions with captures have an extra uncurry level for the capture
   // context.
-  if (AFR.getCaptureInfo().hasLocalCaptures())
+  llvm::DenseSet<AnyFunctionRef> visited;
+  visited.insert(AFR);
+  if (hasLoweredLocalCaptures(AFR, visited))
     Level += 1;
   return Level;
 }
@@ -367,7 +482,15 @@ bool SILDeclRef::isTransparent() const {
   if (hasAutoClosureExpr())
     return true;
 
-  return hasDecl() ? getDecl()->isTransparent() : false;
+  if (hasDecl()) {
+    if (auto *AFD = dyn_cast<AbstractFunctionDecl>(getDecl()))
+      return AFD->isTransparent();
+
+    if (auto *ASD = dyn_cast<AbstractStorageDecl>(getDecl()))
+      return ASD->isTransparent();
+  }
+
+  return false;
 }
 
 /// \brief True if the function should have its body serialized.

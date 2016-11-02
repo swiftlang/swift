@@ -710,10 +710,14 @@ public:
   /// Reads a substitution record from \c DeclTypeCursor.
   ///
   /// If the record at the cursor is not a substitution, returns None.
-  Optional<Substitution> maybeReadSubstitution(llvm::BitstreamCursor &Cursor);
+  Optional<Substitution> maybeReadSubstitution(llvm::BitstreamCursor &Cursor,
+                                               GenericEnvironment *genericEnv =
+                                                nullptr);
 
   /// Recursively reads a protocol conformance from the given cursor.
-  ProtocolConformanceRef readConformance(llvm::BitstreamCursor &Cursor);
+  ProtocolConformanceRef readConformance(llvm::BitstreamCursor &Cursor,
+                                         GenericEnvironment *genericEnv =
+                                           nullptr);
 
   /// Read the given normal conformance from the current module file.
   NormalProtocolConformance *

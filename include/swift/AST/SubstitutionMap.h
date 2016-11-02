@@ -56,14 +56,15 @@ public:
     return subMap;
   }
 
+  /// Retrieve the conformances for the given type.
+  ArrayRef<ProtocolConformanceRef> getConformances(CanType type) const;
+
   void addSubstitution(CanType type, Type replacement);
 
   void addConformances(CanType type, ArrayRef<ProtocolConformanceRef> conformances);
 
   void addParent(CanType type, CanType parent,
                  AssociatedTypeDecl *assocType);
-
-  void removeType(CanType type);
 };
 
 } // end namespace swift

@@ -1131,7 +1131,7 @@ public:
       // If there are captures, put the placeholder curry level in the formal
       // type.
       // TODO: Eliminate the need for this.
-      if (afd->getCaptureInfo().hasLocalCaptures())
+      if (SGF.SGM.M.Types.hasLoweredLocalCaptures(afd))
         substFnType = CanFunctionType::get(
           SGF.getASTContext().TheEmptyTupleType, substFnType);
     }
@@ -1152,7 +1152,7 @@ public:
       // captures in the constant info too, to generate more efficient
       // code for mutually recursive local functions which otherwise
       // capture no state.
-      if (afd->getCaptureInfo().hasLocalCaptures()) {
+      if (SGF.SGM.M.Types.hasLoweredLocalCaptures(afd)) {
         SmallVector<ManagedValue, 4> captures;
         SGF.emitCaptures(e, afd, CaptureEmission::ImmediateApplication,
                          captures);
@@ -1197,14 +1197,15 @@ public:
     // If there are captures, put the placeholder curry level in the formal
     // type.
     // TODO: Eliminate the need for this.
-    if (e->getCaptureInfo().hasLocalCaptures())
+    bool hasCaptures = SGF.SGM.M.Types.hasLoweredLocalCaptures(e);
+    if (hasCaptures)
       substFnType = CanFunctionType::get(
                          SGF.getASTContext().TheEmptyTupleType, substFnType);
 
     setCallee(Callee::forDirect(SGF, constant, substFnType, e));
     
     // If the closure requires captures, emit them.
-    if (e->getCaptureInfo().hasLocalCaptures()) {
+    if (hasCaptures) {
       SmallVector<ManagedValue, 4> captures;
       SGF.emitCaptures(e, e, CaptureEmission::ImmediateApplication,
                        captures);
@@ -3170,6 +3171,7 @@ namespace {
                                              SILParameterInfo param) {
       // If we're bridging a concrete type to `id` via Any, skip the Any
       // boxing.
+      
       // TODO: Generalize. Similarly, when bridging from NSFoo -> Foo -> NSFoo,
       // we should elide the bridge altogether and pass the original object.
       auto paramObjTy = param.getType();
@@ -3185,9 +3187,8 @@ namespace {
                                             origParamType, param);
       
       return SGF.emitNativeToBridgedValue(emitted.loc,
-                                      std::move(emitted.value).getScalarValue(),
-                                      Rep, param.getType());
-                                      
+                    std::move(emitted.value).getAsSingleValue(SGF, emitted.loc),
+                    Rep, param.getType());
     }
     
     enum class ExistentialPeepholeOptionality {
@@ -3276,15 +3277,24 @@ namespace {
                                                AbstractionPattern origParamType,
                                                SILParameterInfo param) {
       auto origArgExpr = argExpr;
-      (void) origArgExpr;
       // Look through existential erasures.
       ExistentialPeepholeOptionality optionality;
       std::tie(argExpr, optionality) = lookThroughExistentialErasures(argExpr);
       
+      // TODO: Only do the peephole for trivially-lowered types, since we
+      // unfortunately don't plumb formal types through
+      // emitNativeToBridgedValue, so can't correctly construct the
+      // substitution for the call to _bridgeAnythingToObjectiveC for function
+      // or metatype values.
+      if (!argExpr->getType()->isLegalSILType()) {
+        argExpr = origArgExpr;
+        optionality = ExistentialPeepholeOptionality::Nonoptional;
+      }
+      
       // Emit the argument.
       auto contexts = getRValueEmissionContexts(loweredSubstArgType, param);
       ManagedValue emittedArg = SGF.emitRValue(argExpr, contexts.ForEmission)
-        .getScalarValue();
+        .getAsSingleValue(SGF, argExpr);
       
       // Early exit if we already exactly match the parameter type.
       if (emittedArg.getType() == param.getSILType()) {
@@ -4974,7 +4984,7 @@ emitSpecializedAccessorFunctionRef(SILGenFunction &gen,
   
   // Collect captures if the accessor has them.
   auto accessorFn = cast<AbstractFunctionDecl>(constant.getDecl());
-  if (accessorFn->getCaptureInfo().hasLocalCaptures()) {
+  if (gen.SGM.M.Types.hasLoweredLocalCaptures(accessorFn)) {
     assert(!selfValue && "local property has self param?!");
     SmallVector<ManagedValue, 4> captures;
     gen.emitCaptures(loc, accessorFn, CaptureEmission::ImmediateApplication,
