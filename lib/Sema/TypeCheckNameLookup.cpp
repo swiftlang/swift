@@ -531,6 +531,9 @@ void TypeChecker::performTypoCorrection(DeclContext *DC, DeclRefKind refKind,
                                         NameLookupOptions lookupOptions,
                                         LookupResult &result,
                                         unsigned maxResults) {
+  if (getLangOpts().DisableTypoCorrection)
+    return;
+
   // Fill in a collection of the most reasonable entries.
   TopCollection<unsigned, ValueDecl*> entries(maxResults);
   auto consumer = makeDeclConsumer([&](ValueDecl *decl,
