@@ -348,18 +348,14 @@ case DeclKind::ID: return cast<ID##Decl>(this)->getLoc();
   llvm_unreachable("Unknown decl kind");
 }
 
-bool Decl::isTransparent() const {
+bool AbstractStorageDecl::isTransparent() const {
+  return getAttrs().hasAttribute<TransparentAttr>();
+}
+
+bool AbstractFunctionDecl::isTransparent() const {
   // Check if the declaration had the attribute.
   if (getAttrs().hasAttribute<TransparentAttr>())
     return true;
-
-  // Check if this is a function declaration which is within a transparent
-  // extension.
-  if (const AbstractFunctionDecl *FD = dyn_cast<AbstractFunctionDecl>(this)) {
-    if (const ExtensionDecl *ED = dyn_cast<ExtensionDecl>(FD->getParent()))
-      if (ED->isTransparent())
-        return true;
-  }
 
   // If this is an accessor, check if the transparent attribute was set
   // on the value decl.

@@ -695,8 +695,8 @@ extension ${Self}: BinaryFloatingPoint {
   }
 }
 
-@_transparent
 extension ${Self} : _ExpressibleByBuiltinIntegerLiteral, ExpressibleByIntegerLiteral {
+  @_transparent
   public
   init(_builtinIntegerLiteral value: Builtin.Int${builtinIntLiteralBits}){
     self = ${Self}(_bits: Builtin.itofp_with_overflow_Int${builtinIntLiteralBits}_FPIEEE${bits}(value))
@@ -715,6 +715,7 @@ extension ${Self} : _ExpressibleByBuiltinIntegerLiteral, ExpressibleByIntegerLit
   ///     // x == 100.0
   ///
   /// - Parameter value: The new value.
+  @_transparent
   public init(integerLiteral value: Int64) {
     self = ${Self}(_bits: Builtin.sitofp_Int64_FPIEEE${bits}(value._value))
   }
@@ -723,8 +724,8 @@ extension ${Self} : _ExpressibleByBuiltinIntegerLiteral, ExpressibleByIntegerLit
 #if !os(Windows) && (arch(i386) || arch(x86_64))
 
 % builtinFloatLiteralBits = 80
-@_transparent
 extension ${Self} : _ExpressibleByBuiltinFloatLiteral {
+  @_transparent
   public
   init(_builtinFloatLiteral value: Builtin.FPIEEE${builtinFloatLiteralBits}) {
 %   if bits == builtinFloatLiteralBits:
@@ -830,12 +831,12 @@ public prefix func - (x: ${Self}) -> ${Self} {
 //===----------------------------------------------------------------------===//
 
 // Construction from integers.
-@_transparent
 extension ${Self} {
 % for (srcBits, srcSigned) in allInts():
 %    That = intName(srcBits, srcSigned)
 %    ThatBuiltinName = builtinIntName(srcBits)
 %    sign = 's' if srcSigned else 'u'
+  @_transparent
   public init(_ v: ${That}) {
     _value = Builtin.${sign}itofp_${ThatBuiltinName}_FPIEEE${bits}(v._value)
   }
@@ -843,7 +844,6 @@ extension ${Self} {
 }
 
 // Construction from other floating point numbers.
-@_transparent
 extension ${Self} {
 % for src_type in all_floating_point_types():
 %   srcBits = src_type.bits
@@ -972,7 +972,6 @@ public func /= (lhs: inout ${Self}, rhs: ${Self}) {
 // Strideable Conformance
 //===----------------------------------------------------------------------===//
 
-@_transparent
 extension ${Self} : Strideable {
   /// Returns the distance from this value to the specified value.
   ///

@@ -430,7 +430,6 @@ extension ${Self} {
 }
 
 % if signed:
-@_transparent
 extension ${Self} : SignedNumber {}
 % end
 
@@ -475,7 +474,6 @@ fixed_fixed_conversion_function = gyb.parse_template("fixed_fixed_conversion_fun
 %    (srcSign, srcExt) = ('s', 'sext') if srcSigned else ('u', 'zext')
 %    safelyConvertible = (srcBits < bits and (srcSign == sign or signed)) or (srcBits == bits and srcSign == sign)
 
-@_transparent
 extension ${Self} {
 
   @_transparent
@@ -672,9 +670,9 @@ public func ${op}=(lhs: inout ${Self}, rhs: ${Self}) {
 % end
 
 // Bitwise operations
-@_transparent
 extension ${Self} : BitwiseOperations {
   /// The empty bitset of type `${Self}`.
+  @_transparent
   public static var allZeros: ${Self} { return 0 }
 }
 
