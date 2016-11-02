@@ -149,6 +149,11 @@ def report(args, rng, runs):
     import math
     bad = False
     keys = set.intersection(*[set(j.keys()) for j in runs])
+    if len(keys) == 0:
+        print "No data found"
+        if len(args.select) != 0:
+            "(perhaps try a different --select?)"
+        return True
     x = [math.log(n) for n in rng]
     rows = []
     for k in keys:
