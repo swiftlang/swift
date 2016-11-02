@@ -173,7 +173,7 @@ public func _bridgeAnyObjectToAny(_ possiblyNullObject: AnyObject?) -> Any {
   if let nonnullObject = possiblyNullObject {
     return nonnullObject // AnyObject-in-Any
   }
-  return possiblyNullObject // AnyObject?-in-Any
+  return possiblyNullObject as Any
 }
 
 /// Convert `x` from its Objective-C representation to its Swift
