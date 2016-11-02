@@ -576,7 +576,7 @@ static void mangleClangDecl(raw_ostream &buffer,
   importer->getMangledName(buffer, clangDecl);
 }
 
-static std::string mangleConstant(SILDeclRef c, StringRef prefix) {
+static std::string mangleConstant(SILDeclRef c, SILDeclRef::ManglingKind Kind) {
   using namespace Mangle;
   Mangler mangler;
 
@@ -586,16 +586,22 @@ static std::string mangleConstant(SILDeclRef c, StringRef prefix) {
   //   mangled-name ::= '_TTO' global   // Foreign function thunk
   //   mangled-name ::= '_TTd' global   // Direct
   StringRef introducer = "_T";
-  if (!prefix.empty()) {
-    introducer = prefix;
-  } else if (c.isForeign) {
-    assert(prefix.empty() && "can't have custom prefix on thunk");
-    introducer = "_TTo";
-  } else if (c.isDirectReference) {
-    introducer = "_TTd";
-  } else if (c.isForeignToNativeThunk()) {
-    assert(prefix.empty() && "can't have custom prefix on thunk");
-    introducer = "_TTO";
+  switch (Kind) {
+    case SILDeclRef::ManglingKind::Default:
+      if (c.isForeign) {
+        introducer = "_TTo";
+      } else if (c.isDirectReference) {
+        introducer = "_TTd";
+      } else if (c.isForeignToNativeThunk()) {
+        introducer = "_TTO";
+      }
+      break;
+    case SILDeclRef::ManglingKind::VTableMethod:
+      introducer = "_TTV";
+      break;
+    case SILDeclRef::ManglingKind::DynamicThunk:
+      introducer = "_TTD";
+      break;
   }
   
   // As a special case, Clang functions and globals don't get mangled at all.
@@ -727,8 +733,8 @@ static std::string mangleConstant(SILDeclRef c, StringRef prefix) {
   llvm_unreachable("bad entity kind!");
 }
 
-std::string SILDeclRef::mangle(StringRef prefix) const {
-  return mangleConstant(*this, prefix);
+std::string SILDeclRef::mangle(ManglingKind MKind) const {
+  return mangleConstant(*this, MKind);
  }
 
 SILDeclRef SILDeclRef::getNextOverriddenVTableEntry() const {
