@@ -379,10 +379,9 @@ SpecializedProtocolConformance::getTypeWitnessSubstAndDecl(
   auto conformingModule = conformingDC->getParentModule();
 
   auto *genericEnv = GenericConformance->getGenericEnvironment();
-  auto *genericSig = GenericConformance->getGenericSignature();
 
   auto substitutionMap = genericEnv->getSubstitutionMap(
-      conformingModule, genericSig, GenericSubstitutions);
+      conformingModule, GenericSubstitutions);
 
   auto genericWitnessAndDecl
     = GenericConformance->getTypeWitnessSubstAndDecl(assocType, resolver);
@@ -534,10 +533,9 @@ ProtocolConformance::getInheritedConformance(ProtocolDecl *protocol) const {
     auto *conformingDC = spec->getDeclContext();
     auto *conformingModule = conformingDC->getParentModule();
 
-    auto *sig = conformingDC->getGenericSignatureOfContext();
     auto *env = conformingDC->getGenericEnvironmentOfContext();
 
-    auto subMap = env->getSubstitutionMap(conformingModule, sig, subs);
+    auto subMap = env->getSubstitutionMap(conformingModule, subs);
 
     auto r = inherited->subst(conformingModule, getType(), subMap);
     assert(getType()->isEqual(r->getType())

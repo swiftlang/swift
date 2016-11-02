@@ -83,18 +83,16 @@ public:
   /// with contextual types instead of interface types.
   SubstitutionMap
   getSubstitutionMap(ModuleDecl *mod,
-                     GenericSignature *sig,
                      ArrayRef<Substitution> subs) const;
 
   /// Same as above, but updates an existing map.
   void
   getSubstitutionMap(ModuleDecl *mod,
-                     GenericSignature *sig,
                      ArrayRef<Substitution> subs,
                      SubstitutionMap &subMap) const;
 
   ArrayRef<Substitution>
-  getForwardingSubstitutions(ModuleDecl *M, GenericSignature *sig) const;
+  getForwardingSubstitutions(ModuleDecl *M) const;
 
   void dump() const;
 };

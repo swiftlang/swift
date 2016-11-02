@@ -1964,8 +1964,7 @@ public:
 
     // Map interface types to archetypes.
     if (auto *env = constantInfo.GenericEnv) {
-      auto sig = constantInfo.SILFnType->getGenericSignature();
-      auto subs = env->getForwardingSubstitutions(M, sig);
+      auto subs = env->getForwardingSubstitutions(M);
       methodTy = methodTy->substGenericArgs(F.getModule(), M, subs);
     }
     assert(!methodTy->isPolymorphic());

@@ -41,8 +41,7 @@ class TypeSubstCloner : public SILClonerWithScopes<ImplClass> {
 
   void computeSubsMap() {
     if (auto *env = Original.getGenericEnvironment()) {
-      auto sig = Original.getLoweredFunctionType()->getGenericSignature();
-      SubsMap = env->getSubstitutionMap(SwiftMod, sig, ApplySubs);
+      SubsMap = env->getSubstitutionMap(SwiftMod, ApplySubs);
     }
   }
 

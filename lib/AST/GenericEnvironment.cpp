@@ -89,8 +89,7 @@ GenericTypeParamType *GenericEnvironment::getSugaredType(
 }
 
 ArrayRef<Substitution>
-GenericEnvironment::getForwardingSubstitutions(
-    ModuleDecl *M, GenericSignature *sig) const {
+GenericEnvironment::getForwardingSubstitutions(ModuleDecl *M) const {
   auto lookupConformanceFn =
       [&](CanType original, Type replacement, ProtocolType *protoType)
           -> ProtocolConformanceRef {
@@ -105,16 +104,14 @@ GenericEnvironment::getForwardingSubstitutions(
 
 SubstitutionMap GenericEnvironment::
 getSubstitutionMap(ModuleDecl *mod,
-                   GenericSignature *sig,
                    ArrayRef<Substitution> subs) const {
   SubstitutionMap result;
-  getSubstitutionMap(mod, getGenericSignature(), subs, result);
+  getSubstitutionMap(mod, subs, result);
   return result;
 }
 
 void GenericEnvironment::
 getSubstitutionMap(ModuleDecl *mod,
-                   GenericSignature *sig,
                    ArrayRef<Substitution> subs,
                    SubstitutionMap &result) const {
   for (auto depTy : getGenericSignature()->getAllDependentTypes()) {
