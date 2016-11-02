@@ -3196,6 +3196,11 @@ bool swift::isExtensionApplied(DeclContext &DC, Type BaseTy,
   bool Failed = false;
   SmallVector<Type, 3> TypeScratch;
 
+  // Don't allow type variables from an existing constraint system to
+  // leak into the new constraint system created below.
+  assert(!BaseTy->hasTypeVariable() &&
+         "Unexpected type variable in base type!");
+
   // Prepare type substitution map.
   auto GenericArgs = BaseTy->getAllGenericArgs(TypeScratch);
   TypeSubstitutionMap Substitutions;
@@ -3258,6 +3263,9 @@ bool swift::isExtensionApplied(DeclContext &DC, Type BaseTy,
 static bool canSatisfy(Type T1, Type T2, DeclContext &DC, ConstraintKind Kind,
                        bool ReplaceArchetypeWithVariables,
                        bool AllowFreeVariables) {
+  assert(!T1->hasTypeVariable() && !T2->hasTypeVariable() &&
+         "Unexpected type variable in constraint satisfaction testing");
+
   std::unique_ptr<TypeChecker> CreatedTC;
   // If the current ast context has no type checker, create one for it.
   auto *TC = static_cast<TypeChecker*>(DC.getASTContext().getLazyResolver());

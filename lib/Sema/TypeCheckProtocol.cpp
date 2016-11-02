@@ -5098,7 +5098,7 @@ bool TypeChecker::isProtocolExtensionUsable(DeclContext *dc, Type type,
 
   // If the type still has parameters, the constrained extension is considered
   // unusable.
-  if (type->hasTypeParameter())
+  if (type->hasTypeParameter() || type->hasTypeVariable())
     return false;
 
   // Set up a constraint system where we open the generic parameters of the
