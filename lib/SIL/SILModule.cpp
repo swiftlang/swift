@@ -486,10 +486,6 @@ bool SILModule::linkFunction(SILFunction *Fun, SILModule::LinkingMode Mode) {
   return SILLinkerVisitor(*this, getSILLoader(), Mode).processFunction(Fun);
 }
 
-bool SILModule::linkFunction(SILDeclRef Decl, SILModule::LinkingMode Mode) {
-  return SILLinkerVisitor(*this, getSILLoader(), Mode).processDeclRef(Decl);
-}
-
 bool SILModule::linkFunction(StringRef Name, SILModule::LinkingMode Mode) {
   return SILLinkerVisitor(*this, getSILLoader(), Mode).processFunction(Name);
 }

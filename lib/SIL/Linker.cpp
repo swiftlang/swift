@@ -79,30 +79,6 @@ bool SILLinkerVisitor::processFunction(SILFunction *F) {
 }
 
 /// Process Decl, recursively deserializing any thing Decl may reference.
-bool SILLinkerVisitor::processDeclRef(SILDeclRef Decl) {
-  if (Mode == LinkingMode::LinkNone)
-    return false;
-
-  // If F is a declaration, first deserialize it.
-  auto *NewFn = Loader->lookupSILFunction(Decl);
-  if (!NewFn || NewFn->isExternalDeclaration())
-    return false;
-
-  if (!shouldImportFunction(NewFn)) {
-    return false;
-  }
-
-  ++NumFuncLinked;
-
-  // Try to transitively deserialize everything referenced by NewFn.
-  Worklist.push_back(NewFn);
-  process();
-
-  // Since we successfully processed at least one function, return true.
-  return true;
-}
-
-/// Process Decl, recursively deserializing any thing Decl may reference.
 bool SILLinkerVisitor::processFunction(StringRef Name) {
   if (Mode == LinkingMode::LinkNone)
     return false;
