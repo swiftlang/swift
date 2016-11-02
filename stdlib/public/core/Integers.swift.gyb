@@ -1509,7 +1509,10 @@ extension BinaryInteger {
   @_transparent
   public func distance(to other: Self) -> Int {
     let distance = other - self
-    return Int(distance)
+    if let result = Int(exactly: distance) {
+      return result
+    }
+    _preconditionFailure("Distance is not representable in Int")
   }
 
   // FIXME(ABI): using Int as the parameter type is wrong.
@@ -1517,7 +1520,10 @@ extension BinaryInteger {
   public func advanced(by n: Int) -> Self {
     var advanced: Int = Int(self)
     advanced += n
-    return Self(advanced)
+    if let result = Self(exactly: advanced) {
+      return result
+    }
+    _preconditionFailure("The result of advanced(by:) is not representable")
   }
 }
 
