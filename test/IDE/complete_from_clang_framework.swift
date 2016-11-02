@@ -29,7 +29,6 @@
 // RUN: %target-swift-ide-test -code-completion -source-filename %s -F %S/Inputs/mock-sdk -code-completion-token=CLANG_INSTANCE_MEMBERS_1 | %FileCheck %s -check-prefix=CLANG_INSTANCE_MEMBERS_1
 
 // XFAIL: linux
-// REQUIRES: rdar28245007
 
 import Foo
 // Don't import FooHelper directly in this test!
