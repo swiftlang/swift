@@ -22,6 +22,7 @@
 #include "swift/AST/ConcreteDeclRef.h"
 #include "swift/AST/DefaultArgumentKind.h"
 #include "swift/AST/GenericSignature.h"
+#include "swift/AST/GenericEnvironment.h"
 #include "swift/AST/LazyResolver.h"
 #include "swift/AST/TypeAlignments.h"
 #include "swift/AST/Witness.h"
@@ -1371,16 +1372,6 @@ class ExtensionDecl final : public Decl, public DeclContext,
   /// The generic parameters of the extension.
   GenericParamList *GenericParams = nullptr;
 
-  /// \brief The generic signature of this extension.
-  ///
-  /// This is the semantic representation of a generic parameters and the
-  /// requirements placed on them.
-  ///
-  /// FIXME: The generic parameters here are also derivable from
-  /// \c GenericParams. However, we likely want to make \c GenericParams
-  /// the parsed representation, and not part of the module file.
-  GenericSignature *GenericSig = nullptr;
-
   /// \brief The generic context of this extension.
   ///
   /// This is the mapping between interface types and archetypes for the
@@ -1467,13 +1458,7 @@ public:
   }
 
   /// Retrieve the generic signature for this extension.
-  GenericSignature *getGenericSignature() const { return GenericSig; }
-
-  /// Set the generic signature of this extension.
-  void setGenericSignature(GenericSignature *sig) {
-    assert(!GenericSig && "Already have generic signature");
-    GenericSig = sig;
-  }
+  GenericSignature *getGenericSignature() const { return GenericEnv ? GenericEnv->getGenericSignature() : nullptr; }
 
   /// Retrieve the generic context for this extension.
   GenericEnvironment *getGenericEnvironment() const { return GenericEnv; }
@@ -2251,16 +2236,6 @@ public:
 class GenericTypeDecl : public TypeDecl, public DeclContext {
   GenericParamList *GenericParams = nullptr;
 
-  /// \brief The generic signature of this type.
-  ///
-  /// This is the semantic representation of a generic parameters and the
-  /// requirements placed on them.
-  ///
-  /// FIXME: The generic parameters here are also derivable from
-  /// \c GenericParams. However, we likely want to make \c GenericParams
-  /// the parsed representation, and not part of the module file.
-  GenericSignature *GenericSig = nullptr;
-
   /// \brief The generic context of this type.
   ///
   /// This is the mapping between interface types and archetypes for the
@@ -2284,31 +2259,25 @@ public:
   /// this function is not generic.
   void setGenericParams(GenericParamList *params);
 
-  /// Set the generic signature of this type.
-  void setGenericSignature(GenericSignature *sig) {
-    assert(!GenericSig && "Already have generic signature");
-    GenericSig = sig;
-  }
-
   /// Retrieve the innermost generic parameter types.
   ArrayRef<GenericTypeParamType *> getInnermostGenericParamTypes() const {
-    if (!GenericSig)
+    if (auto sig = getGenericSignature())
+      return sig->getInnermostGenericParams();
+    else
       return { };
-
-    return GenericSig->getInnermostGenericParams();
   }
 
   /// Retrieve the generic requirements.
   ArrayRef<Requirement> getGenericRequirements() const {
-    if (!GenericSig)
+    if (auto sig = getGenericSignature())
+      return sig->getRequirements();
+    else
       return { };
-
-    return GenericSig->getRequirements();
   }
 
   /// Retrieve the generic signature.
   GenericSignature *getGenericSignature() const {
-    return GenericSig;
+    return GenericEnv ? GenericEnv->getGenericSignature() : nullptr;
   }
   
   void setIsValidatingGenericSignature(bool validating=true) {
@@ -4561,7 +4530,6 @@ protected:
   };
 
   GenericParamList *GenericParams;
-  GenericSignature *GenericSig;
   GenericEnvironment *GenericEnv;
 
   CaptureInfo Captures;
@@ -4578,7 +4546,7 @@ protected:
                        GenericParamList *GenericParams)
       : ValueDecl(Kind, Parent, Name, NameLoc),
         DeclContext(DeclContextKind::AbstractFunctionDecl, Parent),
-        Body(nullptr), GenericParams(nullptr), GenericSig(nullptr),
+        Body(nullptr), GenericParams(nullptr),
         GenericEnv(nullptr), ThrowsLoc(ThrowsLoc) {
     setBodyKind(BodyKind::None);
     setGenericParams(GenericParams);
@@ -4602,13 +4570,8 @@ public:
   /// attribute.
   bool isTransparent() const;
 
-  void setGenericSignature(GenericSignature *GenericSig) {
-    assert(!this->GenericSig && "already have signature?");
-    this->GenericSig = GenericSig;
-  }
-  
   GenericSignature *getGenericSignature() const {
-    return GenericSig;
+    return GenericEnv ? GenericEnv->getGenericSignature() : nullptr;
   }
 
   /// Retrieve the generic context for this function.
@@ -6045,10 +6008,10 @@ inline bool ValueDecl::isImportAsMember() const {
 }
 
 inline ArrayRef<Requirement> ExtensionDecl::getGenericRequirements() const {
-  if (!GenericSig)
+  if (auto sig = getGenericSignature())
+    return sig->getRequirements();
+  else
     return { };
-
-  return GenericSig->getRequirements();
 }
 
 inline bool Decl::isPotentiallyOverridable() const {

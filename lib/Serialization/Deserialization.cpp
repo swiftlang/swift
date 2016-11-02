@@ -2241,7 +2241,6 @@ Decl *ModuleFile::getDecl(DeclID DID, Optional<DeclContext *> ForcedContext) {
       std::tie(sig, env) = maybeReadGenericSignature();
 
       assert(sig && "generic typealias without signature");
-      alias->setGenericSignature(sig);
       alias->setGenericEnvironment(env);
     }
 
@@ -2374,7 +2373,6 @@ Decl *ModuleFile::getDecl(DeclID DID, Optional<DeclContext *> ForcedContext) {
 
     std::tie(sig, env) = maybeReadGenericSignature();
 
-    theStruct->setGenericSignature(sig);
     theStruct->setGenericEnvironment(env);
 
     theStruct->computeType();
@@ -2456,8 +2454,6 @@ Decl *ModuleFile::getDecl(DeclID DID, Optional<DeclContext *> ForcedContext) {
     // its generic parameters.
     ctor->setType(getType(signatureID));
     if (auto interfaceType = getType(interfaceID)) {
-      if (auto genericFnType = interfaceType->getAs<GenericFunctionType>())
-        ctor->setGenericSignature(genericFnType->getGenericSignature());
       ctor->setInterfaceType(interfaceType);
     }
 
@@ -2693,8 +2689,6 @@ Decl *ModuleFile::getDecl(DeclID DID, Optional<DeclContext *> ForcedContext) {
 
     // Set the interface type.
     if (auto interfaceType = getType(interfaceTypeID)) {
-      if (auto genericFnType = interfaceType->getAs<GenericFunctionType>())
-        fn->setGenericSignature(genericFnType->getGenericSignature());
       fn->setInterfaceType(interfaceType);
     }
 
@@ -2825,7 +2819,6 @@ Decl *ModuleFile::getDecl(DeclID DID, Optional<DeclContext *> ForcedContext) {
 
     std::tie(sig, env) = maybeReadGenericSignature();
 
-    proto->setGenericSignature(sig);
     proto->setGenericEnvironment(env);
 
     if (isImplicit)
@@ -3006,7 +2999,6 @@ Decl *ModuleFile::getDecl(DeclID DID, Optional<DeclContext *> ForcedContext) {
 
     std::tie(sig, env) = maybeReadGenericSignature();
 
-    theClass->setGenericSignature(sig);
     theClass->setGenericEnvironment(env);
 
     theClass->computeType();
@@ -3067,7 +3059,6 @@ Decl *ModuleFile::getDecl(DeclID DID, Optional<DeclContext *> ForcedContext) {
 
     std::tie(sig, env) = maybeReadGenericSignature();
 
-    theEnum->setGenericSignature(sig);
     theEnum->setGenericEnvironment(env);
 
     theEnum->computeType();
@@ -3255,7 +3246,6 @@ Decl *ModuleFile::getDecl(DeclID DID, Optional<DeclContext *> ForcedContext) {
 
     std::tie(sig, env) = maybeReadGenericSignature();
 
-    extension->setGenericSignature(sig);
     extension->setGenericEnvironment(env);
 
     extension->setMemberLoader(this, DeclTypeCursor.GetCurrentBitNo());
@@ -3299,8 +3289,6 @@ Decl *ModuleFile::getDecl(DeclID DID, Optional<DeclContext *> ForcedContext) {
     dtor->setType(getType(signatureID));
 
     auto interfaceType = getType(interfaceID);
-    if (auto genericFnType = interfaceType->getAs<GenericFunctionType>())
-      dtor->setGenericSignature(genericFnType->getGenericSignature());
     dtor->setInterfaceType(interfaceType);
 
     dtor->setGenericEnvironment(DC->getGenericEnvironmentOfContext());
@@ -4314,7 +4302,7 @@ void ModuleFile::finishNormalConformance(NormalProtocolConformance *conformance,
     // Set the witness.
     conformance->setWitness(req,
                             Witness(witness, witnessSubstitutions,
-                                    syntheticSig, syntheticEnv,
+                                    syntheticEnv,
                                     reqToSyntheticMap));
   }
   assert(rawIDIter <= rawIDs.end() && "read too much");

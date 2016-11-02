@@ -4843,7 +4843,7 @@ public:
     if (auto gp = FD->getGenericParams()) {
       gp->setOuterParameters(FD->getDeclContext()->getGenericParamsOfContext());
 
-      TC.validateGenericFuncSignature(FD);
+      auto *sig = TC.validateGenericFuncSignature(FD);
 
       // Create a fresh archetype builder.
       ArchetypeBuilder builder =
@@ -4867,13 +4867,12 @@ public:
       TC.revertGenericFuncSignature(FD);
 
       // Assign archetypes.
-      auto *sig = FD->getGenericSignature();
       auto *env = builder.getGenericEnvironment(sig);
       FD->setGenericEnvironment(env);
 
       TC.finalizeGenericParamList(gp, sig, env, FD);
     } else if (FD->getDeclContext()->getGenericSignatureOfContext()) {
-      TC.validateGenericFuncSignature(FD);
+      (void)TC.validateGenericFuncSignature(FD);
       if (!FD->hasType()) {
         // Revert all of the types within the signature of the function.
         TC.revertGenericFuncSignature(FD);
@@ -4892,7 +4891,7 @@ public:
       return;
 
     if (!FD->getGenericSignatureOfContext())
-      TC.configureInterfaceType(FD);
+      TC.configureInterfaceType(FD, FD->getGenericSignature());
 
     if (FD->isInvalid())
       return;
@@ -6515,7 +6514,7 @@ public:
       // Write up generic parameters and check the generic parameter list.
       gp->setOuterParameters(CD->getDeclContext()->getGenericParamsOfContext());
 
-      TC.validateGenericFuncSignature(CD);
+      auto *sig = TC.validateGenericFuncSignature(CD);
 
       auto builder = TC.createArchetypeBuilder(CD->getModuleContext());
       auto *parentSig = CD->getDeclContext()->getGenericSignatureOfContext();
@@ -6530,13 +6529,12 @@ public:
       TC.revertGenericFuncSignature(CD);
 
       // Assign archetypes.
-      auto *sig = CD->getGenericSignature();
       auto *env = builder.getGenericEnvironment(sig);
       CD->setGenericEnvironment(env);
 
       TC.finalizeGenericParamList(gp, sig, env, CD);
     } else if (CD->getDeclContext()->getGenericSignatureOfContext()) {
-      TC.validateGenericFuncSignature(CD);
+      (void)TC.validateGenericFuncSignature(CD);
 
       // Revert all of the types within the signature of the constructor.
       TC.revertGenericFuncSignature(CD);
@@ -6560,7 +6558,7 @@ public:
                                  CD->getParameterList(1)->getType(TC.Context));
 
         if (!CD->getGenericSignatureOfContext())
-          TC.configureInterfaceType(CD);
+          TC.configureInterfaceType(CD, CD->getGenericSignature());
       }
     }
 
@@ -6696,7 +6694,7 @@ public:
     Type SelfTy = configureImplicitSelf(TC, DD);
 
     if (DD->getDeclContext()->getGenericSignatureOfContext()) {
-      TC.validateGenericFuncSignature(DD);
+      (void)TC.validateGenericFuncSignature(DD);
       DD->setGenericEnvironment(
           DD->getDeclContext()->getGenericEnvironmentOfContext());
     }
@@ -6709,7 +6707,7 @@ public:
     }
 
     if (!DD->getGenericSignatureOfContext())
-      TC.configureInterfaceType(DD);
+      TC.configureInterfaceType(DD, DD->getGenericSignature());
 
     if (!DD->hasType()) {
       Type FnTy;
@@ -7628,7 +7626,6 @@ void TypeChecker::validateExtension(ExtensionDecl *ext) {
                                     ext->getGenericParams());
 
     ext->getExtendedTypeLoc().setType(extendedType);
-    ext->setGenericSignature(sig);
     ext->setGenericEnvironment(env);
     return;
   }
@@ -7661,7 +7658,6 @@ void TypeChecker::validateExtension(ExtensionDecl *ext) {
                                     ext->getGenericParams());
 
     ext->getExtendedTypeLoc().setType(extendedType);
-    ext->setGenericSignature(sig);
     ext->setGenericEnvironment(env);
 
     // Speculatively ban extension of AnyObject; it won't be a

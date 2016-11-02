@@ -418,7 +418,6 @@ namespace {
     swift::Witness getWitness(ASTContext &ctx,
                               RequirementEnvironment &&reqEnvironment) const {
       return swift::Witness(this->Witness, WitnessSubstitutions,
-                            reqEnvironment.getSyntheticSignature(),
                             reqEnvironment.getSyntheticEnvironment(),
                             reqEnvironment.takeRequirementToSyntheticMap());
     }

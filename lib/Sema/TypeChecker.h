@@ -1011,12 +1011,13 @@ public:
                                  ExtensionDecl *protocolExtension) override;
 
   /// Configure the interface type of a function declaration.
-  void configureInterfaceType(AbstractFunctionDecl *func);
+  void configureInterfaceType(AbstractFunctionDecl *func,
+                              GenericSignature *sig);
 
   /// Validate the signature of a generic function.
   ///
   /// \param func The generic function.
-  void validateGenericFuncSignature(AbstractFunctionDecl *func);
+  GenericSignature *validateGenericFuncSignature(AbstractFunctionDecl *func);
 
   /// Revert the signature of a generic function to its pre-type-checked state,
   /// so that it can be type checked again when we have resolved its generic

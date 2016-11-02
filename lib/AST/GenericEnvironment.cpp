@@ -16,6 +16,7 @@
 
 #include "swift/AST/ASTContext.h"
 #include "swift/AST/GenericEnvironment.h"
+#include "swift/AST/ProtocolConformance.h"
 
 using namespace swift;
 

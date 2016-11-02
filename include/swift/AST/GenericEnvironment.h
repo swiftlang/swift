@@ -17,7 +17,6 @@
 #ifndef SWIFT_AST_GENERIC_ENVIRONMENT_H
 #define SWIFT_AST_GENERIC_ENVIRONMENT_H
 
-#include "swift/AST/ProtocolConformance.h"
 #include "swift/AST/SubstitutionMap.h"
 #include "swift/AST/GenericSignature.h"
 

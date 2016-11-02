@@ -31,7 +31,6 @@
 using namespace swift;
 
 Witness::Witness(ValueDecl *decl, ArrayRef<Substitution> substitutions,
-                 GenericSignature *syntheticSig,
                  GenericEnvironment *syntheticEnv,
                  SubstitutionMap reqToSynthesizedEnvMap) {
   auto &ctx = decl->getASTContext();
@@ -39,7 +38,7 @@ Witness::Witness(ValueDecl *decl, ArrayRef<Substitution> substitutions,
   auto declRef = ConcreteDeclRef(ctx, decl, substitutions);
   auto storedMem = ctx.Allocate(sizeof(StoredWitness), alignof(StoredWitness));
   auto stored =
-    new (storedMem) StoredWitness{declRef, syntheticSig, syntheticEnv,
+    new (storedMem) StoredWitness{declRef, syntheticEnv,
                                   std::move(reqToSynthesizedEnvMap)};
   ctx.addDestructorCleanup(*stored);
 

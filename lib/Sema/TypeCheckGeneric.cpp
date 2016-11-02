@@ -457,7 +457,7 @@ static Type getResultType(TypeChecker &TC, FuncDecl *fn, Type resultType) {
   return resultType;
 }
 
-void TypeChecker::validateGenericFuncSignature(AbstractFunctionDecl *func) {
+GenericSignature *TypeChecker::validateGenericFuncSignature(AbstractFunctionDecl *func) {
   bool invalid = false;
 
   // Create the archetype builder.
@@ -472,7 +472,7 @@ void TypeChecker::validateGenericFuncSignature(AbstractFunctionDecl *func) {
   // If this triggered a recursive validation, back out: we're done.
   // FIXME: This is an awful hack.
   if (func->hasType())
-    return;
+    return nullptr;
 
   // Finalize the generic requirements.
   (void)builder.finalize(func->getLoc());
@@ -502,22 +502,20 @@ void TypeChecker::validateGenericFuncSignature(AbstractFunctionDecl *func) {
     llvm::errs() << "\n";
   }
 
-  func->setGenericSignature(sig);
-
   if (invalid) {
     func->overwriteType(ErrorType::get(Context));
     func->setInterfaceType(ErrorType::get(Context));
-    return;
+    // null doesn't mean error here: callers still expect the signature.
+    return sig;
   }
 
-  configureInterfaceType(func);
+  configureInterfaceType(func, sig);
+  return sig;
 }
 
-void TypeChecker::configureInterfaceType(AbstractFunctionDecl *func) {
+void TypeChecker::configureInterfaceType(AbstractFunctionDecl *func, GenericSignature *sig) {
   Type funcTy;
   Type initFuncTy;
-
-  auto *sig = func->getGenericSignature();
 
   if (auto fn = dyn_cast<FuncDecl>(func)) {
     funcTy = fn->getBodyResultTypeLoc().getType();
@@ -830,9 +828,7 @@ void TypeChecker::validateGenericTypeSignature(GenericTypeDecl *typeDecl) {
   auto *dc = typeDecl->getDeclContext();
 
   if (!gp) {
-    auto *parentSig = dc->getGenericSignatureOfContext();
     auto *parentEnv = dc->getGenericEnvironmentOfContext();
-    typeDecl->setGenericSignature(parentSig);
     typeDecl->setGenericEnvironment(parentEnv);
     return;
   }
@@ -842,8 +838,6 @@ void TypeChecker::validateGenericTypeSignature(GenericTypeDecl *typeDecl) {
                                        nullptr);
   assert(sig->getInnermostGenericParams().size()
            == typeDecl->getGenericParams()->size());
-  typeDecl->setGenericSignature(sig);
-
   revertGenericParamList(gp);
 
   ArchetypeBuilder builder =

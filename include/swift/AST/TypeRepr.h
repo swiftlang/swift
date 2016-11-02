@@ -19,6 +19,7 @@
 
 #include "swift/AST/Attr.h"
 #include "swift/AST/DeclContext.h"
+#include "swift/AST/GenericEnvironment.h"
 #include "swift/AST/Identifier.h"
 #include "swift/AST/Type.h"
 #include "swift/AST/TypeAlignments.h"
@@ -367,7 +368,6 @@ class FunctionTypeRepr : public TypeRepr {
   // we can have polymorphic function values.
   GenericParamList *GenericParams;
   GenericEnvironment *GenericEnv;
-  GenericSignature *GenericSig;
 
   TypeRepr *ArgsTy;
   TypeRepr *RetTy;
@@ -380,19 +380,13 @@ public:
     : TypeRepr(TypeReprKind::Function),
       GenericParams(genericParams),
       GenericEnv(nullptr),
-      GenericSig(nullptr),
       ArgsTy(argsTy), RetTy(retTy),
       ArrowLoc(arrowLoc), ThrowsLoc(throwsLoc) {
   }
 
   GenericParamList *getGenericParams() const { return GenericParams; }
   GenericEnvironment *getGenericEnvironment() const { return GenericEnv; }
-  GenericSignature *getGenericSignature() const { return GenericSig; }
-
-  void setGenericSignature(GenericSignature *genericSig) {
-    assert(GenericSig == nullptr);
-    GenericSig = genericSig;
-  }
+  GenericSignature *getGenericSignature() const { return GenericEnv ? GenericEnv->getGenericSignature() : nullptr; }
 
   void setGenericEnvironment(GenericEnvironment *genericEnv) {
     assert(GenericEnv == nullptr);
