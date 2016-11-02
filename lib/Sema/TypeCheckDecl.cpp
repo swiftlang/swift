@@ -31,6 +31,7 @@
 #include "swift/AST/PrettyStackTrace.h"
 #include "swift/AST/ReferencedNameTracker.h"
 #include "swift/AST/TypeWalker.h"
+#include "swift/Basic/Statistic.h"
 #include "swift/Parse/Lexer.h"
 #include "swift/Parse/Parser.h"
 #include "swift/Sema/IterativeTypeChecker.h"
@@ -44,6 +45,8 @@
 #include "llvm/ADT/StringExtras.h"
 #include "llvm/ADT/Twine.h"
 using namespace swift;
+
+#define DEBUG_TYPE "TypeCheckDecl"
 
 namespace {
 
@@ -6968,7 +6971,9 @@ void TypeChecker::validateDecl(ValueDecl *D, bool resolveTypeParams) {
       validateExtension(ext);
     }
   }
-  
+
+  SWIFT_FUNC_STAT;
+
   switch (D->getKind()) {
   case DeclKind::Import:
   case DeclKind::Extension:

@@ -28,6 +28,7 @@
 #include "swift/AST/PrettyStackTrace.h"
 #include "swift/AST/TypeLoc.h"
 #include "swift/Basic/SourceManager.h"
+#include "swift/Basic/Statistic.h"
 #include "swift/Basic/StringExtras.h"
 #include "swift/ClangImporter/ClangImporter.h"
 #include "llvm/ADT/APInt.h"
@@ -36,6 +37,8 @@
 #include "llvm/ADT/StringSwitch.h"
 #include "llvm/ADT/Twine.h"
 using namespace swift;
+
+#define DEBUG_TYPE "TypeCheckType"
 
 GenericTypeResolver::~GenericTypeResolver() { }
 
@@ -1525,6 +1528,8 @@ bool TypeChecker::validateType(TypeLoc &Loc, DeclContext *DC,
   // If we've already validated this type, don't do so again.
   if (Loc.wasValidated())
     return Loc.isError();
+
+  SWIFT_FUNC_STAT;
 
   if (Loc.getType().isNull()) {
     // Raise error if we parse an IUO type in an illegal position.

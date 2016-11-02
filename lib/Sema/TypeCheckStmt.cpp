@@ -25,6 +25,7 @@
 #include "swift/Basic/Range.h"
 #include "swift/Basic/STLExtras.h"
 #include "swift/Basic/SourceManager.h"
+#include "swift/Basic/Statistic.h"
 #include "swift/Parse/Lexer.h"
 #include "swift/Parse/LocalContext.h"
 #include "llvm/ADT/DenseMap.h"
@@ -37,6 +38,8 @@
 #include "llvm/Support/Timer.h"
 
 using namespace swift;
+
+#define DEBUG_TYPE "TypeCheckStmt"
 
 namespace {
   class ContextualizeClosures : public ASTWalker {
@@ -1247,6 +1250,8 @@ bool TypeChecker::typeCheckAbstractFunctionBodyUntil(AbstractFunctionDecl *AFD,
 bool TypeChecker::typeCheckAbstractFunctionBody(AbstractFunctionDecl *AFD) {
   if (!AFD->getBody())
     return false;
+
+  SWIFT_FUNC_STAT;
 
   Optional<FunctionBodyTimer> timer;
   if (DebugTimeFunctionBodies || WarnLongFunctionBodies)
