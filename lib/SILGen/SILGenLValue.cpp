@@ -1577,14 +1577,14 @@ LValue SILGenLValue::visitExpr(Expr *e, AccessKind accessKind) {
   llvm_unreachable("unimplemented lvalue expr");
 }
 
-static ArrayRef<Substitution>
-getNonMemberVarDeclSubstitutions(SILGenModule &SGM, VarDecl *var) {
+ArrayRef<Substitution>
+SILGenModule::getNonMemberVarDeclSubstitutions(VarDecl *var) {
   ArrayRef<Substitution> substitutions;
   auto *dc = var->getDeclContext();
   if (auto *genericEnv = dc->getGenericEnvironmentOfContext()) {
     auto *genericSig = dc->getGenericSignatureOfContext();
     substitutions = genericEnv->getForwardingSubstitutions(
-        SGM.SwiftModule, genericSig);
+        SwiftModule, genericSig);
   }
   return substitutions;
 }
@@ -1600,7 +1600,7 @@ addNonMemberVarDeclAddressorComponent(SILGenModule &SGM, VarDecl *var,
   auto typeData = getPhysicalStorageTypeData(SGM, var, formalRValueType);
   SILType storageType = SGM.Types.getLoweredType(var->getType()).getAddressType();
   lvalue.add<AddressorComponent>(var, /*isSuper=*/ false, /*direct*/ true,
-                                 getNonMemberVarDeclSubstitutions(SGM, var),
+                                 SGM.getNonMemberVarDeclSubstitutions(var),
                                  CanType(), typeData, storageType);
 }
 
@@ -1631,7 +1631,7 @@ static LValue emitLValueForNonMemberVarDecl(SILGenFunction &gen,
   case AccessStrategy::DirectToAccessor: {
     auto typeData = getLogicalStorageTypeData(gen.SGM, formalRValueType);
     lv.add<GetterSetterComponent>(var, /*isSuper=*/false, /*direct*/ true,
-                                  getNonMemberVarDeclSubstitutions(gen.SGM, var),
+                                  gen.SGM.getNonMemberVarDeclSubstitutions(var),
                                   CanType(), typeData);
     break;
   }
