@@ -118,9 +118,3 @@ addParent(CanType type, CanType parent, AssociatedTypeDecl *assocType) {
   assert(type && parent && assocType);
   parentMap[type.getPointer()].push_back(std::make_pair(parent, assocType));
 }
-
-void SubstitutionMap::removeType(CanType type) {
-  subMap.erase(type.getPointer());
-  conformanceMap.erase(type.getPointer());
-  parentMap.erase(type.getPointer());
-}

@@ -437,16 +437,36 @@ getSubstitutionsForCallee(SILModule &M,
 
     auto origSubs = AI.getSubstitutions();
 
-    // Decompose the original substitution using the derived method signature.
-    origCalleeSig->getSubstitutionMap(origSubs, subMap);
+    // Add generic parameters from the method itself, ignoring any generic
+    // parameters from the derived class.
+    unsigned minDepth = 0;
+    if (auto derivedClassSig = calleeClassDecl->getGenericSignatureOfContext())
+      minDepth = derivedClassSig->getGenericParams().back()->getDepth() + 1;
 
-    // Drop any generic parameters that come from the derived class, leaving
-    // only generic parameters of the method itself.
-    if (auto derivedClassSig = calleeClassDecl->getGenericSignatureOfContext()) {
-      for (auto depTy : derivedClassSig->getAllDependentTypes()) {
-        subMap.removeType(depTy->getCanonicalType());
-      }
+    for (auto depTy : origCalleeSig->getAllDependentTypes()) {
+      // Grab the next substitution.
+      auto sub = origSubs.front();
+      origSubs = origSubs.slice(1);
+
+      // If the dependent type doesn't contain any generic parameter with
+      // a depth of at least the minimum, skip this type.
+      auto canTy = depTy->getCanonicalType();
+      auto hasInnerGenericParameter = [minDepth](Type type) -> bool {
+        if (auto gp = type->getAs<GenericTypeParamType>()) {
+          return gp->getDepth() >= minDepth;
+        }
+        return false;
+      };
+
+      if (!Type(canTy.getPointer()).findIf(hasInnerGenericParameter))
+        continue;
+
+      // Otherwise, record the replacement and conformances for the mapped
+      // type.
+      subMap.addSubstitution(canTy, sub.getReplacement());
+      subMap.addConformances(canTy, sub.getConformances());
     }
+    assert(origSubs.empty());
   }
 
   // Add any generic substitutions for the base class.
