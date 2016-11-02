@@ -2125,12 +2125,9 @@ extension UnsignedInteger where Self : FixedWidthInteger {
   @_transparent
   public init<T : BinaryInteger>(_ source: T) {
     _precondition(source >= 0,
-      "negative value is not representable")
-    // FIXME(integers): uncomment the check when the ctlz instruction gets the
-    // necessary optimizations. <rdar://problem/29004328>
-    /*let requiredBits = source.minimumSignedRepresentationBitWidth - 1*/
-    /*_precondition(requiredBits <= Self.bitWidth,*/
-      /*"Not enough bits to represent an unsigned value")*/
+      "Negative value is not representable")
+    _precondition(source <= Self.max,
+      "Not enough bits to represent a signed value")
     self.init(extendingOrTruncating: source)
   }
 
@@ -2138,8 +2135,7 @@ extension UnsignedInteger where Self : FixedWidthInteger {
   public init?<T : BinaryInteger>(exactly source: T) {
     _precondition(source >= 0,
       "Negative value is not representable")
-    let requiredBits = source.minimumSignedRepresentationBitWidth - 1
-    if requiredBits > Self.bitWidth {
+    if source > Self.max {
       return nil
     }
     self.init(extendingOrTruncating: source)
@@ -2180,19 +2176,14 @@ extension SignedInteger {
 extension SignedInteger where Self : FixedWidthInteger {
   @_transparent
   public init<T : BinaryInteger>(_ source: T) {
-    // FIXME(integers): uncomment the check when the ctlz instruction gets the
-    // necessary optimizations. <rdar://problem/29004328>
-    /*let requiredBits = source.minimumSignedRepresentationBitWidth*/
-    /*_precondition(*/
-      /*requiredBits <= Self.bitWidth,*/
-      /*"Not enough bits to represent a signed value")*/
+    _precondition(source >= Self.min && source <= Self.max,
+      "Not enough bits to represent a signed value")
     self.init(extendingOrTruncating: source)
   }
 
   @_transparent
   public init?<T : BinaryInteger>(exactly source: T) {
-    let requiredBits = source.minimumSignedRepresentationBitWidth
-    if requiredBits > Self.bitWidth {
+    if source < Self.min || source > Self.max {
       return nil
     }
     self.init(extendingOrTruncating: source)
