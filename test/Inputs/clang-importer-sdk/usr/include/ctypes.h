@@ -265,6 +265,7 @@ typedef struct ModRM {
 // Arrays
 //===---
 void useArray(char x[4], char y[], char z[][8]);
+void staticBoundsArray(const char x[static 4]);
 
 typedef const int FourConstInts[4];
 void nonnullArrayParameters(const char x[_Nonnull], void * const _Nullable y[_Nonnull], _Nonnull FourConstInts z);

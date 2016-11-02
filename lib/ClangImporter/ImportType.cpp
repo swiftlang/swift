@@ -1550,7 +1550,8 @@ ParameterList *ClangImporter::Implementation::importFunctionParameterList(
 
     // Check nullability of the parameter.
     OptionalTypeKind OptionalityOfParam =
-        getParamOptionality(param, !nonNullArgs.empty() && nonNullArgs[index]);
+        getParamOptionality(SwiftContext.LangOpts.EffectiveLanguageVersion,
+                            param, !nonNullArgs.empty() && nonNullArgs[index]);
 
     ImportTypeKind importKind = ImportTypeKind::Parameter;
     if (param->hasAttr<clang::CFReturnsRetainedAttr>())
@@ -1933,8 +1934,9 @@ Type ClangImporter::Implementation::importMethodType(
 
     // Check nullability of the parameter.
     OptionalTypeKind optionalityOfParam
-      = getParamOptionality(param,
-                            !nonNullArgs.empty() && nonNullArgs[paramIndex]);
+        = getParamOptionality(SwiftContext.LangOpts.EffectiveLanguageVersion,
+                              param,
+                              !nonNullArgs.empty() && nonNullArgs[paramIndex]);
 
     bool allowNSUIntegerAsIntInParam = isFromSystemModule;
     if (allowNSUIntegerAsIntInParam) {
