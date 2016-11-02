@@ -187,6 +187,6 @@ public:
   void dump(llvm::raw_ostream &out) const;
 };
 
-} // end namepsace swift
+} // end namespace swift
 
 #endif // SWIFT_AST_WITNESS_H

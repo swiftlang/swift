@@ -991,7 +991,7 @@ RequirementEnvironment::RequirementEnvironment(
     return;
   }
 
-  // Form the conformance of the interface type of the confomance context
+  // Form the conformance of the interface type of the conformance context
   // to the requirement's enclosing protocol.
   ProtocolConformance *specialized = conformance;
   if (conformance && conformance->getGenericSignature()) {
