@@ -441,6 +441,54 @@ bb3:
   return %23 : $Int32
 }
 
+// HOIST-LABEL: sil @always_false_hoist
+// HOIST: bb4
+// HOIST:   builtin "sadd_with_overflow_Int32"
+// HOIST:   tuple_extract
+// HOIST-NOT: builtin "cmp_slt_Int32"
+// HOIST:   cond_br
+// HOIST: }
+sil @always_false_hoist : $@convention(thin) (@owned Array<Int>) -> () {
+bb0(%0 : $Array<Int>):
+  %z0 = integer_literal $Builtin.Int32, 0
+  %f1 = function_ref @getCount2 : $@convention(method) (@owned Array<Int>) -> Int32
+  retain_value %0 : $Array<Int>
+  %t1 = apply %f1(%0) : $@convention(method) (@owned Array<Int>) -> Int32
+  %c1 = struct_extract %t1 : $Int32, #Int32._value
+  %t2 = builtin "cmp_eq_Int32"(%z0 : $Builtin.Int32, %c1 : $Builtin.Int32) : $Builtin.Int1
+  cond_br %t2, bb5, bb1
+
+bb1:
+  br bb2(%z0 : $Builtin.Int32)
+
+bb2(%i0 : $Builtin.Int32):
+  cond_br undef, bb3, bb4
+
+bb3:
+  %f2 = function_ref @checkbounds2 : $@convention(method) (Int32, Bool, @owned Array<Int>) -> _DependenceToken
+  retain_value %0 : $Array<Int>
+  %t3 = struct $Int32(%i0 : $Builtin.Int32)
+
+  br bb4
+
+bb4:
+  %t5 = integer_literal $Builtin.Int1, 0
+  %i2 = integer_literal $Builtin.Int32, 1
+  %t6 = builtin "sadd_with_overflow_Int32"(%i0 : $Builtin.Int32, %i2 : $Builtin.Int32, %t5 : $Builtin.Int1) : $(Builtin.Int32, Builtin.Int1)
+  %t7 = tuple_extract %t6 : $(Builtin.Int32, Builtin.Int1), 0
+  %t8 = tuple_extract %t6 : $(Builtin.Int32, Builtin.Int1), 1
+  cond_fail %t8 : $Builtin.Int1
+  %af1 = builtin "cmp_slt_Int32"(%t7 : $Builtin.Int32, %z0 : $Builtin.Int32) : $Builtin.Int1
+  cond_fail %af1 : $Builtin.Int1
+  %8 = builtin "cmp_eq_Int32"(%t7 : $Builtin.Int32, %c1 : $Builtin.Int32) : $Builtin.Int1
+  cond_br %8, bb5, bb2(%t7 : $Builtin.Int32)
+
+bb5:
+  %r1 = tuple ()
+  return %r1 : $()
+}
+
+
 // HOIST-LABEL: sil @hoistinvariant
 
 // Preheader.
