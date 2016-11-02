@@ -742,8 +742,8 @@ extension ${Self} : _ExpressibleByBuiltinFloatLiteral {
 #else
 
 % builtinFloatLiteralBits = 64
-@_transparent
 extension ${Self} : _ExpressibleByBuiltinFloatLiteral {
+  @_transparent
   public
   init(_builtinFloatLiteral value: Builtin.FPIEEE${builtinFloatLiteralBits}) {
 %   if bits == builtinFloatLiteralBits:
