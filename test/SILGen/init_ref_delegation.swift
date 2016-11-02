@@ -101,9 +101,9 @@ class C1 {
     // CHECK:   [[SELFP:%[0-9]+]] = apply [[DELEG_INIT]]([[X]], [[X]], [[SELF_FROM_BOX]]) : $@convention(method) (X, X, @owned C1) -> @owned C1
     // CHECK:   store [[SELFP]] to [init] [[SELF]] : $*C1
     // CHECK:   [[SELFP:%[0-9]+]] = load [[SELF]] : $*C1
-    // CHECK:   copy_value [[SELFP]] : $C1
+    // CHECK:   [[SELFP_RESULT:%.*]] = copy_value [[SELFP]] : $C1
     // CHECK:   destroy_value [[SELF_BOX]] : $@box C1
-    // CHECK:   return [[SELFP]] : $C1
+    // CHECK:   return [[SELFP_RESULT]] : $C1
     self.init(x1: x, x2: x)
   }
 
@@ -126,9 +126,9 @@ class C1 {
     // CHECK:   [[REPLACE_SELF:%[0-9]+]] = apply [[DELEG_INIT]]([[X]], [[X]], [[SELF]]) : $@convention(method) (X, X, @owned C2) -> @owned C2
     // CHECK:   store [[REPLACE_SELF]] to [init] [[UNINIT_SELF]] : $*C2
     // CHECK:   [[VAR_15:%[0-9]+]] = load [[UNINIT_SELF]] : $*C2
-    // CHECK:   copy_value [[VAR_15]] : $C2
+    // CHECK:   [[VAR_15_RETURN:%.*]] = copy_value [[VAR_15]] : $C2
     // CHECK:   destroy_value [[SELF_BOX]] : $@box C2
-    // CHECK:   return [[VAR_15]] : $C2
+    // CHECK:   return [[VAR_15_RETURN]] : $C2
     self.init(x1: x, x2: x)
     // CHECK-NOT: sil hidden @_TToFC19init_ref_delegation2C2c{{.*}} : $@convention(objc_method) (X, @owned C2) -> @owned C2 {
   }

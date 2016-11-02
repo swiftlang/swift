@@ -125,16 +125,19 @@ func reftype_return() -> Ref {
     // CHECK: return [[RET]]
 }
 
-// CHECK-LABEL: sil hidden @_TF8lifetime11reftype_arg
+// CHECK-LABEL: sil hidden @_TF8lifetime11reftype_argFCS_3RefT_ : $@convention(thin) (@owned Ref) -> () {
 func reftype_arg(_ a: Ref) {
     var a = a
     // CHECK: bb0([[A:%[0-9]+]] : $Ref):
     // CHECK: [[AADDR:%[0-9]+]] = alloc_box $@box Ref
     // CHECK: [[PA:%[0-9]+]] = project_box [[AADDR]]
-    // CHECK: store [[A]] to [init] [[PA]]
+    // CHECK: [[A_COPY:%.*]] = copy_value [[A]]
+    // CHECK: store [[A_COPY]] to [init] [[PA]]
     // CHECK: destroy_value [[AADDR]]
+    // CHECK: destroy_value [[A]]
     // CHECK: return
 }
+// CHECK: } // end sil function '_TF8lifetime11reftype_argFCS_3RefT_'
 
 // CHECK-LABEL: sil hidden @_TF8lifetime26reftype_call_ignore_returnFT_T_
 func reftype_call_ignore_return() {
@@ -177,14 +180,18 @@ func reftype_call_with_arg(_ a: Ref) {
     // CHECK: bb0([[A1:%[0-9]+]] : $Ref):
     // CHECK: [[AADDR:%[0-9]+]] = alloc_box $@box Ref
     // CHECK: [[PB:%.*]] = project_box [[AADDR]]
-    // CHECK: store [[A1]] to [init] [[PB]]
+    // CHECK: [[A1_COPY:%.*]] = copy_value [[A1]]
+    // CHECK: store [[A1_COPY]] to [init] [[PB]]
 
     reftype_func_with_arg(a)
     // CHECK: [[RFWA:%[0-9]+]] = function_ref @_TF8lifetime21reftype_func_with_arg
     // CHECK: [[A2:%[0-9]+]] = load [[PB]]
-    // CHECK: copy_value [[A2]]
-    // CHECK: = apply [[RFWA]]([[A2]])
-
+    // CHECK: [[A2_COPY:%.*]] = copy_value [[A2]]
+    // SEMANTIC ARC TODO: A2 below should be [[A2_COPY]]
+    // CHECK: [[RESULT:%.*]] = apply [[RFWA]]([[A2]])
+    // CHECK: destroy_value [[RESULT]]
+    // CHECK: destroy_value [[AADDR]]
+    // CHECK: destroy_value [[A1]]
     // CHECK: return
 }
 
@@ -258,11 +265,13 @@ struct Daleth {
 class He {
   // -- default initializer:
   // CHECK-LABEL: sil hidden @_TFC8lifetime2Hec{{.*}} : $@convention(method) (@owned He) -> @owned He {
-  // CHECK: bb0([[THIS:%.*]] : $He):
+  // CHECK: bb0([[SELF:%.*]] : $He):
   // CHECK-NEXT: debug_value
-  // CHECK-NEXT: mark_uninitialized
-  // CHECK-NEXT: return
-  // CHECK: }
+  // CHECK-NEXT: [[UNINITIALIZED_SELF:%.*]] = mark_uninitialized [rootself] [[SELF]]
+  // CHECK-NEXT: [[UNINITIALIZED_SELF_COPY:%.*]] = copy_value [[UNINITIALIZED_SELF]]
+  // CHECK-NEXT: destroy_value [[UNINITIALIZED_SELF]]
+  // CHECK-NEXT: return [[UNINITIALIZED_SELF_COPY]]
+  // CHECK: } // end sil function '_TFC8lifetime2Hec{{.*}}'
 
   // -- default allocator:
   // CHECK-LABEL: sil hidden @_TFC8lifetime2HeC{{.*}} : $@convention(method) (@thick He.Type) -> @owned He {
@@ -420,22 +429,39 @@ class Foo<T> {
     z = Foo<T>.makeT()
 
   // -- initializing entry point
-  // CHECK-LABEL: sil hidden @_TFC8lifetime3FoocfT3chiSi_GS0_x_
+  // CHECK-LABEL: sil hidden @_TFC8lifetime3FoocfT3chiSi_GS0_x_ : $@convention(method) <T> (Int, @owned Foo<T>) -> @owned Foo<T> {
     // CHECK: bb0([[CHI:%[0-9]+]] : $Int, [[THISIN:%[0-9]+]] : $Foo<T>):
-    // CHECK: [[THIS:%[0-9]+]] = mark_uninitialized
-    // CHECK: [[CHIADDR:%[0-9]+]] = alloc_box $@box Int
-    // CHECK: [[PCHI:%[0-9]+]] = project_box [[CHIADDR]]
-    // CHECK: store [[CHI]] to [trivial] [[PCHI]]
+    // CHECK:   [[THIS:%[0-9]+]] = mark_uninitialized [rootself] [[THISIN]]
 
-    // CHECK: ref_element_addr {{.*}}, #Foo.z
+    // -- First we initialize #Foo.y.
+    // CHECK:   [[THIS_Y:%.*]] = ref_element_addr [[THIS]] : $Foo<T>, #Foo.y
+    // CHECK:   [[THIS_Y_1:%.*]] = tuple_element_addr [[THIS_Y]] : $*(Int, Ref), 0
+    // CHECK:   assign {{.*}} to [[THIS_Y_1]] : $*Int
+    // CHECK:   [[THIS_Y_2:%.*]] = tuple_element_addr [[THIS_Y]] : $*(Int, Ref), 1
+    // CHECK:   assign {{.*}} to [[THIS_Y_2]] : $*Ref
 
+    // -- Then we create a box that we will use to perform a copy_addr into #Foo.x a bit later.
+    // CHECK:   [[CHIADDR:%[0-9]+]] = alloc_box $@box Int, var, name "chi"
+    // CHECK:   [[PCHI:%[0-9]+]] = project_box [[CHIADDR]]
+    // CHECK:   store [[CHI]] to [trivial] [[PCHI]]
+
+    // -- Then we initialize #Foo.z
+    // CHECK:   [[THIS_Z:%.*]] = ref_element_addr [[THIS]] : {{.*}}, #Foo.z
+    // CHECK:   copy_addr [take] {{.*}} to [[THIS_Z]]
+
+    // -- Then initialize #Foo.x using the earlier stored vlaue of CHI to THIS_Z.
     x = chi
-    // CHECK: [[THIS_X:%[0-9]+]] = ref_element_addr [[THIS]] : {{.*}}, #Foo.x
-    // CHECK: copy_addr [[PCHI]] to [[THIS_X]]
+    // CHECK:   [[THIS_X:%[0-9]+]] = ref_element_addr [[THIS]] : {{.*}}, #Foo.x
+    // CHECK:   copy_addr [[PCHI]] to [[THIS_X]]
 
     // -- cleanup chi
     // CHECK: destroy_value [[CHIADDR]]
-    // CHECK: return [[THIS]]
+
+    // -- Then begin the epilogue sequence
+    // CHECK: [[THIS_RETURN:%.*]] = copy_value [[THIS]]
+    // CHECK: destroy_value [[THIS]]
+    // CHECK: return [[THIS_RETURN]]
+  // CHECK: } // end sil function '_TFC8lifetime3FoocfT3chiSi_GS0_x_'
 
   // -- allocating entry point
   // CHECK-LABEL: sil hidden @_TFC8lifetime3FooC{{.*}} :

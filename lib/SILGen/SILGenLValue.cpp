@@ -1171,7 +1171,7 @@ namespace {
       // we've still got a release active.
       SILValue baseValue = (isFinal ? base.forward(gen) : base.getValue());
       if (!isFinal)
-        gen.B.createCopyValue(loc, baseValue);
+        baseValue = gen.B.createCopyValue(loc, baseValue);
 
       gen.B.createStrongUnpin(loc, baseValue, Atomicity::Atomic);
     }
@@ -2162,8 +2162,7 @@ SILValue SILGenFunction::emitConversionToSemanticRValue(SILLocation loc,
     auto result = B.createUnmanagedToRef(loc, src,
               SILType::getPrimitiveObjectType(unmanagedType.getReferentType()));
     // SEMANTIC ARC TODO: Does this need a cleanup?
-    B.createCopyValue(loc, result);
-    return result;
+    return B.createCopyValue(loc, result);
   }
 
   llvm_unreachable("unexpected storage type that differs from type-of-rvalue");
@@ -2207,8 +2206,7 @@ static SILValue emitLoadOfSemanticRValue(SILGenFunction &gen,
     auto result = gen.B.createUnmanagedToRef(loc, value,
             SILType::getPrimitiveObjectType(unmanagedType.getReferentType()));
     // SEMANTIC ARC TODO: Does this need a cleanup?
-    gen.B.createCopyValue(loc, result);
-    return result;
+    return gen.B.createCopyValue(loc, result);
   }
 
   // NSString * must be bridged to String.

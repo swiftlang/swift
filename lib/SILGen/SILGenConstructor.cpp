@@ -279,7 +279,7 @@ void SILGenFunction::emitValueConstructor(ConstructorDecl *ctor) {
           B.createLoad(cleanupLoc, selfLV, LoadOwnershipQualifier::Unqualified);
 
       // Emit a retain of the loaded value, since we return it +1.
-      lowering.emitCopyValue(B, cleanupLoc, selfValue);
+      selfValue = lowering.emitCopyValue(B, cleanupLoc, selfValue);
 
       // Inject the self value into an optional if the constructor is failable.
       if (ctor->getFailability() != OTK_None) {
@@ -675,7 +675,7 @@ void SILGenFunction::emitClassConstructorInitializer(ConstructorDecl *ctor) {
     }
     
     // We have to do a retain because we are returning the pointer +1.
-    B.emitCopyValueOperation(cleanupLoc, selfArg);
+    selfArg = B.emitCopyValueOperation(cleanupLoc, selfArg);
 
     // Inject the self value into an optional if the constructor is failable.
     if (ctor->getFailability() != OTK_None) {

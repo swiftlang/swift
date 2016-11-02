@@ -34,7 +34,8 @@ func address_only_return(_ x: Unloadable, y: Int) -> Unloadable {
   // CHECK: bb0([[RET:%[0-9]+]] : $*Unloadable, [[XARG:%[0-9]+]] : $*Unloadable, [[YARG:%[0-9]+]] : $Builtin.Int64):
   // CHECK-NEXT: debug_value_addr [[XARG]] : $*Unloadable, let, name "x"
   // CHECK-NEXT: debug_value [[YARG]] : $Builtin.Int64, let, name "y"
-  // CHECK-NEXT: copy_addr [take] [[XARG]] to [initialization] [[RET]]
+  // CHECK-NEXT: copy_addr [[XARG]] to [initialization] [[RET]]
+  // CHECK-NEXT: destroy_addr [[XARG]]
   // CHECK-NEXT: [[VOID:%[0-9]+]] = tuple ()
   // CHECK-NEXT: return [[VOID]]
   return x
@@ -52,7 +53,8 @@ func address_only_conditional_missing_return(_ x: Unloadable) -> Unloadable {
   switch Bool.true_ {
   case .true_:
   // CHECK: [[TRUE]]:
-  // CHECK:   copy_addr [take] %1 to [initialization] %0 : $*Unloadable
+    // CHECK:   copy_addr %1 to [initialization] %0 : $*Unloadable
+    // CHECK:   destroy_addr %1
   // CHECK:   return
     return x
   case .false_:

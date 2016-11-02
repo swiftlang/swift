@@ -48,12 +48,12 @@ func guaranteed_captures() {
 
   // -- partial_apply still takes ownership of its arguments.
   // CHECK: [[FN:%.*]] = function_ref [[FN_NAME]]
-  // CHECK: copy_value [[MUTABLE_TRIVIAL_BOX]]
-  // CHECK: copy_value [[MUTABLE_RETAINABLE_BOX]]
-  // CHECK: copy_value [[MUTABLE_ADDRESS_ONLY_BOX]]
-  // CHECK: copy_value [[IMMUTABLE_RETAINABLE]]
+  // CHECK: [[MUTABLE_TRIVIAL_BOX_COPY:%.*]] = copy_value [[MUTABLE_TRIVIAL_BOX]]
+  // CHECK: [[MUTABLE_RETAINABLE_BOX_COPY:%.*]] = copy_value [[MUTABLE_RETAINABLE_BOX]]
+  // CHECK: [[MUTABLE_ADDRESS_ONLY_BOX_COPY:%.*]] = copy_value [[MUTABLE_ADDRESS_ONLY_BOX]]
+  // CHECK: [[IMMUTABLE_RETAINABLE_COPY:%.*]] = copy_value [[IMMUTABLE_RETAINABLE]]
   // CHECK: [[IMMUTABLE_AO_BOX:%.*]] = alloc_box $@box P
-  // CHECK: [[CLOSURE:%.*]] = partial_apply {{.*}}([[MUTABLE_TRIVIAL_BOX]], [[MUTABLE_RETAINABLE_BOX]], [[MUTABLE_ADDRESS_ONLY_BOX]], [[IMMUTABLE_TRIVIAL]], [[IMMUTABLE_RETAINABLE]], [[IMMUTABLE_AO_BOX]])
+  // CHECK: [[CLOSURE:%.*]] = partial_apply {{.*}}([[MUTABLE_TRIVIAL_BOX_COPY]], [[MUTABLE_RETAINABLE_BOX_COPY]], [[MUTABLE_ADDRESS_ONLY_BOX_COPY]], [[IMMUTABLE_TRIVIAL]], [[IMMUTABLE_RETAINABLE_COPY]], [[IMMUTABLE_AO_BOX]])
   // CHECK: apply {{.*}}[[CLOSURE]]
 
   // CHECK-NOT: copy_value [[MUTABLE_TRIVIAL_BOX]]

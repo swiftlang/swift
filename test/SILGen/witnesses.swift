@@ -188,11 +188,11 @@ func <~>(_ x: ConformingClass, y: ConformingClass) -> ConformingClass { return x
 extension ConformingClass : ClassBounded { }
 // CHECK-LABEL: sil hidden [transparent] [thunk] @_TTWC9witnesses15ConformingClassS_12ClassBoundedS_FS1_9selfTypes{{.*}} : $@convention(witness_method) (@owned ConformingClass, @guaranteed ConformingClass) -> @owned ConformingClass {
 // CHECK:  bb0([[C0:%.*]] : $ConformingClass, [[C1:%.*]] : $ConformingClass):
-// CHECK-NEXT:    copy_value [[C1]]
+// CHECK-NEXT:    [[C1_COPY:%.*]] = copy_value [[C1]]
 // CHECK-NEXT:    function_ref
 // CHECK-NEXT:    [[FUN:%.*]] = function_ref @_TFC9witnesses15ConformingClass9selfTypes
-// CHECK-NEXT:    [[RESULT:%.*]] = apply [[FUN]]([[C0]], [[C1]]) : $@convention(method) (@owned ConformingClass, @guaranteed ConformingClass) -> @owned ConformingClass
-// CHECK-NEXT:    destroy_value [[C1]]
+// CHECK-NEXT:    [[RESULT:%.*]] = apply [[FUN]]([[C0]], [[C1_COPY]]) : $@convention(method) (@owned ConformingClass, @guaranteed ConformingClass) -> @owned ConformingClass
+// CHECK-NEXT:    destroy_value [[C1_COPY]]
 // CHECK-NEXT:    return [[RESULT]] : $ConformingClass
 // CHECK-NEXT:  }
 

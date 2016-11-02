@@ -59,7 +59,7 @@ ManagedValue SILGenFunction::emitManagedRetain(SILLocation loc,
     return ManagedValue::forUnmanaged(v);
   assert(!lowering.isAddressOnly() && "cannot retain an unloadable type");
 
-  lowering.emitCopyValue(B, loc, v);
+  v = lowering.emitCopyValue(B, loc, v);
   return emitManagedRValueWithCleanup(v, lowering);
 }
 
@@ -3234,8 +3234,7 @@ public:
     auto strongType = SILType::getPrimitiveObjectType(
               unowned->getType().castTo<UnmanagedStorageType>().getReferentType());
     auto owned = gen.B.createUnmanagedToRef(loc, unowned, strongType);
-    gen.B.createCopyValue(loc, owned);
-    auto ownedMV = gen.emitManagedRValueWithCleanup(owned);
+    auto ownedMV = gen.emitManagedRetain(loc, owned);
     
     // Reassign the +1 storage with it.
     ownedMV.assignInto(gen, loc, base.getUnmanagedValue());
