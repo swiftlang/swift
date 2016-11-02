@@ -1386,6 +1386,15 @@ ASTContext::getBehaviorConformance(Type conformingType,
   auto conformance = new (*this, AllocationArena::Permanent)
     NormalProtocolConformance(conformingType, conformingInterfaceType,
                               protocol, loc, storage, state);
+
+  if (auto nominal = conformingInterfaceType->getAnyNominal()) {
+    // Note: this is an egregious hack. The conformances need to be associated
+    // with the actual storage declarations.
+    SmallVector<ProtocolConformance *, 2> conformances;
+    if (!nominal->lookupConformance(nominal->getModuleContext(), protocol,
+                                    conformances))
+      nominal->registerProtocolConformance(conformance);
+  }
   return conformance;
 }
 

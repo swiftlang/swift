@@ -1438,8 +1438,11 @@ ConstraintSystem::matchTypes(Type type1, Type type2, ConstraintKind kind,
     }
   }
 
+  bool isTypeVarOrMember1 = desugar1->isTypeVariableOrMember();
+  bool isTypeVarOrMember2 = desugar2->isTypeVariableOrMember();
+
   llvm::SmallVector<RestrictionOrFix, 4> conversionsOrFixes;
-  bool concrete = !typeVar1 && !typeVar2;
+  bool concrete = !isTypeVarOrMember1 && !isTypeVarOrMember2;
 
   // If this is an argument conversion, handle it directly. The rules are
   // different from normal conversions.
@@ -1482,8 +1485,11 @@ ConstraintSystem::matchTypes(Type type1, Type type2, ConstraintKind kind,
       return SolutionKind::Error;
 
     case TypeKind::GenericTypeParam:
-    case TypeKind::DependentMember:
       llvm_unreachable("unmapped dependent type in type checker");
+
+    case TypeKind::DependentMember:
+      // Nothing we can solve.
+      return formUnsolvedResult();
 
     case TypeKind::TypeVariable:
     case TypeKind::Archetype:
@@ -2077,7 +2083,7 @@ commit_to_conversions:
 
   // If we should attempt fixes, add those to the list. They'll only be visited
   // if there are no other possible solutions.
-  if (shouldAttemptFixes() && !typeVar1 && !typeVar2 &&
+  if (shouldAttemptFixes() && !isTypeVarOrMember1 && !isTypeVarOrMember2 &&
       !flags.contains(TMF_ApplyingFix) && kind >= ConstraintKind::Conversion) {
     Type objectType1 = type1->getRValueObjectType();
 
@@ -2136,8 +2142,10 @@ commit_to_conversions:
   }
 
   if (conversionsOrFixes.empty()) {
-    // If one of the types is a type variable, we leave this unsolved.
-    if (typeVar1 || typeVar2) return formUnsolvedResult();
+    // If one of the types is a type variable or member thereof, we leave this
+    // unsolved.
+    if (isTypeVarOrMember1 || isTypeVarOrMember2)
+      return formUnsolvedResult();
 
     return SolutionKind::Error;
   }
@@ -2200,6 +2208,7 @@ ConstraintSystem::SolutionKind
 ConstraintSystem::simplifyConstructionConstraint(
     Type valueType, FunctionType *fnType, TypeMatchOptions flags,
     FunctionRefKind functionRefKind, ConstraintLocator *locator) {
+
   // Desugar the value type.
   auto desugarValueType = valueType->getDesugaredType();
 
@@ -2223,10 +2232,10 @@ ConstraintSystem::simplifyConstructionConstraint(
 
   case TypeKind::GenericFunction:
   case TypeKind::GenericTypeParam:
-  case TypeKind::DependentMember:
     llvm_unreachable("unmapped dependent type");
 
   case TypeKind::TypeVariable:
+  case TypeKind::DependentMember:
     return SolutionKind::Unsolved;
 
   case TypeKind::Tuple: {

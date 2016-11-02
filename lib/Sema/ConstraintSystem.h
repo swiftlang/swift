@@ -1485,10 +1485,10 @@ public:
   /// a new type is created.
   ///
   /// \returns the type variable representing the member type.
-  TypeVariableType *getMemberType(TypeVariableType *baseTypeVar, 
-                                  AssociatedTypeDecl *assocType,
-                                  ConstraintLocatorBuilder locator,
-                                  unsigned options);
+  Type getMemberType(TypeVariableType *baseTypeVar,
+                     AssociatedTypeDecl *assocType,
+                     ConstraintLocatorBuilder locator,
+                     unsigned options);
 
   /// Retrieve the list of inactive constraints.
   ConstraintList &getConstraints() { return InactiveConstraints; }

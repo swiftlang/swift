@@ -2023,28 +2023,39 @@ bool TypeChecker::typeCheckForEachBinding(DeclContext *dc, ForEachStmt *stmt) {
       //
       // We will diagnose it later.
       if (!sequenceType->isExistentialType()) {
-        auto member = cs.TC.lookupMemberType(cs.DC,
-                                             sequenceType,
-                                             tc.Context.Id_Iterator,
-                                             lookupOptions);
-      
-        if (member) {
-          iteratorType = member.front().second;
+        ASTContext &ctx = tc.Context;
+        auto iteratorAssocType =
+          cast<AssociatedTypeDecl>(
+            sequenceProto->lookupDirect(ctx.Id_Iterator).front());
 
-          member = cs.TC.lookupMemberType(cs.DC,
-                                          iteratorType,
-                                          tc.Context.Id_Element,
-                                          lookupOptions);
+        iteratorType = sequenceType->getTypeOfMember(
+                         cs.DC->getParentModule(),
+                         iteratorAssocType,
+                         &tc,
+                         iteratorAssocType->getDeclaredInterfaceType());
 
-          if (member)
-            elementType = member.front().second;
+        if (iteratorType) {
+          auto iteratorProto =
+            tc.getProtocol(Stmt->getForLoc(),
+                           KnownProtocolKind::IteratorProtocol);
+          if (!iteratorProto)
+            return true;
+
+          auto elementAssocType =
+            cast<AssociatedTypeDecl>(
+              iteratorProto->lookupDirect(ctx.Id_Element).front());
+
+          elementType = iteratorType->getTypeOfMember(
+                          cs.DC->getParentModule(),
+                          elementAssocType,
+                          &tc,
+                          elementAssocType->getDeclaredInterfaceType());
         }
       }
 
       // If the type lookup failed, just add some constraints we can
       // try to solve later.
       if (elementType.isNull()) {
-      
         // Determine the iterator type of the sequence.
         iteratorType = cs.createTypeVariable(Locator, /*options=*/0);
         cs.addTypeMemberConstraint(SequenceType, tc.Context.Id_Iterator,
