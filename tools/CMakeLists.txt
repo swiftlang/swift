@@ -6,6 +6,7 @@ add_swift_tool_subdirectory(swift-demangle)
 add_swift_tool_subdirectory(lldb-moduleimport-test)
 add_swift_tool_subdirectory(sil-extract)
 add_swift_tool_subdirectory(swift-llvm-opt)
+add_swift_tool_subdirectory(swift-api-digester)
 
 if(SWIFT_BUILD_SOURCEKIT)
   add_swift_tool_subdirectory(SourceKit)
