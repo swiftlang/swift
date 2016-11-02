@@ -65,8 +65,6 @@ public:
 
   void addParent(CanType type, CanType parent,
                  AssociatedTypeDecl *assocType);
-
-  void removeType(CanType type);
 };
 
 } // end namespace swift
