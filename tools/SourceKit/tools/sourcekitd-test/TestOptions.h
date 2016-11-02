@@ -32,6 +32,7 @@ enum class SourceKitRequest {
   CodeCompleteCacheOnDisk,
   CodeCompleteSetPopularAPI,
   CursorInfo,
+  RangeInfo,
   RelatedIdents,
   SyntaxMap,
   Structure,
