@@ -2242,7 +2242,7 @@ static void emitStoreOfSemanticRValue(SILGenFunction &gen,
     gen.B.createStoreWeak(loc, value, dest, isInit);
 
     // store_weak doesn't take ownership of the input, so cancel it out.
-    gen.B.emitDestroyValueAndFold(loc, value);
+    gen.B.emitDestroyValueOperation(loc, value);
     return;
   }
 
@@ -2254,7 +2254,7 @@ static void emitStoreOfSemanticRValue(SILGenFunction &gen,
       gen.B.createStoreUnowned(loc, value, dest, isInit);
 
       // store_unowned doesn't take ownership of the input, so cancel it out.
-      gen.B.emitDestroyValueAndFold(loc, value);
+      gen.B.emitDestroyValueOperation(loc, value);
       return;
     }
 
@@ -2262,7 +2262,7 @@ static void emitStoreOfSemanticRValue(SILGenFunction &gen,
       gen.B.createRefToUnowned(loc, value, storageType.getObjectType());
     gen.B.createUnownedRetain(loc, unownedValue, Atomicity::Atomic);
     emitUnloweredStoreOfCopy(gen.B, loc, unownedValue, dest, isInit);
-    gen.B.emitDestroyValueAndFold(loc, value);
+    gen.B.emitDestroyValueOperation(loc, value);
     return;
   }
 
@@ -2272,7 +2272,7 @@ static void emitStoreOfSemanticRValue(SILGenFunction &gen,
     auto unmanagedValue =
       gen.B.createRefToUnmanaged(loc, value, storageType.getObjectType());
     emitUnloweredStoreOfCopy(gen.B, loc, unmanagedValue, dest, isInit);
-    gen.B.emitDestroyValueAndFold(loc, value);
+    gen.B.emitDestroyValueOperation(loc, value);
     return;
   }
 
@@ -2362,7 +2362,7 @@ SILValue SILGenFunction::emitConversionFromSemanticValue(SILLocation loc,
 
     SILValue unowned = B.createRefToUnowned(loc, semanticValue, storageType);
     B.createUnownedRetain(loc, unowned, Atomicity::Atomic);
-    B.emitDestroyValueAndFold(loc, semanticValue);
+    B.emitDestroyValueOperation(loc, semanticValue);
     return unowned;
   }
 
@@ -2370,7 +2370,7 @@ SILValue SILGenFunction::emitConversionFromSemanticValue(SILLocation loc,
   if (storageType.is<UnmanagedStorageType>()) {
     SILValue unmanaged =
       B.createRefToUnmanaged(loc, semanticValue, storageType);
-    B.emitDestroyValueAndFold(loc, semanticValue);
+    B.emitDestroyValueOperation(loc, semanticValue);
     return unmanaged;
   }
   

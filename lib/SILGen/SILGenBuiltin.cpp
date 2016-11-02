@@ -236,7 +236,7 @@ static ManagedValue emitBuiltinDestroy(SILGenFunction &gen,
   
   // Destroy the value indirectly. Canonicalization will promote to loads
   // and releases if appropriate.
-  gen.B.emitDestroyAddrAndFold(loc, addr);
+  gen.B.createDestroyAddr(loc, addr);
   
   return ManagedValue::forUnmanaged(gen.emitEmptyTuple(loc));
 }

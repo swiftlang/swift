@@ -718,7 +718,7 @@ namespace {
     void emitDestroyValue(SILBuilder &B, SILLocation loc,
                           SILValue aggValue) const override {
       if (B.getFunction().hasQualifiedOwnership()) {
-        B.emitDestroyValueAndFold(loc, aggValue);
+        B.createDestroyValue(loc, aggValue);
         return;
       }
 
@@ -838,7 +838,7 @@ namespace {
     void emitDestroyValue(SILBuilder &B, SILLocation loc,
                           SILValue value) const override {
       if (B.getFunction().hasQualifiedOwnership()) {
-        B.emitDestroyValueAndFold(loc, value);
+        B.createDestroyValue(loc, value);
         return;
       }
       B.emitReleaseValueAndFold(loc, value);
@@ -850,7 +850,7 @@ namespace {
              "This method should never be called when performing a shallow "
              "destroy value.");
       if (B.getFunction().hasQualifiedOwnership()) {
-        B.emitDestroyValueAndFold(loc, value);
+        B.createDestroyValue(loc, value);
         return;
       }
       B.emitReleaseValueAndFold(loc, value);
@@ -896,7 +896,7 @@ namespace {
     void emitDestroyValue(SILBuilder &B, SILLocation loc,
                           SILValue value) const override {
       if (B.getFunction().hasQualifiedOwnership()) {
-        B.emitDestroyValueAndFold(loc, value);
+        B.createDestroyValue(loc, value);
         return;
       }
       B.emitStrongReleaseAndFold(loc, value);
