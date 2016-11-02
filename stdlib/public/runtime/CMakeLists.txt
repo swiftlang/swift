@@ -50,6 +50,7 @@ set(swift_runtime_sources
     ProtocolConformance.cpp
     ReflectionNative.cpp
     RuntimeEntrySymbols.cpp
+    SectionData.cpp
     SwiftObjectNative.cpp)
 
 # Acknowledge that the following sources are known.
