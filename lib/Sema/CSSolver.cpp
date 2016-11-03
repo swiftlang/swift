@@ -30,6 +30,7 @@ using namespace constraints;
 #define JOIN(X,Y) JOIN2(X,Y)
 #define JOIN2(X,Y) X##Y
 STATISTIC(NumSolutionAttempts, "# of solution attempts");
+STATISTIC(TotalNumTypeVariables, "# of type variables created");
 
 #define CS_STATISTIC(Name, Description) \
   STATISTIC(JOIN2(Overall,Name), Description);
@@ -41,6 +42,16 @@ STATISTIC(NumSolutionAttempts, "# of solution attempts");
   STATISTIC(JOIN2(Largest,Name), Description);
 #include "ConstraintSolverStats.def"
 STATISTIC(LargestSolutionAttemptNumber, "# of the largest solution attempt");
+
+TypeVariableType *ConstraintSystem::createTypeVariable(
+                                     ConstraintLocator *locator,
+                                     unsigned options) {
+  ++TotalNumTypeVariables;
+  auto tv = TypeVariableType::getNew(TC.Context, assignTypeVariableID(),
+                                     locator, options);
+  addTypeVariable(tv);
+  return tv;
+}
 
 /// \brief Check whether the given type can be used as a binding for the given
 /// type variable.

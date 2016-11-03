@@ -1203,12 +1203,7 @@ public:
 
   /// \brief Create a new type variable.
   TypeVariableType *createTypeVariable(ConstraintLocator *locator,
-                                       unsigned options) {
-    auto tv = TypeVariableType::getNew(TC.Context, assignTypeVariableID(),
-                                       locator, options);
-    addTypeVariable(tv);
-    return tv;
-  }
+                                       unsigned options);
 
   /// Retrieve the set of active type variables.
   ArrayRef<TypeVariableType *> getTypeVariables() const {
