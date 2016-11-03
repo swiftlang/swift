@@ -2040,26 +2040,17 @@ SetTestSuite.test("BridgedFromObjC.Nonverbatim.Generate_Huge") {
 
 SetTestSuite.test("BridgedFromObjC.Verbatim.EqualityTest_Empty") {
   var s1 = getBridgedVerbatimSet([])
-  var identity1 = s1._rawIdentifier()
   expectTrue(isCocoaSet(s1))
 
   var s2 = getBridgedVerbatimSet([])
-  var identity2 = s2._rawIdentifier()
   expectTrue(isCocoaSet(s2))
-  expectEqual(identity1, identity2)
 
   expectEqual(s1, s2)
-  expectEqual(identity1, s1._rawIdentifier())
-  expectEqual(identity2, s2._rawIdentifier())
 
   s2.insert(TestObjCKeyTy(4040))
   expectTrue(isNativeSet(s2))
-  expectNotEqual(identity2, s2._rawIdentifier())
-  identity2 = s2._rawIdentifier()
 
   expectNotEqual(s1, s2)
-  expectEqual(identity1, s1._rawIdentifier())
-  expectEqual(identity2, s2._rawIdentifier())
 }
 
 SetTestSuite.test("BridgedFromObjC.Nonverbatim.EqualityTest_Empty") {
