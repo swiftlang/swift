@@ -11,7 +11,7 @@ func testGizmo(gizmo: Gizmo) {
   // CHECK: class_method [volatile] [[SELF:%[0-9]+]] : $Gizmo, #Gizmo.enumerateSubGizmos!1.foreign
   // CHECK: function_ref @_TFSqCfT10nilLiteralT__GSqx_
   gizmo.enumerateSubGizmos()
-} // CHECK: {{^}$}}
+} // CHECK: } // end sil function '_TF26default_arguments_imported9testGizmoFT5gizmoCSo5Gizmo_T_'
 
 // CHECK-LABEL: sil hidden @_TF26default_arguments_imported21testNonnullDictionaryFT5gizmoCSo5Gizmo_T_
 func testNonnullDictionary(gizmo: Gizmo) {
@@ -19,7 +19,7 @@ func testNonnullDictionary(gizmo: Gizmo) {
   // CHECK-NOT: nilLiteral
   // CHECK: function_ref @_TFVs10DictionaryCft17dictionaryLiteralGSaTxq____GS_xq__
   gizmo.doTheThing()
-} // CHECK: {{^}$}}
+} // CHECK: } // end sil function '_TF26default_arguments_imported21testNonnullDictionaryFT5gizmoCSo5Gizmo_T_'
 
 // CHECK-LABEL: sil hidden @_TF26default_arguments_imported22testNullableDictionaryFT5gizmoCSo5Gizmo_T_
 func testNullableDictionary(gizmo: Gizmo) {
@@ -27,4 +27,4 @@ func testNullableDictionary(gizmo: Gizmo) {
   // CHECK-NOT: dictionaryLiteral
   // CHECK: function_ref @_TFSqCfT10nilLiteralT__GSqx_
   gizmo.doTheOtherThing()
-} // CHECK: {{^}$}}
+} // CHECK: } // end sil function '_TF26default_arguments_imported22testNullableDictionaryFT5gizmoCSo5Gizmo_T_'

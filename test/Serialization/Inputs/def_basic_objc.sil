@@ -18,7 +18,7 @@ bb0(%0 : $@thick NSObject.Type):
 
   %void = tuple ()
   return %void : $()
-} // CHECK: {{^}$}}
+} // CHECK: } // end sil function 'objc_classes'
 
 class Bas : NSObject {
   var strRealProp : String

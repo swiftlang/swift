@@ -1484,7 +1484,8 @@ else:
   %3void = tuple ()
 // CHECK-NEXT: return %5 : $()
   return %3void : $()
-} // CHECK: {{^}$}}
+}
+// CHECK: } // end sil function 'value_names'
 
 class Resource {}
 struct Value { var x: Resource }

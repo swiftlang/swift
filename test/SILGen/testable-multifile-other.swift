@@ -29,7 +29,7 @@ func test(internalFoo: FooImpl, publicFoo: PublicFooImpl) {
 // CHECK: = apply [[IMPL_1]]<FooImpl>({{%.+}}) : $@convention(method) <τ_0_0 where τ_0_0 : HasDefaultFoo> (@in_guaranteed τ_0_0) -> ()
 // CHECK: [[IMPL_2:%.+]] = function_ref @_TFE23TestableMultifileHelperPS_13HasDefaultFoo3foofT_T_
 // CHECK: = apply [[IMPL_2]]<PublicFooImpl>({{%.+}}) : $@convention(method) <τ_0_0 where τ_0_0 : HasDefaultFoo> (@in_guaranteed τ_0_0) -> ()
-// CHECK: {{^}$}}
+// CHECK: } // end sil function '_TF4main4testFT11internalFooVS_7FooImpl9publicFooVS_13PublicFooImpl_T_'
 
 func test(internalSub: Sub, publicSub: PublicSub) {
   internalSub.foo()
@@ -39,5 +39,5 @@ func test(internalSub: Sub, publicSub: PublicSub) {
 // CHECK-LABEL: sil hidden @_TF4main4testFT11internalSubCS_3Sub9publicSubCS_9PublicSub_T_
 // CHECK: = class_method %0 : $Sub, #Sub.foo!1
 // CHECK: = class_method %1 : $PublicSub, #PublicSub.foo!1
-// CHECK: {{^}$}}
+// CHECK: } // end sil function '_TF4main4testFT11internalSubCS_3Sub9publicSubCS_9PublicSub_T_'
 

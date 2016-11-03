@@ -324,7 +324,7 @@ func testForceTryMultiple() {
 // CHECK: [[CLEANUPS_2]]([[ERROR:%.+]] : $Error):
 // CHECK-NEXT: destroy_value [[VALUE_1]] : $Cat
 // CHECK-NEXT: br [[FAILURE]]([[ERROR]] : $Error)
-// CHECK: {{^}$}}
+// CHECK: } // end sil function '_TF6errors20testForceTryMultipleFT_T_'
 
 // Make sure we balance scopes correctly inside a switch.
 // <rdar://problem/20923654>
@@ -700,7 +700,7 @@ func testForcePeephole(_ f: () throws -> Int?) -> Int {
 // CHECK-NEXT: br [[DONE]]([[NONE]] : $Optional<Cat>)
 // CHECK: [[CLEANUPS]]([[ERROR:%.+]] : $Error):
 // CHECK-NEXT: br [[FAILURE]]([[ERROR]] : $Error)
-// CHECK: {{^}$}}
+// CHECK: } // end sil function '_TF6errors15testOptionalTryFT_T_'
 func testOptionalTry() {
   _ = try? make_a_cat()
 }
@@ -726,7 +726,7 @@ func testOptionalTry() {
 // CHECK-NEXT: br [[DONE]]
 // CHECK: [[CLEANUPS]]([[ERROR:%.+]] : $Error):
 // CHECK-NEXT: br [[FAILURE]]([[ERROR]] : $Error)
-// CHECK: {{^}$}}
+// CHECK: } // end sil function '_TF6errors18testOptionalTryVarFT_T_'
 func testOptionalTryVar() {
   var cat = try? make_a_cat() // expected-warning {{initialization of variable 'cat' was never used; consider replacing with assignment to '_' or removing it}}
 }
@@ -756,7 +756,7 @@ func testOptionalTryVar() {
 // CHECK: [[CLEANUPS]]([[ERROR:%.+]] : $Error):
 // CHECK-NEXT: dealloc_stack [[ARG_BOX]] : $*T
 // CHECK-NEXT: br [[FAILURE]]([[ERROR]] : $Error)
-// CHECK: {{^}$}}
+// CHECK: } // end sil function '_TF6errors26testOptionalTryAddressOnlyurFxT_'
 func testOptionalTryAddressOnly<T>(_ obj: T) {
   _ = try? dont_return(obj)
 }
@@ -786,7 +786,7 @@ func testOptionalTryAddressOnly<T>(_ obj: T) {
 // CHECK: [[CLEANUPS]]([[ERROR:%.+]] : $Error):
 // CHECK-NEXT: dealloc_stack [[ARG_BOX]] : $*T
 // CHECK-NEXT: br [[FAILURE]]([[ERROR]] : $Error)
-// CHECK: {{^}$}}
+// CHECK: } // end sil function '_TF6errors29testOptionalTryAddressOnlyVarurFxT_'
 func testOptionalTryAddressOnlyVar<T>(_ obj: T) {
   var copy = try? dont_return(obj) // expected-warning {{initialization of variable 'copy' was never used; consider replacing with assignment to '_' or removing it}}
 }
@@ -815,7 +815,7 @@ func testOptionalTryAddressOnlyVar<T>(_ obj: T) {
 // CHECK: [[CLEANUPS_2]]([[ERROR:%.+]] : $Error):
 // CHECK-NEXT: destroy_value [[VALUE_1]] : $Cat
 // CHECK-NEXT: br [[FAILURE]]([[ERROR]] : $Error)
-// CHECK: {{^}$}}
+// CHECK: } // end sil function '_TF6errors23testOptionalTryMultipleFT_T_'
 func testOptionalTryMultiple() {
   _ = try? (make_a_cat(), make_a_cat())
 }
@@ -826,7 +826,7 @@ func testOptionalTryMultiple() {
 // CHECK-NEXT:   = enum $Optional<()>, #Optional.some!enumelt.1, [[VALUE]]
 // CHECK-NEXT:   [[VOID:%.+]] = tuple ()
 // CHECK-NEXT:   return [[VOID]] : $()
-// CHECK: {{^}$}}
+// CHECK: } // end sil function '_TF6errors25testOptionalTryNeverFailsFT_T_'
 func testOptionalTryNeverFails() {
   _ = try? () // expected-warning {{no calls to throwing functions occur within 'try' expression}}
 }
@@ -840,7 +840,7 @@ func testOptionalTryNeverFails() {
 // CHECK-NEXT:   destroy_value [[BOX]] : $@box Optional<()>
 // CHECK-NEXT:   [[VOID:%.+]] = tuple ()
 // CHECK-NEXT:   return [[VOID]] : $()
-// CHECK-NEXT: {{^}$}}
+// CHECK-NEXT: } // end sil function '_TF6errors28testOptionalTryNeverFailsVarFT_T_'
 func testOptionalTryNeverFailsVar() {
   var unit: ()? = try? () // expected-warning {{no calls to throwing functions occur within 'try' expression}} expected-warning {{initialization of variable 'unit' was never used; consider replacing with assignment to '_' or removing it}}
 }
@@ -856,7 +856,7 @@ func testOptionalTryNeverFailsVar() {
 // CHECK-NEXT:   destroy_addr %0 : $*T
 // CHECK-NEXT:   [[VOID:%.+]] = tuple ()
 // CHECK-NEXT:   return [[VOID]] : $()
-// CHECK-NEXT: {{^}$}}
+// CHECK-NEXT: } // end sil function '_TF6errors36testOptionalTryNeverFailsAddressOnlyurFxT_'
 func testOptionalTryNeverFailsAddressOnly<T>(_ obj: T) {
   _ = try? obj // expected-warning {{no calls to throwing functions occur within 'try' expression}}
 }
@@ -872,7 +872,7 @@ func testOptionalTryNeverFailsAddressOnly<T>(_ obj: T) {
 // CHECK-NEXT:   destroy_addr %0 : $*T
 // CHECK-NEXT:   [[VOID:%.+]] = tuple ()
 // CHECK-NEXT:   return [[VOID]] : $()
-// CHECK-NEXT: {{^}$}}
+// CHECK: } // end sil function '_TFC6errors13OtherErrorSubCfT_S0_'
 func testOptionalTryNeverFailsAddressOnlyVar<T>(_ obj: T) {
   var copy = try? obj // expected-warning {{no calls to throwing functions occur within 'try' expression}} expected-warning {{initialization of variable 'copy' was never used; consider replacing with assignment to '_' or removing it}}
 }

@@ -22,11 +22,11 @@ public struct PublicFooImpl: Fooable, HasDefaultFoo {}
 
 // CHECK-LABEL: sil{{.*}} @_TTWV4main7FooImplS_7FooableS_FS1_3foofT_T_ : $@convention(witness_method) (@in_guaranteed FooImpl) -> () {
 // CHECK: function_ref @_TFE23TestableMultifileHelperPS_13HasDefaultFoo3foofT_T_
-// CHECK: {{^}$}}
+// CHECK: } // end sil function '_TTWV4main7FooImplS_7FooableS_FS1_3foofT_T_'
 
 // CHECK-LABEL: sil{{.*}} @_TTWV4main13PublicFooImplS_7FooableS_FS1_3foofT_T_ : $@convention(witness_method) (@in_guaranteed PublicFooImpl) -> () {
 // CHECK: function_ref @_TFE23TestableMultifileHelperPS_13HasDefaultFoo3foofT_T_
-// CHECK: {{^}$}}
+// CHECK: } // end sil function '_TTWV4main13PublicFooImplS_7FooableS_FS1_3foofT_T_'
 
 private class PrivateSub: Base {
   fileprivate override func foo() {}
