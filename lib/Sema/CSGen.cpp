@@ -3084,7 +3084,10 @@ bool swift::isExtensionApplied(DeclContext &DC, Type BaseTy,
   ConstraintSystemOptions Options;
   NominalTypeDecl *Nominal = BaseTy->getNominalOrBoundGenericNominal();
   if (!Nominal || !BaseTy->isSpecialized() ||
-      ED->getGenericRequirements().empty())
+      ED->getGenericRequirements().empty() ||
+      // We'll crash if we leak type variables from one constraint
+      // system into the new one created below.
+      BaseTy->hasTypeVariable())
     return true;
   std::unique_ptr<TypeChecker> CreatedTC;
   // If the current ast context has no type checker, create one for it.
@@ -3100,11 +3103,6 @@ bool swift::isExtensionApplied(DeclContext &DC, Type BaseTy,
   std::vector<Identifier> Scratch;
   bool Failed = false;
   SmallVector<Type, 3> TypeScratch;
-
-  // Don't allow type variables from an existing constraint system to
-  // leak into the new constraint system created below.
-  assert(!BaseTy->hasTypeVariable() &&
-         "Unexpected type variable in base type!");
 
   // Prepare type substitution map.
   TypeSubstitutionMap Substitutions = BaseTy->getMemberSubstitutions(ED);
