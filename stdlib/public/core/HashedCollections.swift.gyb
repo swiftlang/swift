@@ -136,7 +136,10 @@ import SwiftShims
 // ------------------
 //
 // FIXME: decide if this guarantee is worth making, as it restricts
-// collision resolution to first-come-first-serve.
+// collision resolution to first-come-first-serve. The most obvious alternative
+// would be robin hood hashing. The Rust code base is the best
+// resource on a *practical* implementation of robin hood hashing: 
+// https://github.com/rust-lang/rust/blob/ac919fcd9d4a958baf99b2f2ed5c3d38a2ebf9d0/src/libstd/collections/hash/map.rs#L70-L178
 //
 // Indexing a container, `c[i]`, uses the integral offset stored in the index
 // to access the elements referenced by the container. Generally, an index into
