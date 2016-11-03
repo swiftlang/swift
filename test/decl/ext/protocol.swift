@@ -906,3 +906,10 @@ protocol BadProto5 {
 }
 
 class BadClass5 : BadProto5 {} // expected-error{{type 'BadClass5' does not conform to protocol 'BadProto5'}}
+
+typealias A = BadProto1
+typealias B = BadProto1
+
+extension A & B { // expected-error{{protocol 'BadProto1' in the module being compiled cannot be extended via a typealias}}
+
+}

@@ -268,3 +268,27 @@ func useNested(_ ii: Int, hni: HasNested<Int>,
   xis = xfs
 }
 
+// Extensions of nested generic types
+extension OuterNonGeneric.MidGeneric {
+  func takesB(b: B) {}
+}
+
+extension OuterGeneric.MidNonGeneric {
+  func takesD(d: D) {}
+}
+
+extension OuterGeneric.MidGeneric {
+  func takesD(d: D) {}
+  func takesB(f: F) {}
+}
+
+protocol HasAssocType {
+  associatedtype FirstAssocType
+  associatedtype SecondAssocType
+
+  func takesAssocType(first: FirstAssocType, second: SecondAssocType)
+}
+
+extension OuterGeneric.MidGeneric : HasAssocType {
+  func takesAssocType(first: D, second: F) {}
+}
