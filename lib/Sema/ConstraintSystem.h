@@ -1472,24 +1472,6 @@ public:
     InactiveConstraints.erase(constraint);
   }
 
-  /// Retrieve the type that corresponds to the given member of the
-  /// given base type, which may be a newly-created type variable.
-  ///
-  /// \param baseTypeVar The base type variable whose member is being queried.
-  ///
-  /// \param assocType The associated type we're referencing.
-  ///
-  /// \param locator The location used to describe this member access.
-  ///
-  /// \param options Options to be supplied to type variable creation if 
-  /// a new type is created.
-  ///
-  /// \returns the type variable representing the member type.
-  Type getMemberType(TypeVariableType *baseTypeVar,
-                     AssociatedTypeDecl *assocType,
-                     ConstraintLocatorBuilder locator,
-                     unsigned options);
-
   /// Retrieve the list of inactive constraints.
   ConstraintList &getConstraints() { return InactiveConstraints; }
 

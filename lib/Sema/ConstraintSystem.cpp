@@ -26,12 +26,7 @@ using namespace constraints;
 ConstraintSystem::ConstraintSystem(TypeChecker &tc, DeclContext *dc,
                                    ConstraintSystemOptions options)
   : TC(tc), DC(dc), Options(options),
-    Arena(tc.Context, Allocator, 
-          [&](TypeVariableType *baseTypeVar, AssociatedTypeDecl *assocType) {
-            return getMemberType(baseTypeVar, assocType,
-                                 ConstraintLocatorBuilder(nullptr),
-                                 /*options=*/0);
-          }),
+    Arena(tc.Context, Allocator),
     CG(*new ConstraintGraph(*this))
 {
   assert(DC && "context required");
@@ -346,13 +341,6 @@ ConstraintLocator *ConstraintSystem::getConstraintLocator(
   SmallVector<LocatorPathElt, 4> path;
   Expr *anchor = builder.getLocatorParts(path);
   return getConstraintLocator(anchor, path, builder.getSummaryFlags());
-}
-
-Type ConstraintSystem::getMemberType(TypeVariableType *baseTypeVar,
-                                     AssociatedTypeDecl *assocType,
-                                     ConstraintLocatorBuilder locator,
-                                     unsigned options) {
-  return DependentMemberType::get(baseTypeVar, assocType);
 }
 
 namespace {
