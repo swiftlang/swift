@@ -3551,15 +3551,12 @@ namespace {
             SourceLoc(), toGenericParams, SourceLoc());
         result->setGenericParams(genericParams);
 
-        GenericSignature *sig;
-        GenericEnvironment *env;
-        std::tie(sig, env) = Impl.buildGenericSignature(genericParams, result);
-
+        auto *env = Impl.buildGenericEnvironment(genericParams, result);
         result->setGenericEnvironment(env);
 
         // Calculate the correct bound-generic extended type.
         SmallVector<Type, 2> genericArgs;
-        for (auto paramTy : sig->getInnermostGenericParams()) {
+        for (auto paramTy : env->getGenericSignature()->getInnermostGenericParams()) {
           genericArgs.push_back(env->mapTypeIntoContext(paramTy));
         }
         Type extendedType =
@@ -3714,10 +3711,7 @@ namespace {
       result->setInherited(Impl.SwiftContext.AllocateCopy(inheritedTypes));
       result->setCheckedInheritanceClause();
 
-      GenericSignature *sig;
-      GenericEnvironment *env;
-      std::tie(sig, env) = Impl.buildGenericSignature(result->getGenericParams(), dc);
-
+      auto *env = Impl.buildGenericEnvironment(result->getGenericParams(), dc);
       result->setGenericEnvironment(env);
 
       result->setMemberLoader(&Impl, 0);
@@ -3843,10 +3837,7 @@ namespace {
         if (genericParams) {
           result->setGenericParams(genericParams);
 
-          GenericSignature *sig;
-          GenericEnvironment *env;
-          std::tie(sig, env) = Impl.buildGenericSignature(genericParams, dc);
-
+          auto *env = Impl.buildGenericEnvironment(genericParams, dc);
           result->setGenericEnvironment(env);
         }
       } else {
@@ -6848,12 +6839,11 @@ DeclContext *ClangImporter::Implementation::importDeclContextImpl(
   return nullptr;
 }
 
-// Calculate the generic signature and interface type to archetype mapping
-// from an imported generic param list.
-std::pair<GenericSignature *, GenericEnvironment *>
+// Calculate the generic environment from an imported generic param list.
+GenericEnvironment *
 ClangImporter::Implementation::
-buildGenericSignature(GenericParamList *genericParams,
-                      DeclContext *dc) {
+buildGenericEnvironment(GenericParamList *genericParams,
+                        DeclContext *dc) {
   ArchetypeBuilder builder(*dc->getParentModule(), SwiftContext.Diags);
   for (auto param : *genericParams)
     builder.addGenericParameter(param);
@@ -6874,7 +6864,7 @@ buildGenericSignature(GenericParamList *genericParams,
   auto *sig = builder.getGenericSignature();
   auto *env = builder.getGenericEnvironment(sig);
 
-  return std::make_pair(sig, env);
+  return env;
 }
 
 DeclContext *
@@ -6964,10 +6954,7 @@ ClangImporter::Implementation::importDeclContextOf(
   if (auto protoDecl = ext->getAsProtocolExtensionContext()) {
     ext->setGenericParams(protoDecl->createGenericParams(ext));
 
-    GenericSignature *sig;
-    GenericEnvironment *env;
-    std::tie(sig, env) = buildGenericSignature(ext->getGenericParams(), ext);
-
+    auto *env = buildGenericEnvironment(ext->getGenericParams(), ext);
     ext->setGenericEnvironment(env);
   }
 
