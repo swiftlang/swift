@@ -69,3 +69,11 @@ func test_too_many_but_some_better() {
   let match6 = 0
   let x = mtch // expected-error {{use of unresolved identifier 'mtch'}}
 }
+
+// rdar://problem/28387684
+// Don't crash performing typo correction on bound generic types with
+// type variables.
+_ = [Any]().withUnsafeBufferPointer { (buf) -> [Any] in
+  guard let base = buf.baseAddress else { return [] }
+  return (base ..< base + buf.count).m // expected-error {{value of type 'CountableRange<_>' has no member 'm'}}
+}
