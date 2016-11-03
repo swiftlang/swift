@@ -2693,7 +2693,7 @@ internal class _TypedNative${Self}Storage<${TypeParameters}> :
 
 // See the top level docs for a description of this type
 @_versioned
-final internal class _Native${Self}Storage<${TypeParametersDecl}> :
+final internal class _HashableTypedNative${Self}Storage<${TypeParametersDecl}> :
   _TypedNative${Self}Storage<${TypeParameters}> {
 
   internal typealias FullContainer = ${Self}<${TypeParameters}>
@@ -3152,7 +3152,8 @@ internal struct _Native${Self}Buffer<${TypeParameters}> {
 extension _Native${Self}Buffer 
   where ${'Key' if Self == 'Dictionary' else 'Element'} : Hashable
 {
-  internal typealias HashTypedStorage = _Native${Self}Storage<${TypeParameters}>
+  internal typealias HashTypedStorage = 
+    _HashableTypedNative${Self}Storage<${TypeParameters}>
   internal typealias SequenceElement = ${Sequence}
 
   @inline(__always)
@@ -5136,7 +5137,7 @@ extension ${Self} {
       return ${Self}(_nativeBuffer: deferredBuffer.nativeBuffer)
     }
 
-    if let nativeStorage = s as? _Native${Self}Storage<${TypeParameters}> {
+    if let nativeStorage = s as? _HashableTypedNative${Self}Storage<${TypeParameters}> {
       return ${Self}(_nativeBuffer: 
           _Native${Self}Buffer(_storage: nativeStorage))
     }
