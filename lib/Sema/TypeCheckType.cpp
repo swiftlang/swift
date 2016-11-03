@@ -562,7 +562,7 @@ Type TypeChecker::applyUnboundGenericArguments(
       type = ArchetypeBuilder::mapTypeOutOfContext(TAD, TAD->getUnderlyingType());
     }
 
-    type = type.subst(dc->getParentModule(), subs, None);
+    type = type.subst(dc->getParentModule(), subs, SubstFlags::UseErrorType);
 
     // FIXME: return a SubstitutedType to preserve the fact that
     // we resolved a generic TypeAlias, for availability diagnostics.
