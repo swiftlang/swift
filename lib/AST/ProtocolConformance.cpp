@@ -94,6 +94,29 @@ ProtocolConformanceRef::getInherited(ProtocolDecl *parent) const {
   llvm_unreachable("unhandled ProtocolConformanceRef");
 }
 
+ProtocolConformanceRef
+ProtocolConformanceRef::subst(ModuleDecl *module, Type substTy) const {
+  if (isAbstract())
+    return *this;
+
+  auto *concreteC = getConcrete();
+
+  auto specializedConformance =
+      dyn_cast<SpecializedProtocolConformance>(concreteC);
+
+  if (specializedConformance &&
+      specializedConformance->getRootNormalConformance()
+          ->getGenericSignature()) {
+    auto concreteSubs =
+        substTy->gatherAllSubstitutions(module, nullptr, nullptr);
+    concreteC = module->getASTContext().getSpecializedConformance(
+        substTy, specializedConformance->getRootNormalConformance(),
+        concreteSubs);
+  }
+
+  return ProtocolConformanceRef(concreteC);
+}
+
 void *ProtocolConformance::operator new(size_t bytes, ASTContext &context,
                                         AllocationArena arena,
                                         unsigned alignment) {

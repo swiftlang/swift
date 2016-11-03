@@ -26,6 +26,9 @@ namespace llvm {
 
 namespace swift {
 
+class ModuleDecl;
+class Type;
+
 /// A ProtocolConformanceRef is a handle to a protocol conformance which
 /// may be either concrete or abstract.
 ///
@@ -87,6 +90,10 @@ public:
   /// Returns `this` if `parent` is already the same as the protocol this
   /// conformance represents.
   ProtocolConformanceRef getInherited(ProtocolDecl *parent) const;
+
+  /// Substitute the conforming type and produce a ProtocolConformanceRef that
+  /// applies to the substituted type.
+  ProtocolConformanceRef subst(ModuleDecl *module, Type substType) const;
 
   void dump() const;
   void dump(llvm::raw_ostream &out, unsigned indent = 0) const;

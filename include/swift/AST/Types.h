@@ -3304,10 +3304,12 @@ public:
   }
 
   CanSILFunctionType substGenericArgs(SILModule &silModule,
-                                      ArrayRef<Substitution> subs);
+                                      ArrayRef<Substitution> subs,
+                                      GenericSignature *substSig = nullptr);
   CanSILFunctionType substGenericArgs(SILModule &silModule,
                                       TypeSubstitutionFn subs,
-                                      LookupConformanceFn conformances);
+                                      LookupConformanceFn conformances,
+                                      GenericSignature *substSig = nullptr);
 
   void Profile(llvm::FoldingSetNodeID &ID) {
     Profile(ID, getGenericSignature(), getExtInfo(), getCalleeConvention(),

@@ -45,12 +45,20 @@ protected:
   llvm::SmallVector<char, 32> ArgOpStorage;
   llvm::raw_svector_ostream ArgOpBuffer;
 
+  CanSILFunctionType CanSILFnTy;
 protected:
   SpecializationMangler(SpecializationPass P, IsFragile_t Fragile,
                         SILFunction *F)
       : Pass(P), Fragile(Fragile), Function(F), ArgOpBuffer(ArgOpStorage) {}
 
+  SpecializationMangler(SpecializationPass P, IsFragile_t Fragile,
+                        SILFunction *F, CanSILFunctionType CanSILFnTy)
+      : Pass(P), Fragile(Fragile), Function(F), ArgOpBuffer(ArgOpStorage),
+        CanSILFnTy(CanSILFnTy) {}
+
+
   SILFunction *getFunction() const { return Function; }
+  CanSILFunctionType getSILFunctionType() const { return CanSILFnTy; }
 
   void beginMangling();
 

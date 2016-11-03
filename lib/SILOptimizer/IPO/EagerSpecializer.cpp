@@ -479,7 +479,7 @@ void EagerSpecializerTransform::run() {
     ReInfoVec.reserve(F.getSpecializeAttrs().size());
 
     for (auto *SA : F.getSpecializeAttrs()) {
-      ReInfoVec.emplace_back(&F, SA->getSubstitutions());
+      ReInfoVec.emplace_back(ApplySite(), &F, SA->getSubstitutions());
       auto *NewFunc = eagerSpecialize(&F, *SA, ReInfoVec.back());
       SpecializedFuncs.push_back(NewFunc);
     }

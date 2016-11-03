@@ -751,7 +751,8 @@ public:
 
     // If there are substitutions, verify them and apply them to the callee.
     if (subs.empty()) {
-      require(!fnTy->isPolymorphic(),
+      require(!fnTy->isPolymorphic() ||
+                  fnTy->getGenericSignature()->areAllParamsConcrete(),
               "callee of apply without substitutions must not be polymorphic");
       return fnTy;
     }
@@ -838,7 +839,10 @@ public:
             site.getSubstCalleeType()->getRepresentation(),
             "calling convention difference between types");
 
-    require(!site.getSubstCalleeType()->isPolymorphic(),
+    require(!site.getSubstCalleeType()->isPolymorphic() ||
+                site.getSubstCalleeType()
+                    ->getGenericSignature()
+                    ->areAllParamsConcrete(),
             "substituted callee type should not be generic");
 
     requireSameType(SILType::getPrimitiveObjectType(substTy),
