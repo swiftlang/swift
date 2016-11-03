@@ -763,8 +763,7 @@ void swift::addTrivialAccessorsToStorage(AbstractStorageDecl *storage,
 
   // Synthesize and type-check the body of the getter.
   synthesizeTrivialGetter(getter, storage, TC);
-  TC.typeCheckDecl(getter, true);
-  TC.typeCheckDecl(getter, false);
+  TC.validateDecl(getter);
 
   if (setter) {
     if (isDynamic)
@@ -772,8 +771,7 @@ void swift::addTrivialAccessorsToStorage(AbstractStorageDecl *storage,
 
     // Synthesize and type-check the body of the setter.
     synthesizeTrivialSetter(setter, storage, setterValueParam, TC);
-    TC.typeCheckDecl(setter, true);
-    TC.typeCheckDecl(setter, false);
+    TC.validateDecl(setter);
   }
 
   auto *DC = storage->getDeclContext();

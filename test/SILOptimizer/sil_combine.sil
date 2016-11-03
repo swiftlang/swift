@@ -1465,9 +1465,9 @@ sil @generic_call_with_indirect_result : $@convention(thin) <T> (@in T) -> @out 
 sil @generic_call_without_indirect_result : $@convention(thin) <T> (@in T) -> Bool
 sil @generic_call_with_direct_result : $@convention(thin) <T> (T) -> T
 
-// CHECK-LABEL: sil @generic_partial_apply : $@convention(thin) () -> () {
+// CHECK-LABEL: sil @generic_partialapply : $@convention(thin) () -> () {
 // CHECK-NOT: partial_apply
-sil @generic_partial_apply : $@convention(thin) () -> () {
+sil @generic_partialapply : $@convention(thin) () -> () {
 bb0:
   %0 = function_ref @generic_call_with_indirect_result : $@convention(thin) <τ_0_0> (@in τ_0_0) -> @out τ_0_0
   %1 = function_ref @generic_call_without_indirect_result : $@convention(thin) <τ_0_0> (@in τ_0_0) -> Bool
@@ -1806,12 +1806,12 @@ struct FakeInt32 {
   var val : Builtin.Int32
 }
 
-// CHECK-LABEL: sil @loadable_switch_enum_addr_promotion : $@convention(thin) (@in FakeOptional<Builtin.RawPointer>) -> () {
+// CHECK-LABEL: sil @loadable_switchenumaddr_promotion : $@convention(thin) (@in FakeOptional<Builtin.RawPointer>) -> () {
 // CHECK-NOT: switch_enum_addr
 // CHECK: load
 // CHECK-NEXT: switch_enum
 // CHECK-NOT: switch_enum_addr
-sil @loadable_switch_enum_addr_promotion : $@convention(thin) (@in FakeOptional<Builtin.RawPointer>) -> () {
+sil @loadable_switchenumaddr_promotion : $@convention(thin) (@in FakeOptional<Builtin.RawPointer>) -> () {
 bb0(%0 : $*FakeOptional<Builtin.RawPointer>):
   switch_enum_addr %0 : $*FakeOptional<Builtin.RawPointer>, case #FakeOptional.some!enumelt.1: bb1, case #FakeOptional.none!enumelt: bb2
 

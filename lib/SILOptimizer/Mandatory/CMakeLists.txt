@@ -1,9 +1,10 @@
 set(MANDATORY_SOURCES
   Mandatory/DefiniteInitialization.cpp
-  Mandatory/MandatoryInlining.cpp
   Mandatory/DIMemoryUseCollector.cpp
   Mandatory/DataflowDiagnostics.cpp
   Mandatory/DiagnoseUnreachable.cpp
+  Mandatory/GuaranteedARCOpts.cpp
+  Mandatory/MandatoryInlining.cpp
   Mandatory/PredictableMemOpt.cpp
   Mandatory/ConstantPropagation.cpp
   PARENT_SCOPE)

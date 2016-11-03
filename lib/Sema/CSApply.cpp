@@ -6793,6 +6793,9 @@ Expr *TypeChecker::callWitness(Expr *base, DeclContext *dc,
 
   // Find the witness we need to use.
   auto type = base->getType();
+  assert(!type->hasTypeVariable() &&
+         "Building call to witness with unresolved base type!");
+
   if (auto metaType = type->getAs<AnyMetatypeType>())
     type = metaType->getInstanceType();
   

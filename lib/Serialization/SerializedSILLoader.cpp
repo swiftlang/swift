@@ -57,24 +57,6 @@ SILFunction *SerializedSILLoader::lookupSILFunction(SILFunction *Callee) {
   return retVal;
 }
 
-SILFunction *SerializedSILLoader::lookupSILFunction(SILDeclRef Decl) {
-  llvm::SmallString<32> Name;
-  Decl.mangle(Name);
-  // It is possible that one module has a declaration of a SILFunction, while
-  // another has the full definition.
-  SILFunction *retVal = nullptr;
-  for (auto &Des : LoadedSILSections) {
-    if (auto Func = Des->lookupSILFunction(Name)) {
-      DEBUG(llvm::dbgs() << "Deserialized " << Func->getName() << " from "
-            << Des->getModuleIdentifier().str() << "\n");
-      if (!Func->empty())
-        return Func;
-      retVal = Func;
-    }
-  }
-  return retVal;
-}
-
 SILFunction *SerializedSILLoader::lookupSILFunction(StringRef Name,
                                                     bool declarationOnly,
                                                     SILLinkage Linkage) {

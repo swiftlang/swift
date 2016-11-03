@@ -68,6 +68,9 @@ class Octogenarian : Contrarian {
   @objc override func eviscerate() {}
 }
 
+@_silgen_name("unknown")
+func unknown(_ x: id) -> id
+
 // CHECK:    define hidden %objc_object* @_TF4objc5test0{{.*}}(%objc_object*)
 // CHECK-NOT:  call {{.*}} @swift_unknownRetain
 // CHECK:      call {{.*}} @swift_unknownRetain
@@ -77,6 +80,7 @@ class Octogenarian : Contrarian {
 func test0(_ arg: id) -> id {
   var x : id
   x = arg
+  unknown(x)
   var y = x
   return y
 }

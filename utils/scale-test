@@ -44,13 +44,13 @@ def write_input_file(args, ast, d, n):
     return ifile
 
 
-def run_once(args, ast, rng):
+def run_once_with_primary(args, ast, rng, primary_idx):
     import sys, shutil, tempfile, json
     r = {}
     try:
         d = tempfile.mkdtemp()
         inputs = [write_input_file(args, ast, d, i) for i in rng]
-        primary = inputs[-1]
+        primary = inputs[primary_idx]
         ofile = os.path.join(d, "out.o")
         mode = "-c"
         if args.parse:
@@ -72,11 +72,13 @@ def run_once(args, ast, rng):
                  [line.split() for line in open(trace)]
                  if len(fields) == 2}
         else:
+            if args.debug:
+                command = ["lldb", "--"] + command
             stats = os.path.join(d, "stats.json")
-            subprocess.check_call(
-                command + ["-Xllvm", "-stats",
-                           "-Xllvm", "-stats-json",
-                           "-Xllvm", "-info-output-file=" + stats])
+            argv = command + ["-Xllvm", "-stats",
+                              "-Xllvm", "-stats-json",
+                              "-Xllvm", "-info-output-file=" + stats]
+            subprocess.check_call(argv)
             with open(stats) as f:
                 r = json.load(f)
     finally:
@@ -84,6 +86,20 @@ def run_once(args, ast, rng):
 
     return {k:v for (k,v) in r.items() if args.select in k}
 
+
+def run_once(args, ast, rng):
+    if args.sum_multi:
+        cumulative = {}
+        for i in range(len(rng)):
+            tmp = run_once_with_primary(args, ast, rng, i)
+            for (k, v) in tmp.items():
+                if k in cumulative:
+                    cumulative[k] += v
+                else:
+                    cumulative[k] = v
+        return cumulative
+    else:
+        return run_once_with_primary(args, ast, rng, -1)
 
 def run_many(args):
 
@@ -101,23 +117,51 @@ def run_many(args):
 
     ast = gyb.parse_template(args.file.name, args.file.read())
     rng = range(args.begin, args.end, args.step)
-    if args.multi_file:
-        return (rng, [run_once(args, ast, rng[0:i+1]) for i in range(len(rng))])
+    if args.multi_file or args.sum_multi:
+        return (rng, [run_once(args, ast, range(i)) for i in rng])
     else:
         return (rng, [run_once(args, ast, [r]) for r in rng])
 
 
+def linear_regression(x, y):
+   # By the book: https://en.wikipedia.org/wiki/Simple_linear_regression
+   n = len(x)
+   assert n == len(y)
+   if n == 0:
+       return 0, 0
+   prod_sum = 0
+   sum_x = sum(x)
+   sum_y = sum(y)
+   sum_prod = sum(a * b for a, b in zip(x, y))
+   sum_x_sq = sum(a ** 2 for a in x)
+   mean_x = sum_x/n
+   mean_y = sum_y/n
+   mean_prod = sum_prod/n
+   mean_x_sq = sum_x_sq/n
+   covar_xy = mean_prod - mean_x * mean_y
+   var_x = mean_x_sq - mean_x**2
+   slope = covar_xy / var_x
+   inter = mean_y - slope * mean_x
+   return slope, inter
+
+
 def report(args, rng, runs):
-    import numpy as np
+    import math
     bad = False
     keys = set.intersection(*[set(j.keys()) for j in runs])
-    A = np.vstack([np.log(rng), np.ones(len(rng))]).T
+    if len(keys) == 0:
+        print "No data found"
+        if len(args.select) != 0:
+            "(perhaps try a different --select?)"
+        return True
+    x = [math.log(n) for n in rng]
     rows = []
     for k in keys:
         vals = [r[k] for r in runs]
         bounded = [max(v, 1) for v in vals]
-        b, a = np.linalg.lstsq(A, np.log(bounded))[0]
-        b = 0 if np.isclose(b, 0) else b
+        y = [math.log(b) for b in bounded]
+        b, a = linear_regression(x, y)
+        b = 0 if abs(b) < 1e-9 else b
         rows.append((b, k, vals))
     rows.sort()
     tolerance = 1.2
@@ -154,6 +198,9 @@ def main():
         '--multi-file', action='store_true',
         default=False, help='vary number of input files as well')
     parser.add_argument(
+        '--sum-multi', action='store_true',
+        default=False, help='simulate a multi-primary run and sum stats')
+    parser.add_argument(
         '--begin', type=int,
         default=10, help='first value for N')
     parser.add_argument(
@@ -168,6 +215,9 @@ def main():
     parser.add_argument(
         '--select',
         default="", help='substring of counters/symbols to restrict attention to')
+    parser.add_argument(
+        '--debug', action='store_true',
+        default=False, help='invoke lldb on each scale test')
 
     args = parser.parse_args(sys.argv[1:])
     (rng, runs) = run_many(args)

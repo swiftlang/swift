@@ -649,8 +649,8 @@ class C {
   init(v: Int32)
 }
 
-// CHECK-LABEL: @redundant_switch_enum
-sil @redundant_switch_enum : $@convention(thin) (@owned Optional<C>) -> Int32 {
+// CHECK-LABEL: @redundant_switchenum
+sil @redundant_switchenum : $@convention(thin) (@owned Optional<C>) -> Int32 {
 bb0(%0 : $Optional<C>):
   switch_enum %0 : $Optional<C>, case #Optional.some!enumelt.1: bb1, case #Optional.none!enumelt: bb2
 

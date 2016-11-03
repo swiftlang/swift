@@ -39,7 +39,7 @@ func testProtocolWrapper(_ conformer: ForwardClassUser) {
 }
 testProtocolWrapper(ProtoConformer())
 
-func testStruct(_ p: Point) -> Point {
+func testStruct(_ p: Point2D) -> Point2D {
   var result = p
   result.y += 5
   return result

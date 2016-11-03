@@ -991,7 +991,7 @@ RequirementEnvironment::RequirementEnvironment(
     return;
   }
 
-  // Form the conformance of the interface type of the confomance context
+  // Form the conformance of the interface type of the conformance context
   // to the requirement's enclosing protocol.
   ProtocolConformance *specialized = conformance;
   if (conformance && conformance->getGenericSignature()) {
@@ -5445,7 +5445,7 @@ bool TypeChecker::isProtocolExtensionUsable(DeclContext *dc, Type type,
 
   // If the type still has parameters, the constrained extension is considered
   // unusable.
-  if (type->hasTypeParameter())
+  if (type->hasTypeParameter() || type->hasTypeVariable())
     return false;
 
   // Set up a constraint system where we open the generic parameters of the
