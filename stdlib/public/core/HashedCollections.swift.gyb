@@ -1176,7 +1176,7 @@ extension Set {
         return true
       }
 
-      if lhsNative._count != rhsNative._count {
+      if lhsNative.count != rhsNative.count {
         return false
       }
 
@@ -1201,7 +1201,7 @@ extension Set {
       _VariantSetBuffer.cocoa(let rhsCocoa)):
   #if _runtime(_ObjC)
 
-      if lhsNative._count != rhsCocoa.count {
+      if lhsNative.count != rhsCocoa.count {
         return false
       }
 
@@ -2077,7 +2077,7 @@ extension Dictionary where Key : Equatable, Value : Equatable {
         return true
       }
 
-      if lhsNative._count != rhsNative._count {
+      if lhsNative.count != rhsNative.count {
         return false
       }
 
@@ -2110,7 +2110,7 @@ extension Dictionary where Key : Equatable, Value : Equatable {
     case (.native(let lhsNative), .cocoa(let rhsCocoa)):
   #if _runtime(_ObjC)
 
-      if lhsNative._count != rhsCocoa.count {
+      if lhsNative.count != rhsCocoa.count {
         return false
       }
 
@@ -2922,12 +2922,12 @@ internal struct _Native${Self}Buffer<${TypeParameters}> {
   // Forwarding the individual fields of the storage in various forms
 
   @_versioned
-  internal var _capacity: Int {
+  internal var capacity: Int {
     return _assumeNonNegative(_body.capacity)
   }
 
   @_versioned
-  internal var _count: Int {
+  internal var count: Int {
     set {
       _body.count = newValue
     }
@@ -2948,7 +2948,7 @@ internal struct _Native${Self}Buffer<${TypeParameters}> {
   // just a convenience for _keys and _values
   internal var _keysRawAddr: Builtin.RawPointer {
     let bitmapAddr = Builtin.projectTailElems(_storage, UInt.self)
-    let numWordsForBitmap = _UnsafeBitMap.sizeInWords(forSizeInBits: _capacity)
+    let numWordsForBitmap = _UnsafeBitMap.sizeInWords(forSizeInBits: capacity)
     return Builtin.getTailAddr_Word(bitmapAddr,
            numWordsForBitmap._builtinWordValue, UInt.self, Key.self)
   }
@@ -2962,7 +2962,7 @@ internal struct _Native${Self}Buffer<${TypeParameters}> {
   // This API is unsafe and needs a `_fixLifetime` in the caller.
   internal var _values: UnsafeMutablePointer<Value> {
     let valuesAddr = Builtin.getTailAddr_Word(_keysRawAddr,
-        _capacity._builtinWordValue, Key.self, Value.self)
+        capacity._builtinWordValue, Key.self, Value.self)
     return UnsafeMutablePointer(valuesAddr)
   }
 %end
@@ -2985,7 +2985,7 @@ internal struct _Native${Self}Buffer<${TypeParameters}> {
   @_versioned
   @inline(__always)
   internal func key(at i: Int) -> Key {
-    _sanityCheck(i >= 0 && i < _capacity)
+    _sanityCheck(i >= 0 && i < capacity)
     _sanityCheck(isInitializedEntry(at: i))
     defer { _fixLifetime(self) }
 
@@ -3009,7 +3009,7 @@ internal struct _Native${Self}Buffer<${TypeParameters}> {
 
   @_versioned
   internal func isInitializedEntry(at i: Int) -> Bool {
-    _sanityCheck(i >= 0 && i < _capacity)
+    _sanityCheck(i >= 0 && i < capacity)
     defer { _fixLifetime(self) }
 
     return _body.initializedEntries[i]
@@ -3056,7 +3056,7 @@ internal struct _Native${Self}Buffer<${TypeParameters}> {
   }
 
   internal func setKey(_ key: Key, at i: Int) {
-    _sanityCheck(i >= 0 && i < _capacity)
+    _sanityCheck(i >= 0 && i < capacity)
     _sanityCheck(isInitializedEntry(at: i))
     defer { _fixLifetime(self) }
 
@@ -3114,14 +3114,14 @@ internal struct _Native${Self}Buffer<${TypeParameters}> {
 
   @_versioned
   internal var endIndex: Index {
-    return Index(offset: _capacity)
+    return Index(offset: capacity)
   }
 
   @_versioned
   internal func index(after i: Index) -> Index {
     _precondition(i != endIndex)
     var idx = i.offset + 1
-    while idx < _capacity && !isInitializedEntry(at: idx) {
+    while idx < capacity && !isInitializedEntry(at: idx) {
       idx += 1
     }
 
@@ -3135,7 +3135,7 @@ internal struct _Native${Self}Buffer<${TypeParameters}> {
 
   
   internal func assertingGet(_ i: Index) -> SequenceElement {
-    _precondition(i.offset >= 0 && i.offset < _capacity)
+    _precondition(i.offset >= 0 && i.offset < capacity)
     _precondition(
       isInitializedEntry(at: i.offset),
       "attempting to access ${Self} elements using an invalid Index")
@@ -3200,7 +3200,7 @@ extension _Native${Self}Buffer
   var description: String {
     var result = ""
 #if INTERNAL_CHECKS_ENABLED
-    for i in 0..<_capacity {
+    for i in 0..<capacity {
       if isInitializedEntry(at: i) {
         let key = self.key(at: i)
         result += "bucket \(i), ideal bucket = \(_bucket(key)), key = \(key)\n"
@@ -3214,18 +3214,18 @@ extension _Native${Self}Buffer
 
   internal var _bucketMask: Int {
     // The capacity is not negative, therefore subtracting 1 will not overflow.
-    return _capacity &- 1
+    return capacity &- 1
   }
 
   @_versioned
   @inline(__always) // For performance reasons.
   internal func _bucket(_ k: Key) -> Int {
-    return _squeezeHashValue(k.hashValue, _capacity)
+    return _squeezeHashValue(k.hashValue, capacity)
   }
 
   @_versioned
   internal func _index(after bucket: Int) -> Int {
-    // Bucket is within 0 and _capacity. Therefore adding 1 does not overflow.
+    // Bucket is within 0 and capacity. Therefore adding 1 does not overflow.
     return (bucket &+ 1) & _bucketMask
   }
 
@@ -3300,7 +3300,7 @@ extension _Native${Self}Buffer
   @_versioned
   @inline(__always)
   internal func index(forKey key: Key) -> Index? {
-    if _count == 0 {
+    if count == 0 {
       // Fast path that avoids computing the hash of the key.
       return nil
     }
@@ -3322,7 +3322,7 @@ extension _Native${Self}Buffer
   @_versioned
   @inline(__always)
   internal func maybeGet(_ key: Key) -> Value? {
-    if _count == 0 {
+    if count == 0 {
       // Fast path that avoids computing the hash of the key.
       return nil
     }
@@ -3394,7 +3394,7 @@ extension _Native${Self}Buffer
       nativeBuffer.initializeKey(key, at: i.offset)
       count += 1
     }
-    nativeBuffer._count = count
+    nativeBuffer.count = count
 
 %elif Self == 'Dictionary':
 
@@ -3404,7 +3404,7 @@ extension _Native${Self}Buffer
       _precondition(!found, "${Self} literal contains duplicate keys")
       nativeBuffer.initializeKey(key, value: value, at: i.offset)
     }
-    nativeBuffer._count = elements.count
+    nativeBuffer.count = elements.count
 
 %end
 
@@ -3632,10 +3632,10 @@ final internal class _SwiftDeferredNS${Self}<${TypeParametersDecl}>
 
     // Create buffer for bridged data.
     let bridged = BridgedBuffer.createUnhashable(
-      capacity: nativeBuffer._capacity)
+      capacity: nativeBuffer.capacity)
 
     // Bridge everything.
-    for i in 0..<nativeBuffer._capacity {
+    for i in 0..<nativeBuffer.capacity {
       if nativeBuffer.isInitializedEntry(at: i) {
         let key = _bridgeAnythingToObjectiveC(nativeBuffer.key(at: i))
 %if Self == 'Set':
@@ -3660,7 +3660,7 @@ final internal class _SwiftDeferredNS${Self}<${TypeParametersDecl}>
     bridgeEverything()
     // The user is expected to provide a storage of the correct size
     var i = 0 // Position in the input storage
-    let capacity = nativeBuffer._capacity
+    let capacity = nativeBuffer.capacity
 
     if let unmanagedKeys = _UnmanagedAnyObjectArray(keys) {
       if let unmanagedObjects = _UnmanagedAnyObjectArray(objects) {
@@ -3700,7 +3700,7 @@ final internal class _SwiftDeferredNS${Self}<${TypeParametersDecl}>
 
   @objc
   internal var count: Int {
-    return nativeBuffer._count
+    return nativeBuffer.count
   }
 
   internal func bridgingObjectForKey(_ aKey: AnyObject)
@@ -3990,14 +3990,14 @@ internal enum _Variant${Self}Buffer<${TypeParametersDecl}> : _HashBuffer {
     -> (reallocated: Bool, capacityChanged: Bool) {
     switch self {
     case .native:
-      let oldCapacity = asNative._capacity
+      let oldCapacity = asNative.capacity
       if isUniquelyReferenced() && oldCapacity >= minimumCapacity {
         return (reallocated: false, capacityChanged: false)
       }
 
       let oldNativeBuffer = asNative
       var newNativeBuffer = NativeBuffer.create(minimumCapacity: minimumCapacity)
-      let newCapacity = newNativeBuffer._capacity
+      let newCapacity = newNativeBuffer.capacity
       for i in 0..<oldCapacity {
         if oldNativeBuffer.isInitializedEntry(at: i) {
           if oldCapacity == newCapacity {
@@ -4020,11 +4020,11 @@ internal enum _Variant${Self}Buffer<${TypeParametersDecl}> : _HashBuffer {
           }
         }
       }
-      newNativeBuffer._count = oldNativeBuffer._count
+      newNativeBuffer.count = oldNativeBuffer.count
 
       self = .native(newNativeBuffer)
       return (reallocated: true,
-              capacityChanged: oldCapacity != newNativeBuffer._capacity)
+              capacityChanged: oldCapacity != newNativeBuffer.capacity)
 
     case .cocoa(let cocoaBuffer):
 #if _runtime(_ObjC)
@@ -4046,7 +4046,7 @@ internal enum _Variant${Self}Buffer<${TypeParametersDecl}> : _HashBuffer {
       }
 
 %end
-      newNativeBuffer._count = cocoa${Self}.count
+      newNativeBuffer.count = cocoa${Self}.count
 
       self = .native(newNativeBuffer)
       return (reallocated: true, capacityChanged: true)
@@ -4247,9 +4247,9 @@ internal enum _Variant${Self}Buffer<${TypeParametersDecl}> : _HashBuffer {
     var (i, found) = asNative._find(key, startBucket: asNative._bucket(key))
 
     let minCapacity = found
-      ? asNative._capacity
+      ? asNative.capacity
       : NativeBuffer.minimumCapacity(
-          minimumCount: asNative._count + 1,
+          minimumCount: asNative.count + 1,
           maxLoadFactorInverse: asNative._maxLoadFactorInverse)
 
     let (_, capacityChanged) = ensureUniqueNativeBuffer(minCapacity)
@@ -4263,7 +4263,7 @@ internal enum _Variant${Self}Buffer<${TypeParametersDecl}> : _HashBuffer {
       asNative.setKey(key, at: i.offset)
     } else {
       asNative.initializeKey(key, at: i.offset)
-      asNative._count += 1
+      asNative.count += 1
     }
 %elif Self == 'Dictionary':
     let oldValue: Value? = found ? asNative.value(at: i.offset) : nil
@@ -4271,7 +4271,7 @@ internal enum _Variant${Self}Buffer<${TypeParametersDecl}> : _HashBuffer {
       asNative.setKey(key, value: value, at: i.offset)
     } else {
       asNative.initializeKey(key, value: value, at: i.offset)
-      asNative._count += 1
+      asNative.count += 1
     }
 %end
 
@@ -4314,7 +4314,7 @@ internal enum _Variant${Self}Buffer<${TypeParametersDecl}> : _HashBuffer {
     }
 
     let minCapacity = NativeBuffer.minimumCapacity(
-      minimumCount: asNative._count + 1,
+      minimumCount: asNative.count + 1,
       maxLoadFactorInverse: asNative._maxLoadFactorInverse)
 
     let (_, capacityChanged) = ensureUniqueNativeBuffer(minCapacity)
@@ -4325,10 +4325,10 @@ internal enum _Variant${Self}Buffer<${TypeParametersDecl}> : _HashBuffer {
 
 %if Self == 'Set':
     asNative.initializeKey(key, at: i.offset)
-    asNative._count += 1
+    asNative.count += 1
 %elif Self == 'Dictionary':
     asNative.initializeKey(key, value: value, at: i.offset)
-    asNative._count += 1
+    asNative.count += 1
 %end
 
     return (inserted: true, memberAfterInsert: value)
@@ -4369,7 +4369,7 @@ internal enum _Variant${Self}Buffer<${TypeParametersDecl}> : _HashBuffer {
 
     // remove the element
     nativeBuffer.destroyEntry(at: offset)
-    nativeBuffer._count -= 1
+    nativeBuffer.count -= 1
 
     // If we've put a hole in a chain of contiguous elements, some
     // element after the hole may belong where the new hole is.
@@ -4433,7 +4433,7 @@ internal enum _Variant${Self}Buffer<${TypeParametersDecl}> : _HashBuffer {
     }
 
     let (_, capacityChanged) =
-      ensureUniqueNativeBuffer(asNative._capacity)
+      ensureUniqueNativeBuffer(asNative.capacity)
     let nativeBuffer = asNative
     if capacityChanged {
       idealBucket = nativeBuffer._bucket(key)
@@ -4456,7 +4456,7 @@ internal enum _Variant${Self}Buffer<${TypeParametersDecl}> : _HashBuffer {
 
     // The provided index should be valid, so we will always mutating the
     // set buffer.  Request unique buffer.
-    _ = ensureUniqueNativeBuffer(asNative._capacity)
+    _ = ensureUniqueNativeBuffer(asNative.capacity)
     let nativeBuffer = asNative
 
     let result = nativeBuffer.assertingGet(nativeIndex)
@@ -4537,15 +4537,15 @@ internal enum _Variant${Self}Buffer<${TypeParametersDecl}> : _HashBuffer {
 
     // We have already checked for the empty dictionary case, so we will always
     // mutating the dictionary buffer.  Request unique buffer.
-    _ = ensureUniqueNativeBuffer(asNative._capacity)
+    _ = ensureUniqueNativeBuffer(asNative.capacity)
     var nativeBuffer = asNative
 
-    for b in 0..<nativeBuffer._capacity {
+    for b in 0..<nativeBuffer.capacity {
       if nativeBuffer.isInitializedEntry(at: b) {
         nativeBuffer.destroyEntry(at: b)
       }
     }
-    nativeBuffer._count = 0
+    nativeBuffer.count = 0
   }
 
   internal mutating func removeAll(keepingCapacity keepCapacity: Bool) {
@@ -4577,12 +4577,12 @@ internal enum _Variant${Self}Buffer<${TypeParametersDecl}> : _HashBuffer {
 
   internal var count: Int {
     if _fastPath(guaranteedNative) {
-      return asNative._count
+      return asNative.count
     }
 
     switch self {
     case .native:
-      return asNative._count
+      return asNative.count
     case .cocoa(let cocoaBuffer):
 #if _runtime(_ObjC)
       return cocoaBuffer.count
@@ -4650,7 +4650,7 @@ extension _Native${Self}Index {
 #if _runtime(_ObjC)
 @_versioned
 internal struct _Cocoa${Self}Index : Comparable {
-  /// Index into `allKeys`, a property on the parent collection.
+  /// Index into `allKeys` on the CocoaSelfBuffer
   internal var currentKeyIndex: Int
 
   internal init(value: Int) {
@@ -5077,7 +5077,7 @@ public struct _${Self}Builder<${TypeParametersDecl}> {
       "the number of members added does not match the promised count")
 
     // Finish building the `${Self}`.
-    _nativeBuffer._count = _requestedCount
+    _nativeBuffer.count = _requestedCount
 
     // Prevent taking the result twice.
     _actualCount = -1
