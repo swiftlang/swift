@@ -142,7 +142,7 @@ reflect(object: obj)
 // CHECK-64:             (builtin size=8 alignment=8 stride=8 num_extra_inhabitants=2147483647))))))
 // CHECK-64:   (field name=t03 offset=48
 // CHECK-64:     (struct size=9 alignment=8 stride=16 num_extra_inhabitants=0
-// CHECK-64:       (field name=_variantStorage offset=0
+// CHECK-64:       (field name=_variantBuffer offset=0
 // CHECK-64:         (multi_payload_enum size=9 alignment=8 stride=16 num_extra_inhabitants=0
 // CHECK-64:           (field name=native offset=0
 // CHECK-64:             (reference kind=strong refcounting=native))
@@ -186,7 +186,7 @@ reflect(object: obj)
 // CHECK-64:     (reference kind=strong refcounting=unknown))
 // CHECK-64:   (field name=t15 offset=144
 // CHECK-64:     (struct size=9 alignment=8 stride=16 num_extra_inhabitants=0
-// CHECK-64:       (field name=_variantStorage offset=0
+// CHECK-64:       (field name=_variantBuffer offset=0
 // CHECK-64:         (multi_payload_enum size=9 alignment=8 stride=16 num_extra_inhabitants=0
 // CHECK-64:           (field name=native offset=0
 // CHECK-64:             (reference kind=strong refcounting=native))
@@ -266,7 +266,7 @@ reflect(object: obj)
 // CHECK-32:             (builtin size=8 alignment=8 stride=8 num_extra_inhabitants=2147483647))))))
 // CHECK-32:   (field name=t03 offset=32
 // CHECK-32:     (struct size=5 alignment=4 stride=8 num_extra_inhabitants=0
-// CHECK-32:       (field name=_variantStorage offset=0
+// CHECK-32:       (field name=_variantBuffer offset=0
 // CHECK-32:         (multi_payload_enum size=5 alignment=4 stride=8 num_extra_inhabitants=0
 // CHECK-32:           (field name=native offset=0
 // CHECK-32:             (reference kind=strong refcounting=native))
@@ -312,7 +312,7 @@ reflect(object: obj)
 // CHECK-32:     (reference kind=strong refcounting=unknown))
 // CHECK-32:   (field name=t15 offset=92
 // CHECK-32:     (struct size=5 alignment=4 stride=8 num_extra_inhabitants=0
-// CHECK-32:       (field name=_variantStorage offset=0
+// CHECK-32:       (field name=_variantBuffer offset=0
 // CHECK-32:         (multi_payload_enum size=5 alignment=4 stride=8 num_extra_inhabitants=0
 // CHECK-32:           (field name=native offset=0
 // CHECK-32:             (reference kind=strong refcounting=native))
