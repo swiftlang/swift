@@ -4272,12 +4272,14 @@ void TypeChecker::useObjectiveCBridgeableConformances(DeclContext *dc,
 
         if (nominalDecl == TC.Context.getSetDecl() ||
             nominalDecl == TC.Context.getDictionaryDecl()) {
-          auto args = ty->castTo<BoundGenericType>()->getGenericArgs();
-          if (!args.empty()) {
-            auto keyType = args[0];
-            auto *hashableProto =
-              TC.Context.getProtocol(KnownProtocolKind::Hashable);
-            (void)TC.conformsToProtocol(keyType, hashableProto, DC, options);
+          if (auto boundGeneric = ty->getAs<BoundGenericType>()) {
+            auto args = boundGeneric->getGenericArgs();
+            if (!args.empty()) {
+              auto keyType = args[0];
+              auto *hashableProto =
+                TC.Context.getProtocol(KnownProtocolKind::Hashable);
+              (void)TC.conformsToProtocol(keyType, hashableProto, DC, options);
+            }
           }
         }
       }
