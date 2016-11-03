@@ -2104,24 +2104,28 @@ namespace {
                        LookUpConformanceInSubstitutionMap>> Context;
     TypeSubstitutionFn Subst;
     LookupConformanceFn Conformances;
+    CanGenericSignature SubstSig;
 
     ASTContext &getASTContext() { return TheSILModule.getASTContext(); }
 
   public:
-    SILTypeSubstituter(SILModule &silModule, const SubstitutionMap &subs)
+    SILTypeSubstituter(SILModule &silModule, const SubstitutionMap &subs,
+                       GenericSignature *substSig = nullptr)
       : TheSILModule(silModule),
         Context({QueryTypeSubstitutionMap{subs.getMap()},
                  LookUpConformanceInSubstitutionMap(subs)}),
         Subst(Context->first),
-        Conformances(Context->second)
-    {}
+        Conformances(Context->second),
+        SubstSig(substSig) {}
 
     SILTypeSubstituter(SILModule &silModule,
                        TypeSubstitutionFn Subst,
-                       LookupConformanceFn Conformances)
+                       LookupConformanceFn Conformances,
+                       GenericSignature *SubstSig = nullptr)
       : TheSILModule(silModule),
         Subst(Subst),
-        Conformances(Conformances)
+        Conformances(Conformances),
+        SubstSig(SubstSig)
     {}
 
     // SIL type lowering only does special things to tuples and functions.
@@ -2230,8 +2234,28 @@ namespace {
         return origType;
       }
 
-      return TheSILModule.Types.getLoweredType(abstraction, substType)
-               .getSwiftRValueType();
+      CanType SubstTy;
+      if (!SubstSig)
+        SubstTy = TheSILModule.Types.getLoweredType(abstraction, substType)
+                      .getSwiftRValueType();
+      else {
+        // In case of mapping interface types to interfaces types,
+        // the lowering should happen in the target generic context.
+
+        // Temporarily replace the generic context.
+        TheSILModule.Types.popGenericContext(genericSig);
+        do {
+          GenericContextScope scope(TheSILModule.Types, SubstSig);
+
+          AbstractionPattern substAbstraction(SubstSig, origType);
+          SubstTy =
+              TheSILModule.Types.getLoweredType(substAbstraction, substType)
+                  .getSwiftRValueType();
+        } while (false);
+        // Restore the old generic context.
+        TheSILModule.Types.pushGenericContext(genericSig);
+      }
+      return SubstTy;
     }
   };
 } // end anonymous namespace
@@ -2249,20 +2273,33 @@ CanSILFunctionType SILType::substFuncType(SILModule &silModule,
   return STST.visitSILFunctionType(SrcTy, dropGenerics);
 }
 
+CanSILFunctionType SILType::substFuncType(SILModule &silModule,
+                                          TypeSubstitutionFn subs,
+                                          LookupConformanceFn conformances,
+                                          CanSILFunctionType SrcTy,
+                                          bool dropGenerics) {
+  SILTypeSubstituter STST(silModule, subs, conformances);
+  return STST.visitSILFunctionType(SrcTy, dropGenerics);
+}
+
+
 /// Apply a substitution to this polymorphic SILFunctionType so that
 /// it has the form of the normal SILFunctionType for the substituted
 /// type, except using the original conventions.
 CanSILFunctionType
 SILFunctionType::substGenericArgs(SILModule &silModule,
-                                  ArrayRef<Substitution> subs) {
+                                  ArrayRef<Substitution> subs,
+                                  GenericSignature *substSig) {
   if (subs.empty()) {
-    assert(!isPolymorphic() && "no args for polymorphic substitution");
+    assert(
+        (!isPolymorphic() || getGenericSignature()->areAllParamsConcrete()) &&
+        "no args for polymorphic substitution");
     return CanSILFunctionType(this);
   }
 
   assert(isPolymorphic());
   auto map = GenericSig->getSubstitutionMap(subs);
-  SILTypeSubstituter substituter(silModule, map);
+  SILTypeSubstituter substituter(silModule, map, substSig);
 
   return substituter.visitSILFunctionType(CanSILFunctionType(this),
                                           /*dropGenerics*/ true);
@@ -2271,9 +2308,10 @@ SILFunctionType::substGenericArgs(SILModule &silModule,
 CanSILFunctionType
 SILFunctionType::substGenericArgs(SILModule &silModule,
                                   TypeSubstitutionFn subs,
-                                  LookupConformanceFn conformances) {
+                                  LookupConformanceFn conformances,
+                                  GenericSignature *substSig) {
   if (!isPolymorphic()) return CanSILFunctionType(this);
-  SILTypeSubstituter substituter(silModule, subs, conformances);
+  SILTypeSubstituter substituter(silModule, subs, conformances, substSig);
   return substituter.visitSILFunctionType(CanSILFunctionType(this),
                                           /*dropGenerics*/ true);
 }

@@ -2935,7 +2935,33 @@ Optional<ProtocolConformanceRef>
 LookUpConformanceInSubstitutionMap::operator()(CanType dependentType,
                                        Type conformingReplacementType,
                                        ProtocolType *conformedProtocol) const {
-  return Subs.lookupConformance(dependentType, conformedProtocol->getDecl());
+  auto conformance =
+      Subs.lookupConformance(dependentType, conformedProtocol->getDecl());
+  if (conformance.hasValue())
+    return conformance;
+
+  if (!conformingReplacementType)
+    return None;
+
+  if (auto nominal =
+          conformingReplacementType->getNominalOrBoundGenericNominal()) {
+    auto proto = conformedProtocol->getDecl();
+    SmallVector<ProtocolConformance *, 2> conformances;
+    nominal->lookupConformance(nominal->getModuleContext(), proto,
+                               conformances);
+    if (conformances.size() == 1) {
+      auto concreteSubs = conformingReplacementType->gatherAllSubstitutions(
+          nominal->getModuleContext(), nullptr);
+      if (!concreteSubs.empty()) {
+        auto specialized = nominal->getASTContext().getSpecializedConformance(
+            conformingReplacementType, conformances.front(), concreteSubs);
+        return ProtocolConformanceRef(specialized);
+      }
+      return ProtocolConformanceRef(conformances.front());
+    }
+  }
+
+  return None;
 }
 
 Optional<ProtocolConformanceRef>

@@ -1274,14 +1274,18 @@ bool ArchetypeBuilder::addSameTypeRequirementToConcrete(
     }
   }
 
+  RequirementSource nestedSource(RequirementSource::Redundant, Source.getLoc());
+
   // Recursively resolve the associated types to their concrete types.
   for (auto nested : T->getNestedTypes()) {
+    PotentialArchetype *NestedPA = nested.second.front();
+    auto &CurrentSource = (NestedPA->getRepresentative() == T) ? nestedSource : Source;
     AssociatedTypeDecl *assocType
       = nested.second.front()->getResolvedAssociatedType();
     if (auto *concreteArchetype = Concrete->getAs<ArchetypeType>()) {
       Type witnessType = concreteArchetype->getNestedType(nested.first);
       addSameTypeRequirementToConcrete(nested.second.front(), witnessType,
-                                       Source);
+                                       CurrentSource);
     } else if (assocType) {
       assert(conformances.count(assocType->getProtocol()) > 0
              && "missing conformance?");
@@ -1298,11 +1302,11 @@ bool ArchetypeBuilder::addSameTypeRequirementToConcrete(
       if (auto witnessPA = resolveArchetype(witnessType)) {
         addSameTypeRequirementBetweenArchetypes(nested.second.front(),
                                                 witnessPA,
-                                                Source);
+                                                CurrentSource);
       } else {
         addSameTypeRequirementToConcrete(nested.second.front(),
                                          witnessType,
-                                         Source);
+                                         CurrentSource);
       }
     }
   }
@@ -2037,6 +2041,20 @@ static void collectRequirements(ArchetypeBuilder &builder,
 
     requirements.push_back(Requirement(kind, depTy, repTy));
   });
+}
+
+/// FIXME: This is a workaround for rdar://29311216.
+std::pair<GenericSignature *, GenericEnvironment *>
+ArchetypeBuilder::getGenericSignatureAndEnvironment() {
+  // This is a workaround for rdar://29311216.
+  // Re-importing and then generating again a generic signature produces
+  // a real minimized signature.
+  GenericSignature *sig = getGenericSignature();
+  ArchetypeBuilder Builder(Mod);
+  Builder.addGenericSignature(sig);
+  sig = Builder.getGenericSignature();
+  auto env = Builder.getGenericEnvironment(sig);
+  return std::make_pair(sig, env);
 }
 
 GenericSignature *ArchetypeBuilder::getGenericSignature() {

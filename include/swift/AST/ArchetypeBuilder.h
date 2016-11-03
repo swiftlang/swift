@@ -129,12 +129,6 @@ private:
   ArchetypeBuilder(const ArchetypeBuilder &) = delete;
   ArchetypeBuilder &operator=(const ArchetypeBuilder &) = delete;
 
-  /// \brief Add a new conformance requirement specifying that the given
-  /// potential archetype conforms to the given protocol.
-  bool addConformanceRequirement(PotentialArchetype *T,
-                                 ProtocolDecl *Proto,
-                                 RequirementSource Source);
-
   bool addConformanceRequirement(PotentialArchetype *T,
                                  ProtocolDecl *Proto,
                                  RequirementSource Source,
@@ -153,16 +147,22 @@ public:
                                         Type Concrete,
                                         RequirementSource Source);
 
+  /// \brief Add a new same-type requirement specifying that the given potential
+  /// archetypes should map to the equivalent archetype.
+  bool addSameTypeRequirement(Type T1, Type T2, RequirementSource Source);
+
+  /// \brief Add a new conformance requirement specifying that the given
+  /// potential archetype conforms to the given protocol.
+  bool addConformanceRequirement(PotentialArchetype *T,
+                                 ProtocolDecl *Proto,
+                                 RequirementSource Source);
+
 private:
   /// \brief Add a new superclass requirement specifying that the given
   /// potential archetype has the given type as an ancestor.
   bool addSuperclassRequirement(PotentialArchetype *T, 
                                 Type Superclass,
                                 RequirementSource Source);
-
-  /// \brief Add a new same-type requirement specifying that the given potential
-  /// archetypes should map to the equivalent archetype.
-  bool addSameTypeRequirement(Type T1, Type T2, RequirementSource Source);
 
   /// Add the requirements placed on the given abstract type parameter
   /// to the given potential archetype.
@@ -249,6 +249,9 @@ public:
 
   /// \brief Build the generic signature.
   GenericSignature *getGenericSignature();
+  
+  /// \bried Build the generic signature and environment
+  std::pair<GenericSignature *, GenericEnvironment *> getGenericSignatureAndEnvironment();
 
   /// \brief Build the generic environment.
   GenericEnvironment *getGenericEnvironment(GenericSignature *signature);
