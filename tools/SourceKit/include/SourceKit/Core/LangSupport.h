@@ -282,6 +282,13 @@ struct CursorInfo {
   bool IsSystem = false;
 };
 
+struct RangeInfo {
+  bool IsCancelled = false;
+  UIdent RangeKind;
+  StringRef ExprType;
+  StringRef RangeContent;
+};
+
 struct RelatedIdentsInfo {
   bool IsCancelled = false;
   /// (Offset,Length) pairs.
@@ -450,6 +457,10 @@ public:
   virtual void getCursorInfo(StringRef Filename, unsigned Offset,
                              ArrayRef<const char *> Args,
                           std::function<void(const CursorInfo &)> Receiver) = 0;
+
+  virtual void getRangeInfo(StringRef Filename, unsigned Offset, unsigned Length,
+                            ArrayRef<const char *> Args,
+                            std::function<void(const RangeInfo&)> Receiver) = 0;
 
   virtual void
   getCursorInfoFromUSR(StringRef Filename, StringRef USR,

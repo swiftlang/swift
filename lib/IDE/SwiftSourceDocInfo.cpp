@@ -174,6 +174,91 @@ bool SemaLocResolver::visitModuleReference(ModuleEntity Mod,
   return !tryResolve(Mod, Range.getStart());
 }
 
+struct RangeResolver::Implementation {
+  SourceFile &File;
+  SourceLoc Start;
+  SourceLoc End;
+  Optional<ResolvedRangeInfo> Result;
+  Implementation(SourceFile &File, SourceLoc Start, SourceLoc End) :
+    File(File), Start(Start), End(End) {}
+
+  bool isRangeMatch(SourceRange Input) {
+    return Input.Start == Start && Input.End == End;
+  }
+
+  bool shouldEnter(SourceRange Input) {
+    SourceManager &SM = File.getASTContext().SourceMgr;
+    if (SM.isBeforeInBuffer(End, Input.Start))
+      return false;
+    if (SM.isBeforeInBuffer(Input.End, Start))
+      return false;
+    return true;
+  }
+
+  bool hasResult() {
+    return Result.hasValue();
+  }
+
+  ResolvedRangeInfo getResult() {
+    if (Result.hasValue())
+      return Result.getValue();
+    return ResolvedRangeInfo(RangeKind::Invalid, Type(), getContent());
+  }
+
+  StringRef getContent() {
+    SourceManager &SM = File.getASTContext().SourceMgr;
+    return CharSourceRange(SM, Start, Lexer::getLocForEndOfToken(SM, End)).str();
+  }
+};
+
+RangeResolver::RangeResolver(SourceFile &File, SourceLoc Start, SourceLoc End) :
+  Impl(*new Implementation(File, Start, End)) {}
+
+RangeResolver::~RangeResolver() { delete &Impl; }
+
+bool RangeResolver::walkToExprPre(Expr *E) {
+  if (!Impl.shouldEnter(E->getSourceRange()))
+    return false;
+  if (Impl.isRangeMatch(E->getSourceRange())) {
+    Impl.Result = ResolvedRangeInfo(RangeKind::Expression, E->getType(),
+                                    Impl.getContent());
+  }
+  return !Impl.hasResult();
+}
+
+bool RangeResolver::walkToStmtPre(Stmt *S) {
+  if (!Impl.shouldEnter(S->getSourceRange()))
+    return false;
+  if (Impl.isRangeMatch(S->getSourceRange())) {
+    Impl.Result = ResolvedRangeInfo(RangeKind::SingleStatement, Type(),
+                                    Impl.getContent());
+  }
+  return !Impl.hasResult();
+};
+
+
+bool RangeResolver::walkToDeclPre(Decl *D, CharSourceRange Range) {
+  return Impl.shouldEnter(D->getSourceRange());
+}
+
+bool RangeResolver::walkToExprPost(Expr *E) {
+  return !Impl.hasResult();
+}
+
+bool RangeResolver::walkToStmtPost(Stmt *S) {
+  return !Impl.hasResult();
+};
+
+bool RangeResolver::walkToDeclPost(Decl *D) {
+  return !Impl.hasResult();
+}
+
+ResolvedRangeInfo
+RangeResolver::resolve() {
+  walk(Impl.File);
+  return Impl.getResult();
+}
+
 void swift::ide::getLocationInfoForClangNode(ClangNode ClangNode,
                                              ClangImporter *Importer,
                   llvm::Optional<std::pair<unsigned, unsigned>> &DeclarationLoc,

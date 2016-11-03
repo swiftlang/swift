@@ -42,6 +42,8 @@ static bool handleResponse(sourcekitd_response_t Resp, const TestOptions &Opts,
                            TestOptions *InitOpts);
 static void printCursorInfo(sourcekitd_variant_t Info, StringRef Filename,
                             llvm::raw_ostream &OS);
+static void printRangeInfo(sourcekitd_variant_t Info, StringRef Filename,
+                           llvm::raw_ostream &OS);
 static void printDocInfo(sourcekitd_variant_t Info, StringRef Filename);
 static void printInterfaceGen(sourcekitd_variant_t Info, bool CheckASCII);
 static void printSemanticInfo();
@@ -126,6 +128,7 @@ static sourcekitd_uid_t KeyTypeUsr;
 static sourcekitd_uid_t KeyContainerTypeUsr;
 static sourcekitd_uid_t KeyModuleGroups;
 static sourcekitd_uid_t KeySimplified;
+static sourcekitd_uid_t KeyRangeContent;
 
 static sourcekitd_uid_t RequestProtocolVersion;
 static sourcekitd_uid_t RequestDemangle;
@@ -138,6 +141,7 @@ static sourcekitd_uid_t RequestCodeCompleteUpdate;
 static sourcekitd_uid_t RequestCodeCompleteCacheOnDisk;
 static sourcekitd_uid_t RequestCodeCompleteSetPopularAPI;
 static sourcekitd_uid_t RequestCursorInfo;
+static sourcekitd_uid_t RequestRangeInfo;
 static sourcekitd_uid_t RequestRelatedIdents;
 static sourcekitd_uid_t RequestEditorOpen;
 static sourcekitd_uid_t RequestEditorOpenInterface;
@@ -239,6 +243,7 @@ static int skt_main(int argc, const char **argv) {
   KeyContainerTypeUsr = sourcekitd_uid_get_from_cstr("key.containertypeusr");
   KeyModuleGroups = sourcekitd_uid_get_from_cstr("key.modulegroups");
   KeySimplified = sourcekitd_uid_get_from_cstr("key.simplified");
+  KeyRangeContent = sourcekitd_uid_get_from_cstr("key.rangecontent");
 
   SemaDiagnosticStage = sourcekitd_uid_get_from_cstr("source.diagnostic.stage.swift.sema");
 
@@ -255,6 +260,7 @@ static int skt_main(int argc, const char **argv) {
   RequestCodeCompleteCacheOnDisk = sourcekitd_uid_get_from_cstr("source.request.codecomplete.cache.ondisk");
   RequestCodeCompleteSetPopularAPI = sourcekitd_uid_get_from_cstr("source.request.codecomplete.setpopularapi");
   RequestCursorInfo = sourcekitd_uid_get_from_cstr("source.request.cursorinfo");
+  RequestRangeInfo = sourcekitd_uid_get_from_cstr("source.request.rangeinfo");
   RequestRelatedIdents = sourcekitd_uid_get_from_cstr("source.request.relatedidents");
   RequestEditorOpen = sourcekitd_uid_get_from_cstr("source.request.editor.open");
   RequestEditorOpenInterface = sourcekitd_uid_get_from_cstr("source.request.editor.open.interface");
@@ -537,6 +543,11 @@ static int handleTestInvocation(ArrayRef<const char *> Args,
       sourcekitd_request_dictionary_set_int64(Req, KeyOffset, ByteOffset);
     }
     break;
+  case SourceKitRequest::RangeInfo:
+    sourcekitd_request_dictionary_set_uid(Req, KeyRequest, RequestRangeInfo);
+    sourcekitd_request_dictionary_set_int64(Req, KeyOffset, ByteOffset);
+    sourcekitd_request_dictionary_set_int64(Req, KeyLength, Opts.Length);
+    break;
 
   case SourceKitRequest::RelatedIdents:
     sourcekitd_request_dictionary_set_uid(Req, KeyRequest, RequestRelatedIdents);
@@ -799,6 +810,10 @@ static bool handleResponse(sourcekitd_response_t Resp, const TestOptions &Opts,
 
     case SourceKitRequest::CursorInfo:
       printCursorInfo(Info, SourceFile, llvm::outs());
+      break;
+
+    case SourceKitRequest::RangeInfo:
+      printRangeInfo(Info, SourceFile, llvm::outs());
       break;
 
     case SourceKitRequest::DocInfo:
@@ -1129,6 +1144,39 @@ static void printCursorInfo(sourcekitd_variant_t Info, StringRef FilenameIn,
   OS << "MODULE GROUPS END\n";
 }
 
+static void printRangeInfo(sourcekitd_variant_t Info, StringRef FilenameIn,
+                            llvm::raw_ostream &OS) {
+  sourcekitd_uid_t KindUID = sourcekitd_variant_dictionary_get_uid(Info,
+                                      sourcekitd_uid_get_from_cstr("key.kind"));
+  if (KindUID == nullptr) {
+    OS << "<empty range info>\n";
+    return;
+  }
+
+  std::string Filename = FilenameIn;
+  char full_path[MAXPATHLEN];
+  if (const char *path = realpath(Filename.c_str(), full_path))
+    Filename = path;
+
+  sourcekitd_variant_t OffsetObj =
+    sourcekitd_variant_dictionary_get_value(Info, KeyOffset);
+  llvm::Optional<int64_t> Offset;
+  unsigned Length = 0;
+  if (sourcekitd_variant_get_type(OffsetObj) != SOURCEKITD_VARIANT_TYPE_NULL) {
+    Offset = sourcekitd_variant_int64_get_value(OffsetObj);
+    Length = sourcekitd_variant_dictionary_get_int64(Info, KeyLength);
+  }
+  const char *Kind = sourcekitd_uid_get_string_ptr(KindUID);
+  const char *Typename = sourcekitd_variant_dictionary_get_string(Info,
+                                                                  KeyTypename);
+
+  const char *RangeContent = sourcekitd_variant_dictionary_get_string(Info,
+                                                              KeyRangeContent);
+  OS << "<kind>" << Kind << "</kind>\n";
+  OS << "<content>" <<RangeContent << "</content>\n";
+  if (Typename)
+    OS << "<type>" <<Typename << "</type>\n";
+}
 static void printFoundInterface(sourcekitd_variant_t Info,
                                 llvm::raw_ostream &OS) {
   const char *Name = sourcekitd_variant_dictionary_get_string(Info,
