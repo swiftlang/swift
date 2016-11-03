@@ -45,7 +45,6 @@ namespace swift {
   class FileUnit;
   class GenericEnvironment;
   class GenericParamList;
-  class GenericSignature;
   class IRGenOptions;
   class LangOptions;
   class ModuleDecl;
@@ -210,10 +209,9 @@ namespace swift {
                               bool ProduceDiagnostics = true);
 
   /// Expose TypeChecker's handling of GenericParamList to SIL parsing.
-  std::pair<GenericSignature *, GenericEnvironment *>
-  handleSILGenericParams(ASTContext &Ctx,
-                         GenericParamList *genericParams,
-                         DeclContext *DC);
+  GenericEnvironment *handleSILGenericParams(ASTContext &Ctx,
+                                             GenericParamList *genericParams,
+                                             DeclContext *DC);
 
   /// Turn the given module into SIL IR.
   ///

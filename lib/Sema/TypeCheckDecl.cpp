@@ -710,7 +710,7 @@ ArchetypeBuilder TypeChecker::createArchetypeBuilder(Module *mod) {
 }
 
 /// Expose TypeChecker's handling of GenericParamList to SIL parsing.
-std::pair<GenericSignature *, GenericEnvironment *>
+GenericEnvironment *
 TypeChecker::handleSILGenericParams(GenericParamList *genericParams,
                                     DeclContext *DC) {
 
@@ -745,7 +745,7 @@ TypeChecker::handleSILGenericParams(GenericParamList *genericParams,
     finalizeGenericParamList(genericParams, parentSig, parentEnv, DC);
   }
 
-  return std::make_pair(parentSig, parentEnv);
+  return parentEnv;
 }
 
 /// Check whether the given type representation will be
