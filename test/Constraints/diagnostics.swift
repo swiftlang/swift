@@ -737,6 +737,11 @@ extension Foo23752537 {
   }
 }
 
+// <rdar://problem/27391581> QoI: Nonsensical "binary operator '&&' cannot be applied to two 'Bool' operands"
+func rdar27391581(_ a : Int, b : Int) -> Int {
+  return a == b && b != 0
+  // expected-error @-1 {{cannot convert return expression of type 'Bool' to return type 'Int'}}
+}
 
 // <rdar://problem/22276040> QoI: not great error message with "withUnsafePointer" sametype constraints
 func read2(_ p: UnsafeMutableRawPointer, maxLength: Int) {}
