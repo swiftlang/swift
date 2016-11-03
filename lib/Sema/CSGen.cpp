@@ -3179,7 +3179,10 @@ bool swift::isExtensionApplied(DeclContext &DC, Type BaseTy,
   ConstraintSystemOptions Options;
   NominalTypeDecl *Nominal = BaseTy->getNominalOrBoundGenericNominal();
   if (!Nominal || !BaseTy->isSpecialized() ||
-      ED->getGenericRequirements().empty())
+      ED->getGenericRequirements().empty() ||
+      // We'll crash if we leak type variables from one constraint
+      // system into the new one created below.
+      BaseTy->hasTypeVariable())
     return true;
   std::unique_ptr<TypeChecker> CreatedTC;
   // If the current ast context has no type checker, create one for it.
