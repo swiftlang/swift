@@ -2676,6 +2676,7 @@ internal class _TypedNative${Self}Storage<${TypeParameters}> :
     _sanityCheckFailure("Only create this by calling Buffer.createUnhashable")
   }
 
+#if _runtime(_ObjC)
 %if Self == 'Set':
   @objc
   internal required init(objects: UnsafePointer<AnyObject?>, count: Int) {
@@ -2691,6 +2692,7 @@ internal class _TypedNative${Self}Storage<${TypeParameters}> :
     _sanityCheckFailure("don't call this designated initializer")
   }
 %end
+#endif
 }
 
 
@@ -2996,6 +2998,7 @@ internal struct _Native${Self}Buffer<${TypeParameters}> {
     return res
   }
 
+#if _runtime(_ObjC)
   /// Gets the key at the given Index, and then bridges it.
   /// Intended for use with verbatim bridgeable keys.
   internal func bridgedKey(at index: Index) -> AnyObject {
@@ -3009,6 +3012,7 @@ internal struct _Native${Self}Buffer<${TypeParameters}> {
     let v = value(at: index.offset)
     return _bridgeAnythingToObjectiveC(v)
   }
+#endif
 
   @_versioned
   internal func isInitializedEntry(at i: Int) -> Bool {
