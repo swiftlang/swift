@@ -295,6 +295,7 @@ class RefCountBitsT {
   template <ClearPinnedFlag clearPinnedFlag>
   LLVM_ATTRIBUTE_ALWAYS_INLINE LLVM_ATTRIBUTE_UNUSED_RESULT
   bool doDecrementStrongExtraRefCount(uint32_t dec) {
+#ifndef NDEBUG
     if (!hasSideTable()) {
       // Can't check these assertions with side table present.
       
@@ -309,6 +310,7 @@ class RefCountBitsT {
         assert(getStrongExtraRefCount() + 1 >= dec  &&  
                "releasing reference whose refcount is already zero");
     }
+#endif
 
     uint64_t unpin = clearPinnedFlag ? (uint64_t(1) << IsPinnedShift) : 0;
     // This deliberately underflows by borrowing from the UseSlowRC field.
