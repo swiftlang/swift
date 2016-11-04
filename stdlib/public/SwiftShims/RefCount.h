@@ -206,54 +206,116 @@ enum ClearPinnedFlag { DontClearPinnedFlag = false, DoClearPinnedFlag = true };
 enum PerformDeinit { DontPerformDeinit = false, DoPerformDeinit = true };
 
 
-// Basic encoding of refcount and flag data into the object's header.
-// FIXME: Specialize this for a 32-bit field on 32-bit architectures.
+// Raw storage of refcount bits, depending on pointer size and inlinedness.
+// 32-bit inline refcount is 32-bits. All others are 64-bits.
+
+template <RefCountInlinedness refcountIsInline, size_t sizeofPointer>
+struct RefCountBitsInt;
+
+// 64-bit inline
+// 64-bit out of line
 template <RefCountInlinedness refcountIsInline>
-class RefCountBitsT {
+struct RefCountBitsInt<refcountIsInline, 8> {
+  typedef uint64_t Type;
+  typedef int64_t SignedType;
+};
 
-  friend class RefCountBitsT<RefCountIsInline>;
-  friend class RefCountBitsT<RefCountNotInline>;
+// 32-bit out of line
+template <>
+struct RefCountBitsInt<RefCountNotInline, 4> {
+  typedef uint64_t Type;
+  typedef int64_t SignedType;
+};
+
+// 32-bit inline
+template <>
+struct RefCountBitsInt<RefCountIsInline, 4> {
+  typedef uint32_t Type;
+  typedef int32_t SignedType;  
+};
+
+
+// Layout of refcount bits.
+// field value = (bits & mask) >> shift
+// FIXME: redo this abstraction more cleanly
   
-  static const RefCountInlinedness Inlinedness = refcountIsInline;
-  
-  uint64_t bits;
+# define maskForField(name) (((uint64_t(1)<<name##BitCount)-1) << name##Shift)
+# define shiftAfterField(name) (name##Shift + name##BitCount)
 
-  // Layout of bits.
-  // field value = (bits & mask) >> shift
-  
-# define MaskForField(name) (((1ULL<<name##BitCount)-1) << name##Shift)
-# define ShiftAfterField(name) (name##Shift + name##BitCount)
+template <size_t sizeofPointer>
+struct RefCountBitOffsets;
 
-  enum : uint64_t {
-    UnownedRefCountShift = 0,
-    UnownedRefCountBitCount = 32,
-    UnownedRefCountMask = MaskForField(UnownedRefCount),
+// 64-bit inline
+// 64-bit out of line
+// 32-bit out of line
+template <>
+struct RefCountBitOffsets<8> {
+  static const size_t UnownedRefCountShift = 0;
+  static const size_t UnownedRefCountBitCount = 32;
+  static const uint64_t UnownedRefCountMask = maskForField(UnownedRefCount);
 
-    IsPinnedShift = ShiftAfterField(UnownedRefCount), 
-    IsPinnedBitCount = 1, 
-    IsPinnedMask = MaskForField(IsPinned),
+  static const size_t IsPinnedShift = shiftAfterField(UnownedRefCount); 
+  static const size_t IsPinnedBitCount = 1; 
+  static const uint64_t IsPinnedMask = maskForField(IsPinned);
 
-    IsDeinitingShift = ShiftAfterField(IsPinned),
-    IsDeinitingBitCount = 1,
-    IsDeinitingMask = MaskForField(IsDeiniting),
+  static const size_t IsDeinitingShift = shiftAfterField(IsPinned);
+  static const size_t IsDeinitingBitCount = 1;
+  static const uint64_t IsDeinitingMask = maskForField(IsDeiniting);
 
-    StrongExtraRefCountShift = ShiftAfterField(IsDeiniting),
-    StrongExtraRefCountBitCount = 29,
-    StrongExtraRefCountMask = MaskForField(StrongExtraRefCount),
+  static const size_t StrongExtraRefCountShift = shiftAfterField(IsDeiniting);
+  static const size_t StrongExtraRefCountBitCount = 29;
+  static const uint64_t StrongExtraRefCountMask = maskForField(StrongExtraRefCount);
 
-    UseSlowRCShift = ShiftAfterField(StrongExtraRefCount),
-    UseSlowRCBitCount = 1,
-    UseSlowRCMask = MaskForField(UseSlowRC),
+  static const size_t UseSlowRCShift = shiftAfterField(StrongExtraRefCount);
+  static const size_t UseSlowRCBitCount = 1;
+  static const uint64_t UseSlowRCMask = maskForField(UseSlowRC);
 
-    SideTableShift = 0,
-    SideTableBitCount = 62,
-    SideTableMask = MaskForField(SideTable),
+  static const size_t SideTableShift = 0;
+  static const size_t SideTableBitCount = 62;
+  static const uint64_t SideTableMask = maskForField(SideTable);
+  static const size_t SideTableUnusedLowBits = 3;
 
-    SideTableMarkShift = SideTableBitCount,
-    SideTableMarkBitCount = 1,
-    SideTableMarkMask = MaskForField(SideTableMark)
-  };
+  static const size_t SideTableMarkShift = SideTableBitCount;
+  static const size_t SideTableMarkBitCount = 1;
+  static const uint64_t SideTableMarkMask = maskForField(SideTableMark);
+};
 
+// 32-bit inline
+template <>
+struct RefCountBitOffsets<4> {
+  static const size_t UnownedRefCountShift = 0;
+  static const size_t UnownedRefCountBitCount = 8;
+  static const uint32_t UnownedRefCountMask = maskForField(UnownedRefCount);
+
+  static const size_t IsPinnedShift = shiftAfterField(UnownedRefCount); 
+  static const size_t IsPinnedBitCount = 1; 
+  static const uint32_t IsPinnedMask = maskForField(IsPinned);
+
+  static const size_t IsDeinitingShift = shiftAfterField(IsPinned);
+  static const size_t IsDeinitingBitCount = 1;
+  static const uint32_t IsDeinitingMask = maskForField(IsDeiniting);
+
+  static const size_t StrongExtraRefCountShift = shiftAfterField(IsDeiniting);
+  static const size_t StrongExtraRefCountBitCount = 21;
+  static const uint32_t StrongExtraRefCountMask = maskForField(StrongExtraRefCount);
+
+  static const size_t UseSlowRCShift = shiftAfterField(StrongExtraRefCount);
+  static const size_t UseSlowRCBitCount = 1;
+  static const uint32_t UseSlowRCMask = maskForField(UseSlowRC);
+
+  static const size_t SideTableShift = 0;
+  static const size_t SideTableBitCount = 30;
+  static const uint32_t SideTableMask = maskForField(SideTable);
+  static const size_t SideTableUnusedLowBits = 2;
+
+  static const size_t SideTableMarkShift = SideTableBitCount;
+  static const size_t SideTableMarkBitCount = 1;
+  static const uint32_t SideTableMarkMask = maskForField(SideTableMark);
+};
+
+
+/*
+  FIXME: reinstate these assertions
   static_assert(StrongExtraRefCountShift == IsDeinitingShift + 1, 
                 "IsDeiniting must be LSB-wards of StrongExtraRefCount");
   static_assert(UseSlowRCShift + UseSlowRCBitCount == sizeof(bits)*8,
@@ -265,13 +327,42 @@ class RefCountBitsT {
                 IsDeinitingBitCount + StrongExtraRefCountBitCount +
                 UseSlowRCBitCount == sizeof(bits)*8,
                 "wrong bit count for RefCountBits refcount encoding");
-# undef MaskForField
-# undef ShiftAfterField
+*/
+# undef maskForField
+# undef shiftAfterField
 
-# define GetField(name) \
-    ((bits & name##Mask) >> name##Shift)
-# define SetField(name, val) \
-  bits = (bits & ~name##Mask) | (((uint64_t(val) << name##Shift) & name##Mask))
+
+// Basic encoding of refcount and flag data into the object's header.
+template <RefCountInlinedness refcountIsInline>
+class RefCountBitsT {
+
+  friend class RefCountBitsT<RefCountIsInline>;
+  friend class RefCountBitsT<RefCountNotInline>;
+  
+  static const RefCountInlinedness Inlinedness = refcountIsInline;
+
+  typedef typename RefCountBitsInt<refcountIsInline, sizeof(void*)>::Type
+    BitsType;
+  typedef typename RefCountBitsInt<refcountIsInline, sizeof(void*)>::SignedType
+    SignedBitsType;
+  typedef RefCountBitOffsets<sizeof(BitsType)>
+    Offsets;
+
+  BitsType bits;
+
+  // "Bitfield" accessors.
+
+# define getFieldIn(bits, offsets, name)                                \
+    ((bits & offsets::name##Mask) >> offsets::name##Shift)
+# define setFieldIn(bits, offsets, name, val)                           \
+    bits = ((bits & ~offsets::name##Mask) |                             \
+            (((BitsType(val) << offsets::name##Shift) & offsets::name##Mask)))
+  
+# define getField(name) getFieldIn(bits, Offsets, name)
+# define setField(name, val) setFieldIn(bits, Offsets, name, val)  
+# define copyFieldFrom(src, name)                                       \
+    setFieldIn(bits, Offsets, name,                                     \
+               getFieldIn(src.bits, decltype(src)::Offsets, name))
 
   // RefCountBits uses always_inline everywhere
   // to improve performance of debug builds.
@@ -279,12 +370,12 @@ class RefCountBitsT {
   private:
   LLVM_ATTRIBUTE_ALWAYS_INLINE
   bool getUseSlowRC() const {
-    return bool(GetField(UseSlowRC));
+    return bool(getField(UseSlowRC));
   }
 
   LLVM_ATTRIBUTE_ALWAYS_INLINE
   void setUseSlowRC(bool value) {
-    SetField(UseSlowRC, value);
+    setField(UseSlowRC, value);
   }
 
     
@@ -312,10 +403,12 @@ class RefCountBitsT {
     }
 #endif
 
-    uint64_t unpin = clearPinnedFlag ? (uint64_t(1) << IsPinnedShift) : 0;
+    BitsType unpin = (clearPinnedFlag
+                      ? (BitsType(1) << Offsets::IsPinnedShift)
+                      : 0);
     // This deliberately underflows by borrowing from the UseSlowRC field.
-    bits -= unpin + (uint64_t(dec) << StrongExtraRefCountShift);
-    return (int64_t(bits) >= 0);
+    bits -= unpin + (BitsType(dec) << Offsets::StrongExtraRefCountShift);
+    return (SignedBitsType(bits) >= 0);
   }
 
   public:
@@ -326,21 +419,40 @@ class RefCountBitsT {
   LLVM_ATTRIBUTE_ALWAYS_INLINE
   constexpr
   RefCountBitsT(uint32_t strongExtraCount, uint32_t unownedCount)
-    : bits((uint64_t(strongExtraCount) << StrongExtraRefCountShift) |
-           (uint64_t(unownedCount)     << UnownedRefCountShift))
+    : bits((BitsType(strongExtraCount) << Offsets::StrongExtraRefCountShift) |
+           (BitsType(unownedCount)     << Offsets::UnownedRefCountShift))
   { }
 
   LLVM_ATTRIBUTE_ALWAYS_INLINE
   RefCountBitsT(HeapObjectSideTableEntry* side)
-    : bits((reinterpret_cast<uint64_t>(side) >> 3) |
-           (1ULL << UseSlowRCShift) |
-           (1ULL << SideTableMarkShift))
+    : bits((reinterpret_cast<BitsType>(side) >> Offsets::SideTableUnusedLowBits)
+           | (BitsType(1) << Offsets::UseSlowRCShift)
+           | (BitsType(1) << Offsets::SideTableMarkShift))
   {
     assert(refcountIsInline);
   }
 
   LLVM_ATTRIBUTE_ALWAYS_INLINE
-  RefCountBitsT(RefCountBitsT<RefCountIsInline> newbits) : bits(newbits.bits) { }
+  RefCountBitsT(RefCountBitsT<RefCountIsInline> newbits) {
+    bits = 0;
+    
+    if (refcountIsInline  ||  sizeof(newbits) == sizeof(*this)) {
+      // this and newbits are both inline
+      // OR this is out-of-line but the same layout as inline.
+      // (FIXME: use something cleaner than sizeof for same-layout test)
+      // Copy the bits directly.
+      bits = newbits.bits;
+    }
+    else {
+      // this is out-of-line and not the same layout as inline newbits.
+      // Copy field-by-field.
+      copyFieldFrom(newbits, UnownedRefCount);
+      copyFieldFrom(newbits, IsPinned);
+      copyFieldFrom(newbits, IsDeiniting);
+      copyFieldFrom(newbits, StrongExtraRefCount);
+      copyFieldFrom(newbits, UseSlowRC);
+    }
+  }
   
   LLVM_ATTRIBUTE_ALWAYS_INLINE
   bool hasSideTable() const {
@@ -359,33 +471,32 @@ class RefCountBitsT {
     assert(hasSideTable());
 
     // Stored value is a shifted pointer.
-    // FIXME: Don't hard-code this shift amount?
     return reinterpret_cast<HeapObjectSideTableEntry *>
-      (uintptr_t(GetField(SideTable)) << 3);
+      (uintptr_t(getField(SideTable)) << Offsets::SideTableUnusedLowBits);
   }
 
   LLVM_ATTRIBUTE_ALWAYS_INLINE
   uint32_t getUnownedRefCount() const {
     assert(!hasSideTable());
-    return uint32_t(GetField(UnownedRefCount));
+    return uint32_t(getField(UnownedRefCount));
   }
 
   LLVM_ATTRIBUTE_ALWAYS_INLINE
   bool getIsPinned() const {
     assert(!hasSideTable());
-    return bool(GetField(IsPinned));
+    return bool(getField(IsPinned));
   }
 
   LLVM_ATTRIBUTE_ALWAYS_INLINE
   bool getIsDeiniting() const {
     assert(!hasSideTable());
-    return bool(GetField(IsDeiniting));
+    return bool(getField(IsDeiniting));
   }
 
   LLVM_ATTRIBUTE_ALWAYS_INLINE
   uint32_t getStrongExtraRefCount() const {
     assert(!hasSideTable());
-    return uint32_t(GetField(StrongExtraRefCount));
+    return uint32_t(getField(StrongExtraRefCount));
   }
 
 
@@ -399,36 +510,35 @@ class RefCountBitsT {
   void setSideTable(HeapObjectSideTableEntry *side) {
     assert(hasSideTable());
     // Stored value is a shifted pointer.
-    // FIXME: Don't hard-code this shift amount?
     uintptr_t value = reinterpret_cast<uintptr_t>(side);
-    uintptr_t storedValue = value >> 3;
-    assert(storedValue << 3 == value);
-    SetField(SideTable, storedValue);
-    SetField(SideTableMark, 1);
+    uintptr_t storedValue = value >> Offsets::SideTableUnusedLowBits;
+    assert(storedValue << Offsets::SideTableUnusedLowBits == value);
+    setField(SideTable, storedValue);
+    setField(SideTableMark, 1);
   }
 
   LLVM_ATTRIBUTE_ALWAYS_INLINE
   void setUnownedRefCount(uint32_t value) {
     assert(!hasSideTable());
-    SetField(UnownedRefCount, value);
+    setField(UnownedRefCount, value);
   }
 
   LLVM_ATTRIBUTE_ALWAYS_INLINE
   void setIsPinned(bool value) {
     assert(!hasSideTable());
-    SetField(IsPinned, value);
+    setField(IsPinned, value);
   }
 
   LLVM_ATTRIBUTE_ALWAYS_INLINE
   void setIsDeiniting(bool value) {
     assert(!hasSideTable());
-    SetField(IsDeiniting, value);
+    setField(IsDeiniting, value);
   }
 
   LLVM_ATTRIBUTE_ALWAYS_INLINE
   void setStrongExtraRefCount(uint32_t value) {
     assert(!hasSideTable());
-    SetField(StrongExtraRefCount, value);
+    setField(StrongExtraRefCount, value);
   }
   
 
@@ -438,8 +548,8 @@ class RefCountBitsT {
   LLVM_ATTRIBUTE_ALWAYS_INLINE LLVM_ATTRIBUTE_UNUSED_RESULT
   bool incrementStrongExtraRefCount(uint32_t inc) {
     // This deliberately overflows into the UseSlowRC field.
-    bits += uint64_t(inc) << StrongExtraRefCountShift;
-    return (int64_t(bits) >= 0);
+    bits += BitsType(inc) << Offsets::StrongExtraRefCountShift;
+    return (SignedBitsType(bits) >= 0);
   }
 
   // FIXME: I don't understand why I can't make clearPinned a template argument
@@ -462,8 +572,11 @@ class RefCountBitsT {
     setUnownedRefCount(getUnownedRefCount() - dec);
   }
   
-# undef GetField
-# undef SetField
+# undef getFieldIn
+# undef setFieldIn
+# undef getField
+# undef setField
+# undef copyFieldFrom
 };
 
 typedef RefCountBitsT<RefCountIsInline> InlineRefCountBits;
@@ -540,6 +653,11 @@ class SideTableRefCountBits : public RefCountBitsT<RefCountNotInline>
 template <typename RefCountBits>
 class RefCounts {
   std::atomic<RefCountBits> refCounts;
+#if !__LP64__
+  // FIXME: hack - something somewhere is assuming a 3-word header on 32-bit
+  // See also other fixmes marked "small header for 32-bit"
+  uintptr_t unused __attribute__((unavailable));
+#endif
 
   // Out-of-line slow paths.
   
@@ -993,6 +1111,13 @@ static_assert(swift::IsTriviallyConstructible<InlineRefCounts>::value,
               "InlineRefCounts must be trivially initializable");
 static_assert(std::is_trivially_destructible<InlineRefCounts>::value,
               "InlineRefCounts must be trivially destructible");
+
+/* FIXME: small header for 32-bit
+static_assert(sizeof(InlineRefCounts) == sizeof(uintptr_t),
+  "InlineRefCounts must be pointer-sized");
+static_assert(alignof(InlineRefCounts) == alignof(uintptr_t),
+"InlineRefCounts must be pointer-aligned");
+*/
 
 
 class HeapObjectSideTableEntry {

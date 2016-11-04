@@ -57,6 +57,11 @@ static_assert(swift::IsTriviallyConstructible<HeapObject>::value,
               "HeapObject must be trivially initializable");
 static_assert(std::is_trivially_destructible<HeapObject>::value,
               "HeapObject must be trivially destructible");
+// FIXME: small header for 32-bit
+//static_assert(sizeof(HeapObject) == 2*sizeof(void*),
+//              "HeapObject must be two pointers long");
+static_assert(alignof(HeapObject) == alignof(void*),
+              "HeapObject must be pointer-aligned");
 
 } // end namespace swift
 #endif
