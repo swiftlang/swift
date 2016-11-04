@@ -292,3 +292,9 @@ protocol HasAssocType {
 extension OuterGeneric.MidGeneric : HasAssocType {
   func takesAssocType(first: D, second: F) {}
 }
+
+typealias OuterGenericMidGeneric<T> = OuterGeneric<T>.MidGeneric
+
+extension OuterGenericMidGeneric {
+
+}
