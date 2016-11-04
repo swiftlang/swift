@@ -475,7 +475,7 @@ public struct Set<Element : Hashable> :
   public init(minimumCapacity: Int) {
     _variantBuffer =
       _VariantBuffer.native(
-        _NativeBuffer.create(minimumCapacity: minimumCapacity))
+        _NativeBuffer(minimumCapacity: minimumCapacity))
   }
 
   /// Private initializer.
@@ -1667,7 +1667,7 @@ public struct Dictionary<Key : Hashable, Value> :
   ///   allocate buffer for in the new dictionary.
   public init(minimumCapacity: Int) {
     _variantBuffer =
-      .native(_NativeBuffer.create(minimumCapacity: minimumCapacity))
+      .native(_NativeBuffer(minimumCapacity: minimumCapacity))
   }
 
   internal init(_nativeBuffer: _NativeDictionaryBuffer<Key, Value>) {
@@ -2534,6 +2534,8 @@ internal class _RawNative${Self}Storage:
     return storage
   }()
 
+  // This type is made with allocWithTailElems, so no init is ever called.
+  // But we still need to have an init to satisfy the compiler.
   internal init(_doNotCallMe: ()) {
     _sanityCheckFailure("Only create this by using the `empty` singleton")
   }
@@ -2664,8 +2666,10 @@ internal class _TypedNative${Self}Storage<${TypeParameters}> :
     _fixLifetime(self)
   }
 
+  // This type is made with allocWithTailElems, so no init is ever called.
+  // But we still need to have an init to satisfy the compiler.
   override internal init(_doNotCallMe: ()) {
-    _sanityCheckFailure("Only create this by calling Buffer.createUnhashable")
+    _sanityCheckFailure("Only create this by calling Buffer's inits")
   }
 
 #if _runtime(_ObjC)
@@ -2696,8 +2700,10 @@ final internal class _HashableTypedNative${Self}Storage<${TypeParametersDecl}> :
   internal typealias FullContainer = ${Self}<${TypeParameters}>
   internal typealias Buffer = _Native${Self}Buffer<${TypeParameters}>
 
+  // This type is made with allocWithTailElems, so no init is ever called.
+  // But we still need to have an init to satisfy the compiler.
   override internal init(_doNotCallMe: ()) {
-    _sanityCheckFailure("Only create this by calling Buffer.create")
+    _sanityCheckFailure("Only create this by calling Buffer's inits'")
   }
 
   
@@ -2867,8 +2873,8 @@ internal struct _Native${Self}Buffer<${TypeParameters}> {
   internal var _storage: RawStorage
 
   /// Creates a Buffer with a storage that is typed, but doesn't understand
-  /// Hashing. Mostly for bridging; prefer `create(capacity:)`.
-  internal static func createUnhashable(capacity: Int) -> Buffer {
+  /// Hashing. Mostly for bridging; prefer `init(capacity:)`.
+  internal init(capacity: Int, unhashable: ()) {
     let numWordsForBitmap = _UnsafeBitMap.sizeInWords(forSizeInBits: capacity)
 %if Self == 'Dictionary':
     let storage = Builtin.allocWithTailElems_3(TypedStorage.self,
@@ -2880,31 +2886,29 @@ internal struct _Native${Self}Buffer<${TypeParameters}> {
         numWordsForBitmap._builtinWordValue, UInt.self,
         capacity._builtinWordValue, Key.self)
 %end
-    return create(capacity: capacity, storage: storage)
+    self.init(capacity: capacity, storage: storage)
   }
 
   /// Given a capacity and uninitialized RawStorage, completes the 
   /// initialization and returns a Buffer.  
-  internal static func create(capacity: Int, storage: RawStorage) -> Buffer {
+  internal init(capacity: Int, storage: RawStorage) {
     // We can initialize by assignment because _HashedContainerBufferHeader
     // is a trivial type, i.e. contains no references.
     storage._body = BufferHeader(capacity: capacity)
     
-    var buffer = Buffer(_storage: storage)
+    self.init(_storage: storage)
 
     let initializedEntries = _UnsafeBitMap(
-        storage: buffer._initializedHashtableEntriesBitMapBuffer,
+        storage: _initializedHashtableEntriesBitMapBuffer,
         bitCount: capacity)
     initializedEntries.initializeToZero()
 
     // Initialize header
-    buffer._body.initializedEntries = initializedEntries
-    buffer._body.keys = UnsafeMutableRawPointer(buffer._keys)
+    _body.initializedEntries = initializedEntries
+    _body.keys = UnsafeMutableRawPointer(_keys)
 %if Self == 'Dictionary':
-    buffer._body.values = UnsafeMutableRawPointer(buffer._values)
+    _body.values = UnsafeMutableRawPointer(_values)
 %end
-
-    return buffer
   }
 
   /// A convenience forwarding the _storage's body
@@ -3161,19 +3165,19 @@ extension _Native${Self}Buffer
   internal typealias SequenceElement = ${Sequence}
 
   @inline(__always)
-  internal static func create(minimumCapacity: Int) -> Buffer {
+  internal init(minimumCapacity: Int) {
     // Make sure there's a representable power of 2 >= minimumCapacity
     _sanityCheck(minimumCapacity <= (Int.max >> 1) + 1)
     var capacity = 2
     while capacity < minimumCapacity {
       capacity <<= 1
     }
-    return create(capacity: capacity)
+    self.init(capacity: capacity)
   }
 
   /// Create a buffer instance with room for at least 'capacity'
   /// entries and all entries marked invalid.
-  internal static func create(capacity: Int) -> Buffer {
+  internal init(capacity: Int) {
     let numWordsForBitmap = _UnsafeBitMap.sizeInWords(forSizeInBits: capacity)
 %if Self == 'Dictionary':
     let storage = Builtin.allocWithTailElems_3(HashTypedStorage.self,
@@ -3185,7 +3189,7 @@ extension _Native${Self}Buffer
         numWordsForBitmap._builtinWordValue, UInt.self,
         capacity._builtinWordValue, Key.self)
 %end
-    return create(capacity: capacity, storage: storage)
+    self.init(capacity: capacity, storage: storage)
   }
 
 #if _runtime(_ObjC)
@@ -3395,7 +3399,7 @@ extension _Native${Self}Buffer
       Buffer.minimumCapacity(
         minimumCount: elements.count,
         maxLoadFactorInverse: _hashContainerDefaultMaxLoadFactorInverse)
-    var nativeBuffer = Buffer.create(minimumCapacity: requiredCapacity)
+    var nativeBuffer = Buffer(minimumCapacity: requiredCapacity)
 
 %if Self == 'Set':
 
@@ -3517,7 +3521,7 @@ final internal class _SwiftDeferredNS${Self}<${TypeParametersDecl}>
 %end
 
   internal init(minimumCapacity: Int = 2) {
-    nativeBuffer = NativeBuffer.create(minimumCapacity: minimumCapacity)
+    nativeBuffer = NativeBuffer(minimumCapacity: minimumCapacity)
     super.init()
   }
 
@@ -3646,8 +3650,7 @@ final internal class _SwiftDeferredNS${Self}<${TypeParametersDecl}>
     }
 
     // Create buffer for bridged data.
-    let bridged = BridgedBuffer.createUnhashable(
-      capacity: nativeBuffer.capacity)
+    let bridged = BridgedBuffer(capacity: nativeBuffer.capacity, unhashable: ())
 
     // Bridge everything.
     for i in 0..<nativeBuffer.capacity {
@@ -4014,7 +4017,7 @@ internal enum _Variant${Self}Buffer<${TypeParametersDecl}> : _HashBuffer {
       }
 
       let oldNativeBuffer = asNative
-      var newNativeBuffer = NativeBuffer.create(minimumCapacity: minimumCapacity)
+      var newNativeBuffer = NativeBuffer(minimumCapacity: minimumCapacity)
       let newCapacity = newNativeBuffer.capacity
       for i in 0..<oldCapacity {
         if oldNativeBuffer.isInitializedEntry(at: i) {
@@ -4047,7 +4050,7 @@ internal enum _Variant${Self}Buffer<${TypeParametersDecl}> : _HashBuffer {
     case .cocoa(let cocoaBuffer):
 #if _runtime(_ObjC)
       let cocoa${Self} = cocoaBuffer.cocoa${Self}
-      var newNativeBuffer = NativeBuffer.create(minimumCapacity: minimumCapacity)
+      var newNativeBuffer = NativeBuffer(minimumCapacity: minimumCapacity)
       let oldCocoaIterator = _Cocoa${Self}Iterator(cocoa${Self})
 %if Self == 'Set':
       while let key = oldCocoaIterator.next() {
@@ -4572,7 +4575,7 @@ internal enum _Variant${Self}Buffer<${TypeParametersDecl}> : _HashBuffer {
     }
 
     if !keepCapacity {
-      self = .native(NativeBuffer.create(minimumCapacity: 2))
+      self = .native(NativeBuffer(minimumCapacity: 2))
       return
     }
 
@@ -4586,7 +4589,7 @@ internal enum _Variant${Self}Buffer<${TypeParametersDecl}> : _HashBuffer {
       nativeRemoveAll()
     case .cocoa(let cocoaBuffer):
 #if _runtime(_ObjC)
-      self = .native(NativeBuffer.create(minimumCapacity: cocoaBuffer.count))
+      self = .native(NativeBuffer(minimumCapacity: cocoaBuffer.count))
 #else
       _sanityCheckFailure("internal error: unexpected cocoa ${Self}")
 #endif
