@@ -8,7 +8,7 @@ import Builtin
 sil @pod_box_8_8_a : $@convention(thin) () -> () {
 entry:
   // CHECK: [[BOX:%.*]] = call noalias %swift.refcounted* @swift_rt_swift_allocObject(%swift.type* {{.*}} [[POD_8_8_METADATA:@metadata[0-9.]*]], {{.*}} [[WORD:i[0-9]+]] 24, [[WORD]] 7)
-  %a = alloc_box $Builtin.Int64
+  %a = alloc_box $@box Builtin.Int64
   // CHECK-32: [[BOX_RAW:%.*]] = bitcast %swift.refcounted* [[BOX]] to [[POD_8_8_LAYOUT:<\{ %swift.refcounted, \[4 x i8\], \[8 x i8\] \}>]]*
   // CHECK-32: [[BOX_DATA:%.*]] = getelementptr inbounds [[POD_8_8_LAYOUT]], [[POD_8_8_LAYOUT]]* [[BOX_RAW]], i32 0, i32 2
   // CHECK-64: [[BOX_RAW:%.*]] = bitcast %swift.refcounted* [[BOX]] to [[POD_8_8_LAYOUT:<\{ %swift.refcounted, \[8 x i8\] \}>]]*
@@ -24,7 +24,7 @@ entry:
 sil @pod_box_8_8_b : $@convention(thin) () -> () {
 entry:
   // CHECK: [[BOX:%.*]] = call noalias %swift.refcounted* @swift_rt_swift_allocObject(%swift.type* {{.*}} [[POD_8_8_METADATA]], {{.*}} [[WORD]] 24, [[WORD]] 7)
-  %a = alloc_box $Builtin.FPIEEE64
+  %a = alloc_box $@box Builtin.FPIEEE64
   // CHECK-32: [[BOX_RAW:%.*]] = bitcast %swift.refcounted* [[BOX]] to [[POD_8_8_LAYOUT:<\{ %swift.refcounted, \[4 x i8\], \[8 x i8\] \}>]]*
   // CHECK-32: [[BOX_DATA:%.*]] = getelementptr inbounds [[POD_8_8_LAYOUT]], [[POD_8_8_LAYOUT]]* [[BOX_RAW]], i32 0, i32 2
   // CHECK-64: [[BOX_RAW:%.*]] = bitcast %swift.refcounted* [[BOX]] to [[POD_8_8_LAYOUT:<\{ %swift.refcounted, \[8 x i8\] \}>]]*
@@ -45,7 +45,7 @@ struct OverAligned {
 sil @pod_box_32_32 : $@convention(thin) () -> () {
 entry:
   // CHECK: [[BOX:%.*]] = call noalias %swift.refcounted* @swift_rt_swift_allocObject(%swift.type* {{.*}} [[POD_32_32_METADATA:@metadata[0-9.]*]], {{.*}} [[WORD]] 64, [[WORD]] 31)
-  %a = alloc_box $OverAligned
+  %a = alloc_box $@box OverAligned
   // CHECK-32: [[BOX_RAW:%.*]] = bitcast %swift.refcounted* [[BOX]] to [[POD_32_32_LAYOUT:<\{ %swift.refcounted, \[20 x i8\], \[32 x i8\] \}>]]*
   // CHECK-64: [[BOX_RAW:%.*]] = bitcast %swift.refcounted* [[BOX]] to [[POD_32_32_LAYOUT:<\{ %swift.refcounted, \[16 x i8\], \[32 x i8\] \}>]]*
   // CHECK: [[BOX_DATA:%.*]] = getelementptr inbounds [[POD_32_32_LAYOUT]], [[POD_32_32_LAYOUT]]* [[BOX_RAW]], i32 0, i32 2
@@ -67,7 +67,7 @@ sil @rc_box_a : $@convention(thin) () -> () {
 entry:
   // CHECK-32: [[BOX:%.*]] = call noalias %swift.refcounted* @swift_rt_swift_allocObject(%swift.type* {{.*}} [[NATIVE_RC_METADATA:@metadata[0-9.]*]], {{.*}} [[WORD]] 16, [[WORD]] 3)
   // CHECK-64: [[BOX:%.*]] = call noalias %swift.refcounted* @swift_rt_swift_allocObject(%swift.type* {{.*}} [[NATIVE_RC_METADATA:@metadata[0-9.]*]], {{.*}} [[WORD]] 24, [[WORD]] 7)
-  %a = alloc_box $C
+  %a = alloc_box $@box C
   // CHECK: bitcast %swift.refcounted** {{%.*}} to %C11typed_boxes1C**
   %b = project_box %a : $@box C, 0
   dealloc_box %a : $@box C
@@ -80,7 +80,7 @@ entry:
   // TODO: Should reuse metadata
   // CHECK-32: [[BOX:%.*]] = call noalias %swift.refcounted* @swift_rt_swift_allocObject(%swift.type* {{.*}} [[NATIVE_RC_METADATA]], {{.*}} [[WORD]] 16, [[WORD]] 3)
   // CHECK-64: [[BOX:%.*]] = call noalias %swift.refcounted* @swift_rt_swift_allocObject(%swift.type* {{.*}} [[NATIVE_RC_METADATA]], {{.*}} [[WORD]] 24, [[WORD]] 7)
-  %a = alloc_box $D
+  %a = alloc_box $@box D
   // CHECK: bitcast %swift.refcounted** {{%.*}} to %C11typed_boxes1D**
   %b = project_box %a : $@box D, 0
   dealloc_box %a : $@box D
@@ -92,7 +92,7 @@ sil @unknown_rc_box : $@convention(thin) () -> () {
 entry:
   // CHECK-32: [[BOX:%.*]] = call noalias %swift.refcounted* @swift_rt_swift_allocObject(%swift.type* {{.*}} [[UNKNOWN_RC_METADATA:@metadata[0-9.]*]], {{.*}} [[WORD]] 16, [[WORD]] 3)
   // CHECK-64: [[BOX:%.*]] = call noalias %swift.refcounted* @swift_rt_swift_allocObject(%swift.type* {{.*}} [[UNKNOWN_RC_METADATA:@metadata[0-9.]*]], {{.*}} [[WORD]] 24, [[WORD]] 7)
-  %a = alloc_box $Builtin.UnknownObject
+  %a = alloc_box $@box Builtin.UnknownObject
   %b = project_box %a : $@box Builtin.UnknownObject, 0
   dealloc_box %a : $@box Builtin.UnknownObject
   return undef : $()
@@ -106,7 +106,7 @@ struct Fixed {
 
 sil @fixed_box : $@convention(thin) () -> () {
 entry:
-  %a = alloc_box $Fixed
+  %a = alloc_box $@box Fixed
   %b = project_box %a : $@box Fixed, 0
   dealloc_box %a : $@box Fixed
   return undef : $()
@@ -128,7 +128,7 @@ entry:
   // CHECK: [[ALLOC:%.*]] = call { %swift.refcounted*, %swift.opaque* } @swift_allocBox(%swift.type* [[METADATA]])
   // CHECK: [[BOX:%.*]] = extractvalue { %swift.refcounted*, %swift.opaque* } [[ALLOC]], 0
   // CHECK: [[PTR:%.*]] = extractvalue { %swift.refcounted*, %swift.opaque* } [[ALLOC]], 1
-  %a = alloc_box $Dyn<T>
+  %a = alloc_box $@box Dyn<T>
   // CHECK: [[CAST_PTR:%.*]] = bitcast %swift.opaque* [[PTR]] to %V11typed_boxes3Dyn*
   %b = project_box %a : $@box Dyn<T>, 0
   %f = function_ref @take_dyn : $@convention(thin) <T> (@in Dyn<T>) -> ()
@@ -145,7 +145,7 @@ entry:
   // CHECK: [[ALLOC:%.*]] = call { %swift.refcounted*, %swift.opaque* } @swift_allocBox(%swift.type* %T)
   // CHECK: [[BOX:%.*]] = extractvalue { %swift.refcounted*, %swift.opaque* } [[ALLOC]], 0
   // CHECK: [[PTR:%.*]] = extractvalue { %swift.refcounted*, %swift.opaque* } [[ALLOC]], 1
-  %a = alloc_box $T
+  %a = alloc_box $@box T
   %b = project_box %a : $@box T, 0
   %f = function_ref @take_t : $@convention(thin) <T> (@in T) -> ()
   // CHECK: call void @take_t(%swift.opaque* {{[^,]*}} [[PTR]], {{.*}})

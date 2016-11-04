@@ -301,10 +301,10 @@ public:
         getSILDebugLocation(Loc), valueType, operand, F, OpenedArchetypes));
   }
 
-  AllocBoxInst *createAllocBox(SILLocation Loc, SILType ElementType,
+  AllocBoxInst *createAllocBox(SILLocation Loc, CanSILBoxType BoxType,
                                SILDebugVariable Var = SILDebugVariable()) {
     Loc.markAsPrologue();
-    return insert(AllocBoxInst::create(getSILDebugLocation(Loc), ElementType, F,
+    return insert(AllocBoxInst::create(getSILDebugLocation(Loc), BoxType, F,
                                        OpenedArchetypes, Var));
   }
 

@@ -9,7 +9,7 @@ sil @fromLiteral : $@convention(thin) (Builtin.Int128, @thin Int64.Type) -> Int6
 // CHECK-LABEL: sil [transparent] @test_add : $@convention(thin) (Int64) -> Int64 {
 sil [transparent] @test_add : $@convention(thin) (Int64) -> Int64 {
 bb0(%0 : $Int64):
-  %1 = alloc_box $Int64
+  %1 = alloc_box $@box Int64
   %1a = project_box %1 : $@box Int64, 0
   store %0 to %1a : $*Int64
   %3 = function_ref @plus : $@convention(thin) (Int64, Int64) -> Int64
@@ -25,7 +25,7 @@ bb0(%0 : $Int64):
 
 sil @inline_test_add : $@convention(thin) (Int64) -> Int64 {
 bb0(%0 : $Int64):
-  %1 = alloc_box $Int64
+  %1 = alloc_box $@box Int64
   %1a = project_box %1 : $@box Int64, 0
   store %0 to %1a : $*Int64
   %3 = function_ref @plus : $@convention(thin) (Int64, Int64) -> Int64
@@ -49,7 +49,7 @@ bb0(%0 : $Int64):
   // CHECK-LABEL: sil @inline_test_add : $@convention(thin) (Int64) -> Int64 {
   // CHECK: [[VAL9:%.*]] = apply                               {{.*}} line:38:9:sil
   // CHECK: [[VAL10:%.*]] = apply                         {{.*}} line:39:9:sil
-  // CHECK: [[VAL11:%.*]] = alloc_box $Int64,             {{.*}} line:40:9:minlined
+  // CHECK: [[VAL11:%.*]] = alloc_box $@box Int64,             {{.*}} line:40:9:minlined
   // CHECK: [[PB11:%.*]] = project_box [[VAL11]]          {{.*}} line:40:9:minlined
   // CHECK: store [[VAL10]] to [[PB11]]                   {{.*}} line:40:9:minlined
   // CHECK: [[VAL13:%.*]] = function_ref @plus            {{.*}} line:40:9:minlined

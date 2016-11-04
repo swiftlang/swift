@@ -5,8 +5,8 @@ import Swift
 // CHECK-LABEL: sil @alloc_dealloc : $@convention(thin) (Int) -> () {
 sil @alloc_dealloc : $@convention(thin) (Int) -> () {
 entry(%x : $Int):
-  // CHECK: [[B:%.*]] = alloc_box $Int
-  %b = alloc_box $Int
+  // CHECK: [[B:%.*]] = alloc_box $@box Int
+  %b = alloc_box $@box Int
   // CHECK: [[PB:%.*]] = project_box [[B]] : $@box Int, 0
   %ba = project_box %b : $@box Int, 0
   // CHECK: store [[X:%.*]] to [[PB]] : $*Int

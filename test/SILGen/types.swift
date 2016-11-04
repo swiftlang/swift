@@ -27,7 +27,7 @@ struct S {
     var x = x
     // CHECK: bb0([[X:%[0-9]+]] : $Int, [[THIS:%[0-9]+]] : $*S):
     member = x
-    // CHECK: [[XADDR:%[0-9]+]] = alloc_box $Int
+    // CHECK: [[XADDR:%[0-9]+]] = alloc_box $@box Int
     // CHECK: [[X:%[0-9]+]] = project_box [[XADDR]]
     // CHECK: [[MEMBER:%[0-9]+]] = struct_element_addr [[THIS]] : $*S, #S.member
     // CHECK: copy_addr [[X]] to [[MEMBER]]

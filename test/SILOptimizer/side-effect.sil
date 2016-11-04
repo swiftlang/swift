@@ -176,7 +176,7 @@ bb0(%0 : $Int32):
   store %0 to %a : $*Int32
   %l1 = load %a : $*Int32
 
-  %b = alloc_box $Int32
+  %b = alloc_box $@box Int32
   %ba = project_box %b : $@box Int32, 0
   store %0 to %ba : $*Int32
   %l2 = load %ba : $*Int32

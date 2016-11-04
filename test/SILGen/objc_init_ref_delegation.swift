@@ -8,7 +8,7 @@ extension Gizmo {
   // CHECK-LABEL: sil hidden @_TFE24objc_init_ref_delegationCSo5Gizmoc
   convenience init(int i: Int) {
     // CHECK: bb0([[I:%[0-9]+]] : $Int, [[ORIG_SELF:%[0-9]+]] : $Gizmo):
-    // CHECK:   [[SELF_BOX:%[0-9]+]] = alloc_box $Gizmo
+    // CHECK:   [[SELF_BOX:%[0-9]+]] = alloc_box $@box Gizmo
     // CHECK:   [[PB:%.*]] = project_box [[SELF_BOX]]
     // CHECK:   [[SELFMUI:%[0-9]+]] = mark_uninitialized [delegatingself] [[PB]] : $*Gizmo
     // CHECK:   store [[ORIG_SELF]] to [[SELFMUI]] : $*Gizmo

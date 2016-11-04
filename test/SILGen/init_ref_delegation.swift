@@ -7,7 +7,7 @@ struct S {
   // CHECK-LABEL: sil hidden @_TFV19init_ref_delegation1SC{{.*}} : $@convention(method) (@thin S.Type) -> S {
   init() {
     // CHECK: bb0([[SELF_META:%[0-9]+]] : $@thin S.Type):
-    // CHECK-NEXT:   [[SELF_BOX:%[0-9]+]] = alloc_box $S
+    // CHECK-NEXT:   [[SELF_BOX:%[0-9]+]] = alloc_box $@box S
     // CHECK-NEXT:   [[PB:%.*]] = project_box [[SELF_BOX]]
     // CHECK-NEXT:   [[SELF:%[0-9]+]] = mark_uninitialized [delegatingself] [[PB]] : $*S
     
@@ -35,7 +35,7 @@ enum E {
   // CHECK-LABEL: sil hidden @_TFO19init_ref_delegation1EC{{.*}} : $@convention(method) (@thin E.Type) -> E
   init() {
     // CHECK: bb0([[E_META:%[0-9]+]] : $@thin E.Type):
-    // CHECK:   [[E_BOX:%[0-9]+]] = alloc_box $E
+    // CHECK:   [[E_BOX:%[0-9]+]] = alloc_box $@box E
     // CHECK:   [[PB:%.*]] = project_box [[E_BOX]]
     // CHECK:   [[E_SELF:%[0-9]+]] = mark_uninitialized [delegatingself] [[PB]] : $*E
 
@@ -60,7 +60,7 @@ struct S2 {
   // CHECK-LABEL: sil hidden @_TFV19init_ref_delegation2S2C{{.*}} : $@convention(method) (@thin S2.Type) -> S2
   init() {
     // CHECK: bb0([[S2_META:%[0-9]+]] : $@thin S2.Type):
-    // CHECK:   [[SELF_BOX:%[0-9]+]] = alloc_box $S2
+    // CHECK:   [[SELF_BOX:%[0-9]+]] = alloc_box $@box S2
     // CHECK:   [[PB:%.*]] = project_box [[SELF_BOX]]
     // CHECK:   [[SELF:%[0-9]+]] = mark_uninitialized [delegatingself] [[PB]] : $*S2
 
@@ -91,7 +91,7 @@ class C1 {
  // CHECK-LABEL: sil hidden @_TFC19init_ref_delegation2C1c{{.*}} : $@convention(method) (X, @owned C1) -> @owned C1
   convenience init(x: X) {
     // CHECK: bb0([[X:%[0-9]+]] : $X, [[ORIG_SELF:%[0-9]+]] : $C1):
-    // CHECK:   [[SELF_BOX:%[0-9]+]] = alloc_box $C1
+    // CHECK:   [[SELF_BOX:%[0-9]+]] = alloc_box $@box C1
     // CHECK:   [[PB:%.*]] = project_box [[SELF_BOX]]
     // CHECK:   [[SELF:%[0-9]+]] = mark_uninitialized [delegatingself] [[PB]] : $*C1
     // CHECK:   store [[ORIG_SELF]] to [[SELF]] : $*C1
@@ -116,7 +116,7 @@ class C1 {
   // CHECK-LABEL: sil hidden @_TFC19init_ref_delegation2C2c{{.*}} : $@convention(method) (X, @owned C2) -> @owned C2
   convenience init(x: X) {
     // CHECK: bb0([[X:%[0-9]+]] : $X, [[ORIG_SELF:%[0-9]+]] : $C2):
-    // CHECK:   [[SELF_BOX:%[0-9]+]] = alloc_box $C2
+    // CHECK:   [[SELF_BOX:%[0-9]+]] = alloc_box $@box C2
     // CHECK:   [[PB:%.*]] = project_box [[SELF_BOX]]
     // CHECK:   [[UNINIT_SELF:%[0-9]+]] = mark_uninitialized [delegatingself] [[PB]] : $*C2
     // CHECK:   store [[ORIG_SELF]] to [[UNINIT_SELF]] : $*C2
