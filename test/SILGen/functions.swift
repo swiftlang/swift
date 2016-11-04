@@ -102,11 +102,11 @@ func calls(_ i:Int, j:Int, k:Int) {
   var j = j
   var k = k
   // CHECK: bb0(%0 : $Builtin.Int64, %1 : $Builtin.Int64, %2 : $Builtin.Int64):
-  // CHECK: [[IBOX:%[0-9]+]] = alloc_box $Builtin.Int64
+  // CHECK: [[IBOX:%[0-9]+]] = alloc_box $@box Builtin.Int64
   // CHECK: [[IADDR:%.*]] = project_box [[IBOX]]
-  // CHECK: [[JBOX:%[0-9]+]] = alloc_box $Builtin.Int64
+  // CHECK: [[JBOX:%[0-9]+]] = alloc_box $@box Builtin.Int64
   // CHECK: [[JADDR:%.*]] = project_box [[JBOX]]
-  // CHECK: [[KBOX:%[0-9]+]] = alloc_box $Builtin.Int64
+  // CHECK: [[KBOX:%[0-9]+]] = alloc_box $@box Builtin.Int64
   // CHECK: [[KADDR:%.*]] = project_box [[KBOX]]
 
   // CHECK: [[FUNC:%[0-9]+]] = function_ref @_TF9functions19standalone_function{{.*}} : $@convention(thin) (Builtin.Int64, Builtin.Int64) -> Builtin.Int64
@@ -117,7 +117,7 @@ func calls(_ i:Int, j:Int, k:Int) {
 
   // -- Curry 'self' onto struct method argument lists.
 
-  // CHECK: [[ST_ADDR:%.*]] = alloc_box $SomeStruct
+  // CHECK: [[ST_ADDR:%.*]] = alloc_box $@box SomeStruct
   // CHECK: [[CTOR:%.*]] = function_ref @_TFV9functions10SomeStructC{{.*}} : $@convention(method) (Builtin.Int64, Builtin.Int64, @thin SomeStruct.Type) -> SomeStruct
   // CHECK: [[METATYPE:%.*]] = metatype $@thin SomeStruct.Type
   // CHECK: [[I:%.*]] = load [[IADDR]]
@@ -134,7 +134,7 @@ func calls(_ i:Int, j:Int, k:Int) {
 
   // -- Curry 'self' onto method argument lists dispatched using class_method.
 
-  // CHECK: [[CBOX:%[0-9]+]] = alloc_box $SomeClass
+  // CHECK: [[CBOX:%[0-9]+]] = alloc_box $@box SomeClass
   // CHECK: [[CADDR:%.*]] = project_box [[CBOX]]
   // CHECK: [[FUNC:%[0-9]+]] = function_ref @_TFC9functions9SomeClassC{{.*}} : $@convention(method) (Builtin.Int64, Builtin.Int64, @thick SomeClass.Type) -> @owned SomeClass
   // CHECK: [[META:%[0-9]+]] = metatype $@thick SomeClass.Type
@@ -201,7 +201,7 @@ func calls(_ i:Int, j:Int, k:Int) {
   // -- Curry the projected concrete value in an existential (or its Type)
   // -- onto protocol type methods dispatched using protocol_method.
 
-  // CHECK: [[PBOX:%[0-9]+]] = alloc_box $SomeProtocol
+  // CHECK: [[PBOX:%[0-9]+]] = alloc_box $@box SomeProtocol
   // CHECK: [[PADDR:%.*]] = project_box [[PBOX]]
   var p : SomeProtocol = ConformsToSomeProtocol()
 
@@ -231,7 +231,7 @@ func calls(_ i:Int, j:Int, k:Int) {
 
   // -- Use an apply or partial_apply instruction to bind type parameters of a generic.
 
-  // CHECK: [[GBOX:%[0-9]+]] = alloc_box $SomeGeneric<Builtin.Int64>
+  // CHECK: [[GBOX:%[0-9]+]] = alloc_box $@box SomeGeneric<Builtin.Int64>
   // CHECK: [[GADDR:%.*]] = project_box [[GBOX]]
   // CHECK: [[CTOR_GEN:%[0-9]+]] = function_ref @_TFC9functions11SomeGenericC{{.*}} : $@convention(method) <τ_0_0> (@thick SomeGeneric<τ_0_0>.Type) -> @owned SomeGeneric<τ_0_0>
   // CHECK: [[META:%[0-9]+]] = metatype $@thick SomeGeneric<Builtin.Int64>.Type
@@ -272,7 +272,7 @@ func calls(_ i:Int, j:Int, k:Int) {
   // SIL-level "thin" function values need to be able to convert to
   // "thick" function values when stored, returned, or passed as arguments.
 
-  // CHECK: [[FBOX:%[0-9]+]] = alloc_box $@callee_owned (Builtin.Int64, Builtin.Int64) -> Builtin.Int64
+  // CHECK: [[FBOX:%[0-9]+]] = alloc_box $@box @callee_owned (Builtin.Int64, Builtin.Int64) -> Builtin.Int64
   // CHECK: [[FADDR:%.*]] = project_box [[FBOX]]
   // CHECK: [[FUNC_THIN:%[0-9]+]] = function_ref @_TF9functions19standalone_function{{.*}} : $@convention(thin) (Builtin.Int64, Builtin.Int64) -> Builtin.Int64
   // CHECK: [[FUNC_THICK:%[0-9]+]] = thin_to_thick_function [[FUNC_THIN]]

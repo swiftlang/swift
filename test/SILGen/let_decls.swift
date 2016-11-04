@@ -231,7 +231,7 @@ struct WeirdPropertyTest {
 // CHECK-LABEL: sil hidden @{{.*}}test_weird_property
 func test_weird_property(_ v : WeirdPropertyTest, i : Int) -> Int {
   var v = v
-  // CHECK: [[VBOX:%[0-9]+]] = alloc_box $WeirdPropertyTest
+  // CHECK: [[VBOX:%[0-9]+]] = alloc_box $@box WeirdPropertyTest
   // CHECK: [[PB:%.*]] = project_box [[VBOX]]
   // CHECK: store %0 to [trivial] [[PB]]
 
@@ -458,7 +458,7 @@ struct LetPropertyStruct {
 
 // CHECK-LABEL: sil hidden @{{.*}}testLetPropertyAccessOnLValueBase
 // CHECK: bb0(%0 : $LetPropertyStruct):
-// CHECK:  [[ABOX:%[0-9]+]] = alloc_box $LetPropertyStruct
+// CHECK:  [[ABOX:%[0-9]+]] = alloc_box $@box LetPropertyStruct
 // CHECK:  [[A:%[0-9]+]] = project_box [[ABOX]]
 // CHECK:   store %0 to [trivial] [[A]] : $*LetPropertyStruct
 // CHECK:   [[STRUCT:%[0-9]+]] = load [[A]] : $*LetPropertyStruct

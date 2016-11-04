@@ -41,7 +41,7 @@ func direct_to_protocol(_ obj: AnyObject) {
 func direct_to_static_method(_ obj: AnyObject) {
   var obj = obj
   // CHECK: [[START:[A-Za-z0-9_]+]]([[OBJ:%[0-9]+]] : $AnyObject):
-  // CHECK: [[OBJBOX:%[0-9]+]] = alloc_box $AnyObject
+  // CHECK: [[OBJBOX:%[0-9]+]] = alloc_box $@box AnyObject
   // CHECK-NEXT: [[PBOBJ:%[0-9]+]] = project_box [[OBJBOX]]
   // CHECK: store [[OBJ]] to [init] [[PBOBJ]] : $*AnyObject
   // CHECK-NEXT: [[OBJCOPY:%[0-9]+]] = load [[PBOBJ]] : $*AnyObject
@@ -56,10 +56,10 @@ func direct_to_static_method(_ obj: AnyObject) {
 func opt_to_class(_ obj: AnyObject) {
   var obj = obj
   // CHECK: [[ENTRY:[A-Za-z0-9]+]]([[PARAM:%[0-9]+]] : $AnyObject)
-  // CHECK: [[EXISTBOX:%[0-9]+]] = alloc_box $AnyObject 
+  // CHECK: [[EXISTBOX:%[0-9]+]] = alloc_box $@box AnyObject 
   // CHECK-NEXT: [[PBOBJ:%[0-9]+]] = project_box [[EXISTBOX]]
   // CHECK: store [[PARAM]] to [init] [[PBOBJ]]
-  // CHECK-NEXT: [[OPTBOX:%[0-9]+]] = alloc_box $Optional<@callee_owned () -> ()>
+  // CHECK-NEXT: [[OPTBOX:%[0-9]+]] = alloc_box $@box Optional<@callee_owned () -> ()>
   // CHECK-NEXT: [[PBOPT:%.*]] = project_box [[OPTBOX]]
   // CHECK-NEXT: [[EXISTVAL:%[0-9]+]] = load [[PBOBJ]] : $*AnyObject
   // CHECK-NEXT: copy_value [[EXISTVAL]] : $AnyObject
@@ -107,10 +107,10 @@ func forced_without_outer(_ obj: AnyObject) {
 func opt_to_static_method(_ obj: AnyObject) {
   var obj = obj
   // CHECK: [[ENTRY:[A-Za-z0-9]+]]([[OBJ:%[0-9]+]] : $AnyObject):
-  // CHECK: [[OBJBOX:%[0-9]+]] = alloc_box $AnyObject
+  // CHECK: [[OBJBOX:%[0-9]+]] = alloc_box $@box AnyObject
   // CHECK-NEXT: [[PBOBJ:%[0-9]+]] = project_box [[OBJBOX]]
   // CHECK: store [[OBJ]] to [init] [[PBOBJ]] : $*AnyObject
-  // CHECK-NEXT: [[OPTBOX:%[0-9]+]] = alloc_box $Optional<@callee_owned () -> ()>
+  // CHECK-NEXT: [[OPTBOX:%[0-9]+]] = alloc_box $@box Optional<@callee_owned () -> ()>
   // CHECK-NEXT: [[PBO:%.*]] = project_box [[OPTBOX]]
   // CHECK-NEXT: [[OBJCOPY:%[0-9]+]] = load [[PBOBJ]] : $*AnyObject
   // CHECK-NEXT: [[OBJMETA:%[0-9]+]] = existential_metatype $@thick AnyObject.Type, [[OBJCOPY]] : $AnyObject
@@ -125,10 +125,10 @@ func opt_to_static_method(_ obj: AnyObject) {
 func opt_to_property(_ obj: AnyObject) {
   var obj = obj
   // CHECK: bb0([[OBJ:%[0-9]+]] : $AnyObject):
-  // CHECK: [[OBJ_BOX:%[0-9]+]] = alloc_box $AnyObject
+  // CHECK: [[OBJ_BOX:%[0-9]+]] = alloc_box $@box AnyObject
   // CHECK-NEXT: [[PBOBJ:%[0-9]+]] = project_box [[OBJ_BOX]]
   // CHECK: store [[OBJ]] to [init] [[PBOBJ]] : $*AnyObject
-  // CHECK-NEXT: [[INT_BOX:%[0-9]+]] = alloc_box $Int
+  // CHECK-NEXT: [[INT_BOX:%[0-9]+]] = alloc_box $@box Int
   // CHECK-NEXT: project_box [[INT_BOX]]
   // CHECK-NEXT: [[OBJ:%[0-9]+]] = load [[PBOBJ]] : $*AnyObject
   // CHECK-NEXT: copy_value [[OBJ]] : $AnyObject
@@ -151,13 +151,13 @@ func direct_to_subscript(_ obj: AnyObject, i: Int) {
   var obj = obj
   var i = i
   // CHECK: bb0([[OBJ:%[0-9]+]] : $AnyObject, [[I:%[0-9]+]] : $Int):
-  // CHECK: [[OBJ_BOX:%[0-9]+]] = alloc_box $AnyObject
+  // CHECK: [[OBJ_BOX:%[0-9]+]] = alloc_box $@box AnyObject
   // CHECK-NEXT: [[PBOBJ:%[0-9]+]] = project_box [[OBJ_BOX]]
   // CHECK: store [[OBJ]] to [init] [[PBOBJ]] : $*AnyObject
-  // CHECK-NEXT: [[I_BOX:%[0-9]+]] = alloc_box $Int
+  // CHECK-NEXT: [[I_BOX:%[0-9]+]] = alloc_box $@box Int
   // CHECK-NEXT: [[PBI:%.*]] = project_box [[I_BOX]]
   // CHECK-NEXT: store [[I]] to [trivial] [[PBI]] : $*Int
-  // CHECK-NEXT: alloc_box $Int
+  // CHECK-NEXT: alloc_box $@box Int
   // CHECK-NEXT: project_box
   // CHECK-NEXT: [[OBJ:%[0-9]+]] = load [[PBOBJ]] : $*AnyObject
   // CHECK-NEXT: copy_value [[OBJ]] : $AnyObject
@@ -182,10 +182,10 @@ func opt_to_subscript(_ obj: AnyObject, i: Int) {
   var obj = obj
   var i = i
   // CHECK: bb0([[OBJ:%[0-9]+]] : $AnyObject, [[I:%[0-9]+]] : $Int):
-  // CHECK: [[OBJ_BOX:%[0-9]+]] = alloc_box $AnyObject
+  // CHECK: [[OBJ_BOX:%[0-9]+]] = alloc_box $@box AnyObject
   // CHECK-NEXT: [[PBOBJ:%[0-9]+]] = project_box [[OBJ_BOX]]
   // CHECK: store [[OBJ]] to [init] [[PBOBJ]] : $*AnyObject
-  // CHECK-NEXT: [[I_BOX:%[0-9]+]] = alloc_box $Int
+  // CHECK-NEXT: [[I_BOX:%[0-9]+]] = alloc_box $@box Int
   // CHECK-NEXT: [[PBI:%.*]] = project_box [[I_BOX]]
   // CHECK-NEXT: store [[I]] to [trivial] [[PBI]] : $*Int
   // CHECK-NEXT: [[OBJ:%[0-9]+]] = load [[PBOBJ]] : $*AnyObject
@@ -210,7 +210,7 @@ func opt_to_subscript(_ obj: AnyObject, i: Int) {
 func downcast(_ obj: AnyObject) -> X {
   var obj = obj
   // CHECK: bb0([[OBJ:%[0-9]+]] : $AnyObject):
-  // CHECK: [[OBJ_BOX:%[0-9]+]] = alloc_box $AnyObject
+  // CHECK: [[OBJ_BOX:%[0-9]+]] = alloc_box $@box AnyObject
   // CHECK-NEXT: [[PBOBJ:%[0-9]+]] = project_box [[OBJ_BOX]]
   // CHECK: store [[OBJ]] to [init] [[PBOBJ]] : $*AnyObject
   // CHECK-NEXT: [[OBJ:%[0-9]+]] = load [[PBOBJ]] : $*AnyObject

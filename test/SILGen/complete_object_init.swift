@@ -5,7 +5,7 @@ struct X { }
 class A {
   // CHECK-LABEL: sil hidden @_TFC20complete_object_init1Ac{{.*}} : $@convention(method) (@owned A) -> @owned A
 // CHECK: bb0([[SELF_PARAM:%[0-9]+]] : $A):
-// CHECK:   [[SELF_BOX:%[0-9]+]] = alloc_box $A
+// CHECK:   [[SELF_BOX:%[0-9]+]] = alloc_box $@box A
 // CHECK:   [[PB:%.*]] = project_box [[SELF_BOX]]
 // CHECK:   [[SELF:%[0-9]+]] = mark_uninitialized [delegatingself] [[PB]] : $*A
 // CHECK:   store [[SELF_PARAM]] to [[SELF]] : $*A

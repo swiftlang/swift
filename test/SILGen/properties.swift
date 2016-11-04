@@ -10,7 +10,7 @@ func getInt() -> Int { return zero }
 // CHECK: bb0(%0 : $Int):
 func physical_tuple_lvalue(_ c: Int) {
   var x : (Int, Int)
-  // CHECK: [[BOX:%[0-9]+]] = alloc_box $(Int, Int)
+  // CHECK: [[BOX:%[0-9]+]] = alloc_box $@box (Int, Int)
   // CHECK: [[XADDR1:%.*]] = project_box [[BOX]]
   // CHECK: [[XADDR:%[0-9]+]] = mark_uninitialized [var] [[XADDR1]]
   x.1 = c
@@ -90,7 +90,7 @@ struct Val {
 // CHECK-LABEL: sil hidden  @_TF10properties22physical_struct_lvalue
 func physical_struct_lvalue(_ c: Int) {
   var v : Val
-  // CHECK: [[VADDR:%[0-9]+]] = alloc_box $Val
+  // CHECK: [[VADDR:%[0-9]+]] = alloc_box $@box Val
   v.y = c
   // CHECK: assign %0 to [[X_1]]
 }
@@ -322,7 +322,7 @@ func inout_arg(_ x: inout Int) {}
 // CHECK-LABEL: sil hidden  @_TF10properties14physical_inout
 func physical_inout(_ x: Int) {
   var x = x
-  // CHECK: [[XADDR:%[0-9]+]] = alloc_box $Int
+  // CHECK: [[XADDR:%[0-9]+]] = alloc_box $@box Int
   // CHECK: [[PB:%.*]] = project_box [[XADDR]]
   inout_arg(&x)
   // CHECK: [[INOUT_ARG:%[0-9]+]] = function_ref @_TF10properties9inout_arg
@@ -347,7 +347,7 @@ func val_subscript_get(_ v: Val, i: Int) -> Float {
 func val_subscript_set(_ v: Val, i: Int, x: Float) {
   var v = v
   v[i] = x
-  // CHECK: [[VADDR:%[0-9]+]] = alloc_box $Val
+  // CHECK: [[VADDR:%[0-9]+]] = alloc_box $@box Val
   // CHECK: [[PB:%.*]] = project_box [[VADDR]]
   // CHECK: [[SUBSCRIPT_SET_METHOD:%[0-9]+]] = function_ref @_TFV10properties3Vals9subscript
   // CHECK: apply [[SUBSCRIPT_SET_METHOD]]([[X]], [[I]], [[PB]])
@@ -601,7 +601,7 @@ func local_observing_property(_ arg: Int) {
 
 // CHECK-LABEL: sil hidden @{{.*}}local_observing_property
 // CHECK: bb0([[ARG:%[0-9]+]] : $Int)
-// CHECK: [[BOX:%[0-9]+]] = alloc_box $Int
+// CHECK: [[BOX:%[0-9]+]] = alloc_box $@box Int
 // CHECK: [[PB:%.*]] = project_box [[BOX]]
 // CHECK: store [[ARG]] to [trivial] [[PB]]
 
@@ -979,7 +979,7 @@ struct AddressOnlyReadOnlySubscript {
 }
 
 // CHECK-LABEL: sil hidden @_TF10properties43addressOnlyReadOnlySubscriptFromMutableBase
-// CHECK:         [[BASE:%.*]] = alloc_box $AddressOnlyReadOnlySubscript
+// CHECK:         [[BASE:%.*]] = alloc_box $@box AddressOnlyReadOnlySubscript
 // CHECK:         copy_addr [[BASE:%.*]] to [initialization] [[COPY:%.*]] :
 // CHECK:         [[GETTER:%.*]] = function_ref @_TFV10properties28AddressOnlyReadOnlySubscriptg9subscript
 // CHECK:         apply [[GETTER]]({{%.*}}, [[COPY]])
@@ -997,7 +997,7 @@ struct MutatingGetterStruct {
   }
 
   // CHECK-LABEL: sil hidden @_TZFV10properties20MutatingGetterStruct4test
-  // CHECK: [[X:%.*]] = alloc_box $MutatingGetterStruct, var, name "x"
+  // CHECK: [[X:%.*]] = alloc_box $@box MutatingGetterStruct, var, name "x"
   // CHECK-NEXT: [[PB:%.*]] = project_box [[X]]
   // CHECK: store {{.*}} to [trivial] [[PB]] : $*MutatingGetterStruct
   // CHECK: apply {{%.*}}([[PB]]) : $@convention(method) (@inout MutatingGetterStruct) -> Int

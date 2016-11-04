@@ -16,7 +16,7 @@ struct Val {
 // CHECK-LABEL: sil hidden @_TF8lifetime13local_valtypeFT_T_
 func local_valtype() {
     var b: Val
-    // CHECK: [[B:%[0-9]+]] = alloc_box $Val
+    // CHECK: [[B:%[0-9]+]] = alloc_box $@box Val
     // CHECK: destroy_value [[B]]
     // CHECK: return
 }
@@ -24,7 +24,7 @@ func local_valtype() {
 // CHECK-LABEL: sil hidden @_TF8lifetime20local_valtype_branch
 func local_valtype_branch(_ a: Bool) {
     var a = a
-    // CHECK: [[A:%[0-9]+]] = alloc_box $Bool
+    // CHECK: [[A:%[0-9]+]] = alloc_box $@box Bool
 
     if a { return }
     // CHECK: cond_br
@@ -32,7 +32,7 @@ func local_valtype_branch(_ a: Bool) {
     // CHECK: br [[EPILOG:bb[0-9]+]]
 
     var x:Int
-    // CHECK: [[X:%[0-9]+]] = alloc_box $Int
+    // CHECK: [[X:%[0-9]+]] = alloc_box $@box Int
 
     if a { return }
     // CHECK: cond_br
@@ -55,7 +55,7 @@ func local_valtype_branch(_ a: Bool) {
         // CHECK: br [[EPILOG]]
 
         var y:Int
-        // CHECK: [[Y:%[0-9]+]] = alloc_box $Int
+        // CHECK: [[Y:%[0-9]+]] = alloc_box $@box Int
 
         if a { break }
         // CHECK: cond_br
@@ -74,7 +74,7 @@ func local_valtype_branch(_ a: Bool) {
 
         if true {
             var z:Int
-            // CHECK: [[Z:%[0-9]+]] = alloc_box $Int
+            // CHECK: [[Z:%[0-9]+]] = alloc_box $@box Int
 
             if a { break }
             // CHECK: cond_br
@@ -129,7 +129,7 @@ func reftype_return() -> Ref {
 func reftype_arg(_ a: Ref) {
     var a = a
     // CHECK: bb0([[A:%[0-9]+]] : $Ref):
-    // CHECK: [[AADDR:%[0-9]+]] = alloc_box $Ref
+    // CHECK: [[AADDR:%[0-9]+]] = alloc_box $@box Ref
     // CHECK: [[PA:%[0-9]+]] = project_box [[AADDR]]
     // CHECK: store [[A]] to [init] [[PA]]
     // CHECK: destroy_value [[AADDR]]
@@ -148,7 +148,7 @@ func reftype_call_ignore_return() {
 // CHECK-LABEL: sil hidden @_TF8lifetime27reftype_call_store_to_localFT_T_
 func reftype_call_store_to_local() {
     var a = reftype_func()
-    // CHECK: [[A:%[0-9]+]] = alloc_box $Ref
+    // CHECK: [[A:%[0-9]+]] = alloc_box $@box Ref
     // CHECK-NEXT: [[PB:%.*]] = project_box [[A]]
     // CHECK: = function_ref @_TF8lifetime12reftype_funcFT_CS_3Ref : $@convention(thin) () -> @owned Ref
     // CHECK-NEXT: [[R:%[0-9]+]] = apply
@@ -175,7 +175,7 @@ func reftype_call_arg() {
 func reftype_call_with_arg(_ a: Ref) {
     var a = a
     // CHECK: bb0([[A1:%[0-9]+]] : $Ref):
-    // CHECK: [[AADDR:%[0-9]+]] = alloc_box $Ref
+    // CHECK: [[AADDR:%[0-9]+]] = alloc_box $@box Ref
     // CHECK: [[PB:%.*]] = project_box [[AADDR]]
     // CHECK: store [[A1]] to [init] [[PB]]
 
@@ -192,7 +192,7 @@ func reftype_call_with_arg(_ a: Ref) {
 func reftype_reassign(_ a: inout Ref, b: Ref) {
     var b = b
     // CHECK: bb0([[AADDR:%[0-9]+]] : $*Ref, [[B1:%[0-9]+]] : $Ref):
-    // CHECK: [[BADDR:%[0-9]+]] = alloc_box $Ref
+    // CHECK: [[BADDR:%[0-9]+]] = alloc_box $@box Ref
     // CHECK: [[PBB:%.*]] = project_box [[BADDR]]
     a = b
     // CHECK: destroy_value
@@ -336,12 +336,12 @@ func logical_lvalue_lifetime(_ r: RefWithProp, _ i: Int, _ v: Val) {
   var r = r
   var i = i
   var v = v
-  // CHECK: [[RADDR:%[0-9]+]] = alloc_box $RefWithProp
+  // CHECK: [[RADDR:%[0-9]+]] = alloc_box $@box RefWithProp
   // CHECK: [[PR:%[0-9]+]] = project_box [[RADDR]]
-  // CHECK: [[IADDR:%[0-9]+]] = alloc_box $Int
+  // CHECK: [[IADDR:%[0-9]+]] = alloc_box $@box Int
   // CHECK: [[PI:%[0-9]+]] = project_box [[IADDR]]
   // CHECK: store %1 to [trivial] [[PI]]
-  // CHECK: [[VADDR:%[0-9]+]] = alloc_box $Val
+  // CHECK: [[VADDR:%[0-9]+]] = alloc_box $@box Val
   // CHECK: [[PV:%[0-9]+]] = project_box [[VADDR]]
 
   // -- Reference types need to be copy_valued as property method args.
@@ -423,7 +423,7 @@ class Foo<T> {
   // CHECK-LABEL: sil hidden @_TFC8lifetime3FoocfT3chiSi_GS0_x_
     // CHECK: bb0([[CHI:%[0-9]+]] : $Int, [[THISIN:%[0-9]+]] : $Foo<T>):
     // CHECK: [[THIS:%[0-9]+]] = mark_uninitialized
-    // CHECK: [[CHIADDR:%[0-9]+]] = alloc_box $Int
+    // CHECK: [[CHIADDR:%[0-9]+]] = alloc_box $@box Int
     // CHECK: [[PCHI:%[0-9]+]] = project_box [[CHIADDR]]
     // CHECK: store [[CHI]] to [trivial] [[PCHI]]
 
@@ -554,7 +554,7 @@ struct Bar {
   // CHECK-LABEL: sil hidden @_TFV8lifetime3BarC{{.*}}
   init() {
     // CHECK: bb0([[METATYPE:%[0-9]+]] : $@thin Bar.Type):
-    // CHECK: [[THISADDRBOX:%[0-9]+]] = alloc_box $Bar
+    // CHECK: [[THISADDRBOX:%[0-9]+]] = alloc_box $@box Bar
     // CHECK: [[PB:%.*]] = project_box [[THISADDRBOX]]
     // CHECK: [[THISADDR:%[0-9]+]] = mark_uninitialized [rootself] [[PB]]
 
@@ -582,7 +582,7 @@ struct Bas<T> {
   init(yy:T) {
     // CHECK: bb0([[THISADDRPTR:%[0-9]+]] : $*Bas<T>, [[YYADDR:%[0-9]+]] : $*T, [[META:%[0-9]+]] : $@thin Bas<T>.Type):
     // CHECK: alloc_box
-    // CHECK: [[THISADDRBOX:%[0-9]+]] = alloc_box $Bas
+    // CHECK: [[THISADDRBOX:%[0-9]+]] = alloc_box $@box Bas
     // CHECK: [[PB:%.*]] = project_box [[THISADDRBOX]]
     // CHECK: [[THISADDR:%[0-9]+]] = mark_uninitialized [rootself] [[PB]]
 
@@ -612,14 +612,14 @@ class D : B {
   init(x: Int, y: Int) {
     var x = x
     var y = y
-    // CHECK: [[THISADDR1:%[0-9]+]] = alloc_box $D
+    // CHECK: [[THISADDR1:%[0-9]+]] = alloc_box $@box D
     // CHECK: [[PTHIS:%[0-9]+]] = project_box [[THISADDR1]]
     // CHECK: [[THISADDR:%[0-9]+]] = mark_uninitialized [derivedself] [[PTHIS]]
     // CHECK: store [[THIS]] to [[THISADDR]]
-    // CHECK: [[XADDR:%[0-9]+]] = alloc_box $Int
+    // CHECK: [[XADDR:%[0-9]+]] = alloc_box $@box Int
     // CHECK: [[PX:%[0-9]+]] = project_box [[XADDR]]
     // CHECK: store [[X]] to [trivial] [[PX]]
-    // CHECK: [[YADDR:%[0-9]+]] = alloc_box $Int
+    // CHECK: [[YADDR:%[0-9]+]] = alloc_box $@box Int
     // CHECK: [[PY:%[0-9]+]] = project_box [[YADDR]]
     // CHECK: store [[Y]] to [trivial] [[PY]]
 
@@ -640,7 +640,7 @@ class D : B {
 // CHECK-LABEL: sil hidden @_TF8lifetime8downcast
 func downcast(_ b: B) {
   var b = b
-  // CHECK: [[BADDR:%[0-9]+]] = alloc_box $B
+  // CHECK: [[BADDR:%[0-9]+]] = alloc_box $@box B
   // CHECK: [[PB:%[0-9]+]] = project_box [[BADDR]]
   (b as! D).foo()
   // CHECK: [[B:%[0-9]+]] = load [[PB]]

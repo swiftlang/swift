@@ -282,11 +282,12 @@ public:
     assert(!SGF.VarLocs.count(decl) && "Already have an entry for this decl?");
 
     SILType lType = SGF.getLoweredType(decl->getType()->getRValueType());
+    auto boxType = SILBoxType::get(lType.getSwiftRValueType());
 
     // The variable may have its lifetime extended by a closure, heap-allocate
     // it using a box.
     AllocBoxInst *allocBox =
-        SGF.B.createAllocBox(decl, lType, {decl->isLet(), ArgNo});
+        SGF.B.createAllocBox(decl, boxType, {decl->isLet(), ArgNo});
     SILValue addr = SGF.B.createProjectBox(decl, allocBox, 0);
 
     // Mark the memory as uninitialized, so DI will track it for us.

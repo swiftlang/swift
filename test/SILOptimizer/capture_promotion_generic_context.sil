@@ -28,7 +28,7 @@ sil @call_promotable_box_from_generic : $@convention(thin) <T> (@in T, Int) -> @
 entry(%0 : $*T, %1 : $Int):
   destroy_addr %0 : $*T
   %f = function_ref @promotable_box : $@convention(thin) (@box Int) -> Int
-  %b = alloc_box $Int
+  %b = alloc_box $@box Int
   %a = project_box %b : $@box Int, 0
   store %1 to %a : $*Int
   %k = partial_apply %f(%b) : $@convention(thin) (@box Int) -> Int
@@ -62,7 +62,7 @@ entry(%0 : $*T, %1 : $*U, %2 : $Int):
   destroy_addr %0 : $*T
   destroy_addr %1 : $*U
   %f = function_ref @generic_promotable_box : $@convention(thin) <V> (@in V, @box Int) -> Int
-  %b = alloc_box $Int
+  %b = alloc_box $@box Int
   %a = project_box %b : $@box Int, 0
   store %2 to %a : $*Int
   %k = partial_apply %f<U>(%b) : $@convention(thin) <V> (@in V, @box Int) -> Int

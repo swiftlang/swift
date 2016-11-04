@@ -336,8 +336,9 @@ void SILGenFunction::emitCaptures(SILLocation loc,
         // since we could conceivably forward the copied value into the
         // closure context and pass it down to the partially applied function
         // in-place.
-        AllocBoxInst *allocBox =
-          B.createAllocBox(loc, vl.value->getType().getObjectType());
+        auto boxTy = SILBoxType::get(vl.value->getType().getSwiftRValueType());
+        
+        AllocBoxInst *allocBox = B.createAllocBox(loc, boxTy);
         ProjectBoxInst *boxAddress = B.createProjectBox(loc, allocBox, 0);
         B.createCopyAddr(loc, vl.value, boxAddress, IsNotTake,IsInitialization);
         capturedArgs.push_back(emitManagedRValueWithCleanup(allocBox));

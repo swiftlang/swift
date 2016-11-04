@@ -13,7 +13,7 @@ struct Bool {
 // CHECK-LABEL: sil @simple_promotion
 sil @simple_promotion : $(Int) -> Int {
 bb0(%0 : $Int):
-  %1 = alloc_box $Int
+  %1 = alloc_box $@box Int
   %1a = project_box %1 : $@box Int, 0
   %2 = store %0 to %1a : $*Int
   %3 = load %1a : $*Int
@@ -29,7 +29,7 @@ bb0(%0 : $Int):
 // CHECK-LABEL: sil @double_project_box
 sil @double_project_box : $(Int) -> (Int, Int) {
 bb0(%0 : $Int):
-  %1 = alloc_box $Int
+  %1 = alloc_box $@box Int
   %1a = project_box %1 : $@box Int, 0
   %2 = store %0 to %1a : $*Int
   %3 = load %1a : $*Int
@@ -48,7 +48,7 @@ bb0(%0 : $Int):
 // CHECK-LABEL: sil @init_var
 sil @init_var : $() -> Int {
 bb0:
-  %1 = alloc_box $Int
+  %1 = alloc_box $@box Int
   %1a = project_box %1 : $@box Int, 0
   %3 = load %1a : $*Int
   %4 = strong_release %1 : $@box Int
@@ -65,7 +65,7 @@ bb0:
 // CHECK-LABEL: sil @multi_strong_release
 sil @multi_strong_release : $() -> Int {
 bb0:
-  %1 = alloc_box $Int
+  %1 = alloc_box $@box Int
   %1a = project_box %1 : $@box Int, 0
   %2 = mark_uninitialized [rootself] %1a : $*Int
   %3 = load %2 : $*Int
@@ -92,9 +92,9 @@ sil @struct_tuple_element_addr : $(Int) -> Int {
 bb1(%0 : $Int):
 // CHECK-DAG: [[STRUCT:%.*]] = alloc_stack $TestStruct
 // CHECK-DAG: [[TUPLE:%.*]] = alloc_stack $(Int, Int)
-  %1 = alloc_box $TestStruct
+  %1 = alloc_box $@box TestStruct
   %1a = project_box %1 : $@box TestStruct, 0
-  %a = alloc_box $(Int, Int)
+  %a = alloc_box $@box (Int, Int)
   %aa = project_box %a : $@box (Int, Int), 0
 
   %2 = struct_element_addr %1a : $*TestStruct, #TestStruct.Elt
@@ -125,7 +125,7 @@ sil @callee : $@convention(thin) (@inout Int) -> ()
 sil @inout_nocapture : $@convention(thin) () -> Int {
 bb0:
   // CHECK: alloc_stack
-  %1 = alloc_box $Int
+  %1 = alloc_box $@box Int
   %1a = project_box %1 : $@box Int, 0
   %6 = function_ref @callee : $@convention(thin) (@inout Int) -> ()
   %7 = apply %6(%1a) : $@convention(thin) (@inout Int) -> ()
@@ -149,7 +149,7 @@ sil @test_indirect_return : $@convention(thin) () -> () {
 bb0:
   // CHECK: alloc_stack
   %1 = function_ref @returns_protocol : $@convention(thin) () -> @out P
-  %2 = alloc_box $P
+  %2 = alloc_box $@box P
   %2a = project_box %2 : $@box P, 0
   %3 = apply %1(%2a) : $@convention(thin) () -> @out P
   %5 = strong_release %2 : $@box P
@@ -163,7 +163,7 @@ class SomeClass {}
 // CHECK-LABEL: sil @class_promotion
 sil @class_promotion : $(SomeClass) -> SomeClass {
 bb0(%0 : $SomeClass):
-  %1 = alloc_box $SomeClass
+  %1 = alloc_box $@box SomeClass
   %1a = project_box %1 : $@box SomeClass, 0
   %2 = store %0 to %1a : $*SomeClass
   %3 = load %1a : $*SomeClass
@@ -184,7 +184,7 @@ protocol LogicValue {
 // CHECK-LABEL: @protocols
 sil @protocols : $@convention(thin) (@in LogicValue, @thin Bool.Type) -> Bool {
 bb0(%0 : $*LogicValue, %1 : $@thin Bool.Type):
-  %2 = alloc_box $LogicValue
+  %2 = alloc_box $@box LogicValue
   %2a = project_box %2 : $@box LogicValue, 0
 // CHECK:  %2 = alloc_stack $LogicValue
   copy_addr [take] %0 to [initialization] %2a : $*LogicValue
@@ -206,7 +206,7 @@ class Generic<T> {}
 sil @dealloc_box : $@convention(thin) <T> () -> () {
 bb0:  // CHECK-NEXT: bb0:
       // CHECK-NEXT: alloc_stack
-  %1 = alloc_box $Generic<T>
+  %1 = alloc_box $@box Generic<T>
   dealloc_box %1 : $@box Generic<T>
 
   %0 = tuple ()    // CHECK: tuple ()
@@ -229,7 +229,7 @@ sil @_TC1t9SomeClassCfMS0_FT_S0_ : $@convention(thin) (@thick SomeClass.Type) ->
 sil @union_test : $@convention(thin) () -> () {
 bb0:
 // CHECK: [[UNION:%.*]] = alloc_stack
-  %1 = alloc_box $SomeUnion
+  %1 = alloc_box $@box SomeUnion
   %1a = project_box %1 : $@box SomeUnion, 0
   %2 = function_ref @_TO1t9SomeUnion1yfMS0_FCS_9SomeClassS0_ : $@convention(thin) (@owned SomeClass, @thin SomeUnion.Type) -> @owned SomeUnion // user: %7
   %3 = metatype $@thin SomeUnion.Type
@@ -249,7 +249,7 @@ bb0:
 // CHECK-LABEL: sil @multiple_release_test
 sil @multiple_release_test : $@convention(thin) (Bool) -> Bool {
 bb0(%0 : $Bool):
-  %1 = alloc_box $Bool
+  %1 = alloc_box $@box Bool
   %1a = project_box %1 : $@box Bool, 0
   store %0 to %1a : $*Bool
   strong_retain %1 : $@box Bool
@@ -280,7 +280,7 @@ bb0:
   br bb1
 
 bb1:
-  %1 = alloc_box $Bool
+  %1 = alloc_box $@box Bool
   cond_br undef, bb2, bb3
 
 bb2:
@@ -312,7 +312,7 @@ extension Int : My_Incrementable { }
 // CHECK-LABEL: sil @test_mui
 sil @test_mui : $@convention(thin) (Builtin.Int1) -> () {
 bb0(%0 : $Builtin.Int1):
-  %2 = alloc_box $SomeClass
+  %2 = alloc_box $@box SomeClass
   %2a = project_box %2 : $@box SomeClass, 0
   // CHECK: [[STACK:%[0-9]+]] = alloc_stack
   %3 = mark_uninitialized [var] %2a : $*SomeClass
@@ -372,7 +372,7 @@ sil @_TF6struct8useStackFT1tSi_T_ : $@convention(thin) (Int) -> () {
 bb0(%0 : $Int):
   debug_value %0 : $Int, let, name "t" // id: %1
   // CHECK: alloc_stack
-  %2 = alloc_box $Int, var, name "s"                   // users: %3, %6, %7, %7, %9
+  %2 = alloc_box $@box Int, var, name "s"                   // users: %3, %6, %7, %7, %9
   %2a = project_box %2 : $@box Int, 0
   store %0 to %2a : $*Int                        // id: %3
   // function_ref struct.apply (f : () -> Swift.Int) -> Swift.Int
@@ -414,7 +414,7 @@ sil @_TF6struct6useBoxFT1tSi_T_ : $@convention(thin) (Int) -> () {
 bb0(%0 : $Int):
   debug_value %0 : $Int, let, name "t" // id: %1
   // CHECK: alloc_box
-  %2 = alloc_box $Int, var, name "s"                   // users: %3, %6, %7, %7, %10
+  %2 = alloc_box $@box Int, var, name "s"                   // users: %3, %6, %7, %7, %10
   %2a = project_box %2 : $@box Int, 0
   store %0 to %2a : $*Int                        // id: %3
   // function_ref struct.escape (f : () -> Swift.Int) -> () -> Swift.Int
@@ -451,7 +451,7 @@ sil @closure : $@convention(thin) (@owned @box Int) -> ()
 // CHECK-LABEL: sil @no_final_release
 sil @no_final_release : $@convention(thin) (Int) -> Bool {
 bb0(%0 : $Int):
-  %1 = alloc_box $Int
+  %1 = alloc_box $@box Int
   %1a = project_box %1 : $@box Int, 0
   store %0 to %1a : $*Int
   // function_ref main.(newFoo (Swift.Int) -> Swift.Bool).(modify #1) (())()
@@ -491,7 +491,7 @@ bb0(%0 : $*T):
   %2 = function_ref @mightApply : $@convention(thin) <τ_0_0 where τ_0_0 : P> (@owned @callee_owned () -> @out τ_0_0) -> ()
   %3 = function_ref @closure_to_specialize : $@convention(thin) <τ_0_0 where τ_0_0 : P> (@owned @box τ_0_0) -> @out τ_0_0
   // CHECK-NOT: alloc_box
-  %4 = alloc_box $T
+  %4 = alloc_box $@box T
   %4a = project_box %4 : $@box T, 0
   // CHECK: copy_addr %0 to [initialization] [[STACK]] : $*T
   copy_addr %0 to [initialization] %4a : $*T
@@ -572,7 +572,7 @@ bb0(%0 : $Int, %1 : $*S<Q>):
   debug_value_addr %1 : $*S<Q>
   %4 = function_ref @outer : $@convention(thin) (@owned @callee_owned () -> Bool) -> Bool
   %5 = function_ref @closure1 : $@convention(thin) <τ_0_0 where τ_0_0 : Count> (Int, @owned @box S<τ_0_0>) -> Bool
-  %6 = alloc_box $S<Q>
+  %6 = alloc_box $@box S<Q>
   %6a = project_box %6 : $@box S<Q>, 0
   copy_addr %1 to [initialization] %6a : $*S<Q>
   %8 = partial_apply %5<Q>(%0, %6) : $@convention(thin) <τ_0_0 where τ_0_0 : Count> (Int, @owned @box S<τ_0_0>) -> Bool
@@ -590,7 +590,7 @@ bb0(%0 : $Int, %1 : $*S<T>):
   debug_value_addr %1 : $*S<T>
   %4 = function_ref @outer : $@convention(thin) (@owned @callee_owned () -> Bool) -> Bool
   %5 = function_ref @closure1 : $@convention(thin) <τ_0_0 where τ_0_0 : Count> (Int, @owned @box S<τ_0_0>) -> Bool
-  %6 = alloc_box $S<T>
+  %6 = alloc_box $@box S<T>
   %6a = project_box %6 : $@box S<T>, 0
   copy_addr %1 to [initialization] %6a : $*S<T>
   %8 = partial_apply %5<T>(%0, %6) : $@convention(thin) <τ_0_0 where τ_0_0 : Count> (Int, @owned @box S<τ_0_0>) -> Bool
@@ -607,7 +607,7 @@ bb0(%0 : $Int, %1 : $@box S<T>):
   %2 = project_box %1 : $@box S<T>, 0
   %3 = function_ref @inner : $@convention(thin) (@owned @callee_owned () -> Bool) -> Bool
   %4 = function_ref @closure2 : $@convention(thin) <τ_0_0 where τ_0_0 : Count> (Int, @owned @box S<τ_0_0>) -> Bool
-  %5 = alloc_box $S<T>
+  %5 = alloc_box $@box S<T>
   %5a = project_box %5 : $@box S<T>, 0
   copy_addr %2 to [initialization] %5a : $*S<T>
   %7 = partial_apply %4<T>(%0, %5) : $@convention(thin) <τ_0_0 where τ_0_0 : Count> (Int, @owned @box S<τ_0_0>) -> Bool
@@ -650,7 +650,7 @@ bb0(%0 : $*T, %1 : $*T):
   // CHECK: copy_addr %1 to [initialization] [[STACK]]
   // CHECK: [[APPLIED:%.*]] = function_ref
   %3 = function_ref @applied : $@convention(thin) <τ_0_0> (@owned @box τ_0_0) -> ()
-  %4 = alloc_box $T
+  %4 = alloc_box $@box T
   %4a = project_box %4 : $@box T, 0
   copy_addr %1 to [initialization] %4a : $*T
   // CHECK: [[PARTIAL:%.*]] = partial_apply [[APPLIED]]<T>([[STACK]])

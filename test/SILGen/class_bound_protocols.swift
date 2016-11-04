@@ -26,7 +26,7 @@ class ConcreteSubclass : ConcreteClass { }
 func class_bound_generic<T : ClassBound>(x: T) -> T {
   var x = x
   // CHECK: bb0([[X:%.*]] : $T):
-  // CHECK:   [[X_ADDR:%.*]] = alloc_box $T
+  // CHECK:   [[X_ADDR:%.*]] = alloc_box $@box T
   // CHECK:   [[PB:%.*]] = project_box [[X_ADDR]]
   // CHECK:   store [[X]] to [init] [[PB]]
   return x
@@ -39,7 +39,7 @@ func class_bound_generic<T : ClassBound>(x: T) -> T {
 func class_bound_generic_2<T : ClassBound & NotClassBound>(x: T) -> T {
   var x = x
   // CHECK: bb0([[X:%.*]] : $T):
-  // CHECK:   [[X_ADDR:%.*]] = alloc_box $T
+  // CHECK:   [[X_ADDR:%.*]] = alloc_box $@box T
   // CHECK:   [[PB:%.*]] = project_box [[X_ADDR]]
   // CHECK:   store [[X]] to [init] [[PB]]
   return x
@@ -52,7 +52,7 @@ func class_bound_generic_2<T : ClassBound & NotClassBound>(x: T) -> T {
 func class_bound_protocol(x: ClassBound) -> ClassBound {
   var x = x
   // CHECK: bb0([[X:%.*]] : $ClassBound):
-  // CHECK:   [[X_ADDR:%.*]] = alloc_box $ClassBound
+  // CHECK:   [[X_ADDR:%.*]] = alloc_box $@box ClassBound
   // CHECK:   [[PB:%.*]] = project_box [[X_ADDR]]
   // CHECK:   store [[X]] to [init] [[PB]]
   return x
@@ -66,7 +66,7 @@ func class_bound_protocol_composition(x: ClassBound & NotClassBound)
 -> ClassBound & NotClassBound {
   var x = x
   // CHECK: bb0([[X:%.*]] : $ClassBound & NotClassBound):
-  // CHECK:   [[X_ADDR:%.*]] = alloc_box $ClassBound & NotClassBound
+  // CHECK:   [[X_ADDR:%.*]] = alloc_box $@box (ClassBound & NotClassBound)
   // CHECK:   [[PB:%.*]] = project_box [[X_ADDR]]
   // CHECK:   store [[X]] to [init] [[PB]]
   return x

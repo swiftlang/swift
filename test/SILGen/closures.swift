@@ -28,7 +28,7 @@ func return_local_generic_function_with_captures<A, R>(_ a: A) -> (A) -> R {
 func read_only_capture(_ x: Int) -> Int {
   var x = x
   // CHECK: bb0([[X:%[0-9]+]] : $Int):
-  // CHECK: [[XBOX:%[0-9]+]] = alloc_box $Int
+  // CHECK: [[XBOX:%[0-9]+]] = alloc_box $@box Int
 
   func cap() -> Int {
     return x
@@ -52,8 +52,8 @@ func read_only_capture(_ x: Int) -> Int {
 func write_to_capture(_ x: Int) -> Int {
   var x = x
   // CHECK: bb0([[X:%[0-9]+]] : $Int):
-  // CHECK: [[XBOX:%[0-9]+]] = alloc_box $Int
-  // CHECK: [[X2BOX:%[0-9]+]] = alloc_box $Int
+  // CHECK: [[XBOX:%[0-9]+]] = alloc_box $@box Int
+  // CHECK: [[X2BOX:%[0-9]+]] = alloc_box $@box Int
   // CHECK: [[PB:%.*]] = project_box [[X2BOX]]
   var x2 = x
 
@@ -97,7 +97,7 @@ func multiple_closure_refs(_ x: Int) -> (() -> Int, () -> Int) {
 // CHECK-LABEL: sil hidden @_TF8closures18capture_local_func
 func capture_local_func(_ x: Int) -> () -> () -> Int {
   var x = x
-  // CHECK: [[XBOX:%[0-9]+]] = alloc_box $Int
+  // CHECK: [[XBOX:%[0-9]+]] = alloc_box $@box Int
 
   func aleph() -> Int { return x }
 
@@ -122,7 +122,7 @@ func capture_local_func(_ x: Int) -> () -> () -> Int {
 func anon_read_only_capture(_ x: Int) -> Int {
   var x = x
   // CHECK: bb0([[X:%[0-9]+]] : $Int):
-  // CHECK: [[XBOX:%[0-9]+]] = alloc_box $Int
+  // CHECK: [[XBOX:%[0-9]+]] = alloc_box $@box Int
   // CHECK: [[PB:%.*]] = project_box [[XBOX]]
 
   return ({ x })()
@@ -143,7 +143,7 @@ func anon_read_only_capture(_ x: Int) -> Int {
 func small_closure_capture(_ x: Int) -> Int {
   var x = x
   // CHECK: bb0([[X:%[0-9]+]] : $Int):
-  // CHECK: [[XBOX:%[0-9]+]] = alloc_box $Int
+  // CHECK: [[XBOX:%[0-9]+]] = alloc_box $@box Int
   // CHECK: [[PB:%.*]] = project_box [[XBOX]]
 
   return { x }()
@@ -164,7 +164,7 @@ func small_closure_capture(_ x: Int) -> Int {
 // CHECK-LABEL: sil hidden @_TF8closures35small_closure_capture_with_argument
 func small_closure_capture_with_argument(_ x: Int) -> (_ y: Int) -> Int {
   var x = x
-  // CHECK: [[XBOX:%[0-9]+]] = alloc_box $Int
+  // CHECK: [[XBOX:%[0-9]+]] = alloc_box $@box Int
 
   return { x + $0 }
   // -- func expression
@@ -199,12 +199,12 @@ func uncaptured_locals(_ x: Int) -> (Int, Int) {
   var x = x
   // -- locals without captures are stack-allocated
   // CHECK: bb0([[XARG:%[0-9]+]] : $Int):
-  // CHECK:   [[XADDR:%[0-9]+]] = alloc_box $Int
+  // CHECK:   [[XADDR:%[0-9]+]] = alloc_box $@box Int
   // CHECK:   [[PB:%.*]] = project_box [[XADDR]]
   // CHECK:   store [[XARG]] to [trivial] [[PB]]
 
   var y = zero
-  // CHECK:   [[YADDR:%[0-9]+]] = alloc_box $Int
+  // CHECK:   [[YADDR:%[0-9]+]] = alloc_box $@box Int
   return (x, y)
 
 }
@@ -507,7 +507,7 @@ class SuperSub : SuperBase {
 }
 
 // CHECK-LABEL: sil hidden @_TFC8closures24UnownedSelfNestedCapture13nestedCapture{{.*}} : $@convention(method) (@guaranteed UnownedSelfNestedCapture) -> ()
-// CHECK:         [[OUTER_SELF_CAPTURE:%.*]] = alloc_box $@sil_unowned UnownedSelfNestedCapture
+// CHECK:         [[OUTER_SELF_CAPTURE:%.*]] = alloc_box $@box @sil_unowned UnownedSelfNestedCapture
 // CHECK:         [[PB:%.*]] = project_box [[OUTER_SELF_CAPTURE]]
 // CHECK:         [[UNOWNED_SELF:%.*]] = ref_to_unowned [[SELF_PARAM:%.*]] :
 // -- TODO: A lot of fussy r/r traffic and owned/unowned conversions here.

@@ -15,7 +15,7 @@ func TreeA_cases<T>(_ t: T, l: TreeA<T>, r: TreeA<T>) {
   let _ = TreeA<T>.Nil
 
 // CHECK-NEXT:    [[METATYPE:%.*]] = metatype $@thin TreeA<T>.Type
-// CHECK-NEXT:    [[BOX:%.*]] = alloc_box $T
+// CHECK-NEXT:    [[BOX:%.*]] = alloc_box $@box T
 // CHECK-NEXT:    [[PB:%.*]] = project_box [[BOX]]
 // CHECK-NEXT:    copy_addr %0 to [initialization] [[PB]]
 // CHECK-NEXT:    [[LEAF:%.*]] = enum $TreeA<T>, #TreeA.Leaf!enumelt.1, [[BOX]]
@@ -23,7 +23,7 @@ func TreeA_cases<T>(_ t: T, l: TreeA<T>, r: TreeA<T>) {
   let _ = TreeA<T>.Leaf(t)
 
 // CHECK-NEXT:    [[METATYPE:%.*]] = metatype $@thin TreeA<T>.Type
-// CHECK-NEXT:    [[BOX:%.*]] = alloc_box $(left: TreeA<T>, right: TreeA<T>)
+// CHECK-NEXT:    [[BOX:%.*]] = alloc_box $@box (left: TreeA<T>, right: TreeA<T>)
 // CHECK-NEXT:    [[PB:%.*]] = project_box [[BOX]]
 // CHECK-NEXT:    [[LEFT:%.*]] = tuple_element_addr [[PB]] : $*(left: TreeA<T>, right: TreeA<T>), 0
 // CHECK-NEXT:    [[RIGHT:%.*]] = tuple_element_addr [[PB]] : $*(left: TreeA<T>, right: TreeA<T>), 1
@@ -46,7 +46,7 @@ func TreeA_cases<T>(_ t: T, l: TreeA<T>, r: TreeA<T>) {
 func TreeA_reabstract(_ f: @escaping (Int) -> Int) {
 
 // CHECK:         [[METATYPE:%.*]] = metatype $@thin TreeA<(Int) -> Int>.Type
-// CHECK-NEXT:    [[BOX:%.*]] = alloc_box $@callee_owned (@in Int) -> @out Int
+// CHECK-NEXT:    [[BOX:%.*]] = alloc_box $@box @callee_owned (@in Int) -> @out Int
 // CHECK-NEXT:    [[PB:%.*]] = project_box [[BOX]]
 // CHECK-NEXT:    copy_value %0
 // CHECK:         [[THUNK:%.*]] = function_ref @_TTRXFo_dSi_dSi_XFo_iSi_iSi_
@@ -85,7 +85,7 @@ func TreeB_cases<T>(_ t: T, l: TreeB<T>, r: TreeB<T>) {
   let _ = TreeB<T>.Leaf(t)
 
 // CHECK-NEXT:    [[METATYPE:%.*]] = metatype $@thin TreeB<T>.Type
-// CHECK-NEXT:    [[BOX:%.*]] = alloc_box $(left: TreeB<T>, right: TreeB<T>)
+// CHECK-NEXT:    [[BOX:%.*]] = alloc_box $@box (left: TreeB<T>, right: TreeB<T>)
 // CHECK-NEXT:    [[PB:%.*]] = project_box [[BOX]]
 // CHECK-NEXT:    [[LEFT:%.*]] = tuple_element_addr [[PB]]
 // CHECK-NEXT:    [[RIGHT:%.*]] = tuple_element_addr [[PB]]
@@ -120,7 +120,7 @@ func TreeInt_cases(_ t: Int, l: TreeInt, r: TreeInt) {
   let _ = TreeInt.Leaf(t)
 
 // CHECK-NEXT:    [[METATYPE:%.*]] = metatype $@thin TreeInt.Type
-// CHECK-NEXT:    [[BOX:%.*]] = alloc_box $(left: TreeInt, right: TreeInt)
+// CHECK-NEXT:    [[BOX:%.*]] = alloc_box $@box (left: TreeInt, right: TreeInt)
 // CHECK-NEXT:    [[PB:%.*]] = project_box [[BOX]]
 // CHECK-NEXT:    [[LEFT:%.*]] = tuple_element_addr [[PB]]
 // CHECK-NEXT:    [[RIGHT:%.*]] = tuple_element_addr [[PB]]

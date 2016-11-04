@@ -114,7 +114,7 @@ class ObjCInit {
 // CHECK: sil hidden @_TF12dynamic_self12testObjCInit{{.*}} : $@convention(thin) (@thick ObjCInit.Type) -> ()
 func testObjCInit(meta: ObjCInit.Type) {
 // CHECK: bb0([[THICK_META:%[0-9]+]] : $@thick ObjCInit.Type):
-// CHECK:   [[O:%[0-9]+]] = alloc_box $ObjCInit
+// CHECK:   [[O:%[0-9]+]] = alloc_box $@box ObjCInit
 // CHECK:   [[PB:%.*]] = project_box [[O]]
 // CHECK:   [[OBJC_META:%[0-9]+]] = thick_to_objc_metatype [[THICK_META]] : $@thick ObjCInit.Type to $@objc_metatype ObjCInit.Type
 // CHECK:   [[OBJ:%[0-9]+]] = alloc_ref_dynamic [objc] [[OBJC_META]] : $@objc_metatype ObjCInit.Type, $ObjCInit
@@ -180,7 +180,7 @@ class Z {
     // Capturing 'self' weak, so we have to pass in a metatype explicitly
     // so that IRGen can recover metadata.
 
-    // CHECK:      [[WEAK_SELF:%.*]] = alloc_box $@sil_weak Optional<Z>
+    // CHECK:      [[WEAK_SELF:%.*]] = alloc_box $@box @sil_weak Optional<Z>
     // CHECK:      [[FN:%.*]] = function_ref @_TFFC12dynamic_self1Z23testDynamicSelfCapturesFT1xSi_DS0_U1_FT_T_ : $@convention(thin) (@owned @box @sil_weak Optional<Z>, @thick Z.Type) -> ()
     // CHECK:      copy_value [[WEAK_SELF]] : $@box @sil_weak Optional<Z>
     // CHECK-NEXT: [[DYNAMIC_SELF:%.*]] = metatype $@thick @dynamic_self Z.Type
