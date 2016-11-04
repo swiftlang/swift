@@ -314,6 +314,8 @@ public:
   bool operator==(const SDKNode &Other) const;
   bool operator!=(const SDKNode &Other) const { return !((*this) == Other); }
 
+  ArrayRef<NodeAnnotation>
+    getAnnotations(std::vector<NodeAnnotation> &Scrach) const;
   bool isLeaf() const { return Children.empty(); }
   SDKNodeKind getKind() const { return SDKNodeKind(TheKind); }
   StringRef getName() const { return Name; }
@@ -364,10 +366,10 @@ public:
   bool isObjc() const { return Usr.startswith("c:"); }
   static bool classof(const SDKNode *N);
   DeclKind getDeclKind() const { return DKind; }
-  void printFullyQualifiedName(llvm::raw_ostream &OS);
-  StringRef getFullyQualifiedName();
-  bool isSDKPrivate();
-  bool isDeprecated();
+  void printFullyQualifiedName(llvm::raw_ostream &OS) const;
+  StringRef getFullyQualifiedName() const;
+  bool isSDKPrivate() const;
+  bool isDeprecated() const;
   bool isStatic() const { return IsStatic; };
 };
 
@@ -431,9 +433,9 @@ unsigned SDKNode::getChildIndex(NodePtr Child) const {
 }
 
 NodePtr SDKNode::getOnlyChild() const {
-    assert(Children.size() == 1 && "more that one child.");
-    return (*Children.begin()).get();
-  }
+  assert(Children.size() == 1 && "more that one child.");
+  return (*Children.begin()).get();
+}
 
 void SDKNode::addChild(NodeUniquePtr Child) {
   Child->Parent = this;
@@ -466,6 +468,13 @@ void SDKNode::addAnnotateComment(NodeAnnotation Anno, StringRef Comment) {
 
 StringRef SDKNode::getAnnotateComment(NodeAnnotation Anno) const {
   return AnnotateComments.find(Anno)->second;
+}
+
+ArrayRef<NodeAnnotation> SDKNode::
+getAnnotations(std::vector<NodeAnnotation> &Scratch) const {
+  for(auto Ann : Annotations)
+    Scratch.push_back(Ann);
+  return llvm::makeArrayRef(Scratch);
 }
 
 bool SDKNode::isAnnotatedAs(NodeAnnotation Anno) const {
@@ -588,11 +597,11 @@ SDKNode* SDKNodeNil::getInstance() {
   return Instance.get();
 }
 
-bool SDKNodeDecl::isDeprecated() {
+bool SDKNodeDecl::isDeprecated() const {
   return hasDeclAttribute(SDKDeclAttrKind::DAK_deprecated);
 }
 
-bool SDKNodeDecl::isSDKPrivate() {
+bool SDKNodeDecl::isSDKPrivate() const {
   if (getName().startswith("__"))
     return true;
   if (auto *PD = dyn_cast<SDKNodeDecl>(getParent()))
@@ -600,7 +609,7 @@ bool SDKNodeDecl::isSDKPrivate() {
   return false;
 }
 
-void SDKNodeDecl::printFullyQualifiedName(llvm::raw_ostream &OS) {
+void SDKNodeDecl::printFullyQualifiedName(llvm::raw_ostream &OS) const {
   std::vector<NodePtr> Parent;
   for (auto *P = getParent(); isa<SDKNodeDecl>(P); P = P->getParent())
     Parent.push_back(P);
@@ -609,7 +618,7 @@ void SDKNodeDecl::printFullyQualifiedName(llvm::raw_ostream &OS) {
   OS << getPrintedName();
 }
 
-StringRef SDKNodeDecl::getFullyQualifiedName() {
+StringRef SDKNodeDecl::getFullyQualifiedName() const {
   llvm::SmallString<32> Buffer;
   llvm::raw_svector_ostream OS(Buffer);
   printFullyQualifiedName(OS);
@@ -1936,7 +1945,7 @@ public:
     MapImpl.push_back(std::make_pair(Left, Right));
   }
 
-  NodePtr findUpdateCounterpart(NodePtr Node) const {
+  NodePtr findUpdateCounterpart(const SDKNode *Node) const {
     assert(Node->isAnnotatedAs(NodeAnnotation::Updated) && "Not update operation.");
     auto FoundPair = std::find_if(MapImpl.begin(), MapImpl.end(),
                         [&](std::pair<NodePtr, NodePtr> Pair) {
@@ -2688,10 +2697,11 @@ public:
 };
 
 class DiagnosisEmitter : public SDKNodeVisitor {
+  void handle(const SDKNodeDecl *D, NodeAnnotation Anno);
   void visitType(SDKNodeType *T);
   void visitDecl(SDKNodeDecl *D);
   void visit(NodePtr Node) override;
-  SDKNodeDecl *findAddedDecl(SDKNodeDecl *Node);
+  SDKNodeDecl *findAddedDecl(const SDKNodeDecl *Node);
   static StringRef printName(StringRef Name);
   static StringRef printDiagKeyword(StringRef Name);
   static void collectAddedDecls(NodePtr Root, std::set<SDKNodeDecl*> &Results);
@@ -2805,7 +2815,7 @@ void DiagnosisEmitter::collectAddedDecls(NodePtr Root,
     collectAddedDecls(C.get(), Results);
 }
 
-SDKNodeDecl *DiagnosisEmitter::findAddedDecl(SDKNodeDecl *Root) {
+SDKNodeDecl *DiagnosisEmitter::findAddedDecl(const SDKNodeDecl *Root) {
   for (auto *Added : AddedDecls) {
     if (Root->getKind() == Added->getKind() &&
         Root->getPrintedName() == Added->getPrintedName())
@@ -2904,11 +2914,10 @@ void DiagnosisEmitter::diagnosis(NodePtr LeftRoot, NodePtr RightRoot,
   SDKNode::postorderVisit(LeftRoot, Emitter);
 }
 
-void DiagnosisEmitter::visitDecl(SDKNodeDecl *Node) {
-  if (Node->isSDKPrivate())
-    return;
-  if (Node->isAnnotatedAs(NodeAnnotation::Removed) &&
-      !Node->isAnnotatedAs(NodeAnnotation::Rename)) {
+void DiagnosisEmitter::handle(const SDKNodeDecl *Node, NodeAnnotation Anno) {
+  assert(Node->isAnnotatedAs(Anno));
+  switch(Anno) {
+  case NodeAnnotation::Removed: {
     if (auto *Added = findAddedDecl(Node)) {
       MovedDecls.Diags.emplace_back(Node->getDeclKind(),
                                     Added->getDeclKind(),
@@ -2919,29 +2928,34 @@ void DiagnosisEmitter::visitDecl(SDKNodeDecl *Node) {
                                       Node->getFullyQualifiedName(),
                                       Node->isDeprecated());
     }
+    return;
   }
-  if (Node->isAnnotatedAs(NodeAnnotation::Rename)) {
+  case NodeAnnotation::Rename: {
     auto *Count = UpdateMap.findUpdateCounterpart(Node)->getAs<SDKNodeDecl>();
     RenamedDecls.Diags.emplace_back(Node->getDeclKind(), Count->getDeclKind(),
                                     Node->getFullyQualifiedName(),
                                     Count->getFullyQualifiedName());
+    return;
   }
-  if (Node->isAnnotatedAs(NodeAnnotation::NowMutating)) {
+  case NodeAnnotation::NowMutating: {
     AttrChangedDecls.Diags.emplace_back(Node->getDeclKind(),
                                         Node->getFullyQualifiedName(),
                                         InsertToBuffer("mutating"));
+    return;
   }
-  if (Node->isAnnotatedAs(NodeAnnotation::NowThrowing)) {
+  case NodeAnnotation::NowThrowing: {
     AttrChangedDecls.Diags.emplace_back(Node->getDeclKind(),
                                         Node->getFullyQualifiedName(),
                                         InsertToBuffer("throwing"));
+    return;
   }
-  if (Node->isAnnotatedAs(NodeAnnotation::StaticChange)) {
+  case NodeAnnotation::StaticChange: {
     AttrChangedDecls.Diags.emplace_back(Node->getDeclKind(),
                                         Node->getFullyQualifiedName(),
                   InsertToBuffer(Node->isStatic() ? "not static" : "static"));
+    return;
   }
-  if (Node->isAnnotatedAs(NodeAnnotation::OwnershipChange)) {
+  case NodeAnnotation::OwnershipChange: {
     auto getOwnershipDescription = [](swift::Ownership O) {
       switch (O) {
       case Ownership::Strong:    return InsertToBuffer("strong");
@@ -2955,8 +2969,21 @@ void DiagnosisEmitter::visitDecl(SDKNodeDecl *Node) {
                                         Node->getFullyQualifiedName(),
                                   getOwnershipDescription(Node->getOwnership()),
                                 getOwnershipDescription(Count->getOwnership()));
+    return;
+  }
+  default:
+    return;
   }
 }
+
+void DiagnosisEmitter::visitDecl(SDKNodeDecl *Node) {
+  if (Node->isSDKPrivate())
+    return;
+  std::vector<NodeAnnotation> Scratch;
+  for (auto Anno : Node->getAnnotations(Scratch))
+    handle(Node, Anno);
+}
+
 void DiagnosisEmitter::visitType(SDKNodeType *Node) {
   auto *Parent = Node->getParent()->getAs<SDKNodeDecl>();
   if (!Parent || Parent->isSDKPrivate())
