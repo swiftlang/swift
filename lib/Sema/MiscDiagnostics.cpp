@@ -2559,11 +2559,15 @@ VarDeclUsageChecker::~VarDeclUsageChecker() {
       //  ->
       //    _ = foo()
       if (auto *pbd = var->getParentPatternBinding())
-        if (pbd->getSingleVar() == var && pbd->getInit(0) != nullptr) {
+        if (pbd->getSingleVar() == var && pbd->getInit(0) != nullptr &&
+            !isa<TypedPattern>(pbd->getPatternList()[0].getPattern())) {
           unsigned varKind = var->isLet();
+          SourceRange replaceRange(
+              pbd->getStartLoc(),
+              pbd->getPatternList()[0].getPattern()->getEndLoc());
           TC.diagnose(var->getLoc(), diag::pbd_never_used,
                       var->getName(), varKind)
-            .fixItReplace(SourceRange(pbd->getLoc(), var->getLoc()), "_");
+            .fixItReplace(replaceRange, "_");
           continue;
         }
       
