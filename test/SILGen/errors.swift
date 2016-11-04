@@ -468,7 +468,7 @@ class BaseThrowingInit : HasThrowingInit {
   }
 }
 // CHECK: sil hidden @_TFC6errors16BaseThrowingInitc{{.*}} : $@convention(method) (Int, Int, @owned BaseThrowingInit) -> (@owned BaseThrowingInit, @error Error)
-// CHECK:      [[BOX:%.*]] = alloc_box $BaseThrowingInit
+// CHECK:      [[BOX:%.*]] = alloc_box $@box BaseThrowingInit
 // CHECK:      [[PB:%.*]] = project_box [[BOX]]
 // CHECK:      [[MARKED_BOX:%.*]] = mark_uninitialized [derivedself] [[PB]]
 //   Initialize subField.
@@ -707,7 +707,7 @@ func testOptionalTry() {
 
 // CHECK-LABEL: sil hidden @_TF6errors18testOptionalTryVarFT_T_
 // CHECK-NEXT: bb0:
-// CHECK-NEXT: [[BOX:%.+]] = alloc_box $Optional<Cat>
+// CHECK-NEXT: [[BOX:%.+]] = alloc_box $@box Optional<Cat>
 // CHECK-NEXT: [[PB:%.*]] = project_box [[BOX]]
 // CHECK-NEXT: [[BOX_DATA:%.+]] = init_enum_data_addr [[PB]] : $*Optional<Cat>, #Optional.some!enumelt.1
 // CHECK: [[FN:%.+]] = function_ref @_TF6errors10make_a_catFzT_CS_3Cat
@@ -763,7 +763,7 @@ func testOptionalTryAddressOnly<T>(_ obj: T) {
 
 // CHECK-LABEL: sil hidden @_TF6errors29testOptionalTryAddressOnlyVar
 // CHECK: bb0(%0 : $*T):
-// CHECK: [[BOX:%.+]] = alloc_box $Optional<T>
+// CHECK: [[BOX:%.+]] = alloc_box $@box Optional<T>
 // CHECK-NEXT: [[PB:%.*]] = project_box [[BOX]]
 // CHECK-NEXT: [[BOX_DATA:%.+]] = init_enum_data_addr [[PB]] : $*Optional<T>, #Optional.some!enumelt.1
 // CHECK: [[FN:%.+]] = function_ref @_TF6errors11dont_return
@@ -833,7 +833,7 @@ func testOptionalTryNeverFails() {
 
 // CHECK-LABEL: sil hidden @_TF6errors28testOptionalTryNeverFailsVarFT_T_
 // CHECK: bb0:
-// CHECK-NEXT:   [[BOX:%.+]] = alloc_box $Optional<()>
+// CHECK-NEXT:   [[BOX:%.+]] = alloc_box $@box Optional<()>
 // CHECK-NEXT:   [[PB:%.*]] = project_box [[BOX]]
 // CHECK-NEXT:   = init_enum_data_addr [[PB]] : $*Optional<()>, #Optional.some!enumelt.1
 // CHECK-NEXT:   inject_enum_addr [[PB]] : $*Optional<()>, #Optional.some!enumelt.1
@@ -863,7 +863,7 @@ func testOptionalTryNeverFailsAddressOnly<T>(_ obj: T) {
 
 // CHECK-LABEL: sil hidden @_TF6errors39testOptionalTryNeverFailsAddressOnlyVar
 // CHECK: bb0(%0 : $*T):
-// CHECK:   [[BOX:%.+]] = alloc_box $Optional<T>
+// CHECK:   [[BOX:%.+]] = alloc_box $@box Optional<T>
 // CHECK-NEXT:   [[PB:%.*]] = project_box [[BOX]]
 // CHECK-NEXT:   [[BOX_DATA:%.+]] = init_enum_data_addr [[PB]] : $*Optional<T>, #Optional.some!enumelt.1
 // CHECK-NEXT:   copy_addr %0 to [initialization] [[BOX_DATA]] : $*T

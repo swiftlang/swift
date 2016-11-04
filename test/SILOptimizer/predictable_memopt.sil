@@ -7,10 +7,10 @@ import Swift
 // CHECK-LABEL: sil @simple_reg_promotion
 sil @simple_reg_promotion : $@convention(thin) (Int) -> Int {
 bb0(%0 : $Int):                         // CHECK: bb0(%0 : $Int):
-  %1 = alloc_box $Int
+  %1 = alloc_box $@box Int
   %1a = project_box %1 : $@box Int, 0
   store %0 to %1a : $*Int
-  %3 = alloc_box $Int
+  %3 = alloc_box $@box Int
   %3a = project_box %3 : $@box Int, 0
   %4 = load %1a : $*Int
   store %4 to %3a : $*Int
@@ -26,7 +26,7 @@ bb0(%0 : $Int):                         // CHECK: bb0(%0 : $Int):
 // CHECK-LABEL: sil @tuple_reg_promotion
 sil @tuple_reg_promotion : $@convention(thin) (Int) -> Int {
 bb0(%0 : $Int):                         // CHECK: bb0(%0 : $Int):
-  %1 = alloc_box $(Int, Int)
+  %1 = alloc_box $@box (Int, Int)
   %1a = project_box %1 : $@box (Int, Int), 0
 
   %a = tuple_element_addr %1a : $*(Int, Int), 0
@@ -65,8 +65,8 @@ sil @takes_Int_inout : $@convention(thin) (@inout Int) -> ()
 sil @used_by_inout : $@convention(thin) (Int) -> (Int, Int) {
 bb0(%0 : $Int):
   // This alloc_stack can't be removed since it is used by an inout call.
-  // CHECK: %1 = alloc_box $Int
-  %1 = alloc_box $Int
+  // CHECK: %1 = alloc_box $@box Int
+  %1 = alloc_box $@box Int
   %1a = project_box %1 : $@box Int, 0
   %2 = store %0 to %1a : $*Int
 
@@ -104,7 +104,7 @@ sil @closure0 : $@convention(thin) (@owned @box Int) -> ()
 // CHECK-LABEL: sil @closure_test2
 sil @closure_test2 : $@convention(thin) (Int) -> Int {
 bb0(%1 : $Int):
-  %0 = alloc_box $Int
+  %0 = alloc_box $@box Int
   %0a = project_box %0 : $@box Int, 0
   store %1 to %0a : $*Int  // CHECK: store
 
@@ -132,7 +132,7 @@ sil @getSomeClass : $@convention(thin) () -> @owned SomeClass
 // CHECK-LABEL: sil @assign_test_trivial
 sil @assign_test_trivial : $@convention(thin) (Int) -> Int {
 bb0(%0 : $Int):
-  %1 = alloc_box $Int
+  %1 = alloc_box $@box Int
   %1a = project_box %1 : $@box Int, 0
 
   store %0 to %1a : $*Int
@@ -375,8 +375,8 @@ enum IndirectCase {
 sil @indirect_enum_box : $@convention(thin) (Int) -> IndirectCase {
 // CHECK: bb0([[X:%.*]] : $Int):
 entry(%x : $Int):
-  // CHECK: [[BOX:%.*]] = alloc_box $Int
-  %b = alloc_box $Int
+  // CHECK: [[BOX:%.*]] = alloc_box $@box Int
+  %b = alloc_box $@box Int
   // CHECK: [[PB:%.*]] = project_box [[BOX]]
   %ba = project_box %b : $@box Int, 0
   // CHECK: store [[X]] to [[PB]]

@@ -121,6 +121,7 @@ extern SourceKit::UIdent KeyTypeUsr;
 extern SourceKit::UIdent KeyContainerTypeUsr;
 extern SourceKit::UIdent KeyModuleGroups;
 
+extern SourceKit::UIdent KeyRangeContent;
 /// \brief Used for determining the printing order of dictionary keys.
 bool compareDictKeys(SourceKit::UIdent LHS, SourceKit::UIdent RHS);
 

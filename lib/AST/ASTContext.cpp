@@ -2564,6 +2564,12 @@ BoundGenericType::BoundGenericType(TypeKind theKind,
 BoundGenericType *BoundGenericType::get(NominalTypeDecl *TheDecl,
                                         Type Parent,
                                         ArrayRef<Type> GenericArgs) {
+  assert(TheDecl->getGenericParams() && "must be a generic type decl");
+  assert((!Parent || Parent->is<NominalType>() ||
+          Parent->is<BoundGenericType>() ||
+          Parent->is<UnboundGenericType>()) &&
+         "parent must be a nominal type");
+
   ASTContext &C = TheDecl->getDeclContext()->getASTContext();
   llvm::FoldingSetNodeID ID;
   RecursiveTypeProperties properties;
@@ -2609,6 +2615,13 @@ BoundGenericType *BoundGenericType::get(NominalTypeDecl *TheDecl,
 }
 
 NominalType *NominalType::get(NominalTypeDecl *D, Type Parent, const ASTContext &C) {
+  assert((isa<ProtocolDecl>(D) || !D->getGenericParams()) &&
+         "must be a non-generic type decl");
+  assert((!Parent || Parent->is<NominalType>() ||
+          Parent->is<BoundGenericType>() ||
+          Parent->is<UnboundGenericType>()) &&
+         "parent must be a nominal type");
+
   switch (D->getKind()) {
   case DeclKind::Enum:
     return EnumType::get(cast<EnumDecl>(D), Parent, C);

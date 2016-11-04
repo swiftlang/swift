@@ -5,7 +5,7 @@ class B : A {}
 
 
 // CHECK-LABEL: sil hidden @_TF4main3foo
-// CHECK:      [[X:%.*]] = alloc_box $Optional<B>, var, name "x"
+// CHECK:      [[X:%.*]] = alloc_box $@box Optional<B>, var, name "x"
 // CHECK-NEXT: [[PB:%.*]] = project_box [[X]]
 //   Check whether the temporary holds a value.
 // CHECK:      [[T1:%.*]] = select_enum %0
@@ -41,7 +41,7 @@ func foo(_ y : A?) {
 }
 
 // CHECK-LABEL: sil hidden @_TF4main3bar
-// CHECK:      [[X:%.*]] = alloc_box $Optional<Optional<Optional<B>>>, var, name "x"
+// CHECK:      [[X:%.*]] = alloc_box $@box Optional<Optional<Optional<B>>>, var, name "x"
 // CHECK-NEXT: [[PB:%.*]] = project_box [[X]]
 
 // Check for some(...)
@@ -105,7 +105,7 @@ func bar(_ y : A????) {
 }
 
 // CHECK-LABEL: sil hidden @_TF4main3baz
-// CHECK:      [[X:%.*]] = alloc_box $Optional<B>, var, name "x"
+// CHECK:      [[X:%.*]] = alloc_box $@box Optional<B>, var, name "x"
 // CHECK-NEXT: [[PB:%.*]] = project_box [[X]]
 // CHECK-NEXT: copy_value %0
 // CHECK:      [[T1:%.*]] = select_enum %0
@@ -163,7 +163,7 @@ public struct TestAddressOnlyStruct<T> {
 // CHECK-LABEL: sil hidden @_TF4main35testContextualInitOfNonAddrOnlyTypeFGSqSi_T_
 // CHECK: bb0(%0 : $Optional<Int>):
 // CHECK-NEXT: debug_value %0 : $Optional<Int>, let, name "a"
-// CHECK-NEXT: [[X:%.*]] = alloc_box $Optional<Int>, var, name "x"
+// CHECK-NEXT: [[X:%.*]] = alloc_box $@box Optional<Int>, var, name "x"
 // CHECK-NEXT: [[PB:%.*]] = project_box [[X]]
 // CHECK-NEXT: [[CAST:%.*]] = unchecked_addr_cast [[PB]] : $*Optional<Int> to $*Optional<Int>
 // CHECK-NEXT: store %0 to [trivial] [[CAST]] : $*Optional<Int>

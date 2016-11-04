@@ -873,12 +873,17 @@ UnqualifiedLookup::UnqualifiedLookup(DeclName Name, DeclContext *DC,
           else if (auto ext = dyn_cast<ExtensionDecl>(DC))
             dcGenericParams = ext->getGenericParams();
 
-          if (dcGenericParams) {
+          while (dcGenericParams) {
             namelookup::FindLocalVal localVal(SM, Loc, Consumer);
             localVal.checkGenericParams(dcGenericParams);
 
             if (!Results.empty())
               return;
+
+            if (!isa<ExtensionDecl>(DC))
+              break;
+
+            dcGenericParams = dcGenericParams->getOuterParameters();
           }
         }
 

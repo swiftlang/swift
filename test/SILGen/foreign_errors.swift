@@ -170,7 +170,7 @@ class VeryErrorProne : ErrorProne {
   }
 }
 // CHECK:    sil hidden @_TFC14foreign_errors14VeryErrorPronec{{.*}}
-// CHECK:      [[BOX:%.*]] = alloc_box $VeryErrorProne
+// CHECK:      [[BOX:%.*]] = alloc_box $@box VeryErrorProne
 // CHECK:      [[PB:%.*]] = project_box [[BOX]]
 // CHECK:      [[MARKED_BOX:%.*]] = mark_uninitialized [derivedself] [[PB]]
 // CHECK:      [[T0:%.*]] = load [[MARKED_BOX]]

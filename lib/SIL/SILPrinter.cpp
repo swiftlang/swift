@@ -883,7 +883,7 @@ public:
   }
 
   void visitAllocBoxInst(AllocBoxInst *ABI) {
-    *this << ABI->getElementType();
+    *this << ABI->getType();
     printDebugVar(ABI->getVarInfo());
   }
 

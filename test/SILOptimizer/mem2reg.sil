@@ -53,7 +53,7 @@ sil @multiple_store_vals2 : $@convention(thin) (Int64) -> Int64 {
 bb0(%0 : $Int64):
   %1 = alloc_stack $Int64, var, name "c"               // users: %19, %2
   store %0 to %1 : $*Int64                      // id: %2
-  %3 = alloc_box $Int64, var, name "x"                 // users: %16, %11, %6
+  %3 = alloc_box $@box Int64, var, name "x"                 // users: %16, %11, %6
   %3a = project_box %3 : $@box Int64, 0
   %4 = integer_literal $Builtin.Int64, 2          // users: %9, %5
   %5 = struct $Int64 (%4 : $Builtin.Int64)        // users: %12, %6
@@ -84,7 +84,7 @@ sil @with_loads : $@convention(thin) (Int64) -> Int64 {
 bb0(%0 : $Int64):
   %1 = alloc_stack $Int64, var, name "c"               // users: %19, %2, (%20)
   store %0 to %1 : $*Int64                      // id: %2
-  %3 = alloc_box $Int64, var, name "x"                 // users: %16, %11, %6
+  %3 = alloc_box $@box Int64, var, name "x"                 // users: %16, %11, %6
   %3a = project_box %3 : $@box Int64, 0
   %4 = integer_literal $Builtin.Int64, 2          // users: %9, %5
   %5 = struct $Int64 (%4 : $Builtin.Int64)        // users: %12, %6

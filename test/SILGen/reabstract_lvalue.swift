@@ -12,7 +12,7 @@ func transform(_ i: Int) -> Double {
 
 // CHECK-LABEL: sil hidden @_TF17reabstract_lvalue23reabstractFunctionInOutFT_T_ : $@convention(thin) () -> ()
 func reabstractFunctionInOut() {
-  // CHECK: [[BOX:%.*]] = alloc_box $@callee_owned (Int) -> Double
+  // CHECK: [[BOX:%.*]] = alloc_box $@box @callee_owned (Int) -> Double
   // CHECK: [[PB:%.*]] = project_box [[BOX]]
   // CHECK: [[ARG:%.*]] = function_ref @_TF17reabstract_lvalue9transformFSiSd
   // CHECK: [[THICK_ARG:%.*]] = thin_to_thick_function [[ARG]]

@@ -110,7 +110,7 @@ bb0:
 // CHECK-NOT: unchecked_ref_cast
 sil @removeTriviallyDeadInstructions : $@convention(thin) (@owned B) -> () {
 bb0(%0 : $B):
-  %1 = alloc_box $B
+  %1 = alloc_box $@box B
   %1a = project_box %1 : $@box B, 0
   %2 = store %0 to %1a : $*B
   %3 = load %1a : $*B

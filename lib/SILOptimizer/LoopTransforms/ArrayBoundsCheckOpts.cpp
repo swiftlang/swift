@@ -1097,6 +1097,38 @@ static bool isComparisonKnownTrue(BuiltinInst *Builtin, InductionInfo &IndVar) {
                                     m_Specific(IndVar.End)));
 }
 
+/// Based on the induction variable information this comparison is known to be
+/// false.
+static bool isComparisonKnownFalse(BuiltinInst *Builtin,
+                                   InductionInfo &IndVar) {
+  if (!IndVar.IsOverflowCheckInserted ||
+      IndVar.Cmp != BuiltinValueKind::ICMP_EQ)
+    return false;
+
+  // Pattern match a false condition patterns that we can detect and optimize:
+  // Iteration count < 0 (start)
+  // Iteration count + 1 <= 0 (start)
+  // Iteration count + 1 < 0 (start)
+  // Iteration count + 1 == 0 (start)
+  auto MatchIndVarHeader = m_Specific(IndVar.HeaderVal);
+  auto MatchIncrementIndVar = m_TupleExtractInst(
+      m_ApplyInst(BuiltinValueKind::SAddOver, MatchIndVarHeader, m_One()), 0);
+  auto MatchIndVarStart = m_Specific(IndVar.Start);
+
+  if (match(Builtin,
+            m_ApplyInst(BuiltinValueKind::ICMP_SLT,
+                        m_CombineOr(MatchIndVarHeader, MatchIncrementIndVar),
+                        MatchIndVarStart)) ||
+      match(Builtin, m_ApplyInst(BuiltinValueKind::ICMP_EQ,
+                                 MatchIncrementIndVar, MatchIndVarStart)) ||
+      match(Builtin, m_ApplyInst(BuiltinValueKind::ICMP_SLE,
+                                 MatchIncrementIndVar, MatchIndVarStart))) {
+    return true;
+  }
+
+  return false;
+}
+
 /// Analyse the loop for arrays that are not modified and perform dominator tree
 /// based redundant bounds check removal.
 static bool hoistBoundsChecks(SILLoop *Loop, DominanceInfo *DT, SILLoopInfo *LI,
@@ -1197,6 +1229,15 @@ static bool hoistBoundsChecks(SILLoop *Loop, DominanceInfo *DT, SILLoopInfo *LI,
                 TrueVal = SILValue(B.createIntegerLiteral(
                     Builtin->getLoc(), Builtin->getType(), -1));
               Builtin->replaceAllUsesWith(TrueVal);
+              Changed = true;
+              continue;
+            }
+            if (isComparisonKnownFalse(Builtin, *IV)) {
+              if (!FalseVal) {
+                FalseVal = SILValue(B.createIntegerLiteral(
+                    Builtin->getLoc(), Builtin->getType(), 0));
+              }
+              Builtin->replaceAllUsesWith(FalseVal);
               Changed = true;
               continue;
             }

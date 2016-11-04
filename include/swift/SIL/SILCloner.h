@@ -511,7 +511,7 @@ SILCloner<ImplClass>::visitAllocBoxInst(AllocBoxInst *Inst) {
   getBuilder().setCurrentDebugScope(getOpScope(Inst->getDebugScope()));
   doPostProcess(Inst,
     getBuilder().createAllocBox(getOpLocation(Inst->getLoc()),
-                                getOpType(Inst->getElementType())));
+               this->getOpType(Inst->getType()).template castTo<SILBoxType>()));
 }
 
 template<typename ImplClass>

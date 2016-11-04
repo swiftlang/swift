@@ -778,13 +778,18 @@ bool SILDeserializer::readSILInstruction(SILFunction *Fn, SILBasicBlock *BB,
   case ValueKind::DebugValueAddrInst:
     llvm_unreachable("not supported");
 
+  case ValueKind::AllocBoxInst:
+    assert(RecordKind == SIL_ONE_TYPE && "Layout should be OneType.");
+    ResultVal = Builder.createAllocBox(Loc,
+                       cast<SILBoxType>(MF->getType(TyID)->getCanonicalType()));
+    break;
+  
 #define ONETYPE_INST(ID)                      \
   case ValueKind::ID##Inst:                   \
     assert(RecordKind == SIL_ONE_TYPE && "Layout should be OneType.");         \
     ResultVal = Builder.create##ID(Loc,                                        \
                   getSILType(MF->getType(TyID), (SILValueCategory)TyCategory));\
     break;
-  ONETYPE_INST(AllocBox)
   ONETYPE_INST(AllocStack)
   ONETYPE_INST(Metatype)
 #undef ONETYPE_INST

@@ -8,7 +8,7 @@ class Foo {
 
 class Bar: Foo {
   // CHECK-LABEL: sil hidden @_TFC22super_init_refcounting3Barc
-  // CHECK:         [[SELF_VAR:%.*]] = alloc_box $Bar
+  // CHECK:         [[SELF_VAR:%.*]] = alloc_box $@box Bar
   // CHECK:         [[PB:%.*]] = project_box [[SELF_VAR]]
   // CHECK:         [[SELF_MUI:%.*]] =  mark_uninitialized [derivedself] [[PB]]
   // CHECK:         [[ORIG_SELF:%.*]] = load [[SELF_MUI]]
@@ -26,7 +26,7 @@ class Bar: Foo {
 
 extension Foo {
   // CHECK-LABEL: sil hidden @_TFC22super_init_refcounting3Fooc
-  // CHECK:         [[SELF_VAR:%.*]] = alloc_box $Foo
+  // CHECK:         [[SELF_VAR:%.*]] = alloc_box $@box Foo
   // CHECK:         [[PB:%.*]] = project_box [[SELF_VAR]]
   // CHECK:         [[SELF_MUI:%.*]] =  mark_uninitialized [delegatingself] [[PB]]
   // CHECK:         [[ORIG_SELF:%.*]] = load [[SELF_MUI]]
@@ -72,7 +72,7 @@ class Good: Foo {
   let x: Int
 
   // CHECK-LABEL: sil hidden @_TFC22super_init_refcounting4Goodc
-  // CHECK:         [[SELF_BOX:%.*]] = alloc_box $Good
+  // CHECK:         [[SELF_BOX:%.*]] = alloc_box $@box Good
   // CHECK:         [[PB:%.*]] = project_box [[SELF_BOX]]
   // CHECK:         [[SELF:%.*]] = mark_uninitialized [derivedself] [[PB]]
   // CHECK:         store %0 to [[SELF]]
