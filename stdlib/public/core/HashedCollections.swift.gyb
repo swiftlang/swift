@@ -2487,9 +2487,6 @@ internal class _RawNative${Self}Storage:
   internal final var values: UnsafeMutableRawPointer
 % end
 
-  internal final let maxLoadFactorInverse: Double =
-    _hashContainerDefaultMaxLoadFactorInverse
-
   // This API is unsafe and needs a `_fixLifetime` in the caller.
   internal final
   var _initializedHashtableEntriesBitMapBuffer: UnsafeMutablePointer<UInt> {
@@ -2912,10 +2909,6 @@ internal struct _Native${Self}Buffer<${TypeParameters}> {
     get {
       return _assumeNonNegative(_storage.count)
     }
-  }
-
-  internal var _maxLoadFactorInverse: Double {
-    return _storage.maxLoadFactorInverse
   }
 
   internal
@@ -4235,7 +4228,7 @@ internal enum _Variant${Self}Buffer<${TypeParametersDecl}> : _HashBuffer {
       ? asNative.capacity
       : NativeBuffer.minimumCapacity(
           minimumCount: asNative.count + 1,
-          maxLoadFactorInverse: asNative._maxLoadFactorInverse)
+          maxLoadFactorInverse: _hashContainerDefaultMaxLoadFactorInverse)
 
     let (_, capacityChanged) = ensureUniqueNativeBuffer(minCapacity)
     if capacityChanged {
@@ -4300,7 +4293,7 @@ internal enum _Variant${Self}Buffer<${TypeParametersDecl}> : _HashBuffer {
 
     let minCapacity = NativeBuffer.minimumCapacity(
       minimumCount: asNative.count + 1,
-      maxLoadFactorInverse: asNative._maxLoadFactorInverse)
+      maxLoadFactorInverse: _hashContainerDefaultMaxLoadFactorInverse)
 
     let (_, capacityChanged) = ensureUniqueNativeBuffer(minCapacity)
 
