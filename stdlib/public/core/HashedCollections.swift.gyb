@@ -46,14 +46,11 @@ import SwiftShims
 //      |
 //      V  _RawNativeDictionaryStorage (a class)  
 //   +-----------------------------------------------------------+
-//   | +-------------------------------------------------------+ |
-//   | |_DictionaryBufferHeader<K,V> (a struct)               | |
-//   | | capacity                                              | |
-//   | | count                                                 | |
-//   | | ptrToBits                                             | |
-//   | | ptrToKeys                                             | |
-//   | | ptrToValues                                           | |
-//   | +-------------------------------------------------------+ |
+//   | capacity                                                  |
+//   | count                                                     |
+//   | ptrToBits                                                 |
+//   | ptrToKeys                                                 |
+//   | ptrToValues                                               |
 //   | [inline array of bits indicating whether bucket is set ]  |
 //   | [inline array of keys                                  ]  |
 //   | [inline array of values                                ]  |
@@ -2470,26 +2467,6 @@ collections = [
 
 % for (Self, a_self, TypeParametersDecl, TypeParameters, AnyTypeParameters, Sequence, AnySequenceType) in collections:
 
-/// Header part of the RawNativeSelfStorage.
-internal struct _${Self}BufferHeader {
-
-  internal init(capacity: Int) {
-    self.capacity = capacity
-  }
-
-  internal let capacity: Int
-  internal var count: Int = 0
-  internal let maxLoadFactorInverse: Double =
-    _hashContainerDefaultMaxLoadFactorInverse
-
-  // Placeholder values until the struct can be initialized.
-  internal var initializedEntries: _UnsafeBitMap! = nil
-  internal var keys: UnsafeMutableRawPointer! = nil
-% if Self == 'Dictionary':
-  internal var values: UnsafeMutableRawPointer! = nil
-% end
-}
-
 /// An instance of this class has all `${Self}` data tail-allocated.
 /// Enough bytes are allocated to hold the bitmap for marking valid entries,
 /// keys, and values. The data layout starts with the bitmap, followed by the
@@ -2499,13 +2476,22 @@ internal struct _${Self}BufferHeader {
 internal class _RawNative${Self}Storage:
   _SwiftNativeNS${Self}, _NS${Self}Core
 {
-  internal typealias BufferHeader = _${Self}BufferHeader
   internal typealias RawStorage = _RawNative${Self}Storage
+  
+  internal final var capacity: Int
+  internal final var count: Int
 
-  internal var _body: BufferHeader
+  internal final var initializedEntries: _UnsafeBitMap
+  internal final var keys: UnsafeMutableRawPointer
+% if Self == 'Dictionary':
+  internal final var values: UnsafeMutableRawPointer
+% end
+
+  internal final let maxLoadFactorInverse: Double =
+    _hashContainerDefaultMaxLoadFactorInverse
 
   // This API is unsafe and needs a `_fixLifetime` in the caller.
-  internal
+  internal final
   var _initializedHashtableEntriesBitMapBuffer: UnsafeMutablePointer<UInt> {
     return UnsafeMutablePointer(Builtin.projectTailElems(self, UInt.self))
   }
@@ -2521,16 +2507,21 @@ internal class _RawNative${Self}Storage:
     // We set the capacity to 1 so that there's an empty hole to search.
     // Any insertion will lead to a real storage being allocated, because 
     // Dictionary guarantees there's always another empty hole after insertion.
-    storage._body = BufferHeader(capacity: 1)
+    storage.capacity = 1
+    storage.count = 0
+
+    // Initialize pointers to garbage; they should never be loaded
+    storage.keys  = UnsafeMutableRawPointer(bitPattern: 1)!
+  % if Self == 'Dictionary':
+    storage.values = UnsafeMutableRawPointer(bitPattern: 1)!
+  % end
 
     let initializedEntries = _UnsafeBitMap(
         storage: storage._initializedHashtableEntriesBitMapBuffer,
         bitCount: 1)
     initializedEntries.initializeToZero()
 
-    // We don't bother to initalize the pointers in the header because
-    // they should never be accessed on the empty singleton.
-    storage._body.initializedEntries = initializedEntries
+    storage.initializedEntries = initializedEntries
     return storage
   }()
 
@@ -2556,10 +2547,6 @@ internal class _RawNative${Self}Storage:
   @objc(copyWithZone:)
   func copy(with zone: _SwiftNSZone?) -> AnyObject {
     return self
-  }
-
-  var count: Int { 
-    return 0 
   }
 
   @objc(countByEnumeratingWithState:objects:count:)
@@ -2638,12 +2625,9 @@ internal class _TypedNative${Self}Storage<${TypeParameters}> :
 %end
 
   deinit {
-    let capacity = _body.capacity
-    let initializedEntries = _UnsafeBitMap(
-        storage: _initializedHashtableEntriesBitMapBuffer, bitCount: capacity)
-    let keys = _body.keys.assumingMemoryBound(to: Key.self)
+    let keys = self.keys.assumingMemoryBound(to: Key.self)
 %if Self == 'Dictionary':
-    let values = _body.values.assumingMemoryBound(to: Value.self)
+    let values = self.values.assumingMemoryBound(to: Value.self)
 %end
 
     if !_isPOD(Key.self) {
@@ -2719,10 +2703,6 @@ final internal class _HashableTypedNative${Self}Storage<${TypeParametersDecl}> :
 
   var full: FullContainer {
     return FullContainer(_nativeBuffer: buffer)
-  }
-
-  override var count: Int { 
-    return full.count 
   }
 
   override func enumerator() -> _NSEnumerator {
@@ -2854,7 +2834,6 @@ final internal class _HashableTypedNative${Self}Storage<${TypeParametersDecl}> :
 /// Hashable can be found in an extension.
 internal struct _Native${Self}Buffer<${TypeParameters}> {
 
-  internal typealias BufferHeader = _${Self}BufferHeader
   internal typealias RawStorage = _RawNative${Self}Storage
   internal typealias TypedStorage = _TypedNative${Self}Storage<${TypeParameters}>
   internal typealias Buffer = _Native${Self}Buffer<${TypeParameters}>
@@ -2892,9 +2871,8 @@ internal struct _Native${Self}Buffer<${TypeParameters}> {
   /// Given a capacity and uninitialized RawStorage, completes the 
   /// initialization and returns a Buffer.  
   internal init(capacity: Int, storage: RawStorage) {
-    // We can initialize by assignment because _HashedContainerBufferHeader
-    // is a trivial type, i.e. contains no references.
-    storage._body = BufferHeader(capacity: capacity)
+    storage.capacity = capacity
+    storage.count = 0
     
     self.init(_storage: storage)
 
@@ -2910,44 +2888,34 @@ internal struct _Native${Self}Buffer<${TypeParameters}> {
            numWordsForBitmap._builtinWordValue, UInt.self, Key.self)
 
     // Initialize header
-    _body.initializedEntries = initializedEntries
-    _body.keys = UnsafeMutableRawPointer(keysAddr)
+    _storage.initializedEntries = initializedEntries
+    _storage.keys = UnsafeMutableRawPointer(keysAddr)
 %if Self == 'Dictionary':
     let valuesAddr = Builtin.getTailAddr_Word(keysAddr,
         capacity._builtinWordValue, Key.self, Value.self)
-    _body.values = UnsafeMutableRawPointer(valuesAddr)
+    _storage.values = UnsafeMutableRawPointer(valuesAddr)
 %end
-  }
-
-  /// A convenience forwarding the _storage's body
-  internal var _body: BufferHeader { 
-    set {
-      _storage._body = newValue
-    }
-    get {
-      return _storage._body
-    }
   }
 
   // Forwarding the individual fields of the storage in various forms
 
   @_versioned
   internal var capacity: Int {
-    return _assumeNonNegative(_body.capacity)
+    return _assumeNonNegative(_storage.capacity)
   }
 
   @_versioned
   internal var count: Int {
     set {
-      _body.count = newValue
+      _storage.count = newValue
     }
     get {
-      return _assumeNonNegative(_body.count)
+      return _assumeNonNegative(_storage.count)
     }
   }
 
   internal var _maxLoadFactorInverse: Double {
-    return _body.maxLoadFactorInverse
+    return _storage.maxLoadFactorInverse
   }
 
   internal
@@ -2957,13 +2925,13 @@ internal struct _Native${Self}Buffer<${TypeParameters}> {
 
   // This API is unsafe and needs a `_fixLifetime` in the caller.
   internal var keys: UnsafeMutablePointer<Key> {
-    return _body.keys.assumingMemoryBound(to: Key.self)
+    return _storage.keys.assumingMemoryBound(to: Key.self)
   }
 
 %if Self == 'Dictionary':
   // This API is unsafe and needs a `_fixLifetime` in the caller.
   internal var values: UnsafeMutablePointer<Value> {
-    return _body.values.assumingMemoryBound(to: Value.self)
+    return _storage.values.assumingMemoryBound(to: Value.self)
   }
 %end
 
@@ -3016,7 +2984,7 @@ internal struct _Native${Self}Buffer<${TypeParameters}> {
     _sanityCheck(i >= 0 && i < capacity)
     defer { _fixLifetime(self) }
 
-    return _body.initializedEntries[i]
+    return _storage.initializedEntries[i]
   }
 
   @_transparent
@@ -3028,7 +2996,7 @@ internal struct _Native${Self}Buffer<${TypeParameters}> {
 %if Self == 'Dictionary':
     (values + i).deinitialize()
 %end
-    _body.initializedEntries[i] = false
+    _storage.initializedEntries[i] = false
   }
 
 %if Self == 'Set':
@@ -3038,7 +3006,7 @@ internal struct _Native${Self}Buffer<${TypeParameters}> {
     defer { _fixLifetime(self) }
 
     (keys + i).initialize(to: k)
-    _body.initializedEntries[i] = true
+    _storage.initializedEntries[i] = true
   }
 
   @_transparent
@@ -3048,8 +3016,8 @@ internal struct _Native${Self}Buffer<${TypeParameters}> {
     defer { _fixLifetime(self) }
 
     (keys + toEntryAt).initialize(to: (from.keys + at).move())
-    from._body.initializedEntries[at] = false
-    _body.initializedEntries[toEntryAt] = true
+    from._storage.initializedEntries[at] = false
+    _storage.initializedEntries[toEntryAt] = true
   }
 
   /// Alias for key(at:) in Sets for better code reuse
@@ -3075,7 +3043,7 @@ internal struct _Native${Self}Buffer<${TypeParameters}> {
 
     (keys + i).initialize(to: k)
     (values + i).initialize(to: v)
-    _body.initializedEntries[i] = true
+    _storage.initializedEntries[i] = true
   }
 
   @_transparent
@@ -3085,8 +3053,8 @@ internal struct _Native${Self}Buffer<${TypeParameters}> {
 
     (keys + toEntryAt).initialize(to: (from.keys + at).move())
     (values + toEntryAt).initialize(to: (from.values + at).move())
-    from._body.initializedEntries[at] = false
-    _body.initializedEntries[toEntryAt] = true
+    from._storage.initializedEntries[at] = false
+    _storage.initializedEntries[toEntryAt] = true
   }
 
   @_versioned
