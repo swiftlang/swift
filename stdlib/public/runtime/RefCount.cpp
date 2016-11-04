@@ -12,10 +12,8 @@
 
 #include "swift/Runtime/HeapObject.h"
 
-#define relaxed std::memory_order_relaxed
-#define acquire std::memory_order_acquire
-#define release std::memory_order_release
-#define consume std::memory_order_consume
+// See note about memory_order_consume in SwiftShims/RefCount.h.
+#define fake_memory_order_consume std::memory_order_relaxed
 
 
 namespace swift {
@@ -83,7 +81,7 @@ template bool RefCounts<SideTableRefCountBits>::tryIncrementSlow(SideTableRefCou
 template <>
 HeapObjectSideTableEntry* RefCounts<InlineRefCountBits>::allocateSideTable()
 {
-  auto oldbits = refCounts.load(relaxed);
+  auto oldbits = refCounts.load(fake_memory_order_consume);
   
   // Preflight failures before allocating a new side table.
   if (oldbits.hasSideTable()) {
@@ -115,11 +113,11 @@ HeapObjectSideTableEntry* RefCounts<InlineRefCountBits>::allocateSideTable()
       return nullptr;
     }
     
-    // FIXME: barriers?
     side->initRefCounts(oldbits);
     
   } while (! refCounts.compare_exchange_weak(oldbits, newbits,
-                                             release, relaxed));
+                                             std::memory_order_release,
+                                             std::memory_order_relaxed));
   return side;
 }
 

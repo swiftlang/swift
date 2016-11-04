@@ -185,15 +185,16 @@ _swift_release_dealloc(swift::HeapObject *object)
 
 namespace swift {
 
-// FIXME: many `relaxed` in this file should be `consume`,
-// but (1) the compiler doesn't support `consume` directly,
-// and (2) the compiler promotes `consume` to `acquire` instead which
-// is overkill on our CPUs. But this might leave us vulnerable to
-// compiler optimizations that `relaxed` allows but `consume` ought not.
-#define relaxed std::memory_order_relaxed
-#define acquire std::memory_order_acquire
-#define release std::memory_order_release
-#define consume std::memory_order_consume
+// FIXME: some operations here should be memory_order_consume, 
+// but (1) the compiler doesn't support consume directly,
+// and (2) the compiler implements consume as acquire which
+// is unnecessarily slow on some of our CPUs.
+// Such operations are written here as fake_memory_order_consume.
+// We map them to memory_order_relaxed. This might leave us vulnerable to
+// compiler optimizations. In addition, the other dependency-tracking
+// annotations that would be required for real memory_order_consume
+// are not present.
+#define fake_memory_order_consume std::memory_order_relaxed
 
 
 // RefCountIsInline: refcount stored in an object
@@ -354,10 +355,7 @@ class RefCountBitsT {
   LLVM_ATTRIBUTE_ALWAYS_INLINE
   HeapObjectSideTableEntry *getSideTable() const {
     assert(hasSideTable());
-    // FIXME: overkill barrier? Otherwise technically need
-    // a consume re-load of the bits before dereferencing.
-    std::atomic_thread_fence(std::memory_order_acquire);
-    
+
     // Stored value is a shifted pointer.
     // FIXME: Don't hard-code this shift amount?
     return reinterpret_cast<HeapObjectSideTableEntry *>
@@ -527,6 +525,15 @@ class SideTableRefCountBits : public RefCountBitsT<RefCountNotInline>
 // an acquire fence is performed before beginning Swift deinit or ObjC
 // -dealloc code. This ensures that the deinit code sees all modifications
 // of the object's contents that were made before the object was released.
+//
+// Unowned and weak increment and decrement are all unordered.
+// There is no deinit equivalent for these counts so no fence is needed.
+//
+// Accessing the side table requires that refCounts be accessed with
+// a load-consume. Only code that is guaranteed not to try dereferencing
+// the side table may perform a load-relaxed of refCounts.
+// Similarly, storing the new side table pointer into refCounts is a
+// store-release, but most other stores into refCounts are store-relaxed.
 
 template <typename RefCountBits>
 class RefCounts {
@@ -562,7 +569,7 @@ class RefCounts {
     : refCounts(RefCountBits(0, 1)) { }
 
   void init() {
-    refCounts.store(RefCountBits(0, 1), relaxed);
+    refCounts.store(RefCountBits(0, 1), std::memory_order_relaxed);
   }
 
   // Initialize for a stack promoted object. This prevents that the final
@@ -570,34 +577,35 @@ class RefCounts {
   // FIXME: need to mark these and assert they never get a side table,
   // because the extra unowned ref will keep the side table alive forever
   void initForNotFreeing() {
-    refCounts.store(RefCountBits(0, 2), relaxed);
+    refCounts.store(RefCountBits(0, 2), std::memory_order_relaxed);
   }
 
   // Initialize from another refcount bits.
   // Only inline -> out-of-line is allowed (used for new side table entries).
   void init(InlineRefCountBits newBits) {
-    refCounts.store(newBits, relaxed);
+    refCounts.store(newBits, std::memory_order_relaxed);
   }
 
   // Increment the reference count.
   void increment(uint32_t inc = 1) {
-    auto oldbits = refCounts.load(relaxed);
+    auto oldbits = refCounts.load(fake_memory_order_consume);
     RefCountBits newbits;
     do {
       newbits = oldbits;
       bool fast = newbits.incrementStrongExtraRefCount(inc);
       if (!fast)
         return incrementSlow(oldbits, inc);
-    } while (!refCounts.compare_exchange_weak(oldbits, newbits, relaxed));
+    } while (!refCounts.compare_exchange_weak(oldbits, newbits,
+                                              std::memory_order_relaxed));
   }
 
   void incrementNonAtomic(uint32_t inc = 1) {
-    auto oldbits = refCounts.load(relaxed);
+    auto oldbits = refCounts.load(fake_memory_order_consume);
     auto newbits = oldbits;
     bool fast = newbits.incrementStrongExtraRefCount(inc);
     if (!fast)
       return incrementNonAtomicSlow(oldbits, inc);
-    refCounts.store(newbits, relaxed);
+    refCounts.store(newbits, std::memory_order_relaxed);
  }
 
   // Try to simultaneously set the pinned flag and increment the
@@ -610,7 +618,7 @@ class RefCounts {
   //
   // Postcondition: the flag is set.
   bool tryIncrementAndPin() {
-    auto oldbits = refCounts.load(relaxed);
+    auto oldbits = refCounts.load(fake_memory_order_consume);
     RefCountBits newbits;
     do {
       // If the flag is already set, just fail.
@@ -623,12 +631,13 @@ class RefCounts {
       bool fast = newbits.incrementStrongExtraRefCount(1);
       if (!fast)
         return tryIncrementAndPinSlow();
-    } while (!refCounts.compare_exchange_weak(oldbits, newbits, relaxed));
+    } while (!refCounts.compare_exchange_weak(oldbits, newbits,
+                                              std::memory_order_relaxed));
     return true;
   }
 
   bool tryIncrementAndPinNonAtomic() {
-    auto bits = refCounts.load(relaxed);
+    auto bits = refCounts.load(fake_memory_order_consume);
 
     // If the flag is already set, just fail.
     if (!bits.hasSideTable() && bits.getIsPinned())
@@ -639,13 +648,13 @@ class RefCounts {
     bool fast = bits.incrementStrongExtraRefCount(1);
     if (!fast)
       return tryIncrementAndPinNonAtomicSlow();
-    refCounts.store(bits, relaxed);
+    refCounts.store(bits, std::memory_order_relaxed);
     return true;
   }
 
   // Increment the reference count, unless the object is deiniting.
   bool tryIncrement() {
-    auto oldbits = refCounts.load(relaxed);
+    auto oldbits = refCounts.load(fake_memory_order_consume);
     RefCountBits newbits;
     do {
       if (!oldbits.hasSideTable() && oldbits.getIsDeiniting())
@@ -655,7 +664,8 @@ class RefCounts {
       bool fast = newbits.incrementStrongExtraRefCount(1);
       if (!fast)
         return tryIncrementSlow(oldbits);
-    } while (!refCounts.compare_exchange_weak(oldbits, newbits, relaxed));
+    } while (!refCounts.compare_exchange_weak(oldbits, newbits,
+                                              std::memory_order_relaxed));
     return true;
   }
 
@@ -695,7 +705,7 @@ class RefCounts {
   //
   // Precondition: the reference count must be 1
   void decrementFromOneNonAtomic() {
-    auto bits = refCounts.load(relaxed);
+    auto bits = refCounts.load(fake_memory_order_consume);
     if (bits.hasSideTable())
       return bits.getSideTable()->decrementFromOneNonAtomic();
     
@@ -703,13 +713,13 @@ class RefCounts {
     assert(bits.getStrongExtraRefCount() == 0 && "Expect a refcount of 1");
     bits.setStrongExtraRefCount(0);
     bits.setIsDeiniting(true);
-    refCounts.store(bits, relaxed);
+    refCounts.store(bits, std::memory_order_relaxed);
   }
 
   // Return the reference count.
   // Once deinit begins the reference count is undefined.
   uint32_t getCount() const {
-    auto bits = refCounts.load(relaxed);
+    auto bits = refCounts.load(fake_memory_order_consume);
     if (bits.hasSideTable())
       return bits.getSideTable()->getCount();
     
@@ -720,7 +730,7 @@ class RefCounts {
   // Return whether the reference count is exactly 1.
   // Once deinit begins the reference count is undefined.
   bool isUniquelyReferenced() const {
-    auto bits = refCounts.load(relaxed);
+    auto bits = refCounts.load(fake_memory_order_consume);
     if (bits.hasSideTable())
       return false;  // FIXME: implement side table path if useful
     
@@ -731,7 +741,7 @@ class RefCounts {
   // Return whether the reference count is exactly 1 or the pin flag
   // is set. Once deinit begins the reference count is undefined.
   bool isUniquelyReferencedOrPinned() const {
-    auto bits = refCounts.load(relaxed);
+    auto bits = refCounts.load(fake_memory_order_consume);
     if (bits.hasSideTable())
       return false;  // FIXME: implement side table path if useful
     
@@ -757,7 +767,7 @@ class RefCounts {
 
   // Return true if the object has started deiniting.
   bool isDeiniting() const {
-    auto bits = refCounts.load(relaxed);
+    auto bits = refCounts.load(fake_memory_order_consume);
     if (bits.hasSideTable())
       return bits.getSideTable()->isDeiniting();
     else
@@ -772,8 +782,11 @@ class RefCounts {
   ///   unowned reference count is 1
   /// The object is assumed to be deiniting with no strong references already.
   bool canBeFreedNow() const {
-    auto bits = refCounts.load(relaxed);
-    return (!bits.hasSideTable() && bits.getIsDeiniting() && bits.getStrongExtraRefCount() == 0 && bits.getUnownedRefCount() == 1);
+    auto bits = refCounts.load(fake_memory_order_consume);
+    return (!bits.hasSideTable() &&
+            bits.getIsDeiniting() &&
+            bits.getStrongExtraRefCount() == 0 &&
+            bits.getUnownedRefCount() == 1);
     // FIXME: make sure no-assert build optimizes this
   }
 
@@ -816,9 +829,10 @@ class RefCounts {
           newbits.setIsPinned(false);
       }
     } while (!refCounts.compare_exchange_weak(oldbits, newbits,
-                                              release, relaxed));
+                                              std::memory_order_release,
+                                              std::memory_order_relaxed));
     if (performDeinit && deinitNow) {
-      std::atomic_thread_fence(acquire);
+      std::atomic_thread_fence(std::memory_order_acquire);
       _swift_release_dealloc(getHeapObject());
     }
 
@@ -833,7 +847,7 @@ class RefCounts {
   // the caller because the compiler can optimize this arrangement better.
   template <ClearPinnedFlag clearPinnedFlag, PerformDeinit performDeinit>
   bool doDecrement(uint32_t dec) {
-    auto oldbits = refCounts.load(relaxed);
+    auto oldbits = refCounts.load(fake_memory_order_consume);
     RefCountBits newbits;
     
     do {
@@ -843,7 +857,8 @@ class RefCounts {
         // Slow paths include side table; deinit; underflow
         return doDecrementSlow<clearPinnedFlag, performDeinit>(oldbits, dec);
     } while (!refCounts.compare_exchange_weak(oldbits, newbits,
-                                              release, relaxed));
+                                              std::memory_order_release,
+                                              std::memory_order_relaxed));
 
     return false;  // don't deinit
   }
@@ -860,7 +875,7 @@ class RefCounts {
   public:
   // Increment the unowned reference count.
   void incrementUnowned(uint32_t inc) {
-    auto oldbits = refCounts.load(relaxed);
+    auto oldbits = refCounts.load(fake_memory_order_consume);
     RefCountBits newbits;
     do {
       if (oldbits.hasSideTable())
@@ -870,13 +885,14 @@ class RefCounts {
       assert(newbits.getUnownedRefCount() != 0);
       newbits.incrementUnownedRefCount(inc);
       // FIXME: overflow check?
-    } while (!refCounts.compare_exchange_weak(oldbits, newbits, relaxed));
+    } while (!refCounts.compare_exchange_weak(oldbits, newbits,
+                                              std::memory_order_relaxed));
   }
 
   // Decrement the unowned reference count.
   // Return true if the caller should free the object.
   bool decrementUnownedShouldFree(uint32_t dec) {
-    auto oldbits = refCounts.load(relaxed);
+    auto oldbits = refCounts.load(fake_memory_order_consume);
     RefCountBits newbits;
     
     bool performFree;
@@ -897,14 +913,14 @@ class RefCounts {
       }
       // FIXME: underflow check?
     } while (!refCounts.compare_exchange_weak(oldbits, newbits,
-                                              release, relaxed));
+                                              std::memory_order_relaxed));
     return performFree;
   }
 
   // Return unowned reference count.
   // Note that this is not equal to the number of outstanding unowned pointers.
   uint32_t getUnownedCount() const {
-    auto bits = refCounts.load(relaxed);
+    auto bits = refCounts.load(fake_memory_order_consume);
     if (bits.hasSideTable())
       return bits.getSideTable()->getUnownedCount();
     else 
@@ -923,25 +939,27 @@ class RefCounts {
 
   // Increment the weak reference count.
   void incrementWeak() {
-    auto oldbits = refCounts.load(relaxed);
+    auto oldbits = refCounts.load(fake_memory_order_consume);
     RefCountBits newbits;
     do {
       newbits = oldbits;
       assert(newbits.getWeakRefCount() != 0);
       newbits.incrementWeakRefCount();
       // FIXME: overflow check
-    } while (!refCounts.compare_exchange_weak(oldbits, newbits, relaxed));
+    } while (!refCounts.compare_exchange_weak(oldbits, newbits,
+                                              std::memory_order_relaxed));
   }
   
   bool decrementWeakShouldCleanUp() {
-    auto oldbits = refCounts.load(relaxed);
+    auto oldbits = refCounts.load(fake_memory_order_consume);
     RefCountBits newbits;
 
     bool performFree;
     do {
       newbits = oldbits;
-      performFree = newbits.decrementWeakRefCount();      
-    } while (!refCounts.compare_exchange_weak(oldbits, newbits, relaxed));
+      performFree = newbits.decrementWeakRefCount();
+    } while (!refCounts.compare_exchange_weak(oldbits, newbits,
+                                              std::memory_order_relaxed));
 
     return performFree;
   }
@@ -949,7 +967,7 @@ class RefCounts {
   // Return weak reference count.
   // Note that this is not equal to the number of outstanding weak pointers.
   uint32_t getWeakCount() const {
-    auto bits = refCounts.load(relaxed);
+    auto bits = refCounts.load(fake_memory_order_consume);
     if (bits.hasSideTable()) {
       return bits.getSideTable()->getWeakCount();
     } else {
@@ -976,6 +994,7 @@ static_assert(std::is_trivially_destructible<InlineRefCounts>::value,
 
 
 class HeapObjectSideTableEntry {
+  // FIXME: does object need to be atomic?
   std::atomic<HeapObject*> object;
   SideTableRefCounts refCounts;
 
@@ -993,7 +1012,7 @@ class HeapObjectSideTableEntry {
 
   HeapObject* tryRetain() {
     if (refCounts.tryIncrement())
-      return object.load();  // FIXME barrier
+      return object.load(std::memory_order_relaxed);
     else
       return nullptr;
   }
@@ -1003,7 +1022,7 @@ class HeapObjectSideTableEntry {
   }
 
   HeapObject *unsafeGetObject() const {
-    return object.load(relaxed);
+    return object.load(std::memory_order_relaxed);
   }
 
   // STRONG
@@ -1106,7 +1125,7 @@ inline bool RefCounts<InlineRefCountBits>::doDecrementNonAtomic(uint32_t dec) {
   // Therefore there is no other thread that can be concurrently
   // manipulating this object's retain counts.
 
-  auto oldbits = refCounts.load(relaxed);
+  auto oldbits = refCounts.load(fake_memory_order_consume);
 
   // Use slow path if we can't guarantee atomicity.
   if (oldbits.hasSideTable() || oldbits.getUnownedRefCount() != 1)
@@ -1117,7 +1136,7 @@ inline bool RefCounts<InlineRefCountBits>::doDecrementNonAtomic(uint32_t dec) {
   if (!fast)
     return doDecrementSlow<clearPinnedFlag, performDeinit>(oldbits, dec);
 
-  refCounts.store(newbits, relaxed);  
+  refCounts.store(newbits, std::memory_order_relaxed);
   return false;  // don't deinit
 }
 
@@ -1169,11 +1188,6 @@ HeapObject* RefCounts<SideTableRefCountBits>::getHeapObject() const {
 
 // for use by SWIFT_HEAPOBJECT_NON_OBJC_MEMBERS
 typedef swift::InlineRefCounts InlineRefCounts;
-
-#undef relaxed
-#undef acquire
-#undef release
-#undef consume
 
 // __cplusplus
 #endif
