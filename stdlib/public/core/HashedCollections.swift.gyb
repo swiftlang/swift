@@ -2903,11 +2903,19 @@ internal struct _Native${Self}Buffer<${TypeParameters}> {
         bitCount: capacity)
     initializedEntries.initializeToZero()
 
+    // Compute all the array offsets now, so we don't have to later
+    let bitmapAddr = Builtin.projectTailElems(_storage, UInt.self)
+    let numWordsForBitmap = _UnsafeBitMap.sizeInWords(forSizeInBits: capacity)
+    let keysAddr = Builtin.getTailAddr_Word(bitmapAddr,
+           numWordsForBitmap._builtinWordValue, UInt.self, Key.self)
+
     // Initialize header
     _body.initializedEntries = initializedEntries
-    _body.keys = UnsafeMutableRawPointer(_keys)
+    _body.keys = UnsafeMutableRawPointer(keysAddr)
 %if Self == 'Dictionary':
-    _body.values = UnsafeMutableRawPointer(_values)
+    let valuesAddr = Builtin.getTailAddr_Word(keysAddr,
+        capacity._builtinWordValue, Key.self, Value.self)
+    _body.values = UnsafeMutableRawPointer(valuesAddr)
 %end
   }
 
@@ -2947,27 +2955,15 @@ internal struct _Native${Self}Buffer<${TypeParameters}> {
     return _storage._initializedHashtableEntriesBitMapBuffer
   }
 
-  // This is just a convenience for computing the offset of the keys array to
-  // avoid _keys and _values duplicating logic.
-  internal var _keysRawAddr: Builtin.RawPointer {
-    // Gets the offset for the bitmap, then derives the key offset from that.
-    let bitmapAddr = Builtin.projectTailElems(_storage, UInt.self)
-    let numWordsForBitmap = _UnsafeBitMap.sizeInWords(forSizeInBits: capacity)
-    return Builtin.getTailAddr_Word(bitmapAddr,
-           numWordsForBitmap._builtinWordValue, UInt.self, Key.self)
-  }
-
   // This API is unsafe and needs a `_fixLifetime` in the caller.
-  internal var _keys: UnsafeMutablePointer<Key> {
-    return UnsafeMutablePointer(_keysRawAddr)
+  internal var keys: UnsafeMutablePointer<Key> {
+    return _body.keys.assumingMemoryBound(to: Key.self)
   }
 
 %if Self == 'Dictionary':
   // This API is unsafe and needs a `_fixLifetime` in the caller.
-  internal var _values: UnsafeMutablePointer<Value> {
-    let valuesAddr = Builtin.getTailAddr_Word(_keysRawAddr,
-        capacity._builtinWordValue, Key.self, Value.self)
-    return UnsafeMutablePointer(valuesAddr)
+  internal var values: UnsafeMutablePointer<Value> {
+    return _body.values.assumingMemoryBound(to: Value.self)
   }
 %end
 
@@ -2993,7 +2989,7 @@ internal struct _Native${Self}Buffer<${TypeParameters}> {
     _sanityCheck(isInitializedEntry(at: i))
     defer { _fixLifetime(self) }
 
-    let res = (_keys + i).pointee
+    let res = (keys + i).pointee
     return res
   }
 
@@ -3028,9 +3024,9 @@ internal struct _Native${Self}Buffer<${TypeParameters}> {
     _sanityCheck(isInitializedEntry(at: i))
     defer { _fixLifetime(self) }
 
-    (_keys + i).deinitialize()
+    (keys + i).deinitialize()
 %if Self == 'Dictionary':
-    (_values + i).deinitialize()
+    (values + i).deinitialize()
 %end
     _body.initializedEntries[i] = false
   }
@@ -3041,7 +3037,7 @@ internal struct _Native${Self}Buffer<${TypeParameters}> {
     _sanityCheck(!isInitializedEntry(at: i))
     defer { _fixLifetime(self) }
 
-    (_keys + i).initialize(to: k)
+    (keys + i).initialize(to: k)
     _body.initializedEntries[i] = true
   }
 
@@ -3051,7 +3047,7 @@ internal struct _Native${Self}Buffer<${TypeParameters}> {
 
     defer { _fixLifetime(self) }
 
-    (_keys + toEntryAt).initialize(to: (from._keys + at).move())
+    (keys + toEntryAt).initialize(to: (from.keys + at).move())
     from._body.initializedEntries[at] = false
     _body.initializedEntries[toEntryAt] = true
   }
@@ -3068,7 +3064,7 @@ internal struct _Native${Self}Buffer<${TypeParameters}> {
     _sanityCheck(isInitializedEntry(at: i))
     defer { _fixLifetime(self) }
 
-    (_keys + i).pointee = key
+    (keys + i).pointee = key
   }
 
 %elif Self == 'Dictionary':
@@ -3077,8 +3073,8 @@ internal struct _Native${Self}Buffer<${TypeParameters}> {
     _sanityCheck(!isInitializedEntry(at: i))
     defer { _fixLifetime(self) }
 
-    (_keys + i).initialize(to: k)
-    (_values + i).initialize(to: v)
+    (keys + i).initialize(to: k)
+    (values + i).initialize(to: v)
     _body.initializedEntries[i] = true
   }
 
@@ -3087,8 +3083,8 @@ internal struct _Native${Self}Buffer<${TypeParameters}> {
     _sanityCheck(!isInitializedEntry(at: toEntryAt))
     defer { _fixLifetime(self) }
 
-    (_keys + toEntryAt).initialize(to: (from._keys + at).move())
-    (_values + toEntryAt).initialize(to: (from._values + at).move())
+    (keys + toEntryAt).initialize(to: (from.keys + at).move())
+    (values + toEntryAt).initialize(to: (from.values + at).move())
     from._body.initializedEntries[at] = false
     _body.initializedEntries[toEntryAt] = true
   }
@@ -3099,7 +3095,7 @@ internal struct _Native${Self}Buffer<${TypeParameters}> {
     _sanityCheck(isInitializedEntry(at: i))
     defer { _fixLifetime(self) }
 
-    return (_values + i).pointee
+    return (values + i).pointee
   }
 
   @_transparent
@@ -3107,8 +3103,8 @@ internal struct _Native${Self}Buffer<${TypeParameters}> {
     _sanityCheck(isInitializedEntry(at: i))
     defer { _fixLifetime(self) }
 
-    (_keys + i).pointee = key
-    (_values + i).pointee = value
+    (keys + i).pointee = key
+    (values + i).pointee = value
   }
 
 %end
