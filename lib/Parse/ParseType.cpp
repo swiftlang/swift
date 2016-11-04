@@ -540,15 +540,24 @@ ParserResult<TypeRepr> Parser::parseOldStyleProtocolComposition() {
       }
     }
 
-    // Copy trailing content after '>' to the replacement string.
+    if (Protocols.size() > 1) {
+      // Need parenthesis if the next token looks like postfix TypeRepr.
+      // i.e. '?', '!', '.Type', '.Protocol'
+      bool needParen = false;
+      needParen |= !Tok.isAtStartOfLine() && 
+          (isOptionalToken(Tok) || isImplicitlyUnwrappedOptionalToken(Tok));
+      needParen |= Tok.isAny(tok::period, tok::period_prefix);
+      if (needParen) {
+        replacement.insert(replacement.begin(), '(');
+        replacement += ")";
+      }
+    }
+
+    // Copy split token after '>' to the replacement string.
     // FIXME: lexer should smartly separate '>' and trailing contents like '?'.
     StringRef TrailingContent = L->getTokenAt(RAngleLoc).getRange().str().
       substr(1);
     if (!TrailingContent.empty()) {
-      if (Protocols.size() > 1) {
-        replacement.insert(replacement.begin(), '(');
-        replacement += ")";
-      }
       replacement += TrailingContent;
     }
 
