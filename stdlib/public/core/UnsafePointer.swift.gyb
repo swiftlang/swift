@@ -633,10 +633,10 @@ public struct ${Self}<Pointee>
   public func initialize<C : Collection>(from source: C)
     where C.Iterator.Element == Pointee {
     let buf = UnsafeMutableBufferPointer(start: self, count: numericCast(source.count))
-    if var remaining = source._copyContents(initializing: buf),
-       remaining.next() != nil {
-      fatalError("Would have overwritten memory with more elements than expected")
-    }    
+    var (remainders,writtenUpTo) = source._copyContents(initializing: buf)
+    // ensure that exactly rhs.count elements were written
+    _precondition(remainders.next() == nil, "rhs underreported its count")
+    _precondition(writtenUpTo == buf.endIndex, "rhs overreported its count")
   }
 
   /// Replaces the memory referenced by this pointer with the values

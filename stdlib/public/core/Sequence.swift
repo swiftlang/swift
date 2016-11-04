@@ -623,7 +623,7 @@ public protocol Sequence {
   /// iterator with any elements that didn't fit remaining.
   func _copyContents(
     initializing ptr: UnsafeMutableBufferPointer<Iterator.Element>
-  ) -> Iterator?
+  ) -> (Iterator,UnsafeMutableBufferPointer<Iterator.Element>.Index)
 }
 
 /// A default makeIterator() function for `IteratorProtocol` instances that
@@ -1368,18 +1368,27 @@ extension Sequence {
 }
 
 extension Sequence {
+  /// Copies `self` into the supplied buffer.
+  ///
+  /// - Precondition: The memory in `self` is uninitialized. The buffer must
+  ///   contain sufficient uninitialized memory to accommodate `source.underestimatedCount`.
+  ///
+  /// - Postcondition: The `Pointee`s at `buffer[startIndex..<returned index]` are
+  ///   initialized.
   public func _copyContents(
-    initializing buf: UnsafeMutableBufferPointer<Iterator.Element>
-  ) -> Iterator? {
+    initializing buffer: UnsafeMutableBufferPointer<Iterator.Element>
+  ) -> (Iterator,UnsafeMutableBufferPointer<Iterator.Element>.Index) {
     var it = self.makeIterator()
-    // FIXME: decide if a nil buffer base pointer is valid or an error
-    guard let base = buf.baseAddress else { return it }
-    for p in base..<(base + buf.count) {
-      // FIXME: decide if underflow is an error that should trap
+    guard let base = buffer.baseAddress else { return (it,buffer.startIndex) }
+    var idx = buffer.startIndex
+    for p in base..<(base + buffer.count) {
+      // underflow is permitted – e.g. a sequence into
+      // the spare capacity of an Array buffer
       guard let x = it.next() else { break }
       p.initialize(to: x)
+      buffer.formIndex(after: &idx)
     }
-    return it
+    return (it,idx)
   }
 }
 
