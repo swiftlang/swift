@@ -660,8 +660,11 @@ func expectSequencePassthrough<
   SequenceLog._copyContents.expectIncrement(baseType) { () -> Void in
     let ptr = UnsafeMutablePointer<S.Iterator.Element>.allocate(capacity: count)
     let buf = UnsafeMutableBufferPointer(start: ptr, count: count)
-    var remainders = s._copyContents(initializing: buf)
-    expectTrue(remainders == nil || remainders!.next() == nil)
+    var (remainders,writtenUpTo) = s._copyContents(initializing: buf)
+    expectTrue(remainders.next() == nil, 
+      "_copyContents returned unwritten elements")
+    expectTrue(writtenUpTo == buf.endIndex, 
+      "_copyContents failed to use entire buffer")
     ptr.deinitialize(count: count)
     ptr.deallocate(capacity: count)
   }

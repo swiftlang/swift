@@ -495,11 +495,11 @@ internal func += <Element, C : Collection>(
     buf = UnsafeMutableBufferPointer(start: lhs.firstElementAddress + oldCount, count: numericCast(rhs.count))
   }
 
-  if let remainder = buf.initialize(from: rhs) {
-    // there were elements that didn't fit in the existing buffer,
-    // append them in slow sequence-only mode
-    //FIXME: handle this possibility
-  }
+  var (remainders,writtenUpTo) = buf.initialize(from: rhs)
+
+  // ensure that exactly rhs.count elements were written
+  _precondition(remainders.next() == nil, "rhs underreported its count")
+  _precondition(writtenUpTo == buf.endIndex, "rhs overreported its count")    
 }
 
 extension _ContiguousArrayBuffer : RandomAccessCollection {

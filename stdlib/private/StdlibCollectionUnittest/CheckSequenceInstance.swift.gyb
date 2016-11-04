@@ -88,9 +88,11 @@ public func checkSequence<
     for _ in sequence { count += 1 }
     let ptr = UnsafeMutablePointer<S.Iterator.Element>.allocate(capacity: count)
     let buf = UnsafeMutableBufferPointer(start: ptr, count: count)
-    var remainders = sequence._copyContents(initializing: buf)
-    expectTrue(remainders == nil || remainders!.next() == nil, 
+    var (remainders,writtenUpTo) = sequence._copyContents(initializing: buf)
+    expectTrue(remainders.next() == nil, 
       "_copyContents returned unwritten elements")
+    expectTrue(writtenUpTo == buf.endIndex, 
+      "_copyContents failed to use entire buffer")
     expectEqualSequence(expected, buf, ${trace}, sameValue: sameValue)
     ptr.deinitialize(count: count)
     ptr.deallocate(capacity: count)

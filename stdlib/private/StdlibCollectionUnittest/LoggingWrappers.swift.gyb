@@ -321,10 +321,11 @@ public struct ${Self}<
 
   /// Copy a Sequence into an array.
   public func _copyContents(
-    initializing buf: UnsafeMutableBufferPointer<Iterator.Element>
-  ) -> Iterator? {
+    initializing buffer: UnsafeMutableBufferPointer<Iterator.Element>
+  ) -> (Iterator,UnsafeMutableBufferPointer<Iterator.Element>.Index) {
     Log._copyContents[selfType] += 1
-    return base._copyContents(initializing: buf).map(Iterator.init)
+    let (it,idx) = base._copyContents(initializing: buffer)
+    return (Iterator(wrapping: it),idx)
   }
 
 %     if Kind in ['Collection', 'MutableCollection', 'RangeReplaceableCollection']:

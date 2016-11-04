@@ -552,8 +552,9 @@ public struct Data : ReferenceConvertible, Equatable, Hashable, RandomAccessColl
             
             if replacementCount != 0 {
                 let buf = UnsafeMutableBufferPointer(start: bytes + start, count: numericCast(newElements.count))
-                // FIXME: is this guaranteed to return no residual elements?
-                let _ = newElements._copyContents(initializing: buf)
+                var (it,idx) = newElements._copyContents(initializing: buf)
+                precondition(it.next() == nil && idx == buf.endIndex,
+                  "newElements iterator returned different count to newElements.count")
             }
         }
     }

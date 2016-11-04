@@ -1297,20 +1297,33 @@ extension ${Self} : RangeReplaceableCollection, _ArrayProtocol {
     let newElementsCount = newElements.underestimatedCount
 
     let oldCount = self.count
-    let capacity = self.capacity
+    let oldCapacity = self.capacity
     let newCount = oldCount + newElementsCount
 
     // Ensure uniqueness, mutability, and sufficient storage.  Note that
     // for consistency, we need unique self even if newElements is empty.
     self.reserveCapacity(
-      newCount > capacity ?
-      Swift.max(newCount, _growArrayCapacity(capacity))
+      newCount > oldCapacity ?
+      Swift.max(newCount, _growArrayCapacity(oldCapacity))
       : newCount)
 
-    let buf = UnsafeMutableBufferPointer(start: _buffer.firstElementAddress + oldCount, count: newElementsCount)
-    _buffer.count = newCount    
-    if let remainder = buf.initialize(from: newElements) {
-      // there were elements that didn't fit in the existing buffer,
+    let startNewElements = _buffer.firstElementAddress + oldCount
+    let buf = UnsafeMutableBufferPointer(
+                start: startNewElements, 
+                count: self.capacity - oldCount)
+
+    let (remainder,writtenUpTo) = buf.initialize(from: newElements)
+    
+    // trap on underflow from the sequence's underestimate:
+    let writtenCount = buf.distance(from: buf.startIndex, to: writtenUpTo)
+    _precondition(newElementsCount <= writtenCount, 
+      "newElements.underestimatedCount was an overestimate")
+    // can't check for overflow as sequences can underestimate
+
+    _buffer.count += writtenCount
+
+    if writtenUpTo == buf.endIndex {
+      // there may be elements that didn't fit in the existing buffer,
       // append them in slow sequence-only mode
       _buffer._arrayAppendSequence(IteratorSequence(remainder))
     }
@@ -1599,13 +1612,22 @@ extension ${Self} {
   }
 
   public func _copyContents(
-    initializing buf: UnsafeMutableBufferPointer<Element>
-  ) -> Iterator? {
-    // FIXME: decide if this really is a fatalError
-    guard var p = buf.baseAddress 
-      else { fatalError("Attempt to copy contents into nil buffer pointer") }
+    initializing buffer: UnsafeMutableBufferPointer<Iterator.Element>
+  ) -> (Iterator,UnsafeMutableBufferPointer<Iterator.Element>.Index) {
+
+    guard !self.isEmpty else { return (makeIterator(),buffer.startIndex) }
+
+    // It is not OK for there to be no pointer/not enough space, as this is
+    // a precondition and Array never lies about its count.
+    guard var p = buffer.baseAddress
+      else { _preconditionFailure("Attempt to copy contents into nil buffer pointer") }
+    _precondition(self.count <= buffer.count, 
+      "Insufficient space allocated to copy array contents")
+
     if let s = _baseAddressIfContiguous {
       p.initialize(from: s, count: self.count)
+      // Need a _fixLifetime bracketing the _baseAddressIfContiguous getter
+      // and all uses of the pointer it returns:
       _fixLifetime(self._owner)
     } else {
       for x in self {
@@ -1613,7 +1635,10 @@ extension ${Self} {
         p += 1
       }
     }
-    return nil
+
+    var it = IndexingIterator(_elements: self)
+    it._position = endIndex
+    return (it,buffer.index(buffer.startIndex, offsetBy: self.count))
   }
 }
 %end

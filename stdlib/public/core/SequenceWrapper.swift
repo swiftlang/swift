@@ -120,7 +120,7 @@ extension Sequence
   @discardableResult
   public func _copyContents(
     initializing buf: UnsafeMutableBufferPointer<Base.Iterator.Element>
-  ) -> Base.Iterator? {
+  ) -> (Base.Iterator,UnsafeMutableBufferPointer<Base.Iterator.Element>.Index) {
     return _base._copyContents(initializing: buf)
   }
 }

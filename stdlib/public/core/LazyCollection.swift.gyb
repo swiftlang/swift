@@ -98,7 +98,7 @@ extension ${Self} : Sequence {
 
   public func _copyContents(
     initializing buf: UnsafeMutableBufferPointer<Iterator.Element>
-  ) -> Iterator? {
+  ) -> (Iterator,UnsafeMutableBufferPointer<Iterator.Element>.Index) {
     return _base._copyContents(initializing: buf)
   }
 
