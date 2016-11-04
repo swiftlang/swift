@@ -1355,15 +1355,9 @@ public func _setDownCast<BaseValue, DerivedValue>(_ source: Set<BaseValue>)
   && _isClassOrObjCExistential(DerivedValue.self) {
     switch source._variantBuffer {
     case _VariantSetBuffer.native(let buffer):
-      let bridged = buffer.bridged()
-      return Set(
-        _immutableCocoaSet:
-        unsafeBitCast(bridged, to: _NSSet.self))
-
+      return Set(_immutableCocoaSet: buffer.bridged())
     case _VariantSetBuffer.cocoa(let cocoaBuffer):
-      return Set(
-        _immutableCocoaSet:
-        unsafeBitCast(cocoaBuffer, to: _NSSet.self))
+      return Set(_immutableCocoaSet: cocoaBuffer.cocoaSet)
     }
   }
 #endif
@@ -2310,15 +2304,9 @@ public func _dictionaryDownCast<BaseKey, BaseValue, DerivedKey, DerivedValue>(
     case .native(let buffer):
       // Note: it is safe to treat the buffer as immutable here because
       // Dictionary will not mutate buffer with reference count greater than 1.
-      let nativeBuffer = buffer.bridged()
-      return Dictionary(
-        _immutableCocoaDictionary:
-        unsafeBitCast(nativeBuffer, to: _NSDictionary.self))
-
+      return Dictionary(_immutableCocoaDictionary: buffer.bridged())
     case .cocoa(let cocoaBuffer):
-      return Dictionary(
-        _immutableCocoaDictionary:
-        unsafeBitCast(cocoaBuffer, to: _NSDictionary.self))
+      return Dictionary(_immutableCocoaDictionary: cocoaBuffer.cocoaDictionary)
     }
   }
 #endif
@@ -3201,15 +3189,25 @@ extension _Native${Self}Buffer
   }
 
 #if _runtime(_ObjC)
-  func bridged() -> _NS${Self}Core {
+  func bridged() -> _NS${Self} {
     // We can zero-cost bridge if our keys are verbatim
     // or if we're the empty singleton.
+
+    // Temporary var for SOME type safety before a cast.
+    let nsSet: _NS${Self}Core
+
     if (_isBridgedVerbatimToObjectiveC(Key.self) &&
         _isBridgedVerbatimToObjectiveC(Value.self)) ||
         self._storage === RawStorage.empty {
-      return self._storage
+      nsSet = self._storage
+    } else {
+      nsSet = _SwiftDeferredNS${Self}(nativeBuffer: self)
     }
-    return _SwiftDeferredNS${Self}(nativeBuffer: self)
+
+    // Cast from "minimal NS${Self}" to "NS${Self}"
+    // Note that if you actually ask Swift for this cast, it will fail.
+    // Never trust a shadow protocol!
+    return unsafeBitCast(nsSet, to: _NS${Self}.self)
   }
 #endif
 
