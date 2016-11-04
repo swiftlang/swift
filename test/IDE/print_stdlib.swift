@@ -37,7 +37,6 @@
 // CHECK-NOT: func ~>
 // CHECK-NOT: _builtin
 // CHECK-NOT: Builtin.
-// CHECK-NOT: extension [
 // CHECK-NOT: extension {{.*}}?
 // CHECK-NOT: extension {{.*}}!
 // CHECK-NOT: addressWithOwner
