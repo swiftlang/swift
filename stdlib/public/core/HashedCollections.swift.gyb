@@ -3789,6 +3789,9 @@ final internal class _SwiftDeferredNS${Self}<${TypeParametersDecl}> { }
 #endif
 
 #if _runtime(_ObjC)
+
+// FIXME: this should really be a struct but can't because of the lazy allKeys.
+// (but it might be removed with eager bridging, so this is "fine" for now)
 @_versioned
 @_fixed_layout
 internal final class _Cocoa${Self}Buffer : _HashBuffer {
