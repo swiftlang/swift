@@ -2533,7 +2533,7 @@ internal class _RawNative${Self}Storage:
   // NS${Self} implementation, assuming Self is the empty singleton
   //
 
-  /// Get the NSEnumator implementation for self. 
+  /// Get the NSEnumerator implementation for self.
   /// _HashableTypedNative${Self}Storage overloads this to give 
   /// _NativeSelfNSEnumerator proper type parameters.
   func enumerator() -> _NSEnumerator {
