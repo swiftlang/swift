@@ -842,7 +842,7 @@ func testOptionalTryNeverFails() {
 // CHECK-NEXT:   return [[VOID]] : $()
 // CHECK-NEXT: } // end sil function '_TF6errors28testOptionalTryNeverFailsVarFT_T_'
 func testOptionalTryNeverFailsVar() {
-  var unit: ()? = try? () // expected-warning {{no calls to throwing functions occur within 'try' expression}} expected-warning {{initialization of variable 'unit' was never used; consider replacing with assignment to '_' or removing it}}
+  var unit: ()? = try? () // expected-warning {{no calls to throwing functions occur within 'try' expression}} expected-warning {{variable 'unit' was never used; consider replacing with '_' or removing it}}
 }
 
 // CHECK-LABEL: sil hidden @_TF6errors36testOptionalTryNeverFailsAddressOnly

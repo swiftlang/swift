@@ -13,13 +13,13 @@ import Foundation
 
 func collatz(n: Int, m: String?) {
     switch m {
-    case .some(let s):
-        print(s)
-    case .none:
-        print("nothing")
-    default:
-        print("not possible")
-        break
+        case .some(let s):
+            print(s)
+        case .none:
+            print("nothing")
+        default:
+            print("not possible")
+            break
     }
     var r: Int
     if n%2 == 0 {
