@@ -12,7 +12,7 @@ import StdlibUnittest
 
 
 // Note: in this file, we need to go through opaque functions to load
-// constants.  This is to check runtime behaviour and ensure the constant is
+// constants.  This is to check runtime behavior and ensure the constant is
 // not folded.
 
 func expectOverflow<T>(

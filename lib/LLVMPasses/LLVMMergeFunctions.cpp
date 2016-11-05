@@ -119,7 +119,7 @@ class GlobalNumberState {
 };
 
 /// FunctionComparator - Compares two functions to determine whether or not
-/// they will generate machine code with the same behaviour. DataLayout is
+/// they will generate machine code with the same behavior. DataLayout is
 /// used if available. The comparator always fails conservatively (erring on the
 /// side of claiming that two functions are different).
 class FunctionComparator {
@@ -128,7 +128,7 @@ public:
                      GlobalNumberState* GN)
       : FnL(F1), FnR(F2), GlobalNumbers(GN) {}
 
-  /// Test whether the two functions have equivalent behaviour.
+  /// Test whether the two functions have equivalent behavior.
   int compare();
   /// Hash a function. Equivalent functions will have the same hash, and unequal
   /// functions will have different hashes with high probability.
@@ -136,7 +136,7 @@ public:
   static FunctionHash functionHash(Function &);
 
 private:
-  /// Test whether two basic blocks have equivalent behaviour.
+  /// Test whether two basic blocks have equivalent behavior.
   int cmpBasicBlocks(const BasicBlock *BBL, const BasicBlock *BBR);
 
   /// Constants comparison.
@@ -1148,7 +1148,7 @@ int FunctionComparator::cmpOperands(const Instruction *L, const Instruction *R,
   return 0;
 }
 
-// Test whether two basic blocks have equivalent behaviour.
+// Test whether two basic blocks have equivalent behavior.
 int FunctionComparator::cmpBasicBlocks(const BasicBlock *BBL,
                                        const BasicBlock *BBR) {
   BasicBlock::const_iterator InstL = BBL->begin(), InstLE = BBL->end();
@@ -1196,7 +1196,7 @@ int FunctionComparator::cmpBasicBlocks(const BasicBlock *BBL,
   return 0;
 }
 
-// Test whether the two functions have equivalent behaviour.
+// Test whether the two functions have equivalent behavior.
 int FunctionComparator::compare() {
   sn_mapL.clear();
   sn_mapR.clear();
