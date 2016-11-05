@@ -222,6 +222,7 @@ enum class ConditionalCompilationExprKind {
   Error,
   OS,
   Arch,
+  Import,
   LanguageVersion,
   CompilerVersion,
   Binary,

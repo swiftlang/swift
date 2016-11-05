@@ -1522,7 +1522,7 @@ ParserResult<Stmt> Parser::parseStmtGuard() {
 //  - Unary "!" expressions applied to other build configuration conditional
 //    expressions
 //  - Single-argument call expressions, where the function being invoked is a
-//    supported target configuration (currently "os", "arch", and
+//    supported target configuration (currently "os", "arch", "canImport", and
 //    "_compiler_version"), and whose argument is a named decl ref expression
 ConditionalCompilationExprState
 Parser::evaluateConditionalCompilationExpr(Expr *condition) {
@@ -1630,6 +1630,7 @@ Parser::evaluateConditionalCompilationExpr(Expr *condition) {
         !fnName.equals("_endian") &&
         !fnName.equals("_runtime") &&
         !fnName.equals("swift") &&
+        !fnName.equals("canImport") &&
         !fnName.equals("_compiler_version")) {
       diagnose(CE->getLoc(), diag::unsupported_platform_condition_expression);
       return ConditionalCompilationExprState::error();
@@ -1692,6 +1693,15 @@ Parser::evaluateConditionalCompilationExpr(Expr *condition) {
       auto VersionNewEnough = thisVersion >= versionRequirement.getValue();
       return {VersionNewEnough,
               ConditionalCompilationExprKind::LanguageVersion};
+    } else if (fnName.equals("canImport")) {
+      if (auto UDRE = dyn_cast<UnresolvedDeclRefExpr>(PE->getSubExpr())) {
+        auto argument = UDRE->getName().getBaseName();
+        auto canFind = Context.LoadedModules.find(argument) != Context.LoadedModules.end();
+        return { canFind, ConditionalCompilationExprKind::Import };
+      }
+
+      diagnose(PE->getSubExpr()->getLoc(), diag::decl_expected_module_name);
+      return ConditionalCompilationExprState::error();
     } else {
       if (auto UDRE = dyn_cast<UnresolvedDeclRefExpr>(PE->getSubExpr())) {
         // The sub expression should be an UnresolvedDeclRefExpr (we won't
