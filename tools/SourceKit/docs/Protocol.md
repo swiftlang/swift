@@ -79,6 +79,24 @@ completion-result ::=
 }
 ```
 
+```
+completion.open-result ::=
+{
+  <key.kind>:           (UID)         // UID for the declaration kind (function, class, etc.).
+  <key.name>:           (string)      // Name of the word being completed
+  <key.sourcetext>:     (string)      // Text to be inserted in source.
+  <key.description>:    (string)      // Text to be displayed in code-completion window.
+  <key.typename>:       (string)      // Text describing the type of the result.
+  <key.context>:        (UID)         // Semantic context of the code completion result.
+  <key.num_bytes_to_erase>: (int64)   // Number of bytes to the left of the cursor that should be erased before inserting this completion result.
+  <key.substructure>:   (dictionary)  // Can contains an array the `nameoffset`, `namelength`, `bodyoffset`, `bodylength`, and `substructure`. Other `substructure` will exist if the code complete represents a function. Each one is a paramater of the function
+      - <key.nameoffset>  (int64)     // The offset location of the given parameter
+      - <key.namelength>  (int64)     // The length of the given parameter
+      - <key.bodyoffset>  (int64)     // The `nameoffset` + the indentation inside the body of the file
+      - <key.bodylength>  (int64)     // The `namelength` + the indentation inside the body of the file
+}
+```
+
 ### Testing
 
 ```
