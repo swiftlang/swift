@@ -142,9 +142,9 @@ JAVADOC_AUTOBRIEF      = NO
 
 # The MULTILINE_CPP_IS_BRIEF tag can be set to YES to make Doxygen
 # treat a multi-line C++ special comment block (i.e. a block of //! or ///
-# comments) as a brief description. This used to be the default behaviour.
+# comments) as a brief description. This used to be the default behavior.
 # The new default is to treat a multi-line C++ comment block as a detailed
-# description. Set this tag to YES if you prefer the old behaviour instead.
+# description. Set this tag to YES if you prefer the old behavior instead.
 
 MULTILINE_CPP_IS_BRIEF = NO
 
