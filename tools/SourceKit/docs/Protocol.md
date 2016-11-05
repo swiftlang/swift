@@ -54,6 +54,10 @@ provided.
 }
 ```
 
+| Request Name | Request Key | Description |
+| -------------:|:------------|:------------|
+| `open` | `complete.open` | Given an input file, will determine at each offset what keyword is possible. Default offset is `0` if none is provided. |
+
 ### Response
 
 ```
