@@ -7462,7 +7462,7 @@ void TypeChecker::validateAccessibility(ValueDecl *D) {
 /// Check the generic parameters of an extension, recursively handling all of
 /// the parameter lists within the extension.
 static
-std::tuple<GenericSignature *, GenericEnvironment *, Type>
+std::tuple<GenericEnvironment *, Type>
 checkExtensionGenericParams(TypeChecker &tc, ExtensionDecl *ext,
                             Type type, GenericParamList *genericParams) {
   // Find the nominal type declaration and its parent type.
@@ -7481,17 +7481,19 @@ checkExtensionGenericParams(TypeChecker &tc, ExtensionDecl *ext,
   }
 
   // Recurse to check the parent type, if there is one.
-  GenericSignature *parentSig = nullptr;
   GenericEnvironment *parentEnv = nullptr;
   Type newParentType = parentType;
   if (parentType) {
-    std::tie(parentSig, parentEnv, newParentType) =
+    std::tie(parentEnv, newParentType) =
         checkExtensionGenericParams(
                       tc, ext, parentType,
                       nominal->getGenericParams()
                         ? genericParams->getOuterParameters()
                         : genericParams);
+
   }
+  // Avoid having to remember null checks on parentEnv below.
+  GenericSignature *parentSig = parentEnv ? parentEnv->getGenericSignature() : nullptr;
 
   // If we don't have generic parameters at this level, just build the result.
   if (!nominal->getGenericParams()) {
@@ -7501,7 +7503,7 @@ checkExtensionGenericParams(TypeChecker &tc, ExtensionDecl *ext,
     if (resultType->isEqual(type))
       resultType = type;
 
-    return std::make_tuple(parentSig, parentEnv, resultType);
+    return std::make_tuple(parentEnv, resultType);
   }
 
   // Local function used to infer requirements from the extended type.
@@ -7569,7 +7571,7 @@ checkExtensionGenericParams(TypeChecker &tc, ExtensionDecl *ext,
   if (resultType->isEqual(type))
     resultType = type;
 
-  return std::make_tuple(sig, env, resultType);
+  return std::make_tuple(env, resultType);
 }
 
 // FIXME: In TypeChecker.cpp; only needed because LLDB creates
@@ -7618,9 +7620,8 @@ void TypeChecker::validateExtension(ExtensionDecl *ext) {
     assert(genericParams && "bindExtensionDecl didn't set generic params?");
 
     // Check generic parameters.
-    GenericSignature *sig;
     GenericEnvironment *env;
-    std::tie(sig, env, extendedType) =
+    std::tie(env, extendedType) =
         checkExtensionGenericParams(*this, ext,
                                     ext->getExtendedType(),
                                     ext->getGenericParams());
@@ -7651,9 +7652,8 @@ void TypeChecker::validateExtension(ExtensionDecl *ext) {
       return;
     }
 
-    GenericSignature *sig;
     GenericEnvironment *env;
-    std::tie(sig, env, extendedType) =
+    std::tie(env, extendedType) =
         checkExtensionGenericParams(*this, ext, proto,
                                     ext->getGenericParams());
 
