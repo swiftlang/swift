@@ -141,7 +141,7 @@ static void diagSyntacticUseRestrictions(TypeChecker &TC, const Expr *E,
     };
 
     // Partial applications of functions that are not permitted.  This is
-    // tracked in post-order and unravelled as subsequent applications complete
+    // tracked in post-order and unraveled as subsequent applications complete
     // the call (or not).
     llvm::SmallDenseMap<Expr*, PartialApplication,2> InvalidPartialApplications;
 
