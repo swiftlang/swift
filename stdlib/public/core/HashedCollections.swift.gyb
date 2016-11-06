@@ -95,7 +95,7 @@ import SwiftShims
 // (Hereafter RawStorage, TypedStorage, and HashableStorage, respectively)
 //
 // In a less optimized implementation, the parent classes could
-// be eliminated, as they exist only to provide special-case behaviours. 
+// be eliminated, as they exist only to provide special-case behaviors.
 // HashableStorage has everything a full implementation of a Dictionary
 // requires, and is subsequently able to provide a full NSDictionary 
 // implementation. Note that HashableStorage must have the `K: Hashable` 
@@ -2533,7 +2533,7 @@ internal class _RawNative${Self}Storage:
   // NS${Self} implementation, assuming Self is the empty singleton
   //
 
-  /// Get the NSEnumator implementation for self. 
+  /// Get the NSEnumerator implementation for self.
   /// _HashableTypedNative${Self}Storage overloads this to give 
   /// _NativeSelfNSEnumerator proper type parameters.
   func enumerator() -> _NSEnumerator {

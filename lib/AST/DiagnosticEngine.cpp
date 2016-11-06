@@ -41,7 +41,7 @@ enum class DiagnosticOptions {
   /// beginning of the line, then the location is adjusted to point to the end
   /// of the previous token.
   ///
-  /// This behaviour improves experience for "expected token X" diagnostics.
+  /// This behavior improves experience for "expected token X" diagnostics.
   PointsToFirstBadToken,
 
   /// After a fatal error subsequent diagnostics are suppressed.
