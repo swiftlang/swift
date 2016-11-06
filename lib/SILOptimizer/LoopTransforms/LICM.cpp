@@ -450,7 +450,7 @@ bool LoopTreeOptimization::optimize() {
     auto CurrLoopSummary = llvm::make_unique<LoopNestSummary>(CurrentLoop);
     propagateSummaries(CurrLoopSummary);
 
-    // Analyse the current loop for reads that can be hoisted.
+    // Analyze the current loop for reads that can be hoisted.
     ReadSet SafeReads;
     analyzeCurrentLoop(CurrLoopSummary, SafeReads);
 

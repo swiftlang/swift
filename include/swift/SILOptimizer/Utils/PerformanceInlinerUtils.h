@@ -194,7 +194,7 @@ public:
     /// Our assumption on how many times a loop is executed.
     LoopCount = 10,
 
-    /// To keep things simple we only analyse up to this number of nested loops.
+    /// To keep things simple we only analyze up to this number of nested loops.
     MaxNumLoopLevels = 4,
 
     /// The "weight" for the benefit which a single loop nest gives.
