@@ -1591,7 +1591,7 @@ Open Issues
 ===========
 
 There are still a number of known issues with the model described in this
-document. We should endeavour to account for each of them, and if we can't come
+document. We should endeavor to account for each of them, and if we can't come
 up with a satisfactory implementation we should at least make sure that they
 will not turn into pitfalls for library or client developers.
 
