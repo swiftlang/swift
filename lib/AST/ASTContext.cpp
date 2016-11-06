@@ -330,12 +330,8 @@ struct ASTContext::Implementation {
     /// The allocator used for all allocations within this arena.
     llvm::BumpPtrAllocator &Allocator;
 
-    /// Callback used to get a type member of a type variable.
-    GetTypeVariableMemberCallback GetTypeMember;
-
-    ConstraintSolverArena(llvm::BumpPtrAllocator &allocator,
-                          GetTypeVariableMemberCallback &&getTypeMember)
-      : Allocator(allocator), GetTypeMember(std::move(getTypeMember)) { }
+    ConstraintSolverArena(llvm::BumpPtrAllocator &allocator)
+      : Allocator(allocator) { }
 
     ConstraintSolverArena(const ConstraintSolverArena &) = delete;
     ConstraintSolverArena(ConstraintSolverArena &&) = delete;
@@ -369,14 +365,11 @@ ASTContext::Implementation::~Implementation() {
 }
 
 ConstraintCheckerArenaRAII::
-ConstraintCheckerArenaRAII(ASTContext &self, llvm::BumpPtrAllocator &allocator,
-                           GetTypeVariableMemberCallback getTypeMember)
+ConstraintCheckerArenaRAII(ASTContext &self, llvm::BumpPtrAllocator &allocator)
   : Self(self), Data(self.Impl.CurrentConstraintSolverArena.release())
 {
   Self.Impl.CurrentConstraintSolverArena.reset(
-    new ASTContext::Implementation::ConstraintSolverArena(
-          allocator,
-          std::move(getTypeMember)));
+    new ASTContext::Implementation::ConstraintSolverArena(allocator));
 }
 
 ConstraintCheckerArenaRAII::~ConstraintCheckerArenaRAII() {
@@ -1164,12 +1157,6 @@ void ASTContext::setSubstitutions(TypeBase* type,
   boundGenericSubstitutions[{type, gpContext}] = Subs;
 }
 
-Type ASTContext::getTypeVariableMemberType(TypeVariableType *baseTypeVar,
-                                           AssociatedTypeDecl *assocType) {
-  auto &arena = *Impl.CurrentConstraintSolverArena;
-  return arena.GetTypeMember(baseTypeVar, assocType);
-}
-
 void ASTContext::addSearchPath(StringRef searchPath, bool isFramework) {
   OptionSet<SearchPathKind> &loaded = Impl.SearchPathsSet[searchPath];
   auto kind = isFramework ? SearchPathKind::Framework : SearchPathKind::Import;
@@ -1386,6 +1373,15 @@ ASTContext::getBehaviorConformance(Type conformingType,
   auto conformance = new (*this, AllocationArena::Permanent)
     NormalProtocolConformance(conformingType, conformingInterfaceType,
                               protocol, loc, storage, state);
+
+  if (auto nominal = conformingInterfaceType->getAnyNominal()) {
+    // Note: this is an egregious hack. The conformances need to be associated
+    // with the actual storage declarations.
+    SmallVector<ProtocolConformance *, 2> conformances;
+    if (!nominal->lookupConformance(nominal->getModuleContext(), protocol,
+                                    conformances))
+      nominal->registerProtocolConformance(conformance);
+  }
   return conformance;
 }
 

@@ -1690,17 +1690,11 @@ namespace {
                        locator);
       
       // Its subexpression should be convertible to a tuple (T.Element...).
-      // FIXME: We should really go through the conformance above to extract
-      // the element type, rather than just looking for the element type.
-      // FIXME: Member constraint is still weird here.
-      ConstraintLocatorBuilder builder(locator);
-      auto arrayElementTy = CS.getMemberType(arrayTy, elementAssocTy,
-                                             builder.withPathElement(
-                                               ConstraintLocator::Member),
-                                             /*options=*/0);
+      Type arrayElementTy = DependentMemberType::get(arrayTy, elementAssocTy);
 
       // Introduce conversions from each element to the element type of the
       // array.
+      ConstraintLocatorBuilder builder(locator);
       unsigned index = 0;
       for (auto element : expr->getElements()) {
         CS.addConstraint(ConstraintKind::Conversion,
@@ -1758,18 +1752,10 @@ namespace {
 
       // Its subexpression should be convertible to a tuple ((T.Key,T.Value)...).
       ConstraintLocatorBuilder locatorBuilder(locator);
-      auto dictionaryKeyTy = CS.getMemberType(dictionaryTy,
-                                              keyAssocTy,
-                                              locatorBuilder.withPathElement(
-                                                ConstraintLocator::Member),
-                                              /*options=*/0);
-      /// FIXME: ArrayElementType is a total hack here.
-      auto dictionaryValueTy = CS.getMemberType(dictionaryTy,
-                                                valueAssocTy,
-                                                locatorBuilder.withPathElement(
-                                                  ConstraintLocator::ArrayElementType),
-                                                /*options=*/0);
-      
+      auto dictionaryKeyTy = DependentMemberType::get(dictionaryTy,
+                                                      keyAssocTy);
+      auto dictionaryValueTy = DependentMemberType::get(dictionaryTy,
+                                                        valueAssocTy);
       TupleTypeElt tupleElts[2] = { TupleTypeElt(dictionaryKeyTy),
                                     TupleTypeElt(dictionaryValueTy) };
       Type elementTy = TupleType::get(tupleElts, C);

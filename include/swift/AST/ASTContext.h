@@ -121,11 +121,6 @@ enum class KnownFoundationEntity {
 /// entity name.
 Optional<KnownFoundationEntity> getKnownFoundationEntity(StringRef name);
 
-/// Callback function used when referring to a type member of a given
-/// type variable.
-typedef std::function<Type(TypeVariableType *, AssociatedTypeDecl *)>
-  GetTypeVariableMemberCallback;
-
 /// \brief Introduces a new constraint checker arena, whose lifetime is
 /// tied to the lifetime of this RAII object.
 class ConstraintCheckerArenaRAII {
@@ -142,8 +137,7 @@ public:
   /// \param allocator The allocator used for allocating any data that
   /// goes into the constraint checker arena.
   ConstraintCheckerArenaRAII(ASTContext &self,
-                             llvm::BumpPtrAllocator &allocator,
-                             GetTypeVariableMemberCallback getTypeMember);
+                             llvm::BumpPtrAllocator &allocator);
 
   ConstraintCheckerArenaRAII(const ConstraintCheckerArenaRAII &) = delete;
   ConstraintCheckerArenaRAII(ConstraintCheckerArenaRAII &&) = delete;
@@ -519,13 +513,6 @@ public:
   const CanType TheIEEE128Type;           /// 128-bit IEEE floating point
   const CanType ThePPC128Type;            /// 128-bit PowerPC 2xDouble
   
-  /// Retrieve a type member of the given base type variable.
-  ///
-  /// Note that this routine is only usable when a constraint system
-  /// is active.
-  Type getTypeVariableMemberType(TypeVariableType *baseTypeVar, 
-                                 AssociatedTypeDecl *assocType);
-
   /// Adds a search path to SearchPathOpts, unless it is already present.
   ///
   /// Does any proper bookkeeping to keep all module loaders up to date as well.
