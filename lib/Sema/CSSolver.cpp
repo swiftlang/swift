@@ -15,6 +15,7 @@
 //===----------------------------------------------------------------------===//
 #include "ConstraintSystem.h"
 #include "ConstraintGraph.h"
+#include "swift/AST/TypeWalker.h"
 #include "llvm/ADT/Statistic.h"
 #include "llvm/Support/raw_ostream.h"
 #include "llvm/Support/SaveAndRestore.h"
@@ -727,6 +728,37 @@ static bool shouldBindToValueType(Constraint *constraint)
   }
 }
 
+/// Find the set of type variables that are inferrable from the given type.
+///
+/// \param type The type to search.
+/// \param typeVars Collects the type variables that are inferrable from the
+/// given type. This set is not cleared, so that multiple types can be explored
+/// and introduce their results into the same set.
+static void findInferrableTypeVars(
+              Type type,
+              SmallPtrSetImpl<TypeVariableType *> &typeVars) {
+  type = type->getCanonicalType();
+  if (!type->hasTypeVariable()) return;
+
+  class Walker : public TypeWalker {
+    SmallPtrSetImpl<TypeVariableType *> &typeVars;
+  public:
+    explicit Walker(SmallPtrSetImpl<TypeVariableType *> &typeVars)
+      : typeVars(typeVars) { }
+
+    virtual Action walkToTypePre(Type ty) override {
+      if (ty->is<DependentMemberType>())
+        return Action::SkipChildren;
+
+      if (auto typeVar = ty->getAs<TypeVariableType>())
+        typeVars.insert(typeVar);
+      return Action::Continue;
+    }
+  };
+
+  type.walk(Walker(typeVars));
+}
+
 /// \brief Retrieve the set of potential type bindings for the given
 /// representative type variable, along with flags indicating whether
 /// those types should be opened.
@@ -896,15 +928,23 @@ static PotentialBindings getPotentialBindings(ConstraintSystem &cs,
 
     case ConstraintKind::ApplicableFunction:
     case ConstraintKind::BindOverload: {
+      if (result.FullyBound && result.InvolvesTypeVariables) continue;
+
       // If this variable is in the left-hand side, it is fully bound.
-      // FIXME: Can we avoid simplification here by walking the graph? Is it
-      // worthwhile?
-      if (ConstraintSystem::typeVarOccursInType(
-            typeVar,
-            cs.simplifyType(constraint->getFirstType()),
-            &result.InvolvesTypeVariables)) {
+      SmallPtrSet<TypeVariableType *, 4> typeVars;
+      findInferrableTypeVars(cs.simplifyType(constraint->getFirstType()),
+                             typeVars);
+      if (typeVars.count(typeVar))
         result.FullyBound = true;
-      }
+
+      if (result.InvolvesTypeVariables) continue;
+
+      // If this and another type variable occur, this result involves
+      // type variables.
+      findInferrableTypeVars(cs.simplifyType(constraint->getSecondType()),
+                             typeVars);
+      if (typeVars.size() > 1 && typeVars.count(typeVar))
+        result.InvolvesTypeVariables = true;
       continue;
     }
 
@@ -962,12 +1002,15 @@ static PotentialBindings getPotentialBindings(ConstraintSystem &cs,
       kind = AllowedBindingKind::Supertypes;
     } else {
       // Can't infer anything.
-      if (!result.InvolvesTypeVariables)
-        ConstraintSystem::typeVarOccursInType(typeVar, first,
-                                              &result.InvolvesTypeVariables);
-      if (!result.InvolvesTypeVariables)
-        ConstraintSystem::typeVarOccursInType(typeVar, second,
-                                              &result.InvolvesTypeVariables);
+      if (result.InvolvesTypeVariables) continue;
+
+      // Check whether both this type and another type variable are
+      // inferrable.
+      SmallPtrSet<TypeVariableType *, 4> typeVars;
+      findInferrableTypeVars(first, typeVars);
+      findInferrableTypeVars(second, typeVars);
+      if (typeVars.size() > 1 && typeVars.count(typeVar))
+        result.InvolvesTypeVariables = true;
       continue;
     }
 

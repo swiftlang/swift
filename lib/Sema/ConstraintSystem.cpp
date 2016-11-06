@@ -1578,7 +1578,7 @@ Type Solution::simplifyType(TypeChecker &tc, Type type) const {
       return known->second;
     }
 
-        // If this is a dependent member type for which we end up simplifying
+    // If this is a dependent member type for which we end up simplifying
     // the base to a non-type-variable, perform lookup.
     if (auto depMemTy = type->getAs<DependentMemberType>()) {
       // Simplify the base.
