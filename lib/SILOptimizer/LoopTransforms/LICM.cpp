@@ -475,7 +475,7 @@ void LoopTreeOptimization::analyzeCurrentLoop(
     std::unique_ptr<LoopNestSummary> &CurrSummary, ReadSet &SafeReads) {
   WriteSet &MayWrites = CurrSummary->MayWrites;
   SILLoop *Loop = CurrSummary->Loop;
-  DEBUG(llvm::dbgs() << " Analysing accesses.\n");
+  DEBUG(llvm::dbgs() << " Analyzing accesses.\n");
 
   // Contains function calls in the loop, which only read from memory.
   SmallVector<ApplyInst *, 8> ReadOnlyApplies;
