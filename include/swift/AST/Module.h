@@ -831,7 +831,7 @@ public:
   std::vector<Decl*> Decls;
 
   /// The list of local type declarations in the source file.
-  TinyPtrVector<TypeDecl*> LocalTypeDecls;
+  SmallPtrSet<TypeDecl *, 4> LocalTypeDecls;
 
   /// A set of special declaration attributes which require the
   /// Foundation module to be imported to work. If the foundation

@@ -43,14 +43,14 @@ func one() {
   func foo() throws {}
   
   do {
-#if false
+#if true
     try foo()
 #endif
   } catch {    // don't warn, #if code should be scanned.
   }
 
   do {
-#if false
+#if true
     throw opaque_error()
 #endif
   } catch {    // don't warn, #if code should be scanned.

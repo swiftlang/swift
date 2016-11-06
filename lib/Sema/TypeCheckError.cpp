@@ -1421,9 +1421,6 @@ private:
     };
 
     for (auto &clause : S->getClauses()) {
-      // Active clauses are handled by the normal AST walk.
-      if (clause.isActive) continue;
-      
       for (auto elt : clause.Elements)
         elt.walk(ConservativeThrowChecker(*this));
     }

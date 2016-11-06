@@ -805,25 +805,6 @@ SourceFile &ParserUnit::getSourceFile() {
   return *Impl.SF;
 }
 
-ConditionalCompilationExprState
-swift::operator&&(ConditionalCompilationExprState lhs,
-                  ConditionalCompilationExprState rhs) {
-  return {lhs.isConditionActive() && rhs.isConditionActive(),
-          ConditionalCompilationExprKind::Binary};
-}
-
-ConditionalCompilationExprState
-swift::operator||(ConditionalCompilationExprState lhs,
-                  ConditionalCompilationExprState rhs) {
-  return {lhs.isConditionActive() || rhs.isConditionActive(),
-          ConditionalCompilationExprKind::Binary};
-}
-
-ConditionalCompilationExprState
-swift::operator!(ConditionalCompilationExprState state) {
-  return {!state.isConditionActive(), state.getKind()};
-}
-
 ParsedDeclName swift::parseDeclName(StringRef name) {
   if (name.empty()) return ParsedDeclName();
 

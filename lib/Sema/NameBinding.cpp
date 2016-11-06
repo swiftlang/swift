@@ -20,6 +20,7 @@
 #include "swift/AST/DiagnosticsSema.h"
 #include "swift/AST/ASTWalker.h"
 #include "swift/AST/ModuleLoader.h"
+#include "swift/Parse/Lexer.h"
 #include "swift/ClangImporter/ClangModule.h"
 #include "clang/Basic/Module.h"
 #include "llvm/ADT/DenseMap.h"
@@ -301,6 +302,598 @@ static void insertPrecedenceGroupDecl(NameBinder &binder, SourceFile &SF,
   SF.PrecedenceGroups[group->getName()] = { group, true };  
 }
 
+static Decl *resolveConditionalClauses(Decl *TLD, NameBinder &binder,
+                                       SmallVectorImpl<Decl *> &ExtraTLCD) {
+
+  class ConditionClauseResolver : public ASTWalker {
+    SmallVectorImpl<Decl *> &ExtraTLCDs;
+    NameBinder &Binder;
+
+    class ClosureFinder : public ASTWalker {
+      ConditionClauseResolver &CCR;
+    public:
+      ClosureFinder(ConditionClauseResolver &CCR) : CCR(CCR) { }
+      virtual std::pair<bool, Stmt*> walkToStmtPre(Stmt *S) {
+        if (isa<BraceStmt>(S)) {
+          // To respect nesting, don't walk into brace statements.
+          return { false, S };
+        } else {
+          return { true, S };
+        }
+      }
+      virtual std::pair<bool, Expr*> walkToExprPre(Expr *E) {
+        if (ClosureExpr *CE = dyn_cast<ClosureExpr>(E)) {
+          BraceStmt *B = CE->getBody();
+          if (B) {
+            BraceStmt *NB = CCR.transformBraceStmt(B);
+            CE->setBody(NB, CE->hasSingleExpressionBody());
+          }
+        }
+        return { true, E };
+      }
+    };
+    ClosureFinder CF;
+
+  public:
+    ConditionClauseResolver(SmallVectorImpl<Decl *> &ExtraTLCDs,
+                            NameBinder &Binder)
+      : ExtraTLCDs(ExtraTLCDs), Binder(Binder), CF(*this) {}
+
+    bool evaluateCondition(Expr *condition) {
+      ASTContext &Context = Binder.Context;
+      // Evaluate a ParenExpr.
+      if (auto *PE = dyn_cast<ParenExpr>(condition))
+        return evaluateCondition(PE->getSubExpr());
+
+      // Evaluate a "&&" or "||" expression.
+      if (auto *SE = dyn_cast<SequenceExpr>(condition)) {
+        // Check for '&&' or '||' as the expression type.
+        assert((SE->getNumElements() >= 3) && "Ill-formed binary expression");
+
+        // Before type checking, chains of binary expressions will not be fully
+        // parsed, so associativity has not yet been encoded in the subtree.
+        auto elements = SE->getElements();
+        auto numElements = SE->getNumElements();
+        size_t iOperator = 1;
+        size_t iOperand = 2;
+
+        auto result = evaluateCondition(elements[0]);
+
+        while (iOperand < numElements) {
+          auto *UDREOp = cast<UnresolvedDeclRefExpr>(elements[iOperator]);
+          auto name = UDREOp->getName().getBaseName().str();
+
+          if (name.equals("||") || name.equals("&&")) {
+            auto rhs = evaluateCondition(elements[iOperand]);
+
+            if (name.equals("||")) {
+              result = result || rhs;
+              if (result)
+                break;
+            }
+
+            if (name.equals("&&")) {
+              result = result && rhs;
+              if (!result)
+                break;
+            }
+          }
+
+          iOperator += 2;
+          iOperand += 2;
+        }
+
+        return result;
+      }
+
+      // Evaluate a named reference expression.
+      if (auto *UDRE = dyn_cast<UnresolvedDeclRefExpr>(condition)) {
+        auto name = UDRE->getName().getBaseName().str();
+        return Context.LangOpts.isCustomConditionalCompilationFlagSet(name);
+      }
+
+      // Evaluate a Boolean literal.
+      if (auto *boolLit = dyn_cast<BooleanLiteralExpr>(condition)) {
+        return boolLit->getValue();
+      }
+
+      // "#if 0" isn't valid, but is handled by the parser so we must consider
+      // it here too.
+      if (auto *IL = dyn_cast<IntegerLiteralExpr>(condition)) {
+        return IL->getDigitsText() == "1";
+      }
+
+      // Evaluate a negation (unary "!") expression.
+      if (auto *PUE = dyn_cast<PrefixUnaryExpr>(condition)) {
+        // If the PUE is not a negation expression, return false
+        auto nameDecl = cast<UnresolvedDeclRefExpr>(PUE->getFn());
+        if (nameDecl->getName().getBaseName().str() != "!") {
+          return false;
+        }
+        return !evaluateCondition(PUE->getArg());
+      }
+
+      // Evaluate a target config call expression.
+      if (auto *CE = dyn_cast<CallExpr>(condition)) {
+        // Get the arg, which should be in a paren expression.
+        auto fnNameExpr = dyn_cast<UnresolvedDeclRefExpr>(CE->getFn());
+        if (!fnNameExpr) {
+          return false;
+        }
+        auto fnName = fnNameExpr->getName().getBaseName().str();
+        auto *PE = dyn_cast<ParenExpr>(CE->getArg());
+        if (!PE) {
+          return false;
+        }
+        if (fnName.equals("_compiler_version")) {
+          auto SLE = cast<StringLiteralExpr>(PE->getSubExpr());
+
+          // Parse the compiler version string.  Diagnostics have already been
+          // emitted so suppress them.
+          DiagnosticTransaction trans(Binder.Context.Diags);
+          auto versionRequirement =
+            version::Version::parseCompilerVersionString(SLE->getValue(),
+                                                         SLE->getLoc(),
+                                                         &Binder.Context.Diags);
+          trans.abort();
+
+          auto thisVersion = version::Version::getCurrentCompilerVersion();
+          auto VersionNewEnough = thisVersion >= versionRequirement;
+          return VersionNewEnough;
+        } else if (fnName.equals("swift")) {
+          auto PUE = dyn_cast<PrefixUnaryExpr>(PE->getSubExpr());
+          if (!PUE) {
+            return false;
+          }
+          auto prefix = dyn_cast<UnresolvedDeclRefExpr>(PUE->getFn());
+          auto versionArg = PUE->getArg();
+          auto versionStartLoc = versionArg->getStartLoc();
+          auto endLoc = Lexer::getLocForEndOfToken(Context.SourceMgr,
+                                                   versionArg->getSourceRange().End);
+          CharSourceRange versionCharRange(Context.SourceMgr, versionStartLoc,
+                                           endLoc);
+          auto versionString = Context.SourceMgr.extractText(versionCharRange);
+
+          // Parse the version string.  Diagnostics have already been emitted
+          // so suppress them.
+          DiagnosticTransaction trans(Binder.Context.Diags);
+          auto versionRequirement =
+            version::Version::parseVersionString(versionString,
+                                                 versionStartLoc,
+                                                 &Binder.Context.Diags);
+          trans.abort();
+
+          assert(versionRequirement.hasValue());
+          auto thisVersion = Context.LangOpts.EffectiveLanguageVersion;
+          assert(prefix->getName().getBaseName().str().equals(">="));
+
+          auto VersionNewEnough = thisVersion >= versionRequirement.getValue();
+          return VersionNewEnough;
+        } else {
+          auto UDRE = cast<UnresolvedDeclRefExpr>(PE->getSubExpr());
+
+          // The sub expression should be an UnresolvedDeclRefExpr (we won't
+          // tolerate extra parens).
+          auto argument = UDRE->getName().getBaseName().str();
+          // FIXME: Perform the replacement macOS -> OSX in Parse if possible.
+          if (fnName == "os" && argument == "macOS") {
+            argument = "OSX";
+          }
+          auto target = Context.LangOpts.getPlatformConditionValue(fnName);
+          return target == argument;
+        }
+      }
+
+      llvm_unreachable("Unhandled condition kind?");
+    }
+
+    void resolveClausesAndInsertMembers(IterableDeclContext *Nom,
+                                        IfConfigDecl *Cond) {
+      if (Cond->isResolved()) return;
+      for (auto &clause : Cond->getClauses()) {
+        // Evaluate conditions until we find the active clause.
+        if (clause.Cond && !evaluateCondition(clause.Cond)) {
+          continue;
+        }
+
+        for (auto &member : clause.Members) {
+          if (auto innerConfig = dyn_cast<IfConfigDecl>(member)) {
+            resolveClausesAndInsertMembers(Nom, innerConfig);
+          } else {
+            Nom->addMember(member);
+          }
+
+          for (auto Attr : member->getAttrs()) {
+            if (isa<ObjCAttr>(Attr) || isa<DynamicAttr>(Attr))
+              Binder.SF.AttrsRequiringFoundation
+                .insert({Attr->getKind(), Attr});
+          }
+
+          if (!member->getDeclContext()->isLocalContext()) continue;
+          if (auto tyDecl = dyn_cast<TypeDecl>(member)){
+            Binder.SF.LocalTypeDecls.insert(tyDecl);
+          }
+        }
+
+        break;
+      }
+      Cond->setResolved();
+    }
+
+    Stmt *transformStmt(Stmt *S) {
+    switch (S->getKind()) {
+      case StmtKind::Brace:
+        return transformBraceStmt(cast<BraceStmt>(S));
+      case StmtKind::If:
+        return transformIfStmt(cast<IfStmt>(S));
+      case StmtKind::Guard:
+        return transformGuardStmt(cast<GuardStmt>(S));
+      case StmtKind::While:
+        return transformWhileStmt(cast<WhileStmt>(S));
+      case StmtKind::RepeatWhile:
+        return transformRepeatWhileStmt(cast<RepeatWhileStmt>(S));
+      case StmtKind::For:
+        return transformForStmt(cast<ForStmt>(S));
+      case StmtKind::ForEach:
+        return transformForEachStmt(cast<ForEachStmt>(S));
+      case StmtKind::Switch:
+        return transformSwitchStmt(cast<SwitchStmt>(S));
+      case StmtKind::Do:
+        return transformDoStmt(llvm::cast<DoStmt>(S));
+      case StmtKind::DoCatch:
+        return transformDoCatchStmt(cast<DoCatchStmt>(S));
+      default:
+        return S;
+      }
+    }
+
+    // transform*() return their input if it's unmodified,
+    // or a modified copy of their input otherwise.
+    IfStmt *transformIfStmt(IfStmt *IS) {
+      if (Stmt *TS = IS->getThenStmt()) {
+        Stmt *NTS = transformStmt(TS);
+        if (NTS != TS) {
+          IS->setThenStmt(NTS);
+        }
+      }
+
+      if (Stmt *ES = IS->getElseStmt()) {
+        Stmt *NES = transformStmt(ES);
+        if (NES != ES) {
+          IS->setElseStmt(NES);
+        }
+      }
+
+      return IS;
+    }
+
+    GuardStmt *transformGuardStmt(GuardStmt *GS) {
+      if (Stmt *BS = GS->getBody())
+        GS->setBody(transformStmt(BS));
+      return GS;
+    }
+
+    WhileStmt *transformWhileStmt(WhileStmt *WS) {
+      if (Stmt *B = WS->getBody()) {
+        Stmt *NB = transformStmt(B);
+        if (NB != B) {
+          WS->setBody(NB);
+        }
+      }
+
+      return WS;
+    }
+
+    RepeatWhileStmt *transformRepeatWhileStmt(RepeatWhileStmt *RWS) {
+      if (Stmt *B = RWS->getBody()) {
+        Stmt *NB = transformStmt(B);
+        if (NB != B) {
+          RWS->setBody(NB);
+        }
+      }
+
+      return RWS;
+    }
+
+    ForStmt *transformForStmt(ForStmt *FS) {
+      if (Stmt *B = FS->getBody()) {
+        Stmt *NB = transformStmt(B);
+        if (NB != B) {
+          FS->setBody(NB);
+        }
+      }
+
+      return FS;
+    }
+
+    ForEachStmt *transformForEachStmt(ForEachStmt *FES) {
+      if (BraceStmt *B = FES->getBody()) {
+        BraceStmt *NB = transformBraceStmt(B);
+        if (NB != B) {
+          FES->setBody(NB);
+        }
+      }
+
+      return FES;
+    }
+
+    SwitchStmt *transformSwitchStmt(SwitchStmt *SS) {
+      for (CaseStmt *CS : SS->getCases()) {
+        if (Stmt *S = CS->getBody()) {
+          if (auto *B = dyn_cast<BraceStmt>(S)) {
+            BraceStmt *NB = transformBraceStmt(B);
+            if (NB != B) {
+              CS->setBody(NB);
+            }
+          }
+        }
+      }
+
+      return SS;
+    }
+
+    DoStmt *transformDoStmt(DoStmt *DS) {
+      if (BraceStmt *B = dyn_cast_or_null<BraceStmt>(DS->getBody())) {
+        BraceStmt *NB = transformBraceStmt(B);
+        if (NB != B) {
+          DS->setBody(NB);
+        }
+      }
+      return DS;
+    }
+
+    DoCatchStmt *transformDoCatchStmt(DoCatchStmt *DCS) {
+      if (BraceStmt *B = dyn_cast_or_null<BraceStmt>(DCS->getBody())) {
+        BraceStmt *NB = transformBraceStmt(B);
+        if (NB != B) {
+          DCS->setBody(NB);
+        }
+      }
+      for (CatchStmt *C : DCS->getCatches()) {
+        if (BraceStmt *CB = dyn_cast_or_null<BraceStmt>(C->getBody())) {
+          BraceStmt *NCB = transformBraceStmt(CB);
+          if (NCB != CB) {
+            C->setBody(NCB);
+          }
+        }
+      }
+      return DCS;
+    }
+
+    BraceStmt *transformBraceStmt(BraceStmt *BS) {
+      ASTContext &Context = Binder.Context;
+      SmallVector<ASTNode, 3> Elements;
+      for (auto &elt : BS->getElements()) {
+        // If this is a declaration we may have to insert it into the local
+        // type decl list.
+        if (Decl *D = elt.dyn_cast<Decl *>()) {
+          if (D->getDeclContext()->isLocalContext()) {
+            if (auto tyDecl = dyn_cast<TypeDecl>(D)){
+              Binder.SF.LocalTypeDecls.insert(tyDecl);
+            }
+          }
+          Elements.push_back(D);
+          continue;
+        }
+
+        // If this is an expression we have to walk it to transform any interior
+        // closure expression bodies.
+        if (Expr *E = elt.dyn_cast<Expr *>()) {
+          Elements.push_back(E->walk(CF));
+          continue;
+        }
+        
+        // We only transform statements.
+        Stmt *stmt = elt.dyn_cast<Stmt *>();
+        if (!stmt) {
+          Elements.push_back(elt);
+          continue;
+        }
+
+        // Build configurations are handled later.  If this isn't a build
+        // configuration transform the statement only.
+        IfConfigStmt *config = dyn_cast<IfConfigStmt>(stmt);
+        if (!config) {
+          Elements.push_back(transformStmt(stmt));
+          continue;
+        }
+
+        // Insert the configuration then evaluate it.
+        Elements.push_back(config);
+
+        for (auto &clause : config->getClauses()) {
+          if (clause.isResolved()) continue;
+          clause.setResolved();
+
+          // Evaluate conditions until we find the active clause.
+          if (clause.Cond && !evaluateCondition(clause.Cond)) {
+            continue;
+          }
+
+          // Now that we have the active clause, look into its elements for
+          // further statements to transform.
+          for (auto &clauseElt : clause.Elements) {
+            // If this is a declaration we may have to insert it into the local
+            // type decl list.
+            if (Decl *D = clauseElt.dyn_cast<Decl *>()) {
+              if (D->getDeclContext()->isLocalContext()) {
+                if (auto tyDecl = dyn_cast<TypeDecl>(D)){
+                  Binder.SF.LocalTypeDecls.insert(tyDecl);
+                }
+              }
+              Elements.push_back(D);
+              continue;
+            }
+
+            auto innerStmt = clauseElt.dyn_cast<Stmt *>();
+            if (!innerStmt) {
+              Elements.push_back(clauseElt);
+              continue;
+            }
+
+            auto innerConfig = dyn_cast<IfConfigStmt>(innerStmt);
+            if (!innerConfig) {
+              Elements.push_back(transformStmt(innerStmt));
+              continue;
+            }
+
+            // Nested build configurations require an additional transform to
+            // evaluate completely.
+            auto BS = BraceStmt::create(Context, SourceLoc(),
+                                        {innerConfig}, SourceLoc());
+            for (auto &es : transformBraceStmt(BS)->getElements()) {
+              if (auto innerInnerStmt = es.dyn_cast<Stmt *>()) {
+                Elements.push_back(transformStmt(innerInnerStmt));
+              } else {
+                Elements.push_back(es);
+              }
+            }
+          }
+          break;
+        }
+      }
+
+      return swift::BraceStmt::create(Context, BS->getLBraceLoc(),
+                                      Context.AllocateCopy(Elements),
+                                      BS->getRBraceLoc());
+    }
+
+    BraceStmt *resolveClausesAndExtractTLCDs(BraceStmt *BS) {
+      ASTContext &Context = Binder.Context;
+      SmallVector<ASTNode, 3> Elements;
+      for (auto &elt : BS->getElements()) {
+        // If this is an expression we have to walk it to transform any interior
+        // closure expression bodies.
+        if (Expr *E = elt.dyn_cast<Expr *>()) {
+          Elements.push_back(E->walk(CF));
+          continue;
+        }
+
+        // We only transform statements.
+        Stmt *stmt = elt.dyn_cast<Stmt *>();
+        if (!stmt) {
+          Elements.push_back(elt);
+          continue;
+        }
+
+        // Build configurations are handled later.  If this isn't a build
+        // configuration transform the statement only.
+        IfConfigStmt *config = dyn_cast<IfConfigStmt>(stmt);
+        if (!config) {
+          Elements.push_back(transformStmt(stmt));
+          continue;
+        }
+
+        // Now that we have the active clause, look into its elements for
+        // further statements to transform.
+        for (auto &clause : config->getClauses()) {
+          if (clause.isResolved()) continue;
+          clause.setResolved();
+
+          // Evaluate conditions until we find the active clause.
+          if (clause.Cond && !evaluateCondition(clause.Cond)) {
+            continue;
+          }
+
+          for (auto &clauseElt : clause.Elements) {
+            // Now that we have the active clause, look into its members for
+            // further decls.
+            if (auto TLD = clauseElt.dyn_cast<Decl *>()) {
+              // Nested top-level code declarations are a special case that
+              // require extra transformation.
+              if (auto *TLCD = dyn_cast<TopLevelCodeDecl>(TLD)) {
+                if (TLCD->isImplicit()) {
+                  continue;
+                }
+
+                if (BraceStmt *Body = TLCD->getBody()) {
+                  BraceStmt *NewBody = resolveClausesAndExtractTLCDs(Body);
+                  if (NewBody != Body) {
+                    TLCD->setBody(NewBody);
+                  }
+                }
+                ExtraTLCDs.push_back(TLCD);
+              } else {
+                // For newly-inserted aggregates and extensions we need to warn
+                // if they're marked '@objc'.
+                for (auto Attr : TLD->getAttrs()) {
+                  if (isa<ObjCAttr>(Attr) || isa<DynamicAttr>(Attr))
+                    Binder.SF.AttrsRequiringFoundation
+                      .insert({Attr->getKind(), Attr});
+                }
+
+                // Similarly for their members.
+                if (auto *IDC = dyn_cast<IterableDeclContext>(TLD)) {
+                  for (auto member : IDC->getMembers()) {
+                    for (auto Attr : member->getAttrs()) {
+                      if (isa<ObjCAttr>(Attr) || isa<DynamicAttr>(Attr))
+                        Binder.SF.AttrsRequiringFoundation
+                          .insert({Attr->getKind(), Attr});
+                    }
+                  }
+                }
+                ExtraTLCDs.push_back(TLD);
+              }
+            }
+          }
+          break;
+        }
+      }
+      return swift::BraceStmt::create(Context, BS->getLBraceLoc(),
+                                      Context.AllocateCopy(Elements),
+                                      BS->getRBraceLoc());
+    }
+
+    virtual bool walkToDeclPre(Decl *D) {
+      if (TopLevelCodeDecl *TLCD = dyn_cast<TopLevelCodeDecl>(D)) {
+        // For top-level declarations in libraries or in the interpreter we
+        // extract and evaluate any conditions and their corresponding blocks.
+        if (TLCD->isImplicit()) {
+          return false;
+        }
+
+        if (BraceStmt *Body = TLCD->getBody()) {
+          BraceStmt *NewBody = resolveClausesAndExtractTLCDs(Body);
+          if (NewBody != Body) {
+            TLCD->setBody(NewBody);
+          }
+        }
+      } else if (AbstractFunctionDecl *FD = dyn_cast<AbstractFunctionDecl>(D)) {
+        // For functions, transform the statements in the body.
+        // FIXME: This can be deferred until type checking.
+        if (FD->isImplicit()) {
+          return false;
+        }
+        
+        if (BraceStmt *Body = FD->getBody()) {
+          BraceStmt *NewBody = transformBraceStmt(Body);
+          if (NewBody != Body) {
+            FD->setBody(NewBody);
+          }
+        }
+      } else if (auto *IDC = dyn_cast<IterableDeclContext>(D)) {
+        // For aggregates and extensions, gather members under the scope of
+        // build conditions and insert them if they're active.
+        SmallPtrSet<IfConfigDecl *, 4> configsToResolve;
+        for (auto member : IDC->getMembers()) {
+          auto condition = dyn_cast<IfConfigDecl>(member);
+          if (!condition)
+            continue;
+          configsToResolve.insert(condition);
+        }
+        for (auto condition : configsToResolve) {
+          resolveClausesAndInsertMembers(IDC, condition);
+        }
+      }
+      return true;
+    }
+  };
+  
+  ConditionClauseResolver CCR(ExtraTLCD, binder);
+  TLD->walk(CCR);
+  return TLD;
+}
+
 /// performNameBinding - Once parsing is complete, this walks the AST to
 /// resolve names and do other top-level validation.
 ///
@@ -320,6 +913,32 @@ void swift::performNameBinding(SourceFile &SF, unsigned StartElem) {
   SF.clearLookupCache();
 
   NameBinder Binder(SF);
+
+  // Preprocess the declarations to evaluate compilation condition clauses.
+  SmallVector<Decl *, 8> resolvedDecls;
+  std::for_each(SF.Decls.begin(), SF.Decls.end(),
+                [&](Decl *decl) {
+                  // This first pass will unpack any top level declarations.
+                  // The next will resolve any further conditions in these
+                  // new top level declarations.
+                  resolvedDecls.push_back(decl);
+                  auto idx = resolvedDecls.size();
+                  resolvedDecls[idx - 1]
+                    = resolveConditionalClauses(decl, Binder, resolvedDecls);
+                });
+  SF.Decls.clear();
+  for (auto &d : resolvedDecls) {
+    if (auto TLD = dyn_cast<TopLevelCodeDecl>(d)) {
+      // When parsing library files, skip empty top level code declarations.
+      // These are artifacts of the condition clause transform for top level
+      // declarations.
+      if (!SF.isScriptMode() && TLD->getBody()->getElements().empty()) continue;
+    }
+    SmallVector<Decl *, 8> scratch;
+    auto processedD = resolveConditionalClauses(d, Binder, scratch);
+    assert(scratch.empty());
+    SF.Decls.push_back(processedD);
+  }
 
   SmallVector<std::pair<ImportedModule, ImportOptions>, 8> ImportedModules;
 

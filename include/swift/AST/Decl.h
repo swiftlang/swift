@@ -1929,13 +1929,8 @@ struct IfConfigDeclClause {
 
   ArrayRef<Decl*> Members;
 
-  /// True if this is the active clause of the #if block.  Since this is
-  /// evaluated at parse time, this is always known.
-  bool isActive;
-
-  IfConfigDeclClause(SourceLoc Loc, Expr *Cond, ArrayRef<Decl*> Members,
-                     bool isActive)
-    : Loc(Loc), Cond(Cond), Members(Members), isActive(isActive) {
+  IfConfigDeclClause(SourceLoc Loc, Expr *Cond, ArrayRef<Decl*> Members)
+    : Loc(Loc), Cond(Cond), Members(Members) {
   }
 };
   
@@ -1950,27 +1945,18 @@ class IfConfigDecl : public Decl {
   ArrayRef<IfConfigDeclClause> Clauses;
   SourceLoc EndLoc;
   bool HadMissingEnd;
+  bool HasBeenResolved = false;
 public:
   
   IfConfigDecl(DeclContext *Parent, ArrayRef<IfConfigDeclClause> Clauses,
                SourceLoc EndLoc, bool HadMissingEnd)
-    : Decl(DeclKind::IfConfig, Parent), Clauses(Clauses), EndLoc(EndLoc),
-      HadMissingEnd(HadMissingEnd) {
-  }
+    : Decl(DeclKind::IfConfig, Parent), Clauses(Clauses),
+      EndLoc(EndLoc), HadMissingEnd(HadMissingEnd) {}
 
   ArrayRef<IfConfigDeclClause> getClauses() const { return Clauses; }
 
-  /// Return the active clause, or null if there is no active one.
-  const IfConfigDeclClause *getActiveClause() const {
-    for (auto &Clause : Clauses)
-      if (Clause.isActive) return &Clause;
-    return nullptr;
-  }
-  const ArrayRef<Decl*> getActiveMembers() const {
-    if (auto *Clause = getActiveClause())
-      return Clause->Members;
-    return {};
-  }
+  bool isResolved() { return HasBeenResolved; }
+  void setResolved() { HasBeenResolved = true; }
   
   SourceLoc getEndLoc() const { return EndLoc; }
   SourceLoc getLoc() const { return Clauses[0].Loc; }

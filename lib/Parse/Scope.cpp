@@ -61,7 +61,6 @@ Scope::Scope(Parser *P, ScopeKind SC, bool InactiveConfigBlock)
   
   if (SI.CurScope) {
     Depth = SI.CurScope->Depth + 1;
-    IsInactiveConfigBlock |= SI.CurScope->IsInactiveConfigBlock;
   } else {
     Depth = 0;
   }
@@ -76,7 +75,7 @@ Scope::Scope(Parser *P, SavedScope &&SS):
     PrevScope(SI.CurScope),
     PrevResolvableDepth(SI.ResolvableDepth),
     Depth(SS.Depth),
-    Kind(SS.Kind), IsInactiveConfigBlock(SS.IsInactiveConfigBlock) {
+    Kind(SS.Kind) {
     
     SI.CurScope = this;
     if (!isResolvableScope(Kind))

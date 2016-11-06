@@ -667,15 +667,18 @@ struct IfConfigStmtClause {
   
   /// Elements inside the clause
   ArrayRef<ASTNode> Elements;
-  
-  /// True if this is the active clause of the #if block.  Since this is
-  /// evaluated at parse time, this is always known.
-  bool isActive;
-  
+
+  /// Whether or not name binding has resolved this statement.
+  bool HasBeenResolved = false;
+
   IfConfigStmtClause(SourceLoc Loc, Expr *Cond,
-                     ArrayRef<ASTNode> Elements, bool isActive)
-    : Loc(Loc), Cond(Cond), Elements(Elements), isActive(isActive) {
+                     ArrayRef<ASTNode> Elements)
+    : Loc(Loc), Cond(Cond), Elements(Elements) {
   }
+  
+public:
+  bool isResolved() const { return HasBeenResolved; }
+  void setResolved() { HasBeenResolved = true; }
 };
 
 /// IfConfigStmt - This class models the statement-side representation of
@@ -683,12 +686,12 @@ struct IfConfigStmtClause {
 class IfConfigStmt : public Stmt {
   /// An array of clauses controlling each of the #if/#elseif/#else conditions.
   /// The array is ASTContext allocated.
-  ArrayRef<IfConfigStmtClause> Clauses;
+  MutableArrayRef<IfConfigStmtClause> Clauses;
   SourceLoc EndLoc;
   bool HadMissingEnd;
 
 public:
-  IfConfigStmt(ArrayRef<IfConfigStmtClause> Clauses, SourceLoc EndLoc,
+  IfConfigStmt(MutableArrayRef<IfConfigStmtClause> Clauses, SourceLoc EndLoc,
                bool HadMissingEnd)
   : Stmt(StmtKind::IfConfig, /*implicit=*/false),
     Clauses(Clauses), EndLoc(EndLoc), HadMissingEnd(HadMissingEnd) {}
@@ -700,14 +703,7 @@ public:
 
   bool hadMissingEnd() const { return HadMissingEnd; }
 
-  const ArrayRef<IfConfigStmtClause> &getClauses() const { return Clauses; }
-  
-  ArrayRef<ASTNode> getActiveClauseElements() const {
-    for (auto &Clause : Clauses)
-      if (Clause.isActive)
-        return Clause.Elements;
-    return ArrayRef<ASTNode>();
-  }
+  const MutableArrayRef<IfConfigStmtClause> &getClauses() const { return Clauses; }
 
   // Implement isa/cast/dyncast/etc.
   static bool classof(const Stmt *S) {

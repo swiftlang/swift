@@ -59,10 +59,8 @@ namespace swift {
     TopLevelCode,
     /// The top-level of a file, when in parse-as-library mode.
     TopLevelLibrary,
-    /// The body of the inactive clause of an #if/#else/#endif block
-    InactiveConditionalBlock,
-    /// The body of the active clause of an #if/#else/#endif block
-    ActiveConditionalBlock
+    /// The body of the clause of an #if/#else/#endif block
+    ConditionalBlock,
   };
 
   
@@ -617,10 +615,9 @@ public:
                                    BraceItemListKind::Brace,
                                BraceItemListKind ConditionalBlockKind =
                                    BraceItemListKind::Brace);
-  ParserResult<BraceStmt> parseBraceItemList(Diag<> ID);
+  ParserResult<BraceStmt> parseBraceItemList(Diag<> ID, bool inConfig = false);
   
-  void parseIfConfigClauseElements(bool isActive,
-                                   BraceItemListKind Kind,
+  void parseIfConfigClauseElements(BraceItemListKind Kind,
                                    SmallVectorImpl<ASTNode> &Elements);
   
   void parseTopLevelCodeDeclDelayed();
@@ -646,7 +643,8 @@ public:
     PD_InExtension          = 1 << 8,
     PD_InStruct             = 1 << 9,
     PD_InEnum               = 1 << 10,
-    PD_InLoop               = 1 << 11
+    PD_InLoop               = 1 << 11,
+    PD_InIfConfig           = 1 << 12,
   };
 
   /// Options that control the parsing of declarations.
@@ -695,7 +693,7 @@ public:
   /// 'isLine = true' indicates parsing #line instead of #sourcelocation
   ParserStatus parseLineDirective(bool isLine = false);
 
-  void setLocalDiscriminator(ValueDecl *D);
+  void setLocalDiscriminator(ParseDeclOptions Flags, ValueDecl *D);
 
   /// Parse the optional attributes before a declaration.
   bool parseDeclAttributeList(DeclAttributes &Attributes,
@@ -1229,9 +1227,9 @@ public:
   ParserResult<Stmt> parseStmtSwitch(LabeledStmtInfo LabelInfo);
   ParserResult<CaseStmt> parseStmtCase();
 
-  /// Evaluate the condition of an #if directive.
-  ConditionalCompilationExprState
-  evaluateConditionalCompilationExpr(Expr *condition);
+  /// Classify the condition of an #if directive.
+  ConditionalCompilationExprKind
+  classifyConditionalCompilationExpr(Expr *condition);
 
   //===--------------------------------------------------------------------===//
   // Generics Parsing

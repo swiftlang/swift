@@ -54,8 +54,6 @@ public:
   /// scope.
   void addToScope(ValueDecl *D, Parser &TheParser);
 
-  bool isInactiveConfigBlock() const;
-
   SavedScope saveCurrentScope();
 };
 
@@ -91,7 +89,6 @@ class SavedScope {
   ScopeInfo::ScopedHTDetachedScopeTy HTDetachedScope;
   unsigned Depth;
   ScopeKind Kind;
-  bool IsInactiveConfigBlock;
 
   SavedScope() = delete;
   SavedScope(const SavedScope &) = delete;
@@ -103,9 +100,8 @@ public:
   ~SavedScope() = default;
 
   SavedScope(ScopeInfo::ScopedHTDetachedScopeTy &&HTDetachedScope,
-             unsigned Depth, ScopeKind Kind, bool IsInactiveConfigBlock)
-    : HTDetachedScope(std::move(HTDetachedScope)), Depth(Depth), Kind(Kind),
-      IsInactiveConfigBlock(IsInactiveConfigBlock) {}
+             unsigned Depth, ScopeKind Kind)
+    : HTDetachedScope(std::move(HTDetachedScope)), Depth(Depth), Kind(Kind) {}
 };
 
 /// Scope - This class represents lexical scopes.  These objects are created
@@ -125,12 +121,11 @@ class Scope {
   unsigned PrevResolvableDepth;
   unsigned Depth;
   ScopeKind Kind;
-  bool IsInactiveConfigBlock;
 
   /// \brief Save this scope so that it can be re-entered later.  Transfers the
   /// ownership of the scope frame to returned object.
   SavedScope saveScope() {
-    return SavedScope(HTScope.detach(), Depth, Kind, IsInactiveConfigBlock);
+    return SavedScope(HTScope.detach(), Depth, Kind);
   }
 
   unsigned getDepth() const {
@@ -141,7 +136,7 @@ class Scope {
 
 public:
   /// \brief Create a lexical scope of the specified kind.
-  Scope(Parser *P, ScopeKind SC, bool IsInactiveConfigBlock = false);
+  Scope(Parser *P, ScopeKind SC);
 
   /// \brief Re-enter the specified scope, transferring the ownership of the
   /// scope frame to the new object.
@@ -172,12 +167,6 @@ inline ValueDecl *ScopeInfo::lookupValueName(DeclName Name) {
   if (Res.first < ResolvableDepth)
     return 0;
   return Res.second;
-}
-
-inline bool ScopeInfo::isInactiveConfigBlock() const {
-  if (!CurScope)
-    return false;
-  return CurScope->IsInactiveConfigBlock;
 }
 
 inline SavedScope ScopeInfo::saveCurrentScope() {

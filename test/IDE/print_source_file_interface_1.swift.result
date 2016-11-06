@@ -3,13 +3,12 @@
 
 // More blah blah.
 
-
-
 import Swift
 
 internal class FooDisabled {
 }
 internal typealias MyN = Int
+
 
 public class MyClass {
 

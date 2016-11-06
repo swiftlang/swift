@@ -91,6 +91,7 @@ func testError() {
   } catch is TestError {
   } catch {}
 
+  print(testErrorNSError)
 #endif
 
 }
