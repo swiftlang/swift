@@ -1,9 +1,6 @@
 // RUN: %scale-test --sum-multi --parse --begin 5 --end 16 --step 5 --select typeCheckAbstractFunctionBody %s
 // REQUIRES: OS=macosx, tools-release
 
-// FIXME: this test has been failing in CI
-// REQUIRES: rdar29090287
-
 struct Struct${N} {
 % if int(N) > 1:
     var Field : Struct${int(N)-1}?

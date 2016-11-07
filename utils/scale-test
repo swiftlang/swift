@@ -12,7 +12,7 @@
 # values.
 #
 
-import gyb, os, os.path, subprocess
+import gyb, os, os.path, shutil, subprocess
 
 def find_which(p):
     for d in os.environ["PATH"].split(os.pathsep):
@@ -38,20 +38,23 @@ def has_debuginfo(swiftc):
 
 
 def write_input_file(args, ast, d, n):
-    ifile = os.path.join(d, "in%d.swift" % n)
-    with open(ifile,'w+') as f:
+    fname = "in%d.swift" % n
+    pathname = os.path.join(d, fname)
+    with open(pathname,'w+') as f:
         f.write(gyb.execute_template(ast, '', N=n))
-    return ifile
+    return fname
 
 
 def run_once_with_primary(args, ast, rng, primary_idx):
-    import sys, shutil, tempfile, json
+    import sys, tempfile, json
     r = {}
     try:
-        d = tempfile.mkdtemp()
+        if args.tmpdir != None and not os.path.exists(args.tmpdir):
+            os.makedirs(args.tmpdir, 0700)
+        d = tempfile.mkdtemp(dir=args.tmpdir)
         inputs = [write_input_file(args, ast, d, i) for i in rng]
         primary = inputs[primary_idx]
-        ofile = os.path.join(d, "out.o")
+        ofile = "out.o"
 
         mode = "-c"
         if args.parse:
@@ -81,26 +84,26 @@ def run_once_with_primary(args, ast, rng, primary_idx):
             print "running: " + " ".join(command)
 
         if args.dtrace:
-            trace = os.path.join(d, "trace.txt")
+            trace = "trace.txt"
             script = "pid$target:swiftc:*%s*:entry { @[probefunc] = count() }" % args.select
             subprocess.check_call(
                 ["sudo", "dtrace", "-q",
                  "-o", trace,
                  "-b", "256",
                  "-n", script,
-                 "-c", " ".join(command)])
+                 "-c", " ".join(command)], cwd=d)
             r = {fields[0]: int(fields[1]) for fields in
-                 [line.split() for line in open(trace)]
+                 [line.split() for line in open(os.path.join(d, trace))]
                  if len(fields) == 2}
         else:
             if args.debug:
                 command = ["lldb", "--"] + command
-            stats = os.path.join(d, "stats.json")
+            stats = "stats.json"
             argv = command + ["-Xllvm", "-stats",
                               "-Xllvm", "-stats-json",
                               "-Xllvm", "-info-output-file=" + stats]
-            subprocess.check_call(argv)
-            with open(stats) as f:
+            subprocess.check_call(argv, cwd=d)
+            with open(os.path.join(d, stats)) as f:
                 r = json.load(f)
     finally:
         shutil.rmtree(d)
@@ -241,6 +244,9 @@ def main():
     parser.add_argument(
         '--swiftc-binary',
         default="swiftc", help='swift binary to execute')
+    parser.add_argument(
+        '--tmpdir', type=str,
+        default=None, help='directory to create tempfiles in')
     parser.add_argument(
         '--select',
         default="", help='substring of counters/symbols to restrict attention to')
