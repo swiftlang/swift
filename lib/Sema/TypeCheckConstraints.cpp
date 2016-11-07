@@ -1301,6 +1301,12 @@ void CleanupIllFormedExpressionRAII::doIt(Expr *expr, ASTContext &Context) {
       }
       return true;
     }
+
+    // Don't walk into statements.  This handles the BraceStmt in
+    // non-single-expr closures, so we don't walk into their body.
+    std::pair<bool, Stmt *> walkToStmtPre(Stmt *S) override {
+      return { false, S };
+    }
   };
   
   if (expr)
