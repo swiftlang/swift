@@ -239,10 +239,12 @@ func test_break(_ i : Int) {
 
 // <rdar://problem/19150249> Allow labeled "break" from an "if" statement
 
-// CHECK-LABEL: sil hidden @_TF10statements13test_if_breakFGSqCS_1C_T_
+// CHECK-LABEL: sil hidden @_TF10statements13test_if_breakFGSqCS_1C_T_ : $@convention(thin) (@owned Optional<C>) -> () {
 func test_if_break(_ c : C?) {
+// CHECK: bb0([[ARG:%.*]] : $Optional<C>):
 label1:
-  // CHECK: switch_enum %0 : $Optional<C>, case #Optional.some!enumelt.1: [[TRUE:bb[0-9]+]], default [[FALSE:bb[0-9]+]]
+  // CHECK: [[ARG_COPY:%.*]] = copy_value [[ARG]]
+  // CHECK: switch_enum [[ARG_COPY]] : $Optional<C>, case #Optional.some!enumelt.1: [[TRUE:bb[0-9]+]], default [[FALSE:bb[0-9]+]]
   if let x = c {
 // CHECK: [[TRUE]]({{.*}} : $C):
 
@@ -259,10 +261,12 @@ label1:
   // CHECK: return
 }
 
-// CHECK-LABEL: sil hidden @_TF10statements18test_if_else_breakFGSqCS_1C_T_
+// CHECK-LABEL: sil hidden @_TF10statements18test_if_else_breakFGSqCS_1C_T_ : $@convention(thin) (@owned Optional<C>) -> () {
 func test_if_else_break(_ c : C?) {
+// CHECK: bb0([[ARG:%.*]] : $Optional<C>):
 label2:
-  // CHECK: switch_enum %0 : $Optional<C>, case #Optional.some!enumelt.1: [[TRUE:bb[0-9]+]], default [[FALSE:bb[0-9]+]]
+  // CHECK: [[ARG_COPY:%.*]] = copy_value [[ARG]]
+  // CHECK: switch_enum [[ARG_COPY]] : $Optional<C>, case #Optional.some!enumelt.1: [[TRUE:bb[0-9]+]], default [[FALSE:bb[0-9]+]]
   if let x = c {
     // CHECK: [[TRUE]]({{.*}} : $C):
     use(x)
@@ -281,8 +285,10 @@ label2:
 
 // CHECK-LABEL: sil hidden @_TF10statements23test_if_else_then_breakFTSbGSqCS_1C__T_
 func test_if_else_then_break(_ a : Bool, _ c : C?) {
-  label3:
-  // CHECK: switch_enum %1 : $Optional<C>, case #Optional.some!enumelt.1: [[TRUE:bb[0-9]+]], default [[FALSE:bb[0-9]+]]
+label3:
+  // CHECK: bb0({{.*}}, [[ARG2:%.*]] : $Optional<C>):
+  // CHECK: [[ARG2_COPY:%.*]] = copy_value [[ARG2]]
+  // CHECK: switch_enum [[ARG2_COPY]] : $Optional<C>, case #Optional.some!enumelt.1: [[TRUE:bb[0-9]+]], default [[FALSE:bb[0-9]+]]
   if let x = c {
     // CHECK: [[TRUE]]({{.*}} : $C):
     use(x)
@@ -571,22 +577,24 @@ func testRequireOptional1(_ a : Int?) -> Int {
 }
 
 // CHECK-LABEL: sil hidden @_TF10statements20testRequireOptional2FGSqSS_SS
-// CHECK: bb0(%0 : $Optional<String>):
-// CHECK-NEXT:   debug_value %0 : $Optional<String>, let, name "a"
-// CHECK-NEXT:   copy_value %0 : $Optional<String>
-// CHECK-NEXT:   switch_enum %0 : $Optional<String>, case #Optional.some!enumelt.1: bb1, default bb2
+// CHECK: bb0([[ARG:%.*]] : $Optional<String>):
+// CHECK-NEXT:   debug_value [[ARG]] : $Optional<String>, let, name "a"
+// CHECK-NEXT:   [[ARG_COPY:%.*]] = copy_value [[ARG]] : $Optional<String>
+// CHECK-NEXT:   switch_enum [[ARG_COPY]] : $Optional<String>, case #Optional.some!enumelt.1: bb1, default bb2
 func testRequireOptional2(_ a : String?) -> String {
   guard let t = a else { abort() }
 
-  // CHECK:  bb1(%4 : $String):
-  // CHECK-NEXT:   debug_value %4 : $String, let, name "t"
-  // CHECK-NEXT:   destroy_value %0 : $Optional<String>
-  // CHECK-NEXT:   return %4 : $String
+  // CHECK:  bb1([[STR:%.*]] : $String):
+  // CHECK-NEXT:   debug_value [[STR]] : $String, let, name "t"
+  // CHECK-NEXT:   [[RETURN:%.*]] = copy_value [[STR]]
+  // CHECK-NEXT:   destroy_value [[STR]] : $String
+  // CHECK-NEXT:   destroy_value [[ARG]]
+  // CHECK-NEXT:   return [[RETURN]] : $String
 
   // CHECK:        bb2:
   // CHECK-NEXT:   // function_ref statements.abort () -> Swift.Never
-  // CHECK-NEXT:   %8 = function_ref @_TF10statements5abortFT_Os5Never
-  // CHECK-NEXT:   %9 = apply %8()
+  // CHECK-NEXT:   [[ABORT_FUNC:%.*]] = function_ref @_TF10statements5abortFT_Os5Never
+  // CHECK-NEXT:   [[NEVER:%.*]] = apply [[ABORT_FUNC]]()
   // CHECK-NEXT:   unreachable
   return t
 }
@@ -612,15 +620,19 @@ func test_is_pattern(_ y : BaseClass) {
 
 // CHECK-LABEL: sil hidden @_TF10statements15test_as_patternFCS_9BaseClassCS_12DerivedClass
 func test_as_pattern(_ y : BaseClass) -> DerivedClass {
-  // checked_cast_br %0 : $BaseClass to $DerivedClass
+  // CHECK: bb0([[ARG:%.*]] : $BaseClass):
+  // CHECK:   [[ARG_COPY:%.*]] = copy_value [[ARG]]
+  // CHECK:   checked_cast_br [[ARG_COPY]] : $BaseClass to $DerivedClass
   guard case let result as DerivedClass = y else {  }
   // CHECK: bb{{.*}}({{.*}} : $DerivedClass):
 
 
   // CHECK: bb{{.*}}([[PTR:%[0-9]+]] : $DerivedClass):
   // CHECK-NEXT: debug_value [[PTR]] : $DerivedClass, let, name "result"
-  // CHECK-NEXT: destroy_value %0 : $BaseClass
-  // CHECK-NEXT: return [[PTR]] : $DerivedClass
+  // CHECK-NEXT: [[RESULT:%.*]] = copy_value [[PTR]]
+  // CHECK-NEXT: destroy_value [[PTR]] : $DerivedClass
+  // CHECK-NEXT: destroy_value [[ARG]] : $BaseClass
+  // CHECK-NEXT: return [[RESULT]] : $DerivedClass
   return result
 }
 // CHECK-LABEL: sil hidden @_TF10statements22let_else_tuple_bindingFGSqTSiSi__Si

@@ -234,7 +234,7 @@ namespace {
                                         SGFContext ctx) {
       // Retain the result if this is copy-on-success.
       if (!shouldTakeOnSuccess(consumption))
-        origTargetTL.emitCopyValue(SGF.B, Loc, value);
+        value = origTargetTL.emitCopyValue(SGF.B, Loc, value);
 
       // Enter a cleanup for the +1 result.
       ManagedValue result

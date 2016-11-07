@@ -15,9 +15,9 @@ extension Gizmo {
     // CHECK:   [[SELF:%[0-9]+]] = load [[SELFMUI]] : $*Gizmo
     // CHECK:   [[INIT_DELEG:%[0-9]+]] = class_method [volatile] [[SELF]] : $Gizmo, #Gizmo.init!initializer.1.foreign : (Gizmo.Type) -> (Int) -> Gizmo! , $@convention(objc_method) (Int, @owned Gizmo) -> @owned Optional<Gizmo>
     // CHECK:   [[SELF_RET:%[0-9]+]] = apply [[INIT_DELEG]]([[I]], [[SELF]]) : $@convention(objc_method) (Int, @owned Gizmo) -> @owned Optional<Gizmo>
-    // CHECK:   copy_value [[SELF4:%[0-9]+]] : $Gizmo
+    // CHECK:   [[SELF4_COPY:%.*]] = copy_value [[SELF4:%[0-9]+]] : $Gizmo
     // CHECK:   destroy_value [[SELF_BOX:%[0-9]+]] : $@box Gizmo
-    // CHECK:   return [[SELF4]] : $Gizmo
+    // CHECK:   return [[SELF4_COPY]] : $Gizmo
     self.init(bellsOn:i)
   }
 }

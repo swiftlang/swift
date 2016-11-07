@@ -279,7 +279,7 @@ void SILGenFunction::emitCaptures(SILLocation loc,
         }
       
         // Just retain a by-val let.
-        B.emitCopyValueOperation(loc, Val);
+        Val = B.emitCopyValueOperation(loc, Val);
       } else {
         // If we have a mutable binding for a 'let', such as 'self' in an
         // 'init' method, load it.
@@ -321,8 +321,7 @@ void SILGenFunction::emitCaptures(SILLocation loc,
         if (canGuarantee) {
           capturedArgs.push_back(ManagedValue::forUnmanaged(vl.box));
         } else {
-          B.createCopyValue(loc, vl.box);
-          capturedArgs.push_back(emitManagedRValueWithCleanup(vl.box));
+          capturedArgs.push_back(emitManagedRetain(loc, vl.box));
         }
         escapesToMark.push_back(vl.value);
       } else {

@@ -738,7 +738,7 @@ static ManagedValue manageParam(SILGenFunction &gen,
   // Unowned parameters are only guaranteed at the instant of the call, so we
   // must retain them even if we're in a context that can accept a +0 value.
   case ParameterConvention::Direct_Unowned:
-    gen.getTypeLowering(paramValue->getType())
+    paramValue = gen.getTypeLowering(paramValue->getType())
         .emitCopyValue(gen.B, loc, paramValue);
     SWIFT_FALLTHROUGH;
   case ParameterConvention::Direct_Owned:
@@ -2121,8 +2121,7 @@ void ResultPlanner::execute(ArrayRef<SILValue> innerDirectResults,
                        "reabstraction of returns_inner_pointer function");
       SWIFT_FALLTHROUGH;
     case ResultConvention::Unowned:
-      resultTL.emitCopyValue(Gen.B, Loc, resultValue);
-      return Gen.emitManagedRValueWithCleanup(resultValue, resultTL);
+      return Gen.emitManagedRetain(Loc, resultValue, resultTL);
     }
     llvm_unreachable("bad result convention!");
   };

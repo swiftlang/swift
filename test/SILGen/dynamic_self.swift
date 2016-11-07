@@ -34,11 +34,11 @@ class GY<T> : GX<[T]> { }
 // CHECK-LABEL: sil hidden @_TF12dynamic_self23testDynamicSelfDispatch{{.*}} : $@convention(thin) (@owned Y) -> ()
 func testDynamicSelfDispatch(y: Y) {
 // CHECK: bb0([[Y:%[0-9]+]] : $Y):
-// CHECK:   copy_value [[Y]]
-// CHECK:   [[Y_AS_X:%[0-9]+]] = upcast [[Y]] : $Y to $X  
-// CHECK:   [[X_F:%[0-9]+]] = class_method [[Y_AS_X]] : $X, #X.f!1 : (X) -> () -> @dynamic_self X , $@convention(method) (@guaranteed X) -> @owned X
-// CHECK:   [[X_RESULT:%[0-9]+]] = apply [[X_F]]([[Y_AS_X]]) : $@convention(method) (@guaranteed X) -> @owned X
-// CHECK:   destroy_value [[Y_AS_X]]
+// CHECK:   [[Y_COPY:%.*]] = copy_value [[Y]]
+// CHECK:   [[Y_AS_X_COPY:%[0-9]+]] = upcast [[Y_COPY]] : $Y to $X  
+// CHECK:   [[X_F:%[0-9]+]] = class_method [[Y_AS_X_COPY]] : $X, #X.f!1 : (X) -> () -> @dynamic_self X , $@convention(method) (@guaranteed X) -> @owned X
+// CHECK:   [[X_RESULT:%[0-9]+]] = apply [[X_F]]([[Y_AS_X_COPY]]) : $@convention(method) (@guaranteed X) -> @owned X
+// CHECK:   destroy_value [[Y_AS_X_COPY]]
 // CHECK:   [[Y_RESULT:%[0-9]+]] = unchecked_ref_cast [[X_RESULT]] : $X to $Y
 // CHECK:   destroy_value [[Y_RESULT]] : $Y
 // CHECK:   destroy_value [[Y]] : $Y
@@ -48,11 +48,11 @@ func testDynamicSelfDispatch(y: Y) {
 // CHECK-LABEL: sil hidden @_TF12dynamic_self30testDynamicSelfDispatchGeneric{{.*}} : $@convention(thin) (@owned GY<Int>) -> ()
 func testDynamicSelfDispatchGeneric(gy: GY<Int>) {
   // CHECK: bb0([[GY:%[0-9]+]] : $GY<Int>):
-  // CHECK:   copy_value [[GY]]
-  // CHECK:   [[GY_AS_GX:%[0-9]+]] = upcast [[GY]] : $GY<Int> to $GX<Array<Int>>
-  // CHECK:   [[GX_F:%[0-9]+]] = class_method [[GY_AS_GX]] : $GX<Array<Int>>, #GX.f!1 : <T> (GX<T>) -> () -> @dynamic_self GX<T> , $@convention(method) <τ_0_0> (@guaranteed GX<τ_0_0>) -> @owned GX<τ_0_0>
-  // CHECK:   [[GX_RESULT:%[0-9]+]] = apply [[GX_F]]<[Int]>([[GY_AS_GX]]) : $@convention(method) <τ_0_0> (@guaranteed GX<τ_0_0>) -> @owned GX<τ_0_0>
-  // CHECK:   destroy_value [[GY_AS_GX]]
+  // CHECK:   [[GY_COPY:%.*]] = copy_value [[GY]]
+  // CHECK:   [[GY_AS_GX_COPY:%[0-9]+]] = upcast [[GY_COPY]] : $GY<Int> to $GX<Array<Int>>
+  // CHECK:   [[GX_F:%[0-9]+]] = class_method [[GY_AS_GX_COPY]] : $GX<Array<Int>>, #GX.f!1 : <T> (GX<T>) -> () -> @dynamic_self GX<T> , $@convention(method) <τ_0_0> (@guaranteed GX<τ_0_0>) -> @owned GX<τ_0_0>
+  // CHECK:   [[GX_RESULT:%[0-9]+]] = apply [[GX_F]]<[Int]>([[GY_AS_GX_COPY]]) : $@convention(method) <τ_0_0> (@guaranteed GX<τ_0_0>) -> @owned GX<τ_0_0>
+  // CHECK:   destroy_value [[GY_AS_GX_COPY]]
   // CHECK:   [[GY_RESULT:%[0-9]+]] = unchecked_ref_cast [[GX_RESULT]] : $GX<Array<Int>> to $GY<Int>
   // CHECK:   destroy_value [[GY_RESULT]] : $GY<Int>
   // CHECK:   destroy_value [[GY]]
@@ -97,14 +97,17 @@ func testExistentialDispatchClass(cp: CP) {
   @objc func method() -> Self { return self }
 }
 
-// CHECK-LABEL: sil hidden @_TF12dynamic_self21testAnyObjectDispatch{{.*}} : $@convention(thin) (@owned AnyObject) -> ()
+// CHECK-LABEL: sil hidden @_TF12dynamic_self21testAnyObjectDispatchFT1oPs9AnyObject__T_ : $@convention(thin) (@owned AnyObject) -> () {
 func testAnyObjectDispatch(o: AnyObject) {
   // CHECK: dynamic_method_br [[O_OBJ:%[0-9]+]] : $@opened({{.*}}) AnyObject, #ObjC.method!1.foreign, bb1, bb2
 
   // CHECK: bb1([[METHOD:%[0-9]+]] : $@convention(objc_method) (@opened({{.*}}) AnyObject) -> @autoreleased AnyObject):
-  // CHECK:   [[VAR_9:%[0-9]+]] = partial_apply [[METHOD]]([[O_OBJ]]) : $@convention(objc_method) (@opened({{.*}}) AnyObject) -> @autoreleased AnyObject
+  // CHECK:   [[O_OBJ_COPY:%.*]] = copy_value [[O_OBJ]]
+  // CHECK:   [[VAR_9:%[0-9]+]] = partial_apply [[METHOD]]([[O_OBJ_COPY]]) : $@convention(objc_method) (@opened({{.*}}) AnyObject) -> @autoreleased AnyObject
   var x = o.method
 }
+// CHECK: } // end sil function '_TF12dynamic_self21testAnyObjectDispatchFT1oPs9AnyObject__T_'
+
 
 // <rdar://problem/16270889> Dispatch through ObjC metatypes.
 class ObjCInit {
@@ -130,12 +133,14 @@ func testObjCInit(meta: ObjCInit.Type) {
 class OptionalResult {
   func foo() -> Self? { return self }
 }
-// CHECK-LABEL: sil hidden @_TFC12dynamic_self14OptionalResult3foo
-// CHECK: bb0(
-// CHECK-NEXT: debug_value %0 : $OptionalResult
-// CHECK-NEXT: copy_value [[VALUE:%[0-9]+]]
-// CHECK-NEXT: [[T0:%.*]] = enum $Optional<OptionalResult>, #Optional.some!enumelt.1, %0 : $OptionalResult
+
+// CHECK-LABEL: sil hidden @_TFC12dynamic_self14OptionalResult3foofT_GSqDS0__ : $@convention(method) (@guaranteed OptionalResult) -> @owned Optional<OptionalResult> {
+// CHECK: bb0([[SELF:%.*]] : $OptionalResult):
+// CHECK-NEXT: debug_value [[SELF]] : $OptionalResult
+// CHECK-NEXT: [[SELF_COPY:%.*]] = copy_value [[SELF]]
+// CHECK-NEXT: [[T0:%.*]] = enum $Optional<OptionalResult>, #Optional.some!enumelt.1, [[SELF_COPY]] : $OptionalResult
 // CHECK-NEXT: return [[T0]] : $Optional<OptionalResult>
+// CHECK: } // end sil function '_TFC12dynamic_self14OptionalResult3foofT_GSqDS0__'
 
 class OptionalResultInheritor : OptionalResult {
   func bar() {}
@@ -144,9 +149,13 @@ class OptionalResultInheritor : OptionalResult {
 func testOptionalResult(v : OptionalResultInheritor) {
   v.foo()?.bar()
 }
-// CHECK-LABEL: sil hidden @_TF12dynamic_self18testOptionalResult{{.*}} : $@convention(thin) (@owned OptionalResultInheritor) -> ()
-// CHECK:      [[T0:%.*]] = class_method [[V:%.*]] : $OptionalResult, #OptionalResult.foo!1 : (OptionalResult) -> () -> @dynamic_self OptionalResult? , $@convention(method) (@guaranteed OptionalResult) -> @owned Optional<OptionalResult>
-// CHECK-NEXT: [[RES:%.*]] = apply [[T0]]([[V]])
+
+// CHECK-LABEL: sil hidden @_TF12dynamic_self18testOptionalResultFT1vCS_23OptionalResultInheritor_T_ : $@convention(thin) (@owned OptionalResultInheritor) -> () {
+// CHECK: bb0([[ARG:%.*]] : $OptionalResultInheritor):
+// CHECK:      [[COPY_ARG:%.*]] = copy_value [[ARG]]
+// CHECK:      [[CAST_COPY_ARG:%.*]] = upcast [[COPY_ARG]]
+// CHECK:      [[T0:%.*]] = class_method [[CAST_COPY_ARG]] : $OptionalResult, #OptionalResult.foo!1 : (OptionalResult) -> () -> @dynamic_self OptionalResult? , $@convention(method) (@guaranteed OptionalResult) -> @owned Optional<OptionalResult>
+// CHECK-NEXT: [[RES:%.*]] = apply [[T0]]([[CAST_COPY_ARG]])
 // CHECK:      select_enum [[RES]]
 // CHECK:      [[T1:%.*]] = unchecked_enum_data [[RES]]
 // CHECK-NEXT: [[T4:%.*]] = unchecked_ref_cast [[T1]] : $OptionalResult to $OptionalResultInheritor
@@ -154,14 +163,15 @@ func testOptionalResult(v : OptionalResultInheritor) {
 
 class Z {
 
-  // CHECK-LABEL: sil hidden @_TFC12dynamic_self1Z23testDynamicSelfCapturesfT1xSi_DS0_
+  // CHECK-LABEL: sil hidden @_TFC12dynamic_self1Z23testDynamicSelfCapturesfT1xSi_DS0_ : $@convention(method) (Int, @guaranteed Z) -> @owned Z {
   func testDynamicSelfCaptures(x: Int) -> Self {
+    // CHECK: bb0({{.*}}, [[SELF:%.*]] : $Z):
 
     // Single capture of 'self' type
 
     // CHECK:      [[FN:%.*]] = function_ref @_TFFC12dynamic_self1Z23testDynamicSelfCapturesFT1xSi_DS0_U_FT_T_ : $@convention(thin) (@owned Z) -> ()
-    // CHECK-NEXT: copy_value %1 : $Z
-    // CHECK-NEXT: partial_apply [[FN]](%1)
+    // CHECK-NEXT: [[SELF_COPY:%.*]] = copy_value [[SELF]] : $Z
+    // CHECK-NEXT: partial_apply [[FN]]([[SELF_COPY]])
     let fn1 = { _ = self }
     fn1()
 
@@ -169,8 +179,8 @@ class Z {
     // up at the end of the list anyway
 
     // CHECK:      [[FN:%.*]] = function_ref @_TFFC12dynamic_self1Z23testDynamicSelfCapturesFT1xSi_DS0_U0_FT_T_ : $@convention(thin) (Int, @owned Z) -> ()
-    // CHECK-NEXT: copy_value %1 : $Z
-    // CHECK-NEXT: partial_apply [[FN]](%0, %1)
+    // CHECK-NEXT: [[SELF_COPY:%.*]] = copy_value [[SELF]] : $Z
+    // CHECK-NEXT: partial_apply [[FN]]({{.*}}, [[SELF_COPY]])
     let fn2 = {
       _ = self
       _ = x
@@ -182,10 +192,10 @@ class Z {
 
     // CHECK:      [[WEAK_SELF:%.*]] = alloc_box $@box @sil_weak Optional<Z>
     // CHECK:      [[FN:%.*]] = function_ref @_TFFC12dynamic_self1Z23testDynamicSelfCapturesFT1xSi_DS0_U1_FT_T_ : $@convention(thin) (@owned @box @sil_weak Optional<Z>, @thick Z.Type) -> ()
-    // CHECK:      copy_value [[WEAK_SELF]] : $@box @sil_weak Optional<Z>
+    // CHECK:      [[WEAK_SELF_COPY:%.*]] = copy_value [[WEAK_SELF]] : $@box @sil_weak Optional<Z>
     // CHECK-NEXT: [[DYNAMIC_SELF:%.*]] = metatype $@thick @dynamic_self Z.Type
     // CHECK-NEXT: [[STATIC_SELF:%.*]] = upcast [[DYNAMIC_SELF]] : $@thick @dynamic_self Z.Type to $@thick Z.Type
-    // CHECK:      partial_apply [[FN]]([[WEAK_SELF]], [[STATIC_SELF]]) : $@convention(thin) (@owned @box @sil_weak Optional<Z>, @thick Z.Type) -> ()
+    // CHECK:      partial_apply [[FN]]([[WEAK_SELF_COPY]], [[STATIC_SELF]]) : $@convention(thin) (@owned @box @sil_weak Optional<Z>, @thick Z.Type) -> ()
     let fn3 = {
       [weak self] in
       _ = self

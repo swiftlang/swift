@@ -28,10 +28,14 @@ func class_bound_generic<T : ClassBound>(x: T) -> T {
   // CHECK: bb0([[X:%.*]] : $T):
   // CHECK:   [[X_ADDR:%.*]] = alloc_box $@box T
   // CHECK:   [[PB:%.*]] = project_box [[X_ADDR]]
-  // CHECK:   store [[X]] to [init] [[PB]]
+  // CHECK:   [[X_COPY:%.*]] = copy_value [[X]]
+  // CHECK:   store [[X_COPY]] to [init] [[PB]]
   return x
   // CHECK:   [[X1:%.*]] = load [[PB]]
+  // SEMANTIC ARC TODO: This next line should be [[X1_COPY]]
   // CHECK:   copy_value [[X1]]
+  // CHECK:   destroy_value [[X_ADDR]]
+  // CHECK:   destroy_value [[X]]
   // CHECK:   return [[X1]]
 }
 
@@ -41,9 +45,11 @@ func class_bound_generic_2<T : ClassBound & NotClassBound>(x: T) -> T {
   // CHECK: bb0([[X:%.*]] : $T):
   // CHECK:   [[X_ADDR:%.*]] = alloc_box $@box T
   // CHECK:   [[PB:%.*]] = project_box [[X_ADDR]]
-  // CHECK:   store [[X]] to [init] [[PB]]
+  // CHECK:   [[X_COPY:%.*]] = copy_value [[X]]
+  // CHECK:   store [[X_COPY]] to [init] [[PB]]
   return x
   // CHECK:   [[X1:%.*]] = load [[PB]]
+  // SEMANTIC ARC TODO: This next line should be [[X1_COPY]]
   // CHECK:   copy_value [[X1]]
   // CHECK:   return [[X1]]
 }
@@ -54,10 +60,12 @@ func class_bound_protocol(x: ClassBound) -> ClassBound {
   // CHECK: bb0([[X:%.*]] : $ClassBound):
   // CHECK:   [[X_ADDR:%.*]] = alloc_box $@box ClassBound
   // CHECK:   [[PB:%.*]] = project_box [[X_ADDR]]
-  // CHECK:   store [[X]] to [init] [[PB]]
+  // CHECK:   [[X_COPY:%.*]] = copy_value [[X]]
+  // CHECK:   store [[X_COPY]] to [init] [[PB]]
   return x
   // CHECK:   [[X1:%.*]] = load [[PB]]
-  // CHECK:   copy_value [[X1]]
+  // CHECK:   [[X1_COPY:%.*]] = copy_value [[X1]]
+  // SEMANTIC ARC TODO: This next line should be [[X1_COPY]]
   // CHECK:   return [[X1]]
 }
 
@@ -68,10 +76,12 @@ func class_bound_protocol_composition(x: ClassBound & NotClassBound)
   // CHECK: bb0([[X:%.*]] : $ClassBound & NotClassBound):
   // CHECK:   [[X_ADDR:%.*]] = alloc_box $@box (ClassBound & NotClassBound)
   // CHECK:   [[PB:%.*]] = project_box [[X_ADDR]]
-  // CHECK:   store [[X]] to [init] [[PB]]
+  // CHECK:   [[X_COPY:%.*]] = copy_value [[X]]
+  // CHECK:   store [[X_COPY]] to [init] [[PB]]
   return x
   // CHECK:   [[X1:%.*]] = load [[PB]]
   // CHECK:   copy_value [[X1]]
+  // SEMANTIC ARC TODO: This should be [[X1_COPY]]
   // CHECK:   return [[X1]]
 }
 
@@ -82,14 +92,18 @@ func class_bound_erasure(x: ConcreteClass) -> ClassBound {
   // CHECK: return [[PROTO]]
 }
 
-// CHECK-LABEL: sil hidden @_TF21class_bound_protocols30class_bound_existential_upcast
+// CHECK-LABEL: sil hidden @_TF21class_bound_protocols30class_bound_existential_upcastFT1xPS_10ClassBoundS_11ClassBound2__PS0__ :
 func class_bound_existential_upcast(x: ClassBound & ClassBound2)
 -> ClassBound {
   return x
-  // CHECK: [[OPENED:%.*]] = open_existential_ref {{%.*}} : $ClassBound & ClassBound2 to [[OPENED_TYPE:\$@opened(.*) ClassBound & ClassBound2]]
-  // CHECK: [[PROTO:%.*]] = init_existential_ref [[OPENED]] : [[OPENED_TYPE]] : [[OPENED_TYPE]], $ClassBound
-  // CHECK: return [[PROTO]]
+  // CHECK: bb0([[ARG:%.*]] : $ClassBound & ClassBound2):
+  // CHECK:   [[OPENED:%.*]] = open_existential_ref [[ARG]] : $ClassBound & ClassBound2 to [[OPENED_TYPE:\$@opened(.*) ClassBound & ClassBound2]]
+  // CHECK:   [[OPENED_COPY:%.*]] = copy_value [[OPENED]]
+  // CHECK:   [[PROTO:%.*]] = init_existential_ref [[OPENED_COPY]] : [[OPENED_TYPE]] : [[OPENED_TYPE]], $ClassBound
+  // CHECK:   destroy_value [[ARG]]
+  // CHECK:   return [[PROTO]]
 }
+// CHECK: } // end sil function '_TF21class_bound_protocols30class_bound_existential_upcastFT1xPS_10ClassBoundS_11ClassBound2__PS0__'
 
 // CHECK-LABEL: sil hidden @_TF21class_bound_protocols41class_bound_to_unbound_existential_upcast
 func class_bound_to_unbound_existential_upcast

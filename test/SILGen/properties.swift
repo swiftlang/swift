@@ -106,18 +106,20 @@ func physical_struct_lvalue(_ c: Int) {
 
 
 // CHECK-LABEL: sil hidden  @_TF10properties24physical_subclass_lvalue
- func physical_subclass_lvalue(_ r: RefSubclass, a: Int) {
-    r.y = a
-   // copy_value %0 : $RefSubclass
-   // CHECK: [[R_SUP:%[0-9]+]] = upcast %0 : $RefSubclass to $Ref
-   // CHECK: [[FN:%[0-9]+]] = class_method [[R_SUP]] : $Ref, #Ref.y!setter.1 : (Ref) -> (Int) -> () , $@convention(method) (Int, @guaranteed Ref) -> ()
-   // CHECK: apply [[FN]](%1, [[R_SUP]]) :
-   // CHECK: destroy_value [[R_SUP]]
-    r.w = a
+func physical_subclass_lvalue(_ r: RefSubclass, a: Int) {
+  // CHECK: bb0([[ARG1:%.*]] : $RefSubclass, [[ARG2:%.*]] : $Int):
+  r.y = a
+  // CHECK: [[ARG1_COPY:%.*]] = copy_value [[ARG1]] : $RefSubclass
+  // CHECK: [[R_SUP:%[0-9]+]] = upcast [[ARG1_COPY]] : $RefSubclass to $Ref
+  // CHECK: [[FN:%[0-9]+]] = class_method [[R_SUP]] : $Ref, #Ref.y!setter.1 : (Ref) -> (Int) -> () , $@convention(method) (Int, @guaranteed Ref) -> ()
+  // CHECK: apply [[FN]]([[ARG2]], [[R_SUP]]) :
+  // CHECK: destroy_value [[R_SUP]]
+  r.w = a
 
-   // CHECK: [[FN:%[0-9]+]] = class_method %0 : $RefSubclass, #RefSubclass.w!setter.1
-   // CHECK: apply [[FN]](%1, %0) : $@convention(method) (Int, @guaranteed RefSubclass) -> ()
-  }
+  // CHECK: [[FN:%[0-9]+]] = class_method [[ARG1]] : $RefSubclass, #RefSubclass.w!setter.1
+  // CHECK: apply [[FN]](%1, [[ARG1]]) : $@convention(method) (Int, @guaranteed RefSubclass) -> ()
+  // CHECK: destroy_value [[ARG1]]
+}
   
 
 
@@ -666,22 +668,23 @@ func propertyWithDidSetTakingOldValue() {
 
 // CHECK: // properties.(propertyWithDidSetTakingOldValue () -> ()).(p #1).setter : Swift.Int
 // CHECK-NEXT: sil {{.*}} @_TFF10properties32propertyWithDidSetTakingOldValue
-// CHECK: bb0(%0 : $Int, %1 : $@box Int):
-// CHECK-NEXT:  debug_value %0 : $Int, let, name "newValue", argno 1
-// CHECK-NEXT:  %3 = project_box %1
-// CHECK-NEXT:  debug_value_addr %3 : $*Int, var, name "p", argno 2
-// CHECK-NEXT:  %5 = load %3 : $*Int
-// CHECK-NEXT:  debug_value %5 : $Int
-// CHECK-NEXT:  assign %0 to %3 : $*Int
-// CHECK-NEXT:  copy_value %1 : $@box Int
-// CHECK-NEXT:  mark_function_escape %3
+// CHECK: bb0([[ARG1:%.*]] : $Int, [[ARG2:%.*]] : $@box Int):
+// CHECK-NEXT:  debug_value [[ARG1]] : $Int, let, name "newValue", argno 1
+// CHECK-NEXT:  [[ARG2_PB:%.*]] = project_box [[ARG2]]
+// CHECK-NEXT:  debug_value_addr [[ARG2_PB]] : $*Int, var, name "p", argno 2
+// CHECK-NEXT:  [[ARG2_PB_VAL:%.*]] = load [[ARG2_PB]] : $*Int
+// CHECK-NEXT:  debug_value [[ARG2_PB_VAL]] : $Int
+// CHECK-NEXT:  assign [[ARG1]] to [[ARG2_PB]] : $*Int
+// CHECK-NEXT:  [[ARG2_COPY:%.*]] = copy_value [[ARG2]] : $@box Int
+// SEMANTIC ARC TODO: Another case where we need to put the mark_function_escape on a new projection after a copy.
+// CHECK-NEXT:  mark_function_escape [[ARG2_PB]]
 // CHECK-NEXT:  // function_ref
-// CHECK-NEXT:  %10 = function_ref @_TFF10properties32propertyWithDidSetTakingOldValueFT_T_WL_1pSi : $@convention(thin) (Int, @owned @box Int) -> ()
-// CHECK-NEXT:  %11 = apply %10(%5, %1) : $@convention(thin) (Int, @owned @box Int) -> ()
-// CHECK-NEXT:  destroy_value %1 : $@box Int
+// CHECK-NEXT:  [[FUNC:%.*]] = function_ref @_TFF10properties32propertyWithDidSetTakingOldValueFT_T_WL_1pSi : $@convention(thin) (Int, @owned @box Int) -> ()
+// CHECK-NEXT:  %11 = apply [[FUNC]]([[ARG2_PB_VAL]], [[ARG2_COPY]]) : $@convention(thin) (Int, @owned @box Int) -> ()
+// CHECK-NEXT:  destroy_value [[ARG2]] : $@box Int
 // CHECK-NEXT:  %13 = tuple ()
 // CHECK-NEXT:  return %13 : $()
-// CHECK-NEXT:}
+// CHECK-NEXT:} // end sil function '_TFF10properties32propertyWithDidSetTakingOldValue{{.*}}'
 
 
 class BaseProperty {
@@ -698,11 +701,15 @@ class DerivedProperty : BaseProperty {
 
 // rdar://16381392 - Super property references in non-objc classes should be direct.
 
-// CHECK: sil hidden @_TFC10properties15DerivedProperty24super_property_reference
-// CHECK: bb0(%0 : $DerivedProperty):
-// CHECK:  [[BASEPTR:%[0-9]+]] = upcast %0 : $DerivedProperty to $BaseProperty
-// CHECK:  [[FN:%[0-9]+]] = function_ref @_TFC10properties12BasePropertyg1xSi : $@convention(method) (@guaranteed BaseProperty) -> Int 
-// CHECK:  apply [[FN]]([[BASEPTR]]) : $@convention(method) (@guaranteed BaseProperty) -> Int{{.*}} // user: %7
+// CHECK-LABEL: sil hidden @_TFC10properties15DerivedProperty24super_property_referencefT_Si : $@convention(method) (@guaranteed DerivedProperty) -> Int {
+// CHECK: bb0([[SELF:%.*]] : $DerivedProperty):
+// CHECK:   [[SELF_COPY:%[0-9]+]] = copy_value [[SELF]]
+// CHECK:   [[BASEPTR:%[0-9]+]] = upcast [[SELF_COPY]] : $DerivedProperty to $BaseProperty
+// CHECK:   [[FN:%[0-9]+]] = function_ref @_TFC10properties12BasePropertyg1xSi : $@convention(method) (@guaranteed BaseProperty) -> Int 
+// CHECK:   [[RESULT:%.*]] = apply [[FN]]([[BASEPTR]]) : $@convention(method) (@guaranteed BaseProperty) -> Int
+// CHECK:   destroy_value [[BASEPTR]]
+// CHECK:   return [[RESULT]] : $Int
+// CHECK: } // end sil function '_TFC10properties15DerivedProperty24super_property_referencefT_Si'
 
 
 // <rdar://problem/16411449> ownership qualifiers don't work with non-mutating struct property
@@ -1034,8 +1041,9 @@ public class DerivedClassWithPublicProperty : BaseClassWithInternalProperty {
 
 // CHECK-LABEL: sil [transparent] [fragile] @_TFC10properties30DerivedClassWithPublicPropertyg1xT_
 // CHECK:       bb0([[SELF:%.*]] : $DerivedClassWithPublicProperty):
-// CHECK:         copy_value [[SELF]] : $DerivedClassWithPublicProperty
-// CHECK-NEXT:    [[SUPER:%.*]] = upcast [[SELF]] : $DerivedClassWithPublicProperty to $BaseClassWithInternalProperty
-// CHECK-NEXT:    [[METHOD:%.*]] = super_method [[SELF]] : $DerivedClassWithPublicProperty, #BaseClassWithInternalProperty.x!getter.1 : (BaseClassWithInternalProperty) -> () -> () , $@convention(method) (@guaranteed BaseClassWithInternalProperty) -> ()
+// CHECK:         [[SELF_COPY:%.*]] = copy_value [[SELF]] : $DerivedClassWithPublicProperty
+// CHECK-NEXT:    [[SUPER:%.*]] = upcast [[SELF_COPY]] : $DerivedClassWithPublicProperty to $BaseClassWithInternalProperty
+// CHECK-NEXT:    [[METHOD:%.*]] = super_method [[SELF_COPY]] : $DerivedClassWithPublicProperty, #BaseClassWithInternalProperty.x!getter.1 : (BaseClassWithInternalProperty) -> () -> () , $@convention(method) (@guaranteed BaseClassWithInternalProperty) -> ()
 // CHECK-NEXT:    [[RESULT:%.*]] = apply [[METHOD]]([[SUPER]]) : $@convention(method) (@guaranteed BaseClassWithInternalProperty) -> ()
 // CHECK-NEXT:    destroy_value [[SUPER]] : $BaseClassWithInternalProperty
+// CHECK: } // end sil function '_TFC10properties30DerivedClassWithPublicPropertyg1xT_'

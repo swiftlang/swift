@@ -17,9 +17,9 @@ class A {
 // CHECK:   [[INIT_RESULT:%[0-9]+]] = apply [[INIT]]([[X]], [[SELFP]]) : $@convention(method) (X, @owned A) -> @owned A
 // CHECK:   store [[INIT_RESULT]] to [init] [[SELF]] : $*A
 // CHECK:   [[RESULT:%[0-9]+]] = load [[SELF]] : $*A
-// CHECK:   copy_value [[RESULT]] : $A
+// CHECK:   [[RESULT_COPY:%.*]] = copy_value [[RESULT]] : $A
 // CHECK:   destroy_value [[SELF_BOX]] : $@box A
-// CHECK:   return [[RESULT]] : $A
+// CHECK:   return [[RESULT_COPY]] : $A
 
   // CHECK-LABEL: sil hidden @_TFC20complete_object_init1AC{{.*}} : $@convention(method) (@thick A.Type) -> @owned A
   convenience init() {

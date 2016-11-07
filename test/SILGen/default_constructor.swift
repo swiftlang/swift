@@ -56,7 +56,9 @@ class E {
 // CHECK-NEXT: [[VALUE:%[0-9]+]] = apply [[INIT]]() : $@convention(thin) () -> Int64
 // CHECK-NEXT: [[IREF:%[0-9]+]] = ref_element_addr [[SELF]] : $E, #E.i
 // CHECK-NEXT: assign [[VALUE]] to [[IREF]] : $*Int64
-// CHECK-NEXT: return [[SELF]] : $E
+// CHECK-NEXT: [[SELF_COPY:%.*]] = copy_value [[SELF]]
+// CHECK-NEXT: destroy_value [[SELF]]
+// CHECK-NEXT: return [[SELF_COPY]] : $E
 
 class F : E { }
 
@@ -74,9 +76,9 @@ class F : E { }
 // CHECK-NEXT: [[ESELFW:%[0-9]+]] = unchecked_ref_cast [[ESELF]] : $E to $F
 // CHECK-NEXT: store [[ESELFW]] to [init] [[SELF]] : $*F
 // CHECK-NEXT: [[SELFP:%[0-9]+]] = load [[SELF]] : $*F
-// CHECK-NEXT: copy_value [[SELFP]] : $F
+// CHECK-NEXT: [[SELFP_COPY:%.*]] = copy_value [[SELFP]] : $F
 // CHECK-NEXT: destroy_value [[SELF_BOX]] : $@box F
-// CHECK-NEXT: return [[SELFP]] : $F
+// CHECK-NEXT: return [[SELFP_COPY]] : $F
 
 
 // <rdar://problem/19780343> Default constructor for a struct with optional doesn't compile

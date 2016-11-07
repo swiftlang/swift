@@ -686,13 +686,16 @@ extension InitRequirement {
   // CHECK:       bb0([[OUT:%.*]] : $*Self, [[ARG:%.*]] : $D, [[SELF_TYPE:%.*]] : $@thick Self.Type):
   init(d: D) {
   // CHECK:         [[DELEGATEE:%.*]] = witness_method $Self, #InitRequirement.init!allocator.1 : $@convention(witness_method) <τ_0_0 where τ_0_0 : InitRequirement> (@owned C, @thick τ_0_0.Type) -> @out τ_0_0
-  // CHECK:         [[ARG_UP:%.*]] = upcast [[ARG]]
-  // CHECK:         apply [[DELEGATEE]]<Self>({{%.*}}, [[ARG_UP]], [[SELF_TYPE]])
+  // CHECK:         [[ARG_COPY:%.*]] = copy_value [[ARG]]
+  // CHECK:         [[ARG_COPY_CAST:%.*]] = upcast [[ARG_COPY]]
+  // CHECK:         apply [[DELEGATEE]]<Self>({{%.*}}, [[ARG_COPY_CAST]], [[SELF_TYPE]])
     self.init(c: d)
   }
+  // CHECK: } // end sil function '_TFE19protocol_extensionsPS_15InitRequirementC{{.*}}'
 
-  // CHECK-LABEL: sil hidden @_TFE19protocol_extensionsPS_15InitRequirementC{{.*}}
+  // CHECK-LABEL: sil hidden @_TFE19protocol_extensionsPS_15InitRequirementC{{.*}} : $@convention(method)
   // CHECK:         function_ref @_TFE19protocol_extensionsPS_15InitRequirementC{{.*}}
+  // CHECK: } // end sil function '_TFE19protocol_extensionsPS_15InitRequirementC{{.*}}'
   init(d2: D) {
     self.init(d: d2)
   }
@@ -706,8 +709,10 @@ extension ClassInitRequirement {
   // CHECK-LABEL: sil hidden @_TFE19protocol_extensionsPS_20ClassInitRequirementC{{.*}} : $@convention(method) <Self where Self : ClassInitRequirement> (@owned D, @thick Self.Type) -> @owned Self
   // CHECK:       bb0([[ARG:%.*]] : $D, [[SELF_TYPE:%.*]] : $@thick Self.Type):
   // CHECK:         [[DELEGATEE:%.*]] = witness_method $Self, #ClassInitRequirement.init!allocator.1 : $@convention(witness_method) <τ_0_0 where τ_0_0 : ClassInitRequirement> (@owned C, @thick τ_0_0.Type) -> @owned τ_0_0
-  // CHECK:         [[ARG_UP:%.*]] = upcast [[ARG]]
-  // CHECK:         apply [[DELEGATEE]]<Self>([[ARG_UP]], [[SELF_TYPE]])
+  // CHECK:         [[ARG_COPY:%.*]] = copy_value [[ARG]]
+  // CHECK:         [[ARG_COPY_CAST:%.*]] = upcast [[ARG_COPY]]
+  // CHECK:         apply [[DELEGATEE]]<Self>([[ARG_COPY_CAST]], [[SELF_TYPE]])
+  // CHECK: } // end sil function '_TFE19protocol_extensionsPS_20ClassInitRequirementC{{.*}}'
   init(d: D) {
     self.init(c: d)
   }
@@ -730,9 +735,12 @@ extension ObjCInitRequirement {
   // CHECK:         [[OBJC_SELF_TYPE:%.*]] = thick_to_objc_metatype [[SELF_TYPE]]
   // CHECK:         [[SELF:%.*]] = alloc_ref_dynamic [objc] [[OBJC_SELF_TYPE]] : $@objc_metatype Self.Type, $Self
   // CHECK:         [[WITNESS:%.*]] = witness_method [volatile] $Self, #ObjCInitRequirement.init!initializer.1.foreign : $@convention(objc_method) <τ_0_0 where τ_0_0 : ObjCInitRequirement> (OC, OC, @owned τ_0_0) -> @owned τ_0_0
-  // CHECK:         [[UPCAST1:%.*]] = upcast [[ARG]]
-  // CHECK:         [[UPCAST2:%.*]] = upcast [[ARG]]
-  // CHECK:         apply [[WITNESS]]<Self>([[UPCAST1]], [[UPCAST2]], [[SELF]])
+  // CHECK:         [[ARG_COPY_1:%.*]] = copy_value [[ARG]]
+  // CHECK:         [[ARG_COPY_1_UPCAST:%.*]] = upcast [[ARG_COPY_1]]
+  // CHECK:         [[ARG_COPY_2:%.*]] = copy_value [[ARG]]
+  // CHECK:         [[ARG_COPY_2_UPCAST:%.*]] = upcast [[ARG_COPY_2]]
+  // CHECK:         apply [[WITNESS]]<Self>([[ARG_COPY_1_UPCAST]], [[ARG_COPY_2_UPCAST]], [[SELF]])
+  // CHECK: } // end sil function '_TFE19protocol_extensionsPS_19ObjCInitRequirementC{{.*}}'
   init(d: OD) {
     self.init(c: d, d: d)
   }

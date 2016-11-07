@@ -18,9 +18,12 @@ func test_concrete_erasure(_ x: ClericalError) -> Error {
   return x
 }
 // CHECK-LABEL: sil hidden @_TF18boxed_existentials21test_concrete_erasureFOS_13ClericalErrorPs5Error_
+// CHECK:       bb0([[ARG:%.*]] : $ClericalError):
 // CHECK:         [[EXISTENTIAL:%.*]] = alloc_existential_box $Error, $ClericalError
 // CHECK:         [[ADDR:%.*]] = project_existential_box $ClericalError in [[EXISTENTIAL]] : $Error
-// CHECK:         store %0 to [init] [[ADDR]] : $*ClericalError
+// CHECK:         [[ARG_COPY:%.*]] = copy_value [[ARG]]
+// CHECK:         store [[ARG_COPY]] to [init] [[ADDR]] : $*ClericalError
+// CHECK:         destroy_value [[ARG]]
 // CHECK:         return [[EXISTENTIAL]] : $Error
 
 protocol HairType {}
@@ -68,24 +71,29 @@ func test_property_of_lvalue(_ x: Error) -> String {
   var x = x
   return x._domain
 }
-// CHECK-LABEL: sil hidden @_TF18boxed_existentials23test_property_of_lvalueFPs5Error_SS
+
+// CHECK-LABEL: sil hidden @_TF18boxed_existentials23test_property_of_lvalueFPs5Error_SS :
+// CHECK:       bb0([[ARG:%.*]] : $Error):
 // CHECK:         [[VAR:%.*]] = alloc_box $@box Error
-// CHECK-NEXT:    [[PVAR:%.*]] = project_box [[VAR]]
-// CHECK-NEXT:    copy_value %0 : $Error
-// CHECK-NEXT:    store %0 to [init] [[PVAR]]
-// CHECK-NEXT:    [[VALUE_BOX:%.*]] = load [[PVAR]]
-// CHECK-NEXT:    copy_value [[VALUE_BOX]]
-// CHECK-NEXT:    [[VALUE:%.*]] = open_existential_box [[VALUE_BOX]] : $Error to $*[[VALUE_TYPE:@opened\(.*\) Error]]
-// CHECK-NEXT:    [[COPY:%.*]] = alloc_stack $[[VALUE_TYPE]]
-// CHECK-NEXT:    copy_addr [[VALUE]] to [initialization] [[COPY]]
-// CHECK-NEXT:    [[METHOD:%.*]] = witness_method $[[VALUE_TYPE]], #Error._domain!getter.1
-// CHECK-NEXT:    [[RESULT:%.*]] = apply [[METHOD]]<[[VALUE_TYPE]]>([[COPY]])
-// CHECK-NEXT:    destroy_addr [[COPY]]
-// CHECK-NEXT:    dealloc_stack [[COPY]]
-// CHECK-NEXT:    destroy_value [[VALUE_BOX]]
-// CHECK-NEXT:    destroy_value [[VAR]]
-// CHECK-NEXT:    destroy_value %0
-// CHECK-NEXT:    return [[RESULT]]
+// CHECK:         [[PVAR:%.*]] = project_box [[VAR]]
+// CHECK:         [[ARG_COPY:%.*]] = copy_value [[ARG]] : $Error
+// CHECK:         store [[ARG_COPY]] to [init] [[PVAR]]
+// CHECK:         [[VALUE_BOX:%.*]] = load [[PVAR]]
+// CHECK:         [[VALUE_BOX_COPY:%.*]] = copy_value [[VALUE_BOX]]
+// ==> SEMANTIC ARC TODO: The next line should take VALUE_BOX_COPY, not VALUE_BOX
+// CHECK:         [[VALUE:%.*]] = open_existential_box [[VALUE_BOX]] : $Error to $*[[VALUE_TYPE:@opened\(.*\) Error]]
+// CHECK:         [[COPY:%.*]] = alloc_stack $[[VALUE_TYPE]]
+// CHECK:         copy_addr [[VALUE]] to [initialization] [[COPY]]
+// CHECK:         [[METHOD:%.*]] = witness_method $[[VALUE_TYPE]], #Error._domain!getter.1
+// CHECK:         [[RESULT:%.*]] = apply [[METHOD]]<[[VALUE_TYPE]]>([[COPY]])
+// CHECK:         destroy_addr [[COPY]]
+// CHECK:         dealloc_stack [[COPY]]
+// ==> SEMANTIC ARC TODO: The next line should take VALUE_BOX_COPY, not VALUE_BOX.
+// CHECK:         destroy_value [[VALUE_BOX]]
+// CHECK:         destroy_value [[VAR]]
+// CHECK:         destroy_value [[ARG]]
+// CHECK:         return [[RESULT]]
+// CHECK:      } // end sil function '_TF18boxed_existentials23test_property_of_lvalueFPs5Error_SS'
 
 extension Error {
   final func extensionMethod() { }

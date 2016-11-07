@@ -719,7 +719,7 @@ ManagedValue SILGenFunction::emitProtocolMetatypeToObject(SILLocation loc,
   // reference when we use it to prevent it being released and attempting to
   // deallocate itself. It doesn't matter if we ever actually clean up that
   // retain though.
-  B.createCopyValue(loc, value);
+  value = B.createCopyValue(loc, value);
   return ManagedValue::forUnmanaged(value);
 }
 

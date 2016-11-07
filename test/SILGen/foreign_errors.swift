@@ -29,8 +29,8 @@ func test0() throws {
   //   Writeback to the first temporary.
   // CHECK: [[T0:%.*]] = load [[ERR_TEMP1]]
   // CHECK: [[T1:%.*]] = unmanaged_to_ref [[T0]]
-  // CHECK: copy_value [[T1]]
-  // CHECK: assign [[T1]] to [[ERR_TEMP0]]
+  // CHECK: [[T1_COPY:%.*]] = copy_value [[T1]]
+  // CHECK: assign [[T1_COPY]] to [[ERR_TEMP0]]
 
   //   Pull out the boolean value and compare it to zero.
   // CHECK: [[BOOL_OR_INT:%.*]] = struct_extract [[RESULT]]
@@ -158,7 +158,7 @@ func testArgs() throws {
 func testBridgedResult() throws {
   let array = try ErrorProne.collection(withCount: 0)
 }
-// CHECK: sil hidden @_TF14foreign_errors17testBridgedResultFzT_T_ : $@convention(thin) () -> @error Error {
+// CHECK-LABEL: sil hidden @_TF14foreign_errors17testBridgedResultFzT_T_ : $@convention(thin) () -> @error Error {
 // CHECK:   debug_value undef : $Error, var, name "$error", argno 1
 // CHECK:   class_method [volatile] %1 : $@thick ErrorProne.Type, #ErrorProne.collection!1.foreign : (ErrorProne.Type) -> (Int) throws -> [Any] , $@convention(objc_method) (Int, Optional<AutoreleasingUnsafeMutablePointer<Optional<NSError>>>, @objc_metatype ErrorProne.Type) -> @autoreleased Optional<NSArray>
 
@@ -169,17 +169,19 @@ class VeryErrorProne : ErrorProne {
     try super.init(one: two)
   }
 }
-// CHECK:    sil hidden @_TFC14foreign_errors14VeryErrorPronec{{.*}}
+// CHECK-LABEL:    sil hidden @_TFC14foreign_errors14VeryErrorPronec{{.*}}
+// CHECK:    bb0([[ARG1:%.*]] : $Optional<AnyObject>, [[ARG2:%.*]] : $VeryErrorProne):
 // CHECK:      [[BOX:%.*]] = alloc_box $@box VeryErrorProne
 // CHECK:      [[PB:%.*]] = project_box [[BOX]]
 // CHECK:      [[MARKED_BOX:%.*]] = mark_uninitialized [derivedself] [[PB]]
+// CHECK:      store [[ARG2]] to [[MARKED_BOX]]
 // CHECK:      [[T0:%.*]] = load [[MARKED_BOX]]
 // CHECK-NEXT: [[T1:%.*]] = upcast [[T0]] : $VeryErrorProne to $ErrorProne
 // CHECK-NEXT: [[T2:%.*]] = super_method [volatile] [[T0]] : $VeryErrorProne, #ErrorProne.init!initializer.1.foreign : (ErrorProne.Type) -> (Any?) throws -> ErrorProne , $@convention(objc_method) (Optional<AnyObject>, Optional<AutoreleasingUnsafeMutablePointer<Optional<NSError>>>, @owned ErrorProne) -> @owned Optional<ErrorProne>
-// CHECK:      {{$}}
+// CHECK:      [[ARG1_COPY:%.*]] = copy_value [[ARG1]]
 // CHECK-NOT:  [[BOX]]{{^[0-9]}}
 // CHECK-NOT:  [[MARKED_BOX]]{{^[0-9]}}
-// CHECK: apply [[T2]](%0, {{%.*}}, [[T1]])
+// CHECK:      apply [[T2]]([[ARG1_COPY]], {{%.*}}, [[T1]])
 
 // rdar://21051021
 // CHECK: sil hidden @_TF14foreign_errors12testProtocolFzPSo18ErrorProneProtocol_T_
