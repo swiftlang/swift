@@ -114,9 +114,6 @@ enum class ConstraintKind : char {
   /// name, and the type of that member, when referenced as a value, is the
   /// second type.
   UnresolvedValueMember,
-  /// \brief The first type has a type member with the given name, and the
-  /// type of that member, when referenced as a type, is the second type.
-  TypeMember,
   /// \brief The first type can be defaulted to the second (which currently
   /// cannot be dependent).  This is more like a type property than a
   /// relational constraint.
@@ -485,7 +482,6 @@ public:
 
     case ConstraintKind::ValueMember:
     case ConstraintKind::UnresolvedValueMember:
-    case ConstraintKind::TypeMember:
       return ConstraintClassification::Member;
 
     case ConstraintKind::DynamicTypeOf:
@@ -519,16 +515,14 @@ public:
   /// \brief Retrieve the name of the member for a member constraint.
   DeclName getMember() const {
     assert(Kind == ConstraintKind::ValueMember ||
-           Kind == ConstraintKind::UnresolvedValueMember ||
-           Kind == ConstraintKind::TypeMember);
+           Kind == ConstraintKind::UnresolvedValueMember);
     return Types.Member;
   }
 
   /// \brief Determine whether this constraint kind has a second type.
   static bool hasMember(ConstraintKind kind) {
     return kind == ConstraintKind::ValueMember
-        || kind == ConstraintKind::UnresolvedValueMember
-        || kind == ConstraintKind::TypeMember;
+        || kind == ConstraintKind::UnresolvedValueMember;
   }
 
   /// Determine the kind of function reference we have for a member reference.

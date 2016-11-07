@@ -720,7 +720,6 @@ static bool shouldBindToValueType(Constraint *constraint)
   case ConstraintKind::DynamicTypeOf:
   case ConstraintKind::ValueMember:
   case ConstraintKind::UnresolvedValueMember:
-  case ConstraintKind::TypeMember:
   case ConstraintKind::Defaultable:
   case ConstraintKind::Disjunction:
     llvm_unreachable("shouldBindToValueType() may only be called on "
@@ -950,7 +949,6 @@ static PotentialBindings getPotentialBindings(ConstraintSystem &cs,
 
     case ConstraintKind::ValueMember:
     case ConstraintKind::UnresolvedValueMember:
-    case ConstraintKind::TypeMember:
       // If our type variable shows up in the base type, there's
       // nothing to do.
       // FIXME: Can we avoid simplification here?

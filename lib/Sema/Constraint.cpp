@@ -77,7 +77,6 @@ Constraint::Constraint(ConstraintKind Kind, Type First, Type Second,
     assert(!Member && "Relational constraint cannot have a member");
     break;
 
-  case ConstraintKind::TypeMember:
   case ConstraintKind::ValueMember:
   case ConstraintKind::UnresolvedValueMember:
     assert(Member && "Member constraint has no member");
@@ -175,7 +174,6 @@ Constraint *Constraint::clone(ConstraintSystem &cs) const {
 
   case ConstraintKind::ValueMember:
   case ConstraintKind::UnresolvedValueMember:
-  case ConstraintKind::TypeMember:
     return create(cs, getKind(), getFirstType(), getSecondType(), getMember(),
                   getFunctionRefKind(), getLocator());
 
@@ -290,9 +288,6 @@ void Constraint::print(llvm::raw_ostream &Out, SourceManager *sm) const {
     break;
   case ConstraintKind::UnresolvedValueMember:
     Out << "[(implicit) ." << Types.Member << ": value] == ";
-    break;
-  case ConstraintKind::TypeMember:
-    Out << "[." << Types.Member << ": type] == ";
     break;
   case ConstraintKind::Defaultable:
     Out << " can default to ";
@@ -462,7 +457,6 @@ gatherReferencedTypeVars(Constraint *constraint,
   case ConstraintKind::CheckedCast:
   case ConstraintKind::Equal:
   case ConstraintKind::Subtype:
-  case ConstraintKind::TypeMember:
   case ConstraintKind::UnresolvedValueMember:
   case ConstraintKind::ValueMember:
   case ConstraintKind::DynamicTypeOf:
