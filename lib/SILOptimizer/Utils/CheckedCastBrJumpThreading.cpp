@@ -632,7 +632,7 @@ bool CheckedCastBrJumpThreading::trySimplify(CheckedCastBranchInst *CCBI) {
 /// Optimize the checked_cast_br instructions in a function.
 void CheckedCastBrJumpThreading::optimizeFunction() {
 
-  // We separate the work in two phases: analyse and transform. This avoids
+  // We separate the work in two phases: analyze and transform. This avoids
   // re-calculating the dominator tree for each optimized checked_cast_br.
 
   // First phase: analysis.

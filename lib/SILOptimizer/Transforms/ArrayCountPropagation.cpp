@@ -59,7 +59,7 @@ class ArrayAllocation {
 
   bool propagate();
   bool isInitializationWithKnownCount();
-  bool analyseArrayValueUses();
+  bool analyzeArrayValueUses();
   bool recursivelyCollectUses(ValueBase *Def);
   bool propagateCountToUsers();
 
@@ -81,7 +81,7 @@ bool ArrayAllocation::propagate() {
     return false;
 
   // The array value was stored or has escaped.
-  if (!analyseArrayValueUses())
+  if (!analyzeArrayValueUses())
     return false;
 
   // No count users.
@@ -113,7 +113,7 @@ bool ArrayAllocation::isInitializationWithKnownCount() {
 
 /// Collect all getCount users and check that there are no escapes or uses that
 /// could change the array value.
-bool ArrayAllocation::analyseArrayValueUses() {
+bool ArrayAllocation::analyzeArrayValueUses() {
   return recursivelyCollectUses(ArrayValue);
 }
 
