@@ -5,5 +5,6 @@
 // See http://swift.org/LICENSE.txt for license information
 // See http://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
 
-// RUN: not --crash %target-swift-frontend %s -parse
-func f<T{{if true as[T.h
+// RUN: not --crash %target-swift-frontend %s -emit-ir
+// REQUIRES: SR-3149
+b<n([print{$0

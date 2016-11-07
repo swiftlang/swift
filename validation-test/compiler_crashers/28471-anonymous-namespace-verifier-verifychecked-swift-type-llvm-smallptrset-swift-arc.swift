@@ -5,12 +5,8 @@
 // See http://swift.org/LICENSE.txt for license information
 // See http://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
 
-// RUN: not --crash %target-swift-frontend %s -parse
-// REQUIRES: SR-3149
-t c
-let : {{
-return $0
-== Int
-struct B
-}
-g:
+// RUN: not --crash %target-swift-frontend %s -emit-ir
+guard{protocol A{
+protocol a{}protocol a{typealias d:A{}typealias e
+class A{
+let c=e=b

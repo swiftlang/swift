@@ -521,7 +521,13 @@ public:
   Type visitParenType(ParenType *pt) {
     return ParenType::get(pt->getASTContext(), visit(pt->getUnderlyingType()));
   }
-  
+
+  Type visitSubstitutedType(SubstitutedType *st) {
+    return SubstitutedType::get(st->getOriginal(),
+                                visit(st->getReplacementType()),
+                                st->getASTContext());
+  }
+
   Type visitType(TypeBase *t) {
     // Other types should not structurally contain lvalues.
     assert(!t->isLValueType()
@@ -2774,13 +2780,10 @@ static Type getMemberForBaseType(ConformanceSource conformances,
       return getDependentMemberType(ErrorType::get(substBase));
   }
 
-  // If the parent is a type variable, retrieve its member type
-  // variable.
-  if (auto typeVarParent = substBase->getAs<TypeVariableType>()) {
-    assert(assocType && "Missing associated type");
-    return substBase->getASTContext().getTypeVariableMemberType(typeVarParent,
-                                                                assocType);
-  }
+  // If the parent is a type variable or a member rooted in a type variable,
+  // we're done.
+  if (substBase->isTypeVariableOrMember())
+    return getDependentMemberType(substBase);
 
   // Retrieve the member type with the given name.
 

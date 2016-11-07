@@ -120,6 +120,7 @@
                     "open_existential_addr" "alloc_existential_box"
                     "init_existential_ref" "project_existential_box"
                     "open_existential_ref" "open_existential_box"
+                    "open_existential_metatype"
                     "objc_protocol")
                   'words) . font-lock-keyword-face)
    ;; Unchecked Conversions
