@@ -686,7 +686,6 @@ matchCallArguments(ConstraintSystem &cs, ConstraintKind kind,
   case ConstraintKind::LiteralConformsTo:
   case ConstraintKind::OptionalObject:
   case ConstraintKind::SelfObjectOfProtocol:
-  case ConstraintKind::TypeMember:
   case ConstraintKind::UnresolvedValueMember:
   case ConstraintKind::ValueMember:
     llvm_unreachable("Not a call argument constraint");
@@ -813,7 +812,6 @@ ConstraintSystem::matchTupleTypes(TupleType *tuple1, TupleType *tuple2,
   case ConstraintKind::LiteralConformsTo:
   case ConstraintKind::OptionalObject:
   case ConstraintKind::SelfObjectOfProtocol:
-  case ConstraintKind::TypeMember:
   case ConstraintKind::UnresolvedValueMember:
   case ConstraintKind::ValueMember:
     llvm_unreachable("Not a conversion");
@@ -940,7 +938,6 @@ static bool matchFunctionRepresentations(FunctionTypeRepresentation rep1,
   case ConstraintKind::LiteralConformsTo:
   case ConstraintKind::OptionalObject:
   case ConstraintKind::SelfObjectOfProtocol:
-  case ConstraintKind::TypeMember:
   case ConstraintKind::UnresolvedValueMember:
   case ConstraintKind::ValueMember:
     return false;
@@ -1006,7 +1003,6 @@ ConstraintSystem::matchFunctionTypes(FunctionType *func1, FunctionType *func2,
   case ConstraintKind::LiteralConformsTo:
   case ConstraintKind::OptionalObject:
   case ConstraintKind::SelfObjectOfProtocol:
-  case ConstraintKind::TypeMember:
   case ConstraintKind::UnresolvedValueMember:
   case ConstraintKind::ValueMember:
     llvm_unreachable("Not a relational constraint");
@@ -1431,7 +1427,6 @@ ConstraintSystem::matchTypes(Type type1, Type type2, ConstraintKind kind,
     case ConstraintKind::LiteralConformsTo:
     case ConstraintKind::OptionalObject:
     case ConstraintKind::SelfObjectOfProtocol:
-    case ConstraintKind::TypeMember:
     case ConstraintKind::UnresolvedValueMember:
     case ConstraintKind::ValueMember:
       llvm_unreachable("Not a relational constraint");
@@ -2969,40 +2964,6 @@ performMemberLookup(ConstraintKind constraintKind, DeclName memberName,
     return result;
   }
 
-  // If we want member types only, use member type lookup.
-  if (constraintKind == ConstraintKind::TypeMember) {
-    // Types don't have compound names.
-    // FIXME: Customize diagnostic to mention types and compound names.
-    if (!memberName.isSimpleName())
-      return result;    // No result.
-    
-    NameLookupOptions lookupOptions = defaultMemberTypeLookupOptions;
-    if (isa<AbstractFunctionDecl>(DC))
-      lookupOptions |= NameLookupFlags::KnownPrivate;
-    
-    // If we're doing a lookup for diagnostics, include inaccessible members,
-    // the diagnostics machinery will sort it out.
-    if (includeInaccessibleMembers)
-      lookupOptions |= NameLookupFlags::IgnoreAccessibility;
-    
-    auto lookup = TC.lookupMemberType(DC, baseObjTy, memberName.getBaseName(),
-                                      lookupOptions);
-    // Form the overload set.
-    for (auto candidate : lookup) {
-      // If the result is invalid, don't cascade errors.
-      TC.validateDecl(candidate.first, true);
-      if (candidate.first->isInvalid())
-        return result.markErrorAlreadyDiagnosed();
-      
-      result.addViable(OverloadChoice(baseTy, candidate.first,
-                                      /*isSpecialized=*/false,
-                                      functionRefKind));
-    }
-    
-    return result;
-  }
-  
-
   // Look for members within the base.
   LookupResult &lookup = lookupMember(baseObjTy, memberName);
 
@@ -3303,32 +3264,6 @@ ConstraintSystem::simplifyMemberConstraint(ConstraintKind kind,
   // If the lookup found no hits at all (either viable or unviable), diagnose it
   // as such and try to recover in various ways.
 
-  if (kind == ConstraintKind::TypeMember) {
-    // If the base type was an optional, try to look through it.
-    if (shouldAttemptFixes() && baseObjTy->getOptionalObjectType()) {
-      // Determine whether or not we want to provide an optional chaining fixit or
-      // a force unwrap fixit.
-      bool optionalChain;
-      if (!getContextualType())
-        optionalChain = !(Options & ConstraintSystemFlags::PreferForceUnwrapToOptional);
-      else
-        optionalChain = !getContextualType()->getOptionalObjectType().isNull();
-      auto fixKind = optionalChain ? FixKind::OptionalChaining : FixKind::ForceOptional;
-
-      // Note the fix.
-      if (recordFix(fixKind, locator))
-        return SolutionKind::Error;
-      
-      // Look through one level of optional.
-      addTypeMemberConstraint(baseObjTy->getOptionalObjectType(),
-                              member, memberTy, locator);
-      return SolutionKind::Solved;
-    }
-
-    return SolutionKind::Error;
-  }
-  
-  
   auto instanceTy = baseObjTy;
   if (auto MTT = instanceTy->getAs<MetatypeType>())
     instanceTy = MTT->getInstanceType();
@@ -4207,7 +4142,6 @@ ConstraintSystem::addConstraintImpl(ConstraintKind kind, Type first,
 
   case ConstraintKind::ValueMember:
   case ConstraintKind::UnresolvedValueMember:
-  case ConstraintKind::TypeMember:
   case ConstraintKind::BindOverload:
   case ConstraintKind::Disjunction:
     llvm_unreachable("Use the correct addConstraint()");
@@ -4328,7 +4262,6 @@ ConstraintSystem::simplifyConstraint(const Constraint &constraint) {
       
   case ConstraintKind::ValueMember:
   case ConstraintKind::UnresolvedValueMember:
-  case ConstraintKind::TypeMember:
     return simplifyMemberConstraint(constraint.getKind(),
                                     constraint.getFirstType(),
                                     constraint.getMember(),

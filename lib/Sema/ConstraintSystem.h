@@ -1337,32 +1337,6 @@ public:
   }
 
   /// \brief Add a value member constraint to the constraint system.
-  void addTypeMemberConstraint(Type baseTy, DeclName name, Type memberTy,
-                               ConstraintLocatorBuilder locator) {
-    assert(baseTy);
-    assert(memberTy);
-    assert(name);
-    switch (simplifyMemberConstraint(ConstraintKind::TypeMember, baseTy, name,
-                                     memberTy, FunctionRefKind::Compound,
-                                     TMF_GenerateConstraints, locator)) {
-    case SolutionKind::Unsolved:
-      llvm_unreachable("Unsolved result when generating constraints!");
-
-    case SolutionKind::Solved:
-      break;
-
-    case SolutionKind::Error:
-      if (shouldAddNewFailingConstraint()) {
-        addNewFailingConstraint(
-          Constraint::create(*this, ConstraintKind::TypeMember, baseTy,
-                             memberTy, name, FunctionRefKind::Compound,
-                             getConstraintLocator(locator)));
-      }
-      break;
-    }
-  }
-
-  /// \brief Add a value member constraint to the constraint system.
   void addValueMemberConstraint(Type baseTy, DeclName name, Type memberTy,
                                 FunctionRefKind functionRefKind,
                                 ConstraintLocatorBuilder locator) {

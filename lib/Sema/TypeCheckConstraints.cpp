@@ -2017,6 +2017,11 @@ bool TypeChecker::typeCheckForEachBinding(DeclContext *dc, ForEachStmt *stmt) {
 
       auto sequenceType = expr->getType()->getRValueType();
 
+      // Look through one level of optional; this improves recovery but doesn't
+      // change the result.
+      if (auto sequenceObjectType = sequenceType->getAnyOptionalObjectType())
+        sequenceType = sequenceObjectType;
+
       // If the sequence type is an existential, we should not attempt to
       // look up the member type at all, since we cannot represent associated
       // types of existentials.
@@ -2053,27 +2058,16 @@ bool TypeChecker::typeCheckForEachBinding(DeclContext *dc, ForEachStmt *stmt) {
         }
       }
 
-      // If the type lookup failed, just add some constraints we can
-      // try to solve later.
       if (elementType.isNull()) {
-        // Determine the iterator type of the sequence.
-        iteratorType = cs.createTypeVariable(Locator, /*options=*/0);
-        cs.addTypeMemberConstraint(SequenceType, tc.Context.Id_Iterator,
-                                   iteratorType, iteratorLocator);
-
-        // Determine the element type of the iterator.
-        // FIXME: Should look up the type witness.
-        elementType = cs.createTypeVariable(Locator, /*options=*/0);
-        cs.addTypeMemberConstraint(iteratorType, tc.Context.Id_Element,
-                                   elementType, elementLocator);
+        elementType = cs.createTypeVariable(elementLocator,
+                                            TVO_MustBeMaterializable);
       }
-      
 
       // Add a conversion constraint between the element type of the sequence
       // and the type of the element pattern.
       cs.addConstraint(ConstraintKind::Conversion, elementType, InitType,
                        elementLocator);
-      
+
       Stmt->setSequence(expr);
       return false;
     }
