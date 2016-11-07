@@ -47,23 +47,6 @@ struct SyntaxModelContext::Implementation {
       SrcMgr(SrcFile.getASTContext().SourceMgr) {}
 };
 
-static bool canFindSurroundingParens(ArrayRef<Token> Toks,
-                                    const unsigned Current) {
-  bool LeftOk = false;
-  bool RightOk = false;
-  for (unsigned Offset = 1; ; Offset ++) {
-    if (Current < Offset || Current + Offset >= Toks.size())
-      return false;
-    auto &L = Toks[Current - Offset];
-    auto &R = Toks[Current + Offset];
-    LeftOk |= L.getKind() == tok::l_paren;
-    RightOk |= R.getKind() == tok::r_paren;
-    if (LeftOk && RightOk)
-      return true;
-  }
-  llvm_unreachable("unreachable exit condition");
-}
-
 SyntaxModelContext::SyntaxModelContext(SourceFile &SrcFile)
   : Impl(*new Implementation(SrcFile)) {
   const bool IsPlayground = Impl.LangOpts.Playground;
@@ -115,19 +98,22 @@ SyntaxModelContext::SyntaxModelContext(SourceFile &SrcFile)
 #define KEYWORD(X) case tok::kw_##X:
 #include "swift/Parse/Tokens.def"
 #undef KEYWORD
-        if (Tok.getKind() != tok::kw__ &&
-            0 < I && I < Tokens.size() - 1 &&
-            (Tokens[I-1].getKind() == tok::l_paren ||
-             Tokens[I-1].getKind() == tok::comma) &&
-            (Tokens[I+1].getKind() == tok::colon ||
-             Tokens[I+1].getKind() == tok::identifier ||
-             Tokens[I+1].isKeyword()) &&
-            canFindSurroundingParens(Tokens, I)) {
-          // Keywords are allowed as argument labels and should be treated as
-          // identifiers.  The exception is '_' which is not a name.
-          Kind = SyntaxNodeKind::Identifier;
-        } else {
-          Kind = SyntaxNodeKind::Keyword;
+        Kind = SyntaxNodeKind::Keyword;
+        // Some keywords can be used as an argument labels. If this one can and
+        // is being used as one, treat it as an identifier instead.
+        if (Tok.canBeArgumentLabel() && !Tok.is(tok::kw__) &&
+            0 < I && I < Tokens.size() - 1) {
+          auto prev = Tokens[I - 1];
+          auto next = Tokens[I + 1];
+          if ((prev.is(tok::identifier) || prev.isKeyword()) && I > 1)
+            prev = Tokens[I - 2];
+          else if ((next.is(tok::identifier) || next.isKeyword()) &&
+                   I < Tokens.size() - 2)
+            next = Tokens[I + 2];
+
+          if ((prev.is(tok::l_paren) || prev.is(tok::comma)) &&
+              next.is(tok::colon))
+            Kind = SyntaxNodeKind::Identifier;
         }
         break;
 
