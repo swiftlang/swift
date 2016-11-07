@@ -20,7 +20,7 @@ git multi merge upstream/master
 fi
 
 echo ========== Running script ==========
-./swift/utils/build-toolchain local.swift
+./swift/utils/build-toolchain local.swift || exit
 
 echo ========== Finishing ==========
 cd $SWIFT_PATH
