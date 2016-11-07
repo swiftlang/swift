@@ -2411,12 +2411,6 @@ public:
         TS->Patterns.insert({ P, P->getType() });
         return { true, P };
       }
-
-      // Don't walk into statements.  This handles the BraceStmt in
-      // non-single-expr closures, so we don't walk into their body.
-      std::pair<bool, Stmt *> walkToStmtPre(Stmt *S) override {
-        return { false, S };
-      }
     };
 
     E->walk(ExprCleanserImpl(this));
