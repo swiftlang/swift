@@ -1,5 +1,4 @@
 // RUN: %target-parse-verify-swift
-// REQUIRES: closurefixes
 
 func myMap<T1, T2>(_ array: [T1], _ fn: (T1) -> T2) -> [T2] {}
 
