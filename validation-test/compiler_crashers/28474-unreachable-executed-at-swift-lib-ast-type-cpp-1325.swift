@@ -5,11 +5,6 @@
 // See http://swift.org/LICENSE.txt for license information
 // See http://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
 
-// RUN: not %target-swift-frontend %s -parse
-t c
-let : {{
-return $0
-== Int
-struct B
-}
-g:
+// RUN: not --crash %target-swift-frontend %s -emit-ir
+// REQUIRE: SR-3149
+b<n([print{$0
