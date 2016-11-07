@@ -457,7 +457,8 @@ static Type getResultType(TypeChecker &TC, FuncDecl *fn, Type resultType) {
   return resultType;
 }
 
-GenericSignature *TypeChecker::validateGenericFuncSignature(AbstractFunctionDecl *func) {
+GenericSignature *
+TypeChecker::validateGenericFuncSignature(AbstractFunctionDecl *func) {
   bool invalid = false;
 
   // Create the archetype builder.
@@ -513,7 +514,8 @@ GenericSignature *TypeChecker::validateGenericFuncSignature(AbstractFunctionDecl
   return sig;
 }
 
-void TypeChecker::configureInterfaceType(AbstractFunctionDecl *func, GenericSignature *sig) {
+void TypeChecker::configureInterfaceType(AbstractFunctionDecl *func,
+                                         GenericSignature *sig) {
   Type funcTy;
   Type initFuncTy;
 

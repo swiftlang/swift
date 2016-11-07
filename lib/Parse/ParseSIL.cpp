@@ -1334,7 +1334,7 @@ bool getApplySubstitutionsFromParsed(
                              ArrayRef<ParsedSubstitution> parses,
                              SmallVectorImpl<Substitution> &subs) {
   if (parses.empty()) {
-    assert (!env);
+    assert(!env);
     return false;
   }
 
@@ -1814,8 +1814,7 @@ bool SILParser::parseSILInstruction(SILBasicBlock *BB, SILBuilder &B) {
         P.diagnose(P.Tok, diag::sil_substitutions_on_non_polymorphic_type);
         return true;
       }
-      if (getApplySubstitutionsFromParsed(*this, genericEnv,
-                                          parsedSubs, subs))
+      if (getApplySubstitutionsFromParsed(*this, genericEnv, parsedSubs, subs))
         return true;
     }
     
@@ -3787,8 +3786,7 @@ bool SILParser::parseCallInstruction(SILLocation InstLoc,
       P.diagnose(TypeLoc, diag::sil_substitutions_on_non_polymorphic_type);
       return true;
     }
-    if (getApplySubstitutionsFromParsed(*this, GenericEnv,
-                                        parsedSubs, subs))
+    if (getApplySubstitutionsFromParsed(*this, GenericEnv, parsedSubs, subs))
       return true;
   }
 
@@ -4041,9 +4039,7 @@ bool Parser::parseDeclSIL() {
     // the scope.
     Scope Body(this, ScopeKind::FunctionBody);
     GenericEnvironment *GenericEnv;
-    if (FunctionState.parseSILType(FnType,
-                                   GenericEnv,
-                                   true/*IsFuncDecl*/))
+    if (FunctionState.parseSILType(FnType, GenericEnv, true /*IsFuncDecl*/))
       return true;
     auto SILFnType = FnType.getAs<SILFunctionType>();
     if (!SILFnType || !FnType.isObject()) {
@@ -4450,17 +4446,16 @@ ProtocolConformance *SILParser::parseProtocolConformanceHelper(
       return nullptr;
     ProtocolDecl *dummy;
     GenericEnvironment *specializedEnv;
-    auto genericConform = parseProtocolConformance(
-        dummy, specializedEnv,
-        localScope);
+    auto genericConform =
+        parseProtocolConformance(dummy, specializedEnv, localScope);
     if (!genericConform)
       return nullptr;
     if (P.parseToken(tok::r_paren, diag::expected_sil_witness_rparen))
       return nullptr;
 
     SmallVector<Substitution, 4> subs;
-    if (getApplySubstitutionsFromParsed(*this, specializedEnv,
-                                        parsedSubs, subs))
+    if (getApplySubstitutionsFromParsed(*this, specializedEnv, parsedSubs,
+                                        subs))
       return nullptr;
 
     auto result = P.Context.getSpecializedConformance(

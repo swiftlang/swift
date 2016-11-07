@@ -37,9 +37,8 @@ Witness::Witness(ValueDecl *decl, ArrayRef<Substitution> substitutions,
 
   auto declRef = ConcreteDeclRef(ctx, decl, substitutions);
   auto storedMem = ctx.Allocate(sizeof(StoredWitness), alignof(StoredWitness));
-  auto stored =
-    new (storedMem) StoredWitness{declRef, syntheticEnv,
-                                  std::move(reqToSynthesizedEnvMap)};
+  auto stored = new (storedMem)
+      StoredWitness{declRef, syntheticEnv, std::move(reqToSynthesizedEnvMap)};
   ctx.addDestructorCleanup(*stored);
 
   storage = stored;
@@ -379,8 +378,8 @@ SpecializedProtocolConformance::getTypeWitnessSubstAndDecl(
 
   auto *genericEnv = GenericConformance->getGenericEnvironment();
 
-  auto substitutionMap = genericEnv->getSubstitutionMap(
-      conformingModule, GenericSubstitutions);
+  auto substitutionMap =
+      genericEnv->getSubstitutionMap(conformingModule, GenericSubstitutions);
 
   auto genericWitnessAndDecl
     = GenericConformance->getTypeWitnessSubstAndDecl(assocType, resolver);

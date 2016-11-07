@@ -4265,10 +4265,8 @@ void ModuleFile::finishNormalConformance(NormalProtocolConformance *conformance,
     }
 
     // Set the witness.
-    conformance->setWitness(req,
-                            Witness(witness, witnessSubstitutions,
-                                    syntheticEnv,
-                                    reqToSyntheticMap));
+    conformance->setWitness(req, Witness(witness, witnessSubstitutions,
+                                         syntheticEnv, reqToSyntheticMap));
   }
   assert(rawIDIter <= rawIDs.end() && "read too much");
 

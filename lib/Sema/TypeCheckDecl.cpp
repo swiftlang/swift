@@ -7461,10 +7461,9 @@ void TypeChecker::validateAccessibility(ValueDecl *D) {
 
 /// Check the generic parameters of an extension, recursively handling all of
 /// the parameter lists within the extension.
-static
-std::tuple<GenericEnvironment *, Type>
-checkExtensionGenericParams(TypeChecker &tc, ExtensionDecl *ext,
-                            Type type, GenericParamList *genericParams) {
+static std::tuple<GenericEnvironment *, Type>
+checkExtensionGenericParams(TypeChecker &tc, ExtensionDecl *ext, Type type,
+                            GenericParamList *genericParams) {
   // Find the nominal type declaration and its parent type.
   Type parentType;
   NominalTypeDecl *nominal;
@@ -7484,16 +7483,14 @@ checkExtensionGenericParams(TypeChecker &tc, ExtensionDecl *ext,
   GenericEnvironment *parentEnv = nullptr;
   Type newParentType = parentType;
   if (parentType) {
-    std::tie(parentEnv, newParentType) =
-        checkExtensionGenericParams(
-                      tc, ext, parentType,
-                      nominal->getGenericParams()
-                        ? genericParams->getOuterParameters()
-                        : genericParams);
-
+    std::tie(parentEnv, newParentType) = checkExtensionGenericParams(
+        tc, ext, parentType, nominal->getGenericParams()
+                                 ? genericParams->getOuterParameters()
+                                 : genericParams);
   }
   // Avoid having to remember null checks on parentEnv below.
-  GenericSignature *parentSig = parentEnv ? parentEnv->getGenericSignature() : nullptr;
+  GenericSignature *parentSig =
+      parentEnv ? parentEnv->getGenericSignature() : nullptr;
 
   // If we don't have generic parameters at this level, just build the result.
   if (!nominal->getGenericParams()) {
@@ -7621,10 +7618,8 @@ void TypeChecker::validateExtension(ExtensionDecl *ext) {
 
     // Check generic parameters.
     GenericEnvironment *env;
-    std::tie(env, extendedType) =
-        checkExtensionGenericParams(*this, ext,
-                                    ext->getExtendedType(),
-                                    ext->getGenericParams());
+    std::tie(env, extendedType) = checkExtensionGenericParams(
+        *this, ext, ext->getExtendedType(), ext->getGenericParams());
 
     ext->getExtendedTypeLoc().setType(extendedType);
     ext->setGenericEnvironment(env);
@@ -7654,8 +7649,7 @@ void TypeChecker::validateExtension(ExtensionDecl *ext) {
 
     GenericEnvironment *env;
     std::tie(env, extendedType) =
-        checkExtensionGenericParams(*this, ext, proto,
-                                    ext->getGenericParams());
+        checkExtensionGenericParams(*this, ext, proto, ext->getGenericParams());
 
     ext->getExtendedTypeLoc().setType(extendedType);
     ext->setGenericEnvironment(env);

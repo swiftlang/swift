@@ -490,8 +490,7 @@ void SILGenFunction::emitClassConstructorAllocator(ConstructorDecl *ctor) {
   // Call the initializer.
   ArrayRef<Substitution> forwardingSubs;
   if (auto *genericEnv = ctor->getGenericEnvironmentOfContext()) {
-    forwardingSubs = genericEnv->getForwardingSubstitutions(
-        SGM.SwiftModule);
+    forwardingSubs = genericEnv->getForwardingSubstitutions(SGM.SwiftModule);
   }
   std::tie(initVal, initTy, subs)
     = emitSiblingMethodRef(Loc, selfValue, initConstant, forwardingSubs);
@@ -881,8 +880,7 @@ void SILGenFunction::emitMemberInitializers(DeclContext *dc,
         ArrayRef<Substitution> subs;
         auto *genericEnv = dc->getGenericEnvironmentOfContext();
         if (genericEnv) {
-          subs = genericEnv->getForwardingSubstitutions(
-              SGM.SwiftModule);
+          subs = genericEnv->getForwardingSubstitutions(SGM.SwiftModule);
         }
 
         // Get the type of the initialization result, in terms

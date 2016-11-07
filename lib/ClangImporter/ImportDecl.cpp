@@ -3556,7 +3556,8 @@ namespace {
 
         // Calculate the correct bound-generic extended type.
         SmallVector<Type, 2> genericArgs;
-        for (auto paramTy : env->getGenericSignature()->getInnermostGenericParams()) {
+        for (auto paramTy :
+             env->getGenericSignature()->getInnermostGenericParams()) {
           genericArgs.push_back(env->mapTypeIntoContext(paramTy));
         }
         Type extendedType =
@@ -6840,10 +6841,8 @@ DeclContext *ClangImporter::Implementation::importDeclContextImpl(
 }
 
 // Calculate the generic environment from an imported generic param list.
-GenericEnvironment *
-ClangImporter::Implementation::
-buildGenericEnvironment(GenericParamList *genericParams,
-                        DeclContext *dc) {
+GenericEnvironment *ClangImporter::Implementation::buildGenericEnvironment(
+    GenericParamList *genericParams, DeclContext *dc) {
   ArchetypeBuilder builder(*dc->getParentModule(), SwiftContext.Diags);
   for (auto param : *genericParams)
     builder.addGenericParameter(param);

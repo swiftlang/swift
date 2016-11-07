@@ -386,7 +386,9 @@ public:
 
   GenericParamList *getGenericParams() const { return GenericParams; }
   GenericEnvironment *getGenericEnvironment() const { return GenericEnv; }
-  GenericSignature *getGenericSignature() const { return GenericEnv ? GenericEnv->getGenericSignature() : nullptr; }
+  GenericSignature *getGenericSignature() const {
+    return GenericEnv ? GenericEnv->getGenericSignature() : nullptr;
+  }
 
   void setGenericEnvironment(GenericEnvironment *genericEnv) {
     assert(GenericEnv == nullptr);
