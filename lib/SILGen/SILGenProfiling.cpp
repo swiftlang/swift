@@ -80,8 +80,8 @@ static void walkForProfiling(Decl *D, ASTWalker &Walker) {
 
 ProfilerRAII::ProfilerRAII(SILGenModule &SGM, Decl *D)
     : SGM(SGM), PreviousProfiler(std::move(SGM.Profiler)) {
-  assert(isa<AbstractFunctionDecl>(D) ||
-         isa<TopLevelCodeDecl>(D) && "Cannot create profiler for this decl");
+  assert((isa<AbstractFunctionDecl>(D) || isa<TopLevelCodeDecl>(D)) &&
+         "Cannot create profiler for this decl");
   const auto &Opts = SGM.M.getOptions();
   if (!Opts.GenerateProfile || isUnmappedDecl(D))
     return;
