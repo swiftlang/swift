@@ -477,8 +477,8 @@ static void collectGlobalList(IRGenModule &IGM,
 
   std::for_each(list.begin(), list.end(),
                 [](const llvm::WeakVH &global) {
-    assert(!isa<llvm::GlobalValue>(global) ||
-           !cast<llvm::GlobalValue>(global)->isDeclaration() &&
+    assert((!isa<llvm::GlobalValue>(global) ||
+            !cast<llvm::GlobalValue>(global)->isDeclaration()) &&
            "all globals in the 'used' list must be definitions");
   });
 }
