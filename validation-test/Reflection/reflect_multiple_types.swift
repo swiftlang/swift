@@ -4,11 +4,8 @@
 // REQUIRES: objc_interop
 // REQUIRES: executable_test
 
-// FIXME: Test failing in CI for simulator
-// REQUIRES: OS=macosx
-
-// FIXME: https://bugs.swift.org/browse/SR-2808
-// XFAIL: resilient_stdlib
+// FIXME(ABI): This test is too fragile while these type aren't ABI stable
+// REQUIRES: rdar29139967
 
 import SwiftReflectionTest
 import Foundation
