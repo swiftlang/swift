@@ -1,4 +1,4 @@
-# Getting Started with Swift on Ubunutu 14.04
+# Getting Started with Swift on Ubuntu 14.04
 
 The Swift project no longer officially supports Ubuntu 14.04 as a build platform.
 It is highly recommended to upgrade to Ubuntu 16.04 or higher in order to have the best experience building and running the project.
