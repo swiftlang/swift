@@ -38,6 +38,11 @@ must be given either the path to a file (`key.sourcefile`), or some text
 (`key.sourcetext`). `key.sourcefile` is ignored when `key.sourcetext` is also
 provided.
 
+| Request Name | Request Key | Description |
+| -------------:|:------------|:------------|
+| `codecomplete` | `codecomplete` |  Given a file will open a code-completion session which can be filtered upon using `codecomplete.update`. Each session must be closed using `codecomplete.close`.|
+| `open` | `codecomplete.open` | Open a code-completion session for the given input file and offset, and return the initial list of completions. |
+
 ### Request
 
 ```
@@ -54,9 +59,21 @@ provided.
 }
 ```
 
-| Request Name | Request Key | Description |
-| -------------:|:------------|:------------|
-| `open` | `complete.open` | Given an input file, will determine at each offset what keyword is possible. Default offset is `0` if none is provided. |
+`codecomplete.open`
+```
+{
+    <key.request>:          (UID) <source.request.codecomplete.open>
+    [opt] <key.sourcetext>: (string)   // Source contents.
+    [opt] <key.sourcefile>: (string)   // Absolute path to the file.
+    <key.offset>:           (int64)    // Byte offset of code-completion point inside the source contents.
+    [opt] <key.options>:    (dict)     // An options dictionary containing keys.
+    [opt] <key.compilerargs> [string*] // Array of zero or more strings for the compiler arguments,
+                                       // e.g ["-sdk", "/path/to/sdk"]. If key.sourcefile is provided,
+                                       // these must include the path to that file.
+    [opt] <key.not_recommended> [bool] // True if this result is to be avoided, e.g. because
+                                       // the declaration is unavailable.
+}
+```
 
 ### Response
 
@@ -89,7 +106,7 @@ completion.open-result ::=
   <key.typename>:       (string)      // Text describing the type of the result.
   <key.context>:        (UID)         // Semantic context of the code completion result.
   <key.num_bytes_to_erase>: (int64)   // Number of bytes to the left of the cursor that should be erased before inserting this completion result.
-  <key.substructure>:   (dictionary)  // Can contains an array the `nameoffset`, `namelength`, `bodyoffset`, `bodylength`, and `substructure`. Other `substructure` will exist if the code complete represents a function. Each one is a paramater of the function
+  <key.substructure>:   (dictionary)  // Contains an array of dictionaries representing ranges of structural elements in the result description, such as the parameters of a function
       - <key.nameoffset>  (int64)     // The offset location of the given parameter
       - <key.namelength>  (int64)     // The length of the given parameter
       - <key.bodyoffset>  (int64)     // The `nameoffset` + the indentation inside the body of the file
