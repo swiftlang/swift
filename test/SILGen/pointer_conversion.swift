@@ -205,8 +205,8 @@ func classInoutToPointer() {
   // CHECK: apply [[TAKES_PLUS_ZERO]]
   // CHECK: [[UNOWNED_OUT:%.*]] = load [[WRITEBACK]]
   // CHECK: [[OWNED_OUT:%.*]] = unmanaged_to_ref [[UNOWNED_OUT]]
-  // CHECK: copy_value [[OWNED_OUT]]
-  // CHECK: assign [[OWNED_OUT]] to [[PB]]
+  // CHECK: [[OWNED_OUT_COPY:%.*]] = copy_value [[OWNED_OUT]]
+  // CHECK: assign [[OWNED_OUT_COPY]] to [[PB]]
 
   var cq: C? = C()
   takesPlusZeroOptionalPointer(&cq)

@@ -154,7 +154,11 @@ static UIdent KindStructureElemPattern("source.lang.swift.structure.elem.pattern
 static UIdent KindStructureElemTypeRef("source.lang.swift.structure.elem.typeref");
 
 static UIdent KindRangeSingleStatement("source.lang.swift.range.singlestatement");
-static UIdent KindRangeExpression("source.lang.swift.range.expression");
+static UIdent KindRangeSingleExpression("source.lang.swift.range.singleexpression");
+static UIdent KindRangeSingleDeclaration("source.lang.swift.range.singledeclaration");
+
+static UIdent KindRangeMultiStatement("source.lang.swift.range.multistatement");
+
 static UIdent KindRangeInvalid("source.lang.swift.range.invalid");
 
 std::unique_ptr<LangSupport>
@@ -536,8 +540,10 @@ UIdent SwiftLangSupport::getUIDForSyntaxStructureElementKind(
 SourceKit::UIdent SwiftLangSupport::
 getUIDForRangeKind(swift::ide::RangeKind Kind) {
   switch (Kind) {
-    case swift::ide::RangeKind::Expression: return KindRangeExpression;
+    case swift::ide::RangeKind::SingleExpression: return KindRangeSingleExpression;
     case swift::ide::RangeKind::SingleStatement: return KindRangeSingleStatement;
+    case swift::ide::RangeKind::SingleDecl: return KindRangeSingleDeclaration;
+    case swift::ide::RangeKind::MultiStatement: return KindRangeMultiStatement;
     case swift::ide::RangeKind::Invalid: return KindRangeInvalid;
   }
 }

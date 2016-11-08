@@ -7,17 +7,25 @@
 
 import Foundation
 
-// CHECK-LABEL: sil hidden @_TF10objc_error20NSErrorError_erasureFCSo7NSErrorPs5Error_
-// CHECK:         [[ERROR_TYPE:%.*]] = init_existential_ref %0 : $NSError : $NSError, $Error
-// CHECK:         return [[ERROR_TYPE]]
+// CHECK-LABEL: sil hidden @_TF10objc_error20NSErrorError_erasureFCSo7NSErrorPs5Error_ : $@convention(thin) (@owned NSError) -> @owned Error {
+// CHECK:         bb0([[ERROR:%.*]] : $NSError):
+// CHECK:           [[ERROR_COPY:%.*]] = copy_value [[ERROR]]
+// CHECK:           [[ERROR_TYPE:%.*]] = init_existential_ref [[ERROR_COPY]] : $NSError : $NSError, $Error
+// CHECK:           destroy_value [[ERROR]]
+// CHECK:           return [[ERROR_TYPE]]
+// CHECK:       } // end sil function '_TF10objc_error20NSErrorError_erasureFCSo7NSErrorPs5Error_'
 func NSErrorError_erasure(_ x: NSError) -> Error {
   return x
 }
 
-// CHECK-LABEL: sil hidden @_TF10objc_error30NSErrorError_archetype_erasure
-// CHECK:         [[T0:%.*]] = upcast %0 : $T to $NSError
-// CHECK:         [[ERROR_TYPE:%.*]] = init_existential_ref [[T0]] : $NSError : $NSError, $Error
-// CHECK:         return [[ERROR_TYPE]]
+// CHECK-LABEL: sil hidden @_TF10objc_error30NSErrorError_archetype_erasureuRxCSo7NSErrorrFxPs5Error_ : $@convention(thin) <T where T : NSError> (@owned T) -> @owned Error {
+// CHECK:         bb0([[ERROR:%.*]] : $T):
+// CHECK:           [[ERROR_COPY:%.*]] = copy_value [[ERROR]]
+// CHECK:           [[T0:%.*]] = upcast [[ERROR_COPY]] : $T to $NSError
+// CHECK:           [[ERROR_TYPE:%.*]] = init_existential_ref [[T0]] : $NSError : $NSError, $Error
+// CHECK:           destroy_value [[ERROR]]
+// CHECK:           return [[ERROR_TYPE]]
+// CHECK: } // end sil function '_TF10objc_error30NSErrorError_archetype_erasureuRxCSo7NSErrorrFxPs5Error_'
 func NSErrorError_archetype_erasure<T : NSError>(_ t: T) -> Error {
   return t
 }
@@ -110,10 +118,12 @@ func eraseMyNSError() -> Error {
 func eraseFictionalServerError() -> Error {
   // CHECK-NOT: return
   // CHECK: [[NSERROR:%[0-9]+]] = struct_extract {{.*}} : $FictionalServerError, #FictionalServerError._nsError
-  // CHECK: [[ERROR:%[0-9]+]] = init_existential_ref [[NSERROR]]
+  // CHECK: [[NSERROR_COPY:%.*]] = copy_value [[NSERROR]]
+  // CHECK: [[ERROR:%[0-9]+]] = init_existential_ref [[NSERROR_COPY]]
   // CHECK: return [[ERROR]]
   return FictionalServerError(.meltedDown)
 }
+// CHECK: } // end sil function '_TF10objc_error25eraseFictionalServerErrorFT_Ps5Error_'
 
 // SR-1562
 extension Error {

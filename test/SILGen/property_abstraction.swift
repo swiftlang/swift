@@ -10,13 +10,15 @@ struct Foo<T, U> {
   var g: T
 }
 
-// CHECK-LABEL: sil hidden @_TF20property_abstraction4getF
-// CHECK:         bb0([[X_ORIG:%.*]] : $Foo<Int, Int>):
+// CHECK-LABEL: sil hidden @_TF20property_abstraction4getF{{.*}} : 
+// CHECK:       bb0([[X_ORIG:%.*]] : $Foo<Int, Int>):
 // CHECK:         [[F_ORIG:%.*]] = struct_extract [[X_ORIG]] : $Foo<Int, Int>, #Foo.f
-// CHECK:         copy_value [[F_ORIG]]
+// CHECK:         [[F_ORIG_COPY:%.*]] = copy_value [[F_ORIG]]
 // CHECK:         [[REABSTRACT_FN:%.*]] = function_ref @_TTR
-// CHECK:         [[F_SUBST:%.*]] = partial_apply [[REABSTRACT_FN]]([[F_ORIG]])
+// CHECK:         [[F_SUBST:%.*]] = partial_apply [[REABSTRACT_FN]]([[F_ORIG_COPY]])
+// CHECK:         destroy_value [[X_ORIG]]
 // CHECK:         return [[F_SUBST]]
+// CHECK:       } // end sil function '_TF20property_abstraction4getF{{.*}}'
 func getF(_ x: Foo<Int, Int>) -> (Int) -> Int {
   return x.f
 }

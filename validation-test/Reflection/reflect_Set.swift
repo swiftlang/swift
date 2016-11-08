@@ -4,6 +4,9 @@
 // REQUIRES: objc_interop
 // REQUIRES: executable_test
 
+// FIXME(ABI): This test is too fragile while this type isn't ABI stable
+// REQUIRES: rdar29139967
+
 import SwiftReflectionTest
 
 class TestClass {

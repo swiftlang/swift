@@ -281,19 +281,20 @@ class C: Fooable, Barrable {
   // CHECK-LABEL: sil hidden @_TFC15guaranteed_self1Cc{{.*}} : $@convention(method) (@owned C) -> @owned C {
   // CHECK:       bb0([[SELF:%.*]] : $C):
   // CHECK:         [[MARKED_SELF:%.*]] = mark_uninitialized [rootself] [[SELF]]
-  // CHECK-NOT:     [[SELF]]
-  // CHECK-NOT:     copy_value [[MARKED_SELF]]
-  // CHECK-NOT:     destroy_value [[MARKED_SELF]]
-  // CHECK:         return [[MARKED_SELF]]
+  // CHECK:         [[MARKED_SELF_RESULT:%.*]] = copy_value [[MARKED_SELF]]
+  // CHECK:         destroy_value [[MARKED_SELF]]
+  // CHECK:         return [[MARKED_SELF_RESULT]]
+  // CHECK:       } // end sil function '_TFC15guaranteed_self1Cc{{.*}}'
 
   // @objc thunk for initializing constructor
   // CHECK-LABEL: sil hidden [thunk] @_TToFC15guaranteed_self1Cc{{.*}} : $@convention(objc_method) (@owned C) -> @owned C
   // CHECK:       bb0([[SELF:%.*]] : $C):
-  // CHECK-NOT:     copy_value{{.*}} [[SELF]]
+  // CHECK-NOT:     copy_value [[SELF]]
   // CHECK:         [[SELF2:%.*]] = apply {{%.*}}([[SELF]])
-  // CHECK-NOT:     destroy_value{{.*}} [[SELF]]
-  // CHECK-NOT:     destroy_value{{.*}} [[SELF2]]
+  // CHECK-NOT:     destroy_value [[SELF]]
+  // CHECK-NOT:     destroy_value [[SELF2]]
   // CHECK:         return [[SELF2]]
+  // CHECK: } // end sil function '_TToFC15guaranteed_self1Cc{{.*}}'
   @objc required init() {}
 
 
@@ -301,13 +302,16 @@ class C: Fooable, Barrable {
   // CHECK:       bb0({{.*}} [[SELF:%.*]] : $C):
   // CHECK-NOT:     copy_value
   // CHECK-NOT:     destroy_value
+  // CHECK:       } // end sil function '_TFC15guaranteed_self1C3foo{{.*}}'
 
   // CHECK-LABEL: sil hidden [thunk] @_TToFC15guaranteed_self1C3foo{{.*}} : $@convention(objc_method) (Int, C) -> () {
   // CHECK:       bb0({{.*}} [[SELF:%.*]] : $C):
-  // CHECK:         copy_value{{.*}} [[SELF]]
-  // CHECK:         apply {{.*}} [[SELF]]
-  // CHECK:         destroy_value{{.*}} [[SELF]]
-  // CHECK-NOT:     destroy_value{{.*}} [[SELF]]
+  // CHECK:         [[SELF_COPY:%.*]] = copy_value [[SELF]]
+  // CHECK:         apply {{.*}}({{.*}}, [[SELF_COPY]])
+  // CHECK:         destroy_value [[SELF_COPY]]
+  // CHECK-NOT:     destroy_value [[SELF_COPY]]
+  // CHECK-NOT:     destroy_value [[SELF]]
+  // CHECK:       } // end sil function '_TToFC15guaranteed_self1C3foo{{.*}}'
   @objc func foo(_ x: Int) {
     self.foo(x)
   }
@@ -320,17 +324,19 @@ class C: Fooable, Barrable {
 
   // CHECK-LABEL: sil hidden [transparent] [thunk] @_TToFC15guaranteed_self1Cg5prop1Si : $@convention(objc_method) (C) -> Int
   // CHECK:       bb0([[SELF:%.*]] : $C):
-  // CHECK:         copy_value{{.*}} [[SELF]]
-  // CHECK:         apply {{.*}}([[SELF]])
-  // CHECK:         destroy_value{{.*}} [[SELF]]
-  // CHECK-NOT:     destroy_value{{.*}} [[SELF]]
+  // CHECK:         [[SELF_COPY:%.*]] = copy_value [[SELF]]
+  // CHECK:         apply {{.*}}([[SELF_COPY]])
+  // CHECK:         destroy_value [[SELF_COPY]]
+  // CHECK-NOT:     destroy_value [[SELF]]
+  // CHECK-NOT:     destroy_value [[SELF_COPY]]
 
   // CHECK-LABEL: sil hidden [transparent] [thunk] @_TToFC15guaranteed_self1Cs5prop1Si : $@convention(objc_method) (Int, C) -> ()
   // CHECK:       bb0({{.*}} [[SELF:%.*]] : $C):
-  // CHECK:         copy_value{{.*}} [[SELF]]
-  // CHECK:         apply {{.*}} [[SELF]]
-  // CHECK:         destroy_value{{.*}} [[SELF]]
-  // CHECK-NOT:     destroy_value{{.*}} [[SELF]]
+  // CHECK:         [[SELF_COPY:%.*]] = copy_value [[SELF]]
+  // CHECK:         apply {{.*}} [[SELF_COPY]]
+  // CHECK:         destroy_value [[SELF_COPY]]
+  // CHECK-NOT:     destroy_value [[SELF_COPY]]
+  // CHECK-NOT:     destroy_value [[SELF]]
   // CHECK:       }
   @objc var prop1: Int = 0
   @objc var prop2: Int {
@@ -372,18 +378,19 @@ class D: C {
   // CHECK-NOT:     [[SELF2]]
   // CHECK-NOT:     [[SUPER2]]
   // CHECK:         [[SELF_FINAL:%.*]] = load [[SELF_ADDR]]
-  // CHECK-NEXT:    copy_value{{.*}} [[SELF_FINAL]]
-  // CHECK-NEXT:    destroy_value{{.*}} [[SELF_BOX]]
-  // CHECK-NEXT:    return [[SELF_FINAL]]
+  // CHECK-NEXT:    [[SELF_FINAL_COPY:%.*]] = copy_value [[SELF_FINAL]]
+  // CHECK-NEXT:    destroy_value [[SELF_BOX]]
+  // CHECK-NEXT:    return [[SELF_FINAL_COPY]]
   required init() {
     super.init()
   }
 
   // CHECK-LABEL: sil shared [transparent] [thunk] @_TTDFC15guaranteed_self1D3foo{{.*}} : $@convention(method) (Int, @guaranteed D) -> ()
   // CHECK:       bb0({{.*}} [[SELF:%.*]]):
-  // CHECK:         copy_value{{.*}} [[SELF]]
-  // CHECK:         destroy_value{{.*}} [[SELF]]
-  // CHECK-NOT:     destroy_value{{.*}} [[SELF]]
+  // CHECK:         [[SELF_COPY:%.*]] = copy_value [[SELF]]
+  // CHECK:         destroy_value [[SELF_COPY]]
+  // CHECK-NOT:     destroy_value [[SELF_COPY]]
+  // CHECK-NOT:     destroy_value [[SELF]]
   // CHECK:       }
   dynamic override func foo(_ x: Int) {
     self.foo(x)
@@ -475,8 +482,8 @@ class LetFieldClass {
   // CHECK-NEXT: [[KRAKEN:%.*]] = load [[KRAKEN_ADDR]]
   // CHECK-NEXT: copy_value [[KRAKEN]]
   // CHECK: [[DESTROY_SHIP_FUN:%.*]] = function_ref @_TF15guaranteed_self11destroyShipFCS_6KrakenT_ : $@convention(thin) (@owned Kraken) -> ()
-  // CHECK-NEXT: copy_value [[KRAKEN]]
-  // CHECK-NEXT: apply [[DESTROY_SHIP_FUN]]([[KRAKEN]])
+  // CHECK-NEXT: [[KRAKEN_COPY:%.*]] = copy_value [[KRAKEN]]
+  // CHECK-NEXT: apply [[DESTROY_SHIP_FUN]]([[KRAKEN_COPY]])
   // CHECK-NEXT: [[KRAKEN_BOX:%.*]] = alloc_box $@box Kraken
   // CHECK-NEXT: [[PB:%.*]] = project_box [[KRAKEN_BOX]]
   // CHECK-NEXT: [[KRAKEN_ADDR:%.*]] = ref_element_addr [[CLS]] : $LetFieldClass, #LetFieldClass.letk
@@ -509,8 +516,8 @@ class LetFieldClass {
   // CHECK-NEXT: [[KRAKEN_GETTER_FUN:%.*]] = class_method [[CLS]] : $LetFieldClass, #LetFieldClass.vark!getter.1 : (LetFieldClass) -> () -> Kraken , $@convention(method) (@guaranteed LetFieldClass) -> @owned Kraken
   // CHECK-NEXT: [[KRAKEN:%.*]] = apply [[KRAKEN_GETTER_FUN]]([[CLS]])
   // CHECK: [[DESTROY_SHIP_FUN:%.*]] = function_ref @_TF15guaranteed_self11destroyShipFCS_6KrakenT_ : $@convention(thin) (@owned Kraken) -> ()
-  // CHECK-NEXT: copy_value [[KRAKEN]]
-  // CHECK-NEXT: apply [[DESTROY_SHIP_FUN]]([[KRAKEN]])
+  // CHECK-NEXT: [[KRAKEN_COPY:%.*]] = copy_value [[KRAKEN]]
+  // CHECK-NEXT: apply [[DESTROY_SHIP_FUN]]([[KRAKEN_COPY]])
   // CHECK-NEXT: [[KRAKEN_BOX:%.*]] = alloc_box $@box Kraken
   // CHECK-NEXT: [[PB:%.*]] = project_box [[KRAKEN_BOX]]
   // CHECK-NEXT: [[KRAKEN_GETTER_FUN:%.*]] = class_method [[CLS]] : $LetFieldClass, #LetFieldClass.vark!getter.1 : (LetFieldClass) -> () -> Kraken , $@convention(method) (@guaranteed LetFieldClass) -> @owned Kraken

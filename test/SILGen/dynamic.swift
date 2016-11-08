@@ -424,16 +424,22 @@ public class Base {
 
 public class Sub : Base {
   // CHECK-LABEL: sil hidden @_TFC7dynamic3Subg1xSb : $@convention(method) (@guaranteed Sub) -> Bool {
-  // CHECK: [[AUTOCLOSURE:%.*]] = function_ref @_TFFC7dynamic3Subg1xSbu_KzT_Sb : $@convention(thin) (@owned Sub) -> (Bool, @error Error)
-  // CHECK: = partial_apply [[AUTOCLOSURE]](%0)
-  // CHECK: return {{%.*}} : $Bool
-  // CHECK: }
+  // CHECK: bb0([[SELF:%.*]] : $Sub):
+  // CHECK:     [[AUTOCLOSURE:%.*]] = function_ref @_TFFC7dynamic3Subg1xSbu_KzT_Sb : $@convention(thin) (@owned Sub) -> (Bool, @error Error)
+  // CHECK:     [[SELF_COPY:%.*]] = copy_value [[SELF]]
+  // CHECK:     = partial_apply [[AUTOCLOSURE]]([[SELF_COPY]])
+  // CHECK:     return {{%.*}} : $Bool
+  // CHECK: } // end sil function '_TFC7dynamic3Subg1xSb'
 
   // CHECK-LABEL: sil shared [transparent] @_TFFC7dynamic3Subg1xSbu_KzT_Sb : $@convention(thin) (@owned Sub) -> (Bool, @error Error) {
-  // CHECK: [[SUPER:%.*]] = super_method [volatile] %0 : $Sub, #Base.x!getter.1.foreign : (Base) -> () -> Bool , $@convention(objc_method) (Base) -> ObjCBool
-  // CHECK: = apply [[SUPER]]({{%.*}})
-  // CHECK: return {{%.*}} : $Bool
-  // CHECK: }
+  // CHECK: bb0([[VALUE:%.*]] : $Sub):
+  // CHECK:     [[VALUE_COPY:%.*]] = copy_value [[VALUE]]
+  // CHECK:     [[CASTED_VALUE_COPY:%.*]] = upcast [[VALUE_COPY]]
+  // CHECK:     [[SUPER:%.*]] = super_method [volatile] [[VALUE_COPY]] : $Sub, #Base.x!getter.1.foreign : (Base) -> () -> Bool , $@convention(objc_method) (Base) -> ObjCBool
+  // CHECK:     = apply [[SUPER]]([[CASTED_VALUE_COPY]])
+  // CHECK:     destroy_value [[VALUE_COPY]]
+  // CHECK:     destroy_value [[VALUE]]
+  // CHECK: } // end sil function '_TFFC7dynamic3Subg1xSbu_KzT_Sb'
   override var x: Bool { return false || super.x }
 }
 

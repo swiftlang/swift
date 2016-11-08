@@ -3749,12 +3749,9 @@ final internal class _SwiftDeferredNS${Self}<${TypeParametersDecl}> { }
 #endif
 
 #if _runtime(_ObjC)
-
-// FIXME: this should really be a struct but can't because of the lazy allKeys.
-// (but it might be removed with eager bridging, so this is "fine" for now)
 @_versioned
 @_fixed_layout
-internal final class _Cocoa${Self}Buffer : _HashBuffer {
+internal struct _Cocoa${Self}Buffer : _HashBuffer {
   @_versioned
   internal var cocoa${Self}: _NS${Self}
 
@@ -3765,31 +3762,22 @@ internal final class _Cocoa${Self}Buffer : _HashBuffer {
   internal typealias Key = AnyObject
   internal typealias Value = AnyObject
 
-  internal lazy var allKeys : _Box<_HeapBuffer<Int, AnyObject>> = {
-    return _Box(_stdlib_NS${Self}_all${'Objects' if Self == 'Set' else 'Keys'}(self.cocoa${Self}))
-  }()
-
   internal var startIndex: Index {
-    return Index(value: 0)
+    return Index(cocoa${Self}, startIndex: ())
   }
 
   internal var endIndex: Index {
-    return Index(value: allKeys._value.value)
+    return Index(cocoa${Self}, endIndex: ())
   }
 
-  // Assumption: we rely on NS${Self}.getObjects when being
-  // repeatedly called on the same NS${Self}, returning items in the same
-  // order every time.
   @_versioned
   internal func index(after i: Index) -> Index {
-    _precondition(
-      i.currentKeyIndex < allKeys._value.value, "cannot increment endIndex")
-    return _Cocoa${Self}Index(value: i.currentKeyIndex + 1)
+    return i.successor()
   }
 
-  @_versioned
   internal func formIndex(after i: inout Index) {
-    i = index(after: i)
+    // FIXME: swift-3-indexing-model: optimize if possible.
+    i = i.successor()
   }
 
   @_versioned
@@ -3802,26 +3790,31 @@ internal final class _Cocoa${Self}Buffer : _HashBuffer {
       return nil
     }
 
+%if Self == 'Set':
+    let allKeys = _stdlib_NSSet_allObjects(cocoaSet)
+%elif Self == 'Dictionary':
+    let allKeys = _stdlib_NSDictionary_allKeys(cocoaDictionary)
+%end
     var keyIndex = -1
-    for i in 0..<allKeys._value.value {
-      if _stdlib_NSObject_isEqual(key, allKeys._value[i]) {
+    for i in 0..<allKeys.value {
+      if _stdlib_NSObject_isEqual(key, allKeys[i]) {
         keyIndex = i
         break
       }
     }
     _sanityCheck(keyIndex >= 0,
         "key was found in fast path, but not found later?")
-    return Index(value: keyIndex)
+    return Index(cocoa${Self}, allKeys, keyIndex)
   }
 
   internal func assertingGet(_ i: Index) -> SequenceElement {
 %if Self == 'Set':
-    let value: Value? = allKeys._value[i.currentKeyIndex]
+    let value: Value? = i.allKeys[i.currentKeyIndex]
     _sanityCheck(value != nil, "item not found in underlying NS${Self}")
     return value!
 %elif Self == 'Dictionary':
-    let key: Key = allKeys._value[i.currentKeyIndex]
-    let value: Value = cocoaDictionary.objectFor(key)!
+    let key: Key = i.allKeys[i.currentKeyIndex]
+    let value: Value = i.cocoaDictionary.objectFor(key)!
     return (key, value)
 %end
 
@@ -3850,33 +3843,29 @@ internal final class _Cocoa${Self}Buffer : _HashBuffer {
 
   }
 
-  internal init(cocoa${Self}: _NS${Self}) {
-    self.cocoa${Self} = cocoa${Self}
-  }
-
   @discardableResult
-  internal func updateValue(_ value: Value, forKey key: Key) -> Value? {
+  internal mutating func updateValue(_ value: Value, forKey key: Key) -> Value? {
     _sanityCheckFailure("cannot mutate NS${Self}")
   }
 
   @discardableResult
-  internal func insert(
+  internal mutating func insert(
     _ value: Value, forKey key: Key
   ) -> (inserted: Bool, memberAfterInsert: Value) {
     _sanityCheckFailure("cannot mutate NS${Self}")
   }
 
   @discardableResult
-  internal func remove(at index: Index) -> SequenceElement {
+  internal mutating func remove(at index: Index) -> SequenceElement {
     _sanityCheckFailure("cannot mutate NS${Self}")
   }
 
   @discardableResult
-  internal func removeValue(forKey key: Key) -> Value? {
+  internal mutating func removeValue(forKey key: Key) -> Value? {
     _sanityCheckFailure("cannot mutate NS${Self}")
   }
 
-  internal func removeAll(keepingCapacity keepCapacity: Bool) {
+  internal mutating func removeAll(keepingCapacity keepCapacity: Bool) {
     _sanityCheckFailure("cannot mutate NS${Self}")
   }
 
@@ -4465,9 +4454,8 @@ internal enum _Variant${Self}Buffer<${TypeParametersDecl}> : _HashBuffer {
       //
       // FIXME(performance): fuse data migration and element deletion into one
       // operation.
-      let cocoaIndex = index._cocoaIndex
-      let anyObjectKey: AnyObject =
-        cocoaBuffer.allKeys._value[cocoaIndex.currentKeyIndex]
+      let index = index._cocoaIndex
+      let anyObjectKey: AnyObject = index.allKeys[index.currentKeyIndex]
       migrateDataToNativeBuffer(cocoaBuffer)
       let key = _forceBridgeFromObjectiveC(anyObjectKey, Key.self)
       let value = nativeRemoveObject(forKey: key)
@@ -4628,11 +4616,61 @@ extension _Native${Self}Index {
 #if _runtime(_ObjC)
 @_versioned
 internal struct _Cocoa${Self}Index : Comparable {
-  /// Index into `allKeys` on the CocoaSelfBuffer
+  // Assumption: we rely on NSDictionary.getObjects when being
+  // repeatedly called on the same NSDictionary, returning items in the same
+  // order every time.
+  // Similarly, the same assumption holds for NSSet.allObjects.
+
+  /// A reference to the NS${Self}, which owns members in `allObjects`,
+  /// or `allKeys`, for NSSet and NSDictionary respectively.
+  internal let cocoa${Self}: _NS${Self}
+  // FIXME: swift-3-indexing-model: try to remove the cocoa reference, but make
+  // sure that we have a safety check for accessing `allKeys`.  Maybe move both
+  // into the dictionary/set itself.
+
+  /// An unowned array of keys.
+  internal var allKeys: _HeapBuffer<Int, AnyObject>
+
+  /// Index into `allKeys`
   internal var currentKeyIndex: Int
 
-  internal init(value: Int) {
-    currentKeyIndex = value
+  internal init(_ cocoa${Self}: _NS${Self}, startIndex: ()) {
+    self.cocoa${Self} = cocoa${Self}
+%if Self == 'Set':
+    self.allKeys = _stdlib_NSSet_allObjects(cocoaSet)
+%elif Self == 'Dictionary':
+    self.allKeys = _stdlib_NSDictionary_allKeys(cocoaDictionary)
+%end
+    self.currentKeyIndex = 0
+  }
+
+  internal init(_ cocoa${Self}: _NS${Self}, endIndex: ()) {
+    self.cocoa${Self} = cocoa${Self}
+%if Self == 'Set':
+    self.allKeys = _stdlib_NS${Self}_allObjects(cocoa${Self})
+%elif Self == 'Dictionary':
+    self.allKeys = _stdlib_NS${Self}_allKeys(cocoa${Self})
+%end
+    self.currentKeyIndex = allKeys.value
+  }
+
+  internal init(_ cocoa${Self}: _NS${Self},
+    _ allKeys: _HeapBuffer<Int, AnyObject>,
+    _ currentKeyIndex: Int
+  ) {
+    self.cocoa${Self} = cocoa${Self}
+    self.allKeys = allKeys
+    self.currentKeyIndex = currentKeyIndex
+  }
+
+  /// Returns the next consecutive value after `self`.
+  ///
+  /// - Precondition: The next value is representable.
+  internal func successor() -> _Cocoa${Self}Index {
+    // FIXME: swift-3-indexing-model: remove this method.
+    _precondition(
+      currentKeyIndex < allKeys.value, "cannot increment endIndex")
+    return _Cocoa${Self}Index(cocoa${Self}, allKeys, currentKeyIndex + 1)
   }
 }
 

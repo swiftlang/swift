@@ -72,12 +72,13 @@ func test3() {
   // CHECK-NOT: destroy_value
 
   // CHECK: [[USEFN:%[0-9]+]] = function_ref{{.*}}useAString
-  // CHECK-NEXT: copy_value [[STR]]
-  // CHECK-NEXT: [[USE:%[0-9]+]] = apply [[USEFN]]([[STR]])
+  // CHECK-NEXT: [[STR_COPY:%.*]] = copy_value [[STR]]
+  // CHECK-NEXT: [[USE:%[0-9]+]] = apply [[USEFN]]([[STR_COPY]])
   useAString(o)
   
   // CHECK: destroy_value [[STR]]
 }
+// CHECK: } // end sil function '{{.*}}test3{{.*}}'
 
 
 
@@ -252,9 +253,9 @@ func test_weird_property(_ v : WeirdPropertyTest, i : Int) -> Int {
 // CHECK-LABEL: sil hidden @{{.*}}generic_identity
 // CHECK: bb0(%0 : $*T, %1 : $*T):
 // CHECK-NEXT: debug_value_addr %1 : $*T
-// CHECK-NEXT: copy_addr [take] %1 to [initialization] %0 : $*T
-// CHECK-NEXT: %4 = tuple ()
-// CHECK-NEXT: return %4
+// CHECK-NEXT: copy_addr %1 to [initialization] %0 : $*T
+// CHECK-NEXT: destroy_addr %1
+// CHECK: } // end sil function '{{.*}}generic_identity{{.*}}'
 func generic_identity<T>(_ a : T) -> T {
   // Should be a single copy_addr, with no temporary.
   return a
@@ -365,7 +366,11 @@ func member_ref_abstraction_change(_ x: GenericFunctionStruct<Int, Int>) -> (Int
 }
 
 // CHECK-LABEL: sil hidden @{{.*}}call_auto_closure
-// CHECK: apply %0()
+// CHECK: bb0([[CLOSURE:%.*]] : $@callee_owned () -> Bool):
+// CHECK:   [[CLOSURE_COPY:%.*]] = copy_value [[CLOSURE]]
+// CHECK:   apply [[CLOSURE_COPY]]() : $@callee_owned () -> Bool
+// CHECK:   destroy_value [[CLOSURE]]
+// CHECK: } // end sil function '{{.*}}call_auto_closure{{.*}}'
 func call_auto_closure(x: @autoclosure () -> Bool) -> Bool {
   return x()  // Calls of autoclosures should be marked transparent.
 }

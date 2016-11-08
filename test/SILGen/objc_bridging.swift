@@ -220,11 +220,11 @@ class Bas : NSObject {
   var strRealProp: String = "Hello"
   // CHECK-LABEL: sil hidden [transparent] [thunk] @_TToFC13objc_bridging3Basg11strRealPropSS : $@convention(objc_method) (Bas) -> @autoreleased NSString {
   // CHECK: bb0([[THIS:%.*]] : $Bas):
-  // CHECK:   copy_value [[THIS]] : $Bas
+  // CHECK:   [[THIS_COPY:%.*]] = copy_value [[THIS]] : $Bas
   // CHECK:   // function_ref objc_bridging.Bas.strRealProp.getter
   // CHECK:   [[PROPIMPL:%.*]] = function_ref @_TFC13objc_bridging3Basg11strRealPropSS
-  // CHECK:   [[PROP_COPY:%.*]] = apply [[PROPIMPL]]([[THIS]]) : $@convention(method) (@guaranteed Bas) -> @owned String
-  // CHECK:   destroy_value [[THIS]]
+  // CHECK:   [[PROP_COPY:%.*]] = apply [[PROPIMPL]]([[THIS_COPY]]) : $@convention(method) (@guaranteed Bas) -> @owned String
+  // CHECK:   destroy_value [[THIS_COPY]]
   // CHECK:   [[STRING_TO_NSSTRING:%.*]] = function_ref @_TFE10FoundationSS19_bridgeToObjectiveCfT_CSo8NSString
   // CHECK:   [[NSSTR:%.*]] = apply [[STRING_TO_NSSTRING]]([[PROP_COPY]])
   // CHECK:   return [[NSSTR]]
@@ -239,12 +239,16 @@ class Bas : NSObject {
 
   // CHECK-LABEL: sil hidden [transparent] [thunk] @_TToFC13objc_bridging3Bass11strRealPropSS : $@convention(objc_method) (NSString, Bas) -> () {
   // CHECK: bb0([[VALUE:%.*]] : $NSString, [[THIS:%.*]] : $Bas):
+  // CHECK:   [[VALUE_COPY:%.*]] = copy_value [[VALUE]]
+  // CHECK:   [[THIS_COPY:%.*]] = copy_value [[THIS]]
   // CHECK:   [[NSSTRING_TO_STRING:%.*]] = function_ref @_TZFE10FoundationSS36_unconditionallyBridgeFromObjectiveCfGSqCSo8NSString_SS
-  // CHECK:   [[VALUE_BOX:%.*]] = enum $Optional<NSString>, #Optional.some!enumelt.1, [[VALUE]]
+  // CHECK:   [[VALUE_BOX:%.*]] = enum $Optional<NSString>, #Optional.some!enumelt.1, [[VALUE_COPY]]
   // CHECK:   [[STR:%.*]] = apply [[NSSTRING_TO_STRING]]([[VALUE_BOX]]
   
   // CHECK:   [[SETIMPL:%.*]] = function_ref @_TFC13objc_bridging3Bass11strRealPropSS
-  // CHECK:   apply [[SETIMPL]]([[STR]], %1)
+  // CHECK:   apply [[SETIMPL]]([[STR]], [[THIS_COPY]])
+  // CHECK:   destroy_value [[THIS_COPY]]
+  // CHECK: } // end sil function '_TToFC13objc_bridging3Bass11strRealPropSS'
 
   // CHECK-LABEL: sil hidden [transparent] @_TFC13objc_bridging3Bass11strRealPropSS
   // CHECK: bb0(%0 : $String, %1 : $Bas):
@@ -259,21 +263,27 @@ class Bas : NSObject {
   }
   // CHECK-LABEL: sil hidden [thunk] @_TToFC13objc_bridging3Basg11strFakePropSS : $@convention(objc_method) (Bas) -> @autoreleased NSString {
   // CHECK: bb0([[THIS:%.*]] : $Bas):
+  // CHECK:   [[THIS_COPY:%.*]] = copy_value [[THIS]]
   // CHECK:   [[GETTER:%.*]] = function_ref @_TFC13objc_bridging3Basg11strFakePropSS
-  // CHECK:   [[STR:%.*]] = apply [[GETTER]]([[THIS]])
+  // CHECK:   [[STR:%.*]] = apply [[GETTER]]([[THIS_COPY]])
+  // CHECK:   destroy_value [[THIS_COPY]]
   // CHECK:   [[STRING_TO_NSSTRING:%.*]] = function_ref @_TFE10FoundationSS19_bridgeToObjectiveCfT_CSo8NSString
   // CHECK:   [[NSSTR:%.*]] = apply [[STRING_TO_NSSTRING]]([[STR]])
+  // CHECK:   destroy_value [[STR]]
   // CHECK:   return [[NSSTR]]
   // CHECK: }
 
   // CHECK-LABEL: sil hidden [thunk] @_TToFC13objc_bridging3Bass11strFakePropSS : $@convention(objc_method) (NSString, Bas) -> () {
   // CHECK: bb0([[NSSTR:%.*]] : $NSString, [[THIS:%.*]] : $Bas):
+  // CHECK:   [[NSSTR_COPY:%.*]] = copy_value [[NSSTR]]
+  // CHECK:   [[THIS_COPY:%.*]] = copy_value [[THIS]]
   // CHECK:   [[NSSTRING_TO_STRING:%.*]] = function_ref @_TZFE10FoundationSS36_unconditionallyBridgeFromObjectiveCfGSqCSo8NSString_SS
-  // CHECK:   [[NSSTR_BOX:%.*]] = enum $Optional<NSString>, #Optional.some!enumelt.1, [[NSSTR]]
+  // CHECK:   [[NSSTR_BOX:%.*]] = enum $Optional<NSString>, #Optional.some!enumelt.1, [[NSSTR_COPY]]
   // CHECK:   [[STR:%.*]] = apply [[NSSTRING_TO_STRING]]([[NSSTR_BOX]]
   // CHECK:   [[SETTER:%.*]] = function_ref @_TFC13objc_bridging3Bass11strFakePropSS
-  // CHECK:   apply [[SETTER]]([[STR]], [[THIS]])
-  // CHECK: }
+  // CHECK:   apply [[SETTER]]([[STR]], [[THIS_COPY]])
+  // CHECK:   destroy_value [[THIS_COPY]]
+  // CHECK: } // end sil function '_TToFC13objc_bridging3Bass11strFakePropSS'
 
   // -- Bridging thunks for explicitly NSString properties don't convert
   var nsstrRealProp: NSString
@@ -295,21 +305,27 @@ class Bas : NSObject {
   func strResult() -> String { return "" }
   // CHECK-LABEL: sil hidden [thunk] @_TToFC13objc_bridging3Bas9strResult
   // CHECK: bb0([[THIS:%.*]] : $Bas):
+  // CHECK:   [[THIS_COPY:%.*]] = copy_value [[THIS]]
   // CHECK:   [[METHOD:%.*]] = function_ref @_TFC13objc_bridging3Bas9strResult
-  // CHECK:   [[STR:%.*]] = apply [[METHOD]]([[THIS]])
+  // CHECK:   [[STR:%.*]] = apply [[METHOD]]([[THIS_COPY]])
+  // CHECK:   destroy_value [[THIS_COPY]]
   // CHECK:   [[STRING_TO_NSSTRING:%.*]] = function_ref @_TFE10FoundationSS19_bridgeToObjectiveCfT_CSo8NSString
   // CHECK:   [[NSSTR:%.*]] = apply [[STRING_TO_NSSTRING]]([[STR]])
+  // CHECK:   destroy_value [[STR]]
   // CHECK:   return [[NSSTR]]
   // CHECK: }
   func strArg(_ s: String) { }
   // CHECK-LABEL: sil hidden [thunk] @_TToFC13objc_bridging3Bas6strArg
   // CHECK: bb0([[NSSTR:%.*]] : $NSString, [[THIS:%.*]] : $Bas):
+  // CHECK:   [[NSSTR_COPY:%.*]] = copy_value [[NSSTR]]
+  // CHECK:   [[THIS_COPY:%.*]] = copy_value [[THIS]]
   // CHECK:   [[NSSTRING_TO_STRING:%.*]] = function_ref @_TZFE10FoundationSS36_unconditionallyBridgeFromObjectiveCfGSqCSo8NSString_SS
-  // CHECK:   [[NSSTR_BOX:%.*]] = enum $Optional<NSString>, #Optional.some!enumelt.1, [[NSSTR]]
+  // CHECK:   [[NSSTR_BOX:%.*]] = enum $Optional<NSString>, #Optional.some!enumelt.1, [[NSSTR_COPY]]
   // CHECK:   [[STR:%.*]] = apply [[NSSTRING_TO_STRING]]([[NSSTR_BOX]]
   // CHECK:   [[METHOD:%.*]] = function_ref @_TFC13objc_bridging3Bas6strArg
-  // CHECK:   apply [[METHOD]]([[STR]], [[THIS]])
-  // CHECK: }
+  // CHECK:   apply [[METHOD]]([[STR]], [[THIS_COPY]])
+  // CHECK:   destroy_value [[THIS_COPY]]
+  // CHECK: } // end sil function '_TToFC13objc_bridging3Bas6strArgfSST_'
 
   // -- Bridging thunks for explicitly NSString properties don't convert
   func nsstrResult() -> NSString { return NSS }
@@ -330,26 +346,27 @@ class Bas : NSObject {
 
   // CHECK-LABEL: sil hidden [thunk] @_TToFC13objc_bridging3Bas8arrayArg{{.*}} : $@convention(objc_method) (NSArray, Bas) -> ()
   // CHECK: bb0([[NSARRAY:%[0-9]+]] : $NSArray, [[SELF:%[0-9]+]] : $Bas):
-  // CHECK:   copy_value [[NSARRAY]] : $NSArray
-  // CHECK:   copy_value [[SELF]] : $Bas
+  // CHECK:   [[NSARRAY_COPY:%.*]] = copy_value [[NSARRAY]] : $NSArray
+  // CHECK:   [[SELF_COPY:%.*]] = copy_value [[SELF]] : $Bas
   // CHECK:   [[CONV_FN:%[0-9]+]] = function_ref @_TZFE10FoundationSa36_unconditionallyBridgeFromObjectiveCfGSqCSo7NSArray_GSax_
-  // CHECK-NEXT: [[OPT_NSARRAY:%[0-9]+]] = enum $Optional<NSArray>, #Optional.some!enumelt.1, [[NSARRAY]] : $NSArray
-  // CHECK-NEXT: [[ARRAY_META:%[0-9]+]] = metatype $@thin Array<AnyObject>.Type
-  // CHECK-NEXT: [[ARRAY:%[0-9]+]] = apply [[CONV_FN]]<AnyObject>([[OPT_NSARRAY]], [[ARRAY_META]])
+  // CHECK:   [[OPT_NSARRAY:%[0-9]+]] = enum $Optional<NSArray>, #Optional.some!enumelt.1, [[NSARRAY_COPY]] : $NSArray
+  // CHECK:   [[ARRAY_META:%[0-9]+]] = metatype $@thin Array<AnyObject>.Type
+  // CHECK:   [[ARRAY:%[0-9]+]] = apply [[CONV_FN]]<AnyObject>([[OPT_NSARRAY]], [[ARRAY_META]])
   // CHECK:   [[SWIFT_FN:%[0-9]+]] = function_ref @_TFC13objc_bridging3Bas{{.*}} : $@convention(method) (@owned Array<AnyObject>, @guaranteed Bas) -> ()
-  // CHECK:   [[RESULT:%[0-9]+]] = apply [[SWIFT_FN]]([[ARRAY]], [[SELF]]) : $@convention(method) (@owned Array<AnyObject>, @guaranteed Bas) -> ()
-  // CHECK:   destroy_value [[SELF]] : $Bas
+  // CHECK:   [[RESULT:%[0-9]+]] = apply [[SWIFT_FN]]([[ARRAY]], [[SELF_COPY]]) : $@convention(method) (@owned Array<AnyObject>, @guaranteed Bas) -> ()
+  // CHECK:   destroy_value [[SELF_COPY]] : $Bas
   // CHECK:   return [[RESULT]] : $()
   func arrayArg(_ array: [AnyObject]) { }
   
   // CHECK-LABEL: sil hidden [thunk] @_TToFC13objc_bridging3Bas11arrayResult{{.*}} : $@convention(objc_method) (Bas) -> @autoreleased NSArray
   // CHECK: bb0([[SELF:%[0-9]+]] : $Bas):
-  // CHECK:   copy_value [[SELF]] : $Bas
+  // CHECK:   [[SELF_COPY:%.*]] = copy_value [[SELF]] : $Bas
   // CHECK:   [[SWIFT_FN:%[0-9]+]] = function_ref @_TFC13objc_bridging3Bas11arrayResult{{.*}} : $@convention(method) (@guaranteed Bas) -> @owned Array<AnyObject>
-  // CHECK:   [[ARRAY:%[0-9]+]] = apply [[SWIFT_FN]]([[SELF]]) : $@convention(method) (@guaranteed Bas) -> @owned Array<AnyObject>
-  // CHECK:   destroy_value [[SELF]]
+  // CHECK:   [[ARRAY:%[0-9]+]] = apply [[SWIFT_FN]]([[SELF_COPY]]) : $@convention(method) (@guaranteed Bas) -> @owned Array<AnyObject>
+  // CHECK:   destroy_value [[SELF_COPY]]
   // CHECK:   [[CONV_FN:%[0-9]+]] = function_ref @_TFE10FoundationSa19_bridgeToObjectiveCfT_CSo7NSArray
   // CHECK:   [[NSARRAY:%[0-9]+]] = apply [[CONV_FN]]<AnyObject>([[ARRAY]]) : $@convention(method) <τ_0_0> (@guaranteed Array<τ_0_0>) -> @owned NSArray
+  // CHECK:   destroy_value [[ARRAY]]
   // CHECK:   return [[NSARRAY]]
   func arrayResult() -> [AnyObject] { return [] }
 
@@ -358,16 +375,28 @@ class Bas : NSObject {
   var arrayProp: [String] = []
 }
 
-// CHECK-LABEL: sil hidden @_TF13objc_bridging16applyStringBlock
+// CHECK-LABEL: sil hidden @_TF13objc_bridging16applyStringBlock{{.*}} : 
 func applyStringBlock(_ f: @convention(block) (String) -> String, x: String) -> String {
-  // CHECK: [[BLOCK:%.*]] = copy_block %0
-  // CHECK: [[STRING_TO_NSSTRING:%.*]] = function_ref @_TFE10FoundationSS19_bridgeToObjectiveCfT_CSo8NSString
-  // CHECK: [[NSSTR:%.*]] = apply [[STRING_TO_NSSTRING]]
-  // CHECK: [[RES:%.*]] = apply [[BLOCK]]([[NSSTR]]) : $@convention(block) (NSString) -> @autoreleased NSString
-  // CHECK: function_ref @_TZFE10FoundationSS36_unconditionallyBridgeFromObjectiveCfGSqCSo8NSString_SS
-  // CHECK: return {{%.*}} : $String
+  // CHECK: bb0([[BLOCK:%.*]] : $@convention(block) (NSString) -> @autoreleased NSString, [[STRING:%.*]] : $String):
+  // CHECK:   [[BLOCK_COPY:%.*]] = copy_block [[BLOCK]]
+  // CHECK:   [[BLOCK_COPY_COPY:%.*]] = copy_value [[BLOCK_COPY]]
+  // CHECK:   [[STRING_COPY:%.*]] = copy_value [[STRING]]
+  // CHECK:   [[STRING_TO_NSSTRING:%.*]] = function_ref @_TFE10FoundationSS19_bridgeToObjectiveCfT_CSo8NSString
+  // CHECK:   [[NSSTR:%.*]] = apply [[STRING_TO_NSSTRING]]([[STRING_COPY]])
+  // CHECK:   [[RESULT_NSSTR:%.*]] = apply [[BLOCK_COPY_COPY]]([[NSSTR]]) : $@convention(block) (NSString) -> @autoreleased NSString
+  // CHECK:   [[FINAL_BRIDGE:%.*]] = function_ref @_TZFE10FoundationSS36_unconditionallyBridgeFromObjectiveCfGSqCSo8NSString_SS
+  // CHECK:   [[OPTIONAL_NSSTR:%.*]] = enum $Optional<NSString>, #Optional.some!enumelt.1, [[RESULT_NSSTR]]
+  // CHECK:   [[RESULT:%.*]] = apply [[FINAL_BRIDGE]]([[OPTIONAL_NSSTR]], {{.*}}) : $@convention(method) (@owned Optional<NSString>, @thin String.Type) -> @owned String
+  // CHECK:   destroy_value [[NSSTR]]
+  // CHECK:   destroy_value [[STRING_COPY]]
+  // CHECK:   destroy_value [[BLOCK_COPY_COPY]]
+  // CHECK:   destroy_value [[STRING]]
+  // CHECK:   destroy_value [[BLOCK_COPY]]
+  // CHECK:   destroy_value [[BLOCK]]
+  // CHECK:   return [[RESULT]] : $String
   return f(x)
 }
+// CHECK: } // end sil function '_TF13objc_bridging16applyStringBlock{{.*}}'
 
 // CHECK-LABEL: sil hidden @_TF13objc_bridging15bridgeCFunction
 func bridgeCFunction() -> (String!) -> (String!) {

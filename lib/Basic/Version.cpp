@@ -406,6 +406,14 @@ std::string getSwiftFullVersion(Version effectiveVersion) {
   return OS.str();
 }
 
+std::string getSwiftRevision() {
+#ifdef SWIFT_REVISION
+  return SWIFT_REVISION;
+#else
+  return "";
+#endif
+}
+
 } // end namespace version
 } // end namespace swift
 

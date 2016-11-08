@@ -37,10 +37,11 @@ public func foo(_ x: Double) {
   z = makeMetatype().init(value: x)
 
   // CHECK: [[THUNK:%.*]] = function_ref @_TTOFVSC7Struct1CFT5valueSd_S_
-  // CHECK: [[SELF:%.*]] = metatype $@thin Struct1.Type
-  // CHECK: [[A:%.*]] = apply [[THUNK]]([[SELF]])
+  // CHECK: [[SELF_META:%.*]] = metatype $@thin Struct1.Type
+  // CHECK: [[A:%.*]] = apply [[THUNK]]([[SELF_META]])
+  // CHECK: [[A_COPY:%.*]] = copy_value [[A]]
   let a: (Double) -> Struct1 = Struct1.init(value:)
-  // CHECK: apply [[A]]([[X]])
+  // CHECK: apply [[A_COPY]]([[X]])
   z = a(x)
 
   // TODO: Support @convention(c) references that only capture thin metatype
@@ -60,8 +61,9 @@ public func foo(_ x: Double) {
   // CHECK: [[THUNK:%.*]] = function_ref [[THUNK_NAME:@_TTOFVSC7Struct19translateFT7radiansSd_S_]]
   // CHECK: [[ZVAL:%.*]] = load [[Z]]
   // CHECK: [[C:%.*]] = apply [[THUNK]]([[ZVAL]])
+  // CHECK: [[C_COPY:%.*]] = copy_value [[C]]
   let c: (Double) -> Struct1 = z.translate(radians:)
-  // CHECK: apply [[C]]([[X]])
+  // CHECK: apply [[C_COPY]]([[X]])
   z = c(x)
   // CHECK: [[THUNK:%.*]] = function_ref [[THUNK_NAME]]
   // CHECK: thin_to_thick_function [[THUNK]]
@@ -83,8 +85,9 @@ public func foo(_ x: Double) {
   // CHECK: [[THUNK:%.*]] = function_ref @_TTOFVSC7Struct15scaleFSdS_
   // CHECK: [[ZVAL:%.*]] = load [[Z]]
   // CHECK: [[F:%.*]] = apply [[THUNK]]([[ZVAL]])
+  // CHECK: [[F_COPY:%.*]] = copy_value [[F]]
   let f = z.scale
-  // CHECK: apply [[F]]([[X]])
+  // CHECK: apply [[F_COPY]]([[X]])
   z = f(x)
   // CHECK: [[THUNK:%.*]] = function_ref @_TTOFVSC7Struct15scaleFSdS_
   // CHECK: thin_to_thick_function [[THUNK]]
@@ -126,8 +129,9 @@ public func foo(_ x: Double) {
   // CHECK: [[THUNK:%.*]] = function_ref @_TTOZFVSC7Struct112staticMethodFT_Vs5Int32 
   // CHECK: [[SELF:%.*]] = metatype
   // CHECK: [[I:%.*]] = apply [[THUNK]]([[SELF]])
+  // CHECK: [[I_COPY:%.*]] = copy_value [[I]]
   let i = Struct1.staticMethod
-  // CHECK: apply [[I]]()
+  // CHECK: apply [[I_COPY]]()
   y = i()
 
   // TODO: Support @convention(c) references that only capture thin metatype
@@ -188,6 +192,7 @@ public func foo(_ x: Double) {
   //   = Struct1.selfComesThird(a:b:x:)
   // p(z, y, 0, x)
 }
+// CHECK: } // end sil function '_TF10cf_members3foo{{.*}}'
 
 // CHECK-LABEL: sil shared [thunk] @_TTOFVSC7Struct1CfT5valueSd_S_
 // CHECK:       bb0([[X:%.*]] : $Double, [[SELF:%.*]] : $@thin Struct1.Type):

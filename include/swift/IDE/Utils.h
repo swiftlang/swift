@@ -198,8 +198,11 @@ private:
 
 enum class RangeKind : int8_t{
   Invalid = -1,
-  Expression,
+  SingleExpression,
   SingleStatement,
+  SingleDecl,
+
+  MultiStatement,
 };
 
 struct ResolvedRangeInfo {

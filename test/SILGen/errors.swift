@@ -99,10 +99,12 @@ func dont_return<T>(_ argument: T) throws -> T {
 //   Catch HomeworkError.CatAteIt.
 // CHECK:    [[MATCH]]([[T0:%.*]] : $Cat):
 // CHECK-NEXT: debug_value
+// CHECK-NEXT: [[T0_COPY:%.*]] = copy_value [[T0]]
+// CHECK-NEXT: destroy_value [[T0]]
 // CHECK-NEXT: dealloc_stack [[DEST_TEMP]]
 // CHECK-NEXT: destroy_addr [[SRC_TEMP]]
 // CHECK-NEXT: dealloc_stack [[SRC_TEMP]]
-// CHECK-NEXT: br [[RETURN]]([[T0]] : $Cat)
+// CHECK-NEXT: br [[RETURN]]([[T0_COPY]] : $Cat)
 
 //   Catch other HomeworkErrors.
 // CHECK:    [[NO_MATCH]]:
@@ -167,7 +169,9 @@ class HasThrowingInit {
 // CHECK:      [[T0:%.*]] = mark_uninitialized [rootself] %1 : $HasThrowingInit
 // CHECK-NEXT: [[T1:%.*]] = ref_element_addr [[T0]] : $HasThrowingInit
 // CHECK-NEXT: assign %0 to [[T1]] : $*Int
-// CHECK-NEXT: return [[T0]] : $HasThrowingInit
+// CHECK-NEXT: [[T0_RET:%.*]] = copy_value [[T0]]
+// CHECK-NEXT: destroy_value [[T0]]
+// CHECK-NEXT: return [[T0_RET]] : $HasThrowingInit
 
 // CHECK-LABEL: sil hidden @_TFC6errors15HasThrowingInitC{{.*}} : $@convention(method) (Int, @thick HasThrowingInit.Type) -> (@owned HasThrowingInit, @error Error)
 // CHECK:      [[SELF:%.*]] = alloc_ref $HasThrowingInit
@@ -293,9 +297,11 @@ func testForceTry(_ fn: () -> Int) {
   try! createInt(fn)
 }
 // CHECK-LABEL: sil hidden @_TF6errors12testForceTryFFT_SiT_ : $@convention(thin) (@owned @callee_owned () -> Int) -> ()
-// CHECK: [[T0:%.*]] = function_ref @_TF6errors9createIntFzFT_SiT_ : $@convention(thin) (@owned @callee_owned () -> Int) -> @error Error
-// CHECK: try_apply [[T0]](%0)
-// CHECK: destroy_value
+// CHECK: bb0([[ARG:%.*]] : $@callee_owned () -> Int):
+// CHECK: [[FUNC:%.*]] = function_ref @_TF6errors9createIntFzFT_SiT_ : $@convention(thin) (@owned @callee_owned () -> Int) -> @error Error
+// CHECK: [[ARG_COPY:%.*]] = copy_value [[ARG]]
+// CHECK: try_apply [[FUNC]]([[ARG_COPY]])
+// CHECK: destroy_value [[ARG]]
 // CHECK: return
 // CHECK: builtin "unexpectedError"
 // CHECK: unreachable
@@ -386,77 +392,80 @@ func take_many_cats(_ cats: Cat...) throws {}
 func test_variadic(_ cat: Cat) throws {
   try take_many_cats(make_a_cat(), cat, make_a_cat(), make_a_cat())
 }
-// CHECK-LABEL: sil hidden @_TF6errors13test_variadicFzCS_3CatT_
-// CHECK:       debug_value undef : $Error, var, name "$error", argno 2
-// CHECK:       [[TAKE_FN:%.*]] = function_ref @_TF6errors14take_many_catsFztGSaCS_3Cat__T_ : $@convention(thin) (@owned Array<Cat>) -> @error Error
-// CHECK:       [[N:%.*]] = integer_literal $Builtin.Word, 4
-// CHECK:       [[T0:%.*]] = function_ref @_TFs27_allocateUninitializedArray
-// CHECK:       [[T1:%.*]] = apply [[T0]]<Cat>([[N]])
-// CHECK:       [[ARRAY:%.*]] = tuple_extract [[T1]] :  $(Array<Cat>, Builtin.RawPointer), 0
-// CHECK:       [[T2:%.*]] = tuple_extract [[T1]] :  $(Array<Cat>, Builtin.RawPointer), 1
-// CHECK:       [[ELT0:%.*]] = pointer_to_address [[T2]] : $Builtin.RawPointer to [strict] $*Cat
+
+// CHECK-LABEL: sil hidden @_TF6errors13test_variadicFzCS_3CatT_ : $@convention(thin) (@owned Cat) -> @error Error {
+// CHECK:       bb0([[ARG:%.*]] : $Cat):
+// CHECK:         debug_value undef : $Error, var, name "$error", argno 2
+// CHECK:         [[TAKE_FN:%.*]] = function_ref @_TF6errors14take_many_catsFztGSaCS_3Cat__T_ : $@convention(thin) (@owned Array<Cat>) -> @error Error
+// CHECK:         [[N:%.*]] = integer_literal $Builtin.Word, 4
+// CHECK:         [[T0:%.*]] = function_ref @_TFs27_allocateUninitializedArray
+// CHECK:         [[T1:%.*]] = apply [[T0]]<Cat>([[N]])
+// CHECK:         [[ARRAY:%.*]] = tuple_extract [[T1]] :  $(Array<Cat>, Builtin.RawPointer), 0
+// CHECK:         [[T2:%.*]] = tuple_extract [[T1]] :  $(Array<Cat>, Builtin.RawPointer), 1
+// CHECK:         [[ELT0:%.*]] = pointer_to_address [[T2]] : $Builtin.RawPointer to [strict] $*Cat
 //   Element 0.
-// CHECK:       [[T0:%.*]] = function_ref @_TF6errors10make_a_catFzT_CS_3Cat : $@convention(thin) () -> (@owned Cat, @error Error)
-// CHECK:       try_apply [[T0]]() : $@convention(thin) () -> (@owned Cat, @error Error), normal [[NORM_0:bb[0-9]+]], error [[ERR_0:bb[0-9]+]]
-// CHECK:     [[NORM_0]]([[CAT0:%.*]] : $Cat):
-// CHECK-NEXT:  store [[CAT0]] to [init] [[ELT0]]
+// CHECK:         [[T0:%.*]] = function_ref @_TF6errors10make_a_catFzT_CS_3Cat : $@convention(thin) () -> (@owned Cat, @error Error)
+// CHECK:         try_apply [[T0]]() : $@convention(thin) () -> (@owned Cat, @error Error), normal [[NORM_0:bb[0-9]+]], error [[ERR_0:bb[0-9]+]]
+// CHECK:       [[NORM_0]]([[CAT0:%.*]] : $Cat):
+// CHECK-NEXT:    store [[CAT0]] to [init] [[ELT0]]
 //   Element 1.
-// CHECK-NEXT:  [[T0:%.*]] = integer_literal $Builtin.Word, 1
-// CHECK-NEXT:  [[ELT1:%.*]] = index_addr [[ELT0]] : $*Cat, [[T0]]
-// CHECK-NEXT:  copy_value %0
-// CHECK-NEXT:  store %0 to [init] [[ELT1]]
+// CHECK-NEXT:    [[T0:%.*]] = integer_literal $Builtin.Word, 1
+// CHECK-NEXT:    [[ELT1:%.*]] = index_addr [[ELT0]] : $*Cat, [[T0]]
+// CHECK-NEXT:    [[ARG_COPY:%.*]] = copy_value [[ARG]]
+// CHECK-NEXT:    store [[ARG_COPY]] to [init] [[ELT1]]
 //   Element 2.
-// CHECK-NEXT:  [[T0:%.*]] = integer_literal $Builtin.Word, 2
-// CHECK-NEXT:  [[ELT2:%.*]] = index_addr [[ELT0]] : $*Cat, [[T0]]
-// CHECK-NEXT:  // function_ref
-// CHECK-NEXT:  [[T0:%.*]] = function_ref @_TF6errors10make_a_catFzT_CS_3Cat : $@convention(thin) () -> (@owned Cat, @error Error)
-// CHECK-NEXT:  try_apply [[T0]]() : $@convention(thin) () -> (@owned Cat, @error Error), normal [[NORM_2:bb[0-9]+]], error [[ERR_2:bb[0-9]+]]
-// CHECK:     [[NORM_2]]([[CAT2:%.*]] : $Cat):
-// CHECK-NEXT:  store [[CAT2]] to [init] [[ELT2]]
+// CHECK-NEXT:    [[T0:%.*]] = integer_literal $Builtin.Word, 2
+// CHECK-NEXT:    [[ELT2:%.*]] = index_addr [[ELT0]] : $*Cat, [[T0]]
+// CHECK-NEXT:    // function_ref
+// CHECK-NEXT:    [[T0:%.*]] = function_ref @_TF6errors10make_a_catFzT_CS_3Cat : $@convention(thin) () -> (@owned Cat, @error Error)
+// CHECK-NEXT:    try_apply [[T0]]() : $@convention(thin) () -> (@owned Cat, @error Error), normal [[NORM_2:bb[0-9]+]], error [[ERR_2:bb[0-9]+]]
+// CHECK:       [[NORM_2]]([[CAT2:%.*]] : $Cat):
+// CHECK-NEXT:    store [[CAT2]] to [init] [[ELT2]]
 //   Element 3.
-// CHECK-NEXT:  [[T0:%.*]] = integer_literal $Builtin.Word, 3
-// CHECK-NEXT:  [[ELT3:%.*]] = index_addr [[ELT0]] : $*Cat, [[T0]]
-// CHECK-NEXT:  // function_ref
-// CHECK-NEXT:  [[T0:%.*]] = function_ref @_TF6errors10make_a_catFzT_CS_3Cat : $@convention(thin) () -> (@owned Cat, @error Error)
-// CHECK-NEXT:  try_apply [[T0]]() : $@convention(thin) () -> (@owned Cat, @error Error), normal [[NORM_3:bb[0-9]+]], error [[ERR_3:bb[0-9]+]]
-// CHECK:     [[NORM_3]]([[CAT3:%.*]] : $Cat):
-// CHECK-NEXT:  store [[CAT3]] to [init] [[ELT3]]
+// CHECK-NEXT:    [[T0:%.*]] = integer_literal $Builtin.Word, 3
+// CHECK-NEXT:    [[ELT3:%.*]] = index_addr [[ELT0]] : $*Cat, [[T0]]
+// CHECK-NEXT:    // function_ref
+// CHECK-NEXT:    [[T0:%.*]] = function_ref @_TF6errors10make_a_catFzT_CS_3Cat : $@convention(thin) () -> (@owned Cat, @error Error)
+// CHECK-NEXT:    try_apply [[T0]]() : $@convention(thin) () -> (@owned Cat, @error Error), normal [[NORM_3:bb[0-9]+]], error [[ERR_3:bb[0-9]+]]
+// CHECK:       [[NORM_3]]([[CAT3:%.*]] : $Cat):
+// CHECK-NEXT:    store [[CAT3]] to [init] [[ELT3]]
 //   Complete the call and return.
-// CHECK-NEXT:  try_apply [[TAKE_FN]]([[ARRAY]]) : $@convention(thin) (@owned Array<Cat>) -> @error Error, normal [[NORM_CALL:bb[0-9]+]], error [[ERR_CALL:bb[0-9]+]]
-// CHECK:     [[NORM_CALL]]([[T0:%.*]] : $()):
-// CHECK-NEXT:  destroy_value %0 : $Cat
-// CHECK-NEXT:  [[T0:%.*]] = tuple ()
-// CHECK-NEXT:  return
+// CHECK-NEXT:    try_apply [[TAKE_FN]]([[ARRAY]]) : $@convention(thin) (@owned Array<Cat>) -> @error Error, normal [[NORM_CALL:bb[0-9]+]], error [[ERR_CALL:bb[0-9]+]]
+// CHECK:       [[NORM_CALL]]([[T0:%.*]] : $()):
+// CHECK-NEXT:    destroy_value %0 : $Cat
+// CHECK-NEXT:    [[T0:%.*]] = tuple ()
+// CHECK-NEXT:    return
 //   Failure from element 0.
-// CHECK:     [[ERR_0]]([[ERROR:%.*]] : $Error):
-// CHECK-NEXT:  // function_ref
-// CHECK-NEXT:  [[T0:%.*]] = function_ref @_TFs29_deallocateUninitializedArray
-// CHECK-NEXT:  apply [[T0]]<Cat>([[ARRAY]])
-// CHECK-NEXT:  br [[RETHROW:.*]]([[ERROR]] : $Error)
+// CHECK:       [[ERR_0]]([[ERROR:%.*]] : $Error):
+// CHECK-NEXT:    // function_ref
+// CHECK-NEXT:    [[T0:%.*]] = function_ref @_TFs29_deallocateUninitializedArray
+// CHECK-NEXT:    apply [[T0]]<Cat>([[ARRAY]])
+// CHECK-NEXT:    br [[RETHROW:.*]]([[ERROR]] : $Error)
 //   Failure from element 2.
-// CHECK:     [[ERR_2]]([[ERROR:%.*]] : $Error):
-// CHECK-NEXT:  destroy_addr [[ELT1]]
-// CHECK-NEXT:  destroy_addr [[ELT0]]
-// CHECK-NEXT:  // function_ref
-// CHECK-NEXT:  [[T0:%.*]] = function_ref @_TFs29_deallocateUninitializedArray
-// CHECK-NEXT:  apply [[T0]]<Cat>([[ARRAY]])
-// CHECK-NEXT:  br [[RETHROW]]([[ERROR]] : $Error)
+// CHECK:       [[ERR_2]]([[ERROR:%.*]] : $Error):
+// CHECK-NEXT:    destroy_addr [[ELT1]]
+// CHECK-NEXT:    destroy_addr [[ELT0]]
+// CHECK-NEXT:    // function_ref
+// CHECK-NEXT:    [[T0:%.*]] = function_ref @_TFs29_deallocateUninitializedArray
+// CHECK-NEXT:    apply [[T0]]<Cat>([[ARRAY]])
+// CHECK-NEXT:    br [[RETHROW]]([[ERROR]] : $Error)
 //   Failure from element 3.
-// CHECK:     [[ERR_3]]([[ERROR:%.*]] : $Error):
-// CHECK-NEXT:  destroy_addr [[ELT2]]
-// CHECK-NEXT:  destroy_addr [[ELT1]]
-// CHECK-NEXT:  destroy_addr [[ELT0]]
-// CHECK-NEXT:  // function_ref
-// CHECK-NEXT:  [[T0:%.*]] = function_ref @_TFs29_deallocateUninitializedArray
-// CHECK-NEXT:  apply [[T0]]<Cat>([[ARRAY]])
-// CHECK-NEXT:  br [[RETHROW]]([[ERROR]] : $Error)
+// CHECK:       [[ERR_3]]([[ERROR:%.*]] : $Error):
+// CHECK-NEXT:    destroy_addr [[ELT2]]
+// CHECK-NEXT:    destroy_addr [[ELT1]]
+// CHECK-NEXT:    destroy_addr [[ELT0]]
+// CHECK-NEXT:    // function_ref
+// CHECK-NEXT:    [[T0:%.*]] = function_ref @_TFs29_deallocateUninitializedArray
+// CHECK-NEXT:    apply [[T0]]<Cat>([[ARRAY]])
+// CHECK-NEXT:    br [[RETHROW]]([[ERROR]] : $Error)
 //   Failure from call.
-// CHECK:     [[ERR_CALL]]([[ERROR:%.*]] : $Error):
-// CHECK-NEXT:  br [[RETHROW]]([[ERROR]] : $Error)
+// CHECK:       [[ERR_CALL]]([[ERROR:%.*]] : $Error):
+// CHECK-NEXT:    br [[RETHROW]]([[ERROR]] : $Error)
 //   Rethrow.
-// CHECK:     [[RETHROW]]([[ERROR:%.*]] : $Error):
-// CHECK-NEXT:  destroy_value %0 : $Cat
-// CHECK-NEXT:  throw [[ERROR]]
+// CHECK:       [[RETHROW]]([[ERROR:%.*]] : $Error):
+// CHECK-NEXT:    destroy_value %0 : $Cat
+// CHECK-NEXT:    throw [[ERROR]]
+// CHECK: } // end sil function '_TF6errors13test_variadicFzCS_3CatT_'
 
 // rdar://20861374
 // Clear out the self box before delegating.
@@ -526,12 +535,12 @@ func supportStructure<B: Buildable>(_ b: inout B, name: String) throws {
 }
 // CHECK-LABEL: sil hidden @_TF6errors16supportStructure
 // CHECK: [[SUPPORT:%.*]] = witness_method $B.Structure, #Supportable.support!1 :
-// CHECK: copy_value [[INDEX:%1]] : $String
+// CHECK: [[INDEX_COPY:%.*]] = copy_value [[INDEX:%1]] : $String
 // CHECK: [[MATBUFFER:%.*]] = alloc_stack $Builtin.UnsafeValueBuffer
 // CHECK: [[BUFFER:%.*]] = alloc_stack $B.Structure
 // CHECK: [[BUFFER_CAST:%.*]] = address_to_pointer [[BUFFER]] : $*B.Structure to $Builtin.RawPointer
 // CHECK: [[MAT:%.*]] = witness_method $B, #Buildable.subscript!materializeForSet.1 :
-// CHECK: [[T1:%.*]] = apply [[MAT]]<B, B.Structure>([[BUFFER_CAST]], [[MATBUFFER]], [[INDEX]], [[BASE:%[0-9]*]])
+// CHECK: [[T1:%.*]] = apply [[MAT]]<B, B.Structure>([[BUFFER_CAST]], [[MATBUFFER]], [[INDEX_COPY]], [[BASE:%[0-9]*]])
 // CHECK: [[T2:%.*]] = tuple_extract [[T1]] : {{.*}}, 0
 // CHECK: [[CALLBACK:%.*]] = tuple_extract [[T1]] : {{.*}}, 1
 // CHECK: [[T3:%.*]] = pointer_to_address [[T2]] : $Builtin.RawPointer to [strict] $*B.Structure
@@ -570,25 +579,28 @@ struct Bridge {
 func supportStructure(_ b: inout Bridge, name: String) throws {
   try b[name].support()
 }
-// CHECK:    sil hidden @_TF6errors16supportStructureFzTRVS_6Bridge4nameSS_T_ :
+// CHECK:    sil hidden @_TF6errors16supportStructureFzTRVS_6Bridge4nameSS_T_ : $@convention(thin) (@inout Bridge, @owned String) -> @error Error {
+// CHECK:    bb0([[ARG1:%.*]] : $*Bridge, [[ARG2:%.*]] : $String):
 // CHECK:      [[SUPPORT:%.*]] = function_ref @_TFV6errors5Pylon7support
-// CHECK:      copy_value [[INDEX:%1]] : $String
-// CHECK-NEXT: copy_value [[INDEX]] : $String
+// CHECK-NEXT: [[INDEX_COPY_1:%.*]] = copy_value [[ARG2]] : $String
+// CHECK-NEXT: [[INDEX_COPY_2:%.*]] = copy_value [[INDEX_COPY_1]] : $String
 // CHECK-NEXT: [[TEMP:%.*]] = alloc_stack $Pylon
-// CHECK-NEXT: [[BASE:%.*]] = load [[B:%[0-9]*]] : $*Bridge
-// CHECK-NEXT: copy_value [[BASE]]
-// CHECK-NEXT: function_ref
+// CHECK-NEXT: [[BASE:%.*]] = load [[ARG1]] : $*Bridge
+// CHECK-NEXT: [[BASE_COPY:%.*]] = copy_value [[BASE]]
+// CHECK-NEXT: // function_ref
 // CHECK-NEXT: [[GETTER:%.*]] = function_ref @_TFV6errors6Bridgeg9subscriptFSSVS_5Pylon :
-// CHECK-NEXT: [[T0:%.*]] = apply [[GETTER]]([[INDEX]], [[BASE]])
+// ==> SEMANTIC ARC TODO: Next line [[BASE]] should be [[BASE_COPY]]
+// CHECK-NEXT: [[T0:%.*]] = apply [[GETTER]]([[INDEX_COPY_1]], [[BASE]])
+// ==> SEMANTIC ARC TODO: Next line [[BASE]] should be [[BASE_COPY]]
 // CHECK-NEXT: destroy_value [[BASE]]
 // CHECK-NEXT: store [[T0]] to [init] [[TEMP]]
 // CHECK-NEXT: try_apply [[SUPPORT]]([[TEMP]]) : {{.*}}, normal [[BB_NORMAL:bb[0-9]+]], error [[BB_ERROR:bb[0-9]+]]
 
 // CHECK:    [[BB_NORMAL]]
 // CHECK-NEXT: [[T0:%.*]] = load [[TEMP]]
-// CHECK-NEXT: function_ref
+// CHECK-NEXT: // function_ref
 // CHECK-NEXT: [[SETTER:%.*]] = function_ref @_TFV6errors6Bridges9subscriptFSSVS_5Pylon :
-// CHECK-NEXT: apply [[SETTER]]([[T0]], [[INDEX]], [[B]])
+// CHECK-NEXT: apply [[SETTER]]([[T0]], [[INDEX_COPY_2]], [[ARG1]])
 // CHECK-NEXT: dealloc_stack [[TEMP]]
 // CHECK-NEXT: destroy_value [[INDEX]] : $String
 // CHECK-NEXT: tuple ()
@@ -598,16 +610,19 @@ func supportStructure(_ b: inout Bridge, name: String) throws {
 //   consume things during cleanup emission.  It's questionable.
 // CHECK:    [[BB_ERROR]]([[ERROR:%.*]] : $Error):
 // CHECK-NEXT: [[T0:%.*]] = load [[TEMP]]
-// CHECK-NEXT: copy_value [[T0]]
-// CHECK-NEXT: copy_value [[INDEX]] : $String
-// CHECK-NEXT: function_ref
+// CHECK-NEXT: [[T0_COPY:%.*]] = copy_value [[T0]]
+// CHECK-NEXT: [[INDEX_COPY_2_COPY:%.*]] = copy_value [[INDEX_COPY_2]]
+// CHECK-NEXT: // function_ref
 // CHECK-NEXT: [[SETTER:%.*]] = function_ref @_TFV6errors6Bridges9subscriptFSSVS_5Pylon :
-// CHECK-NEXT: apply [[SETTER]]([[T0]], [[INDEX]], [[B]])
+// ==> SEMANTIC ARC TODO: T0 on the next line should be T0_COPY
+// CHECK-NEXT: apply [[SETTER]]([[T0]], [[INDEX_COPY_2_COPY]], [[ARG1]])
 // CHECK-NEXT: destroy_addr [[TEMP]]
 // CHECK-NEXT: dealloc_stack [[TEMP]]
-// CHECK-NEXT: destroy_value [[INDEX]] : $String
+// ==> SEMANTIC ARC TODO: INDEX_COPY_2 on the next ilne should be INDEX_COPY_2_COPY
+// CHECK-NEXT: destroy_value [[INDEX_COPY_2]] : $String
 // CHECK-NEXT: destroy_value [[INDEX]] : $String
 // CHECK-NEXT: throw [[ERROR]]
+// CHECK: } // end sil function '_TF6errors16supportStructureFzTRVS_6Bridge4nameSS_T_'
 
 struct OwnedBridge {
   var owner : Builtin.UnknownObject
@@ -619,12 +634,13 @@ struct OwnedBridge {
 func supportStructure(_ b: inout OwnedBridge, name: String) throws {
   try b[name].support()
 }
-// CHECK: sil hidden @_TF6errors16supportStructureFzTRVS_11OwnedBridge4nameSS_T_ :
+// CHECK:    sil hidden @_TF6errors16supportStructureFzTRVS_11OwnedBridge4nameSS_T_ :
+// CHECK:    bb0([[ARG1:%.*]] : $*OwnedBridge, [[ARG2:%.*]] : $String):
 // CHECK:      [[SUPPORT:%.*]] = function_ref @_TFV6errors5Pylon7support
-// CHECK:      copy_value [[INDEX:%1]] : $String
-// CHECK-NEXT: function_ref
+// CHECK:      [[ARG2_COPY:%.*]] = copy_value [[ARG2]] : $String
+// CHECK-NEXT: // function_ref
 // CHECK-NEXT: [[ADDRESSOR:%.*]] = function_ref @_TFV6errors11OwnedBridgeaO9subscriptFSSVS_5Pylon :
-// CHECK-NEXT: [[T0:%.*]] = apply [[ADDRESSOR]]([[INDEX]], [[BASE:%[0-9]*]])
+// CHECK-NEXT: [[T0:%.*]] = apply [[ADDRESSOR]]([[ARG2_COPY]], [[ARG1]])
 // CHECK-NEXT: [[T1:%.*]] = tuple_extract [[T0]] : {{.*}}, 0
 // CHECK-NEXT: [[OWNER:%.*]] = tuple_extract [[T0]] : {{.*}}, 1
 // CHECK-NEXT: [[T3:%.*]] = struct_extract [[T1]]
@@ -633,13 +649,14 @@ func supportStructure(_ b: inout OwnedBridge, name: String) throws {
 // CHECK-NEXT: try_apply [[SUPPORT]]([[T5]]) : {{.*}}, normal [[BB_NORMAL:bb[0-9]+]], error [[BB_ERROR:bb[0-9]+]]
 // CHECK:    [[BB_NORMAL]]
 // CHECK-NEXT: destroy_value [[OWNER]] : $Builtin.UnknownObject
-// CHECK-NEXT: destroy_value [[INDEX]] : $String
+// CHECK-NEXT: destroy_value [[ARG2]] : $String
 // CHECK-NEXT: tuple ()
 // CHECK-NEXT: return
 // CHECK:    [[BB_ERROR]]([[ERROR:%.*]] : $Error):
 // CHECK-NEXT: destroy_value [[OWNER]] : $Builtin.UnknownObject
-// CHECK-NEXT: destroy_value [[INDEX]] : $String
+// CHECK-NEXT: destroy_value [[ARG2]] : $String
 // CHECK-NEXT: throw [[ERROR]]
+// CHECK: } // end sil function '_TF6errors16supportStructureFzTRVS_11OwnedBridge4nameSS_T_'
 
 struct PinnedBridge {
   var owner : Builtin.NativeObject
@@ -651,29 +668,31 @@ struct PinnedBridge {
 func supportStructure(_ b: inout PinnedBridge, name: String) throws {
   try b[name].support()
 }
-// CHECK: sil hidden @_TF6errors16supportStructureFzTRVS_12PinnedBridge4nameSS_T_ :
-// CHECK:      [[SUPPORT:%.*]] = function_ref @_TFV6errors5Pylon7support
-// CHECK:      copy_value [[INDEX:%1]] : $String
-// CHECK-NEXT: function_ref
-// CHECK-NEXT: [[ADDRESSOR:%.*]] = function_ref @_TFV6errors12PinnedBridgeap9subscriptFSSVS_5Pylon :
-// CHECK-NEXT: [[T0:%.*]] = apply [[ADDRESSOR]]([[INDEX]], [[BASE:%[0-9]*]])
-// CHECK-NEXT: [[T1:%.*]] = tuple_extract [[T0]] : {{.*}}, 0
-// CHECK-NEXT: [[OWNER:%.*]] = tuple_extract [[T0]] : {{.*}}, 1
-// CHECK-NEXT: [[T3:%.*]] = struct_extract [[T1]]
-// CHECK-NEXT: [[T4:%.*]] = pointer_to_address [[T3]]
-// CHECK-NEXT: [[T5:%.*]] = mark_dependence [[T4]] : $*Pylon on [[OWNER]]
-// CHECK-NEXT: try_apply [[SUPPORT]]([[T5]]) : {{.*}}, normal [[BB_NORMAL:bb[0-9]+]], error [[BB_ERROR:bb[0-9]+]]
-// CHECK:    [[BB_NORMAL]]
-// CHECK-NEXT: strong_unpin [[OWNER]] : $Optional<Builtin.NativeObject>
-// CHECK-NEXT: destroy_value [[INDEX]] : $String
-// CHECK-NEXT: tuple ()
-// CHECK-NEXT: return
-// CHECK:    [[BB_ERROR]]([[ERROR:%.*]] : $Error):
-// CHECK-NEXT: copy_value [[OWNER]]
-// CHECK-NEXT: strong_unpin [[OWNER]] : $Optional<Builtin.NativeObject>
-// CHECK-NEXT: destroy_value [[OWNER]]
-// CHECK-NEXT: destroy_value [[INDEX]] : $String
-// CHECK-NEXT: throw [[ERROR]]
+// CHECK:      sil hidden @_TF6errors16supportStructureFzTRVS_12PinnedBridge4nameSS_T_ :
+// CHECK:      bb0([[ARG1:%.*]] : $*PinnedBridge, [[ARG2:%.*]] : $String):
+// CHECK:        [[SUPPORT:%.*]] = function_ref @_TFV6errors5Pylon7support
+// CHECK:        [[ARG2_COPY:%.*]] = copy_value [[ARG2]] : $String
+// CHECK-NEXT:   // function_ref
+// CHECK-NEXT:   [[ADDRESSOR:%.*]] = function_ref @_TFV6errors12PinnedBridgeap9subscriptFSSVS_5Pylon :
+// CHECK-NEXT:   [[T0:%.*]] = apply [[ADDRESSOR]]([[ARG2_COPY]], [[ARG1]])
+// CHECK-NEXT:   [[T1:%.*]] = tuple_extract [[T0]] : {{.*}}, 0
+// CHECK-NEXT:   [[OWNER:%.*]] = tuple_extract [[T0]] : {{.*}}, 1
+// CHECK-NEXT:   [[T3:%.*]] = struct_extract [[T1]]
+// CHECK-NEXT:   [[T4:%.*]] = pointer_to_address [[T3]]
+// CHECK-NEXT:   [[T5:%.*]] = mark_dependence [[T4]] : $*Pylon on [[OWNER]]
+// CHECK-NEXT:   try_apply [[SUPPORT]]([[T5]]) : {{.*}}, normal [[BB_NORMAL:bb[0-9]+]], error [[BB_ERROR:bb[0-9]+]]
+// CHECK:      [[BB_NORMAL]]
+// CHECK-NEXT:   strong_unpin [[OWNER]] : $Optional<Builtin.NativeObject>
+// CHECK-NEXT:   destroy_value [[ARG2]] : $String
+// CHECK-NEXT:   tuple ()
+// CHECK-NEXT:   return
+// CHECK:      [[BB_ERROR]]([[ERROR:%.*]] : $Error):
+// CHECK-NEXT:   [[OWNER_COPY:%.*]] = copy_value [[OWNER]]
+// CHECK-NEXT:   strong_unpin [[OWNER_COPY]] : $Optional<Builtin.NativeObject>
+// CHECK-NEXT:   destroy_value [[OWNER]]
+// CHECK-NEXT:   destroy_value [[ARG2]] : $String
+// CHECK-NEXT:   throw [[ERROR]]
+// CHECK: } // end sil function '_TF6errors16supportStructureFzTRVS_12PinnedBridge4nameSS_T_'
 
 // ! peepholes its argument with getSemanticsProvidingExpr().
 // Test that that doesn't look through try!.

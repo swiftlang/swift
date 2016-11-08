@@ -378,53 +378,59 @@ func test_var_return() {
 func test_let() {
   // CHECK: [[FOOS:%.*]] = function_ref @_TF10switch_var4foosFT_SS
   // CHECK: [[VAL:%.*]] = apply [[FOOS]]()
-
-  // CHECK: copy_value [[VAL]]
+  // CHECK: [[VAL_COPY:%.*]] = copy_value [[VAL]]
   // CHECK: function_ref @_TF10switch_var6runcedFT_Sb
   // CHECK: cond_br {{%.*}}, [[CASE1:bb[0-9]+]], [[NO_CASE1:bb[0-9]+]]
   switch foos() {
   case let x where runced():
-    // CHECK: [[CASE1]]:
-    // CHECK: [[A:%.*]] = function_ref @_TF10switch_var1aFT1xSS_T_
-    // CHECK: copy_value [[VAL]]
-    // CHECK: apply [[A]]([[VAL]])
-    // CHECK: destroy_value [[VAL]]
-    // CHECK: destroy_value [[VAL]]
-    // CHECK: br [[CONT:bb[0-9]+]]
+  // CHECK: [[CASE1]]:
+  // CHECK:   [[A:%.*]] = function_ref @_TF10switch_var1aFT1xSS_T_
+  // CHECK:   [[VAL_COPY_COPY:%.*]] = copy_value [[VAL_COPY]]
+  // CHECK:   apply [[A]]([[VAL_COPY_COPY]])
+  // CHECK:   destroy_value [[VAL_COPY]]
+  // CHECK:   destroy_value [[VAL]]
+  // CHECK:   br [[CONT:bb[0-9]+]]
     a(x: x)
   // CHECK: [[NO_CASE1]]:
-  // CHECK:   destroy_value [[VAL]]
+  // CHECK:   destroy_value [[VAL_COPY]]
   // CHECK:   br [[TRY_CASE2:bb[0-9]+]]
   // CHECK: [[TRY_CASE2]]:
-  // CHECK:   copy_value [[VAL]]
+  // CHECK:   [[VAL_COPY_2:%.*]] = copy_value [[VAL]]
   // CHECK:   function_ref @_TF10switch_var6fungedFT_Sb
   // CHECK:   cond_br {{%.*}}, [[CASE2:bb[0-9]+]], [[NO_CASE2:bb[0-9]+]]
   case let y where funged():
-    // CHECK: [[CASE2]]:
-    // CHECK: [[B:%.*]] = function_ref @_TF10switch_var1bFT1xSS_T_
-    // CHECK: copy_value [[VAL]]
-    // CHECK: apply [[B]]([[VAL]])
-    // CHECK: destroy_value [[VAL]]
-    // CHECK: destroy_value [[VAL]]
-    // CHECK: br [[CONT]]
+  // CHECK: [[CASE2]]:
+  // CHECK:   [[B:%.*]] = function_ref @_TF10switch_var1bFT1xSS_T_
+  // CHECK:   [[VAL_COPY_2_COPY:%.*]] = copy_value [[VAL_COPY_2]]
+  // CHECK:   apply [[B]]([[VAL_COPY_2_COPY]])
+  // CHECK:   destroy_value [[VAL_COPY_2]]
+  // CHECK:   destroy_value [[VAL]]
+  // CHECK:   br [[CONT]]
     b(x: y)
   // CHECK: [[NO_CASE2]]:
-  // CHECK:   copy_value [[VAL]]
+  // CHECK:   destroy_value [[VAL_COPY_2]]
+  // CHECK:   br [[NEXT_CASE:bb6]]
+
+  // CHECK: [[NEXT_CASE]]:
+  // CHECK:   [[VAL_COPY_3:%.*]] = copy_value [[VAL]]
   // CHECK:   function_ref @_TF10switch_var4barsFT_SS
-  // CHECK:   copy_value [[VAL]]
+  // CHECK:   [[VAL_COPY_3_COPY:%.*]] = copy_value [[VAL_COPY_3]]
+  // CHECK:   store [[VAL_COPY_3_COPY]] to [init] [[IN_ARG:%.*]] :
+  // CHECK:   apply {{%.*}}<String>({{.*}}, [[IN_ARG]])
   // CHECK:   cond_br {{%.*}}, [[YES_CASE3:bb[0-9]+]], [[NO_CASE3:bb[0-9]+]]
-  // CHECK: [[YES_CASE3]]:
-  // CHECK:   destroy_value [[VAL]]
-  // CHECK:   destroy_value [[VAL]]
   // ExprPatterns implicitly contain a 'let' binding.
   case bars():
-    // CHECK:   function_ref @_TF10switch_var1cFT_T_
-    // CHECK:   br [[CONT]]
+  // CHECK: [[YES_CASE3]]:
+  // CHECK:   destroy_value [[VAL_COPY_3]]
+  // CHECK:   destroy_value [[VAL]]
+  // CHECK:   function_ref @_TF10switch_var1cFT_T_
+  // CHECK:   br [[CONT]]
     c()
   // CHECK: [[NO_CASE3]]:
-  // CHECK:   destroy_value [[VAL]]
-  // CHECK:   br [[LEAVE_CASE3:bb[0-9]+]]
-  // CHECK: [[LEAVE_CASE3]]:
+  // CHECK:   destroy_value [[VAL_COPY_3]]
+  // CHECK:   br [[NEXT_CASE:bb9+]]
+
+  // CHECK: [[NEXT_CASE]]:
   case _:
     // CHECK:   destroy_value [[VAL]]
     // CHECK:   function_ref @_TF10switch_var1dFT_T_
@@ -434,33 +440,87 @@ func test_let() {
   // CHECK: [[CONT]]:
   // CHECK:   return
 }
+// CHECK: } // end sil function '_TF10switch_var8test_letFT_T_'
 
 // If one of the bindings is a "var", allocate a box for the column.
 // CHECK-LABEL: sil hidden @_TF10switch_var18test_mixed_let_varFT_T_ : $@convention(thin) () -> () {
 func test_mixed_let_var() {
-  // CHECK: [[FOOS:%.*]] = function_ref @_TF10switch_var4foosFT_SS
-  // CHECK: [[VAL:%.*]] = apply [[FOOS]]()
+  // CHECK: bb0:
+  // CHECK:   [[FOOS:%.*]] = function_ref @_TF10switch_var4foosFT_SS
+  // CHECK:   [[VAL:%.*]] = apply [[FOOS]]()
   switch foos() {
+
+  // First pattern.
+  // CHECK:   [[BOX:%.*]] = alloc_box $@box String, var, name "x"
+  // CHECK:   [[PBOX:%.*]] = project_box [[BOX]]
+  // CHECK:   [[VAL_COPY:%.*]] = copy_value [[VAL]]
+  // CHECK:   store [[VAL_COPY]] to [[PBOX]]
+  // CHECK:   cond_br {{.*}}, [[CASE1:bb[0-9]+]], [[NOCASE1:bb[0-9]+]]
   case var x where runced():
-    // CHECK: [[BOX:%.*]] = alloc_box $@box String, var, name "x"
-    // CHECK: [[PBOX:%.*]] = project_box [[BOX]]
-    // CHECK: [[VAL_COPY:%.*]] = copy_value [[VAL]]
-    // CHECK: store [[VAL_COPY]] to [[PBOX]]
-    // CHECK: [[A:%.*]] = function_ref @_TF10switch_var1aFT1xSS_T_
-    // CHECK: [[X:%.*]] = load [[PBOX]]
-    // CHECK: apply [[A]]([[X]])
+  // CHECK: [[CASE1]]:
+  // CHECK:   [[A:%.*]] = function_ref @_TF10switch_var1aFT1xSS_T_
+  // CHECK:   [[X:%.*]] = load [[PBOX]]
+  // CHECK:   [[X_COPY:%.*]] = copy_value [[X]]
+  // SEMANTIC ARC TODO: The next line should pass in X_COPY, not X
+  // CHECK:   apply [[A]]([[X]])
+  // CHECK:   destroy_value [[BOX]]
+  // CHECK:   br [[CONT:bb[0-9]+]]
     a(x: x)
+
+  // CHECK: [[NOCASE1]]:
+  // CHECK:   destroy_value [[BOX]]
+  // CHECK:   br [[NEXT_PATTERN:bb[0-9]+]]
+
+  // CHECK: [[NEXT_PATTERN]]:
+  // CHECK:   [[VAL_COPY:%.*]] = copy_value [[VAL]]
+  // CHECK:   cond_br {{.*}}, [[CASE2:bb[0-9]+]], [[NOCASE2:bb[0-9]+]]
   case let y where funged():
-    // CHECK: [[B:%.*]] = function_ref @_TF10switch_var1bFT1xSS_T_
-    // CHECK: copy_value [[VAL]]
-    // CHECK: apply [[B]]([[VAL]])
-    b(x: y)
+
+  // CHECK: [[CASE2]]:
+  // CHECK:   [[B:%.*]] = function_ref @_TF10switch_var1bFT1xSS_T_
+  // CHECK:   [[VAL_COPY_COPY:%.*]] = copy_value [[VAL_COPY]]
+  // CHECK:   apply [[B]]([[VAL_COPY_COPY]])
+  // CHECK:   destroy_value [[VAL_COPY]]
+  // CHECK:   destroy_value [[VAL]]
+  // CHECK:   br [[CONT]]  
+  b(x: y)
+
+  // CHECK: [[NOCASE2]]:
+  // CHECK:   destroy_value [[VAL_COPY]]
+  // CHECK:   br [[NEXT_CASE:bb[0-9]+]]
+
+  // CHECK: [[NEXT_CASE]]
+  // CHECK:   [[VAL_COPY:%.*]] = copy_value [[VAL]]
+  // CHECK:   [[VAL_COPY_COPY:%.*]] = copy_value [[VAL_COPY]]
+  // CHECK:   store [[VAL_COPY_COPY]] to [init] [[TMP_VAL_COPY_ADDR:%.*]] : $*String
+  // CHECK:   apply {{.*}}<String>({{.*}}, [[TMP_VAL_COPY_ADDR]])
+  // CHECK:   cond_br {{.*}}, [[CASE3:bb[0-9]+]], [[NOCASE3:bb[0-9]+]]
   case bars():
+  // CHECK: [[CASE3]]:
+  // CHECK:   destroy_value [[VAL_COPY]]
+  // CHECK:   destroy_value [[VAL]]
+  // CHECK:   [[FUNC:%.*]] = function_ref @_TF10switch_var1cFT_T_ : $@convention(thin) () -> ()
+  // CHECK:   apply [[FUNC]]()
+  // CHECK:   br [[CONT]]
     c()
+
+  // CHECK: [[NOCASE3]]:
+  // CHECK:   destroy_value [[VAL_COPY]]
+  // CHECK:   br [[NEXT_CASE:bb[0-9]+]]
+
+  // CHECK: [[NEXT_CASE]]:
+  // CHECK:   destroy_value [[VAL]]
+  // CHECK:   [[D_FUNC:%.*]] = function_ref @_TF10switch_var1dFT_T_ : $@convention(thin) () -> ()
+  // CHECK:   apply [[D_FUNC]]()
+  // CHECK:   br [[CONT]]
   case _:
     d()
   }
+
+  // CHECK: [[CONT]]:
+  // CHECK:   return
 }
+// CHECK: } // end sil function '_TF10switch_var18test_mixed_let_varFT_T_'
 
 // CHECK-LABEL: sil hidden @_TF10switch_var23test_multiple_patterns1FT_T_ : $@convention(thin) () -> () {
 func test_multiple_patterns1() {

@@ -1171,7 +1171,7 @@ namespace {
       // we've still got a release active.
       SILValue baseValue = (isFinal ? base.forward(gen) : base.getValue());
       if (!isFinal)
-        gen.B.createCopyValue(loc, baseValue);
+        baseValue = gen.B.createCopyValue(loc, baseValue);
 
       gen.B.createStrongUnpin(loc, baseValue, Atomicity::Atomic);
     }
@@ -2162,8 +2162,7 @@ SILValue SILGenFunction::emitConversionToSemanticRValue(SILLocation loc,
     auto result = B.createUnmanagedToRef(loc, src,
               SILType::getPrimitiveObjectType(unmanagedType.getReferentType()));
     // SEMANTIC ARC TODO: Does this need a cleanup?
-    B.createCopyValue(loc, result);
-    return result;
+    return B.createCopyValue(loc, result);
   }
 
   llvm_unreachable("unexpected storage type that differs from type-of-rvalue");
@@ -2207,8 +2206,7 @@ static SILValue emitLoadOfSemanticRValue(SILGenFunction &gen,
     auto result = gen.B.createUnmanagedToRef(loc, value,
             SILType::getPrimitiveObjectType(unmanagedType.getReferentType()));
     // SEMANTIC ARC TODO: Does this need a cleanup?
-    gen.B.createCopyValue(loc, result);
-    return result;
+    return gen.B.createCopyValue(loc, result);
   }
 
   // NSString * must be bridged to String.
@@ -2242,7 +2240,7 @@ static void emitStoreOfSemanticRValue(SILGenFunction &gen,
     gen.B.createStoreWeak(loc, value, dest, isInit);
 
     // store_weak doesn't take ownership of the input, so cancel it out.
-    gen.B.emitDestroyValueAndFold(loc, value);
+    gen.B.emitDestroyValueOperation(loc, value);
     return;
   }
 
@@ -2254,7 +2252,7 @@ static void emitStoreOfSemanticRValue(SILGenFunction &gen,
       gen.B.createStoreUnowned(loc, value, dest, isInit);
 
       // store_unowned doesn't take ownership of the input, so cancel it out.
-      gen.B.emitDestroyValueAndFold(loc, value);
+      gen.B.emitDestroyValueOperation(loc, value);
       return;
     }
 
@@ -2262,7 +2260,7 @@ static void emitStoreOfSemanticRValue(SILGenFunction &gen,
       gen.B.createRefToUnowned(loc, value, storageType.getObjectType());
     gen.B.createUnownedRetain(loc, unownedValue, Atomicity::Atomic);
     emitUnloweredStoreOfCopy(gen.B, loc, unownedValue, dest, isInit);
-    gen.B.emitDestroyValueAndFold(loc, value);
+    gen.B.emitDestroyValueOperation(loc, value);
     return;
   }
 
@@ -2272,7 +2270,7 @@ static void emitStoreOfSemanticRValue(SILGenFunction &gen,
     auto unmanagedValue =
       gen.B.createRefToUnmanaged(loc, value, storageType.getObjectType());
     emitUnloweredStoreOfCopy(gen.B, loc, unmanagedValue, dest, isInit);
-    gen.B.emitDestroyValueAndFold(loc, value);
+    gen.B.emitDestroyValueOperation(loc, value);
     return;
   }
 
@@ -2362,7 +2360,7 @@ SILValue SILGenFunction::emitConversionFromSemanticValue(SILLocation loc,
 
     SILValue unowned = B.createRefToUnowned(loc, semanticValue, storageType);
     B.createUnownedRetain(loc, unowned, Atomicity::Atomic);
-    B.emitDestroyValueAndFold(loc, semanticValue);
+    B.emitDestroyValueOperation(loc, semanticValue);
     return unowned;
   }
 
@@ -2370,7 +2368,7 @@ SILValue SILGenFunction::emitConversionFromSemanticValue(SILLocation loc,
   if (storageType.is<UnmanagedStorageType>()) {
     SILValue unmanaged =
       B.createRefToUnmanaged(loc, semanticValue, storageType);
-    B.emitDestroyValueAndFold(loc, semanticValue);
+    B.emitDestroyValueOperation(loc, semanticValue);
     return unmanaged;
   }
   

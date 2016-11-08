@@ -20,8 +20,8 @@ func if_no_else() {
   if let x = foo() {
   // CHECK: [[YES]]([[VAL:%[0-9]+]] : $String):
   // CHECK:   [[A:%.*]] = function_ref @_TF16if_while_binding
-  // CHECK:   copy_value [[VAL]]
-  // CHECK:   apply [[A]]([[VAL]])
+  // CHECK:   [[VAL_COPY:%.*]] = copy_value [[VAL]]
+  // CHECK:   apply [[A]]([[VAL_COPY]])
   // CHECK:   destroy_value [[VAL]]
   // CHECK:   br [[CONT]]
     a(x)
@@ -29,6 +29,7 @@ func if_no_else() {
   // CHECK: [[CONT]]:
   // CHECK-NEXT:   tuple ()
 }
+// CHECK: } // end sil function '_TF16if_while_binding10if_no_else{{.*}}'
 
 // CHECK-LABEL: sil hidden @_TF16if_while_binding13if_else_chainFT_T_ : $@convention(thin) () -> () {
 func if_else_chain() {
@@ -39,8 +40,8 @@ func if_else_chain() {
   // CHECK: [[YESX]]([[VAL:%[0-9]+]] : $String):
   // CHECK:   debug_value [[VAL]] : $String, let, name "x"
   // CHECK:   [[A:%.*]] = function_ref @_TF16if_while_binding
-  // CHECK:   copy_value [[VAL]]
-  // CHECK:   apply [[A]]([[VAL]])
+  // CHECK:   [[VAL_COPY:%.*]] = copy_value [[VAL]]
+  // CHECK:   apply [[A]]([[VAL_COPY]])
   // CHECK:   destroy_value [[VAL]]
   // CHECK:   br [[CONT_X:bb[0-9]+]]
     a(x)
@@ -136,9 +137,10 @@ func while_loop_multi() {
   // CHECK: [[LOOP_BODY]]([[B:%[0-9]+]] : $String):
   while let a = foo(), let b = bar() {
     // CHECK:   debug_value [[B]] : $String, let, name "b"
-    // CHECK:   debug_value [[A]] : $String, let, name "c"
+    // CHECK:   [[A_COPY:%.*]] = copy_value [[A]]
+    // CHECK:   debug_value [[A_COPY]] : $String, let, name "c"
+    // CHECK:   destroy_value [[A_COPY]]
     // CHECK:   destroy_value [[B]]
-    // CHECK:   destroy_value [[A]]
     // CHECK:   br [[LOOP_ENTRY]]
     let c = a
   }
@@ -260,10 +262,12 @@ func if_leading_boolean(_ a : Int) {
   // CHECK:   switch_enum [[OPTRESULT]] : $Optional<String>, case #Optional.some!enumelt.1: [[SUCCESS:bb.*]], default [[IF_DONE:bb[0-9]+]]
 
 // CHECK: [[SUCCESS]]([[B:%[0-9]+]] : $String):
-  // CHECK-NEXT:   debug_value [[B:%[0-9]+]] : $String, let, name "b"
-  // CHECK-NEXT:   debug_value [[B:%[0-9]+]] : $String, let, name "c"
-  // CHECK-NEXT:   destroy_value [[B]]
-  // CHECK-NEXT:   br [[IFDONE]]
+  // CHECK:   debug_value [[B]] : $String, let, name "b"
+  // CHECK:   [[B_COPY:%.*]] = copy_value [[B]]
+  // CHECK:   debug_value [[B_COPY]] : $String, let, name "c"
+  // CHECK:   destroy_value [[B_COPY]]
+  // CHECK:   destroy_value [[B]]
+  // CHECK:   br [[IFDONE]]
   if a == a, let b = foo() {
     let c = b
   }
@@ -279,36 +283,35 @@ class DerivedClass : BaseClass {}
 
 // CHECK-LABEL: sil hidden @_TF16if_while_binding20testAsPatternInIfLetFGSqCS_9BaseClass_T_
 func testAsPatternInIfLet(_ a : BaseClass?) {
-  // CHECK: bb0(%0 : $Optional<BaseClass>):
-  // CHECK-NEXT:   debug_value %0 : $Optional<BaseClass>, let, name "a"
-  // CHECK-NEXT:   copy_value %0 : $Optional<BaseClass>
-  // CHECK-NEXT:   switch_enum %0 : $Optional<BaseClass>, case #Optional.some!enumelt.1: [[OPTPRESENTBB:bb[0-9]+]], default [[NILBB:bb[0-9]+]]
-  
-  // CHECK:      [[OPTPRESENTBB]](%4 : $BaseClass):
-  // CHECK-NEXT:   checked_cast_br %4 : $BaseClass to $DerivedClass, [[ISDERIVEDBB:bb[0-9]+]], [[ISBASEBB:bb[0-9]+]]
+  // CHECK: bb0([[ARG:%.*]] : $Optional<BaseClass>):
+  // CHECK:   debug_value [[ARG]] : $Optional<BaseClass>, let, name "a"
+  // CHECK:   [[ARG_COPY:%.*]] = copy_value [[ARG]] : $Optional<BaseClass>
+  // CHECK:   switch_enum [[ARG_COPY]] : $Optional<BaseClass>, case #Optional.some!enumelt.1: [[OPTPRESENTBB:bb[0-9]+]], default [[NILBB:bb[0-9]+]]
 
-  // CHECK:      [[ISDERIVEDBB]](%6 : $DerivedClass):
-  // CHECK:    enum $Optional<DerivedClass>, #Optional.some!enumelt.1, %6 : $DerivedClass
-  // CHECK:    br [[MERGE:bb[0-9]+]](
+  // CHECK: [[OPTPRESENTBB]]([[CLS:%.*]] : $BaseClass):
+  // CHECK:   checked_cast_br [[CLS]] : $BaseClass to $DerivedClass, [[ISDERIVEDBB:bb[0-9]+]], [[ISBASEBB:bb[0-9]+]]
+
+  // CHECK: [[ISDERIVEDBB]]([[DERIVED_CLS:%.*]] : $DerivedClass):
+  // CHECK:   [[DERIVED_CLS_SOME:%.*]] = enum $Optional<DerivedClass>, #Optional.some!enumelt.1, [[DERIVED_CLS]] : $DerivedClass
+  // CHECK:   br [[MERGE:bb[0-9]+]]([[DERIVED_CLS_SOME]] : $Optional<DerivedClass>)
 
   // CHECK: [[ISBASEBB]]:
-  // CHECK:    destroy_value %4 : $BaseClass
-  // CHECK: = enum $Optional<DerivedClass>, #Optional.none!enumelt
-  // CHECK: br [[MERGE]](
+  // CHECK:   destroy_value [[CLS]] : $BaseClass
+  // CHECK:   = enum $Optional<DerivedClass>, #Optional.none!enumelt
+  // CHECK:   br [[MERGE]](
 
   // CHECK: [[MERGE]]([[OPTVAL:%[0-9]+]] : $Optional<DerivedClass>):
   // CHECK:    switch_enum [[OPTVAL]] : $Optional<DerivedClass>, case #Optional.some!enumelt.1: [[ISDERIVEDBB:bb[0-9]+]], default [[NILBB:bb[0-9]+]]
 
-  // CHECK:      [[ISDERIVEDBB]]([[DERIVEDVAL:%[0-9]+]] : $DerivedClass):
-  // CHECK-NEXT:   debug_value [[DERIVEDVAL]] : $DerivedClass
-  // CHECK-NEXT:   destroy_value [[DERIVEDVAL]] : $DerivedClass
-  // CHECK-NEXT:   br [[NILBB]]
-   
+  // CHECK: [[ISDERIVEDBB]]([[DERIVEDVAL:%[0-9]+]] : $DerivedClass):
+  // CHECK:   debug_value [[DERIVEDVAL]] : $DerivedClass
+  // CHECK:   destroy_value [[DERIVEDVAL]] : $DerivedClass
+  // CHECK:   br [[NILBB]]
   
-  // CHECK:      [[NILBB]]:
-  // CHECK-NEXT:   destroy_value %0 : $Optional<BaseClass>
-  // CHECK-NEXT:   tuple ()
-  // CHECK-NEXT:   return
+  // CHECK: [[NILBB]]:
+  // CHECK:   destroy_value [[ARG]] : $Optional<BaseClass>
+  // CHECK:   tuple ()
+  // CHECK:   return
   if case let b as DerivedClass = a {
 
   }

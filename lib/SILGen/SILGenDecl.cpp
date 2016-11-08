@@ -116,7 +116,7 @@ namespace {
   public:
     CleanupClosureConstant(SILValue closure) : closure(closure) {}
     void emit(SILGenFunction &gen, CleanupLocation l) override {
-      gen.B.emitDestroyValueAndFold(l, closure);
+      gen.B.emitDestroyValueOperation(l, closure);
     }
   };
 }
@@ -208,7 +208,7 @@ public:
 
   void emit(SILGenFunction &gen, CleanupLocation l) override {
     if (v->getType().isAddress())
-      gen.B.emitDestroyAddrAndFold(l, v);
+      gen.B.createDestroyAddr(l, v);
     else
       gen.B.emitDestroyValueOperation(l, v);
   }
@@ -1304,7 +1304,7 @@ void SILGenFunction::destroyLocalVariable(SILLocation silLoc, VarDecl *vd) {
   // For a heap variable, the box is responsible for the value. We just need
   // to give up our retain count on it.
   if (loc.box) {
-    B.emitDestroyValueAndFold(silLoc, loc.box);
+    B.emitDestroyValueOperation(silLoc, loc.box);
     return;
   }
 
@@ -1314,7 +1314,7 @@ void SILGenFunction::destroyLocalVariable(SILLocation silLoc, VarDecl *vd) {
   if (!Val->getType().isAddress())
     B.emitDestroyValueOperation(silLoc, Val);
   else
-    B.emitDestroyAddrAndFold(silLoc, Val);
+    B.createDestroyAddr(silLoc, Val);
 }
 
 void SILGenFunction::deallocateUninitializedLocalVariable(SILLocation silLoc,

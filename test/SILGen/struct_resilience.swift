@@ -26,8 +26,9 @@ func functionWithResilientTypes(_ s: Size, f: (Size) -> Size) -> Size {
 // CHECK:         [[RESULT:%.*]] = apply [[FN]]([[SIZE_BOX]])
   _ = s.h
 
+// CHECK:         [[COPIED_CLOSURE:%.*]] = copy_value %2
 // CHECK:         copy_addr %1 to [initialization] [[SIZE_BOX:%.*]] : $*Size
-// CHECK:         apply %2(%0, [[SIZE_BOX]])
+// CHECK:         apply [[COPIED_CLOSURE]](%0, [[SIZE_BOX]])
 // CHECK:         return
   return f(s)
 }
@@ -66,7 +67,8 @@ func functionWithFixedLayoutTypes(_ p: Point, f: (Point) -> Point) -> Point {
 // CHECK:         [[RESULT:%.*]] = struct_extract %0 : $Point, #Point.y
   _ = p.y
 
-// CHECK:         [[NEW_POINT:%.*]] = apply %1(%0)
+// CHECK:         [[COPIED_CLOSURE:%.*]] = copy_value %1
+// CHECK:         [[NEW_POINT:%.*]] = apply [[COPIED_CLOSURE]](%0)
 // CHECK:         return [[NEW_POINT]]
   return f(p)
 }
@@ -143,8 +145,9 @@ public func functionWithMyResilientTypes(_ s: MySize, f: (MySize) -> MySize) -> 
 // CHECK:         [[RESULT:%.*]] = load [[RESULT_ADDR]] : $*Int
   _ = s.h
 
+// CHECK:         [[CLOSURE_COPY:%.*]] = copy_value %2
 // CHECK:         copy_addr %1 to [initialization] [[SIZE_BOX:%.*]] : $*MySize
-// CHECK:         apply %2(%0, [[SIZE_BOX]])
+// CHECK:         apply [[CLOSURE_COPY]](%0, [[SIZE_BOX]])
 // CHECK:         return
   return f(s)
 }

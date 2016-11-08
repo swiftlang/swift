@@ -164,6 +164,13 @@ bool TestOptions::parseArgs(llvm::ArrayRef<const char *> Args) {
       break;
     }
 
+    case OPT_end_pos: {
+      auto linecol = parseLineCol(InputArg->getValue());
+      EndLine = linecol.first;
+      EndCol = linecol.second;
+      break;
+    }
+
     case OPT_line:
       if (StringRef(InputArg->getValue()).getAsInteger(10, Line)) {
         llvm::errs() << "error: expected integer for 'line'\n";

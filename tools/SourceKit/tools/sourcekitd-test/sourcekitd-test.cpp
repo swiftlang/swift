@@ -543,12 +543,17 @@ static int handleTestInvocation(ArrayRef<const char *> Args,
       sourcekitd_request_dictionary_set_int64(Req, KeyOffset, ByteOffset);
     }
     break;
-  case SourceKitRequest::RangeInfo:
+  case SourceKitRequest::RangeInfo: {
     sourcekitd_request_dictionary_set_uid(Req, KeyRequest, RequestRangeInfo);
     sourcekitd_request_dictionary_set_int64(Req, KeyOffset, ByteOffset);
-    sourcekitd_request_dictionary_set_int64(Req, KeyLength, Opts.Length);
+    auto Length = Opts.Length;
+    if (Opts.Length == 0 && Opts.EndLine > 0) {
+      auto EndOff = resolveFromLineCol(Opts.EndLine, Opts.EndCol, SourceFile);
+      Length = EndOff - ByteOffset;
+    }
+    sourcekitd_request_dictionary_set_int64(Req, KeyLength, Length);
     break;
-
+  }
   case SourceKitRequest::RelatedIdents:
     sourcekitd_request_dictionary_set_uid(Req, KeyRequest, RequestRelatedIdents);
     sourcekitd_request_dictionary_set_int64(Req, KeyOffset, ByteOffset);
