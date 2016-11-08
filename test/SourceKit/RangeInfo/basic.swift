@@ -31,6 +31,13 @@ struct S { func foo() {} }
 // RUN: %sourcekitd-test -req=range -pos=3:1 -length 55 %s -- %s | %FileCheck %s -check-prefix=CHECK9
 // RUN: %sourcekitd-test -req=range -pos=4:1 -length 36 %s -- %s | %FileCheck %s -check-prefix=CHECK10
 
+// RUN: %sourcekitd-test -req=range -pos=8:1 -end-pos 8:32 %s -- %s | %FileCheck %s -check-prefix=CHECK5
+// RUN: %sourcekitd-test -req=range -pos=9:1 -end-pos 9:26 %s -- %s | %FileCheck %s -check-prefix=CHECK6
+// RUN: %sourcekitd-test -req=range -pos=10:1 -end-pos 10:27 %s -- %s | %FileCheck %s -check-prefix=CHECK7
+// RUN: %sourcekitd-test -req=range -pos=3:1 -end-pos=4:26 %s -- %s | %FileCheck %s -check-prefix=CHECK8
+// RUN: %sourcekitd-test -req=range -pos=3:1 -end-pos=5:13 %s -- %s | %FileCheck %s -check-prefix=CHECK9
+// RUN: %sourcekitd-test -req=range -pos=4:1 -end-pos=5:13 %s -- %s | %FileCheck %s -check-prefix=CHECK10
+
 // CHECK1-DAG: <kind>source.lang.swift.range.singleexpression</kind>
 // CHECK1-DAG: <content>1 + 2</content>
 // CHECK1-DAG: <type>Int</type>

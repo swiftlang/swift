@@ -87,3 +87,6 @@ def interested_usr : Separate<["-"], "interested-usr">,
 
 def async : Flag<["-"], "async">,
   HelpText<"Perform request asynchronously">;
+
+def end_pos : Separate<["-"], "end-pos">, HelpText<"line:col">;
+def end_pos_EQ : Joined<["-"], "end-pos=">, Alias<end_pos>;
