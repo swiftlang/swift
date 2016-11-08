@@ -100,7 +100,7 @@ static bool readFileList(DiagnosticEngine &diags,
                          const llvm::opt::Arg *filelistPath,
                          const llvm::opt::Arg *primaryFileArg = nullptr,
                          unsigned *primaryFileIndex = nullptr) {
-  assert((primaryFileArg == nullptr) || (primaryFileIndex != nullptr) &&
+  assert((primaryFileArg == nullptr || primaryFileIndex != nullptr) &&
          "did not provide argument for primary file index");
 
   llvm::ErrorOr<std::unique_ptr<llvm::MemoryBuffer>> buffer =
