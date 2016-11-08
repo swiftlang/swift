@@ -44,7 +44,7 @@ git clone https://github.com/apple/swift.git
 ./swift/utils/update-checkout --clone
 ./swift/utils/build-script -r
 ```
-6. Hello, Windows (Subsystem for Linux)
+### 7. Hello, Windows (Subsystem for Linux)
 ```bash
 cd ./build/Ninja-RelWithDebInfoAssert/swift-linux-x86_64\bin # This path may depend on your build configuration
 vim test.swift
