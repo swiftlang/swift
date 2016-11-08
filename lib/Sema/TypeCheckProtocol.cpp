@@ -1591,17 +1591,87 @@ namespace {
     /// requirements.
     SmallVector<std::tuple<AssociatedTypeDecl *, Type, CheckTypeWitnessResult>,
                 2> NonViable;
+
+    void dump(llvm::raw_ostream &out, unsigned indent) const {
+      out << "\n";
+      out.indent(indent) << "(";
+      if (Witness) {
+        Witness->dumpRef(out);
+      }
+
+      for (const auto &inferred : Inferred) {
+        out << "\n";
+        out.indent(indent + 2);
+        out << inferred.first->getName() << " := "
+            << inferred.second.getString();
+      }
+
+      for (const auto &inferred : NonViable) {
+        out << "\n";
+        out.indent(indent + 2);
+        out << std::get<0>(inferred)->getName() << " := "
+            << std::get<1>(inferred).getString();
+        if (auto nominal = std::get<2>(inferred).getProtocolOrClass())
+          out << " [failed constraint " << nominal->getName() << "]";
+      }
+
+      out << ")";
+    }
+
+    LLVM_ATTRIBUTE_DEPRECATED(void dump() const,
+                              "only for use in the debugger");
   };
+
+  void InferredAssociatedTypesByWitness::dump() const {
+    dump(llvm::errs(), 0);
+  }
 
   /// The set of witnesses that were considered when attempting to
   /// infer associated types.
   typedef SmallVector<InferredAssociatedTypesByWitness, 2>
     InferredAssociatedTypesByWitnesses;
 
+  void dumpInferredAssociatedTypesByWitnesses(
+        const InferredAssociatedTypesByWitnesses &inferred,
+        llvm::raw_ostream &out,
+        unsigned indent) {
+    for (const auto &value : inferred) {
+      value.dump(out, indent);
+    }
+  }
+
+  void dumpInferredAssociatedTypesByWitnesses(
+        const InferredAssociatedTypesByWitnesses &inferred) LLVM_ATTRIBUTE_USED;
+
+  void dumpInferredAssociatedTypesByWitnesses(
+                          const InferredAssociatedTypesByWitnesses &inferred) {
+    dumpInferredAssociatedTypesByWitnesses(inferred, llvm::errs(), 0);
+  }
+
   /// A mapping from requirements to the set of matches with witnesses.
   typedef SmallVector<std::pair<ValueDecl *,
                                 InferredAssociatedTypesByWitnesses>, 4>
     InferredAssociatedTypes;
+
+  void dumpInferredAssociatedTypes(const InferredAssociatedTypes &inferred,
+                                   llvm::raw_ostream &out,
+                                   unsigned indent) {
+    for (const auto &value : inferred) {
+      out << "\n";
+      out.indent(indent) << "(";
+      value.first->dumpRef(out);
+      dumpInferredAssociatedTypesByWitnesses(value.second, out, indent + 2);
+      out << ")";
+    }
+    out << "\n";
+  }
+
+  void dumpInferredAssociatedTypes(
+         const InferredAssociatedTypes &inferred) LLVM_ATTRIBUTE_USED;
+
+  void dumpInferredAssociatedTypes(const InferredAssociatedTypes &inferred) {
+    dumpInferredAssociatedTypes(inferred, llvm::errs(), 0);
+  }
 
   /// The protocol conformance checker.
   ///
