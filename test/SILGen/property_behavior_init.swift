@@ -29,7 +29,7 @@ struct Foo {
   init(x: Int) {
     // CHECK: [[UNINIT_SELF:%.*]] = mark_uninitialized [rootself]
     // CHECK: [[UNINIT_STORAGE:%.*]] = struct_element_addr [[UNINIT_SELF]]
-    // CHECK: [[UNINIT_BEHAVIOR:%.*]] = mark_uninitialized_behavior {{.*}}<Foo, Int>([[UNINIT_STORAGE]]) : {{.*}}, {{%.*}}([[UNINIT_SELF]])
+    // CHECK: [[UNINIT_BEHAVIOR:%.*]] = mark_uninitialized_behavior {{.*}}<Foo>([[UNINIT_STORAGE]]) : {{.*}}, {{%.*}}([[UNINIT_SELF]])
 
     // Pure assignments undergo DI analysis so assign to the marking proxy.
 

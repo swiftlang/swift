@@ -2810,12 +2810,12 @@ static Type getMemberForBaseType(ConformanceSource conformances,
     }
 
     if (!conformance) return failed();
+    if (!conformance->isConcrete()) return failed();
 
     // If we have an unsatisfied type witness while we're checking the
     // conformances we're supposed to skip this conformance's unsatisfied type
     // witnesses, and we have an unsatisfied type witness, return
     // "missing".
-    assert(conformance->isConcrete());
     if (conformance->getConcrete()->getRootNormalConformance()->getState()
           == ProtocolConformanceState::CheckingTypeWitnesses &&
         !conformance->getConcrete()->hasTypeWitness(assocType, nullptr))

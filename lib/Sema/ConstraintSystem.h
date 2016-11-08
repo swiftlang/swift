@@ -2382,7 +2382,7 @@ public:
       }
 
       std::pair<bool, Pattern*> walkToPatternPre(Pattern *P) override {
-        TS->Patterns.insert({ P, P->getType() });
+        TS->Patterns.insert({ P, P->hasType() ? P->getType() : Type() });
         return { true, P };
       }
 

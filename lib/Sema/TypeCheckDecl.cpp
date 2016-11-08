@@ -2958,16 +2958,23 @@ static void checkVarBehavior(VarDecl *decl, TypeChecker &TC) {
     TC.Context.AllocateUninitialized<ProtocolConformanceRef>(1);
   auto selfConformance = new ((void*)conformanceMem.data())
     ProtocolConformanceRef(conformance);
-  // FIXME: Additional associated types introduced by other requirements?
-  Substitution interfaceSubs[] = {
+  Substitution allInterfaceSubs[] = {
     Substitution(behaviorInterfaceSelf, *selfConformance),
     Substitution(decl->getInterfaceType(), valueSub.getConformances()),
   };
-  Substitution contextSubs[] = {
+  Substitution allContextSubs[] = {
     Substitution(behaviorSelf, *selfConformance),
     Substitution(decl->getType(), valueSub.getConformances()),
   };
-  
+
+  ArrayRef<Substitution> interfaceSubs = allInterfaceSubs;
+  if (interfaceSubs.back().getConformances().empty())
+    interfaceSubs = interfaceSubs.drop_back();
+
+  ArrayRef<Substitution> contextSubs = allContextSubs;
+  if (contextSubs.back().getConformances().empty())
+    contextSubs = contextSubs.drop_back();
+
   // Now that type witnesses are done, satisfy property and method requirements.
   conformance->setState(ProtocolConformanceState::Checking);
 
@@ -3185,6 +3192,7 @@ static void checkVarBehavior(VarDecl *decl, TypeChecker &TC) {
   // Synthesize the bodies of the property's accessors now, forwarding to the
   // 'value' implementation.
   TC.completePropertyBehaviorAccessors(decl, behavior->ValueDecl,
+                                       decl->getType(),
                                        interfaceSubs, contextSubs);
   
   return;
