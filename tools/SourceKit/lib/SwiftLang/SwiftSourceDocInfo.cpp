@@ -1097,7 +1097,7 @@ static void resolveRange(SwiftLangSupport &Lang,
       Result.RangeKind = Lang.getUIDForRangeKind(Info.Kind);
       Result.RangeContent = Info.Content;
       switch (Info.Kind) {
-      case RangeKind::Expression: {
+      case RangeKind::SingleExpression: {
         SmallString<64> SS;
         llvm::raw_svector_ostream OS(SS);
         Info.Ty.print(OS);
@@ -1105,6 +1105,8 @@ static void resolveRange(SwiftLangSupport &Lang,
         Receiver(Result);
         return;
       }
+      case RangeKind::SingleDecl:
+      case RangeKind::MultiStatement:
       case RangeKind::SingleStatement: {
         Receiver(Result);
         return;

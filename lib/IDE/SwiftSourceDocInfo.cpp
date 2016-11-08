@@ -176,33 +176,100 @@ bool SemaLocResolver::visitModuleReference(ModuleEntity Mod,
 
 struct RangeResolver::Implementation {
   SourceFile &File;
+private:
+  enum class RangeMatchKind : int8_t {
+    NoneMatch,
+    StartMatch,
+    EndMatch,
+    RangeMatch,
+  };
+
+  struct ContextInfo {
+    ASTNode Parent;
+    std::vector<ASTNode> StartMatches;
+    std::vector<ASTNode> EndMatches;
+    ContextInfo(ASTNode Parent) : Parent(Parent) {}
+  };
+
   SourceLoc Start;
   SourceLoc End;
+  StringRef Content;
   Optional<ResolvedRangeInfo> Result;
-  Implementation(SourceFile &File, SourceLoc Start, SourceLoc End) :
-    File(File), Start(Start), End(End) {}
-
-  bool isRangeMatch(SourceRange Input) {
-    return Input.Start == Start && Input.End == End;
+  std::vector<ContextInfo> ContextStack;
+  ContextInfo &getCurrentDC() {
+    assert(!ContextStack.empty());
+    return ContextStack.back();
   }
 
-  bool shouldEnter(SourceRange Input) {
+  ResolvedRangeInfo getSingleNodeKind(ASTNode Node) {
+    assert(!Node.isNull());
+    if (Node.is<Expr*>())
+      return ResolvedRangeInfo(RangeKind::SingleExpression,
+                               Node.get<Expr*>()->getType(), Content);
+    else if (Node.is<Stmt*>())
+      return ResolvedRangeInfo(RangeKind::SingleStatement, Type(), Content);
+    else {
+      assert(Node.is<Decl*>());
+      return ResolvedRangeInfo(RangeKind::SingleDecl, Type(), Content);
+    }
+  }
+
+public:
+  Implementation(SourceFile &File, SourceLoc Start, SourceLoc End) :
+    File(File), Start(Start), End(End), Content(getContent()) {}
+  ~Implementation() { assert(ContextStack.empty()); }
+  bool hasResult() { return Result.hasValue(); }
+  void enter(ASTNode Node) { ContextStack.emplace_back(Node); }
+  void leave() { ContextStack.pop_back(); }
+
+  void analyze(ASTNode Node) {
+    auto &DCInfo = getCurrentDC();
+    switch (getRangeMatchKind(Node.getSourceRange())) {
+    case RangeMatchKind::NoneMatch:
+      return;
+    case RangeMatchKind::RangeMatch:
+      Result = getSingleNodeKind(Node);
+      return;
+    case RangeMatchKind::StartMatch:
+      DCInfo.StartMatches.emplace_back(Node);
+      break;
+    case RangeMatchKind::EndMatch:
+      DCInfo.EndMatches.emplace_back(Node);
+      break;
+    }
+    if (!DCInfo.StartMatches.empty() && !DCInfo.EndMatches.empty()) {
+      Result = {RangeKind::MultiStatement, Type(), Content};
+      return;
+    }
+  }
+
+  bool shouldEnter(ASTNode Node) {
     SourceManager &SM = File.getASTContext().SourceMgr;
-    if (SM.isBeforeInBuffer(End, Input.Start))
+    if (SM.isBeforeInBuffer(End, Node.getSourceRange().Start))
       return false;
-    if (SM.isBeforeInBuffer(Input.End, Start))
+    if (SM.isBeforeInBuffer(Node.getSourceRange().End, Start))
       return false;
     return true;
-  }
-
-  bool hasResult() {
-    return Result.hasValue();
   }
 
   ResolvedRangeInfo getResult() {
     if (Result.hasValue())
       return Result.getValue();
     return ResolvedRangeInfo(RangeKind::Invalid, Type(), getContent());
+  }
+
+private:
+  RangeMatchKind getRangeMatchKind(SourceRange Input) {
+    bool StartMatch = Input.Start == Start;
+    bool EndMatch = Input.End == End;
+    if (StartMatch && EndMatch)
+      return RangeMatchKind::RangeMatch;
+    else if (StartMatch)
+      return RangeMatchKind::StartMatch;
+    else if (EndMatch)
+      return RangeMatchKind::EndMatch;
+    else
+      return RangeMatchKind::NoneMatch;
   }
 
   StringRef getContent() {
@@ -217,45 +284,48 @@ RangeResolver::RangeResolver(SourceFile &File, SourceLoc Start, SourceLoc End) :
 RangeResolver::~RangeResolver() { delete &Impl; }
 
 bool RangeResolver::walkToExprPre(Expr *E) {
-  if (!Impl.shouldEnter(E->getSourceRange()))
+  if (!Impl.shouldEnter(E))
     return false;
-  if (Impl.isRangeMatch(E->getSourceRange())) {
-    Impl.Result = ResolvedRangeInfo(RangeKind::Expression, E->getType(),
-                                    Impl.getContent());
-  }
+  Impl.analyze(E);
+  Impl.enter(E);
   return !Impl.hasResult();
 }
 
 bool RangeResolver::walkToStmtPre(Stmt *S) {
-  if (!Impl.shouldEnter(S->getSourceRange()))
+  if (!Impl.shouldEnter(S))
     return false;
-  if (Impl.isRangeMatch(S->getSourceRange())) {
-    Impl.Result = ResolvedRangeInfo(RangeKind::SingleStatement, Type(),
-                                    Impl.getContent());
-  }
+  Impl.analyze(S);
+  Impl.enter(S);
   return !Impl.hasResult();
 };
 
-
 bool RangeResolver::walkToDeclPre(Decl *D, CharSourceRange Range) {
-  return Impl.shouldEnter(D->getSourceRange());
+  if (!Impl.shouldEnter(D))
+    return false;
+  Impl.analyze(D);
+  Impl.enter(D);
+  return !Impl.hasResult();
 }
 
 bool RangeResolver::walkToExprPost(Expr *E) {
+  Impl.leave();
   return !Impl.hasResult();
 }
 
 bool RangeResolver::walkToStmtPost(Stmt *S) {
+  Impl.leave();
   return !Impl.hasResult();
 };
 
 bool RangeResolver::walkToDeclPost(Decl *D) {
+  Impl.leave();
   return !Impl.hasResult();
 }
 
-ResolvedRangeInfo
-RangeResolver::resolve() {
+ResolvedRangeInfo RangeResolver::resolve() {
+  Impl.enter(ASTNode());
   walk(Impl.File);
+  Impl.leave();
   return Impl.getResult();
 }
 
