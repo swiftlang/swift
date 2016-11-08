@@ -274,8 +274,8 @@ void TypeChecker::checkGenericParamList(ArchetypeBuilder *builder,
   TypeResolutionOptions options;
   DeclContext *lookupDC = genericParams->begin()[0]->getDeclContext();
   if (!lookupDC->isModuleScopeContext()) {
-    assert(isa<GenericTypeDecl>(lookupDC) || isa<ExtensionDecl>(lookupDC) ||
-           isa<AbstractFunctionDecl>(lookupDC) &&
+    assert((isa<GenericTypeDecl>(lookupDC) || isa<ExtensionDecl>(lookupDC) ||
+            isa<AbstractFunctionDecl>(lookupDC)) &&
            "not a proper generic parameter context?");
     options = TR_GenericSignature;
   }    
