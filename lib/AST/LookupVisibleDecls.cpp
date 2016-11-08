@@ -718,7 +718,8 @@ public:
     // Does it make sense to substitute types?
     bool shouldSubst = !BaseTy->hasUnboundGenericType() &&
                        !isa<AnyMetatypeType>(BaseTy.getPointer()) &&
-                       !BaseTy->isAnyExistentialType();
+                       !BaseTy->isAnyExistentialType() &&
+                       !BaseTy->hasTypeVariable();
     ModuleDecl *M = DC->getParentModule();
 
     auto FoundSignature = VD->getOverloadSignature();
