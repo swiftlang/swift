@@ -368,18 +368,18 @@ SILInstruction *SILCombiner::visitAllocStackInst(AllocStackInst *AS) {
 
     if (auto *OEAI = dyn_cast<OpenExistentialAddrInst>(Op->getUser())) {
       for (auto *Op : OEAI->getUses()) {
-        assert(isa<DestroyAddrInst>(Op->getUser()) ||
-               isDebugInst(Op->getUser()) && "Unexpected instruction");
+        assert((isa<DestroyAddrInst>(Op->getUser()) ||
+                isDebugInst(Op->getUser())) && "Unexpected instruction");
         ToDelete.insert(Op->getUser());
       }
     }
 
-    assert(isa<CopyAddrInst>(Op->getUser()) ||
-           isa<OpenExistentialAddrInst>(Op->getUser()) ||
-           isa<DestroyAddrInst>(Op->getUser()) ||
-           isa<DeallocStackInst>(Op->getUser()) ||
-           isa<DeinitExistentialAddrInst>(Op->getUser()) ||
-           isDebugInst(Op->getUser()) && "Unexpected instruction");
+    assert((isa<CopyAddrInst>(Op->getUser()) ||
+            isa<OpenExistentialAddrInst>(Op->getUser()) ||
+            isa<DestroyAddrInst>(Op->getUser()) ||
+            isa<DeallocStackInst>(Op->getUser()) ||
+            isa<DeinitExistentialAddrInst>(Op->getUser()) ||
+            isDebugInst(Op->getUser())) && "Unexpected instruction");
     ToDelete.insert(Op->getUser());
   }
 

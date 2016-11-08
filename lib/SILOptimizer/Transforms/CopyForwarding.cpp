@@ -997,7 +997,8 @@ void CopyForwarding::forwardCopiesOf(SILValue Def, SILFunction *F) {
       // continue propagating from this dead-in block. In any case, erase the
       // original Destroy.
       Destroy->eraseFromParent();
-      assert(HasChanged || !DeadInBlocks.empty() && "HasChanged should be set");
+      assert((HasChanged || !DeadInBlocks.empty()) &&
+             "HasChanged should be set");
     }
   }
   // Any blocks containing a DestroyPoints where hoistDestroy did not find a use

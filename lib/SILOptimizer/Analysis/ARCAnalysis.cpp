@@ -1117,8 +1117,8 @@ static bool hasUnsafeGuaranteedOperand(SILValue UnsafeGuaranteedValue,
                                        SILValue UnsafeGuaranteedValueOperand,
                                        RCIdentityFunctionInfo &RCII,
                                        SILInstruction &Release) {
-  assert(isa<StrongReleaseInst>(Release) ||
-         isa<ReleaseValueInst>(Release) && "Expecting a release");
+  assert((isa<StrongReleaseInst>(Release) ||
+          isa<ReleaseValueInst>(Release)) && "Expecting a release");
 
   auto RCRoot = RCII.getRCIdentityRoot(Release.getOperand(0));
 

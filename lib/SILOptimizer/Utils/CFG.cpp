@@ -241,7 +241,7 @@ void swift::changeBranchTarget(TermInst *T, unsigned EdgeIdx,
 
   case TermKind::DynamicMethodBranchInst: {
     auto DMBI = dyn_cast<DynamicMethodBranchInst>(T);
-    assert(EdgeIdx == 0 || EdgeIdx == 1 && "Invalid edge index");
+    assert((EdgeIdx == 0 || EdgeIdx == 1) && "Invalid edge index");
     auto HasMethodBB = !EdgeIdx ? NewDest : DMBI->getHasMethodBB();
     auto NoMethodBB = EdgeIdx ? NewDest : DMBI->getNoMethodBB();
     B.createDynamicMethodBranch(DMBI->getLoc(), DMBI->getOperand(),
@@ -252,7 +252,7 @@ void swift::changeBranchTarget(TermInst *T, unsigned EdgeIdx,
 
   case TermKind::CheckedCastBranchInst: {
     auto CBI = dyn_cast<CheckedCastBranchInst>(T);
-    assert(EdgeIdx == 0 || EdgeIdx == 1 && "Invalid edge index");
+    assert((EdgeIdx == 0 || EdgeIdx == 1) && "Invalid edge index");
     auto SuccessBB = !EdgeIdx ? NewDest : CBI->getSuccessBB();
     auto FailureBB = EdgeIdx ? NewDest : CBI->getFailureBB();
     B.createCheckedCastBranch(CBI->getLoc(), CBI->isExact(), CBI->getOperand(),
@@ -263,7 +263,7 @@ void swift::changeBranchTarget(TermInst *T, unsigned EdgeIdx,
 
   case TermKind::CheckedCastAddrBranchInst: {
     auto CBI = dyn_cast<CheckedCastAddrBranchInst>(T);
-    assert(EdgeIdx == 0 || EdgeIdx == 1 && "Invalid edge index");
+    assert((EdgeIdx == 0 || EdgeIdx == 1) && "Invalid edge index");
     auto SuccessBB = !EdgeIdx ? NewDest : CBI->getSuccessBB();
     auto FailureBB = EdgeIdx ? NewDest : CBI->getFailureBB();
     B.createCheckedCastAddrBranch(CBI->getLoc(), CBI->getConsumptionKind(),
@@ -398,7 +398,8 @@ void swift::replaceBranchTarget(TermInst *T, SILBasicBlock *OldDest,
 
   case TermKind::DynamicMethodBranchInst: {
     auto DMBI = cast<DynamicMethodBranchInst>(T);
-    assert(OldDest == DMBI->getHasMethodBB() || OldDest == DMBI->getNoMethodBB() && "Invalid edge index");
+    assert((OldDest == DMBI->getHasMethodBB() ||
+            OldDest == DMBI->getNoMethodBB()) && "Invalid edge index");
     auto HasMethodBB = OldDest == DMBI->getHasMethodBB() ? NewDest : DMBI->getHasMethodBB();
     auto NoMethodBB = OldDest == DMBI->getNoMethodBB() ? NewDest : DMBI->getNoMethodBB();
     B.createDynamicMethodBranch(DMBI->getLoc(), DMBI->getOperand(),
@@ -409,7 +410,8 @@ void swift::replaceBranchTarget(TermInst *T, SILBasicBlock *OldDest,
 
   case TermKind::CheckedCastBranchInst: {
     auto CBI = cast<CheckedCastBranchInst>(T);
-    assert(OldDest == CBI->getSuccessBB() || OldDest == CBI->getFailureBB() && "Invalid edge index");
+    assert((OldDest == CBI->getSuccessBB() ||
+            OldDest == CBI->getFailureBB()) && "Invalid edge index");
     auto SuccessBB = OldDest == CBI->getSuccessBB() ? NewDest : CBI->getSuccessBB();
     auto FailureBB = OldDest == CBI->getFailureBB() ? NewDest : CBI->getFailureBB();
     B.createCheckedCastBranch(CBI->getLoc(), CBI->isExact(), CBI->getOperand(),
@@ -420,7 +422,8 @@ void swift::replaceBranchTarget(TermInst *T, SILBasicBlock *OldDest,
 
   case TermKind::CheckedCastAddrBranchInst: {
     auto CBI = cast<CheckedCastAddrBranchInst>(T);
-    assert(OldDest == CBI->getSuccessBB() || OldDest == CBI->getFailureBB() && "Invalid edge index");
+    assert((OldDest == CBI->getSuccessBB() ||
+            OldDest == CBI->getFailureBB()) && "Invalid edge index");
     auto SuccessBB = OldDest == CBI->getSuccessBB() ? NewDest : CBI->getSuccessBB();
     auto FailureBB = OldDest == CBI->getFailureBB() ? NewDest : CBI->getFailureBB();
     B.createCheckedCastAddrBranch(CBI->getLoc(), CBI->getConsumptionKind(),
