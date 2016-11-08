@@ -217,10 +217,12 @@ private:
 public:
   Implementation(SourceFile &File, SourceLoc Start, SourceLoc End) :
     File(File), Start(Start), End(End), Content(getContent()) {}
-  ~Implementation() { assert(ContextStack.empty()); }
   bool hasResult() { return Result.hasValue(); }
   void enter(ASTNode Node) { ContextStack.emplace_back(Node); }
-  void leave() { ContextStack.pop_back(); }
+  void leave(ASTNode Node) {
+    assert(ContextStack.back().Parent.getOpaqueValue() == Node.getOpaqueValue());
+    ContextStack.pop_back();
+  }
 
   void analyze(ASTNode Node) {
     auto &DCInfo = getCurrentDC();
@@ -245,6 +247,8 @@ public:
 
   bool shouldEnter(ASTNode Node) {
     SourceManager &SM = File.getASTContext().SourceMgr;
+    if (hasResult())
+      return false;
     if (SM.isBeforeInBuffer(End, Node.getSourceRange().Start))
       return false;
     if (SM.isBeforeInBuffer(Node.getSourceRange().End, Start))
@@ -288,7 +292,7 @@ bool RangeResolver::walkToExprPre(Expr *E) {
     return false;
   Impl.analyze(E);
   Impl.enter(E);
-  return !Impl.hasResult();
+  return true;
 }
 
 bool RangeResolver::walkToStmtPre(Stmt *S) {
@@ -296,7 +300,7 @@ bool RangeResolver::walkToStmtPre(Stmt *S) {
     return false;
   Impl.analyze(S);
   Impl.enter(S);
-  return !Impl.hasResult();
+  return true;
 };
 
 bool RangeResolver::walkToDeclPre(Decl *D, CharSourceRange Range) {
@@ -304,28 +308,27 @@ bool RangeResolver::walkToDeclPre(Decl *D, CharSourceRange Range) {
     return false;
   Impl.analyze(D);
   Impl.enter(D);
-  return !Impl.hasResult();
+  return true;
 }
 
 bool RangeResolver::walkToExprPost(Expr *E) {
-  Impl.leave();
+  Impl.leave(E);
   return !Impl.hasResult();
 }
 
 bool RangeResolver::walkToStmtPost(Stmt *S) {
-  Impl.leave();
+  Impl.leave(S);
   return !Impl.hasResult();
 };
 
 bool RangeResolver::walkToDeclPost(Decl *D) {
-  Impl.leave();
+  Impl.leave(D);
   return !Impl.hasResult();
 }
 
 ResolvedRangeInfo RangeResolver::resolve() {
   Impl.enter(ASTNode());
   walk(Impl.File);
-  Impl.leave();
   return Impl.getResult();
 }
 
