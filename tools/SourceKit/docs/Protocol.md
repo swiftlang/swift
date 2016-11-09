@@ -40,8 +40,8 @@ provided.
 
 | Request Name | Request Key | Description |
 | -------------:|:------------|:------------|
-| `codecomplete` | `codecomplete` |  Given a file will open a code-completion session which can be filtered upon using `codecomplete.update`. Each session must be closed using `codecomplete.close`.|
-| `open` | `codecomplete.open` | Open a code-completion session for the given input file and offset, and return the initial list of completions. |
+| `codecomplete` | `codecomplete` | Open a code-completion session for the given input file and offset, and return the initial list of completions. |
+| `open` | `codecomplete.open` | Given a file will open a code-completion session which can be filtered using `codecomplete.update`. Each session must be closed using `codecomplete.close`. |
 
 ### Request
 
@@ -66,7 +66,7 @@ provided.
     [opt] <key.sourcetext>: (string)   // Source contents.
     [opt] <key.sourcefile>: (string)   // Absolute path to the file.
     <key.offset>:           (int64)    // Byte offset of code-completion point inside the source contents.
-    [opt] <key.options>:    (dict)     // An options dictionary containing keys.
+    [opt] <key.codecomplete.options>:    (dict)     // An options dictionary containing keys.
     [opt] <key.compilerargs> [string*] // Array of zero or more strings for the compiler arguments,
                                        // e.g ["-sdk", "/path/to/sdk"]. If key.sourcefile is provided,
                                        // these must include the path to that file.
