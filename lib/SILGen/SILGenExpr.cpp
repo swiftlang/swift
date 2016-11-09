@@ -63,6 +63,21 @@ ManagedValue SILGenFunction::emitManagedRetain(SILLocation loc,
   return emitManagedRValueWithCleanup(v, lowering);
 }
 
+ManagedValue SILGenFunction::emitManagedLoadCopy(SILLocation loc, SILValue v) {
+  auto &lowering = getTypeLowering(v->getType().getSwiftRValueType());
+  return emitManagedLoadCopy(loc, v, lowering);
+}
+
+ManagedValue SILGenFunction::emitManagedLoadCopy(SILLocation loc, SILValue v,
+                                                 const TypeLowering &lowering) {
+  assert(lowering.getLoweredType().getAddressType() == v->getType());
+  v = lowering.emitLoadOfCopy(B, loc, v, IsNotTake);
+  if (lowering.isTrivial())
+    return ManagedValue::forUnmanaged(v);
+  assert(!lowering.isAddressOnly() && "cannot retain an unloadable type");
+  return emitManagedRValueWithCleanup(v, lowering);
+}
+
 ManagedValue SILGenFunction::emitManagedRValueWithCleanup(SILValue v) {
   auto &lowering = getTypeLowering(v->getType());
   return emitManagedRValueWithCleanup(v, lowering);
@@ -3243,8 +3258,8 @@ public:
   RValue get(SILGenFunction &gen, SILLocation loc,
              ManagedValue base, SGFContext c) && override {
     // Load the value at +0.
-    SILValue owned = gen.B.createLoad(loc, base.getUnmanagedValue(),
-                                      LoadOwnershipQualifier::Unqualified);
+    SILValue owned = gen.B.createLoadBorrow(loc, base.getUnmanagedValue());
+
     // Convert it to unowned.
     auto refType = owned->getType().getSwiftRValueType();
     auto unownedType = SILType::getPrimitiveObjectType(

@@ -92,7 +92,7 @@ void TupleInitialization::copyOrInitValueInto(SILGenFunction &SGF,
       member = SGF.B.createTupleElementAddr(loc, value, i, fieldTy);
       if (!fieldTL.isAddressOnly())
         member =
-            SGF.B.createLoad(loc, member, LoadOwnershipQualifier::Unqualified);
+            fieldTL.emitLoad(SGF.B, loc, member, LoadOwnershipQualifier::Take);
     } else {
       member = SGF.B.createTupleExtract(loc, value, i, fieldTy);
     }
@@ -715,7 +715,7 @@ emitEnumMatch(ManagedValue value, EnumElementDecl *ElementDecl,
     // Load a loadable data value.
     if (eltTL.isLoadable())
       eltValue =
-          SGF.B.createLoad(loc, eltValue, LoadOwnershipQualifier::Unqualified);
+          eltTL.emitLoad(SGF.B, loc, eltValue, LoadOwnershipQualifier::Take);
   } else {
     // Otherwise, we're consuming this as a +1 value.
     value.forward(SGF);
@@ -728,9 +728,10 @@ emitEnumMatch(ManagedValue value, EnumElementDecl *ElementDecl,
   if (ElementDecl->isIndirect() || ElementDecl->getParentEnum()->isIndirect()) {
     SILValue boxedValue = SGF.B.createProjectBox(loc, eltMV.getValue(), 0);
     auto &boxedTL = SGF.getTypeLowering(boxedValue->getType());
+    // SEMANTIC ARC TODO: Revisit this when the verifier is enabled.
     if (boxedTL.isLoadable())
-      boxedValue = SGF.B.createLoad(loc, boxedValue,
-                                    LoadOwnershipQualifier::Unqualified);
+      boxedValue = boxedTL.emitLoad(SGF.B, loc, boxedValue,
+                                    LoadOwnershipQualifier::Take);
 
     // We must treat the boxed value as +0 since it may be shared. Copy it if
     // nontrivial.

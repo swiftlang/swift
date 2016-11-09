@@ -51,7 +51,7 @@ func read_only_capture(_ x: Int) -> Int {
 // CHECK: sil shared @[[CAP_NAME]]
 // CHECK: bb0([[XBOX:%[0-9]+]] : $@box Int):
 // CHECK: [[XADDR:%[0-9]+]] = project_box [[XBOX]]
-// CHECK: [[X:%[0-9]+]] = load [[XADDR]]
+// CHECK: [[X:%[0-9]+]] = load [trivial] [[XADDR]]
 // CHECK: destroy_value [[XBOX]]
 // CHECK: return [[X]]
 // } // end sil function '[[CAP_NAME]]'
@@ -82,7 +82,7 @@ func write_to_capture(_ x: Int) -> Int {
   // SEMANTIC ARC TODO: This should load from X2BOX_COPY project. There is an
   // issue here where after a copy_value, we need to reassign a projection in
   // some way.
-  // CHECK:   [[RET:%[0-9]+]] = load [[X2BOX_PB]]
+  // CHECK:   [[RET:%[0-9]+]] = load [trivial] [[X2BOX_PB]]
   // CHECK:   destroy_value [[X2BOX]]
   // CHECK:   destroy_value [[XBOX]]
   // CHECK:   return [[RET]]
@@ -170,7 +170,7 @@ func anon_read_only_capture(_ x: Int) -> Int {
 }
 // CHECK: sil shared @[[CLOSURE_NAME]]
 // CHECK: bb0([[XADDR:%[0-9]+]] : $*Int):
-// CHECK: [[X:%[0-9]+]] = load [[XADDR]]
+// CHECK: [[X:%[0-9]+]] = load [trivial] [[XADDR]]
 // CHECK: return [[X]]
 
 // CHECK-LABEL: sil hidden @_TF8closures21small_closure_capture
@@ -191,7 +191,7 @@ func small_closure_capture(_ x: Int) -> Int {
 }
 // CHECK: sil shared @[[CLOSURE_NAME]]
 // CHECK: bb0([[XADDR:%[0-9]+]] : $*Int):
-// CHECK: [[X:%[0-9]+]] = load [[XADDR]]
+// CHECK: [[X:%[0-9]+]] = load [trivial] [[XADDR]]
 // CHECK: return [[X]]
 
 
@@ -213,7 +213,7 @@ func small_closure_capture_with_argument(_ x: Int) -> (_ y: Int) -> Int {
 // CHECK: bb0([[DOLLAR0:%[0-9]+]] : $Int, [[XBOX:%[0-9]+]] : $@box Int):
 // CHECK: [[XADDR:%[0-9]+]] = project_box [[XBOX]]
 // CHECK: [[PLUS:%[0-9]+]] = function_ref @_TFsoi1pFTSiSi_Si{{.*}}
-// CHECK: [[LHS:%[0-9]+]] = load [[XADDR]]
+// CHECK: [[LHS:%[0-9]+]] = load [trivial] [[XADDR]]
 // CHECK: [[RET:%[0-9]+]] = apply [[PLUS]]([[LHS]], [[DOLLAR0]])
 // CHECK: destroy_value [[XBOX]]
 // CHECK: return [[RET]]
@@ -304,10 +304,9 @@ class SelfCapturedInInit : Base {
   var foo : () -> SelfCapturedInInit
 
   // CHECK-LABEL: sil hidden @_TFC8closures18SelfCapturedInInitc{{.*}} : $@convention(method) (@owned SelfCapturedInInit) -> @owned SelfCapturedInInit {
-  // CHECK:         [[VAL:%.*]] = load {{%.*}} : $*SelfCapturedInInit
-  // CHECK:         [[VAL:%.*]] = load {{%.*}} : $*SelfCapturedInInit
-  // CHECK:         [[VAL:%.*]] = load {{%.*}} : $*SelfCapturedInInit
-  // CHECK:         copy_value [[VAL]] : $SelfCapturedInInit
+  // CHECK:         [[VAL:%.*]] = load_borrow {{%.*}} : $*SelfCapturedInInit
+  // CHECK:         [[VAL:%.*]] = load_borrow {{%.*}} : $*SelfCapturedInInit
+  // CHECK:         [[VAL:%.*]] = load [copy] {{%.*}} : $*SelfCapturedInInit
   // CHECK:         partial_apply {{%.*}}([[VAL]]) : $@convention(thin) (@owned SelfCapturedInInit) -> @owned SelfCapturedInInit
   override init() {
     super.init()
@@ -355,12 +354,9 @@ func closeOverLetLValue() {
 // CHECK: bb0([[ARG:%.*]] : $ClassWithIntProperty):
 // CHECK:   [[TMP_CLASS_ADDR:%.*]] = alloc_stack $ClassWithIntProperty, let, name "a", argno 1
 // CHECK:   store [[ARG]] to [init] [[TMP_CLASS_ADDR]] : $*ClassWithIntProperty
-// CHECK:   [[LOADED_CLASS:%.*]] = load [[TMP_CLASS_ADDR]] : $*ClassWithIntProperty
-// CHECK:   [[LOADED_CLASS_COPY:%.*]] = copy_value [[LOADED_CLASS]]
-// SEMANTIC ARC TODO: This should be a ref_element_addr from LOADED_CLASS_COPY.
+// CHECK:   [[LOADED_CLASS:%.*]] = load [copy] [[TMP_CLASS_ADDR]] : $*ClassWithIntProperty
 // CHECK:   [[INT_IN_CLASS_ADDR:%.*]] = ref_element_addr [[LOADED_CLASS]] : $ClassWithIntProperty, #ClassWithIntProperty.x
-// CHECK:   [[INT_IN_CLASS:%.*]] = load [[INT_IN_CLASS_ADDR]] : $*Int
-// SEMANTIC ARC TODO: This should be a destroy_value on LOADED_CLASS_COPY
+// CHECK:   [[INT_IN_CLASS:%.*]] = load [trivial] [[INT_IN_CLASS_ADDR]] : $*Int
 // CHECK:   destroy_value [[LOADED_CLASS]]
 // CHECK:   destroy_addr [[TMP_CLASS_ADDR]] : $*ClassWithIntProperty
 // CHECK:   dealloc_stack %1 : $*ClassWithIntProperty
@@ -639,8 +635,7 @@ class SuperSub : SuperBase {
 // CHECK:         store [[UNOWNED_SELF]] to [init] [[PB]]
 // SEMANTIC ARC TODO: This destroy_value should probably be /after/ the load from PB on the next line.
 // CHECK:         destroy_value [[SELF_COPY]]
-// CHECK:         [[UNOWNED_SELF:%.*]] = load [[PB]]
-// -- strong +1, unowned +1
+// CHECK:         [[UNOWNED_SELF:%.*]] = load [take] [[PB]]
 // -- strong +2, unowned +1
 // CHECK:         strong_retain_unowned [[UNOWNED_SELF]]
 // CHECK:         [[SELF:%.*]] = unowned_to_ref [[UNOWNED_SELF]]

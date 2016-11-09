@@ -323,7 +323,7 @@ func test_isa_1(p: P) {
 
   case is X:
   // CHECK: [[IS_X]]:
-  // CHECK-NEXT: load [[TMPBUF]]
+  // CHECK-NEXT: load [trivial] [[TMPBUF]]
   // CHECK-NEXT: dealloc_stack [[TMPBUF]]
   // CHECK-NEXT: destroy_addr [[PTMPBUF]]
   // CHECK-NEXT: dealloc_stack [[PTMPBUF]]
@@ -873,7 +873,7 @@ func test_union_addr_only_1(u: MaybeAddressOnlyPair) {
 
   // CHECK: [[IS_RIGHT]]:
   // CHECK:   [[STR_ADDR:%.*]] = unchecked_take_enum_data_addr [[ENUM_ADDR]] : $*MaybeAddressOnlyPair, #MaybeAddressOnlyPair.Right!enumelt.1
-  // CHECK:   [[STR:%.*]] = load [[STR_ADDR]]
+  // CHECK:   [[STR:%.*]] = load [take] [[STR_ADDR]]
   case .Right(_):
   // CHECK:   destroy_value [[STR]] : $String
   // CHECK:   function_ref @_TF6switch1cFT_T_

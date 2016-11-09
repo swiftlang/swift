@@ -335,8 +335,9 @@ static bool isProtocolClass(Type t) {
 static ManagedValue emitManagedLoad(SILGenFunction &gen, SILLocation loc,
                                     ManagedValue addr,
                                     const TypeLowering &addrTL) {
-  auto loadedValue = gen.B.createLoad(loc, addr.forward(gen),
-                                      LoadOwnershipQualifier::Unqualified);
+  // SEMANTIC ARC TODO: When the verifier is finished, revisit this.
+  auto loadedValue = addrTL.emitLoad(gen.B, loc, addr.forward(gen),
+                                     LoadOwnershipQualifier::Take);
   return gen.emitManagedRValueWithCleanup(loadedValue, addrTL);
 }
 
@@ -2182,8 +2183,9 @@ void ResultPlanner::execute(ArrayRef<SILValue> innerDirectResults,
 
     case Operation::DirectToIndirect: {
       auto result = claimNextInnerDirectResult(op.InnerResult);
-      Gen.B.createStore(Loc, result.forward(Gen), op.OuterResultAddr,
-                        StoreOwnershipQualifier::Unqualified);
+      Gen.B.emitStoreValueOperation(Loc, result.forward(Gen),
+                                    op.OuterResultAddr,
+                                    StoreOwnershipQualifier::Init);
       continue;
     }
 
@@ -2191,8 +2193,8 @@ void ResultPlanner::execute(ArrayRef<SILValue> innerDirectResults,
       auto resultAddr = op.InnerResultAddr;
       auto &resultTL = Gen.getTypeLowering(resultAddr->getType());
       auto result = Gen.emitManagedRValueWithCleanup(
-          Gen.B.createLoad(Loc, resultAddr,
-                           LoadOwnershipQualifier::Unqualified),
+          resultTL.emitLoad(Gen.B, Loc, resultAddr,
+                            LoadOwnershipQualifier::Take),
           resultTL);
       addOuterDirectResult(result, op.OuterResult);
       continue;

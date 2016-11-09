@@ -17,7 +17,7 @@ import resilient_enum
 // CHECK-NEXT:    br bb6
 // CHECK:       bb3:
 // CHECK-NEXT:    [[INDIRECT_ADDR:%.*]] = unchecked_take_enum_data_addr [[BOX]]
-// CHECK-NEXT:    [[INDIRECT:%.*]] = load [[INDIRECT_ADDR]]
+// CHECK-NEXT:    [[INDIRECT:%.*]] = load [take] [[INDIRECT_ADDR]]
 // CHECK-NEXT:    [[PAYLOAD:%.*]] = project_box [[INDIRECT]]
 // CHECK-NEXT:    destroy_value [[INDIRECT]]
 // CHECK-NEXT:    dealloc_stack [[BOX]]

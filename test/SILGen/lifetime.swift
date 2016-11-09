@@ -185,9 +185,7 @@ func reftype_call_with_arg(_ a: Ref) {
 
     reftype_func_with_arg(a)
     // CHECK: [[RFWA:%[0-9]+]] = function_ref @_TF8lifetime21reftype_func_with_arg
-    // CHECK: [[A2:%[0-9]+]] = load [[PB]]
-    // CHECK: [[A2_COPY:%.*]] = copy_value [[A2]]
-    // SEMANTIC ARC TODO: A2 below should be [[A2_COPY]]
+    // CHECK: [[A2:%[0-9]+]] = load [copy] [[PB]]
     // CHECK: [[RESULT:%.*]] = apply [[RFWA]]([[A2]])
     // CHECK: destroy_value [[RESULT]]
     // CHECK: destroy_value [[AADDR]]
@@ -355,15 +353,13 @@ func logical_lvalue_lifetime(_ r: RefWithProp, _ i: Int, _ v: Val) {
 
   // -- Reference types need to be copy_valued as property method args.
   r.int_prop = i
-  // CHECK: [[R1:%[0-9]+]] = load [[PR]]
-  // CHECK: copy_value [[R1]]
+  // CHECK: [[R1:%[0-9]+]] = load [copy] [[PR]]
   // CHECK: [[SETTER_METHOD:%[0-9]+]] = class_method {{.*}} : $RefWithProp, #RefWithProp.int_prop!setter.1 : (RefWithProp) -> (Int) -> () , $@convention(method) (Int, @guaranteed RefWithProp) -> ()
   // CHECK: apply [[SETTER_METHOD]]({{.*}}, [[R1]])
   // CHECK: destroy_value [[R1]]
 
   r.aleph_prop.b = v
-  // CHECK: [[R2:%[0-9]+]] = load [[PR]]
-  // CHECK: copy_value [[R2]]
+  // CHECK: [[R2:%[0-9]+]] = load [copy] [[PR]]
   // CHECK: [[STORAGE:%.*]] = alloc_stack $Builtin.UnsafeValueBuffer
   // CHECK: [[ALEPH_PROP_TEMP:%[0-9]+]] = alloc_stack $Aleph
   // CHECK: [[T0:%.*]] = address_to_pointer [[ALEPH_PROP_TEMP]]
@@ -589,7 +585,7 @@ struct Bar {
     // CHECK: assign {{.*}} to [[THIS_X]]
 
     // -- load and return this
-    // CHECK: [[THISVAL:%[0-9]+]] = load [[THISADDR]]
+    // CHECK: [[THISVAL:%[0-9]+]] = load [trivial] [[THISADDR]]
     // CHECK: destroy_value [[THISADDRBOX]]
     // CHECK: return [[THISVAL]]
   }
@@ -641,7 +637,7 @@ class D : B {
     // CHECK: [[THISADDR1:%[0-9]+]] = alloc_box $@box D
     // CHECK: [[PTHIS:%[0-9]+]] = project_box [[THISADDR1]]
     // CHECK: [[THISADDR:%[0-9]+]] = mark_uninitialized [derivedself] [[PTHIS]]
-    // CHECK: store [[THIS]] to [[THISADDR]]
+    // CHECK: store [[THIS]] to [init] [[THISADDR]]
     // CHECK: [[XADDR:%[0-9]+]] = alloc_box $@box Int
     // CHECK: [[PX:%[0-9]+]] = project_box [[XADDR]]
     // CHECK: store [[X]] to [trivial] [[PX]]
@@ -650,14 +646,14 @@ class D : B {
     // CHECK: store [[Y]] to [trivial] [[PY]]
 
     super.init(y: y)
-    // CHECK: [[THIS1:%[0-9]+]] = load [[THISADDR]]
+    // CHECK: [[THIS1:%[0-9]+]] = load_borrow [[THISADDR]]
     // CHECK: [[THIS1_SUP:%[0-9]+]] = upcast [[THIS1]] : ${{.*}} to $B
     // CHECK: [[SUPER_CTOR:%[0-9]+]] = function_ref @_TFC8lifetime1BcfT1ySi_S0_ : $@convention(method) (Int, @owned B) -> @owned B
-    // CHECK: [[Y:%[0-9]+]] = load [[PY]]
+    // CHECK: [[Y:%[0-9]+]] = load [trivial] [[PY]]
     // CHECK: [[THIS2_SUP:%[0-9]+]] = apply [[SUPER_CTOR]]([[Y]], [[THIS1_SUP]])
     // CHECK: [[THIS2:%[0-9]+]] = unchecked_ref_cast [[THIS2_SUP]] : $B to $D
-    // CHECK: [[THIS1:%[0-9]+]] = load [[THISADDR]]
-    // CHECK: destroy_value 
+    // CHECK: [[THIS1:%[0-9]+]] = load [copy] [[THISADDR]]
+    // CHECK: destroy_value [[THISADDR1]]
   }
 
   func foo() {}
@@ -669,8 +665,7 @@ func downcast(_ b: B) {
   // CHECK: [[BADDR:%[0-9]+]] = alloc_box $@box B
   // CHECK: [[PB:%[0-9]+]] = project_box [[BADDR]]
   (b as! D).foo()
-  // CHECK: [[B:%[0-9]+]] = load [[PB]]
-  // CHECK: copy_value [[B]]
+  // CHECK: [[B:%[0-9]+]] = load [copy] [[PB]]
   // CHECK: [[D:%[0-9]+]] = unconditional_checked_cast [[B]] : {{.*}} to $D
   // CHECK: apply {{.*}}([[D]])
   // CHECK-NOT: destroy_value [[B]]

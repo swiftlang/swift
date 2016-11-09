@@ -301,9 +301,11 @@ public:
     : Operands(operands) {}
 
   /// A simple iterator adapter.
-  class iterator {
+  class iterator : public std::iterator<std::forward_iterator_tag,
+                                        SILValue, ptrdiff_t> {
     const Operand *Ptr;
   public:
+    iterator() = default;
     iterator(const Operand *ptr) : Ptr(ptr) {}
     SILValue operator*() const { assert(Ptr); return Ptr->get(); }
     SILValue operator->() const { return operator*(); }

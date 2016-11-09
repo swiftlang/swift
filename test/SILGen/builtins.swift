@@ -18,7 +18,7 @@ func foo(_ x: Builtin.Int1, y: Builtin.Int1) -> Builtin.Int1 {
 // CHECK-LABEL: sil hidden @_TF8builtins8load_pod
 func load_pod(_ x: Builtin.RawPointer) -> Builtin.Int64 {
   // CHECK: [[ADDR:%.*]] = pointer_to_address {{%.*}} to [strict] $*Builtin.Int64
-  // CHECK: [[VAL:%.*]] = load [[ADDR]]
+  // CHECK: [[VAL:%.*]] = load [trivial] [[ADDR]]
   // CHECK: return [[VAL]]
   return Builtin.load(x)
 }
@@ -26,8 +26,7 @@ func load_pod(_ x: Builtin.RawPointer) -> Builtin.Int64 {
 // CHECK-LABEL: sil hidden @_TF8builtins8load_obj
 func load_obj(_ x: Builtin.RawPointer) -> Builtin.NativeObject {
   // CHECK: [[ADDR:%.*]] = pointer_to_address {{%.*}} to [strict] $*Builtin.NativeObject
-  // CHECK: [[VAL:%.*]] = load [[ADDR]]
-  // CHECK: copy_value [[VAL]]
+  // CHECK: [[VAL:%.*]] = load [copy] [[ADDR]]
   // CHECK: return [[VAL]]
   return Builtin.load(x)
 }
@@ -35,7 +34,7 @@ func load_obj(_ x: Builtin.RawPointer) -> Builtin.NativeObject {
 // CHECK-LABEL: sil hidden @_TF8builtins12load_raw_pod
 func load_raw_pod(_ x: Builtin.RawPointer) -> Builtin.Int64 {
   // CHECK: [[ADDR:%.*]] = pointer_to_address {{%.*}} to $*Builtin.Int64
-  // CHECK: [[VAL:%.*]] = load [[ADDR]]
+  // CHECK: [[VAL:%.*]] = load [trivial] [[ADDR]]
   // CHECK: return [[VAL]]
   return Builtin.loadRaw(x)
 }
@@ -43,8 +42,7 @@ func load_raw_pod(_ x: Builtin.RawPointer) -> Builtin.Int64 {
 // CHECK-LABEL: sil hidden @_TF8builtins12load_raw_obj
 func load_raw_obj(_ x: Builtin.RawPointer) -> Builtin.NativeObject {
   // CHECK: [[ADDR:%.*]] = pointer_to_address {{%.*}} to $*Builtin.NativeObject
-  // CHECK: [[VAL:%.*]] = load [[ADDR]]
-  // CHECK: copy_value [[VAL]]
+  // CHECK: [[VAL:%.*]] = load [copy] [[ADDR]]
   // CHECK: return [[VAL]]
   return Builtin.loadRaw(x)
 }
@@ -59,7 +57,7 @@ func load_gen<T>(_ x: Builtin.RawPointer) -> T {
 // CHECK-LABEL: sil hidden @_TF8builtins8move_pod
 func move_pod(_ x: Builtin.RawPointer) -> Builtin.Int64 {
   // CHECK: [[ADDR:%.*]] = pointer_to_address {{%.*}} to [strict] $*Builtin.Int64
-  // CHECK: [[VAL:%.*]] = load [[ADDR]]
+  // CHECK: [[VAL:%.*]] = load [trivial] [[ADDR]]
   // CHECK: return [[VAL]]
   return Builtin.take(x)
 }
@@ -67,7 +65,7 @@ func move_pod(_ x: Builtin.RawPointer) -> Builtin.Int64 {
 // CHECK-LABEL: sil hidden @_TF8builtins8move_obj
 func move_obj(_ x: Builtin.RawPointer) -> Builtin.NativeObject {
   // CHECK: [[ADDR:%.*]] = pointer_to_address {{%.*}} to [strict] $*Builtin.NativeObject
-  // CHECK: [[VAL:%.*]] = load [[ADDR]]
+  // CHECK: [[VAL:%.*]] = load [take] [[ADDR]]
   // CHECK-NOT: copy_value [[VAL]]
   // CHECK: return [[VAL]]
   return Builtin.take(x)
@@ -559,7 +557,7 @@ func reinterpretAddrOnly<T, U>(_ t: T) -> U {
 // CHECK-LABEL: sil hidden @_TF8builtins28reinterpretAddrOnlyToTrivial
 func reinterpretAddrOnlyToTrivial<T>(_ t: T) -> Int {
   // CHECK: [[ADDR:%.*]] = unchecked_addr_cast [[INPUT:%.*]] : $*T to $*Int
-  // CHECK: [[VALUE:%.*]] = load [[ADDR]]
+  // CHECK: [[VALUE:%.*]] = load [trivial] [[ADDR]]
   // CHECK: destroy_addr [[INPUT]]
   return Builtin.reinterpretCast(t)
 }
@@ -572,7 +570,7 @@ func reinterpretAddrOnlyLoadable<T>(_ a: Int, _ b: T) -> (T, Int) {
   // CHECK: copy_addr [[RES1]] to [initialization]
   return (Builtin.reinterpretCast(a) as T,
   // CHECK: [[RES:%.*]] = unchecked_addr_cast {{%.*}} : $*T to $*Int
-  // CHECK: load [[RES]]
+  // CHECK: load [trivial] [[RES]]
           Builtin.reinterpretCast(b) as Int)
 }
 

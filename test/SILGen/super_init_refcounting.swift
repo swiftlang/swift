@@ -11,7 +11,7 @@ class Bar: Foo {
   // CHECK:         [[SELF_VAR:%.*]] = alloc_box $@box Bar
   // CHECK:         [[PB:%.*]] = project_box [[SELF_VAR]]
   // CHECK:         [[SELF_MUI:%.*]] =  mark_uninitialized [derivedself] [[PB]]
-  // CHECK:         [[ORIG_SELF:%.*]] = load [[SELF_MUI]]
+  // CHECK:         [[ORIG_SELF:%.*]] = load_borrow [[SELF_MUI]]
   // CHECK-NOT:     copy_value [[ORIG_SELF]]
   // CHECK:         [[ORIG_SELF_UP:%.*]] = upcast [[ORIG_SELF]]
   // CHECK-NOT:     copy_value [[ORIG_SELF_UP]]
@@ -29,7 +29,7 @@ extension Foo {
   // CHECK:         [[SELF_VAR:%.*]] = alloc_box $@box Foo
   // CHECK:         [[PB:%.*]] = project_box [[SELF_VAR]]
   // CHECK:         [[SELF_MUI:%.*]] =  mark_uninitialized [delegatingself] [[PB]]
-  // CHECK:         [[ORIG_SELF:%.*]] = load [[SELF_MUI]]
+  // CHECK:         [[ORIG_SELF:%.*]] = load_borrow [[SELF_MUI]]
   // CHECK-NOT:     copy_value [[ORIG_SELF]]
   // CHECK:         [[SUPER_INIT:%.*]] = class_method
   // CHECK:         [[NEW_SELF:%.*]] = apply [[SUPER_INIT]]([[ORIG_SELF]])
@@ -75,16 +75,16 @@ class Good: Foo {
   // CHECK:         [[SELF_BOX:%.*]] = alloc_box $@box Good
   // CHECK:         [[PB:%.*]] = project_box [[SELF_BOX]]
   // CHECK:         [[SELF:%.*]] = mark_uninitialized [derivedself] [[PB]]
-  // CHECK:         store %0 to [[SELF]]
-  // CHECK:         [[SELF_OBJ:%.*]] = load [[SELF]]
+  // CHECK:         store %0 to [init] [[SELF]]
+  // CHECK:         [[SELF_OBJ:%.*]] = load_borrow [[SELF]]
   // CHECK:         [[X_ADDR:%.*]] = ref_element_addr [[SELF_OBJ]] : $Good, #Good.x
   // CHECK:         assign {{.*}} to [[X_ADDR]] : $*Int
-  // CHECK:         [[SELF_OBJ:%.*]] = load [[SELF]] : $*Good
+  // CHECK:         [[SELF_OBJ:%.*]] = load_borrow [[SELF]] : $*Good
   // CHECK:         [[SUPER_OBJ:%.*]] = upcast [[SELF_OBJ]] : $Good to $Foo
   // CHECK:         [[SUPER_INIT:%.*]] = function_ref @_TFC22super_init_refcounting3FoocfSiS0_ : $@convention(method) (Int, @owned Foo) -> @owned Foo
-  // CHECK:         [[SELF_OBJ:%.*]] = load [[SELF]]
+  // CHECK:         [[SELF_OBJ:%.*]] = load_borrow [[SELF]]
   // CHECK:         [[X_ADDR:%.*]] = ref_element_addr [[SELF_OBJ]] : $Good, #Good.x
-  // CHECK:         [[X:%.*]] = load [[X_ADDR]] : $*Int
+  // CHECK:         [[X:%.*]] = load [trivial] [[X_ADDR]] : $*Int
   // CHECK:         apply [[SUPER_INIT]]([[X]], [[SUPER_OBJ]])
   override init() {
     x = 10

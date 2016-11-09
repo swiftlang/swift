@@ -63,7 +63,7 @@ func test0(c c: C) {
   // CHECK:   destroy_value [[ARG_COPY]]
 
   a.x = x
-  // CHECK:   [[T2:%.*]] = load [[PBX]] : $*@sil_unowned C     
+  // CHECK:   [[T2:%.*]] = load [take] [[PBX]] : $*@sil_unowned C     
   // CHECK:   strong_retain_unowned  [[T2]] : $@sil_unowned C  
   // CHECK:   [[T3:%.*]] = unowned_to_ref [[T2]] : $@sil_unowned C to $C
   // CHECK:   [[XP:%.*]] = struct_element_addr [[A]] : $*A, #A.x
@@ -91,7 +91,7 @@ func unowned_local() -> C {
   // CHECK: destroy_value [[C_COPY]]
   unowned let uc = c
 
-  // CHECK: [[tmp2:%.*]] = load [[PB_UC]]
+  // CHECK: [[tmp2:%.*]] = load [take] [[PB_UC]]
   // CHECK: strong_retain_unowned [[tmp2]]
   // CHECK: [[tmp3:%.*]] = unowned_to_ref [[tmp2]]
   return uc

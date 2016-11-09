@@ -1375,7 +1375,7 @@ emitTupleDispatch(ArrayRef<RowToSpecialize> rows, ConsumableManagedValue src,
       member = SGF.B.createTupleElementAddr(loc, v, i, fieldTy);
       if (!fieldTL.isAddressOnly())
         member =
-            SGF.B.createLoad(loc, member, LoadOwnershipQualifier::Unqualified);
+            fieldTL.emitLoad(SGF.B, loc, member, LoadOwnershipQualifier::Take);
     } else {
       member = SGF.B.createTupleExtract(loc, v, i, fieldTy);
     }
@@ -1764,8 +1764,8 @@ emitEnumElementDispatch(ArrayRef<RowToSpecialize> rows,
         
         // Load a loadable data value.
         if (eltTL->isLoadable())
-          eltValue = SGF.B.createLoad(loc, eltValue,
-                                      LoadOwnershipQualifier::Unqualified);
+          eltValue = eltTL->emitLoad(SGF.B, loc, eltValue,
+                                     LoadOwnershipQualifier::Take);
       } else {
         eltValue = new (SGF.F.getModule()) SILArgument(caseBB, eltTy);
       }
@@ -1779,8 +1779,7 @@ emitEnumElementDispatch(ArrayRef<RowToSpecialize> rows,
         SILValue boxedValue = SGF.B.createProjectBox(loc, origCMV.getValue(), 0);
         eltTL = &SGF.getTypeLowering(boxedValue->getType());
         if (eltTL->isLoadable())
-          boxedValue = SGF.B.createLoad(loc, boxedValue,
-                                        LoadOwnershipQualifier::Unqualified);
+          boxedValue = SGF.B.createLoadBorrow(loc, boxedValue);
 
         // The boxed value may be shared, so we always have to copy it.
         eltCMV = getManagedSubobject(SGF, boxedValue, *eltTL,

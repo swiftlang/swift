@@ -41,7 +41,7 @@ func test0(_ ref: A) {
 // CHECK-NEXT: [[T0:%.*]] = class_method %0 : $A, #A.array!getter.1
 // CHECK-NEXT: [[T1:%.*]] = apply [[T0]](%0)
 // CHECK-NEXT: store [[T1]] to [init] [[TEMP]]
-// CHECK-NEXT: [[T0:%.*]] = load [[TEMP]]
+// CHECK-NEXT: [[T0:%.*]] = load [take] [[TEMP]]
 // CHECK-NEXT: // function_ref accessors.OrdinarySub.subscript.getter : (Swift.Int) -> Swift.Int
 // CHECK-NEXT: [[T1:%.*]] = function_ref @_TFV9accessors11OrdinarySubg9subscriptFSiSi
 // CHECK-NEXT: [[VALUE:%.*]] = apply [[T1]]([[INDEX1]], [[T0]])
