@@ -1239,7 +1239,7 @@ extension Set {
 }
 
 extension Set : CustomStringConvertible, CustomDebugStringConvertible {
-  private func makeDescription(isDebug: Bool) -> String {
+  internal func makeDescription(isDebug: Bool) -> String {
     var result = isDebug ? "Set([" : "["
     var first = true
     for member in self {
@@ -2829,6 +2829,7 @@ final internal class _HashableTypedNative${Self}Storage<${TypeParametersDecl}> :
 /// The reason for this is to support storing AnyObject for bridging
 /// with _SwiftDeferredNS${Self}. What functionality actually relies on
 /// Hashable can be found in an extension.
+@_versioned
 internal struct _Native${Self}Buffer<${TypeParameters}> {
 
   internal typealias RawStorage = _RawNative${Self}Storage
@@ -2917,12 +2918,14 @@ internal struct _Native${Self}Buffer<${TypeParameters}> {
   }
 
   // This API is unsafe and needs a `_fixLifetime` in the caller.
+  @_versioned
   internal var keys: UnsafeMutablePointer<Key> {
     return _storage.keys.assumingMemoryBound(to: Key.self)
   }
 
 %if Self == 'Dictionary':
   // This API is unsafe and needs a `_fixLifetime` in the caller.
+  @_versioned
   internal var values: UnsafeMutablePointer<Value> {
     return _storage.values.assumingMemoryBound(to: Value.self)
   }
