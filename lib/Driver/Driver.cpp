@@ -254,8 +254,8 @@ static bool populateOutOfDateMap(InputInfoMap &map, StringRef argsHashStr,
     if (seqI != seqE)
       return true;
 
-    timeValue = llvm::sys::TimePoint<>(std::chrono::system_clock::duration(parsedNanoseconds));
-    timeValue += std::chrono::seconds(parsedSeconds);
+    timeValue = llvm::sys::TimePoint<>(std::chrono::seconds(parsedSeconds));
+    timeValue += std::chrono::nanoseconds(parsedNanoseconds);
     return false;
   };
 

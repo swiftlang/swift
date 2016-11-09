@@ -191,10 +191,11 @@ static void writeCompilationRecord(StringRef path, StringRef argsHash,
 
   auto writeTimeValue = [](llvm::raw_ostream &out,
                            llvm::sys::TimePoint<> time) {
-    auto seconds = llvm::sys::toTimeT(time);
-    auto nanoseconds = (time.time_since_epoch() %
-                        std::chrono::seconds(1)).count();
-    out << "[" << seconds << ", " << nanoseconds << "]";
+    using namespace std::chrono;
+    auto secs = time_point_cast<seconds>(time);
+    time -= secs.time_since_epoch(); // remainder in nanoseconds
+    out << "[" << secs.time_since_epoch().count()
+        << ", " << time.time_since_epoch().count() << "]";
   };
 
   using compilation_record::TopLevelKey;
