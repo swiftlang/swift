@@ -11,7 +11,7 @@ bash
 ```
 
 ### 2. Install dependencies
-Install the developer dependencies needed to compile the Swift project. These are identical to the Ubuntu dependencies, with the addition of `make`
+Install the developer dependencies needed to compile the Swift project. These are identical to the Ubuntu dependencies, with the addition of `make`.
 ```bash
 sudo apt-get install git make cmake ninja-build clang python uuid-dev libicu-dev icu-devtools libbsd-dev libedit-dev libxml2-dev libsqlite3-dev swig libpython-dev libncurses5-dev pkg-config libblocksruntime-dev libcurl4-openssl-dev
 ```
@@ -25,15 +25,16 @@ sudo update-alternatives --install /usr/bin/clang++ clang++ /usr/bin/clang++-3.6
 ```
 
 ### 4. Upgrade CMake
+Install the latest version of CMake - Swift uses new CMake features such as `IN_LIST` and won't build without these features.
 ```bash
-wget http://www.cmake.org/files/v3.5/cmake-3.5.2.tar.gz
-tar xf cmake-3.5.2.tar.gz
-cd cmake-3.5.2
+wget http://www.cmake.org/files/v3.5/cmake-3.6.2.tar.gz
+tar xf cmake-3.6.2.tar.gz
+cd cmake-3.6.2
 ./configure
 make
 sudo make install
 sudo update-alternatives --install /usr/bin/cmake cmake /usr/local/bin/cmake 1 --force
-cmake --version # This should print 3.5.2
+cmake --version # This should print 3.6.2
 ```
 
 ### 6. Clone and build the Swift project
@@ -46,10 +47,8 @@ git clone https://github.com/apple/swift.git
 ```
 ### 7. Hello, Windows (Subsystem for Linux)
 ```bash
-cd ./build/Ninja-RelWithDebInfoAssert/swift-linux-x86_64\bin # This path may depend on your build configuration
-vim test.swift
-print("Hello, Windows");
-:wq
+cd ./build/Ninja-RelWithDebInfoAssert/swift-linux-x86_64/bin # This path may depend on your build configuration
+echo 'print("Hello, Windows")' >> test.swift
 swiftc test.swift
 ./test # Hello, Windows
 ```
