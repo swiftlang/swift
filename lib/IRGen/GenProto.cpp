@@ -200,29 +200,16 @@ void PolymorphicConvention::addPseudogenericFulfillments() {
 void PolymorphicConvention::enumerateRequirements(const RequirementCallback &callback) {
   if (!Generics) return;
 
-  // Make a first pass to get all the type metadata.
-  for (auto &reqt : Generics->getRequirements()) {
-    switch (reqt.getKind()) {
-        // Ignore these; they don't introduce extra requirements.
-      case RequirementKind::Superclass:
-      case RequirementKind::SameType:
-      case RequirementKind::Conformance:
-        continue;
-
-      case RequirementKind::WitnessMarker: {
-        CanType type = CanType(reqt.getFirstType());
-        if (isa<GenericTypeParamType>(type))
-          callback({type, nullptr});
-        continue;
-      }
-    }
-    llvm_unreachable("bad requirement kind");
+  // Get all of the type metadata.
+  for (auto gp : Generics.getGenericParams()) {
+    if (Generics->getCanonicalTypeInContext(gp, M) == gp)
+      callback({gp, nullptr});
   }
 
-  // Make a second pass for all the protocol conformances.
+  // Get the protocol conformances.
   for (auto &reqt : Generics->getRequirements()) {
     switch (reqt.getKind()) {
-        // Ignore these; they don't introduce extra requirements.
+      // Ignore these; they don't introduce extra requirements.
       case RequirementKind::Superclass:
       case RequirementKind::SameType:
       case RequirementKind::WitnessMarker:

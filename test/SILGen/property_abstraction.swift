@@ -129,4 +129,4 @@ func setBuilder<F: Factory where F.Product == MyClass>(_ factory: inout F) {
 // CHECK:   [[SETTER:%.*]] = witness_method $F, #Factory.builder!setter.1
 // CHECK:   [[REABSTRACTOR:%.*]] = function_ref @_TTR
 // CHECK:   [[F2:%.*]] = partial_apply [[REABSTRACTOR]]([[F1]])
-// CHECK:   apply [[SETTER]]<F, MyClass>([[F2]], %0)
+// CHECK:   apply [[SETTER]]<F>([[F2]], %0)

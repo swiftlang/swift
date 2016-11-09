@@ -5436,7 +5436,9 @@ bool FailureDiagnosis::visitApplyExpr(ApplyExpr *callExpr) {
     if (calleeInfo.closeness == CC_ExactMatch)
       return true;
 
-    if (!CS->getContextualType() || calleeInfo.closeness != CC_ArgumentMismatch)
+    if (!CS->getContextualType() ||
+        (calleeInfo.closeness != CC_ArgumentMismatch &&
+         calleeInfo.closeness != CC_OneGenericArgumentMismatch))
       return false;
 
     CalleeCandidateInfo candidates(fnExpr, hasTrailingClosure, CS);

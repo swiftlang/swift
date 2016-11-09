@@ -393,6 +393,8 @@ SpecializedProtocolConformance::getTypeWitnessSubstAndDecl(
   // Apply the substitution we computed above
   auto specializedType
     = genericWitness.getReplacement().subst(substitutionMap, None);
+  if (!specializedType)
+    specializedType = ErrorType::get(genericWitness.getReplacement());
 
   // If the type witness was unchanged, just copy it directly.
   if (specializedType.getPointer() == genericWitness.getReplacement().getPointer()) {
