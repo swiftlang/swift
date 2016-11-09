@@ -1,4 +1,34 @@
+// RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=PATTERN_ATOM_1 | %FileCheck %s -check-prefix=NO_COMPLETIONS
+// RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=PATTERN_ATOM_2 | %FileCheck %s -check-prefix=NO_COMPLETIONS
+// RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=PATTERN_ATOM_3 | %FileCheck %s -check-prefix=NO_COMPLETIONS
+// RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=PATTERN_ATOM_4 | %FileCheck %s -check-prefix=NO_COMPLETIONS
+// RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=PATTERN_ATOM_5 | %FileCheck %s -check-prefix=NO_COMPLETIONS
+// RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=PATTERN_ATOM_6 | %FileCheck %s -check-prefix=NO_COMPLETIONS
+// RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=PATTERN_ATOM_7 | %FileCheck %s -check-prefix=NO_COMPLETIONS
+// RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=PATTERN_ATOM_8 | %FileCheck %s -check-prefix=NO_COMPLETIONS
+// RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=PATTERN_ATOM_9 | %FileCheck %s -check-prefix=NO_COMPLETIONS
+// RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=PATTERN_ATOM_10 | %FileCheck %s -check-prefix=NO_COMPLETIONS
+// RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=PATTERN_ATOM_11 | %FileCheck %s -check-prefix=NO_COMPLETIONS
+// RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=PATTERN_ATOM_12 | %FileCheck %s -check-prefix=NO_COMPLETIONS
+// RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=PATTERN_IF_CASE_1 | %FileCheck %s -check-prefix=GLOBAL
+// RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=PATTERN_IF_CASE_2 | %FileCheck %s -check-prefix=NO_COMPLETIONS
+// RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=PATTERN_INFUNC_ATOM_1 | %FileCheck %s -check-prefix=NO_COMPLETIONS
+// RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=PATTERN_INFUNC_ATOM_2 | %FileCheck %s -check-prefix=NO_COMPLETIONS
+// RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=PATTERN_INFUNC_ATOM_3 | %FileCheck %s -check-prefix=NO_COMPLETIONS
+// RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=PATTERN_INFUNC_ATOM_4 | %FileCheck %s -check-prefix=NO_COMPLETIONS
+// RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=PATTERN_INFUNC_ATOM_5 | %FileCheck %s -check-prefix=NO_COMPLETIONS
+// RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=PATTERN_INFUNC_ATOM_6 | %FileCheck %s -check-prefix=NO_COMPLETIONS
+// RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=PATTERN_INFUNC_ATOM_7 | %FileCheck %s -check-prefix=NO_COMPLETIONS
+// RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=PATTERN_INFUNC_ATOM_8 | %FileCheck %s -check-prefix=NO_COMPLETIONS
+// RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=PATTERN_INFUNC_ATOM_9 | %FileCheck %s -check-prefix=NO_COMPLETIONS
+// RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=PATTERN_INFUNC_ATOM_10 | %FileCheck %s -check-prefix=NO_COMPLETIONS
+// RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=PATTERN_INFUNC_ATOM_11 | %FileCheck %s -check-prefix=NO_COMPLETIONS
+// RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=PATTERN_INFUNC_ATOM_12 | %FileCheck %s -check-prefix=NO_COMPLETIONS
+// RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=PATTERN_INFUNC_IF_CASE_1 | %FileCheck %s -check-prefix=GLOBAL
+// RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=PATTERN_INFUNC_IF_CASE_2 | %FileCheck %s -check-prefix=NO_COMPLETIONS
 
+// RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=PATTERN_IS_1 > %t.types.txt
+// RUN: %FileCheck %s -check-prefix=GLOBAL_NEGATIVE < %t.types.txt
 
 // RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=PATTERN_IS_1 > %t.types.txt
 // RUN: %FileCheck %s -check-prefix=GLOBAL_NEGATIVE < %t.types.txt
@@ -60,6 +90,14 @@ protocol BarProtocol {
 
 typealias FooTypealias = Int
 
+// GLOBAL: Begin completions
+// GLOBAL-DAG: fooObject
+// GLOBAL-DAG: fooFunc
+// GLOBAL-DAG: FooTypealias
+// GLOBAL-DAG: FooProtocol
+// GLOBAL-DAG: FooClass
+// GLOBAL: End completions
+
 // GLOBAL_NEGATIVE-NOT: fooObject
 // GLOBAL_NEGATIVE-NOT: fooFunc
 
@@ -67,12 +105,40 @@ typealias FooTypealias = Int
 //===--- Test that we don't try to suggest anything where pattern-atom is expected.
 //===---
 
-var #^PATTERN_ATOM_1^#
-var (#^PATTERN_ATOM_2^#
-var (a, #^PATTERN_ATOM_3^#
-var (a #^PATTERN_ATOM_4^#
-var ((#^PATTERN_ATOM_5^#
-var ((a, b), #^PATTERN_ATOM_6^#
+// NO_COMPLETIONS-NOT: Begin completions
+
+// Use do { } to reset the parser after broken syntax.
+do { var #^PATTERN_ATOM_1^# }
+do { var (#^PATTERN_ATOM_2^# }
+do {var (a, #^PATTERN_ATOM_3^# }
+do {var (a #^PATTERN_ATOM_4^# }
+do {var ((#^PATTERN_ATOM_5^# }
+do {var ((a, b), #^PATTERN_ATOM_6^# }
+do {guard var #^PATTERN_ATOM_7^# }
+do {guard var #^PATTERN_ATOM_8^# else { fatalError() } }
+do {guard let #^PATTERN_ATOM_9^# else { fatalError() } }
+do {guard let a = Optional(1), let #^PATTERN_ATOM_10^# else { fatalError() } }
+do {if let #^PATTERN_ATOM_11^# {} }
+do {if let a = Optional(1), let #^PATTERN_ATOM_12^# {} }
+do {if case #^PATTERN_IF_CASE_1^# {} }
+do {if case let #^PATTERN_IF_CASE_2^# {} }
+
+func inFunc() {
+  do { var #^PATTERN_INFUNC_ATOM_1^# }
+  do { var (#^PATTERN_INFUNC_ATOM_2^# }
+  do {var (a, #^PATTERN_INFUNC_ATOM_3^# }
+  do {var (a #^PATTERN_INFUNC_ATOM_4^# }
+  do {var ((#^PATTERN_INFUNC_ATOM_5^# }
+  do {var ((a, b), #^PATTERN_INFUNC_ATOM_6^# }
+  do {guard var #^PATTERN_INFUNC_ATOM_7^# }
+  do {guard var #^PATTERN_INFUNC_ATOM_8^# else { fatalError() } }
+  do {guard let #^PATTERN_INFUNC_ATOM_9^# else { fatalError() } }
+  do {guard let a = Optional(1), let #^PATTERN_INFUNC_ATOM_10^# else { fatalError() } }
+  do {if let #^PATTERN_INFUNC_ATOM_11^# {} }
+  do {if let a = Optional(1), let #^PATTERN_INFUNC_ATOM_12^# {} }
+  do {if case #^PATTERN_INFUNC_IF_CASE_1^# {} }
+  do {if case let #^PATTERN_INFUNC_IF_CASE_2^# {} }
+}
 
 //===---
 //===--- Test that we complete the type in 'is' pattern.
