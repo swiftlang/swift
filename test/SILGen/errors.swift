@@ -509,7 +509,7 @@ func supportFirstStructure<B: Buildable>(_ b: inout B) throws {
 // CHECK: [[BUFFER:%.*]] = alloc_stack $B.Structure
 // CHECK: [[BUFFER_CAST:%.*]] = address_to_pointer [[BUFFER]] : $*B.Structure to $Builtin.RawPointer
 // CHECK: [[MAT:%.*]] = witness_method $B, #Buildable.firstStructure!materializeForSet.1 :
-// CHECK: [[T1:%.*]] = apply [[MAT]]<B, B.Structure>([[BUFFER_CAST]], [[MATBUFFER]], [[BASE:%[0-9]*]])
+// CHECK: [[T1:%.*]] = apply [[MAT]]<B>([[BUFFER_CAST]], [[MATBUFFER]], [[BASE:%[0-9]*]])
 // CHECK: [[T2:%.*]] = tuple_extract [[T1]] : {{.*}}, 0
 // CHECK: [[CALLBACK:%.*]] = tuple_extract [[T1]] : {{.*}}, 1
 // CHECK: [[T3:%.*]] = pointer_to_address [[T2]] : $Builtin.RawPointer to [strict] $*B.Structure
@@ -540,7 +540,7 @@ func supportStructure<B: Buildable>(_ b: inout B, name: String) throws {
 // CHECK: [[BUFFER:%.*]] = alloc_stack $B.Structure
 // CHECK: [[BUFFER_CAST:%.*]] = address_to_pointer [[BUFFER]] : $*B.Structure to $Builtin.RawPointer
 // CHECK: [[MAT:%.*]] = witness_method $B, #Buildable.subscript!materializeForSet.1 :
-// CHECK: [[T1:%.*]] = apply [[MAT]]<B, B.Structure>([[BUFFER_CAST]], [[MATBUFFER]], [[INDEX_COPY]], [[BASE:%[0-9]*]])
+// CHECK: [[T1:%.*]] = apply [[MAT]]<B>([[BUFFER_CAST]], [[MATBUFFER]], [[INDEX_COPY]], [[BASE:%[0-9]*]])
 // CHECK: [[T2:%.*]] = tuple_extract [[T1]] : {{.*}}, 0
 // CHECK: [[CALLBACK:%.*]] = tuple_extract [[T1]] : {{.*}}, 1
 // CHECK: [[T3:%.*]] = pointer_to_address [[T2]] : $Builtin.RawPointer to [strict] $*B.Structure

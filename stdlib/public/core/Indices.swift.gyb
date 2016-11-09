@@ -107,7 +107,11 @@ public struct ${Self}<
   internal var _endIndex: Elements.Index
 }
 
-extension ${collectionForTraversal(Traversal)} where Indices == ${Self}<Self> {
+extension ${collectionForTraversal(Traversal)}
+%     if Traversal != 'RandomAccess':
+  where Indices == ${Self}<Self>
+%     end
+{
   /// The indices that are valid for subscripting the collection, in ascending
   /// order.
   ///

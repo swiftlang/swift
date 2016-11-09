@@ -1438,11 +1438,11 @@ void TypeChecker::completePropertyBehaviorParameter(VarDecl *VD,
 
 void TypeChecker::completePropertyBehaviorAccessors(VarDecl *VD,
                                        VarDecl *ValueImpl,
+                                       Type valueTy,
                                        ArrayRef<Substitution> SelfInterfaceSubs,
                                        ArrayRef<Substitution> SelfContextSubs) {
   auto selfTy = SelfContextSubs[0].getReplacement();
-  auto valueTy = SelfContextSubs[1].getReplacement();
-  
+
   SmallVector<ASTNode, 3> bodyStmts;
   
   auto makeSelfExpr = [&](FuncDecl *fromAccessor,
