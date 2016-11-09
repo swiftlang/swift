@@ -258,7 +258,7 @@ bool Parser::parseTopLevel() {
 
   // Next time start relexing from the beginning of the comment so that we can
   // attach it to the token.
-  State->markParserPosition(Tok.getCommentRange().getStart(), PreviousLoc,
+  State->markParserPosition(Tok.getAbsoluteTriviaStart(), PreviousLoc,
                             InPoundLineEnvironment);
 
   return FoundTopLevelCodeToExecute;
@@ -278,7 +278,8 @@ bool Parser::skipExtraTopLevelRBraces() {
 
 
 static Optional<StringRef>
-getStringLiteralIfNotInterpolated(Parser &P, SourceLoc Loc, const Token &Tok,
+getStringLiteralIfNotInterpolated(Parser &P, SourceLoc Loc,
+                                  syntax::Token Tok,
                                   StringRef DiagText) {
   SmallVector<Lexer::StringSegment, 1> Segments;
   P.L->getStringLiteralSegments(Tok, Segments);
@@ -295,7 +296,7 @@ getStringLiteralIfNotInterpolated(Parser &P, SourceLoc Loc, const Token &Tok,
 bool Parser::parseNewDeclAttribute(DeclAttributes &Attributes, SourceLoc AtLoc,
                                    DeclAttrKind DK) {
   // Ok, it is a valid attribute, eat it, and then process it.
-  StringRef AttrName = Tok.getText();
+  auto AttrName = Tok.getText().str();
   SourceLoc Loc = consumeToken();
   bool DiscardAttribute = false;
 
@@ -886,7 +887,8 @@ bool Parser::parseNewDeclAttribute(DeclAttributes &Attributes, SourceLoc AtLoc,
       case IsDeprecated:
         if (!findAttrValueDelimiter()) {
           if (PlatformAgnostic != PlatformAgnosticAvailabilityKind::None) {
-            diagnose(Tok, diag::attr_availability_unavailable_deprecated,
+            diagnose(Tok,
+                     diag::attr_availability_unavailable_deprecated,
                      AttrName);
           }
 
@@ -929,7 +931,8 @@ bool Parser::parseNewDeclAttribute(DeclAttributes &Attributes, SourceLoc AtLoc,
 
       case IsUnavailable:
         if (PlatformAgnostic != PlatformAgnosticAvailabilityKind::None) {
-          diagnose(Tok, diag::attr_availability_unavailable_deprecated,
+          diagnose(Tok,
+                   diag::attr_availability_unavailable_deprecated,
                    AttrName);
         }
 
@@ -1578,7 +1581,7 @@ bool Parser::parseDeclAttributeList(DeclAttributes &Attributes,
       FoundCCToken = true;
       continue;
     }
-    SourceLoc AtLoc = consumeToken();
+    auto AtLoc = consumeToken();
     if (parseDeclAttribute(Attributes, AtLoc))
       return true;
   }
@@ -1608,7 +1611,8 @@ bool Parser::parseTypeAttributeListPresent(TypeAttributes &Attributes) {
   return false;
 }
 
-static bool isStartOfOperatorDecl(const Token &Tok, const Token &Tok2) {
+static bool isStartOfOperatorDecl(const syntax::Token &Tok,
+                                  const syntax::Token &Tok2) {
   return Tok.isContextualKeyword("operator") &&
          (Tok2.isContextualKeyword("prefix") ||
           Tok2.isContextualKeyword("postfix") ||
@@ -1660,7 +1664,7 @@ static void diagnoseOperatorFixityAttributes(Parser &P,
   }
 }
 
-bool swift::isKeywordPossibleDeclStart(const Token &Tok) {
+bool swift::isKeywordPossibleDeclStart(const syntax::Token &Tok) {
   switch (Tok.getKind()) {
   case tok::at_sign:
   case tok::kw_associatedtype:
@@ -1732,7 +1736,7 @@ bool Parser::isStartOfDecl() {
   
   // The protocol keyword needs more checking to reject "protocol<Int>".
   if (Tok.is(tok::kw_protocol)) {
-    const Token &Tok2 = peekToken();
+    auto Tok2 = peekToken();
     return !Tok2.isAnyOperator() || !Tok2.getText().equals("<");
   }
 
@@ -1745,7 +1749,7 @@ bool Parser::isStartOfDecl() {
   if (Tok.isNot(tok::identifier)) return true;
 
   // If this is an operator declaration, handle it.
-  const Token &Tok2 = peekToken();
+  auto Tok2 = peekToken();
   if (isStartOfOperatorDecl(Tok, Tok2))
     return true;
     
@@ -1885,8 +1889,12 @@ ParserStatus Parser::parseDecl(ParseDeclOptions Flags,
                                   StructureMarkerKind::Declaration);
 
   DeclAttributes Attributes;
-  if (Tok.hasComment())
-    Attributes.add(new (Context) RawDocCommentAttr(Tok.getCommentRange()));
+  auto RCPieces = Tok.getRawCommentPieces(Context.SourceMgr);
+  if (!RCPieces.empty()) {
+    auto CopiedPieces = Context.AllocateCopy(llvm::makeArrayRef(RCPieces));
+    auto RC = RawComment { CopiedPieces };
+    Attributes.add(new (Context) RawDocCommentAttr { RC });
+  }
   bool FoundCCTokenInAttr;
   parseDeclAttributeList(Attributes, FoundCCTokenInAttr);
 
@@ -2433,13 +2441,15 @@ ParserStatus Parser::parseInheritance(SmallVectorImpl<TypeLoc> &Inherited,
           // Provide fixits to remove the composition, leaving the types intact.
           auto compositionRange = Composition->getCompositionRange();
           auto token = Lexer::getTokenAtLocation(SourceMgr, compositionRange.End);
-          diagnose(Composition->getSourceLoc(),
-                   diag::disallowed_protocol_composition)
-            .highlight({Composition->getStartLoc(), compositionRange.End})
-            .fixItRemove({Composition->getSourceLoc(), compositionRange.Start})
-            .fixItRemove(startsWithGreater(token)
-                         ? compositionRange.End
-                         : SourceLoc());
+          if (token.hasValue())
+            diagnose(Composition->getSourceLoc(),
+                     diag::disallowed_protocol_composition)
+              .highlight({Composition->getStartLoc(), compositionRange.End})
+              .fixItRemove({Composition->getSourceLoc(),
+                            compositionRange.Start})
+              .fixItRemove(startsWithGreater(token.getValue())
+                           ? compositionRange.End
+                           : SourceLoc());
         } else {
           diagnose(Composition->getStartLoc(),
                    diag::disallowed_protocol_composition)
@@ -3308,27 +3318,27 @@ void Parser::consumeGetSetBody(AbstractFunctionDecl *AFD,
   }
 }
 
-static AddressorKind getImmutableAddressorKind(Token &tok) {
-  if (tok.isContextualKeyword("unsafeAddress")) {
+static AddressorKind getImmutableAddressorKind(const syntax::Token &Tok) {
+  if (Tok.isContextualKeyword("unsafeAddress")) {
     return AddressorKind::Unsafe;
-  } else if (tok.isContextualKeyword("addressWithOwner")) {
+  } else if (Tok.isContextualKeyword("addressWithOwner")) {
     return AddressorKind::Owning;
-  } else if (tok.isContextualKeyword("addressWithNativeOwner")) {
+  } else if (Tok.isContextualKeyword("addressWithNativeOwner")) {
     return AddressorKind::NativeOwning;
-  } else if (tok.isContextualKeyword("addressWithPinnedNativeOwner")) {
+  } else if (Tok.isContextualKeyword("addressWithPinnedNativeOwner")) {
     return AddressorKind::NativePinning;
   } else {
     return AddressorKind::NotAddressor;
   }
 }
-static AddressorKind getMutableAddressorKind(Token &tok) {
-  if (tok.isContextualKeyword("unsafeMutableAddress")) {
+static AddressorKind getMutableAddressorKind(const syntax::Token &Tok) {
+  if (Tok.isContextualKeyword("unsafeMutableAddress")) {
     return AddressorKind::Unsafe;
-  } else if (tok.isContextualKeyword("mutableAddressWithOwner")) {
+  } else if (Tok.isContextualKeyword("mutableAddressWithOwner")) {
     return AddressorKind::Owning;
-  } else if (tok.isContextualKeyword("mutableAddressWithNativeOwner")) {
+  } else if (Tok.isContextualKeyword("mutableAddressWithNativeOwner")) {
     return AddressorKind::NativeOwning;
-  } else if (tok.isContextualKeyword("mutableAddressWithPinnedNativeOwner")) {
+  } else if (Tok.isContextualKeyword("mutableAddressWithPinnedNativeOwner")) {
     return AddressorKind::NativePinning;
   } else {
     return AddressorKind::NotAddressor;
@@ -4182,7 +4192,7 @@ ParserStatus Parser::parseDeclVar(ParseDeclOptions Flags,
     // Parse a behavior block if present.
     if (Context.LangOpts.EnableExperimentalPropertyBehaviors
         && Tok.is(tok::identifier)
-        && Tok.getRawText().equals("__behavior")) {
+        && Tok.getText().equals("__behavior")) {
       consumeToken(tok::identifier);
       auto type = parseType(diag::expected_behavior_name,
                             /*handle completion*/ true);
@@ -4392,10 +4402,10 @@ Parser::parseDeclFunc(SourceLoc StaticLoc, StaticSpellingKind StaticSpelling,
 
   // Forgive the lexer
   if (Tok.is(tok::amp_prefix)) {
-    Tok.setKind(tok::oper_prefix);
+    Tok = Tok.withKind(tok::oper_prefix);
   }
   Identifier SimpleName;
-  Token NameTok = Tok;
+  auto NameTok = Tok;
   SourceLoc NameLoc = Tok.getLoc();
 
   // Within a protocol, recover from a missing 'static'.
@@ -4474,12 +4484,28 @@ Parser::parseDeclFunc(SourceLoc StaticLoc, StaticSpellingKind StaticSpelling,
     GenericParams = Result.getPtrOrNull();
     GPHasCodeCompletion |= Result.hasCodeCompletion();
 
-    auto NameTokText = NameTok.getRawText();
-    markSplitToken(tok::identifier,
-                   NameTokText.substr(0, NameTokText.size() - 1));
-    markSplitToken(tok::oper_binary_unspaced,
-                   NameTokText.substr(NameTokText.size() - 1));
+    auto NameTokText = NameTok.getText();
 
+    auto SplitIdentifierText = NameTokText.substr(0, NameTokText.size() - 1);
+    auto SplitIdentifierLoc =
+      SourceLoc(llvm::SMLoc::getFromPointer(SplitIdentifierText.begin()));
+    auto SplitIdentifier = syntax::Token { tok::identifier,
+      SplitIdentifierText,
+      NameTok.getLeadingTrivia(),
+      std::deque<syntax::Trivia> {},
+      SplitIdentifierLoc };
+    SplitTokens.push_back(SplitIdentifier);
+
+    auto SplitOperatorText = NameTokText.substr(NameTokText.size() - 1);
+    auto SplitOperatorLoc =
+      SourceLoc(llvm::SMLoc::getFromPointer(SplitOperatorText.begin()));
+    auto SplitOperator = syntax::Token {
+      tok::oper_binary_unspaced,
+      String::createUnmanaged(SplitOperatorText),
+      std::deque<syntax::Trivia> {},
+      NameTok.getTrailingTrivia(),
+      SplitOperatorLoc };
+    SplitTokens.push_back(SplitOperator);
   } else {
     auto Result = maybeParseGenericParams();
     GenericParams = Result.getPtrOrNull();

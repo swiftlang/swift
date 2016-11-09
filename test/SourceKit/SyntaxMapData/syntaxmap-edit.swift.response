@@ -6,12 +6,12 @@
     {
       key.kind: source.lang.swift.syntaxtype.comment,
       key.offset: 0,
-      key.length: 22
+      key.length: 21
     },
     {
       key.kind: source.lang.swift.syntaxtype.comment,
       key.offset: 22,
-      key.length: 58
+      key.length: 57
     },
     {
       key.kind: source.lang.swift.syntaxtype.keyword,

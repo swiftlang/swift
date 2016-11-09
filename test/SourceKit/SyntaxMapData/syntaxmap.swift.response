@@ -6,12 +6,12 @@
     {
       key.kind: source.lang.swift.syntaxtype.comment,
       key.offset: 0,
-      key.length: 22
+      key.length: 21
     },
     {
       key.kind: source.lang.swift.syntaxtype.comment,
       key.offset: 22,
-      key.length: 60
+      key.length: 59
     },
     {
       key.kind: source.lang.swift.syntaxtype.keyword,
@@ -111,7 +111,7 @@
     {
       key.kind: source.lang.swift.syntaxtype.comment,
       key.offset: 185,
-      key.length: 27
+      key.length: 26
     },
     {
       key.kind: source.lang.swift.syntaxtype.comment,
@@ -126,7 +126,7 @@
     {
       key.kind: source.lang.swift.syntaxtype.comment,
       key.offset: 245,
-      key.length: 16
+      key.length: 15
     },
     {
       key.kind: source.lang.swift.syntaxtype.comment,
@@ -140,11 +140,6 @@
     },
     {
       key.kind: source.lang.swift.syntaxtype.comment,
-      key.offset: 283,
-      key.length: 1
-    },
-    {
-      key.kind: source.lang.swift.syntaxtype.comment,
       key.offset: 284,
       key.length: 3
     },
@@ -152,11 +147,6 @@
       key.kind: source.lang.swift.syntaxtype.comment.url,
       key.offset: 287,
       key.length: 20
-    },
-    {
-      key.kind: source.lang.swift.syntaxtype.comment,
-      key.offset: 307,
-      key.length: 1
     },
     {
       key.kind: source.lang.swift.syntaxtype.keyword,
@@ -206,22 +196,22 @@
     {
       key.kind: source.lang.swift.syntaxtype.doccomment,
       key.offset: 360,
-      key.length: 23
+      key.length: 22
     },
     {
       key.kind: source.lang.swift.syntaxtype.doccomment,
       key.offset: 383,
-      key.length: 4
+      key.length: 3
     },
     {
       key.kind: source.lang.swift.syntaxtype.doccomment,
       key.offset: 387,
-      key.length: 16
+      key.length: 15
     },
     {
       key.kind: source.lang.swift.syntaxtype.doccomment,
       key.offset: 403,
-      key.length: 4
+      key.length: 3
     },
     {
       key.kind: source.lang.swift.syntaxtype.doccomment,
@@ -236,27 +226,27 @@
     {
       key.kind: source.lang.swift.syntaxtype.doccomment,
       key.offset: 423,
-      key.length: 2
+      key.length: 1
     },
     {
       key.kind: source.lang.swift.syntaxtype.doccomment,
       key.offset: 425,
-      key.length: 15
+      key.length: 14
     },
     {
       key.kind: source.lang.swift.syntaxtype.doccomment,
       key.offset: 440,
-      key.length: 8
+      key.length: 7
     },
     {
       key.kind: source.lang.swift.syntaxtype.doccomment,
       key.offset: 448,
-      key.length: 33
+      key.length: 32
     },
     {
       key.kind: source.lang.swift.syntaxtype.doccomment,
       key.offset: 481,
-      key.length: 4
+      key.length: 3
     },
     {
       key.kind: source.lang.swift.syntaxtype.doccomment,
@@ -271,7 +261,7 @@
     {
       key.kind: source.lang.swift.syntaxtype.doccomment,
       key.offset: 500,
-      key.length: 13
+      key.length: 12
     },
     {
       key.kind: source.lang.swift.syntaxtype.doccomment,
@@ -286,7 +276,7 @@
     {
       key.kind: source.lang.swift.syntaxtype.doccomment,
       key.offset: 526,
-      key.length: 10
+      key.length: 9
     },
     {
       key.kind: source.lang.swift.syntaxtype.keyword,
@@ -395,11 +385,6 @@
     },
     {
       key.kind: source.lang.swift.syntaxtype.comment,
-      key.offset: 771,
-      key.length: 1
-    },
-    {
-      key.kind: source.lang.swift.syntaxtype.comment,
       key.offset: 772,
       key.length: 3
     },
@@ -410,18 +395,13 @@
     },
     {
       key.kind: source.lang.swift.syntaxtype.comment,
-      key.offset: 788,
-      key.length: 1
-    },
-    {
-      key.kind: source.lang.swift.syntaxtype.comment,
       key.offset: 789,
-      key.length: 24
+      key.length: 23
     },
     {
       key.kind: source.lang.swift.syntaxtype.comment,
       key.offset: 813,
-      key.length: 36
+      key.length: 35
     },
     {
       key.kind: source.lang.swift.syntaxtype.keyword,

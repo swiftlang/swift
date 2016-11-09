@@ -165,9 +165,10 @@ void swift::performDelayedParsing(
 }
 
 /// \brief Tokenizes a string literal, taking into account string interpolation.
-static void getStringPartTokens(const Token &Tok, const LangOptions &LangOpts,
+static void getStringPartTokens(const syntax::Token &Tok,
+                                const LangOptions &LangOpts,
                                 const SourceManager &SM,
-                                int BufID, std::vector<Token> &Toks) {
+                                int BufID, std::vector<syntax::Token> &Toks){
   assert(Tok.is(tok::string_literal));
   SmallVector<Lexer::StringSegment, 4> Segments;
   Lexer::getStringLiteralSegments(Tok, Segments, /*Diags=*/0);
@@ -189,8 +190,12 @@ static void getStringPartTokens(const Token &Tok, const LangOptions &LangOpts,
       }
 
       StringRef Text = SM.extractText({ Loc, Len });
-      Token NewTok;
-      NewTok.setToken(tok::string_literal, Text);
+      auto NewTok = syntax::Token {
+        tok::string_literal, Text,
+        isFirst ? Tok.getLeadingTrivia() : syntax::TriviaList(),
+        isLast ? Tok.getTrailingTrivia() : syntax::TriviaList(),
+        Loc
+      };
       Toks.push_back(NewTok);
 
     } else {
@@ -201,35 +206,45 @@ static void getStringPartTokens(const Token &Tok, const LangOptions &LangOpts,
 
       if (isFirst) {
         // Add a token for the quote character.
-        StringRef Text = SM.extractText({ Seg.Loc.getAdvancedLoc(-2), 1 });
-        Token NewTok;
-        NewTok.setToken(tok::string_literal, Text);
+        auto Loc = Seg.Loc.getAdvancedLoc(-2);
+        StringRef Text = SM.extractText({ Loc , 1 });
+        auto NewTok = syntax::Token {
+          tok::string_literal, Text,
+          Tok.getLeadingTrivia(), syntax::TriviaList(),
+          Loc
+        };
         Toks.push_back(NewTok);
       }
 
-      std::vector<Token> NewTokens = swift::tokenize(LangOpts, SM, BufID,
-                                                     Offset, EndOffset,
-                                                     /*KeepComments=*/true);
+      auto NewTokens = swift::tokenize(LangOpts, SM, EOFRetention::DiscardEOF,
+                                       BufID, Offset, EndOffset,
+                                       /*KeepComments=*/true);
       Toks.insert(Toks.end(), NewTokens.begin(), NewTokens.end());
 
       if (isLast) {
         // Add a token for the quote character.
         StringRef Text = SM.extractText({ Seg.Loc.getAdvancedLoc(Seg.Length),
                                           1 });
-        Token NewTok;
-        NewTok.setToken(tok::string_literal, Text);
+        auto NewTok = syntax::Token {
+          tok::string_literal, Text,
+          syntax::TriviaList(), Tok.getTrailingTrivia(),
+          Seg.Loc
+        };
         Toks.push_back(NewTok);
       }
     }
   }
 }
 
-std::vector<Token> swift::tokenize(const LangOptions &LangOpts,
-                                   const SourceManager &SM, unsigned BufferID,
-                                   unsigned Offset, unsigned EndOffset,
-                                   bool KeepComments,
-                                   bool TokenizeInterpolatedString,
-                                   ArrayRef<Token> SplitTokens) {
+std::vector<syntax::Token> swift::tokenize(const LangOptions &LangOpts,
+                                           const SourceManager &SM,
+                                           EOFRetention IncludeEOF,
+                                           unsigned BufferID,
+                                           unsigned Offset,
+                                           unsigned EndOffset,
+                                           bool KeepComments,
+                                           bool TokenizeInterpolatedString,
+                                          ArrayRef<syntax::Token> SplitTokens) {
   if (Offset == 0 && EndOffset == 0)
     EndOffset = SM.getRangeForBuffer(BufferID).getByteLength();
 
@@ -238,40 +253,47 @@ std::vector<Token> swift::tokenize(const LangOptions &LangOpts,
                        : CommentRetentionMode::AttachToNextToken,
           Offset, EndOffset);
 
-  auto TokComp = [&] (const Token &A, const Token &B) {
+  auto TokComp = [&] (const syntax::Token &A, const syntax::Token &B) {
     return SM.isBeforeInBuffer(A.getLoc(), B.getLoc());
   };
 
-  std::set<Token, decltype(TokComp)> ResetTokens(TokComp);
+  std::set<syntax::Token, decltype(TokComp)> ResetTokens(TokComp);
   for (auto C = SplitTokens.begin(), E = SplitTokens.end(); C != E; ++C) {
     ResetTokens.insert(*C);
   }
 
-  std::vector<Token> Tokens;
+  std::vector<syntax::Token> Tokens;
   do {
-    Tokens.emplace_back();
-    L.lex(Tokens.back());
+    auto Tok = L.lex();
+    Tokens.push_back(Tok);
 
     // If the token has the same location as a reset location,
     // reset the token stream
-    auto F = ResetTokens.find(Tokens.back());
+    auto F = std::find_if(ResetTokens.begin(), ResetTokens.end(),
+                          [&](const syntax::Token &T) -> bool {
+      return T.getLoc() == Tokens.back().getLoc();
+    });
     if (F != ResetTokens.end()) {
-      Tokens.back() = *F;
+      auto Tok = *F;
+      Tokens.back() = Tok;
       assert(Tokens.back().isNot(tok::string_literal));
 
       auto NewState = L.getStateForBeginningOfTokenLoc(
-                                    F->getLoc().getAdvancedLoc(F->getLength()));
+                                 Tok.getLoc().getAdvancedLoc(Tok.getWidth()));
       L.restoreState(NewState);
       continue;
     }
 
     if (Tokens.back().is(tok::string_literal) && TokenizeInterpolatedString) {
-      Token StrTok = Tokens.back();
+      auto StrTok = Tokens.back();
       Tokens.pop_back();
       getStringPartTokens(StrTok, LangOpts, SM, BufferID, Tokens);
     }
   } while (Tokens.back().isNot(tok::eof));
-  Tokens.pop_back(); // Remove EOF.
+
+  if (IncludeEOF == EOFRetention::DiscardEOF)
+    Tokens.pop_back();
+
   return Tokens;
 }
 
@@ -308,7 +330,7 @@ Parser::Parser(std::unique_ptr<Lexer> Lex, SourceFile &SF,
 
   // Set the token to a sentinel so that we know the lexer isn't primed yet.
   // This cannot be tok::unknown, since that is a token the lexer could produce.
-  Tok.setKind(tok::NUM_TOKENS);
+  Tok = syntax::Token { tok::NUM_TOKENS };
 
   auto ParserPos = State->takeParserPosition();
   if (ParserPos.isValid() &&
@@ -323,29 +345,30 @@ Parser::~Parser() {
   delete L;
 }
 
-const Token &Parser::peekToken() {
+const syntax::Token &Parser::peekToken() {
   return L->peekNextToken();
 }
 
 SourceLoc Parser::consumeToken() {
-  SourceLoc Loc = Tok.getLoc();
+  auto CurrentLoc = Tok.getLoc();
   assert(Tok.isNot(tok::eof) && "Lexing past eof!");
 
   if (IsParsingInterfaceTokens && !Tok.getText().empty()) {
     SF.recordInterfaceToken(Tok.getText());
   }
 
-  L->lex(Tok);
-  PreviousLoc = Loc;
-  return Loc;
+  PreviousLoc = CurrentLoc;
+  Tok = L->lex();
+  return CurrentLoc;
 }
 
 SourceLoc Parser::getEndOfPreviousLoc() {
   return Lexer::getLocForEndOfToken(SourceMgr, PreviousLoc);
 }
 
-Parser::ParserPosition Parser::getParserPositionAfterFirstCharacter(Token T) {
-  assert(T.getLength() > 1 && "Token must have more than one character");
+Parser::ParserPosition
+Parser::getParserPositionAfterFirstCharacter(const syntax::Token &T) {
+  assert(T.getWidth() > 1 && "Token must have more than one character");
   auto Loc = T.getLoc();
   auto NewState = L->getStateForBeginningOfTokenLoc(Loc.getAdvancedLoc(1));
   return ParserPosition(NewState, Loc);
@@ -356,21 +379,25 @@ SourceLoc Parser::consumeStartingCharacterOfCurrentToken() {
   // it's location.
 
   // Current token can be either one-character token we want to consume...
-  if (Tok.getLength() == 1) {
+  if (Tok.getWidth() == 1) {
     return consumeToken();
   }
 
-  markSplitToken(tok::oper_binary_unspaced, Tok.getText().substr(0, 1));
+  auto SplitOperatorText = Tok.getText().substr(0, 1);
+  auto SplitOperatorLoc =
+    SourceLoc(llvm::SMLoc::getFromPointer(SplitOperatorText.begin()));
+  auto SplitOperator = syntax::Token {
+    tok::oper_binary_unspaced,
+    SplitOperatorText,
+    Tok.getLeadingTrivia(),
+    std::deque<syntax::Trivia> {},
+    SplitOperatorLoc };
+  SplitTokens.push_back(SplitOperator);
 
   // ... or a multi-character token with the first character being the one that
   // we want to consume as a separate token.
   restoreParserPosition(getParserPositionAfterFirstCharacter(Tok));
   return PreviousLoc;
-}
-
-void Parser::markSplitToken(tok Kind, StringRef Txt) {
-  SplitTokens.emplace_back();
-  SplitTokens.back().setToken(Kind, Txt);
 }
 
 SourceLoc Parser::consumeStartingLess() {
@@ -520,24 +547,24 @@ bool Parser::parseEndIfDirective(SourceLoc &Loc) {
 }
 
 Parser::StructureMarkerRAII::StructureMarkerRAII(Parser &parser,
-                                                 const Token &tok)
+                                                 const syntax::Token &T)
   : P(parser)
 {
-  switch (tok.getKind()) {
+  switch (T.getKind()) {
   case tok::l_brace:
-    P.StructureMarkers.push_back({tok.getLoc(),
+    P.StructureMarkers.push_back({T.getLoc(),
                                   StructureMarkerKind::OpenBrace,
                                   None});
     break;
 
   case tok::l_paren:
-    P.StructureMarkers.push_back({tok.getLoc(),
+    P.StructureMarkers.push_back({T.getLoc(),
                                   StructureMarkerKind::OpenParen,
                                   None});
     break;
 
   case tok::l_square:
-    P.StructureMarkers.push_back({tok.getLoc(),
+    P.StructureMarkers.push_back({T.getLoc(),
                                   StructureMarkerKind::OpenSquare,
                                   None});
     break;
@@ -668,7 +695,7 @@ Parser::parseList(tok RightK, SourceLoc LeftLoc, SourceLoc &RightLoc,
         .fixItRemove(SourceRange(Tok.getLoc()));
       consumeToken();
     }
-    SourceLoc StartLoc = Tok.getLoc();
+    auto StartLoc = Tok.getLoc();
     Status |= callback();
     if (Tok.is(RightK))
       break;

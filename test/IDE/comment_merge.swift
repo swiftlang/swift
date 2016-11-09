@@ -115,14 +115,14 @@ func is_doc19() {}
 // CHECK-NEXT: comment_merge.swift:33:6: Func/is_doc7 RawComment=[/**\n * is_doc7  IS_DOC_SINGLE */]
 // CHECK-NEXT: comment_merge.swift:38:6: Func/is_doc8 RawComment=[/**\n * is_doc8\n * IS_DOC_SINGLE */]
 // CHECK-NEXT: comment_merge.swift:44:6: Func/is_doc9 RawComment=[/**\n * is_doc9\n * IS_DOC_SINGLE\n */]
-// CHECK-NEXT: comment_merge.swift:47:6: Func/is_doc10 RawComment=[/// is_doc10 IS_DOC_SINGLE\n]
-// CHECK-NEXT: comment_merge.swift:51:6: Func/is_doc11 RawComment=[/// Bbb.  is_doc11 IS_DOC_SINGLE\n]
+// CHECK-NEXT: comment_merge.swift:47:6: Func/is_doc10 RawComment=[/// is_doc10 IS_DOC_SINGLE]
+// CHECK-NEXT: comment_merge.swift:51:6: Func/is_doc11 RawComment=[/// Bbb.  is_doc11 IS_DOC_SINGLE]
 // CHECK-NEXT: comment_merge.swift:55:6: Func/not_doc12 RawComment=none
 // CHECK-NEXT: comment_merge.swift:59:6: Func/not_doc13 RawComment=none
-// CHECK-NEXT: comment_merge.swift:63:6: Func/is_doc14 RawComment=[/// is_doc14 IS_DOC_START\n/// IS_DOC_END\n]
-// CHECK-NEXT: comment_merge.swift:68:6: Func/is_doc15 RawComment=[/// is_doc15 IS_DOC_START\n/// Aaa bbb ccc.\n/// IS_DOC_END\n]
-// CHECK-NEXT: comment_merge.swift:73:6: Func/is_doc16 RawComment=[/// is_doc16 IS_DOC_START\n/** Aaa bbb ccc. *//// IS_DOC_END\n]
-// CHECK-NEXT: comment_merge.swift:77:6: Func/is_doc17 RawComment=[/** Aaa is_doc17 IS_DOC_START *//** bbb *//// IS_DOC_END\n]
-// CHECK-NEXT: comment_merge.swift:82:6: Func/is_doc18 RawComment=[/// is_doc18 IS_DOC_START IS_DOC_END\n]
-// CHECK-NEXT: comment_merge.swift:93:6: Func/is_doc19 RawComment=[/// is_doc19 IS_DOC_START\n/** Aaa\n *\n * Bbb *//// Ccc\n/** Ddd\n *  Eee  IS_DOC_END\n */]
+// CHECK-NEXT: comment_merge.swift:63:6: Func/is_doc14 RawComment=[/// is_doc14 IS_DOC_START\n/// IS_DOC_END]
+// CHECK-NEXT: comment_merge.swift:68:6: Func/is_doc15 RawComment=[/// is_doc15 IS_DOC_START\n/// Aaa bbb ccc.\n/// IS_DOC_END]
+// CHECK-NEXT: comment_merge.swift:73:6: Func/is_doc16 RawComment=[/// is_doc16 IS_DOC_START\n/** Aaa bbb ccc. */\n/// IS_DOC_END]
+// CHECK-NEXT: comment_merge.swift:77:6: Func/is_doc17 RawComment=[/** Aaa is_doc17 IS_DOC_START */\n/** bbb */\n/// IS_DOC_END]
+// CHECK-NEXT: comment_merge.swift:82:6: Func/is_doc18 RawComment=[/// is_doc18 IS_DOC_START IS_DOC_END]
+// CHECK-NEXT: comment_merge.swift:93:6: Func/is_doc19 RawComment=[/// is_doc19 IS_DOC_START\n/** Aaa\n *\n * Bbb */\n/// Ccc\n/** Ddd\n *  Eee  IS_DOC_END\n */]
 

@@ -359,7 +359,7 @@ ParserResult<Expr> Parser::parseExprSequenceElement(Diag<> message,
                                                     bool isExprBasic) {
   SourceLoc tryLoc;
   bool hadTry = consumeIf(tok::kw_try, tryLoc);
-  Optional<Token> trySuffix;
+  Optional<syntax::Token> trySuffix;
   if (hadTry && Tok.isAny(tok::exclaim_postfix, tok::question_postfix)) {
     trySuffix = Tok;
     consumeToken();
@@ -368,15 +368,16 @@ ParserResult<Expr> Parser::parseExprSequenceElement(Diag<> message,
   ParserResult<Expr> sub = parseExprUnary(message, isExprBasic);
 
   if (hadTry && !sub.hasCodeCompletion() && !sub.isNull()) {
-    switch (trySuffix ? trySuffix->getKind() : tok::NUM_TOKENS) {
+    switch (trySuffix ? trySuffix.getValue().getKind() : tok::NUM_TOKENS) {
     case tok::exclaim_postfix:
       sub = makeParserResult(
-          new (Context) ForceTryExpr(tryLoc, sub.get(), trySuffix->getLoc()));
+          new (Context) ForceTryExpr(tryLoc, sub.get(),
+                                     trySuffix.getValue().getLoc()));
       break;
     case tok::question_postfix:
       sub = makeParserResult(
           new (Context) OptionalTryExpr(tryLoc, sub.get(),
-                                        trySuffix->getLoc()));
+                                        trySuffix.getValue().getLoc()));
       break;
     default:
       // If this is a simple "try expr" situation, where the expr is a closure
@@ -440,7 +441,7 @@ ParserResult<Expr> Parser::parseExprUnary(Diag<> Message, bool isExprBasic) {
     // syntactically because the operator may just follow whatever precedes this
     // expression (and that may not always be an expression).
     diagnose(Tok, diag::invalid_postfix_operator);
-    Tok.setKind(tok::oper_prefix);
+    Tok = Tok.withKind(tok::oper_prefix);
     SWIFT_FALLTHROUGH;
   case tok::oper_prefix:
     Operator = parseExprOperator();
@@ -448,8 +449,8 @@ ParserResult<Expr> Parser::parseExprUnary(Diag<> Message, bool isExprBasic) {
   case tok::oper_binary_spaced:
   case tok::oper_binary_unspaced: {
     // For recovery purposes, accept an oper_binary here.
-    SourceLoc OperEndLoc = Tok.getLoc().getAdvancedLoc(Tok.getLength());
-    Tok.setKind(tok::oper_prefix);
+    auto OperEndLoc = Tok.getLoc().getAdvancedLoc(Tok.getWidth());
+    Tok = Tok.withKind(tok::oper_prefix);
     Operator = parseExprOperator();
 
     if (OperEndLoc == Tok.getLoc())
@@ -843,7 +844,7 @@ static bool isStartOfGetSetAccessor(Parser &P) {
   //
   // If we have a 'didSet' or a 'willSet' label, disambiguate immediately as
   // an accessor block.
-  Token NextToken = P.peekToken();
+  auto NextToken = P.peekToken();
   if (NextToken.isContextualKeyword("didSet") ||
       NextToken.isContextualKeyword("willSet"))
     return true;
@@ -1196,10 +1197,10 @@ ParserResult<Expr> Parser::parseExprPostfix(Diag<> ID, bool isExprBasic) {
                Tok.getText())
         .fixItInsert(DotLoc, "0")
         .highlight({DotLoc, Tok.getLoc()});
-      char *Ptr = (char*)Context.Allocate(Tok.getLength()+2, 1);
+      char *Ptr = (char*)Context.Allocate(Tok.getWidth()+2, 1);
       memcpy(Ptr, "0.", 2);
-      memcpy(Ptr+2, Tok.getText().data(), Tok.getLength());
-      auto FltText = StringRef(Ptr, Tok.getLength()+2);
+      memcpy(Ptr+2, Tok.getText().data(), Tok.getWidth());
+      auto FltText = StringRef(Ptr, Tok.getWidth()+2);
       FltText = copyAndStripUnderscores(Context, FltText);
       
       consumeToken(tok::integer_literal);
@@ -1227,7 +1228,7 @@ ParserResult<Expr> Parser::parseExprPostfix(Diag<> ID, bool isExprBasic) {
         bool HasReturn = false;
 
         // Until we see the code completion token, collect identifiers.
-        for (L->lex(Tok); !Tok.is(tok::code_complete); consumeToken()) {
+        for (Tok = L->lex(); !Tok.is(tok::code_complete); consumeToken()) {
           if (!HasReturn)
             HasReturn = Tok.is(tok::kw_return);
           if (Tok.is(tok::identifier)) {
@@ -1684,7 +1685,7 @@ ParserResult<Expr> Parser::parseExprStringLiteral() {
     case Lexer::StringSegment::Expr: {
       // We are going to mess with Tok to do reparsing for interpolated literals,
       // don't lose our 'next' token.
-      llvm::SaveAndRestore<Token> SavedTok(Tok);
+      llvm::SaveAndRestore<syntax::Token> SavedTok(Tok);
 
       // Create a temporary lexer that lexes from the body of the string.
       Lexer::State BeginState =
@@ -1702,7 +1703,7 @@ ParserResult<Expr> Parser::parseExprStringLiteral() {
       // Prime the new lexer with a '(' as the first token.
       // We might be at tok::eof now, so ensure that consumeToken() does not
       // assert about lexing past eof.
-      Tok.setKind(tok::unknown);
+      Tok = syntax::Token::unknown();
       consumeToken();
       assert(Tok.is(tok::l_paren));
       
@@ -1730,15 +1731,18 @@ ParserResult<Expr> Parser::parseExprStringLiteral() {
                                       Loc, Context.AllocateCopy(Exprs)));
 }
 
-void Parser::diagnoseEscapedArgumentLabel(const Token &tok) {
-  assert(tok.isEscapedIdentifier() && "Only for escaped identifiers");
-  if (!canBeArgumentLabel(tok.getText())) return;
+void Parser::diagnoseEscapedArgumentLabel(const syntax::Token &Tok) {
+  assert(Tok.isEscapedIdentifier() && "Only for escaped identifiers");
+  if (!canBeArgumentLabel(Tok.getText())) return;
 
-  SourceLoc start = tok.getLoc();
-  SourceLoc end = start.getAdvancedLoc(tok.getLength());
-  diagnose(tok, diag::escaped_parameter_name, tok.getText())
-    .fixItRemoveChars(start, start.getAdvancedLoc(1))
-    .fixItRemoveChars(end.getAdvancedLoc(-1), end);
+  auto LeftBacktick = Tok.getLeadingTrivia().back();
+  auto RightBacktick = Tok.getTrailingTrivia().front();
+
+  diagnose(Tok, diag::escaped_parameter_name, Tok.getText())
+    .fixItRemoveChars(LeftBacktick.getLoc(),
+                      LeftBacktick.getLoc().getAdvancedLoc(1))
+    .fixItRemoveChars(RightBacktick.getLoc(),
+                      RightBacktick.getLoc().getAdvancedLoc(1));
 }
 
 DeclName Parser::parseUnqualifiedDeclName(bool afterDot,
@@ -1846,7 +1850,7 @@ static bool shouldAddSelfFixit(DeclContext* Current, DeclName Name,
 ///     unqualified-decl-name generic-args?
 Expr *Parser::parseExprIdentifier() {
   assert(Tok.isAny(tok::identifier, tok::kw_self, tok::kw_Self));
-  Token IdentTok = Tok;
+  auto IdentTok = Tok;
 
   // Parse the unqualified-decl-name.
   DeclNameLoc loc;
@@ -1933,7 +1937,7 @@ Expr *Parser::parseExprIdentifier() {
   return E;
 }
 
-Expr *Parser::parseExprEditorPlaceholder(Token PlaceholderTok,
+Expr *Parser::parseExprEditorPlaceholder(const syntax::Token &PlaceholderTok,
                                          Identifier PlaceholderId) {
   assert(PlaceholderTok.is(tok::identifier));
   assert(PlaceholderId.isEditorPlaceholder());
@@ -1963,7 +1967,7 @@ Expr *Parser::parseExprEditorPlaceholder(Token PlaceholderTok,
 
       // Temporarily swap out the parser's current lexer with our new one.
       llvm::SaveAndRestore<Lexer *> T(L, &LocalLex);
-      Tok.setKind(tok::unknown); // we might be at tok::eof now.
+      Tok = syntax::Token::unknown(); // we might be at tok::eof now.
       consumeToken();
       return parseType().getPtrOrNull();
     };

@@ -129,7 +129,7 @@ static bool startsParameterName(Parser &parser, bool isClosure) {
     return false;
 
   // If the next token can be an argument label or is ':', this is a name.
-  const auto &nextTok = parser.peekToken();
+  auto nextTok = parser.peekToken();
   if (nextTok.is(tok::colon) || nextTok.canBeArgumentLabel())
     return true;
 
@@ -302,7 +302,7 @@ Parser::parseParameterClause(SourceLoc &leftParenLoc,
       {
         BacktrackingScope backtrack(*this);
         isBareType = canParseType() && Tok.isAny(tok::comma, tok::r_paren,
-                                                 tok::equal);
+                                                  tok::equal);
       }
 
       if (isBareType) {

@@ -783,8 +783,6 @@ public:
 
 private:
   friend class Decl;
-  Optional<RawComment> getRawComment(const Decl *D);
-  void setRawComment(const Decl *D, RawComment RC);
 
   Optional<StringRef> getBriefComment(const Decl *D);
   void setBriefComment(const Decl *D, StringRef Comment);

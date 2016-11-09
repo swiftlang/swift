@@ -4425,7 +4425,7 @@ void CodeCompletionCallbacksImpl::completePostfixExprParen(Expr *E,
   // When it appears that there is already code for the call present, just
   // complete values and/or argument labels.  Otherwise give the entire call
   // pattern.
-  Token next = P.peekToken();
+  auto next = P.peekToken();
   if (next.isAtStartOfLine() || next.is(tok::eof)) {
     ShouldCompleteCallPatternAfterParen = true;
   } else if (next.is(tok::r_paren)) {

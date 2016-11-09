@@ -22,9 +22,9 @@
 #include "swift/Parse/Lexer.h"
 #include "swift/Parse/LocalContext.h"
 #include "swift/Parse/PersistentParserState.h"
-#include "swift/Parse/Token.h"
 #include "swift/Parse/ParserResult.h"
 #include "swift/Basic/OptionSet.h"
+#include "swift/Syntax/Token.h"
 #include "swift/Config.h"
 #include "llvm/ADT/SetVector.h"
 
@@ -71,7 +71,7 @@ class Parser {
 
   bool IsInputIncomplete = false;
   SourceLoc DelayedDeclEnd;
-  std::vector<Token> SplitTokens;
+  std::vector<syntax::Token> SplitTokens;
 
 public:
   SourceManager &SourceMgr;
@@ -146,9 +146,7 @@ public:
     return SF.isScriptMode();
   }
 
-  const std::vector<Token> &getSplitTokens() { return SplitTokens; }
-
-  void markSplitToken(tok Kind, StringRef Txt);
+  const std::vector<syntax::Token> &getSplitTokens() { return SplitTokens; }
 
   /// Returns true if the parser reached EOF with incomplete source input, due
   /// for example, a missing right brace.
@@ -159,7 +157,7 @@ public:
   }
 
   /// \brief This is the current token being considered by the parser.
-  Token Tok;
+  syntax::Token Tok;
 
   /// \brief The location of the previous token.
   SourceLoc PreviousLoc;
@@ -260,7 +258,7 @@ public:
       P.StructureMarkers.push_back({loc, kind, None});
     }
 
-    StructureMarkerRAII(Parser &parser, const Token &tok);
+    StructureMarkerRAII(Parser &parser, const syntax::Token &tok);
 
     ~StructureMarkerRAII() {
       P.StructureMarkers.pop_back();
@@ -318,14 +316,14 @@ public:
   }
 
   /// \brief Return parser position after the first character of token T
-  ParserPosition getParserPositionAfterFirstCharacter(Token T);
+  ParserPosition getParserPositionAfterFirstCharacter(const syntax::Token &T);
 
   void restoreParserPosition(ParserPosition PP) {
     L->restoreState(PP.LS);
 
-    // We might be at tok::eof now, so ensure that consumeToken() does not
-    // assert about lexing past eof.
-    Tok.setKind(tok::unknown);
+    // We might be at tok::eof now, so ensure that consumeToken()
+    // does not assert about lexing past eof.
+    Tok = syntax::Token::unknown();
     consumeToken();
 
     PreviousLoc = PP.PreviousLoc;
@@ -336,9 +334,9 @@ public:
 
     L->backtrackToState(PP.LS);
 
-    // We might be at tok::eof now, so ensure that consumeToken() does not
-    // assert about lexing past eof.
-    Tok.setKind(tok::unknown);
+    // We might be at tok::eof now, so ensure that consumeToken()
+    // does not assert about lexing past eof.
+    Tok = syntax::Token::unknown();
     consumeToken();
 
     PreviousLoc = PP.PreviousLoc;
@@ -389,7 +387,7 @@ public:
   // Utilities
 
   /// \brief Return the next token that will be installed by \c consumeToken.
-  const Token &peekToken();
+  const syntax::Token &peekToken();
 
   SourceLoc consumeToken();
   SourceLoc consumeToken(tok K) {
@@ -398,9 +396,10 @@ public:
   }
 
   SourceLoc consumeIdentifier(Identifier *Result = nullptr) {
-    assert(Tok.isAny(tok::identifier, tok::kw_self, tok::kw_Self, tok::kw_throws));
+    assert(Tok.isAny(tok::identifier, tok::kw_self,
+                     tok::kw_Self, tok::kw_throws));
     if (Result)
-      *Result = Context.getIdentifier(Tok.getText());
+      *Result = Context.getIdentifier(Tok.getText().str());
     return consumeToken();
   }
 
@@ -447,7 +446,6 @@ public:
   void skipUntilDeclStmtRBrace(tok T1);
 
   void skipUntilDeclRBrace(tok T1, tok T2);
-  
   /// Skip a single token, but match parentheses, braces, and square brackets.
   ///
   /// Note: this does \em not match angle brackets ("<" and ">")! These are
@@ -469,7 +467,7 @@ public:
     return Diags.diagnose(Loc, Diag);
   }
 
-  InFlightDiagnostic diagnose(Token Tok, Diagnostic Diag) {
+  InFlightDiagnostic diagnose(const syntax::Token &Tok, Diagnostic Diag) {
     return diagnose(Tok.getLoc(), Diag);
   }
 
@@ -480,7 +478,8 @@ public:
   }
 
   template<typename ...DiagArgTypes, typename ...ArgTypes>
-  InFlightDiagnostic diagnose(Token Tok, Diag<DiagArgTypes...> DiagID,
+  InFlightDiagnostic diagnose(const syntax::Token &Tok,
+                              Diag<DiagArgTypes...> DiagID,
                               ArgTypes &&...Args) {
     return diagnose(Tok.getLoc(),
                     Diagnostic(DiagID, std::forward<ArgTypes>(Args)...));
@@ -489,12 +488,12 @@ public:
   void diagnoseRedefinition(ValueDecl *Prev, ValueDecl *New);
      
   /// \brief Check whether the current token starts with '<'.
-  bool startsWithLess(Token Tok) {
+  bool startsWithLess(const syntax::Token &Tok) {
     return Tok.isAnyOperator() && Tok.getText()[0] == '<';
   }
 
   /// \brief Check whether the current token starts with '>'.
-  bool startsWithGreater(Token Tok) {
+  bool startsWithGreater(const syntax::Token &Tok) {
     return Tok.isAnyOperator() && Tok.getText()[0] == '>';
   }
 
@@ -585,7 +584,8 @@ public:
   bool parseToken(tok K, SourceLoc &TokLoc, const Diagnostic &D);
   
   template<typename ...DiagArgTypes, typename ...ArgTypes>
-  bool parseToken(tok K, Diag<DiagArgTypes...> ID, ArgTypes... Args) {
+  bool parseToken(tok K, Diag<DiagArgTypes...> ID,
+                  ArgTypes... Args) {
     SourceLoc L;
     return parseToken(K, L, Diagnostic(ID, Args...));
   }
@@ -598,12 +598,14 @@ public:
   /// \brief Parse the specified expected token and return its location
   /// on success.  On failure, emit the specified error diagnostic, and
   /// a note at the specified note location.
-  bool parseMatchingToken(tok K, SourceLoc &TokLoc, Diag<> ErrorDiag,
+  bool parseMatchingToken(tok K, SourceLoc &TokLoc,
+                          Diag<> ErrorDiag,
                           SourceLoc OtherLoc);
 
   /// \brief Parse the list of statements, expressions, or declarations.
-  ParserStatus parseList(tok RightK, SourceLoc LeftLoc, SourceLoc &RightLoc,
-                         tok SeparatorK, bool OptionalSep,
+  ParserStatus parseList(tok RightK, SourceLoc LeftLoc,
+                         SourceLoc &RightLoc, tok SeparatorK,
+                         bool OptionalSep,
                          bool AllowSepAfterLast, Diag<> ErrorDiag,
                          std::function<ParserStatus()> callback);
 
@@ -875,10 +877,10 @@ public:
   ParserResult<ImplicitlyUnwrappedOptionalTypeRepr>
     parseTypeImplicitlyUnwrappedOptional(TypeRepr *Base);
 
-  bool isOptionalToken(const Token &T) const;
+  bool isOptionalToken(const syntax::Token &T) const;
   SourceLoc consumeOptionalToken();
   
-  bool isImplicitlyUnwrappedOptionalToken(const Token &T) const;
+  bool isImplicitlyUnwrappedOptionalToken(const syntax::Token &T) const;
   SourceLoc consumeImplicitlyUnwrappedOptionalToken();
 
   TypeRepr *applyAttributeToType(TypeRepr *Ty, const TypeAttributes &Attr);
@@ -1099,7 +1101,7 @@ public:
 
   /// If the token is an escaped identifier being used as an argument
   /// label, but doesn't need to be, diagnose it.
-  void diagnoseEscapedArgumentLabel(const Token &tok);
+  void diagnoseEscapedArgumentLabel(const syntax::Token &tok);
 
   /// Parse an unqualified-decl-name.
   ///
@@ -1115,7 +1117,7 @@ public:
                                     const Diagnostic &diag);
 
   Expr *parseExprIdentifier();
-  Expr *parseExprEditorPlaceholder(Token PlaceholderTok,
+  Expr *parseExprEditorPlaceholder(const syntax::Token &PlaceholderTok,
                                    Identifier PlaceholderId);
 
   /// \brief Parse a closure expression after the opening brace.
@@ -1159,10 +1161,12 @@ public:
                                       SourceLoc &inLoc);
 
   Expr *parseExprAnonClosureArg();
-  ParserResult<Expr> parseExprList(tok LeftTok, tok RightTok);
+  ParserResult<Expr> parseExprList(tok LeftTok,
+                                   tok RightTok);
 
   /// Parse an expression list, keeping all of the pieces separated.
-  ParserStatus parseExprList(tok leftTok, tok rightTok,
+  ParserStatus parseExprList(tok leftTok,
+                             tok rightTok,
                              bool isPostfix,
                              bool isExprBasic,
                              SourceLoc &leftLoc,
@@ -1333,7 +1337,7 @@ DeclName formDeclName(ASTContext &ctx,
 DeclName parseDeclName(ASTContext &ctx, StringRef name);
 
 /// Whether a given token can be the start of a decl.
-bool isKeywordPossibleDeclStart(const Token &Tok);
+bool isKeywordPossibleDeclStart(const syntax::Token &Tok);
 
 } // end namespace swift
 

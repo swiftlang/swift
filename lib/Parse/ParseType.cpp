@@ -878,7 +878,7 @@ ParserResult<TypeRepr> Parser::parseTypeCollection() {
                                                       brackets));
 }
 
-bool Parser::isOptionalToken(const Token &T) const {
+bool Parser::isOptionalToken(const syntax::Token &T) const {
   // A postfix '?' by itself is obviously optional.
   if (T.is(tok::question_postfix))
     return true;
@@ -892,7 +892,7 @@ bool Parser::isOptionalToken(const Token &T) const {
   return false;
 }
 
-bool Parser::isImplicitlyUnwrappedOptionalToken(const Token &T) const {
+bool Parser::isImplicitlyUnwrappedOptionalToken(const syntax::Token &T) const {
   // A postfix '!' by itself, or a '!' in SIL mode, is obviously implicitly
   // unwrapped optional.
   if (T.is(tok::exclaim_postfix) || T.is(tok::sil_exclamation))
@@ -940,8 +940,8 @@ Parser::parseTypeImplicitlyUnwrappedOptional(TypeRepr *base) {
 //===----------------------------------------------------------------------===//
 
 static bool isGenericTypeDisambiguatingToken(Parser &P) {
-  auto &tok = P.Tok;
-  switch (tok.getKind()) {
+  auto Tok = P.Tok;
+  switch (Tok.getKind()) {
   default:
     return false;
   case tok::r_paren:
@@ -962,12 +962,12 @@ static bool isGenericTypeDisambiguatingToken(Parser &P) {
   case tok::oper_binary_spaced:
   case tok::oper_postfix:
     // These might be '?' or '!' type modifiers.
-    return P.isOptionalToken(tok) || P.isImplicitlyUnwrappedOptionalToken(tok);
+    return P.isOptionalToken(Tok) || P.isImplicitlyUnwrappedOptionalToken(Tok);
 
   case tok::l_paren:
   case tok::l_square:
     // These only apply to the generic type if they don't start a new line.
-    return !tok.isAtStartOfLine();
+    return !Tok.isAtStartOfLine();
   }
 }
 

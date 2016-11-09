@@ -3921,7 +3921,7 @@ bool SILParser::isStartOfSILInstruction() {
   if (P.Tok.is(tok::sil_local_name))
     return true;
   if (P.Tok.is(tok::identifier) || P.Tok.isKeyword()) {
-    auto &peek = P.peekToken();
+    auto peek = P.peekToken();
     return !peek.is(tok::l_paren) && !peek.is(tok::colon);
   }
   return false;
