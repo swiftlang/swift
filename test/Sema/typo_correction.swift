@@ -1,4 +1,6 @@
 // RUN: %target-parse-verify-swift
+// RUN: not %target-swift-frontend -parse -disable-typo-correction %s 2>&1 | %FileCheck %s -check-prefix=DISABLED
+// DISABLED-NOT: did you mean
 
 // This is close enough to get typo-correction.
 func test_short_and_close() {
