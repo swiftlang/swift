@@ -1,8 +1,9 @@
-// RUN: %swiftc_driver_plain -parse -Xfrontend -verify %s
+// RUN: %swiftc_driver_plain -target %target-triple -module-cache-path %t -parse -Xfrontend -verify %s
 
 // This test should be updated to match the expected default Swift version
 // when swiftc is invoked directly.
-// It should /not/ follow the version specified when invoking lit.
+// It should /not/ follow the version specified when invoking lit, which means
+// it can't use the %swiftc_driver or %target-build-swift substitutions.
 
 #if swift(>=3)
 asdf // expected-error {{use of unresolved identifier}}
