@@ -1417,65 +1417,59 @@ void AttributeChecker::visitSpecializeAttr(SpecializeAttr *attr) {
   }
   // Initialize each TypeLoc in this attribute with a concrete type,
   // and populate a substitution map from GenericTypeParamType to concrete Type.
-  TypeSubstitutionMap subMap;
+  SubstitutionMap subMap;
   for (unsigned paramIdx = 0; paramIdx < numTypes; ++paramIdx) {
 
     auto *genericTypeParamTy = genericSig->getGenericParams()[paramIdx];
     auto &tl = attr->getTypeLocs()[paramIdx];
 
     auto ty = TC.resolveType(tl.getTypeRepr(), DC, None);
-    if (ty && !ty->hasError()) {
-      if (ty->getCanonicalType()->hasArchetype()) {
-        TC.diagnose(attr->getLocation(),
-                    diag::cannot_partially_specialize_generic_function);
-        return;
-      }
-      tl.setType(ty, /*validated=*/true);
-      subMap[genericTypeParamTy->getCanonicalType().getPointer()] = ty;
+    if (!ty || ty->hasError()) {
+      attr->setInvalid();
+      return;
     }
+
+    if (ty->getCanonicalType()->hasArchetype()) {
+      TC.diagnose(attr->getLocation(),
+                  diag::cannot_partially_specialize_generic_function);
+      attr->setInvalid();
+      return;
+    }
+
+    tl.setType(ty, /*validated=*/true);
+    subMap.addSubstitution(genericTypeParamTy->getCanonicalType(), ty);
   }
-  // Build a list of Substitutions.
-  //
-  // This walks the generic signature's requirements, similar to
-  // Solution::computeSubstitutions but with several differences:
-  // - It does not operate within the type constraint system.
-  // - This is the first point at which diagnostics must be emitted for
-  //   bad conformances. Self and super requirements must also be
-  //   checked and diagnosed.
-  // - This does not make use of Archetypes since it is directly substituting
-  //   in place of GenericTypeParams.
-  //
-  // FIXME: Refactor to use GenericSignature->getSubstitutions()?
-  SmallVector<Substitution, 4> substitutions;
-  auto currentModule = FD->getParentModule();
-  Type currentFromTy;
-  Type currentReplacement;
+
+  // Capture the conformances needed for the substitution map.
+  CanType currentType;
   SmallVector<ProtocolConformanceRef, 4> currentConformances;
+  auto flushConformances = [&] {
+    subMap.addConformances(currentType,
+                           TC.Context.AllocateCopy(currentConformances));
+    currentConformances.clear();
+  };
+
   for (const auto &req : genericSig->getRequirements()) {
+    // If we're on to a new dependent type, flush the conformances gathered
+    // thus far.
+    CanType canFirstType = req.getFirstType()->getCanonicalType();
+    if (req.getKind() != RequirementKind::WitnessMarker &&
+        canFirstType != currentType) {
+      if (currentType) flushConformances();
+      currentType = canFirstType;
+    }
 
     switch (req.getKind()) {
     case RequirementKind::WitnessMarker:
-      // Flush the current conformances.
-      if (currentFromTy) {
-        substitutions.push_back({
-          currentReplacement,
-          DC->getASTContext().AllocateCopy(currentConformances)
-        });
-        currentConformances.clear();
-      }
-      // Each witness marker starts a new substitution.
-      currentFromTy = req.getFirstType();
-      currentReplacement = currentFromTy.subst(currentModule, subMap, None);
       break;
 
     case RequirementKind::Conformance: {
-      assert(currentFromTy->getCanonicalType()
-             == req.getFirstType()->getCanonicalType() && "bad WitnessMarker");
       // Get the conformance and record it.
+      auto firstType = req.getFirstType().subst(subMap);
       auto protoType = req.getSecondType()->castTo<ProtocolType>();
       ProtocolConformance *conformance = nullptr;
       bool conforms =
-        TC.conformsToProtocol(currentReplacement,
+        TC.conformsToProtocol(firstType,
                               protoType->getDecl(),
                               DC,
                               (ConformanceCheckFlags::InExpression|
@@ -1484,47 +1478,47 @@ void AttributeChecker::visitSpecializeAttr(SpecializeAttr *attr) {
       if (!conforms || !conformance) {
         TC.diagnose(attr->getLocation(),
                     diag::cannot_convert_argument_value_protocol,
-                    currentReplacement, protoType);
-        // leaks prior conformances
+                    firstType, protoType);
+        attr->setInvalid();
         return;
       }
-      currentConformances.push_back(
-        ProtocolConformanceRef(protoType->getDecl(), conformance));
+
+      currentConformances.push_back(ProtocolConformanceRef(conformance));
       break;
     }
     case RequirementKind::Superclass: {
       // Superclass requirements aren't recorded in substitutions.
-      auto firstTy = req.getFirstType().subst(currentModule, subMap, None);
-      auto superTy = req.getSecondType().subst(currentModule, subMap, None);
+      auto firstTy = req.getFirstType().subst(subMap);
+      auto superTy = req.getSecondType().subst(subMap);
       if (!TC.isSubtypeOf(firstTy, superTy, DC)) {
         TC.diagnose(attr->getLocation(), diag::type_does_not_inherit,
                     FD->getInterfaceType(), firstTy, superTy);
+        attr->setInvalid();
+        return;
       }
       break;
     }
     case RequirementKind::SameType: {
       // Same-type requirements are type checked but not recorded in
       // substitutions.
-      auto firstTy = req.getFirstType().subst(currentModule, subMap, None);
-      auto sameTy = req.getSecondType().subst(currentModule, subMap, None);
+      auto firstTy = req.getFirstType().subst(subMap);
+      auto sameTy = req.getSecondType().subst(subMap);
       if (!firstTy->isEqual(sameTy)) {
         TC.diagnose(attr->getLocation(), diag::types_not_equal,
                     FD->getInterfaceType(), firstTy, sameTy);
-
+        attr->setInvalid();
         return;
       }
       break;
     }
     }
   }
-  // Flush the final conformances.
-  if (currentFromTy) {
-    substitutions.push_back({
-      currentReplacement,
-      DC->getASTContext().AllocateCopy(currentConformances),
-    });
-    currentConformances.clear();
-  }
+  if (currentType) flushConformances();
+
+  // Compute the substitutions.
+  SmallVector<Substitution, 4> substitutions;
+  genericSig->getSubstitutions(*FD->getParentModule(), subMap, substitutions);
+
   // Package the Substitution list in the SpecializeAttr's ConcreteDeclRef.
   attr->setConcreteDecl(
     ConcreteDeclRef(DC->getASTContext(), FD, substitutions));
