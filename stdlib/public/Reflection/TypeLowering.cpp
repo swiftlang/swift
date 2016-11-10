@@ -378,6 +378,8 @@ public:
 unsigned RecordTypeInfoBuilder::addField(unsigned fieldSize,
                                          unsigned fieldAlignment,
                                          unsigned numExtraInhabitants) {
+  assert(fieldAlignment > 0);
+
   // Align the current size appropriately
   Size = ((Size + fieldAlignment - 1) & ~(fieldAlignment - 1));
 
@@ -873,7 +875,7 @@ class EnumTypeInfoBuilder {
 
 public:
   EnumTypeInfoBuilder(TypeConverter &TC)
-    : TC(TC), Size(0), Alignment(0), NumExtraInhabitants(0),
+    : TC(TC), Size(0), Alignment(1), NumExtraInhabitants(0),
       Kind(RecordKind::Invalid), Invalid(false) {}
 
   const TypeInfo *build(const TypeRef *TR, const FieldDescriptor *FD) {
