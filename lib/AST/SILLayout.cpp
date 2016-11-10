@@ -25,8 +25,8 @@
 //
 //===----------------------------------------------------------------------===//
 
-#include "swift/SIL/SILLayout.h"
-#include "swift/SIL/SILModule.h"
+#include "swift/AST/ASTContext.h"
+#include "swift/AST/SILLayout.h"
 
 using namespace swift;
 

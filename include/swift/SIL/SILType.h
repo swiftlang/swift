@@ -596,7 +596,25 @@ inline SILType SILBoxType::getBoxedAddressType() const {
 static inline llvm::hash_code hash_value(SILType V) {
   return llvm::hash_value(V.getOpaqueValue());
 }
-  
+ 
+inline SILType SILBoxType::getFieldType(unsigned index) const {
+  auto fieldTy = getLayout()->getFields()[index].getLoweredType();
+  // Apply generic arguments if the layout is generic.
+  if (!getGenericArgs().empty()) {
+    auto substMap =
+      getLayout()->getGenericSignature()->getSubstitutionMap(getGenericArgs());
+    fieldTy = fieldTy.subst(substMap)->getCanonicalType();
+  }
+  return SILType::getPrimitiveAddressType(fieldTy);
+}
+
+inline SILType SILField::getAddressType() const {
+  return SILType::getPrimitiveAddressType(getLoweredType());
+}
+inline SILType SILField::getObjectType() const {
+  return SILType::getPrimitiveObjectType(getLoweredType());
+}
+
 } // end swift namespace
 
 namespace llvm {

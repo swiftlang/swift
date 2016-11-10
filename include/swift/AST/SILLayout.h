@@ -31,11 +31,11 @@
 #include "llvm/ADT/PointerIntPair.h"
 #include "swift/AST/GenericSignature.h"
 #include "swift/AST/Identifier.h"
-#include "swift/AST/Types.h"
-#include "swift/SIL/SILAllocated.h"
-#include "swift/SIL/SILType.h"
+#include "swift/AST/Type.h"
 
 namespace swift {
+
+class SILType;
 
 /// A field of a SIL aggregate layout.
 class SILField final {
@@ -68,12 +68,8 @@ public:
   /// in this aggregate should be lowered.
   CanType getLoweredType() const { return LoweredTypeAndFlags.getPointer(); }
   
-  SILType getAddressType() const {
-    return SILType::getPrimitiveAddressType(getLoweredType());
-  }
-  SILType getObjectType() const {
-    return SILType::getPrimitiveObjectType(getLoweredType());
-  }
+  SILType getAddressType() const; // In SILType.h
+  SILType getObjectType() const; // In SILType.h
   
   /// True if this field is mutable inside its aggregate.
   ///
@@ -148,17 +144,6 @@ public:
     Profile(id, getGenericSignature(), getFields());
   }
 };
-
-inline SILType SILBoxType::getFieldType(unsigned index) const {
-  auto fieldTy = getLayout()->getFields()[index].getLoweredType();
-  // Apply generic arguments if the layout is generic.
-  if (!getGenericArgs().empty()) {
-    auto substMap =
-      getLayout()->getGenericSignature()->getSubstitutionMap(getGenericArgs());
-    fieldTy = fieldTy.subst(substMap)->getCanonicalType();
-  }
-  return SILType::getPrimitiveAddressType(fieldTy);
-}
 
 } // end namespace swift
 

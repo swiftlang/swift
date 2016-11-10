@@ -21,6 +21,7 @@
 #include "swift/AST/GenericParamKey.h"
 #include "swift/AST/Ownership.h"
 #include "swift/AST/Requirement.h"
+#include "swift/AST/SILLayout.h"
 #include "swift/AST/Substitution.h"
 #include "swift/AST/Type.h"
 #include "swift/AST/TypeAlignments.h"
@@ -3332,7 +3333,7 @@ class SILBoxType;
 class SILLayout; // From SIL
 typedef CanTypeWrapper<SILBoxType> CanSILBoxType;
 
-/// The SIL-only type @box T, which represents a reference to a (non-class)
+/// The SIL-only type for boxes, which represent a reference to a (non-class)
 /// refcounted value referencing an aggregate with a given lowered layout.
 class SILBoxType final : public TypeBase,
                          private llvm::TrailingObjects<SILBoxType,Substitution>{
@@ -3353,6 +3354,9 @@ public:
     return llvm::makeArrayRef(getTrailingObjects<Substitution>(),
                               NumGenericArgs);
   }
+  SILType getFieldType(unsigned index) const; // In SILType.h
+
+  void printBoxType(llvm::raw_ostream &os) const; // In SIL<something>.cpp
 
   // TODO: SILBoxTypes should be explicitly constructed in terms of specific
   // layouts. As a staging mechanism, we expose the old single-boxed-type
@@ -3363,7 +3367,6 @@ public:
   CanType getBoxedType() const;
   // In SILType.h
   SILType getBoxedAddressType() const;
-  SILType getFieldType(unsigned index) const;
 
   static bool classof(const TypeBase *T) {
     return T->getKind() == TypeKind::SILBox;
