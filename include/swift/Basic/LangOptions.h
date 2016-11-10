@@ -43,6 +43,9 @@ namespace swift {
 
     /// \brief Disable API availability checking.
     bool DisableAvailabilityChecking = false;
+
+    /// \brief Disable typo correction.
+    bool DisableTypoCorrection = false;
     
     /// Whether to warn about "needless" words in declarations.
     bool WarnOmitNeedlessWords = false;

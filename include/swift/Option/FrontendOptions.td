@@ -115,6 +115,9 @@ def serialize_debugging_options : Flag<["-"], "serialize-debugging-options">,
 def autolink_library : Separate<["-"], "autolink-library">,
   HelpText<"Add dependent library">, Flags<[FrontendOption]>;
 
+def disable_typo_correction : Flag<["-"], "disable-typo-correction">,
+  HelpText<"Disable typo correction">;
+
 } // end let Flags = [FrontendOption, NoDriverOption]
 
 def debug_crash_Group : OptionGroup<"<automatic crashing options>">;
