@@ -168,7 +168,7 @@ public:
   struct Implementation;
   Implementation &Impl;
   
-  friend class ConstraintCheckerArenaRAII;
+  friend ConstraintCheckerArenaRAII;
 public:
   ASTContext(LangOptions &langOpts, SearchPathOptions &SearchPathOpts,
              SourceManager &SourceMgr, DiagnosticEngine &Diags);
@@ -787,25 +787,43 @@ public:
   bool isSwiftVersion3() const { return LangOpts.isSwiftVersion3(); }
 
 private:
-  friend class Decl;
+  friend Decl;
   Optional<RawComment> getRawComment(const Decl *D);
   void setRawComment(const Decl *D, RawComment RC);
 
   Optional<StringRef> getBriefComment(const Decl *D);
   void setBriefComment(const Decl *D, StringRef Comment);
 
-  friend class TypeBase;
+  friend TypeBase;
 
   /// \brief Set the substitutions for the given bound generic type.
   void setSubstitutions(TypeBase *type,
                         DeclContext *gpContext,
                         ArrayRef<Substitution> Subs) const;
 
-  /// Provide context-level uniquing for SIL lowered type layouts.
+  /// Retrieve the archetype builder and potential archetype
+  /// corresponding to the given archetype type.
+  ///
+  /// This facility is only used by the archetype builder when forming
+  /// archetypes.a
+  std::pair<ArchetypeBuilder *, ArchetypeBuilder::PotentialArchetype *>
+  getLazyArchetype(const ArchetypeType *archetype);
+
+  /// Register information for a lazily-constructed archetype.
+  void registerLazyArchetype(
+         const ArchetypeType *archetype,
+         ArchetypeBuilder &builder,
+         ArchetypeBuilder::PotentialArchetype *potentialArchetype);
+
+  /// Unregister information about the given lazily-constructed archetype.
+  void unregisterLazyArchetype(const ArchetypeType *archetype);
+
+  friend ArchetypeType;
+  friend ArchetypeBuilder::PotentialArchetype;
+
+  /// Provide context-level uniquing for SIL lowered type layouts and boxes.
   friend SILLayout;
-  llvm::FoldingSet<SILLayout> *&getSILLayouts();
   friend SILBoxType;
-  llvm::DenseMap<CanType, SILBoxType *> &getSILBoxTypes();
 };
 
 /// Retrieve information about the given Objective-C method for

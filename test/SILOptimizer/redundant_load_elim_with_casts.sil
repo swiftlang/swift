@@ -72,8 +72,8 @@ struct Wrapper {
 // CHECK: return
 sil @tbaa_class_alias_nonclass : $@convention(thin) (@owned B, @inout Agg1) -> () {
 bb0(%0 : $B, %1 : $*Agg1):
-  %2 = alloc_box $@box B
-  %2a = project_box %2 : $@box B, 0
+  %2 = alloc_box $<τ_0_0> { var τ_0_0 } <B>
+  %2a = project_box %2 : $<τ_0_0> { var τ_0_0 } <B>, 0
   %3 = load %1 : $*Agg1
   %4 = store %3 to %1 : $*Agg1
   %5 = load %2a : $*B

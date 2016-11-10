@@ -38,31 +38,6 @@ static bool anyMutable(ArrayRef<SILField> Fields) {
   return false;
 }
 
-SILLayout *SILLayout::get(ASTContext &C,
-                          CanGenericSignature Generics,
-                          ArrayRef<SILField> Fields) {
-  // Profile the layout parameters.
-  llvm::FoldingSetNodeID id;
-  Profile(id, Generics, Fields);
-  
-  // Return an existing layout if there is one.
-  void *insertPos;
-  auto *&Layouts = C.getSILLayouts();
-  if (!Layouts)
-    Layouts = new llvm::FoldingSet<SILLayout>;
-  
-  if (auto existing = Layouts->FindNodeOrInsertPos(id, insertPos))
-    return existing;
-  
-  // Allocate a new layout.
-  void *memory = C.Allocate(totalSizeToAlloc<SILField>(Fields.size()),
-                            alignof(SILLayout));
-  
-  auto newLayout = ::new (memory) SILLayout(Generics, Fields);
-  Layouts->InsertNode(newLayout, insertPos);
-  return newLayout;
-}
-
 #ifndef NDEBUG
 /// Verify that the types of fields are valid within a given generic signature.
 static void verifyFields(CanGenericSignature Sig, ArrayRef<SILField> Fields) {

@@ -3336,7 +3336,9 @@ typedef CanTypeWrapper<SILBoxType> CanSILBoxType;
 /// The SIL-only type for boxes, which represent a reference to a (non-class)
 /// refcounted value referencing an aggregate with a given lowered layout.
 class SILBoxType final : public TypeBase,
-                         private llvm::TrailingObjects<SILBoxType,Substitution>{
+                         public llvm::FoldingSetNode,
+                         private llvm::TrailingObjects<SILBoxType,Substitution>
+{
   friend TrailingObjects;
   
   SILLayout *Layout;
@@ -3349,27 +3351,47 @@ class SILBoxType final : public TypeBase,
              SILLayout *Layout, ArrayRef<Substitution> Args);
 
 public:
+  static CanSILBoxType get(ASTContext &C,
+                           SILLayout *Layout,
+                           ArrayRef<Substitution> Args);
+
   SILLayout *getLayout() const { return Layout; }
   ArrayRef<Substitution> getGenericArgs() const {
     return llvm::makeArrayRef(getTrailingObjects<Substitution>(),
                               NumGenericArgs);
   }
+  CanType getFieldLoweredType(unsigned index) const {
+    auto fieldTy = getLayout()->getFields()[index].getLoweredType();
+    // Apply generic arguments if the layout is generic.
+    if (!getGenericArgs().empty()) {
+      auto substMap =
+       getLayout()->getGenericSignature()->getSubstitutionMap(getGenericArgs());
+      fieldTy = fieldTy.subst(substMap)->getCanonicalType();
+    }
+    return fieldTy;
+  }
   SILType getFieldType(unsigned index) const; // In SILType.h
-
-  void printBoxType(llvm::raw_ostream &os) const; // In SIL<something>.cpp
 
   // TODO: SILBoxTypes should be explicitly constructed in terms of specific
   // layouts. As a staging mechanism, we expose the old single-boxed-type
   // interface.
-  // These functions are implemented in the SIL library instead of the AST.
   
   static CanSILBoxType get(CanType BoxedType);
-  CanType getBoxedType() const;
-  // In SILType.h
-  SILType getBoxedAddressType() const;
+  CanType getBoxedType() const; // In SILType.h
+  SILType getBoxedAddressType() const; // In SILType.h
 
   static bool classof(const TypeBase *T) {
     return T->getKind() == TypeKind::SILBox;
+  }
+  
+  /// Produce a profile of this box, for use in a folding set.
+  static void Profile(llvm::FoldingSetNodeID &id,
+                      SILLayout *Layout,
+                      ArrayRef<Substitution> Args);
+  
+  /// \brief Produce a profile of this box, for use in a folding set.
+  void Profile(llvm::FoldingSetNodeID &id) {
+    Profile(id, getLayout(), getGenericArgs());
   }
 };
 DEFINE_EMPTY_CAN_TYPE_WRAPPER(SILBoxType, Type)

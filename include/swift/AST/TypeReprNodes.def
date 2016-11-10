@@ -51,6 +51,7 @@ TYPEREPR(Metatype, TypeRepr)
 TYPEREPR(Protocol, TypeRepr)
 TYPEREPR(InOut, TypeRepr)
 TYPEREPR(Fixed, TypeRepr)
+TYPEREPR(SILBox, TypeRepr)
 
 #undef ABSTRACT_TYPEREPR
 #undef TYPEREPR

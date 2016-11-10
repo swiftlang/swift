@@ -36,8 +36,8 @@ func inOutFunc(_ f: inout ((Int) -> Int)) { }
 
 // CHECK-LABEL: sil hidden @_TF20property_abstraction6inOutF{{.*}} : 
 // CHECK: bb0([[ARG:%.*]] : $Foo<Int, Int>):
-// CHECK:   [[XBOX:%.*]] = alloc_box $@box Foo<Int, Int>, var, name "x"
-// CHECK:   [[XBOX_PB:%.*]] = project_box [[XBOX]] : $@box Foo<Int, Int>, 0
+// CHECK:   [[XBOX:%.*]] = alloc_box $<τ_0_0> { var τ_0_0 } <Foo<Int, Int>>, var, name "x"
+// CHECK:   [[XBOX_PB:%.*]] = project_box [[XBOX]] : $<τ_0_0> { var τ_0_0 } <Foo<Int, Int>>, 0
 // CHECK:   [[ARG_COPY:%.*]] = copy_value [[ARG]]
 // CHECK:   store [[ARG_COPY]] to [init] [[XBOX_PB]]
 // CHECK:   [[INOUTFUNC:%.*]] = function_ref @_TF20property_abstraction9inOutFunc

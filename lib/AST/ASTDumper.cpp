@@ -2932,7 +2932,7 @@ namespace {
 
     void visitSILFunctionType(SILFunctionType *T, StringRef label) {
       printCommon(T, label, "sil_function_type");
-      // FIXME: Make this useful.
+      // FIXME: Print the structure of the type.
       printField("type", T->getString());
       OS << ")";
     }
@@ -2945,7 +2945,8 @@ namespace {
 
     void visitSILBoxType(SILBoxType *T, StringRef label) {
       printCommon(T, label, "sil_box_type");
-      printRec(T->getBoxedType());
+      // FIXME: Print the structure of the type.
+      printField("type", T->getString());
       OS << ")";
     }
 
