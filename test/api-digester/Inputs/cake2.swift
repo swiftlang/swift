@@ -11,4 +11,5 @@ public class C1 {
   public func foo2(_ : ()->()) {}
   public var CIIns1 : C1?
   public weak var CIIns2 : C1?
+  public func foo3(a : ()?) {}
 }
