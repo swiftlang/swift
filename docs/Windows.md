@@ -1,5 +1,8 @@
 # Getting Started with Swift on Windows
 
+## MSVC
+To be filled in.
+
 ## Windows Subsystem for Linux (WSL)
 - Note that all compiled Swift binaries are only executable within Bash on Windows and are Ubunutu, not Windows, executables.
 - Make sure to run all commands from Bash, or the project won't compile.
