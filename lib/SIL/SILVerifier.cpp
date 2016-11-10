@@ -132,9 +132,6 @@ public:
   }
 #define require(condition, complaint) \
   _require(bool(condition), complaint ": " #condition)
-#define requireTrueAndSILOwnership(verifier, condition, complaint)             \
-  _require(!verifier->isSILOwnershipEnabled() || bool(condition),              \
-           complaint ": " #condition)
 
   template <class T> typename CanTypeWrapperTraits<T>::type
   _requireObjectType(SILType type, const Twine &valueDescription,
