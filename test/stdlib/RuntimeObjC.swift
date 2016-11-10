@@ -425,17 +425,6 @@ Runtime.test("casting AnyObject to class metatypes") {
 
 var RuntimeFoundationWrappers = TestSuite("RuntimeFoundationWrappers")
 
-RuntimeFoundationWrappers.test("_stdlib_NSObject_isEqual/NoLeak") {
-  nsObjectCanaryCount = 0
-  autoreleasepool {
-    let a = NSObjectCanary()
-    let b = NSObjectCanary()
-    expectEqual(2, nsObjectCanaryCount)
-    _stdlib_NSObject_isEqual(a, b)
-  }
-  expectEqual(0, nsObjectCanaryCount)
-}
-
 var nsStringCanaryCount = 0
 @objc class NSStringCanary : NSString {
   override init() {

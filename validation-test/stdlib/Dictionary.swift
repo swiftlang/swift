@@ -719,7 +719,7 @@ DictionaryTestSuite.test("COW.Slow.RemoveValueForKeyDoesNotReallocate") {
 DictionaryTestSuite.test("COW.Fast.RemoveAllDoesNotReallocate") {
   do {
     var d = getCOWFastDictionary()
-    let originalCapacity = d._variantBuffer.asNative.capacity
+    let originalCapacity = d._buffer.capacity
     assert(d.count == 3)
     assert(d[10]! == 1010)
 
@@ -727,7 +727,7 @@ DictionaryTestSuite.test("COW.Fast.RemoveAllDoesNotReallocate") {
     // We cannot assert that identity changed, since the new buffer of smaller
     // size can be allocated at the same address as the old one.
     var identity1 = d._rawIdentifier()
-    assert(d._variantBuffer.asNative.capacity < originalCapacity)
+    assert(d._buffer.capacity < originalCapacity)
     assert(d.count == 0)
     assert(d[10] == nil)
 
@@ -740,19 +740,19 @@ DictionaryTestSuite.test("COW.Fast.RemoveAllDoesNotReallocate") {
   do {
     var d = getCOWFastDictionary()
     var identity1 = d._rawIdentifier()
-    let originalCapacity = d._variantBuffer.asNative.capacity
+    let originalCapacity = d._buffer.capacity
     assert(d.count == 3)
     assert(d[10]! == 1010)
 
     d.removeAll(keepingCapacity: true)
     assert(identity1 == d._rawIdentifier())
-    assert(d._variantBuffer.asNative.capacity == originalCapacity)
+    assert(d._buffer.capacity == originalCapacity)
     assert(d.count == 0)
     assert(d[10] == nil)
 
     d.removeAll(keepingCapacity: true)
     assert(identity1 == d._rawIdentifier())
-    assert(d._variantBuffer.asNative.capacity == originalCapacity)
+    assert(d._buffer.capacity == originalCapacity)
     assert(d.count == 0)
     assert(d[10] == nil)
   }
@@ -781,7 +781,7 @@ DictionaryTestSuite.test("COW.Fast.RemoveAllDoesNotReallocate") {
   do {
     var d1 = getCOWFastDictionary()
     var identity1 = d1._rawIdentifier()
-    let originalCapacity = d1._variantBuffer.asNative.capacity
+    let originalCapacity = d1._buffer.capacity
     assert(d1.count == 3)
     assert(d1[10] == 1010)
 
@@ -792,7 +792,7 @@ DictionaryTestSuite.test("COW.Fast.RemoveAllDoesNotReallocate") {
     assert(identity2 != identity1)
     assert(d1.count == 3)
     assert(d1[10]! == 1010)
-    assert(d2._variantBuffer.asNative.capacity == originalCapacity)
+    assert(d2._buffer.capacity == originalCapacity)
     assert(d2.count == 0)
     assert(d2[10] == nil)
 
@@ -805,7 +805,7 @@ DictionaryTestSuite.test("COW.Fast.RemoveAllDoesNotReallocate") {
 DictionaryTestSuite.test("COW.Slow.RemoveAllDoesNotReallocate") {
   do {
     var d = getCOWSlowDictionary()
-    let originalCapacity = d._variantBuffer.asNative.capacity
+    let originalCapacity = d._buffer.capacity
     assert(d.count == 3)
     assert(d[TestKeyTy(10)]!.value == 1010)
 
@@ -813,7 +813,7 @@ DictionaryTestSuite.test("COW.Slow.RemoveAllDoesNotReallocate") {
     // We cannot assert that identity changed, since the new buffer of smaller
     // size can be allocated at the same address as the old one.
     var identity1 = d._rawIdentifier()
-    assert(d._variantBuffer.asNative.capacity < originalCapacity)
+    assert(d._buffer.capacity < originalCapacity)
     assert(d.count == 0)
     assert(d[TestKeyTy(10)] == nil)
 
@@ -826,19 +826,19 @@ DictionaryTestSuite.test("COW.Slow.RemoveAllDoesNotReallocate") {
   do {
     var d = getCOWSlowDictionary()
     var identity1 = d._rawIdentifier()
-    let originalCapacity = d._variantBuffer.asNative.capacity
+    let originalCapacity = d._buffer.capacity
     assert(d.count == 3)
     assert(d[TestKeyTy(10)]!.value == 1010)
 
     d.removeAll(keepingCapacity: true)
     assert(identity1 == d._rawIdentifier())
-    assert(d._variantBuffer.asNative.capacity == originalCapacity)
+    assert(d._buffer.capacity == originalCapacity)
     assert(d.count == 0)
     assert(d[TestKeyTy(10)] == nil)
 
     d.removeAll(keepingCapacity: true)
     assert(identity1 == d._rawIdentifier())
-    assert(d._variantBuffer.asNative.capacity == originalCapacity)
+    assert(d._buffer.capacity == originalCapacity)
     assert(d.count == 0)
     assert(d[TestKeyTy(10)] == nil)
   }
@@ -867,7 +867,7 @@ DictionaryTestSuite.test("COW.Slow.RemoveAllDoesNotReallocate") {
   do {
     var d1 = getCOWSlowDictionary()
     var identity1 = d1._rawIdentifier()
-    let originalCapacity = d1._variantBuffer.asNative.capacity
+    let originalCapacity = d1._buffer.capacity
     assert(d1.count == 3)
     assert(d1[TestKeyTy(10)]!.value == 1010)
 
@@ -878,7 +878,7 @@ DictionaryTestSuite.test("COW.Slow.RemoveAllDoesNotReallocate") {
     assert(identity2 != identity1)
     assert(d1.count == 3)
     assert(d1[TestKeyTy(10)]!.value == 1010)
-    assert(d2._variantBuffer.asNative.capacity == originalCapacity)
+    assert(d2._buffer.capacity == originalCapacity)
     assert(d2.count == 0)
     assert(d2[TestKeyTy(10)] == nil)
 
@@ -1312,6 +1312,30 @@ class ParallelArrayDictionary : NSDictionary {
   override var count: Int {
     return 4
   }
+
+  override func keyEnumerator() -> NSEnumerator {
+    return KeyEnumerator(dict: self)
+  }
+
+  class KeyEnumerator: NSEnumerator {
+    let dict: ParallelArrayDictionary
+    var idx: Int = 0
+
+    init(dict: ParallelArrayDictionary) {
+      self.dict = dict
+    }
+
+    override func nextObject() -> Any? {
+      idx += 1
+      switch idx {
+      case 1: return dict.keys[0].key0
+      case 2: return dict.keys[0].key1
+      case 3: return dict.keys[0].key2
+      case 4: return dict.keys[0].key3
+      default: return nil
+      }
+    }
+  }
 }
 
 func getParallelArrayBridgedVerbatimDictionary() -> Dictionary<NSObject, AnyObject> {
@@ -1377,8 +1401,7 @@ class CustomImmutableNSDictionary : NSDictionary {
 DictionaryTestSuite.test("BridgedFromObjC.Verbatim.DictionaryIsCopied") {
   var (d, nsd) = getBridgedVerbatimDictionaryAndNSMutableDictionary()
   var identity1 = d._rawIdentifier()
-  assert(isCocoaDictionary(d))
-
+  
   // Find an existing key.
   do {
     var kv = d[d.index(forKey: TestObjCKeyTy(10))!]
@@ -1402,8 +1425,7 @@ DictionaryTestSuite.test("BridgedFromObjC.Verbatim.DictionaryIsCopied") {
 DictionaryTestSuite.test("BridgedFromObjC.Nonverbatim.DictionaryIsCopied") {
   var (d, nsd) = getBridgedNonverbatimDictionaryAndNSMutableDictionary()
   var identity1 = d._rawIdentifier()
-  assert(isNativeDictionary(d))
-
+  
   // Find an existing key.
   do {
     var kv = d[d.index(forKey: TestBridgedKeyTy(10))!]
@@ -1424,26 +1446,6 @@ DictionaryTestSuite.test("BridgedFromObjC.Nonverbatim.DictionaryIsCopied") {
   }
 }
 
-
-DictionaryTestSuite.test("BridgedFromObjC.Verbatim.NSDictionaryIsRetained") {
-  var nsd: NSDictionary = autoreleasepool {
-    NSDictionary(dictionary:
-      getAsNSDictionary([10: 1010, 20: 1020, 30: 1030]))
-  }
-
-  var d: [NSObject : AnyObject] = convertNSDictionaryToDictionary(nsd)
-
-  var bridgedBack: NSDictionary = convertDictionaryToNSDictionary(d)
-
-  expectEqual(
-    unsafeBitCast(nsd, to: Int.self),
-    unsafeBitCast(bridgedBack, to: Int.self))
-
-  _fixLifetime(nsd)
-  _fixLifetime(d)
-  _fixLifetime(bridgedBack)
-}
-
 DictionaryTestSuite.test("BridgedFromObjC.Nonverbatim.NSDictionaryIsCopied") {
   var nsd: NSDictionary = autoreleasepool {
     NSDictionary(dictionary:
@@ -1456,30 +1458,6 @@ DictionaryTestSuite.test("BridgedFromObjC.Nonverbatim.NSDictionaryIsCopied") {
   var bridgedBack: NSDictionary = convertDictionaryToNSDictionary(d)
 
   expectNotEqual(
-    unsafeBitCast(nsd, to: Int.self),
-    unsafeBitCast(bridgedBack, to: Int.self))
-
-  _fixLifetime(nsd)
-  _fixLifetime(d)
-  _fixLifetime(bridgedBack)
-}
-
-
-DictionaryTestSuite.test("BridgedFromObjC.Verbatim.ImmutableDictionaryIsRetained") {
-  var nsd: NSDictionary = CustomImmutableNSDictionary(_privateInit: ())
-
-  CustomImmutableNSDictionary.timesCopyWithZoneWasCalled = 0
-  CustomImmutableNSDictionary.timesObjectForKeyWasCalled = 0
-  CustomImmutableNSDictionary.timesKeyEnumeratorWasCalled = 0
-  CustomImmutableNSDictionary.timesCountWasCalled = 0
-  var d: [NSObject : AnyObject] = convertNSDictionaryToDictionary(nsd)
-  expectEqual(1, CustomImmutableNSDictionary.timesCopyWithZoneWasCalled)
-  expectEqual(0, CustomImmutableNSDictionary.timesObjectForKeyWasCalled)
-  expectEqual(0, CustomImmutableNSDictionary.timesKeyEnumeratorWasCalled)
-  expectEqual(0, CustomImmutableNSDictionary.timesCountWasCalled)
-
-  var bridgedBack: NSDictionary = convertDictionaryToNSDictionary(d)
-  expectEqual(
     unsafeBitCast(nsd, to: Int.self),
     unsafeBitCast(bridgedBack, to: Int.self))
 
@@ -1518,8 +1496,7 @@ DictionaryTestSuite.test("BridgedFromObjC.Nonverbatim.ImmutableDictionaryIsCopie
 DictionaryTestSuite.test("BridgedFromObjC.Verbatim.IndexForKey") {
   var d = getBridgedVerbatimDictionary()
   var identity1 = d._rawIdentifier()
-  assert(isCocoaDictionary(d))
-
+  
   // Find an existing key.
   do {
     var kv = d[d.index(forKey: TestObjCKeyTy(10))!]
@@ -1543,8 +1520,7 @@ DictionaryTestSuite.test("BridgedFromObjC.Verbatim.IndexForKey") {
 DictionaryTestSuite.test("BridgedFromObjC.Nonverbatim.IndexForKey") {
   var d = getBridgedNonverbatimDictionary()
   var identity1 = d._rawIdentifier()
-  assert(isNativeDictionary(d))
-
+  
   // Find an existing key.
   do {
     var kv = d[d.index(forKey: TestBridgedKeyTy(10))!]
@@ -1568,8 +1544,7 @@ DictionaryTestSuite.test("BridgedFromObjC.Nonverbatim.IndexForKey") {
 DictionaryTestSuite.test("BridgedFromObjC.Verbatim.SubscriptWithIndex") {
   var d = getBridgedVerbatimDictionary()
   var identity1 = d._rawIdentifier()
-  assert(isCocoaDictionary(d))
-
+  
   var startIndex = d.startIndex
   var endIndex = d.endIndex
   assert(startIndex != endIndex)
@@ -1596,8 +1571,7 @@ DictionaryTestSuite.test("BridgedFromObjC.Verbatim.SubscriptWithIndex") {
 DictionaryTestSuite.test("BridgedFromObjC.Nonverbatim.SubscriptWithIndex") {
   var d = getBridgedNonverbatimDictionary()
   var identity1 = d._rawIdentifier()
-  assert(isNativeDictionary(d))
-
+  
   var startIndex = d.startIndex
   var endIndex = d.endIndex
   assert(startIndex != endIndex)
@@ -1624,8 +1598,7 @@ DictionaryTestSuite.test("BridgedFromObjC.Nonverbatim.SubscriptWithIndex") {
 DictionaryTestSuite.test("BridgedFromObjC.Verbatim.SubscriptWithIndex_Empty") {
   var d = getBridgedVerbatimDictionary([:])
   var identity1 = d._rawIdentifier()
-  assert(isCocoaDictionary(d))
-
+  
   var startIndex = d.startIndex
   var endIndex = d.endIndex
   assert(startIndex == endIndex)
@@ -1643,8 +1616,7 @@ DictionaryTestSuite.test("BridgedFromObjC.Verbatim.SubscriptWithIndex_Empty") {
 DictionaryTestSuite.test("BridgedFromObjC.Nonverbatim.SubscriptWithIndex_Empty") {
   var d = getBridgedNonverbatimDictionary([:])
   var identity1 = d._rawIdentifier()
-  assert(isNativeDictionary(d))
-
+  
   var startIndex = d.startIndex
   var endIndex = d.endIndex
   assert(startIndex == endIndex)
@@ -1662,8 +1634,7 @@ DictionaryTestSuite.test("BridgedFromObjC.Nonverbatim.SubscriptWithIndex_Empty")
 DictionaryTestSuite.test("BridgedFromObjC.Verbatim.SubscriptWithKey") {
   var d = getBridgedVerbatimDictionary()
   var identity1 = d._rawIdentifier()
-  assert(isCocoaDictionary(d))
-
+  
   // Read existing key-value pairs.
   var v = d[TestObjCKeyTy(10)] as! TestObjCValueTy
   assert(v.value == 1010)
@@ -1680,7 +1651,6 @@ DictionaryTestSuite.test("BridgedFromObjC.Verbatim.SubscriptWithKey") {
   d[TestObjCKeyTy(40)] = TestObjCValueTy(2040)
   var identity2 = d._rawIdentifier()
   assert(identity1 != identity2)
-  assert(isNativeDictionary(d))
   assert(d.count == 4)
 
   v = d[TestObjCKeyTy(10)] as! TestObjCValueTy
@@ -1698,7 +1668,6 @@ DictionaryTestSuite.test("BridgedFromObjC.Verbatim.SubscriptWithKey") {
   // Overwrite value in existing binding.
   d[TestObjCKeyTy(10)] = TestObjCValueTy(2010)
   assert(identity2 == d._rawIdentifier())
-  assert(isNativeDictionary(d))
   assert(d.count == 4)
 
   v = d[TestObjCKeyTy(10)] as! TestObjCValueTy
@@ -1717,8 +1686,7 @@ DictionaryTestSuite.test("BridgedFromObjC.Verbatim.SubscriptWithKey") {
 DictionaryTestSuite.test("BridgedFromObjC.Nonverbatim.SubscriptWithKey") {
   var d = getBridgedNonverbatimDictionary()
   var identity1 = d._rawIdentifier()
-  assert(isNativeDictionary(d))
-
+  
   // Read existing key-value pairs.
   var v = d[TestBridgedKeyTy(10)]
   assert(v!.value == 1010)
@@ -1735,7 +1703,6 @@ DictionaryTestSuite.test("BridgedFromObjC.Nonverbatim.SubscriptWithKey") {
   d[TestBridgedKeyTy(40)] = TestBridgedValueTy(2040)
   var identity2 = d._rawIdentifier()
   assert(identity1 != identity2)
-  assert(isNativeDictionary(d))
   assert(d.count == 4)
 
   v = d[TestBridgedKeyTy(10)]
@@ -1753,7 +1720,6 @@ DictionaryTestSuite.test("BridgedFromObjC.Nonverbatim.SubscriptWithKey") {
   // Overwrite value in existing binding.
   d[TestBridgedKeyTy(10)] = TestBridgedValueTy(2010)
   assert(identity2 == d._rawIdentifier())
-  assert(isNativeDictionary(d))
   assert(d.count == 4)
 
   v = d[TestBridgedKeyTy(10)]
@@ -1773,15 +1739,10 @@ DictionaryTestSuite.test("BridgedFromObjC.Verbatim.UpdateValueForKey") {
   // Insert a new key-value pair.
   do {
     var d = getBridgedVerbatimDictionary()
-    var identity1 = d._rawIdentifier()
-    assert(isCocoaDictionary(d))
-
+    
     var oldValue: AnyObject? =
         d.updateValue(TestObjCValueTy(2040), forKey: TestObjCKeyTy(40))
     assert(oldValue == nil)
-    var identity2 = d._rawIdentifier()
-    assert(identity1 != identity2)
-    assert(isNativeDictionary(d))
     assert(d.count == 4)
 
     assert((d[TestObjCKeyTy(10)] as! TestObjCValueTy).value == 1010)
@@ -1794,15 +1755,13 @@ DictionaryTestSuite.test("BridgedFromObjC.Verbatim.UpdateValueForKey") {
   do {
     var d = getBridgedVerbatimDictionary()
     var identity1 = d._rawIdentifier()
-    assert(isCocoaDictionary(d))
-
+    
     var oldValue: AnyObject? =
         d.updateValue(TestObjCValueTy(2010), forKey: TestObjCKeyTy(10))
     assert((oldValue as! TestObjCValueTy).value == 1010)
 
     var identity2 = d._rawIdentifier()
-    assert(identity1 != identity2)
-    assert(isNativeDictionary(d))
+    assert(identity1 == identity2)
     assert(d.count == 3)
 
     assert((d[TestObjCKeyTy(10)] as! TestObjCValueTy).value == 2010)
@@ -1815,15 +1774,10 @@ DictionaryTestSuite.test("BridgedFromObjC.Nonverbatim.UpdateValueForKey") {
   // Insert a new key-value pair.
   do {
     var d = getBridgedNonverbatimDictionary()
-    var identity1 = d._rawIdentifier()
-    assert(isNativeDictionary(d))
-
+    
     var oldValue =
         d.updateValue(TestBridgedValueTy(2040), forKey: TestBridgedKeyTy(40))
     assert(oldValue == nil)
-    var identity2 = d._rawIdentifier()
-    assert(identity1 != identity2)
-    assert(isNativeDictionary(d))
     assert(d.count == 4)
 
     assert(d[TestBridgedKeyTy(10)]!.value == 1010)
@@ -1836,15 +1790,13 @@ DictionaryTestSuite.test("BridgedFromObjC.Nonverbatim.UpdateValueForKey") {
   do {
     var d = getBridgedNonverbatimDictionary()
     var identity1 = d._rawIdentifier()
-    assert(isNativeDictionary(d))
-
+    
     var oldValue =
         d.updateValue(TestBridgedValueTy(2010), forKey: TestBridgedKeyTy(10))!
     assert(oldValue.value == 1010)
 
     var identity2 = d._rawIdentifier()
     assert(identity1 == identity2)
-    assert(isNativeDictionary(d))
     assert(d.count == 3)
 
     assert(d[TestBridgedKeyTy(10)]!.value == 2010)
@@ -1857,16 +1809,14 @@ DictionaryTestSuite.test("BridgedFromObjC.Nonverbatim.UpdateValueForKey") {
 DictionaryTestSuite.test("BridgedFromObjC.Verbatim.RemoveAt") {
   var d = getBridgedVerbatimDictionary()
   var identity1 = d._rawIdentifier()
-  assert(isCocoaDictionary(d))
-
+  
   let foundIndex1 = d.index(forKey: TestObjCKeyTy(10))!
   assert(d[foundIndex1].0 == TestObjCKeyTy(10))
   assert((d[foundIndex1].1 as! TestObjCValueTy).value == 1010)
   assert(identity1 == d._rawIdentifier())
 
   let removedElement = d.remove(at: foundIndex1)
-  assert(identity1 != d._rawIdentifier())
-  assert(isNativeDictionary(d))
+  assert(identity1 == d._rawIdentifier())
   assert(removedElement.0 == TestObjCKeyTy(10))
   assert((removedElement.1 as! TestObjCValueTy).value == 1010)
   assert(d.count == 2)
@@ -1876,8 +1826,7 @@ DictionaryTestSuite.test("BridgedFromObjC.Verbatim.RemoveAt") {
 DictionaryTestSuite.test("BridgedFromObjC.Nonverbatim.RemoveAt") {
   var d = getBridgedNonverbatimDictionary()
   var identity1 = d._rawIdentifier()
-  assert(isNativeDictionary(d))
-
+  
   let foundIndex1 = d.index(forKey: TestBridgedKeyTy(10))!
   assert(d[foundIndex1].0 == TestBridgedKeyTy(10))
   assert(d[foundIndex1].1.value == 1010)
@@ -1885,7 +1834,6 @@ DictionaryTestSuite.test("BridgedFromObjC.Nonverbatim.RemoveAt") {
 
   let removedElement = d.remove(at: foundIndex1)
   assert(identity1 == d._rawIdentifier())
-  assert(isNativeDictionary(d))
   assert(removedElement.0 == TestObjCKeyTy(10) as TestBridgedKeyTy)
   assert(removedElement.1.value == 1010)
   assert(d.count == 2)
@@ -1897,18 +1845,15 @@ DictionaryTestSuite.test("BridgedFromObjC.Verbatim.RemoveValueForKey") {
   do {
     var d = getBridgedVerbatimDictionary()
     var identity1 = d._rawIdentifier()
-    assert(isCocoaDictionary(d))
-
+    
     var deleted: AnyObject? = d.removeValue(forKey: TestObjCKeyTy(0))
     assert(deleted == nil)
     assert(identity1 == d._rawIdentifier())
-    assert(isCocoaDictionary(d))
-
+    
     deleted = d.removeValue(forKey: TestObjCKeyTy(10))
     assert((deleted as! TestObjCValueTy).value == 1010)
     var identity2 = d._rawIdentifier()
-    assert(identity1 != identity2)
-    assert(isNativeDictionary(d))
+    assert(identity1 == identity2)
     assert(d.count == 2)
 
     assert(d[TestObjCKeyTy(10)] == nil)
@@ -1922,22 +1867,16 @@ DictionaryTestSuite.test("BridgedFromObjC.Verbatim.RemoveValueForKey") {
     var identity1 = d1._rawIdentifier()
 
     var d2 = d1
-    assert(isCocoaDictionary(d1))
-    assert(isCocoaDictionary(d2))
-
+        
     var deleted: AnyObject? = d2.removeValue(forKey: TestObjCKeyTy(0))
     assert(deleted == nil)
     assert(identity1 == d1._rawIdentifier())
     assert(identity1 == d2._rawIdentifier())
-    assert(isCocoaDictionary(d1))
-    assert(isCocoaDictionary(d2))
-
+        
     deleted = d2.removeValue(forKey: TestObjCKeyTy(10))
     assert((deleted as! TestObjCValueTy).value == 1010)
     var identity2 = d2._rawIdentifier()
     assert(identity1 != identity2)
-    assert(isCocoaDictionary(d1))
-    assert(isNativeDictionary(d2))
     assert(d2.count == 2)
 
     assert((d1[TestObjCKeyTy(10)] as! TestObjCValueTy).value == 1010)
@@ -1956,18 +1895,15 @@ DictionaryTestSuite.test("BridgedFromObjC.Nonverbatim.RemoveValueForKey") {
   do {
     var d = getBridgedNonverbatimDictionary()
     var identity1 = d._rawIdentifier()
-    assert(isNativeDictionary(d))
-
+    
     var deleted = d.removeValue(forKey: TestBridgedKeyTy(0))
     assert(deleted == nil)
     assert(identity1 == d._rawIdentifier())
-    assert(isNativeDictionary(d))
-
+    
     deleted = d.removeValue(forKey: TestBridgedKeyTy(10))
     assert(deleted!.value == 1010)
     var identity2 = d._rawIdentifier()
     assert(identity1 == identity2)
-    assert(isNativeDictionary(d))
     assert(d.count == 2)
 
     assert(d[TestBridgedKeyTy(10)] == nil)
@@ -1981,22 +1917,16 @@ DictionaryTestSuite.test("BridgedFromObjC.Nonverbatim.RemoveValueForKey") {
     var identity1 = d1._rawIdentifier()
 
     var d2 = d1
-    assert(isNativeDictionary(d1))
-    assert(isNativeDictionary(d2))
-
+        
     var deleted = d2.removeValue(forKey: TestBridgedKeyTy(0))
     assert(deleted == nil)
     assert(identity1 == d1._rawIdentifier())
     assert(identity1 == d2._rawIdentifier())
-    assert(isNativeDictionary(d1))
-    assert(isNativeDictionary(d2))
-
+        
     deleted = d2.removeValue(forKey: TestBridgedKeyTy(10))
     assert(deleted!.value == 1010)
     var identity2 = d2._rawIdentifier()
     assert(identity1 != identity2)
-    assert(isNativeDictionary(d1))
-    assert(isNativeDictionary(d2))
     assert(d2.count == 2)
 
     assert(d1[TestBridgedKeyTy(10)]!.value == 1010)
@@ -2016,7 +1946,6 @@ DictionaryTestSuite.test("BridgedFromObjC.Verbatim.RemoveAll") {
   do {
     var d = getBridgedVerbatimDictionary([:])
     var identity1 = d._rawIdentifier()
-    assert(isCocoaDictionary(d))
     assert(d.count == 0)
 
     d.removeAll()
@@ -2027,14 +1956,13 @@ DictionaryTestSuite.test("BridgedFromObjC.Verbatim.RemoveAll") {
   do {
     var d = getBridgedVerbatimDictionary()
     var identity1 = d._rawIdentifier()
-    assert(isCocoaDictionary(d))
     let originalCapacity = d.count
     assert(d.count == 3)
     assert((d[TestObjCKeyTy(10)] as! TestObjCValueTy).value == 1010)
 
     d.removeAll()
     assert(identity1 != d._rawIdentifier())
-    assert(d._variantBuffer.asNative.capacity < originalCapacity)
+    assert(d._buffer.capacity < originalCapacity)
     assert(d.count == 0)
     assert(d[TestObjCKeyTy(10)] == nil)
   }
@@ -2042,14 +1970,13 @@ DictionaryTestSuite.test("BridgedFromObjC.Verbatim.RemoveAll") {
   do {
     var d = getBridgedVerbatimDictionary()
     var identity1 = d._rawIdentifier()
-    assert(isCocoaDictionary(d))
     let originalCapacity = d.count
     assert(d.count == 3)
     assert((d[TestObjCKeyTy(10)] as! TestObjCValueTy).value == 1010)
 
     d.removeAll(keepingCapacity: true)
-    assert(identity1 != d._rawIdentifier())
-    assert(d._variantBuffer.asNative.capacity >= originalCapacity)
+    assert(identity1 == d._rawIdentifier())
+    assert(d._buffer.capacity >= originalCapacity)
     assert(d.count == 0)
     assert(d[TestObjCKeyTy(10)] == nil)
   }
@@ -2057,7 +1984,6 @@ DictionaryTestSuite.test("BridgedFromObjC.Verbatim.RemoveAll") {
   do {
     var d1 = getBridgedVerbatimDictionary()
     var identity1 = d1._rawIdentifier()
-    assert(isCocoaDictionary(d1))
     let originalCapacity = d1.count
     assert(d1.count == 3)
     assert((d1[TestObjCKeyTy(10)] as! TestObjCValueTy).value == 1010)
@@ -2069,7 +1995,7 @@ DictionaryTestSuite.test("BridgedFromObjC.Verbatim.RemoveAll") {
     assert(identity2 != identity1)
     assert(d1.count == 3)
     assert((d1[TestObjCKeyTy(10)] as! TestObjCValueTy).value == 1010)
-    assert(d2._variantBuffer.asNative.capacity < originalCapacity)
+    assert(d2._buffer.capacity < originalCapacity)
     assert(d2.count == 0)
     assert(d2[TestObjCKeyTy(10)] == nil)
   }
@@ -2077,7 +2003,6 @@ DictionaryTestSuite.test("BridgedFromObjC.Verbatim.RemoveAll") {
   do {
     var d1 = getBridgedVerbatimDictionary()
     var identity1 = d1._rawIdentifier()
-    assert(isCocoaDictionary(d1))
     let originalCapacity = d1.count
     assert(d1.count == 3)
     assert((d1[TestObjCKeyTy(10)] as! TestObjCValueTy).value == 1010)
@@ -2089,7 +2014,7 @@ DictionaryTestSuite.test("BridgedFromObjC.Verbatim.RemoveAll") {
     assert(identity2 != identity1)
     assert(d1.count == 3)
     assert((d1[TestObjCKeyTy(10)] as! TestObjCValueTy).value == 1010)
-    assert(d2._variantBuffer.asNative.capacity >= originalCapacity)
+    assert(d2._buffer.capacity >= originalCapacity)
     assert(d2.count == 0)
     assert(d2[TestObjCKeyTy(10)] == nil)
   }
@@ -2099,7 +2024,6 @@ DictionaryTestSuite.test("BridgedFromObjC.Nonverbatim.RemoveAll") {
   do {
     var d = getBridgedNonverbatimDictionary([:])
     var identity1 = d._rawIdentifier()
-    assert(isNativeDictionary(d))
     assert(d.count == 0)
 
     d.removeAll()
@@ -2110,14 +2034,13 @@ DictionaryTestSuite.test("BridgedFromObjC.Nonverbatim.RemoveAll") {
   do {
     var d = getBridgedNonverbatimDictionary()
     var identity1 = d._rawIdentifier()
-    assert(isNativeDictionary(d))
     let originalCapacity = d.count
     assert(d.count == 3)
     assert(d[TestBridgedKeyTy(10)]!.value == 1010)
 
     d.removeAll()
     assert(identity1 != d._rawIdentifier())
-    assert(d._variantBuffer.asNative.capacity < originalCapacity)
+    assert(d._buffer.capacity < originalCapacity)
     assert(d.count == 0)
     assert(d[TestBridgedKeyTy(10)] == nil)
   }
@@ -2125,14 +2048,13 @@ DictionaryTestSuite.test("BridgedFromObjC.Nonverbatim.RemoveAll") {
   do {
     var d = getBridgedNonverbatimDictionary()
     var identity1 = d._rawIdentifier()
-    assert(isNativeDictionary(d))
     let originalCapacity = d.count
     assert(d.count == 3)
     assert(d[TestBridgedKeyTy(10)]!.value == 1010)
 
     d.removeAll(keepingCapacity: true)
     assert(identity1 == d._rawIdentifier())
-    assert(d._variantBuffer.asNative.capacity >= originalCapacity)
+    assert(d._buffer.capacity >= originalCapacity)
     assert(d.count == 0)
     assert(d[TestBridgedKeyTy(10)] == nil)
   }
@@ -2140,7 +2062,6 @@ DictionaryTestSuite.test("BridgedFromObjC.Nonverbatim.RemoveAll") {
   do {
     var d1 = getBridgedNonverbatimDictionary()
     var identity1 = d1._rawIdentifier()
-    assert(isNativeDictionary(d1))
     let originalCapacity = d1.count
     assert(d1.count == 3)
     assert(d1[TestBridgedKeyTy(10)]!.value == 1010)
@@ -2152,7 +2073,7 @@ DictionaryTestSuite.test("BridgedFromObjC.Nonverbatim.RemoveAll") {
     assert(identity2 != identity1)
     assert(d1.count == 3)
     assert(d1[TestBridgedKeyTy(10)]!.value == 1010)
-    assert(d2._variantBuffer.asNative.capacity < originalCapacity)
+    assert(d2._buffer.capacity < originalCapacity)
     assert(d2.count == 0)
     assert(d2[TestBridgedKeyTy(10)] == nil)
   }
@@ -2160,7 +2081,6 @@ DictionaryTestSuite.test("BridgedFromObjC.Nonverbatim.RemoveAll") {
   do {
     var d1 = getBridgedNonverbatimDictionary()
     var identity1 = d1._rawIdentifier()
-    assert(isNativeDictionary(d1))
     let originalCapacity = d1.count
     assert(d1.count == 3)
     assert(d1[TestBridgedKeyTy(10)]!.value == 1010)
@@ -2172,7 +2092,7 @@ DictionaryTestSuite.test("BridgedFromObjC.Nonverbatim.RemoveAll") {
     assert(identity2 != identity1)
     assert(d1.count == 3)
     assert(d1[TestBridgedKeyTy(10)]!.value == 1010)
-    assert(d2._variantBuffer.asNative.capacity >= originalCapacity)
+    assert(d2._buffer.capacity >= originalCapacity)
     assert(d2.count == 0)
     assert(d2[TestBridgedKeyTy(10)] == nil)
   }
@@ -2182,8 +2102,7 @@ DictionaryTestSuite.test("BridgedFromObjC.Nonverbatim.RemoveAll") {
 DictionaryTestSuite.test("BridgedFromObjC.Verbatim.Count") {
   var d = getBridgedVerbatimDictionary()
   var identity1 = d._rawIdentifier()
-  assert(isCocoaDictionary(d))
-
+  
   assert(d.count == 3)
   assert(identity1 == d._rawIdentifier())
 }
@@ -2191,8 +2110,7 @@ DictionaryTestSuite.test("BridgedFromObjC.Verbatim.Count") {
 DictionaryTestSuite.test("BridgedFromObjC.Nonverbatim.Count") {
   var d = getBridgedNonverbatimDictionary()
   var identity1 = d._rawIdentifier()
-  assert(isNativeDictionary(d))
-
+  
   assert(d.count == 3)
   assert(identity1 == d._rawIdentifier())
 }
@@ -2201,8 +2119,7 @@ DictionaryTestSuite.test("BridgedFromObjC.Nonverbatim.Count") {
 DictionaryTestSuite.test("BridgedFromObjC.Verbatim.Generate") {
   var d = getBridgedVerbatimDictionary()
   var identity1 = d._rawIdentifier()
-  assert(isCocoaDictionary(d))
-
+  
   var iter = d.makeIterator()
   var pairs = Array<(Int, Int)>()
   while let (key, value) = iter.next() {
@@ -2221,8 +2138,7 @@ DictionaryTestSuite.test("BridgedFromObjC.Verbatim.Generate") {
 DictionaryTestSuite.test("BridgedFromObjC.Nonverbatim.Generate") {
   var d = getBridgedNonverbatimDictionary()
   var identity1 = d._rawIdentifier()
-  assert(isNativeDictionary(d))
-
+  
   var iter = d.makeIterator()
   var pairs = Array<(Int, Int)>()
   while let (key, value) = iter.next() {
@@ -2241,8 +2157,7 @@ DictionaryTestSuite.test("BridgedFromObjC.Nonverbatim.Generate") {
 DictionaryTestSuite.test("BridgedFromObjC.Verbatim.Generate_Empty") {
   var d = getBridgedVerbatimDictionary([:])
   var identity1 = d._rawIdentifier()
-  assert(isCocoaDictionary(d))
-
+  
   var iter = d.makeIterator()
   // Cannot write code below because of
   // <rdar://problem/16811736> Optional tuples are broken as optionals regarding == comparison
@@ -2259,8 +2174,7 @@ DictionaryTestSuite.test("BridgedFromObjC.Verbatim.Generate_Empty") {
 DictionaryTestSuite.test("BridgedFromObjC.Nonverbatim.Generate_Empty") {
   var d = getBridgedNonverbatimDictionary([:])
   var identity1 = d._rawIdentifier()
-  assert(isNativeDictionary(d))
-
+  
   var iter = d.makeIterator()
   // Cannot write code below because of
   // <rdar://problem/16811736> Optional tuples are broken as optionals regarding == comparison
@@ -2278,8 +2192,7 @@ DictionaryTestSuite.test("BridgedFromObjC.Nonverbatim.Generate_Empty") {
 DictionaryTestSuite.test("BridgedFromObjC.Verbatim.Generate_Huge") {
   var d = getHugeBridgedVerbatimDictionary()
   var identity1 = d._rawIdentifier()
-  assert(isCocoaDictionary(d))
-
+  
   var iter = d.makeIterator()
   var pairs = Array<(Int, Int)>()
   while let (key, value) = iter.next() {
@@ -2302,8 +2215,7 @@ DictionaryTestSuite.test("BridgedFromObjC.Verbatim.Generate_Huge") {
 DictionaryTestSuite.test("BridgedFromObjC.Nonverbatim.Generate_Huge") {
   var d = getHugeBridgedNonverbatimDictionary()
   var identity1 = d._rawIdentifier()
-  assert(isNativeDictionary(d))
-
+  
   var iter = d.makeIterator()
   var pairs = Array<(Int, Int)>()
   while let (key, value) = iter.next() {
@@ -2331,8 +2243,7 @@ autoreleasepoolIfUnoptimizedReturnAutoreleased {
 
   var d = getParallelArrayBridgedVerbatimDictionary()
   var identity1 = d._rawIdentifier()
-  assert(isCocoaDictionary(d))
-
+  
   var iter = d.makeIterator()
   var pairs = Array<(Int, Int)>()
   while let (key, value) = iter.next() {
@@ -2357,8 +2268,7 @@ autoreleasepoolIfUnoptimizedReturnAutoreleased {
 
   var d = getParallelArrayBridgedNonverbatimDictionary()
   var identity1 = d._rawIdentifier()
-  assert(isNativeDictionary(d))
-
+  
   var iter = d.makeIterator()
   var pairs = Array<(Int, Int)>()
   while let (key, value) = iter.next() {
@@ -2380,12 +2290,10 @@ autoreleasepoolIfUnoptimizedReturnAutoreleased {
 DictionaryTestSuite.test("BridgedFromObjC.Verbatim.EqualityTest_Empty") {
   var d1 = getBridgedVerbatimEquatableDictionary([:])
   var identity1 = d1._rawIdentifier()
-  assert(isCocoaDictionary(d1))
-
+  
   var d2 = getBridgedVerbatimEquatableDictionary([:])
   var identity2 = d2._rawIdentifier()
-  assert(isCocoaDictionary(d2))
-
+  
   // We can't check that `identity1 != identity2` because Foundation might be
   // returning the same singleton NSDictionary for empty dictionaries.
 
@@ -2394,8 +2302,7 @@ DictionaryTestSuite.test("BridgedFromObjC.Verbatim.EqualityTest_Empty") {
   assert(identity2 == d2._rawIdentifier())
 
   d2[TestObjCKeyTy(10)] = TestObjCEquatableValueTy(2010)
-  assert(isNativeDictionary(d2))
-  assert(identity2 != d2._rawIdentifier())
+  assert(identity2 == d2._rawIdentifier())
   identity2 = d2._rawIdentifier()
 
   assert(d1 != d2)
@@ -2406,19 +2313,15 @@ DictionaryTestSuite.test("BridgedFromObjC.Verbatim.EqualityTest_Empty") {
 DictionaryTestSuite.test("BridgedFromObjC.Nonverbatim.EqualityTest_Empty") {
   var d1 = getBridgedNonverbatimEquatableDictionary([:])
   var identity1 = d1._rawIdentifier()
-  assert(isNativeDictionary(d1))
-
+  
   var d2 = getBridgedNonverbatimEquatableDictionary([:])
   var identity2 = d2._rawIdentifier()
-  assert(isNativeDictionary(d2))
-  assert(identity1 != identity2)
 
   assert(d1 == d2)
   assert(identity1 == d1._rawIdentifier())
   assert(identity2 == d2._rawIdentifier())
 
   d2[TestBridgedKeyTy(10)] = TestBridgedEquatableValueTy(2010)
-  assert(isNativeDictionary(d2))
   assert(identity2 == d2._rawIdentifier())
 
   assert(d1 != d2)
@@ -2431,12 +2334,10 @@ DictionaryTestSuite.test("BridgedFromObjC.Verbatim.EqualityTest_Small") {
   func helper(_ nd1: Dictionary<Int, Int>, _ nd2: Dictionary<Int, Int>, _ expectedEq: Bool) {
     let d1 = getBridgedVerbatimEquatableDictionary(nd1)
     let identity1 = d1._rawIdentifier()
-    assert(isCocoaDictionary(d1))
-
+    
     var d2 = getBridgedVerbatimEquatableDictionary(nd2)
     var identity2 = d2._rawIdentifier()
-    assert(isCocoaDictionary(d2))
-
+    
     do {
       let eq1 = (d1 == d2)
       assert(eq1 == expectedEq)
@@ -2455,8 +2356,6 @@ DictionaryTestSuite.test("BridgedFromObjC.Verbatim.EqualityTest_Small") {
 
     d2[TestObjCKeyTy(1111)] = TestObjCEquatableValueTy(1111)
     d2[TestObjCKeyTy(1111)] = nil
-    assert(isNativeDictionary(d2))
-    assert(identity2 != d2._rawIdentifier())
     identity2 = d2._rawIdentifier()
 
     do {
@@ -2904,9 +2803,6 @@ func getRoundtripBridgedNSDictionary() -> NSDictionary {
   let d: Dictionary<NSObject, AnyObject> = convertNSDictionaryToDictionary(nsd)
 
   let bridgedBack = convertDictionaryToNSDictionary(d)
-  assert(isCocoaNSDictionary(bridgedBack))
-  // FIXME: this should be true.
-  //assert(unsafeBitCast(nsd, Int.self) == unsafeBitCast(bridgedBack, Int.self))
 
   return bridgedBack
 }
@@ -3468,92 +3364,6 @@ DictionaryDerivedAPIs.test("isEmpty") {
     expectFalse(d.isEmpty)
   }
 }
-
-#if _runtime(_ObjC)
-@objc
-class MockDictionaryWithCustomCount : NSDictionary {
-  init(count: Int) {
-    self._count = count
-    super.init()
-  }
-
-  override init() {
-    expectUnreachable()
-    super.init()
-  }
-
-  override init(
-    objects: UnsafePointer<AnyObject>,
-    forKeys keys: UnsafePointer<NSCopying>,
-    count: Int) {
-    expectUnreachable()
-    super.init(objects: objects, forKeys: keys, count: count)
-  }
-
-  required init(coder aDecoder: NSCoder) {
-    fatalError("init(coder:) not implemented by MockDictionaryWithCustomCount")
-  }
-
-  @objc(copyWithZone:)
-  override func copy(with zone: NSZone?) -> Any {
-    // Ensure that copying this dictionary produces an object of the same
-    // dynamic type.
-    return self
-  }
-
-  override func object(forKey aKey: Any) -> Any? {
-    expectUnreachable()
-    return NSObject()
-  }
-
-  override var count: Int {
-    MockDictionaryWithCustomCount.timesCountWasCalled += 1
-    return _count
-  }
-
-  var _count: Int = 0
-
-  static var timesCountWasCalled = 0
-}
-
-func getMockDictionaryWithCustomCount(count: Int)
-  -> Dictionary<NSObject, AnyObject> {
-
-  return MockDictionaryWithCustomCount(count: count) as Dictionary
-}
-
-func callGenericIsEmpty<C : Collection>(_ collection: C) -> Bool {
-  return collection.isEmpty
-}
-
-DictionaryDerivedAPIs.test("isEmpty/ImplementationIsCustomized") {
-  do {
-    var d = getMockDictionaryWithCustomCount(count: 0)
-    MockDictionaryWithCustomCount.timesCountWasCalled = 0
-    expectTrue(d.isEmpty)
-    expectEqual(1, MockDictionaryWithCustomCount.timesCountWasCalled)
-  }
-  do {
-    var d = getMockDictionaryWithCustomCount(count: 0)
-    MockDictionaryWithCustomCount.timesCountWasCalled = 0
-    expectTrue(callGenericIsEmpty(d))
-    expectEqual(1, MockDictionaryWithCustomCount.timesCountWasCalled)
-  }
-
-  do {
-    var d = getMockDictionaryWithCustomCount(count: 4)
-    MockDictionaryWithCustomCount.timesCountWasCalled = 0
-    expectFalse(d.isEmpty)
-    expectEqual(1, MockDictionaryWithCustomCount.timesCountWasCalled)
-  }
-  do {
-    var d = getMockDictionaryWithCustomCount(count: 4)
-    MockDictionaryWithCustomCount.timesCountWasCalled = 0
-    expectFalse(callGenericIsEmpty(d))
-    expectEqual(1, MockDictionaryWithCustomCount.timesCountWasCalled)
-  }
-}
-#endif // _runtime(_ObjC)
 
 DictionaryDerivedAPIs.test("keys") {
   do {

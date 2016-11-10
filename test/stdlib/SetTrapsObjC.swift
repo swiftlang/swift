@@ -134,13 +134,8 @@ SetTraps.test("Downcast1")
     reason: "this trap is not guaranteed to happen in -Ounchecked"))
   .code {
   let s: Set<NSObject> = [ NSObject(), NSObject() ]
-  let s2: Set<TestObjCKeyTy> = _setDownCast(s)
   expectCrashLater()
-  let v1 = s2.contains(TestObjCKeyTy(10))
-  let v2 = s2.contains(TestObjCKeyTy(20))
-
-  // This triggers failure.
-  for m in s2 { }
+  _ = _setDownCast(s) as Set<TestObjCKeyTy>
 }
 
 SetTraps.test("Downcast2")

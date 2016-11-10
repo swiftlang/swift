@@ -77,7 +77,6 @@ func getCOWFastSet(_ members: [Int] = [1010, 2020, 3030]) -> Set<Int> {
   for member in members {
     s.insert(member)
   }
-  expectTrue(isNativeSet(s))
   return s
 }
 
@@ -86,7 +85,6 @@ func getCOWSlowSet(_ members: [Int] = [1010, 2020, 3030]) -> Set<TestKeyTy> {
   for member in members {
     s.insert(TestKeyTy(member))
   }
-  expectTrue(isNativeSet(s))
   return s
 }
 
@@ -126,15 +124,6 @@ func equalsUnordered(_ lhs: Set<Int>, _ rhs: Set<Int>) -> Bool {
   }
 }
 
-func isNativeSet<T : Hashable>(_ s: Set<T>) -> Bool {
-  switch s._variantBuffer {
-  case .native:
-    return true
-  case .cocoa:
-    return false
-  }
-}
-
 #if _runtime(_ObjC)
 func isNativeNSSet(_ s: NSSet) -> Bool {
   let className: NSString = NSStringFromClass(type(of: s)) as NSString
@@ -156,10 +145,6 @@ func getBridgedEmptyNSSet() -> NSSet {
   expectTrue(isNativeNSSet(bridged))
 
   return bridged
-}
-
-func isCocoaSet<T : Hashable>(_ s: Set<T>) -> Bool {
-  return !isNativeSet(s)
 }
 
 /// Get an NSSet of TestObjCKeyTy values
@@ -196,7 +181,6 @@ func getBridgedVerbatimSet(_ members: [Int] = [1010, 2020, 3030])
   -> Set<NSObject> {
   let nss = getAsNSSet(members)
   let result: Set<NSObject> = convertNSSetToSet(nss)
-  expectTrue(isCocoaSet(result))
   return result
 }
 
@@ -204,7 +188,6 @@ func getBridgedVerbatimSet(_ members: [Int] = [1010, 2020, 3030])
 func getNativeBridgedVerbatimSet(_ members: [Int] = [1010, 2020, 3030]) ->
   Set<NSObject> {
   let result: Set<NSObject> = Set(members.map({ TestObjCKeyTy($0) }))
-  expectTrue(isNativeSet(result))
   return result
 }
 
@@ -212,7 +195,6 @@ func getNativeBridgedVerbatimSet(_ members: [Int] = [1010, 2020, 3030]) ->
 func getHugeBridgedVerbatimSet() -> Set<NSObject> {
   let nss = getAsNSSet(hugeNumberArray)
   let result: Set<NSObject> = convertNSSetToSet(nss)
-  expectTrue(isCocoaSet(result))
   return result
 }
 
@@ -223,7 +205,6 @@ func getBridgedNonverbatimSet(_ members: [Int] = [1010, 2020, 3030]) ->
   let _ = unsafeBitCast(nss, to: Int.self)
   let result: Set<TestBridgedKeyTy> =
     Swift._forceBridgeFromObjectiveC(nss, Set.self)
-  expectTrue(isNativeSet(result))
   return result
 }
 
@@ -233,7 +214,6 @@ func getHugeBridgedNonverbatimSet() -> Set<TestBridgedKeyTy> {
   let _ = unsafeBitCast(nss, to: Int.self)
   let result: Set<TestBridgedKeyTy> =
     Swift._forceBridgeFromObjectiveC(nss, Set.self)
-  expectTrue(isNativeSet(result))
   return result
 }
 
@@ -291,7 +271,6 @@ func getRoundtripBridgedNSSet() -> NSSet {
   let s: Set<NSObject> = convertNSSetToSet(nss)
 
   let bridgedBack = convertSetToNSSet(s)
-  expectTrue(isCocoaNSSet(bridgedBack))
   // FIXME: this should be true.
   //expectTrue(unsafeBitCast(nsd, to: Int.self) == unsafeBitCast(bridgedBack, to: Int.self))
 
@@ -834,7 +813,7 @@ SetTestSuite.test("COW.Fast.UnionInPlaceSmallSetDoesNotReallocate") {
 SetTestSuite.test("COW.Fast.RemoveAllDoesNotReallocate") {
   do {
     var s = getCOWFastSet()
-    let originalCapacity = s._variantBuffer.asNative.capacity
+    let originalCapacity = s._buffer.capacity
     expectEqual(3, s.count)
     expectTrue(s.contains(1010))
 
@@ -842,7 +821,7 @@ SetTestSuite.test("COW.Fast.RemoveAllDoesNotReallocate") {
     // We cannot expectTrue that identity changed, since the new buffer of
     // smaller size can be allocated at the same address as the old one.
     var identity1 = s._rawIdentifier()
-    expectTrue(s._variantBuffer.asNative.capacity < originalCapacity)
+    expectTrue(s._buffer.capacity < originalCapacity)
     expectEqual(0, s.count)
     expectFalse(s.contains(1010))
 
@@ -855,19 +834,19 @@ SetTestSuite.test("COW.Fast.RemoveAllDoesNotReallocate") {
   do {
     var s = getCOWFastSet()
     var identity1 = s._rawIdentifier()
-    let originalCapacity = s._variantBuffer.asNative.capacity
+    let originalCapacity = s._buffer.capacity
     expectEqual(3, s.count)
     expectTrue(s.contains(1010))
 
     s.removeAll(keepingCapacity: true)
     expectEqual(identity1, s._rawIdentifier())
-    expectEqual(originalCapacity, s._variantBuffer.asNative.capacity)
+    expectEqual(originalCapacity, s._buffer.capacity)
     expectEqual(0, s.count)
     expectFalse(s.contains(1010))
 
     s.removeAll(keepingCapacity: true)
     expectEqual(identity1, s._rawIdentifier())
-    expectEqual(originalCapacity, s._variantBuffer.asNative.capacity)
+    expectEqual(originalCapacity, s._buffer.capacity)
     expectEqual(0, s.count)
     expectFalse(s.contains(1010))
   }
@@ -896,7 +875,7 @@ SetTestSuite.test("COW.Fast.RemoveAllDoesNotReallocate") {
   do {
     var s1 = getCOWFastSet()
     var identity1 = s1._rawIdentifier()
-    let originalCapacity = s1._variantBuffer.asNative.capacity
+    let originalCapacity = s1._buffer.capacity
     expectEqual(3, s1.count)
     expectTrue(s1.contains(1010))
 
@@ -907,7 +886,7 @@ SetTestSuite.test("COW.Fast.RemoveAllDoesNotReallocate") {
     expectNotEqual(identity1, identity2)
     expectEqual(3, s1.count)
     expectTrue(s1.contains(1010))
-    expectEqual(originalCapacity, s2._variantBuffer.asNative.capacity)
+    expectEqual(originalCapacity, s2._buffer.capacity)
     expectEqual(0, s2.count)
     expectFalse(s2.contains(1010))
 
@@ -920,7 +899,7 @@ SetTestSuite.test("COW.Fast.RemoveAllDoesNotReallocate") {
 SetTestSuite.test("COW.Slow.RemoveAllDoesNotReallocate") {
   do {
     var s = getCOWSlowSet()
-    let originalCapacity = s._variantBuffer.asNative.capacity
+    let originalCapacity = s._buffer.capacity
     expectEqual(3, s.count)
     expectTrue(s.contains(TestKeyTy(1010)))
 
@@ -928,7 +907,7 @@ SetTestSuite.test("COW.Slow.RemoveAllDoesNotReallocate") {
     // We cannot expectTrue that identity changed, since the new buffer of
     // smaller size can be allocated at the same address as the old one.
     var identity1 = s._rawIdentifier()
-    expectTrue(s._variantBuffer.asNative.capacity < originalCapacity)
+    expectTrue(s._buffer.capacity < originalCapacity)
     expectEqual(0, s.count)
     expectFalse(s.contains(TestKeyTy(1010)))
 
@@ -941,19 +920,19 @@ SetTestSuite.test("COW.Slow.RemoveAllDoesNotReallocate") {
   do {
     var s = getCOWSlowSet()
     var identity1 = s._rawIdentifier()
-    let originalCapacity = s._variantBuffer.asNative.capacity
+    let originalCapacity = s._buffer.capacity
     expectEqual(3, s.count)
     expectTrue(s.contains(TestKeyTy(1010)))
 
     s.removeAll(keepingCapacity: true)
     expectEqual(identity1, s._rawIdentifier())
-    expectEqual(originalCapacity, s._variantBuffer.asNative.capacity)
+    expectEqual(originalCapacity, s._buffer.capacity)
     expectEqual(0, s.count)
     expectFalse(s.contains(TestKeyTy(1010)))
 
     s.removeAll(keepingCapacity: true)
     expectEqual(identity1, s._rawIdentifier())
-    expectEqual(originalCapacity, s._variantBuffer.asNative.capacity)
+    expectEqual(originalCapacity, s._buffer.capacity)
     expectEqual(0, s.count)
     expectFalse(s.contains(TestKeyTy(1010)))
   }
@@ -982,7 +961,7 @@ SetTestSuite.test("COW.Slow.RemoveAllDoesNotReallocate") {
   do {
     var s1 = getCOWSlowSet()
     var identity1 = s1._rawIdentifier()
-    let originalCapacity = s1._variantBuffer.asNative.capacity
+    let originalCapacity = s1._buffer.capacity
     expectEqual(3, s1.count)
     expectTrue(s1.contains(TestKeyTy(1010)))
 
@@ -993,7 +972,7 @@ SetTestSuite.test("COW.Slow.RemoveAllDoesNotReallocate") {
     expectNotEqual(identity1, identity2)
     expectEqual(3, s1.count)
     expectTrue(s1.contains(TestKeyTy(1010)))
-    expectEqual(originalCapacity, s2._variantBuffer.asNative.capacity)
+    expectEqual(originalCapacity, s2._buffer.capacity)
     expectEqual(0, s2.count)
     expectFalse(s2.contains(TestKeyTy(1010)))
 
@@ -1235,8 +1214,7 @@ class CustomImmutableNSSet : NSSet {
 
 SetTestSuite.test("BridgedFromObjC.Verbatim.SetIsCopied") {
   var (s, nss) = getBridgedVerbatimSetAndNSMutableSet()
-  expectTrue(isCocoaSet(s))
-
+  
   expectTrue(s.contains(TestObjCKeyTy(1010)))
   expectNotNil(nss.member(TestObjCKeyTy(1010)))
 
@@ -1248,8 +1226,7 @@ SetTestSuite.test("BridgedFromObjC.Verbatim.SetIsCopied") {
 
 SetTestSuite.test("BridgedFromObjC.Nonverbatim.SetIsCopied") {
   var (s, nss) = getBridgedNonverbatimSetAndNSMutableSet()
-  expectTrue(isNativeSet(s))
-
+  
   expectTrue(s.contains(TestBridgedKeyTy(1010)))
   expectNotNil(nss.member(TestBridgedKeyTy(1010) as AnyObject))
 
@@ -1257,23 +1234,6 @@ SetTestSuite.test("BridgedFromObjC.Nonverbatim.SetIsCopied") {
   expectNil(nss.member(TestBridgedKeyTy(1010) as AnyObject))
 
   expectTrue(s.contains(TestBridgedKeyTy(1010)))
-}
-
-
-SetTestSuite.test("BridgedFromObjC.Verbatim.NSSetIsRetained") {
-  var nss: NSSet = NSSet(set: getAsNSSet([ 1010, 1020, 1030 ]))
-
-  var s: Set<NSObject> = convertNSSetToSet(nss)
-
-  var bridgedBack: NSSet = convertSetToNSSet(s)
-
-  expectEqual(
-    unsafeBitCast(nss, to: Int.self),
-    unsafeBitCast(bridgedBack, to: Int.self))
-
-  _fixLifetime(nss)
-  _fixLifetime(s)
-  _fixLifetime(bridgedBack)
 }
 
 SetTestSuite.test("BridgedFromObjC.Nonverbatim.NSSetIsCopied") {
@@ -1284,30 +1244,6 @@ SetTestSuite.test("BridgedFromObjC.Nonverbatim.NSSetIsCopied") {
   var bridgedBack: NSSet = convertSetToNSSet(s)
 
   expectNotEqual(
-    unsafeBitCast(nss, to: Int.self),
-    unsafeBitCast(bridgedBack, to: Int.self))
-
-  _fixLifetime(nss)
-  _fixLifetime(s)
-  _fixLifetime(bridgedBack)
-}
-
-
-SetTestSuite.test("BridgedFromObjC.Verbatim.ImmutableSetIsRetained") {
-  var nss: NSSet = CustomImmutableNSSet(_privateInit: ())
-
-  CustomImmutableNSSet.timesCopyWithZoneWasCalled = 0
-  CustomImmutableNSSet.timesMemberWasCalled = 0
-  CustomImmutableNSSet.timesObjectEnumeratorWasCalled = 0
-  CustomImmutableNSSet.timesCountWasCalled = 0
-  var s: Set<NSObject> = convertNSSetToSet(nss)
-  expectEqual(1, CustomImmutableNSSet.timesCopyWithZoneWasCalled)
-  expectEqual(0, CustomImmutableNSSet.timesMemberWasCalled)
-  expectEqual(0, CustomImmutableNSSet.timesObjectEnumeratorWasCalled)
-  expectEqual(0, CustomImmutableNSSet.timesCountWasCalled)
-
-  var bridgedBack: NSSet = convertSetToNSSet(s)
-  expectEqual(
     unsafeBitCast(nss, to: Int.self),
     unsafeBitCast(bridgedBack, to: Int.self))
 
@@ -1343,8 +1279,7 @@ SetTestSuite.test("BridgedFromObjC.Nonverbatim.ImmutableSetIsCopied") {
 SetTestSuite.test("BridgedFromObjC.Verbatim.IndexForMember") {
   var s = getBridgedVerbatimSet()
   var identity1 = s._rawIdentifier()
-  expectTrue(isCocoaSet(s))
-
+  
   // Find an existing key.
   var member = s[s.index(of: TestObjCKeyTy(1010))!]
   expectEqual(TestObjCKeyTy(1010), member)
@@ -1383,14 +1318,12 @@ SetTestSuite.test("BridgedFromObjC.Verbatim.Insert") {
   do {
     var s = getBridgedVerbatimSet()
     var identity1 = s._rawIdentifier()
-    expectTrue(isCocoaSet(s))
-
+    
     expectFalse(s.contains(TestObjCKeyTy(2040)))
     s.insert(TestObjCKeyTy(2040))
 
     var identity2 = s._rawIdentifier()
     expectNotEqual(identity1, identity2)
-    expectTrue(isNativeSet(s))
     expectEqual(4, s.count)
 
     expectTrue(s.contains(TestObjCKeyTy(1010)))
@@ -1404,14 +1337,12 @@ SetTestSuite.test("BridgedFromObjC.Nonverbatim.Insert") {
   do {
     var s = getBridgedNonverbatimSet()
     var identity1 = s._rawIdentifier()
-    expectTrue(isNativeSet(s))
-
+    
     expectFalse(s.contains(TestBridgedKeyTy(2040)))
     s.insert(TestObjCKeyTy(2040) as TestBridgedKeyTy)
 
     var identity2 = s._rawIdentifier()
     expectNotEqual(identity1, identity2)
-    expectTrue(isNativeSet(s))
     expectEqual(4, s.count)
 
     expectTrue(s.contains(TestBridgedKeyTy(1010)))
@@ -1424,8 +1355,7 @@ SetTestSuite.test("BridgedFromObjC.Nonverbatim.Insert") {
 SetTestSuite.test("BridgedFromObjC.Verbatim.SubscriptWithIndex") {
   var s = getBridgedVerbatimSet()
   var identity1 = s._rawIdentifier()
-  expectTrue(isCocoaSet(s))
-
+  
   var startIndex = s.startIndex
   var endIndex = s.endIndex
   expectNotEqual(startIndex, endIndex)
@@ -1452,8 +1382,7 @@ SetTestSuite.test("BridgedFromObjC.Verbatim.SubscriptWithIndex") {
 SetTestSuite.test("BridgedFromObjC.Nonverbatim.SubscriptWithIndex") {
   var s = getBridgedNonverbatimSet()
   var identity1 = s._rawIdentifier()
-  expectTrue(isNativeSet(s))
-
+  
   var startIndex = s.startIndex
   var endIndex = s.endIndex
   expectNotEqual(startIndex, endIndex)
@@ -1480,8 +1409,7 @@ SetTestSuite.test("BridgedFromObjC.Nonverbatim.SubscriptWithIndex") {
 SetTestSuite.test("BridgedFromObjC.Verbatim.SubscriptWithIndex_Empty") {
   var s = getBridgedVerbatimSet([])
   var identity1 = s._rawIdentifier()
-  expectTrue(isCocoaSet(s))
-
+  
   var startIndex = s.startIndex
   var endIndex = s.endIndex
   expectEqual(startIndex, endIndex)
@@ -1499,8 +1427,7 @@ SetTestSuite.test("BridgedFromObjC.Verbatim.SubscriptWithIndex_Empty") {
 SetTestSuite.test("BridgedFromObjC.Nonverbatim.SubscriptWithIndex_Empty") {
   var s = getBridgedNonverbatimSet([])
   var identity1 = s._rawIdentifier()
-  expectTrue(isNativeSet(s))
-
+  
   var startIndex = s.startIndex
   var endIndex = s.endIndex
   expectEqual(startIndex, endIndex)
@@ -1518,8 +1445,7 @@ SetTestSuite.test("BridgedFromObjC.Nonverbatim.SubscriptWithIndex_Empty") {
 SetTestSuite.test("BridgedFromObjC.Verbatim.Contains") {
   var s = getBridgedVerbatimSet()
   var identity1 = s._rawIdentifier()
-  expectTrue(isCocoaSet(s))
-
+  
   expectTrue(s.contains(TestObjCKeyTy(1010)))
   expectTrue(s.contains(TestObjCKeyTy(2020)))
   expectTrue(s.contains(TestObjCKeyTy(3030)))
@@ -1530,7 +1456,6 @@ SetTestSuite.test("BridgedFromObjC.Verbatim.Contains") {
   s.insert(TestObjCKeyTy(4040))
   var identity2 = s._rawIdentifier()
   expectNotEqual(identity1, identity2)
-  expectTrue(isNativeSet(s))
   expectEqual(4, s.count)
 
   // Verify items are still present.
@@ -1543,7 +1468,6 @@ SetTestSuite.test("BridgedFromObjC.Verbatim.Contains") {
   // A copy should *not* occur here.
   s.insert(TestObjCKeyTy(1010))
   expectEqual(identity2, s._rawIdentifier())
-  expectTrue(isNativeSet(s))
   expectEqual(4, s.count)
 
   // Again, verify items are still present.
@@ -1556,8 +1480,7 @@ SetTestSuite.test("BridgedFromObjC.Verbatim.Contains") {
 SetTestSuite.test("BridgedFromObjC.Nonverbatim.Contains") {
   var s = getBridgedNonverbatimSet()
   var identity1 = s._rawIdentifier()
-  expectTrue(isNativeSet(s))
-
+  
   expectTrue(s.contains(TestBridgedKeyTy(1010)))
   expectTrue(s.contains(TestBridgedKeyTy(2020)))
   expectTrue(s.contains(TestBridgedKeyTy(3030)))
@@ -1568,7 +1491,6 @@ SetTestSuite.test("BridgedFromObjC.Nonverbatim.Contains") {
   s.insert(TestBridgedKeyTy(4040))
   var identity2 = s._rawIdentifier()
   expectNotEqual(identity1, identity2)
-  expectTrue(isNativeSet(s))
   expectEqual(4, s.count)
 
   // Verify items are still present.
@@ -1581,7 +1503,6 @@ SetTestSuite.test("BridgedFromObjC.Nonverbatim.Contains") {
   // A copy should *not* occur here.
   s.insert(TestBridgedKeyTy(1010))
   expectEqual(identity2, s._rawIdentifier())
-  expectTrue(isNativeSet(s))
   expectEqual(4, s.count)
 
   // Again, verify items are still present.
@@ -1594,8 +1515,7 @@ SetTestSuite.test("BridgedFromObjC.Nonverbatim.Contains") {
 SetTestSuite.test("BridgedFromObjC.Nonverbatim.SubscriptWithMember") {
   var s = getBridgedNonverbatimSet()
   var identity1 = s._rawIdentifier()
-  expectTrue(isNativeSet(s))
-
+  
   expectTrue(s.contains(TestBridgedKeyTy(1010)))
   expectTrue(s.contains(TestBridgedKeyTy(2020)))
   expectTrue(s.contains(TestBridgedKeyTy(3030)))
@@ -1607,7 +1527,6 @@ SetTestSuite.test("BridgedFromObjC.Nonverbatim.SubscriptWithMember") {
   s.insert(TestBridgedKeyTy(4040))
   var identity2 = s._rawIdentifier()
 
-  expectTrue(isNativeSet(s))
   expectEqual(4, s.count)
 
   // Verify all items in place.
@@ -1620,7 +1539,6 @@ SetTestSuite.test("BridgedFromObjC.Nonverbatim.SubscriptWithMember") {
   // This should *not* trigger a copy.
   s.insert(TestBridgedKeyTy(1010))
   expectEqual(identity2, s._rawIdentifier())
-  expectTrue(isNativeSet(s))
   expectEqual(4, s.count)
 
   // Again, verify all items in place.
@@ -1633,15 +1551,13 @@ SetTestSuite.test("BridgedFromObjC.Nonverbatim.SubscriptWithMember") {
 SetTestSuite.test("BridgedFromObjC.Verbatim.RemoveAt") {
   var s = getBridgedVerbatimSet()
   let identity1 = s._rawIdentifier()
-  expectTrue(isCocoaSet(s))
-
+  
   let foundIndex1 = s.index(of: TestObjCKeyTy(1010))!
   expectEqual(TestObjCKeyTy(1010), s[foundIndex1])
   expectEqual(identity1, s._rawIdentifier())
 
   let removedElement = s.remove(at: foundIndex1)
-  expectNotEqual(identity1, s._rawIdentifier())
-  expectTrue(isNativeSet(s))
+  expectEqual(identity1, s._rawIdentifier())
   expectEqual(2, s.count)
   expectEqual(TestObjCKeyTy(1010), removedElement)
   expectNil(s.index(of: TestObjCKeyTy(1010)))
@@ -1650,15 +1566,13 @@ SetTestSuite.test("BridgedFromObjC.Verbatim.RemoveAt") {
 SetTestSuite.test("BridgedFromObjC.Nonverbatim.RemoveAt") {
   var s = getBridgedNonverbatimSet()
   let identity1 = s._rawIdentifier()
-  expectTrue(isNativeSet(s))
-
+  
   let foundIndex1 = s.index(of: TestBridgedKeyTy(1010))!
   expectEqual(1010, s[foundIndex1].value)
   expectEqual(identity1, s._rawIdentifier())
 
   let removedElement = s.remove(at: foundIndex1)
   expectEqual(identity1, s._rawIdentifier())
-  expectTrue(isNativeSet(s))
   expectEqual(1010, removedElement.value)
   expectEqual(2, s.count)
   expectNil(s.index(of: TestBridgedKeyTy(1010)))
@@ -1668,18 +1582,15 @@ SetTestSuite.test("BridgedFromObjC.Verbatim.Remove") {
   do {
     var s = getBridgedVerbatimSet()
     var identity1 = s._rawIdentifier()
-    expectTrue(isCocoaSet(s))
-
+    
     var deleted: AnyObject? = s.remove(TestObjCKeyTy(0))
     expectNil(deleted)
     expectEqual(identity1, s._rawIdentifier())
-    expectTrue(isCocoaSet(s))
-
+    
     deleted = s.remove(TestObjCKeyTy(1010))
     expectEqual(1010, deleted!.value)
     var identity2 = s._rawIdentifier()
-    expectNotEqual(identity1, identity2)
-    expectTrue(isNativeSet(s))
+    expectEqual(identity1, identity2)
     expectEqual(2, s.count)
 
     expectFalse(s.contains(TestObjCKeyTy(1010)))
@@ -1693,22 +1604,16 @@ SetTestSuite.test("BridgedFromObjC.Verbatim.Remove") {
     var identity1 = s1._rawIdentifier()
 
     var s2 = s1
-    expectTrue(isCocoaSet(s1))
-    expectTrue(isCocoaSet(s2))
-
+        
     var deleted: AnyObject? = s2.remove(TestObjCKeyTy(0))
     expectNil(deleted)
     expectEqual(identity1, s1._rawIdentifier())
     expectEqual(identity1, s2._rawIdentifier())
-    expectTrue(isCocoaSet(s1))
-    expectTrue(isCocoaSet(s2))
-
+        
     deleted = s2.remove(TestObjCKeyTy(1010))
     expectEqual(1010, deleted!.value)
     var identity2 = s2._rawIdentifier()
     expectNotEqual(identity1, identity2)
-    expectTrue(isCocoaSet(s1))
-    expectTrue(isNativeSet(s2))
     expectEqual(2, s2.count)
 
     expectTrue(s1.contains(TestObjCKeyTy(1010)))
@@ -1728,22 +1633,19 @@ SetTestSuite.test("BridgedFromObjC.Nonverbatim.Remove") {
   do {
     var s = getBridgedNonverbatimSet()
     var identity1 = s._rawIdentifier()
-    expectTrue(isNativeSet(s))
-
+    
     // Trying to remove something not in the set should
     // leave it completely unchanged.
     var deleted = s.remove(TestBridgedKeyTy(0))
     expectNil(deleted)
     expectEqual(identity1, s._rawIdentifier())
-    expectTrue(isNativeSet(s))
-
+    
     // Now remove an item that is in the set. This should
     // not create a new set altogether, however.
     deleted = s.remove(TestBridgedKeyTy(1010))
     expectEqual(1010, deleted!.value)
     var identity2 = s._rawIdentifier()
     expectEqual(identity1, identity2)
-    expectTrue(isNativeSet(s))
     expectEqual(2, s.count)
 
     // Double-check - the removed member should not be found.
@@ -1762,22 +1664,16 @@ SetTestSuite.test("BridgedFromObjC.Nonverbatim.Remove") {
     let identity1 = s1._rawIdentifier()
 
     var s2 = s1
-    expectTrue(isNativeSet(s1))
-    expectTrue(isNativeSet(s2))
-
+        
     var deleted = s2.remove(TestBridgedKeyTy(0))
     expectNil(deleted)
     expectEqual(identity1, s1._rawIdentifier())
     expectEqual(identity1, s2._rawIdentifier())
-    expectTrue(isNativeSet(s1))
-    expectTrue(isNativeSet(s2))
-
+        
     deleted = s2.remove(TestBridgedKeyTy(1010))
     expectEqual(1010, deleted!.value)
     let identity2 = s2._rawIdentifier()
     expectNotEqual(identity1, identity2)
-    expectTrue(isNativeSet(s1))
-    expectTrue(isNativeSet(s2))
     expectEqual(2, s2.count)
 
     expectTrue(s1.contains(TestBridgedKeyTy(1010)))
@@ -1796,7 +1692,6 @@ SetTestSuite.test("BridgedFromObjC.Verbatim.RemoveAll") {
   do {
     var s = getBridgedVerbatimSet([])
     var identity1 = s._rawIdentifier()
-    expectTrue(isCocoaSet(s))
     expectEqual(0, s.count)
 
     s.removeAll()
@@ -1807,7 +1702,6 @@ SetTestSuite.test("BridgedFromObjC.Verbatim.RemoveAll") {
   do {
     var s = getBridgedVerbatimSet()
     var identity1 = s._rawIdentifier()
-    expectTrue(isCocoaSet(s))
     expectEqual(3, s.count)
     expectTrue(s.contains(TestBridgedKeyTy(1010) as NSObject))
 
@@ -1819,7 +1713,6 @@ SetTestSuite.test("BridgedFromObjC.Verbatim.RemoveAll") {
   do {
     var s1 = getBridgedVerbatimSet()
     var identity1 = s1._rawIdentifier()
-    expectTrue(isCocoaSet(s1))
     expectEqual(3, s1.count)
     expectTrue(s1.contains(TestBridgedKeyTy(1010) as NSObject))
 
@@ -1837,7 +1730,6 @@ SetTestSuite.test("BridgedFromObjC.Verbatim.RemoveAll") {
   do {
     var s1 = getBridgedVerbatimSet()
     var identity1 = s1._rawIdentifier()
-    expectTrue(isCocoaSet(s1))
     expectEqual(3, s1.count)
     expectTrue(s1.contains(TestBridgedKeyTy(1010) as NSObject))
 
@@ -1857,7 +1749,6 @@ SetTestSuite.test("BridgedFromObjC.Nonverbatim.RemoveAll") {
   do {
     var s = getBridgedNonverbatimSet([])
     var identity1 = s._rawIdentifier()
-    expectTrue(isNativeSet(s))
     expectEqual(0, s.count)
 
     s.removeAll()
@@ -1868,7 +1759,6 @@ SetTestSuite.test("BridgedFromObjC.Nonverbatim.RemoveAll") {
   do {
     var s = getBridgedNonverbatimSet()
     var identity1 = s._rawIdentifier()
-    expectTrue(isNativeSet(s))
     expectEqual(3, s.count)
     expectTrue(s.contains(TestBridgedKeyTy(1010)))
 
@@ -1880,7 +1770,6 @@ SetTestSuite.test("BridgedFromObjC.Nonverbatim.RemoveAll") {
   do {
     var s1 = getBridgedNonverbatimSet()
     var identity1 = s1._rawIdentifier()
-    expectTrue(isNativeSet(s1))
     expectEqual(3, s1.count)
     expectTrue(s1.contains(TestBridgedKeyTy(1010)))
 
@@ -1898,7 +1787,6 @@ SetTestSuite.test("BridgedFromObjC.Nonverbatim.RemoveAll") {
   do {
     var s1 = getBridgedNonverbatimSet()
     var identity1 = s1._rawIdentifier()
-    expectTrue(isNativeSet(s1))
     expectEqual(3, s1.count)
     expectTrue(s1.contains(TestBridgedKeyTy(1010)))
 
@@ -1917,8 +1805,7 @@ SetTestSuite.test("BridgedFromObjC.Nonverbatim.RemoveAll") {
 SetTestSuite.test("BridgedFromObjC.Verbatim.Count") {
   var s = getBridgedVerbatimSet()
   var identity1 = s._rawIdentifier()
-  expectTrue(isCocoaSet(s))
-
+  
   expectEqual(3, s.count)
   expectEqual(identity1, s._rawIdentifier())
 }
@@ -1926,8 +1813,7 @@ SetTestSuite.test("BridgedFromObjC.Verbatim.Count") {
 SetTestSuite.test("BridgedFromObjC.Nonverbatim.Count") {
   var s = getBridgedNonverbatimSet()
   var identity1 = s._rawIdentifier()
-  expectTrue(isNativeSet(s))
-
+  
   expectEqual(3, s.count)
   expectEqual(identity1, s._rawIdentifier())
 }
@@ -1935,8 +1821,7 @@ SetTestSuite.test("BridgedFromObjC.Nonverbatim.Count") {
 SetTestSuite.test("BridgedFromObjC.Verbatim.Generate") {
   var s = getBridgedVerbatimSet()
   var identity1 = s._rawIdentifier()
-  expectTrue(isCocoaSet(s))
-
+  
   var iter = s.makeIterator()
   var members: [Int] = []
   while let member = iter.next() {
@@ -1954,8 +1839,7 @@ SetTestSuite.test("BridgedFromObjC.Verbatim.Generate") {
 SetTestSuite.test("BridgedFromObjC.Nonverbatim.Generate") {
   var s = getBridgedNonverbatimSet()
   var identity1 = s._rawIdentifier()
-  expectTrue(isNativeSet(s))
-
+  
   var iter = s.makeIterator()
   var members: [Int] = []
   while let member = iter.next() {
@@ -1973,8 +1857,7 @@ SetTestSuite.test("BridgedFromObjC.Nonverbatim.Generate") {
 SetTestSuite.test("BridgedFromObjC.Verbatim.Generate_Empty") {
   var s = getBridgedVerbatimSet([])
   var identity1 = s._rawIdentifier()
-  expectTrue(isCocoaSet(s))
-
+  
   var iter = s.makeIterator()
   expectNil(iter.next())
   // The following is not required by the IteratorProtocol protocol, but
@@ -1988,8 +1871,7 @@ SetTestSuite.test("BridgedFromObjC.Verbatim.Generate_Empty") {
 SetTestSuite.test("BridgedFromObjC.Nonverbatim.Generate_Empty") {
   var s = getBridgedNonverbatimSet([])
   var identity1 = s._rawIdentifier()
-  expectTrue(isNativeSet(s))
-
+  
   var iter = s.makeIterator()
   expectNil(iter.next())
   // The following is not required by the IteratorProtocol protocol, but
@@ -2003,8 +1885,7 @@ SetTestSuite.test("BridgedFromObjC.Nonverbatim.Generate_Empty") {
 SetTestSuite.test("BridgedFromObjC.Verbatim.Generate_Huge") {
   var s = getHugeBridgedVerbatimSet()
   var identity1 = s._rawIdentifier()
-  expectTrue(isCocoaSet(s))
-
+  
   var iter = s.makeIterator()
   var members = [Int]()
   while let member = iter.next() {
@@ -2022,8 +1903,7 @@ SetTestSuite.test("BridgedFromObjC.Verbatim.Generate_Huge") {
 SetTestSuite.test("BridgedFromObjC.Nonverbatim.Generate_Huge") {
   var s = getHugeBridgedNonverbatimSet()
   var identity1 = s._rawIdentifier()
-  expectTrue(isNativeSet(s))
-
+  
   var iter = s.makeIterator()
   var members = [Int]()
   while let member = iter.next() as AnyObject? {
@@ -2040,27 +1920,22 @@ SetTestSuite.test("BridgedFromObjC.Nonverbatim.Generate_Huge") {
 
 SetTestSuite.test("BridgedFromObjC.Verbatim.EqualityTest_Empty") {
   var s1 = getBridgedVerbatimSet([])
-  expectTrue(isCocoaSet(s1))
-
+  
   var s2 = getBridgedVerbatimSet([])
-  expectTrue(isCocoaSet(s2))
-
+  
   expectEqual(s1, s2)
 
   s2.insert(TestObjCKeyTy(4040))
-  expectTrue(isNativeSet(s2))
-
+  
   expectNotEqual(s1, s2)
 }
 
 SetTestSuite.test("BridgedFromObjC.Nonverbatim.EqualityTest_Empty") {
   var s1 = getBridgedNonverbatimSet([])
   var identity1 = s1._rawIdentifier()
-  expectTrue(isNativeSet(s1))
-
+  
   var s2 = getBridgedNonverbatimSet([])
   var identity2 = s2._rawIdentifier()
-  expectTrue(isNativeSet(s2))
   expectNotEqual(identity1, identity2)
 
   expectEqual(s1, s2)
@@ -2068,7 +1943,6 @@ SetTestSuite.test("BridgedFromObjC.Nonverbatim.EqualityTest_Empty") {
   expectEqual(identity2, s2._rawIdentifier())
 
   s2.insert(TestObjCKeyTy(4040) as TestBridgedKeyTy)
-  expectTrue(isNativeSet(s2))
   expectEqual(identity2, s2._rawIdentifier())
 
   expectNotEqual(s1, s2)
@@ -2079,11 +1953,9 @@ SetTestSuite.test("BridgedFromObjC.Nonverbatim.EqualityTest_Empty") {
 SetTestSuite.test("BridgedFromObjC.Verbatim.EqualityTest_Small") {
   var s1 = getBridgedVerbatimSet()
   let identity1 = s1._rawIdentifier()
-  expectTrue(isCocoaSet(s1))
-
+  
   var s2 = getBridgedVerbatimSet()
   let identity2 = s2._rawIdentifier()
-  expectTrue(isCocoaSet(s2))
   expectNotEqual(identity1, identity2)
 
   expectEqual(s1, s2)
@@ -2094,11 +1966,9 @@ SetTestSuite.test("BridgedFromObjC.Verbatim.EqualityTest_Small") {
 SetTestSuite.test("BridgedFromObjC.Nonverbatim.EqualityTest_Small") {
   var s1 = getBridgedNonverbatimSet()
   let identity1 = s1._rawIdentifier()
-  expectTrue(isNativeSet(s1))
-
+  
   var s2 = getBridgedNonverbatimSet()
   let identity2 = s2._rawIdentifier()
-  expectTrue(isNativeSet(s2))
   expectNotEqual(identity1, identity2)
 
   expectEqual(s1, s2)
@@ -3553,34 +3423,6 @@ func getMockSetWithCustomCount(count: Int)
 
 func callGenericIsEmpty<C : Collection>(_ collection: C) -> Bool {
   return collection.isEmpty
-}
-
-SetTestSuite.test("isEmpty/ImplementationIsCustomized") {
-  do {
-    var d = getMockSetWithCustomCount(count: 0)
-    MockSetWithCustomCount.timesCountWasCalled = 0
-    expectTrue(d.isEmpty)
-    expectEqual(1, MockSetWithCustomCount.timesCountWasCalled)
-  }
-  do {
-    var d = getMockSetWithCustomCount(count: 0)
-    MockSetWithCustomCount.timesCountWasCalled = 0
-    expectTrue(callGenericIsEmpty(d))
-    expectEqual(1, MockSetWithCustomCount.timesCountWasCalled)
-  }
-
-  do {
-    var d = getMockSetWithCustomCount(count: 4)
-    MockSetWithCustomCount.timesCountWasCalled = 0
-    expectFalse(d.isEmpty)
-    expectEqual(1, MockSetWithCustomCount.timesCountWasCalled)
-  }
-  do {
-    var d = getMockSetWithCustomCount(count: 4)
-    MockSetWithCustomCount.timesCountWasCalled = 0
-    expectFalse(callGenericIsEmpty(d))
-    expectEqual(1, MockSetWithCustomCount.timesCountWasCalled)
-  }
 }
 #endif // _runtime(_ObjC)
 

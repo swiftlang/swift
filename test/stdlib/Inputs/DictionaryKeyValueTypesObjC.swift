@@ -18,21 +18,6 @@ public func convertNSDictionaryToDictionary<
   return result!
 }
 
-func isNativeDictionary<KeyTy : Hashable, ValueTy>(
-  _ d: Dictionary<KeyTy, ValueTy>) -> Bool {
-  switch d._variantBuffer {
-  case .native:
-    return true
-  case .cocoa:
-    return false
-  }
-}
-
-func isCocoaDictionary<KeyTy : Hashable, ValueTy>(
-  _ d: Dictionary<KeyTy, ValueTy>) -> Bool {
-  return !isNativeDictionary(d)
-}
-
 func isNativeNSDictionary(_ d: NSDictionary) -> Bool {
   let className: NSString = NSStringFromClass(type(of: d)) as NSString
   return ["_SwiftDeferredNSDictionary", "NativeDictionaryStorage"].contains {
