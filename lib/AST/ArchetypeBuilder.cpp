@@ -1517,9 +1517,6 @@ void ArchetypeBuilder::addRequirement(const Requirement &req,
   case RequirementKind::SameType:
     addSameTypeRequirement(req.getFirstType(), req.getSecondType(), source);
     return;
-    
-  case RequirementKind::WitnessMarker:
-    return;
   }
 
   llvm_unreachable("Unhandled requirement?");
@@ -1569,9 +1566,6 @@ public:
     RequirementSource source(RequirementSource::Inferred, Loc);
     for (const auto &req : genericSig->getRequirements()) {
       switch (req.getKind()) {
-      case RequirementKind::WitnessMarker:
-        break;
-
       case RequirementKind::SameType: {
         auto firstType = req.getFirstType().subst(
                            &Builder.getModule(),
@@ -1891,10 +1885,6 @@ void ArchetypeBuilder::enumerateRequirements(llvm::function_ref<
       continue;
     }
 
-    // Add the witness marker.
-    f(RequirementKind::WitnessMarker, archetype, Type(),
-      RequirementSource(RequirementSource::Explicit, SourceLoc()));
-
     // If we have a superclass, produce a superclass requirement
     if (Type superclass = archetype->getSuperclass()) {
       f(RequirementKind::Superclass, archetype, superclass,
@@ -1956,10 +1946,6 @@ void ArchetypeBuilder::dump(llvm::raw_ostream &out) {
       out << " [";
       source.dump(out, &Context.SourceMgr);
       out << "]";
-      break;
-
-    case RequirementKind::WitnessMarker:
-      out << "\n  " << archetype->getDebugName() << " witness marker";
       break;
     }
   });
@@ -2046,15 +2032,6 @@ Type ArchetypeBuilder::substDependentType(Type type) {
 static void collectRequirements(ArchetypeBuilder &builder,
                                 ArrayRef<GenericTypeParamType *> params,
                                 SmallVectorImpl<Requirement> &requirements) {
-  // Don't emit WitnessMarker requirements for secondary types with
-  // no requirements.
-  auto dropRedundantWitnessMarker = [&]() {
-    if (!requirements.empty() &&
-        requirements.back().getKind() == RequirementKind::WitnessMarker &&
-        !requirements.back().getFirstType()->is<GenericTypeParamType>())
-      requirements.pop_back();
-  };
-
   builder.enumerateRequirements([&](RequirementKind kind,
           ArchetypeBuilder::PotentialArchetype *archetype,
           llvm::PointerUnion<Type, ArchetypeBuilder::PotentialArchetype *> type,
@@ -2078,12 +2055,6 @@ static void collectRequirements(ArchetypeBuilder &builder,
     if (depTy->hasError())
       return;
 
-    if (kind == RequirementKind::WitnessMarker) {
-      dropRedundantWitnessMarker();
-      requirements.push_back(Requirement(kind, depTy, Type()));
-      return;
-    }
-
     Type repTy;
     if (auto concreteTy = type.dyn_cast<Type>()) {
       // Maybe we were equated to a concrete type...
@@ -2099,8 +2070,6 @@ static void collectRequirements(ArchetypeBuilder &builder,
 
     requirements.push_back(Requirement(kind, depTy, repTy));
   });
-
-  dropRedundantWitnessMarker();
 }
 
 GenericSignature *ArchetypeBuilder::getGenericSignature() {

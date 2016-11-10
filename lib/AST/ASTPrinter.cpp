@@ -233,8 +233,6 @@ struct SynthesizedExtensionAnalyzer::Implementation {
     assert(Ext->getGenericSignature() && "No generic signature.");
     for (auto Req : Ext->getGenericSignature()->getRequirements()) {
       auto Kind = Req.getKind();
-      if (Kind == RequirementKind::WitnessMarker)
-        continue;
 
       Type First = Req.getFirstType().subst(
           M, subMap, SubstOptions());
@@ -251,9 +249,6 @@ struct SynthesizedExtensionAnalyzer::Implementation {
       Second = Second->getCanonicalType();
 
       switch (Kind) {
-        case RequirementKind::WitnessMarker:
-          break;
-
         case RequirementKind::Conformance:
         case RequirementKind::Superclass:
           if (!canPossiblyConvertTo(First, Second, *DC))
@@ -1208,7 +1203,6 @@ static unsigned getDepthOfRequirement(const Requirement &req) {
   switch (req.getKind()) {
   case RequirementKind::Conformance:
   case RequirementKind::Superclass:
-  case RequirementKind::WitnessMarker:
     return getDepthOfType(req.getFirstType());
 
   case RequirementKind::SameType: {
@@ -1337,9 +1331,6 @@ void PrintAST::printSingleDepthOfGenericSignature(
     // Print the requirements.
     bool isFirstReq = true;
     for (const auto &req : requirements) {
-      if (req.getKind() == RequirementKind::WitnessMarker)
-        continue;
-
       auto first = req.getFirstType();
       auto second = req.getSecondType();
 
@@ -1387,9 +1378,6 @@ void PrintAST::printRequirement(const Requirement &req) {
   case RequirementKind::SameType:
     Printer << " == ";
     break;
-
-  case RequirementKind::WitnessMarker:
-    llvm_unreachable("Handled above");
   }
   printType(req.getSecondType());
 }
@@ -4119,9 +4107,6 @@ void GenericSignature::dump() const {
 
 void Requirement::dump() const {
   switch (getKind()) {
-  case RequirementKind::WitnessMarker:
-    llvm::errs() << "witness_marker: ";
-    break;
   case RequirementKind::Conformance:
     llvm::errs() << "conforms_to: ";
     break;

@@ -932,7 +932,6 @@ static uint8_t getRawStableRequirementKind(RequirementKind kind) {
   CASE(Conformance)
   CASE(Superclass)
   CASE(SameType)
-  CASE(WitnessMarker)
   }
 #undef CASE
 }

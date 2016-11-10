@@ -269,9 +269,6 @@ static void initDocGenericParams(const Decl *D, DocEntityInfo &Info) {
     proto = typeDC->getAsProtocolOrProtocolExtensionContext();
 
   for (auto &Req : GenericSig->getRequirements()) {
-    if (Req.getKind() == RequirementKind::WitnessMarker)
-      continue;
-
     // Skip protocol Self requirement.
     if (proto &&
         Req.getKind() == RequirementKind::Conformance &&

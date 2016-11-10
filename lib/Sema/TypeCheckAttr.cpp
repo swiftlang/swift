@@ -1453,16 +1453,12 @@ void AttributeChecker::visitSpecializeAttr(SpecializeAttr *attr) {
     // If we're on to a new dependent type, flush the conformances gathered
     // thus far.
     CanType canFirstType = req.getFirstType()->getCanonicalType();
-    if (req.getKind() != RequirementKind::WitnessMarker &&
-        canFirstType != currentType) {
+    if (canFirstType != currentType) {
       if (currentType) flushConformances();
       currentType = canFirstType;
     }
 
     switch (req.getKind()) {
-    case RequirementKind::WitnessMarker:
-      break;
-
     case RequirementKind::Conformance: {
       // Get the conformance and record it.
       auto firstType = req.getFirstType().subst(subMap);

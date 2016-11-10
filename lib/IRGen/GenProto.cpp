@@ -212,7 +212,6 @@ void PolymorphicConvention::enumerateRequirements(const RequirementCallback &cal
       // Ignore these; they don't introduce extra requirements.
       case RequirementKind::Superclass:
       case RequirementKind::SameType:
-      case RequirementKind::WitnessMarker:
         continue;
 
       case RequirementKind::Conformance: {

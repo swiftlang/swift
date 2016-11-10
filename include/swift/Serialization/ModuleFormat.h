@@ -54,7 +54,7 @@ const uint16_t VERSION_MAJOR = 0;
 /// in source control, you should also update the comment to briefly
 /// describe what change you made. The content of this comment isn't important;
 /// it just ensures a conflict if two people change the module format.
-const uint16_t VERSION_MINOR = 282; // Last change: @_inlineable
+const uint16_t VERSION_MINOR = 283; // Last change: witness markers removed
 
 using DeclID = PointerEmbeddedInt<unsigned, 31>;
 using DeclIDField = BCFixed<31>;
@@ -236,9 +236,8 @@ static inline OperatorKind getStableFixity(DeclKind kind) {
 // VERSION_MAJOR.
 enum GenericRequirementKind : uint8_t {
   Conformance = 0,
-  SameType,
-  WitnessMarker,
-  Superclass
+  SameType    = 1,
+  Superclass  = 2,
 };
 using GenericRequirementKindField = BCFixed<2>;
 

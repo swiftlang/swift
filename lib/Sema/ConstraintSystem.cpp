@@ -965,9 +965,6 @@ void ConstraintSystem::openGeneric(
       addConstraint(ConstraintKind::Bind, firstTy, secondTy, locatorPtr);
       break;
     }
-
-    case RequirementKind::WitnessMarker:
-      break;
   }
   }
 }

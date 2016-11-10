@@ -3119,8 +3119,6 @@ bool swift::isExtensionApplied(DeclContext &DC, Type BaseTy,
       case RequirementKind::SameType:
         createMemberConstraint(Req, ConstraintKind::Equal);
         break;
-      case RequirementKind::WitnessMarker:
-        break;
     }
   }
   if (Failed)
