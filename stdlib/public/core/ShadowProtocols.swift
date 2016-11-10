@@ -127,7 +127,10 @@ public protocol _NSDictionary : _NSDictionaryCore {
   // importer.
   func getObjects(_ objects: UnsafeMutablePointer<AnyObject>?,
       andKeys keys: UnsafeMutablePointer<AnyObject>?)
-    }
+
+  func enumerateKeysAndObjectsUsingBlock(
+      _ block: @convention(block) (AnyObject, AnyObject, UnsafeMutablePointer<UInt8>) -> ())
+}
 
 /// A shadow for the "core operations" of NSSet.
 ///
@@ -169,6 +172,8 @@ public protocol _NSSetCore :
 /// supplies.
 @unsafe_no_objc_tagged_pointer @objc
 public protocol _NSSet : _NSSetCore {
+  func enumerateObjectsUsingBlock(
+      _ block: @convention(block) (AnyObject, UnsafeMutablePointer<UInt8>) -> ())
 }
 
 /// A shadow for the API of NSNumber we will use in the core

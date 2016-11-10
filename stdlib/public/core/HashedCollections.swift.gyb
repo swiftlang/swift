@@ -398,8 +398,10 @@ public struct Set<Element : Hashable> :
     _sanityCheck(_isBridgedVerbatimToObjectiveC(Element.self),
       "Set can be backed by NSSet _variantBuffer only when the member type can be bridged verbatim to Objective-C")
     
-    // TODO: rewrite this
-    self.init()
+    _buffer = _NativeBuffer(minimumCapacity: _immutableCocoaSet.count)
+    _immutableCocoaSet.enumerateObjectsUsingBlock { (key, stop) in
+      insert(_forceBridgeFromObjectiveC(key, Element.self))
+    }
   }
 #endif
 
@@ -1204,19 +1206,12 @@ public func _setDownCastIndirect<SourceValue, TargetValue>(
 ///   are reference types.
 public func _setDownCast<BaseValue, DerivedValue>(_ source: Set<BaseValue>)
   -> Set<DerivedValue> {
-/* TODO: check out what this did
 #if _runtime(_ObjC)
   if _isClassOrObjCExistential(BaseValue.self)
   && _isClassOrObjCExistential(DerivedValue.self) {
-    switch source._variantBuffer {
-    case _VariantSetBuffer.native(let buffer):
-      return Set(_immutableCocoaSet: buffer.bridged())
-    case _VariantSetBuffer.cocoa(let cocoaBuffer):
-      return Set(_immutableCocoaSet: cocoaBuffer.cocoaSet)
-    }
+    return Set(_immutableCocoaSet: source._bridgeToObjectiveCImpl())
   }
 #endif
-*/
   return _setDownCastConditional(source)!
 }
 
@@ -1537,15 +1532,18 @@ public struct Dictionary<Key : Hashable, Value> :
   /// * `Key` and `Value` are bridged verbatim to Objective-C (i.e.,
   ///   are reference types).
   public init(_immutableCocoaDictionary: _NSDictionary) {
-    /* TODO: replace this
     _sanityCheck(
       _isBridgedVerbatimToObjectiveC(Key.self) &&
       _isBridgedVerbatimToObjectiveC(Value.self),
       "Dictionary can be backed by NSDictionary buffer only when both key and value are bridged verbatim to Objective-C")
-    _buffer = .cocoa(
-      _CocoaDictionaryBuffer(cocoaDictionary: _immutableCocoaDictionary))
-    */
-    self.init()
+    
+    _buffer = _NativeBuffer(minimumCapacity: _immutableCocoaDictionary.count)
+    _immutableCocoaDictionary.enumerateKeysAndObjectsUsingBlock { 
+      (key, value, stop) in
+      let _ = _buffer.insert(
+          _forceBridgeFromObjectiveC(value, Value.self),
+          forKey: _forceBridgeFromObjectiveC(key, Key.self))
+    }
   }
 #endif
 
@@ -2106,24 +2104,17 @@ public func _dictionaryDownCast<BaseKey, BaseValue, DerivedKey, DerivedValue>(
   _ source: Dictionary<BaseKey, BaseValue>
 ) -> Dictionary<DerivedKey, DerivedValue> {
 
-/* TODO: figure out what this did
 #if _runtime(_ObjC)
   if _isClassOrObjCExistential(BaseKey.self)
   && _isClassOrObjCExistential(BaseValue.self)
   && _isClassOrObjCExistential(DerivedKey.self)
   && _isClassOrObjCExistential(DerivedValue.self) {
-
-    switch source._variantBuffer {
-    case .native(let buffer):
-      // Note: it is safe to treat the buffer as immutable here because
-      // Dictionary will not mutate buffer with reference count greater than 1.
-      return Dictionary(_immutableCocoaDictionary: buffer.bridged())
-    case .cocoa(let cocoaBuffer):
-      return Dictionary(_immutableCocoaDictionary: cocoaBuffer.cocoaDictionary)
-    }
+    // Note: it is safe to treat the buffer as immutable here because
+    // Dictionary will not mutate buffer with reference count greater than 1.
+    return Dictionary(
+        _immutableCocoaDictionary: source._bridgeToObjectiveCImpl())
   }
 #endif
-*/
   return _dictionaryDownCastConditional(source)!
 }
 
@@ -4031,7 +4022,7 @@ extension ${Self} {
 
 #if _runtime(_ObjC)
 extension ${Self} {
-  public func _bridgeToObjectiveCImpl() -> _NS${Self}Core {
+  public func _bridgeToObjectiveCImpl() -> _NS${Self} {
     return _buffer.bridged()
   }
 
