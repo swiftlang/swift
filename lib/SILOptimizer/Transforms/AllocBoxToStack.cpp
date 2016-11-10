@@ -538,8 +538,10 @@ PromotedParamCloner::initCloned(SILFunction *Orig, IsFragile_t Fragile,
   unsigned Index = OrigFTI->getNumIndirectResults();
   for (auto &param : OrigFTI->getParameters()) {
     if (count(PromotedParamIndices, Index)) {
-      auto paramTy = param.getType()->castTo<SILBoxType>()
-        ->getBoxedAddressType();
+      auto boxTy = param.getType()->castTo<SILBoxType>();
+      assert(boxTy->getLayout()->getFields().size() == 1
+             && "promoting compound box not implemented");
+      auto paramTy = boxTy->getFieldType(0);
       auto promotedParam = SILParameterInfo(paramTy.getSwiftRValueType(),
                                   ParameterConvention::Indirect_InoutAliasable);
       ClonedInterfaceArgTys.push_back(promotedParam);
@@ -594,8 +596,10 @@ PromotedParamCloner::populateCloned() {
   while (I != E) {
     if (count(PromotedParamIndices, ArgNo)) {
       // Create a new argument with the promoted type.
-      auto promotedTy = (*I)->getType().castTo<SILBoxType>()
-        ->getBoxedAddressType();
+      auto boxTy = (*I)->getType().castTo<SILBoxType>();
+      assert(boxTy->getLayout()->getFields().size() == 1
+             && "promoting multi-field boxes not implemented yet");
+      auto promotedTy = boxTy->getFieldType(0);
       auto *promotedArg =
           ClonedEntryBB->createArgument(promotedTy, (*I)->getDecl());
       PromotedParameters.insert(*I);
