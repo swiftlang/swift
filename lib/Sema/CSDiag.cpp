@@ -4681,6 +4681,7 @@ static bool diagnoseSingleCandidateFailures(CalleeCandidateInfo &CCI,
   // attempt to use matchCallArguments to diagnose the problem.
   class ArgumentDiagnostic : public MatchCallArgumentListener {
     TypeChecker &TC;
+    Expr *FnExpr;
     Expr *ArgExpr;
     llvm::SmallVectorImpl<CallArgParam> &Parameters;
     llvm::SmallVectorImpl<CallArgParam> &Arguments;
@@ -4696,11 +4697,13 @@ static bool diagnoseSingleCandidateFailures(CalleeCandidateInfo &CCI,
     SmallVector<ParamBinding, 4> Bindings;
 
   public:
-    ArgumentDiagnostic(Expr *argExpr,
+    ArgumentDiagnostic(Expr *fnExpr,
+                       Expr *argExpr,
                        llvm::SmallVectorImpl<CallArgParam> &params,
                        llvm::SmallVectorImpl<CallArgParam> &args,
                        CalleeCandidateInfo &CCI, bool isSubscript)
-        : TC(CCI.CS->TC), ArgExpr(argExpr), Parameters(params), Arguments(args),
+        : TC(CCI.CS->TC), FnExpr(fnExpr), ArgExpr(argExpr),
+          Parameters(params), Arguments(args),
           CandidateInfo(CCI), IsSubscript(isSubscript) {}
 
     void extraArgument(unsigned extraArgIdx) override {
@@ -4730,13 +4733,115 @@ static bool diagnoseSingleCandidateFailures(CalleeCandidateInfo &CCI,
     }
 
     void missingArgument(unsigned missingParamIdx) override {
-      Identifier name = Parameters[missingParamIdx].Label;
-      auto loc = ArgExpr->getStartLoc();
+      auto &param = Parameters[missingParamIdx];
+      Identifier name = param.Label;
+
+      // Search insertion index.
+      unsigned argIdx = 0;
+      for (int Idx = missingParamIdx - 1; Idx >= 0; --Idx) {
+        if (Bindings[Idx].empty()) continue;
+        argIdx = Bindings[Idx].back() + 1;
+        break;
+      }
+
+      unsigned insertableEndIdx = Arguments.size();
+      if (CandidateInfo.hasTrailingClosure)
+        insertableEndIdx -= 1;
+
+      // Build argument string for fix-it.
+      SmallString<32> insertBuf;
+      llvm::raw_svector_ostream insertText(insertBuf);
+
+      if (argIdx != 0)
+        insertText << ", ";
+      if (!name.empty())
+        insertText << name.str() << ": ";
+      Type Ty = param.Ty;
+      // Explode inout type.
+      if (auto IOT = param.Ty->getAs<InOutType>()) {
+        insertText << "&";
+        Ty = IOT->getObjectType();
+      }
+      // @autoclosure; the type should be the result type.
+      if (auto FT = param.Ty->getAs<AnyFunctionType>())
+        if (FT->isAutoClosure())
+          Ty = FT->getResult();
+      insertText << "<#T##" << Ty << "#>";
+      if (argIdx == 0 && insertableEndIdx != 0)
+        insertText << ", ";
+
+      SourceLoc insertLoc;
+      if (argIdx > insertableEndIdx) {
+        // Unreachable for now.
+        // FIXME: matchCallArguments() doesn't detect "missing argument after
+        // trailing closure". E.g.
+        //   func fn(x: Int, y: () -> Int, z: Int) { ... }
+        //   fn(x: 1) { return 1 }
+        // is diagnosed as "missing argument for 'y'" (missingParamIdx 1).
+        // It should be "missing argument for 'z'" (missingParamIdx 2).
+      } else if (auto *TE = dyn_cast<TupleExpr>(ArgExpr)) {
+        // fn():
+        //   fn([argMissing])
+        // fn(argX, argY):
+        //   fn([argMissing, ]argX, argY)
+        //   fn(argX[, argMissing], argY)
+        //   fn(argX, argY[, argMissing])
+        // fn(argX) { closure }:
+        //   fn([argMissing, ]argX) { closure }
+        //   fn(argX[, argMissing]) { closure }
+        //   fn(argX[, closureLabel: ]{closure}[, argMissing)] // Not impl.
+        if (insertableEndIdx == 0)
+          insertLoc = TE->getRParenLoc();
+        else if (argIdx != 0)
+          insertLoc = Lexer::getLocForEndOfToken(
+              TC.Context.SourceMgr, TE->getElement(argIdx - 1)->getEndLoc());
+        else {
+          insertLoc = TE->getElementNameLoc(0);
+          if (insertLoc.isInvalid())
+            insertLoc = TE->getElement(0)->getStartLoc();
+        }
+      } else if (auto *PE = dyn_cast<ParenExpr>(ArgExpr)) {
+        assert(argIdx <= 1);
+        if (PE->getRParenLoc().isValid()) {
+          // fn(argX):
+          //   fn([argMissing, ]argX)
+          //   fn(argX[, argMissing])
+          // fn() { closure }:
+          //   fn([argMissing]) {closure}
+          //   fn([closureLabel: ]{closure}[, argMissing]) // Not impl.
+          if (insertableEndIdx == 0)
+            insertLoc = PE->getRParenLoc();
+          else if (argIdx == 0)
+            insertLoc = PE->getSubExpr()->getStartLoc();
+          else
+            insertLoc = Lexer::getLocForEndOfToken(
+                TC.Context.SourceMgr, PE->getSubExpr()->getEndLoc());
+        } else {
+          // fn { closure }:
+          //   fn[(argMissing)] { closure }
+          //   fn[(closureLabel:] { closure }[, missingArg)]  // Not impl.
+          assert(!IsSubscript && "bracket less subscript");
+          assert(PE->hasTrailingClosure() &&
+                 "paren less ParenExpr without trailing closure");
+          insertBuf.insert(insertBuf.begin(), '(');
+          insertBuf.insert(insertBuf.end(), ')');
+          insertLoc = Lexer::getLocForEndOfToken(
+              TC.Context.SourceMgr, FnExpr->getEndLoc());
+        }
+      } else {
+        llvm_unreachable("unexpected argument expression type");
+        // Can't be TupleShuffleExpr because this argExpr is not yet resolved.
+      }
+
+      assert(insertLoc.isValid() && "missing argument after trailing closure?");
+
       if (name.empty())
-        TC.diagnose(loc, diag::missing_argument_positional,
-                    missingParamIdx + 1);
+        TC.diagnose(insertLoc, diag::missing_argument_positional,
+                    missingParamIdx + 1)
+          .fixItInsert(insertLoc, insertText.str());
       else
-        TC.diagnose(loc, diag::missing_argument_named, name);
+        TC.diagnose(insertLoc, diag::missing_argument_named, name)
+          .fixItInsert(insertLoc, insertText.str());
 
       auto candidate = CandidateInfo[0];
       if (candidate.getDecl())
@@ -4827,7 +4932,7 @@ static bool diagnoseSingleCandidateFailures(CalleeCandidateInfo &CCI,
     }
   };
 
-  return ArgumentDiagnostic(argExpr, params, args, CCI,
+  return ArgumentDiagnostic(fnExpr, argExpr, params, args, CCI,
                             isa<SubscriptExpr>(fnExpr))
       .diagnose();
 }
