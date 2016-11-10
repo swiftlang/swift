@@ -333,6 +333,7 @@ public:
   bool isAnnotatedAs(NodeAnnotation Anno) const;
   void addChild(NodeUniquePtr Child);
   ArrayRef<NodeUniquePtr> getChildren() const;
+  bool hasSameChildren(const SDKNode &Other) const;
   void collectChildren(NodeVector &Bucket) const;
   unsigned getChildIndex(NodePtr Child) const;
   const SDKNode* getOnlyChild() const;
@@ -880,6 +881,16 @@ NodeUniquePtr SDKNode::constructSDKNode(llvm::yaml::MappingNode *Node) {
   return Result;
 }
 
+bool SDKNode::hasSameChildren(const SDKNode &Other) const {
+  if(Children.size() != Other.Children.size())
+    return false;
+  for (unsigned I = 0; I < Children.size(); ++ I) {
+    if (*Children[I] != *Other.Children[I])
+      return false;
+  }
+  return true;
+}
+
 bool SDKNode::operator==(const SDKNode &Other) const {
   auto *LeftAlias = dyn_cast<SDKNodeTypeNameAlias>(this);
   auto *RightAlias = dyn_cast<SDKNodeTypeNameAlias>(&Other);
@@ -895,12 +906,17 @@ bool SDKNode::operator==(const SDKNode &Other) const {
 
   switch(getKind()) {
     case SDKNodeKind::TypeNameAlias:
+      llvm_unreachable("Should be handled above.");
     case SDKNodeKind::TypeNominal:
     case SDKNodeKind::TypeFunc: {
       auto Left = this->getAs<SDKNodeType>();
       auto Right = (&Other)->getAs<SDKNodeType>();
-      return Left->getTypeAttributes().equals(Right->getTypeAttributes())
-        && Left->getPrintedName() == Right->getPrintedName();
+      if (!Left->getTypeAttributes().equals(Right->getTypeAttributes()))
+        return false;
+      if (Left->getPrintedName() == Right->getPrintedName())
+        return true;
+      return Left->getName() == Right->getName() &&
+        Left->hasSameChildren(*Right);
     }
 
     case SDKNodeKind::Function:
@@ -928,15 +944,8 @@ bool SDKNode::operator==(const SDKNode &Other) const {
     }
     case SDKNodeKind::Root:
     case SDKNodeKind::Nil: {
-      if (getPrintedName() == Other.getPrintedName() &&
-          Children.size() == Other.Children.size()) {
-        for (unsigned I = 0; I < Children.size(); ++ I) {
-          if (*Children[I] != *Other.Children[I])
-            return false;
-        }
-        return true;
-      }
-      return false;
+      return getPrintedName() == Other.getPrintedName() &&
+        hasSameChildren(Other);
     }
   }
 }
