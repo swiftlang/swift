@@ -1,6 +1,11 @@
 // RUN: %target-parse-verify-swift
 // RUN: not %target-swift-frontend -parse -disable-typo-correction %s 2>&1 | %FileCheck %s -check-prefix=DISABLED
+// RUN: not %target-swift-frontend -parse -DIMPORT_FAIL %s 2>&1 | %FileCheck %s -check-prefix=DISABLED
 // DISABLED-NOT: did you mean
+
+#if IMPORT_FAIL
+import NoSuchModule
+#endif
 
 // This is close enough to get typo-correction.
 func test_short_and_close() {
