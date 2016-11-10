@@ -95,7 +95,7 @@ public struct ${Self}<
   Base : ${collectionForTraversal(Traversal)}, Element
 > : LazyCollectionProtocol, ${collectionForTraversal(Traversal)} {
 
-  // FIXME(compiler limitation): should be inferrable.
+  // FIXME(compiler limitation): should be inferable.
   public typealias Index = Base.Index
 
   public var startIndex: Base.Index { return _base.startIndex }

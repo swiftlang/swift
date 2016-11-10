@@ -445,7 +445,7 @@ class Foo<T> {
     // CHECK:   [[THIS_Z:%.*]] = ref_element_addr [[THIS]] : {{.*}}, #Foo.z
     // CHECK:   copy_addr [take] {{.*}} to [[THIS_Z]]
 
-    // -- Then initialize #Foo.x using the earlier stored vlaue of CHI to THIS_Z.
+    // -- Then initialize #Foo.x using the earlier stored value of CHI to THIS_Z.
     x = chi
     // CHECK:   [[THIS_X:%[0-9]+]] = ref_element_addr [[THIS]] : {{.*}}, #Foo.x
     // CHECK:   copy_addr [[PCHI]] to [[THIS_X]]

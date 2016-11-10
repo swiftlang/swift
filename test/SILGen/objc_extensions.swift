@@ -75,7 +75,7 @@ extension Sub {
     // CHECK:    destroy_value [[SELF_COPY]]
     // CHECK:    [[DIDSET_NOTIFIER:%.*]] = function_ref @_TFC15objc_extensions3SubW4propGSQSS_ : $@convention(method) (@owned Optional<String>, @guaranteed Sub) -> ()
     // CHECK:    [[COPIED_OLD_NSSTRING_BRIDGED_CAST:%.*]] = copy_value [[OLD_NSSTRING_BRIDGED_CAST]]
-    // This is an identity cast that should be elimianted by SILGen peepholes.
+    // This is an identity cast that should be eliminated by SILGen peepholes.
     // CHECK:    [[COPIED_OLD_NSSTRING_BRIDGED_CAST2:%.*]] = unchecked_bitwise_cast [[COPIED_OLD_NSSTRING_BRIDGED_CAST]]
     // CHECK:    apply [[DIDSET_NOTIFIER]]([[COPIED_OLD_NSSTRING_BRIDGED_CAST2]], [[SELF]])
     // CHECK:    destroy_value [[OLD_NSSTRING_BRIDGED_CAST]]

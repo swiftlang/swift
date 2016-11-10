@@ -315,7 +315,7 @@ public:
   bool operator!=(const SDKNode &Other) const { return !((*this) == Other); }
 
   ArrayRef<NodeAnnotation>
-    getAnnotations(std::vector<NodeAnnotation> &Scrach) const;
+    getAnnotations(std::vector<NodeAnnotation> &Scratch) const;
   bool isLeaf() const { return Children.empty(); }
   SDKNodeKind getKind() const { return SDKNodeKind(TheKind); }
   StringRef getName() const { return Name; }
