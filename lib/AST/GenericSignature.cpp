@@ -158,16 +158,6 @@ bool GenericSignature::enumeratePairedRequirements(
   ArrayRef<Requirement> reqs = getRequirements();
   unsigned curReqIdx = 0, numReqs = reqs.size();
 
-  /// Local function to skip over witness marker requirements. Returns \c true
-  /// if we hit the end.
-  auto skipWitnessMarkers = [&] {
-    while (curReqIdx != numReqs &&
-           reqs[curReqIdx].getKind() == RequirementKind::WitnessMarker)
-      ++curReqIdx;
-
-    return curReqIdx == numReqs;
-  };
-
   // ... and walking through the list of generic parameters.
   ArrayRef<GenericTypeParamType *> genericParams = getGenericParams();
   unsigned curGenericParamIdx = 0, numGenericParams = genericParams.size();
@@ -217,7 +207,7 @@ bool GenericSignature::enumeratePairedRequirements(
   };
 
   // Walk over all of the requirements.
-  while (!skipWitnessMarkers()) {
+  while (curReqIdx != numReqs) {
     // "Catch up" by enumerating generic parameters up to this dependent type.
     CanType depTy = reqs[curReqIdx].getFirstType()->getCanonicalType();
     if (enumerateGenericParamsUpToDependentType(depTy)) return true;
@@ -234,7 +224,6 @@ bool GenericSignature::enumeratePairedRequirements(
           sawSameTypeConstraint = true;
 
         ++curReqIdx;
-        if (skipWitnessMarkers()) break;
       }
     };
 
@@ -249,7 +238,6 @@ bool GenericSignature::enumeratePairedRequirements(
            reqs[curReqIdx].getFirstType()->getCanonicalType() == depTy) {
       ++curReqIdx;
       endIdx = curReqIdx;
-      if (skipWitnessMarkers()) break;
     }
 
     // Skip any trailing non-conformance constraints.

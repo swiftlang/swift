@@ -1081,9 +1081,6 @@ RequirementEnvironment::RequirementEnvironment(
   RequirementSource source(RequirementSource::Explicit, SourceLoc());
   for (auto &reqReq : reqSig->getRequirements()) {
     switch (reqReq.getKind()) {
-    case RequirementKind::WitnessMarker:
-      break;
-
     case RequirementKind::Conformance: {
       // Substitute the constrained types.
       auto first = reqReq.getFirstType().subst(reqToSyntheticEnvMap);

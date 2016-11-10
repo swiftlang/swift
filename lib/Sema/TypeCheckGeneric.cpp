@@ -1006,9 +1006,6 @@ bool TypeChecker::checkGenericArguments(DeclContext *dc, SourceLoc loc,
         return true;
       }
       continue;
-      
-    case RequirementKind::WitnessMarker:
-      continue;
     }
   }
 

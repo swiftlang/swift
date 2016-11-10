@@ -3542,8 +3542,7 @@ void GenericSignature::Profile(llvm::FoldingSetNodeID &ID,
 
   for (auto &reqt : requirements) {
     ID.AddPointer(reqt.getFirstType().getPointer());
-    if (reqt.getKind() != RequirementKind::WitnessMarker)
-      ID.AddPointer(reqt.getSecondType().getPointer());
+    ID.AddPointer(reqt.getSecondType().getPointer());
     ID.AddInteger(unsigned(reqt.getKind()));
   }
 }
@@ -4056,8 +4055,7 @@ CanGenericSignature ASTContext::getSingleGenericParameterSignature() const {
     return theSig;
   
   auto param = GenericTypeParamType::get(0, 0, *this);
-  auto witnessReqt = Requirement(RequirementKind::WitnessMarker, param, Type());
-  auto sig = GenericSignature::get(param, witnessReqt);;
+  auto sig = GenericSignature::get(param, { });
   auto canonicalSig = CanGenericSignature(sig);
   Impl.SingleGenericParameterSignature = canonicalSig;
   return canonicalSig;
