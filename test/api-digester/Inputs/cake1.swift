@@ -3,6 +3,7 @@ public struct S1 {
   public func foo1() {}
   mutating public func foo2() {}
   public func foo3() {}
+  public func foo4() -> Void {}
 }
 
 public class C1 {

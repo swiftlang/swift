@@ -335,7 +335,7 @@ public:
   ArrayRef<NodeUniquePtr> getChildren() const;
   void collectChildren(NodeVector &Bucket) const;
   unsigned getChildIndex(NodePtr Child) const;
-  NodePtr getOnlyChild() const;
+  const SDKNode* getOnlyChild() const;
   template <typename T> const T *getAs() const;
   template <typename T> T *getAs();
 };
@@ -418,8 +418,13 @@ class SDKNodeTypeNameAlias : public SDKNodeType {
 public:
   SDKNodeTypeNameAlias(SDKNodeInitInfo Info) : SDKNodeType(Info,
                                                   SDKNodeKind::TypeNameAlias) {}
+  const SDKNodeType *getUnderlyingType() const;
   static bool classof(const SDKNode *N);
 };
+
+const SDKNodeType *SDKNodeTypeNameAlias::getUnderlyingType() const {
+  return getOnlyChild()->getAs<SDKNodeType>();
+}
 
 template <typename T> const T *
 SDKNode::getAs() const {
@@ -440,7 +445,7 @@ unsigned SDKNode::getChildIndex(NodePtr Child) const {
     [&](const NodeUniquePtr &P) { return P.get() == Child; }) - Children.begin();
 }
 
-NodePtr SDKNode::getOnlyChild() const {
+const SDKNode* SDKNode::getOnlyChild() const {
   assert(Children.size() == 1 && "more that one child.");
   return (*Children.begin()).get();
 }
@@ -876,6 +881,15 @@ NodeUniquePtr SDKNode::constructSDKNode(llvm::yaml::MappingNode *Node) {
 }
 
 bool SDKNode::operator==(const SDKNode &Other) const {
+  auto *LeftAlias = dyn_cast<SDKNodeTypeNameAlias>(this);
+  auto *RightAlias = dyn_cast<SDKNodeTypeNameAlias>(&Other);
+  if (LeftAlias || RightAlias) {
+    // Comparing the underlying types if any of the inputs are alias.
+    const SDKNode *Left = LeftAlias ? LeftAlias->getUnderlyingType() : this;
+    const SDKNode *Right = RightAlias ? RightAlias->getUnderlyingType() : &Other;
+    return *Left == *Right;
+  }
+
   if (getKind() != Other.getKind())
     return false;
 
