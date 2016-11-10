@@ -164,14 +164,14 @@ class CapturingClass {
   // CHECK-64: (class functions.CapturingClass)
  
   // CHECK-64: Type info:
-  // CHECK-64: (class_instance size=16 alignment=16 stride=16
+  // CHECK-64: (class_instance size=16 alignment=1 stride=16
   
   // CHECK-32: Reflecting an object.
   // CHECK-32: Type reference:
   // CHECK-32: (class functions.CapturingClass)
   
   // CHECK-32: Type info:
-  // CHECK-32: (class_instance size=12 alignment=16 stride=16
+  // CHECK-32: (class_instance size=12 alignment=1 stride=12
   @_semantics("optimize.sil.never")
   func arity0Capture1() -> () -> () {
     let closure = {

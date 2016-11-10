@@ -1266,9 +1266,9 @@ const TypeInfo *TypeConverter::getClassInstanceTypeInfo(const TypeRef *TR,
     // TypeRef to make field types concrete.
     RecordTypeInfoBuilder builder(*this, RecordKind::ClassInstance);
 
-    // Start layout from the given instance start offset.
-    // Extra inhabitants do not matter for a class instance payload.
-    builder.addField(start, align, /*numExtraInhabitants=*/0);
+    // Start layout from the given instance start offset. This should
+    // be the superclass instance size.
+    builder.addField(start, 1, /*numExtraInhabitants=*/0);
 
     for (auto Field : getBuilder().getFieldTypeRefs(TR, FD))
       builder.addField(Field.Name, Field.TR);
