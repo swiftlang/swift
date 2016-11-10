@@ -393,6 +393,7 @@ bool SDKNodeType::classof(const SDKNode *N) {
   switch (N->getKind()) {
   case SDKNodeKind::TypeNominal:
   case SDKNodeKind::TypeFunc:
+  case SDKNodeKind::TypeNameAlias:
     return true;
   default:
     return false;
@@ -410,6 +411,13 @@ class SDKNodeTypeFunc : public SDKNodeType {
 public:
   SDKNodeTypeFunc(SDKNodeInitInfo Info) : SDKNodeType(Info, SDKNodeKind::TypeFunc) {}
   bool isEscaping() const { return !hasTypeAttribute(TypeAttrKind::TAK_noescape); }
+  static bool classof(const SDKNode *N);
+};
+
+class SDKNodeTypeNameAlias : public SDKNodeType {
+public:
+  SDKNodeTypeNameAlias(SDKNodeInitInfo Info) : SDKNodeType(Info,
+                                                  SDKNodeKind::TypeNameAlias) {}
   static bool classof(const SDKNode *N);
 };
 
@@ -639,6 +647,7 @@ bool SDKNodeDecl::classof(const SDKNode *N) {
     case SDKNodeKind::Root:
     case SDKNodeKind::TypeNominal:
     case SDKNodeKind::TypeFunc:
+    case SDKNodeKind::TypeNameAlias:
       return false;
   }
 }
@@ -871,6 +880,7 @@ bool SDKNode::operator==(const SDKNode &Other) const {
     return false;
 
   switch(getKind()) {
+    case SDKNodeKind::TypeNameAlias:
     case SDKNodeKind::TypeNominal:
     case SDKNodeKind::TypeFunc: {
       auto Left = this->getAs<SDKNodeType>();
@@ -1077,8 +1087,11 @@ case SDKNodeKind::X:                                                           \
 static NodeUniquePtr constructTypeNode(Type T) {
   NodeUniquePtr Root = SDKNodeInitInfo(T).createSDKNode(SDKNodeKind::TypeNominal);
 
-  if (isa<NameAliasType>(T.getPointer()))
+  if (auto NAT = dyn_cast<NameAliasType>(T.getPointer())) {
+    NodeUniquePtr Root = SDKNodeInitInfo(T).createSDKNode(SDKNodeKind::TypeNameAlias);
+    Root->addChild(constructTypeNode(NAT->getCanonicalType()));
     return Root;
+  }
 
   if (auto Fun = T->getAs<AnyFunctionType>()) {
     NodeUniquePtr Root = SDKNodeInitInfo(T).createSDKNode(SDKNodeKind::TypeFunc);
@@ -2072,7 +2085,8 @@ public:
     case SDKNodeKind::Constructor:
     case SDKNodeKind::TypeAlias:
     case SDKNodeKind::TypeFunc:
-    case SDKNodeKind::TypeNominal: {
+    case SDKNodeKind::TypeNominal:
+    case SDKNodeKind::TypeNameAlias: {
       // If matched nodes are both function/var/TypeAlias decls, mapping their
       // parameters sequentially.
       SequentialNodeMatcher(Left->getChildren(),
