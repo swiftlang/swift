@@ -40,10 +40,11 @@ SYMBOLS_PACKAGE="${SRC_DIR}/${SYM_ARCHIVE}"
 if [[ "$(uname -s)" == "Darwin" ]] ; then
     SWIFT_PACKAGE=buildbot_osx_package
 else
+    USE_GOLD_LINKER=1
     SWIFT_PACKAGE=buildbot_linux
 fi
 
-./utils/build-script-impl ${DRY_RUN} --preset="${SWIFT_PACKAGE}" \
+./utils/build-script ${DRY_RUN} --preset="${SWIFT_PACKAGE}" \
         install_destdir="${SWIFT_INSTALL_DIR}" \
         installable_package="${SWIFT_INSTALLABLE_PACKAGE}" \
         install_toolchain_dir="${SWIFT_TOOLCHAIN_DIR}" \
