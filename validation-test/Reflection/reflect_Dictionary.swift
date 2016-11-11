@@ -26,7 +26,7 @@ reflect(object: obj)
 // CHECK-64: (class reflect_Dictionary.TestClass)
 
 // CHECK-64: Type info:
-// CHECK-64: (class_instance size=25 alignment=16 stride=32 num_extra_inhabitants=0
+// CHECK-64: (class_instance size=25 alignment=8 stride=32 num_extra_inhabitants=0
 // CHECK-64:   (field name=t offset=16
 // CHECK-64:     (struct size=9 alignment=8 stride=16 num_extra_inhabitants=0
 // CHECK-64:       (field name=_variantBuffer offset=0
