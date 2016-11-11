@@ -5,6 +5,9 @@
 // See http://swift.org/LICENSE.txt for license information
 // See http://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
 
+// rdar://problem/29145783 - The compiler is periodically hanging on this test.
+// REQUIRES: rdar29145783
+
 // RUN: not --crash %target-swift-frontend %s -emit-ir
 protocol P{func c(array:A.c
 class A:P
