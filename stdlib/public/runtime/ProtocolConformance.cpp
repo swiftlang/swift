@@ -449,10 +449,6 @@ void swift::_swift_initializeCallbacksToInspectDylib(
 # error No known mechanism to inspect dynamic libraries on this platform.
 #endif
 
-// This variable is used to signal when a cache was generated and
-// it is correct to avoid a new scan.
-static unsigned ConformanceCacheGeneration = 0;
-
 void
 swift::swift_registerProtocolConformances(const ProtocolConformanceRecord *begin,
                                           const ProtocolConformanceRecord *end){
@@ -460,40 +456,83 @@ swift::swift_registerProtocolConformances(const ProtocolConformanceRecord *begin
   _registerProtocolConformances(C, begin, end);
 }
 
-/// Search the witness table in the ConformanceCache. \returns a pair of the
-/// WitnessTable pointer and a boolean value True if a definitive value is
-/// found. \returns false if the type or its superclasses were not found in
-/// the cache.
+
+struct ConformanceCacheResult {
+  // true if witnessTable is an authoritative result as-is.
+  // false if more searching is required (for example, because a cached
+  // failure was returned in failureEntry but it is out-of-date.
+  bool isAuthoritative;
+
+  // The matching witness table, or null if no cached conformance was found.
+  const WitnessTable *witnessTable;
+
+  // If the search fails, this may be the negative cache entry for the
+  // queried type itself. This entry may be null or out-of-date.
+  ConformanceCacheEntry *failureEntry;
+
+  static ConformanceCacheResult
+  cachedSuccess(const WitnessTable *table) {
+    return ConformanceCacheResult { true, table, nullptr };
+  }
+
+  static ConformanceCacheResult
+  cachedFailure(ConformanceCacheEntry *entry, bool auth) {
+    return ConformanceCacheResult { auth, nullptr, entry };
+  }
+
+  static ConformanceCacheResult
+  cacheMiss() {
+    return ConformanceCacheResult { false, nullptr, nullptr };
+  }
+};
+
+/// Search for a witness table in the ConformanceCache.
 static
-std::pair<const WitnessTable *, bool>
+ConformanceCacheResult
 searchInConformanceCache(const Metadata *type,
-                         const ProtocolDescriptor *protocol,
-                         ConformanceCacheEntry *&foundEntry) {
+                         const ProtocolDescriptor *protocol) {
   auto &C = Conformances.get();
   auto origType = type;
+  ConformanceCacheEntry *failureEntry = nullptr;
 
-  foundEntry = nullptr;
-
-recur_inside_cache_lock:
-
-  // See if we have a cached conformance. Try the specific type first.
-
+recur:
   {
-    // Check if the type-protocol entry exists in the cache entry that we found.
+    // Try the specific type first.
     if (auto *Value = C.findCached(type, protocol)) {
-      if (Value->isSuccessful())
-        return std::make_pair(Value->getWitnessTable(), true);
-
-      // If we're still looking up for the original type, remember that
-      // we found an exact match.
-      if (type == origType)
-        foundEntry = Value;
-
-      // If we got a cached negative response, check the generation number.
-      if (Value->getFailureGeneration() == C.SectionsToScan.size()) {
-        // We found an entry with a negative value.
-        return std::make_pair(nullptr, true);
+      if (Value->isSuccessful()) {
+        // Found a conformance on the type or some superclass. Return it.
+        return ConformanceCacheResult::cachedSuccess(Value->getWitnessTable());
       }
+
+      // Found a negative cache entry.
+
+      bool isAuthoritative;
+      if (type == origType) {
+        // This negative cache entry is for the original query type.
+        // Remember it so it can be returned later.
+        failureEntry = Value;
+        // An up-to-date entry for the original type is authoritative.
+        isAuthoritative = true;
+      } else {
+        // A up-to-date cached failure for a superclass of the type is not
+        // authoritative: there may be a still-undiscovered conformance
+        // for the original query type.
+        isAuthoritative = false;
+      }
+
+      // Check if the negative cache entry is up-to-date.
+      // FIXME: Using SectionsToScan.size() outside SectionsToScanLock
+      // is undefined.
+      if (Value->getFailureGeneration() == C.SectionsToScan.size()) {
+        // Negative cache entry is up-to-date. Return failure along with
+        // the original query type's own cache entry, if we found one.
+        // (That entry may be out of date but the caller still has use for it.)
+        return ConformanceCacheResult::cachedFailure(failureEntry,
+                                                     isAuthoritative);
+      }
+
+      // Negative cache entry is out-of-date.
+      // Continue searching for a better result.
     }
   }
 
@@ -506,7 +545,7 @@ recur_inside_cache_lock:
     // Hash and lookup the type-protocol pair in the cache.
     if (auto *Value = C.findCached(description, protocol)) {
       if (Value->isSuccessful())
-        return std::make_pair(Value->getWitnessTable(), true);
+        return ConformanceCacheResult::cachedSuccess(Value->getWitnessTable());
 
       // We don't try to cache negative responses for generic
       // patterns.
@@ -517,12 +556,17 @@ recur_inside_cache_lock:
   if (const ClassMetadata *classType = type->getClassObject()) {
     if (classHasSuperclass(classType)) {
       type = swift_getObjCClassMetadata(classType->SuperClass);
-      goto recur_inside_cache_lock;
+      goto recur;
     }
   }
 
-  // We did not find an entry.
-  return std::make_pair(nullptr, false);
+  // We did not find an up-to-date cache entry.
+  // If we found an out-of-date entry for the original query type then
+  // return it (non-authoritatively). Otherwise return a cache miss.
+  if (failureEntry)
+    return ConformanceCacheResult::cachedFailure(failureEntry, false);
+  else
+    return ConformanceCacheResult::cacheMiss();
 }
 
 /// Checks if a given candidate is a type itself, one of its
@@ -562,59 +606,71 @@ bool isRelatedType(const Metadata *type, const void *candidate,
 }
 
 const WitnessTable *
-swift::swift_conformsToProtocol(const Metadata *type,
+swift::swift_conformsToProtocol(const Metadata * const type,
                                 const ProtocolDescriptor *protocol) {
   auto &C = Conformances.get();
-  auto origType = type;
-  unsigned numSections = 0;
-  ConformanceCacheEntry *foundEntry;
 
-recur:
   // See if we have a cached conformance. The ConcurrentMap data structure
   // allows us to insert and search the map concurrently without locking.
   // We do lock the slow path because the SectionsToScan data structure is not
   // concurrent.
-  auto FoundConformance = searchInConformanceCache(type, protocol, foundEntry);
-  // The negative answer does not always mean that there is no conformance,
-  // unless it is an exact match on the type. If it is not an exact match,
-  // it may mean that all of the superclasses do not have this conformance,
-  // but the actual type may still have this conformance.
-  if (FoundConformance.second) {
-    if (FoundConformance.first || foundEntry)
-      return FoundConformance.first;
+  auto FoundConformance = searchInConformanceCache(type, protocol);
+  // If the result (positive or negative) is authoritative, return it.
+  if (FoundConformance.isAuthoritative)
+    return FoundConformance.witnessTable;
+
+  auto failureEntry = FoundConformance.failureEntry;
+
+  // No up-to-date cache entry found.
+  // Acquire the lock so we can scan conformance records.
+  ScopedLock guard(C.SectionsToScanLock);
+
+  // The world may have changed while we waited for the lock.
+  // If we found an out-of-date negative cache entry before
+  // acquiring the lock, make sure the entry is still negative and out of date.
+  // If we found no entry before acquiring the lock, search the cache again.
+  if (failureEntry) {
+    if (failureEntry->isSuccessful()) {
+      // Somebody else found a conformance.
+      return failureEntry->getWitnessTable();
+    }
+    if (failureEntry->getFailureGeneration() == C.SectionsToScan.size()) {
+      // Somebody else brought the negative cache entry up to date.
+      return nullptr;
+    }
+  }
+  else {
+    FoundConformance = searchInConformanceCache(type, protocol);
+    if (FoundConformance.isAuthoritative) {
+      // Somebody else found a conformance or cached an up-to-date failure.
+      return FoundConformance.witnessTable;
+    }
+    failureEntry = FoundConformance.failureEntry;
   }
 
-  // If we didn't have an up-to-date cache entry, scan the conformance records.
-  C.SectionsToScanLock.lock();
-  unsigned failedGeneration = ConformanceCacheGeneration;
+  // We are now caught up after acquiring the lock.
+  // Prepare to scan conformance records.
 
-  // If we have no new information to pull in (and nobody else pulled in
-  // new information while we waited on the lock), we're done.
-  if (C.SectionsToScan.size() == numSections) {
-    if (failedGeneration != ConformanceCacheGeneration) {
-      // Someone else pulled in new conformances while we were waiting.
-      // Start over with our newly-populated cache.
-      C.SectionsToScanLock.unlock();
-      type = origType;
-      goto recur;
-    }
+  // Scan only sections that were not scanned yet.
+  // If we found an out-of-date negative cache entry,
+  // we need not to re-scan the sections that it covers.
+  unsigned startSectionIdx =
+    failureEntry ? failureEntry->getFailureGeneration() : 0;
 
+  unsigned endSectionIdx = C.SectionsToScan.size();
 
-    // Save the failure for this type-protocol pair in the cache.
+  // If there are no unscanned sections outstanding
+  // then we can cache failure and give up now.
+  if (startSectionIdx == endSectionIdx) {
     C.cacheFailure(type, protocol);
-
-    C.SectionsToScanLock.unlock();
     return nullptr;
   }
 
-  // Update the last known number of sections to scan.
-  numSections = C.SectionsToScan.size();
+  // Really scan conformance records.
 
-  // Scan only sections that were not scanned yet.
-  unsigned sectionIdx = foundEntry ? foundEntry->getFailureGeneration() : 0;
-  unsigned endSectionIdx = C.SectionsToScan.size();
-
-  for (; sectionIdx < endSectionIdx; ++sectionIdx) {
+  for (unsigned sectionIdx = startSectionIdx;
+       sectionIdx < endSectionIdx;
+       ++sectionIdx) {
     auto &section = C.SectionsToScan[sectionIdx];
     // Eagerly pull records for nondependent witnesses into our cache.
     for (const auto &record : section) {
@@ -671,12 +727,17 @@ recur:
       }
     }
   }
-  ++ConformanceCacheGeneration;
 
-  C.SectionsToScanLock.unlock();
-  // Start over with our newly-populated cache.
-  type = origType;
-  goto recur;
+  // Conformance scan is complete.
+  // Search the cache once more, and this time update the cache if necessary.
+
+  FoundConformance = searchInConformanceCache(type, protocol);
+  if (FoundConformance.isAuthoritative) {
+    return FoundConformance.witnessTable;
+  } else {
+    C.cacheFailure(type, protocol);
+    return nullptr;
+  }
 }
 
 const Metadata *
