@@ -89,6 +89,69 @@ SILInstruction *SILCombiner::optimizeBuiltinCanBeObjCClass(BuiltinInst *BI) {
   }
 }
 
+static unsigned getTypeWidth(SILType Ty) {
+  if (auto BuiltinIntTy =
+          dyn_cast<BuiltinIntegerType>(Ty.getSwiftRValueType())) {
+    if (BuiltinIntTy->isFixedWidth()) {
+      return BuiltinIntTy->getFixedWidth();
+    }
+  }
+  return 0;
+}
+
+SILInstruction *SILCombiner::optimizeBuiltinTruncOrBitCast(BuiltinInst *I) {
+  assert(I->getBuiltinInfo().ID == BuiltinValueKind::TruncOrBitCast &&
+         "BuiltinInst is not Trunc");
+  SILValue Op = I->getArguments()[0];
+  SILValue Source;
+  if (match(Op, m_ZExtOrBitCast(m_SILValue(Source)))) {
+    SILType ResultType = I->getType();
+    SILType SourceType = Source->getType();
+    SILType SourceTargetType = Op->getType();
+    unsigned ResultTypeWidth = getTypeWidth(ResultType);
+    unsigned SourceTypeWidth = getTypeWidth(SourceType);
+    unsigned SourceTargetTypeWidth = getTypeWidth(SourceTargetType);
+    if (ResultTypeWidth == 0 || SourceTypeWidth == 0 ||
+        SourceTargetTypeWidth == 0) {
+      // Not all types involved have fixed width
+      return nullptr;
+    }
+    if (SourceTargetTypeWidth <= SourceTypeWidth) {
+      return nullptr;
+    }
+    if (ResultTypeWidth < SourceTypeWidth) {
+      return nullptr;
+    }
+    // Reach here if and only if:
+    // SourceTargetTypeWidth > SourceTypeWidth and ResultTypeWidth >=
+    // SourceTypeWidth
+    auto *NI = Builder.createBuiltinBinaryFunctionWithTwoOpTypes(
+        I->getLoc(), "zextOrBitCast", Source->getType(), ResultType, ResultType,
+        Source);
+    replaceInstUsesWith(*I, NI);
+    return eraseInstFromFunction(*I);
+  }
+  return nullptr;
+}
+
+SILInstruction *SILCombiner::optimizeBuiltinZextOrBitCast(BuiltinInst *I) {
+  assert(I->getBuiltinInfo().ID == BuiltinValueKind::ZExtOrBitCast &&
+         "BuiltinInst is not ZExt");
+  SILValue Op = I->getArguments()[0];
+  SILValue Source;
+  if (match(Op, m_ZExtOrBitCast(m_SILValue(Source)))) {
+    SILType ResultType = I->getType();
+    // We can't extend to a size *smaller* than the source.
+    // As such, this transformation will always maintain correctness
+    auto *NI = Builder.createBuiltinBinaryFunctionWithTwoOpTypes(
+        I->getLoc(), "zextOrBitCast", Source->getType(), ResultType, ResultType,
+        Source);
+    replaceInstUsesWith(*I, NI);
+    return eraseInstFromFunction(*I);
+  }
+  return nullptr;
+}
+
 /// Optimize builtins which receive the same value in their first and second
 /// operand.
 static SILInstruction *optimizeBuiltinWithSameOperands(SILBuilder &Builder,
@@ -359,6 +422,13 @@ SILInstruction *SILCombiner::visitBuiltinInst(BuiltinInst *I) {
       I->getBuiltinInfo().ID == BuiltinValueKind::TakeArrayBackToFront ||
       I->getBuiltinInfo().ID == BuiltinValueKind::CopyArray)
     return optimizeBuiltinArrayOperation(I, Builder);
+
+  if (I->getBuiltinInfo().ID == BuiltinValueKind::TruncOrBitCast) {
+    return optimizeBuiltinTruncOrBitCast(I);
+  }
+  if (I->getBuiltinInfo().ID == BuiltinValueKind::ZExtOrBitCast) {
+    return optimizeBuiltinZextOrBitCast(I);
+  }
 
   if (I->getNumOperands() >= 2 && I->getOperand(0) == I->getOperand(1)) {
     // It's a builtin which has the same value in its first and second operand.

@@ -367,18 +367,21 @@ public:
     auto &C = getASTContext();
 
     llvm::SmallString<16> NameStr = Name;
-    if (auto BuiltinIntTy =
-            dyn_cast<BuiltinIntegerType>(OpdTy.getSwiftRValueType())) {
-      if (BuiltinIntTy == BuiltinIntegerType::getWordType(getASTContext())) {
-        NameStr += "_Word";
-      } else {
-        unsigned NumBits = BuiltinIntTy->getWidth().getFixedWidth();
-        NameStr += "_Int" + llvm::utostr(NumBits);
-      }
-    } else {
-      assert(OpdTy.getSwiftRValueType() == C.TheRawPointerType);
-      NameStr += "_RawPointer";
-    }
+    appendOperandTypeName(OpdTy, NameStr);
+    auto Ident = C.getIdentifier(NameStr);
+    return insert(BuiltinInst::create(getSILDebugLocation(Loc), Ident, ResultTy,
+                                      {}, Args, F));
+  }
+
+  // Create a binary function with the signature: OpdTy1, OpdTy2 -> ResultTy.
+  BuiltinInst *createBuiltinBinaryFunctionWithTwoOpTypes(
+      SILLocation Loc, StringRef Name, SILType OpdTy1, SILType OpdTy2,
+      SILType ResultTy, ArrayRef<SILValue> Args) {
+    auto &C = getASTContext();
+
+    llvm::SmallString<16> NameStr = Name;
+    appendOperandTypeName(OpdTy1, NameStr);
+    appendOperandTypeName(OpdTy2, NameStr);
     auto Ident = C.getIdentifier(NameStr);
     return insert(BuiltinInst::create(getSILDebugLocation(Loc), Ident,
                                       ResultTy, {}, Args, F));
@@ -1634,6 +1637,22 @@ private:
       InsertedInstrs->push_back(TheInst);
 
     BB->insert(InsertPt, TheInst);
+  }
+
+  void appendOperandTypeName(SILType OpdTy, llvm::SmallString<16> &Name) {
+    auto &C = getASTContext();
+    if (auto BuiltinIntTy =
+            dyn_cast<BuiltinIntegerType>(OpdTy.getSwiftRValueType())) {
+      if (BuiltinIntTy == BuiltinIntegerType::getWordType(getASTContext())) {
+        Name += "_Word";
+      } else {
+        unsigned NumBits = BuiltinIntTy->getWidth().getFixedWidth();
+        Name += "_Int" + llvm::utostr(NumBits);
+      }
+    } else {
+      assert(OpdTy.getSwiftRValueType() == C.TheRawPointerType);
+      Name += "_RawPointer";
+    }
   }
 };
 
