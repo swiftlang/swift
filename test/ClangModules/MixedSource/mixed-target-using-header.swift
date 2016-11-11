@@ -39,7 +39,7 @@ func testProtocolWrapper(_ conformer: ForwardClassUser) {
 }
 testProtocolWrapper(ProtoConformer())
 
-func testStruct(_ p: Darwin.Point) -> Darwin.Point {
+func testStruct(_ p: Point) -> Point {
   var result = p
   result.y += 5
   return result
