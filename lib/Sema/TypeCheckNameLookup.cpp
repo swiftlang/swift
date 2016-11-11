@@ -531,7 +531,10 @@ void TypeChecker::performTypoCorrection(DeclContext *DC, DeclRefKind refKind,
                                         NameLookupOptions lookupOptions,
                                         LookupResult &result,
                                         unsigned maxResults) {
-  if (getLangOpts().DisableTypoCorrection)
+  // Disable typo-correction if we won't show the diagnostic anyway.
+  if (getLangOpts().DisableTypoCorrection ||
+      (Diags.hasFatalErrorOccurred() &&
+       !Diags.getShowDiagnosticsAfterFatalError()))
     return;
 
   // Fill in a collection of the most reasonable entries.
