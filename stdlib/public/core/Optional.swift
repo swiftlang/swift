@@ -351,7 +351,7 @@ public func == <T: Equatable>(lhs: T?, rhs: T?) -> Bool {
 /// Returns a Boolean value indicating whether two optional instances are not
 /// equal.
 ///
-/// Use this not-equal-to operator (`==`) to compare any two optional instances
+/// Use this not-equal-to operator (`!=`) to compare any two optional instances
 /// of a type that conforms to the `Equatable` protocol. The comparison
 /// returns `true` if only one of the arguments is `nil` or if the two
 /// arguments wrap values that are not equal. The comparison returns `false`
