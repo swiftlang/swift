@@ -149,7 +149,7 @@ std::pair<unsigned, unsigned> getSwiftNumericVersion();
 std::string getSwiftFullVersion(Version effectiveLanguageVersion =
                                 Version::getCurrentLanguageVersion());
 
-/// Retrieves the repository revision number (or identifer) from which                               
+/// Retrieves the repository revision number (or identifier) from which
 /// this Swift was built.
 std::string getSwiftRevision();
 

@@ -727,13 +727,13 @@ static bool shouldBindToValueType(Constraint *constraint)
   }
 }
 
-/// Find the set of type variables that are inferrable from the given type.
+/// Find the set of type variables that are inferable from the given type.
 ///
 /// \param type The type to search.
-/// \param typeVars Collects the type variables that are inferrable from the
+/// \param typeVars Collects the type variables that are inferable from the
 /// given type. This set is not cleared, so that multiple types can be explored
 /// and introduce their results into the same set.
-static void findInferrableTypeVars(
+static void findInferableTypeVars(
               Type type,
               SmallPtrSetImpl<TypeVariableType *> &typeVars) {
   type = type->getCanonicalType();
@@ -931,7 +931,7 @@ static PotentialBindings getPotentialBindings(ConstraintSystem &cs,
 
       // If this variable is in the left-hand side, it is fully bound.
       SmallPtrSet<TypeVariableType *, 4> typeVars;
-      findInferrableTypeVars(cs.simplifyType(constraint->getFirstType()),
+      findInferableTypeVars(cs.simplifyType(constraint->getFirstType()),
                              typeVars);
       if (typeVars.count(typeVar))
         result.FullyBound = true;
@@ -940,7 +940,7 @@ static PotentialBindings getPotentialBindings(ConstraintSystem &cs,
 
       // If this and another type variable occur, this result involves
       // type variables.
-      findInferrableTypeVars(cs.simplifyType(constraint->getSecondType()),
+      findInferableTypeVars(cs.simplifyType(constraint->getSecondType()),
                              typeVars);
       if (typeVars.size() > 1 && typeVars.count(typeVar))
         result.InvolvesTypeVariables = true;
@@ -1003,10 +1003,10 @@ static PotentialBindings getPotentialBindings(ConstraintSystem &cs,
       if (result.InvolvesTypeVariables) continue;
 
       // Check whether both this type and another type variable are
-      // inferrable.
+      // inferable.
       SmallPtrSet<TypeVariableType *, 4> typeVars;
-      findInferrableTypeVars(first, typeVars);
-      findInferrableTypeVars(second, typeVars);
+      findInferableTypeVars(first, typeVars);
+      findInferableTypeVars(second, typeVars);
       if (typeVars.size() > 1 && typeVars.count(typeVar))
         result.InvolvesTypeVariables = true;
       continue;

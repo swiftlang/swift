@@ -137,7 +137,7 @@ public struct ${Self}<
   Base : ${Collection}
 > : LazyCollectionProtocol, ${Collection} {
 
-  // FIXME(compiler limitation): should be inferrable.
+  // FIXME(compiler limitation): should be inferable.
   public typealias Index = LazyDropWhileIndex<Base>
 
   public var startIndex: Index {
