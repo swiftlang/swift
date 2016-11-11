@@ -306,3 +306,7 @@ protocol P1 {}
 protocol P2 {}
 var a : protocol<P1, P2>?
 var a2 : protocol<P1>= 17
+
+class TestOptionalMethodFixit {
+  optional func test() {}
+}
