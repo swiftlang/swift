@@ -2172,6 +2172,12 @@ extension ${Self} {
   /// Calls the given closure with a pointer to the underlying bytes of the
   /// array's contiguous storage.
   ///
+  /// The array's `Element` type must be a *trivial type*, which can be copied
+  /// with just a bit-for-bit copy without any indirection or
+  /// reference-counting operations. Generally, native Swift types that do not
+  /// contain strong or weak references are trivial, as are imported C structs
+  /// and enums.
+  ///
   /// The following example copies the bytes of the `numbers` array into a
   /// buffer of `UInt8`:
   ///
@@ -2189,7 +2195,7 @@ extension ${Self} {
   ///   valid only for the duration of the closure's execution.
   /// - Returns: The return value of the `body` closure parameter, if any.
   ///
-  /// - SeeAlso: `withUnsafeBytes`, `UnsafeRawBufferPointer`
+  /// - SeeAlso: `withUnsafeMutableBytes`, `UnsafeRawBufferPointer`
   public func withUnsafeBytes<R>(
     _ body: (UnsafeRawBufferPointer) throws -> R
   ) rethrows -> R {
