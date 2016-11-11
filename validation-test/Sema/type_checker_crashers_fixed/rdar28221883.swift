@@ -1,4 +1,4 @@
-// RUN: not --crash %target-swift-frontend %s -parse
+// RUN: not %target-swift-frontend %s -parse
 
 typealias F = (inout Int?) -> Void
 
@@ -10,4 +10,5 @@ class K<T> {
   init(with: @escaping (T, F) -> Void) {}
 }
 
+// Related: SR-2994
 _ = K{ (c: C?, fn: F) in fn(&(c.s["hi"])) }
