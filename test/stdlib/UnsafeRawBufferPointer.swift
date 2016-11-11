@@ -75,6 +75,27 @@ UnsafeRawBufferPointerTestSuite.test("initFromArray") {
   expectEqual(array2, array1)
 }
 
+UnsafeRawBufferPointerTestSuite.test("initializeMemory(as:from:)") {
+  let buffer = UnsafeMutableRawBufferPointer.allocate(count: 30)
+  defer { buffer.deallocate() }
+  let source = stride(from: 5 as Int64, to: 0, by: -1)
+  var (it,idx) = buffer.initializeMemory(as: Int64.self, from: source)
+  expectEqual(it.next()!, 2)
+  expectEqual(idx, 24)
+  ([5,4,3] as [Int64]).withUnsafeBytes {
+    expectEqualSequence($0,buffer[0..<idx])
+  }
+}
+
+UnsafeRawBufferPointerTestSuite.test("initializeMemory(as:from:).overflow") {
+  let buffer = UnsafeMutableRawBufferPointer.allocate(count: 30)
+  defer { buffer.deallocate() }
+  let source: [Int64] = [5,4,3,2,1]
+  expectCrashLater()
+  var (it,idx) = buffer.initializeMemory(as: Int64.self, from: source)
+}
+
+
 // Directly test the byte Sequence produced by withUnsafeBytes.
 UnsafeRawBufferPointerTestSuite.test("withUnsafeBytes.Sequence") {
   let array1: [Int32] = [0, 1, 2, 3]

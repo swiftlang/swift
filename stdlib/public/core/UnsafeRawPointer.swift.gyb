@@ -294,7 +294,9 @@ public struct Unsafe${Mutable}RawPointer : Strideable, Hashable, _Pointer {
   /// - Postcondition: The `T` values at `self..<self + source.count *
   ///   MemoryLayout<T>.stride` are initialized.
   ///
-  /// TODO: Optimize where `C` is a `ContiguousArrayBuffer`.
+  // TODO: Optimize where `C` is a `ContiguousArrayBuffer`.
+  // This is fundamentally unsafe since collections can underreport their count.
+  @available(*, deprecated, message: "it will be removed in Swift 4.0.  Please use 'UnsafeMutableRawBufferPointer.initialize(from:)' instead")
   @discardableResult
   public func initializeMemory<C : Collection>(
     as: C.Iterator.Element.Type, from source: C
