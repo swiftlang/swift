@@ -372,9 +372,7 @@ swift::swift_getTypeName(const Metadata *type, bool qualified) {
     auto name = nameForMetadata(type, qualified);
     // Copy it to memory we can reference forever.
     auto size = name.size();
-    auto result = (char *)malloc(size + 1);
-    memcpy(result, name.data(), size);
-    result[size] = 0;
+    auto result = strndup(name.data(), size);
 
     cache.insert({key, {result, size}});
     return Pair{result, size};
