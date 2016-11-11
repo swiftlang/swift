@@ -15,6 +15,7 @@
 //===----------------------------------------------------------------------===//
 
 #include "swift/AST/Module.h"
+#include "swift/AST/AccessScope.h"
 #include "swift/AST/AST.h"
 #include "swift/AST/ASTPrinter.h"
 #include "swift/AST/ASTScope.h"
@@ -428,8 +429,8 @@ void Module::lookupMember(SmallVectorImpl<ValueDecl*> &results,
       return VD->getModuleContext() == this;
     });
 
-    const DeclContext *accessScope = nominal->getFormalAccessScope();
-    if (accessScope && !accessScope->isModuleContext())
+    auto AS = nominal->getFormalAccessScope();
+    if (AS.isPrivate() || AS.isFileScope())
       alreadyInPrivateContext = true;
 
     break;
