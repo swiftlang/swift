@@ -1221,7 +1221,7 @@ toolchains::GenericUnix::constructInvocation(const AutolinkExtractJobAction &job
 }
 
 std::string toolchains::GenericUnix::getDefaultLinker() const {
-    return "gold";
+    return "";
     switch(getTriple().getArch()) {
         case llvm::Triple::arm:
         case llvm::Triple::armeb:
