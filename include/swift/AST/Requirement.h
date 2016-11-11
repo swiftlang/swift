@@ -35,12 +35,6 @@ enum class RequirementKind : unsigned {
   /// A same-type requirement T == U, where T and U are types that shall be
   /// equivalent.
   SameType,
-  /// A marker that indicates where the witness for the given (first)
-  /// type should be located.
-  ///
-  /// FIXME: This is a crutch used to help us eliminate various walks over
-  /// "all archetypes".
-  WitnessMarker
 
   // Note: there is code that packs this enum in a 2-bit bitfield.  Audit users
   // when adding enumerators.
@@ -56,10 +50,8 @@ public:
   /// Create a conformance or same-type requirement.
   Requirement(RequirementKind kind, Type first, Type second)
     : FirstTypeAndKind(first, kind), SecondType(second) {
-    if (kind != RequirementKind::WitnessMarker) {
-      assert(first);
-      assert(second);
-    }
+    assert(first);
+    assert(second);
   }
 
   /// \brief Determine the kind of requirement.

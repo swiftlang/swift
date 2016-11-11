@@ -49,7 +49,7 @@ if x == 5 {
 }
 
 // CHECK: [[MERGE]]:
-// CHECK: load [[COUNTMUI]]
+// CHECK: load [trivial] [[COUNTMUI]]
 markUsed(count)
 
 

@@ -315,7 +315,7 @@ public:
   bool operator!=(const SDKNode &Other) const { return !((*this) == Other); }
 
   ArrayRef<NodeAnnotation>
-    getAnnotations(std::vector<NodeAnnotation> &Scrach) const;
+    getAnnotations(std::vector<NodeAnnotation> &Scratch) const;
   bool isLeaf() const { return Children.empty(); }
   SDKNodeKind getKind() const { return SDKNodeKind(TheKind); }
   StringRef getName() const { return Name; }
@@ -333,9 +333,10 @@ public:
   bool isAnnotatedAs(NodeAnnotation Anno) const;
   void addChild(NodeUniquePtr Child);
   ArrayRef<NodeUniquePtr> getChildren() const;
+  bool hasSameChildren(const SDKNode &Other) const;
   void collectChildren(NodeVector &Bucket) const;
   unsigned getChildIndex(NodePtr Child) const;
-  NodePtr getOnlyChild() const;
+  const SDKNode* getOnlyChild() const;
   template <typename T> const T *getAs() const;
   template <typename T> T *getAs();
 };
@@ -393,6 +394,7 @@ bool SDKNodeType::classof(const SDKNode *N) {
   switch (N->getKind()) {
   case SDKNodeKind::TypeNominal:
   case SDKNodeKind::TypeFunc:
+  case SDKNodeKind::TypeNameAlias:
     return true;
   default:
     return false;
@@ -413,6 +415,18 @@ public:
   static bool classof(const SDKNode *N);
 };
 
+class SDKNodeTypeNameAlias : public SDKNodeType {
+public:
+  SDKNodeTypeNameAlias(SDKNodeInitInfo Info) : SDKNodeType(Info,
+                                                  SDKNodeKind::TypeNameAlias) {}
+  const SDKNodeType *getUnderlyingType() const;
+  static bool classof(const SDKNode *N);
+};
+
+const SDKNodeType *SDKNodeTypeNameAlias::getUnderlyingType() const {
+  return getOnlyChild()->getAs<SDKNodeType>();
+}
+
 template <typename T> const T *
 SDKNode::getAs() const {
   if (T::classof(this))
@@ -432,7 +446,7 @@ unsigned SDKNode::getChildIndex(NodePtr Child) const {
     [&](const NodeUniquePtr &P) { return P.get() == Child; }) - Children.begin();
 }
 
-NodePtr SDKNode::getOnlyChild() const {
+const SDKNode* SDKNode::getOnlyChild() const {
   assert(Children.size() == 1 && "more that one child.");
   return (*Children.begin()).get();
 }
@@ -639,6 +653,7 @@ bool SDKNodeDecl::classof(const SDKNode *N) {
     case SDKNodeKind::Root:
     case SDKNodeKind::TypeNominal:
     case SDKNodeKind::TypeFunc:
+    case SDKNodeKind::TypeNameAlias:
       return false;
   }
 }
@@ -866,17 +881,42 @@ NodeUniquePtr SDKNode::constructSDKNode(llvm::yaml::MappingNode *Node) {
   return Result;
 }
 
+bool SDKNode::hasSameChildren(const SDKNode &Other) const {
+  if(Children.size() != Other.Children.size())
+    return false;
+  for (unsigned I = 0; I < Children.size(); ++ I) {
+    if (*Children[I] != *Other.Children[I])
+      return false;
+  }
+  return true;
+}
+
 bool SDKNode::operator==(const SDKNode &Other) const {
+  auto *LeftAlias = dyn_cast<SDKNodeTypeNameAlias>(this);
+  auto *RightAlias = dyn_cast<SDKNodeTypeNameAlias>(&Other);
+  if (LeftAlias || RightAlias) {
+    // Comparing the underlying types if any of the inputs are alias.
+    const SDKNode *Left = LeftAlias ? LeftAlias->getUnderlyingType() : this;
+    const SDKNode *Right = RightAlias ? RightAlias->getUnderlyingType() : &Other;
+    return *Left == *Right;
+  }
+
   if (getKind() != Other.getKind())
     return false;
 
   switch(getKind()) {
+    case SDKNodeKind::TypeNameAlias:
+      llvm_unreachable("Should be handled above.");
     case SDKNodeKind::TypeNominal:
     case SDKNodeKind::TypeFunc: {
       auto Left = this->getAs<SDKNodeType>();
       auto Right = (&Other)->getAs<SDKNodeType>();
-      return Left->getTypeAttributes().equals(Right->getTypeAttributes())
-        && Left->getPrintedName() == Right->getPrintedName();
+      if (!Left->getTypeAttributes().equals(Right->getTypeAttributes()))
+        return false;
+      if (Left->getPrintedName() == Right->getPrintedName())
+        return true;
+      return Left->getName() == Right->getName() &&
+        Left->hasSameChildren(*Right);
     }
 
     case SDKNodeKind::Function:
@@ -904,15 +944,8 @@ bool SDKNode::operator==(const SDKNode &Other) const {
     }
     case SDKNodeKind::Root:
     case SDKNodeKind::Nil: {
-      if (getPrintedName() == Other.getPrintedName() &&
-          Children.size() == Other.Children.size()) {
-        for (unsigned I = 0; I < Children.size(); ++ I) {
-          if (*Children[I] != *Other.Children[I])
-            return false;
-        }
-        return true;
-      }
-      return false;
+      return getPrintedName() == Other.getPrintedName() &&
+        hasSameChildren(Other);
     }
   }
 }
@@ -1077,8 +1110,11 @@ case SDKNodeKind::X:                                                           \
 static NodeUniquePtr constructTypeNode(Type T) {
   NodeUniquePtr Root = SDKNodeInitInfo(T).createSDKNode(SDKNodeKind::TypeNominal);
 
-  if (isa<NameAliasType>(T.getPointer()))
+  if (auto NAT = dyn_cast<NameAliasType>(T.getPointer())) {
+    NodeUniquePtr Root = SDKNodeInitInfo(T).createSDKNode(SDKNodeKind::TypeNameAlias);
+    Root->addChild(constructTypeNode(NAT->getCanonicalType()));
     return Root;
+  }
 
   if (auto Fun = T->getAs<AnyFunctionType>()) {
     NodeUniquePtr Root = SDKNodeInitInfo(T).createSDKNode(SDKNodeKind::TypeFunc);
@@ -2072,7 +2108,8 @@ public:
     case SDKNodeKind::Constructor:
     case SDKNodeKind::TypeAlias:
     case SDKNodeKind::TypeFunc:
-    case SDKNodeKind::TypeNominal: {
+    case SDKNodeKind::TypeNominal:
+    case SDKNodeKind::TypeNameAlias: {
       // If matched nodes are both function/var/TypeAlias decls, mapping their
       // parameters sequentially.
       SequentialNodeMatcher(Left->getChildren(),

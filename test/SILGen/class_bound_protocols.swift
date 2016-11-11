@@ -31,9 +31,7 @@ func class_bound_generic<T : ClassBound>(x: T) -> T {
   // CHECK:   [[X_COPY:%.*]] = copy_value [[X]]
   // CHECK:   store [[X_COPY]] to [init] [[PB]]
   return x
-  // CHECK:   [[X1:%.*]] = load [[PB]]
-  // SEMANTIC ARC TODO: This next line should be [[X1_COPY]]
-  // CHECK:   copy_value [[X1]]
+  // CHECK:   [[X1:%.*]] = load [copy] [[PB]]
   // CHECK:   destroy_value [[X_ADDR]]
   // CHECK:   destroy_value [[X]]
   // CHECK:   return [[X1]]
@@ -48,9 +46,7 @@ func class_bound_generic_2<T : ClassBound & NotClassBound>(x: T) -> T {
   // CHECK:   [[X_COPY:%.*]] = copy_value [[X]]
   // CHECK:   store [[X_COPY]] to [init] [[PB]]
   return x
-  // CHECK:   [[X1:%.*]] = load [[PB]]
-  // SEMANTIC ARC TODO: This next line should be [[X1_COPY]]
-  // CHECK:   copy_value [[X1]]
+  // CHECK:   [[X1:%.*]] = load [copy] [[PB]]
   // CHECK:   return [[X1]]
 }
 
@@ -63,9 +59,7 @@ func class_bound_protocol(x: ClassBound) -> ClassBound {
   // CHECK:   [[X_COPY:%.*]] = copy_value [[X]]
   // CHECK:   store [[X_COPY]] to [init] [[PB]]
   return x
-  // CHECK:   [[X1:%.*]] = load [[PB]]
-  // CHECK:   [[X1_COPY:%.*]] = copy_value [[X1]]
-  // SEMANTIC ARC TODO: This next line should be [[X1_COPY]]
+  // CHECK:   [[X1:%.*]] = load [copy] [[PB]]
   // CHECK:   return [[X1]]
 }
 
@@ -79,9 +73,7 @@ func class_bound_protocol_composition(x: ClassBound & NotClassBound)
   // CHECK:   [[X_COPY:%.*]] = copy_value [[X]]
   // CHECK:   store [[X_COPY]] to [init] [[PB]]
   return x
-  // CHECK:   [[X1:%.*]] = load [[PB]]
-  // CHECK:   copy_value [[X1]]
-  // SEMANTIC ARC TODO: This should be [[X1_COPY]]
+  // CHECK:   [[X1:%.*]] = load [copy] [[PB]]
   // CHECK:   return [[X1]]
 }
 
@@ -112,16 +104,25 @@ func class_bound_to_unbound_existential_upcast
   // CHECK: [[X_OPENED:%.*]] = open_existential_ref %1 : $ClassBound & NotClassBound to [[OPENED_TYPE:\$@opened(.*) ClassBound & NotClassBound]]
   // CHECK: [[PAYLOAD_ADDR:%.*]] = init_existential_addr %0 : $*NotClassBound, [[OPENED_TYPE]]
   // CHECK: [[X_OPENED_COPY:%.*]] = copy_value [[X_OPENED]]
-  // CHECK: store [[X_OPENED_COPY]] to [[PAYLOAD_ADDR]]
+  // CHECK: store [[X_OPENED_COPY]] to [init] [[PAYLOAD_ADDR]]
 }
 
 // CHECK-LABEL: sil hidden @_TF21class_bound_protocols18class_bound_method
+// CHECK: bb0([[ARG:%.*]] : $ClassBound):
 func class_bound_method(x: ClassBound) {
   var x = x
   x.classBoundMethod()
-  // CHECK: [[X:%.*]] = load {{%.*}} : $*ClassBound
+  // CHECK: [[XBOX:%.*]] = alloc_box $@box ClassBound, var, name "x"
+  // CHECK: [[XBOX_PB:%.*]] = project_box [[XBOX]]
+  // CHECK: [[ARG_COPY:%.*]] = copy_value [[ARG]]
+  // CHECK: store [[ARG_COPY]] to [init] [[XBOX_PB]]
+  // CHECK: [[X:%.*]] = load [copy] [[XBOX_PB]] : $*ClassBound
   // CHECK: [[PROJ:%.*]] = open_existential_ref [[X]] : $ClassBound to $[[OPENED:@opened(.*) ClassBound]]
   // CHECK: [[METHOD:%.*]] = witness_method $[[OPENED]], #ClassBound.classBoundMethod!1
   // CHECK: apply [[METHOD]]<[[OPENED]]>([[PROJ]])
+  // CHECK: destroy_value [[PROJ]]
+  // CHECK: destroy_value [[XBOX]]
+  // CHECK: destroy_value [[ARG]]
 }
+// CHECK: } // end sil function '_TF21class_bound_protocols18class_bound_methodFT1xPS_10ClassBound__T_'
 

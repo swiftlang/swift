@@ -47,7 +47,7 @@ func init_var_from_computed_lvalue() {
 // CHECK-LABEL: sil hidden @_TF21copy_lvalue_peepholes27assign_computed_from_lvalue
 // CHECK:   [[Y:%.*]] = alloc_box
 // CHECK:   [[PBY:%.*]] = project_box [[Y]]
-// CHECK:   [[Y_VAL:%.*]] = load [[PBY]]
+// CHECK:   [[Y_VAL:%.*]] = load [trivial] [[PBY]]
 // CHECK:   [[SETTER:%.*]] = function_ref @_TF21copy_lvalue_peepholess8computedBi64_
 // CHECK:   apply [[SETTER]]([[Y_VAL]])
 func assign_computed_from_lvalue(y: Int) {

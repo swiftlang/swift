@@ -101,9 +101,6 @@ class Traversal : public TypeVisitor<Traversal, bool>
         if (doIt(req.getSecondType()))
           return true;
         break;
-
-      case RequirementKind::WitnessMarker:
-        break;
       }
     }
 

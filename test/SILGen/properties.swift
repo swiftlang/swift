@@ -32,8 +32,8 @@ func physical_tuple_rvalue() -> Int {
 // CHECK-LABEL: sil hidden  @_TF10properties16tuple_assignment
 func tuple_assignment(_ a: inout Int, b: inout Int) {
   // CHECK: bb0([[A_ADDR:%[0-9]+]] : $*Int, [[B_ADDR:%[0-9]+]] : $*Int):
-  // CHECK: [[B:%[0-9]+]] = load [[B_ADDR]]
-  // CHECK: [[A:%[0-9]+]] = load [[A_ADDR]]
+  // CHECK: [[B:%[0-9]+]] = load [trivial] [[B_ADDR]]
+  // CHECK: [[A:%[0-9]+]] = load [trivial] [[A_ADDR]]
   // CHECK: assign [[B]] to [[A_ADDR]]
   // CHECK: assign [[A]] to [[B_ADDR]]
   (a, b) = (b, a)
@@ -182,7 +182,7 @@ func logical_struct_in_reftype_set(_ value: inout Val, z1: Int) {
   value.ref.val_prop.z_tuple.1 = z1
   // -- val.ref
   // CHECK: [[VAL_REF_ADDR:%[0-9]+]] = struct_element_addr [[VAL]] : $*Val, #Val.ref
-  // CHECK: [[VAL_REF:%[0-9]+]] = load [[VAL_REF_ADDR]]
+  // CHECK: [[VAL_REF:%[0-9]+]] = load [copy] [[VAL_REF_ADDR]]
   // -- getters and setters
   // -- val.ref.val_prop
   // CHECK: [[STORAGE:%.*]] = alloc_stack $Builtin.UnsafeValueBuffer
@@ -195,8 +195,7 @@ func logical_struct_in_reftype_set(_ value: inout Val, z1: Int) {
   // CHECK: [[T1:%[0-9]+]] = pointer_to_address [[T0]] : $Builtin.RawPointer to [strict] $*Val
   // CHECK: [[VAL_REF_VAL_PROP_MAT:%.*]] = mark_dependence [[T1]] : $*Val on [[VAL_REF]]
   // CHECK: [[V_R_VP_Z_TUPLE_MAT:%[0-9]+]] = alloc_stack $(Int, Int)
-  // CHECK: [[LD:%[0-9]+]] = load [[VAL_REF_VAL_PROP_MAT]]
-  // CHECK: copy_value [[LD]]
+  // CHECK: [[LD:%[0-9]+]] = load [copy] [[VAL_REF_VAL_PROP_MAT]]
   // -- val.ref.val_prop.z_tuple
   // CHECK: [[GET_Z_TUPLE_METHOD:%[0-9]+]] = function_ref @_TFV10properties3Valg7z_tupleT
   // CHECK: [[A0:%.*]] = tuple_element_addr [[V_R_VP_Z_TUPLE_MAT]] : {{.*}}, 0
@@ -210,7 +209,7 @@ func logical_struct_in_reftype_set(_ value: inout Val, z1: Int) {
   // CHECK: [[V_R_VP_Z_TUPLE_1:%[0-9]+]] = tuple_element_addr [[V_R_VP_Z_TUPLE_MAT]] : {{.*}}, 1
   // CHECK: assign [[Z1]] to [[V_R_VP_Z_TUPLE_1]]
   // -- writeback to val.ref.val_prop.z_tuple
-  // CHECK: [[WB_V_R_VP_Z_TUPLE:%[0-9]+]] = load [[V_R_VP_Z_TUPLE_MAT]]
+  // CHECK: [[WB_V_R_VP_Z_TUPLE:%[0-9]+]] = load [trivial] [[V_R_VP_Z_TUPLE_MAT]]
   // CHECK: [[SET_Z_TUPLE_METHOD:%[0-9]+]] = function_ref @_TFV10properties3Vals7z_tupleT
   // CHECK: apply [[SET_Z_TUPLE_METHOD]]({{%[0-9]+, %[0-9]+}}, [[VAL_REF_VAL_PROP_MAT]])
   // -- writeback to val.ref.val_prop
@@ -242,8 +241,7 @@ func tuple_in_logical_struct_set(_ value: inout Val, z1: Int) {
   // CHECK: bb0([[VAL:%[0-9]+]] : $*Val, [[Z1:%[0-9]+]] : $Int):
   value.z_tuple.1 = z1
   // CHECK: [[Z_TUPLE_MATERIALIZED:%[0-9]+]] = alloc_stack $(Int, Int)
-  // CHECK: [[VAL1:%[0-9]+]] = load [[VAL]]
-  // CHECK: copy_value [[VAL1]]
+  // CHECK: [[VAL1:%[0-9]+]] = load [copy] [[VAL]]
   // CHECK: [[Z_GET_METHOD:%[0-9]+]] = function_ref @_TFV10properties3Valg7z_tupleT
   // CHECK: [[A0:%.*]] = tuple_element_addr [[Z_TUPLE_MATERIALIZED]] : {{.*}}, 0
   // CHECK: [[A1:%.*]] = tuple_element_addr [[Z_TUPLE_MATERIALIZED]] : {{.*}}, 1
@@ -254,7 +252,7 @@ func tuple_in_logical_struct_set(_ value: inout Val, z1: Int) {
   // CHECK: store [[T1]] to [trivial] [[A1]]
   // CHECK: [[Z_TUPLE_1:%[0-9]+]] = tuple_element_addr [[Z_TUPLE_MATERIALIZED]] : {{.*}}, 1
   // CHECK: assign [[Z1]] to [[Z_TUPLE_1]]
-  // CHECK: [[Z_TUPLE_MODIFIED:%[0-9]+]] = load [[Z_TUPLE_MATERIALIZED]]
+  // CHECK: [[Z_TUPLE_MODIFIED:%[0-9]+]] = load [trivial] [[Z_TUPLE_MATERIALIZED]]
   // CHECK: [[Z_SET_METHOD:%[0-9]+]] = function_ref @_TFV10properties3Vals7z_tupleT
   // CHECK: apply [[Z_SET_METHOD]]({{%[0-9]+, %[0-9]+}}, [[VAL]])
   // CHECK: dealloc_stack [[Z_TUPLE_MATERIALIZED]]
@@ -469,7 +467,7 @@ struct DidSetWillSetTests: ForceAccessors {
       // CHECK-NEXT: // function_ref properties.takeInt
       // CHECK-NEXT: [[TAKEINTFN:%.*]] = function_ref @_TF10properties7takeInt
       // CHECK-NEXT: [[FIELDPTR:%.*]] = struct_element_addr %1 : $*DidSetWillSetTests, #DidSetWillSetTests.a
-      // CHECK-NEXT: [[A:%.*]] = load [[FIELDPTR]] : $*Int
+      // CHECK-NEXT: [[A:%.*]] = load [trivial] [[FIELDPTR]] : $*Int
       // CHECK-NEXT: apply [[TAKEINTFN]]([[A]]) : $@convention(thin) (Int) -> ()
 
       takeInt(newA)
@@ -491,7 +489,7 @@ struct DidSetWillSetTests: ForceAccessors {
       // CHECK-NEXT: // function_ref properties.takeInt (Swift.Int) -> ()
       // CHECK-NEXT: [[TAKEINTFN:%.*]] = function_ref @_TF10properties7takeInt
       // CHECK-NEXT: [[AADDR:%.*]] = struct_element_addr %1 : $*DidSetWillSetTests, #DidSetWillSetTests.a
-      // CHECK-NEXT: [[A:%.*]] = load [[AADDR]] : $*Int
+      // CHECK-NEXT: [[A:%.*]] = load [trivial] [[AADDR]] : $*Int
       // CHECK-NEXT: apply [[TAKEINTFN]]([[A]]) : $@convention(thin) (Int) -> ()
 
       a = zero  // reassign, but don't infinite loop.
@@ -527,7 +525,7 @@ struct DidSetWillSetTests: ForceAccessors {
   // CHECK-NEXT: debug_value_addr %1
 
   // CHECK-NEXT: [[AADDR:%.*]] = struct_element_addr %1 : $*DidSetWillSetTests, #DidSetWillSetTests.a
-  // CHECK-NEXT: [[OLDVAL:%.*]] = load [[AADDR]] : $*Int
+  // CHECK-NEXT: [[OLDVAL:%.*]] = load [trivial] [[AADDR]] : $*Int
   // CHECK-NEXT: debug_value [[OLDVAL]] : $Int, let, name "tmp"
 
   // CHECK-NEXT: // function_ref {{.*}}.DidSetWillSetTests.a.willset : Swift.Int
@@ -672,7 +670,7 @@ func propertyWithDidSetTakingOldValue() {
 // CHECK-NEXT:  debug_value [[ARG1]] : $Int, let, name "newValue", argno 1
 // CHECK-NEXT:  [[ARG2_PB:%.*]] = project_box [[ARG2]]
 // CHECK-NEXT:  debug_value_addr [[ARG2_PB]] : $*Int, var, name "p", argno 2
-// CHECK-NEXT:  [[ARG2_PB_VAL:%.*]] = load [[ARG2_PB]] : $*Int
+// CHECK-NEXT:  [[ARG2_PB_VAL:%.*]] = load [trivial] [[ARG2_PB]] : $*Int
 // CHECK-NEXT:  debug_value [[ARG2_PB_VAL]] : $Int
 // CHECK-NEXT:  assign [[ARG1]] to [[ARG2_PB]] : $*Int
 // CHECK-NEXT:  [[ARG2_COPY:%.*]] = copy_value [[ARG2]] : $@box Int
@@ -852,7 +850,7 @@ func genericProps(_ x: GenericClass<String>) {
   // CHECK: class_method %0 : $GenericClass<String>, #GenericClass.y!getter.1
   let _ = x.y
   // CHECK: [[Z:%.*]] = ref_element_addr %0 : $GenericClass<String>, #GenericClass.z
-  // CHECK: load [[Z]] : $*String
+  // CHECK: load [copy] [[Z]] : $*String
   let _ = x.z
 }
 
@@ -872,10 +870,10 @@ class ClassWithLetProperty {
   // We shouldn't have any dynamic dispatch within this method, just load p.
   func ReturnConstant() -> Int { return p }
 // CHECK-LABEL: sil hidden @_TFC10properties20ClassWithLetProperty14ReturnConstant
-// CHECK:       bb0(%0 : $ClassWithLetProperty):
+// CHECK:       bb0([[ARG:%.*]] : $ClassWithLetProperty):
 // CHECK-NEXT:    debug_value
-// CHECK-NEXT:    [[PTR:%[0-9]+]] = ref_element_addr %0 : $ClassWithLetProperty, #ClassWithLetProperty.p
-// CHECK-NEXT:    [[VAL:%[0-9]+]] = load [[PTR]] : $*Int
+// CHECK-NEXT:    [[PTR:%[0-9]+]] = ref_element_addr [[ARG]] : $ClassWithLetProperty, #ClassWithLetProperty.p
+// CHECK-NEXT:    [[VAL:%[0-9]+]] = load [trivial] [[PTR]] : $*Int
 // CHECK-NEXT:   return [[VAL]] : $Int
 
 
@@ -900,7 +898,7 @@ class r19254812Derived: r19254812Base{
 // CHECK: [[SELFMUI:%[0-9]+]] = mark_uninitialized [derivedself] 
 
 // Initialization of the pi field: no copy_values/releases.
-// CHECK:  [[SELF:%[0-9]+]] = load [[SELFMUI]] : $*r19254812Derived
+// CHECK:  [[SELF:%[0-9]+]] = load_borrow [[SELFMUI]] : $*r19254812Derived
 // CHECK-NEXT:  [[PIPTR:%[0-9]+]] = ref_element_addr [[SELF]] : $r19254812Derived, #r19254812Derived.pi
 // CHECK-NEXT:  assign {{.*}} to [[PIPTR]] : $*Double
 
@@ -908,9 +906,9 @@ class r19254812Derived: r19254812Base{
 // CHECK-NOT: copy_value
 
 // Load of the pi field: no copy_values/releases.
-// CHECK:  [[SELF:%[0-9]+]] = load [[SELFMUI]] : $*r19254812Derived
+// CHECK:  [[SELF:%[0-9]+]] = load_borrow [[SELFMUI]] : $*r19254812Derived
 // CHECK-NEXT:  [[PIPTR:%[0-9]+]] = ref_element_addr [[SELF]] : $r19254812Derived, #r19254812Derived.pi
-// CHECK-NEXT:  {{.*}} = load [[PIPTR]] : $*Double
+// CHECK-NEXT:  {{.*}} = load [trivial] [[PIPTR]] : $*Double
 // CHECK: return
 }
 

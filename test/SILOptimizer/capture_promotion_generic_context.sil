@@ -1,4 +1,4 @@
-// RUN: %target-swift-frontend -emit-sil -O %s | %FileCheck %s
+// RUN: %target-swift-frontend -assume-parsing-unqualified-ownership-sil -emit-sil -O %s | %FileCheck %s
 
 sil_stage raw
 

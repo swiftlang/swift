@@ -250,7 +250,7 @@ ManagedValue SILGenFunction::emitUncheckedGetOptionalValueFrom(SILLocation loc,
   
     if (optTL.isLoadable())
       payloadVal =
-          B.createLoad(loc, payloadVal, LoadOwnershipQualifier::Unqualified);
+          optTL.emitLoad(B, loc, payloadVal, LoadOwnershipQualifier::Take);
   }
 
   // Produce a correctly managed value.

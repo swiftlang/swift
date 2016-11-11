@@ -3561,6 +3561,36 @@ case TypeKind::Id:
       return FunctionType::get(inputTy, resultTy, function->getExtInfo());
     }
 
+    // Sort/unique the generic parameters by depth/index.
+    using llvm::array_pod_sort;
+    array_pod_sort(genericParams.begin(), genericParams.end(),
+                   [](GenericTypeParamType * const * gpp1,
+                      GenericTypeParamType * const * gpp2) {
+                     auto gp1 = *gpp1;
+                     auto gp2 = *gpp2;
+
+                     if (gp1->getDepth() < gp2->getDepth())
+                       return -1;
+
+                     if (gp1->getDepth() > gp2->getDepth())
+                       return 1;
+
+                     if (gp1->getIndex() < gp2->getIndex())
+                       return -1;
+
+                     if (gp1->getIndex() > gp2->getIndex())
+                       return 1;
+
+                     return 0;
+                   });
+    genericParams.erase(std::unique(genericParams.begin(), genericParams.end(),
+                                    [](GenericTypeParamType *gp1,
+                                       GenericTypeParamType *gp2) {
+                                      return gp1->getDepth() == gp2->getDepth()
+                                          && gp1->getIndex() == gp2->getIndex();
+                                    }),
+                        genericParams.end());
+
     // Produce the new generic function type.
     auto sig = GenericSignature::get(genericParams, requirements);
     return GenericFunctionType::get(sig, inputTy, resultTy,

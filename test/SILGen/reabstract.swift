@@ -21,9 +21,9 @@ func test0() {
 // CHECK-NEXT: return
 
 // CHECK:    sil shared [transparent] [reabstraction_thunk] [[THUNK]] : $@convention(thin) (@in Int, @owned @callee_owned (Int) -> Optional<Int>) -> @out Optional<Int> {
-// CHECK:      [[T0:%.*]] = load %1 : $*Int
+// CHECK:      [[T0:%.*]] = load [trivial] %1 : $*Int
 // CHECK-NEXT: [[T1:%.*]] = apply %2([[T0]])
-// CHECK-NEXT: store [[T1]] to %0
+// CHECK-NEXT: store [[T1]] to [trivial] %0
 // CHECK-NEXT: tuple ()
 // CHECK-NEXT: return
 

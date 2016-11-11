@@ -18,7 +18,7 @@ struct GenericMetatype<T> {
 
 // CHECK-LABEL: sil hidden @_TFs26genericMetatypeFromGeneric
 // CHECK:         [[ADDR:%.*]] = struct_element_addr {{%.*}} : $*Generic<T.Type>, #Generic.value
-// CHECK:         [[META:%.*]] = load [[ADDR]] : $*@thick T.Type
+// CHECK:         [[META:%.*]] = load [trivial] [[ADDR]] : $*@thick T.Type
 // CHECK:         return [[META]] : $@thick T.Type
 // CHECK:       }
 func genericMetatypeFromGeneric<T>(_ x: Generic<T.Type>) -> T.Type {
@@ -27,7 +27,7 @@ func genericMetatypeFromGeneric<T>(_ x: Generic<T.Type>) -> T.Type {
 }
 // CHECK-LABEL: sil hidden @_TFs26dynamicMetatypeFromGeneric
 // CHECK:         [[ADDR:%.*]] = struct_element_addr {{%.*}} : $*Generic<C.Type>, #Generic.value
-// CHECK:         [[META:%.*]] = load [[ADDR]] : $*@thick C.Type
+// CHECK:         [[META:%.*]] = load [trivial] [[ADDR]] : $*@thick C.Type
 // CHECK:         return [[META]] : $@thick C.Type
 // CHECK:       }
 func dynamicMetatypeFromGeneric(_ x: Generic<C.Type>) -> C.Type {
@@ -44,7 +44,7 @@ func staticMetatypeFromGeneric(_ x: Generic<S.Type>) -> S.Type {
 
 // CHECK-LABEL: sil hidden @_TFs34genericMetatypeFromGenericMetatype
 // CHECK:         [[ADDR:%.*]] = struct_element_addr {{%.*}} : $*GenericMetatype<T>, #GenericMetatype.value
-// CHECK:         [[META:%.*]] = load [[ADDR]] : $*@thick T.Type
+// CHECK:         [[META:%.*]] = load [trivial] [[ADDR]] : $*@thick T.Type
 // CHECK:         return [[META]] : $@thick T.Type
 // CHECK:       }
 func genericMetatypeFromGenericMetatype<T>(_ x: GenericMetatype<T>)-> T.Type {
@@ -55,7 +55,7 @@ func genericMetatypeFromGenericMetatype<T>(_ x: GenericMetatype<T>)-> T.Type {
 // CHECK:         [[XBOX:%[0-9]+]] = alloc_box $@box GenericMetatype<C>
 // CHECK:         [[PX:%[0-9]+]] = project_box [[XBOX]]
 // CHECK:         [[ADDR:%.*]] = struct_element_addr [[PX]] : $*GenericMetatype<C>, #GenericMetatype.value
-// CHECK:         [[META:%.*]] = load [[ADDR]] : $*@thick C.Type
+// CHECK:         [[META:%.*]] = load [trivial] [[ADDR]] : $*@thick C.Type
 // CHECK:         return [[META]] : $@thick C.Type
 // CHECK:       }
 func dynamicMetatypeFromGenericMetatype(_ x: GenericMetatype<C>) -> C.Type {
@@ -90,7 +90,7 @@ func dynamicMetatypeToGeneric(_ x: C.Type) {
 // CHECK-LABEL: sil hidden @_TFs32dynamicMetatypeToGenericMetatypeFMCs1CT_
 // CHECK:         [[XBOX:%[0-9]+]] = alloc_box $@box (@thick C.Type)
 // CHECK:         [[PX:%[0-9]+]] = project_box [[XBOX]]
-// CHECK:         [[META:%.*]] = load [[PX]] : $*@thick C.Type
+// CHECK:         [[META:%.*]] = load [trivial] [[PX]] : $*@thick C.Type
 // CHECK:         apply {{%.*}}<C>([[META]]) : $@convention(thin) <τ_0_0> (@thick τ_0_0.Type) -> ()
 func dynamicMetatypeToGenericMetatype(_ x: C.Type) {
   var x = x

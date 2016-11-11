@@ -75,7 +75,7 @@ func dont_return<T>(_ argument: T) throws -> T {
 // CHECK-NEXT: [[RET_TEMP:%.*]] = alloc_stack $Cat
 // CHECK-NEXT: try_apply [[DR_FN]]<Cat>([[RET_TEMP]], [[ARG_TEMP]]) : $@convention(thin) <τ_0_0> (@in τ_0_0) -> (@out τ_0_0, @error Error), normal [[DR_NORMAL:bb[0-9]+]], error [[DR_ERROR:bb[0-9]+]]
 // CHECK:    [[DR_NORMAL]]({{%.*}} : $()):
-// CHECK-NEXT: [[T0:%.*]] = load [[RET_TEMP]] : $*Cat
+// CHECK-NEXT: [[T0:%.*]] = load [take] [[RET_TEMP]] : $*Cat
 // CHECK-NEXT: dealloc_stack [[RET_TEMP]]
 // CHECK-NEXT: dealloc_stack [[ARG_TEMP]]
 // CHECK-NEXT: br [[RETURN:bb[0-9]+]]([[T0]] : $Cat)
@@ -93,7 +93,7 @@ func dont_return<T>(_ argument: T) throws -> T {
 
 //   Catch HomeworkError.
 // CHECK:    [[IS_HWE]]:
-// CHECK-NEXT: [[T0:%.*]] = load [[DEST_TEMP]] : $*HomeworkError
+// CHECK-NEXT: [[T0:%.*]] = load [take] [[DEST_TEMP]] : $*HomeworkError
 // CHECK-NEXT: switch_enum [[T0]] : $HomeworkError, case #HomeworkError.CatAteIt!enumelt.1: [[MATCH:bb[0-9]+]], default [[NO_MATCH:bb[0-9]+]]
 
 //   Catch HomeworkError.CatAteIt.
@@ -213,7 +213,7 @@ protocol Doomed {
 // CHECK-LABEL: sil hidden [transparent] [thunk] @_TTWV6errors12DoomedStructS_6DoomedS_FS1_5check{{.*}} : $@convention(witness_method) (@in_guaranteed DoomedStruct) -> @error Error
 // CHECK:      [[TEMP:%.*]] = alloc_stack $DoomedStruct
 // CHECK:      copy_addr %0 to [initialization] [[TEMP]]
-// CHECK:      [[SELF:%.*]] = load [[TEMP]] : $*DoomedStruct
+// CHECK:      [[SELF:%.*]] = load [trivial] [[TEMP]] : $*DoomedStruct
 // CHECK:      [[T0:%.*]] = function_ref @_TFV6errors12DoomedStruct5check{{.*}} : $@convention(method) (DoomedStruct) -> @error Error
 // CHECK-NEXT: try_apply [[T0]]([[SELF]])
 // CHECK:    bb1([[T0:%.*]] : $()):
@@ -231,7 +231,7 @@ struct DoomedStruct : Doomed {
 // CHECK-LABEL: sil hidden [transparent] [thunk] @_TTWC6errors11DoomedClassS_6DoomedS_FS1_5check{{.*}} : $@convention(witness_method) (@in_guaranteed DoomedClass) -> @error Error {
 // CHECK:      [[TEMP:%.*]] = alloc_stack $DoomedClass
 // CHECK:      copy_addr %0 to [initialization] [[TEMP]]
-// CHECK:      [[SELF:%.*]] = load [[TEMP]] : $*DoomedClass
+// CHECK:      [[SELF:%.*]] = load [take] [[TEMP]] : $*DoomedClass
 // CHECK:      [[T0:%.*]] = class_method [[SELF]] : $DoomedClass, #DoomedClass.check!1 : (DoomedClass) -> () throws -> () , $@convention(method) (@guaranteed DoomedClass) -> @error Error
 // CHECK-NEXT: try_apply [[T0]]([[SELF]])
 // CHECK:    bb1([[T0:%.*]] : $()):
@@ -251,7 +251,7 @@ class DoomedClass : Doomed {
 // CHECK-LABEL: sil hidden [transparent] [thunk] @_TTWV6errors11HappyStructS_6DoomedS_FS1_5check{{.*}} : $@convention(witness_method) (@in_guaranteed HappyStruct) -> @error Error
 // CHECK:      [[TEMP:%.*]] = alloc_stack $HappyStruct
 // CHECK:      copy_addr %0 to [initialization] [[TEMP]]
-// CHECK:      [[SELF:%.*]] = load [[TEMP]] : $*HappyStruct
+// CHECK:      [[SELF:%.*]] = load [trivial] [[TEMP]] : $*HappyStruct
 // CHECK:      [[T0:%.*]] = function_ref @_TFV6errors11HappyStruct5check{{.*}} : $@convention(method) (HappyStruct) -> ()
 // CHECK:      [[T1:%.*]] = apply [[T0]]([[SELF]])
 // CHECK:      [[T1:%.*]] = tuple ()
@@ -264,7 +264,7 @@ struct HappyStruct : Doomed {
 // CHECK-LABEL: sil hidden [transparent] [thunk] @_TTWC6errors10HappyClassS_6DoomedS_FS1_5check{{.*}} : $@convention(witness_method) (@in_guaranteed HappyClass) -> @error Error
 // CHECK:      [[TEMP:%.*]] = alloc_stack $HappyClass
 // CHECK:      copy_addr %0 to [initialization] [[TEMP]]
-// CHECK:      [[SELF:%.*]] = load [[TEMP]] : $*HappyClass
+// CHECK:      [[SELF:%.*]] = load [take] [[TEMP]] : $*HappyClass
 // CHECK:      [[T0:%.*]] = class_method [[SELF]] : $HappyClass, #HappyClass.check!1 : (HappyClass) -> () -> () , $@convention(method) (@guaranteed HappyClass) -> ()
 // CHECK:      [[T1:%.*]] = apply [[T0]]([[SELF]])
 // CHECK:      [[T1:%.*]] = tuple ()
@@ -285,7 +285,7 @@ func testThunk(_ fn: () throws -> Int) throws -> Int {
 // CHECK: bb0(%0 : $*Int, %1 : $@callee_owned () -> (Int, @error Error)):
 // CHECK:   try_apply %1()
 // CHECK: bb1([[T0:%.*]] : $Int):
-// CHECK:   store [[T0]] to %0 : $*Int
+// CHECK:   store [[T0]] to [trivial] %0 : $*Int
 // CHECK:   [[T0:%.*]] = tuple ()
 // CHECK:   return [[T0]]
 // CHECK: bb2([[T0:%.*]] : $Error):
@@ -481,11 +481,11 @@ class BaseThrowingInit : HasThrowingInit {
 // CHECK:      [[PB:%.*]] = project_box [[BOX]]
 // CHECK:      [[MARKED_BOX:%.*]] = mark_uninitialized [derivedself] [[PB]]
 //   Initialize subField.
-// CHECK:      [[T0:%.*]] = load [[MARKED_BOX]]
+// CHECK:      [[T0:%.*]] = load_borrow [[MARKED_BOX]]
 // CHECK-NEXT: [[T1:%.*]] = ref_element_addr [[T0]] : $BaseThrowingInit, #BaseThrowingInit.subField
 // CHECK-NEXT: assign %1 to [[T1]]
 //   Super delegation.
-// CHECK-NEXT: [[T0:%.*]] = load [[MARKED_BOX]]
+// CHECK-NEXT: [[T0:%.*]] = load_borrow [[MARKED_BOX]]
 // CHECK-NEXT: [[T2:%.*]] = upcast [[T0]] : $BaseThrowingInit to $HasThrowingInit
 // CHECK: [[T3:%[0-9]+]] = function_ref @_TFC6errors15HasThrowingInitcfzT5valueSi_S0_ : $@convention(method) (Int, @owned HasThrowingInit) -> (@owned HasThrowingInit, @error Error)
 // CHECK-NEXT: apply [[T3]](%0, [[T2]])
@@ -585,19 +585,16 @@ func supportStructure(_ b: inout Bridge, name: String) throws {
 // CHECK-NEXT: [[INDEX_COPY_1:%.*]] = copy_value [[ARG2]] : $String
 // CHECK-NEXT: [[INDEX_COPY_2:%.*]] = copy_value [[INDEX_COPY_1]] : $String
 // CHECK-NEXT: [[TEMP:%.*]] = alloc_stack $Pylon
-// CHECK-NEXT: [[BASE:%.*]] = load [[ARG1]] : $*Bridge
-// CHECK-NEXT: [[BASE_COPY:%.*]] = copy_value [[BASE]]
+// CHECK-NEXT: [[BASE:%.*]] = load [copy] [[ARG1]] : $*Bridge
 // CHECK-NEXT: // function_ref
 // CHECK-NEXT: [[GETTER:%.*]] = function_ref @_TFV6errors6Bridgeg9subscriptFSSVS_5Pylon :
-// ==> SEMANTIC ARC TODO: Next line [[BASE]] should be [[BASE_COPY]]
 // CHECK-NEXT: [[T0:%.*]] = apply [[GETTER]]([[INDEX_COPY_1]], [[BASE]])
-// ==> SEMANTIC ARC TODO: Next line [[BASE]] should be [[BASE_COPY]]
 // CHECK-NEXT: destroy_value [[BASE]]
 // CHECK-NEXT: store [[T0]] to [init] [[TEMP]]
 // CHECK-NEXT: try_apply [[SUPPORT]]([[TEMP]]) : {{.*}}, normal [[BB_NORMAL:bb[0-9]+]], error [[BB_ERROR:bb[0-9]+]]
 
 // CHECK:    [[BB_NORMAL]]
-// CHECK-NEXT: [[T0:%.*]] = load [[TEMP]]
+// CHECK-NEXT: [[T0:%.*]] = load [take] [[TEMP]]
 // CHECK-NEXT: // function_ref
 // CHECK-NEXT: [[SETTER:%.*]] = function_ref @_TFV6errors6Bridges9subscriptFSSVS_5Pylon :
 // CHECK-NEXT: apply [[SETTER]]([[T0]], [[INDEX_COPY_2]], [[ARG1]])
@@ -609,12 +606,10 @@ func supportStructure(_ b: inout Bridge, name: String) throws {
 //   We end up with ugly redundancy here because we don't want to
 //   consume things during cleanup emission.  It's questionable.
 // CHECK:    [[BB_ERROR]]([[ERROR:%.*]] : $Error):
-// CHECK-NEXT: [[T0:%.*]] = load [[TEMP]]
-// CHECK-NEXT: [[T0_COPY:%.*]] = copy_value [[T0]]
+// CHECK-NEXT: [[T0:%.*]] = load [copy] [[TEMP]]
 // CHECK-NEXT: [[INDEX_COPY_2_COPY:%.*]] = copy_value [[INDEX_COPY_2]]
 // CHECK-NEXT: // function_ref
 // CHECK-NEXT: [[SETTER:%.*]] = function_ref @_TFV6errors6Bridges9subscriptFSSVS_5Pylon :
-// ==> SEMANTIC ARC TODO: T0 on the next line should be T0_COPY
 // CHECK-NEXT: apply [[SETTER]]([[T0]], [[INDEX_COPY_2_COPY]], [[ARG1]])
 // CHECK-NEXT: destroy_addr [[TEMP]]
 // CHECK-NEXT: dealloc_stack [[TEMP]]

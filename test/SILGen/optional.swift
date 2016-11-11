@@ -41,8 +41,7 @@ func testAddrOnlyCallResult<T>(_ f: (() -> T)?) {
 //   If so, pull out the value...
 // CHECK:    bb1:
 // CHECK-NEXT: [[T1:%.*]] = unchecked_take_enum_data_addr [[PBF]]
-// CHECK-NEXT: [[T0:%.*]] = load [[T1]]
-// CHECK-NEXT: copy_value
+// CHECK-NEXT: [[T0:%.*]] = load [copy] [[T1]]
 //   ...evaluate the rest of the suffix...
 // CHECK-NEXT: apply [[T0]]([[TEMP]])
 //   ...and coerce to T?

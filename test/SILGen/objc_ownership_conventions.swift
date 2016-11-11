@@ -33,40 +33,68 @@ func test3() -> NSObject {
 func test5(_ g: Gizmo) {
   var g = g
   Gizmo.inspect(g)
-  // CHECK:      [[CLASS:%.*]] = metatype $@thick Gizmo.Type
-  // CHECK-NEXT: [[METHOD:%.*]] = class_method [volatile] [[CLASS]] : {{.*}}, #Gizmo.inspect!1.foreign
-  // CHECK-NEXT: [[OBJC_CLASS:%[0-9]+]] = thick_to_objc_metatype [[CLASS]] : $@thick Gizmo.Type to $@objc_metatype Gizmo.Type
-  // CHECK:      [[V:%.*]] = load
-  // CHECK:      copy_value [[V]]
-  // CHECK:      [[G:%.*]] = enum $Optional<Gizmo>, #Optional.some!enumelt.1, [[V]]
-  // CHECK-NEXT: apply [[METHOD]]([[G]], [[OBJC_CLASS]])
-  // CHECK-NEXT: destroy_value [[G]]
+  // CHECK: bb0([[ARG:%.*]] : $Gizmo):
+  // CHECK:   [[GIZMO_BOX:%.*]] = alloc_box $@box Gizmo
+  // CHECK:   [[GIZMO_BOX_PB:%.*]] = project_box [[GIZMO_BOX]]
+  // CHECK:   [[ARG_COPY:%.*]] = copy_value [[ARG]]
+  // CHECK:   store [[ARG_COPY]] to [init] [[GIZMO_BOX_PB]]
+  // CHECK:   [[CLASS:%.*]] = metatype $@thick Gizmo.Type
+  // CHECK:   [[METHOD:%.*]] = class_method [volatile] [[CLASS]] : {{.*}}, #Gizmo.inspect!1.foreign
+  // CHECK:   [[OBJC_CLASS:%[0-9]+]] = thick_to_objc_metatype [[CLASS]] : $@thick Gizmo.Type to $@objc_metatype Gizmo.Type
+  // CHECK:   [[V:%.*]] = load [copy] [[GIZMO_BOX_PB]]
+  // CHECK:   [[G:%.*]] = enum $Optional<Gizmo>, #Optional.some!enumelt.1, [[V]]
+  // CHECK:   apply [[METHOD]]([[G]], [[OBJC_CLASS]])
+  // CHECK:   destroy_value [[G]]
+  // CHECK:   destroy_value [[GIZMO_BOX]]
+  // CHECK:   destroy_value [[ARG]]
 }
+// CHECK: } // end sil function '_TF26objc_ownership_conventions5test5{{.*}}'
+
 // The argument to consume is __attribute__((ns_consumed)).
 // CHECK-LABEL: sil hidden  @_TF26objc_ownership_conventions5test6
 func test6(_ g: Gizmo) {
   var g = g
   Gizmo.consume(g)
-  // CHECK:      [[CLASS:%.*]] = metatype $@thick Gizmo.Type
-  // CHECK-NEXT: [[METHOD:%.*]] = class_method [volatile] [[CLASS]] : {{.*}}, #Gizmo.consume!1.foreign
-  // CHECK-NEXT: [[OBJC_CLASS:%.*]] = thick_to_objc_metatype [[CLASS]] : $@thick Gizmo.Type to $@objc_metatype Gizmo.Type
-  // CHECK:      [[V:%.*]] = load
-  // CHECK:      copy_value [[V]]
-  // CHECK:      [[G:%.*]] = enum $Optional<Gizmo>, #Optional.some!
-  // CHECK-NEXT: apply [[METHOD]]([[G]], [[OBJC_CLASS]])
+  // CHECK: bb0([[ARG:%.*]] : $Gizmo):
+  // CHECK:   [[GIZMO_BOX:%.*]] = alloc_box $@box Gizmo
+  // CHECK:   [[GIZMO_BOX_PB:%.*]] = project_box [[GIZMO_BOX]]
+  // CHECK:   [[ARG_COPY:%.*]] = copy_value [[ARG]]
+  // CHECK:   store [[ARG_COPY]] to [init] [[GIZMO_BOX_PB]]
+  // CHECK:   [[CLASS:%.*]] = metatype $@thick Gizmo.Type
+  // CHECK:   [[METHOD:%.*]] = class_method [volatile] [[CLASS]] : {{.*}}, #Gizmo.consume!1.foreign
+  // CHECK:   [[OBJC_CLASS:%.*]] = thick_to_objc_metatype [[CLASS]] : $@thick Gizmo.Type to $@objc_metatype Gizmo.Type
+  // CHECK:   [[V:%.*]] = load [copy] [[GIZMO_BOX_PB]]
+  // CHECK:   [[G:%.*]] = enum $Optional<Gizmo>, #Optional.some!enumelt.1, [[V]]
+  // CHECK:   apply [[METHOD]]([[G]], [[OBJC_CLASS]])
+  // CHECK-NOT:  destroy_value [[G]]
+  // CHECK:   destroy_value [[GIZMO_BOX]]
+  // CHECK-NOT:  destroy_value [[G]]
+  // CHECK:   destroy_value [[ARG]]
   // CHECK-NOT:  destroy_value [[G]]
 }
+// CHECK: } // end sil function '_TF26objc_ownership_conventions5test6{{.*}}'
+
 // fork is __attribute__((ns_consumes_self)).
 // CHECK-LABEL: sil hidden  @_TF26objc_ownership_conventions5test7
 func test7(_ g: Gizmo) {
   var g = g
   g.fork()
-  // CHECK:      [[G:%.*]] = load
-  // CHECK-NEXT: copy_value [[G]]
-  // CHECK-NEXT: [[METHOD:%.*]] = class_method [volatile] [[G]] : {{.*}}, #Gizmo.fork!1.foreign
-  // CHECK-NEXT: apply [[METHOD]]([[G]])
+  // CHECK: bb0([[ARG:%.*]] : $Gizmo):
+  // CHECK:   [[GIZMO_BOX:%.*]] = alloc_box $@box Gizmo
+  // CHECK:   [[GIZMO_BOX_PB:%.*]] = project_box [[GIZMO_BOX]]
+  // CHECK:   [[ARG_COPY:%.*]] = copy_value [[ARG]]
+  // CHECK:   store [[ARG_COPY]] to [init] [[GIZMO_BOX_PB]]
+  // CHECK:   [[G:%.*]] = load [copy] [[GIZMO_BOX_PB]]
+  // CHECK:   [[METHOD:%.*]] = class_method [volatile] [[G]] : {{.*}}, #Gizmo.fork!1.foreign
+  // CHECK:   apply [[METHOD]]([[G]])
+  // CHECK-NOT:  destroy_value [[G]]
+  // CHECK:   destroy_value [[GIZMO_BOX]]
+  // CHECK-NOT:  destroy_value [[G]]
+  // CHECK:   destroy_value [[ARG]]
   // CHECK-NOT:  destroy_value [[G]]
 }
+// CHECK: } // end sil function '_TF26objc_ownership_conventions5test7{{.*}}'
+
 // clone is __attribute__((ns_returns_retained)).
 // CHECK-LABEL: sil hidden  @_TF26objc_ownership_conventions5test8
 func test8(_ g: Gizmo) -> Gizmo {

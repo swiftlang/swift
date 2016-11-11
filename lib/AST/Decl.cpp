@@ -2973,6 +2973,10 @@ Witness ProtocolDecl::getDefaultWitness(ValueDecl *requirement) const {
 /// Record the default witness for a requirement.
 void ProtocolDecl::setDefaultWitness(ValueDecl *requirement, Witness witness) {
   assert(witness);
+  // The first type we insert a default witness, register a destructor for
+  // this type.
+  if (DefaultWitnesses.empty())
+    getASTContext().addDestructorCleanup(DefaultWitnesses);
   auto pair = DefaultWitnesses.insert(std::make_pair(requirement, witness));
   assert(pair.second && "Already have a default witness!");
   (void) pair;

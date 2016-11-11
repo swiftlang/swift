@@ -9,8 +9,8 @@ entry(%x : $Int):
   %b = alloc_box $@box Int
   // CHECK: [[PB:%.*]] = project_box [[B]] : $@box Int, 0
   %ba = project_box %b : $@box Int, 0
-  // CHECK: store [[X:%.*]] to [[PB]] : $*Int
-  store %x to %ba : $*Int
+  // CHECK: store [[X:%.*]] to [trivial] [[PB]] : $*Int
+  store %x to [trivial] %ba : $*Int
   // CHECK: dealloc_box [[B]] : $@box Int
   dealloc_box %b : $@box Int
   return undef : $()

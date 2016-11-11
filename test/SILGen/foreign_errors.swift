@@ -18,7 +18,7 @@ func test0() throws {
   // CHECK: inject_enum_addr [[ERR_TEMP0]] : $*Optional<NSError>, #Optional.none!enumelt
   //   Create an unmanaged temporary, copy into it, and make a AutoreleasingUnsafeMutablePointer.
   // CHECK: [[ERR_TEMP1:%.*]] = alloc_stack $@sil_unmanaged Optional<NSError>
-  // CHECK: [[T0:%.*]] = load [[ERR_TEMP0]]
+  // CHECK: [[T0:%.*]] = load_borrow [[ERR_TEMP0]]
   // CHECK: [[T1:%.*]] = ref_to_unmanaged [[T0]]
   // CHECK: store [[T1]] to [trivial] [[ERR_TEMP1]]
   // CHECK: address_to_pointer [[ERR_TEMP1]]
@@ -27,7 +27,7 @@ func test0() throws {
   // CHECK: [[RESULT:%.*]] = apply [[METHOD]]({{.*}}, [[OBJC_SELF]])
 
   //   Writeback to the first temporary.
-  // CHECK: [[T0:%.*]] = load [[ERR_TEMP1]]
+  // CHECK: [[T0:%.*]] = load [trivial] [[ERR_TEMP1]]
   // CHECK: [[T1:%.*]] = unmanaged_to_ref [[T0]]
   // CHECK: [[T1_COPY:%.*]] = copy_value [[T1]]
   // CHECK: assign [[T1_COPY]] to [[ERR_TEMP0]]
@@ -47,7 +47,7 @@ func test0() throws {
   
   //   Error path: fall out and rethrow.
   // CHECK: [[ERROR_BB]]:
-  // CHECK: [[T0:%.*]] = load [[ERR_TEMP0]]
+  // CHECK: [[T0:%.*]] = load [take] [[ERR_TEMP0]]
   // CHECK: [[T1:%.*]] = function_ref @swift_convertNSErrorToError : $@convention(thin) (@owned Optional<NSError>) -> @owned Error
   // CHECK: [[T2:%.*]] = apply [[T1]]([[T0]])
   // CHECK: throw [[T2]] : $Error
@@ -144,7 +144,7 @@ let fn = ErrorProne.fail
 // CHECK:      [[RESULT:%.*]] = apply [[METHOD]]({{%.*}}, [[SELF]])
 // CHECK:      cond_br
 // CHECK:      return
-// CHECK:      [[T0:%.*]] = load [[TEMP]]
+// CHECK:      [[T0:%.*]] = load [take] [[TEMP]]
 // CHECK:      [[T1:%.*]] = apply {{%.*}}([[T0]])
 // CHECK:      throw [[T1]]
 
@@ -169,13 +169,14 @@ class VeryErrorProne : ErrorProne {
     try super.init(one: two)
   }
 }
+
 // CHECK-LABEL:    sil hidden @_TFC14foreign_errors14VeryErrorPronec{{.*}}
 // CHECK:    bb0([[ARG1:%.*]] : $Optional<AnyObject>, [[ARG2:%.*]] : $VeryErrorProne):
 // CHECK:      [[BOX:%.*]] = alloc_box $@box VeryErrorProne
 // CHECK:      [[PB:%.*]] = project_box [[BOX]]
 // CHECK:      [[MARKED_BOX:%.*]] = mark_uninitialized [derivedself] [[PB]]
-// CHECK:      store [[ARG2]] to [[MARKED_BOX]]
-// CHECK:      [[T0:%.*]] = load [[MARKED_BOX]]
+// CHECK:      store [[ARG2]] to [init] [[MARKED_BOX]]
+// CHECK:      [[T0:%.*]] = load_borrow [[MARKED_BOX]]
 // CHECK-NEXT: [[T1:%.*]] = upcast [[T0]] : $VeryErrorProne to $ErrorProne
 // CHECK-NEXT: [[T2:%.*]] = super_method [volatile] [[T0]] : $VeryErrorProne, #ErrorProne.init!initializer.1.foreign : (ErrorProne.Type) -> (Any?) throws -> ErrorProne , $@convention(objc_method) (Optional<AnyObject>, Optional<AutoreleasingUnsafeMutablePointer<Optional<NSError>>>, @owned ErrorProne) -> @owned Optional<ErrorProne>
 // CHECK:      [[ARG1_COPY:%.*]] = copy_value [[ARG1]]
@@ -214,7 +215,7 @@ func testNonNilError() throws -> Float {
 // CHECK:   [[OPTERR:%.*]] = alloc_stack $Optional<NSError>
 // CHECK:   [[RESULT:%.*]] = apply [[T1]](
 // CHECK:   assign {{%.*}} to [[OPTERR]]
-// CHECK:   [[T0:%.*]] = load [[OPTERR]]
+// CHECK:   [[T0:%.*]] = load [take] [[OPTERR]]
 // CHECK:   switch_enum [[T0]] : $Optional<NSError>, case #Optional.some!enumelt.1: [[ERROR_BB:bb[0-9]+]], case #Optional.none!enumelt: [[NORMAL_BB:bb[0-9]+]]
 // CHECK: [[NORMAL_BB]]:
 // CHECK-NOT: destroy_value

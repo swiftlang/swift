@@ -40,19 +40,19 @@ struct Foo {
 
     // Reads or inouts use the accessors normally.
 
-    // CHECK: [[SELF:%.*]] = load [[UNINIT_SELF]]
+    // CHECK: [[SELF:%.*]] = load [trivial] [[UNINIT_SELF]]
     // CHECK: [[GETTER:%.*]] = function_ref @_TFV22property_behavior_init3Foog1xSi
     // CHECK: apply [[GETTER]]([[SELF]])
     _ = self.x
 
     // CHECK: [[WHACK:%.*]] = function_ref @_TF22property_behavior_init5whackurFRxT_
     // CHECK: [[INOUT:%.*]] = alloc_stack
-    // CHECK: [[SELF:%.*]] = load [[UNINIT_SELF]]
+    // CHECK: [[SELF:%.*]] = load [trivial] [[UNINIT_SELF]]
     // CHECK: [[GETTER:%.*]] = function_ref @_TFV22property_behavior_init3Foog1xSi
     // CHECK: [[VALUE:%.*]] = apply [[GETTER]]([[SELF]])
     // CHECK: store [[VALUE]] to [trivial] [[INOUT]]
     // CHECK: apply [[WHACK]]<Int>([[INOUT]])
-    // CHECK: [[VALUE:%.*]] = load [[INOUT]]
+    // CHECK: [[VALUE:%.*]] = load [trivial] [[INOUT]]
     // CHECK: [[SETTER:%.*]] = function_ref @_TFV22property_behavior_init3Foos1xSi
     // CHECK: apply [[SETTER]]([[VALUE]], [[UNINIT_SELF]])
     whack(&self.x)

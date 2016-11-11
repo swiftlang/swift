@@ -93,16 +93,13 @@ public:
         // by looking at the size of the superclass
         bool valid;
         unsigned size, align;
-        auto super =
-            this->readSuperClassFromClassMetadata(MetadataAddress);
-        if (super) {
-          std::tie(valid, size, align) =
-              this->readInstanceSizeAndAlignmentFromClassMetadata(super);
+        std::tie(valid, size, align) =
+            this->readInstanceSizeAndAlignmentFromClassMetadata(MetadataAddress);
 
-          // Perform layout
-          if (valid)
-            TI = TC.getClassInstanceTypeInfo(TR, size, align);
-        }
+        // Perform layout
+        if (valid)
+          TI = TC.getClassInstanceTypeInfo(TR, size, align);
+
         break;
       }
       default:

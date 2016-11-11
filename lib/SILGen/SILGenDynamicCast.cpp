@@ -140,8 +140,8 @@ namespace {
         //emission.
         scalarOperandValue = operand.forward(SGF);
         if (scalarOperandValue->getType().isAddress()) {
-          scalarOperandValue = SGF.B.createLoad(
-              Loc, scalarOperandValue, LoadOwnershipQualifier::Unqualified);
+          scalarOperandValue = SGF.B.emitLoadValueOperation(
+              Loc, scalarOperandValue, LoadOwnershipQualifier::Take);
         }
         SGF.B.createCheckedCastBranch(Loc, /*exact*/ false, scalarOperandValue,
                                       origTargetTL.getLoweredType(),

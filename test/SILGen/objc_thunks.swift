@@ -80,8 +80,7 @@ class Hoozit : Gizmo {
   // CHECK: bb0(%0 : $Hoozit):
   // CHECK-NEXT:   debug_value %0
   // CHECK-NEXT:   [[ADDR:%.*]] = ref_element_addr %0 : {{.*}}, #Hoozit.typicalProperty
-  // CHECK-NEXT:   [[RES:%.*]] = load [[ADDR]] {{.*}}
-  // CHECK-NEXT:   copy_value [[RES]] : $Gizmo
+  // CHECK-NEXT:   [[RES:%.*]] = load [copy] [[ADDR]] {{.*}}
   // CHECK-NEXT:   return [[RES]]
 
   // -- setter
@@ -93,7 +92,7 @@ class Hoozit : Gizmo {
   // CHECK:   [[FR:%.*]] = function_ref @_TFC11objc_thunks6Hoozits15typicalPropertyCSo5Gizmo
   // CHECK:   [[RES:%.*]] = apply [[FR]]([[VALUE_COPY]], [[THIS_COPY]])
   // CHECK:   destroy_value [[THIS_COPY]]
-  // CHECK:   return [[RES]] : $(), scope {{.*}} // id: {{.*}} line:[[@LINE-29]]:7:auto_gen
+  // CHECK:   return [[RES]] : $(), scope {{.*}} // id: {{.*}} line:[[@LINE-28]]:7:auto_gen
   // CHECK: } // end sil function '_TToFC11objc_thunks6Hoozits15typicalPropertyCSo5Gizmo'
 
   // CHECK-LABEL: sil hidden [transparent] @_TFC11objc_thunks6Hoozits15typicalPropertyCSo5Gizmo
@@ -120,8 +119,7 @@ class Hoozit : Gizmo {
   // CHECK-LABEL: sil hidden [transparent] @_TFC11objc_thunks6Hoozitg12copyPropertyCSo5Gizmo
   // CHECK: bb0(%0 : $Hoozit):
   // CHECK:        [[ADDR:%.*]] = ref_element_addr %0 : {{.*}}, #Hoozit.copyProperty
-  // CHECK-NEXT:   [[RES:%.*]] = load [[ADDR]]
-  // CHECK-NEXT:   copy_value [[RES]] 
+  // CHECK-NEXT:   [[RES:%.*]] = load [copy] [[ADDR]]
   // CHECK-NEXT:   return [[RES]]
 
   // -- setter is normal

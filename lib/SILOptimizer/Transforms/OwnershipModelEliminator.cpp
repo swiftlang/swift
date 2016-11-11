@@ -69,20 +69,12 @@ bool OwnershipModelEliminatorVisitor::visitLoadInst(LoadInst *LI) {
   if (Qualifier == LoadOwnershipQualifier::Unqualified)
     return false;
 
-  // Otherwise, we need to break down the load inst into its unqualified
-  // components.
-  auto *UnqualifiedLoad = B.createLoad(LI->getLoc(), LI->getOperand(),
-                                       LoadOwnershipQualifier::Unqualified);
-
-  // If we have a copy, insert a retain_value. All other copies do not require
-  // more work.
-  if (Qualifier == LoadOwnershipQualifier::Copy) {
-    B.emitCopyValueOperation(UnqualifiedLoad->getLoc(), UnqualifiedLoad);
-  }
+  SILValue Result = B.emitLoadValueOperation(LI->getLoc(), LI->getOperand(),
+                                             LI->getOwnershipQualifier());
 
   // Then remove the qualified load and use the unqualified load as the def of
   // all of LI's uses.
-  LI->replaceAllUsesWith(UnqualifiedLoad);
+  LI->replaceAllUsesWith(Result);
   LI->eraseFromParent();
   return true;
 }
@@ -95,25 +87,8 @@ bool OwnershipModelEliminatorVisitor::visitStoreInst(StoreInst *SI) {
   if (Qualifier == StoreOwnershipQualifier::Unqualified)
     return false;
 
-  // Otherwise, we need to break down the store.
-  if (Qualifier != StoreOwnershipQualifier::Assign) {
-    // If the ownership qualifier is not an assign, we can just emit an
-    // unqualified store.
-    B.createStore(SI->getLoc(), SI->getSrc(), SI->getDest(),
-                  StoreOwnershipQualifier::Unqualified);
-  } else {
-    // If the ownership qualifier is [assign], then we need to eliminate the
-    // old value.
-    //
-    // 1. Load old value.
-    // 2. Store new value.
-    // 3. Release old value.
-    auto *Old = B.createLoad(SI->getLoc(), SI->getDest(),
-                             LoadOwnershipQualifier::Unqualified);
-    B.createStore(SI->getLoc(), SI->getSrc(), SI->getDest(),
-                  StoreOwnershipQualifier::Unqualified);
-    B.emitDestroyValueOperation(SI->getLoc(), Old);
-  }
+  B.emitStoreValueOperation(SI->getLoc(), SI->getSrc(), SI->getDest(),
+                            SI->getOwnershipQualifier());
 
   // Then remove the qualified store.
   SI->eraseFromParent();

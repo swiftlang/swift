@@ -528,10 +528,6 @@ Type Mangler::getDeclTypeForMangling(const ValueDecl *decl,
       requirementsBuf.clear();
       for (auto &reqt : sig->getRequirements()) {
         switch (reqt.getKind()) {
-        case RequirementKind::WitnessMarker:
-          // Not needed for mangling.
-          continue;
-
         case RequirementKind::Conformance:
         case RequirementKind::Superclass:
           // We don't need the requirement if the constrained type is above the
@@ -637,9 +633,6 @@ mangle_requirements:
   // Mangle the requirements.
   for (auto &reqt : requirements) {
     switch (reqt.getKind()) {
-    case RequirementKind::WitnessMarker:
-      break;
-        
     case RequirementKind::Conformance:
       if (!didMangleRequirement) {
         Buffer << 'R';

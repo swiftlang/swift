@@ -360,9 +360,9 @@ func convFuncExistential(_ f1: @escaping (Any) -> (Int) -> Int) {
 // CHECK:         return
 
 // CHECK-LABEL: sil shared [transparent] [reabstraction_thunk] @_TTRXFo_dSi_dSi_XFo_iSi_iSi_ : $@convention(thin) (@in Int, @owned @callee_owned (Int) -> Int) -> @out Int
-// CHECK:         load %1 : $*Int
+// CHECK:         load [trivial] %1 : $*Int
 // CHECK-NEXT:    apply %2(%3)
-// CHECK-NEXT:    store {{.*}} to %0
+// CHECK-NEXT:    store {{.*}} to [trivial] %0
 // CHECK:         return
 
 // ==== Class-bound archetype upcast

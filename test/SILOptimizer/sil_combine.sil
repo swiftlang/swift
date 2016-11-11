@@ -1318,6 +1318,45 @@ bb0(%0 : $Builtin.RawPointer, %1: $Builtin.Int64):
   return %11 : $Int32
 }
 
+// CHECK-LABEL: sil @trunc_of_zext : $@convention(thin) (Builtin.Int16) -> Builtin.Int32
+// CHECK-NOT: builtin "zextOrBitCast_Int16_Int64"
+// CHECK-NOT: builtin "truncOrBitCast_Int64_Int32"
+// CHECK: builtin "zextOrBitCast_Int16_Int32"
+// CHECK-NEXT: return
+sil @trunc_of_zext : $@convention(thin) (Builtin.Int16) -> Builtin.Int32 {
+bb0(%0 : $Builtin.Int16):
+  %zext = builtin "zextOrBitCast_Int16_Int64"(%0 : $Builtin.Int16) : $Builtin.Int64
+  %trunc = builtin "truncOrBitCast_Int64_Int32"(%zext : $Builtin.Int64) : $Builtin.Int32
+  return %trunc : $Builtin.Int32
+}
+
+// CHECK-LABEL: sil @zext_of_zext : $@convention(thin) (Builtin.Int16) -> Builtin.Int64
+// CHECK-NOT: builtin "zextOrBitCast_Int16_Int32"
+// CHECK-NOT: builtin "zextOrBitCast_Int32_Int64"
+// CHECK: builtin "zextOrBitCast_Int16_Int64"
+// CHECK-NEXT: return
+sil @zext_of_zext : $@convention(thin) (Builtin.Int16) -> Builtin.Int64 {
+bb0(%0 : $Builtin.Int16):
+  %zext1 = builtin "zextOrBitCast_Int16_Int32"(%0 : $Builtin.Int16) : $Builtin.Int32
+  %zext2 = builtin "zextOrBitCast_Int32_Int64"(%zext1 : $Builtin.Int32) : $Builtin.Int64
+  return %zext2 : $Builtin.Int64
+}
+
+// CHECK-LABEL: sil @trunc_of_zext_then_zext : $@convention(thin) (Builtin.Int16) -> Builtin.Int16
+// CHECK-NOT: builtin "zextOrBitCast_Int16_Int64"
+// CHECK-NOT: builtin "truncOrBitCast_Int64_Int32"
+// CHECK-NOT: builtin "zextOrBitCast_Int32_Int64"
+// CHECK-NOT: builtin "truncOrBitCast_Int64_Int16"
+// CHECK: return
+sil @trunc_of_zext_then_zext : $@convention(thin) (Builtin.Int16) -> Builtin.Int16 {
+bb0(%0 : $Builtin.Int16):
+  %zext = builtin "zextOrBitCast_Int16_Int64"(%0 : $Builtin.Int16) : $Builtin.Int64
+  %trunc = builtin "truncOrBitCast_Int64_Int32"(%zext : $Builtin.Int64) : $Builtin.Int32
+  %zext2 = builtin "zextOrBitCast_Int32_Int64"(%trunc : $Builtin.Int32) : $Builtin.Int64
+  %trunc2 = builtin "truncOrBitCast_Int64_Int16"(%zext2 : $Builtin.Int64) : $Builtin.Int16
+  return %trunc2 : $Builtin.Int16
+}
+
 sil @eliminate_dead_thin_to_thick_function_fun : $@convention(thin) () -> ()
 
 // CHECK-LABEL: sil @eliminate_dead_thin_to_thick_function : $@convention(thin) () -> () {

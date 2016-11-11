@@ -100,11 +100,11 @@ struct ConformingStruct : X {
   func selfTypes(x: ConformingStruct) -> ConformingStruct { return x }
   // CHECK-LABEL: sil hidden [transparent] [thunk] @_TTWV9witnesses16ConformingStructS_1XS_FS1_9selfTypes{{.*}} : $@convention(witness_method) (@in ConformingStruct, @inout ConformingStruct) -> @out ConformingStruct {
   // CHECK:       bb0(%0 : $*ConformingStruct, %1 : $*ConformingStruct, %2 : $*ConformingStruct):
-  // CHECK-NEXT:    %3 = load %1 : $*ConformingStruct
+  // CHECK-NEXT:    %3 = load [trivial] %1 : $*ConformingStruct
   // CHECK-NEXT:    // function_ref
   // CHECK-NEXT:    %4 = function_ref @_TFV9witnesses16ConformingStruct9selfTypes{{.*}} : $@convention(method) (ConformingStruct, @inout ConformingStruct) -> ConformingStruct
   // CHECK-NEXT:    %5 = apply %4(%3, %2) : $@convention(method) (ConformingStruct, @inout ConformingStruct) -> ConformingStruct
-  // CHECK-NEXT:    store %5 to %0 : $*ConformingStruct
+  // CHECK-NEXT:    store %5 to [trivial] %0 : $*ConformingStruct
   // CHECK-NEXT:    %7 = tuple ()
   // CHECK-NEXT:    return %7 : $()
   // CHECK-NEXT:  }
@@ -152,13 +152,13 @@ struct ConformingStruct : X {
 }
 func <~>(_ x: ConformingStruct, y: ConformingStruct) -> ConformingStruct { return x }
 // CHECK-LABEL: sil hidden [transparent] [thunk] @_TTWV9witnesses16ConformingStructS_1XS_ZFS1_oi3ltg{{.*}} : $@convention(witness_method) (@in ConformingStruct, @in ConformingStruct, @thick ConformingStruct.Type) -> @out ConformingStruct {
-// CHECK:       bb0(%0 : $*ConformingStruct, %1 : $*ConformingStruct, %2 : $*ConformingStruct, %3 : $@thick ConformingStruct.Type):
-// CHECK-NEXT:    %4 = load %1 : $*ConformingStruct
-// CHECK-NEXT:    %5 = load %2 : $*ConformingStruct
+// CHECK:       bb0([[ARG1:%.*]] : $*ConformingStruct, [[ARG2:%.*]] : $*ConformingStruct, [[ARG3:%.*]] : $*ConformingStruct, [[ARG4:%.*]] : $@thick ConformingStruct.Type):
+// CHECK-NEXT:    [[LOADED_ARG2:%.*]] = load [trivial] [[ARG2]] : $*ConformingStruct
+// CHECK-NEXT:    [[LOADED_ARG3:%.*]] = load [trivial] [[ARG3]] : $*ConformingStruct
 // CHECK-NEXT:    // function_ref
-// CHECK-NEXT:    %6 = function_ref @_TF9witnessesoi3ltgFTVS_16ConformingStructS0__S0_ : $@convention(thin) (ConformingStruct, ConformingStruct) -> ConformingStruct
-// CHECK-NEXT:    %7 = apply %6(%4, %5) : $@convention(thin) (ConformingStruct, ConformingStruct) -> ConformingStruct
-// CHECK-NEXT:    store %7 to %0 : $*ConformingStruct
+// CHECK-NEXT:    [[FUNC:%.*]] = function_ref @_TF9witnessesoi3ltgFTVS_16ConformingStructS0__S0_ : $@convention(thin) (ConformingStruct, ConformingStruct) -> ConformingStruct
+// CHECK-NEXT:    [[FUNC_RESULT:%.*]] = apply [[FUNC]]([[LOADED_ARG2]], [[LOADED_ARG3]]) : $@convention(thin) (ConformingStruct, ConformingStruct) -> ConformingStruct
+// CHECK-NEXT:    store [[FUNC_RESULT]] to [trivial] [[ARG1]] : $*ConformingStruct
 // CHECK-NEXT:    %9 = tuple ()
 // CHECK-NEXT:    return %9 : $()
 // CHECK-NEXT:  }
@@ -166,18 +166,15 @@ func <~>(_ x: ConformingStruct, y: ConformingStruct) -> ConformingStruct { retur
 final class ConformingClass : X {
   func selfTypes(x: ConformingClass) -> ConformingClass { return x }
   // CHECK-LABEL: sil hidden [transparent] [thunk] @_TTWC9witnesses15ConformingClassS_1XS_FS1_9selfTypes{{.*}} : $@convention(witness_method) (@in ConformingClass, @inout ConformingClass) -> @out ConformingClass {
-  // CHECK:       bb0(%0 : $*ConformingClass, %1 : $*ConformingClass, %2 : $*ConformingClass):
+  // CHECK:  bb0([[ARG1:%.*]] : $*ConformingClass, [[ARG2:%.*]] : $*ConformingClass, [[ARG3:%.*]] : $*ConformingClass):
   // -- load and copy_value 'self' from inout witness 'self' parameter
-  // CHECK-NEXT:    %3 = load %2 : $*ConformingClass
-  // CHECK-NEXT:    copy_value %3 : $ConformingClass
-  // CHECK-NEXT:    %5 = load %1 : $*ConformingClass
-  // CHECK:         %6 = function_ref @_TFC9witnesses15ConformingClass9selfTypes 
-  // CHECK-NEXT:    %7 = apply %6(%5, %3) : $@convention(method) (@owned ConformingClass, @guaranteed ConformingClass) -> @owned ConformingClass
-  // CHECK-NEXT:    store %7 to %0 : $*ConformingClass
-  // CHECK-NEXT:    %9 = tuple ()
-  // CHECK-NEXT:    destroy_value %3
-  // CHECK-NEXT:    return %9 : $()
-  // CHECK-NEXT:  }
+  // CHECK:    [[ARG3_LOADED:%.*]] = load [copy] [[ARG3]] : $*ConformingClass
+  // CHECK:    [[ARG2_LOADED:%.*]] = load [take] [[ARG2]] : $*ConformingClass
+  // CHECK:    [[FUNC:%.*]] = function_ref @_TFC9witnesses15ConformingClass9selfTypes 
+  // CHECK:    [[FUNC_RESULT:%.*]] = apply [[FUNC]]([[ARG2_LOADED]], [[ARG3_LOADED]]) : $@convention(method) (@owned ConformingClass, @guaranteed ConformingClass) -> @owned ConformingClass
+  // CHECK:    store [[FUNC_RESULT]] to [init] [[ARG1]] : $*ConformingClass
+  // CHECK:    destroy_value [[ARG3_LOADED]]
+  // CHECK:  } // end sil function '_TTWC9witnesses15ConformingClassS_1XS_FS1_9selfTypes{{.*}}'
   func loadable(x: Loadable) -> Loadable { return x }
   func addrOnly(x: AddrOnly) -> AddrOnly { return x }
   func generic<D>(x: D) -> D { return x }
@@ -260,7 +257,7 @@ struct ConformsWithMoreGeneric : X, Y {
   // CHECK-NEXT:    [[WITNESS_FN:%.*]] = function_ref @_TFV9witnesses23ConformsWithMoreGeneric7classes{{.*}} : $@convention(method) <τ_0_0> (@in τ_0_0, @inout ConformsWithMoreGeneric) -> @out τ_0_0
   // CHECK-NEXT:    [[RESULT_BOX:%.*]] = alloc_stack $τ_0_0
   // CHECK-NEXT:    [[RESULT:%.*]] = apply [[WITNESS_FN]]<τ_0_0>([[RESULT_BOX]], [[SELF_BOX]], %1) : $@convention(method) <τ_0_0> (@in τ_0_0, @inout ConformsWithMoreGeneric) -> @out τ_0_0
-  // CHECK-NEXT:    [[RESULT:%.*]] = load [[RESULT_BOX]] : $*τ_0_0
+  // CHECK-NEXT:    [[RESULT:%.*]] = load [take] [[RESULT_BOX]] : $*τ_0_0
   // CHECK-NEXT:    dealloc_stack [[RESULT_BOX]] : $*τ_0_0
   // CHECK-NEXT:    dealloc_stack [[SELF_BOX]] : $*τ_0_0
   // CHECK-NEXT:    return [[RESULT]] : $τ_0_0
@@ -350,7 +347,7 @@ struct FailableModel: FailableRequirement, IUOFailableRequirement {
   // CHECK: bb0([[SELF:%[0-9]+]] : $*Optional<FailableModel>, [[FOO:%[0-9]+]] : $Int, [[META:%[0-9]+]] : $@thick FailableModel.Type):
   // CHECK: [[FN:%.*]] = function_ref @_TFV9witnesses13FailableModelC{{.*}}
   // CHECK: [[INNER:%.*]] = apply [[FN]](
-  // CHECK: store [[INNER]] to %0
+  // CHECK: store [[INNER]] to [trivial] [[SELF]]
   // CHECK: return
   init?(foo: Int) {}
 }
@@ -493,7 +490,7 @@ class CrashableBase {
 // CHECK:       bb0(%0 : $*GenericCrashable<τ_0_0>):
 // CHECK-NEXT: [[BOX:%.*]] = alloc_stack $GenericCrashable<τ_0_0>
 // CHECK-NEXT: copy_addr %0 to [initialization] [[BOX]] : $*GenericCrashable<τ_0_0>
-// CHECK-NEXT: [[SELF:%.*]] = load [[BOX]] : $*GenericCrashable<τ_0_0>
+// CHECK-NEXT: [[SELF:%.*]] = load [take] [[BOX]] : $*GenericCrashable<τ_0_0>
 // CHECK-NEXT: [[BASE:%.*]] = upcast [[SELF]] : $GenericCrashable<τ_0_0> to $CrashableBase
 // CHECK-NEXT: [[FN:%.*]] = class_method [[BASE]] : $CrashableBase, #CrashableBase.crash!1 : (CrashableBase) -> () -> () , $@convention(method) (@guaranteed CrashableBase) -> ()
 // CHECK-NEXT: apply [[FN]]([[BASE]]) : $@convention(method) (@guaranteed CrashableBase) -> ()

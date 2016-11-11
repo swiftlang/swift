@@ -658,8 +658,7 @@ func test_open_existential_semantics_class(_ guaranteed: CP1,
   // CHECK-NOT: destroy_value %0
   guaranteed.f1()
 
-  // CHECK: [[IMMEDIATE:%.*]] = load [[PB]]
-  // CHECK: copy_value [[IMMEDIATE]]
+  // CHECK: [[IMMEDIATE:%.*]] = load [copy] [[PB]]
   // CHECK: [[VALUE:%.*]] = open_existential_ref [[IMMEDIATE]]
   // CHECK: [[METHOD:%.*]] = function_ref
   // CHECK: apply [[METHOD]]<{{.*}}>([[VALUE]])
