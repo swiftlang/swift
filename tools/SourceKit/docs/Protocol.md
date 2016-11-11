@@ -40,7 +40,7 @@ provided.
 
 | Request Name | Request Key | Description |
 | -------------:|:------------|:------------|
-| `codecomplete` | `codecomplete` | Open a code-completion session for the given input file and offset, and return the initial list of completions. |
+| `codecomplete` | `codecomplete` | Returns a list of completions. |
 | `open` | `codecomplete.open` | Given a file will open a code-completion session which can be filtered using `codecomplete.update`. Each session must be closed using `codecomplete.close`. |
 
 ### Request
