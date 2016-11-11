@@ -4766,7 +4766,7 @@ static bool diagnoseSingleCandidateFailures(CalleeCandidateInfo &CCI,
       if (auto FT = param.Ty->getAs<AnyFunctionType>())
         if (FT->isAutoClosure())
           Ty = FT->getResult();
-      insertText << "<#T##" << Ty << "#>";
+      insertText << "<#" << Ty << "#>";
       if (argIdx == 0 && insertableEndIdx != 0)
         insertText << ", ";
 
