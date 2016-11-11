@@ -1221,26 +1221,27 @@ toolchains::GenericUnix::constructInvocation(const AutolinkExtractJobAction &job
 }
 
 std::string toolchains::GenericUnix::getDefaultLinker() const {
-  switch(getTriple().getArch()) {
-  case llvm::Triple::arm:
-  case llvm::Triple::armeb:
-  case llvm::Triple::thumb:
-  case llvm::Triple::thumbeb:
-    // BFD linker has issues wrt relocation of the protocol conformance
-    // section on these targets, it also generates COPY relocations for
-    // final executables, as such, unless specified, we default to gold
-    // linker.
-    return "gold";
-  case llvm::Triple::x86_64:
-  case llvm::Triple::ppc64:
-  case llvm::Triple::ppc64le:
-  case llvm::Triple::systemz:
-    // BFD linker has issues wrt relocations against protected symbols.
-    return "gold";
-  default:
-    // Otherwise, use the default BFD linker.
     return "";
-  }
+    switch(getTriple().getArch()) {
+        case llvm::Triple::arm:
+        case llvm::Triple::armeb:
+        case llvm::Triple::thumb:
+        case llvm::Triple::thumbeb:
+            // BFD linker has issues wrt relocation of the protocol conformance
+            // section on these targets, it also generates COPY relocations for
+            // final executables, as such, unless specified, we default to gold
+            // linker.
+            return "gold";
+        case llvm::Triple::x86_64:
+        case llvm::Triple::ppc64:
+        case llvm::Triple::ppc64le:
+        case llvm::Triple::systemz:
+            // BFD linker has issues wrt relocations against protected symbols.
+            return "gold";
+        default:
+            // Otherwise, use the default BFD linker.
+            return "";
+    }
 }
 
 std::string toolchains::GenericUnix::getTargetForLinker() const {
