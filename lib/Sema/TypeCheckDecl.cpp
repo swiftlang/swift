@@ -8400,8 +8400,8 @@ static void validateAttributes(TypeChecker &TC, Decl *D) {
   // Only protocol members can be optional.
   if (auto *OA = Attrs.getAttribute<OptionalAttr>()) {
     if (!isa<ProtocolDecl>(D->getDeclContext())) {
-      TC.diagnose(OA->getLocation(),
-                  diag::optional_attribute_non_protocol);
+      TC.diagnose(OA->getLocation(), diag::optional_attribute_non_protocol)
+        .fixItRemove(OA->getRange());
       D->getAttrs().removeAttribute(OA);
     } else if (!cast<ProtocolDecl>(D->getDeclContext())->isObjC()) {
       TC.diagnose(OA->getLocation(),
