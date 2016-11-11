@@ -851,12 +851,12 @@ void ModuleFile::readGenericRequirements(
 }
 
 GenericEnvironment *ModuleFile::readGenericEnvironment(
-    SmallVectorImpl<GenericTypeParamType *> &paramTypes,
     llvm::BitstreamCursor &Cursor,
     Optional<ArrayRef<Requirement>> optRequirements) {
   using namespace decls_block;
 
   SmallVector<uint64_t, 8> scratch;
+  SmallVector<GenericTypeParamType *, 4> paramTypes;
   StringRef blobData;
 
   TypeSubstitutionMap interfaceToArchetypeMap;
@@ -956,10 +956,8 @@ GenericEnvironment *ModuleFile::readGenericEnvironment(
                                  interfaceToArchetypeMap);
 }
 
-GenericEnvironment *
-ModuleFile::maybeReadGenericEnvironment() {
-  SmallVector<GenericTypeParamType *, 4> paramTypes;
-  return readGenericEnvironment(paramTypes, DeclTypeCursor);
+GenericEnvironment *ModuleFile::maybeReadGenericEnvironment() {
+  return readGenericEnvironment(DeclTypeCursor);
 }
 
 bool ModuleFile::readMembers(SmallVectorImpl<Decl *> &Members) {
@@ -2399,8 +2397,7 @@ Decl *ModuleFile::getDecl(DeclID DID, Optional<DeclContext *> ForcedContext) {
     if (declOrOffset.isComplete())
       return declOrOffset;
 
-    SmallVector<GenericTypeParamType *, 2> genericParamTypes;
-    auto *genericEnv = readGenericEnvironment(genericParamTypes, DeclTypeCursor);
+    auto *genericEnv = readGenericEnvironment(DeclTypeCursor);
 
     // Resolve the name ids.
     SmallVector<Identifier, 2> argNames;
@@ -2609,8 +2606,7 @@ Decl *ModuleFile::getDecl(DeclID DID, Optional<DeclContext *> ForcedContext) {
     // DeclContext for now.
     GenericParamList *genericParams = maybeReadGenericParams(DC);
 
-    SmallVector<GenericTypeParamType *, 2> genericParamTypes;
-    auto *genericEnv = readGenericEnvironment(genericParamTypes, DeclTypeCursor);
+    auto *genericEnv = readGenericEnvironment(DeclTypeCursor);
 
     auto staticSpelling = getActualStaticSpellingKind(rawStaticSpelling);
     if (!staticSpelling.hasValue()) {
