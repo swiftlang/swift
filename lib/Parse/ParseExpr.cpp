@@ -2217,7 +2217,8 @@ parseClosureSignatureIfPresent(SmallVectorImpl<CaptureListEntry> &captureList,
       throwsLoc = consumeToken();
     } else if (Tok.is(tok::kw_rethrows)) {
       throwsLoc = consumeToken();
-      diagnose(throwsLoc, diag::rethrowing_function_type);
+      diagnose(throwsLoc, diag::rethrowing_function_type)
+        .fixItReplace(throwsLoc, "throws");
     }
 
     // Parse the optional explicit return type.

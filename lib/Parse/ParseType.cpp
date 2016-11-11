@@ -214,12 +214,12 @@ ParserResult<TypeRepr> Parser::parseType(Diag<> MessageID,
   SourceLoc throwsLoc;
   if (Tok.isAny(tok::kw_throws, tok::kw_rethrows, tok::kw_throw) &&
       peekToken().is(tok::arrow)) {
-    if (Tok.is(tok::kw_rethrows)) {
+    if (Tok.isNot(tok::kw_throws)) {
       // 'rethrows' is only allowed on function declarations for now.
-      diagnose(Tok.getLoc(), diag::rethrowing_function_type);
-    } else if (Tok.is(tok::kw_throw)) {
-      // 'throw' is probably a typo for 'throws'
-      diagnose(Tok.getLoc(), diag::throw_in_function_type)
+      // 'throw' is probably a typo for 'throws'.
+      Diag<> DiagID = Tok.is(tok::kw_rethrows) ?
+        diag::rethrowing_function_type : diag::throw_in_function_type;
+      diagnose(Tok.getLoc(), DiagID)
         .fixItReplace(Tok.getLoc(), "throws");
     }
     throwsLoc = consumeToken();
