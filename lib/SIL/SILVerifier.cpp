@@ -1366,7 +1366,7 @@ public:
   void checkCopyValueInst(CopyValueInst *I) {
     require(I->getOperand()->getType().isObject(),
             "Source value should be an object value");
-    require(F.hasQualifiedOwnership(),
+    require(!fnConv.useLoweredAddresses() || F.hasQualifiedOwnership(),
             "copy_value is only valid in functions with qualified "
             "ownership");
   }
@@ -1384,7 +1384,7 @@ public:
   void checkDestroyValueInst(DestroyValueInst *I) {
     require(I->getOperand()->getType().isObject(),
             "Source value should be an object value");
-    require(F.hasQualifiedOwnership(),
+    require(!fnConv.useLoweredAddresses() || F.hasQualifiedOwnership(),
             "destroy_value is only valid in functions with qualified "
             "ownership");
   }
