@@ -3982,7 +3982,7 @@ namespace {
       if (name.empty())
         return nullptr;
 
-      if (isAccessibilityDecl(decl))
+      if (shouldImportPropertyAsAccessors(decl))
         return nullptr;
 
       // Check whether there is a function with the same name as this
