@@ -7382,9 +7382,12 @@ void TypeChecker::validateDecl(ValueDecl *D, bool resolveTypeParams) {
   case DeclKind::EnumElement: {
     if (D->hasType())
       return;
-    auto container = cast<NominalTypeDecl>(D->getDeclContext());
-    validateDecl(container);
-    typeCheckDecl(D, true);
+    if (auto container = dyn_cast<NominalTypeDecl>(D->getDeclContext())) {
+      validateDecl(container);
+      typeCheckDecl(D, true);
+    } else {
+      D->setType(ErrorType::get(Context));
+    }
     break;
   }
   }
