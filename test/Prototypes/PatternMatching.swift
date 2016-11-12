@@ -361,8 +361,9 @@ let source2 = Array("hack hack cough cough cough spork".utf8)
 (%"hack ")*.searchTest(in: source2)
 (%"cough ")+.searchTest(in: source2)
 
+// The final * steps around <rdar://29229409>
 let fancyPattern
-  = %"quick "..((%"brown" | %"black" | %"fox" | %"dog") .. %" ")+..any()
+  = %"quick "..((%"brown" | %"black" | %"fox" | %"dog") .. %" ")+..any()*
 fancyPattern.searchTest(in: source)
 
 //===--- Parsing pairs ----------------------------------------------------===//
