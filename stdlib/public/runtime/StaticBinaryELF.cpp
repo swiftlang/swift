@@ -1,0 +1,316 @@
+//===-- StaticBinaryELF.cpp -------------------------------------*- C++ -*-===//
+//
+// This source file is part of the Swift.org open source project
+//
+// Copyright (c) 2014 - 2017 Apple Inc. and the Swift project authors
+// Licensed under Apache License v2.0 with Runtime Library Exception
+//
+// See https://swift.org/LICENSE.txt for license information
+// See https://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
+//
+//===----------------------------------------------------------------------===//
+//
+// Parse a static ELF binary to implement lookupSymbol() address lookup.
+//
+//===----------------------------------------------------------------------===//
+
+#if defined(__ELF__) && defined(__linux__)
+
+#include "ImageInspection.h"
+#include "llvm/ADT/StringRef.h"
+#include <string>
+#include <vector>
+#include <elf.h>
+#include <fcntl.h>
+#include <pthread.h>
+#include <unistd.h>
+#include <linux/limits.h>
+#include <sys/mman.h>
+#include <sys/stat.h>
+#include <sys/types.h>
+
+using namespace std;
+using namespace llvm;
+
+#ifdef __LP64__
+#define ELFCLASS ELFCLASS64
+typedef Elf64_Ehdr Elf_Ehdr;
+typedef Elf64_Shdr Elf_Shdr;
+typedef Elf64_Phdr Elf_Phdr;
+typedef Elf64_Addr Elf_Addr;
+typedef Elf64_Word Elf_Word;
+typedef Elf64_Sym  Elf_Sym;
+typedef Elf64_Section Elf_Section;
+#define ELF_ST_TYPE(x) ELF64_ST_TYPE(x)
+#else
+#define ELFCLASS ELFCLASS32
+typedef Elf32_Ehdr Elf_Ehdr;
+typedef Elf32_Shdr Elf_Shdr;
+typedef Elf32_Phdr Elf_Phdr;
+typedef Elf32_Addr Elf_Addr;
+typedef Elf32_Word Elf_Word;
+typedef Elf32_Sym  Elf_Sym;
+typedef Elf32_Section Elf_Section;
+#define ELF_ST_TYPE(x) ELF32_ST_TYPE(x)
+#endif
+
+extern const Elf_Ehdr __ehdr_start;
+
+class StaticBinaryELF {
+
+private:
+  // mmap a section of a file that might not be page aligned.
+  class Mapping {
+  public:
+    void *mapping;
+    size_t mapLength;
+    off_t diff;
+
+    Mapping(int fd, size_t fileSize, off_t offset, size_t length) {
+      if (fd < 0 || offset + length > fileSize) {
+        mapping = nullptr;
+        mapLength = 0;
+        return;
+      }
+      long pageSize = sysconf(_SC_PAGESIZE);
+      long pageMask = ~(pageSize - 1);
+
+      off_t alignedOffset = offset & pageMask;
+      diff = (offset - alignedOffset);
+      mapLength = diff + length;
+      mapping = mmap(nullptr, mapLength, PROT_READ, MAP_SHARED, fd,
+                     alignedOffset);
+      if (mapping == MAP_FAILED) {
+        mapping = nullptr;
+        mapLength = 0;
+      }
+    }
+
+    template<typename T>
+    T data() {
+      return reinterpret_cast<T>(reinterpret_cast<char *>(mapping) + diff);
+    }
+
+    ~Mapping() {
+      if (mapping && mapLength > 0) {
+        munmap(mapping, mapLength);
+      }
+    }
+  };
+
+  string fullPathName;
+  const Elf_Ehdr *elfHeader = &__ehdr_start;
+  const Elf_Phdr *programHeaders = nullptr;
+  const Elf_Shdr *symbolTable = nullptr;
+  const Elf_Shdr *stringTable = nullptr;
+  Mapping *sectionHeaders = nullptr;
+  Mapping *symbolTableData = nullptr;
+  Mapping *stringTableData = nullptr;
+
+public:
+  StaticBinaryELF() {
+    programHeaders = reinterpret_cast<const Elf_Phdr *>(elfHeader +
+                                                        elfHeader->e_phoff);
+
+    // If a interpreter is set in the program headers then this is a
+    // dynamic executable and therefore not valid.
+    for (size_t idx = 0; idx < elfHeader->e_phnum; idx++) {
+      if (programHeaders[idx].p_type == PT_INTERP) {
+        return;
+      }
+    }
+
+    getExecutablePathName();
+    if (!fullPathName.empty()) {
+      mmapExecutable();
+    }
+  }
+
+  ~StaticBinaryELF() {
+    delete stringTableData;
+    delete symbolTableData;
+    delete sectionHeaders;
+  }
+
+  const char *getPathName() {
+    return fullPathName.empty() ? nullptr : fullPathName.c_str();
+  }
+
+  void *getSectionLoadAddress(const void *addr) {
+    if (programHeaders) {
+      auto searchAddr = reinterpret_cast<Elf_Addr>(addr);
+
+      for (size_t idx = 0; idx < elfHeader->e_phnum; idx++) {
+        auto header = &programHeaders[idx];
+        if (header->p_type == PT_LOAD && searchAddr >= header->p_vaddr
+            && searchAddr <= (header->p_vaddr + header->p_memsz)) {
+          return reinterpret_cast<void *>(header->p_vaddr);
+        }
+      }
+    }
+    return nullptr;
+  }
+
+  // Lookup a function symbol by address.
+  const Elf_Sym *findSymbol(const void *addr) {
+    if (symbolTable) {
+      auto searchAddr = reinterpret_cast<Elf_Addr>(addr);
+      auto entries = symbolTable->sh_size / symbolTable->sh_entsize;
+      auto symbols = symbolTableData->data<const Elf_Sym *>();
+
+      for (decltype(entries) idx = 0; idx < entries; idx++) {
+        auto symbol = &symbols[idx];
+        if (ELF_ST_TYPE(symbol->st_info) == STT_FUNC
+            && searchAddr >= symbol->st_value
+            && searchAddr < (symbol->st_value + symbol->st_size)) {
+          return symbol;
+        }
+      }
+    }
+    return nullptr;
+  }
+
+  const char *symbolName(const Elf_Sym *symbol) {
+    if (stringTable && symbol->st_name < stringTable->sh_size) {
+      return stringTableData->data<const char *>() + symbol->st_name;
+    }
+    return nullptr;
+  }
+
+private:
+  // This is Linux specific - find the full path of the executable
+  // by looking in /proc/self/maps for a mapping holding the current
+  // address space. For a static binary it should only be mapping one
+  // file anyway. Dont use /proc/self/exe as the symlink will be removed
+  // if the main thread terminates - see proc(5).
+  void getExecutablePathName() {
+    uintptr_t address = (uintptr_t)&__ehdr_start;
+
+    FILE *fp = fopen("/proc/self/maps", "r");
+    if (!fp) {
+      perror("Unable to open /proc/self/maps");
+    } else {
+      char *line = nullptr;
+      size_t size = 0;
+      // Format is: addrLo-addrHi perms offset dev inode pathname.
+      // If the executable has been deleted the last column will be '(deleted)'.
+      StringRef deleted = StringRef("(deleted)");
+
+      while(getdelim(&line, &size, '\n', fp) != -1) {
+        StringRef entry = StringRef(line).rsplit('\n').first;
+        auto addrRange = entry.split(' ').first.split('-');
+        unsigned long long low = strtoull(addrRange.first.str().c_str(),
+                                          nullptr, 16);
+        if (low == 0 || low > UINTPTR_MAX || address < (uintptr_t)low) {
+          continue;
+        }
+
+        unsigned long long high = strtoull(addrRange.second.str().c_str(),
+                                           nullptr, 16);
+        if (high == 0 || high > UINTPTR_MAX || address > (uintptr_t)high) {
+          continue;
+        }
+
+        auto fname = entry.split('/').second;
+        if (fname.empty() || fname.endswith(deleted)) {
+          continue;
+        }
+
+        fullPathName = "/" + fname.str();
+        break;
+      }
+      if (line) {
+        free(line);
+      }
+      fclose(fp);
+    }
+  }
+
+
+  // Parse the ELF binary using mmap for the section headers, symbol table and
+  // string table.
+  void mmapExecutable() {
+    struct stat buf;
+    int fd = open(fullPathName.c_str(), O_RDONLY);
+    if (fd < 0) {
+      return;
+    }
+
+    if (fstat(fd, &buf) != 0) {
+      close(fd);
+      return;
+    }
+
+    // Map in the section headers.
+    size_t sectionHeadersSize = (elfHeader->e_shentsize * elfHeader->e_shnum);
+    sectionHeaders = new Mapping(fd, buf.st_size, elfHeader->e_shoff,
+                                 sectionHeadersSize);
+    if (sectionHeaders->mapping) {
+      auto section = findSectionHeader(SHT_SYMTAB);
+      if (section) {
+        symbolTableData = new Mapping(fd, buf.st_size, section->sh_offset,
+                                      section->sh_size);
+        if (symbolTableData->mapping) {
+          symbolTable = section;
+        }
+      }
+      section = findSectionHeader(SHT_STRTAB);
+      if (section) {
+        stringTableData = new Mapping(fd, buf.st_size, section->sh_offset,
+                                      section->sh_size);
+        if (stringTableData->mapping) {
+          stringTable = section;
+        }
+      }
+    }
+    close(fd);
+    return;
+  }
+
+  // Find the section header of a specified type in the section headers table.
+  const Elf_Shdr *findSectionHeader(Elf_Word sectionType) {
+    if (sectionHeaders && sectionHeaders->mapping) {
+      auto headers = sectionHeaders->data<const Elf_Shdr *>();
+      for (size_t idx = 0; idx < elfHeader->e_shnum; idx++) {
+        if (idx == elfHeader->e_shstrndx) {
+          continue;
+        }
+        auto header = &headers[idx];
+        if (header->sh_type == sectionType) {
+          if (header->sh_entsize > 0 && header->sh_size % header->sh_entsize) {
+            fprintf(stderr,
+                    "section size is not a multiple of entrysize (%ld/%ld)\n",
+                    header->sh_size, header->sh_entsize);
+            return nullptr;
+          }
+          return header;
+        }
+      }
+    }
+    return nullptr;
+  }
+};
+
+
+int
+swift::lookupSymbol(const void *address, SymbolInfo *info) {
+  // The pointers returned point into the mmap()'d binary so keep the
+  // object once instantiated.
+  static auto binary = StaticBinaryELF();
+
+  info->fileName = binary.getPathName();
+  info->baseAddress = binary.getSectionLoadAddress(address);
+
+  auto symbol = binary.findSymbol(address);
+  if (symbol != nullptr) {
+    info->symbolAddress = reinterpret_cast<void *>(symbol->st_value);
+    info->symbolName = binary.symbolName(symbol);
+  } else {
+    info->symbolAddress = nullptr;
+    info->symbolName = nullptr;
+  }
+
+  return 1;
+}
+
+#endif // defined(__ELF__) && defined(__linux__)
