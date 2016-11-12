@@ -25,27 +25,28 @@
 #include "llvm/Support/raw_ostream.h"
 
 namespace swift {
-  class Operand;
-  class ValueBaseUseIterator;
-  class ValueUseIterator;
-  class SILBasicBlock;
-  class SILFunction;
-  class SILModule;
-  class SILInstruction;
-  class SILLocation;
-  class DominanceInfo;
 
-  enum class ValueKind {
+class DominanceInfo;
+class Operand;
+class SILBasicBlock;
+class SILFunction;
+class SILInstruction;
+class SILLocation;
+class SILModule;
+class ValueBaseUseIterator;
+class ValueUseIterator;
+
+enum class ValueKind {
 #define VALUE(Id, Parent) Id,
-#define VALUE_RANGE(Id, FirstId, LastId) \
-    First_##Id = FirstId, Last_##Id = LastId,
+#define VALUE_RANGE(Id, FirstId, LastId)                                       \
+  First_##Id = FirstId, Last_##Id = LastId,
 #include "swift/SIL/SILNodes.def"
-  };
+};
 
-  /// ValueKind hashes to its underlying integer representation.
-  static inline llvm::hash_code hash_value(ValueKind K) {
-    return llvm::hash_value(size_t(K));
-  }
+/// ValueKind hashes to its underlying integer representation.
+static inline llvm::hash_code hash_value(ValueKind K) {
+  return llvm::hash_value(size_t(K));
+}
 
 /// ValueBase - This is the base class of the SIL value hierarchy, which
 /// represents a runtime computed value.  Things like SILInstruction derive
@@ -136,9 +137,11 @@ inline llvm::raw_ostream &operator<<(llvm::raw_ostream &OS,
   V.print(OS);
   return OS;
 }
+
 }  // end namespace swift
 
 namespace llvm {
+
 /// ValueBase * is always at least eight-byte aligned; make the three tag bits
 /// available through PointerLikeTypeTraits.
 template<>
@@ -152,6 +155,7 @@ public:
   }
   enum { NumLowBitsAvailable = 3 };
 };
+
 } // end namespace llvm
 
 namespace swift {
