@@ -521,7 +521,13 @@ public:
   Type visitParenType(ParenType *pt) {
     return ParenType::get(pt->getASTContext(), visit(pt->getUnderlyingType()));
   }
-  
+
+  Type visitSubstitutedType(SubstitutedType *st) {
+    return SubstitutedType::get(st->getOriginal(),
+                                visit(st->getReplacementType()),
+                                st->getASTContext());
+  }
+
   Type visitType(TypeBase *t) {
     // Other types should not structurally contain lvalues.
     assert(!t->isLValueType()
@@ -2774,13 +2780,10 @@ static Type getMemberForBaseType(ConformanceSource conformances,
       return getDependentMemberType(ErrorType::get(substBase));
   }
 
-  // If the parent is a type variable, retrieve its member type
-  // variable.
-  if (auto typeVarParent = substBase->getAs<TypeVariableType>()) {
-    assert(assocType && "Missing associated type");
-    return substBase->getASTContext().getTypeVariableMemberType(typeVarParent,
-                                                                assocType);
-  }
+  // If the parent is a type variable or a member rooted in a type variable,
+  // we're done.
+  if (substBase->isTypeVariableOrMember())
+    return getDependentMemberType(substBase);
 
   // Retrieve the member type with the given name.
 
@@ -2807,12 +2810,12 @@ static Type getMemberForBaseType(ConformanceSource conformances,
     }
 
     if (!conformance) return failed();
+    if (!conformance->isConcrete()) return failed();
 
     // If we have an unsatisfied type witness while we're checking the
     // conformances we're supposed to skip this conformance's unsatisfied type
     // witnesses, and we have an unsatisfied type witness, return
     // "missing".
-    assert(conformance->isConcrete());
     if (conformance->getConcrete()->getRootNormalConformance()->getState()
           == ProtocolConformanceState::CheckingTypeWitnesses &&
         !conformance->getConcrete()->hasTypeWitness(assocType, nullptr))
@@ -3557,6 +3560,36 @@ case TypeKind::Id:
     if (genericParams.empty()) {
       return FunctionType::get(inputTy, resultTy, function->getExtInfo());
     }
+
+    // Sort/unique the generic parameters by depth/index.
+    using llvm::array_pod_sort;
+    array_pod_sort(genericParams.begin(), genericParams.end(),
+                   [](GenericTypeParamType * const * gpp1,
+                      GenericTypeParamType * const * gpp2) {
+                     auto gp1 = *gpp1;
+                     auto gp2 = *gpp2;
+
+                     if (gp1->getDepth() < gp2->getDepth())
+                       return -1;
+
+                     if (gp1->getDepth() > gp2->getDepth())
+                       return 1;
+
+                     if (gp1->getIndex() < gp2->getIndex())
+                       return -1;
+
+                     if (gp1->getIndex() > gp2->getIndex())
+                       return 1;
+
+                     return 0;
+                   });
+    genericParams.erase(std::unique(genericParams.begin(), genericParams.end(),
+                                    [](GenericTypeParamType *gp1,
+                                       GenericTypeParamType *gp2) {
+                                      return gp1->getDepth() == gp2->getDepth()
+                                          && gp1->getIndex() == gp2->getIndex();
+                                    }),
+                        genericParams.end());
 
     // Produce the new generic function type.
     auto sig = GenericSignature::get(genericParams, requirements);

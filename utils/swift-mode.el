@@ -269,6 +269,21 @@ one is present, returning t if so and nil otherwise"
             (swift-skip-comments-and-space))))
     found))
 
+(defun swift-skip-constraint ()
+    "Hop over a single type constraint if one is present,
+returning t if so and nil otherwise"
+  (swift-skip-comments-and-space)
+  (and (swift-skip-type-name)
+       (swift-skip-re ":\\|==")
+       (swift-skip-type-name)))
+
+(defun swift-skip-where-clause ()
+    "Hop over a where clause if one is present, returning t if so
+and nil otherwise"
+  (when (swift-skip-re "\\<where\\>")
+    (while (and (swift-skip-constraint) (swift-skip-re ",")))
+    t))
+
 (defun swift-in-string-or-comment ()
   "Return non-nil if point is in a string or comment."
   (or (nth 3 (syntax-ppss)) (nth 4 (syntax-ppss))))
@@ -311,7 +326,8 @@ Use `M-x hs-show-all' to show them again."
                     (swift-skip-comments-and-space)
                     (equal (char-after) ?\())
                   ;; parse the parameter list and any return type
-                  (swift-skip-type-name)))))
+                  (swift-skip-type-name)
+                  (swift-skip-where-clause)))))
              (swift-skip-re "{"))
           (hs-hide-block :reposition-at-end))))))
 

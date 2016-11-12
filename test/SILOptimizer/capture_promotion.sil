@@ -8,7 +8,10 @@
 sil_stage raw
 
 import Builtin
-import Swift
+
+struct Int {
+  var value : Builtin.Int64
+}
 
 class Foo {
   func foo() -> Int
@@ -31,19 +34,19 @@ sil @dummy_func : $@convention(thin) (Int, Int, Int) -> Int
 sil @test_capture_promotion : $@convention(thin) () -> @owned @callee_owned () -> Int {
 bb0:
   %0 = tuple ()
-  %1 = alloc_box $Foo
+  %1 = alloc_box $@box Foo
   %1a = project_box %1 : $@box Foo, 0
   %2 = function_ref @foo_allocating_init : $@convention(thin) (@thick Foo.Type) -> @owned Foo
   %3 = metatype $@thick Foo.Type
   %4 = apply %2(%3) : $@convention(thin) (@thick Foo.Type) -> @owned Foo
   store %4 to %1a : $*Foo
-  %6 = alloc_box $Baz
+  %6 = alloc_box $@box Baz
   %6a = project_box %6 : $@box Baz, 0
   %7 = function_ref @baz_init : $@convention(thin) (@thin Baz.Type) -> @owned Baz
   %8 = metatype $@thin Baz.Type
   %9 = apply %7(%8) : $@convention(thin) (@thin Baz.Type) -> @owned Baz
   store %9 to %6a : $*Baz
-  %11 = alloc_box $Int
+  %11 = alloc_box $@box Int
   %11a = project_box %11 : $@box Int, 0
   %12 = function_ref @convert_from_integer_literal : $@convention(thin) (Builtin.Word, @thin Int.Type) -> Int
   %13 = metatype $@thin Int.Type
@@ -90,19 +93,19 @@ bb0:
 sil @test_capture_promotion_indirect : $@convention(thin) () -> @owned @callee_owned () -> @out Int {
 bb0:
   %0 = tuple ()
-  %1 = alloc_box $Foo
+  %1 = alloc_box $@box Foo
   %1a = project_box %1 : $@box Foo, 0
   %2 = function_ref @foo_allocating_init : $@convention(thin) (@thick Foo.Type) -> @owned Foo
   %3 = metatype $@thick Foo.Type
   %4 = apply %2(%3) : $@convention(thin) (@thick Foo.Type) -> @owned Foo
   store %4 to %1a : $*Foo
-  %6 = alloc_box $Baz
+  %6 = alloc_box $@box Baz
   %6a = project_box %6 : $@box Baz, 0
   %7 = function_ref @baz_init : $@convention(thin) (@thin Baz.Type) -> @owned Baz
   %8 = metatype $@thin Baz.Type
   %9 = apply %7(%8) : $@convention(thin) (@thin Baz.Type) -> @owned Baz
   store %9 to %6a : $*Baz
-  %11 = alloc_box $Int
+  %11 = alloc_box $@box Int
   %11a = project_box %11 : $@box Int, 0
   %12 = function_ref @convert_from_integer_literal : $@convention(thin) (Builtin.Word, @thin Int.Type) -> Int
   %13 = metatype $@thin Int.Type
@@ -199,7 +202,7 @@ bb0(%0 : $@box Foo, %2 : $@box Baz, %4 : $@box Int):
 sil @test_unpromotable : $@convention(thin) () -> @owned @callee_owned () -> Int {
 bb0:
   %0 = tuple ()
-  %1 = alloc_box $Foo
+  %1 = alloc_box $@box Foo
   %1a = project_box %1 : $@box Foo, 0
   %2 = function_ref @foo_allocating_init : $@convention(thin) (@thick Foo.Type) -> @owned Foo
   %3 = metatype $@thick Foo.Type
@@ -237,10 +240,10 @@ sil @apply : $@convention(thin) (@owned @callee_owned () -> ()) -> ()
 sil @captureWithinGeneric : $@convention(thin) <T> (@inout Int, @inout Int) -> () {
 // CHECK: bb0
 bb0(%0 : $*Int, %1 : $*Int):
-  %2 = alloc_box $Int
+  %2 = alloc_box $@box Int
   %2a = project_box %2 : $@box Int, 0
   copy_addr %0 to [initialization] %2a : $*Int
-  %4 = alloc_box $Int
+  %4 = alloc_box $@box Int
   %4a = project_box %4 : $@box Int, 0
   copy_addr %1 to [initialization] %4a : $*Int
   %6 = function_ref @apply : $@convention(thin) (@owned @callee_owned () -> ()) -> ()

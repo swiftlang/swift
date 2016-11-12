@@ -92,7 +92,7 @@ void TupleInitialization::copyOrInitValueInto(SILGenFunction &SGF,
       member = SGF.B.createTupleElementAddr(loc, value, i, fieldTy);
       if (!fieldTL.isAddressOnly())
         member =
-            SGF.B.createLoad(loc, member, LoadOwnershipQualifier::Unqualified);
+            fieldTL.emitLoad(SGF.B, loc, member, LoadOwnershipQualifier::Take);
     } else {
       member = SGF.B.createTupleExtract(loc, value, i, fieldTy);
     }
@@ -116,7 +116,7 @@ namespace {
   public:
     CleanupClosureConstant(SILValue closure) : closure(closure) {}
     void emit(SILGenFunction &gen, CleanupLocation l) override {
-      gen.B.emitDestroyValueAndFold(l, closure);
+      gen.B.emitDestroyValueOperation(l, closure);
     }
   };
 }
@@ -208,7 +208,7 @@ public:
 
   void emit(SILGenFunction &gen, CleanupLocation l) override {
     if (v->getType().isAddress())
-      gen.B.emitDestroyAddrAndFold(l, v);
+      gen.B.createDestroyAddr(l, v);
     else
       gen.B.emitDestroyValueOperation(l, v);
   }
@@ -282,11 +282,12 @@ public:
     assert(!SGF.VarLocs.count(decl) && "Already have an entry for this decl?");
 
     SILType lType = SGF.getLoweredType(decl->getType()->getRValueType());
+    auto boxType = SILBoxType::get(lType.getSwiftRValueType());
 
     // The variable may have its lifetime extended by a closure, heap-allocate
     // it using a box.
     AllocBoxInst *allocBox =
-        SGF.B.createAllocBox(decl, lType, {decl->isLet(), ArgNo});
+        SGF.B.createAllocBox(decl, boxType, {decl->isLet(), ArgNo});
     SILValue addr = SGF.B.createProjectBox(decl, allocBox, 0);
 
     // Mark the memory as uninitialized, so DI will track it for us.
@@ -714,7 +715,7 @@ emitEnumMatch(ManagedValue value, EnumElementDecl *ElementDecl,
     // Load a loadable data value.
     if (eltTL.isLoadable())
       eltValue =
-          SGF.B.createLoad(loc, eltValue, LoadOwnershipQualifier::Unqualified);
+          eltTL.emitLoad(SGF.B, loc, eltValue, LoadOwnershipQualifier::Take);
   } else {
     // Otherwise, we're consuming this as a +1 value.
     value.forward(SGF);
@@ -727,9 +728,10 @@ emitEnumMatch(ManagedValue value, EnumElementDecl *ElementDecl,
   if (ElementDecl->isIndirect() || ElementDecl->getParentEnum()->isIndirect()) {
     SILValue boxedValue = SGF.B.createProjectBox(loc, eltMV.getValue(), 0);
     auto &boxedTL = SGF.getTypeLowering(boxedValue->getType());
+    // SEMANTIC ARC TODO: Revisit this when the verifier is enabled.
     if (boxedTL.isLoadable())
-      boxedValue = SGF.B.createLoad(loc, boxedValue,
-                                    LoadOwnershipQualifier::Unqualified);
+      boxedValue = boxedTL.emitLoad(SGF.B, loc, boxedValue,
+                                    LoadOwnershipQualifier::Take);
 
     // We must treat the boxed value as +0 since it may be shared. Copy it if
     // nontrivial.
@@ -1303,7 +1305,7 @@ void SILGenFunction::destroyLocalVariable(SILLocation silLoc, VarDecl *vd) {
   // For a heap variable, the box is responsible for the value. We just need
   // to give up our retain count on it.
   if (loc.box) {
-    B.emitDestroyValueAndFold(silLoc, loc.box);
+    B.emitDestroyValueOperation(silLoc, loc.box);
     return;
   }
 
@@ -1313,7 +1315,7 @@ void SILGenFunction::destroyLocalVariable(SILLocation silLoc, VarDecl *vd) {
   if (!Val->getType().isAddress())
     B.emitDestroyValueOperation(silLoc, Val);
   else
-    B.emitDestroyAddrAndFold(silLoc, Val);
+    B.createDestroyAddr(silLoc, Val);
 }
 
 void SILGenFunction::deallocateUninitializedLocalVariable(SILLocation silLoc,

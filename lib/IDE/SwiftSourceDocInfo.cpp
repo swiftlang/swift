@@ -174,6 +174,164 @@ bool SemaLocResolver::visitModuleReference(ModuleEntity Mod,
   return !tryResolve(Mod, Range.getStart());
 }
 
+struct RangeResolver::Implementation {
+  SourceFile &File;
+private:
+  enum class RangeMatchKind : int8_t {
+    NoneMatch,
+    StartMatch,
+    EndMatch,
+    RangeMatch,
+  };
+
+  struct ContextInfo {
+    ASTNode Parent;
+    std::vector<ASTNode> StartMatches;
+    std::vector<ASTNode> EndMatches;
+    ContextInfo(ASTNode Parent) : Parent(Parent) {}
+  };
+
+  SourceLoc Start;
+  SourceLoc End;
+  StringRef Content;
+  Optional<ResolvedRangeInfo> Result;
+  std::vector<ContextInfo> ContextStack;
+  ContextInfo &getCurrentDC() {
+    assert(!ContextStack.empty());
+    return ContextStack.back();
+  }
+
+  ResolvedRangeInfo getSingleNodeKind(ASTNode Node) {
+    assert(!Node.isNull());
+    if (Node.is<Expr*>())
+      return ResolvedRangeInfo(RangeKind::SingleExpression,
+                               Node.get<Expr*>()->getType(), Content);
+    else if (Node.is<Stmt*>())
+      return ResolvedRangeInfo(RangeKind::SingleStatement, Type(), Content);
+    else {
+      assert(Node.is<Decl*>());
+      return ResolvedRangeInfo(RangeKind::SingleDecl, Type(), Content);
+    }
+  }
+
+public:
+  Implementation(SourceFile &File, SourceLoc Start, SourceLoc End) :
+    File(File), Start(Start), End(End), Content(getContent()) {}
+  bool hasResult() { return Result.hasValue(); }
+  void enter(ASTNode Node) { ContextStack.emplace_back(Node); }
+  void leave(ASTNode Node) {
+    assert(ContextStack.back().Parent.getOpaqueValue() == Node.getOpaqueValue());
+    ContextStack.pop_back();
+  }
+
+  void analyze(ASTNode Node) {
+    auto &DCInfo = getCurrentDC();
+    switch (getRangeMatchKind(Node.getSourceRange())) {
+    case RangeMatchKind::NoneMatch:
+      return;
+    case RangeMatchKind::RangeMatch:
+      Result = getSingleNodeKind(Node);
+      return;
+    case RangeMatchKind::StartMatch:
+      DCInfo.StartMatches.emplace_back(Node);
+      break;
+    case RangeMatchKind::EndMatch:
+      DCInfo.EndMatches.emplace_back(Node);
+      break;
+    }
+    if (!DCInfo.StartMatches.empty() && !DCInfo.EndMatches.empty()) {
+      Result = {RangeKind::MultiStatement, Type(), Content};
+      return;
+    }
+  }
+
+  bool shouldEnter(ASTNode Node) {
+    SourceManager &SM = File.getASTContext().SourceMgr;
+    if (hasResult())
+      return false;
+    if (SM.isBeforeInBuffer(End, Node.getSourceRange().Start))
+      return false;
+    if (SM.isBeforeInBuffer(Node.getSourceRange().End, Start))
+      return false;
+    return true;
+  }
+
+  ResolvedRangeInfo getResult() {
+    if (Result.hasValue())
+      return Result.getValue();
+    return ResolvedRangeInfo(RangeKind::Invalid, Type(), getContent());
+  }
+
+private:
+  RangeMatchKind getRangeMatchKind(SourceRange Input) {
+    bool StartMatch = Input.Start == Start;
+    bool EndMatch = Input.End == End;
+    if (StartMatch && EndMatch)
+      return RangeMatchKind::RangeMatch;
+    else if (StartMatch)
+      return RangeMatchKind::StartMatch;
+    else if (EndMatch)
+      return RangeMatchKind::EndMatch;
+    else
+      return RangeMatchKind::NoneMatch;
+  }
+
+  StringRef getContent() {
+    SourceManager &SM = File.getASTContext().SourceMgr;
+    return CharSourceRange(SM, Start, Lexer::getLocForEndOfToken(SM, End)).str();
+  }
+};
+
+RangeResolver::RangeResolver(SourceFile &File, SourceLoc Start, SourceLoc End) :
+  Impl(*new Implementation(File, Start, End)) {}
+
+RangeResolver::~RangeResolver() { delete &Impl; }
+
+bool RangeResolver::walkToExprPre(Expr *E) {
+  if (!Impl.shouldEnter(E))
+    return false;
+  Impl.analyze(E);
+  Impl.enter(E);
+  return true;
+}
+
+bool RangeResolver::walkToStmtPre(Stmt *S) {
+  if (!Impl.shouldEnter(S))
+    return false;
+  Impl.analyze(S);
+  Impl.enter(S);
+  return true;
+};
+
+bool RangeResolver::walkToDeclPre(Decl *D, CharSourceRange Range) {
+  if (!Impl.shouldEnter(D))
+    return false;
+  Impl.analyze(D);
+  Impl.enter(D);
+  return true;
+}
+
+bool RangeResolver::walkToExprPost(Expr *E) {
+  Impl.leave(E);
+  return !Impl.hasResult();
+}
+
+bool RangeResolver::walkToStmtPost(Stmt *S) {
+  Impl.leave(S);
+  return !Impl.hasResult();
+};
+
+bool RangeResolver::walkToDeclPost(Decl *D) {
+  Impl.leave(D);
+  return !Impl.hasResult();
+}
+
+ResolvedRangeInfo RangeResolver::resolve() {
+  Impl.enter(ASTNode());
+  walk(Impl.File);
+  return Impl.getResult();
+}
+
 void swift::ide::getLocationInfoForClangNode(ClangNode ClangNode,
                                              ClangImporter *Importer,
                   llvm::Optional<std::pair<unsigned, unsigned>> &DeclarationLoc,

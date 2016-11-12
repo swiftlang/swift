@@ -1203,12 +1203,7 @@ public:
 
   /// \brief Create a new type variable.
   TypeVariableType *createTypeVariable(ConstraintLocator *locator,
-                                       unsigned options) {
-    auto tv = TypeVariableType::getNew(TC.Context, assignTypeVariableID(),
-                                       locator, options);
-    addTypeVariable(tv);
-    return tv;
-  }
+                                       unsigned options);
 
   /// Retrieve the set of active type variables.
   ArrayRef<TypeVariableType *> getTypeVariables() const {
@@ -1342,32 +1337,6 @@ public:
   }
 
   /// \brief Add a value member constraint to the constraint system.
-  void addTypeMemberConstraint(Type baseTy, DeclName name, Type memberTy,
-                               ConstraintLocatorBuilder locator) {
-    assert(baseTy);
-    assert(memberTy);
-    assert(name);
-    switch (simplifyMemberConstraint(ConstraintKind::TypeMember, baseTy, name,
-                                     memberTy, FunctionRefKind::Compound,
-                                     TMF_GenerateConstraints, locator)) {
-    case SolutionKind::Unsolved:
-      llvm_unreachable("Unsolved result when generating constraints!");
-
-    case SolutionKind::Solved:
-      break;
-
-    case SolutionKind::Error:
-      if (shouldAddNewFailingConstraint()) {
-        addNewFailingConstraint(
-          Constraint::create(*this, ConstraintKind::TypeMember, baseTy,
-                             memberTy, name, FunctionRefKind::Compound,
-                             getConstraintLocator(locator)));
-      }
-      break;
-    }
-  }
-
-  /// \brief Add a value member constraint to the constraint system.
   void addValueMemberConstraint(Type baseTy, DeclName name, Type memberTy,
                                 FunctionRefKind functionRefKind,
                                 ConstraintLocatorBuilder locator) {
@@ -1476,24 +1445,6 @@ public:
     CG.removeConstraint(constraint);
     InactiveConstraints.erase(constraint);
   }
-
-  /// Retrieve the type that corresponds to the given member of the
-  /// given base type, which may be a newly-created type variable.
-  ///
-  /// \param baseTypeVar The base type variable whose member is being queried.
-  ///
-  /// \param assocType The associated type we're referencing.
-  ///
-  /// \param locator The location used to describe this member access.
-  ///
-  /// \param options Options to be supplied to type variable creation if 
-  /// a new type is created.
-  ///
-  /// \returns the type variable representing the member type.
-  TypeVariableType *getMemberType(TypeVariableType *baseTypeVar, 
-                                  AssociatedTypeDecl *assocType,
-                                  ConstraintLocatorBuilder locator,
-                                  unsigned options);
 
   /// Retrieve the list of inactive constraints.
   ConstraintList &getConstraints() { return InactiveConstraints; }
@@ -2431,7 +2382,7 @@ public:
       }
 
       std::pair<bool, Pattern*> walkToPatternPre(Pattern *P) override {
-        TS->Patterns.insert({ P, P->getType() });
+        TS->Patterns.insert({ P, P->hasType() ? P->getType() : Type() });
         return { true, P };
       }
 

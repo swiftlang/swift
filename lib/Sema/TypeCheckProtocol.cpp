@@ -991,7 +991,7 @@ RequirementEnvironment::RequirementEnvironment(
     return;
   }
 
-  // Form the conformance of the interface type of the confomance context
+  // Form the conformance of the interface type of the conformance context
   // to the requirement's enclosing protocol.
   ProtocolConformance *specialized = conformance;
   if (conformance && conformance->getGenericSignature()) {
@@ -1081,9 +1081,6 @@ RequirementEnvironment::RequirementEnvironment(
   RequirementSource source(RequirementSource::Explicit, SourceLoc());
   for (auto &reqReq : reqSig->getRequirements()) {
     switch (reqReq.getKind()) {
-    case RequirementKind::WitnessMarker:
-      break;
-
     case RequirementKind::Conformance: {
       // Substitute the constrained types.
       auto first = reqReq.getFirstType().subst(reqToSyntheticEnvMap);
@@ -1591,17 +1588,87 @@ namespace {
     /// requirements.
     SmallVector<std::tuple<AssociatedTypeDecl *, Type, CheckTypeWitnessResult>,
                 2> NonViable;
+
+    void dump(llvm::raw_ostream &out, unsigned indent) const {
+      out << "\n";
+      out.indent(indent) << "(";
+      if (Witness) {
+        Witness->dumpRef(out);
+      }
+
+      for (const auto &inferred : Inferred) {
+        out << "\n";
+        out.indent(indent + 2);
+        out << inferred.first->getName() << " := "
+            << inferred.second.getString();
+      }
+
+      for (const auto &inferred : NonViable) {
+        out << "\n";
+        out.indent(indent + 2);
+        out << std::get<0>(inferred)->getName() << " := "
+            << std::get<1>(inferred).getString();
+        if (auto nominal = std::get<2>(inferred).getProtocolOrClass())
+          out << " [failed constraint " << nominal->getName() << "]";
+      }
+
+      out << ")";
+    }
+
+    LLVM_ATTRIBUTE_DEPRECATED(void dump() const,
+                              "only for use in the debugger");
   };
+
+  void InferredAssociatedTypesByWitness::dump() const {
+    dump(llvm::errs(), 0);
+  }
 
   /// The set of witnesses that were considered when attempting to
   /// infer associated types.
   typedef SmallVector<InferredAssociatedTypesByWitness, 2>
     InferredAssociatedTypesByWitnesses;
 
+  void dumpInferredAssociatedTypesByWitnesses(
+        const InferredAssociatedTypesByWitnesses &inferred,
+        llvm::raw_ostream &out,
+        unsigned indent) {
+    for (const auto &value : inferred) {
+      value.dump(out, indent);
+    }
+  }
+
+  void dumpInferredAssociatedTypesByWitnesses(
+        const InferredAssociatedTypesByWitnesses &inferred) LLVM_ATTRIBUTE_USED;
+
+  void dumpInferredAssociatedTypesByWitnesses(
+                          const InferredAssociatedTypesByWitnesses &inferred) {
+    dumpInferredAssociatedTypesByWitnesses(inferred, llvm::errs(), 0);
+  }
+
   /// A mapping from requirements to the set of matches with witnesses.
   typedef SmallVector<std::pair<ValueDecl *,
                                 InferredAssociatedTypesByWitnesses>, 4>
     InferredAssociatedTypes;
+
+  void dumpInferredAssociatedTypes(const InferredAssociatedTypes &inferred,
+                                   llvm::raw_ostream &out,
+                                   unsigned indent) {
+    for (const auto &value : inferred) {
+      out << "\n";
+      out.indent(indent) << "(";
+      value.first->dumpRef(out);
+      dumpInferredAssociatedTypesByWitnesses(value.second, out, indent + 2);
+      out << ")";
+    }
+    out << "\n";
+  }
+
+  void dumpInferredAssociatedTypes(
+         const InferredAssociatedTypes &inferred) LLVM_ATTRIBUTE_USED;
+
+  void dumpInferredAssociatedTypes(const InferredAssociatedTypes &inferred) {
+    dumpInferredAssociatedTypes(inferred, llvm::errs(), 0);
+  }
 
   /// The protocol conformance checker.
   ///
@@ -4567,12 +4634,14 @@ void TypeChecker::useObjectiveCBridgeableConformances(DeclContext *dc,
         // of the key type to Hashable.
         if (nominalDecl == TC.Context.getSetDecl() ||
             nominalDecl == TC.Context.getDictionaryDecl()) {
-          auto args = ty->castTo<BoundGenericType>()->getGenericArgs();
-          if (!args.empty()) {
-            auto keyType = args[0];
-            auto *hashableProto =
-              TC.Context.getProtocol(KnownProtocolKind::Hashable);
-            (void)TC.conformsToProtocol(keyType, hashableProto, DC, options);
+          if (auto boundGeneric = ty->getAs<BoundGenericType>()) {
+            auto args = boundGeneric->getGenericArgs();
+            if (!args.empty()) {
+              auto keyType = args[0];
+              auto *hashableProto =
+                TC.Context.getProtocol(KnownProtocolKind::Hashable);
+              (void)TC.conformsToProtocol(keyType, hashableProto, DC, options);
+            }
           }
         }
       }
@@ -5445,7 +5514,7 @@ bool TypeChecker::isProtocolExtensionUsable(DeclContext *dc, Type type,
 
   // If the type still has parameters, the constrained extension is considered
   // unusable.
-  if (type->hasTypeParameter())
+  if (type->hasTypeParameter() || type->hasTypeVariable())
     return false;
 
   // Set up a constraint system where we open the generic parameters of the

@@ -158,3 +158,17 @@ func joinWithNil(s: String) {
   let a4 = [nil, "hello"]
   let _: Int = a4 // expected-error{{value of type '[String?]'}}
 }
+
+struct OptionSetLike : ExpressibleByArrayLiteral {
+  typealias Element = OptionSetLike
+  init() { }
+
+  init(arrayLiteral elements: OptionSetLike...) { }
+
+  static let option: OptionSetLike = OptionSetLike()
+}
+
+func testOptionSetLike(b: Bool) {
+  let _: OptionSetLike = [ b ? [] : OptionSetLike.option, OptionSetLike.option]
+  let _: OptionSetLike = [ b ? [] : .option, .option]
+}

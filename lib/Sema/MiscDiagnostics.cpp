@@ -141,7 +141,7 @@ static void diagSyntacticUseRestrictions(TypeChecker &TC, const Expr *E,
     };
 
     // Partial applications of functions that are not permitted.  This is
-    // tracked in post-order and unravelled as subsequent applications complete
+    // tracked in post-order and unraveled as subsequent applications complete
     // the call (or not).
     llvm::SmallDenseMap<Expr*, PartialApplication,2> InvalidPartialApplications;
 
@@ -2559,11 +2559,15 @@ VarDeclUsageChecker::~VarDeclUsageChecker() {
       //  ->
       //    _ = foo()
       if (auto *pbd = var->getParentPatternBinding())
-        if (pbd->getSingleVar() == var && pbd->getInit(0) != nullptr) {
+        if (pbd->getSingleVar() == var && pbd->getInit(0) != nullptr &&
+            !isa<TypedPattern>(pbd->getPatternList()[0].getPattern())) {
           unsigned varKind = var->isLet();
+          SourceRange replaceRange(
+              pbd->getStartLoc(),
+              pbd->getPatternList()[0].getPattern()->getEndLoc());
           TC.diagnose(var->getLoc(), diag::pbd_never_used,
                       var->getName(), varKind)
-            .fixItReplace(SourceRange(pbd->getLoc(), var->getLoc()), "_");
+            .fixItReplace(replaceRange, "_");
           continue;
         }
       
@@ -3727,7 +3731,7 @@ static void diagnoseUnintendedOptionalBehavior(TypeChecker &TC, const Expr *E,
           }
 
           // Bail out if we don't have an optional.
-          if (!segment->getType()->getOptionalObjectType()) {
+          if (!segment->getType()->getRValueType()->getOptionalObjectType()) {
             continue;
           }
 

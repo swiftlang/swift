@@ -883,7 +883,7 @@ public:
   }
 
   void visitAllocBoxInst(AllocBoxInst *ABI) {
-    *this << ABI->getElementType();
+    *this << ABI->getType();
     printDebugVar(ABI->getVarInfo());
   }
 
@@ -1869,9 +1869,9 @@ void SILFunction::print(SILPrintContext &PrintCtx) const {
 
     SILPrinter(PrintCtx, (Aliases.empty() ? nullptr : &Aliases))
         .print(this);
-    OS << "}";
+    OS << "} // end sil function '" << getName() << '\'';
   }
-  
+
   OS << "\n\n";
 }
       

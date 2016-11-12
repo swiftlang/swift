@@ -98,7 +98,7 @@ func inout_func(_ n: inout Int) {}
 // CHECK-LABEL: sil hidden @_TF19protocol_extensions5testDFTVS_10MetaHolder2ddMCS_1D1dS1__T_ : $@convention(thin) (MetaHolder, @thick D.Type, @owned D) -> ()
 // CHECK: bb0([[M:%[0-9]+]] : $MetaHolder, [[DD:%[0-9]+]] : $@thick D.Type, [[D:%[0-9]+]] : $D):
 func testD(_ m: MetaHolder, dd: D.Type, d: D) {
-  // CHECK: [[D2:%[0-9]+]] = alloc_box $D
+  // CHECK: [[D2:%[0-9]+]] = alloc_box $@box D
   // CHECK: [[RESULT:%.*]] = project_box [[D2]]
   // CHECK: [[FN:%[0-9]+]] = function_ref @_TFE19protocol_extensionsPS_2P111returnsSelf{{.*}}
   // CHECK: [[DCOPY:%[0-9]+]] = alloc_stack $D
@@ -523,7 +523,7 @@ func testExistentials1(_ p1: P1, b: Bool, i: Int64) {
 // CHECK-LABEL: sil hidden @_TF19protocol_extensions17testExistentials2
 // CHECK: bb0([[P:%[0-9]+]] : $*P1):
 func testExistentials2(_ p1: P1) {
-  // CHECK: [[P1A:%[0-9]+]] = alloc_box $P1
+  // CHECK: [[P1A:%[0-9]+]] = alloc_box $@box P1
   // CHECK: [[PB:%.*]] = project_box [[P1A]]
   // CHECK: [[POPENED:%[0-9]+]] = open_existential_addr [[P]] : $*P1 to $*@opened([[UUID:".*"]]) P1
   // CHECK: [[P1AINIT:%[0-9]+]] = init_existential_addr [[PB]] : $*P1, $@opened([[UUID2:".*"]]) P1
@@ -552,7 +552,7 @@ func testExistentialsGetters(_ p1: P1) {
 // CHECK: bb0([[P:%[0-9]+]] : $*P1, [[B:%[0-9]+]] : $Bool):
 func testExistentialSetters(_ p1: P1, b: Bool) {
   var p1 = p1
-  // CHECK: [[PBOX:%[0-9]+]] = alloc_box $P1
+  // CHECK: [[PBOX:%[0-9]+]] = alloc_box $@box P1
   // CHECK: [[PBP:%[0-9]+]] = project_box [[PBOX]]
   // CHECK-NEXT: copy_addr [[P]] to [initialization] [[PBP]] : $*P1
   // CHECK: [[POPENED:%[0-9]+]] = open_existential_addr [[PBP]] : $*P1 to $*@opened([[UUID:".*"]]) P1
@@ -583,7 +583,7 @@ struct HasAP1 {
 // CHECK: bb0([[HASP1:%[0-9]+]] : $*HasAP1, [[B:%[0-9]+]] : $Bool)
 func testLogicalExistentialSetters(_ hasAP1: HasAP1, _ b: Bool) {
   var hasAP1 = hasAP1
-  // CHECK: [[HASP1_BOX:%[0-9]+]] = alloc_box $HasAP1
+  // CHECK: [[HASP1_BOX:%[0-9]+]] = alloc_box $@box HasAP1
   // CHECK: [[PBHASP1:%[0-9]+]] = project_box [[HASP1_BOX]]
   // CHECK-NEXT: copy_addr [[HASP1]] to [initialization] [[PBHASP1]] : $*HasAP1
   // CHECK: [[P1_COPY:%[0-9]+]] = alloc_stack $P1
@@ -607,7 +607,7 @@ func plusOneP1() -> P1 {}
 func test_open_existential_semantics_opaque(_ guaranteed: P1,
                                             immediate: P1) {
   var immediate = immediate
-  // CHECK: [[IMMEDIATE_BOX:%.*]] = alloc_box $P1
+  // CHECK: [[IMMEDIATE_BOX:%.*]] = alloc_box $@box P1
   // CHECK: [[PB:%.*]] = project_box [[IMMEDIATE_BOX]]
   // CHECK: [[VALUE:%.*]] = open_existential_addr %0
   // CHECK: [[METHOD:%.*]] = function_ref
@@ -647,7 +647,7 @@ func plusOneCP1() -> CP1 {}
 func test_open_existential_semantics_class(_ guaranteed: CP1,
                                            immediate: CP1) {
   var immediate = immediate
-  // CHECK: [[IMMEDIATE_BOX:%.*]] = alloc_box $CP1
+  // CHECK: [[IMMEDIATE_BOX:%.*]] = alloc_box $@box CP1
   // CHECK: [[PB:%.*]] = project_box [[IMMEDIATE_BOX]]
 
   // CHECK-NOT: copy_value %0
@@ -658,8 +658,7 @@ func test_open_existential_semantics_class(_ guaranteed: CP1,
   // CHECK-NOT: destroy_value %0
   guaranteed.f1()
 
-  // CHECK: [[IMMEDIATE:%.*]] = load [[PB]]
-  // CHECK: copy_value [[IMMEDIATE]]
+  // CHECK: [[IMMEDIATE:%.*]] = load [copy] [[PB]]
   // CHECK: [[VALUE:%.*]] = open_existential_ref [[IMMEDIATE]]
   // CHECK: [[METHOD:%.*]] = function_ref
   // CHECK: apply [[METHOD]]<{{.*}}>([[VALUE]])
@@ -686,13 +685,16 @@ extension InitRequirement {
   // CHECK:       bb0([[OUT:%.*]] : $*Self, [[ARG:%.*]] : $D, [[SELF_TYPE:%.*]] : $@thick Self.Type):
   init(d: D) {
   // CHECK:         [[DELEGATEE:%.*]] = witness_method $Self, #InitRequirement.init!allocator.1 : $@convention(witness_method) <τ_0_0 where τ_0_0 : InitRequirement> (@owned C, @thick τ_0_0.Type) -> @out τ_0_0
-  // CHECK:         [[ARG_UP:%.*]] = upcast [[ARG]]
-  // CHECK:         apply [[DELEGATEE]]<Self>({{%.*}}, [[ARG_UP]], [[SELF_TYPE]])
+  // CHECK:         [[ARG_COPY:%.*]] = copy_value [[ARG]]
+  // CHECK:         [[ARG_COPY_CAST:%.*]] = upcast [[ARG_COPY]]
+  // CHECK:         apply [[DELEGATEE]]<Self>({{%.*}}, [[ARG_COPY_CAST]], [[SELF_TYPE]])
     self.init(c: d)
   }
+  // CHECK: } // end sil function '_TFE19protocol_extensionsPS_15InitRequirementC{{.*}}'
 
-  // CHECK-LABEL: sil hidden @_TFE19protocol_extensionsPS_15InitRequirementC{{.*}}
+  // CHECK-LABEL: sil hidden @_TFE19protocol_extensionsPS_15InitRequirementC{{.*}} : $@convention(method)
   // CHECK:         function_ref @_TFE19protocol_extensionsPS_15InitRequirementC{{.*}}
+  // CHECK: } // end sil function '_TFE19protocol_extensionsPS_15InitRequirementC{{.*}}'
   init(d2: D) {
     self.init(d: d2)
   }
@@ -706,8 +708,10 @@ extension ClassInitRequirement {
   // CHECK-LABEL: sil hidden @_TFE19protocol_extensionsPS_20ClassInitRequirementC{{.*}} : $@convention(method) <Self where Self : ClassInitRequirement> (@owned D, @thick Self.Type) -> @owned Self
   // CHECK:       bb0([[ARG:%.*]] : $D, [[SELF_TYPE:%.*]] : $@thick Self.Type):
   // CHECK:         [[DELEGATEE:%.*]] = witness_method $Self, #ClassInitRequirement.init!allocator.1 : $@convention(witness_method) <τ_0_0 where τ_0_0 : ClassInitRequirement> (@owned C, @thick τ_0_0.Type) -> @owned τ_0_0
-  // CHECK:         [[ARG_UP:%.*]] = upcast [[ARG]]
-  // CHECK:         apply [[DELEGATEE]]<Self>([[ARG_UP]], [[SELF_TYPE]])
+  // CHECK:         [[ARG_COPY:%.*]] = copy_value [[ARG]]
+  // CHECK:         [[ARG_COPY_CAST:%.*]] = upcast [[ARG_COPY]]
+  // CHECK:         apply [[DELEGATEE]]<Self>([[ARG_COPY_CAST]], [[SELF_TYPE]])
+  // CHECK: } // end sil function '_TFE19protocol_extensionsPS_20ClassInitRequirementC{{.*}}'
   init(d: D) {
     self.init(c: d)
   }
@@ -730,9 +734,12 @@ extension ObjCInitRequirement {
   // CHECK:         [[OBJC_SELF_TYPE:%.*]] = thick_to_objc_metatype [[SELF_TYPE]]
   // CHECK:         [[SELF:%.*]] = alloc_ref_dynamic [objc] [[OBJC_SELF_TYPE]] : $@objc_metatype Self.Type, $Self
   // CHECK:         [[WITNESS:%.*]] = witness_method [volatile] $Self, #ObjCInitRequirement.init!initializer.1.foreign : $@convention(objc_method) <τ_0_0 where τ_0_0 : ObjCInitRequirement> (OC, OC, @owned τ_0_0) -> @owned τ_0_0
-  // CHECK:         [[UPCAST1:%.*]] = upcast [[ARG]]
-  // CHECK:         [[UPCAST2:%.*]] = upcast [[ARG]]
-  // CHECK:         apply [[WITNESS]]<Self>([[UPCAST1]], [[UPCAST2]], [[SELF]])
+  // CHECK:         [[ARG_COPY_1:%.*]] = copy_value [[ARG]]
+  // CHECK:         [[ARG_COPY_1_UPCAST:%.*]] = upcast [[ARG_COPY_1]]
+  // CHECK:         [[ARG_COPY_2:%.*]] = copy_value [[ARG]]
+  // CHECK:         [[ARG_COPY_2_UPCAST:%.*]] = upcast [[ARG_COPY_2]]
+  // CHECK:         apply [[WITNESS]]<Self>([[ARG_COPY_1_UPCAST]], [[ARG_COPY_2_UPCAST]], [[SELF]])
+  // CHECK: } // end sil function '_TFE19protocol_extensionsPS_19ObjCInitRequirementC{{.*}}'
   init(d: OD) {
     self.init(c: d, d: d)
   }
@@ -750,7 +757,7 @@ extension ProtoDelegatesToObjC where Self : ObjCInitClass {
   // CHECK-LABEL: sil hidden @_TFe19protocol_extensionsRxCS_13ObjCInitClassxS_20ProtoDelegatesToObjCrS1_C{{.*}}
   // CHECK: bb0([[STR:%[0-9]+]] : $String, [[SELF_META:%[0-9]+]] : $@thick Self.Type):
   init(string: String) {
-    // CHECK:   [[SELF_BOX:%[0-9]+]] = alloc_box $Self
+    // CHECK:   [[SELF_BOX:%[0-9]+]] = alloc_box $@box Self
     // CHECK:   [[PB:%.*]] = project_box [[SELF_BOX]]
     // CHECK:   [[SELF:%[0-9]+]] = mark_uninitialized [delegatingself] [[PB]] : $*Self
     // CHECK:   [[SELF_META_OBJC:%[0-9]+]] = thick_to_objc_metatype [[SELF_META]] : $@thick Self.Type to $@objc_metatype Self.Type
@@ -776,7 +783,7 @@ extension ProtoDelegatesToRequired where Self : RequiredInitClass {
   // CHECK-LABEL: sil hidden @_TFe19protocol_extensionsRxCS_17RequiredInitClassxS_24ProtoDelegatesToRequiredrS1_C{{.*}} 
   // CHECK: bb0([[STR:%[0-9]+]] : $String, [[SELF_META:%[0-9]+]] : $@thick Self.Type):
   init(string: String) {
-  // CHECK:   [[SELF_BOX:%[0-9]+]] = alloc_box $Self
+  // CHECK:   [[SELF_BOX:%[0-9]+]] = alloc_box $@box Self
   // CHECK:   [[PB:%.*]] = project_box [[SELF_BOX]]
   // CHECK:   [[SELF:%[0-9]+]] = mark_uninitialized [delegatingself] [[PB]] : $*Self
   // CHECK:   [[SELF_META_AS_CLASS_META:%[0-9]+]] = upcast [[SELF_META]] : $@thick Self.Type to $@thick RequiredInitClass.Type

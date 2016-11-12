@@ -31,27 +31,27 @@ func MRV() -> (Int, Float, (), Double) {}
 // CHECK-LABEL: sil hidden @_TF5decls14tuple_patternsFT_T_
 func tuple_patterns() {
   var (a, b) : (Int, Float)
-  // CHECK: [[AADDR1:%[0-9]+]] = alloc_box $Int
+  // CHECK: [[AADDR1:%[0-9]+]] = alloc_box $@box Int
   // CHECK: [[PBA:%.*]] = project_box [[AADDR1]]
   // CHECK: [[AADDR:%[0-9]+]] = mark_uninitialized [var] [[PBA]]
-  // CHECK: [[BADDR1:%[0-9]+]] = alloc_box $Float
+  // CHECK: [[BADDR1:%[0-9]+]] = alloc_box $@box Float
   // CHECK: [[PBB:%.*]] = project_box [[BADDR1]]
   // CHECK: [[BADDR:%[0-9]+]] = mark_uninitialized [var] [[PBB]]
 
   var (c, d) = (a, b)
-  // CHECK: [[CADDR:%[0-9]+]] = alloc_box $Int
+  // CHECK: [[CADDR:%[0-9]+]] = alloc_box $@box Int
   // CHECK: [[PBC:%.*]] = project_box [[CADDR]]
-  // CHECK: [[DADDR:%[0-9]+]] = alloc_box $Float
+  // CHECK: [[DADDR:%[0-9]+]] = alloc_box $@box Float
   // CHECK: [[PBD:%.*]] = project_box [[DADDR]]
   // CHECK: copy_addr [[AADDR]] to [initialization] [[PBC]]
   // CHECK: copy_addr [[BADDR]] to [initialization] [[PBD]]
 
-  // CHECK: [[EADDR:%[0-9]+]] = alloc_box $Int
+  // CHECK: [[EADDR:%[0-9]+]] = alloc_box $@box Int
   // CHECK: [[PBE:%.*]] = project_box [[EADDR]]
-  // CHECK: [[FADDR:%[0-9]+]] = alloc_box $Float
+  // CHECK: [[FADDR:%[0-9]+]] = alloc_box $@box Float
   // CHECK: [[PBF:%.*]] = project_box [[FADDR]]
-  // CHECK: [[GADDR:%[0-9]+]] = alloc_box $()
-  // CHECK: [[HADDR:%[0-9]+]] = alloc_box $Double
+  // CHECK: [[GADDR:%[0-9]+]] = alloc_box $@box ()
+  // CHECK: [[HADDR:%[0-9]+]] = alloc_box $@box Double
   // CHECK: [[PBH:%.*]] = project_box [[HADDR]]
   // CHECK: [[EFGH:%[0-9]+]] = apply
   // CHECK: [[E:%[0-9]+]] = tuple_extract {{.*}}, 0
@@ -62,19 +62,19 @@ func tuple_patterns() {
   // CHECK: store [[H]] to [trivial] [[PBH]]
   var (e,f,g,h) : (Int, Float, (), Double) = MRV()
 
-  // CHECK: [[IADDR:%[0-9]+]] = alloc_box $Int
+  // CHECK: [[IADDR:%[0-9]+]] = alloc_box $@box Int
   // CHECK: [[PBI:%.*]] = project_box [[IADDR]]
-  // CHECK-NOT: alloc_box $Float
+  // CHECK-NOT: alloc_box $@box Float
   // CHECK: copy_addr [[AADDR]] to [initialization] [[PBI]]
-  // CHECK: [[B:%[0-9]+]] = load [[BADDR]]
+  // CHECK: [[B:%[0-9]+]] = load [trivial] [[BADDR]]
   // CHECK-NOT: store [[B]]
   var (i,_) = (a, b)
 
-  // CHECK: [[JADDR:%[0-9]+]] = alloc_box $Int
+  // CHECK: [[JADDR:%[0-9]+]] = alloc_box $@box Int
   // CHECK: [[PBJ:%.*]] = project_box [[JADDR]]
-  // CHECK-NOT: alloc_box $Float
-  // CHECK: [[KADDR:%[0-9]+]] = alloc_box $()
-  // CHECK-NOT: alloc_box $Double
+  // CHECK-NOT: alloc_box $@box Float
+  // CHECK: [[KADDR:%[0-9]+]] = alloc_box $@box ()
+  // CHECK-NOT: alloc_box $@box Double
   // CHECK: [[J_K_:%[0-9]+]] = apply
   // CHECK: [[J:%[0-9]+]] = tuple_extract {{.*}}, 0
   // CHECK: [[K:%[0-9]+]] = tuple_extract {{.*}}, 2
@@ -84,10 +84,10 @@ func tuple_patterns() {
 
 // CHECK-LABEL: sil hidden @_TF5decls16simple_arguments
 // CHECK: bb0(%0 : $Int, %1 : $Int):
-// CHECK: [[X:%[0-9]+]] = alloc_box $Int
+// CHECK: [[X:%[0-9]+]] = alloc_box $@box Int
 // CHECK-NEXT: [[PBX:%.*]] = project_box [[X]]
 // CHECK-NEXT: store %0 to [trivial] [[PBX]]
-// CHECK-NEXT: [[Y:%[0-9]+]] = alloc_box $Int
+// CHECK-NEXT: [[Y:%[0-9]+]] = alloc_box $@box Int
 // CHECK-NEXT: [[PBY:%[0-9]+]] = project_box [[Y]]
 // CHECK-NEXT: store %1 to [trivial] [[PBY]]
 func simple_arguments(x: Int, y: Int) -> Int {
@@ -105,7 +105,7 @@ func tuple_argument(x: (Int, Float, ())) {
 
 // CHECK-LABEL: sil hidden @_TF5decls14inout_argument
 // CHECK: bb0(%0 : $*Int, %1 : $Int):
-// CHECK: [[X_LOCAL:%[0-9]+]] = alloc_box $Int
+// CHECK: [[X_LOCAL:%[0-9]+]] = alloc_box $@box Int
 // CHECK: [[PBX:%.*]] = project_box [[X_LOCAL]]
 func inout_argument(x: inout Int, y: Int) {
   var y = y
@@ -120,7 +120,7 @@ func load_from_global() -> Int {
   // CHECK: [[ACCESSOR:%[0-9]+]] = function_ref @_TF5declsau6globalSi
   // CHECK: [[PTR:%[0-9]+]] = apply [[ACCESSOR]]()
   // CHECK: [[ADDR:%[0-9]+]] = pointer_to_address [[PTR]]
-  // CHECK: [[VALUE:%[0-9]+]] = load [[ADDR]]
+  // CHECK: [[VALUE:%[0-9]+]] = load [trivial] [[ADDR]]
   // CHECK: return [[VALUE]]
 }
 
@@ -128,7 +128,7 @@ func load_from_global() -> Int {
 func store_to_global(x: Int) {
   var x = x
   global = x
-  // CHECK: [[XADDR:%[0-9]+]] = alloc_box $Int
+  // CHECK: [[XADDR:%[0-9]+]] = alloc_box $@box Int
   // CHECK: [[PBX:%.*]] = project_box [[XADDR]]
   // CHECK: [[ACCESSOR:%[0-9]+]] = function_ref @_TF5declsau6globalSi
   // CHECK: [[PTR:%[0-9]+]] = apply [[ACCESSOR]]()

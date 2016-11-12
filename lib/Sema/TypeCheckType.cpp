@@ -28,6 +28,7 @@
 #include "swift/AST/PrettyStackTrace.h"
 #include "swift/AST/TypeLoc.h"
 #include "swift/Basic/SourceManager.h"
+#include "swift/Basic/Statistic.h"
 #include "swift/Basic/StringExtras.h"
 #include "swift/ClangImporter/ClangImporter.h"
 #include "llvm/ADT/APInt.h"
@@ -36,6 +37,8 @@
 #include "llvm/ADT/StringSwitch.h"
 #include "llvm/ADT/Twine.h"
 using namespace swift;
+
+#define DEBUG_TYPE "TypeCheckType"
 
 GenericTypeResolver::~GenericTypeResolver() { }
 
@@ -559,7 +562,7 @@ Type TypeChecker::applyUnboundGenericArguments(
       type = ArchetypeBuilder::mapTypeOutOfContext(TAD, TAD->getUnderlyingType());
     }
 
-    type = type.subst(dc->getParentModule(), subs, None);
+    type = type.subst(dc->getParentModule(), subs, SubstFlags::UseErrorType);
 
     // FIXME: return a SubstitutedType to preserve the fact that
     // we resolved a generic TypeAlias, for availability diagnostics.
@@ -1525,6 +1528,8 @@ bool TypeChecker::validateType(TypeLoc &Loc, DeclContext *DC,
   // If we've already validated this type, don't do so again.
   if (Loc.wasValidated())
     return Loc.isError();
+
+  SWIFT_FUNC_STAT;
 
   if (Loc.getType().isNull()) {
     // Raise error if we parse an IUO type in an illegal position.
@@ -2798,20 +2803,33 @@ Type TypeResolver::buildProtocolType(
 Type TypeChecker::substMemberTypeWithBase(Module *module,
                                           const TypeDecl *member,
                                           Type baseTy) {
-  Type memberType = member->getDeclaredInterfaceType();
-
   // The declared interface type for a generic type will have the type
   // arguments; strip them off.
-  if (auto nominalTypeDecl = dyn_cast<NominalTypeDecl>(member)) {
-    if (auto boundGenericTy = memberType->getAs<BoundGenericType>()) {
-      memberType = UnboundGenericType::get(
-                     const_cast<NominalTypeDecl *>(nominalTypeDecl),
-                     boundGenericTy->getParent(),
-                     Context);
-    }
-  }
+  if (isa<NominalTypeDecl>(member)) {
+    auto memberType = member->getDeclaredType();
 
-  return baseTy->getTypeOfMember(module, member, this, memberType);
+    if (baseTy->is<ModuleType>())
+      return memberType;
+
+    if (baseTy->getAnyNominal() ||
+        baseTy->is<UnboundGenericType>()) {
+      if (auto *unboundGenericType = memberType->getAs<UnboundGenericType>()) {
+        return UnboundGenericType::get(
+            unboundGenericType->getDecl(), baseTy,
+            unboundGenericType->getASTContext());
+      } else if (auto *nominalType = memberType->getAs<NominalType>()) {
+        return NominalType::get(
+            nominalType->getDecl(), baseTy,
+            nominalType->getASTContext());
+      }
+      llvm_unreachable("Not a nominal type?");
+    }
+
+    return memberType;
+  } else {
+    auto memberType = member->getDeclaredInterfaceType();
+    return baseTy->getTypeOfMember(module, member, this, memberType);
+  }
 }
 
 Type TypeChecker::getSuperClassOf(Type type) {

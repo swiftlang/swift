@@ -18,7 +18,7 @@ public func importAsUnaryInit() {
 public func foo(_ x: Double) {
 // CHECK: bb0([[X:%.*]] : $Double):
   // CHECK: [[GLOBALVAR:%.*]] = global_addr @IAMStruct1GlobalVar
-  // CHECK: [[ZZ:%.*]] = load [[GLOBALVAR]]
+  // CHECK: [[ZZ:%.*]] = load [trivial] [[GLOBALVAR]]
   let zz = Struct1.globalVar
   // CHECK: assign [[ZZ]] to [[GLOBALVAR]]
   Struct1.globalVar = zz
@@ -37,10 +37,11 @@ public func foo(_ x: Double) {
   z = makeMetatype().init(value: x)
 
   // CHECK: [[THUNK:%.*]] = function_ref @_TTOFVSC7Struct1CFT5valueSd_S_
-  // CHECK: [[SELF:%.*]] = metatype $@thin Struct1.Type
-  // CHECK: [[A:%.*]] = apply [[THUNK]]([[SELF]])
+  // CHECK: [[SELF_META:%.*]] = metatype $@thin Struct1.Type
+  // CHECK: [[A:%.*]] = apply [[THUNK]]([[SELF_META]])
+  // CHECK: [[A_COPY:%.*]] = copy_value [[A]]
   let a: (Double) -> Struct1 = Struct1.init(value:)
-  // CHECK: apply [[A]]([[X]])
+  // CHECK: apply [[A_COPY]]([[X]])
   z = a(x)
 
   // TODO: Support @convention(c) references that only capture thin metatype
@@ -52,16 +53,17 @@ public func foo(_ x: Double) {
   z.invert()
 
   // CHECK: [[FN:%.*]] = function_ref @IAMStruct1Rotate : $@convention(c) (@in Struct1, Double) -> Struct1
-  // CHECK: [[ZVAL:%.*]] = load [[Z]]
+  // CHECK: [[ZVAL:%.*]] = load [trivial] [[Z]]
   // CHECK: store [[ZVAL]] to [trivial] [[ZTMP:%.*]] :
   // CHECK: apply [[FN]]([[ZTMP]], [[X]])
   z = z.translate(radians: x)
 
   // CHECK: [[THUNK:%.*]] = function_ref [[THUNK_NAME:@_TTOFVSC7Struct19translateFT7radiansSd_S_]]
-  // CHECK: [[ZVAL:%.*]] = load [[Z]]
+  // CHECK: [[ZVAL:%.*]] = load [trivial] [[Z]]
   // CHECK: [[C:%.*]] = apply [[THUNK]]([[ZVAL]])
+  // CHECK: [[C_COPY:%.*]] = copy_value [[C]]
   let c: (Double) -> Struct1 = z.translate(radians:)
-  // CHECK: apply [[C]]([[X]])
+  // CHECK: apply [[C_COPY]]([[X]])
   z = c(x)
   // CHECK: [[THUNK:%.*]] = function_ref [[THUNK_NAME]]
   // CHECK: thin_to_thick_function [[THUNK]]
@@ -76,20 +78,21 @@ public func foo(_ x: Double) {
   // z = e(z, x)
 
   // CHECK: [[FN:%.*]] = function_ref @IAMStruct1Scale
-  // CHECK: [[ZVAL:%.*]] = load [[Z]]
+  // CHECK: [[ZVAL:%.*]] = load [trivial] [[Z]]
   // CHECK: apply [[FN]]([[ZVAL]], [[X]])
   z = z.scale(x)
 
   // CHECK: [[THUNK:%.*]] = function_ref @_TTOFVSC7Struct15scaleFSdS_
-  // CHECK: [[ZVAL:%.*]] = load [[Z]]
+  // CHECK: [[ZVAL:%.*]] = load [trivial] [[Z]]
   // CHECK: [[F:%.*]] = apply [[THUNK]]([[ZVAL]])
+  // CHECK: [[F_COPY:%.*]] = copy_value [[F]]
   let f = z.scale
-  // CHECK: apply [[F]]([[X]])
+  // CHECK: apply [[F_COPY]]([[X]])
   z = f(x)
   // CHECK: [[THUNK:%.*]] = function_ref @_TTOFVSC7Struct15scaleFSdS_
   // CHECK: thin_to_thick_function [[THUNK]]
   let g = Struct1.scale
-  // CHECK: [[ZVAL:%.*]] = load [[Z]]
+  // CHECK: [[ZVAL:%.*]] = load [trivial] [[Z]]
   z = g(z)(x)
 
   // TODO: If we implement SE-0042, this should directly reference the
@@ -97,17 +100,17 @@ public func foo(_ x: Double) {
   // let h: @convention(c) (Struct1, Double) -> Struct1 = Struct1.scale
   // z = h(z, x)
 
-  // CHECK: [[ZVAL:%.*]] = load [[Z]]
+  // CHECK: [[ZVAL:%.*]] = load [trivial] [[Z]]
   // CHECK: store [[ZVAL]] to [trivial] [[ZTMP:%.*]] :
   // CHECK: [[GET:%.*]] = function_ref @IAMStruct1GetRadius : $@convention(c) (@in Struct1) -> Double
   // CHECK: apply [[GET]]([[ZTMP]])
   _ = z.radius
-  // CHECK: [[ZVAL:%.*]] = load [[Z]]
+  // CHECK: [[ZVAL:%.*]] = load [trivial] [[Z]]
   // CHECK: [[SET:%.*]] = function_ref @IAMStruct1SetRadius : $@convention(c) (Struct1, Double) -> ()
   // CHECK: apply [[SET]]([[ZVAL]], [[X]])
   z.radius = x
 
-  // CHECK: [[ZVAL:%.*]] = load [[Z]]
+  // CHECK: [[ZVAL:%.*]] = load [trivial] [[Z]]
   // CHECK: [[GET:%.*]] = function_ref @IAMStruct1GetAltitude : $@convention(c) (Struct1) -> Double
   // CHECK: apply [[GET]]([[ZVAL]])
   _ = z.altitude
@@ -115,7 +118,7 @@ public func foo(_ x: Double) {
   // CHECK: apply [[SET]]([[Z]], [[X]])
   z.altitude = x
   
-  // CHECK: [[ZVAL:%.*]] = load [[Z]]
+  // CHECK: [[ZVAL:%.*]] = load [trivial] [[Z]]
   // CHECK: [[GET:%.*]] = function_ref @IAMStruct1GetMagnitude : $@convention(c) (Struct1) -> Double
   // CHECK: apply [[GET]]([[ZVAL]])
   _ = z.magnitude
@@ -126,8 +129,9 @@ public func foo(_ x: Double) {
   // CHECK: [[THUNK:%.*]] = function_ref @_TTOZFVSC7Struct112staticMethodFT_Vs5Int32 
   // CHECK: [[SELF:%.*]] = metatype
   // CHECK: [[I:%.*]] = apply [[THUNK]]([[SELF]])
+  // CHECK: [[I_COPY:%.*]] = copy_value [[I]]
   let i = Struct1.staticMethod
-  // CHECK: apply [[I]]()
+  // CHECK: apply [[I_COPY]]()
   y = i()
 
   // TODO: Support @convention(c) references that only capture thin metatype
@@ -161,7 +165,7 @@ public func foo(_ x: Double) {
   _ = makeMetatype().getOnlyProperty
 
   // CHECK: [[FN:%.*]] = function_ref @IAMStruct1SelfComesLast : $@convention(c) (Double, Struct1) -> ()
-  // CHECK: [[ZVAL:%.*]] = load [[Z]]
+  // CHECK: [[ZVAL:%.*]] = load [trivial] [[Z]]
   // CHECK: apply [[FN]]([[X]], [[ZVAL]])
   z.selfComesLast(x: x)
   let k: (Double) -> () = z.selfComesLast(x:)
@@ -174,7 +178,7 @@ public func foo(_ x: Double) {
   // m(z, x)
 
   // CHECK: [[FN:%.*]] = function_ref @IAMStruct1SelfComesThird : $@convention(c) (Int32, Float, Struct1, Double) -> ()
-  // CHECK: [[ZVAL:%.*]] = load [[Z]]
+  // CHECK: [[ZVAL:%.*]] = load [trivial] [[Z]]
   // CHECK: apply [[FN]]({{.*}}, {{.*}}, [[ZVAL]], [[X]])
   z.selfComesThird(a: y, b: 0, x: x)
   let n: (Int32, Float, Double) -> () = z.selfComesThird(a:b:x:)
@@ -188,6 +192,7 @@ public func foo(_ x: Double) {
   //   = Struct1.selfComesThird(a:b:x:)
   // p(z, y, 0, x)
 }
+// CHECK: } // end sil function '_TF10cf_members3foo{{.*}}'
 
 // CHECK-LABEL: sil shared [thunk] @_TTOFVSC7Struct1CfT5valueSd_S_
 // CHECK:       bb0([[X:%.*]] : $Double, [[SELF:%.*]] : $@thin Struct1.Type):

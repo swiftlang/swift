@@ -450,7 +450,9 @@ Pattern *ModuleFile::maybeReadPattern() {
   }
 }
 
-ProtocolConformanceRef ModuleFile::readConformance(llvm::BitstreamCursor &Cursor){
+ProtocolConformanceRef ModuleFile::readConformance(
+                                             llvm::BitstreamCursor &Cursor,
+                                             GenericEnvironment *genericEnv) {
   using namespace decls_block;
 
   SmallVector<uint64_t, 16> scratch;
@@ -475,6 +477,10 @@ ProtocolConformanceRef ModuleFile::readConformance(llvm::BitstreamCursor &Cursor
 
     ASTContext &ctx = getContext();
     Type conformingType = getType(conformingTypeID);
+    if (genericEnv) {
+      conformingType = genericEnv->mapTypeIntoContext(getAssociatedModule(),
+                                                      conformingType);
+    }
 
     PrettyStackTraceType trace(getAssociatedModule()->getASTContext(),
                                "reading specialized conformance for",
@@ -483,12 +489,13 @@ ProtocolConformanceRef ModuleFile::readConformance(llvm::BitstreamCursor &Cursor
     // Read the substitutions.
     SmallVector<Substitution, 4> substitutions;
     while (numSubstitutions--) {
-      auto sub = maybeReadSubstitution(Cursor);
+      auto sub = maybeReadSubstitution(Cursor, genericEnv);
       assert(sub.hasValue() && "Missing substitution?");
       substitutions.push_back(*sub);
     }
 
-    ProtocolConformanceRef genericConformance = readConformance(Cursor);
+    ProtocolConformanceRef genericConformance =
+      readConformance(Cursor, genericEnv);
     PrettyStackTraceDecl traceTo("... to", genericConformance.getRequirement());
 
     assert(genericConformance.isConcrete() && "Abstract generic conformance?");
@@ -505,11 +512,17 @@ ProtocolConformanceRef ModuleFile::readConformance(llvm::BitstreamCursor &Cursor
 
     ASTContext &ctx = getContext();
     Type conformingType = getType(conformingTypeID);
+    if (genericEnv) {
+      conformingType = genericEnv->mapTypeIntoContext(getAssociatedModule(),
+                                                      conformingType);
+    }
+
     PrettyStackTraceType trace(getAssociatedModule()->getASTContext(),
                                "reading inherited conformance for",
                                conformingType);
 
-    ProtocolConformanceRef inheritedConformance = readConformance(Cursor);
+    ProtocolConformanceRef inheritedConformance =
+      readConformance(Cursor, genericEnv);
     PrettyStackTraceDecl traceTo("... to",
                                  inheritedConformance.getRequirement());
 
@@ -541,8 +554,7 @@ ProtocolConformanceRef ModuleFile::readConformance(llvm::BitstreamCursor &Cursor
     auto module = getModule(moduleID);
 
     SmallVector<ProtocolConformance *, 2> conformances;
-    nominal->lookupConformance(module, proto,
-                               conformances);
+    nominal->lookupConformance(module, proto, conformances);
     PrettyStackTraceModuleFile traceMsg(
         "If you're seeing a crash here, check that your SDK and dependencies "
         "are at least as new as the versions used to build", this);
@@ -641,7 +653,8 @@ NormalProtocolConformance *ModuleFile::readNormalConformance(
 }
 
 Optional<Substitution>
-ModuleFile::maybeReadSubstitution(llvm::BitstreamCursor &cursor) {
+ModuleFile::maybeReadSubstitution(llvm::BitstreamCursor &cursor,
+                                  GenericEnvironment *genericEnv) {
   BCOffsetRAII lastRecordOffset(cursor);
 
   auto entry = cursor.advance(AF_DontPopBlockAtEnd);
@@ -661,6 +674,10 @@ ModuleFile::maybeReadSubstitution(llvm::BitstreamCursor &cursor) {
                                                           numConformances);
 
   auto replacementTy = getType(replacementID);
+  if (genericEnv) {
+    replacementTy = genericEnv->mapTypeIntoContext(getAssociatedModule(),
+                                                   replacementTy);
+  }
 
   SmallVector<ProtocolConformanceRef, 4> conformanceBuf;
   while (numConformances--) {
@@ -812,13 +829,6 @@ void ModuleFile::readGenericRequirements(
 
         requirements.push_back(Requirement(RequirementKind::SameType,
                                            first, second));
-        break;
-      }
-      case GenericRequirementKind::WitnessMarker: {
-        auto first = getType(rawTypeIDs[0]);
-
-        requirements.push_back(Requirement(RequirementKind::WitnessMarker,
-                                           first, Type()));
         break;
       }
       default:
@@ -4206,17 +4216,85 @@ void ModuleFile::finishNormalConformance(NormalProtocolConformance *conformance,
   ASTContext &ctx = getContext();
   ArrayRef<uint64_t>::iterator rawIDIter = rawIDs.begin();
 
-  WitnessMap witnesses;
   while (valueCount--) {
-    auto first = cast<ValueDecl>(getDecl(*rawIDIter++));
-    auto second = cast_or_null<ValueDecl>(getDecl(*rawIDIter++));
-    assert(second || first->getAttrs().hasAttribute<OptionalAttr>() ||
-           first->getAttrs().isUnavailable(ctx));
-    (void) ctx;
-    if (second)
-      witnesses.insert(std::make_pair(first, second));
-    else
-      witnesses.insert(std::make_pair(first, Witness()));
+    auto req = cast<ValueDecl>(getDecl(*rawIDIter++));
+    auto witness = cast_or_null<ValueDecl>(getDecl(*rawIDIter++));
+    assert(witness ||
+           req->getAttrs().hasAttribute<OptionalAttr>() ||
+           req->getAttrs().isUnavailable(ctx));
+    if (!witness) {
+      conformance->setWitness(req, Witness());
+      continue;
+    }
+
+    // Generic signature and environment.
+    GenericSignature *syntheticSig = nullptr;
+    GenericEnvironment *syntheticEnv = nullptr;
+    if (unsigned numGenericParams = *rawIDIter++) {
+      // Generic parameters.
+      SmallVector<GenericTypeParamType *, 2> genericParams;
+      while (numGenericParams--) {
+        genericParams.push_back(
+          getType(*rawIDIter++)->castTo<GenericTypeParamType>());
+      }
+
+      // Generic requirements.
+      SmallVector<Requirement, 4> requirements;
+      readGenericRequirements(requirements);
+
+      // Form the generic signature for the synthetic environment.
+      syntheticSig = GenericSignature::get(genericParams, requirements);
+
+      // Create an archetype builder, which will help us create the
+      // synthetic environment.
+      ArchetypeBuilder builder(*getAssociatedModule(), ctx.Diags);
+      builder.addGenericSignature(syntheticSig, nullptr);
+      builder.finalize(SourceLoc());
+      syntheticEnv = builder.getGenericEnvironment();
+    }
+
+    // Requirement -> synthetic map.
+    SubstitutionMap reqToSyntheticMap;
+    bool hasReqToSyntheticMap = false;
+    if (unsigned numEntries = *rawIDIter++) {
+      hasReqToSyntheticMap = true;
+      while (numEntries--) {
+        auto first = getType(*rawIDIter++);
+        auto second = getType(*rawIDIter++);
+        reqToSyntheticMap.addSubstitution(first->getCanonicalType(), second);
+
+        if (unsigned numConformances = *rawIDIter++) {
+          SmallVector<ProtocolConformanceRef, 2> conformances;
+          while (numConformances--) {
+            conformances.push_back(readConformance(DeclTypeCursor));
+          }
+          reqToSyntheticMap.addConformances(first->getCanonicalType(),
+                                            ctx.AllocateCopy(conformances));
+        }
+      }
+    }
+
+    // Witness substitutions.
+    SmallVector<Substitution, 4> witnessSubstitutions;
+    if (unsigned numWitnessSubstitutions = *rawIDIter++) {
+      while (numWitnessSubstitutions--) {
+        auto sub = maybeReadSubstitution(DeclTypeCursor, syntheticEnv);
+        witnessSubstitutions.push_back(*sub);
+      }
+    }
+
+    // Handle simple witnesses.
+    if (witnessSubstitutions.empty() && !syntheticSig && !syntheticEnv &&
+        !hasReqToSyntheticMap) {
+      conformance->setWitness(req, Witness(witness));
+      continue;
+    }
+
+    // Set the witness.
+    conformance->setWitness(req,
+                            Witness(witness, witnessSubstitutions,
+                                    syntheticSig, syntheticEnv,
+                                    reqToSyntheticMap));
   }
   assert(rawIDIter <= rawIDs.end() && "read too much");
 
@@ -4232,15 +4310,11 @@ void ModuleFile::finishNormalConformance(NormalProtocolConformance *conformance,
   }
   assert(rawIDIter <= rawIDs.end() && "read too much");
 
+
   // Set type witnesses.
   for (auto typeWitness : typeWitnesses) {
     conformance->setTypeWitness(typeWitness.first, typeWitness.second.first,
                                 typeWitness.second.second);
-  }
-
-  // Set witnesses.
-  for (auto witness : witnesses) {
-    conformance->setWitness(witness.first, witness.second);
   }
 }
 

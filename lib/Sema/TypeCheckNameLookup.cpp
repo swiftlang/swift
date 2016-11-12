@@ -504,6 +504,12 @@ void TypeChecker::performTypoCorrection(DeclContext *DC, DeclRefKind refKind,
                                         NameLookupOptions lookupOptions,
                                         LookupResult &result,
                                         unsigned maxResults) {
+  // Disable typo-correction if we won't show the diagnostic anyway.
+  if (getLangOpts().DisableTypoCorrection ||
+      (Diags.hasFatalErrorOccurred() &&
+       !Diags.getShowDiagnosticsAfterFatalError()))
+    return;
+
   // Fill in a collection of the most reasonable entries.
   TopCollection<unsigned, ValueDecl*> entries(maxResults);
   auto consumer = makeDeclConsumer([&](ValueDecl *decl,

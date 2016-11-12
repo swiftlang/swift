@@ -10,13 +10,15 @@ struct Foo<T, U> {
   var g: T
 }
 
-// CHECK-LABEL: sil hidden @_TF20property_abstraction4getF
-// CHECK:         bb0([[X_ORIG:%.*]] : $Foo<Int, Int>):
+// CHECK-LABEL: sil hidden @_TF20property_abstraction4getF{{.*}} : 
+// CHECK:       bb0([[X_ORIG:%.*]] : $Foo<Int, Int>):
 // CHECK:         [[F_ORIG:%.*]] = struct_extract [[X_ORIG]] : $Foo<Int, Int>, #Foo.f
-// CHECK:         copy_value [[F_ORIG]]
+// CHECK:         [[F_ORIG_COPY:%.*]] = copy_value [[F_ORIG]]
 // CHECK:         [[REABSTRACT_FN:%.*]] = function_ref @_TTR
-// CHECK:         [[F_SUBST:%.*]] = partial_apply [[REABSTRACT_FN]]([[F_ORIG]])
+// CHECK:         [[F_SUBST:%.*]] = partial_apply [[REABSTRACT_FN]]([[F_ORIG_COPY]])
+// CHECK:         destroy_value [[X_ORIG]]
 // CHECK:         return [[F_SUBST]]
+// CHECK:       } // end sil function '_TF20property_abstraction4getF{{.*}}'
 func getF(_ x: Foo<Int, Int>) -> (Int) -> Int {
   return x.f
 }
@@ -32,19 +34,27 @@ func setF(_ x: inout Foo<Int, Int>, f: @escaping (Int) -> Int) {
 
 func inOutFunc(_ f: inout ((Int) -> Int)) { }
 
-// CHECK-LABEL: sil hidden @_TF20property_abstraction6inOutF
-// CHECK:         [[INOUTFUNC:%.*]] = function_ref @_TF20property_abstraction9inOutFunc
-// CHECK:         [[F_ADDR:%.*]] = struct_element_addr {{%.*}} : $*Foo<Int, Int>, #Foo.f
-// CHECK:         [[F_SUBST_MAT:%.*]] = alloc_stack
-// CHECK:         [[F_ORIG:%.*]] = load [[F_ADDR]]
-// CHECK:         [[REABSTRACT_FN:%.*]] = function_ref @_TTR
-// CHECK:         [[F_SUBST_IN:%.*]] = partial_apply [[REABSTRACT_FN]]([[F_ORIG]])
-// CHECK:         store [[F_SUBST_IN]] to [init] [[F_SUBST_MAT]]
-// CHECK:         apply [[INOUTFUNC]]([[F_SUBST_MAT]])
-// CHECK:         [[F_SUBST_OUT:%.*]] = load [[F_SUBST_MAT]]
-// CHECK:         [[REABSTRACT_FN:%.*]] = function_ref @_TTR
-// CHECK:         [[F_ORIG:%.*]] = partial_apply [[REABSTRACT_FN]]([[F_SUBST_OUT]])
-// CHECK:         assign [[F_ORIG]] to [[F_ADDR]]
+// CHECK-LABEL: sil hidden @_TF20property_abstraction6inOutF{{.*}} : 
+// CHECK: bb0([[ARG:%.*]] : $Foo<Int, Int>):
+// CHECK:   [[XBOX:%.*]] = alloc_box $@box Foo<Int, Int>, var, name "x"
+// CHECK:   [[XBOX_PB:%.*]] = project_box [[XBOX]] : $@box Foo<Int, Int>, 0
+// CHECK:   [[ARG_COPY:%.*]] = copy_value [[ARG]]
+// CHECK:   store [[ARG_COPY]] to [init] [[XBOX_PB]]
+// CHECK:   [[INOUTFUNC:%.*]] = function_ref @_TF20property_abstraction9inOutFunc
+// CHECK:   [[F_ADDR:%.*]] = struct_element_addr [[XBOX_PB]] : $*Foo<Int, Int>, #Foo.f
+// CHECK:   [[F_SUBST_MAT:%.*]] = alloc_stack
+// CHECK:   [[F_ORIG:%.*]] = load [copy] [[F_ADDR]]
+// CHECK:   [[REABSTRACT_FN:%.*]] = function_ref @_TTR
+// CHECK:   [[F_SUBST_IN:%.*]] = partial_apply [[REABSTRACT_FN]]([[F_ORIG]])
+// CHECK:   store [[F_SUBST_IN]] to [init] [[F_SUBST_MAT]]
+// CHECK:   apply [[INOUTFUNC]]([[F_SUBST_MAT]])
+// CHECK:   [[F_SUBST_OUT:%.*]] = load [take] [[F_SUBST_MAT]]
+// CHECK:   [[REABSTRACT_FN:%.*]] = function_ref @_TTR
+// CHECK:   [[F_ORIG:%.*]] = partial_apply [[REABSTRACT_FN]]([[F_SUBST_OUT]])
+// CHECK:   assign [[F_ORIG]] to [[F_ADDR]]
+// CHECK:   destroy_value [[XBOX]]
+// CHECK:   destroy_value [[ARG]]
+// CHECK: } // end sil function '_TF20property_abstraction6inOutF{{.*}}'
 func inOutF(_ x: Foo<Int, Int>) {
   var x = x
   inOutFunc(&x.f)
@@ -68,11 +78,14 @@ struct AddressOnlyLet<T> {
 }
 
 // CHECK-LABEL: sil hidden @_TF20property_abstraction34getAddressOnlyReabstractedProperty{{.*}} : $@convention(thin) (@in AddressOnlyLet<Int>) -> @owned @callee_owned (Int) -> Int
-// CHECK:         [[CLOSURE_ADDR:%.*]] = struct_element_addr {{%.*}} : $*AddressOnlyLet<Int>, #AddressOnlyLet.f
-// CHECK:         [[CLOSURE_ORIG:%.*]] = load [[CLOSURE_ADDR]]
-// CHECK:         [[REABSTRACT:%.*]] = function_ref
-// CHECK:         [[CLOSURE_SUBST:%.*]] = partial_apply [[REABSTRACT]]([[CLOSURE_ORIG]])
-// CHECK:         return [[CLOSURE_SUBST]]
+// CHECK: bb0([[ARG:%.*]] : $*AddressOnlyLet<Int>):
+// CHECK:   [[CLOSURE_ADDR:%.*]] = struct_element_addr {{%.*}} : $*AddressOnlyLet<Int>, #AddressOnlyLet.f
+// CHECK:   [[CLOSURE_ORIG:%.*]] = load [copy] [[CLOSURE_ADDR]]
+// CHECK:   [[REABSTRACT:%.*]] = function_ref
+// CHECK:   [[CLOSURE_SUBST:%.*]] = partial_apply [[REABSTRACT]]([[CLOSURE_ORIG]])
+// CHECK:   destroy_addr [[ARG]]
+// CHECK:   return [[CLOSURE_SUBST]]
+// CHECK: } // end sil function '_TF20property_abstraction34getAddressOnlyReabstractedProperty{{.*}}'
 func getAddressOnlyReabstractedProperty(_ x: AddressOnlyLet<Int>) -> (Int) -> Int {
   return x.f
 }
@@ -127,4 +140,4 @@ func setBuilder<F: Factory where F.Product == MyClass>(_ factory: inout F) {
 // CHECK:   [[SETTER:%.*]] = witness_method $F, #Factory.builder!setter.1
 // CHECK:   [[REABSTRACTOR:%.*]] = function_ref @_TTR
 // CHECK:   [[F2:%.*]] = partial_apply [[REABSTRACTOR]]([[F1]])
-// CHECK:   apply [[SETTER]]<F, MyClass>([[F2]], %0)
+// CHECK:   apply [[SETTER]]<F>([[F2]], %0)

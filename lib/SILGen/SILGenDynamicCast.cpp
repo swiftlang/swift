@@ -140,8 +140,8 @@ namespace {
         //emission.
         scalarOperandValue = operand.forward(SGF);
         if (scalarOperandValue->getType().isAddress()) {
-          scalarOperandValue = SGF.B.createLoad(
-              Loc, scalarOperandValue, LoadOwnershipQualifier::Unqualified);
+          scalarOperandValue = SGF.B.emitLoadValueOperation(
+              Loc, scalarOperandValue, LoadOwnershipQualifier::Take);
         }
         SGF.B.createCheckedCastBranch(Loc, /*exact*/ false, scalarOperandValue,
                                       origTargetTL.getLoweredType(),
@@ -234,7 +234,7 @@ namespace {
                                         SGFContext ctx) {
       // Retain the result if this is copy-on-success.
       if (!shouldTakeOnSuccess(consumption))
-        origTargetTL.emitCopyValue(SGF.B, Loc, value);
+        value = origTargetTL.emitCopyValue(SGF.B, Loc, value);
 
       // Enter a cleanup for the +1 result.
       ManagedValue result

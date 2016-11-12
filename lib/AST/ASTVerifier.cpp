@@ -1893,7 +1893,7 @@ struct ASTNodeBase {};
           }
 
           // Check the witness substitutions.
-          auto witness = normal->getWitness(req, nullptr);
+          const auto &witness = normal->getWitness(req, nullptr);
 
           if (witness.requiresSubstitution()) {
             GenericEnv.push_back(witness.getSyntheticEnvironment());

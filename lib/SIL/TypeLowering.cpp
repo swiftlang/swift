@@ -494,8 +494,7 @@ namespace {
   public:
     void emitDestroyAddress(SILBuilder &B, SILLocation loc,
                             SILValue addr) const override {
-      SILValue value =
-          B.createLoad(loc, addr, LoadOwnershipQualifier::Unqualified);
+      SILValue value = emitLoad(B, loc, addr, LoadOwnershipQualifier::Take);
       emitDestroyValue(B, loc, value);
     }
 
@@ -520,23 +519,29 @@ namespace {
 
     SILValue emitLoadOfCopy(SILBuilder &B, SILLocation loc, SILValue addr,
                             IsTake_t isTake) const override {
-      return B.createLoad(loc, addr, LoadOwnershipQualifier::Unqualified);
+      return emitLoad(B, loc, addr, LoadOwnershipQualifier::Trivial);
     }
 
     void emitStoreOfCopy(SILBuilder &B, SILLocation loc,
                          SILValue value, SILValue addr,
                          IsInitialization_t isInit) const override {
-      B.createStore(loc, value, addr, StoreOwnershipQualifier::Unqualified);
+      emitStore(B, loc, value, addr, StoreOwnershipQualifier::Trivial);
     }
 
     void emitStore(SILBuilder &B, SILLocation loc, SILValue value,
                    SILValue addr, StoreOwnershipQualifier qual) const override {
-      B.createStore(loc, value, addr, StoreOwnershipQualifier::Trivial);
+      if (B.getFunction().hasQualifiedOwnership()) {
+        B.createStore(loc, value, addr, StoreOwnershipQualifier::Trivial);
+        return;
+      }
+      B.createStore(loc, value, addr, StoreOwnershipQualifier::Unqualified);
     }
 
     SILValue emitLoad(SILBuilder &B, SILLocation loc, SILValue addr,
                       LoadOwnershipQualifier qual) const override {
-      return B.createLoad(loc, addr, LoadOwnershipQualifier::Trivial);
+      if (B.getFunction().hasQualifiedOwnership())
+        return B.createLoad(loc, addr, LoadOwnershipQualifier::Trivial);
+      return B.createLoad(loc, addr, LoadOwnershipQualifier::Unqualified);
     }
 
     void emitDestroyAddress(SILBuilder &B, SILLocation loc,
@@ -576,32 +581,57 @@ namespace {
 
     SILValue emitLoadOfCopy(SILBuilder &B, SILLocation loc,
                             SILValue addr, IsTake_t isTake) const override {
-      SILValue value =
-          B.createLoad(loc, addr, LoadOwnershipQualifier::Unqualified);
-      if (!isTake)
-        emitCopyValue(B, loc, value);
-      return value;
+      auto qual =
+          isTake ? LoadOwnershipQualifier::Take : LoadOwnershipQualifier::Copy;
+      return emitLoad(B, loc, addr, qual);
     }
 
     void emitStoreOfCopy(SILBuilder &B, SILLocation loc,
                          SILValue newValue, SILValue addr,
                          IsInitialization_t isInit) const override {
-      SILValue oldValue;
-      if (!isInit)
-        oldValue = B.createLoad(loc, addr, LoadOwnershipQualifier::Unqualified);
-      B.createStore(loc, newValue, addr, StoreOwnershipQualifier::Unqualified);
-      if (!isInit)
-        emitDestroyValue(B, loc, oldValue);
+      auto qual = isInit ? StoreOwnershipQualifier::Init
+                         : StoreOwnershipQualifier::Assign;
+      emitStore(B, loc, newValue, addr, qual);
     }
 
     void emitStore(SILBuilder &B, SILLocation loc, SILValue value,
                    SILValue addr, StoreOwnershipQualifier qual) const override {
-      B.createStore(loc, value, addr, qual);
+      if (B.getFunction().hasQualifiedOwnership()) {
+        B.createStore(loc, value, addr, qual);
+        return;
+      }
+
+      if (qual != StoreOwnershipQualifier::Assign) {
+        B.createStore(loc, value, addr, StoreOwnershipQualifier::Unqualified);
+        return;
+      }
+
+      // If the ownership qualifier is [assign], then we need to eliminate the
+      // old value.
+      //
+      // 1. Load old value.
+      // 2. Store new value.
+      // 3. Release old value.
+      SILValue old =
+          B.createLoad(loc, addr, LoadOwnershipQualifier::Unqualified);
+      B.createStore(loc, value, addr, StoreOwnershipQualifier::Unqualified);
+      B.emitDestroyValueOperation(loc, old);
     }
 
     SILValue emitLoad(SILBuilder &B, SILLocation loc, SILValue addr,
                       LoadOwnershipQualifier qual) const override {
-      return B.createLoad(loc, addr, qual);
+      if (B.getFunction().hasQualifiedOwnership())
+        return B.createLoad(loc, addr, qual);
+
+      SILValue loadValue =
+          B.createLoad(loc, addr, LoadOwnershipQualifier::Unqualified);
+
+      // If we do not have a copy, just return the value...
+      if (qual != LoadOwnershipQualifier::Copy)
+        return loadValue;
+
+      // Otherwise, emit the copy value operation.
+      return B.emitCopyValueOperation(loc, loadValue);
     }
   };
 
@@ -718,7 +748,7 @@ namespace {
     void emitDestroyValue(SILBuilder &B, SILLocation loc,
                           SILValue aggValue) const override {
       if (B.getFunction().hasQualifiedOwnership()) {
-        B.emitDestroyValueAndFold(loc, aggValue);
+        B.createDestroyValue(loc, aggValue);
         return;
       }
 
@@ -838,7 +868,7 @@ namespace {
     void emitDestroyValue(SILBuilder &B, SILLocation loc,
                           SILValue value) const override {
       if (B.getFunction().hasQualifiedOwnership()) {
-        B.emitDestroyValueAndFold(loc, value);
+        B.createDestroyValue(loc, value);
         return;
       }
       B.emitReleaseValueAndFold(loc, value);
@@ -850,7 +880,7 @@ namespace {
              "This method should never be called when performing a shallow "
              "destroy value.");
       if (B.getFunction().hasQualifiedOwnership()) {
-        B.emitDestroyValueAndFold(loc, value);
+        B.createDestroyValue(loc, value);
         return;
       }
       B.emitReleaseValueAndFold(loc, value);
@@ -896,7 +926,7 @@ namespace {
     void emitDestroyValue(SILBuilder &B, SILLocation loc,
                           SILValue value) const override {
       if (B.getFunction().hasQualifiedOwnership()) {
-        B.emitDestroyValueAndFold(loc, value);
+        B.createDestroyValue(loc, value);
         return;
       }
       B.emitStrongReleaseAndFold(loc, value);
@@ -1696,7 +1726,7 @@ TypeConverter::getFunctionInterfaceTypeWithCaptures(CanAnyFunctionType funcType,
 
   // If we don't have any local captures (including function captures),
   // there's no context to apply.
-  if (!theClosure.getCaptureInfo().hasLocalCaptures()) {
+  if (!hasLoweredLocalCaptures(theClosure)) {
     if (!genericSig)
       return CanFunctionType::get(funcType.getInput(),
                                   funcType.getResult(),
@@ -2019,6 +2049,11 @@ getAnyFunctionRefFromCapture(CapturedValue capture) {
   if (auto *afd = dyn_cast<AbstractFunctionDecl>(capture.getDecl()))
     return AnyFunctionRef(afd);
   return None;
+}
+
+bool
+TypeConverter::hasLoweredLocalCaptures(AnyFunctionRef fn) {
+  return !getLoweredLocalCaptures(fn).getCaptures().empty();
 }
 
 CaptureInfo

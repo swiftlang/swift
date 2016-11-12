@@ -81,7 +81,7 @@ class ValueDecl;
 /// environment are those of the context of the protocol conformance (\c U
 /// and \c V, in the example above) and the innermost generic parameters are
 /// those of the generic requirement (\c T, in the example above). The
-/// \c Witness class contains this syntheetic environment (both its generic
+/// \c Witness class contains this synthetic environment (both its generic
 /// signature and a generic environment providing archetypes), a substitution
 /// map that allows one to map the interface types of the requirement into
 /// the interface types of the synthetic domain, and the set of substitutions
@@ -187,6 +187,6 @@ public:
   void dump(llvm::raw_ostream &out) const;
 };
 
-} // end namepsace swift
+} // end namespace swift
 
 #endif // SWIFT_AST_WITNESS_H

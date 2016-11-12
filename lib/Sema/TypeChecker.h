@@ -1164,6 +1164,7 @@ public:
   /// property.
   void completePropertyBehaviorAccessors(VarDecl *VD,
                                      VarDecl *ValueImpl,
+                                     Type valueTy,
                                      ArrayRef<Substitution> SelfInterfaceSubs,
                                      ArrayRef<Substitution> SelfContextSubs);
 

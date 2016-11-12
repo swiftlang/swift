@@ -1573,26 +1573,9 @@ namespace {
       auto fnGenericParams
         = fn->getGenericSignatureOfContext()->getGenericParams();
 
-      SmallVector<Substitution, 2> Subs;
-      Substitution sub(valueType, Conformances);
-      Subs.push_back(sub);
-
-      // Add substitution for the dependent type T._ObjectiveCType.
-      if (conformsToBridgedToObjectiveC) {
-        auto objcTypeId = tc.Context.Id_ObjectiveCType;
-        auto objcAssocType = cast<AssociatedTypeDecl>(
-                               conformance->getProtocol()->lookupDirect(
-                                 objcTypeId).front());
-        const Substitution &objcSubst = conformance->getTypeWitness(
-                                          objcAssocType, &tc);
-
-        // Create a substitution for the dependent type.
-        Substitution newDepTypeSubst(
-                       objcSubst.getReplacement(),
-                       objcSubst.getConformances());
-
-        Subs.push_back(newDepTypeSubst);
-      }
+      Substitution Subs[1] = {
+        Substitution(valueType, Conformances)
+      };
 
       ConcreteDeclRef fnSpecRef(tc.Context, fn, Subs);
       auto fnRef = new (tc.Context) DeclRefExpr(fnSpecRef,
@@ -6793,6 +6776,9 @@ Expr *TypeChecker::callWitness(Expr *base, DeclContext *dc,
 
   // Find the witness we need to use.
   auto type = base->getType();
+  assert(!type->hasTypeVariable() &&
+         "Building call to witness with unresolved base type!");
+
   if (auto metaType = type->getAs<AnyMetatypeType>())
     type = metaType->getInstanceType();
   

@@ -1,4 +1,5 @@
 // RUN: %target-swift-frontend -emit-silgen -enable-experimental-property-behaviors %s | %FileCheck %s
+// REQUIRES: property_behavior_value_substitution
 protocol behavior {
   associatedtype Value
 }

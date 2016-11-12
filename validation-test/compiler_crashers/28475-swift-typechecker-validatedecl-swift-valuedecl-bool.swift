@@ -6,11 +6,5 @@
 // See http://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
 
 // RUN: not --crash %target-swift-frontend %s -emit-ir
-// REQUIRES: asserts
-protocol C{{
-}
-typealias F
-func g
-struct D:C{
-func g<T where T=F>func g
-func g
+protocol P{func c(array:A.c
+class A:P

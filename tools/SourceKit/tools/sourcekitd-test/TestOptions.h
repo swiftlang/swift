@@ -32,6 +32,7 @@ enum class SourceKitRequest {
   CodeCompleteCacheOnDisk,
   CodeCompleteSetPopularAPI,
   CursorInfo,
+  RangeInfo,
   RelatedIdents,
   SyntaxMap,
   Structure,
@@ -62,6 +63,8 @@ struct TestOptions {
   std::string InterestedUSR;
   unsigned Line = 0;
   unsigned Col = 0;
+  unsigned EndLine = 0;
+  unsigned EndCol = 0;
   unsigned Offset = 0;
   unsigned Length = 0;
   llvm::Optional<std::string> ReplaceText;

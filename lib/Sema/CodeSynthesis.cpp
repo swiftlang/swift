@@ -763,8 +763,7 @@ void swift::addTrivialAccessorsToStorage(AbstractStorageDecl *storage,
 
   // Synthesize and type-check the body of the getter.
   synthesizeTrivialGetter(getter, storage, TC);
-  TC.typeCheckDecl(getter, true);
-  TC.typeCheckDecl(getter, false);
+  TC.validateDecl(getter);
 
   if (setter) {
     if (isDynamic)
@@ -772,8 +771,7 @@ void swift::addTrivialAccessorsToStorage(AbstractStorageDecl *storage,
 
     // Synthesize and type-check the body of the setter.
     synthesizeTrivialSetter(setter, storage, setterValueParam, TC);
-    TC.typeCheckDecl(setter, true);
-    TC.typeCheckDecl(setter, false);
+    TC.validateDecl(setter);
   }
 
   auto *DC = storage->getDeclContext();
@@ -1440,11 +1438,11 @@ void TypeChecker::completePropertyBehaviorParameter(VarDecl *VD,
 
 void TypeChecker::completePropertyBehaviorAccessors(VarDecl *VD,
                                        VarDecl *ValueImpl,
+                                       Type valueTy,
                                        ArrayRef<Substitution> SelfInterfaceSubs,
                                        ArrayRef<Substitution> SelfContextSubs) {
   auto selfTy = SelfContextSubs[0].getReplacement();
-  auto valueTy = SelfContextSubs[1].getReplacement();
-  
+
   SmallVector<ASTNode, 3> bodyStmts;
   
   auto makeSelfExpr = [&](FuncDecl *fromAccessor,

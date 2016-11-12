@@ -586,28 +586,24 @@ TypeBase::gatherAllSubstitutions(Module *module,
   // The type itself contains substitutions up to the innermost
   // non-type context.
   CanType parent(canon);
-  auto *parentDC = gpContext;
+  ArrayRef<GenericTypeParamType *> genericParams =
+    genericSig->getGenericParams();
+  unsigned lastGenericIndex = genericParams.size();
   while (parent) {
     if (auto boundGeneric = dyn_cast<BoundGenericType>(parent)) {
-      auto genericSig = parentDC->getGenericSignatureOfContext();
-      unsigned index = 0;
-
-      assert(boundGeneric->getGenericArgs().size() ==
-             genericSig->getInnermostGenericParams().size());
-
+      unsigned index = lastGenericIndex - boundGeneric->getGenericArgs().size();
       for (Type arg : boundGeneric->getGenericArgs()) {
-        auto paramTy = genericSig->getInnermostGenericParams()[index++];
+        auto paramTy = genericParams[index++];
         substitutions[paramTy->getCanonicalType().getPointer()] = arg;
       }
+      lastGenericIndex -= boundGeneric->getGenericArgs().size();
 
       parent = CanType(boundGeneric->getParent());
-      parentDC = parentDC->getParent();
       continue;
     }
 
     if (auto nominal = dyn_cast<NominalType>(parent)) {
       parent = CanType(nominal->getParent());
-      parentDC = parentDC->getParent();
       continue;
     }
 
@@ -616,6 +612,9 @@ TypeBase::gatherAllSubstitutions(Module *module,
 
   // Add forwarding substitutions from the outer context if we have
   // a type nested inside a generic function.
+  auto *parentDC = gpContext;
+  while (parentDC->isTypeContext())
+    parentDC = parentDC->getParent();
   if (auto *outerEnv = parentDC->getGenericEnvironmentOfContext())
     for (auto pair : outerEnv->getInterfaceToArchetypeMap()) {
       auto result = substitutions.insert(pair);

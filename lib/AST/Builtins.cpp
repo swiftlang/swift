@@ -196,14 +196,8 @@ getBuiltinGenericFunction(Identifier Id,
     GenericParamTypes.push_back(gp->getDeclaredType()
                                   ->castTo<GenericTypeParamType>());
   }
-  // Create witness markers for all of the generic param types.
-  SmallVector<Requirement, 2> requirements;
-  for (auto param : GenericParamTypes) {
-    requirements.push_back(Requirement(RequirementKind::WitnessMarker,
-                                       param, Type()));
-  }
   GenericSignature *Sig =
-      GenericSignature::get(GenericParamTypes, requirements);
+    GenericSignature::get(GenericParamTypes, { });
   GenericEnvironment *Env =
       GenericEnvironment::get(Context, GenericParamTypes,
                               InterfaceToArchetypeMap);

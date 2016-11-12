@@ -279,7 +279,7 @@ void SILGenFunction::emitCaptures(SILLocation loc,
         }
       
         // Just retain a by-val let.
-        B.emitCopyValueOperation(loc, Val);
+        Val = B.emitCopyValueOperation(loc, Val);
       } else {
         // If we have a mutable binding for a 'let', such as 'self' in an
         // 'init' method, load it.
@@ -321,8 +321,7 @@ void SILGenFunction::emitCaptures(SILLocation loc,
         if (canGuarantee) {
           capturedArgs.push_back(ManagedValue::forUnmanaged(vl.box));
         } else {
-          B.createCopyValue(loc, vl.box);
-          capturedArgs.push_back(emitManagedRValueWithCleanup(vl.box));
+          capturedArgs.push_back(emitManagedRetain(loc, vl.box));
         }
         escapesToMark.push_back(vl.value);
       } else {
@@ -336,8 +335,9 @@ void SILGenFunction::emitCaptures(SILLocation loc,
         // since we could conceivably forward the copied value into the
         // closure context and pass it down to the partially applied function
         // in-place.
-        AllocBoxInst *allocBox =
-          B.createAllocBox(loc, vl.value->getType().getObjectType());
+        auto boxTy = SILBoxType::get(vl.value->getType().getSwiftRValueType());
+        
+        AllocBoxInst *allocBox = B.createAllocBox(loc, boxTy);
         ProjectBoxInst *boxAddress = B.createProjectBox(loc, allocBox, 0);
         B.createCopyAddr(loc, vl.value, boxAddress, IsNotTake,IsInitialization);
         capturedArgs.push_back(emitManagedRValueWithCleanup(allocBox));
@@ -362,11 +362,9 @@ SILGenFunction::emitClosureValue(SILLocation loc, SILDeclRef constant,
   auto closure = *constant.getAnyFunctionRef();
   auto captureInfo = closure.getCaptureInfo();
   auto loweredCaptureInfo = SGM.Types.getLoweredLocalCaptures(closure);
-
-  assert(((constant.uncurryLevel == 1 &&
-           captureInfo.hasLocalCaptures()) ||
-          (constant.uncurryLevel == 0 &&
-           !captureInfo.hasLocalCaptures())) &&
+  auto hasCaptures = SGM.Types.hasLoweredLocalCaptures(closure);
+  assert(((constant.uncurryLevel == 1 && hasCaptures) ||
+          (constant.uncurryLevel == 0 && !hasCaptures)) &&
          "curried local functions not yet supported");
 
   auto constantInfo = getConstantInfo(constant);
@@ -406,7 +404,7 @@ SILGenFunction::emitClosureValue(SILLocation loc, SILDeclRef constant,
         loc, captureInfo);
   }
 
-  if (!captureInfo.hasLocalCaptures() && !wasSpecialized) {
+  if (!hasCaptures && !wasSpecialized) {
     auto result = ManagedValue::forUnmanaged(functionRef);
     return emitOrigToSubstValue(loc, result,
                                 AbstractionPattern(expectedType),
@@ -436,7 +434,7 @@ SILGenFunction::emitClosureValue(SILLocation loc, SILDeclRef constant,
   //  - the original type
   auto origLoweredFormalType =
       AbstractionPattern(constantInfo.LoweredInterfaceType);
-  if (captureInfo.hasLocalCaptures()) {
+  if (hasCaptures) {
     // Get the unlowered formal type of the constant, stripping off
     // the first level of function application, which applies captures.
     origLoweredFormalType =
@@ -794,7 +792,7 @@ void SILGenFunction::emitCurryThunk(ValueDecl *vd,
 
   } else if (auto fd = dyn_cast<AbstractFunctionDecl>(vd)) {
     // Forward implicit closure context arguments.
-    bool hasCaptures = fd->getCaptureInfo().hasLocalCaptures();
+    bool hasCaptures = SGM.M.Types.hasLoweredLocalCaptures(fd);
     if (hasCaptures)
       --paramCount;
 

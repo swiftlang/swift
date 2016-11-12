@@ -3,16 +3,17 @@
 class A {}
 class B : A {}
 
-
-// CHECK-LABEL: sil hidden @_TF4main3foo
-// CHECK:      [[X:%.*]] = alloc_box $Optional<B>, var, name "x"
+// CHECK-LABEL: sil hidden @_TF4main3fooFGSqCS_1A_T_ : $@convention(thin) (@owned Optional<A>) -> () {
+// CHECK:    bb0([[ARG:%.*]] : $Optional<A>):
+// CHECK:      [[X:%.*]] = alloc_box $@box Optional<B>, var, name "x"
 // CHECK-NEXT: [[PB:%.*]] = project_box [[X]]
 //   Check whether the temporary holds a value.
-// CHECK:      [[T1:%.*]] = select_enum %0
+// CHECK:      [[ARG_COPY:%.*]] = copy_value [[ARG]]
+// CHECK:      [[T1:%.*]] = select_enum [[ARG_COPY]]
 // CHECK-NEXT: cond_br [[T1]], [[IS_PRESENT:bb.*]], [[NOT_PRESENT:bb[0-9]+]]
 //   If so, pull the value out and check whether it's a B.
 // CHECK:    [[IS_PRESENT]]:
-// CHECK-NEXT: [[VAL:%.*]] = unchecked_enum_data %0 : $Optional<A>, #Optional.some!enumelt.1
+// CHECK-NEXT: [[VAL:%.*]] = unchecked_enum_data [[ARG_COPY]] : $Optional<A>, #Optional.some!enumelt.1
 // CHECK-NEXT: [[X_VALUE:%.*]] = init_enum_data_addr [[PB]] : $*Optional<B>, #Optional.some
 // CHECK-NEXT: checked_cast_br [[VAL]] : $A to $B, [[IS_B:bb.*]], [[NOT_B:bb[0-9]+]]
 //   If so, materialize that and inject it into x.
@@ -40,17 +41,18 @@ func foo(_ y : A?) {
   var x = (y as? B)
 }
 
-// CHECK-LABEL: sil hidden @_TF4main3bar
-// CHECK:      [[X:%.*]] = alloc_box $Optional<Optional<Optional<B>>>, var, name "x"
+// CHECK-LABEL: sil hidden @_TF4main3barFGSqGSqGSqGSqCS_1A____T_ : $@convention(thin) (@owned Optional<Optional<Optional<Optional<A>>>>) -> () {
+// CHECK:    bb0([[ARG:%.*]] : $Optional<Optional<Optional<Optional<A>>>>):
+// CHECK:      [[X:%.*]] = alloc_box $@box Optional<Optional<Optional<B>>>, var, name "x"
 // CHECK-NEXT: [[PB:%.*]] = project_box [[X]]
 
 // Check for some(...)
-// CHECK-NEXT: copy_value %0
-// CHECK:      [[T1:%.*]] = select_enum %0
+// CHECK-NEXT: [[ARG_COPY:%.*]] = copy_value [[ARG]]
+// CHECK:      [[T1:%.*]] = select_enum [[ARG_COPY]]
 // CHECK-NEXT: cond_br [[T1]], [[P:bb.*]], [[NIL_DEPTH2:bb[0-9]+]]
 //   If so, drill down another level and check for some(some(...)).
 // CHECK:    [[P]]:
-// CHECK-NEXT: [[VALUE_OOOA:%.*]] = unchecked_enum_data %0
+// CHECK-NEXT: [[VALUE_OOOA:%.*]] = unchecked_enum_data [[ARG_COPY]]
 // CHECK:      [[T1:%.*]] = select_enum [[VALUE_OOOA]]
 // CHECK-NEXT: cond_br [[T1]], [[PP:bb.*]], [[NIL_DEPTH2:bb[0-9]+]]
 //   If so, drill down another level and check for some(some(some(...))).
@@ -104,14 +106,21 @@ func bar(_ y : A????) {
   var x = (y as? B??)
 }
 
-// CHECK-LABEL: sil hidden @_TF4main3baz
-// CHECK:      [[X:%.*]] = alloc_box $Optional<B>, var, name "x"
-// CHECK-NEXT: [[PB:%.*]] = project_box [[X]]
-// CHECK-NEXT: copy_value %0
-// CHECK:      [[T1:%.*]] = select_enum %0
-// CHECK: [[VAL:%.*]] = unchecked_enum_data %0
-// CHECK-NEXT: [[X_VALUE:%.*]] = init_enum_data_addr [[PB]] : $*Optional<B>, #Optional.some
-// CHECK-NEXT: checked_cast_br [[VAL]] : $AnyObject to $B, [[IS_B:bb.*]], [[NOT_B:bb[0-9]+]]
+
+// CHECK-LABEL: sil hidden @_TF4main3bazFGSqPs9AnyObject__T_ : $@convention(thin) (@owned Optional<AnyObject>) -> () {
+// CHECK:       bb0([[ARG:%.*]] : $Optional<AnyObject>):
+// CHECK:         [[X:%.*]] = alloc_box $@box Optional<B>, var, name "x"
+// CHECK-NEXT:    [[PB:%.*]] = project_box [[X]]
+// CHECK-NEXT:    [[ARG_COPY:%.*]] = copy_value [[ARG]]
+// CHECK:         [[T1:%.*]] = select_enum [[ARG_COPY]]
+// CHECK:       bb1:
+// CHECK:         [[VAL:%.*]] = unchecked_enum_data [[ARG_COPY]]
+// CHECK-NEXT:    [[X_VALUE:%.*]] = init_enum_data_addr [[PB]] : $*Optional<B>, #Optional.some
+// CHECK-NEXT:    checked_cast_br [[VAL]] : $AnyObject to $B, [[IS_B:bb.*]], [[NOT_B:bb[0-9]+]]
+// CHECK:       [[IS_B]](
+// CHECK:       [[NOT_B]]:
+// CHECK:         destroy_value [[VAL]]
+// CHECK: } // end sil function '_TF4main3bazFGSqPs9AnyObject__T_'
 func baz(_ y : AnyObject?) {
   var x = (y as? B)
 }
@@ -129,19 +138,22 @@ func opt_to_opt_trivial(_ x: Int?) -> Int! {
   return x
 }
 
-// CHECK-LABEL: sil hidden @_TF4main20opt_to_opt_referenceFGSQCS_1C_GSqS0__
-// CHECK:       bb0(%0 : $Optional<C>):
-// CHECK-NEXT:  debug_value %0 : $Optional<C>, let, name "x"
-// CHECK-NEXT:  %2 = unchecked_ref_cast %0 : $Optional<C> to $Optional<C>
-// CHECK-NEXT:  return %2 : $Optional<C>
-// CHECK-NEXT:}
+// CHECK-LABEL: sil hidden @_TF4main20opt_to_opt_referenceFGSQCS_1C_GSqS0__ :
+// CHECK:  bb0([[ARG:%.*]] : $Optional<C>):
+// CHECK:    debug_value [[ARG]] : $Optional<C>, let, name "x"
+// CHECK:    [[COPY_ARG:%.*]] = copy_value [[ARG]]
+// CHECK:    [[RESULT:%.*]] = unchecked_ref_cast [[COPY_ARG]] : $Optional<C> to $Optional<C>
+// CHECK:    destroy_value [[ARG]]
+// CHECK:    return [[RESULT]] : $Optional<C>
+// CHECK: } // end sil function '_TF4main20opt_to_opt_referenceFGSQCS_1C_GSqS0__'
 func opt_to_opt_reference(_ x : C!) -> C? { return x }
 
 // CHECK-LABEL: sil hidden @_TF4main22opt_to_opt_addressOnly
 // CHECK:       bb0(%0 : $*Optional<T>, %1 : $*Optional<T>):
 // CHECK-NEXT:  debug_value_addr %1 : $*Optional<T>, let, name "x"
 // CHECK-NEXT:  %3 = unchecked_addr_cast %0 : $*Optional<T> to $*Optional<T>
-// CHECK-NEXT:  copy_addr [take] %1 to [initialization] %3
+// CHECK-NEXT:  copy_addr %1 to [initialization] %3
+// CHECK-NEXT:  destroy_addr %1
 func opt_to_opt_addressOnly<T>(_ x : T!) -> T? { return x }
 
 class C {}
@@ -163,7 +175,7 @@ public struct TestAddressOnlyStruct<T> {
 // CHECK-LABEL: sil hidden @_TF4main35testContextualInitOfNonAddrOnlyTypeFGSqSi_T_
 // CHECK: bb0(%0 : $Optional<Int>):
 // CHECK-NEXT: debug_value %0 : $Optional<Int>, let, name "a"
-// CHECK-NEXT: [[X:%.*]] = alloc_box $Optional<Int>, var, name "x"
+// CHECK-NEXT: [[X:%.*]] = alloc_box $@box Optional<Int>, var, name "x"
 // CHECK-NEXT: [[PB:%.*]] = project_box [[X]]
 // CHECK-NEXT: [[CAST:%.*]] = unchecked_addr_cast [[PB]] : $*Optional<Int> to $*Optional<Int>
 // CHECK-NEXT: store %0 to [trivial] [[CAST]] : $*Optional<Int>

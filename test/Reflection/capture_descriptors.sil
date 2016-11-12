@@ -24,7 +24,7 @@ bb0(%i: $Int, %b: $@box Int, %m: $@thin Int.Type, %p: $@thick P.Type):
 sil @concrete_caller1 : $@convention(thin) (Int, @thick P.Type) -> @owned @callee_owned () -> () {
 bb0(%i: $Int, %p: $@thick P.Type):
   %f = function_ref @concrete_callee1 : $@convention(thin) (Int, @owned @box Int, @thin Int.Type, @thick P.Type) -> ()
-  %b = alloc_box $Int
+  %b = alloc_box $@box Int
   %m = metatype $@thin Int.Type
   %c = partial_apply %f(%i, %b, %m, %p) : $@convention(thin) (Int, @owned @box Int, @thin Int.Type, @thick P.Type) -> ()
   return %c : $@callee_owned () -> ()
@@ -60,7 +60,7 @@ sil @concrete_caller2 : $@convention(thin) () -> @owned @callee_owned () -> () {
 bb0:
   %f = function_ref @generic_callee2 : $@convention(thin) <T, U> (@in T, @owned @box U) -> ()
   %i = alloc_stack $Int
-  %b = alloc_box $String
+  %b = alloc_box $@box String
   %c = partial_apply %f<Int, String>(%i, %b) : $@convention(thin) <T, U> (@in T, @owned @box U) -> ()
   dealloc_stack %i : $*Int
   return %c : $@callee_owned () -> ()

@@ -213,7 +213,7 @@ static bool isIdentifiedUnderlyingArrayObject(SILValue V) {
 /// eliminate if there exists an earlier bounds check that covers the same
 /// index.
 ///
-/// We analyse a region of code for instructions that mayModify the size of an
+/// We analyze a region of code for instructions that mayModify the size of an
 /// array whenever we encounter an instruction that mayModify a specific array
 /// or all arrays we clear the safe arrays (either a specific array or all of
 /// them).
@@ -259,19 +259,19 @@ public:
   /// If an instruction is encountered that might modify any array this method
   /// stops further analysis and returns false. Otherwise, true is returned and
   /// the safe arrays can be queried.
-  void analyseBlock(SILBasicBlock *BB) {
+  void analyzeBlock(SILBasicBlock *BB) {
     for (auto &Inst : *BB)
-      analyseInstruction(&Inst);
+      analyzeInstruction(&Inst);
   }
 
   /// Returns false if the instruction may change the size of any array. All
   /// redundant safe array accesses seen up to the instruction can be removed.
-  void analyse(SILInstruction *I) {
+  void analyze(SILInstruction *I) {
     assert(!LoopMode &&
            "This function can only be used in on cfg without loops");
     (void)LoopMode;
 
-    analyseInstruction(I);
+    analyzeInstruction(I);
   }
 
   /// Returns true if the Array is unsafe.
@@ -288,8 +288,8 @@ public:
   }
 
 private:
-  /// Analyse one instruction wrt. the instructions we have seen so far.
-  void analyseInstruction(SILInstruction *Inst) {
+  /// Analyze one instruction wrt. the instructions we have seen so far.
+  void analyzeInstruction(SILInstruction *Inst) {
     SILValue Array;
     ArrayCallKind K;
     auto BoundsEffect =
@@ -357,7 +357,7 @@ static bool removeRedundantChecksInBlock(SILBasicBlock &BB, ArraySet &Arrays,
     auto Inst = &*Iter;
     ++Iter;
 
-    ABC.analyse(Inst);
+    ABC.analyze(Inst);
 
     if (ABC.clearArraysUnsafeFlag()) {
       // Any array may be modified -> forget everything. This is just a
@@ -762,7 +762,7 @@ struct InductionInfo {
   }
 };
 
-/// Analyse canonical induction variables in a loop to find their start and end
+/// Analyze canonical induction variables in a loop to find their start and end
 /// values.
 /// At the moment we only handle very simple induction variables that increment
 /// by one and use equality comparison.
@@ -788,7 +788,7 @@ public:
   InductionAnalysis(const InductionAnalysis &) = delete;
   InductionAnalysis &operator=(const InductionAnalysis &) = delete;
 
-  bool analyse() {
+  bool analyze() {
     bool FoundIndVar = false;
     for (auto *Arg : Header->getBBArgs()) {
       // Look for induction variables.
@@ -799,8 +799,8 @@ public:
       }
 
       InductionInfo *Info;
-      if (!(Info = analyseIndVar(Arg, IV.Inc, IV.IncVal))) {
-        DEBUG(llvm::dbgs() << " could not analyse the induction on: " << *Arg);
+      if (!(Info = analyzeIndVar(Arg, IV.Inc, IV.IncVal))) {
+        DEBUG(llvm::dbgs() << " could not analyze the induction on: " << *Arg);
         continue;
       }
 
@@ -820,8 +820,8 @@ public:
 
 private:
 
-  /// Analyse one potential induction variable starting at Arg.
-  InductionInfo *analyseIndVar(SILArgument *HeaderVal, BuiltinInst *Inc,
+  /// Analyze one potential induction variable starting at Arg.
+  InductionInfo *analyzeIndVar(SILArgument *HeaderVal, BuiltinInst *Inc,
                                IntegerLiteralInst *IncVal) {
     if (IncVal->getValue() != 1)
       return nullptr;
@@ -1105,7 +1105,7 @@ static bool isComparisonKnownFalse(BuiltinInst *Builtin,
       IndVar.Cmp != BuiltinValueKind::ICMP_EQ)
     return false;
 
-  // Eencountered a few false condition patterns we can detect and optimize:
+  // Pattern match a false condition patterns that we can detect and optimize:
   // Iteration count < 0 (start)
   // Iteration count + 1 <= 0 (start)
   // Iteration count + 1 < 0 (start)
@@ -1129,7 +1129,7 @@ static bool isComparisonKnownFalse(BuiltinInst *Builtin,
   return false;
 }
 
-/// Analyse the loop for arrays that are not modified and perform dominator tree
+/// Analyze the loop for arrays that are not modified and perform dominator tree
 /// based redundant bounds check removal.
 static bool hoistBoundsChecks(SILLoop *Loop, DominanceInfo *DT, SILLoopInfo *LI,
                               IVInfo &IVs, ArraySet &Arrays,
@@ -1154,7 +1154,7 @@ static bool hoistBoundsChecks(SILLoop *Loop, DominanceInfo *DT, SILLoopInfo *LI,
   // could mutate their size in the loop.
   ABCAnalysis ABC(true, Arrays, RCIA);
   for (auto *BB : Loop->getBlocks()) {
-    ABC.analyseBlock(BB);
+    ABC.analyzeBlock(BB);
   }
 
   // Remove redundant checks down the dominator tree inside the loop,
@@ -1198,7 +1198,7 @@ static bool hoistBoundsChecks(SILLoop *Loop, DominanceInfo *DT, SILLoopInfo *LI,
 
   // Find canonical induction variables.
   InductionAnalysis IndVars(DT, IVs, Preheader, Header, ExitingBlk, ExitBlk);
-  bool IVarsFound = IndVars.analyse();
+  bool IVarsFound = IndVars.analyze();
   if (!IVarsFound) {
     DEBUG(llvm::dbgs() << "No induction variables found\n");
   }

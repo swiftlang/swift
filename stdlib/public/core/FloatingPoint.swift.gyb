@@ -574,8 +574,8 @@ public protocol FloatingPoint: Comparable, SignedArithmetic, Strideable {
   ///     print(x - 2.25)
   ///     // Prints "5.25"
   ///
-  /// The `subtracting(_:)` method implements the addition operation defined by
-  /// the [IEEE 754 specification][spec].
+  /// The `subtracting(_:)` method implements the subtraction operation
+  /// defined by the [IEEE 754 specification][spec].
   ///
   /// [spec]: http://ieeexplore.ieee.org/servlet/opac?punumber=4610933
   ///

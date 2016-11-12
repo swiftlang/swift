@@ -863,11 +863,11 @@ class AllocBoxInst final
 
   TailAllocatedDebugVariable VarInfo;
 
-  AllocBoxInst(SILDebugLocation DebugLoc, SILType ElementType,
+  AllocBoxInst(SILDebugLocation DebugLoc, CanSILBoxType BoxType,
                ArrayRef<SILValue> TypeDependentOperands, SILFunction &F,
                SILDebugVariable Var);
 
-  static AllocBoxInst *create(SILDebugLocation Loc, SILType elementType,
+  static AllocBoxInst *create(SILDebugLocation Loc, CanSILBoxType boxType,
                               SILFunction &F,
                               SILOpenedArchetypesState &OpenedArchetypes,
                               SILDebugVariable Var);

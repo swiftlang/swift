@@ -197,6 +197,7 @@ static SILFunction *genGetterFromInit(StoreInst *Store,
   auto *varDecl = SILG->getDecl();
 
   Mangle::Mangler getterMangler;
+  getterMangler.append("_T");
   getterMangler.mangleGlobalGetterEntity(varDecl);
   auto getterName = getterMangler.finalize();
 
@@ -231,7 +232,7 @@ static SILFunction *genGetterFromInit(StoreInst *Store,
       ParameterConvention::Direct_Owned, { }, Results, None,
       Store->getModule().getASTContext());
   auto *GetterF = Store->getModule().getOrCreateFunction(Store->getLoc(),
-      getterName, SILLinkage::PrivateExternal, LoweredType,
+      getterName, SILLinkage::Private, LoweredType,
       IsBare_t::IsBare, IsTransparent_t::IsNotTransparent,
       IsFragile_t::IsFragile);
   GetterF->setDebugScope(Store->getFunction()->getDebugScope());
@@ -470,6 +471,7 @@ static SILFunction *genGetterFromInit(SILFunction *InitF, VarDecl *varDecl) {
   // Generate a getter from the global init function without side-effects.
 
   Mangle::Mangler getterMangler;
+  getterMangler.append("_T");
   getterMangler.mangleGlobalGetterEntity(varDecl);
   auto getterName = getterMangler.finalize();
 
@@ -486,7 +488,7 @@ static SILFunction *genGetterFromInit(SILFunction *InitF, VarDecl *varDecl) {
       ParameterConvention::Direct_Owned, { }, Results, None,
       InitF->getASTContext());
   auto *GetterF = InitF->getModule().getOrCreateFunction(InitF->getLocation(),
-     getterName, SILLinkage::PrivateExternal, LoweredType,
+     getterName, SILLinkage::Private, LoweredType,
       IsBare_t::IsBare, IsTransparent_t::IsNotTransparent,
       IsFragile_t::IsFragile);
   if (InitF->hasUnqualifiedOwnership())

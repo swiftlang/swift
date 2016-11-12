@@ -10,7 +10,7 @@
 //
 //===----------------------------------------------------------------------===//
 //
-// This file implements semantic analysis for patterns, analysing a
+// This file implements semantic analysis for patterns, analyzing a
 // pattern tree in both bottom-up and top-down ways.
 //
 //===----------------------------------------------------------------------===//

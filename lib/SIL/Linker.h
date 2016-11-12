@@ -62,10 +62,6 @@ public:
   /// with this Name.
   bool hasFunction(StringRef Name, SILLinkage Linkage);
 
-  /// Process Decl, recursively deserializing any thing that
-  /// the SILFunction corresponding to Decl may reference.
-  bool processDeclRef(SILDeclRef Decl);
-
   /// Deserialize the VTable mapped to C if it exists and all SIL the VTable
   /// transitively references.
   ///

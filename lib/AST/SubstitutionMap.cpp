@@ -106,14 +106,15 @@ addConformances(CanType type, ArrayRef<ProtocolConformanceRef> conformances) {
   (void) result;
 }
 
+ArrayRef<ProtocolConformanceRef> SubstitutionMap::
+getConformances(CanType type) const {
+  auto known = conformanceMap.find(type.getPointer());
+  if (known == conformanceMap.end()) return { };
+  return known->second;
+}
+
 void SubstitutionMap::
 addParent(CanType type, CanType parent, AssociatedTypeDecl *assocType) {
   assert(type && parent && assocType);
   parentMap[type.getPointer()].push_back(std::make_pair(parent, assocType));
-}
-
-void SubstitutionMap::removeType(CanType type) {
-  subMap.erase(type.getPointer());
-  conformanceMap.erase(type.getPointer());
-  parentMap.erase(type.getPointer());
 }

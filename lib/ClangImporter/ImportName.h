@@ -226,8 +226,7 @@ private:
   /// the same module as the decl
   bool hasNamingConflict(const clang::NamedDecl *decl,
                          const clang::IdentifierInfo *proposedName,
-                         const clang::TypedefNameDecl *cfTypedef,
-                         clang::Sema &clangSema);
+                         const clang::TypedefNameDecl *cfTypedef);
 
   Optional<ImportedErrorInfo>
   considerErrorImport(const clang::ObjCMethodDecl *clangDecl,
@@ -241,8 +240,7 @@ private:
 
   EffectiveClangContext determineEffectiveContext(const clang::NamedDecl *,
                                                   const clang::DeclContext *,
-                                                  ImportNameOptions options,
-                                                  clang::Sema &clangSema);
+                                                  ImportNameOptions options);
 
   ImportedName importNameImpl(const clang::NamedDecl *,
                               ImportNameOptions options);

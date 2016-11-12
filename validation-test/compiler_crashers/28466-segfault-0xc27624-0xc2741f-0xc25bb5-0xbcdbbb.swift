@@ -5,9 +5,5 @@
 // See http://swift.org/LICENSE.txt for license information
 // See http://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
 
-// RUN: not --crash %target-swift-frontend %s -parse
-// REQUIRES: asserts
-func d<T{
-var d
-var d:[T
-struct S{var _=d.j
+// RUN: not --crash %target-swift-frontend %s -emit-ir
+{associatedtype b<T>func c:[T

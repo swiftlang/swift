@@ -234,11 +234,14 @@ struct SILDeclRef {
   
   SILLocation getAsRegularLocation() const;
 
+  enum class ManglingKind {
+    Default,
+    VTableMethod,
+    DynamicThunk,
+  };
+
   /// Produce a mangled form of this constant.
-  ///
-  /// If 'prefix' is non-empty, it will be used in place of the standard '_T'
-  /// prefix.
-  std::string mangle(StringRef prefix = {}) const;
+  std::string mangle(ManglingKind MKind = ManglingKind::Default) const;
 
   /// True if the SILDeclRef references a function.
   bool isFunc() const {

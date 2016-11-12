@@ -150,6 +150,23 @@ targets mentioned above and modify it as necessary. lit.py also has several
 useful features, like timing tests and providing a timeout. Check these features
 out with ``lit.py -h``.
 
+Extra lit.py invocation options
+^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+* ``--param gmalloc`` will run all tests under Guard Malloc (macOS only). See
+  ``man libgmalloc`` for more information.
+
+* ``--param swift-version=<MAJOR>`` overrides the default Swift language
+  version used by swift/swiftc and swift-ide-test.
+
+* ``--param interpret`` is an experimental option for running execution tests
+  using Swift's interpreter rather than compiling them first. Note that this
+  does not affect all substitutions.
+
+* ``--param swift_test_mode=<MODE>`` drives the various suffix variations
+  mentioned above. Again, it's best to get the invocation from the existing
+  build system targets and modify it rather than constructing it yourself.
+
 Writing tests
 -------------
 
@@ -421,6 +438,10 @@ FIXME: full list.
   plus cpu configuration.
 
 * ``optimized_stdlib_<CPUNAME>``: an optimized stdlib plus cpu configuration.
+
+* ``SWIFT_VERSION=<MAJOR>``: restricts a test to Swift 3 or Swift 4. If you
+  need to use this, make sure to add a test for the other version as well
+  unless you are specifically testing ``-swift-version``-related functionality.
 
 * ``XFAIL: linux``: tests that need to be adapted for Linux, for example parts
   that depend on Objective-C interop need to be split out.

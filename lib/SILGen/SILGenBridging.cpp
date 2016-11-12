@@ -883,8 +883,7 @@ static SILValue emitObjCUnconsumedArgument(SILGenFunction &gen,
     return tmp;
   }
 
-  lowering.emitCopyValue(gen.B, loc, arg);
-  return arg;
+  return lowering.emitCopyValue(gen.B, loc, arg);
 }
 
 /// Bridge argument types and adjust retain count conventions for an ObjC thunk.

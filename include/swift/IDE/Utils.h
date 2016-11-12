@@ -195,6 +195,38 @@ private:
   bool visitSubscriptReference(ValueDecl *D, CharSourceRange Range,
                                bool IsOpenBracket) override;
 };
+
+enum class RangeKind : int8_t{
+  Invalid = -1,
+  SingleExpression,
+  SingleStatement,
+  SingleDecl,
+
+  MultiStatement,
+};
+
+struct ResolvedRangeInfo {
+  RangeKind Kind;
+  Type Ty;
+  StringRef Content;
+  ResolvedRangeInfo(RangeKind Kind, Type Ty, StringRef Content) : Kind(Kind),
+    Ty(Ty), Content(Content) {}
+};
+
+class RangeResolver : public SourceEntityWalker {
+  struct Implementation;
+  Implementation &Impl;
+  bool walkToExprPre(Expr *E) override;
+  bool walkToExprPost(Expr *E) override;
+  bool walkToStmtPre(Stmt *S) override;
+  bool walkToStmtPost(Stmt *S) override;
+  bool walkToDeclPre(Decl *D, CharSourceRange Range) override;
+  bool walkToDeclPost(Decl *D) override;
+public:
+  RangeResolver(SourceFile &File, SourceLoc Start, SourceLoc End);
+  ResolvedRangeInfo resolve();
+  ~RangeResolver();
+};
 } // namespace ide
 
 } // namespace swift

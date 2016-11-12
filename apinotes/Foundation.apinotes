@@ -1254,8 +1254,6 @@ Tags:
 - Name: NSURLHandleStatus
   SwiftName: NSURLHandle.Status
 Typedefs:
-- Name: NSAffineTransformStruct
-  SwiftName: AffineTransform
 - Name: NSComparator
   SwiftName: Comparator
 - Name: NSDecimal

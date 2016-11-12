@@ -5,6 +5,12 @@
 // See http://swift.org/LICENSE.txt for license information
 // See http://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
 
-// RUN: not --crash %target-swift-frontend %s -parse
-// REQUIRES: asserts
-func a<T{if let a<T:T.h{
+// RUN: not --crash %target-swift-frontend %s -emit-ir
+class B:d<T{}class A:Range<A>:a{.a b<T=b:a()->:a{
+defer{typealias e
+protocol a
+protocol {{}}
+{{struct A{
+func a}typealias F
+}
+protoco

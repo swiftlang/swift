@@ -61,7 +61,7 @@ class StrongReleaseCleanup : public Cleanup {
 public:
   StrongReleaseCleanup(SILValue box) : box(box) {}
   void emit(SILGenFunction &gen, CleanupLocation l) override {
-    gen.B.emitDestroyValueAndFold(l, box);
+    gen.B.emitDestroyValueOperation(l, box);
   }
 };
 } // end anonymous namespace

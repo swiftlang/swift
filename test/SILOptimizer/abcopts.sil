@@ -446,6 +446,13 @@ bb3:
 // HOIST:   builtin "sadd_with_overflow_Int32"
 // HOIST:   tuple_extract
 // HOIST-NOT: builtin "cmp_slt_Int32"
+// HOIST-NOT: builtin "cmp_sle_Int32"
+// HOIST-NOT: builtin "cmp_eq_Int32"
+// HOIST:   cond_fail
+// HOIST:   cond_fail
+// HOIST:   cond_fail
+// HOIST:   cond_fail
+// HOIST:   builtin "cmp_eq_Int32"
 // HOIST:   cond_br
 // HOIST: }
 sil @always_false_hoist : $@convention(thin) (@owned Array<Int>) -> () {
@@ -478,8 +485,14 @@ bb4:
   %t7 = tuple_extract %t6 : $(Builtin.Int32, Builtin.Int1), 0
   %t8 = tuple_extract %t6 : $(Builtin.Int32, Builtin.Int1), 1
   cond_fail %t8 : $Builtin.Int1
-  %af1 = builtin "cmp_slt_Int32"(%t7 : $Builtin.Int32, %z0 : $Builtin.Int32) : $Builtin.Int1
+  %af1 = builtin "cmp_slt_Int32"(%i0 : $Builtin.Int32, %z0 : $Builtin.Int32) : $Builtin.Int1
   cond_fail %af1 : $Builtin.Int1
+  %af2 = builtin "cmp_slt_Int32"(%t7 : $Builtin.Int32, %z0 : $Builtin.Int32) : $Builtin.Int1
+  cond_fail %af2 : $Builtin.Int1
+  %af3 = builtin "cmp_sle_Int32"(%t7 : $Builtin.Int32, %z0 : $Builtin.Int32) : $Builtin.Int1
+  cond_fail %af3 : $Builtin.Int1
+  %af4 = builtin "cmp_eq_Int32"(%t7 : $Builtin.Int32, %z0 : $Builtin.Int32) : $Builtin.Int1
+  cond_fail %af4 : $Builtin.Int1
   %8 = builtin "cmp_eq_Int32"(%t7 : $Builtin.Int32, %c1 : $Builtin.Int32) : $Builtin.Int1
   cond_br %8, bb5, bb2(%t7 : $Builtin.Int32)
 

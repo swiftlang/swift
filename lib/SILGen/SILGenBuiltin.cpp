@@ -236,7 +236,7 @@ static ManagedValue emitBuiltinDestroy(SILGenFunction &gen,
   
   // Destroy the value indirectly. Canonicalization will promote to loads
   // and releases if appropriate.
-  gen.B.emitDestroyAddrAndFold(loc, addr);
+  gen.B.createDestroyAddr(loc, addr);
   
   return ManagedValue::forUnmanaged(gen.emitEmptyTuple(loc));
 }
@@ -607,8 +607,7 @@ emitBuiltinCastReference(SILGenFunction &gen,
     return gen.emitManagedBufferWithCleanup(toAddr);
 
   // Load the destination value.
-  auto result =
-      gen.B.createLoad(loc, toAddr, LoadOwnershipQualifier::Unqualified);
+  auto result = toTL.emitLoad(gen.B, loc, toAddr, LoadOwnershipQualifier::Take);
   return gen.emitManagedRValueWithCleanup(result);
 }
 
@@ -643,9 +642,7 @@ static ManagedValue emitBuiltinReinterpretCast(SILGenFunction &gen,
     // Load and retain the destination value if it's loadable. Leave the cleanup
     // on the original value since we don't know anything about it's type.
     if (toTL.isLoadable()) {
-      SILValue val =
-          gen.B.createLoad(loc, toAddr, LoadOwnershipQualifier::Unqualified);
-      return gen.emitManagedRetain(loc, val, toTL);
+      return gen.emitManagedLoadCopy(loc, toAddr, toTL);
     }
     // Leave the cleanup on the original value.
     if (toTL.isTrivial())

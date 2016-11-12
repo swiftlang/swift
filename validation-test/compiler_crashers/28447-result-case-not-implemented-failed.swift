@@ -7,6 +7,8 @@
 
 // RUN: not --crash %target-swift-frontend %s -emit-ir
 // REQUIRES: asserts
+// This doesn't reproduce 100% of the time, so it is disabled.
+// REQUIRES: SR3118
 t c
 let : {{
 return $0

@@ -126,7 +126,6 @@ extension Bool : CustomStringConvertible {
 public // COMPILER_INTRINSIC
 func _getBool(_ v: Builtin.Int1) -> Bool { return Bool(v) }
 
-@_transparent
 extension Bool : Equatable, Hashable {
   /// The hash value for the Boolean value.
   ///
@@ -136,6 +135,7 @@ extension Bool : Equatable, Hashable {
   ///   invocations of the same program. Do not persist the hash value across
   ///   program runs.
   /// - SeeAlso: `Hashable`
+  @_transparent
   public var hashValue: Int {
     return self ? 1 : 0
   }

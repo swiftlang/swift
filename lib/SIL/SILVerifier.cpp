@@ -132,9 +132,6 @@ public:
   }
 #define require(condition, complaint) \
   _require(bool(condition), complaint ": " #condition)
-#define requireTrueAndSILOwnership(verifier, condition, complaint)             \
-  _require(!verifier->isSILOwnershipEnabled() || bool(condition),              \
-           complaint ": " #condition)
 
   template <class T> typename CanTypeWrapperTraits<T>::type
   _requireObjectType(SILType type, const Twine &valueDescription,
@@ -1123,24 +1120,21 @@ public:
     case LoadOwnershipQualifier::Unqualified:
       // We should not see loads with unqualified ownership when SILOwnership is
       // enabled.
-      requireTrueAndSILOwnership(
-          this, F.hasUnqualifiedOwnership(),
-          "Load with unqualified ownership in a qualified function");
+      require(F.hasUnqualifiedOwnership(),
+              "Load with unqualified ownership in a qualified function");
       break;
     case LoadOwnershipQualifier::Copy:
     case LoadOwnershipQualifier::Take:
-      requireTrueAndSILOwnership(
-          this, F.hasQualifiedOwnership(),
-          "Load with qualified ownership in an unqualified function");
+      require(F.hasQualifiedOwnership(),
+              "Load with qualified ownership in an unqualified function");
       // TODO: Could probably make this a bit stricter.
       require(!LI->getType().isTrivial(LI->getModule()),
               "load [copy] or load [take] can only be applied to non-trivial "
               "types");
       break;
     case LoadOwnershipQualifier::Trivial:
-      requireTrueAndSILOwnership(
-          this, F.hasQualifiedOwnership(),
-          "Load with qualified ownership in an unqualified function");
+      require(F.hasQualifiedOwnership(),
+              "Load with qualified ownership in an unqualified function");
       require(LI->getType().isTrivial(LI->getModule()),
               "A load with trivial ownership must load a trivial type");
       break;
@@ -1148,8 +1142,8 @@ public:
   }
 
   void checkLoadBorrowInst(LoadBorrowInst *LBI) {
-    requireTrueAndSILOwnership(
-        this, F.hasQualifiedOwnership(),
+    require(
+        F.hasQualifiedOwnership(),
         "Inst with qualified ownership in a function that is not qualified");
     require(LBI->getType().isObject(), "Result of load must be an object");
     require(LBI->getType().isLoadable(LBI->getModule()),
@@ -1161,8 +1155,8 @@ public:
   }
 
   void checkEndBorrowInst(EndBorrowInst *EBI) {
-    requireTrueAndSILOwnership(
-        this, F.hasQualifiedOwnership(),
+    require(
+        F.hasQualifiedOwnership(),
         "Inst with qualified ownership in a function that is not qualified");
     // We allow for end_borrow to express relationships in between addresses and
     // values, but we require that the types are the same ignoring value
@@ -1188,13 +1182,13 @@ public:
     case StoreOwnershipQualifier::Unqualified:
       // We should not see loads with unqualified ownership when SILOwnership is
       // enabled.
-      requireTrueAndSILOwnership(this, F.hasUnqualifiedOwnership(),
-                                 "Invalid load with unqualified ownership");
+      require(F.hasUnqualifiedOwnership(),
+              "Qualified store in function with unqualified ownership?!");
       break;
     case StoreOwnershipQualifier::Init:
     case StoreOwnershipQualifier::Assign:
-      requireTrueAndSILOwnership(
-          this, F.hasQualifiedOwnership(),
+      require(
+          F.hasQualifiedOwnership(),
           "Inst with qualified ownership in a function that is not qualified");
       // TODO: Could probably make this a bit stricter.
       require(!SI->getSrc()->getType().isTrivial(SI->getModule()),
@@ -1202,8 +1196,8 @@ public:
               "non-trivial types");
       break;
     case StoreOwnershipQualifier::Trivial:
-      requireTrueAndSILOwnership(
-          this, F.hasQualifiedOwnership(),
+      require(
+          F.hasQualifiedOwnership(),
           "Inst with qualified ownership in a function that is not qualified");
       require(SI->getSrc()->getType().isTrivial(SI->getModule()),
               "A store with trivial ownership must store a trivial type");
@@ -1924,13 +1918,8 @@ public:
     require(selfGenericParam->getDepth() == 0
             && selfGenericParam->getIndex() == 0,
             "method should be polymorphic on Self parameter at depth 0 index 0");
-    auto selfMarker
-      = methodType->getGenericSignature()->getRequirements()[0];
-    require(selfMarker.getKind() == RequirementKind::WitnessMarker
-            && selfMarker.getFirstType()->isEqual(selfGenericParam),
-            "method's Self parameter should appear first in requirements");
     auto selfRequirement
-      = methodType->getGenericSignature()->getRequirements()[1];
+      = methodType->getGenericSignature()->getRequirements()[0];
     require(selfRequirement.getKind() == RequirementKind::Conformance
             && selfRequirement.getFirstType()->isEqual(selfGenericParam)
             && selfRequirement.getSecondType()->getAs<ProtocolType>()

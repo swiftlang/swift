@@ -764,9 +764,6 @@ public:
             sma::SameTypeRequirement{convertToTypeName(Req.getFirstType()),
                                      convertToTypeName(Req.getSecondType())});
         break;
-      case RequirementKind::WitnessMarker:
-        // This RequirementKind is a hack; skip it.
-        break;
       }
     }
     return ResultGS;

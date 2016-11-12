@@ -382,7 +382,7 @@ class COWArrayOpt {
   SmallPtrSet<Operand*, 8> MatchedReleases;
 
   // The address of the array passed to the current make_mutable we are
-  // analysing.
+  // analyzing.
   SILValue CurrentArrayAddr;
 public:
   COWArrayOpt(RCIdentityFunctionInfo *RCIA, SILLoop *L,

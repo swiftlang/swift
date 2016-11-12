@@ -31,6 +31,7 @@
 #include "swift/AST/PrettyStackTrace.h"
 #include "swift/AST/ReferencedNameTracker.h"
 #include "swift/AST/TypeWalker.h"
+#include "swift/Basic/Statistic.h"
 #include "swift/Parse/Lexer.h"
 #include "swift/Parse/Parser.h"
 #include "swift/Sema/IterativeTypeChecker.h"
@@ -44,6 +45,8 @@
 #include "llvm/ADT/StringExtras.h"
 #include "llvm/ADT/Twine.h"
 using namespace swift;
+
+#define DEBUG_TYPE "TypeCheckDecl"
 
 namespace {
 
@@ -2955,16 +2958,23 @@ static void checkVarBehavior(VarDecl *decl, TypeChecker &TC) {
     TC.Context.AllocateUninitialized<ProtocolConformanceRef>(1);
   auto selfConformance = new ((void*)conformanceMem.data())
     ProtocolConformanceRef(conformance);
-  // FIXME: Additional associated types introduced by other requirements?
-  Substitution interfaceSubs[] = {
+  Substitution allInterfaceSubs[] = {
     Substitution(behaviorInterfaceSelf, *selfConformance),
     Substitution(decl->getInterfaceType(), valueSub.getConformances()),
   };
-  Substitution contextSubs[] = {
+  Substitution allContextSubs[] = {
     Substitution(behaviorSelf, *selfConformance),
     Substitution(decl->getType(), valueSub.getConformances()),
   };
-  
+
+  ArrayRef<Substitution> interfaceSubs = allInterfaceSubs;
+  if (interfaceSubs.back().getConformances().empty())
+    interfaceSubs = interfaceSubs.drop_back();
+
+  ArrayRef<Substitution> contextSubs = allContextSubs;
+  if (contextSubs.back().getConformances().empty())
+    contextSubs = contextSubs.drop_back();
+
   // Now that type witnesses are done, satisfy property and method requirements.
   conformance->setState(ProtocolConformanceState::Checking);
 
@@ -3182,6 +3192,7 @@ static void checkVarBehavior(VarDecl *decl, TypeChecker &TC) {
   // Synthesize the bodies of the property's accessors now, forwarding to the
   // 'value' implementation.
   TC.completePropertyBehaviorAccessors(decl, behavior->ValueDecl,
+                                       decl->getType(),
                                        interfaceSubs, contextSubs);
   
   return;
@@ -3612,6 +3623,21 @@ public:
         synthesizeMaterializeForSet(materializeForSet, VD, TC);
         TC.typeCheckDecl(materializeForSet, true);
         TC.typeCheckDecl(materializeForSet, false);
+      }
+    }
+
+    // Typecheck any accessors that were previously synthesized
+    // (that were previously only validated at point of synthesis)
+    if (auto getter = VD->getGetter()) {
+      if (getter->hasBody()) {
+        TC.typeCheckDecl(getter, true);
+        TC.typeCheckDecl(getter, false);
+      }
+    }
+    if (auto setter = VD->getSetter()) {
+      if (setter->hasBody()) {
+        TC.typeCheckDecl(setter, true);
+        TC.typeCheckDecl(setter, false);
       }
     }
 
@@ -5864,6 +5890,7 @@ public:
     UNINTERESTING_ATTR(IBOutlet)
     UNINTERESTING_ATTR(Indirect)
     UNINTERESTING_ATTR(Inline)
+    UNINTERESTING_ATTR(Inlineable)
     UNINTERESTING_ATTR(Effects)
     UNINTERESTING_ATTR(FixedLayout)
     UNINTERESTING_ATTR(Lazy)
@@ -6967,7 +6994,9 @@ void TypeChecker::validateDecl(ValueDecl *D, bool resolveTypeParams) {
       validateExtension(ext);
     }
   }
-  
+
+  SWIFT_FUNC_STAT;
+
   switch (D->getKind()) {
   case DeclKind::Import:
   case DeclKind::Extension:
@@ -7434,9 +7463,10 @@ void TypeChecker::validateAccessibility(ValueDecl *D) {
 
 /// Check the generic parameters of an extension, recursively handling all of
 /// the parameter lists within the extension.
-static Type checkExtensionGenericParams(
-              TypeChecker &tc, ExtensionDecl *ext,
-              Type type, GenericParamList *genericParams) {
+static
+std::tuple<GenericSignature *, GenericEnvironment *, Type>
+checkExtensionGenericParams(TypeChecker &tc, ExtensionDecl *ext,
+                            Type type, GenericParamList *genericParams) {
   // Find the nominal type declaration and its parent type.
   Type parentType;
   NominalTypeDecl *nominal;
@@ -7453,26 +7483,27 @@ static Type checkExtensionGenericParams(
   }
 
   // Recurse to check the parent type, if there is one.
+  GenericSignature *parentSig = nullptr;
+  GenericEnvironment *parentEnv = nullptr;
   Type newParentType = parentType;
   if (parentType) {
-    newParentType = checkExtensionGenericParams(
+    std::tie(parentSig, parentEnv, newParentType) =
+        checkExtensionGenericParams(
                       tc, ext, parentType,
                       nominal->getGenericParams()
                         ? genericParams->getOuterParameters()
                         : genericParams);
-    if (!newParentType)
-      return Type();
   }
 
-  // If we don't need generic parameters, just build the result.
+  // If we don't have generic parameters at this level, just build the result.
   if (!nominal->getGenericParams()) {
-    assert(!genericParams);
+    Type resultType = NominalType::get(nominal, newParentType, tc.Context);
 
     // If the parent was unchanged, return the original pointer.
-    if (parentType.getPointer() == newParentType.getPointer())
-      return type;
+    if (resultType->isEqual(type))
+      resultType = type;
 
-    return NominalType::get(nominal, newParentType, tc.Context);
+    return std::make_tuple(parentSig, parentEnv, resultType);
   }
 
   // Local function used to infer requirements from the extended type.
@@ -7482,7 +7513,7 @@ static Type checkExtensionGenericParams(
       if (isa<ProtocolDecl>(nominal)) {
         // Simple case: protocols don't form bound generic types.
         extendedTypeInfer.setType(nominal->getDeclaredInterfaceType());
-      } else {
+      } else if (nominal->getGenericParams()) {
         SmallVector<Type, 2> genericArgs;
         for (auto gp : *genericParams) {
           genericArgs.push_back(gp->getDeclaredInterfaceType());
@@ -7491,6 +7522,10 @@ static Type checkExtensionGenericParams(
         extendedTypeInfer.setType(BoundGenericType::get(nominal,
                                                         newParentType,
                                                         genericArgs));
+      } else {
+        extendedTypeInfer.setType(NominalType::get(nominal,
+                                                   newParentType,
+                                                   tc.Context));
       }
     }
     
@@ -7501,13 +7536,10 @@ static Type checkExtensionGenericParams(
   SWIFT_DEFER { ext->setIsBeingTypeChecked(false); };
 
   // Validate the generic type signature.
-  auto *parentSig = ext->getDeclContext()->getGenericSignatureOfContext();
-  auto *parentEnv = ext->getDeclContext()->getGenericEnvironmentOfContext();
   auto *sig = tc.validateGenericSignature(genericParams,
                                           ext->getDeclContext(), parentSig,
                                           /*allowConcreteGenericParams=*/true,
                                           inferExtendedTypeReqs);
-  ext->setGenericSignature(sig);
 
   // Validate the generic parameters for the last time.
   tc.revertGenericParamList(genericParams);
@@ -7516,25 +7548,30 @@ static Type checkExtensionGenericParams(
   inferExtendedTypeReqs(builder);
 
   auto *env = builder.getGenericEnvironment();
-  ext->setGenericEnvironment(env);
 
   tc.finalizeGenericParamList(genericParams, sig, env, ext);
 
+  // Compute the final extended type.
+  Type resultType;
+
   if (isa<ProtocolDecl>(nominal)) {
     // Retain type sugar if it's there.
-    if (nominal->getDeclaredType()->isEqual(type))
-      return type;
-
-    return nominal->getDeclaredType();
+    resultType = nominal->getDeclaredType();
+  } else if (nominal->getGenericParams()) {
+    SmallVector<Type, 2> genericArgs;
+    for (auto gp : sig->getInnermostGenericParams()) {
+      genericArgs.push_back(env->mapTypeIntoContext(gp));
+    }
+    resultType = BoundGenericType::get(nominal, newParentType, genericArgs);
+  } else {
+    resultType = NominalType::get(nominal, newParentType, tc.Context);
   }
 
-  // Compute the final extended type.
-  SmallVector<Type, 2> genericArgs;
-  for (auto gp : sig->getInnermostGenericParams()) {
-    genericArgs.push_back(env->mapTypeIntoContext(gp));
-  }
-  Type resultType = BoundGenericType::get(nominal, newParentType, genericArgs);
-  return resultType->isEqual(type) ? type : resultType;
+  // If the desugared type didn't change, preserve sugar.
+  if (resultType->isEqual(type))
+    resultType = type;
+
+  return std::make_tuple(sig, env, resultType);
 }
 
 // FIXME: In TypeChecker.cpp; only needed because LLDB creates
@@ -7543,8 +7580,7 @@ static Type checkExtensionGenericParams(
 namespace swift {
 GenericParamList *cloneGenericParams(ASTContext &ctx,
                                      DeclContext *dc,
-                                     GenericParamList *fromParams,
-                                     GenericParamList *outerParams);
+                                     GenericParamList *fromParams);
 }
 
 void TypeChecker::validateExtension(ExtensionDecl *ext) {
@@ -7566,9 +7602,9 @@ void TypeChecker::validateExtension(ExtensionDecl *ext) {
   if (extendedType.isNull() || extendedType->hasError())
     return;
 
-  if (auto unbound = extendedType->getAs<UnboundGenericType>()) {
+  if (extendedType->hasUnboundGenericType()) {
     // Validate the nominal type declaration being extended.
-    auto nominal = unbound->getDecl();
+    auto nominal = extendedType->getAnyNominal();
     validateDecl(nominal);
 
     auto genericParams = ext->getGenericParams();
@@ -7578,23 +7614,22 @@ void TypeChecker::validateExtension(ExtensionDecl *ext) {
     // ability to create the generic parameter lists. Create the list now.
     if (!genericParams && Context.LangOpts.DebuggerSupport) {
       genericParams = cloneGenericParams(Context, ext,
-                                         nominal->getGenericParams(),
-                                         nullptr);
+                                         nominal->getGenericParams());
       ext->setGenericParams(genericParams);
     }
     assert(genericParams && "bindExtensionDecl didn't set generic params?");
 
     // Check generic parameters.
-    extendedType = checkExtensionGenericParams(*this, ext,
-                                               ext->getExtendedType(),
-                                               ext->getGenericParams());
-    if (!extendedType) {
-      ext->setInvalid();
-      ext->getExtendedTypeLoc().setInvalidType(Context);
-      return;
-    }
+    GenericSignature *sig;
+    GenericEnvironment *env;
+    std::tie(sig, env, extendedType) =
+        checkExtensionGenericParams(*this, ext,
+                                    ext->getExtendedType(),
+                                    ext->getGenericParams());
 
     ext->getExtendedTypeLoc().setType(extendedType);
+    ext->setGenericSignature(sig);
+    ext->setGenericEnvironment(env);
     return;
   }
 
@@ -7619,15 +7654,15 @@ void TypeChecker::validateExtension(ExtensionDecl *ext) {
       return;
     }
 
-    extendedType = checkExtensionGenericParams(*this, ext, proto,
-                                               ext->getGenericParams());
-    if (!extendedType) {
-      ext->setInvalid();
-      ext->getExtendedTypeLoc().setInvalidType(Context);
-      return;
-    }
+    GenericSignature *sig;
+    GenericEnvironment *env;
+    std::tie(sig, env, extendedType) =
+        checkExtensionGenericParams(*this, ext, proto,
+                                    ext->getGenericParams());
 
     ext->getExtendedTypeLoc().setType(extendedType);
+    ext->setGenericSignature(sig);
+    ext->setGenericEnvironment(env);
 
     // Speculatively ban extension of AnyObject; it won't be a
     // protocol forever, and we don't want to allow code that we know
@@ -8365,8 +8400,8 @@ static void validateAttributes(TypeChecker &TC, Decl *D) {
   // Only protocol members can be optional.
   if (auto *OA = Attrs.getAttribute<OptionalAttr>()) {
     if (!isa<ProtocolDecl>(D->getDeclContext())) {
-      TC.diagnose(OA->getLocation(),
-                  diag::optional_attribute_non_protocol);
+      TC.diagnose(OA->getLocation(), diag::optional_attribute_non_protocol)
+        .fixItRemove(OA->getRange());
       D->getAttrs().removeAttribute(OA);
     } else if (!cast<ProtocolDecl>(D->getDeclContext())->isObjC()) {
       TC.diagnose(OA->getLocation(),

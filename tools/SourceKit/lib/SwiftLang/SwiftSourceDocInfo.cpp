@@ -31,6 +31,7 @@
 
 #include "clang/AST/ASTContext.h"
 #include "clang/AST/DeclObjC.h"
+#include "clang/Basic/CharInfo.h"
 #include "clang/Basic/Module.h"
 #include "clang/Index/USRGeneration.h"
 #include "clang/Lex/Lexer.h"
@@ -842,6 +843,82 @@ static bool passCursorInfoForDecl(const ValueDecl *VD,
   return false;
 }
 
+class CursorRangeInfoConsumer : public SwiftASTConsumer {
+protected:
+  SwiftLangSupport &Lang;
+  SwiftInvocationRef ASTInvok;
+  StringRef InputFile;
+  unsigned Offset;
+
+private:
+  const bool TryExistingAST;
+  SmallVector<ImmutableTextSnapshotRef, 4> PreviousASTSnaps;
+
+protected:
+  ArrayRef<ImmutableTextSnapshotRef> getPreviousASTSnaps() {
+    return llvm::makeArrayRef(PreviousASTSnaps);
+  }
+
+public:
+  CursorRangeInfoConsumer(StringRef InputFile, unsigned Offset,
+                          SwiftLangSupport &Lang, SwiftInvocationRef ASTInvok,
+                          bool TryExistingAST)
+    : Lang(Lang), ASTInvok(ASTInvok),InputFile(InputFile), Offset(Offset),
+      TryExistingAST(TryExistingAST) { }
+
+  bool canUseASTWithSnapshots(ArrayRef<ImmutableTextSnapshotRef> Snapshots) override {
+    if (!TryExistingAST) {
+      LOG_INFO_FUNC(High, "will resolve using up-to-date AST");
+      return false;
+    }
+
+    // If there is an existing AST and the offset can be mapped back to the
+    // document snapshot that was used to create it, then use that AST.
+    // The downside is that we may return stale information, but we get the
+    // benefit of increased responsiveness, since the request will not be
+    // blocked waiting on the AST to be fully typechecked.
+
+    ImmutableTextSnapshotRef InputSnap;
+    if (auto EditorDoc = Lang.getEditorDocuments().findByPath(InputFile))
+      InputSnap = EditorDoc->getLatestSnapshot();
+      if (!InputSnap)
+        return false;
+
+    auto mappedBackOffset = [&]()->llvm::Optional<unsigned> {
+      for (auto &Snap : Snapshots) {
+        if (Snap->isFromSameBuffer(InputSnap)) {
+          if (Snap->getStamp() == InputSnap->getStamp())
+            return Offset;
+
+          auto OptOffset = mapOffsetToOlderSnapshot(Offset, InputSnap, Snap);
+          if (!OptOffset.hasValue())
+            return None;
+
+          // Check that the new and old offset still point to the same token.
+          StringRef NewTok = getSourceToken(Offset, InputSnap);
+          if (NewTok.empty())
+            return None;
+          if (NewTok == getSourceToken(OptOffset.getValue(), Snap))
+            return OptOffset;
+
+          return None;
+        }
+      }
+      return None;
+    };
+
+    auto OldOffsetOpt = mappedBackOffset();
+    if (OldOffsetOpt.hasValue()) {
+      Offset = *OldOffsetOpt;
+      PreviousASTSnaps.append(Snapshots.begin(), Snapshots.end());
+      LOG_INFO_FUNC(High, "will try existing AST");
+      return true;
+    }
+
+    LOG_INFO_FUNC(High, "will resolve using up-to-date AST");
+    return false;
+  }
+};
 static void resolveCursor(SwiftLangSupport &Lang,
                           StringRef InputFile, unsigned Offset,
                           SwiftInvocationRef Invok,
@@ -849,14 +926,8 @@ static void resolveCursor(SwiftLangSupport &Lang,
                           std::function<void(const CursorInfo &)> Receiver) {
   assert(Invok);
 
-  class CursorInfoConsumer : public SwiftASTConsumer {
-    std::string InputFile;
-    unsigned Offset;
-    SwiftLangSupport &Lang;
-    SwiftInvocationRef ASTInvok;
-    const bool TryExistingAST;
+  class CursorInfoConsumer : public CursorRangeInfoConsumer {
     std::function<void(const CursorInfo &)> Receiver;
-    SmallVector<ImmutableTextSnapshotRef, 4> PreviousASTSnaps;
 
   public:
     CursorInfoConsumer(StringRef InputFile, unsigned Offset,
@@ -864,65 +935,8 @@ static void resolveCursor(SwiftLangSupport &Lang,
                        SwiftInvocationRef ASTInvok,
                        bool TryExistingAST,
                        std::function<void(const CursorInfo &)> Receiver)
-      : InputFile(InputFile), Offset(Offset),
-        Lang(Lang),
-        ASTInvok(std::move(ASTInvok)),
-        TryExistingAST(TryExistingAST),
-        Receiver(std::move(Receiver)) { }
-
-    bool canUseASTWithSnapshots(
-        ArrayRef<ImmutableTextSnapshotRef> Snapshots) override {
-      if (!TryExistingAST) {
-        LOG_INFO_FUNC(High, "will resolve using up-to-date AST");
-        return false;
-      }
-
-      // If there is an existing AST and the offset can be mapped back to the
-      // document snapshot that was used to create it, then use that AST.
-      // The downside is that we may return stale information, but we get the
-      // benefit of increased responsiveness, since the request will not be
-      // blocked waiting on the AST to be fully typechecked.
-
-      ImmutableTextSnapshotRef InputSnap;
-      if (auto EditorDoc = Lang.getEditorDocuments().findByPath(InputFile))
-        InputSnap = EditorDoc->getLatestSnapshot();
-      if (!InputSnap)
-        return false;
-
-      auto mappedBackOffset = [&]()->llvm::Optional<unsigned> {
-        for (auto &Snap : Snapshots) {
-          if (Snap->isFromSameBuffer(InputSnap)) {
-            if (Snap->getStamp() == InputSnap->getStamp())
-              return Offset;
-
-            auto OptOffset = mapOffsetToOlderSnapshot(Offset, InputSnap, Snap);
-            if (!OptOffset.hasValue())
-              return None;
-
-            // Check that the new and old offset still point to the same token.
-            StringRef NewTok = getSourceToken(Offset, InputSnap);
-            if (NewTok.empty())
-              return None;
-            if (NewTok == getSourceToken(OptOffset.getValue(), Snap))
-              return OptOffset;
-
-            return None;
-          }
-        }
-        return None;
-      };
-
-      auto OldOffsetOpt = mappedBackOffset();
-      if (OldOffsetOpt.hasValue()) {
-        Offset = *OldOffsetOpt;
-        PreviousASTSnaps.append(Snapshots.begin(), Snapshots.end());
-        LOG_INFO_FUNC(High, "will try existing AST");
-        return true;
-      }
-
-      LOG_INFO_FUNC(High, "will resolve using up-to-date AST");
-      return false;
-    }
+    : CursorRangeInfoConsumer(InputFile, Offset, Lang, ASTInvok, TryExistingAST),
+      Receiver(std::move(Receiver)){ }
 
     void handlePrimaryAST(ASTUnitRef AstUnit) override {
       auto &CompIns = AstUnit->getCompilerInstance();
@@ -964,10 +978,10 @@ static void resolveCursor(SwiftLangSupport &Lang,
                                             SemaTok.ContainerType,
                                             SemaTok.ContainerType,
                                             SemaTok.IsRef, BufferID, Lang,
-                                            CompInvok, PreviousASTSnaps,
+                                            CompInvok, getPreviousASTSnaps(),
                                             Receiver);
         if (Failed) {
-          if (!PreviousASTSnaps.empty()) {
+          if (!getPreviousASTSnaps().empty()) {
             // Attempt again using the up-to-date AST.
             resolveCursor(Lang, InputFile, Offset, ASTInvok,
                           /*TryExistingAST=*/false, Receiver);
@@ -997,6 +1011,139 @@ static void resolveCursor(SwiftLangSupport &Lang,
   static const char OncePerASTToken = 0;
   Lang.getASTManager().processASTAsync(Invok, std::move(Consumer), &OncePerASTToken);
 }
+
+static void resolveRange(SwiftLangSupport &Lang,
+                          StringRef InputFile, unsigned Offset, unsigned Length,
+                          SwiftInvocationRef Invok,
+                          bool TryExistingAST,
+                          std::function<void(const RangeInfo&)> Receiver) {
+  assert(Invok);
+
+  class RangeInfoConsumer : public CursorRangeInfoConsumer {
+    unsigned Length;
+    std::function<void(const RangeInfo&)> Receiver;
+
+    static SourceLoc getNonwhitespaceLocBefore(SourceManager &SM,
+                                               unsigned BufferID,
+                                               unsigned Offset) {
+      CharSourceRange entireRange = SM.getRangeForBuffer(BufferID);
+      StringRef Buffer = SM.extractText(entireRange);
+
+      const char *BufStart = Buffer.data();
+      if (Offset >= Buffer.size())
+        return SourceLoc();
+
+      for (unsigned Off = Offset; Off != 0; Off --) {
+        if (!clang::isWhitespace(*(BufStart + Off))) {
+          return SM.getLocForOffset(BufferID, Off);
+        }
+      }
+      return clang::isWhitespace(*BufStart) ? SourceLoc() :
+        SM.getLocForOffset(BufferID, 0);
+    }
+
+    static SourceLoc getNonwhitespaceLocAfter(SourceManager &SM,
+                                              unsigned BufferID,
+                                              unsigned Offset) {
+      CharSourceRange entireRange = SM.getRangeForBuffer(BufferID);
+      StringRef Buffer = SM.extractText(entireRange);
+
+      const char *BufStart = Buffer.data();
+      if (Offset >= Buffer.size())
+        return SourceLoc();
+
+      for (unsigned Off = Offset; Off < Buffer.size(); Off ++) {
+        if (!clang::isWhitespace(*(BufStart + Off))) {
+          return SM.getLocForOffset(BufferID, Off);
+        }
+      }
+      return SourceLoc();
+    }
+
+  public:
+    RangeInfoConsumer(StringRef InputFile, unsigned Offset, unsigned Length,
+                       SwiftLangSupport &Lang, SwiftInvocationRef ASTInvok,
+                       bool TryExistingAST,
+                       std::function<void(const RangeInfo&)> Receiver)
+    : CursorRangeInfoConsumer(InputFile, Offset, Lang, ASTInvok, TryExistingAST),
+      Length(Length), Receiver(std::move(Receiver)){ }
+
+    void handlePrimaryAST(ASTUnitRef AstUnit) override {
+      auto &CompIns = AstUnit->getCompilerInstance();
+
+      unsigned BufferID = AstUnit->getPrimarySourceFile().getBufferID().getValue();
+      SourceManager &SM = CompIns.getSourceMgr();
+      SourceLoc StartLoc = getNonwhitespaceLocAfter(SM, BufferID, Offset);
+      SourceLoc EndLoc = getNonwhitespaceLocBefore(SM, BufferID,
+                                                   Offset + Length - 1);
+
+      StartLoc = Lexer::getLocForStartOfToken(SM, StartLoc);
+      EndLoc = Lexer::getLocForStartOfToken(SM, EndLoc);
+
+      if (StartLoc.isInvalid() || EndLoc.isInvalid()) {
+        Receiver({});
+        return;
+      }
+
+      if (trace::enabled()) {
+        // FIXME: Implement tracing
+      }
+      RangeResolver Resolver(AstUnit->getPrimarySourceFile(), StartLoc, EndLoc);
+      ResolvedRangeInfo Info = Resolver.resolve();
+
+      CompilerInvocation CompInvok;
+      ASTInvok->applyTo(CompInvok);
+      RangeInfo Result;
+      Result.RangeKind = Lang.getUIDForRangeKind(Info.Kind);
+      Result.RangeContent = Info.Content;
+      switch (Info.Kind) {
+      case RangeKind::SingleExpression: {
+        SmallString<64> SS;
+        llvm::raw_svector_ostream OS(SS);
+        Info.Ty.print(OS);
+        Result.ExprType = OS.str();
+        Receiver(Result);
+        return;
+      }
+      case RangeKind::SingleDecl:
+      case RangeKind::MultiStatement:
+      case RangeKind::SingleStatement: {
+        Receiver(Result);
+        return;
+      }
+      case RangeKind::Invalid:
+        if (!getPreviousASTSnaps().empty()) {
+          // Attempt again using the up-to-date AST.
+          resolveRange(Lang, InputFile, Offset, Length, ASTInvok,
+                      /*TryExistingAST=*/false, Receiver);
+        } else {
+          Receiver(Result);
+        }
+        return;
+      }
+    }
+
+    void cancelled() override {
+      RangeInfo Info;
+      Info.IsCancelled = true;
+      Receiver(Info);
+    }
+
+    void failed(StringRef Error) override {
+      LOG_WARN_FUNC("range info failed: " << Error);
+      Receiver({});
+    }
+  };
+
+  auto Consumer = std::make_shared<RangeInfoConsumer>(
+    InputFile, Offset, Length, Lang, Invok, TryExistingAST, Receiver);
+  /// FIXME: When request cancellation is implemented and Xcode adopts it,
+  /// don't use 'OncePerASTToken'.
+  static const char OncePerASTToken = 0;
+  Lang.getASTManager().processASTAsync(Invok, std::move(Consumer),
+                                       &OncePerASTToken);
+}
+
 
 void SwiftLangSupport::getCursorInfo(
     StringRef InputFile, unsigned Offset,
@@ -1050,6 +1197,31 @@ void SwiftLangSupport::getCursorInfo(
   }
 
   resolveCursor(*this, InputFile, Offset, Invok, /*TryExistingAST=*/true,
+                Receiver);
+}
+
+void SwiftLangSupport::
+getRangeInfo(StringRef InputFile, unsigned Offset, unsigned Length,
+             ArrayRef<const char *> Args,
+             std::function<void(const RangeInfo&)> Receiver) {
+  if (IFaceGenContexts.get(InputFile)) {
+    // FIXME: return range info for generated interfaces.
+    Receiver(RangeInfo());
+    return;
+  }
+  std::string Error;
+  SwiftInvocationRef Invok = ASTMgr->getInvocation(Args, InputFile, Error);
+  if (!Invok) {
+    // FIXME: Report it as failed request.
+    LOG_WARN_FUNC("failed to create an ASTInvocation: " << Error);
+    Receiver(RangeInfo());
+    return;
+  }
+  if (Length == 0) {
+    Receiver(RangeInfo());
+    return;
+  }
+  resolveRange(*this, InputFile, Offset, Length, Invok, /*TryExistingAST=*/true,
                 Receiver);
 }
 

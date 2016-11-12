@@ -1,4 +1,4 @@
-// RUN: %target-swift-frontend -O -emit-sil %s | %FileCheck %s
+// RUN: %target-swift-frontend -assume-parsing-unqualified-ownership-sil -O -emit-sil %s | %FileCheck %s
 // REQUIRES: objc_interop
 
 // FIXME: https://bugs.swift.org/browse/SR-2808

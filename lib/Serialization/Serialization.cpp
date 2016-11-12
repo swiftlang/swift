@@ -932,7 +932,6 @@ static uint8_t getRawStableRequirementKind(RequirementKind kind) {
   CASE(Conformance)
   CASE(Superclass)
   CASE(SameType)
-  CASE(WitnessMarker)
   }
 #undef CASE
 }
@@ -1032,13 +1031,52 @@ void Serializer::writeNormalConformance(
                        ProtocolType::compareProtocols);
 
   conformance->forEachValueWitness(nullptr,
-                                   [&](ValueDecl *req,
-                                       ConcreteDeclRef witness) {
-    data.push_back(addDeclRef(req));
-    data.push_back(addDeclRef(witness.getDecl()));
-    assert(witness.getDecl() || req->getAttrs().hasAttribute<OptionalAttr>()
-           || req->getAttrs().isUnavailable(req->getASTContext()));
-    ++numValueWitnesses;
+    [&](ValueDecl *req, Witness witness) {
+      data.push_back(addDeclRef(req));
+      data.push_back(addDeclRef(witness.getDecl()));
+      assert(witness.getDecl() || req->getAttrs().hasAttribute<OptionalAttr>()
+             || req->getAttrs().isUnavailable(req->getASTContext()));
+
+      // If there is no witness, we're done.
+      if (!witness.getDecl()) return;
+
+      // If no substitution is required, all of the data structures are of
+      // length zero.
+      if (!witness.requiresSubstitution()) {
+        data.push_back(0); // generic parameters
+        data.push_back(0); // requirement-to-synthetic map
+        data.push_back(0); // witness substitutions
+        return;
+      }
+
+      if (auto genericSig = witness.getSyntheticSignature()) {
+        // Generic parameters.
+        data.push_back(genericSig->getGenericParams().size());
+        for (auto gp : genericSig->getGenericParams())
+          data.push_back(addTypeRef(gp));
+
+        // Requirements come at the end.
+      } else {
+        data.push_back(0);
+      }
+
+      // Mapping from the requirement's interface types to the interface
+      // types of the synthetic environment.
+      // FIXME: non-deterministic ordering
+      const auto &reqToSyntheticMap =
+        witness.getRequirementToSyntheticMap().getMap();
+      data.push_back(reqToSyntheticMap.size());
+      for (const auto &entry : reqToSyntheticMap) {
+        data.push_back(addTypeRef(entry.first));
+        data.push_back(addTypeRef(entry.second));
+        auto conformances =
+          witness.getRequirementToSyntheticMap().getConformances(
+                                             entry.first->getCanonicalType());
+        data.push_back(conformances.size());
+        // Conformances come at the end.
+      }
+      data.push_back(witness.getSubstitutions().size());
+      ++numValueWitnesses;
   });
 
   conformance->forEachTypeWitness(/*resolver=*/nullptr,
@@ -1069,6 +1107,33 @@ void Serializer::writeNormalConformance(
                      DeclTypeAbbrCodes);
   }
 
+  conformance->forEachValueWitness(nullptr,
+                                   [&](ValueDecl *req, Witness witness) {
+   // Bail out early for simple witnesses.
+   if (!witness.getDecl() || !witness.requiresSubstitution()) return;
+
+   // Write the generic requirements of the synthetic environment.
+   if (auto genericSig = witness.getSyntheticSignature())
+     writeGenericRequirements(genericSig->getRequirements());
+
+   // Write conformances for the requirement-to-synthetic environment map.
+   const auto &reqToSyntheticMap =
+     witness.getRequirementToSyntheticMap().getMap();
+   for (const auto &entry : reqToSyntheticMap) {
+     auto conformances =
+       witness.getRequirementToSyntheticMap().getConformances(
+                                              entry.first->getCanonicalType());
+     for (auto conformance : conformances) {
+       writeConformance(conformance, DeclTypeAbbrCodes);
+     }
+   }
+
+   // Write the witness substitutions.
+   writeSubstitutions(witness.getSubstitutions(),
+                      DeclTypeAbbrCodes,
+                      witness.getSyntheticEnvironment());
+  });
+
   conformance->forEachTypeWitness(/*resolver=*/nullptr,
                                   [&](AssociatedTypeDecl *assocType,
                                       const Substitution &witness,
@@ -1080,13 +1145,15 @@ void Serializer::writeNormalConformance(
 
 void
 Serializer::writeConformance(ProtocolConformance *conformance,
-                             const std::array<unsigned, 256> &abbrCodes) {
-  writeConformance(ProtocolConformanceRef(conformance), abbrCodes);
+                             const std::array<unsigned, 256> &abbrCodes,
+                             GenericEnvironment *genericEnv) {
+  writeConformance(ProtocolConformanceRef(conformance), abbrCodes, genericEnv);
 }
 
 void
 Serializer::writeConformance(ProtocolConformanceRef conformanceRef,
-                             const std::array<unsigned, 256> &abbrCodes) {
+                             const std::array<unsigned, 256> &abbrCodes,
+                             GenericEnvironment *genericEnv) {
   using namespace decls_block;
 
   if (conformanceRef.isAbstract()) {
@@ -1123,13 +1190,16 @@ Serializer::writeConformance(ProtocolConformanceRef conformanceRef,
     auto conf = cast<SpecializedProtocolConformance>(conformance);
     auto substitutions = conf->getGenericSubstitutions();
     unsigned abbrCode = abbrCodes[SpecializedProtocolConformanceLayout::Code];
+    auto type = conf->getType();
+    if (genericEnv)
+      type = genericEnv->mapTypeOutOfContext(const_cast<ModuleDecl *>(M), type);
     SpecializedProtocolConformanceLayout::emitRecord(Out, ScratchRecord,
                                                      abbrCode,
-                                                     addTypeRef(conf->getType()),
+                                                     addTypeRef(type),
                                                      substitutions.size());
-    writeSubstitutions(substitutions, abbrCodes);
+    writeSubstitutions(substitutions, abbrCodes, genericEnv);
 
-    writeConformance(conf->getGenericConformance(), abbrCodes);
+    writeConformance(conf->getGenericConformance(), abbrCodes, genericEnv);
     break;
   }
 
@@ -1138,11 +1208,14 @@ Serializer::writeConformance(ProtocolConformanceRef conformanceRef,
     unsigned abbrCode
       = abbrCodes[InheritedProtocolConformanceLayout::Code];
 
-    InheritedProtocolConformanceLayout::emitRecord(
-      Out, ScratchRecord, abbrCode,
-      addTypeRef(conformance->getType()));
+    auto type = conf->getType();
+    if (genericEnv)
+      type = genericEnv->mapTypeOutOfContext(const_cast<ModuleDecl *>(M), type);
 
-    writeConformance(conf->getInheritedConformance(), abbrCodes);
+    InheritedProtocolConformanceLayout::emitRecord(
+      Out, ScratchRecord, abbrCode, addTypeRef(type));
+
+    writeConformance(conf->getInheritedConformance(), abbrCodes, genericEnv);
     break;
   }
   }
@@ -1168,17 +1241,26 @@ Serializer::writeConformances(ArrayRef<ProtocolConformance*> conformances,
 
 void
 Serializer::writeSubstitutions(ArrayRef<Substitution> substitutions,
-                               const std::array<unsigned, 256> &abbrCodes) {
+                               const std::array<unsigned, 256> &abbrCodes,
+                               GenericEnvironment *genericEnv) {
   using namespace decls_block;
   auto abbrCode = abbrCodes[BoundGenericSubstitutionLayout::Code];
+
   for (auto &sub : substitutions) {
+    auto replacementType = sub.getReplacement();
+    if (genericEnv) {
+      replacementType =
+        genericEnv->mapTypeOutOfContext(const_cast<ModuleDecl *>(M),
+                                        replacementType);
+    }
+
     BoundGenericSubstitutionLayout::emitRecord(
       Out, ScratchRecord, abbrCode,
-      addTypeRef(sub.getReplacement()),
+      addTypeRef(replacementType),
       sub.getConformances().size());
 
     for (auto conformance : sub.getConformances()) {
-      writeConformance(conformance, abbrCodes);
+      writeConformance(conformance, abbrCodes, genericEnv);
     }
   }
 }
