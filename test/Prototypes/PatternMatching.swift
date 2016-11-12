@@ -111,7 +111,13 @@ extension MatchAnyOne : CustomStringConvertible {
   var description: String { return "." }
 }
 
-typealias any<T : Equatable, Index : Comparable> = MatchAnyOne<T,Index>
+enum MatchAny {}
+var __ : MatchAny.Type { return MatchAny.self }
+prefix func % <
+  T : Equatable, Index : Comparable
+>(_: MatchAny.Type) -> MatchAnyOne<T,Index> {
+  return MatchAnyOne()
+}
 
 /// A matcher for two other matchers in sequence.
 struct ConsecutiveMatches<M0: Pattern, M1: Pattern> : Pattern
@@ -360,7 +366,7 @@ let source2 = Array("hack hack cough cough cough spork".utf8)
 // The final * steps around <rdar://29229409>
 let fancyPattern
   = %"quick "..((%"brown" | %"black" | %"fox" | %"chicken") .. %" ")+ 
-   .. any()* .. %"do"
+  .. (%__)* .. %"do"
 
 fancyPattern.searchTest(in: source)
 
