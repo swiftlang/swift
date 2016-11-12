@@ -20,6 +20,18 @@ Classes:
       - Name: accessorsOnlyForClassExceptInVersion3
         PropertyKind:    Class
         SwiftImportAsAccessors: true
+      - Name: accessorsOnlyWithNewType
+        PropertyKind:    Instance
+        SwiftImportAsAccessors: true
+        Type: '__kindof Base * _Nonnull'
+  - Name: TypeChanges
+    Methods:
+      - Selector: 'methodWithA:'
+        MethodKind: Instance
+        ResultType: 'A * _Nonnull'
+        Parameters:
+          - Position: 0
+            Type: 'A * _Nullable'
 Functions:
   - Name: jumpToLocation
     SwiftName: 'jumpTo(x:y:z:)'
