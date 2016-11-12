@@ -40,3 +40,8 @@
 // CHECK-BOTH-DAG: class func accessorsOnlyForClass() -> Any
 // CHECK-BOTH-DAG: class func setAccessorsOnlyForClass(_ accessorsOnlyForClass: Any)
 // CHECK-BOTH: {{^}$}}
+
+// CHECK-BOTH-DAG: func accessorsOnlyWithNewType() -> Base
+// CHECK-BOTH-DAG: func setAccessorsOnlyWithNewType(_ accessorsOnlyWithNewType: Base)
+
+// CHECK-BOTH: {{^}$}}

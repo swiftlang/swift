@@ -23,4 +23,8 @@ __attribute__((objc_root_class))
 @property (nonatomic, readwrite, retain, class) id accessorsOnlyForClass;
 @end
 
+@interface TestProperties (Retyped)
+@property (nonatomic, readwrite, retain) id accessorsOnlyWithNewType;
+@end
+
 #pragma clang assume_nonnull end
