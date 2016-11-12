@@ -419,7 +419,6 @@ namespace {
     swift::Witness getWitness(ASTContext &ctx,
                               RequirementEnvironment &&reqEnvironment) const {
       return swift::Witness(this->Witness, WitnessSubstitutions,
-                            reqEnvironment.getSyntheticSignature(),
                             reqEnvironment.getSyntheticEnvironment(),
                             reqEnvironment.takeRequirementToSyntheticMap());
     }
@@ -1131,7 +1130,7 @@ RequirementEnvironment::RequirementEnvironment(
 
   // Produce the generic signature and environment.
   syntheticSignature = builder.getGenericSignature();
-  syntheticEnvironment = builder.getGenericEnvironment();
+  syntheticEnvironment = builder.getGenericEnvironment(syntheticSignature);
 }
 
 static RequirementMatch

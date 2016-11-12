@@ -1390,7 +1390,6 @@ void TypeChecker::completePropertyBehaviorParameter(VarDecl *VD,
                      TypeLoc::withoutLoc(SubstBodyResultTy), DC);
 
   Parameter->setInterfaceType(SubstInterfaceTy);
-  Parameter->setGenericSignature(genericSig);
   Parameter->setGenericEnvironment(genericEnv);
 
   // Mark the method to be final, implicit, and private.  In a class, this
@@ -2121,9 +2120,8 @@ swift::createDesignatedInitOverride(TypeChecker &tc,
   auto selfType = configureImplicitSelf(tc, ctor);
 
   // Set the interface type of the initializer.
-  ctor->setGenericSignature(classDecl->getGenericSignatureOfContext());
   ctor->setGenericEnvironment(classDecl->getGenericEnvironmentOfContext());
-  tc.configureInterfaceType(ctor);
+  tc.configureInterfaceType(ctor, ctor->getGenericSignature());
 
   // Set the contextual type of the initializer. This will go away one day.
   configureConstructorType(ctor, selfType, bodyParams->getType(ctx));

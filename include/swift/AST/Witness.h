@@ -92,7 +92,6 @@ class Witness {
     /// The witness declaration, along with the substitutions needed to use
     /// the witness declaration from the synthetic environment.
     ConcreteDeclRef declRef;
-    GenericSignature *syntheticSignature;
     GenericEnvironment *syntheticEnvironment;
     SubstitutionMap reqToSyntheticEnvMap;
   };
@@ -116,14 +115,12 @@ public:
   /// \param substitutions The substitutions required to use the witness from
   /// the synthetic environment.
   ///
-  /// \param syntheticSig The generic signature for the synthetic environment.
-  ///
   /// \param syntheticEnv The synthetic environment.
   ///
   /// \param reqToSyntheticEnvMap The mapping from the interface types of the
   /// requirement into the interface types of the synthetic environment.
   Witness(ValueDecl *decl, ArrayRef<Substitution> substitutions,
-          GenericSignature *syntheticSig, GenericEnvironment *syntheticEnv,
+          GenericEnvironment *syntheticEnv,
           SubstitutionMap reqToSyntheticEnvMap);
 
   /// Retrieve the witness declaration reference, which includes the
@@ -164,7 +161,10 @@ public:
   /// Retrieve the generic signature of the synthetic environment.
   GenericSignature *getSyntheticSignature() const {
     assert(requiresSubstitution() && "No substitutions required for witness");
-    return storage.get<StoredWitness *>()->syntheticSignature;
+    if (auto *env = getSyntheticEnvironment())
+      return env->getGenericSignature();
+    else
+      return nullptr;
   }
 
   /// Retrieve the synthetic generic environment.

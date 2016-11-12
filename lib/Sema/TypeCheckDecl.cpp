@@ -711,7 +711,7 @@ ArchetypeBuilder TypeChecker::createArchetypeBuilder(Module *mod) {
 }
 
 /// Expose TypeChecker's handling of GenericParamList to SIL parsing.
-std::pair<GenericSignature *, GenericEnvironment *>
+GenericEnvironment *
 TypeChecker::handleSILGenericParams(GenericParamList *genericParams,
                                     DeclContext *DC) {
 
@@ -742,11 +742,11 @@ TypeChecker::handleSILGenericParams(GenericParamList *genericParams,
     checkGenericParamList(&builder, genericParams, parentSig, parentEnv,
                           nullptr);
     parentSig = genericSig;
-    parentEnv = builder.getGenericEnvironment();
+    parentEnv = builder.getGenericEnvironment(parentSig);
     finalizeGenericParamList(genericParams, parentSig, parentEnv, DC);
   }
 
-  return std::make_pair(parentSig, parentEnv);
+  return parentEnv;
 }
 
 /// Check whether the given type representation will be
@@ -4849,7 +4849,7 @@ public:
     if (auto gp = FD->getGenericParams()) {
       gp->setOuterParameters(FD->getDeclContext()->getGenericParamsOfContext());
 
-      TC.validateGenericFuncSignature(FD);
+      auto *sig = TC.validateGenericFuncSignature(FD);
 
       // Create a fresh archetype builder.
       ArchetypeBuilder builder =
@@ -4873,13 +4873,12 @@ public:
       TC.revertGenericFuncSignature(FD);
 
       // Assign archetypes.
-      auto *sig = FD->getGenericSignature();
-      auto *env = builder.getGenericEnvironment();
+      auto *env = builder.getGenericEnvironment(sig);
       FD->setGenericEnvironment(env);
 
       TC.finalizeGenericParamList(gp, sig, env, FD);
     } else if (FD->getDeclContext()->getGenericSignatureOfContext()) {
-      TC.validateGenericFuncSignature(FD);
+      (void)TC.validateGenericFuncSignature(FD);
       if (!FD->hasType()) {
         // Revert all of the types within the signature of the function.
         TC.revertGenericFuncSignature(FD);
@@ -4898,7 +4897,7 @@ public:
       return;
 
     if (!FD->getGenericSignatureOfContext())
-      TC.configureInterfaceType(FD);
+      TC.configureInterfaceType(FD, FD->getGenericSignature());
 
     if (FD->isInvalid())
       return;
@@ -6514,7 +6513,7 @@ public:
       // Write up generic parameters and check the generic parameter list.
       gp->setOuterParameters(CD->getDeclContext()->getGenericParamsOfContext());
 
-      TC.validateGenericFuncSignature(CD);
+      auto *sig = TC.validateGenericFuncSignature(CD);
 
       auto builder = TC.createArchetypeBuilder(CD->getModuleContext());
       auto *parentSig = CD->getDeclContext()->getGenericSignatureOfContext();
@@ -6529,13 +6528,12 @@ public:
       TC.revertGenericFuncSignature(CD);
 
       // Assign archetypes.
-      auto *sig = CD->getGenericSignature();
-      auto *env = builder.getGenericEnvironment();
+      auto *env = builder.getGenericEnvironment(sig);
       CD->setGenericEnvironment(env);
 
       TC.finalizeGenericParamList(gp, sig, env, CD);
     } else if (CD->getDeclContext()->getGenericSignatureOfContext()) {
-      TC.validateGenericFuncSignature(CD);
+      (void)TC.validateGenericFuncSignature(CD);
 
       // Revert all of the types within the signature of the constructor.
       TC.revertGenericFuncSignature(CD);
@@ -6559,7 +6557,7 @@ public:
                                  CD->getParameterList(1)->getType(TC.Context));
 
         if (!CD->getGenericSignatureOfContext())
-          TC.configureInterfaceType(CD);
+          TC.configureInterfaceType(CD, CD->getGenericSignature());
       }
     }
 
@@ -6695,7 +6693,7 @@ public:
     Type SelfTy = configureImplicitSelf(TC, DD);
 
     if (DD->getDeclContext()->getGenericSignatureOfContext()) {
-      TC.validateGenericFuncSignature(DD);
+      (void)TC.validateGenericFuncSignature(DD);
       DD->setGenericEnvironment(
           DD->getDeclContext()->getGenericEnvironmentOfContext());
     }
@@ -6708,7 +6706,7 @@ public:
     }
 
     if (!DD->getGenericSignatureOfContext())
-      TC.configureInterfaceType(DD);
+      TC.configureInterfaceType(DD, DD->getGenericSignature());
 
     if (!DD->hasType()) {
       Type FnTy;
@@ -7465,10 +7463,9 @@ void TypeChecker::validateAccessibility(ValueDecl *D) {
 
 /// Check the generic parameters of an extension, recursively handling all of
 /// the parameter lists within the extension.
-static
-std::tuple<GenericSignature *, GenericEnvironment *, Type>
-checkExtensionGenericParams(TypeChecker &tc, ExtensionDecl *ext,
-                            Type type, GenericParamList *genericParams) {
+static std::tuple<GenericEnvironment *, Type>
+checkExtensionGenericParams(TypeChecker &tc, ExtensionDecl *ext, Type type,
+                            GenericParamList *genericParams) {
   // Find the nominal type declaration and its parent type.
   Type parentType;
   NominalTypeDecl *nominal;
@@ -7485,17 +7482,17 @@ checkExtensionGenericParams(TypeChecker &tc, ExtensionDecl *ext,
   }
 
   // Recurse to check the parent type, if there is one.
-  GenericSignature *parentSig = nullptr;
   GenericEnvironment *parentEnv = nullptr;
   Type newParentType = parentType;
   if (parentType) {
-    std::tie(parentSig, parentEnv, newParentType) =
-        checkExtensionGenericParams(
-                      tc, ext, parentType,
-                      nominal->getGenericParams()
-                        ? genericParams->getOuterParameters()
-                        : genericParams);
+    std::tie(parentEnv, newParentType) = checkExtensionGenericParams(
+        tc, ext, parentType, nominal->getGenericParams()
+                                 ? genericParams->getOuterParameters()
+                                 : genericParams);
   }
+  // Avoid having to remember null checks on parentEnv below.
+  GenericSignature *parentSig =
+      parentEnv ? parentEnv->getGenericSignature() : nullptr;
 
   // If we don't have generic parameters at this level, just build the result.
   if (!nominal->getGenericParams()) {
@@ -7505,7 +7502,7 @@ checkExtensionGenericParams(TypeChecker &tc, ExtensionDecl *ext,
     if (resultType->isEqual(type))
       resultType = type;
 
-    return std::make_tuple(parentSig, parentEnv, resultType);
+    return std::make_tuple(parentEnv, resultType);
   }
 
   // Local function used to infer requirements from the extended type.
@@ -7549,7 +7546,7 @@ checkExtensionGenericParams(TypeChecker &tc, ExtensionDecl *ext,
   tc.checkGenericParamList(&builder, genericParams, parentSig, parentEnv, nullptr);
   inferExtendedTypeReqs(builder);
 
-  auto *env = builder.getGenericEnvironment();
+  auto *env = builder.getGenericEnvironment(sig);
 
   tc.finalizeGenericParamList(genericParams, sig, env, ext);
 
@@ -7573,7 +7570,7 @@ checkExtensionGenericParams(TypeChecker &tc, ExtensionDecl *ext,
   if (resultType->isEqual(type))
     resultType = type;
 
-  return std::make_tuple(sig, env, resultType);
+  return std::make_tuple(env, resultType);
 }
 
 // FIXME: In TypeChecker.cpp; only needed because LLDB creates
@@ -7622,15 +7619,11 @@ void TypeChecker::validateExtension(ExtensionDecl *ext) {
     assert(genericParams && "bindExtensionDecl didn't set generic params?");
 
     // Check generic parameters.
-    GenericSignature *sig;
     GenericEnvironment *env;
-    std::tie(sig, env, extendedType) =
-        checkExtensionGenericParams(*this, ext,
-                                    ext->getExtendedType(),
-                                    ext->getGenericParams());
+    std::tie(env, extendedType) = checkExtensionGenericParams(
+        *this, ext, ext->getExtendedType(), ext->getGenericParams());
 
     ext->getExtendedTypeLoc().setType(extendedType);
-    ext->setGenericSignature(sig);
     ext->setGenericEnvironment(env);
     return;
   }
@@ -7656,14 +7649,11 @@ void TypeChecker::validateExtension(ExtensionDecl *ext) {
       return;
     }
 
-    GenericSignature *sig;
     GenericEnvironment *env;
-    std::tie(sig, env, extendedType) =
-        checkExtensionGenericParams(*this, ext, proto,
-                                    ext->getGenericParams());
+    std::tie(env, extendedType) =
+        checkExtensionGenericParams(*this, ext, proto, ext->getGenericParams());
 
     ext->getExtendedTypeLoc().setType(extendedType);
-    ext->setGenericSignature(sig);
     ext->setGenericEnvironment(env);
 
     // Speculatively ban extension of AnyObject; it won't be a
