@@ -33,6 +33,7 @@ class Module;
 class NamedDecl;
 class ObjCInterfaceDecl;
 class ObjCMethodDecl;
+class ObjCPropertyDecl;
 class ParmVarDecl;
 class QualType;
 class Sema;
@@ -120,12 +121,9 @@ bool isDesignatedInitializer(const clang::ObjCInterfaceDecl *classDecl,
 /// of the given class.
 bool isRequiredInitializer(const clang::ObjCMethodDecl *method);
 
-/// \brief Check if the declaration is one of the specially handled
-/// accessibility APIs.
-///
-/// These appear as both properties and methods in ObjC and should be
-/// imported as methods into Swift.
-bool isAccessibilityDecl(const clang::Decl *objCMethodOrProp);
+/// Determine whether this property should be imported as its getter and setter
+/// rather than as a Swift property.
+bool shouldImportPropertyAsAccessors(const clang::ObjCPropertyDecl *prop);
 
 /// Determine whether this method is an Objective-C "init" method
 /// that will be imported as a Swift initializer.
