@@ -114,11 +114,6 @@ extension MatchAnyOne : CustomStringConvertible {
 typealias any<T : Equatable, Index : Comparable> = MatchAnyOne<T,Index>
 
 /// A matcher for two other matchers in sequence.
-///
-/// - Note: matchers are deterministic and greedy, so if the first matcher
-///   matches but the second doesn't, there is no provision for backtracking and
-///   asking the first matcher to look for another match, as would be required
-///   for NFA-based regular-expression matching.
 struct ConsecutiveMatches<M0: Pattern, M1: Pattern> : Pattern
 where M0.Element == M1.Element, M0.Index == M1.Index {
   init(_ m0: M0, _ m1: M1) { self.matchers = (m0, m1) }
@@ -134,19 +129,26 @@ where M0.Element == M1.Element, M0.Index == M1.Index {
   , C.SubSequence : Collection, Element_<C.SubSequence> == Element
   , C.SubSequence.Index == Index, C.SubSequence.SubSequence == C.SubSequence
   {
-    switch matchers.0.matched(atStartOf: c) {
-    case .found(let end0, let data0):
-      switch matchers.1.matched(atStartOf: c[end0..<c.endIndex]) {
-      case .found(let end1, let data1):
-        return .found(end: end1, data: (midPoint: end0, data: (data0, data1)))
-      case .notFound(_):
-        // I don't think we can know anything interesting about where to begin
-        // searching again, because there's no communication between the two
-        // matchers that would allow it.
-        return .notFound(resumeAt: nil)
+    var src0 = c[c.startIndex..<c.endIndex]
+    while true {
+      switch matchers.0.matched(atStartOf: src0) {
+      case .found(let end0, let data0):
+        switch matchers.1.matched(atStartOf: c[end0..<c.endIndex]) {
+        case .found(let end1, let data1):
+          return .found(end: end1, data: (midPoint: end0, data: (data0, data1)))
+        case .notFound(_):
+          if src0.isEmpty {
+            // I don't think we can know anything interesting about where to
+            // begin searching again, because there's no communication between
+            // the two matchers that would allow it.
+            return .notFound(resumeAt: nil)
+          }
+          // backtrack
+          src0 = src0.dropLast()
+        }
+      case .notFound(let j):
+        return .notFound(resumeAt: j)
       }
-    case .notFound(let j):
-      return .notFound(resumeAt: j)
     }
   }
 }
@@ -263,11 +265,8 @@ extension OrMatches : CustomStringConvertible {
 
 
 infix operator .. : AdditionPrecedence
-//precedencegroup PatternPostfix {
-//  higherThan: AdditionPrecedence
-//}
-postfix operator * // : PatternPostfix
-postfix operator + // : PatternPostfix
+postfix operator *
+postfix operator +
 
 func .. <M0: Pattern, M1: Pattern>(m0: M0, m1: M1) -> ConsecutiveMatches<M0,M1>
 where M0.Element == M1.Element, M0.Index == M1.Index {
@@ -342,13 +341,10 @@ extension Pattern where Element == UTF8.CodeUnit {
     print()
   }
 }
-
 //===--- Just for testing -------------------------------------------------===//
-
 
 //===--- Tests ------------------------------------------------------------===//
 let source = Array("the quick brown fox jumps over the lazy dog".utf8)
-
 
 let source2 = Array("hack hack cough cough cough spork".utf8)
 
@@ -363,7 +359,9 @@ let source2 = Array("hack hack cough cough cough spork".utf8)
 
 // The final * steps around <rdar://29229409>
 let fancyPattern
-  = %"quick "..((%"brown" | %"black" | %"fox" | %"dog") .. %" ")+..any()*
+  = %"quick "..((%"brown" | %"black" | %"fox" | %"chicken") .. %" ")+ 
+   .. any()* .. %"do"
+
 fancyPattern.searchTest(in: source)
 
 //===--- Parsing pairs ----------------------------------------------------===//
