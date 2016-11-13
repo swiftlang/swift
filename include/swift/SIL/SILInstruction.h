@@ -1239,6 +1239,13 @@ public:
     return getSubstCalleeType()->getSILArgumentConvention(index);
   }
 
+  Optional<SILResultInfo> getSingleResult() const {
+    auto SubstCallee = getSubstCalleeType();
+    if (SubstCallee->getNumAllResults() != 1)
+      return None;
+    return SubstCallee->getSingleResult();
+  }
+
   Substitution getSelfSubstitution() const {
     assert(getNumArguments() && "Should only be called when Callee has "
            "at least a self parameter.");
