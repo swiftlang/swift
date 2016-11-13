@@ -6393,7 +6393,8 @@ public:
         AccessScope desiredAccessScope = AccessScope::getPublic();
         switch (access) {
         case Accessibility::Private:
-          assert(ED->getDeclContext()->isModuleScopeContext() &&
+          assert((ED->isInvalid() ||
+                  ED->getDeclContext()->isModuleScopeContext()) &&
                  "non-top-level extensions make 'private' != 'fileprivate'");
           SWIFT_FALLTHROUGH;
         case Accessibility::FilePrivate: {
