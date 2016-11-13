@@ -226,6 +226,7 @@ InlineCost swift::instructionInlineCost(SILInstruction &I) {
     case ValueKind::StringLiteralInst:
     case ValueKind::FixLifetimeInst:
     case ValueKind::EndBorrowInst:
+    case ValueKind::BeginBorrowInst:
     case ValueKind::MarkDependenceInst:
     case ValueKind::FunctionRefInst:
     case ValueKind::AllocGlobalInst:
@@ -366,6 +367,7 @@ InlineCost swift::instructionInlineCost(SILInstruction &I) {
     case ValueKind::RefToUnmanagedInst:
     case ValueKind::RefToUnownedInst:
     case ValueKind::StoreInst:
+    case ValueKind::StoreBorrowInst:
     case ValueKind::StoreUnownedInst:
     case ValueKind::StoreWeakInst:
     case ValueKind::StrongPinInst:

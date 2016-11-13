@@ -858,7 +858,13 @@ public:
   void visitInitBlockStorageHeaderInst(InitBlockStorageHeaderInst *i);
   
   void visitFixLifetimeInst(FixLifetimeInst *i);
+  void visitBeginBorrowInst(BeginBorrowInst *i) {
+    llvm_unreachable("unimplemented");
+  }
   void visitEndBorrowInst(EndBorrowInst *i) {
+    llvm_unreachable("unimplemented");
+  }
+  void visitStoreBorrowInst(StoreBorrowInst *i) {
     llvm_unreachable("unimplemented");
   }
   void visitMarkDependenceInst(MarkDependenceInst *i);

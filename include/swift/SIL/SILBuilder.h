@@ -488,6 +488,11 @@ public:
                       LoadBorrowInst(getSILDebugLocation(Loc), LV));
   }
 
+  BeginBorrowInst *createBeginBorrow(SILLocation Loc, SILValue LV) {
+    return insert(new (F.getModule())
+                      BeginBorrowInst(getSILDebugLocation(Loc), LV));
+  }
+
   StoreInst *createStore(SILLocation Loc, SILValue Src, SILValue DestAddr,
                          StoreOwnershipQualifier Qualifier) {
     assert((Qualifier != StoreOwnershipQualifier::Unqualified) ||
@@ -518,6 +523,12 @@ public:
   AssignInst *createAssign(SILLocation Loc, SILValue Src, SILValue DestAddr) {
     return insert(new (F.getModule())
                       AssignInst(getSILDebugLocation(Loc), Src, DestAddr));
+  }
+
+  StoreBorrowInst *createStoreBorrow(SILLocation Loc, SILValue Src,
+                                     SILValue DestAddr) {
+    return insert(new (F.getModule())
+                      StoreBorrowInst(getSILDebugLocation(Loc), Src, DestAddr));
   }
 
   MarkUninitializedInst *

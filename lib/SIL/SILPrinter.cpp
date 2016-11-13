@@ -1038,6 +1038,10 @@ public:
     *this << getIDAndType(LBI->getOperand());
   }
 
+  void visitBeginBorrowInst(BeginBorrowInst *LBI) {
+    *this << getIDAndType(LBI->getOperand());
+  }
+
   void printStoreOwnershipQualifier(StoreOwnershipQualifier Qualifier) {
     switch (Qualifier) {
     case StoreOwnershipQualifier::Unqualified:
@@ -1057,6 +1061,11 @@ public:
   void visitStoreInst(StoreInst *SI) {
     *this << getID(SI->getSrc()) << " to ";
     printStoreOwnershipQualifier(SI->getOwnershipQualifier());
+    *this << getIDAndType(SI->getDest());
+  }
+
+  void visitStoreBorrowInst(StoreBorrowInst *SI) {
+    *this << getID(SI->getSrc()) << " to ";
     *this << getIDAndType(SI->getDest());
   }
 
