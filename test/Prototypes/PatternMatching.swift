@@ -293,26 +293,34 @@ where M0.Element == M1.Element, M0.Index == M1.Index {
 }
 
 //===--- Just for testing -------------------------------------------------===//
-extension StaticString : Pattern {
+struct MatchStaticString : Pattern {
   typealias Element = UTF8.CodeUnit
   typealias Buffer = UnsafeBufferPointer<Element>
   typealias Index = Buffer.Index
+
+  let content: StaticString
+  init(_ x: StaticString) { content = x }
   
   func matched<C: Collection>(atStartOf c: C) -> MatchResult<Index, ()>
   where C.Index == Index, Element_<C> == Element
   // The following requirements go away with upcoming generics features
   , C.SubSequence : Collection, Element_<C.SubSequence> == Element
   , C.SubSequence.Index == Index, C.SubSequence.SubSequence == C.SubSequence {
-    return withUTF8Buffer {
+    return content.withUTF8Buffer {
       LiteralMatch<Buffer, Index>($0).matched(atStartOf: c)
     }
   }
+}
+extension MatchStaticString : CustomStringConvertible {
+  var description: String { return String(describing: content) }
 }
 
 // A way to force string literals to be interpreted as StaticString
 prefix operator %
 extension StaticString {  
-  static prefix func %(x: StaticString) -> StaticString { return x }
+  static prefix func %(x: StaticString) -> MatchStaticString {
+    return MatchStaticString(x)
+  }
 }
 
 extension Collection where Iterator.Element == UTF8.CodeUnit {
