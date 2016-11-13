@@ -446,9 +446,7 @@ self.test("\(testNamePrefix)._withUnsafeMutableBufferPointerIfSupported()/semant
   for test in subscriptRangeTests {
     var c = makeWrappedCollection(test.collection)
     var result = c._withUnsafeMutableBufferPointerIfSupported {
-      (baseAddress, count) -> OpaqueValue<Array<OpaqueValue<Int>>> in
-      let bufferPointer =
-        UnsafeMutableBufferPointer(start: baseAddress, count: count)
+      (bufferPointer) -> OpaqueValue<Array<OpaqueValue<Int>>> in
       return OpaqueValue(Array(bufferPointer.map(extractValue)))
     }
     expectType(Optional<OpaqueValue<Array<OpaqueValue<Int>>>>.self, &result)
