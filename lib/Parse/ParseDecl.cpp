@@ -5612,6 +5612,13 @@ ParserResult<PrecedenceGroupDecl>
 Parser::parseDeclPrecedenceGroup(ParseDeclOptions flags,
                                  DeclAttributes &attributes) {
   SourceLoc precedenceGroupLoc = consumeToken(tok::kw_precedencegroup);
+  DebuggerContextChange DCC (*this);
+
+  if (!CodeCompletion && !DCC.movedToTopLevel() && !(flags & PD_AllowTopLevel))
+  {
+    diagnose(precedenceGroupLoc, diag::decl_inner_scope);
+    return nullptr;
+  }
 
   Identifier name;
   SourceLoc nameLoc;
