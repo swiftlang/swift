@@ -216,31 +216,30 @@ extension RepeatMatch : CustomStringConvertible {
   }
 }
 
-
-enum Or<A, B> {
+enum OneOf<A, B> {
   case a(A)
   case b(B)
 }
 
-extension Or : CustomStringConvertible {
+extension OneOf : CustomStringConvertible {
   var description: String {
     switch self {
     case .a(let x):
-      return A.self == Void.self ? ".a" : ".a:\(x)"
+      return "\(x)"
     case .b(let x):
-      return B.self == Void.self ? ".b" : ".b:\(x)"
+      return "\(x)"
     }
   }
 }
 
-struct OrMatches<M0: Pattern, M1: Pattern> : Pattern
+struct MatchOneOf<M0: Pattern, M1: Pattern> : Pattern
 where M0.Element == M1.Element, M0.Index == M1.Index {
   init(_ m0: M0, _ m1: M1) { self.matchers = (m0, m1) }
   fileprivate let matchers: (M0, M1)
   
   typealias Element = M0.Element
   typealias Index = M0.Index
-  typealias MatchData = Or<M0.MatchData,M1.MatchData>
+  typealias MatchData = OneOf<M0.MatchData,M1.MatchData>
 
   func matched<C: Collection>(atStartOf c: C) -> MatchResult<Index, MatchData>
   where C.Index == Index, Element_<C> == Element
@@ -265,7 +264,7 @@ where M0.Element == M1.Element, M0.Index == M1.Index {
   }
 }
 
-extension OrMatches : CustomStringConvertible {
+extension MatchOneOf : CustomStringConvertible {
   var description: String { return "\(matchers.0)|\(matchers.1)" }
 }
 
@@ -287,9 +286,9 @@ postfix func + <M: Pattern>(m: M) -> RepeatMatch<M> {
   return RepeatMatch(singlePattern: m, repeatLimits: 1...Int.max)
 }
 
-func | <M0: Pattern, M1: Pattern>(m0: M0, m1: M1) -> OrMatches<M0,M1>
+func | <M0: Pattern, M1: Pattern>(m0: M0, m1: M1) -> MatchOneOf<M0,M1>
 where M0.Element == M1.Element, M0.Index == M1.Index {
-  return OrMatches(m0, m1)
+  return MatchOneOf(m0, m1)
 }
 
 //===--- Just for testing -------------------------------------------------===//
