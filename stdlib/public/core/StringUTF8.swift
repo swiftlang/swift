@@ -254,7 +254,7 @@ extension String {
 
       /// A Buffer value with the high byte set
       internal static var _bufferHiByte: Buffer {
-        return 0xFF << numericCast((MemoryLayout<Buffer>.size &- 1) &* 8)
+        return 0xFF &<< numericCast((MemoryLayout<Buffer>.size &- 1) &* 8)
       }
       
       /// Consume a byte of the given buffer: shift out the low byte
@@ -312,7 +312,7 @@ extension String {
       
       // Map the high nibble of the current code unit into the
       // amount by which to increment the UTF-16 index.
-      let increment = (u16Increments >> numericCast(hiNibble << 1)) & 0x3
+      let increment = (u16Increments &>> numericCast(hiNibble << 1)) & 0x3
       let nextCoreIndex = i._coreIndex &+ increment
       let nextBuffer = Index._nextBuffer(after: i._buffer)
 

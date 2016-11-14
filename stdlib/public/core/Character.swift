@@ -178,7 +178,7 @@ public struct Character :
     // overflow when multiplied by 8.
     let bits = MemoryLayout.size(ofValue: initialUTF8) &* 8 &- 1
     if _fastPath(
-      count == s._core.count && (initialUTF8 & (1 << numericCast(bits))) != 0) {
+      count == s._core.count && (initialUTF8 & (1 &<< numericCast(bits))) != 0) {
       _representation = .small(Builtin.trunc_Int64_Int63(initialUTF8._value))
     }
     else {

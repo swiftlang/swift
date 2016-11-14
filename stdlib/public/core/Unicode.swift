@@ -649,7 +649,7 @@ public struct UTF32 : UnicodeCodec {
   ) -> UnicodeDecodingResult where I.Element == CodeUnit {
     guard let x = input.next() else { return .emptyInput }
     // Check code unit is valid: not surrogate-reserved and within range.
-    guard _fastPath((x >> 11) != 0b1101_1 && x <= 0x10ffff)
+    guard _fastPath((x &>> 11) != 0b1101_1 && x <= 0x10ffff)
       else { return .error }
     // x is a valid scalar.
     return .scalarValue(UnicodeScalar(_unchecked: x))
@@ -794,7 +794,7 @@ internal func _transcodeSomeUTF16AsUTF8<Input>(
           r = 0b10__00_0000__10__00_0000__1110__0000
           r |= u &>> 12
           r |= ((u &>> 6) & 0b11_1111) &<< 8
-          r |= (u        & 0b11_1111) &<< 16
+          r |= (u         & 0b11_1111) &<< 16
           scalarUtf8Length = 3
         }
       } else {
@@ -819,8 +819,8 @@ internal func _transcodeSomeUTF16AsUTF8<Input>(
             r = 0b10__00_0000__10__00_0000__10__00_0000__1111_0__000
             r |= v &>> 18
             r |= ((v &>> 12) & 0b11_1111) &<< 8
-            r |= ((v &>> 6) & 0b11_1111) &<< 16
-            r |= (v        & 0b11_1111) &<< 24
+            r |= ((v &>> 6)  & 0b11_1111) &<< 16
+            r |= (v          & 0b11_1111) &<< 24
             scalarUtf8Length = 4
             utf16Length = 2
           } else {
