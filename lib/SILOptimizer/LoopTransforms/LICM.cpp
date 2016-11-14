@@ -348,7 +348,7 @@ static bool sinkFixLifetime(SILLoop *Loop, DominanceInfo *DomTree,
   // Sink the fix_lifetime instruction.
   bool Changed = false;
   for (auto *FLI : FixLifetimeInsts)
-    if (DomTree->dominates(FLI->getOperand()->getParentBB(),
+    if (DomTree->dominates(FLI->getOperand()->getParentBlock(),
                            Preheader)) {
       auto Succs = ExitingBB->getSuccessors();
       for (unsigned EdgeIdx = 0; EdgeIdx <  Succs.size(); ++EdgeIdx) {

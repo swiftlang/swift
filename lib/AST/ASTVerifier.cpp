@@ -15,6 +15,7 @@
 //===----------------------------------------------------------------------===//
 
 #include "swift/Subsystems.h"
+#include "swift/AST/AccessScope.h"
 #include "swift/AST/ArchetypeBuilder.h"
 #include "swift/AST/AST.h"
 #include "swift/AST/ASTContext.h"
@@ -639,7 +640,7 @@ struct ASTNodeBase {};
 
       if (D->hasAccessibility()) {
         PrettyStackTraceDecl debugStack("verifying access", D);
-        if (D->getFormalAccessScope() == nullptr &&
+        if (D->getFormalAccessScope().isPublic() &&
             D->getFormalAccess() < Accessibility::Public) {
           Out << "non-public decl has no formal access scope\n";
           D->dump(Out);

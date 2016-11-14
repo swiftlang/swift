@@ -2087,13 +2087,11 @@ GenericSignature *ArchetypeBuilder::getGenericSignature() {
   return sig;
 }
 
-GenericEnvironment *ArchetypeBuilder::getGenericEnvironment() {
-  SmallVector<GenericTypeParamType *, 4> genericParamTypes;
+GenericEnvironment *ArchetypeBuilder::getGenericEnvironment(GenericSignature *signature) {
   TypeSubstitutionMap interfaceToArchetypeMap;
 
   for (auto pair : Impl->PotentialArchetypes) {
     auto paramTy = pair.second->getGenericParam();
-    genericParamTypes.push_back(paramTy);
 
     auto archetypeTy = pair.second->getType(*this).getAsArchetype();
     auto concreteTy = pair.second->getType(*this).getAsConcreteType();
@@ -2105,7 +2103,8 @@ GenericEnvironment *ArchetypeBuilder::getGenericEnvironment() {
       llvm_unreachable("broken generic parameter");
   }
 
-  return GenericEnvironment::get(Context, genericParamTypes,
+
+  return GenericEnvironment::get(Context, signature,
                                  interfaceToArchetypeMap);
 }
 

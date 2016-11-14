@@ -1160,7 +1160,7 @@ bool swift::tryDeleteDeadClosure(SILInstruction *Closure,
 void ValueLifetimeAnalysis::propagateLiveness() {
   assert(LiveBlocks.empty() && "frontier computed twice");
 
-  auto DefBB = DefValue->getParentBB();
+  auto DefBB = DefValue->getParentBlock();
   llvm::SmallVector<SILBasicBlock *, 64> Worklist;
 
   // Find the initial set of blocks where the value is live, because
@@ -2759,7 +2759,7 @@ void swift::hoistAddressProjections(Operand &Op, SILInstruction *InsertBefore,
         continue;
       }
       default:
-        assert(DomTree->dominates(V->getParentBB(), InsertBefore->getParent()) &&
+        assert(DomTree->dominates(V->getParentBlock(), InsertBefore->getParent()) &&
                "The projected value must dominate the insertion point");
         return;
     }

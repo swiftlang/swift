@@ -65,6 +65,7 @@ static SILValue getIncomingValueForPred(const SILBasicBlock *BB,
   case TermKind::UnreachableInst:
   case TermKind::ReturnInst:
   case TermKind::ThrowInst:
+    llvm_unreachable("Have terminator that implies no successors?!");
   case TermKind::TryApplyInst:
   case TermKind::SwitchValueInst:
   case TermKind::SwitchEnumAddrInst:

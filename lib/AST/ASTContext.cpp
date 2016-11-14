@@ -3583,9 +3583,9 @@ GenericSignature *GenericSignature::get(ArrayRef<GenericTypeParamType *> params,
 
 GenericEnvironment *
 GenericEnvironment::get(ASTContext &ctx,
-                        ArrayRef<GenericTypeParamType *> genericParamTypes,
+                        GenericSignature *signature,
                         TypeSubstitutionMap interfaceToArchetypeMap) {
-  return new (ctx) GenericEnvironment(genericParamTypes,
+  return new (ctx) GenericEnvironment(signature,
                                       interfaceToArchetypeMap);
 }
 

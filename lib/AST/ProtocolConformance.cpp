@@ -31,16 +31,14 @@
 using namespace swift;
 
 Witness::Witness(ValueDecl *decl, ArrayRef<Substitution> substitutions,
-                 GenericSignature *syntheticSig,
                  GenericEnvironment *syntheticEnv,
                  SubstitutionMap reqToSynthesizedEnvMap) {
   auto &ctx = decl->getASTContext();
 
   auto declRef = ConcreteDeclRef(ctx, decl, substitutions);
   auto storedMem = ctx.Allocate(sizeof(StoredWitness), alignof(StoredWitness));
-  auto stored =
-    new (storedMem) StoredWitness{declRef, syntheticSig, syntheticEnv,
-                                  std::move(reqToSynthesizedEnvMap)};
+  auto stored = new (storedMem)
+      StoredWitness{declRef, syntheticEnv, std::move(reqToSynthesizedEnvMap)};
   ctx.addDestructorCleanup(*stored);
 
   storage = stored;
@@ -379,10 +377,9 @@ SpecializedProtocolConformance::getTypeWitnessSubstAndDecl(
   auto conformingModule = conformingDC->getParentModule();
 
   auto *genericEnv = GenericConformance->getGenericEnvironment();
-  auto *genericSig = GenericConformance->getGenericSignature();
 
-  auto substitutionMap = genericEnv->getSubstitutionMap(
-      conformingModule, genericSig, GenericSubstitutions);
+  auto substitutionMap =
+      genericEnv->getSubstitutionMap(conformingModule, GenericSubstitutions);
 
   auto genericWitnessAndDecl
     = GenericConformance->getTypeWitnessSubstAndDecl(assocType, resolver);
@@ -534,10 +531,9 @@ ProtocolConformance::getInheritedConformance(ProtocolDecl *protocol) const {
     auto *conformingDC = spec->getDeclContext();
     auto *conformingModule = conformingDC->getParentModule();
 
-    auto *sig = conformingDC->getGenericSignatureOfContext();
     auto *env = conformingDC->getGenericEnvironmentOfContext();
 
-    auto subMap = env->getSubstitutionMap(conformingModule, sig, subs);
+    auto subMap = env->getSubstitutionMap(conformingModule, subs);
 
     auto r = inherited->subst(conformingModule, getType(), subMap);
     assert(getType()->isEqual(r->getType())

@@ -199,7 +199,7 @@ getBuiltinGenericFunction(Identifier Id,
   GenericSignature *Sig =
     GenericSignature::get(GenericParamTypes, { });
   GenericEnvironment *Env =
-      GenericEnvironment::get(Context, GenericParamTypes,
+      GenericEnvironment::get(Context, Sig,
                               InterfaceToArchetypeMap);
 
   Type InterfaceType = GenericFunctionType::get(Sig, ArgParamType, ResType,
@@ -236,7 +236,6 @@ getBuiltinGenericFunction(Identifier Id,
                                TypeLoc::withoutLoc(ResBodyType), DC);
     
   func->setInterfaceType(InterfaceType);
-  func->setGenericSignature(Sig);
   func->setGenericEnvironment(Env);
   func->setImplicit();
   func->setAccessibility(Accessibility::Public);

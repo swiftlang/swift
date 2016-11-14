@@ -1582,9 +1582,7 @@ SILGenModule::getNonMemberVarDeclSubstitutions(VarDecl *var) {
   ArrayRef<Substitution> substitutions;
   auto *dc = var->getDeclContext();
   if (auto *genericEnv = dc->getGenericEnvironmentOfContext()) {
-    auto *genericSig = dc->getGenericSignatureOfContext();
-    substitutions = genericEnv->getForwardingSubstitutions(
-        SwiftModule, genericSig);
+    substitutions = genericEnv->getForwardingSubstitutions(SwiftModule);
   }
   return substitutions;
 }

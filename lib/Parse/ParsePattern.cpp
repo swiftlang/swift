@@ -282,7 +282,7 @@ Parser::parseParameterClause(SourceLoc &leftParenLoc,
                                                  fnTR->getThrowsLoc(),
                                                  fnTR->getArrowLoc(),
                                                  fnTR->getResultTypeRepr());
-              newTR->setGenericSignature(fnTR->getGenericSignature());
+              newTR->setGenericEnvironment(fnTR->getGenericEnvironment());
               param.Type = newTR;
               param.SpecifierKind = ParsedParameter::Let;
               param.LetVarInOutLoc = SourceLoc();

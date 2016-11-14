@@ -689,7 +689,7 @@ static bool isRangeChecked(SILValue Start, SILValue End,
 }
 
 static bool dominates(DominanceInfo *DT, SILValue V, SILBasicBlock *B) {
-  if (auto ValueBB = V->getParentBB())
+  if (auto ValueBB = V->getParentBlock())
     return DT->dominates(ValueBB, B);
   return false;
 }

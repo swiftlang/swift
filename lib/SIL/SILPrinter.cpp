@@ -1683,7 +1683,7 @@ ID SILPrinter::getID(SILValue V) {
 
   // Lazily initialize the instruction -> ID mapping.
   if (ValueToIDMap.empty()) {
-    V->getParentBB()->getParent()->numberValues(ValueToIDMap);
+    V->getParentBlock()->getParent()->numberValues(ValueToIDMap);
   }
 
   ID R = { ID::SSAValue, ValueToIDMap[V] };

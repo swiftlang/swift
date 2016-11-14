@@ -147,7 +147,6 @@ FuncDecl *DerivedConformance::declareDerivedPropertyGetter(TypeChecker &tc,
                                          propertyInterfaceType);
   Type selfInterfaceType = getterDecl->computeInterfaceSelfType(false);
   if (auto sig = parentDC->getGenericSignatureOfContext()) {
-    getterDecl->setGenericSignature(sig);
     getterDecl->setGenericEnvironment(
         parentDC->getGenericEnvironmentOfContext());
     interfaceType = GenericFunctionType::get(sig, selfInterfaceType,

@@ -18,6 +18,7 @@
 #define TYPECHECKING_H
 
 #include "swift/Sema/TypeCheckRequest.h"
+#include "swift/AST/AccessScope.h"
 #include "swift/AST/AST.h"
 #include "swift/AST/AnyFunctionRef.h"
 #include "swift/AST/Availability.h"
@@ -490,7 +491,7 @@ public:
   /// during type checking.
   llvm::SetVector<NominalTypeDecl *> ValidatedTypes;
 
-  using TypeAccessScopeCacheMap = llvm::DenseMap<Type, const DeclContext *>;
+  using TypeAccessScopeCacheMap = llvm::DenseMap<Type, AccessScope>;
 
   /// Caches the outermost scope where a particular type can be used, relative
   /// to a particular file.
@@ -743,9 +744,8 @@ public:
   void checkUnsupportedProtocolType(Stmt *stmt);
 
   /// Expose TypeChecker's handling of GenericParamList to SIL parsing.
-  std::pair<GenericSignature *, GenericEnvironment *>
-  handleSILGenericParams(GenericParamList *genericParams,
-                         DeclContext *DC);
+  GenericEnvironment *handleSILGenericParams(GenericParamList *genericParams,
+                                             DeclContext *DC);
 
   /// \brief Resolves a TypeRepr to a type.
   ///
@@ -1011,12 +1011,13 @@ public:
                                  ExtensionDecl *protocolExtension) override;
 
   /// Configure the interface type of a function declaration.
-  void configureInterfaceType(AbstractFunctionDecl *func);
+  void configureInterfaceType(AbstractFunctionDecl *func,
+                              GenericSignature *sig);
 
   /// Validate the signature of a generic function.
   ///
   /// \param func The generic function.
-  void validateGenericFuncSignature(AbstractFunctionDecl *func);
+  GenericSignature *validateGenericFuncSignature(AbstractFunctionDecl *func);
 
   /// Revert the signature of a generic function to its pre-type-checked state,
   /// so that it can be type checked again when we have resolved its generic

@@ -257,7 +257,7 @@ static bool canHoistArrayArgument(ApplyInst *SemanticsCall, SILValue Arr,
     return false;
 
   ValueBase *SelfVal = Arr;
-  auto *SelfBB = SelfVal->getParentBB();
+  auto *SelfBB = SelfVal->getParentBlock();
   if (DT->dominates(SelfBB, InsertBefore->getParent()))
     return true;
 
@@ -267,7 +267,7 @@ static bool canHoistArrayArgument(ApplyInst *SemanticsCall, SILValue Arr,
     auto Val = LI->getOperand();
     bool DoesNotDominate;
     StructElementAddrInst *SEI;
-    while ((DoesNotDominate = !DT->dominates(Val->getParentBB(),
+    while ((DoesNotDominate = !DT->dominates(Val->getParentBlock(),
                                              InsertBefore->getParent())) &&
            (SEI = dyn_cast<StructElementAddrInst>(Val)))
       Val = SEI->getOperand();
@@ -325,7 +325,7 @@ bool swift::ArraySemanticsCall::canHoist(SILInstruction *InsertBefore,
 static SILValue copyArrayLoad(SILValue ArrayStructValue,
                                SILInstruction *InsertBefore,
                                DominanceInfo *DT) {
-  if (DT->dominates(ArrayStructValue->getParentBB(),
+  if (DT->dominates(ArrayStructValue->getParentBlock(),
                     InsertBefore->getParent()))
     return ArrayStructValue;
 
@@ -334,7 +334,7 @@ static SILValue copyArrayLoad(SILValue ArrayStructValue,
   // Recursively move struct_element_addr.
   ValueBase *Val = LI->getOperand();
   auto *InsertPt = InsertBefore;
-  while (!DT->dominates(Val->getParentBB(), InsertBefore->getParent())) {
+  while (!DT->dominates(Val->getParentBlock(), InsertBefore->getParent())) {
     auto *Inst = cast<StructElementAddrInst>(Val);
     Inst->moveBefore(InsertPt);
     Val = Inst->getOperand();

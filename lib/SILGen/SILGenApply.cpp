@@ -2272,6 +2272,52 @@ static bool hasUnownedInnerPointerResult(CanSILFunctionType fnType) {
   return false;
 }
 
+static ResultPlanPtr
+computeResultPlan(SILGenFunction *SGF, CanSILFunctionType substFnType,
+                  AbstractionPattern origResultType, CanType substResultType,
+                  const Optional<ForeignErrorConvention> &foreignError,
+                  SILFunctionTypeRepresentation rep, SILLocation loc,
+                  SGFContext evalContext,
+                  SmallVectorImpl<SILValue> &indirectResultAddrs) {
+  auto origResultTypeForPlan = origResultType;
+  auto substResultTypeForPlan = substResultType;
+  ArrayRef<SILResultInfo> allResults = substFnType->getAllResults();
+  SILResultInfo optResult;
+
+  // The plan needs to be built using the formal result type
+  // after foreign-error adjustment.
+  if (foreignError) {
+    switch (foreignError->getKind()) {
+    // These conventions make the formal result type ().
+    case ForeignErrorConvention::ZeroResult:
+    case ForeignErrorConvention::NonZeroResult:
+      assert(substResultType->isVoid());
+      allResults = {};
+      break;
+
+    // These conventions leave the formal result alone.
+    case ForeignErrorConvention::ZeroPreservedResult:
+    case ForeignErrorConvention::NonNilError:
+      break;
+
+    // This convention changes the formal result to the optional object
+    // type; we need to make our own make SILResultInfo array.
+    case ForeignErrorConvention::NilResult: {
+      assert(allResults.size() == 1);
+      SILType objectType =
+          allResults[0].getSILType().getAnyOptionalObjectType();
+      optResult = allResults[0].getWithType(objectType.getSwiftRValueType());
+      allResults = optResult;
+      break;
+    }
+    }
+  }
+
+  ResultPlanBuilder builder(*SGF, loc, allResults, rep, indirectResultAddrs);
+  return builder.build(evalContext.getEmitInto(), origResultTypeForPlan,
+                       substResultTypeForPlan);
+}
+
 /// Emit a function application, assuming that the arguments have been
 /// lowered appropriately for the abstraction level but that the
 /// result does need to be turned back into something matching a
@@ -2292,45 +2338,9 @@ RValue SILGenFunction::emitApply(
 
   // Create the result plan.
   SmallVector<SILValue, 4> indirectResultAddrs;
-  ResultPlanPtr resultPlan = [&]() -> ResultPlanPtr {
-    auto origResultTypeForPlan = origResultType;
-    auto substResultTypeForPlan = substResultType;
-    ArrayRef<SILResultInfo> allResults = substFnType->getAllResults();
-    SILResultInfo optResult;
-
-    // The plan needs to be built using the formal result type
-    // after foreign-error adjustment.
-    if (foreignError) {
-      switch (foreignError->getKind()) {
-      // These conventions make the formal result type ().
-      case ForeignErrorConvention::ZeroResult:
-      case ForeignErrorConvention::NonZeroResult:
-        assert(substResultType->isVoid());
-        allResults = {};
-        break;
-
-      // These conventions leave the formal result alone.
-      case ForeignErrorConvention::ZeroPreservedResult:
-      case ForeignErrorConvention::NonNilError:
-        break;
-
-      // This convention changes the formal result to the optional object
-      // type; we need to make our own make SILResultInfo array.
-      case ForeignErrorConvention::NilResult: {
-        assert(allResults.size() == 1);
-        SILType objectType =
-          allResults[0].getSILType().getAnyOptionalObjectType();
-        optResult = allResults[0].getWithType(objectType.getSwiftRValueType());
-        allResults = optResult;
-        break;
-      }
-      }
-    }
-
-    ResultPlanBuilder builder(*this, loc, allResults, rep, indirectResultAddrs);
-    return builder.build(evalContext.getEmitInto(),
-                         origResultTypeForPlan, substResultTypeForPlan);
-  }();
+  ResultPlanPtr resultPlan = computeResultPlan(
+      this, substFnType, origResultType, substResultType, foreignError, rep,
+      loc, evalContext, indirectResultAddrs);
 
   // If the function returns an inner pointer, we'll need to lifetime-extend
   // the 'self' parameter.

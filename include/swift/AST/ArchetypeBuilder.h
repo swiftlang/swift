@@ -258,7 +258,7 @@ public:
   GenericSignature *getGenericSignature();
 
   /// \brief Build the generic environment.
-  GenericEnvironment *getGenericEnvironment();
+  GenericEnvironment *getGenericEnvironment(GenericSignature *signature);
 
   /// Infer requirements from the given type, recursively.
   ///

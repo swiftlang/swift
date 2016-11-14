@@ -1421,9 +1421,9 @@ Type ClangImporter::Implementation::importPropertyType(
       clang::ObjCPropertyDecl::OBJC_PR_unsafe_unretained;
 
   ImportTypeKind importKind;
-  // HACK: Accessibility decls are always imported using bridged types,
-  // because they're inconsistent between properties and methods.
-  if (isAccessibilityDecl(decl)) {
+  // HACK: Certain decls are always imported using bridged types,
+  // because that's what a standalone method would do.
+  if (shouldImportPropertyAsAccessors(decl)) {
     importKind = ImportTypeKind::Property;
   } else {
     switch (decl->getSetterKind()) {
