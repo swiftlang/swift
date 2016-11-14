@@ -225,18 +225,18 @@ extension String {
 
       let index = _internalIndex(at: i._offset)
       let u = _core[index]
-      if _fastPath((u >> 11) != 0b1101_1) {
+      if _fastPath((u &>> 11) != 0b1101_1) {
         // Neither high-surrogate, nor low-surrogate -- well-formed sequence
         // of 1 code unit.
         return u
       }
 
-      if (u >> 10) == 0b1101_10 {
+      if (u &>> 10) == 0b1101_10 {
         // `u` is a high-surrogate.  Sequence is well-formed if it
         // is followed by a low-surrogate.
         if _fastPath(
                index + 1 < _core.count &&
-               (_core[index + 1] >> 10) == 0b1101_11) {
+               (_core[index + 1] &>> 10) == 0b1101_11) {
           return u
         }
         return 0xfffd
@@ -244,7 +244,7 @@ extension String {
 
       // `u` is a low-surrogate.  Sequence is well-formed if
       // previous code unit is a high-surrogate.
-      if _fastPath(index != 0 && (_core[index - 1] >> 10) == 0b1101_10) {
+      if _fastPath(index != 0 && (_core[index - 1] &>> 10) == 0b1101_10) {
         return u
       }
       return 0xfffd

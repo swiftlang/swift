@@ -223,7 +223,7 @@ public struct UTF8 : UnicodeCodec {
       // ASCII in buffer.  We don't refill the buffer so we can return
       // to bufferless mode once we've exhausted it.
       let codeUnit = _decodeBuffer & 0xff
-      _decodeBuffer >>= 8
+      _decodeBuffer &>>= 8
       _bitsInBuffer = _bitsInBuffer &- 8
       return .scalarValue(UnicodeScalar(_unchecked: codeUnit))
     }
@@ -234,7 +234,7 @@ public struct UTF8 : UnicodeCodec {
       if let codeUnit = input.next() {
         // We know _bitsInBuffer < 32 so we use `& 0x1f` (31) to make the
         // compiler omit a bounds check branch for the bitshift.
-        _decodeBuffer |= (UInt32(codeUnit) << UInt32(_bitsInBuffer & 0x1f))
+        _decodeBuffer |= (UInt32(codeUnit) &<< UInt32(_bitsInBuffer & 0x1f))
         _bitsInBuffer = _bitsInBuffer &+ 8
       } else {
         if _bitsInBuffer == 0 { return .emptyInput }
@@ -253,7 +253,7 @@ public struct UTF8 : UnicodeCodec {
     // _decodeBuffer >>= UInt32(bitsConsumed) // >>= 32 crashes.
     // Mask with 0x3f (63) to let the compiler omit the '>= 64' bounds check.
     _decodeBuffer = UInt32(truncatingBitPattern:
-      UInt64(_decodeBuffer) >> (UInt64(bitsConsumed) & 0x3f))
+      UInt64(_decodeBuffer) &>> (UInt64(bitsConsumed) & 0x3f))
     _bitsInBuffer = _bitsInBuffer &- bitsConsumed
 
     guard _fastPath(result != nil) else { return .error }
@@ -300,8 +300,8 @@ public struct UTF8 : UnicodeCodec {
     let lut1: UInt32 = 0b1100_0000__1111_1111__1111_1111__1111_1111
 
     let index: UInt32 = (buffer &>> (3 as UInt32)) & 0x1f
-    let bit0 = (lut0 >> index) & 1
-    let bit1 = (lut1 >> index) & 1
+    let bit0 = (lut0 &>> index) & 1
+    let bit1 = (lut1 &>> index) & 1
 
     switch (bit1, bit0) {
     case (0, 0): // 2-byte sequence, buffer: [ … … CU1 CU0 ].
@@ -310,8 +310,8 @@ public struct UTF8 : UnicodeCodec {
       // Disallow xxxx xxxx  xxx0 000x (<= 7 bits case).
       if _slowPath(buffer & 0x001e == 0x0000) { return (nil, 1) }
       // Extract data bits.
-      let value = (buffer & 0x3f00) >> (8 as UInt32)
-                | (buffer & 0x001f) << (6 as UInt32)
+      let value = (buffer & 0x3f00) &>> (8 as UInt32)
+                | (buffer & 0x001f) &<< (6 as UInt32)
       return (value, 2)
 
     case (0, 1): // 3-byte sequence, buffer: [ … CU2 CU1 CU0 ].
@@ -325,9 +325,9 @@ public struct UTF8 : UnicodeCodec {
         return (nil, 2) // All checks on CU0 & CU1 passed.
       }
       // Extract data bits.
-      let value = (buffer & 0x3f0000) >> (16 as UInt32)
-                | (buffer & 0x003f00) >> (2 as UInt32)
-                | (buffer & 0x00000f) << (12 as UInt32)
+      let value = (buffer & 0x3f0000) &>> (16 as UInt32)
+                | (buffer & 0x003f00) &>> (2 as UInt32)
+                | (buffer & 0x00000f) &<< (12 as UInt32)
       return (value, 3)
 
     case (1, 0): // 4-byte sequence, buffer: [ CU3 CU2 CU1 CU0 ].
@@ -347,10 +347,10 @@ public struct UTF8 : UnicodeCodec {
       }
       // Extract data bits.
       // FIXME(integers): remove extra type hints
-      let value = (buffer & 0x3f000000) >> (24 as UInt32)
-                | (buffer & 0x003f0000) >> (10 as UInt32)
-                | (buffer & 0x00003f00) << (4 as UInt32)
-                | (buffer & 0x00000007) << (18 as UInt32)
+      let value = (buffer & 0x3f000000) &>> (24 as UInt32)
+                | (buffer & 0x003f0000) &>> (10 as UInt32)
+                | (buffer & 0x00003f00) &<< (4 as UInt32)
+                | (buffer & 0x00000007) &<< (18 as UInt32)
       return (value, 4)
 
     default: // Invalid sequence (CU0 invalid).
@@ -381,22 +381,22 @@ public struct UTF8 : UnicodeCodec {
     var c = UInt32(input)
     var buf3 = UInt8(c & 0xFF)
 
-    if c >= UInt32(1<<7) {
-      c >>= 6
+    if c >= UInt32(1 &<< 7) {
+      c &>>= 6
       buf3 = (buf3 & 0x3F) | 0x80 // 10xxxxxx
       var buf2 = UInt8(c & 0xFF)
-      if c < UInt32(1<<5) {
+      if c < UInt32(1 &<< 5) {
         buf2 |= 0xC0              // 110xxxxx
       }
       else {
-        c >>= 6
+        c &>>= 6
         buf2 = (buf2 & 0x3F) | 0x80 // 10xxxxxx
         var buf1 = UInt8(c & 0xFF)
-        if c < UInt32(1<<4) {
+        if c < UInt32(1 &<< 4) {
           buf1 |= 0xE0              // 1110xxxx
         }
         else {
-          c >>= 6
+          c &>>= 6
           buf1 = (buf1 & 0x3F) | 0x80 // 10xxxxxx
           processCodeUnit(UInt8(c | 0xF0)) // 11110xxx
         }
@@ -513,25 +513,25 @@ public struct UTF16 : UnicodeCodec {
     // [1101 10xx xxxx xxxx] [1101 11xx xxxx xxxx]
 
     // Common case first, non-surrogate -- just a sequence of 1 code unit.
-    if _fastPath((unit0 >> 11) != 0b1101_1) {
+    if _fastPath((unit0 &>> 11) != 0b1101_1) {
       return .scalarValue(UnicodeScalar(_unchecked: UInt32(unit0)))
     }
 
     // Ensure `unit0` is a high-surrogate.
-    guard _fastPath((unit0 >> 10) == 0b1101_10) else { return .error }
+    guard _fastPath((unit0 &>> 10) == 0b1101_10) else { return .error }
 
     // We already have a high-surrogate, so there should be a next code unit.
     guard let unit1 = input.next() else { return .error }
 
     // `unit0` is a high-surrogate, so `unit1` should be a low-surrogate.
-    guard _fastPath((unit1 >> 10) == 0b1101_11) else {
+    guard _fastPath((unit1 &>> 10) == 0b1101_11) else {
       // Invalid sequence, discard `unit0` and store `unit1` for the next call.
       _decodeLookahead = unit1
       return .error
     }
 
     // We have a well-formed surrogate pair, decode it.
-    let result = 0x10000 + ((UInt32(unit0 & 0x03ff) << 10) | UInt32(unit1 & 0x03ff))
+    let result = 0x10000 + ((UInt32(unit0 & 0x03ff) &<< 10) | UInt32(unit1 & 0x03ff))
     return .scalarValue(UnicodeScalar(_unchecked: result))
   }
 
@@ -581,8 +581,8 @@ public struct UTF16 : UnicodeCodec {
       processCodeUnit(UInt16(scalarValue))
     }
     else {
-      let lead_offset = UInt32(0xd800) - UInt32(0x10000 >> 10)
-      processCodeUnit(UInt16(lead_offset + (scalarValue >> 10)))
+      let lead_offset = UInt32(0xd800) - UInt32(0x10000 &>> 10)
+      processCodeUnit(UInt16(lead_offset + (scalarValue &>> (10 as UInt32))))
       processCodeUnit(UInt16(0xdc00 + (scalarValue & 0x3ff)))
     }
   }
@@ -776,30 +776,30 @@ internal func _transcodeSomeUTF16AsUTF8<Input>(
     var utf16Length: Input.IndexDistance = 1
 
     if _fastPath(u <= 0x7f) {
-      result |= _UTF8Chunk(u) << shift
+      result |= _UTF8Chunk(u) &<< shift
       utf8Count += 1
     } else {
       var scalarUtf8Length: Int
       var r: UInt
-      if _fastPath((u >> 11) != 0b1101_1) {
+      if _fastPath((u &>> 11) != 0b1101_1) {
         // Neither high-surrogate, nor low-surrogate -- well-formed sequence
         // of 1 code unit, decoding is trivial.
         if u < 0x800 {
           r = 0b10__00_0000__110__0_0000
-          r |= u >> 6
-          r |= (u & 0b11_1111) << 8
+          r |= u &>> 6
+          r |= (u & 0b11_1111) &<< 8
           scalarUtf8Length = 2
         }
         else {
           r = 0b10__00_0000__10__00_0000__1110__0000
-          r |= u >> 12
-          r |= ((u >> 6) & 0b11_1111) << 8
-          r |= (u        & 0b11_1111) << 16
+          r |= u &>> 12
+          r |= ((u &>> 6) & 0b11_1111) &<< 8
+          r |= (u        & 0b11_1111) &<< 16
           scalarUtf8Length = 3
         }
       } else {
         let unit0 = u
-        if _slowPath((unit0 >> 10) == 0b1101_11) {
+        if _slowPath((unit0 &>> 10) == 0b1101_11) {
           // `unit0` is a low-surrogate.  We have an ill-formed sequence.
           // Replace it with U+FFFD.
           r = 0xbdbfef
@@ -811,16 +811,16 @@ internal func _transcodeSomeUTF16AsUTF8<Input>(
           scalarUtf8Length = 3
         } else {
           let unit1 = UInt(input[input.index(nextIndex, offsetBy: 1)])
-          if _fastPath((unit1 >> 10) == 0b1101_11) {
+          if _fastPath((unit1 &>> 10) == 0b1101_11) {
             // `unit1` is a low-surrogate.  We have a well-formed surrogate
             // pair.
-            let v = 0x10000 + (((unit0 & 0x03ff) << 10) | (unit1 & 0x03ff))
+            let v = 0x10000 + (((unit0 & 0x03ff) &<< 10) | (unit1 & 0x03ff))
 
             r = 0b10__00_0000__10__00_0000__10__00_0000__1111_0__000
-            r |= v >> 18
-            r |= ((v >> 12) & 0b11_1111) << 8
-            r |= ((v >> 6) & 0b11_1111) << 16
-            r |= (v        & 0b11_1111) << 24
+            r |= v &>> 18
+            r |= ((v &>> 12) & 0b11_1111) &<< 8
+            r |= ((v &>> 6) & 0b11_1111) &<< 16
+            r |= (v        & 0b11_1111) &<< 24
             scalarUtf8Length = 4
             utf16Length = 2
           } else {
@@ -835,14 +835,14 @@ internal func _transcodeSomeUTF16AsUTF8<Input>(
       if utf8Count + scalarUtf8Length > utf8Max {
         break
       }
-      result |= numericCast(r) << shift
+      result |= numericCast(r) &<< shift
       utf8Count += scalarUtf8Length
     }
     nextIndex = input.index(nextIndex, offsetBy: utf16Length)
   }
   // FIXME: Annoying check, courtesy of <rdar://problem/16740169>
   if utf8Count < MemoryLayout.size(ofValue: result) {
-    result |= ~0 << numericCast(utf8Count * 8)
+    result |= ~0 &<< numericCast(utf8Count * 8)
   }
   return (nextIndex, result)
 }
@@ -933,7 +933,7 @@ extension UTF16 {
   /// - SeeAlso: `UTF16.width(_:)`, `UTF16.trailSurrogate(_:)`
   public static func leadSurrogate(_ x: UnicodeScalar) -> UTF16.CodeUnit {
     _precondition(width(x) == 2)
-    return UTF16.CodeUnit((x.value - 0x1_0000) >> (10 as UInt32)) + 0xD800
+    return UTF16.CodeUnit((x.value - 0x1_0000) &>> (10 as UInt32)) + 0xD800
   }
 
   /// Returns the low-surrogate code unit of the surrogate pair representing
@@ -958,7 +958,7 @@ extension UTF16 {
   public static func trailSurrogate(_ x: UnicodeScalar) -> UTF16.CodeUnit {
     _precondition(width(x) == 2)
     return UTF16.CodeUnit(
-      (x.value - 0x1_0000) & (((1 as UInt32) << 10) - 1)
+      (x.value - 0x1_0000) & (((1 as UInt32) &<< 10) - 1)
     ) + 0xDC00
   }
 
