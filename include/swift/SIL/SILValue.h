@@ -121,15 +121,15 @@ public:
 
   /// If this is a SILArgument or a SILInstruction get its parent basic block,
   /// otherwise return null.
-  SILBasicBlock *getParentBB();
+  SILBasicBlock *getParentBB() const;
 
   /// If this is a SILArgument or a SILInstruction get its parent function,
   /// otherwise return null.
-  SILFunction *getFunction();
+  SILFunction *getFunction() const;
 
   /// If this is a SILArgument or a SILInstruction get its parent module,
   /// otherwise return null.
-  SILModule *getModule();
+  SILModule *getModule() const;
 };
 
 inline llvm::raw_ostream &operator<<(llvm::raw_ostream &OS,
