@@ -210,6 +210,13 @@ public:
     } else if (auto apply = dyn_cast<ApplyExpr>(E)) {
       recurse = asImpl().checkApply(apply);
     }
+    // Error handling validation (via checkTopLevelErrorHandling) happens after
+    // type checking. If an unchecked expression is still around, the code was
+    // invalid.
+#define UNCHECKED_EXPR(KIND, BASE) \
+    else if (isa<KIND##Expr>(E)) return {false, nullptr};
+#include "swift/AST/ExprNodes.def"
+
     return {bool(recurse), E};
   }
 
