@@ -1,8 +1,5 @@
 // RUN: %target-swift-frontend %s -emit-ir -g -o - | %FileCheck %s
 // REQUIRES: objc_interop
-// XFAIL: *
-// FIXME(eager-bridging): this test was XFAIL'd because I didn't know what else
-// to do.
 
 public struct Q<T> {
   let x: T
