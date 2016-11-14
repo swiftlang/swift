@@ -413,9 +413,22 @@ std::unique_ptr<Compilation> Driver::buildCompilation(
   bool ShowIncrementalBuildDecisions =
     ArgList->hasArg(options::OPT_driver_show_incremental);
 
-  bool Incremental = ArgList->hasArg(options::OPT_incremental) &&
-    !ArgList->hasArg(options::OPT_whole_module_optimization) &&
-    !ArgList->hasArg(options::OPT_embed_bitcode);
+  bool Incremental = ArgList->hasArg(options::OPT_incremental);
+  if (ArgList->hasArg(options::OPT_whole_module_optimization)) {
+    if (Incremental && ShowIncrementalBuildDecisions) {
+      llvm::outs() << "Incremental compilation has been disabled, because it "
+                   << "is not compatible with whole module optimization.";
+    }
+    Incremental = false;
+  }
+  if (ArgList->hasArg(options::OPT_embed_bitcode)) {
+    if (Incremental && ShowIncrementalBuildDecisions) {
+      llvm::outs() << "Incremental compilation has been disabled, because it "
+                   << "is not currently compatible with embedding LLVM IR "
+                   << "bitcode.";
+    }
+    Incremental = false;
+  }
 
   bool SaveTemps = ArgList->hasArg(options::OPT_save_temps);
   bool ContinueBuildingAfterErrors =
