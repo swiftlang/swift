@@ -213,3 +213,13 @@ func testStructDefaultInit() {
   let _ = AnonUnion()
   let _ = GLKVector4()
 }
+
+func testArrays() {
+  nonnullArrayParameters([], [], [])
+  nonnullArrayParameters(nil, [], []) // expected-error {{nil is not compatible with expected argument type 'UnsafePointer<Int8>'}}
+  nonnullArrayParameters([], nil, []) // expected-error {{nil is not compatible with expected argument type 'UnsafePointer<UnsafeMutableRawPointer?>'}}
+  nonnullArrayParameters([], [], nil) // expected-error {{nil is not compatible with expected argument type 'UnsafePointer<Int32>'}}
+
+  nullableArrayParameters([], [], [])
+  nullableArrayParameters(nil, nil, nil)
+}
