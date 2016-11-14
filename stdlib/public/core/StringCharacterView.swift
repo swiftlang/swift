@@ -29,7 +29,7 @@ extension String {
   /// `CharacterView` collection is a `Character` instance.
   ///
   ///     let flowers = "Flowers 💐"
-  ///     for c in flowers {
+  ///     for c in flowers.characters {
   ///         print(c)
   ///     }
   ///     // F
