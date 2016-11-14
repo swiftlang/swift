@@ -31,7 +31,7 @@ static_assert(sizeof(SILValue) == sizeof(uintptr_t),
 //                              Utility Methods
 //===----------------------------------------------------------------------===//
 
-SILBasicBlock *ValueBase::getParentBB() const {
+SILBasicBlock *ValueBase::getParentBlock() const {
   auto *NonConstThis = const_cast<ValueBase *>(this);
   if (auto *Inst = dyn_cast<SILInstruction>(NonConstThis))
     return Inst->getParent();

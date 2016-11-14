@@ -200,7 +200,7 @@ SILValue CheckedCastBrJumpThreading::isArgValueEquivalentToCondition(
       if (Def != Value)
         return SILValue();
 
-      if (!DT->dominates(DomBB, Value->getParentBB()))
+      if (!DT->dominates(DomBB, Value->getParentBlock()))
         return SILValue();
       // OK, this value is a potential candidate
     }

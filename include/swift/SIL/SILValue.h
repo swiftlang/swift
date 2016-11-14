@@ -121,7 +121,7 @@ public:
 
   /// If this is a SILArgument or a SILInstruction get its parent basic block,
   /// otherwise return null.
-  SILBasicBlock *getParentBB() const;
+  SILBasicBlock *getParentBlock() const;
 
   /// If this is a SILArgument or a SILInstruction get its parent function,
   /// otherwise return null.

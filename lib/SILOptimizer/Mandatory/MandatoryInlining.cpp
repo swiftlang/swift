@@ -360,7 +360,7 @@ runOnFunctionRecursively(SILFunction *F, FullApplySite AI,
         if (auto *II = dyn_cast<SILInstruction>(NewInst))
           I = II->getIterator();
         else
-          I = NewInst->getParentBB()->begin();
+          I = NewInst->getParentBlock()->begin();
         auto NewAI = FullApplySite::isa(NewInstPair.second.getInstruction());
         if (!NewAI)
           continue;

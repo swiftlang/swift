@@ -131,7 +131,7 @@ static SILValue stripRCIdentityPreservingInsts(SILValue V) {
 /// dominates the BB of A.
 static bool dominatesArgument(DominanceInfo *DI, SILArgument *A,
                               SILValue FirstIV) {
-  SILBasicBlock *OtherBB = FirstIV->getParentBB();
+  SILBasicBlock *OtherBB = FirstIV->getParentBlock();
   if (!OtherBB || OtherBB == A->getParent())
     return false;
   return DI->dominates(OtherBB, A->getParent());
@@ -190,7 +190,7 @@ findDominatingNonPayloadedEdge(SILBasicBlock *IncomingEdgeBB,
                                SILValue RCIdentity) {
   // First grab the NonPayloadedEnumBB and RCIdentityBB. If we cannot find
   // either of them, return false.
-  SILBasicBlock *RCIdentityBB = RCIdentity->getParentBB();
+  SILBasicBlock *RCIdentityBB = RCIdentity->getParentBlock();
   if (!RCIdentityBB)
     return false;
 

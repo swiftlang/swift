@@ -925,7 +925,7 @@ bool swift::getFinalReleasesForValue(SILValue V, ReleaseTracker &Tracker) {
   llvm::SmallPtrSet<SILBasicBlock *, 16> UseBlocks;
 
   // First attempt to get the BB where this value resides.
-  auto *DefBB = V->getParentBB();
+  auto *DefBB = V->getParentBlock();
   if (!DefBB)
     return false;
 

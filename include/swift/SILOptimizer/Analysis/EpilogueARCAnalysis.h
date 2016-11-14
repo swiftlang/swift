@@ -279,7 +279,7 @@ public:
   virtual void handleDeleteNotification(ValueBase *V) override {
     // If the parent function of this instruction was just turned into an
     // external declaration, bail. This happens during SILFunction destruction.
-    SILFunction *F = V->getParentBB()->getParent();
+    SILFunction *F = V->getFunction();
     if (F->isExternalDeclaration()) {
       return;
     }
