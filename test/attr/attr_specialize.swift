@@ -23,6 +23,9 @@ public func twoGenericParams<T, U>(_ t: T, u: U) -> (T, U) {
   return (t, u)
 }
 
+@_specialize(Int) // expected-error{{generic type 'nonGenericParam' specialized with too many type parameters (got 1, but expected 0)}}
+func nonGenericParam(x: Int) {}
+
 // Specialize contextual types.
 // ----------------------------
 
