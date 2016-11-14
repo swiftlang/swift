@@ -273,7 +273,7 @@ class CustomImmutableNSArray : NSArray {
     super.init()
   }
 
-  override init(objects: UnsafePointer<AnyObject>, count: Int) {
+  override init(objects: UnsafePointer<AnyObject>?, count: Int) {
     super.init(objects: objects, count: count)
   }
 
