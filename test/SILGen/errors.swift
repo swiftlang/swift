@@ -613,7 +613,7 @@ func supportStructure(_ b: inout Bridge, name: String) throws {
 // CHECK-NEXT: apply [[SETTER]]([[T0]], [[INDEX_COPY_2_COPY]], [[ARG1]])
 // CHECK-NEXT: destroy_addr [[TEMP]]
 // CHECK-NEXT: dealloc_stack [[TEMP]]
-// ==> SEMANTIC ARC TODO: INDEX_COPY_2 on the next ilne should be INDEX_COPY_2_COPY
+// ==> SEMANTIC ARC TODO: INDEX_COPY_2 on the next line should be INDEX_COPY_2_COPY
 // CHECK-NEXT: destroy_value [[INDEX_COPY_2]] : $String
 // CHECK-NEXT: destroy_value [[INDEX]] : $String
 // CHECK-NEXT: throw [[ERROR]]
