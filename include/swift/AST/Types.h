@@ -4110,7 +4110,7 @@ END_CAN_TYPE_WRAPPER(GenericTypeParamType, SubstitutableType)
 /// Describes the type of an associated type.
 ///
 /// \sa AssociatedTypeDecl
-class AssociatedTypeType : public SubstitutableType {
+class AssociatedTypeType : public TypeBase {
   /// The generic type parameter.
   AssociatedTypeDecl *AssocType;
 
@@ -4132,11 +4132,10 @@ private:
   // These aren't classified as dependent for some reason.
 
   AssociatedTypeType(AssociatedTypeDecl *assocType)
-    : SubstitutableType(TypeKind::AssociatedType, nullptr,
-                        RecursiveTypeProperties()),
+    : TypeBase(TypeKind::AssociatedType, nullptr, RecursiveTypeProperties()),
       AssocType(assocType) { }
 };
-DEFINE_EMPTY_CAN_TYPE_WRAPPER(AssociatedTypeType, SubstitutableType)
+DEFINE_EMPTY_CAN_TYPE_WRAPPER(AssociatedTypeType, Type)
 
 /// SubstitutedType - A type that has been substituted for some other type,
 /// which implies that the replacement type meets all of the requirements of
