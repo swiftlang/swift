@@ -2308,47 +2308,38 @@ bool ConstraintSystem::solveSimplified(
                                    allowFreeTypeVariables);
   }
 
-  // If there are no disjunctions, we can't solve this system.
+  // If there are no disjunctions we can't solve this system unless we have
+  // free type variables and are allowing them in the solution.
   if (disjunctions.empty()) {
-    // If the only remaining constraints are conformance constraints
-    // or member equality constraints, and we're allowed to have free
-    // variables, we still have a solution.  FIXME: It seems like this
-    // should be easier to detect. Aren't there other kinds of
-    // constraints that could show up here?
-    if (allowFreeTypeVariables != FreeTypeVariableBinding::Disallow &&
-        hasFreeTypeVariables()) {
+    if (allowFreeTypeVariables == FreeTypeVariableBinding::Disallow ||
+        !hasFreeTypeVariables())
+      return true;
 
-      // If this solution is worse than the best solution we've seen so far,
-      // skip it.
-      if (worseThanBestSolution())
+    // If this solution is worse than the best solution we've seen so far,
+    // skip it.
+    if (worseThanBestSolution())
+      return true;
+
+    // If we only have relational or member constraints and are allowing
+    // free type variables, save the solution.
+    for (auto &constraint : InactiveConstraints) {
+      switch (constraint.getClassification()) {
+      case ConstraintClassification::Relational:
+      case ConstraintClassification::Member:
+        continue;
+      default:
         return true;
-
-      bool anyNonConformanceConstraints = false;
-      for (auto &constraint : InactiveConstraints) {
-        switch (constraint.getClassification()) {
-        case ConstraintClassification::Relational:
-        case ConstraintClassification::Member:
-          continue;
-        default:
-          break;
-        }
-
-        anyNonConformanceConstraints = true;
-        break;
-      }
-
-      if (!anyNonConformanceConstraints) {
-        auto solution = finalize(allowFreeTypeVariables);
-        if (TC.getLangOpts().DebugConstraintSolver) {
-          auto &log = getASTContext().TypeCheckerDebug->getStream();
-          log.indent(solverState->depth * 2) << "(found solution)\n";
-        }
-        
-        solutions.push_back(std::move(solution));
-        return false;
       }
     }
-    return true;
+
+    auto solution = finalize(allowFreeTypeVariables);
+    if (TC.getLangOpts().DebugConstraintSolver) {
+      auto &log = getASTContext().TypeCheckerDebug->getStream();
+      log.indent(solverState->depth * 2) << "(found solution)\n";
+    }
+
+    solutions.push_back(std::move(solution));
+    return false;
   }
 
   // Pick the smallest disjunction.
