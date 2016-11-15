@@ -32,6 +32,9 @@ class GenericEnvironment final {
   TypeSubstitutionMap ArchetypeToInterfaceMap;
   TypeSubstitutionMap InterfaceToArchetypeMap;
 
+  GenericEnvironment(GenericSignature *signature,
+                     TypeSubstitutionMap interfaceToArchetypeMap);
+
 public:
   GenericSignature *getGenericSignature() const {
     return Signature;
@@ -41,21 +44,14 @@ public:
     return Signature->getGenericParams();
   }
 
-  const TypeSubstitutionMap &getArchetypeToInterfaceMap() const {
-    return ArchetypeToInterfaceMap;
-  }
-
-  const TypeSubstitutionMap &getInterfaceToArchetypeMap() const {
-    return InterfaceToArchetypeMap;
-  }
-
-  GenericEnvironment(GenericSignature *signature,
-                     TypeSubstitutionMap interfaceToArchetypeMap);
+  /// Determine whether this generic environment contains the given
+  /// primary archetype.
+  bool containsPrimaryArchetype(ArchetypeType *archetype) const;
 
   static
-  GenericEnvironment * get(ASTContext &ctx,
-                           GenericSignature *signature,
-                           TypeSubstitutionMap interfaceToArchetypeMap);
+  GenericEnvironment *get(ASTContext &ctx,
+                          GenericSignature *signature,
+                          TypeSubstitutionMap interfaceToArchetypeMap);
 
   /// Make vanilla new/delete illegal.
   void *operator new(size_t Bytes) = delete;

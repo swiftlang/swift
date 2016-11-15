@@ -616,11 +616,13 @@ TypeBase::gatherAllSubstitutions(Module *module,
   auto *parentDC = gpContext;
   while (parentDC->isTypeContext())
     parentDC = parentDC->getParent();
-  if (auto *outerEnv = parentDC->getGenericEnvironmentOfContext())
-    for (auto pair : outerEnv->getInterfaceToArchetypeMap()) {
-      auto result = substitutions.insert(pair);
+  if (auto *outerEnv = parentDC->getGenericEnvironmentOfContext()) {
+    for (auto gp : outerEnv->getGenericParams()) {
+      auto result = substitutions.insert({gp->getCanonicalType().getPointer(),
+                                          outerEnv->mapTypeIntoContext(gp)});
       assert(result.second);
     }
+  }
 
   auto lookupConformanceFn =
       [&](CanType original, Type replacement, ProtocolType *protoType)

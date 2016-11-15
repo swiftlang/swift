@@ -59,6 +59,11 @@ void *GenericEnvironment::operator new(size_t bytes, const ASTContext &ctx) {
   return ctx.Allocate(bytes, alignof(GenericEnvironment), AllocationArena::Permanent);
 }
 
+bool GenericEnvironment::containsPrimaryArchetype(
+                                              ArchetypeType *archetype) const {
+  return ArchetypeToInterfaceMap.count(archetype) > 0;
+}
+
 Type GenericEnvironment::mapTypeOutOfContext(ModuleDecl *M, Type type) const {
   type = type.subst(M, ArchetypeToInterfaceMap, SubstFlags::AllowLoweredTypes);
   assert(!type->hasArchetype() && "not fully substituted");
