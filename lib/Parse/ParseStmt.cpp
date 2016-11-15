@@ -1352,7 +1352,7 @@ ParserStatus Parser::parseStmtCondition(StmtCondition &Condition,
       // Although we require an initializer, recover by parsing as if it were
       // merely omitted.
       diagnose(Tok, diag::conditional_var_initializer_required);
-      Init = new (Context) ErrorExpr(Tok.getLoc());
+      Init = new (Context) ErrorExpr(ThePattern.get()->getEndLoc());
     }
     
     result.push_back({IntroducerLoc, ThePattern.get(), Init});
