@@ -2104,14 +2104,14 @@ static Substitution getArchetypeSubstitution(TypeChecker &tc,
   // FIXME: Turn the nullptr check into an assertion
   if (archetype != nullptr) {
     for (auto proto : archetype->getConformsTo()) {
-      ProtocolConformance *conformance = nullptr;
-      bool conforms = tc.conformsToProtocol(replacement, proto, dc, None,
-                                            &conformance);
-      assert((conforms || isError) &&
+      auto conformance = tc.conformsToProtocol(replacement, proto, dc, None);
+      assert((conformance || isError) &&
              "Conformance should already have been verified");
       (void)isError;
-      (void)conforms;
-      conformances.push_back(ProtocolConformanceRef(proto, conformance));
+      if (conformance)
+        conformances.push_back(*conformance);
+      else
+        conformances.push_back(ProtocolConformanceRef(proto));
     }
   }
 
@@ -2425,11 +2425,10 @@ ConformanceChecker::resolveWitnessViaLookup(ValueDecl *requirement) {
         // Otherwise, go satisfy the derivable requirement, which can introduce
         // a member that could in turn satisfy *this* requirement.
         auto derivableProto = cast<ProtocolDecl>(derivable->getDeclContext());
-        ProtocolConformance *conformance = nullptr;
-        if (TC.conformsToProtocol(Adoptee, derivableProto, DC, None,
-                                  &conformance) &&
-            conformance) {
-          conformance->getWitness(derivable, &TC);
+        if (auto conformance =
+              TC.conformsToProtocol(Adoptee, derivableProto, DC, None)) {
+          if (conformance->isConcrete())
+            conformance->getConcrete()->getWitness(derivable, &TC);
         }
       }
     }
@@ -3416,11 +3415,11 @@ void ConformanceChecker::resolveTypeWitnesses() {
 
       // If that failed, check whether it's because of the conformance we're
       // evaluating.
-      ProtocolConformance *localConformance = nullptr;
-      if (!TC.conformsToProtocol(baseTy, assocType->getProtocol(), DC, None,
-                                 &localConformance) ||
-          !localConformance ||
-          localConformance->getRootNormalConformance() != Conformance) {
+      auto localConformance
+        = TC.conformsToProtocol(baseTy, assocType->getProtocol(), DC, None);
+      if (!localConformance || localConformance->isAbstract() ||
+          (localConformance->getConcrete()->getRootNormalConformance()
+             != Conformance)) {
         return nullptr;
       }
 
@@ -4472,13 +4471,14 @@ checkConformsToProtocol(TypeChecker &TC,
 
   // Check that T conforms to all inherited protocols.
   for (auto InheritedProto : Proto->getInheritedProtocols(&TC)) {
-    ProtocolConformance *InheritedConformance = nullptr;
-    if (TC.conformsToProtocol(T, InheritedProto, DC,
-                              ConformanceCheckFlags::Used,
-                              &InheritedConformance, ComplainLoc)) {
+    auto InheritedConformance =
+      TC.conformsToProtocol(T, InheritedProto, DC,
+                            ConformanceCheckFlags::Used,
+                            ComplainLoc);
+    if (InheritedConformance && InheritedConformance->isConcrete()) {
       if (!conformance->hasInheritedConformance(InheritedProto))
-        conformance->setInheritedConformance(InheritedProto,
-                                             InheritedConformance);
+        conformance->setInheritedConformance(
+          InheritedProto, InheritedConformance->getConcrete());
     } else {
       // Recursive call already diagnosed this problem, but tack on a note
       // to establish the relationship.
@@ -4502,11 +4502,10 @@ checkConformsToProtocol(TypeChecker &TC,
   return conformance;
 }
 
-bool TypeChecker::containsProtocol(Type T, ProtocolDecl *Proto,
-                                   DeclContext *DC,
-                                   ConformanceCheckOptions options,
-                                   ProtocolConformance **Conformance,
-                                   SourceLoc ComplainLoc) {
+Optional<ProtocolConformanceRef> TypeChecker::containsProtocol(
+                                               Type T, ProtocolDecl *Proto,
+                                               DeclContext *DC,
+                                               ConformanceCheckOptions options) {
   // Existential types don't need to conform, i.e., they only need to
   // contain the protocol.
   if (T->isExistentialType()) {
@@ -4517,37 +4516,27 @@ bool TypeChecker::containsProtocol(Type T, ProtocolDecl *Proto,
       // Special case -- any class-bound protocol can be passed as an
       // AnyObject argument.
       if (P->requiresClass() &&
-          Proto->isSpecificProtocol(KnownProtocolKind::AnyObject)) {
-        if (Conformance)
-          *Conformance = nullptr;
-        return true;
-      }
+          Proto->isSpecificProtocol(KnownProtocolKind::AnyObject))
+        return ProtocolConformanceRef(Proto);
 
-      // If this isn't the protocol we're looking for, continue looking.
-      if (P == Proto || P->inheritsFrom(Proto)) {
-        if (Conformance)
-          *Conformance = nullptr;
-        return true;
-      }
+      // If we found the protocol we're looking forward, return an abstract
+      /// conformance to it.
+      if (P == Proto || P->inheritsFrom(Proto))
+        return ProtocolConformanceRef(Proto);
     }
-  } else {
-    // Check whether this type conforms to the protocol.
-    if (conformsToProtocol(T, Proto, DC, options, Conformance, ComplainLoc))
-      return true;
+
+    return None;
   }
 
-  return false;
+  // Check whether this type conforms to the protocol.
+  return conformsToProtocol(T, Proto, DC, options);
 }
 
-// FIXME: This is a bug-prone interface.
-/// Returns true if T conforms to Proto. For concrete conformances,
-/// Conformance is set to the lookup result, but for abstract
-/// conformances, Conformance is set to nullptr.
-bool TypeChecker::conformsToProtocol(Type T, ProtocolDecl *Proto,
-                                     DeclContext *DC,
-                                     ConformanceCheckOptions options,
-                                     ProtocolConformance **Conformance,
-                                     SourceLoc ComplainLoc) {
+Optional<ProtocolConformanceRef> TypeChecker::conformsToProtocol(
+                                   Type T, ProtocolDecl *Proto,
+                                   DeclContext *DC,
+                                   ConformanceCheckOptions options,
+                                   SourceLoc ComplainLoc) {
   bool InExpression = options.contains(ConformanceCheckFlags::InExpression);
 
   auto recordDependency = [=](ProtocolConformance *conformance = nullptr) {
@@ -4565,17 +4554,13 @@ bool TypeChecker::conformsToProtocol(Type T, ProtocolDecl *Proto,
     else
       recordDependency();
 
-    return false;
+    return None;
   }
 
   // Store the conformance and record the dependency.
   if (lookupResult->isConcrete()) {
-    if (Conformance)
-      *Conformance = lookupResult->getConcrete();
     recordDependency(lookupResult->getConcrete());
   } else {
-    if (Conformance)
-      *Conformance = nullptr;
     recordDependency();
   }
 
@@ -4595,7 +4580,7 @@ bool TypeChecker::conformsToProtocol(Type T, ProtocolDecl *Proto,
       sf->addUsedConformance(normalConf);
     }
   }
-  return true;
+  return lookupResult;
 }
 
 /// Mark any _ObjectiveCBridgeable conformances in the given type as "used".
@@ -4682,16 +4667,14 @@ void TypeChecker::useBridgedNSErrorConformances(DeclContext *dc, Type type) {
     return;
 
   // _BridgedStoredNSError.
-  ProtocolConformance *conformance = nullptr;
-  if (conformsToProtocol(type, bridgedStoredNSError, dc,
-                         ConformanceCheckFlags::Used,
-                        &conformance) &&
-      conformance) {
+  auto conformance = conformsToProtocol(type, bridgedStoredNSError, dc,
+                                        ConformanceCheckFlags::Used);
+  if (conformance && conformance->isConcrete()) {
     // Hack: If we've used a conformance to the _BridgedStoredNSError
     // protocol, also use the RawRepresentable and _ErrorCodeProtocol
     // conformances on the Code associated type witness.
     if (auto codeType = ProtocolConformance::getTypeWitnessByName(
-                          type, conformance, Context.Id_Code, this)) {
+                          type, *conformance, Context.Id_Code, this)) {
       (void)conformsToProtocol(codeType, errorCodeProto, dc,
                                ConformanceCheckFlags::Used);
       (void)conformsToProtocol(codeType, rawProto, dc,
@@ -4700,15 +4683,15 @@ void TypeChecker::useBridgedNSErrorConformances(DeclContext *dc, Type type) {
   }
 
   // _ErrorCodeProtocol.
-  if (conformsToProtocol(type, errorCodeProto, dc,
-                         (ConformanceCheckFlags::SuppressDependencyTracking|
-                          ConformanceCheckFlags::Used),
-                         &conformance) &&
-      conformance) {
+  conformance =
+  conformsToProtocol(type, errorCodeProto, dc,
+                     (ConformanceCheckFlags::SuppressDependencyTracking|
+                      ConformanceCheckFlags::Used));
+  if (conformance && conformance->isConcrete()) {
     if (Type errorType = ProtocolConformance::getTypeWitnessByName(
-          type, conformance, Context.Id_ErrorType, this)) {
-      (void) conformsToProtocol(errorType, bridgedStoredNSError, dc,
-                                ConformanceCheckFlags::Used);
+          type, *conformance, Context.Id_ErrorType, this)) {
+      (void)conformsToProtocol(errorType, bridgedStoredNSError, dc,
+                               ConformanceCheckFlags::Used);
     }
   }
 }
@@ -5343,13 +5326,12 @@ void TypeChecker::resolveWitness(const NormalProtocolConformance *conformance,
 ProtocolConformance *TypeChecker::resolveInheritedConformance(
        const NormalProtocolConformance *conformance,
        ProtocolDecl *inherited) {
-  ProtocolConformance *inheritedConformance = nullptr;
-  if (conformsToProtocol(conformance->getType(), inherited,
-                         conformance->getDeclContext(),
-                         ConformanceCheckFlags::InExpression,
-                         &inheritedConformance) &&
-      inheritedConformance)
-    return inheritedConformance;
+  auto inheritedConformance =
+    conformsToProtocol(conformance->getType(), inherited,
+                       conformance->getDeclContext(),
+                       ConformanceCheckFlags::InExpression);
+  if (inheritedConformance && inheritedConformance->isConcrete())
+    return inheritedConformance->getConcrete();
 
   return nullptr;
 }

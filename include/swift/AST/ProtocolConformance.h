@@ -160,7 +160,7 @@ public:
 
   static Type
   getTypeWitnessByName(Type type,
-                       ProtocolConformance *conformance,
+                       ProtocolConformanceRef conformance,
                        Identifier name,
                        LazyResolver *resolver);
 

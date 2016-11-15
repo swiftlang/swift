@@ -638,22 +638,20 @@ public:
     VarDecl *generator;
     {
       Type sequenceType = sequence->getType();
-      ProtocolConformance *conformance = nullptr;
-      if (!TC.conformsToProtocol(sequenceType, sequenceProto, DC,
-                                 ConformanceCheckFlags::InExpression,
-                                 &conformance, sequence->getLoc()))
+      auto conformance =
+        TC.conformsToProtocol(sequenceType, sequenceProto, DC,
+                              ConformanceCheckFlags::InExpression,
+                              sequence->getLoc());
+      if (!conformance)
         return nullptr;
       
-      if (conformance && conformance->isInvalid())
-        return nullptr;
-
       generatorTy = TC.getWitnessType(sequenceType, sequenceProto,
-                                      conformance,
+                                      *conformance,
                                       TC.Context.Id_Iterator,
                                       diag::sequence_protocol_broken);
       
       Expr *getIterator
-        = TC.callWitness(sequence, DC, sequenceProto, conformance,
+        = TC.callWitness(sequence, DC, sequenceProto, *conformance,
                          TC.Context.Id_makeIterator,
                          {}, diag::sequence_protocol_broken);
       if (!getIterator) return nullptr;
@@ -687,14 +685,15 @@ public:
     // we'll use to drive the loop.
     // FIXME: Would like to customize the diagnostic emitted in
     // conformsToProtocol().
-    ProtocolConformance *genConformance = nullptr;
-    if (!TC.conformsToProtocol(generatorTy, generatorProto, DC,
-                               ConformanceCheckFlags::InExpression,
-                               &genConformance, sequence->getLoc()))
+    auto genConformance =
+      TC.conformsToProtocol(generatorTy, generatorProto, DC,
+                            ConformanceCheckFlags::InExpression,
+                            sequence->getLoc());
+    if (!genConformance)
       return nullptr;
     
     Type elementTy = TC.getWitnessType(generatorTy, generatorProto,
-                                       genConformance, TC.Context.Id_Element,
+                                       *genConformance, TC.Context.Id_Element,
                                        diag::iterator_protocol_broken);
     if (!elementTy)
       return nullptr;
@@ -704,7 +703,7 @@ public:
       = TC.callWitness(TC.buildCheckedRefExpr(generator, DC,
                                               DeclNameLoc(S->getInLoc()),
                                               /*implicit*/true),
-                       DC, generatorProto, genConformance,
+                       DC, generatorProto, *genConformance,
                        TC.Context.Id_next, {}, diag::iterator_protocol_broken);
     if (!iteratorNext) return nullptr;
     // Check that next() produces an Optional<T> value.
