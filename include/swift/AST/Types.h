@@ -3763,13 +3763,6 @@ protected:
     : TypeBase(K, C, properties) { }
 
 public:
-  /// \brief Retrieve the name of this type.
-  Identifier getName() const;
-
-  /// \brief Retrieve the parent of this type, or null if this is a
-  /// primary type.
-  SubstitutableType *getParent() const;
-
   // Implement isa/cast/dyncast/etc.
   static bool classof(const TypeBase *T) {
     return T->getKind() >= TypeKind::First_SubstitutableType &&
@@ -4647,22 +4640,6 @@ ParameterTypeFlags::fromParameterType(Type paramTy, bool isVariadic) {
   bool escaping = paramTy->is<AnyFunctionType>() &&
                   !paramTy->castTo<AnyFunctionType>()->isNoEscape();
   return {isVariadic, autoclosure, escaping};
-}
-
-inline Identifier SubstitutableType::getName() const {
-  if (auto Archetype = dyn_cast<ArchetypeType>(this))
-    return Archetype->getName();
-  if (auto GenericParam = dyn_cast<GenericTypeParamType>(this))
-    return GenericParam->getName();
-
-  llvm_unreachable("Not a substitutable type");
-}
-
-inline SubstitutableType *SubstitutableType::getParent() const {
-  if (auto Archetype = dyn_cast<ArchetypeType>(this))
-    return Archetype->getParent();
-
-  return nullptr;
 }
 
 inline CanType Type::getCanonicalTypeOrNull() const {
