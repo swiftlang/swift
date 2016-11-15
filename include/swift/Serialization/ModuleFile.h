@@ -56,12 +56,6 @@ class ModuleFile : public LazyMemberLoader {
   std::unique_ptr<llvm::MemoryBuffer> ModuleInputBuffer;
   std::unique_ptr<llvm::MemoryBuffer> ModuleDocInputBuffer;
 
-  /// The reader attached to \c ModuleInputBuffer.
-  llvm::BitstreamReader ModuleInputReader;
-
-  /// The reader attached to \c ModuleDocInputBuffer.
-  llvm::BitstreamReader ModuleDocInputReader;
-
   /// The cursor used to lazily load things from the file.
   llvm::BitstreamCursor DeclTypeCursor;
 
