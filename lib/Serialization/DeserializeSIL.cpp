@@ -105,7 +105,7 @@ SILDeserializer::SILDeserializer(ModuleFile *MF, SILModule &M,
   SILCursor = MF->getSILCursor();
   SILIndexCursor = MF->getSILIndexCursor();
   // Early return if either sil block or sil index block does not exist.
-  if (!SILCursor.getBitStreamReader() || !SILIndexCursor.getBitStreamReader())
+  if (SILCursor.AtEndOfStream() || SILIndexCursor.AtEndOfStream())
     return;
 
   // Load any abbrev records at the start of the block.
