@@ -341,7 +341,7 @@ static void addRangeLocationAbbrev(llvm::BitCodeAbbrev *Abbrev) {
 }
 
 void SerializedDiagnosticConsumer::emitBlockInfoBlock() {
-  State->Stream.EnterBlockInfoBlock(3);
+  State->Stream.EnterBlockInfoBlock();
 
   using namespace llvm;
   llvm::BitstreamWriter &Stream = State->Stream;
