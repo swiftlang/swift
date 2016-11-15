@@ -595,7 +595,8 @@ TypeBase::gatherAllSubstitutions(Module *module,
       unsigned index = lastGenericIndex - boundGeneric->getGenericArgs().size();
       for (Type arg : boundGeneric->getGenericArgs()) {
         auto paramTy = genericParams[index++];
-        substitutions[paramTy->getCanonicalType().getPointer()] = arg;
+        substitutions[
+          paramTy->getCanonicalType()->castTo<GenericTypeParamType>()] = arg;
       }
       lastGenericIndex -= boundGeneric->getGenericArgs().size();
 
@@ -618,8 +619,9 @@ TypeBase::gatherAllSubstitutions(Module *module,
     parentDC = parentDC->getParent();
   if (auto *outerEnv = parentDC->getGenericEnvironmentOfContext()) {
     for (auto gp : outerEnv->getGenericParams()) {
-      auto result = substitutions.insert({gp->getCanonicalType().getPointer(),
-                                          outerEnv->mapTypeIntoContext(gp)});
+      auto result = substitutions.insert(
+                      {gp->getCanonicalType()->castTo<GenericTypeParamType>(),
+                       outerEnv->mapTypeIntoContext(gp)});
       assert(result.second);
     }
   }

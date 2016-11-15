@@ -79,7 +79,8 @@ Type GenericEnvironment::mapTypeIntoContext(ModuleDecl *M, Type type) const {
 
 Type GenericEnvironment::mapTypeIntoContext(GenericTypeParamType *type) const {
   auto canTy = type->getCanonicalType();
-  auto found = InterfaceToArchetypeMap.find(canTy.getPointer());
+  auto found =
+    InterfaceToArchetypeMap.find(canTy->castTo<GenericTypeParamType>());
   assert(found != InterfaceToArchetypeMap.end() &&
          "missing generic parameter");
   return found->second;

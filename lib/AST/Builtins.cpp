@@ -488,7 +488,7 @@ namespace {
 
       for (unsigned i = 0, e = GenericTypeParams.size(); i < e; i++) {
         auto paramTy = GenericTypeParams[i]->getDeclaredType()
-            ->getCanonicalType().getPointer();
+          ->getCanonicalType()->castTo<GenericTypeParamType>();
         InterfaceToArchetypeMap[paramTy] = Archetypes[i];
       }
     }
