@@ -6692,8 +6692,7 @@ static bool hasArchetype(const GenericTypeDecl *generic,
   if (!genericEnv)
     return false;
 
-  auto &map = genericEnv->getArchetypeToInterfaceMap();
-  return map.find(archetype) != map.end();
+  return genericEnv->containsPrimaryArchetype(archetype);
 }
 
 static void noteArchetypeSource(const TypeLoc &loc, ArchetypeType *archetype,

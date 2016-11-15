@@ -3090,9 +3090,9 @@ void TypeBase::dump(raw_ostream &os, unsigned indent) const {
 
 void GenericEnvironment::dump() const {
   llvm::errs() << "Generic environment:\n";
-  for (auto pair : getInterfaceToArchetypeMap()) {
-    pair.first->dump();
-    pair.second->dump();
+  for (auto gp : getGenericParams()) {
+    gp->dump();
+    mapTypeIntoContext(gp)->dump();
   }
   llvm::errs() << "Generic parameters:\n";
   for (auto paramTy : getGenericParams())

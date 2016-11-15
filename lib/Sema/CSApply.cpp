@@ -90,7 +90,8 @@ Type Solution::computeSubstitutions(
   assert(openedTypes != OpenedTypes.end() && "Missing opened type information");
   TypeSubstitutionMap subs;
   for (const auto &opened : openedTypes->second) {
-    subs[opened.first.getPointer()] = getFixedType(opened.second);
+    subs[opened.first->castTo<GenericTypeParamType>()] =
+      getFixedType(opened.second);
   }
 
   // Produce the concrete form of the opened type.

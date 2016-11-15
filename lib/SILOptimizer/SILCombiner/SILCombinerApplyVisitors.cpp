@@ -692,7 +692,7 @@ SILCombiner::createApplyWithConcreteType(FullApplySite AI,
     NewSubstCalleeType = SILType::getPrimitiveObjectType(SFT);
   } else {
     TypeSubstitutionMap TypeSubstitutions;
-    TypeSubstitutions[OpenedArchetype.getPointer()] = ConcreteType;
+    TypeSubstitutions[OpenedArchetype->castTo<ArchetypeType>()] = ConcreteType;
     NewSubstCalleeType = SubstCalleeType.subst(AI.getModule(),
                                                AI.getModule().getSwiftModule(),
                                                TypeSubstitutions);

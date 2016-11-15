@@ -447,8 +447,7 @@ struct ASTNodeBase {};
           // Get the primary archetype.
           auto *parent = archetype->getPrimary();
 
-          auto &map = GenericEnv.back()->getArchetypeToInterfaceMap();
-          if (map.find(parent) == map.end()) {
+          if (!GenericEnv.back()->containsPrimaryArchetype(parent)) {
             Out << "AST verification error: archetype "
                 << archetype->getString() << " not allowed in this context\n";
 
@@ -1917,20 +1916,8 @@ struct ASTNodeBase {};
         return;
 
       if (sig && env) {
-        auto &map = env->getInterfaceToArchetypeMap();
-        if (sig->getGenericParams().size() != map.size()) {
-          Out << "Mismatch between signature and environment parameter count\n";
-          abort();
-        }
-
         for (auto *paramTy : sig->getGenericParams()) {
-          auto found = map.find(paramTy->getCanonicalType().getPointer());
-          if (found == map.end()) {
-            Out << "Generic parameter present in signature but not "
-                   "in environment\n";
-            paramTy->dump();
-            abort();
-          }
+          (void)env->mapTypeIntoContext(paramTy);
         }
 
         return;

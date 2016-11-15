@@ -90,7 +90,8 @@ SubstitutionMap::lookupConformance(CanType type,
 
 void SubstitutionMap::
 addSubstitution(CanType type, Type replacement) {
-  auto result = subMap.insert(std::make_pair(type.getPointer(), replacement));
+  auto result = subMap.insert(std::make_pair(type->castTo<SubstitutableType>(),
+                                             replacement));
   assert(result.second);
   (void) result;
 }

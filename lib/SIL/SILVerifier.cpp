@@ -62,7 +62,7 @@ static bool isArchetypeValidInFunction(ArchetypeType *A, SILFunction *F) {
   // Ok, we have a primary archetype, make sure it is in the nested generic
   // environment of our caller.
   if (auto *genericEnv = F->getGenericEnvironment())
-    if (genericEnv->getArchetypeToInterfaceMap().count(A))
+    if (genericEnv->containsPrimaryArchetype(A))
       return true;
 
   return false;

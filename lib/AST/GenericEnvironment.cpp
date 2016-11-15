@@ -59,6 +59,11 @@ void *GenericEnvironment::operator new(size_t bytes, const ASTContext &ctx) {
   return ctx.Allocate(bytes, alignof(GenericEnvironment), AllocationArena::Permanent);
 }
 
+bool GenericEnvironment::containsPrimaryArchetype(
+                                              ArchetypeType *archetype) const {
+  return ArchetypeToInterfaceMap.count(archetype) > 0;
+}
+
 Type GenericEnvironment::mapTypeOutOfContext(ModuleDecl *M, Type type) const {
   type = type.subst(M, ArchetypeToInterfaceMap, SubstFlags::AllowLoweredTypes);
   assert(!type->hasArchetype() && "not fully substituted");
@@ -74,7 +79,8 @@ Type GenericEnvironment::mapTypeIntoContext(ModuleDecl *M, Type type) const {
 
 Type GenericEnvironment::mapTypeIntoContext(GenericTypeParamType *type) const {
   auto canTy = type->getCanonicalType();
-  auto found = InterfaceToArchetypeMap.find(canTy.getPointer());
+  auto found =
+    InterfaceToArchetypeMap.find(canTy->castTo<GenericTypeParamType>());
   assert(found != InterfaceToArchetypeMap.end() &&
          "missing generic parameter");
   return found->second;
