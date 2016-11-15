@@ -262,6 +262,10 @@ private:
     return nullptr;
   }
 
+  Expr *getCurrentExpr() {
+    return ExprStack.empty() ? nullptr : ExprStack.back();
+  }
+
   Expr *getParentExpr() {
     if (ExprStack.size() >= 2)
       return ExprStack.end()[-2];
@@ -510,7 +514,7 @@ bool IndexSwiftASTWalker::startEntityRef(ValueDecl *D, SourceLoc Loc) {
 
   if (isa<AbstractFunctionDecl>(D)) {
     IndexSymbol Info;
-    if (initCallRefIndexSymbol(ExprStack.back(), getParentExpr(), D, Loc, Info))
+    if (initCallRefIndexSymbol(getCurrentExpr(), getParentExpr(), D, Loc, Info))
       return false;
 
     return startEntity(D, Info);
