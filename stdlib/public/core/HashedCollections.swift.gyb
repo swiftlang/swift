@@ -2830,6 +2830,7 @@ final internal class _HashableTypedNative${Self}Storage<${TypeParametersDecl}> :
 /// with _SwiftDeferredNS${Self}. What functionality actually relies on
 /// Hashable can be found in an extension.
 @_versioned
+@_fixed_layout
 internal struct _Native${Self}Buffer<${TypeParameters}> {
 
   internal typealias RawStorage = _RawNative${Self}Storage
@@ -3883,6 +3884,8 @@ internal struct _Cocoa${Self}Buffer : _HashBuffer {
   }
 }
 #else
+@_versioned
+@_fixed_layout
 internal struct _Cocoa${Self}Buffer {}
 #endif
 
