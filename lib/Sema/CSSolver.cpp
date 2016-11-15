@@ -2247,32 +2247,32 @@ static bool shortCircuitDisjunctionAt(Constraint *constraint,
   return false;
 }
 
-bool ConstraintSystem::solveSimplified(
-       SmallVectorImpl<Solution> &solutions,
-       FreeTypeVariableBinding allowFreeTypeVariables) {
-  // Collect disjunctions.
-  SmallVector<Constraint *, 4> disjunctions;
+void ConstraintSystem::collectDisjunctions(
+    SmallVectorImpl<Constraint *> &disjunctions) {
   for (auto &constraint : InactiveConstraints) {
     if (constraint.getKind() == ConstraintKind::Disjunction)
       disjunctions.push_back(&constraint);
   }
+}
 
+std::pair<PotentialBindings, TypeVariableType *>
+determineBestBindings(ConstraintSystem &CS) {
   // Look for potential type variable bindings.
   TypeVariableType *bestTypeVar = nullptr;
   PotentialBindings bestBindings;
-  for (auto typeVar : TypeVariables) {
+  for (auto typeVar : CS.getTypeVariables()) {
     // Skip any type variables that are bound.
     if (typeVar->getImpl().hasRepresentativeOrFixed())
       continue;
 
     // Get potential bindings.
-    auto bindings = getPotentialBindings(*this, typeVar);
+    auto bindings = getPotentialBindings(CS, typeVar);
     if (!bindings)
       continue;
 
-    if (TC.getLangOpts().DebugConstraintSolver) {
-      auto &log = getASTContext().TypeCheckerDebug->getStream();
-      bindings.dump(typeVar, log, solverState->depth * 2);
+    if (CS.TC.getLangOpts().DebugConstraintSolver) {
+      auto &log = CS.getASTContext().TypeCheckerDebug->getStream();
+      bindings.dump(typeVar, log, CS.solverState->depth * 2);
     }
 
     // If these are the first bindings, or they are better than what
@@ -2282,6 +2282,20 @@ bool ConstraintSystem::solveSimplified(
       bestTypeVar = typeVar;
     }
   }
+
+  return std::make_pair(bestBindings, bestTypeVar);
+}
+
+bool ConstraintSystem::solveSimplified(
+    SmallVectorImpl<Solution> &solutions,
+    FreeTypeVariableBinding allowFreeTypeVariables) {
+
+  SmallVector<Constraint *, 4> disjunctions;
+  collectDisjunctions(disjunctions);
+
+  TypeVariableType *bestTypeVar = nullptr;
+  PotentialBindings bestBindings;
+  std::tie(bestBindings, bestTypeVar) = determineBestBindings(*this);
 
   // If we have a binding that does not involve type variables, or we have
   // no other option, go ahead and try the bindings for this type variable.
