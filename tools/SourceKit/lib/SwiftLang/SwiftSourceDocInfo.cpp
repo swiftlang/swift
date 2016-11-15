@@ -493,7 +493,7 @@ static StringRef getSourceToken(unsigned Offset,
   return L.getTokenAt(Loc).getText();
 }
 
-static llvm::Optional<unsigned> 
+static llvm::Optional<unsigned>
 mapOffsetToOlderSnapshot(unsigned Offset,
                          ImmutableTextSnapshotRef NewSnap,
                          ImmutableTextSnapshotRef OldSnap) {
@@ -519,7 +519,7 @@ mapOffsetToOlderSnapshot(unsigned Offset,
   return Offset;
 }
 
-static llvm::Optional<unsigned> 
+static llvm::Optional<unsigned>
 mapOffsetToNewerSnapshot(unsigned Offset,
                          ImmutableTextSnapshotRef OldSnap,
                          ImmutableTextSnapshotRef NewSnap) {
@@ -1023,43 +1023,6 @@ static void resolveRange(SwiftLangSupport &Lang,
     unsigned Length;
     std::function<void(const RangeInfo&)> Receiver;
 
-    static SourceLoc getNonwhitespaceLocBefore(SourceManager &SM,
-                                               unsigned BufferID,
-                                               unsigned Offset) {
-      CharSourceRange entireRange = SM.getRangeForBuffer(BufferID);
-      StringRef Buffer = SM.extractText(entireRange);
-
-      const char *BufStart = Buffer.data();
-      if (Offset >= Buffer.size())
-        return SourceLoc();
-
-      for (unsigned Off = Offset; Off != 0; Off --) {
-        if (!clang::isWhitespace(*(BufStart + Off))) {
-          return SM.getLocForOffset(BufferID, Off);
-        }
-      }
-      return clang::isWhitespace(*BufStart) ? SourceLoc() :
-        SM.getLocForOffset(BufferID, 0);
-    }
-
-    static SourceLoc getNonwhitespaceLocAfter(SourceManager &SM,
-                                              unsigned BufferID,
-                                              unsigned Offset) {
-      CharSourceRange entireRange = SM.getRangeForBuffer(BufferID);
-      StringRef Buffer = SM.extractText(entireRange);
-
-      const char *BufStart = Buffer.data();
-      if (Offset >= Buffer.size())
-        return SourceLoc();
-
-      for (unsigned Off = Offset; Off < Buffer.size(); Off ++) {
-        if (!clang::isWhitespace(*(BufStart + Off))) {
-          return SM.getLocForOffset(BufferID, Off);
-        }
-      }
-      return SourceLoc();
-    }
-
   public:
     RangeInfoConsumer(StringRef InputFile, unsigned Offset, unsigned Length,
                        SwiftLangSupport &Lang, SwiftInvocationRef ASTInvok,
@@ -1070,25 +1033,10 @@ static void resolveRange(SwiftLangSupport &Lang,
 
     void handlePrimaryAST(ASTUnitRef AstUnit) override {
       auto &CompIns = AstUnit->getCompilerInstance();
-
-      unsigned BufferID = AstUnit->getPrimarySourceFile().getBufferID().getValue();
-      SourceManager &SM = CompIns.getSourceMgr();
-      SourceLoc StartLoc = getNonwhitespaceLocAfter(SM, BufferID, Offset);
-      SourceLoc EndLoc = getNonwhitespaceLocBefore(SM, BufferID,
-                                                   Offset + Length - 1);
-
-      StartLoc = Lexer::getLocForStartOfToken(SM, StartLoc);
-      EndLoc = Lexer::getLocForStartOfToken(SM, EndLoc);
-
-      if (StartLoc.isInvalid() || EndLoc.isInvalid()) {
-        Receiver({});
-        return;
-      }
-
       if (trace::enabled()) {
         // FIXME: Implement tracing
       }
-      RangeResolver Resolver(AstUnit->getPrimarySourceFile(), StartLoc, EndLoc);
+      RangeResolver Resolver(AstUnit->getPrimarySourceFile(), Offset, Length);
       ResolvedRangeInfo Info = Resolver.resolve();
 
       CompilerInvocation CompInvok;

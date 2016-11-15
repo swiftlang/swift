@@ -209,13 +209,15 @@ struct ResolvedRangeInfo {
   RangeKind Kind;
   Type Ty;
   StringRef Content;
-  ResolvedRangeInfo(RangeKind Kind, Type Ty, StringRef Content) : Kind(Kind),
+  ResolvedRangeInfo(RangeKind Kind, Type Ty, StringRef Content): Kind(Kind),
     Ty(Ty), Content(Content) {}
+  ResolvedRangeInfo(): ResolvedRangeInfo(RangeKind::Invalid, Type(), StringRef()) {}
+  void print(llvm::raw_ostream &OS);
 };
 
 class RangeResolver : public SourceEntityWalker {
   struct Implementation;
-  Implementation &Impl;
+  Implementation *Impl;
   bool walkToExprPre(Expr *E) override;
   bool walkToExprPost(Expr *E) override;
   bool walkToStmtPre(Stmt *S) override;
@@ -224,6 +226,7 @@ class RangeResolver : public SourceEntityWalker {
   bool walkToDeclPost(Decl *D) override;
 public:
   RangeResolver(SourceFile &File, SourceLoc Start, SourceLoc End);
+  RangeResolver(SourceFile &File, unsigned Offset, unsigned Length);
   ResolvedRangeInfo resolve();
   ~RangeResolver();
 };
