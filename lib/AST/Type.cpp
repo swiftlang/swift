@@ -2897,9 +2897,13 @@ static Type substType(
       return SubstitutedType::get(type, known->second,
                                   type->getASTContext());
 
+    // For archetypes, we can substitute the parent (if present).
+    auto archetype = substOrig->getAs<ArchetypeType>();
+    if (!archetype) return type;
+
     // If we don't have a substitution for this type and it doesn't have a
     // parent, then we're not substituting it.
-    auto parent = substOrig->getParent();
+    auto parent = archetype->getParent();
     if (!parent)
       return type;
 
@@ -2911,13 +2915,10 @@ static Type substType(
       return type;
 
     // Get the associated type reference from a child archetype.
-    AssociatedTypeDecl *assocType = nullptr;
-    if (auto archetype = substOrig->getAs<ArchetypeType>()) {
-      assocType = archetype->getAssocType();
-    }
-    
+    AssociatedTypeDecl *assocType = archetype->getAssocType();
+
     return getMemberForBaseType(conformances, parent, substParent,
-                                assocType, substOrig->getName(),
+                                assocType, archetype->getName(),
                                 options);
   });
 }
