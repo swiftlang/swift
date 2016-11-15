@@ -1228,8 +1228,8 @@ extension Sequence where
     return AnySequence(result)
   }
   
-  /// Returns a subsequence starting after the initial, consecutive elements
-  /// that satisfy the given predicate.
+  /// Returns a subsequence by skipping the initial, consecutive elements that
+  /// satisfy the given predicate.
   ///
   /// The following example uses the `drop(while:)` method to skip over the
   /// positive numbers at the beginning of the `numbers` array. The result

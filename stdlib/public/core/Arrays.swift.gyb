@@ -1144,11 +1144,18 @@ extension ${Self} : RangeReplaceableCollection, _ArrayProtocol {
     return _getCount()
   }
 
-  /// The total number of elements that the array can contain using its current
-  /// storage.
+  /// The total number of elements that the array can contain without
+  /// allocating new storage.
   ///
-  /// If you add more elements to an array than it can hold with its current
-  /// capacity, it discards its current storage and allocates a larger one.
+  /// Every array reserves a specific amount of memory to hold its contents.
+  /// When you add elements to an array and that array begins to exceed its
+  /// reserved capacity, the array allocates a larger region of memory and
+  /// copies its elements into the new storage. The new storage is a multiple
+  /// of the old storage's size. This exponential growth strategy means that
+  /// appending an element happens in constant time, averaging the performance
+  /// of many append operations. Append operations that trigger reallocation
+  /// have a performance cost, but they occur less and less often as the array
+  /// grows larger.
   ///
   /// The following example creates an array of integers from an array literal,
   /// then appends the elements of another collection. Before appending, the

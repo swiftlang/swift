@@ -323,13 +323,24 @@ func _diagnoseUnexpectedNilOptional(_filenameStart: Builtin.RawPointer,
 ///
 /// You can also use this operator to compare a non-optional value to an
 /// optional that wraps the same type. The non-optional value is wrapped as an
-/// optional before the comparison is made. In this example, the
+/// optional before the comparison is made. In the following example, the
 /// `numberToMatch` constant is wrapped as an optional before comparing to the
 /// optional `numberFromString`:
 ///
 ///     let numberToFind: Int = 23
 ///     let numberFromString: Int? = Int("23")      // Optional(23)
 ///     if numberToFind == numberFromString {
+///         print("It's a match!")
+///     }
+///     // Prints "It's a match!"
+///
+/// An instance that is expressed as a literal can also be used with this
+/// operator. In the next example, an integer literal is compared with the
+/// optional integer `numberFromString`. The literal `23` is inferred as an
+/// `Int` instance and then wrapped as an optional before the comparison is
+/// performed.
+///
+///     if 23 == numberFromString {
 ///         print("It's a match!")
 ///     }
 ///     // Prints "It's a match!"
@@ -399,31 +410,28 @@ public struct _OptionalNilComparisonType : ExpressibleByNilLiteral {
 ///
 /// You can use the pattern-matching operator (`~=`) to test whether an
 /// optional instance is `nil` even when the wrapped value's type does not
-/// conform to the `Equatable` protocol. The following example declares the
-/// `numbers` variable as an optional array of integers. Although `Array<Int>`
-/// is not an `Equatable` type, this operator allows matching against `nil`.
+/// conform to the `Equatable` protocol. The pattern-matching operator is used
+/// internally in `case` statements for pattern matching.
 ///
-///     var numbers: [Int]?
-///     if nil ~= numbers {
-///         print("No numbers to be found.")
-///     }
-///     // Prints "No numbers to be found."
-///
-/// The pattern-matching operator is used internally in `case` statements for
-/// pattern matching. When you match against `nil` in a `case` statement, this
+/// The following example declares the `stream` variable as an optional
+/// instance of a hypothetical `DataStream` type, and then uses a `switch`
+/// statement to determine whether the stream is `nil` or has a configured
+/// value. When evaluating the `nil` case of the `switch` statement, this
 /// operator is called behind the scenes.
 ///
-///     switch numbers {
+///     var stream: DataStream? = nil
+///     switch stream {
 ///     case nil:
-///         print("No numbers to be found.")
+///         print("No data stream is configured.")
 ///     case let x?:
-///         print("Found \(x.count) numbers.")
+///         print("The data stream has \(x.availableBytes) bytes available.")
 ///     }
-///     // Prints "No numbers to be found."
+///     // Prints "No data stream is configured."
 ///
-/// - Note: In most cases, you should use the equal-to operator (`==`) to test
-///   whether an instance is `nil`. The pattern-matching operator is primarily
-///   intended to enable `case` statement pattern matching.
+/// - Note: To test whether an instance is `nil` in an `if` statement, use the
+///   equal-to operator (`==`) instead of the pattern-matching operator. The
+///   pattern-matching operator is primarily intended to enable `case`
+///   statement pattern matching.
 ///
 /// - Parameters:
 ///   - lhs: A `nil` literal.
@@ -446,16 +454,18 @@ public func ~= <T>(lhs: _OptionalNilComparisonType, rhs: T?) -> Bool {
 ///
 /// You can use this equal-to operator (`==`) to test whether an optional
 /// instance is `nil` even when the wrapped value's type does not conform to
-/// the `Equatable` protocol. The following example declares the `numbers`
-/// variable as an optional array of integers. Although `Array<Int>` is not an
-/// `Equatable` type, this operator allows checking whether `numbers` is
+/// the `Equatable` protocol.
+///
+/// The following example declares the `stream` variable as an optional
+/// instance of a hypothetical `DataStream` type. Although `DataStream` is not
+/// an `Equatable` type, this operator allows checking whether `stream` is
 /// `nil`.
 ///
-///     var numbers: [Int]?
-///     if numbers == nil {
-///         print("No numbers to be found.")
+///     var stream: DataStream? = nil
+///     if stream == nil {
+///         print("No data stream is configured.")
 ///     }
-///     // Prints "No numbers to be found."
+///     // Prints "No data stream is configured."
 ///
 /// - Parameters:
 ///   - lhs: A value to compare to `nil`.
@@ -475,16 +485,18 @@ public func == <T>(lhs: T?, rhs: _OptionalNilComparisonType) -> Bool {
 ///
 /// You can use this not-equal-to operator (`!=`) to test whether an optional
 /// instance is not `nil` even when the wrapped value's type does not conform
-/// to the `Equatable` protocol. The following example declares the `numbers`
-/// variable as an optional array of integers. Although `Array<Int>` is not an
-/// `Equatable` type, this operator allows checking whether `numbers` wraps a
-/// value and is therefore not `nil`.
+/// to the `Equatable` protocol.
 ///
-///     var numbers: [Int]? = [10, 20, 30, 40]
-///     if nil != numbers {
-///         print("Found some numbers.")
+/// The following example declares the `stream` variable as an optional
+/// instance of a hypothetical `DataStream` type. Although `DataStream` is not
+/// an `Equatable` type, this operator allows checking whether `stream` wraps
+/// a value and is therefore not `nil`.
+///
+///     var stream: DataStream? = fetchDataStream()
+///     if stream != nil {
+///         print("The data stream has been configured.")
 ///     }
-///     // Prints "Found some numbers."
+///     // Prints "The data stream has been configured."
 ///
 /// - Parameters:
 ///   - lhs: A value to compare to `nil`.
@@ -504,16 +516,18 @@ public func != <T>(lhs: T?, rhs: _OptionalNilComparisonType) -> Bool {
 ///
 /// You can use this equal-to operator (`==`) to test whether an optional
 /// instance is `nil` even when the wrapped value's type does not conform to
-/// the `Equatable` protocol. The following example declares the `numbers`
-/// variable as an optional array of integers. Although `Array<Int>` is not an
-/// `Equatable` type, this operator allows checking whether `numbers` is
+/// the `Equatable` protocol.
+///
+/// The following example declares the `stream` variable as an optional
+/// instance of a hypothetical `DataStream` type. Although `DataStream` is not
+/// an `Equatable` type, this operator allows checking whether `stream` is
 /// `nil`.
 ///
-///     var numbers: [Int]?
-///     if nil == numbers {
-///         print("No numbers to be found.")
+///     var stream: DataStream? = nil
+///     if nil == stream {
+///         print("No data stream is configured.")
 ///     }
-///     // Prints "No numbers to be found."
+///     // Prints "No data stream is configured."
 ///
 /// - Parameters:
 ///   - lhs: A `nil` literal.
@@ -533,16 +547,18 @@ public func == <T>(lhs: _OptionalNilComparisonType, rhs: T?) -> Bool {
 ///
 /// You can use this not-equal-to operator (`!=`) to test whether an optional
 /// instance is not `nil` even when the wrapped value's type does not conform
-/// to the `Equatable` protocol. The following example declares the `numbers`
-/// variable as an optional array of integers. Although `Array<Int>` is not an
-/// `Equatable` type, this operator allows checking whether `numbers` wraps a
-/// value and is therefore not `nil`.
+/// to the `Equatable` protocol.
 ///
-///     var numbers: [Int]? = [10, 20, 30, 40]
-///     if nil != numbers {
-///         print("Found some numbers.")
+/// The following example declares the `stream` variable as an optional
+/// instance of a hypothetical `DataStream` type. Although `DataStream` is not
+/// an `Equatable` type, this operator allows checking whether `stream` wraps
+/// a value and is therefore not `nil`.
+///
+///     var stream: DataStream? = fetchDataStream()
+///     if nil != stream {
+///         print("The data stream has been configured.")
 ///     }
-///     // Prints "Found some numbers."
+///     // Prints "The data stream has been configured."
 ///
 /// - Parameters:
 ///   - lhs: A `nil` literal.
