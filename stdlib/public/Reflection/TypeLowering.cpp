@@ -1247,8 +1247,7 @@ const TypeInfo *TypeConverter::getTypeInfo(const TypeRef *TR) {
 }
 
 const TypeInfo *TypeConverter::getClassInstanceTypeInfo(const TypeRef *TR,
-                                                        unsigned start,
-                                                        unsigned align) {
+                                                        unsigned start) {
   const FieldDescriptor *FD = getBuilder().getFieldTypeInfo(TR);
   if (FD == nullptr) {
     DEBUG(std::cerr << "No field descriptor: "; TR->dump());
