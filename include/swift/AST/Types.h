@@ -4033,29 +4033,10 @@ CanArchetypeType getParent() const {
 }
 END_CAN_TYPE_WRAPPER(ArchetypeType, SubstitutableType)
 
-/// Abstract class used to describe the type of a generic type parameter
-/// or associated type.
-///
-/// \sa AbstractTypeParamDecl
-class AbstractTypeParamType : public SubstitutableType {
-protected:
-  AbstractTypeParamType(TypeKind kind, const ASTContext *ctx,
-                        RecursiveTypeProperties properties)
-    : SubstitutableType(kind, ctx, properties) { }
-
-public:
-  // Implement isa/cast/dyncast/etc.
-  static bool classof(const TypeBase *T) {
-    return T->getKind() >= TypeKind::First_AbstractTypeParamType &&
-           T->getKind() <= TypeKind::Last_AbstractTypeParamType;
-  }
-};
-DEFINE_EMPTY_CAN_TYPE_WRAPPER(AbstractTypeParamType, SubstitutableType)
-
 /// Describes the type of a generic parameter.
 ///
 /// \sa GenericTypeParamDecl
-class GenericTypeParamType : public AbstractTypeParamType {
+class GenericTypeParamType : public SubstitutableType {
   using DepthIndexTy = llvm::PointerEmbeddedInt<unsigned, 31>;
 
   /// The generic type parameter or depth/index.
@@ -4108,28 +4089,28 @@ private:
   friend class GenericTypeParamDecl;
 
   explicit GenericTypeParamType(GenericTypeParamDecl *param)
-    : AbstractTypeParamType(TypeKind::GenericTypeParam, nullptr,
-                            RecursiveTypeProperties::HasTypeParameter),
+    : SubstitutableType(TypeKind::GenericTypeParam, nullptr,
+                        RecursiveTypeProperties::HasTypeParameter),
       ParamOrDepthIndex(param) { }
 
   explicit GenericTypeParamType(unsigned depth,
                                 unsigned index,
                                 const ASTContext &ctx)
-    : AbstractTypeParamType(TypeKind::GenericTypeParam, &ctx,
-                            RecursiveTypeProperties::HasTypeParameter),
+    : SubstitutableType(TypeKind::GenericTypeParam, &ctx,
+                        RecursiveTypeProperties::HasTypeParameter),
       ParamOrDepthIndex(depth << 16 | index) { }
 };
-BEGIN_CAN_TYPE_WRAPPER(GenericTypeParamType, AbstractTypeParamType)
+BEGIN_CAN_TYPE_WRAPPER(GenericTypeParamType, SubstitutableType)
   static CanGenericTypeParamType get(unsigned depth, unsigned index,
                                      const ASTContext &C) {
     return CanGenericTypeParamType(GenericTypeParamType::get(depth, index, C));
   }
-END_CAN_TYPE_WRAPPER(GenericTypeParamType, AbstractTypeParamType)
+END_CAN_TYPE_WRAPPER(GenericTypeParamType, SubstitutableType)
 
 /// Describes the type of an associated type.
 ///
 /// \sa AssociatedTypeDecl
-class AssociatedTypeType : public AbstractTypeParamType {
+class AssociatedTypeType : public SubstitutableType {
   /// The generic type parameter.
   AssociatedTypeDecl *AssocType;
 
@@ -4151,11 +4132,11 @@ private:
   // These aren't classified as dependent for some reason.
 
   AssociatedTypeType(AssociatedTypeDecl *assocType)
-    : AbstractTypeParamType(TypeKind::AssociatedType, nullptr,
-                            RecursiveTypeProperties()),
+    : SubstitutableType(TypeKind::AssociatedType, nullptr,
+                        RecursiveTypeProperties()),
       AssocType(assocType) { }
 };
-DEFINE_EMPTY_CAN_TYPE_WRAPPER(AssociatedTypeType, AbstractTypeParamType)
+DEFINE_EMPTY_CAN_TYPE_WRAPPER(AssociatedTypeType, SubstitutableType)
 
 /// SubstitutedType - A type that has been substituted for some other type,
 /// which implies that the replacement type meets all of the requirements of
