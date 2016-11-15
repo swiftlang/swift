@@ -43,6 +43,8 @@ A<[[A<B>]]>.c()
 A<(Int, UnicodeScalar)>.c()
 A<(a:Int, b:UnicodeScalar)>.c()
 A<Runcible & Fungible>.c()
+A<@convention(c) () -> Int32>.c()
+A<(@autoclosure @escaping () -> Int, Int) -> Void>.c()
 
 A<B>(x: 0) // expected-warning{{unused}}
 
