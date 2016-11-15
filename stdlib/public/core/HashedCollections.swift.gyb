@@ -268,14 +268,12 @@ internal var _hashContainerDefaultMaxLoadFactorInverse: Double {
 internal func _stdlib_NSObject_isEqual(_ lhs: AnyObject, _ rhs: AnyObject) -> Bool
 #endif
 
-//===--- Hacks and workarounds --------------------------------------------===//
 
-// FIXME(ABI)#158 (Performance)
-// There used to be a now-fixed optimizer bug that prevented using
-// UnsafePointer<Unmanaged<AnyObject>> in Dictionary implementation.
-// rdar://problem/16861508
-/// Like `UnsafeMutablePointer<Unmanaged<AnyObject>>`, or `id
-/// __unsafe_unretained *` in Objective-C ARC.
+/// A temporary view of an array of AnyObject as an array of Unmanaged<AnyObject>
+/// for fast iteration and transformation of the elements.
+///
+/// Accesses the underlying raw memory as Unmanaged<AnyObject> using untyped
+/// memory accesses. The memory remains bound to managed AnyObjects.
 internal struct _UnmanagedAnyObjectArray {
   /// Underlying pointer.
   internal var value: UnsafeMutableRawPointer
