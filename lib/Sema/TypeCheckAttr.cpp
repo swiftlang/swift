@@ -1463,15 +1463,13 @@ void AttributeChecker::visitSpecializeAttr(SpecializeAttr *attr) {
       // Get the conformance and record it.
       auto firstType = req.getFirstType().subst(subMap);
       auto protoType = req.getSecondType()->castTo<ProtocolType>();
-      ProtocolConformance *conformance = nullptr;
-      bool conforms =
+      auto conformance =
         TC.conformsToProtocol(firstType,
                               protoType->getDecl(),
                               DC,
                               (ConformanceCheckFlags::InExpression|
-                               ConformanceCheckFlags::Used),
-                              &conformance);
-      if (!conforms || !conformance) {
+                               ConformanceCheckFlags::Used));
+      if (!conformance) {
         TC.diagnose(attr->getLocation(),
                     diag::cannot_convert_argument_value_protocol,
                     firstType, protoType);
@@ -1479,7 +1477,7 @@ void AttributeChecker::visitSpecializeAttr(SpecializeAttr *attr) {
         return;
       }
 
-      currentConformances.push_back(ProtocolConformanceRef(conformance));
+      currentConformances.push_back(*conformance);
       break;
     }
     case RequirementKind::Superclass: {

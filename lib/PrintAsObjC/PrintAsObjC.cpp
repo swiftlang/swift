@@ -875,7 +875,7 @@ private:
     auto conformance = conformances.front();
     Type objcType = ProtocolConformance::getTypeWitnessByName(
                       nominal->getDeclaredType(),
-                      conformance,
+                      ProtocolConformanceRef(conformance),
                       ctx.Id_ObjectiveCType,
                       nullptr);
     if (!objcType) return nullptr;

@@ -3883,7 +3883,7 @@ Type ASTContext::getBridgedToObjC(const DeclContext *dc, Type type,
     // Find the Objective-C class type we bridge to.
     if (conformance->isConcrete()) {
       return ProtocolConformance::getTypeWitnessByName(
-               type, conformance->getConcrete(), Id_ObjectiveCType,
+               type, *conformance, Id_ObjectiveCType,
                getLazyResolver());
     } else {
       return type->castTo<ArchetypeType>()->getNestedType(Id_ObjectiveCType)
