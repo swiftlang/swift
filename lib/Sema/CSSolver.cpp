@@ -979,14 +979,8 @@ static PotentialBindings getPotentialBindings(ConstraintSystem &cs,
     auto first = cs.simplifyType(constraint->getFirstType());
     auto second = cs.simplifyType(constraint->getSecondType());
 
-    if (auto firstTyvar = first->getAs<TypeVariableType>()) {
-      if (auto secondTyvar = second->getAs<TypeVariableType>()) {
-        if (cs.getRepresentative(firstTyvar) ==
-            cs.getRepresentative(secondTyvar)) {
-          continue;
-        }
-      }
-    }
+    if (first->is<TypeVariableType>() && first->isEqual(second))
+      continue;
 
     Type type;
     AllowedBindingKind kind;
