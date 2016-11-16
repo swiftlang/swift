@@ -32,8 +32,7 @@ struct GuaranteedARCOptsVisitor
 
 static SILBasicBlock::reverse_iterator
 getPrevReverseIterator(SILInstruction *I) {
-  auto Iter = std::next(I->getIterator());
-  return std::next(SILBasicBlock::reverse_iterator(Iter));
+  return std::next(I->getIterator().getReverse());
 }
 
 bool GuaranteedARCOptsVisitor::visitDestroyAddrInst(DestroyAddrInst *DAI) {
