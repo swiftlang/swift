@@ -29,7 +29,7 @@ Structs and tuples currently share the same layout algorithm, noted as the
 is as follows:
 
 - Start with a **size** of **0** and an **alignment** of **1**.
-- Iterate through the fields, in element order for tuples, or in ``var`` 
+- Iterate through the fields, in element order for tuples, or in ``var``
   declaration order for structs. For each field:
 
   * Update **size** by rounding up to the **alignment of the field**, that is,
@@ -41,7 +41,7 @@ is as follows:
     **alignment of the field**.
 
 - The final **size** and **alignment** are the size and alignment of the
-  aggregate. The **stride** of the type is the final **size** rounded up to 
+  aggregate. The **stride** of the type is the final **size** rounded up to
   **alignment**.
 
 Note that this differs from C or LLVM's normal layout rules in that *size*
@@ -852,7 +852,7 @@ The first identifier in a ``<private-decl-name>`` is a string that represents
 the file the original declaration came from. It should be considered unique
 within the enclosing module. The second identifier is the name of the entity.
 
-Not all declarations marked ``private`` declarations will use the 
+Not all declarations marked ``private`` declarations will use the
 ``<private-decl-name>`` mangling; if the entity's context is enough to uniquely
 identify the entity, the simple ``identifier`` form is preferred.
 
@@ -929,7 +929,7 @@ Types
   type ::= 'b' type type                     // objc block function type
   type ::= 'c' type type                     // C function pointer type
   type ::= 'F' throws-annotation? type type  // function type
-  type ::= 'f' throws-annotation? type type  // uncurried function type  
+  type ::= 'f' throws-annotation? type type  // uncurried function type
   type ::= 'G' type <type>+ '_'              // generic type application
   type ::= 'K' type type                     // @auto_closure function type
   type ::= 'M' type                          // metatype without representation

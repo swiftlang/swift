@@ -21,7 +21,7 @@ When type theorists consider a programming language, we break it down like this:
 
 Swift has a pretty small set of types right now:
 
-* Fundamental types: currently i1, i8, i16, i32, and i64; 
+* Fundamental types: currently i1, i8, i16, i32, and i64;
   float and double; eventually maybe others.
 * Function types.
 * Tuples. Heterogeneous fixed-length products. Swift's system
@@ -297,7 +297,7 @@ braces end up causing a lot of unnecessary vertical whitespace, like so::
   case .bar {
     // …
   }
-  
+
 So instead, let's require the switch statement to have braces, and
 we'll allow the cases to be written without them::
 
@@ -441,7 +441,7 @@ I think this should bind looser than any binary operators except assignments;
 effectively we should have::
 
   expr-binary ::= # most of the current expr grammar
-  
+
   expr ::= expr-binary
   expr ::= expr-binary 'is' expr-primary pattern-guard?
 

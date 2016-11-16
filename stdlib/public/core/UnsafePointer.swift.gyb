@@ -293,7 +293,7 @@ public struct ${Self}<Pointee>
     _debugPrecondition(
       count >= 0, "${Self}.initialize with negative count")
     _debugPrecondition(
-      UnsafePointer(self) + count <= source || 
+      UnsafePointer(self) + count <= source ||
       source + count <= UnsafePointer(self),
       "${Self}.initialize overlapping range")
     Builtin.copyArray(
@@ -652,7 +652,7 @@ extension ${Self} {
     count: Int) {
     Builtin.unreachable()
   }
-  
+
   @available(*, unavailable, renamed: "moveAssign(from:count:)")
   public func moveAssignFrom(_ source: UnsafePointer<Pointee>, count: Int) {
     Builtin.unreachable()

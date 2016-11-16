@@ -464,7 +464,7 @@ public func expectRandomAccessCollectionAssociatedTypes<X : RandomAccessCollecti
   X.Indices.Iterator.Element == X.Index,
   X.Indices.Index == X.Index,
   X.Indices.SubSequence == X.Indices {}
-  
+
 public struct AssertionResult : CustomStringConvertible {
   init(isPass: Bool) {
     self._isPass = isPass
@@ -643,7 +643,7 @@ func _childProcess() {
     } else {
       print("*** [StdlibUnittest] Terminating due to uncaught exception: " +
         "\(exception)",
-        to: &stderr)      
+        to: &stderr)
     }
   }
 #endif
@@ -2146,11 +2146,11 @@ public func checkComparable<Instances : Collection>(
   // FIXME(ABI)#91 (Associated Types with where clauses): these constraints should be applied to
   // associated types of Collection.
   Instances.Indices.Iterator.Element == Instances.Index {
-  
+
   // Also checks that equality is consistent with comparison and that
   // the oracle obeys the equality laws
   checkEquatable(instances, oracle: { oracle($0, $1).isEQ() }, ${trace})
-  
+
   for i in instances.indices {
     let x = instances[i]
 
@@ -2178,15 +2178,15 @@ public func checkComparable<Instances : Collection>(
 
     for j in instances.indices where i != j {
       let y = instances[j]
-      
+
       let expected = oracle(i, j)
-      
+
       expectEqual(
         expected.flip(), oracle(j, i),
         "bad oracle: missing antisymmetry: "
         + "(\(String(reflecting: i)), \(String(reflecting: j)))",
         stackTrace: ${stackTrace})
-      
+
       expectEqual(expected.isLT(), x < y,
         "x < y\n" +
         "lhs (at index \(i)): \(String(reflecting: x))\n" +
@@ -2265,11 +2265,11 @@ public func checkStrideable<Instances : Collection, Strides : Collection>(
       return d < 0 ? .lt : d == 0 ? .eq : .gt
     },
     ${trace})
-  
+
   for i in instances.indices {
     let x = instances[i]
     expectEqual(x, x.advanced(by: 0))
-    
+
     for j in strides.indices {
       let y = strides[j]
       expectEqual(advanceOracle(i, j), x.advanced(by: y))
@@ -2304,7 +2304,7 @@ public func expectEqualSequence<
 ) where
   Expected.Iterator.Element == Actual.Iterator.Element,
   Expected.Iterator.Element : Equatable {
-  
+
   expectEqualSequence(expected, actual, ${trace}) { $0 == $1 }
 }
 
@@ -2351,7 +2351,7 @@ public func expectEqualsUnordered<
     -> ExpectedComparisonResult
 ) where
   Expected.Iterator.Element == Actual.Iterator.Element {
-  
+
   let x: [Expected.Iterator.Element] =
     expected.sorted(by: compose(compare, { $0.isLT() }))
   let y: [Actual.Iterator.Element] =
@@ -2498,7 +2498,7 @@ public func expectEqualUnicodeScalars(
   _ expected: [UInt32], _ actual: String, ${TRACE}) {
   let actualUnicodeScalars = Array(
     actual.unicodeScalars.lazy.map { $0.value })
-  
+
   if !expected.elementsEqual(actualUnicodeScalars) {
     expectationFailure(
       "expected elements: \"\(asHex(expected))\"\n"

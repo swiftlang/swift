@@ -196,7 +196,7 @@ void trace::initTraceFiles(trace::SwiftInvocation &SwiftArgs,
 
 void SwiftLangSupport::indexSource(StringRef InputFile,
                                    IndexingConsumer &IdxConsumer,
-                                   ArrayRef<const char *> Args,
+                                   ArrayRef<const char *> OrigArgs,
                                    StringRef Hash) {
   std::string Error;
   auto InputBuf = ASTMgr->getMemoryBuffer(InputFile, Error);
@@ -213,6 +213,12 @@ void SwiftLangSupport::indexSource(StringRef InputFile,
   // Display diagnostics to stderr.
   PrintingDiagnosticConsumer PrintDiags;
   CI.addDiagnosticConsumer(&PrintDiags);
+
+  // Add -disable-typo-correction, since the errors won't be captured in the
+  // response, and it can be expensive to do typo-correction when there are many
+  // errors, which is common in indexing.
+  SmallVector<const char *, 16> Args(OrigArgs.begin(), OrigArgs.end());
+  Args.push_back("-disable-typo-correction");
 
   CompilerInvocation Invocation;
   bool Failed = getASTManager().initCompilerInvocation(Invocation, Args,

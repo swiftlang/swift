@@ -275,10 +275,8 @@ void SILGenFunction::emitValueConstructor(ConstructorDecl *ctor) {
     
     if (!lowering.isAddressOnly()) {
       // Otherwise, load and return the final 'self' value.
-      selfValue = B.createLoad(cleanupLoc, selfLV);
-      
-      // Emit a retain of the loaded value, since we return it +1.
-      lowering.emitCopyValue(B, cleanupLoc, selfValue);
+      selfValue = lowering.emitLoad(B, cleanupLoc, selfLV,
+                                    LoadOwnershipQualifier::Copy);
 
       // Inject the self value into an optional if the constructor is failable.
       if (ctor->getFailability() != OTK_None) {
@@ -492,9 +490,7 @@ void SILGenFunction::emitClassConstructorAllocator(ConstructorDecl *ctor) {
   // Call the initializer.
   ArrayRef<Substitution> forwardingSubs;
   if (auto *genericEnv = ctor->getGenericEnvironmentOfContext()) {
-    auto *genericSig = ctor->getGenericSignatureOfContext();
-    forwardingSubs = genericEnv->getForwardingSubstitutions(
-        SGM.SwiftModule, genericSig);
+    forwardingSubs = genericEnv->getForwardingSubstitutions(SGM.SwiftModule);
   }
   std::tie(initVal, initTy, subs)
     = emitSiblingMethodRef(Loc, selfValue, initConstant, forwardingSubs);
@@ -581,7 +577,9 @@ void SILGenFunction::emitClassConstructorInitializer(ConstructorDecl *ctor) {
     if (NeedsBoxForSelf) {
       SILLocation prologueLoc = RegularLocation(ctor);
       prologueLoc.markAsPrologue();
-      B.createStore(prologueLoc, selfArg, VarLocs[selfDecl].value);
+      // SEMANTIC ARC TODO: When the verifier is complete, review this.
+      B.emitStoreValueOperation(prologueLoc, selfArg, VarLocs[selfDecl].value,
+                                StoreOwnershipQualifier::Init);
     } else {
       selfArg = B.createMarkUninitialized(selfDecl, selfArg, MUKind);
       VarLocs[selfDecl] = VarLoc::get(selfArg);
@@ -667,12 +665,20 @@ void SILGenFunction::emitClassConstructorInitializer(ConstructorDecl *ctor) {
       // Emit the call to super.init() right before exiting from the initializer.
       if (Expr *SI = ctor->getSuperInitCall())
         emitRValue(SI);
-      
-      selfArg = B.createLoad(cleanupLoc, VarLocs[selfDecl].value);
+
+      selfArg = B.emitLoadValueOperation(cleanupLoc, VarLocs[selfDecl].value,
+                                         LoadOwnershipQualifier::Copy);
+    } else {
+      // We have to do a retain because we are returning the pointer +1.
+      //
+      // SEMANTIC ARC TODO: When the verifier is complete, we will need to
+      // change this to selfArg = B.emitCopyValueOperation(...). Currently due
+      // to the way that SILGen performs folding of copy_value, destroy_value,
+      // the returned selfArg may be deleted causing us to have a
+      // dead-pointer. Instead just use the old self value since we have a
+      // class.
+      selfArg = B.emitCopyValueOperation(cleanupLoc, selfArg);
     }
-    
-    // We have to do a retain because we are returning the pointer +1.
-    selfArg = B.emitCopyValueOperation(cleanupLoc, selfArg);
 
     // Inject the self value into an optional if the constructor is failable.
     if (ctor->getFailability() != OTK_None) {
@@ -874,9 +880,7 @@ void SILGenFunction::emitMemberInitializers(DeclContext *dc,
         ArrayRef<Substitution> subs;
         auto *genericEnv = dc->getGenericEnvironmentOfContext();
         if (genericEnv) {
-          auto *genericSig = dc->getGenericSignatureOfContext();
-          subs = genericEnv->getForwardingSubstitutions(
-              SGM.SwiftModule, genericSig);
+          subs = genericEnv->getForwardingSubstitutions(SGM.SwiftModule);
         }
 
         // Get the type of the initialization result, in terms

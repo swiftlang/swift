@@ -521,7 +521,13 @@ public:
   Type visitParenType(ParenType *pt) {
     return ParenType::get(pt->getASTContext(), visit(pt->getUnderlyingType()));
   }
-  
+
+  Type visitSubstitutedType(SubstitutedType *st) {
+    return SubstitutedType::get(st->getOriginal(),
+                                visit(st->getReplacementType()),
+                                st->getASTContext());
+  }
+
   Type visitType(TypeBase *t) {
     // Other types should not structurally contain lvalues.
     assert(!t->isLValueType()
@@ -2774,13 +2780,10 @@ static Type getMemberForBaseType(ConformanceSource conformances,
       return getDependentMemberType(ErrorType::get(substBase));
   }
 
-  // If the parent is a type variable, retrieve its member type
-  // variable.
-  if (auto typeVarParent = substBase->getAs<TypeVariableType>()) {
-    assert(assocType && "Missing associated type");
-    return substBase->getASTContext().getTypeVariableMemberType(typeVarParent,
-                                                                assocType);
-  }
+  // If the parent is a type variable or a member rooted in a type variable,
+  // we're done.
+  if (substBase->isTypeVariableOrMember())
+    return getDependentMemberType(substBase);
 
   // Retrieve the member type with the given name.
 
@@ -2807,12 +2810,12 @@ static Type getMemberForBaseType(ConformanceSource conformances,
     }
 
     if (!conformance) return failed();
+    if (!conformance->isConcrete()) return failed();
 
     // If we have an unsatisfied type witness while we're checking the
     // conformances we're supposed to skip this conformance's unsatisfied type
     // witnesses, and we have an unsatisfied type witness, return
     // "missing".
-    assert(conformance->isConcrete());
     if (conformance->getConcrete()->getRootNormalConformance()->getState()
           == ProtocolConformanceState::CheckingTypeWitnesses &&
         !conformance->getConcrete()->hasTypeWitness(assocType, nullptr))
@@ -2872,15 +2875,6 @@ static Type substType(
     // For dependent member types, we may need to look up the member if the
     // base is resolved to a non-dependent type.
     if (auto depMemTy = type->getAs<DependentMemberType>()) {
-      // Check whether we have a direct substitution for the dependent type.
-      // FIXME: This arguably should be getMemberForBaseType's responsibility.
-      auto known =
-        substitutions.find(depMemTy->getCanonicalType().getPointer());
-      if (known != substitutions.end() && known->second) {
-        return SubstitutedType::get(type, known->second,
-                                    type->getASTContext());
-      }
-    
       auto newBase = substType(depMemTy->getBase(), conformances,
                                substitutions, options);
       if (!newBase)
@@ -2903,9 +2897,13 @@ static Type substType(
       return SubstitutedType::get(type, known->second,
                                   type->getASTContext());
 
+    // For archetypes, we can substitute the parent (if present).
+    auto archetype = substOrig->getAs<ArchetypeType>();
+    if (!archetype) return type;
+
     // If we don't have a substitution for this type and it doesn't have a
     // parent, then we're not substituting it.
-    auto parent = substOrig->getParent();
+    auto parent = archetype->getParent();
     if (!parent)
       return type;
 
@@ -2917,13 +2915,10 @@ static Type substType(
       return type;
 
     // Get the associated type reference from a child archetype.
-    AssociatedTypeDecl *assocType = nullptr;
-    if (auto archetype = substOrig->getAs<ArchetypeType>()) {
-      assocType = archetype->getAssocType();
-    }
-    
+    AssociatedTypeDecl *assocType = archetype->getAssocType();
+
     return getMemberForBaseType(conformances, parent, substParent,
-                                assocType, substOrig->getName(),
+                                assocType, archetype->getName(),
                                 options);
   });
 }
@@ -3015,7 +3010,7 @@ TypeSubstitutionMap TypeBase::getMemberSubstitutions(const DeclContext *dc) {
     // FIXME: This feels painfully inefficient. We're creating a dense map
     // for a single substitution.
     substitutions[dc->getSelfInterfaceType()
-                    ->getCanonicalType().getPointer()]
+                    ->getCanonicalType()->castTo<GenericTypeParamType>()]
       = baseTy;
     return substitutions;
   }
@@ -3048,7 +3043,7 @@ TypeSubstitutionMap TypeBase::getMemberSubstitutions(const DeclContext *dc) {
       auto args = boundGeneric->getGenericArgs();
       for (unsigned i = 0, n = args.size(); i != n; ++i) {
         substitutions[params[i]->getDeclaredType()->getCanonicalType()
-                        .getPointer()] = args[i];
+                        ->castTo<GenericTypeParamType>()] = args[i];
       }
 
       // Continue looking into the parent.
@@ -3111,7 +3106,7 @@ Type TypeBase::adjustSuperclassMemberDeclType(const ValueDecl *decl,
           genericParams->size() == parentParams->size()) {
         for (unsigned i = 0, e = genericParams->size(); i < e; i++) {
           auto paramTy = parentParams->getParams()[i]->getDeclaredInterfaceType()
-              ->getCanonicalType().getPointer();
+          ->getCanonicalType()->castTo<GenericTypeParamType>();
           subs[paramTy] = genericParams->getParams()[i]
               ->getDeclaredInterfaceType();
         }
@@ -3557,6 +3552,36 @@ case TypeKind::Id:
     if (genericParams.empty()) {
       return FunctionType::get(inputTy, resultTy, function->getExtInfo());
     }
+
+    // Sort/unique the generic parameters by depth/index.
+    using llvm::array_pod_sort;
+    array_pod_sort(genericParams.begin(), genericParams.end(),
+                   [](GenericTypeParamType * const * gpp1,
+                      GenericTypeParamType * const * gpp2) {
+                     auto gp1 = *gpp1;
+                     auto gp2 = *gpp2;
+
+                     if (gp1->getDepth() < gp2->getDepth())
+                       return -1;
+
+                     if (gp1->getDepth() > gp2->getDepth())
+                       return 1;
+
+                     if (gp1->getIndex() < gp2->getIndex())
+                       return -1;
+
+                     if (gp1->getIndex() > gp2->getIndex())
+                       return 1;
+
+                     return 0;
+                   });
+    genericParams.erase(std::unique(genericParams.begin(), genericParams.end(),
+                                    [](GenericTypeParamType *gp1,
+                                       GenericTypeParamType *gp2) {
+                                      return gp1->getDepth() == gp2->getDepth()
+                                          && gp1->getIndex() == gp2->getIndex();
+                                    }),
+                        genericParams.end());
 
     // Produce the new generic function type.
     auto sig = GenericSignature::get(genericParams, requirements);

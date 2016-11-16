@@ -1,4 +1,4 @@
-// RUN: %target-sil-opt -sdk %clang-importer-sdk-path %s
+// RUN: %target-sil-opt -assume-parsing-unqualified-ownership-sil -sdk %clang-importer-sdk-path %s
 
 import ctypes
 

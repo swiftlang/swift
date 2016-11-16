@@ -82,7 +82,7 @@ public struct DispatchData : RandomAccessCollection, _ObjectiveCBridgeable {
 	}
 
 	public func enumerateBytes(
-		block: (_ buffer: UnsafeBufferPointer<UInt8>, _ byteIndex: Int, _ stop: inout Bool) -> Void) 
+		block: (_ buffer: UnsafeBufferPointer<UInt8>, _ byteIndex: Int, _ stop: inout Bool) -> Void)
 	{
 		_swift_dispatch_data_apply(__wrapped) { (_, offset: Int, ptr: UnsafeRawPointer, size: Int) in
             let bytePtr = ptr.bindMemory(to: UInt8.self, capacity: size)
@@ -137,7 +137,7 @@ public struct DispatchData : RandomAccessCollection, _ObjectiveCBridgeable {
 	public func copyBytes(to pointer: UnsafeMutablePointer<UInt8>, count: Int) {
 		_copyBytesHelper(to: pointer, from: 0..<count)
 	}
-		
+
 	/// Copy a subset of the contents of the data to a pointer.
 	///
 	/// - parameter pointer: A pointer to the buffer you wish to copy the bytes into.
@@ -146,7 +146,7 @@ public struct DispatchData : RandomAccessCollection, _ObjectiveCBridgeable {
 	public func copyBytes(to pointer: UnsafeMutablePointer<UInt8>, from range: CountableRange<Index>) {
 		_copyBytesHelper(to: pointer, from: range)
 	}
-	
+
 	/// Copy the contents of the data into a buffer.
 	///
 	/// This function copies the bytes in `range` from the data into the buffer. If the count of the `range` is greater than `MemoryLayout<DestinationType>.stride * buffer.count` then the first N bytes will be copied into the buffer.
@@ -157,23 +157,23 @@ public struct DispatchData : RandomAccessCollection, _ObjectiveCBridgeable {
 	public func copyBytes<DestinationType>(to buffer: UnsafeMutableBufferPointer<DestinationType>, from range: CountableRange<Index>? = nil) -> Int {
 		let cnt = count
 		guard cnt > 0 else { return 0 }
-		
+
 		let copyRange : CountableRange<Index>
 		if let r = range {
 			guard !r.isEmpty else { return 0 }
 			precondition(r.startIndex >= 0)
 			precondition(r.startIndex < cnt, "The range is outside the bounds of the data")
-			
+
 			precondition(r.endIndex >= 0)
 			precondition(r.endIndex <= cnt, "The range is outside the bounds of the data")
-			
+
 			copyRange = r.startIndex..<(r.startIndex + Swift.min(buffer.count * MemoryLayout<DestinationType>.stride, r.count))
 		} else {
 			copyRange = 0..<Swift.min(buffer.count * MemoryLayout<DestinationType>.stride, cnt)
 		}
-		
+
 		guard !copyRange.isEmpty else { return 0 }
-		
+
 		_copyBytesHelper(to: buffer.baseAddress!, from: copyRange)
 		return copyRange.count
 	}

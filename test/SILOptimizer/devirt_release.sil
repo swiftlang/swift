@@ -1,4 +1,4 @@
-// RUN: %target-sil-opt -enable-sil-verify-all %s -release-devirtualizer -module-name=test | %FileCheck %s
+// RUN: %target-sil-opt -assume-parsing-unqualified-ownership-sil -enable-sil-verify-all %s -release-devirtualizer -module-name=test | %FileCheck %s
 
 sil_stage canonical
 
@@ -11,7 +11,7 @@ class B {
 
 // CHECK-LABEL: sil @devirtualize_object
 // CHECK: [[A:%[0-9]+]] = alloc_ref
-// CHECK-NEXT: set_deallocating [[A]] 
+// CHECK-NEXT: set_deallocating [[A]]
 // CHECK-NOT: strong_release
 // CHECK: [[D:%[0-9]+]] = function_ref @_TFC4test1BD
 // CHECK-NEXT: apply [[D]]([[A]])
@@ -76,7 +76,7 @@ bb0(%0 : $B):
 
 // CHECK-LABEL: sil @dont_crash_with_missing_release
 // CHECK: [[A:%[0-9]+]] = alloc_ref
-// CHECK-NEXT: set_deallocating [[A]] 
+// CHECK-NEXT: set_deallocating [[A]]
 // CHECK-NOT: strong_release
 // CHECK: [[D:%[0-9]+]] = function_ref @_TFC4test1BD
 // CHECK-NEXT: apply [[D]]([[A]])

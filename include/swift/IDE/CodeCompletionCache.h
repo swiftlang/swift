@@ -17,6 +17,7 @@
 #include "swift/Basic/ThreadSafeRefCounted.h"
 #include "llvm/ADT/IntrusiveRefCntPtr.h"
 #include "llvm/Support/Chrono.h"
+#include <system_error>
 
 namespace swift {
 namespace ide {

@@ -1,4 +1,4 @@
-// RUN: %target-sil-opt -enable-sil-verify-all -loop-rotate %s | %FileCheck %s
+// RUN: %target-sil-opt -assume-parsing-unqualified-ownership-sil -enable-sil-verify-all -loop-rotate %s | %FileCheck %s
 
 sil_stage canonical
 
@@ -45,7 +45,7 @@ sil @looprotate : $@convention(thin) (Int32, @owned Bar) -> Int32 {
 bb0(%0 : $Int32, %25: $Bar):
   %1 = struct_extract %0 : $Int32, #Int32._value
   %2 = integer_literal $Builtin.Int32, 0
-  %30 = alloc_box $Bool
+  %30 = alloc_box $@box Bool
   %30a = project_box %30 : $@box Bool, 0
   br bb1(%1 : $Builtin.Int32, %2 : $Builtin.Int32, %25: $Bar, %30 : $@box Bool, %30a : $*Bool)
 
@@ -113,14 +113,14 @@ bb3 (%23 : $Builtin.Int32) :
 
 // The following function used to crash the compiler, because loop rotate
 // could not properly handle the reference from witness_method to the
-// archetype opened by open_existential_addr 
+// archetype opened by open_existential_addr
 // CHECK-LABEL: sil @looprotate_with_opened_archetype
 // CHECK: return
 sil @looprotate_with_opened_archetype : $@convention(thin) (Int32, @in P) -> Int32 {
 bb0(%0 : $Int32, %25: $*P):
   %1 = struct_extract %0 : $Int32, #Int32._value
   %2 = integer_literal $Builtin.Int32, 0
-  %30 = alloc_box $Bool
+  %30 = alloc_box $@box Bool
   %30a = project_box %30 : $@box Bool, 0
   %40 = open_existential_addr %25 : $*P to $*@opened("C22498FA-CABF-11E5-B9A9-685B35C48C83") P
   br bb1(%1 : $Builtin.Int32, %2 : $Builtin.Int32, %25: $*P, %30 : $@box Bool, %30a : $*Bool)

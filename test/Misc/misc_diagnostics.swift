@@ -8,7 +8,7 @@ import CoreGraphics
 var roomName : String?
 
 if let realRoomName = roomName as! NSString { // expected-error {{initializer for conditional binding must have Optional type, not 'NSString'}} expected-warning {{cast from 'String?' to unrelated type 'NSString' always fails}}
-			
+
 }
 
 var pi = 3.14159265358979

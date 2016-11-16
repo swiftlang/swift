@@ -439,7 +439,7 @@ ${orderingExplanation}
   public func lexicographicallyPrecedes<OtherSequence>(
     _ other: OtherSequence${"," if preds else ""}
 %   if preds:
-    by areInIncreasingOrder: 
+    by areInIncreasingOrder:
       (${GElement}, ${GElement}) throws -> Bool
 %   end
   ) ${rethrows_}-> Bool
@@ -516,7 +516,7 @@ extension Sequence {
   ///         case ok
   ///         case error(Int)
   ///     }
-  /// 
+  ///
   ///     let lastThreeResponses: [HTTPResponse] = [.ok, .ok, .error(404)]
   ///     let hadError = lastThreeResponses.contains { element in
   ///         if case .error = element {
@@ -557,37 +557,47 @@ extension Sequence {
 //===----------------------------------------------------------------------===//
 
 extension Sequence {
-  /// Returns the result of calling the given combining closure with each
-  /// element of this sequence and an accumulating value.
+  /// Returns the result of combining the elements of the sequence using the
+  /// given closure.
+  ///
+  /// Use the `reduce(_:_:)` method to produce a single value from the elements
+  /// of an entire sequence. For example, you can use this method on an array
+  /// of numbers to find their sum or product.
   ///
   /// The `nextPartialResult` closure is called sequentially with an
-  /// accumulating value initialized to `initialResult` and each
-  /// element of the sequence. This example shows how to find the sum
-  /// of an array of numbers.
+  /// accumulating value initialized to `initialResult` and each element of
+  /// the sequence. This example shows how to find the sum of an array of
+  /// numbers.
   ///
   ///     let numbers = [1, 2, 3, 4]
-  ///     let addTwo: (Int, Int) -> Int = { x, y in x + y }
-  ///     let numberSum = numbers.reduce(0, addTwo)
-  ///     // 'numberSum' == 10
+  ///     let numberSum = numbers.reduce(0, { x, y in
+  ///         x + y
+  ///     })
+  ///     // numberSum == 10
   ///
-  /// When `numbers.reduce(_:_:)` is called, the
-  /// following steps occur:
+  /// When `numbers.reduce(_:_:)` is called, the following steps occur:
   ///
-  /// 1. The `nextPartialResult` closure is called with the initial
-  ///    result and the first element of `numbers`, returning the sum:
+  /// 1. The `nextPartialResult` closure is called with `initialResult`---`0`
+  ///    in this case---and the first element of `numbers`, returning the sum:
   ///    `1`.
-  /// 2. The closure is called again repeatedly with the previous call's
-  ///    return value and each element of the sequence.
+  /// 2. The closure is called again repeatedly with the previous call's return
+  ///    value and each element of the sequence.
   /// 3. When the sequence is exhausted, the last value returned from the
   ///    closure is returned to the caller.
   ///
+  /// If the sequence has no elements, `nextPartialResult` is never executed
+  /// and `initialResult` is the result of the call to `reduce(_:_:)`.
+  ///
   /// - Parameters:
-  ///   - initialResult: the initial accumulating value.
-  ///   - nextPartialResult: A closure that combines an accumulating
-  ///     value and an element of the sequence into a new accumulating
-  ///     value, to be used in the next call of the
-  ///     `nextPartialResult` closure or returned to the caller.
-  /// - Returns: The final accumulated value.
+  ///   - initialResult: The value to use as the initial accumulating value.
+  ///     `initialResult` is passed to `nextPartialResult` the first time the
+  ///     closure is executed.
+  ///   - nextPartialResult: A closure that combines an accumulating value and
+  ///     an element of the sequence into a new accumulating value, to be used
+  ///     in the next call of the `nextPartialResult` closure or returned to
+  ///     the caller.
+  /// - Returns: The final accumulated value. If the sequence has no elements,
+  ///   the result is `initialResult`.
   public func reduce<Result>(
     _ initialResult: Result,
     _ nextPartialResult:
@@ -643,10 +653,10 @@ extension Sequence {
   /// `flatMap` with a transformation that returns an array.
   ///
   ///     let numbers = [1, 2, 3, 4]
-  /// 
+  ///
   ///     let mapped = numbers.map { Array(count: $0, repeatedValue: $0) }
   ///     // [[1], [2, 2], [3, 3, 3], [4, 4, 4, 4]]
-  /// 
+  ///
   ///     let flatMapped = numbers.flatMap { Array(count: $0, repeatedValue: $0) }
   ///     // [1, 2, 2, 3, 3, 3, 4, 4, 4, 4]
   ///
@@ -682,10 +692,10 @@ extension Sequence {
   /// `flatMap` with a transformation that returns an optional `Int` value.
   ///
   ///     let possibleNumbers = ["1", "2", "three", "///4///", "5"]
-  /// 
+  ///
   ///     let mapped: [Int?] = possibleNumbers.map { str in Int(str) }
   ///     // [1, 2, nil, nil, 5]
-  /// 
+  ///
   ///     let flatMapped: [Int] = possibleNumbers.flatMap { str in Int(str) }
   ///     // [1, 2, 5]
   ///

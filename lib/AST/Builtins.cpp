@@ -196,16 +196,10 @@ getBuiltinGenericFunction(Identifier Id,
     GenericParamTypes.push_back(gp->getDeclaredType()
                                   ->castTo<GenericTypeParamType>());
   }
-  // Create witness markers for all of the generic param types.
-  SmallVector<Requirement, 2> requirements;
-  for (auto param : GenericParamTypes) {
-    requirements.push_back(Requirement(RequirementKind::WitnessMarker,
-                                       param, Type()));
-  }
   GenericSignature *Sig =
-      GenericSignature::get(GenericParamTypes, requirements);
+    GenericSignature::get(GenericParamTypes, { });
   GenericEnvironment *Env =
-      GenericEnvironment::get(Context, GenericParamTypes,
+      GenericEnvironment::get(Context, Sig,
                               InterfaceToArchetypeMap);
 
   Type InterfaceType = GenericFunctionType::get(Sig, ArgParamType, ResType,
@@ -242,7 +236,6 @@ getBuiltinGenericFunction(Identifier Id,
                                TypeLoc::withoutLoc(ResBodyType), DC);
     
   func->setInterfaceType(InterfaceType);
-  func->setGenericSignature(Sig);
   func->setGenericEnvironment(Env);
   func->setImplicit();
   func->setAccessibility(Accessibility::Public);
@@ -495,7 +488,7 @@ namespace {
 
       for (unsigned i = 0, e = GenericTypeParams.size(); i < e; i++) {
         auto paramTy = GenericTypeParams[i]->getDeclaredType()
-            ->getCanonicalType().getPointer();
+          ->getCanonicalType()->castTo<GenericTypeParamType>();
         InterfaceToArchetypeMap[paramTy] = Archetypes[i];
       }
     }

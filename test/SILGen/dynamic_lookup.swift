@@ -23,78 +23,92 @@ class X {
 
 // CHECK-LABEL: sil hidden @_TF14dynamic_lookup15direct_to_class
 func direct_to_class(_ obj: AnyObject) {
-  // CHECK: [[OBJ_SELF:%[0-9]+]] = open_existential_ref [[EX:%[0-9]+]] : $AnyObject to $@opened({{.*}}) AnyObject
-  // CHECK: [[METHOD:%[0-9]+]] = dynamic_method [volatile] [[OBJ_SELF]] : $@opened({{.*}}) AnyObject, #X.f!1.foreign : (X) -> () -> (), $@convention(objc_method) (@opened({{.*}}) AnyObject) -> ()
-  // CHECK: apply [[METHOD]]([[OBJ_SELF]]) : $@convention(objc_method) (@opened({{.*}}) AnyObject) -> ()
+  // CHECK: bb0([[ARG:%.*]] : $AnyObject):
+  // CHECK: [[OPENED_ARG:%[0-9]+]] = open_existential_ref [[ARG]] : $AnyObject to $@opened({{.*}}) AnyObject
+  // CHECK: [[OPENED_ARG_COPY:%.*]] = copy_value [[OPENED_ARG]]
+  // CHECK: [[METHOD:%[0-9]+]] = dynamic_method [volatile] [[OPENED_ARG_COPY]] : $@opened({{.*}}) AnyObject, #X.f!1.foreign : (X) -> () -> (), $@convention(objc_method) (@opened({{.*}}) AnyObject) -> ()
+  // CHECK: apply [[METHOD]]([[OPENED_ARG_COPY]]) : $@convention(objc_method) (@opened({{.*}}) AnyObject) -> ()
+  // CHECK: destroy_value [[OPENED_ARG_COPY]]
+  // CHECK: destroy_value [[ARG]]
   obj.f!()
 }
+// CHECK: } // end sil function '_TF14dynamic_lookup15direct_to_class{{.*}}'
 
 // CHECK-LABEL: sil hidden @_TF14dynamic_lookup18direct_to_protocol
 func direct_to_protocol(_ obj: AnyObject) {
-  // CHECK: [[OBJ_SELF:%[0-9]+]] = open_existential_ref [[EX:%[0-9]+]] : $AnyObject to $@opened({{.*}}) AnyObject
-  // CHECK: [[METHOD:%[0-9]+]] = dynamic_method [volatile] [[OBJ_SELF]] : $@opened({{.*}}) AnyObject, #P.g!1.foreign : <Self where Self : P> (Self) -> () -> (), $@convention(objc_method) (@opened({{.*}}) AnyObject) -> ()
-  // CHECK: apply [[METHOD]]([[OBJ_SELF]]) : $@convention(objc_method) (@opened({{.*}}) AnyObject) -> ()
+  // CHECK: bb0([[ARG:%.*]] : $AnyObject):
+  // CHECK:   [[OPENED_ARG:%[0-9]+]] = open_existential_ref [[ARG]] : $AnyObject to $@opened({{.*}}) AnyObject
+  // CHECK:   [[OPENED_ARG_COPY:%.*]] = copy_value [[OPENED_ARG]]
+  // CHECK:   [[METHOD:%[0-9]+]] = dynamic_method [volatile] [[OPENED_ARG_COPY]] : $@opened({{.*}}) AnyObject, #P.g!1.foreign : <Self where Self : P> (Self) -> () -> (), $@convention(objc_method) (@opened({{.*}}) AnyObject) -> ()
+  // CHECK:   apply [[METHOD]]([[OPENED_ARG_COPY]]) : $@convention(objc_method) (@opened({{.*}}) AnyObject) -> ()
+  // CHECK:   destroy_value [[OPENED_ARG_COPY]]
+  // CHECK:   destroy_value [[ARG]]
   obj.g!()
 }
+// CHECK: } // end sil function '_TF14dynamic_lookup18direct_to_protocol{{.*}}'
 
 // CHECK-LABEL: sil hidden @_TF14dynamic_lookup23direct_to_static_method
 func direct_to_static_method(_ obj: AnyObject) {
+  // CHECK: bb0([[ARG:%.*]] : $AnyObject):
   var obj = obj
-  // CHECK: [[START:[A-Za-z0-9_]+]]([[OBJ:%[0-9]+]] : $AnyObject):
-  // CHECK: [[OBJBOX:%[0-9]+]] = alloc_box $AnyObject
+  // CHECK: [[OBJBOX:%[0-9]+]] = alloc_box $@box AnyObject
   // CHECK-NEXT: [[PBOBJ:%[0-9]+]] = project_box [[OBJBOX]]
-  // CHECK: store [[OBJ]] to [[PBOBJ]] : $*AnyObject
-  // CHECK-NEXT: [[OBJCOPY:%[0-9]+]] = load [[PBOBJ]] : $*AnyObject
+  // CHECK: [[ARG_COPY:%.*]] = copy_value [[ARG]]
+  // CHECK: store [[ARG_COPY]] to [init] [[PBOBJ]] : $*AnyObject
+  // CHECK-NEXT: [[OBJCOPY:%[0-9]+]] = load_borrow [[PBOBJ]] : $*AnyObject
   // CHECK-NEXT: [[OBJMETA:%[0-9]+]] = existential_metatype $@thick AnyObject.Type, [[OBJCOPY]] : $AnyObject
   // CHECK-NEXT: [[OPENMETA:%[0-9]+]] = open_existential_metatype [[OBJMETA]] : $@thick AnyObject.Type to $@thick (@opened([[UUID:".*"]]) AnyObject).Type
   // CHECK-NEXT: [[METHOD:%[0-9]+]] = dynamic_method [volatile] [[OPENMETA]] : $@thick (@opened([[UUID]]) AnyObject).Type, #X.staticF!1.foreign : (X.Type) -> () -> (), $@convention(objc_method) (@thick (@opened([[UUID]]) AnyObject).Type) -> ()
   // CHECK: apply [[METHOD]]([[OPENMETA]]) : $@convention(objc_method) (@thick (@opened([[UUID]]) AnyObject).Type) -> ()
+  // CHECK: destroy_value [[OBJBOX]]
+  // CHECK: destroy_value [[ARG]]
   type(of: obj).staticF!()
 }
+// } // end sil function '_TF14dynamic_lookup23direct_to_static_method{{.*}}'
 
 // CHECK-LABEL: sil hidden @_TF14dynamic_lookup12opt_to_class
 func opt_to_class(_ obj: AnyObject) {
+  // CHECK: bb0([[ARG:%.*]] : $AnyObject):
   var obj = obj
-  // CHECK: [[ENTRY:[A-Za-z0-9]+]]([[PARAM:%[0-9]+]] : $AnyObject)
-  // CHECK: [[EXISTBOX:%[0-9]+]] = alloc_box $AnyObject 
-  // CHECK-NEXT: [[PBOBJ:%[0-9]+]] = project_box [[EXISTBOX]]
-  // CHECK: store [[PARAM]] to [[PBOBJ]]
-  // CHECK-NEXT: [[OPTBOX:%[0-9]+]] = alloc_box $Optional<@callee_owned () -> ()>
-  // CHECK-NEXT: [[PBOPT:%.*]] = project_box [[OPTBOX]]
-  // CHECK-NEXT: [[EXISTVAL:%[0-9]+]] = load [[PBOBJ]] : $*AnyObject
-  // CHECK-NEXT: strong_retain [[EXISTVAL]] : $AnyObject
-  // CHECK-NEXT: [[OBJ_SELF:%[0-9]*]] = open_existential_ref [[EXIST:%[0-9]+]]
-  // CHECK-NEXT: [[OPTTEMP:%.*]] = alloc_stack $Optional<@callee_owned () -> ()>
-  // CHECK-NEXT: dynamic_method_br [[OBJ_SELF]] : $@opened({{.*}}) AnyObject, #X.f!1.foreign, [[HASBB:[a-zA-z0-9]+]], [[NOBB:[a-zA-z0-9]+]]
+  // CHECK:   [[EXISTBOX:%[0-9]+]] = alloc_box $@box AnyObject 
+  // CHECK:   [[PBOBJ:%[0-9]+]] = project_box [[EXISTBOX]]
+  // CHECK:   [[ARG_COPY:%.*]] = copy_value [[ARG]]
+  // CHECK:   store [[ARG_COPY]] to [init] [[PBOBJ]]
+  // CHECK:   [[OPTBOX:%[0-9]+]] = alloc_box $@box Optional<@callee_owned () -> ()>
+  // CHECK:   [[PBOPT:%.*]] = project_box [[OPTBOX]]
+  // CHECK:   [[EXISTVAL:%[0-9]+]] = load [copy] [[PBOBJ]] : $*AnyObject
+  // CHECK:   [[OBJ_SELF:%[0-9]*]] = open_existential_ref [[EXISTVAL]]
+  // CHECK:   [[OPT_TMP:%.*]] = alloc_stack $Optional<@callee_owned () -> ()>
+  // CHECK:   dynamic_method_br [[OBJ_SELF]] : $@opened({{.*}}) AnyObject, #X.f!1.foreign, [[HASBB:[a-zA-z0-9]+]], [[NOBB:[a-zA-z0-9]+]]
 
   // Has method BB:
   // CHECK: [[HASBB]]([[UNCURRIED:%[0-9]+]] : $@convention(objc_method) (@opened({{.*}}) AnyObject) -> ()):
-  // CHECK-NEXT: strong_retain [[OBJ_SELF]]
-  // CHECK-NEXT: [[PARTIAL:%[0-9]+]] = partial_apply [[UNCURRIED]]([[OBJ_SELF]]) : $@convention(objc_method) (@opened({{.*}}) AnyObject) -> ()
-  // CHECK-NEXT: [[THUNK_PAYLOAD:%.*]] = init_enum_data_addr [[OPTIONAL:%[0-9]+]]
-  // CHECK-NEXT: store [[PARTIAL]] to [[THUNK_PAYLOAD]]
-  // CHECK-NEXT: inject_enum_addr [[OPTIONAL]]{{.*}}some
-  // CHECK-NEXT: br [[CONTBB:[a-zA-Z0-9]+]]
-  
+  // CHECK:   [[OBJ_SELF_COPY:%.*]] = copy_value [[OBJ_SELF]]
+  // CHECK:   [[PARTIAL:%[0-9]+]] = partial_apply [[UNCURRIED]]([[OBJ_SELF_COPY]]) : $@convention(objc_method) (@opened({{.*}}) AnyObject) -> ()
+  // CHECK:   [[THUNK_PAYLOAD:%.*]] = init_enum_data_addr [[OPT_TMP]]
+  // CHECK:   store [[PARTIAL]] to [init] [[THUNK_PAYLOAD]]
+  // CHECK:   inject_enum_addr [[OPT_TMP]] : $*Optional<@callee_owned () -> ()>, #Optional.some!enumelt.1
+  // CHECK:   br [[CONTBB:[a-zA-Z0-9]+]]
+
   // No method BB:
   // CHECK: [[NOBB]]:
-  // CHECK-NEXT: inject_enum_addr [[OPTIONAL]]{{.*}}none
-  // CHECK-NEXT: br [[CONTBB]]
+  // CHECK:   inject_enum_addr [[OPT_TMP]] : {{.*}}, #Optional.none!enumelt
+  // CHECK:   br [[CONTBB]]
 
   // Continuation block
   // CHECK: [[CONTBB]]:
-  // CHECK-NEXT: [[OPT:%.*]] = load [[OPTTEMP]]
-  // CHECK-NEXT: store [[OPT]] to [[PBOPT]] : $*Optional<@callee_owned () -> ()>
-  // CHECK-NEXT: dealloc_stack [[OPTTEMP]]
+  // CHECK:   [[OPT:%.*]] = load [take] [[OPT_TMP]]
+  // CHECK:   store [[OPT]] to [init] [[PBOPT]] : $*Optional<@callee_owned () -> ()>
+  // CHECK:   dealloc_stack [[OPT_TMP]]
   var of: (() -> ())! = obj.f
 
   // Exit
-  // CHECK-NEXT: strong_release [[OBJ_SELF]] : $@opened({{".*"}}) AnyObject
-  // CHECK-NEXT: strong_release [[OPTBOX]] : $@box Optional<@callee_owned () -> ()>
-  // CHECK-NEXT: strong_release [[EXISTBOX]] : $@box AnyObject
-  // CHECK-NEXT: strong_release %0
-  // CHECK-NEXT: [[RESULT:%[0-9]+]] = tuple ()
-  // CHECK-NEXT: return [[RESULT]] : $()
+  // CHECK:   destroy_value [[OBJ_SELF]] : $@opened({{".*"}}) AnyObject
+  // CHECK:   destroy_value [[OPTBOX]] : $@box Optional<@callee_owned () -> ()>
+  // CHECK:   destroy_value [[EXISTBOX]] : $@box AnyObject
+  // CHECK:   destroy_value %0
+  // CHECK:   [[RESULT:%[0-9]+]] = tuple ()
+  // CHECK:   return [[RESULT]] : $()
 }
 
 // CHECK-LABEL: sil hidden @_TF14dynamic_lookup20forced_without_outer
@@ -106,18 +120,19 @@ func forced_without_outer(_ obj: AnyObject) {
 // CHECK-LABEL: sil hidden @_TF14dynamic_lookup20opt_to_static_method
 func opt_to_static_method(_ obj: AnyObject) {
   var obj = obj
-  // CHECK: [[ENTRY:[A-Za-z0-9]+]]([[OBJ:%[0-9]+]] : $AnyObject):
-  // CHECK: [[OBJBOX:%[0-9]+]] = alloc_box $AnyObject
-  // CHECK-NEXT: [[PBOBJ:%[0-9]+]] = project_box [[OBJBOX]]
-  // CHECK: store [[OBJ]] to [[PBOBJ]] : $*AnyObject
-  // CHECK-NEXT: [[OPTBOX:%[0-9]+]] = alloc_box $Optional<@callee_owned () -> ()>
-  // CHECK-NEXT: [[PBO:%.*]] = project_box [[OPTBOX]]
-  // CHECK-NEXT: [[OBJCOPY:%[0-9]+]] = load [[PBOBJ]] : $*AnyObject
-  // CHECK-NEXT: [[OBJMETA:%[0-9]+]] = existential_metatype $@thick AnyObject.Type, [[OBJCOPY]] : $AnyObject
-  // CHECK-NEXT: [[OPENMETA:%[0-9]+]] = open_existential_metatype [[OBJMETA]] : $@thick AnyObject.Type to $@thick (@opened
-  // CHECK-NEXT: [[OBJCMETA:%[0-9]+]] = thick_to_objc_metatype [[OPENMETA]]
-  // CHECK-NEXT: [[OPTTEMP:%.*]] = alloc_stack $Optional<@callee_owned () -> ()>
-  // CHECK-NEXT: dynamic_method_br [[OBJCMETA]] : $@objc_metatype (@opened({{".*"}}) AnyObject).Type, #X.staticF!1.foreign, [[HASMETHOD:[A-Za-z0-9_]+]], [[NOMETHOD:[A-Za-z0-9_]+]]
+  // CHECK: bb0([[OBJ:%[0-9]+]] : $AnyObject):
+  // CHECK:   [[OBJBOX:%[0-9]+]] = alloc_box $@box AnyObject
+  // CHECK:   [[PBOBJ:%[0-9]+]] = project_box [[OBJBOX]]
+  // CHECK:   [[OBJ_COPY:%.*]] = copy_value [[OBJ]]
+  // CHECK:   store [[OBJ_COPY]] to [init] [[PBOBJ]] : $*AnyObject
+  // CHECK:   [[OPTBOX:%[0-9]+]] = alloc_box $@box Optional<@callee_owned () -> ()>
+  // CHECK:   [[PBO:%.*]] = project_box [[OPTBOX]]
+  // CHECK:   [[OBJCOPY:%[0-9]+]] = load_borrow [[PBOBJ]] : $*AnyObject
+  // CHECK:   [[OBJMETA:%[0-9]+]] = existential_metatype $@thick AnyObject.Type, [[OBJCOPY]] : $AnyObject
+  // CHECK:   [[OPENMETA:%[0-9]+]] = open_existential_metatype [[OBJMETA]] : $@thick AnyObject.Type to $@thick (@opened
+  // CHECK:   [[OBJCMETA:%[0-9]+]] = thick_to_objc_metatype [[OPENMETA]]
+  // CHECK:   [[OPTTEMP:%.*]] = alloc_stack $Optional<@callee_owned () -> ()>
+  // CHECK:   dynamic_method_br [[OBJCMETA]] : $@objc_metatype (@opened({{".*"}}) AnyObject).Type, #X.staticF!1.foreign, [[HASMETHOD:[A-Za-z0-9_]+]], [[NOMETHOD:[A-Za-z0-9_]+]]
   var optF: (() -> ())! = type(of: obj).staticF
 }
 
@@ -125,84 +140,87 @@ func opt_to_static_method(_ obj: AnyObject) {
 func opt_to_property(_ obj: AnyObject) {
   var obj = obj
   // CHECK: bb0([[OBJ:%[0-9]+]] : $AnyObject):
-  // CHECK: [[OBJ_BOX:%[0-9]+]] = alloc_box $AnyObject
-  // CHECK-NEXT: [[PBOBJ:%[0-9]+]] = project_box [[OBJ_BOX]]
-  // CHECK: store [[OBJ]] to [[PBOBJ]] : $*AnyObject
-  // CHECK-NEXT: [[INT_BOX:%[0-9]+]] = alloc_box $Int
-  // CHECK-NEXT: project_box [[INT_BOX]]
-  // CHECK-NEXT: [[OBJ:%[0-9]+]] = load [[PBOBJ]] : $*AnyObject
-  // CHECK-NEXT: strong_retain [[OBJ]] : $AnyObject
-  // CHECK-NEXT: [[RAWOBJ_SELF:%[0-9]+]] = open_existential_ref [[OBJ]] : $AnyObject
-  // CHECK-NEXT: [[OPTTEMP:%.*]] = alloc_stack $Optional<Int>
-  // CHECK-NEXT: dynamic_method_br [[RAWOBJ_SELF]] : $@opened({{.*}}) AnyObject, #X.value!getter.1.foreign, bb1, bb2
+  // CHECK:   [[OBJ_BOX:%[0-9]+]] = alloc_box $@box AnyObject
+  // CHECK:   [[PBOBJ:%[0-9]+]] = project_box [[OBJ_BOX]]
+  // CHECK:   [[OBJ_COPY:%.*]] = copy_value [[OBJ]]
+  // CHECK:   store [[OBJ_COPY]] to [init] [[PBOBJ]] : $*AnyObject
+  // CHECK:   [[INT_BOX:%[0-9]+]] = alloc_box $@box Int
+  // CHECK:   project_box [[INT_BOX]]
+  // CHECK:   [[OBJ:%[0-9]+]] = load [copy] [[PBOBJ]] : $*AnyObject
+  // CHECK:   [[RAWOBJ_SELF:%[0-9]+]] = open_existential_ref [[OBJ]] : $AnyObject
+  // CHECK:   [[OPTTEMP:%.*]] = alloc_stack $Optional<Int>
+  // CHECK:   dynamic_method_br [[RAWOBJ_SELF]] : $@opened({{.*}}) AnyObject, #X.value!getter.1.foreign, bb1, bb2
+
   // CHECK: bb1([[METHOD:%[0-9]+]] : $@convention(objc_method) (@opened({{.*}}) AnyObject) -> Int):
-  // CHECK-NEXT: strong_retain [[RAWOBJ_SELF]]
-  // CHECK-NEXT: [[BOUND_METHOD:%[0-9]+]] = partial_apply [[METHOD]]([[RAWOBJ_SELF]]) : $@convention(objc_method) (@opened({{.*}}) AnyObject) -> Int
-  // CHECK-NEXT: [[VALUE:%[0-9]+]] = apply [[BOUND_METHOD]]() : $@callee_owned () -> Int
-  // CHECK-NEXT: [[VALUETEMP:%.*]] = init_enum_data_addr [[OPTTEMP]]
-  // CHECK-NEXT: store [[VALUE]] to [[VALUETEMP]]
-  // CHECK-NEXT: inject_enum_addr [[OPTTEMP]]{{.*}}some
-  // CHECK-NEXT: br bb3
+  // CHECK:   [[RAWOBJ_SELF_COPY:%.*]] = copy_value [[RAWOBJ_SELF]]
+  // CHECK:   [[BOUND_METHOD:%[0-9]+]] = partial_apply [[METHOD]]([[RAWOBJ_SELF_COPY]]) : $@convention(objc_method) (@opened({{.*}}) AnyObject) -> Int
+  // CHECK:   [[VALUE:%[0-9]+]] = apply [[BOUND_METHOD]]() : $@callee_owned () -> Int
+  // CHECK:   [[VALUETEMP:%.*]] = init_enum_data_addr [[OPTTEMP]]
+  // CHECK:   store [[VALUE]] to [trivial] [[VALUETEMP]]
+  // CHECK:   inject_enum_addr [[OPTTEMP]]{{.*}}some
+  // CHECK:   br bb3
   var i: Int = obj.value!
 }
+// CHECK: } // end sil function '_TF14dynamic_lookup15opt_to_property{{.*}}'
 
 // CHECK-LABEL: sil hidden @_TF14dynamic_lookup19direct_to_subscript
 func direct_to_subscript(_ obj: AnyObject, i: Int) {
   var obj = obj
   var i = i
   // CHECK: bb0([[OBJ:%[0-9]+]] : $AnyObject, [[I:%[0-9]+]] : $Int):
-  // CHECK: [[OBJ_BOX:%[0-9]+]] = alloc_box $AnyObject
-  // CHECK-NEXT: [[PBOBJ:%[0-9]+]] = project_box [[OBJ_BOX]]
-  // CHECK: store [[OBJ]] to [[PBOBJ]] : $*AnyObject
-  // CHECK-NEXT: [[I_BOX:%[0-9]+]] = alloc_box $Int
-  // CHECK-NEXT: [[PBI:%.*]] = project_box [[I_BOX]]
-  // CHECK-NEXT: store [[I]] to [[PBI]] : $*Int
-  // CHECK-NEXT: alloc_box $Int
-  // CHECK-NEXT: project_box
-  // CHECK-NEXT: [[OBJ:%[0-9]+]] = load [[PBOBJ]] : $*AnyObject
-  // CHECK-NEXT: strong_retain [[OBJ]] : $AnyObject
-  // CHECK-NEXT: [[OBJ_REF:%[0-9]+]] = open_existential_ref [[OBJ]] : $AnyObject to $@opened({{.*}}) AnyObject
-  // CHECK-NEXT: [[I:%[0-9]+]] = load [[PBI]] : $*Int
-  // CHECK-NEXT: [[OPTTEMP:%.*]] = alloc_stack $Optional<Int>
-  // CHECK-NEXT: dynamic_method_br [[OBJ_REF]] : $@opened({{.*}}) AnyObject, #X.subscript!getter.1.foreign, bb1, bb2
+  // CHECK:   [[OBJ_BOX:%[0-9]+]] = alloc_box $@box AnyObject
+  // CHECK:   [[PBOBJ:%[0-9]+]] = project_box [[OBJ_BOX]]
+  // CHECK:   [[OBJ_COPY:%.*]] = copy_value [[OBJ]]
+  // CHECK:   store [[OBJ_COPY]] to [init] [[PBOBJ]] : $*AnyObject
+  // CHECK:   [[I_BOX:%[0-9]+]] = alloc_box $@box Int
+  // CHECK:   [[PBI:%.*]] = project_box [[I_BOX]]
+  // CHECK:   store [[I]] to [trivial] [[PBI]] : $*Int
+  // CHECK:   alloc_box $@box Int
+  // CHECK:   project_box
+  // CHECK:   [[OBJ:%[0-9]+]] = load [copy] [[PBOBJ]] : $*AnyObject
+  // CHECK:   [[OBJ_REF:%[0-9]+]] = open_existential_ref [[OBJ]] : $AnyObject to $@opened({{.*}}) AnyObject
+  // CHECK:   [[I:%[0-9]+]] = load [trivial] [[PBI]] : $*Int
+  // CHECK:   [[OPTTEMP:%.*]] = alloc_stack $Optional<Int>
+  // CHECK:   dynamic_method_br [[OBJ_REF]] : $@opened({{.*}}) AnyObject, #X.subscript!getter.1.foreign, bb1, bb2
 
   // CHECK: bb1([[GETTER:%[0-9]+]] : $@convention(objc_method) (Int, @opened({{.*}}) AnyObject) -> Int):
-  // CHECK-NEXT: strong_retain [[OBJ_REF]]
-  // CHECK-NEXT: [[GETTER_WITH_SELF:%[0-9]+]] = partial_apply [[GETTER]]([[OBJ_REF]]) : $@convention(objc_method) (Int, @opened({{.*}}) AnyObject) -> Int
-  // CHECK-NEXT: [[RESULT:%[0-9]+]] = apply [[GETTER_WITH_SELF]]([[I]]) : $@callee_owned (Int) -> Int
-  // CHECK-NEXT: [[RESULTTEMP:%.*]] = init_enum_data_addr [[OPTTEMP]]
-  // CHECK-NEXT: store [[RESULT]] to [[RESULTTEMP]]
-  // CHECK-NEXT: inject_enum_addr [[OPTTEMP]]{{.*}}some
-  // CHECK-NEXT: br bb3
+  // CHECK:   [[OBJ_REF_COPY:%.*]] = copy_value [[OBJ_REF]]
+  // CHECK:   [[GETTER_WITH_SELF:%[0-9]+]] = partial_apply [[GETTER]]([[OBJ_REF_COPY]]) : $@convention(objc_method) (Int, @opened({{.*}}) AnyObject) -> Int
+  // CHECK:   [[RESULT:%[0-9]+]] = apply [[GETTER_WITH_SELF]]([[I]]) : $@callee_owned (Int) -> Int
+  // CHECK:   [[RESULTTEMP:%.*]] = init_enum_data_addr [[OPTTEMP]]
+  // CHECK:   store [[RESULT]] to [trivial] [[RESULTTEMP]]
+  // CHECK:   inject_enum_addr [[OPTTEMP]]{{.*}}some
+  // CHECK:   br bb3
   var x: Int = obj[i]!
 }
+// CHECK: } // end sil function '_TF14dynamic_lookup19direct_to_subscript{{.*}}'
 
 // CHECK-LABEL: sil hidden @_TF14dynamic_lookup16opt_to_subscript
 func opt_to_subscript(_ obj: AnyObject, i: Int) {
   var obj = obj
   var i = i
   // CHECK: bb0([[OBJ:%[0-9]+]] : $AnyObject, [[I:%[0-9]+]] : $Int):
-  // CHECK: [[OBJ_BOX:%[0-9]+]] = alloc_box $AnyObject
-  // CHECK-NEXT: [[PBOBJ:%[0-9]+]] = project_box [[OBJ_BOX]]
-  // CHECK: store [[OBJ]] to [[PBOBJ]] : $*AnyObject
-  // CHECK-NEXT: [[I_BOX:%[0-9]+]] = alloc_box $Int
-  // CHECK-NEXT: [[PBI:%.*]] = project_box [[I_BOX]]
-  // CHECK-NEXT: store [[I]] to [[PBI]] : $*Int
-  // CHECK-NEXT: [[OBJ:%[0-9]+]] = load [[PBOBJ]] : $*AnyObject
-  // CHECK-NEXT: strong_retain [[OBJ]] : $AnyObject
-  // CHECK-NEXT: [[OBJ_REF:%[0-9]+]] = open_existential_ref [[OBJ]] : $AnyObject to $@opened({{.*}}) AnyObject
-  // CHECK-NEXT: [[I:%[0-9]+]] = load [[PBI]] : $*Int
-  // CHECK-NEXT: [[OPTTEMP:%.*]] = alloc_stack $Optional<Int>
-  // CHECK-NEXT: dynamic_method_br [[OBJ_REF]] : $@opened({{.*}}) AnyObject, #X.subscript!getter.1.foreign, bb1, bb2
+  // CHECK:   [[OBJ_BOX:%[0-9]+]] = alloc_box $@box AnyObject
+  // CHECK:   [[PBOBJ:%[0-9]+]] = project_box [[OBJ_BOX]]
+  // CHECK:   [[OBJ_COPY:%.*]] = copy_value [[OBJ]]
+  // CHECK:   store [[OBJ_COPY]] to [init] [[PBOBJ]] : $*AnyObject
+  // CHECK:   [[I_BOX:%[0-9]+]] = alloc_box $@box Int
+  // CHECK:   [[PBI:%.*]] = project_box [[I_BOX]]
+  // CHECK:   store [[I]] to [trivial] [[PBI]] : $*Int
+  // CHECK:   [[OBJ:%[0-9]+]] = load [copy] [[PBOBJ]] : $*AnyObject
+  // CHECK:   [[OBJ_REF:%[0-9]+]] = open_existential_ref [[OBJ]] : $AnyObject to $@opened({{.*}}) AnyObject
+  // CHECK:   [[I:%[0-9]+]] = load [trivial] [[PBI]] : $*Int
+  // CHECK:   [[OPTTEMP:%.*]] = alloc_stack $Optional<Int>
+  // CHECK:   dynamic_method_br [[OBJ_REF]] : $@opened({{.*}}) AnyObject, #X.subscript!getter.1.foreign, bb1, bb2
 
   // CHECK: bb1([[GETTER:%[0-9]+]] : $@convention(objc_method) (Int, @opened({{.*}}) AnyObject) -> Int):
-  // CHECK-NEXT: strong_retain [[OBJ_REF]]
-  // CHECK-NEXT: [[GETTER_WITH_SELF:%[0-9]+]] = partial_apply [[GETTER]]([[OBJ_REF]]) : $@convention(objc_method) (Int, @opened({{.*}}) AnyObject) -> Int
-  // CHECK-NEXT: [[RESULT:%[0-9]+]] = apply [[GETTER_WITH_SELF]]([[I]]) : $@callee_owned (Int) -> Int
-  // CHECK-NEXT: [[RESULTTEMP:%.*]] = init_enum_data_addr [[OPTTEMP]]
-  // CHECK-NEXT: store [[RESULT]] to [[RESULTTEMP]]
-  // CHECK-NEXT: inject_enum_addr [[OPTTEMP]]
-  // CHECK-NEXT: br bb3
+  // CHECK:   [[OBJ_REF_COPY:%.*]] = copy_value [[OBJ_REF]]
+  // CHECK:   [[GETTER_WITH_SELF:%[0-9]+]] = partial_apply [[GETTER]]([[OBJ_REF_COPY]]) : $@convention(objc_method) (Int, @opened({{.*}}) AnyObject) -> Int
+  // CHECK:   [[RESULT:%[0-9]+]] = apply [[GETTER_WITH_SELF]]([[I]]) : $@callee_owned (Int) -> Int
+  // CHECK:   [[RESULTTEMP:%.*]] = init_enum_data_addr [[OPTTEMP]]
+  // CHECK:   store [[RESULT]] to [trivial] [[RESULTTEMP]]
+  // CHECK:   inject_enum_addr [[OPTTEMP]]
+  // CHECK:   br bb3
   obj[i]
 }
 
@@ -210,15 +228,15 @@ func opt_to_subscript(_ obj: AnyObject, i: Int) {
 func downcast(_ obj: AnyObject) -> X {
   var obj = obj
   // CHECK: bb0([[OBJ:%[0-9]+]] : $AnyObject):
-  // CHECK: [[OBJ_BOX:%[0-9]+]] = alloc_box $AnyObject
-  // CHECK-NEXT: [[PBOBJ:%[0-9]+]] = project_box [[OBJ_BOX]]
-  // CHECK: store [[OBJ]] to [[PBOBJ]] : $*AnyObject
-  // CHECK-NEXT: [[OBJ:%[0-9]+]] = load [[PBOBJ]] : $*AnyObject
-  // CHECK-NEXT: strong_retain [[OBJ]] : $AnyObject
-  // CHECK-NEXT: [[X:%[0-9]+]] = unconditional_checked_cast [[OBJ]] : $AnyObject to $X
-  // CHECK-NEXT: strong_release [[OBJ_BOX]] : $@box AnyObject
-  // CHECK-NEXT: strong_release %0
-  // CHECK-NEXT: return [[X]] : $X
+  // CHECK:   [[OBJ_BOX:%[0-9]+]] = alloc_box $@box AnyObject
+  // CHECK:   [[PBOBJ:%[0-9]+]] = project_box [[OBJ_BOX]]
+  // CHECK:   [[OBJ_COPY:%.*]] = copy_value [[OBJ]]
+  // CHECK:   store [[OBJ_COPY]] to [init] [[PBOBJ]] : $*AnyObject
+  // CHECK:   [[OBJ:%[0-9]+]] = load [copy] [[PBOBJ]] : $*AnyObject
+  // CHECK:   [[X:%[0-9]+]] = unconditional_checked_cast [[OBJ]] : $AnyObject to $X
+  // CHECK:   destroy_value [[OBJ_BOX]] : $@box AnyObject
+  // CHECK:   destroy_value %0
+  // CHECK:   return [[X]] : $X
   return obj as! X
 }
 
@@ -234,12 +252,13 @@ func downcast(_ obj: AnyObject) -> X {
 // CHECK:        dynamic_method_br [[SELF:%.*]] : $@opened("{{.*}}") Fruit, #Fruit.juice!getter.1.foreign, bb1, bb2
 
 // CHECK: bb1([[FN:%.*]] : $@convention(objc_method) (@opened("{{.*}}") Fruit) -> @autoreleased Juice):
-// CHECK:        [[METHOD:%.*]] = partial_apply [[FN]]([[SELF]]) : $@convention(objc_method) (@opened("{{.*}}") Fruit) -> @autoreleased Juice
-// CHECK:        [[RESULT:%.*]] = apply [[METHOD]]() : $@callee_owned () -> @owned Juice
-// CHECK:        [[PAYLOAD:%.*]] = init_enum_data_addr [[BOX]] : $*Optional<Juice>, #Optional.some!enumelt.1
-// CHECK:        store [[RESULT]] to [[PAYLOAD]]
-// CHECK:        inject_enum_addr [[BOX]] : $*Optional<Juice>, #Optional.some!enumelt.1
-// CHECK:        br bb3
+// CHECK:   [[SELF_COPY:%.*]] = copy_value [[SELF]]
+// CHECK:   [[METHOD:%.*]] = partial_apply [[FN]]([[SELF_COPY]]) : $@convention(objc_method) (@opened("{{.*}}") Fruit) -> @autoreleased Juice
+// CHECK:   [[RESULT:%.*]] = apply [[METHOD]]() : $@callee_owned () -> @owned Juice
+// CHECK:   [[PAYLOAD:%.*]] = init_enum_data_addr [[BOX]] : $*Optional<Juice>, #Optional.some!enumelt.1
+// CHECK:   store [[RESULT]] to [init] [[PAYLOAD]]
+// CHECK:   inject_enum_addr [[BOX]] : $*Optional<Juice>, #Optional.some!enumelt.1
+// CHECK:   br bb3
 
 // CHECK: bb2:
 // CHECK:        inject_enum_addr [[BOX]] : $*Optional<Juice>, #Optional.none!enumelt

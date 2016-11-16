@@ -1160,7 +1160,7 @@ bool swift::tryDeleteDeadClosure(SILInstruction *Closure,
 void ValueLifetimeAnalysis::propagateLiveness() {
   assert(LiveBlocks.empty() && "frontier computed twice");
 
-  auto DefBB = DefValue->getParentBB();
+  auto DefBB = DefValue->getParentBlock();
   llvm::SmallVector<SILBasicBlock *, 64> Worklist;
 
   // Find the initial set of blocks where the value is live, because
@@ -1332,28 +1332,6 @@ void ValueLifetimeAnalysis::dump() const {
 //                    Casts Optimization and Simplification
 //===----------------------------------------------------------------------===//
 
-/// \brief Get a substitution corresponding to the type witness.
-/// Inspired by ProtocolConformance::getTypeWitnessByName.
-static const Substitution *
-getTypeWitnessByName(ProtocolConformance *conformance, Identifier name) {
-  // Find the named requirement.
-  AssociatedTypeDecl *assocType = nullptr;
-  assert(conformance && "Missing conformance information");
-  auto members = conformance->getProtocol()->lookupDirect(name);
-  for (auto member : members) {
-    assocType = dyn_cast<AssociatedTypeDecl>(member);
-    if (assocType)
-      break;
-  }
-
-  if (!assocType)
-    return nullptr;
-
-  if (!conformance->hasTypeWitness(assocType, nullptr)) {
-    return nullptr;
-  }
-  return &conformance->getTypeWitness(assocType, nullptr);
-}
 
 /// Check if is a bridging cast, i.e. one of the sides is
 /// a bridged type.
@@ -1455,7 +1433,8 @@ optimizeBridgedObjCToSwiftCast(SILInstruction *Inst,
     }
 
     // Generate a load for the source argument.
-    auto *Load = Builder.createLoad(Loc, Src);
+    auto *Load =
+        Builder.createLoad(Loc, Src, LoadOwnershipQualifier::Unqualified);
     // Try to convert the source into the expected ObjC type first.
 
 
@@ -1512,14 +1491,12 @@ optimizeBridgedObjCToSwiftCast(SILInstruction *Inst,
   SmallVector<SILValue, 1> Args;
 
   // Add substitutions
-  SmallVector<Substitution, 2> Subs;
   auto Conformances =
     M.getASTContext().AllocateUninitialized<ProtocolConformanceRef>(1);
   Conformances[0] = ProtocolConformanceRef(Conformance);
-  Subs.push_back(Substitution(Target, Conformances));
-  const Substitution *DepTypeSubst = getTypeWitnessByName(
-      Conformance, M.getASTContext().getIdentifier("_ObjectiveCType"));
-  Subs.push_back(*DepTypeSubst);
+  Substitution Subs[1] = {
+    Substitution(Target, Conformances)
+  };
   auto SILFnTy = FuncRef->getType();
   SILType SubstFnTy = SILFnTy.substGenericArgs(M, Subs);
   SILType ResultTy = SubstFnTy.castTo<SILFunctionType>()->getSILResult();
@@ -1694,7 +1671,7 @@ optimizeBridgedSwiftToObjCCast(SILInstruction *Inst,
   auto FnRef = Builder.createFunctionRef(Loc, BridgedFunc);
   if (Src->getType().isAddress() && !ParamTypes[0].isIndirect()) {
     // Create load
-    Src = Builder.createLoad(Loc, Src);
+    Src = Builder.createLoad(Loc, Src, LoadOwnershipQualifier::Unqualified);
   }
 
   // Compensate different owning conventions of the replaced cast instruction
@@ -1795,7 +1772,8 @@ optimizeBridgedSwiftToObjCCast(SILInstruction *Inst,
            "of the source operand");
     auto CastedValue = SILValue(
         (ConvTy == DestTy) ? NewI : Builder.createUpcast(Loc, NewAI, DestTy));
-    NewI = Builder.createStore(Loc, CastedValue, Dest);
+    NewI = Builder.createStore(Loc, CastedValue, Dest,
+                               StoreOwnershipQualifier::Unqualified);
   }
 
   if (Dest) {
@@ -2169,7 +2147,8 @@ optimizeCheckedCastAddrBranchInst(CheckedCastAddrBranchInst *Inst) {
           SuccessBB->createBBArg(Dest->getType().getObjectType(), nullptr);
           B.setInsertionPoint(SuccessBB->begin());
           // Store the result
-          B.createStore(Loc, SuccessBB->getBBArg(0), Dest);
+          B.createStore(Loc, SuccessBB->getBBArg(0), Dest,
+                        StoreOwnershipQualifier::Unqualified);
           EraseInstAction(Inst);
           return NewI;
         }
@@ -2477,7 +2456,8 @@ optimizeUnconditionalCheckedCastAddrInst(UnconditionalCheckedCastAddrInst *Inst)
     if (!resultTL.isAddressOnly()) {
       auto undef = SILValue(SILUndef::get(DestType.getObjectType(),
                                           Builder.getModule()));
-      Builder.createStore(Loc, undef, Dest);
+      Builder.createStore(Loc, undef, Dest,
+                          StoreOwnershipQualifier::Unqualified);
     }
     auto *TrapI = Builder.createBuiltinTrap(Loc);
     Inst->replaceAllUsesWithUndef();
@@ -2779,7 +2759,7 @@ void swift::hoistAddressProjections(Operand &Op, SILInstruction *InsertBefore,
         continue;
       }
       default:
-        assert(DomTree->dominates(V->getParentBB(), InsertBefore->getParent()) &&
+        assert(DomTree->dominates(V->getParentBlock(), InsertBefore->getParent()) &&
                "The projected value must dominate the insertion point");
         return;
     }

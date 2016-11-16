@@ -575,8 +575,9 @@ AggregateAvailableValues(SILInstruction *Inst, SILType LoadTy,
   // otherwise emit a load of the value.
   auto Val = AvailableValues[FirstElt];
   if (!Val.first)
-    return B.createLoad(Inst->getLoc(), Address);
-  
+    return B.createLoad(Inst->getLoc(), Address,
+                        LoadOwnershipQualifier::Unqualified);
+
   SILValue EltVal = ExtractSubElement(Val.first, Val.second, B, Inst->getLoc());
   // It must be the same type as LoadTy if available.
   assert(EltVal->getType() == LoadTy &&

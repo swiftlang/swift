@@ -178,7 +178,7 @@ emitElementAddress(unsigned EltNo, SILLocation Loc, SILBuilder &B) const {
       if (auto *NTD =
              cast_or_null<NominalTypeDecl>(PointeeType->getAnyNominal())) {
         if (isa<ClassDecl>(NTD) && Ptr->getType().isAddress())
-          Ptr = B.createLoad(Loc, Ptr);
+          Ptr = B.createLoad(Loc, Ptr, LoadOwnershipQualifier::Unqualified);
         for (auto *VD : NTD->getStoredProperties()) {
           auto FieldType = VD->getType()->getCanonicalType();
           unsigned NumFieldElements = getElementCountRec(FieldType, false);
@@ -372,7 +372,8 @@ static SILValue scalarizeLoad(LoadInst *LI,
   SmallVector<SILValue, 4> ElementTmps;
   
   for (unsigned i = 0, e = ElementAddrs.size(); i != e; ++i) {
-    auto *SubLI = B.createLoad(LI->getLoc(), ElementAddrs[i]);
+    auto *SubLI = B.createLoad(LI->getLoc(), ElementAddrs[i],
+                               LoadOwnershipQualifier::Unqualified);
     ElementTmps.push_back(SubLI);
   }
   
@@ -855,7 +856,8 @@ void ElementUseCollector::collectUses(SILValue Pointer, unsigned BaseEltNo) {
         getScalarizedElements(SI->getOperand(0), ElementTmps, SI->getLoc(), B);
         
         for (unsigned i = 0, e = ElementAddrs.size(); i != e; ++i)
-          B.createStore(SI->getLoc(), ElementTmps[i], ElementAddrs[i]);
+          B.createStore(SI->getLoc(), ElementTmps[i], ElementAddrs[i],
+                        StoreOwnershipQualifier::Unqualified);
         SI->eraseFromParent();
         continue;
       }
@@ -1155,6 +1157,27 @@ static bool isSelfInitUse(SILArgument *Arg) {
   return isSelfInitUse(Pred->getTerminator());
 }
 
+/// Returns true if \p Method is a callee of a full apply site that takes in \p
+/// Pointer as an argument. In such a case, we want to ignore the class method
+/// use and allow for the use by the apply inst to take precedence.
+static bool shouldIgnoreClassMethodUseError(
+    ClassMethodInst *Method, SILValue Pointer) {
+
+  // In order to work around use-list ordering issues, if this method is called
+  // by an apply site that has I as an argument, we want to process the apply
+  // site for errors to emit, not the class method. If we do not obey these
+  // conditions, then continue to treat the class method as an escape.
+  auto CheckFullApplySite = [&](Operand *Op) -> bool {
+    FullApplySite FAS(Op->getUser());
+    if (!FAS || (FAS.getCallee() != Method))
+      return false;
+    return llvm::any_of(
+        FAS.getArgumentsWithoutIndirectResults(),
+        [&](SILValue Arg) -> bool { return Arg == Pointer; });
+  };
+
+  return llvm::any_of(Method->getUses(), CheckFullApplySite);
+}
 
 void ElementUseCollector::
 collectClassSelfUses(SILValue ClassPointer, SILType MemorySILType,
@@ -1178,14 +1201,27 @@ collectClassSelfUses(SILValue ClassPointer, SILType MemorySILType,
       collectUses(REAI, EltNumbering[REAI->getField()]);
       continue;
     }
-    
-    // releases of self are tracked as a release (but retains are just treated
-    // like a normal 'load' use).  In the case of a failing initializer, the
-    // release on the exit path needs to cleanup the partially initialized
-    // elements.
+
+    // retains of self in class constructors can be ignored since we do not care
+    // about the retain that we are producing, but rather the consumer of the
+    // retain. This /should/ be true today and will be verified as true in
+    // Semantic SIL.
+    if (isa<StrongRetainInst>(User)) {
+      continue;
+    }
+
+    // releases of self are tracked as a release. In the case of a failing
+    // initializer, the release on the exit path needs to cleanup the partially
+    // initialized elements.
     if (isa<StrongReleaseInst>(User)) {
       Releases.push_back(User);
       continue;
+    }
+
+    if (auto *Method = dyn_cast<ClassMethodInst>(User)) {
+      if (shouldIgnoreClassMethodUseError(Method, ClassPointer)){
+        continue;
+      }
     }
 
     // If this is an upcast instruction, it is a conversion of self to the base.
@@ -1315,10 +1351,15 @@ void ElementUseCollector::collectDelegatingClassInitSelfUses() {
           continue;
         }
 
-        // class_method that refers to an initializing constructor is a method
-        // lookup for delegation, which is ignored.
-        if (auto Method = dyn_cast<ClassMethodInst>(User)) {
+        if (auto *Method = dyn_cast<ClassMethodInst>(User)) {
+          // class_method that refers to an initializing constructor is a method
+          // lookup for delegation, which is ignored.
           if (Method->getMember().kind == SILDeclRef::Kind::Initializer)
+            continue;
+
+          /// Returns true if \p Method used by an apply in a way that we know
+          /// will cause us to emit a better error.
+          if (shouldIgnoreClassMethodUseError(Method, LI))
             continue;
         }
 
@@ -1326,12 +1367,13 @@ void ElementUseCollector::collectDelegatingClassInitSelfUses() {
         // base.  This is either part of a super.init sequence, or a general
         // superclass access.  We special case super.init calls since they are
         // part of the object lifecycle.
-        if (auto *UCI = dyn_cast<UpcastInst>(User))
+        if (auto *UCI = dyn_cast<UpcastInst>(User)) {
           if (auto *subAI = isSuperInitUse(UCI)) {
             Uses.push_back(DIMemoryUse(subAI, DIUseKind::SuperInit, 0, 1));
             recordFailableInitCall(subAI);
             continue;
           }
+        }
 
         // We only track two kinds of uses for delegating initializers:
         // calls to self.init, and "other", which we choose to model as escapes.

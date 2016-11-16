@@ -434,6 +434,9 @@ namespace swift {
     void setShowDiagnosticsAfterFatalError(bool val = true) {
       showDiagnosticsAfterFatalError = val;
     }
+    bool getShowDiagnosticsAfterFatalError() {
+      return showDiagnosticsAfterFatalError;
+    }
 
     /// \brief Whether to skip emitting warnings
     void setSuppressWarnings(bool val) { suppressWarnings = val; }
@@ -508,6 +511,9 @@ namespace swift {
 
     void setShowDiagnosticsAfterFatalError(bool val = true) {
       state.setShowDiagnosticsAfterFatalError(val);
+    }
+    bool getShowDiagnosticsAfterFatalError() {
+      return state.getShowDiagnosticsAfterFatalError();
     }
 
     /// \brief Whether to skip emitting warnings

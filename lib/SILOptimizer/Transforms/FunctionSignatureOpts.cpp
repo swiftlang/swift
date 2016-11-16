@@ -474,6 +474,9 @@ void FunctionSignatureTransform::createFunctionSignatureOptimizedFunction() {
       F->isTransparent(), F->isFragile(), F->isThunk(), F->getClassVisibility(),
       F->getInlineStrategy(), F->getEffectsKind(), 0, F->getDebugScope(),
       F->getDeclContext());
+  if (F->hasUnqualifiedOwnership()) {
+    NewF->setUnqualifiedOwnership();
+  }
 
   // Then we transfer the body of F to NewF.
   NewF->spliceBody(F);

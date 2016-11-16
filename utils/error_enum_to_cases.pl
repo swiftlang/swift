@@ -22,7 +22,7 @@ foreach my $line (<STDIN>) {
     my $fullname = $1;
     my $value = $2;
     my $has_availability = 0;
-    
+
     my $availability = "";
 #    if ($line =~ /AVAILABLE\s*[(](([0-9]+_[0-9]+)|(NA))[ ]*,[ ]*(([0-9]+_[0-9]+)|(NA))[)]/) {
     if ($line =~ /AVAILABLE[ ]*[(]([^),]*),([^)]*)[)]/) {
@@ -34,7 +34,7 @@ foreach my $line (<STDIN>) {
       $availability = "  \@available(OSX, $osx) \@available(iOS, $ios)\n";
     }
 
-    # If the full name ends in "Minimum" or "Maximum", it's for a range. 
+    # If the full name ends in "Minimum" or "Maximum", it's for a range.
     my $rangeName = "";
     if ($fullname =~ /(Minimum|Maximum)$/) {
       $rangeName = substr $PREMATCH, $prefixLength;

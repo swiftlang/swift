@@ -934,6 +934,11 @@ static bool performCompile(CompilerInstance &Instance,
     if (observer) {
       observer->performedSILDiagnostics(*SM);
     }
+  } else {
+    // Even if we are not supposed to run the diagnostic passes, we still need
+    // to run the ownership evaluator.
+    if (runSILOwnershipEliminatorPass(*SM))
+      return true;
   }
 
   // Now if we are asked to link all, link all.

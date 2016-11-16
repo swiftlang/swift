@@ -105,7 +105,7 @@ public:
         // loaded.  Except it's not really an invariant, because
         // argument emission likes to lie sometimes.
         if (eltTI.isLoadable()) {
-          elt = gen.B.createLoad(loc, elt);
+          elt = eltTI.emitLoad(gen.B, loc, elt, LoadOwnershipQualifier::Take);
         }
       }
 

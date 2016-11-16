@@ -437,6 +437,7 @@
           key.entities: [
             {
               key.kind: source.lang.swift.decl.function.accessor.getter,
+              key.name: "getter:extV",
               key.usr: "s:FC5index2CCg4extVSi",
               key.line: 52,
               key.column: 18
@@ -535,12 +536,14 @@
           key.entities: [
             {
               key.kind: source.lang.swift.decl.function.accessor.getter,
+              key.name: "getter:value",
               key.usr: "s:FC5index16ComputedPropertyg5valueSi",
               key.line: 61,
               key.column: 5
             },
             {
               key.kind: source.lang.swift.decl.function.accessor.setter,
+              key.name: "setter:value",
               key.usr: "s:FC5index16ComputedPropertys5valueSi",
               key.line: 65,
               key.column: 5
@@ -563,6 +566,7 @@
           key.entities: [
             {
               key.kind: source.lang.swift.decl.function.accessor.getter,
+              key.name: "getter:readOnly",
               key.usr: "s:FC5index16ComputedPropertyg8readOnlySi",
               key.line: 70,
               key.column: 22
@@ -691,12 +695,14 @@
           key.entities: [
             {
               key.kind: source.lang.swift.decl.function.accessor.getter,
+              key.name: "getter:subscript(_:)",
               key.usr: "s:FC5index3CC2g9subscriptFSiSi",
               key.line: 82,
               key.column: 5
             },
             {
               key.kind: source.lang.swift.decl.function.accessor.setter,
+              key.name: "setter:subscript(_:)",
               key.usr: "s:FC5index3CC2s9subscriptFSiSi",
               key.line: 85,
               key.column: 5,
@@ -911,6 +917,7 @@
       key.entities: [
         {
           key.kind: source.lang.swift.decl.function.accessor.getter,
+          key.name: "getter:globReadOnly",
           key.usr: "s:F5indexg12globReadOnlyVS_2S2",
           key.line: 106,
           key.column: 3,
@@ -1312,6 +1319,7 @@
           key.entities: [
             {
               key.kind: source.lang.swift.decl.function.accessor.willset,
+              key.name: "willSet:globObserving",
               key.usr: "s:FC5index9Observingw13globObservingSi",
               key.line: 168,
               key.column: 5,
@@ -1332,6 +1340,7 @@
             },
             {
               key.kind: source.lang.swift.decl.function.accessor.didset,
+              key.name: "didSet:globObserving",
               key.usr: "s:FC5index9ObservingW13globObservingSi",
               key.line: 171,
               key.column: 5,
@@ -1377,6 +1386,7 @@
           key.entities: [
             {
               key.kind: source.lang.swift.decl.function.accessor.didset,
+              key.name: "didSet:S1",
               key.usr: "s:FC5index12rdar18640140W2S1Si",
               key.line: 186,
               key.column: 5,
@@ -1413,12 +1423,14 @@
           key.entities: [
             {
               key.kind: source.lang.swift.decl.function.accessor.getter,
+              key.name: "getter:S1",
               key.usr: "s:FP5index20rdar18640140Protocolg2S1Si",
               key.line: 195,
               key.column: 5
             },
             {
               key.kind: source.lang.swift.decl.function.accessor.setter,
+              key.name: "setter:S1",
               key.usr: "s:FP5index20rdar18640140Protocols2S1Si",
               key.line: 194,
               key.column: 5

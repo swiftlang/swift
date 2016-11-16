@@ -97,20 +97,20 @@ extern NSError *_NSErrorWithFilePathAndErrno(NSInteger posixErrno, id pathOrURL,
 SWIFT_CC(swift)
 BOOL _NSWriteDataToFile_Swift(NSURL * NS_RELEASES_ARGUMENT url, NSData * NS_RELEASES_ARGUMENT data, NSDataWritingOptions writingOptions, NSError **errorPtr) {
     assert((writingOptions & NSDataWritingAtomic) == 0);
-    
+
     NSString *path = url.path;
     char cpath[1026];
-    
+
     if (![path getFileSystemRepresentation:cpath maxLength:1024]) {
         if (errorPtr) *errorPtr = _NSErrorWithFilePath(NSFileWriteInvalidFileNameError, path);
         return NO;
     }
-    
+
     int protectionClass = 0;
 #if TARGET_OS_IPHONE && !TARGET_OS_SIMULATOR
     protectionClass = __NSFileProtectionClassForOptions(writingOptions);
 #endif
-    
+
     int flags = O_WRONLY|O_CREAT|O_TRUNC;
     if (writingOptions & NSDataWritingWithoutOverwriting) {
         flags |= O_EXCL;
@@ -122,7 +122,7 @@ BOOL _NSWriteDataToFile_Swift(NSURL * NS_RELEASES_ARGUMENT url, NSData * NS_RELE
         [data release];
         return NO;
     }
-    
+
     __block BOOL writingFailed = NO;
     __block int32_t saveerr = 0;
     NSUInteger dataLength = [data length];

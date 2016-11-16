@@ -81,6 +81,7 @@ bool swift::runSILDiagnosticPasses(SILModule &Module) {
   // passes, just run mandatory inlining with dead transparent function cleanup
   // disabled.
   if (Module.getOptions().DebugSerialization) {
+    PM.addOwnershipModelEliminator();
     PM.addMandatoryInlining();
     PM.run();
     return Ctx.hadError();
@@ -100,6 +101,7 @@ bool swift::runSILDiagnosticPasses(SILModule &Module) {
   PM.addMandatoryInlining();
   PM.addPredictableMemoryOptimizations();
   PM.addDiagnosticConstantPropagation();
+  PM.addGuaranteedARCOpts();
   PM.addDiagnoseUnreachable();
   PM.addEmitDFDiagnostics();
   // Canonical swift requires all non cond_br critical edges to be split.
@@ -123,6 +125,19 @@ bool swift::runSILDiagnosticPasses(SILModule &Module) {
   }
 
   // If errors were produced during SIL analysis, return true.
+  return Ctx.hadError();
+}
+
+bool swift::runSILOwnershipEliminatorPass(SILModule &Module) {
+  auto &Ctx = Module.getASTContext();
+
+  SILPassManager PM(&Module);
+
+  // Lower all ownership instructions.
+  PM.addOwnershipModelEliminator();
+  PM.runOneIteration();
+  PM.resetAndRemoveTransformations();
+
   return Ctx.hadError();
 }
 

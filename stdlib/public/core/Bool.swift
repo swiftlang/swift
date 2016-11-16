@@ -14,10 +14,9 @@
 
 /// A value type whose instances are either `true` or `false`.
 ///
-/// `Bool` represents Boolean values in Swift. Create instances of
-/// `Bool` by using one of the Boolean literals `true` and `false` or by
-/// assigning the result of a Boolean method or operation to a variable or
-/// constant.
+/// `Bool` represents Boolean values in Swift. Create instances of `Bool` by
+/// using one of the Boolean literals `true` or `false`, or by assigning the
+/// result of a Boolean method or operation to a variable or constant.
 ///
 ///     var godotHasArrived = false
 ///
@@ -33,8 +32,8 @@
 ///
 /// Swift uses only simple Boolean values in conditional contexts to help avoid
 /// accidental programming errors and to help maintain the clarity of each
-/// control statement. Unlike other programming languages, in Swift integers
-/// and strings cannot be used where a Boolean value is expected.
+/// control statement. Unlike in other programming languages, in Swift, integers
+/// and strings cannot be used where a Boolean value is required.
 ///
 /// For example, the following code sample does not compile, because it
 /// attempts to use the integer `i` in a logical context:
@@ -52,13 +51,21 @@
 ///         print(i)
 ///         i -= 1
 ///     }
+///
+/// Using Imported Boolean values
+/// =============================
+///
+/// The C `bool` and `Boolean` types and the Objective-C `BOOL` type are all
+/// bridged into Swift as `Bool`. The single `Bool` type in Swift guarantees
+/// that functions, methods, and properties imported from C and Objective-C
+/// have a consistent type interface.
 @_fixed_layout
 public struct Bool {
   internal var _value: Builtin.Int1
 
   /// Creates an instance initialized to `false`.
   ///
-  /// Don't call this initializer directly. Instead, use the Boolean literal
+  /// Do not call this initializer directly. Instead, use the Boolean literal
   /// `false` to create a new `Bool` instance.
   @_transparent
   public init() {
@@ -85,7 +92,7 @@ extension Bool : _ExpressibleByBuiltinBooleanLiteral, ExpressibleByBooleanLitera
   ///
   /// Do not call this initializer directly. It is used by the compiler when
   /// you use a Boolean literal. Instead, create a new `Bool` instance by
-  /// using one of the Boolean literals `true` and `false`.
+  /// using one of the Boolean literals `true` or `false`.
   ///
   ///     var printedMessage = false
   ///
@@ -126,7 +133,6 @@ extension Bool : CustomStringConvertible {
 public // COMPILER_INTRINSIC
 func _getBool(_ v: Builtin.Int1) -> Bool { return Bool(v) }
 
-@_transparent
 extension Bool : Equatable, Hashable {
   /// The hash value for the Boolean value.
   ///
@@ -136,6 +142,7 @@ extension Bool : Equatable, Hashable {
   ///   invocations of the same program. Do not persist the hash value across
   ///   program runs.
   /// - SeeAlso: `Hashable`
+  @_transparent
   public var hashValue: Int {
     return self ? 1 : 0
   }

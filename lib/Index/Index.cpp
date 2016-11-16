@@ -23,9 +23,37 @@
 using namespace swift;
 using namespace swift::index;
 
+
+static bool
+printArtificialName(const swift::ValueDecl *VD, llvm::raw_ostream &OS) {
+  auto *FD = dyn_cast<FuncDecl>(VD);
+  if (!FD)
+    return true;
+  switch (FD->getAccessorKind()) {
+  case AccessorKind::IsGetter:
+    OS << "getter:" << FD->getAccessorStorageDecl()->getFullName();
+    return false;
+  case AccessorKind::IsSetter:
+    OS << "setter:" << FD->getAccessorStorageDecl()->getFullName();
+    return false;
+  case AccessorKind::IsDidSet:
+    OS << "didSet:" << FD->getAccessorStorageDecl()->getFullName();
+    return false;
+  case AccessorKind::IsWillSet:
+    OS << "willSet:" << FD->getAccessorStorageDecl()->getFullName() ;
+    return false;
+
+  case AccessorKind::NotAccessor:
+  case AccessorKind::IsMaterializeForSet:
+  case AccessorKind::IsAddressor:
+  case AccessorKind::IsMutableAddressor:
+    return true;
+  }
+}
+
 static bool printDisplayName(const swift::ValueDecl *D, llvm::raw_ostream &OS) {
   if (!D->hasName())
-    return true;
+    return printArtificialName(D, OS);
 
   OS << D->getFullName();
   return false;
@@ -232,6 +260,10 @@ private:
     if (!EntitiesStack.empty())
       return EntitiesStack.back().D;
     return nullptr;
+  }
+
+  Expr *getCurrentExpr() {
+    return ExprStack.empty() ? nullptr : ExprStack.back();
   }
 
   Expr *getParentExpr() {
@@ -482,7 +514,7 @@ bool IndexSwiftASTWalker::startEntityRef(ValueDecl *D, SourceLoc Loc) {
 
   if (isa<AbstractFunctionDecl>(D)) {
     IndexSymbol Info;
-    if (initCallRefIndexSymbol(ExprStack.back(), getParentExpr(), D, Loc, Info))
+    if (initCallRefIndexSymbol(getCurrentExpr(), getParentExpr(), D, Loc, Info))
       return false;
 
     return startEntity(D, Info);

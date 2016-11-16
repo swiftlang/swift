@@ -231,6 +231,13 @@ public:
   /// Instruction visitor helpers.
   SILInstruction *optimizeBuiltinCanBeObjCClass(BuiltinInst *AI);
 
+  // Optimize the "trunc_N1_M2" builtin. if N1 is a result of "zext_M1_*" and
+  // the following holds true: N1 > M1 and M2>= M1
+  SILInstruction *optimizeBuiltinTruncOrBitCast(BuiltinInst *I);
+
+  // Optimize the "zext_M2_M3" builtin. if M2 is a result of "zext_M1_M2"
+  SILInstruction *optimizeBuiltinZextOrBitCast(BuiltinInst *I);
+
   // Optimize the "cmp_eq_XXX" builtin. If \p NegateResult is true then negate
   // the result bit.
   SILInstruction *optimizeBuiltinCompareEq(BuiltinInst *AI, bool NegateResult);

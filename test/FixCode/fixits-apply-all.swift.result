@@ -15,7 +15,7 @@ func foo() -> Int {
   }
 }
 func goo(_ e: Error) {
-	
+
 }
 
 

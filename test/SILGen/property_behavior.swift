@@ -1,4 +1,5 @@
 // RUN: %target-swift-frontend -emit-silgen -enable-experimental-property-behaviors %s | %FileCheck %s
+// REQUIRES: property_behavior_value_substitution
 protocol behavior {
   associatedtype Value
 }
@@ -96,9 +97,17 @@ extension withStorage {
 // TODO: storage behaviors in non-instance context
 struct S2<T> {
   var instance: T __behavior withStorage
+
+  // FIXME: Hack because we can't find the synthesized associated type witness
+  // during witness matching.
+  typealias Value = T
 }
 class C2<T> {
   var instance: T __behavior withStorage
+
+  // FIXME: Hack because we can't find the synthesized associated type witness
+  // during witness matching.
+  typealias Value = T
 }
 
 func exerciseStorage<T>(_ sx: inout S2<T>, _ sy: inout S2<Int>,
@@ -135,10 +144,18 @@ extension withInit {
 func any<T>() -> T { }
 
 struct S3<T> {
+
+  // FIXME: Hack because we can't find the synthesized associated type witness
+  // during witness matching.
+  typealias Value = T
   var instance: T __behavior withInit { any() }
 }
 class C3<T> {
   var instance: T __behavior withInit { any() }
+
+  // FIXME: Hack because we can't find the synthesized associated type witness
+  // during witness matching.
+  typealias Value = T
 }
 
 func exerciseStorage<T>(_ sx: inout S3<T>, _ sy: inout S3<Int>,

@@ -376,7 +376,7 @@ void SILSerializer::writeSILFunction(const SILFunction &F, bool DeclOnly) {
   // Write the body's context archetypes, unless we don't actually have a body.
   if (!F.isExternalDeclaration()) {
     if (auto genericEnv = F.getGenericEnvironment())
-      S.writeGenericEnvironment(genericEnv, SILAbbrCodes);
+      S.writeGenericEnvironment(genericEnv, SILAbbrCodes, true);
   }
 
   // Assign a unique ID to each basic block of the SILFunction.
@@ -650,7 +650,7 @@ void SILSerializer::writeSILInstruction(const SILInstruction &SI) {
   }
   case ValueKind::AllocBoxInst: {
     const AllocBoxInst *ABI = cast<AllocBoxInst>(&SI);
-    writeOneTypeLayout(ABI->getKind(), ABI->getElementType());
+    writeOneTypeLayout(ABI->getKind(), ABI->getType());
     break;
   }
   case ValueKind::AllocRefInst:

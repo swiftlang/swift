@@ -67,6 +67,7 @@ class Traversal : public TypeVisitor<Traversal, bool>
     return doIt(ty->getSelfType());
   }
   bool visitSubstitutableType(SubstitutableType *ty) { return false; }
+  bool visitAssociatedTypeType(AssociatedTypeType *ty) { return false; }
 
   bool visitSubstitutedType(SubstitutedType *ty) {
     if (Walker.shouldVisitOriginalSubstitutedType())
@@ -100,9 +101,6 @@ class Traversal : public TypeVisitor<Traversal, bool>
       case RequirementKind::Superclass:
         if (doIt(req.getSecondType()))
           return true;
-        break;
-
-      case RequirementKind::WitnessMarker:
         break;
       }
     }

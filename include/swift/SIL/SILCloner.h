@@ -511,7 +511,7 @@ SILCloner<ImplClass>::visitAllocBoxInst(AllocBoxInst *Inst) {
   getBuilder().setCurrentDebugScope(getOpScope(Inst->getDebugScope()));
   doPostProcess(Inst,
     getBuilder().createAllocBox(getOpLocation(Inst->getLoc()),
-                                getOpType(Inst->getElementType())));
+               this->getOpType(Inst->getType()).template castTo<SILBoxType>()));
 }
 
 template<typename ImplClass>
@@ -660,9 +660,9 @@ template<typename ImplClass>
 void
 SILCloner<ImplClass>::visitLoadInst(LoadInst *Inst) {
   getBuilder().setCurrentDebugScope(getOpScope(Inst->getDebugScope()));
-  doPostProcess(Inst,
-    getBuilder().createLoad(getOpLocation(Inst->getLoc()),
-                            getOpValue(Inst->getOperand())));
+  doPostProcess(Inst, getBuilder().createLoad(getOpLocation(Inst->getLoc()),
+                                              getOpValue(Inst->getOperand()),
+                                              Inst->getOwnershipQualifier()));
 }
 
 template <typename ImplClass>
@@ -676,10 +676,10 @@ void SILCloner<ImplClass>::visitLoadBorrowInst(LoadBorrowInst *Inst) {
 template <typename ImplClass>
 void SILCloner<ImplClass>::visitStoreInst(StoreInst *Inst) {
   getBuilder().setCurrentDebugScope(getOpScope(Inst->getDebugScope()));
-  doPostProcess(Inst,
-    getBuilder().createStore(getOpLocation(Inst->getLoc()),
-                             getOpValue(Inst->getSrc()),
-                             getOpValue(Inst->getDest())));
+  doPostProcess(Inst, getBuilder().createStore(getOpLocation(Inst->getLoc()),
+                                               getOpValue(Inst->getSrc()),
+                                               getOpValue(Inst->getDest()),
+                                               Inst->getOwnershipQualifier()));
 }
 
 template <typename ImplClass>

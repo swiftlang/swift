@@ -1,4 +1,4 @@
-// RUN: %target-sil-opt -enable-sil-verify-all -eager-specializer  %s | %FileCheck %s
+// RUN: %target-sil-opt -assume-parsing-unqualified-ownership-sil -enable-sil-verify-all -eager-specializer  %s | %FileCheck %s
 
 sil_stage canonical
 
@@ -76,7 +76,7 @@ sil @_TFV16eager_specialize1G12getContainerfwx3Eltx : $@convention(method) <Cont
 bb0(%0 : $*Container, %1 : $*Container.Elt, %2 : $G<Container>):
   %4 = witness_method $Container, #HasElt.init!allocator.1 : $@convention(witness_method) <τ_0_0 where τ_0_0 : HasElt> (@in τ_0_0.Elt, @thick τ_0_0.Type) -> @out τ_0_0, scope 20 // user: %6
   %5 = metatype $@thick Container.Type, scope 20 // user: %6
-  %6 = apply %4<Container, Container.Elt>(%0, %1, %5) : $@convention(witness_method) <τ_0_0 where τ_0_0 : HasElt> (@in τ_0_0.Elt, @thick τ_0_0.Type) -> @out τ_0_0, scope 20
+  %6 = apply %4<Container>(%0, %1, %5) : $@convention(witness_method) <τ_0_0 where τ_0_0 : HasElt> (@in τ_0_0.Elt, @thick τ_0_0.Type) -> @out τ_0_0, scope 20
   %7 = tuple (), scope 20 // user: %8
   return %7 : $(), scope 20 // id: %8
 }
@@ -89,7 +89,7 @@ sil [_specialize <S, X>] @_TF16eager_specialize19getGenericContaineruRxS_6HasElt
 bb0(%0 : $*T, %1 : $G<T>, %2 : $*T.Elt):
   // function_ref G.getContainer(A.Elt) -> A
   %5 = function_ref @_TFV16eager_specialize1G12getContainerfwx3Eltx : $@convention(method) <τ_0_0 where τ_0_0 : HasElt> (@in τ_0_0.Elt, G<τ_0_0>) -> @out τ_0_0, scope 6 // user: %6
-  %6 = apply %5<T, T.Elt>(%0, %2, %1) : $@convention(method) <τ_0_0 where τ_0_0 : HasElt> (@in τ_0_0.Elt, G<τ_0_0>) -> @out τ_0_0, scope 6
+  %6 = apply %5<T>(%0, %2, %1) : $@convention(method) <τ_0_0 where τ_0_0 : HasElt> (@in τ_0_0.Elt, G<τ_0_0>) -> @out τ_0_0, scope 6
   %7 = tuple (), scope 6 // user: %8
   return %7 : $(), scope 6 // id: %8
 }
@@ -113,7 +113,7 @@ bb0(%0 : $*T, %1 : $G<T>, %2 : $*T.Elt):
 
 // CHECK: bb1:                                              // Preds: bb0
 // CHECK:   %9 = function_ref @_TFV16eager_specialize1G12getContainerfwx3Eltx : $@convention(method) <τ_0_0 where τ_0_0 : HasElt> (@in τ_0_0.Elt, G<τ_0_0>) -> @out τ_0_0
-// CHECK:   %10 = apply %9<T, T.Elt>(%0, %2, %1) : $@convention(method) <τ_0_0 where τ_0_0 : HasElt> (@in τ_0_0.Elt, G<τ_0_0>) -> @out τ_0_0
+// CHECK:   %10 = apply %9<T>(%0, %2, %1) : $@convention(method) <τ_0_0 where τ_0_0 : HasElt> (@in τ_0_0.Elt, G<τ_0_0>) -> @out τ_0_0
 // CHECK:   br bb2
 
 // CHECK: bb2:                                              // Preds: bb3 bb1
@@ -159,7 +159,7 @@ bb0(%0 : $*T, %1 : $*T):
 }
 
 // divideNum<A where ...> (A, den : A) throws -> A
-sil [_specialize <Int, Int, Int, Int, Int>] @_TF16eager_specialize9divideNumuRxs13SignedIntegerrFzTx3denx_x : $@convention(thin) <T where T : SignedInteger, T.IntegerLiteralType : _ExpressibleByBuiltinIntegerLiteral, T.IntegerLiteralType : _ExpressibleByBuiltinIntegerLiteral, T.Stride : SignedNumber, T.Stride.IntegerLiteralType : _ExpressibleByBuiltinIntegerLiteral> (@in T, @in T) -> (@out T, @error Error) {
+sil [_specialize <Int>] @_TF16eager_specialize9divideNumuRxs13SignedIntegerrFzTx3denx_x : $@convention(thin) <T where T : SignedInteger> (@in T, @in T) -> (@out T, @error Error) {
 // %0                                             // user: %19
 // %1                                             // users: %3, %19, %23
 // %2                                             // users: %4, %7, %19, %22
@@ -202,7 +202,7 @@ bb2:                                              // Preds: bb0
 // CHECK: throw %{{.*}}
 
 // Generic with specialized dispatch. No more [specialize] attribute.
-// 
+//
 // CHECK-LABEL: sil @_TF16eager_specialize9divideNumuRxs13SignedIntegerrFzTx3denx_x : $@convention(thin) <T where T : SignedInteger> (@in T, @in T) -> (@out T, @error Error) {
 // CHECK: bb0(%0 : $*T, %1 : $*T, %2 : $*T):
 // CHECK:   %3 = metatype $@thick T.Type

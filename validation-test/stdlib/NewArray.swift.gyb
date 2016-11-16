@@ -106,13 +106,13 @@ func test<
 
   x.reserveCapacity(x.count + 2)
   checkEqual(x, LifetimeTracked(1)...LifetimeTracked(5), true)
-  
+
   let bufferId0 = x._bufferID
 
   // Append a range of integers
   x += LifetimeTracked(0)..<LifetimeTracked(2)
   let bufferId1 = checkReallocation(x, bufferId0, false)
-  
+
   for i in x.count..<(x.capacity + 1) {
     let bufferId1a = checkReallocation(x, bufferId1, false)
     x.append(LifetimeTracked(13))
@@ -141,7 +141,7 @@ func test<
         reallocations += 1
       }
     }
-    
+
     if reallocations > 3 {
       print(
         "Unexpectedly found \(reallocations) reallocations "
@@ -175,22 +175,22 @@ func testAsArray() {
   print("== AsArray ==")
   var w: ContiguousArray<LifetimeTracked>
     = [LifetimeTracked(4), LifetimeTracked(2), LifetimeTracked(1)]
-  // CHECK: == AsArray == 
-  
+  // CHECK: == AsArray ==
+
   let x = ContiguousArray(w)
   print(w._bufferID == x._bufferID)
   // CHECK-NEXT: true
-  
+
   let y = Array(x)
   print(x._bufferID == y._bufferID)
   // CHECK-NEXT: true
 
   // Because of their indirection, arrays of classes can share
-  // buffers.  
+  // buffers.
   let y1 = Array(y)
   print(y1._bufferID == y._bufferID)
   // CHECK-NEXT: true
-  
+
   let z = ArraySlice(y)
   print(y._bufferID == z._bufferID)
   // CHECK-NEXT: true
@@ -227,7 +227,7 @@ func testCocoa() {
   var a = nsArrayOfStrings()
   printSequence(a)
   // CHECK-objc-NEXT: [foo, bar, baz]
-  
+
   a.append("qux")
   printSequence(a)
   // CHECK-objc-NEXT: [foo, bar, baz, qux]
@@ -235,9 +235,9 @@ func testCocoa() {
   a = nsArrayOfStrings()
   printSequence(a)
   // CHECK-objc-NEXT: [foo, bar, baz]
-  
+
   let b = a
-  
+
   a[1] = "garply"
   printSequence(a)
   // CHECK-objc-NEXT: [foo, garply, baz]
@@ -245,7 +245,7 @@ func testCocoa() {
   // Mutating an element in a has no effect on b
   printSequence(b)
   // CHECK-objc-NEXT: [foo, bar, baz]
-  
+
   a = nsArrayOfStrings()
   a.insert("bag", at: 2)
   printSequence(a)
@@ -255,7 +255,7 @@ func testCocoa() {
   a.reserveCapacity(30)
   printSequence(a)
   // CHECK-objc-NEXT: [foo, bar, baz]
-  
+
   print(a.capacity >= 30)
   // CHECK-objc-NEXT: true
 
@@ -363,7 +363,7 @@ func testReplace${A}(
   // the out-of-place code paths.
   let r = makeOne()
   testReplace({ r })
-  
+
   // This test should ensure r's retain isn't dropped before we start testing.
   if (r.count != testWidth) {
     print("something bad happened!")
@@ -411,7 +411,7 @@ func testInoutViolation() {
     }
   }
 %end
-  
+
   // An overload of sorted for Arrays uses withUnsafeMutableBufferPointer,
   // which disables bounds checks.
   _ = a.sorted { x, y in
@@ -428,14 +428,14 @@ testInoutViolation()
 func testSingleElementModifiers${A}() {
   print("testing ${A} single-argument modifiers")
   // CHECK-NEXT: testing ${A} single-argument modifiers
-  
+
   var a = ${A}(LifetimeTracked(0)..<LifetimeTracked(10))
   print(a.removeLast().value)     // CHECK-NEXT: 9
   printSequence(a)               // CHECK-NEXT: [0, 1, 2, 3, 4, 5, 6, 7, 8]
-  
+
   a.insert(LifetimeTracked(42), at: 4)
   printSequence(a)               // CHECK-NEXT: [0, 1, 2, 3, 42, 4, 5, 6, 7, 8]
-  
+
   print(a.remove(at: 2).value) // CHECK-NEXT: 2
   printSequence(a)                  // CHECK-NEXT: [0, 1, 3, 42, 4, 5, 6, 7, 8]
 }
@@ -458,14 +458,14 @@ func testIsEmptyFirstLast${A}() {
 
   print("<\(${A}<Int>().first)>")    // CHECK-NEXT: nil
   print("<\(${A}<Int>().last)>")     // CHECK-NEXT: nil
-  
+
   var a = ${A}(LifetimeTracked(0)..<LifetimeTracked(10))
   print(a.removeLast().value)     // CHECK-NEXT: 9
   printSequence(a)               // CHECK-NEXT: [0, 1, 2, 3, 4, 5, 6, 7, 8]
-  
+
   a.insert(LifetimeTracked(42), at: 4)
   printSequence(a)               // CHECK-NEXT: [0, 1, 2, 3, 42, 4, 5, 6, 7, 8]
-  
+
   print(a.remove(at: 2).value) // CHECK-NEXT: 2
   printSequence(a)                  // CHECK-NEXT: [0, 1, 3, 42, 4, 5, 6, 7, 8]
 }
@@ -492,7 +492,7 @@ typealias OSColor = UIColor
 
 class Rdar16914909 : NSObject {
   var basicColorSet = [OSColor]()
-  
+
   func doColorStuff() {
     basicColorSet.append(OSColor.lightGray)
     print("appended")

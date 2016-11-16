@@ -802,6 +802,9 @@ struct MemberLookupResult {
     
     /// The member is inaccessible (e.g. a private member in another file).
     UR_Inaccessible,
+    
+    // A type's destructor cannot be referenced
+    UR_DestructorInaccessible,
   };
   
   /// This is a list of considered, but rejected, candidates, along with a
@@ -889,10 +892,6 @@ private:
   /// The current fixed score for this constraint system and the (partial)
   /// solution it represents.
   Score CurrentScore;
-
-  /// Whether this constraint system is processing a favored
-  /// constraint.
-  bool HandlingFavoredConstraint = false;
 
   SmallVector<TypeVariableType *, 16> TypeVariables;
 
@@ -1054,14 +1053,6 @@ public:
   /// that locator.
   llvm::DenseMap<ConstraintLocator *, ArgumentLabelState> ArgumentLabels;
 
-  /// FIXME: This is a workaround for the way we perform protocol
-  /// conformance checking for generic requirements, where we re-use
-  /// the archetypes of the requirement (rather than, say, building
-  /// new archetypes) to match up with the witness. Those archetypes
-  /// can end up with references to the outer archetypes (of the
-  /// associated types), which need to be replaced.
-  TypeVariableType *SelfTypeVar = nullptr;
-
   /// \brief The set of additional attributes inferred for a FunctionType.  Note
   /// that this is not state kept as part of SolverState, so it only supports
   /// function attributes that need to be set invariant of the actual typing of
@@ -1212,12 +1203,7 @@ public:
 
   /// \brief Create a new type variable.
   TypeVariableType *createTypeVariable(ConstraintLocator *locator,
-                                       unsigned options) {
-    auto tv = TypeVariableType::getNew(TC.Context, assignTypeVariableID(),
-                                       locator, options);
-    addTypeVariable(tv);
-    return tv;
-  }
+                                       unsigned options);
 
   /// Retrieve the set of active type variables.
   ArrayRef<TypeVariableType *> getTypeVariables() const {
@@ -1351,32 +1337,6 @@ public:
   }
 
   /// \brief Add a value member constraint to the constraint system.
-  void addTypeMemberConstraint(Type baseTy, DeclName name, Type memberTy,
-                               ConstraintLocatorBuilder locator) {
-    assert(baseTy);
-    assert(memberTy);
-    assert(name);
-    switch (simplifyMemberConstraint(ConstraintKind::TypeMember, baseTy, name,
-                                     memberTy, FunctionRefKind::Compound,
-                                     TMF_GenerateConstraints, locator)) {
-    case SolutionKind::Unsolved:
-      llvm_unreachable("Unsolved result when generating constraints!");
-
-    case SolutionKind::Solved:
-      break;
-
-    case SolutionKind::Error:
-      if (shouldAddNewFailingConstraint()) {
-        addNewFailingConstraint(
-          Constraint::create(*this, ConstraintKind::TypeMember, baseTy,
-                             memberTy, name, FunctionRefKind::Compound,
-                             getConstraintLocator(locator)));
-      }
-      break;
-    }
-  }
-
-  /// \brief Add a value member constraint to the constraint system.
   void addValueMemberConstraint(Type baseTy, DeclName name, Type memberTy,
                                 FunctionRefKind functionRefKind,
                                 ConstraintLocatorBuilder locator) {
@@ -1486,24 +1446,6 @@ public:
     InactiveConstraints.erase(constraint);
   }
 
-  /// Retrieve the type that corresponds to the given member of the
-  /// given base type, which may be a newly-created type variable.
-  ///
-  /// \param baseTypeVar The base type variable whose member is being queried.
-  ///
-  /// \param assocType The associated type we're referencing.
-  ///
-  /// \param locator The location used to describe this member access.
-  ///
-  /// \param options Options to be supplied to type variable creation if 
-  /// a new type is created.
-  ///
-  /// \returns the type variable representing the member type.
-  TypeVariableType *getMemberType(TypeVariableType *baseTypeVar, 
-                                  AssociatedTypeDecl *assocType,
-                                  ConstraintLocatorBuilder locator,
-                                  unsigned options);
-
   /// Retrieve the list of inactive constraints.
   ConstraintList &getConstraints() { return InactiveConstraints; }
 
@@ -1526,6 +1468,30 @@ public:
                                TypeVariableType *typeVar2,
                                bool updateWorkList = true);
 
+  /// \brief Flags that direct type matching.
+  enum TypeMatchFlags {
+    /// \brief Indicates that we are in a context where we should be
+    /// generating constraints for any unsolvable problems.
+    ///
+    /// This flag is automatically introduced when type matching destructures
+    /// a type constructor (tuple, function type, etc.), solving that
+    /// constraint while potentially generating others.
+    TMF_GenerateConstraints = 0x01,
+
+    /// Indicates that we are applying a fix.
+    TMF_ApplyingFix = 0x02,
+
+    /// Indicates we're matching an operator parameter.
+    TMF_ApplyingOperatorParameter = 0x4,
+
+    /// Indicates we're unwrapping an optional type for a value-to-optional
+    /// conversion.
+    TMF_UnwrappingOptional = 0x8,
+  };
+
+  /// Options that govern how type matching should proceed.
+  typedef OptionSet<TypeMatchFlags> TypeMatchOptions;
+
   /// \brief Retrieve the fixed type corresponding to the given type variable,
   /// or a null type if there is no fixed type.
   Type getFixedType(TypeVariableType *typeVar) {
@@ -1543,6 +1509,27 @@ public:
   ///
   /// param retainParens Whether to retain parentheses.
   Type getFixedTypeRecursive(Type type, bool wantRValue,
+                             bool retainParens = false) {
+    TypeMatchOptions flags = None;
+    return getFixedTypeRecursive(type, flags, wantRValue, retainParens);
+  }
+
+  /// Retrieve the fixed type corresponding to a given type variable,
+  /// recursively, until we hit something that isn't a type variable
+  /// or a type variable that doesn't have a fixed type.
+  ///
+  /// \param type The type to simplify.
+  ///
+  /// \param flags When simplifying one of the types that is part of a
+  /// constraint we are examining, the set of flags that governs the
+  /// simplification. The set of flags may be both queried and mutated.
+  ///
+  /// \param wantRValue Whether this routine should look through
+  /// lvalues at each step.
+  ///
+  /// param retainParens Whether to retain parentheses.
+  Type getFixedTypeRecursive(Type type, TypeMatchOptions &flags,
+                             bool wantRValue,
                              bool retainParens = false);
 
   /// Determine whether the given type variable occurs within the given type.
@@ -1699,11 +1686,6 @@ public:
                           ConstraintLocatorBuilder locator,
                           const DeclRefExpr *base = nullptr);
 
-  /// Replace the 'Self' type in the archetype with the appropriate
-  /// type variable, if needed.
-  /// FIXME: See the documentation of SelfTypeVar.
-  Type replaceSelfTypeInArchetype(ArchetypeType *archetype);
-
   /// \brief Retrieve the type of a reference to the given value declaration,
   /// as a member with a base of the given type.
   ///
@@ -1798,32 +1780,6 @@ public:
   /// destination of an assignment statement.
   Type computeAssignDestType(Expr *dest, SourceLoc equalLoc);
 
-public:
-  /// \brief Flags that direct type matching.
-  enum TypeMatchFlags {
-    /// \brief Indicates that we are in a context where we should be
-    /// generating constraints for any unsolvable problems.
-    ///
-    /// This flag is automatically introduced when type matching destructures
-    /// a type constructor (tuple, function type, etc.), solving that
-    /// constraint while potentially generating others.
-    TMF_GenerateConstraints = 0x01,
-
-    /// Indicates that we are applying a fix.
-    TMF_ApplyingFix = 0x02,
-    
-    /// Indicates we're matching an operator parameter.
-    TMF_ApplyingOperatorParameter = 0x4,
-    
-    /// Indicates we're unwrapping an optional type for a value-to-optional
-    /// conversion.
-    TMF_UnwrappingOptional = 0x8,
-  };
-
-  /// Options that govern how type matching should proceed.
-  typedef OptionSet<TypeMatchFlags> TypeMatchOptions;
-
-private:
   /// \brief Subroutine of \c matchTypes(), which matches up two tuple types.
   ///
   /// \returns the result of performing the tuple-to-tuple conversion.
@@ -1911,6 +1867,21 @@ public:
   /// The resulting types can be compared canonically, so long as additional
   /// type equivalence requirements aren't introduced between comparisons.
   Type simplifyType(Type type);
+
+  /// \brief Simplify a type, by replacing type variables with either their
+  /// fixed types (if available) or their representatives.
+  ///
+  /// \param flags If the simplified type has changed, this will be updated
+  /// to include \c TMF_GenerateConstraints.
+  ///
+  /// The resulting types can be compared canonically, so long as additional
+  /// type equivalence requirements aren't introduced between comparisons.
+  Type simplifyType(Type type, TypeMatchOptions &flags) {
+    Type result = simplifyType(type);
+    if (result.getPointer() != type.getPointer())
+      flags |= TMF_GenerateConstraints;
+    return result;
+  }
 
   /// Given a ValueMember, UnresolvedValueMember, or TypeMember constraint,
   /// perform a lookup into the specified base type to find a candidate list.
@@ -2059,6 +2030,9 @@ private:
   SolutionKind addConstraintImpl(ConstraintKind kind, Type first, Type second,
                                  ConstraintLocatorBuilder locator,
                                  bool isFavored);
+
+  /// \brief Collect the current inactive disjunciton constraints.
+  void collectDisjunctions(SmallVectorImpl<Constraint *> &disjunctions);
 
   /// \brief Solve the system of constraints after it has already been
   /// simplified.
@@ -2411,7 +2385,7 @@ public:
       }
 
       std::pair<bool, Pattern*> walkToPatternPre(Pattern *P) override {
-        TS->Patterns.insert({ P, P->getType() });
+        TS->Patterns.insert({ P, P->hasType() ? P->getType() : Type() });
         return { true, P };
       }
 

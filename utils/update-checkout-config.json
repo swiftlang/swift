@@ -189,6 +189,24 @@
                 "swift-integration-tests": "swift-3.0-branch",
                 "swift-xcode-playground-support": "swift-3.0-branch"
             }
+        },
+        "swift-3.1-branch" : {
+            "aliases": ["swift-3.1-branch"],
+            "repos": {
+                "llvm": "swift-3.1-branch",
+                "clang": "swift-3.1-branch",
+                "swift": "master",
+                "lldb": "master",
+                "cmark": "master",
+                "llbuild": "master",
+                "swiftpm": "master",
+                "compiler-rt": "swift-3.1-branch",
+                "swift-corelibs-xctest": "master",
+                "swift-corelibs-foundation": "master",
+                "swift-corelibs-libdispatch": "master",
+                "swift-integration-tests": "master",
+                "swift-xcode-playground-support": "master"
+            }
         }
     }
 }

@@ -51,7 +51,7 @@ static void _dispatch_overlay_constructor() {
 
 #include "swift/Runtime/Config.h"
 
-SWIFT_CC(swift) DISPATCH_RUNTIME_STDLIB_INTERFACE 
+SWIFT_CC(swift) DISPATCH_RUNTIME_STDLIB_INTERFACE
 extern "C" dispatch_queue_attr_t
 _swift_dispatch_queue_concurrent(void) {
   return DISPATCH_QUEUE_CONCURRENT;

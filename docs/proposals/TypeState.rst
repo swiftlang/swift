@@ -91,7 +91,7 @@ It defines typestates with syntax that looks like it is defining types::
 
   state OpenFile case of File = {
     val filePtr;
-    method read() { ... } 
+    method read() { ... }
     method close() { this <- ClosedFile; }
   }
 

@@ -34,8 +34,8 @@ extension SubscriptTest {
 % for SelfType in ['UnsafeRawBufferPointer', 'UnsafeMutableRawBufferPointer']:
   /// Create and populate an `${SelfType}` for use with unit tests.
   /// PRECONDITION: `memory` must be allocated with space for
-  /// `SubscriptGetTest.elementCount` bytes. 
-  static func create${SelfType}(from memory: UnsafeMutableRawPointer) 
+  /// `SubscriptGetTest.elementCount` bytes.
+  static func create${SelfType}(from memory: UnsafeMutableRawPointer)
     -> ${SelfType}
   {
     for i in Self.start..<Self.end {
@@ -48,12 +48,12 @@ extension SubscriptTest {
 % for SelfType in ['UnsafeBufferPointer', 'UnsafeMutableBufferPointer']:
   /// Create and populate an `${SelfType}` for use with unit tests.
   /// PRECONDITION: `memory` must be allocated with space for
-  /// `SubscriptGetTest.elementCount` elements. 
-  static func create${SelfType}(from memory: UnsafeMutablePointer<OpaqueValue<Int>>) 
-    -> ${SelfType}<OpaqueValue<Int>> 
+  /// `SubscriptGetTest.elementCount` elements.
+  static func create${SelfType}(from memory: UnsafeMutablePointer<OpaqueValue<Int>>)
+    -> ${SelfType}<OpaqueValue<Int>>
   {
     for i in Self.start..<Self.end {
-      memory[i] = OpaqueValue(i)  
+      memory[i] = OpaqueValue(i)
     }
     return ${SelfType}(start: memory, count: Self.elementCount)
   }
@@ -101,7 +101,7 @@ let subscriptGetTests : [SubscriptGetTest] = [
     expectedClosedValues: [19]),
 
   // Valid, internal.
-  SubscriptGetTest(rangeSelection: .leftHalf, 
+  SubscriptGetTest(rangeSelection: .leftHalf,
     expectedValues: [0, 1, 2, 3, 4, 5, 6, 7, 8, 9]),
   SubscriptGetTest(rangeSelection: .rightHalf,
     expectedValues: [10, 11, 12, 13, 14, 15, 16, 17, 18, 19]),
@@ -155,7 +155,7 @@ struct SubscriptSetTest : SubscriptTest {
   let loc: SourceLoc
 
   init(
-    rangeSelection: RangeSelection, 
+    rangeSelection: RangeSelection,
     replacementValues: [Int],
     replacementClosedValues: [Int]? = nil,
     expectedValues: [Int]? = nil,
@@ -489,7 +489,7 @@ ${SelfName}TestSuite.test("RandomAccessCollection") {
 }
 
 %   for RangeName in ['range', 'countableRange', 'closedRange', 'countableClosedRange']:
-${SelfName}TestSuite.test("subscript/${RangeName}/get").forEach(in: subscriptGetTests) { 
+${SelfName}TestSuite.test("subscript/${RangeName}/get").forEach(in: subscriptGetTests) {
   (test) in
 
   let expectedValues: [Int]?

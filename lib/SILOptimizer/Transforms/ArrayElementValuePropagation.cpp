@@ -67,7 +67,7 @@ class ArrayAllocation {
   bool findValueReplacements();
   bool isInitializationWithKnownElements();
   bool mapInitializationStores();
-  bool analyseArrayValueUses();
+  bool analyzeArrayValueUses();
   bool recursivelyCollectUses(ValueBase *Def);
   bool collectForwardableValues();
 
@@ -172,7 +172,7 @@ bool ArrayAllocation::findValueReplacements() {
     return false;
 
   // The array value was stored or has escaped.
-  if (!analyseArrayValueUses())
+  if (!analyzeArrayValueUses())
     return false;
 
   // No count users.
@@ -184,7 +184,7 @@ bool ArrayAllocation::findValueReplacements() {
 
 /// Collect all get_element users and check that there are no escapes or uses
 /// that could change the array value.
-bool ArrayAllocation::analyseArrayValueUses() {
+bool ArrayAllocation::analyzeArrayValueUses() {
   return recursivelyCollectUses(ArrayValue);
 }
 

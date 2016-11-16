@@ -1301,7 +1301,6 @@ bool ArchetypeBuilder::addSameTypeRequirement(Type Reqt1, Type Reqt2,
   
   // Require that at least one side of the requirement be a potential archetype.
   if (!T1 && !T2) {
-    assert(Source.getLoc().isValid() && "reintroducing invalid requirement");
     Diags.diagnose(Source.getLoc(), diag::requires_no_same_type_archetype);
     return true;
   }
@@ -1489,7 +1488,7 @@ void ArchetypeBuilder::addRequirement(const Requirement &req,
   switch (req.getKind()) {
   case RequirementKind::Superclass: {
     PotentialArchetype *pa = resolveArchetype(req.getFirstType());
-    assert(pa && "Re-introducing invalid requirement");
+    if (!pa) return;
 
     assert(req.getSecondType()->getClassOrBoundGenericClass());
     addSuperclassRequirement(pa, req.getSecondType(), source);
@@ -1498,11 +1497,7 @@ void ArchetypeBuilder::addRequirement(const Requirement &req,
 
   case RequirementKind::Conformance: {
     PotentialArchetype *pa = resolveArchetype(req.getFirstType());
-    assert(pa && "Re-introducing invalid requirement");
-    // FIXME: defensively return if assertions are disabled until we figure out
-    // how this situation can occur and fix it properly.
-    if (!pa)
-      return;
+    if (!pa) return;
 
     SmallVector<ProtocolDecl *, 4> conformsTo;
     bool existential = req.getSecondType()->isExistentialType(conformsTo);
@@ -1521,9 +1516,6 @@ void ArchetypeBuilder::addRequirement(const Requirement &req,
 
   case RequirementKind::SameType:
     addSameTypeRequirement(req.getFirstType(), req.getSecondType(), source);
-    return;
-    
-  case RequirementKind::WitnessMarker:
     return;
   }
 
@@ -1574,9 +1566,6 @@ public:
     RequirementSource source(RequirementSource::Inferred, Loc);
     for (const auto &req : genericSig->getRequirements()) {
       switch (req.getKind()) {
-      case RequirementKind::WitnessMarker:
-        break;
-
       case RequirementKind::SameType: {
         auto firstType = req.getFirstType().subst(
                            &Builder.getModule(),
@@ -1896,10 +1885,6 @@ void ArchetypeBuilder::enumerateRequirements(llvm::function_ref<
       continue;
     }
 
-    // Add the witness marker.
-    f(RequirementKind::WitnessMarker, archetype, Type(),
-      RequirementSource(RequirementSource::Explicit, SourceLoc()));
-
     // If we have a superclass, produce a superclass requirement
     if (Type superclass = archetype->getSuperclass()) {
       f(RequirementKind::Superclass, archetype, superclass,
@@ -1961,10 +1946,6 @@ void ArchetypeBuilder::dump(llvm::raw_ostream &out) {
       out << " [";
       source.dump(out, &Context.SourceMgr);
       out << "]";
-      break;
-
-    case RequirementKind::WitnessMarker:
-      out << "\n  " << archetype->getDebugName() << " witness marker";
       break;
     }
   });
@@ -2074,11 +2055,6 @@ static void collectRequirements(ArchetypeBuilder &builder,
     if (depTy->hasError())
       return;
 
-    if (kind == RequirementKind::WitnessMarker) {
-      requirements.push_back(Requirement(kind, depTy, Type()));
-      return;
-    }
-
     Type repTy;
     if (auto concreteTy = type.dyn_cast<Type>()) {
       // Maybe we were equated to a concrete type...
@@ -2111,13 +2087,11 @@ GenericSignature *ArchetypeBuilder::getGenericSignature() {
   return sig;
 }
 
-GenericEnvironment *ArchetypeBuilder::getGenericEnvironment() {
-  SmallVector<GenericTypeParamType *, 4> genericParamTypes;
+GenericEnvironment *ArchetypeBuilder::getGenericEnvironment(GenericSignature *signature) {
   TypeSubstitutionMap interfaceToArchetypeMap;
 
   for (auto pair : Impl->PotentialArchetypes) {
     auto paramTy = pair.second->getGenericParam();
-    genericParamTypes.push_back(paramTy);
 
     auto archetypeTy = pair.second->getType(*this).getAsArchetype();
     auto concreteTy = pair.second->getType(*this).getAsConcreteType();
@@ -2129,7 +2103,8 @@ GenericEnvironment *ArchetypeBuilder::getGenericEnvironment() {
       llvm_unreachable("broken generic parameter");
   }
 
-  return GenericEnvironment::get(Context, genericParamTypes,
+
+  return GenericEnvironment::get(Context, signature,
                                  interfaceToArchetypeMap);
 }
 

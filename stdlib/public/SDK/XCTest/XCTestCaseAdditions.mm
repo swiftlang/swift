@@ -108,18 +108,18 @@ fail:
 - (NSString *)className
 {
   NSString *className = [super className];
-  
+
   char *modulePart;
   char *classPart;
   bool ok = demangleSimpleClass([className UTF8String],
                                 &modulePart, &classPart);
   if (ok) {
     className = [NSString stringWithUTF8String:classPart];
-    
+
     free(modulePart);
     free(classPart);
   }
-  
+
   return className;
 }
 
@@ -138,12 +138,12 @@ XCT_EXPORT NSDictionary *_XCTRunThrowableBlockBridge(void (^block)());
 NSDictionary *_XCTRunThrowableBlockBridge(void (^block)())
 {
     NSDictionary *result;
-    
+
     @try {
         block();
         result = @{};
     }
-    
+
     @catch (NSException *exception) {
         result = @{
                    @"type": @"objc",
@@ -152,13 +152,13 @@ NSDictionary *_XCTRunThrowableBlockBridge(void (^block)())
                    @"reason": exception.reason,
                    };
     }
-    
+
     @catch (...) {
         result = @{
                    @"type": @"unknown",
                    };
     }
-    
+
     Block_release(block);
     return [result retain];
 }

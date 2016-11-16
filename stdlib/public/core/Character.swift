@@ -106,7 +106,7 @@ public struct Character :
 
   /// Creates a character with the specified value.
   ///
-  /// Don't call this initializer directly. It is used by the compiler when you
+  /// Do not call this initializer directly. It is used by the compiler when you
   /// use a string literal to initialize a `Character` instance. For example:
   ///
   ///     let snowflake: Character = "❄︎"
@@ -134,8 +134,9 @@ public struct Character :
 
   /// Creates a character with the specified value.
   ///
-  /// Don't call this initializer directly. It is used by the compiler when you
-  /// use a string literal to initialize a `Character` instance. For example:
+  /// Do not call this initializer directly. It is used by the compiler when
+  /// you use a string literal to initialize a `Character` instance. For
+  /// example:
   ///
   ///     let oBreve: Character = "o\u{306}"
   ///     print(oBreve)

@@ -96,7 +96,7 @@ Having header files for public API is nice for a couple of reasons:
    headers but not the implementation of system classes.  This allows "jump to
    definition" to go to the declaration of an API in the header, which is
    conveniently co-located with headerdoc.
-    
+
 On the other hand, headers have a number of disadvantages including:
 
 1. It is plain code duplication, with all the negative effects of it.  It slows

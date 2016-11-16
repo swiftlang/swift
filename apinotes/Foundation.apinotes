@@ -1254,8 +1254,6 @@ Tags:
 - Name: NSURLHandleStatus
   SwiftName: NSURLHandle.Status
 Typedefs:
-- Name: NSAffineTransformStruct
-  SwiftName: AffineTransform
 - Name: NSComparator
   SwiftName: Comparator
 - Name: NSDecimal
@@ -1740,3 +1738,13 @@ Enumerators:
   SwiftName: regularExpression
 - Name: NSStringEnumerationByLines
   SwiftName: byLines
+SwiftVersions:
+- Version: 3
+  Protocols:
+  - Name: NSFastEnumeration
+    Methods:
+    - Selector: 'countByEnumeratingWithState:objects:count:'
+      MethodKind: Instance
+      Parameters:
+      - Position: 1
+        Nullability: U

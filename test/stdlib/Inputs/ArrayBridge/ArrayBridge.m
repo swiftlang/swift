@@ -10,7 +10,7 @@
 //
 //===----------------------------------------------------------------------===//
 //
-//  
+//
 //
 //===----------------------------------------------------------------------===//
 #include "ArrayBridge.h"
@@ -48,7 +48,7 @@ void testSubclass(id thunks) {
   [toObjCArr addObject: [thunks createSubclass:12]];
   [toObjCArr addObject: [thunks createSubclass:13]];
   [toObjCArr addObject: [thunks createSubclass:14]];
-  
+
   [thunks acceptSubclassArray: toObjCArr expecting: toObjCArr];
 }
 
@@ -56,7 +56,7 @@ void testBridgeableValue(id thunks) {
   // Retrieve an array from Swift.
   NSArray *fromSwiftArr = [thunks produceBridgeableValueArray];
   [thunks checkProducedBridgeableValueArray: fromSwiftArr];
-    
+
   // Send an array to swift.
   NSMutableArray *toSwiftArr = [[NSMutableArray alloc] init];
   [toSwiftArr addObject: [thunks createSubclass:10]];

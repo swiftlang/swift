@@ -67,15 +67,17 @@ public struct CGFloat {
   public var native: NativeType
 }
 
-@_transparent extension CGFloat : BinaryFloatingPoint {
+extension CGFloat : BinaryFloatingPoint {
 
   public typealias RawSignificand = UInt
   public typealias Exponent = Int
 
+  @_transparent
   public static var exponentBitCount: Int {
     return NativeType.exponentBitCount
   }
 
+  @_transparent
   public static var significandBitCount: Int {
     return NativeType.significandBitCount
   }
@@ -83,26 +85,32 @@ public struct CGFloat {
   //  Conversions to/from integer encoding.  These are not part of the
   //  BinaryFloatingPoint prototype because there's no guarantee that an
   //  integer type of the same size actually exists (e.g. Float80).
+  @_transparent
   public var bitPattern: UInt {
     return UInt(native.bitPattern)
   }
 
+  @_transparent
   public init(bitPattern: UInt) {
     native = NativeType(bitPattern: UInt${word_bits}(bitPattern))
   }
 
+  @_transparent
   public var sign: FloatingPointSign {
     return native.sign
   }
 
+  @_transparent
   public var exponentBitPattern: UInt {
     return native.exponentBitPattern
   }
 
+  @_transparent
   public var significandBitPattern: UInt {
     return UInt(native.significandBitPattern)
   }
 
+  @_transparent
   public init(sign: FloatingPointSign,
               exponentBitPattern: UInt,
               significandBitPattern: UInt) {
@@ -111,125 +119,154 @@ public struct CGFloat {
       significandBitPattern: NativeType.RawSignificand(significandBitPattern))
   }
 
+  @_transparent
   public init(nan payload: RawSignificand, signaling: Bool) {
     native = NativeType(nan: NativeType.RawSignificand(payload),
                         signaling: signaling)
   }
 
+  @_transparent
   public static var infinity: CGFloat {
     return CGFloat(NativeType.infinity)
   }
 
+  @_transparent
   public static var nan: CGFloat {
     return CGFloat(NativeType.nan)
   }
 
+  @_transparent
   public static var signalingNaN: CGFloat {
     return CGFloat(NativeType.signalingNaN)
   }
-  
+
   @available(*, unavailable, renamed: "nan")
   public static var quietNaN: CGFloat {
     fatalError("unavailable")
   }
 
+  @_transparent
   public static var greatestFiniteMagnitude: CGFloat {
     return CGFloat(NativeType.greatestFiniteMagnitude)
   }
 
+  @_transparent
   public static var pi: CGFloat {
     return CGFloat(NativeType.pi)
   }
 
+  @_transparent
   public var ulp: CGFloat {
     return CGFloat(native.ulp)
   }
 
+  @_transparent
   public static var leastNormalMagnitude: CGFloat {
     return CGFloat(NativeType.leastNormalMagnitude)
   }
 
+  @_transparent
   public static var leastNonzeroMagnitude: CGFloat {
     return CGFloat(NativeType.leastNonzeroMagnitude)
   }
 
+  @_transparent
   public var exponent: Int {
     return native.exponent
   }
 
+  @_transparent
   public var significand: CGFloat {
     return CGFloat(native.significand)
   }
 
+  @_transparent
   public init(sign: FloatingPointSign, exponent: Int, significand: CGFloat) {
     native = NativeType(sign: sign,
       exponent: exponent, significand: significand.native)
   }
 
+  @_transparent
   public mutating func round(_ rule: FloatingPointRoundingRule) {
     native.round(rule)
   }
 
+  @_transparent
   public var nextUp: CGFloat {
     return CGFloat(native.nextUp)
   }
 
+  @_transparent
   public var magnitude: CGFloat {
     return CGFloat(Swift.abs(native))
   }
 
+  @_transparent
   public mutating func negate() {
     native.negate()
   }
 
+  @_transparent
   public mutating func add(_ other: CGFloat) {
     native.add(other.native)
   }
 
+  @_transparent
   public mutating func subtract(_ other: CGFloat) {
     native.subtract(other.native)
   }
 
+  @_transparent
   public mutating func multiply(by other: CGFloat) {
     native.multiply(by: other.native)
   }
 
+  @_transparent
   public mutating func divide(by other: CGFloat) {
     native.divide(by: other.native)
   }
 
+  @_transparent
   public mutating func formTruncatingRemainder(dividingBy other: CGFloat) {
     native.formTruncatingRemainder(dividingBy: other.native)
   }
 
+  @_transparent
   public mutating func formRemainder(dividingBy other: CGFloat) {
     native.formRemainder(dividingBy: other.native)
   }
 
+  @_transparent
   public mutating func formSquareRoot( ) {
     native.formSquareRoot( )
   }
 
+  @_transparent
   public mutating func addProduct(_ lhs: CGFloat, _ rhs: CGFloat) {
     native.addProduct(lhs.native, rhs.native)
   }
 
+  @_transparent
   public func isEqual(to other: CGFloat) -> Bool {
     return self.native.isEqual(to: other.native)
   }
 
+  @_transparent
   public func isLess(than other: CGFloat) -> Bool {
     return self.native.isLess(than: other.native)
   }
 
+  @_transparent
   public func isLessThanOrEqualTo(_ other: CGFloat) -> Bool {
     return self.native.isLessThanOrEqualTo(other.native)
   }
 
+  @_transparent
   public var isNormal:  Bool {
     return native.isNormal
   }
 
+  @_transparent
   public var isFinite:  Bool {
     return native.isFinite
   }
@@ -276,11 +313,13 @@ public struct CGFloat {
   }
 
   /// Create an instance initialized to `value`.
+  @_transparent
   public init(floatLiteral value: NativeType) {
     native = value
   }
 
   /// Create an instance initialized to `value`.
+  @_transparent
   public init(integerLiteral value: Int) {
     native = NativeType(value)
   }
@@ -320,14 +359,15 @@ extension CGFloat : CustomReflectable {
   }
 }
 
-@_transparent extension CGFloat : CustomStringConvertible {
+extension CGFloat : CustomStringConvertible {
   /// A textual representation of `self`.
+  @_transparent
   public var description: String {
     return native.description
   }
 }
 
-@_transparent extension CGFloat : Hashable {
+extension CGFloat : Hashable {
   /// The hash value.
   ///
   /// **Axiom:** `x == y` implies `x.hashValue == y.hashValue`
@@ -335,6 +375,7 @@ extension CGFloat : CustomReflectable {
   /// - Note: the hash value is not guaranteed to be stable across
   ///   different invocations of the same program.  Do not persist the
   ///   hash value across program runs.
+  @_transparent
   public var hashValue: Int {
     return native.hashValue
   }
@@ -342,7 +383,8 @@ extension CGFloat : CustomReflectable {
 
 % for dst_ty in all_integer_types(word_bits):
 
-@_transparent extension ${dst_ty.stdlib_name} {
+extension ${dst_ty.stdlib_name} {
+  @_transparent
   public init(_ value: CGFloat) {
     self = ${dst_ty.stdlib_name}(value.native)
   }
@@ -351,15 +393,17 @@ extension CGFloat : CustomReflectable {
 % end
 
 
-@_transparent extension Double {
+extension Double {
+  @_transparent
   public init(_ value: CGFloat) {
-    self = Double(value.native) 
+    self = Double(value.native)
   }
 }
 
-@_transparent extension Float {
+extension Float {
+  @_transparent
   public init(_ value: CGFloat) {
-    self = Float(value.native) 
+    self = Float(value.native)
   }
 }
 
@@ -417,7 +461,7 @@ public func /=(lhs: inout CGFloat, rhs: CGFloat) {
 // Strideable Conformance
 //===----------------------------------------------------------------------===//
 
-@_transparent extension CGFloat : Strideable {
+extension CGFloat : Strideable {
   /// Returns a stride `x` such that `self.advanced(by: x)` approximates
   /// `other`.
   ///
@@ -750,17 +794,18 @@ public func yn(_ n: Int, _ x: CGFloat) -> CGFloat {
   return CGFloat(yn(n, Double(x.native)))
 }
 
-@_transparent
 extension CGFloat : _CVarArgPassedAsDouble, _CVarArgAligned {
   /// Transform `self` into a series of machine words that can be
   /// appropriately interpreted by C varargs
+  @_transparent
   public var _cVarArgEncoding: [Int] {
     return native._cVarArgEncoding
   }
 
-  /// Return the required alignment in bytes of 
+  /// Return the required alignment in bytes of
   /// the value returned by `_cVarArgEncoding`.
-  public var _cVarArgAlignment: Int { 
+  @_transparent
+  public var _cVarArgAlignment: Int {
     return native._cVarArgAlignment
   }
 }

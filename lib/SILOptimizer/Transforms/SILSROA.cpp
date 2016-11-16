@@ -233,7 +233,8 @@ void SROAMemoryUseAnalyzer::chopUpAlloca(std::vector<AllocStackInst *> &Worklist
     SILBuilderWithScope B(LI);
     llvm::SmallVector<SILValue, 4> Elements;
     for (auto *NewAI : NewAllocations)
-      Elements.push_back(B.createLoad(LI->getLoc(), NewAI));
+      Elements.push_back(B.createLoad(LI->getLoc(), NewAI,
+                                      LoadOwnershipQualifier::Unqualified));
     auto *Agg = createAgg(B, LI->getLoc(), LI->getType().getObjectType(),
                           Elements);
     LI->replaceAllUsesWith(Agg);
@@ -246,7 +247,8 @@ void SROAMemoryUseAnalyzer::chopUpAlloca(std::vector<AllocStackInst *> &Worklist
     for (unsigned EltNo : indices(NewAllocations))
       B.createStore(SI->getLoc(),
                     createAggProjection(B, SI->getLoc(), SI->getSrc(), EltNo),
-                    NewAllocations[EltNo]);
+                    NewAllocations[EltNo],
+                    StoreOwnershipQualifier::Unqualified);
     SI->eraseFromParent();
   }
 

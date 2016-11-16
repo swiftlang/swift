@@ -275,7 +275,8 @@ RValue Transform::transform(RValue &&input,
   SmallVector<InitializationPtr, 4> eltInitsBuffer;
   MutableArrayRef<InitializationPtr> eltInits;
   auto tupleInit = ctxt.getEmitInto();
-  if (!ctxt.getEmitInto()->canSplitIntoTupleElements()) {
+  if (!ctxt.getEmitInto()
+      || !ctxt.getEmitInto()->canSplitIntoTupleElements()) {
     tupleInit = nullptr;
   } else {
     eltInits = tupleInit->splitIntoTupleElements(SGF, Loc, outputTupleType,
@@ -334,7 +335,9 @@ static bool isProtocolClass(Type t) {
 static ManagedValue emitManagedLoad(SILGenFunction &gen, SILLocation loc,
                                     ManagedValue addr,
                                     const TypeLowering &addrTL) {
-  auto loadedValue = gen.B.createLoad(loc, addr.forward(gen));
+  // SEMANTIC ARC TODO: When the verifier is finished, revisit this.
+  auto loadedValue = addrTL.emitLoad(gen.B, loc, addr.forward(gen),
+                                     LoadOwnershipQualifier::Take);
   return gen.emitManagedRValueWithCleanup(loadedValue, addrTL);
 }
 
@@ -520,6 +523,21 @@ ManagedValue Transform::transform(ManagedValue v,
     return emitTransformExistential(SGF, Loc, v,
                                     inputSubstType, outputSubstType,
                                     ctxt);
+  }
+
+  // - T : Hashable to AnyHashable
+  if (isa<StructType>(outputSubstType) &&
+      outputSubstType->getAnyNominal() ==
+        SGF.getASTContext().getAnyHashableDecl()) {
+    auto *protocol = SGF.getASTContext().getProtocol(
+        KnownProtocolKind::Hashable);
+    auto conformance = SGF.SGM.M.getSwiftModule()->lookupConformance(
+        inputSubstType, protocol, nullptr);
+    auto result = SGF.emitAnyHashableErasure(Loc, v, inputSubstType,
+                                             *conformance, ctxt);
+    if (result.isInContext())
+      return ManagedValue::forInContext();
+    return std::move(result).getAsSingleValue(SGF, Loc);
   }
 
   // Should have handled the conversion in one of the cases above.
@@ -721,7 +739,7 @@ static ManagedValue manageParam(SILGenFunction &gen,
   // Unowned parameters are only guaranteed at the instant of the call, so we
   // must retain them even if we're in a context that can accept a +0 value.
   case ParameterConvention::Direct_Unowned:
-    gen.getTypeLowering(paramValue->getType())
+    paramValue = gen.getTypeLowering(paramValue->getType())
         .emitCopyValue(gen.B, loc, paramValue);
     SWIFT_FALLTHROUGH;
   case ParameterConvention::Direct_Owned:
@@ -2104,8 +2122,7 @@ void ResultPlanner::execute(ArrayRef<SILValue> innerDirectResults,
                        "reabstraction of returns_inner_pointer function");
       SWIFT_FALLTHROUGH;
     case ResultConvention::Unowned:
-      resultTL.emitCopyValue(Gen.B, Loc, resultValue);
-      return Gen.emitManagedRValueWithCleanup(resultValue, resultTL);
+      return Gen.emitManagedRetain(Loc, resultValue, resultTL);
     }
     llvm_unreachable("bad result convention!");
   };
@@ -2166,7 +2183,9 @@ void ResultPlanner::execute(ArrayRef<SILValue> innerDirectResults,
 
     case Operation::DirectToIndirect: {
       auto result = claimNextInnerDirectResult(op.InnerResult);
-      Gen.B.createStore(Loc, result.forward(Gen), op.OuterResultAddr);
+      Gen.B.emitStoreValueOperation(Loc, result.forward(Gen),
+                                    op.OuterResultAddr,
+                                    StoreOwnershipQualifier::Init);
       continue;
     }
 
@@ -2174,7 +2193,9 @@ void ResultPlanner::execute(ArrayRef<SILValue> innerDirectResults,
       auto resultAddr = op.InnerResultAddr;
       auto &resultTL = Gen.getTypeLowering(resultAddr->getType());
       auto result = Gen.emitManagedRValueWithCleanup(
-                                 Gen.B.createLoad(Loc, resultAddr), resultTL);
+          resultTL.emitLoad(Gen.B, Loc, resultAddr,
+                            LoadOwnershipQualifier::Take),
+          resultTL);
       addOuterDirectResult(result, op.OuterResult);
       continue;
     }

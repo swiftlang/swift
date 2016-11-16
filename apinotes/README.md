@@ -11,7 +11,7 @@ API notes are organized into a set of `.apinotes` files. Each
 written in YAML (FIXME: to be) described below. These YAML sources
 must be manually compiled into a binary representation (`.apinotesc`)
 that the Swift compiler will lazily load when it builds code, also
-described below. 
+described below.
 
 # API Notes YAML Format
 
@@ -42,7 +42,7 @@ When updating API notes for a system module, recompile the API notes
 and place the result in the appropriate directories listed above. The
 Swift compiler itself need not be recompiled except in rare cases
 where the changes affect how the SDK overlays are built. To recompile
-API notes for a given module `$MODULE` and place them into their 
+API notes for a given module `$MODULE` and place them into their
 
 ### OS X
 ```

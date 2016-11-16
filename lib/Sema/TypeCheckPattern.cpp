@@ -10,7 +10,7 @@
 //
 //===----------------------------------------------------------------------===//
 //
-// This file implements semantic analysis for patterns, analysing a
+// This file implements semantic analysis for patterns, analyzing a
 // pattern tree in both bottom-up and top-down ways.
 //
 //===----------------------------------------------------------------------===//
@@ -1510,6 +1510,25 @@ bool TypeChecker::coerceParameterListToType(ParameterList *P, ClosureExpr *CE,
   Type paramListType = FN->getInput();
   bool hadError = paramListType->hasError();
 
+  // Local function to check if the given type is valid e.g. doesn't have
+  // errors, type variables or unresolved types related to it.
+  auto isValidType = [](Type type) -> bool {
+    return !(type.isNull() || type->hasError() || type->hasUnresolvedType() ||
+             type->hasTypeVariable());
+  };
+
+  // Local function to check whether type of given parameter
+  // should be coerced to a given contextual type or not.
+  auto shouldOverwriteParam = [&](ParamDecl *param) -> bool {
+    if (param->isInvalid())
+      return true;
+
+    if (auto type = param->getTypeLoc().getType())
+      return !isValidType(type);
+
+    return true;
+  };
+
   // Sometimes a scalar type gets applied to a single-argument parameter list.
   auto handleParameter = [&](ParamDecl *param, Type ty) -> bool {
     bool hadError = false;
@@ -1521,8 +1540,10 @@ bool TypeChecker::coerceParameterListToType(ParameterList *P, ClosureExpr *CE,
       
       // Now that we've type checked the explicit argument type, see if it
       // agrees with the contextual type.
-      if (!hadError && !ty->isEqual(param->getTypeLoc().getType()) &&
-          !ty->hasError())
+      auto paramType = param->getTypeLoc().getType();
+      // Coerce explicitly specified argument type to contextual type
+      // only if both types are valid and do not match.
+      if (!hadError && isValidType(ty) && !ty->isEqual(paramType))
         param->overwriteType(ty);
     }
 
@@ -1534,10 +1555,11 @@ bool TypeChecker::coerceParameterListToType(ParameterList *P, ClosureExpr *CE,
                  diag::param_type_non_materializable_tuple, ty);
       }
     }
-    
-    if (param->isInvalid())
-      param->overwriteType(ErrorType::get(Context));
-    else
+
+    // If contextual type is invalid and we have a valid argument type
+    // trying to coerce argument to contextual type would mean erasing
+    // valuable diagnostic information.
+    if (isValidType(ty) || shouldOverwriteParam(param))
       param->overwriteType(ty);
     
     checkTypeModifyingDeclAttributes(param);

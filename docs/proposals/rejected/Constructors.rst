@@ -69,10 +69,10 @@ subclass whose own ``init`` has not completed. A contrived example::
   }
 
   -(NSString *)description {
-    return self->title; 
+    return self->title;
   }
   @end
-  
+
 During the second phase of initialization, A's ``-init`` method
 invokes the ``-description`` method, which ends up in B's
 ``-description``. Here, ``title`` will be ``nil`` even though the
@@ -88,7 +88,7 @@ A's ``-init`` sends the ``description`` message, it would invoke A's
 ``-description``. This is somewhat safer than two-phase
 initialization, because the programmer does not have to deal with the
 possibility of executing one's methods before the initialization of
-one's instance variables have completed. It is also less flexible. 
+one's instance variables have completed. It is also less flexible.
 
 Designated Initializers
 ~~~~~~~~~~~~~~~~~~~~~~~
@@ -140,7 +140,7 @@ aforementioned "Concepts in Objective-C Programming" document)::
 The first initializer is the designated initializer, which directly
 initializes the instance variables from its parameters. The second two
 initializers are secondary initializers, which delegate to other
-initializers, eventually reaching the designated initializer. 
+initializers, eventually reaching the designated initializer.
 
 A subclass should override all of its superclass's designated
 initializers, but it need not override the secondary initializers. We
@@ -156,8 +156,8 @@ instance variable::
 
   @implementation PackagedTask
   - (id)initWithTitle:(NSString *)aTitle date:(NSDate *)aDate {
-    return [self initWithTitle:aTitle 
-                 date:aDate 
+    return [self initWithTitle:aTitle
+                 date:aDate
                  queue:dispatch_get_global_queue(DISPATCH_QUEUE_PRIORITY_DEFAULT, 0)];
   }
 
@@ -282,7 +282,7 @@ definite initialization analysis. For example, the Swift
   class PackagedTask : Task {
     var queue : dispatch_queue_t
 
-    constructor(title : String, date : NSDate = NSDate(), 
+    constructor(title : String, date : NSDate = NSDate(),
                 queue : dispatch_queue_t = dispatch_get_global_queue(DISPATCH_QUEUE_PRIORITY_DEFAULT, 0)) {
       super.constructor(title:title, date:date)
       self.queue = queue
@@ -335,7 +335,7 @@ This model complicates constructor inheritance considerably. A
 secondary initializer in Objective-C works by delegating to
 (eventually) a designated initializer, which is overridden by the
 subclass. Following the C++/Java/C# precedent breaks this pattern,
-because the overriding designated initializer will never be invoked. 
+because the overriding designated initializer will never be invoked.
 
 Constructor Inheritance
 ~~~~~~~~~~~~~~~~~~~~~~~
@@ -359,7 +359,7 @@ presence of class extensions.
 One potential approach is to bring Objective-C's notion of designated
 and secondary initializers into Swift. A "designated" constructor is
 responsible for calling the superclass constructor and then
-initializing its own instance variables. 
+initializing its own instance variables.
 
 A "secondary" constructor can be written in the class definition or an
 extension. A secondary constructor must delegate to another
@@ -374,7 +374,7 @@ override all of the designated constructors of their
 superclass. Therefore, we require that designated constructors be
 written within the class definition [#]_. Secondary constructors can
 be written in either the class definition or an
-extension. 
+extension.
 
 In Objective-C, classes generally only have one or two designated
 initializers, so having to override them doesn't seem too onerous. If
@@ -399,7 +399,7 @@ constructors in class extensions.
 
 Class Clusters and Assignment to Self
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-TBD. 
+TBD.
 
 
 Objective-C Interoperability
@@ -446,7 +446,7 @@ selector for the Objective-C entry point is formed by:
 
 For example, given the Swift constructor::
 
-  constructor withTitle(aTitle : String) date(aDate : NSDate) { 
+  constructor withTitle(aTitle : String) date(aDate : NSDate) {
     // ...
   }
 
@@ -504,19 +504,19 @@ Nil and Re-assigned Self
 An Objective-C initializer can return a self pointer that is different
 than the one it was called with. When this happens, it is either due
 to an error (in which case it will return nil) or because the object
-is being substituted for another object. 
+is being substituted for another object.
 
 In both cases, we are left with a partially-constructed object that
 then needs to be destroyed, even though its instance variables may not
 yet have been initialized. This is also a problem for Objective-C,
 which makes returning anything other than the original ''self''
-brittle. 
+brittle.
 
 In Swift, we will have a separate error-handling mechanism to report
 failures. A Swift constructor will not be allowed to return a value;
 rather, it should raise an error if an error occurs, and that error
 will be propagated however we eventually decide to implement error
-propagation. 
+propagation.
 
 Object substitution is the more complicated feature. I propose that we
 do not initially support object substitution within Swift

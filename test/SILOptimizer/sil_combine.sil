@@ -1,4 +1,4 @@
-// RUN: %target-sil-opt -enable-sil-verify-all %s -sil-combine -verify-skip-unreachable-must-be-last | %FileCheck %s
+// RUN: %target-sil-opt -assume-parsing-unqualified-ownership-sil -enable-sil-verify-all %s -sil-combine -verify-skip-unreachable-must-be-last | %FileCheck %s
 
 sil_stage canonical
 
@@ -142,7 +142,7 @@ bb0:
 // CHECK-NOT: unchecked_ref_cast
 sil @removeTriviallyDeadInstructions : $@convention(thin) (@owned B) -> () {
 bb0(%0 : $B):
-  %1 = alloc_box $B
+  %1 = alloc_box $@box B
   %1a = project_box %1 : $@box B, 0
   %2 = store %0 to %1a : $*B
   %3 = load %1a : $*B
@@ -1318,6 +1318,45 @@ bb0(%0 : $Builtin.RawPointer, %1: $Builtin.Int64):
   return %11 : $Int32
 }
 
+// CHECK-LABEL: sil @trunc_of_zext : $@convention(thin) (Builtin.Int16) -> Builtin.Int32
+// CHECK-NOT: builtin "zextOrBitCast_Int16_Int64"
+// CHECK-NOT: builtin "truncOrBitCast_Int64_Int32"
+// CHECK: builtin "zextOrBitCast_Int16_Int32"
+// CHECK-NEXT: return
+sil @trunc_of_zext : $@convention(thin) (Builtin.Int16) -> Builtin.Int32 {
+bb0(%0 : $Builtin.Int16):
+  %zext = builtin "zextOrBitCast_Int16_Int64"(%0 : $Builtin.Int16) : $Builtin.Int64
+  %trunc = builtin "truncOrBitCast_Int64_Int32"(%zext : $Builtin.Int64) : $Builtin.Int32
+  return %trunc : $Builtin.Int32
+}
+
+// CHECK-LABEL: sil @zext_of_zext : $@convention(thin) (Builtin.Int16) -> Builtin.Int64
+// CHECK-NOT: builtin "zextOrBitCast_Int16_Int32"
+// CHECK-NOT: builtin "zextOrBitCast_Int32_Int64"
+// CHECK: builtin "zextOrBitCast_Int16_Int64"
+// CHECK-NEXT: return
+sil @zext_of_zext : $@convention(thin) (Builtin.Int16) -> Builtin.Int64 {
+bb0(%0 : $Builtin.Int16):
+  %zext1 = builtin "zextOrBitCast_Int16_Int32"(%0 : $Builtin.Int16) : $Builtin.Int32
+  %zext2 = builtin "zextOrBitCast_Int32_Int64"(%zext1 : $Builtin.Int32) : $Builtin.Int64
+  return %zext2 : $Builtin.Int64
+}
+
+// CHECK-LABEL: sil @trunc_of_zext_then_zext : $@convention(thin) (Builtin.Int16) -> Builtin.Int16
+// CHECK-NOT: builtin "zextOrBitCast_Int16_Int64"
+// CHECK-NOT: builtin "truncOrBitCast_Int64_Int32"
+// CHECK-NOT: builtin "zextOrBitCast_Int32_Int64"
+// CHECK-NOT: builtin "truncOrBitCast_Int64_Int16"
+// CHECK: return
+sil @trunc_of_zext_then_zext : $@convention(thin) (Builtin.Int16) -> Builtin.Int16 {
+bb0(%0 : $Builtin.Int16):
+  %zext = builtin "zextOrBitCast_Int16_Int64"(%0 : $Builtin.Int16) : $Builtin.Int64
+  %trunc = builtin "truncOrBitCast_Int64_Int32"(%zext : $Builtin.Int64) : $Builtin.Int32
+  %zext2 = builtin "zextOrBitCast_Int32_Int64"(%trunc : $Builtin.Int32) : $Builtin.Int64
+  %trunc2 = builtin "truncOrBitCast_Int64_Int16"(%zext2 : $Builtin.Int64) : $Builtin.Int16
+  return %trunc2 : $Builtin.Int16
+}
+
 sil @eliminate_dead_thin_to_thick_function_fun : $@convention(thin) () -> ()
 
 // CHECK-LABEL: sil @eliminate_dead_thin_to_thick_function : $@convention(thin) () -> () {
@@ -1465,9 +1504,9 @@ sil @generic_call_with_indirect_result : $@convention(thin) <T> (@in T) -> @out 
 sil @generic_call_without_indirect_result : $@convention(thin) <T> (@in T) -> Bool
 sil @generic_call_with_direct_result : $@convention(thin) <T> (T) -> T
 
-// CHECK-LABEL: sil @generic_partial_apply : $@convention(thin) () -> () {
+// CHECK-LABEL: sil @generic_partialapply : $@convention(thin) () -> () {
 // CHECK-NOT: partial_apply
-sil @generic_partial_apply : $@convention(thin) () -> () {
+sil @generic_partialapply : $@convention(thin) () -> () {
 bb0:
   %0 = function_ref @generic_call_with_indirect_result : $@convention(thin) <τ_0_0> (@in τ_0_0) -> @out τ_0_0
   %1 = function_ref @generic_call_without_indirect_result : $@convention(thin) <τ_0_0> (@in τ_0_0) -> Bool
@@ -1620,7 +1659,7 @@ bb0:
 
 
 class ZZZ {
-  @objc deinit 
+  @objc deinit
   init()
 }
 
@@ -1628,7 +1667,7 @@ struct SSS {
 }
 
 //CHECK-LABEL: sil @test_delete_readonly_owned
-//CHECK: bb0(%0 : $ZZZ): 
+//CHECK: bb0(%0 : $ZZZ):
 //CHECK-NEXT: strong_release %0
 //CHECK-NEXT: tuple
 //CHECK-NEXT: return
@@ -1643,7 +1682,7 @@ bb0(%0 : $ZZZ):
 sil [readonly] @read_only_owned : $@convention(thin) (@owned ZZZ) -> ()
 
 //CHECK-LABEL: sil @test_delete_readonly_guaranteed
-//CHECK: bb0(%0 : $ZZZ): 
+//CHECK: bb0(%0 : $ZZZ):
 //CHECK-NEXT: tuple
 //CHECK-NEXT: return
 sil @test_delete_readonly_guaranteed : $@convention(thin) (@guaranteed ZZZ) -> () {
@@ -1657,7 +1696,7 @@ bb0(%0 : $ZZZ):
 sil [readonly] @read_only_guaranteed : $@convention(thin) (@guaranteed ZZZ) -> ()
 
 //CHECK-LABEL: sil @test_delete_readonly_in
-//CHECK: bb0(%0 : $*SSS): 
+//CHECK: bb0(%0 : $*SSS):
 //CHECK-NEXT: destroy_addr %0
 //CHECK-NEXT: tuple
 //CHECK-NEXT: return
@@ -1678,7 +1717,7 @@ sil @unknown : $@convention(thin) () -> ()
 sil [readonly] @readonly_throwing : $@convention(thin) (@owned ZZZ) -> (ZZZ, @error Error)
 
 //CHECK-LABEL: sil @test_delete_readonly_try_apply
-//CHECK:      bb0(%0 : $ZZZ): 
+//CHECK:      bb0(%0 : $ZZZ):
 //CHECK-NEXT:   strong_release %0
 //CHECK-NEXT:   [[IL:%[0-9]+]] = integer_literal $Builtin.Int1, 0
 //CHECK-NEXT:   cond_br [[IL]], bb1, bb2
@@ -1806,12 +1845,12 @@ struct FakeInt32 {
   var val : Builtin.Int32
 }
 
-// CHECK-LABEL: sil @loadable_switch_enum_addr_promotion : $@convention(thin) (@in FakeOptional<Builtin.RawPointer>) -> () {
+// CHECK-LABEL: sil @loadable_switchenumaddr_promotion : $@convention(thin) (@in FakeOptional<Builtin.RawPointer>) -> () {
 // CHECK-NOT: switch_enum_addr
 // CHECK: load
 // CHECK-NEXT: switch_enum
 // CHECK-NOT: switch_enum_addr
-sil @loadable_switch_enum_addr_promotion : $@convention(thin) (@in FakeOptional<Builtin.RawPointer>) -> () {
+sil @loadable_switchenumaddr_promotion : $@convention(thin) (@in FakeOptional<Builtin.RawPointer>) -> () {
 bb0(%0 : $*FakeOptional<Builtin.RawPointer>):
   switch_enum_addr %0 : $*FakeOptional<Builtin.RawPointer>, case #FakeOptional.some!enumelt.1: bb1, case #FakeOptional.none!enumelt: bb2
 
@@ -2444,7 +2483,7 @@ bb3:
 // CHECK-NEXT: return
 sil @partial_apply_retain_removal : $@convention(thin) (@owned Builtin.NativeObject) -> @owned Builtin.NativeObject {
 bb0(%0 : $Builtin.NativeObject):
-  %1 = function_ref @user : $@convention(thin) (@owned Builtin.NativeObject) -> ()  
+  %1 = function_ref @user : $@convention(thin) (@owned Builtin.NativeObject) -> ()
   %2 = partial_apply %1(%0) : $@convention(thin) (@owned Builtin.NativeObject) -> ()
   strong_retain %0 : $Builtin.NativeObject
   strong_release %2 : $@callee_owned @convention(thick) () -> ()
@@ -2502,7 +2541,7 @@ sil @lower_retainrelease_value_of_unowned_to_unowned_retainrelease : $@conventio
 bb0(%0 : $@sil_unowned NClass, %1 : $@sil_unowned NClass):
   retain_value %0 : $@sil_unowned NClass
   release_value %1 : $@sil_unowned NClass
-  release_value %0 : $@sil_unowned NClass  
+  release_value %0 : $@sil_unowned NClass
   return %0 : $@sil_unowned NClass
 }
 
@@ -2609,27 +2648,27 @@ bb0:
 }
 
 class CC1 {
-   deinit 
+   deinit
   init()
 }
 
 class CC2 {
-   deinit 
+   deinit
   init()
 }
 
 class CC3 {
-   deinit 
+   deinit
   init()
 }
 
 class CC4 {
-   deinit 
+   deinit
   init()
 }
 
 
-// Function that takes different kinds of arguments: @in, @guaranteed, @owned, 
+// Function that takes different kinds of arguments: @in, @guaranteed, @owned,
 sil @closure_with_in_guaranteed_owned_in_args : $@convention(method) (@in CC2, @guaranteed CC1, @owned CC3, @in CC4) -> Optional<Int>
 
 // Test the peephole performing apply{partial_apply(x, y, z)}(a) -> apply(a, x, y, z)
@@ -2648,7 +2687,7 @@ sil @closure_with_in_guaranteed_owned_in_args : $@convention(method) (@in CC2, @
 // CHECK: [[TMP:%[0-9]+]] = alloc_stack $CC4
 // CHECK: [[CLOSURE:%[0-9]+]] = function_ref @closure_with_in_guaranteed_owned_in_args
 // Copy the original value of the argument into a temporary
-// CHECK: copy_addr {{.*}} to [initialization] [[TMP]] : $*CC4 
+// CHECK: copy_addr {{.*}} to [initialization] [[TMP]] : $*CC4
 // CHECK-NOT: partial_apply
 
 // CHECK: bb1:
@@ -2692,7 +2731,7 @@ sil @closure_with_in_guaranteed_owned_in_args : $@convention(method) (@in CC2, @
 
 sil @test_apply_of_partial_apply : $@convention(thin) (@in Optional<CC2>, @guaranteed CC1, @guaranteed CC3, @guaranteed CC4, @guaranteed CC2) -> Optional<Int> {
 bb0(%0 : $*Optional<CC2>, %1 : $CC1, %2 : $CC3, %3 : $CC4, %4 : $CC2):
-  
+
   %5 = function_ref @closure_with_in_guaranteed_owned_in_args : $@convention(method) (@in CC2, @guaranteed CC1, @owned CC3, @in CC4) -> Optional<Int>
   %6 = alloc_stack $CC3
   store %2 to %6 : $*CC3
@@ -2734,11 +2773,11 @@ bb1:
   store %108 to %16 : $*Optional<Int>
   dealloc_stack %104 : $*CC2
   dealloc_stack %102 : $*CC2
-  
+
   dealloc_stack %17 : $*Optional<CC2>
 
   br bb3
-  
+
 bb2:
   %39 = alloc_stack $CC2
   store %4 to %39 : $*CC2
@@ -2974,7 +3013,7 @@ public final class VV {
 
 sil @plus : $@convention(method) <Self where Self : PM> (@in_guaranteed Self) -> @out Self
 
-sil @minus : $@convention(method) <Self where Self : PM> (@in_guaranteed Self) -> () 
+sil @minus : $@convention(method) <Self where Self : PM> (@in_guaranteed Self) -> ()
 
 // CHECK-LABEL: sil @silcombine_dont_change_allocstack_for_opened_archetypes
 // CHECK-NOT: alloc_stack{{.*}}opened

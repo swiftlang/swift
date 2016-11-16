@@ -61,7 +61,7 @@ class StrongReleaseCleanup : public Cleanup {
 public:
   StrongReleaseCleanup(SILValue box) : box(box) {}
   void emit(SILGenFunction &gen, CleanupLocation l) override {
-    gen.B.emitStrongReleaseAndFold(l, box);
+    gen.B.emitDestroyValueOperation(l, box);
   }
 };
 } // end anonymous namespace
@@ -366,7 +366,7 @@ static void emitCaptureArguments(SILGenFunction &gen, CapturedValue capture,
     // temporary within the closure to provide this address.
     if (VD->isSettable(VD->getDeclContext())) {
       auto addr = gen.emitTemporaryAllocation(VD, ty);
-      gen.B.createStore(VD, val, addr);
+      lowering.emitStore(gen.B, VD, val, addr, StoreOwnershipQualifier::Init);
       val = addr;
     }
 

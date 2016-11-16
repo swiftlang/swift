@@ -23,7 +23,7 @@ information that only pertains to ObjC interop, are marked **ObjC-only**.
 Entry points in this section are intended to be removed or internalized before
 ABI stabilization.
 
-### Exported C++ symbols 
+### Exported C++ symbols
 
 **ABI TODO**: Any exported C++ symbols are implementation details that are not
 intended to be part of the stable runtime interface.

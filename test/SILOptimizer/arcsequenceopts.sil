@@ -1,6 +1,6 @@
-// RUN: %target-sil-opt -enable-sil-verify-all -enable-loop-arc=0 -arc-sequence-opts %s | %FileCheck %s
-// RUN: %target-sil-opt -enable-sil-verify-all -enable-loop-arc=1 -arc-sequence-opts %s | %FileCheck -check-prefix=CHECK -check-prefix=CHECK-LOOP %s
-// RUN: %target-sil-opt -enable-sil-verify-all -arc-loop-opts  %s | %FileCheck -check-prefix=CHECK -check-prefix=CHECK-LOOP %s
+// RUN: %target-sil-opt -assume-parsing-unqualified-ownership-sil -enable-sil-verify-all -enable-loop-arc=0 -arc-sequence-opts %s | %FileCheck %s
+// RUN: %target-sil-opt -assume-parsing-unqualified-ownership-sil -enable-sil-verify-all -enable-loop-arc=1 -arc-sequence-opts %s | %FileCheck -check-prefix=CHECK -check-prefix=CHECK-LOOP %s
+// RUN: %target-sil-opt -assume-parsing-unqualified-ownership-sil -enable-sil-verify-all -arc-loop-opts  %s | %FileCheck -check-prefix=CHECK -check-prefix=CHECK-LOOP %s
 
 sil_stage canonical
 
@@ -355,7 +355,7 @@ bb0(%0 : $@box Builtin.Int32):
 // CHECK-NEXT: return
 sil @simple_alias_load_use_test : $@convention(thin) (@inout Builtin.Int32) -> () {
 bb0(%0 : $*Builtin.Int32):
-  %1 = alloc_box $Builtin.Int32
+  %1 = alloc_box $@box Builtin.Int32
   %1a = project_box %1 : $@box Builtin.Int32, 0
   %2 = function_ref @user : $@convention(thin) (@box Builtin.Int32) -> ()
   strong_retain %1 : $@box Builtin.Int32
@@ -382,7 +382,7 @@ bb0(%0 : $*Builtin.Int32):
 // CHECK-NEXT: return
 sil @simple_alias_load_use_test_two_release : $@convention(thin) (@inout Builtin.Int32) -> () {
 bb0(%0 : $*Builtin.Int32):
-  %1 = alloc_box $Builtin.Int32
+  %1 = alloc_box $@box Builtin.Int32
   %1a = project_box %1 : $@box Builtin.Int32, 0
   %2 = function_ref @user : $@convention(thin) (@box Builtin.Int32) -> ()
   strong_retain %1 : $@box Builtin.Int32
@@ -479,7 +479,7 @@ sil @clear_state_in_fact_of_autorelease_pool_ops : $@convention(thin) (Builtin.R
 bb0(%0 : $Builtin.RawPointer):
   %1 = function_ref @objc_autoreleasePoolPush : $@convention(thin) () -> Builtin.RawPointer
   %2 = function_ref @objc_autoreleasePoolPop : $@convention(thin) (Builtin.RawPointer) -> ()
-  %3 = alloc_box $Builtin.Int32
+  %3 = alloc_box $@box Builtin.Int32
   strong_retain %3 : $@box Builtin.Int32
   apply %1() : $@convention(thin) () -> Builtin.RawPointer
   strong_release %3 : $@box Builtin.Int32
@@ -498,7 +498,7 @@ bb0(%0 : $Builtin.RawPointer):
 // CHECK: strong_release
 sil @release_can_decrement_other_releases  : $@convention(thin) () -> () {
 bb0:
-  %1 = alloc_box $Builtin.Int32
+  %1 = alloc_box $@box Builtin.Int32
   %2 = alloc_stack $@box Builtin.Int32
   store %1 to %2 : $*@box Builtin.Int32
   %4 = function_ref @user : $@convention(thin) (@box Builtin.Int32) -> ()
@@ -1386,7 +1386,7 @@ bb3:
 // CHECK: bb2:
 // CHECK: strong_retain
 // CHECK: bb3:
-// CHECK: strong_release 
+// CHECK: strong_release
 sil @switch_merge_with_bit_cast_in_branches : $@convention(thin) (@owned S) -> () {
 bb0(%0 : $S):
   cond_br undef, bb1, bb2
@@ -1961,7 +1961,7 @@ bb0(%0 : $@box Builtin.Int32):
 // CHECK-NOT: strong_release
 sil @alloc_box_returns_at_p1 : $@convention(thin) () -> () {
 bb0:
-  %0 = alloc_box $Builtin.Int32
+  %0 = alloc_box $@box Builtin.Int32
   strong_retain %0 : $@box Builtin.Int32
   %3 = function_ref @user : $@convention(thin) (@box Builtin.Int32) -> ()
   apply %3(%0) : $@convention(thin) (@box Builtin.Int32) -> ()

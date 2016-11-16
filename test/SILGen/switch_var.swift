@@ -46,13 +46,13 @@ func cc(x x: (Int, Int)) {}
 func test_var_1() {
   // CHECK:   function_ref @_TF10switch_var3fooFT_Si
   switch foo() {
-  // CHECK:   [[XADDR:%.*]] = alloc_box $Int
+  // CHECK:   [[XADDR:%.*]] = alloc_box $@box Int
   // CHECK:   [[X:%.*]] = project_box [[XADDR]]
   // CHECK-NOT: br bb
   case var x:
   // CHECK:   function_ref @_TF10switch_var1aFT1xSi_T_
-  // CHECK:   load [[X]]
-  // CHECK:   release [[XADDR]]
+  // CHECK:   load [trivial] [[X]]
+  // CHECK:   destroy_value [[XADDR]]
   // CHECK:   br [[CONT:bb[0-9]+]]
     a(x: x)
   }
@@ -65,41 +65,41 @@ func test_var_1() {
 func test_var_2() {
   // CHECK:   function_ref @_TF10switch_var3fooFT_Si
   switch foo() {
-  // CHECK:   [[XADDR:%.*]] = alloc_box $Int
+  // CHECK:   [[XADDR:%.*]] = alloc_box $@box Int
   // CHECK:   [[X:%.*]] = project_box [[XADDR]]
   // CHECK:   function_ref @_TF10switch_var6runcedFT1xSi_Sb
-  // CHECK:   load [[X]]
+  // CHECK:   load [trivial] [[X]]
   // CHECK:   cond_br {{%.*}}, [[CASE1:bb[0-9]+]], [[NO_CASE1:bb[0-9]+]]
   // -- TODO: Clean up these empty waypoint bbs.
   case var x where runced(x: x):
   // CHECK: [[CASE1]]:
   // CHECK:   function_ref @_TF10switch_var1aFT1xSi_T_
-  // CHECK:   load [[X]]
-  // CHECK:   release [[XADDR]]
+  // CHECK:   load [trivial] [[X]]
+  // CHECK:   destroy_value [[XADDR]]
   // CHECK:   br [[CONT:bb[0-9]+]]
     a(x: x)
   // CHECK: [[NO_CASE1]]:
-  // CHECK:   [[YADDR:%.*]] = alloc_box $Int
+  // CHECK:   [[YADDR:%.*]] = alloc_box $@box Int
   // CHECK:   [[Y:%.*]] = project_box [[YADDR]]
   // CHECK:   function_ref @_TF10switch_var6fungedFT1xSi_Sb
-  // CHECK:   load [[Y]]
+  // CHECK:   load [trivial] [[Y]]
   // CHECK:   cond_br {{%.*}}, [[CASE2:bb[0-9]+]], [[NO_CASE2:bb[0-9]+]]
   case var y where funged(x: y):
   // CHECK: [[CASE2]]:
   // CHECK:   function_ref @_TF10switch_var1bFT1xSi_T_
-  // CHECK:   load [[Y]]
-  // CHECK:   release [[YADDR]]
+  // CHECK:   load [trivial] [[Y]]
+  // CHECK:   destroy_value [[YADDR]]
   // CHECK:   br [[CONT]]
     b(x: y)
   // CHECK: [[NO_CASE2]]:
   // CHECK:   br [[CASE3:bb[0-9]+]]
   case var z:
   // CHECK: [[CASE3]]:
-  // CHECK:   [[ZADDR:%.*]] = alloc_box $Int
+  // CHECK:   [[ZADDR:%.*]] = alloc_box $@box Int
   // CHECK:   [[Z:%.*]] = project_box [[ZADDR]]
   // CHECK:   function_ref @_TF10switch_var1cFT1xSi_T_
-  // CHECK:   load [[Z]]
-  // CHECK:   release [[ZADDR]]
+  // CHECK:   load [trivial] [[Z]]
+  // CHECK:   destroy_value [[ZADDR]]
   // CHECK:   br [[CONT]]
     c(x: z)
   }
@@ -113,7 +113,7 @@ func test_var_3() {
   // CHECK:   function_ref @_TF10switch_var3fooFT_Si
   // CHECK:   function_ref @_TF10switch_var3barFT_Si
   switch (foo(), bar()) {
-  // CHECK:   [[XADDR:%.*]] = alloc_box $(Int, Int)
+  // CHECK:   [[XADDR:%.*]] = alloc_box $@box (Int, Int)
   // CHECK:   [[X:%.*]] = project_box [[XADDR]]
   // CHECK:   function_ref @_TF10switch_var6runcedFT1xSi_Sb
   // CHECK:   tuple_element_addr [[X]] : {{.*}}, 0
@@ -121,31 +121,31 @@ func test_var_3() {
   case var x where runced(x: x.0):
   // CHECK: [[CASE1]]:
   // CHECK:   function_ref @_TF10switch_var2aaFT1xTSiSi__T_
-  // CHECK:   load [[X]]
-  // CHECK:   release [[XADDR]]
+  // CHECK:   load [trivial] [[X]]
+  // CHECK:   destroy_value [[XADDR]]
   // CHECK:   br [[CONT:bb[0-9]+]]
     aa(x: x)
   // CHECK: [[NO_CASE1]]:
-  // CHECK:   [[YADDR:%.*]] = alloc_box $Int
+  // CHECK:   [[YADDR:%.*]] = alloc_box $@box Int
   // CHECK:   [[Y:%.*]] = project_box [[YADDR]]
-  // CHECK:   [[Z:%.*]] = alloc_box $Int
+  // CHECK:   [[Z:%.*]] = alloc_box $@box Int
   // CHECK:   [[Z:%.*]] = project_box [[ZADDR]]
   // CHECK:   function_ref @_TF10switch_var6fungedFT1xSi_Sb
-  // CHECK:   load [[Y]]
+  // CHECK:   load [trivial] [[Y]]
   // CHECK:   cond_br {{%.*}}, [[CASE2:bb[0-9]+]], [[NO_CASE2:bb[0-9]+]]
   case (var y, var z) where funged(x: y):
   // CHECK: [[CASE2]]:
   // CHECK:   function_ref @_TF10switch_var1aFT1xSi_T_
-  // CHECK:   load [[Y]]
+  // CHECK:   load [trivial] [[Y]]
   // CHECK:   function_ref @_TF10switch_var1bFT1xSi_T_
-  // CHECK:   load [[Z]]
-  // CHECK:   release [[ZADDR]]
-  // CHECK:   release [[YADDR]]
+  // CHECK:   load [trivial] [[Z]]
+  // CHECK:   destroy_value [[ZADDR]]
+  // CHECK:   destroy_value [[YADDR]]
   // CHECK:   br [[CONT]]
     a(x: y)
     b(x: z)
   // CHECK: [[NO_CASE2]]:
-  // CHECK:   [[WADDR:%.*]] = alloc_box $(Int, Int)
+  // CHECK:   [[WADDR:%.*]] = alloc_box $@box (Int, Int)
   // CHECK:   [[W:%.*]] = project_box [[WADDR]]
   // CHECK:   function_ref @_TF10switch_var5ansedFT1xSi_Sb
   // CHECK:   tuple_element_addr [[W]] : {{.*}}, 0
@@ -153,19 +153,19 @@ func test_var_3() {
   case var w where ansed(x: w.0):
   // CHECK: [[CASE3]]:
   // CHECK:   function_ref @_TF10switch_var2bbFT1xTSiSi__T_
-  // CHECK:   load [[W]]
+  // CHECK:   load [trivial] [[W]]
   // CHECK:   br [[CONT]]
     bb(x: w)
   // CHECK: [[NO_CASE3]]:
-  // CHECK:   release [[WADDR]]
+  // CHECK:   destroy_value [[WADDR]]
   // CHECK:   br [[CASE4:bb[0-9]+]]
   case var v:
   // CHECK: [[CASE4]]:
-  // CHECK:   [[VADDR:%.*]] = alloc_box $(Int, Int) 
+  // CHECK:   [[VADDR:%.*]] = alloc_box $@box (Int, Int) 
   // CHECK:   [[V:%.*]] = project_box [[VADDR]]
   // CHECK:   function_ref @_TF10switch_var2ccFT1xTSiSi__T_
-  // CHECK:   load [[V]]
-  // CHECK:   release [[VADDR]]
+  // CHECK:   load [trivial] [[V]]
+  // CHECK:   destroy_value [[VADDR]]
   // CHECK:   br [[CONT]]
     cc(x: v)
   }
@@ -188,22 +188,22 @@ func test_var_4(p p: P) {
   // CHECK:   store
   // CHECK:   [[PAIR_0:%.*]] = tuple_element_addr [[PAIR]] : $*(P, Int), 0
   // CHECK:   [[T0:%.*]] = tuple_element_addr [[PAIR]] : $*(P, Int), 1
-  // CHECK:   [[PAIR_1:%.*]] = load [[T0]] : $*Int
+  // CHECK:   [[PAIR_1:%.*]] = load [trivial] [[T0]] : $*Int
   // CHECK:   [[TMP:%.*]] = alloc_stack $X
   // CHECK:   checked_cast_addr_br copy_on_success P in [[PAIR_0]] : $*P to X in [[TMP]] : $*X, [[IS_X:bb[0-9]+]], [[IS_NOT_X:bb[0-9]+]]
 
   // CHECK: [[IS_X]]:
-  // CHECK:   [[T0:%.*]] = load [[TMP]] : $*X
-  // CHECK:   [[XADDR:%.*]] = alloc_box $Int
+  // CHECK:   [[T0:%.*]] = load [trivial] [[TMP]] : $*X
+  // CHECK:   [[XADDR:%.*]] = alloc_box $@box Int
   // CHECK:   [[X:%.*]] = project_box [[XADDR]]
-  // CHECK:   store [[PAIR_1]] to [[X]]
+  // CHECK:   store [[PAIR_1]] to [trivial] [[X]]
   // CHECK:   function_ref @_TF10switch_var6runcedFT1xSi_Sb
-  // CHECK:   load [[X]]
+  // CHECK:   load [trivial] [[X]]
   // CHECK:   cond_br {{%.*}}, [[CASE1:bb[0-9]+]], [[NO_CASE1:bb[0-9]+]]
   case (is X, var x) where runced(x: x):
   // CHECK: [[CASE1]]:
   // CHECK:   function_ref @_TF10switch_var1aFT1xSi_T_
-  // CHECK:   release [[XADDR]]
+  // CHECK:   destroy_value [[XADDR]]
   // CHECK:   dealloc_stack [[TMP]]
   // CHECK:   destroy_addr [[PAIR_0]] : $*P
   // CHECK:   dealloc_stack [[PAIR]]
@@ -211,7 +211,7 @@ func test_var_4(p p: P) {
     a(x: x)
 
   // CHECK: [[NO_CASE1]]:
-  // CHECK:   release [[XADDR]]
+  // CHECK:   destroy_value [[XADDR]]
   // CHECK:   dealloc_stack [[TMP]]
   // CHECK:   br [[NEXT:bb[0-9]+]]
   // CHECK: [[IS_NOT_X]]:
@@ -223,19 +223,19 @@ func test_var_4(p p: P) {
   // CHECK:   checked_cast_addr_br copy_on_success P in [[PAIR_0]] : $*P to Y in [[TMP]] : $*Y, [[IS_Y:bb[0-9]+]], [[IS_NOT_Y:bb[0-9]+]]
 
   // CHECK: [[IS_Y]]:
-  // CHECK:   [[T0:%.*]] = load [[TMP]] : $*Y
-  // CHECK:   [[YADDR:%.*]] = alloc_box $Int
+  // CHECK:   [[T0:%.*]] = load [trivial] [[TMP]] : $*Y
+  // CHECK:   [[YADDR:%.*]] = alloc_box $@box Int
   // CHECK:   [[Y:%.*]] = project_box [[YADDR]]
-  // CHECK:   store [[PAIR_1]] to [[Y]]
+  // CHECK:   store [[PAIR_1]] to [trivial] [[Y]]
   // CHECK:   function_ref @_TF10switch_var6fungedFT1xSi_Sb
-  // CHECK:   load [[Y]]
+  // CHECK:   load [trivial] [[Y]]
   // CHECK:   cond_br {{%.*}}, [[CASE2:bb[0-9]+]], [[NO_CASE2:bb[0-9]+]]
 
   case (is Y, var y) where funged(x: y):
   // CHECK: [[CASE2]]:
   // CHECK:   function_ref @_TF10switch_var1bFT1xSi_T_
-  // CHECK:   load [[Y]]
-  // CHECK:   release [[YADDR]]
+  // CHECK:   load [trivial] [[Y]]
+  // CHECK:   destroy_value [[YADDR]]
   // CHECK:   dealloc_stack [[TMP]]
   // CHECK:   destroy_addr [[PAIR_0]] : $*P
   // CHECK:   dealloc_stack [[PAIR]]
@@ -243,7 +243,7 @@ func test_var_4(p p: P) {
     b(x: y)
 
   // CHECK: [[NO_CASE2]]:
-  // CHECK:   release [[YADDR]]
+  // CHECK:   destroy_value [[YADDR]]
   // CHECK:   dealloc_stack [[TMP]]
   // CHECK:   br [[NEXT:bb[0-9]+]]
   // CHECK: [[IS_NOT_Y]]:
@@ -251,7 +251,7 @@ func test_var_4(p p: P) {
   // CHECK:   br [[NEXT]]
 
   // CHECK: [[NEXT]]:
-  // CHECK:   [[ZADDR:%.*]] = alloc_box $(P, Int)
+  // CHECK:   [[ZADDR:%.*]] = alloc_box $@box (P, Int)
   // CHECK:   [[Z:%.*]] = project_box [[ZADDR]]
   // CHECK:   function_ref @_TF10switch_var5ansedFT1xSi_Sb
   // CHECK:   tuple_element_addr [[Z]] : {{.*}}, 1
@@ -260,22 +260,22 @@ func test_var_4(p p: P) {
   // CHECK: [[CASE3]]:
   // CHECK:   function_ref @_TF10switch_var1cFT1xSi_T_
   // CHECK:   tuple_element_addr [[Z]] : {{.*}}, 1
-  // CHECK:   release [[ZADDR]]
+  // CHECK:   destroy_value [[ZADDR]]
   // CHECK-NEXT: dealloc_stack [[PAIR]]
   // CHECK:   br [[CONT]]
     c(x: z.1)
 
   // CHECK: [[DFLT_NO_CASE3]]:
-  // CHECK:   release [[ZADDR]]
+  // CHECK:   destroy_value [[ZADDR]]
   // CHECK:   br [[CASE4:bb[0-9]+]]
   case (_, var w):
   // CHECK: [[CASE4]]:
   // CHECK:   [[PAIR_0:%.*]] = tuple_element_addr [[PAIR]] : $*(P, Int), 0
-  // CHECK:   [[WADDR:%.*]] = alloc_box $Int
+  // CHECK:   [[WADDR:%.*]] = alloc_box $@box Int
   // CHECK:   [[W:%.*]] = project_box [[WADDR]]
   // CHECK:   function_ref @_TF10switch_var1dFT1xSi_T_
-  // CHECK:   load [[W]]
-  // CHECK:   release [[WADDR]]
+  // CHECK:   load [trivial] [[W]]
+  // CHECK:   destroy_value [[WADDR]]
   // CHECK:   destroy_addr [[PAIR_0]] : $*P
   // CHECK:   dealloc_stack [[PAIR]]
   // CHECK:   br [[CONT]]
@@ -289,7 +289,7 @@ func test_var_5() {
   // CHECK:   function_ref @_TF10switch_var3fooFT_Si
   // CHECK:   function_ref @_TF10switch_var3barFT_Si
   switch (foo(), bar()) {
-  // CHECK:   [[XADDR:%.*]] = alloc_box $(Int, Int)
+  // CHECK:   [[XADDR:%.*]] = alloc_box $@box (Int, Int)
   // CHECK:   [[X:%.*]] = project_box [[XADDR]]
   // CHECK:   cond_br {{%.*}}, [[CASE1:bb[0-9]+]], [[NO_CASE1:bb[0-9]+]]
   case var x where runced(x: x.0):
@@ -297,20 +297,20 @@ func test_var_5() {
   // CHECK:   br [[CONT:bb[0-9]+]]
     a()
   // CHECK: [[NO_CASE1]]:
-  // CHECK:   [[YADDR:%[0-9]+]] = alloc_box $Int
+  // CHECK:   [[YADDR:%[0-9]+]] = alloc_box $@box Int
   // CHECK:   [[Y:%[0-9]+]] = project_box [[YADDR]]
-  // CHECK:   [[ZADDR:%[0-9]+]] = alloc_box $Int
+  // CHECK:   [[ZADDR:%[0-9]+]] = alloc_box $@box Int
   // CHECK:   [[Z:%[0-9]+]] = project_box [[ZADDR]]
   // CHECK:   cond_br {{%.*}}, [[CASE2:bb[0-9]+]], [[NO_CASE2:bb[0-9]+]]
   case (var y, var z) where funged(x: y):
   // CHECK: [[CASE2]]:
-  // CHECK:   release [[ZADDR]]
-  // CHECK:   release [[YADDR]]
+  // CHECK:   destroy_value [[ZADDR]]
+  // CHECK:   destroy_value [[YADDR]]
   // CHECK:   br [[CONT]]
     b()
   // CHECK: [[NO_CASE2]]:
-  // CHECK:   release [[ZADDR]]
-  // CHECK:   release [[YADDR]]
+  // CHECK:   destroy_value [[ZADDR]]
+  // CHECK:   destroy_value [[YADDR]]
   // CHECK:   cond_br {{%.*}}, [[CASE3:bb[0-9]+]], [[NO_CASE3:bb[0-9]+]]
   case (_, _) where runced():
   // CHECK: [[CASE3]]:
@@ -331,41 +331,41 @@ func test_var_5() {
 func test_var_return() {
   switch (foo(), bar()) {
   case var x where runced():
-    // CHECK: [[XADDR:%[0-9]+]] = alloc_box $(Int, Int)
+    // CHECK: [[XADDR:%[0-9]+]] = alloc_box $@box (Int, Int)
     // CHECK: [[X:%[0-9]+]] = project_box [[XADDR]]
     // CHECK: function_ref @_TF10switch_var1aFT_T_
-    // CHECK: release [[XADDR]]
+    // CHECK: destroy_value [[XADDR]]
     // CHECK: br [[EPILOG:bb[0-9]+]]
     a()
     return
-  // CHECK: [[YADDR:%[0-9]+]] = alloc_box $Int
+  // CHECK: [[YADDR:%[0-9]+]] = alloc_box $@box Int
   // CHECK: [[Y:%[0-9]+]] = project_box [[YADDR]]
-  // CHECK: [[ZADDR:%[0-9]+]] = alloc_box $Int
+  // CHECK: [[ZADDR:%[0-9]+]] = alloc_box $@box Int
   // CHECK: [[Z:%[0-9]+]] = project_box [[ZADDR]]
   case (var y, var z) where funged():
     // CHECK: function_ref @_TF10switch_var1bFT_T_
-    // CHECK: release [[ZADDR]]
-    // CHECK: release [[YADDR]]
+    // CHECK: destroy_value [[ZADDR]]
+    // CHECK: destroy_value [[YADDR]]
     // CHECK: br [[EPILOG]]
     b()
     return
   case var w where ansed():
-    // CHECK: [[WADDR:%[0-9]+]] = alloc_box $(Int, Int)
+    // CHECK: [[WADDR:%[0-9]+]] = alloc_box $@box (Int, Int)
     // CHECK: [[W:%[0-9]+]] = project_box [[WADDR]]
     // CHECK: function_ref @_TF10switch_var1cFT_T_
-    // CHECK-NOT: release [[ZADDR]]
-    // CHECK-NOT: release [[YADDR]]
-    // CHECK: release [[WADDR]]
+    // CHECK-NOT: destroy_value [[ZADDR]]
+    // CHECK-NOT: destroy_value [[YADDR]]
+    // CHECK: destroy_value [[WADDR]]
     // CHECK: br [[EPILOG]]
     c()
     return
   case var v:
-    // CHECK: [[VADDR:%[0-9]+]] = alloc_box $(Int, Int)
+    // CHECK: [[VADDR:%[0-9]+]] = alloc_box $@box (Int, Int)
     // CHECK: [[V:%[0-9]+]] = project_box [[VADDR]]
     // CHECK: function_ref @_TF10switch_var1dFT_T_
-    // CHECK-NOT: release [[ZADDR]]
-    // CHECK-NOT: release [[YADDR]]
-    // CHECK: release [[VADDR]]
+    // CHECK-NOT: destroy_value [[ZADDR]]
+    // CHECK-NOT: destroy_value [[YADDR]]
+    // CHECK: destroy_value [[VADDR]]
     // CHECK: br [[EPILOG]]
     d()
     return
@@ -378,55 +378,61 @@ func test_var_return() {
 func test_let() {
   // CHECK: [[FOOS:%.*]] = function_ref @_TF10switch_var4foosFT_SS
   // CHECK: [[VAL:%.*]] = apply [[FOOS]]()
-
-  // CHECK: retain_value [[VAL]]
+  // CHECK: [[VAL_COPY:%.*]] = copy_value [[VAL]]
   // CHECK: function_ref @_TF10switch_var6runcedFT_Sb
   // CHECK: cond_br {{%.*}}, [[CASE1:bb[0-9]+]], [[NO_CASE1:bb[0-9]+]]
   switch foos() {
   case let x where runced():
-    // CHECK: [[CASE1]]:
-    // CHECK: [[A:%.*]] = function_ref @_TF10switch_var1aFT1xSS_T_
-    // CHECK: retain_value [[VAL]]
-    // CHECK: apply [[A]]([[VAL]])
-    // CHECK: release_value [[VAL]]
-    // CHECK: release_value [[VAL]]
-    // CHECK: br [[CONT:bb[0-9]+]]
+  // CHECK: [[CASE1]]:
+  // CHECK:   [[A:%.*]] = function_ref @_TF10switch_var1aFT1xSS_T_
+  // CHECK:   [[VAL_COPY_COPY:%.*]] = copy_value [[VAL_COPY]]
+  // CHECK:   apply [[A]]([[VAL_COPY_COPY]])
+  // CHECK:   destroy_value [[VAL_COPY]]
+  // CHECK:   destroy_value [[VAL]]
+  // CHECK:   br [[CONT:bb[0-9]+]]
     a(x: x)
   // CHECK: [[NO_CASE1]]:
-  // CHECK:   release_value [[VAL]]
+  // CHECK:   destroy_value [[VAL_COPY]]
   // CHECK:   br [[TRY_CASE2:bb[0-9]+]]
   // CHECK: [[TRY_CASE2]]:
-  // CHECK:   retain_value [[VAL]]
+  // CHECK:   [[VAL_COPY_2:%.*]] = copy_value [[VAL]]
   // CHECK:   function_ref @_TF10switch_var6fungedFT_Sb
   // CHECK:   cond_br {{%.*}}, [[CASE2:bb[0-9]+]], [[NO_CASE2:bb[0-9]+]]
   case let y where funged():
-    // CHECK: [[CASE2]]:
-    // CHECK: [[B:%.*]] = function_ref @_TF10switch_var1bFT1xSS_T_
-    // CHECK: retain_value [[VAL]]
-    // CHECK: apply [[B]]([[VAL]])
-    // CHECK: release_value [[VAL]]
-    // CHECK: release_value [[VAL]]
-    // CHECK: br [[CONT]]
+  // CHECK: [[CASE2]]:
+  // CHECK:   [[B:%.*]] = function_ref @_TF10switch_var1bFT1xSS_T_
+  // CHECK:   [[VAL_COPY_2_COPY:%.*]] = copy_value [[VAL_COPY_2]]
+  // CHECK:   apply [[B]]([[VAL_COPY_2_COPY]])
+  // CHECK:   destroy_value [[VAL_COPY_2]]
+  // CHECK:   destroy_value [[VAL]]
+  // CHECK:   br [[CONT]]
     b(x: y)
   // CHECK: [[NO_CASE2]]:
-  // CHECK:   retain_value [[VAL]]
+  // CHECK:   destroy_value [[VAL_COPY_2]]
+  // CHECK:   br [[NEXT_CASE:bb6]]
+
+  // CHECK: [[NEXT_CASE]]:
+  // CHECK:   [[VAL_COPY_3:%.*]] = copy_value [[VAL]]
   // CHECK:   function_ref @_TF10switch_var4barsFT_SS
-  // CHECK:   retain_value [[VAL]]
+  // CHECK:   [[VAL_COPY_3_COPY:%.*]] = copy_value [[VAL_COPY_3]]
+  // CHECK:   store [[VAL_COPY_3_COPY]] to [init] [[IN_ARG:%.*]] :
+  // CHECK:   apply {{%.*}}<String>({{.*}}, [[IN_ARG]])
   // CHECK:   cond_br {{%.*}}, [[YES_CASE3:bb[0-9]+]], [[NO_CASE3:bb[0-9]+]]
-  // CHECK: [[YES_CASE3]]:
-  // CHECK:   release_value [[VAL]]
-  // CHECK:   release_value [[VAL]]
   // ExprPatterns implicitly contain a 'let' binding.
   case bars():
-    // CHECK:   function_ref @_TF10switch_var1cFT_T_
-    // CHECK:   br [[CONT]]
+  // CHECK: [[YES_CASE3]]:
+  // CHECK:   destroy_value [[VAL_COPY_3]]
+  // CHECK:   destroy_value [[VAL]]
+  // CHECK:   function_ref @_TF10switch_var1cFT_T_
+  // CHECK:   br [[CONT]]
     c()
   // CHECK: [[NO_CASE3]]:
-  // CHECK:   release_value [[VAL]]
-  // CHECK:   br [[LEAVE_CASE3:bb[0-9]+]]
-  // CHECK: [[LEAVE_CASE3]]:
+  // CHECK:   destroy_value [[VAL_COPY_3]]
+  // CHECK:   br [[NEXT_CASE:bb9+]]
+
+  // CHECK: [[NEXT_CASE]]:
   case _:
-    // CHECK:   release_value [[VAL]]
+    // CHECK:   destroy_value [[VAL]]
     // CHECK:   function_ref @_TF10switch_var1dFT_T_
     // CHECK:   br [[CONT]]
     d()
@@ -434,33 +440,85 @@ func test_let() {
   // CHECK: [[CONT]]:
   // CHECK:   return
 }
+// CHECK: } // end sil function '_TF10switch_var8test_letFT_T_'
 
 // If one of the bindings is a "var", allocate a box for the column.
 // CHECK-LABEL: sil hidden @_TF10switch_var18test_mixed_let_varFT_T_ : $@convention(thin) () -> () {
 func test_mixed_let_var() {
-  // CHECK: [[FOOS:%.*]] = function_ref @_TF10switch_var4foosFT_SS
-  // CHECK: [[VAL:%.*]] = apply [[FOOS]]()
+  // CHECK: bb0:
+  // CHECK:   [[FOOS:%.*]] = function_ref @_TF10switch_var4foosFT_SS
+  // CHECK:   [[VAL:%.*]] = apply [[FOOS]]()
   switch foos() {
+
+  // First pattern.
+  // CHECK:   [[BOX:%.*]] = alloc_box $@box String, var, name "x"
+  // CHECK:   [[PBOX:%.*]] = project_box [[BOX]]
+  // CHECK:   [[VAL_COPY:%.*]] = copy_value [[VAL]]
+  // CHECK:   store [[VAL_COPY]] to [init] [[PBOX]]
+  // CHECK:   cond_br {{.*}}, [[CASE1:bb[0-9]+]], [[NOCASE1:bb[0-9]+]]
   case var x where runced():
-    // CHECK: [[BOX:%.*]] = alloc_box $String, var, name "x"
-    // CHECK: [[PBOX:%.*]] = project_box [[BOX]]
-    // CHECK: store [[VAL]] to [[PBOX]]
-    // CHECK: [[A:%.*]] = function_ref @_TF10switch_var1aFT1xSS_T_
-    // CHECK: [[X:%.*]] = load [[PBOX]]
-    // CHECK: retain_value [[X]]
-    // CHECK: apply [[A]]([[X]])
+  // CHECK: [[CASE1]]:
+  // CHECK:   [[A:%.*]] = function_ref @_TF10switch_var1aFT1xSS_T_
+  // CHECK:   [[X:%.*]] = load [copy] [[PBOX]]
+  // CHECK:   apply [[A]]([[X]])
+  // CHECK:   destroy_value [[BOX]]
+  // CHECK:   br [[CONT:bb[0-9]+]]
     a(x: x)
+
+  // CHECK: [[NOCASE1]]:
+  // CHECK:   destroy_value [[BOX]]
+  // CHECK:   br [[NEXT_PATTERN:bb[0-9]+]]
+
+  // CHECK: [[NEXT_PATTERN]]:
+  // CHECK:   [[VAL_COPY:%.*]] = copy_value [[VAL]]
+  // CHECK:   cond_br {{.*}}, [[CASE2:bb[0-9]+]], [[NOCASE2:bb[0-9]+]]
   case let y where funged():
-    // CHECK: [[B:%.*]] = function_ref @_TF10switch_var1bFT1xSS_T_
-    // CHECK: retain_value [[VAL]]
-    // CHECK: apply [[B]]([[VAL]])
-    b(x: y)
+
+  // CHECK: [[CASE2]]:
+  // CHECK:   [[B:%.*]] = function_ref @_TF10switch_var1bFT1xSS_T_
+  // CHECK:   [[VAL_COPY_COPY:%.*]] = copy_value [[VAL_COPY]]
+  // CHECK:   apply [[B]]([[VAL_COPY_COPY]])
+  // CHECK:   destroy_value [[VAL_COPY]]
+  // CHECK:   destroy_value [[VAL]]
+  // CHECK:   br [[CONT]]  
+  b(x: y)
+
+  // CHECK: [[NOCASE2]]:
+  // CHECK:   destroy_value [[VAL_COPY]]
+  // CHECK:   br [[NEXT_CASE:bb[0-9]+]]
+
+  // CHECK: [[NEXT_CASE]]
+  // CHECK:   [[VAL_COPY:%.*]] = copy_value [[VAL]]
+  // CHECK:   [[VAL_COPY_COPY:%.*]] = copy_value [[VAL_COPY]]
+  // CHECK:   store [[VAL_COPY_COPY]] to [init] [[TMP_VAL_COPY_ADDR:%.*]] : $*String
+  // CHECK:   apply {{.*}}<String>({{.*}}, [[TMP_VAL_COPY_ADDR]])
+  // CHECK:   cond_br {{.*}}, [[CASE3:bb[0-9]+]], [[NOCASE3:bb[0-9]+]]
   case bars():
+  // CHECK: [[CASE3]]:
+  // CHECK:   destroy_value [[VAL_COPY]]
+  // CHECK:   destroy_value [[VAL]]
+  // CHECK:   [[FUNC:%.*]] = function_ref @_TF10switch_var1cFT_T_ : $@convention(thin) () -> ()
+  // CHECK:   apply [[FUNC]]()
+  // CHECK:   br [[CONT]]
     c()
+
+  // CHECK: [[NOCASE3]]:
+  // CHECK:   destroy_value [[VAL_COPY]]
+  // CHECK:   br [[NEXT_CASE:bb[0-9]+]]
+
+  // CHECK: [[NEXT_CASE]]:
+  // CHECK:   destroy_value [[VAL]]
+  // CHECK:   [[D_FUNC:%.*]] = function_ref @_TF10switch_var1dFT_T_ : $@convention(thin) () -> ()
+  // CHECK:   apply [[D_FUNC]]()
+  // CHECK:   br [[CONT]]
   case _:
     d()
   }
+
+  // CHECK: [[CONT]]:
+  // CHECK:   return
 }
+// CHECK: } // end sil function '_TF10switch_var18test_mixed_let_varFT_T_'
 
 // CHECK-LABEL: sil hidden @_TF10switch_var23test_multiple_patterns1FT_T_ : $@convention(thin) () -> () {
 func test_multiple_patterns1() {
@@ -612,7 +670,7 @@ func test_multiple_patterns5() {
     // CHECK:     [[A_X:%.*]] = tuple_extract
     // CHECK:     [[A_N:%.*]] = tuple_extract
     // CHECK:     [[A_BOX:%.*]] = project_box
-    // CHECK:     store [[A_X]] to [[A_BOX]]
+    // CHECK:     store [[A_X]] to [trivial] [[A_BOX]]
     // CHECK:     [[FUNC_A:%.*]] = function_ref @_TF10switch_var3aaaFT1xRSi_T_
     // CHECK:     apply [[FUNC_A]]([[A_BOX]])
     
@@ -620,13 +678,13 @@ func test_multiple_patterns5() {
     // CHECK:     [[B_N:%.*]] = tuple_extract
     // CHECK:     [[B_X:%.*]] = tuple_extract
     // CHECK:     [[B_BOX:%.*]] = project_box
-    // CHECK:     store [[B_X]] to [[B_BOX]]
+    // CHECK:     store [[B_X]] to [trivial] [[B_BOX]]
     // CHECK:     [[FUNC_B:%.*]] = function_ref @_TF10switch_var3aaaFT1xRSi_T_
     // CHECK:     apply [[FUNC_B]]([[B_BOX]])
     
     // CHECK:   [[C]]({{%.*}} : $(Int, Int, Double)):
     // CHECK:     [[Y_BOX:%.*]] = project_box
-    // CHECK:     store [[Y_X]] to [[Y_BOX]]
+    // CHECK:     store [[Y_X]] to [trivial] [[Y_BOX]]
     // CHECK:     [[FUNC_C:%.*]] = function_ref @_TF10switch_var3aaaFT1xRSi_T_
     // CHECK:     apply [[FUNC_C]]([[Y_BOX]])
     
@@ -634,7 +692,7 @@ func test_multiple_patterns5() {
     // CHECK:     [[Z_X:%.*]] = tuple_extract
     // CHECK:     [[Z_F:%.*]] = tuple_extract
     // CHECK:     [[Z_BOX:%.*]] = project_box
-    // CHECK:     store [[Z_X]] to [[Z_BOX]]
+    // CHECK:     store [[Z_X]] to [trivial] [[Z_BOX]]
     // CHECK:     [[FUNC_Z:%.*]] = function_ref @_TF10switch_var3aaaFT1xRSi_T_
     // CHECK:     apply [[FUNC_Z]]([[Z_BOX]])
     aaa(x: &x)

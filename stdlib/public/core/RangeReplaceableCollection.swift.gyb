@@ -492,7 +492,7 @@ public protocol RangeReplaceableCollection
   /// Removes and returns the first element of the collection.
   ///
   /// The collection must not be empty.
-  /// 
+  ///
   ///     var bugs = ["Aphid", "Bumblebee", "Cicada", "Damselfly", "Earwig"]
   ///     bugs.removeFirst()
   ///     print(bugs)
@@ -827,7 +827,7 @@ extension RangeReplaceableCollection where SubSequence == Self {
   /// The collection must not be empty.
   ///
   /// Calling this method may invalidate all saved indices of this
-  /// collection. Don't rely on a previously stored index value after
+  /// collection. Do not rely on a previously stored index value after
   /// altering a collection with any operation that can change its length.
   ///
   /// - Returns: The first element of the collection.
@@ -849,7 +849,7 @@ extension RangeReplaceableCollection where SubSequence == Self {
   /// triggers a runtime error.
   ///
   /// Calling this method may invalidate all saved indices of this
-  /// collection. Don't rely on a previously stored index value after
+  /// collection. Do not rely on a previously stored index value after
   /// altering a collection with any operation that can change its length.
   ///
   /// - Parameter n: The number of elements to remove from the collection.
@@ -986,7 +986,7 @@ extension RangeReplaceableCollection where Self : BidirectionalCollection {
   /// The collection must not be empty.
   ///
   /// Calling this method may invalidate all saved indices of this
-  /// collection. Don't rely on a previously stored index value after
+  /// collection. Do not rely on a previously stored index value after
   /// altering a collection with any operation that can change its length.
   ///
   /// - Returns: The last element of the collection.
@@ -1008,7 +1008,7 @@ extension RangeReplaceableCollection where Self : BidirectionalCollection {
   /// triggers a runtime error.
   ///
   /// Calling this method may invalidate all saved indices of this
-  /// collection. Don't rely on a previously stored index value after
+  /// collection. Do not rely on a previously stored index value after
   /// altering a collection with any operation that can change its length.
   ///
   /// - Parameter n: The number of elements to remove from the collection.
@@ -1041,7 +1041,7 @@ extension RangeReplaceableCollection
   /// The collection must not be empty.
   ///
   /// Calling this method may invalidate all saved indices of this
-  /// collection. Don't rely on a previously stored index value after
+  /// collection. Do not rely on a previously stored index value after
   /// altering a collection with any operation that can change its length.
   ///
   /// - Returns: The last element of the collection.
@@ -1063,7 +1063,7 @@ extension RangeReplaceableCollection
   /// triggers a runtime error.
   ///
   /// Calling this method may invalidate all saved indices of this
-  /// collection. Don't rely on a previously stored index value after
+  /// collection. Do not rely on a previously stored index value after
   /// altering a collection with any operation that can change its length.
   ///
   /// - Parameter n: The number of elements to remove from the collection.
@@ -1182,7 +1182,7 @@ extension RangeReplaceableCollection {
   ) where C : Collection, C.Iterator.Element == Iterator.Element {
     Builtin.unreachable()
   }
-  
+
   @available(*, unavailable, renamed: "remove(at:)")
   public mutating func removeAtIndex(_ i: Index) -> Iterator.Element {
     Builtin.unreachable()

@@ -1,4 +1,4 @@
-:orphan: 
+:orphan:
 
 Unified Function Syntax via Selector Splitting
 ==============================================
@@ -19,7 +19,7 @@ as well as what its various arguments are. For example,
   - (void)moveRowAtIndex:(NSInteger)oldIndex toIndex:(NSInteger)newIndex;
 
 Note that there are three pieces of information in the selector
-``moveRowAtIndex:toIndex:``: 
+``moveRowAtIndex:toIndex:``:
 
 1. What the method is doing ("moving a row").
 2. What the first argument is ("the index of the row we're moving").
@@ -151,7 +151,7 @@ To refer to the complete method name, place the method name in
 backticks, as in this reference to an optional method in a delegate::
 
   if let method = delegate.`tableView(_:viewForTableColumn:row:)` {
-    // ... 
+    // ...
   }
 
 Initializers
@@ -230,7 +230,7 @@ Optionality and Ordering of Keyword Arguments
 A number of programming languages have keyword arguments in one form
 or another, including Ada, C#, Fortran 95, Lua, OCaml,
 Perl 6, Python, and Ruby. Objective-C and Smalltalk's use of selectors
-is roughly equivalent, in the sense that the arguments get names. 
+is roughly equivalent, in the sense that the arguments get names.
 The languages with keyword arguments (but not Objective-C and
 Smalltalk) all allow re-ordering of
 arguments at the call site, and many allow one to

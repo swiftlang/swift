@@ -21,7 +21,6 @@
 #include "swift/IDE/Formatting.h"
 #include "swift/Option/Options.h"
 #include "swift/Subsystems.h"
-#include "clang/Format/Format.h"
 #include "llvm/Option/Arg.h"
 #include "llvm/Option/Option.h"
 #include "llvm/Support/CommandLine.h"
@@ -80,10 +79,8 @@ private:
   std::string MainExecutablePath;
   std::string OutputFilename = "-";
   std::vector<std::string> InputFilenames;
-  bool UseTabs = false;
+  CodeFormatOptions FormatOptions;
   bool InPlace = false;
-  unsigned TabWidth = 4;
-  unsigned IndentWidth = 4;
   std::vector<std::string> LineRanges;
 
   bool parseLineRange(StringRef Input, unsigned &FromLine, unsigned &ToLine) {
@@ -118,18 +115,21 @@ public:
     }
 
     if (ParsedArgs.getLastArg(OPT_use_tabs))
-      UseTabs = true;
+      FormatOptions.UseTabs = true;
+
+    if (ParsedArgs.getLastArg(OPT_indent_switch_case))
+      FormatOptions.IndentSwitchCase = true;
 
     if (ParsedArgs.getLastArg(OPT_in_place))
       InPlace = true;
 
     if (const Arg *A = ParsedArgs.getLastArg(OPT_tab_width))
-      if (StringRef(A->getValue()).getAsInteger(10, TabWidth))
+      if (StringRef(A->getValue()).getAsInteger(10, FormatOptions.TabWidth))
         Diags.diagnose(SourceLoc(), diag::error_invalid_arg_value,
                        A->getAsString(ParsedArgs), A->getValue());
 
     if (const Arg *A = ParsedArgs.getLastArg(OPT_indent_width))
-      if (StringRef(A->getValue()).getAsInteger(10, IndentWidth))
+      if (StringRef(A->getValue()).getAsInteger(10, FormatOptions.IndentWidth))
         Diags.diagnose(SourceLoc(), diag::error_invalid_arg_value,
                        A->getAsString(ParsedArgs), A->getValue());
 
@@ -187,8 +187,8 @@ public:
     if (LineRanges.empty()) {
       LineRanges.push_back("1:" + std::to_string(UINT_MAX));
     }
+
     std::string Output = Doc.memBuffer().getBuffer();
-    clang::tooling::Replacements Replacements;
     for (unsigned Range = 0; Range < LineRanges.size(); ++Range) {
       unsigned FromLine;
       unsigned ToLine;
@@ -206,34 +206,13 @@ public:
         if (Length < 0)
           break;
 
-        CodeFormatOptions FormatOptions;
-        FormatOptions.UseTabs = UseTabs;
-        FormatOptions.IndentWidth = IndentWidth;
-        FormatOptions.TabWidth = TabWidth;
         std::string Formatted =
             Doc.reformat(LineRange(Line, 1), FormatOptions).second;
         if (Formatted.find_first_not_of(" \t\v\f", 0) == StringRef::npos)
           Formatted = "";
 
-        if (Formatted == Output.substr(Offset, Length))
-          continue;
-
         Output.replace(Offset, Length, Formatted);
-        Doc.updateCode(llvm::MemoryBuffer::getMemBuffer(Output));
-
-        // TODO: Replacements::add returns a failure when there is a conflict in
-        // between the replacement we are adding and the replacements that have
-        // already been added or if the added replacement's file path is
-        // different from the filepath of the existing replacements. We should
-        // add a first class diagnostic for this. For now, due to time
-        // constraints, on failure, we just log a message to std::err and return
-        // true.
-        llvm::Error Error = Replacements.add(
-            clang::tooling::Replacement(Filename, Offset, Length, Formatted));
-        if (!Error) {
-          llvm::errs() << "Error! Invalid replacement!\n";
-          return true;
-        }
+        Doc.updateCode(llvm::MemoryBuffer::getMemBuffer(Output));        
       }
       if (Filename == "-" || (!InPlace && OutputFilename == "-")) {
         llvm::outs() << Output;

@@ -382,7 +382,7 @@ class COWArrayOpt {
   SmallPtrSet<Operand*, 8> MatchedReleases;
 
   // The address of the array passed to the current make_mutable we are
-  // analysing.
+  // analyzing.
   SILValue CurrentArrayAddr;
 public:
   COWArrayOpt(RCIdentityFunctionInfo *RCIA, SILLoop *L,
@@ -1011,11 +1011,11 @@ struct HoistableMakeMutable {
     MakeMutable = M;
 
     // The function_ref needs to be invariant.
-    if (Loop->contains(MakeMutable->getCallee()->getParentBB()))
+    if (Loop->contains(MakeMutable->getCallee()->getParentBlock()))
       return;
 
     // The array reference is invariant.
-    if (!L->contains(M.getSelf()->getParentBB())) {
+    if (!L->contains(M.getSelf()->getParentBlock())) {
       IsHoistable = true;
       return;
     }
@@ -1093,7 +1093,7 @@ private:
 
     SILValue ArrayBuffer = stripValueProjections(UncheckedRefCast->getOperand(), DepInsts);
     auto *BaseLoad = dyn_cast<LoadInst>(ArrayBuffer);
-    if (!BaseLoad ||  Loop->contains(BaseLoad->getOperand()->getParentBB()))
+    if (!BaseLoad ||  Loop->contains(BaseLoad->getOperand()->getParentBlock()))
       return false;
     DepInsts.push_back(BaseLoad);
 
@@ -1104,15 +1104,15 @@ private:
         GetElementAddrCall.getKind() != ArrayCallKind::kGetElementAddress)
       return false;
     if (Loop->contains(
-            ((ApplyInst *)GetElementAddrCall)->getCallee()->getParentBB()))
+            ((ApplyInst *)GetElementAddrCall)->getCallee()->getParentBlock()))
       return false;
-    if (Loop->contains(GetElementAddrCall.getIndex()->getParentBB()))
+    if (Loop->contains(GetElementAddrCall.getIndex()->getParentBlock()))
       return false;
 
     auto *GetElementAddrArrayLoad =
         dyn_cast<LoadInst>(GetElementAddrCall.getSelf());
     if (!GetElementAddrArrayLoad ||
-        Loop->contains(GetElementAddrArrayLoad->getOperand()->getParentBB()))
+        Loop->contains(GetElementAddrArrayLoad->getOperand()->getParentBlock()))
       return false;
 
     // Check the retain/release around the get_element_addr call.
@@ -1139,18 +1139,18 @@ private:
     if (CheckSubscript.getKind() == ArrayCallKind::kMakeMutable)
       return true;
 
-    if (Loop->contains(CheckSubscript.getIndex()->getParentBB()) ||
+    if (Loop->contains(CheckSubscript.getIndex()->getParentBlock()) ||
         Loop->contains(CheckSubscript.getArrayPropertyIsNativeTypeChecked()
-                           ->getParentBB()))
+                           ->getParentBlock()))
       return false;
 
     auto *CheckSubscriptArrayLoad =
         dyn_cast<LoadInst>(CheckSubscript.getSelf());
     if (!CheckSubscript ||
-        Loop->contains(CheckSubscriptArrayLoad->getOperand()->getParentBB()))
+        Loop->contains(CheckSubscriptArrayLoad->getOperand()->getParentBlock()))
       return false;
   if (Loop->contains(
-            ((ApplyInst *)CheckSubscript)->getCallee()->getParentBB()))
+            ((ApplyInst *)CheckSubscript)->getCallee()->getParentBlock()))
       return false;
 
     // The array must match get_element_addr's array.
@@ -1459,7 +1459,7 @@ bool COWArrayOpt::hoistMakeMutable(ArraySemanticsCall MakeMutable) {
   // We can hoist address projections (even if they are only conditionally
   // executed).
   auto ArrayAddrBase = stripUnaryAddressProjections(CurrentArrayAddr);
-  SILBasicBlock *ArrayAddrBaseBB = ArrayAddrBase->getParentBB();
+  SILBasicBlock *ArrayAddrBaseBB = ArrayAddrBase->getParentBlock();
 
   if (ArrayAddrBaseBB && !DomTree->dominates(ArrayAddrBaseBB, Preheader)) {
     DEBUG(llvm::dbgs() << "    Skipping Array: does not dominate loop!\n");
@@ -2042,7 +2042,7 @@ protected:
   }
 
   SILValue remapValue(SILValue V) {
-    if (auto *BB = V->getParentBB()) {
+    if (auto *BB = V->getParentBlock()) {
       if (!DomTree.dominates(StartBB, BB)) {
         // Must be a value that dominates the start basic block.
         assert(DomTree.dominates(BB, StartBB) &&

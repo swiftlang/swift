@@ -1,4 +1,4 @@
-// RUN: %target-sil-opt -enable-sil-verify-all -sil-epilogue-arc-dumper %s | %FileCheck %s
+// RUN: %target-sil-opt -assume-parsing-unqualified-ownership-sil -enable-sil-verify-all -sil-epilogue-arc-dumper %s | %FileCheck %s
 
 import Builtin
 import Swift
@@ -10,7 +10,7 @@ import Swift
 
 class foo {
   var a: Int
-   deinit 
+   deinit
   init()
 }
 
@@ -189,7 +189,7 @@ bb1:
   strong_retain %0 : $foo
   br bb3(%0 : $foo)
 bb2:
-  %5 = function_ref @epilogue_retains_in_diamond_top_and_left_split_block : $@convention(thin) (@owned foo) -> @owned foo 
+  %5 = function_ref @epilogue_retains_in_diamond_top_and_left_split_block : $@convention(thin) (@owned foo) -> @owned foo
   %6 = apply %5(%0)  : $@convention(thin) (@owned foo) -> @owned foo
   br bb3( %6 : $foo)
 bb3(%3 : $foo):

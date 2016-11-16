@@ -140,14 +140,14 @@ namespace {
       if (foundInType->is<ArchetypeType>() ||
           Options.contains(NameLookupFlags::PerformConformanceCheck)) {
         // Dig out the protocol conformance.
-        ProtocolConformance *conformance = nullptr;
-        if (!TC.conformsToProtocol(foundInType, foundProto, DC,
-                                   conformanceOptions, &conformance))
+        auto conformance = TC.conformsToProtocol(foundInType, foundProto, DC,
+                                                 conformanceOptions);
+        if (!conformance)
           return;
 
         // We have an abstract conformance of an archetype to a protocol.
         // Just return the requirement.
-        if (!conformance) {
+        if (conformance->isAbstract()) {
           assert(foundInType->is<ArchetypeType>());
           addResult(found);
           return;
@@ -155,8 +155,9 @@ namespace {
 
         // Dig out the witness.
         ValueDecl *witness;
+        auto concrete = conformance->getConcrete();
         if (auto assocType = dyn_cast<AssociatedTypeDecl>(found)) {
-          witness = conformance->getTypeWitnessSubstAndDecl(assocType, &TC)
+          witness = concrete->getTypeWitnessSubstAndDecl(assocType, &TC)
             .second;
         } else if (isa<TypeAliasDecl>(found)) {
           // No witness for typealiases. This means typealiases in
@@ -166,7 +167,7 @@ namespace {
           // FIXME: Fix this.
           return;
         } else {
-          witness = conformance->getWitness(found, &TC).getDecl();
+          witness = concrete->getWitness(found, &TC).getDecl();
         }
 
         // FIXME: the "isa<ProtocolDecl>()" check will be wrong for
@@ -392,17 +393,17 @@ LookupTypeResult TypeChecker::lookupMemberType(DeclContext *dc,
       // If the type does not actually conform to the protocol, skip this
       // member entirely.
       auto *protocol = cast<ProtocolDecl>(assocType->getDeclContext());
-      ProtocolConformance *conformance = nullptr;
-      if (!conformsToProtocol(type, protocol, dc, conformanceOptions,
-                              &conformance) ||
-          !conformance) {
+      auto conformance = conformsToProtocol(type, protocol, dc,
+                                            conformanceOptions);
+      if (!conformance || conformance->isAbstract()) {
         // FIXME: This is an error path. Should we try to recover?
         continue;
       }
 
       // Use the type witness.
+      auto concrete = conformance->getConcrete();
       Type memberType =
-        conformance->getTypeWitness(assocType, this).getReplacement();
+        concrete->getTypeWitness(assocType, this).getReplacement();
       assert(memberType && "Missing type witness?");
 
       // If we haven't seen this type result yet, add it to the result set.
@@ -504,6 +505,12 @@ void TypeChecker::performTypoCorrection(DeclContext *DC, DeclRefKind refKind,
                                         NameLookupOptions lookupOptions,
                                         LookupResult &result,
                                         unsigned maxResults) {
+  // Disable typo-correction if we won't show the diagnostic anyway.
+  if (getLangOpts().DisableTypoCorrection ||
+      (Diags.hasFatalErrorOccurred() &&
+       !Diags.getShowDiagnosticsAfterFatalError()))
+    return;
+
   // Fill in a collection of the most reasonable entries.
   TopCollection<unsigned, ValueDecl*> entries(maxResults);
   auto consumer = makeDeclConsumer([&](ValueDecl *decl,

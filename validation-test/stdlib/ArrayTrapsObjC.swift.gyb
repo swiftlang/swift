@@ -135,7 +135,7 @@ class ViolateInoutSafetySwitchToObjcBuffer {
 ArraySemanticOptzns.test("inout_rule_violated_isNativeBuffer")
   .skip(.custom(
     { _isFastAssertConfiguration() },
-    reason: "this trap is not guaranteed to happen in -Ounchecked"))  
+    reason: "this trap is not guaranteed to happen in -Ounchecked"))
   .crashOutputMatches(_isDebugAssertConfiguration() ?
     "fatal error: inout rules were violated: the array was overwritten" : "")
   .code {
@@ -178,7 +178,7 @@ class ViolateInoutSafetyNeedElementTypeCheck {
 ArraySemanticOptzns.test("inout_rule_violated_needsElementTypeCheck")
   .skip(.custom(
     { _isFastAssertConfiguration() },
-    reason: "this trap is not guaranteed to happen in -Ounchecked"))  
+    reason: "this trap is not guaranteed to happen in -Ounchecked"))
   .crashOutputMatches(_isDebugAssertConfiguration() ?
     "fatal error: inout rules were violated: the array was overwritten" : "")
   .code {

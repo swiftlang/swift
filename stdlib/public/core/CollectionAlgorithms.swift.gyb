@@ -547,7 +547,7 @@ ${subscriptCommentPost}
     }
 %   end
   }
-  
+
 ${subscriptCommentPre}
 ${subscriptCommentMid}
 ${subscriptCommentPost}
@@ -565,7 +565,7 @@ ${subscriptCommentPost}
 % end
 
 //===--- Unavailable stuff ------------------------------------------------===//
-    
+
 extension MutableCollection where Self : RandomAccessCollection {
   @available(*, unavailable, message: "call partition(by:)")
   public mutating func partition(

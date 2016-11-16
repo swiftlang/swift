@@ -236,7 +236,7 @@ extension CGFloat : _ObjectiveCBridgeable {
       precondition(tag == .SwiftCGFloat,
         "NSNumber does not contain right type to be cast to CGFloat")
     }
-    
+
     result = CGFloat(x)
   }
 

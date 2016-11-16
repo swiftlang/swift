@@ -249,7 +249,8 @@ ManagedValue SILGenFunction::emitUncheckedGetOptionalValueFrom(SILLocation loc,
                                         someDecl, origPayloadTy);
   
     if (optTL.isLoadable())
-      payloadVal = B.createLoad(loc, payloadVal);
+      payloadVal =
+          optTL.emitLoad(B, loc, payloadVal, LoadOwnershipQualifier::Take);
   }
 
   // Produce a correctly managed value.
@@ -358,7 +359,8 @@ SILGenFunction::emitPointerToPointer(SILLocation loc,
   // The generic function currently always requires indirection, but pointers
   // are always loadable.
   auto origBuf = emitTemporaryAllocation(loc, input.getType());
-  B.createStore(loc, input.forward(*this), origBuf);
+  B.emitStoreValueOperation(loc, input.forward(*this), origBuf,
+                            StoreOwnershipQualifier::Init);
   auto origValue = emitManagedBufferWithCleanup(origBuf);
   
   // Invoke the conversion intrinsic to convert to the destination type.
@@ -717,8 +719,7 @@ ManagedValue SILGenFunction::emitProtocolMetatypeToObject(SILLocation loc,
   // reference when we use it to prevent it being released and attempting to
   // deallocate itself. It doesn't matter if we ever actually clean up that
   // retain though.
-  B.createStrongRetain(loc, value, Atomicity::Atomic);
-  
+  value = B.createCopyValue(loc, value);
   return ManagedValue::forUnmanaged(value);
 }
 

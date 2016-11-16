@@ -165,7 +165,7 @@ public struct Unsafe${Mutable}RawPointer : Strideable, Hashable, _Pointer {
     Builtin.deallocRaw(
       _rawValue, bytes._builtinWordValue, alignedTo._builtinWordValue)
   }
-  
+
   /// Binds the allocated memory to type `T` and returns an
   /// `Unsafe${Mutable}Pointer<T>` to the bound memory at `self`.
   ///
@@ -378,7 +378,7 @@ public struct Unsafe${Mutable}RawPointer : Strideable, Hashable, _Pointer {
 
 %  if mutable:
   /// Stores a value's bytes into raw memory at `self + offset`.
-  ///  
+  ///
   /// - Precondition: The underlying pointer plus `offset` is properly
   ///   aligned for storing type `T`.
   ///
@@ -387,7 +387,7 @@ public struct Unsafe${Mutable}RawPointer : Strideable, Hashable, _Pointer {
   /// - Precondition: The memory is uninitialized, or initialized to
   ///   some trivial type `U` such that `T` and `U` are mutually layout
   ///   compatible.
-  /// 
+  ///
   /// - Postcondition: The memory is initialized to raw bytes. If the
   ///   memory is bound to type `U`, then it now contains a value of
   ///   type `U`.
@@ -424,9 +424,9 @@ public struct Unsafe${Mutable}RawPointer : Strideable, Hashable, _Pointer {
         /*volatile:*/ false._value)
     }
   }
-  
+
   /// Copies `count` bytes from `source` into memory at `self`.
-  ///  
+  ///
   /// - Precondition: `count` is non-negative.
   ///
   /// - Precondition: The memory at `source..<source + count` is

@@ -39,7 +39,7 @@ You can also selectively import certain declarations from a module::
 .. admonition:: Comparison with Other Languages
 
   Importing a module is much like importing a library in Ruby, Python, or Perl,
-  importing a class in Java, or including a header file in a C-family language. 
+  importing a class in Java, or including a header file in a C-family language.
   However, unlike C, module files are not textually included and must be valid
   programs on their own, and may not be in a textual format at all. Unlike Java,
   declarations in a module are not visible at all until imported. And unlike the
@@ -81,7 +81,7 @@ visible. If more than one imported module declares the same name, the full
   The one exception to this rule is declarations that must be compatible with
   Objective-C. Such declarations follow the usual Objective-C rules for name
   conflicts: all classes must have unique names, all protocols must have unique
-  names, and all constructors, methods, and properties must have unique names 
+  names, and all constructors, methods, and properties must have unique names
   within their class (including inherited methods and properties).
 
 
@@ -91,7 +91,7 @@ Modules may contain code
 In addition to declarations, modules may contain implementations of the
 functions they define. The compiler may choose to use this information when
 optimizing a user's program, usually by inlining the module code into a caller.
-In some cases [#]_, the compiler may even use a module's function 
+In some cases [#]_, the compiler may even use a module's function
 implementations to produce more effective diagnostics.
 
 Modules can also contain `autolinking` information, which the compiler passes
@@ -158,7 +158,7 @@ module names are conventionally capitalized.
 
     Foundation.SupportType() // from the class or from the module?
 
-  In both cases, the type takes priority over the module, but this should still 
+  In both cases, the type takes priority over the module, but this should still
   be avoided.
 
   .. admonition:: TODO
@@ -216,7 +216,7 @@ loaded with ``import``, but with a few important differences:
 
 .. admonition:: FIXME
 
-  This wouldn't belong in the user model at all except for the implicit 
+  This wouldn't belong in the user model at all except for the implicit
   visibility thing. Is there a better way to talk about this?
 
 
@@ -261,18 +261,18 @@ Submodules
 
 For large projects, it is usually desirable to break a single application or
 framework into subsystems, which Swift calls "submodules". A submodule is a
-development-time construct used for grouping within a module. By default, 
-declarations within a submodule are considered "submodule-private", which 
+development-time construct used for grouping within a module. By default,
+declarations within a submodule are considered "submodule-private", which
 means they are only visible within that submodule (rather than across the
 entire module). These declarations will not conflict with declarations in other
-submodules that may have the same name. 
+submodules that may have the same name.
 
 Declarations explicitly marked "whole-module" or "API" are still visible
 across the entire module (even if declared within a submodule), and must have a
 unique name within that space.
 
 The `qualified name` of a declaration within a submodule consists of the
-top-level module name, followed by the submodule name, followed by the 
+top-level module name, followed by the submodule name, followed by the
 declaration.
 
 .. note::
@@ -284,16 +284,16 @@ declaration.
   We need to decide once and for all whether implicit visibility applies across
   submodule boundaries, i.e. "can I access the public Swift.AST.Module from
   Swift.Sema without an import, or do I have to say ``import Swift.AST``?"
-  
+
   Advantages of module-wide implicit visibility:
-  
+
   - Better name conflict checking. (The alternative is a linker error, or worse
     *no* linker error if the names have different manglings.)
   - Less work if things move around.
   - Build time performance is consistent whether or not you use this feature.
-  
+
   Advantages of submodule-only implicit visibility:
-  
+
   - Code completion will include names of public things you don't care about.
   - We haven't actually tested the build time performance of any large Swift
     projects, so we don't know if we can actually handle targets that contain
@@ -303,7 +303,7 @@ declaration.
   - In this mode, we could allow two "whole-module" declarations to have the
     same name, since they won't. (We could allow this in the other mode too
     but then the qualified name would always be required.)
-  
+
   Both cases still use "submodule-only" as the default access control, so this
   only affects the implicit visibility of whole-module and public declarations.
 
@@ -337,7 +337,7 @@ Clang Submodules
 ----------------
 
 Clang also has a concept of "submodules", which are essentially hierarchically-
-named modules. Unlike Swift's :ref:`submodules`, Clang submodules are visible 
+named modules. Unlike Swift's :ref:`submodules`, Clang submodules are visible
 from outside the module. It is conventional for a top-level Clang module to
 re-export all of its submodules, but sometimes certain submodules are specified
 to require an explicit import::
@@ -382,13 +382,13 @@ Accessing Swift declarations from Objective-C
 Using the new ``@import`` syntax, Objective-C translation units can import
 Swift modules as well. Swift declarations will be mirrored into Objective-C
 and can be called natively, just as Objective-C declarations are mirrored into
-Swift for `Clang modules <Clang module>`. In this case, only the declarations 
+Swift for `Clang modules <Clang module>`. In this case, only the declarations
 compatible with Objective-C will be visible.
 
 .. admonition:: TODO
 
-  We need to actually do this, but it requires working on a branch of Clang, so 
-  we're pushing it back in the schedule as far as possible. The workaround is 
+  We need to actually do this, but it requires working on a branch of Clang, so
+  we're pushing it back in the schedule as far as possible. The workaround is
   to manually write header files for imported Swift classes.
 
 .. admonition:: TODO
@@ -412,7 +412,7 @@ Glossary
     specify them at link time.
 
   Clang module
-    A module whose contents are generated from a C-family header or set of 
+    A module whose contents are generated from a C-family header or set of
     headers. See Clang's Modules__ documentation for more information.
 
     __ http://clang.llvm.org/docs/Modules.html
@@ -427,7 +427,7 @@ Glossary
     be created by users.
 
   import
-    To locate and read a module, then make its declarations available in the 
+    To locate and read a module, then make its declarations available in the
     current context.
 
   library
@@ -457,15 +457,15 @@ Glossary
     included the former module.
 
   serialized module
-    A particular encoding of a module that contains declarations that have 
-    already been processed by the compiler. It may also contain implementations 
+    A particular encoding of a module that contains declarations that have
+    already been processed by the compiler. It may also contain implementations
     of some function declarations in `SIL` form.
-  
+
   SIL
     "Swift Intermediate Language", a stable IR for the distribution of
     inlineable code.
-  
-  
+
+
   target
     A dynamic library, framework, plug-in, or application to be built.
     A natural LTO boundary, and roughly the same as what Xcode requires

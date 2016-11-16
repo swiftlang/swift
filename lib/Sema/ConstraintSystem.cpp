@@ -26,12 +26,7 @@ using namespace constraints;
 ConstraintSystem::ConstraintSystem(TypeChecker &tc, DeclContext *dc,
                                    ConstraintSystemOptions options)
   : TC(tc), DC(dc), Options(options),
-    Arena(tc.Context, Allocator, 
-          [&](TypeVariableType *baseTypeVar, AssociatedTypeDecl *assocType) {
-            return getMemberType(baseTypeVar, assocType,
-                                 ConstraintLocatorBuilder(nullptr),
-                                 /*options=*/0);
-          }),
+    Arena(tc.Context, Allocator),
     CG(*new ConstraintGraph(*this))
 {
   assert(DC && "context required");
@@ -348,102 +343,21 @@ ConstraintLocator *ConstraintSystem::getConstraintLocator(
   return getConstraintLocator(anchor, path, builder.getSummaryFlags());
 }
 
-TypeVariableType *
-ConstraintSystem::getMemberType(TypeVariableType *baseTypeVar, 
-                                AssociatedTypeDecl *assocType,
-                                ConstraintLocatorBuilder locator,
-                                unsigned options) {
-  return CG.getMemberType(baseTypeVar, assocType->getName(), [&]() {
-    // FIXME: Premature associated type -> identifier mapping. We should
-    // retain the associated type throughout.
-    auto loc = getConstraintLocator(locator);
-    auto memberTypeVar = createTypeVariable(loc, options);
-    addTypeMemberConstraint(baseTypeVar, assocType->getName(),
-                            memberTypeVar, loc);
-    return memberTypeVar;
-  });
-}
-
 namespace {
-  /// Function object that retrieves a type variable corresponding to the
-  /// given dependent type.
-  class GetTypeVariable {
-    ConstraintSystem &CS;
-    ConstraintGraph &CG;
-    ConstraintLocatorBuilder &Locator;
-
-  public:
-    GetTypeVariable(ConstraintSystem &cs,
-                    ConstraintLocatorBuilder &locator)
-      : CS(cs), CG(CS.getConstraintGraph()), Locator(locator) {}
-
-    TypeVariableType *operator()(Type base, AssociatedTypeDecl *member) {
-      // FIXME: Premature associated type -> identifier mapping. We should
-      // retain the associated type throughout.
-      auto baseTypeVar = base->castTo<TypeVariableType>();
-      return CG.getMemberType(baseTypeVar, member->getName(),
-                              [&]() -> TypeVariableType* {
-        auto implArchetype = baseTypeVar->getImpl().getArchetype();
-        if (!implArchetype) {
-          // If the base type variable doesn't have an associated archetype,
-          // just form the member constraint.
-          // FIXME: Additional requirements?
-          auto locator = CS.getConstraintLocator(
-                           Locator.withPathElement(member));
-          auto memberTypeVar = CS.createTypeVariable(locator,
-                                                     TVO_PrefersSubtypeBinding);
-          CS.addTypeMemberConstraint(baseTypeVar, member->getName(),
-                                     memberTypeVar, locator);
-          return memberTypeVar;
-        }
-                                
-                                
-        ArchetypeType::NestedType nestedType;
-        ArchetypeType* archetype = nullptr;
-                                
-        if (implArchetype->hasNestedType(member->getName())) {
-          nestedType = implArchetype->getNestedType(member->getName());
-          archetype = nestedType.getValue()->getAs<ArchetypeType>();
-        }
-
-        ConstraintLocator *locator;
-        if (archetype) {
-          locator = CS.getConstraintLocator(
-                      Locator.withPathElement(LocatorPathElt(archetype)));
-        } else {
-          // FIXME: Occurs when the nested type is a concrete type,
-          // in which case it's quite silly to create a type variable at all.
-          locator = CS.getConstraintLocator(Locator.withPathElement(member));
-        }
-                                
-        auto memberTypeVar = CS.createTypeVariable(locator,
-                                                   TVO_PrefersSubtypeBinding);
-
-        // Bind the member's type variable as a type member of the base.
-        CS.addTypeMemberConstraint(baseTypeVar, member->getName(),
-                                   memberTypeVar, locator);
-
-        return memberTypeVar;
-      });
-    }
-  };
-
   /// Function object that replaces all occurrences of archetypes and
   /// dependent types with type variables.
   class ReplaceDependentTypes {
     ConstraintSystem &cs;
     ConstraintLocatorBuilder &locator;
     llvm::DenseMap<CanType, TypeVariableType *> &replacements;
-    GetTypeVariable &getTypeVariable;
+    llvm::DenseMap<CanType, Type> dependentMemberReplacements;
 
   public:
     ReplaceDependentTypes(
         ConstraintSystem &cs,
         ConstraintLocatorBuilder &locator,
-        llvm::DenseMap<CanType, TypeVariableType *> &replacements,
-        GetTypeVariable &getTypeVariable)
-      : cs(cs), locator(locator), replacements(replacements),
-        getTypeVariable(getTypeVariable) { }
+        llvm::DenseMap<CanType, TypeVariableType *> &replacements)
+      : cs(cs), locator(locator), replacements(replacements) { }
 
     Type operator()(Type type) {
       // Swift only supports rank-1 polymorphism.
@@ -469,15 +383,19 @@ namespace {
       // member of its base type.
       if (auto dependentMember = type->getAs<DependentMemberType>()) {
         // Check whether we've already dealt with this dependent member.
-        auto known = replacements.find(dependentMember->getCanonicalType());
-        if (known != replacements.end())
+        auto known = dependentMemberReplacements.find(
+                       dependentMember->getCanonicalType());
+        if (known != dependentMemberReplacements.end())
           return known->second;
 
         // Replace archetypes in the base type.
+        // FIXME: Tracking the dependent members seems unnecessary.
         if (auto base =
             ((*this)(dependentMember->getBase()))->getAs<TypeVariableType>()) {
-          auto result = getTypeVariable(base, dependentMember->getAssocType());
-          replacements[dependentMember->getCanonicalType()] = result;
+          auto result =
+            DependentMemberType::get(base, dependentMember->getAssocType());
+          dependentMemberReplacements[dependentMember->getCanonicalType()] =
+            result;
           return result;
         }
       }
@@ -538,10 +456,7 @@ Type ConstraintSystem::openType(
        Type startingType,
        ConstraintLocatorBuilder locator,
        llvm::DenseMap<CanType, TypeVariableType *> &replacements) {
-  GetTypeVariable getTypeVariable{*this, locator};
-
-  ReplaceDependentTypes replaceDependentTypes(*this, locator, replacements,
-                                              getTypeVariable);
+  ReplaceDependentTypes replaceDependentTypes(*this, locator, replacements);
   return startingType.transform(replaceDependentTypes);
 }
 
@@ -672,30 +587,54 @@ Type ConstraintSystem::openBindingType(Type type,
 }
 
 Type ConstraintSystem::getFixedTypeRecursive(Type type,
+                                             TypeMatchOptions &flags,
                                              bool wantRValue,
                                              bool retainParens) {
+
   if (wantRValue)
     type = type->getRValueType();
 
   if (retainParens) {
     if (auto parenTy = dyn_cast<ParenType>(type.getPointer())) {
-      type = getFixedTypeRecursive(parenTy->getUnderlyingType(),
+      type = getFixedTypeRecursive(parenTy->getUnderlyingType(), flags,
                                    wantRValue, retainParens);
       return ParenType::get(getASTContext(), type);
     }
   }
 
-  while (auto typeVar = type->getAs<TypeVariableType>()) {
-    if (auto fixed = getFixedType(typeVar)) {
-      if (wantRValue)
-        fixed = fixed->getRValueType();
+  while (true) {
+    if (auto depMemType = type->getAs<DependentMemberType>()) {
+      if (!depMemType->getBase()->isTypeVariableOrMember()) return type;
 
-      type = fixed;
+      // FIXME: Perform a more limited simplification?
+      Type newType = simplifyType(type);
+      if (newType.getPointer() == type.getPointer()) return type;
+
+      if (wantRValue)
+        newType = newType->getRValueType();
+
+      type = newType;
+
+      // Once we've simplified a dependent member type, we need to generate a
+      // new constraint.
+      flags |= TMF_GenerateConstraints;
       continue;
+    }
+
+    if (auto typeVar = type->getAs<TypeVariableType>()) {
+      if (auto fixed = getFixedType(typeVar)) {
+        if (wantRValue)
+          fixed = fixed->getRValueType();
+
+        type = fixed;
+        continue;
+      }
+      break;
     }
 
     break;
   }
+
   return type;
 }
 
@@ -982,9 +921,7 @@ void ConstraintSystem::openGeneric(
     replacements[gp->getCanonicalType()] = typeVar;
   }
 
-  GetTypeVariable getTypeVariable{*this, locator};
-  ReplaceDependentTypes replaceDependentTypes(*this, locator, replacements,
-                                              getTypeVariable);
+  ReplaceDependentTypes replaceDependentTypes(*this, locator, replacements);
 
   // Remember that any new constraints generated by opening this generic are
   // due to the opening.
@@ -1028,9 +965,6 @@ void ConstraintSystem::openGeneric(
       addConstraint(ConstraintKind::Bind, firstTy, secondTy, locatorPtr);
       break;
     }
-
-    case RequirementKind::WitnessMarker:
-      break;
   }
   }
 }
@@ -1059,29 +993,6 @@ static void addSelfConstraint(ConstraintSystem &cs, Type objectTy, Type selfTy,
   // Otherwise, the types must be equivalent.
   cs.addConstraint(ConstraintKind::Equal, objectTy, selfTy,
                    cs.getConstraintLocator(locator));
-}
-
-Type ConstraintSystem::replaceSelfTypeInArchetype(ArchetypeType *archetype) {
-  assert(SelfTypeVar && "Meaningless unless there is a type variable for Self");
-  if (auto parent = archetype->getParent()) {
-    // Replace Self in the parent archetype. If nothing changes, we're done.
-    Type newParent = replaceSelfTypeInArchetype(parent);
-    if (newParent->getAs<ArchetypeType>() == parent)
-      return archetype;
-
-    // We expect to get a type variable back.
-    return getMemberType(newParent->castTo<TypeVariableType>(),
-                         archetype->getAssocType(),
-                         ConstraintLocatorBuilder(nullptr),
-                         /*options=*/0);
-  }
-
-  // If the archetype is the same as for the 'Self' type variable,
-  // return the 'Self' type variable.
-  if (SelfTypeVar->getImpl().getArchetype() == archetype)
-    return SelfTypeVar;
-
-  return archetype;
 }
 
 /// Determine whether the given locator is for a witness or requirement.
@@ -1152,17 +1063,19 @@ ConstraintSystem::getTypeOfMemberReference(
     if (!baseObjTy->isExistentialType() &&
         baseObjTy->getAnyNominal()) {
       auto proto = cast<ProtocolDecl>(assocType->getDeclContext());
-      ProtocolConformance *conformance = nullptr;
-      if (TC.conformsToProtocol(baseObjTy, proto, DC,
-                                ConformanceCheckFlags::InExpression,
-                                &conformance)) {
-        auto memberTy = conformance->getTypeWitness(assocType, &TC)
-          .getReplacement();
-        if (!isTypeReference)
-          memberTy = MetatypeType::get(memberTy);
+      if (auto conformance =
+            TC.conformsToProtocol(baseObjTy, proto, DC,
+                                  ConformanceCheckFlags::InExpression)) {
+        if (conformance->isConcrete()) {
+          auto memberTy = conformance->getConcrete()->getTypeWitness(assocType,
+                                                                     &TC)
+            .getReplacement();
+          if (!isTypeReference)
+            memberTy = MetatypeType::get(memberTy);
 
-        auto openedType = FunctionType::get(baseObjTy, memberTy);
-        return { openedType, memberTy };
+          auto openedType = FunctionType::get(baseObjTy, memberTy);
+          return { openedType, memberTy };
+        }
       }
     }
 
@@ -1333,11 +1246,13 @@ ConstraintSystem::getTypeOfMemberReference(
       // FIXME: Feels like a total hack.
     } else if (!baseOpenedTy->isExistentialType() &&
                !baseOpenedTy->is<ArchetypeType>()) {
-      ProtocolConformance *conformance = nullptr;
-      if (TC.conformsToProtocol(baseOpenedTy, proto, DC,
-                                ConformanceCheckFlags::InExpression,
-                                &conformance)) {
-        type = conformance->getTypeWitness(assocType, &TC).getReplacement();
+      if (auto conformance =
+            TC.conformsToProtocol(baseOpenedTy, proto, DC,
+                                  ConformanceCheckFlags::InExpression)) {
+        if (conformance->isConcrete()) {
+          type = conformance->getConcrete()->getTypeWitness(assocType, &TC)
+                   .getReplacement();
+        }
       }
     }
   } else if (!value->isInstanceMember() || isInstance) {
@@ -1502,19 +1417,6 @@ void ConstraintSystem::resolveOverload(ConstraintLocator *locator,
     break;
   }
   
-  // If we have a type variable for the 'Self' of a protocol
-  // requirement that's being opened, and the resulting type has an
-  // archetype in it, replace the 'Self' archetype with the
-  // corresponding type variable.
-  // FIXME: See the comment for SelfTypeVar for information about this hack.
-  if (SelfTypeVar && refType->hasArchetype()) {
-    refType = refType.transform([&](Type type) -> Type {
-        if (auto archetype = type->getAs<ArchetypeType>()) {
-          return replaceSelfTypeInArchetype(archetype);
-        }
-        return type;
-      });
-  }
   assert(!refType->hasTypeParameter() && "Cannot have a dependent type here");
   
   // If we're binding to an init member, the 'throws' need to line up between
@@ -1604,6 +1506,51 @@ Type ConstraintSystem::simplifyType(Type type) {
       return tvt;
     }
 
+    // If this is a dependent member type for which we end up simplifying
+    // the base to a non-type-variable, perform lookup.
+    if (auto depMemTy = type->getAs<DependentMemberType>()) {
+      // Simplify the base.
+      Type newBase = simplifyType(depMemTy->getBase());
+      if (!newBase) return type;
+
+      // If nothing changed, we're done.
+      if (newBase.getPointer() == depMemTy->getBase().getPointer())
+        return type;
+
+      Type lookupBaseType = newBase;
+
+      // Look through an inout type.
+      if (auto inout = lookupBaseType->getAs<InOutType>())
+        lookupBaseType = inout->getObjectType();
+
+      // Look through a metatype.
+      if (auto metatype = lookupBaseType->getAs<AnyMetatypeType>())
+        lookupBaseType = metatype->getInstanceType();
+
+      // If the new base is still something we can't handle, just build a
+      // new dependent member type.
+      if (lookupBaseType->is<TypeVariableType>() ||
+          lookupBaseType->is<UnresolvedType>()) {
+        if (auto assocType = depMemTy->getAssocType())
+          return DependentMemberType::get(newBase, assocType);
+        else
+          return DependentMemberType::get(newBase, assocType);
+      }
+
+      // Dependent member types should only be created for associated types.
+      auto assocType = depMemTy->getAssocType();
+      assert(depMemTy->getAssocType());
+
+      auto result = lookupBaseType->getTypeOfMember(
+                      DC->getParentModule(), assocType, &TC,
+                      assocType->getDeclaredInterfaceType());
+
+      // FIXME: Record failure somehow?
+      if (!result) return type;
+
+      return result;
+    }
+
     // If this is a FunctionType and we inferred new function attributes, apply
     // them.
     if (auto ft = dyn_cast<FunctionType>(type.getPointer())) {
@@ -1624,11 +1571,42 @@ Type ConstraintSystem::simplifyType(Type type) {
 }
 
 Type Solution::simplifyType(TypeChecker &tc, Type type) const {
+  // FIXME: Nearly identical to ConstraintSystem::simplifyType().
   return type.transform([&](Type type) -> Type {
     if (auto tvt = dyn_cast<TypeVariableType>(type.getPointer())) {
       auto known = typeBindings.find(tvt);
       assert(known != typeBindings.end());
       return known->second;
+    }
+
+    // If this is a dependent member type for which we end up simplifying
+    // the base to a non-type-variable, perform lookup.
+    if (auto depMemTy = type->getAs<DependentMemberType>()) {
+      // Simplify the base.
+      Type newBase = simplifyType(tc, depMemTy->getBase());
+      if (!newBase) return type;
+
+      // If nothing changed, we're done.
+      if (newBase.getPointer() == depMemTy->getBase().getPointer())
+        return type;
+
+      Type lookupBaseType = newBase;
+
+      // Look through an inout type.
+      if (auto inout = lookupBaseType->getAs<InOutType>())
+        lookupBaseType = inout->getObjectType();
+
+      // Look through a metatype.
+      if (auto metatype = lookupBaseType->getAs<AnyMetatypeType>())
+        lookupBaseType = metatype->getInstanceType();
+
+      // Dependent member types should only be created for associated types.
+      auto assocType = depMemTy->getAssocType();
+      assert(depMemTy->getAssocType());
+
+      return lookupBaseType->getTypeOfMember(
+               getConstraintSystem().DC->getParentModule(), assocType, &tc,
+               assocType->getDeclaredInterfaceType());
     }
 
     // If this is a FunctionType and we inferred new function attributes, apply

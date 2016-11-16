@@ -95,7 +95,7 @@ endfunction()
 #   ANALYZE_CODE_COVERAGE analyze_code_coverage
 #   RESULT_VAR_NAME result_var_name
 #   DEPLOYMENT_VERSION_IOS deployment_version_ios # If provided, overrides the default value of the iOS deployment target set by the Swift project for this compilation only.
-# 
+#
 # )
 function(_add_variant_c_compile_link_flags)
   set(oneValueArgs SDK ARCH BUILD_TYPE RESULT_VAR_NAME ENABLE_LTO ANALYZE_CODE_COVERAGE DEPLOYMENT_VERSION_IOS)
@@ -104,7 +104,7 @@ function(_add_variant_c_compile_link_flags)
     "${oneValueArgs}"
     ""
     ${ARGN})
-  
+
   set(result
     ${${CFLAGS_RESULT_VAR_NAME}}
     "-target" "${SWIFT_SDK_${CFLAGS_SDK}_ARCH_${CFLAGS_ARCH}_TRIPLE}")
@@ -446,6 +446,7 @@ endfunction()
 #   _add_swift_library_single(
 #     target
 #     name
+#     [MODULE_TARGET]
 #     [SHARED]
 #     [STATIC]
 #     [SDK sdk]
@@ -473,6 +474,9 @@ endfunction()
 #
 # name
 #   Name of the library (e.g., swiftParse).
+#
+# MODULE_TARGET
+#   Name of the module target (e.g., swiftParse-swiftmodule-IOS-armv7).
 #
 # SHARED
 #   Build a shared library.
@@ -543,7 +547,7 @@ function(_add_swift_library_single target name)
       API_NOTES_NON_OVERLAY DONT_EMBED_BITCODE)
   cmake_parse_arguments(SWIFTLIB_SINGLE
     "${SWIFTLIB_SINGLE_options}"
-    "SDK;ARCHITECTURE;INSTALL_IN_COMPONENT;DEPLOYMENT_VERSION_IOS"
+    "MODULE_TARGET;SDK;ARCHITECTURE;INSTALL_IN_COMPONENT;DEPLOYMENT_VERSION_IOS"
     "DEPENDS;LINK_LIBRARIES;FRAMEWORK_DEPENDS;FRAMEWORK_DEPENDS_WEAK;LLVM_COMPONENT_DEPENDS;C_COMPILE_FLAGS;SWIFT_COMPILE_FLAGS;LINK_FLAGS;PRIVATE_LINK_LIBRARIES;INTERFACE_LINK_LIBRARIES;INCORPORATE_OBJECT_LIBRARIES;FILE_DEPENDS"
     ${ARGN})
 
@@ -682,6 +686,7 @@ function(_add_swift_library_single target name)
   # just any swiftmodule files that are associated with them.
   handle_swift_sources(
       swift_object_dependency_target
+      swift_module_dependency_target
       SWIFTLIB_SINGLE_SOURCES
       SWIFTLIB_SINGLE_EXTERNAL_SOURCES ${name}
       DEPENDS
@@ -699,6 +704,13 @@ function(_add_swift_library_single target name)
       ${SWIFTLIB_SINGLE_IS_SDK_OVERLAY_keyword}
       INSTALL_IN_COMPONENT "${SWIFTLIB_INSTALL_IN_COMPONENT}")
   add_swift_source_group("${SWIFTLIB_SINGLE_EXTERNAL_SOURCES}")
+
+  # If there were any swift sources, then a .swiftmodule may have been created.
+  # If that is the case, then add a target which is an alias of the module files.
+  if(NOT "${SWIFTLIB_SINGLE_MODULE_TARGET}" STREQUAL "" AND NOT "${swift_module_dependency_target}" STREQUAL "")
+    add_custom_target("${SWIFTLIB_SINGLE_MODULE_TARGET}"
+                      DEPENDS ${swift_module_dependency_target})
+  endif()
 
   set(VARIANT_SUFFIX "-${SWIFT_SDK_${SWIFTLIB_SINGLE_SDK}_LIB_SUBDIR}-${SWIFTLIB_SINGLE_ARCHITECTURE}")
   set(SWIFTLIB_INCORPORATED_OBJECT_LIBRARIES_EXPRESSIONS)
@@ -874,6 +886,7 @@ function(_add_swift_library_single target name)
         ${SWIFTLIB_SINGLE_DEPENDS}
         ${gyb_dependency_targets}
         "${swift_object_dependency_target}"
+        "${swift_module_dependency_target}"
         ${LLVM_COMMON_DEPENDS})
 
   # HACK: On some systems or build directory setups, CMake will not find static
@@ -1297,12 +1310,12 @@ function(add_swift_library name)
     message(FATAL_ERROR
         "Either SHARED, STATIC, or OBJECT_LIBRARY must be specified")
   endif()
-  
+
   if(SWIFTLIB_TARGET_LIBRARY)
     if(NOT SWIFT_BUILD_RUNTIME_WITH_HOST_COMPILER)
       list(APPEND SWIFTLIB_DEPENDS clang)
     endif()
-    
+
     # If we are building this library for targets, loop through the various
     # SDKs building the variants of this library.
     list_intersect(
@@ -1320,6 +1333,8 @@ function(add_swift_library name)
         # Configure variables for this subdirectory.
         set(VARIANT_SUFFIX "-${SWIFT_SDK_${sdk}_LIB_SUBDIR}-${arch}")
         set(VARIANT_NAME "${name}${VARIANT_SUFFIX}")
+        set(MODULE_VARIANT_SUFFIX "-swiftmodule${VARIANT_SUFFIX}")
+        set(MODULE_VARIANT_NAME "${name}${MODULE_VARIANT_SUFFIX}")
 
         # Map dependencies over to the appropriate variants.
         set(swiftlib_link_libraries)
@@ -1352,23 +1367,17 @@ function(add_swift_library name)
               ${SWIFTLIB_SWIFT_MODULE_DEPENDS_LINUX})
         endif()
 
+        # Swift compiles depend on swift modules, while links depend on
+        # linked libraries.  Find targets for both of these here.
         set(swiftlib_module_dependency_targets)
+        set(swiftlib_private_link_libraries_targets)
         foreach(mod ${swiftlib_module_depends_flattened})
           list(APPEND swiftlib_module_dependency_targets
+              "swift${mod}${MODULE_VARIANT_SUFFIX}")
+          list(APPEND swiftlib_private_link_libraries_targets
               "swift${mod}${VARIANT_SUFFIX}")
         endforeach()
 
-        set(swiftlib_framework_depends_flattened ${SWIFTLIB_FRAMEWORK_DEPENDS})
-        if("${sdk}" STREQUAL "OSX")
-          list(APPEND swiftlib_framework_depends_flattened
-              ${SWIFTLIB_FRAMEWORK_DEPENDS_OSX})
-        elseif("${sdk}" STREQUAL "IOS" OR "${sdk}" STREQUAL "IOS_SIMULATOR" OR "${sdk}" STREQUAL "TVOS" OR "${sdk}" STREQUAL "TVOS_SIMULATOR")
-          list(APPEND swiftlib_framework_depends_flattened
-              ${SWIFTLIB_FRAMEWORK_DEPENDS_IOS_TVOS})
-        endif()
-
-        set(swiftlib_private_link_libraries_targets
-            ${swiftlib_module_dependency_targets})
         foreach(lib ${SWIFTLIB_PRIVATE_LINK_LIBRARIES})
           if("${lib}" STREQUAL "ICU_UC")
             list(APPEND swiftlib_private_link_libraries_targets
@@ -1383,6 +1392,15 @@ function(add_swift_library name)
             list(APPEND swiftlib_private_link_libraries_targets "${lib}")
           endif()
         endforeach()
+
+        set(swiftlib_framework_depends_flattened ${SWIFTLIB_FRAMEWORK_DEPENDS})
+        if("${sdk}" STREQUAL "OSX")
+          list(APPEND swiftlib_framework_depends_flattened
+              ${SWIFTLIB_FRAMEWORK_DEPENDS_OSX})
+        elseif("${sdk}" STREQUAL "IOS" OR "${sdk}" STREQUAL "IOS_SIMULATOR" OR "${sdk}" STREQUAL "TVOS" OR "${sdk}" STREQUAL "TVOS_SIMULATOR")
+          list(APPEND swiftlib_framework_depends_flattened
+              ${SWIFTLIB_FRAMEWORK_DEPENDS_IOS_TVOS})
+        endif()
 
         # Collect compiler flags
         set(swiftlib_swift_compile_flags_all ${SWIFTLIB_SWIFT_COMPILE_FLAGS})
@@ -1421,6 +1439,7 @@ function(add_swift_library name)
           ${SWIFTLIB_STATIC_keyword}
           ${SWIFTLIB_OBJECT_LIBRARY_keyword}
           ${SWIFTLIB_SOURCES}
+          MODULE_TARGET ${MODULE_VARIANT_NAME}
           SDK ${sdk}
           ARCHITECTURE ${arch}
           DEPENDS ${SWIFTLIB_DEPENDS}
@@ -1675,7 +1694,7 @@ function(_add_swift_executable_single name)
   # Determine compiler flags.
   set(c_compile_flags)
   set(link_flags)
-  
+
   # Add variant-specific flags.
   _add_variant_c_compile_flags(
     SDK "${SWIFTEXE_SINGLE_SDK}"
@@ -1730,6 +1749,7 @@ function(_add_swift_executable_single name)
 
   handle_swift_sources(
       dependency_target
+      unused_module_dependency_target
       SWIFTEXE_SINGLE_SOURCES SWIFTEXE_SINGLE_EXTERNAL_SOURCES ${name}
       DEPENDS
         ${SWIFTEXE_SINGLE_DEPENDS}

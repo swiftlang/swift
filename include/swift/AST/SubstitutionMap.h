@@ -34,10 +34,12 @@
 
 namespace swift {
 
+class SubstitutableType;
+
 class SubstitutionMap {
   using ParentType = std::pair<CanType, AssociatedTypeDecl *>;
 
-  llvm::DenseMap<TypeBase *, Type> subMap;
+  llvm::DenseMap<SubstitutableType *, Type> subMap;
   llvm::DenseMap<TypeBase *, ArrayRef<ProtocolConformanceRef>> conformanceMap;
   llvm::DenseMap<TypeBase *, SmallVector<ParentType, 1>> parentMap;
 
@@ -52,9 +54,12 @@ public:
   Optional<ProtocolConformanceRef>
   lookupConformance(CanType type, ProtocolDecl *proto) const;
 
-  const llvm::DenseMap<TypeBase *, Type> &getMap() const {
+  const llvm::DenseMap<SubstitutableType *, Type> &getMap() const {
     return subMap;
   }
+
+  /// Retrieve the conformances for the given type.
+  ArrayRef<ProtocolConformanceRef> getConformances(CanType type) const;
 
   void addSubstitution(CanType type, Type replacement);
 
@@ -62,8 +67,6 @@ public:
 
   void addParent(CanType type, CanType parent,
                  AssociatedTypeDecl *assocType);
-
-  void removeType(CanType type);
 };
 
 } // end namespace swift

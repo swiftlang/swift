@@ -3224,9 +3224,16 @@
               ],
               "children": [
                 {
-                  "kind": "TypeNominal",
+                  "kind": "TypeNameAlias",
                   "name": "Void",
-                  "printedName": "Void"
+                  "printedName": "Void",
+                  "children": [
+                    {
+                      "kind": "TypeNominal",
+                      "name": "Void",
+                      "printedName": "()"
+                    }
+                  ]
                 },
                 {
                   "kind": "TypeNominal",
@@ -4808,9 +4815,16 @@
           "moduleName": "Swift",
           "children": [
             {
-              "kind": "TypeNominal",
+              "kind": "TypeNameAlias",
               "name": "UIntMax",
-              "printedName": "UIntMax"
+              "printedName": "UIntMax",
+              "children": [
+                {
+                  "kind": "TypeNominal",
+                  "name": "UInt64",
+                  "printedName": "UInt64"
+                }
+              ]
             }
           ]
         },
@@ -4824,9 +4838,16 @@
           "moduleName": "Swift",
           "children": [
             {
-              "kind": "TypeNominal",
+              "kind": "TypeNameAlias",
               "name": "IntMax",
-              "printedName": "IntMax"
+              "printedName": "IntMax",
+              "children": [
+                {
+                  "kind": "TypeNominal",
+                  "name": "Int64",
+                  "printedName": "Int64"
+                }
+              ]
             }
           ]
         },
@@ -9083,9 +9104,16 @@
           "moduleName": "Swift",
           "children": [
             {
-              "kind": "TypeNominal",
+              "kind": "TypeNameAlias",
               "name": "UIntMax",
-              "printedName": "UIntMax"
+              "printedName": "UIntMax",
+              "children": [
+                {
+                  "kind": "TypeNominal",
+                  "name": "UInt64",
+                  "printedName": "UInt64"
+                }
+              ]
             }
           ]
         },
@@ -9099,9 +9127,16 @@
           "moduleName": "Swift",
           "children": [
             {
-              "kind": "TypeNominal",
+              "kind": "TypeNameAlias",
               "name": "IntMax",
-              "printedName": "IntMax"
+              "printedName": "IntMax",
+              "children": [
+                {
+                  "kind": "TypeNominal",
+                  "name": "Int64",
+                  "printedName": "Int64"
+                }
+              ]
             }
           ]
         },
@@ -12023,9 +12058,16 @@
           "moduleName": "Swift",
           "children": [
             {
-              "kind": "TypeNominal",
+              "kind": "TypeNameAlias",
               "name": "IntMax",
-              "printedName": "IntMax"
+              "printedName": "IntMax",
+              "children": [
+                {
+                  "kind": "TypeNominal",
+                  "name": "Int64",
+                  "printedName": "Int64"
+                }
+              ]
             }
           ]
         },
@@ -12051,9 +12093,16 @@
               ]
             },
             {
-              "kind": "TypeNominal",
+              "kind": "TypeNameAlias",
               "name": "IntMax",
-              "printedName": "IntMax"
+              "printedName": "IntMax",
+              "children": [
+                {
+                  "kind": "TypeNominal",
+                  "name": "Int64",
+                  "printedName": "Int64"
+                }
+              ]
             }
           ]
         },
@@ -12545,9 +12594,16 @@
           "moduleName": "Swift",
           "children": [
             {
-              "kind": "TypeNominal",
+              "kind": "TypeNameAlias",
               "name": "Index",
-              "printedName": "EmptyCollection.Index"
+              "printedName": "EmptyCollection.Index",
+              "children": [
+                {
+                  "kind": "TypeNominal",
+                  "name": "Int",
+                  "printedName": "Int"
+                }
+              ]
             },
             {
               "kind": "Getter",
@@ -12559,9 +12615,16 @@
               "moduleName": "Swift",
               "children": [
                 {
-                  "kind": "TypeNominal",
+                  "kind": "TypeNameAlias",
                   "name": "Index",
-                  "printedName": "EmptyCollection.Index"
+                  "printedName": "EmptyCollection.Index",
+                  "children": [
+                    {
+                      "kind": "TypeNominal",
+                      "name": "Int",
+                      "printedName": "Int"
+                    }
+                  ]
                 },
                 {
                   "kind": "TypeNominal",
@@ -12589,9 +12652,16 @@
           "moduleName": "Swift",
           "children": [
             {
-              "kind": "TypeNominal",
+              "kind": "TypeNameAlias",
               "name": "Index",
-              "printedName": "EmptyCollection.Index"
+              "printedName": "EmptyCollection.Index",
+              "children": [
+                {
+                  "kind": "TypeNominal",
+                  "name": "Int",
+                  "printedName": "Int"
+                }
+              ]
             },
             {
               "kind": "Getter",
@@ -12603,9 +12673,16 @@
               "moduleName": "Swift",
               "children": [
                 {
-                  "kind": "TypeNominal",
+                  "kind": "TypeNameAlias",
                   "name": "Index",
-                  "printedName": "EmptyCollection.Index"
+                  "printedName": "EmptyCollection.Index",
+                  "children": [
+                    {
+                      "kind": "TypeNominal",
+                      "name": "Int",
+                      "printedName": "Int"
+                    }
+                  ]
                 },
                 {
                   "kind": "TypeNominal",
@@ -12633,14 +12710,28 @@
           "moduleName": "Swift",
           "children": [
             {
-              "kind": "TypeNominal",
+              "kind": "TypeNameAlias",
               "name": "Index",
-              "printedName": "EmptyCollection.Index"
+              "printedName": "EmptyCollection.Index",
+              "children": [
+                {
+                  "kind": "TypeNominal",
+                  "name": "Int",
+                  "printedName": "Int"
+                }
+              ]
             },
             {
-              "kind": "TypeNominal",
+              "kind": "TypeNameAlias",
               "name": "Index",
-              "printedName": "EmptyCollection.Index"
+              "printedName": "EmptyCollection.Index",
+              "children": [
+                {
+                  "kind": "TypeNominal",
+                  "name": "Int",
+                  "printedName": "Int"
+                }
+              ]
             }
           ]
         },
@@ -12654,14 +12745,28 @@
           "moduleName": "Swift",
           "children": [
             {
-              "kind": "TypeNominal",
+              "kind": "TypeNameAlias",
               "name": "Index",
-              "printedName": "EmptyCollection.Index"
+              "printedName": "EmptyCollection.Index",
+              "children": [
+                {
+                  "kind": "TypeNominal",
+                  "name": "Int",
+                  "printedName": "Int"
+                }
+              ]
             },
             {
-              "kind": "TypeNominal",
+              "kind": "TypeNameAlias",
               "name": "Index",
-              "printedName": "EmptyCollection.Index"
+              "printedName": "EmptyCollection.Index",
+              "children": [
+                {
+                  "kind": "TypeNominal",
+                  "name": "Int",
+                  "printedName": "Int"
+                }
+              ]
             }
           ]
         },
@@ -12742,19 +12847,40 @@
           "moduleName": "Swift",
           "children": [
             {
-              "kind": "TypeNominal",
+              "kind": "TypeNameAlias",
               "name": "Index",
-              "printedName": "EmptyCollection.Index"
+              "printedName": "EmptyCollection.Index",
+              "children": [
+                {
+                  "kind": "TypeNominal",
+                  "name": "Int",
+                  "printedName": "Int"
+                }
+              ]
             },
             {
-              "kind": "TypeNominal",
+              "kind": "TypeNameAlias",
               "name": "Index",
-              "printedName": "EmptyCollection.Index"
+              "printedName": "EmptyCollection.Index",
+              "children": [
+                {
+                  "kind": "TypeNominal",
+                  "name": "Int",
+                  "printedName": "Int"
+                }
+              ]
             },
             {
-              "kind": "TypeNominal",
+              "kind": "TypeNameAlias",
               "name": "IndexDistance",
-              "printedName": "EmptyCollection.IndexDistance"
+              "printedName": "EmptyCollection.IndexDistance",
+              "children": [
+                {
+                  "kind": "TypeNominal",
+                  "name": "Int",
+                  "printedName": "Int"
+                }
+              ]
             }
           ]
         },
@@ -12773,26 +12899,54 @@
               "printedName": "EmptyCollection.Index?",
               "children": [
                 {
-                  "kind": "TypeNominal",
+                  "kind": "TypeNameAlias",
                   "name": "Index",
-                  "printedName": "EmptyCollection.Index"
+                  "printedName": "EmptyCollection.Index",
+                  "children": [
+                    {
+                      "kind": "TypeNominal",
+                      "name": "Int",
+                      "printedName": "Int"
+                    }
+                  ]
                 }
               ]
             },
             {
-              "kind": "TypeNominal",
+              "kind": "TypeNameAlias",
               "name": "Index",
-              "printedName": "EmptyCollection.Index"
+              "printedName": "EmptyCollection.Index",
+              "children": [
+                {
+                  "kind": "TypeNominal",
+                  "name": "Int",
+                  "printedName": "Int"
+                }
+              ]
             },
             {
-              "kind": "TypeNominal",
+              "kind": "TypeNameAlias",
               "name": "IndexDistance",
-              "printedName": "EmptyCollection.IndexDistance"
+              "printedName": "EmptyCollection.IndexDistance",
+              "children": [
+                {
+                  "kind": "TypeNominal",
+                  "name": "Int",
+                  "printedName": "Int"
+                }
+              ]
             },
             {
-              "kind": "TypeNominal",
+              "kind": "TypeNameAlias",
               "name": "Index",
-              "printedName": "EmptyCollection.Index"
+              "printedName": "EmptyCollection.Index",
+              "children": [
+                {
+                  "kind": "TypeNominal",
+                  "name": "Int",
+                  "printedName": "Int"
+                }
+              ]
             }
           ]
         },
@@ -12806,19 +12960,40 @@
           "moduleName": "Swift",
           "children": [
             {
-              "kind": "TypeNominal",
+              "kind": "TypeNameAlias",
               "name": "IndexDistance",
-              "printedName": "EmptyCollection.IndexDistance"
+              "printedName": "EmptyCollection.IndexDistance",
+              "children": [
+                {
+                  "kind": "TypeNominal",
+                  "name": "Int",
+                  "printedName": "Int"
+                }
+              ]
             },
             {
-              "kind": "TypeNominal",
+              "kind": "TypeNameAlias",
               "name": "Index",
-              "printedName": "EmptyCollection.Index"
+              "printedName": "EmptyCollection.Index",
+              "children": [
+                {
+                  "kind": "TypeNominal",
+                  "name": "Int",
+                  "printedName": "Int"
+                }
+              ]
             },
             {
-              "kind": "TypeNominal",
+              "kind": "TypeNameAlias",
               "name": "Index",
-              "printedName": "EmptyCollection.Index"
+              "printedName": "EmptyCollection.Index",
+              "children": [
+                {
+                  "kind": "TypeNominal",
+                  "name": "Int",
+                  "printedName": "Int"
+                }
+              ]
             }
           ]
         },
@@ -15121,9 +15296,16 @@
               "printedName": "Float"
             },
             {
-              "kind": "TypeNominal",
+              "kind": "TypeNameAlias",
               "name": "RawSignificand",
-              "printedName": "Float.RawSignificand"
+              "printedName": "Float.RawSignificand",
+              "children": [
+                {
+                  "kind": "TypeNominal",
+                  "name": "UInt32",
+                  "printedName": "UInt32"
+                }
+              ]
             },
             {
               "kind": "TypeNominal",
@@ -17110,9 +17292,16 @@
           "moduleName": "Swift",
           "children": [
             {
-              "kind": "TypeNominal",
+              "kind": "TypeNameAlias",
               "name": "UIntMax",
-              "printedName": "UIntMax"
+              "printedName": "UIntMax",
+              "children": [
+                {
+                  "kind": "TypeNominal",
+                  "name": "UInt64",
+                  "printedName": "UInt64"
+                }
+              ]
             }
           ]
         },
@@ -17126,9 +17315,16 @@
           "moduleName": "Swift",
           "children": [
             {
-              "kind": "TypeNominal",
+              "kind": "TypeNameAlias",
               "name": "IntMax",
-              "printedName": "IntMax"
+              "printedName": "IntMax",
+              "children": [
+                {
+                  "kind": "TypeNominal",
+                  "name": "Int64",
+                  "printedName": "Int64"
+                }
+              ]
             }
           ]
         },
@@ -21422,9 +21618,16 @@
               "printedName": "Double"
             },
             {
-              "kind": "TypeNominal",
+              "kind": "TypeNameAlias",
               "name": "RawSignificand",
-              "printedName": "Double.RawSignificand"
+              "printedName": "Double.RawSignificand",
+              "children": [
+                {
+                  "kind": "TypeNominal",
+                  "name": "UInt64",
+                  "printedName": "UInt64"
+                }
+              ]
             },
             {
               "kind": "TypeNominal",
@@ -26875,9 +27078,16 @@
           "moduleName": "Swift",
           "children": [
             {
-              "kind": "TypeNominal",
+              "kind": "TypeNameAlias",
               "name": "IntMax",
-              "printedName": "IntMax"
+              "printedName": "IntMax",
+              "children": [
+                {
+                  "kind": "TypeNominal",
+                  "name": "Int64",
+                  "printedName": "Int64"
+                }
+              ]
             }
           ]
         },
@@ -27938,9 +28148,16 @@
               ],
               "children": [
                 {
-                  "kind": "TypeNominal",
+                  "kind": "TypeNameAlias",
                   "name": "Void",
-                  "printedName": "Void"
+                  "printedName": "Void",
+                  "children": [
+                    {
+                      "kind": "TypeNominal",
+                      "name": "Void",
+                      "printedName": "()"
+                    }
+                  ]
                 },
                 {
                   "kind": "TypeNominal",
@@ -28670,9 +28887,16 @@
               ],
               "children": [
                 {
-                  "kind": "TypeNominal",
+                  "kind": "TypeNameAlias",
                   "name": "Void",
-                  "printedName": "Void"
+                  "printedName": "Void",
+                  "children": [
+                    {
+                      "kind": "TypeNominal",
+                      "name": "Void",
+                      "printedName": "()"
+                    }
+                  ]
                 },
                 {
                   "kind": "TypeNominal",
@@ -32975,9 +33199,16 @@
           "moduleName": "Swift",
           "children": [
             {
-              "kind": "TypeNominal",
+              "kind": "TypeNameAlias",
               "name": "IntMax",
-              "printedName": "IntMax"
+              "printedName": "IntMax",
+              "children": [
+                {
+                  "kind": "TypeNominal",
+                  "name": "Int64",
+                  "printedName": "Int64"
+                }
+              ]
             }
           ]
         },
@@ -35295,9 +35526,16 @@
           "moduleName": "Swift",
           "children": [
             {
-              "kind": "TypeNominal",
+              "kind": "TypeNameAlias",
               "name": "IntMax",
-              "printedName": "IntMax"
+              "printedName": "IntMax",
+              "children": [
+                {
+                  "kind": "TypeNominal",
+                  "name": "Int64",
+                  "printedName": "Int64"
+                }
+              ]
             }
           ]
         },
@@ -36290,9 +36528,16 @@
               ],
               "children": [
                 {
-                  "kind": "TypeNominal",
+                  "kind": "TypeNameAlias",
                   "name": "Void",
-                  "printedName": "Void"
+                  "printedName": "Void",
+                  "children": [
+                    {
+                      "kind": "TypeNominal",
+                      "name": "Void",
+                      "printedName": "()"
+                    }
+                  ]
                 },
                 {
                   "kind": "TypeNominal",
@@ -36300,9 +36545,16 @@
                   "printedName": "(UTF8.CodeUnit)",
                   "children": [
                     {
-                      "kind": "TypeNominal",
+                      "kind": "TypeNameAlias",
                       "name": "CodeUnit",
-                      "printedName": "UTF8.CodeUnit"
+                      "printedName": "UTF8.CodeUnit",
+                      "children": [
+                        {
+                          "kind": "TypeNominal",
+                          "name": "UInt8",
+                          "printedName": "UInt8"
+                        }
+                      ]
                     }
                   ]
                 }
@@ -36326,9 +36578,16 @@
               "printedName": "Bool"
             },
             {
-              "kind": "TypeNominal",
+              "kind": "TypeNameAlias",
               "name": "CodeUnit",
-              "printedName": "UTF8.CodeUnit"
+              "printedName": "UTF8.CodeUnit",
+              "children": [
+                {
+                  "kind": "TypeNominal",
+                  "name": "UInt8",
+                  "printedName": "UInt8"
+                }
+              ]
             }
           ]
         }
@@ -36524,9 +36783,16 @@
               ],
               "children": [
                 {
-                  "kind": "TypeNominal",
+                  "kind": "TypeNameAlias",
                   "name": "Void",
-                  "printedName": "Void"
+                  "printedName": "Void",
+                  "children": [
+                    {
+                      "kind": "TypeNominal",
+                      "name": "Void",
+                      "printedName": "()"
+                    }
+                  ]
                 },
                 {
                   "kind": "TypeNominal",
@@ -36534,9 +36800,16 @@
                   "printedName": "(UTF16.CodeUnit)",
                   "children": [
                     {
-                      "kind": "TypeNominal",
+                      "kind": "TypeNameAlias",
                       "name": "CodeUnit",
-                      "printedName": "UTF16.CodeUnit"
+                      "printedName": "UTF16.CodeUnit",
+                      "children": [
+                        {
+                          "kind": "TypeNominal",
+                          "name": "UInt16",
+                          "printedName": "UInt16"
+                        }
+                      ]
                     }
                   ]
                 }
@@ -36577,9 +36850,16 @@
           "static": true,
           "children": [
             {
-              "kind": "TypeNominal",
+              "kind": "TypeNameAlias",
               "name": "CodeUnit",
-              "printedName": "UTF16.CodeUnit"
+              "printedName": "UTF16.CodeUnit",
+              "children": [
+                {
+                  "kind": "TypeNominal",
+                  "name": "UInt16",
+                  "printedName": "UInt16"
+                }
+              ]
             },
             {
               "kind": "TypeNominal",
@@ -36599,9 +36879,16 @@
           "static": true,
           "children": [
             {
-              "kind": "TypeNominal",
+              "kind": "TypeNameAlias",
               "name": "CodeUnit",
-              "printedName": "UTF16.CodeUnit"
+              "printedName": "UTF16.CodeUnit",
+              "children": [
+                {
+                  "kind": "TypeNominal",
+                  "name": "UInt16",
+                  "printedName": "UInt16"
+                }
+              ]
             },
             {
               "kind": "TypeNominal",
@@ -36626,9 +36913,16 @@
               "printedName": "Bool"
             },
             {
-              "kind": "TypeNominal",
+              "kind": "TypeNameAlias",
               "name": "CodeUnit",
-              "printedName": "UTF16.CodeUnit"
+              "printedName": "UTF16.CodeUnit",
+              "children": [
+                {
+                  "kind": "TypeNominal",
+                  "name": "UInt16",
+                  "printedName": "UInt16"
+                }
+              ]
             }
           ]
         },
@@ -36648,9 +36942,16 @@
               "printedName": "Bool"
             },
             {
-              "kind": "TypeNominal",
+              "kind": "TypeNameAlias",
               "name": "CodeUnit",
-              "printedName": "UTF16.CodeUnit"
+              "printedName": "UTF16.CodeUnit",
+              "children": [
+                {
+                  "kind": "TypeNominal",
+                  "name": "UInt16",
+                  "printedName": "UInt16"
+                }
+              ]
             }
           ]
         },
@@ -37528,9 +37829,16 @@
           "moduleName": "Swift",
           "children": [
             {
-              "kind": "TypeNominal",
+              "kind": "TypeNameAlias",
               "name": "IntMax",
-              "printedName": "IntMax"
+              "printedName": "IntMax",
+              "children": [
+                {
+                  "kind": "TypeNominal",
+                  "name": "Int64",
+                  "printedName": "Int64"
+                }
+              ]
             }
           ]
         },
@@ -38516,9 +38824,16 @@
               ],
               "children": [
                 {
-                  "kind": "TypeNominal",
+                  "kind": "TypeNameAlias",
                   "name": "Void",
-                  "printedName": "Void"
+                  "printedName": "Void",
+                  "children": [
+                    {
+                      "kind": "TypeNominal",
+                      "name": "Void",
+                      "printedName": "()"
+                    }
+                  ]
                 },
                 {
                   "kind": "TypeNominal",
@@ -38526,9 +38841,16 @@
                   "printedName": "(UTF32.CodeUnit)",
                   "children": [
                     {
-                      "kind": "TypeNominal",
+                      "kind": "TypeNameAlias",
                       "name": "CodeUnit",
-                      "printedName": "UTF32.CodeUnit"
+                      "printedName": "UTF32.CodeUnit",
+                      "children": [
+                        {
+                          "kind": "TypeNominal",
+                          "name": "UInt32",
+                          "printedName": "UInt32"
+                        }
+                      ]
                     }
                   ]
                 }
@@ -38939,9 +39261,16 @@
           "moduleName": "Swift",
           "children": [
             {
-              "kind": "TypeNominal",
+              "kind": "TypeNameAlias",
               "name": "IntMax",
-              "printedName": "IntMax"
+              "printedName": "IntMax",
+              "children": [
+                {
+                  "kind": "TypeNominal",
+                  "name": "Int64",
+                  "printedName": "Int64"
+                }
+              ]
             }
           ]
         },
@@ -39095,9 +39424,16 @@
               "printedName": "AnyIndex"
             },
             {
-              "kind": "TypeNominal",
+              "kind": "TypeNameAlias",
               "name": "IntMax",
-              "printedName": "IntMax"
+              "printedName": "IntMax",
+              "children": [
+                {
+                  "kind": "TypeNominal",
+                  "name": "Int64",
+                  "printedName": "Int64"
+                }
+              ]
             }
           ]
         },
@@ -39128,9 +39464,16 @@
               "printedName": "AnyIndex"
             },
             {
-              "kind": "TypeNominal",
+              "kind": "TypeNameAlias",
               "name": "IntMax",
-              "printedName": "IntMax"
+              "printedName": "IntMax",
+              "children": [
+                {
+                  "kind": "TypeNominal",
+                  "name": "Int64",
+                  "printedName": "Int64"
+                }
+              ]
             },
             {
               "kind": "TypeNominal",
@@ -39159,9 +39502,16 @@
               "printedName": "inout AnyIndex"
             },
             {
-              "kind": "TypeNominal",
+              "kind": "TypeNameAlias",
               "name": "IntMax",
-              "printedName": "IntMax"
+              "printedName": "IntMax",
+              "children": [
+                {
+                  "kind": "TypeNominal",
+                  "name": "Int64",
+                  "printedName": "Int64"
+                }
+              ]
             }
           ]
         },
@@ -39185,9 +39535,16 @@
               "printedName": "inout AnyIndex"
             },
             {
-              "kind": "TypeNominal",
+              "kind": "TypeNameAlias",
               "name": "IntMax",
-              "printedName": "IntMax"
+              "printedName": "IntMax",
+              "children": [
+                {
+                  "kind": "TypeNominal",
+                  "name": "Int64",
+                  "printedName": "Int64"
+                }
+              ]
             },
             {
               "kind": "TypeNominal",
@@ -39206,9 +39563,16 @@
           "moduleName": "Swift",
           "children": [
             {
-              "kind": "TypeNominal",
+              "kind": "TypeNameAlias",
               "name": "IntMax",
-              "printedName": "IntMax"
+              "printedName": "IntMax",
+              "children": [
+                {
+                  "kind": "TypeNominal",
+                  "name": "Int64",
+                  "printedName": "Int64"
+                }
+              ]
             },
             {
               "kind": "TypeNominal",
@@ -39232,9 +39596,16 @@
           "moduleName": "Swift",
           "children": [
             {
-              "kind": "TypeNominal",
+              "kind": "TypeNameAlias",
               "name": "IntMax",
-              "printedName": "IntMax"
+              "printedName": "IntMax",
+              "children": [
+                {
+                  "kind": "TypeNominal",
+                  "name": "Int64",
+                  "printedName": "Int64"
+                }
+              ]
             },
             {
               "kind": "Getter",
@@ -39246,9 +39617,16 @@
               "moduleName": "Swift",
               "children": [
                 {
-                  "kind": "TypeNominal",
+                  "kind": "TypeNameAlias",
                   "name": "IntMax",
-                  "printedName": "IntMax"
+                  "printedName": "IntMax",
+                  "children": [
+                    {
+                      "kind": "TypeNominal",
+                      "name": "Int64",
+                      "printedName": "Int64"
+                    }
+                  ]
                 },
                 {
                   "kind": "TypeNominal",
@@ -39593,9 +39971,16 @@
               ],
               "children": [
                 {
-                  "kind": "TypeNominal",
+                  "kind": "TypeNameAlias",
                   "name": "Void",
-                  "printedName": "Void"
+                  "printedName": "Void",
+                  "children": [
+                    {
+                      "kind": "TypeNominal",
+                      "name": "Void",
+                      "printedName": "()"
+                    }
+                  ]
                 },
                 {
                   "kind": "TypeNominal",
@@ -40525,9 +40910,16 @@
           "moduleName": "Swift",
           "children": [
             {
-              "kind": "TypeNominal",
+              "kind": "TypeNameAlias",
               "name": "IntMax",
-              "printedName": "IntMax"
+              "printedName": "IntMax",
+              "children": [
+                {
+                  "kind": "TypeNominal",
+                  "name": "Int64",
+                  "printedName": "Int64"
+                }
+              ]
             }
           ]
         },
@@ -40553,9 +40945,16 @@
               ]
             },
             {
-              "kind": "TypeNominal",
+              "kind": "TypeNameAlias",
               "name": "IntMax",
-              "printedName": "IntMax"
+              "printedName": "IntMax",
+              "children": [
+                {
+                  "kind": "TypeNominal",
+                  "name": "Int64",
+                  "printedName": "Int64"
+                }
+              ]
             }
           ]
         }
@@ -43168,9 +43567,16 @@
           "moduleName": "Swift",
           "children": [
             {
-              "kind": "TypeNominal",
+              "kind": "TypeNameAlias",
               "name": "IntMax",
-              "printedName": "IntMax"
+              "printedName": "IntMax",
+              "children": [
+                {
+                  "kind": "TypeNominal",
+                  "name": "Int64",
+                  "printedName": "Int64"
+                }
+              ]
             }
           ]
         }
@@ -45006,9 +45412,16 @@
           ],
           "children": [
             {
-              "kind": "TypeNominal",
+              "kind": "TypeNameAlias",
               "name": "Void",
-              "printedName": "Void"
+              "printedName": "Void",
+              "children": [
+                {
+                  "kind": "TypeNominal",
+                  "name": "Void",
+                  "printedName": "()"
+                }
+              ]
             },
             {
               "kind": "TypeNominal",
@@ -46121,9 +46534,16 @@
               ],
               "children": [
                 {
-                  "kind": "TypeNominal",
+                  "kind": "TypeNameAlias",
                   "name": "Void",
-                  "printedName": "Void"
+                  "printedName": "Void",
+                  "children": [
+                    {
+                      "kind": "TypeNominal",
+                      "name": "Void",
+                      "printedName": "()"
+                    }
+                  ]
                 },
                 {
                   "kind": "TypeNominal",
@@ -46554,9 +46974,35 @@
               "printedName": "AnyCollection<Mirror.Child>",
               "children": [
                 {
-                  "kind": "TypeNominal",
+                  "kind": "TypeNameAlias",
                   "name": "Child",
-                  "printedName": "Mirror.Child"
+                  "printedName": "Mirror.Child",
+                  "children": [
+                    {
+                      "kind": "TypeNominal",
+                      "name": "Tuple",
+                      "printedName": "(label: Optional<String>, value: Any)",
+                      "children": [
+                        {
+                          "kind": "TypeNominal",
+                          "name": "Optional",
+                          "printedName": "Optional<String>",
+                          "children": [
+                            {
+                              "kind": "TypeNominal",
+                              "name": "String",
+                              "printedName": "String"
+                            }
+                          ]
+                        },
+                        {
+                          "kind": "TypeNominal",
+                          "name": "ProtocolComposition",
+                          "printedName": "Any"
+                        }
+                      ]
+                    }
+                  ]
                 }
               ]
             }
@@ -47134,9 +47580,42 @@
           "moduleName": "Swift",
           "children": [
             {
-              "kind": "TypeNominal",
+              "kind": "TypeNameAlias",
               "name": "Children",
-              "printedName": "Mirror.Children"
+              "printedName": "Mirror.Children",
+              "children": [
+                {
+                  "kind": "TypeNominal",
+                  "name": "AnyCollection",
+                  "printedName": "AnyCollection<(label: Optional<String>, value: Any)>",
+                  "children": [
+                    {
+                      "kind": "TypeNominal",
+                      "name": "Tuple",
+                      "printedName": "(label: Optional<String>, value: Any)",
+                      "children": [
+                        {
+                          "kind": "TypeNominal",
+                          "name": "Optional",
+                          "printedName": "Optional<String>",
+                          "children": [
+                            {
+                              "kind": "TypeNominal",
+                              "name": "String",
+                              "printedName": "String"
+                            }
+                          ]
+                        },
+                        {
+                          "kind": "TypeNominal",
+                          "name": "ProtocolComposition",
+                          "printedName": "Any"
+                        }
+                      ]
+                    }
+                  ]
+                }
+              ]
             },
             {
               "kind": "Getter",
@@ -47148,9 +47627,42 @@
               "moduleName": "Swift",
               "children": [
                 {
-                  "kind": "TypeNominal",
+                  "kind": "TypeNameAlias",
                   "name": "Children",
-                  "printedName": "Mirror.Children"
+                  "printedName": "Mirror.Children",
+                  "children": [
+                    {
+                      "kind": "TypeNominal",
+                      "name": "AnyCollection",
+                      "printedName": "AnyCollection<(label: Optional<String>, value: Any)>",
+                      "children": [
+                        {
+                          "kind": "TypeNominal",
+                          "name": "Tuple",
+                          "printedName": "(label: Optional<String>, value: Any)",
+                          "children": [
+                            {
+                              "kind": "TypeNominal",
+                              "name": "Optional",
+                              "printedName": "Optional<String>",
+                              "children": [
+                                {
+                                  "kind": "TypeNominal",
+                                  "name": "String",
+                                  "printedName": "String"
+                                }
+                              ]
+                            },
+                            {
+                              "kind": "TypeNominal",
+                              "name": "ProtocolComposition",
+                              "printedName": "Any"
+                            }
+                          ]
+                        }
+                      ]
+                    }
+                  ]
                 },
                 {
                   "kind": "TypeNominal",
@@ -47323,9 +47835,23 @@
               "printedName": "AnyObject"
             },
             {
-              "kind": "TypeNominal",
+              "kind": "TypeNameAlias",
               "name": "AnyClass",
-              "printedName": "AnyClass"
+              "printedName": "AnyClass",
+              "children": [
+                {
+                  "kind": "TypeNominal",
+                  "name": "ExistentialMetatype",
+                  "printedName": "AnyObject.Type",
+                  "children": [
+                    {
+                      "kind": "TypeNominal",
+                      "name": "AnyObject",
+                      "printedName": "AnyObject"
+                    }
+                  ]
+                }
+              ]
             },
             {
               "kind": "TypeNominal",
@@ -47743,9 +48269,16 @@
               "printedName": "OpaquePointer"
             },
             {
-              "kind": "TypeNominal",
+              "kind": "TypeNameAlias",
               "name": "RawPointer",
-              "printedName": "RawPointer"
+              "printedName": "RawPointer",
+              "children": [
+                {
+                  "kind": "TypeNominal",
+                  "name": "BuiltinRawPointer",
+                  "printedName": "Builtin.RawPointer"
+                }
+              ]
             }
           ]
         },
@@ -48806,9 +49339,16 @@
                       "printedName": "(Float32)",
                       "children": [
                         {
-                          "kind": "TypeNominal",
+                          "kind": "TypeNameAlias",
                           "name": "Float32",
-                          "printedName": "Float32"
+                          "printedName": "Float32",
+                          "children": [
+                            {
+                              "kind": "TypeNominal",
+                              "name": "Float",
+                              "printedName": "Float"
+                            }
+                          ]
                         }
                       ]
                     }
@@ -48860,9 +49400,16 @@
                       "printedName": "(Float64)",
                       "children": [
                         {
-                          "kind": "TypeNominal",
+                          "kind": "TypeNameAlias",
                           "name": "Float64",
-                          "printedName": "Float64"
+                          "printedName": "Float64",
+                          "children": [
+                            {
+                              "kind": "TypeNominal",
+                              "name": "Double",
+                              "printedName": "Double"
+                            }
+                          ]
                         }
                       ]
                     }
@@ -49184,24 +49731,52 @@
                       "printedName": "(Float64, Float64, Float64, Float64)",
                       "children": [
                         {
-                          "kind": "TypeNominal",
+                          "kind": "TypeNameAlias",
                           "name": "Float64",
-                          "printedName": "Float64"
+                          "printedName": "Float64",
+                          "children": [
+                            {
+                              "kind": "TypeNominal",
+                              "name": "Double",
+                              "printedName": "Double"
+                            }
+                          ]
                         },
                         {
-                          "kind": "TypeNominal",
+                          "kind": "TypeNameAlias",
                           "name": "Float64",
-                          "printedName": "Float64"
+                          "printedName": "Float64",
+                          "children": [
+                            {
+                              "kind": "TypeNominal",
+                              "name": "Double",
+                              "printedName": "Double"
+                            }
+                          ]
                         },
                         {
-                          "kind": "TypeNominal",
+                          "kind": "TypeNameAlias",
                           "name": "Float64",
-                          "printedName": "Float64"
+                          "printedName": "Float64",
+                          "children": [
+                            {
+                              "kind": "TypeNominal",
+                              "name": "Double",
+                              "printedName": "Double"
+                            }
+                          ]
                         },
                         {
-                          "kind": "TypeNominal",
+                          "kind": "TypeNameAlias",
                           "name": "Float64",
-                          "printedName": "Float64"
+                          "printedName": "Float64",
+                          "children": [
+                            {
+                              "kind": "TypeNominal",
+                              "name": "Double",
+                              "printedName": "Double"
+                            }
+                          ]
                         }
                       ]
                     }
@@ -49253,14 +49828,28 @@
                       "printedName": "(Float64, Float64)",
                       "children": [
                         {
-                          "kind": "TypeNominal",
+                          "kind": "TypeNameAlias",
                           "name": "Float64",
-                          "printedName": "Float64"
+                          "printedName": "Float64",
+                          "children": [
+                            {
+                              "kind": "TypeNominal",
+                              "name": "Double",
+                              "printedName": "Double"
+                            }
+                          ]
                         },
                         {
-                          "kind": "TypeNominal",
+                          "kind": "TypeNameAlias",
                           "name": "Float64",
-                          "printedName": "Float64"
+                          "printedName": "Float64",
+                          "children": [
+                            {
+                              "kind": "TypeNominal",
+                              "name": "Double",
+                              "printedName": "Double"
+                            }
+                          ]
                         }
                       ]
                     }
@@ -49312,14 +49901,28 @@
                       "printedName": "(Float64, Float64)",
                       "children": [
                         {
-                          "kind": "TypeNominal",
+                          "kind": "TypeNameAlias",
                           "name": "Float64",
-                          "printedName": "Float64"
+                          "printedName": "Float64",
+                          "children": [
+                            {
+                              "kind": "TypeNominal",
+                              "name": "Double",
+                              "printedName": "Double"
+                            }
+                          ]
                         },
                         {
-                          "kind": "TypeNominal",
+                          "kind": "TypeNameAlias",
                           "name": "Float64",
-                          "printedName": "Float64"
+                          "printedName": "Float64",
+                          "children": [
+                            {
+                              "kind": "TypeNominal",
+                              "name": "Double",
+                              "printedName": "Double"
+                            }
+                          ]
                         }
                       ]
                     }
@@ -50468,9 +51071,16 @@
               ],
               "children": [
                 {
-                  "kind": "TypeNominal",
+                  "kind": "TypeNameAlias",
                   "name": "Void",
-                  "printedName": "Void"
+                  "printedName": "Void",
+                  "children": [
+                    {
+                      "kind": "TypeNominal",
+                      "name": "Void",
+                      "printedName": "()"
+                    }
+                  ]
                 },
                 {
                   "kind": "TypeNominal",
@@ -51413,9 +52023,23 @@
               ]
             },
             {
-              "kind": "TypeNominal",
+              "kind": "TypeNameAlias",
               "name": "AnyClass",
-              "printedName": "AnyClass"
+              "printedName": "AnyClass",
+              "children": [
+                {
+                  "kind": "TypeNominal",
+                  "name": "ExistentialMetatype",
+                  "printedName": "AnyObject.Type",
+                  "children": [
+                    {
+                      "kind": "TypeNominal",
+                      "name": "AnyObject",
+                      "printedName": "AnyObject"
+                    }
+                  ]
+                }
+              ]
             },
             {
               "kind": "TypeNominal",
@@ -51894,9 +52518,23 @@
               ]
             },
             {
-              "kind": "TypeNominal",
+              "kind": "TypeNameAlias",
               "name": "AnyClass",
-              "printedName": "AnyClass"
+              "printedName": "AnyClass",
+              "children": [
+                {
+                  "kind": "TypeNominal",
+                  "name": "ExistentialMetatype",
+                  "printedName": "AnyObject.Type",
+                  "children": [
+                    {
+                      "kind": "TypeNominal",
+                      "name": "AnyObject",
+                      "printedName": "AnyObject"
+                    }
+                  ]
+                }
+              ]
             },
             {
               "kind": "TypeNominal",
@@ -56677,9 +57315,16 @@
           "moduleName": "Swift",
           "children": [
             {
-              "kind": "TypeNominal",
+              "kind": "TypeNameAlias",
               "name": "Index",
-              "printedName": "Repeated.Index"
+              "printedName": "Repeated.Index",
+              "children": [
+                {
+                  "kind": "TypeNominal",
+                  "name": "Int",
+                  "printedName": "Int"
+                }
+              ]
             },
             {
               "kind": "Getter",
@@ -56691,9 +57336,16 @@
               "moduleName": "Swift",
               "children": [
                 {
-                  "kind": "TypeNominal",
+                  "kind": "TypeNameAlias",
                   "name": "Index",
-                  "printedName": "Repeated.Index"
+                  "printedName": "Repeated.Index",
+                  "children": [
+                    {
+                      "kind": "TypeNominal",
+                      "name": "Int",
+                      "printedName": "Int"
+                    }
+                  ]
                 },
                 {
                   "kind": "TypeNominal",
@@ -56721,9 +57373,16 @@
           "moduleName": "Swift",
           "children": [
             {
-              "kind": "TypeNominal",
+              "kind": "TypeNameAlias",
               "name": "Index",
-              "printedName": "Repeated.Index"
+              "printedName": "Repeated.Index",
+              "children": [
+                {
+                  "kind": "TypeNominal",
+                  "name": "Int",
+                  "printedName": "Int"
+                }
+              ]
             },
             {
               "kind": "Getter",
@@ -56735,9 +57394,16 @@
               "moduleName": "Swift",
               "children": [
                 {
-                  "kind": "TypeNominal",
+                  "kind": "TypeNameAlias",
                   "name": "Index",
-                  "printedName": "Repeated.Index"
+                  "printedName": "Repeated.Index",
+                  "children": [
+                    {
+                      "kind": "TypeNominal",
+                      "name": "Int",
+                      "printedName": "Int"
+                    }
+                  ]
                 },
                 {
                   "kind": "TypeNominal",
@@ -57551,9 +58217,16 @@
           "moduleName": "Swift",
           "children": [
             {
-              "kind": "TypeNominal",
+              "kind": "TypeNameAlias",
               "name": "IntMax",
-              "printedName": "IntMax"
+              "printedName": "IntMax",
+              "children": [
+                {
+                  "kind": "TypeNominal",
+                  "name": "Int64",
+                  "printedName": "Int64"
+                }
+              ]
             }
           ]
         },
@@ -58494,9 +59167,16 @@
           "moduleName": "Swift",
           "children": [
             {
-              "kind": "TypeNominal",
+              "kind": "TypeNameAlias",
               "name": "UIntMax",
-              "printedName": "UIntMax"
+              "printedName": "UIntMax",
+              "children": [
+                {
+                  "kind": "TypeNominal",
+                  "name": "UInt64",
+                  "printedName": "UInt64"
+                }
+              ]
             }
           ]
         },
@@ -58522,9 +59202,16 @@
               ]
             },
             {
-              "kind": "TypeNominal",
+              "kind": "TypeNameAlias",
               "name": "UIntMax",
-              "printedName": "UIntMax"
+              "printedName": "UIntMax",
+              "children": [
+                {
+                  "kind": "TypeNominal",
+                  "name": "UInt64",
+                  "printedName": "UInt64"
+                }
+              ]
             }
           ]
         },
@@ -61975,9 +62662,16 @@
           "moduleName": "Swift",
           "children": [
             {
-              "kind": "TypeNominal",
+              "kind": "TypeNameAlias",
               "name": "UIntMax",
-              "printedName": "UIntMax"
+              "printedName": "UIntMax",
+              "children": [
+                {
+                  "kind": "TypeNominal",
+                  "name": "UInt64",
+                  "printedName": "UInt64"
+                }
+              ]
             }
           ]
         },
@@ -61991,9 +62685,16 @@
           "moduleName": "Swift",
           "children": [
             {
-              "kind": "TypeNominal",
+              "kind": "TypeNameAlias",
               "name": "IntMax",
-              "printedName": "IntMax"
+              "printedName": "IntMax",
+              "children": [
+                {
+                  "kind": "TypeNominal",
+                  "name": "Int64",
+                  "printedName": "Int64"
+                }
+              ]
             }
           ]
         },
@@ -63796,9 +64497,16 @@
               ],
               "children": [
                 {
-                  "kind": "TypeNominal",
+                  "kind": "TypeNameAlias",
                   "name": "Void",
-                  "printedName": "Void"
+                  "printedName": "Void",
+                  "children": [
+                    {
+                      "kind": "TypeNominal",
+                      "name": "Void",
+                      "printedName": "()"
+                    }
+                  ]
                 },
                 {
                   "kind": "TypeNominal",
@@ -73836,9 +74544,16 @@
           "moduleName": "Swift",
           "children": [
             {
-              "kind": "TypeNominal",
+              "kind": "TypeNameAlias",
               "name": "IntMax",
-              "printedName": "IntMax"
+              "printedName": "IntMax",
+              "children": [
+                {
+                  "kind": "TypeNominal",
+                  "name": "Int64",
+                  "printedName": "Int64"
+                }
+              ]
             }
           ]
         },
@@ -73992,9 +74707,16 @@
               "printedName": "AnyIndex"
             },
             {
-              "kind": "TypeNominal",
+              "kind": "TypeNameAlias",
               "name": "IntMax",
-              "printedName": "IntMax"
+              "printedName": "IntMax",
+              "children": [
+                {
+                  "kind": "TypeNominal",
+                  "name": "Int64",
+                  "printedName": "Int64"
+                }
+              ]
             }
           ]
         },
@@ -74025,9 +74747,16 @@
               "printedName": "AnyIndex"
             },
             {
-              "kind": "TypeNominal",
+              "kind": "TypeNameAlias",
               "name": "IntMax",
-              "printedName": "IntMax"
+              "printedName": "IntMax",
+              "children": [
+                {
+                  "kind": "TypeNominal",
+                  "name": "Int64",
+                  "printedName": "Int64"
+                }
+              ]
             },
             {
               "kind": "TypeNominal",
@@ -74056,9 +74785,16 @@
               "printedName": "inout AnyIndex"
             },
             {
-              "kind": "TypeNominal",
+              "kind": "TypeNameAlias",
               "name": "IntMax",
-              "printedName": "IntMax"
+              "printedName": "IntMax",
+              "children": [
+                {
+                  "kind": "TypeNominal",
+                  "name": "Int64",
+                  "printedName": "Int64"
+                }
+              ]
             }
           ]
         },
@@ -74082,9 +74818,16 @@
               "printedName": "inout AnyIndex"
             },
             {
-              "kind": "TypeNominal",
+              "kind": "TypeNameAlias",
               "name": "IntMax",
-              "printedName": "IntMax"
+              "printedName": "IntMax",
+              "children": [
+                {
+                  "kind": "TypeNominal",
+                  "name": "Int64",
+                  "printedName": "Int64"
+                }
+              ]
             },
             {
               "kind": "TypeNominal",
@@ -74103,9 +74846,16 @@
           "moduleName": "Swift",
           "children": [
             {
-              "kind": "TypeNominal",
+              "kind": "TypeNameAlias",
               "name": "IntMax",
-              "printedName": "IntMax"
+              "printedName": "IntMax",
+              "children": [
+                {
+                  "kind": "TypeNominal",
+                  "name": "Int64",
+                  "printedName": "Int64"
+                }
+              ]
             },
             {
               "kind": "TypeNominal",
@@ -74129,9 +74879,16 @@
           "moduleName": "Swift",
           "children": [
             {
-              "kind": "TypeNominal",
+              "kind": "TypeNameAlias",
               "name": "IntMax",
-              "printedName": "IntMax"
+              "printedName": "IntMax",
+              "children": [
+                {
+                  "kind": "TypeNominal",
+                  "name": "Int64",
+                  "printedName": "Int64"
+                }
+              ]
             },
             {
               "kind": "Getter",
@@ -74143,9 +74900,16 @@
               "moduleName": "Swift",
               "children": [
                 {
-                  "kind": "TypeNominal",
+                  "kind": "TypeNameAlias",
                   "name": "IntMax",
-                  "printedName": "IntMax"
+                  "printedName": "IntMax",
+                  "children": [
+                    {
+                      "kind": "TypeNominal",
+                      "name": "Int64",
+                      "printedName": "Int64"
+                    }
+                  ]
                 },
                 {
                   "kind": "TypeNominal",
@@ -74590,9 +75354,16 @@
               ],
               "children": [
                 {
-                  "kind": "TypeNominal",
+                  "kind": "TypeNameAlias",
                   "name": "Void",
-                  "printedName": "Void"
+                  "printedName": "Void",
+                  "children": [
+                    {
+                      "kind": "TypeNominal",
+                      "name": "Void",
+                      "printedName": "()"
+                    }
+                  ]
                 },
                 {
                   "kind": "TypeNominal",
@@ -75701,9 +76472,16 @@
               "printedName": "Float80"
             },
             {
-              "kind": "TypeNominal",
+              "kind": "TypeNameAlias",
               "name": "RawSignificand",
-              "printedName": "Float80.RawSignificand"
+              "printedName": "Float80.RawSignificand",
+              "children": [
+                {
+                  "kind": "TypeNominal",
+                  "name": "UInt64",
+                  "printedName": "UInt64"
+                }
+              ]
             },
             {
               "kind": "TypeNominal",
@@ -80641,9 +81419,23 @@
           "moduleName": "Swift",
           "children": [
             {
-              "kind": "TypeNominal",
+              "kind": "TypeNameAlias",
               "name": "Indices",
-              "printedName": "UnsafeBufferPointer.Indices"
+              "printedName": "UnsafeBufferPointer.Indices",
+              "children": [
+                {
+                  "kind": "TypeNominal",
+                  "name": "CountableRange",
+                  "printedName": "CountableRange<Int>",
+                  "children": [
+                    {
+                      "kind": "TypeNominal",
+                      "name": "Int",
+                      "printedName": "Int"
+                    }
+                  ]
+                }
+              ]
             },
             {
               "kind": "Getter",
@@ -80655,9 +81447,23 @@
               "moduleName": "Swift",
               "children": [
                 {
-                  "kind": "TypeNominal",
+                  "kind": "TypeNameAlias",
                   "name": "Indices",
-                  "printedName": "UnsafeBufferPointer.Indices"
+                  "printedName": "UnsafeBufferPointer.Indices",
+                  "children": [
+                    {
+                      "kind": "TypeNominal",
+                      "name": "CountableRange",
+                      "printedName": "CountableRange<Int>",
+                      "children": [
+                        {
+                          "kind": "TypeNominal",
+                          "name": "Int",
+                          "printedName": "Int"
+                        }
+                      ]
+                    }
+                  ]
                 },
                 {
                   "kind": "TypeNominal",
@@ -81735,9 +82541,23 @@
           "moduleName": "Swift",
           "children": [
             {
-              "kind": "TypeNominal",
+              "kind": "TypeNameAlias",
               "name": "Indices",
-              "printedName": "UnsafeMutableBufferPointer.Indices"
+              "printedName": "UnsafeMutableBufferPointer.Indices",
+              "children": [
+                {
+                  "kind": "TypeNominal",
+                  "name": "CountableRange",
+                  "printedName": "CountableRange<Int>",
+                  "children": [
+                    {
+                      "kind": "TypeNominal",
+                      "name": "Int",
+                      "printedName": "Int"
+                    }
+                  ]
+                }
+              ]
             },
             {
               "kind": "Getter",
@@ -81749,9 +82569,23 @@
               "moduleName": "Swift",
               "children": [
                 {
-                  "kind": "TypeNominal",
+                  "kind": "TypeNameAlias",
                   "name": "Indices",
-                  "printedName": "UnsafeMutableBufferPointer.Indices"
+                  "printedName": "UnsafeMutableBufferPointer.Indices",
+                  "children": [
+                    {
+                      "kind": "TypeNominal",
+                      "name": "CountableRange",
+                      "printedName": "CountableRange<Int>",
+                      "children": [
+                        {
+                          "kind": "TypeNominal",
+                          "name": "Int",
+                          "printedName": "Int"
+                        }
+                      ]
+                    }
+                  ]
                 },
                 {
                   "kind": "TypeNominal",
@@ -87291,9 +88125,16 @@
                       ]
                     },
                     {
-                      "kind": "TypeNominal",
+                      "kind": "TypeNameAlias",
                       "name": "UTF8Index",
-                      "printedName": "String.UTF8Index"
+                      "printedName": "String.UTF8Index",
+                      "children": [
+                        {
+                          "kind": "TypeNominal",
+                          "name": "Index",
+                          "printedName": "String.UTF8View.Index"
+                        }
+                      ]
                     },
                     {
                       "kind": "TypeNominal",
@@ -87317,9 +88158,16 @@
                       "printedName": "String.UTF16View.Index"
                     },
                     {
-                      "kind": "TypeNominal",
+                      "kind": "TypeNameAlias",
                       "name": "UnicodeScalarIndex",
-                      "printedName": "String.UnicodeScalarIndex"
+                      "printedName": "String.UnicodeScalarIndex",
+                      "children": [
+                        {
+                          "kind": "TypeNominal",
+                          "name": "Index",
+                          "printedName": "String.UnicodeScalarView.Index"
+                        }
+                      ]
                     },
                     {
                       "kind": "TypeNominal",
@@ -87343,9 +88191,16 @@
                       "printedName": "String.UTF16View.Index"
                     },
                     {
-                      "kind": "TypeNominal",
+                      "kind": "TypeNameAlias",
                       "name": "Index",
-                      "printedName": "String.Index"
+                      "printedName": "String.Index",
+                      "children": [
+                        {
+                          "kind": "TypeNominal",
+                          "name": "Index",
+                          "printedName": "String.CharacterView.Index"
+                        }
+                      ]
                     },
                     {
                       "kind": "TypeNominal",
@@ -87397,9 +88252,16 @@
                       "printedName": "String.UnicodeScalarIndex?",
                       "children": [
                         {
-                          "kind": "TypeNominal",
+                          "kind": "TypeNameAlias",
                           "name": "UnicodeScalarIndex",
-                          "printedName": "String.UnicodeScalarIndex"
+                          "printedName": "String.UnicodeScalarIndex",
+                          "children": [
+                            {
+                              "kind": "TypeNominal",
+                              "name": "Index",
+                              "printedName": "String.UnicodeScalarView.Index"
+                            }
+                          ]
                         }
                       ]
                     },
@@ -87425,9 +88287,16 @@
                       "printedName": "String.Index?",
                       "children": [
                         {
-                          "kind": "TypeNominal",
+                          "kind": "TypeNameAlias",
                           "name": "Index",
-                          "printedName": "String.Index"
+                          "printedName": "String.Index",
+                          "children": [
+                            {
+                              "kind": "TypeNominal",
+                              "name": "Index",
+                              "printedName": "String.CharacterView.Index"
+                            }
+                          ]
                         }
                       ]
                     },
@@ -87565,9 +88434,16 @@
                   "moduleName": "Swift",
                   "children": [
                     {
-                      "kind": "TypeNominal",
+                      "kind": "TypeNameAlias",
                       "name": "IndexDistance",
-                      "printedName": "String.UTF16View.IndexDistance"
+                      "printedName": "String.UTF16View.IndexDistance",
+                      "children": [
+                        {
+                          "kind": "TypeNominal",
+                          "name": "Int",
+                          "printedName": "Int"
+                        }
+                      ]
                     }
                   ]
                 },
@@ -87613,9 +88489,16 @@
                   "moduleName": "Swift",
                   "children": [
                     {
-                      "kind": "TypeNominal",
+                      "kind": "TypeNameAlias",
                       "name": "Index",
-                      "printedName": "String.UTF16View.Indices.Index"
+                      "printedName": "String.UTF16View.Indices.Index",
+                      "children": [
+                        {
+                          "kind": "TypeNominal",
+                          "name": "Index",
+                          "printedName": "String.UTF16View.Index"
+                        }
+                      ]
                     },
                     {
                       "kind": "Getter",
@@ -87627,9 +88510,16 @@
                       "moduleName": "Swift",
                       "children": [
                         {
-                          "kind": "TypeNominal",
+                          "kind": "TypeNameAlias",
                           "name": "Index",
-                          "printedName": "String.UTF16View.Indices.Index"
+                          "printedName": "String.UTF16View.Indices.Index",
+                          "children": [
+                            {
+                              "kind": "TypeNominal",
+                              "name": "Index",
+                              "printedName": "String.UTF16View.Index"
+                            }
+                          ]
                         },
                         {
                           "kind": "TypeNominal",
@@ -87650,9 +88540,16 @@
                   "moduleName": "Swift",
                   "children": [
                     {
-                      "kind": "TypeNominal",
+                      "kind": "TypeNameAlias",
                       "name": "Index",
-                      "printedName": "String.UTF16View.Indices.Index"
+                      "printedName": "String.UTF16View.Indices.Index",
+                      "children": [
+                        {
+                          "kind": "TypeNominal",
+                          "name": "Index",
+                          "printedName": "String.UTF16View.Index"
+                        }
+                      ]
                     },
                     {
                       "kind": "Getter",
@@ -87664,9 +88561,16 @@
                       "moduleName": "Swift",
                       "children": [
                         {
-                          "kind": "TypeNominal",
+                          "kind": "TypeNameAlias",
                           "name": "Index",
-                          "printedName": "String.UTF16View.Indices.Index"
+                          "printedName": "String.UTF16View.Indices.Index",
+                          "children": [
+                            {
+                              "kind": "TypeNominal",
+                              "name": "Index",
+                              "printedName": "String.UTF16View.Index"
+                            }
+                          ]
                         },
                         {
                           "kind": "TypeNominal",
@@ -87687,9 +88591,16 @@
                   "moduleName": "Swift",
                   "children": [
                     {
-                      "kind": "TypeNominal",
+                      "kind": "TypeNameAlias",
                       "name": "Indices",
-                      "printedName": "String.UTF16View.Indices.Indices"
+                      "printedName": "String.UTF16View.Indices.Indices",
+                      "children": [
+                        {
+                          "kind": "TypeNominal",
+                          "name": "Indices",
+                          "printedName": "String.UTF16View.Indices"
+                        }
+                      ]
                     },
                     {
                       "kind": "Getter",
@@ -87701,9 +88612,16 @@
                       "moduleName": "Swift",
                       "children": [
                         {
-                          "kind": "TypeNominal",
+                          "kind": "TypeNameAlias",
                           "name": "Indices",
-                          "printedName": "String.UTF16View.Indices.Indices"
+                          "printedName": "String.UTF16View.Indices.Indices",
+                          "children": [
+                            {
+                              "kind": "TypeNominal",
+                              "name": "Indices",
+                              "printedName": "String.UTF16View.Indices"
+                            }
+                          ]
                         },
                         {
                           "kind": "TypeNominal",
@@ -87724,14 +88642,28 @@
                   "moduleName": "Swift",
                   "children": [
                     {
-                      "kind": "TypeNominal",
+                      "kind": "TypeNameAlias",
                       "name": "Index",
-                      "printedName": "String.UTF16View.Indices.Index"
+                      "printedName": "String.UTF16View.Indices.Index",
+                      "children": [
+                        {
+                          "kind": "TypeNominal",
+                          "name": "Index",
+                          "printedName": "String.UTF16View.Index"
+                        }
+                      ]
                     },
                     {
-                      "kind": "TypeNominal",
+                      "kind": "TypeNameAlias",
                       "name": "Index",
-                      "printedName": "String.UTF16View.Indices.Index"
+                      "printedName": "String.UTF16View.Indices.Index",
+                      "children": [
+                        {
+                          "kind": "TypeNominal",
+                          "name": "Index",
+                          "printedName": "String.UTF16View.Index"
+                        }
+                      ]
                     }
                   ]
                 },
@@ -87766,14 +88698,28 @@
                   "moduleName": "Swift",
                   "children": [
                     {
-                      "kind": "TypeNominal",
+                      "kind": "TypeNameAlias",
                       "name": "Index",
-                      "printedName": "String.UTF16View.Indices.Index"
+                      "printedName": "String.UTF16View.Indices.Index",
+                      "children": [
+                        {
+                          "kind": "TypeNominal",
+                          "name": "Index",
+                          "printedName": "String.UTF16View.Index"
+                        }
+                      ]
                     },
                     {
-                      "kind": "TypeNominal",
+                      "kind": "TypeNameAlias",
                       "name": "Index",
-                      "printedName": "String.UTF16View.Indices.Index"
+                      "printedName": "String.UTF16View.Indices.Index",
+                      "children": [
+                        {
+                          "kind": "TypeNominal",
+                          "name": "Index",
+                          "printedName": "String.UTF16View.Index"
+                        }
+                      ]
                     }
                   ]
                 },
@@ -87808,19 +88754,40 @@
                   "moduleName": "Swift",
                   "children": [
                     {
-                      "kind": "TypeNominal",
+                      "kind": "TypeNameAlias",
                       "name": "Index",
-                      "printedName": "String.UTF16View.Indices.Index"
+                      "printedName": "String.UTF16View.Indices.Index",
+                      "children": [
+                        {
+                          "kind": "TypeNominal",
+                          "name": "Index",
+                          "printedName": "String.UTF16View.Index"
+                        }
+                      ]
                     },
                     {
-                      "kind": "TypeNominal",
+                      "kind": "TypeNameAlias",
                       "name": "Index",
-                      "printedName": "String.UTF16View.Indices.Index"
+                      "printedName": "String.UTF16View.Indices.Index",
+                      "children": [
+                        {
+                          "kind": "TypeNominal",
+                          "name": "Index",
+                          "printedName": "String.UTF16View.Index"
+                        }
+                      ]
                     },
                     {
-                      "kind": "TypeNominal",
+                      "kind": "TypeNameAlias",
                       "name": "IndexDistance",
-                      "printedName": "String.UTF16View.Indices.IndexDistance"
+                      "printedName": "String.UTF16View.Indices.IndexDistance",
+                      "children": [
+                        {
+                          "kind": "TypeNominal",
+                          "name": "Int",
+                          "printedName": "Int"
+                        }
+                      ]
                     }
                   ]
                 },
@@ -87839,26 +88806,54 @@
                       "printedName": "String.UTF16View.Indices.Index?",
                       "children": [
                         {
-                          "kind": "TypeNominal",
+                          "kind": "TypeNameAlias",
                           "name": "Index",
-                          "printedName": "String.UTF16View.Indices.Index"
+                          "printedName": "String.UTF16View.Indices.Index",
+                          "children": [
+                            {
+                              "kind": "TypeNominal",
+                              "name": "Index",
+                              "printedName": "String.UTF16View.Index"
+                            }
+                          ]
                         }
                       ]
                     },
                     {
-                      "kind": "TypeNominal",
+                      "kind": "TypeNameAlias",
                       "name": "Index",
-                      "printedName": "String.UTF16View.Indices.Index"
+                      "printedName": "String.UTF16View.Indices.Index",
+                      "children": [
+                        {
+                          "kind": "TypeNominal",
+                          "name": "Index",
+                          "printedName": "String.UTF16View.Index"
+                        }
+                      ]
                     },
                     {
-                      "kind": "TypeNominal",
+                      "kind": "TypeNameAlias",
                       "name": "IndexDistance",
-                      "printedName": "String.UTF16View.Indices.IndexDistance"
+                      "printedName": "String.UTF16View.Indices.IndexDistance",
+                      "children": [
+                        {
+                          "kind": "TypeNominal",
+                          "name": "Int",
+                          "printedName": "Int"
+                        }
+                      ]
                     },
                     {
-                      "kind": "TypeNominal",
+                      "kind": "TypeNameAlias",
                       "name": "Index",
-                      "printedName": "String.UTF16View.Indices.Index"
+                      "printedName": "String.UTF16View.Indices.Index",
+                      "children": [
+                        {
+                          "kind": "TypeNominal",
+                          "name": "Index",
+                          "printedName": "String.UTF16View.Index"
+                        }
+                      ]
                     }
                   ]
                 },
@@ -87872,19 +88867,40 @@
                   "moduleName": "Swift",
                   "children": [
                     {
-                      "kind": "TypeNominal",
+                      "kind": "TypeNameAlias",
                       "name": "IndexDistance",
-                      "printedName": "String.UTF16View.Indices.IndexDistance"
+                      "printedName": "String.UTF16View.Indices.IndexDistance",
+                      "children": [
+                        {
+                          "kind": "TypeNominal",
+                          "name": "Int",
+                          "printedName": "Int"
+                        }
+                      ]
                     },
                     {
-                      "kind": "TypeNominal",
+                      "kind": "TypeNameAlias",
                       "name": "Index",
-                      "printedName": "String.UTF16View.Indices.Index"
+                      "printedName": "String.UTF16View.Indices.Index",
+                      "children": [
+                        {
+                          "kind": "TypeNominal",
+                          "name": "Index",
+                          "printedName": "String.UTF16View.Index"
+                        }
+                      ]
                     },
                     {
-                      "kind": "TypeNominal",
+                      "kind": "TypeNameAlias",
                       "name": "Index",
-                      "printedName": "String.UTF16View.Indices.Index"
+                      "printedName": "String.UTF16View.Indices.Index",
+                      "children": [
+                        {
+                          "kind": "TypeNominal",
+                          "name": "Index",
+                          "printedName": "String.UTF16View.Index"
+                        }
+                      ]
                     }
                   ]
                 },
@@ -88012,9 +89028,16 @@
                   "printedName": "String.UTF16View.Index"
                 },
                 {
-                  "kind": "TypeNominal",
+                  "kind": "TypeNameAlias",
                   "name": "IndexDistance",
-                  "printedName": "String.UTF16View.IndexDistance"
+                  "printedName": "String.UTF16View.IndexDistance",
+                  "children": [
+                    {
+                      "kind": "TypeNominal",
+                      "name": "Int",
+                      "printedName": "Int"
+                    }
+                  ]
                 }
               ]
             },
@@ -88045,9 +89068,16 @@
                   "printedName": "String.UTF16View.Index"
                 },
                 {
-                  "kind": "TypeNominal",
+                  "kind": "TypeNameAlias",
                   "name": "IndexDistance",
-                  "printedName": "String.UTF16View.IndexDistance"
+                  "printedName": "String.UTF16View.IndexDistance",
+                  "children": [
+                    {
+                      "kind": "TypeNominal",
+                      "name": "Int",
+                      "printedName": "Int"
+                    }
+                  ]
                 },
                 {
                   "kind": "TypeNominal",
@@ -88066,9 +89096,16 @@
               "moduleName": "Swift",
               "children": [
                 {
-                  "kind": "TypeNominal",
+                  "kind": "TypeNameAlias",
                   "name": "IndexDistance",
-                  "printedName": "String.UTF16View.IndexDistance"
+                  "printedName": "String.UTF16View.IndexDistance",
+                  "children": [
+                    {
+                      "kind": "TypeNominal",
+                      "name": "Int",
+                      "printedName": "Int"
+                    }
+                  ]
                 },
                 {
                   "kind": "TypeNominal",
@@ -88419,9 +89456,16 @@
                       ]
                     },
                     {
-                      "kind": "TypeNominal",
+                      "kind": "TypeNameAlias",
                       "name": "UTF16Index",
-                      "printedName": "String.UTF16Index"
+                      "printedName": "String.UTF16Index",
+                      "children": [
+                        {
+                          "kind": "TypeNominal",
+                          "name": "Index",
+                          "printedName": "String.UTF16View.Index"
+                        }
+                      ]
                     },
                     {
                       "kind": "TypeNominal",
@@ -88445,9 +89489,16 @@
                       "printedName": "String.UTF8View.Index"
                     },
                     {
-                      "kind": "TypeNominal",
+                      "kind": "TypeNameAlias",
                       "name": "UnicodeScalarIndex",
-                      "printedName": "String.UnicodeScalarIndex"
+                      "printedName": "String.UnicodeScalarIndex",
+                      "children": [
+                        {
+                          "kind": "TypeNominal",
+                          "name": "Index",
+                          "printedName": "String.UnicodeScalarView.Index"
+                        }
+                      ]
                     },
                     {
                       "kind": "TypeNominal",
@@ -88471,9 +89522,16 @@
                       "printedName": "String.UTF8View.Index"
                     },
                     {
-                      "kind": "TypeNominal",
+                      "kind": "TypeNameAlias",
                       "name": "Index",
-                      "printedName": "String.Index"
+                      "printedName": "String.Index",
+                      "children": [
+                        {
+                          "kind": "TypeNominal",
+                          "name": "Index",
+                          "printedName": "String.CharacterView.Index"
+                        }
+                      ]
                     },
                     {
                       "kind": "TypeNominal",
@@ -88525,9 +89583,16 @@
                       "printedName": "String.UnicodeScalarIndex?",
                       "children": [
                         {
-                          "kind": "TypeNominal",
+                          "kind": "TypeNameAlias",
                           "name": "UnicodeScalarIndex",
-                          "printedName": "String.UnicodeScalarIndex"
+                          "printedName": "String.UnicodeScalarIndex",
+                          "children": [
+                            {
+                              "kind": "TypeNominal",
+                              "name": "Index",
+                              "printedName": "String.UnicodeScalarView.Index"
+                            }
+                          ]
                         }
                       ]
                     },
@@ -88553,9 +89618,16 @@
                       "printedName": "String.Index?",
                       "children": [
                         {
-                          "kind": "TypeNominal",
+                          "kind": "TypeNameAlias",
                           "name": "Index",
-                          "printedName": "String.Index"
+                          "printedName": "String.Index",
+                          "children": [
+                            {
+                              "kind": "TypeNominal",
+                              "name": "Index",
+                              "printedName": "String.CharacterView.Index"
+                            }
+                          ]
                         }
                       ]
                     },
@@ -88970,9 +90042,16 @@
               "printedName": "ContiguousArray<CChar>",
               "children": [
                 {
-                  "kind": "TypeNominal",
+                  "kind": "TypeNameAlias",
                   "name": "CChar",
-                  "printedName": "CChar"
+                  "printedName": "CChar",
+                  "children": [
+                    {
+                      "kind": "TypeNominal",
+                      "name": "Int8",
+                      "printedName": "Int8"
+                    }
+                  ]
                 }
               ]
             },
@@ -88991,9 +90070,16 @@
                   "printedName": "ContiguousArray<CChar>",
                   "children": [
                     {
-                      "kind": "TypeNominal",
+                      "kind": "TypeNameAlias",
                       "name": "CChar",
-                      "printedName": "CChar"
+                      "printedName": "CChar",
+                      "children": [
+                        {
+                          "kind": "TypeNominal",
+                          "name": "Int8",
+                          "printedName": "Int8"
+                        }
+                      ]
                     }
                   ]
                 },
@@ -89141,16 +90227,30 @@
                       "printedName": "String.Index?",
                       "children": [
                         {
-                          "kind": "TypeNominal",
+                          "kind": "TypeNameAlias",
                           "name": "Index",
-                          "printedName": "String.Index"
+                          "printedName": "String.Index",
+                          "children": [
+                            {
+                              "kind": "TypeNominal",
+                              "name": "Index",
+                              "printedName": "String.CharacterView.Index"
+                            }
+                          ]
                         }
                       ]
                     },
                     {
-                      "kind": "TypeNominal",
+                      "kind": "TypeNameAlias",
                       "name": "UnicodeScalarIndex",
-                      "printedName": "String.UnicodeScalarIndex"
+                      "printedName": "String.UnicodeScalarIndex",
+                      "children": [
+                        {
+                          "kind": "TypeNominal",
+                          "name": "Index",
+                          "printedName": "String.UnicodeScalarView.Index"
+                        }
+                      ]
                     },
                     {
                       "kind": "TypeNominal",
@@ -89174,16 +90274,30 @@
                       "printedName": "String.Index?",
                       "children": [
                         {
-                          "kind": "TypeNominal",
+                          "kind": "TypeNameAlias",
                           "name": "Index",
-                          "printedName": "String.Index"
+                          "printedName": "String.Index",
+                          "children": [
+                            {
+                              "kind": "TypeNominal",
+                              "name": "Index",
+                              "printedName": "String.CharacterView.Index"
+                            }
+                          ]
                         }
                       ]
                     },
                     {
-                      "kind": "TypeNominal",
+                      "kind": "TypeNameAlias",
                       "name": "UTF16Index",
-                      "printedName": "String.UTF16Index"
+                      "printedName": "String.UTF16Index",
+                      "children": [
+                        {
+                          "kind": "TypeNominal",
+                          "name": "Index",
+                          "printedName": "String.UTF16View.Index"
+                        }
+                      ]
                     },
                     {
                       "kind": "TypeNominal",
@@ -89207,16 +90321,30 @@
                       "printedName": "String.Index?",
                       "children": [
                         {
-                          "kind": "TypeNominal",
+                          "kind": "TypeNameAlias",
                           "name": "Index",
-                          "printedName": "String.Index"
+                          "printedName": "String.Index",
+                          "children": [
+                            {
+                              "kind": "TypeNominal",
+                              "name": "Index",
+                              "printedName": "String.CharacterView.Index"
+                            }
+                          ]
                         }
                       ]
                     },
                     {
-                      "kind": "TypeNominal",
+                      "kind": "TypeNameAlias",
                       "name": "UTF8Index",
-                      "printedName": "String.UTF8Index"
+                      "printedName": "String.UTF8Index",
+                      "children": [
+                        {
+                          "kind": "TypeNominal",
+                          "name": "Index",
+                          "printedName": "String.UTF8View.Index"
+                        }
+                      ]
                     },
                     {
                       "kind": "TypeNominal",
@@ -89814,9 +90942,16 @@
               "printedName": "UnsafePointer<CChar>",
               "children": [
                 {
-                  "kind": "TypeNominal",
+                  "kind": "TypeNameAlias",
                   "name": "CChar",
-                  "printedName": "CChar"
+                  "printedName": "CChar",
+                  "children": [
+                    {
+                      "kind": "TypeNominal",
+                      "name": "Int8",
+                      "printedName": "Int8"
+                    }
+                  ]
                 }
               ]
             }
@@ -89877,9 +91012,16 @@
               "printedName": "UnsafePointer<CChar>",
               "children": [
                 {
-                  "kind": "TypeNominal",
+                  "kind": "TypeNameAlias",
                   "name": "CChar",
-                  "printedName": "CChar"
+                  "printedName": "CChar",
+                  "children": [
+                    {
+                      "kind": "TypeNominal",
+                      "name": "Int8",
+                      "printedName": "Int8"
+                    }
+                  ]
                 }
               ]
             }
@@ -90612,9 +91754,16 @@
               "printedName": "String"
             },
             {
-              "kind": "TypeNominal",
+              "kind": "TypeNameAlias",
               "name": "Float32",
-              "printedName": "Float32"
+              "printedName": "Float32",
+              "children": [
+                {
+                  "kind": "TypeNominal",
+                  "name": "Float",
+                  "printedName": "Float"
+                }
+              ]
             }
           ]
         },
@@ -90633,9 +91782,16 @@
               "printedName": "String"
             },
             {
-              "kind": "TypeNominal",
+              "kind": "TypeNameAlias",
               "name": "Float64",
-              "printedName": "Float64"
+              "printedName": "Float64",
+              "children": [
+                {
+                  "kind": "TypeNominal",
+                  "name": "Double",
+                  "printedName": "Double"
+                }
+              ]
             }
           ]
         },
@@ -91112,9 +92268,16 @@
           "moduleName": "Swift",
           "children": [
             {
-              "kind": "TypeNominal",
+              "kind": "TypeNameAlias",
               "name": "IndexDistance",
-              "printedName": "String.CharacterView.IndexDistance"
+              "printedName": "String.CharacterView.IndexDistance",
+              "children": [
+                {
+                  "kind": "TypeNominal",
+                  "name": "Int",
+                  "printedName": "Int"
+                }
+              ]
             }
           ]
         },
@@ -91128,9 +92291,16 @@
           "moduleName": "Swift",
           "children": [
             {
-              "kind": "TypeNominal",
+              "kind": "TypeNameAlias",
               "name": "Index",
-              "printedName": "String.Index"
+              "printedName": "String.Index",
+              "children": [
+                {
+                  "kind": "TypeNominal",
+                  "name": "Index",
+                  "printedName": "String.CharacterView.Index"
+                }
+              ]
             },
             {
               "kind": "Getter",
@@ -91142,9 +92312,16 @@
               "moduleName": "Swift",
               "children": [
                 {
-                  "kind": "TypeNominal",
+                  "kind": "TypeNameAlias",
                   "name": "Index",
-                  "printedName": "String.Index"
+                  "printedName": "String.Index",
+                  "children": [
+                    {
+                      "kind": "TypeNominal",
+                      "name": "Index",
+                      "printedName": "String.CharacterView.Index"
+                    }
+                  ]
                 },
                 {
                   "kind": "TypeNominal",
@@ -91165,9 +92342,16 @@
           "moduleName": "Swift",
           "children": [
             {
-              "kind": "TypeNominal",
+              "kind": "TypeNameAlias",
               "name": "Index",
-              "printedName": "String.Index"
+              "printedName": "String.Index",
+              "children": [
+                {
+                  "kind": "TypeNominal",
+                  "name": "Index",
+                  "printedName": "String.CharacterView.Index"
+                }
+              ]
             },
             {
               "kind": "Getter",
@@ -91179,9 +92363,16 @@
               "moduleName": "Swift",
               "children": [
                 {
-                  "kind": "TypeNominal",
+                  "kind": "TypeNameAlias",
                   "name": "Index",
-                  "printedName": "String.Index"
+                  "printedName": "String.Index",
+                  "children": [
+                    {
+                      "kind": "TypeNominal",
+                      "name": "Index",
+                      "printedName": "String.CharacterView.Index"
+                    }
+                  ]
                 },
                 {
                   "kind": "TypeNominal",
@@ -91202,14 +92393,28 @@
           "moduleName": "Swift",
           "children": [
             {
-              "kind": "TypeNominal",
+              "kind": "TypeNameAlias",
               "name": "Index",
-              "printedName": "String.Index"
+              "printedName": "String.Index",
+              "children": [
+                {
+                  "kind": "TypeNominal",
+                  "name": "Index",
+                  "printedName": "String.CharacterView.Index"
+                }
+              ]
             },
             {
-              "kind": "TypeNominal",
+              "kind": "TypeNameAlias",
               "name": "Index",
-              "printedName": "String.Index"
+              "printedName": "String.Index",
+              "children": [
+                {
+                  "kind": "TypeNominal",
+                  "name": "Index",
+                  "printedName": "String.CharacterView.Index"
+                }
+              ]
             }
           ]
         },
@@ -91223,14 +92428,28 @@
           "moduleName": "Swift",
           "children": [
             {
-              "kind": "TypeNominal",
+              "kind": "TypeNameAlias",
               "name": "Index",
-              "printedName": "String.Index"
+              "printedName": "String.Index",
+              "children": [
+                {
+                  "kind": "TypeNominal",
+                  "name": "Index",
+                  "printedName": "String.CharacterView.Index"
+                }
+              ]
             },
             {
-              "kind": "TypeNominal",
+              "kind": "TypeNameAlias",
               "name": "Index",
-              "printedName": "String.Index"
+              "printedName": "String.Index",
+              "children": [
+                {
+                  "kind": "TypeNominal",
+                  "name": "Index",
+                  "printedName": "String.CharacterView.Index"
+                }
+              ]
             }
           ]
         },
@@ -91244,19 +92463,40 @@
           "moduleName": "Swift",
           "children": [
             {
-              "kind": "TypeNominal",
+              "kind": "TypeNameAlias",
               "name": "Index",
-              "printedName": "String.Index"
+              "printedName": "String.Index",
+              "children": [
+                {
+                  "kind": "TypeNominal",
+                  "name": "Index",
+                  "printedName": "String.CharacterView.Index"
+                }
+              ]
             },
             {
-              "kind": "TypeNominal",
+              "kind": "TypeNameAlias",
               "name": "Index",
-              "printedName": "String.Index"
+              "printedName": "String.Index",
+              "children": [
+                {
+                  "kind": "TypeNominal",
+                  "name": "Index",
+                  "printedName": "String.CharacterView.Index"
+                }
+              ]
             },
             {
-              "kind": "TypeNominal",
+              "kind": "TypeNameAlias",
               "name": "IndexDistance",
-              "printedName": "String.IndexDistance"
+              "printedName": "String.IndexDistance",
+              "children": [
+                {
+                  "kind": "TypeNominal",
+                  "name": "Int",
+                  "printedName": "Int"
+                }
+              ]
             }
           ]
         },
@@ -91275,26 +92515,54 @@
               "printedName": "String.Index?",
               "children": [
                 {
-                  "kind": "TypeNominal",
+                  "kind": "TypeNameAlias",
                   "name": "Index",
-                  "printedName": "String.Index"
+                  "printedName": "String.Index",
+                  "children": [
+                    {
+                      "kind": "TypeNominal",
+                      "name": "Index",
+                      "printedName": "String.CharacterView.Index"
+                    }
+                  ]
                 }
               ]
             },
             {
-              "kind": "TypeNominal",
+              "kind": "TypeNameAlias",
               "name": "Index",
-              "printedName": "String.Index"
+              "printedName": "String.Index",
+              "children": [
+                {
+                  "kind": "TypeNominal",
+                  "name": "Index",
+                  "printedName": "String.CharacterView.Index"
+                }
+              ]
             },
             {
-              "kind": "TypeNominal",
+              "kind": "TypeNameAlias",
               "name": "IndexDistance",
-              "printedName": "String.IndexDistance"
+              "printedName": "String.IndexDistance",
+              "children": [
+                {
+                  "kind": "TypeNominal",
+                  "name": "Int",
+                  "printedName": "Int"
+                }
+              ]
             },
             {
-              "kind": "TypeNominal",
+              "kind": "TypeNameAlias",
               "name": "Index",
-              "printedName": "String.Index"
+              "printedName": "String.Index",
+              "children": [
+                {
+                  "kind": "TypeNominal",
+                  "name": "Index",
+                  "printedName": "String.CharacterView.Index"
+                }
+              ]
             }
           ]
         },
@@ -91308,19 +92576,40 @@
           "moduleName": "Swift",
           "children": [
             {
-              "kind": "TypeNominal",
+              "kind": "TypeNameAlias",
               "name": "IndexDistance",
-              "printedName": "String.IndexDistance"
+              "printedName": "String.IndexDistance",
+              "children": [
+                {
+                  "kind": "TypeNominal",
+                  "name": "Int",
+                  "printedName": "Int"
+                }
+              ]
             },
             {
-              "kind": "TypeNominal",
+              "kind": "TypeNameAlias",
               "name": "Index",
-              "printedName": "String.Index"
+              "printedName": "String.Index",
+              "children": [
+                {
+                  "kind": "TypeNominal",
+                  "name": "Index",
+                  "printedName": "String.CharacterView.Index"
+                }
+              ]
             },
             {
-              "kind": "TypeNominal",
+              "kind": "TypeNameAlias",
               "name": "Index",
-              "printedName": "String.Index"
+              "printedName": "String.Index",
+              "children": [
+                {
+                  "kind": "TypeNominal",
+                  "name": "Index",
+                  "printedName": "String.CharacterView.Index"
+                }
+              ]
             }
           ]
         },
@@ -91446,9 +92735,16 @@
               "printedName": "Range<String.Index>",
               "children": [
                 {
-                  "kind": "TypeNominal",
+                  "kind": "TypeNameAlias",
                   "name": "Index",
-                  "printedName": "String.Index"
+                  "printedName": "String.Index",
+                  "children": [
+                    {
+                      "kind": "TypeNominal",
+                      "name": "Index",
+                      "printedName": "String.CharacterView.Index"
+                    }
+                  ]
                 }
               ]
             },
@@ -91487,9 +92783,16 @@
               "printedName": "Range<String.Index>",
               "children": [
                 {
-                  "kind": "TypeNominal",
+                  "kind": "TypeNameAlias",
                   "name": "Index",
-                  "printedName": "String.Index"
+                  "printedName": "String.Index",
+                  "children": [
+                    {
+                      "kind": "TypeNominal",
+                      "name": "Index",
+                      "printedName": "String.CharacterView.Index"
+                    }
+                  ]
                 }
               ]
             },
@@ -91521,9 +92824,16 @@
               "printedName": "ClosedRange<String.Index>",
               "children": [
                 {
-                  "kind": "TypeNominal",
+                  "kind": "TypeNameAlias",
                   "name": "Index",
-                  "printedName": "String.Index"
+                  "printedName": "String.Index",
+                  "children": [
+                    {
+                      "kind": "TypeNominal",
+                      "name": "Index",
+                      "printedName": "String.CharacterView.Index"
+                    }
+                  ]
                 }
               ]
             },
@@ -91562,9 +92872,16 @@
               "printedName": "ClosedRange<String.Index>",
               "children": [
                 {
-                  "kind": "TypeNominal",
+                  "kind": "TypeNameAlias",
                   "name": "Index",
-                  "printedName": "String.Index"
+                  "printedName": "String.Index",
+                  "children": [
+                    {
+                      "kind": "TypeNominal",
+                      "name": "Index",
+                      "printedName": "String.CharacterView.Index"
+                    }
+                  ]
                 }
               ]
             },
@@ -91596,9 +92913,16 @@
               "printedName": "Character"
             },
             {
-              "kind": "TypeNominal",
+              "kind": "TypeNameAlias",
               "name": "Index",
-              "printedName": "String.Index"
+              "printedName": "String.Index",
+              "children": [
+                {
+                  "kind": "TypeNominal",
+                  "name": "Index",
+                  "printedName": "String.CharacterView.Index"
+                }
+              ]
             }
           ]
         },
@@ -91630,9 +92954,16 @@
               ]
             },
             {
-              "kind": "TypeNominal",
+              "kind": "TypeNameAlias",
               "name": "Index",
-              "printedName": "String.Index"
+              "printedName": "String.Index",
+              "children": [
+                {
+                  "kind": "TypeNominal",
+                  "name": "Index",
+                  "printedName": "String.CharacterView.Index"
+                }
+              ]
             }
           ]
         },
@@ -91652,9 +92983,16 @@
               "printedName": "Character"
             },
             {
-              "kind": "TypeNominal",
+              "kind": "TypeNameAlias",
               "name": "Index",
-              "printedName": "String.Index"
+              "printedName": "String.Index",
+              "children": [
+                {
+                  "kind": "TypeNominal",
+                  "name": "Index",
+                  "printedName": "String.CharacterView.Index"
+                }
+              ]
             }
           ]
         },
@@ -91679,9 +93017,16 @@
               "printedName": "Range<String.Index>",
               "children": [
                 {
-                  "kind": "TypeNominal",
+                  "kind": "TypeNameAlias",
                   "name": "Index",
-                  "printedName": "String.Index"
+                  "printedName": "String.Index",
+                  "children": [
+                    {
+                      "kind": "TypeNominal",
+                      "name": "Index",
+                      "printedName": "String.CharacterView.Index"
+                    }
+                  ]
                 }
               ]
             }
@@ -91708,9 +93053,16 @@
               "printedName": "ClosedRange<String.Index>",
               "children": [
                 {
-                  "kind": "TypeNominal",
+                  "kind": "TypeNameAlias",
                   "name": "Index",
-                  "printedName": "String.Index"
+                  "printedName": "String.Index",
+                  "children": [
+                    {
+                      "kind": "TypeNominal",
+                      "name": "Index",
+                      "printedName": "String.CharacterView.Index"
+                    }
+                  ]
                 }
               ]
             }
@@ -91771,16 +93123,30 @@
                       "printedName": "String.UnicodeScalarIndex?",
                       "children": [
                         {
-                          "kind": "TypeNominal",
+                          "kind": "TypeNameAlias",
                           "name": "UnicodeScalarIndex",
-                          "printedName": "String.UnicodeScalarIndex"
+                          "printedName": "String.UnicodeScalarIndex",
+                          "children": [
+                            {
+                              "kind": "TypeNominal",
+                              "name": "Index",
+                              "printedName": "String.UnicodeScalarView.Index"
+                            }
+                          ]
                         }
                       ]
                     },
                     {
-                      "kind": "TypeNominal",
+                      "kind": "TypeNameAlias",
                       "name": "UTF16Index",
-                      "printedName": "String.UTF16Index"
+                      "printedName": "String.UTF16Index",
+                      "children": [
+                        {
+                          "kind": "TypeNominal",
+                          "name": "Index",
+                          "printedName": "String.UTF16View.Index"
+                        }
+                      ]
                     },
                     {
                       "kind": "TypeNominal",
@@ -91804,16 +93170,30 @@
                       "printedName": "String.UnicodeScalarIndex?",
                       "children": [
                         {
-                          "kind": "TypeNominal",
+                          "kind": "TypeNameAlias",
                           "name": "UnicodeScalarIndex",
-                          "printedName": "String.UnicodeScalarIndex"
+                          "printedName": "String.UnicodeScalarIndex",
+                          "children": [
+                            {
+                              "kind": "TypeNominal",
+                              "name": "Index",
+                              "printedName": "String.UnicodeScalarView.Index"
+                            }
+                          ]
                         }
                       ]
                     },
                     {
-                      "kind": "TypeNominal",
+                      "kind": "TypeNameAlias",
                       "name": "UTF8Index",
-                      "printedName": "String.UTF8Index"
+                      "printedName": "String.UTF8Index",
+                      "children": [
+                        {
+                          "kind": "TypeNominal",
+                          "name": "Index",
+                          "printedName": "String.UTF8View.Index"
+                        }
+                      ]
                     },
                     {
                       "kind": "TypeNominal",
@@ -91832,14 +93212,28 @@
                   "moduleName": "Swift",
                   "children": [
                     {
-                      "kind": "TypeNominal",
+                      "kind": "TypeNameAlias",
                       "name": "UnicodeScalarIndex",
-                      "printedName": "String.UnicodeScalarIndex"
+                      "printedName": "String.UnicodeScalarIndex",
+                      "children": [
+                        {
+                          "kind": "TypeNominal",
+                          "name": "Index",
+                          "printedName": "String.UnicodeScalarView.Index"
+                        }
+                      ]
                     },
                     {
-                      "kind": "TypeNominal",
+                      "kind": "TypeNameAlias",
                       "name": "Index",
-                      "printedName": "String.Index"
+                      "printedName": "String.Index",
+                      "children": [
+                        {
+                          "kind": "TypeNominal",
+                          "name": "Index",
+                          "printedName": "String.CharacterView.Index"
+                        }
+                      ]
                     },
                     {
                       "kind": "TypeNominal",
@@ -91905,9 +93299,16 @@
                       "printedName": "String.Index?",
                       "children": [
                         {
-                          "kind": "TypeNominal",
+                          "kind": "TypeNameAlias",
                           "name": "Index",
-                          "printedName": "String.Index"
+                          "printedName": "String.Index",
+                          "children": [
+                            {
+                              "kind": "TypeNominal",
+                              "name": "Index",
+                              "printedName": "String.CharacterView.Index"
+                            }
+                          ]
                         }
                       ]
                     },
@@ -92806,9 +94207,16 @@
           "moduleName": "Swift",
           "children": [
             {
-              "kind": "TypeNominal",
+              "kind": "TypeNameAlias",
               "name": "IntMax",
-              "printedName": "IntMax"
+              "printedName": "IntMax",
+              "children": [
+                {
+                  "kind": "TypeNominal",
+                  "name": "Int64",
+                  "printedName": "Int64"
+                }
+              ]
             }
           ]
         },
@@ -92962,9 +94370,16 @@
               "printedName": "AnyIndex"
             },
             {
-              "kind": "TypeNominal",
+              "kind": "TypeNameAlias",
               "name": "IntMax",
-              "printedName": "IntMax"
+              "printedName": "IntMax",
+              "children": [
+                {
+                  "kind": "TypeNominal",
+                  "name": "Int64",
+                  "printedName": "Int64"
+                }
+              ]
             }
           ]
         },
@@ -92995,9 +94410,16 @@
               "printedName": "AnyIndex"
             },
             {
-              "kind": "TypeNominal",
+              "kind": "TypeNameAlias",
               "name": "IntMax",
-              "printedName": "IntMax"
+              "printedName": "IntMax",
+              "children": [
+                {
+                  "kind": "TypeNominal",
+                  "name": "Int64",
+                  "printedName": "Int64"
+                }
+              ]
             },
             {
               "kind": "TypeNominal",
@@ -93026,9 +94448,16 @@
               "printedName": "inout AnyIndex"
             },
             {
-              "kind": "TypeNominal",
+              "kind": "TypeNameAlias",
               "name": "IntMax",
-              "printedName": "IntMax"
+              "printedName": "IntMax",
+              "children": [
+                {
+                  "kind": "TypeNominal",
+                  "name": "Int64",
+                  "printedName": "Int64"
+                }
+              ]
             }
           ]
         },
@@ -93052,9 +94481,16 @@
               "printedName": "inout AnyIndex"
             },
             {
-              "kind": "TypeNominal",
+              "kind": "TypeNameAlias",
               "name": "IntMax",
-              "printedName": "IntMax"
+              "printedName": "IntMax",
+              "children": [
+                {
+                  "kind": "TypeNominal",
+                  "name": "Int64",
+                  "printedName": "Int64"
+                }
+              ]
             },
             {
               "kind": "TypeNominal",
@@ -93073,9 +94509,16 @@
           "moduleName": "Swift",
           "children": [
             {
-              "kind": "TypeNominal",
+              "kind": "TypeNameAlias",
               "name": "IntMax",
-              "printedName": "IntMax"
+              "printedName": "IntMax",
+              "children": [
+                {
+                  "kind": "TypeNominal",
+                  "name": "Int64",
+                  "printedName": "Int64"
+                }
+              ]
             },
             {
               "kind": "TypeNominal",
@@ -93099,9 +94542,16 @@
           "moduleName": "Swift",
           "children": [
             {
-              "kind": "TypeNominal",
+              "kind": "TypeNameAlias",
               "name": "IntMax",
-              "printedName": "IntMax"
+              "printedName": "IntMax",
+              "children": [
+                {
+                  "kind": "TypeNominal",
+                  "name": "Int64",
+                  "printedName": "Int64"
+                }
+              ]
             },
             {
               "kind": "Getter",
@@ -93113,9 +94563,16 @@
               "moduleName": "Swift",
               "children": [
                 {
-                  "kind": "TypeNominal",
+                  "kind": "TypeNameAlias",
                   "name": "IntMax",
-                  "printedName": "IntMax"
+                  "printedName": "IntMax",
+                  "children": [
+                    {
+                      "kind": "TypeNominal",
+                      "name": "Int64",
+                      "printedName": "Int64"
+                    }
+                  ]
                 },
                 {
                   "kind": "TypeNominal",
@@ -93560,9 +95017,16 @@
               ],
               "children": [
                 {
-                  "kind": "TypeNominal",
+                  "kind": "TypeNameAlias",
                   "name": "Void",
-                  "printedName": "Void"
+                  "printedName": "Void",
+                  "children": [
+                    {
+                      "kind": "TypeNominal",
+                      "name": "Void",
+                      "printedName": "()"
+                    }
+                  ]
                 },
                 {
                   "kind": "TypeNominal",
@@ -98195,9 +99659,16 @@
               "printedName": "StaticString"
             },
             {
-              "kind": "TypeNominal",
+              "kind": "TypeNameAlias",
               "name": "Int32",
-              "printedName": "Int32"
+              "printedName": "Int32",
+              "children": [
+                {
+                  "kind": "TypeNominal",
+                  "name": "BuiltinInteger",
+                  "printedName": "Builtin.Int32"
+                }
+              ]
             }
           ]
         },
@@ -99093,9 +100564,16 @@
           "moduleName": "Swift",
           "children": [
             {
-              "kind": "TypeNominal",
+              "kind": "TypeNameAlias",
               "name": "UIntMax",
-              "printedName": "UIntMax"
+              "printedName": "UIntMax",
+              "children": [
+                {
+                  "kind": "TypeNominal",
+                  "name": "UInt64",
+                  "printedName": "UInt64"
+                }
+              ]
             }
           ]
         },
@@ -99109,9 +100587,16 @@
           "moduleName": "Swift",
           "children": [
             {
-              "kind": "TypeNominal",
+              "kind": "TypeNameAlias",
               "name": "IntMax",
-              "printedName": "IntMax"
+              "printedName": "IntMax",
+              "children": [
+                {
+                  "kind": "TypeNominal",
+                  "name": "Int64",
+                  "printedName": "Int64"
+                }
+              ]
             }
           ]
         },
@@ -100010,9 +101495,16 @@
               "printedName": "Bool"
             },
             {
-              "kind": "TypeNominal",
+              "kind": "TypeNameAlias",
               "name": "Int1",
-              "printedName": "Int1"
+              "printedName": "Int1",
+              "children": [
+                {
+                  "kind": "TypeNominal",
+                  "name": "BuiltinInteger",
+                  "printedName": "Builtin.Int1"
+                }
+              ]
             }
           ]
         },

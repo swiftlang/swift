@@ -270,10 +270,10 @@ past that, so:
 
 1. Generate an output file map that contains all the per-file outputs you care
    about. Most likely this is just the object files and incremental build
-   dependency files; everything else is an intermediate. (There should probably 
+   dependency files; everything else is an intermediate. (There should probably
    be a tool that does this, perhaps built on what the package manager does.)
 
-2. Set TMPDIR to somewhere you don't mind uninteresting intermediate files 
+2. Set TMPDIR to somewhere you don't mind uninteresting intermediate files
    going.
 
 3. Do one of the following:

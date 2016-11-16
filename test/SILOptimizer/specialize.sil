@@ -1,4 +1,4 @@
-// RUN: %target-sil-opt -enable-sil-verify-all -generic-specializer %s | %FileCheck %s
+// RUN: %target-sil-opt -assume-parsing-unqualified-ownership-sil -enable-sil-verify-all -generic-specializer %s | %FileCheck %s
 
 sil_stage canonical
 
@@ -166,7 +166,7 @@ bb0(%0 : $*T):
   debug_value_addr %0 : $*T, let, name "t" // id: %1
   // function_ref specialize.(getGenericClosure <A>(t : A) -> () -> A).(tmp #1) (())A
   %2 = function_ref @_TFF10specialize17getGenericClosureU__FT1tQ__FT_Q_L_3tmpfT_Q_ : $@convention(thin) <τ_0_0> (@owned @box τ_0_0) -> @out τ_0_0 // user: %5
-  %3 = alloc_box $T                               // users: %4, %5, %5
+  %3 = alloc_box $@box T                               // users: %4, %5, %5
   %3a = project_box %3 : $@box T, 0
   copy_addr %0 to [initialization] %3a : $*T     // id: %4
   %5 = partial_apply %2<T>(%3) : $@convention(thin) <τ_0_0> (@owned @box τ_0_0) -> @out τ_0_0 // user: %7
@@ -296,7 +296,7 @@ bb0(%0 : $*U):
   debug_value_addr %0 : $*U, let, name "y" // id: %1
   // function_ref test4.(boo <A : test4.P, B>(A) -> (Swift.Int32, B) -> Swift.Int32).(closure #1)
   %2 = function_ref @_TFF5test43booUS_1P___FQ_FTVs5Int32Q0__S1_U_FTS1_Q0__S1_ : $@convention(thin) <τ_0_0, τ_0_1 where τ_0_0 : P> (Int32, @in τ_0_1, @owned @box τ_0_0) -> Int32 // user: %5
-  %3 = alloc_box $U                               // users: %4, %5, %5
+  %3 = alloc_box $@box U                               // users: %4, %5, %5
   %3a = project_box %3 : $@box U, 0
   copy_addr %0 to [initialization] %3a : $*U     // id: %4
   %5 = partial_apply %2<U, T>(%3) : $@convention(thin) <τ_0_0, τ_0_1 where τ_0_0 : P> (Int32, @in τ_0_1, @owned @box τ_0_0) -> Int32 // user: %7
@@ -374,7 +374,7 @@ bb0(%0 : $*T):
   debug_value_addr %0 : $*T, let, name "x" // id: %1
   // function_ref test4.(gen1 <A : test4.P>(A) -> (Swift.Int32) -> Swift.Int32).(closure #1)
   %2 = function_ref @_TFF5test44gen1US_1P__FQ_FVs5Int32S1_U_FS1_S1_ : $@convention(thin) <τ_0_0 where τ_0_0 : P> (Int32, @owned @box τ_0_0) -> Int32 // user: %5
-  %3 = alloc_box $T                               // users: %4, %5, %5
+  %3 = alloc_box $@box T                               // users: %4, %5, %5
   %3a = project_box %3 : $@box T, 0
   copy_addr %0 to [initialization] %3a : $*T     // id: %4
   %5 = partial_apply %2<T>(%3) : $@convention(thin) <τ_0_0 where τ_0_0 : P> (Int32, @owned @box τ_0_0) -> Int32 // user: %7
@@ -413,7 +413,7 @@ bb0(%0 : $Int32, %1 : $@box T):
 
 // Check that there is a generic specialization of foo
 // CHECK-LABEL: sil shared [noinline] @_TTSg5V4main1CS0_S_1PS__S0_S0_S1_S____TF5test43fooUS_1P_S0___FTQ_Q0__FTVs5Int32Sf_S1_ : $@convention(thin) (C, C) -> @owned @callee_owned (Int32, Float) -> Int32
-// CHECK: function_ref @_TTSg5V4main1CS0_S_1PS__Sf___TF5test43booUS_1P___FQ_FTVs5Int32Q0__S1_ 
+// CHECK: function_ref @_TTSg5V4main1CS0_S_1PS__Sf___TF5test43booUS_1P___FQ_FTVs5Int32Q0__S1_
 // check that it invokes a generic specialization of the reabstraction thunk helper which invokes a specialization boo
 // CHECK: [[THUNK_SPECIALIZATION:%[0-9]+]] = function_ref @_TTSg5V4main1CS0_S_1PS__S0_S0_S1_S____TTRG1_RPq_P5test41P_Pq0_PS0___XFo_dVs5Int32iSf_dS1__XFo_dS1_dSf_dS1__
 // CHECK-NOT: apply
@@ -515,7 +515,7 @@ bb0:
 
 // test_bind<A> (Builtin.RawPointer, A.Type) -> ()
 // Check that this is specialized as T=Int.
-// CHECK-LABEL: sil shared @_TTSg5Si___TF5test9test_bindurFTBpMx_T_ 
+// CHECK-LABEL: sil shared @_TTSg5Si___TF5test9test_bindurFTBpMx_T_
 // CHECK: bind_memory %0 : $Builtin.RawPointer, {{%.*}} : $Builtin.Word to $*Int
 // CHECK: return
 sil hidden @_TF5test9test_bindurFTBpMx_T_ : $@convention(thin) <T> (Builtin.RawPointer, @thick T.Type) -> () {

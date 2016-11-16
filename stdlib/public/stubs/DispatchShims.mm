@@ -72,7 +72,7 @@ swift::_swift_dispatch_block_notify(
   dispatch_block_notify(cast(block), cast(queue), cast(notifier));
 }
 
-void 
+void
 swift::_swift_dispatch_block_cancel(
     __swift_shims_dispatch_block_t block)
 {

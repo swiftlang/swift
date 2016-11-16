@@ -40,7 +40,7 @@ static int Errors;
   } while (0)
 
 
-void TestSwiftNativeNSBase(void) 
+void TestSwiftNativeNSBase(void)
 {
   printf("TestSwiftNativeNSBase\n");
 

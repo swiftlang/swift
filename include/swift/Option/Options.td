@@ -230,7 +230,7 @@ def import_cf_types : Flag<["-"], "import-cf-types">,
 
 def solver_memory_threshold : Separate<["-"], "solver-memory-threshold">,
   Flags<[FrontendOption, HelpHidden, DoesNotAffectIncrementalBuild]>,
-  HelpText<"Set the upper bound for memory consumption, in bytes, by the constraint solver">;   
+  HelpText<"Set the upper bound for memory consumption, in bytes, by the constraint solver">;
 
 def disable_swift_bridge_attr : Flag<["-"], "disable-swift-bridge-attr">,
   Flags<[FrontendOption, HelpHidden]>,
@@ -335,6 +335,11 @@ def code_formatting_Group : OptionGroup<"<code formatting options>">;
 def use_tabs : Flag<["-"], "use-tabs">, Group<code_formatting_Group>,
   Flags<[NoInteractiveOption, NoBatchOption, SwiftFormatOption]>,
   HelpText<"Use tabs for indentation.">;
+
+def indent_switch_case : Flag<["-"], "indent-switch-case">,
+  Group<code_formatting_Group>,
+  Flags<[NoInteractiveOption, NoBatchOption, SwiftFormatOption]>,
+  HelpText<"Indent cases in switch statements.">;
 
 def in_place : Flag<["-"], "in-place">, Group<code_formatting_Group>,
   Flags<[NoInteractiveOption, NoBatchOption, SwiftFormatOption]>,

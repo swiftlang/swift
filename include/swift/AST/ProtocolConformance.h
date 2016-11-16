@@ -23,6 +23,7 @@
 #include "swift/AST/Type.h"
 #include "swift/AST/Types.h"
 #include "swift/AST/TypeAlignments.h"
+#include "swift/AST/Witness.h"
 #include "llvm/ADT/ArrayRef.h"
 #include "llvm/ADT/DenseMap.h"
 #include "llvm/ADT/FoldingSet.h"
@@ -37,14 +38,15 @@ class GenericParamList;
 class NormalProtocolConformance;
 class ProtocolConformance;
 class ModuleDecl;
+class SubstitutableType;
 enum class AllocationArena;
-  
+
 /// \brief Type substitution mapping from substitutable types to their
 /// replacements.
-typedef llvm::DenseMap<TypeBase *, Type> TypeSubstitutionMap;
+typedef llvm::DenseMap<SubstitutableType *, Type> TypeSubstitutionMap;
 
 /// Map from non-type requirements to the corresponding conformance witnesses.
-typedef llvm::DenseMap<ValueDecl *, ConcreteDeclRef> WitnessMap;
+typedef llvm::DenseMap<ValueDecl *, Witness> WitnessMap;
 
 /// Map from associated type requirements to the corresponding substitution,
 /// which captures the replacement type along with any conformances it requires.
@@ -159,7 +161,7 @@ public:
 
   static Type
   getTypeWitnessByName(Type type,
-                       ProtocolConformance *conformance,
+                       ProtocolConformanceRef conformance,
                        Identifier name,
                        LazyResolver *resolver);
 
@@ -193,8 +195,7 @@ public:
   }
 
   /// Retrieve the non-type witness for the given requirement.
-  ConcreteDeclRef getWitness(ValueDecl *requirement, 
-                             LazyResolver *resolver) const;
+  Witness getWitness(ValueDecl *requirement, LazyResolver *resolver) const;
 
 private:
   /// Determine whether we have a witness for the given requirement.
@@ -205,7 +206,7 @@ public:
   /// protocol conformance.
   ///
   /// The function object should accept a \c ValueDecl* for the requirement
-  /// followed by the \c ConcreteDeclRef for the witness. Note that a generic
+  /// followed by the \c Witness for the witness. Note that a generic
   /// witness will only be specialized if the conformance came from the current
   /// file.
   template<typename F>
@@ -450,8 +451,9 @@ public:
   ///
   /// Note that a generic witness will only be specialized if the conformance
   /// came from the current file.
-  ConcreteDeclRef getWitness(ValueDecl *requirement, 
-                             LazyResolver *resolver) const;
+  ///
+  /// FIXME: The 'only specialized if from the same file' bit is awful.
+  Witness getWitness(ValueDecl *requirement, LazyResolver *resolver) const;
 
   /// Determine whether the protocol conformance has a witness for the given
   /// requirement.
@@ -462,7 +464,7 @@ public:
   }
 
   /// Set the witness for the given requirement.
-  void setWitness(ValueDecl *requirement, ConcreteDeclRef witness) const;
+  void setWitness(ValueDecl *requirement, Witness witness) const;
 
   /// Retrieve the protocol conformances directly-inherited protocols.
   const InheritedConformanceMap &getInheritedConformances() const {
@@ -584,8 +586,7 @@ public:
                              LazyResolver *resolver) const;
 
   /// Retrieve the value witness corresponding to the given requirement.
-  ConcreteDeclRef getWitness(ValueDecl *requirement, 
-                             LazyResolver *resolver) const;
+  Witness getWitness(ValueDecl *requirement, LazyResolver *resolver) const;
 
 
   /// Retrieve the protocol conformances directly-inherited protocols.
@@ -686,8 +687,8 @@ public:
   }
 
   /// Retrieve the value witness corresponding to the given requirement.
-  ConcreteDeclRef getWitness(ValueDecl *requirement, 
-                             LazyResolver *resolver) const {
+  Witness getWitness(ValueDecl *requirement, LazyResolver *resolver) const {
+    // FIXME: Substitute!
     return InheritedConformance->getWitness(requirement, resolver);
   }
 

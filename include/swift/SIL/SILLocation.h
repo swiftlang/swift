@@ -90,8 +90,13 @@ public:
     StringRef Filename;
 
     DebugLoc(unsigned Line = 0, unsigned Column = 0,
-             StringRef Filename = StringRef()) : Line(Line), Column(Column),
-                                                 Filename(Filename) { }
+             StringRef Filename = StringRef())
+        : Line(Line), Column(Column), Filename(Filename) {}
+
+    inline bool operator==(const DebugLoc &R) const {
+      return Line == R.Line && Column == R.Column &&
+             Filename.equals(R.Filename);
+    }
   };
 
 protected:

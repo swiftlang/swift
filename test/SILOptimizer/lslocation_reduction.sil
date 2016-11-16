@@ -1,4 +1,4 @@
-// RUN: %target-sil-opt %s -lslocation-dump -ml=only-reduction | %FileCheck %s
+// RUN: %target-sil-opt -assume-parsing-unqualified-ownership-sil %s -lslocation-dump -ml=only-reduction | %FileCheck %s
 
 sil_stage canonical
 
@@ -54,10 +54,10 @@ struct S4 {
 }
 
 class SelfLoop {
-  var a: Int 
-  var b: Int 
+  var a: Int
+  var b: Int
   var c: SelfLoop
-   deinit 
+   deinit
   init()
 }
 
@@ -92,7 +92,7 @@ sil @stack_store : $@convention(thin) () -> () {
 // CHECK-NEXT: [[RET0:%.+]] = alloc_box
 sil @store_after_store : $@convention(thin) (@owned B) -> () {
 bb0(%0 : $B):
-  %1 = alloc_box $B
+  %1 = alloc_box $@box B
   %1a = project_box %1 : $@box B, 0
   %2 = store %0 to %1a : $*B
   %3 = store %0 to %1a : $*B
@@ -108,7 +108,7 @@ bb0(%0 : $B):
 // CHECK: #1 store
 // CHECK-NEXT: [[RET0:%.+]] = alloc_stack
 // CHECK-NEXT: Address Projection Type: $*Int
-// CHECK-NEXT: Field Type: var a: Int  
+// CHECK-NEXT: Field Type: var a: Int
 sil @store_after_store_struct : $@convention(thin) () -> () {
   %1 = alloc_stack $S1
   %9 = integer_literal $Builtin.Int64, 0          // user: %10
@@ -155,7 +155,7 @@ bb0:
   return %15 : $()                                // id: %19
 }
 
-// CHECK-LABEL: self_loop 
+// CHECK-LABEL: self_loop
 // CHECK: #0 store
 // CHECK-NEXT: alloc_stack $S5, var, name "b"{{.*}}   // users: %7, %4
 sil hidden @self_loop : $@convention(thin) () -> () {

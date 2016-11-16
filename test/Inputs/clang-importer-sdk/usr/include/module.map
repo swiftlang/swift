@@ -45,25 +45,25 @@ module CoreGraphics {
   export *
 }
 module CoreFoundation {
-  header "CoreFoundation.h" 
+  header "CoreFoundation.h"
   export *
 }
 
 module Foundation {
-  header "Foundation.h" 
+  header "Foundation.h"
   export *
 }
 module AppKit {
-  header "AppKit.h" 
+  header "AppKit.h"
   export *
 }
 module UIKit {
-  header "UIKit.h" 
+  header "UIKit.h"
   export *
 }
 
 module NotificationCenter {
-  header "NotificationCenter.h" 
+  header "NotificationCenter.h"
   export *
 }
 

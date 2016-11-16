@@ -1,13 +1,17 @@
-// RUN: %target-swift-frontend %s -emit-ir | %FileCheck %s --check-prefix=CHECK --check-prefix=CHECK-%target-ptrsize --check-prefix=CHECK-%target-runtime
+// RUN: %target-swift-frontend -assume-parsing-unqualified-ownership-sil %s -emit-ir | %FileCheck %s --check-prefix=CHECK --check-prefix=CHECK-%target-ptrsize --check-prefix=CHECK-%target-runtime
 
 import Swift
 
+sil @error_user : $@convention(thin) (@owned Error) -> ()
+
 // CHECK-LABEL: define{{( protected)?}} void @retain_release_boxed_existential(%swift.error*)
-sil @retain_release_boxed_existential : $@convention(thin) (Error) -> () {
+sil @retain_release_boxed_existential : $@convention(thin) (@owned Error) -> () {
 entry(%e : $Error):
   // CHECK-objc: @swift_errorRetain
   // CHECK-native: @swift_rt_swift_retain
   strong_retain %e : $Error
+  %1 = function_ref @error_user : $@convention(thin) (@owned Error) -> ()
+  apply %1(%e) : $@convention(thin) (@owned Error) -> ()
   // CHECK-objc: @swift_errorRelease
   // CHECK-native: @swift_rt_swift_release
   strong_release %e : $Error

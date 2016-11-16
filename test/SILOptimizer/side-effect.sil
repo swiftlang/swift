@@ -1,4 +1,4 @@
-// RUN: %target-sil-opt %s -module-name Swift -side-effects-dump -o /dev/null | %FileCheck %s
+// RUN: %target-sil-opt -assume-parsing-unqualified-ownership-sil %s -module-name Swift -side-effects-dump -o /dev/null | %FileCheck %s
 
 // REQUIRES: asserts
 
@@ -176,11 +176,11 @@ bb0(%0 : $Int32):
   store %0 to %a : $*Int32
   %l1 = load %a : $*Int32
 
-  %b = alloc_box $Int32
+  %b = alloc_box $@box Int32
   %ba = project_box %b : $@box Int32, 0
   store %0 to %ba : $*Int32
   %l2 = load %ba : $*Int32
- 
+
   %s = alloc_stack $Int32
   store %0 to %s : $*Int32
   %l3 = load %s : $*Int32

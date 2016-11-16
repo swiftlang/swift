@@ -89,7 +89,7 @@ public struct Unsafe${Mutable}RawBufferPointer
     /// Once `nil` has been returned, all subsequent calls return `nil`.
     public mutating func next() -> UInt8? {
       if _position == _end { return nil }
-      
+
       let result = _position!.load(as: UInt8.self)
       _position! += 1
       return result
@@ -140,7 +140,7 @@ public struct Unsafe${Mutable}RawBufferPointer
 
 %  if mutable:
   /// Stores a value's bytes into raw memory at `self + offset`.
-  ///  
+  ///
   /// - Precondition: `offset + MemoryLayout<T>.size < self.count`
   ///
   /// - Precondition: The underlying pointer plus `offset` is properly
@@ -151,7 +151,7 @@ public struct Unsafe${Mutable}RawBufferPointer
   /// - Precondition: The memory is uninitialized, or initialized to
   ///   some trivial type `U` such that `T` and `U` are mutually layout
   ///   compatible.
-  /// 
+  ///
   /// - Postcondition: The memory is initialized to raw bytes. If the
   ///   memory is bound to type `U`, then it now contains a value of
   ///   type `U`.
@@ -172,7 +172,7 @@ public struct Unsafe${Mutable}RawBufferPointer
   }
 
   /// Copies `count` bytes from `source` into memory at `self`.
-  ///  
+  ///
   /// - Precondition: `count` is non-negative.
   ///
   /// - Precondition: The memory at `source..<source + count` is

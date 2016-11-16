@@ -1,4 +1,4 @@
-// RUN: %target-sil-opt %s -aa=typed-access-tb-aa -aa-dump -o /dev/null | %FileCheck %s
+// RUN: %target-sil-opt -assume-parsing-unqualified-ownership-sil %s -aa=typed-access-tb-aa -aa-dump -o /dev/null | %FileCheck %s
 
 // REQUIRES: asserts
 
@@ -9,28 +9,28 @@ import Builtin
 ///////////////////////
 
 class foo {
-   deinit 
+   deinit
   init()
 }
 
 class boo : foo {
-   deinit 
+   deinit
   override init()
 }
 
 class baz : foo {
-   deinit 
+   deinit
   override init()
 }
 
 class goo : boo {
-   deinit 
+   deinit
   override init()
 }
 
 sil @boo_init : $@convention(thin) (@thick boo.Type) -> @owned boo
 sil @baz_init : $@convention(thin) (@thick baz.Type) -> @owned baz
-sil @goo_init : $@convention(thin) (@thick goo.Type) -> @owned goo 
+sil @goo_init : $@convention(thin) (@thick goo.Type) -> @owned goo
 
 // CHECK-LABEL: no_parent_child_relation_reftype_tests
 // CHECK: PAIR #1.
@@ -39,22 +39,22 @@ sil @goo_init : $@convention(thin) (@thick goo.Type) -> @owned goo
 // CHECK-NEXT: NoAlias
 sil hidden @no_parent_child_relation_reftype_tests : $@convention(thin) () -> () {
 bb0:
-  %0 = alloc_stack $boo, var, name "a"                 // users: %5, %14 
-  %1 = alloc_stack $baz, var, name "b"                 // users: %9, %13 
+  %0 = alloc_stack $boo, var, name "a"                 // users: %5, %14
+  %1 = alloc_stack $baz, var, name "b"                 // users: %9, %13
   %2 = function_ref @boo_init : $@convention(thin) (@thick boo.Type) -> @owned boo // user: %4
   %3 = metatype $@thick boo.Type                  // user: %4
-  %4 = apply %2(%3) : $@convention(thin) (@thick boo.Type) -> @owned boo // users: %5, %11 
+  %4 = apply %2(%3) : $@convention(thin) (@thick boo.Type) -> @owned boo // users: %5, %11
   store %4 to %0 : $*boo                        // id: %5
   %6 = function_ref @baz_init : $@convention(thin) (@thick baz.Type) -> @owned baz // user: %8
   %7 = metatype $@thick baz.Type                  // user: %8
-  %8 = apply %6(%7) : $@convention(thin) (@thick baz.Type) -> @owned baz // users: %9, %10 
+  %8 = apply %6(%7) : $@convention(thin) (@thick baz.Type) -> @owned baz // users: %9, %10
   store %8 to %1 : $*baz                        // id: %9
-  strong_release %8 : $baz                        // id: %10 
-  strong_release %4 : $boo                        // id: %11 
-  %12 = tuple ()                                  // user: %15 
-  dealloc_stack %1 : $*baz       // id: %13 
-  dealloc_stack %0 : $*boo       // id: %14 
-  return %12 : $()                                // id: %15 
+  strong_release %8 : $baz                        // id: %10
+  strong_release %4 : $boo                        // id: %11
+  %12 = tuple ()                                  // user: %15
+  dealloc_stack %1 : $*baz       // id: %13
+  dealloc_stack %0 : $*boo       // id: %14
+  return %12 : $()                                // id: %15
 }
 
 // CHECK-LABEL: with_parent_child_relation_reftype_tests
@@ -65,22 +65,22 @@ bb0:
 // CHECK-NEXT: MayAlias
 sil hidden @with_parent_child_relation_reftype_tests : $@convention(thin) () -> () {
 bb0:
-  %0 = alloc_stack $boo, var, name "a"                 // users: %5, %14 
-  %1 = alloc_stack $goo, var, name "b"                 // users: %9, %13 
+  %0 = alloc_stack $boo, var, name "a"                 // users: %5, %14
+  %1 = alloc_stack $goo, var, name "b"                 // users: %9, %13
   %2 = function_ref @boo_init : $@convention(thin) (@thick boo.Type) -> @owned boo // user: %4
   %3 = metatype $@thick boo.Type                  // user: %4
-  %4 = apply %2(%3) : $@convention(thin) (@thick boo.Type) -> @owned boo // users: %5, %11 
+  %4 = apply %2(%3) : $@convention(thin) (@thick boo.Type) -> @owned boo // users: %5, %11
   store %4 to %0 : $*boo                        // id: %5
   %6 = function_ref @goo_init : $@convention(thin) (@thick goo.Type) -> @owned goo // user: %8
   %7 = metatype $@thick goo.Type                  // user: %8
-  %8 = apply %6(%7) : $@convention(thin) (@thick goo.Type) -> @owned goo // users: %9, %10 
+  %8 = apply %6(%7) : $@convention(thin) (@thick goo.Type) -> @owned goo // users: %9, %10
   store %8 to %1 : $*goo                        // id: %9
-  strong_release %8 : $goo                        // id: %10 
-  strong_release %4 : $boo                        // id: %11 
-  %12 = tuple ()                                  // user: %15 
-  dealloc_stack %1 : $*goo       // id: %13 
-  dealloc_stack %0 : $*boo       // id: %14 
-  return %12 : $()                                // id: %15 
+  strong_release %8 : $goo                        // id: %10
+  strong_release %4 : $boo                        // id: %11
+  %12 = tuple ()                                  // user: %15
+  dealloc_stack %1 : $*goo       // id: %13
+  dealloc_stack %0 : $*boo       // id: %14
+  return %12 : $()                                // id: %15
 }
 
 // CHECK-LABEL: @builtin_test
@@ -326,13 +326,13 @@ bb0:
 
 sil @builtin_test : $@convention(thin) () -> () {
 bb0:
-  %0 = alloc_box $Builtin.RawPointer
-  %1 = alloc_box $Builtin.NativeObject
-  %2 = alloc_box $Builtin.UnknownObject
-  %3 = alloc_box $Builtin.Int8
-  %4 = alloc_box $Builtin.Int32
-  %5 = alloc_box $Builtin.FPIEEE32
-  %6 = alloc_box $Builtin.FPIEEE64
+  %0 = alloc_box $@box Builtin.RawPointer
+  %1 = alloc_box $@box Builtin.NativeObject
+  %2 = alloc_box $@box Builtin.UnknownObject
+  %3 = alloc_box $@box Builtin.Int8
+  %4 = alloc_box $@box Builtin.Int32
+  %5 = alloc_box $@box Builtin.FPIEEE32
+  %6 = alloc_box $@box Builtin.FPIEEE64
 
   %7 = project_box %0 : $@box Builtin.RawPointer, 0
   %8 = project_box %1 : $@box Builtin.NativeObject, 0
@@ -447,13 +447,13 @@ struct STest_S3 {
 
 sil @struct_tests : $@convention(thin) () -> () {
 
-  %0 = alloc_box $STest_S1
-  %1 = alloc_box $STest_S2
-  %2 = alloc_box $STest_E1
-  %3 = alloc_box $STest_E2
-  %4 = alloc_box $STest_C1
-  %5 = alloc_box $STest_C2
-  %6 = alloc_box $STest_S3
+  %0 = alloc_box $@box STest_S1
+  %1 = alloc_box $@box STest_S2
+  %2 = alloc_box $@box STest_E1
+  %3 = alloc_box $@box STest_E2
+  %4 = alloc_box $@box STest_C1
+  %5 = alloc_box $@box STest_C2
+  %6 = alloc_box $@box STest_S3
 
   %7 = project_box %0 : $@box STest_S1, 0
   %8 = project_box %1 : $@box STest_S2, 0
@@ -471,11 +471,11 @@ sil @struct_tests : $@convention(thin) () -> () {
   %19 = project_box %5 : $@box STest_C2, 0
   %20 = project_box %6 : $@box STest_S3, 0
 
-  %21 = alloc_box $Builtin.RawPointer
-  %22 = alloc_box $Builtin.NativeObject
-  %23 = alloc_box $Builtin.UnknownObject
-  %24 = alloc_box $Builtin.Int32
-  %25 = alloc_box $Builtin.FPIEEE32
+  %21 = alloc_box $@box Builtin.RawPointer
+  %22 = alloc_box $@box Builtin.NativeObject
+  %23 = alloc_box $@box Builtin.UnknownObject
+  %24 = alloc_box $@box Builtin.Int32
+  %25 = alloc_box $@box Builtin.FPIEEE32
 
   %26 = project_box %21 : $@box Builtin.RawPointer, 0
   %27 = project_box %22 : $@box Builtin.NativeObject, 0
@@ -569,13 +569,13 @@ enum ETest_E3 {
 }
 
 sil @enum_tests : $@convention(thin) () -> () {
-  %0 = alloc_box $ETest_S1
-  %1 = alloc_box $ETest_S2
-  %2 = alloc_box $ETest_E1
-  %3 = alloc_box $ETest_E2
-  %4 = alloc_box $ETest_C1
-  %5 = alloc_box $ETest_C2
-  %6 = alloc_box $ETest_E3
+  %0 = alloc_box $@box ETest_S1
+  %1 = alloc_box $@box ETest_S2
+  %2 = alloc_box $@box ETest_E1
+  %3 = alloc_box $@box ETest_E2
+  %4 = alloc_box $@box ETest_C1
+  %5 = alloc_box $@box ETest_C2
+  %6 = alloc_box $@box ETest_E3
 
   %7 = project_box %0 : $@box ETest_S1, 0
   %8 = project_box %1 : $@box ETest_S2, 0
@@ -593,11 +593,11 @@ sil @enum_tests : $@convention(thin) () -> () {
   %19 = project_box %5 : $@box ETest_C2, 0
   %20 = project_box %6 : $@box ETest_E3, 0
 
-  %21 = alloc_box $Builtin.RawPointer
-  %22 = alloc_box $Builtin.NativeObject
-  %23 = alloc_box $Builtin.UnknownObject
-  %24 = alloc_box $Builtin.Int32
-  %25 = alloc_box $Builtin.FPIEEE32
+  %21 = alloc_box $@box Builtin.RawPointer
+  %22 = alloc_box $@box Builtin.NativeObject
+  %23 = alloc_box $@box Builtin.UnknownObject
+  %24 = alloc_box $@box Builtin.Int32
+  %25 = alloc_box $@box Builtin.FPIEEE32
 
   %26 = project_box %21 : $@box Builtin.RawPointer, 0
   %27 = project_box %22 : $@box Builtin.NativeObject, 0
@@ -759,9 +759,9 @@ class CTest_C3 : CTest_C1 {
 protocol AnyObject {}
 
 sil @class_tests : $@convention(thin) () -> () {
-  %0 = alloc_box $CTest_C1
-  %1 = alloc_box $CTest_C2
-  %2 = alloc_box $CTest_C3
+  %0 = alloc_box $@box CTest_C1
+  %1 = alloc_box $@box CTest_C2
+  %2 = alloc_box $@box CTest_C3
 
   %3 = project_box %0 : $@box CTest_C1, 0
   %4 = project_box %1 : $@box CTest_C2, 0
@@ -771,13 +771,13 @@ sil @class_tests : $@convention(thin) () -> () {
   %7 = project_box %1 : $@box CTest_C2, 0
   %8 = project_box %2 : $@box CTest_C3, 0
 
-  %9 = alloc_box $AnyObject
-  %10 = alloc_box $Builtin.RawPointer
-  %11 = alloc_box $Builtin.NativeObject
-  %12 = alloc_box $Builtin.UnknownObject
-  %13 = alloc_box $Builtin.Int8
-  %14 = alloc_box $Builtin.Int32
-  %15 = alloc_box $Builtin.FPIEEE32
+  %9 = alloc_box $@box AnyObject
+  %10 = alloc_box $@box Builtin.RawPointer
+  %11 = alloc_box $@box Builtin.NativeObject
+  %12 = alloc_box $@box Builtin.UnknownObject
+  %13 = alloc_box $@box Builtin.Int8
+  %14 = alloc_box $@box Builtin.Int32
+  %15 = alloc_box $@box Builtin.FPIEEE32
 
   %16 = project_box %9 : $@box AnyObject, 0
   %17 = project_box %10 : $@box Builtin.RawPointer, 0
@@ -903,9 +903,9 @@ enum TTest_E1 {
 }
 
 sil @tuple_tests : $@convention(thin) () -> () {
-  %0 = alloc_box $(Builtin.RawPointer, Builtin.Int64)
-  %1 = alloc_box $(TTest_S1, Builtin.Int64)
-  %2 = alloc_box $(TTest_E1, Builtin.Int64)
+  %0 = alloc_box $@box (Builtin.RawPointer, Builtin.Int64)
+  %1 = alloc_box $@box (TTest_S1, Builtin.Int64)
+  %2 = alloc_box $@box (TTest_E1, Builtin.Int64)
 
   %3 = project_box %0 : $@box (Builtin.RawPointer, Builtin.Int64), 0
   %4 = project_box %1 : $@box (TTest_S1, Builtin.Int64), 0
@@ -915,12 +915,12 @@ sil @tuple_tests : $@convention(thin) () -> () {
   %7 = project_box %1 : $@box (TTest_S1, Builtin.Int64), 0
   %8 = project_box %2 : $@box (TTest_E1, Builtin.Int64), 0
 
-  %9 = alloc_box $Builtin.RawPointer
-  %10 = alloc_box $Builtin.NativeObject
-  %11 = alloc_box $Builtin.UnknownObject
-  %12 = alloc_box $Builtin.Int8
-  %13 = alloc_box $Builtin.Int32
-  %14 = alloc_box $Builtin.FPIEEE32
+  %9 = alloc_box $@box Builtin.RawPointer
+  %10 = alloc_box $@box Builtin.NativeObject
+  %11 = alloc_box $@box Builtin.UnknownObject
+  %12 = alloc_box $@box Builtin.Int8
+  %13 = alloc_box $@box Builtin.Int32
+  %14 = alloc_box $@box Builtin.FPIEEE32
 
   %15 = project_box %9 : $@box Builtin.RawPointer, 0
   %16 = project_box %10 : $@box Builtin.NativeObject, 0

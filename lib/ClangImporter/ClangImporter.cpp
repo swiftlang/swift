@@ -1577,9 +1577,8 @@ bool importer::shouldSuppressDeclImport(const clang::Decl *decl) {
     if (hasNativeSwiftDecl(cast<clang::ObjCContainerDecl>(dc)))
       return true;
 
-    // Suppress certain accessibility properties; they're imported as
-    // getter/setter pairs instead.
-    if (isAccessibilityDecl(objcProperty))
+    // Suppress certain properties; import them as getter/setter pairs instead.
+    if (shouldImportPropertyAsAccessors(objcProperty))
       return true;
 
     // Check whether there is a superclass method for the getter that

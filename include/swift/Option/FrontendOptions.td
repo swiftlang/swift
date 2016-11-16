@@ -116,6 +116,9 @@ def serialize_debugging_options : Flag<["-"], "serialize-debugging-options">,
 def autolink_library : Separate<["-"], "autolink-library">,
   HelpText<"Add dependent library">, Flags<[FrontendOption]>;
 
+def disable_typo_correction : Flag<["-"], "disable-typo-correction">,
+  HelpText<"Disable typo correction">;
+
 } // end let Flags = [FrontendOption, NoDriverOption]
 
 def debug_crash_Group : OptionGroup<"<automatic crashing options>">;
@@ -229,6 +232,9 @@ def emit_verbose_sil : Flag<["-"], "emit-verbose-sil">,
 
 def enable_sil_ownership : Flag<["-"], "enable-sil-ownership">,
   HelpText<"Enable the SIL Ownership Model">;
+
+def assume_parsing_unqualified_ownership_sil : Flag<["-"], "assume-parsing-unqualified-ownership-sil">,
+  HelpText<"Assume unqualified SIL ownership when parsing SIL">;
 
 def enable_experimental_property_behaviors :
   Flag<["-"], "enable-experimental-property-behaviors">,

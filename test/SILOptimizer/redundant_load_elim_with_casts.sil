@@ -1,7 +1,7 @@
-// RUN: %target-sil-opt -enable-sil-verify-all %s -module-name Swift -redundant-load-elim | %FileCheck -check-prefix=CHECK-FUTURE %s
+// RUN: %target-sil-opt -assume-parsing-unqualified-ownership-sil -enable-sil-verify-all %s -module-name Swift -redundant-load-elim | %FileCheck -check-prefix=CHECK-FUTURE %s
 //
 // FIXME: Contains tests which are handled by old RLE, but not current one. Mostly due to casting. Eventually we probably should
-// handle these cases if they turn out to be important. 
+// handle these cases if they turn out to be important.
 //
 // The problem is the current RLE uses type projection tree/path to model fields in an object. This makes it difficult for it to
 // reason about casts, i.e. 1 memory with different types.
@@ -72,7 +72,7 @@ struct Wrapper {
 // CHECK: return
 sil @tbaa_class_alias_nonclass : $@convention(thin) (@owned B, @inout Agg1) -> () {
 bb0(%0 : $B, %1 : $*Agg1):
-  %2 = alloc_box $B
+  %2 = alloc_box $@box B
   %2a = project_box %2 : $@box B, 0
   %3 = load %1 : $*Agg1
   %4 = store %3 to %1 : $*Agg1

@@ -1847,12 +1847,15 @@ bool CalleeCandidateInfo::diagnoseGenericParameterErrors(Expr *badArgExpr) {
     }
     
     for (auto proto : archetype->getConformsTo()) {
-      if (!CS->TC.conformsToProtocol(substitution, proto, CS->DC, ConformanceCheckOptions(TR_InExpression))) {
+      if (!CS->TC.conformsToProtocol(substitution, proto, CS->DC,
+                                     ConformanceCheckFlags::InExpression)) {
         if (substitution->isEqual(argType)) {
-          CS->TC.diagnose(badArgExpr->getLoc(), diag::cannot_convert_argument_value_protocol,
+          CS->TC.diagnose(badArgExpr->getLoc(),
+                          diag::cannot_convert_argument_value_protocol,
                           substitution, proto->getDeclaredType());
         } else {
-          CS->TC.diagnose(badArgExpr->getLoc(), diag::cannot_convert_partial_argument_value_protocol,
+          CS->TC.diagnose(badArgExpr->getLoc(),
+                          diag::cannot_convert_partial_argument_value_protocol,
                           argType, substitution, proto->getDeclaredType());
         }
         foundFailure = true;
@@ -2015,6 +2018,11 @@ private:
   /// true.
   bool diagnoseAmbiguousMultiStatementClosure(ClosureExpr *closure);
 
+  /// Check the associated constraint system to see if it has any archetypes
+  /// not properly resolved or missing. If so, diagnose the problem with
+  /// an error and return true.
+  bool diagnoseArchetypeAmbiguity();
+
   /// Emit an error message about an unbound generic parameter existing, and
   /// emit notes referring to the target of a diagnostic, e.g., the function
   /// or parameter being used.
@@ -2104,25 +2112,6 @@ static bool isConversionConstraint(const Constraint *C) {
   return C->getClassification() == ConstraintClassification::Relational;
 }
 
-/// Return true if this member constraint is a low priority for diagnostics, so
-/// low that we would only like to issue an error message about it if there is
-/// nothing else interesting we can scrape out of the constraint system.
-static bool isLowPriorityConstraint(Constraint *C) {
-  // If the member constraint is a ".Iterator" lookup to find the iterator
-  // type in a foreach loop, or a ".Element" lookup to find its element type,
-  // then it is very low priority: We will get a better and more useful
-  // diagnostic from the failed conversion to Sequence that will fail as well.
-  if (C->getKind() == ConstraintKind::TypeMember) {
-    if (auto *loc = C->getLocator())
-      for (auto Elt : loc->getPath())
-        if (Elt.getKind() == ConstraintLocator::GeneratorElementType ||
-            Elt.getKind() == ConstraintLocator::SequenceIteratorProtocol)
-          return true;
-  }
-
-  return false;
-}
-
 /// Attempt to diagnose a failure without taking into account the specific
 /// kind of expression that could not be type checked.
 bool FailureDiagnosis::diagnoseConstraintFailure() {
@@ -2143,9 +2132,6 @@ bool FailureDiagnosis::diagnoseConstraintFailure() {
   // This is a predicate that classifies constraints according to our
   // priorities.
   std::function<void (Constraint*)> classifyConstraint = [&](Constraint *C) {
-    if (isLowPriorityConstraint(C))
-      return rankedConstraints.push_back({C, CR_OtherConstraint});
-
     if (isMemberConstraint(C))
       return rankedConstraints.push_back({C, CR_MemberConstraint});
 
@@ -2774,6 +2760,10 @@ diagnoseUnviableLookupResults(MemberLookupResult &result, Type baseObjTy,
         
       return;
     }
+    case MemberLookupResult::UR_DestructorInaccessible: {
+      diagnose(nameLoc, diag::destructor_not_accessible);
+      return;
+    }
     }
   }
 
@@ -3029,16 +3019,16 @@ bool FailureDiagnosis::diagnoseGeneralConversionFailure(Constraint *constraint){
       return true;
     }
 
-    // Emit a conformance error through conformsToProtocol.  If this succeeds
-    // and yields a valid protocol conformance, then keep searching.
-    ProtocolConformance *Conformance = nullptr;
-    if (CS->TC.conformsToProtocol(fromType, PT->getDecl(), CS->DC,
-                                  ConformanceCheckFlags::InExpression,
-                                  &Conformance, expr->getLoc())) {
-      if (!Conformance || !Conformance->isInvalid()) {
+    // Emit a conformance error through conformsToProtocol.
+    if (auto conformance =
+          CS->TC.conformsToProtocol(fromType, PT->getDecl(), CS->DC,
+                                    ConformanceCheckFlags::InExpression,
+                                    expr->getLoc())) {
+      if (conformance->isAbstract() ||
+          !conformance->getConcrete()->isInvalid())
         return false;
-      }
     }
+
     return true;
   }
 
@@ -3623,15 +3613,15 @@ static Type isRawRepresentable(Type fromType,
   if (!rawReprType)
     return Type();
 
-  ProtocolConformance *conformance;
-  if (!CS->TC.conformsToProtocol(fromType, rawReprType, CS->DC,
-                                 ConformanceCheckFlags::InExpression,
-                                 &conformance))
+  auto conformance =
+    CS->TC.conformsToProtocol(fromType, rawReprType, CS->DC,
+                              ConformanceCheckFlags::InExpression);
+  if (!conformance)
     return Type();
 
   Type rawTy = ProtocolConformance::getTypeWitnessByName(fromType,
-                                                         conformance,
-                                  CS->getASTContext().getIdentifier("RawValue"),
+                                                         *conformance,
+                                              CS->getASTContext().Id_RawValue,
                                                          &CS->TC);
   return rawTy;
 }
@@ -3989,14 +3979,12 @@ bool FailureDiagnosis::diagnoseContextualConversionError() {
     auto &TC = CS->getTypeChecker();
     if (auto errorCodeProtocol =
             TC.Context.getProtocol(KnownProtocolKind::ErrorCodeProtocol)) {
-      ProtocolConformance *conformance = nullptr;
-      if (TC.conformsToProtocol(expr->getType(), errorCodeProtocol, CS->DC,
-                                ConformanceCheckFlags::InExpression,
-                                &conformance) &&
-          conformance) {
+      if (auto conformance =
+            TC.conformsToProtocol(expr->getType(), errorCodeProtocol, CS->DC,
+                                  ConformanceCheckFlags::InExpression)) {
         Type errorCodeType = expr->getType();
         Type errorType =
-          ProtocolConformance::getTypeWitnessByName(errorCodeType, conformance,
+          ProtocolConformance::getTypeWitnessByName(errorCodeType, *conformance,
                                                     TC.Context.Id_ErrorType,
                                                     &TC)->getCanonicalType();
         if (errorType) {
@@ -4694,6 +4682,7 @@ static bool diagnoseSingleCandidateFailures(CalleeCandidateInfo &CCI,
   // attempt to use matchCallArguments to diagnose the problem.
   class ArgumentDiagnostic : public MatchCallArgumentListener {
     TypeChecker &TC;
+    Expr *FnExpr;
     Expr *ArgExpr;
     llvm::SmallVectorImpl<CallArgParam> &Parameters;
     llvm::SmallVectorImpl<CallArgParam> &Arguments;
@@ -4709,11 +4698,13 @@ static bool diagnoseSingleCandidateFailures(CalleeCandidateInfo &CCI,
     SmallVector<ParamBinding, 4> Bindings;
 
   public:
-    ArgumentDiagnostic(Expr *argExpr,
+    ArgumentDiagnostic(Expr *fnExpr,
+                       Expr *argExpr,
                        llvm::SmallVectorImpl<CallArgParam> &params,
                        llvm::SmallVectorImpl<CallArgParam> &args,
                        CalleeCandidateInfo &CCI, bool isSubscript)
-        : TC(CCI.CS->TC), ArgExpr(argExpr), Parameters(params), Arguments(args),
+        : TC(CCI.CS->TC), FnExpr(fnExpr), ArgExpr(argExpr),
+          Parameters(params), Arguments(args),
           CandidateInfo(CCI), IsSubscript(isSubscript) {}
 
     void extraArgument(unsigned extraArgIdx) override {
@@ -4743,13 +4734,115 @@ static bool diagnoseSingleCandidateFailures(CalleeCandidateInfo &CCI,
     }
 
     void missingArgument(unsigned missingParamIdx) override {
-      Identifier name = Parameters[missingParamIdx].Label;
-      auto loc = ArgExpr->getStartLoc();
+      auto &param = Parameters[missingParamIdx];
+      Identifier name = param.Label;
+
+      // Search insertion index.
+      unsigned argIdx = 0;
+      for (int Idx = missingParamIdx - 1; Idx >= 0; --Idx) {
+        if (Bindings[Idx].empty()) continue;
+        argIdx = Bindings[Idx].back() + 1;
+        break;
+      }
+
+      unsigned insertableEndIdx = Arguments.size();
+      if (CandidateInfo.hasTrailingClosure)
+        insertableEndIdx -= 1;
+
+      // Build argument string for fix-it.
+      SmallString<32> insertBuf;
+      llvm::raw_svector_ostream insertText(insertBuf);
+
+      if (argIdx != 0)
+        insertText << ", ";
+      if (!name.empty())
+        insertText << name.str() << ": ";
+      Type Ty = param.Ty;
+      // Explode inout type.
+      if (auto IOT = param.Ty->getAs<InOutType>()) {
+        insertText << "&";
+        Ty = IOT->getObjectType();
+      }
+      // @autoclosure; the type should be the result type.
+      if (auto FT = param.Ty->getAs<AnyFunctionType>())
+        if (FT->isAutoClosure())
+          Ty = FT->getResult();
+      insertText << "<#" << Ty << "#>";
+      if (argIdx == 0 && insertableEndIdx != 0)
+        insertText << ", ";
+
+      SourceLoc insertLoc;
+      if (argIdx > insertableEndIdx) {
+        // Unreachable for now.
+        // FIXME: matchCallArguments() doesn't detect "missing argument after
+        // trailing closure". E.g.
+        //   func fn(x: Int, y: () -> Int, z: Int) { ... }
+        //   fn(x: 1) { return 1 }
+        // is diagnosed as "missing argument for 'y'" (missingParamIdx 1).
+        // It should be "missing argument for 'z'" (missingParamIdx 2).
+      } else if (auto *TE = dyn_cast<TupleExpr>(ArgExpr)) {
+        // fn():
+        //   fn([argMissing])
+        // fn(argX, argY):
+        //   fn([argMissing, ]argX, argY)
+        //   fn(argX[, argMissing], argY)
+        //   fn(argX, argY[, argMissing])
+        // fn(argX) { closure }:
+        //   fn([argMissing, ]argX) { closure }
+        //   fn(argX[, argMissing]) { closure }
+        //   fn(argX[, closureLabel: ]{closure}[, argMissing)] // Not impl.
+        if (insertableEndIdx == 0)
+          insertLoc = TE->getRParenLoc();
+        else if (argIdx != 0)
+          insertLoc = Lexer::getLocForEndOfToken(
+              TC.Context.SourceMgr, TE->getElement(argIdx - 1)->getEndLoc());
+        else {
+          insertLoc = TE->getElementNameLoc(0);
+          if (insertLoc.isInvalid())
+            insertLoc = TE->getElement(0)->getStartLoc();
+        }
+      } else if (auto *PE = dyn_cast<ParenExpr>(ArgExpr)) {
+        assert(argIdx <= 1);
+        if (PE->getRParenLoc().isValid()) {
+          // fn(argX):
+          //   fn([argMissing, ]argX)
+          //   fn(argX[, argMissing])
+          // fn() { closure }:
+          //   fn([argMissing]) {closure}
+          //   fn([closureLabel: ]{closure}[, argMissing]) // Not impl.
+          if (insertableEndIdx == 0)
+            insertLoc = PE->getRParenLoc();
+          else if (argIdx == 0)
+            insertLoc = PE->getSubExpr()->getStartLoc();
+          else
+            insertLoc = Lexer::getLocForEndOfToken(
+                TC.Context.SourceMgr, PE->getSubExpr()->getEndLoc());
+        } else {
+          // fn { closure }:
+          //   fn[(argMissing)] { closure }
+          //   fn[(closureLabel:] { closure }[, missingArg)]  // Not impl.
+          assert(!IsSubscript && "bracket less subscript");
+          assert(PE->hasTrailingClosure() &&
+                 "paren less ParenExpr without trailing closure");
+          insertBuf.insert(insertBuf.begin(), '(');
+          insertBuf.insert(insertBuf.end(), ')');
+          insertLoc = Lexer::getLocForEndOfToken(
+              TC.Context.SourceMgr, FnExpr->getEndLoc());
+        }
+      } else {
+        llvm_unreachable("unexpected argument expression type");
+        // Can't be TupleShuffleExpr because this argExpr is not yet resolved.
+      }
+
+      assert(insertLoc.isValid() && "missing argument after trailing closure?");
+
       if (name.empty())
-        TC.diagnose(loc, diag::missing_argument_positional,
-                    missingParamIdx + 1);
+        TC.diagnose(insertLoc, diag::missing_argument_positional,
+                    missingParamIdx + 1)
+          .fixItInsert(insertLoc, insertText.str());
       else
-        TC.diagnose(loc, diag::missing_argument_named, name);
+        TC.diagnose(insertLoc, diag::missing_argument_named, name)
+          .fixItInsert(insertLoc, insertText.str());
 
       auto candidate = CandidateInfo[0];
       if (candidate.getDecl())
@@ -4840,7 +4933,7 @@ static bool diagnoseSingleCandidateFailures(CalleeCandidateInfo &CCI,
     }
   };
 
-  return ArgumentDiagnostic(argExpr, params, args, CCI,
+  return ArgumentDiagnostic(fnExpr, argExpr, params, args, CCI,
                             isa<SubscriptExpr>(fnExpr))
       .diagnose();
 }
@@ -5331,7 +5424,7 @@ bool FailureDiagnosis::visitApplyExpr(ApplyExpr *callExpr) {
         return {CC_GeneralMismatch, {}};
 
       // FIXME: Handle matching of the generic types properly.
-      // Currently we don't filter result types containing generic parametes
+      // Currently we don't filter result types containing generic parameters
       // because there is no easy way to do that, and candidate set is going
       // to be pruned by matching of the argument types later on anyway, so
       // it's better to over report than to be too conservative.
@@ -5438,7 +5531,33 @@ bool FailureDiagnosis::visitApplyExpr(ApplyExpr *callExpr) {
   }
 
   auto overloadName = calleeInfo.declName;
-  
+
+  // Local function to check if the error with argument type is
+  // related to contextual type information of the enclosing expression
+  // rather than resolution of argument expression itself.
+  auto isContextualConversionFailure = [&](Expr *argExpr) -> bool {
+    // If we found an exact match, this must be a problem with a conversion from
+    // the result of the call to the expected type. Diagnose this as a
+    // conversion failure.
+    if (calleeInfo.closeness == CC_ExactMatch)
+      return true;
+
+    if (!CS->getContextualType() ||
+        (calleeInfo.closeness != CC_ArgumentMismatch &&
+         calleeInfo.closeness != CC_OneGenericArgumentMismatch))
+      return false;
+
+    CalleeCandidateInfo candidates(fnExpr, hasTrailingClosure, CS);
+
+    // Filter original list of choices based on the deduced type of
+    // argument expression after force re-check.
+    candidates.filterContextualMemberList(argExpr);
+
+    // One of the candidates matches exactly, which means that
+    // this is a contextual type conversion failure, we can't diagnose here.
+    return candidates.closeness == CC_ExactMatch;
+  };
+
   // Otherwise, we have a generic failure.  Diagnose it with a generic error
   // message now.
   if (isa<BinaryExpr>(callExpr) && isa<TupleExpr>(argExpr)) {
@@ -5478,28 +5597,9 @@ bool FailureDiagnosis::visitApplyExpr(ApplyExpr *callExpr) {
         return true;
       }
     }
-    
-    // If we found an exact match, this must be a problem with a conversion from
-    // the result of the call to the expected type.  Diagnose this as a
-    // conversion failure.
-    if (calleeInfo.closeness == CC_ExactMatch)
+
+    if (isContextualConversionFailure(argTuple))
       return false;
-
-    // If this is not a specific structural problem we can diagnose,
-    // let's check if this is contextual type conversion error.
-    if (CS->getContextualType() &&
-        calleeInfo.closeness == CC_ArgumentMismatch) {
-      CalleeCandidateInfo candidates(fnExpr, hasTrailingClosure, CS);
-
-      // Filter original list of choices based on the deduced type of
-      // argument expression after force re-check.
-      candidates.filterContextualMemberList(argTuple);
-
-      // One of the candidates matches exactly, which means that
-      // this is a contextual type conversion failure, we can't diagnose here.
-      if (candidates.closeness == CC_ExactMatch)
-        return false;
-    }
 
     if (!lhsType->isEqual(rhsType)) {
       diagnose(callExpr->getLoc(), diag::cannot_apply_binop_to_args,
@@ -5527,11 +5627,8 @@ bool FailureDiagnosis::visitApplyExpr(ApplyExpr *callExpr) {
 
     return true;
   }
-  
-  // If we found an exact match, this must be a problem with a conversion from
-  // the result of the call to the expected type.  Diagnose this as a
-  // conversion failure.
-  if (calleeInfo.closeness == CC_ExactMatch)
+
+  if (isContextualConversionFailure(argExpr))
     return false;
   
   // Generate specific error messages for unary operators.
@@ -5948,7 +6045,8 @@ static bool isDictionaryLiteralCompatible(Type ty, ConstraintSystem *CS,
                               KnownProtocolKind::ExpressibleByDictionaryLiteral);
   if (!DLC) return false;
   return CS->TC.conformsToProtocol(ty, DLC, CS->DC,
-                                   ConformanceCheckFlags::InExpression);
+                                   ConformanceCheckFlags::InExpression)
+           .hasValue();
 }
 
 bool FailureDiagnosis::visitArrayExpr(ArrayExpr *E) {
@@ -5966,23 +6064,14 @@ bool FailureDiagnosis::visitArrayExpr(ArrayExpr *E) {
     // figure out what the contextual element type is in place.
     auto ALC = CS->TC.getProtocol(E->getLoc(),
                                   KnownProtocolKind::ExpressibleByArrayLiteral);
-    ProtocolConformance *Conformance = nullptr;
     if (!ALC)
       return visitExpr(E);
 
     // Check to see if the contextual type conforms.
-    bool typeConforms =
+    auto Conformance =
       CS->TC.conformsToProtocol(contextualType, ALC, CS->DC,
-                                ConformanceCheckFlags::InExpression,
-                                &Conformance);
-    (void) typeConforms;
+                                ConformanceCheckFlags::InExpression);
 
-    // The type can conform, but not have a concrete conformance, in
-    // which case Conformance will be nullptr, but typeConforms will
-    // still be true.
-    assert((!Conformance || typeConforms) &&
-           "Expected null Conformance if the type doesn't conform!");
-    
     // If not, we may have an implicit conversion going on.  If the contextual
     // type is an UnsafePointer or UnsafeMutablePointer, then that is probably
     // what is happening.
@@ -5995,12 +6084,9 @@ bool FailureDiagnosis::visitArrayExpr(ArrayExpr *E) {
       if (Type pointeeTy = unwrappedTy->getAnyPointerElementType(pointerKind)) {
         if (pointerKind == PTK_UnsafePointer) {
           auto arrayTy = ArraySliceType::get(pointeeTy);
-          typeConforms =
+          Conformance =
             CS->TC.conformsToProtocol(arrayTy, ALC, CS->DC,
-                                      ConformanceCheckFlags::InExpression,
-                                      &Conformance);
-          assert((!Conformance || typeConforms) &&
-                 "Expected null Conformance if the type doesn't conform!");
+                                      ConformanceCheckFlags::InExpression);
 
           if (Conformance)
             contextualType = arrayTy;
@@ -6036,18 +6122,12 @@ bool FailureDiagnosis::visitArrayExpr(ArrayExpr *E) {
       return true;
     }
 
-    Conformance->forEachTypeWitness(&CS->TC,
-                                    [&](AssociatedTypeDecl *ATD,
-                          const Substitution &subst, TypeDecl *d)->bool
-    {
-      if (ATD->getName().str() == "Element")
-        contextualElementType = subst.getReplacement()->getDesugaredType();
-      return false;
-    });
-    assert(contextualElementType &&
-           "Could not find 'Element' ArrayLiteral associated types from"
-           " contextual type conformance");
-
+    contextualElementType = ProtocolConformance::getTypeWitnessByName(
+                                                 contextualType,
+                                                 *Conformance,
+                                                 CS->getASTContext().Id_Element,
+                                                 &CS->TC)
+                              ->getDesugaredType();
     elementTypePurpose = CTP_ArrayElement;
   }
 
@@ -6083,25 +6163,29 @@ bool FailureDiagnosis::visitDictionaryExpr(DictionaryExpr *E) {
 
     // Validate the contextual type conforms to ExpressibleByDictionaryLiteral
     // and figure out what the contextual Key/Value types are in place.
-    ProtocolConformance *Conformance = nullptr;
-    if (!CS->TC.conformsToProtocol(contextualType, DLC, CS->DC,
-                                   ConformanceCheckFlags::InExpression,
-                                   &Conformance)) {
+    auto Conformance =
+      CS->TC.conformsToProtocol(contextualType, DLC, CS->DC,
+                                ConformanceCheckFlags::InExpression);
+    if (!Conformance) {
       diagnose(E->getStartLoc(), diag::type_is_not_dictionary, contextualType)
         .highlight(E->getSourceRange());
       return true;
     }
 
-    Conformance->forEachTypeWitness(&CS->TC,
-                                    [&](AssociatedTypeDecl *ATD,
-                          const Substitution &subst, TypeDecl *d)->bool
-    {
-      if (ATD->getName().str() == "Key")
-        contextualKeyType = subst.getReplacement()->getDesugaredType();
-      else if (ATD->getName().str() == "Value")
-        contextualValueType = subst.getReplacement()->getDesugaredType();
-      return false;
-    });
+    contextualKeyType =
+      ProtocolConformance::getTypeWitnessByName(contextualType,
+                                                *Conformance,
+                                                CS->getASTContext().Id_Key,
+                                                &CS->TC)
+        ->getDesugaredType();
+
+    contextualValueType =
+      ProtocolConformance::getTypeWitnessByName(contextualType,
+                                                *Conformance,
+                                                CS->getASTContext().Id_Value,
+                                                &CS->TC)
+        ->getDesugaredType();
+
     assert(contextualKeyType && contextualValueType &&
            "Could not find Key/Value DictionaryLiteral associated types from"
            " contextual type conformance");
@@ -6608,8 +6692,7 @@ static bool hasArchetype(const GenericTypeDecl *generic,
   if (!genericEnv)
     return false;
 
-  auto &map = genericEnv->getArchetypeToInterfaceMap();
-  return map.find(archetype) != map.end();
+  return genericEnv->containsPrimaryArchetype(archetype);
 }
 
 static void noteArchetypeSource(const TypeLoc &loc, ArchetypeType *archetype,
@@ -6809,6 +6892,82 @@ diagnoseAmbiguousMultiStatementClosure(ClosureExpr *closure) {
   return true;
 }
 
+/// Check the associated constraint system to see if it has any archetypes
+/// not properly resolved or missing. If so, diagnose the problem with
+/// an error and return true.
+bool FailureDiagnosis::diagnoseArchetypeAmbiguity() {
+  using Archetype = std::tuple<ArchetypeType *, ConstraintLocator *, unsigned>;
+
+  llvm::SmallVector<Archetype, 2> unboundParams;
+  // Check out all of the type variables lurking in the system.  If any are
+  // unbound archetypes, then the problem is that it couldn't be resolved.
+  for (auto tv : CS->getTypeVariables()) {
+    auto &impl = tv->getImpl();
+
+    if (impl.hasRepresentativeOrFixed())
+      continue;
+
+    // If this is a conversion to a type variable used to form an archetype,
+    // Then diagnose this as a generic parameter that could not be resolved.
+    auto archetype = impl.getArchetype();
+
+    // Only diagnose archetypes that don't have a parent, i.e., ones
+    // that correspond to generic parameters.
+    if (!archetype || archetype->getParent())
+      continue;
+
+    // Number of constraints related to particular unbound parameter
+    // is significant indicator of the problem, because if there are
+    // no constraints associated with it, that means it can't ever be resolved,
+    // such helps to diagnose situations like: struct S<A, B> { init(_ a: A) {}}
+    // because type B would have no constraints associated with it.
+    unsigned numConstraints = 0;
+    {
+      llvm::SmallVector<Constraint *, 2> constraints;
+      CS->getConstraintGraph().gatherConstraints(tv, constraints);
+
+      for (auto constraint : constraints) {
+        // We are not interested in ConformsTo constraints because
+        // such constraints specify restrictions on the archetypes themselves.
+        if (constraint->getKind() == ConstraintKind::ConformsTo)
+          continue;
+
+        // Some of the bind constraints specify relations between
+        // parent type and it's member fields/types, we are not
+        // interested in that, since it's not related to archetype resolution.
+        if (constraint->getKind() == ConstraintKind::Bind) {
+          if (auto locator = constraint->getLocator()) {
+            auto anchor = locator->getAnchor();
+            if (anchor && isa<UnresolvedDotExpr>(anchor))
+              continue;
+          }
+        }
+
+        numConstraints++;
+      }
+    }
+
+    auto locator = impl.getLocator();
+    unboundParams.push_back(
+        std::make_tuple(archetype, locator, numConstraints));
+  }
+
+  // We've found unbound generic parameters, let's diagnose
+  // based on the number of constraints each one is related to.
+  if (!unboundParams.empty()) {
+    // Let's prioritize archetypes that don't have any constraints associated.
+    std::stable_sort(unboundParams.begin(), unboundParams.end(),
+                     [](Archetype a, Archetype b) {
+                       return std::get<2>(a) < std::get<2>(b);
+                     });
+
+    auto param = unboundParams.front();
+    diagnoseUnboundArchetype(std::get<0>(param), std::get<1>(param));
+    return true;
+  }
+
+  return false;
+}
 
 /// Emit an error message about an unbound generic parameter existing, and
 /// emit notes referring to the target of a diagnostic, e.g., the function
@@ -6903,26 +7062,10 @@ void FailureDiagnosis::diagnoseUnboundArchetype(ArchetypeType *archetype,
 
 /// Emit an ambiguity diagnostic about the specified expression.
 void FailureDiagnosis::diagnoseAmbiguity(Expr *E) {
-
-  // Check out all of the type variables lurking in the system.  If any are
-  // unbound archetypes, then the problem is that it couldn't be resolved.
-  for (auto tv : CS->getTypeVariables()) {
-    if (tv->getImpl().hasRepresentativeOrFixed())
-      continue;
-    
-    
-    // If this is a conversion to a type variable used to form an archetype,
-    // Then diagnose this as a generic parameter that could not be resolved.
-    auto archetype = tv->getImpl().getArchetype();
-    
-    // Only diagnose archetypes that don't have a parent, i.e., ones
-    // that correspond to generic parameters.
-    if (archetype && !archetype->getParent()) {
-      diagnoseUnboundArchetype(archetype, tv->getImpl().getLocator());
-      return;
-    }
-    continue;
-  }
+  // First, let's try to diagnose any problems related to ambiguous
+  // archetypes (generic parameters) present in the constraint system.
+  if (diagnoseArchetypeAmbiguity())
+    return;
 
   // Unresolved/Anonymous ClosureExprs are common enough that we should give
   // them tailored diagnostics.

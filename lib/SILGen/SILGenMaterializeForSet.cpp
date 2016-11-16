@@ -317,7 +317,9 @@ public:
     // load+materialize in some cases, but it's not really important.
     SILValue selfValue = self.getValue();
     if (selfValue->getType().isAddress()) {
-      selfValue = gen.B.createLoad(loc, selfValue);
+      // SEMANTIC ARC TODO: We are returning self as a borrowed value. Is this
+      // correct?
+      selfValue = gen.B.createLoadBorrow(loc, selfValue);
     }
 
     // Do a derived-to-base conversion if necessary.
@@ -629,7 +631,9 @@ SILValue MaterializeForSetEmitter::emitUsingAddressor(SILGenFunction &gen,
   } else {
     SILValue allocatedCallbackBuffer =
       gen.B.createAllocValueBuffer(loc, owner.getType(), callbackBuffer);
-    gen.B.createStore(loc, owner.forward(gen), allocatedCallbackBuffer);
+    gen.B.emitStoreValueOperation(loc, owner.forward(gen),
+                                  allocatedCallbackBuffer,
+                                  StoreOwnershipQualifier::Init);
 
     callback = createAddressorCallback(gen.F, owner.getType(), addressorKind);
   }
@@ -648,7 +652,8 @@ MaterializeForSetEmitter::createAddressorCallback(SILFunction &F,
                             SILValue self) {
     auto ownerAddress =
       gen.B.createProjectValueBuffer(loc, ownerType, callbackStorage);
-    auto owner = gen.B.createLoad(loc, ownerAddress);
+    auto owner = gen.B.emitLoadValueOperation(loc, ownerAddress,
+                                              LoadOwnershipQualifier::Take);
 
     switch (addressorKind) {
     case AddressorKind::NotAddressor:
@@ -657,7 +662,7 @@ MaterializeForSetEmitter::createAddressorCallback(SILFunction &F,
 
     case AddressorKind::Owning:
     case AddressorKind::NativeOwning:
-      gen.B.createStrongRelease(loc, owner, Atomicity::Atomic);
+      gen.B.createDestroyValue(loc, owner);
       break;
 
     case AddressorKind::NativePinning:
@@ -760,7 +765,8 @@ MaterializeForSetEmitter::createSetterCallback(SILFunction &F,
       SILValue indicesV =
         gen.B.createProjectValueBuffer(loc, indicesTy, callbackBuffer);
       if (indicesTL->isLoadable())
-        indicesV = gen.B.createLoad(loc, indicesV);
+        indicesV = indicesTL->emitLoad(gen.B, loc, indicesV,
+                                       LoadOwnershipQualifier::Take);
       ManagedValue mIndices =
         gen.emitManagedRValueWithCleanup(indicesV, *indicesTL);
 
@@ -780,7 +786,7 @@ MaterializeForSetEmitter::createSetterCallback(SILFunction &F,
     value = gen.B.createPointerToAddress(
       loc, value, valueTL.getLoweredType().getAddressType(), /*isStrict*/ true);
     if (valueTL.isLoadable())
-      value = gen.B.createLoad(loc, value);
+      value = valueTL.emitLoad(gen.B, loc, value, LoadOwnershipQualifier::Take);
     ManagedValue mValue = gen.emitManagedRValueWithCleanup(value, valueTL);
     RValue rvalue(gen, loc, lvalue.getSubstFormalType(), mValue);
 

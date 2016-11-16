@@ -1,4 +1,4 @@
-// RUN: %target-sil-opt -enable-sil-verify-all -retain-sinking -late-release-hoisting %s | %FileCheck %s
+// RUN: %target-sil-opt -assume-parsing-unqualified-ownership-sil -enable-sil-verify-all -retain-sinking -late-release-hoisting %s | %FileCheck %s
 
 import Builtin
 import Swift
@@ -75,7 +75,7 @@ sil [fragile] @guaranteed_throwing_use : $@convention(thin) (@guaranteed Builtin
 // CHECK: bb2:
 // CHECK-NOT: strong_retain
 // CHECK: bb3:
-// CHECK: strong_retain 
+// CHECK: strong_retain
 sil @sink_retains_from_preds : $@convention(thin) (Builtin.NativeObject) -> () {
 bb0(%0 : $Builtin.NativeObject):
   strong_release %0 : $Builtin.NativeObject
@@ -181,15 +181,15 @@ bb3(%3 : $C):
   %4 = tuple()
   return %4 : $()
 }
-  
+
 // Make sure retain instruction is sunk across copy_addr inst, as copy_addr
 // dest is initialized.
 //
 // CHECK-LABEL: retain_not_blocked_by_copyaddrinit
 // CHECK: bb0
 // CHECK-NEXT: strong_release
-// CHECK-NEXT: copy_addr 
-// CHECK-NEXT: tuple 
+// CHECK-NEXT: copy_addr
+// CHECK-NEXT: tuple
 // CHECK-NEXT: strong_retain
 sil hidden @retain_not_blocked_by_copyaddrinit : $@convention(thin) <T> (@in T, B) -> @out T {
 bb0(%0 : $*T, %1 : $*T, %2 : $B):
@@ -251,7 +251,7 @@ bb1:
 bb2:
   br bb3
 
-bb3: 
+bb3:
   %5 = tuple()
   return %5 : $()
 }
@@ -349,7 +349,7 @@ bb2(%4 : $Error):
 // CHECK: br bb3
 // CHECK: bb3:
 // CHECK-NOT: strong_release
-// CHECK: return 
+// CHECK: return
 sil @hoist_release_across_local_memory_use : $@convention(thin) (Builtin.NativeObject) ->() {
 bb0(%0 : $Builtin.NativeObject):
   %1 = alloc_stack $A

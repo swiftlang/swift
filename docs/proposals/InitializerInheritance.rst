@@ -61,7 +61,7 @@ The defining class of a subobject initializer is central to its
 behavior.  It can be soundly inherited by a class C only if is trivial
 to initialize the ivars of C, but it's convenient to ignore that and
 assume that subobjects will always trivially wrap and delegate to
-superclass subobject initializers. 
+superclass subobject initializers.
 
 A subobject initializer must either (1) delegate to a peer subobject
 initializer or (2) take responsibility for initializing all ivars of
@@ -201,7 +201,7 @@ examples::
   }
 
   class B3 : A {
-    var counter: Int 
+    var counter: Int
 
     init withInitialCount(initialCount: Int) { // subobject initializer
       counter = initialCount
@@ -214,7 +214,7 @@ examples::
       self.init(withInitialCount: initialCount)
     }
 
-    // does not inherit A's init(), because init withTitle(String) is not 
+    // does not inherit A's init(), because init withTitle(String) is not
     // overridden.
   }
 
@@ -299,8 +299,8 @@ every subclass. For example::
   class E2 : D {
     var title: String
 
-    @virtual init() { 
-      title = "Unnamed" 
+    @virtual init() {
+      title = "Unnamed"
       super.init()
     }
 
@@ -310,11 +310,11 @@ every subclass. For example::
   class E3 : D {
     var title: String
 
-    @virtual init() -> Self { 
+    @virtual init() -> Self {
       self.init(withTitle: "Unnamed")
     }
 
-    init withTitle(title: String) { 
+    init withTitle(title: String) {
       self.title = title
       super.init()
     }
@@ -393,4 +393,4 @@ diagnostic indicating that the initializer needs to be
 implemented.
 
 .. [#] Syntax suggestion from Joe Groff.
-       
+

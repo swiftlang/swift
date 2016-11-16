@@ -228,7 +228,7 @@ let offsetByTests: [OffsetByTest] = [
     advanceFromEnd: true),
   OffsetByTest(advanceBy: -10, newOpenIndex: 10, newClosedIndex: 11,
     advanceFromEnd: true),
-  OffsetByTest(advanceBy: -11, newClosedIndex: 10, 
+  OffsetByTest(advanceBy: -11, newClosedIndex: 10,
     advanceFromEnd: true),
   OffsetByTest(advanceBy: 0, newOpenIndex: 20, newClosedIndex: 21,
     advanceFromEnd: true),
@@ -246,7 +246,7 @@ struct IndexDistanceTest {
   // between open and closed ranges.
   let leftIndex: Int?
   let rightIndex: Int?
-  
+
   let loc: SourceLoc
   let openDistance: Int
   let closedDistance: Int

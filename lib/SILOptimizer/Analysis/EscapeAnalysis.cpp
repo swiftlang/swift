@@ -1843,8 +1843,8 @@ bool EscapeAnalysis::canEscapeTo(SILValue V, RefCountingInst *RI) {
 
 /// Utility to get the function which contains both values \p V1 and \p V2.
 static SILFunction *getCommonFunction(SILValue V1, SILValue V2) {
-  SILBasicBlock *BB1 = V1->getParentBB();
-  SILBasicBlock *BB2 = V2->getParentBB();
+  SILBasicBlock *BB1 = V1->getParentBlock();
+  SILBasicBlock *BB2 = V2->getParentBlock();
   if (!BB1 || !BB2)
     return nullptr;
 
@@ -1969,7 +1969,7 @@ void EscapeAnalysis::invalidate(SILFunction *F, InvalidationKind K) {
 }
 
 void EscapeAnalysis::handleDeleteNotification(ValueBase *I) {
-  if (SILBasicBlock *Parent = I->getParentBB()) {
+  if (SILBasicBlock *Parent = I->getParentBlock()) {
     SILFunction *F = Parent->getParent();
     if (FunctionInfo *FInfo = Function2Info.lookup(F)) {
       if (FInfo->isValid()) {

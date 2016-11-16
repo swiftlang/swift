@@ -1,6 +1,6 @@
 // RUN: rm -rf %t && mkdir -p %t
 // RUN: %build-irgen-test-overlays
-// RUN: %target-swift-frontend(mock-sdk: -sdk %S/Inputs -I %t) %s -emit-ir -disable-objc-attr-requires-foundation-module | %FileCheck %s --check-prefix=CHECK --check-prefix=CHECK-%target-ptrsize
+// RUN: %target-swift-frontend(mock-sdk: -sdk %S/Inputs -I %t) %s -emit-ir -assume-parsing-unqualified-ownership-sil -disable-objc-attr-requires-foundation-module | %FileCheck %s --check-prefix=CHECK --check-prefix=CHECK-%target-ptrsize
 
 // REQUIRES: CPU=x86_64
 // REQUIRES: objc_interop
@@ -13,7 +13,7 @@ import gizmo
 @objc class ObjCClass : BaseClassForMethodFamilies {
   func method(x: Int) {}
   func method2(r: NSRect) {}
-  
+
   override func fakeInitFamily() -> ObjCClass { return self }
 }
 sil_vtable ObjCClass {}
@@ -559,7 +559,7 @@ sil @empty_box : $@convention(thin) () -> () {
 entry:
   // CHECK: store %swift.refcounted* null
   // CHECK: store %swift.opaque* undef
-  %b = alloc_box $()
+  %b = alloc_box $@box ()
   %ba = project_box %b : $@box (), 0
   %f = function_ref @partial_empty_box : $@convention(thin) (@owned @box (), @inout ()) -> ()
   %g = partial_apply %f(%b, %ba) : $@convention(thin) (@owned @box (), @inout ()) -> ()
@@ -575,7 +575,7 @@ sil hidden_external @complex_generic_function : $@convention(thin) <T where T : 
 sil @partial_apply_complex_generic_function : $@convention(thin) <T where T : P2, T.Y : P2> (Int) -> () {
 bb0(%0 : $Int):
   %fn = function_ref @complex_generic_function : $@convention(thin) <T where T : P2, T.Y : P2> (Int) -> ()
-  %pa = partial_apply %fn <T, T.Y, T.Y.X, T.Y.Y, T.Y.Y.X>(%0) : $@convention(thin) <T where T : P2, T.Y : P1, T.Y : P2, T.Y.X : P0, T.Y.Y : P1, T.Y.Y.X : P0> (Int) -> ()
+  %pa = partial_apply %fn <T, T.Y>(%0) : $@convention(thin) <T where T : P2, T.Y : P1, T.Y : P2> (Int) -> ()
   %result = tuple ()
   return %result : $()
 }

@@ -107,11 +107,11 @@ NSString *swift::convertStringToNSString(String *swiftString) {
     // ObjC interop is low.
     if (!convertStringToNSString)
       return @"SwiftObject";
-    
+
     TheConvertStringToNSString.store(convertStringToNSString,
                                      std::memory_order_relaxed);
   }
-  
+
   return convertStringToNSString(swiftString->x,
                                  swiftString->y,
                                  swiftString->z);
@@ -180,7 +180,7 @@ static NSString *_getClassDescription(Class cls) {
   Class cls = (Class) _swift_getClassOfAllocated(self);
   fatalError(/* flags = */ 0,
              "Unrecognized selector %c[%s %s]\n",
-             class_isMetaClass(cls) ? '+' : '-', 
+             class_isMetaClass(cls) ? '+' : '-',
              class_getName(cls), sel_getName(sel));
 }
 
@@ -278,7 +278,7 @@ static NSString *_getClassDescription(Class cls) {
 - (BOOL)conformsToProtocol:(Protocol*)proto {
   if (!proto) return NO;
   auto selfClass = (Class) _swift_getClassOfAllocated(self);
-  
+
   // Walk the superclass chain.
   while (selfClass) {
     if (class_conformsToProtocol(selfClass, proto))
@@ -299,7 +299,7 @@ static NSString *_getClassDescription(Class cls) {
       return YES;
     selfClass = class_getSuperclass(selfClass);
   }
-  
+
   return NO;
 }
 
@@ -1114,7 +1114,7 @@ swift::swift_dynamicCastObjCClassUnconditional(const void *object,
   }
 
   Class sourceType = object_getClass((id)object);
-  swift_dynamicCastFailure(reinterpret_cast<const Metadata *>(sourceType), 
+  swift_dynamicCastFailure(reinterpret_cast<const Metadata *>(sourceType),
                            targetType);
 }
 
@@ -1150,7 +1150,7 @@ extern "C" const Metadata *swift_dynamicCastTypeToObjCProtocolUnconditional(
                                                  size_t numProtocols,
                                                  Protocol * const *protocols) {
   Class classObject;
-  
+
   switch (type->getKind()) {
   case MetadataKind::Class:
     // Native class metadata is also the class object.
@@ -1161,7 +1161,7 @@ extern "C" const Metadata *swift_dynamicCastTypeToObjCProtocolUnconditional(
     classObject = (Class)static_cast<const ObjCClassWrapperMetadata *>(type)
       ->Class;
     break;
-  
+
   // Other kinds of type can never conform to ObjC protocols.
   case MetadataKind::Struct:
   case MetadataKind::Enum:
@@ -1175,21 +1175,21 @@ extern "C" const Metadata *swift_dynamicCastTypeToObjCProtocolUnconditional(
   case MetadataKind::ForeignClass:
     swift_dynamicCastFailure(type, nameForMetadata(type).c_str(),
                              protocols[0], protocol_getName(protocols[0]));
-      
+
   case MetadataKind::HeapLocalVariable:
   case MetadataKind::HeapGenericLocalVariable:
   case MetadataKind::ErrorObject:
     assert(false && "not type metadata");
     break;
   }
-  
+
   for (size_t i = 0; i < numProtocols; ++i) {
     if (![classObject conformsToProtocol:protocols[i]]) {
       swift_dynamicCastFailure(type, nameForMetadata(type).c_str(),
                                protocols[i], protocol_getName(protocols[i]));
     }
   }
-  
+
   return type;
 }
 
@@ -1199,7 +1199,7 @@ extern "C" const Metadata *swift_dynamicCastTypeToObjCProtocolConditional(
                                                 size_t numProtocols,
                                                 Protocol * const *protocols) {
   Class classObject;
-  
+
   switch (type->getKind()) {
   case MetadataKind::Class:
     // Native class metadata is also the class object.
@@ -1210,7 +1210,7 @@ extern "C" const Metadata *swift_dynamicCastTypeToObjCProtocolConditional(
     classObject = (Class)static_cast<const ObjCClassWrapperMetadata *>(type)
       ->Class;
     break;
-  
+
   // Other kinds of type can never conform to ObjC protocols.
   case MetadataKind::Struct:
   case MetadataKind::Enum:
@@ -1223,20 +1223,20 @@ extern "C" const Metadata *swift_dynamicCastTypeToObjCProtocolConditional(
   case MetadataKind::ExistentialMetatype:
   case MetadataKind::ForeignClass:
     return nullptr;
-      
+
   case MetadataKind::HeapLocalVariable:
   case MetadataKind::HeapGenericLocalVariable:
   case MetadataKind::ErrorObject:
     assert(false && "not type metadata");
     break;
   }
-  
+
   for (size_t i = 0; i < numProtocols; ++i) {
     if (![classObject conformsToProtocol:protocols[i]]) {
       return nullptr;
     }
   }
-  
+
   return type;
 }
 
@@ -1247,11 +1247,11 @@ extern "C" id swift_dynamicCastObjCProtocolUnconditional(id object,
   for (size_t i = 0; i < numProtocols; ++i) {
     if (![object conformsToProtocol:protocols[i]]) {
       Class sourceType = object_getClass(object);
-      swift_dynamicCastFailure(sourceType, class_getName(sourceType), 
+      swift_dynamicCastFailure(sourceType, class_getName(sourceType),
                                protocols[i], protocol_getName(protocols[i]));
     }
   }
-  
+
   return object;
 }
 
@@ -1264,7 +1264,7 @@ extern "C" id swift_dynamicCastObjCProtocolConditional(id object,
       return nil;
     }
   }
-  
+
   return object;
 }
 
@@ -1321,7 +1321,7 @@ swift::swift_dynamicCastForeignClassMetatype(const ClassMetadata *sourceType,
 const ClassMetadata *
 swift::swift_dynamicCastForeignClassMetatypeUnconditional(
   const ClassMetadata *sourceType,
-  const ClassMetadata *targetType) 
+  const ClassMetadata *targetType)
 {
   // FIXME: Actually compare CFTypeIDs, once they arae available in
   // the metadata.
@@ -1338,7 +1338,7 @@ static bool usesNativeSwiftReferenceCounting_nonNull(
   return !isObjCTaggedPointer(object) &&
     usesNativeSwiftReferenceCounting_allocated(object);
 }
-#endif 
+#endif
 
 SWIFT_RT_ENTRY_VISIBILITY
 bool swift::swift_isUniquelyReferenced_nonNull_native(
@@ -1359,7 +1359,7 @@ bool swift::swift_isUniquelyReferencedNonObjC_nonNull(const void* object) {
   return
 #if SWIFT_OBJC_INTEROP
     usesNativeSwiftReferenceCounting_nonNull(object) &&
-#endif 
+#endif
     SWIFT_RT_ENTRY_CALL(swift_isUniquelyReferenced_nonNull_native)((HeapObject*)object);
 }
 
@@ -1378,7 +1378,7 @@ bool swift::swift_isUniquelyReferencedNonObjC_nonNull_bridgeObject(
   uintptr_t bits
 ) {
   auto bridgeObject = (void*)bits;
-  
+
   if (isObjCTaggedPointer(bridgeObject))
     return false;
 
@@ -1431,7 +1431,7 @@ bool swift::swift_isUniquelyReferencedOrPinnedNonObjC_nonNull(
   return
 #if SWIFT_OBJC_INTEROP
     usesNativeSwiftReferenceCounting_nonNull(object) &&
-#endif 
+#endif
     swift_isUniquelyReferencedOrPinned_nonNull_native(
                                                     (const HeapObject*)object);
 }
@@ -1482,7 +1482,7 @@ swift_objc_class_unknownGetInstanceExtents(const ClassMetadata* c) {
   // Pure ObjC classes never have negative extents.
   if (c->isPureObjC())
     return ClassExtents{0, class_getInstanceSize((Class)c)};
-  
+
   return swift_class_getInstanceExtents(c);
 }
 

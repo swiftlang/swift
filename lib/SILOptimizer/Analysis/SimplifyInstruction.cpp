@@ -477,9 +477,20 @@ static SILValue simplifyBuiltin(BuiltinInst *BI) {
   switch (Builtin.ID) {
   default: break;
 
+  case BuiltinValueKind::SExtOrBitCast: {
+    const SILValue &Op = Args[0];
+    // extOrBitCast_N_N(x) -> x
+    if (Op->getType() == BI->getType())
+      return Op;
+  }
+  break;
+
   case BuiltinValueKind::TruncOrBitCast: {
     const SILValue &Op = Args[0];
     SILValue Result;
+    // truncOrBitCast_N_N(x) -> x
+    if (Op->getType() == BI->getType())
+      return Op;
     // trunc(extOrBitCast(x)) -> x
     if (match(Op, m_ExtOrBitCast(m_SILValue(Result)))) {
       // Truncated back to the same bits we started with.
@@ -524,6 +535,17 @@ static SILValue simplifyBuiltin(BuiltinInst *BI) {
         return val3;
     }
   }
+  break;
+  case BuiltinValueKind::Shl:
+  case BuiltinValueKind::AShr:
+  case BuiltinValueKind::LShr:
+    auto *RHS = dyn_cast<IntegerLiteralInst>(Args[1]);
+    if (RHS && !RHS->getValue()) {
+      // Shifting a value by 0 bits is equivalent to the value itself.
+      auto LHS = Args[0];
+      return LHS;
+    }
+    break;
   }
   return SILValue();
 }

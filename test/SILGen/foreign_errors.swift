@@ -18,19 +18,19 @@ func test0() throws {
   // CHECK: inject_enum_addr [[ERR_TEMP0]] : $*Optional<NSError>, #Optional.none!enumelt
   //   Create an unmanaged temporary, copy into it, and make a AutoreleasingUnsafeMutablePointer.
   // CHECK: [[ERR_TEMP1:%.*]] = alloc_stack $@sil_unmanaged Optional<NSError>
-  // CHECK: [[T0:%.*]] = load [[ERR_TEMP0]]
+  // CHECK: [[T0:%.*]] = load_borrow [[ERR_TEMP0]]
   // CHECK: [[T1:%.*]] = ref_to_unmanaged [[T0]]
-  // CHECK: store [[T1]] to [[ERR_TEMP1]]
+  // CHECK: store [[T1]] to [trivial] [[ERR_TEMP1]]
   // CHECK: address_to_pointer [[ERR_TEMP1]]
 
   //   Call the method.
   // CHECK: [[RESULT:%.*]] = apply [[METHOD]]({{.*}}, [[OBJC_SELF]])
 
   //   Writeback to the first temporary.
-  // CHECK: [[T0:%.*]] = load [[ERR_TEMP1]]
+  // CHECK: [[T0:%.*]] = load [trivial] [[ERR_TEMP1]]
   // CHECK: [[T1:%.*]] = unmanaged_to_ref [[T0]]
-  // CHECK: retain_value [[T1]]
-  // CHECK: assign [[T1]] to [[ERR_TEMP0]]
+  // CHECK: [[T1_COPY:%.*]] = copy_value [[T1]]
+  // CHECK: assign [[T1_COPY]] to [[ERR_TEMP0]]
 
   //   Pull out the boolean value and compare it to zero.
   // CHECK: [[BOOL_OR_INT:%.*]] = struct_extract [[RESULT]]
@@ -47,7 +47,7 @@ func test0() throws {
   
   //   Error path: fall out and rethrow.
   // CHECK: [[ERROR_BB]]:
-  // CHECK: [[T0:%.*]] = load [[ERR_TEMP0]]
+  // CHECK: [[T0:%.*]] = load [take] [[ERR_TEMP0]]
   // CHECK: [[T1:%.*]] = function_ref @swift_convertNSErrorToError : $@convention(thin) (@owned Optional<NSError>) -> @owned Error
   // CHECK: [[T2:%.*]] = apply [[T1]]([[T0]])
   // CHECK: throw [[T2]] : $Error
@@ -73,12 +73,12 @@ extension NSObject {
 // CHECK:   [[OBJCERR:%.*]] = enum $Optional<NSError>, #Optional.some!enumelt.1, [[T1]] : $NSError
 // CHECK:   [[SETTER:%.*]] = function_ref @_TFVs33AutoreleasingUnsafeMutablePointers7pointeex :
 // CHECK:   [[TEMP:%.*]] = alloc_stack $Optional<NSError>
-// CHECK:   store [[OBJCERR]] to [[TEMP]]
+// CHECK:   store [[OBJCERR]] to [init] [[TEMP]]
 // CHECK:   apply [[SETTER]]<Optional<NSError>>([[TEMP]], [[UNWRAPPED_OUT]])
 // CHECK:   dealloc_stack [[TEMP]]
 // CHECK:   br bb5
 // CHECK: bb4:
-// CHECK:   strong_release [[ERR]] : $Error
+// CHECK:   destroy_value [[ERR]] : $Error
 // CHECK:   br bb5
 // CHECK: bb5:
 // CHECK:   [[BITS:%.*]] = integer_literal $Builtin.Int{{[18]}}, 0
@@ -107,12 +107,12 @@ extension NSObject {
 // CHECK:   [[OBJCERR:%.*]] = enum $Optional<NSError>, #Optional.some!enumelt.1, [[T1]] : $NSError
 // CHECK:   [[SETTER:%.*]] = function_ref @_TFVs33AutoreleasingUnsafeMutablePointers7pointeex :
 // CHECK:   [[TEMP:%.*]] = alloc_stack $Optional<NSError>
-// CHECK:   store [[OBJCERR]] to [[TEMP]]
+// CHECK:   store [[OBJCERR]] to [init] [[TEMP]]
 // CHECK:   apply [[SETTER]]<Optional<NSError>>([[TEMP]], [[UNWRAPPED_OUT]])
 // CHECK:   dealloc_stack [[TEMP]]
 // CHECK:   br bb5
 // CHECK: bb4:
-// CHECK:   strong_release [[ERR]] : $Error
+// CHECK:   destroy_value [[ERR]] : $Error
 // CHECK:   br bb5
 // CHECK: bb5:
 // CHECK:   [[T0:%.*]] = enum $Optional<NSString>, #Optional.none!enumelt
@@ -144,7 +144,7 @@ let fn = ErrorProne.fail
 // CHECK:      [[RESULT:%.*]] = apply [[METHOD]]({{%.*}}, [[SELF]])
 // CHECK:      cond_br
 // CHECK:      return
-// CHECK:      [[T0:%.*]] = load [[TEMP]]
+// CHECK:      [[T0:%.*]] = load [take] [[TEMP]]
 // CHECK:      [[T1:%.*]] = apply {{%.*}}([[T0]])
 // CHECK:      throw [[T1]]
 
@@ -158,7 +158,7 @@ func testArgs() throws {
 func testBridgedResult() throws {
   let array = try ErrorProne.collection(withCount: 0)
 }
-// CHECK: sil hidden @_TF14foreign_errors17testBridgedResultFzT_T_ : $@convention(thin) () -> @error Error {
+// CHECK-LABEL: sil hidden @_TF14foreign_errors17testBridgedResultFzT_T_ : $@convention(thin) () -> @error Error {
 // CHECK:   debug_value undef : $Error, var, name "$error", argno 1
 // CHECK:   class_method [volatile] %1 : $@thick ErrorProne.Type, #ErrorProne.collection!1.foreign : (ErrorProne.Type) -> (Int) throws -> [Any] , $@convention(objc_method) (Int, Optional<AutoreleasingUnsafeMutablePointer<Optional<NSError>>>, @objc_metatype ErrorProne.Type) -> @autoreleased Optional<NSArray>
 
@@ -169,17 +169,20 @@ class VeryErrorProne : ErrorProne {
     try super.init(one: two)
   }
 }
-// CHECK:    sil hidden @_TFC14foreign_errors14VeryErrorPronec{{.*}}
-// CHECK:      [[BOX:%.*]] = alloc_box $VeryErrorProne
+
+// CHECK-LABEL:    sil hidden @_TFC14foreign_errors14VeryErrorPronec{{.*}}
+// CHECK:    bb0([[ARG1:%.*]] : $Optional<AnyObject>, [[ARG2:%.*]] : $VeryErrorProne):
+// CHECK:      [[BOX:%.*]] = alloc_box $@box VeryErrorProne
 // CHECK:      [[PB:%.*]] = project_box [[BOX]]
 // CHECK:      [[MARKED_BOX:%.*]] = mark_uninitialized [derivedself] [[PB]]
-// CHECK:      [[T0:%.*]] = load [[MARKED_BOX]]
+// CHECK:      store [[ARG2]] to [init] [[MARKED_BOX]]
+// CHECK:      [[T0:%.*]] = load_borrow [[MARKED_BOX]]
 // CHECK-NEXT: [[T1:%.*]] = upcast [[T0]] : $VeryErrorProne to $ErrorProne
 // CHECK-NEXT: [[T2:%.*]] = super_method [volatile] [[T0]] : $VeryErrorProne, #ErrorProne.init!initializer.1.foreign : (ErrorProne.Type) -> (Any?) throws -> ErrorProne , $@convention(objc_method) (Optional<AnyObject>, Optional<AutoreleasingUnsafeMutablePointer<Optional<NSError>>>, @owned ErrorProne) -> @owned Optional<ErrorProne>
-// CHECK:      {{$}}
+// CHECK:      [[ARG1_COPY:%.*]] = copy_value [[ARG1]]
 // CHECK-NOT:  [[BOX]]{{^[0-9]}}
 // CHECK-NOT:  [[MARKED_BOX]]{{^[0-9]}}
-// CHECK: apply [[T2]](%0, {{%.*}}, [[T1]])
+// CHECK:      apply [[T2]]([[ARG1_COPY]], {{%.*}}, [[T1]])
 
 // rdar://21051021
 // CHECK: sil hidden @_TF14foreign_errors12testProtocolFzPSo18ErrorProneProtocol_T_
@@ -212,10 +215,10 @@ func testNonNilError() throws -> Float {
 // CHECK:   [[OPTERR:%.*]] = alloc_stack $Optional<NSError>
 // CHECK:   [[RESULT:%.*]] = apply [[T1]](
 // CHECK:   assign {{%.*}} to [[OPTERR]]
-// CHECK:   [[T0:%.*]] = load [[OPTERR]]
+// CHECK:   [[T0:%.*]] = load [take] [[OPTERR]]
 // CHECK:   switch_enum [[T0]] : $Optional<NSError>, case #Optional.some!enumelt.1: [[ERROR_BB:bb[0-9]+]], case #Optional.none!enumelt: [[NORMAL_BB:bb[0-9]+]]
 // CHECK: [[NORMAL_BB]]:
-// CHECK-NOT: release
+// CHECK-NOT: destroy_value
 // CHECK:   return [[RESULT]]
 // CHECK: [[ERROR_BB]]
 
@@ -232,7 +235,7 @@ func testPreservedResult() throws -> CInt {
 // CHECK:   [[T2:%.*]] = builtin "cmp_ne_Int32"([[T0]] : $[[PRIM]], [[T1]] : $[[PRIM]])
 // CHECK:   cond_br [[T2]], [[NORMAL_BB:bb[0-9]+]], [[ERROR_BB:bb[0-9]+]]
 // CHECK: [[NORMAL_BB]]:
-// CHECK-NOT: release
+// CHECK-NOT: destroy_value
 // CHECK:   return [[RESULT]]
 // CHECK: [[ERROR_BB]]
 
@@ -250,7 +253,7 @@ func testPreservedResultBridged() throws -> Int {
 // CHECK:   [[T2:%.*]] = builtin "cmp_ne_Int{{.*}}"([[T0]] : $[[PRIM]], [[T1]] : $[[PRIM]])
 // CHECK:   cond_br [[T2]], [[NORMAL_BB:bb[0-9]+]], [[ERROR_BB:bb[0-9]+]]
 // CHECK: [[NORMAL_BB]]:
-// CHECK-NOT: release
+// CHECK-NOT: destroy_value
 // CHECK:   return [[RESULT]]
 // CHECK: [[ERROR_BB]]
 
@@ -268,6 +271,6 @@ func testPreservedResultInverted() throws {
 // CHECK:   [[T2:%.*]] = builtin "cmp_ne_Int32"([[T0]] : $[[PRIM]], [[T1]] : $[[PRIM]])
 // CHECK:   cond_br [[T2]], [[ERROR_BB:bb[0-9]+]], [[NORMAL_BB:bb[0-9]+]]
 // CHECK: [[NORMAL_BB]]:
-// CHECK-NOT: release
+// CHECK-NOT: destroy_value
 // CHECK:   return {{%.+}} : $()
 // CHECK: [[ERROR_BB]]

@@ -19,13 +19,13 @@
 from SwiftIntTypes import all_integer_types
 
 word_bits = int(CMAKE_SIZEOF_VOID_P)
-  
+
 def maskOfWidth(n):
   return (1 << n) - 1
 
 def inRadix(radix, n, zero='0'):
   """
-Represent the int n in the given radix.  
+Represent the int n in the given radix.
 Note: the third parameter, zero, is not for user consumption.
   """
   if n < 0:
@@ -63,7 +63,7 @@ tests.test("${Self}/success") {
   //===--- Important cases ------------------------------------------------===//
   expectEqual(0, ${Self}("0"))      // zero
   expectEqual(17, ${Self}("17"))    // non-zero with no radix
-  
+
   // Leading zeroes, with and without a radix
   expectEqual(10, ${Self}("010"))
   expectEqual(15, ${Self}("00F", radix: 16))
@@ -136,7 +136,7 @@ tests.test("${Self}/Basics") {
   expectEqual(String(${Self}.nan), String(${Self}("nan")!))
   expectEqual(String(${Self}.nan), String(${Self}("NaN")!))
 % end
-  
+
   expectEqual(-0.0, ${Self}("-0"))
   expectEqual(-0.0, ${Self}("-0.0"))
   expectEqual(0.0, ${Self}("0"))
@@ -149,11 +149,11 @@ tests.test("${Self}/Basics") {
     repeatElement(1024 as ${Self}, count: 10).reduce(1, *)
   let largeText = String(large)
   expectEqual(largeText, String(${Self}(largeText)!))
-  
+
   // ...ditto for its inverse.
   let smallText = String(1 / large)
   expectEqual(smallText, String(${Self}(smallText)!))
-  
+
   // Cases that should fail to parse
   expectNil(${Self}(""))       // EMPTY
   expectNil(${Self}("0FACE"))  // Hex characters without 0x
@@ -165,13 +165,13 @@ tests.test("${Self}/Basics") {
   // Overflow and underflow.  Interleave with other checks to make
   // sure we're not abusing errno
   expectEqual(0.0, ${Self}("0"))
-  expectNil(${Self}("2e99999999999999"))  
+  expectNil(${Self}("2e99999999999999"))
   expectEqual(0.0, ${Self}("0"))
-  expectNil(${Self}("2e-99999999999999"))  
+  expectNil(${Self}("2e-99999999999999"))
   expectEqual(0.0, ${Self}("0"))
-  expectNil(${Self}("-2e99999999999999"))  
+  expectNil(${Self}("-2e99999999999999"))
   expectEqual(0.0, ${Self}("0"))
-  expectNil(${Self}("-2e-99999999999999"))  
+  expectNil(${Self}("-2e-99999999999999"))
   expectEqual(0.0, ${Self}("0"))
 }
 

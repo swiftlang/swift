@@ -81,7 +81,8 @@ static bool expandCopyAddr(CopyAddrInst *CA) {
   SILBuilderWithScope Builder(CA);
 
   // %new = load %0 : $*T
-  LoadInst *New = Builder.createLoad(CA->getLoc(), Source);
+  LoadInst *New = Builder.createLoad(CA->getLoc(), Source,
+                                     LoadOwnershipQualifier::Unqualified);
 
   SILValue Destination = CA->getDest();
 
@@ -98,7 +99,8 @@ static bool expandCopyAddr(CopyAddrInst *CA) {
     IsInitialization_t IsInit = CA->isInitializationOfDest();
     LoadInst *Old = nullptr;
     if (IsInitialization_t::IsNotInitialization == IsInit) {
-      Old = Builder.createLoad(CA->getLoc(), Destination);
+      Old = Builder.createLoad(CA->getLoc(), Destination,
+                               LoadOwnershipQualifier::Unqualified);
     }
 
     // If we are not taking and have a reference type:
@@ -108,7 +110,7 @@ static bool expandCopyAddr(CopyAddrInst *CA) {
     IsTake_t IsTake = CA->isTakeOfSrc();
     if (IsTake_t::IsNotTake == IsTake) {
       TL.emitLoweredCopyValue(Builder, CA->getLoc(), New,
-                              TypeLowering::LoweringStyle::DeepNoEnum);
+                              TypeLowering::LoweringStyle::Deep);
     }
 
     // If we are not initializing:
@@ -117,12 +119,13 @@ static bool expandCopyAddr(CopyAddrInst *CA) {
     // release_value %old : $*T
     if (Old) {
       TL.emitLoweredDestroyValue(Builder, CA->getLoc(), Old,
-                                 TypeLowering::LoweringStyle::DeepNoEnum);
+                                 TypeLowering::LoweringStyle::Deep);
     }
   }
 
   // Create the store.
-  Builder.createStore(CA->getLoc(), New, Destination);
+  Builder.createStore(CA->getLoc(), New, Destination,
+                      StoreOwnershipQualifier::Unqualified);
 
   ++NumExpand;
   return true;
@@ -144,10 +147,11 @@ static bool expandDestroyAddr(DestroyAddrInst *DA) {
   // If we have a non-trivial type...
   if (!Type.isTrivial(Module)) {
     // If we have a type with reference semantics, emit a load/strong release.
-    LoadInst *LI = Builder.createLoad(DA->getLoc(), Addr);
+    LoadInst *LI = Builder.createLoad(DA->getLoc(), Addr,
+                                      LoadOwnershipQualifier::Unqualified);
     auto &TL = Module.getTypeLowering(Type);
     TL.emitLoweredDestroyValue(Builder, DA->getLoc(), LI,
-                               TypeLowering::LoweringStyle::DeepNoEnum);
+                               TypeLowering::LoweringStyle::Deep);
   }
 
   ++NumExpand;
@@ -169,7 +173,7 @@ static bool expandReleaseValue(ReleaseValueInst *DV) {
 
   auto &TL = Module.getTypeLowering(Type);
   TL.emitLoweredDestroyValue(Builder, DV->getLoc(), Value,
-                             TypeLowering::LoweringStyle::DeepNoEnum);
+                             TypeLowering::LoweringStyle::Deep);
 
   DEBUG(llvm::dbgs() << "    Expanding Destroy Value: " << *DV);
 
@@ -192,7 +196,7 @@ static bool expandRetainValue(RetainValueInst *CV) {
 
   auto &TL = Module.getTypeLowering(Type);
   TL.emitLoweredCopyValue(Builder, CV->getLoc(), Value,
-                          TypeLowering::LoweringStyle::DeepNoEnum);
+                          TypeLowering::LoweringStyle::Deep);
 
   DEBUG(llvm::dbgs() << "    Expanding Copy Value: " << *CV);
 

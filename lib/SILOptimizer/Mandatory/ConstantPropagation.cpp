@@ -13,6 +13,7 @@
 #define DEBUG_TYPE "constant-propagation"
 #include "swift/SILOptimizer/PassManager/Passes.h"
 #include "swift/AST/DiagnosticsSIL.h"
+#include "swift/SIL/PatternMatch.h"
 #include "swift/SIL/SILBuilder.h"
 #include "swift/SIL/SILInstruction.h"
 #include "swift/SILOptimizer/Utils/Local.h"
@@ -23,6 +24,7 @@
 #include "llvm/Support/Debug.h"
 #include "llvm/Support/CommandLine.h"
 using namespace swift;
+using namespace swift::PatternMatch;
 
 STATISTIC(NumInstFolded, "Number of constant folded instructions");
 
@@ -176,6 +178,33 @@ static SILInstruction *constantFoldIntrinsic(BuiltinInst *BI,
     return Op1;
   }
 
+  case llvm::Intrinsic::ctlz: {
+    assert(BI->getArguments().size() == 2 && "Ctlz should have 2 args.");
+    OperandValueArrayRef Args = BI->getArguments();
+
+    // Fold for integer constant arguments.
+    auto *LHS = dyn_cast<IntegerLiteralInst>(Args[0]);
+    if (!LHS) {
+      return nullptr;
+    }
+    APInt LHSI = LHS->getValue();
+    unsigned LZ = 0;
+    // Check corner-case of source == zero
+    if (LHSI == 0) {
+      auto *RHS = dyn_cast<IntegerLiteralInst>(Args[1]);
+      if (!RHS || RHS->getValue() != 0) {
+        // Undefined
+        return nullptr;
+      }
+      LZ = LHSI.getBitWidth();
+    } else {
+      LZ = LHSI.countLeadingZeros();
+    }
+    APInt LZAsAPInt = APInt(LHSI.getBitWidth(), LZ);
+    SILBuilderWithScope B(BI);
+    return B.createIntegerLiteral(BI->getLoc(), LHS->getType(), LZAsAPInt);
+  }
+
   case llvm::Intrinsic::sadd_with_overflow:
   case llvm::Intrinsic::uadd_with_overflow:
   case llvm::Intrinsic::ssub_with_overflow:
@@ -200,6 +229,33 @@ static SILInstruction *constantFoldCompare(BuiltinInst *BI,
     APInt Res = constantFoldComparison(LHS->getValue(), RHS->getValue(), ID);
     SILBuilderWithScope B(BI);
     return B.createIntegerLiteral(BI->getLoc(), BI->getType(), Res);
+  }
+
+  SILValue Other;
+  auto MatchNonNegative =
+      m_BuiltinInst(BuiltinValueKind::AssumeNonNegative, m_ValueBase());
+  if (match(BI, m_CombineOr(m_BuiltinInst(BuiltinValueKind::ICMP_ULT,
+                                          m_SILValue(Other), m_Zero()),
+                            m_BuiltinInst(BuiltinValueKind::ICMP_UGT, m_Zero(),
+                                          m_SILValue(Other)))) ||
+      match(BI, m_CombineOr(m_BuiltinInst(BuiltinValueKind::ICMP_SLT,
+                                          MatchNonNegative, m_Zero()),
+                            m_BuiltinInst(BuiltinValueKind::ICMP_SGT, m_Zero(),
+                                          MatchNonNegative)))) {
+    SILBuilderWithScope B(BI);
+    return B.createIntegerLiteral(BI->getLoc(), BI->getType(), APInt());
+  }
+
+  if (match(BI, m_CombineOr(m_BuiltinInst(BuiltinValueKind::ICMP_UGE,
+                                          m_SILValue(Other), m_Zero()),
+                            m_BuiltinInst(BuiltinValueKind::ICMP_ULE, m_Zero(),
+                                          m_SILValue(Other)))) ||
+      match(BI, m_CombineOr(m_BuiltinInst(BuiltinValueKind::ICMP_SGE,
+                                          MatchNonNegative, m_Zero()),
+                            m_BuiltinInst(BuiltinValueKind::ICMP_SLE, m_Zero(),
+                                          MatchNonNegative)))) {
+    SILBuilderWithScope B(BI);
+    return B.createIntegerLiteral(BI->getLoc(), BI->getType(), APInt(1, 1));
   }
 
   return nullptr;

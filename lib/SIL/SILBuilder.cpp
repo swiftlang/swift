@@ -275,6 +275,29 @@ SILBuilder::emitReleaseValue(SILLocation Loc, SILValue Operand) {
   return createReleaseValue(Loc, Operand, Atomicity::Atomic);
 }
 
+PointerUnion<CopyValueInst *, DestroyValueInst *>
+SILBuilder::emitDestroyValue(SILLocation Loc, SILValue Operand) {
+  // Check to see if the instruction immediately before the insertion point is a
+  // retain_value of the specified operand.  If so, we can zap the pair.
+  auto I = getInsertionPoint(), BBStart = getInsertionBB()->begin();
+  while (I != BBStart) {
+    auto *Inst = &*--I;
+
+    if (auto *CVI = dyn_cast<CopyValueInst>(Inst)) {
+      if (SILValue(CVI) == Operand || CVI->getOperand() == Operand)
+        return CVI;
+      // Skip past unrelated retains.
+      continue;
+    }
+
+    // Scan past simple instructions that cannot reduce refcounts.
+    if (couldReduceStrongRefcount(Inst))
+      break;
+  }
+
+  // If we didn't find a retain to fold this into, emit the release.
+  return createDestroyValue(Loc, Operand);
+}
 
 SILValue SILBuilder::emitThickToObjCMetatype(SILLocation Loc, SILValue Op,
                                              SILType Ty) {

@@ -1,4 +1,4 @@
-// RUN: %target-sil-opt -module-name Swift -enable-sil-verify-all %s -diagnostics | %FileCheck %s
+// RUN: %target-sil-opt -assume-parsing-unqualified-ownership-sil -module-name Swift -enable-sil-verify-all %s -diagnostics | %FileCheck %s
 
 sil_stage raw
 
@@ -12,8 +12,8 @@ class TheClass {}
 // an undef operand, but that we do later remove it in the diagnostics
 // passes.
 
-// CHECK-LABEL: sil @unreachable_dealloc_stack
-sil @unreachable_dealloc_stack: $@convention(method) (@guaranteed TheClass) -> () {
+// CHECK-LABEL: sil @unreachable_deallocstack
+sil @unreachable_deallocstack: $@convention(method) (@guaranteed TheClass) -> () {
 bb0(%0 : $TheClass):
   %1 = function_ref @nada : $@convention(c) (Builtin.Int32) -> Never
   %2 = integer_literal $Builtin.Int32, 0

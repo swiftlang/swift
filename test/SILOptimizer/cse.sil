@@ -1,4 +1,4 @@
-// RUN: %target-sil-opt -enable-sil-verify-all %s -cse | %FileCheck %s
+// RUN: %target-sil-opt -assume-parsing-unqualified-ownership-sil -enable-sil-verify-all %s -cse | %FileCheck %s
 
 import Builtin
 import Swift
@@ -110,7 +110,7 @@ bb0:
 // CHECK-NOT: unchecked_ref_cast
 sil @removeTriviallyDeadInstructions : $@convention(thin) (@owned B) -> () {
 bb0(%0 : $B):
-  %1 = alloc_box $B
+  %1 = alloc_box $@box B
   %1a = project_box %1 : $@box B, 0
   %2 = store %0 to %1a : $*B
   %3 = load %1a : $*B
@@ -1324,7 +1324,7 @@ protocol Proto : class {
   func doThat()
 }
 
-// Check that all open_existential_ref instructions are CSEd 
+// Check that all open_existential_ref instructions are CSEd
 // Any reference to the $@opened("1B685052-4796-11E6-B7DF-B8E856428C60") Proto should be replaced by
 // references to $@opened("1B68354A-4796-11E6-B7DF-B8E856428C60") Proto.
 // CHECK-LABEL: sil @cse_open_existential : $@convention(thin) (@guaranteed Proto, Bool) -> ()

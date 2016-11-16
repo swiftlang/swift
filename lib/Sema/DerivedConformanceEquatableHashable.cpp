@@ -144,20 +144,34 @@ static void deriveBodyEquatable_enum_eq(AbstractFunctionDecl *eqDecl) {
                                            bParam, eqDecl, "index_b");
   
   // Generate the compare of the indices.
-  FuncDecl *cmpFunc = C.getEqualIntDecl(nullptr);
+  FuncDecl *cmpFunc = C.getEqualIntDecl();
   assert(cmpFunc && "should have a == for int as we already checked for it");
   
-  auto fnType = dyn_cast<FunctionType>(cmpFunc->getType()->getCanonicalType());
+  auto fnType = cast<FunctionType>(cmpFunc->getType()->getCanonicalType());
+
+  Expr *cmpFuncExpr;
+  if (cmpFunc->getDeclContext()->isTypeContext()) {
+    auto contextTy = cmpFunc->getDeclContext()->getSelfInterfaceType();
+    Expr *base = TypeExpr::createImplicitHack(SourceLoc(), contextTy, C);
+    Expr *ref = new (C) DeclRefExpr(cmpFunc, DeclNameLoc(), /*Implicit*/ true,
+                                    AccessSemantics::Ordinary, fnType);
+
+    fnType = cast<FunctionType>(fnType.getResult());
+    cmpFuncExpr = new (C) DotSyntaxCallExpr(ref, SourceLoc(), base, fnType);
+    cmpFuncExpr->setImplicit();
+  } else {
+    cmpFuncExpr = new (C) DeclRefExpr(cmpFunc, DeclNameLoc(),
+                                      /*implicit*/ true,
+                                      AccessSemantics::Ordinary,
+                                      fnType);
+  }
+
   auto tType = fnType.getInput();
-  
   TupleExpr *abTuple = TupleExpr::create(C, SourceLoc(), { aIndex, bIndex },
                                          { }, { }, SourceLoc(),
                                          /*HasTrailingClosure*/ false,
                                          /*Implicit*/ true, tType);
-  auto *cmpFuncExpr = new (C) DeclRefExpr(cmpFunc, DeclNameLoc(),
-                                          /*implicit*/ true,
-                                          AccessSemantics::Ordinary,
-                                          cmpFunc->getType());
+
   auto *cmpExpr = new (C) BinaryExpr(cmpFuncExpr, abTuple, /*implicit*/ true,
                                      boolTy);
   statements.push_back(new (C) ReturnStmt(SourceLoc(), cmpExpr));
@@ -231,7 +245,7 @@ deriveEquatable_enum_eq(TypeChecker &tc, Decl *parentDecl, EnumDecl *enumDecl) {
                 diag::broken_equatable_eq_operator);
     return nullptr;
   }
-  if (!C.getEqualIntDecl(nullptr)) {
+  if (!C.getEqualIntDecl()) {
     tc.diagnose(parentDecl->getLoc(), diag::no_equal_overload_for_int);
     return nullptr;
   }
@@ -257,7 +271,6 @@ deriveEquatable_enum_eq(TypeChecker &tc, Decl *parentDecl, EnumDecl *enumDecl) {
   Type interfaceTy;
   Type selfIfaceTy = eqDecl->computeInterfaceSelfType(false);
   if (auto genericSig = parentDC->getGenericSignatureOfContext()) {
-    eqDecl->setGenericSignature(genericSig);
     eqDecl->setGenericEnvironment(parentDC->getGenericEnvironmentOfContext());
 
     Type enumIfaceTy = parentDC->getDeclaredInterfaceType();
@@ -411,7 +424,6 @@ deriveHashable_enum_hashValue(TypeChecker &tc, Decl *parentDecl,
   Type interfaceType;
   Type selfIfaceType = getterDecl->computeInterfaceSelfType(false);
   if (auto sig = parentDC->getGenericSignatureOfContext()) {
-    getterDecl->setGenericSignature(sig);
     getterDecl->setGenericEnvironment(parentDC->getGenericEnvironmentOfContext());
     interfaceType = GenericFunctionType::get(sig, selfIfaceType, methodType,
                                              AnyFunctionType::ExtInfo());

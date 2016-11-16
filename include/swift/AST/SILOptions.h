@@ -116,6 +116,9 @@ public:
 
   /// If set to true, compile with the SIL Ownership Model enabled.
   bool EnableSILOwnership = false;
+
+  /// When parsing SIL, assume unqualified ownership.
+  bool AssumeUnqualifiedOwnershipWhenParsing = false;
 };
 
 } // end namespace swift

@@ -546,9 +546,8 @@ ArrayRef<Substitution> SILFunction::getForwardingSubstitutions() {
   if (!env)
     return {};
 
-  auto sig = getLoweredFunctionType()->getGenericSignature();
   auto *M = getModule().getSwiftModule();
-  ForwardingSubs = env->getForwardingSubstitutions(M, sig);
+  ForwardingSubs = env->getForwardingSubstitutions(M);
 
   return *ForwardingSubs;
 }

@@ -456,7 +456,7 @@ func stringliterals(_ d: [String: Int]) {
     "something else")"
   // expected-error @-2 {{unterminated string literal}} expected-error @-1 {{unterminated string literal}}
 
-  // expected-warning @+2 {{initialization of variable 'x2' was never used; consider replacing with assignment to '_' or removing it}}
+  // expected-warning @+2 {{variable 'x2' was never used; consider replacing with '_' or removing it}}
   // expected-error @+1 {{unterminated string literal}}
   var x2 : () = ("hello" + "
   ;

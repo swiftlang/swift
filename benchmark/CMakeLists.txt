@@ -64,6 +64,10 @@ set(SWIFT_BENCH_MODULES
     single-source/NSStringConversion
     single-source/NopDeinit
     single-source/ObjectAllocation
+    single-source/ObserverClosure
+    single-source/ObserverForwarderStruct
+    single-source/ObserverPartiallyAppliedMethod 
+    single-source/ObserverUnappliedMethod 
     single-source/OpenClose
     single-source/Phonebook
     single-source/PolymorphicCalls

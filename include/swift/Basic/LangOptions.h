@@ -47,6 +47,9 @@ namespace swift {
 
     /// \brief Disable API availability checking.
     bool DisableAvailabilityChecking = false;
+
+    /// \brief Disable typo correction.
+    bool DisableTypoCorrection = false;
     
     /// Should access control be respected?
     bool EnableAccessControl = true;

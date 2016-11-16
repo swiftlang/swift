@@ -44,6 +44,10 @@ func evaluateLazy() -> Int {
 
 class Foo {
   var y: Int __behavior lazy { evaluateLazy() }
+
+  // FIXME: Hack because we can't find the synthesized associated type witness
+  // during witness matching.
+  typealias Value = Int
 }
 
 var Lazy = TestSuite("Lazy")

@@ -24,7 +24,7 @@
 ///   This type is always canonical.  The default behavior is TYPE(id, parent).
 
 /// BUILTIN_TYPE(id, parent)
-///   This type is a builtin type. The default behavior is 
+///   This type is a builtin type. The default behavior is
 ///   ALWAYS_CANONICAL_TYPE(id, parent).
 
 /// SUGARED_TYPE(id, parent)
@@ -116,11 +116,9 @@ ALWAYS_CANONICAL_TYPE(Module, Type)
 TYPE(DynamicSelf, Type)
 ABSTRACT_TYPE(Substitutable, Type)
   ALWAYS_CANONICAL_TYPE(Archetype, SubstitutableType)
-  ABSTRACT_TYPE(AbstractTypeParam, SubstitutableType)
-    TYPE(GenericTypeParam, AbstractTypeParamType)
-    SUGARED_TYPE(AssociatedType, AbstractTypeParamType)
-    TYPE_RANGE(AbstractTypeParam, GenericTypeParam, AssociatedType)
-  TYPE_RANGE(Substitutable, Archetype, AssociatedType)
+  TYPE(GenericTypeParam, SubstitutableType)
+  TYPE_RANGE(Substitutable, Archetype, GenericTypeParam)
+SUGARED_TYPE(AssociatedType, Type)
 SUGARED_TYPE(Substituted, Type)
 TYPE(DependentMember, Type)
 ABSTRACT_TYPE(AnyFunction, Type)

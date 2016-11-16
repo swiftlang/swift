@@ -2792,7 +2792,12 @@ for host in "${ALL_HOSTS[@]}"; do
                     # executing ninja directly, have it dump the commands it would
                     # run, strip Ninja's progress prefix with sed, and tell the
                     # shell to execute that.
-                    sh -e -x -c "$("${build_cmd[@]}" -n -v ${target} | sed -e 's/[^]]*] //')"
+                    # However, if we do this in a subshell in the ``sh -e -x -c`` line,
+                    # errors in the command will not stop the script as they should.
+                    echo "Generating dry run test command from: ${build_cmd[@]} -n -v ${target}"
+                    dry_run_command_output="$(${build_cmd[@]} -n -v ${target} | sed -e 's/[^]]*] //')"
+                    echo "Test command: ${dry_run_command_output}"
+                    sh -e -x -c "${dry_run_command_output}"
                 else
                     call "${build_cmd[@]}" ${BUILD_TARGET_FLAG} ${target}
                 fi

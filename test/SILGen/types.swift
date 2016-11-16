@@ -4,18 +4,17 @@ class C {
   var member: Int = 0
 
   // Methods have method calling convention.
-  // CHECK-LABEL: sil hidden @_TFC5types1C3foo{{.*}} : $@convention(method) (Int, @guaranteed C) -> () {
+  // CHECK-LABEL: sil hidden @_TFC5types1C3foofT1xSi_T_ : $@convention(method) (Int, @guaranteed C) -> () {
   func foo(x x: Int) {
     // CHECK: bb0([[X:%[0-9]+]] : $Int, [[THIS:%[0-9]+]] : $C):
     member = x
 
-    // CHECK-NOT: strong_retain
+    // CHECK-NOT: copy_value
     // CHECK: [[FN:%[0-9]+]] = class_method %1 : $C, #C.member!setter.1
     // CHECK: apply [[FN]](%0, %1) : $@convention(method) (Int, @guaranteed C) -> ()
-    // CHECK-NOT: strong_release
-
-
+    // CHECK-NOT: destroy_value
   }
+  // CHECK: } // end sil function '_TFC5types1C3foofT1xSi_T_'
 }
 
 struct S {
@@ -27,7 +26,7 @@ struct S {
     var x = x
     // CHECK: bb0([[X:%[0-9]+]] : $Int, [[THIS:%[0-9]+]] : $*S):
     member = x
-    // CHECK: [[XADDR:%[0-9]+]] = alloc_box $Int
+    // CHECK: [[XADDR:%[0-9]+]] = alloc_box $@box Int
     // CHECK: [[X:%[0-9]+]] = project_box [[XADDR]]
     // CHECK: [[MEMBER:%[0-9]+]] = struct_element_addr [[THIS]] : $*S, #S.member
     // CHECK: copy_addr [[X]] to [[MEMBER]]

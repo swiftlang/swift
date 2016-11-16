@@ -69,15 +69,16 @@ func test3() {
   // CHECK-NEXT: [[STR:%[0-9]+]] = apply [[GETFN]]()
   let o = getAString()
   
-  // CHECK-NOT: release_value
+  // CHECK-NOT: destroy_value
 
   // CHECK: [[USEFN:%[0-9]+]] = function_ref{{.*}}useAString
-  // CHECK-NEXT: retain_value [[STR]]
-  // CHECK-NEXT: [[USE:%[0-9]+]] = apply [[USEFN]]([[STR]])
+  // CHECK-NEXT: [[STR_COPY:%.*]] = copy_value [[STR]]
+  // CHECK-NEXT: [[USE:%[0-9]+]] = apply [[USEFN]]([[STR_COPY]])
   useAString(o)
   
-  // CHECK: release_value [[STR]]
+  // CHECK: destroy_value [[STR]]
 }
+// CHECK: } // end sil function '{{.*}}test3{{.*}}'
 
 
 
@@ -96,8 +97,7 @@ func testAddressOnlyStructString<T>(_ a : T) -> String {
   // CHECK: [[TMPSTRUCT:%[0-9]+]] = alloc_stack $AddressOnlyStruct<T>
   // CHECK: apply [[PRODFN]]<T>([[TMPSTRUCT]],
   // CHECK-NEXT: [[STRADDR:%[0-9]+]] = struct_element_addr [[TMPSTRUCT]] : $*AddressOnlyStruct<T>, #AddressOnlyStruct.str
-  // CHECK-NEXT: [[STRVAL:%[0-9]+]] = load [[STRADDR]]
-  // CHECK-NEXT: retain_value [[STRVAL]]
+  // CHECK-NEXT: [[STRVAL:%[0-9]+]] = load [copy] [[STRADDR]]
   // CHECK-NEXT: destroy_addr [[TMPSTRUCT]]
   // CHECK-NEXT: dealloc_stack [[TMPSTRUCT]]
   // CHECK: return [[STRVAL]]
@@ -231,12 +231,12 @@ struct WeirdPropertyTest {
 // CHECK-LABEL: sil hidden @{{.*}}test_weird_property
 func test_weird_property(_ v : WeirdPropertyTest, i : Int) -> Int {
   var v = v
-  // CHECK: [[VBOX:%[0-9]+]] = alloc_box $WeirdPropertyTest
+  // CHECK: [[VBOX:%[0-9]+]] = alloc_box $@box WeirdPropertyTest
   // CHECK: [[PB:%.*]] = project_box [[VBOX]]
-  // CHECK: store %0 to [[PB]]
+  // CHECK: store %0 to [trivial] [[PB]]
 
   // The setter isn't mutating, so we need to load the box.
-  // CHECK: [[VVAL:%[0-9]+]] = load [[PB]]
+  // CHECK: [[VVAL:%[0-9]+]] = load [trivial] [[PB]]
   // CHECK: [[SETFN:%[0-9]+]] = function_ref @_TFV9let_decls17WeirdPropertyTests1pSi
   // CHECK: apply [[SETFN]](%1, [[VVAL]])
   v.p = i
@@ -252,9 +252,9 @@ func test_weird_property(_ v : WeirdPropertyTest, i : Int) -> Int {
 // CHECK-LABEL: sil hidden @{{.*}}generic_identity
 // CHECK: bb0(%0 : $*T, %1 : $*T):
 // CHECK-NEXT: debug_value_addr %1 : $*T
-// CHECK-NEXT: copy_addr [take] %1 to [initialization] %0 : $*T
-// CHECK-NEXT: %4 = tuple ()
-// CHECK-NEXT: return %4
+// CHECK-NEXT: copy_addr %1 to [initialization] %0 : $*T
+// CHECK-NEXT: destroy_addr %1
+// CHECK: } // end sil function '{{.*}}generic_identity{{.*}}'
 func generic_identity<T>(_ a : T) -> T {
   // Should be a single copy_addr, with no temporary.
   return a
@@ -341,7 +341,7 @@ func testAddressOnlyTupleArgument(_ bounds: (start: SimpleProtocol, pastEnd: Int
 // CHECK-NEXT:    %3 = tuple_element_addr %2 : $*(start: SimpleProtocol, pastEnd: Int), 0
 // CHECK-NEXT:    copy_addr [take] %0 to [initialization] %3 : $*SimpleProtocol
 // CHECK-NEXT:    %5 = tuple_element_addr %2 : $*(start: SimpleProtocol, pastEnd: Int), 1
-// CHECK-NEXT:    store %1 to %5 : $*Int
+// CHECK-NEXT:    store %1 to [trivial] %5 : $*Int
 // CHECK-NEXT:    debug_value_addr %2
 // CHECK-NEXT:    destroy_addr %2 : $*(start: SimpleProtocol, pastEnd: Int)
 // CHECK-NEXT:    dealloc_stack %2 : $*(start: SimpleProtocol, pastEnd: Int)
@@ -365,7 +365,11 @@ func member_ref_abstraction_change(_ x: GenericFunctionStruct<Int, Int>) -> (Int
 }
 
 // CHECK-LABEL: sil hidden @{{.*}}call_auto_closure
-// CHECK: apply %0()
+// CHECK: bb0([[CLOSURE:%.*]] : $@callee_owned () -> Bool):
+// CHECK:   [[CLOSURE_COPY:%.*]] = copy_value [[CLOSURE]]
+// CHECK:   apply [[CLOSURE_COPY]]() : $@callee_owned () -> Bool
+// CHECK:   destroy_value [[CLOSURE]]
+// CHECK: } // end sil function '{{.*}}call_auto_closure{{.*}}'
 func call_auto_closure(x: @autoclosure () -> Bool) -> Bool {
   return x()  // Calls of autoclosures should be marked transparent.
 }
@@ -384,7 +388,7 @@ struct StructMemberTest {
   var s : AnotherStruct
   var t : (Int, AnotherStruct)
 
-  // rdar://15867140 - Accessing the int member here should not retain the
+  // rdar://15867140 - Accessing the int member here should not copy_value the
   // whole struct.
   func testIntMemberLoad() -> Int {
     return i
@@ -393,10 +397,10 @@ struct StructMemberTest {
   // CHECK: bb0(%0 : $StructMemberTest):
   // CHECK:  debug_value %0 : $StructMemberTest, let, name "self"
   // CHECK:  %2 = struct_extract %0 : $StructMemberTest, #StructMemberTest.i
-  // CHECK-NOT:  release_value %0 : $StructMemberTest
+  // CHECK-NOT:  destroy_value %0 : $StructMemberTest
   // CHECK:  return %2 : $Int
 
-  // Accessing the int member in s should not retain the whole struct.
+  // Accessing the int member in s should not copy_value the whole struct.
   func testRecursiveIntMemberLoad() -> Int {
     return s.i
   }
@@ -405,7 +409,7 @@ struct StructMemberTest {
   // CHECK:  debug_value %0 : $StructMemberTest, let, name "self"
   // CHECK:  %2 = struct_extract %0 : $StructMemberTest, #StructMemberTest.s
   // CHECK:  %3 = struct_extract %2 : $AnotherStruct, #AnotherStruct.i
-  // CHECK-NOT:  release_value %0 : $StructMemberTest
+  // CHECK-NOT:  destroy_value %0 : $StructMemberTest
   // CHECK:  return %3 : $Int
   
   func testTupleMemberLoad() -> Int {
@@ -442,12 +446,12 @@ struct GenericStruct<T> {
   }
   
   // CHECK-LABEL: sil hidden @{{.*}}GenericStruct4getB{{.*}} : $@convention(method) <T> (@in_guaranteed GenericStruct<T>) -> Int
-  // CHECK: bb0(%0 : $*GenericStruct<T>):
-  // CHECK-NEXT: debug_value_addr %0 : $*GenericStruct<T>, let, name "self"
-  // CHECK-NEXT: %2 = struct_element_addr %0 : $*GenericStruct<T>, #GenericStruct.b
-  // CHECK-NEXT: %3 = load %2 : $*Int
-  // CHECK-NOT: destroy_addr %0 : $*GenericStruct<T>
-  // CHECK-NEXT: return %3 : $Int
+  // CHECK: bb0([[SELF_ADDR:%.*]] : $*GenericStruct<T>):
+  // CHECK-NEXT: debug_value_addr [[SELF_ADDR]] : $*GenericStruct<T>, let, name "self"
+  // CHECK-NEXT: [[PROJ_ADDR:%.*]] = struct_element_addr [[SELF_ADDR]] : $*GenericStruct<T>, #GenericStruct.b
+  // CHECK-NEXT: [[PROJ_VAL:%.*]] = load [trivial] [[PROJ_ADDR]] : $*Int
+  // CHECK-NOT: destroy_addr [[SELF]] : $*GenericStruct<T>
+  // CHECK-NEXT: return [[PROJ_VAL]] : $Int
 }
 
 
@@ -458,12 +462,12 @@ struct LetPropertyStruct {
 
 // CHECK-LABEL: sil hidden @{{.*}}testLetPropertyAccessOnLValueBase
 // CHECK: bb0(%0 : $LetPropertyStruct):
-// CHECK:  [[ABOX:%[0-9]+]] = alloc_box $LetPropertyStruct
+// CHECK:  [[ABOX:%[0-9]+]] = alloc_box $@box LetPropertyStruct
 // CHECK:  [[A:%[0-9]+]] = project_box [[ABOX]]
-// CHECK:   store %0 to [[A]] : $*LetPropertyStruct
-// CHECK:   [[STRUCT:%[0-9]+]] = load [[A]] : $*LetPropertyStruct
+// CHECK:   store %0 to [trivial] [[A]] : $*LetPropertyStruct
+// CHECK:   [[STRUCT:%[0-9]+]] = load_borrow [[A]] : $*LetPropertyStruct
 // CHECK:   [[PROP:%[0-9]+]] = struct_extract [[STRUCT]] : $LetPropertyStruct, #LetPropertyStruct.lp
-// CHECK:   strong_release [[ABOX]] : $@box LetPropertyStruct
+// CHECK:   destroy_value [[ABOX]] : $@box LetPropertyStruct
 // CHECK:   return [[PROP]] : $Int
 func testLetPropertyAccessOnLValueBase(_ a : LetPropertyStruct) -> Int {
   var a = a

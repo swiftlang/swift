@@ -371,7 +371,7 @@ tests.test("ForwardCollection") {
 tests.test("BidirectionalCollection") {
   let a0: ContiguousArray = [1, 2, 3, 5, 8, 13, 21]
   let fc0 = AnyCollection(a0.lazy.reversed())
-  
+
   let bc0_ = AnyBidirectionalCollection(fc0)  // upgrade!
   expectNotNil(bc0_)
   let bc0 = bc0_!
@@ -382,7 +382,7 @@ tests.test("BidirectionalCollection") {
 
   let fc2 = AnyCollection(bc0)                // downgrade
   expectTrue(storesSameUnderlyingCollection(fc2, bc0))
-  
+
   let a1 = ContiguousArray(bc0.lazy.reversed())
   expectEqual(a0, a1)
   for e in a0 {
@@ -394,7 +394,7 @@ tests.test("BidirectionalCollection") {
     expectNotEqual(bc0.endIndex, i)
     expectEqual(1, bc0.indices.filter { $0 == i }.count)
   }
-  
+
   // Can't upgrade a non-random-access collection to random access
   let s0 = "Hello, Woyld".characters
   let bc1 = AnyBidirectionalCollection(s0)
@@ -417,7 +417,7 @@ tests.test("RandomAccessCollection") {
 
   let fc1 = AnyBidirectionalCollection(rc0)         // downgrade
   expectTrue(storesSameUnderlyingCollection(fc1, rc0))
-  
+
   let a1 = ContiguousArray(rc0.lazy.reversed())
   expectEqual(a0, a1)
   for e in a0 {

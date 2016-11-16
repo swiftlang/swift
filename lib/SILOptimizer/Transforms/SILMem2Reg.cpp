@@ -348,7 +348,7 @@ static void replaceDestroy(DestroyAddrInst *DAI, SILValue NewValue) {
   auto Ty = DAI->getOperand()->getType();
   auto &TL = DAI->getModule().getTypeLowering(Ty);
   TL.emitLoweredDestroyValue(Builder, DAI->getLoc(), NewValue,
-                             Lowering::TypeLowering::LoweringStyle::DeepNoEnum);
+                             Lowering::TypeLowering::LoweringStyle::Deep);
   DAI->eraseFromParent();
 }
 

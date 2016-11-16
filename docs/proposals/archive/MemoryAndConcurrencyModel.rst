@@ -7,7 +7,7 @@ Swift Memory and Concurrency Model
 ==================================
 
 .. warning:: This is a very early design document discussing the features of
-  a possible Swift concurrency model. It should not be taken as a plan of 
+  a possible Swift concurrency model. It should not be taken as a plan of
   record.
 
 The goal of this writeup is to provide a safe and efficient way to model,
@@ -118,14 +118,14 @@ definition. These kinds are:
      func do_mandelbrot(_ x : float, y : float) -> int {
        // details elided
      }
-     
+
      actor MandelbrotCalculator {
        func compute(_ x : float, y : float, Driver D) {
          var num_iters = do_mandelbrot(x, y)
          D.collect_point(x, y, num_iters)
        }
      }
-     
+
      actor Driver {
        var result : image; // result and numpoints are mutable per-actor data.
        var numpoints : int;
@@ -140,7 +140,7 @@ definition. These kinds are:
            }
          }
        }
-     
+
        func collect_point(_ x : float, y : float, num_iters : int) {
          result.setPoint(x, y, Color(num_iters, num_iters, num_iters))
          if (--numpoints == 0)
@@ -310,7 +310,7 @@ to access the ivar. Silly example::
     var title : string; // string is an immutable by-ref type.
     ...
   }
-  
+
   ...
   var x = new Window;
   print(x.title) // ok, all stores will be atomic, an (recursively) immutable data is valid in all actors, so this is fine to load.
