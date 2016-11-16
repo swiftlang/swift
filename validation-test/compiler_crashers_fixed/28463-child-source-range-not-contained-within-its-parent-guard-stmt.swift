@@ -5,5 +5,5 @@
 // See http://swift.org/LICENSE.txt for license information
 // See http://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
 
-// RUN: not --crash %target-swift-frontend %s -emit-ir
-func<{var f={guard let{
+// RUN: not %target-swift-frontend %s -emit-ir
+{.n{guard let a
