@@ -108,14 +108,24 @@ public:
 class LoweredValue {
 public:
   enum class Kind {
-    /// This LoweredValue corresponds to a SIL address value.
-    /// The LoweredValue of an alloc_stack keeps an owning container in
-    /// addition to the address of the allocated buffer.
+    /// The first two LoweredValue kinds correspond to a SIL address value.
+    ///
+    /// The LoweredValue of an existential alloc_stack keeps an owning container
+    /// in addition to the address of the allocated buffer.
     /// Depending on the allocated type, the container may be equal to the
     /// buffer itself (for types with known sizes) or it may be the address
     /// of a fixed-size container which points to the heap-allocated buffer.
     /// In this case the address-part may be null, which means that the buffer
     /// is not allocated yet.
+    ContainedAddress,
+
+    /// The LoweredValue of a resilient, generic, or loadable typed alloc_stack
+    /// keeps an optional stackrestore point in addition to the address of the
+    /// allocated buffer. For all other address values the stackrestore point is
+    /// just null.
+    /// If the stackrestore point is set (currently, this might happen for
+    /// opaque types: generic and resilient) the deallocation of the stack must
+    /// reset the stack pointer to this point.
     Address,
 
     /// The following kinds correspond to SIL non-address values.
@@ -142,7 +152,8 @@ private:
   using ExplosionVector = SmallVector<llvm::Value *, 4>;
   
   union {
-    ContainedAddress address;
+    ContainedAddress containedAddress;
+    StackAddress address;
     OwnedAddress boxWithAddress;
     struct {
       ExplosionVector values;
@@ -153,9 +164,14 @@ private:
 
 public:
 
-  /// Create an address value without a container (the usual case).
+  /// Create an address value without a stack restore point.
   LoweredValue(const Address &address)
-    : kind(Kind::Address), address(Address(), address)
+    : kind(Kind::Address), address(address)
+  {}
+
+  /// Create an address value with an optional stack restore point.
+  LoweredValue(const StackAddress &address)
+    : kind(Kind::Address), address(address)
   {}
   
   enum ContainerForUnallocatedAddress_t { ContainerForUnallocatedAddress };
@@ -163,13 +179,13 @@ public:
   /// Create an address value for an alloc_stack, consisting of a container and
   /// a not yet allocated buffer.
   LoweredValue(const Address &container, ContainerForUnallocatedAddress_t)
-    : kind(Kind::Address), address(container, Address())
+    : kind(Kind::ContainedAddress), containedAddress(container, Address())
   {}
   
   /// Create an address value for an alloc_stack, consisting of a container and
   /// the address of the allocated buffer.
   LoweredValue(const ContainedAddress &address)
-  : kind(Kind::Address), address(address)
+    : kind(Kind::ContainedAddress), containedAddress(address)
   {}
   
   LoweredValue(StaticFunction &&staticFunction)
@@ -194,8 +210,11 @@ public:
     : kind(lv.kind)
   {    
     switch (kind) {
+    case Kind::ContainedAddress:
+      ::new (&containedAddress) ContainedAddress(std::move(lv.containedAddress));
+      break;
     case Kind::Address:
-      ::new (&address) ContainedAddress(std::move(lv.address));
+      ::new (&address) StackAddress(std::move(lv.address));
       break;
     case Kind::Explosion:
       ::new (&explosion.values) ExplosionVector(std::move(lv.explosion.values));
@@ -223,7 +242,8 @@ public:
     return kind == Kind::Address && address.getAddress().isValid();
   }
   bool isUnallocatedAddressInBuffer() const {
-    return kind == Kind::Address && !address.getAddress().isValid();
+    return kind == Kind::ContainedAddress &&
+           !containedAddress.getAddress().isValid();
   }
   bool isValue() const {
     return kind >= Kind::Value_First && kind <= Kind::Value_Last;
@@ -236,11 +256,16 @@ public:
     assert(isAddress() && "not an allocated address");
     return address.getAddress();
   }
+
+  StackAddress getStackAddress() const {
+    assert(isAddress() && "not an allocated address");
+    return address;
+  }
   
   Address getContainerOfAddress() const {
-    assert(kind == Kind::Address);
-    assert(address.getContainer().isValid() && "address has no container");
-    return address.getContainer();
+    assert(kind == Kind::ContainedAddress);
+    assert(containedAddress.getContainer().isValid() && "address has no container");
+    return containedAddress.getContainer();
   }
   
   void getExplosion(IRGenFunction &IGF, Explosion &ex) const;
@@ -271,7 +296,10 @@ public:
   ~LoweredValue() {
     switch (kind) {
     case Kind::Address:
-      address.~ContainedAddress();
+      address.~StackAddress();
+      break;
+    case Kind::ContainedAddress:
+      containedAddress.~ContainedAddress();
       break;
     case Kind::Explosion:
       explosion.values.~ExplosionVector();
@@ -326,28 +354,6 @@ public:
   unsigned NumAnonVars = 0;
   unsigned NumCondFails = 0;
 
-  /// Notes about instructions for which we're supposed to perform some
-  /// sort of non-standard emission.  This enables some really simply local
-  /// peepholing in cases where you can't just do that with the lowered value.
-  ///
-  /// Since emission notes generally change semantics, we enforce that all
-  /// notes must be claimed.
-  ///
-  /// This uses a set because the current peepholes don't need to record any
-  /// extra structure; if you need extra structure, feel free to make it a
-  /// map.  This set is generally very small because claiming a note removes
-  /// it.
-  llvm::SmallPtrSet<SILInstruction *, 4> EmissionNotes;
-
-  void addEmissionNote(SILInstruction *inst) {
-    assert(inst);
-    EmissionNotes.insert(inst);
-  }
-
-  bool claimEmissionNote(SILInstruction *inst) {
-    return EmissionNotes.erase(inst);
-  }
-
   /// Accumulative amount of allocated bytes on the stack. Used to limit the
   /// size for stack promoted objects.
   /// We calculate it on demand, so that we don't have to do it if the
@@ -386,7 +392,7 @@ public:
     setLoweredValue(v, address);
   }
 
-  void setLoweredContainedAddress(SILValue v, const ContainedAddress &address) {
+  void setLoweredStackAddress(SILValue v, const StackAddress &address) {
     assert(v->getType().isAddress() && "address for non-address value?!");
     setLoweredValue(v, address);
   }
@@ -508,6 +514,11 @@ public:
   Address getLoweredAddress(SILValue v) {
     return getLoweredValue(v).getAddress();
   }
+
+  StackAddress getLoweredStackAddress(SILValue v) {
+    return getLoweredValue(v).getStackAddress();
+  }
+
   Address getLoweredContainerOfAddress(SILValue v) {
     return getLoweredValue(v).getContainerOfAddress();
   }
@@ -952,6 +963,7 @@ llvm::Value *StaticFunction::getExplosionValue(IRGenFunction &IGF) const {
 void LoweredValue::getExplosion(IRGenFunction &IGF, Explosion &ex) const {
   switch (kind) {
   case Kind::Address:
+  case Kind::ContainedAddress:
     llvm_unreachable("not a value");
       
   case Kind::Explosion:
@@ -976,6 +988,7 @@ void LoweredValue::getExplosion(IRGenFunction &IGF, Explosion &ex) const {
 llvm::Value *LoweredValue::getSingletonExplosion(IRGenFunction &IGF) const {
   switch (kind) {
   case Kind::Address:
+  case Kind::ContainedAddress:
     llvm_unreachable("not a value");
 
   case Kind::Explosion:
@@ -1456,8 +1469,6 @@ void IRGenSILFunction::emitSILFunction() {
     if (!visitedBlocks.count(&bb))
       LoweredBBs[&bb].bb->eraseFromParent();
 
-  assert(EmissionNotes.empty() &&
-         "didn't claim emission notes for all instructions!");
 }
 
 void IRGenSILFunction::estimateStackSize() {
@@ -1560,8 +1571,6 @@ void IRGenSILFunction::visitSILBasicBlock(SILBasicBlock *BB) {
     }
     visit(&I);
 
-    assert(!EmissionNotes.count(&I) &&
-           "didn't claim emission note for instruction!");
   }
   
   assert(Builder.hasPostTerminatorIP() && "SIL bb did not terminate block?!");
@@ -1943,6 +1952,7 @@ static CallEmission getCallEmissionForLoweredValue(IRGenSILFunction &IGF,
       
   case LoweredValue::Kind::BoxWithAddress:
     llvm_unreachable("@box isn't a valid callee");
+  case LoweredValue::Kind::ContainedAddress:
   case LoweredValue::Kind::Address:
     llvm_unreachable("sil address isn't a valid callee");
   }
@@ -2095,6 +2105,7 @@ getPartialApplicationFunction(IRGenSILFunction &IGF, SILValue v,
   auto fnType = v->getType().castTo<SILFunctionType>();
 
   switch (lv.kind) {
+  case LoweredValue::Kind::ContainedAddress:
   case LoweredValue::Kind::Address:
     llvm_unreachable("can't partially apply an address");
   case LoweredValue::Kind::BoxWithAddress:
@@ -3517,19 +3528,15 @@ void IRGenSILFunction::visitAllocStackInst(swift::AllocStackInst *i) {
 # endif
 
   (void) Decl;
-  // If a dynamic alloc_stack is immediately initialized by a copy_addr
-  // operation, we can combine the allocation and initialization using an
-  // optimized value witness.
-  if (tryDeferFixedSizeBufferInitialization(*this, i, type, Address(), dbgname))
-    return;
 
-  auto addr = type.allocateStack(*this,
-                                 i->getElementType(),
-                                 dbgname);
+  bool isEntryBlock =
+      i->getParentBlock() == i->getFunction()->entryBB();
+  auto addr =
+      type.allocateStack(*this, i->getElementType(), isEntryBlock, dbgname);
 
   emitDebugInfoForAllocStack(i, type, addr.getAddress().getAddress());
   
-  setLoweredContainedAddress(i, addr);
+  setLoweredStackAddress(i, addr);
 }
 
 static void
@@ -3584,15 +3591,9 @@ void IRGenSILFunction::visitAllocRefDynamicInst(swift::AllocRefDynamicInst *i) {
 void IRGenSILFunction::visitDeallocStackInst(swift::DeallocStackInst *i) {
   auto allocatedType = i->getOperand()->getType();
   const TypeInfo &allocatedTI = getTypeInfo(allocatedType);
-  Address container = getLoweredContainerOfAddress(i->getOperand());
+  StackAddress stackAddr = getLoweredStackAddress(i->getOperand());
 
-  // If the type isn't fixed-size, check whether we added an emission note.
-  // If so, we should deallocate and destroy at the same time.
-  if (!isa<FixedTypeInfo>(allocatedTI) && claimEmissionNote(i)) {
-    allocatedTI.destroyStack(*this, container, allocatedType);
-  } else {
-    allocatedTI.deallocateStack(*this, container, allocatedType);
-  }
+  allocatedTI.deallocateStack(*this, stackAddr, allocatedType);
 }
 
 void IRGenSILFunction::visitDeallocRefInst(swift::DeallocRefInst *i) {
@@ -4600,47 +4601,9 @@ void IRGenSILFunction::visitCopyAddrInst(swift::CopyAddrInst *i) {
 // does not produce any values.
 void IRGenSILFunction::visitBindMemoryInst(swift::BindMemoryInst *) {}
 
-static DeallocStackInst *
-findPairedDeallocStackForDestroyAddr(DestroyAddrInst *destroyAddr) {
-  // This peephole only applies if the address being destroyed is the
-  // result of an alloc_stack.
-  auto allocStack = dyn_cast<AllocStackInst>(destroyAddr->getOperand());
-  if (!allocStack) return nullptr;
-
-  for (auto inst = &*std::next(destroyAddr->getIterator()); !isa<TermInst>(inst);
-       inst = &*std::next(inst->getIterator())) {
-    // If we find a dealloc_stack of the right memory, great.
-    if (auto deallocStack = dyn_cast<DeallocStackInst>(inst))
-      if (deallocStack->getOperand() == allocStack)
-        return deallocStack;
-
-    // Otherwise, if the instruction uses the alloc_stack result, treat it
-    // as interfering.  This assumes that any re-initialization of
-    // the alloc_stack will be obvious in the function.
-    for (auto &operand : inst->getAllOperands())
-      if (operand.get() == allocStack)
-        return nullptr;
-  }
-
-  // If we ran into the terminator, stop; only apply this peephole locally.
-  // TODO: this could use a fancier dominance analysis, maybe.
-  return nullptr;
-}
-
 void IRGenSILFunction::visitDestroyAddrInst(swift::DestroyAddrInst *i) {
   SILType addrTy = i->getOperand()->getType();
   const TypeInfo &addrTI = getTypeInfo(addrTy);
-
-  // Try to fold a destroy_addr of a dynamic alloc_stack into a single
-  // destroyBuffer operation.
-  if (!isa<FixedTypeInfo>(addrTI)) {
-    // If we can find a matching dealloc stack, just set an emission note
-    // on it; that will cause it to destroy the current value.
-    if (auto deallocStack = findPairedDeallocStackForDestroyAddr(i)) {
-      addEmissionNote(deallocStack);
-      return;
-    }
-  }
 
   // Otherwise, do the normal thing.
   Address base = getLoweredAddress(i->getOperand());

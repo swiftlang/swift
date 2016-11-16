@@ -57,28 +57,30 @@ public:
   // This is useful for metaprogramming.
   static bool isFixed() { return false; }
 
-  ContainedAddress allocateStack(IRGenFunction &IGF,
+  StackAddress allocateStack(IRGenFunction &IGF,
                                  SILType T,
+                                 bool isInEntryBlock,
                                  const llvm::Twine &name) const override {
-    // Make a fixed-size buffer.
-    Address buffer = IGF.createFixedSizeBufferAlloca(name);
-    IGF.Builder.CreateLifetimeStart(buffer, getFixedBufferSize(IGF.IGM));
-
-    // Allocate an object of the appropriate type within it.
-    llvm::Value *address = emitAllocateBufferCall(IGF, T, buffer);
-    return { buffer, getAsBitCastAddress(IGF, address) };
+    // Allocate memory on the stack.
+    auto alloca = emitDynamicAlloca(IGF, T, isInEntryBlock);
+    assert((isInEntryBlock && alloca.SavedSP == nullptr) ||
+           (!isInEntryBlock && alloca.SavedSP != nullptr) &&
+               "stacksave/restore operations can only be skipped in the entry "
+               "block");
+    IGF.Builder.CreateLifetimeStart(alloca.Alloca);
+    return { getAsBitCastAddress(IGF, alloca.Alloca), alloca.SavedSP };
   }
 
-  void deallocateStack(IRGenFunction &IGF, Address buffer,
+  void deallocateStack(IRGenFunction &IGF, StackAddress stackAddress,
                        SILType T) const override {
-    emitDeallocateBufferCall(IGF, T, buffer);
-    IGF.Builder.CreateLifetimeEnd(buffer, getFixedBufferSize(IGF.IGM));
+    IGF.Builder.CreateLifetimeEnd(stackAddress.getAddress().getAddress());
+    emitDeallocateDynamicAlloca(IGF, stackAddress);
   }
 
-  void destroyStack(IRGenFunction &IGF, Address buffer,
+  void destroyStack(IRGenFunction &IGF, StackAddress stackAddress,
                     SILType T) const override {
-    emitDestroyBufferCall(IGF, T, buffer);
-    IGF.Builder.CreateLifetimeEnd(buffer, getFixedBufferSize(IGF.IGM));
+    emitDestroyCall(IGF, T, stackAddress.getAddress());
+    deallocateStack(IGF, stackAddress, T);
   }
 
   llvm::Value *getValueWitnessTable(IRGenFunction &IGF, SILType T) const {

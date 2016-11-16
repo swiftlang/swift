@@ -63,30 +63,31 @@ Address IRGenModule::emitSILGlobalVariable(SILGlobalVariable *var) {
   return addr;
 }
 
-ContainedAddress FixedTypeInfo::allocateStack(IRGenFunction &IGF, SILType T,
-                                              const Twine &name) const {
+StackAddress FixedTypeInfo::allocateStack(IRGenFunction &IGF, SILType T,
+                                          bool isEntryBlock,
+                                          const Twine &name) const {
   // If the type is known to be empty, don't actually allocate anything.
   if (isKnownEmpty(ResilienceExpansion::Maximal)) {
     auto addr = getUndefAddress();
-    return { addr, addr };
+    return { addr };
   }
 
   Address alloca =
     IGF.createAlloca(getStorageType(), getFixedAlignment(), name);
   IGF.Builder.CreateLifetimeStart(alloca, getFixedSize());
   
-  return { alloca, alloca };
+  return { alloca };
 }
 
-void FixedTypeInfo::destroyStack(IRGenFunction &IGF, Address addr,
+void FixedTypeInfo::destroyStack(IRGenFunction &IGF, StackAddress addr,
                                  SILType T) const {
-  destroy(IGF, addr, T);
+  destroy(IGF, addr.getAddress(), T);
   FixedTypeInfo::deallocateStack(IGF, addr, T);
 }
 
-void FixedTypeInfo::deallocateStack(IRGenFunction &IGF, Address addr,
+void FixedTypeInfo::deallocateStack(IRGenFunction &IGF, StackAddress addr,
                                     SILType T) const {
   if (isKnownEmpty(ResilienceExpansion::Maximal))
     return;
-  IGF.Builder.CreateLifetimeEnd(addr, getFixedSize());
+  IGF.Builder.CreateLifetimeEnd(addr.getAddress(), getFixedSize());
 }
