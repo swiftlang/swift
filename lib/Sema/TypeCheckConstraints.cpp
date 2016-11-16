@@ -306,7 +306,9 @@ static bool diagnoseOperatorJuxtaposition(UnresolvedDeclRefExpr *UDRE,
   // be a case where a space was forgotten.
   if (isBinOp) {
     auto tok = Lexer::getTokenAtLocation(TC.Context.SourceMgr, UDRE->getLoc());
-    if (tok.getKind() != tok::oper_binary_unspaced)
+    if (!tok.hasValue())
+      return false;
+    if (tok.getValue().isNot(tok::oper_binary_unspaced))
       return false;
   }
 

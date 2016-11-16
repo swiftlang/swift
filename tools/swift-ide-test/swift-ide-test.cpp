@@ -765,7 +765,11 @@ public:
     switch (Kind) {
     case SyntaxNodeKind::Keyword: Id = "kw"; break;
     // Skip identifier.
-    case SyntaxNodeKind::Identifier: return;
+    case SyntaxNodeKind::Identifier: {
+      auto var = StringRef(CurrBufPtr, 3);
+      assert(var != "var");
+      return;
+    }
     case SyntaxNodeKind::DollarIdent: Id = "dollar"; break;
     case SyntaxNodeKind::Integer: Id = "int"; break;
     case SyntaxNodeKind::Floating: Id = "float"; break;
@@ -2147,8 +2151,12 @@ public:
       return;
     }
     OS << "[";
-    for (auto &SRC : RC.Comments)
-      printWithEscaping(SRC.RawText);
+    for (auto SRC = RC.Comments.begin(); SRC != RC.Comments.end(); ++SRC) {
+      if (SRC != RC.Comments.begin())
+        OS << "\\n";
+
+      printWithEscaping(SRC->RawText);
+    }
     OS << "]";
   }
 

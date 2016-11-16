@@ -26,6 +26,7 @@
 #include "swift/Parse/PersistentParserState.h"
 #include "swift/SIL/SILModule.h"
 #include "swift/SILOptimizer/PassManager/Passes.h"
+#include "swift/Syntax/Token.h"
 #include "llvm/ExecutionEngine/MCJIT.h"
 #include "llvm/IR/Module.h"
 #include "llvm/Transforms/Utils/Cloning.h"
@@ -1014,8 +1015,7 @@ public:
             CI.getSourceMgr().addMemBufferCopy(Line, "<REPL Input>");
         Lexer L(CI.getASTContext().LangOpts,
                 CI.getSourceMgr(), BufferID, nullptr, false /*not SIL*/);
-        Token Tok;
-        L.lex(Tok);
+        auto Tok = L.lex();
         assert(Tok.is(tok::colon));
         
         if (L.peekNextToken().getText() == "help") {
@@ -1049,8 +1049,8 @@ public:
                    L.peekNextToken().getText() == "print_decl") {
           PrintOrDump doPrint = (L.peekNextToken().getText() == "print_decl")
             ? PrintOrDump::Print : PrintOrDump::Dump;
-          L.lex(Tok);
-          L.lex(Tok);
+          Tok = L.lex();
+          Tok = L.lex();
           ASTContext &ctx = CI.getASTContext();
           UnqualifiedLookup lookup(ctx.getIdentifier(Tok.getText()),
                                    &REPLInputFile, nullptr);
@@ -1078,18 +1078,18 @@ public:
         } else if (L.peekNextToken().getText() == "dump_source") {
           llvm::errs() << DumpSource;
         } else if (L.peekNextToken().getText() == "print_module") {
-          L.lex(Tok);
+          Tok = L.lex();
           SmallVector<ImportDecl::AccessPathElement, 4> accessPath;
           ASTContext &ctx = CI.getASTContext();
 
-          L.lex(Tok);
+          Tok = L.lex();
           if (Tok.is(tok::identifier)) {
             accessPath.push_back({ctx.getIdentifier(Tok.getText()),
                                   Tok.getLoc()});
             
             while (L.peekNextToken().is(tok::period)) {
-              L.lex(Tok);
-              L.lex(Tok);
+              Tok = L.lex();
+              Tok = L.lex();
               if (Tok.is(tok::identifier)) {
                 accessPath.push_back({ctx.getIdentifier(Tok.getText()),
                                       Tok.getLoc()});
@@ -1118,10 +1118,10 @@ public:
           }
           
         } else if (L.peekNextToken().getText() == "constraints") {
-          L.lex(Tok);
-          L.lex(Tok);
+          Tok = L.lex();
+          Tok = L.lex();
           if (Tok.getText() == "debug") {
-            L.lex(Tok);
+            Tok = L.lex();
             if (Tok.getText() == "on") {
               CI.getASTContext().LangOpts.DebugConstraintSolver = true;
             } else if (Tok.getText() == "off") {
@@ -1133,8 +1133,8 @@ public:
             llvm::outs() << "Unknown :constraints command; try :help\n";
           }
         } else if (L.peekNextToken().getText() == "autoindent") {
-          L.lex(Tok);
-          L.lex(Tok);
+          Tok = L.lex();
+          Tok = L.lex();
           if (Tok.getText() == "on") {
             Input.Autoindent = true;
           } else if (Tok.getText() == "off") {

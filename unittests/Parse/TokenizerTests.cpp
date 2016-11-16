@@ -63,16 +63,17 @@ public:
     }
   }
   
-  void assertTokens(std::vector<Token> Ts, StringRef Expected) {
+  void assertTokens(std::vector<syntax::Token> Ts, StringRef Expected) {
     std::string Actual;
     for (auto C = Ts.begin(), E = Ts.end(); C != E; ++C) {
       Actual += tokToString(C->getKind());
-      Actual += ": ";
-      
-      std::string Txt(C->getRawText());
-      replaceNewLines(Txt);
-      Actual += Txt;
-      
+      if (C->getKind() != tok::eof) {
+        Actual += ": ";
+        std::string Txt(C->getText());
+        replaceNewLines(Txt);
+        Actual += Txt;
+      }
+
       Actual += "\n";
     }
     EXPECT_EQ(Expected, Actual)
@@ -80,7 +81,7 @@ public:
       << "---- Actual: \n" << Actual << "\n";
   }
   
-  std::vector<Token> parseAndGetSplitTokens(unsigned BufID) {
+  std::vector<syntax::Token> parseAndGetSplitTokens(unsigned BufID) {
     swift::ParserUnit PU(SM, BufID, LangOpts, "unknown");
 
     bool Done = false;
@@ -92,10 +93,12 @@ public:
     return PU.getParser().getSplitTokens();
   }
   
-  std::vector<Token> tokenize(unsigned BufID, const std::vector<Token> &SplitTokens = {}) {
-    return swift::tokenize(LangOpts, 
-                           SM, 
-                           BufID, 
+  std::vector<syntax::Token> tokenize(unsigned BufID,
+    const std::vector<syntax::Token> &SplitTokens = {}) {
+    return swift::tokenize(LangOpts,
+                           SM,
+                           EOFRetention::KeepEOF,
+                           BufID,
                            /* Offset = */ 0,
                            /* EndOffset = */ 0,
                            /* KeepComments = */ true,
@@ -137,6 +140,7 @@ TEST_F(TokenizerTest, ProperlySplitTokens) {
     "r_paren: )\n"
     "l_brace: {\n"
     "r_brace: }\n"
+    "eof\n"
   );
 
   // Parse the input and get split tokens info
@@ -170,6 +174,7 @@ TEST_F(TokenizerTest, ProperlySplitTokens) {
      "r_paren: )\n"
      "l_brace: {\n"
      "r_brace: }\n"
+     "eof\n"
   );
 }
 

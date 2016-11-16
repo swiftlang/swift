@@ -17,6 +17,7 @@
 #include "swift/Frontend/Frontend.h"
 #include "swift/Basic/SourceManager.h"
 #include "swift/IDE/Formatting.h"
+#include "swift/Syntax/Token.h"
 #include "swift/Subsystems.h"
 
 using namespace swift;
@@ -30,14 +31,16 @@ struct SiblingAlignInfo {
 };
 
 struct TokenInfo {
-  const Token *StartOfLineTarget;
-  const Token *StartOfLineBeforeTarget;
-  TokenInfo(const Token *StartOfLineTarget,
-            const Token *StartOfLineBeforeTarget) :
+  const syntax::Token StartOfLineTarget;
+  const syntax::Token StartOfLineBeforeTarget;
+  TokenInfo(const syntax::Token StartOfLineTarget,
+            const syntax::Token StartOfLineBeforeTarget) :
     StartOfLineTarget(StartOfLineTarget),
     StartOfLineBeforeTarget(StartOfLineBeforeTarget) {}
-  TokenInfo() : TokenInfo(nullptr, nullptr) {}
-  operator bool() { return StartOfLineTarget && StartOfLineBeforeTarget; }
+  TokenInfo() : TokenInfo(syntax::Token(), syntax::Token()) {}
+  operator bool() {
+    return StartOfLineTarget.isKnown() && StartOfLineBeforeTarget.isKnown();
+  }
 };
 
 typedef llvm::SmallString<64> StringBuilder;
@@ -262,9 +265,9 @@ public:
       return false;
 
     if (TInfo) {
-      if (TInfo.StartOfLineTarget->getKind() == tok::l_brace &&
-          isKeywordPossibleDeclStart(*TInfo.StartOfLineBeforeTarget) &&
-          TInfo.StartOfLineBeforeTarget->isKeyword())
+      if (TInfo.StartOfLineTarget.getKind() == tok::l_brace &&
+          isKeywordPossibleDeclStart(TInfo.StartOfLineBeforeTarget) &&
+          TInfo.StartOfLineBeforeTarget.isKeyword())
         return false;
     }
 
@@ -462,11 +465,11 @@ public:
 };
 
 class FormatWalker : public SourceEntityWalker {
-  typedef std::vector<Token>::iterator TokenIt;
+  using TokenIt = std::vector<syntax::Token>::iterator;
   class SiblingCollector {
     SourceLoc FoundSibling;
     SourceManager &SM;
-    std::vector<Token> &Tokens;
+    std::vector<syntax::Token> Tokens;
     SourceLoc &TargetLoc;
     TokenIt TI;
     bool NeedExtraIndentation;
@@ -486,7 +489,9 @@ class FormatWalker : public SourceEntityWalker {
       }
       bool operator==(const SourceLocIterator& rhs) {return It==rhs.It;}
       bool operator!=(const SourceLocIterator& rhs) {return It!=rhs.It;}
-      SourceLoc operator*() {return It->getLoc();}
+      SourceLoc operator*() {
+        return It->getLoc();
+      }
     };
 
     void adjustTokenIteratorToImmediateAfter(SourceLoc End) {
@@ -529,7 +534,7 @@ class FormatWalker : public SourceEntityWalker {
     }
 
   public:
-    SiblingCollector(SourceManager &SM, std::vector<Token> &Tokens,
+    SiblingCollector(SourceManager &SM, std::vector<syntax::Token> &Tokens,
                      SourceLoc &TargetLoc) : SM(SM), Tokens(Tokens),
     TargetLoc(TargetLoc), TI(Tokens.begin()),
     NeedExtraIndentation(false) {}
@@ -545,7 +550,8 @@ class FormatWalker : public SourceEntityWalker {
         return PrevLoc = Loc;
       };
 
-      auto addPair = [&](SourceLoc EndLoc, SourceLoc AlignLoc, tok Separator) {
+      auto addPair = [&](SourceLoc EndLoc, SourceLoc AlignLoc,
+                         tok Separator) {
         if (isImmediateAfterSeparator(EndLoc, Separator))
           FoundSibling = AlignLoc;
       };
@@ -571,7 +577,8 @@ class FormatWalker : public SourceEntityWalker {
           if (EleStart.isInvalid()) {
             EleStart = TE->getElement(I)->getStartLoc();
           }
-          addPair(TE->getElement(I)->getEndLoc(), FindAlignLoc(EleStart), tok::comma);
+          addPair(TE->getElement(I)->getEndLoc(), FindAlignLoc(EleStart),
+                  tok::comma);
         }
       }
 
@@ -622,13 +629,15 @@ class FormatWalker : public SourceEntityWalker {
 #endif
         for (unsigned I = 0, N = AE->getNumElements(); I < N; I++) {
           addPair(AE->getElement(I)->getEndLoc(),
-                  FindAlignLoc(AE->getElement(I)->getStartLoc()), tok::comma);
+                  FindAlignLoc(AE->getElement(I)->getStartLoc()),
+                  tok::comma);
         }
       }
       // Case label items in a case statement are siblings.
       if (auto CS = dyn_cast_or_null<CaseStmt>(Node.dyn_cast<Stmt *>())) {
         for (const CaseLabelItem& Item : CS->getCaseLabelItems()) {
-          addPair(Item.getEndLoc(), FindAlignLoc(Item.getStartLoc()), tok::comma);
+          addPair(Item.getEndLoc(), FindAlignLoc(Item.getStartLoc()),
+                  tok::comma);
         }
       }
     };
@@ -646,7 +655,7 @@ class FormatWalker : public SourceEntityWalker {
   swift::ASTWalker::ParentTy AtEnd;
   bool InDocCommentBlock = false;
   bool InCommentLine = false;
-  std::vector<Token> Tokens;
+  std::vector<syntax::Token> Tokens;
   LangOptions Options;
   TokenIt CurrentTokIt;
   unsigned TargetLine;
@@ -700,16 +709,20 @@ class FormatWalker : public SourceEntityWalker {
   void scanForComments(SourceLoc Loc) {
     if (InDocCommentBlock || InCommentLine)
       return;
-    for (auto InValid = Loc.isInvalid(); CurrentTokIt != Tokens.end() &&
-         (InValid || SM.isBeforeInBuffer(CurrentTokIt->getLoc(), Loc));
+    for (auto Invalid = Loc.isInvalid(); CurrentTokIt != Tokens.end();
          CurrentTokIt++) {
-      if (CurrentTokIt->getKind() == tok::comment) {
-        auto StartLine = SM.getLineNumber(CurrentTokIt->getRange().getStart());
-        auto EndLine = SM.getLineNumber(CurrentTokIt->getRange().getEnd());
-        auto TokenStr = CurrentTokIt->getRange().str();
+      for (const auto &Leader : CurrentTokIt->getLeadingTrivia()) {
+        if (Invalid)
+          return;
+        if (!Leader.isAnyComment())
+          continue;
+        auto StartLine = SM.getLineNumber(Leader.getRange().getStart());
+        auto EndLine = SM.getLineNumber(Leader.getRange().getEnd());
         InDocCommentBlock |= TargetLine > StartLine && TargetLine <= EndLine &&
-        TokenStr.startswith("/*");
-        InCommentLine |= StartLine == TargetLine && TokenStr.startswith("//");
+          Leader.isAnyComment();
+
+        InCommentLine |= StartLine == TargetLine &&
+          Leader.getKind() == syntax::TriviaKind::Comment;
       }
     }
   }
@@ -724,8 +737,9 @@ class FormatWalker : public SourceEntityWalker {
 
 public:
   explicit FormatWalker(SourceFile &SF, SourceManager &SM)
-  :SF(SF), SM(SM),
-  Tokens(tokenize(Options, SM, SF.getBufferID().getValue())),
+    : SF(SF), SM(SM),
+  Tokens(tokenize(Options, SM, EOFRetention::KeepEOF,
+                  SF.getBufferID().getValue())),
   CurrentTokIt(Tokens.begin()),
   SCollector(SM, Tokens, TargetLocation) {}
 
@@ -735,12 +749,12 @@ public:
     TargetLine = SM.getLineNumber(TargetLocation);
     AtStart = AtEnd = swift::ASTWalker::ParentTy();
     walk(SF);
-    scanForComments(SourceLoc());
+    scanForComments(Loc);
     return FormatContext(SM, Stack, AtStart, AtEnd, InDocCommentBlock,
                          InCommentLine, SCollector.getSiblingInfo());
   }
 
-  ArrayRef<Token> getTokens() {
+  ArrayRef<syntax::Token> getTokens() {
     return llvm::makeArrayRef(Tokens);
   }
 
@@ -861,35 +875,35 @@ public:
 
 class TokenInfoCollector {
   SourceManager &SM;
-  ArrayRef<Token> Tokens;
+  ArrayRef<syntax::Token> Tokens;
   unsigned Line;
 
   struct Comparator {
     SourceManager &SM;
     Comparator(SourceManager &SM) : SM(SM) {}
-    bool operator()(const Token &T, unsigned Line) const {
+    bool operator()(const syntax::Token &T, unsigned Line) const {
       return SM.getLineNumber(T.getLoc()) < Line;
     }
-    bool operator()(unsigned Line, const Token &T) const {
+    bool operator()(unsigned Line, syntax::Token T) const {
       return Line < SM.getLineNumber(T.getLoc());
     }
   };
 
 public:
-  TokenInfoCollector(SourceManager &SM, ArrayRef<Token> Tokens,
+  TokenInfoCollector(SourceManager &SM, ArrayRef<syntax::Token> Tokens,
          unsigned Line) : SM(SM), Tokens(Tokens), Line(Line) {}
 
   TokenInfo collect() {
     if (Line == 0)
       return TokenInfo();
     Comparator Comp(SM);
-    auto LineMatch = [this] (const Token* T, unsigned Line) {
-      return T != Tokens.end() && SM.getLineNumber(T->getLoc()) == Line;
+    auto LineMatch = [this] (const syntax::Token &T, unsigned Line) {
+      return T != *Tokens.end() && SM.getLineNumber(T.getLoc()) == Line;
     };
     auto TargetIt = std::lower_bound(Tokens.begin(), Tokens.end(), Line, Comp);
     auto LineBefore = std::lower_bound(Tokens.begin(), TargetIt, Line - 1, Comp);
-    if (LineMatch(TargetIt, Line) && LineMatch(LineBefore, Line - 1))
-      return TokenInfo(TargetIt, LineBefore);
+    if (LineMatch(*TargetIt, Line) && LineMatch(*LineBefore, Line - 1))
+      return TokenInfo(*TargetIt, *LineBefore);
     return TokenInfo();
   }
 };

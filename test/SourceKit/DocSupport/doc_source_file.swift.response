@@ -867,7 +867,7 @@
   {
     key.kind: source.lang.swift.syntaxtype.comment,
     key.offset: 930,
-    key.length: 25
+    key.length: 24
   },
   {
     key.kind: source.lang.swift.syntaxtype.keyword,

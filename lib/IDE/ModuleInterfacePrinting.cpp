@@ -21,7 +21,7 @@
 #include "swift/Basic/PrimitiveParsing.h"
 #include "swift/ClangImporter/ClangImporter.h"
 #include "swift/ClangImporter/ClangModule.h"
-#include "swift/Parse/Token.h"
+#include "swift/Syntax/Token.h"
 #include "swift/Serialization/ModuleFile.h"
 #include "swift/Subsystems.h"
 #include "swift/Serialization/SerializedModuleLoader.h"

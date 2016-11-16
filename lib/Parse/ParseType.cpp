@@ -73,7 +73,7 @@ ParserResult<TypeRepr> Parser::parseTypeSimple(Diag<> MessageID,
     if (CodeCompletion)
       CodeCompletion->completeTypeSimpleBeginning();
     // Eat the code completion token because we handled it.
-    consumeToken(tok::code_complete);
+    consumeLoc(tok::code_complete);
     return makeParserCodeCompletionResult<TypeRepr>();
   case tok::kw_super:
   case tok::kw_self:
@@ -81,7 +81,7 @@ ParserResult<TypeRepr> Parser::parseTypeSimple(Diag<> MessageID,
     // safe to skip over.
     diagnose(Tok, MessageID);
     ty = makeParserErrorResult(new (Context) ErrorTypeRepr(Tok.getLoc()));
-    consumeToken();
+    consumeLoc();
     // FIXME: we could try to continue to parse.
     return ty;
   case tok::l_square:
@@ -97,7 +97,7 @@ ParserResult<TypeRepr> Parser::parseTypeSimple(Diag<> MessageID,
     diagnose(Tok, MessageID);
     if (Tok.isKeyword() && !Tok.isAtStartOfLine()) {
       ty = makeParserErrorResult(new (Context) ErrorTypeRepr(Tok.getLoc()));
-      consumeToken();
+      consumeLoc();
       return ty;
     }
     checkForInputIncomplete();
@@ -108,15 +108,15 @@ ParserResult<TypeRepr> Parser::parseTypeSimple(Diag<> MessageID,
   while (ty.isNonNull()) {
     if ((Tok.is(tok::period) || Tok.is(tok::period_prefix))) {
       if (peekToken().isContextualKeyword("Type")) {
-        consumeToken();
-        SourceLoc metatypeLoc = consumeToken(tok::identifier);
+        consumeLoc();
+        SourceLoc metatypeLoc = consumeLoc(tok::identifier);
         ty = makeParserResult(ty,
           new (Context) MetatypeTypeRepr(ty.get(), metatypeLoc));
         continue;
       }
       if (peekToken().isContextualKeyword("Protocol")) {
-        consumeToken();
-        SourceLoc protocolLoc = consumeToken(tok::identifier);
+        consumeLoc();
+        SourceLoc protocolLoc = consumeLoc(tok::identifier);
         ty = makeParserResult(ty,
           new (Context) ProtocolTypeRepr(ty.get(), protocolLoc));
         continue;
@@ -197,7 +197,7 @@ ParserResult<TypeRepr> Parser::parseType(Diag<> MessageID,
 
     beforeThrowsPos = getParserPosition();
     rethrows = Tok.is(tok::kw_rethrows);
-    throwsLoc = consumeToken();
+    throwsLoc = consumeLoc();
   }
 
   // Handle type-function if we have an arrow.
@@ -321,7 +321,7 @@ ParserResult<TypeRepr> Parser::parseTypeIdentifier() {
       if (CodeCompletion)
         CodeCompletion->completeTypeSimpleBeginning();
       // Eat the code completion token because we handled it.
-      consumeToken(tok::code_complete);
+      consumeLoc(tok::code_complete);
       return makeParserCodeCompletionResult<IdentTypeRepr>();
     }
 
@@ -330,7 +330,7 @@ ParserResult<TypeRepr> Parser::parseTypeIdentifier() {
     // If there is a keyword at the start of a new line, we won't want to
     // skip it as a recovery but rather keep it.
     if (Tok.isKeyword() && !Tok.isAtStartOfLine())
-      consumeToken();
+      consumeLoc();
 
     return nullptr;
   }
@@ -379,7 +379,7 @@ ParserResult<TypeRepr> Parser::parseTypeIdentifier() {
       }
       if (!peekToken().isContextualKeyword("Type")
           && !peekToken().isContextualKeyword("Protocol")) {
-        consumeToken();
+        consumeLoc();
         continue;
       }
     } else if (Tok.is(tok::code_complete)) {
@@ -404,13 +404,13 @@ ParserResult<TypeRepr> Parser::parseTypeIdentifier() {
   if (Status.hasCodeCompletion() && CodeCompletion) {
     if (Tok.isNot(tok::code_complete)) {
       // We have a dot.
-      consumeToken();
+      consumeLoc();
       CodeCompletion->completeTypeIdentifierWithDot(ITR);
     } else {
       CodeCompletion->completeTypeIdentifierWithoutDot(ITR);
     }
     // Eat the code completion token because we handled it.
-    consumeToken(tok::code_complete);
+    consumeLoc(tok::code_complete);
   }
 
   return makeParserResult(Status, ITR);
@@ -456,7 +456,7 @@ Parser::parseTypeSimpleOrComposition(Diag<> MessageID,
   addType(FirstType.get());
   
   while (Tok.isContextualPunctuator("&")) {
-    consumeToken(); // consume '&'
+    consumeLoc(); // consume '&'
     ParserResult<TypeRepr> ty =
       parseTypeSimple(diag::expected_identifier_for_type, HandleCodeCompletion);
     if (ty.hasCodeCompletion())
@@ -471,7 +471,7 @@ Parser::parseTypeSimpleOrComposition(Diag<> MessageID,
 
 ParserResult<CompositionTypeRepr> Parser::parseAnyType() {
   return makeParserResult(CompositionTypeRepr
-    ::createEmptyComposition(Context, consumeToken(tok::kw_Any)));
+    ::createEmptyComposition(Context, consumeLoc(tok::kw_Any)));
 }
 
 /// parseOldStyleProtocolComposition
@@ -485,7 +485,7 @@ ParserResult<CompositionTypeRepr> Parser::parseAnyType() {
 ParserResult<TypeRepr> Parser::parseOldStyleProtocolComposition() {
   assert(Tok.is(tok::kw_protocol) && startsWithLess(peekToken()));
 
-  SourceLoc ProtocolLoc = consumeToken();
+  SourceLoc ProtocolLoc = consumeLoc();
   SourceLoc LAngleLoc = consumeStartingLess();
 
   // Parse the type-composition-list.
@@ -583,7 +583,7 @@ ParserResult<TypeRepr> Parser::parseOldStyleProtocolComposition() {
 ///     type
 ParserResult<TupleTypeRepr> Parser::parseTypeTupleBody() {
   Parser::StructureMarkerRAII ParsingTypeTuple(*this, Tok);
-  SourceLoc RPLoc, LPLoc = consumeToken(tok::l_paren);
+  SourceLoc RPLoc, LPLoc = consumeLoc(tok::l_paren);
   SourceLoc EllipsisLoc;
   unsigned EllipsisIdx;
   SmallVector<TypeRepr *, 8> ElementsR;
@@ -615,7 +615,7 @@ ParserResult<TupleTypeRepr> Parser::parseTypeTupleBody() {
       Identifier name;
       if (!Tok.is(tok::kw__))
         name = Context.getIdentifier(Tok.getText());
-      SourceLoc nameLoc = consumeToken();
+      SourceLoc nameLoc = consumeLoc();
 
       // If there is a second name, consume it as well.
       Identifier secondName;
@@ -623,7 +623,7 @@ ParserResult<TupleTypeRepr> Parser::parseTypeTupleBody() {
       if (Tok.canBeArgumentLabel()) {
         if (!Tok.is(tok::kw__))
           secondName = Context.getIdentifier(Tok.getText());
-        secondNameLoc = consumeToken();
+        secondNameLoc = consumeLoc();
       }
 
       // Consume the ':'.
@@ -695,7 +695,7 @@ ParserResult<TupleTypeRepr> Parser::parseTypeTupleBody() {
     // Parse '= expr' here so we can complain about it directly, rather
     // than dying when we see it.
     if (Tok.is(tok::equal)) {
-      SourceLoc equalLoc = consumeToken(tok::equal);
+      SourceLoc equalLoc = consumeLoc(tok::equal);
       auto init = parseExpr(diag::expected_init_value);
       auto inFlight = diagnose(equalLoc, diag::tuple_type_init);
       if (init.isNonNull())
@@ -707,9 +707,9 @@ ParserResult<TupleTypeRepr> Parser::parseTypeTupleBody() {
         diagnose(Tok, diag::multiple_ellipsis_in_tuple)
           .highlight(EllipsisLoc)
           .fixItRemove(Tok.getLoc());
-        (void)consumeToken();
+        (void)consumeLoc();
       } else {
-        EllipsisLoc = consumeToken();
+        EllipsisLoc = consumeLoc();
         EllipsisIdx = ElementsR.size() - 1;
       }
     }
@@ -797,7 +797,7 @@ ParserResult<TupleTypeRepr> Parser::parseTypeTupleBody() {
 ParserResult<TypeRepr> Parser::parseTypeArray(TypeRepr *Base) {
   assert(Tok.isFollowingLSquare());
   Parser::StructureMarkerRAII ParsingArrayBound(*this, Tok);
-  SourceLoc lsquareLoc = consumeToken();
+  SourceLoc lsquareLoc = consumeLoc();
   ArrayTypeRepr *ATR = nullptr;
   
   // Handle a postfix [] production, a common typo for a C-like array.
@@ -833,7 +833,7 @@ ParserResult<TypeRepr> Parser::parseTypeCollection() {
   // Parse the leading '['.
   assert(Tok.is(tok::l_square));
   Parser::StructureMarkerRAII parsingCollection(*this, Tok);
-  SourceLoc lsquareLoc = consumeToken();
+  SourceLoc lsquareLoc = consumeLoc();
 
   // Parse the element type.
   ParserResult<TypeRepr> firstTy = parseType(diag::expected_element_type);
@@ -842,7 +842,7 @@ ParserResult<TypeRepr> Parser::parseTypeCollection() {
   SourceLoc colonLoc;
   ParserResult<TypeRepr> secondTy;
   if (Tok.is(tok::colon)) {
-    colonLoc = consumeToken();
+    colonLoc = consumeLoc();
 
     // Parse the second type.
     secondTy = parseType(diag::expected_dictionary_value_type);
@@ -878,7 +878,7 @@ ParserResult<TypeRepr> Parser::parseTypeCollection() {
                                                       brackets));
 }
 
-bool Parser::isOptionalToken(const Token &T) const {
+bool Parser::isOptionalToken(const syntax::Token &T) const {
   // A postfix '?' by itself is obviously optional.
   if (T.is(tok::question_postfix))
     return true;
@@ -892,7 +892,7 @@ bool Parser::isOptionalToken(const Token &T) const {
   return false;
 }
 
-bool Parser::isImplicitlyUnwrappedOptionalToken(const Token &T) const {
+bool Parser::isImplicitlyUnwrappedOptionalToken(const syntax::Token &T) const {
   // A postfix '!' by itself, or a '!' in SIL mode, is obviously implicitly
   // unwrapped optional.
   if (T.is(tok::exclaim_postfix) || T.is(tok::sil_exclamation))
@@ -940,8 +940,8 @@ Parser::parseTypeImplicitlyUnwrappedOptional(TypeRepr *base) {
 //===----------------------------------------------------------------------===//
 
 static bool isGenericTypeDisambiguatingToken(Parser &P) {
-  auto &tok = P.Tok;
-  switch (tok.getKind()) {
+  auto Tok = P.Tok;
+  switch (Tok.getKind()) {
   default:
     return false;
   case tok::r_paren:
@@ -962,12 +962,12 @@ static bool isGenericTypeDisambiguatingToken(Parser &P) {
   case tok::oper_binary_spaced:
   case tok::oper_postfix:
     // These might be '?' or '!' type modifiers.
-    return P.isOptionalToken(tok) || P.isImplicitlyUnwrappedOptionalToken(tok);
+    return P.isOptionalToken(Tok) || P.isImplicitlyUnwrappedOptionalToken(Tok);
 
   case tok::l_paren:
   case tok::l_square:
     // These only apply to the generic type if they don't start a new line.
-    return !tok.isAtStartOfLine();
+    return !Tok.isAtStartOfLine();
   }
 }
 
@@ -1016,19 +1016,19 @@ bool Parser::canParseType() {
       return false;
     break;
   case tok::l_paren: {
-    consumeToken();
+    consumeLoc();
     if (!canParseTypeTupleBody())
       return false;
     break;
   }
   case tok::at_sign: {
-    consumeToken();
+    consumeLoc();
     if (!canParseTypeAttribute())
       return false;
     return canParseType();
   }
   case tok::l_square:
-    consumeToken();
+    consumeLoc();
     if (!canParseType())
       return false;
     if (consumeIf(tok::colon)) {
@@ -1049,8 +1049,8 @@ bool Parser::canParseType() {
     if ((Tok.is(tok::period) || Tok.is(tok::period_prefix)) &&
         (peekToken().isContextualKeyword("Type")
          || peekToken().isContextualKeyword("Protocol"))) {
-      consumeToken();
-      consumeToken(tok::identifier);
+      consumeLoc();
+      consumeLoc(tok::identifier);
       continue;
     }
     if (isOptionalToken(Tok)) {
@@ -1066,7 +1066,7 @@ bool Parser::canParseType() {
   
   // Handle type-function if we have an arrow or 'throws'/'rethrows' modifier.
   if (Tok.isAny(tok::kw_throws, tok::kw_rethrows)) {
-    consumeToken();
+    consumeLoc();
     // "throws" or "rethrows" isn't a valid type without being followed by
     // a return.
     if (!Tok.is(tok::arrow))
@@ -1091,7 +1091,7 @@ bool Parser::canParseTypeIdentifierOrTypeComposition() {
       return false;
     
     if (Tok.isContextualPunctuator("&")) {
-      consumeToken();
+      consumeLoc();
       continue;
     } else {
       return true;
@@ -1103,7 +1103,7 @@ bool Parser::canParseTypeIdentifier() {
   while (true) {
     if (!Tok.isAny(tok::identifier, tok::kw_Self, tok::kw_Any))
       return false;
-    consumeToken();
+    consumeLoc();
     
     if (startsWithLess(Tok)) {
       if (!canParseGenericArguments())
@@ -1115,7 +1115,7 @@ bool Parser::canParseTypeIdentifier() {
     if ((Tok.is(tok::period) || Tok.is(tok::period_prefix)) &&
         !peekToken().isContextualKeyword("Type") &&
         !peekToken().isContextualKeyword("Protocol")) {
-      consumeToken();
+      consumeLoc();
     } else {
       return true;
     }
@@ -1124,7 +1124,7 @@ bool Parser::canParseTypeIdentifier() {
 
 
 bool Parser::canParseOldStyleProtocolComposition() {
-  consumeToken(tok::kw_protocol);
+  consumeLoc(tok::kw_protocol);
   
   // Check for the starting '<'.
   if (!startsWithLess(Tok)) {
@@ -1165,12 +1165,12 @@ bool Parser::canParseTypeTupleBody() {
       // by a type annotation.
       if (Tok.canBeArgumentLabel() && 
           (peekToken().is(tok::colon) || peekToken().canBeArgumentLabel())) {
-        consumeToken();
+        consumeLoc();
         if (Tok.canBeArgumentLabel()) {
-          consumeToken();
+          consumeLoc();
           if (!Tok.is(tok::colon)) return false;
         }
-        consumeToken(tok::colon);
+        consumeLoc(tok::colon);
 
         // Parse a type.
         if (!canParseType())
@@ -1195,7 +1195,7 @@ bool Parser::canParseTypeTupleBody() {
         return false;
 
       if (Tok.isEllipsis())
-        consumeToken();
+        consumeLoc();
 
     } while (consumeIf(tok::comma));
   }
