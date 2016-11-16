@@ -1056,9 +1056,10 @@ public postfix func -- (lhs: inout ${Self}) -> ${Self} {
 }
 
 extension ${Self} {
-  @available(*, unavailable, message: "Please use the `abs(_:)` free function")
+  @available(swift, deprecated: 3.1, obsoleted: 4.0, message: "Please use the `abs(_:)` free function")
+  @_transparent
   public static func abs(_ x: ${Self}) -> ${Self} {
-    fatalError("unavailable")
+    return x.magnitude
   }
 }
 
