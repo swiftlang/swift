@@ -1263,8 +1263,7 @@ ArchetypeBuilder *ASTContext::getOrCreateArchetypeBuilder(
 
   // Create a new archetype builder with the given signature.
   auto builder = new ArchetypeBuilder(*mod, Diags);
-  builder->addGenericSignature(sig, nullptr,
-                               /*treatRequirementsAsExplicit=*/true);
+  builder->addGenericSignature(sig);
   
   // Store this archetype builder.
   Impl.ArchetypeBuilders[{sig, mod}]

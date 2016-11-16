@@ -61,10 +61,6 @@ void RequirementSource::dump(llvm::raw_ostream &out,
     out << "inferred";
     break;
 
-  case OuterScope:
-    out << "outer";
-    break;
-
   case Inherited:
     out << "inherited";
     break;
@@ -685,7 +681,6 @@ ArchetypeBuilder::PotentialArchetype::getType(ArchetypeBuilder &builder) {
     switch (conforms.second.getKind()) {
     case RequirementSource::Explicit:
     case RequirementSource::Inferred:
-    case RequirementSource::OuterScope:
     case RequirementSource::Protocol:
     case RequirementSource::Redundant:
       Protos.push_back(conforms.first);
@@ -2009,35 +2004,15 @@ ArchetypeBuilder::mapTypeOutOfContext(ModuleDecl *M,
   return env->mapTypeOutOfContext(M, type);
 }
 
-void ArchetypeBuilder::addGenericSignature(GenericSignature *sig,
-                                           GenericEnvironment *env,
-                                           bool treatRequirementsAsExplicit) {
+void ArchetypeBuilder::addGenericSignature(GenericSignature *sig) {
   if (!sig) return;
   
-  RequirementSource::Kind sourceKind = treatRequirementsAsExplicit
-    ? RequirementSource::Explicit
-    : RequirementSource::OuterScope;
-  
-  for (auto param : sig->getGenericParams()) {
+  for (auto param : sig->getGenericParams())
     addGenericParameter(param);
 
-    if (env) {
-      // If this generic parameter has an archetype, use it as the concrete
-      // type.
-      auto contextTy = env->mapTypeIntoContext(param);
-      auto key = GenericTypeParamKey::forType(param);
-      assert(Impl->PotentialArchetypes.count(key) && "Missing parameter?");
-      auto *pa = Impl->PotentialArchetypes[key];
-      assert(pa == pa->getRepresentative() && "Not the representative");
-      pa->ArchetypeOrConcreteType = NestedType::forConcreteType(contextTy);
-      pa->SameTypeSource = RequirementSource(sourceKind, SourceLoc());
-    }
-  }
-
-  RequirementSource source(sourceKind, SourceLoc());
-  for (auto &reqt : sig->getRequirements()) {
+  RequirementSource source(RequirementSource::Explicit, SourceLoc());
+  for (auto &reqt : sig->getRequirements())
     addRequirement(reqt, source);
-  }
 }
 
 Type ArchetypeBuilder::substDependentType(Type type) {
@@ -2057,7 +2032,6 @@ static void collectRequirements(ArchetypeBuilder &builder,
     switch (source.getKind()) {
     case RequirementSource::Explicit:
     case RequirementSource::Inferred:
-    case RequirementSource::OuterScope:
       // The requirement was explicit and required, keep it.
       break;
 

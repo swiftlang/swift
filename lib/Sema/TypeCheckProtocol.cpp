@@ -1029,7 +1029,7 @@ RequirementEnvironment::RequirementEnvironment(
     conformanceSig = conformanceSig->getCanonicalSignature();
     allGenericParams.append(conformanceSig->getGenericParams().begin(),
                             conformanceSig->getGenericParams().end());
-    builder.addGenericSignature(conformanceSig, nullptr);
+    builder.addGenericSignature(conformanceSig);
     depth = allGenericParams.back()->getDepth() + 1;
   }
 
