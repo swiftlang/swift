@@ -2875,15 +2875,6 @@ static Type substType(
     // For dependent member types, we may need to look up the member if the
     // base is resolved to a non-dependent type.
     if (auto depMemTy = type->getAs<DependentMemberType>()) {
-      // Check whether we have a direct substitution for the dependent type.
-      // FIXME: This arguably should be getMemberForBaseType's responsibility.
-      auto known =
-        substitutions.find(depMemTy->getCanonicalType().getPointer());
-      if (known != substitutions.end() && known->second) {
-        return SubstitutedType::get(type, known->second,
-                                    type->getASTContext());
-      }
-    
       auto newBase = substType(depMemTy->getBase(), conformances,
                                substitutions, options);
       if (!newBase)
@@ -2906,9 +2897,13 @@ static Type substType(
       return SubstitutedType::get(type, known->second,
                                   type->getASTContext());
 
+    // For archetypes, we can substitute the parent (if present).
+    auto archetype = substOrig->getAs<ArchetypeType>();
+    if (!archetype) return type;
+
     // If we don't have a substitution for this type and it doesn't have a
     // parent, then we're not substituting it.
-    auto parent = substOrig->getParent();
+    auto parent = archetype->getParent();
     if (!parent)
       return type;
 
@@ -2920,13 +2915,10 @@ static Type substType(
       return type;
 
     // Get the associated type reference from a child archetype.
-    AssociatedTypeDecl *assocType = nullptr;
-    if (auto archetype = substOrig->getAs<ArchetypeType>()) {
-      assocType = archetype->getAssocType();
-    }
-    
+    AssociatedTypeDecl *assocType = archetype->getAssocType();
+
     return getMemberForBaseType(conformances, parent, substParent,
-                                assocType, substOrig->getName(),
+                                assocType, archetype->getName(),
                                 options);
   });
 }
@@ -3018,7 +3010,7 @@ TypeSubstitutionMap TypeBase::getMemberSubstitutions(const DeclContext *dc) {
     // FIXME: This feels painfully inefficient. We're creating a dense map
     // for a single substitution.
     substitutions[dc->getSelfInterfaceType()
-                    ->getCanonicalType().getPointer()]
+                    ->getCanonicalType()->castTo<GenericTypeParamType>()]
       = baseTy;
     return substitutions;
   }
@@ -3051,7 +3043,7 @@ TypeSubstitutionMap TypeBase::getMemberSubstitutions(const DeclContext *dc) {
       auto args = boundGeneric->getGenericArgs();
       for (unsigned i = 0, n = args.size(); i != n; ++i) {
         substitutions[params[i]->getDeclaredType()->getCanonicalType()
-                        .getPointer()] = args[i];
+                        ->castTo<GenericTypeParamType>()] = args[i];
       }
 
       // Continue looking into the parent.
@@ -3114,7 +3106,7 @@ Type TypeBase::adjustSuperclassMemberDeclType(const ValueDecl *decl,
           genericParams->size() == parentParams->size()) {
         for (unsigned i = 0, e = genericParams->size(); i < e; i++) {
           auto paramTy = parentParams->getParams()[i]->getDeclaredInterfaceType()
-              ->getCanonicalType().getPointer();
+          ->getCanonicalType()->castTo<GenericTypeParamType>();
           subs[paramTy] = genericParams->getParams()[i]
               ->getDeclaredInterfaceType();
         }

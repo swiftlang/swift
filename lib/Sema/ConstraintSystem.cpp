@@ -1063,17 +1063,19 @@ ConstraintSystem::getTypeOfMemberReference(
     if (!baseObjTy->isExistentialType() &&
         baseObjTy->getAnyNominal()) {
       auto proto = cast<ProtocolDecl>(assocType->getDeclContext());
-      ProtocolConformance *conformance = nullptr;
-      if (TC.conformsToProtocol(baseObjTy, proto, DC,
-                                ConformanceCheckFlags::InExpression,
-                                &conformance)) {
-        auto memberTy = conformance->getTypeWitness(assocType, &TC)
-          .getReplacement();
-        if (!isTypeReference)
-          memberTy = MetatypeType::get(memberTy);
+      if (auto conformance =
+            TC.conformsToProtocol(baseObjTy, proto, DC,
+                                  ConformanceCheckFlags::InExpression)) {
+        if (conformance->isConcrete()) {
+          auto memberTy = conformance->getConcrete()->getTypeWitness(assocType,
+                                                                     &TC)
+            .getReplacement();
+          if (!isTypeReference)
+            memberTy = MetatypeType::get(memberTy);
 
-        auto openedType = FunctionType::get(baseObjTy, memberTy);
-        return { openedType, memberTy };
+          auto openedType = FunctionType::get(baseObjTy, memberTy);
+          return { openedType, memberTy };
+        }
       }
     }
 
@@ -1244,11 +1246,13 @@ ConstraintSystem::getTypeOfMemberReference(
       // FIXME: Feels like a total hack.
     } else if (!baseOpenedTy->isExistentialType() &&
                !baseOpenedTy->is<ArchetypeType>()) {
-      ProtocolConformance *conformance = nullptr;
-      if (TC.conformsToProtocol(baseOpenedTy, proto, DC,
-                                ConformanceCheckFlags::InExpression,
-                                &conformance)) {
-        type = conformance->getTypeWitness(assocType, &TC).getReplacement();
+      if (auto conformance =
+            TC.conformsToProtocol(baseOpenedTy, proto, DC,
+                                  ConformanceCheckFlags::InExpression)) {
+        if (conformance->isConcrete()) {
+          type = conformance->getConcrete()->getTypeWitness(assocType, &TC)
+                   .getReplacement();
+        }
       }
     }
   } else if (!value->isInstanceMember() || isInstance) {
@@ -1445,7 +1449,7 @@ void ConstraintSystem::resolveOverload(ConstraintLocator *locator,
                                               refType};
   if (TC.getLangOpts().DebugConstraintSolver) {
     auto &log = getASTContext().TypeCheckerDebug->getStream();
-    log.indent(solverState? solverState->depth * 2 : 2)
+    log.indent(solverState ? solverState->depth * 2 : 2)
       << "(overload set choice binding "
       << boundType->getString() << " := "
       << refType->getString() << ")\n";

@@ -90,7 +90,8 @@ Type Solution::computeSubstitutions(
   assert(openedTypes != OpenedTypes.end() && "Missing opened type information");
   TypeSubstitutionMap subs;
   for (const auto &opened : openedTypes->second) {
-    subs[opened.first.getPointer()] = getFixedType(opened.second);
+    subs[opened.first->castTo<GenericTypeParamType>()] =
+      getFixedType(opened.second);
   }
 
   // Produce the concrete form of the opened type.
@@ -107,28 +108,31 @@ Type Solution::computeSubstitutions(
   auto lookupConformanceFn =
       [&](CanType original, Type replacement, ProtocolType *protoType)
           -> ProtocolConformanceRef {
-    ProtocolConformance *conformance = nullptr;
-
-    bool conforms = tc.conformsToProtocol(
-                      replacement,
-                      protoType->getDecl(),
-                      getConstraintSystem().DC,
-                      (ConformanceCheckFlags::InExpression|
-                       ConformanceCheckFlags::Used),
-                      &conformance);
+    auto conformance = tc.conformsToProtocol(
+                         replacement,
+                         protoType->getDecl(),
+                         getConstraintSystem().DC,
+                         (ConformanceCheckFlags::InExpression|
+                          ConformanceCheckFlags::Used));
     (void)isOpenedAnyObject;
-    assert((conforms ||
+    assert((conformance ||
             replacement->hasError() ||
             isOpenedAnyObject(replacement) ||
             replacement->is<GenericTypeParamType>()) &&
            "Constraint system missed a conformance?");
-    (void)conforms;
 
-    assert(conformance ||
+    // Put an abstract conformance in place if we don't already have one.
+    // FIXME: Feels like a hack
+    if (!conformance &&
+        (replacement->hasDependentProtocolConformances() ||
+         replacement->hasError()))
+      conformance = ProtocolConformanceRef(protoType->getDecl());
+
+    assert(conformance->isConcrete() ||
            replacement->hasError() ||
            replacement->hasDependentProtocolConformances());
 
-    return ProtocolConformanceRef(protoType->getDecl(), conformance);
+    return *conformance;
   };
 
   sig->getSubstitutions(*mod, subs, lookupConformanceFn, result);
@@ -153,10 +157,11 @@ Type Solution::computeSubstitutions(
 ///
 /// \returns The named witness, or nullptr if no witness could be found.
 template <typename DeclTy>
-static DeclTy *findNamedWitnessImpl(TypeChecker &tc, DeclContext *dc, Type type,
-                                    ProtocolDecl *proto, DeclName name,
-                                    Diag<> diag,
-                                    ProtocolConformance *conformance = nullptr){
+static DeclTy *findNamedWitnessImpl(
+                        TypeChecker &tc, DeclContext *dc, Type type,
+                        ProtocolDecl *proto, DeclName name,
+                        Diag<> diag,
+                        Optional<ProtocolConformanceRef> conformance = None) {
   // Find the named requirement.
   DeclTy *requirement = nullptr;
   for (auto member : proto->getMembers()) {
@@ -177,10 +182,9 @@ static DeclTy *findNamedWitnessImpl(TypeChecker &tc, DeclContext *dc, Type type,
 
   // Find the member used to satisfy the named requirement.
   if (!conformance) {
-    bool conforms = tc.conformsToProtocol(type, proto, dc,
-                                          ConformanceCheckFlags::InExpression,
-                                          &conformance);
-    if (!conforms)
+    conformance = tc.conformsToProtocol(type, proto, dc,
+                                          ConformanceCheckFlags::InExpression);
+    if (!conformance)
       return nullptr;
   }
 
@@ -190,10 +194,10 @@ static DeclTy *findNamedWitnessImpl(TypeChecker &tc, DeclContext *dc, Type type,
     return requirement;
   }
 
-  assert(conformance && "Missing conformance information");
+  if (!conformance->isConcrete()) return nullptr;
+  auto concrete = conformance->getConcrete();
   // FIXME: Dropping substitutions here.
-  return cast_or_null<DeclTy>(
-    conformance->getWitness(requirement, &tc).getDecl());
+  return cast_or_null<DeclTy>(concrete->getWitness(requirement, &tc).getDecl());
 }
 
 static bool shouldAccessStorageDirectly(Expr *base, VarDecl *member,
@@ -397,16 +401,16 @@ namespace {
           // (or later) can devirtualize as appropriate.
           if (!baseTy->is<ArchetypeType>() && !baseTy->isAnyExistentialType()) {
             auto &tc = cs.getTypeChecker();
-            ProtocolConformance *conformance = nullptr;
-            (void)tc.conformsToProtocol(baseTy, proto, cs.DC,
-                                        (ConformanceCheckFlags::InExpression|
-                                         ConformanceCheckFlags::Used),
-                                        &conformance);
-            if (conformance) {
-              if (auto witnessRef = conformance->getWitness(decl, &tc)) {
+            auto conformance =
+              tc.conformsToProtocol(baseTy, proto, cs.DC,
+                                    (ConformanceCheckFlags::InExpression|
+                                         ConformanceCheckFlags::Used));
+            if (conformance && conformance->isConcrete()) {
+              if (auto witnessRef =
+                    conformance->getConcrete()->getWitness(decl, &tc)) {
                 // Hack up an AST that we can type-check (independently) to get
                 // it into the right form.
-                // FIXME: the hope through 'getDecl()' is because
+                // FIXME: the hop through 'getDecl()' is because
                 // SpecializedProtocolConformance doesn't substitute into
                 // witnesses' ConcreteDeclRefs.
                 Type expectedFnType = simplifiedFnType->getResult();
@@ -1450,18 +1454,13 @@ namespace {
         = tc.Context.getProtocol(KnownProtocolKind::ObjectiveCBridgeable);
 
       // Find the conformance of the value type to _ObjectiveCBridgeable.
-      ProtocolConformance *conformance = nullptr;
       Type valueType = value->getType()->getRValueType();
-      bool conformsToBridgeable =
-        tc.conformsToProtocol(valueType, bridgedProto, cs.DC,
-                              (ConformanceCheckFlags::InExpression|
-                               ConformanceCheckFlags::Used),
-                              &conformance);
-
-      if (conformsToBridgeable) {
+      if (auto conformance =
+            tc.conformsToProtocol(valueType, bridgedProto, cs.DC,
+                                  (ConformanceCheckFlags::InExpression|
+                                   ConformanceCheckFlags::Used))) {
         // Form the call.
-        return tc.callWitness(value, cs.DC, bridgedProto,
-                              conformance,
+        return tc.callWitness(value, cs.DC, bridgedProto, *conformance,
                               tc.Context.Id_bridgeToObjectiveC,
                               { }, diag::broken_bridged_to_objc_protocol);
       }
@@ -1526,19 +1525,16 @@ namespace {
         = tc.Context.getProtocol(KnownProtocolKind::ObjectiveCBridgeable);
 
       // Try to find the conformance of the value type to _BridgedToObjectiveC.
-      ProtocolConformance *conformance = nullptr;
-
-      bool conformsToBridgedToObjectiveC
+      auto bridgedToObjectiveCConformance
         = tc.conformsToProtocol(valueType,
                                 bridgedProto,
                                 cs.DC,
                                 (ConformanceCheckFlags::InExpression|
-                                 ConformanceCheckFlags::Used),
-                                &conformance);
+                                 ConformanceCheckFlags::Used));
 
       FuncDecl *fn = nullptr;
 
-      if (conformsToBridgedToObjectiveC) {
+      if (bridgedToObjectiveCConformance) {
         // The conformance to _BridgedToObjectiveC is statically known.
         // Retrieve the bridging operation to be used if a static conformance
         // to _BridgedToObjectiveC can be proven.
@@ -1564,10 +1560,10 @@ namespace {
       // so we need to form substitutions and compute the resulting type.
       auto Conformances =
         tc.Context.AllocateUninitialized<ProtocolConformanceRef>(
-                                                          conformance ? 1 : 0);
+                                        bridgedToObjectiveCConformance ? 1 : 0);
 
-      if (conformsToBridgedToObjectiveC) {
-        Conformances[0] = ProtocolConformanceRef(bridgedProto, conformance);
+      if (bridgedToObjectiveCConformance) {
+        Conformances[0] = *bridgedToObjectiveCConformance;
       }
 
       auto fnGenericParams
@@ -2148,12 +2144,10 @@ namespace {
       // Find the appropriate object literal protocol.
       auto proto = tc.getLiteralProtocol(expr);
       assert(proto && "Missing object literal protocol?");
-      ProtocolConformance *conformance = nullptr;
-      bool conforms = tc.conformsToProtocol(conformingType, proto, cs.DC,
-                                            ConformanceCheckFlags::InExpression,
-                                            &conformance);
-      (void)conforms;
-      assert(conforms && "object literal type conforms to protocol");
+      auto conformance =
+        tc.conformsToProtocol(conformingType, proto, cs.DC,
+                              ConformanceCheckFlags::InExpression);
+      assert(conformance && "object literal type conforms to protocol");
 
       Expr *base = TypeExpr::createImplicitHack(expr->getLoc(), conformingType,
                                                 ctx);
@@ -2165,7 +2159,7 @@ namespace {
       for (auto elt : tupleArg->getElements())
         args.push_back(elt);
       DeclName constrName(tc.getObjectLiteralConstructorName(expr));
-      Expr *semanticExpr = tc.callWitness(base, dc, proto, conformance,
+      Expr *semanticExpr = tc.callWitness(base, dc, proto, *conformance,
                                           constrName, args,
                                           diag::object_literal_broken_proto);
       expr->setSemanticExpr(semanticExpr);
@@ -2590,13 +2584,10 @@ namespace {
                          KnownProtocolKind::ExpressibleByArrayLiteral);
       assert(arrayProto && "type-checked array literal w/o protocol?!");
 
-      ProtocolConformance *conformance = nullptr;
-      bool conforms = tc.conformsToProtocol(arrayTy, arrayProto,
-                                            cs.DC,
-                                            ConformanceCheckFlags::InExpression,
-                                            &conformance);
-      (void)conforms;
-      assert(conforms && "Type does not conform to protocol?");
+      auto conformance =
+        tc.conformsToProtocol(arrayTy, arrayProto, cs.DC,
+                              ConformanceCheckFlags::InExpression);
+      assert(conformance && "Type does not conform to protocol?");
 
       // Call the witness that builds the array literal.
       // FIXME: callWitness() may end up re-doing some work we already did
@@ -2636,7 +2627,7 @@ namespace {
                                     SourceLoc(), /*HasTrailingClosure=*/false,
                                     /*Implicit=*/true,
                                     argType);
-      Expr *result = tc.callWitness(typeRef, dc, arrayProto, conformance,
+      Expr *result = tc.callWitness(typeRef, dc, arrayProto, *conformance,
                                     name, arg, diag::array_protocol_broken);
       if (!result)
         return nullptr;
@@ -2660,12 +2651,10 @@ namespace {
         = tc.getProtocol(expr->getLoc(),
                          KnownProtocolKind::ExpressibleByDictionaryLiteral);
 
-      ProtocolConformance *conformance = nullptr;
-      bool conforms = tc.conformsToProtocol(dictionaryTy, dictionaryProto,
-                                            cs.DC,
-                                            ConformanceCheckFlags::InExpression,
-                                            &conformance);
-      if (!conforms)
+      auto conformance =
+        tc.conformsToProtocol(dictionaryTy, dictionaryProto, cs.DC,
+                              ConformanceCheckFlags::InExpression);
+      if (!conformance)
         return nullptr;
 
       // Call the witness that builds the dictionary literal.
@@ -2710,7 +2699,7 @@ namespace {
                                     argType);
 
       Expr *result = tc.callWitness(typeRef, dc, dictionaryProto,
-                                    conformance, name, arg,
+                                    *conformance, name, arg,
                                     diag::dictionary_protocol_broken);
       if (!result)
         return nullptr;
@@ -4424,14 +4413,10 @@ collectExistentialConformances(TypeChecker &tc, Type fromType, Type toType,
 
   SmallVector<ProtocolConformanceRef, 4> conformances;
   for (auto proto : protocols) {
-    ProtocolConformance *concrete;
-    bool conforms = tc.containsProtocol(fromType, proto, DC,
-                                        (ConformanceCheckFlags::InExpression|
-                                         ConformanceCheckFlags::Used),
-                                        &concrete);
-    assert(conforms && "Type does not conform to protocol?");
-    (void)conforms;
-    conformances.push_back(ProtocolConformanceRef(proto, concrete));
+    conformances.push_back(
+      *tc.containsProtocol(fromType, proto, DC,
+                           (ConformanceCheckFlags::InExpression|
+                            ConformanceCheckFlags::Used)));
   }
 
   return tc.Context.AllocateCopy(conformances);
@@ -5272,17 +5257,13 @@ Expr *ExprRewriter::coerceToType(Expr *expr, Type toType,
 
       // Find the conformance of the source type to Hashable.
       auto hashable = tc.Context.getProtocol(KnownProtocolKind::Hashable);
-      ProtocolConformance *conformance;
-      bool conforms = tc.conformsToProtocol(expr->getType(), hashable, cs.DC,
-                                            ConformanceCheckFlags::InExpression |
-                                            ConformanceCheckFlags::Used,
-                                            &conformance);
-      assert(conforms && "must conform to Hashable");
-      (void)conforms;
-      ProtocolConformanceRef conformanceRef(hashable, conformance);
-
+      auto conformance =
+        tc.conformsToProtocol(expr->getType(), hashable, cs.DC,
+                              (ConformanceCheckFlags::InExpression |
+                               ConformanceCheckFlags::Used));
+      assert(conformance && "must conform to Hashable");
       return new (tc.Context) AnyHashableErasureExpr(expr, toType,
-                                                     conformanceRef);
+                                                     *conformance);
     }
 
     case ConversionRestrictionKind::DictionaryUpcast: {
@@ -5731,18 +5712,18 @@ Expr *ExprRewriter::convertLiteral(Expr *literal,
   }
   
   // Check whether this literal type conforms to the builtin protocol.
-  ProtocolConformance *builtinConformance = nullptr;
+  Optional<ProtocolConformanceRef> builtinConformance;
   if (builtinProtocol &&
-      tc.conformsToProtocol(type, builtinProtocol, cs.DC,
-                            ConformanceCheckFlags::InExpression,
-                            &builtinConformance)) {
+      (builtinConformance =
+         tc.conformsToProtocol(type, builtinProtocol, cs.DC,
+                               ConformanceCheckFlags::InExpression))) {
     // Find the builtin argument type we'll use.
     Type argType;
     if (builtinLiteralType.is<Type>())
       argType = builtinLiteralType.get<Type>();
     else
       argType = tc.getWitnessType(type, builtinProtocol,
-                                  builtinConformance,
+                                  *builtinConformance,
                                   builtinLiteralType.get<Identifier>(),
                                   brokenBuiltinProtocolDiag);
 
@@ -5768,7 +5749,7 @@ Expr *ExprRewriter::convertLiteral(Expr *literal,
     Expr *base = TypeExpr::createImplicitHack(literal->getLoc(), type,
                                               tc.Context);
     Expr *result = tc.callWitness(base, dc,
-                                  builtinProtocol, builtinConformance,
+                                  builtinProtocol, *builtinConformance,
                                   builtinLiteralFuncName,
                                   literal,
                                   brokenBuiltinProtocolDiag);
@@ -5779,12 +5760,9 @@ Expr *ExprRewriter::convertLiteral(Expr *literal,
 
   // This literal type must conform to the (non-builtin) protocol.
   assert(protocol && "requirements should have stopped recursion");
-  ProtocolConformance *conformance = nullptr;
-  bool conforms = tc.conformsToProtocol(type, protocol, cs.DC,
-                                        ConformanceCheckFlags::InExpression,
-                                        &conformance);
-  assert(conforms && "must conform to literal protocol");
-  (void)conforms;
+  auto conformance = tc.conformsToProtocol(type, protocol, cs.DC,
+                                           ConformanceCheckFlags::InExpression);
+  assert(conformance && "must conform to literal protocol");
 
   // Figure out the (non-builtin) argument type if there is one.
   Type argType;
@@ -5801,7 +5779,7 @@ Expr *ExprRewriter::convertLiteral(Expr *literal,
     if (literalType.is<Type>())
       argType = literalType.get<Type>();
     else
-      argType = tc.getWitnessType(type, protocol, conformance,
+      argType = tc.getWitnessType(type, protocol, *conformance,
                                   literalType.get<Identifier>(),
                                   brokenProtocolDiag);
     if (!argType)
@@ -5828,7 +5806,7 @@ Expr *ExprRewriter::convertLiteral(Expr *literal,
   Expr *base = TypeExpr::createImplicitHack(literal->getLoc(), type,
                                             tc.Context);
   literal = tc.callWitness(base, dc,
-                           protocol, conformance, literalFuncName,
+                           protocol, *conformance, literalFuncName,
                            literal, brokenProtocolDiag);
   if (literal)
     literal->setType(type);
@@ -5861,17 +5839,17 @@ Expr *ExprRewriter::convertLiteralInPlace(Expr *literal,
 
   // Check whether this literal type conforms to the builtin protocol. If so,
   // initialize via the builtin protocol.
-  ProtocolConformance *builtinConformance = nullptr;
+  Optional<ProtocolConformanceRef> builtinConformance;
   if (builtinProtocol &&
-      tc.conformsToProtocol(type, builtinProtocol, cs.DC,
-                            ConformanceCheckFlags::InExpression,
-                            &builtinConformance)) {
+      (builtinConformance =
+         tc.conformsToProtocol(type, builtinProtocol, cs.DC,
+                               ConformanceCheckFlags::InExpression))) {
     // Find the witness that we'll use to initialize the type via a builtin
     // literal.
     auto witness = findNamedWitnessImpl<AbstractFunctionDecl>(
                      tc, dc, type->getRValueType(), builtinProtocol,
                      builtinLiteralFuncName, brokenBuiltinProtocolDiag,
-                     builtinConformance);
+                     *builtinConformance);
     if (!witness)
       return nullptr;
 
@@ -5907,17 +5885,14 @@ Expr *ExprRewriter::convertLiteralInPlace(Expr *literal,
 
   // This literal type must conform to the (non-builtin) protocol.
   assert(protocol && "requirements should have stopped recursion");
-  ProtocolConformance *conformance = nullptr;
-  bool conforms = tc.conformsToProtocol(type, protocol, cs.DC,
-                                        ConformanceCheckFlags::InExpression,
-                                        &conformance);
-  assert(conforms && "must conform to literal protocol");
-  (void)conforms;
+  auto conformance = tc.conformsToProtocol(type, protocol, cs.DC,
+                                           ConformanceCheckFlags::InExpression);
+  assert(conformance && "must conform to literal protocol");
 
   // Dig out the literal type and perform a builtin literal conversion to it.
   if (!literalType.empty()) {
     // Extract the literal type.
-    Type builtinLiteralType = tc.getWitnessType(type, protocol, conformance,
+    Type builtinLiteralType = tc.getWitnessType(type, protocol, *conformance,
                                                 literalType,
                                                 brokenProtocolDiag);
     if (!builtinLiteralType)
@@ -6767,7 +6742,7 @@ static bool argumentNamesMatch(Expr *arg, ArrayRef<Identifier> names) {
 
 Expr *TypeChecker::callWitness(Expr *base, DeclContext *dc,
                                ProtocolDecl *protocol,
-                               ProtocolConformance *conformance,
+                               ProtocolConformanceRef conformance,
                                DeclName name,
                                MutableArrayRef<Expr *> arguments,
                                Diag<> brokenProtocolDiag) {

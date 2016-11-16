@@ -150,8 +150,13 @@ public struct ${Self}<
 
   /// The number of elements in the collection.
   ///
-  /// - Complexity: O(1) if `Index` conforms to `RandomAccessIndex`;
-  ///   O(*n*) otherwise.
+  /// To check whether the collection is empty, use its `isEmpty` property
+  /// instead of comparing `count` to zero. Unless the collection guarantees
+  /// random-access performance, calculating `count` can be an O(*n*)
+  /// operation.
+  ///
+  /// - Complexity: O(1) if `Index` conforms to `RandomAccessIndex`; O(*n*)
+  ///   otherwise.
   public var count: Base.IndexDistance {
     return _base.count
   }

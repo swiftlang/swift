@@ -156,7 +156,7 @@ ProtocolConformance::getTypeWitness(AssociatedTypeDecl *assocType,
 
 Type
 ProtocolConformance::getTypeWitnessByName(Type type,
-                                          ProtocolConformance *conformance,
+                                          ProtocolConformanceRef conformance,
                                           Identifier name,
                                           LazyResolver *resolver) {
   // For an archetype, retrieve the nested type with the appropriate
@@ -167,21 +167,25 @@ ProtocolConformance::getTypeWitnessByName(Type type,
 
   // Find the named requirement.
   AssociatedTypeDecl *assocType = nullptr;
-  auto members = conformance->getProtocol()->lookupDirect(name);
+  auto members = conformance.getRequirement()->lookupDirect(name);
   for (auto member : members) {
     assocType = dyn_cast<AssociatedTypeDecl>(member);
     if (assocType)
       break;
   }
 
+  // FIXME: Shouldn't this be a hard error?
   if (!assocType)
     return nullptr;
-  
-  assert(conformance && "Missing conformance information");
-  if (!conformance->hasTypeWitness(assocType, resolver)) {
+
+  if (conformance.isAbstract())
+    return DependentMemberType::get(type, assocType);
+
+  auto concrete = conformance.getConcrete();
+  if (!concrete->hasTypeWitness(assocType, resolver)) {
     return nullptr;
   }
-  return conformance->getTypeWitness(assocType, resolver).getReplacement();
+  return concrete->getTypeWitness(assocType, resolver).getReplacement();
 }
 
 Witness ProtocolConformance::getWitness(ValueDecl *requirement,

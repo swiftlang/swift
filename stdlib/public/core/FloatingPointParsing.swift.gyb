@@ -116,9 +116,9 @@ extension ${Self} : LosslessStringConvertible {
   /// Passing any other format or any additional characters as `text` results
   /// in `nil`. For example, the following conversions result in `nil`:
   ///
-  ///     Double(" 5.0")      // Includes whitespace
-  ///     Double("±2.0")      // Invalid character
-  ///     Double("0x1.25e4")  // Incorrect exponent format
+  ///     ${Self}(" 5.0")      // Includes whitespace
+  ///     ${Self}("±2.0")      // Invalid character
+  ///     ${Self}("0x1.25e4")  // Incorrect exponent format
   ///
   /// - Parameter text: The input string to convert to a `${Self}` instance. If
   ///   `text` has invalid characters or is in an invalid format, the result

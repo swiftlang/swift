@@ -129,3 +129,9 @@ func test001() {
   _ = genstruct2.z
 // CHECK: type: Dictionary<Int, Int>
 }
+
+protocol P1 {}
+func foo1(p : P1) {}
+// CHECK: decl: protocol P1  for 'P1' usr=s:P14swift_ide_test2P1
+// CHECK: decl: func foo1(p: P1)  for 'foo1' usr=s:F14swift_ide_test4foo1FT1pPS_2P1__T_
+// CHECK: decl: let p: P1 for 'p' usr=s:vF14swift_ide_test4foo1FT1pPS_2P1__T_L_1pPS0__

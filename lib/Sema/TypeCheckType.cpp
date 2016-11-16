@@ -325,18 +325,19 @@ Type TypeChecker::resolveTypeInContext(
       //
       if (!fromProto &&
           ownerNominal->getAsProtocolOrProtocolExtensionContext()) {
-        ProtocolConformance *conformance = nullptr;
+        Optional<ProtocolConformanceRef> conformance;
 
         // If the conformance check failed, the associated type is for a
         // conformance of an outer context.
         if (!options.contains(TR_InheritanceClause) &&
-            conformsToProtocol(fromType,
-                               cast<ProtocolDecl>(ownerNominal),
-                               parentDC, ConformanceCheckFlags::Used,
-                               &conformance) &&
-            conformance) {
+            (conformance = conformsToProtocol(
+                             fromType,
+                             cast<ProtocolDecl>(ownerNominal),
+                             parentDC, ConformanceCheckFlags::Used)) &&
+            conformance->isConcrete()) {
           if (assocType) {
-            return conformance->getTypeWitness(assocType, this).getReplacement();
+            return conformance->getConcrete()->getTypeWitness(assocType, this)
+                     .getReplacement();
           }
 
           return substMemberTypeWithBase(parentDC->getParentModule(), typeDecl,
@@ -547,12 +548,13 @@ Type TypeChecker::applyUnboundGenericArguments(
     TypeSubstitutionMap subs;
     for (unsigned i = 0, e = genericArgs.size(); i < e; i++) {
       auto t = signature->getInnermostGenericParams()[i];
-      subs[t->getCanonicalType().getPointer()] = genericArgs[i].getType();
+      subs[t->getCanonicalType()->castTo<GenericTypeParamType>()] =
+        genericArgs[i].getType();
     }
 
     if (auto outerSig = TAD->getDeclContext()->getGenericSignatureOfContext()) {
       for (auto outerParam : outerSig->getGenericParams()) {
-        subs[outerParam->getCanonicalType().getPointer()] =
+        subs[outerParam->getCanonicalType()->castTo<GenericTypeParamType>()] =
             resolver->resolveTypeOfDecl(outerParam->getDecl());
       }
     }
@@ -1132,15 +1134,15 @@ static Type resolveNestedIdentTypeComponent(
         conformanceOptions |= ConformanceCheckFlags::InExpression;
 
       auto *protocol = cast<ProtocolDecl>(assocType->getDeclContext());
-      ProtocolConformance *conformance = nullptr;
-      if (!TC.conformsToProtocol(parentTy, protocol, DC, conformanceOptions,
-                                 &conformance) ||
-          !conformance) {
+      auto conformance = TC.conformsToProtocol(parentTy, protocol, DC,
+                                               conformanceOptions);
+      if (!conformance || conformance->isAbstract()) {
         return nullptr;
       }
 
       // FIXME: Establish that we need a type witness.
-      return conformance->getTypeWitness(assocType, &TC).getReplacement();
+      return conformance->getConcrete()->getTypeWitness(assocType, &TC)
+               .getReplacement();
     }
 
     // Otherwise, simply substitute the parent type into the member.

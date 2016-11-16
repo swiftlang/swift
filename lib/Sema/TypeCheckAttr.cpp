@@ -1408,11 +1408,14 @@ void AttributeChecker::visitSpecializeAttr(SpecializeAttr *attr) {
   auto *FD = cast<AbstractFunctionDecl>(D);
   auto *genericSig = FD->getGenericSignature();
 
-  unsigned numTypes = genericSig->getGenericParams().size();
+  unsigned numTypes = 0;
+  if (genericSig)
+    numTypes = genericSig->getGenericParams().size();
   if (numTypes != attr->getTypeLocs().size()) {
     TC.diagnose(attr->getLocation(), diag::type_parameter_count_mismatch,
                 FD->getName(), numTypes, attr->getTypeLocs().size(),
                 numTypes > attr->getTypeLocs().size());
+    attr->setInvalid();
     return;
   }
   // Initialize each TypeLoc in this attribute with a concrete type,
@@ -1463,15 +1466,13 @@ void AttributeChecker::visitSpecializeAttr(SpecializeAttr *attr) {
       // Get the conformance and record it.
       auto firstType = req.getFirstType().subst(subMap);
       auto protoType = req.getSecondType()->castTo<ProtocolType>();
-      ProtocolConformance *conformance = nullptr;
-      bool conforms =
+      auto conformance =
         TC.conformsToProtocol(firstType,
                               protoType->getDecl(),
                               DC,
                               (ConformanceCheckFlags::InExpression|
-                               ConformanceCheckFlags::Used),
-                              &conformance);
-      if (!conforms || !conformance) {
+                               ConformanceCheckFlags::Used));
+      if (!conformance) {
         TC.diagnose(attr->getLocation(),
                     diag::cannot_convert_argument_value_protocol,
                     firstType, protoType);
@@ -1479,7 +1480,7 @@ void AttributeChecker::visitSpecializeAttr(SpecializeAttr *attr) {
         return;
       }
 
-      currentConformances.push_back(ProtocolConformanceRef(conformance));
+      currentConformances.push_back(*conformance);
       break;
     }
     case RequirementKind::Superclass: {

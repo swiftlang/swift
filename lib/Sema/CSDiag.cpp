@@ -1847,12 +1847,15 @@ bool CalleeCandidateInfo::diagnoseGenericParameterErrors(Expr *badArgExpr) {
     }
     
     for (auto proto : archetype->getConformsTo()) {
-      if (!CS->TC.conformsToProtocol(substitution, proto, CS->DC, ConformanceCheckOptions(TR_InExpression))) {
+      if (!CS->TC.conformsToProtocol(substitution, proto, CS->DC,
+                                     ConformanceCheckFlags::InExpression)) {
         if (substitution->isEqual(argType)) {
-          CS->TC.diagnose(badArgExpr->getLoc(), diag::cannot_convert_argument_value_protocol,
+          CS->TC.diagnose(badArgExpr->getLoc(),
+                          diag::cannot_convert_argument_value_protocol,
                           substitution, proto->getDeclaredType());
         } else {
-          CS->TC.diagnose(badArgExpr->getLoc(), diag::cannot_convert_partial_argument_value_protocol,
+          CS->TC.diagnose(badArgExpr->getLoc(),
+                          diag::cannot_convert_partial_argument_value_protocol,
                           argType, substitution, proto->getDeclaredType());
         }
         foundFailure = true;
@@ -3016,16 +3019,16 @@ bool FailureDiagnosis::diagnoseGeneralConversionFailure(Constraint *constraint){
       return true;
     }
 
-    // Emit a conformance error through conformsToProtocol.  If this succeeds
-    // and yields a valid protocol conformance, then keep searching.
-    ProtocolConformance *Conformance = nullptr;
-    if (CS->TC.conformsToProtocol(fromType, PT->getDecl(), CS->DC,
-                                  ConformanceCheckFlags::InExpression,
-                                  &Conformance, expr->getLoc())) {
-      if (!Conformance || !Conformance->isInvalid()) {
+    // Emit a conformance error through conformsToProtocol.
+    if (auto conformance =
+          CS->TC.conformsToProtocol(fromType, PT->getDecl(), CS->DC,
+                                    ConformanceCheckFlags::InExpression,
+                                    expr->getLoc())) {
+      if (conformance->isAbstract() ||
+          !conformance->getConcrete()->isInvalid())
         return false;
-      }
     }
+
     return true;
   }
 
@@ -3610,15 +3613,15 @@ static Type isRawRepresentable(Type fromType,
   if (!rawReprType)
     return Type();
 
-  ProtocolConformance *conformance;
-  if (!CS->TC.conformsToProtocol(fromType, rawReprType, CS->DC,
-                                 ConformanceCheckFlags::InExpression,
-                                 &conformance))
+  auto conformance =
+    CS->TC.conformsToProtocol(fromType, rawReprType, CS->DC,
+                              ConformanceCheckFlags::InExpression);
+  if (!conformance)
     return Type();
 
   Type rawTy = ProtocolConformance::getTypeWitnessByName(fromType,
-                                                         conformance,
-                                  CS->getASTContext().getIdentifier("RawValue"),
+                                                         *conformance,
+                                              CS->getASTContext().Id_RawValue,
                                                          &CS->TC);
   return rawTy;
 }
@@ -3976,14 +3979,12 @@ bool FailureDiagnosis::diagnoseContextualConversionError() {
     auto &TC = CS->getTypeChecker();
     if (auto errorCodeProtocol =
             TC.Context.getProtocol(KnownProtocolKind::ErrorCodeProtocol)) {
-      ProtocolConformance *conformance = nullptr;
-      if (TC.conformsToProtocol(expr->getType(), errorCodeProtocol, CS->DC,
-                                ConformanceCheckFlags::InExpression,
-                                &conformance) &&
-          conformance) {
+      if (auto conformance =
+            TC.conformsToProtocol(expr->getType(), errorCodeProtocol, CS->DC,
+                                  ConformanceCheckFlags::InExpression)) {
         Type errorCodeType = expr->getType();
         Type errorType =
-          ProtocolConformance::getTypeWitnessByName(errorCodeType, conformance,
+          ProtocolConformance::getTypeWitnessByName(errorCodeType, *conformance,
                                                     TC.Context.Id_ErrorType,
                                                     &TC)->getCanonicalType();
         if (errorType) {
@@ -6044,7 +6045,8 @@ static bool isDictionaryLiteralCompatible(Type ty, ConstraintSystem *CS,
                               KnownProtocolKind::ExpressibleByDictionaryLiteral);
   if (!DLC) return false;
   return CS->TC.conformsToProtocol(ty, DLC, CS->DC,
-                                   ConformanceCheckFlags::InExpression);
+                                   ConformanceCheckFlags::InExpression)
+           .hasValue();
 }
 
 bool FailureDiagnosis::visitArrayExpr(ArrayExpr *E) {
@@ -6062,23 +6064,14 @@ bool FailureDiagnosis::visitArrayExpr(ArrayExpr *E) {
     // figure out what the contextual element type is in place.
     auto ALC = CS->TC.getProtocol(E->getLoc(),
                                   KnownProtocolKind::ExpressibleByArrayLiteral);
-    ProtocolConformance *Conformance = nullptr;
     if (!ALC)
       return visitExpr(E);
 
     // Check to see if the contextual type conforms.
-    bool typeConforms =
+    auto Conformance =
       CS->TC.conformsToProtocol(contextualType, ALC, CS->DC,
-                                ConformanceCheckFlags::InExpression,
-                                &Conformance);
-    (void) typeConforms;
+                                ConformanceCheckFlags::InExpression);
 
-    // The type can conform, but not have a concrete conformance, in
-    // which case Conformance will be nullptr, but typeConforms will
-    // still be true.
-    assert((!Conformance || typeConforms) &&
-           "Expected null Conformance if the type doesn't conform!");
-    
     // If not, we may have an implicit conversion going on.  If the contextual
     // type is an UnsafePointer or UnsafeMutablePointer, then that is probably
     // what is happening.
@@ -6091,12 +6084,9 @@ bool FailureDiagnosis::visitArrayExpr(ArrayExpr *E) {
       if (Type pointeeTy = unwrappedTy->getAnyPointerElementType(pointerKind)) {
         if (pointerKind == PTK_UnsafePointer) {
           auto arrayTy = ArraySliceType::get(pointeeTy);
-          typeConforms =
+          Conformance =
             CS->TC.conformsToProtocol(arrayTy, ALC, CS->DC,
-                                      ConformanceCheckFlags::InExpression,
-                                      &Conformance);
-          assert((!Conformance || typeConforms) &&
-                 "Expected null Conformance if the type doesn't conform!");
+                                      ConformanceCheckFlags::InExpression);
 
           if (Conformance)
             contextualType = arrayTy;
@@ -6132,18 +6122,12 @@ bool FailureDiagnosis::visitArrayExpr(ArrayExpr *E) {
       return true;
     }
 
-    Conformance->forEachTypeWitness(&CS->TC,
-                                    [&](AssociatedTypeDecl *ATD,
-                          const Substitution &subst, TypeDecl *d)->bool
-    {
-      if (ATD->getName().str() == "Element")
-        contextualElementType = subst.getReplacement()->getDesugaredType();
-      return false;
-    });
-    assert(contextualElementType &&
-           "Could not find 'Element' ArrayLiteral associated types from"
-           " contextual type conformance");
-
+    contextualElementType = ProtocolConformance::getTypeWitnessByName(
+                                                 contextualType,
+                                                 *Conformance,
+                                                 CS->getASTContext().Id_Element,
+                                                 &CS->TC)
+                              ->getDesugaredType();
     elementTypePurpose = CTP_ArrayElement;
   }
 
@@ -6179,25 +6163,29 @@ bool FailureDiagnosis::visitDictionaryExpr(DictionaryExpr *E) {
 
     // Validate the contextual type conforms to ExpressibleByDictionaryLiteral
     // and figure out what the contextual Key/Value types are in place.
-    ProtocolConformance *Conformance = nullptr;
-    if (!CS->TC.conformsToProtocol(contextualType, DLC, CS->DC,
-                                   ConformanceCheckFlags::InExpression,
-                                   &Conformance)) {
+    auto Conformance =
+      CS->TC.conformsToProtocol(contextualType, DLC, CS->DC,
+                                ConformanceCheckFlags::InExpression);
+    if (!Conformance) {
       diagnose(E->getStartLoc(), diag::type_is_not_dictionary, contextualType)
         .highlight(E->getSourceRange());
       return true;
     }
 
-    Conformance->forEachTypeWitness(&CS->TC,
-                                    [&](AssociatedTypeDecl *ATD,
-                          const Substitution &subst, TypeDecl *d)->bool
-    {
-      if (ATD->getName().str() == "Key")
-        contextualKeyType = subst.getReplacement()->getDesugaredType();
-      else if (ATD->getName().str() == "Value")
-        contextualValueType = subst.getReplacement()->getDesugaredType();
-      return false;
-    });
+    contextualKeyType =
+      ProtocolConformance::getTypeWitnessByName(contextualType,
+                                                *Conformance,
+                                                CS->getASTContext().Id_Key,
+                                                &CS->TC)
+        ->getDesugaredType();
+
+    contextualValueType =
+      ProtocolConformance::getTypeWitnessByName(contextualType,
+                                                *Conformance,
+                                                CS->getASTContext().Id_Value,
+                                                &CS->TC)
+        ->getDesugaredType();
+
     assert(contextualKeyType && contextualValueType &&
            "Could not find Key/Value DictionaryLiteral associated types from"
            " contextual type conformance");
@@ -6704,8 +6692,7 @@ static bool hasArchetype(const GenericTypeDecl *generic,
   if (!genericEnv)
     return false;
 
-  auto &map = genericEnv->getArchetypeToInterfaceMap();
-  return map.find(archetype) != map.end();
+  return genericEnv->containsPrimaryArchetype(archetype);
 }
 
 static void noteArchetypeSource(const TypeLoc &loc, ArchetypeType *archetype,
@@ -7182,7 +7169,6 @@ bool ConstraintSystem::salvage(SmallVectorImpl<Solution> &viable, Expr *expr) {
     // Set up solver state.
     SolverState state(*this);
     state.recordFixes = true;
-    this->solverState = &state;
 
     // Solve the system.
     solveRec(viable, FreeTypeVariableBinding::Disallow);
@@ -7223,9 +7209,6 @@ bool ConstraintSystem::salvage(SmallVectorImpl<Solution> &viable, Expr *expr) {
         return true;
       }
     }
-
-    // Remove the solver state.
-    this->solverState = nullptr;
 
     // Fall through to produce diagnostics.
   }

@@ -386,29 +386,29 @@ func <#test1#> () {}
 /// - seealso nope
 /// - returns: `x + y`
 func foo(x: Int, y: Int) -> Int { return x + y }
-// CHECK: <doc-comment-line>/// Brief.
-// CHECK: </doc-comment-line><doc-comment-line>///
-// CHECK: </doc-comment-line><doc-comment-line>/// Simple case.
-// CHECK: </doc-comment-line><doc-comment-line>///
-// CHECK: </doc-comment-line><doc-comment-line>/// - <doc-comment-field>parameter</doc-comment-field> x: A number
-// CHECK: </doc-comment-line><doc-comment-line>/// - <doc-comment-field>parameter</doc-comment-field> y: Another number
-// CHECK: </doc-comment-line><doc-comment-line>/// - <doc-comment-field>PaRamEteR</doc-comment-field> z-hyphen-q: Another number
-// CHECK: </doc-comment-line><doc-comment-line>/// - <doc-comment-field>parameter</doc-comment-field> : A strange number...
-// CHECK: </doc-comment-line><doc-comment-line>/// - parameternope1: Another number
-// CHECK: </doc-comment-line><doc-comment-line>/// - parameter nope2
-// CHECK: </doc-comment-line><doc-comment-line>/// - parameter: nope3
-// CHECK: </doc-comment-line><doc-comment-line>/// -parameter nope4: Another number
-// CHECK: </doc-comment-line><doc-comment-line>/// * parameter nope5: Another number
-// CHECK: </doc-comment-line><doc-comment-line>///  - parameter nope6: Another number
-// CHECK: </doc-comment-line><doc-comment-line>///  - Parameters: nope7
-// CHECK: </doc-comment-line><doc-comment-line>/// - <doc-comment-field>seealso</doc-comment-field>: yes
-// CHECK: </doc-comment-line><doc-comment-line>///   - <doc-comment-field>seealso</doc-comment-field>: yes
-// CHECK: </doc-comment-line><doc-comment-line>/// - <doc-comment-field>seealso</doc-comment-field>:
-// CHECK: </doc-comment-line><doc-comment-line>/// -seealso: nope
-// CHECK: </doc-comment-line><doc-comment-line>/// - seealso : nope
-// CHECK: </doc-comment-line><doc-comment-line>/// - seealso nope
-// CHECK: </doc-comment-line><doc-comment-line>/// - <doc-comment-field>returns</doc-comment-field>: `x + y`
-// CHECK: </doc-comment-line><kw>func</kw> foo(x: <type>Int</type>, y: <type>Int</type>) -> <type>Int</type> { <kw>return</kw> x + y }
+// CHECK: <doc-comment-line>/// Brief.</doc-comment-line>
+// CHECK: <doc-comment-line>///</doc-comment-line>
+// CHECK: <doc-comment-line>/// Simple case.</doc-comment-line>
+// CHECK: <doc-comment-line>///</doc-comment-line>
+// CHECK: <doc-comment-line>/// - <doc-comment-field>parameter</doc-comment-field> x: A number</doc-comment-line>
+// CHECK: <doc-comment-line>/// - <doc-comment-field>parameter</doc-comment-field> y: Another number</doc-comment-line>
+// CHECK: <doc-comment-line>/// - <doc-comment-field>PaRamEteR</doc-comment-field> z-hyphen-q: Another number</doc-comment-line>
+// CHECK: <doc-comment-line>/// - <doc-comment-field>parameter</doc-comment-field> : A strange number...</doc-comment-line>
+// CHECK: <doc-comment-line>/// - parameternope1: Another number</doc-comment-line>
+// CHECK: <doc-comment-line>/// - parameter nope2</doc-comment-line>
+// CHECK: <doc-comment-line>/// - parameter: nope3</doc-comment-line>
+// CHECK: <doc-comment-line>/// -parameter nope4: Another number</doc-comment-line>
+// CHECK: <doc-comment-line>/// * parameter nope5: Another number</doc-comment-line>
+// CHECK: <doc-comment-line>///  - parameter nope6: Another number</doc-comment-line>
+// CHECK: <doc-comment-line>///  - Parameters: nope7</doc-comment-line>
+// CHECK: <doc-comment-line>/// - <doc-comment-field>seealso</doc-comment-field>: yes</doc-comment-line>
+// CHECK: <doc-comment-line>///   - <doc-comment-field>seealso</doc-comment-field>: yes</doc-comment-line>
+// CHECK: <doc-comment-line>/// - <doc-comment-field>seealso</doc-comment-field>:</doc-comment-line>
+// CHECK: <doc-comment-line>/// -seealso: nope</doc-comment-line>
+// CHECK: <doc-comment-line>/// - seealso : nope</doc-comment-line>
+// CHECK: <doc-comment-line>/// - seealso nope</doc-comment-line>
+// CHECK: <doc-comment-line>/// - <doc-comment-field>returns</doc-comment-field>: `x + y`</doc-comment-line>
+// CHECK: <kw>func</kw> foo(x: <type>Int</type>, y: <type>Int</type>) -> <type>Int</type> { <kw>return</kw> x + y }
 
 
 /// Brief.
@@ -425,15 +425,15 @@ func foo(x: Int, y: Int) -> Int { return x + y }
 ///   - note: Not a Note field (not at top level)
 /// - returns: `x + y`
 func bar(x: Int, y: Int) -> Int { return x + y }
-// CHECK: <doc-comment-line>/// Brief.
-// CHECK: </doc-comment-line><doc-comment-line>///
-// CHECK: </doc-comment-line><doc-comment-line>/// Simple case.
-// CHECK: </doc-comment-line><doc-comment-line>///
-// CHECK: </doc-comment-line><doc-comment-line>/// - <doc-comment-field>Parameters</doc-comment-field>:
-// CHECK: </doc-comment-line><doc-comment-line>/// - x: A number
-// CHECK: </doc-comment-line><doc-comment-line>/// - y: Another number
-// CHECK: </doc-comment-line><doc-comment-line>/// - <doc-comment-field>returns</doc-comment-field>: `x + y`
-// CHECK: </doc-comment-line><kw>func</kw> bar(x: <type>Int</type>, y: <type>Int</type>) -> <type>Int</type> { <kw>return</kw> x + y }
+// CHECK: <doc-comment-line>/// Brief.</doc-comment-line>
+// CHECK: <doc-comment-line>///</doc-comment-line>
+// CHECK: <doc-comment-line>/// Simple case.</doc-comment-line>
+// CHECK: <doc-comment-line>///</doc-comment-line>
+// CHECK: <doc-comment-line>/// - <doc-comment-field>Parameters</doc-comment-field>:</doc-comment-line>
+// CHECK: <doc-comment-line>/// - x: A number</doc-comment-line>
+// CHECK: <doc-comment-line>/// - y: Another number</doc-comment-line>
+// CHECK: <doc-comment-line>/// - <doc-comment-field>returns</doc-comment-field>: `x + y`</doc-comment-line>
+// CHECK: <kw>func</kw> bar(x: <type>Int</type>, y: <type>Int</type>) -> <type>Int</type> { <kw>return</kw> x + y }
 
 /**
   Does pretty much nothing.
@@ -592,11 +592,7 @@ func keywordInCaseAndLocalArgLabel(_ for: Int, for in: Int, class _: Int) {
 }
 
 // Keep this as the last test
-/**
-  Trailing off ...
-func unterminatedBlockComment() {}
+/** Block Comment */
 // CHECK: <comment-line>// Keep this as the last test</comment-line>
-// CHECK: <doc-comment-block>/**
-// CHECK:  Trailing off ...
+// CHECK: <doc-comment-block>/** Block Comment</doc-comment-block>
 // CHECK:  func unterminatedBlockComment() {}
-// CHECK:  </doc-comment-block>

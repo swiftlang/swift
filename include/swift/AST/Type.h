@@ -42,6 +42,7 @@ class NormalProtocolConformance;
 enum OptionalTypeKind : unsigned;
 class ProtocolDecl;
 class StructDecl;
+class SubstitutableType;
 class SubstitutionMap;
 class TypeBase;
 class Type;
@@ -49,7 +50,7 @@ class TypeWalker;
 
 /// \brief Type substitution mapping from substitutable types to their
 /// replacements.
-typedef llvm::DenseMap<TypeBase *, Type> TypeSubstitutionMap;
+typedef llvm::DenseMap<SubstitutableType *, Type> TypeSubstitutionMap;
 
 /// Flags that can be passed when substituting into a type.
 enum class SubstFlags {

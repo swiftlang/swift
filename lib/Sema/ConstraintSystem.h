@@ -1178,7 +1178,7 @@ private:
   ///
   /// \returns null when we aren't currently solving the system.
   SavedTypeVariableBindings *getSavedBindings() const {
-    return solverState? &solverState->savedBindings : nullptr;
+    return solverState ? &solverState->savedBindings : nullptr;
   }
 
   /// Add a new type variable that was already created.
@@ -2030,6 +2030,9 @@ private:
   SolutionKind addConstraintImpl(ConstraintKind kind, Type first, Type second,
                                  ConstraintLocatorBuilder locator,
                                  bool isFavored);
+
+  /// \brief Collect the current inactive disjunciton constraints.
+  void collectDisjunctions(SmallVectorImpl<Constraint *> &disjunctions);
 
   /// \brief Solve the system of constraints after it has already been
   /// simplified.

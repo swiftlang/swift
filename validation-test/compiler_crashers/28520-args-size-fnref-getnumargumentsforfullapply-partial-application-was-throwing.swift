@@ -6,4 +6,5 @@
 // See http://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
 
 // RUN: not --crash %target-swift-frontend %s -emit-ir
-let E{{guard let a
+// REQUIRES: asserts
+{}(assert||()A

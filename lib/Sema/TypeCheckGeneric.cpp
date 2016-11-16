@@ -966,7 +966,7 @@ bool TypeChecker::checkGenericArguments(DeclContext *dc, SourceLoc loc,
       // FIXME: Do we really need "used" at this point?
       // FIXME: Poor location information. How much better can we do here?
       if (!conformsToProtocol(firstType, proto->getDecl(), dc,
-                              ConformanceCheckFlags::Used, nullptr, loc)) {
+                              ConformanceCheckFlags::Used, loc)) {
         return true;
       }
 
@@ -1009,12 +1009,13 @@ bool TypeChecker::checkGenericArguments(DeclContext *dc, SourceLoc loc,
 }
 
 Type TypeChecker::getWitnessType(Type type, ProtocolDecl *protocol,
-                                 ProtocolConformance *conformance,
+                                 ProtocolConformanceRef conformance,
                                  Identifier name,
                                  Diag<> brokenProtocolDiag) {
   Type ty = ProtocolConformance::getTypeWitnessByName(type, conformance,
                                                       name, this);
-  if (!ty && !conformance->isInvalid())
+  if (!ty &&
+      !(conformance.isConcrete() && conformance.getConcrete()->isInvalid()))
     diagnose(protocol->getLoc(), brokenProtocolDiag);
 
   return ty;

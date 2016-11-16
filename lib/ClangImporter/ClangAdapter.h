@@ -139,11 +139,15 @@ bool isUnavailableInSwift(const clang::Decl *decl, const PlatformAvailability &,
 
 /// Determine the optionality of the given Clang parameter.
 ///
+/// \param swiftLanguageVersion What version of Swift we're using, which affects
+/// how optionality is inferred.
+///
 /// \param param The Clang parameter.
 ///
 /// \param knownNonNull Whether a function- or method-level "nonnull" attribute
 /// applies to this parameter.
-OptionalTypeKind getParamOptionality(const clang::ParmVarDecl *param,
+OptionalTypeKind getParamOptionality(version::Version swiftLanguageVersion,
+                                     const clang::ParmVarDecl *param,
                                      bool knownNonNull);
 }
 }

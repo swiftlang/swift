@@ -2847,8 +2847,6 @@ static void checkVarBehavior(VarDecl *decl, TypeChecker &TC) {
   //
   // TODO: Handle non-protocol requirements ('class', base class, etc.)
   for (auto refinedProto : behaviorProto->getInheritedProtocols(&TC)) {
-    ProtocolConformance *inherited = nullptr;
-    
     // A behavior in non-type or static context is never going to be able to
     // satisfy Self constraints (until we give structural types that ability).
     // Give a tailored error message for this case.
@@ -2868,12 +2866,13 @@ static void checkVarBehavior(VarDecl *decl, TypeChecker &TC) {
     } else {
       llvm_unreachable("unknown type context type?!");
     }
-    bool conforms = TC.conformsToProtocol(behaviorSelf, refinedProto, dc,
-                                          ConformanceCheckFlags::Used,
-                                          &inherited,
-                                          blameLoc);
-    if (conforms) {
-      conformance->setInheritedConformance(refinedProto, inherited);
+
+    auto inherited = TC.conformsToProtocol(behaviorSelf, refinedProto, dc,
+                                           ConformanceCheckFlags::Used,
+                                           blameLoc);
+    if (inherited && inherited->isConcrete()) {
+      conformance->setInheritedConformance(refinedProto,
+                                           inherited->getConcrete());
     } else {
       // Add some notes that the conformance is behavior-driven.
       TC.diagnose(behavior->getLoc(),
@@ -2921,12 +2920,10 @@ static void checkVarBehavior(VarDecl *decl, TypeChecker &TC) {
     auto propTy = decl->getType();
     SmallVector<ProtocolConformanceRef, 4> valueConformances;
     for (auto proto : assocTy->getConformingProtocols()) {
-      ProtocolConformance *valueConformance = nullptr;
-      bool conforms = TC.conformsToProtocol(propTy, proto, dc,
-                                            ConformanceCheckFlags::Used,
-                                            &valueConformance,
-                                            decl->getLoc());
-      if (!conforms) {
+      auto valueConformance = TC.conformsToProtocol(propTy, proto, dc,
+                                                    ConformanceCheckFlags::Used,
+                                                    decl->getLoc());
+      if (!valueConformance) {
         conformance->setInvalid();
         TC.diagnose(behavior->getLoc(),
                     diag::value_conformance_required_by_property_behavior,
@@ -2934,11 +2931,7 @@ static void checkVarBehavior(VarDecl *decl, TypeChecker &TC) {
                     behaviorProto->getName());
         goto next_requirement;
       }
-      // FIXME: ProtocolConformanceRef should have an "error" representation
-      if (!valueConformance)
-        valueConformances.push_back(ProtocolConformanceRef(proto));
-      else
-        valueConformances.push_back(ProtocolConformanceRef(valueConformance));
+      valueConformances.push_back(*valueConformance);
     }
     
     {
@@ -6393,7 +6386,8 @@ public:
         AccessScope desiredAccessScope = AccessScope::getPublic();
         switch (access) {
         case Accessibility::Private:
-          assert(ED->getDeclContext()->isModuleScopeContext() &&
+          assert((ED->isInvalid() ||
+                  ED->getDeclContext()->isModuleScopeContext()) &&
                  "non-top-level extensions make 'private' != 'fileprivate'");
           SWIFT_FALLTHROUGH;
         case Accessibility::FilePrivate: {

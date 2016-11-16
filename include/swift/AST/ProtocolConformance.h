@@ -38,11 +38,12 @@ class GenericParamList;
 class NormalProtocolConformance;
 class ProtocolConformance;
 class ModuleDecl;
+class SubstitutableType;
 enum class AllocationArena;
 
 /// \brief Type substitution mapping from substitutable types to their
 /// replacements.
-typedef llvm::DenseMap<TypeBase *, Type> TypeSubstitutionMap;
+typedef llvm::DenseMap<SubstitutableType *, Type> TypeSubstitutionMap;
 
 /// Map from non-type requirements to the corresponding conformance witnesses.
 typedef llvm::DenseMap<ValueDecl *, Witness> WitnessMap;
@@ -160,7 +161,7 @@ public:
 
   static Type
   getTypeWitnessByName(Type type,
-                       ProtocolConformance *conformance,
+                       ProtocolConformanceRef conformance,
                        Identifier name,
                        LazyResolver *resolver);
 

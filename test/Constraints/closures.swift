@@ -368,3 +368,16 @@ func fn_r28909024(n: Int) {
     _ in true
   }
 }
+
+// SR-2994: Unexpected ambiguous expression in closure with generics
+struct S_2994 {
+  var dataOffset: Int
+}
+class C_2994<R> {
+  init(arg: (R) -> Void) {}
+}
+func f_2994(arg: String) {}
+func g_2994(arg: Int) -> Double {
+  return 2
+}
+C_2994<S_2994>(arg: { (r: S_2994) in f_2994(arg: g_2994(arg: r.dataOffset)) }) // expected-error {{cannot convert value of type 'Double' to expected argument type 'String'}}
