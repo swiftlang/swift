@@ -336,8 +336,7 @@ extension CGFloat {
     fatalError("unavailable")
   }
 
-  @available(swift, deprecated: 3.1, message: "Please use the `abs(_:)` free function")
-  @available(swift, obsoleted: 4.0, message: "Please use the `abs(_:)` free function")
+  @available(swift, deprecated: 3.1, obsoleted: 4.0, message: "Please use the `abs(_:)` free function")
   @_transparent
   public static func abs(_ x: CGFloat) -> CGFloat {
     return x.magnitude
