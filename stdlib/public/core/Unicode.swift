@@ -214,10 +214,11 @@ public struct UTF8 : UnicodeCodec {
       guard let codeUnit = input.next() else { return .emptyInput }
       // ASCII, return immediately.
       if codeUnit & 0x80 == 0 {
-        return .scalarValue(UnicodeScalar(_unchecked: UInt32(codeUnit)))
+        return .scalarValue(UnicodeScalar(
+          _unchecked: UInt32(extendingOrTruncating: codeUnit)))
       }
       // Non-ASCII, proceed to buffering mode.
-      _decodeBuffer = UInt32(codeUnit)
+      _decodeBuffer = UInt32(extendingOrTruncating: codeUnit)
       _bitsInBuffer = 8
     } else if (_decodeBuffer & 0x80 == 0) {
       // ASCII in buffer.  We don't refill the buffer so we can return
@@ -234,7 +235,9 @@ public struct UTF8 : UnicodeCodec {
       if let codeUnit = input.next() {
         // We know _bitsInBuffer < 32 so we use `& 0x1f` (31) to make the
         // compiler omit a bounds check branch for the bitshift.
-        _decodeBuffer |= (UInt32(codeUnit) &<< UInt32(_bitsInBuffer & 0x1f))
+        _decodeBuffer |=
+          (UInt32(extendingOrTruncating: codeUnit) &<<
+          UInt32(extendingOrTruncating: _bitsInBuffer & 0x1f))
         _bitsInBuffer = _bitsInBuffer &+ 8
       } else {
         if _bitsInBuffer == 0 { return .emptyInput }
@@ -252,8 +255,9 @@ public struct UTF8 : UnicodeCodec {
     // Swift doesn't allow shifts greater than or equal to the type width.
     // _decodeBuffer >>= UInt32(bitsConsumed) // >>= 32 crashes.
     // Mask with 0x3f (63) to let the compiler omit the '>= 64' bounds check.
-    _decodeBuffer = UInt32(truncatingBitPattern:
-      UInt64(_decodeBuffer) &>> (UInt64(bitsConsumed) & 0x3f))
+    _decodeBuffer = UInt32(extendingOrTruncating:
+      UInt64(extendingOrTruncating: _decodeBuffer) &>>
+      (UInt64(extendingOrTruncating: bitsConsumed) & 0x3f))
     _bitsInBuffer = _bitsInBuffer &- bitsConsumed
 
     guard _fastPath(result != nil) else { return .error }
@@ -379,26 +383,26 @@ public struct UTF8 : UnicodeCodec {
     into processCodeUnit: (CodeUnit) -> Void
   ) {
     var c = UInt32(input)
-    var buf3 = UInt8(c & 0xFF)
+    var buf3 = UInt8(extendingOrTruncating: c & 0xFF)
 
-    if c >= UInt32(1 &<< 7) {
+    if c >= ((1 as UInt32) &<< 7) {
       c &>>= 6
       buf3 = (buf3 & 0x3F) | 0x80 // 10xxxxxx
-      var buf2 = UInt8(c & 0xFF)
-      if c < UInt32(1 &<< 5) {
+      var buf2 = UInt8(extendingOrTruncating: c & 0xFF)
+      if c < ((1 as UInt32) &<< 5) {
         buf2 |= 0xC0              // 110xxxxx
       }
       else {
         c &>>= 6
         buf2 = (buf2 & 0x3F) | 0x80 // 10xxxxxx
-        var buf1 = UInt8(c & 0xFF)
+        var buf1 = UInt8(extendingOrTruncating: c & 0xFF)
         if c < UInt32(1 &<< 4) {
           buf1 |= 0xE0              // 1110xxxx
         }
         else {
           c &>>= 6
           buf1 = (buf1 & 0x3F) | 0x80 // 10xxxxxx
-          processCodeUnit(UInt8(c | 0xF0)) // 11110xxx
+          processCodeUnit(UInt8(extendingOrTruncating: c | 0xF0)) // 11110xxx
         }
         processCodeUnit(buf1)
       }
@@ -514,7 +518,8 @@ public struct UTF16 : UnicodeCodec {
 
     // Common case first, non-surrogate -- just a sequence of 1 code unit.
     if _fastPath((unit0 &>> 11) != 0b1101_1) {
-      return .scalarValue(UnicodeScalar(_unchecked: UInt32(unit0)))
+      return .scalarValue(UnicodeScalar(
+        _unchecked: UInt32(extendingOrTruncating: unit0)))
     }
 
     // Ensure `unit0` is a high-surrogate.
@@ -531,7 +536,9 @@ public struct UTF16 : UnicodeCodec {
     }
 
     // We have a well-formed surrogate pair, decode it.
-    let result = 0x10000 + ((UInt32(unit0 & 0x03ff) &<< 10) | UInt32(unit1 & 0x03ff))
+    let result = 0x10000 + (
+      (UInt32(extendingOrTruncating: unit0 & 0x03ff) &<< 10) |
+      UInt32(extendingOrTruncating: unit1 & 0x03ff))
     return .scalarValue(UnicodeScalar(_unchecked: result))
   }
 
@@ -577,11 +584,12 @@ public struct UTF16 : UnicodeCodec {
   ) {
     let scalarValue: UInt32 = UInt32(input)
 
-    if scalarValue <= UInt32(UInt16.max) {
-      processCodeUnit(UInt16(scalarValue))
+    if scalarValue <= UInt32(extendingOrTruncating: UInt16.max) {
+      processCodeUnit(UInt16(extendingOrTruncating: scalarValue))
     }
     else {
-      let lead_offset = UInt32(0xd800) - UInt32(0x10000 &>> 10)
+      let lead_offset =
+        (0xd800 as UInt32) - UInt32(extendingOrTruncating: 0x10000 &>> 10)
       processCodeUnit(UInt16(lead_offset + (scalarValue &>> (10 as UInt32))))
       processCodeUnit(UInt16(0xdc00 + (scalarValue & 0x3ff)))
     }
@@ -873,14 +881,14 @@ extension UTF8.CodeUnit : _StringElement {
   public // @testable
   static func _toUTF16CodeUnit(_ x: UTF8.CodeUnit) -> UTF16.CodeUnit {
     _sanityCheck(x <= 0x7f, "should only be doing this with ASCII")
-    return UTF16.CodeUnit(x)
+    return UTF16.CodeUnit(extendingOrTruncating: x)
   }
   public // @testable
   static func _fromUTF16CodeUnit(
     _ utf16: UTF16.CodeUnit
   ) -> UTF8.CodeUnit {
     _sanityCheck(utf16 <= 0x7f, "should only be doing this with ASCII")
-    return UTF8.CodeUnit(utf16)
+    return UTF8.CodeUnit(extendingOrTruncating: utf16)
   }
 }
 
@@ -933,7 +941,8 @@ extension UTF16 {
   /// - SeeAlso: `UTF16.width(_:)`, `UTF16.trailSurrogate(_:)`
   public static func leadSurrogate(_ x: UnicodeScalar) -> UTF16.CodeUnit {
     _precondition(width(x) == 2)
-    return UTF16.CodeUnit((x.value - 0x1_0000) &>> (10 as UInt32)) + 0xD800
+    return 0xD800 + UTF16.CodeUnit(extendingOrTruncating:
+      (x.value - 0x1_0000) &>> (10 as UInt32))
   }
 
   /// Returns the low-surrogate code unit of the surrogate pair representing
@@ -957,9 +966,8 @@ extension UTF16 {
   /// - SeeAlso: `UTF16.width(_:)`, `UTF16.leadSurrogate(_:)`
   public static func trailSurrogate(_ x: UnicodeScalar) -> UTF16.CodeUnit {
     _precondition(width(x) == 2)
-    return UTF16.CodeUnit(
-      (x.value - 0x1_0000) & (((1 as UInt32) &<< 10) - 1)
-    ) + 0xDC00
+    return 0xDC00 + UTF16.CodeUnit(extendingOrTruncating:
+      (x.value - 0x1_0000) & (((1 as UInt32) &<< 10) - 1))
   }
 
   /// Returns a Boolean value indicating whether the specified code unit is a
