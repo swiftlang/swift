@@ -2399,7 +2399,7 @@ public struct ${Self}
 % for x in maskingShifts:
   @_transparent
   public static func ${x.operator}(_ lhs: ${Self}, _ rhs: ${Self}) -> ${Self} {
-    let rhs_ = rhs & ${Self}._highBitIndex
+    let rhs_ = rhs & ${bits - 1}
     return ${Self}(
       Builtin.${x.llvmName(signed)}_Int${bits}(lhs._value, rhs_._value))
   }
