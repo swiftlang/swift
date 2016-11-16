@@ -478,20 +478,15 @@ extension ${Self} : CustomPlaygroundQuickLookable {
   }
 }
 
-/// - Note: Strideable's implementation is potentially less efficient and cannot
-///   handle misaligned pointers.
-@_transparent
-public func == <Pointee>(
-  lhs: ${Self}<Pointee>, rhs: ${Self}<Pointee>
-) -> Bool {
-  return Bool(Builtin.cmp_eq_RawPointer(lhs._rawValue, rhs._rawValue))
-}
-
-/// - Note: Strideable's implementation is potentially less efficient and cannot
-///   handle misaligned pointers.
-///
-/// - Note: This is an unsigned comparison unlike Strideable's implementation.
+/// - Note: Strideable's implementation is potentially less efficient and
+///   cannot handle misaligned pointers.
 extension ${Self} {
+  @_transparent
+  public static func == (lhs: ${Self}<Pointee>, rhs: ${Self}<Pointee>) -> Bool {
+    return Bool(Builtin.cmp_eq_RawPointer(lhs._rawValue, rhs._rawValue))
+  }
+
+  /// - Note: This is an unsigned comparison unlike Strideable's implementation.
   @_transparent
   public static func < (lhs: ${Self}<Pointee>, rhs: ${Self}<Pointee>) -> Bool {
     return Bool(Builtin.cmp_ult_RawPointer(lhs._rawValue, rhs._rawValue))

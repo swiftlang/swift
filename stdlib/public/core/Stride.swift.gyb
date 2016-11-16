@@ -64,44 +64,6 @@ public func == <T : Strideable>(x: T, y: T) -> Bool {
 
 //===----------------------------------------------------------------------===//
 
-%{
-Overloads = """
-  Availability
-  public static func + (lhs: Self, rhs: Self.Stride) -> Self {
-    return lhs.advanced(by: rhs)
-  }
-
-  Availability
-  public static func + (lhs: Self.Stride, rhs: Self) -> Self {
-    return rhs.advanced(by: lhs)
-  }
-
-  Availability
-  public static func - (lhs: Self, rhs: Self.Stride) -> Self {
-    return lhs.advanced(by: -rhs)
-  }
-
-  Availability
-  public static func - (lhs: Self, rhs: Self) -> Self.Stride {
-    return rhs.distance(to: lhs)
-  }
-
-  Availability
-  public static func += (lhs: inout Self, rhs: Self.Stride) {
-    lhs = lhs.advanced(by: rhs)
-  }
-
-  Availability
-  public static func -= (lhs: inout Self, rhs: Self.Stride) {
-    lhs = lhs.advanced(by: -rhs)
-  }
-"""
-}%
-
-extension _Pointer where Self : Strideable {
-${Overloads.replace("Availability", "@available(swift, introduced: 4.0)")}
-}
-
 % # Versions constrained to Arithmetic break the ambiguity
 % for arithmetic in [True, False]:
 extension Strideable
@@ -109,7 +71,41 @@ extension Strideable
   where Self : Arithmetic
 %   end
 {
-${Overloads.replace("Availability", "@available(swift, obsoleted: 4.0)")}
+  @available(swift, obsoleted: 4.0)
+  @_transparent
+  public static func + (lhs: Self, rhs: Self.Stride) -> Self {
+    return lhs.advanced(by: rhs)
+  }
+
+  @available(swift, obsoleted: 4.0)
+  @_transparent
+  public static func + (lhs: Self.Stride, rhs: Self) -> Self {
+    return rhs.advanced(by: lhs)
+  }
+
+  @available(swift, obsoleted: 4.0)
+  @_transparent
+  public static func - (lhs: Self, rhs: Self.Stride) -> Self {
+    return lhs.advanced(by: -rhs)
+  }
+
+  @available(swift, obsoleted: 4.0)
+  @_transparent
+  public static func - (lhs: Self, rhs: Self) -> Self.Stride {
+    return rhs.distance(to: lhs)
+  }
+
+  @available(swift, obsoleted: 4.0)
+  @_transparent
+  public static func += (lhs: inout Self, rhs: Self.Stride) {
+    lhs = lhs.advanced(by: rhs)
+  }
+
+  @available(swift, obsoleted: 4.0)
+  @_transparent
+  public static func -= (lhs: inout Self, rhs: Self.Stride) {
+    lhs = lhs.advanced(by: -rhs)
+  }
 }
 % end
 
