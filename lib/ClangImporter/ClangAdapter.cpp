@@ -695,18 +695,27 @@ bool importer::isUnavailableInSwift(
   return false;
 }
 
-OptionalTypeKind importer::getParamOptionality(const clang::ParmVarDecl *param,
+OptionalTypeKind importer::getParamOptionality(version::Version swiftVersion,
+                                               const clang::ParmVarDecl *param,
                                                bool knownNonNull) {
   auto &clangCtx = param->getASTContext();
 
   // If nullability is available on the type, use it.
-  if (auto nullability = param->getType()->getNullability(clangCtx)) {
+  clang::QualType paramTy = param->getType();
+  if (auto nullability = paramTy->getNullability(clangCtx)) {
     return translateNullability(*nullability);
   }
 
   // If it's known non-null, use that.
   if (knownNonNull || param->hasAttr<clang::NonNullAttr>())
     return OTK_None;
+
+  // Check for the 'static' annotation on C arrays.
+  if (!swiftVersion.isVersion3())
+    if (const auto *DT = dyn_cast<clang::DecayedType>(paramTy))
+      if (const auto *AT = DT->getOriginalType()->getAsArrayTypeUnsafe())
+        if (AT->getSizeModifier() == clang::ArrayType::Static)
+          return OTK_None;
 
   // Default to implicitly unwrapped optionals.
   return OTK_ImplicitlyUnwrappedOptional;

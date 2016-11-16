@@ -222,4 +222,9 @@ func testArrays() {
 
   nullableArrayParameters([], [], [])
   nullableArrayParameters(nil, nil, nil)
+
+  // It would also be nice to warn here about the arrays being too short, but
+  // that's probably beyond us for a while.
+  staticBoundsArray([])
+  staticBoundsArray(nil) // no-error
 }
