@@ -26,7 +26,7 @@ struct RC4 {
   mutating
   func initialize(_ Key: [UInt8]) {
     for i in 0..<256 {
-      State[i] = UInt8(i)
+      State[i] = UInt8(extendingOrTruncating: i)
     }
 
     var j: UInt8 = 0
@@ -50,8 +50,10 @@ struct RC4 {
   func next() -> UInt8 {
     I = I &+ 1
     J = J &+ State[Int(I)]
-    swapByIndex(Int(I), y: Int(J))
-    return State[Int(State[Int(I)] &+ State[Int(J)]) & 0xFF]
+    let intI = Int(extendingOrTruncating: I)
+    let intJ = Int(extendingOrTruncating: J)
+    swapByIndex(intI, y: intJ)
+    return State[Int(extendingOrTruncating: State[intI] &+ State[intJ]) & 0xFF]
   }
 
   mutating
