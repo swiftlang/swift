@@ -228,6 +228,15 @@ bool StackPromoter::tryPromoteAlloc(AllocRefInst *ARI) {
   if (!canPromoteAlloc(ARI, AllocInsertionPoint, DeallocInsertionPoint))
     return false;
 
+  if (AllocInsertionPoint) {
+    // Check if any operands of the alloc_ref prevents us from moving the
+    // instruction.
+    for (const Operand &Op : ARI->getAllOperands()) {
+      if (!DT->properlyDominates(Op.get(), AllocInsertionPoint))
+        return false;
+    }
+  }
+
   DEBUG(llvm::dbgs() << "Promoted " << *ARI);
   DEBUG(llvm::dbgs() << "    in " << ARI->getFunction()->getName() << '\n');
   NumStackPromoted++;
