@@ -170,9 +170,10 @@ class SDKContext {
   std::vector<std::unique_ptr<SDKNode>> OwnedNodes;
 
 public:
-  void own(SDKNode *Node) {
+  SDKNode* own(SDKNode *Node) {
     assert(Node);
     OwnedNodes.emplace_back(Node);
+    return Node;
   }
   StringRef buffer(StringRef Text) {
     return TextData.insert(Text).first->getKey();
@@ -313,9 +314,7 @@ class SDKNode {
 
 protected:
   SDKNode(SDKNodeInitInfo Info, SDKNodeKind Kind) : Ctx(Info.Ctx), Name(Info.Name),
-    PrintedName(Info.PrintedName), TheKind(unsigned(Kind)) {
-      Ctx.own(this);
-  }
+    PrintedName(Info.PrintedName), TheKind(unsigned(Kind)) {}
 
 public:
   static SDKNode *constructSDKNode(SDKContext &Ctx, llvm::yaml::MappingNode *Node);
@@ -1094,7 +1093,7 @@ case SDKNodeKind::X:                                                           \
   break;
 #include "DigesterEnums.def"
   }
-  return Result;
+  return Ctx.own(Result);
 }
 
 // Recursively construct a node that represents a type, for instance,
