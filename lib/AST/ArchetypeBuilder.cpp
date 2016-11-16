@@ -64,6 +64,10 @@ void RequirementSource::dump(llvm::raw_ostream &out,
   case OuterScope:
     out << "outer";
     break;
+
+  case Inherited:
+    out << "inherited";
+    break;
   }
 
   if (srcMgr && getLoc().isValid()) {
@@ -232,7 +236,7 @@ static ProtocolConformance *getSuperConformance(
   // appropriately.
   updateRequirementSource(
     conformsSource,
-    RequirementSource(RequirementSource::Redundant,
+    RequirementSource(RequirementSource::Inherited,
                       pa->getSuperclassSource().getLoc()));
   return conformance->getConcrete();
 }
@@ -678,7 +682,20 @@ ArchetypeBuilder::PotentialArchetype::getType(ArchetypeBuilder &builder) {
 
   SmallVector<ProtocolDecl *, 4> Protos;
   for (const auto &conforms : ConformsTo) {
-    Protos.push_back(conforms.first);
+    switch (conforms.second.getKind()) {
+    case RequirementSource::Explicit:
+    case RequirementSource::Inferred:
+    case RequirementSource::OuterScope:
+    case RequirementSource::Protocol:
+    case RequirementSource::Redundant:
+      Protos.push_back(conforms.first);
+      break;
+
+    case RequirementSource::Inherited:
+      // Inherited conformances are recoverable from the superclass
+      // constraint.
+      break;
+    }
   }
 
   Type superclass;
@@ -990,7 +1007,7 @@ bool ArchetypeBuilder::addSuperclassRequirement(PotentialArchetype *T,
           auto nested = nestedTypes.find(assocType->getName());
           if (nested == nestedTypes.end()) continue;
 
-          RequirementSource redundantSource(RequirementSource::Redundant,
+          RequirementSource redundantSource(RequirementSource::Inherited,
                                             Source.getLoc());
 
           for (auto nestedPA : nested->second) {
@@ -2046,6 +2063,7 @@ static void collectRequirements(ArchetypeBuilder &builder,
 
     case RequirementSource::Protocol:
     case RequirementSource::Redundant:
+    case RequirementSource::Inherited:
       // The requirement was redundant, drop it.
       return;
     }

@@ -78,6 +78,12 @@ public:
     /// These are dropped when building the GenericSignature.
     Redundant,
 
+    /// The requirement is redundant due to the superclass conforming to one
+    /// of the protocols.
+    ///
+    /// These are dropped when building the GenericSignature.
+    Inherited,
+
     /// The requirement came from an outer scope.
     /// FIXME: eliminate this in favor of keeping requirement sources in 
     /// GenericSignatures, at least non-canonical ones?
