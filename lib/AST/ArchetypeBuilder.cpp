@@ -61,10 +61,6 @@ void RequirementSource::dump(llvm::raw_ostream &out,
     out << "inferred";
     break;
 
-  case OuterScope:
-    out << "outer";
-    break;
-
   case Inherited:
     out << "inherited";
     break;
@@ -685,7 +681,6 @@ ArchetypeBuilder::PotentialArchetype::getType(ArchetypeBuilder &builder) {
     switch (conforms.second.getKind()) {
     case RequirementSource::Explicit:
     case RequirementSource::Inferred:
-    case RequirementSource::OuterScope:
     case RequirementSource::Protocol:
     case RequirementSource::Redundant:
       Protos.push_back(conforms.first);
@@ -2010,14 +2005,10 @@ ArchetypeBuilder::mapTypeOutOfContext(ModuleDecl *M,
 }
 
 void ArchetypeBuilder::addGenericSignature(GenericSignature *sig,
-                                           GenericEnvironment *env,
-                                           bool treatRequirementsAsExplicit) {
+                                           GenericEnvironment *env) {
   if (!sig) return;
   
-  RequirementSource::Kind sourceKind = treatRequirementsAsExplicit
-    ? RequirementSource::Explicit
-    : RequirementSource::OuterScope;
-  
+  RequirementSource::Kind sourceKind = RequirementSource::Explicit;
   for (auto param : sig->getGenericParams()) {
     addGenericParameter(param);
 
@@ -2057,7 +2048,6 @@ static void collectRequirements(ArchetypeBuilder &builder,
     switch (source.getKind()) {
     case RequirementSource::Explicit:
     case RequirementSource::Inferred:
-    case RequirementSource::OuterScope:
       // The requirement was explicit and required, keep it.
       break;
 
