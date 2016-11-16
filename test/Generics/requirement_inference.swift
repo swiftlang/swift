@@ -57,7 +57,7 @@ class Fox : P1 {
 class Box<T : Fox> {
 // CHECK-LABEL: .unpack@
 // CHECK-NEXT: Requirements:
-// CHECK-NEXT:   T : Fox [outer]
+// CHECK-NEXT:   T : Fox [explicit]
   func unpack(_ x: X1<T>) {}
 }
 
