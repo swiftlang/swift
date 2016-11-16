@@ -270,3 +270,16 @@ func downcast(_ obj: AnyObject) -> X {
 func consume(_ fruit: Fruit) {
   _ = fruit.juice
 }
+
+// rdar://problem/29249513 -- looking up an IUO member through AnyObject
+// produces a Foo!? type. The SIL verifier did not correctly consider Optional
+// to be the lowering of IUO (which is now eliminated by SIL lowering).
+
+@objc protocol IUORequirement {
+  var iuoProperty: AnyObject! { get }
+}
+
+func getIUOPropertyDynamically(x: AnyObject) -> Any {
+  return x.iuoProperty
+}
+
