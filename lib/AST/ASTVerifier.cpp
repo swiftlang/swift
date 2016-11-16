@@ -1341,7 +1341,7 @@ struct ASTNodeBase {};
     void verifyChecked(SubscriptExpr *E) {
       PrettyStackTraceExpr debugStack(Ctx, "verifying SubscriptExpr", E);
 
-      if (!E->getDecl()) {
+      if (!E->hasDecl()) {
         Out << "Subscript expression is missing subscript declaration";
         abort();
       }

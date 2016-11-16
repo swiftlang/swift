@@ -1233,11 +1233,32 @@ namespace {
                          ConstraintLocatorBuilder locator,
                          bool isImplicit, AccessSemantics semantics) {
       // Determine the declaration selected for this subscript operation.
-      auto selected = getOverloadChoice(
+      auto selected = getOverloadChoiceIfAvailable(
                         cs.getConstraintLocator(
                           locator.withPathElement(
                             ConstraintLocator::SubscriptMember)));
-      auto choice = selected.choice;
+
+      // Handles situation where there was a solution available but it didn't
+      // have a proper overload selected from subscript call, might be because
+      // solver was allowed to return free or unresolved types, which can
+      // happen while running diagnostics on one of the expressions.
+      if (!selected.hasValue()) {
+        auto &tc = cs.TC;
+        auto baseType = base->getType();
+
+        if (auto errorType = baseType->getAs<ErrorType>()) {
+          tc.diagnose(base->getLoc(), diag::cannot_subscript_base,
+                      errorType->getOriginalType())
+              .highlight(base->getSourceRange());
+        } else {
+          tc.diagnose(base->getLoc(), diag::cannot_subscript_ambiguous_base)
+              .highlight(base->getSourceRange());
+        }
+
+        return nullptr;
+      }
+
+      auto choice = selected->choice;
       auto subscript = cast<SubscriptDecl>(choice.getDecl());
 
       auto &tc = cs.getTypeChecker();
@@ -1255,7 +1276,7 @@ namespace {
       // Figure out the index and result types.
       auto containerTy
         = subscript->getDeclContext()->getDeclaredTypeOfContext();
-      auto subscriptTy = simplifyType(selected.openedType);
+      auto subscriptTy = simplifyType(selected->openedType);
       auto indexTy = subscriptTy->castTo<AnyFunctionType>()->getInput();
       auto resultTy = subscriptTy->castTo<AnyFunctionType>()->getResult();
 
@@ -1282,7 +1303,7 @@ namespace {
       // Form the subscript expression.
 
       // Handle dynamic lookup.
-      if (selected.choice.getKind() == OverloadChoiceKind::DeclViaDynamic ||
+      if (choice.getKind() == OverloadChoiceKind::DeclViaDynamic ||
           subscript->getAttrs().hasAttribute<OptionalAttr>()) {
         base = coerceObjectArgumentToType(base, baseTy, subscript,
                                           AccessSemantics::Ordinary, locator);
@@ -1308,13 +1329,13 @@ namespace {
         solution.computeSubstitutions(
           subscript->getInterfaceType(),
           dc,
-          selected.openedFullType,
+          selected->openedFullType,
           getConstraintSystem().getConstraintLocator(
             locator.withPathElement(ConstraintLocator::SubscriptMember)),
           substitutions);
 
         // Convert the base.
-        auto openedFullFnType = selected.openedFullType->castTo<FunctionType>();
+        auto openedFullFnType = selected->openedFullType->castTo<FunctionType>();
         auto openedBaseType = openedFullFnType->getInput();
         containerTy = solution.simplifyType(tc, openedBaseType);
         base = coerceObjectArgumentToType(
