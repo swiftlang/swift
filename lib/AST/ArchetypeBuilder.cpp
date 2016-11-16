@@ -1275,6 +1275,7 @@ bool ArchetypeBuilder::addSameTypeRequirementToConcrete(
   T->SameTypeSource = Source;
 
   // Recursively resolve the associated types to their concrete types.
+  RequirementSource nestedSource(RequirementSource::Redundant, Source.getLoc());
   for (auto nested : T->getNestedTypes()) {
     AssociatedTypeDecl *assocType
       = nested.second.front()->getResolvedAssociatedType();
@@ -1283,7 +1284,7 @@ bool ArchetypeBuilder::addSameTypeRequirementToConcrete(
           concreteArchetype->getNestedType(nested.first);
       addSameTypeRequirementToConcrete(nested.second.front(),
                                        witnessType.getValue(),
-                                       Source);
+                                       nestedSource);
     } else {
       assert(conformances.count(assocType->getProtocol()) > 0
              && "missing conformance?");
@@ -1293,11 +1294,11 @@ bool ArchetypeBuilder::addSameTypeRequirementToConcrete(
       if (auto witnessPA = resolveArchetype(witnessType)) {
         addSameTypeRequirementBetweenArchetypes(nested.second.front(),
                                                 witnessPA,
-                                                Source);
+                                                nestedSource);
       } else {
         addSameTypeRequirementToConcrete(nested.second.front(),
                                          witnessType,
-                                         Source);
+                                         nestedSource);
       }
     }
   }
