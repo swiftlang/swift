@@ -415,6 +415,10 @@ void truncate(SmallVectorImpl<T> &vec, unsigned newSize) {
 } // end anonymous namespace
 
 ConstraintSystem::SolverState::SolverState(ConstraintSystem &cs) : CS(cs) {
+  assert(!CS.solverState &&
+         "Constraint system should not already have solver state!");
+  CS.solverState = this;
+
   ++NumSolutionAttempts;
   SolutionAttempt = NumSolutionAttempts;
 
@@ -433,6 +437,10 @@ ConstraintSystem::SolverState::SolverState(ConstraintSystem &cs) : CS(cs) {
 }
 
 ConstraintSystem::SolverState::~SolverState() {
+  assert((CS.solverState == this) &&
+         "Expected constraint system to have this solver state!");
+  CS.solverState = nullptr;
+
   // Restore debugging state.
   LangOptions &langOpts = CS.getTypeChecker().Context.LangOpts;
   langOpts.DebugConstraintSolver = OldDebugConstraintSolver;
@@ -1489,14 +1497,11 @@ bool ConstraintSystem::Candidate::solve() {
   llvm::SmallVector<Solution, 2> solutions;
   {
     SolverState state(cs);
-    cs.solverState = &state;
 
     // Use solveRec() instead of solve() in here, because solve()
     // would try to deduce the best solution, which we don't
     // really want. Instead, we want the reduced set of domain choices.
     cs.solveRec(solutions, FreeTypeVariableBinding::Allow);
-
-    cs.solverState = nullptr;
   }
 
   // No solutions for the sub-expression means that either main expression
@@ -1916,10 +1921,8 @@ ConstraintSystem::solve(Expr *&expr,
 
 bool ConstraintSystem::solve(SmallVectorImpl<Solution> &solutions,
                              FreeTypeVariableBinding allowFreeTypeVariables) {
-  assert(!solverState && "use solveRec for recursive calls");
   // Set up solver state.
   SolverState state(*this);
-  this->solverState = &state;
 
   // Solve the system.
   solveRec(solutions, allowFreeTypeVariables);
@@ -1934,9 +1937,6 @@ bool ConstraintSystem::solve(SmallVectorImpl<Solution> &solutions,
       solutions.erase(solutions.begin() + 1, solutions.end());
     }
   }
-
-  // Remove the solver state.
-  this->solverState = nullptr;
 
   // We fail if there is no solution.
   return solutions.empty();

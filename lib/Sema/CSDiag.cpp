@@ -7169,7 +7169,6 @@ bool ConstraintSystem::salvage(SmallVectorImpl<Solution> &viable, Expr *expr) {
     // Set up solver state.
     SolverState state(*this);
     state.recordFixes = true;
-    this->solverState = &state;
 
     // Solve the system.
     solveRec(viable, FreeTypeVariableBinding::Disallow);
@@ -7210,9 +7209,6 @@ bool ConstraintSystem::salvage(SmallVectorImpl<Solution> &viable, Expr *expr) {
         return true;
       }
     }
-
-    // Remove the solver state.
-    this->solverState = nullptr;
 
     // Fall through to produce diagnostics.
   }

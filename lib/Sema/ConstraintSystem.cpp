@@ -1449,7 +1449,7 @@ void ConstraintSystem::resolveOverload(ConstraintLocator *locator,
                                               refType};
   if (TC.getLangOpts().DebugConstraintSolver) {
     auto &log = getASTContext().TypeCheckerDebug->getStream();
-    log.indent(solverState? solverState->depth * 2 : 2)
+    log.indent(solverState ? solverState->depth * 2 : 2)
       << "(overload set choice binding "
       << boundType->getString() << " := "
       << refType->getString() << ")\n";

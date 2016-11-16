@@ -1178,7 +1178,7 @@ private:
   ///
   /// \returns null when we aren't currently solving the system.
   SavedTypeVariableBindings *getSavedBindings() const {
-    return solverState? &solverState->savedBindings : nullptr;
+    return solverState ? &solverState->savedBindings : nullptr;
   }
 
   /// Add a new type variable that was already created.
