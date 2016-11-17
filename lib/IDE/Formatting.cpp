@@ -897,12 +897,13 @@ public:
     if (Line == 0)
       return TokenInfo();
     Comparator Comp(SM);
-    auto LineMatch = [this] (const syntax::Token &T, unsigned Line) {
-      return T != *Tokens.end() && SM.getLineNumber(T.getLoc()) == Line;
+    auto LineMatch = [this] (const decltype(Tokens)::iterator T,
+                             unsigned Line) {
+      return T != Tokens.end() && SM.getLineNumber(T->getLoc()) == Line;
     };
     auto TargetIt = std::lower_bound(Tokens.begin(), Tokens.end(), Line, Comp);
     auto LineBefore = std::lower_bound(Tokens.begin(), TargetIt, Line - 1, Comp);
-    if (LineMatch(*TargetIt, Line) && LineMatch(*LineBefore, Line - 1))
+    if (LineMatch(TargetIt, Line) && LineMatch(LineBefore, Line - 1))
       return TokenInfo(*TargetIt, *LineBefore);
     return TokenInfo();
   }
