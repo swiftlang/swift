@@ -971,6 +971,12 @@ public struct ${Self}<Element>
 
   /// The number of elements.
   ///
+% if Traversal != 'RandomAccess':
+  /// To check whether a collection is empty, use its `isEmpty` property
+  /// instead of comparing `count` to zero. Calculating `count` can be an O(*n*)
+  /// operation.
+  ///
+% end
   /// - Complexity: ${'O(1)' if Traversal == 'RandomAccess' else 'O(*n*)'}
   public var count: IntMax {
     return _box._count

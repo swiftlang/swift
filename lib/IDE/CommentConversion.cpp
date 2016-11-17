@@ -19,7 +19,8 @@
 #include "swift/Basic/SourceManager.h"
 #include "swift/Markup/Markup.h"
 #include "swift/Markup/XMLUtils.h"
-#include "swift/Parse/Token.h"
+#include "swift/Parse/Lexer.h"
+#include "swift/Syntax/Token.h"
 #include "swift/Subsystems.h"
 #include "llvm/Support/MemoryBuffer.h"
 #include "llvm/Support/raw_ostream.h"
@@ -400,21 +401,23 @@ static void replaceObjcDeclarationsWithSwiftOnes(const Decl *D,
 std::string ide::extractPlainTextFromComment(const StringRef Text) {
   LangOptions LangOpts;
   SourceManager SourceMgr;
-  auto Tokens = swift::tokenize(LangOpts, SourceMgr,
-                                SourceMgr.addMemBufferCopy(Text));
-  std::vector<SingleRawComment> Comments;
-  Comments.reserve(Tokens.size());
-  for (auto &Tok : Tokens) {
-    if (Tok.is(tok::comment)) {
-      Comments.push_back(SingleRawComment(Tok.getText(), 0));
-    }
-  }
-  if (Comments.empty())
+
+  swift::Lexer L(LangOpts, SourceMgr, SourceMgr.addMemBufferCopy(Text),
+                 /*Diags=*/nullptr, /*InSILMode=*/false,
+                 // FIXME: Don't need this parameter anymore
+                 swift::CommentRetentionMode::ReturnAsTokens,
+                 /*Offset=*/0, /*EndOffset=*/0);
+  auto eof = L.lex();
+  assert(eof.getKind() == tok::eof);
+
+  auto RawCommentPieces = eof.getRawCommentPieces(SourceMgr);
+  if (RawCommentPieces.empty())
     return {};
 
-  RawComment Comment(Comments);
+  auto RC = RawComment { llvm::makeArrayRef(RawCommentPieces) };
+
   swift::markup::MarkupContext MC;
-  return MC.getLineList(Comment).str();
+  return MC.getLineList(RC).str();
 }
 
 bool ide::getDocumentationCommentAsXML(const Decl *D, raw_ostream &OS) {

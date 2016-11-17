@@ -47,6 +47,29 @@
           ]
         },
         {
+          "kind": "Function",
+          "name": "foo6",
+          "printedName": "foo6()",
+          "declKind": "Func",
+          "usr": "s:FV4cake2S14foo6FT_T_",
+          "location": "",
+          "moduleName": "cake",
+          "children": [
+            {
+              "kind": "TypeNameAlias",
+              "name": "Void",
+              "printedName": "Void",
+              "children": [
+                {
+                  "kind": "TypeNominal",
+                  "name": "Void",
+                  "printedName": "()"
+                }
+              ]
+            }
+          ]
+        },
+        {
           "kind": "Constructor",
           "name": "init",
           "printedName": "init()",

@@ -31,7 +31,7 @@ class Phoûx : NSObject, Fooable {
 // CHECK:      bb0([[IN_ADDR:%.*]] : 
 // CHECK:         [[STACK_SLOT:%.*]] = alloc_stack $Phoûx
 // CHECK:         copy_addr [[IN_ADDR]] to [initialization] [[STACK_SLOT]]
-// CHECK:         [[VALUE:%.*]] = load [[STACK_SLOT]]
+// CHECK:         [[VALUE:%.*]] = load [take] [[STACK_SLOT]]
 // CHECK:         class_method [[VALUE]] : $Phoûx, #Phoûx.foo!1
 
 protocol Bells {
@@ -48,7 +48,7 @@ extension Gizmo : Bells {
 // CHECK:   [[IUO_RESULT:%[0-9]+]] = apply [[INIT]]([[I]], [[META]]) : $@convention(method) (Int, @thick Gizmo.Type) -> @owned Optional<Gizmo>
 // CHECK:   switch_enum [[IUO_RESULT]]
 // CHECK:   [[UNWRAPPED_RESULT:%[0-9]+]] = unchecked_enum_data [[IUO_RESULT]]
-// CHECK:   store [[UNWRAPPED_RESULT]] to [[SELF]] : $*Gizmo
+// CHECK:   store [[UNWRAPPED_RESULT]] to [init] [[SELF]] : $*Gizmo
 
 // Test extension of a native @objc class to conform to a protocol with a
 // subscript requirement. rdar://problem/20371661

@@ -17,7 +17,7 @@ func testSwitchOnExistential(_ value: Any) {
 // CHECK:   [[BOOL:%.*]] = alloc_stack $Bool
 // CHECK:   checked_cast_addr_br copy_on_success Any in [[ANY]] : $*Any to Bool in [[BOOL]] : $*Bool, [[IS_BOOL:bb[0-9]+]], [[IS_NOT_BOOL:bb[0-9]+]]
 // CHECK: [[IS_BOOL]]:
-// CHECK:   [[T0:%.*]] = load [[BOOL]]
+// CHECK:   [[T0:%.*]] = load [trivial] [[BOOL]]
 
 enum Foo {
   case A

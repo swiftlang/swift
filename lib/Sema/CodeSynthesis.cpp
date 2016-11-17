@@ -763,8 +763,7 @@ void swift::addTrivialAccessorsToStorage(AbstractStorageDecl *storage,
 
   // Synthesize and type-check the body of the getter.
   synthesizeTrivialGetter(getter, storage, TC);
-  TC.typeCheckDecl(getter, true);
-  TC.typeCheckDecl(getter, false);
+  TC.validateDecl(getter);
 
   if (setter) {
     if (isDynamic)
@@ -772,8 +771,7 @@ void swift::addTrivialAccessorsToStorage(AbstractStorageDecl *storage,
 
     // Synthesize and type-check the body of the setter.
     synthesizeTrivialSetter(setter, storage, setterValueParam, TC);
-    TC.typeCheckDecl(setter, true);
-    TC.typeCheckDecl(setter, false);
+    TC.validateDecl(setter);
   }
 
   auto *DC = storage->getDeclContext();
@@ -1138,17 +1136,6 @@ static FuncDecl *completeLazyPropertyGetter(VarDecl *VD, VarDecl *Storage,
   return Get;
 }
 
-static ArrayRef<Substitution>
-getForwardingSubstitutions(DeclContext *DC) {
-  if (auto *env = DC->getGenericEnvironmentOfContext()) {
-    auto *sig = DC->getGenericSignatureOfContext();
-    return env->getForwardingSubstitutions(
-        DC->getParentModule(), sig);
-  }
-
-  return { };
-}
-
 void TypeChecker::completePropertyBehaviorStorage(VarDecl *VD,
                                VarDecl *BehaviorStorage,
                                FuncDecl *DefaultInitStorage,
@@ -1281,16 +1268,17 @@ void TypeChecker::completePropertyBehaviorStorage(VarDecl *VD,
   // Add accessors to the storage, since we'll need them to satisfy the
   // conformance requirements.
   addTrivialAccessorsToStorage(Storage, *this);
-  
+
+  // FIXME: Hack to eliminate spurious diagnostics.
+  if (BehaviorStorage->isStatic() != Storage->isStatic()) return;
+
   // Add the witnesses to the conformance.
-  auto MemberSubs = getForwardingSubstitutions(DC);
-  BehaviorConformance->setWitness(BehaviorStorage,
-                                 ConcreteDeclRef(Context, Storage, MemberSubs));
-  BehaviorConformance->setWitness(BehaviorStorage->getGetter(),
-                    ConcreteDeclRef(Context, Storage->getGetter(), MemberSubs));
+  recordKnownWitness(BehaviorConformance, BehaviorStorage, Storage);
+  recordKnownWitness(BehaviorConformance, BehaviorStorage->getGetter(),
+                     Storage->getGetter());
   if (BehaviorStorage->isSettable(DC))
-    BehaviorConformance->setWitness(BehaviorStorage->getSetter(),
-                    ConcreteDeclRef(Context, Storage->getSetter(), MemberSubs));
+    recordKnownWitness(BehaviorConformance, BehaviorStorage->getSetter(),
+                       Storage->getSetter());
 }
 
 void TypeChecker::completePropertyBehaviorParameter(VarDecl *VD,
@@ -1402,7 +1390,6 @@ void TypeChecker::completePropertyBehaviorParameter(VarDecl *VD,
                      TypeLoc::withoutLoc(SubstBodyResultTy), DC);
 
   Parameter->setInterfaceType(SubstInterfaceTy);
-  Parameter->setGenericSignature(genericSig);
   Parameter->setGenericEnvironment(genericEnv);
 
   // Mark the method to be final, implicit, and private.  In a class, this
@@ -1445,18 +1432,16 @@ void TypeChecker::completePropertyBehaviorParameter(VarDecl *VD,
   addMemberToContextIfNeeded(Parameter, DC);
 
   // Add the witnesses to the conformance.
-  auto MemberSubs = getForwardingSubstitutions(DC);
-  BehaviorConformance->setWitness(BehaviorParameter,
-                               ConcreteDeclRef(Context, Parameter, MemberSubs));
+  recordKnownWitness(BehaviorConformance, BehaviorParameter, Parameter);
 }
 
 void TypeChecker::completePropertyBehaviorAccessors(VarDecl *VD,
                                        VarDecl *ValueImpl,
+                                       Type valueTy,
                                        ArrayRef<Substitution> SelfInterfaceSubs,
                                        ArrayRef<Substitution> SelfContextSubs) {
   auto selfTy = SelfContextSubs[0].getReplacement();
-  auto valueTy = SelfContextSubs[1].getReplacement();
-  
+
   SmallVector<ASTNode, 3> bodyStmts;
   
   auto makeSelfExpr = [&](FuncDecl *fromAccessor,
@@ -2135,9 +2120,8 @@ swift::createDesignatedInitOverride(TypeChecker &tc,
   auto selfType = configureImplicitSelf(tc, ctor);
 
   // Set the interface type of the initializer.
-  ctor->setGenericSignature(classDecl->getGenericSignatureOfContext());
   ctor->setGenericEnvironment(classDecl->getGenericEnvironmentOfContext());
-  tc.configureInterfaceType(ctor);
+  tc.configureInterfaceType(ctor, ctor->getGenericSignature());
 
   // Set the contextual type of the initializer. This will go away one day.
   configureConstructorType(ctor, selfType, bodyParams->getType(ctx));

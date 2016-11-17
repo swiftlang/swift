@@ -95,17 +95,17 @@ public protocol SameNameProtocol {
   {
     key.kind: source.lang.swift.syntaxtype.doccomment,
     key.offset: 106,
-    key.length: 18
+    key.length: 17
   },
   {
     key.kind: source.lang.swift.syntaxtype.doccomment,
     key.offset: 124,
-    key.length: 26
+    key.length: 25
   },
   {
     key.kind: source.lang.swift.syntaxtype.doccomment,
     key.offset: 150,
-    key.length: 18
+    key.length: 17
   },
   {
     key.kind: source.lang.swift.syntaxtype.attribute.builtin,
@@ -125,7 +125,7 @@ public protocol SameNameProtocol {
   {
     key.kind: source.lang.swift.syntaxtype.comment,
     key.offset: 193,
-    key.length: 19
+    key.length: 18
   },
   {
     key.kind: source.lang.swift.syntaxtype.attribute.builtin,

@@ -95,6 +95,7 @@ enum class ActionType {
   GenerateModuleAPIDescription,
   DiffModuleAPI,
   ReconstructType,
+  Range,
 };
 
 class NullDebuggerClient : public DebuggerClient {
@@ -208,6 +209,9 @@ Action(llvm::cl::desc("Mode:"), llvm::cl::init(ActionType::None),
            clEnumValN(ActionType::PrintModuleGroups,
                       "print-module-groups",
                       "Print group names in a module"),
+           clEnumValN(ActionType::Range,
+                      "range",
+                      "Print information about a given range"),
            clEnumValEnd));
 
 static llvm::cl::opt<std::string>
@@ -524,6 +528,9 @@ static llvm::cl::opt<std::string>
 LineColumnPair("pos", llvm::cl::desc("Line:Column pair"));
 
 static llvm::cl::opt<std::string>
+EndLineColumnPair("end-pos", llvm::cl::desc("Line:Column pair"));
+
+static llvm::cl::opt<std::string>
 USR("usr", llvm::cl::desc("USR"));
 
 static llvm::cl::opt<std::string>
@@ -758,7 +765,11 @@ public:
     switch (Kind) {
     case SyntaxNodeKind::Keyword: Id = "kw"; break;
     // Skip identifier.
-    case SyntaxNodeKind::Identifier: return;
+    case SyntaxNodeKind::Identifier: {
+      auto var = StringRef(CurrBufPtr, 3);
+      assert(var != "var");
+      return;
+    }
     case SyntaxNodeKind::DollarIdent: Id = "dollar"; break;
     case SyntaxNodeKind::Integer: Id = "int"; break;
     case SyntaxNodeKind::Floating: Id = "float"; break;
@@ -2140,8 +2151,12 @@ public:
       return;
     }
     OS << "[";
-    for (auto &SRC : RC.Comments)
-      printWithEscaping(SRC.RawText);
+    for (auto SRC = RC.Comments.begin(); SRC != RC.Comments.end(); ++SRC) {
+      if (SRC != RC.Comments.begin())
+        OS << "\\n";
+
+      printWithEscaping(SRC->RawText);
+    }
     OS << "]";
   }
 
@@ -2615,6 +2630,48 @@ static int doReconstructType(const CompilerInvocation &InitInvok,
   return 0;
 }
 
+static int doPrintRangeInfo(const CompilerInvocation &InitInvok,
+                            StringRef SourceFileName,
+                            StringRef StartPos,
+                            StringRef EndPos) {
+  auto StartOp = parseLineCol(StartPos);
+  auto EndOp = parseLineCol(EndPos);
+  if (!StartOp.hasValue() || !EndOp.hasValue())
+    return 1;
+  auto StartLineCol = StartOp.getValue();
+  auto EndLineCol = EndOp.getValue();
+  CompilerInvocation Invocation(InitInvok);
+  Invocation.addInputFilename(SourceFileName);
+  Invocation.getLangOptions().DisableAvailabilityChecking = false;
+
+  CompilerInstance CI;
+
+  // Display diagnostics to stderr.
+  PrintingDiagnosticConsumer PrintDiags;
+  CI.addDiagnosticConsumer(&PrintDiags);
+  if (CI.setup(Invocation))
+    return 1;
+  CI.performSema();
+  SourceFile *SF = nullptr;
+  for (auto Unit : CI.getMainModule()->getFiles()) {
+    SF = dyn_cast<SourceFile>(Unit);
+    if (SF)
+      break;
+  }
+  assert(SF && "no source file?");
+  assert(SF->getBufferID().hasValue() && "no buffer id?");
+  SourceManager &SM = SF->getASTContext().SourceMgr;
+  unsigned bufferID = SF->getBufferID().getValue();
+  SourceLoc StartLoc = SM.getLocForLineCol(bufferID, StartLineCol.first,
+                                           StartLineCol.second);
+  SourceLoc EndLoc = SM.getLocForLineCol(bufferID, EndLineCol.first,
+                                         EndLineCol.second);
+  RangeResolver Resolver(*SF, StartLoc, EndLoc);
+  ResolvedRangeInfo Result = Resolver.resolve();
+  Result.print(llvm::outs());
+  return 0;
+}
+
 static int doPrintUSRs(const CompilerInvocation &InitInvok,
                        StringRef SourceFilename) {
   CompilerInvocation Invocation(InitInvok);
@@ -3025,6 +3082,11 @@ int main(int argc, char *argv[]) {
     break;
   case ActionType::ReconstructType:
     ExitCode = doReconstructType(InitInvok, options::SourceFilename);
+    break;
+  case ActionType::Range:
+    ExitCode = doPrintRangeInfo(InitInvok, options::SourceFilename,
+                                options::LineColumnPair,
+                                options::EndLineColumnPair);
     break;
   }
 

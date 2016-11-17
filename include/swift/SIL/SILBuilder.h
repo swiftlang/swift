@@ -301,10 +301,10 @@ public:
         getSILDebugLocation(Loc), valueType, operand, F, OpenedArchetypes));
   }
 
-  AllocBoxInst *createAllocBox(SILLocation Loc, SILType ElementType,
+  AllocBoxInst *createAllocBox(SILLocation Loc, CanSILBoxType BoxType,
                                SILDebugVariable Var = SILDebugVariable()) {
     Loc.markAsPrologue();
-    return insert(AllocBoxInst::create(getSILDebugLocation(Loc), ElementType, F,
+    return insert(AllocBoxInst::create(getSILDebugLocation(Loc), BoxType, F,
                                        OpenedArchetypes, Var));
   }
 
@@ -367,18 +367,21 @@ public:
     auto &C = getASTContext();
 
     llvm::SmallString<16> NameStr = Name;
-    if (auto BuiltinIntTy =
-            dyn_cast<BuiltinIntegerType>(OpdTy.getSwiftRValueType())) {
-      if (BuiltinIntTy == BuiltinIntegerType::getWordType(getASTContext())) {
-        NameStr += "_Word";
-      } else {
-        unsigned NumBits = BuiltinIntTy->getWidth().getFixedWidth();
-        NameStr += "_Int" + llvm::utostr(NumBits);
-      }
-    } else {
-      assert(OpdTy.getSwiftRValueType() == C.TheRawPointerType);
-      NameStr += "_RawPointer";
-    }
+    appendOperandTypeName(OpdTy, NameStr);
+    auto Ident = C.getIdentifier(NameStr);
+    return insert(BuiltinInst::create(getSILDebugLocation(Loc), Ident, ResultTy,
+                                      {}, Args, F));
+  }
+
+  // Create a binary function with the signature: OpdTy1, OpdTy2 -> ResultTy.
+  BuiltinInst *createBuiltinBinaryFunctionWithTwoOpTypes(
+      SILLocation Loc, StringRef Name, SILType OpdTy1, SILType OpdTy2,
+      SILType ResultTy, ArrayRef<SILValue> Args) {
+    auto &C = getASTContext();
+
+    llvm::SmallString<16> NameStr = Name;
+    appendOperandTypeName(OpdTy1, NameStr);
+    appendOperandTypeName(OpdTy2, NameStr);
     auto Ident = C.getIdentifier(NameStr);
     return insert(BuiltinInst::create(getSILDebugLocation(Loc), Ident,
                                       ResultTy, {}, Args, F));
@@ -459,9 +462,24 @@ public:
 
   LoadInst *createLoad(SILLocation Loc, SILValue LV,
                        LoadOwnershipQualifier Qualifier) {
+    assert((Qualifier != LoadOwnershipQualifier::Unqualified) ||
+           F.hasUnqualifiedOwnership() &&
+               "Unqualified inst in qualified function");
+    assert((Qualifier == LoadOwnershipQualifier::Unqualified) ||
+           F.hasQualifiedOwnership() &&
+               "Qualified inst in unqualified function");
     assert(LV->getType().isLoadable(F.getModule()));
     return insert(new (F.getModule())
                       LoadInst(getSILDebugLocation(Loc), LV, Qualifier));
+  }
+
+  /// Convenience function for calling emitLoad on the type lowering for
+  /// non-address values.
+  SILValue emitLoadValueOperation(SILLocation Loc, SILValue LV,
+                                  LoadOwnershipQualifier Qualifier) {
+    assert(LV->getType().isLoadable(F.getModule()));
+    const auto &lowering = getTypeLowering(LV->getType());
+    return lowering.emitLoad(*this, Loc, LV, Qualifier);
   }
 
   LoadBorrowInst *createLoadBorrow(SILLocation Loc, SILValue LV) {
@@ -472,8 +490,23 @@ public:
 
   StoreInst *createStore(SILLocation Loc, SILValue Src, SILValue DestAddr,
                          StoreOwnershipQualifier Qualifier) {
+    assert((Qualifier != StoreOwnershipQualifier::Unqualified) ||
+           F.hasUnqualifiedOwnership() &&
+               "Unqualified inst in qualified function");
+    assert((Qualifier == StoreOwnershipQualifier::Unqualified) ||
+           F.hasQualifiedOwnership() &&
+               "Qualified inst in unqualified function");
     return insert(new (F.getModule()) StoreInst(getSILDebugLocation(Loc), Src,
                                                 DestAddr, Qualifier));
+  }
+
+  /// Convenience function for calling emitStore on the type lowering for
+  /// non-address values.
+  void emitStoreValueOperation(SILLocation Loc, SILValue Src, SILValue DestAddr,
+                               StoreOwnershipQualifier Qualifier) {
+    assert(!Src->getType().isAddress());
+    const auto &lowering = getTypeLowering(Src->getType());
+    return lowering.emitStore(*this, Loc, Src, DestAddr, Qualifier);
   }
 
   EndBorrowInst *createEndBorrow(SILLocation Loc, SILValue Src,
@@ -1604,6 +1637,22 @@ private:
       InsertedInstrs->push_back(TheInst);
 
     BB->insert(InsertPt, TheInst);
+  }
+
+  void appendOperandTypeName(SILType OpdTy, llvm::SmallString<16> &Name) {
+    auto &C = getASTContext();
+    if (auto BuiltinIntTy =
+            dyn_cast<BuiltinIntegerType>(OpdTy.getSwiftRValueType())) {
+      if (BuiltinIntTy == BuiltinIntegerType::getWordType(getASTContext())) {
+        Name += "_Word";
+      } else {
+        unsigned NumBits = BuiltinIntTy->getWidth().getFixedWidth();
+        Name += "_Int" + llvm::utostr(NumBits);
+      }
+    } else {
+      assert(OpdTy.getSwiftRValueType() == C.TheRawPointerType);
+      Name += "_RawPointer";
+    }
   }
 };
 

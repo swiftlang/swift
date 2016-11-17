@@ -10,7 +10,7 @@
 //
 //===----------------------------------------------------------------------===//
 //
-// This file implements semantic analysis for expressions, analysing an
+// This file implements semantic analysis for expressions, analyzing an
 // expression tree in post-order, bottom-up, from leaves up to the root.
 //
 //===----------------------------------------------------------------------===//

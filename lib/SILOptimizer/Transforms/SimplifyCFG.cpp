@@ -3357,7 +3357,7 @@ static void tryToReplaceArgWithIncomingValue(SILBasicBlock *BB, unsigned i,
   // If the incoming values of all predecessors are equal usually this means
   // that the common incoming value dominates the BB. But: this might be not
   // the case if BB is unreachable. Therefore we still have to check it.
-  if (!DT->dominates(V->getParentBB(), BB))
+  if (!DT->dominates(V->getParentBlock(), BB))
     return;
 
   // An argument has one result value. We need to replace this with the *value*

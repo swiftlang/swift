@@ -78,10 +78,11 @@ public:
     /// These are dropped when building the GenericSignature.
     Redundant,
 
-    /// The requirement came from an outer scope.
-    /// FIXME: eliminate this in favor of keeping requirement sources in 
-    /// GenericSignatures, at least non-canonical ones?
-    OuterScope,
+    /// The requirement is redundant due to the superclass conforming to one
+    /// of the protocols.
+    ///
+    /// These are dropped when building the GenericSignature.
+    Inherited,
   };
 
   RequirementSource(Kind kind, SourceLoc loc) : StoredKind(kind), Loc(loc) { }
@@ -246,19 +247,14 @@ public:
   void addRequirement(const Requirement &req, RequirementSource source);
   
   /// \brief Add all of a generic signature's parameters and requirements.
-  ///
-  /// FIXME: Requirements from the generic signature are treated as coming from
-  /// an outer scope. Setting \c treatRequirementsAsExplicit to true disables
-  /// this behavior.
   void addGenericSignature(GenericSignature *sig,
-                           GenericEnvironment *genericEnv,
-                           bool treatRequirementsAsExplicit = false);
+                           GenericEnvironment *genericEnv);
 
   /// \brief Build the generic signature.
   GenericSignature *getGenericSignature();
 
   /// \brief Build the generic environment.
-  GenericEnvironment *getGenericEnvironment();
+  GenericEnvironment *getGenericEnvironment(GenericSignature *signature);
 
   /// Infer requirements from the given type, recursively.
   ///

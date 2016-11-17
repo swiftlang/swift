@@ -52,7 +52,7 @@ void EnumInfo::classifyEnum(ASTContext &ctx, const clang::EnumDecl *decl,
   }
 
   // Was the enum declared using *_ENUM or *_OPTIONS?
-  // FIXME: Use Clang attributes instead of grovelling the macro expansion loc.
+  // FIXME: Use Clang attributes instead of groveling the macro expansion loc.
   auto loc = decl->getLocStart();
   if (loc.isMacroID()) {
     StringRef MacroName = pp.getImmediateMacroName(loc);

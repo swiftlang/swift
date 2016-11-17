@@ -220,7 +220,7 @@ func generic_member_ref<T>(_ x: Generic<T>) -> Int {
   // CHECK: bb0([[XADDR:%[0-9]+]] : $*Generic<T>):
   return x.mono_member
   // CHECK: [[MEMBER_ADDR:%[0-9]+]] = struct_element_addr {{.*}}, #Generic.mono_member
-  // CHECK: load [[MEMBER_ADDR]]
+  // CHECK: load [trivial] [[MEMBER_ADDR]]
 }
 
 // CHECK-LABEL: sil hidden @_TF11expressions24bound_generic_member_ref
@@ -229,7 +229,7 @@ func bound_generic_member_ref(_ x: Generic<UnicodeScalar>) -> Int {
   // CHECK: bb0([[XADDR:%[0-9]+]] : $Generic<UnicodeScalar>):
   return x.mono_member
   // CHECK: [[MEMBER_ADDR:%[0-9]+]] = struct_element_addr {{.*}}, #Generic.mono_member
-  // CHECK: load [[MEMBER_ADDR]]
+  // CHECK: load [trivial] [[MEMBER_ADDR]]
 }
 
 // CHECK-LABEL: sil hidden @_TF11expressions6coerce
@@ -400,7 +400,7 @@ func tuple() -> (Int, Float) { return (1, 1.0) }
 // CHECK-LABEL: sil hidden @_TF11expressions13tuple_element
 func tuple_element(_ x: (Int, Float)) {
   var x = x
-  // CHECK: [[XADDR:%.*]] = alloc_box $(Int, Float)
+  // CHECK: [[XADDR:%.*]] = alloc_box $@box (Int, Float)
   // CHECK: [[PB:%.*]] = project_box [[XADDR]]
 
   int(x.0)
@@ -433,15 +433,15 @@ func if_expr(_ a: Bool, b: Bool, x: Int, y: Int, z: Int) -> Int {
   var y = y
   var z = z
   // CHECK: bb0({{.*}}):
-  // CHECK: [[AB:%[0-9]+]] = alloc_box $Bool
+  // CHECK: [[AB:%[0-9]+]] = alloc_box $@box Bool
   // CHECK: [[PBA:%.*]] = project_box [[AB]]
-  // CHECK: [[BB:%[0-9]+]] = alloc_box $Bool
+  // CHECK: [[BB:%[0-9]+]] = alloc_box $@box Bool
   // CHECK: [[PBB:%.*]] = project_box [[BB]]
-  // CHECK: [[XB:%[0-9]+]] = alloc_box $Int
+  // CHECK: [[XB:%[0-9]+]] = alloc_box $@box Int
   // CHECK: [[PBX:%.*]] = project_box [[XB]]
-  // CHECK: [[YB:%[0-9]+]] = alloc_box $Int
+  // CHECK: [[YB:%[0-9]+]] = alloc_box $@box Int
   // CHECK: [[PBY:%.*]] = project_box [[YB]]
-  // CHECK: [[ZB:%[0-9]+]] = alloc_box $Int
+  // CHECK: [[ZB:%[0-9]+]] = alloc_box $@box Int
   // CHECK: [[PBZ:%.*]] = project_box [[ZB]]
 
   return a
@@ -449,21 +449,21 @@ func if_expr(_ a: Bool, b: Bool, x: Int, y: Int, z: Int) -> Int {
     : b
     ? y
     : z
-  // CHECK:   [[A:%[0-9]+]] = load [[PBA]]
+  // CHECK:   [[A:%[0-9]+]] = load [trivial] [[PBA]]
   // CHECK:   [[ACOND:%[0-9]+]] = apply {{.*}}([[A]])
   // CHECK:   cond_br [[ACOND]], [[IF_A:bb[0-9]+]], [[ELSE_A:bb[0-9]+]]
   // CHECK: [[IF_A]]:
-  // CHECK:   [[XVAL:%[0-9]+]] = load [[PBX]]
+  // CHECK:   [[XVAL:%[0-9]+]] = load [trivial] [[PBX]]
   // CHECK:   br [[CONT_A:bb[0-9]+]]([[XVAL]] : $Int)
   // CHECK: [[ELSE_A]]:
-  // CHECK:   [[B:%[0-9]+]] = load [[PBB]]
+  // CHECK:   [[B:%[0-9]+]] = load [trivial] [[PBB]]
   // CHECK:   [[BCOND:%[0-9]+]] = apply {{.*}}([[B]])
   // CHECK:   cond_br [[BCOND]], [[IF_B:bb[0-9]+]], [[ELSE_B:bb[0-9]+]]
   // CHECK: [[IF_B]]:
-  // CHECK:   [[YVAL:%[0-9]+]] = load [[PBY]]
+  // CHECK:   [[YVAL:%[0-9]+]] = load [trivial] [[PBY]]
   // CHECK:   br [[CONT_B:bb[0-9]+]]([[YVAL]] : $Int)
   // CHECK: [[ELSE_B]]:
-  // CHECK:   [[ZVAL:%[0-9]+]] = load [[PBZ]]
+  // CHECK:   [[ZVAL:%[0-9]+]] = load [trivial] [[PBZ]]
   // CHECK:   br [[CONT_B:bb[0-9]+]]([[ZVAL]] : $Int)
   // CHECK: [[CONT_B]]([[B_RES:%[0-9]+]] : $Int):
   // CHECK:   br [[CONT_A:bb[0-9]+]]([[B_RES]] : $Int)

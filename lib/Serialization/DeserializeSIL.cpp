@@ -492,8 +492,10 @@ SILFunction *SILDeserializer::readSILFunction(DeclID FID,
 
   GenericEnvironment *genericEnv = nullptr;
   if (!declarationOnly) {
-    SmallVector<GenericTypeParamType *, 4> genericParamTypes;
-    genericEnv = MF->readGenericEnvironment(genericParamTypes, SILCursor);
+    auto signature = fn->getLoweredFunctionType()->getGenericSignature();
+    genericEnv = MF->readGenericEnvironment(
+        SILCursor,
+        signature ? signature->getRequirements() : ArrayRef<Requirement>());
   }
 
   // If the next entry is the end of the block, then this function has
@@ -778,13 +780,18 @@ bool SILDeserializer::readSILInstruction(SILFunction *Fn, SILBasicBlock *BB,
   case ValueKind::DebugValueAddrInst:
     llvm_unreachable("not supported");
 
+  case ValueKind::AllocBoxInst:
+    assert(RecordKind == SIL_ONE_TYPE && "Layout should be OneType.");
+    ResultVal = Builder.createAllocBox(Loc,
+                       cast<SILBoxType>(MF->getType(TyID)->getCanonicalType()));
+    break;
+  
 #define ONETYPE_INST(ID)                      \
   case ValueKind::ID##Inst:                   \
     assert(RecordKind == SIL_ONE_TYPE && "Layout should be OneType.");         \
     ResultVal = Builder.create##ID(Loc,                                        \
                   getSILType(MF->getType(TyID), (SILValueCategory)TyCategory));\
     break;
-  ONETYPE_INST(AllocBox)
   ONETYPE_INST(AllocStack)
   ONETYPE_INST(Metatype)
 #undef ONETYPE_INST

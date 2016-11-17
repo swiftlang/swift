@@ -85,6 +85,8 @@ public protocol _IndexableBase {
   /// - Parameter position: The position of the element to access. `position`
   ///   must be a valid index of the collection that is not equal to the
   ///   `endIndex` property.
+  ///
+  /// - Complexity: O(1)
   subscript(position: Index) -> _Element { get }
 
   // WORKAROUND: rdar://25214066
@@ -97,6 +99,8 @@ public protocol _IndexableBase {
   /// - Parameter bounds: A range of the collection's indices. The upper and
   ///   lower bounds of the `bounds` range must be valid indices of the
   ///   collection.
+  ///
+  /// - Complexity: O(1)
   subscript(bounds: Range<Index>) -> SubSequence { get }
   
   /// Performs a range check in O(1), or a no-op when a range check is not
@@ -144,6 +148,10 @@ public protocol _IndexableBase {
 
   /// Returns the position immediately after the given index.
   ///
+  /// The successor of an index must be well-defined. For an index `i` into a
+  /// collection `c`, calling `c.index(after: i)` returns the same index every
+  /// time.
+  ///
   /// - Parameter i: A valid index of the collection. `i` must be less than
   ///   `endIndex`.
   /// - Returns: The index value immediately after `i`.
@@ -153,6 +161,8 @@ public protocol _IndexableBase {
   ///
   /// - Parameter i: A valid index of the collection. `i` must be less than
   ///   `endIndex`.
+  ///
+  /// - SeeAlso: `index(after:)`
   func formIndex(after i: inout Index)
 }
 
@@ -375,7 +385,7 @@ public struct IndexingIterator<
   /// exists.
   ///
   /// Repeatedly calling this method returns all the elements of the underlying
-  /// sequence in order.  As soon as the sequence has run out of elements, all
+  /// sequence in order. As soon as the sequence has run out of elements, all
   /// subsequent calls return `nil`.
   ///
   /// This example shows how an iterator can be used explicitly to emulate a
@@ -593,6 +603,8 @@ public protocol Collection : _Indexable, Sequence {
   /// - Parameter position: The position of the element to access. `position`
   ///   must be a valid index of the collection that is not equal to the
   ///   `endIndex` property.
+  ///
+  /// - Complexity: O(1)
   subscript(position: Index) -> Iterator.Element { get }
 
   /// Accesses a contiguous subrange of the collection's elements.
@@ -616,6 +628,8 @@ public protocol Collection : _Indexable, Sequence {
   ///
   /// - Parameter bounds: A range of the collection's indices. The bounds of
   ///   the range must be valid indices of the collection.
+  ///
+  /// - Complexity: O(1)
   subscript(bounds: Range<Index>) -> SubSequence { get }
 
   /// A type that can represent the indices that are valid for subscripting the
@@ -747,6 +761,11 @@ public protocol Collection : _Indexable, Sequence {
   var isEmpty: Bool { get }
 
   /// The number of elements in the collection.
+  ///
+  /// To check whether a collection is empty, use its `isEmpty` property
+  /// instead of comparing `count` to zero. Unless the collection guarantees
+  /// random-access performance, calculating `count` can be an O(*n*)
+  /// operation.
   ///
   /// - Complexity: O(1) if the collection conforms to
   ///   `RandomAccessCollection`; otherwise, O(*n*), where *n* is the length
@@ -1133,6 +1152,8 @@ extension Collection where SubSequence == Slice<Self> {
   ///
   /// - Parameter bounds: A range of the collection's indices. The bounds of
   ///   the range must be valid indices of the collection.
+  ///
+  /// - Complexity: O(1)
   public subscript(bounds: Range<Index>) -> Slice<Self> {
     _failEarlyRangeCheck(bounds, bounds: startIndex..<endIndex)
     return Slice(base: self, bounds: bounds)
@@ -1215,6 +1236,11 @@ extension Collection {
   }
 
   /// The number of elements in the collection.
+  ///
+  /// To check whether a collection is empty, use its `isEmpty` property
+  /// instead of comparing `count` to zero. Unless the collection guarantees
+  /// random-access performance, calculating `count` can be an O(*n*)
+  /// operation.
   ///
   /// - Complexity: O(1) if the collection conforms to
   ///   `RandomAccessCollection`; otherwise, O(*n*), where *n* is the length

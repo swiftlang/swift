@@ -44,13 +44,13 @@ class Bar: NSObject {
 // CHECK-LABEL: sil hidden @_TF42objc_bridged_using_protocol_extension_impl7callBarFT3barCS_3Bar3fooVS_3Foo_T_
 func callBar(bar: Bar, foo: Foo) {
   // CHECK: [[BRIDGE:%.*]] = function_ref @_TFe42objc_bridged_using_protocol_extension_implRxs21_ObjectiveCBridgeablexS_7FooablerS1_19_bridgeToObjectiveCfT_wxPS0_15_ObjectiveCType
-  // CHECK: apply [[BRIDGE]]<Foo, NSObject>
+  // CHECK: apply [[BRIDGE]]<Foo>
   bar.bar(foo)
 }
 
 // CHECK-LABEL:sil hidden @_TF42objc_bridged_using_protocol_extension_impl7callBarFT3barCS_3Bar3genGVS_3GenSiSS__T_ 
 func callBar(bar: Bar, gen: Gen<Int, String>) {
   // CHECK: [[BRIDGE:%.*]] = function_ref @_TFe42objc_bridged_using_protocol_extension_implRxs21_ObjectiveCBridgeablexS_7FooablerS1_19_bridgeToObjectiveCfT_wxPS0_15_ObjectiveCType
-  // CHECK: apply [[BRIDGE]]<Gen<Int, String>, NSObject>
+  // CHECK: apply [[BRIDGE]]<Gen<Int, String>>
   bar.bar(gen)
 }

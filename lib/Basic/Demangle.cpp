@@ -510,8 +510,7 @@ private:
     }
 
     // Partial application thunks.
-    if (Mangled.nextIf('P')) {
-      if (!Mangled.nextIf('A')) return nullptr;
+    if (Mangled.nextIf("PA")) {
       Node::Kind kind = Node::Kind::PartialApplyForwarder;
       if (Mangled.nextIf('o'))
         kind = Node::Kind::PartialApplyObjCForwarder;

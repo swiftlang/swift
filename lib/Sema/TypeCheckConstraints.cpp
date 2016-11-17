@@ -306,7 +306,9 @@ static bool diagnoseOperatorJuxtaposition(UnresolvedDeclRefExpr *UDRE,
   // be a case where a space was forgotten.
   if (isBinOp) {
     auto tok = Lexer::getTokenAtLocation(TC.Context.SourceMgr, UDRE->getLoc());
-    if (tok.getKind() != tok::oper_binary_unspaced)
+    if (!tok.hasValue())
+      return false;
+    if (tok.getValue().isNot(tok::oper_binary_unspaced))
       return false;
   }
 
@@ -2017,52 +2019,57 @@ bool TypeChecker::typeCheckForEachBinding(DeclContext *dc, ForEachStmt *stmt) {
 
       auto sequenceType = expr->getType()->getRValueType();
 
+      // Look through one level of optional; this improves recovery but doesn't
+      // change the result.
+      if (auto sequenceObjectType = sequenceType->getAnyOptionalObjectType())
+        sequenceType = sequenceObjectType;
+
       // If the sequence type is an existential, we should not attempt to
       // look up the member type at all, since we cannot represent associated
       // types of existentials.
       //
       // We will diagnose it later.
       if (!sequenceType->isExistentialType()) {
-        auto member = cs.TC.lookupMemberType(cs.DC,
-                                             sequenceType,
-                                             tc.Context.Id_Iterator,
-                                             lookupOptions);
-      
-        if (member) {
-          iteratorType = member.front().second;
+        ASTContext &ctx = tc.Context;
+        auto iteratorAssocType =
+          cast<AssociatedTypeDecl>(
+            sequenceProto->lookupDirect(ctx.Id_Iterator).front());
 
-          member = cs.TC.lookupMemberType(cs.DC,
-                                          iteratorType,
-                                          tc.Context.Id_Element,
-                                          lookupOptions);
+        iteratorType = sequenceType->getTypeOfMember(
+                         cs.DC->getParentModule(),
+                         iteratorAssocType,
+                         &tc,
+                         iteratorAssocType->getDeclaredInterfaceType());
 
-          if (member)
-            elementType = member.front().second;
+        if (iteratorType) {
+          auto iteratorProto =
+            tc.getProtocol(Stmt->getForLoc(),
+                           KnownProtocolKind::IteratorProtocol);
+          if (!iteratorProto)
+            return true;
+
+          auto elementAssocType =
+            cast<AssociatedTypeDecl>(
+              iteratorProto->lookupDirect(ctx.Id_Element).front());
+
+          elementType = iteratorType->getTypeOfMember(
+                          cs.DC->getParentModule(),
+                          elementAssocType,
+                          &tc,
+                          elementAssocType->getDeclaredInterfaceType());
         }
       }
 
-      // If the type lookup failed, just add some constraints we can
-      // try to solve later.
       if (elementType.isNull()) {
-      
-        // Determine the iterator type of the sequence.
-        iteratorType = cs.createTypeVariable(Locator, /*options=*/0);
-        cs.addTypeMemberConstraint(SequenceType, tc.Context.Id_Iterator,
-                                   iteratorType, iteratorLocator);
-
-        // Determine the element type of the iterator.
-        // FIXME: Should look up the type witness.
-        elementType = cs.createTypeVariable(Locator, /*options=*/0);
-        cs.addTypeMemberConstraint(iteratorType, tc.Context.Id_Element,
-                                   elementType, elementLocator);
+        elementType = cs.createTypeVariable(elementLocator,
+                                            TVO_MustBeMaterializable);
       }
-      
 
       // Add a conversion constraint between the element type of the sequence
       // and the type of the element pattern.
       cs.addConstraint(ConstraintKind::Conversion, elementType, InitType,
                        elementLocator);
-      
+
       Stmt->setSequence(expr);
       return false;
     }

@@ -4,6 +4,7 @@ public struct S1 {
   internal func foo3() {}
   private func foo4() {}
   fileprivate func foo5() {}
+  public func foo6() -> Void {}
 }
 
 public class C1 {

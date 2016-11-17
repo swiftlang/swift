@@ -208,7 +208,7 @@ namespace {
         return true;
       }
       P.Tok.getText().getAsInteger(0, Result);
-      P.consumeToken(tok::integer_literal);
+      P.consumeLoc(tok::integer_literal);
       return false;
     }
 
@@ -217,23 +217,20 @@ namespace {
     /// @{ Type parsing.
     bool parseASTType(CanType &result);
     bool parseSILType(SILType &Result,
-                      GenericSignature *&genericSig,
                       GenericEnvironment *&genericEnv,
                       bool IsFuncDecl = false);
     bool parseSILType(SILType &Result) {
-      GenericSignature *IgnoredSig;
       GenericEnvironment *IgnoredEnv;
-      return parseSILType(Result, IgnoredSig, IgnoredEnv);
+      return parseSILType(Result, IgnoredEnv);
     }
     bool parseSILType(SILType &Result, SourceLoc &TypeLoc) {
       TypeLoc = P.Tok.getLoc();
       return parseSILType(Result);
     }
     bool parseSILType(SILType &Result, SourceLoc &TypeLoc,
-                      GenericSignature *&GenericSig,
                       GenericEnvironment *&GenericEnv) {
       TypeLoc = P.Tok.getLoc();
-      return parseSILType(Result, GenericSig, GenericEnv);
+      return parseSILType(Result, GenericEnv);
     }
     /// @}
 
@@ -294,14 +291,12 @@ namespace {
                             GenericEnvironment *GenericEnv=nullptr);
 
     ProtocolConformance *parseProtocolConformance(ProtocolDecl *&proto,
-                             GenericSignature *&genericSig,
                              GenericEnvironment *&genericEnv,
                              bool localScope);
     ProtocolConformance *parseProtocolConformance() {
       ProtocolDecl *dummy;
-      GenericSignature *sig;
       GenericEnvironment *env;
-      return parseProtocolConformance(dummy, sig, env, true);
+      return parseProtocolConformance(dummy, env, true);
     }
 
     Optional<llvm::coverage::Counter>
@@ -346,7 +341,7 @@ bool SILParser::parseSILIdentifier(Identifier &Result, SourceLoc &Loc,
   }
 
   Loc = P.Tok.getLoc();
-  P.consumeToken();
+  P.consumeLoc();
   return false;
 }
 
@@ -615,14 +610,14 @@ static bool parseSILLinkage(Optional<SILLinkage> &Result, Parser &P) {
   // Unfortunate collision with access control keywords.
   if (P.Tok.is(tok::kw_public)) {
     Result = SILLinkage::Public;
-    P.consumeToken();
+    P.consumeLoc();
     return false;
   }
 
   // Unfortunate collision with access control keywords.
   if (P.Tok.is(tok::kw_private)) {
     Result = SILLinkage::Private;
-    P.consumeToken();
+    P.consumeLoc();
     return false;
   }
 
@@ -643,7 +638,7 @@ static bool parseSILLinkage(Optional<SILLinkage> &Result, Parser &P) {
 
   // If we succeed, consume the token.
   if (Result) {
-    P.consumeToken(tok::identifier);
+    P.consumeLoc(tok::identifier);
   }
 
   return false;
@@ -694,7 +689,7 @@ static bool parseDeclSILOptional(bool *isTransparent, bool *isFragile,
   while (SP.P.consumeIf(tok::l_square)) {
     if (isLet && SP.P.Tok.is(tok::kw_let)) {
       *isLet = true;
-      SP.P.consumeToken(tok::kw_let);
+      SP.P.consumeLoc(tok::kw_let);
       SP.P.parseToken(tok::r_square, diag::expected_in_attribute_list);
       continue;
     }
@@ -722,7 +717,7 @@ static bool parseDeclSILOptional(bool *isTransparent, bool *isFragile,
     else if (MRK && SP.P.Tok.getText() == "readwrite")
       *MRK = EffectsKind::ReadWrite;
     else if (Semantics && SP.P.Tok.getText() == "_semantics") {
-      SP.P.consumeToken(tok::identifier);
+      SP.P.consumeLoc(tok::identifier);
       if (SP.P.Tok.getKind() != tok::string_literal) {
         SP.P.diagnose(SP.P.Tok, diag::expected_in_attribute_list);
         return true;
@@ -731,13 +726,13 @@ static bool parseDeclSILOptional(bool *isTransparent, bool *isFragile,
       // Drop the double quotes.
       StringRef rawString = SP.P.Tok.getText().drop_front().drop_back();
       Semantics->push_back(rawString);
-      SP.P.consumeToken(tok::string_literal);
+      SP.P.consumeLoc(tok::string_literal);
 
       SP.P.parseToken(tok::r_square, diag::expected_in_attribute_list);
       continue;
     }
     else if (SpecAttrs && SP.P.Tok.getText() == "_specialize") {
-      SP.P.consumeToken(tok::identifier);
+      SP.P.consumeLoc(tok::identifier);
 
       /// Parse a specialized attributed, building a parsed substitution list
       /// and pushing a new ParsedSpecAttr on the SpecAttrs list. Conformances
@@ -753,7 +748,7 @@ static bool parseDeclSILOptional(bool *isTransparent, bool *isFragile,
       continue;
     }
     else if (ClangDecl && SP.P.Tok.getText() == "clang") {
-      SP.P.consumeToken(tok::identifier);
+      SP.P.consumeLoc(tok::identifier);
       if (SP.parseSILDottedPathWithoutPound(*ClangDecl))
         return true;
 
@@ -764,7 +759,7 @@ static bool parseDeclSILOptional(bool *isTransparent, bool *isFragile,
       SP.P.diagnose(SP.P.Tok, diag::expected_in_attribute_list);
       return true;
     }
-    SP.P.consumeToken(tok::identifier);
+    SP.P.consumeLoc(tok::identifier);
     SP.P.parseToken(tok::r_square, diag::expected_in_attribute_list);
   }
   return false;
@@ -842,10 +837,8 @@ bool SILParser::parseASTType(CanType &result) {
 ///     '$' '*'? attribute-list (generic-params)? type
 ///
 bool SILParser::parseSILType(SILType &Result,
-                             GenericSignature *&GenericSig,
                              GenericEnvironment *&GenericEnv,
                              bool IsFuncDecl){
-  GenericSig = nullptr;
   GenericEnv = nullptr;
 
   if (P.parseToken(tok::sil_dollar, diag::expected_sil_type))
@@ -855,7 +848,7 @@ bool SILParser::parseSILType(SILType &Result,
   SILValueCategory category = SILValueCategory::Object;
   if (P.Tok.isAnyOperator() && P.Tok.getText() == "*") {
     category = SILValueCategory::Address;
-    P.consumeToken();
+    P.consumeLoc();
   }
 
   // Parse attributes.
@@ -886,9 +879,7 @@ bool SILParser::parseSILType(SILType &Result,
 
   if (auto fnType = dyn_cast<FunctionTypeRepr>(TyR.get())) {
     if (auto generics = fnType->getGenericParams()) {
-      std::tie(GenericSig, GenericEnv) =
-          handleSILGenericParams(P.Context, generics, &P.SF);
-      fnType->setGenericSignature(GenericSig);
+      GenericEnv = handleSILGenericParams(P.Context, generics, &P.SF);
       fnType->setGenericEnvironment(GenericEnv);
     }
   }
@@ -1076,7 +1067,7 @@ bool SILParser::parseSILDeclRef(SILDeclRef &Result,
         break;
     } else if (ParseState < 2 && P.Tok.is(tok::integer_literal)) {
       P.Tok.getText().getAsInteger(0, uncurryLevel);
-      P.consumeToken(tok::integer_literal);
+      P.consumeLoc(tok::integer_literal);
       ParseState = 2;
     } else
       // TODO: resilience expansion?
@@ -1099,7 +1090,7 @@ bool SILParser::parseValueName(UnresolvedValueName &Result) {
   Result.Name = P.Tok.getText();
 
   if (P.Tok.is(tok::kw_undef)) {
-    Result.NameLoc = P.consumeToken(tok::kw_undef);
+    Result.NameLoc = P.consumeLoc(tok::kw_undef);
     return false;
   }
 
@@ -1159,7 +1150,7 @@ bool SILParser::parseSILOpcode(ValueKind &Opcode, SourceLoc &OpcodeLoc,
                .Default(ValueKind::SILArgument);
 
   if (Opcode != ValueKind::SILArgument) {
-    P.consumeToken();
+    P.consumeLoc();
     return false;
   }
   P.diagnose(OpcodeLoc, diag::expected_sil_instr_opcode);
@@ -1173,10 +1164,10 @@ static bool peekSILDebugLocation(Parser &P) {
 
 bool SILParser::parseSILDebugVar(SILDebugVariable &Var) {
   while (P.Tok.is(tok::comma) && !peekSILDebugLocation(P)) {
-    P.consumeToken();
+    P.consumeLoc();
     StringRef Key = P.Tok.getText();
     if (Key == "name") {
-      P.consumeToken();
+      P.consumeLoc();
       if (P.Tok.getKind() != tok::string_literal) {
         P.diagnose(P.Tok, diag::expected_tok_in_sil_instr, "string");
         return true;
@@ -1185,7 +1176,7 @@ bool SILParser::parseSILDebugVar(SILDebugVariable &Var) {
       StringRef Val = P.Tok.getText().drop_front().drop_back();
       Var.Name = Val;
     } else if (Key == "argno") {
-      P.consumeToken();
+      P.consumeLoc();
       if (P.Tok.getKind() != tok::integer_literal) {
         P.diagnose(P.Tok, diag::expected_tok_in_sil_instr, "integer");
         return true;
@@ -1202,7 +1193,7 @@ bool SILParser::parseSILDebugVar(SILDebugVariable &Var) {
       P.diagnose(P.Tok, diag::sil_dbg_unknown_key, Key);
       return true;
     }
-    P.consumeToken();
+    P.consumeLoc();
   }
   return false;
 }
@@ -1210,7 +1201,7 @@ bool SILParser::parseSILDebugVar(SILDebugVariable &Var) {
 bool SILParser::parseSILBBArgsAtBranch(SmallVector<SILValue, 6> &Args,
                                        SILBuilder &B) {
   if (P.Tok.is(tok::l_paren)) {
-    SourceLoc LParenLoc = P.consumeToken(tok::l_paren);
+    SourceLoc LParenLoc = P.consumeLoc(tok::l_paren);
     SourceLoc RParenLoc;
 
     if (P.parseList(tok::r_paren, LParenLoc, RParenLoc,
@@ -1238,7 +1229,7 @@ bool SILParser::parseSubstitutions(SmallVectorImpl<ParsedSubstitution> &parsed,
   if (!P.Tok.isContextualPunctuator("<"))
     return false;
   
-  P.consumeToken();
+  P.consumeLoc();
   
   // Parse a list of Substitutions.
   do {
@@ -1259,7 +1250,7 @@ bool SILParser::parseSubstitutions(SmallVectorImpl<ParsedSubstitution> &parsed,
     P.diagnose(P.Tok, diag::expected_tok_in_sil_instr, ">");
     return true;
   }
-  P.consumeToken();
+  P.consumeLoc();
   
   return false;
 }
@@ -1339,22 +1330,21 @@ static bool getConformancesForSubstitution(Parser &P,
 /// from a SILFunctionType.
 bool getApplySubstitutionsFromParsed(
                              SILParser &SP,
-                             GenericSignature *sig,
                              GenericEnvironment *env,
                              ArrayRef<ParsedSubstitution> parses,
                              SmallVectorImpl<Substitution> &subs) {
   if (parses.empty()) {
-    assert (!sig && !env);
+    assert(!env);
     return false;
   }
 
-  assert(sig && env);
+  assert(env);
 
   auto loc = parses[0].loc;
 
   // Collect conformance requirements in a convenient form.
   llvm::DenseMap<TypeBase *, SmallVector<ProtocolDecl *, 2>> conformsTo;
-  for (auto reqt : sig->getRequirements()) {
+  for (auto reqt : env->getGenericSignature()->getRequirements()) {
     if (reqt.getKind() == RequirementKind::Conformance) {
       auto canTy = reqt.getFirstType()->getCanonicalType();
       auto nominal = reqt.getSecondType()->getAnyNominal();
@@ -1363,7 +1353,7 @@ bool getApplySubstitutionsFromParsed(
   }
 
   // The replacement is for the corresponding dependent type by ordering.
-  for (auto depTy : sig->getAllDependentTypes()) {
+  for (auto depTy : env->getGenericSignature()->getAllDependentTypes()) {
 
     auto canTy = depTy->getCanonicalType().getPointer();
 
@@ -1425,7 +1415,7 @@ bool SILParser::parseSILLocation(SILLocation &Loc) {
   // Drop the double quotes.
   StringRef File = P.Tok.getText().drop_front().drop_back();
   L.Filename = P.Context.getIdentifier(File).str().data();
-  P.consumeToken(tok::string_literal);
+  P.consumeLoc(tok::string_literal);
   if (P.parseToken(tok::colon, diag::expected_colon_in_sil_location))
     return true;
   if (parseInteger(L.Line, diag::sil_invalid_line_in_sil_location))
@@ -1458,7 +1448,7 @@ bool SILParser::parseSILDebugLocation(SILLocation &L, SILBuilder &B,
                                       bool parsedComma) {
   // Parse the debug information, if any.
   if (P.Tok.is(tok::comma)) {
-    P.consumeToken();
+    P.consumeLoc();
     parsedComma = true;
   }
   if (!parsedComma)
@@ -1470,7 +1460,7 @@ bool SILParser::parseSILDebugLocation(SILLocation &L, SILBuilder &B,
       return true;
 
     if (P.Tok.is(tok::comma)) {
-      P.consumeToken();
+      P.consumeLoc();
       requireScope = true;
     }
   }
@@ -1554,7 +1544,7 @@ bool SILParser::parseSILInstruction(SILBasicBlock *BB, SILBuilder &B) {
   if (P.Tok.is(tok::sil_local_name)) {
     ResultName = P.Tok.getText();
     ResultNameLoc = P.Tok.getLoc();
-    P.consumeToken(tok::sil_local_name);
+    P.consumeLoc(tok::sil_local_name);
     if (P.parseToken(tok::equal, diag::expected_equal_in_sil_instr))
       return true;
   }
@@ -1605,7 +1595,7 @@ bool SILParser::parseSILInstruction(SILBasicBlock *BB, SILBuilder &B) {
       return true;
     if (parseSILDebugLocation(InstLoc, B))
       return true;
-    ResultVal = B.createAllocBox(InstLoc, Ty, VarInfo);
+    ResultVal = B.createAllocBox(InstLoc, Ty.castTo<SILBoxType>(), VarInfo);
     break;
   }
   case ValueKind::ApplyInst:
@@ -1623,7 +1613,7 @@ bool SILParser::parseSILInstruction(SILBasicBlock *BB, SILBuilder &B) {
     bool Negative = false;
     if (P.Tok.isAnyOperator() && P.Tok.getText() == "-") {
       Negative = true;
-      P.consumeToken();
+      P.consumeLoc();
     }
     if (P.Tok.getKind() != tok::integer_literal) {
       P.diagnose(P.Tok, diag::expected_tok_in_sil_instr, "integer");
@@ -1646,7 +1636,7 @@ bool SILParser::parseSILInstruction(SILBasicBlock *BB, SILBuilder &B) {
     if (value.getBitWidth() != intTy->getGreatestWidth())
       value = value.zextOrTrunc(intTy->getGreatestWidth());
 
-    P.consumeToken(tok::integer_literal);
+    P.consumeLoc(tok::integer_literal);
     if (parseSILDebugLocation(InstLoc, B))
       return true;
     ResultVal = B.createIntegerLiteral(InstLoc, Ty, value);
@@ -1682,7 +1672,7 @@ bool SILParser::parseSILInstruction(SILBasicBlock *BB, SILBuilder &B) {
     if (parseSILDebugLocation(InstLoc, B))
       return true;
     ResultVal = B.createFloatLiteral(InstLoc, Ty, value);
-    P.consumeToken(tok::integer_literal);
+    P.consumeLoc(tok::integer_literal);
     break;
   }
   case ValueKind::StringLiteralInst: {
@@ -1702,7 +1692,7 @@ bool SILParser::parseSILInstruction(SILBasicBlock *BB, SILBuilder &B) {
       P.diagnose(P.Tok, diag::sil_string_invalid_encoding, P.Tok.getText());
       return true;
     }
-    P.consumeToken(tok::identifier);
+    P.consumeLoc(tok::identifier);
 
     if (P.Tok.getKind() != tok::string_literal) {
       P.diagnose(P.Tok, diag::expected_tok_in_sil_instr, "string");
@@ -1715,7 +1705,7 @@ bool SILParser::parseSILInstruction(SILBasicBlock *BB, SILBuilder &B) {
     // Ask the lexer to interpret the entire string as a literal segment.
     SmallVector<char, 128> stringBuffer;
     StringRef string = P.L->getEncodedStringSegment(rawString, stringBuffer);
-    P.consumeToken(tok::string_literal);
+    P.consumeLoc(tok::string_literal);
     if (parseSILDebugLocation(InstLoc, B))
       return true;
     ResultVal = B.createStringLiteral(InstLoc, string, encoding);
@@ -1768,7 +1758,7 @@ bool SILParser::parseSILInstruction(SILBasicBlock *BB, SILBuilder &B) {
     assert(!error && "project_box index did not parse as integer?!");
     (void)error;
 
-    P.consumeToken(tok::integer_literal);
+    P.consumeLoc(tok::integer_literal);
     if (parseSILDebugLocation(InstLoc, B))
       return true;
     
@@ -1798,7 +1788,7 @@ bool SILParser::parseSILInstruction(SILBasicBlock *BB, SILBuilder &B) {
     }
     StringRef Str = P.Tok.getText();
     Identifier Id = P.Context.getIdentifier(Str.substr(1, Str.size()-2));
-    P.consumeToken(tok::string_literal);
+    P.consumeLoc(tok::string_literal);
     
     // Find the builtin in the Builtin module
     SmallVector<ValueDecl*, 2> foundBuiltins;
@@ -1812,7 +1802,6 @@ bool SILParser::parseSILInstruction(SILBasicBlock *BB, SILBuilder &B) {
     assert(foundBuiltins.size() == 1 && "ambiguous builtin name?!");
 
     auto *builtinFunc = cast<FuncDecl>(foundBuiltins[0]);
-    GenericSignature *genericSig = builtinFunc->getGenericSignature();
     GenericEnvironment *genericEnv = builtinFunc->getGenericEnvironment();
     
     SmallVector<ParsedSubstitution, 4> parsedSubs;
@@ -1821,12 +1810,11 @@ bool SILParser::parseSILInstruction(SILBasicBlock *BB, SILBuilder &B) {
       return true;
     
     if (!parsedSubs.empty()) {
-      if (!genericSig) {
+      if (!genericEnv) {
         P.diagnose(P.Tok, diag::sil_substitutions_on_non_polymorphic_type);
         return true;
       }
-      if (getApplySubstitutionsFromParsed(*this, genericSig, genericEnv,
-                                          parsedSubs, subs))
+      if (getApplySubstitutionsFromParsed(*this, genericEnv, parsedSubs, subs))
         return true;
     }
     
@@ -1834,7 +1822,7 @@ bool SILParser::parseSILInstruction(SILBasicBlock *BB, SILBuilder &B) {
       P.diagnose(P.Tok, diag::expected_tok_in_sil_instr, "(");
       return true;
     }
-    P.consumeToken(tok::l_paren);
+    P.consumeLoc(tok::l_paren);
 
     SmallVector<SILValue, 4> Args;
     while (true) {
@@ -1857,7 +1845,7 @@ bool SILParser::parseSILInstruction(SILBasicBlock *BB, SILBuilder &B) {
       P.diagnose(P.Tok, diag::expected_tok_in_sil_instr, ":");
       return true;
     }
-    P.consumeToken(tok::colon);
+    P.consumeLoc(tok::colon);
     
     SILType ResultTy;
     if (parseSILType(ResultTy))
@@ -2333,7 +2321,6 @@ bool SILParser::parseSILInstruction(SILBasicBlock *BB, SILBuilder &B) {
                         SetterFuncName, SelfName;
     SmallVector<ParsedSubstitution, 4> ParsedInitStorageSubs,
                                        ParsedSetterSubs;
-    GenericSignature *InitStorageSig, *SetterSig;
     GenericEnvironment *InitStorageEnv, *SetterEnv;
     SILType InitStorageTy, SetterTy;
     
@@ -2345,7 +2332,7 @@ bool SILParser::parseSILInstruction(SILBasicBlock *BB, SILBuilder &B) {
         || parseValueName(StorageName)
         || P.parseToken(tok::r_paren, diag::expected_tok_in_sil_instr, ")")
         || P.parseToken(tok::colon, diag::expected_tok_in_sil_instr, ":")
-        || parseSILType(InitStorageTy, InitStorageSig, InitStorageEnv)
+        || parseSILType(InitStorageTy, InitStorageEnv)
         || P.parseToken(tok::comma, diag::expected_tok_in_sil_instr, ",")
         || parseValueName(SetterFuncName)
         || parseSubstitutions(ParsedSetterSubs)
@@ -2353,7 +2340,7 @@ bool SILParser::parseSILInstruction(SILBasicBlock *BB, SILBuilder &B) {
         || parseValueName(SelfName)
         || P.parseToken(tok::r_paren, diag::expected_tok_in_sil_instr, ")")
         || P.parseToken(tok::colon, diag::expected_tok_in_sil_instr, ":")
-        || parseSILType(SetterTy, SetterSig, SetterEnv)
+        || parseSILType(SetterTy, SetterEnv)
         || parseSILDebugLocation(InstLoc, B))
       return true;
     
@@ -2363,9 +2350,9 @@ bool SILParser::parseSILInstruction(SILBasicBlock *BB, SILBuilder &B) {
     SILValue SetterFunc = getLocalValue(SetterFuncName, SetterTy, InstLoc, B);
     
     SmallVector<Substitution, 4> InitStorageSubs, SetterSubs;
-    if (getApplySubstitutionsFromParsed(*this, InitStorageSig, InitStorageEnv,
+    if (getApplySubstitutionsFromParsed(*this, InitStorageEnv,
                                         ParsedInitStorageSubs, InitStorageSubs)
-        || getApplySubstitutionsFromParsed(*this, SetterSig, SetterEnv,
+        || getApplySubstitutionsFromParsed(*this, SetterEnv,
                                            ParsedSetterSubs, SetterSubs))
       return true;
     
@@ -2585,7 +2572,7 @@ bool SILParser::parseSILInstruction(SILBasicBlock *BB, SILBuilder &B) {
             !P.Tok.isAnyOperator() ||
             P.Tok.getText() != "*")
           return true;
-        P.consumeToken();
+        P.consumeLoc();
 
         SILValue ElemCount;
         if (parseTypedValueRef(ElemCount, B))
@@ -2783,7 +2770,7 @@ bool SILParser::parseSILInstruction(SILBasicBlock *BB, SILBuilder &B) {
       return true;
     
     if (P.Tok.is(tok::comma) && !peekSILDebugLocation(P)) {
-      P.consumeToken(tok::comma);
+      P.consumeLoc(tok::comma);
       if (parseTypedValueRef(Operand, B))
         return true;
     }
@@ -2852,7 +2839,7 @@ bool SILParser::parseSILInstruction(SILBasicBlock *BB, SILBuilder &B) {
       P.diagnose(P.Tok, diag::sil_tuple_inst_wrong_field);
       return true;
     }
-    P.consumeToken(tok::integer_literal);
+    P.consumeLoc(tok::integer_literal);
     if (parseSILDebugLocation(InstLoc, B))
       return true;
     auto ResultTy = TT->getElement(Field).getType()->getCanonicalType();
@@ -2960,10 +2947,7 @@ bool SILParser::parseSILInstruction(SILBasicBlock *BB, SILBuilder &B) {
       if (auto generics = fnType->getGenericParams()) {
         assert(!Ty.wasValidated() && Ty.getType().isNull());
 
-        GenericSignature *genericSig;
-        std::tie(genericSig, genericEnv) =
-            handleSILGenericParams(P.Context, generics, &P.SF);
-        fnType->setGenericSignature(genericSig);
+        genericEnv = handleSILGenericParams(P.Context, generics, &P.SF);
         fnType->setGenericEnvironment(genericEnv);
       }
     }
@@ -3035,7 +3019,7 @@ bool SILParser::parseSILInstruction(SILBasicBlock *BB, SILBuilder &B) {
     // Optional operand.
     SILValue Operand;
     if (P.Tok.is(tok::comma)) {
-      P.consumeToken(tok::comma);
+      P.consumeLoc(tok::comma);
       if (parseTypedValueRef(Operand, B))
         return true;
     }
@@ -3690,7 +3674,6 @@ bool SILParser::parseSILInstruction(SILBasicBlock *BB, SILBuilder &B) {
     
     UnresolvedValueName invokeName;
     SILType invokeTy;
-    GenericSignature *invokeGenericSig;
     GenericEnvironment *invokeGenericEnv;
     
     SILType blockType;
@@ -3704,7 +3687,7 @@ bool SILParser::parseSILInstruction(SILBasicBlock *BB, SILBuilder &B) {
         parseValueName(invokeName) ||
         parseSubstitutions(parsedSubs) ||
         P.parseToken(tok::colon, diag::expected_tok_in_sil_instr, ":") ||
-        parseSILType(invokeTy, invokeGenericSig, invokeGenericEnv) ||
+        parseSILType(invokeTy, invokeGenericEnv) ||
         P.parseToken(tok::comma, diag::expected_tok_in_sil_instr, ",") ||
         parseSILIdentifier(type, typeLoc,
                            diag::expected_tok_in_sil_instr, "type") ||
@@ -3725,12 +3708,11 @@ bool SILParser::parseSILInstruction(SILBasicBlock *BB, SILBuilder &B) {
     
     SmallVector<Substitution, 4> subs;
     if (!parsedSubs.empty()) {
-      if (!invokeGenericSig) {
+      if (!invokeGenericEnv) {
         P.diagnose(typeLoc, diag::sil_substitutions_on_non_polymorphic_type);
         return true;
       }
       if (getApplySubstitutionsFromParsed(*this,
-                                          invokeGenericSig,
                                           invokeGenericEnv,
                                           parsedSubs, subs))
         return true;
@@ -3786,11 +3768,10 @@ bool SILParser::parseCallInstruction(SILLocation InstLoc,
 
   SILType Ty;
   SourceLoc TypeLoc;
-  GenericSignature *GenericSig = nullptr;
   GenericEnvironment *GenericEnv = nullptr;
   if (P.parseToken(tok::r_paren, diag::expected_tok_in_sil_instr, ")") ||
       P.parseToken(tok::colon, diag::expected_tok_in_sil_instr, ":") ||
-      parseSILType(Ty, TypeLoc, GenericSig, GenericEnv))
+      parseSILType(Ty, TypeLoc, GenericEnv))
     return true;
 
   auto FTI = Ty.getAs<SILFunctionType>();
@@ -3801,12 +3782,11 @@ bool SILParser::parseCallInstruction(SILLocation InstLoc,
 
   SmallVector<Substitution, 4> subs;
   if (!parsedSubs.empty()) {
-    if (!GenericSig) {
+    if (!GenericEnv) {
       P.diagnose(TypeLoc, diag::sil_substitutions_on_non_polymorphic_type);
       return true;
     }
-    if (getApplySubstitutionsFromParsed(*this, GenericSig, GenericEnv,
-                                        parsedSubs, subs))
+    if (getApplySubstitutionsFromParsed(*this, GenericEnv, parsedSubs, subs))
       return true;
   }
 
@@ -3941,7 +3921,7 @@ bool SILParser::isStartOfSILInstruction() {
   if (P.Tok.is(tok::sil_local_name))
     return true;
   if (P.Tok.is(tok::identifier) || P.Tok.isKeyword()) {
-    auto &peek = P.peekToken();
+    auto peek = P.peekToken();
     return !peek.is(tok::l_paren) && !peek.is(tok::colon);
   }
   return false;
@@ -3996,6 +3976,9 @@ bool SILParser::parseSILBasicBlock(SILBuilder &B) {
 
   bool AssumeUnqualifiedOwnershipWhenParsing =
     F->getModule().getOptions().AssumeUnqualifiedOwnershipWhenParsing;
+  if (AssumeUnqualifiedOwnershipWhenParsing) {
+    F->setUnqualifiedOwnership();
+  }
   do {
     if (parseSILInstruction(BB, B))
       return true;
@@ -4003,9 +3986,8 @@ bool SILParser::parseSILBasicBlock(SILBuilder &B) {
     // Qualification. For more details, see the comment on the
     // FunctionOwnershipEvaluator class.
     SILInstruction *ParsedInst = &*BB->rbegin();
-    if (AssumeUnqualifiedOwnershipWhenParsing) {
-      F->setUnqualifiedOwnership();
-    } else if (!OwnershipEvaluator.evaluate(ParsedInst)) {
+    if (!AssumeUnqualifiedOwnershipWhenParsing &&
+        !OwnershipEvaluator.evaluate(ParsedInst)) {
       P.diagnose(ParsedInst->getLoc().getSourceLoc(),
                  diag::found_unqualified_instruction_in_qualified_function,
                  F->getName());
@@ -4025,7 +4007,7 @@ bool Parser::parseDeclSIL() {
   // properly handled.
   Lexer::SILBodyRAII Tmp(*L);
 
-  consumeToken(tok::kw_sil);
+  consumeLoc(tok::kw_sil);
 
   SILParser FunctionState(*this);
 
@@ -4056,11 +4038,8 @@ bool Parser::parseDeclSIL() {
     // Construct a Scope for the function body so TypeAliasDecl can be added to
     // the scope.
     Scope Body(this, ScopeKind::FunctionBody);
-    GenericSignature *GenericSig;
     GenericEnvironment *GenericEnv;
-    if (FunctionState.parseSILType(FnType,
-                                   GenericSig, GenericEnv,
-                                   true/*IsFuncDecl*/))
+    if (FunctionState.parseSILType(FnType, GenericEnv, true /*IsFuncDecl*/))
       return true;
     auto SILFnType = FnType.getAs<SILFunctionType>();
     if (!SILFnType || !FnType.isObject()) {
@@ -4095,8 +4074,7 @@ bool Parser::parseDeclSIL() {
       // Resolve specialization attributes after setting GenericEnv.
       for (auto &Attr : SpecAttrs) {
         SmallVector<Substitution, 4> Subs;
-        if (getApplySubstitutionsFromParsed(FunctionState,
-                                            GenericSig, GenericEnv,
+        if (getApplySubstitutionsFromParsed(FunctionState, GenericEnv,
                                             Attr.subs, Subs)) {
           return true;
         }
@@ -4162,7 +4140,7 @@ bool Parser::parseDeclSIL() {
 ///   decl-sil-stage:   [[only in SIL mode]]
 ///     'sil_stage' ('raw' | 'canonical')
 bool Parser::parseDeclSILStage() {
-  SourceLoc stageLoc = consumeToken(tok::kw_sil_stage);
+  SourceLoc stageLoc = consumeLoc(tok::kw_sil_stage);
   if (!Tok.is(tok::identifier)) {
     diagnose(Tok, diag::expected_sil_stage_name);
     return true;
@@ -4170,13 +4148,13 @@ bool Parser::parseDeclSILStage() {
   SILStage stage;
   if (Tok.isContextualKeyword("raw")) {
     stage = SILStage::Raw;
-    consumeToken();
+    consumeLoc();
   } else if (Tok.isContextualKeyword("canonical")) {
     stage = SILStage::Canonical;
-    consumeToken();
+    consumeLoc();
   } else {
     diagnose(Tok, diag::expected_sil_stage_name);
-    consumeToken();
+    consumeLoc();
     return true;
   }
   
@@ -4193,7 +4171,7 @@ bool Parser::parseDeclSILStage() {
 /// decl-sil-global: [[only in SIL mode]]
 ///   'sil_global' sil-linkage @name : sil-type [external]
 bool Parser::parseSILGlobal() {
-  consumeToken(tok::kw_sil_global);
+  consumeLoc(tok::kw_sil_global);
   Optional<SILLinkage> GlobalLinkage;
   Identifier GlobalName;
   SILType GlobalType;
@@ -4256,7 +4234,7 @@ bool Parser::parseSILGlobal() {
 /// sil-vtable-entry:
 ///   SILDeclRef ':' SILFunctionName
 bool Parser::parseSILVTable() {
-  consumeToken(tok::kw_sil_vtable);
+  consumeLoc(tok::kw_sil_vtable);
   SILParser VTableState(*this);
 
   // Parse the class name.
@@ -4282,7 +4260,7 @@ bool Parser::parseSILVTable() {
   }
 
   SourceLoc LBraceLoc = Tok.getLoc();
-  consumeToken(tok::l_brace);
+  consumeLoc(tok::l_brace);
 
   // We need to turn on InSILBody to parse SILDeclRef.
   Lexer::SILBodyRAII Tmp(*L);
@@ -4298,7 +4276,7 @@ bool Parser::parseSILVTable() {
         return true;
       SILFunction *Func = nullptr;
       if (Tok.is(tok::kw_nil)) {
-        consumeToken();
+        consumeLoc();
       } else {
         if (parseToken(tok::colon, diag::expected_sil_vtable_colon) ||
           VTableState.parseSILIdentifier(FuncName, FuncLoc,
@@ -4415,7 +4393,6 @@ static NormalProtocolConformance *parseNormalProtocolConformance(Parser &P,
 /// Note that generic-parameter-list is already parsed before calling this.
 ProtocolConformance *SILParser::parseProtocolConformance(
            ProtocolDecl *&proto,
-           GenericSignature *&genericSig,
            GenericEnvironment *&genericEnv,
            bool localScope) {
   // Parse generic params for the protocol conformance. We need to make sure
@@ -4425,13 +4402,11 @@ ProtocolConformance *SILParser::parseProtocolConformance(
     GenericsScope.emplace(&P, ScopeKind::Generics);
 
   // Make sure we don't leave it uninitialized in the caller
-  genericSig = nullptr;
   genericEnv = nullptr;
 
   auto *genericParams = P.maybeParseGenericParams().getPtrOrNull();
   if (genericParams) {
-    std::tie(genericSig, genericEnv) =
-        handleSILGenericParams(P.Context, genericParams, &P.SF);
+    genericEnv = handleSILGenericParams(P.Context, genericParams, &P.SF);
   }
 
   ProtocolConformance *retVal =
@@ -4460,7 +4435,7 @@ ProtocolConformance *SILParser::parseProtocolConformanceHelper(
     return nullptr;
 
   if (P.Tok.is(tok::identifier) && P.Tok.getText() == "specialize") {
-    P.consumeToken();
+    P.consumeLoc();
 
     // Parse substitutions for specialized conformance.
     SmallVector<ParsedSubstitution, 4> parsedSubs;
@@ -4470,19 +4445,17 @@ ProtocolConformance *SILParser::parseProtocolConformanceHelper(
     if (P.parseToken(tok::l_paren, diag::expected_sil_witness_lparen))
       return nullptr;
     ProtocolDecl *dummy;
-    GenericSignature *specializedSig;
     GenericEnvironment *specializedEnv;
-    auto genericConform = parseProtocolConformance(
-        dummy, specializedSig, specializedEnv,
-        localScope);
+    auto genericConform =
+        parseProtocolConformance(dummy, specializedEnv, localScope);
     if (!genericConform)
       return nullptr;
     if (P.parseToken(tok::r_paren, diag::expected_sil_witness_rparen))
       return nullptr;
 
     SmallVector<Substitution, 4> subs;
-    if (getApplySubstitutionsFromParsed(*this, specializedSig, specializedEnv,
-                                        parsedSubs, subs))
+    if (getApplySubstitutionsFromParsed(*this, specializedEnv, parsedSubs,
+                                        subs))
       return nullptr;
 
     auto result = P.Context.getSpecializedConformance(
@@ -4491,7 +4464,7 @@ ProtocolConformance *SILParser::parseProtocolConformanceHelper(
   }
 
   if (P.Tok.is(tok::identifier) && P.Tok.getText() == "inherit") {
-    P.consumeToken();
+    P.consumeLoc();
 
     if (P.parseToken(tok::l_paren, diag::expected_sil_witness_lparen))
       return nullptr;
@@ -4521,7 +4494,7 @@ ProtocolConformance *SILParser::parseProtocolConformanceHelper(
 ///                              protocol-conformance|dependent
 ///   base_protocol ProtocolName: protocol-conformance
 bool Parser::parseSILWitnessTable() {
-  consumeToken(tok::kw_sil_witness_table);
+  consumeLoc(tok::kw_sil_witness_table);
   SILParser WitnessState(*this);
   
   // Parse the linkage.
@@ -4542,10 +4515,8 @@ bool Parser::parseSILWitnessTable() {
 
   // Parse the protocol conformance.
   ProtocolDecl *proto;
-  GenericSignature *witnessSig;
   GenericEnvironment *witnessEnv;
   auto conf = WitnessState.parseProtocolConformance(proto,
-                                                    witnessSig,
                                                     witnessEnv,
                                                     false/*localScope*/);
   WitnessState.GenericEnv = witnessEnv;
@@ -4578,7 +4549,7 @@ bool Parser::parseSILWitnessTable() {
   }
 
   SourceLoc LBraceLoc = Tok.getLoc();
-  consumeToken(tok::l_brace);
+  consumeLoc(tok::l_brace);
 
   // We need to turn on InSILBody to parse SILDeclRef.
   Lexer::SILBodyRAII Tmp(*L);
@@ -4632,7 +4603,7 @@ bool Parser::parseSILWitnessTable() {
             continue;
           conformance = ProtocolConformanceRef(concrete);
         } else {
-          consumeToken();
+          consumeLoc();
         }
 
         witnessEntries.push_back(SILWitnessTable::AssociatedTypeProtocolWitness{
@@ -4681,7 +4652,7 @@ bool Parser::parseSILWitnessTable() {
       
       SILFunction *Func = nullptr;
       if (Tok.is(tok::kw_nil)) {
-        consumeToken();
+        consumeLoc();
       } else {
         if (parseToken(tok::at_sign, diag::expected_sil_function_name) ||
             WitnessState.parseSILIdentifier(FuncName, FuncLoc,
@@ -4724,7 +4695,7 @@ bool Parser::parseSILWitnessTable() {
 ///   'method' SILDeclRef ':' @SILFunctionName
 ///   'no_default'
 bool Parser::parseSILDefaultWitnessTable() {
-  consumeToken(tok::kw_sil_default_witness_table);
+  consumeLoc(tok::kw_sil_default_witness_table);
   SILParser WitnessState(*this);
   
   // Parse the linkage.
@@ -4742,7 +4713,7 @@ bool Parser::parseSILDefaultWitnessTable() {
 
   // Parse the body.
   SourceLoc LBraceLoc = Tok.getLoc();
-  consumeToken(tok::l_brace);
+  consumeLoc(tok::l_brace);
 
   // We need to turn on InSILBody to parse SILDeclRef.
   Lexer::SILBodyRAII Tmp(*L);
@@ -4823,7 +4794,7 @@ llvm::Optional<llvm::coverage::Counter> SILParser::parseSILCoverageExpr(
   }
 
   if (P.Tok.is(tok::l_paren)) {
-    P.consumeToken(tok::l_paren);
+    P.consumeLoc(tok::l_paren);
     auto LHS = parseSILCoverageExpr(Builder);
     if (!LHS)
       return None;
@@ -4862,7 +4833,7 @@ llvm::Optional<llvm::coverage::Counter> SILParser::parseSILCoverageExpr(
 /// sil-coverage-expr:
 ///   ...
 bool Parser::parseSILCoverageMap() {
-  consumeToken(tok::kw_sil_coverage_map);
+  consumeLoc(tok::kw_sil_coverage_map);
   SILParser State(*this);
 
   // Parse the filename.
@@ -4894,7 +4865,7 @@ bool Parser::parseSILCoverageMap() {
     return true;
   }
   SourceLoc LBraceLoc = Tok.getLoc();
-  consumeToken(tok::l_brace);
+  consumeLoc(tok::l_brace);
 
   llvm::coverage::CounterExpressionBuilder Builder;
   std::vector<SILCoverageMap::MappedRegion> Regions;
@@ -4951,7 +4922,7 @@ bool Parser::parseSILCoverageMap() {
 /// scope-parent ::= sil-scope-ref
 /// debug-loc ::= 'loc' string-literal ':' [0-9]+ ':' [0-9]+
 bool Parser::parseSILScope() {
-  consumeToken(tok::kw_sil_scope);
+  consumeLoc(tok::kw_sil_scope);
   SILParser ScopeState(*this);
 
   SourceLoc SlotLoc = Tok.getLoc();
@@ -4960,7 +4931,7 @@ bool Parser::parseSILScope() {
     return true;
 
   SourceLoc LBraceLoc = Tok.getLoc();
-  consumeToken(tok::l_brace);
+  consumeLoc(tok::l_brace);
 
   StringRef Key = Tok.getText();
   RegularLocation Loc{SILLocation::DebugLoc()};
@@ -4981,13 +4952,12 @@ bool Parser::parseSILScope() {
     SourceLoc FnLoc = Tok.getLoc();
     // We need to turn on InSILBody to parse the function reference.
     Lexer::SILBodyRAII Tmp(*L);
-    GenericSignature *IgnoredSig;
     GenericEnvironment *IgnoredEnv;
     Scope S(this, ScopeKind::TopLevel);
     Scope Body(this, ScopeKind::FunctionBody);
     if ((ScopeState.parseGlobalName(FnName)) ||
         parseToken(tok::colon, diag::expected_sil_colon_value_ref) ||
-        ScopeState.parseSILType(Ty, IgnoredSig, IgnoredEnv, true))
+        ScopeState.parseSILType(Ty, IgnoredEnv, true))
       return true;
 
     // The function doesn't exist yet. Create a zombie forward declaration.
@@ -5002,7 +4972,7 @@ bool Parser::parseSILScope() {
 
   SILDebugScope *InlinedAt = nullptr;
   if (Tok.getText() == "inlined_at") {
-    consumeToken();
+    consumeLoc();
     if (ScopeState.parseScopeRef(InlinedAt))
       return true;
   }

@@ -6,6 +6,7 @@
 // See http://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
 
 // RUN: not --crash %target-swift-frontend %s -parse
+// REQUIRES: SR-3149
 t c
 let : {{
 return $0

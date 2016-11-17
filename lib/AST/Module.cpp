@@ -15,6 +15,7 @@
 //===----------------------------------------------------------------------===//
 
 #include "swift/AST/Module.h"
+#include "swift/AST/AccessScope.h"
 #include "swift/AST/AST.h"
 #include "swift/AST/ASTPrinter.h"
 #include "swift/AST/ASTScope.h"
@@ -428,8 +429,8 @@ void Module::lookupMember(SmallVectorImpl<ValueDecl*> &results,
       return VD->getModuleContext() == this;
     });
 
-    const DeclContext *accessScope = nominal->getFormalAccessScope();
-    if (accessScope && !accessScope->isModuleContext())
+    auto AS = nominal->getFormalAccessScope();
+    if (AS.isPrivate() || AS.isFileScope())
       alreadyInPrivateContext = true;
 
     break;
@@ -586,28 +587,25 @@ TypeBase::gatherAllSubstitutions(Module *module,
   // The type itself contains substitutions up to the innermost
   // non-type context.
   CanType parent(canon);
-  auto *parentDC = gpContext;
+  ArrayRef<GenericTypeParamType *> genericParams =
+    genericSig->getGenericParams();
+  unsigned lastGenericIndex = genericParams.size();
   while (parent) {
     if (auto boundGeneric = dyn_cast<BoundGenericType>(parent)) {
-      auto genericSig = parentDC->getGenericSignatureOfContext();
-      unsigned index = 0;
-
-      assert(boundGeneric->getGenericArgs().size() ==
-             genericSig->getInnermostGenericParams().size());
-
+      unsigned index = lastGenericIndex - boundGeneric->getGenericArgs().size();
       for (Type arg : boundGeneric->getGenericArgs()) {
-        auto paramTy = genericSig->getInnermostGenericParams()[index++];
-        substitutions[paramTy->getCanonicalType().getPointer()] = arg;
+        auto paramTy = genericParams[index++];
+        substitutions[
+          paramTy->getCanonicalType()->castTo<GenericTypeParamType>()] = arg;
       }
+      lastGenericIndex -= boundGeneric->getGenericArgs().size();
 
       parent = CanType(boundGeneric->getParent());
-      parentDC = parentDC->getParent();
       continue;
     }
 
     if (auto nominal = dyn_cast<NominalType>(parent)) {
       parent = CanType(nominal->getParent());
-      parentDC = parentDC->getParent();
       continue;
     }
 
@@ -616,11 +614,17 @@ TypeBase::gatherAllSubstitutions(Module *module,
 
   // Add forwarding substitutions from the outer context if we have
   // a type nested inside a generic function.
-  if (auto *outerEnv = parentDC->getGenericEnvironmentOfContext())
-    for (auto pair : outerEnv->getInterfaceToArchetypeMap()) {
-      auto result = substitutions.insert(pair);
+  auto *parentDC = gpContext;
+  while (parentDC->isTypeContext())
+    parentDC = parentDC->getParent();
+  if (auto *outerEnv = parentDC->getGenericEnvironmentOfContext()) {
+    for (auto gp : outerEnv->getGenericParams()) {
+      auto result = substitutions.insert(
+                      {gp->getCanonicalType()->castTo<GenericTypeParamType>(),
+                       outerEnv->mapTypeIntoContext(gp)});
       assert(result.second);
     }
+  }
 
   auto lookupConformanceFn =
       [&](CanType original, Type replacement, ProtocolType *protoType)

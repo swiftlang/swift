@@ -821,6 +821,8 @@ static bool ParseLangArgs(LangOptions &Opts, ArgList &Args,
       = A->getOption().matches(OPT_enable_access_control);
   }
 
+  Opts.DisableTypoCorrection |= Args.hasArg(OPT_disable_typo_correction);
+
   Opts.CodeCompleteInitsInPostfixExpr |=
       Args.hasArg(OPT_code_complete_inits_in_postfix_expr);
 

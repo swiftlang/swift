@@ -37,6 +37,9 @@ public:
   /// Does instruction A properly dominate instruction B?
   bool properlyDominates(SILInstruction *a, SILInstruction *b);
 
+  /// Does value A properly dominate instruction B?
+  bool properlyDominates(SILValue a, SILInstruction *b);
+
   void verify() const;
 
   /// Return true if the other dominator tree does not match this dominator

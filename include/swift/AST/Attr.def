@@ -152,7 +152,7 @@ SIMPLE_DECL_ATTR(prefix , Prefix , OnFunc | OnOperator | DeclModifier, 24)
 SIMPLE_DECL_ATTR(postfix, Postfix, OnFunc | OnOperator | DeclModifier, 25)
 
 SIMPLE_DECL_ATTR(_transparent, Transparent,
-                 OnFunc|OnConstructor|OnVar|OnExtension|UserInaccessible, 26)
+                 OnFunc|OnConstructor|OnVar|UserInaccessible, 26)
 SIMPLE_DECL_ATTR(requires_stored_property_inits, RequiresStoredPropertyInits,
                  OnClass, 27)
 DECL_ATTR(autoclosure, AutoClosure, OnParam, 28)
@@ -164,9 +164,13 @@ SIMPLE_DECL_ATTR(nonobjc, NonObjC,
 SIMPLE_DECL_ATTR(_fixed_layout, FixedLayout,
                  OnVar | OnClass | OnStruct | OnEnum | UserInaccessible, 31)
 
+SIMPLE_DECL_ATTR(_inlineable, Inlineable,
+                 OnVar | OnSubscript | OnFunc | OnConstructor | OnDestructor |
+                 UserInaccessible, 32)
+
 DECL_ATTR(_specialize, Specialize,
           OnConstructor | OnFunc | AllowMultipleAttributes | LongAttribute
-          | UserInaccessible, 32)
+          | UserInaccessible, 33)
 
 // Non-serialized attributes.
 

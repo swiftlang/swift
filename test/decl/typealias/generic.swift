@@ -224,12 +224,39 @@ func takesSugaredType2(m: GenericClass<Int>.TA<Float>) {
 }
 
 
+//
+// Error paths
+//
 
-extension A {}  // expected-error {{non-nominal type 'A' cannot be extended}}
+// This works, but in the body of the extension we see the original type
+// parameters of A<>'s underlying type MyType<>, rather than the type
+// parameters of A<>.
+extension A {}
+
 extension A<T> {}  // expected-error {{generic type 'A' specialized with too few type parameters (got 1, but expected 2)}}
 extension A<Float,Int> {}  // expected-error {{constrained extension must be declared on the unspecialized generic type 'MyType' with constraints specified by a 'where' clause}}
 extension C<T> {}  // expected-error {{use of undeclared type 'T'}}
 extension C<Int> {}  // expected-error {{constrained extension must be declared on the unspecialized generic type 'MyType' with constraints specified by a 'where' clause}}
+
+
+protocol ErrorQ {
+  associatedtype Y
+}
+protocol ErrorP {
+  associatedtype X: ErrorQ // expected-note {{protocol requires nested type 'X'; do you want to add it?}}
+}
+
+typealias ErrorA<T: ErrorP> = T.X.Y
+
+struct ErrorB : ErrorP { // expected-error {{type 'ErrorB' does not conform to protocol 'ErrorP'}}
+  typealias X = ErrorC // expected-note {{possibly intended match 'ErrorB.X' (aka 'ErrorC') does not conform to 'ErrorQ'}}
+}
+
+struct ErrorC {
+  typealias Y = Int
+}
+
+typealias Y = ErrorA<ErrorB>
 
 
 //

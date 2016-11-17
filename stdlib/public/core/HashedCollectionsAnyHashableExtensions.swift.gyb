@@ -44,7 +44,7 @@ extension Set where Element == AnyHashable {
     _ newMember: ConcreteElement
   ) -> (inserted: Bool, memberAfterInsert: ConcreteElement) {
     let (inserted, memberAfterInsert) =
-      _concreteElement_insert(AnyHashable(newMember) as! Element)
+      _concreteElement_insert(AnyHashable(newMember))
     return (
       inserted: inserted,
       memberAfterInsert: memberAfterInsert.base as! ConcreteElement)

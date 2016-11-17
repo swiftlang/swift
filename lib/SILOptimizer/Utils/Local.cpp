@@ -1160,7 +1160,7 @@ bool swift::tryDeleteDeadClosure(SILInstruction *Closure,
 void ValueLifetimeAnalysis::propagateLiveness() {
   assert(LiveBlocks.empty() && "frontier computed twice");
 
-  auto DefBB = DefValue->getParentBB();
+  auto DefBB = DefValue->getParentBlock();
   llvm::SmallVector<SILBasicBlock *, 64> Worklist;
 
   // Find the initial set of blocks where the value is live, because
@@ -1332,28 +1332,6 @@ void ValueLifetimeAnalysis::dump() const {
 //                    Casts Optimization and Simplification
 //===----------------------------------------------------------------------===//
 
-/// \brief Get a substitution corresponding to the type witness.
-/// Inspired by ProtocolConformance::getTypeWitnessByName.
-static const Substitution *
-getTypeWitnessByName(ProtocolConformance *conformance, Identifier name) {
-  // Find the named requirement.
-  AssociatedTypeDecl *assocType = nullptr;
-  assert(conformance && "Missing conformance information");
-  auto members = conformance->getProtocol()->lookupDirect(name);
-  for (auto member : members) {
-    assocType = dyn_cast<AssociatedTypeDecl>(member);
-    if (assocType)
-      break;
-  }
-
-  if (!assocType)
-    return nullptr;
-
-  if (!conformance->hasTypeWitness(assocType, nullptr)) {
-    return nullptr;
-  }
-  return &conformance->getTypeWitness(assocType, nullptr);
-}
 
 /// Check if is a bridging cast, i.e. one of the sides is
 /// a bridged type.
@@ -1513,14 +1491,12 @@ optimizeBridgedObjCToSwiftCast(SILInstruction *Inst,
   SmallVector<SILValue, 1> Args;
 
   // Add substitutions
-  SmallVector<Substitution, 2> Subs;
   auto Conformances =
     M.getASTContext().AllocateUninitialized<ProtocolConformanceRef>(1);
   Conformances[0] = ProtocolConformanceRef(Conformance);
-  Subs.push_back(Substitution(Target, Conformances));
-  const Substitution *DepTypeSubst = getTypeWitnessByName(
-      Conformance, M.getASTContext().getIdentifier("_ObjectiveCType"));
-  Subs.push_back(*DepTypeSubst);
+  Substitution Subs[1] = {
+    Substitution(Target, Conformances)
+  };
   auto SILFnTy = FuncRef->getType();
   SILType SubstFnTy = SILFnTy.substGenericArgs(M, Subs);
   SILType ResultTy = SubstFnTy.castTo<SILFunctionType>()->getSILResult();
@@ -2783,7 +2759,7 @@ void swift::hoistAddressProjections(Operand &Op, SILInstruction *InsertBefore,
         continue;
       }
       default:
-        assert(DomTree->dominates(V->getParentBB(), InsertBefore->getParent()) &&
+        assert(DomTree->dominates(V->getParentBlock(), InsertBefore->getParent()) &&
                "The projected value must dominate the insertion point");
         return;
     }

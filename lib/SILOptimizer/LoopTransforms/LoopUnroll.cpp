@@ -56,7 +56,7 @@ public:
 
 protected:
   SILValue remapValue(SILValue V) {
-    if (auto *BB = V->getParentBB()) {
+    if (auto *BB = V->getParentBlock()) {
       if (!Loop->contains(BB))
         return V;
     }
@@ -314,9 +314,9 @@ updateSSA(SILLoop *Loop,
         UseList.push_back(UseWrapper(Use));
     // Update SSA of use with the available values.
     SSAUp.Initialize(OrigValue->getType());
-    SSAUp.AddAvailableValue(OrigValue->getParentBB(), OrigValue);
+    SSAUp.AddAvailableValue(OrigValue->getParentBlock(), OrigValue);
     for (auto NewValue : MapEntry.second)
-      SSAUp.AddAvailableValue(NewValue->getParentBB(), NewValue);
+      SSAUp.AddAvailableValue(NewValue->getParentBlock(), NewValue);
     for (auto U : UseList) {
       Operand *Use = U;
       SSAUp.RewriteUse(*Use);

@@ -435,7 +435,7 @@ static void lookupDeclsFromProtocolsBeingConformedTo(
         // Skip value requirements that have corresponding witnesses. This cuts
         // down on duplicates.
         if (!NormalConformance->hasWitness(VD) ||
-            NormalConformance->getWitness(VD, nullptr) == nullptr ||
+            !NormalConformance->getWitness(VD, nullptr) ||
             NormalConformance->getWitness(VD, nullptr).getDecl()->getFullName()
               != VD->getFullName()) {
           Consumer.foundDecl(VD, ReasonForThisProtocol);
@@ -718,7 +718,8 @@ public:
     // Does it make sense to substitute types?
     bool shouldSubst = !BaseTy->hasUnboundGenericType() &&
                        !isa<AnyMetatypeType>(BaseTy.getPointer()) &&
-                       !BaseTy->isAnyExistentialType();
+                       !BaseTy->isAnyExistentialType() &&
+                       !BaseTy->hasTypeVariable();
     ModuleDecl *M = DC->getParentModule();
 
     auto FoundSignature = VD->getOverloadSignature();

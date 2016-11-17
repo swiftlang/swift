@@ -151,7 +151,7 @@ def map_line_from_source_file(source_filename, source_line_num, target_filename)
         result = target_line_num + (source_line_num - found_source_line_num)
         if i + 1 == len(map) or map[i + 1][0] > result:
             return result + 1
-    raise RuntimeError, "line not found"
+    raise RuntimeError("line not found")
 
 def run():
     """Simulate a couple of gyb-generated files
@@ -239,7 +239,7 @@ def run():
         source_file = sys.argv[1]
         source_line = int(sys.argv[2])
         target_file = sys.argv[3]
-        print map_line_from_source_file(source_file, source_line, target_file)
+        print(map_line_from_source_file(source_file, source_line, target_file))
     else:
         dashes = sys.argv.index('--')
         sources = sys.argv[1:dashes]

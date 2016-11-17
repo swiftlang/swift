@@ -157,6 +157,11 @@ extension ${Self} : ${TraversalCollection} {
 
   /// Returns the number of elements.
   ///
+  /// To check whether a collection is empty, use its `isEmpty` property
+  /// instead of comparing `count` to zero. Unless the collection guarantees
+  /// random-access performance, calculating `count` can be an O(*n*)
+  /// operation.
+  ///
   /// - Complexity: O(1) if `Self` conforms to `RandomAccessCollection`;
   ///   O(*n*) otherwise.
   public var count: Base.IndexDistance {

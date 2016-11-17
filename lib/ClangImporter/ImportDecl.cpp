@@ -1290,7 +1290,6 @@ static FuncDecl *buildSubscriptGetterDecl(ClangImporter::Implementation &Impl,
       TypeLoc::withoutLoc(elementTy), dc, getter->getClangNode());
   thunk->setBodyResultType(elementTy);
   thunk->setInterfaceType(interfaceType);
-  thunk->setGenericSignature(dc->getGenericSignatureOfContext());
   thunk->setGenericEnvironment(dc->getGenericEnvironmentOfContext());
 
   thunk->setAccessibility(getOverridableAccessibility(dc));
@@ -1354,7 +1353,6 @@ static FuncDecl *buildSubscriptSetterDecl(ClangImporter::Implementation &Impl,
       TypeLoc::withoutLoc(TupleType::getEmpty(C)), dc, setter->getClangNode());
   thunk->setBodyResultType(TupleType::getEmpty(C));
   thunk->setInterfaceType(interfaceType);
-  thunk->setGenericSignature(dc->getGenericSignatureOfContext());
   thunk->setGenericEnvironment(dc->getGenericEnvironmentOfContext());
 
   thunk->setAccessibility(getOverridableAccessibility(dc));
@@ -3323,7 +3321,6 @@ namespace {
       result->setBodyResultType(resultTy);
       result->setType(type);
       result->setInterfaceType(interfaceType);
-      result->setGenericSignature(dc->getGenericSignatureOfContext());
       result->setGenericEnvironment(dc->getGenericEnvironmentOfContext());
 
       // Optional methods in protocols.
@@ -3554,16 +3551,13 @@ namespace {
             SourceLoc(), toGenericParams, SourceLoc());
         result->setGenericParams(genericParams);
 
-        GenericSignature *sig;
-        GenericEnvironment *env;
-        std::tie(sig, env) = Impl.buildGenericSignature(genericParams, result);
-
-        result->setGenericSignature(sig);
+        auto *env = Impl.buildGenericEnvironment(genericParams, result);
         result->setGenericEnvironment(env);
 
         // Calculate the correct bound-generic extended type.
         SmallVector<Type, 2> genericArgs;
-        for (auto paramTy : sig->getInnermostGenericParams()) {
+        for (auto paramTy :
+             env->getGenericSignature()->getInnermostGenericParams()) {
           genericArgs.push_back(env->mapTypeIntoContext(paramTy));
         }
         Type extendedType =
@@ -3718,11 +3712,7 @@ namespace {
       result->setInherited(Impl.SwiftContext.AllocateCopy(inheritedTypes));
       result->setCheckedInheritanceClause();
 
-      GenericSignature *sig;
-      GenericEnvironment *env;
-      std::tie(sig, env) = Impl.buildGenericSignature(result->getGenericParams(), dc);
-
-      result->setGenericSignature(sig);
+      auto *env = Impl.buildGenericEnvironment(result->getGenericParams(), dc);
       result->setGenericEnvironment(env);
 
       result->setMemberLoader(&Impl, 0);
@@ -3848,11 +3838,7 @@ namespace {
         if (genericParams) {
           result->setGenericParams(genericParams);
 
-          GenericSignature *sig;
-          GenericEnvironment *env;
-          std::tie(sig, env) = Impl.buildGenericSignature(genericParams, dc);
-
-          result->setGenericSignature(sig);
+          auto *env = Impl.buildGenericEnvironment(genericParams, dc);
           result->setGenericEnvironment(env);
         }
       } else {
@@ -3891,6 +3877,27 @@ namespace {
         }
       }
       result->setSuperclass(superclassType);
+
+      // Mark the class as runtime-only if it is named 'OS_object', even
+      // if it doesn't have the runtime-only Clang attribute. This is a
+      // targeted fix allowing IRGen to emit convenience initializers
+      // correctly.
+      //
+      // FIXME: Remove this once SILGen gets proper support for factory
+      // initializers.
+      if (result->getName() ==
+          result->getASTContext().getIdentifier("OS_object")) {
+        result->setForeignClassKind(ClassDecl::ForeignKind::RuntimeOnly);
+      }
+
+      // If the superclass is runtime-only, our class is also. This only
+      // matters in the case above.
+      if (superclassType) {
+        auto superclassDecl = cast<ClassDecl>(superclassType->getAnyNominal());
+        auto kind = superclassDecl->getForeignClassKind();
+        if (kind != ClassDecl::ForeignKind::Normal)
+          result->setForeignClassKind(kind);
+      }
 
       // Import protocols this class conforms to.
       importObjCProtocols(result, decl->getReferencedProtocols(),
@@ -3982,7 +3989,7 @@ namespace {
       if (name.empty())
         return nullptr;
 
-      if (isAccessibilityDecl(decl))
+      if (shouldImportPropertyAsAccessors(decl))
         return nullptr;
 
       // Check whether there is a function with the same name as this
@@ -4320,14 +4327,12 @@ Decl *SwiftDeclConverter::importSwift2TypeAlias(const clang::NamedDecl *decl,
 
   // Handle generic types.
   GenericParamList *genericParams = nullptr;
-  GenericSignature *genericSig = nullptr;
   GenericEnvironment *genericEnv = nullptr;
   auto underlyingType = typeDecl->getDeclaredInterfaceType();
 
   if (auto generic = dyn_cast<GenericTypeDecl>(typeDecl)) {
     if (generic->getGenericSignature() && !isa<ProtocolDecl>(typeDecl)) {
       genericParams = generic->getGenericParams();
-      genericSig = generic->getGenericSignature();
       genericEnv = generic->getGenericEnvironment();
 
       underlyingType =
@@ -4351,7 +4356,6 @@ Decl *SwiftDeclConverter::importSwift2TypeAlias(const clang::NamedDecl *decl,
       Impl.importSourceLoc(decl->getLocation()),
       TypeLoc::withoutLoc(underlyingType), genericParams, dc);
   alias->computeType();
-  alias->setGenericSignature(genericSig);
   alias->setGenericEnvironment(genericEnv);
 
   // Record that this is the Swift 2 version of this declaration.
@@ -4781,7 +4785,6 @@ Decl *SwiftDeclConverter::importGlobalAsMethod(const clang::FunctionDecl *decl,
       getGenericMethodType(dc, fnType->castTo<AnyFunctionType>());
   result->setType(fnType);
   result->setInterfaceType(interfaceType);
-  result->setGenericSignature(dc->getGenericSignatureOfContext());
   result->setGenericEnvironment(dc->getGenericEnvironmentOfContext());
 
   result->setBodyResultType(swiftResultTy);
@@ -5361,7 +5364,6 @@ ConstructorDecl *SwiftDeclConverter::importConstructor(
 
   result->setInitializerInterfaceType(interfaceInitType);
   result->setInterfaceType(interfaceAllocType);
-  result->setGenericSignature(dc->getGenericSignatureOfContext());
   result->setGenericEnvironment(dc->getGenericEnvironmentOfContext());
 
   result->setType(allocType);
@@ -6659,7 +6661,7 @@ void ClangImporter::Implementation::finishProtocolConformance(
         // we'll end up querying this at runtime.
         auto Attrs = func->getAttrs();
         if (Attrs.hasAttribute<OptionalAttr>()) {
-          conformance->setWitness(valueReq, ConcreteDeclRef());
+          conformance->setWitness(valueReq, Witness());
           continue;
         }
       }
@@ -6838,12 +6840,9 @@ DeclContext *ClangImporter::Implementation::importDeclContextImpl(
   return nullptr;
 }
 
-// Calculate the generic signature and interface type to archetype mapping
-// from an imported generic param list.
-std::pair<GenericSignature *, GenericEnvironment *>
-ClangImporter::Implementation::
-buildGenericSignature(GenericParamList *genericParams,
-                      DeclContext *dc) {
+// Calculate the generic environment from an imported generic param list.
+GenericEnvironment *ClangImporter::Implementation::buildGenericEnvironment(
+    GenericParamList *genericParams, DeclContext *dc) {
   ArchetypeBuilder builder(*dc->getParentModule(), SwiftContext.Diags);
   for (auto param : *genericParams)
     builder.addGenericParameter(param);
@@ -6862,9 +6861,9 @@ buildGenericSignature(GenericParamList *genericParams,
   }
 
   auto *sig = builder.getGenericSignature();
-  auto *env = builder.getGenericEnvironment();
+  auto *env = builder.getGenericEnvironment(sig);
 
-  return std::make_pair(sig, env);
+  return env;
 }
 
 DeclContext *
@@ -6954,11 +6953,7 @@ ClangImporter::Implementation::importDeclContextOf(
   if (auto protoDecl = ext->getAsProtocolExtensionContext()) {
     ext->setGenericParams(protoDecl->createGenericParams(ext));
 
-    GenericSignature *sig;
-    GenericEnvironment *env;
-    std::tie(sig, env) = buildGenericSignature(ext->getGenericParams(), ext);
-
-    ext->setGenericSignature(sig);
+    auto *env = buildGenericEnvironment(ext->getGenericParams(), ext);
     ext->setGenericEnvironment(env);
   }
 

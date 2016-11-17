@@ -92,7 +92,7 @@ void TupleInitialization::copyOrInitValueInto(SILGenFunction &SGF,
       member = SGF.B.createTupleElementAddr(loc, value, i, fieldTy);
       if (!fieldTL.isAddressOnly())
         member =
-            SGF.B.createLoad(loc, member, LoadOwnershipQualifier::Unqualified);
+            fieldTL.emitLoad(SGF.B, loc, member, LoadOwnershipQualifier::Take);
     } else {
       member = SGF.B.createTupleExtract(loc, value, i, fieldTy);
     }
@@ -116,7 +116,7 @@ namespace {
   public:
     CleanupClosureConstant(SILValue closure) : closure(closure) {}
     void emit(SILGenFunction &gen, CleanupLocation l) override {
-      gen.B.emitDestroyValueAndFold(l, closure);
+      gen.B.emitDestroyValueOperation(l, closure);
     }
   };
 }
@@ -208,7 +208,7 @@ public:
 
   void emit(SILGenFunction &gen, CleanupLocation l) override {
     if (v->getType().isAddress())
-      gen.B.emitDestroyAddrAndFold(l, v);
+      gen.B.createDestroyAddr(l, v);
     else
       gen.B.emitDestroyValueOperation(l, v);
   }
@@ -282,11 +282,12 @@ public:
     assert(!SGF.VarLocs.count(decl) && "Already have an entry for this decl?");
 
     SILType lType = SGF.getLoweredType(decl->getType()->getRValueType());
+    auto boxType = SILBoxType::get(lType.getSwiftRValueType());
 
     // The variable may have its lifetime extended by a closure, heap-allocate
     // it using a box.
     AllocBoxInst *allocBox =
-        SGF.B.createAllocBox(decl, lType, {decl->isLet(), ArgNo});
+        SGF.B.createAllocBox(decl, boxType, {decl->isLet(), ArgNo});
     SILValue addr = SGF.B.createProjectBox(decl, allocBox, 0);
 
     // Mark the memory as uninitialized, so DI will track it for us.
@@ -714,7 +715,7 @@ emitEnumMatch(ManagedValue value, EnumElementDecl *ElementDecl,
     // Load a loadable data value.
     if (eltTL.isLoadable())
       eltValue =
-          SGF.B.createLoad(loc, eltValue, LoadOwnershipQualifier::Unqualified);
+          eltTL.emitLoad(SGF.B, loc, eltValue, LoadOwnershipQualifier::Take);
   } else {
     // Otherwise, we're consuming this as a +1 value.
     value.forward(SGF);
@@ -727,9 +728,10 @@ emitEnumMatch(ManagedValue value, EnumElementDecl *ElementDecl,
   if (ElementDecl->isIndirect() || ElementDecl->getParentEnum()->isIndirect()) {
     SILValue boxedValue = SGF.B.createProjectBox(loc, eltMV.getValue(), 0);
     auto &boxedTL = SGF.getTypeLowering(boxedValue->getType());
+    // SEMANTIC ARC TODO: Revisit this when the verifier is enabled.
     if (boxedTL.isLoadable())
-      boxedValue = SGF.B.createLoad(loc, boxedValue,
-                                    LoadOwnershipQualifier::Unqualified);
+      boxedValue = boxedTL.emitLoad(SGF.B, loc, boxedValue,
+                                    LoadOwnershipQualifier::Take);
 
     // We must treat the boxed value as +0 since it may be shared. Copy it if
     // nontrivial.
@@ -1303,7 +1305,7 @@ void SILGenFunction::destroyLocalVariable(SILLocation silLoc, VarDecl *vd) {
   // For a heap variable, the box is responsible for the value. We just need
   // to give up our retain count on it.
   if (loc.box) {
-    B.emitDestroyValueAndFold(silLoc, loc.box);
+    B.emitDestroyValueOperation(silLoc, loc.box);
     return;
   }
 
@@ -1313,7 +1315,7 @@ void SILGenFunction::destroyLocalVariable(SILLocation silLoc, VarDecl *vd) {
   if (!Val->getType().isAddress())
     B.emitDestroyValueOperation(silLoc, Val);
   else
-    B.emitDestroyAddrAndFold(silLoc, Val);
+    B.createDestroyAddr(silLoc, Val);
 }
 
 void SILGenFunction::deallocateUninitializedLocalVariable(SILLocation silLoc,
@@ -1362,11 +1364,11 @@ template<typename T> class SILGenWitnessTable : public SILWitnessVisitor<T> {
   T &asDerived() { return *static_cast<T*>(this); }
 
 public:
-  void addMethod(FuncDecl *fd, ConcreteDeclRef witness) {
-    return addMethod(fd, witness.getDecl(), witness.getSubstitutions());
+  void addMethod(FuncDecl *fd, Witness witness) {
+    return addMethod(fd, witness.getDecl(), witness);
   }
 
-  void addConstructor(ConstructorDecl *cd, ConcreteDeclRef witness) {
+  void addConstructor(ConstructorDecl *cd, Witness witness) {
     SILDeclRef requirementRef(cd, SILDeclRef::Kind::Allocator,
                               ResilienceExpansion::Minimal);
 
@@ -1375,7 +1377,7 @@ public:
                           requirementRef.uncurryLevel);
 
     asDerived().addMethod(requirementRef, witnessRef, IsNotFreeFunctionWitness,
-                          witness.getSubstitutions());
+                          witness);
   }
 
   /// Subclasses must override SILWitnessVisitor::visitAbstractStorageDecl()
@@ -1383,22 +1385,18 @@ public:
   /// be passed down into addMethod().
   ///
   /// FIXME: Seems that conformance->getWitness() should do this for us?
-  void addAbstractStorageDecl(AbstractStorageDecl *d,
-                              ConcreteDeclRef witness) {
+  void addAbstractStorageDecl(AbstractStorageDecl *d, Witness witness) {
     auto *witnessSD = cast<AbstractStorageDecl>(witness.getDecl());
-    addMethod(d->getGetter(), witnessSD->getGetter(),
-              witness.getSubstitutions());
+    addMethod(d->getGetter(), witnessSD->getGetter(), witness);
     if (d->isSettable(d->getDeclContext()))
-      addMethod(d->getSetter(), witnessSD->getSetter(),
-                witness.getSubstitutions());
+      addMethod(d->getSetter(), witnessSD->getSetter(), witness);
     if (auto materializeForSet = d->getMaterializeForSetFunc())
       addMethod(materializeForSet, witnessSD->getMaterializeForSetFunc(),
-                witness.getSubstitutions());
+                witness);
   }
 
 private:
-  void addMethod(FuncDecl *fd, ValueDecl *witnessDecl,
-                 ArrayRef<Substitution> witnessSubs) {
+  void addMethod(FuncDecl *fd, ValueDecl *witnessDecl, Witness witness) {
 
     // TODO: multiple resilience expansions?
     // TODO: multiple uncurry levels?
@@ -1414,7 +1412,7 @@ private:
                           SILDeclRef::ConstructAtBestResilienceExpansion,
                           witnessUncurryLevel);
 
-    asDerived().addMethod(requirementRef, witnessRef, isFree, witnessSubs);
+    asDerived().addMethod(requirementRef, witnessRef, isFree, witness);
   }
 
 };
@@ -1519,19 +1517,19 @@ public:
   }
 
   void addMethod(FuncDecl *fd) {
-    ConcreteDeclRef witness = Conformance->getWitness(fd, nullptr);
+    Witness witness = Conformance->getWitness(fd, nullptr);
     super::addMethod(fd, witness);
   }
 
   void addConstructor(ConstructorDecl *cd) {
-    ConcreteDeclRef witness = Conformance->getWitness(cd, nullptr);
+    Witness witness = Conformance->getWitness(cd, nullptr);
     super::addConstructor(cd, witness);
   }
 
   void addMethod(SILDeclRef requirementRef,
                  SILDeclRef witnessRef,
                  IsFreeFunctionWitness_t isFree,
-                 ArrayRef<Substitution> witnessSubs) {
+                 Witness witness) {
     // Emit the witness thunk and add it to the table.
 
     // If this is a non-present optional requirement, emit a MissingOptional.
@@ -1545,7 +1543,7 @@ public:
 
     SILFunction *witnessFn =
       SGM.emitProtocolWitness(Conformance, Linkage, requirementRef, witnessRef,
-                              isFree, witnessSubs);
+                              isFree, witness);
     Entries.push_back(
                     SILWitnessTable::MethodWitness{requirementRef, witnessFn});
   }
@@ -1602,7 +1600,7 @@ public:
   }
 
   void visitAbstractStorageDecl(AbstractStorageDecl *d) {
-    ConcreteDeclRef witness = Conformance->getWitness(d, nullptr);
+    Witness witness = Conformance->getWitness(d, nullptr);
     addAbstractStorageDecl(d, witness);
   }
 };
@@ -1685,166 +1683,15 @@ static bool maybeOpenCodeProtocolWitness(SILGenFunction &gen,
   return false;
 }
 
-static bool isSelfDerived(Type selfTy, Type t) {
-  while (auto dmt = t->getAs<DependentMemberType>())
-    t = dmt->getBase();
-
-  return t->isEqual(selfTy);
-}
-
-/// Substitute the `Self` type from a protocol conformance into a protocol
-/// requirement's type to get the type of the witness.
-static CanAnyFunctionType
-substSelfTypeIntoProtocolRequirementType(SILModule &M,
-                                         GenericEnvironment *reqtEnv,
-                                         CanGenericFunctionType reqtTy,
-                                         ProtocolConformance *conformance,
-                                         GenericEnvironment *&genericEnv,
-                                         SubstitutionMap &thunkSubs) {
-
-  auto &C = M.getASTContext();
-
-  // Build a substitution map to replace `self` and its associated types.
-  auto selfTy = conformance->getProtocol()->getSelfInterfaceType()
-      ->getCanonicalType();
-  Type concreteTy = conformance->getInterfaceType();
-
-  SubstitutionMap subs;
-  subs.addSubstitution(selfTy, concreteTy);
-
-  // FIXME: conformance substitutions should be in terms of interface types
-  auto concreteSubs = concreteTy->gatherAllSubstitutions(M.getSwiftModule(),
-                                                         nullptr, nullptr);
-  auto specialized = conformance;
-  if (conformance->getGenericSignature())
-    specialized = C.getSpecializedConformance(
-        concreteTy, conformance, concreteSubs);
-
-  SmallVector<ProtocolConformanceRef, 1> conformances;
-  conformances.push_back(ProtocolConformanceRef(specialized));
-  subs.addConformances(selfTy, C.AllocateCopy(conformances));
-
-  ArchetypeBuilder builder(*M.getSwiftModule(), C.Diags);
-
-  SmallVector<GenericTypeParamType*, 4> allParams;
-
-  // Add the outer generic signature of the witness.
-  if (auto *outerSig = conformance->getGenericSignature()) {
-    allParams.append(outerSig->getGenericParams().begin(),
-                     outerSig->getGenericParams().end());
-    builder.addGenericSignature(outerSig, nullptr);
-  }
-
-  // Now we look at the generic signature of the requirement.
-  // We are going to drop `Self`, and requirements rooted in `Self`.
-  for (auto *param : reqtEnv->getGenericParams().slice(1)) {
-    allParams.push_back(param);
-    builder.addGenericParameter(param);
-  }
-
-  RequirementSource source(RequirementSource::Explicit, SourceLoc());
-
-  for (auto &reqt : reqtTy->getRequirements()) {
-    switch (reqt.getKind()) {
-    case RequirementKind::Conformance:
-    case RequirementKind::Superclass:
-    case RequirementKind::WitnessMarker:
-      if (isSelfDerived(selfTy, reqt.getFirstType()))
-        continue;
-
-      builder.addRequirement(reqt, source);
-      break;
-
-    case RequirementKind::SameType: {
-      if (isSelfDerived(selfTy, reqt.getFirstType()) &&
-          isSelfDerived(selfTy, reqt.getSecondType()))
-        continue;
-
-      // Substitute the constrained types.
-      auto first = reqt.getFirstType().subst(subs)->getCanonicalType();
-      auto second = reqt.getSecondType().subst(subs)->getCanonicalType();
-
-      if (!first->isTypeParameter()) {
-        assert(second->isTypeParameter());
-        std::swap(first, second);
-      }
-
-      builder.addRequirement(Requirement(RequirementKind::SameType,
-                                         first, second), source);
-      break;
-    }
-    }
-  }
-
-  // Substitute away `Self` in parameter and result types.
-  auto input = reqtTy->getInput().subst(subs)->getCanonicalType();
-  auto result = reqtTy->getResult().subst(subs)->getCanonicalType();
-
-  CanAnyFunctionType reqtSubstTy;
-
-  auto addArchetypeSubstitution = [&](ArchetypeType *archetypeTy, Type substTy) {
-    auto contextTy = ArchetypeBuilder::mapTypeIntoContext(
-        M.getSwiftModule(), genericEnv, substTy);
-
-    thunkSubs.addSubstitution(CanType(archetypeTy), contextTy);
-
-    SmallVector<ProtocolConformanceRef, 2> conformances;
-    for (auto proto : archetypeTy->getConformsTo())
-      conformances.push_back(ProtocolConformanceRef(proto));
-    thunkSubs.addConformances(CanType(archetypeTy),
-                              C.AllocateCopy(conformances));
-  };
-
-  // The result might be fully concrete, if the witness had no generic
-  // signature, and the requirement had no additional generic parameters
-  // beyond `Self`.
-  if (!allParams.empty()) {
-    builder.finalize(SourceLoc());
-
-    auto *sig = builder.getGenericSignature();
-    genericEnv = builder.getGenericEnvironment();
-
-    // Outer generic parameters come from the generic context of
-    // the conformance (which might not be the same as the generic
-    // context of the witness, if the witness is defined in a
-    // superclass, concrete extension or protocol extension).
-    if (auto *outerEnv = conformance->getGenericEnvironment()) {
-      for (auto pair : outerEnv->getArchetypeToInterfaceMap()) {
-        auto archetypeTy = pair.first->castTo<ArchetypeType>();
-        auto substTy = pair.second;
-        addArchetypeSubstitution(archetypeTy, substTy);
-      }
-    }
-
-    reqtSubstTy = cast<GenericFunctionType>(
-      GenericFunctionType::get(sig, input, result, reqtTy->getExtInfo())
-        ->getCanonicalType());
-  } else {
-    genericEnv = nullptr;
-
-    reqtSubstTy = CanFunctionType::get(input, result, reqtTy->getExtInfo());
-  }
-
-  // Inner generic parameters come from the requirement and
-  // also map to the archetypes of the requirement.
-  for (auto pair : reqtEnv->getArchetypeToInterfaceMap()) {
-    auto archetypeTy = pair.first->castTo<ArchetypeType>();
-    auto substTy = pair.second.subst(subs);
-    addArchetypeSubstitution(archetypeTy, substTy);
-  }
-
-  return reqtSubstTy;
-}
-
 SILFunction *
 SILGenModule::emitProtocolWitness(ProtocolConformance *conformance,
                                   SILLinkage linkage,
                                   SILDeclRef requirement,
-                                  SILDeclRef witness,
+                                  SILDeclRef witnessRef,
                                   IsFreeFunctionWitness_t isFree,
-                                  ArrayRef<Substitution> witnessSubs) {
+                                  Witness witness) {
   auto requirementInfo = Types.getConstantInfo(requirement);
-  unsigned witnessUncurryLevel = witness.uncurryLevel;
+  unsigned witnessUncurryLevel = witnessRef.uncurryLevel;
 
   // If the witness is a free function, consider the self argument
   // uncurry level.
@@ -1863,37 +1710,62 @@ SILGenModule::emitProtocolWitness(ProtocolConformance *conformance,
   auto reqtOrigTy
     = cast<GenericFunctionType>(requirementInfo.LoweredInterfaceType);
   CanAnyFunctionType reqtSubstTy;
-  if (conformance == nullptr) {
-    reqtSubstTy = reqtOrigTy;
-    genericEnv = requirementInfo.GenericEnv;
-  } else {
-    SubstitutionMap thunkSubs;
-    reqtSubstTy
-      = substSelfTypeIntoProtocolRequirementType(M, requirementInfo.GenericEnv,
-                                                 reqtOrigTy, conformance,
-                                                 genericEnv, thunkSubs);
+  ArrayRef<Substitution> witnessSubs;
+  if (witness.requiresSubstitution()) {
+    GenericSignature *genericSig = witness.getSyntheticSignature();;
+    genericEnv = witness.getSyntheticEnvironment();
+    witnessSubs = witness.getSubstitutions();
 
-    // Remap witness substitutions to use the correct archetypes.
-    // Sema produces witness substitutions using a mix of archetypes
-    // from the requirement and the witness. To solve downstream
-    // issues in the SIL optimizer, we build all-new archetypes
-    // using the correct generic signature here.
-    //
-    // FIXME: Once Sema records witness substitutions in terms of
-    // interface types, this code as well as the code that builds
-    // thunkSubs in substSelfTypeIntoProtocolRequirementType() can
-    // be removed.
-    auto newWitnessSubs = getASTContext().AllocateCopy(witnessSubs);
-    for (unsigned i = 0, e = witnessSubs.size(); i < e; i++)
-      newWitnessSubs[i] = witnessSubs[i].subst(M.getSwiftModule(), thunkSubs);
-    witnessSubs = newWitnessSubs;
+    const SubstitutionMap &reqtSubs
+      = witness.getRequirementToSyntheticMap();
+    auto input = reqtOrigTy->getInput().subst(reqtSubs)->getCanonicalType();
+    auto result = reqtOrigTy->getResult().subst(reqtSubs)->getCanonicalType();
+
+    if (genericSig) {
+      reqtSubstTy = cast<GenericFunctionType>(
+        GenericFunctionType::get(genericSig, input, result,
+                                 reqtOrigTy->getExtInfo())
+          ->getCanonicalType());
+    } else {
+      reqtSubstTy = CanFunctionType::get(input, result,
+                                         reqtOrigTy->getExtInfo());
+    }
+  } else {
+    genericEnv = witnessRef.getDecl()->getInnermostDeclContext()
+                   ->getGenericEnvironmentOfContext();
+
+    auto selfTy = conformance->getProtocol()->getSelfInterfaceType()
+                    ->getCanonicalType();
+
+    Type concreteTy = conformance->getInterfaceType();
+
+    SubstitutionMap reqtSubs;
+    reqtSubs.addSubstitution(selfTy, concreteTy);
+
+    // FIXME: conformance substitutions should be in terms of interface types
+    auto concreteSubs = concreteTy->gatherAllSubstitutions(M.getSwiftModule(),
+                                                           nullptr, nullptr);
+    auto specialized = conformance;
+    ASTContext &ctx = getASTContext();
+    if (conformance->getGenericSignature())
+      specialized = ctx.getSpecializedConformance(concreteTy, conformance,
+                                                  concreteSubs);
+
+    SmallVector<ProtocolConformanceRef, 1> conformances;
+    conformances.push_back(ProtocolConformanceRef(specialized));
+    reqtSubs.addConformances(selfTy, ctx.AllocateCopy(conformances));
+
+    auto input = reqtOrigTy->getInput().subst(reqtSubs)->getCanonicalType();
+    auto result = reqtOrigTy->getResult().subst(reqtSubs)->getCanonicalType();
+
+    reqtSubstTy = CanFunctionType::get(input, result, reqtOrigTy->getExtInfo());
   }
 
   // Lower the witness thunk type with the requirement's abstraction level.
   auto witnessSILFnType = getNativeSILFunctionType(M,
                                                    AbstractionPattern(reqtOrigTy),
                                                    reqtSubstTy,
-                                                   witness);
+                                                   witnessRef);
 
   // Mangle the name of the witness thunk.
   std::string nameBuffer;
@@ -1931,23 +1803,23 @@ SILGenModule::emitProtocolWitness(ProtocolConformance *conformance,
   // setting on the theory that forcing inlining off should only
   // effect the user's function, not otherwise invisible thunks.
   Inline_t InlineStrategy = InlineDefault;
-  if (witness.isAlwaysInline())
+  if (witnessRef.isAlwaysInline())
     InlineStrategy = AlwaysInline;
 
   IsFragile_t isFragile = IsNotFragile;
   if (makeModuleFragile)
     isFragile = IsFragile;
-  if (witness.isFragile())
+  if (witnessRef.isFragile())
     isFragile = IsFragile;
 
   auto *f = M.createFunction(
       linkage, nameBuffer, witnessSILFnType,
-      genericEnv, SILLocation(witness.getDecl()),
+      genericEnv, SILLocation(witnessRef.getDecl()),
       IsNotBare, IsTransparent, isFragile, IsThunk,
       SILFunction::NotRelevant, InlineStrategy);
 
   f->setDebugScope(new (M)
-                   SILDebugScope(RegularLocation(witness.getDecl()), f));
+                   SILDebugScope(RegularLocation(witnessRef.getDecl()), f));
 
   PrettyStackTraceSILFunction trace("generating protocol witness thunk", f);
 
@@ -1973,7 +1845,7 @@ SILGenModule::emitProtocolWitness(ProtocolConformance *conformance,
   // Open-code certain protocol witness "thunks".
   if (maybeOpenCodeProtocolWitness(gen, conformance, linkage,
                                    selfInterfaceType, selfType, genericEnv,
-                                   requirement, witness, witnessSubs)) {
+                                   requirement, witnessRef, witnessSubs)) {
     assert(!isFree);
     return f;
   }
@@ -1981,7 +1853,7 @@ SILGenModule::emitProtocolWitness(ProtocolConformance *conformance,
   gen.emitProtocolWitness(selfType,
                           AbstractionPattern(reqtOrigTy),
                           reqtSubstTy,
-                          requirement, witness,
+                          requirement, witnessRef,
                           witnessSubs, isFree);
 
   return f;
@@ -2014,7 +1886,7 @@ public:
   }
 
   void addMethod(FuncDecl *fd) {
-    ConcreteDeclRef witness = Proto->getDefaultWitness(fd);
+    auto witness = Proto->getDefaultWitness(fd);
     if (!witness) {
       addMissingDefault();
       return;
@@ -2024,7 +1896,7 @@ public:
   }
 
   void addConstructor(ConstructorDecl *cd) {
-    ConcreteDeclRef witness = Proto->getDefaultWitness(cd);
+    auto witness = Proto->getDefaultWitness(cd);
     if (!witness) {
       addMissingDefault();
       return;
@@ -2036,10 +1908,10 @@ public:
   void addMethod(SILDeclRef requirementRef,
                  SILDeclRef witnessRef,
                  IsFreeFunctionWitness_t isFree,
-                 ArrayRef<Substitution> witnessSubs) {
+                 Witness witness) {
     SILFunction *witnessFn = SGM.emitProtocolWitness(nullptr, Linkage,
                                                      requirementRef, witnessRef,
-                                                     isFree, witnessSubs);
+                                                     isFree, witness);
     auto entry = SILDefaultWitnessTable::Entry(requirementRef, witnessFn);
     DefaultWitnesses.push_back(entry);
   }
@@ -2059,7 +1931,7 @@ public:
   }
 
   void visitAbstractStorageDecl(AbstractStorageDecl *d) {
-    ConcreteDeclRef witness = Proto->getDefaultWitness(d);
+    auto witness = Proto->getDefaultWitness(d);
     if (!witness) {
       addMissingDefault();
       if (d->isSettable(d->getDeclContext()))

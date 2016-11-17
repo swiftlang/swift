@@ -35,7 +35,10 @@ import sys
 
 assert sys.argv[1] == '-frontend'
 
-if '-primary-file' in sys.argv:
+# NB: The bitcode options automatically specify a -primary-file, even in cases
+#     where we do not wish to use a dependencies file in the test.
+if '-primary-file' in sys.argv \
+        and '-embed-bitcode' not in sys.argv and '-emit-bc' not in sys.argv:
     primaryFile = sys.argv[sys.argv.index('-primary-file') + 1]
     depsFile = sys.argv[sys.argv.index(
         '-emit-reference-dependencies-path') + 1]

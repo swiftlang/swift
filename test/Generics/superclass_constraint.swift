@@ -64,18 +64,16 @@ extension P2 where Self.T : C {
 
 // CHECK: superclassConformance1
 // CHECK: Requirements:
-// CHECK-NEXT: T witness marker
 // CHECK-NEXT: T : C [explicit @
-// CHECK-NEXT: T : P3 [redundant @
+// CHECK-NEXT: T : P3 [inherited @
 // CHECK-NEXT: T[.P3].T == C.T [redundant]
 // CHECK: Canonical generic signature: <τ_0_0 where τ_0_0 : C>
 func superclassConformance1<T>(t: T) where T : C, T : P3 {}
 
 // CHECK: superclassConformance2
 // CHECK: Requirements:
-// CHECK-NEXT: T witness marker
 // CHECK-NEXT: T : C [explicit @
-// CHECK-NEXT: T : P3 [redundant @
+// CHECK-NEXT: T : P3 [inherited @
 // CHECK-NEXT: T[.P3].T == C.T [redundant]
 // CHECK: Canonical generic signature: <τ_0_0 where τ_0_0 : C>
 func superclassConformance2<T>(t: T) where T : C, T : P3 {}
@@ -86,8 +84,7 @@ class C2 : C, P4 { }
 
 // CHECK: superclassConformance3
 // CHECK: Requirements:
-// CHECK-NEXT: T witness marker
 // CHECK-NEXT: T : C2 [explicit @
-// CHECK-NEXT: T : P4 [redundant @
+// CHECK-NEXT: T : P4 [inherited @
 // CHECK: Canonical generic signature: <τ_0_0 where τ_0_0 : C2>
 func superclassConformance3<T>(t: T) where T : C, T : P4, T : C2 {}

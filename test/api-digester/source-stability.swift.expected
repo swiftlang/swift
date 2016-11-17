@@ -1,5 +1,4 @@
-
-==================================================== Removed Decls ====================================================
+/* Removed declarations */
 Protocol BidirectionalIndexable has been removed (deprecated)
 Protocol ExpressibleByStringInterpolation has been removed (deprecated)
 Protocol Indexable has been removed (deprecated)
@@ -8,15 +7,5 @@ Protocol MutableIndexable has been removed (deprecated)
 Protocol RandomAccessIndexable has been removed (deprecated)
 Protocol RangeReplaceableIndexable has been removed (deprecated)
 
-==================================================== Moved Decls ====================================================
-// rdar://28456614 Swift 3 breaking change: static function 'abs' removed from Double/Float/Float80/CGFloat
-Func Double.abs(_:) has been moved to Func abs(_:)
-Func Float.abs(_:) has been moved to Func abs(_:)
-Func Float80.abs(_:) has been moved to Func abs(_:)
-
-==================================================== Renamed Decls ====================================================
-
-==================================================== Type Changes ====================================================
+/* Function type change */
 Func UnsafePointer.withMemoryRebound(to:capacity:_:) has 3rd parameter type change from (UnsafeMutablePointer<T>) throws -> Result to (UnsafePointer<T>) throws -> Result
-
-==================================================== Decl Attribute changes ====================================================

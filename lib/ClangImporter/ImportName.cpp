@@ -713,6 +713,8 @@ static bool omitNeedlessWordsInFunctionName(
     Optional<unsigned> errorParamIndex, bool returnsSelf, bool isInstanceMethod,
     NameImporter &nameImporter) {
   clang::ASTContext &clangCtx = nameImporter.getClangContext();
+  const version::Version &swiftLanguageVersion =
+      nameImporter.getLangOpts().EffectiveLanguageVersion;
 
   // Collect the parameter type names.
   StringRef firstParamName;
@@ -741,7 +743,8 @@ static bool omitNeedlessWordsInFunctionName(
     bool hasDefaultArg =
         ClangImporter::Implementation::inferDefaultArgument(
             param->getType(),
-            getParamOptionality(param, !nonNullArgs.empty() && nonNullArgs[i]),
+            getParamOptionality(swiftLanguageVersion, param,
+                                !nonNullArgs.empty() && nonNullArgs[i]),
             nameImporter.getIdentifier(baseName), numParams, argumentName,
             i == 0, isLastParameter, nameImporter) != DefaultArgumentKind::None;
 
@@ -793,9 +796,10 @@ static StringRef determineSwiftNewtypeBaseName(StringRef baseName,
   return baseName;
 }
 
-EffectiveClangContext NameImporter::determineEffectiveContext(
-    const clang::NamedDecl *decl, const clang::DeclContext *dc,
-    ImportNameOptions options, clang::Sema &clangSema) {
+EffectiveClangContext
+NameImporter::determineEffectiveContext(const clang::NamedDecl *decl,
+                                        const clang::DeclContext *dc,
+                                        ImportNameOptions options) {
   EffectiveClangContext res;
 
   // Enumerators can end up within their enclosing enum or in the global
@@ -841,8 +845,7 @@ EffectiveClangContext NameImporter::determineEffectiveContext(
 
 bool NameImporter::hasNamingConflict(const clang::NamedDecl *decl,
                                      const clang::IdentifierInfo *proposedName,
-                                     const clang::TypedefNameDecl *cfTypedef,
-                                     clang::Sema &clangSema) {
+                                     const clang::TypedefNameDecl *cfTypedef) {
   // Test to see if there is a value with the same name as 'proposedName'
   // in the same module as the decl
   // FIXME: This will miss macros.
@@ -1101,7 +1104,7 @@ ImportedName NameImporter::importNameImpl(const clang::NamedDecl *D,
 
   // Compute the effective context.
   auto dc = const_cast<clang::DeclContext *>(D->getDeclContext());
-  auto effectiveCtx = determineEffectiveContext(D, dc, options, clangSema);
+  auto effectiveCtx = determineEffectiveContext(D, dc, options);
   if (!effectiveCtx)
     return {};
   result.EffectiveContext = effectiveCtx;
@@ -1455,8 +1458,7 @@ ImportedName NameImporter::importNameImpl(const clang::NamedDecl *D,
   SmallString<16> baseNameWithProtocolSuffix;
   if (auto objcProto = dyn_cast<clang::ObjCProtocolDecl>(D)) {
     if (objcProto->hasDefinition()) {
-      if (hasNamingConflict(D, objcProto->getIdentifier(), nullptr,
-                            clangSema)) {
+      if (hasNamingConflict(D, objcProto->getIdentifier(), nullptr)) {
         baseNameWithProtocolSuffix = baseName;
         baseNameWithProtocolSuffix += SWIFT_PROTOCOL_SUFFIX;
         baseName = baseNameWithProtocolSuffix;
@@ -1472,7 +1474,7 @@ ImportedName NameImporter::importNameImpl(const clang::NamedDecl *D,
       auto swiftName = getCFTypeName(typedefNameDecl);
       if (!swiftName.empty() &&
           !hasNamingConflict(D, &clangCtx.Idents.get(swiftName),
-                             typedefNameDecl, clangSema)) {
+                             typedefNameDecl)) {
         // Adopt the requested name.
         baseName = swiftName;
       }

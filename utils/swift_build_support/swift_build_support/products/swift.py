@@ -33,6 +33,9 @@ class Swift(product.Product):
         # Add any sil ownership flags.
         self.cmake_options.extend(self._sil_ownership_flags)
 
+        # Generate the compile db.
+        self.cmake_options.extend(self._compile_db_flags)
+
     @property
     def _runtime_sanitizer_flags(self):
         sanitizer_list = []
@@ -101,3 +104,9 @@ updated without updating swift.py?")
         if not self.args.enable_sil_ownership:
             return []
         return ["-DSWIFT_STDLIB_ENABLE_SIL_OWNERSHIP=TRUE"]
+
+    @property
+    def _compile_db_flags(self):
+        if not self.args.compilation_db:
+            return []
+        return ['-DCMAKE_EXPORT_COMPILE_COMMANDS=TRUE']

@@ -318,3 +318,18 @@ struct EventHorizon : Timewarp {
 func activate<T>(_ t: T) {}
 
 activate(Teleporter<EventHorizon, Beam>())
+
+// rdar://problem/29288428
+class C {}
+
+protocol P9 {
+  associatedtype A
+}
+
+struct X7<T: P9> where T.A : C { }
+
+extension X7 where T.A == Int { } // expected-error 2{{'T' requires that 'Int' inherit from 'C'}}
+
+struct X8<T: C> { }
+
+extension X8 where T == Int { } // expected-error 2{{'T' requires that 'Int' inherit from 'C'}}

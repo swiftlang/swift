@@ -17,8 +17,8 @@
 #ifndef SWIFT_AST_GENERIC_ENVIRONMENT_H
 #define SWIFT_AST_GENERIC_ENVIRONMENT_H
 
-#include "swift/AST/ProtocolConformance.h"
 #include "swift/AST/SubstitutionMap.h"
+#include "swift/AST/GenericSignature.h"
 
 namespace swift {
 
@@ -28,30 +28,30 @@ class GenericTypeParamType;
 /// Describes the mapping between archetypes and interface types for the
 /// generic parameters of a DeclContext.
 class GenericEnvironment final {
-  SmallVector<GenericTypeParamType *, 4> GenericParams;
+  GenericSignature *Signature;
   TypeSubstitutionMap ArchetypeToInterfaceMap;
   TypeSubstitutionMap InterfaceToArchetypeMap;
 
-public:
-  ArrayRef<GenericTypeParamType *> getGenericParams() const {
-    return GenericParams;
-  }
-
-  const TypeSubstitutionMap &getArchetypeToInterfaceMap() const {
-    return ArchetypeToInterfaceMap;
-  }
-
-  const TypeSubstitutionMap &getInterfaceToArchetypeMap() const {
-    return InterfaceToArchetypeMap;
-  }
-
-  GenericEnvironment(ArrayRef<GenericTypeParamType *> genericParamTypes,
+  GenericEnvironment(GenericSignature *signature,
                      TypeSubstitutionMap interfaceToArchetypeMap);
 
+public:
+  GenericSignature *getGenericSignature() const {
+    return Signature;
+  }
+
+  ArrayRef<GenericTypeParamType *> getGenericParams() const {
+    return Signature->getGenericParams();
+  }
+
+  /// Determine whether this generic environment contains the given
+  /// primary archetype.
+  bool containsPrimaryArchetype(ArchetypeType *archetype) const;
+
   static
-  GenericEnvironment * get(ASTContext &ctx,
-                           ArrayRef<GenericTypeParamType *> genericParamTypes,
-                           TypeSubstitutionMap interfaceToArchetypeMap);
+  GenericEnvironment *get(ASTContext &ctx,
+                          GenericSignature *signature,
+                          TypeSubstitutionMap interfaceToArchetypeMap);
 
   /// Make vanilla new/delete illegal.
   void *operator new(size_t Bytes) = delete;
@@ -78,18 +78,15 @@ public:
   /// with contextual types instead of interface types.
   SubstitutionMap
   getSubstitutionMap(ModuleDecl *mod,
-                     GenericSignature *sig,
                      ArrayRef<Substitution> subs) const;
 
   /// Same as above, but updates an existing map.
   void
   getSubstitutionMap(ModuleDecl *mod,
-                     GenericSignature *sig,
                      ArrayRef<Substitution> subs,
                      SubstitutionMap &subMap) const;
 
-  ArrayRef<Substitution>
-  getForwardingSubstitutions(ModuleDecl *M, GenericSignature *sig) const;
+  ArrayRef<Substitution> getForwardingSubstitutions(ModuleDecl *M) const;
 
   void dump() const;
 };

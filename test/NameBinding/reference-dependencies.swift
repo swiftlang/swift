@@ -93,7 +93,7 @@ func <(lhs: IntWrapper, rhs: IntWrapper) -> Bool {
 prefix func ***(lhs: IntWrapper) {}
 
 // This is provided as an operator but not implemented here.
-prefix operator ^^^ {}
+prefix operator ^^^
 
 // CHECK-DAG: "ClassFromOtherFile"
 class Subclass : ClassFromOtherFile {}
@@ -126,9 +126,9 @@ protocol ExpressibleByExtraFloatLiteral
 private protocol ExpressibleByExtraCharLiteral : ExpressibleByUnicodeScalarLiteral {
 }
 
-prefix operator ~~~ {}
+prefix operator ~~~
 protocol ThreeTilde {
-  prefix func ~~~(lhs: Self)
+  prefix static func ~~~(lhs: Self)
 }
 
 private struct ThreeTildeTypeImpl : ThreeTilde {
@@ -141,7 +141,7 @@ func overloadedOnProto<T: ThreeTilde>(_: T) {}
 private prefix func ~~~(_: ThreeTildeTypeImpl) {}
 
 // CHECK-DAG: - "~~~~"
-prefix operator ~~~~ {}
+prefix operator ~~~~
 protocol FourTilde {
   prefix static func ~~~~(arg: Self)
 }
@@ -405,13 +405,9 @@ struct Sentinel2 {}
 // CHECK-DAG: - ["Ps25ExpressibleByFloatLiteral", ""]
 // CHECK-DAG: - !private ["Ps33ExpressibleByUnicodeScalarLiteral", ""]
 // CHECK-DAG: - !private ["Ps10Strideable", "Stride"]
-// CHECK-DAG: - !private ["Sa", "Element"]
 // CHECK-DAG: - !private ["Sa", "reduce"]
 // CHECK-DAG: - !private ["Sb", "_getBuiltinLogicValue"]
 // CHECK-DAG: - ["Sb", "InnerToBool"]
-// CHECK-DAG: - !private ["Vs10Dictionary", "Key"]
-// CHECK-DAG: - !private ["Vs10Dictionary", "Value"]
-// CHECK-DAG: - !private ["V4main17OtherFileIntArray", "Iterator"]
 // CHECK-DAG: - !private ["V4main17OtherFileIntArray", "deinit"]
 // CHECK-DAG: - !private ["V4main18OtherFileOuterType", "InnerType"]
 // CHECK-DAG: - !private ["VV4main18OtherFileOuterType9InnerType", "init"]
@@ -419,9 +415,7 @@ struct Sentinel2 {}
 // CHECK-DAG: - !private ["VV4main26OtherFileSecretTypeWrapper10SecretType", "constant"]
 // CHECK-DAG: - !private ["V4main25OtherFileProtoImplementor", "deinit"]
 // CHECK-DAG: - !private ["V4main26OtherFileProtoImplementor2", "deinit"]
-// CHECK-DAG: - !private ["Vs13EmptyIterator", "Element"]
 // CHECK-DAG: - !private ["Vs13EmptyIterator", "init"]
-// CHECK-DAG: - !private ["Vs16IndexingIterator", "Element"]
 // CHECK-DAG: - ["O4main13OtherFileEnum", "Value"]
 // CHECK-DAG: - !private ["V4main20OtherFileEnumWrapper", "Enum"]
 
@@ -451,7 +445,6 @@ struct Sentinel2 {}
 // CHECK-DAG: !private "Ps10Strideable"
 // CHECK-DAG: !private "Sa"
 // CHECK-DAG: - "Sb"
-// CHECK-DAG: !private "Vs10Dictionary"
 // CHECK-DAG: !private "V4main17OtherFileIntArray"
 // CHECK-DAG: !private "V4main18OtherFileOuterType"
 // CHECK-DAG: !private "VV4main18OtherFileOuterType9InnerType"
@@ -459,7 +452,6 @@ struct Sentinel2 {}
 // CHECK-DAG: !private "V4main25OtherFileProtoImplementor"
 // CHECK-DAG: !private "V4main26OtherFileProtoImplementor2"
 // CHECK-DAG: !private "Vs13EmptyIterator"
-// CHECK-DAG: !private "Vs16IndexingIterator"
 // CHECK-DAG: - "O4main13OtherFileEnum"
 // CHECK-DAG: !private "V4main20OtherFileEnumWrapper"
 // CHECK-DAG: !private "V4main20OtherFileEnumWrapper"

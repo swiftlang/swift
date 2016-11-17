@@ -245,7 +245,7 @@ class ClassWithGetter : PropertyWithGetter {
 // CHECK: bb0([[C:%.*]] : $*ClassWithGetter):
 // CHECK-NEXT: [[CCOPY:%.*]] = alloc_stack $ClassWithGetter
 // CHECK-NEXT: copy_addr [[C]] to [initialization] [[CCOPY]]
-// CHECK-NEXT: [[CCOPY_LOADED:%.*]] = load [[CCOPY]]
+// CHECK-NEXT: [[CCOPY_LOADED:%.*]] = load [take] [[CCOPY]]
 // CHECK-NEXT: [[FUN:%.*]] = class_method [[CCOPY_LOADED]] : $ClassWithGetter, #ClassWithGetter.a!getter.1 : (ClassWithGetter) -> () -> Int , $@convention(method) (@guaranteed ClassWithGetter) -> Int
 // CHECK-NEXT: apply [[FUN]]([[CCOPY_LOADED]])
 // CHECK-NEXT: destroy_value [[CCOPY_LOADED]]
@@ -271,7 +271,7 @@ class ClassWithGetterSetter : PropertyWithGetterSetter, PropertyWithGetter {
 // CHECK: bb0([[C:%.*]] : $*ClassWithGetterSetter):
 // CHECK-NEXT: [[CCOPY:%.*]] = alloc_stack $ClassWithGetterSetter
 // CHECK-NEXT: copy_addr [[C]] to [initialization] [[CCOPY]]
-// CHECK-NEXT: [[CCOPY_LOADED:%.*]] = load [[CCOPY]]
+// CHECK-NEXT: [[CCOPY_LOADED:%.*]] = load [take] [[CCOPY]]
 // CHECK-NEXT: [[FUN:%.*]] = class_method [[CCOPY_LOADED]] : $ClassWithGetterSetter, #ClassWithGetterSetter.b!getter.1 : (ClassWithGetterSetter) -> () -> Int , $@convention(method) (@guaranteed ClassWithGetterSetter) -> Int
 // CHECK-NEXT: apply [[FUN]]([[CCOPY_LOADED]])
 // CHECK-NEXT: destroy_value [[CCOPY_LOADED]]
@@ -325,7 +325,7 @@ struct StructWithStoredProperty : PropertyWithGetter {
 // CHECK: bb0([[C:%.*]] : $*StructWithStoredProperty):
 // CHECK-NEXT: [[CCOPY:%.*]] = alloc_stack $StructWithStoredProperty
 // CHECK-NEXT: copy_addr [[C]] to [initialization] [[CCOPY]]
-// CHECK-NEXT: [[CCOPY_LOADED:%.*]] = load [[CCOPY]]
+// CHECK-NEXT: [[CCOPY_LOADED:%.*]] = load [trivial] [[CCOPY]]
 // CHECK-NEXT: function_ref
 // CHECK-NEXT: [[FUN:%.*]] = function_ref @_TFV9protocols24StructWithStoredPropertyg1aSi : $@convention(method) (StructWithStoredProperty) -> Int
 // CHECK-NEXT: apply [[FUN]]([[CCOPY_LOADED]])
@@ -355,7 +355,7 @@ struct StructWithStoredClassProperty : PropertyWithGetter {
 // CHECK: bb0([[C:%.*]] : $*StructWithStoredClassProperty):
 // CHECK-NEXT: [[CCOPY:%.*]] = alloc_stack $StructWithStoredClassProperty
 // CHECK-NEXT: copy_addr [[C]] to [initialization] [[CCOPY]]
-// CHECK-NEXT: [[CCOPY_LOADED:%.*]] = load [[CCOPY]]
+// CHECK-NEXT: [[CCOPY_LOADED:%.*]] = load [take] [[CCOPY]]
 // CHECK-NEXT: function_ref
 // CHECK-NEXT: [[FUN:%.*]] = function_ref @_TFV9protocols29StructWithStoredClassPropertyg1aSi : $@convention(method) (@guaranteed StructWithStoredClassProperty) -> Int
 // CHECK-NEXT: apply [[FUN]]([[CCOPY_LOADED]])

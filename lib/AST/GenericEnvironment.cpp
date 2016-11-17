@@ -14,19 +14,21 @@
 //
 //===----------------------------------------------------------------------===//
 
-#include "swift/AST/ASTContext.h"
 #include "swift/AST/GenericEnvironment.h"
+#include "swift/AST/ASTContext.h"
+#include "swift/AST/ProtocolConformance.h"
 
 using namespace swift;
 
 GenericEnvironment::GenericEnvironment(
-    ArrayRef<GenericTypeParamType *> genericParamTypes,
-    TypeSubstitutionMap interfaceToArchetypeMap) {
+    GenericSignature *signature,
+    TypeSubstitutionMap interfaceToArchetypeMap)
+  : Signature(signature)
+{
 
   assert(!interfaceToArchetypeMap.empty());
-
-  for (auto *paramTy : genericParamTypes)
-    GenericParams.push_back(paramTy);
+  assert(interfaceToArchetypeMap.size() == signature->getGenericParams().size()
+         && "incorrect number of parameters");
 
   // Build a mapping in both directions, making sure to canonicalize the
   // interface type where it is used as a key, so that substitution can
@@ -57,6 +59,11 @@ void *GenericEnvironment::operator new(size_t bytes, const ASTContext &ctx) {
   return ctx.Allocate(bytes, alignof(GenericEnvironment), AllocationArena::Permanent);
 }
 
+bool GenericEnvironment::containsPrimaryArchetype(
+                                              ArchetypeType *archetype) const {
+  return ArchetypeToInterfaceMap.count(archetype) > 0;
+}
+
 Type GenericEnvironment::mapTypeOutOfContext(ModuleDecl *M, Type type) const {
   type = type.subst(M, ArchetypeToInterfaceMap, SubstFlags::AllowLoweredTypes);
   assert(!type->hasArchetype() && "not fully substituted");
@@ -72,7 +79,8 @@ Type GenericEnvironment::mapTypeIntoContext(ModuleDecl *M, Type type) const {
 
 Type GenericEnvironment::mapTypeIntoContext(GenericTypeParamType *type) const {
   auto canTy = type->getCanonicalType();
-  auto found = InterfaceToArchetypeMap.find(canTy.getPointer());
+  auto found =
+    InterfaceToArchetypeMap.find(canTy->castTo<GenericTypeParamType>());
   assert(found != InterfaceToArchetypeMap.end() &&
          "missing generic parameter");
   return found->second;
@@ -80,7 +88,7 @@ Type GenericEnvironment::mapTypeIntoContext(GenericTypeParamType *type) const {
 
 GenericTypeParamType *GenericEnvironment::getSugaredType(
     GenericTypeParamType *type) const {
-  for (auto *sugaredType : GenericParams)
+  for (auto *sugaredType : getGenericParams())
     if (sugaredType->isEqual(type))
       return sugaredType;
 
@@ -88,8 +96,7 @@ GenericTypeParamType *GenericEnvironment::getSugaredType(
 }
 
 ArrayRef<Substitution>
-GenericEnvironment::getForwardingSubstitutions(
-    ModuleDecl *M, GenericSignature *sig) const {
+GenericEnvironment::getForwardingSubstitutions(ModuleDecl *M) const {
   auto lookupConformanceFn =
       [&](CanType original, Type replacement, ProtocolType *protoType)
           -> ProtocolConformanceRef {
@@ -97,26 +104,24 @@ GenericEnvironment::getForwardingSubstitutions(
   };
 
   SmallVector<Substitution, 4> result;
-  sig->getSubstitutions(*M, InterfaceToArchetypeMap,
-                        lookupConformanceFn, result);
-  return sig->getASTContext().AllocateCopy(result);
+  getGenericSignature()->getSubstitutions(*M, InterfaceToArchetypeMap,
+                                          lookupConformanceFn, result);
+  return getGenericSignature()->getASTContext().AllocateCopy(result);
 }
 
 SubstitutionMap GenericEnvironment::
 getSubstitutionMap(ModuleDecl *mod,
-                   GenericSignature *sig,
                    ArrayRef<Substitution> subs) const {
   SubstitutionMap result;
-  getSubstitutionMap(mod, sig, subs, result);
+  getSubstitutionMap(mod, subs, result);
   return result;
 }
 
 void GenericEnvironment::
 getSubstitutionMap(ModuleDecl *mod,
-                   GenericSignature *sig,
                    ArrayRef<Substitution> subs,
                    SubstitutionMap &result) const {
-  for (auto depTy : sig->getAllDependentTypes()) {
+  for (auto depTy : getGenericSignature()->getAllDependentTypes()) {
 
     // Map the interface type to a context type.
     auto contextTy = depTy.subst(mod, InterfaceToArchetypeMap, SubstOptions());
@@ -130,7 +135,7 @@ getSubstitutionMap(ModuleDecl *mod,
     result.addConformances(CanType(archetype), sub.getConformances());
   }
 
-  for (auto reqt : sig->getRequirements()) {
+  for (auto reqt : getGenericSignature()->getRequirements()) {
     if (reqt.getKind() != RequirementKind::SameType)
       continue;
 

@@ -25,8 +25,8 @@ public class first_decl_class_1 {
   public func decl_func_3() {}
 }
 
-// CHECK: Class/first_decl_class_1 RawComment=[/// first_decl_class_1 Aaa.\n]
-// CHECK: Func/first_decl_class_1.decl_func_1 RawComment=[/// decl_func_1 Aaa.\n]
+// CHECK: Class/first_decl_class_1 RawComment=[/// first_decl_class_1 Aaa.]
+// CHECK: Func/first_decl_class_1.decl_func_1 RawComment=[/// decl_func_1 Aaa.]
 // CHECK: Func/first_decl_class_1.decl_func_2 RawComment=[/**\n   * decl_func_3 Aaa.\n   */]
 // CHECK: Func/first_decl_class_1.decl_func_3 RawComment=[/// decl_func_3 Aaa.\n/** Bbb. */]
 

@@ -607,7 +607,7 @@ public:
       auto type = getType();
       if (isa<ArchetypeType>(type) ||
           isa<DependentMemberType>(type) ||
-          isa<AbstractTypeParamType>(type)) {
+          isa<GenericTypeParamType>(type)) {
         return true;
       }
       return false;
@@ -636,7 +636,7 @@ public:
       if (auto archetype = dyn_cast<ArchetypeType>(type))
         return archetype->requiresClass();
       else if (isa<DependentMemberType>(type) ||
-               isa<AbstractTypeParamType>(type)) {
+               isa<GenericTypeParamType>(type)) {
         assert(GenericSig &&
                "Dependent type in pattern without generic signature?");
         return GenericSig->requiresClass(type, module);

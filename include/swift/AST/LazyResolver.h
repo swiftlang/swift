@@ -52,6 +52,11 @@ public:
   virtual void resolveWitness(const NormalProtocolConformance *conformance,
                               ValueDecl *requirement) = 0;
 
+  /// Resolve an inherited conformance.
+  virtual ProtocolConformance *resolveInheritedConformance(
+                                 const NormalProtocolConformance *conformance,
+                                 ProtocolDecl *inherited) = 0;
+
   /// Resolve a member type.
   ///
   /// \param dc The context in which to resolve the type.
@@ -133,6 +138,11 @@ public:
     Principal.resolveWitness(conformance, requirement);
   }
 
+  ProtocolConformance *resolveInheritedConformance(
+                         const NormalProtocolConformance *conformance,
+                         ProtocolDecl *inherited) override {
+    return Principal.resolveInheritedConformance(conformance, inherited);
+  }
 
   Type resolveMemberType(DeclContext *dc, Type type, Identifier name) override {
     return Principal.resolveMemberType(dc, type, name);

@@ -46,7 +46,7 @@ bb0:                                  // CHECK: bb0:
   %0 = tuple ()                       // CHECK:   %0 = tuple ()
   br bb1                              // CHECK:   br bb1
 bb1:
-  %b = alloc_box $Int               // CHECK:   %2 = alloc_box $Int
+  %b = alloc_box $@box Int               // CHECK:   %2 = alloc_box $@box Int
   %c = integer_literal $Builtin.Word, 1
   // CHECK: integer_literal $Builtin.Word, -1
   %e = integer_literal $Builtin.Word, -1
@@ -65,7 +65,7 @@ bb1:
   return %5 : $()                              // CHECK:   return %5 : $()
 bb2:
   %5 = tuple ()                                // CHECK:   %5 = tuple ()
-  %6 = alloc_box $Int                          // CHECK:   %6 = alloc_box $Int
+  %6 = alloc_box $@box Int                          // CHECK:   %6 = alloc_box $@box Int
   %7 = project_box %6 : $@box Int, 0           // CHECK:   %7 = project_box %6 : $@box Int
 
   br bb1                                       // CHECK:   br bb1
@@ -283,7 +283,7 @@ protocol Bendable { }
 sil @_T4todo18erasure_from_protoFT1xPS_8RuncibleS_8Bendable__PS0__ : $@convention(thin) (@in Bendable & Runcible) -> @out Runcible {
 bb0(%0 : $*Runcible, %1 : $*Bendable & Runcible):
   // CHECK: alloc_box
-  %2 = alloc_box $Bendable & Runcible
+  %2 = alloc_box $@box Bendable & Runcible
   %2a = project_box %2 : $@box Bendable & Runcible, 0
   // CHECK: copy_addr [take] {{.*}} to [initialization] {{.*}} : $*Bendable & Runcible
   %3 = copy_addr [take] %1 to [initialization] %2a : $*Bendable & Runcible
@@ -309,7 +309,7 @@ protocol ClassBound : class {
 // CHECK: $@convention(thin) (ClassBound) -> ()
 sil @_T4todo18class_bound_methodFT1xPS_10ClassBound__T_ : $@convention(thin) (ClassBound) -> () {
 bb0(%0 : $ClassBound):
-  %1 = alloc_box $ClassBound                // CHECK: alloc_box
+  %1 = alloc_box $@box ClassBound                // CHECK: alloc_box
   %1a = project_box %1 : $@box ClassBound, 0
   %2 = store %0 to %1a : $*ClassBound      // CHECK: store
   %3 = load %1a : $*ClassBound             // CHECK: load
@@ -355,7 +355,7 @@ bb0(%0 : $Ref, %1 : $Val, %2 : $@thin Aleph.Type):
 sil @_TV6struct5AlephCfMS0_FT_S0_ : $@convention(thin) (@thin Aleph.Type) -> Aleph {
 bb0(%0 : $@thin Aleph.Type):
   %1 = tuple ()
-  %2 = alloc_box $Aleph       // CHECK: alloc_box
+  %2 = alloc_box $@box Aleph       // CHECK: alloc_box
   %2a = project_box %2 : $@box Aleph, 0
   // CHECK: struct_element_addr {{.*}} : $*Aleph, #Aleph.a
   %5 = struct_element_addr %2a : $*Aleph, #Aleph.a
@@ -421,7 +421,7 @@ sil @_T5tuple5tupleFT_TSiSf_ : $@convention(thin) () -> (Int, Float32)
 // CHECK: $@convention(thin) (Int, Float) -> ()
 sil @_T5tuple13tuple_elementFT1xTSiSf__T_ : $@convention(thin) (Int, Float) -> () {
 bb0(%0 : $Int, %1 : $Float):
-  %2 = alloc_box $(Int, Float)
+  %2 = alloc_box $@box (Int, Float)
   %2a = project_box %2 : $@box (Int, Float), 0
   // CHECK: tuple ({{%.*}} : $Int, {{%.*}} : $Float)
   %3 = tuple (%0 : $Int, %1 : $Float)
@@ -457,10 +457,10 @@ class M {
 // CHECK: $@convention(method) (Int, M) -> ()
 sil @_TC3ref1C3foofS0_FT1xSi_T_ : $@convention(method) (Int, M) -> () {
 bb0(%0 : $Int, %1 : $M):
-  %2 = alloc_box $Int     // CHECK: alloc_box $Int
+  %2 = alloc_box $@box Int     // CHECK: alloc_box $@box Int
   %2a = project_box %2 : $@box Int, 0
   %3 = store %0 to %2a : $*Int
-  %4 = alloc_box $M         // CHECK: alloc_box $M
+  %4 = alloc_box $@box M         // CHECK: alloc_box $@box M
   %4a = project_box %4 : $@box M, 0
   %5 = store %1 to %4a : $*M
   %6 = load %2a : $*Int  // CHECK: load {{.*}} : $*Int
@@ -497,7 +497,7 @@ class E : B { }
 // CHECK: $@convention(thin) (B) -> Builtin.Int1
 sil @_T4null3isaFT1bCS_1B_Sb : $@convention(thin) (B) -> Builtin.Int1 {
 bb0(%0 : $B):
-  %1 = alloc_box $B                           // CHECK: alloc_box
+  %1 = alloc_box $@box B                           // CHECK: alloc_box
   %1a = project_box %1 : $@box B, 0
   %2 = store %0 to %1a : $*B
   %3 = load %1a : $*B                        // CHECK: load
@@ -521,9 +521,9 @@ sil @_TSS32_convertFromBuiltinStringLiteralfMSSFT5valueBp17utf8CodeUnitCountBi64
 
 sil @_T5index5gep64FT1pBp1iBi64__Bp : $@convention(thin) (Builtin.RawPointer, Builtin.Word) -> Builtin.RawPointer {
 bb0(%0 : $Builtin.RawPointer, %1 : $Builtin.Word):
-  %2 = alloc_box $Builtin.RawPointer              // CHECK: alloc_box
+  %2 = alloc_box $@box Builtin.RawPointer              // CHECK: alloc_box
   %2a = project_box %2 : $@box Builtin.RawPointer, 0
-  %3 = alloc_box $Builtin.Word                   // CHECK: alloc_box
+  %3 = alloc_box $@box Builtin.Word                   // CHECK: alloc_box
   %3a = project_box %3 : $@box Builtin.Word, 0
   %4 = store %0 to %2a : $*Builtin.RawPointer
   %5 = store %1 to %3a : $*Builtin.Word
@@ -563,9 +563,9 @@ class SomeSubclass : SomeClass {}
 
 sil @test_class_metatype : $@convention(thin) (SomeClass, SomeSubclass) -> (@thick SomeClass.Type, @thick SomeClass.Type) {
 bb0(%0 : $SomeClass, %1 : $SomeSubclass):
-  %2 = alloc_box $SomeClass                       // CHECK: alloc_box
+  %2 = alloc_box $@box SomeClass                       // CHECK: alloc_box
   %2a = project_box %2 : $@box SomeClass, 0
-  %3 = alloc_box $SomeSubclass                    // CHECK: alloc_box
+  %3 = alloc_box $@box SomeSubclass                    // CHECK: alloc_box
   %3a = project_box %3 : $@box SomeSubclass, 0
   %4 = store %0 to %2a : $*SomeClass
   %5 = store %1 to %3a : $*SomeSubclass
@@ -588,7 +588,7 @@ bb0(%0 : $SomeClass, %1 : $SomeSubclass):
 
 sil @test_value_metatype : $@convention(thin) <T> (@in T) -> (@thick T.Type, @thick T.Type) {
 bb0(%0 : $*T):
-  %1 = alloc_box $T                               // CHECK: alloc_box
+  %1 = alloc_box $@box T                               // CHECK: alloc_box
   %1a = project_box %1 : $@box T, 0
   %2 = copy_addr [take] %0 to [initialization] %1a : $*T
   %3 = metatype $@thick T.Type                       // CHECK: metatype
@@ -605,7 +605,7 @@ bb0(%0 : $*T):
 
 sil @test_existential_metatype : $@convention(thin) (@in SomeProtocol) -> @thick SomeProtocol.Type {
 bb0(%0 : $*SomeProtocol):
-  %1 = alloc_box $SomeProtocol                    // CHECK: alloc_box
+  %1 = alloc_box $@box SomeProtocol                    // CHECK: alloc_box
   %1a = project_box %1 : $@box SomeProtocol, 0
   %2 = copy_addr [take] %0 to [initialization] %1a : $*SomeProtocol
   %4 = alloc_stack $SomeProtocol                    // CHECK: alloc_stack
@@ -672,9 +672,9 @@ bb3(%4 : $Int):
 // CHECK-LABEL: sil @test_builtin
 sil @test_builtin : $@convention(thin) (Builtin.Int1, Builtin.Int1) -> Builtin.Int1 {
 bb0(%0 : $Builtin.Int1, %1 : $Builtin.Int1):
-  %2 = alloc_box $Builtin.Int1
+  %2 = alloc_box $@box Builtin.Int1
   %2a = project_box %2 : $@box Builtin.Int1, 0
-  %3 = alloc_box $Builtin.Int1
+  %3 = alloc_box $@box Builtin.Int1
   %3a = project_box %3 : $@box Builtin.Int1, 0
   store %0 to %2a : $*Builtin.Int1
   store %1 to %3a : $*Builtin.Int1
@@ -709,7 +709,7 @@ bb0:
 // CHECK-LABEL: sil @test_dealloc_box
 sil @test_dealloc_box : $@convention(thin) () -> () {
 bb0:
-  %0 = alloc_box $Class1
+  %0 = alloc_box $@box Class1
   dealloc_box %0 : $@box Class1
   %2 = tuple ()
   return %2 : $()
@@ -765,7 +765,7 @@ sil @closure0 : $@convention(thin) (@box Int, @inout Int) -> ()
 
 sil @closure_test : $@convention(thin) () -> () {
 bb0:
-  %0 = alloc_box $Int                           // users: %10, %8, %8, %7, %4
+  %0 = alloc_box $@box Int                           // users: %10, %8, %8, %7, %4
   %0a = project_box %0 : $@box Int, 0
 
   %5 = function_ref @takes_closure : $@convention(thin) (@callee_owned () -> ()) -> ()
@@ -806,7 +806,7 @@ sil @_T6switch1cFT_T_ : $@convention(thin) () -> ()
 // CHECK-LABEL: sil @test_switch_union : $@convention(thin) (MaybePair) -> ()
 sil @test_switch_union : $@convention(thin) (MaybePair) -> () {
 bb0(%0 : $MaybePair):
-  %1 = alloc_box $MaybePair
+  %1 = alloc_box $@box MaybePair
   %1a = project_box %1 : $@box MaybePair, 0
   store %0 to %1a : $*MaybePair
   %3 = load %1a : $*MaybePair
@@ -968,7 +968,7 @@ struct Spoon : Bendable {
 // CHECK-LABEL: sil @test_init_existential : $@convention(thin) (Spoon) -> @out Bendable
 sil @test_init_existential : $@convention(thin) (Spoon) -> @out Bendable {
 bb0(%0 : $*Bendable, %1 : $Spoon):
-  %2 = alloc_box $Spoon
+  %2 = alloc_box $@box Spoon
   %2a = project_box %2 : $@box Spoon, 0
   store %1 to %2a : $*Spoon
   // CHECK: init_existential_addr %{{.*}} : $*Bendable, $Spoon
@@ -985,7 +985,7 @@ bb0(%0 : $*Bendable, %1 : $Spoon):
 // CHECK-LABEL: sil @test_existential_ref : $@convention(thin) (ConcreteClass) -> ClassP
 sil @test_existential_ref : $@convention(thin) (ConcreteClass) -> ClassP {
 bb0(%0 : $ConcreteClass):
-  %1 = alloc_box $ConcreteClass
+  %1 = alloc_box $@box ConcreteClass
   %1a = project_box %1 : $@box ConcreteClass, 0
   store %0 to %1a : $*ConcreteClass
   %3 = load %1a : $*ConcreteClass
@@ -1040,10 +1040,10 @@ class X {
 // CHECK-LABEL: sil @test_dynamic_lookup_br : $@convention(thin) (AnyObject) -> ()
 sil @test_dynamic_lookup_br : $@convention(thin) (AnyObject) -> () {
 bb0(%0 : $AnyObject):
-  %1 = alloc_box $AnyObject
+  %1 = alloc_box $@box AnyObject
   %1a = project_box %1 : $@box AnyObject, 0
   store %0 to %1a : $*AnyObject
-  %3 = alloc_box $Optional<() -> ()>
+  %3 = alloc_box $@box Optional<() -> ()>
   %4 = load %1a : $*AnyObject
   strong_retain %4 : $AnyObject
   %6 = open_existential_ref %4 : $AnyObject to $@opened("01234567-89ab-cdef-0123-222222222222") AnyObject
@@ -1062,9 +1062,9 @@ bb3:
 
 // CHECK-LABEL: sil @test_mark_fn_escape
 sil @test_mark_fn_escape : $() -> () {
-  %b = alloc_box $Int
+  %b = alloc_box $@box Int
   %ba = project_box %b : $@box Int, 0
-  %c = alloc_box $Int
+  %c = alloc_box $@box Int
   %ca = project_box %c : $@box Int, 0
 
   // CHECK: mark_function_escape {{.*}} : $*Int
@@ -1484,7 +1484,8 @@ else:
   %3void = tuple ()
 // CHECK-NEXT: return %5 : $()
   return %3void : $()
-} // CHECK: {{^}$}}
+}
+// CHECK: } // end sil function 'value_names'
 
 class Resource {}
 struct Value { var x: Resource }

@@ -286,7 +286,7 @@ func rdar21078316() {
 
 // <rdar://problem/20978044> QoI: Poor diagnostic when using an incorrect tuple element in a closure
 var numbers = [1, 2, 3]
-zip(numbers, numbers).filter { $0.2 > 1 }  // expected-error {{value of tuple type '(Int, Int)' has no member '2'}}
+zip(numbers, numbers).filter { $0.2 > 1 }  // expected-error {{contextual closure type '(Int, Int) -> Bool' expects 2 arguments, but 1 was used in closure body}}
 
 
 
@@ -356,3 +356,28 @@ class C_SR_2505 : P_SR_2505 {
 }
 
 let _ = C_SR_2505().call(C_SR_2505())
+
+// <rdar://problem/28909024> Returning incorrect result type from method invocation can result in nonsense diagnostic
+extension Collection {
+  func r28909024(_ predicate: (Iterator.Element)->Bool) -> Index {
+    return startIndex
+  }
+}
+func fn_r28909024(n: Int) {
+  return (0..<10).r28909024 { // expected-error {{unexpected non-void return value in void function}}
+    _ in true
+  }
+}
+
+// SR-2994: Unexpected ambiguous expression in closure with generics
+struct S_2994 {
+  var dataOffset: Int
+}
+class C_2994<R> {
+  init(arg: (R) -> Void) {}
+}
+func f_2994(arg: String) {}
+func g_2994(arg: Int) -> Double {
+  return 2
+}
+C_2994<S_2994>(arg: { (r: S_2994) in f_2994(arg: g_2994(arg: r.dataOffset)) }) // expected-error {{cannot convert value of type 'Double' to expected argument type 'String'}}

@@ -1609,7 +1609,7 @@ namespace {
       return expr->getType();
     }
 
-    virtual Type visitTupleExpr(TupleExpr *expr) {
+    Type visitTupleExpr(TupleExpr *expr) {
       // The type of a tuple expression is simply a tuple of the types of
       // its subexpressions.
       SmallVector<TupleTypeElt, 4> elements;
@@ -1690,17 +1690,11 @@ namespace {
                        locator);
       
       // Its subexpression should be convertible to a tuple (T.Element...).
-      // FIXME: We should really go through the conformance above to extract
-      // the element type, rather than just looking for the element type.
-      // FIXME: Member constraint is still weird here.
-      ConstraintLocatorBuilder builder(locator);
-      auto arrayElementTy = CS.getMemberType(arrayTy, elementAssocTy,
-                                             builder.withPathElement(
-                                               ConstraintLocator::Member),
-                                             /*options=*/0);
+      Type arrayElementTy = DependentMemberType::get(arrayTy, elementAssocTy);
 
       // Introduce conversions from each element to the element type of the
       // array.
+      ConstraintLocatorBuilder builder(locator);
       unsigned index = 0;
       for (auto element : expr->getElements()) {
         CS.addConstraint(ConstraintKind::Conversion,
@@ -1758,18 +1752,10 @@ namespace {
 
       // Its subexpression should be convertible to a tuple ((T.Key,T.Value)...).
       ConstraintLocatorBuilder locatorBuilder(locator);
-      auto dictionaryKeyTy = CS.getMemberType(dictionaryTy,
-                                              keyAssocTy,
-                                              locatorBuilder.withPathElement(
-                                                ConstraintLocator::Member),
-                                              /*options=*/0);
-      /// FIXME: ArrayElementType is a total hack here.
-      auto dictionaryValueTy = CS.getMemberType(dictionaryTy,
-                                                valueAssocTy,
-                                                locatorBuilder.withPathElement(
-                                                  ConstraintLocator::ArrayElementType),
-                                                /*options=*/0);
-      
+      auto dictionaryKeyTy = DependentMemberType::get(dictionaryTy,
+                                                      keyAssocTy);
+      auto dictionaryValueTy = DependentMemberType::get(dictionaryTy,
+                                                        valueAssocTy);
       TupleTypeElt tupleElts[2] = { TupleTypeElt(dictionaryKeyTy),
                                     TupleTypeElt(dictionaryValueTy) };
       Type elementTy = TupleType::get(tupleElts, C);
@@ -3011,16 +2997,6 @@ public:
     return VT = createFreeTypeVariableType(Expr);
   }
 
-  Type visitTupleExpr(TupleExpr *Expr) override {
-    if (Target != Expr) {
-      // If expr is not the target, do the default constraint generation.
-      return ConstraintGenerator::visitTupleExpr(Expr);
-    }
-    // Otherwise, create a type variable saying we know nothing about this expr.
-    assert(!VT && "cannot reassign type variable.");
-    return VT = createFreeTypeVariableType(Expr);
-  }
-
   Type visitErrorExpr(ErrorExpr *Expr) override {
     return createFreeTypeVariableType(Expr);
   }
@@ -3094,7 +3070,10 @@ bool swift::isExtensionApplied(DeclContext &DC, Type BaseTy,
   ConstraintSystemOptions Options;
   NominalTypeDecl *Nominal = BaseTy->getNominalOrBoundGenericNominal();
   if (!Nominal || !BaseTy->isSpecialized() ||
-      ED->getGenericRequirements().empty())
+      ED->getGenericRequirements().empty() ||
+      // We'll crash if we leak type variables from one constraint
+      // system into the new one created below.
+      BaseTy->hasTypeVariable())
     return true;
   std::unique_ptr<TypeChecker> CreatedTC;
   // If the current ast context has no type checker, create one for it.
@@ -3140,8 +3119,6 @@ bool swift::isExtensionApplied(DeclContext &DC, Type BaseTy,
       case RequirementKind::SameType:
         createMemberConstraint(Req, ConstraintKind::Equal);
         break;
-      case RequirementKind::WitnessMarker:
-        break;
     }
   }
   if (Failed)
@@ -3154,6 +3131,9 @@ bool swift::isExtensionApplied(DeclContext &DC, Type BaseTy,
 static bool canSatisfy(Type T1, Type T2, DeclContext &DC, ConstraintKind Kind,
                        bool ReplaceArchetypeWithVariables,
                        bool AllowFreeVariables) {
+  assert(!T1->hasTypeVariable() && !T2->hasTypeVariable() &&
+         "Unexpected type variable in constraint satisfaction testing");
+
   std::unique_ptr<TypeChecker> CreatedTC;
   // If the current ast context has no type checker, create one for it.
   auto *TC = static_cast<TypeChecker*>(DC.getASTContext().getLazyResolver());

@@ -17,7 +17,9 @@ namespace swift {
 namespace ide {
 
 struct CodeFormatOptions {
+public:
   bool UseTabs = false;
+  bool IndentSwitchCase = false;
   unsigned IndentWidth = 4;
   unsigned TabWidth = 4;
 };

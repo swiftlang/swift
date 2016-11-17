@@ -340,6 +340,9 @@ ERROR(cannot_convert_closure_result_protocol,none,
 ERROR(cannot_convert_closure_result_nil,none,
       "nil is not compatible with closure result type %0", (Type))
 
+ERROR(destructor_not_accessible,none,
+      "deinitializers cannot be accessed", ())
+
 // Array Element
 ERROR(cannot_convert_array_element,none,
       "cannot convert value of type %0 to expected element type %1",
@@ -927,8 +930,6 @@ ERROR(static_functions_not_mutating,none,
 
 ERROR(transparent_stored_property,none,
       "@_transparent cannot be applied to stored properties", ())
-ERROR(transparent_on_invalid_extension,none,
-      "@_transparent is only supported on struct and enum extensions", ())
 ERROR(transparent_in_protocols_not_supported,none,
       "@_transparent is not supported on declarations within protocols", ())
 ERROR(transparent_in_classes_not_supported,none,
@@ -1108,32 +1109,34 @@ ERROR(static_requires_initializer,none,
       "expression or getter/setter specifier", (StaticSpellingKind))
 ERROR(pattern_type_access,none,
       "%select{%select{variable|constant}0|property}1 "
-      "%select{must be declared %select{private|fileprivate|internal|PUBLIC}4"
+      "%select{must be declared %select{"
+      "%select{private|fileprivate|internal|PUBLIC}3|private or fileprivate}4"
       "|cannot be declared %select{PRIVATE|fileprivate|internal|public}3}2 "
       "because its type uses "
-      "%select{a private|a fileprivate|an internal|PUBLIC}4 type",
-      (bool, bool, bool, Accessibility, Accessibility))
+      "%select{a private|a fileprivate|an internal|PUBLIC}5 type",
+      (bool, bool, bool, Accessibility, bool, Accessibility))
 WARNING(pattern_type_access_warn,none,
         "%select{%select{variable|constant}0|property}1 "
-        "%select{should be declared %select{private|fileprivate|internal|PUBLIC}4"
+        "%select{should be declared %select{private|fileprivate|internal|PUBLIC}5"
         "|should not be declared %select{in this context|fileprivate|internal|public}3}2 "
         "because its type uses "
-        "%select{a private|a fileprivate|an internal|PUBLIC}4 type",
-        (bool, bool, bool, Accessibility, Accessibility))
+        "%select{a private|a fileprivate|an internal|PUBLIC}5 type",
+        (bool, bool, bool, Accessibility, bool, Accessibility))
 ERROR(pattern_type_access_inferred,none,
       "%select{%select{variable|constant}0|property}1 "
-      "%select{must be declared %select{private|fileprivate|internal|PUBLIC}4"
+      "%select{must be declared %select{"
+      "%select{private|fileprivate|internal|PUBLIC}3|private or fileprivate}4"
       "|cannot be declared %select{PRIVATE|fileprivate|internal|public}3}2 "
-      "because its type %5 uses "
-      "%select{a private|a fileprivate|an internal|PUBLIC}4 type",
-      (bool, bool, bool, Accessibility, Accessibility, Type))
+      "because its type %6 uses "
+      "%select{a private|a fileprivate|an internal|PUBLIC}5 type",
+      (bool, bool, bool, Accessibility, bool, Accessibility, Type))
 WARNING(pattern_type_access_inferred_warn,none,
         "%select{%select{variable|constant}0|property}1 "
-        "%select{should be declared %select{private|fileprivate|internal|PUBLIC}4"
+        "%select{should be declared %select{private|fileprivate|internal|PUBLIC}5"
         "|should not be declared %select{in this context|fileprivate|internal|public}3}2 "
-        "because its type %5 uses "
-        "%select{a private|a fileprivate|an internal|PUBLIC}4 type",
-        (bool, bool, bool, Accessibility, Accessibility, Type))
+        "because its type %6 uses "
+        "%select{a private|a fileprivate|an internal|PUBLIC}5 type",
+        (bool, bool, bool, Accessibility, bool, Accessibility, Type))
 ERROR(pattern_binds_no_variables,none,
       "%select{property|global variable}0 declaration does not bind any "
       "variables",
@@ -1167,24 +1170,24 @@ ERROR(unsupported_nested_protocol,none,
 ERROR(circular_type_alias,none,
       "type alias %0 circularly references itself", (Identifier))
 ERROR(type_alias_underlying_type_access,none,
-      "type alias %select{must be declared "
-      "%select{private|fileprivate|internal|PUBLIC}2"
+      "type alias %select{must be declared %select{"
+      "%select{private|fileprivate|internal|PUBLIC}2|private or fileprivate}3"
       "|cannot be declared %select{PRIVATE|fileprivate|internal|public}1}0 "
       "because its underlying type uses "
       "%select{a private|a fileprivate|an internal|PUBLIC}2 type",
-      (bool, Accessibility, Accessibility))
+      (bool, Accessibility, Accessibility, bool))
 WARNING(type_alias_underlying_type_access_warn,none,
         "type alias %select{should be declared "
         "%select{private|fileprivate|internal|PUBLIC}2"
         "|should not be declared %select{PRIVATE|fileprivate|internal|public}1}0 "
         "because its underlying type uses "
         "%select{a private|a fileprivate|an internal|PUBLIC}2 type",
-        (bool, Accessibility, Accessibility))
+        (bool, Accessibility, Accessibility, bool))
 
 // Subscripts
 ERROR(subscript_type_access,none,
       "subscript %select{must be declared "
-      "%select{private|fileprivate|internal|PUBLIC}2"
+      "%select{private|fileprivate|internal|PUBLIC}1"
       "|cannot be declared %select{PRIVATE|fileprivate|internal|public}1}0 "
       "because its %select{index|element type}3 uses "
       "%select{a private|a fileprivate|an internal|PUBLIC}2 type",
@@ -1199,19 +1202,20 @@ WARNING(subscript_type_access_warn,none,
 
 // Functions
 ERROR(function_type_access,none,
-      "%select{function|method|initializer}3 "
-      "%select{must be declared %select{private|fileprivate|internal|PUBLIC}2"
+      "%select{function|method|initializer}4 "
+      "%select{must be declared %select{"
+      "%select{private|fileprivate|internal|PUBLIC}1|private or fileprivate}2"
       "|cannot be declared %select{PRIVATE|fileprivate|internal|public}1}0 "
-      "because its %select{parameter|result}4 uses "
-      "%select{a private|a fileprivate|an internal|PUBLIC}2 type",
-      (bool, Accessibility, Accessibility, unsigned, bool))
+      "because its %select{parameter|result}5 uses "
+      "%select{a private|a fileprivate|an internal|PUBLIC}3 type",
+      (bool, Accessibility, bool, Accessibility, unsigned, bool))
 WARNING(function_type_access_warn,none,
-        "%select{function|method|initializer}3 "
-        "%select{should be declared %select{private|fileprivate|internal|PUBLIC}2"
+        "%select{function|method|initializer}4 "
+        "%select{should be declared %select{private|fileprivate|internal|PUBLIC}3"
         "|should not be declared %select{in this context|fileprivate|internal|public}1}0 "
-        "because its %select{parameter|result}4 uses "
-        "%select{a private|a fileprivate|an internal|PUBLIC}2 type",
-        (bool, Accessibility, Accessibility, unsigned, bool))
+        "because its %select{parameter|result}5 uses "
+        "%select{a private|a fileprivate|an internal|PUBLIC}3 type",
+        (bool, Accessibility, bool, Accessibility, unsigned, bool))
 WARNING(non_trailing_closure_before_default_args,none,
         "closure parameter prior to parameters with default arguments will "
         "not be treated as a trailing closure", ())
@@ -1318,14 +1322,14 @@ ERROR(witness_not_accessible_proto,none,
       "%select{initializer %1|method %1|%select{|setter for }2property %1"
       "|subscript%select{| setter}2}0 must be declared "
       "%select{PRIVATE|fileprivate|internal|public}3 because it matches a "
-      "requirement in %select{PRIVATE|fileprivate|internal|public}3 protocol "
-      "%4",
-      (RequirementKind, DeclName, bool, Accessibility, DeclName))
+      "requirement in %select{private|fileprivate|internal|public}4 protocol "
+      "%5",
+      (RequirementKind, DeclName, bool, Accessibility, Accessibility, DeclName))
 ERROR(witness_not_accessible_type,none,
       "%select{initializer %1|method %1|%select{|setter for }2property %1"
       "|subscript%select{| setter}2}0 must be as accessible as its enclosing "
-      "type because it matches a requirement in protocol %4",
-      (RequirementKind, DeclName, bool, Accessibility, DeclName))
+      "type because it matches a requirement in protocol %5",
+      (RequirementKind, DeclName, bool, Accessibility, Accessibility, DeclName))
 ERROR(type_witness_not_accessible_proto,none,
       "%0 %1 must be declared %select{PRIVATE|fileprivate|internal|public}2 "
       "because it matches a requirement in "
@@ -1337,17 +1341,18 @@ ERROR(type_witness_not_accessible_type,none,
       (DescriptiveDeclKind, DeclName, Accessibility, DeclName))
 
 ERROR(protocol_refine_access,none,
-      "%select{protocol must be declared "
-      "%select{private|fileprivate|internal|PUBLIC}2 because it refines"
+      "%select{protocol must be declared %select{"
+      "%select{private|fileprivate|internal|PUBLIC}2"
+      "|private or fileprivate}3 because it refines"
       "|%select{PRIVATE|fileprivate|internal|public}1 protocol cannot "
       "refine}0 %select{a private|a fileprivate|an internal|PUBLIC}2 protocol",
-      (bool, Accessibility, Accessibility))
+      (bool, Accessibility, Accessibility, bool))
 WARNING(protocol_refine_access_warn,none,
         "%select{protocol should be declared "
         "%select{private|fileprivate|internal|PUBLIC}2 because it refines"
         "|%select{in this context|fileprivate|internal|public}1 protocol should not "
         "refine}0 %select{a private|a fileprivate|an internal|PUBLIC}2 protocol",
-        (bool, Accessibility, Accessibility))
+        (bool, Accessibility, Accessibility, bool))
 ERROR(protocol_property_must_be_computed_var,none,
       "immutable property requirement must be declared as 'var' with a "
       "'{ get }' specifier", ())
@@ -1543,19 +1548,19 @@ ERROR(requires_generic_param_same_type_does_not_conform,none,
       (Type, Identifier))
 
 ERROR(generic_param_access,none,
-      "%0 %select{must be declared "
-      "%select{private|fileprivate|internal|PUBLIC}3"
+      "%0 %select{must be declared %select{"
+      "%select{private|fileprivate|internal|PUBLIC}3|private or fileprivate}4"
       "|cannot be declared %select{PRIVATE|fileprivate|internal|public}2}1 "
-      "because its generic %select{parameter|requirement}4 uses "
+      "because its generic %select{parameter|requirement}5 uses "
       "%select{a private|a fileprivate|an internal|PUBLIC}3 type",
-      (DescriptiveDeclKind, bool, Accessibility, Accessibility, bool))
+      (DescriptiveDeclKind, bool, Accessibility, Accessibility, bool, bool))
 WARNING(generic_param_access_warn,none,
         "%0 %select{should be declared "
         "%select{private|fileprivate|internal|PUBLIC}3"
         "|should not be declared %select{in this context|fileprivate|internal|public}2}1 "
-        "because its generic %select{parameter|requirement}4 uses "
+        "because its generic %select{parameter|requirement}5 uses "
         "%select{a private|a fileprivate|an internal|PUBLIC}3 type",
-        (DescriptiveDeclKind, bool, Accessibility, Accessibility, bool))
+        (DescriptiveDeclKind, bool, Accessibility, Accessibility, bool, bool))
 
 ERROR(override_multiple_decls_base,none,
       "declaration %0 cannot override more than one superclass declaration",
@@ -1774,19 +1779,19 @@ ERROR(enum_raw_type_nonconforming_and_nonsynthable,none,
 NOTE(enum_declares_rawrep_with_raw_type,none,
       "%0 declares raw type %1, which implies RawRepresentable", (Type, Type))
 ERROR(enum_raw_type_access,none,
-      "enum %select{must be declared "
-      "%select{private|fileprivate|internal|PUBLIC}2"
+      "enum %select{must be declared %select{"
+      "%select{private|fileprivate|internal|PUBLIC}2|private or fileprivate}3"
       "|cannot be declared %select{PRIVATE|fileprivate|internal|public}1}0 "
       "because its raw type uses "
       "%select{a private|a fileprivate|an internal|PUBLIC}2 type",
-      (bool, Accessibility, Accessibility))
+      (bool, Accessibility, Accessibility, bool))
 WARNING(enum_raw_type_access_warn,none,
         "enum %select{should be declared "
         "%select{private|fileprivate|internal|PUBLIC}2"
         "|should not be declared %select{in this context|fileprivate|internal|public}1}0 "
         "because its raw type uses "
         "%select{a private|a fileprivate|an internal|PUBLIC}2 type",
-        (bool, Accessibility, Accessibility))
+        (bool, Accessibility, Accessibility, bool))
 
 NOTE(enum_here,none,
      "enum %0 declared here", (Identifier))
@@ -1903,6 +1908,8 @@ ERROR(property_behavior_invalid_parameter,none,
       "parameter expression provided, but property behavior %0 does not "
       "use it",
       (Identifier))
+ERROR(property_behavior_conformance_broken,none,
+      "property behavior for %0 in type %1 is broken", (DeclName, Type))
 
 //------------------------------------------------------------------------------
 // Type Check Attributes
@@ -2726,19 +2733,19 @@ ERROR(self_in_nominal,none,
       "'Self' is only available in a protocol or as the result of a "
       "method in a class; did you mean %0?", (Identifier))
 ERROR(class_super_access,none,
-      "class %select{must be declared "
-      "%select{private|fileprivate|internal|PUBLIC}2"
+      "class %select{must be declared %select{"
+      "%select{private|fileprivate|internal|PUBLIC}2|private or fileprivate}3"
       "|cannot be declared %select{PRIVATE|fileprivate|internal|public}1}0 "
       "because its superclass is "
       "%select{private|fileprivate|internal|PUBLIC}2",
-      (bool, Accessibility, Accessibility))
+      (bool, Accessibility, Accessibility, bool))
 WARNING(class_super_access_warn,none,
         "class %select{should be declared "
         "%select{private|fileprivate|internal|PUBLIC}2"
         "|should not be declared %select{in this context|fileprivate|internal|public}1}0 "
         "because its superclass is "
         "%select{private|fileprivate|internal|PUBLIC}2",
-        (bool, Accessibility, Accessibility))
+        (bool, Accessibility, Accessibility, bool))
 ERROR(dot_protocol_on_non_existential,none,
       "cannot use 'Protocol' with non-protocol type %0", (Type))
 ERROR(tuple_single_element,none,

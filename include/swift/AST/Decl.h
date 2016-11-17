@@ -17,13 +17,16 @@
 #ifndef SWIFT_DECL_H
 #define SWIFT_DECL_H
 
+#include "swift/AST/AccessScope.h"
 #include "swift/AST/CaptureInfo.h"
 #include "swift/AST/ClangNode.h"
 #include "swift/AST/ConcreteDeclRef.h"
 #include "swift/AST/DefaultArgumentKind.h"
+#include "swift/AST/GenericEnvironment.h"
 #include "swift/AST/GenericSignature.h"
 #include "swift/AST/LazyResolver.h"
 #include "swift/AST/TypeAlignments.h"
+#include "swift/AST/Witness.h"
 #include "swift/Basic/OptionalEnum.h"
 #include "swift/Basic/Range.h"
 #include "llvm/ADT/DenseMap.h"
@@ -70,7 +73,7 @@ namespace swift {
   class SubscriptDecl;
   class ValueDecl;
   class VarDecl;
-  
+
 enum class DeclKind : uint8_t {
 #define DECL(Id, Parent) Id,
 #define DECL_RANGE(Id, FirstId, LastId) \
@@ -732,10 +735,6 @@ public:
 
   bool walk(ASTWalker &walker);
 
-  /// \brief Should this declaration be treated as if annotated with transparent
-  /// attribute.
-  bool isTransparent() const;
-
   /// \brief Return whether this declaration has been determined invalid.
   bool isInvalid() const { return DeclBits.Invalid; }
   
@@ -1374,16 +1373,6 @@ class ExtensionDecl final : public Decl, public DeclContext,
   /// The generic parameters of the extension.
   GenericParamList *GenericParams = nullptr;
 
-  /// \brief The generic signature of this extension.
-  ///
-  /// This is the semantic representation of a generic parameters and the
-  /// requirements placed on them.
-  ///
-  /// FIXME: The generic parameters here are also derivable from
-  /// \c GenericParams. However, we likely want to make \c GenericParams
-  /// the parsed representation, and not part of the module file.
-  GenericSignature *GenericSig = nullptr;
-
   /// \brief The generic context of this extension.
   ///
   /// This is the mapping between interface types and archetypes for the
@@ -1470,12 +1459,8 @@ public:
   }
 
   /// Retrieve the generic signature for this extension.
-  GenericSignature *getGenericSignature() const { return GenericSig; }
-
-  /// Set the generic signature of this extension.
-  void setGenericSignature(GenericSignature *sig) {
-    assert(!GenericSig && "Already have generic signature");
-    GenericSig = sig;
+  GenericSignature *getGenericSignature() const {
+    return GenericEnv ? GenericEnv->getGenericSignature() : nullptr;
   }
 
   /// Retrieve the generic context for this extension.
@@ -2068,7 +2053,7 @@ public:
   ///
   /// \sa getFormalAccess
   /// \sa isAccessibleFrom
-  const DeclContext *
+  AccessScope
   getFormalAccessScope(const DeclContext *useDC = nullptr) const;
 
   /// Returns the access level that actually controls how a declaration should
@@ -2254,16 +2239,6 @@ public:
 class GenericTypeDecl : public TypeDecl, public DeclContext {
   GenericParamList *GenericParams = nullptr;
 
-  /// \brief The generic signature of this type.
-  ///
-  /// This is the semantic representation of a generic parameters and the
-  /// requirements placed on them.
-  ///
-  /// FIXME: The generic parameters here are also derivable from
-  /// \c GenericParams. However, we likely want to make \c GenericParams
-  /// the parsed representation, and not part of the module file.
-  GenericSignature *GenericSig = nullptr;
-
   /// \brief The generic context of this type.
   ///
   /// This is the mapping between interface types and archetypes for the
@@ -2287,31 +2262,25 @@ public:
   /// this function is not generic.
   void setGenericParams(GenericParamList *params);
 
-  /// Set the generic signature of this type.
-  void setGenericSignature(GenericSignature *sig) {
-    assert(!GenericSig && "Already have generic signature");
-    GenericSig = sig;
-  }
-
   /// Retrieve the innermost generic parameter types.
   ArrayRef<GenericTypeParamType *> getInnermostGenericParamTypes() const {
-    if (!GenericSig)
+    if (auto sig = getGenericSignature())
+      return sig->getInnermostGenericParams();
+    else
       return { };
-
-    return GenericSig->getInnermostGenericParams();
   }
 
   /// Retrieve the generic requirements.
   ArrayRef<Requirement> getGenericRequirements() const {
-    if (!GenericSig)
+    if (auto sig = getGenericSignature())
+      return sig->getRequirements();
+    else
       return { };
-
-    return GenericSig->getRequirements();
   }
 
   /// Retrieve the generic signature.
   GenericSignature *getGenericSignature() const {
-    return GenericSig;
+    return GenericEnv ? GenericEnv->getGenericSignature() : nullptr;
   }
   
   void setIsValidatingGenericSignature(bool validating=true) {
@@ -3333,7 +3302,7 @@ class ProtocolDecl : public NominalTypeDecl {
 
   ArrayRef<ProtocolDecl *> InheritedProtocols;
 
-  llvm::DenseMap<ValueDecl *, ConcreteDeclRef> DefaultWitnesses;
+  llvm::DenseMap<ValueDecl *, Witness> DefaultWitnesses;
 
   /// True if the protocol has requirements that cannot be satisfied (e.g.
   /// because they could not be imported from Objective-C).
@@ -3482,10 +3451,10 @@ public:
 
   /// Returns the default witness for a requirement, or nullptr if there is
   /// no default.
-  ConcreteDeclRef getDefaultWitness(ValueDecl *requirement) const;
+  Witness getDefaultWitness(ValueDecl *requirement) const;
 
   /// Record the default witness for a requirement.
-  void setDefaultWitness(ValueDecl *requirement, ConcreteDeclRef witness);
+  void setDefaultWitness(ValueDecl *requirement, Witness witness);
 
   /// Set the list of inherited protocols.
   void setInheritedProtocols(ArrayRef<ProtocolDecl *> protocols) {
@@ -3782,6 +3751,10 @@ protected:
     AbstractStorageDeclBits.Overridden = false;
   }
 public:
+
+  /// \brief Should this declaration be treated as if annotated with transparent
+  /// attribute.
+  bool isTransparent() const;
 
   /// \brief Determine whether this storage is a static member, if it
   /// is a member.  Currently only variables can be static.
@@ -4560,7 +4533,6 @@ protected:
   };
 
   GenericParamList *GenericParams;
-  GenericSignature *GenericSig;
   GenericEnvironment *GenericEnv;
 
   CaptureInfo Captures;
@@ -4570,15 +4542,14 @@ protected:
 
   ImportAsMemberStatus IAMStatus;
 
-  AbstractFunctionDecl(DeclKind Kind, DeclContext *Parent,
-                       DeclName Name, SourceLoc NameLoc,
-                       bool Throws, SourceLoc ThrowsLoc,
+  AbstractFunctionDecl(DeclKind Kind, DeclContext *Parent, DeclName Name,
+                       SourceLoc NameLoc, bool Throws, SourceLoc ThrowsLoc,
                        unsigned NumParameterLists,
                        GenericParamList *GenericParams)
       : ValueDecl(Kind, Parent, Name, NameLoc),
         DeclContext(DeclContextKind::AbstractFunctionDecl, Parent),
-        Body(nullptr), GenericParams(nullptr), GenericSig(nullptr),
-        GenericEnv(nullptr), ThrowsLoc(ThrowsLoc) {
+        Body(nullptr), GenericParams(nullptr), GenericEnv(nullptr),
+        ThrowsLoc(ThrowsLoc) {
     setBodyKind(BodyKind::None);
     setGenericParams(GenericParams);
     AbstractFunctionDeclBits.NumParameterLists = NumParameterLists;
@@ -4594,15 +4565,15 @@ protected:
   }
 
   void setGenericParams(GenericParamList *GenericParams);
-  
+
 public:
-  void setGenericSignature(GenericSignature *GenericSig) {
-    assert(!this->GenericSig && "already have signature?");
-    this->GenericSig = GenericSig;
-  }
-  
+
+  /// \brief Should this declaration be treated as if annotated with transparent
+  /// attribute.
+  bool isTransparent() const;
+
   GenericSignature *getGenericSignature() const {
-    return GenericSig;
+    return GenericEnv ? GenericEnv->getGenericSignature() : nullptr;
   }
 
   /// Retrieve the generic context for this function.
@@ -6039,10 +6010,10 @@ inline bool ValueDecl::isImportAsMember() const {
 }
 
 inline ArrayRef<Requirement> ExtensionDecl::getGenericRequirements() const {
-  if (!GenericSig)
+  if (auto sig = getGenericSignature())
+    return sig->getRequirements();
+  else
     return { };
-
-  return GenericSig->getRequirements();
 }
 
 inline bool Decl::isPotentiallyOverridable() const {

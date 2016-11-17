@@ -28,7 +28,6 @@
 #include "swift/AST/ParameterList.h"
 #include "swift/AST/Types.h"
 #include "swift/ClangImporter/ClangModule.h"
-#include "swift/Parse/Token.h"
 #include "swift/Basic/Fallthrough.h"
 #include "clang/Sema/Lookup.h"
 #include "clang/Sema/Sema.h"
@@ -1421,9 +1420,9 @@ Type ClangImporter::Implementation::importPropertyType(
       clang::ObjCPropertyDecl::OBJC_PR_unsafe_unretained;
 
   ImportTypeKind importKind;
-  // HACK: Accessibility decls are always imported using bridged types,
-  // because they're inconsistent between properties and methods.
-  if (isAccessibilityDecl(decl)) {
+  // HACK: Certain decls are always imported using bridged types,
+  // because that's what a standalone method would do.
+  if (shouldImportPropertyAsAccessors(decl)) {
     importKind = ImportTypeKind::Property;
   } else {
     switch (decl->getSetterKind()) {
@@ -1550,7 +1549,8 @@ ParameterList *ClangImporter::Implementation::importFunctionParameterList(
 
     // Check nullability of the parameter.
     OptionalTypeKind OptionalityOfParam =
-        getParamOptionality(param, !nonNullArgs.empty() && nonNullArgs[index]);
+        getParamOptionality(SwiftContext.LangOpts.EffectiveLanguageVersion,
+                            param, !nonNullArgs.empty() && nonNullArgs[index]);
 
     ImportTypeKind importKind = ImportTypeKind::Parameter;
     if (param->hasAttr<clang::CFReturnsRetainedAttr>())
@@ -1933,8 +1933,9 @@ Type ClangImporter::Implementation::importMethodType(
 
     // Check nullability of the parameter.
     OptionalTypeKind optionalityOfParam
-      = getParamOptionality(param,
-                            !nonNullArgs.empty() && nonNullArgs[paramIndex]);
+        = getParamOptionality(SwiftContext.LangOpts.EffectiveLanguageVersion,
+                              param,
+                              !nonNullArgs.empty() && nonNullArgs[paramIndex]);
 
     bool allowNSUIntegerAsIntInParam = isFromSystemModule;
     if (allowNSUIntegerAsIntInParam) {

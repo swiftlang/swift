@@ -1017,15 +1017,15 @@ void PatternMatchEmission::emitWildcardDispatch(ClauseMatrix &clauses,
   // Bind the rest of the patterns.
   bindIrrefutablePatterns(clauses[row], args, !hasGuard, hasMultipleItems);
 
-  SGF.usingImplicitVariablesForPattern(clauses[row].getCasePattern(), dyn_cast<CaseStmt>(stmt), [&]{
-    // Emit the guard branch, if it exists.
-    if (guardExpr) {
+  // Emit the guard branch, if it exists.
+  if (guardExpr) {
+    SGF.usingImplicitVariablesForPattern(clauses[row].getCasePattern(), dyn_cast<CaseStmt>(stmt), [&]{
       this->emitGuardBranch(guardExpr, guardExpr, failure);
-    }
+    });
+  }
 
-    // Enter the row.
-    CompletionHandler(*this, args, clauses[row]);
-  });
+  // Enter the row.
+  CompletionHandler(*this, args, clauses[row]);
   assert(!SGF.B.hasValidInsertionPoint());
 }
 
@@ -1168,6 +1168,13 @@ void PatternMatchEmission::bindVariable(SILLocation loc, VarDecl *var,
                                         CanType formalValueType,
                                         bool isIrrefutable,
                                         bool hasMultipleItems) {
+  // If this binding is one of multiple patterns, each individual binding
+  // will just be let, and then the chosen value will get forwarded into
+  // a var box in the final shared case block.
+  bool forcedLet = hasMultipleItems && !var->isLet();
+  if (forcedLet)
+    var->setLet(true);
+  
   // Initialize the variable value.
   InitializationPtr init = SGF.emitInitializationForVarDecl(var);
 
@@ -1177,6 +1184,9 @@ void PatternMatchEmission::bindVariable(SILLocation loc, VarDecl *var,
   } else {
     std::move(rv).copyInto(SGF, loc, init.get());
   }
+  
+  if (forcedLet)
+    var->setLet(false);
 }
 
 /// Evaluate a guard expression and, if it returns false, branch to
@@ -1375,7 +1385,7 @@ emitTupleDispatch(ArrayRef<RowToSpecialize> rows, ConsumableManagedValue src,
       member = SGF.B.createTupleElementAddr(loc, v, i, fieldTy);
       if (!fieldTL.isAddressOnly())
         member =
-            SGF.B.createLoad(loc, member, LoadOwnershipQualifier::Unqualified);
+            fieldTL.emitLoad(SGF.B, loc, member, LoadOwnershipQualifier::Take);
     } else {
       member = SGF.B.createTupleExtract(loc, v, i, fieldTy);
     }
@@ -1445,9 +1455,9 @@ emitCastOperand(SILGenFunction &SGF, SILLocation loc,
     // Okay, if all we need to do is drop the value in an address,
     // this is easy.
     if (!hasAbstraction) {
-      SGF.B.createStore(loc, src.getFinalManagedValue().forward(SGF),
-                        init->getAddress(),
-                        StoreOwnershipQualifier::Unqualified);
+      SGF.B.emitStoreValueOperation(
+          loc, src.getFinalManagedValue().forward(SGF), init->getAddress(),
+          StoreOwnershipQualifier::Init);
       init->finishInitialization(SGF);
       ConsumableManagedValue result =
         { init->getManagedAddress(), src.getFinalConsumption() };
@@ -1764,8 +1774,8 @@ emitEnumElementDispatch(ArrayRef<RowToSpecialize> rows,
         
         // Load a loadable data value.
         if (eltTL->isLoadable())
-          eltValue = SGF.B.createLoad(loc, eltValue,
-                                      LoadOwnershipQualifier::Unqualified);
+          eltValue = eltTL->emitLoad(SGF.B, loc, eltValue,
+                                     LoadOwnershipQualifier::Take);
       } else {
         eltValue = new (SGF.F.getModule()) SILArgument(caseBB, eltTy);
       }
@@ -1779,8 +1789,7 @@ emitEnumElementDispatch(ArrayRef<RowToSpecialize> rows,
         SILValue boxedValue = SGF.B.createProjectBox(loc, origCMV.getValue(), 0);
         eltTL = &SGF.getTypeLowering(boxedValue->getType());
         if (eltTL->isLoadable())
-          boxedValue = SGF.B.createLoad(loc, boxedValue,
-                                        LoadOwnershipQualifier::Unqualified);
+          boxedValue = SGF.B.createLoadBorrow(loc, boxedValue);
 
         // The boxed value may be shared, so we always have to copy it.
         eltCMV = getManagedSubobject(SGF, boxedValue, *eltTL,
@@ -2093,7 +2102,7 @@ void SILGenFunction::usingImplicitVariablesForPattern(Pattern *pattern, CaseStmt
 
   ArrayRef<CaseLabelItem> labelItems = stmt->getCaseLabelItems();
   auto expectedPattern = labelItems[0].getPattern();
-
+  
   if (labelItems.size() <= 1 || pattern == expectedPattern) {
     f();
     return;
@@ -2101,28 +2110,27 @@ void SILGenFunction::usingImplicitVariablesForPattern(Pattern *pattern, CaseStmt
 
   // Remap vardecls that the case body is expecting to the pattern var locations
   // for the given pattern, emit whatever, and switch back.
-  SmallVector<VarDecl *, 4> expectedVars;
-  SmallVector<VarLoc, 4> savedVarLocs;
-  expectedPattern->collectVariables(expectedVars);
-
-  for (auto expected : expectedVars)
-    savedVarLocs.push_back(VarLocs[expected]);
+  SmallVector<VarDecl *, 4> Vars;
+  expectedPattern->collectVariables(Vars);
   
-  pattern->forEachVariable([&](VarDecl *VD) {
-    if (!VD->hasName())
-      return;
-    for (auto expected : expectedVars) {
-      if (expected->hasName() && expected->getName() == VD->getName()) {
-        VarLocs[expected] = VarLocs[VD];
+  auto variableSwapper = [&] {
+    pattern->forEachVariable([&](VarDecl *VD) {
+      if (!VD->hasName())
         return;
+      for (auto expected : Vars) {
+        if (expected->hasName() && expected->getName() == VD->getName()) {
+          auto swap = VarLocs[expected];
+          VarLocs[expected] = VarLocs[VD];
+          VarLocs[VD] = swap;
+          return;
+        }
       }
-    }
-  });
+    });
+  };
   
+  variableSwapper();
   f();
-
-  for (unsigned index = 0; index < savedVarLocs.size(); index++)
-    VarLocs[expectedVars[index]] = savedVarLocs[index];
+  variableSwapper();
 }
 
 void SILGenFunction::emitSwitchStmt(SwitchStmt *S) {
@@ -2149,6 +2157,41 @@ void SILGenFunction::emitSwitchStmt(SwitchStmt *S) {
       JumpDest sharedDest = emission.getSharedCaseBlockDest(caseBlock,
                                                         row.hasFallthroughTo());
       Cleanups.emitBranchAndCleanups(sharedDest, caseBlock);
+    } else if (caseBlock->getCaseLabelItems().size() > 1) {
+      JumpDest sharedDest = emission.getSharedCaseBlockDest(caseBlock,
+                                                            row.hasFallthroughTo());
+      
+      // Generate the arguments from this row's pattern in the case block's expected order,
+      // and keep those arguments from being cleaned up, as we're passing the +1 along to
+      // the shared case block dest. (The cleanups still happen, as they are threaded through
+      // here messily, but the explicit retains here counteract them, and then the
+      // retain/release pair gets optimized out.)
+      ArrayRef<CaseLabelItem> labelItems = caseBlock->getCaseLabelItems();
+      SmallVector<SILValue, 4> args;
+      SmallVector<VarDecl *, 4> expectedVarOrder;
+      SmallVector<VarDecl *, 4> Vars;
+      labelItems[0].getPattern()->collectVariables(expectedVarOrder);
+      row.getCasePattern()->collectVariables(Vars);
+      
+      for (auto expected : expectedVarOrder) {
+        if (!expected->hasName())
+        continue;
+        for (auto var : Vars) {
+          if (var->hasName() && var->getName() == expected->getName()) {
+            auto value = VarLocs[var].value;
+            
+            for (auto cmv : argArray) {
+              if (cmv.getValue() == value) {
+                value = B.emitCopyValueOperation(CurrentSILLoc, value);
+                break;
+              }
+            }
+            args.push_back(value);
+            break;
+          }
+        }
+      }
+      Cleanups.emitBranchAndCleanups(sharedDest, caseBlock, args);
     } else {
       // However, if we don't have a fallthrough or a multi-pattern 'case', we
       // can just emit the body inline and save some dead blocks.

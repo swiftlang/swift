@@ -440,25 +440,23 @@ private:
                                      GenericParamList *outerParams = nullptr);
 
   /// Reads a set of requirements from \c DeclTypeCursor.
-  void readGenericRequirements(SmallVectorImpl<Requirement> &requirements);
+  void readGenericRequirements(SmallVectorImpl<Requirement> &requirements,
+                               llvm::BitstreamCursor &Cursor);
 
   /// Reads a GenericEnvironment from \c DeclTypeCursor.
   ///
-  /// Also returns the set of generic parameters read, in order, to help with
-  /// forming a GenericSignature.
+  /// The optional requirements are used to construct the signature without
+  /// attempting to deserialize any requirements, such as when reading SIL.
   GenericEnvironment *readGenericEnvironment(
-      SmallVectorImpl<GenericTypeParamType *> &paramTypes,
-      llvm::BitstreamCursor &Cursor);
+      llvm::BitstreamCursor &Cursor,
+      Optional<ArrayRef<Requirement>> optRequirements = None);
 
   /// Reads a GenericEnvironment followed by requirements from \c DeclTypeCursor.
   ///
-  /// Returns the GenericEnvironment and the signature formed from the
-  /// generic parameters of the environment, together with the
-  /// read requirements.
+  /// Returns the GenericEnvironment.
   ///
   /// Returns nullptr if there's no generic signature here.
-  std::pair<GenericSignature *, GenericEnvironment *>
-  maybeReadGenericSignature();
+  GenericEnvironment *maybeReadGenericEnvironment();
 
   /// Populates the vector with members of a DeclContext from \c DeclTypeCursor.
   ///
@@ -710,10 +708,14 @@ public:
   /// Reads a substitution record from \c DeclTypeCursor.
   ///
   /// If the record at the cursor is not a substitution, returns None.
-  Optional<Substitution> maybeReadSubstitution(llvm::BitstreamCursor &Cursor);
+  Optional<Substitution> maybeReadSubstitution(llvm::BitstreamCursor &Cursor,
+                                               GenericEnvironment *genericEnv =
+                                                nullptr);
 
   /// Recursively reads a protocol conformance from the given cursor.
-  ProtocolConformanceRef readConformance(llvm::BitstreamCursor &Cursor);
+  ProtocolConformanceRef readConformance(llvm::BitstreamCursor &Cursor,
+                                         GenericEnvironment *genericEnv =
+                                           nullptr);
 
   /// Read the given normal conformance from the current module file.
   NormalProtocolConformance *

@@ -265,8 +265,7 @@ namespace swift {
 /// of the requirements, because they will be inferred.
 GenericParamList *cloneGenericParams(ASTContext &ctx,
                                      DeclContext *dc,
-                                     GenericParamList *fromParams,
-                                     GenericParamList *outerParams) {
+                                     GenericParamList *fromParams) {
   // Clone generic parameters.
   SmallVector<GenericTypeParamDecl *, 2> toGenericParams;
   for (auto fromGP : *fromParams) {
@@ -283,7 +282,12 @@ GenericParamList *cloneGenericParams(ASTContext &ctx,
 
   auto toParams = GenericParamList::create(ctx, SourceLoc(), toGenericParams,
                                            SourceLoc());
+
+  auto outerParams = fromParams->getOuterParameters();
+  if (outerParams != nullptr)
+    outerParams = cloneGenericParams(ctx, dc, outerParams);
   toParams->setOuterParameters(outerParams);
+
   return toParams;
 }
 }
@@ -319,6 +323,15 @@ static void bindExtensionDecl(ExtensionDecl *ED, TypeChecker &TC) {
   // Dig out the extended type.
   auto extendedType = ED->getExtendedType();
 
+  // Hack to allow extending a generic typealias.
+  if (auto *unboundGeneric = extendedType->getAs<UnboundGenericType>()) {
+    if (auto *aliasDecl = dyn_cast<TypeAliasDecl>(unboundGeneric->getDecl())) {
+      extendedType = aliasDecl->getUnderlyingType()->getAnyNominal()
+          ->getDeclaredType();
+      ED->getExtendedTypeLoc().setType(extendedType);
+    }
+  }
+
   // Handle easy cases.
 
   // Cannot extend a metatype.
@@ -353,7 +366,7 @@ static void bindExtensionDecl(ExtensionDecl *ED, TypeChecker &TC) {
 
   // If the extended type is generic or is a protocol. Clone or create
   // the generic parameters.
-  if (extendedNominal->getGenericParams()) {
+  if (extendedNominal->getGenericParamsOfContext()) {
     if (auto proto = dyn_cast<ProtocolDecl>(extendedNominal)) {
       // For a protocol extension, build the generic parameter list.
       ED->setGenericParams(proto->createGenericParams(ED));
@@ -361,15 +374,14 @@ static void bindExtensionDecl(ExtensionDecl *ED, TypeChecker &TC) {
       // Clone the existing generic parameter list.
       ED->setGenericParams(
         cloneGenericParams(TC.Context, ED,
-                           extendedNominal->getGenericParams(),
-                           nullptr));
+                           extendedNominal->getGenericParamsOfContext()));
     }
   }
 
   // If we have a trailing where clause, deal with it now.
   // For now, trailing where clauses are only permitted on protocol extensions.
   if (auto trailingWhereClause = ED->getTrailingWhereClause()) {
-    if (!extendedNominal->getGenericParams()) {
+    if (!extendedNominal->getGenericParamsOfContext()) {
       // Only generic and protocol types are permitted to have
       // trailing where clauses.
       TC.diagnose(ED, diag::extension_nongeneric_trailing_where, extendedType)
@@ -505,6 +517,7 @@ static void typeCheckFunctionsAndExternalDecls(TypeChecker &TC) {
 
   } while (currentFunctionIdx < TC.definedFunctions.size() ||
            currentExternalDef < TC.Context.ExternalDefinitions.size() ||
+           !TC.ValidatedTypes.empty() ||
            !TC.UsedConformances.empty());
 
   // FIXME: Horrible hack. Store this somewhere more appropriate.
@@ -720,9 +733,8 @@ bool swift::performTypeLocChecking(ASTContext &Ctx, TypeLoc &T,
 }
 
 /// Expose TypeChecker's handling of GenericParamList to SIL parsing.
-std::pair<GenericSignature *, GenericEnvironment *>
-swift::handleSILGenericParams(ASTContext &Ctx,
-                              GenericParamList *genericParams,
+GenericEnvironment *
+swift::handleSILGenericParams(ASTContext &Ctx, GenericParamList *genericParams,
                               DeclContext *DC) {
   return TypeChecker(Ctx).handleSILGenericParams(genericParams, DC);
 }

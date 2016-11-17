@@ -101,7 +101,19 @@ class TestCharacterSet : TestCharacterSetSuper {
         let result = testString.trimmingCharacters(in: asciiLowercase)
         expectEqual(result, expected)
     }
-    
+
+    func testClosedRanges_SR_2988() {
+      // "CharacterSet.insert(charactersIn: ClosedRange) crashes on a closed ClosedRange<UnicodeScalar> containing U+D7FF"
+      let problematicChar = UnicodeScalar(0xD7FF)!
+      let range = capitalA...problematicChar
+      var characters = CharacterSet(charactersIn: range) // this should not crash
+      expectTrue(characters.contains(problematicChar))
+      characters.remove(charactersIn: range) // this should not crash
+      expectTrue(!characters.contains(problematicChar))
+      characters.insert(charactersIn: range) // this should not crash
+      expectTrue(characters.contains(problematicChar))
+    }
+
     func testInsertAndRemove() {
         var asciiUppercase = CharacterSet(charactersIn: UnicodeScalar(0x41)!...UnicodeScalar(0x5A)!)
         expectTrue(asciiUppercase.contains(UnicodeScalar(0x49)!))

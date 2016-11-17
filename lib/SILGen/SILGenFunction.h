@@ -198,6 +198,8 @@ public:
                 SILBasicBlock::iterator insertInst)
       : SILGenBuilder(gen, &*insertBB, insertInst) {}
 
+  SILGenModule &getSILGenModule() const { return SGM; }
+
   // Metatype instructions use the conformances necessary to instantiate the
   // type.
   
@@ -1153,7 +1155,11 @@ public:
   ManagedValue emitManagedRetain(SILLocation loc, SILValue v);
   ManagedValue emitManagedRetain(SILLocation loc, SILValue v,
                                  const TypeLowering &lowering);
-  
+
+  ManagedValue emitManagedLoadCopy(SILLocation loc, SILValue v);
+  ManagedValue emitManagedLoadCopy(SILLocation loc, SILValue v,
+                                   const TypeLowering &lowering);
+
   ManagedValue emitManagedRValueWithCleanup(SILValue v);
   ManagedValue emitManagedRValueWithCleanup(SILValue v,
                                             const TypeLowering &lowering);
@@ -1445,9 +1451,8 @@ public:
                                        SILValue foreignErrorSlot,
                                  const ForeignErrorConvention &foreignError);
 
-  void emitForeignErrorBlock(SILLocation loc,
-                             SILBasicBlock *errorBB,
-                             ManagedValue errorSlot);
+  void emitForeignErrorBlock(SILLocation loc, SILBasicBlock *errorBB,
+                             Optional<ManagedValue> errorSlot);
 
   void emitForeignErrorCheck(SILLocation loc,
                              SmallVectorImpl<ManagedValue> &directResults,

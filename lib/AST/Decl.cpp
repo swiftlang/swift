@@ -15,6 +15,7 @@
 //===----------------------------------------------------------------------===//
 
 #include "swift/AST/Decl.h"
+#include "swift/AST/AccessScope.h"
 #include "swift/AST/ArchetypeBuilder.h"
 #include "swift/AST/AST.h"
 #include "swift/AST/ASTContext.h"
@@ -348,18 +349,14 @@ case DeclKind::ID: return cast<ID##Decl>(this)->getLoc();
   llvm_unreachable("Unknown decl kind");
 }
 
-bool Decl::isTransparent() const {
+bool AbstractStorageDecl::isTransparent() const {
+  return getAttrs().hasAttribute<TransparentAttr>();
+}
+
+bool AbstractFunctionDecl::isTransparent() const {
   // Check if the declaration had the attribute.
   if (getAttrs().hasAttribute<TransparentAttr>())
     return true;
-
-  // Check if this is a function declaration which is within a transparent
-  // extension.
-  if (const AbstractFunctionDecl *FD = dyn_cast<AbstractFunctionDecl>(this)) {
-    if (const ExtensionDecl *ED = dyn_cast<ExtensionDecl>(FD->getParent()))
-      if (ED->isTransparent())
-        return true;
-  }
 
   // If this is an accessor, check if the transparent attribute was set
   // on the value decl.
@@ -1877,18 +1874,13 @@ Accessibility ValueDecl::getFormalAccessImpl(const DeclContext *useDC) const {
   return getFormalAccess();
 }
 
-const DeclContext *
-ValueDecl::getFormalAccessScope(const DeclContext *useDC) const {
+AccessScope ValueDecl::getFormalAccessScope(const DeclContext *useDC) const {
   const DeclContext *result = getDeclContext();
   Accessibility access = getFormalAccess(useDC);
 
   while (!result->isModuleScopeContext()) {
-    if (result->isLocalContext())
-      return result;
-
-    if (access == Accessibility::Private) {
-      return result;
-    }
+    if (result->isLocalContext() || access == Accessibility::Private)
+      return AccessScope(result, true);
 
     if (auto enclosingNominal = dyn_cast<NominalTypeDecl>(result)) {
       access = std::min(access, enclosingNominal->getFormalAccess(useDC));
@@ -1913,15 +1905,15 @@ ValueDecl::getFormalAccessScope(const DeclContext *useDC) const {
   case Accessibility::Private:
   case Accessibility::FilePrivate:
     assert(result->isModuleScopeContext());
-    return result;
+    return AccessScope(result, access == Accessibility::Private);
   case Accessibility::Internal:
-    return result->getParentModule();
+    return AccessScope(result->getParentModule());
   case Accessibility::Public:
   case Accessibility::Open:
-    return nullptr;
+    return AccessScope::getPublic();
   }
 
-  return result;
+  llvm_unreachable("unknown accessibility level");
 }
 
 
@@ -2965,19 +2957,22 @@ void ProtocolDecl::createGenericParamsIfMissing() {
 
 /// Returns the default witness for a requirement, or nullptr if there is
 /// no default.
-ConcreteDeclRef ProtocolDecl::getDefaultWitness(ValueDecl *requirement) const {
+Witness ProtocolDecl::getDefaultWitness(ValueDecl *requirement) const {
   loadAllMembers();
 
   auto found = DefaultWitnesses.find(requirement);
   if (found == DefaultWitnesses.end())
-    return nullptr;
+    return Witness();
   return found->second;
 }
 
 /// Record the default witness for a requirement.
-void ProtocolDecl::setDefaultWitness(ValueDecl *requirement,
-                                     ConcreteDeclRef witness) {
+void ProtocolDecl::setDefaultWitness(ValueDecl *requirement, Witness witness) {
   assert(witness);
+  // The first type we insert a default witness, register a destructor for
+  // this type.
+  if (DefaultWitnesses.empty())
+    getASTContext().addDestructorCleanup(DefaultWitnesses);
   auto pair = DefaultWitnesses.insert(std::make_pair(requirement, witness));
   assert(pair.second && "Already have a default witness!");
   (void) pair;
@@ -4594,7 +4589,9 @@ DynamicSelfType *FuncDecl::getDynamicSelfInterface() const {
 
 SourceRange FuncDecl::getSourceRange() const {
   SourceLoc StartLoc = getStartLoc();
-  if (StartLoc.isInvalid()) return SourceRange();
+  if (StartLoc.isInvalid() ||
+      getBodyKind() == BodyKind::Synthesize)
+    return SourceRange();
 
   if (getBodyKind() == BodyKind::Unparsed ||
       getBodyKind() == BodyKind::Skipped)
