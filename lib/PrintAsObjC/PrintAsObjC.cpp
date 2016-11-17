@@ -159,7 +159,7 @@ public:
 
   void print(const Decl *D) {
     PrettyStackTraceDecl trace("printing", D);
-    visit(const_cast<Decl *>(D));
+    ASTVisitor::visit(const_cast<Decl *>(D));
   }
 
   void printAdHocCategory(iterator_range<const ValueDecl * const *> members) {
@@ -194,8 +194,6 @@ public:
   }
 
 private:
-  using ASTVisitor::visit;
-
   /// Prints a protocol adoption list: <code>&lt;NSCoding, NSCopying&gt;</code>
   ///
   /// This method filters out non-ObjC protocols, along with the special
@@ -241,7 +239,7 @@ private:
         protocolMembersOptional = VD->getAttrs().hasAttribute<OptionalAttr>();
         os << (protocolMembersOptional ? "@optional\n" : "@required\n");
       }
-      visit(const_cast<ValueDecl*>(VD));
+      ASTVisitor::visit(const_cast<ValueDecl*>(VD));
     }
   }
 
@@ -821,7 +819,7 @@ private:
       break;
     case NullabilityPrintKind::After:
       os << ' ';
-      [[clang::fallthrough]];
+      LLVM_FALLTHROUGH;
     case NullabilityPrintKind::Before:
       switch (*kind) {
       case OTK_None:
@@ -1536,7 +1534,7 @@ public:
   }
 };
 
-class ReferencedTypeFinder : private TypeVisitor<ReferencedTypeFinder> {
+class ReferencedTypeFinder : public TypeVisitor<ReferencedTypeFinder> {
   friend TypeVisitor;
 
   ModuleDecl &M;
@@ -1782,6 +1780,8 @@ public:
     case EmissionState::Defined:
       return true;
     }
+
+    llvm_unreachable("Unhandled EmissionState in switch.");
   }
 
   void forwardDeclare(const NominalTypeDecl *NTD,
