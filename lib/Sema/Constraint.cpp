@@ -184,6 +184,8 @@ Constraint *Constraint::clone(ConstraintSystem &cs) const {
   case ConstraintKind::Disjunction:
     return createDisjunction(cs, getNestedConstraints(), getLocator());
   }
+
+  llvm_unreachable("Unhandled ConstraintKind in switch.");
 }
 
 void Constraint::print(llvm::raw_ostream &Out, SourceManager *sm) const {
@@ -324,8 +326,15 @@ void Constraint::dump(ConstraintSystem *CS) const {
   // Print all type variables as $T0 instead of _ here.
   llvm::SaveAndRestore<bool> X(CS->getASTContext().LangOpts.
                                DebugConstraintSolver, true);
-  
+  // Disabled MSVC warning: only for use within the debugger
+#if defined(_MSC_VER)
+#pragma warning(push)
+#pragma warning(disable: 4996)
+#endif
   dump(&CS->getASTContext().SourceMgr);
+#if defined(_MSC_VER)
+#pragma warning(pop)
+#endif
 }
 
 
@@ -417,6 +426,8 @@ StringRef Fix::getName(FixKind kind) {
   case FixKind::CoerceToCheckedCast:
     return "fix: as to as!";
   }
+
+  llvm_unreachable("Unhandled FixKind in switch.");
 }
 
 void Fix::print(llvm::raw_ostream &Out, ConstraintSystem *cs) const {

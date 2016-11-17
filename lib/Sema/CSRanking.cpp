@@ -150,6 +150,8 @@ static bool sameOverloadChoice(const OverloadChoice &x,
   case OverloadChoiceKind::TupleIndex:
     return x.getTupleIndex() == y.getTupleIndex();
   }
+
+  llvm_unreachable("Unhandled OverloadChoiceKind in switch.");
 }
 
 /// Compare two declarations to determine whether one is a witness of the other.

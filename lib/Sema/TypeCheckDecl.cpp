@@ -169,6 +169,8 @@ public:
     case RawValueKey::Kind::Tombstone:
       return 0;
     }
+
+    llvm_unreachable("Unhandled RawValueKey in switch.");
   }
   static bool isEqual(RawValueKey a, RawValueKey b) {
     if (a.kind != b.kind)
@@ -188,6 +190,8 @@ public:
     case RawValueKey::Kind::Tombstone:
       return true;
     }
+
+    llvm_unreachable("Unhandled RawValueKey in switch.");
   }
 };
   
@@ -2577,6 +2581,8 @@ static LiteralExpr *getAutomaticRawValueExpr(TypeChecker &TC,
                 diag::enum_non_integer_raw_value_auto_increment);
     return nullptr;
   }
+
+  llvm_unreachable("Unhandled AutomaticEnumValueKind in switch.");
 }
 
 static void checkEnumRawValues(TypeChecker &TC, EnumDecl *ED) {
@@ -7616,6 +7622,8 @@ static Optional<std::string> buildDefaultInitializerString(TypeChecker &tc,
     return buildDefaultInitializerString(
              tc, dc, cast<VarPattern>(pattern)->getSubPattern());
   }
+
+  llvm_unreachable("Unhandled PatternKind in switch.");
 }
 
 /// Diagnose a class that does not have any initializers.

@@ -629,6 +629,8 @@ namespace {
     case FunctionRefKind::Compound:
       return FunctionRefKind::Compound;
     }
+
+    llvm_unreachable("Unhandled FunctionRefKind in switch.");
   }
 
   /// Update a direct callee expression node that has a function reference kind

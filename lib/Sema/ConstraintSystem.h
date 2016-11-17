@@ -1729,8 +1729,7 @@ public:
   ArrayRef<typename std::iterator_traits<It>::value_type>
   allocateCopy(It start, It end) {
     typedef typename std::iterator_traits<It>::value_type T;
-    T *result = (T*)getAllocator().Allocate(sizeof(T)*(end-start),
-                                            __alignof__(T));
+    T *result = (T*)getAllocator().Allocate(sizeof(T)*(end-start), alignof(T));
     unsigned i;
     for (i = 0; start != end; ++start, ++i)
       new (result+i) T(*start);

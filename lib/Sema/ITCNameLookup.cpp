@@ -163,6 +163,8 @@ bool IterativeTypeChecker::isUnqualifiedLookupInDeclContextSatisfied(
                                                       payload.Name,
                                                       payload.Loc});
   }
+
+  llvm_unreachable("Unhandled DeclContextKind in switch.");
 }
 
 void IterativeTypeChecker::processUnqualifiedLookupInDeclContext(

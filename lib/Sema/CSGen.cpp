@@ -1238,6 +1238,8 @@ namespace {
         return unsafeRawPointer->getDeclaredType();
       }
       }
+
+      llvm_unreachable("Unhandled MagicIdentifierLiteralExpr in switch.");
     }
 
     Type visitObjectLiteralExpr(ObjectLiteralExpr *expr) {

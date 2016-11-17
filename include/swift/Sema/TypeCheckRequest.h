@@ -23,6 +23,7 @@
 #include "swift/Basic/SourceLoc.h"
 #include "llvm/ADT/PointerUnion.h"
 #include "llvm/ADT/STLExtras.h"
+#include "llvm/Support/ErrorHandling.h"
 #include <cassert>
 #include <utility>
 
@@ -97,6 +98,8 @@ private:
 
 #include "swift/Sema/TypeCheckRequestKinds.def"
     }
+
+    llvm_unreachable("Unhandled PayloadKind in switch.");
   }
 
 public:

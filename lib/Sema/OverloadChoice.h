@@ -229,6 +229,8 @@ public:
     case OverloadChoiceKind::TupleIndex:
       return false;
     }
+
+    llvm_unreachable("Unhandled OverloadChoiceKind in switch.");
   }
 
   /// \brief Retrieve the declaration that corresponds to this overload choice.
