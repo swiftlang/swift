@@ -52,7 +52,11 @@ private:
   friend struct llvm::ilist_traits<SILBasicBlock>;
   SILBasicBlock() : Parent(nullptr) {}
   void operator=(const SILBasicBlock &) = delete;
+
+  // Work around MSVC error: attempting to reference a deleted function.
+#if !defined(_MSC_VER) || defined(__clang__)
   void operator delete(void *Ptr, size_t) = delete;
+#endif
 
   SILBasicBlock(SILFunction *F, SILBasicBlock *afterBB = nullptr);
 

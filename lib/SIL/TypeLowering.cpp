@@ -338,6 +338,8 @@ namespace {
       case ExistentialRepresentation::Metatype:
         return asImpl().handleTrivial(type);
       }
+
+      llvm_unreachable("Unhandled ExistentialRepresentation in switch.");
     }
     RetTy visitProtocolType(CanProtocolType type) {
       return visitExistentialType(type);
@@ -1210,8 +1212,8 @@ TypeConverter::~TypeConverter() {
 void *TypeLowering::operator new(size_t size, TypeConverter &tc,
                                  IsDependent_t dependent) {
   return dependent
-    ? tc.DependentBPA.Allocate(size, alignof(TypeLowering))
-    : tc.IndependentBPA.Allocate(size, alignof(TypeLowering));
+    ? tc.DependentBPA.Allocate(size, alignof(TypeLowering&))
+    : tc.IndependentBPA.Allocate(size, alignof(TypeLowering&));
 }
 
 const TypeLowering *TypeConverter::find(TypeKey k) {
@@ -1812,6 +1814,8 @@ CanAnyFunctionType TypeConverter::makeConstantInterfaceType(SILDeclRef c) {
     return getIVarInitDestroyerInterfaceType(cast<ClassDecl>(vd),
                                              c.isForeign, Context, true);
   }
+
+  llvm_unreachable("Unhandled SILDeclRefKind in switch.");
 }
 
 /// Get the generic environment for an entity.
@@ -1858,6 +1862,8 @@ TypeConverter::getConstantGenericEnvironment(SILDeclRef c) {
     // Use the generic environment of the containing type.
     return c.getDecl()->getDeclContext()->getGenericEnvironmentOfContext();
   }
+
+  llvm_unreachable("Unhandled SILDeclRefKind in switch.");
 }
 
 SILType TypeConverter::getSubstitutedStorageType(AbstractStorageDecl *value,

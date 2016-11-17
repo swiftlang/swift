@@ -309,4 +309,6 @@ bool FunctionOwnershipEvaluator::evaluate(SILInstruction *I) {
     return true;
   }
   }
+
+  llvm_unreachable("Unhandled OwnershipQualifiedKind in switch.");
 }

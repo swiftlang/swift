@@ -28,8 +28,11 @@ public:
   void *operator new(size_t) = delete;
   void *operator new[](size_t) = delete;
 
+  // Work around MSVC error: attempting to reference a deleted function.
+#if !defined(_MSC_VER) || defined(__clang__)
   /// Disable non-placement delete.
   void operator delete(void *) = delete;
+#endif
   void operator delete[](void *) = delete;
 
   /// Custom version of 'new' that uses the SILModule's BumpPtrAllocator with

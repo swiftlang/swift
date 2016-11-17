@@ -36,7 +36,11 @@ SILFunctionType::getSILArgumentConvention(unsigned index) const {
 
 class SILArgument : public ValueBase {
   void operator=(const SILArgument &) = delete;
+
+  // Work around MSVC error: attempting to reference a deleted function.
+#if !defined(_MSC_VER) || defined(__clang__)
   void operator delete(void *Ptr, size_t) = delete;
+#endif
 
   SILBasicBlock *ParentBB;
   const ValueDecl *Decl;
