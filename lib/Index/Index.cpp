@@ -49,6 +49,8 @@ printArtificialName(const swift::ValueDecl *VD, llvm::raw_ostream &OS) {
   case AccessorKind::IsMutableAddressor:
     return true;
   }
+
+  llvm_unreachable("Unhandled AccessorKind in switch.");
 }
 
 static bool printDisplayName(const swift::ValueDecl *D, llvm::raw_ostream &OS) {
@@ -595,6 +597,8 @@ static SymbolSubKind getSubKindForAccessor(AccessorKind AK) {
   case AccessorKind::IsMaterializeForSet:
     llvm_unreachable("unexpected MaterializeForSet");
   }
+
+  llvm_unreachable("Unhandled AccessorKind in switch.");
 }
 
 bool IndexSwiftASTWalker::reportPseudoAccessor(AbstractStorageDecl *D,
