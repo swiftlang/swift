@@ -223,3 +223,10 @@ func testArrays() {
   nullableArrayParameters([], [], [])
   nullableArrayParameters(nil, nil, nil)
 }
+
+func testVaList() {
+  withVaList([]) {
+    hasVaList($0) // okay
+  }
+  hasVaList(nil) // expected-error {{nil is not compatible with expected argument type 'CVaListPointer'}}
+}
