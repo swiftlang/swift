@@ -988,6 +988,21 @@ bool ArchetypeBuilder::addSuperclassRequirement(PotentialArchetype *T,
         });
   }
 
+  // Make sure the concrete type fulfills the superclass requirement
+  // of the archetype.
+  if (T->isConcreteType()) {
+    Type concrete = T->getConcreteType();
+    if (!Superclass->isExactSuperclassOf(concrete, getLazyResolver())) {
+      Diags.diagnose(T->getSameTypeSource().getLoc(),
+                     diag::type_does_not_inherit,
+                     T->getRootParam(), concrete, Superclass)
+        .highlight(Source.getLoc());
+      return true;
+    }
+
+    return false;
+  }
+
   // Local function to handle the update of superclass conformances
   // when the superclass constraint changes.
   auto updateSuperclassConformances = [&] {
@@ -1272,6 +1287,17 @@ bool ArchetypeBuilder::addSameTypeRequirementToConcrete(
   // Record the requirement.
   T->ArchetypeOrConcreteType = NestedType::forConcreteType(Concrete);
   T->SameTypeSource = Source;
+
+  // Make sure the concrete type fulfills the superclass requirement
+  // of the archetype.
+  if (T->Superclass) {
+    if (!T->Superclass->isExactSuperclassOf(Concrete, getLazyResolver())) {
+      Diags.diagnose(Source.getLoc(), diag::type_does_not_inherit,
+                     T->getRootParam(), Concrete, T->Superclass)
+        .highlight(T->SuperclassSource->getLoc());
+      return true;
+    }
+  }
 
   // Recursively resolve the associated types to their concrete types.
   RequirementSource nestedSource(RequirementSource::Redundant, Source.getLoc());
