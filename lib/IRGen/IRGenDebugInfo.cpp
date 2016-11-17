@@ -1058,12 +1058,11 @@ llvm::DINodeArray IRGenDebugInfo::getTupleElements(
     unsigned Flags, DeclContext *DeclContext, unsigned &SizeInBits) {
   SmallVector<llvm::Metadata *, 16> Elements;
   unsigned OffsetInBits = 0;
-  auto genericSig = IGM.getSILTypes().getCurGenericContext();
   for (auto ElemTy : TupleTy->getElementTypes()) {
     auto &elemTI =
-      IGM.getTypeInfoForUnlowered(AbstractionPattern(genericSig,
-                                                  ElemTy->getCanonicalType()),
-                                  ElemTy);
+      IGM.getTypeInfoForUnlowered(
+          AbstractionPattern(ElemTy->getCanonicalType()),
+          ElemTy);
     DebugTypeInfo DbgTy(ElemTy, elemTI, DeclContext);
     Elements.push_back(
         createMemberType(DbgTy, StringRef(), OffsetInBits, Scope, File, Flags));

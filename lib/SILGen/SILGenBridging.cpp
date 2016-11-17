@@ -175,8 +175,6 @@ emitBridgeObjectiveCToNative(SILGenFunction &gen,
         cast<AbstractFunctionDecl>(witness.getDecl())->getGenericSignature())
     witnessGenericSignature = genericSig->getCanonicalSignature();
 
-  GenericContextScope genericContextScope(gen.SGM.Types,
-                                          witnessGenericSignature);
   return gen.emitApply(loc, ManagedValue::forUnmanaged(witnessRef),
                        substitutions,
                        { objcValue, ManagedValue::forUnmanaged(metatypeValue) },
@@ -358,10 +356,12 @@ ManagedValue SILGenFunction::emitFuncToBlock(SILLocation loc,
   // Build the invoke function signature. The block will capture the original
   // function value.
   auto fnTy = fn.getType().castTo<SILFunctionType>();
-  auto fnInterfaceTy = cast<SILFunctionType>(
-    F.mapTypeOutOfContext(fnTy)->getCanonicalType());
-  auto blockInterfaceTy = cast<SILFunctionType>(
-    F.mapTypeOutOfContext(blockTy)->getCanonicalType());
+  auto fnInterfaceTy =
+    F.mapTypeOutOfContext(SILType::getPrimitiveObjectType(fnTy))
+      .castTo<SILFunctionType>();
+  auto blockInterfaceTy =
+    F.mapTypeOutOfContext(SILType::getPrimitiveObjectType(blockTy))
+      .castTo<SILFunctionType>();
 
   auto storageTy = SILBlockStorageType::get(fnTy);
   auto storageInterfaceTy = SILBlockStorageType::get(fnInterfaceTy);

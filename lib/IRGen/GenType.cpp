@@ -16,6 +16,7 @@
 
 #include "swift/AST/CanTypeVisitor.h"
 #include "swift/AST/Decl.h"
+#include "swift/AST/GenericEnvironment.h"
 #include "swift/AST/IRGenOptions.h"
 #include "swift/AST/PrettyStackTrace.h"
 #include "swift/AST/Types.h"
@@ -660,31 +661,35 @@ TypeConverter::~TypeConverter() {
 void TypeConverter::pushGenericContext(CanGenericSignature signature) {
   if (!signature)
     return;
-  
-  // Push the generic context down to the SIL TypeConverter, so we can share
-  // archetypes with SIL.
-  IGM.getSILTypes().pushGenericContext(signature);
+  assert(!GenericSig);
+  GenericSig = signature;
+
+  auto moduleDecl = IGM.getSwiftModule();
+  GenericEnv = moduleDecl->getASTContext()
+      .getCanonicalGenericEnvironment(GenericSig, moduleDecl);
 }
 
 void TypeConverter::popGenericContext(CanGenericSignature signature) {
   if (!signature)
     return;
-
-  // Pop the SIL TypeConverter's generic context too.
-  IGM.getSILTypes().popGenericContext(signature);
-  
+  assert(signature == GenericSig);
+  GenericSig = CanGenericSignature();
+  GenericEnv = nullptr;
   Types.DependentCache.clear();
 }
 
-ArchetypeBuilder &TypeConverter::getArchetypes() {
-  auto moduleDecl = IGM.getSwiftModule();
-  auto genericSig = IGM.getSILTypes().getCurGenericContext();
-  return *moduleDecl->getASTContext()
-      .getOrCreateArchetypeBuilder(genericSig, moduleDecl);
+SILType TypeConverter::mapTypeIntoContext(SILType type) {
+  if (!type.hasTypeParameter())
+    return type;
+
+  return type.subst(IGM.getSILModule(),
+                    IGM.getSwiftModule(),
+                    GenericEnv->getInterfaceToArchetypeMap(),
+                    GenericSig);
 }
 
-ArchetypeBuilder &IRGenModule::getContextArchetypes() {
-  return Types.getArchetypes();
+SILType IRGenModule::mapTypeIntoContext(SILType type) {
+  return Types.mapTypeIntoContext(type);
 }
 
 /// Add a temporary forward declaration for a type.  This will live
@@ -1139,10 +1144,8 @@ TypeCacheEntry TypeConverter::getTypeEntry(CanType canonicalTy) {
   auto contextTy = canonicalTy;
   if (contextTy->hasTypeParameter()) {
     // The type we got should be lowered, so lower it like a SILType.
-    contextTy = getArchetypes().substDependentType(IGM.getSILModule(),
-                                   SILType::getPrimitiveAddressType(contextTy))
-      .getSwiftRValueType();
-    
+    contextTy = mapTypeIntoContext(SILType::getPrimitiveAddressType(contextTy))
+        .getSwiftRValueType();
   }
   
   // Fold archetypes to unique exemplars. Any archetype with the same

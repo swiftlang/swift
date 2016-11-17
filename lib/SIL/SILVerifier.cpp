@@ -231,14 +231,6 @@ public:
     // TODO: We should compare generic signatures. Class and witness methods
     // allow variance in "self"-fulfilled parameters; other functions must
     // match exactly.
-    auto signature1 = type1->getGenericSignature();
-    auto signature2 = type2->getGenericSignature();
-
-    auto getAnyOptionalObjectTypeInContext = [&](CanGenericSignature sig,
-                                                 SILType type) {
-      Lowering::GenericContextScope context(F.getModule().Types, sig);
-      return type.getAnyOptionalObjectType();
-    };
 
     // TODO: More sophisticated param and return ABI compatibility rules could
     // diverge.
@@ -292,8 +284,8 @@ public:
           continue;
         
         // Optional and IUO are interchangeable if their elements are.
-        auto aObject = getAnyOptionalObjectTypeInContext(signature1, aa);
-        auto bObject = getAnyOptionalObjectTypeInContext(signature2, bb);
+        auto aObject = aa.getAnyOptionalObjectType();
+        auto bObject = bb.getAnyOptionalObjectType();
         if (aObject && bObject
             && areABICompatibleParamsOrReturns(aObject, bObject))
           continue;

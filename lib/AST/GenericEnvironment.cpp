@@ -65,13 +65,14 @@ bool GenericEnvironment::containsPrimaryArchetype(
 }
 
 Type GenericEnvironment::mapTypeOutOfContext(ModuleDecl *M, Type type) const {
+  // FIXME: Nuke AllowLoweredTypes
   type = type.subst(M, ArchetypeToInterfaceMap, SubstFlags::AllowLoweredTypes);
   assert(!type->hasArchetype() && "not fully substituted");
   return type;
 }
 
 Type GenericEnvironment::mapTypeIntoContext(ModuleDecl *M, Type type) const {
-  type = type.subst(M, InterfaceToArchetypeMap, SubstFlags::AllowLoweredTypes);
+  type = type.subst(M, InterfaceToArchetypeMap);
   assert((!type->hasTypeParameter() || type->hasError()) &&
          "not fully substituted");
   return type;

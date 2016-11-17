@@ -63,7 +63,7 @@ public:
     virtual bool hasLimitedInterestingConformances(CanType type) const = 0;
 
     /// Return the limited interesting conformances for an interesting type.
-    virtual GenericSignature::ConformsToArray
+    virtual ArrayRef<ProtocolDecl *>
       getInterestingConformances(CanType type) const = 0;
 
     virtual ~InterestingKeysCallback() = default;
@@ -75,7 +75,7 @@ public:
     bool isInterestingType(CanType type) const override;
     bool hasInterestingType(CanType type) const override;
     bool hasLimitedInterestingConformances(CanType type) const override;
-    GenericSignature::ConformsToArray
+    ArrayRef<ProtocolDecl *>
       getInterestingConformances(CanType type) const override;
   };
 

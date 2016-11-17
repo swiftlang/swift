@@ -87,7 +87,7 @@ protected:
 
   FulfillmentMap Fulfillments;
 
-  GenericSignature::ConformsToArray getConformsTo(Type t) {
+  ArrayRef<ProtocolDecl *> getConformsTo(Type t) {
     return Generics->getConformsTo(t, M);
   }
 
@@ -279,7 +279,7 @@ bool PolymorphicConvention::considerType(CanType type, IsExact_t isExact,
     bool hasLimitedInterestingConformances(CanType type) const override {
       return true;
     }
-    GenericSignature::ConformsToArray
+    ArrayRef<ProtocolDecl *>
     getInterestingConformances(CanType type) const override {
       return Self.getConformsTo(type);
     }
@@ -434,6 +434,8 @@ public:
 private:
   CanType getTypeInContext(CanType type) const;
 
+  SILType getTypeInContext(SILType type) const;
+
   CanType getArgTypeInContext(unsigned paramIndex) const;
 
   /// Fulfill local type data from any extra information associated with
@@ -462,8 +464,13 @@ CanType EmitPolymorphicParameters::getTypeInContext(CanType type) const {
   return Fn.mapTypeIntoContext(type)->getCanonicalType();
 }
 
+SILType EmitPolymorphicParameters::getTypeInContext(SILType type) const {
+  return Fn.mapTypeIntoContext(type);
+}
+
 CanType EmitPolymorphicParameters::getArgTypeInContext(unsigned paramIndex) const {
-  return getTypeInContext(FnType->getParameters()[paramIndex].getType());
+  return getTypeInContext(FnType->getParameters()[paramIndex].getSILType())
+      .getSwiftRValueType();
 }
 
 void EmitPolymorphicParameters::bindExtraSource(const MetadataSource &source,
@@ -1261,7 +1268,7 @@ public:
           bool hasLimitedInterestingConformances(CanType type) const override {
             return false;
           }
-          GenericSignature::ConformsToArray
+          ArrayRef<ProtocolDecl *>
           getInterestingConformances(CanType type) const override {
             llvm_unreachable("no limits");
           }

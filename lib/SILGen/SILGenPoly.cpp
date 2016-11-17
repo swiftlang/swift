@@ -2370,24 +2370,24 @@ CanSILFunctionType SILGenFunction::buildThunkType(
   for (auto &param : params) {
     interfaceParams.push_back(
       SILParameterInfo(
-          F.mapTypeOutOfContext(param.getType())
-              ->getCanonicalType(),
+          F.mapTypeOutOfContext(param.getSILType())
+              .getSwiftRValueType(),
           param.getConvention()));
   }
 
   SmallVector<SILResultInfo, 4> interfaceResults;
   for (auto &result : expectedType->getAllResults()) {
     auto interfaceResult = result.getWithType(
-        F.mapTypeOutOfContext(result.getType())
-            ->getCanonicalType());
+        F.mapTypeOutOfContext(result.getSILType())
+            .getSwiftRValueType());
     interfaceResults.push_back(interfaceResult);
   }
 
   Optional<SILResultInfo> interfaceErrorResult;
   if (expectedType->hasErrorResult()) {
     interfaceErrorResult = SILResultInfo(
-      F.mapTypeOutOfContext(expectedType->getErrorResult().getType())
-          ->getCanonicalType(),
+      F.mapTypeOutOfContext(expectedType->getErrorResult().getSILType())
+          .getSwiftRValueType(),
       expectedType->getErrorResult().getConvention());
   }
   

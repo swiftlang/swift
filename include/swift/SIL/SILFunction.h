@@ -591,6 +591,10 @@ public:
   /// therefore contain context archetypes, to an interface type.
   Type mapTypeOutOfContext(Type type) const;
 
+  /// Map the given type, which is based on a contextual SILFunctionType and may
+  /// therefore contain context archetypes, to an interface type.
+  SILType mapTypeOutOfContext(SILType type) const;
+
   /// Converts the given function definition to a declaration.
   void convertToDeclaration();
 

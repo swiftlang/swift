@@ -35,18 +35,6 @@
 using namespace swift;
 using namespace irgen;
 
-static SILType applyContextArchetypes(IRGenFunction &IGF,
-                                      SILType type) {
-  if (!type.hasTypeParameter()) {
-    return type;
-  }
-
-  auto substType =
-    IGF.IGM.getContextArchetypes().substDependentType(type.getSwiftRValueType())
-      ->getCanonicalType();
-  return SILType::getPrimitiveType(substType, type.getCategory());
-}
-
 /// Given a substituted explosion, re-emit it as an unsubstituted one.
 ///
 /// For example, given an explosion which begins with the
@@ -57,11 +45,11 @@ static SILType applyContextArchetypes(IRGenFunction &IGF,
 void irgen::reemitAsUnsubstituted(IRGenFunction &IGF,
                                   SILType expectedTy, SILType substTy,
                                   Explosion &in, Explosion &out) {
-  expectedTy = applyContextArchetypes(IGF, expectedTy);
+  expectedTy = IGF.IGM.mapTypeIntoContext(expectedTy);
 
   ExplosionSchema expectedSchema = IGF.IGM.getSchema(expectedTy);
   assert(expectedSchema.size() ==
-         IGF.IGM.getExplosionSize(applyContextArchetypes(IGF, substTy)));
+         IGF.IGM.getExplosionSize(IGF.IGM.mapTypeIntoContext(substTy)));
   for (ExplosionSchema::Element &elt : expectedSchema) {
     llvm::Value *value = in.claimNext();
     assert(elt.isScalar());

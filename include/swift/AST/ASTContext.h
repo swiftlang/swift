@@ -58,6 +58,7 @@ namespace swift {
   class ExtensionDecl;
   class ForeignRepresentationInfo;
   class FuncDecl;
+  class GenericEnvironment;
   class InFlightDiagnostic;
   class LazyResolver;
   class PatternBindingDecl;
@@ -760,10 +761,10 @@ public:
   /// not necessarily loaded.
   void getVisibleTopLevelClangModules(SmallVectorImpl<clang::Module*> &Modules) const;
 
-  /// Retrieve or create the stored archetype builder for the given
+  /// Retrieve or create the canonical GenericEnvironment for the given
   /// canonical generic signature and module.
-  ArchetypeBuilder *getOrCreateArchetypeBuilder(CanGenericSignature sig,
-                                                ModuleDecl *mod);
+  GenericEnvironment *getCanonicalGenericEnvironment(CanGenericSignature sig,
+                                                     ModuleDecl *mod);
 
   /// Retrieve the inherited name set for the given class.
   const InheritedNameSet *getAllPropertyNames(ClassDecl *classDecl,

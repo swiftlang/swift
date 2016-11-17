@@ -81,6 +81,8 @@ public:
 private:
   llvm::DenseMap<ProtocolDecl*, const ProtocolInfo*> Protocols;
   const TypeInfo *FirstType;
+  CanGenericSignature GenericSig;
+  GenericEnvironment *GenericEnv = nullptr;
   
   const ProtocolInfo *FirstProtocol;
   const LoadableTypeInfo *NativeObjectTI = nullptr;
@@ -172,10 +174,12 @@ public:
   /// Exit a generic context.
   void popGenericContext(CanGenericSignature signature);
 
-  /// Get the ArchetypeBuilder for the current generic context. Fails if there
-  /// is no generic context.
-  ArchetypeBuilder &getArchetypes();
-  
+  /// Get the current generic environment.
+  GenericEnvironment *getGenericEnvironment();
+
+  /// Map a SILType into the archetypes of the current generic context.
+  SILType mapTypeIntoContext(SILType type);
+
 private:
   // Debugging aids.
 #ifndef NDEBUG

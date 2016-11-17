@@ -85,13 +85,6 @@ inline CanSILFunctionType adjustFunctionType(CanSILFunctionType t,
 }
   
 
-/// Flag used to place context-dependent TypeLowerings in their own arena which
-/// can be disposed when a generic context is exited.
-enum IsDependent_t : unsigned {
-  IsNotDependent = false,
-  IsDependent = true
-};
-  
 /// Extended type information used by SIL.
 class TypeLowering {
 public:
@@ -335,10 +328,8 @@ public:
   }
 
   /// Allocate a new TypeLowering using the TypeConverter's allocator.
-  void *operator new(size_t size, TypeConverter &tc,
-                     IsDependent_t dependent);
-  void *operator new[](size_t size, TypeConverter &tc,
-                       IsDependent_t dependent);
+  void *operator new(size_t size, TypeConverter &tc);
+  void *operator new[](size_t size, TypeConverter &tc);
 
   // Forbid 'new FooTypeLowering' and try to forbid 'delete tl'.
   // The latter is made challenging because the existence of the
@@ -399,9 +390,6 @@ class TypeConverter {
   friend class TypeLowering;
 
   llvm::BumpPtrAllocator IndependentBPA;
-  /// BumpPtrAllocator for types dependent on contextual generic parameters,
-  /// which is reset when the generic context is popped.
-  llvm::BumpPtrAllocator DependentBPA;
 
   enum : unsigned {
     /// There is a unique entry with this uncurry level in the
@@ -411,15 +399,17 @@ class TypeConverter {
   };
 
   struct CachingTypeKey {
-    GenericSignature *Sig;
+    GenericSignature *OrigSig;
     AbstractionPattern::CachingKey OrigType;
+    GenericSignature *SubstSig;
     CanType SubstType;
     unsigned UncurryLevel;
 
     friend bool operator==(const CachingTypeKey &lhs,
                            const CachingTypeKey &rhs) {
-      return lhs.Sig == rhs.Sig
+      return lhs.OrigSig == rhs.OrigSig
           && lhs.OrigType == rhs.OrigType
+          && lhs.SubstSig == rhs.SubstSig
           && lhs.SubstType == rhs.SubstType
           && lhs.UncurryLevel == rhs.UncurryLevel;
     }
@@ -432,6 +422,10 @@ class TypeConverter {
   struct TypeKey {
     /// An unsubstituted version of a type, dictating its abstraction patterns.
     AbstractionPattern OrigType;
+
+    /// The generic signature describing dependent types in the substituted
+    /// type.
+    CanGenericSignature SubstSig;
 
     /// The substituted version of the type, dictating the types that
     /// should be used in the lowered type.
@@ -446,6 +440,7 @@ class TypeConverter {
                    ? OrigType.getGenericSignature()
                    : nullptr),
                OrigType.getCachingKey(),
+               SubstSig,
                SubstType,
                UncurryLevel };
     }
@@ -453,19 +448,15 @@ class TypeConverter {
     bool isCacheable() const {
       return OrigType.hasCachingKey();
     }
-    
-    IsDependent_t isDependent() const {
-      if (SubstType->hasTypeParameter())
-        return IsDependent;
-      return IsNotDependent;
-    }
   };
 
   friend struct llvm::DenseMapInfo<CachingTypeKey>;
   
-  TypeKey getTypeKey(AbstractionPattern origTy, CanType substTy,
+  TypeKey getTypeKey(AbstractionPattern origTy,
+                     CanGenericSignature substSig,
+                     CanType substTy,
                      unsigned uncurryLevel) {
-    return {origTy, substTy, uncurryLevel};
+    return {origTy, substSig, substTy, uncurryLevel};
   }
   
   struct OverrideKey {
@@ -491,12 +482,7 @@ class TypeConverter {
   /// Insert a mapping into the cache.
   void insert(TypeKey k, const TypeLowering *tl);
   
-  /// Mapping for types independent on contextual generic parameters, which is
-  /// cleared when the generic context is popped.
   llvm::DenseMap<CachingTypeKey, const TypeLowering *> IndependentTypes;
-  /// Mapping for types dependent on contextual generic parameters, which is
-  /// cleared when the generic context is popped.
-  llvm::DenseMap<CachingTypeKey, const TypeLowering *> DependentTypes;
   
   llvm::DenseMap<SILDeclRef, SILConstantInfo> ConstantTypes;
   
@@ -577,16 +563,22 @@ public:
   
   /// Lowers a Swift type to a SILType, and returns the SIL TypeLowering
   /// for that type.
-  const TypeLowering &getTypeLowering(Type t, unsigned uncurryLevel = 0) {
-    AbstractionPattern pattern(CurGenericContext, t->getCanonicalType());
-    return getTypeLowering(pattern, t, uncurryLevel);
+  const TypeLowering &getTypeLowering(Type t, unsigned uncurryLevel = 0,
+                                      CanGenericSignature genericSig
+                                          = CanGenericSignature()) {
+    if (!genericSig)
+      genericSig = CurGenericContext;
+    AbstractionPattern pattern(genericSig, t->getCanonicalType());
+    return getTypeLowering(pattern, t, uncurryLevel, genericSig);
   }
 
   /// Lowers a Swift type to a SILType according to the abstraction
   /// patterns of the given original type.
   const TypeLowering &getTypeLowering(AbstractionPattern origType,
                                       Type substType,
-                                      unsigned uncurryLevel = 0);
+                                      unsigned uncurryLevel = 0,
+                                      CanGenericSignature genericSig
+                                          = CanGenericSignature());
 
   /// Returns the SIL TypeLowering for an already lowered SILType. If the
   /// SILType is an address, returns the TypeLowering for the pointed-to
@@ -594,14 +586,19 @@ public:
   const TypeLowering &getTypeLowering(SILType t);
 
   // Returns the lowered SIL type for a Swift type.
-  SILType getLoweredType(Type t, unsigned uncurryLevel = 0) {
-    return getTypeLowering(t, uncurryLevel).getLoweredType();
+  SILType getLoweredType(Type t, unsigned uncurryLevel = 0,
+                         CanGenericSignature genericSig
+                             = CanGenericSignature()) {
+    return getTypeLowering(t, uncurryLevel, genericSig).getLoweredType();
   }
 
   // Returns the lowered SIL type for a Swift type.
   SILType getLoweredType(AbstractionPattern origType, Type substType,
-                         unsigned uncurryLevel = 0) {
-    return getTypeLowering(origType, substType, uncurryLevel).getLoweredType();
+                         unsigned uncurryLevel = 0,
+                         CanGenericSignature genericSig
+                            = CanGenericSignature()) {
+    return getTypeLowering(origType, substType, uncurryLevel, genericSig)
+        .getLoweredType();
   }
 
   SILType getLoweredLoadableType(Type t, unsigned uncurryLevel = 0) {
@@ -736,24 +733,6 @@ public:
   CanGenericSignature getEffectiveGenericSignature(AnyFunctionRef fn,
                                                    CaptureInfo captureInfo);
 
-  /// Push a generic function context. See GenericContextScope for an RAII
-  /// interface to this function.
-  ///
-  /// Types containing generic parameter references must be lowered in a generic
-  /// context. There can be at most one level of generic context active at any
-  /// point in time.
-  void pushGenericContext(CanGenericSignature sig);
-
-  /// Return the current generic context.  This should only be used in
-  /// the type-conversion routines.
-  CanGenericSignature getCurGenericContext() const {
-    return CurGenericContext;
-  }
-  
-  /// Pop a generic function context. See GenericContextScope for an RAII
-  /// interface to this function. There must be an active generic context.
-  void popGenericContext(CanGenericSignature sig);
-  
   /// Known types for bridging.
 #define BRIDGING_KNOWN_TYPE(BridgedModule,BridgedType) \
   CanType get##BridgedType##Type();
@@ -797,7 +776,8 @@ public:
                                   CanAnyFunctionType origInterfaceType);
 private:
   CanType getLoweredRValueType(AbstractionPattern origType, CanType substType,
-                               unsigned uncurryLevel);
+                               unsigned uncurryLevel,
+                               CanGenericSignature genericSig);
 
   Type getLoweredCBridgedType(AbstractionPattern pattern, Type t,
                               bool canBridgeBool,
@@ -826,26 +806,6 @@ TypeLowering::getSemanticTypeLowering(TypeConverter &TC) const {
   return *this;
 }
 
-/// RAII interface to push a generic context.
-class GenericContextScope {
-  TypeConverter &TC;
-  CanGenericSignature Sig;
-public:
-  GenericContextScope(TypeConverter &TC, CanGenericSignature sig)
-    : TC(TC), Sig(sig)
-  {
-    TC.pushGenericContext(sig);
-  }
-  
-  ~GenericContextScope() {
-    TC.popGenericContext(Sig);
-  }
-  
-private:
-  GenericContextScope(const GenericContextScope&) = delete;
-  GenericContextScope &operator=(const GenericContextScope&) = delete;
-};
-  
 } // namespace Lowering
 } // namespace swift
 
@@ -860,19 +820,22 @@ namespace llvm {
 
     // Use the second field because the first field can validly be null.
     static CachingTypeKey getEmptyKey() {
-      return {nullptr, APCachingKey(), CanTypeInfo::getEmptyKey(), 0};
+      return {nullptr, APCachingKey(), nullptr, CanTypeInfo::getEmptyKey(), 0};
     }
     static CachingTypeKey getTombstoneKey() {
-      return {nullptr, APCachingKey(), CanTypeInfo::getTombstoneKey(), 0};
+      return {nullptr, APCachingKey(), nullptr, CanTypeInfo::getTombstoneKey(), 0};
     }
     static unsigned getHashValue(CachingTypeKey val) {
-      auto hashSig =
-        DenseMapInfo<swift::GenericSignature *>::getHashValue(val.Sig);
+      auto hashOrigSig =
+        DenseMapInfo<swift::GenericSignature *>::getHashValue(val.OrigSig);
       auto hashOrig =
         CachingKeyInfo::getHashValue(val.OrigType);
       auto hashSubst =
         DenseMapInfo<swift::CanType>::getHashValue(val.SubstType);
-      return hash_combine(hashSig, hashOrig, hashSubst, val.UncurryLevel);
+      auto hashSubstSig =
+        DenseMapInfo<swift::GenericSignature *>::getHashValue(val.SubstSig);
+      return hash_combine(hashOrigSig, hashOrig, hashSubstSig, hashSubst,
+                          val.UncurryLevel);
     }
     static bool isEqual(CachingTypeKey LHS, CachingTypeKey RHS) {
       return LHS == RHS;

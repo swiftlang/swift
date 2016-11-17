@@ -1183,16 +1183,15 @@ void CallEmission::emitToMemory(Address addr,
   // We're never being asked to do anything with *formal*
   // indirect results here, just the possibility of a direct-in-SIL
   // result that's actually being passed indirectly.
-  CanType origResultType = origFnType->getSILResult().getSwiftRValueType();
+  SILType origResultType = origFnType->getSILResult();
   CanType substResultType = substFnType->getSILResult().getSwiftRValueType();
 
-  if (origResultType->hasTypeParameter())
-    origResultType = IGF.IGM.getContextArchetypes()
-      .substDependentType(origResultType)
-      ->getCanonicalType();
+  if (origResultType.hasTypeParameter())
+    origResultType = IGF.IGM.mapTypeIntoContext(origResultType);
 
-  if (origResultType != substResultType) {
-    auto origTy = IGF.IGM.getStoragePointerTypeForLowered(origResultType);
+  if (origResultType.getSwiftRValueType() != substResultType) {
+    auto origTy = IGF.IGM.getStoragePointerTypeForLowered(
+        origResultType.getSwiftRValueType());
     origAddr = IGF.Builder.CreateBitCast(origAddr, origTy);
   }
 
