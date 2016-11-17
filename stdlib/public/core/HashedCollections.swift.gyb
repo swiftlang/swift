@@ -1163,6 +1163,12 @@ internal func _compareSets<Element>(_ lhs: Set<Element>, _ rhs: Set<Element>)
   return (true, lhs.count == rhs.count)
 }
 
+// FIXME: rdar://problem/23549059 (Optimize == for Set)
+// Look into initially trying to compare the two sets by directly comparing the
+// contents of both buffers in order. If they happen to have the exact same
+// ordering we can get the `true` response without ever hashing. If the two
+// buffers' contents differ at all then we have to fall back to hashing the
+// rest of the elements (but we don't need to hash any prefix that did match).
 extension Set {
   /// Returns a Boolean value indicating whether two sets have equal elements.
   ///
@@ -3590,15 +3596,6 @@ final internal class _SwiftDeferredNS${Self}<${TypeParametersDecl}>
       object: _heapStorageBridgedPtr, desired: newStorage)
   }
 
-  /// Detach the buffer of bridged ${Self} elements.
-  ///
-  /// Call this before mutating the ${Self} buffer owned by this owner.
-  internal func deinitializeHeapStorageBridged() {
-    // Perform a non-atomic store because buffer should be
-    // uniquely-referenced.
-    _heapStorageBridgedPtr.pointee = nil
-  }
-
   /// Returns the bridged ${Self} values.
   internal var bridgedBuffer: BridgedBuffer {
     return BridgedBuffer(_storage: _bridgedStorage!)
@@ -3608,6 +3605,11 @@ final internal class _SwiftDeferredNS${Self}<${TypeParametersDecl}>
     if _fastPath(_bridgedStorage != nil) {
       return
     }
+
+    // FIXME: rdar://problem/19486139 (split bridged buffers for keys and values)
+    // We bridge keys and values unconditionally here, even if one of them
+    // actually is verbatim bridgeable (e.g. Dictionary<Int, AnyObject>).
+    // Investigate only allocating the buffer for a Set in this case.
 
     // Create buffer for bridged data.
     let bridged = BridgedBuffer(capacity: nativeBuffer.capacity, unhashable: ())
