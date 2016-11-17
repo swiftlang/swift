@@ -44,6 +44,9 @@ inline static StringRef getName(TopLevelKey Key) {
   case TopLevelKey::BuildTime: return "build_time";
   case TopLevelKey::Inputs: return "inputs";
   }
+
+  // Work around MSVC warning: not all control paths return a value
+  llvm_unreachable("All switch cases are covered");
 }
 
 /// \returns The string identifier used to represent the given status in a
@@ -64,6 +67,9 @@ getIdentifierForInputInfoStatus(CompileJobAction::InputInfo::Status Status) {
   case CompileJobAction::InputInfo::NeedsNonCascadingBuild:
     return "!private";
   }
+
+  // Work around MSVC warning: not all control paths return a value
+  llvm_unreachable("All switch cases are covered");
 }
 
 /// \returns The status corresponding to the string identifier used in a
