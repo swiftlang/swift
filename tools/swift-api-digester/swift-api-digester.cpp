@@ -1545,7 +1545,7 @@ public:
     for (unsigned long i = 0; i < std::max(Left.size(), Right.size()); i ++) {
       auto L = i < Left.size() ? Left[i] : nullptr;
       auto R = i < Right.size() ? Right[i] : nullptr;
-      if (*L == *R)
+      if (L && R && *L == *R)
         continue;
       if (!L || !R)
         Listener.foundRemoveAddMatch(L, R);
