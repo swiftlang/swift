@@ -1318,6 +1318,48 @@ bb0(%0 : $Builtin.RawPointer, %1: $Builtin.Int64):
   return %11 : $Int32
 }
 
+// CHECK-LABEL: sil @max_int_ult : $@convention(thin) (Builtin.Int32) -> Builtin.Int32
+// CHECK-NOT: builtin "cmp_ult_Int32"
+// CHECK: integer_literal $Builtin.Int1, 0
+sil @max_int_ult : $@convention(thin) (Builtin.Int32) -> Builtin.Int32 {
+bb0(%0 : $Builtin.Int32):
+  %minint = integer_literal $Builtin.Int32, -1
+  %cmp = builtin "cmp_ult_Int32"(%minint : $Builtin.Int32, %0 : $Builtin.Int32) : $Builtin.Int1
+  cond_br %cmp, bb1, bb2
+
+bb1:
+  %badret = integer_literal $Builtin.Int32, 0
+  br bb3(%badret : $Builtin.Int32)
+
+bb2:
+  %goodret = integer_literal $Builtin.Int32, 1
+  br bb3(%goodret : $Builtin.Int32)
+
+bb3(%ret : $Builtin.Int32):
+  return %ret : $Builtin.Int32
+}
+
+// CHECK-LABEL: sil @max_int_ule : $@convention(thin) (Builtin.Int32) -> Builtin.Int32
+// CHECK: builtin "cmp_ule_Int32"
+// CHECK-NOT: integer_literal $Builtin.Int1, 0
+sil @max_int_ule : $@convention(thin) (Builtin.Int32) -> Builtin.Int32 {
+bb0(%0 : $Builtin.Int32):
+  %minint = integer_literal $Builtin.Int32, -1
+  %cmp = builtin "cmp_ule_Int32"(%minint : $Builtin.Int32, %0 : $Builtin.Int32) : $Builtin.Int1
+  cond_br %cmp, bb1, bb2
+
+bb1:
+  %badret = integer_literal $Builtin.Int32, 0
+  br bb3(%badret : $Builtin.Int32)
+
+bb2:
+  %goodret = integer_literal $Builtin.Int32, 1
+  br bb3(%goodret : $Builtin.Int32)
+
+bb3(%ret : $Builtin.Int32):
+  return %ret : $Builtin.Int32
+}
+
 // CHECK-LABEL: sil @trunc_of_zext : $@convention(thin) (Builtin.Int16) -> Builtin.Int32
 // CHECK-NOT: builtin "zextOrBitCast_Int16_Int64"
 // CHECK-NOT: builtin "truncOrBitCast_Int64_Int32"
