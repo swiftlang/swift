@@ -14,10 +14,13 @@
 
 #include "swift/AST/Decl.h"
 #include "swift/Basic/Fallthrough.h"
+#include "swift/Basic/Statistic.h"
 #include "swift/SIL/SILModule.h"
 #include "swift/SILOptimizer/Utils/Local.h"
 
 #include <algorithm>
+
+#define DEBUG_TYPE "BasicCalleeAnalysis"
 
 using namespace swift;
 
@@ -127,6 +130,7 @@ void CalleeCache::computeWitnessMethodCalleesForWitnessTable(
 /// Compute the callees for each method that appears in a VTable or
 /// Witness Table.
 void CalleeCache::computeMethodCallees() {
+  SWIFT_FUNC_STAT;
   for (auto &VTable : M.getVTableList())
     computeClassMethodCalleesForClass(VTable.getClass());
 
