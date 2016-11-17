@@ -1481,7 +1481,7 @@ llvm::DIType *IRGenDebugInfo::createType(DebugTypeInfo DbgTy,
       // FIXME: Do something more clever based on the decl's mangled name.
       std::string FullModuleNameBuffer;
       StringRef ModulePath;
-      StringRef ModuleName;// = "__ObjC";
+      StringRef ModuleName = "__ObjC";
       if (auto *OwningModule = ClangDecl->getImportedOwningModule())
         ModuleName = OwningModule->getTopLevelModuleName();
 
