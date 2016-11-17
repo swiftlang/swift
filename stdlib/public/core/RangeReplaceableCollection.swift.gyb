@@ -724,7 +724,7 @@ extension RangeReplaceableCollection {
   /// measurements.
   ///
   ///     var measurements = [1.2, 1.5, 2.9, 1.2, 1.5]
-  ///     measurements.removeSubrange(1..<3)
+  ///     measurements.removeSubrange(1..<4)
   ///     print(measurements)
   ///     // Prints "[1.2, 1.5]"
   ///
@@ -936,7 +936,7 @@ extension RangeReplaceableCollection
   /// measurements.
   ///
   ///     var measurements = [1.2, 1.5, 2.9, 1.2, 1.5]
-  ///     measurements.removeSubrange(1..<3)
+  ///     measurements.removeSubrange(1..<4)
   ///     print(measurements)
   ///     // Prints "[1.2, 1.5]"
   ///
