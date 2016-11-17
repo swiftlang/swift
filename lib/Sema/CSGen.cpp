@@ -2455,7 +2455,10 @@ namespace {
 
     Type visitForcedCheckedCastExpr(ForcedCheckedCastExpr *expr) {
       auto &tc = CS.getTypeChecker();
-      
+      auto fromExpr = expr->getSubExpr();
+      if (!fromExpr) // Either wasn't constructed correctly or wasn't folded.
+        return nullptr;
+
       // Validate the resulting type.
       TypeResolutionOptions options = TR_AllowUnboundGenerics;
       options |= TR_InExpression;
@@ -2467,8 +2470,8 @@ namespace {
                                 CS.getConstraintLocator(expr));
       expr->getCastTypeLoc().setType(toType, /*validated=*/true);
 
-      auto fromType = expr->getSubExpr()->getType();
-      auto locator = CS.getConstraintLocator(expr->getSubExpr());
+      auto fromType = fromExpr->getType();
+      auto locator = CS.getConstraintLocator(fromExpr);
 
       // The source type can be checked-cast to the destination type.
       CS.addConstraint(ConstraintKind::CheckedCast, fromType, toType, locator);
@@ -2517,6 +2520,9 @@ namespace {
 
     Type visitConditionalCheckedCastExpr(ConditionalCheckedCastExpr *expr) {
       auto &tc = CS.getTypeChecker();
+      auto fromExpr = expr->getSubExpr();
+      if (!fromExpr) // Either wasn't constructed correctly or wasn't folded.
+        return nullptr;
 
       // Validate the resulting type.
       TypeResolutionOptions options = TR_AllowUnboundGenerics;
@@ -2529,8 +2535,8 @@ namespace {
                                 CS.getConstraintLocator(expr));
       expr->getCastTypeLoc().setType(toType, /*validated=*/true);
 
-      auto fromType = expr->getSubExpr()->getType();
-      auto locator = CS.getConstraintLocator(expr->getSubExpr());
+      auto fromType = fromExpr->getType();
+      auto locator = CS.getConstraintLocator(fromExpr);
       CS.addConstraint(ConstraintKind::CheckedCast, fromType, toType, locator);
       return OptionalType::get(toType);
     }
