@@ -771,6 +771,10 @@ public:
   /// from this module.
   void emitOpaqueTypeMetadataRecord(const NominalTypeDecl *nominalDecl);
 
+  /// Some nominal type declarations require us to emit a fixed-size type
+  /// descriptor, because they have special layout considerations.
+  bool shouldEmitOpaqueTypeMetadataRecord(const NominalTypeDecl *nominalDecl);
+
   /// Emit reflection metadata records for builtin and imported types referenced
   /// from this module.
   void emitBuiltinReflectionMetadata();

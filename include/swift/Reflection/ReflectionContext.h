@@ -92,13 +92,13 @@ public:
         // Figure out where the stored properties of this class begin
         // by looking at the size of the superclass
         bool valid;
-        unsigned size, align;
-        std::tie(valid, size, align) =
-            this->readInstanceSizeAndAlignmentFromClassMetadata(MetadataAddress);
+        unsigned start;
+        std::tie(valid, start) =
+            this->readInstanceStartAndAlignmentFromClassMetadata(MetadataAddress);
 
         // Perform layout
         if (valid)
-          TI = TC.getClassInstanceTypeInfo(TR, size, align);
+          TI = TC.getClassInstanceTypeInfo(TR, start);
 
         break;
       }

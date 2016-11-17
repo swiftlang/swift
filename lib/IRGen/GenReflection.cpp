@@ -557,6 +557,17 @@ void IRGenModule::emitOpaqueTypeMetadataRecord(const NominalTypeDecl *nominalDec
   builder.emit();
 }
 
+bool IRGenModule::shouldEmitOpaqueTypeMetadataRecord(
+    const NominalTypeDecl *nominalDecl) {
+  if (nominalDecl->getAttrs().hasAttribute<AlignmentAttr>()) {
+    auto &ti = getTypeInfoForUnlowered(nominalDecl->getDeclaredTypeInContext());
+    if (isa<FixedTypeInfo>(ti))
+      return true;
+  }
+
+  return false;
+}
+
 /// Builds a constant LLVM struct describing the layout of a fixed-size
 /// SIL @box. These look like closure contexts, but without any necessary
 /// bindings or metadata sources, and only a single captured value.

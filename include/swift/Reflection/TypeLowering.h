@@ -246,8 +246,7 @@ public:
   ///
   /// Not cached.
   const TypeInfo *getClassInstanceTypeInfo(const TypeRef *TR,
-                                           unsigned start,
-                                           unsigned align);
+                                           unsigned start);
 
 private:
   friend class swift::reflection::LowerType;
