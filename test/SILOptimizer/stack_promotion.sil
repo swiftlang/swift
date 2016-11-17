@@ -402,6 +402,77 @@ bb3:
   return %l2 : $Int32
 }
 
+// CHECK-LABEL: sil @dont_move_above_operand_1
+// CHECK: alloc_ref [tail_elems $Int32
+// CHECK-NOT: dealloc_ref
+// CHECK: return
+sil @dont_move_above_operand_1 : $@convention(thin) () -> Int32 {
+bb0:
+  %s1 = alloc_stack $Int32
+  %i = integer_literal $Builtin.Word, 1
+  cond_br undef, bb1, bb2
+
+bb1:
+  br bb2
+
+bb2:
+  %o1 = alloc_ref [tail_elems $Int32 * %i : $Builtin.Word] $XX
+  %f1 = function_ref @xx_init : $@convention(thin) (@guaranteed XX) -> XX
+  %n1 = apply %f1(%o1) : $@convention(thin) (@guaranteed XX) -> XX
+  dealloc_stack %s1 : $*Int32
+  %l1 = ref_element_addr %n1 : $XX, #XX.x
+  %l2 = load %l1 : $*Int32
+  strong_release %n1 : $XX
+  return %l2 : $Int32
+}
+
+// CHECK-LABEL: sil @dont_move_above_operand_2
+// CHECK: alloc_ref [tail_elems $Int32
+// CHECK-NOT: dealloc_ref
+// CHECK: return
+sil @dont_move_above_operand_2 : $@convention(thin) () -> Int32 {
+bb0:
+  %s1 = alloc_stack $Int32
+  cond_br undef, bb1, bb2
+
+bb1:
+  br bb2
+
+bb2:
+  %i = integer_literal $Builtin.Word, 1
+  %o1 = alloc_ref [tail_elems $Int32 * %i : $Builtin.Word] $XX
+  %f1 = function_ref @xx_init : $@convention(thin) (@guaranteed XX) -> XX
+  %n1 = apply %f1(%o1) : $@convention(thin) (@guaranteed XX) -> XX
+  dealloc_stack %s1 : $*Int32
+  %l1 = ref_element_addr %n1 : $XX, #XX.x
+  %l2 = load %l1 : $*Int32
+  strong_release %n1 : $XX
+  return %l2 : $Int32
+}
+
+// CHECK-LABEL: sil @dont_move_above_operand_3
+// CHECK: alloc_ref [tail_elems $Int32
+// CHECK-NOT: dealloc_ref
+// CHECK: return
+sil @dont_move_above_operand_3 : $@convention(thin) (Builtin.Word) -> Int32 {
+bb0(%0 : $Builtin.Word):
+  %s1 = alloc_stack $Int32
+  cond_br undef, bb1, bb2(%0 : $Builtin.Word)
+
+bb1:
+  br bb2(%0 : $Builtin.Word)
+
+bb2(%i : $Builtin.Word):
+  %o1 = alloc_ref [tail_elems $Int32 * %i : $Builtin.Word] $XX
+  %f1 = function_ref @xx_init : $@convention(thin) (@guaranteed XX) -> XX
+  %n1 = apply %f1(%o1) : $@convention(thin) (@guaranteed XX) -> XX
+  dealloc_stack %s1 : $*Int32
+  %l1 = ref_element_addr %n1 : $XX, #XX.x
+  %l2 = load %l1 : $*Int32
+  strong_release %n1 : $XX
+  return %l2 : $Int32
+}
+
 // CHECK-LABEL: sil @promote_array
 // CHECK: [[B:%[0-9]+]] = alloc_ref [stack] [tail_elems $Int
 // CHECK: [[IF:%[0-9]+]] = function_ref @init_array_with_buffer

@@ -209,6 +209,7 @@ KNOWN_SETTINGS=(
     darwin-toolchain-application-cert  ""        "Application Cert name to codesign xctoolchain"
     darwin-toolchain-installer-cert    ""        "Installer Cert name to create installer pkg"
     darwin-toolchain-installer-package ""        "The path to installer pkg"
+    darwin-sdk-deployment-targets      ""        "semicolon-separated list of triples like 'fookit-ios-9.0;barkit-watchos-9.0'"
     build-jobs                         ""        "The number of parallel build jobs to use"
     darwin-toolchain-alias             ""        "Swift alias for toolchain"
     android-ndk                        ""        "An absolute path to the NDK that will be used as a libc implementation for Android builds"
@@ -641,6 +642,18 @@ function set_build_options_for_host() {
                     exit 1
                     ;;
             esac
+
+            if [[ "${DARWIN_SDK_DEPLOYMENT_TARGETS}" != "" ]]; then
+                local IFS=";"; DARWIN_SDK_DEPLOYMENT_TARGETS=($DARWIN_SDK_DEPLOYMENT_TARGETS)
+
+                for target in "${DARWIN_SDK_DEPLOYMENT_TARGETS[@]}"; do
+                    local IFS="-"; triple=($target)
+                    sdk_target=$(toupper ${triple[0]}_${triple[1]})
+                    swift_cmake_options+=(
+                        "-DSWIFTLIB_DEPLOYMENT_VERSION_${sdk_target}=${triple[2]}"
+                    )
+                done
+            fi
 
             llvm_cmake_options=(
                 -DCMAKE_OSX_DEPLOYMENT_TARGET:STRING="${cmake_osx_deployment_target}"

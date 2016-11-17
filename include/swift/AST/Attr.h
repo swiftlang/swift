@@ -28,6 +28,7 @@
 #include "swift/AST/KnownProtocols.h"
 #include "swift/AST/Ownership.h"
 #include "swift/AST/PlatformKind.h"
+#include "swift/AST/RawComment.h"
 #include "llvm/ADT/SmallVector.h"
 #include "llvm/ADT/StringRef.h"
 #include "llvm/Support/ErrorHandling.h"
@@ -958,15 +959,15 @@ public:
 class RawDocCommentAttr : public DeclAttribute {
   /// Source range of the attached comment.  This comment is located before
   /// the declaration.
-  CharSourceRange CommentRange;
+  const RawComment Comment;
 
 public:
-  RawDocCommentAttr(CharSourceRange CommentRange)
+  RawDocCommentAttr(RawComment Comment)
       : DeclAttribute(DAK_RawDocComment, SourceLoc(), SourceRange(),
                       /*Implicit=*/false),
-        CommentRange(CommentRange) {}
+        Comment(Comment) {}
 
-  CharSourceRange getCommentRange() const { return CommentRange; }
+  const RawComment &getComment() const { return Comment; }
 
   static bool classof(const DeclAttribute *DA) {
     return DA->getKind() == DAK_RawDocComment;

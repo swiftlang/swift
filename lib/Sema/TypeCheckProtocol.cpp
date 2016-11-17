@@ -1240,8 +1240,10 @@ matchWitness(TypeChecker &tc,
   auto finalize = [&](bool anyRenaming, 
                       ArrayRef<OptionalAdjustment> optionalAdjustments) 
                         -> RequirementMatch {
-    // Try to solve the system.
-    auto solution = cs->solveSingle(FreeTypeVariableBinding::Allow);
+    // Try to solve the system disallowing free type variables, because
+    // that would resolve in incorrect substitution matching when witness
+    // type has free type variables present as well.
+    auto solution = cs->solveSingle(FreeTypeVariableBinding::Disallow);
     if (!solution)
       return RequirementMatch(witness, MatchKind::TypeConflict,
                               witnessType);

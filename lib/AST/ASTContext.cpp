@@ -179,9 +179,6 @@ struct ASTContext::Implementation {
   /// \brief The module loader used to load Clang modules.
   ClangModuleLoader *TheClangModuleLoader = nullptr;
 
-  /// \brief Map from Swift declarations to raw comments.
-  llvm::DenseMap<const Decl *, RawComment> RawComments;
-
   /// \brief Map from Swift declarations to brief comments.
   llvm::DenseMap<const Decl *, StringRef> BriefComments;
 
@@ -1266,8 +1263,7 @@ ArchetypeBuilder *ASTContext::getOrCreateArchetypeBuilder(
 
   // Create a new archetype builder with the given signature.
   auto builder = new ArchetypeBuilder(*mod, Diags);
-  builder->addGenericSignature(sig, nullptr,
-                               /*treatRequirementsAsExplicit=*/true);
+  builder->addGenericSignature(sig, nullptr);
   
   // Store this archetype builder.
   Impl.ArchetypeBuilders[{sig, mod}]
@@ -1319,18 +1315,6 @@ Module *ASTContext::getStdlibModule(bool loadIfAbsent) {
     TheStdlibModule = getLoadedModule(StdlibModuleName);
   }
   return TheStdlibModule;
-}
-
-Optional<RawComment> ASTContext::getRawComment(const Decl *D) {
-  auto Known = Impl.RawComments.find(D);
-  if (Known == Impl.RawComments.end())
-    return None;
-
-  return Known->second;
-}
-
-void ASTContext::setRawComment(const Decl *D, RawComment RC) {
-  Impl.RawComments[D] = RC;
 }
 
 Optional<StringRef> ASTContext::getBriefComment(const Decl *D) {
@@ -1498,7 +1482,6 @@ size_t ASTContext::getTotalMemory() const {
     Impl.Allocator.getTotalMemory() +
     Impl.Cleanups.capacity() +
     llvm::capacity_in_bytes(Impl.ModuleLoaders) +
-    llvm::capacity_in_bytes(Impl.RawComments) +
     llvm::capacity_in_bytes(Impl.BriefComments) +
     llvm::capacity_in_bytes(Impl.LocalDiscriminators) +
     llvm::capacity_in_bytes(Impl.ModuleTypes) +

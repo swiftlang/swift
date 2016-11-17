@@ -529,14 +529,15 @@ func test_multiple_patterns1() {
     // CHECK:   cond_br {{%.*}}, [[FIRST_MATCH_CASE:bb[0-9]+]], [[FIRST_FAIL:bb[0-9]+]]
     // CHECK:   [[FIRST_MATCH_CASE]]:
     // CHECK:     debug_value [[FIRST_X:%.*]] :
-    // CHECK:     [[B1_FUNC:%.*]] = function_ref @_TF10switch_var1aFT1xSi_T_
-    // CHECK:     apply [[B1_FUNC]]([[FIRST_X]])
+    // CHECK:     br [[CASE_BODY:bb[0-9]+]]([[FIRST_X]] : $Int)
     // CHECK:   [[FIRST_FAIL]]:
     // CHECK:     cond_br {{%.*}}, [[SECOND_MATCH_CASE:bb[0-9]+]], [[SECOND_FAIL:bb[0-9]+]]
     // CHECK:   [[SECOND_MATCH_CASE]]:
     // CHECK:     debug_value [[SECOND_X:%.*]] :
-    // CHECK:     [[B2_FUNC:%.*]] = function_ref @_TF10switch_var1aFT1xSi_T_
-    // CHECK:     apply [[B2_FUNC]]([[SECOND_X]])
+    // CHECK:     br [[CASE_BODY]]([[SECOND_X]] : $Int)
+    // CHECK:   [[CASE_BODY]]([[BODY_VAR:%.*]] : $Int):
+    // CHECK:     [[A:%.*]] = function_ref @_TF10switch_var1aFT1xSi_T_
+    // CHECK:     apply [[A]]([[BODY_VAR]])
     a(x: x)
   default:
     // CHECK:   [[SECOND_FAIL]]:
@@ -559,15 +560,16 @@ func test_multiple_patterns2() {
     // CHECK:   apply {{%.*}}([[FIRST_X]], [[T1]])
     // CHECK:   cond_br {{%.*}}, [[FIRST_MATCH_CASE:bb[0-9]+]], [[FIRST_FAIL:bb[0-9]+]]
     // CHECK:   [[FIRST_MATCH_CASE]]:
-    // CHECK:     [[A:%.*]] = function_ref @_TF10switch_var1aFT1xSi_T_
-    // CHECK:     apply [[A]]([[FIRST_X]])
+    // CHECK:     br [[CASE_BODY:bb[0-9]+]]([[FIRST_X]] : $Int)
     // CHECK:   [[FIRST_FAIL]]:
     // CHECK:     debug_value [[SECOND_X:%.*]] :
     // CHECK:     apply {{%.*}}([[SECOND_X]], [[T2]])
     // CHECK:     cond_br {{%.*}}, [[SECOND_MATCH_CASE:bb[0-9]+]], [[SECOND_FAIL:bb[0-9]+]]
     // CHECK:   [[SECOND_MATCH_CASE]]:
+    // CHECK:     br [[CASE_BODY]]([[SECOND_X]] : $Int)
+    // CHECK:   [[CASE_BODY]]([[BODY_VAR:%.*]] : $Int):
     // CHECK:     [[A:%.*]] = function_ref @_TF10switch_var1aFT1xSi_T_
-    // CHECK:     apply [[A]]([[SECOND_X]])
+    // CHECK:     apply [[A]]([[BODY_VAR]])
     a(x: x)
   default:
     // CHECK:   [[SECOND_FAIL]]:
@@ -591,22 +593,22 @@ func test_multiple_patterns3() {
     // CHECK:   [[A]]({{%.*}} : $(Int, Double)):
     // CHECK:     [[A_X:%.*]] = tuple_extract
     // CHECK:     [[A_N:%.*]] = tuple_extract
-    // CHECK:     [[FUNC_A:%.*]] = function_ref @_TF10switch_var1aFT1xSi_T_
-    // CHECK:     apply [[FUNC_A]]([[A_X]])
+    // CHECK:     br [[CASE_BODY:bb[0-9]+]]([[A_X]] : $Int, [[A_N]] : $Double)
     
     // CHECK:   [[B]]({{%.*}} : $(Double, Int)):
     // CHECK:     [[B_N:%.*]] = tuple_extract
     // CHECK:     [[B_X:%.*]] = tuple_extract
-    // CHECK:     [[FUNC_B:%.*]] = function_ref @_TF10switch_var1aFT1xSi_T_
-    // CHECK:     apply [[FUNC_B]]([[B_X]])
+    // CHECK:     br [[CASE_BODY]]([[B_X]] : $Int, [[B_N]] : $Double)
 
     // CHECK:   [[C]]({{%.*}} : $(Int, Int, Double)):
     // CHECK:     [[C__:%.*]] = tuple_extract
     // CHECK:     [[C_X:%.*]] = tuple_extract
     // CHECK:     [[C_N:%.*]] = tuple_extract
-    // CHECK:     [[FUNC_C:%.*]] = function_ref @_TF10switch_var1aFT1xSi_T_
-    // CHECK:     apply [[FUNC_C]]([[C_X]])
+    // CHECK:     br [[CASE_BODY]]([[C_X]] : $Int, [[C_N]] : $Double)
 
+    // CHECK:   [[CASE_BODY]]([[BODY_X:%.*]] : $Int, [[BODY_N:%.*]] : $Double):
+    // CHECK:     [[FUNC_A:%.*]] = function_ref @_TF10switch_var1aFT1xSi_T_
+    // CHECK:     apply [[FUNC_A]]([[BODY_X]])
     a(x: x)
   }
 }
@@ -630,25 +632,24 @@ func test_multiple_patterns4() {
     // CHECK:   [[A]]({{%.*}} : $(Int, Double)):
     // CHECK:     [[A_X:%.*]] = tuple_extract
     // CHECK:     [[A_N:%.*]] = tuple_extract
-    // CHECK:     [[FUNC_A:%.*]] = function_ref @_TF10switch_var1aFT1xSi_T_
-    // CHECK:     apply [[FUNC_A]]([[A_X]])
+    // CHECK:     br [[CASE_BODY:bb[0-9]+]]([[A_X]] : $Int)
     
     // CHECK:   [[B]]({{%.*}} : $(Double, Int)):
     // CHECK:     [[B_N:%.*]] = tuple_extract
     // CHECK:     [[B_X:%.*]] = tuple_extract
-    // CHECK:     [[FUNC_B:%.*]] = function_ref @_TF10switch_var1aFT1xSi_T_
-    // CHECK:     apply [[FUNC_B]]([[B_X]])
+    // CHECK:     br [[CASE_BODY]]([[B_X]] : $Int)
     
     // CHECK:   [[C]]({{%.*}} : $(Int, Int, Double)):
-    // CHECK:     [[FUNC_C:%.*]] = function_ref @_TF10switch_var1aFT1xSi_T_
-    // CHECK:     apply [[FUNC_C]]([[Y_X]])
+    // CHECK:     br [[CASE_BODY]]([[Y_X]] : $Int)
 
     // CHECK:   [[Z]]({{%.*}} : $(Int, Foo)):
     // CHECK:     [[Z_X:%.*]] = tuple_extract
     // CHECK:     [[Z_F:%.*]] = tuple_extract
-    // CHECK:     [[FUNC_Z:%.*]] = function_ref @_TF10switch_var1aFT1xSi_T_
-    // CHECK:     apply [[FUNC_Z]]([[Z_X]])
+    // CHECK:     br [[CASE_BODY]]([[Z_X]] : $Int)
 
+    // CHECK:   [[CASE_BODY]]([[BODY_X:%.*]] : $Int):
+    // CHECK:     [[FUNC_A:%.*]] = function_ref @_TF10switch_var1aFT1xSi_T_
+    // CHECK:     apply [[FUNC_A]]([[BODY_X]])
     a(x: x)
   }
 }
@@ -669,33 +670,33 @@ func test_multiple_patterns5() {
     // CHECK:   [[A]]({{%.*}} : $(Int, Double)):
     // CHECK:     [[A_X:%.*]] = tuple_extract
     // CHECK:     [[A_N:%.*]] = tuple_extract
-    // CHECK:     [[A_BOX:%.*]] = project_box
-    // CHECK:     store [[A_X]] to [trivial] [[A_BOX]]
-    // CHECK:     [[FUNC_A:%.*]] = function_ref @_TF10switch_var3aaaFT1xRSi_T_
-    // CHECK:     apply [[FUNC_A]]([[A_BOX]])
+    // CHECK:     br [[CASE_BODY:bb[0-9]+]]([[A_X]] : $Int)
     
     // CHECK:   [[B]]({{%.*}} : $(Double, Int)):
     // CHECK:     [[B_N:%.*]] = tuple_extract
     // CHECK:     [[B_X:%.*]] = tuple_extract
-    // CHECK:     [[B_BOX:%.*]] = project_box
-    // CHECK:     store [[B_X]] to [trivial] [[B_BOX]]
-    // CHECK:     [[FUNC_B:%.*]] = function_ref @_TF10switch_var3aaaFT1xRSi_T_
-    // CHECK:     apply [[FUNC_B]]([[B_BOX]])
+    // CHECK:     br [[CASE_BODY]]([[B_X]] : $Int)
     
     // CHECK:   [[C]]({{%.*}} : $(Int, Int, Double)):
-    // CHECK:     [[Y_BOX:%.*]] = project_box
-    // CHECK:     store [[Y_X]] to [trivial] [[Y_BOX]]
-    // CHECK:     [[FUNC_C:%.*]] = function_ref @_TF10switch_var3aaaFT1xRSi_T_
-    // CHECK:     apply [[FUNC_C]]([[Y_BOX]])
+    // CHECK:     br [[CASE_BODY]]([[Y_X]] : $Int)
     
     // CHECK:   [[Z]]({{%.*}} : $(Int, Foo)):
     // CHECK:     [[Z_X:%.*]] = tuple_extract
     // CHECK:     [[Z_F:%.*]] = tuple_extract
-    // CHECK:     [[Z_BOX:%.*]] = project_box
-    // CHECK:     store [[Z_X]] to [trivial] [[Z_BOX]]
-    // CHECK:     [[FUNC_Z:%.*]] = function_ref @_TF10switch_var3aaaFT1xRSi_T_
-    // CHECK:     apply [[FUNC_Z]]([[Z_BOX]])
+    // CHECK:     br [[CASE_BODY]]([[Z_X]] : $Int)
+    
+    // CHECK:   [[CASE_BODY]]([[BODY_X:%.*]] : $Int):
+    // CHECK:     store [[BODY_X]] to [trivial] [[BOX_X:%.*]] : $*Int
+    // CHECK:     [[FUNC_AAA:%.*]] = function_ref @_TF10switch_var3aaaFT1xRSi_T_
+    // CHECK:     apply [[FUNC_AAA]]([[BOX_X]])
     aaa(x: &x)
   }
 }
 
+// rdar://problem/29252758 -- local decls must not be reemitted.
+func test_against_reemission(x: Bar) {
+  switch x {
+  case .Y(let a, _), .Z(_, let a):
+    let b = a
+  }
+}

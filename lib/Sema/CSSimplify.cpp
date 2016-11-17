@@ -4039,7 +4039,7 @@ bool ConstraintSystem::recordFix(Fix fix, ConstraintLocatorBuilder locator) {
   auto &ctx = getASTContext();
   if (ctx.LangOpts.DebugConstraintSolver) {
     auto &log = ctx.TypeCheckerDebug->getStream();
-    log.indent(solverState? solverState->depth * 2 + 2 : 0)
+    log.indent(solverState ? solverState->depth * 2 + 2 : 0)
       << "(attempting fix ";
     fix.print(log, this);
     log << " @";

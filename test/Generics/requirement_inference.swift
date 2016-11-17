@@ -57,7 +57,7 @@ class Fox : P1 {
 class Box<T : Fox> {
 // CHECK-LABEL: .unpack@
 // CHECK-NEXT: Requirements:
-// CHECK-NEXT:   T : Fox [outer]
+// CHECK-NEXT:   T : Fox [explicit]
   func unpack(_ x: X1<T>) {}
 }
 
@@ -135,6 +135,20 @@ func inferSameType2<T : P3, U : P4>(_: T) where U.P4Assoc : P2, T.P3Assoc == U.P
 // CHECK-NEXT:   T[.PCommonAssoc1].CommonAssoc == T[.PCommonAssoc2].CommonAssoc [redundant @ {{.*}}requirement_inference.swift:{{.*}}:76]
 // CHECK-NEXT: Generic signature
 func inferSameType3<T : PCommonAssoc1>(_: T) where T.CommonAssoc : P1, T : PCommonAssoc2 {}
+
+struct X6 : PAssoc {
+  typealias Assoc = X6
+}
+
+// CHECK-LABEL: .inferSameType4@
+// CHECK-NEXT: Requirements:
+// CHECK-NEXT:   T : PAssoc [explicit @
+// CHECK-NEXT:   T[.PAssoc].Assoc == X6 [explicit
+// CHECK-NEXT:   T[.PAssoc].Assoc[.PAssoc].Assoc == X6.Assoc [redundant
+// CHECK-NEXT:   T[.PAssoc].Assoc[.PAssoc].Assoc[.PAssoc].Assoc == X6.Assoc [redundant
+// CHECK-NEXT: Generic signature: <T where T : PAssoc, T.Assoc == X6>
+// CHECK-NEXT: Canonical generic signature: <τ_0_0 where τ_0_0 : PAssoc, τ_0_0.Assoc == X6>
+func inferSameType4<T : PAssoc>(_: T) where T.Assoc : PAssoc, T.Assoc.Assoc : PAssoc, T.Assoc == X6  {}
 
 protocol P5 {
   associatedtype Element
