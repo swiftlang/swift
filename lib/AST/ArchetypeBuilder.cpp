@@ -61,10 +61,6 @@ void RequirementSource::dump(llvm::raw_ostream &out,
     out << "inferred";
     break;
 
-  case OuterScope:
-    out << "outer";
-    break;
-
   case Inherited:
     out << "inherited";
     break;
@@ -685,7 +681,6 @@ ArchetypeBuilder::PotentialArchetype::getType(ArchetypeBuilder &builder) {
     switch (conforms.second.getKind()) {
     case RequirementSource::Explicit:
     case RequirementSource::Inferred:
-    case RequirementSource::OuterScope:
     case RequirementSource::Protocol:
     case RequirementSource::Redundant:
       Protos.push_back(conforms.first);
@@ -993,6 +988,21 @@ bool ArchetypeBuilder::addSuperclassRequirement(PotentialArchetype *T,
         });
   }
 
+  // Make sure the concrete type fulfills the superclass requirement
+  // of the archetype.
+  if (T->isConcreteType()) {
+    Type concrete = T->getConcreteType();
+    if (!Superclass->isExactSuperclassOf(concrete, getLazyResolver())) {
+      Diags.diagnose(T->getSameTypeSource().getLoc(),
+                     diag::type_does_not_inherit,
+                     T->getRootParam(), concrete, Superclass)
+        .highlight(Source.getLoc());
+      return true;
+    }
+
+    return false;
+  }
+
   // Local function to handle the update of superclass conformances
   // when the superclass constraint changes.
   auto updateSuperclassConformances = [&] {
@@ -1257,7 +1267,7 @@ bool ArchetypeBuilder::addSameTypeRequirementToConcrete(
   }
   
   // Make sure the concrete type fulfills the requirements on the archetype.
-  DenseMap<ProtocolDecl *, ProtocolConformance*> conformances;
+  DenseMap<ProtocolDecl *, ProtocolConformanceRef> conformances;
   if (!Concrete->is<ArchetypeType>()) {
     for (auto conforms : T->getConformsTo()) {
       auto protocol = conforms.first;
@@ -1270,8 +1280,7 @@ bool ArchetypeBuilder::addSameTypeRequirementToConcrete(
         return true;
       }
 
-      assert(conformance->isConcrete() && "Abstract conformance?");
-      conformances[protocol] = conformance->getConcrete();
+      conformances.insert({protocol, *conformance});
     }
   }
   
@@ -1279,7 +1288,19 @@ bool ArchetypeBuilder::addSameTypeRequirementToConcrete(
   T->ArchetypeOrConcreteType = NestedType::forConcreteType(Concrete);
   T->SameTypeSource = Source;
 
+  // Make sure the concrete type fulfills the superclass requirement
+  // of the archetype.
+  if (T->Superclass) {
+    if (!T->Superclass->isExactSuperclassOf(Concrete, getLazyResolver())) {
+      Diags.diagnose(Source.getLoc(), diag::type_does_not_inherit,
+                     T->getRootParam(), Concrete, T->Superclass)
+        .highlight(T->SuperclassSource->getLoc());
+      return true;
+    }
+  }
+
   // Recursively resolve the associated types to their concrete types.
+  RequirementSource nestedSource(RequirementSource::Redundant, Source.getLoc());
   for (auto nested : T->getNestedTypes()) {
     AssociatedTypeDecl *assocType
       = nested.second.front()->getResolvedAssociatedType();
@@ -1288,21 +1309,28 @@ bool ArchetypeBuilder::addSameTypeRequirementToConcrete(
           concreteArchetype->getNestedType(nested.first);
       addSameTypeRequirementToConcrete(nested.second.front(),
                                        witnessType.getValue(),
-                                       Source);
+                                       nestedSource);
     } else {
       assert(conformances.count(assocType->getProtocol()) > 0
              && "missing conformance?");
-      auto witness = conformances[assocType->getProtocol()]
-            ->getTypeWitness(assocType, getLazyResolver());
-      auto witnessType = witness.getReplacement();
+      auto conformance = conformances.find(assocType->getProtocol())->second;
+      Type witnessType;
+      if (conformance.isConcrete()) {
+        witnessType = conformance.getConcrete()
+                        ->getTypeWitness(assocType, getLazyResolver())
+                        .getReplacement();
+      } else {
+        witnessType = DependentMemberType::get(Concrete, assocType);
+      }
+
       if (auto witnessPA = resolveArchetype(witnessType)) {
         addSameTypeRequirementBetweenArchetypes(nested.second.front(),
                                                 witnessPA,
-                                                Source);
+                                                nestedSource);
       } else {
         addSameTypeRequirementToConcrete(nested.second.front(),
                                          witnessType,
-                                         Source);
+                                         nestedSource);
       }
     }
   }
@@ -2010,14 +2038,10 @@ ArchetypeBuilder::mapTypeOutOfContext(ModuleDecl *M,
 }
 
 void ArchetypeBuilder::addGenericSignature(GenericSignature *sig,
-                                           GenericEnvironment *env,
-                                           bool treatRequirementsAsExplicit) {
+                                           GenericEnvironment *env) {
   if (!sig) return;
   
-  RequirementSource::Kind sourceKind = treatRequirementsAsExplicit
-    ? RequirementSource::Explicit
-    : RequirementSource::OuterScope;
-  
+  RequirementSource::Kind sourceKind = RequirementSource::Explicit;
   for (auto param : sig->getGenericParams()) {
     addGenericParameter(param);
 
@@ -2057,7 +2081,6 @@ static void collectRequirements(ArchetypeBuilder &builder,
     switch (source.getKind()) {
     case RequirementSource::Explicit:
     case RequirementSource::Inferred:
-    case RequirementSource::OuterScope:
       // The requirement was explicit and required, keep it.
       break;
 

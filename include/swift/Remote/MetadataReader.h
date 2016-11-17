@@ -561,94 +561,28 @@ public:
   }
 
   /// Given a remote pointer to class metadata, attempt to discover its class
-  /// instance size and alignment.
-  std::tuple<bool, unsigned, unsigned>
-  readInstanceSizeAndAlignmentFromClassMetadata(StoredPointer MetadataAddress) {
+  /// instance size and whether fields should use the resilient layout strategy.
+  std::pair<bool, unsigned>
+  readInstanceStartAndAlignmentFromClassMetadata(StoredPointer MetadataAddress) {
     auto meta = readMetadata(MetadataAddress);
     if (!meta || meta->getKind() != MetadataKind::Class)
-      return std::make_tuple(false, 0, 0);
+      return std::make_pair(false, 0);
 
-    auto classMeta = cast<TargetClassMetadata<Runtime>>(meta);
+    // The following algorithm only works on the non-fragile Apple runtime.
 
-    // See swift_initClassMetadata_UniversalStrategy()
-    uint32_t size, align;
+    // Grab the RO-data pointer.  This part is not ABI.
+    StoredPointer roDataPtr = readObjCRODataPtr(MetadataAddress);
+    if (!roDataPtr)
+      return std::make_pair(false, 0);
 
-    // If this class is defined in Objective-C, return the value of the
-    // InstanceStart field from the ROData.
-    if (!classMeta->isTypeMetadata()) {
-      // The following algorithm only works on the non-fragile Apple runtime.
+    // Get the address of the InstanceStart field.
+    auto address = roDataPtr + sizeof(uint32_t) * 1;
 
-      // Grab the RO-data pointer.  This part is not ABI.
-      StoredPointer roDataPtr = readObjCRODataPtr(MetadataAddress);
-      if (!roDataPtr)
-        return std::make_tuple(false, 0, 0);
+    unsigned start;
+    if (!Reader->readInteger(RemoteAddress(address), &start))
+      return std::make_pair(false, 0);
 
-      // Get the address of the InstanceStart field.
-      auto address = roDataPtr + sizeof(uint32_t) * 1;
-
-      align = 16;
-
-      if (!Reader->readInteger(RemoteAddress(address), &size))
-        return std::make_tuple(false, 0, 0);
-
-      assert((size & (align - 1)) == 0);
-      return std::make_tuple(true, size, align);
-    }
-
-    // Otherwise, it is a Swift class. Get the superclass.
-    auto superAddr = readSuperClassFromClassMetadata(MetadataAddress);
-    if (superAddr) {
-      auto superMeta = readMetadata(superAddr);
-      if (!superMeta || superMeta->getKind() != MetadataKind::Class)
-        return std::make_tuple(false, 0, 0);
-
-      auto superclassMeta = cast<TargetClassMetadata<Runtime>>(superMeta);
-
-      // If the superclass is an Objective-C class, we start layout
-      // from the InstanceSize of the superclass, aligned up to
-      // 16 bytes.
-      if (superclassMeta->isTypeMetadata()) {
-        // Superclass is a Swift class. Get the size of an instance,
-        // and start layout from that.
-        size = superclassMeta->getInstanceSize();
-        align = 1;
-
-        return std::make_tuple(true, size, align);
-      }
-
-      std::string superName;
-      if (!readObjCClassName(superAddr, superName))
-        return std::make_tuple(false, 0, 0);
-
-      if (superName != "SwiftObject") {
-        // Grab the RO-data pointer.  This part is not ABI.
-        StoredPointer roDataPtr = readObjCRODataPtr(superAddr);
-        if (!roDataPtr)
-          return std::make_tuple(false, 0, 0);
-
-        // Get the address of the InstanceSize field.
-        auto address = roDataPtr + sizeof(uint32_t) * 2;
-
-        // malloc alignment boundary.
-        align = 16;
-
-        if (!Reader->readInteger(RemoteAddress(address), &size))
-          return std::make_tuple(false, 0, 0);
-
-        // Round up to the alignment boundary.
-        size = (size + (align - 1)) & ~(align - 1);
-
-        return std::make_tuple(true, size, align);
-      }
-
-      // Fall through.
-    }
-
-    // No superclass, just an object header. 12 bytes on 32-bit, 16 on 64-bit
-    size = Reader->getPointerSize() + sizeof(uint64_t);
-    align = 1;
-
-    return std::make_tuple(true, size, align);
+    return std::make_pair(true, start);
   }
 
   /// Given a remote pointer to metadata, attempt to turn it into a type.
