@@ -28,12 +28,12 @@ Or you can format in-place (the original file will be overwritten):
 
      swift-format -in-place sample.swift
 
-If you want to indent using tabs instead of spaces, use the "-use-tabs" option:
+If you want to indent using tabs instead of spaces, use the `-use-tabs` option:
 
      swift-format -use-tabs sample.swift
 
-You can set the number of tabs or spaces using the "-tab-width" and
-"-indent-width" options, respectively.
+You can set the number of tabs or spaces using the `-tab-width` and
+`-indent-width` options, respectively.
 
 swift-format supports formatting a range of lines from a file:
 
@@ -41,9 +41,9 @@ swift-format supports formatting a range of lines from a file:
 
 This will format the file from lines 2 to 45, inclusive.
 
-You can format several files, but the "-line-range" option is not supported in
+You can format several files, but the `-line-range` option is not supported in
 that case.
 
-You can also provide several line ranges by using multiple "-line-range" options:
+You can also provide several line ranges by using multiple `-line-range` options:
 
      swift-format -line-range 2:45 -line-range 100:120 sample.swift
