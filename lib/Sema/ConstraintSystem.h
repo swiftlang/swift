@@ -2031,7 +2031,7 @@ private:
                                  ConstraintLocatorBuilder locator,
                                  bool isFavored);
 
-  /// \brief Collect the current inactive disjunciton constraints.
+  /// \brief Collect the current inactive disjunction constraints.
   void collectDisjunctions(SmallVectorImpl<Constraint *> &disjunctions);
 
   /// \brief Solve the system of constraints after it has already been
