@@ -1480,7 +1480,7 @@ llvm::DIType *IRGenDebugInfo::createType(DebugTypeInfo DbgTy,
       // Use "__ObjC" as default for implicit decls.
       // FIXME: Do something more clever based on the decl's mangled name.
       StringRef ModulePath;
-      StringRef ModuleName = "__ObjC";
+      StringRef ModuleName;// = "__ObjC";
       if (auto *OwningModule = ClangDecl->getImportedOwningModule())
         ModuleName = OwningModule->getTopLevelModuleName();
 
@@ -1488,7 +1488,7 @@ llvm::DIType *IRGenDebugInfo::createType(DebugTypeInfo DbgTy,
         if (auto *ClangModule = SwiftModule->findUnderlyingClangModule()) {
           // FIXME: Clang submodules are not handled here.
           // FIXME: Clang module config macros are not handled here.
-          ModuleName = ClangModule->getFullModuleName();
+          ModuleName = (StringRef)ClangModule->getFullModuleName();
           // FIXME: A clang module's Directory is supposed to be the
           // directory containing the module map, but ClangImporter
           // sets it to the module cache directory.
