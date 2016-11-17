@@ -505,6 +505,8 @@ public:
     case ReferenceCounting::Error:
       llvm_unreachable("unowned references to this type are not supported");
     }
+
+    llvm_unreachable("Not a valid ReferenceCounting.");
   }
   
   /// Return the spare bit mask to use for types that comprise heap object

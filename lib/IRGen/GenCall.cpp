@@ -317,6 +317,8 @@ llvm::Type *SignatureExpansion::expandDirectResult() {
     return schema.getScalarResultType(IGM);
   }
   }
+
+  llvm_unreachable("Not a valid SILFunctionLanguage.");
 }
 
 static const clang::FieldDecl *

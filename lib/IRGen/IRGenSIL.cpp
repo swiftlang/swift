@@ -1653,6 +1653,8 @@ static llvm::Value *getClassMetatype(IRGenFunction &IGF,
   case MetatypeRepresentation::ObjC:
     return emitHeapMetadataRefForHeapObject(IGF, baseValue, instanceType);
   }
+
+  llvm_unreachable("Not a valid MetatypeRepresentation.");
 }
 
 void IRGenSILFunction::visitValueMetatypeInst(swift::ValueMetatypeInst *i) {
@@ -2141,6 +2143,8 @@ getPartialApplicationFunction(IRGenSILFunction &IGF, SILValue v,
     return std::make_tuple(fn, context, fnType);
   }
   }
+
+  llvm_unreachable("Not a valid SILFunctionType.");
 }
 
 void IRGenSILFunction::visitPartialApplyInst(swift::PartialApplyInst *i) {

@@ -186,10 +186,10 @@ public:
     for (auto C : Path) {
       switch (C.getKind()) {
       case Component::Kind::NominalParent:
-        Root = A.template createParent(Root);
+        Root = A.createParent(Root);
         continue;
       case Component::Kind::NominalTypeArgument:
-        Root = A.template createGenericArgument(C.getPrimaryIndex(), Root);
+        Root = A.createGenericArgument(C.getPrimaryIndex(), Root);
         continue;
       default:
         return nullptr;

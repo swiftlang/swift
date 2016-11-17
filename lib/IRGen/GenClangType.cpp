@@ -82,6 +82,8 @@ getClangBuiltinTypeFromKind(const clang::ASTContext &context,
     return context.SingletonId;
 #include "clang/Basic/OpenCLImageTypes.def"
   }
+
+  llvm_unreachable("Not a valid BuiltinType.");
 }
 
 static clang::CanQualType getClangSelectorType(
@@ -490,6 +492,8 @@ GenClangType::visitBoundGenericType(CanBoundGenericType type) {
     return getCanonicalType(fnPtrTy);
   }
   }
+
+  llvm_unreachable("Not a valid StructKind.");
 }
 
 clang::CanQualType GenClangType::visitEnumType(CanEnumType type) {

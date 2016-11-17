@@ -378,6 +378,7 @@ IRGenModule::IRGenModule(IRGenerator &irgen,
 
   // Only use the new calling conventions on platforms that support it.
   auto Arch = Triple.getArch();
+  (void)Arch;
   if (SWIFT_RT_USE_RegisterPreservingCC &&
       Arch == llvm::Triple::ArchType::aarch64)
     RegisterPreservingCC = SWIFT_LLVM_CC(RegisterPreservingCC);
