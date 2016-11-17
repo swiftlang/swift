@@ -39,8 +39,10 @@
 #include "llvm/Transforms/IPO/PassManagerBuilder.h"
 #include "llvm/Support/Path.h"
 
-#if defined(_MSC_VER)
-#include "Windows.h"
+#if defined(_WIN32)
+#define WIN32_LEAN_AND_MEAN
+#define NOMINMAX
+#include <windows.h>
 #else
 #include <dlfcn.h>
 #endif
@@ -49,8 +51,8 @@ using namespace swift;
 using namespace swift::immediate;
 
 static void *loadRuntimeLib(StringRef runtimeLibPathWithName) {
-#if defined(_MSC_VER)
-  return LoadLibrary(runtimeLibPathWithName.str().c_str());
+#if defined(_WIN32)
+  return LoadLibraryA(runtimeLibPathWithName.str().c_str());
 #else
   return dlopen(runtimeLibPathWithName.str().c_str(), RTLD_LAZY | RTLD_GLOBAL);
 #endif
@@ -319,10 +321,18 @@ int swift::RunImmediately(CompilerInstance &CI, const ProcessCmdLine &CmdLine,
 
   // Setup interpreted process arguments.
   using ArgOverride = void (*)(const char **, int);
+#if defined(_WIN32)
+  auto module = static_cast<HMODULE>(stdlib);
+  auto emplaceProcessArgs = static_cast<ArgOverride>(
+    GetProcAddress(module, "_swift_stdlib_overrideUnsafeArgvArgc"));
+  if (emplaceProcessArgs == nullptr)
+    return -1;
+#else
   auto emplaceProcessArgs
           = (ArgOverride)dlsym(stdlib, "_swift_stdlib_overrideUnsafeArgvArgc");
   if (dlerror())
     return -1;
+#endif
 
   SmallVector<const char *, 32> argBuf;
   for (size_t i = 0; i < CmdLine.size(); ++i) {
