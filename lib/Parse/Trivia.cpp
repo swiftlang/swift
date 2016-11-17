@@ -1,4 +1,4 @@
-//===--- Lexer.h - Swift Source Trivia --------------------------*- C++ -*-===//
+//===--- Trivia.cpp - Swift Source Trivia ---------------------------------===//
 //
 // This source file is part of the Swift.org open source project
 //

@@ -1,4 +1,4 @@
-//===--- Token.cpp - Token interface ----------------------------*- C++ -*-===//
+//===--- Token.cpp - Token interface --------------------------------------===//
 //
 // This source file is part of the Swift.org open source project
 //
@@ -88,7 +88,7 @@ void Token::dump(llvm::raw_ostream &OS, unsigned Indent) const {
   OS << ')';
 }
 
-/// Print the raw syntax tree with full formatting fideltiy.
+/// Print the raw syntax tree with full formatting fidelity.
 void Token::print(llvm::raw_ostream &OS) const {
   for (auto Leader : LeadingTrivia)
     Leader.print(OS);
