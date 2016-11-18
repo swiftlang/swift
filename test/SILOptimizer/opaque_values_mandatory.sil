@@ -1,0 +1,19 @@
+// RUN: %target-sil-opt -diagnostics -enable-sil-opaque-values -emit-sorted-sil %s | %FileCheck %s
+
+import Builtin
+
+sil_stage raw
+
+// Test trivial, guaranteed copyforwarding.
+// ----
+//
+// CHECK-LABEL: sil hidden @diagnose_identity : $@convention(thin) <T> (@in T) -> @out T {
+// CHECK: bb0(%0 : $T):
+// CHECK: return %0 : $T
+// CHECK-LABEL: } // end sil function 'diagnose_identity'
+sil hidden @diagnose_identity : $@convention(thin) <T> (@in T) -> @out T {
+bb0(%0 : $T):
+  %c = copy_value %0 : $T
+  destroy_value %0 : $T
+  return %c : $T
+}
