@@ -51,7 +51,7 @@ internal struct _SliceBuffer<Element>
 
   internal func _invariantCheck() {
     let isNative = _hasNativeBuffer
-    let isNativeStorage: Bool = (owner as? _ContiguousArrayStorageBase) != nil
+    let isNativeStorage: Bool = owner is _ContiguousArrayStorageBase
     _sanityCheck(isNativeStorage == isNative)
     if isNative {
       _sanityCheck(count <= nativeBuffer.count)
