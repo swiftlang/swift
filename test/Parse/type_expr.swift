@@ -240,4 +240,15 @@ func compositionType() {
   _ = (P1? & P2).self // expected-error {{non-protocol type 'P1?' cannot be used within a protocol composition}}
 
   _ = (P1 & P2.Type).self // expected-error {{non-protocol type 'P2.Type' cannot be used within a protocol composition}}
+
+  let _ = P1 & P2 -> P3 & P1 -> Int
+  // expected-error @-1 {{single argument function types require parentheses}} {{22-22=(}} {{29-29=)}}
+  // expected-error @-2 {{single argument function types require parentheses}} {{11-11=(}} {{18-18=)}}
+  // expected-error @-3 {{expected member name or constructor call after type name}}
+  // FIXME(add parenthesis): expected-note @-4 {{use '.self'}} {{36-36=.self}}
+  // FIXME(don't emit this): expected-note @-5 {{add arguments}} {{36-36=()}} 
+
+  _ = (() -> P1 & P2).self // Ok
+  _ = (P1 & P2 -> P3 & P2).self // expected-error {{single argument function types require parentheses}} {{8-8=(}} {{15-15=)}}
+  _ = ((P1 & P2) -> (P3 & P2) -> P1 & Any).self // Ok
 }
