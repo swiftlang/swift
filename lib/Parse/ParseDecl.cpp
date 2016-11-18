@@ -1745,6 +1745,31 @@ bool Parser::isStartOfDecl() {
   if (Tok.is(tok::kw_try))
     return peekToken().isAny(tok::kw_let, tok::kw_var);
   
+  // Look through attribute list, because it may be an *type* attribute list.
+  if (Tok.is(tok::at_sign)) {
+    BacktrackingScope backtrack(*this);
+    while (consumeIf(tok::at_sign)) {
+      // If not identifier or code complete token, consider '@' is a incomplete
+      // attribute.
+      if (Tok.isNot(tok::identifier, tok::code_complete))
+        continue;
+      consumeToken();
+      // Eat paren after attribute name; e.g. @foo(x)
+      if (consumeIf(tok::l_paren)) {
+        while (Tok.isNot(tok::r_brace, tok::eof, tok::pound_endif)) {
+          if (consumeIf(tok::r_paren)) break;
+          skipSingle();
+        }
+      }
+    }
+    // If this attribute is the last element in the block,
+    // consider it is a start of incomplete decl.
+    if (Tok.isAny(tok::r_brace, tok::eof, tok::pound_endif))
+      return true;
+
+    return isStartOfDecl();
+  }
+
   // Otherwise, the only hard case left is the identifier case.
   if (Tok.isNot(tok::identifier)) return true;
 
