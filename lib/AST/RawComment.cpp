@@ -25,7 +25,6 @@
 #include "swift/Basic/SourceManager.h"
 #include "swift/Markup/Markup.h"
 #include "swift/Parse/Lexer.h"
-#include "swift/Syntax/Token.h"
 #include "llvm/ADT/SmallString.h"
 #include "llvm/ADT/StringRef.h"
 #include "llvm/Support/raw_ostream.h"
@@ -68,16 +67,77 @@ SingleRawComment::SingleRawComment(StringRef RawText, unsigned StartColumn)
     : RawText(RawText), Kind(static_cast<unsigned>(getCommentKind(RawText))),
       StartColumn(StartColumn), StartLine(0), EndLine(0) {}
 
+static void addCommentToList(SmallVectorImpl<SingleRawComment> &Comments,
+                             const SingleRawComment &SRC) {
+  // TODO: consider producing warnings when we decide not to merge comments.
+
+  if (SRC.isOrdinary()) {
+    // Skip gyb comments that are line number markers.
+    if (SRC.RawText.startswith("// ###"))
+      return;
+
+    Comments.clear();
+    return;
+  }
+
+  // If this is the first documentation comment, save it (because there isn't
+  // anything to merge it with).
+  if (Comments.empty()) {
+    Comments.push_back(SRC);
+    return;
+  }
+
+  auto &Last = Comments.back();
+
+  // Merge comments if they are on same or consecutive lines.
+  if (Last.EndLine + 1 < SRC.StartLine) {
+    Comments.clear();
+    return;
+  }
+
+  Comments.push_back(SRC);
+}
+
+static RawComment toRawComment(ASTContext &Context, CharSourceRange Range) {
+  if (Range.isInvalid())
+    return RawComment();
+
+  auto &SourceMgr = Context.SourceMgr;
+  unsigned BufferID = SourceMgr.findBufferContainingLoc(Range.getStart());
+  unsigned Offset = SourceMgr.getLocOffsetInBuffer(Range.getStart(), BufferID);
+  unsigned EndOffset = SourceMgr.getLocOffsetInBuffer(Range.getEnd(), BufferID);
+  LangOptions FakeLangOpts;
+  Lexer L(FakeLangOpts, SourceMgr, BufferID, nullptr, /*InSILMode=*/false,
+          CommentRetentionMode::ReturnAsTokens, Offset, EndOffset);
+  SmallVector<SingleRawComment, 16> Comments;
+  Token Tok;
+  while (true) {
+    L.lex(Tok);
+    if (Tok.is(tok::eof))
+      break;
+    assert(Tok.is(tok::comment));
+    addCommentToList(Comments, SingleRawComment(Tok.getRange(), SourceMgr));
+  }
+  RawComment Result;
+  Result.Comments = Context.AllocateCopy(Comments);
+  return Result;
+}
+
 RawComment Decl::getRawComment() const {
   if (!this->canHaveComment())
     return RawComment();
 
+  // Check the cache in ASTContext.
+  auto &Context = getASTContext();
+  if (Optional<RawComment> RC = Context.getRawComment(this))
+    return RC.getValue();
+
   // Check the declaration itself.
   if (auto *Attr = getAttrs().getAttribute<RawDocCommentAttr>()) {
-    return Attr->getComment();
+    RawComment Result = toRawComment(Context, Attr->getCommentRange());
+    Context.setRawComment(this, Result);
+    return Result;
   }
-
-  auto &Context = getASTContext();
 
   // Ask the parent module.
   if (auto *Unit =
@@ -85,6 +145,7 @@ RawComment Decl::getRawComment() const {
     if (Optional<CommentInfo> C = Unit->getCommentForDecl(this)) {
       swift::markup::MarkupContext MC;
       Context.setBriefComment(this, C->Brief);
+      Context.setRawComment(this, C->Raw);
       return C->Raw;
     }
   }

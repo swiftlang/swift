@@ -622,8 +622,7 @@ ASTPrinter &operator<<(ASTPrinter &printer, tok keyword) {
   switch (keyword) {
 
 #define KEYWORD(KW) case tok::kw_##KW: name = #KW; break;
-#define POUND_KEYWORD(KW) \
-  case tok::pound_##KW: name = "#"#KW; break;
+#define POUND_KEYWORD(KW) case tok::pound_##KW: name = "#"#KW; break;
 #include "swift/Parse/Tokens.def"
   default:
     llvm_unreachable("unexpected keyword kind");

@@ -58,7 +58,7 @@ bool Parser::isStartOfStmt() {
     // "try" cannot actually start any statements, but we parse it there for
     // better recovery.
     Parser::BacktrackingScope backtrack(*this);
-    consumeLoc(tok::kw_try);
+    consumeToken(tok::kw_try);
     return isStartOfStmt();
   }
       
@@ -70,8 +70,8 @@ bool Parser::isStartOfStmt() {
     // question colon expression or something else, we look ahead to the second
     // token.
     Parser::BacktrackingScope backtrack(*this);
-    consumeLoc(tok::identifier);
-    consumeLoc(tok::colon);
+    consumeToken(tok::identifier);
+    consumeToken(tok::colon);
     // For better recovery, we just accept a label on any statement.  We reject
     // putting a label on something inappropriate in parseStmt().
     return isStartOfStmt();
@@ -83,7 +83,7 @@ ParserStatus Parser::parseExprOrStmt(ASTNode &Result) {
   if (Tok.is(tok::semi)) {
     diagnose(Tok, diag::illegal_semi_stmt)
       .fixItRemove(SourceRange(Tok.getLoc()));
-    consumeLoc();
+    consumeToken();
     return makeParserError();
   }
   
@@ -104,7 +104,7 @@ ParserStatus Parser::parseExprOrStmt(ASTNode &Result) {
   if (Tok.is(tok::code_complete)) {
     if (CodeCompletion)
       CodeCompletion->completeStmtOrExpr();
-    consumeLoc(tok::code_complete);
+    consumeToken(tok::code_complete);
     return makeParserCodeCompletionStatus();
   }
 
@@ -127,7 +127,7 @@ ParserStatus Parser::parseExprOrStmt(ASTNode &Result) {
   return ResultExpr;
 }
 
-static bool isTerminatorForBraceItemListKind(const syntax::Token &Tok,
+static bool isTerminatorForBraceItemListKind(const Token &Tok,
                                              BraceItemListKind Kind,
                                              ArrayRef<ASTNode> ParsedDecls) {
   switch (Kind) {
@@ -168,7 +168,7 @@ void Parser::consumeTopLevelDecl(ParserPosition BeginParserPosition,
   SourceLoc BeginLoc = Tok.getLoc();
   // Consume tokens up to code completion token.
   while (Tok.isNot(tok::code_complete, tok::eof)) {
-    consumeLoc();
+    consumeToken();
   }
   // Consume the code completion token, if there is one.
   consumeIf(tok::code_complete);
@@ -414,9 +414,9 @@ ParserStatus Parser::parseBraceItems(SmallVectorImpl<ASTNode> &Entries,
     if (!NeedParseErrorRecovery && !PreviousHadSemi && Tok.is(tok::semi)) {
       if (Result) {
         if (Result.is<Expr*>()) {
-          Result.get<Expr*>()->TrailingSemiLoc = consumeLoc(tok::semi);
+          Result.get<Expr*>()->TrailingSemiLoc = consumeToken(tok::semi);
         } else {
-          Result.get<Stmt*>()->TrailingSemiLoc = consumeLoc(tok::semi);
+          Result.get<Stmt*>()->TrailingSemiLoc = consumeToken(tok::semi);
         }
       }
       PreviousHadSemi = true;
@@ -449,7 +449,7 @@ void Parser::parseTopLevelCodeDeclDelayed() {
 
   // ParserPositionRAII needs a primed parser to restore to.
   if (Tok.is(tok::NUM_TOKENS))
-    consumeLoc();
+    consumeToken();
 
   // Ensure that we restore the parser state at exit.
   ParserPositionRAII PPR(*this);
@@ -512,7 +512,7 @@ ParserResult<Stmt> Parser::parseStmt() {
   // parsing logic below.
   if (Tok.is(tok::identifier) && peekToken().is(tok::colon)) {
     LabelInfo.Loc = consumeIdentifier(&LabelInfo.Name);
-    consumeLoc(tok::colon);
+    consumeToken(tok::colon);
   }
 
   SourceLoc tryLoc;
@@ -582,7 +582,7 @@ ParserResult<Stmt> Parser::parseStmt() {
     if (LabelInfo) diagnose(LabelInfo.Loc, diag::invalid_label_on_stmt);
     if (tryLoc.isValid()) diagnose(tryLoc, diag::try_on_stmt, Tok.getText());
     return makeParserResult(
-        new (Context) FallthroughStmt(consumeLoc(tok::kw_fallthrough)));
+        new (Context) FallthroughStmt(consumeToken(tok::kw_fallthrough)));
   }
 }
 
@@ -598,7 +598,7 @@ ParserResult<BraceStmt> Parser::parseBraceItemList(Diag<> ID) {
     diagnose(Tok, ID);
     return nullptr;
   }
-  SourceLoc LBLoc = consumeLoc(tok::l_brace);
+  SourceLoc LBLoc = consumeToken(tok::l_brace);
 
   SmallVector<ASTNode, 16> Entries;
   SourceLoc RBLoc;
@@ -628,7 +628,7 @@ void Parser::parseIfConfigClauseElements(bool isActive,
 ///     'break' identifier?
 ///
 ParserResult<Stmt> Parser::parseStmtBreak() {
-  SourceLoc Loc = consumeLoc(tok::kw_break);
+  SourceLoc Loc = consumeToken(tok::kw_break);
   SourceLoc TargetLoc;
   Identifier Target;
 
@@ -650,7 +650,7 @@ ParserResult<Stmt> Parser::parseStmtBreak() {
 ///     'continue' identifier?
 ///
 ParserResult<Stmt> Parser::parseStmtContinue() {
-  SourceLoc Loc = consumeLoc(tok::kw_continue);
+  SourceLoc Loc = consumeToken(tok::kw_continue);
   SourceLoc TargetLoc;
   Identifier Target;
 
@@ -673,7 +673,7 @@ ParserResult<Stmt> Parser::parseStmtContinue() {
 ///     'return' expr?
 ///   
 ParserResult<Stmt> Parser::parseStmtReturn(SourceLoc tryLoc) {
-  SourceLoc ReturnLoc = consumeLoc(tok::kw_return);
+  SourceLoc ReturnLoc = consumeToken(tok::kw_return);
 
   if (Tok.is(tok::code_complete)) {
     auto CCE = new (Context) CodeCompletionExpr(SourceRange(Tok.getLoc()));
@@ -682,7 +682,7 @@ ParserResult<Stmt> Parser::parseStmtReturn(SourceLoc tryLoc) {
       CodeCompletion->completeReturnStmt(CCE);
     }
     Result.setHasCodeCompletion();
-    consumeLoc();
+    consumeToken();
     return Result;
   }
 
@@ -737,7 +737,7 @@ ParserResult<Stmt> Parser::parseStmtReturn(SourceLoc tryLoc) {
 ///   'throw' expr
 ///
 ParserResult<Stmt> Parser::parseStmtThrow(SourceLoc tryLoc) {
-  SourceLoc throwLoc = consumeLoc(tok::kw_throw);
+  SourceLoc throwLoc = consumeToken(tok::kw_throw);
   SourceLoc exprLoc;
   if (Tok.isNot(tok::eof))
     exprLoc = Tok.getLoc();
@@ -771,7 +771,7 @@ ParserResult<Stmt> Parser::parseStmtThrow(SourceLoc tryLoc) {
 ///     'defer' brace-stmt
 ///
 ParserResult<Stmt> Parser::parseStmtDefer() {
-  SourceLoc DeferLoc = consumeLoc(tok::kw_defer);
+  SourceLoc DeferLoc = consumeToken(tok::kw_defer);
   
   // Macro expand out the defer into a closure and call, which we can typecheck
   // and emit where needed.
@@ -881,7 +881,7 @@ static void parseGuardedPattern(Parser &P, GuardedPattern &result,
         P.CodeCompletion->completePostfixExprBeginning(nullptr);
         break;
       }
-      P.consumeLoc();
+      P.consumeToken();
     } else {
       result.ThePattern = patternResult.get();
       status.setHasCodeCompletion();
@@ -893,9 +893,9 @@ static void parseGuardedPattern(Parser &P, GuardedPattern &result,
       P.peekToken().is(tok::code_complete)) {
     setErrorResult();
     if (P.CodeCompletion) {
-      P.consumeLoc();
+      P.consumeToken();
       P.CodeCompletion->completeCaseStmtDotPrefix();
-      P.consumeLoc();
+      P.consumeToken();
     } else {
       result.ThePattern = patternResult.get();
       status.setHasCodeCompletion();
@@ -1084,7 +1084,7 @@ static void validateAvailabilitySpecList(Parser &P,
 
 // #available(...)
 ParserResult<PoundAvailableInfo> Parser::parseStmtConditionPoundAvailable() {
-  SourceLoc PoundLoc = consumeLoc(tok::pound_available);
+  SourceLoc PoundLoc = consumeToken(tok::pound_available);
 
   if (!Tok.isFollowingLParen()) {
     diagnose(Tok, diag::avail_query_expected_condition);
@@ -1092,7 +1092,7 @@ ParserResult<PoundAvailableInfo> Parser::parseStmtConditionPoundAvailable() {
   }
 
   StructureMarkerRAII ParsingAvailabilitySpecList(*this, Tok);
-  SourceLoc LParenLoc = consumeLoc(tok::l_paren);
+  SourceLoc LParenLoc = consumeToken(tok::l_paren);
 
   SmallVector<AvailabilitySpec *, 5> Specs;
   ParserStatus Status = parseAvailabilitySpecList(Specs);
@@ -1135,7 +1135,7 @@ Parser::parseAvailabilitySpecList(SmallVectorImpl<AvailabilitySpec *> &Specs) {
     // We don't allow binary operators to combine specs.
     if (Tok.isBinaryOperator()) {
       diagnose(Tok, diag::avail_query_disallowed_operator, Tok.getText());
-      consumeLoc();
+      consumeToken();
       Status.setIsParseError();
     } else if (consumeIf(tok::comma)) {
       // keep going.
@@ -1180,7 +1180,7 @@ ParserStatus Parser::parseStmtCondition(StmtCondition &Condition,
         Tok.getText() == "&&") {
       diagnose(Tok, diag::expected_comma_stmtcondition)
         .fixItReplaceChars(getEndOfPreviousLoc(), Tok.getRange().getEnd(), ",");
-      consumeLoc();
+      consumeToken();
       return true;
     }
 
@@ -1189,7 +1189,7 @@ ParserStatus Parser::parseStmtCondition(StmtCondition &Condition,
     if (Tok.is(tok::kw_where)) {
       diagnose(Tok, diag::expected_comma_stmtcondition)
         .fixItReplaceChars(getEndOfPreviousLoc(), Tok.getRange().getEnd(), ",");
-      consumeLoc();
+      consumeToken();
       return true;
     }
     
@@ -1224,8 +1224,8 @@ ParserStatus Parser::parseStmtCondition(StmtCondition &Condition,
     
     // Handle code completion after the #.
     if (Tok.is(tok::pound) && peekToken().is(tok::code_complete)) {
-      auto PoundPos = consumeLoc();
-      auto CodeCompletionPos = consumeLoc();
+      auto PoundPos = consumeToken();
+      auto CodeCompletionPos = consumeToken();
       auto Expr = new (Context) CodeCompletionExpr(CharSourceRange(SourceMgr,
                                            PoundPos, CodeCompletionPos));
       if (CodeCompletion)
@@ -1271,7 +1271,7 @@ ParserStatus Parser::parseStmtCondition(StmtCondition &Condition,
     SourceLoc IntroducerLoc;
     if (Tok.isAny(tok::kw_let, tok::kw_var, tok::kw_case)) {
       BindingKindStr = Tok.getText();
-      IntroducerLoc = consumeLoc();
+      IntroducerLoc = consumeToken();
     } else {
       // If we lack the leading let/var/case keyword, then we're here because
       // the user wrote something like "if let x = foo(), y = bar() {".  Fix
@@ -1304,7 +1304,7 @@ ParserStatus Parser::parseStmtCondition(StmtCondition &Condition,
       .fixItRemove(IntroducerLoc)
       .fixItInsertAfter(Tok.getLoc(), " " + BindingKindStr.str());
 
-      consumeLoc(tok::kw_case);
+      consumeToken(tok::kw_case);
       
       bool wasLet = BindingKindStr == "let";
       
@@ -1379,7 +1379,7 @@ ParserStatus Parser::parseStmtCondition(StmtCondition &Condition,
 ///    'else' stmt-brace
 ///    'else' stmt-if
 ParserResult<Stmt> Parser::parseStmtIf(LabeledStmtInfo LabelInfo) {
-  SourceLoc IfLoc = consumeLoc(tok::kw_if);
+  SourceLoc IfLoc = consumeToken(tok::kw_if);
 
   ParserStatus Status;
   StmtCondition Condition;
@@ -1430,7 +1430,7 @@ ParserResult<Stmt> Parser::parseStmtIf(LabeledStmtInfo LabelInfo) {
   SourceLoc ElseLoc;
   ParserResult<Stmt> ElseBody;
   if (Tok.is(tok::kw_else)) {
-    ElseLoc = consumeLoc(tok::kw_else);
+    ElseLoc = consumeToken(tok::kw_else);
     if (Tok.is(tok::kw_if))
       ElseBody = parseStmtIf(LabeledStmtInfo());
     else
@@ -1448,7 +1448,7 @@ ParserResult<Stmt> Parser::parseStmtIf(LabeledStmtInfo LabelInfo) {
 ///     'guard' condition 'else' stmt-brace
 ///
 ParserResult<Stmt> Parser::parseStmtGuard() {
-  SourceLoc GuardLoc = consumeLoc(tok::kw_guard);
+  SourceLoc GuardLoc = consumeToken(tok::kw_guard);
   
   ParserStatus Status;
   StmtCondition Condition;
@@ -1766,7 +1766,7 @@ ParserResult<Stmt> Parser::parseStmtIfConfig(BraceItemListKind Kind) {
   
   while (1) {
     bool isElse = Tok.is(tok::pound_else);
-    SourceLoc ClauseLoc = consumeLoc();
+    SourceLoc ClauseLoc = consumeToken();
     Expr *Condition = nullptr;
 
     if (isElse) {
@@ -1830,7 +1830,7 @@ ParserResult<Stmt> Parser::parseStmtIfConfig(BraceItemListKind Kind) {
 ///   stmt-while:
 ///     (identifier ':')? 'while' expr-basic stmt-brace
 ParserResult<Stmt> Parser::parseStmtWhile(LabeledStmtInfo LabelInfo) {
-  SourceLoc WhileLoc = consumeLoc(tok::kw_while);
+  SourceLoc WhileLoc = consumeToken(tok::kw_while);
 
   Scope S(this, ScopeKind::WhileVars);
   
@@ -1881,7 +1881,7 @@ ParserResult<Stmt> Parser::parseStmtWhile(LabeledStmtInfo LabelInfo) {
 ///   stmt-repeat:
 ///     (identifier ':')? 'repeat' stmt-brace 'while' expr
 ParserResult<Stmt> Parser::parseStmtRepeat(LabeledStmtInfo labelInfo) {
-  SourceLoc repeatLoc = consumeLoc(tok::kw_repeat);
+  SourceLoc repeatLoc = consumeToken(tok::kw_repeat);
 
   ParserStatus status;
 
@@ -1924,7 +1924,7 @@ ParserResult<Stmt> Parser::parseStmtRepeat(LabeledStmtInfo labelInfo) {
 ///     (identifier ':')? 'do' stmt-brace
 ///     (identifier ':')? 'do' stmt-brace stmt-catch+
 ParserResult<Stmt> Parser::parseStmtDo(LabeledStmtInfo labelInfo) {
-  SourceLoc doLoc = consumeLoc(tok::kw_do);
+  SourceLoc doLoc = consumeToken(tok::kw_do);
 
   ParserStatus status;
 
@@ -2005,7 +2005,7 @@ ParserResult<CatchStmt> Parser::parseStmtCatch() {
   // A catch block has its own scope for variables bound out of the pattern.
   Scope S(this, ScopeKind::CatchVars);
 
-  SourceLoc catchLoc = consumeLoc(tok::kw_catch);
+  SourceLoc catchLoc = consumeToken(tok::kw_catch);
 
   SmallVector<VarDecl*, 4> boundDecls;
 
@@ -2032,7 +2032,7 @@ ParserResult<CatchStmt> Parser::parseStmtCatch() {
 }
 
 ParserResult<Stmt> Parser::parseStmtFor(LabeledStmtInfo LabelInfo) {
-  SourceLoc ForLoc = consumeLoc(tok::kw_for);
+  SourceLoc ForLoc = consumeToken(tok::kw_for);
 
   // The c-style-for loop and foreach-style-for loop are conflated together into
   // a single keyword, so we have to do some lookahead to resolve what is going
@@ -2042,7 +2042,7 @@ ParserResult<Stmt> Parser::parseStmtFor(LabeledStmtInfo LabelInfo) {
   // obviously a for-each loop.  For error recovery, also parse "for in ..." as
   // foreach.
   if ((Tok.isIdentifierOrUnderscore() &&
-       peekToken().isAny(tok::colon, tok::kw_in)) ||
+         peekToken().isAny(tok::colon, tok::kw_in)) ||
       Tok.is(tok::kw_in))
     return parseStmtForEach(ForLoc, LabelInfo);
 
@@ -2145,7 +2145,7 @@ ParserResult<Stmt> Parser::parseStmtForCStyle(SourceLoc ForLoc,
   Scope S(this, ScopeKind::ForVars);
   
   if (Tok.is(tok::l_paren)) {
-    LPLoc = consumeLoc();
+    LPLoc = consumeToken();
     LPLocConsumed = true;
   }
   // Parse the first part, either a var, let, expr, or stmt-assign.
@@ -2180,7 +2180,7 @@ ParserResult<Stmt> Parser::parseStmtForCStyle(SourceLoc ForLoc,
 
     // Parse additional expressions.
     while (Tok.is(tok::comma)) {
-      consumeLoc(tok::comma);
+      consumeToken(tok::comma);
 
       First = parseExpr(diag::expected_expr);
       Status |= First;
@@ -2303,7 +2303,7 @@ ParserResult<Stmt> Parser::parseStmtForCStyle(SourceLoc ForLoc,
 
     // Parse additional expressions.
     while (Tok.is(tok::comma)) {
-      consumeLoc(tok::comma);
+      consumeToken(tok::comma);
 
       Third = parseExprBasic(diag::expected_expr);
       Status |= Third;
@@ -2428,7 +2428,7 @@ ParserResult<Stmt> Parser::parseStmtForEach(SourceLoc ForLoc,
 ///    stmt-switch:
 ///      (identifier ':')? 'switch' expr-basic '{' stmt-case+ '}'
 ParserResult<Stmt> Parser::parseStmtSwitch(LabeledStmtInfo LabelInfo) {
-  SourceLoc SwitchLoc = consumeLoc(tok::kw_switch);
+  SourceLoc SwitchLoc = consumeToken(tok::kw_switch);
 
   ParserStatus Status;
   ParserResult<Expr> SubjectExpr;
@@ -2451,7 +2451,7 @@ ParserResult<Stmt> Parser::parseStmtSwitch(LabeledStmtInfo LabelInfo) {
     diagnose(Tok, diag::expected_lbrace_after_switch);
     return nullptr;
   }
-  SourceLoc lBraceLoc = consumeLoc(tok::l_brace);
+  SourceLoc lBraceLoc = consumeToken(tok::l_brace);
   SourceLoc rBraceLoc;
   
   // Reject an empty 'switch'.
@@ -2466,7 +2466,7 @@ ParserResult<Stmt> Parser::parseStmtSwitch(LabeledStmtInfo LabelInfo) {
          && !Tok.is(tok::r_brace) && !Tok.is(tok::eof)) {
     if (ErrorAtNotCoveredStmt) {
       // Error recovery.
-      consumeLoc();
+      consumeToken();
       continue;
     }
     if (!DiagnosedNotCoveredStmt) {
@@ -2517,7 +2517,7 @@ static ParserStatus parseStmtCase(Parser &P, SourceLoc &CaseLoc,
   ParserStatus Status;
   bool isFirst = true;
   
-  CaseLoc = P.consumeLoc(tok::kw_case);
+  CaseLoc = P.consumeToken(tok::kw_case);
 
   do {
     GuardedPattern PatternResult;
@@ -2535,7 +2535,7 @@ static ParserStatus parseStmtCase(Parser &P, SourceLoc &CaseLoc,
     P.diagnose(P.Tok, diag::expected_case_colon, "case");
     Status.setIsParseError();
   } else
-    P.consumeLoc(tok::colon);
+    P.consumeToken(tok::colon);
 
   return Status;
 }
@@ -2546,7 +2546,7 @@ parseStmtCaseDefault(Parser &P, SourceLoc &CaseLoc,
                      SourceLoc &ColonLoc) {
   ParserStatus Status;
 
-  CaseLoc = P.consumeLoc(tok::kw_default);
+  CaseLoc = P.consumeToken(tok::kw_default);
 
   // We don't allow 'where' guards on a 'default' block. For recovery
   // parse one if present.
@@ -2554,7 +2554,7 @@ parseStmtCaseDefault(Parser &P, SourceLoc &CaseLoc,
   ParserResult<Expr> Guard;
   if (P.Tok.is(tok::kw_where)) {
     P.diagnose(P.Tok, diag::default_with_where);
-    WhereLoc = P.consumeLoc(tok::kw_where);
+    WhereLoc = P.consumeToken(tok::kw_where);
     Guard = P.parseExpr(diag::expected_case_where_expr);
     Status |= Guard;
   }
@@ -2564,7 +2564,7 @@ parseStmtCaseDefault(Parser &P, SourceLoc &CaseLoc,
     P.diagnose(P.Tok, diag::expected_case_colon, "default");
     Status.setIsParseError();
   } else
-    P.consumeLoc(tok::colon);
+    P.consumeToken(tok::colon);
 
   // Create an implicit AnyPattern to represent the default match.
   auto Any = new (P.Context) AnyPattern(CaseLoc);

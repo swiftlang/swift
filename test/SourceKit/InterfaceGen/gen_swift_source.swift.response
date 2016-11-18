@@ -47,12 +47,12 @@ internal enum Colors {
   {
     key.kind: source.lang.swift.syntaxtype.comment,
     key.offset: 0,
-    key.length: 49
+    key.length: 50
   },
   {
     key.kind: source.lang.swift.syntaxtype.comment,
     key.offset: 50,
-    key.length: 17
+    key.length: 18
   },
   {
     key.kind: source.lang.swift.syntaxtype.keyword,
@@ -92,7 +92,7 @@ internal enum Colors {
   {
     key.kind: source.lang.swift.syntaxtype.doccomment,
     key.offset: 139,
-    key.length: 26
+    key.length: 27
   },
   {
     key.kind: source.lang.swift.syntaxtype.attribute.builtin,
@@ -232,7 +232,7 @@ internal enum Colors {
   {
     key.kind: source.lang.swift.syntaxtype.doccomment,
     key.offset: 473,
-    key.length: 21
+    key.length: 22
   },
   {
     key.kind: source.lang.swift.syntaxtype.attribute.builtin,
@@ -257,7 +257,7 @@ internal enum Colors {
   {
     key.kind: source.lang.swift.syntaxtype.doccomment,
     key.offset: 527,
-    key.length: 18
+    key.length: 19
   },
   {
     key.kind: source.lang.swift.syntaxtype.attribute.builtin,

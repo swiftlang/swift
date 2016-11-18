@@ -24,10 +24,6 @@ namespace swift {
   class ModuleDecl;
   class SourceFile;
 
-namespace syntax {
-  class Trivia;
-}
-
 namespace ide {
 
 enum class SyntaxNodeKind : uint8_t {
@@ -185,8 +181,6 @@ public:
 class SyntaxModelContext {
   struct Implementation;
   Implementation &Impl;
-
-  void addTrivia(const syntax::Trivia &T, std::vector<SyntaxNode> &Nodes);
 
 public:
   explicit SyntaxModelContext(SourceFile &SrcFile);
