@@ -144,6 +144,18 @@ namespace swift {
     static void verifyFunction(SILFunction *F);
   };
 
+  // RAII helper for locking analyses.
+  class AnalysisPreserver {
+    SILAnalysis *Analysis;
+    public:
+    AnalysisPreserver(SILAnalysis *A) : Analysis(A) {
+      Analysis->lockInvalidation();
+    }
+    ~AnalysisPreserver() {
+      Analysis->unlockInvalidation();
+    }
+  };
+
   /// An abstract base class that implements the boiler plate of caching and
   /// invalidating analysis for specific functions.
   template<typename AnalysisTy>
