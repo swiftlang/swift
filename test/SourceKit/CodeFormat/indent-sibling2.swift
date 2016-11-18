@@ -42,13 +42,6 @@ public func someTestFunc(withArgumentLabel label: String,
                       andAnotherArgumentLabel label3: String) {
 }
 
-func foo(x: Int, y: Int, z: Int) {}
-func testFoo() {
-  foo(x: 1, // comment
-  y: 2,
-        z: 3)
-}
-
 // RUN: %sourcekitd-test -req=format -line=6 -length=1 %s >%t.response
 // RUN: %sourcekitd-test -req=format -line=7 -length=1 %s >>%t.response
 // RUN: %sourcekitd-test -req=format -line=8 -length=1 %s >>%t.response
@@ -63,7 +56,6 @@ func testFoo() {
 // RUN: %sourcekitd-test -req=format -line=37 -length=1 %s >>%t.response
 // RUN: %sourcekitd-test -req=format -line=41 -length=1 %s >>%t.response
 // RUN: %sourcekitd-test -req=format -line=42 -length=1 %s >>%t.response
-// RUN: %sourcekitd-test -req=format -line=48 -length=1 %s >>%t.response
 
 // RUN: %FileCheck --strict-whitespace %s <%t.response
 
@@ -101,6 +93,3 @@ func testFoo() {
 
 //                        "              someOtherArgumentLabel label2: String,"
 // CHECK: key.sourcetext: "              andAnotherArgumentLabel label3: String) {"
-
-//                        "  foo(x: 1, // comment"
-// CHECK: key.sourcetext: "      y: 2,"
