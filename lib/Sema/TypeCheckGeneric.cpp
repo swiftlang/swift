@@ -191,7 +191,8 @@ Type CompleteGenericTypeResolver::resolveDependentMemberType(
                 baseTy, ref->getIdentifier(), newName)
       .fixItReplace(ref->getIdLoc(), newName.str());
     ref->overwriteIdentifier(newName);
-
+    nestedPA->setAlreadyDiagnosedRename();
+    
     // Go get the actual nested type.
     nestedPA = basePA->getNestedType(newName, Builder);
     assert(!nestedPA->wasRenamed());
@@ -485,6 +486,8 @@ TypeChecker::validateGenericFuncSignature(AbstractFunctionDecl *func) {
   CompleteGenericTypeResolver completeResolver(*this, builder);
   if (checkGenericFuncSignature(*this, nullptr, func, completeResolver))
     invalid = true;
+  if (builder.diagnoseRemainingRenames(func->getLoc()))
+    invalid = true;
 
   // The generic function signature is complete and well-formed. Determine
   // the type of the generic function.
@@ -683,6 +686,7 @@ GenericSignature *TypeChecker::validateGenericSignature(
   CompleteGenericTypeResolver completeResolver(*this, builder);
   checkGenericParamList(nullptr, genericParams, nullptr,
                         nullptr, &completeResolver);
+  (void)builder.diagnoseRemainingRenames(genericParams->getSourceRange().Start);
 
   // Record the generic type parameter types and the requirements.
   auto sig = builder.getGenericSignature();
