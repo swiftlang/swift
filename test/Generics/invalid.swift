@@ -1,4 +1,4 @@
-// RUN: %target-parse-verify-swift -enable-experimental-nested-generic-types
+// RUN: %target-parse-verify-swift
 
 func bet() where A : B {} // expected-error {{'where' clause cannot be attached to a non-generic declaration}}
 

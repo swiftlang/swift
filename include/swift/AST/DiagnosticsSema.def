@@ -1144,15 +1144,6 @@ ERROR(pattern_binds_no_variables,none,
 
 
 // Generic types
-ERROR(unsupported_generic_nested_in_type,none,
-      "generic type %0 cannot be nested in type %1",
-      (Identifier, Identifier))
-ERROR(unsupported_type_nested_in_generic_type,none,
-      "type %0 cannot be nested in generic type %1",
-      (Identifier, Identifier))
-ERROR(unsupported_type_nested_in_generic_extension,none,
-      "type %0 cannot be nested in extension of generic type %1",
-      (Identifier, Identifier))
 ERROR(unsupported_type_nested_in_generic_function,none,
       "type %0 cannot be nested in generic function %1",
       (Identifier, Identifier))

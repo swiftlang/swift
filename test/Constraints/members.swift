@@ -131,7 +131,7 @@ func enumMetatypeMember(_ opt: Int?) {
 
 // Reference a Type member. <rdar://problem/15034920>
 class G<T> {
-  class In { // expected-error{{nested in generic type}}
+  class In {
     class func foo() {}
   }
 }

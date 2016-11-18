@@ -3969,33 +3969,6 @@ public:
         return true;
       }
 
-      if (!TC.Context.LangOpts.EnableExperimentalNestedGenericTypes) {
-        if (auto parent = dyn_cast<NominalTypeDecl>(DC)) {
-          if (NTD->getGenericParams())
-            TC.diagnose(NTD->getLoc(), diag::unsupported_generic_nested_in_type,
-                        NTD->getName(),
-                        parent->getName());
-          else
-            TC.diagnose(NTD->getLoc(),
-                        diag::unsupported_type_nested_in_generic_type,
-                        NTD->getName(),
-                        parent->getName());
-          NTD->setInvalid();
-          return true;
-        } else if (auto ED = dyn_cast<ExtensionDecl>(DC)) {
-          auto *parent = ED->getAsNominalTypeOrNominalTypeExtensionContext();
-          if (parent == nullptr) {
-            /* Invalid extension -- diagnosed elsewhere */
-            return true;
-          }
-
-          TC.diagnose(NTD->getLoc(),
-                      diag::unsupported_type_nested_in_generic_extension,
-                      NTD->getName(),
-                      parent->getName());
-        }
-      }
-
       if (DC->isLocalContext() && DC->isGenericContext()) {
         // A local generic context is a generic function.
         if (auto AFD = dyn_cast<AbstractFunctionDecl>(DC)) {

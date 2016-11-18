@@ -9,7 +9,7 @@
 // --------------------------------------------------
 
 struct Foo<T> { // expected-note{{generic type 'Foo' declared here}} expected-note{{generic type 'Foo' declared here}}
-  struct Wibble { } // expected-error{{cannot be nested in generic type}}
+  struct Wibble { }
 }
 
 class Dict<K, V> { } // expected-note{{generic type 'Dict' declared here}} expected-note{{generic type 'Dict' declared here}} expected-note{{generic type 'Dict' declared here}}
