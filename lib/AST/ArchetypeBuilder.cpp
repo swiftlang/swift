@@ -127,6 +127,9 @@ struct ArchetypeBuilder::Implementation {
   /// Once all requirements have been added, this will be zero in well-formed
   /// code.
   unsigned NumUnresolvedNestedTypes = 0;
+
+  /// The nested types that have been renamed.
+  SmallVector<PotentialArchetype *, 4> RenamedNestedTypes;
 };
 
 ArchetypeBuilder::PotentialArchetype::~PotentialArchetype() {
@@ -1146,6 +1149,17 @@ static int compareDependentTypes(ArchetypeBuilder::PotentialArchetype * const* p
   if (b->getResolvedAssociatedType())
     return +1;
 
+  // Along the error path where one or both of the potential archetypes was
+  // renamed due to typo correction,
+  if (a->wasRenamed() || b->wasRenamed()) {
+    if (a->wasRenamed() != b->wasRenamed())
+      return a->wasRenamed() ? +1 : -1;
+
+    if (int compareNames = a->getOriginalName().str().compare(
+                                                    b->getOriginalName().str()))
+      return compareNames;
+  }
+
   llvm_unreachable("potential archetype total order failure");
 }
 
@@ -1846,6 +1860,7 @@ ArchetypeBuilder::finalize(SourceLoc loc, bool allowConcreteGenericParams) {
 
       // Set the typo-corrected name.
       pa->setRenamed(correction);
+      Impl->RenamedNestedTypes.push_back(pa);
       
       // Resolve the associated type and merge the potential archetypes.
       auto replacement = pa->getParent()->getNestedType(correction, *this);
@@ -1854,6 +1869,20 @@ ArchetypeBuilder::finalize(SourceLoc loc, bool allowConcreteGenericParams) {
         RequirementSource(RequirementSource::Redundant, SourceLoc()));
     });
   }
+}
+
+bool ArchetypeBuilder::diagnoseRemainingRenames(SourceLoc loc) {
+  bool invalid = false;
+  for (auto pa : Impl->RenamedNestedTypes) {
+    if (pa->alreadyDiagnosedRename()) continue;
+
+    Diags.diagnose(loc, diag::invalid_member_type_suggest,
+                   pa->getParent()->getDependentType(*this, true),
+                   pa->getOriginalName(), pa->getName());
+    invalid = true;
+  }
+
+  return invalid;
 }
 
 template<typename F>
