@@ -441,12 +441,21 @@ SILInstruction *SILCombiner::visitBuiltinInst(BuiltinInst *I) {
   //   cmp_*_T . (zext U->T x, zext U->T y)
   //      => cmp_*_T (x, y)
   switch (I->getBuiltinInfo().ID) {
-  case BuiltinValueKind::ICMP_EQ:
-  case BuiltinValueKind::ICMP_NE:
+  case BuiltinValueKind::ICMP_ULT: {
+    if (auto *ILOp = dyn_cast<IntegerLiteralInst>(I->getArguments()[0])) {
+      if (ILOp->getValue().isMaxValue()) {
+        auto *Zero = Builder.createIntegerLiteral(I->getLoc(), I->getType(), 0);
+        replaceInstUsesWith(*I, Zero);
+        return eraseInstFromFunction(*I);
+      }
+    }
+  }
+    LLVM_FALLTHROUGH;
   case BuiltinValueKind::ICMP_ULE:
-  case BuiltinValueKind::ICMP_ULT:
   case BuiltinValueKind::ICMP_UGE:
-  case BuiltinValueKind::ICMP_UGT: {
+  case BuiltinValueKind::ICMP_UGT:
+  case BuiltinValueKind::ICMP_EQ:
+  case BuiltinValueKind::ICMP_NE: {
     SILValue LCast, RCast;
     if (match(I->getArguments()[0],
               m_ApplyInst(BuiltinValueKind::ZExtOrBitCast,

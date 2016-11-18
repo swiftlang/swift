@@ -451,9 +451,6 @@ public struct Set<Element : Hashable> :
   internal typealias _VariantBuffer = _VariantSetBuffer<Element>
   internal typealias _NativeBuffer = _NativeSetBuffer<Element>
 
-  /// The index type for subscripting the set.
-  public typealias Index = SetIndex<Element>
-
   internal var _variantBuffer: _VariantBuffer
 
   /// Creates a new, empty set with at least the specified number of elements'
@@ -1641,9 +1638,6 @@ public struct Dictionary<Key : Hashable, Value> :
   /// The element type of a dictionary: a tuple containing an individual
   /// key-value pair.
   public typealias Element = (key: Key, value: Value)
-
-  /// The index type of a dictionary.
-  public typealias Index = DictionaryIndex<Key, Value>
 
   internal var _variantBuffer: _VariantBuffer
 
@@ -4705,6 +4699,7 @@ internal enum ${Self}IndexRepresentation<${TypeParametersDecl}> {
   case _cocoa(_CocoaIndex)
 }
 
+extension ${Self} {
 %{
 if Self == 'Set':
   SubscriptingWithIndexDoc = """\
@@ -4726,12 +4721,7 @@ elif Self == 'Dictionary':
 }%
 
 ${SubscriptingWithIndexDoc}
-public struct ${Self}Index<${TypeParametersDecl}> :
-  Comparable {
-  // FIXME(ABI)#34 (Nesting types in generics): `DictionaryIndex` and `SetIndex` should
-  // be nested types (Dictionary.Index and Set.Index).
-  // rdar://problem/17002096
-
+public struct Index : Comparable {
   // Index for native buffer is efficient.  Index for bridged NS${Self} is
   // not, because neither NSEnumerator nor fast enumeration support moving
   // backwards.  Even if they did, there is another issue: NSEnumerator does
@@ -4750,12 +4740,12 @@ public struct ${Self}Index<${TypeParametersDecl}> :
   internal var _value: ${Self}IndexRepresentation<${TypeParameters}>
 
   @_versioned
-  internal static func _native(_ index: _NativeIndex) -> ${Self}Index {
+  internal static func _native(_ index: _NativeIndex) -> Index {
     return ${Self}Index(_value: ._native(index))
   }
 #if _runtime(_ObjC)
   @_versioned
-  internal static func _cocoa(_ index: _CocoaIndex) -> ${Self}Index {
+  internal static func _cocoa(_ index: _CocoaIndex) -> Index {
     return ${Self}Index(_value: ._cocoa(index))
   }
 #endif
@@ -4789,10 +4779,15 @@ public struct ${Self}Index<${TypeParametersDecl}> :
 #endif
 }
 
-extension ${Self}Index {
+}
+
+public typealias ${Self}Index<${TypeParametersDecl}> =
+    ${Self}<${TypeParameters}>.Index
+
+extension ${Self}.Index {
   public static func == (
-    lhs: ${Self}Index<${TypeParameters}>,
-    rhs: ${Self}Index<${TypeParameters}>
+    lhs: ${Self}<${TypeParameters}>.Index,
+    rhs: ${Self}<${TypeParameters}>.Index
   ) -> Bool {
     if _fastPath(lhs._guaranteedNative) {
       return lhs._nativeIndex == rhs._nativeIndex
@@ -4813,8 +4808,8 @@ extension ${Self}Index {
   }
 
   public static func < (
-    lhs: ${Self}Index<${TypeParameters}>,
-    rhs: ${Self}Index<${TypeParameters}>
+    lhs: ${Self}<${TypeParameters}>.Index,
+    rhs: ${Self}<${TypeParameters}>.Index
   ) -> Bool {
     if _fastPath(lhs._guaranteedNative) {
       return lhs._nativeIndex < rhs._nativeIndex

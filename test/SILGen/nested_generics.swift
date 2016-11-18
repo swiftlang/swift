@@ -1,7 +1,7 @@
-// RUN: %target-swift-frontend -Xllvm -sil-full-demangle -emit-silgen -enable-experimental-nested-generic-types -parse-as-library %s | %FileCheck %s
-// RUN: %target-swift-frontend -Xllvm -sil-full-demangle -emit-sil -enable-experimental-nested-generic-types -parse-as-library %s > /dev/null
-// RUN: %target-swift-frontend -Xllvm -sil-full-demangle -emit-sil -O -enable-experimental-nested-generic-types -parse-as-library %s > /dev/null
-// RUN: %target-swift-frontend -Xllvm -sil-full-demangle -emit-ir -enable-experimental-nested-generic-types -parse-as-library %s > /dev/null
+// RUN: %target-swift-frontend -Xllvm -sil-full-demangle -emit-silgen -parse-as-library %s | %FileCheck %s
+// RUN: %target-swift-frontend -Xllvm -sil-full-demangle -emit-sil -parse-as-library %s > /dev/null
+// RUN: %target-swift-frontend -Xllvm -sil-full-demangle -emit-sil -O -parse-as-library %s > /dev/null
+// RUN: %target-swift-frontend -Xllvm -sil-full-demangle -emit-ir -parse-as-library %s > /dev/null
 
 // TODO:
 // - test generated SIL -- mostly we're just testing mangling here

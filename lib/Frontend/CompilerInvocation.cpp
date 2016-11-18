@@ -804,9 +804,6 @@ static bool ParseLangArgs(LangOptions &Opts, ArgList &Args,
   Opts.EnableExperimentalPropertyBehaviors |=
     Args.hasArg(OPT_enable_experimental_property_behaviors);
 
-  Opts.EnableExperimentalNestedGenericTypes |=
-    Args.hasArg(OPT_enable_experimental_nested_generic_types);
-
   Opts.EnableClassResilience |=
     Args.hasArg(OPT_enable_class_resilience);
 

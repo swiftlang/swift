@@ -4,19 +4,74 @@
 #include "Private.h"
 
 #if SWIFT_OBJC_INTEROP
-
 #include <objc/runtime.h>
+#endif
+
+// FIXME: This stuff should be merged with the existing logic in
+// include/swift/Reflection/TypeRefBuilder.h as part of the rewrite
+// to change stdlib reflection over to using remote mirrors.
+
+Demangle::NodePointer
+swift::_swift_buildDemanglingForMetadata(const Metadata *type);
 
 // Build a demangled type tree for a nominal type.
 static Demangle::NodePointer
-_buildDemanglingForNominalType(Demangle::Node::Kind boundGenericKind,
-                               const Metadata *type,
-                               const NominalTypeDescriptor *description) {
+_buildDemanglingForNominalType(const Metadata *type) {
   using namespace Demangle;
-  
+
+  const Metadata *parent;
+  Node::Kind boundGenericKind;
+  const NominalTypeDescriptor *description;
+
+  // Demangle the parent type, if any.
+  switch (type->getKind()) {
+  case MetadataKind::Class: {
+    auto classType = static_cast<const ClassMetadata *>(type);
+    parent = classType->getParentType(classType->getDescription());
+    boundGenericKind = Node::Kind::BoundGenericClass;
+    description = classType->getDescription();
+    break;
+  }
+  case MetadataKind::Enum:
+  case MetadataKind::Optional: {
+    auto enumType = static_cast<const EnumMetadata *>(type);
+    parent = enumType->Parent;
+    boundGenericKind = Node::Kind::BoundGenericEnum;
+    description = enumType->Description;
+    break;
+  }
+  case MetadataKind::Struct: {
+    auto structType = static_cast<const StructMetadata *>(type);
+    parent = structType->Parent;
+    boundGenericKind = Node::Kind::BoundGenericStructure;
+    description = structType->Description;
+    break;
+  }
+  default:
+    return nullptr;
+  }
+
   // Demangle the base name.
   auto node = demangleTypeAsNode(description->Name,
-                                     strlen(description->Name));
+                                 strlen(description->Name));
+  assert(node->getKind() == Node::Kind::Type);
+
+  // Demangle the parent.
+  if (parent) {
+    auto parentNode = _swift_buildDemanglingForMetadata(parent);
+    if (parentNode->getKind() == Node::Kind::Type)
+      parentNode = parentNode->getChild(0);
+
+    auto typeNode = node->getChild(0);
+    auto newTypeNode = NodeFactory::create(typeNode->getKind());
+    newTypeNode->addChild(parentNode);
+    newTypeNode->addChild(typeNode->getChild(1));
+
+    auto newNode = NodeFactory::create(Node::Kind::Type);
+    newNode->addChild(newTypeNode);
+    node = newNode;
+  }
+
   // If generic, demangle the type parameters.
   if (description->GenericParams.NumPrimaryParams > 0) {
     auto typeParams = NodeFactory::create(Node::Kind::TypeList);
@@ -44,22 +99,11 @@ Demangle::NodePointer swift::_swift_buildDemanglingForMetadata(const Metadata *t
   using namespace Demangle;
 
   switch (type->getKind()) {
-  case MetadataKind::Class: {
-    auto classType = static_cast<const ClassMetadata *>(type);
-    return _buildDemanglingForNominalType(Node::Kind::BoundGenericClass,
-                                          type, classType->getDescription());
-  }
+  case MetadataKind::Class:
   case MetadataKind::Enum:
-  case MetadataKind::Optional: {
-    auto structType = static_cast<const EnumMetadata *>(type);
-    return _buildDemanglingForNominalType(Node::Kind::BoundGenericEnum,
-                                          type, structType->Description);
-  }
-  case MetadataKind::Struct: {
-    auto structType = static_cast<const StructMetadata *>(type);
-    return _buildDemanglingForNominalType(Node::Kind::BoundGenericStructure,
-                                          type, structType->Description);
-  }
+  case MetadataKind::Optional:
+  case MetadataKind::Struct:
+    return _buildDemanglingForNominalType(type);
   case MetadataKind::ObjCClassWrapper: {
 #if SWIFT_OBJC_INTEROP
     auto objcWrapper = static_cast<const ObjCClassWrapperMetadata *>(type);
@@ -203,8 +247,10 @@ Demangle::NodePointer swift::_swift_buildDemanglingForMetadata(const Metadata *t
   case MetadataKind::Metatype: {
     auto metatype = static_cast<const MetatypeMetadata *>(type);
     auto instance = _swift_buildDemanglingForMetadata(metatype->InstanceType);
+    auto typeNode = NodeFactory::create(Node::Kind::Type);
+    typeNode->addChild(instance);
     auto node = NodeFactory::create(Node::Kind::Metatype);
-    node->addChild(instance);
+    node->addChild(typeNode);
     return node;
   }
   case MetadataKind::Tuple: {
@@ -252,5 +298,3 @@ Demangle::NodePointer swift::_swift_buildDemanglingForMetadata(const Metadata *t
   // Not a type.
   return nullptr;
 }
-
-#endif

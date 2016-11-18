@@ -6,4 +6,5 @@
 // See http://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
 
 // RUN: not --crash %target-swift-frontend %s -emit-ir
-{{}typealias{guard{return.h.A>String({
+// REQUIRES: asserts
+_{&(n:_{

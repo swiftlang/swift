@@ -191,7 +191,8 @@ Type CompleteGenericTypeResolver::resolveDependentMemberType(
                 baseTy, ref->getIdentifier(), newName)
       .fixItReplace(ref->getIdLoc(), newName.str());
     ref->overwriteIdentifier(newName);
-
+    nestedPA->setAlreadyDiagnosedRename();
+    
     // Go get the actual nested type.
     nestedPA = basePA->getNestedType(newName, Builder);
     assert(!nestedPA->wasRenamed());
@@ -457,6 +458,24 @@ static Type getResultType(TypeChecker &TC, FuncDecl *fn, Type resultType) {
   return resultType;
 }
 
+/// Determine whether the given type is \c Self, an associated type of \c Self,
+/// or a concrete type.
+static bool isSelfDerivedOrConcrete(Type type) {
+  // Check for a concrete type.
+  if (!type->hasTypeParameter())
+    return true;
+
+  // Unwrap dependent member types.
+  while (auto depMem = type->getAs<DependentMemberType>()) {
+    type = depMem->getBase();
+  }
+
+  if (auto gp = type->getAs<GenericTypeParamType>())
+    return gp->getDepth() == 0 && gp->getIndex() == 0;
+
+  return false;
+}
+
 GenericSignature *
 TypeChecker::validateGenericFuncSignature(AbstractFunctionDecl *func) {
   bool invalid = false;
@@ -485,10 +504,40 @@ TypeChecker::validateGenericFuncSignature(AbstractFunctionDecl *func) {
   CompleteGenericTypeResolver completeResolver(*this, builder);
   if (checkGenericFuncSignature(*this, nullptr, func, completeResolver))
     invalid = true;
+  if (builder.diagnoseRemainingRenames(func->getLoc()))
+    invalid = true;
 
   // The generic function signature is complete and well-formed. Determine
   // the type of the generic function.
   auto sig = builder.getGenericSignature();
+
+  // For a generic requirement in a protocol, make sure that the requirement
+  // set didn't add any requirements to Self or its associated types.
+  if (!invalid && func->getGenericParams() &&
+      isa<ProtocolDecl>(func->getDeclContext())) {
+    auto proto = cast<ProtocolDecl>(func->getDeclContext());
+    for (auto req : sig->getRequirements()) {
+      // If one of the types in the requirement is dependent on a non-Self
+      // type parameter, this requirement is okay.
+      if (!isSelfDerivedOrConcrete(req.getFirstType()) ||
+          !isSelfDerivedOrConcrete(req.getSecondType()))
+        continue;
+
+      // The conformance of 'Self' to the protocol is okay.
+      if (req.getKind() == RequirementKind::Conformance &&
+          req.getSecondType()->getAs<ProtocolType>()->getDecl() == proto &&
+          req.getFirstType()->is<GenericTypeParamType>())
+        continue;
+
+      diagnose(func, diag::requirement_restricts_self,
+               func->getDescriptiveKind(), func->getFullName(),
+               req.getFirstType().getString(),
+               static_cast<unsigned>(req.getKind()),
+               req.getSecondType().getString());
+
+      invalid = true;
+    }
+  }
 
   // Debugging of the archetype builder and generic signature generation.
   if (Context.LangOpts.DebugGenericSignatures) {
@@ -683,6 +732,7 @@ GenericSignature *TypeChecker::validateGenericSignature(
   CompleteGenericTypeResolver completeResolver(*this, builder);
   checkGenericParamList(nullptr, genericParams, nullptr,
                         nullptr, &completeResolver);
+  (void)builder.diagnoseRemainingRenames(genericParams->getSourceRange().Start);
 
   // Record the generic type parameter types and the requirements.
   auto sig = builder.getGenericSignature();

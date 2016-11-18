@@ -1110,8 +1110,14 @@ RequirementEnvironment::RequirementEnvironment(
       auto first = reqReq.getFirstType().subst(reqToSyntheticEnvMap);
       auto second = reqReq.getSecondType().subst(reqToSyntheticEnvMap);
 
+      // FIXME: We really want to check hasTypeParameter here, but the
+      // ArchetypeBuilder isn't ready for that.
       if (!first->isTypeParameter()) {
-        assert(second->isTypeParameter());
+        // When the second is not a type parameter either, drop the requirement.
+        // If the types were different, this requirement will be unsatisfiable.
+        if (!second->isTypeParameter()) continue;
+
+        // Put the type parameter first.
         std::swap(first, second);
       }
 

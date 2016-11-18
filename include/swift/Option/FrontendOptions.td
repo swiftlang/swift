@@ -240,10 +240,6 @@ def enable_experimental_property_behaviors :
   Flag<["-"], "enable-experimental-property-behaviors">,
   HelpText<"Enable experimental property behaviors">;
 
-def enable_experimental_nested_generic_types :
-  Flag<["-"], "enable-experimental-nested-generic-types">,
-  HelpText<"Enable experimental support for nested generic types">;
-
 def disable_availability_checking : Flag<["-"],
   "disable-availability-checking">,
   HelpText<"Disable checking for potentially unavailable APIs">;

@@ -180,6 +180,11 @@ static void checkForOutOfDateInputs(DiagnosticEngine &diags,
 static void writeCompilationRecord(StringRef path, StringRef argsHash,
                                    llvm::sys::TimeValue buildTime,
                                    const InputInfoMap &inputs) {
+  // Before writing to the dependencies file path, preserve any previous file
+  // that may have been there. No error handling -- this is just a nicety, it
+  // doesn't matter if it fails.
+  llvm::sys::fs::rename(path, path + "~");
+
   std::error_code error;
   llvm::raw_fd_ostream out(path, error, llvm::sys::fs::F_None);
   if (out.has_error()) {

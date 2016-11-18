@@ -710,6 +710,7 @@ function(_add_swift_library_single target name)
       SWIFTLIB_SINGLE_EXTERNAL_SOURCES ${name}
       DEPENDS
         ${gyb_dependency_targets}
+        ${SWIFTLIB_SINGLE_DEPENDS}
         ${SWIFTLIB_SINGLE_FILE_DEPENDS}
         ${SWIFTLIB_SINGLE_LINK_LIBRARIES}
         ${SWIFTLIB_SINGLE_INTERFACE_LINK_LIBRARIES}
