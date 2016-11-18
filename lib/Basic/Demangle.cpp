@@ -2396,6 +2396,11 @@ private:
     case Node::Kind::VariadicTuple:
       return true;
 
+    case Node::Kind::ProtocolList:
+      if (pointer->getChild(0)->getNumChildren() <= 1)
+        return true;
+      return false;
+
     case Node::Kind::Allocator:
     case Node::Kind::ArgumentTuple:
     case Node::Kind::AssociatedTypeMetadataAccessor:
@@ -2473,7 +2478,6 @@ private:
     case Node::Kind::PrefixOperator:
     case Node::Kind::ProtocolConformance:
     case Node::Kind::ProtocolDescriptor:
-    case Node::Kind::ProtocolList:
     case Node::Kind::ProtocolWitness:
     case Node::Kind::ProtocolWitnessTable:
     case Node::Kind::ProtocolWitnessTableAccessor:
@@ -2686,8 +2690,6 @@ private:
 } // end anonymous namespace
 
 static bool isExistentialType(NodePointer node) {
-  assert(node->getKind() == Node::Kind::Type);
-  node = node->getChild(0);
   return (node->getKind() == Node::Kind::ExistentialMetatype ||
           node->getKind() == Node::Kind::ProtocolList);
 }
@@ -3004,7 +3006,10 @@ void NodePrinter::print(NodePointer pointer, bool asContext, bool suppressType) 
       if (!pointer->hasChildren())
         need_parens = true;
       else {
-        Node::Kind child0_kind = pointer->getChild(0)->getChild(0)->getKind();
+        Node::Kind child0_kind = pointer->getChild(0)->getKind();
+        if (child0_kind == Node::Kind::Type)
+          child0_kind = pointer->getChild(0)->getChild(0)->getKind();
+
         if (child0_kind != Node::Kind::VariadicTuple &&
             child0_kind != Node::Kind::NonVariadicTuple)
           need_parens = true;
@@ -3410,8 +3415,13 @@ void NodePrinter::print(NodePointer pointer, bool asContext, bool suppressType) 
       Printer << " ";
       Idx++;
     }
-    NodePointer type = pointer->getChild(Idx);
+    NodePointer type = pointer->getChild(Idx)->getChild(0);
+    bool needs_parens = !isSimpleType(type);
+    if (needs_parens)
+      Printer << "(";
     print(type);
+    if (needs_parens)
+      Printer << ")";
     if (isExistentialType(type)) {
       Printer << ".Protocol";
     } else {
