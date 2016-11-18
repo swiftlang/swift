@@ -242,7 +242,7 @@ ValidationInfo serialization::validateSerializedAST(
   llvm::BitstreamEntry topLevelEntry;
 
   while (!cursor.AtEndOfStream()) {
-    topLevelEntry = cursor.advance();
+    topLevelEntry = cursor.advance(AF_DontPopBlockAtEnd);
     if (topLevelEntry.Kind != llvm::BitstreamEntry::SubBlock)
       break;
 
@@ -774,7 +774,7 @@ ModuleFile::ModuleFile(
   llvm::BitstreamEntry topLevelEntry;
 
   while (!cursor.AtEndOfStream()) {
-    topLevelEntry = cursor.advance();
+    topLevelEntry = cursor.advance(AF_DontPopBlockAtEnd);
     if (topLevelEntry.Kind != llvm::BitstreamEntry::SubBlock)
       break;
 
@@ -973,8 +973,6 @@ ModuleFile::ModuleFile(
       }
       break;
     }
-
-    topLevelEntry = cursor.advance(AF_DontPopBlockAtEnd);
   }
 
   if (topLevelEntry.Kind != llvm::BitstreamEntry::EndBlock) {
@@ -993,7 +991,7 @@ ModuleFile::ModuleFile(
   }
 
   while (!docCursor.AtEndOfStream()) {
-    topLevelEntry = docCursor.advance();
+    topLevelEntry = docCursor.advance(AF_DontPopBlockAtEnd);
     if (topLevelEntry.Kind != llvm::BitstreamEntry::SubBlock)
       break;
 
