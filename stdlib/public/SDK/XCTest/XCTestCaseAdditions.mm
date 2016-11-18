@@ -159,6 +159,5 @@ NSDictionary *_XCTRunThrowableBlockBridge(void (^block)())
                    };
     }
 
-    Block_release(block);
     return [result retain];
 }
