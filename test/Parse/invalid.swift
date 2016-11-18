@@ -120,3 +120,9 @@ struct Weak<T: class> { // expected-error {{'class' constraint can only appear o
   weak var value: T // expected-error {{'weak' may only be applied to class and class-bound protocol types}}
   // expected-error@-1 {{use of undeclared type 'T'}}
 }
+
+let x: () = ()
+!() // expected-error {{missing argument for parameter #1 in call}}
+!(()) // expected-error {{cannot convert value of type '()' to expected argument type 'Bool'}}
+!(x) // expected-error {{cannot convert value of type '()' to expected argument type 'Bool'}}
+!x // expected-error {{cannot convert value of type '()' to expected argument type 'Bool'}}
