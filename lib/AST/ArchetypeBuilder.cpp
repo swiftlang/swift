@@ -975,6 +975,8 @@ bool ArchetypeBuilder::addConformanceRequirement(PotentialArchetype *PAT,
 bool ArchetypeBuilder::addSuperclassRequirement(PotentialArchetype *T,
                                                 Type Superclass,
                                                 RequirementSource Source) {
+  T = T->getRepresentative();
+
   if (Superclass->hasArchetype()) {
     // Map contextual type to interface type.
     // FIXME: There might be a better way to do this.
@@ -1238,7 +1240,11 @@ bool ArchetypeBuilder::addSameTypeRequirementBetweenArchetypes(
   for (auto equiv : T2->EquivalenceClass)
     T1->EquivalenceClass.push_back(equiv);
 
-  // FIXME: superclass requirements!
+  // Superclass requirements.
+  if (T2->Superclass) {
+    addSuperclassRequirement(T1, T2->getSuperclass(),
+                             T2->getSuperclassSource());
+  }
 
   // Add all of the protocol conformance requirements of T2 to T1.
   for (auto conforms : T2->ConformsTo) {
