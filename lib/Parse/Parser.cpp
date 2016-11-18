@@ -349,21 +349,17 @@ const syntax::Token &Parser::peekToken() {
   return L->peekNextToken();
 }
 
-syntax::Token Parser::consumeToken() {
-  auto CurrentTok = Tok;
-  assert(CurrentTok.isNot(tok::eof) && "Lexing past eof!");
+SourceLoc Parser::consumeToken() {
+  auto CurrentLoc = Tok.getLoc();
+  assert(Tok.isNot(tok::eof) && "Lexing past eof!");
 
-  if (IsParsingInterfaceTokens && !CurrentTok.getText().empty()) {
+  if (IsParsingInterfaceTokens && !Tok.getText().empty()) {
     SF.recordInterfaceToken(Tok.getText());
   }
 
-  PreviousLoc = CurrentTok.getLoc();
+  PreviousLoc = CurrentLoc;
   Tok = L->lex();
-  return CurrentTok;
-}
-
-SourceLoc Parser::consumeLoc() {
-  return consumeToken().getLoc();
+  return CurrentLoc;
 }
 
 SourceLoc Parser::getEndOfPreviousLoc() {
@@ -384,7 +380,7 @@ SourceLoc Parser::consumeStartingCharacterOfCurrentToken() {
 
   // Current token can be either one-character token we want to consume...
   if (Tok.getWidth() == 1) {
-    return consumeLoc();
+    return consumeToken();
   }
 
   auto SplitOperatorText = Tok.getText().substr(0, 1);
@@ -417,24 +413,24 @@ SourceLoc Parser::consumeStartingGreater() {
 void Parser::skipSingle() {
   switch (Tok.getKind()) {
   case tok::l_paren:
-    consumeLoc();
+    consumeToken();
     skipUntil(tok::r_paren);
     consumeIf(tok::r_paren);
     break;
   case tok::l_brace:
-    consumeLoc();
+    consumeToken();
     skipUntil(tok::r_brace);
     consumeIf(tok::r_brace);
     break;
   case tok::l_square:
-    consumeLoc();
+    consumeToken();
     skipUntil(tok::r_square);
     consumeIf(tok::r_square);
     break;
   case tok::pound_if:
   case tok::pound_else:
   case tok::pound_elseif:
-    consumeLoc();
+    consumeToken();
     // skipUntil also implicitly stops at tok::pound_endif.
     skipUntil(tok::pound_else, tok::pound_elseif);
       
@@ -445,7 +441,7 @@ void Parser::skipSingle() {
     break;
       
   default:
-    consumeLoc();
+    consumeToken();
     break;
   }
 }
@@ -605,7 +601,7 @@ bool Parser::parseSpecificIdentifier(StringRef expected, SourceLoc &loc,
     diagnose(Tok, D);
     return true;
   }
-  loc = consumeLoc(tok::identifier);
+  loc = consumeToken(tok::identifier);
   return false;
 }
 
@@ -617,7 +613,7 @@ bool Parser::parseAnyIdentifier(Identifier &Result, SourceLoc &Loc,
   if (Tok.is(tok::identifier) || Tok.isAnyOperator()) {
     Result = Context.getIdentifier(Tok.getText());
     Loc = Tok.getLoc();
-    consumeLoc();
+    consumeToken();
     return false;
   }
 
@@ -626,7 +622,7 @@ bool Parser::parseAnyIdentifier(Identifier &Result, SourceLoc &Loc,
   if (Tok.is(tok::exclaim_postfix)) {
     Result = Context.getIdentifier(Tok.getText());
     Loc = Tok.getLoc();
-    consumeLoc(tok::exclaim_postfix);
+    consumeToken(tok::exclaim_postfix);
     return false;
   }
 
@@ -649,7 +645,7 @@ bool Parser::parseAnyIdentifier(Identifier &Result, SourceLoc &Loc,
 /// If the input is malformed, this emits the specified error diagnostic.
 bool Parser::parseToken(tok K, SourceLoc &TokLoc, const Diagnostic &D) {
   if (Tok.is(K)) {
-    TokLoc = consumeLoc(K);
+    TokLoc = consumeToken(K);
     return false;
   }
 
@@ -687,7 +683,7 @@ Parser::parseList(tok RightK, SourceLoc LeftLoc, SourceLoc &RightLoc,
   assert(SeparatorK == tok::comma || SeparatorK == tok::semi);
 
   if (Tok.is(RightK)) {
-    RightLoc = consumeLoc(RightK);
+    RightLoc = consumeToken(RightK);
     return makeParserSuccess();
   }
 
@@ -697,7 +693,7 @@ Parser::parseList(tok RightK, SourceLoc LeftLoc, SourceLoc &RightLoc,
       diagnose(Tok, diag::unexpected_separator,
                SeparatorK == tok::comma ? "," : ";")
         .fixItRemove(SourceRange(Tok.getLoc()));
-      consumeLoc();
+      consumeToken();
     }
     auto StartLoc = Tok.getLoc();
     Status |= callback();
@@ -748,7 +744,7 @@ Parser::parseList(tok RightK, SourceLoc LeftLoc, SourceLoc &RightLoc,
 
   if (Status.isError()) {
     // If we've already got errors, don't emit missing RightK diagnostics.
-    RightLoc = Tok.is(RightK) ? consumeLoc() : PreviousLoc;
+    RightLoc = Tok.is(RightK) ? consumeToken() : PreviousLoc;
   } else if (parseMatchingToken(RightK, RightLoc, ErrorDiag, LeftLoc)) {
     Status.setIsParseError();
   }

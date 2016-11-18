@@ -71,7 +71,7 @@ Parser::parseGenericParameters(SourceLoc LAngleLoc) {
     // Parse the ':' followed by a type.
     SmallVector<TypeLoc, 1> Inherited;
     if (Tok.is(tok::colon)) {
-      (void)consumeLoc();
+      (void)consumeToken();
       ParserResult<TypeRepr> Ty;
       
       if (Tok.isAny(tok::identifier, tok::code_complete, tok::kw_protocol, tok::kw_Any)) {
@@ -81,7 +81,7 @@ Parser::parseGenericParameters(SourceLoc LAngleLoc) {
         diagnose(Tok, diag::unexpected_class_constraint);
         diagnose(Tok, diag::suggest_anyobject, Name)
           .fixItReplace(Tok.getLoc(), "AnyObject");
-        consumeLoc();
+        consumeToken();
         Invalid = true;
       } else {
         diagnose(Tok, diag::expected_generics_type_restriction, Name);
@@ -248,7 +248,7 @@ ParserStatus Parser::parseGenericWhereClause(
                bool &FirstTypeInComplete) {
   ParserStatus Status;
   // Parse the 'where'.
-  WhereLoc = consumeLoc(tok::kw_where);
+  WhereLoc = consumeToken(tok::kw_where);
   FirstTypeInComplete = false;
   do {
     // Parse the leading type-identifier.
@@ -264,7 +264,7 @@ ParserStatus Parser::parseGenericWhereClause(
 
     if (Tok.is(tok::colon)) {
       // A conformance-requirement.
-      SourceLoc ColonLoc = consumeLoc();
+      SourceLoc ColonLoc = consumeToken();
 
       // Parse the protocol or composition.
       ParserResult<TypeRepr> Protocol = parseTypeForInheritance(
@@ -288,7 +288,7 @@ ParserStatus Parser::parseGenericWhereClause(
         diagnose(Tok, diag::requires_single_equal)
           .fixItReplace(SourceRange(Tok.getLoc()), "==");
       }
-      SourceLoc EqualLoc = consumeLoc();
+      SourceLoc EqualLoc = consumeToken();
 
       // Parse the second type.
       ParserResult<TypeRepr> SecondType = parseType();

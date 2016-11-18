@@ -321,10 +321,10 @@ public:
   void restoreParserPosition(ParserPosition PP) {
     L->restoreState(PP.LS);
 
-    // We might be at tok::eof now, so ensure that consumeLoc()
+    // We might be at tok::eof now, so ensure that consumeToken()
     // does not assert about lexing past eof.
     Tok = syntax::Token::unknown();
-    consumeLoc();
+    consumeToken();
 
     PreviousLoc = PP.PreviousLoc;
   }
@@ -334,10 +334,10 @@ public:
 
     L->backtrackToState(PP.LS);
 
-    // We might be at tok::eof now, so ensure that consumeLoc()
+    // We might be at tok::eof now, so ensure that consumeToken()
     // does not assert about lexing past eof.
     Tok = syntax::Token::unknown();
-    consumeLoc();
+    consumeToken();
 
     PreviousLoc = PP.PreviousLoc;
   }
@@ -386,14 +386,13 @@ public:
   //===--------------------------------------------------------------------===//
   // Utilities
 
-  /// \brief Return the next token that will be installed by \c consumeLoc.
+  /// \brief Return the next token that will be installed by \c consumeToken.
   const syntax::Token &peekToken();
 
-  syntax::Token consumeToken();
-  SourceLoc consumeLoc();
-  SourceLoc consumeLoc(tok K) {
+  SourceLoc consumeToken();
+  SourceLoc consumeToken(tok K) {
     assert(Tok.is(K) && "Consuming wrong token kind");
-    return consumeLoc();
+    return consumeToken();
   }
 
   SourceLoc consumeIdentifier(Identifier *Result = nullptr) {
@@ -401,7 +400,7 @@ public:
                      tok::kw_Self, tok::kw_throws));
     if (Result)
       *Result = Context.getIdentifier(Tok.getText().str());
-    return consumeLoc();
+    return consumeToken();
   }
 
   /// \brief Retrieve the location just past the end of the previous
@@ -412,7 +411,7 @@ public:
   /// return true.  Otherwise, return false without consuming it.
   bool consumeIf(tok K) {
     if (Tok.isNot(K)) return false;
-    consumeLoc(K);
+    consumeToken(K);
     return true;
   }
 
@@ -420,7 +419,7 @@ public:
   /// return true.  Otherwise, return false without consuming it.
   bool consumeIf(tok K, SourceLoc &consumedLoc) {
     if (Tok.isNot(K)) return false;
-    consumedLoc = consumeLoc(K);
+    consumedLoc = consumeToken(K);
     return true;
   }
 
