@@ -2150,8 +2150,10 @@ extension UnsignedInteger {
 extension UnsignedInteger where Self : FixedWidthInteger {
   @_transparent
   public init<T : BinaryInteger>(_ source: T) {
-    _precondition(source >= 0,
-      "Negative value is not representable")
+    // This check is potentially removable by the optimizer
+    if T.isSigned {
+      _precondition(source >= 0, "Negative value is not representable")
+    }
     _precondition(source <= Self.max,
       "Not enough bits to represent a signed value")
     self.init(extendingOrTruncating: source)
@@ -2159,8 +2161,10 @@ extension UnsignedInteger where Self : FixedWidthInteger {
 
   @_transparent
   public init?<T : BinaryInteger>(exactly source: T) {
-    _precondition(source >= 0,
-      "Negative value is not representable")
+    // This check is potentially removable by the optimizer
+    if T.isSigned {
+      _precondition(source >= 0, "Negative value is not representable")
+    }
     if source > Self.max {
       return nil
     }
@@ -2202,14 +2206,23 @@ extension SignedInteger {
 extension SignedInteger where Self : FixedWidthInteger {
   @_transparent
   public init<T : BinaryInteger>(_ source: T) {
-    _precondition(source >= Self.min && source <= Self.max,
+    // This check is potentially removable by the optimizer
+    if T.isSigned {
+      _precondition(source >= Self.min,
+        "Not enough bits to represent a signed value")
+    }
+    _precondition(source <= Self.max,
       "Not enough bits to represent a signed value")
     self.init(extendingOrTruncating: source)
   }
 
   @_transparent
   public init?<T : BinaryInteger>(exactly source: T) {
-    if source < Self.min || source > Self.max {
+    // This check is potentially removable by the optimizer
+    if T.isSigned && source < Self.min {
+      return nil
+    }
+    if source > Self.max {
       return nil
     }
     self.init(extendingOrTruncating: source)
