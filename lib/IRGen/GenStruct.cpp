@@ -829,6 +829,12 @@ irgen::getPhysicalStructMemberAccessStrategy(IRGenModule &IGM,
 void IRGenModule::emitStructDecl(StructDecl *st) {
   emitStructMetadata(*this, st);
   emitNestedTypeDecls(st->getMembers());
+
+  if (shouldEmitOpaqueTypeMetadataRecord(st)) {
+    emitOpaqueTypeMetadataRecord(st);
+    return;
+  }
+
   emitFieldMetadataRecord(st);
 }
 

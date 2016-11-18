@@ -561,37 +561,28 @@ public:
   }
 
   /// Given a remote pointer to class metadata, attempt to discover its class
-  /// instance size and alignment.
-  std::tuple<bool, unsigned, unsigned>
-  readInstanceSizeAndAlignmentFromClassMetadata(StoredPointer MetadataAddress) {
-    auto superMeta = readMetadata(MetadataAddress);
-    if (!superMeta || superMeta->getKind() != MetadataKind::Class)
-      return std::make_tuple(false, 0, 0);
+  /// instance size and whether fields should use the resilient layout strategy.
+  std::pair<bool, unsigned>
+  readInstanceStartAndAlignmentFromClassMetadata(StoredPointer MetadataAddress) {
+    auto meta = readMetadata(MetadataAddress);
+    if (!meta || meta->getKind() != MetadataKind::Class)
+      return std::make_pair(false, 0);
 
-    auto super = cast<TargetClassMetadata<Runtime>>(superMeta);
+    // The following algorithm only works on the non-fragile Apple runtime.
 
-    // See swift_initClassMetadata_UniversalStrategy()
-    uint32_t size, align;
-    if (super->isTypeMetadata()) {
-      size = super->getInstanceSize();
-      align = super->getInstanceAlignMask() + 1;
-    } else {
-      // The following algorithm only works on the non-fragile Apple runtime.
+    // Grab the RO-data pointer.  This part is not ABI.
+    StoredPointer roDataPtr = readObjCRODataPtr(MetadataAddress);
+    if (!roDataPtr)
+      return std::make_pair(false, 0);
 
-      // Grab the RO-data pointer.  This part is not ABI.
-      StoredPointer roDataPtr = readObjCRODataPtr(MetadataAddress);
-      if (!roDataPtr)
-        return std::make_tuple(false, 0, 0);
+    // Get the address of the InstanceStart field.
+    auto address = roDataPtr + sizeof(uint32_t) * 1;
 
-      auto address = roDataPtr + sizeof(uint32_t) * 2;
+    unsigned start;
+    if (!Reader->readInteger(RemoteAddress(address), &start))
+      return std::make_pair(false, 0);
 
-      align = 16; // malloc alignment guarantee
-
-      if (!Reader->readInteger(RemoteAddress(address), &size))
-        return std::make_tuple(false, 0, 0);
-    }
-
-    return std::make_tuple(true, size, align);
+    return std::make_pair(true, start);
   }
 
   /// Given a remote pointer to metadata, attempt to turn it into a type.

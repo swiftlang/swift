@@ -117,7 +117,9 @@ public:
            unsigned Size, unsigned Alignment,
            unsigned Stride, unsigned NumExtraInhabitants)
     : Kind(Kind), Size(Size), Alignment(Alignment), Stride(Stride),
-      NumExtraInhabitants(NumExtraInhabitants) {}
+      NumExtraInhabitants(NumExtraInhabitants) {
+    assert(Alignment > 0);
+  }
 
   TypeInfoKind getKind() const { return Kind; }
 
@@ -244,8 +246,7 @@ public:
   ///
   /// Not cached.
   const TypeInfo *getClassInstanceTypeInfo(const TypeRef *TR,
-                                           unsigned start,
-                                           unsigned align);
+                                           unsigned start);
 
 private:
   friend class swift::reflection::LowerType;
