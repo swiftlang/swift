@@ -1073,12 +1073,7 @@ public struct URL : ReferenceConvertible, Equatable {
     public func setResourceValues(_ keyedValues: [URLResourceKey : AnyObject]) throws {
         fatalError()
     }
-    
-    @available(*, unavailable, message: "Use struct URLResourceValues and URL.resourceValues(forKeys:) instead")
-    public func resourceValues(forKeys keys: [URLResourceKey]) throws -> [URLResourceKey : AnyObject] {
-        fatalError()
-    }
-    
+        
     @available(*, unavailable, message: "Use struct URLResourceValues and URL.setResourceValues(_:) instead")
     public func getResourceValue(_ value: AutoreleasingUnsafeMutablePointer<AnyObject?>, forKey key: URLResourceKey) throws {
         fatalError()

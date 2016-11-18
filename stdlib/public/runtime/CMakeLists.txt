@@ -40,6 +40,9 @@ set(swift_runtime_sources
     ErrorDefaultImpls.cpp
     Heap.cpp
     HeapObject.cpp
+    ImageInspectionMachO.cpp
+    ImageInspectionELF.cpp
+    ImageInspectionWin32.cpp
     KnownMetadata.cpp
     Metadata.cpp
     MetadataLookup.cpp

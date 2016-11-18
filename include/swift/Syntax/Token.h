@@ -396,7 +396,7 @@ public:
   /// Dump the structure of the raw syntax tree for debugging.
   void dump(llvm::raw_ostream &OS, unsigned Indent = 0) const;
 
-  /// Print the raw syntax tree with full formatting fideltiy.
+  /// Print the raw syntax tree with full formatting fidelity.
   void print(llvm::raw_ostream &OS) const;
 };
 
