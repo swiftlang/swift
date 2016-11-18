@@ -4,8 +4,8 @@
 #include "Private.h"
 
 #if SWIFT_OBJC_INTEROP
-
 #include <objc/runtime.h>
+#endif
 
 // FIXME: This stuff should be merged with the existing logic in
 // include/swift/Reflection/TypeRefBuilder.h as part of the rewrite
@@ -298,5 +298,3 @@ Demangle::NodePointer swift::_swift_buildDemanglingForMetadata(const Metadata *t
   // Not a type.
   return nullptr;
 }
-
-#endif
