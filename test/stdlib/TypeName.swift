@@ -156,4 +156,25 @@ TypeNameTests.test("Functions") {
     _typeName(type(of: curry3Throws)))
 }
 
+class SomeOuterClass {
+  struct SomeInnerStruct {}
+  struct SomeInnerGenericStruct<T> {}
+}
+
+class SomeOuterGenericClass<T> {
+  struct SomeInnerStruct {}
+  struct SomeInnerGenericStruct<U> {}
+}
+
+TypeNameTests.test("Nested") {
+  expectEqual("main.SomeOuterClass.SomeInnerStruct",
+              _typeName(SomeOuterClass.SomeInnerStruct.self));
+  expectEqual("main.SomeOuterClass.SomeInnerGenericStruct<Swift.Int>",
+              _typeName(SomeOuterClass.SomeInnerGenericStruct<Int>.self));
+  expectEqual("main.SomeOuterGenericClass<Swift.Int>.SomeInnerStruct",
+              _typeName(SomeOuterGenericClass<Int>.SomeInnerStruct.self));
+  expectEqual("main.SomeOuterGenericClass<Swift.String>.SomeInnerGenericStruct<Swift.Int>",
+              _typeName(SomeOuterGenericClass<String>.SomeInnerGenericStruct<Int>.self));
+}
+
 runAllTests()
