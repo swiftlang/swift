@@ -397,22 +397,22 @@ public class FooOverlayClassDerived : Foo.FooOverlayClassBase {
   {
     key.kind: source.lang.swift.syntaxtype.comment,
     key.offset: 124,
-    key.length: 9
+    key.length: 10
   },
   {
     key.kind: source.lang.swift.syntaxtype.comment,
     key.offset: 135,
-    key.length: 13
+    key.length: 14
   },
   {
     key.kind: source.lang.swift.syntaxtype.comment,
     key.offset: 149,
-    key.length: 6
+    key.length: 7
   },
   {
     key.kind: source.lang.swift.syntaxtype.doccomment,
     key.offset: 157,
-    key.length: 25
+    key.length: 26
   },
   {
     key.kind: source.lang.swift.syntaxtype.attribute.builtin,
@@ -507,7 +507,7 @@ public class FooOverlayClassDerived : Foo.FooOverlayClassBase {
   {
     key.kind: source.lang.swift.syntaxtype.doccomment,
     key.offset: 346,
-    key.length: 26
+    key.length: 27
   },
   {
     key.kind: source.lang.swift.syntaxtype.attribute.builtin,
@@ -817,7 +817,7 @@ public class FooOverlayClassDerived : Foo.FooOverlayClassBase {
   {
     key.kind: source.lang.swift.syntaxtype.doccomment,
     key.offset: 894,
-    key.length: 36
+    key.length: 37
   },
   {
     key.kind: source.lang.swift.syntaxtype.attribute.builtin,
@@ -842,7 +842,7 @@ public class FooOverlayClassDerived : Foo.FooOverlayClassBase {
   {
     key.kind: source.lang.swift.syntaxtype.comment,
     key.offset: 981,
-    key.length: 20
+    key.length: 21
   },
   {
     key.kind: source.lang.swift.syntaxtype.keyword,
@@ -867,7 +867,7 @@ public class FooOverlayClassDerived : Foo.FooOverlayClassBase {
   {
     key.kind: source.lang.swift.syntaxtype.comment,
     key.offset: 1050,
-    key.length: 24
+    key.length: 25
   },
   {
     key.kind: source.lang.swift.syntaxtype.keyword,
@@ -882,7 +882,7 @@ public class FooOverlayClassDerived : Foo.FooOverlayClassBase {
   {
     key.kind: source.lang.swift.syntaxtype.doccomment,
     key.offset: 1106,
-    key.length: 34
+    key.length: 35
   },
   {
     key.kind: source.lang.swift.syntaxtype.attribute.builtin,
@@ -927,7 +927,7 @@ public class FooOverlayClassDerived : Foo.FooOverlayClassBase {
   {
     key.kind: source.lang.swift.syntaxtype.comment,
     key.offset: 1229,
-    key.length: 17
+    key.length: 18
   },
   {
     key.kind: source.lang.swift.syntaxtype.attribute.builtin,
@@ -988,6 +988,11 @@ public class FooOverlayClassDerived : Foo.FooOverlayClassBase {
     key.kind: source.lang.swift.syntaxtype.identifier,
     key.offset: 1365,
     key.length: 3
+  },
+  {
+    key.kind: source.lang.swift.syntaxtype.comment,
+    key.offset: 1371,
+    key.length: 24
   },
   {
     key.kind: source.lang.swift.syntaxtype.attribute.builtin,
@@ -1322,7 +1327,7 @@ public class FooOverlayClassDerived : Foo.FooOverlayClassBase {
   {
     key.kind: source.lang.swift.syntaxtype.doccomment,
     key.offset: 1938,
-    key.length: 28
+    key.length: 29
   },
   {
     key.kind: source.lang.swift.syntaxtype.attribute.builtin,
@@ -1347,7 +1352,7 @@ public class FooOverlayClassDerived : Foo.FooOverlayClassBase {
   {
     key.kind: source.lang.swift.syntaxtype.doccomment,
     key.offset: 2005,
-    key.length: 26
+    key.length: 27
   },
   {
     key.kind: source.lang.swift.syntaxtype.attribute.builtin,
@@ -1372,7 +1377,7 @@ public class FooOverlayClassDerived : Foo.FooOverlayClassBase {
   {
     key.kind: source.lang.swift.syntaxtype.doccomment,
     key.offset: 2061,
-    key.length: 25
+    key.length: 26
   },
   {
     key.kind: source.lang.swift.syntaxtype.attribute.builtin,
@@ -1727,7 +1732,7 @@ public class FooOverlayClassDerived : Foo.FooOverlayClassBase {
   {
     key.kind: source.lang.swift.syntaxtype.doccomment,
     key.offset: 2872,
-    key.length: 8
+    key.length: 9
   },
   {
     key.kind: source.lang.swift.syntaxtype.attribute.builtin,
@@ -1747,22 +1752,22 @@ public class FooOverlayClassDerived : Foo.FooOverlayClassBase {
   {
     key.kind: source.lang.swift.syntaxtype.doccomment,
     key.offset: 2916,
-    key.length: 36
+    key.length: 37
   },
   {
     key.kind: source.lang.swift.syntaxtype.doccomment,
     key.offset: 2953,
-    key.length: 8
+    key.length: 9
   },
   {
     key.kind: source.lang.swift.syntaxtype.doccomment,
     key.offset: 2962,
-    key.length: 3
+    key.length: 4
   },
   {
     key.kind: source.lang.swift.syntaxtype.doccomment,
     key.offset: 2966,
-    key.length: 8
+    key.length: 9
   },
   {
     key.kind: source.lang.swift.syntaxtype.attribute.builtin,
@@ -1782,7 +1787,7 @@ public class FooOverlayClassDerived : Foo.FooOverlayClassBase {
   {
     key.kind: source.lang.swift.syntaxtype.doccomment,
     key.offset: 3010,
-    key.length: 49
+    key.length: 50
   },
   {
     key.kind: source.lang.swift.syntaxtype.attribute.builtin,
@@ -1822,7 +1827,7 @@ public class FooOverlayClassDerived : Foo.FooOverlayClassBase {
   {
     key.kind: source.lang.swift.syntaxtype.doccomment,
     key.offset: 3127,
-    key.length: 32
+    key.length: 33
   },
   {
     key.kind: source.lang.swift.syntaxtype.attribute.builtin,
@@ -1842,12 +1847,12 @@ public class FooOverlayClassDerived : Foo.FooOverlayClassBase {
   {
     key.kind: source.lang.swift.syntaxtype.doccomment,
     key.offset: 3204,
-    key.length: 29
+    key.length: 30
   },
   {
     key.kind: source.lang.swift.syntaxtype.doccomment,
     key.offset: 3238,
-    key.length: 8
+    key.length: 9
   },
   {
     key.kind: source.lang.swift.syntaxtype.attribute.builtin,
@@ -1867,12 +1872,12 @@ public class FooOverlayClassDerived : Foo.FooOverlayClassBase {
   {
     key.kind: source.lang.swift.syntaxtype.doccomment,
     key.offset: 3288,
-    key.length: 50
+    key.length: 51
   },
   {
     key.kind: source.lang.swift.syntaxtype.doccomment,
     key.offset: 3343,
-    key.length: 8
+    key.length: 9
   },
   {
     key.kind: source.lang.swift.syntaxtype.attribute.builtin,
@@ -2177,7 +2182,7 @@ public class FooOverlayClassDerived : Foo.FooOverlayClassBase {
   {
     key.kind: source.lang.swift.syntaxtype.doccomment,
     key.offset: 4096,
-    key.length: 32
+    key.length: 33
   },
   {
     key.kind: source.lang.swift.syntaxtype.attribute.builtin,
@@ -2498,6 +2503,11 @@ public class FooOverlayClassDerived : Foo.FooOverlayClassBase {
     key.kind: source.lang.swift.syntaxtype.identifier,
     key.offset: 4797,
     key.length: 3
+  },
+  {
+    key.kind: source.lang.swift.syntaxtype.comment,
+    key.offset: 4803,
+    key.length: 39
   },
   {
     key.kind: source.lang.swift.syntaxtype.attribute.builtin,
@@ -3397,7 +3407,7 @@ public class FooOverlayClassDerived : Foo.FooOverlayClassBase {
   {
     key.kind: source.lang.swift.syntaxtype.comment,
     key.offset: 6644,
-    key.length: 53
+    key.length: 54
   },
   {
     key.kind: source.lang.swift.syntaxtype.keyword,
@@ -3412,7 +3422,7 @@ public class FooOverlayClassDerived : Foo.FooOverlayClassBase {
   {
     key.kind: source.lang.swift.syntaxtype.comment,
     key.offset: 6719,
-    key.length: 50
+    key.length: 51
   },
   {
     key.kind: source.lang.swift.syntaxtype.attribute.builtin,

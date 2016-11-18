@@ -127,7 +127,7 @@ ParserStatus Parser::parseExprOrStmt(ASTNode &Result) {
   return ResultExpr;
 }
 
-static bool isTerminatorForBraceItemListKind(const syntax::Token &Tok,
+static bool isTerminatorForBraceItemListKind(const Token &Tok,
                                              BraceItemListKind Kind,
                                              ArrayRef<ASTNode> ParsedDecls) {
   switch (Kind) {
@@ -2042,7 +2042,7 @@ ParserResult<Stmt> Parser::parseStmtFor(LabeledStmtInfo LabelInfo) {
   // obviously a for-each loop.  For error recovery, also parse "for in ..." as
   // foreach.
   if ((Tok.isIdentifierOrUnderscore() &&
-       peekToken().isAny(tok::colon, tok::kw_in)) ||
+         peekToken().isAny(tok::colon, tok::kw_in)) ||
       Tok.is(tok::kw_in))
     return parseStmtForEach(ForLoc, LabelInfo);
 

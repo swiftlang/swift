@@ -22,7 +22,6 @@
 #include "swift/Parse/DelayedParsingCallbacks.h"
 #include "swift/Parse/Parser.h"
 #include "swift/IDE/CodeCompletion.h"
-#include "swift/Syntax/Token.h"
 #include "swift/Subsystems.h"
 #include "llvm/Support/raw_ostream.h"
 #include "llvm/Support/MemoryBuffer.h"
@@ -248,16 +247,15 @@ void REPLCompletions::populate(SourceFile &SF, StringRef EnteredCode) {
                    CompletionCallbacksFactory.get());
 
   ASTContext &Ctx = SF.getASTContext();
-  auto Tokens = tokenize(Ctx.LangOpts, Ctx.SourceMgr, EOFRetention::DiscardEOF,
-                         BufferID);
+  std::vector<Token> Tokens = tokenize(Ctx.LangOpts, Ctx.SourceMgr, BufferID);
 
   if (!Tokens.empty() && Tokens.back().is(tok::code_complete))
     Tokens.pop_back();
 
   if (!Tokens.empty()) {
-    auto LastToken = Tokens.back();
-    if (LastToken.is(tok::identifier) || LastToken.isKeyword()){
-      Prefix = LastToken.getText().str();
+    Token &LastToken = Tokens.back();
+    if (LastToken.is(tok::identifier) || LastToken.isKeyword()) {
+      Prefix = LastToken.getText();
 
       unsigned Offset = Ctx.SourceMgr.getLocOffsetInBuffer(LastToken.getLoc(),
                                                            BufferID);

@@ -28,6 +28,7 @@
 #include "swift/AST/ParameterList.h"
 #include "swift/AST/Types.h"
 #include "swift/ClangImporter/ClangModule.h"
+#include "swift/Parse/Token.h"
 #include "swift/Basic/Fallthrough.h"
 #include "clang/Sema/Lookup.h"
 #include "clang/Sema/Sema.h"

@@ -19,7 +19,6 @@
 
 #include "swift/Basic/LLVM.h"
 #include "swift/Basic/OptionSet.h"
-#include "swift/Syntax/Token.h"
 #include "llvm/IR/LLVMContext.h"
 #include "llvm/ADT/ArrayRef.h"
 #include "llvm/ADT/Optional.h"
@@ -60,12 +59,7 @@ namespace swift {
   class Token;
   class TopLevelContext;
   struct TypeLoc;
-
-  enum class EOFRetention {
-    KeepEOF,
-    DiscardEOF,
-  };
-
+  
   /// SILParserState - This is a context object used to optionally maintain SIL
   /// parsing context for the parser.
   class SILParserState {
@@ -126,15 +120,12 @@ namespace swift {
                              CodeCompletionCallbacksFactory *Factory);
 
   /// \brief Lex and return a vector of tokens for the given buffer.
-  std::vector<syntax::Token> tokenize(const LangOptions &LangOpts,
-                                      const SourceManager &SM,
-                                      EOFRetention IncludeEOF,
-                                      unsigned BufferID,
-                                      unsigned Offset = 0,
-                                      unsigned EndOffset = 0,
-                                      bool KeepComments = true,
-                                      bool TokenizeInterpolatedString = true,
-                                      ArrayRef<syntax::Token> SplitTokens = {});
+  std::vector<Token> tokenize(const LangOptions &LangOpts,
+                              const SourceManager &SM, unsigned BufferID,
+                              unsigned Offset = 0, unsigned EndOffset = 0,
+                              bool KeepComments = true,
+                              bool TokenizeInterpolatedString = true,
+                              ArrayRef<Token> SplitTokens = ArrayRef<Token>());
 
   /// Once parsing is complete, this walks the AST to resolve imports, record
   /// operators, and do other top-level validation.

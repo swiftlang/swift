@@ -50,12 +50,8 @@ Parser::parseGenericParameters(SourceLoc LAngleLoc) {
 
     // Parse attributes.
     DeclAttributes attributes;
-    auto RCPieces = Tok.getRawCommentPieces(Context.SourceMgr);
-    if (!RCPieces.empty()) {
-      auto CopiedPieces = Context.AllocateCopy(llvm::makeArrayRef(RCPieces));
-      auto RC = RawComment { CopiedPieces };
-      attributes.add(new (Context) RawDocCommentAttr { RC });
-    }
+    if (Tok.hasComment())
+      attributes.add(new (Context) RawDocCommentAttr(Tok.getCommentRange()));
     bool foundCCTokenInAttr;
     parseDeclAttributeList(attributes, foundCCTokenInAttr);
 
@@ -282,7 +278,7 @@ ParserStatus Parser::parseGenericWhereClause(
       Requirements.push_back(RequirementRepr::getTypeConstraint(FirstType.get(),
                                                      ColonLoc, Protocol.get()));
     } else if ((Tok.isAnyOperator() && Tok.getText() == "==") ||
-                Tok.is(tok::equal)) {
+               Tok.is(tok::equal)) {
       // A same-type-requirement
       if (Tok.is(tok::equal)) {
         diagnose(Tok, diag::requires_single_equal)
