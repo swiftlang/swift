@@ -1291,6 +1291,10 @@ ERROR(requirement_restricts_self,none,
       "%0 requirement %1 cannot add constraint '%2%select{:|:| ==|:}3 %4' on "
       "'Self'",
       (DescriptiveDeclKind, DeclName, StringRef, unsigned, StringRef))
+WARNING(requirement_restricts_self_swift3,none,
+        "adding constraint '%2%select{:|:| ==|:}3 %4' on 'Self' via %0 "
+        "requirement %1 is deprecated in Swift 3",
+        (DescriptiveDeclKind, DeclName, StringRef, unsigned, StringRef))
 ERROR(witness_argument_name_mismatch,none,
       "%select{method|initializer}0 %1 has different argument names from those "
       "required by protocol %2 (%3)", (bool, DeclName, Type, DeclName))

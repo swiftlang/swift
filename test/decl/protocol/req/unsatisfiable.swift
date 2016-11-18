@@ -1,4 +1,4 @@
-// RUN: %target-parse-verify-swift
+// RUN: %target-parse-verify-swift -swift-version 4
 
 protocol P {
   associatedtype A

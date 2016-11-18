@@ -529,13 +529,17 @@ TypeChecker::validateGenericFuncSignature(AbstractFunctionDecl *func) {
           req.getFirstType()->is<GenericTypeParamType>())
         continue;
 
-      diagnose(func, diag::requirement_restricts_self,
+      diagnose(func,
+               Context.LangOpts.EffectiveLanguageVersion[0] >= 4
+                 ? diag::requirement_restricts_self
+                 : diag::requirement_restricts_self_swift3,
                func->getDescriptiveKind(), func->getFullName(),
                req.getFirstType().getString(),
                static_cast<unsigned>(req.getKind()),
                req.getSecondType().getString());
 
-      invalid = true;
+      if (Context.LangOpts.EffectiveLanguageVersion[0] >= 4)
+        invalid = true;
     }
   }
 
