@@ -1,6 +1,6 @@
 // RUN: not %swift 2>&1 | %FileCheck %s -check-prefix=CHECK1
 // RUN: not %swift %s 2>&1 | %FileCheck %s -check-prefix=CHECK1
-// RUN: not %swift -parse 2>&1 | %FileCheck %s -check-prefix=CHECK2
+// RUN: not %swift -typecheck 2>&1 | %FileCheck %s -check-prefix=CHECK2
 // RUN: not %swift -emit-sil 2>&1 | %FileCheck %s -check-prefix=CHECK2
 // RUN: not %swift -emit-object 2>&1 | %FileCheck %s -check-prefix=CHECK2
 

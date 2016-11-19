@@ -1,4 +1,4 @@
-// RUN: %target-parse-verify-swift
+// RUN: %target-typecheck-verify-swift
 
 // Verify the use of unbound generic types. They are permitted in
 // certain places where type inference can fill in the generic

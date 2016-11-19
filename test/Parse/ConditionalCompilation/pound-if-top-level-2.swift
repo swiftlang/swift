@@ -1,4 +1,4 @@
-// RUN: %target-parse-verify-swift
+// RUN: %target-typecheck-verify-swift
 
 #if 0  // expected-error {{'0' is not a valid conditional compilation expression, use 'false'}} {{5-6=false}}
   let x = 1

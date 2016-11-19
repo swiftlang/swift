@@ -1,4 +1,4 @@
-// RUN: %target-parse-verify-swift
+// RUN: %target-typecheck-verify-swift
 
 var func6 : (_ fn : ((Int, Int)) -> Int) -> ()
 var func6a : ((Int, Int) -> Int) -> ()

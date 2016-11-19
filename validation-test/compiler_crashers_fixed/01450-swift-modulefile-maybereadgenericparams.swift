@@ -5,7 +5,7 @@
 // See https://swift.org/LICENSE.txt for license information
 // See https://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
 
-// RUN: not %target-swift-frontend %s -parse
+// RUN: not %target-swift-frontend %s -typecheck
 var d {
 func b<h: Int>: T, Any] as a(e!().e = a","foobar"A, f(t: T> (x) in x }
 protocol P {

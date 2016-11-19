@@ -1,4 +1,4 @@
-// RUN: %target-parse-verify-swift %s -enable-astscope-lookup
+// RUN: %target-typecheck-verify-swift %s -enable-astscope-lookup
 
 // Name binding in default arguments
 

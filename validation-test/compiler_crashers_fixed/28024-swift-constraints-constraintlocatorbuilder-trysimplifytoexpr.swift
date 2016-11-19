@@ -5,5 +5,5 @@
 // See https://swift.org/LICENSE.txt for license information
 // See https://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
 
-// RUN: not %target-swift-frontend %s -parse
+// RUN: not %target-swift-frontend %s -typecheck
 let:{{class B{struct S{let b=[Void{func a{struct Q{class d{struct S{class a{enum E<T where B:a{struct B{{}struct B<g{class B{class d{var _=B

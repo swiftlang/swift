@@ -1,4 +1,4 @@
-// RUN: %target-build-swift -parse %s -Xfrontend -verify
+// RUN: %target-build-swift -typecheck %s -Xfrontend -verify
 // RUN: %target-build-swift -emit-ir -g %s -DNO_ERROR > /dev/null
 // REQUIRES: executable_test
 

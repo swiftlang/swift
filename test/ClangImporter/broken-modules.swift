@@ -1,12 +1,12 @@
 // RUN: rm -rf %t && mkdir -p %t
 
-// RUN: not %target-swift-frontend -parse %s -I %S/Inputs/custom-modules/ -show-diagnostics-after-fatal -D MISSING_FROM_MODULE 2> %t/err.txt
+// RUN: not %target-swift-frontend -typecheck %s -I %S/Inputs/custom-modules/ -show-diagnostics-after-fatal -D MISSING_FROM_MODULE 2> %t/err.txt
 // RUN: %FileCheck -check-prefix CHECK-MODULE-MAP %s < %t/err.txt
 
-// RUN: not %target-swift-frontend -parse %s -I %S/Inputs/custom-modules/ -show-diagnostics-after-fatal 2> %t/err.txt
+// RUN: not %target-swift-frontend -typecheck %s -I %S/Inputs/custom-modules/ -show-diagnostics-after-fatal 2> %t/err.txt
 // RUN: %FileCheck -check-prefix CHECK -check-prefix CHECK-DIRECT %s < %t/err.txt
 
-// RUN: not %target-swift-frontend -parse %s -I %S/Inputs/custom-modules/ -show-diagnostics-after-fatal -D INDIRECT 2> %t/err.txt
+// RUN: not %target-swift-frontend -typecheck %s -I %S/Inputs/custom-modules/ -show-diagnostics-after-fatal -D INDIRECT 2> %t/err.txt
 // RUN: %FileCheck -check-prefix CHECK -check-prefix CHECK-INDIRECT %s < %t/err.txt
 
 // FIXME: not every test here depends on Objective-C syntax, this test can be

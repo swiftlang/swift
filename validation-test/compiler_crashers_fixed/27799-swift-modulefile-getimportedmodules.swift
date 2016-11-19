@@ -5,5 +5,5 @@
 // See https://swift.org/LICENSE.txt for license information
 // See https://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
 
-// RUN: not %target-swift-frontend %s -parse
+// RUN: not %target-swift-frontend %s -typecheck
 let c{{func f:A{{var _=a{{class A{var b{{<let{{}let a{a{}{{{}struct Q{struct d{struct Q{var b{let a{{class B{func a{{{}{deinit{()={

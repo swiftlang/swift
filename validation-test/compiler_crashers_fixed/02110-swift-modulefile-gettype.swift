@@ -5,7 +5,7 @@
 // See https://swift.org/LICENSE.txt for license information
 // See https://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
 
-// RUN: not %target-swift-frontend %s -parse
+// RUN: not %target-swift-frontend %s -typecheck
 var b[(with: B>) -> {
 protocol b = b<c where Optional<d = b(")() -> <r : (bytes: String {
 class B<T where f{ x in 0)

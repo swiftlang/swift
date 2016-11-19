@@ -9,7 +9,7 @@
 // See https://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
 //
 //===----------------------------------------------------------------------===//
-// RUN: %target-parse-verify-swift
+// RUN: %target-typecheck-verify-swift
 
 import StdlibUnittest
 

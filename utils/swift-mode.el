@@ -443,7 +443,7 @@ current buffer.
 Set to 'swift-syntax-check-single-file to ignore other files in the current directory.")
 (put 'swift-syntax-check-fn 'safe-local-variable 'functionp)
 
-(defvar-local swift-syntax-check-args '("-parse")
+(defvar-local swift-syntax-check-args '("-typecheck")
   "List of arguments to be passed to swiftc for syntax checking.
 Elements of this list that are strings are inserted literally
 into the command line.  Elements that are S-expressions are
@@ -459,7 +459,7 @@ that variable you should set this one to nil.")
 
 (defun swift-syntax-check-single-file (swiftc temp-file)
   "Return a flymake command-line list for syntax-checking the current buffer in isolation"
-  `(,swiftc ("-parse" ,temp-file)))
+  `(,swiftc ("-typecheck" ,temp-file)))
 
 (defun swift-syntax-check-directory (swiftc temp-file)
   "Return a flymake command-line list for syntax-checking the
@@ -470,7 +470,7 @@ directory."
       (when (and (string-equal "swift" (file-name-extension x))
                  (not (file-equal-p x (buffer-file-name))))
         (setq sources (cons x sources))))
-    `(,swiftc ("-parse" ,temp-file ,@sources))))
+    `(,swiftc ("-typecheck" ,temp-file ,@sources))))
 
 (defun flymake-swift-init ()
   (let* ((temp-file

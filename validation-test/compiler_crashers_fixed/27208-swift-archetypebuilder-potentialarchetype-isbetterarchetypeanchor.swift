@@ -5,5 +5,5 @@
 // See https://swift.org/LICENSE.txt for license information
 // See https://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
 
-// RUN: not %target-swift-frontend %s -parse
+// RUN: not %target-swift-frontend %s -typecheck
 let f{{struct Q{protocol A{enum A{class d{{{}}struct B{class a{enum a{{{}}class d{func a{{func a{{{{{}}}}=A

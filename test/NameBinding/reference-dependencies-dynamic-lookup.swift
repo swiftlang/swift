@@ -1,6 +1,6 @@
 // RUN: rm -rf %t && mkdir -p %t
 // RUN: cp %s %t/main.swift
-// RUN: %target-swift-frontend(mock-sdk: %clang-importer-sdk) -parse -primary-file %t/main.swift -emit-reference-dependencies-path - > %t.swiftdeps
+// RUN: %target-swift-frontend(mock-sdk: %clang-importer-sdk) -typecheck -primary-file %t/main.swift -emit-reference-dependencies-path - > %t.swiftdeps
 // RUN: %FileCheck %s < %t.swiftdeps
 // RUN: %FileCheck -check-prefix=NEGATIVE %s < %t.swiftdeps
 

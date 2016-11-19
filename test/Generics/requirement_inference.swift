@@ -1,5 +1,5 @@
-// RUN: %target-parse-verify-swift -parse %s -verify
-// RUN: %target-parse-verify-swift -parse -debug-generic-signatures %s > %t.dump 2>&1 
+// RUN: %target-typecheck-verify-swift -typecheck %s -verify
+// RUN: %target-typecheck-verify-swift -typecheck -debug-generic-signatures %s > %t.dump 2>&1 
 // RUN: %FileCheck %s < %t.dump
 
 protocol P1 { 

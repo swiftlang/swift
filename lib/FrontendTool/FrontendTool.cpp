@@ -874,8 +874,8 @@ static bool performCompile(CompilerInstance &Instance,
       opts.ImplicitObjCHeaderPath.empty() &&
       !Context.LangOpts.EnableAppExtensionRestrictions;
 
-  // We've just been told to perform a parse, so we can return now.
-  if (Action == FrontendOptions::Parse) {
+  // We've just been told to perform a typecheck, so we can return now.
+  if (Action == FrontendOptions::Typecheck) {
     if (!opts.ObjCHeaderOutputPath.empty())
       return printAsObjC(opts.ObjCHeaderOutputPath, Instance.getMainModule(),
                          opts.ImplicitObjCHeaderPath, moduleIsPublic);

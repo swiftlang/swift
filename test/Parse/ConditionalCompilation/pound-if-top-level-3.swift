@@ -1,4 +1,4 @@
-// RUN: %target-parse-verify-swift
+// RUN: %target-typecheck-verify-swift
 
 #if arch(x86_64)
 // expected-error@+2{{expected '{' in protocol type}}

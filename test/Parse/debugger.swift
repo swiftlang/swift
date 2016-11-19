@@ -1,4 +1,4 @@
-// RUN: %target-parse-verify-swift -debugger-support
+// RUN: %target-typecheck-verify-swift -debugger-support
 
 import Nonexistent_Module // expected-error {{no such module}}
 
