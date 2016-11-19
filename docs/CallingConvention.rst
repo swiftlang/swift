@@ -278,7 +278,7 @@ considering here:
   This is optimal if the caller has responsibility for the value and
   doesn't need it after the call.  This is an extremely common
   situation; for example, it comes up whenever a call result is
-  immediately used an argument.  By giving the callee responsibility
+  immediately used as an argument.  By giving the callee responsibility
   for the value, this convention allows the callee to use the value at
   a later point without taking any extra action to keep it alive.
 
