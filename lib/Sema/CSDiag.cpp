@@ -4581,6 +4581,186 @@ typeCheckArgumentChildIndependently(Expr *argExpr, Type argType,
                            TE->isImplicit(), TT);
 }
 
+static bool diagnoseImplicitSelfErrors(Expr *fnExpr, Expr *argExpr,
+                                       CalleeCandidateInfo &CCI,
+                                       ArrayRef<Identifier> argLabels,
+                                       ConstraintSystem *CS) {
+  // If candidate list is empty it means that problem is somewhere else,
+  // since we need to have candidates which might be shadowing other funcs.
+  if (CCI.empty() || !CCI[0].getDecl())
+    return false;
+
+  auto &TC = CS->TC;
+  // Call expression is formed as 'foo.bar' where 'foo' might be an
+  // implicit "Self" reference, such use wouldn't provide good diagnostics
+  // for situations where instance members have equal names to functions in
+  // Swift Standard Library e.g. min/max.
+  auto UDE = dyn_cast<UnresolvedDotExpr>(fnExpr);
+  if (!UDE)
+    return false;
+
+  auto baseExpr = dyn_cast<DeclRefExpr>(UDE->getBase());
+  if (!baseExpr)
+    return false;
+
+  auto baseDecl = baseExpr->getDecl();
+  if (!baseExpr->isImplicit() || baseDecl->getName() != TC.Context.Id_self)
+    return false;
+
+  // Our base expression is an implicit 'self.' reference e.g.
+  //
+  // extension Sequence {
+  //   func test() -> Int {
+  //     return max(1, 2)
+  //   }
+  // }
+  //
+  // In this example the Sequence class already has two methods named 'max'
+  // none of which accept two arguments, but there is a function in
+  // Swift Standard Library called 'max' which does accept two arguments,
+  // so user might have called that by mistake without realizing that
+  // compiler would add implicit 'self.' prefix to the call of 'max'.
+  ExprCleaner cleanup(argExpr);
+
+  // Let's type check argument expression without any contextual information.
+  ConcreteDeclRef ref = nullptr;
+  auto typeResult = TC.getTypeOfExpressionWithoutApplying(argExpr, CS->DC, ref);
+  if (!typeResult.hasValue())
+    return false;
+
+  auto argType = typeResult.getValue();
+
+  // If argument type couldn't be properly resolved or has errors,
+  // we can't diagnose anything in here, it points to the different problem.
+  if (isUnresolvedOrTypeVarType(argType) || argType->hasError())
+    return false;
+
+  auto context = CS->DC;
+  using CandididateMap =
+      llvm::SmallDenseMap<ValueDecl *, llvm::SmallVector<OverloadChoice, 2>>;
+
+  auto getBaseKind = [](ValueDecl *base) -> DescriptiveDeclKind {
+    DescriptiveDeclKind kind = DescriptiveDeclKind::Module;
+    if (!base)
+      return kind;
+
+    auto context = base->getDeclContext();
+    do {
+      if (isa<ExtensionDecl>(context))
+        return DescriptiveDeclKind::Extension;
+
+      if (auto nominal = dyn_cast<NominalTypeDecl>(context)) {
+        kind = nominal->getDescriptiveKind();
+        break;
+      }
+
+      context = context->getParent();
+    } while (context);
+
+    return kind;
+  };
+
+  auto getBaseName = [](DeclContext *context) -> DeclName {
+    if (context->isTypeContext()) {
+      auto generic = context->getAsGenericTypeOrGenericTypeExtensionContext();
+      return generic->getName();
+    } else if (context->isModuleScopeContext())
+      return context->getParentModule()->getName();
+    else
+      llvm_unreachable("Unsupported base");
+  };
+
+  auto diagnoseShadowing = [&](ValueDecl *base,
+                               ArrayRef<OverloadChoice> candidates) -> bool {
+    CalleeCandidateInfo calleeInfo(base ? base->getInterfaceType() : nullptr,
+                                   candidates, CCI.hasTrailingClosure, CS,
+                                   base);
+
+    calleeInfo.filterList(argType, argLabels);
+    if (calleeInfo.closeness != CC_ExactMatch)
+      return false;
+
+    auto choice = calleeInfo.candidates[0].getDecl();
+    auto baseKind = getBaseKind(base);
+    auto baseName = getBaseName(choice->getDeclContext());
+
+    auto origCandidate = CCI[0].getDecl();
+    TC.diagnose(UDE->getLoc(), diag::member_shadows_global_function,
+                UDE->getName(), origCandidate->getDescriptiveKind(),
+                origCandidate->getFullName(), choice->getDescriptiveKind(),
+                choice->getFullName(), baseKind, baseName);
+
+    auto topLevelDiag = diag::fix_unqualified_access_top_level;
+    if (baseKind == DescriptiveDeclKind::Module)
+      topLevelDiag = diag::fix_unqualified_access_top_level_multi;
+
+    auto name = baseName.getBaseName();
+    SmallString<32> namePlusDot = name.str();
+    namePlusDot.push_back('.');
+
+    TC.diagnose(UDE->getLoc(), topLevelDiag, namePlusDot,
+                choice->getDescriptiveKind(), name)
+        .fixItInsert(UDE->getStartLoc(), namePlusDot);
+
+    for (auto &candidate : calleeInfo.candidates) {
+      if (auto decl = candidate.getDecl())
+        TC.diagnose(decl, diag::decl_declared_here, decl->getFullName());
+    }
+
+    return true;
+  };
+
+  // For each of the parent contexts, let's try to find any candidates
+  // which have the same name and the same number of arguments as callee.
+  while (context->getParent()) {
+    auto result = TC.lookupUnqualified(context, UDE->getName(), UDE->getLoc());
+    context = context->getParent();
+
+    if (!result || result.empty())
+      continue;
+
+    CandididateMap candidates;
+    for (const auto &candidate : result) {
+      auto base = candidate.Base;
+      if ((base && base->isInvalid()) || candidate->isInvalid())
+        continue;
+
+      // If base is present but it doesn't represent a valid nominal,
+      // we can't use current candidate as one of the choices.
+      if (base && !base->getInterfaceType()->getNominalOrBoundGenericNominal())
+        continue;
+
+      auto context = candidate->getDeclContext();
+      // We are only interested in static or global functions, because
+      // there is no way to call anything else properly.
+      if (!candidate->isStatic() && !context->isModuleScopeContext())
+        continue;
+
+      OverloadChoice choice(base ? base->getInterfaceType() : nullptr,
+                            candidate, false, UDE->getFunctionRefKind());
+
+      if (base) { // Let's group all of the candidates have a common base.
+        candidates[base].push_back(choice);
+        continue;
+      }
+
+      // If there is no base, it means this is one of the global functions,
+      // let's try to diagnose its shadowing inline.
+      if (diagnoseShadowing(base, choice))
+        return true;
+    }
+
+    if (candidates.empty())
+      continue;
+
+    for (const auto &candidate : candidates) {
+      if (diagnoseShadowing(candidate.getFirst(), candidate.getSecond()))
+        return true;
+    }
+  }
+
+  return false;
+}
 
 /// Emit a class of diagnostics that we only know how to generate when there is
 /// exactly one candidate we know about.  Return true if an error is emitted.
@@ -4983,6 +5163,10 @@ bool FailureDiagnosis::diagnoseParameterErrors(CalleeCandidateInfo &CCI,
       return true;
     }
   }
+
+  // Try to diagnose errors related to the use of implicit self reference.
+  if (diagnoseImplicitSelfErrors(fnExpr, argExpr, CCI, argLabels, CS))
+    return true;
 
   // Do all the stuff that we only have implemented when there is a single
   // candidate.
