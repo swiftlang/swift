@@ -122,11 +122,19 @@ ERROR(candidate_inaccessible,none,
       "'%select{private|fileprivate|internal|PUBLIC}1' protection level",
       (DeclName, Accessibility))
 
+NOTE(note_candidate_inaccessible,none,
+     "%0 is inaccessible due to "
+     "'%select{private|fileprivate|internal|PUBLIC}1' protection level",
+     (DeclName, Accessibility))
+
 ERROR(init_candidate_inaccessible,none,
       "%0 initializer is inaccessible due to "
       "'%select{private|fileprivate|internal|PUBLIC}1' protection level",
       (Type, Accessibility))
 
+ERROR(all_candidates_inaccessible,none,
+      "all %0 candidates are inaccessible",
+      (DeclName))
 
 ERROR(cannot_pass_rvalue_mutating_subelement,none,
       "cannot use mutating member on immutable value: %0",

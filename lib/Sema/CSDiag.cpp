@@ -2364,6 +2364,7 @@ bool FailureDiagnosis::diagnoseGeneralMemberFailure(Constraint *constraint) {
   // Since the lookup was allowing inaccessible members, let's check
   // if it found anything of that sort, which is easy to diagnose.
   bool allUnavailable = !CS->TC.getLangOpts().DisableAvailabilityChecking;
+  bool allInaccessible = true;
   for (auto &member : result.ViableCandidates) {
     if (!member.isDecl()) {
       // if there is no declaration, this choice is implicitly available.
@@ -2377,30 +2378,29 @@ bool FailureDiagnosis::diagnoseGeneralMemberFailure(Constraint *constraint) {
       allUnavailable = false;
 
     if (decl->isAccessibleFrom(CS->DC))
-      continue;
-
-    if (auto *CD = dyn_cast<ConstructorDecl>(decl)) {
-      CS->TC.diagnose(anchor->getLoc(), diag::init_candidate_inaccessible,
-                      CD->getResultType(), decl->getFormalAccess());
-    } else {
-      CS->TC.diagnose(anchor->getLoc(), diag::candidate_inaccessible,
-                      decl->getName(), decl->getFormalAccess());
-    }
+      allInaccessible = false;
+  }
+  
+  // If no candidates were accessible, say so.
+  if (allInaccessible && !result.ViableCandidates.empty()) {
+    CS->TC.diagnose(anchor->getLoc(), diag::all_candidates_inaccessible,
+                    memberName);
 
     for (auto &candidate : result.ViableCandidates) {
       if (auto decl = candidate.getDecl()) {
-        CS->TC.diagnose(decl, diag::decl_declared_here, decl->getFullName());
+        CS->TC.diagnose(decl, diag::note_candidate_inaccessible,
+                        decl->getFullName(), decl->getFormalAccess());
       }
     }
 
     return true;
   }
 
-  // Diagnose 'super.init', which can only appear inside another initializer,
-  // specially.
   if (result.UnviableCandidates.empty() && isInitializer &&
       !baseObjTy->is<MetatypeType>()) {
     if (auto ctorRef = dyn_cast<UnresolvedDotExpr>(expr)) {
+      // Diagnose 'super.init', which can only appear inside another
+      // initializer, specially.
       if (isa<SuperRefExpr>(ctorRef->getBase())) {
         diagnose(anchor->getLoc(), diag::super_initializer_not_in_initializer);
         return true;
