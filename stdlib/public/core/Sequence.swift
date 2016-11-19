@@ -1059,10 +1059,6 @@ extension Sequence {
   }
 }
 
-internal enum _StopIteration : Error {
-  case stop
-}
-
 extension Sequence {
   /// Returns the first element of the sequence that satisfies the given
   /// predicate.
