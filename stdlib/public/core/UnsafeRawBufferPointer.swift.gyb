@@ -206,7 +206,7 @@ public struct Unsafe${Mutable}RawBufferPointer
   ///   then it contains values of type `U`.
   public func copyBytes<C : Collection>(from source: C
   ) where C.Iterator.Element == UInt8 {
-    _debugPrecondition(numericCast(source.count) <= self.count,
+    _debugPrecondition(source.count <= self.count,
       "${Self}.copyBytes source has too many elements")
     guard let position = _position else {
       return
