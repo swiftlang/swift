@@ -19,6 +19,7 @@ using namespace swift;
 bool FrontendOptions::actionHasOutput() const {
   switch (RequestedAction) {
   case NoneAction:
+  case Parse:
   case Typecheck:
   case DumpParse:
   case DumpAST:
@@ -48,6 +49,7 @@ bool FrontendOptions::actionHasOutput() const {
 bool FrontendOptions::actionIsImmediate() const {
   switch (RequestedAction) {
   case NoneAction:
+  case Parse:
   case Typecheck:
   case DumpParse:
   case DumpAST:

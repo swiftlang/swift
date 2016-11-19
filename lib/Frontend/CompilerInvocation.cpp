@@ -247,6 +247,8 @@ static bool ParseFrontendArgs(FrontendOptions &Opts, ArgList &Args,
       Action = FrontendOptions::EmitSIB;
     } else if (Opt.matches(OPT_emit_sibgen)) {
       Action = FrontendOptions::EmitSIBGen;
+    } else if (Opt.matches(OPT_parse)) {
+      Action = FrontendOptions::Parse;
     } else if (Opt.matches(OPT_typecheck)) {
       Action = FrontendOptions::Typecheck;
     } else if (Opt.matches(OPT_dump_parse)) {
@@ -459,6 +461,7 @@ static bool ParseFrontendArgs(FrontendOptions &Opts, ArgList &Args,
     case FrontendOptions::NoneAction:
       break;
 
+    case FrontendOptions::Parse:
     case FrontendOptions::Typecheck:
     case FrontendOptions::DumpParse:
     case FrontendOptions::DumpInterfaceHash:
@@ -660,6 +663,7 @@ static bool ParseFrontendArgs(FrontendOptions &Opts, ArgList &Args,
     case FrontendOptions::REPL:
       Diags.diagnose(SourceLoc(), diag::error_mode_cannot_emit_dependencies);
       return true;
+    case FrontendOptions::Parse:
     case FrontendOptions::Typecheck:
     case FrontendOptions::EmitModuleOnly:
     case FrontendOptions::EmitSILGen:
@@ -687,6 +691,7 @@ static bool ParseFrontendArgs(FrontendOptions &Opts, ArgList &Args,
     case FrontendOptions::REPL:
       Diags.diagnose(SourceLoc(), diag::error_mode_cannot_emit_header);
       return true;
+    case FrontendOptions::Parse:
     case FrontendOptions::Typecheck:
     case FrontendOptions::EmitModuleOnly:
     case FrontendOptions::EmitSILGen:
@@ -705,6 +710,7 @@ static bool ParseFrontendArgs(FrontendOptions &Opts, ArgList &Args,
       !Opts.ModuleDocOutputPath.empty()) {
     switch (Opts.RequestedAction) {
     case FrontendOptions::NoneAction:
+    case FrontendOptions::Parse:
     case FrontendOptions::Typecheck:
     case FrontendOptions::DumpParse:
     case FrontendOptions::DumpInterfaceHash:

@@ -757,11 +757,15 @@ static bool performCompile(CompilerInstance &Instance,
   if (shouldTrackReferences)
     Instance.setReferencedNameTracker(&nameTracker);
 
-  if (Action == FrontendOptions::DumpParse ||
+  if (Action == FrontendOptions::Parse ||
+      Action == FrontendOptions::DumpParse ||
       Action == FrontendOptions::DumpInterfaceHash)
     Instance.performParseOnly();
   else
     Instance.performSema();
+
+  if (Action == FrontendOptions::Parse)
+    return false;
 
   if (observer) {
     observer->performedSemanticAnalysis(Instance);
