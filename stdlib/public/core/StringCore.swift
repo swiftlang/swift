@@ -151,9 +151,9 @@ public struct _StringCore {
     self._baseAddress = baseAddress
 
     self._countAndFlags
-      = (UInt(elementShift) &<< (UInt.bitWidth - 1))
+      = (UInt(extendingOrTruncating: elementShift) &<< (UInt.bitWidth - 1))
       | ((hasCocoaBuffer ? 1 : 0) &<< (UInt.bitWidth - 2))
-      | UInt(count)
+      | UInt(extendingOrTruncating: count)
 
     self._owner = owner
     _sanityCheck(UInt(count) & _flagMask == 0, "String too long to represent")

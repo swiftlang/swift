@@ -29,7 +29,8 @@ internal struct _ArrayBody {
     _storage = _SwiftArrayBodyStorage(
       count: count,
       _capacityAndFlags:
-        (UInt(capacity) << 1) | (elementTypeIsBridgedVerbatim ? 1 : 0))
+        (UInt(extendingOrTruncating: capacity) &<< 1) |
+        (elementTypeIsBridgedVerbatim ? 1 : 0))
   }
 
   /// In principle ArrayBody shouldn't need to be default
