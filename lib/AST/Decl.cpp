@@ -4481,6 +4481,23 @@ Type FuncDecl::getResultType() const {
   return resultTy;
 }
 
+Type FuncDecl::getResultInterfaceType() const {
+  if (!hasType())
+    return nullptr;
+
+  Type resultTy = getInterfaceType();
+  if (resultTy->hasError())
+    return resultTy;
+
+  for (unsigned i = 0, e = getNumParameterLists(); i != e; ++i)
+    resultTy = resultTy->castTo<AnyFunctionType>()->getResult();
+
+  if (!resultTy)
+    resultTy = TupleType::getEmpty(getASTContext());
+
+  return resultTy;
+}
+
 bool FuncDecl::isUnaryOperator() const {
   if (!isOperator())
     return false;
@@ -4699,6 +4716,13 @@ Type ConstructorDecl::getArgumentType() const {
 
 Type ConstructorDecl::getResultType() const {
   Type ArgTy = getType();
+  ArgTy = ArgTy->castTo<AnyFunctionType>()->getResult();
+  ArgTy = ArgTy->castTo<AnyFunctionType>()->getResult();
+  return ArgTy;
+}
+
+Type ConstructorDecl::getResultInterfaceType() const {
+  Type ArgTy = getInterfaceType();
   ArgTy = ArgTy->castTo<AnyFunctionType>()->getResult();
   ArgTy = ArgTy->castTo<AnyFunctionType>()->getResult();
   return ArgTy;

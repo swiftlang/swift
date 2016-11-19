@@ -2492,7 +2492,7 @@ Type TupleType::getVarArgsBaseType() const {
 
 CanArchetypeType ArchetypeType::getNew(const ASTContext &Ctx,
                                        ArchetypeType *Parent,
-                                       AssocTypeOrProtocolType AssocTypeOrProto,
+                                       AssociatedTypeDecl *AssocType,
                                        Identifier Name,
                                        ArrayRef<Type> ConformsTo,
                                        Type Superclass,
@@ -2506,14 +2506,14 @@ CanArchetypeType ArchetypeType::getNew(const ASTContext &Ctx,
 
   auto arena = AllocationArena::Permanent;
   return CanArchetypeType(
-           new (Ctx, arena) ArchetypeType(Ctx, Parent, AssocTypeOrProto, Name,
+           new (Ctx, arena) ArchetypeType(Ctx, Parent, AssocType, Name,
                                           Ctx.AllocateCopy(ConformsToProtos),
                                           Superclass, isRecursive));
 }
 
 CanArchetypeType
 ArchetypeType::getNew(const ASTContext &Ctx, ArchetypeType *Parent,
-                      AssocTypeOrProtocolType AssocTypeOrProto,
+                      AssociatedTypeDecl *AssocType,
                       Identifier Name,
                       SmallVectorImpl<ProtocolDecl *> &ConformsTo,
                       Type Superclass, bool isRecursive) {
@@ -2522,7 +2522,7 @@ ArchetypeType::getNew(const ASTContext &Ctx, ArchetypeType *Parent,
 
   auto arena = AllocationArena::Permanent;
   return CanArchetypeType(
-           new (Ctx, arena) ArchetypeType(Ctx, Parent, AssocTypeOrProto, Name,
+           new (Ctx, arena) ArchetypeType(Ctx, Parent, AssocType, Name,
                                           Ctx.AllocateCopy(ConformsTo),
                                           Superclass, isRecursive));
 }

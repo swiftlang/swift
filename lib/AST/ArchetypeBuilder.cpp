@@ -614,13 +614,12 @@ ArchetypeBuilder::PotentialArchetype::getType(ArchetypeBuilder &builder) {
     return representative->ArchetypeOrConcreteType;
   }
   
-  ArchetypeType::AssocTypeOrProtocolType assocTypeOrProto = RootProtocol;
+  AssociatedTypeDecl *assocType = nullptr;
+
   // Allocate a new archetype.
   ArchetypeType *ParentArchetype = nullptr;
   auto &mod = builder.getModule();
   if (auto parent = getParent()) {
-    assert(assocTypeOrProto.isNull() &&
-           "root protocol type given for non-root archetype");
     auto parentTy = parent->getType(builder);
     if (!parentTy)
       return NestedType::forConcreteType(
@@ -671,7 +670,7 @@ ArchetypeBuilder::PotentialArchetype::getType(ArchetypeBuilder &builder) {
       }
     }
 
-    assocTypeOrProto = getResolvedAssociatedType();
+    assocType = getResolvedAssociatedType();
   }
 
   // If we ended up building our parent archetype, then we'll have
@@ -714,7 +713,7 @@ ArchetypeBuilder::PotentialArchetype::getType(ArchetypeBuilder &builder) {
 
   auto arch
     = ArchetypeType::getNew(builder.getASTContext(), ParentArchetype,
-                            assocTypeOrProto, getName(), Protos,
+                            assocType, getName(), Protos,
                             superclass, isRecursive());
 
   representative->ArchetypeOrConcreteType = NestedType::forArchetype(arch);
@@ -868,7 +867,6 @@ auto ArchetypeBuilder::resolveArchetype(Type type) -> PotentialArchetype * {
 }
 
 auto ArchetypeBuilder::addGenericParameter(GenericTypeParamType *GenericParam,
-                                           ProtocolDecl *RootProtocol,
                                            Identifier ParamName)
        -> PotentialArchetype *
 {
@@ -876,21 +874,15 @@ auto ArchetypeBuilder::addGenericParameter(GenericTypeParamType *GenericParam,
   
   // Create a potential archetype for this type parameter.
   assert(!Impl->PotentialArchetypes[Key]);
-  auto PA = new PotentialArchetype(GenericParam, RootProtocol, ParamName);
+  auto PA = new PotentialArchetype(GenericParam, ParamName);
 
   Impl->PotentialArchetypes[Key] = PA;
   return PA;
 }
 
 void ArchetypeBuilder::addGenericParameter(GenericTypeParamDecl *GenericParam) {
-  ProtocolDecl *RootProtocol = dyn_cast<ProtocolDecl>(GenericParam->getDeclContext());
-  if (!RootProtocol) {
-    if (auto Ext = dyn_cast<ExtensionDecl>(GenericParam->getDeclContext()))
-      RootProtocol = dyn_cast_or_null<ProtocolDecl>(Ext->getExtendedType()->getAnyNominal());
-  }
   addGenericParameter(
         GenericParam->getDeclaredType()->castTo<GenericTypeParamType>(),
-        RootProtocol,
         GenericParam->getName());
 }
 
@@ -912,7 +904,7 @@ void ArchetypeBuilder::addGenericParameter(GenericTypeParamType *GenericParam) {
   if (name.str().startswith("$"))
     name = Context.getIdentifier(name.str().slice(1, name.str().size()));
   
-  addGenericParameter(GenericParam, nullptr, name);
+  addGenericParameter(GenericParam, name);
 }
 
 bool ArchetypeBuilder::addConformanceRequirement(PotentialArchetype *PAT,

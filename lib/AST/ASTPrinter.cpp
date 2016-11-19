@@ -555,31 +555,6 @@ void ASTPrinter::printTypeRef(Type T, const TypeDecl *RefTo, Identifier Name) {
   printName(Name, Context);
 }
 
-void ASTPrinter::printTypeRef(DynamicSelfType *T, Identifier Name) {
-  // Try to print as a reference to the static type so that we will get a USR,
-  // in cursor info.
-  if (auto staticSelfT = T->getSelfType()) {
-    // Handle protocol 'Self', which is an archetype.
-    if (auto AT = staticSelfT->getAs<ArchetypeType>()) {
-      if (auto SelfP = AT->getSelfProtocol()) {
-        if (auto GTD = SelfP->getProtocolSelf()) {
-          assert(GTD->isProtocolSelf());
-          printTypeRef(T, GTD, Name);
-          return;
-        }
-      }
-
-    // Handle class 'Self', which is just a class type.
-    } else if (auto *NTD = staticSelfT->getAnyNominal()) {
-      printTypeRef(T, NTD, Name);
-      return;
-    }
-  }
-
-  // If that fails, just print the name.
-  printName(Name, PrintNameContext::ClassDynamicSelf);
-}
-
 void ASTPrinter::printModuleRef(ModuleEntity Mod, Identifier Name) {
   printName(Name);
 }
@@ -892,9 +867,11 @@ class PrintAST : public ASTVisitor<PrintAST> {
         Options.TransformContext->getTypeBase()) {
       auto *DC = Current->getInnermostDeclContext();
 
-      // Get the interface type, since TypeLocs still have
-      // contextual types in them.
-      T = ArchetypeBuilder::mapTypeOutOfContext(DC, T);
+      if (T->hasArchetype()) {
+        // Get the interface type, since TypeLocs still have
+        // contextual types in them.
+        T = ArchetypeBuilder::mapTypeOutOfContext(DC, T);
+      }
 
       // Get the innermost nominal type context.
       DC = DC->getInnermostTypeContext();
@@ -2427,8 +2404,12 @@ void PrintAST::printOneParameter(const ParamDecl *param,
 
   printArgName();
 
-  if (!TheTypeLoc.getTypeRepr() && param->hasType())
-    TheTypeLoc = TypeLoc::withoutLoc(param->getType());
+  if (!TheTypeLoc.getTypeRepr() && param->hasType()) {
+    // FIXME: ParamDecls should have interface types instead
+    auto *DC = Current->getInnermostDeclContext();
+    auto type = ArchetypeBuilder::mapTypeOutOfContext(DC, param->getType());
+    TheTypeLoc = TypeLoc::withoutLoc(type);
+  }
 
   // If the parameter is variadic, we will print the "..." after it, but we have
   // to strip off the added array type.
@@ -2516,7 +2497,7 @@ void PrintAST::printParameterList(ParameterList *PL, Type paramListTy,
 
 void PrintAST::printFunctionParameters(AbstractFunctionDecl *AFD) {
   auto BodyParams = AFD->getParameterLists();
-  auto curTy = AFD->hasType() ? AFD->getType() : nullptr;
+  auto curTy = AFD->hasType() ? AFD->getInterfaceType() : nullptr;
 
   // Skip over the implicit 'self'.
   if (AFD->getImplicitSelfDecl()) {
@@ -2684,7 +2665,7 @@ void PrintAST::visitFuncDecl(FuncDecl *decl) {
           printFunctionParameters(decl);
         });
 
-      Type ResultTy = decl->getResultType();
+      Type ResultTy = decl->getResultInterfaceType();
       if (ResultTy && !ResultTy->isVoid()) {
         TypeLoc ResultTyLoc = decl->getBodyResultTypeLoc();
         if (!ResultTyLoc.getTypeRepr())
@@ -3670,7 +3651,17 @@ public:
       return;
     }
 
-    Printer.printTypeRef(T, T->getASTContext().Id_Self);
+    // Try to print as a reference to the static type so that we will get a USR,
+    // in cursor info.
+    auto staticSelfT = T->getSelfType();
+
+    if (auto *NTD = staticSelfT->getAnyNominal()) {
+      auto Name = T->getASTContext().Id_Self;
+      Printer.printTypeRef(T, NTD, Name);
+      return;
+    }
+
+    visit(staticSelfT);
   }
 
   void printFunctionExtInfo(AnyFunctionType::ExtInfo info) {
@@ -3987,21 +3978,14 @@ public:
         }
       }
 
-      if (T->getName().empty())
+      auto Name = T->getName();
+      if (Name.empty())
         Printer << "<anonymous>";
       else {
-        // Print protocol 'Self' as a generic parameter so that it gets
-        // annotated in cursor info.
-        // FIXME: in a protocol extension, we really want the extension, not the
-        // protocol.
-        if (auto *P = T->getSelfProtocol()) {
-          auto *GTD = P->getProtocolSelf();
-          assert(GTD && GTD->isProtocolSelf());
-          Printer.printTypeRef(T, GTD, T->getName());
-          return;
-        }
-
-        Printer.printName(T->getName());
+        PrintNameContext context = PrintNameContext::Normal;
+        if (Name == T->getASTContext().Id_Self)
+          context = PrintNameContext::GenericParameter;
+        Printer.printName(Name, context);
       }
     }
   }
@@ -4027,10 +4011,14 @@ public:
     if (Name.empty())
       Printer << "<anonymous>";
     else {
-      PrintNameContext context = PrintNameContext::Normal;
-      if (T->getDecl() && T->getDecl()->isProtocolSelf())
-        context = PrintNameContext::GenericParameter;
+      if (T->getDecl() && T->getDecl()->isProtocolSelf()) {
+        Printer.printTypeRef(T, T->getDecl(), Name);
+        return;
+      }
 
+      PrintNameContext context = PrintNameContext::Normal;
+      if (Name == T->getASTContext().Id_Self)
+        context = PrintNameContext::GenericParameter;
       Printer.printName(Name, context);
     }
   }
