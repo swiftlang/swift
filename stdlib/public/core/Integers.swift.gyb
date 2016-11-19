@@ -2323,11 +2323,13 @@ public struct ${Self}
 %     end
 
 %     if bits < word_bits:
-    return Int(extendingOrTruncating: lhs) < rhs
+    let lhs_ = Int(_truncatingBits: lhs._lowUWord)
+    return lhs_ < rhs
 %     elif bits == word_bits:
     return Bool(Builtin.cmp_${u}lt_Int${bits}(lhs._value, rhs._value))
 %     else:
-    return lhs < ${Self}(extendingOrTruncating: rhs)
+    let rhs_ = ${Self}(_truncatingBits: rhs._lowUWord)
+    return lhs < rhs_
 %     end
   }
 
@@ -2337,11 +2339,41 @@ public struct ${Self}
     if lhs < 0 { return true }
 %     end
 %     if bits < word_bits:
-    return lhs < Int(extendingOrTruncating: rhs)
+    let rhs_ = Int(_truncatingBits: rhs._lowUWord)
+    return lhs < rhs_
 %     elif bits == word_bits:
     return Bool(Builtin.cmp_${u}lt_Int${bits}(lhs._value, rhs._value))
 %     else:
-    return ${Self}(extendingOrTruncating: lhs) < rhs
+    let lhs_ = ${Self}(_truncatingBits: lhs._lowUWord)
+    return lhs_ < rhs
+%     end
+  }
+
+  @_transparent
+  public static func == (lhs: ${Self}, rhs: Int) -> Bool {
+%     if not signed:
+    if rhs < 0 { return false }
+%     end
+%     if bits < word_bits:
+    return Int(_truncatingBits: lhs._lowUWord) == rhs
+%     elif bits == word_bits:
+    return Bool(Builtin.cmp_eq_Int${bits}(lhs._value, rhs._value))
+%     else:
+    return lhs == ${Self}(_truncatingBits: rhs._lowUWord)
+%     end
+  }
+
+  @_transparent
+  public static func == (lhs: Int, rhs: ${Self}) -> Bool {
+%     if not signed:
+    if lhs < 0 { return false }
+%     end
+%     if bits < word_bits:
+    return lhs == Int(_truncatingBits: rhs._lowUWord)
+%     elif bits == word_bits:
+    return Bool(Builtin.cmp_eq_Int${bits}(lhs._value, rhs._value))
+%     else:
+    return ${Self}(_truncatingBits: lhs._lowUWord) == rhs
 %     end
   }
 
@@ -2360,8 +2392,15 @@ public struct ${Self}
   public static func >= (${Args}) -> Bool {
     return !(lhs < rhs)
   }
+
+  @_transparent
+  public static func != (${Args}) -> Bool {
+    return !(lhs == rhs)
+  }
 %     end
+
 %   else: # if Self != 'Int'
+
   // FIXME(integers): Comparable default implementations should really be
   // chosen by the compiler. <rdar://problem/29340480>
   @_transparent
@@ -2377,6 +2416,11 @@ public struct ${Self}
   @_transparent
   public static func >= (lhs: Int, rhs: Int) -> Bool {
     return !(lhs < rhs)
+  }
+
+  @_transparent
+  public static func != (lhs: Int, rhs: Int) -> Bool {
+    return !(lhs == rhs)
   }
 %   end # if Self != 'Int'
 
