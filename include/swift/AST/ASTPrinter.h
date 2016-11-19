@@ -155,8 +155,6 @@ public:
 
   // Helper functions.
 
-  void printTypeRef(DynamicSelfType *T, Identifier Name);
-
   void printSeparator(bool &first, StringRef separator) {
     if (first) {
       first = false;

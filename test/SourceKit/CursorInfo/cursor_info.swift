@@ -649,10 +649,9 @@ func convention7(_: @convention(witness_method) ()->()) {}
 // RUN: %sourcekitd-test -req=cursor -pos=165:8 %s -- -F %S/../Inputs/libIDE-mock-sdk -I %t.tmp %mcp_opt %s | %FileCheck %s -check-prefix=CHECK75
 // CHECK75: source.lang.swift.decl.function.method.instance (165:8-165:20)
 // CHECK75: <Self where Self : P3> (Self) -> (Self) -> Self
-// CHECK75: <Declaration>func f(_ s: <Type usr="s:tE11cursor_infoPS_2P34SelfMx">Self</Type>) -&gt; <Type usr="s:tP11cursor_info2P34SelfMx">Self</Type></Declaration>
+// CHECK75: <Declaration>func f(_ s: <Type usr="s:tE11cursor_infoPS_2P34SelfMx">Self</Type>) -&gt; <Type usr="s:tE11cursor_infoPS_2P34SelfMx">Self</Type></Declaration>
 // CHECK75: <decl.var.parameter.type><ref.generic_type_param usr="s:tE11cursor_infoPS_2P34SelfMx">Self</ref.generic_type_param></decl.var.parameter.type>
-// CHECK75-SAME: <decl.function.returntype><ref.generic_type_param usr="s:tP11cursor_info2P34SelfMx">Self</ref.generic_type_param></decl.function.returntype>
-// FIXME: the return type gets the USR for the original protocol, rather than the extension.
+// CHECK75-SAME: <decl.function.returntype><ref.generic_type_param usr="s:tE11cursor_infoPS_2P34SelfMx">Self</ref.generic_type_param></decl.function.returntype>
 
 // RUN: %sourcekitd-test -req=cursor -pos=169:8 %s -- -F %S/../Inputs/libIDE-mock-sdk -I %t.tmp %mcp_opt %s | %FileCheck %s -check-prefix=CHECK76
 // CHECK76: source.lang.swift.decl.function.method.instance (169:8-169:11)
