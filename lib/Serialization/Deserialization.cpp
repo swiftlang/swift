@@ -3609,12 +3609,12 @@ Type ModuleFile::getType(TypeID TID) {
   case decls_block::ARCHETYPE_TYPE: {
     IdentifierID nameID;
     TypeID parentID;
-    DeclID assocTypeOrProtoID;
+    DeclID assocTypeID;
     TypeID superclassID;
     ArrayRef<uint64_t> rawConformanceIDs;
 
     decls_block::ArchetypeTypeLayout::readRecord(scratch, nameID, parentID,
-                                                 assocTypeOrProtoID,
+                                                 assocTypeID,
                                                  superclassID,
                                                  rawConformanceIDs);
 
@@ -3625,13 +3625,8 @@ Type ModuleFile::getType(TypeID TID) {
     if (auto parentType = getType(parentID))
       parent = parentType->castTo<ArchetypeType>();
 
-    ArchetypeType::AssocTypeOrProtocolType assocTypeOrProto;
-    auto assocTypeOrProtoDecl = getDecl(assocTypeOrProtoID);
-    if (auto assocType
-          = dyn_cast_or_null<AssociatedTypeDecl>(assocTypeOrProtoDecl))
-      assocTypeOrProto = assocType;
-    else
-      assocTypeOrProto = cast_or_null<ProtocolDecl>(assocTypeOrProtoDecl);
+    auto assocTypeDecl = dyn_cast_or_null<AssociatedTypeDecl>(
+        getDecl(assocTypeID));
 
     superclass = getType(superclassID);
 
@@ -3642,7 +3637,7 @@ Type ModuleFile::getType(TypeID TID) {
     if (typeOrOffset.isComplete())
       break;
 
-    auto archetype = ArchetypeType::getNew(ctx, parent, assocTypeOrProto,
+    auto archetype = ArchetypeType::getNew(ctx, parent, assocTypeDecl,
                                            getIdentifier(nameID), conformances,
                                            superclass, false);
     typeOrOffset = archetype;

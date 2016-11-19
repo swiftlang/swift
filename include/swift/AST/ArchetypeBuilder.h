@@ -218,7 +218,6 @@ public:
 
 private:
   PotentialArchetype *addGenericParameter(GenericTypeParamType *GenericParam,
-                                          ProtocolDecl *RootProtocol,
                                           Identifier ParamName);
 
 public:
@@ -357,9 +356,6 @@ class ArchetypeBuilder::PotentialArchetype {
   /// archetype corresponds.
   llvm::PointerUnion<PotentialArchetype*, GenericTypeParamType*> ParentOrParam;
 
-  /// The root protocol with which this potential archetype is associated.
-  ProtocolDecl *RootProtocol = nullptr;
-
   /// \brief The name of this potential archetype or, for an
   /// associated type, the declaration of the associated type to which
   /// this potential archetype has been resolved. Or, for a type alias,
@@ -460,9 +456,8 @@ class ArchetypeBuilder::PotentialArchetype {
 
   /// \brief Construct a new potential archetype for a generic parameter.
   PotentialArchetype(GenericTypeParamType *GenericParam, 
-                     ProtocolDecl *RootProtocol,
                      Identifier Name)
-    : ParentOrParam(GenericParam), RootProtocol(RootProtocol), 
+    : ParentOrParam(GenericParam),
       NameOrAssociatedType(Name), Representative(this), IsRecursive(false),
       Invalid(false), SubstitutingConcreteType(false),
       RecursiveConcreteType(false), RecursiveSuperclassType(false),
