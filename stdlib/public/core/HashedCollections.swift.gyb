@@ -2473,6 +2473,11 @@ collections = [
 /// keys, followed by the values.
 //
 // See the docs at the top of the file for more details on this type
+//
+// NOTE: The precise layout of this type is relied on in the runtime
+// to provide a statically allocated empty singleton. 
+// See stdlib/public/stubs/GlobalObjects.cpp for details.
+@objc_non_lazy_realization
 internal class _RawNative${Self}Storage:
   _SwiftNativeNS${Self}, _NS${Self}Core
 {
@@ -2496,31 +2501,10 @@ internal class _RawNative${Self}Storage:
   /// The empty singleton that is used for every single Dictionary that is
   /// created without any elements. The contents of the storage should never
   /// be mutated.
-  // FIXME: this should be set up in rodata like the Array singleton
-  internal static let empty: RawStorage = {
-    let storage = Builtin.allocWithTailElems_1(RawStorage.self,
-        1._builtinWordValue, UInt.self)
-    
-    // We set the capacity to 1 so that there's an empty hole to search.
-    // Any insertion will lead to a real storage being allocated, because 
-    // Dictionary guarantees there's always another empty hole after insertion.
-    storage.capacity = 1
-    storage.count = 0
-
-    // Initialize pointers to garbage; they should never be loaded
-    storage.keys  = UnsafeMutableRawPointer(bitPattern: 1)!
-  % if Self == 'Dictionary':
-    storage.values = UnsafeMutableRawPointer(bitPattern: 1)!
-  % end
-
-    let initializedEntries = _UnsafeBitMap(
-        storage: storage._initializedHashtableEntriesBitMapBuffer,
-        bitCount: 1)
-    initializedEntries.initializeToZero()
-
-    storage.initializedEntries = initializedEntries
-    return storage
-  }()
+  internal static var empty: RawStorage {
+    return Builtin.bridgeFromRawPointer(
+      Builtin.addressof(&_swiftEmpty${Self}Storage))
+  }
 
   // This type is made with allocWithTailElems, so no init is ever called.
   // But we still need to have an init to satisfy the compiler.

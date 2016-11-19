@@ -39,6 +39,44 @@ struct _SwiftEmptyArrayStorage {
 extern SWIFT_RUNTIME_STDLIB_INTERFACE
 struct _SwiftEmptyArrayStorage _swiftEmptyArrayStorage;
 
+struct _SwiftUnsafeBitMap {
+  __swift_uintptr_t *values;
+  __swift_intptr_t bitCount;
+};
+
+struct _SwiftDictionaryBodyStorage {
+  __swift_intptr_t capacity;
+  __swift_intptr_t count;
+  struct _SwiftUnsafeBitMap initializedEntries;
+  void *keys;
+  void *values;
+};
+
+struct _SwiftSetBodyStorage {
+  __swift_intptr_t capacity;
+  __swift_intptr_t count;
+  struct _SwiftUnsafeBitMap initializedEntries;
+  void *keys;
+};
+
+struct _SwiftEmptyDictionaryStorage {
+  struct HeapObject header;
+  struct _SwiftDictionaryBodyStorage body;
+  __swift_uintptr_t entries;
+};
+
+struct _SwiftEmptySetStorage {
+  struct HeapObject header;
+  struct _SwiftSetBodyStorage body;
+  __swift_uintptr_t entries;
+};
+
+extern SWIFT_RUNTIME_STDLIB_INTERFACE
+struct _SwiftEmptyDictionaryStorage _swiftEmptyDictionaryStorage;
+
+extern SWIFT_RUNTIME_STDLIB_INTERFACE
+struct _SwiftEmptySetStorage _swiftEmptySetStorage;
+
 struct _SwiftHashingSecretKey {
   __swift_uint64_t key0;
   __swift_uint64_t key1;
