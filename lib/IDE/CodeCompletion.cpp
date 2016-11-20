@@ -3122,7 +3122,8 @@ public:
                                bool includePrivate,
                                std::vector<OperatorDecl *> &results) {
     for (auto &pair : map) {
-      if (pair.second.getInt() || includePrivate) {
+      if (pair.second.getPointer() &&
+          (pair.second.getInt() || includePrivate)) {
         results.push_back(pair.second.getPointer());
       }
     }
