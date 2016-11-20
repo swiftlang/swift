@@ -22,8 +22,15 @@ extension Collection {
   func offset(of i: Index) -> IndexDistance {
     return distance(from: startIndex, to: i)
   }
+  subscript() -> SubSequence { return self[startIndex..<endIndex] }
 }
 //===--- Niceties ---------------------------------------------------------===//
+
+protocol EncodedCollection : Collection {
+  associatedtype Encoding
+  associatedtype CodeUnits : Collection
+  var codeUnits : CodeUnits { get }
+}
 
 enum MatchResult<Index: Comparable, MatchData> {
 case found(end: Index, data: MatchData)
@@ -35,18 +42,20 @@ protocol Pattern {
   associatedtype Index : Comparable
   associatedtype MatchData = ()
   
-  func matched<C: Collection>(atStartOf c: C) -> MatchResult<Index, MatchData>
+  func matched<C: EncodedCollection>(
+    atStartOf c: C
+  ) -> MatchResult<Index, MatchData>
   where C.Index == Index, Element_<C> == Element
   // The following requirements go away with upcoming generics features
-  , C.SubSequence : Collection, Element_<C.SubSequence> == Element
+  , C.SubSequence: EncodedCollection, Element_<C.SubSequence> == Element
   , C.SubSequence.Index == Index, C.SubSequence.SubSequence == C.SubSequence
 }
 
 extension Pattern {
-  func found<C: Collection>(in c: C) -> (extent: Range<Index>, data: MatchData)?
+  func found<C: EncodedCollection>(in c: C) -> (extent: Range<Index>, data: MatchData)?
   where C.Index == Index, Element_<C> == Element
   // The following requirements go away with upcoming generics features
-  , C.SubSequence : Collection, Element_<C.SubSequence> == Element
+  , C.SubSequence : EncodedCollection, Element_<C.SubSequence> == Element
   , C.SubSequence.Index == Index, C.SubSequence.SubSequence == C.SubSequence
   {
     var i = c.startIndex
@@ -77,7 +86,7 @@ where Element_<T> : Equatable {
   func matched<C: Collection>(atStartOf c: C) -> MatchResult<Index, ()>
   where C.Index == Index, Element_<C> == Element
   // The following requirements go away with upcoming generics features
-  , C.SubSequence : Collection, Element_<C.SubSequence> == Element
+  , C.SubSequence: Collection, Element_<C.SubSequence> == Element
   , C.SubSequence.Index == Index, C.SubSequence.SubSequence == C.SubSequence
   {
     var i = c.startIndex
@@ -96,10 +105,10 @@ where Element_<T> : Equatable {
 struct MatchAnyOne<T : Equatable, Index : Comparable> : Pattern {
   typealias Element = T
   
-  func matched<C: Collection>(atStartOf c: C) -> MatchResult<Index, ()>
+  func matched<C: EncodedCollection>(atStartOf c: C) -> MatchResult<Index, ()>
   where C.Index == Index, Element_<C> == Element
   // The following requirements go away with upcoming generics features
-  , C.SubSequence : Collection, Element_<C.SubSequence> == Element
+  , C.SubSequence: EncodedCollection, Element_<C.SubSequence> == Element
   , C.SubSequence.Index == Index, C.SubSequence.SubSequence == C.SubSequence
   {
     return c.isEmpty
@@ -130,10 +139,10 @@ where M0.Element == M1.Element, M0.Index == M1.Index {
   typealias Index = M0.Index
   typealias MatchData = (midPoint: M0.Index, data: (M0.MatchData, M1.MatchData))
 
-  func matched<C: Collection>(atStartOf c: C) -> MatchResult<Index, MatchData>
+  func matched<C: EncodedCollection>(atStartOf c: C) -> MatchResult<Index, MatchData>
   where C.Index == Index, Element_<C> == Element
   // The following requirements go away with upcoming generics features
-  , C.SubSequence : Collection, Element_<C.SubSequence> == Element
+  , C.SubSequence: EncodedCollection, Element_<C.SubSequence> == Element
   , C.SubSequence.Index == Index, C.SubSequence.SubSequence == C.SubSequence
   {
     var src0 = c[c.startIndex..<c.endIndex]
@@ -171,10 +180,10 @@ struct RepeatMatch<M0: Pattern> : Pattern {
   let singlePattern: M0
   var repeatLimits: ClosedRange<Int>
   
-  func matched<C: Collection>(atStartOf c: C) -> MatchResult<M0.Index, MatchData>
+  func matched<C: EncodedCollection>(atStartOf c: C) -> MatchResult<M0.Index, MatchData>
   where C.Index == M0.Index, Element_<C> == M0.Element
   // The following requirements go away with upcoming generics features
-  , C.SubSequence : Collection, Element_<C.SubSequence> == M0.Element
+  , C.SubSequence: EncodedCollection, Element_<C.SubSequence> == M0.Element
   , C.SubSequence.Index == M0.Index, C.SubSequence.SubSequence == C.SubSequence
   {
     var lastEnd = c.startIndex
@@ -242,10 +251,10 @@ where M0.Element == M1.Element, M0.Index == M1.Index {
   typealias Index = M0.Index
   typealias MatchData = OneOf<M0.MatchData,M1.MatchData>
 
-  func matched<C: Collection>(atStartOf c: C) -> MatchResult<Index, MatchData>
+  func matched<C: EncodedCollection>(atStartOf c: C) -> MatchResult<Index, MatchData>
   where C.Index == Index, Element_<C> == Element
   // The following requirements go away with upcoming generics features
-  , C.SubSequence : Collection, Element_<C.SubSequence> == Element
+  , C.SubSequence: EncodedCollection, Element_<C.SubSequence> == Element
   , C.SubSequence.Index == Index, C.SubSequence.SubSequence == C.SubSequence
   {
     switch matchers.0.matched(atStartOf: c) {
@@ -291,7 +300,163 @@ func | <M0: Pattern, M1: Pattern>(m0: M0, m1: M1) -> MatchOneOf<M0,M1>
 where M0.Element == M1.Element, M0.Index == M1.Index {
   return MatchOneOf(m0, m1)
 }
+//===--- Adaptation for Collections ---------------------------------------===//
+enum IdentityEncoding {}
 
+public struct IdentityEncoded<Base: Collection>
+where Base.SubSequence : Collection,
+  Base.SubSequence.SubSequence == Base.SubSequence {
+  let _base: Base
+  init(_ c: Base) { self._base = c }
+}
+
+extension IdentityEncoded : Sequence {
+
+  /// Returns an iterator over the elements of this sequence.
+  ///
+  /// - Complexity: O(1).
+  public func makeIterator() -> Base.Iterator {
+    return _base.makeIterator()
+  }
+
+  /// Returns a value less than or equal to the number of elements in
+  /// `self`, **nondestructively**.
+  ///
+  /// - Complexity: O(*n*)
+  public var underestimatedCount: Int { return _base.underestimatedCount }
+
+  public func _copyToContiguousArray()
+     -> ContiguousArray<Base.Iterator.Element> {
+    return _base._copyToContiguousArray()
+  }
+
+  @discardableResult
+  public func _copyContents(
+    initializing ptr: UnsafeMutablePointer<Base.Iterator.Element>
+  ) -> UnsafeMutablePointer<Base.Iterator.Element> {
+    return _base._copyContents(initializing: ptr)
+  }
+
+  public func _customContainsEquatableElement(
+    _ element: Base.Iterator.Element
+  ) -> Bool? {
+    return _base._customContainsEquatableElement(element)
+  }
+}
+
+extension IdentityEncoded : Collection {
+  public typealias Index = Base.Index
+  
+  /// The position of the first element in a non-empty collection.
+  ///
+  /// In an empty collection, `startIndex == endIndex`.
+  public var startIndex: Base.Index {
+    return _base.startIndex
+  }
+
+  /// The collection's "past the end" position---that is, the position one
+  /// greater than the last valid subscript argument.
+  ///
+  /// `endIndex` is always reachable from `startIndex` by zero or more
+  /// applications of `index(after:)`.
+  public var endIndex: Base.Index {
+    return _base.endIndex
+  }
+
+  public var indices: Base.Indices {
+    return _base.indices
+  }
+
+  // TODO: swift-3-indexing-model - add docs
+  public func index(after i: Base.Index) -> Base.Index {
+    return _base.index(after: i)
+  }
+
+  /// Accesses the element at `position`.
+  ///
+  /// - Precondition: `position` is a valid position in `self` and
+  ///   `position != endIndex`.
+  public subscript(position: Base.Index) -> Base.Iterator.Element {
+    return _base[position]
+  }
+  
+  /// Returns a collection representing a contiguous sub-range of
+  /// `self`'s elements.
+  ///
+  /// - Complexity: O(1)
+  public subscript(bounds: Range<Index>) -> IdentityEncoded<Base.SubSequence> {
+    return IdentityEncoded<Base.SubSequence>(_base[bounds])
+  }
+
+  /// A Boolean value indicating whether the collection is empty.
+  public var isEmpty: Bool {
+    return _base.isEmpty
+  }
+
+  /// Returns the number of elements.
+  ///
+  /// - Complexity: O(1) if `Self` conforms to `RandomAccessCollection`;
+  ///   O(*n*) otherwise.
+  public var count: Base.IndexDistance {
+    return _base.count
+  }
+
+  // The following requirement enables dispatching for index(of:) when
+  // the element type is Equatable.
+
+  /// Returns `Optional(Optional(index))` if an element was found;
+  /// `nil` otherwise.
+  ///
+  /// - Complexity: O(*n*)
+  public func _customIndexOfEquatableElement(
+    _ element: Base.Iterator.Element
+  ) -> Index?? {
+    return _base._customIndexOfEquatableElement(element)
+  }
+
+  /// Returns the first element of `self`, or `nil` if `self` is empty.
+  public var first: Base.Iterator.Element? {
+    return _base.first
+  }
+
+  // TODO: swift-3-indexing-model - add docs
+  public func index(_ i: Index, offsetBy n: Base.IndexDistance) -> Index {
+    return _base.index(i, offsetBy: n)
+  }
+
+  // TODO: swift-3-indexing-model - add docs
+  public func index(
+    _ i: Index, offsetBy n: Base.IndexDistance, limitedBy limit: Index
+  ) -> Index? {
+    return _base.index(i, offsetBy: n, limitedBy: limit)
+  }
+
+  // TODO: swift-3-indexing-model - add docs
+  public func distance(from start: Index, to end: Index) -> Base.IndexDistance {
+    return _base.distance(from:start, to: end)
+  }
+}
+
+extension IdentityEncoded : EncodedCollection {
+  typealias Encoding = IdentityEncoding
+  typealias CodeUnits = Base
+  var codeUnits : Base { return _base }
+}
+
+extension Collection
+   // The following requirements go away with upcoming generics features
+where SubSequence : Collection, Element_<SubSequence> == Element_<Self>
+  , SubSequence.Index == Index, SubSequence.SubSequence == SubSequence { 
+
+  // We need generic subscripts to make this look right
+  func subscript_<P: Pattern>(firstMatch pattern: P) -> SubSequence?
+  where P.Index == Index, P.Element == Element_<Self>
+  {
+    return pattern.found(in: IdentityEncoded(self)).map {
+      self[$0.extent]
+    }
+  }
+}
 //===--- Just for testing -------------------------------------------------===//
 struct MatchStaticString : Pattern {
   typealias Element = UTF8.CodeUnit
@@ -304,7 +469,7 @@ struct MatchStaticString : Pattern {
   func matched<C: Collection>(atStartOf c: C) -> MatchResult<Index, ()>
   where C.Index == Index, Element_<C> == Element
   // The following requirements go away with upcoming generics features
-  , C.SubSequence : Collection, Element_<C.SubSequence> == Element
+  , C.SubSequence: Collection, Element_<C.SubSequence> == Element
   , C.SubSequence.Index == Index, C.SubSequence.SubSequence == C.SubSequence {
     return content.withUTF8Buffer {
       LiteralMatch<Buffer, Index>($0).matched(atStartOf: c)
@@ -334,12 +499,12 @@ extension Collection where Iterator.Element == UTF8.CodeUnit {
 }
 
 extension Pattern where Element == UTF8.CodeUnit {
-  func searchTest<C: Collection>(
+  func searchTest<C: EncodedCollection>(
     in c: C,
     format: (MatchData)->String = { String(reflecting: $0) })
   where C.Index == Index, Element_<C> == Element
   // The following requirements go away with upcoming generics features
-  , C.SubSequence : Collection, Element_<C.SubSequence> == Element
+  , C.SubSequence: EncodedCollection, Element_<C.SubSequence> == Element
   , C.SubSequence.Index == Index, C.SubSequence.SubSequence == C.SubSequence {
     print("searching for /\(self)/ in \(c.u8str)...", terminator: "")
     if let (extent, data) = self.found(in: c) {
@@ -353,6 +518,16 @@ extension Pattern where Element == UTF8.CodeUnit {
       print("NOT FOUND")
     }
     print()
+  }
+  
+  func searchTest<C: Collection>(
+    in c: C,
+    format: (MatchData)->String = { String(reflecting: $0) })
+  where C.Index == Index, Element_<C> == Element
+  // The following requirements go away with upcoming generics features
+  , C.SubSequence: Collection, Element_<C.SubSequence> == Element
+  , C.SubSequence.Index == Index, C.SubSequence.SubSequence == C.SubSequence {
+    return searchTest(in: IdentityEncoded(c), format: format)
   }
 }
 //===--- Just for testing -------------------------------------------------===//
@@ -396,7 +571,7 @@ struct Paired<T: Hashable, I: Comparable> : Pattern {
   func matched<C: Collection>(atStartOf c: C) -> MatchResult<Index, MatchData>
   where C.Index == Index, Element_<C> == Element
   // The following requirements go away with upcoming generics features
-  , C.SubSequence : Collection, Element_<C.SubSequence> == Element
+  , C.SubSequence: EncodedCollection, Element_<C.SubSequence> == Element
   , C.SubSequence.Index == Index, C.SubSequence.SubSequence == C.SubSequence {
     guard let closer = c.first.flatMap({ pairs[$0] }) else {
       return .notFound(resumeAt: nil)
