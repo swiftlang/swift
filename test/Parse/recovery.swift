@@ -621,6 +621,11 @@ func r22387625() {
   let _= 5 // expected-error{{'=' must have consistent whitespace on both sides}} {{8-8= }}
   let _ =5 // expected-error{{'=' must have consistent whitespace on both sides}} {{10-10= }}
 }
+// <https://bugs.swift.org/browse/SR-3135>
+func SR3135() {
+  let _: Int= 5 // expected-error{{'=' must have consistent whitespace on both sides}} {{13-13= }}
+  let _: Array<Int>= [] // expected-error{{'=' must have consistent whitespace on both sides}} {{20-20= }}
+}
 
 
 // <rdar://problem/23086402> Swift compiler crash in CSDiag

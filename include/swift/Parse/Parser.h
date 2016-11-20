@@ -320,8 +320,8 @@ public:
   /// \brief Return parser position after the first character of token T
   ParserPosition getParserPositionAfterFirstCharacter(Token T);
 
-  void restoreParserPosition(ParserPosition PP) {
-    L->restoreState(PP.LS);
+  void restoreParserPosition(ParserPosition PP, bool enableDiagnostics = false) {
+    L->restoreState(PP.LS, enableDiagnostics);
 
     // We might be at tok::eof now, so ensure that consumeToken() does not
     // assert about lexing past eof.
