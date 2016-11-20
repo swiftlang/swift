@@ -443,25 +443,15 @@ PrintOptions PrintOptions::printTypeInterface(Type T) {
   return result;
 }
 
-void PrintOptions::setArchetypeSelfTransform(Type T) {
+void PrintOptions::setBaseType(Type T) {
   TransformContext = TypeTransformContext(T);
 }
 
-void PrintOptions::setArchetypeSelfTransformForQuickHelp(Type T) {
-  TransformContext = TypeTransformContext(T);
-}
-
-void PrintOptions::setArchetypeAndDynamicSelfTransform(Type T) {
-  TransformContext = TypeTransformContext(T);
-  StripDynamicSelf = true;
-}
-
-void PrintOptions::
-initArchetypeTransformerForSynthesizedExtensions(NominalTypeDecl *D) {
+void PrintOptions::initForSynthesizedExtension(NominalTypeDecl *D) {
   TransformContext = TypeTransformContext(D);
 }
 
-void PrintOptions::clearArchetypeTransformerForSynthesizedExtensions() {
+void PrintOptions::clearSynthesizedExtension() {
   TransformContext.reset();
 }
 
@@ -475,7 +465,7 @@ NominalTypeDecl *TypeTransformContext::getNominal() const {
   return Nominal;
 }
 
-Type TypeTransformContext::getTypeBase() const {
+Type TypeTransformContext::getBaseType() const {
   return Type(BaseType);
 }
 
@@ -658,11 +648,10 @@ void StreamPrinter::printText(StringRef Text) {
 
 /// Whether we will be printing a TypeLoc by using the TypeRepr printer
 static bool willUseTypeReprPrinting(TypeLoc tyLoc,
-                                    const PrintOptions &options) {
+                                    Type currentType,
+                                    PrintOptions options) {
   // Special case for when transforming archetypes
-  if (options.TransformContext &&
-      options.TransformContext->getTypeBase() &&
-      tyLoc.getType())
+  if (currentType && tyLoc.getType())
     return false;
 
   return ((options.PreferTypeRepr && tyLoc.hasLocation()) ||
@@ -676,6 +665,7 @@ class PrintAST : public ASTVisitor<PrintAST> {
   PrintOptions Options;
   unsigned IndentLevel = 0;
   Decl *Current = nullptr;
+  Type CurrentType;
 
   friend DeclVisitor<PrintAST>;
 
@@ -854,7 +844,6 @@ class PrintAST : public ASTVisitor<PrintAST> {
       PrintOptions FreshOptions;
       FreshOptions.ExcludeAttrList = Options.ExcludeAttrList;
       FreshOptions.ExclusiveAttrList = Options.ExclusiveAttrList;
-      FreshOptions.StripDynamicSelf = Options.StripDynamicSelf;
       T.print(Printer, FreshOptions);
       return;
     }
@@ -863,46 +852,39 @@ class PrintAST : public ASTVisitor<PrintAST> {
   }
 
   void printTransformedType(Type T) {
-    if (Options.TransformContext &&
-        Options.TransformContext->getTypeBase()) {
-      auto *DC = Current->getInnermostDeclContext();
-
+    if (CurrentType) {
       if (T->hasArchetype()) {
         // Get the interface type, since TypeLocs still have
         // contextual types in them.
-        T = ArchetypeBuilder::mapTypeOutOfContext(DC, T);
+        T = ArchetypeBuilder::mapTypeOutOfContext(
+            Current->getInnermostDeclContext(), T);
       }
 
       // Get the innermost nominal type context.
-      DC = DC->getInnermostTypeContext();
-      if (isa<TypeAliasDecl>(DC))
-        DC = DC->getParent()->getInnermostTypeContext();
-      assert(DC);
+      DeclContext *DC;
+      if (isa<NominalTypeDecl>(Current))
+        DC = Current->getInnermostDeclContext();
+      else
+        DC = Current->getDeclContext();
 
-
-      if (Options.TransformContext->getTypeBase()->canTreatContextAsMember(DC)) {
-        // Get the substitutions from our base type.
-        auto subMap = Options.TransformContext->getTypeBase()
-          ->getMemberSubstitutions(DC);
-        auto *M = DC->getParentModule();
-        T = T.subst(M, subMap, SubstFlags::DesugarMemberTypes);
-      }
+      // Get the substitutions from our base type.
+      auto subMap = CurrentType->getMemberSubstitutions(DC);
+      auto *M = DC->getParentModule();
+      T = T.subst(M, subMap, SubstFlags::DesugarMemberTypes);
     }
 
     printType(T);
   }
 
   void printTypeLoc(const TypeLoc &TL) {
-    if (Options.TransformContext &&
-        Options.TransformContext->getTypeBase() &&
-        TL.getType()) {
+    if (CurrentType && TL.getType()) {
       printTransformedType(TL.getType());
       return;
     }
 
     // Print a TypeRepr if instructed to do so by options, or if the type
     // is null.
-    if (willUseTypeReprPrinting(TL, Options)) {
+    if (willUseTypeReprPrinting(TL, CurrentType, Options)) {
       if (auto repr = TL.getTypeRepr()) {
         llvm::SaveAndRestore<bool> SPTA(Options.SkipParameterTypeAttributes,
                                         true);
@@ -989,7 +971,10 @@ private:
 
 public:
   PrintAST(ASTPrinter &Printer, const PrintOptions &Options)
-      : Printer(Printer), Options(Options) {}
+      : Printer(Printer), Options(Options) {
+    if (Options.TransformContext)
+      CurrentType = Options.TransformContext->getBaseType();
+  }
 
   using ASTVisitor::visit;
 
@@ -1000,6 +985,16 @@ public:
     Decl *Old = Current;
     Current = D;
     SWIFT_DEFER { Current = Old; };
+
+    Type OldType = CurrentType;
+    if (CurrentType && (Old != nullptr || Options.PrintAsMember)) {
+      if (auto *NTD = dyn_cast<NominalTypeDecl>(D)) {
+        CurrentType = CurrentType->getTypeOfMember(
+            Options.CurrentModule, NTD, nullptr);
+      }
+    }
+
+    SWIFT_DEFER { CurrentType = OldType; };
 
     bool Synthesize =
         Options.TransformContext &&
@@ -1268,13 +1263,10 @@ void PrintAST::printSingleDepthOfGenericSignature(
   TypeSubstitutionMap subMap;
   ModuleDecl *M = nullptr;
 
-  if (Options.TransformContext &&
-      Options.TransformContext->getTypeBase()) {
-    auto BaseType = Options.TransformContext->getTypeBase();
-    if (!BaseType->isAnyExistentialType()) {
+  if (CurrentType) {
+    if (!CurrentType->isAnyExistentialType()) {
       auto *DC = Current->getInnermostDeclContext()->getInnermostTypeContext();
-      subMap = Options.TransformContext->getTypeBase()
-          ->getMemberSubstitutions(DC);
+      subMap = CurrentType->getMemberSubstitutions(DC);
       M = DC->getParentModule();
     }
   }
@@ -2424,7 +2416,7 @@ void PrintAST::printOneParameter(const ParamDecl *param,
   // Special case, if we're not going to use the type repr printing, peek
   // through the paren types so that we don't print excessive @escapings.
   unsigned numParens = 0;
-  if (!willUseTypeReprPrinting(TheTypeLoc, Options)) {
+  if (!willUseTypeReprPrinting(TheTypeLoc, CurrentType, Options)) {
     while (auto parenTy =
                 dyn_cast<ParenType>(TheTypeLoc.getType().getPointer())) {
       ++numParens;
@@ -3640,11 +3632,6 @@ public:
   }
 
   void visitDynamicSelfType(DynamicSelfType *T) {
-    if (Options.StripDynamicSelf) {
-      visit(T->getSelfType());
-      return;
-    }
-
     if (Options.PrintInSILBody) {
       Printer << "@dynamic_self ";
       visit(T->getSelfType());
@@ -3656,9 +3643,11 @@ public:
     auto staticSelfT = T->getSelfType();
 
     if (auto *NTD = staticSelfT->getAnyNominal()) {
-      auto Name = T->getASTContext().Id_Self;
-      Printer.printTypeRef(T, NTD, Name);
-      return;
+      if (isa<ClassDecl>(NTD)) {
+        auto Name = T->getASTContext().Id_Self;
+        Printer.printTypeRef(T, NTD, Name);
+        return;
+      }
     }
 
     visit(staticSelfT);

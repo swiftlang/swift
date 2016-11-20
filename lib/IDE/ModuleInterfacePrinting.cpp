@@ -573,12 +573,10 @@ void swift::ide::printSubmoduleInterface(
                 AdjustedOptions.BracketOptions = {ET.first, false,
                                         Decls.back().first == ET.first, true};
                 if (ET.second)
-                  AdjustedOptions.
-                    initArchetypeTransformerForSynthesizedExtensions(NTD);
+                  AdjustedOptions.initForSynthesizedExtension(NTD);
                 ET.first->print(Printer, AdjustedOptions);
                 if (ET.second)
-                  AdjustedOptions.
-                    clearArchetypeTransformerForSynthesizedExtensions();
+                  AdjustedOptions.clearSynthesizedExtension();
                 if (AdjustedOptions.BracketOptions.shouldCloseExtension(ET.first))
                   Printer << "\n";
               }
@@ -605,12 +603,10 @@ void swift::ide::printSubmoduleInterface(
                 if (AdjustedOptions.BracketOptions.shouldOpenExtension(ET.first))
                   Printer << "\n";
                 if (ET.second)
-                  AdjustedOptions.
-                    initArchetypeTransformerForSynthesizedExtensions(NTD);
+                  AdjustedOptions.initForSynthesizedExtension(NTD);
                 ET.first->print(Printer, AdjustedOptions);
                 if (ET.second)
-                  AdjustedOptions.
-                    clearArchetypeTransformerForSynthesizedExtensions();
+                  AdjustedOptions.clearSynthesizedExtension();
                 if (AdjustedOptions.BracketOptions.shouldCloseExtension(ET.first))
                   Printer << "\n";
             }
