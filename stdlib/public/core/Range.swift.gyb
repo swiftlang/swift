@@ -592,9 +592,9 @@ extension ${Self} : Equatable {
 }
 % end
 
-% for (Self, CountableSelf) in [
-%   ('Range', 'CountableRange'),
-%   ('ClosedRange', 'CountableClosedRange'),
+% for Self in [
+%   'Range',
+%   'ClosedRange',
 % ]:
 // FIXME(ABI)#57 (Conditional Conformance): replace this extension with a conditional
 // conformance.
