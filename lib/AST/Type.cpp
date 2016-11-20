@@ -2957,36 +2957,31 @@ Type TypeBase::getSuperclassForDecl(const ClassDecl *baseClass,
   llvm_unreachable("no inheritance relationship between given classes");
 }
 
-bool TypeBase::canTreatContextAsMember(const DeclContext *dc) {
-  Type baseTy(getRValueType());
+static bool
+isContextContainedNominalTypeFromSuperClass(Type &baseTy, const DeclContext *dc,
+                                            LazyResolver *resolver) {
 
-  if (auto metaBase = baseTy->getAs<AnyMetatypeType>()) {
-    baseTy = metaBase->getInstanceType()->getRValueType();
-  }
-
-  if (!baseTy->getAnyNominal())
+  // If baseTy is not a class type, return false;
+  if (!baseTy->getClassOrBoundGenericClass())
     return false;
 
-  // If the context is a protocol or its extensions, the base type should conform
-  // to that protocol.
-  if (auto Prot = dc->getAsProtocolOrProtocolExtensionContext()) {
-    for (auto Conf : baseTy->getAnyNominal()->getAllConformances()) {
-      if (Conf->getProtocol() == Prot)
-        return true;
+  // Collect all nominal type contexts that contain the given dc.
+  llvm::SmallPtrSet<const NominalTypeDecl*, 4> Parent;
+  for (auto *D = dc->getParent(); D; D = D->getParent()) {
+    if (auto *N = D->getAsNominalTypeOrNominalTypeExtensionContext()) {
+      Parent.insert(N);
     }
   }
-
-  // If the context is a nominal type context or one of its extensions, the base
-  // type should be either exactly that nominal type of sub-class of that type.
-  if (auto ownerNominal = dc->getAsNominalTypeOrNominalTypeExtensionContext()) {
-    LazyResolver *resolver = dc->getASTContext().getLazyResolver();
-    if (auto *ownerClass = dyn_cast<ClassDecl>(ownerNominal))
-      baseTy = getSuperClassForDeclInternal(Type(this), ownerClass, resolver);
-    if (baseTy && baseTy->getAnyNominal() == ownerNominal)
+  // For each super class:
+  for (auto superTy = baseTy->getSuperclass(resolver); superTy;
+       superTy = superTy->getSuperclass(resolver)) {
+    // If the super class is one of the containing context,
+    if (Parent.count(superTy->getAnyNominal())) {
+      // The baseTy should be the super type, and we find the exact case.
+      baseTy = superTy;
       return true;
+    }
   }
-
-  // The context cannot be treated as part of the type.
   return false;
 }
 
@@ -3021,7 +3016,8 @@ TypeSubstitutionMap TypeBase::getMemberSubstitutions(const DeclContext *dc) {
   // Find the superclass type with the context matching that of the member.
   //
   // FIXME: Do this in the caller?
-  if (baseTy->getAnyNominal()) {
+  if (!isContextContainedNominalTypeFromSuperClass(baseTy, dc, resolver) &&
+      baseTy->getAnyNominal()) {
     auto *ownerNominal = dc->getAsNominalTypeOrNominalTypeExtensionContext();
     if (auto *ownerClass = dyn_cast<ClassDecl>(ownerNominal))
       baseTy = baseTy->getSuperclassForDecl(ownerClass, resolver);
