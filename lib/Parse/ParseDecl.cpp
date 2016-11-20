@@ -1745,7 +1745,7 @@ bool Parser::isStartOfDecl() {
   if (Tok.is(tok::at_sign)) {
     BacktrackingScope backtrack(*this);
     while (consumeIf(tok::at_sign)) {
-      // If not identifier or code complete token, consider '@' is a incomplete
+      // If not identifier or code complete token, consider '@' as an incomplete
       // attribute.
       if (Tok.isNot(tok::identifier, tok::code_complete))
         continue;
