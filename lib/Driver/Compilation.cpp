@@ -433,7 +433,7 @@ int Compilation::performJobsImpl() {
   }
 
   int Result = EXIT_SUCCESS;
-  llvm::TimerGroup DriverTimerGroup("Driver Time Compilation");
+  llvm::TimerGroup DriverTimerGroup("driver", "Driver Compilation Time");
   llvm::SmallDenseMap<const Job *, std::unique_ptr<llvm::Timer>, 16>
     DriverTimers;
 
@@ -465,7 +465,7 @@ int Compilation::performJobsImpl() {
       DriverTimers.insert({
         BeganCmd,
         std::unique_ptr<llvm::Timer>(
-          new llvm::Timer(OS.str(), DriverTimerGroup))
+          new llvm::Timer("task", OS.str(), DriverTimerGroup))
       });
       DriverTimers[BeganCmd]->startTimer();
     }
