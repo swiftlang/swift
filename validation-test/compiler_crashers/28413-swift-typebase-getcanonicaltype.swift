@@ -5,6 +5,7 @@
 // See http://swift.org/LICENSE.txt for license information
 // See http://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
 
+// REQUIRES: deterministic-behavior
 // RUN: not --crash %target-swift-frontend %s -parse
 // REQUIRES: SR-3149
 t c
