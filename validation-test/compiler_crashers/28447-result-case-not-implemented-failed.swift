@@ -5,6 +5,7 @@
 // See http://swift.org/LICENSE.txt for license information
 // See http://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
 
+// REQUIRES: deterministic-behavior
 // RUN: not --crash %target-swift-frontend %s -emit-ir
 // REQUIRES: asserts
 // This doesn't reproduce 100% of the time, so it is disabled.
