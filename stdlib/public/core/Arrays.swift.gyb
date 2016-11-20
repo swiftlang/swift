@@ -1985,21 +1985,6 @@ extension _ArrayBufferProtocol {
   }
 }
 
-internal struct _InitializePointer<T> : _PointerFunction {
-  internal func call(_ rawMemory: UnsafeMutablePointer<T>, count: Int) {
-    _sanityCheck(count == 1)
-    // FIXME: it would be better if we could find a way to move, here
-    rawMemory.initialize(to: newValue)
-  }
-
-  @_transparent
-  internal init(_ newValue: T) {
-    self.newValue = newValue
-  }
-
-  internal var newValue: T
-}
-
 internal struct _IgnorePointer<T> : _PointerFunction {
   internal func call(_: UnsafeMutablePointer<T>, count: Int) {
     _sanityCheck(count == 0)
