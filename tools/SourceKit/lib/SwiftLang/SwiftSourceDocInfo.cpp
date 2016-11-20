@@ -394,7 +394,7 @@ static void printAnnotatedDeclaration(const ValueDecl *VD,
   AnnotatedDeclarationPrinter Printer(OS);
   PrintOptions PO = PrintOptions::printQuickHelpDeclaration();
   if (BaseTy)
-    PO.setArchetypeSelfTransformForQuickHelp(BaseTy);
+    PO.setBaseType(BaseTy);
 
   // If it's implicit, try to find an overridden ValueDecl that's not implicit.
   // This will ensure we can properly annotate TypeRepr with a usr
@@ -414,7 +414,7 @@ void SwiftLangSupport::printFullyAnnotatedDeclaration(const ValueDecl *VD,
   FullyAnnotatedDeclarationPrinter Printer(OS);
   PrintOptions PO = PrintOptions::printQuickHelpDeclaration();
   if (BaseTy)
-    PO.setArchetypeSelfTransformForQuickHelp(BaseTy);
+    PO.setBaseType(BaseTy);
 
   // If it's implicit, try to find an overridden ValueDecl that's not implicit.
   // This will ensure we can properly annotate TypeRepr with a usr
@@ -439,7 +439,7 @@ printFullyAnnotatedSynthesizedDeclaration(const swift::ValueDecl *VD,
       new SynthesizedExtensionAnalyzer(Target, PO));
     TargetToAnalyzerMap.insert({Target, std::move(Analyzer)});
   }
-  PO.initArchetypeTransformerForSynthesizedExtensions(Target);
+  PO.initForSynthesizedExtension(Target);
   VD->print(Printer, PO);
 }
 
@@ -743,7 +743,7 @@ static bool passCursorInfoForDecl(const ValueDecl *VD,
         PO.ArgAndParamPrinting = PrintOptions::ArgAndParamPrintingMode::ArgumentOnly;
         XMLEscapingPrinter Printer(OS);
         if (BaseType)
-          PO.setArchetypeSelfTransform(BaseType);
+          PO.setBaseType(BaseType);
         RelatedDecl->print(Printer, PO);
       } else {
         llvm::SmallString<128> Buf;

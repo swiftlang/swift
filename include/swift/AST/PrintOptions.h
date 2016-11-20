@@ -43,7 +43,7 @@ struct TypeTransformContext {
   explicit TypeTransformContext(Type T);
   explicit TypeTransformContext(NominalTypeDecl* NTD);
 
-  Type getTypeBase() const;
+  Type getBaseType() const;
   NominalTypeDecl *getNominal() const;
 
   bool isPrintingSynthesizedExtension() const;
@@ -185,10 +185,6 @@ struct PrintOptions {
   /// \brief Print Swift.Array and Swift.Optional with sugared syntax
   /// ([] and ?), even if there are no sugar type nodes.
   bool SynthesizeSugarOnTypes = false;
-
-  /// \brief Print a dynamic Self type as its underlying type, rather than
-  /// the keyword `Self`.
-  bool StripDynamicSelf = false;
 
   /// \brief If true, the printer will explode a pattern like this:
   /// \code
@@ -407,15 +403,11 @@ struct PrintOptions {
 
   static PrintOptions printTypeInterface(Type T);
 
-  void setArchetypeSelfTransform(Type T);
+  void setBaseType(Type T);
 
-  void setArchetypeSelfTransformForQuickHelp(Type T);
+  void initForSynthesizedExtension(NominalTypeDecl *D);
 
-  void setArchetypeAndDynamicSelfTransform(Type T);
-
-  void initArchetypeTransformerForSynthesizedExtensions(NominalTypeDecl *D);
-
-  void clearArchetypeTransformerForSynthesizedExtensions();
+  void clearSynthesizedExtension();
 
   /// Retrieve the print options that are suitable to print the testable interface.
   static PrintOptions printTestableInterface() {

@@ -2384,11 +2384,7 @@ static void diagnoseNoWitness(ValueDecl *Requirement, Type RequirementType,
       Options.AccessibilityFilter = Accessibility::Private;
       Options.PrintAccessibility = false;
       Options.FunctionBody = [](const ValueDecl *VD) { return "<#code#>"; };
-      Type SelfType = Adopter->getSelfTypeInContext();
-      if (Adopter->getAsClassOrClassExtensionContext())
-        Options.setArchetypeSelfTransform(SelfType);
-      else
-        Options.setArchetypeAndDynamicSelfTransform(SelfType);
+      Options.setBaseType(Adopter->getSelfTypeInContext());
       Options.CurrentModule = Adopter->getParentModule();
       if (!Adopter->isExtensionContext()) {
         // Create a variable declaration instead of a computed property in

@@ -4103,7 +4103,7 @@ public:
       DeclNameOffsetLocatorPrinter Printer(OS);
       PrintOptions Options;
       if (auto transformType = CurrDeclContext->getDeclaredTypeInContext())
-        Options.setArchetypeSelfTransform(transformType);
+        Options.setBaseType(transformType);
       Options.PrintDefaultParameterPlaceholder = false;
       Options.PrintImplicitAttrs = false;
       Options.ExclusiveAttrList.push_back(TAK_escaping);
