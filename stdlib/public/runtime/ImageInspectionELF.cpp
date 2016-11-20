@@ -1,4 +1,4 @@
-//===--- ImageInspectionELFDynamic.cpp - ELF image inspection -------------===//
+//===--- ImageInspectionELF.cpp - ELF image inspection --------------------===//
 //
 // This source file is part of the Swift.org open source project
 //
