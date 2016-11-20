@@ -428,10 +428,6 @@ public struct ManagedBufferPointer<Header, Element> : Equatable {
       toAlignment: MemoryLayout<Element>.alignment)
   }
 
-  internal mutating func _isUniqueOrPinnedReference() -> Bool {
-    return _isUniqueOrPinned(&_nativeBuffer)
-  }
-
   internal var _nativeBuffer: Builtin.NativeObject
 }
 
