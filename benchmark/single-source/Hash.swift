@@ -52,13 +52,6 @@ class Hash {
     return x
   }
 
-  func digestFast(_ Res: inout [UInt8]) {
-    fillBlock()
-    hash()
-    // We use [UInt8] to avoid using String::append.
-    hashStateFast(&Res)
-  }
-
   // private:
 
   // Hash state:
