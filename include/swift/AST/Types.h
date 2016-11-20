@@ -810,12 +810,6 @@ public:
   /// Otherwise, it returns the type itself.
   Type getReferenceStorageReferent();
 
-  /// This is to check the pre-condition of calling
-  /// getMemberSubstitutions(const DeclContext *dc)
-  /// The function checks whether the given context can be treated as a part
-  /// of the type.
-  bool canTreatContextAsMember(const DeclContext *dc);
-
   /// Determine the set of substitutions that should be applied to a
   /// type spelled within the given DeclContext to treat it as a
   /// member of this type.
