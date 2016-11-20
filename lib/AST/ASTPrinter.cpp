@@ -853,27 +853,24 @@ class PrintAST : public ASTVisitor<PrintAST> {
 
   void printTransformedType(Type T) {
     if (CurrentType) {
-      auto *DC = Current->getInnermostDeclContext();
-
       if (T->hasArchetype()) {
         // Get the interface type, since TypeLocs still have
         // contextual types in them.
-        T = ArchetypeBuilder::mapTypeOutOfContext(DC, T);
+        T = ArchetypeBuilder::mapTypeOutOfContext(
+            Current->getInnermostDeclContext(), T);
       }
 
       // Get the innermost nominal type context.
-      DC = DC->getInnermostTypeContext();
-      if (isa<TypeAliasDecl>(DC))
-        DC = DC->getParent()->getInnermostTypeContext();
-      assert(DC);
+      DeclContext *DC;
+      if (isa<NominalTypeDecl>(Current))
+        DC = Current->getInnermostDeclContext();
+      else
+        DC = Current->getDeclContext();
 
-      if (CurrentType->canTreatContextAsMember(DC)) {
-        // Get the substitutions from our base type.
-        auto subMap = CurrentType
-          ->getMemberSubstitutions(DC);
-        auto *M = DC->getParentModule();
-        T = T.subst(M, subMap, SubstFlags::DesugarMemberTypes);
-      }
+      // Get the substitutions from our base type.
+      auto subMap = CurrentType->getMemberSubstitutions(DC);
+      auto *M = DC->getParentModule();
+      T = T.subst(M, subMap, SubstFlags::DesugarMemberTypes);
     }
 
     printType(T);
@@ -988,6 +985,16 @@ public:
     Decl *Old = Current;
     Current = D;
     SWIFT_DEFER { Current = Old; };
+
+    Type OldType = CurrentType;
+    if (CurrentType && (Old != nullptr || Options.PrintAsMember)) {
+      if (auto *NTD = dyn_cast<NominalTypeDecl>(D)) {
+        CurrentType = CurrentType->getTypeOfMember(
+            Options.CurrentModule, NTD, nullptr);
+      }
+    }
+
+    SWIFT_DEFER { CurrentType = OldType; };
 
     bool Synthesize =
         Options.TransformContext &&

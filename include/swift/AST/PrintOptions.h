@@ -340,6 +340,8 @@ struct PrintOptions {
   /// \brief The information for converting archetypes to specialized types.
   llvm::Optional<TypeTransformContext> TransformContext;
 
+  bool PrintAsMember = false;
+
   /// \brief If this is not \c nullptr then functions (including accessors and
   /// constructors) will be printed with a body that is determined by this
   /// function.
