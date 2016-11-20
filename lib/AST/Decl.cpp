@@ -1659,8 +1659,14 @@ Type ValueDecl::getInterfaceType() const {
   if (InterfaceTy)
     return InterfaceTy;
 
-  if (auto nominal = dyn_cast<NominalTypeDecl>(this))
-    return nominal->computeInterfaceType();
+  if (auto nominal = dyn_cast<NominalTypeDecl>(this)) {
+    auto declaredTy = nominal->getDeclaredInterfaceType();
+    if (!declaredTy)
+      return declaredTy;
+    auto &ctx = getASTContext();
+    InterfaceTy = MetatypeType::get(declaredTy, ctx);
+    return InterfaceTy;
+  }
 
   if (auto assocType = dyn_cast<AssociatedTypeDecl>(this)) {
     auto proto = cast<ProtocolDecl>(getDeclContext());
@@ -1938,6 +1944,9 @@ Type TypeDecl::getDeclaredType() const {
 }
 
 Type TypeDecl::getDeclaredInterfaceType() const {
+  if (auto NTD = dyn_cast<NominalTypeDecl>(this))
+    return NTD->getDeclaredInterfaceType();
+
   Type interfaceType = getInterfaceType();
   if (interfaceType.isNull() || interfaceType->hasError())
     return interfaceType;
@@ -2122,16 +2131,14 @@ Type NominalTypeDecl::getDeclaredTypeInContext() const {
   return DeclaredTyInContext;
 }
 
-Type NominalTypeDecl::computeInterfaceType() const {
-  if (InterfaceTy)
-    return InterfaceTy;
+Type NominalTypeDecl::getDeclaredInterfaceType() const {
+  if (DeclaredInterfaceTy)
+    return DeclaredInterfaceTy;
 
   auto *decl = const_cast<NominalTypeDecl *>(this);
-  Type type = computeNominalType(decl, DeclTypeKind::DeclaredInterfaceType);
-  if (!type)
-    return type;
-  InterfaceTy = MetatypeType::get(type, getASTContext());
-  return InterfaceTy;
+  decl->DeclaredInterfaceTy = computeNominalType(decl,
+                                                 DeclTypeKind::DeclaredInterfaceType);
+  return DeclaredInterfaceTy;
 }
 
 void NominalTypeDecl::prepareExtensions() {
