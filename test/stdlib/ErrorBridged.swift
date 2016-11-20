@@ -89,7 +89,7 @@ ErrorBridgingTests.test("NSCoding") {
 ErrorBridgingTests.test("NSError-to-enum bridging") {
   NoisyErrorLifeCount = 0
   NoisyErrorDeathCount = 0
-  let testURL = URL(string: "http://swift.org")!
+  let testURL = URL(string: "https://swift.org")!
 
   autoreleasepool {
     let underlyingError = CocoaError(.fileLockingError)
