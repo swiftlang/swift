@@ -3643,9 +3643,11 @@ public:
     auto staticSelfT = T->getSelfType();
 
     if (auto *NTD = staticSelfT->getAnyNominal()) {
-      auto Name = T->getASTContext().Id_Self;
-      Printer.printTypeRef(T, NTD, Name);
-      return;
+      if (isa<ClassDecl>(NTD)) {
+        auto Name = T->getASTContext().Id_Self;
+        Printer.printTypeRef(T, NTD, Name);
+        return;
+      }
     }
 
     visit(staticSelfT);
