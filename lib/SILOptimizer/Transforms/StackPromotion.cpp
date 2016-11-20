@@ -300,10 +300,6 @@ public:
                          NonUnreachableBlockIter rhs) {
     return lhs.BaseIterator == rhs.BaseIterator;
   }
-  friend bool operator!=(NonUnreachableBlockIter lhs,
-                         NonUnreachableBlockIter rhs) {
-    return !(lhs == rhs);
-  }
 };
 } // end anonymous namespace
 
