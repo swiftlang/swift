@@ -326,8 +326,9 @@ Use `M-x hs-show-all' to show them again."
                     (swift-skip-comments-and-space)
                     (equal (char-after) ?\())
                   ;; parse the parameter list and any return type
-                  (swift-skip-type-name)
-                  (swift-skip-where-clause)))))
+                  (prog1
+                    (swift-skip-type-name)
+                    (swift-skip-where-clause))))))
              (swift-skip-re "{"))
           (hs-hide-block :reposition-at-end))))))
 
