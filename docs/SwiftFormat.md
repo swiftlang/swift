@@ -35,6 +35,13 @@ If you want to indent using tabs instead of spaces, use the "-use-tabs" option:
 You can set the number of tabs or spaces using the "-tab-width" and
 "-indent-width" options, respectively.
 
+If you want to indent cases in switch statements, use the "-indent-switch-case"
+option. The result would be something like this:
+
+    switch aSwitch {
+      case .some(let s):
+        print(s)
+
 swift-format supports formatting a range of lines from a file:
 
      swift-format -line-range 2:45 sample.swift
