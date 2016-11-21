@@ -1929,8 +1929,12 @@ struct IfConfigDeclClause {
 
   ArrayRef<Decl*> Members;
 
-  IfConfigDeclClause(SourceLoc Loc, Expr *Cond, ArrayRef<Decl*> Members)
-    : Loc(Loc), Cond(Cond), Members(Members) {
+  /// True if this is the active clause of the #if block.
+  bool isActive;
+
+  IfConfigDeclClause(SourceLoc Loc, Expr *Cond, ArrayRef<Decl*> Members,
+                     bool isActive)
+    : Loc(Loc), Cond(Cond), Members(Members), isActive(isActive) {
   }
 };
   
@@ -1955,7 +1959,20 @@ public:
 
   ArrayRef<IfConfigDeclClause> getClauses() const { return Clauses; }
 
-  bool isResolved() { return HasBeenResolved; }
+  /// Return the active clause, or null if there is no active one.
+  const IfConfigDeclClause *getActiveClause() const {
+    for (auto &Clause : Clauses)
+      if (Clause.isActive) return &Clause;
+    return nullptr;
+  }
+
+  const ArrayRef<Decl*> getActiveMembers() const {
+    if (auto *Clause = getActiveClause())
+      return Clause->Members;
+    return {};
+  }
+
+  bool isResolved() const { return HasBeenResolved; }
   void setResolved() { HasBeenResolved = true; }
   
   SourceLoc getEndLoc() const { return EndLoc; }

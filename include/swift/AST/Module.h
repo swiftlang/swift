@@ -831,13 +831,13 @@ public:
   std::vector<Decl*> Decls;
 
   /// The list of local type declarations in the source file.
-  SmallPtrSet<TypeDecl *, 4> LocalTypeDecls;
+  SmallPtrSet<TypeDecl *, 2> LocalTypeDecls;
 
   /// A set of special declaration attributes which require the
   /// Foundation module to be imported to work. If the foundation
   /// module is still not imported by the time type checking is
   /// complete, we diagnose.
-  std::map<DeclAttrKind, const DeclAttribute *> AttrsRequiringFoundation;
+  SmallPtrSet<const DeclAttribute *, 4> AttrsRequiringFoundation;
 
   /// A mapping from Objective-C selectors to the methods that have
   /// those selectors.

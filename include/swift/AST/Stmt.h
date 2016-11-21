@@ -668,17 +668,13 @@ struct IfConfigStmtClause {
   /// Elements inside the clause
   ArrayRef<ASTNode> Elements;
 
-  /// Whether or not name binding has resolved this statement.
-  bool HasBeenResolved = false;
+  /// True if this is the active clause of the #if block.
+  bool isActive;
 
   IfConfigStmtClause(SourceLoc Loc, Expr *Cond,
-                     ArrayRef<ASTNode> Elements)
-    : Loc(Loc), Cond(Cond), Elements(Elements) {
+                     ArrayRef<ASTNode> Elements, bool isActive)
+    : Loc(Loc), Cond(Cond), Elements(Elements), isActive(isActive) {
   }
-  
-public:
-  bool isResolved() const { return HasBeenResolved; }
-  void setResolved() { HasBeenResolved = true; }
 };
 
 /// IfConfigStmt - This class models the statement-side representation of
@@ -686,12 +682,13 @@ public:
 class IfConfigStmt : public Stmt {
   /// An array of clauses controlling each of the #if/#elseif/#else conditions.
   /// The array is ASTContext allocated.
-  MutableArrayRef<IfConfigStmtClause> Clauses;
+  ArrayRef<IfConfigStmtClause> Clauses;
   SourceLoc EndLoc;
   bool HadMissingEnd;
+  bool HasBeenResolved = false;
 
 public:
-  IfConfigStmt(MutableArrayRef<IfConfigStmtClause> Clauses, SourceLoc EndLoc,
+  IfConfigStmt(ArrayRef<IfConfigStmtClause> Clauses, SourceLoc EndLoc,
                bool HadMissingEnd)
   : Stmt(StmtKind::IfConfig, /*implicit=*/false),
     Clauses(Clauses), EndLoc(EndLoc), HadMissingEnd(HadMissingEnd) {}
@@ -703,7 +700,17 @@ public:
 
   bool hadMissingEnd() const { return HadMissingEnd; }
 
-  const MutableArrayRef<IfConfigStmtClause> &getClauses() const { return Clauses; }
+  bool isResolved() { return HasBeenResolved; }
+  void setResolved() { HasBeenResolved = true; }
+  
+  const ArrayRef<IfConfigStmtClause> &getClauses() const { return Clauses; }
+
+  ArrayRef<ASTNode> getActiveClauseElements() const {
+    for (auto &Clause : Clauses)
+      if (Clause.isActive)
+        return Clause.Elements;
+    return ArrayRef<ASTNode>();
+  }
 
   // Implement isa/cast/dyncast/etc.
   static bool classof(const Stmt *S) {

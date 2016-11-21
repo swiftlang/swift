@@ -217,20 +217,6 @@ template <typename T> ParserResult<T>::ParserResult(ParserStatus Status) {
     setHasCodeCompletion();
 }
 
-enum class ConditionalCompilationExprKind {
-  Unknown,
-  Error,
-  OS,
-  Arch,
-  LanguageVersion,
-  CompilerVersion,
-  Binary,
-  Paren,
-  DeclRef,
-  Boolean,
-  Integer
-};
-
 } // namespace swift
 
 #endif // LLVM_SWIFT_PARSER_PARSER_RESULT_H

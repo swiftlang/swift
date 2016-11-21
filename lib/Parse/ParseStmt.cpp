@@ -157,6 +157,7 @@ static bool isTerminatorForBraceItemListKind(const Token &Tok,
   case BraceItemListKind::TopLevelLibrary:
     return false;
   case BraceItemListKind::ConditionalBlock:
+  case BraceItemListKind::StaticallyInactiveConditionalBlock:
     return Tok.isNot(tok::pound_else) && Tok.isNot(tok::pound_endif) &&
            Tok.isNot(tok::pound_elseif);
   }
@@ -233,9 +234,18 @@ ParserStatus Parser::parseBraceItems(SmallVectorImpl<ASTNode> &Entries,
   
   bool IsTopLevel = (Kind == BraceItemListKind::TopLevelCode) ||
                     (Kind == BraceItemListKind::TopLevelLibrary);
+  bool isConditionalBlock
+    = (ConditionalBlockKind == BraceItemListKind::ConditionalBlock) ||
+      (ConditionalBlockKind == BraceItemListKind::StaticallyInactiveConditionalBlock);
 
-  // Form a new lexical scope.
-  Scope S(this, IsTopLevel ? ScopeKind::TopLevel : ScopeKind::Brace);
+  // If we're not parsing an inactive #if block, form a new lexical scope.
+  Optional<Scope> initScope;
+  bool isInactiveConditionalBlock =
+    ConditionalBlockKind == BraceItemListKind::StaticallyInactiveConditionalBlock;
+  if (!isInactiveConditionalBlock) {
+    auto scopeKind =  IsTopLevel ? ScopeKind::TopLevel : ScopeKind::Brace;
+    initScope.emplace(this, scopeKind, isInactiveConditionalBlock);
+  }
 
   ParserStatus BraceItemsStatus;
   SmallVector<Decl*, 8> TmpDecls;
@@ -254,7 +264,7 @@ ParserStatus Parser::parseBraceItems(SmallVectorImpl<ASTNode> &Entries,
          Tok.isNot(tok::kw_sil_global) &&
          Tok.isNot(tok::kw_sil_witness_table) &&
          Tok.isNot(tok::kw_sil_default_witness_table) &&
-         (ConditionalBlockKind ==  BraceItemListKind::ConditionalBlock ||
+         (isConditionalBlock ||
           !isTerminatorForBraceItemListKind(Tok, Kind, Entries))) {
     if (Kind == BraceItemListKind::TopLevelLibrary &&
         skipExtraTopLevelRBraces())
@@ -285,11 +295,8 @@ ParserStatus Parser::parseBraceItems(SmallVectorImpl<ASTNode> &Entries,
     if (isStartOfDecl()
         && Tok.isNot(tok::pound_if, tok::pound_sourceLocation)) {
       ParseDeclOptions options = IsTopLevel ? PD_AllowTopLevel : PD_Default;
-      if (ConditionalBlockKind == BraceItemListKind::ConditionalBlock) {
-        options |= PD_InIfConfig;
-      }
       ParserStatus Status =
-          parseDecl(options, [&](Decl *D) {TmpDecls.push_back(D);});
+        parseDecl(options, [&](Decl *D) { TmpDecls.push_back(D); });
       if (Status.isError()) {
         NeedParseErrorRecovery = true;
         if (Status.hasCodeCompletion() && IsTopLevel &&
@@ -323,10 +330,10 @@ ParserStatus Parser::parseBraceItems(SmallVectorImpl<ASTNode> &Entries,
         continue;
       }
 
-      // Add the #if block itself as a TLCD if necessary.  They will be
-      // flattened away in name binding.
-      if (Kind == BraceItemListKind::TopLevelCode ||
-          Kind == BraceItemListKind::TopLevelLibrary) {
+      // Add the #if block itself as a TLCD if necessary.  When parsing library
+      // code, the TLCD will be flattened away in Name Binding.
+      if (Kind == BraceItemListKind::TopLevelCode
+          || Kind == BraceItemListKind::TopLevelLibrary) {
         auto *TLCD = new (Context) TopLevelCodeDecl(CurDeclContext);
         auto Brace = BraceStmt::create(Context, StartLoc,
                                        {Result}, PreviousLoc);
@@ -334,6 +341,13 @@ ParserStatus Parser::parseBraceItems(SmallVectorImpl<ASTNode> &Entries,
         Entries.push_back(TLCD);
       } else {
         Entries.push_back(Result);
+      }
+
+      IfConfigStmt *ICS = cast<IfConfigStmt>(Result.get<Stmt*>());
+      if (ICS->isResolved()) {
+        for (auto &Entry : ICS->getActiveClauseElements()) {
+          Entries.push_back(Entry);
+        }
       }
     } else if (Tok.is(tok::pound_line)) {
       ParserStatus Status = parseLineDirective(true);
@@ -578,7 +592,7 @@ ParserResult<Stmt> Parser::parseStmt() {
 ///   brace-item-list:
 ///     '{' brace-item* '}'
 ///
-ParserResult<BraceStmt> Parser::parseBraceItemList(Diag<> ID, bool inConfig) {
+ParserResult<BraceStmt> Parser::parseBraceItemList(Diag<> ID) {
   if (Tok.isNot(tok::l_brace)) {
     diagnose(Tok, ID);
     return nullptr;
@@ -589,9 +603,7 @@ ParserResult<BraceStmt> Parser::parseBraceItemList(Diag<> ID, bool inConfig) {
   SourceLoc RBLoc;
 
   ParserStatus Status = parseBraceItems(Entries, BraceItemListKind::Brace,
-                                        inConfig
-                                          ? BraceItemListKind::ConditionalBlock
-                                          : BraceItemListKind::Brace);
+                                        BraceItemListKind::Brace);
   parseMatchingToken(tok::r_brace, RBLoc,
                      diag::expected_rbrace_in_brace_stmt, LBLoc);
 
@@ -600,10 +612,13 @@ ParserResult<BraceStmt> Parser::parseBraceItemList(Diag<> ID, bool inConfig) {
 }
 
 /// \brief Parses the elements in active or inactive if config clauses.
-void Parser::parseIfConfigClauseElements(BraceItemListKind Kind,
+void Parser::parseIfConfigClauseElements(bool isInactive,
+                                         BraceItemListKind Kind,
                                          SmallVectorImpl<ASTNode> &Elements) {
   parseBraceItems(Elements, Kind,
-                  BraceItemListKind::ConditionalBlock);
+                  isInactive
+                    ? BraceItemListKind::StaticallyInactiveConditionalBlock
+                    : BraceItemListKind::ConditionalBlock);
 }
 
 /// parseStmtBreak
@@ -785,7 +800,7 @@ ParserResult<Stmt> Parser::parseStmtDefer() {
                        TypeLoc(),
                        CurDeclContext);
   tempDecl->setImplicit();
-  setLocalDiscriminator(ParseDeclOptions(), tempDecl);
+  setLocalDiscriminator(tempDecl);
   ParserStatus Status;
   {
     // Change the DeclContext for any variables declared in the defer to be within
@@ -1497,20 +1512,62 @@ ParserResult<Stmt> Parser::parseStmtGuard() {
               new (Context) GuardStmt(GuardLoc, Condition, Body.get()));
 }
 
-// Validate and classify the kind of a conditional compilation expression.
-ConditionalCompilationExprKind
-Parser::classifyConditionalCompilationExpr(Expr *condition) {
+
+// Evaluate a subset of expression types suitable for build configuration
+// conditional expressions.  The accepted expression types are:
+//  - The magic constants "true" and "false".
+//  - Named decl ref expressions ("FOO")
+//  - Parenthesized expressions ("(FOO)")
+//  - Binary "&&" or "||" operations applied to other build configuration
+//    conditional expressions
+//  - Unary "!" expressions applied to other build configuration conditional
+//    expressions
+//  - Single-argument call expressions, where the function being invoked is a
+//    supported target configuration (currently "os", "arch", and
+//    "_compiler_version"), and whose argument is a named decl ref expression
+Optional<bool>
+Parser::classifyConditionalCompilationExpr(Expr *condition,
+                                           ASTContext &Context,
+                                           DiagnosticEngine &D,
+                                           bool fullCheck) {
+  auto negate = [](Optional<bool> val) -> Optional<bool> {
+    if (val.hasValue()) {
+      return !val.getValue();
+    }
+    return None;
+  };
+
+  auto conjoin = [](Optional<bool> &lhs, Optional<bool> &rhs) -> Optional<bool> {
+    if (lhs.hasValue() && rhs.hasValue()) {
+      return lhs.getValue() && rhs.getValue();
+    }
+    return None;
+  };
+
+  auto disjoin = [](Optional<bool> &lhs, Optional<bool> &rhs) -> Optional<bool> {
+    if (lhs.hasValue() && rhs.hasValue()) {
+      return lhs.getValue() || rhs.getValue();
+    }
+    return None;
+  };
+
+  // No condition, no classification.
+  if (!condition) {
+    return None;
+  }
+
   // Evaluate a ParenExpr.
   if (auto *PE = dyn_cast<ParenExpr>(condition))
-    return classifyConditionalCompilationExpr(PE->getSubExpr());
+    return classifyConditionalCompilationExpr(PE->getSubExpr(), Context, D,
+                                              fullCheck);
 
-  // Evaluate a "&&" or "||" expression.
+  // Classify a "&&" or "||" expression.
   if (auto *SE = dyn_cast<SequenceExpr>(condition)) {
     // Check for '&&' or '||' as the expression type.
     if (SE->getNumElements() < 3) {
-      diagnose(SE->getLoc(),
-               diag::unsupported_conditional_compilation_binary_expression);
-      return ConditionalCompilationExprKind::Error;
+      D.diagnose(SE->getLoc(),
+                 diag::unsupported_conditional_compilation_binary_expression);
+      return None;
     }
     // Before type checking, chains of binary expressions will not be fully
     // parsed, so associativity has not yet been encoded in the subtree.
@@ -1519,35 +1576,57 @@ Parser::classifyConditionalCompilationExpr(Expr *condition) {
     size_t iOperator = 1;
     size_t iOperand = 2;
 
-    (void)classifyConditionalCompilationExpr(elements[0]);
+    auto result = classifyConditionalCompilationExpr(elements[0], Context, D,
+                                                     fullCheck);
 
     while (iOperand < numElements) {
+      auto *UDREOp = cast<UnresolvedDeclRefExpr>(elements[iOperator]);
+      auto name = UDREOp->getName().getBaseName().str();
 
-      if (auto *UDREOp = dyn_cast<UnresolvedDeclRefExpr>(elements[iOperator])) {
-        auto name = UDREOp->getName().getBaseName().str();
+      if (name.equals("||") || name.equals("&&")) {
+        auto rhs = classifyConditionalCompilationExpr(elements[iOperand],
+                                                      Context, D, fullCheck);
 
-        if (!name.equals("||") && !name.equals("&&")) {
-          diagnose(SE->getLoc(),
-                   diag::unsupported_conditional_compilation_binary_expression);
-          return ConditionalCompilationExprKind::Error;
+        if (name.equals("||")) {
+          result = disjoin(result, rhs);
+          if (result.getValueOr(true))
+            break;
         }
+
+        if (name.equals("&&")) {
+          result = conjoin(result, rhs);
+          if (!result.getValueOr(false))
+            break;
+        }
+      } else {
+        D.diagnose(SE->getLoc(),
+                   diag::unsupported_conditional_compilation_binary_expression);
+        return None;
       }
 
       iOperator += 2;
       iOperand += 2;
     }
 
-    return ConditionalCompilationExprKind::Binary;
+    return result;
   }
 
+
   // Classify a named reference expression.
-  if (isa<UnresolvedDeclRefExpr>(condition)) {
-    return ConditionalCompilationExprKind::DeclRef;
+  if (auto *UDRE = dyn_cast<UnresolvedDeclRefExpr>(condition)) {
+    if (!fullCheck) {
+      return None;
+    }
+    auto name = UDRE->getName().getBaseName().str();
+    return Context.LangOpts.isCustomConditionalCompilationFlagSet(name);
   }
 
   // Classify a Boolean literal.
-  if (isa<BooleanLiteralExpr>(condition)) {
-    return ConditionalCompilationExprKind::Boolean;
+  if (auto blit = dyn_cast<BooleanLiteralExpr>(condition)) {
+    if (!fullCheck) {
+      return None;
+    }
+    return blit->getValue();
   }
 
   // Classify a negation (unary "!") expression.
@@ -1556,12 +1635,14 @@ Parser::classifyConditionalCompilationExpr(Expr *condition) {
     auto name =
       cast<UnresolvedDeclRefExpr>(PUE->getFn())->getName().getBaseName().str();
     if (name != "!") {
-      diagnose(PUE->getLoc(),
-               diag::unsupported_conditional_compilation_unary_expression);
-      return ConditionalCompilationExprKind::Error;
+      D.diagnose(PUE->getLoc(),
+                 diag::unsupported_conditional_compilation_unary_expression);
+      return None;
     }
 
-    return classifyConditionalCompilationExpr(PUE->getArg());
+    return negate(
+             classifyConditionalCompilationExpr(PUE->getArg(), Context, D,
+                                                fullCheck));
   }
 
   // Classify a target config call expression.
@@ -1571,120 +1652,148 @@ Parser::classifyConditionalCompilationExpr(Expr *condition) {
 
     // Get the arg, which should be in a paren expression.
     if (!fnNameExpr) {
-      diagnose(CE->getLoc(), diag::unsupported_platform_condition_expression);
-      return ConditionalCompilationExprKind::Error;
+      D.diagnose(CE->getLoc(),
+                 diag::unsupported_platform_condition_expression);
+      return None;
     }
 
     auto fnName = fnNameExpr->getName().getBaseName().str();
 
     auto *PE = dyn_cast<ParenExpr>(CE->getArg());
     if (!PE) {
-      diagnose(CE->getLoc(),
-               diag::platform_condition_expected_one_argument);
-      return ConditionalCompilationExprKind::Error;
+      D.diagnose(CE->getLoc(),
+                 diag::platform_condition_expected_one_argument);
+      return None;
     }
 
     if (!fnName.equals("arch") && !fnName.equals("os") &&
         !fnName.equals("_endian") &&
         !fnName.equals("_runtime") &&
         !fnName.equals("swift") &&
-        !fnName.equals("_compiler_version")) {
-      diagnose(CE->getLoc(),
-               diag::unsupported_platform_condition_expression);
-      return ConditionalCompilationExprKind::Error;
+        !fnName.equals("_compiler_version") &&
+        !fnName.equals("canImport")) {
+      D.diagnose(CE->getLoc(),
+                 diag::unsupported_platform_condition_expression);
+      return None;
     }
 
     if (fnName.equals("_compiler_version")) {
       if (auto SLE = dyn_cast<StringLiteralExpr>(PE->getSubExpr())) {
         if (SLE->getValue().empty()) {
-          diagnose(CE->getLoc(), diag::empty_version_string);
-          return ConditionalCompilationExprKind::Error;
+          D.diagnose(CE->getLoc(), diag::empty_version_string);
+          return None;
         }
         auto versionRequirement =
-        version::Version::parseCompilerVersionString(SLE->getValue(),
-                                                     SLE->getLoc(),
-                                                     &Diags);
-        return ConditionalCompilationExprKind::CompilerVersion;
+          version::Version::parseCompilerVersionString(SLE->getValue(),
+                                                       SLE->getLoc(),
+                                                       &D);
+        auto thisVersion = version::Version::getCurrentCompilerVersion();
+        auto VersionNewEnough = thisVersion >= versionRequirement;
+        return VersionNewEnough;
       } else {
-        diagnose(CE->getLoc(),
-                 diag::unsupported_platform_condition_argument,
-                 "string literal");
-        return ConditionalCompilationExprKind::Error;
+        D.diagnose(CE->getLoc(),
+                   diag::unsupported_platform_condition_argument,
+                   "string literal");
+        return None;
       }
     } else if (fnName.equals("swift")) {
       auto PUE = dyn_cast<PrefixUnaryExpr>(PE->getSubExpr());
       if (!PUE) {
-        diagnose(PE->getSubExpr()->getLoc(),
-                 diag::unsupported_platform_condition_argument,
-                 "a unary comparison, such as '>=2.2'");
-        return ConditionalCompilationExprKind::Error;
+        D.diagnose(PE->getSubExpr()->getLoc(),
+                   diag::unsupported_platform_condition_argument,
+                   "a unary comparison, such as '>=2.2'");
+        return None;
       }
 
       auto prefix = dyn_cast<UnresolvedDeclRefExpr>(PUE->getFn());
       auto versionArg = PUE->getArg();
       auto versionStartLoc = versionArg->getStartLoc();
-      auto endLoc = Lexer::getLocForEndOfToken(SourceMgr,
+      auto endLoc = Lexer::getLocForEndOfToken(Context.SourceMgr,
                                                versionArg->getSourceRange().End);
-      CharSourceRange versionCharRange(SourceMgr, versionStartLoc, endLoc);
-      auto versionString = SourceMgr.extractText(versionCharRange);
+      CharSourceRange versionCharRange(Context.SourceMgr, versionStartLoc,
+                                       endLoc);
+      auto versionString = Context.SourceMgr.extractText(versionCharRange);
 
       auto versionRequirement =
         version::Version::parseVersionString(versionString,
                                              versionStartLoc,
-                                             &Diags);
+                                             &D);
 
       if (!versionRequirement.hasValue())
-        return ConditionalCompilationExprKind::Error;
+        return None;
 
       if (!prefix->getName().getBaseName().str().equals(">=")) {
-        diagnose(PUE->getFn()->getLoc(),
-                 diag::unexpected_version_comparison_operator)
+        D.diagnose(PUE->getFn()->getLoc(),
+                   diag::unexpected_version_comparison_operator)
           .fixItReplace(PUE->getFn()->getLoc(), ">=");
-        return ConditionalCompilationExprKind::Error;
+        return None;
       }
 
-      return ConditionalCompilationExprKind::LanguageVersion;
+      assert(versionRequirement.hasValue());
+      auto thisVersion = Context.LangOpts.EffectiveLanguageVersion;
+      assert(prefix->getName().getBaseName().str().equals(">="));
+
+      auto VersionNewEnough = thisVersion >= versionRequirement.getValue();
+      return VersionNewEnough;
     } else {
       if (auto UDRE = dyn_cast<UnresolvedDeclRefExpr>(PE->getSubExpr())) {
         // The sub expression should be an UnresolvedDeclRefExpr (we won't
         // tolerate extra parens).
-        auto argument = UDRE->getName().getBaseName().str();
+        auto argumentIdent = UDRE->getName().getBaseName();
+        auto argument = argumentIdent.str();
 
         // Error for values that don't make sense if there's a clear definition
         // of the possible values (as there is for _runtime).
-        if (fnName.equals("_runtime") &&
-            !argument.equals("_ObjC") && !argument.equals("_Native")) {
-          diagnose(CE->getLoc(),
-                   diag::unsupported_platform_runtime_condition_argument);
-          return ConditionalCompilationExprKind::Error;
-        }
-        if (fnName == "os") {
+        if (fnName.equals("_runtime")) {
+          if (!argument.equals("_ObjC") && !argument.equals("_Native")) {
+            D.diagnose(CE->getLoc(),
+                       diag::unsupported_platform_runtime_condition_argument);
+            return None;
+          }
+        } else if (fnName == "os") {
           if (!LangOptions::checkPlatformConditionOS(argument)) {
-            diagnose(UDRE->getLoc(),
-                     diag::unknown_platform_condition_argument,
-                     "operating system", fnName);
-            return ConditionalCompilationExprKind::Error;
+            D.diagnose(UDRE->getLoc(),
+                       diag::unknown_platform_condition_argument,
+                       "operating system", fnName);
+            return None;
           }
         } else if (fnName == "arch") {
           if (!LangOptions::isPlatformConditionArchSupported(argument)) {
-            diagnose(UDRE->getLoc(),
-                     diag::unknown_platform_condition_argument,
-                     "architecture", fnName);
-            return ConditionalCompilationExprKind::Error;
+            D.diagnose(UDRE->getLoc(),
+                       diag::unknown_platform_condition_argument,
+                       "architecture", fnName);
+            return None;
           }
         } else if (fnName == "_endian") {
           if (!LangOptions::isPlatformConditionEndiannessSupported(argument)) {
-            diagnose(UDRE->getLoc(),
-                     diag::unknown_platform_condition_argument,
-                     "endianness", fnName);
+            D.diagnose(UDRE->getLoc(),
+                       diag::unknown_platform_condition_argument,
+                       "endianness", fnName);
+            return None;
           }
+        } else if (fnName == "canImport") {
+          if (!fullCheck) {
+            return None;
+          }
+          return
+            Context.getModule({ { argumentIdent, UDRE->getLoc() } }) != nullptr;
         }
-        return ConditionalCompilationExprKind::DeclRef;
+
+        if (!fullCheck) {
+          return None;
+        }
+
+        // FIXME: Perform the replacement macOS -> OSX elsewhere.
+        if (fnName == "os" && argument == "macOS") {
+          argument = "OSX";
+        }
+        auto target = Context.LangOpts.getPlatformConditionValue(fnName);
+        return target == argument;
       } else {
-        diagnose(CE->getLoc(),
-                 diag::unsupported_platform_condition_argument,
-                 "identifier");
-        return ConditionalCompilationExprKind::Error;
+        D.diagnose(CE->getLoc(),
+                   diag::unsupported_platform_condition_argument,
+                   "identifier");
+        return None;
       }
     }
   }
@@ -1694,18 +1803,21 @@ Parser::classifyConditionalCompilationExpr(Expr *condition) {
   if (auto *IL = dyn_cast<IntegerLiteralExpr>(condition)) {
     if (IL->getDigitsText() == "0" || IL->getDigitsText() == "1") {
       StringRef replacement = IL->getDigitsText() == "0" ? "false" :"true";
-      diagnose(IL->getLoc(),
-               diag::unsupported_conditional_compilation_integer,
-               IL->getDigitsText(), replacement)
+      D.diagnose(IL->getLoc(),
+                 diag::unsupported_conditional_compilation_integer,
+                 IL->getDigitsText(), replacement)
         .fixItReplace(IL->getLoc(), replacement);
-      return ConditionalCompilationExprKind::Integer;
+      if (!fullCheck) {
+        return None;
+      }
+      return IL->getDigitsText() == "1";
     }
   }
 
   // If we've gotten here, it's an unsupported expression type.
-  diagnose(condition->getLoc(),
-           diag::unsupported_conditional_compilation_expression_type);
-  return ConditionalCompilationExprKind::Error;
+  D.diagnose(condition->getLoc(),
+             diag::unsupported_conditional_compilation_expression_type);
+  return None;
 }
 
 ParserResult<Stmt> Parser::parseStmtIfConfig(BraceItemListKind Kind) {
@@ -1714,7 +1826,8 @@ ParserResult<Stmt> Parser::parseStmtIfConfig(BraceItemListKind Kind) {
   llvm::SaveAndRestore<bool> S(InPoundIfEnvironment, true);
   SmallVector<IfConfigStmtClause, 4> Clauses;
 
-  bool skipEmitDiagnostics = false;
+  bool canStaticallyFindActive = true;
+  bool foundActiveClause = false;
   while (1) {
     bool isElse = Tok.is(tok::pound_else);
     SourceLoc ClauseLoc = consumeToken();
@@ -1742,28 +1855,35 @@ ParserResult<Stmt> Parser::parseStmtIfConfig(BraceItemListKind Kind) {
     }
 
     SmallVector<ASTNode, 16> Elements;
-    auto condTy = Condition ? classifyConditionalCompilationExpr(Condition)
-                            : ConditionalCompilationExprKind::Unknown;
-    auto skipParse =
-      condTy == ConditionalCompilationExprKind::CompilerVersion ||
-      condTy == ConditionalCompilationExprKind::LanguageVersion;
+    auto condValue = classifyConditionalCompilationExpr(Condition, Context,
+                                                        Diags);
 
-    // HACK: If we see a block conditionalizing compilation on language or
-    // compiler version we must take care not to emit diagnostics here or in
-    // further condition blocks.
-    if (skipParse || (isElse && skipEmitDiagnostics)) {
-      // #if false is a special case where we must continue parsing further
-      // conditions.
-      skipEmitDiagnostics = true;
+    // If we see a block conditionalizing compilation on language or
+    // compiler version we must take care not to emit diagnostics.
+    if (!condValue.getValueOr(true)
+        || (isElse && canStaticallyFindActive && foundActiveClause)) {
       DiagnosticTransaction DT(Diags);
-      parseIfConfigClauseElements(Kind, Elements);
+      skipUntilConditionalBlockClose();
       DT.abort();
     } else {
-      parseIfConfigClauseElements(Kind, Elements);
+      // If any of the conditions of the clause cannot be resolved statically,
+      // subsequent conditions must be determined later.
+      if (!(isElse || condValue.hasValue())) {
+        canStaticallyFindActive = false;
+      } else if (condValue.getValueOr(false)) {
+        foundActiveClause = true;
+      }
+      parseIfConfigClauseElements(!condValue.getValueOr(true), Kind, Elements);
+    }
+
+    // If we can statically determine the condition of a '#else' clause, do so.
+    if (canStaticallyFindActive && isElse) {
+      condValue.emplace(!foundActiveClause);
     }
 
     Clauses.push_back(IfConfigStmtClause(ClauseLoc, Condition,
-                                         Context.AllocateCopy(Elements)));
+                                         Context.AllocateCopy(Elements),
+                                         condValue.getValueOr(false)));
 
     if (Tok.isNot(tok::pound_elseif) && Tok.isNot(tok::pound_else))
       break;
@@ -1777,6 +1897,10 @@ ParserResult<Stmt> Parser::parseStmtIfConfig(BraceItemListKind Kind) {
 
   auto *ICS = new (Context) IfConfigStmt(Context.AllocateCopy(Clauses),
                                          EndLoc, HadMissingEnd);
+  // If we were able to resolve this condition statically, mark it as such.
+  if (canStaticallyFindActive) {
+    ICS->setResolved();
+  }
   return makeParserResult(ICS);
 }
 

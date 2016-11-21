@@ -1843,14 +1843,13 @@ void Parser::consumeDecl(ParserPosition BeginParserPosition,
   }
 }
 
-void Parser::setLocalDiscriminator(ParseDeclOptions Flags, ValueDecl *D) {
+void Parser::setLocalDiscriminator(ValueDecl *D) {
   // If we're not in a local context, this is unnecessary.
   if (!CurLocalContext || !D->getDeclContext()->isLocalContext())
     return;
 
-  if (auto TD = dyn_cast<TypeDecl>(D))
-    if (!(Flags & PD_InIfConfig))
-      SF.LocalTypeDecls.insert(TD);
+  if (getScopeInfo().isStaticallyInactiveConfigBlock())
+    return;
 
   Identifier name = D->getName();
   unsigned discriminator = CurLocalContext->claimNextNamedDiscriminator(name);
@@ -1899,6 +1898,12 @@ ParserStatus Parser::parseDecl(ParseDeclOptions Flags,
     if (auto ICD = IfConfigResult.getPtrOrNull()) {
       // The IfConfigDecl is ahead of its members in source order.
       Handler(ICD);
+      // Copy the active members into the entries list.
+      if (ICD->isResolved()) {
+        for (auto activeMember : ICD->getActiveMembers()) {
+          Handler(activeMember);
+        }
+      }
     }
     return IfConfigResult;
   }
@@ -2210,17 +2215,6 @@ ParserStatus Parser::parseDecl(ParseDeclOptions Flags,
 
     // If we 'break' out of the switch, break out of the loop too.
     break;
-  }
-
-  if (auto SF = CurDeclContext->getParentSourceFile()) {
-    // '@objc' attributes on active clauses in configuration blocks are handled
-    // later.
-    if (!(Flags & PD_InIfConfig)) {
-      for (auto Attr : Attributes) {
-        if (isa<ObjCAttr>(Attr) || isa<DynamicAttr>(Attr))
-          SF->AttrsRequiringFoundation.insert({Attr->getKind(), Attr});
-      }
-    }
   }
 
   if (FoundCCTokenInAttr) {
@@ -2814,7 +2808,8 @@ ParserResult<IfConfigDecl> Parser::parseDeclIfConfig(ParseDeclOptions Flags) {
 
   SmallVector<IfConfigDeclClause, 4> Clauses;
 
-  bool skipEmitDiagnostics = false;
+  bool canStaticallyFindActive = true;
+  bool foundActiveClause = false;
   while (1) {
     bool isElse = Tok.is(tok::pound_else);
     SourceLoc ClauseLoc = consumeToken();
@@ -2845,27 +2840,26 @@ ParserResult<IfConfigDecl> Parser::parseDeclIfConfig(ParseDeclOptions Flags) {
     scope.emplace(this, getScopeInfo().getCurrentScope()->getKind());
     
     SmallVector<Decl*, 8> Decls;
-    auto condTy = Condition ? classifyConditionalCompilationExpr(Condition)
-                            : ConditionalCompilationExprKind::Unknown;
-    auto skipParse =
-      condTy == ConditionalCompilationExprKind::CompilerVersion ||
-      condTy == ConditionalCompilationExprKind::LanguageVersion;
+    auto condValue = classifyConditionalCompilationExpr(Condition, Context,
+                                                        Diags);
 
-    // HACK: If we see a block conditionalizing compilation on language or
-    // compiler version we must take care not to emit diagnostics here or in
-    // further condition blocks.
-    if (skipParse || (isElse && skipEmitDiagnostics)) {
-      skipEmitDiagnostics = true;
+    // If we see a block conditionalizing compilation on language or
+    // compiler version we must take care not to emit diagnostics.
+    if (!condValue.getValueOr(true)
+        || (isElse && canStaticallyFindActive && foundActiveClause)) {
       DiagnosticTransaction DT(Diags);
       skipUntilConditionalBlockClose();
       DT.abort();
     } else {
+      if (!(isElse || condValue.hasValue())) {
+        canStaticallyFindActive = false;
+      } else if (condValue.getValueOr(false)) {
+        foundActiveClause = true;
+      }
       ParserStatus Status;
       while (Tok.isNot(tok::pound_else) && Tok.isNot(tok::pound_endif) &&
              Tok.isNot(tok::pound_elseif)) {
-        Status = parseDecl(Flags | PD_InIfConfig, [&](Decl *D) {
-          Decls.push_back(D);
-        });
+        Status = parseDecl(Flags, [&](Decl *D) { Decls.push_back(D); });
         if (Status.isError()) {
           diagnose(Tok, diag::expected_close_to_if_directive);
           skipUntilConditionalBlockClose();
@@ -2874,8 +2868,14 @@ ParserResult<IfConfigDecl> Parser::parseDeclIfConfig(ParseDeclOptions Flags) {
       }
     }
 
+    // If we can statically determine the condition of a '#else' clause, do so.
+    if (canStaticallyFindActive && isElse) {
+      condValue.emplace(!foundActiveClause);
+    }
+
     Clauses.push_back(IfConfigDeclClause(ClauseLoc, Condition,
-                                         Context.AllocateCopy(Decls)));
+                                         Context.AllocateCopy(Decls),
+                                         condValue.getValueOr(false)));
 
     if (Tok.isNot(tok::pound_elseif) && Tok.isNot(tok::pound_else))
       break;
@@ -2890,6 +2890,11 @@ ParserResult<IfConfigDecl> Parser::parseDeclIfConfig(ParseDeclOptions Flags) {
   IfConfigDecl *ICD = new (Context) IfConfigDecl(CurDeclContext,
                                                  Context.AllocateCopy(Clauses),
                                                  EndLoc, HadMissingEnd);
+  // If we were able to resolve this condition statically, mark it as such.
+  if (canStaticallyFindActive) {
+    ICD->setResolved();
+  }
+
   return makeParserResult(ICD);
 }
 
@@ -3776,7 +3781,7 @@ VarDecl *Parser::parseDeclVarGetSet(Pattern *pattern,
     diagnose(pattern->getLoc(), diag::getset_nontrivial_pattern);
     Invalid = true;
   } else {
-    setLocalDiscriminator(Flags, PrimaryVar);
+    setLocalDiscriminator(PrimaryVar);
   }
 
   TypeLoc TyLoc;
@@ -4611,7 +4616,7 @@ Parser::parseDeclFunc(SourceLoc StaticLoc, StaticSpellingKind StaticSpelling,
     DefaultArgs.setFunctionContext(FD);
     for (auto PL : FD->getParameterLists())
       addParametersToScope(PL);
-    setLocalDiscriminator(Flags, FD);
+    setLocalDiscriminator(FD);
     
     // Establish the new context.
     ParseFunctionBody CC(*this, FD);
@@ -4628,8 +4633,7 @@ Parser::parseDeclFunc(SourceLoc StaticLoc, StaticSpellingKind StaticSpelling,
         skipUntilDeclRBrace();
       } else if (!isDelayedParsingEnabled()) {
         ParserResult<BraceStmt> Body =
-            parseBraceItemList(diag::func_decl_without_brace,
-                               Flags.contains(PD_InIfConfig));
+            parseBraceItemList(diag::func_decl_without_brace);
         if (Body.isNull()) {
           // FIXME: Should do some sort of error recovery here?
         } else if (SignatureStatus.hasCodeCompletion()) {
@@ -4735,7 +4739,7 @@ ParserResult<EnumDecl> Parser::parseDeclEnum(ParseDeclOptions Flags,
 
   EnumDecl *ED = new (Context) EnumDecl(EnumLoc, EnumName, EnumNameLoc,
                                         { }, GenericParams, CurDeclContext);
-  setLocalDiscriminator(Flags, ED);
+  setLocalDiscriminator(ED);
   ED->getAttrs() = Attributes;
 
   // Parse optional inheritance clause within the context of the enum.
@@ -5031,7 +5035,7 @@ ParserResult<StructDecl> Parser::parseDeclStruct(ParseDeclOptions Flags,
                                             { },
                                             GenericParams,
                                             CurDeclContext);
-  setLocalDiscriminator(Flags, SD);
+  setLocalDiscriminator(SD);
   SD->getAttrs() = Attributes;
 
   // Parse optional inheritance clause within the context of the struct.
@@ -5113,7 +5117,7 @@ ParserResult<ClassDecl> Parser::parseDeclClass(SourceLoc ClassLoc,
   // Create the class.
   ClassDecl *CD = new (Context) ClassDecl(ClassLoc, ClassName, ClassNameLoc,
                                           { }, GenericParams, CurDeclContext);
-  setLocalDiscriminator(Flags, CD);
+  setLocalDiscriminator(CD);
 
   // Attach attributes.
   CD->getAttrs() = Attributes;
@@ -5147,9 +5151,6 @@ ParserResult<ClassDecl> Parser::parseDeclClass(SourceLoc ClassLoc,
     Scope S(this, ScopeKind::ClassBody);
     ParseDeclOptions Options(PD_HasContainerType | PD_AllowDestructor |
                              PD_InClass);
-    if (Flags & PD_InIfConfig) {
-      Options |= PD_InIfConfig;
-    }
     auto Handler = [&] (Decl *D) {
       CD->addMember(D);
       if (isa<DestructorDecl>(D))

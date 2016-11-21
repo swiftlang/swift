@@ -52,15 +52,18 @@ static bool isResolvableScope(ScopeKind SK) {
   llvm_unreachable("Unhandled ScopeKind in switch.");
 }
 
-Scope::Scope(Parser *P, ScopeKind SC, bool InactiveConfigBlock)
-    : SI(P->getScopeInfo()),
-      HTScope(SI.HT, SI.CurScope ? &SI.CurScope->HTScope : nullptr),
-      PrevScope(SI.CurScope), PrevResolvableDepth(SI.ResolvableDepth), Kind(SC),
-      IsInactiveConfigBlock(InactiveConfigBlock) {
+Scope::Scope(Parser *P, ScopeKind SC, bool IsStaticallyInactiveConfigBlock)
+  : SI(P->getScopeInfo()),
+    HTScope(SI.HT, SI.CurScope ? &SI.CurScope->HTScope : nullptr),
+    PrevScope(SI.CurScope),
+    PrevResolvableDepth(SI.ResolvableDepth),
+    Kind(SC),
+    IsStaticallyInactiveConfigBlock(IsStaticallyInactiveConfigBlock) {
   assert(PrevScope || Kind == ScopeKind::TopLevel);
   
   if (SI.CurScope) {
     Depth = SI.CurScope->Depth + 1;
+    IsStaticallyInactiveConfigBlock |= SI.CurScope->IsStaticallyInactiveConfigBlock;
   } else {
     Depth = 0;
   }
@@ -75,8 +78,9 @@ Scope::Scope(Parser *P, SavedScope &&SS):
     PrevScope(SI.CurScope),
     PrevResolvableDepth(SI.ResolvableDepth),
     Depth(SS.Depth),
-    Kind(SS.Kind) {
-    
+    Kind(SS.Kind),
+    IsStaticallyInactiveConfigBlock(SS.IsStaticallyInactiveConfigBlock) {
+
     SI.CurScope = this;
     if (!isResolvableScope(Kind))
       SI.ResolvableDepth = Depth + 1;

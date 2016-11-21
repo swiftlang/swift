@@ -61,6 +61,9 @@ namespace swift {
     TopLevelLibrary,
     /// The body of the clause of an #if/#else/#endif block
     ConditionalBlock,
+    /// The body of the clause of an #if/#else/#endif block that was statically
+    /// determined to be inactive.
+    StaticallyInactiveConditionalBlock,
   };
 
   
@@ -615,9 +618,10 @@ public:
                                    BraceItemListKind::Brace,
                                BraceItemListKind ConditionalBlockKind =
                                    BraceItemListKind::Brace);
-  ParserResult<BraceStmt> parseBraceItemList(Diag<> ID, bool inConfig = false);
+  ParserResult<BraceStmt> parseBraceItemList(Diag<> ID);
   
-  void parseIfConfigClauseElements(BraceItemListKind Kind,
+  void parseIfConfigClauseElements(bool isInactive,
+                                   BraceItemListKind Kind,
                                    SmallVectorImpl<ASTNode> &Elements);
   
   void parseTopLevelCodeDeclDelayed();
@@ -644,7 +648,6 @@ public:
     PD_InStruct             = 1 << 9,
     PD_InEnum               = 1 << 10,
     PD_InLoop               = 1 << 11,
-    PD_InIfConfig           = 1 << 12,
   };
 
   /// Options that control the parsing of declarations.
@@ -693,7 +696,7 @@ public:
   /// 'isLine = true' indicates parsing #line instead of #sourcelocation
   ParserStatus parseLineDirective(bool isLine = false);
 
-  void setLocalDiscriminator(ParseDeclOptions Flags, ValueDecl *D);
+  void setLocalDiscriminator(ValueDecl *D);
 
   /// Parse the optional attributes before a declaration.
   bool parseDeclAttributeList(DeclAttributes &Attributes,
@@ -1227,9 +1230,14 @@ public:
   ParserResult<Stmt> parseStmtSwitch(LabeledStmtInfo LabelInfo);
   ParserResult<CaseStmt> parseStmtCase();
 
-  /// Classify the condition of an #if directive.
-  ConditionalCompilationExprKind
-  classifyConditionalCompilationExpr(Expr *condition);
+  /// Classify the condition of an #if directive according to whether it can
+  /// be evaluated statically.  If evaluation is not possible, the result is
+  /// 'None'.
+  static Optional<bool>
+  classifyConditionalCompilationExpr(Expr *condition,
+                                     ASTContext &context,
+                                     DiagnosticEngine &diags,
+                                     bool fullCheck = false);
 
   //===--------------------------------------------------------------------===//
   // Generics Parsing

@@ -167,8 +167,8 @@ func testForceValueExpr() {
 
 // <rdar://problem/20894455> "variable was never mutated" diagnostic does not take #if into account
 func testBuildConfigs() {
-  let abc = 42    // expected-warning{{initialization of immutable value 'abc' was never used; consider replacing with assignment to '_' or removing it}}.
-  var mut = 18    // expected-warning{{initialization of variable 'mut' was never used; consider replacing with assignment to '_' or removing it}}.
+  let abc = 42    // no warning.
+  var mut = 18    // no warning.
 #if false
   mut = abc    // These uses prevent abc/mut from being unused/unmutated.
 #endif
