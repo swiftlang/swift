@@ -3947,6 +3947,7 @@ public:
       TC.diagnose(NTD->getLoc(),
                   diag::unsupported_nested_protocol,
                   NTD->getName());
+      NTD->setInvalid();
       return true;
     }
 
