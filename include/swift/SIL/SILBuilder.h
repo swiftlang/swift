@@ -1640,7 +1640,6 @@ private:
   }
 
   void appendOperandTypeName(SILType OpdTy, llvm::SmallString<16> &Name) {
-    auto &C = getASTContext();
     if (auto BuiltinIntTy =
             dyn_cast<BuiltinIntegerType>(OpdTy.getSwiftRValueType())) {
       if (BuiltinIntTy == BuiltinIntegerType::getWordType(getASTContext())) {
@@ -1650,7 +1649,7 @@ private:
         Name += "_Int" + llvm::utostr(NumBits);
       }
     } else {
-      assert(OpdTy.getSwiftRValueType() == C.TheRawPointerType);
+      assert(OpdTy.getSwiftRValueType() == getASTContext().TheRawPointerType);
       Name += "_RawPointer";
     }
   }
