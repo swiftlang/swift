@@ -364,7 +364,8 @@ SourceLoc Parser::consumeStartingCharacterOfCurrentToken() {
 
   // ... or a multi-character token with the first character being the one that
   // we want to consume as a separate token.
-  restoreParserPosition(getParserPositionAfterFirstCharacter(Tok));
+  restoreParserPosition(getParserPositionAfterFirstCharacter(Tok),
+                        /*enableDiagnostics=*/true);
   return PreviousLoc;
 }
 
