@@ -5,8 +5,8 @@
 // Copyright (c) 2014 - 2016 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
-// See http://swift.org/LICENSE.txt for license information
-// See http://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
+// See https://swift.org/LICENSE.txt for license information
+// See https://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
 //
 //===----------------------------------------------------------------------===//
 //
@@ -218,7 +218,6 @@ public:
 
 private:
   PotentialArchetype *addGenericParameter(GenericTypeParamType *GenericParam,
-                                          ProtocolDecl *RootProtocol,
                                           Identifier ParamName);
 
 public:
@@ -291,6 +290,11 @@ public:
   /// be made concrete.
   void finalize(SourceLoc loc, bool allowConcreteGenericParams=false);
 
+  /// Diagnose any remaining renames.
+  ///
+  /// \returns \c true if there were any remaining renames to diagnose.
+  bool diagnoseRemainingRenames(SourceLoc loc);
+
   /// \brief Resolve the given type to the potential archetype it names.
   ///
   /// This routine will synthesize nested types as required to refer to a
@@ -352,9 +356,6 @@ class ArchetypeBuilder::PotentialArchetype {
   /// archetype corresponds.
   llvm::PointerUnion<PotentialArchetype*, GenericTypeParamType*> ParentOrParam;
 
-  /// The root protocol with which this potential archetype is associated.
-  ProtocolDecl *RootProtocol = nullptr;
-
   /// \brief The name of this potential archetype or, for an
   /// associated type, the declaration of the associated type to which
   /// this potential archetype has been resolved. Or, for a type alias,
@@ -409,8 +410,12 @@ class ArchetypeBuilder::PotentialArchetype {
   /// the superclass type.
   unsigned RecursiveSuperclassType : 1;
 
-  /// Whether we have renamed this (nested) type due to typo correction.
-  unsigned Renamed : 1;
+  /// Whether we have diagnosed a rename.
+  unsigned DiagnosedRename : 1;
+
+  /// If we have renamed this (nested) type due to typo correction,
+  /// the old name.
+  Identifier OrigName;
 
   /// The equivalence class of this potential archetype.
   llvm::TinyPtrVector<PotentialArchetype *> EquivalenceClass;
@@ -421,7 +426,7 @@ class ArchetypeBuilder::PotentialArchetype {
     : ParentOrParam(Parent), NameOrAssociatedType(Name), Representative(this),
       IsRecursive(false), Invalid(false), SubstitutingConcreteType(false),
       RecursiveConcreteType(false), RecursiveSuperclassType(false),
-      Renamed(false)
+      DiagnosedRename(false)
   { 
     assert(Parent != nullptr && "Not an associated type?");
     EquivalenceClass.push_back(this);
@@ -432,8 +437,8 @@ class ArchetypeBuilder::PotentialArchetype {
     : ParentOrParam(Parent), NameOrAssociatedType(AssocType), 
       Representative(this), IsRecursive(false), Invalid(false),
       SubstitutingConcreteType(false), RecursiveConcreteType(false),
-      RecursiveSuperclassType(false), Renamed(false)
-  { 
+      RecursiveSuperclassType(false), DiagnosedRename(false)
+  {
     assert(Parent != nullptr && "Not an associated type?");
     EquivalenceClass.push_back(this);
   }
@@ -443,7 +448,7 @@ class ArchetypeBuilder::PotentialArchetype {
     : ParentOrParam(Parent), NameOrAssociatedType(TypeAlias),
       Representative(this), IsRecursive(false), Invalid(false),
       SubstitutingConcreteType(false), RecursiveConcreteType(false),
-      RecursiveSuperclassType(false), Renamed(false)
+      RecursiveSuperclassType(false), DiagnosedRename(false)
   {
     assert(Parent != nullptr && "Not an associated type?");
     EquivalenceClass.push_back(this);
@@ -451,13 +456,12 @@ class ArchetypeBuilder::PotentialArchetype {
 
   /// \brief Construct a new potential archetype for a generic parameter.
   PotentialArchetype(GenericTypeParamType *GenericParam, 
-                     ProtocolDecl *RootProtocol,
                      Identifier Name)
-    : ParentOrParam(GenericParam), RootProtocol(RootProtocol), 
+    : ParentOrParam(GenericParam),
       NameOrAssociatedType(Name), Representative(this), IsRecursive(false),
       Invalid(false), SubstitutingConcreteType(false),
       RecursiveConcreteType(false), RecursiveSuperclassType(false),
-      Renamed(false)
+      DiagnosedRename(false)
   {
     EquivalenceClass.push_back(this);
   }
@@ -601,14 +605,26 @@ public:
 
   /// Determine whether this archetype was renamed due to typo
   /// correction. If so, \c getName() retrieves the new name.
-  bool wasRenamed() const { return Renamed; }
+  bool wasRenamed() const { return !OrigName.empty(); }
 
   /// Note that this potential archetype was renamed (due to typo
   /// correction), providing the new name.
   void setRenamed(Identifier newName) {
+    OrigName = getName();
     NameOrAssociatedType = newName;
-    Renamed = true;
   }
+
+  /// For a renamed potential archetype, retrieve the original name.
+  Identifier getOriginalName() const {
+    assert(wasRenamed());
+    return OrigName;
+  }
+
+  /// Whether we already diagnosed this rename.
+  bool alreadyDiagnosedRename() const { return DiagnosedRename; }
+
+  /// Note that we already diagnosed this rename.
+  void setAlreadyDiagnosedRename() { DiagnosedRename = true; }
 
   /// Whether this potential archetype makes a better archetype anchor than
   /// the given archetype anchor.

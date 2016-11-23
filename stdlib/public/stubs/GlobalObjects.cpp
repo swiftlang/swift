@@ -5,8 +5,8 @@
 // Copyright (c) 2014 - 2016 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
-// See http://swift.org/LICENSE.txt for license information
-// See http://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
+// See https://swift.org/LICENSE.txt for license information
+// See https://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
 //
 //===----------------------------------------------------------------------===//
 //
@@ -26,6 +26,14 @@ namespace swift {
 // _direct type metadata for Swift._EmptyArrayStorage
 SWIFT_RUNTIME_STDLIB_INTERFACE
 extern "C" ClassMetadata _TMCs18_EmptyArrayStorage;
+
+// _direct type metadata for Swift._RawNativeDictionaryStorage
+SWIFT_RUNTIME_STDLIB_INTERFACE
+extern "C" ClassMetadata _TMCs27_RawNativeDictionaryStorage;
+
+// _direct type metadata for Swift._RawNativeSetStorage
+SWIFT_RUNTIME_STDLIB_INTERFACE
+extern "C" ClassMetadata _TMCs20_RawNativeSetStorage;
 }
 
 swift::_SwiftEmptyArrayStorage swift::_swiftEmptyArrayStorage = {
@@ -39,6 +47,62 @@ swift::_SwiftEmptyArrayStorage swift::_swiftEmptyArrayStorage = {
     0, // int count;                                    
     1  // unsigned int _capacityAndFlags; 1 means elementTypeIsBridgedVerbatim
   }
+};
+
+
+
+swift::_SwiftEmptyDictionaryStorage swift::_swiftEmptyDictionaryStorage = {
+  // HeapObject header;
+  {
+    &_TMCs27_RawNativeDictionaryStorage, // isa pointer
+  },
+  
+  // _SwiftDictionaryBodyStorage body;
+  {
+    // We set the capacity to 1 so that there's an empty hole to search.
+    // Any insertion will lead to a real storage being allocated, because 
+    // Dictionary guarantees there's always another empty hole after insertion.
+    1, // int capacity;                               
+    0, // int count;
+    
+    // _SwiftUnsafeBitMap initializedEntries
+    {
+      &swift::_swiftEmptyDictionaryStorage.entries, // unsigned int* values;
+      1 // int bitCount; (1 so there's something for iterators to read)
+    },
+    
+    (void*)1, // void* keys; (non-null garabage)
+    (void*)1  // void* values; (non-null garbage)
+  },
+
+  0 // int entries; (zero'd bits)
+};
+
+
+swift::_SwiftEmptySetStorage swift::_swiftEmptySetStorage = {
+  // HeapObject header;
+  {
+    &_TMCs20_RawNativeSetStorage, // isa pointer
+  },
+  
+  // _SwiftDictionaryBodyStorage body;
+  {
+    // We set the capacity to 1 so that there's an empty hole to search.
+    // Any insertion will lead to a real storage being allocated, because 
+    // Dictionary guarantees there's always another empty hole after insertion.
+    1, // int capacity;                                    
+    0, // int count;
+    
+    // _SwiftUnsafeBitMap initializedEntries
+    {
+      &swift::_swiftEmptySetStorage.entries, // unsigned int* values;
+      1 // int bitCount; (1 so there's something for iterators to read)
+    },
+    
+    (void*)1 // void* keys; (non-null garabage)
+  },
+
+  0 // int entries; (zero'd bits)
 };
 
 static __swift_uint64_t randomUInt64() {

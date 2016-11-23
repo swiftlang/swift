@@ -5,8 +5,8 @@
 // Copyright (c) 2014 - 2016 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
-// See http://swift.org/LICENSE.txt for license information
-// See http://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
+// See https://swift.org/LICENSE.txt for license information
+// See https://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
 //
 //===----------------------------------------------------------------------===//
 //
@@ -19,12 +19,9 @@
 
 #include "swift/Basic/SourceLoc.h"
 #include "swift/Basic/SourceManager.h"
-#include "swift/Syntax/Token.h"
-#include "swift/Syntax/Syntax.h"
+#include "swift/Parse/Token.h"
 #include "swift/AST/DiagnosticEngine.h"
 #include "llvm/ADT/SmallVector.h"
-
-#include <deque>
 
 namespace swift {
   class DiagnosticEngine;
@@ -91,7 +88,7 @@ class Lexer {
 
   /// @}
 
-  syntax::Token NextToken;
+  Token NextToken;
   
   /// \brief This is true if we're lexing a .sil file instead of a .swift
   /// file.  This enables the 'sil' keyword.
@@ -102,13 +99,6 @@ class Lexer {
   /// InSILBody - This is true when we're lexing the body of a SIL declaration
   /// in a SIL file.  This enables some context-sensitive lexing.
   bool InSILBody = false;
-
-  /// The source trivia leading up to the current token.
-  std::deque<syntax::Trivia> LeadingTrivia;
-
-  /// The source trivia after the current token, up to and including the first
-  /// newline after the token.
-  std::deque<syntax::Trivia> TrailingTrivia;
   
 public:
   /// \brief Lexer state can be saved/restored to/from objects of this class.
@@ -202,11 +192,10 @@ public:
     return CodeCompletionPtr != nullptr;
   }
 
-  syntax::Token lex() {
-    auto Result = NextToken;
+  void lex(Token &Result) {
+    Result = NextToken;
     if (Result.isNot(tok::eof))
       lexImpl();
-    return Result;
   }
 
   bool isKeepingComments() const {
@@ -217,7 +206,7 @@ public:
 
   /// peekNextToken - Return the next token to be returned by Lex without
   /// actually lexing it.
-  const syntax::Token &peekNextToken() const { return NextToken; }
+  const Token &peekNextToken() const { return NextToken; }
 
   /// \brief Returns the lexer state for the beginning of the given token
   /// location. After restoring the state, lexer will return this token and
@@ -227,11 +216,11 @@ public:
   /// \brief Returns the lexer state for the beginning of the given token.
   /// After restoring the state, lexer will return this token and continue from
   /// there.
-  State getStateForBeginningOfToken(syntax::Token Tok) const {
+  State getStateForBeginningOfToken(const Token &Tok) const {
     // If the token has a comment attached to it, rewind to before the comment,
     // not just the start of the token.  This ensures that we will re-lex and
     // reattach the comment to the token if rewound to this state.
-    auto TokStart = Tok.getAbsoluteTriviaStart();
+    SourceLoc TokStart = Tok.getCommentStart();
     if (TokStart.isInvalid())
       TokStart = Tok.getLoc();
     return getStateForBeginningOfTokenLoc(TokStart);
@@ -267,8 +256,8 @@ public:
   /// resides.
   ///
   /// \param Loc The source location of the beginning of a token.
-  static Optional<syntax::Token>
-  getTokenAtLocation(const SourceManager &SM, SourceLoc Loc);
+  static Token getTokenAtLocation(const SourceManager &SM, SourceLoc Loc);
+
 
   /// \brief Retrieve the source location that points just past the
   /// end of the token referred to by \c Loc.
@@ -379,11 +368,11 @@ public:
   /// \brief Given a string literal token, separate it into string/expr segments
   /// of a potentially interpolated string.
   static void getStringLiteralSegments(
-      const syntax::Token &Str,
+      const Token &Str,
       SmallVectorImpl<StringSegment> &Segments,
       DiagnosticEngine *Diags);
 
-  void getStringLiteralSegments(const syntax::Token &Str,
+  void getStringLiteralSegments(const Token &Str,
                                 SmallVectorImpl<StringSegment> &Segments) {
     return getStringLiteralSegments(Str, Segments, Diags);
   }
@@ -393,7 +382,7 @@ public:
   }
 
   /// Get the token that starts at the given location.
-  syntax::Token getTokenAt(SourceLoc Loc);
+  Token getTokenAt(SourceLoc Loc);
 
   /// SILBodyRAII - This helper class is used when parsing a SIL body to inform
   /// the lexer that SIL-specific lexing should be enabled.
@@ -437,7 +426,6 @@ private:
 
   void formToken(tok Kind, const char *TokStart);
 
-  void skipUpToEndOfLine();
   void skipToEndOfLine();
 
   /// Skip to the end of the line of a // comment.
@@ -453,12 +441,6 @@ private:
   void lexOperatorIdentifier();
   void lexHexNumber();
   void lexNumber();
-  void lexTrivia(std::deque<syntax::Trivia> &T, bool StopAtFirstNewline = false);
-  Optional<syntax::Trivia> lexWhitespace(bool StopAtFirstNewline);
-  Optional<syntax::Trivia> lexComment();
-  Optional<syntax::Trivia> lexSingleLineComment(syntax::TriviaKind Kind);
-  Optional<syntax::Trivia> lexBlockComment(syntax::TriviaKind Kind);
-  Optional<syntax::Trivia> lexDocComment();
   static unsigned lexUnicodeEscape(const char *&CurPtr, Lexer *Diags);
 
   unsigned lexCharacter(const char *&CurPtr,

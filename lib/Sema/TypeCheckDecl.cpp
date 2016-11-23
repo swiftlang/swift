@@ -5,8 +5,8 @@
 // Copyright (c) 2014 - 2016 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
-// See http://swift.org/LICENSE.txt for license information
-// See http://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
+// See https://swift.org/LICENSE.txt for license information
+// See https://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
 //
 //===----------------------------------------------------------------------===//
 //
@@ -3967,33 +3967,6 @@ public:
         }
         NTD->setInvalid();
         return true;
-      }
-
-      if (!TC.Context.LangOpts.EnableExperimentalNestedGenericTypes) {
-        if (auto parent = dyn_cast<NominalTypeDecl>(DC)) {
-          if (NTD->getGenericParams())
-            TC.diagnose(NTD->getLoc(), diag::unsupported_generic_nested_in_type,
-                        NTD->getName(),
-                        parent->getName());
-          else
-            TC.diagnose(NTD->getLoc(),
-                        diag::unsupported_type_nested_in_generic_type,
-                        NTD->getName(),
-                        parent->getName());
-          NTD->setInvalid();
-          return true;
-        } else if (auto ED = dyn_cast<ExtensionDecl>(DC)) {
-          auto *parent = ED->getAsNominalTypeOrNominalTypeExtensionContext();
-          if (parent == nullptr) {
-            /* Invalid extension -- diagnosed elsewhere */
-            return true;
-          }
-
-          TC.diagnose(NTD->getLoc(),
-                      diag::unsupported_type_nested_in_generic_extension,
-                      NTD->getName(),
-                      parent->getName());
-        }
       }
 
       if (DC->isLocalContext() && DC->isGenericContext()) {

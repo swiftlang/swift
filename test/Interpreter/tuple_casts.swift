@@ -47,7 +47,7 @@ tupleCastTests.test("Incorrect labels conditional cast") {
 
 tupleCastTests
   .test("Incorrect labels forced cast")
-  .crashOutputMatches("Could not cast value of type '(x: Swift.Int, z: Swift.Int)'")
+  .crashOutputMatches("Could not cast value of type '(x : Swift.Int, z : Swift.Int)'")
   .code {
   expectCrashLater()
   _ = anyToIntPoint((x: 1, z: 2))

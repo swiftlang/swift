@@ -24,6 +24,7 @@ func typoAssoc2<T : P1, U : P1>() where T.assoc == U.assoc {}
 // CHECK-GENERIC-LABEL: .typoAssoc2
 // CHECK-GENERIC: Generic signature: <T, U where T : P1, U : P1, T.Assoc == U.Assoc>
 
+// expected-error@+3{{'U.AssocP2' does not have a member type named 'assoc'; did you mean 'Assoc'?}}
 // expected-error@+3{{'T.AssocP2' does not have a member type named 'assoc'; did you mean 'Assoc'?}}{{42-47=Assoc}}
 // expected-error@+2{{'U.AssocP2' does not have a member type named 'assoc'; did you mean 'Assoc'?}}{{19-24=Assoc}}
 func typoAssoc3<T : P2, U : P2>()
@@ -56,4 +57,26 @@ func typoFunc2<T : P1>(x: TypoType, y: T) { // expected-error{{use of undeclared
 }
 
 func typoFunc3<T : P1>(x: TypoType, y: (T.Assoc) -> ()) { // expected-error{{use of undeclared type 'TypoType'}}
+}
+
+// rdar://problem/29261689
+typealias Element_<S: Sequence> = S.Iterator.Element
+
+public protocol _Indexable1 {
+  associatedtype Slice
+}
+public protocol Indexable : _Indexable1 {
+  associatedtype Slice : _Indexable1
+}
+
+protocol Pattern {
+  associatedtype Element : Equatable
+  
+  // FIXME: Diagnostics here are very poor
+  // expected-error@+3{{'C' does not have a member type named 'Iterator'; did you mean 'Slice'?}}
+  // expected-error@+2{{'C.Slice' does not have a member type named 'Element'; did you mean 'Slice'?}}
+  // expected-error@+1{{'C.Slice' does not have a member type named 'Iterator'; did you mean 'Slice'?}}
+  func matched<C: Indexable>(atStartOf c: C)
+  where Element_<C> == Element
+  , Element_<C.Slice> == Element
 }

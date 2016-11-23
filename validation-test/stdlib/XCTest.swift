@@ -1,14 +1,9 @@
 // RUN: %target-run-stdlib-swift
 // REQUIRES: executable_test
-
 // REQUIRES: objc_interop
 
+// FIXME: Add a feature for "platforms that support XCTest".
 // REQUIRES: OS=macosx
-
-// REQUIRES: rdar25733187
-
-// watchOS 2.0 does not have an XCTest module.
-// XFAIL: OS=watchos
 
 import StdlibUnittest
 

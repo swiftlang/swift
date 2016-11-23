@@ -5,8 +5,8 @@
 // Copyright (c) 2014 - 2016 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
-// See http://swift.org/LICENSE.txt for license information
-// See http://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
+// See https://swift.org/LICENSE.txt for license information
+// See https://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
 //
 //===----------------------------------------------------------------------===//
 //
@@ -178,6 +178,9 @@ struct ASTContext::Implementation {
 
   /// \brief The module loader used to load Clang modules.
   ClangModuleLoader *TheClangModuleLoader = nullptr;
+
+  /// \brief Map from Swift declarations to raw comments.
+  llvm::DenseMap<const Decl *, RawComment> RawComments;
 
   /// \brief Map from Swift declarations to brief comments.
   llvm::DenseMap<const Decl *, StringRef> BriefComments;
@@ -1317,6 +1320,18 @@ Module *ASTContext::getStdlibModule(bool loadIfAbsent) {
   return TheStdlibModule;
 }
 
+Optional<RawComment> ASTContext::getRawComment(const Decl *D) {
+  auto Known = Impl.RawComments.find(D);
+  if (Known == Impl.RawComments.end())
+    return None;
+
+  return Known->second;
+}
+
+void ASTContext::setRawComment(const Decl *D, RawComment RC) {
+  Impl.RawComments[D] = RC;
+}
+
 Optional<StringRef> ASTContext::getBriefComment(const Decl *D) {
   auto Known = Impl.BriefComments.find(D);
   if (Known == Impl.BriefComments.end())
@@ -1482,6 +1497,7 @@ size_t ASTContext::getTotalMemory() const {
     Impl.Allocator.getTotalMemory() +
     Impl.Cleanups.capacity() +
     llvm::capacity_in_bytes(Impl.ModuleLoaders) +
+    llvm::capacity_in_bytes(Impl.RawComments) +
     llvm::capacity_in_bytes(Impl.BriefComments) +
     llvm::capacity_in_bytes(Impl.LocalDiscriminators) +
     llvm::capacity_in_bytes(Impl.ModuleTypes) +

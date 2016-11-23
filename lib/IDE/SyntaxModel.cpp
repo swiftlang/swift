@@ -5,8 +5,8 @@
 // Copyright (c) 2014 - 2016 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
-// See http://swift.org/LICENSE.txt for license information
-// See http://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
+// See https://swift.org/LICENSE.txt for license information
+// See https://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
 //
 //===----------------------------------------------------------------------===//
 
@@ -21,8 +21,7 @@
 #include "swift/AST/TypeRepr.h"
 #include "swift/Basic/SourceManager.h"
 #include "swift/Parse/Lexer.h"
-#include "swift/Syntax/Token.h"
-#include "swift/Syntax/Trivia.h"
+#include "swift/Parse/Token.h"
 #include "swift/Config.h"
 #include "swift/Subsystems.h"
 #include "clang/Basic/CharInfo.h"
@@ -48,48 +47,22 @@ struct SyntaxModelContext::Implementation {
       SrcMgr(SrcFile.getASTContext().SourceMgr) {}
 };
 
-
-void SyntaxModelContext::addTrivia(const syntax::Trivia &T,
-                                   std::vector<SyntaxNode> &Nodes) {
-  if (!T.isAnyComment())
-    return;
-
-  SyntaxNodeKind Kind;
-
-  if (T.str().startswith("///") ||
-      (Impl.LangOpts.Playground && T.str().startswith("//:")))
-    Kind = SyntaxNodeKind::DocCommentLine;
-  else if (T.str().startswith("/**") ||
-           (Impl.LangOpts.Playground && T.str().startswith("/*:")))
-    Kind = SyntaxNodeKind::DocCommentBlock;
-  else if (T.str().startswith("//"))
-    Kind = SyntaxNodeKind::CommentLine;
-  else
-    Kind = SyntaxNodeKind::CommentBlock;
-
-  Nodes.emplace_back(Kind, T.getRange());
-}
-
 SyntaxModelContext::SyntaxModelContext(SourceFile &SrcFile)
   : Impl(*new Implementation(SrcFile)) {
+  const bool IsPlayground = Impl.LangOpts.Playground;
   const SourceManager &SM = Impl.SrcMgr;
-  auto Tokens = swift::tokenize(Impl.LangOpts, SM,
-                                EOFRetention::KeepEOF,
-                                *Impl.SrcFile.getBufferID(),
-                                /*Offset=*/0,
-                                /*EndOffset=*/0,
-                                /*KeepComments=*/true,
-                                /*TokenizeInterpolatedString=*/true);
+  std::vector<Token> Tokens = swift::tokenize(Impl.LangOpts, SM,
+                                              *Impl.SrcFile.getBufferID(),
+                                              /*Offset=*/0,
+                                              /*EndOffset=*/0,
+                                              /*KeepComments=*/true,
+                                           /*TokenizeInterpolatedString=*/true);
   std::vector<SyntaxNode> Nodes;
   SourceLoc AttrLoc;
   SourceLoc UnaryMinusLoc;
   auto LiteralStartLoc = Optional<SourceLoc>();
   for (unsigned I = 0, E = Tokens.size(); I != E; ++I) {
     auto &Tok = Tokens[I];
-
-    for (auto Leader : Tok.getLeadingTrivia())
-      addTrivia(Leader, Nodes);
-
     SyntaxNodeKind Kind;
     SourceLoc Loc;
     Optional<unsigned> Length;
@@ -101,7 +74,7 @@ SyntaxModelContext::SyntaxModelContext(SourceFile &SrcFile)
         // syntax coloring. If swift gets user attributes then all identifiers
         // will be treated as syntactic attribute nodes.
         Loc = AttrLoc;
-        Length = SM.getByteDistance(Loc, Tok.getLoc()) + Tok.getWidth();
+        Length = SM.getByteDistance(Loc, Tok.getLoc()) + Tok.getLength();
         Kind = SyntaxNodeKind::AttributeId;
       }
       AttrLoc = SourceLoc();
@@ -109,7 +82,7 @@ SyntaxModelContext::SyntaxModelContext(SourceFile &SrcFile)
 
     if (!Loc.isValid()) {
       Loc = Tok.getLoc();
-      Length = Tok.getWidth();
+      Length = Tok.getLength();
 
       if (LiteralStartLoc.hasValue() && Length.hasValue()) {
         if (Tok.getKind() != tok::r_paren)
@@ -146,8 +119,7 @@ SyntaxModelContext::SyntaxModelContext(SourceFile &SrcFile)
 
 #define POUND_OLD_OBJECT_LITERAL(Name, NewName, OldArg, NewArg) \
       case tok::pound_##Name:
-#define POUND_OBJECT_LITERAL(Name, Desc, Proto) \
-      case tok::pound_##Name:
+#define POUND_OBJECT_LITERAL(Name, Desc, Proto) case tok::pound_##Name:
 #include "swift/Parse/Tokens.def"
         LiteralStartLoc = Loc;
         continue;
@@ -164,12 +136,8 @@ SyntaxModelContext::SyntaxModelContext(SourceFile &SrcFile)
         else
           Kind = SyntaxNodeKind::Identifier;
         break;
-      case tok::dollarident:
-          Kind = SyntaxNodeKind::DollarIdent;
-          break;
-      case tok::string_literal:
-          Kind = SyntaxNodeKind::String;
-          break;
+      case tok::dollarident: Kind = SyntaxNodeKind::DollarIdent; break;
+      case tok::string_literal: Kind = SyntaxNodeKind::String; break;
 
       case tok::integer_literal:
         Kind = SyntaxNodeKind::Integer;
@@ -191,6 +159,18 @@ SyntaxModelContext::SyntaxModelContext(SourceFile &SrcFile)
           UnaryMinusLoc = Loc;
         continue;
 
+      case tok::comment:
+        if (Tok.getText().startswith("///") ||
+            (IsPlayground && Tok.getText().startswith("//:")))
+          Kind = SyntaxNodeKind::DocCommentLine;
+        else if (Tok.getText().startswith("/**") ||
+                 (IsPlayground && Tok.getText().startswith("/*:")))
+          Kind = SyntaxNodeKind::DocCommentBlock;
+        else if (Tok.getText().startswith("//"))
+          Kind = SyntaxNodeKind::CommentLine;
+        else
+          Kind = SyntaxNodeKind::CommentBlock;
+        break;
       case tok::at_sign:
         // Set the location of @ and continue. Next token should be the
         // attribute name.
@@ -237,9 +217,6 @@ SyntaxModelContext::SyntaxModelContext(SourceFile &SrcFile)
     assert(Nodes.empty() || SM.isBeforeInBuffer(Nodes.back().Range.getStart(),
                                                 Loc));
     Nodes.emplace_back(Kind, CharSourceRange(Loc, Length.getValue()));
-
-    for (auto Trailer : Tok.getTrailingTrivia())
-      addTrivia(Trailer, Nodes);
   }
 
   Impl.TokenNodes = std::move(Nodes);
@@ -332,7 +309,7 @@ private:
   typedef std::pair<const DeclAttribute *, SourceRange> DeclAttributeAndRange;
 
   bool handleSpecialDeclAttribute(const DeclAttribute *Decl,
-                                  std::vector<syntax::Token> &Toks);
+                                  std::vector<Token> &Toks);
   bool handleAttrRanges(ArrayRef<DeclAttributeAndRange> DeclRanges);
 
   void handleStmtCondition(StmtCondition cond);
@@ -1084,7 +1061,7 @@ bool ModelASTWalker::annotateIfConfigConditionIdentifiers(Expr *Cond) {
 }
 
 bool ModelASTWalker::handleSpecialDeclAttribute(const DeclAttribute *D,
-                                          std::vector<syntax::Token> &Toks) {
+                                                std::vector<Token> &Toks) {
   if (!D)
     return false;
   if (isa<AvailableAttr>(D)) {
@@ -1159,8 +1136,8 @@ bool ModelASTWalker::handleAttrRanges(ArrayRef<DeclAttributeAndRange> DeclRanges
 
   SourceLoc BeginLoc = DeclRanges.front().second.Start;
 
-  auto Toks = swift::tokenize(
-      LangOpts, SM, EOFRetention::KeepEOF, BufferID,
+  std::vector<Token> Toks = swift::tokenize(
+      LangOpts, SM, BufferID,
       SM.getLocOffsetInBuffer(BeginLoc, BufferID),
       SM.getLocOffsetInBuffer(DeclRanges.back().second.End, BufferID),
       /*KeepComments=*/true,

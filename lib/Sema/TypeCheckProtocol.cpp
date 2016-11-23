@@ -5,8 +5,8 @@
 // Copyright (c) 2014 - 2016 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
-// See http://swift.org/LICENSE.txt for license information
-// See http://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
+// See https://swift.org/LICENSE.txt for license information
+// See https://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
 //
 //===----------------------------------------------------------------------===//
 //
@@ -1110,8 +1110,14 @@ RequirementEnvironment::RequirementEnvironment(
       auto first = reqReq.getFirstType().subst(reqToSyntheticEnvMap);
       auto second = reqReq.getSecondType().subst(reqToSyntheticEnvMap);
 
+      // FIXME: We really want to check hasTypeParameter here, but the
+      // ArchetypeBuilder isn't ready for that.
       if (!first->isTypeParameter()) {
-        assert(second->isTypeParameter());
+        // When the second is not a type parameter either, drop the requirement.
+        // If the types were different, this requirement will be unsatisfiable.
+        if (!second->isTypeParameter()) continue;
+
+        // Put the type parameter first.
         std::swap(first, second);
       }
 
@@ -2378,11 +2384,7 @@ static void diagnoseNoWitness(ValueDecl *Requirement, Type RequirementType,
       Options.AccessibilityFilter = Accessibility::Private;
       Options.PrintAccessibility = false;
       Options.FunctionBody = [](const ValueDecl *VD) { return "<#code#>"; };
-      Type SelfType = Adopter->getSelfTypeInContext();
-      if (Adopter->getAsClassOrClassExtensionContext())
-        Options.setArchetypeSelfTransform(SelfType);
-      else
-        Options.setArchetypeAndDynamicSelfTransform(SelfType);
+      Options.setBaseType(Adopter->getSelfTypeInContext());
       Options.CurrentModule = Adopter->getParentModule();
       if (!Adopter->isExtensionContext()) {
         // Create a variable declaration instead of a computed property in

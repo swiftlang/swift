@@ -5,8 +5,8 @@
 // Copyright (c) 2014 - 2016 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
-// See http://swift.org/LICENSE.txt for license information
-// See http://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
+// See https://swift.org/LICENSE.txt for license information
+// See https://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
 //
 //===----------------------------------------------------------------------===//
 //
@@ -809,12 +809,6 @@ public:
   /// For a ReferenceStorageType like @unowned, this returns the referent.
   /// Otherwise, it returns the type itself.
   Type getReferenceStorageReferent();
-
-  /// This is to check the pre-condition of calling
-  /// getMemberSubstitutions(const DeclContext *dc)
-  /// The function checks whether the given context can be treated as a part
-  /// of the type.
-  bool canTreatContextAsMember(const DeclContext *dc);
 
   /// Determine the set of substitutions that should be applied to a
   /// type spelled within the given DeclContext to treat it as a
@@ -3782,9 +3776,6 @@ class ArchetypeType final : public SubstitutableType,
   friend TrailingObjects;
 
 public:
-  typedef llvm::PointerUnion<AssociatedTypeDecl *, ProtocolDecl *>
-    AssocTypeOrProtocolType;
-  
   /// A nested type. Either a dependent associated archetype, or a concrete
   /// type (which may be a bound archetype from an outer context).
   class NestedType {
@@ -3831,7 +3822,7 @@ private:
   Type Superclass;
 
   llvm::PointerUnion<ArchetypeType *, TypeBase *> ParentOrOpened;
-  AssocTypeOrProtocolType AssocTypeOrProto;
+  AssociatedTypeDecl *AssocType;
   Identifier Name;
   unsigned isRecursive: 1;
   MutableArrayRef<std::pair<Identifier, NestedType>> NestedTypes;
@@ -3851,7 +3842,7 @@ public:
   /// The ConformsTo array will be copied into the ASTContext by this routine.
   static CanTypeWrapper<ArchetypeType>
                         getNew(const ASTContext &Ctx, ArchetypeType *Parent,
-                               AssocTypeOrProtocolType AssocTypeOrProto,
+                               AssociatedTypeDecl *AssocType,
                                Identifier Name, ArrayRef<Type> ConformsTo,
                                Type Superclass,
                                bool isRecursive = false);
@@ -3862,7 +3853,7 @@ public:
   /// by this routine.
   static CanTypeWrapper<ArchetypeType>
                         getNew(const ASTContext &Ctx, ArchetypeType *Parent,
-                               AssocTypeOrProtocolType AssocTypeOrProto,
+                               AssociatedTypeDecl *AssocType,
                                Identifier Name,
                                SmallVectorImpl<ProtocolDecl *> &ConformsTo,
                                Type Superclass,
@@ -3910,15 +3901,9 @@ public:
   /// be a member of one of the protocols to which the parent archetype
   /// conforms.
   AssociatedTypeDecl *getAssocType() const {
-    return AssocTypeOrProto.dyn_cast<AssociatedTypeDecl *>();
+    return AssocType;
   }
 
-  /// Retrieve the protocol for which this archetype describes the 'Self'
-  /// parameter.
-  ProtocolDecl *getSelfProtocol() const {
-    return AssocTypeOrProto.dyn_cast<ProtocolDecl *>();
-  }
-  
   /// getConformsTo - Retrieve the set of protocols to which this substitutable
   /// type shall conform.
   ArrayRef<ProtocolDecl *> getConformsTo() const { return ConformsTo; }
@@ -3934,12 +3919,6 @@ public:
   /// \brief Return true if the archetype has any requirements at all.
   bool hasRequirements() const {
     return !getConformsTo().empty() || getSuperclass();
-  }
-
-  /// Retrieve either the associated type or the protocol to which this
-  /// associated type corresponds.
-  AssocTypeOrProtocolType getAssocTypeOrProtocol() const {
-    return AssocTypeOrProto;
   }
 
   /// \brief Retrieve the nested type with the given name.
@@ -3998,14 +3977,14 @@ public:
   
 private:
   ArchetypeType(const ASTContext &Ctx, ArchetypeType *Parent,
-                AssocTypeOrProtocolType AssocTypeOrProto,
+                AssociatedTypeDecl *AssocType,
                 Identifier Name, ArrayRef<ProtocolDecl *> ConformsTo,
                 Type Superclass,
                 bool isRecursive = false)
     : SubstitutableType(TypeKind::Archetype, &Ctx,
                         RecursiveTypeProperties::HasArchetype),
       ConformsTo(ConformsTo), Superclass(Superclass), ParentOrOpened(Parent),
-      AssocTypeOrProto(AssocTypeOrProto), Name(Name),
+      AssocType(AssocType), Name(Name),
       isRecursive(isRecursive) { }
 
   ArchetypeType(const ASTContext &Ctx, 
@@ -4018,6 +3997,7 @@ private:
                           RecursiveTypeProperties::HasOpenedExistential)),
       ConformsTo(ConformsTo), Superclass(Superclass),
       ParentOrOpened(Existential.getPointer()),
+      AssocType(nullptr),
       isRecursive(isRecursive) { }
 };
 BEGIN_CAN_TYPE_WRAPPER(ArchetypeType, SubstitutableType)

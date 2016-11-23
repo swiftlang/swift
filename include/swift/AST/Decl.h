@@ -5,8 +5,8 @@
 // Copyright (c) 2014 - 2016 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
-// See http://swift.org/LICENSE.txt for license information
-// See http://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
+// See https://swift.org/LICENSE.txt for license information
+// See https://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
 //
 //===----------------------------------------------------------------------===//
 //
@@ -4991,9 +4991,10 @@ public:
   const TypeLoc &getBodyResultTypeLoc() const { return FnRetType; }
 
   /// Retrieve the result type of this function.
-  ///
-  /// \sa getBodyResultType
   Type getResultType() const;
+
+  /// Retrieve the result interface type of this function.
+  Type getResultInterfaceType() const;
 
   /// Retrieve the result type of this function for use within the function
   /// definition.
@@ -5409,6 +5410,9 @@ public:
 
   /// \brief Get the type of the constructed object.
   Type getResultType() const;
+
+  /// \brief Get the interface type of the constructed object.
+  Type getResultInterfaceType() const;
 
   /// Get the interface type of the initializing constructor.
   Type getInitializerInterfaceType();

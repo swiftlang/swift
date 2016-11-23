@@ -5,8 +5,8 @@
 // Copyright (c) 2014 - 2016 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
-// See http://swift.org/LICENSE.txt for license information
-// See http://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
+// See https://swift.org/LICENSE.txt for license information
+// See https://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
 //
 //===----------------------------------------------------------------------===//
 
@@ -3122,7 +3122,8 @@ public:
                                bool includePrivate,
                                std::vector<OperatorDecl *> &results) {
     for (auto &pair : map) {
-      if (pair.second.getInt() || includePrivate) {
+      if (pair.second.getPointer() &&
+          (pair.second.getInt() || includePrivate)) {
         results.push_back(pair.second.getPointer());
       }
     }
@@ -4103,7 +4104,7 @@ public:
       DeclNameOffsetLocatorPrinter Printer(OS);
       PrintOptions Options;
       if (auto transformType = CurrDeclContext->getDeclaredTypeInContext())
-        Options.setArchetypeSelfTransform(transformType);
+        Options.setBaseType(transformType);
       Options.PrintDefaultParameterPlaceholder = false;
       Options.PrintImplicitAttrs = false;
       Options.ExclusiveAttrList.push_back(TAK_escaping);
@@ -4425,7 +4426,7 @@ void CodeCompletionCallbacksImpl::completePostfixExprParen(Expr *E,
   // When it appears that there is already code for the call present, just
   // complete values and/or argument labels.  Otherwise give the entire call
   // pattern.
-  auto next = P.peekToken();
+  Token next = P.peekToken();
   if (next.isAtStartOfLine() || next.is(tok::eof)) {
     ShouldCompleteCallPatternAfterParen = true;
   } else if (next.is(tok::r_paren)) {

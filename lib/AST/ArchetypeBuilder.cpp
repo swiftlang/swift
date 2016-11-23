@@ -5,8 +5,8 @@
 // Copyright (c) 2014 - 2016 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
-// See http://swift.org/LICENSE.txt for license information
-// See http://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
+// See https://swift.org/LICENSE.txt for license information
+// See https://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
 //
 //===----------------------------------------------------------------------===//
 //
@@ -127,6 +127,9 @@ struct ArchetypeBuilder::Implementation {
   /// Once all requirements have been added, this will be zero in well-formed
   /// code.
   unsigned NumUnresolvedNestedTypes = 0;
+
+  /// The nested types that have been renamed.
+  SmallVector<PotentialArchetype *, 4> RenamedNestedTypes;
 };
 
 ArchetypeBuilder::PotentialArchetype::~PotentialArchetype() {
@@ -611,13 +614,12 @@ ArchetypeBuilder::PotentialArchetype::getType(ArchetypeBuilder &builder) {
     return representative->ArchetypeOrConcreteType;
   }
   
-  ArchetypeType::AssocTypeOrProtocolType assocTypeOrProto = RootProtocol;
+  AssociatedTypeDecl *assocType = nullptr;
+
   // Allocate a new archetype.
   ArchetypeType *ParentArchetype = nullptr;
   auto &mod = builder.getModule();
   if (auto parent = getParent()) {
-    assert(assocTypeOrProto.isNull() &&
-           "root protocol type given for non-root archetype");
     auto parentTy = parent->getType(builder);
     if (!parentTy)
       return NestedType::forConcreteType(
@@ -668,7 +670,7 @@ ArchetypeBuilder::PotentialArchetype::getType(ArchetypeBuilder &builder) {
       }
     }
 
-    assocTypeOrProto = getResolvedAssociatedType();
+    assocType = getResolvedAssociatedType();
   }
 
   // If we ended up building our parent archetype, then we'll have
@@ -711,7 +713,7 @@ ArchetypeBuilder::PotentialArchetype::getType(ArchetypeBuilder &builder) {
 
   auto arch
     = ArchetypeType::getNew(builder.getASTContext(), ParentArchetype,
-                            assocTypeOrProto, getName(), Protos,
+                            assocType, getName(), Protos,
                             superclass, isRecursive());
 
   representative->ArchetypeOrConcreteType = NestedType::forArchetype(arch);
@@ -865,7 +867,6 @@ auto ArchetypeBuilder::resolveArchetype(Type type) -> PotentialArchetype * {
 }
 
 auto ArchetypeBuilder::addGenericParameter(GenericTypeParamType *GenericParam,
-                                           ProtocolDecl *RootProtocol,
                                            Identifier ParamName)
        -> PotentialArchetype *
 {
@@ -873,21 +874,15 @@ auto ArchetypeBuilder::addGenericParameter(GenericTypeParamType *GenericParam,
   
   // Create a potential archetype for this type parameter.
   assert(!Impl->PotentialArchetypes[Key]);
-  auto PA = new PotentialArchetype(GenericParam, RootProtocol, ParamName);
+  auto PA = new PotentialArchetype(GenericParam, ParamName);
 
   Impl->PotentialArchetypes[Key] = PA;
   return PA;
 }
 
 void ArchetypeBuilder::addGenericParameter(GenericTypeParamDecl *GenericParam) {
-  ProtocolDecl *RootProtocol = dyn_cast<ProtocolDecl>(GenericParam->getDeclContext());
-  if (!RootProtocol) {
-    if (auto Ext = dyn_cast<ExtensionDecl>(GenericParam->getDeclContext()))
-      RootProtocol = dyn_cast_or_null<ProtocolDecl>(Ext->getExtendedType()->getAnyNominal());
-  }
   addGenericParameter(
         GenericParam->getDeclaredType()->castTo<GenericTypeParamType>(),
-        RootProtocol,
         GenericParam->getName());
 }
 
@@ -909,7 +904,7 @@ void ArchetypeBuilder::addGenericParameter(GenericTypeParamType *GenericParam) {
   if (name.str().startswith("$"))
     name = Context.getIdentifier(name.str().slice(1, name.str().size()));
   
-  addGenericParameter(GenericParam, nullptr, name);
+  addGenericParameter(GenericParam, name);
 }
 
 bool ArchetypeBuilder::addConformanceRequirement(PotentialArchetype *PAT,
@@ -972,6 +967,8 @@ bool ArchetypeBuilder::addConformanceRequirement(PotentialArchetype *PAT,
 bool ArchetypeBuilder::addSuperclassRequirement(PotentialArchetype *T,
                                                 Type Superclass,
                                                 RequirementSource Source) {
+  T = T->getRepresentative();
+
   if (Superclass->hasArchetype()) {
     // Map contextual type to interface type.
     // FIXME: There might be a better way to do this.
@@ -1146,6 +1143,17 @@ static int compareDependentTypes(ArchetypeBuilder::PotentialArchetype * const* p
   if (b->getResolvedAssociatedType())
     return +1;
 
+  // Along the error path where one or both of the potential archetypes was
+  // renamed due to typo correction,
+  if (a->wasRenamed() || b->wasRenamed()) {
+    if (a->wasRenamed() != b->wasRenamed())
+      return a->wasRenamed() ? +1 : -1;
+
+    if (int compareNames = a->getOriginalName().str().compare(
+                                                    b->getOriginalName().str()))
+      return compareNames;
+  }
+
   llvm_unreachable("potential archetype total order failure");
 }
 
@@ -1224,7 +1232,11 @@ bool ArchetypeBuilder::addSameTypeRequirementBetweenArchetypes(
   for (auto equiv : T2->EquivalenceClass)
     T1->EquivalenceClass.push_back(equiv);
 
-  // FIXME: superclass requirements!
+  // Superclass requirements.
+  if (T2->Superclass) {
+    addSuperclassRequirement(T1, T2->getSuperclass(),
+                             T2->getSuperclassSource());
+  }
 
   // Add all of the protocol conformance requirements of T2 to T1.
   for (auto conforms : T2->ConformsTo) {
@@ -1300,7 +1312,6 @@ bool ArchetypeBuilder::addSameTypeRequirementToConcrete(
   }
 
   // Recursively resolve the associated types to their concrete types.
-  RequirementSource nestedSource(RequirementSource::Redundant, Source.getLoc());
   for (auto nested : T->getNestedTypes()) {
     AssociatedTypeDecl *assocType
       = nested.second.front()->getResolvedAssociatedType();
@@ -1309,7 +1320,7 @@ bool ArchetypeBuilder::addSameTypeRequirementToConcrete(
           concreteArchetype->getNestedType(nested.first);
       addSameTypeRequirementToConcrete(nested.second.front(),
                                        witnessType.getValue(),
-                                       nestedSource);
+                                       Source);
     } else {
       assert(conformances.count(assocType->getProtocol()) > 0
              && "missing conformance?");
@@ -1326,11 +1337,11 @@ bool ArchetypeBuilder::addSameTypeRequirementToConcrete(
       if (auto witnessPA = resolveArchetype(witnessType)) {
         addSameTypeRequirementBetweenArchetypes(nested.second.front(),
                                                 witnessPA,
-                                                nestedSource);
+                                                Source);
       } else {
         addSameTypeRequirementToConcrete(nested.second.front(),
                                          witnessType,
-                                         nestedSource);
+                                         Source);
       }
     }
   }
@@ -1846,6 +1857,7 @@ ArchetypeBuilder::finalize(SourceLoc loc, bool allowConcreteGenericParams) {
 
       // Set the typo-corrected name.
       pa->setRenamed(correction);
+      Impl->RenamedNestedTypes.push_back(pa);
       
       // Resolve the associated type and merge the potential archetypes.
       auto replacement = pa->getParent()->getNestedType(correction, *this);
@@ -1854,6 +1866,20 @@ ArchetypeBuilder::finalize(SourceLoc loc, bool allowConcreteGenericParams) {
         RequirementSource(RequirementSource::Redundant, SourceLoc()));
     });
   }
+}
+
+bool ArchetypeBuilder::diagnoseRemainingRenames(SourceLoc loc) {
+  bool invalid = false;
+  for (auto pa : Impl->RenamedNestedTypes) {
+    if (pa->alreadyDiagnosedRename()) continue;
+
+    Diags.diagnose(loc, diag::invalid_member_type_suggest,
+                   pa->getParent()->getDependentType(*this, true),
+                   pa->getOriginalName(), pa->getName());
+    invalid = true;
+  }
+
+  return invalid;
 }
 
 template<typename F>

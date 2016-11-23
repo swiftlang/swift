@@ -5,8 +5,8 @@
 ; Copyright (c) 2014 - 2016 Apple Inc. and the Swift project authors
 ; Licensed under Apache License v2.0 with Runtime Library Exception
 ;
-; See http://swift.org/LICENSE.txt for license information
-; See http://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
+; See https://swift.org/LICENSE.txt for license information
+; See https://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
 ;
 ;===----------------------------------------------------------------------===;
 
@@ -241,7 +241,6 @@ generic-parameter-list? ( `.' identifier generic-parameter-list?
 )*, returning t if the initial identifier was found and nil otherwise."
   (when (swift-skip-identifier)
     (swift-skip-generic-parameter-list)
-    (swift-skip-re "\\?+")
     (when (swift-skip-re "\\.")
       (swift-skip-simple-type-name))
     t))
@@ -264,9 +263,10 @@ one is present, returning t if so and nil otherwise"
            (setq found t)))
 
           ;; followed by "->"
-          (prog1 (swift-skip-re "throws\\|rethrows\\|->")
-            (swift-skip-re "->") ;; accounts for the throws/rethrows cases on the previous line
-            (swift-skip-comments-and-space))))
+         (prog2 (swift-skip-re "\\?+")
+             (swift-skip-re "throws\\|rethrows\\|->")
+           (swift-skip-re "->") ;; accounts for the throws/rethrows cases on the previous line
+           (swift-skip-comments-and-space))))
     found))
 
 (defun swift-skip-constraint ()
@@ -326,8 +326,9 @@ Use `M-x hs-show-all' to show them again."
                     (swift-skip-comments-and-space)
                     (equal (char-after) ?\())
                   ;; parse the parameter list and any return type
-                  (swift-skip-type-name)
-                  (swift-skip-where-clause)))))
+                  (prog1
+                    (swift-skip-type-name)
+                    (swift-skip-where-clause))))))
              (swift-skip-re "{"))
           (hs-hide-block :reposition-at-end))))))
 

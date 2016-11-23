@@ -5,8 +5,8 @@
 // Copyright (c) 2014 - 2016 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
-// See http://swift.org/LICENSE.txt for license information
-// See http://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
+// See https://swift.org/LICENSE.txt for license information
+// See https://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
 //
 //===----------------------------------------------------------------------===//
 
@@ -208,7 +208,7 @@ namespace {
         return true;
       }
       P.Tok.getText().getAsInteger(0, Result);
-      P.consumeLoc(tok::integer_literal);
+      P.consumeToken(tok::integer_literal);
       return false;
     }
 
@@ -341,7 +341,7 @@ bool SILParser::parseSILIdentifier(Identifier &Result, SourceLoc &Loc,
   }
 
   Loc = P.Tok.getLoc();
-  P.consumeLoc();
+  P.consumeToken();
   return false;
 }
 
@@ -610,14 +610,14 @@ static bool parseSILLinkage(Optional<SILLinkage> &Result, Parser &P) {
   // Unfortunate collision with access control keywords.
   if (P.Tok.is(tok::kw_public)) {
     Result = SILLinkage::Public;
-    P.consumeLoc();
+    P.consumeToken();
     return false;
   }
 
   // Unfortunate collision with access control keywords.
   if (P.Tok.is(tok::kw_private)) {
     Result = SILLinkage::Private;
-    P.consumeLoc();
+    P.consumeToken();
     return false;
   }
 
@@ -638,7 +638,7 @@ static bool parseSILLinkage(Optional<SILLinkage> &Result, Parser &P) {
 
   // If we succeed, consume the token.
   if (Result) {
-    P.consumeLoc(tok::identifier);
+    P.consumeToken(tok::identifier);
   }
 
   return false;
@@ -689,7 +689,7 @@ static bool parseDeclSILOptional(bool *isTransparent, bool *isFragile,
   while (SP.P.consumeIf(tok::l_square)) {
     if (isLet && SP.P.Tok.is(tok::kw_let)) {
       *isLet = true;
-      SP.P.consumeLoc(tok::kw_let);
+      SP.P.consumeToken(tok::kw_let);
       SP.P.parseToken(tok::r_square, diag::expected_in_attribute_list);
       continue;
     }
@@ -717,7 +717,7 @@ static bool parseDeclSILOptional(bool *isTransparent, bool *isFragile,
     else if (MRK && SP.P.Tok.getText() == "readwrite")
       *MRK = EffectsKind::ReadWrite;
     else if (Semantics && SP.P.Tok.getText() == "_semantics") {
-      SP.P.consumeLoc(tok::identifier);
+      SP.P.consumeToken(tok::identifier);
       if (SP.P.Tok.getKind() != tok::string_literal) {
         SP.P.diagnose(SP.P.Tok, diag::expected_in_attribute_list);
         return true;
@@ -726,13 +726,13 @@ static bool parseDeclSILOptional(bool *isTransparent, bool *isFragile,
       // Drop the double quotes.
       StringRef rawString = SP.P.Tok.getText().drop_front().drop_back();
       Semantics->push_back(rawString);
-      SP.P.consumeLoc(tok::string_literal);
+      SP.P.consumeToken(tok::string_literal);
 
       SP.P.parseToken(tok::r_square, diag::expected_in_attribute_list);
       continue;
     }
     else if (SpecAttrs && SP.P.Tok.getText() == "_specialize") {
-      SP.P.consumeLoc(tok::identifier);
+      SP.P.consumeToken(tok::identifier);
 
       /// Parse a specialized attributed, building a parsed substitution list
       /// and pushing a new ParsedSpecAttr on the SpecAttrs list. Conformances
@@ -748,7 +748,7 @@ static bool parseDeclSILOptional(bool *isTransparent, bool *isFragile,
       continue;
     }
     else if (ClangDecl && SP.P.Tok.getText() == "clang") {
-      SP.P.consumeLoc(tok::identifier);
+      SP.P.consumeToken(tok::identifier);
       if (SP.parseSILDottedPathWithoutPound(*ClangDecl))
         return true;
 
@@ -759,7 +759,7 @@ static bool parseDeclSILOptional(bool *isTransparent, bool *isFragile,
       SP.P.diagnose(SP.P.Tok, diag::expected_in_attribute_list);
       return true;
     }
-    SP.P.consumeLoc(tok::identifier);
+    SP.P.consumeToken(tok::identifier);
     SP.P.parseToken(tok::r_square, diag::expected_in_attribute_list);
   }
   return false;
@@ -848,7 +848,7 @@ bool SILParser::parseSILType(SILType &Result,
   SILValueCategory category = SILValueCategory::Object;
   if (P.Tok.isAnyOperator() && P.Tok.getText() == "*") {
     category = SILValueCategory::Address;
-    P.consumeLoc();
+    P.consumeToken();
   }
 
   // Parse attributes.
@@ -1067,7 +1067,7 @@ bool SILParser::parseSILDeclRef(SILDeclRef &Result,
         break;
     } else if (ParseState < 2 && P.Tok.is(tok::integer_literal)) {
       P.Tok.getText().getAsInteger(0, uncurryLevel);
-      P.consumeLoc(tok::integer_literal);
+      P.consumeToken(tok::integer_literal);
       ParseState = 2;
     } else
       // TODO: resilience expansion?
@@ -1090,7 +1090,7 @@ bool SILParser::parseValueName(UnresolvedValueName &Result) {
   Result.Name = P.Tok.getText();
 
   if (P.Tok.is(tok::kw_undef)) {
-    Result.NameLoc = P.consumeLoc(tok::kw_undef);
+    Result.NameLoc = P.consumeToken(tok::kw_undef);
     return false;
   }
 
@@ -1150,7 +1150,7 @@ bool SILParser::parseSILOpcode(ValueKind &Opcode, SourceLoc &OpcodeLoc,
                .Default(ValueKind::SILArgument);
 
   if (Opcode != ValueKind::SILArgument) {
-    P.consumeLoc();
+    P.consumeToken();
     return false;
   }
   P.diagnose(OpcodeLoc, diag::expected_sil_instr_opcode);
@@ -1164,10 +1164,10 @@ static bool peekSILDebugLocation(Parser &P) {
 
 bool SILParser::parseSILDebugVar(SILDebugVariable &Var) {
   while (P.Tok.is(tok::comma) && !peekSILDebugLocation(P)) {
-    P.consumeLoc();
+    P.consumeToken();
     StringRef Key = P.Tok.getText();
     if (Key == "name") {
-      P.consumeLoc();
+      P.consumeToken();
       if (P.Tok.getKind() != tok::string_literal) {
         P.diagnose(P.Tok, diag::expected_tok_in_sil_instr, "string");
         return true;
@@ -1176,7 +1176,7 @@ bool SILParser::parseSILDebugVar(SILDebugVariable &Var) {
       StringRef Val = P.Tok.getText().drop_front().drop_back();
       Var.Name = Val;
     } else if (Key == "argno") {
-      P.consumeLoc();
+      P.consumeToken();
       if (P.Tok.getKind() != tok::integer_literal) {
         P.diagnose(P.Tok, diag::expected_tok_in_sil_instr, "integer");
         return true;
@@ -1193,7 +1193,7 @@ bool SILParser::parseSILDebugVar(SILDebugVariable &Var) {
       P.diagnose(P.Tok, diag::sil_dbg_unknown_key, Key);
       return true;
     }
-    P.consumeLoc();
+    P.consumeToken();
   }
   return false;
 }
@@ -1201,7 +1201,7 @@ bool SILParser::parseSILDebugVar(SILDebugVariable &Var) {
 bool SILParser::parseSILBBArgsAtBranch(SmallVector<SILValue, 6> &Args,
                                        SILBuilder &B) {
   if (P.Tok.is(tok::l_paren)) {
-    SourceLoc LParenLoc = P.consumeLoc(tok::l_paren);
+    SourceLoc LParenLoc = P.consumeToken(tok::l_paren);
     SourceLoc RParenLoc;
 
     if (P.parseList(tok::r_paren, LParenLoc, RParenLoc,
@@ -1229,7 +1229,7 @@ bool SILParser::parseSubstitutions(SmallVectorImpl<ParsedSubstitution> &parsed,
   if (!P.Tok.isContextualPunctuator("<"))
     return false;
   
-  P.consumeLoc();
+  P.consumeToken();
   
   // Parse a list of Substitutions.
   do {
@@ -1250,7 +1250,7 @@ bool SILParser::parseSubstitutions(SmallVectorImpl<ParsedSubstitution> &parsed,
     P.diagnose(P.Tok, diag::expected_tok_in_sil_instr, ">");
     return true;
   }
-  P.consumeLoc();
+  P.consumeToken();
   
   return false;
 }
@@ -1415,7 +1415,7 @@ bool SILParser::parseSILLocation(SILLocation &Loc) {
   // Drop the double quotes.
   StringRef File = P.Tok.getText().drop_front().drop_back();
   L.Filename = P.Context.getIdentifier(File).str().data();
-  P.consumeLoc(tok::string_literal);
+  P.consumeToken(tok::string_literal);
   if (P.parseToken(tok::colon, diag::expected_colon_in_sil_location))
     return true;
   if (parseInteger(L.Line, diag::sil_invalid_line_in_sil_location))
@@ -1448,7 +1448,7 @@ bool SILParser::parseSILDebugLocation(SILLocation &L, SILBuilder &B,
                                       bool parsedComma) {
   // Parse the debug information, if any.
   if (P.Tok.is(tok::comma)) {
-    P.consumeLoc();
+    P.consumeToken();
     parsedComma = true;
   }
   if (!parsedComma)
@@ -1460,7 +1460,7 @@ bool SILParser::parseSILDebugLocation(SILLocation &L, SILBuilder &B,
       return true;
 
     if (P.Tok.is(tok::comma)) {
-      P.consumeLoc();
+      P.consumeToken();
       requireScope = true;
     }
   }
@@ -1544,7 +1544,7 @@ bool SILParser::parseSILInstruction(SILBasicBlock *BB, SILBuilder &B) {
   if (P.Tok.is(tok::sil_local_name)) {
     ResultName = P.Tok.getText();
     ResultNameLoc = P.Tok.getLoc();
-    P.consumeLoc(tok::sil_local_name);
+    P.consumeToken(tok::sil_local_name);
     if (P.parseToken(tok::equal, diag::expected_equal_in_sil_instr))
       return true;
   }
@@ -1613,7 +1613,7 @@ bool SILParser::parseSILInstruction(SILBasicBlock *BB, SILBuilder &B) {
     bool Negative = false;
     if (P.Tok.isAnyOperator() && P.Tok.getText() == "-") {
       Negative = true;
-      P.consumeLoc();
+      P.consumeToken();
     }
     if (P.Tok.getKind() != tok::integer_literal) {
       P.diagnose(P.Tok, diag::expected_tok_in_sil_instr, "integer");
@@ -1636,7 +1636,7 @@ bool SILParser::parseSILInstruction(SILBasicBlock *BB, SILBuilder &B) {
     if (value.getBitWidth() != intTy->getGreatestWidth())
       value = value.zextOrTrunc(intTy->getGreatestWidth());
 
-    P.consumeLoc(tok::integer_literal);
+    P.consumeToken(tok::integer_literal);
     if (parseSILDebugLocation(InstLoc, B))
       return true;
     ResultVal = B.createIntegerLiteral(InstLoc, Ty, value);
@@ -1672,7 +1672,7 @@ bool SILParser::parseSILInstruction(SILBasicBlock *BB, SILBuilder &B) {
     if (parseSILDebugLocation(InstLoc, B))
       return true;
     ResultVal = B.createFloatLiteral(InstLoc, Ty, value);
-    P.consumeLoc(tok::integer_literal);
+    P.consumeToken(tok::integer_literal);
     break;
   }
   case ValueKind::StringLiteralInst: {
@@ -1692,7 +1692,7 @@ bool SILParser::parseSILInstruction(SILBasicBlock *BB, SILBuilder &B) {
       P.diagnose(P.Tok, diag::sil_string_invalid_encoding, P.Tok.getText());
       return true;
     }
-    P.consumeLoc(tok::identifier);
+    P.consumeToken(tok::identifier);
 
     if (P.Tok.getKind() != tok::string_literal) {
       P.diagnose(P.Tok, diag::expected_tok_in_sil_instr, "string");
@@ -1705,7 +1705,7 @@ bool SILParser::parseSILInstruction(SILBasicBlock *BB, SILBuilder &B) {
     // Ask the lexer to interpret the entire string as a literal segment.
     SmallVector<char, 128> stringBuffer;
     StringRef string = P.L->getEncodedStringSegment(rawString, stringBuffer);
-    P.consumeLoc(tok::string_literal);
+    P.consumeToken(tok::string_literal);
     if (parseSILDebugLocation(InstLoc, B))
       return true;
     ResultVal = B.createStringLiteral(InstLoc, string, encoding);
@@ -1758,7 +1758,7 @@ bool SILParser::parseSILInstruction(SILBasicBlock *BB, SILBuilder &B) {
     assert(!error && "project_box index did not parse as integer?!");
     (void)error;
 
-    P.consumeLoc(tok::integer_literal);
+    P.consumeToken(tok::integer_literal);
     if (parseSILDebugLocation(InstLoc, B))
       return true;
     
@@ -1788,7 +1788,7 @@ bool SILParser::parseSILInstruction(SILBasicBlock *BB, SILBuilder &B) {
     }
     StringRef Str = P.Tok.getText();
     Identifier Id = P.Context.getIdentifier(Str.substr(1, Str.size()-2));
-    P.consumeLoc(tok::string_literal);
+    P.consumeToken(tok::string_literal);
     
     // Find the builtin in the Builtin module
     SmallVector<ValueDecl*, 2> foundBuiltins;
@@ -1822,7 +1822,7 @@ bool SILParser::parseSILInstruction(SILBasicBlock *BB, SILBuilder &B) {
       P.diagnose(P.Tok, diag::expected_tok_in_sil_instr, "(");
       return true;
     }
-    P.consumeLoc(tok::l_paren);
+    P.consumeToken(tok::l_paren);
 
     SmallVector<SILValue, 4> Args;
     while (true) {
@@ -1845,7 +1845,7 @@ bool SILParser::parseSILInstruction(SILBasicBlock *BB, SILBuilder &B) {
       P.diagnose(P.Tok, diag::expected_tok_in_sil_instr, ":");
       return true;
     }
-    P.consumeLoc(tok::colon);
+    P.consumeToken(tok::colon);
     
     SILType ResultTy;
     if (parseSILType(ResultTy))
@@ -2572,7 +2572,7 @@ bool SILParser::parseSILInstruction(SILBasicBlock *BB, SILBuilder &B) {
             !P.Tok.isAnyOperator() ||
             P.Tok.getText() != "*")
           return true;
-        P.consumeLoc();
+        P.consumeToken();
 
         SILValue ElemCount;
         if (parseTypedValueRef(ElemCount, B))
@@ -2770,7 +2770,7 @@ bool SILParser::parseSILInstruction(SILBasicBlock *BB, SILBuilder &B) {
       return true;
     
     if (P.Tok.is(tok::comma) && !peekSILDebugLocation(P)) {
-      P.consumeLoc(tok::comma);
+      P.consumeToken(tok::comma);
       if (parseTypedValueRef(Operand, B))
         return true;
     }
@@ -2839,7 +2839,7 @@ bool SILParser::parseSILInstruction(SILBasicBlock *BB, SILBuilder &B) {
       P.diagnose(P.Tok, diag::sil_tuple_inst_wrong_field);
       return true;
     }
-    P.consumeLoc(tok::integer_literal);
+    P.consumeToken(tok::integer_literal);
     if (parseSILDebugLocation(InstLoc, B))
       return true;
     auto ResultTy = TT->getElement(Field).getType()->getCanonicalType();
@@ -3019,7 +3019,7 @@ bool SILParser::parseSILInstruction(SILBasicBlock *BB, SILBuilder &B) {
     // Optional operand.
     SILValue Operand;
     if (P.Tok.is(tok::comma)) {
-      P.consumeLoc(tok::comma);
+      P.consumeToken(tok::comma);
       if (parseTypedValueRef(Operand, B))
         return true;
     }
@@ -3921,7 +3921,7 @@ bool SILParser::isStartOfSILInstruction() {
   if (P.Tok.is(tok::sil_local_name))
     return true;
   if (P.Tok.is(tok::identifier) || P.Tok.isKeyword()) {
-    auto peek = P.peekToken();
+    auto &peek = P.peekToken();
     return !peek.is(tok::l_paren) && !peek.is(tok::colon);
   }
   return false;
@@ -4007,7 +4007,7 @@ bool Parser::parseDeclSIL() {
   // properly handled.
   Lexer::SILBodyRAII Tmp(*L);
 
-  consumeLoc(tok::kw_sil);
+  consumeToken(tok::kw_sil);
 
   SILParser FunctionState(*this);
 
@@ -4140,7 +4140,7 @@ bool Parser::parseDeclSIL() {
 ///   decl-sil-stage:   [[only in SIL mode]]
 ///     'sil_stage' ('raw' | 'canonical')
 bool Parser::parseDeclSILStage() {
-  SourceLoc stageLoc = consumeLoc(tok::kw_sil_stage);
+  SourceLoc stageLoc = consumeToken(tok::kw_sil_stage);
   if (!Tok.is(tok::identifier)) {
     diagnose(Tok, diag::expected_sil_stage_name);
     return true;
@@ -4148,13 +4148,13 @@ bool Parser::parseDeclSILStage() {
   SILStage stage;
   if (Tok.isContextualKeyword("raw")) {
     stage = SILStage::Raw;
-    consumeLoc();
+    consumeToken();
   } else if (Tok.isContextualKeyword("canonical")) {
     stage = SILStage::Canonical;
-    consumeLoc();
+    consumeToken();
   } else {
     diagnose(Tok, diag::expected_sil_stage_name);
-    consumeLoc();
+    consumeToken();
     return true;
   }
   
@@ -4171,7 +4171,7 @@ bool Parser::parseDeclSILStage() {
 /// decl-sil-global: [[only in SIL mode]]
 ///   'sil_global' sil-linkage @name : sil-type [external]
 bool Parser::parseSILGlobal() {
-  consumeLoc(tok::kw_sil_global);
+  consumeToken(tok::kw_sil_global);
   Optional<SILLinkage> GlobalLinkage;
   Identifier GlobalName;
   SILType GlobalType;
@@ -4234,7 +4234,7 @@ bool Parser::parseSILGlobal() {
 /// sil-vtable-entry:
 ///   SILDeclRef ':' SILFunctionName
 bool Parser::parseSILVTable() {
-  consumeLoc(tok::kw_sil_vtable);
+  consumeToken(tok::kw_sil_vtable);
   SILParser VTableState(*this);
 
   // Parse the class name.
@@ -4260,7 +4260,7 @@ bool Parser::parseSILVTable() {
   }
 
   SourceLoc LBraceLoc = Tok.getLoc();
-  consumeLoc(tok::l_brace);
+  consumeToken(tok::l_brace);
 
   // We need to turn on InSILBody to parse SILDeclRef.
   Lexer::SILBodyRAII Tmp(*L);
@@ -4276,7 +4276,7 @@ bool Parser::parseSILVTable() {
         return true;
       SILFunction *Func = nullptr;
       if (Tok.is(tok::kw_nil)) {
-        consumeLoc();
+        consumeToken();
       } else {
         if (parseToken(tok::colon, diag::expected_sil_vtable_colon) ||
           VTableState.parseSILIdentifier(FuncName, FuncLoc,
@@ -4435,7 +4435,7 @@ ProtocolConformance *SILParser::parseProtocolConformanceHelper(
     return nullptr;
 
   if (P.Tok.is(tok::identifier) && P.Tok.getText() == "specialize") {
-    P.consumeLoc();
+    P.consumeToken();
 
     // Parse substitutions for specialized conformance.
     SmallVector<ParsedSubstitution, 4> parsedSubs;
@@ -4464,7 +4464,7 @@ ProtocolConformance *SILParser::parseProtocolConformanceHelper(
   }
 
   if (P.Tok.is(tok::identifier) && P.Tok.getText() == "inherit") {
-    P.consumeLoc();
+    P.consumeToken();
 
     if (P.parseToken(tok::l_paren, diag::expected_sil_witness_lparen))
       return nullptr;
@@ -4494,7 +4494,7 @@ ProtocolConformance *SILParser::parseProtocolConformanceHelper(
 ///                              protocol-conformance|dependent
 ///   base_protocol ProtocolName: protocol-conformance
 bool Parser::parseSILWitnessTable() {
-  consumeLoc(tok::kw_sil_witness_table);
+  consumeToken(tok::kw_sil_witness_table);
   SILParser WitnessState(*this);
   
   // Parse the linkage.
@@ -4549,7 +4549,7 @@ bool Parser::parseSILWitnessTable() {
   }
 
   SourceLoc LBraceLoc = Tok.getLoc();
-  consumeLoc(tok::l_brace);
+  consumeToken(tok::l_brace);
 
   // We need to turn on InSILBody to parse SILDeclRef.
   Lexer::SILBodyRAII Tmp(*L);
@@ -4603,7 +4603,7 @@ bool Parser::parseSILWitnessTable() {
             continue;
           conformance = ProtocolConformanceRef(concrete);
         } else {
-          consumeLoc();
+          consumeToken();
         }
 
         witnessEntries.push_back(SILWitnessTable::AssociatedTypeProtocolWitness{
@@ -4652,7 +4652,7 @@ bool Parser::parseSILWitnessTable() {
       
       SILFunction *Func = nullptr;
       if (Tok.is(tok::kw_nil)) {
-        consumeLoc();
+        consumeToken();
       } else {
         if (parseToken(tok::at_sign, diag::expected_sil_function_name) ||
             WitnessState.parseSILIdentifier(FuncName, FuncLoc,
@@ -4695,7 +4695,7 @@ bool Parser::parseSILWitnessTable() {
 ///   'method' SILDeclRef ':' @SILFunctionName
 ///   'no_default'
 bool Parser::parseSILDefaultWitnessTable() {
-  consumeLoc(tok::kw_sil_default_witness_table);
+  consumeToken(tok::kw_sil_default_witness_table);
   SILParser WitnessState(*this);
   
   // Parse the linkage.
@@ -4713,7 +4713,7 @@ bool Parser::parseSILDefaultWitnessTable() {
 
   // Parse the body.
   SourceLoc LBraceLoc = Tok.getLoc();
-  consumeLoc(tok::l_brace);
+  consumeToken(tok::l_brace);
 
   // We need to turn on InSILBody to parse SILDeclRef.
   Lexer::SILBodyRAII Tmp(*L);
@@ -4794,7 +4794,7 @@ llvm::Optional<llvm::coverage::Counter> SILParser::parseSILCoverageExpr(
   }
 
   if (P.Tok.is(tok::l_paren)) {
-    P.consumeLoc(tok::l_paren);
+    P.consumeToken(tok::l_paren);
     auto LHS = parseSILCoverageExpr(Builder);
     if (!LHS)
       return None;
@@ -4833,7 +4833,7 @@ llvm::Optional<llvm::coverage::Counter> SILParser::parseSILCoverageExpr(
 /// sil-coverage-expr:
 ///   ...
 bool Parser::parseSILCoverageMap() {
-  consumeLoc(tok::kw_sil_coverage_map);
+  consumeToken(tok::kw_sil_coverage_map);
   SILParser State(*this);
 
   // Parse the filename.
@@ -4865,7 +4865,7 @@ bool Parser::parseSILCoverageMap() {
     return true;
   }
   SourceLoc LBraceLoc = Tok.getLoc();
-  consumeLoc(tok::l_brace);
+  consumeToken(tok::l_brace);
 
   llvm::coverage::CounterExpressionBuilder Builder;
   std::vector<SILCoverageMap::MappedRegion> Regions;
@@ -4922,7 +4922,7 @@ bool Parser::parseSILCoverageMap() {
 /// scope-parent ::= sil-scope-ref
 /// debug-loc ::= 'loc' string-literal ':' [0-9]+ ':' [0-9]+
 bool Parser::parseSILScope() {
-  consumeLoc(tok::kw_sil_scope);
+  consumeToken(tok::kw_sil_scope);
   SILParser ScopeState(*this);
 
   SourceLoc SlotLoc = Tok.getLoc();
@@ -4931,7 +4931,7 @@ bool Parser::parseSILScope() {
     return true;
 
   SourceLoc LBraceLoc = Tok.getLoc();
-  consumeLoc(tok::l_brace);
+  consumeToken(tok::l_brace);
 
   StringRef Key = Tok.getText();
   RegularLocation Loc{SILLocation::DebugLoc()};
@@ -4972,7 +4972,7 @@ bool Parser::parseSILScope() {
 
   SILDebugScope *InlinedAt = nullptr;
   if (Tok.getText() == "inlined_at") {
-    consumeLoc();
+    consumeToken();
     if (ScopeState.parseScopeRef(InlinedAt))
       return true;
   }

@@ -5,8 +5,8 @@
 // Copyright (c) 2014 - 2016 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
-// See http://swift.org/LICENSE.txt for license information
-// See http://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
+// See https://swift.org/LICENSE.txt for license information
+// See https://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
 //
 //===----------------------------------------------------------------------===//
 ///
@@ -54,7 +54,7 @@ const uint16_t VERSION_MAJOR = 0;
 /// in source control, you should also update the comment to briefly
 /// describe what change you made. The content of this comment isn't important;
 /// it just ensures a conflict if two people change the module format.
-const uint16_t VERSION_MINOR = 283; // Last change: witness markers removed
+const uint16_t VERSION_MINOR = 284; // Last change: Self archetype protocol removed
 
 using DeclID = PointerEmbeddedInt<unsigned, 31>;
 using DeclIDField = BCFixed<31>;
@@ -626,7 +626,7 @@ namespace decls_block {
     ARCHETYPE_TYPE,
     IdentifierIDField,   // name
     TypeIDField,         // index if primary, parent if non-primary
-    DeclIDField,         // associated type or protocol decl
+    DeclIDField,         // associated type decl
     TypeIDField,         // superclass
     BCArray<DeclIDField> // conformances
     // Trailed by the nested types record.

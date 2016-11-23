@@ -14,13 +14,28 @@ public:
   LangOptions LangOpts;
   SourceManager SourceMgr;
 
-  std::vector<syntax::Token> checkLex(StringRef Source,
-                              ArrayRef<tok> ExpectedTokens) {
+  std::vector<Token> tokenizeAndKeepEOF(unsigned BufferID) {
+    Lexer L(LangOpts, SourceMgr, BufferID, /*Diags=*/nullptr,
+            /*InSILMode=*/false);
+    std::vector<Token> Tokens;
+    do {
+      Tokens.emplace_back();
+      L.lex(Tokens.back());
+    } while (Tokens.back().isNot(tok::eof));
+    return Tokens;
+  }
+
+  std::vector<Token> checkLex(StringRef Source,
+                              ArrayRef<tok> ExpectedTokens,
+                              bool KeepComments = false,
+                              bool KeepEOF = false) {
     unsigned BufID = SourceMgr.addMemBufferCopy(Source);
 
-    std::vector<syntax::Token> Toks;
-    Toks = tokenize(LangOpts, SourceMgr, EOFRetention::KeepEOF,
-                    BufID, 0, 0, true);
+    std::vector<Token> Toks;
+    if (KeepEOF)
+      Toks = tokenizeAndKeepEOF(BufID);
+    else
+      Toks = tokenize(LangOpts, SourceMgr, BufID, 0, 0, KeepComments);
     EXPECT_EQ(ExpectedTokens.size(), Toks.size());
     for (unsigned i = 0, e = ExpectedTokens.size(); i != e; ++i) {
       EXPECT_EQ(ExpectedTokens[i], Toks[i].getKind()) << "i = " << i;
@@ -34,47 +49,66 @@ public:
   }
 };
 
-
 TEST_F(LexerTest, TokenizeSkipComments) {
   const char *Source =
       "// Blah\n"
       "(/*yo*/)";
-  std::vector<tok> ExpectedTokens { tok::l_paren, tok::r_paren, tok::eof };
-  checkLex(Source, ExpectedTokens);
+  std::vector<tok> ExpectedTokens{ tok::l_paren, tok::r_paren };
+  checkLex(Source, ExpectedTokens, /*KeepComments=*/false);
+}
+
+TEST_F(LexerTest, TokenizeWithComments) {
+  const char *Source =
+      "// Blah\n"
+      "(/*yo*/)";
+  std::vector<tok> ExpectedTokens{
+    tok::comment, tok::l_paren, tok::comment, tok::r_paren
+  };
+  std::vector<Token> Toks = checkLex(Source, ExpectedTokens,
+                                     /*KeepComments=*/true);
+  EXPECT_EQ(Toks[0].getLength(), 8U);
+  EXPECT_EQ(Toks[2].getLength(), 6U);
+  EXPECT_EQ(getLocForEndOfToken(Toks[0].getLoc()),
+            Toks[0].getLoc().getAdvancedLoc(8));
 }
 
 TEST_F(LexerTest, EOFTokenLengthIsZero) {
   const char *Source = "meow";
-  std::vector<tok> ExpectedTokens {
-    tok::identifier,
-    tok::eof
-  };
-  auto Toks = checkLex(Source, ExpectedTokens);
-  EXPECT_EQ(Toks[1].getWidth(), 0U);
+  std::vector<tok> ExpectedTokens{ tok::identifier, tok::eof };
+  std::vector<Token> Toks = checkLex(Source, ExpectedTokens,
+                                     /*KeepComments=*/true,
+                                     /*KeepEOF=*/true);
+  EXPECT_EQ(Toks[1].getLength(), 0U);
 }
 
 TEST_F(LexerTest, BrokenStringLiteral1) {
   StringRef Source("\"meow\0", 6);
-  std::vector<tok> ExpectedTokens { tok::unknown, tok::eof };
-  auto Toks = checkLex(Source, ExpectedTokens);
-  EXPECT_EQ(Toks[0].getWidth(), 6U);
-  EXPECT_EQ(Toks[1].getWidth(), 0U);
+  std::vector<tok> ExpectedTokens{ tok::unknown, tok::eof };
+  std::vector<Token> Toks = checkLex(Source, ExpectedTokens,
+                                     /*KeepComments=*/true,
+                                     /*KeepEOF=*/true);
+  EXPECT_EQ(Toks[0].getLength(), 6U);
+  EXPECT_EQ(Toks[1].getLength(), 0U);
 }
 
 TEST_F(LexerTest, BrokenStringLiteral2) {
   StringRef Source("\"\\(meow\0", 8);
-  std::vector<tok> ExpectedTokens { tok::unknown, tok::eof };
-  auto Toks = checkLex(Source, ExpectedTokens);
-  EXPECT_EQ(Toks[0].getWidth(), 8U);
-  EXPECT_EQ(Toks[1].getWidth(), 0U);
+  std::vector<tok> ExpectedTokens{ tok::unknown, tok::eof };
+  std::vector<Token> Toks = checkLex(Source, ExpectedTokens,
+                                     /*KeepComments=*/true,
+                                     /*KeepEOF=*/true);
+  EXPECT_EQ(Toks[0].getLength(), 8U);
+  EXPECT_EQ(Toks[1].getLength(), 0U);
 }
 
 TEST_F(LexerTest, StringLiteralWithNUL1) {
   StringRef Source("\"\0\"", 3);
-  std::vector<tok> ExpectedTokens { tok::string_literal, tok::eof };
-  auto Toks = checkLex(Source, ExpectedTokens);
-  EXPECT_EQ(Toks[0].getWidth(), 3U);
-  EXPECT_EQ(Toks[1].getWidth(), 0U);
+  std::vector<tok> ExpectedTokens{ tok::string_literal, tok::eof };
+  std::vector<Token> Toks = checkLex(Source, ExpectedTokens,
+                                     /*KeepComments=*/true,
+                                     /*KeepEOF=*/true);
+  EXPECT_EQ(Toks[0].getLength(), 3U);
+  EXPECT_EQ(Toks[1].getLength(), 0U);
 }
 
 TEST_F(LexerTest, RestoreBasic) {
@@ -86,40 +120,41 @@ TEST_F(LexerTest, RestoreBasic) {
 
   Lexer L(LangOpts, SourceMgr, BufferID, /*Diags=*/nullptr, /*InSILMode=*/false);
 
-  auto Tok = L.lex();
+  Token Tok;
 
+  L.lex(Tok);
   ASSERT_EQ(tok::identifier, Tok.getKind());
   ASSERT_EQ("aaa", Tok.getText());
   ASSERT_TRUE(Tok.isAtStartOfLine());
 
-  Tok = L.lex();
+  L.lex(Tok);
   ASSERT_EQ(tok::identifier, Tok.getKind());
   ASSERT_EQ("bbb", Tok.getText());
   ASSERT_FALSE(Tok.isAtStartOfLine());
 
   Lexer::State S = L.getStateForBeginningOfToken(Tok);
 
-  Tok = L.lex();
+  L.lex(Tok);
   ASSERT_EQ(tok::identifier, Tok.getKind());
   ASSERT_EQ("ccc", Tok.getText());
   ASSERT_FALSE(Tok.isAtStartOfLine());
 
-  Tok = L.lex();
+  L.lex(Tok);
   ASSERT_EQ(tok::eof, Tok.getKind());
 
   L.restoreState(S);
 
-  Tok = L.lex();
+  L.lex(Tok);
   ASSERT_EQ(tok::identifier, Tok.getKind());
   ASSERT_EQ("bbb", Tok.getText());
   ASSERT_FALSE(Tok.isAtStartOfLine());
 
-  Tok = L.lex();
+  L.lex(Tok);
   ASSERT_EQ(tok::identifier, Tok.getKind());
   ASSERT_EQ("ccc", Tok.getText());
   ASSERT_FALSE(Tok.isAtStartOfLine());
 
-  Tok = L.lex();
+  L.lex(Tok);
   ASSERT_EQ(tok::eof, Tok.getKind());
 }
 
@@ -132,40 +167,41 @@ TEST_F(LexerTest, RestoreNewlineFlag) {
 
   Lexer L(LangOpts, SourceMgr, BufferID, /*Diags=*/nullptr, /*InSILMode=*/false);
 
-  auto Tok = L.lex();
+  Token Tok;
 
+  L.lex(Tok);
   ASSERT_EQ(tok::identifier, Tok.getKind());
   ASSERT_EQ("aaa", Tok.getText());
   ASSERT_TRUE(Tok.isAtStartOfLine());
 
-  Tok = L.lex();
+  L.lex(Tok);
   ASSERT_EQ(tok::identifier, Tok.getKind());
   ASSERT_EQ("bbb", Tok.getText());
   ASSERT_TRUE(Tok.isAtStartOfLine());
 
   Lexer::State S = L.getStateForBeginningOfToken(Tok);
 
-  Tok = L.lex();
+  L.lex(Tok);
   ASSERT_EQ(tok::identifier, Tok.getKind());
   ASSERT_EQ("ccc", Tok.getText());
   ASSERT_TRUE(Tok.isAtStartOfLine());
 
-  Tok = L.lex();
+  L.lex(Tok);
   ASSERT_EQ(tok::eof, Tok.getKind());
 
   L.restoreState(S);
 
-  Tok = L.lex();
+  L.lex(Tok);
   ASSERT_EQ(tok::identifier, Tok.getKind());
   ASSERT_EQ("bbb", Tok.getText());
   ASSERT_TRUE(Tok.isAtStartOfLine());
 
-  Tok = L.lex();
+  L.lex(Tok);
   ASSERT_EQ(tok::identifier, Tok.getKind());
   ASSERT_EQ("ccc", Tok.getText());
   ASSERT_TRUE(Tok.isAtStartOfLine());
 
-  Tok = L.lex();
+  L.lex(Tok);
   ASSERT_EQ(tok::eof, Tok.getKind());
 }
 
@@ -179,28 +215,30 @@ TEST_F(LexerTest, RestoreStopAtCodeCompletion) {
 
   Lexer L(LangOpts, SourceMgr, BufferID, /*Diags=*/nullptr, /*InSILMode=*/false);
 
-  auto Tok = L.lex();
+  Token Tok;
+
+  L.lex(Tok);
   ASSERT_EQ(tok::identifier, Tok.getKind());
   ASSERT_EQ("aaa", Tok.getText());
   ASSERT_TRUE(Tok.isAtStartOfLine());
 
-  Tok = L.lex();
+  L.lex(Tok);
   ASSERT_EQ(tok::code_complete, Tok.getKind());
   ASSERT_TRUE(Tok.isAtStartOfLine());
 
-  Tok = L.lex();
+  L.lex(Tok);
   ASSERT_EQ(tok::identifier, Tok.getKind());
   ASSERT_EQ("bbb", Tok.getText());
   ASSERT_FALSE(Tok.isAtStartOfLine());
 
   Lexer::State S = L.getStateForBeginningOfToken(Tok);
 
-  Tok = L.lex();
+  L.lex(Tok);
   ASSERT_EQ(tok::identifier, Tok.getKind());
   ASSERT_EQ("ccc", Tok.getText());
   ASSERT_TRUE(Tok.isAtStartOfLine());
 
-  Tok = L.lex();
+  L.lex(Tok);
   ASSERT_EQ(tok::eof, Tok.getKind());
 
   L.restoreState(S);
@@ -208,17 +246,17 @@ TEST_F(LexerTest, RestoreStopAtCodeCompletion) {
   // Ensure that we don't get tok::code_complete here.  We saved the lexer
   // position after it, so we should not be getting it.
 
-  Tok = L.lex();
+  L.lex(Tok);
   ASSERT_EQ(tok::identifier, Tok.getKind());
   ASSERT_EQ("bbb", Tok.getText());
   ASSERT_FALSE(Tok.isAtStartOfLine());
 
-  Tok = L.lex();
+  L.lex(Tok);
   ASSERT_EQ(tok::identifier, Tok.getKind());
   ASSERT_EQ("ccc", Tok.getText());
   ASSERT_TRUE(Tok.isAtStartOfLine());
 
-  Tok = L.lex();
+  L.lex(Tok);
   ASSERT_EQ(tok::eof, Tok.getKind());
 }
 
@@ -246,44 +284,47 @@ TEST_F(LexerTest, NestedSubLexers) {
 
   Lexer Primary(LangOpts, SourceMgr, BufferID, /*Diags=*/nullptr,
                 /*InSILMode=*/false);
-  std::vector<syntax::Token> TokensPrimary;
+  std::vector<Token> TokensPrimary;
   do {
-    TokensPrimary.push_back(Primary.lex());
+    TokensPrimary.emplace_back();
+    Primary.lex(TokensPrimary.back());
   } while (TokensPrimary.back().isNot(tok::eof));
   ASSERT_EQ(8U, TokensPrimary.size());
   ASSERT_EQ(tok::eof, TokensPrimary.back().getKind());
 
   Lexer Sub1(Primary, Primary.getStateForBeginningOfToken(TokensPrimary[1]),
              Primary.getStateForBeginningOfToken(*(TokensPrimary.end() - 2)));
-  std::vector<syntax::Token> TokensSub1;
+  std::vector<Token> TokensSub1;
   do {
-    TokensSub1.push_back(Sub1.lex());
+    TokensSub1.emplace_back();
+    Sub1.lex(TokensSub1.back());
   } while (TokensSub1.back().isNot(tok::eof));
   ASSERT_EQ(6U, TokensSub1.size());
   ASSERT_EQ("bbb1", TokensSub1.front().getText());
-  ASSERT_EQ("fff5", (*(TokensSub1.end() - 2)).getText());
+  ASSERT_EQ("fff5", (TokensSub1.end() - 2)->getText());
   ASSERT_EQ(tok::eof, TokensSub1.back().getKind());
   ASSERT_EQ("ggg6", TokensSub1.back().getText());
 
   Lexer Sub2(Sub1, Sub1.getStateForBeginningOfToken(TokensSub1[1]),
              Sub1.getStateForBeginningOfToken(*(TokensSub1.end() - 2)));
-  std::vector<syntax::Token> TokensSub2;
+  std::vector<Token> TokensSub2;
   do {
-    TokensSub2.push_back(Sub2.lex());
+    TokensSub2.emplace_back();
+    Sub2.lex(TokensSub2.back());
   } while (TokensSub2.back().isNot(tok::eof));
   ASSERT_EQ(4U, TokensSub2.size());
   ASSERT_EQ("ccc2", TokensSub2.front().getText());
-  ASSERT_EQ("eee4", (*(TokensSub2.end() - 2)).getText());
+  ASSERT_EQ("eee4", (TokensSub2.end() - 2)->getText());
   ASSERT_EQ(tok::eof, TokensSub2.back().getKind());
   ASSERT_EQ("fff5", TokensSub2.back().getText());
 }
 
 TEST_F(LexerTest, TokenizePlaceholder) {
   const char *Source = "aa <#one#> bb <# two #>";
-  std::vector<tok> ExpectedTokens {
-    tok::identifier, tok::identifier, tok::identifier, tok::identifier, tok::eof
+  std::vector<tok> ExpectedTokens{
+    tok::identifier, tok::identifier, tok::identifier, tok::identifier
   };
-  auto Toks = checkLex(Source, ExpectedTokens);
+  std::vector<Token> Toks = checkLex(Source, ExpectedTokens);
   EXPECT_EQ("aa", Toks[0].getText());
   EXPECT_EQ("<#one#>", Toks[1].getText());
   EXPECT_EQ("bb", Toks[2].getText());
@@ -293,8 +334,7 @@ TEST_F(LexerTest, TokenizePlaceholder) {
 TEST_F(LexerTest, NoPlaceholder) {
   auto checkTok = [&](StringRef Source) {
     unsigned BufID = SourceMgr.addMemBufferCopy(Source);
-    auto Toks = tokenize(LangOpts, SourceMgr, EOFRetention::KeepEOF,
-                         BufID, 0, 0, false);
+    std::vector<Token> Toks = tokenize(LangOpts, SourceMgr, BufID, 0, 0, false);
     ASSERT_FALSE(Toks.empty());
     EXPECT_NE(tok::identifier, Toks[0].getKind());
   };
@@ -306,33 +346,9 @@ TEST_F(LexerTest, NoPlaceholder) {
 
 TEST_F(LexerTest, NestedPlaceholder) {
   const char *Source = "<#<#aa#>#>";
-  std::vector<tok> ExpectedTokens {
-    tok::oper_prefix, tok::pound, tok::identifier, tok::pound, tok::oper_postfix,
-    tok::eof
+  std::vector<tok> ExpectedTokens{
+    tok::oper_prefix, tok::pound, tok::identifier, tok::pound, tok::oper_postfix
   };
-  auto Toks = checkLex(Source, ExpectedTokens);
+  std::vector<Token> Toks = checkLex(Source, ExpectedTokens);
   EXPECT_EQ("<#aa#>", Toks[2].getText());
-}
-
-TEST_F(LexerTest, BacktickTrivia) {
-  const char *Source = "let `let` = 2";
-  std::vector<tok> ExpectedTokens {
-    tok::kw_let, tok::identifier, tok::equal, tok::integer_literal, tok::eof
-  };
-  auto Toks = checkLex(Source, ExpectedTokens);
-  auto Identifier = Toks[1];
-  ASSERT_TRUE(Identifier.isEscapedIdentifier());
-
-  Source = "_ = f1(_:`while`:)";
-  ExpectedTokens = {
-    tok::kw__, tok::equal,
-    tok::identifier, tok::l_paren,
-    tok::kw__, tok::colon,
-    tok::identifier, tok::colon,
-    tok::r_paren,
-    tok::eof,
-  };
-  Toks = checkLex(Source, ExpectedTokens);
-  auto WhileIdentifier = Toks[6];
-  ASSERT_TRUE(WhileIdentifier.isEscapedIdentifier());
 }
