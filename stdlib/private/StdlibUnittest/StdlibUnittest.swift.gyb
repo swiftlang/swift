@@ -500,13 +500,15 @@ public func expectUnreachableCatch(_ error: Error, ${TRACE}) {
 
 public func expectTrue(_ actual: AssertionResult, ${TRACE}) {
   if !actual._isPass {
-    expectationFailure("expected: true", trace: ${trace})
+    expectationFailure(
+      "expected: passed assertion\n\(actual.description)", trace: ${trace})
   }
 }
 
 public func expectFalse(_ actual: AssertionResult, ${TRACE}) {
   if actual._isPass {
-    expectationFailure("expected: false", trace: ${trace})
+    expectationFailure(
+      "expected: failed assertion\n\(actual.description)", trace: ${trace})
   }
 }
 
