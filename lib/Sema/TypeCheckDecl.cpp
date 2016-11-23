@@ -862,7 +862,7 @@ static Expr *buildDefaultInitializer(TypeChecker &tc, Type type) {
   return nullptr;
 }
 
-/// Check whether \c current is a declaration.
+/// Check whether \c current is a redeclaration.
 static void checkRedeclaration(TypeChecker &tc, ValueDecl *current) {
   // If we've already checked this declaration, don't do it again.
   if (current->alreadyCheckedRedeclaration())
@@ -942,7 +942,23 @@ static void checkRedeclaration(TypeChecker &tc, ValueDecl *current) {
     if (!other->isAccessibleFrom(currentDC))
       continue;
 
-    // If there is a conflict, complain.
+    const auto markInvalid = [&current, &tc]() {
+      current->setInvalid();
+      if (current->hasType())
+        current->overwriteType(ErrorType::get(tc.Context));
+    };
+
+    // Thwart attempts to override the same declaration more than once.
+    const auto *currentOverride = current->getOverriddenDecl();
+    const auto *otherOverride = other->getOverriddenDecl();
+    if (currentOverride && currentOverride == otherOverride) {
+      tc.diagnose(current, diag::multiple_override, current->getFullName());
+      tc.diagnose(other, diag::multiple_override_prev, other->getFullName());
+      markInvalid();
+      break;
+    }
+
+    // If there is another conflict, complain.
     if (conflicting(currentSig, other->getOverloadSignature())) {
       // If the two declarations occur in the same source file, make sure
       // we get the diagnostic ordering to be sensible.
@@ -969,10 +985,7 @@ static void checkRedeclaration(TypeChecker &tc, ValueDecl *current) {
 
       tc.diagnose(current, diag::invalid_redecl, current->getFullName());
       tc.diagnose(other, diag::invalid_redecl_prev, other->getFullName());
-
-      current->setInvalid();
-      if (current->hasType())
-        current->overwriteType(ErrorType::get(tc.Context));
+      markInvalid();
       break;
     }
   }

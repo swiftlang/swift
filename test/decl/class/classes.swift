@@ -4,8 +4,8 @@ class B : A {
   override init() { super.init() }
   override func f() {}
   func g() -> (B, B) { return (B(), B()) } // expected-error {{declaration 'g()' cannot override more than one superclass declaration}}
-  override func h() -> (A, B) { return (B(), B()) }
-  override func h() -> (B, A) { return (B(), B()) }
+  override func h() -> (A, B) { return (B(), B()) } // expected-note {{'h()' previously overridden here}}
+  override func h() -> (B, A) { return (B(), B()) } // expected-error {{'h()' has already been overridden}}
   func i() {} // expected-error {{declarations from extensions cannot be overridden yet}}
   override func j() -> Int { return 0 }
   func j() -> Float { return 0.0 }

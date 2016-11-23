@@ -1586,6 +1586,11 @@ NOTE(overridden_here_with_type,none,
 ERROR(missing_override,none,
       "overriding declaration requires an 'override' keyword", ())
 
+ERROR(multiple_override,none,
+      "%0 has already been overridden", (DeclName))
+NOTE(multiple_override_prev,none,
+     "%0 previously overridden here", (DeclName))
+
 ERROR(override_unavailable,none,
       "cannot override %0 which has been marked unavailable", (Identifier))
 ERROR(override_unavailable_msg, none,
