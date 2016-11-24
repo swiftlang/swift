@@ -4990,9 +4990,6 @@ public:
   TypeLoc &getBodyResultTypeLoc() { return FnRetType; }
   const TypeLoc &getBodyResultTypeLoc() const { return FnRetType; }
 
-  /// Retrieve the result type of this function.
-  Type getResultType() const;
-
   /// Retrieve the result interface type of this function.
   Type getResultInterfaceType() const;
 

@@ -1147,7 +1147,7 @@ static SDKNode *constructTypeNode(SDKContext &Ctx, Type T) {
 static SDKNode *constructFunctionNode(SDKContext &Ctx, FuncDecl* FD,
                                       SDKNodeKind Kind, bool SkipFirst) {
   auto Func = SDKNodeInitInfo(Ctx, FD).createSDKNode(Kind);
-  Func->addChild(constructTypeNode(Ctx, FD->getResultType()));
+  Func->addChild(constructTypeNode(Ctx, FD->getResultInterfaceType()));
   for (auto *paramList : FD->getParameterLists()) {
     for (auto param : *paramList)
       Func->addChild(constructTypeNode(Ctx, param->getInterfaceType()));
