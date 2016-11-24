@@ -1659,15 +1659,6 @@ Type ValueDecl::getInterfaceType() const {
   if (InterfaceTy)
     return InterfaceTy;
 
-  if (auto nominal = dyn_cast<NominalTypeDecl>(this)) {
-    auto declaredTy = nominal->getDeclaredInterfaceType();
-    if (!declaredTy)
-      return declaredTy;
-    auto &ctx = getASTContext();
-    InterfaceTy = MetatypeType::get(declaredTy, ctx);
-    return InterfaceTy;
-  }
-
   if (auto assocType = dyn_cast<AssociatedTypeDecl>(this)) {
     auto proto = cast<ProtocolDecl>(getDeclContext());
     auto selfTy = proto->getSelfInterfaceType();
@@ -2029,6 +2020,9 @@ void NominalTypeDecl::computeType() {
   // Don't add them again.
   if (auto proto = dyn_cast<ProtocolDecl>(this))
     proto->createGenericParamsIfMissing();
+
+  Type declaredInterfaceTy = getDeclaredInterfaceType();
+  setInterfaceType(MetatypeType::get(declaredInterfaceTy, ctx));
 
   // If we still don't have a declared type, don't crash -- there's a weird
   // circular declaration issue in the code.
