@@ -2005,6 +2005,9 @@ public:
 
   bool hasType() const { return !TypeAndAccess.getPointer().isNull(); }
   Type getType() const {
+    assert(!isa<AbstractFunctionDecl>(this) &&
+           !isa<EnumElementDecl>(this) &&
+           "functions and enum case constructors only have an interface type");
     assert(hasType() && "declaration has no type set yet");
     return TypeAndAccess.getPointer();
   }
