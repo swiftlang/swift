@@ -71,7 +71,7 @@ swift::_SwiftEmptyDictionaryStorage swift::_swiftEmptyDictionaryStorage = {
       1 // int bitCount; (1 so there's something for iterators to read)
     },
     
-    (void*)1, // void* keys; (non-null garabage)
+    (void*)1, // void* keys; (non-null garbage)
     (void*)1  // void* values; (non-null garbage)
   },
 
@@ -99,7 +99,7 @@ swift::_SwiftEmptySetStorage swift::_swiftEmptySetStorage = {
       1 // int bitCount; (1 so there's something for iterators to read)
     },
     
-    (void*)1 // void* keys; (non-null garabage)
+    (void*)1 // void* keys; (non-null garbage)
   },
 
   0 // int entries; (zero'd bits)
