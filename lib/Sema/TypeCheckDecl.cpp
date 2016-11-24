@@ -651,7 +651,6 @@ static void checkCircularity(TypeChecker &tc, T *decl,
 
       decl->setInvalid();
       decl->overwriteType(ErrorType::get(tc.Context));
-      decl->setInterfaceType(ErrorType::get(tc.Context));
       breakInheritanceCycle(decl);
       break;
     }
@@ -674,7 +673,6 @@ static void checkCircularity(TypeChecker &tc, T *decl,
     // Set this declaration as invalid, then break the cycle somehow.
     decl->setInvalid();
     decl->overwriteType(ErrorType::get(tc.Context));
-    decl->setInterfaceType(ErrorType::get(tc.Context));
     breakInheritanceCycle(decl);
     break;
   }
@@ -703,7 +701,6 @@ static void setBoundVarsTypeError(Pattern *pattern, ASTContext &ctx) {
       return;
 
     var->overwriteType(ErrorType::get(ctx));
-    var->setInterfaceType(ErrorType::get(ctx));
     var->setInvalid();
   });
 }
@@ -948,9 +945,7 @@ static void checkRedeclaration(TypeChecker &tc, ValueDecl *current) {
     const auto markInvalid = [&current, &tc]() {
       current->setInvalid();
       if (current->hasType())
-          current->overwriteType(ErrorType::get(tc.Context));
-      if (current->hasInterfaceType())
-        current->setInterfaceType(ErrorType::get(tc.Context));
+        current->overwriteType(ErrorType::get(tc.Context));
     };
 
     // Thwart attempts to override the same declaration more than once.
@@ -1108,6 +1103,18 @@ static void validatePatternBindingDecl(TypeChecker &tc,
   if (binding->getPattern(entryNumber)->hasType())
     if (auto var = binding->getSingleVar())
       tc.checkTypeModifyingDeclAttributes(var);
+
+  // If we're in a generic type context, provide interface types for all of
+  // the variables.
+  {
+    auto dc = binding->getDeclContext();
+    if (dc->isGenericContext() && dc->isTypeContext()) {
+      binding->getPattern(entryNumber)->forEachVariable([&](VarDecl *var) {
+        var->setInterfaceType(
+          ArchetypeBuilder::mapTypeOutOfContext(dc, var->getType()));
+      });
+    }
+  }
 }
 
 void swift::makeFinal(ASTContext &ctx, ValueDecl *D) {
@@ -2955,7 +2962,6 @@ static void checkVarBehavior(VarDecl *decl, TypeChecker &TC) {
   if (conformance->isInvalid()) {
     decl->setInvalid();
     decl->overwriteType(ErrorType::get(TC.Context));
-    decl->setInterfaceType(ErrorType::get(TC.Context));
     return;
   }
 
@@ -3169,7 +3175,6 @@ static void checkVarBehavior(VarDecl *decl, TypeChecker &TC) {
   if (conformance->isInvalid()) {
     decl->setInvalid();
     decl->overwriteType(ErrorType::get(TC.Context));
-    decl->setInterfaceType(ErrorType::get(TC.Context));
     return;
   }
 
@@ -3193,7 +3198,6 @@ static void checkVarBehavior(VarDecl *decl, TypeChecker &TC) {
                 diag::property_behavior_value_decl_here);
     decl->setInvalid();
     decl->overwriteType(ErrorType::get(TC.Context));
-    decl->setInterfaceType(ErrorType::get(TC.Context));
     return;
   }
 
@@ -3539,7 +3543,6 @@ public:
       TC.diagnose(VD->getStartLoc(), diag::var_type_not_materializable,
                   VD->getType());
       VD->overwriteType(ErrorType::get(TC.Context));
-      VD->setInterfaceType(ErrorType::get(TC.Context));
       VD->setInvalid();
     }
 
@@ -3568,13 +3571,11 @@ public:
         TC.diagnose(VD->getLoc(), diag::enum_stored_property);
         VD->setInvalid();
         VD->overwriteType(ErrorType::get(TC.Context));
-        VD->setInterfaceType(ErrorType::get(TC.Context));
       } else if (isa<ExtensionDecl>(VD->getDeclContext()) &&
                  !VD->isStatic()) {
         TC.diagnose(VD->getLoc(), diag::extension_stored_property);
         VD->setInvalid();
         VD->overwriteType(ErrorType::get(TC.Context));
-        VD->setInterfaceType(ErrorType::get(TC.Context));
       }
       
       // We haven't implemented type-level storage in some contexts.
@@ -3734,10 +3735,8 @@ public:
           TC.diagnose(var->getLoc(), diag::observingprop_requires_initializer);
           PBD->setInvalid();
           var->setInvalid();
-          if (!var->hasType()) {
+          if (!var->hasType())
             var->setType(ErrorType::get(TC.Context));
-            var->setInterfaceType(ErrorType::get(TC.Context));
-          }
           return;
         }
 
@@ -3749,10 +3748,8 @@ public:
                       var->getCorrectStaticSpelling());
           PBD->setInvalid();
           var->setInvalid();
-          if (!var->hasType()) {
+          if (!var->hasType())
             var->setType(ErrorType::get(TC.Context));
-            var->setInterfaceType(ErrorType::get(TC.Context));
-          }
           return;
         }
 
@@ -3764,10 +3761,8 @@ public:
                       diag::global_requires_initializer, var->isLet());
           PBD->setInvalid();
           var->setInvalid();
-          if (!var->hasType()) {
+          if (!var->hasType())
             var->setType(ErrorType::get(TC.Context));
-            var->setInterfaceType(ErrorType::get(TC.Context));
-          }
           return;
         }
       });
@@ -3801,7 +3796,6 @@ public:
 
     if (isInvalid) {
       SD->overwriteType(ErrorType::get(TC.Context));
-      SD->setInterfaceType(ErrorType::get(TC.Context));
       SD->setInvalid();
     } else {
       // Hack to deal with types already getting set during type validation
@@ -3810,15 +3804,17 @@ public:
         return;
 
       // Relabel the indices according to the subscript name.
-      auto indicesTy = SD->getIndices()->getType(TC.Context);
-      SD->setType(FunctionType::get(indicesTy, SD->getElementType()));
+      auto indicesType = SD->getIndices()->getType(TC.Context);
+      SD->setType(FunctionType::get(indicesType, SD->getElementType()));
 
       // If we're in a generic context, set the interface type.
-      auto indicesIfaceTy = ArchetypeBuilder::mapTypeOutOfContext(
-                              dc, indicesTy);
-      auto elementIfaceTy = ArchetypeBuilder::mapTypeOutOfContext(
-                              dc, SD->getElementType());
-      SD->setInterfaceType(FunctionType::get(indicesIfaceTy, elementIfaceTy));
+      if (dc->isGenericContext()) {
+        auto indicesTy = ArchetypeBuilder::mapTypeOutOfContext(
+                           dc, indicesType);
+        auto elementTy = ArchetypeBuilder::mapTypeOutOfContext(
+                           dc, SD->getElementType());
+        SD->setInterfaceType(FunctionType::get(indicesTy, elementTy));
+      }
     }
 
     validateAttributes(TC, SD);
@@ -3912,13 +3908,8 @@ public:
                                  TAD->getDeclContext(), options)) {
         TAD->setInvalid();
         TAD->overwriteType(ErrorType::get(TC.Context));
-        TAD->setInterfaceType(ErrorType::get(TC.Context));
         TAD->getUnderlyingTypeLoc().setInvalidType(TC.Context);
-      }
-
-      if (TAD->getType()->getCanonicalType()->hasTypeParameter())
-        TAD->setInterfaceType(TAD->getType());
-      else {
+      } else if (TAD->getDeclContext()->isGenericContext()) {
         TAD->setInterfaceType(
           ArchetypeBuilder::mapTypeOutOfContext(TAD, TAD->getType()));
       }
@@ -4030,7 +4021,6 @@ public:
           auto Res = Elements.insert({ EED->getName(), EED });
           if (!Res.second) {
             EED->overwriteType(ErrorType::get(TC.Context));
-            EED->setInterfaceType(ErrorType::get(TC.Context));
             EED->setInvalid();
             if (auto *RawValueExpr = EED->getRawValueExpr())
               RawValueExpr->setType(ErrorType::get(TC.Context));
@@ -4728,7 +4718,7 @@ public:
     // Check the parameters for a reference to 'Self'.
     bool isProtocol = isa<ProtocolDecl>(selfNominal);
     for (auto param : *FD->getParameterList(1)) {
-      auto paramType = param->getType();
+      auto paramType = param->getInterfaceType();
       if (!paramType) break;
 
       // Look through 'inout'.
@@ -6234,29 +6224,21 @@ public:
 
   /// Compute the interface type of the given enum element.
   void computeEnumElementInterfaceType(EnumElementDecl *elt) {
-    EnumDecl *ED = elt->getParentEnum();
-    Type resultTy = ED->getDeclaredInterfaceType();
+    auto enumDecl = cast<EnumDecl>(elt->getDeclContext());
+    assert(enumDecl->getGenericSignatureOfContext() && "Not a generic enum");
 
-    if (resultTy->hasError()) {
-      elt->setInterfaceType(resultTy);
-      return;
-    }
-
-    Type argTy = MetatypeType::get(resultTy);
-
-    // The type of the enum element is either (T) -> T or (T) -> ArgType -> T.
-    if (auto inputTy = elt->getArgumentType())
-      resultTy = FunctionType::get(
-          ArchetypeBuilder::mapTypeOutOfContext(ED, inputTy), resultTy);
-
-    if (auto *genericSig = ED->getGenericSignatureOfContext())
-      resultTy = GenericFunctionType::get(genericSig, argTy, resultTy,
-                                          AnyFunctionType::ExtInfo());
-    else
-      resultTy = FunctionType::get(argTy, resultTy);
+    // Build the generic function type.
+    auto funcTy = elt->getType()->castTo<AnyFunctionType>();
+    auto inputTy = ArchetypeBuilder::mapTypeOutOfContext(enumDecl,
+                                                         funcTy->getInput());
+    auto resultTy = ArchetypeBuilder::mapTypeOutOfContext(enumDecl,
+                                                          funcTy->getResult());
+    auto interfaceTy
+      = GenericFunctionType::get(enumDecl->getGenericSignatureOfContext(),
+                                 inputTy, resultTy, funcTy->getExtInfo());
 
     // Record the interface type.
-    elt->setInterfaceType(resultTy);
+    elt->setInterfaceType(interfaceTy);
   }
 
   void visitEnumCaseDecl(EnumCaseDecl *ECD) {
@@ -6274,7 +6256,6 @@ public:
     if (EED->isBeingTypeChecked()) {
       TC.diagnose(EED->getLoc(), diag::circular_reference);
       EED->setType(ErrorType::get(TC.Context));
-      EED->setInterfaceType(ErrorType::get(TC.Context));
       EED->setInvalid();
       return;
     }
@@ -6295,7 +6276,6 @@ public:
         if (TC.validateType(EED->getArgumentTypeLoc(), EED->getDeclContext(),
                             TR_EnumCase)) {
           EED->overwriteType(ErrorType::get(TC.Context));
-          EED->setInterfaceType(ErrorType::get(TC.Context));
           EED->setInvalid();
           return;
         }
@@ -6337,14 +6317,18 @@ public:
         return;
     }
 
-    computeEnumElementInterfaceType(EED);
+    // Test for type parameters, as opposed to a generic decl context, in
+    // case the enclosing enum type was illegally declared inside of a generic
+    // context. (In that case, we'll post a diagnostic while visiting the
+    // parent enum.)
+    if (EED->getDeclContext()->getGenericSignatureOfContext())
+      computeEnumElementInterfaceType(EED);
 
     // Require the carried type to be materializable.
     if (EED->getArgumentType() &&
         !EED->getArgumentType()->isMaterializable()) {
       TC.diagnose(EED->getLoc(), diag::enum_element_not_materializable);
       EED->overwriteType(ErrorType::get(TC.Context));
-      EED->setInterfaceType(ErrorType::get(TC.Context));
       EED->setInvalid();
     }
     TC.checkDeclAttributes(EED);
@@ -7093,7 +7077,6 @@ void TypeChecker::validateDecl(ValueDecl *D, bool resolveTypeParams) {
         typeAlias->getUnderlyingTypeLoc().setInvalidType(Context);
         typeAlias->setInvalid();
         typeAlias->overwriteType(ErrorType::get(Context));
-        typeAlias->setInterfaceType(ErrorType::get(Context));
       }
       return;
     }
@@ -7254,7 +7237,6 @@ void TypeChecker::validateDecl(ValueDecl *D, bool resolveTypeParams) {
           }
         } else {
           D->setType(ErrorType::get(Context));
-          D->setInterfaceType(ErrorType::get(Context));
         }      
       } else {
         // FIXME: This case is hit when code completion occurs in a function
@@ -7265,7 +7247,6 @@ void TypeChecker::validateDecl(ValueDecl *D, bool resolveTypeParams) {
                isa<AbstractClosureExpr>(D->getDeclContext()) ||
                isa<TopLevelCodeDecl>(D->getDeclContext()));
         D->setType(ErrorType::get(Context));
-        D->setInterfaceType(ErrorType::get(Context));
       }
 
       // Make sure the getter and setter have valid types, since they will be
@@ -7383,7 +7364,6 @@ void TypeChecker::validateDecl(ValueDecl *D, bool resolveTypeParams) {
       typeCheckDecl(D, true);
     } else {
       D->setType(ErrorType::get(Context));
-      D->setInterfaceType(ErrorType::get(Context));
     }
     break;
   }

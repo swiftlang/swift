@@ -845,7 +845,7 @@ static bool isTestCandidate(ValueDecl *D) {
     return false;
 
   // 3. ...that returns void...
-  Type RetTy = FD->getResultInterfaceType();
+  Type RetTy = FD->getResultType();
   if (RetTy && !RetTy->isVoid())
     return false;
 

@@ -1297,9 +1297,8 @@ bool swift::fixItOverrideDeclarationTypes(TypeChecker &TC,
     }
     if (auto *method = dyn_cast<FuncDecl>(decl)) {
       auto *baseMethod = cast<FuncDecl>(base);
-      auto resultType = ArchetypeBuilder::mapTypeIntoContext(
-          baseMethod, baseMethod->getResultInterfaceType());
-      fixedAny |= checkType(method->getBodyResultType(), resultType,
+      fixedAny |= checkType(method->getBodyResultType(),
+                            baseMethod->getResultType(),
                             method->getBodyResultTypeLoc().getSourceRange());
     }
     return fixedAny;
@@ -4019,8 +4018,7 @@ Optional<DeclName> TypeChecker::omitNeedlessWords(AbstractFunctionDecl *afd) {
   bool returnsSelf = false;
 
   if (auto func = dyn_cast<FuncDecl>(afd)) {
-    resultType = func->getResultInterfaceType();
-    resultType = ArchetypeBuilder::mapTypeIntoContext(func, resultType);
+    resultType = func->getResultType();
     returnsSelf = func->hasDynamicSelf();
   } else if (isa<ConstructorDecl>(afd)) {
     resultType = contextType;

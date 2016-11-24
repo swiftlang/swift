@@ -1659,6 +1659,9 @@ Type ValueDecl::getInterfaceType() const {
   if (InterfaceTy)
     return InterfaceTy;
 
+  if (auto nominal = dyn_cast<NominalTypeDecl>(this))
+    return nominal->computeInterfaceType();
+
   if (auto assocType = dyn_cast<AssociatedTypeDecl>(this)) {
     auto proto = cast<ProtocolDecl>(getDeclContext());
     auto selfTy = proto->getSelfInterfaceType();
@@ -1675,11 +1678,19 @@ Type ValueDecl::getInterfaceType() const {
   if (!hasType())
     return Type();
 
-  // FIXME: ParamDecls are funky and don't always have an interface type
-  if (isa<ParamDecl>(this))
-    return getType();
+  assert(!isa<AbstractFunctionDecl>(this) &&
+         "functions should have an interface type");
 
-  llvm_unreachable("decl has context type but no interface type");
+  // If the type involves a type variable, don't cache it.
+  auto type = getType();
+  assert((type.isNull() || !type->is<PolymorphicFunctionType>())
+         && "decl has polymorphic function type but no interface type");
+
+  if (type->hasTypeVariable())
+    return type;
+
+  InterfaceTy = type;
+  return InterfaceTy;
 }
 
 void ValueDecl::setInterfaceType(Type type) {
@@ -1927,9 +1938,6 @@ Type TypeDecl::getDeclaredType() const {
 }
 
 Type TypeDecl::getDeclaredInterfaceType() const {
-  if (auto NTD = dyn_cast<NominalTypeDecl>(this))
-    return NTD->getDeclaredInterfaceType();
-
   Type interfaceType = getInterfaceType();
   if (interfaceType.isNull() || interfaceType->hasError())
     return interfaceType;
@@ -2020,9 +2028,6 @@ void NominalTypeDecl::computeType() {
   // Don't add them again.
   if (auto proto = dyn_cast<ProtocolDecl>(this))
     proto->createGenericParamsIfMissing();
-
-  Type declaredInterfaceTy = getDeclaredInterfaceType();
-  setInterfaceType(MetatypeType::get(declaredInterfaceTy, ctx));
 
   // If we still don't have a declared type, don't crash -- there's a weird
   // circular declaration issue in the code.
@@ -2117,14 +2122,16 @@ Type NominalTypeDecl::getDeclaredTypeInContext() const {
   return DeclaredTyInContext;
 }
 
-Type NominalTypeDecl::getDeclaredInterfaceType() const {
-  if (DeclaredInterfaceTy)
-    return DeclaredInterfaceTy;
+Type NominalTypeDecl::computeInterfaceType() const {
+  if (InterfaceTy)
+    return InterfaceTy;
 
   auto *decl = const_cast<NominalTypeDecl *>(this);
-  decl->DeclaredInterfaceTy = computeNominalType(decl,
-                                                 DeclTypeKind::DeclaredInterfaceType);
-  return DeclaredInterfaceTy;
+  Type type = computeNominalType(decl, DeclTypeKind::DeclaredInterfaceType);
+  if (!type)
+    return type;
+  InterfaceTy = MetatypeType::get(type, getASTContext());
+  return InterfaceTy;
 }
 
 void NominalTypeDecl::prepareExtensions() {
@@ -2251,7 +2258,6 @@ GenericTypeParamDecl::GenericTypeParamDecl(DeclContext *dc, Identifier name,
   auto &ctx = dc->getASTContext();
   auto type = new (ctx, AllocationArena::Permanent) GenericTypeParamType(this);
   setType(MetatypeType::get(type, ctx));
-  setInterfaceType(MetatypeType::get(type, ctx));
 }
 
 SourceRange GenericTypeParamDecl::getSourceRange() const {
@@ -4458,6 +4464,23 @@ void FuncDecl::setDeserializedSignature(ArrayRef<ParameterList *> BodyParams,
   this->FnRetType = FnRetType;
 }
 
+Type FuncDecl::getResultType() const {
+  if (!hasType())
+    return nullptr;
+
+  Type resultTy = getType();
+  if (resultTy->hasError())
+    return resultTy;
+
+  for (unsigned i = 0, e = getNumParameterLists(); i != e; ++i)
+    resultTy = resultTy->castTo<AnyFunctionType>()->getResult();
+
+  if (!resultTy)
+    resultTy = TupleType::getEmpty(getASTContext());
+
+  return resultTy;
+}
+
 Type FuncDecl::getResultInterfaceType() const {
   if (!hasType())
     return nullptr;
@@ -4684,10 +4707,17 @@ SourceRange ConstructorDecl::getSourceRange() const {
   return { getConstructorLoc(), End };
 }
 
-Type ConstructorDecl::getArgumentInterfaceType() const {
-  Type ArgTy = getInterfaceType();
+Type ConstructorDecl::getArgumentType() const {
+  Type ArgTy = getType();
   ArgTy = ArgTy->castTo<AnyFunctionType>()->getResult();
   ArgTy = ArgTy->castTo<AnyFunctionType>()->getInput();
+  return ArgTy;
+}
+
+Type ConstructorDecl::getResultType() const {
+  Type ArgTy = getType();
+  ArgTy = ArgTy->castTo<AnyFunctionType>()->getResult();
+  ArgTy = ArgTy->castTo<AnyFunctionType>()->getResult();
   return ArgTy;
 }
 

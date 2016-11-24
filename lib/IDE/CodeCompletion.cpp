@@ -2811,8 +2811,7 @@ public:
           if (auto AT = MT->getInstanceType()) {
             if (!CD->getType()->is<ErrorType>() &&
                 AT->getKind() == TypeKind::NameAlias &&
-                AT->getDesugaredType() ==
-                    CD->getResultInterfaceType().getPointer())
+                AT->getDesugaredType() == CD->getResultType().getPointer())
               Result = AT;
           }
           addConstructorCall(CD, Reason, None, Result);

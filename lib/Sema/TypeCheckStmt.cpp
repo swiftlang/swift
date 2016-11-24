@@ -664,7 +664,6 @@ public:
       generator = new (TC.Context)
         VarDecl(/*static*/ false, /*IsLet*/ false, S->getInLoc(),
                 TC.Context.getIdentifier(name), generatorTy, DC);
-      generator->setInterfaceType(generatorTy);
       generator->setImplicit();
       
       // Create a pattern binding to initialize the generator.

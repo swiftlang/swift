@@ -465,8 +465,7 @@ private:
       } else {
         auto func = cast<FuncDecl>(AFD);
         OptionalTypeKind optionalKind;
-        (void)func->getResultInterfaceType()
-            ->getAnyOptionalObjectType(optionalKind);
+        (void)func->getResultType()->getAnyOptionalObjectType(optionalKind);
         printNullability(optionalKind,
                          NullabilityPrintKind::ContextSensitive);
       }
