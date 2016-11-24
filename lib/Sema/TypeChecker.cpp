@@ -199,7 +199,7 @@ DeclName TypeChecker::getObjectLiteralConstructorName(ObjectLiteralExpr *expr) {
 /// unambiguous name.
 Type TypeChecker::getObjectLiteralParameterType(ObjectLiteralExpr *expr,
                                                 ConstructorDecl *ctor) {
-  Type argType = ctor->getArgumentType();
+  Type argType = ctor->getArgumentInterfaceType();
   auto argTuple = argType->getAs<TupleType>();
   if (!argTuple) return argType;
 
