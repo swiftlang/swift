@@ -703,7 +703,8 @@ struct ASTNodeBase {};
       auto func = Functions.back();
       Type resultType;
       if (FuncDecl *FD = dyn_cast<FuncDecl>(func)) {
-        resultType = FD->getResultType();
+        resultType = FD->getResultInterfaceType();
+        resultType = ArchetypeBuilder::mapTypeIntoContext(FD, resultType);
       } else if (auto closure = dyn_cast<AbstractClosureExpr>(func)) {
         resultType = closure->getResultType();
       } else {
