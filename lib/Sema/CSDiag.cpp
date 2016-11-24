@@ -3199,8 +3199,10 @@ namespace {
       for (auto patternElt : PatternTypes)
         patternElt.first->setType(patternElt.second);
       
-      for (auto paramDeclElt : ParamDeclTypes)
+      for (auto paramDeclElt : ParamDeclTypes) {
         paramDeclElt.first->overwriteType(paramDeclElt.second);
+        paramDeclElt.first->setInterfaceType(Type());
+      }
       
       for (auto CSE : CollectionSemanticExprs)
         CSE.first->setSemanticExpr(CSE.second);

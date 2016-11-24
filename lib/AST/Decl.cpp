@@ -2259,6 +2259,7 @@ GenericTypeParamDecl::GenericTypeParamDecl(DeclContext *dc, Identifier name,
   auto &ctx = dc->getASTContext();
   auto type = new (ctx, AllocationArena::Permanent) GenericTypeParamType(this);
   setType(MetatypeType::get(type, ctx));
+  setInterfaceType(MetatypeType::get(type, ctx));
 }
 
 SourceRange GenericTypeParamDecl::getSourceRange() const {
@@ -4625,26 +4626,54 @@ SourceRange EnumElementDecl::getSourceRange() const {
 
 bool EnumElementDecl::computeType() {
   EnumDecl *ED = getParentEnum();
-  Type resultTy = ED->getDeclaredTypeInContext();
+  {
+    Type resultTy = ED->getDeclaredTypeInContext();
 
-  if (resultTy->hasError()) {
+    if (resultTy->hasError()) {
+      setType(resultTy);
+      setInterfaceType(resultTy);
+      return false;
+    }
+
+    Type argTy = MetatypeType::get(resultTy);
+
+    // The type of the enum element is either (T) -> T or (T) -> ArgType -> T.
+    if (getArgumentType())
+      resultTy = FunctionType::get(getArgumentType(), resultTy);
+
+    if (ED->isGenericContext())
+      resultTy = PolymorphicFunctionType::get(argTy, resultTy,
+                                              ED->getGenericParamsOfContext());
+    else
+      resultTy = FunctionType::get(argTy, resultTy);
+
     setType(resultTy);
-    return false;
+  }
+  {
+    Type resultTy = ED->getDeclaredInterfaceType();
+
+    if (resultTy->hasError()) {
+      setInterfaceType(resultTy);
+      return false;
+    }
+
+    Type argTy = MetatypeType::get(resultTy);
+
+    // The type of the enum element is either (T) -> T or (T) -> ArgType -> T.
+    if (auto inputTy = getArgumentType())
+      resultTy = FunctionType::get(
+          ArchetypeBuilder::mapTypeOutOfContext(ED, inputTy), resultTy);
+
+    if (auto *genericSig = ED->getGenericSignatureOfContext())
+      resultTy = GenericFunctionType::get(genericSig, argTy, resultTy,
+                                          AnyFunctionType::ExtInfo());
+    else
+      resultTy = FunctionType::get(argTy, resultTy);
+
+    // Record the interface type.
+    setInterfaceType(resultTy);
   }
 
-  Type argTy = MetatypeType::get(resultTy);
-
-  // The type of the enum element is either (T) -> T or (T) -> ArgType -> T.
-  if (getArgumentType())
-    resultTy = FunctionType::get(getArgumentType(), resultTy);
-
-  if (ED->isGenericContext())
-    resultTy = PolymorphicFunctionType::get(argTy, resultTy,
-                                            ED->getGenericParamsOfContext());
-  else
-    resultTy = FunctionType::get(argTy, resultTy);
-
-  setType(resultTy);
   return true;
 }
 

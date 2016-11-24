@@ -883,6 +883,7 @@ bool TypeChecker::typeCheckPattern(Pattern *P, DeclContext *dc,
       if (auto var = named->getDecl()) {
         var->setInvalid();
         var->overwriteType(ErrorType::get(Context));
+        var->setInterfaceType(ErrorType::get(Context));
       }
     }
     return true;
@@ -970,6 +971,7 @@ static bool coercePatternViaConditionalDowncast(TypeChecker &tc,
                                             pattern->getLoc(),
                                             tc.Context.getIdentifier("$match"),
                                             type, dc);
+  matchVar->setInterfaceType(type);
   matchVar->setHasNonPatternBindingInit();
 
   // Form the cast $match as? T, which produces an optional.
@@ -1083,16 +1085,20 @@ bool TypeChecker::coercePatternToType(Pattern *&P, DeclContext *dc, Type type,
     NamedPattern *NP = cast<NamedPattern>(P);
     VarDecl *var = NP->getDecl();
     if (var->isInvalid())
-      var->overwriteType(ErrorType::get(Context));
+      type = ErrorType::get(Context);
+    var->overwriteType(type);
+    if (type->hasTypeParameter())
+      var->setInterfaceType(type);
     else
-      var->overwriteType(type);
+      var->setInterfaceType(ArchetypeBuilder::mapTypeOutOfContext(
+          var->getDeclContext(), type));
 
     checkTypeModifyingDeclAttributes(var);
     if (type->is<InOutType>()) {
       NP->getDecl()->setLet(false);
     }
     if (var->getAttrs().hasAttribute<OwnershipAttr>())
-      type = getTypeOfRValue(var, true);
+      type = getTypeOfRValue(var, false);
     else if (!var->isInvalid())
       type = var->getType();
     P->setType(type);

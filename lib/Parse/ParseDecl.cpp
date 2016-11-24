@@ -5315,6 +5315,7 @@ ParserStatus Parser::parseDeclSubscript(ParseDeclOptions Flags,
 
   if (Invalid) {
     Subscript->setType(ErrorType::get(Context));
+    Subscript->setInterfaceType(ErrorType::get(Context));
     Subscript->setInvalid();
   }
 

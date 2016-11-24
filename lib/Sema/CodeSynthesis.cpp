@@ -1440,6 +1440,7 @@ void TypeChecker::completePropertyBehaviorAccessors(VarDecl *VD,
                                        ArrayRef<Substitution> SelfInterfaceSubs,
                                        ArrayRef<Substitution> SelfContextSubs) {
   auto selfTy = SelfContextSubs[0].getReplacement();
+  auto selfIfaceTy = SelfInterfaceSubs[0].getReplacement();
 
   SmallVector<ASTNode, 3> bodyStmts;
   
@@ -1469,6 +1470,8 @@ void TypeChecker::completePropertyBehaviorAccessors(VarDecl *VD,
                                        SourceLoc(),
                                        Context.getIdentifier("tempSelf"),
                                        selfTy, fromAccessor);
+      var->setInterfaceType(selfIfaceTy);
+
       auto varPat = new (Context) NamedPattern(var);
       auto pbd = PatternBindingDecl::create(Context, SourceLoc(),
                                             StaticSpellingKind::None,
