@@ -347,6 +347,7 @@ ModuleDecl::ModuleDecl(Identifier name, ASTContext &ctx)
   ctx.addDestructorCleanup(*this);
   setImplicit();
   setType(ModuleType::get(this));
+  setInterfaceType(ModuleType::get(this));
   setAccessibility(Accessibility::Public);
 }
 
