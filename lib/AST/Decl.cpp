@@ -4721,13 +4721,6 @@ Type ConstructorDecl::getArgumentInterfaceType() const {
   return ArgTy;
 }
 
-Type ConstructorDecl::getResultType() const {
-  Type ArgTy = getType();
-  ArgTy = ArgTy->castTo<AnyFunctionType>()->getResult();
-  ArgTy = ArgTy->castTo<AnyFunctionType>()->getResult();
-  return ArgTy;
-}
-
 Type ConstructorDecl::getResultInterfaceType() const {
   Type ArgTy = getInterfaceType();
   ArgTy = ArgTy->castTo<AnyFunctionType>()->getResult();
