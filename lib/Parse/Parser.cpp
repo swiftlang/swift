@@ -555,18 +555,23 @@ Parser::StructureMarkerRAII::StructureMarkerRAII(Parser &parser,
 bool Parser::parseIdentifier(Identifier &Result, SourceLoc &Loc,
                              const Diagnostic &D) {
   switch (Tok.getKind()) {
+  case tok::kw_throws:
   case tok::kw_rethrows:
+    if (!Context.isSwiftVersion3())
+      break;
+    // Swift3 accepts 'throws' and 'rethrows'
+    SWIFT_FALLTHROUGH;
   case tok::kw_self:
   case tok::kw_Self:
-  case tok::kw_throws:
   case tok::identifier:
     Loc = consumeIdentifier(&Result);
     return false;
   default:
-    checkForInputIncomplete();
-    diagnose(Tok, D);
-    return true;
+    break;
   }
+  checkForInputIncomplete();
+  diagnose(Tok, D);
+  return true;
 }
 
 bool Parser::parseSpecificIdentifier(StringRef expected, SourceLoc &loc,

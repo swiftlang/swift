@@ -19,12 +19,13 @@
 
 #include "swift/AST/AST.h"
 #include "swift/AST/DiagnosticsParse.h"
+#include "swift/Basic/Fallthrough.h"
+#include "swift/Basic/OptionSet.h"
 #include "swift/Parse/Lexer.h"
 #include "swift/Parse/LocalContext.h"
 #include "swift/Parse/PersistentParserState.h"
 #include "swift/Parse/Token.h"
 #include "swift/Parse/ParserResult.h"
-#include "swift/Basic/OptionSet.h"
 #include "swift/Config.h"
 #include "llvm/ADT/SetVector.h"
 
@@ -398,7 +399,8 @@ public:
   }
 
   SourceLoc consumeIdentifier(Identifier *Result = nullptr) {
-    assert(Tok.isAny(tok::identifier, tok::kw_self, tok::kw_Self, tok::kw_throws));
+    assert(Tok.isAny(tok::identifier, tok::kw_self, tok::kw_Self,
+                     /* for Swift3 */tok::kw_throws, tok::kw_rethrows));
     if (Result)
       *Result = Context.getIdentifier(Tok.getText());
     return consumeToken();
