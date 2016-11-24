@@ -2017,7 +2017,7 @@ struct ASTNodeBase {};
           CD->getDeclContext()->getDeclaredInterfaceType()->getAnyNominal() 
             != Ctx.getImplicitlyUnwrappedOptionalDecl()) {
         OptionalTypeKind resultOptionality = OTK_None;
-        CD->getResultType()->getAnyOptionalObjectType(resultOptionality);
+        CD->getResultInterfaceType()->getAnyOptionalObjectType(resultOptionality);
         if (resultOptionality != CD->getFailability()) {
           Out << "Initializer has result optionality/failability mismatch\n";
           CD->dump(llvm::errs());
