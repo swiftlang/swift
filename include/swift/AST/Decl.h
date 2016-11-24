@@ -2642,6 +2642,7 @@ class NominalTypeDecl : public GenericTypeDecl, public IterableDeclContext {
 protected:
   Type DeclaredTy;
   Type DeclaredTyInContext;
+  Type DeclaredInterfaceTy;
 
   NominalTypeDecl(DeclKind K, DeclContext *DC, Identifier name,
                   SourceLoc NameLoc,
@@ -2726,16 +2727,13 @@ public:
   /// any generic parameters bound if this is a generic type.
   Type getDeclaredType() const;
 
-  /// getDeclaredType - Retrieve the type declared by this entity, with
+  /// getDeclaredTypeInContext - Retrieve the type declared by this entity, with
   /// context archetypes bound if this is a generic type.
   Type getDeclaredTypeInContext() const;
 
-  /// Get the "interface" type of the given nominal type, which is the
-  /// type used to refer to the nominal type externally.
-  ///
-  /// For a generic type, or a member thereof, this is the a specialization
-  /// of the type using its own generic parameters.
-  Type computeInterfaceType() const;
+  /// getDeclaredInterfaceType - Retrieve the type declared by this entity, with
+  /// generic parameters bound if this is a generic type.
+  Type getDeclaredInterfaceType() const;
 
   /// \brief Add a new extension to this nominal type.
   void addExtension(ExtensionDecl *extension);
@@ -4990,9 +4988,6 @@ public:
   TypeLoc &getBodyResultTypeLoc() { return FnRetType; }
   const TypeLoc &getBodyResultTypeLoc() const { return FnRetType; }
 
-  /// Retrieve the result type of this function.
-  Type getResultType() const;
-
   /// Retrieve the result interface type of this function.
   Type getResultInterfaceType() const;
 
@@ -5405,11 +5400,8 @@ public:
   SourceLoc getStartLoc() const { return getConstructorLoc(); }
   SourceRange getSourceRange() const;
 
-  /// getArgumentType - get the type of the argument tuple
-  Type getArgumentType() const;
-
-  /// \brief Get the type of the constructed object.
-  Type getResultType() const;
+  /// getArgumentInterfaceType - get the interface type of the argument tuple
+  Type getArgumentInterfaceType() const;
 
   /// \brief Get the interface type of the constructed object.
   Type getResultInterfaceType() const;

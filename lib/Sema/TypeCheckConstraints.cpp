@@ -1284,6 +1284,7 @@ void CleanupIllFormedExpressionRAII::doIt(Expr *expr, ASTContext &Context) {
       if (auto VD = dyn_cast<ValueDecl>(D)) {
         if (VD->hasType() && VD->getType()->hasTypeVariable()) {
           VD->overwriteType(ErrorType::get(context));
+          VD->setInterfaceType(ErrorType::get(context));
           VD->setInvalid();
         }
       }
@@ -1891,6 +1892,7 @@ bool TypeChecker::typeCheckBinding(Pattern *&pattern, Expr *&initializer,
         return;
 
       var->overwriteType(ErrorType::get(Context));
+      var->setInterfaceType(ErrorType::get(Context));
       var->setInvalid();
     });
   }
@@ -2221,6 +2223,7 @@ bool TypeChecker::typeCheckStmtCondition(StmtCondition &cond, DeclContext *dc,
         if (var->hasType() && !var->getType()->hasError())
           return;
         var->overwriteType(ErrorType::get(Context));
+        var->setInterfaceType(ErrorType::get(Context));
         var->setInvalid();
       });
     };
