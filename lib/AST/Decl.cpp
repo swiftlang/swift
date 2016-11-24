@@ -1684,19 +1684,11 @@ Type ValueDecl::getInterfaceType() const {
   if (!hasType())
     return Type();
 
-  assert(!isa<AbstractFunctionDecl>(this) &&
-         "functions should have an interface type");
+  // FIXME: ParamDecls are funky and don't always have an interface type
+  if (isa<ParamDecl>(this))
+    return getType();
 
-  // If the type involves a type variable, don't cache it.
-  auto type = getType();
-  assert((type.isNull() || !type->is<PolymorphicFunctionType>())
-         && "decl has polymorphic function type but no interface type");
-
-  if (type->hasTypeVariable())
-    return type;
-
-  InterfaceTy = type;
-  return InterfaceTy;
+  llvm_unreachable("decl has context type but no interface type");
 }
 
 void ValueDecl::setInterfaceType(Type type) {
@@ -2265,6 +2257,7 @@ GenericTypeParamDecl::GenericTypeParamDecl(DeclContext *dc, Identifier name,
   auto &ctx = dc->getASTContext();
   auto type = new (ctx, AllocationArena::Permanent) GenericTypeParamType(this);
   setType(MetatypeType::get(type, ctx));
+  setInterfaceType(MetatypeType::get(type, ctx));
 }
 
 SourceRange GenericTypeParamDecl::getSourceRange() const {

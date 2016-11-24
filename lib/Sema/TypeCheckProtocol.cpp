@@ -2256,19 +2256,22 @@ void ConformanceChecker::recordTypeWitness(AssociatedTypeDecl *assocType,
                                                     /*genericparams*/nullptr, 
                                                     DC);
     aliasDecl->computeType();
-    aliasDecl->setImplicit();
-    if (type->hasError()) {
-      aliasDecl->setInvalid();
 
-      // If we're recording a failed type witness, keep the sugar around for
-      // code completion.
-      type = aliasDecl->getDeclaredType();
-    } else if (type->hasArchetype()) {
-      Type metaType = MetatypeType::get(type);
+    // Strip off sugar from the interface type if it is dependent.
+    // FIXME: Without this, the stdlib doesn't compile because
+    // 'typealias _Buffer' is insufficiently accessible.
+    if (type->hasArchetype()) {
+      auto metaType = MetatypeType::get(type);
       aliasDecl->setInterfaceType(
         ArchetypeBuilder::mapTypeOutOfContext(DC, metaType));
+    } else {
+      aliasDecl->setInterfaceType(aliasDecl->getType());
     }
-    
+
+    aliasDecl->setImplicit();
+    if (type->hasError())
+      aliasDecl->setInvalid();
+
     // Inject the typealias into the nominal decl that conforms to the protocol.
     if (auto nominal = DC->getAsNominalTypeOrNominalTypeExtensionContext()) {
       TC.computeAccessibility(nominal);
