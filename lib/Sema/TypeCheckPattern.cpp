@@ -883,7 +883,6 @@ bool TypeChecker::typeCheckPattern(Pattern *P, DeclContext *dc,
       if (auto var = named->getDecl()) {
         var->setInvalid();
         var->overwriteType(ErrorType::get(Context));
-        var->setInterfaceType(ErrorType::get(Context));
       }
     }
     return true;
@@ -1084,20 +1083,16 @@ bool TypeChecker::coercePatternToType(Pattern *&P, DeclContext *dc, Type type,
     NamedPattern *NP = cast<NamedPattern>(P);
     VarDecl *var = NP->getDecl();
     if (var->isInvalid())
-      type = ErrorType::get(Context);
-    var->overwriteType(type);
-    if (type->hasTypeParameter())
-      var->setInterfaceType(type);
+      var->overwriteType(ErrorType::get(Context));
     else
-      var->setInterfaceType(ArchetypeBuilder::mapTypeOutOfContext(
-          var->getDeclContext(), type));
+      var->overwriteType(type);
 
     checkTypeModifyingDeclAttributes(var);
     if (type->is<InOutType>()) {
       NP->getDecl()->setLet(false);
     }
     if (var->getAttrs().hasAttribute<OwnershipAttr>())
-      type = getTypeOfRValue(var, false);
+      type = getTypeOfRValue(var, true);
     else if (!var->isInvalid())
       type = var->getType();
     P->setType(type);

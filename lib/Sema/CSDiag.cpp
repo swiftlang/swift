@@ -1886,7 +1886,7 @@ bool CalleeCandidateInfo::diagnoseSimpleErrors(const Expr *E) {
     assert(decl && "Only decl-based candidates may be marked inaccessible");
     if (auto *CD = dyn_cast<ConstructorDecl>(decl)) {
       CS->TC.diagnose(loc, diag::init_candidate_inaccessible,
-                      CD->getResultInterfaceType(), decl->getFormalAccess());
+                      CD->getResultType(), decl->getFormalAccess());
      
     } else {
       CS->TC.diagnose(loc, diag::candidate_inaccessible, decl->getName(),

@@ -67,7 +67,6 @@ static DeclRefExpr *convertEnumToIndex(SmallVectorImpl<ASTNode> &stmts,
   auto indexVar = new (C) VarDecl(/*static*/false, /*let*/false,
                                   SourceLoc(), C.getIdentifier(indexName),
                                   intType, funcDecl);
-  indexVar->setInterfaceType(intType);
   indexVar->setImplicit();
   
   // generate: var indexVar
@@ -447,7 +446,6 @@ deriveHashable_enum_hashValue(TypeChecker &tc, Decl *parentDecl,
                                            SourceLoc(), C.Id_hashValue,
                                            intType, parentDC);
   hashValueDecl->setImplicit();
-  hashValueDecl->setInterfaceType(intType);
   hashValueDecl->makeComputed(SourceLoc(), getterDecl,
                               nullptr, nullptr, SourceLoc());
   hashValueDecl->setAccessibility(getterDecl->getFormalAccess());

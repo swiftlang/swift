@@ -771,11 +771,8 @@ ConstraintSystem::getTypeOfReference(ValueDecl *value,
   }
 
   // Determine the type of the value, opening up that type if necessary.
-  bool wantInterfaceType = true;
-  if (isa<VarDecl>(value))
-    wantInterfaceType = !value->getDeclContext()->isLocalContext();
   Type valueType = TC.getUnopenedTypeOfReference(value, Type(), DC, base,
-                                                 wantInterfaceType);
+                                                 /*wantInterfaceType=*/true);
 
   // If this is a let-param whose type is a type variable, this is an untyped
   // closure param that may be bound to an inout type later. References to the

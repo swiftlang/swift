@@ -1819,7 +1819,7 @@ static Type getTypeForDisplay(Module *module, ValueDecl *decl) {
 
   // For a constructor, we only care about the parameter types.
   if (auto ctor = dyn_cast<ConstructorDecl>(decl)) {
-    return ctor->getArgumentInterfaceType();
+    return ctor->getArgumentType();
   }
 
   // We have something function-like, so we want to strip off the 'self'.
@@ -2256,22 +2256,19 @@ void ConformanceChecker::recordTypeWitness(AssociatedTypeDecl *assocType,
                                                     /*genericparams*/nullptr, 
                                                     DC);
     aliasDecl->computeType();
-
-    // Strip off sugar from the interface type if it is dependent.
-    // FIXME: Without this, the stdlib doesn't compile because
-    // 'typealias _Buffer' is insufficiently accessible.
-    if (type->hasArchetype()) {
-      auto metaType = MetatypeType::get(type);
-      aliasDecl->setInterfaceType(
-        ArchetypeBuilder::mapTypeOutOfContext(DC, metaType));
-    } else {
-      aliasDecl->setInterfaceType(aliasDecl->getType());
-    }
-
     aliasDecl->setImplicit();
-    if (type->hasError())
+    if (type->hasError()) {
       aliasDecl->setInvalid();
 
+      // If we're recording a failed type witness, keep the sugar around for
+      // code completion.
+      type = aliasDecl->getDeclaredType();
+    } else if (type->hasArchetype()) {
+      Type metaType = MetatypeType::get(type);
+      aliasDecl->setInterfaceType(
+        ArchetypeBuilder::mapTypeOutOfContext(DC, metaType));
+    }
+    
     // Inject the typealias into the nominal decl that conforms to the protocol.
     if (auto nominal = DC->getAsNominalTypeOrNominalTypeExtensionContext()) {
       TC.computeAccessibility(nominal);

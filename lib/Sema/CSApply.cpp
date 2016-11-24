@@ -458,22 +458,20 @@ namespace {
 
       // If this is a declaration with generic function type, build a
       // specialized reference to it.
-      if (isa<AbstractFunctionDecl>(decl) || isa<SubscriptDecl>(decl)) {
-        if (auto genericFn
-              = decl->getInterfaceType()->getAs<GenericFunctionType>()) {
-          auto dc = decl->getInnermostDeclContext();
+      if (auto genericFn
+            = decl->getInterfaceType()->getAs<GenericFunctionType>()) {
+        auto dc = decl->getInnermostDeclContext();
 
-          SmallVector<Substitution, 4> substitutions;
-          auto type = solution.computeSubstitutions(
-                        genericFn, dc, openedType,
-                        getConstraintSystem().getConstraintLocator(locator),
-                        substitutions);
-          auto declRefExpr =
-            new (ctx) DeclRefExpr(ConcreteDeclRef(ctx, decl, substitutions),
-                                  loc, implicit, semantics, type);
-          declRefExpr->setFunctionRefKind(functionRefKind);
-          return declRefExpr;
-        }
+        SmallVector<Substitution, 4> substitutions;
+        auto type = solution.computeSubstitutions(
+                      genericFn, dc, openedType,
+                      getConstraintSystem().getConstraintLocator(locator),
+                      substitutions);
+        auto declRefExpr =
+          new (ctx) DeclRefExpr(ConcreteDeclRef(ctx, decl, substitutions),
+                                loc, implicit, semantics, type);
+        declRefExpr->setFunctionRefKind(functionRefKind);
+        return declRefExpr;
       }
 
       auto type = simplifyType(openedType);

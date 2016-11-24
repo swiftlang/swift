@@ -1641,7 +1641,6 @@ void TypeChecker::checkNoEscapeAttr(ParamDecl *PD, NoEscapeAttr *attr) {
 
 void TypeChecker::checkOwnershipAttr(VarDecl *var, OwnershipAttr *attr) {
   Type type = var->getType();
-  Type interfaceType = var->getInterfaceType();
 
   // Just stop if we've already processed this declaration.
   if (type->is<ReferenceStorageType>())
@@ -1700,10 +1699,7 @@ void TypeChecker::checkOwnershipAttr(VarDecl *var, OwnershipAttr *attr) {
   }
 
   // Change the type to the appropriate reference storage type.
-  var->overwriteType(ReferenceStorageType::get(
-      type, ownershipKind, Context));
-  var->setInterfaceType(ReferenceStorageType::get(
-      interfaceType, ownershipKind, Context));
+  var->overwriteType(ReferenceStorageType::get(type, ownershipKind, Context));
 }
 
 Optional<Diag<>>
