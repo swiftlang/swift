@@ -2566,7 +2566,6 @@ void Serializer::writeDecl(const Decl *D) {
                            fn->hasDynamicSelf(),
                            fn->hasThrows(),
                            fn->getParameterLists().size(),
-                           addTypeRef(fn->getType()),
                            addTypeRef(fn->getInterfaceType()),
                            addDeclRef(fn->getOperatorDecl()),
                            addDeclRef(fn->getOverriddenDecl()),
@@ -2612,7 +2611,6 @@ void Serializer::writeDecl(const Decl *D) {
                                   addIdentifierRef(elem->getName()),
                                   contextID,
                                   addTypeRef(elem->getArgumentType()),
-                                  addTypeRef(elem->getType()),
                                   addTypeRef(elem->getInterfaceType()),
                                   elem->isImplicit(),
                                   (unsigned)RawValueKind,
@@ -2689,7 +2687,6 @@ void Serializer::writeDecl(const Decl *D) {
                                   ctor->hasThrows(),
                                   getStableCtorInitializerKind(
                                     ctor->getInitKind()),
-                                  addTypeRef(ctor->getType()),
                                   addTypeRef(ctor->getInterfaceType()),
                                   addDeclRef(ctor->getOverriddenDecl()),
                                   rawAccessLevel,
@@ -2719,7 +2716,6 @@ void Serializer::writeDecl(const Decl *D) {
                                  contextID,
                                  dtor->isImplicit(),
                                  dtor->isObjC(),
-                                 addTypeRef(dtor->getType()),
                                  addTypeRef(dtor->getInterfaceType()));
     assert(dtor->getParameterLists().size() == 1);
     // Why is this writing out the param list for self?

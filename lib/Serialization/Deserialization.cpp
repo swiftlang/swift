@@ -2377,7 +2377,6 @@ Decl *ModuleFile::getDecl(DeclID DID, Optional<DeclContext *> ForcedContext) {
     uint8_t rawFailability;
     bool isImplicit, isObjC, hasStubImplementation, throws;
     uint8_t storedInitKind, rawAccessLevel;
-    TypeID signatureID;
     TypeID interfaceID;
     DeclID overriddenID;
     ArrayRef<uint64_t> argNameIDs;
@@ -2386,7 +2385,7 @@ Decl *ModuleFile::getDecl(DeclID DID, Optional<DeclContext *> ForcedContext) {
                                                rawFailability, isImplicit, 
                                                isObjC, hasStubImplementation,
                                                throws, storedInitKind,
-                                               signatureID, interfaceID,
+                                               interfaceID,
                                                overriddenID, rawAccessLevel,
                                                argNameIDs);
     auto parent = getDeclContext(contextID);
@@ -2431,13 +2430,9 @@ Decl *ModuleFile::getDecl(DeclID DID, Optional<DeclContext *> ForcedContext) {
     assert(bodyParams0 && bodyParams1 && "missing parameters for constructor");
     ctor->setParameterLists(bodyParams0->get(0), bodyParams1);
 
-    // This must be set after recording the constructor in the map.
-    // A polymorphic constructor type needs to refer to the constructor to get
-    // its generic parameters.
-    ctor->setType(getType(signatureID));
-    if (auto interfaceType = getType(interfaceID)) {
-      ctor->setInterfaceType(interfaceType);
-    }
+    auto interfaceType = getType(interfaceID);
+    ctor->setType(interfaceType);
+    ctor->setInterfaceType(interfaceType);
 
     ctor->setGenericEnvironment(genericEnv);
 
@@ -2575,7 +2570,6 @@ Decl *ModuleFile::getDecl(DeclID DID, Optional<DeclContext *> ForcedContext) {
     uint8_t rawStaticSpelling, rawAccessLevel, rawAddressorKind;
     bool isObjC, isMutating, hasDynamicSelf, throws;
     unsigned numParamPatterns;
-    TypeID signatureID;
     TypeID interfaceTypeID;
     DeclID associatedDeclID;
     DeclID overriddenID;
@@ -2586,7 +2580,7 @@ Decl *ModuleFile::getDecl(DeclID DID, Optional<DeclContext *> ForcedContext) {
     decls_block::FuncLayout::readRecord(scratch, contextID, isImplicit,
                                         isStatic, rawStaticSpelling, isObjC,
                                         isMutating, hasDynamicSelf, throws,
-                                        numParamPatterns, signatureID,
+                                        numParamPatterns,
                                         interfaceTypeID, associatedDeclID,
                                         overriddenID, accessorStorageDeclID,
                                         hasCompoundName, rawAddressorKind,
@@ -2662,16 +2656,10 @@ Decl *ModuleFile::getDecl(DeclID DID, Optional<DeclContext *> ForcedContext) {
       // Otherwise, unknown associated decl kind.
     }
 
-    // This must be set after recording the constructor in the map.
-    // A polymorphic constructor type needs to refer to the constructor to get
-    // its generic parameters.
-    auto signature = getType(signatureID)->castTo<AnyFunctionType>();
-    fn->setType(signature);
-
     // Set the interface type.
-    if (auto interfaceType = getType(interfaceTypeID)) {
-      fn->setInterfaceType(interfaceType);
-    }
+    auto interfaceType = getType(interfaceTypeID);
+    fn->setType(interfaceType);
+    fn->setInterfaceType(interfaceType);
 
     fn->setGenericEnvironment(genericEnv);
 
@@ -2683,8 +2671,7 @@ Decl *ModuleFile::getDecl(DeclID DID, Optional<DeclContext *> ForcedContext) {
     if (numParamPatterns && DC->isTypeContext())
       paramLists[0]->get(0)->setImplicit();
     
-    fn->setDeserializedSignature(paramLists,
-                                 TypeLoc::withoutLoc(signature->getResult()));
+    fn->setDeserializedSignature(paramLists, TypeLoc());
 
     if (auto errorConvention = maybeReadForeignErrorConvention())
       fn->setForeignErrorConvention(*errorConvention);
@@ -3046,13 +3033,13 @@ Decl *ModuleFile::getDecl(DeclID DID, Optional<DeclContext *> ForcedContext) {
   case decls_block::ENUM_ELEMENT_DECL: {
     IdentifierID nameID;
     DeclContextID contextID;
-    TypeID argTypeID, ctorTypeID, interfaceTypeID;
+    TypeID argTypeID, interfaceTypeID;
     bool isImplicit; bool isNegative;
     unsigned rawValueKindID;
 
     decls_block::EnumElementLayout::readRecord(scratch, nameID,
                                                contextID, argTypeID,
-                                               ctorTypeID, interfaceTypeID,
+                                               interfaceTypeID,
                                                isImplicit, rawValueKindID,
                                                isNegative);
 
@@ -3087,9 +3074,10 @@ Decl *ModuleFile::getDecl(DeclID DID, Optional<DeclContext *> ForcedContext) {
     }
     }
 
-    elem->setType(getType(ctorTypeID));
-    if (auto interfaceType = getType(interfaceTypeID))
-      elem->setInterfaceType(interfaceType);
+    auto interfaceType = getType(interfaceTypeID);
+    elem->setType(interfaceType);
+    elem->setInterfaceType(interfaceType);
+
     if (isImplicit)
       elem->setImplicit();
     elem->setAccessibility(std::max(cast<EnumDecl>(DC)->getFormalAccess(),
@@ -3229,10 +3217,10 @@ Decl *ModuleFile::getDecl(DeclID DID, Optional<DeclContext *> ForcedContext) {
   case decls_block::DESTRUCTOR_DECL: {
     DeclContextID contextID;
     bool isImplicit, isObjC;
-    TypeID signatureID, interfaceID;
+    TypeID interfaceID;
 
     decls_block::DestructorLayout::readRecord(scratch, contextID,
-                                              isImplicit, isObjC, signatureID,
+                                              isImplicit, isObjC,
                                               interfaceID);
 
     DeclContext *DC = getDeclContext(contextID);
@@ -3251,9 +3239,8 @@ Decl *ModuleFile::getDecl(DeclID DID, Optional<DeclContext *> ForcedContext) {
     assert(selfParams && "Didn't get self pattern?");
     dtor->setSelfDecl(selfParams->get(0));
 
-    dtor->setType(getType(signatureID));
-
     auto interfaceType = getType(interfaceID);
+    dtor->setType(interfaceType);
     dtor->setInterfaceType(interfaceType);
 
     dtor->setGenericEnvironment(DC->getGenericEnvironmentOfContext());
