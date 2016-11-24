@@ -5406,6 +5406,9 @@ public:
   /// getArgumentType - get the type of the argument tuple
   Type getArgumentType() const;
 
+  /// getArgumentInterfaceType - get the interface type of the argument tuple
+  Type getArgumentInterfaceType() const;
+
   /// \brief Get the type of the constructed object.
   Type getResultType() const;
 
