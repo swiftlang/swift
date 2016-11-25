@@ -1028,7 +1028,7 @@ static bool ParseDiagnosticArgs(DiagnosticOptions &Opts, ArgList &Args,
   Opts.WarningsAsErrors |= Args.hasArg(OPT_warnings_as_errors);
 
   assert(!(Opts.WarningsAsErrors && Opts.SuppressWarnings) &&
-         "conflicting arguments; should of been caught by driver");
+         "conflicting arguments; should have been caught by driver");
 
   return false;
 }
