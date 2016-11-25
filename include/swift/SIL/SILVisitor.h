@@ -68,8 +68,7 @@ public:
   }
 
   void visitBasicBlockArguments(SILBasicBlock *BB) {
-    for (auto argI = BB->bbarg_begin(), argEnd = BB->bbarg_end();
-         argI != argEnd;
+    for (auto argI = BB->args_begin(), argEnd = BB->args_end(); argI != argEnd;
          ++argI)
       asImpl().visit(*argI);
   }

@@ -281,9 +281,8 @@ SILGenFunction::emitOptionalToOptional(SILLocation loc,
   if (resultTL.isAddressOnly())
     result = emitTemporaryAllocation(loc, resultTy);
   else
-    result = new (F.getModule()) SILArgument(contBB, resultTL.getLoweredType());
+    result = contBB->createArgument(resultTL.getLoweredType());
 
-  
   // Branch on whether the input is optional, this doesn't consume the value.
   auto isPresent = emitDoesOptionalHaveValue(loc, input.getValue());
   B.createCondBranch(loc, isPresent, isPresentBB, isNotPresentBB);
@@ -523,7 +522,7 @@ ManagedValue SILGenFunction::emitExistentialErasure(
         // layering reasons, so perform an unchecked cast down to NSError.
         SILType anyObjectTy =
           potentialNSError.getType().getAnyOptionalObjectType();
-        SILValue nsError = isPresentBB->createBBArg(anyObjectTy);
+        SILValue nsError = isPresentBB->createArgument(anyObjectTy);
         nsError = B.createUncheckedRefCast(loc, nsError, 
                                            getLoweredType(nsErrorType));
 
@@ -555,7 +554,7 @@ ManagedValue SILGenFunction::emitExistentialErasure(
       B.emitBlock(contBB);
 
       SILValue existentialResult =
-        contBB->createBBArg(existentialTL.getLoweredType());
+          contBB->createArgument(existentialTL.getLoweredType());
       return emitManagedRValueWithCleanup(existentialResult, existentialTL);
     }
   }

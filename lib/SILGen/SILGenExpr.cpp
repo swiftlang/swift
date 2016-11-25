@@ -829,7 +829,7 @@ RValue RValueEmitter::visitForceTryExpr(ForceTryExpr *E, SGFContext C) {
     SavedInsertionPoint scope(SGF, catchBB, FunctionSection::Postmatter);
 
     ASTContext &ctx = SGF.getASTContext();
-    auto error = catchBB->createBBArg(SILType::getExceptionType(ctx));
+    auto error = catchBB->createArgument(SILType::getExceptionType(ctx));
     SGF.B.createBuiltin(E, ctx.getIdentifier("unexpectedError"),
                         SGF.SGM.Types.getEmptyTupleType(), {}, {error});
     SGF.B.createUnreachable(E);
@@ -913,8 +913,8 @@ RValue RValueEmitter::visitOptionalTryExpr(OptionalTryExpr *E, SGFContext C) {
   // result type.
   SGF.B.emitBlock(catchBB);
   FullExpr catchCleanups(SGF.Cleanups, E);
-  auto *errorArg = catchBB->createBBArg(
-      SILType::getExceptionType(SGF.getASTContext()));
+  auto *errorArg =
+      catchBB->createArgument(SILType::getExceptionType(SGF.getASTContext()));
   (void) SGF.emitManagedRValueWithCleanup(errorArg);
   catchCleanups.pop();
 
@@ -932,7 +932,7 @@ RValue RValueEmitter::visitOptionalTryExpr(OptionalTryExpr *E, SGFContext C) {
   // If this was done in SSA registers, then the value is provided as an
   // argument to the block.
   if (!isByAddress) {
-    auto arg = contBB->createBBArg(optTL.getLoweredType());
+    auto arg = contBB->createArgument(optTL.getLoweredType());
     return RValue(SGF, E, SGF.emitManagedRValueWithCleanup(arg, optTL));
   }
 
@@ -2113,7 +2113,7 @@ static ManagedValue flattenOptional(SILGenFunction &SGF, SILLocation loc,
   if (resultTL.isAddressOnly())
     result = SGF.emitTemporaryAllocation(loc, resultTy);
   else
-    result = contBB->createBBArg(resultTy);
+    result = contBB->createArgument(resultTy);
 
   // Branch on whether the input is optional, this doesn't consume the value.
   auto isPresent = SGF.emitDoesOptionalHaveValue(loc, optVal.getValue());
@@ -2581,9 +2581,9 @@ RValue RValueEmitter::visitIfExpr(IfExpr *E, SGFContext C) {
     
     SILBasicBlock *cont = cond.complete(SGF);
     assert(cont && "no continuation block for if expr?!");
-    
-    SILValue result = cont->bbarg_begin()[0];
-    
+
+    SILValue result = cont->args_begin()[0];
+
     return RValue(SGF, E, SGF.emitManagedRValueWithCleanup(result));
   } else {
     // If the result is address-only, emit the result into a common stack buffer
@@ -3040,7 +3040,7 @@ RValue RValueEmitter::visitOptionalEvaluationExpr(OptionalEvaluationExpr *E,
   // If this was done in SSA registers, then the value is provided as an
   // argument to the block.
   if (!isByAddress) {
-    auto arg = new (SGF.SGM.M) SILArgument(contBB, optTL.getLoweredType());
+    auto arg = contBB->createArgument(optTL.getLoweredType());
     return RValue(SGF, E, SGF.emitManagedRValueWithCleanup(arg, optTL));
   }
   

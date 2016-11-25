@@ -572,12 +572,12 @@ void ClosureSpecCloner::populateCloned() {
 
   // Create arguments for the entry block.
   SILBasicBlock *ClosureUserEntryBB = &*ClosureUser->begin();
-  SILBasicBlock *ClonedEntryBB = new (M) SILBasicBlock(Cloned);
+  SILBasicBlock *ClonedEntryBB = Cloned->createBasicBlock();
 
   // Remove the closure argument.
   SILArgument *ClosureArg = nullptr;
-  for (size_t i = 0, e = ClosureUserEntryBB->bbarg_size(); i != e; ++i) {
-    SILArgument *Arg = ClosureUserEntryBB->getBBArg(i);
+  for (size_t i = 0, e = ClosureUserEntryBB->args_size(); i != e; ++i) {
+    SILArgument *Arg = ClosureUserEntryBB->getArgument(i);
     if (i == CallSiteDesc.getClosureIndex()) {
       ClosureArg = Arg;
       continue;
@@ -585,8 +585,7 @@ void ClosureSpecCloner::populateCloned() {
 
     // Otherwise, create a new argument which copies the original argument
     SILValue MappedValue =
-      new (M) SILArgument(ClonedEntryBB, Arg->getType(), Arg->getDecl());
-
+        ClonedEntryBB->createArgument(Arg->getType(), Arg->getDecl());
     ValueMap.insert(std::make_pair(Arg, MappedValue));
   }
 
@@ -603,8 +602,7 @@ void ClosureSpecCloner::populateCloned() {
   unsigned NumNotCaptured = NumTotalParams - CallSiteDesc.getNumArguments();
   llvm::SmallVector<SILValue, 4> NewPAIArgs;
   for (auto &PInfo : ClosedOverFunTy->getParameters().slice(NumNotCaptured)) {
-    SILValue MappedValue =
-      new (M) SILArgument(ClonedEntryBB, PInfo.getSILType());
+    SILValue MappedValue = ClonedEntryBB->createArgument(PInfo.getSILType());
     NewPAIArgs.push_back(MappedValue);
   }
 

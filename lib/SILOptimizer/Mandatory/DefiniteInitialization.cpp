@@ -125,18 +125,17 @@ static void InsertCFGDiamond(SILValue Cond, SILLocation Loc, SILBuilder &B,
                              SILBasicBlock *&FalseBB,
                              SILBasicBlock *&ContBB) {
   SILBasicBlock *StartBB = B.getInsertionBB();
-  SILModule &Module = StartBB->getModule();
   
   // Start by splitting the current block.
-  ContBB = StartBB->splitBasicBlock(B.getInsertionPoint());
-  
+  ContBB = StartBB->split(B.getInsertionPoint());
+
   // Create the true block if requested.
   SILBasicBlock *TrueDest;
   if (!createTrueBB) {
     TrueDest = ContBB;
     TrueBB = nullptr;
   } else {
-    TrueDest = new (Module) SILBasicBlock(StartBB->getParent());
+    TrueDest = StartBB->getParent()->createBasicBlock();
     B.moveBlockTo(TrueDest, ContBB);
     B.setInsertionPoint(TrueDest);
     B.createBranch(Loc, ContBB);
@@ -149,7 +148,7 @@ static void InsertCFGDiamond(SILValue Cond, SILLocation Loc, SILBuilder &B,
     FalseDest = ContBB;
     FalseBB = nullptr;
   } else {
-    FalseDest = new (Module) SILBasicBlock(StartBB->getParent());
+    FalseDest = StartBB->getParent()->createBasicBlock();
     B.moveBlockTo(FalseDest, ContBB);
     B.setInsertionPoint(FalseDest);
     B.createBranch(Loc, ContBB);
@@ -1224,7 +1223,7 @@ static bool isFailableInitReturnUseOfEnum(EnumInst *EI) {
   auto *BI = dyn_cast<BranchInst>(EI->use_begin()->getUser());
   if (!BI || BI->getNumArgs() != 1) return false;
 
-  auto *TargetArg = BI->getDestBB()->getBBArg(0);
+  auto *TargetArg = BI->getDestBB()->getArgument(0);
   if (!TargetArg->hasOneUse()) return false;
   return isa<ReturnInst>(TargetArg->use_begin()->getUser());
 }

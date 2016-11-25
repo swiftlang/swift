@@ -57,18 +57,17 @@ SILFunction *GenericCloner::initCloned(SILFunction *Orig,
 
 void GenericCloner::populateCloned() {
   SILFunction *Cloned = getCloned();
-  SILModule &M = Cloned->getModule();
 
   // Create arguments for the entry block.
   SILBasicBlock *OrigEntryBB = &*Original.begin();
-  SILBasicBlock *ClonedEntryBB = new (M) SILBasicBlock(Cloned);
+  SILBasicBlock *ClonedEntryBB = Cloned->createBasicBlock();
   getBuilder().setInsertionPoint(ClonedEntryBB);
 
   llvm::SmallVector<AllocStackInst *, 8> AllocStacks;
   AllocStackInst *ReturnValueAddr = nullptr;
 
   // Create the entry basic block with the function arguments.
-  auto I = OrigEntryBB->bbarg_begin(), E = OrigEntryBB->bbarg_end();
+  auto I = OrigEntryBB->args_begin(), E = OrigEntryBB->args_end();
   int ArgIdx = 0;
   while (I != E) {
     SILArgument *OrigArg = *I;
@@ -90,7 +89,7 @@ void GenericCloner::populateCloned() {
       } else {
         // Store the new direct parameter to the alloc_stack.
         auto *NewArg =
-          new (M) SILArgument(ClonedEntryBB, mappedType, OrigArg->getDecl());
+            ClonedEntryBB->createArgument(mappedType, OrigArg->getDecl());
         getBuilder().createStore(Loc, NewArg, ASI,
                                  StoreOwnershipQualifier::Unqualified);
 
@@ -105,7 +104,7 @@ void GenericCloner::populateCloned() {
       }
     } else {
       auto *NewArg =
-        new (M) SILArgument(ClonedEntryBB, mappedType, OrigArg->getDecl());
+          ClonedEntryBB->createArgument(mappedType, OrigArg->getDecl());
       ValueMap[OrigArg] = NewArg;
     }
     ++I;

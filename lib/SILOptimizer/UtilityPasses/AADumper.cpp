@@ -38,7 +38,7 @@ using namespace swift;
 // least two values to compare.
 static bool gatherValues(SILFunction &Fn, std::vector<SILValue> &Values) {
   for (auto &BB : Fn) {
-    for (auto *Arg : BB.getBBArgs())
+    for (auto *Arg : BB.getArguments())
       Values.push_back(SILValue(Arg));
     for (auto &II : BB)
       if (II.hasValue())

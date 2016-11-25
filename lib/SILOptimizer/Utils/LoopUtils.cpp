@@ -24,13 +24,13 @@
 using namespace swift;
 
 static SILBasicBlock *createInitialPreheader(SILBasicBlock *Header) {
-  auto *Preheader = new (Header->getModule())
-      SILBasicBlock(Header->getParent(), &*std::prev(Header->getIterator()));
+  auto *Preheader =
+      Header->getParent()->createBasicBlock(&*std::prev(Header->getIterator()));
 
   // Clone the arguments from header into the pre-header.
   llvm::SmallVector<SILValue, 8> Args;
-  for (auto *HeaderArg : Header->getBBArgs()) {
-    Args.push_back(Preheader->createBBArg(HeaderArg->getType(), nullptr));
+  for (auto *HeaderArg : Header->getArguments()) {
+    Args.push_back(Preheader->createArgument(HeaderArg->getType(), nullptr));
   }
 
   // Create the branch to the header.
@@ -116,8 +116,7 @@ static SILBasicBlock *insertBackedgeBlock(SILLoop *L, DominanceInfo *DT,
   }
 
   // Create and insert the new backedge block...
-  SILBasicBlock *BEBlock =
-    new (F->getModule()) SILBasicBlock(F, BackedgeBlocks.back());
+  SILBasicBlock *BEBlock = F->createBasicBlock(BackedgeBlocks.back());
 
   DEBUG(llvm::dbgs() << "  Inserting unique backedge block " << *BEBlock
         << "\n");
@@ -125,8 +124,9 @@ static SILBasicBlock *insertBackedgeBlock(SILLoop *L, DominanceInfo *DT,
   // Now that the block has been inserted into the function, create PHI nodes in
   // the backedge block which correspond to any PHI nodes in the header block.
   SmallVector<SILValue, 6> BBArgs;
-  for (auto *BBArg : Header->getBBArgs()) {
-    BBArgs.push_back(BEBlock->createBBArg(BBArg->getType(), /*Decl=*/nullptr));
+  for (auto *BBArg : Header->getArguments()) {
+    BBArgs.push_back(
+        BEBlock->createArgument(BBArg->getType(), /*Decl=*/nullptr));
   }
 
   // Arbitrarily pick one of the predecessor's branch locations.

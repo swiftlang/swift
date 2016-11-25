@@ -391,7 +391,7 @@ void SILSerializer::writeSILFunction(const SILFunction &F, bool DeclOnly) {
     auto &BB = **Iter;
     BasicBlockMap.insert(std::make_pair(&BB, BasicID++));
 
-    for (auto I = BB.bbarg_begin(), E = BB.bbarg_end(); I != E; ++I)
+    for (auto I = BB.args_begin(), E = BB.args_end(); I != E; ++I)
       ValueIDs[static_cast<const ValueBase*>(*I)] = ++ValueID;
 
     for (const SILInstruction &SI : BB)
@@ -414,7 +414,7 @@ void SILSerializer::writeSILFunction(const SILFunction &F, bool DeclOnly) {
 
 void SILSerializer::writeSILBasicBlock(const SILBasicBlock &BB) {
   SmallVector<DeclID, 4> Args;
-  for (auto I = BB.bbarg_begin(), E = BB.bbarg_end(); I != E; ++I) {
+  for (auto I = BB.args_begin(), E = BB.args_end(); I != E; ++I) {
     SILArgument *SA = *I;
     DeclID tId = S.addTypeRef(SA->getType().getSwiftRValueType());
     DeclID vId = addValueRef(static_cast<const ValueBase*>(SA));

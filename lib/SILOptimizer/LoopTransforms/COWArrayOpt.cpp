@@ -427,7 +427,7 @@ bool COWArrayOpt::checkUniqueArrayContainer(SILValue ArrayContainer) {
     // Check that the argument is passed as an inout type. This means there are
     // no aliases accessible within this function scope.
     auto Params = Function->getLoweredFunctionType()->getParameters();
-    ArrayRef<SILArgument*> FunctionArgs = Function->begin()->getBBArgs();
+    ArrayRef<SILArgument *> FunctionArgs = Function->begin()->getArguments();
     for (unsigned ArgIdx = 0, ArgEnd = Params.size();
          ArgIdx != ArgEnd; ++ArgIdx) {
       if (FunctionArgs[ArgIdx] != Arg)
@@ -1819,7 +1819,7 @@ private:
       // Check that the argument is passed as an inout or by value type. This
       // means there are no aliases accessible within this function scope.
       auto Params = Fun->getLoweredFunctionType()->getParameters();
-      ArrayRef<SILArgument*> FunctionArgs = Fun->begin()->getBBArgs();
+      ArrayRef<SILArgument *> FunctionArgs = Fun->begin()->getArguments();
       for (unsigned ArgIdx = 0, ArgEnd = Params.size(); ArgIdx != ArgEnd;
            ++ArgIdx) {
         if (FunctionArgs[ArgIdx] != Arg)
@@ -1952,9 +1952,7 @@ public:
 
   SILBasicBlock *cloneRegion() {
     assert (DomTree.getNode(StartBB) != nullptr && "Can't cloned dead code");
-
     auto CurFun = StartBB->getParent();
-    auto &Mod = CurFun->getModule();
 
     // We don't want to visit blocks outside of the region. visitSILBasicBlocks
     // checks BBMap before it clones a block. So we mark exiting blocks as
@@ -1975,13 +1973,13 @@ public:
     }
 
     // Create the cloned start basic block.
-    auto *ClonedStartBB = new (Mod) SILBasicBlock(CurFun);
+    auto *ClonedStartBB = CurFun->createBasicBlock();
     BBMap[StartBB] = ClonedStartBB;
 
     // Clone the arguments.
-    for (auto &Arg : StartBB->getBBArgs()) {
+    for (auto &Arg : StartBB->getArguments()) {
       SILValue MappedArg =
-          new (Mod) SILArgument(ClonedStartBB, getOpType(Arg->getType()));
+          ClonedStartBB->createArgument(getOpType(Arg->getType()));
       ValueMap.insert(std::make_pair(Arg, MappedArg));
     }
 
@@ -2091,7 +2089,7 @@ protected:
       auto *OrigBB = Entry.first;
 
       // Update outside used phi values.
-      for (auto *Arg : OrigBB->getBBArgs())
+      for (auto *Arg : OrigBB->getArguments())
         updateSSAForValue(OrigBB, Arg, SSAUp);
 
       // Update outside used instruction values.

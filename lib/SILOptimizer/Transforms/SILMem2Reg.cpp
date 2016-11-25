@@ -511,10 +511,8 @@ void MemoryToRegisters::removeSingleBlockAllocation(AllocStackInst *ASI) {
 void StackAllocationPromoter::addBlockArguments(BlockSet &PhiBlocks) {
   DEBUG(llvm::dbgs() << "*** Adding new block arguments.\n");
 
-  SILModule &M = ASI->getModule();
-
-  for (auto Block : PhiBlocks)
-    new (M) SILArgument(Block, ASI->getElementType());
+  for (auto *Block : PhiBlocks)
+    Block->createArgument(ASI->getElementType());
 }
 
 SILValue
@@ -537,7 +535,7 @@ StackAllocationPromoter::getLiveOutValue(BlockSet &PhiBlocks,
     if (PhiBlocks.count(BB)) {
       // Return the dummy instruction that represents the new value that we will
       // add to the basic block.
-      SILValue Phi = BB->getBBArg(BB->getNumBBArg()-1);
+      SILValue Phi = BB->getArgument(BB->getNumArguments() - 1);
       DEBUG(llvm::dbgs() << "*** Found a dummy Phi def " << *Phi);
       return Phi;
     }
@@ -558,7 +556,7 @@ StackAllocationPromoter::getLiveInValue(BlockSet &PhiBlocks,
   // chain.
   if (PhiBlocks.count(BB)) {
     DEBUG(llvm::dbgs() << "*** Found a local Phi definition.\n");
-    return BB->getBBArg(BB->getNumBBArg()-1);
+    return BB->getArgument(BB->getNumArguments() - 1);
   }
 
   if (BB->pred_empty() || !DT->getNode(BB))

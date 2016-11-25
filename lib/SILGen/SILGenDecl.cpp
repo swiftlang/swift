@@ -697,7 +697,7 @@ emitEnumMatch(ManagedValue value, EnumElementDecl *ElementDecl,
   // is not address-only.
   SILValue eltValue;
   if (!value.getType().isAddress())
-    eltValue = new (SGF.F.getModule()) SILArgument(contBB, eltTy);
+    eltValue = contBB->createArgument(eltTy);
 
   if (subInit == nullptr) {
     // If there is no subinitialization, then we are done matching.  Don't

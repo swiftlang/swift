@@ -173,7 +173,7 @@ bool ConditionForwarding::tryOptimize(SwitchEnumInst *SEI) {
   // No other values, beside the Enum, should be passed from the condition's
   // destinations to the merging block.
   SILBasicBlock *BB = Arg->getParent();
-  if (BB->getNumBBArg() != 1)
+  if (BB->getNumArguments() != 1)
     return false;
 
   llvm::SmallVector<SILBasicBlock *, 4> PredBlocks;
@@ -242,11 +242,11 @@ bool ConditionForwarding::tryOptimize(SwitchEnumInst *SEI) {
       SILArgument *NewArg = nullptr;
       if (NeedEnumArg.insert(UseBlock).second) {
         // The first Enum use in this UseBlock.
-        NewArg = UseBlock->createBBArg(Arg->getType());
+        NewArg = UseBlock->createArgument(Arg->getType());
       } else {
         // We already inserted the Enum argument for this UseBlock.
-        assert(UseBlock->getNumBBArg() >= 1);
-        NewArg = UseBlock->getBBArg(UseBlock->getNumBBArg() - 1);
+        assert(UseBlock->getNumArguments() >= 1);
+        NewArg = UseBlock->getArgument(UseBlock->getNumArguments() - 1);
       }
       ArgUse->set(NewArg);
       continue;
@@ -267,7 +267,7 @@ bool ConditionForwarding::tryOptimize(SwitchEnumInst *SEI) {
     SILBuilder B(BI);
     llvm::SmallVector<SILValue, 2> BranchArgs;
     unsigned HasEnumArg = NeedEnumArg.count(SEDest);
-    if (SEDest->getNumBBArg() == 1 + HasEnumArg) {
+    if (SEDest->getNumArguments() == 1 + HasEnumArg) {
       // The successor block has an original argument, which is the Enum's
       // payload.
       BranchArgs.push_back(EI->getOperand());
@@ -286,7 +286,7 @@ bool ConditionForwarding::tryOptimize(SwitchEnumInst *SEI) {
   B.createBranch(Condition->getLoc(), BB);
   Condition->moveBefore(SEI);
   SEI->eraseFromParent();
-  BB->eraseBBArg(0);
+  BB->eraseArgument(0);
   return true;
 }
 

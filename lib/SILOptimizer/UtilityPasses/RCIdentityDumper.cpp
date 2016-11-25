@@ -45,7 +45,7 @@ class RCIdentityDumper : public SILFunctionTransform {
     llvm::outs() << "@" << Fn->getName() << "@\n";
 
     for (auto &BB : *Fn) {
-      for (auto *Arg : BB.getBBArgs()) {
+      for (auto *Arg : BB.getArguments()) {
         ValueToValueIDMap[Arg] = ValueCount++;
         Results.push_back({Arg, RCId->getRCIdentityRoot(Arg)});
       }

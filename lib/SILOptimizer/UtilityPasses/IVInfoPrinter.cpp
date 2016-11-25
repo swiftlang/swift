@@ -47,7 +47,7 @@ class IVInfoPrinter : public SILModuleTransform {
       bool FoundIV = false;
 
       for (auto &BB : F) {
-        for (auto A : BB.getBBArgs())
+        for (auto A : BB.getArguments())
           if (Info.isInductionVariable(A)) {
             if (!FoundIV)
               llvm::errs() << "Induction variables for function: " <<

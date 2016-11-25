@@ -272,7 +272,7 @@ static SILArgument *getParameterForOperand(SILFunction *F, Operand *O) {
   auto &Entry = F->front();
   size_t ParamIndex = getParameterIndexForOperand(O);
 
-  return Entry.getBBArg(ParamIndex);
+  return Entry.getArgument(ParamIndex);
 }
 
 /// Return a pointer to the SILFunction called by Call if we can
@@ -585,20 +585,19 @@ PromotedParamCloner::initCloned(SILFunction *Orig, IsFragile_t Fragile,
 void
 PromotedParamCloner::populateCloned() {
   SILFunction *Cloned = getCloned();
-  SILModule &M = Cloned->getModule();
 
   // Create arguments for the entry block
   SILBasicBlock *OrigEntryBB = &*Orig->begin();
-  SILBasicBlock *ClonedEntryBB = new (M) SILBasicBlock(Cloned);
+  SILBasicBlock *ClonedEntryBB = Cloned->createBasicBlock();
   unsigned ArgNo = 0;
-  auto I = OrigEntryBB->bbarg_begin(), E = OrigEntryBB->bbarg_end();
+  auto I = OrigEntryBB->args_begin(), E = OrigEntryBB->args_end();
   while (I != E) {
     if (count(PromotedParamIndices, ArgNo)) {
       // Create a new argument with the promoted type.
       auto promotedTy = (*I)->getType().castTo<SILBoxType>()
         ->getBoxedAddressType();
-      auto promotedArg = new (M)
-        SILArgument(ClonedEntryBB, promotedTy, (*I)->getDecl());
+      auto *promotedArg =
+          ClonedEntryBB->createArgument(promotedTy, (*I)->getDecl());
       PromotedParameters.insert(*I);
       
       // Map any projections of the box to the promoted argument.
@@ -611,7 +610,7 @@ PromotedParamCloner::populateCloned() {
     } else {
       // Create a new argument which copies the original argument.
       SILValue MappedValue =
-        new (M) SILArgument(ClonedEntryBB, (*I)->getType(), (*I)->getDecl());
+          ClonedEntryBB->createArgument((*I)->getType(), (*I)->getDecl());
       ValueMap.insert(std::make_pair(*I, MappedValue));
     }
     ++ArgNo;

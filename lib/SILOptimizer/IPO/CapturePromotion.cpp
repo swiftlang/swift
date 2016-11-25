@@ -463,20 +463,19 @@ ClosureCloner::initCloned(SILFunction *Orig, IsFragile_t Fragile,
 void
 ClosureCloner::populateCloned() {
   SILFunction *Cloned = getCloned();
-  SILModule &M = Cloned->getModule();
 
   // Create arguments for the entry block
   SILBasicBlock *OrigEntryBB = &*Orig->begin();
-  SILBasicBlock *ClonedEntryBB = new (M) SILBasicBlock(Cloned);
+  SILBasicBlock *ClonedEntryBB = Cloned->createBasicBlock();
   unsigned ArgNo = 0;
-  auto I = OrigEntryBB->bbarg_begin(), E = OrigEntryBB->bbarg_end();
+  auto I = OrigEntryBB->args_begin(), E = OrigEntryBB->args_end();
   while (I != E) {
     if (PromotableIndices.count(ArgNo)) {
       // Handle the case of a promoted capture argument.
       auto BoxedTy = (*I)->getType().castTo<SILBoxType>()->getBoxedAddressType()
         .getObjectType();
       SILValue MappedValue =
-        new (M) SILArgument(ClonedEntryBB, BoxedTy, (*I)->getDecl());
+          ClonedEntryBB->createArgument(BoxedTy, (*I)->getDecl());
       BoxArgumentMap.insert(std::make_pair(*I, MappedValue));
       
       // Track the projections of the box.
@@ -488,7 +487,7 @@ ClosureCloner::populateCloned() {
     } else {
       // Otherwise, create a new argument which copies the original argument
       SILValue MappedValue =
-        new (M) SILArgument(ClonedEntryBB, (*I)->getType(), (*I)->getDecl());
+          ClonedEntryBB->createArgument((*I)->getType(), (*I)->getDecl());
       ValueMap.insert(std::make_pair(*I, MappedValue));
     }
     ++ArgNo;
@@ -610,7 +609,7 @@ ClosureCloner::visitLoadInst(LoadInst *Inst) {
 static SILArgument *getBoxFromIndex(SILFunction *F, unsigned Index) {
   assert(F->isDefinition() && "Expected definition not external declaration!");
   auto &Entry = F->front();
-  return Entry.getBBArg(Index);
+  return Entry.getArgument(Index);
 }
 
 /// \brief Given a partial_apply instruction and the argument index into its

@@ -39,20 +39,21 @@ private:
   /// automatically managed by the SILSuccessor class.
   SILSuccessor *PredList;
 
-  /// BBArgList - This is the list of basic block arguments for this block.
-  std::vector<SILArgument*> BBArgList;
+  /// This is the list of basic block arguments for this block.
+  std::vector<SILArgument *> ArgumentList;
 
   /// The ordered set of instructions in the SILBasicBlock.
   InstListType InstList;
 
   friend struct llvm::ilist_sentinel_traits<SILBasicBlock>;
   friend struct llvm::ilist_traits<SILBasicBlock>;
-  SILBasicBlock() : Parent(0) {}
+  SILBasicBlock() : Parent(nullptr) {}
   void operator=(const SILBasicBlock &) = delete;
   void operator delete(void *Ptr, size_t) = delete;
 
-public:
   SILBasicBlock(SILFunction *F, SILBasicBlock *afterBB = nullptr);
+
+public:
   ~SILBasicBlock();
 
   /// Gets the ID (= index in the function's block list) of the block.
@@ -131,7 +132,7 @@ public:
   /// Note that all the instructions BEFORE the specified iterator
   /// stay as part of the original basic block. The old basic block is left
   /// without a terminator.
-  SILBasicBlock *splitBasicBlock(iterator I);
+  SILBasicBlock *split(iterator I);
 
   /// \brief Move the basic block to after the specified basic block in the IR.
   /// The basic blocks must reside in the same function.
@@ -141,53 +142,47 @@ public:
   // SILBasicBlock Argument List Inspection and Manipulation
   //===--------------------------------------------------------------------===//
 
-  using bbarg_iterator = std::vector<SILArgument *>::iterator;
-  using const_bbarg_iterator = std::vector<SILArgument *>::const_iterator;
+  using arg_iterator = std::vector<SILArgument *>::iterator;
+  using const_arg_iterator = std::vector<SILArgument *>::const_iterator;
 
-  bool bbarg_empty() const { return BBArgList.empty(); }
-  size_t bbarg_size() const { return BBArgList.size(); }
-  bbarg_iterator bbarg_begin() { return BBArgList.begin(); }
-  bbarg_iterator bbarg_end() { return BBArgList.end(); }
-  const_bbarg_iterator bbarg_begin() const { return BBArgList.begin(); }
-  const_bbarg_iterator bbarg_end() const { return BBArgList.end(); }
+  bool args_empty() const { return ArgumentList.empty(); }
+  size_t args_size() const { return ArgumentList.size(); }
+  arg_iterator args_begin() { return ArgumentList.begin(); }
+  arg_iterator args_end() { return ArgumentList.end(); }
+  const_arg_iterator args_begin() const { return ArgumentList.begin(); }
+  const_arg_iterator args_end() const { return ArgumentList.end(); }
 
-  ArrayRef<SILArgument*> getBBArgs() const { return BBArgList; }
+  ArrayRef<SILArgument *> getArguments() const { return ArgumentList; }
 
-  unsigned getNumBBArg() const { return BBArgList.size(); }
-  const SILArgument *getBBArg(unsigned i) const { return BBArgList[i]; }
-  SILArgument *getBBArg(unsigned i) { return BBArgList[i]; }
+  unsigned getNumArguments() const { return ArgumentList.size(); }
+  const SILArgument *getArgument(unsigned i) const { return ArgumentList[i]; }
+  SILArgument *getArgument(unsigned i) { return ArgumentList[i]; }
 
   /// Replace the \p{i}th BB arg with a new BBArg with SILType \p Ty and ValueDecl
   /// \p D.
-  SILArgument *replaceBBArg(unsigned i, SILType Ty, const ValueDecl *D=nullptr);
+  SILArgument *replaceArgument(unsigned i, SILType Ty,
+                               const ValueDecl *D = nullptr);
 
   /// Erase a specific argument from the arg list.
-  void eraseBBArg(int Index);
+  void eraseArgument(int Index);
 
   /// Allocate a new argument of type \p Ty and append it to the argument
   /// list. Optionally you can pass in a value decl parameter.
-  SILArgument *createBBArg(SILType Ty, const ValueDecl *D=nullptr);
+  SILArgument *createArgument(SILType Ty, const ValueDecl *D = nullptr);
 
   /// Insert a new SILArgument with type \p Ty and \p Decl at position \p Pos.
-  SILArgument *insertBBArg(bbarg_iterator Pos, SILType Ty,
-                           const ValueDecl *D=nullptr);
+  SILArgument *insertArgument(arg_iterator Pos, SILType Ty,
+                              const ValueDecl *D = nullptr);
 
-  SILArgument *insertBBArg(unsigned Index, SILType Ty,
-                           const ValueDecl *D=nullptr) {
-    bbarg_iterator Pos = BBArgList.begin();
+  SILArgument *insertArgument(unsigned Index, SILType Ty,
+                              const ValueDecl *D = nullptr) {
+    arg_iterator Pos = ArgumentList.begin();
     std::advance(Pos, Index);
-    return insertBBArg(Pos, Ty, D);
+    return insertArgument(Pos, Ty, D);
   }
 
   /// \brief Remove all block arguments.
-  void dropAllBBArgs() { BBArgList.clear(); }
-
-  /// \brief Drops all uses that belong to this basic block.
-  void dropAllReferences() {
-    dropAllBBArgs();
-    for (SILInstruction &I : *this)
-      I.dropAllReferences();
-  }
+  void dropAllArguments() { ArgumentList.clear(); }
 
   //===--------------------------------------------------------------------===//
   // Predecessors and Successors
@@ -294,12 +289,19 @@ public:
     return &SILBasicBlock::InstList;
   }
 
+  /// \brief Drops all uses that belong to this basic block.
+  void dropAllReferences() {
+    dropAllArguments();
+    for (SILInstruction &I : *this)
+      I.dropAllReferences();
+  }
+
 private:
   friend class SILArgument;
 
   /// BBArgument's ctor adds it to the argument list of this block.
-  void insertArgument(bbarg_iterator Iter, SILArgument *Arg) {
-    BBArgList.insert(Iter, Arg);
+  void insertArgument(arg_iterator Iter, SILArgument *Arg) {
+    ArgumentList.insert(Iter, Arg);
   }
 };
 

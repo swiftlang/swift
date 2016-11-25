@@ -416,7 +416,7 @@ SILInstruction *StackPromoter::findDeallocPoint(SILInstruction *StartInst,
       Iter = StartInst->getIterator();
     } else {
       // Track all uses in the block arguments.
-      for (SILArgument *BBArg : BB->getBBArgs()) {
+      for (SILArgument *BBArg : BB->getArguments()) {
         if (ConGraph->isUsePoint(BBArg, Node))
           NumUsePointsToFind--;
       }

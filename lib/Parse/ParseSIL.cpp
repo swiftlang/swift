@@ -477,12 +477,12 @@ SILFunction *SILParser::getGlobalNameForReference(Identifier Name,
 SILBasicBlock *SILParser::getBBForDefinition(Identifier Name, SourceLoc Loc) {
   // If there was no name specified for this block, just create a new one.
   if (Name.empty())
-    return new (SILMod) SILBasicBlock(F);
-  
+    return F->createBasicBlock();
+
   SILBasicBlock *&BB = BlocksByName[Name];
   // If the block has never been named yet, just create it.
   if (BB == nullptr)
-    return BB = new (SILMod) SILBasicBlock(F);
+    return BB = F->createBasicBlock();
 
   // If it already exists, it was either a forward reference or a redefinition.
   // If it is a forward reference, it should be in our undefined set.
@@ -491,7 +491,7 @@ SILBasicBlock *SILParser::getBBForDefinition(Identifier Name, SourceLoc Loc) {
     // instructions after the terminator.
     P.diagnose(Loc, diag::sil_basicblock_redefinition, Name);
     HadError = true;
-    return new (SILMod) SILBasicBlock(F);
+    return F->createBasicBlock();
   }
 
   // FIXME: Splice the block to the end of the function so they come out in the
@@ -510,7 +510,7 @@ SILBasicBlock *SILParser::getBBForReference(Identifier Name, SourceLoc Loc) {
 
   // Otherwise, create it and remember that this is a forward reference so
   // that we can diagnose use without definition problems.
-  BB = new (SILMod) SILBasicBlock(F);
+  BB = F->createBasicBlock();
   UndefinedBlocks[BB] = {Loc, Name};
   return BB;
 }
@@ -3957,7 +3957,7 @@ bool SILParser::parseSILBasicBlock(SILBuilder &B) {
             P.parseToken(tok::colon, diag::expected_sil_colon_value_ref) ||
             parseSILType(Ty))
           return true;
-        auto Arg = new (SILMod) SILArgument(BB, Ty);
+        auto Arg = BB->createArgument(Ty);
         setLocalValue(Arg, Name, NameLoc);
       } while (P.consumeIf(tok::comma));
       
