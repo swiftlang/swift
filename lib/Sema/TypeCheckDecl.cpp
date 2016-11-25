@@ -761,10 +761,6 @@ static bool isDefaultInitializable(TypeRepr *typeRepr) {
     return isDefaultInitializable(attributed->getTypeRepr());
   }
 
-  // Look through named types.
-  if (auto named = dyn_cast<NamedTypeRepr>(typeRepr))
-    return isDefaultInitializable(named->getTypeRepr());
-  
   // Optional types are default-initializable.
   if (isa<OptionalTypeRepr>(typeRepr) ||
       isa<ImplicitlyUnwrappedOptionalTypeRepr>(typeRepr))

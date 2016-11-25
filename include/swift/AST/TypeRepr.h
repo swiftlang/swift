@@ -34,7 +34,6 @@ namespace swift {
   class DeclContext;
   class IdentTypeRepr;
   class ValueDecl;
-  class NamedTypeRepr;
 
 enum class TypeReprKind : uint8_t {
 #define TYPEREPR(ID, PARENT) ID,
@@ -541,6 +540,8 @@ private:
 /// \brief A tuple type.
 /// \code
 ///   (Foo, Bar)
+///   (x: Foo)
+///   (_ x: Foo)
 /// \endcode
 class TupleTypeRepr final : public TypeRepr,
     private llvm::TrailingObjects<TupleTypeRepr, TypeRepr*, Identifier,
@@ -579,6 +580,7 @@ class TupleTypeRepr final : public TypeRepr,
                 SourceLoc Ellipsis, unsigned EllipsisIdx);
 public:
 
+  unsigned getNumElements() const { return NumElements; }
   bool hasElementNames() const { return NameStatus >= HasNames; }
   bool hasUnderscoreLocs() const { return NameStatus == HasLabels; }
 
@@ -657,52 +659,6 @@ public:
 private:
   SourceLoc getStartLocImpl() const { return Parens.Start; }
   SourceLoc getEndLocImpl() const { return Parens.End; }
-  void printImpl(ASTPrinter &Printer, const PrintOptions &Opts) const;
-  friend class TypeRepr;
-};
-
-/// \brief A named element of a tuple type or a named parameter of a function
-/// type.
-/// \code
-///   (x: Foo)
-///   (_ x: Foo) -> ()
-/// \endcode
-class NamedTypeRepr : public TypeRepr {
-  Identifier Id;
-  TypeRepr *Ty;
-  SourceLoc IdLoc;
-  SourceLoc UnderscoreLoc;
-
-public:
-  /// Used for a named element of a tuple type.
-  NamedTypeRepr(Identifier Id, TypeRepr *Ty, SourceLoc IdLoc)
-    : TypeRepr(TypeReprKind::Named), Id(Id), Ty(Ty), IdLoc(IdLoc) {
-  }
-  /// Used for a named parameter of a function type.
-  NamedTypeRepr(Identifier Id, TypeRepr *Ty, SourceLoc IdLoc,
-                SourceLoc underscoreLoc)
-    : TypeRepr(TypeReprKind::Named), Id(Id), Ty(Ty), IdLoc(IdLoc),
-      UnderscoreLoc(underscoreLoc) {
-  }
-
-  bool hasName() const { return !Id.empty(); }
-  Identifier getName() const { return Id; }
-  TypeRepr *getTypeRepr() const { return Ty; }
-  SourceLoc getNameLoc() const { return IdLoc; }
-  SourceLoc getUnderscoreLoc() const { return UnderscoreLoc; }
-
-  bool isNamedParameter() const { return UnderscoreLoc.isValid(); }
-
-  static bool classof(const TypeRepr *T) {
-    return T->getKind() == TypeReprKind::Named;
-  }
-  static bool classof(const NamedTypeRepr *T) { return true; }
-
-private:
-  SourceLoc getStartLocImpl() const {
-    return UnderscoreLoc.isValid() ? UnderscoreLoc : IdLoc;
-  }
-  SourceLoc getEndLocImpl() const { return Ty->getEndLoc(); }
   void printImpl(ASTPrinter &Printer, const PrintOptions &Opts) const;
   friend class TypeRepr;
 };
@@ -881,7 +837,6 @@ inline bool TypeRepr::isSimple() const {
   case TypeReprKind::CompoundIdent:
   case TypeReprKind::Metatype:
   case TypeReprKind::Protocol:
-  case TypeReprKind::Named:
   case TypeReprKind::Dictionary:
   case TypeReprKind::Optional:
   case TypeReprKind::ImplicitlyUnwrappedOptional:

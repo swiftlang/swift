@@ -94,12 +94,9 @@ void TypeRepr::print(raw_ostream &OS, const PrintOptions &Opts) const {
 }
 
 void TypeRepr::print(ASTPrinter &Printer, const PrintOptions &Opts) const {
-  // The type part of a NamedTypeRepr will get the callback.
-  if (!isa<NamedTypeRepr>(this))
-    Printer.printTypePre(TypeLoc(const_cast<TypeRepr *>(this)));
+  Printer.printTypePre(TypeLoc(const_cast<TypeRepr *>(this)));
   SWIFT_DEFER {
-    if (!isa<NamedTypeRepr>(this))
-      Printer.printTypePost(TypeLoc(const_cast<TypeRepr *>(this)));
+    Printer.printTypePost(TypeLoc(const_cast<TypeRepr *>(this)));
   };
 
   switch (getKind()) {
@@ -189,11 +186,6 @@ TypeRepr *CloneVisitor::visitTupleTypeRepr(TupleTypeRepr *T) {
                                T->getElementNames(), T->getElementNameLocs(),
                                T->getUnderscoreLocs(),
                                T->getEllipsisLoc(), T->getEllipsisIndex());
-}
-
-TypeRepr *CloneVisitor::visitNamedTypeRepr(NamedTypeRepr *T) {
-  return new (Ctx) NamedTypeRepr(T->getName(), visit(T->getTypeRepr()),
-                                 T->getNameLoc(), T->getUnderscoreLoc());
 }
 
 TypeRepr *CloneVisitor::visitCompositionTypeRepr(CompositionTypeRepr *T) {
@@ -463,32 +455,30 @@ void TupleTypeRepr::printImpl(ASTPrinter &Printer,
   for (unsigned i = 0, e = NumElements; i != e; ++i) {
     if (i) Printer << ", ";
     Printer.callPrintStructurePre(PrintStructureKind::TupleElement);
+    auto name = getElementName(i);
+    if (isNamedParameter(i)) {
+      // Printing empty Identifier is same as printing '_'.
+      Printer.printName(Identifier(),
+                        PrintNameContext::FunctionParameterExternal);
+      if (!name.empty()) {
+        Printer << " ";
+        Printer.printName(name, PrintNameContext::FunctionParameterLocal);
+      }
+      Printer << ": ";
+    } else {
+      if (!name.empty()) {
+        Printer.printName(name, PrintNameContext::TupleElement);
+        Printer << ": ";
+      }
+    }
     printTypeRepr(getElement(i), Printer, Opts);
     Printer.printStructurePost(PrintStructureKind::TupleElement);
 
     if (hasEllipsis() && getEllipsisIndex() == i)
       Printer << "...";
   }
-  Printer << ")";
-}
 
-void NamedTypeRepr::printImpl(ASTPrinter &Printer,
-                              const PrintOptions &Opts) const {
-  if (isNamedParameter()) {
-    // Printing empty Identifier is same as printing '_'.
-    Printer.printName(Identifier(), PrintNameContext::FunctionParameterExternal);
-    if (!Id.empty()) {
-      Printer << " ";
-      Printer.printName(Id, PrintNameContext::FunctionParameterLocal);
-    }
-    Printer << ": ";
-  } else {
-    if (!Id.empty()) {
-      Printer.printName(Id, PrintNameContext::TupleElement);
-      Printer << ": ";
-    }
-  }
-  printTypeRepr(Ty, Printer, Opts);
+  Printer << ")";
 }
 
 CompositionTypeRepr *

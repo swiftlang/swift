@@ -1408,14 +1408,14 @@ private:
       if (auto *FTR = dyn_cast<FunctionTypeRepr>(T)) {
         FoundFunctionTypeRepr = true;
         if (auto *TTR = dyn_cast_or_null<TupleTypeRepr>(FTR->getArgsTypeRepr())) {
-          for (auto *ArgTR : TTR->getElements()) {
+          for (unsigned i = 0, end = TTR->getNumElements(); i != end; ++i) {
+            auto *ArgTR = TTR->getElement(i);
             CharSourceRange NR;
             CharSourceRange TR;
-            auto *NTR = dyn_cast<NamedTypeRepr>(ArgTR);
-            if (NTR && NTR->hasName()) {
-              NR = CharSourceRange(NTR->getNameLoc(),
-                                   NTR->getName().getLength());
-              ArgTR = NTR->getTypeRepr();
+            auto name = TTR->getElementName(i);
+            if (!name.empty()) {
+              NR = CharSourceRange(TTR->getElementNameLoc(i),
+                                   name.getLength());
             }
             SourceLoc SRE = Lexer::getLocForEndOfToken(SM,
                                                        ArgTR->getEndLoc());

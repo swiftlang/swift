@@ -763,8 +763,6 @@ ParserResult<TupleTypeRepr> Parser::parseTypeTupleBody() {
         // Form the named type representation.
         ElementNames[i] = firstName;
         ElementNameLocs[i] = firstNameLoc;
-        ElementsR[i] = new (Context) NamedTypeRepr(firstName, ElementsR[i],
-                                                   firstNameLoc);
         continue;
       }
 
@@ -786,8 +784,6 @@ ParserResult<TupleTypeRepr> Parser::parseTypeTupleBody() {
         ElementNames[i] = secondName;
         ElementNameLocs[i] = secondNameLoc;
         UnderscoreLocs[i]  = firstNameLoc;
-        ElementsR[i] = new (Context) NamedTypeRepr(secondName, ElementsR[i],
-                                                   secondNameLoc, firstNameLoc);
       }
     }
   }

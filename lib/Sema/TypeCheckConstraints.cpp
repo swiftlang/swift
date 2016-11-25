@@ -1086,8 +1086,6 @@ TypeExpr *PreCheckExpression::simplifyTypeExpr(Expr *E) {
         }
         EltNames[EltNo] = name;
         EltNameLocs[EltNo] = TE->getElementNameLoc(EltNo);
-        eltTR = new (TC.Context) NamedTypeRepr(name, eltTR,
-                                               TE->getElementNameLoc(EltNo));
       }
 
       Elts.push_back(eltTR);
