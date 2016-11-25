@@ -184,13 +184,6 @@ public:
   /// \brief Remove all block arguments.
   void dropAllArguments() { ArgumentList.clear(); }
 
-  /// \brief Drops all uses that belong to this basic block.
-  void dropAllReferences() {
-    dropAllArguments();
-    for (SILInstruction &I : *this)
-      I.dropAllReferences();
-  }
-
   //===--------------------------------------------------------------------===//
   // Predecessors and Successors
   //===--------------------------------------------------------------------===//
@@ -294,6 +287,13 @@ public:
   /// getSublistAccess() - returns pointer to member of instruction list
   static InstListType SILBasicBlock::*getSublistAccess() {
     return &SILBasicBlock::InstList;
+  }
+
+  /// \brief Drops all uses that belong to this basic block.
+  void dropAllReferences() {
+    dropAllArguments();
+    for (SILInstruction &I : *this)
+      I.dropAllReferences();
   }
 
 private:
