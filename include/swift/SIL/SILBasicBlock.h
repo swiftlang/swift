@@ -47,7 +47,7 @@ private:
 
   friend struct llvm::ilist_sentinel_traits<SILBasicBlock>;
   friend struct llvm::ilist_traits<SILBasicBlock>;
-  SILBasicBlock() : Parent(0) {}
+  SILBasicBlock() : Parent(nullptr) {}
   void operator=(const SILBasicBlock &) = delete;
   void operator delete(void *Ptr, size_t) = delete;
 
