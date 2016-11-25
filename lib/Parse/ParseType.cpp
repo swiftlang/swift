@@ -723,12 +723,21 @@ ParserResult<TupleTypeRepr> Parser::parseTypeTupleBody() {
   if (EllipsisLoc.isInvalid())
     EllipsisIdx = ElementsR.size();
 
+  SmallVector<Identifier, 4> ElementNames;
+  SmallVector<SourceLoc, 4> ElementNameLocs;
+  SmallVector<SourceLoc, 4> UnderscoreLocs;
   // If there were any labels, figure out which labels should go into the type
   // representation.
   if (!Labels.empty()) {
     assert(Labels.size() == ElementsR.size());
+
     bool isFunctionType = Tok.isAny(tok::arrow, tok::kw_throws,
                                     tok::kw_rethrows);
+    ElementNames.resize(ElementsR.size());
+    ElementNameLocs.resize(ElementsR.size());
+    if (isFunctionType)
+      UnderscoreLocs.resize(ElementsR.size());
+
     for (unsigned i : indices(ElementsR)) {
       auto &currentLabel = Labels[i];
 
@@ -752,6 +761,8 @@ ParserResult<TupleTypeRepr> Parser::parseTypeTupleBody() {
         }
 
         // Form the named type representation.
+        ElementNames[i] = firstName;
+        ElementNameLocs[i] = firstNameLoc;
         ElementsR[i] = new (Context) NamedTypeRepr(firstName, ElementsR[i],
                                                    firstNameLoc);
         continue;
@@ -772,6 +783,9 @@ ParserResult<TupleTypeRepr> Parser::parseTypeTupleBody() {
 
       if (firstNameLoc.isValid() || secondNameLoc.isValid()) {
         // Form the named parameter type representation.
+        ElementNames[i] = secondName;
+        ElementNameLocs[i] = secondNameLoc;
+        UnderscoreLocs[i]  = firstNameLoc;
         ElementsR[i] = new (Context) NamedTypeRepr(secondName, ElementsR[i],
                                                    secondNameLoc, firstNameLoc);
       }
@@ -781,6 +795,8 @@ ParserResult<TupleTypeRepr> Parser::parseTypeTupleBody() {
   return makeParserResult(Status,
                           TupleTypeRepr::create(Context, ElementsR,
                                                 SourceRange(LPLoc, RPLoc),
+                                                ElementNames, ElementNameLocs,
+                                                UnderscoreLocs,
                                                 EllipsisLoc, EllipsisIdx));
 }
 
