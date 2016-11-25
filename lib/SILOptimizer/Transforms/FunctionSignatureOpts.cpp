@@ -209,13 +209,13 @@ private:
     if (AD.Explode) {
       llvm::SmallVector<SILValue, 4> LeafValues;
       AD.ProjTree.createTreeFromValue(Builder, BB->getParent()->getLocation(),
-                                      BB->getBBArg(AD.Index), LeafValues);
+                                      BB->getArgument(AD.Index), LeafValues);
       NewArgs.append(LeafValues.begin(), LeafValues.end());
       return;
     }
 
     // All other arguments get pushed as what they are.
-    NewArgs.push_back(BB->getBBArg(AD.Index));
+    NewArgs.push_back(BB->getArgument(AD.Index));
   } 
 
   /// Take ArgumentDescList and ResultDescList and create an optimized function
@@ -503,7 +503,7 @@ void FunctionSignatureTransform::createFunctionSignatureOptimizedFunction() {
   F->setInlineStrategy(AlwaysInline);
   SILBasicBlock *ThunkBody = F->createBasicBlock();
   for (auto &ArgDesc : ArgumentDescList) {
-    ThunkBody->createBBArg(ArgDesc.Arg->getType(), ArgDesc.Decl);
+    ThunkBody->createArgument(ArgDesc.Arg->getType(), ArgDesc.Decl);
   }
 
   SILLocation Loc = ThunkBody->getParent()->getLocation();
@@ -528,11 +528,11 @@ void FunctionSignatureTransform::createFunctionSignatureOptimizedFunction() {
     // We need a try_apply to call a function with an error result.
     SILFunction *Thunk = ThunkBody->getParent();
     SILBasicBlock *NormalBlock = Thunk->createBasicBlock();
-    ReturnValue = NormalBlock->createBBArg(ResultType, 0);
+    ReturnValue = NormalBlock->createArgument(ResultType, 0);
     SILBasicBlock *ErrorBlock = Thunk->createBasicBlock();
     SILType Error =
         SILType::getPrimitiveObjectType(FunctionTy->getErrorResult().getType());
-    auto *ErrorArg = ErrorBlock->createBBArg(Error, 0);
+    auto *ErrorArg = ErrorBlock->createArgument(Error, 0);
     Builder.createTryApply(Loc, FRI, LoweredType, ArrayRef<Substitution>(),
                            ThunkArgs, NormalBlock, ErrorBlock);
 
@@ -563,7 +563,7 @@ void FunctionSignatureTransform::createFunctionSignatureOptimizedFunction() {
 bool FunctionSignatureTransform::DeadArgumentAnalyzeParameters() {
   // Did we decide we should optimize any parameter?
   bool SignatureOptimize = false;
-  ArrayRef<SILArgument *> Args = F->begin()->getBBArgs();
+  ArrayRef<SILArgument *> Args = F->begin()->getArguments();
 
   // Analyze the argument information.
   for (unsigned i = 0, e = Args.size(); i != e; ++i) {
@@ -588,7 +588,7 @@ void FunctionSignatureTransform::DeadArgumentTransformFunction() {
   for (const ArgumentDescriptor &AD : ArgumentDescList) {
     if (!AD.IsEntirelyDead)
       continue;
-    eraseUsesOfValue(BB->getBBArg(AD.Index));
+    eraseUsesOfValue(BB->getArgument(AD.Index));
   }
 }
 
@@ -598,7 +598,7 @@ void FunctionSignatureTransform::DeadArgumentFinalizeOptimizedFunction() {
   for (const ArgumentDescriptor &AD : reverse(ArgumentDescList)) {
     if (!AD.IsEntirelyDead)
       continue;
-    BB->eraseBBArg(AD.Arg->getIndex());
+    BB->eraseArgument(AD.Arg->getIndex());
   }
 }
 
@@ -606,7 +606,7 @@ void FunctionSignatureTransform::DeadArgumentFinalizeOptimizedFunction() {
 /// Owned to Guaranteed transformation.                       ///
 /// ----------------------------------------------------------///
 bool FunctionSignatureTransform::OwnedToGuaranteedAnalyzeParameters() {
-  ArrayRef<SILArgument *> Args = F->begin()->getBBArgs();
+  ArrayRef<SILArgument *> Args = F->begin()->getArguments();
   // A map from consumed SILArguments to the release associated with an
   // argument.
   //
@@ -773,7 +773,7 @@ OwnedToGuaranteedAddResultRelease(ResultDescriptor &RD, SILBuilder &Builder,
     SILBasicBlock *NormalBB = dyn_cast<TryApplyInst>(Call)->getNormalBB();
     Builder.setInsertionPoint(&*NormalBB->begin());
     Builder.createRetainValue(RegularLocation(SourceLoc()),
-                              NormalBB->getBBArg(0), Atomicity::Atomic);
+                              NormalBB->getArgument(0), Atomicity::Atomic);
   }
 }
 
@@ -783,7 +783,7 @@ OwnedToGuaranteedAddResultRelease(ResultDescriptor &RD, SILBuilder &Builder,
 bool FunctionSignatureTransform::ArgumentExplosionAnalyzeParameters() {
   // Did we decide we should optimize any parameter?
   bool SignatureOptimize = false;
-  ArrayRef<SILArgument *> Args = F->begin()->getBBArgs();
+  ArrayRef<SILArgument *> Args = F->begin()->getArguments();
   ConsumedArgToEpilogueReleaseMatcher ArgToReturnReleaseMap(RCIA->get(F), F);
 
   // Analyze the argument information.
@@ -830,8 +830,9 @@ void FunctionSignatureTransform::ArgumentExplosionFinalizeOptimizedFunction() {
     llvm::SmallVector<const ProjectionTreeNode*, 8> LeafNodes;
     AD.ProjTree.getLeafNodes(LeafNodes);
     for (auto Node : LeafNodes) {
-      LeafValues.push_back(BB->insertBBArg(ArgOffset++, Node->getType(),
-                           BB->getBBArg(OldArgIndex)->getDecl()));
+      LeafValues.push_back(
+          BB->insertArgument(ArgOffset++, Node->getType(),
+                             BB->getArgument(OldArgIndex)->getDecl()));
       AIM[TotalArgIndex - 1] = AD.Index;
       TotalArgIndex ++;
     }
@@ -849,12 +850,12 @@ void FunctionSignatureTransform::ArgumentExplosionFinalizeOptimizedFunction() {
                                              LeafValues);
 
     // Replace all uses of the original arg with the new value.
-    SILArgument *OrigArg = BB->getBBArg(OldArgIndex);
+    SILArgument *OrigArg = BB->getArgument(OldArgIndex);
     OrigArg->replaceAllUsesWith(NewOrigArgValue);
 
     // Now erase the old argument since it does not have any uses. We also
     // decrement ArgOffset since we have one less argument now.
-    BB->eraseBBArg(OldArgIndex); 
+    BB->eraseArgument(OldArgIndex);
     TotalArgIndex --;
   }
 }
@@ -911,7 +912,7 @@ public:
     /// Keep a map between the exploded argument index and the original argument
     /// index.
     llvm::SmallDenseMap<int, int> AIM;
-    int asize = F->begin()->getBBArgs().size();
+    int asize = F->begin()->getArguments().size();
     for (auto i = 0; i < asize; ++i) {
       AIM[i] = i;
     }
@@ -919,7 +920,7 @@ public:
     // Allocate the argument and result descriptors.
     llvm::SmallVector<ArgumentDescriptor, 4> ArgumentDescList;
     llvm::SmallVector<ResultDescriptor, 4> ResultDescList;
-    ArrayRef<SILArgument *> Args = F->begin()->getBBArgs();
+    ArrayRef<SILArgument *> Args = F->begin()->getArguments();
     for (unsigned i = 0, e = Args.size(); i != e; ++i) {
       ArgumentDescList.emplace_back(Args[i]);
     }

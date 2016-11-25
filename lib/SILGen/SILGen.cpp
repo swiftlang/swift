@@ -1366,7 +1366,7 @@ public:
         auto returnBB = gen.createBasicBlock();
         if (gen.B.hasValidInsertionPoint())
           gen.B.createBranch(returnLoc, returnBB, returnValue);
-        returnValue = returnBB->createBBArg(returnType);
+        returnValue = returnBB->createArgument(returnType);
         gen.B.emitBlock(returnBB);
 
         // Emit the rethrow block.
@@ -1374,7 +1374,7 @@ public:
                                     FunctionSection::Postmatter);
 
         // Log the error.
-        SILValue error = rethrowBB->getBBArg(0);
+        SILValue error = rethrowBB->getArgument(0);
         gen.B.createBuiltin(moduleLoc,
                             sgm.getASTContext().getIdentifier("errorInMain"),
                             sgm.Types.getEmptyTupleType(), {}, {error});

@@ -272,7 +272,7 @@ static SILArgument *getParameterForOperand(SILFunction *F, Operand *O) {
   auto &Entry = F->front();
   size_t ParamIndex = getParameterIndexForOperand(O);
 
-  return Entry.getBBArg(ParamIndex);
+  return Entry.getArgument(ParamIndex);
 }
 
 /// Return a pointer to the SILFunction called by Call if we can
@@ -591,7 +591,7 @@ PromotedParamCloner::populateCloned() {
   SILBasicBlock *OrigEntryBB = &*Orig->begin();
   SILBasicBlock *ClonedEntryBB = Cloned->createBasicBlock();
   unsigned ArgNo = 0;
-  auto I = OrigEntryBB->bbarg_begin(), E = OrigEntryBB->bbarg_end();
+  auto I = OrigEntryBB->args_begin(), E = OrigEntryBB->args_end();
   while (I != E) {
     if (count(PromotedParamIndices, ArgNo)) {
       // Create a new argument with the promoted type.

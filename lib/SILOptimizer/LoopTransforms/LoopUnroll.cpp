@@ -83,7 +83,7 @@ void LoopCloner::cloneLoop() {
   BBMap[Header] = ClonedHeader;
 
   // Clone the arguments.
-  for (auto *Arg : Header->getBBArgs()) {
+  for (auto *Arg : Header->getArguments()) {
     SILValue MappedArg =
         new (Mod) SILArgument(ClonedHeader, getOpType(Arg->getType()));
     ValueMap.insert(std::make_pair(Arg, MappedArg));
@@ -271,7 +271,7 @@ static void collectLoopLiveOutValues(
     DenseMap<SILInstruction *, SILInstruction *> &ClonedInstructions) {
   for (auto *Block : Loop->getBlocks()) {
     // Look at block arguments.
-    for (auto *Arg : Block->getBBArgs()) {
+    for (auto *Arg : Block->getArguments()) {
       for (auto *Op : Arg->getUses()) {
         // Is this use outside the loop?
         if (!Loop->contains(Op->getUser())) {

@@ -469,7 +469,7 @@ ClosureCloner::populateCloned() {
   SILBasicBlock *OrigEntryBB = &*Orig->begin();
   SILBasicBlock *ClonedEntryBB = Cloned->createBasicBlock();
   unsigned ArgNo = 0;
-  auto I = OrigEntryBB->bbarg_begin(), E = OrigEntryBB->bbarg_end();
+  auto I = OrigEntryBB->args_begin(), E = OrigEntryBB->args_end();
   while (I != E) {
     if (PromotableIndices.count(ArgNo)) {
       // Handle the case of a promoted capture argument.
@@ -610,7 +610,7 @@ ClosureCloner::visitLoadInst(LoadInst *Inst) {
 static SILArgument *getBoxFromIndex(SILFunction *F, unsigned Index) {
   assert(F->isDefinition() && "Expected definition not external declaration!");
   auto &Entry = F->front();
-  return Entry.getBBArg(Index);
+  return Entry.getArgument(Index);
 }
 
 /// \brief Given a partial_apply instruction and the argument index into its

@@ -472,8 +472,8 @@ public:
 
   void print(const SILBasicBlock *BB) {
     // Output uses for BB arguments.
-    if (!BB->bbarg_empty()) {
-      for (auto I = BB->bbarg_begin(), E = BB->bbarg_end(); I != E; ++I) {
+    if (!BB->args_empty()) {
+      for (auto I = BB->args_begin(), E = BB->args_end(); I != E; ++I) {
         SILValue V = *I;
         if (V->use_empty())
           continue;
@@ -505,10 +505,11 @@ public:
 
     *this << getID(BB);
 
-    if (!BB->bbarg_empty()) {
+    if (!BB->args_empty()) {
       *this << '(';
-      for (auto I = BB->bbarg_begin(), E = BB->bbarg_end(); I != E; ++I) {
-        if (I != BB->bbarg_begin()) *this << ", ";
+      for (auto I = BB->args_begin(), E = BB->args_end(); I != E; ++I) {
+        if (I != BB->args_begin())
+          *this << ", ";
         *this << getIDAndType(*I);
       }
       *this << ')';

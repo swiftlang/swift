@@ -1211,9 +1211,9 @@ isTryApplyResultNotUsed(UserListTy &AcceptedUses, TryApplyInst *TAI) {
   }
 
   // Check if the normal and error results only have ARC operations as uses.
-  if (!recursivelyCollectARCUsers(AcceptedUses, NormalBB->getBBArg(0)))
+  if (!recursivelyCollectARCUsers(AcceptedUses, NormalBB->getArgument(0)))
     return false;
-  if (!recursivelyCollectARCUsers(AcceptedUses, ErrorBB->getBBArg(0)))
+  if (!recursivelyCollectARCUsers(AcceptedUses, ErrorBB->getArgument(0)))
     return false;
 
   SmallPtrSet<SILInstruction *, 8> UsesSet;
@@ -1261,8 +1261,8 @@ SILInstruction *SILCombiner::visitTryApplyInst(TryApplyInst *AI) {
                 SILType::getBuiltinIntegerType(1, Builder.getASTContext()), 0);
       Builder.createCondBranch(Loc, TrueLit, NormalBB, ErrorBB);
 
-      NormalBB->eraseBBArg(0);
-      ErrorBB->eraseBBArg(0);
+      NormalBB->eraseArgument(0);
+      ErrorBB->eraseArgument(0);
       return nullptr;
     }
     // We found a user that we can't handle.

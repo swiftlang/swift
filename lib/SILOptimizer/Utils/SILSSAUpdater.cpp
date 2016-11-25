@@ -199,10 +199,10 @@ SILValue SILSSAUpdater::GetValueInMiddleOfBlock(SILBasicBlock *BB) {
     return SingularValue;
 
   // Check if we already have an equivalent phi.
-  if (!BB->getBBArgs().empty()) {
+  if (!BB->getArguments().empty()) {
     llvm::SmallDenseMap<SILBasicBlock *, SILValue, 8> ValueMap(PredVals.begin(),
                                                                PredVals.end());
-    for (auto *Arg : BB->getBBArgs())
+    for (auto *Arg : BB->getArguments())
       if (isEquivalentPHI(Arg, ValueMap))
         return Arg;
 
@@ -238,12 +238,13 @@ public:
   /// can be used in the SSAUpdaterImpl.
   class PhiIt {
   private:
-    SILBasicBlock::bbarg_iterator It;
+    SILBasicBlock::arg_iterator It;
+
   public:
     explicit PhiIt(SILBasicBlock *B) // begin iterator
-        : It(B->bbarg_begin()) {}
+        : It(B->args_begin()) {}
     PhiIt(SILBasicBlock *B, bool) // end iterator
-        : It(B->bbarg_end()) {}
+        : It(B->args_end()) {}
     PhiIt &operator++() { ++It; return *this; }
 
     operator SILArgument *() { return *It; }
@@ -489,7 +490,7 @@ static StructInst *replaceBBArgWithStruct(
   SmallVector<unsigned, 4> ArgIdxForOper;
   for (unsigned OperIdx : indices(FirstSI->getElements())) {
     bool FoundMatchingArgIdx = false;
-    for (unsigned ArgIdx : indices(PhiBB->getBBArgs())) {
+    for (unsigned ArgIdx : indices(PhiBB->getArguments())) {
       SmallVectorImpl<SILValue>::const_iterator AVIter = ArgValues.begin();
       bool TryNextArgIdx = false;
       for (SILBasicBlock *PredBB : PhiBB->getPreds()) {
@@ -517,7 +518,7 @@ static StructInst *replaceBBArgWithStruct(
 
   SmallVector<SILValue, 4> StructArgs;
   for (auto ArgIdx : ArgIdxForOper)
-    StructArgs.push_back(PhiBB->getBBArg(ArgIdx));
+    StructArgs.push_back(PhiBB->getArgument(ArgIdx));
 
   SILBuilder Builder(PhiBB, PhiBB->begin());
   return Builder.createStruct(cast<StructInst>(ArgValues[0])->getLoc(),

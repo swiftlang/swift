@@ -89,9 +89,9 @@ bool SILInliner::inlineFunction(FullApplySite AI, ArrayRef<SILValue> Args) {
   // Clear argument map and map ApplyInst arguments to the arguments of the
   // callee's entry block.
   ValueMap.clear();
-  assert(CalleeEntryBB->bbarg_size() == Args.size() &&
+  assert(CalleeEntryBB->args_size() == Args.size() &&
          "Unexpected number of arguments to entry block of function?");
-  auto BAI = CalleeEntryBB->bbarg_begin();
+  auto BAI = CalleeEntryBB->args_begin();
   for (auto AI = Args.begin(), AE = Args.end(); AI != AE; ++AI, ++BAI)
     ValueMap.insert(std::make_pair(*BAI, *AI));
 

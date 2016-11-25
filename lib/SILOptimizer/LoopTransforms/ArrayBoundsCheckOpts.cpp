@@ -790,7 +790,7 @@ public:
 
   bool analyze() {
     bool FoundIndVar = false;
-    for (auto *Arg : Header->getBBArgs()) {
+    for (auto *Arg : Header->getArguments()) {
       // Look for induction variables.
       IVInfo::IVDesc IV;
       if (!(IV = IVs.getInductionDesc(Arg))) {
@@ -1208,7 +1208,7 @@ static bool hoistBoundsChecks(SILLoop *Loop, DominanceInfo *DT, SILLoopInfo *LI,
   if (IVarsFound) {
     SILValue TrueVal;
     SILValue FalseVal;
-    for (auto *Arg: Header->getBBArgs()) {
+    for (auto *Arg : Header->getArguments()) {
       if (auto *IV = IndVars[Arg]) {
         SILBuilderWithScope B(Preheader->getTerminator(), IV->getInstruction());
 

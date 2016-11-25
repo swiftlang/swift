@@ -396,7 +396,7 @@ void GlobalPropertyOpt::scanInstructions() {
       // Add dependencies from predecessor's terminator operands to the block
       // arguments.
       int argIdx = 0;
-      for (auto *BBArg : BB.getBBArgs()) {
+      for (auto *BBArg : BB.getArguments()) {
         bool hasPreds = false;
         SILType Type = BBArg->getType();
         if (isArrayType(Type) || isTupleWithArray(Type.getSwiftRValueType())) {

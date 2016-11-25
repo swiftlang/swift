@@ -618,8 +618,8 @@ bool CheckedCastBrJumpThreading::trySimplify(CheckedCastBranchInst *CCBI) {
 
     // Record what we want to change.
     Edit *edit = new (EditAllocator.Allocate())
-      Edit(BB, InvertSuccess, SuccessPreds, FailurePreds, numUnknownPreds != 0,
-           DomCCBI->getSuccessBB()->getBBArg(0));
+        Edit(BB, InvertSuccess, SuccessPreds, FailurePreds,
+             numUnknownPreds != 0, DomCCBI->getSuccessBB()->getArgument(0));
     Edits.push_back(edit);
 
     return true;

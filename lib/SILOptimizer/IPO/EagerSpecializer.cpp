@@ -68,10 +68,10 @@ static bool isTrivialReturnBlock(SILBasicBlock *RetBB) {
   if (&*RetBB->begin() != RetInst)
     return false;
 
-  if (RetBB->bbarg_size() != 1)
+  if (RetBB->args_size() != 1)
     return false;
 
-  return (RetOperand == RetBB->getBBArg(0));
+  return (RetOperand == RetBB->getArgument(0));
 }
 
 /// Adds a CFG edge from the unterminated NewRetBB to a merged "return" or
@@ -113,7 +113,7 @@ static void addReturnValueImpl(SILBasicBlock *RetBB, SILBasicBlock *NewRetBB,
       // Forward the existing return argument to a new BBArg.
       MergedBB = RetBB->splitBasicBlock(RetInst->getIterator());
       SILValue OldRetVal = RetInst->getOperand(0);
-      RetInst->setOperand(0, MergedBB->createBBArg(OldRetVal->getType()));
+      RetInst->setOperand(0, MergedBB->createArgument(OldRetVal->getType()));
       Builder.setInsertionPoint(RetBB);
       Builder.createBranch(Loc, MergedBB, {OldRetVal});
     }
@@ -165,7 +165,7 @@ emitApplyWithRethrow(SILBuilder &Builder,
     // Emit the rethrow logic.
     Builder.emitBlock(ErrorBB);
     SILValue Error =
-      ErrorBB->createBBArg(CanSILFuncTy->getErrorResult().getSILType());
+        ErrorBB->createArgument(CanSILFuncTy->getErrorResult().getSILType());
 
     Builder.createBuiltin(Loc,
                           Builder.getASTContext().getIdentifier("willThrow"),
@@ -180,7 +180,7 @@ emitApplyWithRethrow(SILBuilder &Builder,
   // result value.
   Builder.clearInsertionPoint();
   Builder.emitBlock(NormalBB);
-  return Builder.getInsertionBB()->createBBArg(CanSILFuncTy->getSILResult());
+  return Builder.getInsertionBB()->createArgument(CanSILFuncTy->getSILResult());
 }
 
 /// Emits code to invoke the specified nonpolymorphic CalleeFunc using the

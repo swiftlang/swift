@@ -1684,7 +1684,7 @@ SILValue SILGenFunction::emitApplyWithRethrow(SILLocation loc,
   {
     B.emitBlock(errorBB);
     SILValue error =
-      errorBB->createBBArg(silFnType->getErrorResult().getSILType());
+        errorBB->createArgument(silFnType->getErrorResult().getSILType());
 
     B.createBuiltin(loc, SGM.getASTContext().getIdentifier("willThrow"),
                     SGM.Types.getEmptyTupleType(), {}, {error});
@@ -1695,7 +1695,7 @@ SILValue SILGenFunction::emitApplyWithRethrow(SILLocation loc,
 
   // Enter the normal path.
   B.emitBlock(normalBB);
-  return normalBB->createBBArg(resultType);
+  return normalBB->createArgument(resultType);
 }
 
 static RValue emitStringLiteral(SILGenFunction &SGF, Expr *E, StringRef Str,
@@ -1839,7 +1839,7 @@ static SILValue emitRawApply(SILGenFunction &gen,
   // Otherwise, we need to create a try_apply.
   } else {
     SILBasicBlock *normalBB = gen.createBasicBlock();
-    result = normalBB->createBBArg(resultType);
+    result = normalBB->createArgument(resultType);
 
     SILBasicBlock *errorBB =
       gen.getTryApplyErrorDest(loc, substFnType->getErrorResult(),

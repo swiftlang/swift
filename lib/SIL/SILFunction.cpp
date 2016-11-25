@@ -152,7 +152,7 @@ void SILFunction::numberValues(llvm::DenseMap<const ValueBase*,
                                unsigned> &ValueToNumberMap) const {
   unsigned idx = 0;
   for (auto &BB : *this) {
-    for (auto I = BB.bbarg_begin(), E = BB.bbarg_end(); I != E; ++I)
+    for (auto I = BB.args_begin(), E = BB.args_end(); I != E; ++I)
       ValueToNumberMap[*I] = idx++;
     
     for (auto &I : BB)

@@ -68,7 +68,7 @@ void GenericCloner::populateCloned() {
   AllocStackInst *ReturnValueAddr = nullptr;
 
   // Create the entry basic block with the function arguments.
-  auto I = OrigEntryBB->bbarg_begin(), E = OrigEntryBB->bbarg_end();
+  auto I = OrigEntryBB->args_begin(), E = OrigEntryBB->args_end();
   int ArgIdx = 0;
   while (I != E) {
     SILArgument *OrigArg = *I;

@@ -370,7 +370,7 @@ SILValue getArgForBlock(SILBasicBlock *From, SILBasicBlock *To,
 
 // Try to sink values from the Nth argument \p ArgNum.
 static bool sinkLiteralArguments(SILBasicBlock *BB, unsigned ArgNum) {
-  assert(ArgNum < BB->getNumBBArg() && "Invalid argument");
+  assert(ArgNum < BB->getNumArguments() && "Invalid argument");
 
   // Check if the argument passed to the first predecessor is a literal inst.
   SILBasicBlock *FirstPred = *BB->pred_begin();
@@ -393,14 +393,14 @@ static bool sinkLiteralArguments(SILBasicBlock *BB, unsigned ArgNum) {
 
   // Replace the use of the argument with the cloned literal.
   auto Cloned = FirstLiteral->clone(&*BB->begin());
-  BB->getBBArg(ArgNum)->replaceAllUsesWith(Cloned);
+  BB->getArgument(ArgNum)->replaceAllUsesWith(Cloned);
 
   return true;
 }
 
 // Try to sink values from the Nth argument \p ArgNum.
 static bool sinkArgument(SILBasicBlock *BB, unsigned ArgNum) {
-  assert(ArgNum < BB->getNumBBArg() && "Invalid argument");
+  assert(ArgNum < BB->getNumArguments() && "Invalid argument");
 
   // Find the first predecessor, the first terminator and the Nth argument.
   SILBasicBlock *FirstPred = *BB->pred_begin();
@@ -479,10 +479,10 @@ static bool sinkArgument(SILBasicBlock *BB, unsigned ArgNum) {
     // The instruction we are lowering has an argument which is different
     // for each predecessor.  We need to sink the instruction, then add
     // arguments for each predecessor.
-    BB->getBBArg(ArgNum)->replaceAllUsesWith(FSI);
+    BB->getArgument(ArgNum)->replaceAllUsesWith(FSI);
 
     const auto &ArgType = FSI->getOperand(*DifferentOperandIndex)->getType();
-    BB->replaceBBArg(ArgNum, ArgType);
+    BB->replaceArgument(ArgNum, ArgType);
 
     // Update all branch instructions in the predecessors to pass the new
     // argument to this BB.
@@ -504,14 +504,14 @@ static bool sinkArgument(SILBasicBlock *BB, unsigned ArgNum) {
 
     // The sunk instruction should now read from the argument of the BB it
     // was moved to.
-    FSI->setOperand(*DifferentOperandIndex, BB->getBBArg(ArgNum));
+    FSI->setOperand(*DifferentOperandIndex, BB->getArgument(ArgNum));
     return true;
   }
 
   // Sink one of the copies of the instruction.
   FirstPredArg->replaceAllUsesWith(Undef);
   FSI->moveBefore(&*BB->begin());
-  BB->getBBArg(ArgNum)->replaceAllUsesWith(FirstPredArg);
+  BB->getArgument(ArgNum)->replaceAllUsesWith(FirstPredArg);
 
   // The argument is no longer in use. Replace all incoming inputs with undef
   // and try to delete the instruction.
@@ -537,7 +537,7 @@ static bool sinkLiteralsFromPredecessors(SILBasicBlock *BB) {
 
   // Try to sink values from each of the arguments to the basic block.
   bool Changed = false;
-  for (int i = 0, e = BB->getNumBBArg(); i < e; ++i)
+  for (int i = 0, e = BB->getNumArguments(); i < e; ++i)
     Changed |= sinkLiteralArguments(BB, i);
 
   return Changed;
@@ -555,7 +555,7 @@ static bool sinkArgumentsFromPredecessors(SILBasicBlock *BB) {
 
   // Try to sink values from each of the arguments to the basic block.
   bool Changed = false;
-  for (int i = 0, e = BB->getNumBBArg(); i < e; ++i)
+  for (int i = 0, e = BB->getNumArguments(); i < e; ++i)
     Changed |= sinkArgument(BB, i);
 
   return Changed;
@@ -666,7 +666,7 @@ static bool sinkCodeFromPredecessors(SILBasicBlock *BB) {
             ValueInBlock OpInFirstPred(InstToSink->getOperand(idx), FirstPred);
             assert(valueToArgIdxMap.count(OpInFirstPred) != 0);
             int argIdx = valueToArgIdxMap[OpInFirstPred];
-            InstToSink->setOperand(idx, BB->getBBArg(argIdx));
+            InstToSink->setOperand(idx, BB->getArgument(argIdx));
           }
         }
         Changed = true;

@@ -119,13 +119,13 @@ class SILArgument : public ValueBase {
   const ValueDecl *Decl;
 public:
   SILArgument(SILBasicBlock *ParentBB, SILType Ty, const ValueDecl *D=nullptr);
-  SILArgument(SILBasicBlock *ParentBB, SILBasicBlock::bbarg_iterator Pos,
-              SILType Ty, const ValueDecl *D=nullptr);
+  SILArgument(SILBasicBlock *ParentBB, SILBasicBlock::arg_iterator Pos,
+              SILType Ty, const ValueDecl *D = nullptr);
 
   SILArgument(SILFunction::iterator ParentBB, SILType Ty,
               const ValueDecl *D = nullptr)
       : SILArgument(&*ParentBB, Ty, D) {}
-  SILArgument(SILFunction::iterator ParentBB, SILBasicBlock::bbarg_iterator Pos,
+  SILArgument(SILFunction::iterator ParentBB, SILBasicBlock::arg_iterator Pos,
               SILType Ty, const ValueDecl *D = nullptr)
       : SILArgument(&*ParentBB, Pos, Ty, D) {}
 
@@ -149,7 +149,7 @@ public:
   }
 
   unsigned getIndex() const {
-    ArrayRef<SILArgument *> Args = getParent()->getBBArgs();
+    ArrayRef<SILArgument *> Args = getParent()->getArguments();
     for (unsigned i = 0, e = Args.size(); i != e; ++i)
       if (Args[i] == this)
         return i;

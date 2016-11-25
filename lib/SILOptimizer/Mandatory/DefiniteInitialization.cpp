@@ -1223,7 +1223,7 @@ static bool isFailableInitReturnUseOfEnum(EnumInst *EI) {
   auto *BI = dyn_cast<BranchInst>(EI->use_begin()->getUser());
   if (!BI || BI->getNumArgs() != 1) return false;
 
-  auto *TargetArg = BI->getDestBB()->getBBArg(0);
+  auto *TargetArg = BI->getDestBB()->getArgument(0);
   if (!TargetArg->hasOneUse()) return false;
   return isa<ReturnInst>(TargetArg->use_begin()->getUser());
 }

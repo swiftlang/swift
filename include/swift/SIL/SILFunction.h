@@ -672,29 +672,29 @@ public:
 
   SILArgument *getArgument(unsigned i) {
     assert(!empty() && "Cannot get argument of a function without a body");
-    return begin()->getBBArg(i);
+    return begin()->getArgument(i);
   }
 
   const SILArgument *getArgument(unsigned i) const {
     assert(!empty() && "Cannot get argument of a function without a body");
-    return begin()->getBBArg(i);
+    return begin()->getArgument(i);
   }
 
   ArrayRef<SILArgument *> getArguments() const {
     assert(!empty() && "Cannot get arguments of a function without a body");
-    return begin()->getBBArgs();
+    return begin()->getArguments();
   }
 
   ArrayRef<SILArgument *> getIndirectResults() const {
     assert(!empty() && "Cannot get arguments of a function without a body");
-    return begin()->getBBArgs().slice(0,
-                            getLoweredFunctionType()->getNumIndirectResults());
+    return begin()->getArguments().slice(
+        0, getLoweredFunctionType()->getNumIndirectResults());
   }
 
   ArrayRef<SILArgument *> getArgumentsWithoutIndirectResults() const {
     assert(!empty() && "Cannot get arguments of a function without a body");
-    return begin()->getBBArgs().slice(
-                            getLoweredFunctionType()->getNumIndirectResults());
+    return begin()->getArguments().slice(
+        getLoweredFunctionType()->getNumIndirectResults());
   }
 
   const SILArgument *getSelfArgument() const {

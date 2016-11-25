@@ -109,7 +109,7 @@ static void propagateBasicBlockArgs(SILBasicBlock &BB) {
   //     use(%2 : $Builtin.Int1)
 
   // If there are no predecessors or no arguments, there is nothing to do.
-  if (BB.pred_empty() || BB.bbarg_empty())
+  if (BB.pred_empty() || BB.args_empty())
     return;
 
   // Check if all the predecessors supply the same arguments to the BB.
@@ -163,9 +163,8 @@ static void propagateBasicBlockArgs(SILBasicBlock &BB) {
   // Drop the parameters from basic blocks and replace all uses with the passed
   // in arguments.
   unsigned Idx = 0;
-  for (SILBasicBlock::bbarg_iterator AI = BB.bbarg_begin(),
-                                     AE = BB.bbarg_end();
-                                     AI != AE; ++AI, ++Idx) {
+  for (SILBasicBlock::arg_iterator AI = BB.args_begin(), AE = BB.args_end();
+       AI != AE; ++AI, ++Idx) {
     // FIXME: These could be further propagatable now, we might want to move
     // this to CCP and trigger another round of copy propagation.
     SILArgument *Arg = *AI;
@@ -176,7 +175,7 @@ static void propagateBasicBlockArgs(SILBasicBlock &BB) {
   }
 
   // Remove args from the block.
-  BB.dropAllBBArgs();
+  BB.dropAllArguments();
 
   // The old branch instructions are no longer used, erase them.
   recursivelyDeleteTriviallyDeadInstructions(ToBeDeleted, true);
@@ -282,7 +281,7 @@ static bool constantFoldTerminator(SILBasicBlock &BB,
       // Replace the switch with a branch to the TheSuccessorBlock.
       SILBuilderWithScope B(&BB, TI);
       SILLocation Loc = TI->getLoc();
-      if (!TheSuccessorBlock->bbarg_empty()) {
+      if (!TheSuccessorBlock->args_empty()) {
         assert(TheEnum->hasOperand());
         B.createBranch(Loc, TheSuccessorBlock, TheEnum->getOperand());
       } else

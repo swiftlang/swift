@@ -523,7 +523,7 @@ ManagedValue SILGenFunction::emitExistentialErasure(
         // layering reasons, so perform an unchecked cast down to NSError.
         SILType anyObjectTy =
           potentialNSError.getType().getAnyOptionalObjectType();
-        SILValue nsError = isPresentBB->createBBArg(anyObjectTy);
+        SILValue nsError = isPresentBB->createArgument(anyObjectTy);
         nsError = B.createUncheckedRefCast(loc, nsError, 
                                            getLoweredType(nsErrorType));
 
@@ -555,7 +555,7 @@ ManagedValue SILGenFunction::emitExistentialErasure(
       B.emitBlock(contBB);
 
       SILValue existentialResult =
-        contBB->createBBArg(existentialTL.getLoweredType());
+          contBB->createArgument(existentialTL.getLoweredType());
       return emitManagedRValueWithCleanup(existentialResult, existentialTL);
     }
   }

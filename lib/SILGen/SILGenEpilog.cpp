@@ -100,13 +100,13 @@ SILGenFunction::emitEpilogBB(SILLocation TopLevel) {
     // Steal the branch argument as the return value if present.
     SILBasicBlock *pred = *epilogBB->pred_begin();
     BranchInst *predBranch = cast<BranchInst>(pred->getTerminator());
-    assert(predBranch->getArgs().size() == epilogBB->bbarg_size() &&
+    assert(predBranch->getArgs().size() == epilogBB->args_size() &&
            "epilog predecessor arguments does not match block params");
 
     for (auto index : indices(predBranch->getArgs())) {
       SILValue result = predBranch->getArgs()[index];
       directResults.push_back(result);
-      epilogBB->getBBArg(index)->replaceAllUsesWith(result);
+      epilogBB->getArgument(index)->replaceAllUsesWith(result);
     }
 
     // If we are optimizing, we should use the return location from the single,
@@ -135,7 +135,7 @@ SILGenFunction::emitEpilogBB(SILLocation TopLevel) {
 
     // Emit the epilog into the epilog bb. Its arguments are the
     // direct results.
-    directResults.append(epilogBB->bbarg_begin(), epilogBB->bbarg_end());
+    directResults.append(epilogBB->args_begin(), epilogBB->args_end());
 
     // If we are falling through from the current block, the return is implicit.
     B.emitBlock(epilogBB, ImplicitReturnFromTopLevel);
@@ -221,7 +221,7 @@ void SILGenFunction::emitRethrowEpilog(SILLocation topLevel) {
   }
 
   SILLocation throwLoc = topLevel;
-  SILValue exn = rethrowBB->bbarg_begin()[0];
+  SILValue exn = rethrowBB->args_begin()[0];
   bool reposition = true;
 
   // If the rethrow destination has a single branch predecessor,

@@ -430,10 +430,10 @@ void DCE::replaceBranchWithJump(SILInstruction *Inst, SILBasicBlock *Block) {
          "Unexpected dead terminator kind!");
 
   SILInstruction *Branch;
-  if (!Block->bbarg_empty()) {
+  if (!Block->args_empty()) {
     std::vector<SILValue> Args;
-    auto E = Block->bbarg_end();
-    for (auto A = Block->bbarg_begin(); A != E; ++A) {
+    auto E = Block->args_end();
+    for (auto A = Block->args_begin(); A != E; ++A) {
       assert(!LiveValues.count(*A) && "Unexpected live block argument!");
       Args.push_back(SILUndef::get((*A)->getType(), (*A)->getModule()));
     }
@@ -452,7 +452,7 @@ bool DCE::removeDead(SILFunction &F) {
   bool Changed = false;
 
   for (auto &BB : F) {
-    for (auto I = BB.bbarg_begin(), E = BB.bbarg_end(); I != E; ) {
+    for (auto I = BB.args_begin(), E = BB.args_end(); I != E;) {
       auto Inst = *I++;
       if (LiveValues.count(Inst))
         continue;

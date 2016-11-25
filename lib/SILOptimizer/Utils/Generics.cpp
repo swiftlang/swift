@@ -289,13 +289,12 @@ static ApplySite replaceWithSpecializedCallee(ApplySite AI,
                              Arguments, ResultBB, TAI->getErrorBB());
     if (StoreResultTo) {
       // The original normal result of the try_apply is an empty tuple.
-      assert(ResultBB->getNumBBArg() == 1);
+      assert(ResultBB->getNumArguments() == 1);
       Builder.setInsertionPoint(ResultBB->begin());
-      fixUsedVoidType(ResultBB->getBBArg(0), Loc, Builder);
+      fixUsedVoidType(ResultBB->getArgument(0), Loc, Builder);
 
-
-      SILArgument *Arg =
-        ResultBB->replaceBBArg(0, StoreResultTo->getType().getObjectType());
+      SILArgument *Arg = ResultBB->replaceArgument(
+          0, StoreResultTo->getType().getObjectType());
       // Store the direct result to the original result address.
       Builder.createStore(Loc, Arg, StoreResultTo,
                           StoreOwnershipQualifier::Unqualified);
@@ -391,7 +390,7 @@ static SILFunction *createReabstractionThunk(const ReabstractionInfo &ReInfo,
 
   // Convert indirect to direct parameters/results.
   SmallVector<SILValue, 4> Arguments;
-  auto SpecArgIter = SpecEntryBB->bbarg_begin();
+  auto SpecArgIter = SpecEntryBB->args_begin();
   for (unsigned Idx = 0; Idx < ReInfo.getNumArguments(); Idx++) {
     if (ReInfo.isArgConverted(Idx)) {
       if (ReInfo.isResultIndex(Idx)) {

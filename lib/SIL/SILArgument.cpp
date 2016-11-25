@@ -26,13 +26,13 @@ using namespace swift;
 SILArgument::SILArgument(SILBasicBlock *ParentBB, SILType Ty,
                          const ValueDecl *D)
   : ValueBase(ValueKind::SILArgument, Ty), ParentBB(ParentBB), Decl(D) {
-  ParentBB->insertArgument(ParentBB->bbarg_end(), this);
+  ParentBB->insertArgument(ParentBB->args_end(), this);
 }
 
 SILArgument::SILArgument(SILBasicBlock *ParentBB,
-                         SILBasicBlock::bbarg_iterator Pos,
-                         SILType Ty, const ValueDecl *D)
-  : ValueBase(ValueKind::SILArgument, Ty), ParentBB(ParentBB), Decl(D) {
+                         SILBasicBlock::arg_iterator Pos, SILType Ty,
+                         const ValueDecl *D)
+    : ValueBase(ValueKind::SILArgument, Ty), ParentBB(ParentBB), Decl(D) {
   // Function arguments need to have a decl.
   assert(
     !ParentBB->getParent()->isBare() &&
@@ -185,5 +185,5 @@ bool SILArgument::isSelf() const {
   // Return true if we are the last argument of our BB and that our parent
   // function has a call signature with self.
   return getFunction()->hasSelfParam() &&
-         getParent()->getBBArgs().back() == this;
+         getParent()->getArguments().back() == this;
 }

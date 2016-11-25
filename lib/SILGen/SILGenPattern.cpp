@@ -1968,7 +1968,7 @@ JumpDest PatternMatchEmission::getSharedCaseBlockDest(CaseStmt *caseBlock,
       pattern->forEachVariable([&](VarDecl *V) {
         if (!V->hasName())
           return;
-        block->createBBArg(SGF.VarLocs[V].value->getType(), V);
+        block->createArgument(SGF.VarLocs[V].value->getType(), V);
       });
     }
   }
@@ -2024,7 +2024,7 @@ void PatternMatchEmission::emitSharedCaseBlocks() {
           return;
         if (V->isLet()) {
           // Just emit a let with cleanup.
-          SGF.VarLocs[V].value = caseBB->getBBArg(argIndex++);
+          SGF.VarLocs[V].value = caseBB->getArgument(argIndex++);
           SGF.emitInitializationForVarDecl(V)->finishInitialization(SGF);
         } else {
           // The pattern variables were all emitted as lets and one got passed in,
@@ -2032,7 +2032,8 @@ void PatternMatchEmission::emitSharedCaseBlocks() {
           SGF.VarLocs.erase(V);
           auto newVar = SGF.emitInitializationForVarDecl(V);
           auto loc = SGF.CurrentSILLoc;
-          auto value = ManagedValue::forUnmanaged(caseBB->getBBArg(argIndex++));
+          auto value =
+              ManagedValue::forUnmanaged(caseBB->getArgument(argIndex++));
           auto formalType = V->getType()->getCanonicalType();
           RValue(SGF, loc, formalType, value).forwardInto(SGF, loc, newVar.get());
         }

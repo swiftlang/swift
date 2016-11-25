@@ -1075,8 +1075,8 @@ void SILGenFunction::emitNativeToForeignThunk(SILDeclRef thunk) {
     // Emit the non-error destination.
     {
       B.emitBlock(normalBB);
-      SILValue nativeResult = normalBB->createBBArg(swiftResultTy);
-      
+      SILValue nativeResult = normalBB->createArgument(swiftResultTy);
+
       if (substTy->hasIndirectResults()) {
         assert(substTy->getNumAllResults() == 1);
         nativeResult = args[0];
@@ -1097,7 +1097,7 @@ void SILGenFunction::emitNativeToForeignThunk(SILDeclRef thunk) {
     {
       B.emitBlock(errorBB);
       SILValue nativeError =
-        errorBB->createBBArg(substTy->getErrorResult().getSILType());
+          errorBB->createArgument(substTy->getErrorResult().getSILType());
 
       // In this branch, the eventual return value is mostly invented.
       // Store the native error in the appropriate location and return.
@@ -1109,7 +1109,7 @@ void SILGenFunction::emitNativeToForeignThunk(SILDeclRef thunk) {
 
     // Emit the join block.
     B.emitBlock(contBB);
-    result = contBB->createBBArg(objcResultTy);
+    result = contBB->createArgument(objcResultTy);
 
     // Leave the scope now.
     argScope.pop();

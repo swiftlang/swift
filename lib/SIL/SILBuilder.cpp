@@ -118,7 +118,7 @@ void SILBuilder::emitBlock(SILBasicBlock *BB, SILLocation BranchLoc) {
   }
 
   // Fall though from the currently active block into the given block.
-  assert(BB->bbarg_empty() && "cannot fall through to bb with args");
+  assert(BB->args_empty() && "cannot fall through to bb with args");
 
   // This is a fall through into BB, emit the fall through branch.
   createBranch(BranchLoc, BB);

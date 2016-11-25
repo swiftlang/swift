@@ -457,10 +457,8 @@ public:
 
   /// True if 'return' without an operand or falling off the end of the current
   /// function is valid.
-  bool allowsVoidReturn() const {
-    return ReturnDest.getBlock()->bbarg_empty();
-  }
-  
+  bool allowsVoidReturn() const { return ReturnDest.getBlock()->args_empty(); }
+
   /// This location, when set, is used as an override location for magic
   /// identifier expansion (e.g. #file).  This allows default argument
   /// expansion to report the location of the call, instead of the location

@@ -427,7 +427,7 @@ bool COWArrayOpt::checkUniqueArrayContainer(SILValue ArrayContainer) {
     // Check that the argument is passed as an inout type. This means there are
     // no aliases accessible within this function scope.
     auto Params = Function->getLoweredFunctionType()->getParameters();
-    ArrayRef<SILArgument*> FunctionArgs = Function->begin()->getBBArgs();
+    ArrayRef<SILArgument *> FunctionArgs = Function->begin()->getArguments();
     for (unsigned ArgIdx = 0, ArgEnd = Params.size();
          ArgIdx != ArgEnd; ++ArgIdx) {
       if (FunctionArgs[ArgIdx] != Arg)
@@ -1819,7 +1819,7 @@ private:
       // Check that the argument is passed as an inout or by value type. This
       // means there are no aliases accessible within this function scope.
       auto Params = Fun->getLoweredFunctionType()->getParameters();
-      ArrayRef<SILArgument*> FunctionArgs = Fun->begin()->getBBArgs();
+      ArrayRef<SILArgument *> FunctionArgs = Fun->begin()->getArguments();
       for (unsigned ArgIdx = 0, ArgEnd = Params.size(); ArgIdx != ArgEnd;
            ++ArgIdx) {
         if (FunctionArgs[ArgIdx] != Arg)
@@ -1979,7 +1979,7 @@ public:
     BBMap[StartBB] = ClonedStartBB;
 
     // Clone the arguments.
-    for (auto &Arg : StartBB->getBBArgs()) {
+    for (auto &Arg : StartBB->getArguments()) {
       SILValue MappedArg =
           new (Mod) SILArgument(ClonedStartBB, getOpType(Arg->getType()));
       ValueMap.insert(std::make_pair(Arg, MappedArg));
@@ -2091,7 +2091,7 @@ protected:
       auto *OrigBB = Entry.first;
 
       // Update outside used phi values.
-      for (auto *Arg : OrigBB->getBBArgs())
+      for (auto *Arg : OrigBB->getArguments())
         updateSSAForValue(OrigBB, Arg, SSAUp);
 
       // Update outside used instruction values.

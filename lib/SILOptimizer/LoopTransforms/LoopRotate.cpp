@@ -169,7 +169,7 @@ rewriteNewLoopEntryCheckBlock(SILBasicBlock *Header,
   SILSSAUpdater Updater(&InsertedPHIs);
 
   // Fix PHIs (incoming arguments).
-  for (auto *Inst: Header->getBBArgs())
+  for (auto *Inst : Header->getArguments())
     updateSSAForUseOfInst(Updater, InsertedPHIs, ValueMap, Header,
                           EntryCheckBlock, Inst);
 
@@ -331,7 +331,7 @@ bool swift::rotateLoop(SILLoop *L, DominanceInfo *DT, SILLoopInfo *LI,
 
   // The original 'phi' argument values are just the values coming from the
   // preheader edge.
-  ArrayRef<SILArgument *> PHIs = Header->getBBArgs();
+  ArrayRef<SILArgument *> PHIs = Header->getArguments();
   OperandValueArrayRef PreheaderArgs =
       cast<BranchInst>(Preheader->getTerminator())->getArgs();
   assert(PHIs.size() == PreheaderArgs.size() &&
