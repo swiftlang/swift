@@ -252,7 +252,7 @@ SILBasicBlock *SILDeserializer::getBBForDefinition(SILFunction *Fn,
   SILBasicBlock *&BB = BlocksByID[ID];
   // If the block has never been named yet, just create it.
   if (BB == nullptr)
-    return BB = new (SILMod) SILBasicBlock(Fn, Prev);
+    return BB = Fn->createBasicBlock(Prev);
 
   // If it already exists, it was either a forward reference or a redefinition.
   // The latter should never happen.
@@ -273,7 +273,7 @@ SILBasicBlock *SILDeserializer::getBBForReference(SILFunction *Fn,
     return BB;
 
   // Otherwise, create it and remember that this is a forward reference
-  BB = new (SILMod) SILBasicBlock(Fn);
+  BB = Fn->createBasicBlock();
   UndefinedBlocks[BB] = ID;
   return BB;
 }

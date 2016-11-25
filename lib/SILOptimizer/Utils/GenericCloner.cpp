@@ -61,7 +61,7 @@ void GenericCloner::populateCloned() {
 
   // Create arguments for the entry block.
   SILBasicBlock *OrigEntryBB = &*Original.begin();
-  SILBasicBlock *ClonedEntryBB = new (M) SILBasicBlock(Cloned);
+  SILBasicBlock *ClonedEntryBB = Cloned->createBasicBlock();
   getBuilder().setInsertionPoint(ClonedEntryBB);
 
   llvm::SmallVector<AllocStackInst *, 8> AllocStacks;

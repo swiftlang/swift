@@ -34,14 +34,14 @@ static void diagnose(ASTContext &Context, SourceLoc loc, Diag<T...> diag,
 SILBasicBlock *SILGenFunction::createBasicBlock(SILBasicBlock *afterBB) {
   // Honor an explicit placement if given.
   if (afterBB) {
-    return new (F.getModule()) SILBasicBlock(&F, afterBB);
+    return F.createBasicBlock(afterBB);
 
-  // If we don't have a requested placement, but we do have a current
-  // insertion point, insert there.
+    // If we don't have a requested placement, but we do have a current
+    // insertion point, insert there.
   } else if (B.hasValidInsertionPoint()) {
-    return new (F.getModule()) SILBasicBlock(&F, B.getInsertionBB());
+    return F.createBasicBlock(B.getInsertionBB());
 
-  // Otherwise, insert at the end of the current section.
+    // Otherwise, insert at the end of the current section.
   } else {
     return createBasicBlock(CurFunctionSection);
   }
@@ -55,13 +55,13 @@ SILBasicBlock *SILGenFunction::createBasicBlock(FunctionSection section) {
     SILBasicBlock *afterBB = (StartOfPostmatter != F.end())
                                  ? &*std::prev(StartOfPostmatter)
                                  : nullptr;
-    return new (F.getModule()) SILBasicBlock(&F, afterBB);
+    return F.createBasicBlock(afterBB);
   }
 
   case FunctionSection::Postmatter: {
     // The end of the postmatter section is always the end of the function.
     // Register the new block as the start of the postmatter if needed.
-    SILBasicBlock *newBB = new (F.getModule()) SILBasicBlock(&F, nullptr);
+    SILBasicBlock *newBB = F.createBasicBlock(nullptr);
     if (StartOfPostmatter == F.end())
       StartOfPostmatter = newBB->getIterator();
     return newBB;

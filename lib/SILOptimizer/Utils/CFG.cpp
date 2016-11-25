@@ -579,7 +579,7 @@ SILBasicBlock *swift::splitEdge(TermInst *T, unsigned EdgeIdx,
   SILBasicBlock *DestBB = T->getSuccessors()[EdgeIdx];
 
   // Create a new basic block in the edge, and insert it after the SrcBB.
-  auto *EdgeBB = new (Fn->getModule()) SILBasicBlock(Fn, SrcBB);
+  auto *EdgeBB = Fn->createBasicBlock(SrcBB);
 
   SmallVector<SILValue, 16> Args;
   getEdgeArgs(T, EdgeIdx, EdgeBB, Args);

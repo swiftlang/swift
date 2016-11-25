@@ -79,7 +79,7 @@ void LoopCloner::cloneLoop() {
   for (auto *ExitBB : ExitBlocks)
     BBMap[ExitBB] = ExitBB;
 
-  auto *ClonedHeader = new (Mod) SILBasicBlock(CurFun);
+  auto *ClonedHeader = CurFun->createBasicBlock();
   BBMap[Header] = ClonedHeader;
 
   // Clone the arguments.

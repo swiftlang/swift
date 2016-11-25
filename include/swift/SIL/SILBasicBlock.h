@@ -51,8 +51,9 @@ private:
   void operator=(const SILBasicBlock &) = delete;
   void operator delete(void *Ptr, size_t) = delete;
 
-public:
   SILBasicBlock(SILFunction *F, SILBasicBlock *afterBB = nullptr);
+
+public:
   ~SILBasicBlock();
 
   /// Gets the ID (= index in the function's block list) of the block.

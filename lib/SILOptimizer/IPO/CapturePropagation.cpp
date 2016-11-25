@@ -165,7 +165,7 @@ void CapturePropagationCloner::cloneBlocks(
 
   // Create the entry basic block with the function arguments.
   SILBasicBlock *OrigEntryBB = &*OrigF->begin();
-  SILBasicBlock *ClonedEntryBB = new (M) SILBasicBlock(&CloneF);
+  SILBasicBlock *ClonedEntryBB = CloneF.createBasicBlock();
   CanSILFunctionType CloneFTy = CloneF.getLoweredFunctionType();
 
   // Only clone the arguments that remain in the new function type. The trailing

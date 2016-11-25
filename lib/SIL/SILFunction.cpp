@@ -288,6 +288,10 @@ SILBasicBlock *SILFunction::createBasicBlock() {
   return new (getModule()) SILBasicBlock(this);
 }
 
+SILBasicBlock *SILFunction::createBasicBlock(SILBasicBlock *AfterBlock) {
+  return new (getModule()) SILBasicBlock(this, AfterBlock);
+}
+
 //===----------------------------------------------------------------------===//
 //                          View CFG Implementation
 //===----------------------------------------------------------------------===//

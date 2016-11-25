@@ -371,7 +371,7 @@ static SILFunction *createReabstractionThunk(const ReabstractionInfo &ReInfo,
   if (!Thunk->empty())
     return Thunk;
 
-  SILBasicBlock *EntryBB = new (M) SILBasicBlock(Thunk);
+  SILBasicBlock *EntryBB = Thunk->createBasicBlock();
   SILBuilder Builder(EntryBB);
   SILBasicBlock *SpecEntryBB = &*SpecializedFunc->begin();
   CanSILFunctionType SpecType = SpecializedFunc->getLoweredFunctionType();
@@ -421,8 +421,8 @@ static SILFunction *createReabstractionThunk(const ReabstractionInfo &ReInfo,
   SILValue ReturnValue;
   if (SpecType->hasErrorResult()) {
     // Create the logic for calling a throwing function.
-    SILBasicBlock *NormalBB = new (M) SILBasicBlock(Thunk);
-    SILBasicBlock *ErrorBB = new (M) SILBasicBlock(Thunk);
+    SILBasicBlock *NormalBB = Thunk->createBasicBlock();
+    SILBasicBlock *ErrorBB = Thunk->createBasicBlock();
     Builder.createTryApply(Loc, FRI, SpecializedFunc->getLoweredType(),
                            {}, Arguments, NormalBB, ErrorBB);
     auto *ErrorVal = new (M) SILArgument(ErrorBB,

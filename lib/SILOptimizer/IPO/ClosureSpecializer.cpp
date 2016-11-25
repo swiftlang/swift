@@ -572,7 +572,7 @@ void ClosureSpecCloner::populateCloned() {
 
   // Create arguments for the entry block.
   SILBasicBlock *ClosureUserEntryBB = &*ClosureUser->begin();
-  SILBasicBlock *ClonedEntryBB = new (M) SILBasicBlock(Cloned);
+  SILBasicBlock *ClonedEntryBB = Cloned->createBasicBlock();
 
   // Remove the closure argument.
   SILArgument *ClosureArg = nullptr;

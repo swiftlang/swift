@@ -368,7 +368,7 @@ public:
     auto *Fn = BI->getFunction();
     auto *SrcBB = BI->getParent();
     auto *DestBB = BI->getDestBB();
-    auto *EdgeBB = new (Fn->getModule()) SILBasicBlock(Fn, SrcBB);
+    auto *EdgeBB = Fn->createBasicBlock(SrcBB);
 
     // Create block arguments.
     unsigned ArgIdx = 0;
