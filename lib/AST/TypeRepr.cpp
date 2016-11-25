@@ -182,7 +182,12 @@ TypeRepr * CloneVisitor::visitImplicitlyUnwrappedOptionalTypeRepr(
 }
 
 TypeRepr *CloneVisitor::visitTupleTypeRepr(TupleTypeRepr *T) {
-  return TupleTypeRepr::create(Ctx, T->getElements(), T->getParens(),
+  // FIXME: Avoid this stash vector.
+  SmallVector<TypeRepr *, 8> elements;
+  elements.reserve(T->getNumElements());
+  for (auto *arg : T->getElements())
+    elements.push_back(visit(arg));
+  return TupleTypeRepr::create(Ctx, elements, T->getParens(),
                                T->getElementNames(), T->getElementNameLocs(),
                                T->getUnderscoreLocs(),
                                T->getEllipsisLoc(), T->getEllipsisIndex());
