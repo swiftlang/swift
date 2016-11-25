@@ -27,6 +27,7 @@
 #include "llvm/ADT/PointerUnion.h"
 #include "llvm/ADT/STLExtras.h"
 #include "llvm/Support/ErrorHandling.h"
+#include "llvm/Support/TrailingObjects.h"
 
 namespace swift {
   class ASTWalker;
@@ -100,10 +101,14 @@ public:
   void *operator new(size_t bytes, const ASTContext &C,
                      unsigned Alignment = alignof(TypeRepr));
 
+  void *operator new(size_t bytes, void *data) {
+    assert(data);
+    return data;
+  }
+
   // Make placement new and vanilla new/delete illegal for TypeReprs.
   void *operator new(size_t bytes) = delete;
   void operator delete(void *data) = delete;
-  void *operator new(size_t bytes, void *data) = delete;
 
   void print(raw_ostream &OS, const PrintOptions &Opts = PrintOptions()) const;
   void print(ASTPrinter &Printer, const PrintOptions &Opts) const;
@@ -537,22 +542,23 @@ private:
 /// \code
 ///   (Foo, Bar)
 /// \endcode
-class TupleTypeRepr : public TypeRepr {
-  ArrayRef<TypeRepr *> Elements;
+class TupleTypeRepr final : public TypeRepr,
+    private llvm::TrailingObjects<TupleTypeRepr, TypeRepr*> {
+  friend TrailingObjects;
+
+  unsigned NumElements;
   SourceRange Parens;
-  // FIXME: Tail allocation.
   SourceLoc Ellipsis;
   unsigned EllipsisIdx;
 
-public:
   TupleTypeRepr(ArrayRef<TypeRepr *> Elements, SourceRange Parens,
-                SourceLoc Ellipsis, unsigned EllipsisIdx)
-    : TypeRepr(TypeReprKind::Tuple), Elements(Elements),
-      Parens(Parens), Ellipsis(Ellipsis), EllipsisIdx(EllipsisIdx) {
-  }
+                SourceLoc Ellipsis, unsigned EllipsisIdx);
+public:
 
-  ArrayRef<TypeRepr *> getElements() const { return Elements; }
-  TypeRepr *getElement(unsigned i) const { return Elements[i]; }
+  ArrayRef<TypeRepr *> getElements() const {
+    return { getTrailingObjects<TypeRepr *>(), NumElements };
+  }
+  TypeRepr *getElement(unsigned i) const { return getElements()[i]; }
   SourceRange getParens() const { return Parens; }
   SourceLoc getEllipsisLoc() const { return Ellipsis; }
   unsigned getEllipsisIndex() const { return EllipsisIdx; }
@@ -560,17 +566,19 @@ public:
 
   void removeEllipsis() {
     Ellipsis = SourceLoc();
-    EllipsisIdx = Elements.size();
+    EllipsisIdx = NumElements;
   }
 
   bool isParenType() const {
-    return Elements.size() == 1 && !isa<NamedTypeRepr>(Elements[0]) &&
+    return NumElements == 1 && !isa<NamedTypeRepr>(getElement(0)) &&
            !hasEllipsis();
   }
 
-  static TupleTypeRepr *create(ASTContext &C, ArrayRef<TypeRepr *> Elements,
+  static TupleTypeRepr *create(const ASTContext &C,
+                               ArrayRef<TypeRepr *> Elements,
                                SourceRange Parens, SourceLoc Ellipsis,
                                unsigned EllipsisIdx);
+  static TupleTypeRepr *createEmpty(const ASTContext &C, SourceRange Parens);
 
   static bool classof(const TypeRepr *T) {
     return T->getKind() == TypeReprKind::Tuple;

@@ -1163,8 +1163,7 @@ TypeExpr *PreCheckExpression::simplifyTypeExpr(Expr *E) {
         return TyE->getTypeRepr();
       if (auto *TE = dyn_cast<TupleExpr>(E))
         if (TE->getNumElements() == 0)
-          return new (TC.Context) TupleTypeRepr({}, TE->getSourceRange(),
-              /*EllipsisLoc*/ SourceLoc(), /*EllipsisIdx*/ 0);
+          return TupleTypeRepr::createEmpty(TC.Context, TE->getSourceRange());
 
       // When simplifying a type expr like "P1 & P2 -> P3 & P4 -> Int",
       // it may have been folded at the same time; recursively simplify it.
