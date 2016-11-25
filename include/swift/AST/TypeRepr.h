@@ -545,20 +545,20 @@ private:
 /// \endcode
 class TupleTypeRepr final : public TypeRepr,
     private llvm::TrailingObjects<TupleTypeRepr, TypeRepr*, Identifier,
-                                  SourceLoc> {
+                                  SourceLoc, std::pair<SourceLoc, unsigned>> {
   friend TrailingObjects;
+  typedef std::pair<SourceLoc, unsigned> SourceLocAndIdx;
 
   unsigned NumElements;
   SourceRange Parens;
-  SourceLoc Ellipsis;
-  unsigned EllipsisIdx;
 
   enum {
     NotNamed = 0,
     HasNames = 1,
     HasLabels = 2
-  } NameStatus;
-
+  } NameStatus : 2;
+  bool HasEllipsis : 1;
+  
   size_t numTrailingObjects(OverloadToken<TypeRepr *>) const {
     return NumElements;
   }
@@ -622,13 +622,21 @@ public:
   }
 
   SourceRange getParens() const { return Parens; }
-  SourceLoc getEllipsisLoc() const { return Ellipsis; }
-  unsigned getEllipsisIndex() const { return EllipsisIdx; }
-  bool hasEllipsis() const { return Ellipsis.isValid(); }
+  SourceLoc getEllipsisLoc() const {
+    return HasEllipsis ?
+      getTrailingObjects<SourceLocAndIdx>()[0].first : SourceLoc();
+  }
+  unsigned getEllipsisIndex() const {
+    return HasEllipsis ?
+      getTrailingObjects<SourceLocAndIdx>()[0].second : NumElements;
+  }
+  bool hasEllipsis() const { return HasEllipsis; }
 
   void removeEllipsis() {
-    Ellipsis = SourceLoc();
-    EllipsisIdx = NumElements;
+    if (HasEllipsis) {
+      HasEllipsis = false;
+      getTrailingObjects<SourceLocAndIdx>()[0] = {SourceLoc(), NumElements};
+    }
   }
 
   bool isParenType() const {
