@@ -636,6 +636,9 @@ ToolChain::constructInvocation(const ModuleWrapJobAction &job,
   assert(context.Output.getPrimaryOutputType() == types::TY_Object &&
          "The -modulewrap mode only produces object files");
 
+  Arguments.push_back("-target");
+  Arguments.push_back(context.Args.MakeArgString(getTriple().str()));
+    
   Arguments.push_back("-o");
   Arguments.push_back(
       context.Args.MakeArgString(context.Output.getPrimaryOutputFilename()));
