@@ -1675,11 +1675,19 @@ Type ValueDecl::getInterfaceType() const {
   if (!hasType())
     return Type();
 
-  // FIXME: ParamDecls are funky and don't always have an interface type
-  if (isa<ParamDecl>(this))
-    return getType();
+  assert(!isa<AbstractFunctionDecl>(this) &&
+         "functions should have an interface type");
 
-  llvm_unreachable("decl has context type but no interface type");
+  // If the type involves a type variable, don't cache it.
+  auto type = getType();
+  assert((type.isNull() || !type->is<PolymorphicFunctionType>())
+         && "decl has polymorphic function type but no interface type");
+
+  if (type->hasTypeVariable())
+    return type;
+
+  InterfaceTy = type;
+  return InterfaceTy;
 }
 
 void ValueDecl::setInterfaceType(Type type) {
