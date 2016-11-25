@@ -296,6 +296,24 @@ public:
 bool shouldPrint(const Decl *D, PrintOptions &Options);
 bool shouldPrintPattern(const Pattern *P, PrintOptions &Options);
 
+/// A utility to help printing colorful output.
+class OSColor {
+  llvm::raw_ostream &OS;
+  bool HasColors;
+public:
+  OSColor(llvm::raw_ostream &OS, llvm::raw_ostream::Colors Color) : OS(OS) {
+    HasColors = OS.has_colors();
+    if (HasColors)
+      OS.changeColor(Color);
+  }
+  ~OSColor() {
+    if (HasColors)
+      OS.resetColor();
+  }
+
+  OSColor &operator<<(char C) { OS << C; return *this; }
+  OSColor &operator<<(llvm::StringRef Str) { OS << Str; return *this; }
+};
 } // namespace swift
 
 #endif // LLVM_SWIFT_AST_ASTPRINTER_H
