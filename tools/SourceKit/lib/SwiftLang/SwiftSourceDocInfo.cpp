@@ -1039,7 +1039,6 @@ static void resolveRange(SwiftLangSupport &Lang,
       Length(Length), Receiver(std::move(Receiver)){ }
 
     void handlePrimaryAST(ASTUnitRef AstUnit) override {
-      auto &CompIns = AstUnit->getCompilerInstance();
       if (trace::enabled()) {
         // FIXME: Implement tracing
       }
