@@ -57,7 +57,6 @@ SILFunction *GenericCloner::initCloned(SILFunction *Orig,
 
 void GenericCloner::populateCloned() {
   SILFunction *Cloned = getCloned();
-  SILModule &M = Cloned->getModule();
 
   // Create arguments for the entry block.
   SILBasicBlock *OrigEntryBB = &*Original.begin();
@@ -90,7 +89,7 @@ void GenericCloner::populateCloned() {
       } else {
         // Store the new direct parameter to the alloc_stack.
         auto *NewArg =
-          new (M) SILArgument(ClonedEntryBB, mappedType, OrigArg->getDecl());
+            ClonedEntryBB->createArgument(mappedType, OrigArg->getDecl());
         getBuilder().createStore(Loc, NewArg, ASI,
                                  StoreOwnershipQualifier::Unqualified);
 
@@ -105,7 +104,7 @@ void GenericCloner::populateCloned() {
       }
     } else {
       auto *NewArg =
-        new (M) SILArgument(ClonedEntryBB, mappedType, OrigArg->getDecl());
+          ClonedEntryBB->createArgument(mappedType, OrigArg->getDecl());
       ValueMap[OrigArg] = NewArg;
     }
     ++I;

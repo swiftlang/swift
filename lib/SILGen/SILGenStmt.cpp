@@ -166,7 +166,7 @@ Condition SILGenFunction::emitCondition(SILValue V, SILLocation Loc,
   SILBasicBlock *ContBB = createBasicBlock();
 
   for (SILType argTy : contArgs) {
-    new (F.getModule()) SILArgument(ContBB, argTy);
+    ContBB->createArgument(argTy);
   }
   
   SILBasicBlock *FalseBB, *FalseDestBB;

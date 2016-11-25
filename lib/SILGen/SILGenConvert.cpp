@@ -281,9 +281,8 @@ SILGenFunction::emitOptionalToOptional(SILLocation loc,
   if (resultTL.isAddressOnly())
     result = emitTemporaryAllocation(loc, resultTy);
   else
-    result = new (F.getModule()) SILArgument(contBB, resultTL.getLoweredType());
+    result = contBB->createArgument(resultTL.getLoweredType());
 
-  
   // Branch on whether the input is optional, this doesn't consume the value.
   auto isPresent = emitDoesOptionalHaveValue(loc, input.getValue());
   B.createCondBranch(loc, isPresent, isPresentBB, isNotPresentBB);

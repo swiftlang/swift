@@ -626,9 +626,8 @@ SILBasicBlock *SILDeserializer::readSILBasicBlock(SILFunction *Fn,
     if (!ValId) return nullptr;
 
     auto ArgTy = MF->getType(TyID);
-    auto Arg = new (SILMod) SILArgument(CurrentBB,
-                                        getSILType(ArgTy,
-                                                   (SILValueCategory)Args[I+1]));
+    auto Arg = CurrentBB->createArgument(
+        getSILType(ArgTy, (SILValueCategory)Args[I + 1]));
     LastValueID = LastValueID + 1;
     setLocalValue(Arg, LastValueID);
   }

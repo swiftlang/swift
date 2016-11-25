@@ -254,8 +254,8 @@ public:
     : gen(gen), parent(parent), loc(l), functionArgs(functionArgs) {}
 
   RValue visitType(CanType t) {
-    SILValue arg = new (gen.SGM.M)
-      SILArgument(parent, gen.getLoweredType(t), loc.getAsASTNode<ValueDecl>());
+    SILValue arg = parent->createArgument(gen.getLoweredType(t),
+                                          loc.getAsASTNode<ValueDecl>());
     ManagedValue mv = isa<InOutType>(t)
       ? ManagedValue::forLValue(arg)
       : gen.emitManagedRValueWithCleanup(arg);

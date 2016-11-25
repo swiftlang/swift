@@ -5541,8 +5541,7 @@ RValue SILGenFunction::emitDynamicMemberRefExpr(DynamicMemberRefExpr *e,
     auto dynamicMethodTy = getDynamicMethodLoweredType(*this, operand, member,
                                                        memberFnTy);
     auto loweredMethodTy = SILType::getPrimitiveObjectType(dynamicMethodTy);
-    SILValue memberArg = new (F.getModule()) SILArgument(hasMemberBB,
-                                                         loweredMethodTy);
+    SILValue memberArg = hasMemberBB->createArgument(loweredMethodTy);
 
     // Create the result value.
     SILValue result = emitDynamicPartialApply(*this, e, memberArg, operand,
@@ -5637,8 +5636,7 @@ RValue SILGenFunction::emitDynamicSubscriptExpr(DynamicSubscriptExpr *e,
     auto dynamicMethodTy = getDynamicMethodLoweredType(*this, base, member,
                                                        functionTy);
     auto loweredMethodTy = SILType::getPrimitiveObjectType(dynamicMethodTy);
-    SILValue memberArg = new (F.getModule()) SILArgument(hasMemberBB,
-                                                         loweredMethodTy);
+    SILValue memberArg = hasMemberBB->createArgument(loweredMethodTy);
     // Emit the application of 'self'.
     SILValue result = emitDynamicPartialApply(*this, e, memberArg, base,
                                               cast<FunctionType>(methodTy));

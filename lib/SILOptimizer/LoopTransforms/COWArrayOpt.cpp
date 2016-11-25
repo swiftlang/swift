@@ -1952,9 +1952,7 @@ public:
 
   SILBasicBlock *cloneRegion() {
     assert (DomTree.getNode(StartBB) != nullptr && "Can't cloned dead code");
-
     auto CurFun = StartBB->getParent();
-    auto &Mod = CurFun->getModule();
 
     // We don't want to visit blocks outside of the region. visitSILBasicBlocks
     // checks BBMap before it clones a block. So we mark exiting blocks as
@@ -1981,7 +1979,7 @@ public:
     // Clone the arguments.
     for (auto &Arg : StartBB->getArguments()) {
       SILValue MappedArg =
-          new (Mod) SILArgument(ClonedStartBB, getOpType(Arg->getType()));
+          ClonedStartBB->createArgument(getOpType(Arg->getType()));
       ValueMap.insert(std::make_pair(Arg, MappedArg));
     }
 

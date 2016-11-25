@@ -28,7 +28,7 @@ void SILGenFunction::prepareEpilog(Type resultType, bool isThrowing,
     NeedsReturn = (F.getLoweredFunctionType()->getNumAllResults() != 0);
     for (auto directResult : F.getLoweredFunctionType()->getDirectResults()) {
       SILType resultType = F.mapTypeIntoContext(directResult.getSILType());
-      new (F.getModule()) SILArgument(epilogBB, resultType);
+      epilogBB->createArgument(resultType);
     }
   }
 
@@ -42,7 +42,7 @@ void SILGenFunction::prepareEpilog(Type resultType, bool isThrowing,
 void SILGenFunction::prepareRethrowEpilog(CleanupLocation cleanupLoc) {
   auto exnType = SILType::getExceptionType(getASTContext());
   SILBasicBlock *rethrowBB = createBasicBlock(FunctionSection::Postmatter);
-  new (F.getModule()) SILArgument(rethrowBB, exnType);
+  rethrowBB->createArgument(exnType);
   ThrowDest = JumpDest(rethrowBB, getCleanupsDepth(), cleanupLoc);
 }
 

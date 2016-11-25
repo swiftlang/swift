@@ -72,7 +72,6 @@ protected:
 void LoopCloner::cloneLoop() {
   auto *Header = Loop->getHeader();
   auto *CurFun = Loop->getHeader()->getParent();
-  auto &Mod = CurFun->getModule();
 
   SmallVector<SILBasicBlock *, 16> ExitBlocks;
   Loop->getExitBlocks(ExitBlocks);
@@ -85,7 +84,7 @@ void LoopCloner::cloneLoop() {
   // Clone the arguments.
   for (auto *Arg : Header->getArguments()) {
     SILValue MappedArg =
-        new (Mod) SILArgument(ClonedHeader, getOpType(Arg->getType()));
+        ClonedHeader->createArgument(getOpType(Arg->getType()));
     ValueMap.insert(std::make_pair(Arg, MappedArg));
   }
 

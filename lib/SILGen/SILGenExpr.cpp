@@ -3040,7 +3040,7 @@ RValue RValueEmitter::visitOptionalEvaluationExpr(OptionalEvaluationExpr *E,
   // If this was done in SSA registers, then the value is provided as an
   // argument to the block.
   if (!isByAddress) {
-    auto arg = new (SGF.SGM.M) SILArgument(contBB, optTL.getLoweredType());
+    auto arg = contBB->createArgument(optTL.getLoweredType());
     return RValue(SGF, E, SGF.emitManagedRValueWithCleanup(arg, optTL));
   }
   

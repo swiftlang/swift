@@ -511,10 +511,8 @@ void MemoryToRegisters::removeSingleBlockAllocation(AllocStackInst *ASI) {
 void StackAllocationPromoter::addBlockArguments(BlockSet &PhiBlocks) {
   DEBUG(llvm::dbgs() << "*** Adding new block arguments.\n");
 
-  SILModule &M = ASI->getModule();
-
-  for (auto Block : PhiBlocks)
-    new (M) SILArgument(Block, ASI->getElementType());
+  for (auto *Block : PhiBlocks)
+    Block->createArgument(ASI->getElementType());
 }
 
 SILValue

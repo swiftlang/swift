@@ -117,18 +117,8 @@ class SILArgument : public ValueBase {
 
   SILBasicBlock *ParentBB;
   const ValueDecl *Decl;
+
 public:
-  SILArgument(SILBasicBlock *ParentBB, SILType Ty, const ValueDecl *D=nullptr);
-  SILArgument(SILBasicBlock *ParentBB, SILBasicBlock::arg_iterator Pos,
-              SILType Ty, const ValueDecl *D = nullptr);
-
-  SILArgument(SILFunction::iterator ParentBB, SILType Ty,
-              const ValueDecl *D = nullptr)
-      : SILArgument(&*ParentBB, Ty, D) {}
-  SILArgument(SILFunction::iterator ParentBB, SILBasicBlock::arg_iterator Pos,
-              SILType Ty, const ValueDecl *D = nullptr)
-      : SILArgument(&*ParentBB, Pos, Ty, D) {}
-
   SILBasicBlock *getParent() { return ParentBB; }
   const SILBasicBlock *getParent() const { return ParentBB; }
 
@@ -230,10 +220,16 @@ public:
   }
 
 private:
+  friend class SILBasicBlock;
+
+  SILArgument(SILBasicBlock *ParentBB, SILType Ty,
+              const ValueDecl *D = nullptr);
+  SILArgument(SILBasicBlock *ParentBB, SILBasicBlock::arg_iterator Pos,
+              SILType Ty, const ValueDecl *D = nullptr);
+
   // A special constructor, only intended for use in SILBasicBlock::replaceBBArg.
   explicit SILArgument(SILType Ty, const ValueDecl *D =nullptr) :
     ValueBase(ValueKind::SILArgument, Ty), ParentBB(nullptr), Decl(D) {}
-  friend class SILBasicBlock;
   void setParent(SILBasicBlock *P) { ParentBB = P; }
 };
 

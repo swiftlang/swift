@@ -1777,7 +1777,7 @@ emitEnumElementDispatch(ArrayRef<RowToSpecialize> rows,
           eltValue = eltTL->emitLoad(SGF.B, loc, eltValue,
                                      LoadOwnershipQualifier::Take);
       } else {
-        eltValue = new (SGF.F.getModule()) SILArgument(caseBB, eltTy);
+        eltValue = caseBB->createArgument(eltTy);
       }
 
       origCMV = getManagedSubobject(SGF, eltValue, *eltTL, eltConsumption);

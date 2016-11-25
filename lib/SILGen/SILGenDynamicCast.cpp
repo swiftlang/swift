@@ -158,8 +158,8 @@ namespace {
           result = finishFromResultBuffer(hasAbstraction, resultBuffer,
                                           abstraction, origTargetTL, ctx);
         } else {
-          SILValue argument = new (SGF.F.getModule())
-            SILArgument(trueBB, origTargetTL.getLoweredType());
+          SILValue argument =
+              trueBB->createArgument(origTargetTL.getLoweredType());
           result = finishFromResultScalar(hasAbstraction, argument, consumption,
                                           abstraction, origTargetTL, ctx);
         }
@@ -499,8 +499,7 @@ RValue Lowering::emitConditionalCheckedCast(SILGenFunction &SGF,
   if (resultObjectTemp) {
     result = SGF.manageBufferForExprResult(resultBuffer, resultTL, C);
   } else {
-    auto argument =
-      new (SGF.F.getModule()) SILArgument(contBB, resultTL.getLoweredType());
+    auto argument = contBB->createArgument(resultTL.getLoweredType());
     result = SGF.emitManagedRValueWithCleanup(argument, resultTL);
   }
 
@@ -549,7 +548,7 @@ SILValue Lowering::emitIsa(SILGenFunction &SGF, SILLocation loc,
     });
 
   auto contBB = scope.exit();
-  auto isa = new (SGF.SGM.M) SILArgument(contBB, i1Ty);
+  auto isa = contBB->createArgument(i1Ty);
   return isa;
 }
 

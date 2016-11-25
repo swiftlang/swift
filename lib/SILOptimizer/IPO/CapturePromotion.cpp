@@ -463,7 +463,6 @@ ClosureCloner::initCloned(SILFunction *Orig, IsFragile_t Fragile,
 void
 ClosureCloner::populateCloned() {
   SILFunction *Cloned = getCloned();
-  SILModule &M = Cloned->getModule();
 
   // Create arguments for the entry block
   SILBasicBlock *OrigEntryBB = &*Orig->begin();
@@ -476,7 +475,7 @@ ClosureCloner::populateCloned() {
       auto BoxedTy = (*I)->getType().castTo<SILBoxType>()->getBoxedAddressType()
         .getObjectType();
       SILValue MappedValue =
-        new (M) SILArgument(ClonedEntryBB, BoxedTy, (*I)->getDecl());
+          ClonedEntryBB->createArgument(BoxedTy, (*I)->getDecl());
       BoxArgumentMap.insert(std::make_pair(*I, MappedValue));
       
       // Track the projections of the box.
@@ -488,7 +487,7 @@ ClosureCloner::populateCloned() {
     } else {
       // Otherwise, create a new argument which copies the original argument
       SILValue MappedValue =
-        new (M) SILArgument(ClonedEntryBB, (*I)->getType(), (*I)->getDecl());
+          ClonedEntryBB->createArgument((*I)->getType(), (*I)->getDecl());
       ValueMap.insert(std::make_pair(*I, MappedValue));
     }
     ++ArgNo;

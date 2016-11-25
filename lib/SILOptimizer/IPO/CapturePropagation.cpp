@@ -161,7 +161,6 @@ void CapturePropagationCloner::cloneBlocks(
   OperandValueArrayRef PartialApplyArgs) {
 
   SILFunction &CloneF = getBuilder().getFunction();
-  SILModule &M = CloneF.getModule();
 
   // Create the entry basic block with the function arguments.
   SILBasicBlock *OrigEntryBB = &*OrigF->begin();
@@ -177,8 +176,8 @@ void CapturePropagationCloner::cloneBlocks(
 
     SILArgument *Arg = OrigEntryBB->getArgument(ParamIdx);
 
-    SILValue MappedValue = new (M)
-        SILArgument(ClonedEntryBB, remapType(Arg->getType()), Arg->getDecl());
+    SILValue MappedValue = ClonedEntryBB->createArgument(
+        remapType(Arg->getType()), Arg->getDecl());
     ValueMap.insert(std::make_pair(Arg, MappedValue));
   }
   assert(OrigEntryBB->args_size() - ParamIdx == PartialApplyArgs.size() &&

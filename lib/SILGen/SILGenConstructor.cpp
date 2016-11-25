@@ -38,8 +38,8 @@ static SILValue emitConstructorMetatypeArg(SILGenFunction &gen,
                                AC.getIdentifier("$metatype"), SourceLoc(),
                                AC.getIdentifier("$metatype"), metatype,
                                ctor->getDeclContext());
-  gen.AllocatorMetatype = new (gen.F.getModule()) SILArgument(gen.F.begin(),
-                                              gen.getLoweredType(metatype), VD);
+  gen.AllocatorMetatype =
+      gen.F.begin()->createArgument(gen.getLoweredType(metatype), VD);
   return gen.AllocatorMetatype;
 }
 
@@ -60,9 +60,7 @@ static RValue emitImplicitValueConstructorArg(SILGenFunction &gen,
                                  AC.getIdentifier("$implicit_value"),
                                  SourceLoc(),
                                  AC.getIdentifier("$implicit_value"), ty, DC);
-    SILValue arg = new (gen.F.getModule()) SILArgument(gen.F.begin(),
-                                                       gen.getLoweredType(ty),
-                                                       VD);
+    SILValue arg = gen.F.begin()->createArgument(gen.getLoweredType(ty), VD);
     return RValue(gen, loc, ty, gen.emitManagedRValueWithCleanup(arg));
   }
 }
@@ -85,7 +83,7 @@ static void emitImplicitValueConstructor(SILGenFunction &gen,
                                  SourceLoc(),
                                  AC.getIdentifier("$return_value"), selfTyCan,
                                  ctor);
-    resultSlot = new (gen.F.getModule()) SILArgument(gen.F.begin(), selfTy, VD);
+    resultSlot = gen.F.begin()->createArgument(selfTy, VD);
   }
 
   // Emit the elementwise arguments.
@@ -237,8 +235,8 @@ void SILGenFunction::emitValueConstructor(ConstructorDecl *ctor) {
       B.createReturn(ctor, emitEmptyTuple(ctor));
     } else {
       // Pass 'nil' as the return value to the exit BB.
-      failureExitArg = new (F.getModule())
-        SILArgument(failureExitBB, resultLowering.getLoweredType());
+      failureExitArg =
+          failureExitBB->createArgument(resultLowering.getLoweredType());
       SILValue nilResult =
         B.createEnum(ctor, {}, getASTContext().getOptionalNoneDecl(),
                      resultLowering.getLoweredType());
@@ -365,9 +363,7 @@ void SILGenFunction::emitEnumConstructor(EnumElementDecl *element) {
                                  AC.getIdentifier("$return_value"),
                                  CanInOutType::get(enumTy),
                                  element->getDeclContext());
-    auto resultSlot = new (SGM.M) SILArgument(F.begin(),
-                                              enumTI.getLoweredType(),
-                                              VD);
+    auto resultSlot = F.begin()->createArgument(enumTI.getLoweredType(), VD);
     dest = std::unique_ptr<Initialization>(
         new KnownAddressInitialization(resultSlot));
   }
@@ -563,7 +559,7 @@ void SILGenFunction::emitClassConstructorInitializer(ConstructorDecl *ctor) {
              TupleType::getEmpty(F.getASTContext()), ctor, ctor->hasThrows());
 
   SILType selfTy = getLoweredLoadableType(selfDecl->getType());
-  SILValue selfArg = new (SGM.M) SILArgument(F.begin(), selfTy, selfDecl);
+  SILValue selfArg = F.begin()->createArgument(selfTy, selfDecl);
 
   if (!NeedsBoxForSelf) {
     SILLocation PrologueLoc(selfDecl);
@@ -612,8 +608,8 @@ void SILGenFunction::emitClassConstructorInitializer(ConstructorDecl *ctor) {
     SavedInsertionPoint savedIP(*this, failureBB, FunctionSection::Postmatter);
 
     failureExitBB = createBasicBlock();
-    failureExitArg = new (F.getModule())
-      SILArgument(failureExitBB, resultLowering.getLoweredType());
+    failureExitArg =
+        failureExitBB->createArgument(resultLowering.getLoweredType());
 
     Cleanups.emitCleanupsForReturn(ctor);
     SILValue nilResult = B.createEnum(loc, {},
@@ -942,7 +938,7 @@ void SILGenFunction::emitIVarInitializer(SILDeclRef ivarInitializer) {
   // Emit 'self', then mark it uninitialized.
   auto selfDecl = cd->getDestructor()->getImplicitSelfDecl();
   SILType selfTy = getLoweredLoadableType(selfDecl->getType());
-  SILValue selfArg = new (SGM.M) SILArgument(F.begin(), selfTy, selfDecl);
+  SILValue selfArg = F.begin()->createArgument(selfTy, selfDecl);
   SILLocation PrologueLoc(selfDecl);
   PrologueLoc.markAsPrologue();
   B.createDebugValue(PrologueLoc, selfArg);

@@ -396,13 +396,12 @@ static SILFunction *createReabstractionThunk(const ReabstractionInfo &ReInfo,
       if (ReInfo.isResultIndex(Idx)) {
         // Store the result later.
         SILType Ty = SpecType->getSILResult().getAddressType();
-        ReturnValueAddr = new (M) SILArgument(EntryBB, Ty);
+        ReturnValueAddr = EntryBB->createArgument(Ty);
       } else {
         // Instead of passing the address, pass the loaded value.
         SILArgument *SpecArg = *SpecArgIter++;
         SILType Ty = SpecArg->getType().getAddressType();
-        SILArgument *NewArg = new (M) SILArgument(EntryBB, Ty,
-                                                  SpecArg->getDecl());
+        SILArgument *NewArg = EntryBB->createArgument(Ty, SpecArg->getDecl());
         auto *ArgVal = Builder.createLoad(Loc, NewArg,
                                           LoadOwnershipQualifier::Unqualified);
         Arguments.push_back(ArgVal);
@@ -410,8 +409,8 @@ static SILFunction *createReabstractionThunk(const ReabstractionInfo &ReInfo,
     } else {
       // No change to the argument.
       SILArgument *SpecArg = *SpecArgIter++;
-      SILArgument *NewArg = new (M) SILArgument(EntryBB, SpecArg->getType(),
-                                                SpecArg->getDecl());
+      SILArgument *NewArg =
+          EntryBB->createArgument(SpecArg->getType(), SpecArg->getDecl());
       Arguments.push_back(NewArg);
     }
   }
@@ -424,11 +423,11 @@ static SILFunction *createReabstractionThunk(const ReabstractionInfo &ReInfo,
     SILBasicBlock *ErrorBB = Thunk->createBasicBlock();
     Builder.createTryApply(Loc, FRI, SpecializedFunc->getLoweredType(),
                            {}, Arguments, NormalBB, ErrorBB);
-    auto *ErrorVal = new (M) SILArgument(ErrorBB,
-                                         SpecType->getErrorResult().getSILType());
+    auto *ErrorVal =
+        ErrorBB->createArgument(SpecType->getErrorResult().getSILType());
     Builder.setInsertionPoint(ErrorBB);
     Builder.createThrow(Loc, ErrorVal);
-    ReturnValue = new (M) SILArgument(NormalBB, SpecType->getSILResult());
+    ReturnValue = NormalBB->createArgument(SpecType->getSILResult());
     Builder.setInsertionPoint(NormalBB);
   } else {
     ReturnValue = Builder.createApply(Loc, FRI, SpecializedFunc->getLoweredType(),
