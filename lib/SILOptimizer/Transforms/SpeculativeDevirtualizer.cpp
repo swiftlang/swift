@@ -109,7 +109,7 @@ static FullApplySite speculateMonomorphicTarget(FullApplySite AI,
   SILBasicBlock *Virt = F->createBasicBlock();
   Iden->createArgument(SubType);
 
-  SILBasicBlock *Continue = Entry->splitBasicBlock(It);
+  SILBasicBlock *Continue = Entry->split(It);
 
   SILBuilderWithScope Builder(Entry, AI.getInstruction());
   // Create the checked_cast_branch instruction that checks at runtime if the

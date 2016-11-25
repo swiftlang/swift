@@ -127,7 +127,7 @@ bool SILInliner::inlineFunction(FullApplySite AI, ArrayRef<SILValue> Args) {
     SILBasicBlock *CallerBB = AI.getParent();
     // Split the BB and do NOT create a branch between the old and new
     // BBs; we will create the appropriate terminator manually later.
-    ReturnToBB = CallerBB->splitBasicBlock(InsertPoint);
+    ReturnToBB = CallerBB->split(InsertPoint);
     // Place the return-to BB after all the other mapped BBs.
     if (InsertBeforeBB)
       F.getBlocks().splice(SILFunction::iterator(InsertBeforeBB), F.getBlocks(),

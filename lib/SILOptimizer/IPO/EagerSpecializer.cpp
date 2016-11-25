@@ -106,12 +106,12 @@ static void addReturnValueImpl(SILBasicBlock *RetBB, SILBasicBlock *NewRetBB,
         TupleI = TupleI->clone(RetInst);
         RetInst->setOperand(0, TupleI);
       }
-      MergedBB = RetBB->splitBasicBlock(TupleI->getIterator());
+      MergedBB = RetBB->split(TupleI->getIterator());
       Builder.setInsertionPoint(RetBB);
       Builder.createBranch(Loc, MergedBB);
     } else {
       // Forward the existing return argument to a new BBArg.
-      MergedBB = RetBB->splitBasicBlock(RetInst->getIterator());
+      MergedBB = RetBB->split(RetInst->getIterator());
       SILValue OldRetVal = RetInst->getOperand(0);
       RetInst->setOperand(0, MergedBB->createArgument(OldRetVal->getType()));
       Builder.setInsertionPoint(RetBB);
@@ -255,7 +255,7 @@ void EagerDispatch::emitDispatchTo(SILFunction *NewFunc) {
 
   // First split the entry BB, moving all instructions to the FailedTypeCheckBB.
   auto &EntryBB = GenericFunc->front();
-  SILBasicBlock *FailedTypeCheckBB = EntryBB.splitBasicBlock(EntryBB.begin());
+  SILBasicBlock *FailedTypeCheckBB = EntryBB.split(EntryBB.begin());
   Builder.setInsertionPoint(&EntryBB, EntryBB.begin());
 
   // Iterate over all dependent types in the generic signature, which will match

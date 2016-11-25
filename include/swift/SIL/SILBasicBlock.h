@@ -132,7 +132,7 @@ public:
   /// Note that all the instructions BEFORE the specified iterator
   /// stay as part of the original basic block. The old basic block is left
   /// without a terminator.
-  SILBasicBlock *splitBasicBlock(iterator I);
+  SILBasicBlock *split(iterator I);
 
   /// \brief Move the basic block to after the specified basic block in the IR.
   /// The basic blocks must reside in the same function.

@@ -127,8 +127,8 @@ static void InsertCFGDiamond(SILValue Cond, SILLocation Loc, SILBuilder &B,
   SILBasicBlock *StartBB = B.getInsertionBB();
   
   // Start by splitting the current block.
-  ContBB = StartBB->splitBasicBlock(B.getInsertionPoint());
-  
+  ContBB = StartBB->split(B.getInsertionPoint());
+
   // Create the true block if requested.
   SILBasicBlock *TrueDest;
   if (!createTrueBB) {

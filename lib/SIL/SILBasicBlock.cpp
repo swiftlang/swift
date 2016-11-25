@@ -146,7 +146,7 @@ void SILBasicBlock::eraseArgument(int Index) {
 /// Note that all the instructions BEFORE the specified iterator
 /// stay as part of the original basic block. The old basic block is left
 /// without a terminator.
-SILBasicBlock *SILBasicBlock::splitBasicBlock(iterator I) {
+SILBasicBlock *SILBasicBlock::split(iterator I) {
   SILBasicBlock *New = new (Parent->getModule()) SILBasicBlock(Parent);
   SILFunction::iterator Where = std::next(SILFunction::iterator(this));
   SILFunction::iterator First = SILFunction::iterator(New);

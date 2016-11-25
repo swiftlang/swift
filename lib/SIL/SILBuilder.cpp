@@ -142,7 +142,7 @@ SILBasicBlock *SILBuilder::splitBlockForFallthrough() {
   }
 
   // Otherwise we need to split the current block at the insertion point.
-  auto *NewBB = BB->splitBasicBlock(InsertPt);
+  auto *NewBB = BB->split(InsertPt);
   InsertPt = BB->end();
   return NewBB;
 }
