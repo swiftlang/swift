@@ -663,7 +663,7 @@ void TypeChecker::computeCaptures(AnyFunctionRef AFR) {
   }
 
   if (AFR.hasType() && !AFR.isObjC()) {
-    finder.checkType(AFR.getType(), AFR.getLoc());
+    finder.checkType(AFR.getInterfaceType(), AFR.getLoc());
   }
 
   // If this is an init(), explicitly walk the initializer values for members of

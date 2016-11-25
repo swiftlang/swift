@@ -606,8 +606,11 @@ namespace {
 
       if (favoredConstraints.size() == 1) {
         auto overloadChoice = favoredConstraints[0]->getOverloadChoice();
-        auto overloadType = overloadChoice.getDecl()->getType();
+        auto overloadType = overloadChoice.getDecl()->getInterfaceType();
         auto resultType = overloadType->getAs<AnyFunctionType>()->getResult();
+        resultType = ArchetypeBuilder::mapTypeIntoContext(
+            overloadChoice.getDecl()->getInnermostDeclContext(),
+            resultType);
         CS.setFavoredType(expr, resultType.getPointer());
       }
 
@@ -712,11 +715,11 @@ namespace {
   /// Return a pair, containing the total parameter count of a function, coupled
   /// with the number of non-default parameters.
   std::pair<size_t, size_t> getParamCount(ValueDecl *VD) {
-    auto fty = VD->getType()->getAs<AnyFunctionType>();
-    assert(fty && "attempting to count parameters of a non-function type");
+    auto fTy = VD->getInterfaceType()->getAs<AnyFunctionType>();
+    assert(fTy && "attempting to count parameters of a non-function type");
     
-    auto t = fty->getInput();
-    size_t nOperands = getOperandCount(t);
+    auto inputTy = fTy->getInput();
+    size_t nOperands = getOperandCount(inputTy);
     size_t nNoDefault = 0;
     
     if (auto AFD = dyn_cast<AbstractFunctionDecl>(VD)) {
@@ -739,7 +742,7 @@ namespace {
                                    ConstraintSystem &CS) {
     // Determine whether the given declaration is favored.
     auto isFavoredDecl = [&](ValueDecl *value) -> bool {
-      auto valueTy = value->getType();
+      auto valueTy = value->getInterfaceType();
       
       auto fnTy = valueTy->getAs<AnyFunctionType>();
       if (!fnTy)
@@ -750,8 +753,10 @@ namespace {
         fnTy = fnTy->getResult()->castTo<AnyFunctionType>();
       }
       
-      Type paramTy = fnTy->getInput();
-      auto resultTy = fnTy->getResult();
+      Type paramTy = ArchetypeBuilder::mapTypeIntoContext(
+          value->getInnermostDeclContext(), fnTy->getInput());
+      auto resultTy = ArchetypeBuilder::mapTypeIntoContext(
+          value->getInnermostDeclContext(), fnTy->getResult());
       auto contextualTy = CS.getContextualType(expr);
       
       return isFavoredParamAndArg(CS, paramTy, expr->getArg(),
@@ -775,7 +780,7 @@ namespace {
       bool haveMultipleApplicableOverloads = false;
       
       for (auto VD : ODR->getDecls()) {
-        if (VD->getType()->getAs<AnyFunctionType>()) {
+        if (VD->getInterfaceType()->is<AnyFunctionType>()) {
           auto nParams = getParamCount(VD);
           
           if (nArgs == nParams.first) {
@@ -790,12 +795,11 @@ namespace {
       
       // Determine whether the given declaration is favored.
       auto isFavoredDecl = [&](ValueDecl *value) -> bool {
-        auto valueTy = value->getType();
+        auto valueTy = value->getInterfaceType();
         
-        auto fnTy = valueTy->getAs<AnyFunctionType>();
-        if (!fnTy)
+        if (!valueTy->is<AnyFunctionType>())
           return false;
-        
+
         auto paramCount = getParamCount(value);
         
         return nArgs == paramCount.first ||
@@ -809,7 +813,7 @@ namespace {
     if (auto favoredTy = CS.getFavoredType(expr->getArg())) {
       // Determine whether the given declaration is favored.
       auto isFavoredDecl = [&](ValueDecl *value) -> bool {
-        auto valueTy = value->getType();
+        auto valueTy = value->getInterfaceType();
         
         auto fnTy = valueTy->getAs<AnyFunctionType>();
         if (!fnTy)
@@ -825,6 +829,8 @@ namespace {
           }
         }
         Type paramTy = fnTy->getInput();
+        paramTy = ArchetypeBuilder::mapTypeIntoContext(
+            value->getInnermostDeclContext(), paramTy);
         
         return favoredTy->isEqual(paramTy);
       };
@@ -868,7 +874,7 @@ namespace {
     
     // Determine whether the given declaration is favored.
     auto isFavoredDecl = [&](ValueDecl *value) -> bool {
-      auto valueTy = value->getType();
+      auto valueTy = value->getInterfaceType();
       
       auto fnTy = valueTy->getAs<AnyFunctionType>();
       if (!fnTy)
@@ -909,7 +915,8 @@ namespace {
         fnTy = fnTy->getResult()->castTo<AnyFunctionType>();
       }
       
-      Type paramTy = fnTy->getInput();
+      Type paramTy = ArchetypeBuilder::mapTypeIntoContext(
+          value->getInnermostDeclContext(), fnTy->getInput());
       auto paramTupleTy = paramTy->getAs<TupleType>();
       if (!paramTupleTy || paramTupleTy->getNumElements() != 2)
         return false;
@@ -917,7 +924,8 @@ namespace {
       auto firstParamTy = paramTupleTy->getElement(0).getType();
       auto secondParamTy = paramTupleTy->getElement(1).getType();
       
-      auto resultTy = fnTy->getResult();
+      auto resultTy = ArchetypeBuilder::mapTypeIntoContext(
+          value->getInnermostDeclContext(), fnTy->getResult());
       auto contextualTy = CS.getContextualType(expr);
       
       return
@@ -1285,7 +1293,8 @@ namespace {
       // error recovery within a ClosureExpr.  Just create a new type variable
       // for the decl that isn't bound to anything.  This will ensure that it
       // is considered ambiguous.
-      if (E->getDecl()->hasType() &&
+      if (isa<VarDecl>(E->getDecl()) &&
+          E->getDecl()->hasType() &&
           E->getDecl()->getType()->is<UnresolvedType>()) {
         return CS.createTypeVariable(CS.getConstraintLocator(E),
                                      TVO_CanBindToLValue);
@@ -1310,7 +1319,8 @@ namespace {
                                         E->isSpecialized(),
                                         E->getFunctionRefKind()));
       
-      if (E->getDecl()->getType() &&
+      if (isa<VarDecl>(E->getDecl()) &&
+          E->getDecl()->getType() &&
           !E->getDecl()->getType()->getAs<TypeVariableType>()) {
         CS.setFavoredType(E, E->getDecl()->getType().getPointer());
       }
@@ -2308,7 +2318,9 @@ namespace {
           if (FD->getHaveSearchedForCommonOverloadReturnType()) {
             
             if (FD->getHaveFoundCommonOverloadReturnType()) {
-              outputTy = FD->getType()->getAs<AnyFunctionType>()->getResult();
+              outputTy = FD->getInterfaceType()->getAs<AnyFunctionType>()
+                  ->getResult();
+              outputTy = ArchetypeBuilder::mapTypeIntoContext(FD, outputTy);
             }
             
           } else {
@@ -2320,7 +2332,7 @@ namespace {
             for (auto OD : OSR->getDecls()) {
               
               if (auto OFD = dyn_cast<FuncDecl>(OD)) {
-                auto OFT = OFD->getType()->getAs<AnyFunctionType>();
+                auto OFT = OFD->getInterfaceType()->getAs<AnyFunctionType>();
                 
                 if (!OFT) {
                   commonType = Type();
@@ -2328,6 +2340,8 @@ namespace {
                 }
                 
                 resultType = OFT->getResult();
+                resultType = ArchetypeBuilder::mapTypeIntoContext(
+                    OFD, resultType);
                 
                 if (commonType.isNull()) {
                   commonType = resultType;
