@@ -566,8 +566,6 @@ ClosureSpecCloner::initCloned(const CallSiteDescriptor &CallSiteDesc,
 /// necessary. This is where we create the actual specialized BB Arguments.
 void ClosureSpecCloner::populateCloned() {
   SILFunction *Cloned = getCloned();
-  SILModule &M = Cloned->getModule();
-
   SILFunction *ClosureUser = CallSiteDesc.getApplyCallee();
 
   // Create arguments for the entry block.
