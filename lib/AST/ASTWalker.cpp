@@ -1532,14 +1532,6 @@ bool Traversal::visitTupleTypeRepr(TupleTypeRepr *T) {
   return false;
 }
 
-bool Traversal::visitNamedTypeRepr(NamedTypeRepr *T) {
-  if (T->getTypeRepr()) {
-    if (doIt(T->getTypeRepr()))
-      return true;
-  }
-  return false;
-}
-
 bool Traversal::visitCompositionTypeRepr(CompositionTypeRepr *T) {
   for (auto elem : T->getTypes()) {
     if (doIt(elem))

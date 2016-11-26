@@ -3127,8 +3127,7 @@ static FuncDecl *createAccessorFunc(SourceLoc DeclLoc, ParameterList *param,
       return new (P->Context) FixedTypeRepr(type, SourceLoc());
     };
     auto makePairType = [&](TypeRepr *fst, TypeRepr *snd) -> TypeRepr* {
-      return TupleTypeRepr::create(P->Context, {fst, snd}, SourceRange(),
-                                   SourceLoc(), 2);
+      return TupleTypeRepr::create(P->Context, {fst, snd}, SourceRange());
     };
 
     switch (addressorKind) {
