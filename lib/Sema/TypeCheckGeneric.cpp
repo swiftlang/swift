@@ -24,6 +24,14 @@ using namespace swift;
 
 Type DependentGenericTypeResolver::resolveGenericTypeParamType(
                                      GenericTypeParamType *gp) {
+  auto gpDecl = gp->getDecl();
+  assert(gpDecl && "Missing generic parameter declaration");
+
+  // Hack: See parseGenericParameters(). When the issue there is fixed,
+  // we won't need the isInvalid() check anymore.
+  if (gpDecl->isInvalid())
+    return ErrorType::get(gpDecl->getASTContext());
+
   // Don't resolve generic parameters.
   return gp;
 }
@@ -113,8 +121,10 @@ Type PartialGenericTypeToArchetypeResolver::resolveGenericTypeParamType(
 
   // Hack: See parseGenericParameters(). When the issue there is fixed,
   // we won't need the isInvalid() check anymore.
-  if (gpDecl->isInvalid() ||
-      !gpDecl->getDeclContext()->isValidGenericContext())
+  if (gpDecl->isInvalid())
+    return ErrorType::get(gpDecl->getASTContext());
+
+  if (!gpDecl->getDeclContext()->isValidGenericContext())
     return Type(gp);
 
   auto *genericEnv = gpDecl->getDeclContext()->getGenericEnvironmentOfContext();
@@ -159,6 +169,14 @@ PartialGenericTypeToArchetypeResolver::resolveTypeOfDecl(TypeDecl *decl) {
 
 Type CompleteGenericTypeResolver::resolveGenericTypeParamType(
                                               GenericTypeParamType *gp) {
+  auto gpDecl = gp->getDecl();
+  assert(gpDecl && "Missing generic parameter declaration");
+
+  // Hack: See parseGenericParameters(). When the issue there is fixed,
+  // we won't need the isInvalid() check anymore.
+  if (gpDecl->isInvalid())
+    return ErrorType::get(gpDecl->getASTContext());
+
   // Retrieve the potential archetype corresponding to this generic type
   // parameter.
   // FIXME: When generic parameters can map down to specific types, do so

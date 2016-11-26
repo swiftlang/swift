@@ -5,5 +5,5 @@
 // See https://swift.org/LICENSE.txt for license information
 // See https://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
 
-// RUN: not --crash %target-swift-frontend %s -parse
-func a<b{enum c:b
+// RUN: not %target-swift-frontend %s -parse
+func b<f{typealias f:f.a{func x(n:f.d

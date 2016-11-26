@@ -5,5 +5,5 @@
 // See https://swift.org/LICENSE.txt for license information
 // See https://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
 
-// RUN: not --crash %target-swift-frontend %s -emit-ir
-func b<a{let:a=.A
+// RUN: not %target-swift-frontend %s -parse
+class A{class S<T>func b<T{class A:S<T>
