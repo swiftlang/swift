@@ -1190,29 +1190,6 @@ static bool findGenericSubstitutions(DeclContext *dc, Type paramType,
     }
   };
   
-  // If paramType contains any substitutions already, find them and add them
-  // to our list before matching the two types to find more.
-  paramType.findIf([&](Type type) -> bool {
-    if (auto substitution = dyn_cast<SubstitutedType>(type.getPointer())) {
-      Type original = substitution->getOriginal();
-      if (dc && dc->getGenericParamsOfContext() && original->isTypeParameter())
-        original = ArchetypeBuilder::mapTypeIntoContext(dc, original);
-      
-      Type replacement = substitution->getReplacementType();
-      // If the replacement is itself an archetype, then the constraint
-      // system was asserting equivalencies between different levels of
-      // generics, rather than binding a generic to a concrete type (and we
-      // don't/won't have a concrete type). In which case, it is the
-      // replacement we are interested in, since it is the one in our current
-      // context. That generic type should equal itself.
-      if (auto ourGeneric = replacement->getAs<ArchetypeType>())
-        archetypesMap[ourGeneric] = replacement;
-      else if (auto archetype = original->getAs<ArchetypeType>())
-        archetypesMap[archetype] = replacement;
-    }
-    return false;
-  });
-  
   GenericVisitor visitor(dc, archetypesMap);
   return visitor.match(paramType, actualArgType);
 }
@@ -1332,6 +1309,28 @@ CalleeCandidateInfo::evaluateCloseness(DeclContext *dc, Type candArgListType,
         // against the type contained therein.
         if (paramType->is<InOutType>() && argType->is<LValueType>())
           matchType = matchType->getInOutObjectType();
+
+        matchType.findIf([&](Type type) -> bool {
+          if (auto substitution = dyn_cast<SubstitutedType>(type.getPointer())) {
+            Type original = substitution->getOriginal();
+            if (dc && dc->getGenericParamsOfContext() && original->isTypeParameter())
+              original = ArchetypeBuilder::mapTypeIntoContext(dc, original);
+            
+            Type replacement = substitution->getReplacementType();
+            // If the replacement is itself an archetype, then the constraint
+            // system was asserting equivalencies between different levels of
+            // generics, rather than binding a generic to a concrete type (and we
+            // don't/won't have a concrete type). In which case, it is the
+            // replacement we are interested in, since it is the one in our current
+            // context. That generic type should equal itself.
+            if (auto ourGeneric = replacement->getAs<ArchetypeType>())
+              archetypesMap[ourGeneric] = replacement;
+            else if (auto archetype = original->getAs<ArchetypeType>())
+              archetypesMap[archetype] = replacement;
+          }
+          return false;
+        });
+
         matched = findGenericSubstitutions(dc, matchType, rArgType,
                                            archetypesMap);
       }
