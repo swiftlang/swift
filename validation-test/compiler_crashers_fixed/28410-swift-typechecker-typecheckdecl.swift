@@ -5,8 +5,9 @@
 // See https://swift.org/LICENSE.txt for license information
 // See https://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
 
-// RUN: not --crash %target-swift-frontend %s -emit-ir
-func b<T{
-typealias e=b>typealias e:T.a
-class A{
-let c=e
+// RUN: not %target-swift-frontend %s -parse
+// REQUIRES: asserts
+func g<a{{}associatedtype B<T
+struct A{let f:e
+}
+typealias e:T

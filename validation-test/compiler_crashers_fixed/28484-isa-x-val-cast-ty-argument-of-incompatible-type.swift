@@ -5,6 +5,6 @@
 // See https://swift.org/LICENSE.txt for license information
 // See https://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
 
-// RUN: not --crash %target-swift-frontend %s -parse
+// RUN: not %target-swift-frontend %s -emit-ir
 // REQUIRES: asserts
-func a<T{class a<T>o{a<T>(
+func g<T{struct B:a<T>.o)class a<T>:a

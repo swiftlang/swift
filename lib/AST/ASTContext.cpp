@@ -1112,7 +1112,6 @@ Optional<ArrayRef<Substitution>>
 ASTContext::createTrivialSubstitutions(BoundGenericType *BGT,
                                        DeclContext *gpContext) const {
   assert(gpContext && "No generic parameter context");
-  assert(BGT->isCanonical() && "Requesting non-canonical substitutions");
   assert(gpContext->isValidGenericContext() &&
          "Not type-checked yet");
   assert(BGT->getGenericArgs().size() == 1);
@@ -1129,7 +1128,6 @@ ASTContext::getSubstitutions(TypeBase *type,
                              DeclContext *gpContext) const {
   assert(gpContext && "Missing generic parameter context");
   auto arena = getArena(type->getRecursiveProperties());
-  assert(type->isCanonical() && "Requesting non-canonical substitutions");
   auto &boundGenericSubstitutions
     = Impl.getArena(arena).BoundGenericSubstitutions;
   auto known = boundGenericSubstitutions.find({type, gpContext});
@@ -1151,7 +1149,6 @@ void ASTContext::setSubstitutions(TypeBase* type,
   auto arena = getArena(type->getRecursiveProperties());
   auto &boundGenericSubstitutions
     = Impl.getArena(arena).BoundGenericSubstitutions;
-  assert(type->isCanonical() && "Requesting non-canonical substitutions");
   assert(boundGenericSubstitutions.count({type, gpContext}) == 0 &&
          "Already have substitutions?");
   boundGenericSubstitutions[{type, gpContext}] = Subs;
