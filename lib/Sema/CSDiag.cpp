@@ -3399,7 +3399,7 @@ typeCheckChildIndependently(Expr *subExpr, Type convertType,
 
     // Replace archetypes and type parameters with UnresolvedType.
     if (convertType->hasTypeVariable() || convertType->hasArchetype() ||
-        convertType->isTypeParameter())
+        convertType->hasTypeParameter())
       convertType = replaceArchetypesAndTypeVarsWithUnresolved(convertType);
     
     // If the conversion type contains no info, drop it.
