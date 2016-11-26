@@ -1310,10 +1310,14 @@ bool swift::fixItOverrideDeclarationTypes(TypeChecker &TC,
       });
     }
     if (auto *method = dyn_cast<FuncDecl>(decl)) {
-      auto *baseMethod = cast<FuncDecl>(base);
       auto resultType = ArchetypeBuilder::mapTypeIntoContext(
+          method, method->getResultInterfaceType());
+
+      auto *baseMethod = cast<FuncDecl>(base);
+      auto baseResultType = ArchetypeBuilder::mapTypeIntoContext(
           baseMethod, baseMethod->getResultInterfaceType());
-      fixedAny |= checkType(method->getBodyResultType(), resultType,
+
+      fixedAny |= checkType(resultType, baseResultType,
                             method->getBodyResultTypeLoc().getSourceRange());
     }
     return fixedAny;

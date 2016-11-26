@@ -443,7 +443,6 @@ static FuncDecl *makeEnumRawValueGetter(ClangImporter::Implementation &Impl,
   getterDecl->setType(type);
   getterDecl->setInterfaceType(type);
 
-  getterDecl->setBodyResultType(enumDecl->getRawType());
   getterDecl->setAccessibility(Accessibility::Public);
 
   rawValueDecl->makeComputed(SourceLoc(), getterDecl, nullptr, nullptr,
@@ -508,7 +507,6 @@ static FuncDecl *makeNewtypeBridgedRawValueGetter(
   getterDecl->setType(type);
   getterDecl->setInterfaceType(type);
 
-  getterDecl->setBodyResultType(computedType);
   getterDecl->setAccessibility(Accessibility::Public);
 
   computedVar->makeComputed(SourceLoc(), getterDecl, nullptr, nullptr,
@@ -559,7 +557,6 @@ static FuncDecl *makeFieldGetterDecl(ClangImporter::Implementation &Impl,
   getterDecl->setType(type);
   getterDecl->setInterfaceType(type);
 
-  getterDecl->setBodyResultType(getterType);
 
   return getterDecl;
 }
@@ -596,7 +593,6 @@ static FuncDecl *makeFieldSetterDecl(ClangImporter::Implementation &Impl,
   setterDecl->setType(type);
   setterDecl->setInterfaceType(type);
 
-  setterDecl->setBodyResultType(voidTy);
   setterDecl->setAccessibility(Accessibility::Public);
   setterDecl->setMutating();
 
@@ -1288,7 +1284,6 @@ static FuncDecl *buildSubscriptGetterDecl(ClangImporter::Implementation &Impl,
       /*AccessorKeywordLoc=*/SourceLoc(),
       /*GenericParams=*/nullptr, getterArgs, getterType,
       TypeLoc::withoutLoc(elementTy), dc, getter->getClangNode());
-  thunk->setBodyResultType(elementTy);
   thunk->setInterfaceType(interfaceType);
   thunk->setGenericEnvironment(dc->getGenericEnvironmentOfContext());
 
@@ -1351,7 +1346,6 @@ static FuncDecl *buildSubscriptSetterDecl(ClangImporter::Implementation &Impl,
       /*AccessorKeywordLoc=*/SourceLoc(),
       /*GenericParams=*/nullptr, setterArgs, setterType,
       TypeLoc::withoutLoc(TupleType::getEmpty(C)), dc, setter->getClangNode());
-  thunk->setBodyResultType(TupleType::getEmpty(C));
   thunk->setInterfaceType(interfaceType);
   thunk->setGenericEnvironment(dc->getGenericEnvironmentOfContext());
 
@@ -1529,7 +1523,6 @@ static bool addErrorDomain(NominalTypeDecl *swiftDecl,
 
   getterDecl->setImplicit();
   getterDecl->setStatic(isStatic);
-  getterDecl->setBodyResultType(stringTy);
   getterDecl->setAccessibility(Accessibility::Public);
 
   auto ret = new (C) ReturnStmt(SourceLoc(), domainDeclRef);
@@ -2915,7 +2908,6 @@ namespace {
           TypeLoc::withoutLoc(resultTy), dc, decl);
 
       result->setInterfaceType(type);
-      result->setBodyResultType(resultTy);
 
       // Someday, maybe this will need to be 'open' for C++ virtual methods.
       result->setAccessibility(Accessibility::Public);
@@ -3318,7 +3310,6 @@ namespace {
       std::tie(type, interfaceType)
         = getGenericMethodType(dc, type->castTo<AnyFunctionType>());
 
-      result->setBodyResultType(resultTy);
       result->setType(type);
       result->setInterfaceType(interfaceType);
       result->setGenericEnvironment(dc->getGenericEnvironmentOfContext());
@@ -4787,7 +4778,6 @@ Decl *SwiftDeclConverter::importGlobalAsMethod(const clang::FunctionDecl *decl,
   result->setInterfaceType(interfaceType);
   result->setGenericEnvironment(dc->getGenericEnvironmentOfContext());
 
-  result->setBodyResultType(swiftResultTy);
   result->setAccessibility(Accessibility::Public);
   if (selfIsInOut)
     result->setMutating();
@@ -7083,7 +7073,6 @@ ClangImporter::Implementation::createConstant(Identifier name, DeclContext *dc,
                      getterType, TypeLoc::withoutLoc(type), dc);
   func->setStatic(isStatic);
   func->setInterfaceType(getterType);
-  func->setBodyResultType(type);
   func->setAccessibility(getOverridableAccessibility(dc));
 
   // If we're not done type checking, build the getter body.

@@ -14,6 +14,7 @@
 #define SWIFT_AST_ANY_FUNCTION_REF_H
 
 #include "swift/Basic/LLVM.h"
+#include "swift/AST/ArchetypeBuilder.h"
 #include "swift/AST/Decl.h"
 #include "swift/AST/Expr.h"
 #include "swift/AST/Types.h"
@@ -78,7 +79,7 @@ public:
       return AFD->getType();
     return TheFunction.get<AbstractClosureExpr *>()->getType();
   }
-  
+
   /// FIXME: This should just be getType() when interface types take over in
   /// the AST.
   Type getInterfaceType() const {
@@ -90,7 +91,8 @@ public:
   Type getBodyResultType() const {
     if (auto *AFD = TheFunction.dyn_cast<AbstractFunctionDecl *>()) {
       if (auto *FD = dyn_cast<FuncDecl>(AFD))
-        return FD->getBodyResultType();
+        return ArchetypeBuilder::mapTypeIntoContext(
+            FD, FD->getResultInterfaceType());
       return TupleType::getEmpty(AFD->getASTContext());
     }
     return TheFunction.get<AbstractClosureExpr *>()->getResultType();

@@ -140,7 +140,6 @@ FuncDecl *DerivedConformance::declareDerivedPropertyGetter(TypeChecker &tc,
   else
     type = FunctionType::get(selfType, type);
   getterDecl->setType(type);
-  getterDecl->setBodyResultType(propertyContextType);
 
   // Compute the interface type of the getter.
   Type interfaceType = FunctionType::get(TupleType::getEmpty(C),

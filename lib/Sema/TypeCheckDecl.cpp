@@ -4399,7 +4399,6 @@ public:
     if (!funcTy) {
       funcTy = TupleType::getEmpty(TC.Context);
     }
-    auto bodyResultType = funcTy;
 
     // Form the function type by building the curried function type
     // from the back to the front, "prepending" each of the parameter
@@ -4440,7 +4439,6 @@ public:
       }
     }
     FD->setType(funcTy);
-    FD->setBodyResultType(bodyResultType);
 
     return false;
   }

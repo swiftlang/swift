@@ -1399,7 +1399,6 @@ void TypeChecker::completePropertyBehaviorParameter(VarDecl *VD,
   Parameter->setImplicit();
   Parameter->setAccessibility(Accessibility::Private);
   Parameter->setIsBeingTypeChecked();
-  Parameter->setBodyResultType(SubstBodyResultTy);
 
   // Recontextualize any closure declcontexts nested in the initializer to
   // realize that they are in the parameter function.

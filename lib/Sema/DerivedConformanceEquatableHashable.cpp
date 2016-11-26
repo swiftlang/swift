@@ -418,8 +418,7 @@ deriveHashable_enum_hashValue(TypeChecker &tc, Decl *parentDecl,
   else
     type = FunctionType::get(selfType, methodType);
   getterDecl->setType(type);
-  getterDecl->setBodyResultType(intType);
-  
+
   // Compute the interface type of hashValue().
   Type interfaceType;
   Type selfIfaceType = getterDecl->computeInterfaceSelfType(false);
