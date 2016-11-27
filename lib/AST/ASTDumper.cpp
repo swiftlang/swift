@@ -514,7 +514,8 @@ namespace {
       if (GenericTypeDecl *GTD = dyn_cast<GenericTypeDecl>(VD))
         printGenericParameters(OS, GTD->getGenericParams());
 
-      if (!VD->hasType() || !VD->getType()->is<PolymorphicFunctionType>()) {
+      if (!isa<AbstractFunctionDecl>(VD) &&
+          !isa<EnumElementDecl>(VD)) {
         OS << " type='";
         if (VD->hasType())
           VD->getType().print(OS);
@@ -523,9 +524,7 @@ namespace {
         OS << '\'';
       }
 
-      if (VD->hasInterfaceType() &&
-          (!VD->hasType() ||
-           VD->getInterfaceType().getPointer() != VD->getType().getPointer())) {
+      if (VD->hasInterfaceType()) {
         OS << " interface type='";
         VD->getInterfaceType()->getCanonicalType().print(OS);
         OS << '\'';

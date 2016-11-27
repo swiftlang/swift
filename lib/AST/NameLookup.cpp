@@ -173,7 +173,7 @@ bool swift::removeShadowedDecls(SmallVectorImpl<ValueDecl*> &decls,
     if (decl->isBeingTypeChecked())
       continue;
 
-    signature = decl->getType()->getCanonicalType();
+    signature = decl->getInterfaceType()->getCanonicalType();
 
     // FIXME: The type of a variable or subscript doesn't include
     // enough context to distinguish entities from different
