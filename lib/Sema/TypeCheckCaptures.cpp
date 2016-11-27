@@ -173,7 +173,7 @@ public:
 
     // Visit the type of the capture, if it isn't a class reference, since
     // we'd need the metadata to do so.
-    if (VD->hasType()
+    if (VD->hasInterfaceType()
         && (!AFR.isObjC()
             || isa<AbstractFunctionDecl>(VD)
             || !VD->getType()->hasRetainablePointerRepresentation()))
@@ -181,7 +181,7 @@ public:
 
     // If VD is a noescape decl, then the closure we're computing this for
     // must also be noescape.
-    if (VD->hasType() &&
+    if (VD->hasInterfaceType() &&
         VD->getInterfaceType()->is<AnyFunctionType>() &&
         VD->getInterfaceType()->castTo<AnyFunctionType>()->isNoEscape() &&
         !capture.isNoEscape() &&

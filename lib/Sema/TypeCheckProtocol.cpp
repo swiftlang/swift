@@ -1372,7 +1372,7 @@ bool WitnessChecker::findBestWitness(
       continue;
     }
 
-    if (!witness->hasType())
+    if (!witness->hasInterfaceType())
       TC.validateDecl(witness, true);
 
     auto match = matchWitness(TC, Proto, conformance, DC,
@@ -3027,7 +3027,7 @@ static Type mapErrorTypeToOriginal(Type type) {
 static Type getWitnessTypeForMatching(TypeChecker &tc,
                                       NormalProtocolConformance *conformance,
                                       ValueDecl *witness) {
-  if (!witness->hasType()) {
+  if (!witness->hasInterfaceType()) {
     // Don't cause a recursive type-check of the witness.
     // FIXME: We shouldn't need this.
     if (witness->isBeingTypeChecked())
@@ -3971,7 +3971,7 @@ void ConformanceChecker::resolveSingleWitness(ValueDecl *requirement) {
   SWIFT_DEFER { ResolvingWitnesses.erase(requirement); };
 
   // Make sure we've validated the requirement.
-  if (!requirement->hasType())
+  if (!requirement->hasInterfaceType())
     TC.validateDecl(requirement, true);
 
   if (requirement->isInvalid()) {
@@ -4224,7 +4224,7 @@ void ConformanceChecker::checkConformance() {
     }
 
     // Make sure we've validated the requirement.
-    if (!requirement->hasType())
+    if (!requirement->hasInterfaceType())
       TC.validateDecl(requirement, true);
 
     if (requirement->isInvalid()) {

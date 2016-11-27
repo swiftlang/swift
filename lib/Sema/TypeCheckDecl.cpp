@@ -868,7 +868,7 @@ static void checkRedeclaration(TypeChecker &tc, ValueDecl *current) {
     return;
 
   // If there's no type yet, come back to it later.
-  if (!current->hasType())
+  if (!current->hasInterfaceType())
     return;
   
   // Make sure we don't do this checking again.
@@ -930,7 +930,7 @@ static void checkRedeclaration(TypeChecker &tc, ValueDecl *current) {
 
     // Validate the declaration.
     tc.validateDecl(other);
-    if (other->isInvalid() || !other->hasType())
+    if (other->isInvalid() || !other->hasInterfaceType())
       continue;
 
     // Skip declarations in other files.
@@ -943,7 +943,9 @@ static void checkRedeclaration(TypeChecker &tc, ValueDecl *current) {
 
     const auto markInvalid = [&current, &tc]() {
       current->setInvalid();
-      if (current->hasType())
+      if (!isa<AbstractFunctionDecl>(current) &&
+          !isa<EnumElementDecl>(current))
+        if (current->hasType())
           current->overwriteType(ErrorType::get(tc.Context));
       if (current->hasInterfaceType())
         current->setInterfaceType(ErrorType::get(tc.Context));
@@ -4776,7 +4778,7 @@ public:
     TC.checkDeclAttributesEarly(FD);
     TC.computeAccessibility(FD);
 
-    if (FD->hasType())
+    if (FD->hasInterfaceType())
       return;
 
     // Bind operator functions to the corresponding operator declaration.
@@ -6238,7 +6240,7 @@ public:
       checkAccessibility(TC, EED);
       return;
     }
-    if (EED->hasType())
+    if (EED->hasInterfaceType())
       return;
     
     if (EED->isBeingTypeChecked()) {
@@ -6303,7 +6305,7 @@ public:
 
       // Now that we have an argument type we can set the element's declared
       // type.
-      if (!EED->hasType() && !EED->computeType())
+      if (!EED->hasInterfaceType() && !EED->computeType())
         return;
     }
 
@@ -6418,7 +6420,7 @@ public:
       checkAccessibility(TC, CD);
       return;
     }
-    if (CD->hasType())
+    if (CD->hasInterfaceType())
       return;
 
     TC.checkDeclAttributesEarly(CD);
@@ -6641,7 +6643,7 @@ public:
         TC.definedFunctions.push_back(DD);
     }
 
-    if (IsSecondPass || DD->hasType()) {
+    if (IsSecondPass || DD->hasInterfaceType()) {
       return;
     }
 
@@ -7329,7 +7331,7 @@ void TypeChecker::validateDecl(ValueDecl *D, bool resolveTypeParams) {
   }
       
   case DeclKind::Func: {
-    if (D->hasType())
+    if (D->hasInterfaceType())
       return;
     typeCheckDecl(D, true);
     break;
@@ -7337,14 +7339,14 @@ void TypeChecker::validateDecl(ValueDecl *D, bool resolveTypeParams) {
 
   case DeclKind::Subscript:
   case DeclKind::Constructor:
-    if (D->hasType())
+    if (D->hasInterfaceType())
       return;
     typeCheckDecl(D, true);
     break;
 
   case DeclKind::Destructor:
   case DeclKind::EnumElement: {
-    if (D->hasType())
+    if (D->hasInterfaceType())
       return;
     if (auto container = dyn_cast<NominalTypeDecl>(D->getDeclContext())) {
       validateDecl(container);
@@ -7357,7 +7359,7 @@ void TypeChecker::validateDecl(ValueDecl *D, bool resolveTypeParams) {
   }
   }
 
-  assert(D->hasType());
+  assert(D->hasInterfaceType());
 }
 
 

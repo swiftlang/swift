@@ -509,7 +509,7 @@ TypeChecker::validateGenericFuncSignature(AbstractFunctionDecl *func) {
 
   // If this triggered a recursive validation, back out: we're done.
   // FIXME: This is an awful hack.
-  if (func->hasType())
+  if (func->hasInterfaceType())
     return nullptr;
 
   // Finalize the generic requirements.
