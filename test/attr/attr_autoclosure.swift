@@ -6,7 +6,7 @@
 // Simple case.
 var fn : @autoclosure () -> Int = 4  // expected-error {{@autoclosure may only be used on parameters}}  expected-error {{cannot convert value of type 'Int' to specified type '() -> Int'}}
 
-@autoclosure func func1() {}  // expected-error {{@autoclosure may only be used on 'parameter' declarations}}
+@autoclosure func func1() {}  // expected-error {{@autoclosure may only be used on parameters}}
 
 func func1a(_ v1 : @autoclosure Int) {} // expected-error {{@autoclosure attribute only applies to function types}}
 
@@ -27,14 +27,14 @@ let migrate4 : (@autoclosure() -> ()) -> ()
 
 
 struct SomeStruct {
-  @autoclosure let property : () -> Int  // expected-error {{@autoclosure may only be used on 'parameter' declarations}} {{3-16=}}
+  @autoclosure let property : () -> Int  // expected-error {{@autoclosure may only be used on parameters}} {{3-16=}}
 
   init() {
   }
 }
 
 class BaseClass {
-  @autoclosure var property : () -> Int // expected-error {{@autoclosure may only be used on 'parameter' declarations}} {{3-16=}}
+  @autoclosure var property : () -> Int // expected-error {{@autoclosure may only be used on parameters}} {{3-16=}}
   init() {}
 }
 
@@ -66,7 +66,7 @@ struct S : P2 {
 
 
 struct AutoclosureEscapeTest {
-  @autoclosure let delayed: () -> Int  // expected-error {{@autoclosure may only be used on 'parameter' declarations}} {{3-16=}}
+  @autoclosure let delayed: () -> Int  // expected-error {{@autoclosure may only be used on parameters}} {{3-16=}}
 }
 
 // @autoclosure(escaping)

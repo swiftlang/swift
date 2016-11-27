@@ -38,7 +38,7 @@ public:
   /// This emits a diagnostic with a fixit to remove the attribute.
   template<typename ...ArgTypes>
   void diagnoseAndRemoveAttr(DeclAttribute *attr, ArgTypes &&...Args) {
-    TC.diagnose(attr->getLocation(), std::forward<ArgTypes>(Args)...)
+    TC.diagnose(attr->getRangeWithAt().Start, std::forward<ArgTypes>(Args)...)
       .fixItRemove(attr->getRangeWithAt());
     attr->setInvalid();
   }
@@ -655,14 +655,14 @@ void TypeChecker::checkDeclAttributesEarly(Decl *D) {
     case DeclAttribute::OnProtocol:
       OnlyKind = "protocol";
       break;
-    case DeclAttribute::OnParam:
-      OnlyKind = "parameter";
-      break;
     default:
       break;
     }
 
-    if (!OnlyKind.empty())
+    if (PossibleDeclKinds == DeclAttribute::OnParam)
+      Checker.diagnoseAndRemoveAttr(attr, diag::attr_only_on_parameters,
+                                    "@" + attr->getAttrName().str());
+    else if (!OnlyKind.empty())
       Checker.diagnoseAndRemoveAttr(attr, diag::attr_only_one_decl_kind,
                                     attr, OnlyKind);
     else if (attr->isDeclModifier())
@@ -1527,29 +1527,6 @@ void TypeChecker::checkDeclAttributes(Decl *D) {
   for (auto attr : D->getAttrs()) {
     if (attr->isValid())
       Checker.visit(attr);
-  }
-}
-
-void TypeChecker::checkTypeModifyingDeclAttributes(VarDecl *var) {
-  if (auto *attr = var->getAttrs().getAttribute<OwnershipAttr>())
-    checkOwnershipAttr(var, attr);
-  if (auto *attr = var->getAttrs().getAttribute<AutoClosureAttr>()) {
-    if (auto *pd = dyn_cast<ParamDecl>(var))
-      checkAutoClosureAttr(pd, attr);
-    else {
-      AttributeEarlyChecker Checker(*this, var);
-      Checker.diagnoseAndRemoveAttr(attr, diag::attr_only_one_decl_kind,
-                                    attr, "parameter");
-    }
-  }
-  if (auto *attr = var->getAttrs().getAttribute<NoEscapeAttr>()) {
-    if (auto *pd = dyn_cast<ParamDecl>(var))
-      checkNoEscapeAttr(pd, attr);
-    else {
-      AttributeEarlyChecker Checker(*this, var);
-      Checker.diagnoseAndRemoveAttr(attr, diag::attr_only_one_decl_kind,
-                                    attr, "parameter");
-    }
   }
 }
 

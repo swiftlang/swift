@@ -1095,11 +1095,6 @@ static void validatePatternBindingDecl(TypeChecker &tc,
     }
   }
 
-  // If we have any type-adjusting attributes, apply them here.
-  if (binding->getPattern(entryNumber)->hasType())
-    if (auto var = binding->getSingleVar())
-      tc.checkTypeModifyingDeclAttributes(var);
-
   // If we're in a generic type context, provide interface types for all of
   // the variables.
   {
@@ -3686,10 +3681,6 @@ public:
             !PBD->getInit(i) &&
             PBD->getPattern(i)->hasStorage() &&
             !PBD->getPattern(i)->getType()->hasError()) {
-
-          // If we have a type-adjusting attribute (like ownership), apply it now.
-          if (auto var = PBD->getSingleVar())
-            TC.checkTypeModifyingDeclAttributes(var);
 
           // Decide whether we should suppress default initialization.
           if (isNeverDefaultInitializable(PBD->getPattern(i)))
