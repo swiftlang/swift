@@ -144,7 +144,9 @@ Type ParameterList::getInterfaceType(DeclContext *DC) const {
     assert(P->hasType());
 
     Type type;
-    if (P->hasInterfaceType())
+    // FIXME: Awful predicate because hasInterfaceType() now always
+    // returns true on ParamDecls.
+    if (!P->getInterfaceType()->hasArchetype())
       type = P->getInterfaceType();
     else if (!P->getTypeLoc().hasLocation())
       type = ArchetypeBuilder::mapTypeOutOfContext(DC, P->getType());
