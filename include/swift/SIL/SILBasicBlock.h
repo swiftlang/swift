@@ -317,8 +317,9 @@ namespace llvm {
 //===----------------------------------------------------------------------===//
 
 template <>
-struct ilist_traits<::swift::SILBasicBlock> :
-public ilist_default_traits<::swift::SILBasicBlock> {
+struct ilist_traits<::swift::SILBasicBlock>
+  : ilist_default_traits<::swift::SILBasicBlock> {
+
   using SelfTy = ilist_traits<::swift::SILBasicBlock>;
   using SILBasicBlock = ::swift::SILBasicBlock;
   using SILFunction = ::swift::SILFunction;
