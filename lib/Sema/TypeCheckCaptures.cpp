@@ -127,14 +127,27 @@ public:
     // Perhaps this entire analysis should happen at the SILGen level,
     // instead, but even there we don't really have enough information to
     // perform it accurately.
-    if (type->hasArchetype()) {
+    if (type->hasArchetype() || type->hasTypeParameter()) {
       type.walk(TypeCaptureWalker(AFR, [&](Type t) {
-        if (t->is<ArchetypeType>() &&
+        if ((t->is<ArchetypeType>() ||
+             t->is<GenericTypeParamType>()) &&
             !t->isOpenedExistential() &&
-          GenericParamCaptureLoc.isInvalid()) {
+            GenericParamCaptureLoc.isInvalid()) {
           GenericParamCaptureLoc = loc;
         }
       }));
+    }
+
+    if (auto *gft = type->getAs<GenericFunctionType>()) {
+      TypeCaptureWalker walker(AFR, [&](Type t) {
+        if (t->is<GenericTypeParamType>() &&
+            GenericParamCaptureLoc.isInvalid()) {
+          GenericParamCaptureLoc = loc;
+        }
+      });
+
+      gft->getInput().walk(walker);
+      gft->getResult().walk(walker);
     }
   }
 
@@ -162,13 +175,15 @@ public:
     // we'd need the metadata to do so.
     if (VD->hasType()
         && (!AFR.isObjC()
+            || isa<AbstractFunctionDecl>(VD)
             || !VD->getType()->hasRetainablePointerRepresentation()))
-      checkType(VD->getType(), VD->getLoc());
+      checkType(VD->getInterfaceType(), VD->getLoc());
 
     // If VD is a noescape decl, then the closure we're computing this for
     // must also be noescape.
-    if (VD->hasType() && VD->getType()->is<AnyFunctionType>() &&
-        VD->getType()->castTo<AnyFunctionType>()->isNoEscape() &&
+    if (VD->hasType() &&
+        VD->getInterfaceType()->is<AnyFunctionType>() &&
+        VD->getInterfaceType()->castTo<AnyFunctionType>()->isNoEscape() &&
         !capture.isNoEscape() &&
         // Don't repeatedly diagnose the same thing.
         Diagnosed.insert(VD).second) {
@@ -183,7 +198,7 @@ public:
       // If we're a parameter, emit a helpful fixit to add @escaping
       auto paramDecl = dyn_cast<ParamDecl>(VD);
       bool isAutoClosure =
-          VD->getType()->castTo<AnyFunctionType>()->isAutoClosure();
+          VD->getInterfaceType()->castTo<AnyFunctionType>()->isAutoClosure();
       if (paramDecl && !isAutoClosure) {
         TC.diagnose(paramDecl->getStartLoc(), diag::noescape_parameter,
                     paramDecl->getName())
@@ -667,7 +682,7 @@ void TypeChecker::computeCaptures(AnyFunctionRef AFR) {
   }
 
   if (AFR.hasType() && !AFR.isObjC()) {
-    finder.checkType(AFR.getType(), AFR.getLoc());
+    finder.checkType(AFR.getInterfaceType(), AFR.getLoc());
   }
 
   // If this is an init(), explicitly walk the initializer values for members of
