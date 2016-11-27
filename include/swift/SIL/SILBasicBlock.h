@@ -124,7 +124,7 @@ public:
   }
 
   const TermInst *getTerminator() const {
-    return const_cast<SILBasicBlock*>(this)->getTerminator();
+    return const_cast<SILBasicBlock *>(this)->getTerminator();
   }
 
   /// \brief Splits a basic block into two at the specified instruction.
@@ -271,7 +271,7 @@ public:
   }
 
   const SILBasicBlock *getSinglePredecessor() const {
-    return const_cast<SILBasicBlock*>(this)->getSinglePredecessor();
+    return const_cast<SILBasicBlock *>(this)->getSinglePredecessor();
   }
 
   /// Pretty-print the SILBasicBlock.
@@ -319,7 +319,6 @@ namespace llvm {
 template <>
 struct ilist_traits<::swift::SILBasicBlock>
   : ilist_default_traits<::swift::SILBasicBlock> {
-
   using SelfTy = ilist_traits<::swift::SILBasicBlock>;
   using SILBasicBlock = ::swift::SILBasicBlock;
   using SILFunction = ::swift::SILFunction;
@@ -332,19 +331,17 @@ private:
   SILFunction *Parent;
 
 public:
-
   SILBasicBlock *createSentinel() const {
-    return static_cast<SILBasicBlock*>(&Sentinel);
+    return static_cast<SILBasicBlock *>(&Sentinel);
   }
   void destroySentinel(SILBasicBlock *) const {}
 
   SILBasicBlock *provideInitialHead() const { return createSentinel(); }
-  SILBasicBlock *ensureHead(SILBasicBlock*) const { return createSentinel(); }
-  static void noteHead(SILBasicBlock*, SILBasicBlock*) {}
+  SILBasicBlock *ensureHead(SILBasicBlock *) const { return createSentinel(); }
+  static void noteHead(SILBasicBlock *, SILBasicBlock *) {}
   static void deleteNode(SILBasicBlock *BB) { BB->~SILBasicBlock(); }
 
-  void addNodeToList(SILBasicBlock *BB) {
-  }
+  void addNodeToList(SILBasicBlock *BB) {}
 
   void transferNodesFromList(ilist_traits<SILBasicBlock> &SrcTraits,
                              ilist_iterator<SILBasicBlock> First,
