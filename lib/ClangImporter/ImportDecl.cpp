@@ -1459,7 +1459,7 @@ static void inferProtocolMemberAvailability(ClangImporter::Implementation &impl,
     return;
 
   AvailabilityContext requiredRange =
-      AvailabilityInference::inferForType(valueDecl->getType());
+      AvailabilityInference::inferForType(valueDecl->getInterfaceType());
 
   ASTContext &C = impl.SwiftContext;
 
@@ -5284,7 +5284,7 @@ ConstructorDecl *SwiftDeclConverter::importConstructor(
     // If the types don't match, this is a different constructor with
     // the same selector. This can happen when an overlay overloads an
     // existing selector with a Swift-only signature.
-    Type ctorParamType = ctor->getType()
+    Type ctorParamType = ctor->getInterfaceType()
                              ->castTo<AnyFunctionType>()
                              ->getResult()
                              ->castTo<AnyFunctionType>()
@@ -5648,11 +5648,8 @@ SwiftDeclConverter::importSubscript(Decl *decl,
                        ->getResult()
                        ->castTo<AnyFunctionType>()
                        ->getResult();
-  auto elementContextTy = getter->getType()
-                              ->castTo<AnyFunctionType>()
-                              ->getResult()
-                              ->castTo<AnyFunctionType>()
-                              ->getResult();
+  auto elementContextTy = ArchetypeBuilder::mapTypeIntoContext(
+      getter, elementTy);
 
   // Local function to mark the setter unavailable.
   auto makeSetterUnavailable = [&] {
