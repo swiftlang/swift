@@ -1140,7 +1140,28 @@ static int compareDependentTypes(ArchetypeBuilder::PotentialArchetype * const* p
     return -1;
   }
 
+  // A resolved archetype is always ordered before an unresolved one.
   if (b->getResolvedAssociatedType())
+    return +1;
+
+  // Make sure typealiases are properly ordered, to avoid crashers.
+  // FIXME: Ideally we would eliminate typealiases earlier.
+  if (auto *aa = a->getTypeAliasDecl()) {
+    if (auto *ab = b->getTypeAliasDecl()) {
+      // - by protocol, so t_n_m.`P.T` < t_n_m.`Q.T` (given P < Q)
+      auto protoa = aa->getDeclContext()->getAsProtocolOrProtocolExtensionContext();
+      auto protob = ab->getDeclContext()->getAsProtocolOrProtocolExtensionContext();
+      if (int compareProtocols
+            = ProtocolType::compareProtocols(&protoa, &protob))
+        return compareProtocols;
+    }
+
+    // A resolved archetype is always ordered before an unresolved one.
+    return -1;
+  }
+
+  // A resolved archetype is always ordered before an unresolved one.
+  if (b->getTypeAliasDecl())
     return +1;
 
   // Along the error path where one or both of the potential archetypes was
