@@ -216,9 +216,7 @@ public:
   }
 
   const SILBasicBlock *getSingleSuccessor() const {
-    if (succ_empty() || std::next(succ_begin()) != succ_end())
-      return nullptr;
-    return *succ_begin();
+    return const_cast<SILBasicBlock *>(this)->getSingleSuccessor();
   }
 
   /// \brief Returns true if \p BB is a successor of this block.
