@@ -1650,6 +1650,10 @@ void ValueDecl::setType(Type T) {
 }
 
 void ValueDecl::overwriteType(Type T) {
+  assert(!isa<AbstractFunctionDecl>(this) &&
+         !isa<EnumElementDecl>(this) &&
+         "functions and enum case constructors only have an interface type");
+
   TypeAndAccess.setPointer(T);
   if (!T.isNull() && T->hasError())
     setInvalid();
