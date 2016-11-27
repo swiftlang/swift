@@ -761,12 +761,6 @@ namespace {
       }
     }
 
-    llvm::Value *visitPolymorphicFunctionType(CanPolymorphicFunctionType type) {
-      IGF.unimplemented(SourceLoc(),
-                        "metadata ref for polymorphic function type");
-      return llvm::UndefValue::get(IGF.IGM.TypeMetadataPtrTy);
-    }
-
     llvm::Value *visitGenericFunctionType(CanGenericFunctionType type) {
       IGF.unimplemented(SourceLoc(),
                         "metadata ref for generic function type");

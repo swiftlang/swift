@@ -3061,23 +3061,6 @@ void Serializer::writeType(Type ty) {
     break;
   }
 
-  case TypeKind::PolymorphicFunction: {
-    auto fnTy = cast<PolymorphicFunctionType>(ty.getPointer());
-    const Decl *genericContext = getGenericContext(&fnTy->getGenericParams());
-    DeclID dID = genericContext ? addDeclRef(genericContext) : DeclID();
-
-    unsigned abbrCode = DeclTypeAbbrCodes[PolymorphicFunctionTypeLayout::Code];
-    PolymorphicFunctionTypeLayout::emitRecord(Out, ScratchRecord, abbrCode,
-            addTypeRef(fnTy->getInput()),
-            addTypeRef(fnTy->getResult()),
-            dID,
-            getRawStableFunctionTypeRepresentation(fnTy->getRepresentation()),
-            fnTy->throws());
-    if (!genericContext)
-      writeGenericParams(&fnTy->getGenericParams());
-    break;
-  }
-
   case TypeKind::GenericFunction: {
     auto fnTy = cast<GenericFunctionType>(ty.getPointer());
     unsigned abbrCode = DeclTypeAbbrCodes[GenericFunctionTypeLayout::Code];
@@ -3305,7 +3288,6 @@ void Serializer::writeAllDeclsAndTypes() {
   registerDeclTypeAbbr<SubstitutedTypeLayout>();
   registerDeclTypeAbbr<BoundGenericTypeLayout>();
   registerDeclTypeAbbr<BoundGenericSubstitutionLayout>();
-  registerDeclTypeAbbr<PolymorphicFunctionTypeLayout>();
   registerDeclTypeAbbr<GenericFunctionTypeLayout>();
   registerDeclTypeAbbr<SILBlockStorageTypeLayout>();
   registerDeclTypeAbbr<SILBoxTypeLayout>();

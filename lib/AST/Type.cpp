@@ -139,7 +139,6 @@ bool CanType::isReferenceTypeImpl(CanType type, bool functionsCount) {
 
   // Functions have reference semantics, but are not class references.
   case TypeKind::Function:
-  case TypeKind::PolymorphicFunction:
   case TypeKind::GenericFunction:
   case TypeKind::SILFunction:
     return functionsCount;
@@ -301,8 +300,7 @@ bool TypeBase::isUnspecializedGeneric() {
   case TypeKind::BoundGenericStruct:
     return true;
 
-  case TypeKind::Function:
-  case TypeKind::PolymorphicFunction: {
+  case TypeKind::Function: {
     auto funcTy = cast<AnyFunctionType>(this);
     return funcTy->getInput()->isUnspecializedGeneric() ||
            funcTy->getResult()->isUnspecializedGeneric();
@@ -760,12 +758,6 @@ Type TypeBase::replaceCovariantResultType(Type newResultType,
                                     fnType->getExtInfo());
   }
   
-  if (auto polyFn = dyn_cast<PolymorphicFunctionType>(fnType)) {
-    return PolymorphicFunctionType::get(inputType, resultType,
-                                        &polyFn->getGenericParams(),
-                                        fnType->getExtInfo());
-  }
-  
   return FunctionType::get(inputType, resultType, fnType->getExtInfo());
 }
 
@@ -925,12 +917,6 @@ Type TypeBase::replaceSelfParameterType(Type newSelf) {
                                     input,
                                     fnTy->getResult(),
                                     fnTy->getExtInfo());
-  }
-
-  if (auto polyFnTy = getAs<PolymorphicFunctionType>()) {
-    return PolymorphicFunctionType::get(input,
-                                        fnTy->getResult(),
-                                        &polyFnTy->getGenericParams());
   }
 
   return FunctionType::get(input,
@@ -1185,14 +1171,6 @@ CanType TypeBase::getCanonicalType() {
   case TypeKind::InOut:
     Result = InOutType::get(getInOutObjectType()->getCanonicalType());
     break;
-  case TypeKind::PolymorphicFunction: {
-    PolymorphicFunctionType *FT = cast<PolymorphicFunctionType>(this);
-    Type In = FT->getInput()->getCanonicalType();
-    Type Out = FT->getResult()->getCanonicalType();
-    Result = PolymorphicFunctionType::get(In, Out, &FT->getGenericParams(),
-                                          FT->getExtInfo());
-    break;
-  }
   case TypeKind::GenericFunction: {
     GenericFunctionType *function = cast<GenericFunctionType>(this);
 
@@ -1297,7 +1275,6 @@ TypeBase *TypeBase::getDesugaredType() {
 #include "swift/AST/TypeNodes.def"
   case TypeKind::Tuple:
   case TypeKind::Function:
-  case TypeKind::PolymorphicFunction:
   case TypeKind::GenericFunction:
   case TypeKind::SILBlockStorage:
   case TypeKind::SILBox:
@@ -1524,7 +1501,6 @@ bool TypeBase::isSpelledLike(Type other) {
   case TypeKind::SILFunction:
   case TypeKind::SILBlockStorage:
   case TypeKind::SILBox:
-  case TypeKind::PolymorphicFunction:
   case TypeKind::GenericFunction: {
     // Polymorphic function types should never be explicitly spelled.
     return false;
@@ -2689,11 +2665,6 @@ Type ProtocolCompositionType::get(const ASTContext &C,
   return build(C, CanProtocolTypes);
 }
 
-ArrayRef<GenericTypeParamDecl *>
-PolymorphicFunctionType::getGenericParameters() const {
-  return Params->getParams();
-}
-
 FunctionType *
 GenericFunctionType::substGenericArgs(ArrayRef<Substitution> args) {
   auto params = getGenericParams();
@@ -3390,8 +3361,7 @@ case TypeKind::Id:
                                 Ptr->getASTContext());
   }
 
-  case TypeKind::Function:
-  case TypeKind::PolymorphicFunction: {
+  case TypeKind::Function: {
     auto function = cast<AnyFunctionType>(base);
     auto inputTy = function->getInput().transform(fn);
     if (!inputTy)
@@ -3403,12 +3373,6 @@ case TypeKind::Id:
     if (inputTy.getPointer() == function->getInput().getPointer() &&
         resultTy.getPointer() == function->getResult().getPointer())
       return *this;
-
-    if (auto polyFn = dyn_cast<PolymorphicFunctionType>(function)) {
-      return PolymorphicFunctionType::get(inputTy, resultTy,
-                                          &polyFn->getGenericParams(),
-                                          function->getExtInfo());
-    }
 
     return FunctionType::get(inputTy, resultTy,
                              function->getExtInfo());
@@ -3748,7 +3712,6 @@ bool TypeBase::usesNativeReferenceCounting(ResilienceExpansion resilience) {
 
   case TypeKind::UnboundGeneric:
   case TypeKind::Function:
-  case TypeKind::PolymorphicFunction:
   case TypeKind::GenericFunction:
   case TypeKind::SILFunction:
   case TypeKind::SILBlockStorage:

@@ -805,7 +805,7 @@ struct ASTNodeBase {};
         E->dump(Out);
         abort();
       }
-      if (E->getType()->is<PolymorphicFunctionType>()) {
+      if (E->getType()->is<GenericFunctionType>()) {
         PrettyStackTraceExpr debugStack(Ctx, "verifying decl reference", E);
         Out << "unspecialized reference with polymorphic type "
           << E->getType().getString() << "\n";

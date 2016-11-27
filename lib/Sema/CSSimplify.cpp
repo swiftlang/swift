@@ -1576,7 +1576,6 @@ ConstraintSystem::matchTypes(Type type1, Type type2, ConstraintKind kind,
       return matchFunctionTypes(func1, func2, kind, flags, locator);
     }
 
-    case TypeKind::PolymorphicFunction:
     case TypeKind::GenericFunction:
       llvm_unreachable("Polymorphic function type should have been opened");
 
@@ -2259,9 +2258,6 @@ ConstraintSystem::simplifyConstructionConstraint(
   case TypeKind::Protocol:
     // Break out to handle the actual construction below.
     break;
-
-  case TypeKind::PolymorphicFunction:
-    llvm_unreachable("Polymorphic function type should have been opened");
 
   case TypeKind::UnboundGeneric:
     llvm_unreachable("Unbound generic type should have been opened");

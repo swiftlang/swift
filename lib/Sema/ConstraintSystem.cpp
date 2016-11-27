@@ -361,7 +361,6 @@ namespace {
 
     Type operator()(Type type) {
       // Swift only supports rank-1 polymorphism.
-      assert(!type->is<PolymorphicFunctionType>());
       assert(!type->is<GenericFunctionType>());
 
       // Preserve parens when opening types.

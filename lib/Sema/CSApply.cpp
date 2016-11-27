@@ -6123,8 +6123,6 @@ Expr *ExprRewriter::finishApply(ApplyExpr *apply, Type openedType,
     apply->setType(fnType->getResult());
     apply->setIsSuper(isSuper);
 
-    assert(!apply->getType()->is<PolymorphicFunctionType>() &&
-           "Polymorphic function type slipped through");
     Expr *result = tc.substituteInputSugarTypeForResult(apply);
 
     // Try closing the existential, if there is one.

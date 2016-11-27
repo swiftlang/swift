@@ -2928,13 +2928,6 @@ namespace {
       OS << ")";
     }
 
-    void visitPolymorphicFunctionType(PolymorphicFunctionType *T,
-                                      StringRef label) {
-      printAnyFunctionTypeCommon(T, label, "polymorphic_function_type");
-      // FIXME: generic parameters
-      OS << ")";
-    }
-
     void visitGenericFunctionType(GenericFunctionType *T, StringRef label) {
       printAnyFunctionTypeCommon(T, label, "generic_function_type");
       // FIXME: generic signature dumping needs improvement

@@ -89,9 +89,6 @@ FormalLinkage swift::getTypeLinkage(CanType type) {
     if (auto nominal = type->getAnyNominal())
       result ^= getDeclLinkage(nominal);
 
-    assert(!isa<PolymorphicFunctionType>(type) &&
-           "Don't expect a polymorphic function type here");
-
     return false; // continue searching
   });
 

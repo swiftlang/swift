@@ -944,9 +944,6 @@ void Mangler::mangleType(Type type, unsigned uncurryLevel) {
     return;
   }
 
-  case TypeKind::PolymorphicFunction:
-    llvm_unreachable("should not be mangled");
-
   case TypeKind::SILFunction: {
     // <type> ::= 'XF' <impl-function-type>
     // <impl-function-type> ::= <impl-callee-convention>

@@ -1284,8 +1284,7 @@ IRGenDebugInfo::createFunctionPointer(DebugTypeInfo DbgTy, llvm::DIScope *Scope,
   // FIXME: Handling of generic parameters in SIL type lowering is in flux.
   // DebugInfo doesn't appear to care about the generic context, so just
   // throw it away before lowering.
-  else if (isa<GenericFunctionType>(BaseTy) ||
-           isa<PolymorphicFunctionType>(BaseTy)) {
+  else if (isa<GenericFunctionType>(BaseTy)) {
     auto *fTy = cast<AnyFunctionType>(BaseTy);
     auto *nongenericTy =
         FunctionType::get(fTy->getInput(), fTy->getResult(), fTy->getExtInfo());
@@ -1629,7 +1628,6 @@ llvm::DIType *IRGenDebugInfo::createType(DebugTypeInfo DbgTy,
 
   case TypeKind::SILFunction:
   case TypeKind::Function:
-  case TypeKind::PolymorphicFunction:
  case TypeKind::GenericFunction: {
     if (Opts.DebugInfoKind > IRGenDebugInfoKind::ASTTypes)
       return createFunctionPointer(DbgTy, Scope, SizeInBits, AlignInBits, Flags,
@@ -1765,7 +1763,6 @@ llvm::DIType *IRGenDebugInfo::createType(DebugTypeInfo DbgTy,
 /// Determine if there exists a name mangling for the given type.
 static bool canMangle(TypeBase *Ty) {
   switch (Ty->getKind()) {
-  case TypeKind::PolymorphicFunction: // Mangler crashes.
   case TypeKind::GenericFunction:     // Not yet supported.
   case TypeKind::SILBlockStorage:     // Not supported at all.
   case TypeKind::SILBox:

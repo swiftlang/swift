@@ -1705,8 +1705,6 @@ Type ValueDecl::getInterfaceType() const {
 void ValueDecl::setInterfaceType(Type type) {
   assert((type.isNull() || !type->hasTypeVariable()) &&
          "Type variable in interface type");
-  assert((type.isNull() || !type->is<PolymorphicFunctionType>()) &&
-         "setting polymorphic function type as interface type");
   
   InterfaceTy = type;
 }
@@ -4728,8 +4726,6 @@ Type ConstructorDecl::getInitializerInterfaceType() {
 }
 
 void ConstructorDecl::setInitializerInterfaceType(Type t) {
-  assert(!t->is<PolymorphicFunctionType>()
-         && "polymorphic function type is invalid interface type");
   InitializerInterfaceType = t;
 }
 
