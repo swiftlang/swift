@@ -792,6 +792,14 @@ static void gatherArgumentLabels(Type type,
   labels.push_back(Identifier());
 }
 
+static Type stripSubstitutedTypes(Type t) {
+  return t.transform([](Type t) -> Type {
+    while (auto *ST = dyn_cast<SubstitutedType>(t.getPointer()))
+      t = ST->getReplacementType();
+    return t;
+  });
+}
+
 namespace {
   /// Each match in an ApplyExpr is evaluated for how close of a match it is.
   /// The result is captured in this enum value, where the earlier entries are
@@ -832,7 +840,21 @@ namespace {
     Type entityType;
 
     UncurriedCandidate(ValueDecl *decl, unsigned level)
-      : declOrExpr(decl), level(level), entityType(decl->getType()) {
+      : declOrExpr(decl), level(level) {
+
+      if (isa<AbstractFunctionDecl>(decl) || isa<EnumElementDecl>(decl)) {
+        entityType = decl->getInterfaceType();
+        if (auto *GFT = entityType->getAs<GenericFunctionType>()) {
+          auto *DC = decl->getInnermostDeclContext();
+          auto *M = DC->getParentModule();
+          auto subs = DC->getGenericEnvironmentOfContext()
+              ->getForwardingSubstitutions(M);
+          entityType = stripSubstitutedTypes(GFT->substGenericArgs(subs));
+        }
+      } else {
+        entityType = decl->getType();
+      }
+
       // For some reason, subscripts and properties don't include their self
       // type.  Tack it on for consistency with other members.
       if (isa<AbstractStorageDecl>(decl)) {
@@ -1484,7 +1506,7 @@ void CalleeCandidateInfo::collectCalleeCandidates(Expr *fn,
     auto decl = declRefExpr->getDecl();
     candidates.push_back({ decl, getCalleeLevel(decl) });
     
-    if (auto fTy = decl->getType()->getAs<AnyFunctionType>())
+    if (auto fTy = decl->getInterfaceType()->getAs<AnyFunctionType>())
       declName = fTy->getInput()->getRValueInstanceType()->getString()+".init";
     else
       declName = "init";
