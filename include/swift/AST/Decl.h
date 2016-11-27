@@ -2003,7 +2003,13 @@ public:
   SourceLoc getNameLoc() const { return NameLoc; }
   SourceLoc getLoc() const { return NameLoc; }
 
-  bool hasType() const { return !TypeAndAccess.getPointer().isNull(); }
+  bool hasType() const {
+    assert(!isa<AbstractFunctionDecl>(this) &&
+           !isa<EnumElementDecl>(this) &&
+           "functions and enum case constructors only have an interface type");
+    return !TypeAndAccess.getPointer().isNull();
+  }
+
   Type getType() const {
     assert(!isa<AbstractFunctionDecl>(this) &&
            !isa<EnumElementDecl>(this) &&
