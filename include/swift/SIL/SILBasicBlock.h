@@ -135,7 +135,9 @@ public:
   SILBasicBlock *split(iterator I);
 
   /// \brief Move the basic block to after the specified basic block in the IR.
-  /// The basic blocks must reside in the same function.
+  ///
+  /// Assumes that the basic blocks must reside in the same function. In asserts
+  /// builds, an assert verifies that this is true.
   void moveAfter(SILBasicBlock *After);
 
   //===--------------------------------------------------------------------===//
