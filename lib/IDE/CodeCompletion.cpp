@@ -1481,7 +1481,7 @@ static bool isTopLevelContext(const DeclContext *DC) {
 
 static Type getReturnTypeFromContext(const DeclContext *DC) {
   if (auto FD = dyn_cast<AbstractFunctionDecl>(DC)) {
-    if (FD->hasType()) {
+    if (FD->hasInterfaceType()) {
       if (auto FT = FD->getInterfaceType()->getAs<FunctionType>()) {
         return FT->getResult();
       }
@@ -2768,7 +2768,7 @@ public:
     if (IsKeyPathExpr && !KeyPathFilter(D, Reason))
       return;
         
-    if (!D->hasType())
+    if (!D->hasInterfaceType())
       TypeResolver->resolveDeclSignature(D);
     else if (isa<TypeAliasDecl>(D)) {
       // A TypeAliasDecl might have type set, but not the underlying type.
@@ -2980,7 +2980,7 @@ public:
   }
 
   bool handleEnumElement(ValueDecl *D, DeclVisibilityKind Reason) {
-    if (!D->hasType())
+    if (!D->hasInterfaceType())
       TypeResolver->resolveDeclSignature(D);
 
     if (auto *EED = dyn_cast<EnumElementDecl>(D)) {
@@ -2990,7 +2990,7 @@ public:
       llvm::DenseSet<EnumElementDecl *> Elements;
       ED->getAllElements(Elements);
       for (auto *Ele : Elements) {
-        if (!Ele->hasType())
+        if (!Ele->hasInterfaceType())
           TypeResolver->resolveDeclSignature(Ele);
         addEnumElementRef(Ele, Reason, /*HasTypeContext=*/true);
       }
@@ -3676,7 +3676,7 @@ public:
           handleDeclRange(Ex->getMembers(), Reason);
         }
       } else if (isNameHit(VD->getNameStr())) {
-        if (VD->hasType())
+        if (VD->hasInterfaceType())
           unboxType(VD->getInterfaceType());
       }
     }
@@ -3691,9 +3691,9 @@ public:
         // same result type) as the contextual type.
         auto contextCanT = T->getCanonicalType();
         FilteredDeclConsumer consumer(*this, [=](ValueDecl *VD, DeclVisibilityKind reason) {
-          if (!VD->hasType()) {
+          if (!VD->hasInterfaceType()) {
             TypeResolver->resolveDeclSignature(VD);
-            if (!VD->hasType())
+            if (!VD->hasInterfaceType())
               return false;
           }
 
@@ -4223,7 +4223,7 @@ public:
     if (D->getAttrs().hasAttribute<FinalAttr>())
       return;
 
-    if (!D->hasType())
+    if (!D->hasInterfaceType())
       TypeResolver->resolveDeclSignature(D);
 
     bool hasIntroducer = hasFuncIntroducer ||
