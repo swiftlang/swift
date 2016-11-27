@@ -1655,6 +1655,22 @@ void ValueDecl::overwriteType(Type T) {
     setInvalid();
 }
 
+bool ValueDecl::hasInterfaceType() const {
+  // getInterfaceType() always returns something for associated types.
+  if (isa<AssociatedTypeDecl>(this)) {
+    auto proto = cast<ProtocolDecl>(getDeclContext());
+    auto selfTy = proto->getSelfInterfaceType();
+    return !!selfTy;
+  }
+
+  // getInterfaceType() returns the contextual type for ParamDecls which
+  // don't have an explicit interface type.
+  if (isa<ParamDecl>(this))
+    return hasType();
+
+  return !!InterfaceTy;
+}
+
 Type ValueDecl::getInterfaceType() const {
   if (InterfaceTy)
     return InterfaceTy;
