@@ -127,7 +127,7 @@ static bool hoistSILArgumentReleaseInst(SILBasicBlock *BB) {
 
   // Make sure the release will not be blocked by the terminator instructions
   // Make sure the terminator does not block, nor is a branch with multiple targets.
-  for (auto P : BB->getPreds()) {
+  for (auto P : BB->getPredecessorBlocks()) {
     if (!isa<BranchInst>(P->getTerminator()))
       return false;
   }
@@ -139,7 +139,7 @@ static bool hoistSILArgumentReleaseInst(SILBasicBlock *BB) {
 
   // Ok, we can get all the incoming values and create releases for them.
   unsigned indices = 0;
-  for (auto P : BB->getPreds()) {
+  for (auto P : BB->getPredecessorBlocks()) {
     createDecrementBefore(PredValues[indices++], P->getTerminator());
   }
   // Erase the old instruction.
@@ -203,7 +203,7 @@ static SILValue findValueShallowRoot(const SILValue &In) {
   // then we know exactly which value is passed to the argument.
   if (SILArgument *Arg = dyn_cast<SILArgument>(In)) {
     SILBasicBlock *Parent = Arg->getParent();
-    SILBasicBlock *Pred = Parent->getSinglePredecessor();
+    SILBasicBlock *Pred = Parent->getSinglePredecessorBlock();
     if (!Pred) return In;
 
     // If the terminator is a cast instruction then use the pre-cast value.
@@ -380,7 +380,7 @@ static bool sinkLiteralArguments(SILBasicBlock *BB, unsigned ArgNum) {
     return false;
 
   // Check if the Nth argument in all predecessors is identical.
-  for (auto P : BB->getPreds()) {
+  for (auto P : BB->getPredecessorBlocks()) {
     if (P == FirstPred)
       continue;
 
@@ -430,7 +430,7 @@ static bool sinkArgument(SILBasicBlock *BB, unsigned ArgNum) {
   llvm::Optional<unsigned> DifferentOperandIndex;
 
   // Check if the Nth argument in all predecessors is identical.
-  for (auto P : BB->getPreds()) {
+  for (auto P : BB->getPredecessorBlocks()) {
     if (P == FirstPred)
       continue;
 
@@ -487,7 +487,7 @@ static bool sinkArgument(SILBasicBlock *BB, unsigned ArgNum) {
     // Update all branch instructions in the predecessors to pass the new
     // argument to this BB.
     auto CloneIt = Clones.begin();
-    for (auto P : BB->getPreds()) {
+    for (auto P : BB->getPredecessorBlocks()) {
       // Only handle branch or conditional branch instructions.
       TermInst *TI = P->getTerminator();
       assert((isa<BranchInst>(TI) || isa<CondBranchInst>(TI)) &&
@@ -532,7 +532,7 @@ static bool sinkArgument(SILBasicBlock *BB, unsigned ArgNum) {
 /// Notice that unlike other sinking methods in this file we do allow sinking
 /// of literals from blocks with multiple successors.
 static bool sinkLiteralsFromPredecessors(SILBasicBlock *BB) {
-  if (BB->pred_empty() || BB->getSinglePredecessor())
+  if (BB->pred_empty() || BB->getSinglePredecessorBlock())
     return false;
 
   // Try to sink values from each of the arguments to the basic block.
@@ -545,12 +545,12 @@ static bool sinkLiteralsFromPredecessors(SILBasicBlock *BB) {
 
 /// Try to sink identical arguments coming from multiple predecessors.
 static bool sinkArgumentsFromPredecessors(SILBasicBlock *BB) {
-  if (BB->pred_empty() || BB->getSinglePredecessor())
+  if (BB->pred_empty() || BB->getSinglePredecessorBlock())
     return false;
 
   // This block must be the only successor of all the predecessors.
-  for (auto P : BB->getPreds())
-    if (P->getSingleSuccessor() != BB)
+  for (auto P : BB->getPredecessorBlocks())
+    if (P->getSingleSuccessorBlock() != BB)
       return false;
 
   // Try to sink values from each of the arguments to the basic block.
@@ -591,8 +591,8 @@ static bool sinkCodeFromPredecessors(SILBasicBlock *BB) {
     return Changed;
 
   // This block must be the only successor of all the predecessors.
-  for (auto P : BB->getPreds())
-    if (P->getSingleSuccessor() != BB)
+  for (auto P : BB->getPredecessorBlocks())
+    if (P->getSingleSuccessorBlock() != BB)
       return Changed;
 
   SILBasicBlock *FirstPred = *BB->pred_begin();
@@ -612,7 +612,7 @@ static bool sinkCodeFromPredecessors(SILBasicBlock *BB) {
   // bb3(%x, %y):
   //   ...
   ValueToBBArgIdxMap valueToArgIdxMap;
-  for (auto P : BB->getPreds()) {
+  for (auto P : BB->getPredecessorBlocks()) {
     if (auto *BI = dyn_cast<BranchInst>(P->getTerminator())) {
       auto Args = BI->getArgs();
       for (size_t idx = 0, size = Args.size(); idx < size; idx++) {
@@ -637,7 +637,7 @@ static bool sinkCodeFromPredecessors(SILBasicBlock *BB) {
       OperandRelation opRelation = NotDeterminedYet;
 
       // For all preds:
-      for (auto P : BB->getPreds()) {
+      for (auto P : BB->getPredecessorBlocks()) {
         if (P == FirstPred)
           continue;
 
@@ -887,7 +887,7 @@ static bool sinkIncrementsIntoSwitchRegions(SILBasicBlock *BB, AliasAnalysis *AA
   bool CanSinkToSuccessor = std::none_of(BB->succ_begin(), BB->succ_end(),
     [](const SILSuccessor &S) -> bool {
       SILBasicBlock *SuccBB = S.getBB();
-      return !SuccBB || !SuccBB->getSinglePredecessor();
+      return !SuccBB || !SuccBB->getSinglePredecessorBlock();
   });
 
   SILInstruction *S = BB->getTerminator();
@@ -1142,7 +1142,7 @@ initWithFirstPred(BBToDataflowStateMap &BBToStateMap,
   // are tracking with it.
   //
   // TODO: I am writing this too fast. Clean this up later.
-  if (FirstPredBB->getSingleSuccessor()) {
+  if (FirstPredBB->getSingleSuccessorBlock()) {
     for (auto P : ValueToCaseMap.getItems()) {
       if (!P.hasValue())
         continue;
@@ -1266,7 +1266,7 @@ mergePredecessorStates(BBToDataflowStateMap &BBToStateMap) {
 
       // Check if out predecessor has any other successors. If that is true we
       // clear all the state since we cannot hoist safely.
-      if (!PredBB->getSingleSuccessor()) {
+      if (!PredBB->getSingleSuccessorBlock()) {
         EnumToEnumBBCaseListMap.clear();
         DEBUG(llvm::dbgs() << "                Predecessor has other "
               "successors. Clearing BB cast list map.\n");
@@ -1418,7 +1418,7 @@ BBEnumTagDataflowState::hoistDecrementsIntoSwitchRegions(AliasAnalysis *AA) {
 
       // Otherwise create the release_value before the terminator of the
       // predecessor.
-      assert(P.first->getSingleSuccessor() &&
+      assert(P.first->getSingleSuccessorBlock() &&
              "Cannot hoist release into BB that has multiple successors");
       SILBuilderWithScope Builder(P.first->getTerminator(), RVI);
       createRefCountOpForPayload(Builder, RVI, P.second);
@@ -1577,8 +1577,9 @@ static bool processFunction(SILFunction *F, AliasAnalysis *AA,
     BBEnumTagDataflowState &State = BBToStateMap.getRPOState(RPOIdx);
 
     DEBUG(llvm::dbgs() << "    Predecessors (empty if no predecessors):\n");
-    DEBUG(for (SILBasicBlock *Pred : State.getBB()->getPreds()) {
-        llvm::dbgs() << "        BB#" << RPOIdx << "; Ptr: " << Pred << "\n";
+    DEBUG(for (SILBasicBlock *Pred
+               : State.getBB()->getPredecessorBlocks()) {
+      llvm::dbgs() << "        BB#" << RPOIdx << "; Ptr: " << Pred << "\n";
     });
     DEBUG(llvm::dbgs() << "    State Addr: " << &State << "\n");
 

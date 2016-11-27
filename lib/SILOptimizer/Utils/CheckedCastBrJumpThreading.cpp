@@ -320,19 +320,23 @@ modifyCFGForSuccessPreds(Optional<BasicBlockCloner> &Cloner) {
 /// Handle a special case, where ArgBB is the entry block.
 bool CheckedCastBrJumpThreading::handleArgBBIsEntryBlock(SILBasicBlock *ArgBB,
                                                 CheckedCastBranchInst *DomCCBI) {
-  if (ArgBB->getPreds().begin() == ArgBB->getPreds().end()) {
-    // It must be the entry block
-    // See if it is reached over Success or Failure path.
-    bool SuccessDominates = DomCCBI->getSuccessBB() == BB;
-    bool FailureDominates = DomCCBI->getFailureBB() == BB;
+  if (!ArgBB->pred_empty())
+    return false;
 
-    if (BlocksToEdit.count(ArgBB) != 0)
-      return false;
+  // It must be the entry block
+  //
+  // TODO: Is this a correct assumption? Do we know that at this point that
+  // ArgBB can not be unreachable?
+  //
+  // See if it is reached over Success or Failure path.
+  bool SuccessDominates = DomCCBI->getSuccessBB() == BB;
+  bool FailureDominates = DomCCBI->getFailureBB() == BB;
 
-    classifyPredecessor(ArgBB, SuccessDominates, FailureDominates);
-    return true;
-  }
-  return false;
+  if (BlocksToEdit.count(ArgBB) != 0)
+    return false;
+
+  classifyPredecessor(ArgBB, SuccessDominates, FailureDominates);
+  return true;
 }
 
 // Returns false if cloning required by jump threading cannot
@@ -393,7 +397,7 @@ areEquivalentConditionsAlongSomePaths(CheckedCastBranchInst *DomCCBI,
   if (!handleArgBBIsEntryBlock(ArgBB, DomCCBI)) {
     // ArgBB is not the entry block and has predecessors.
     unsigned idx = 0;
-    for (auto *PredBB : ArgBB->getPreds()) {
+    for (auto *PredBB : ArgBB->getPredecessorBlocks()) {
 
       // We must avoid that we are going to change a block twice.
       if (BlocksToEdit.count(PredBB) != 0)
@@ -456,7 +460,7 @@ areEquivalentConditionsAlongPaths(CheckedCastBranchInst *DomCCBI) {
 
     // Figure out for each predecessor which branch of
     // the dominating checked_cast_br is used to reach it.
-    for (auto *PredBB : BB->getPreds()) {
+    for (auto *PredBB : BB->getPredecessorBlocks()) {
       // All predecessors should either unconditionally branch
       // to the current BB or be another checked_cast_br instruction.
       if (!isa<CheckedCastBranchInst>(PredBB->getTerminator()) &&
@@ -469,7 +473,8 @@ areEquivalentConditionsAlongPaths(CheckedCastBranchInst *DomCCBI) {
 
       // Don't allow critical edges from PredBB to BB. This ensures that
       // splitAllCriticalEdges() will not invalidate our predecessor lists.
-      if (!BB->getSinglePredecessor() && !PredBB->getSingleSuccessor())
+      if (!BB->getSinglePredecessorBlock() &&
+          !PredBB->getSingleSuccessorBlock())
         return false;
 
       SILBasicBlock *DomSuccessBB = DomCCBI->getSuccessBB();
@@ -610,10 +615,9 @@ bool CheckedCastBrJumpThreading::trySimplify(CheckedCastBranchInst *CCBI) {
     // We have to generate new dedicated BBs as landing BBs for all
     // FailurePreds and all SuccessPreds.
 
-    // Since we are going to change the BB,
-    // add its successors and predecessors
+    // Since we are going to change the BB, add its successors and predecessors
     // for re-processing.
-    for (auto *B : BB->getPreds()) {
+    for (auto *B : BB->getPredecessorBlocks()) {
       BlocksForWorklist.push_back(B);
     }
     for (auto *B : BB->getSuccessorBlocks()) {

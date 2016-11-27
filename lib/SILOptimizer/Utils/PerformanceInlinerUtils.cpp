@@ -315,7 +315,7 @@ SILBasicBlock *ConstantTracker::getTakenBlock(TermInst *term) {
 int ShortestPathAnalysis::getEntryDistFromPreds(const SILBasicBlock *BB,
                                                 int LoopDepth) {
   int MinDist = InitialDist;
-  for (SILBasicBlock *Pred : BB->getPreds()) {
+  for (SILBasicBlock *Pred : BB->getPredecessorBlocks()) {
     BlockInfo *PredInfo = getBlockInfo(Pred);
     Distances &PDists = PredInfo->getDistances(LoopDepth);
     int DistFromEntry = PDists.DistFromEntry + PredInfo->Length +
@@ -351,7 +351,7 @@ static SILBasicBlock *detectLoopBypassPreheader(SILLoop *Loop) {
   if (!Pred)
     return nullptr;
 
-  SILBasicBlock *PredPred = Pred->getSinglePredecessor();
+  SILBasicBlock *PredPred = Pred->getSinglePredecessorBlock();
   if (!PredPred)
     return nullptr;
 
@@ -362,8 +362,8 @@ static SILBasicBlock *detectLoopBypassPreheader(SILLoop *Loop) {
   SILBasicBlock *Succ = (CBR->getTrueBB() == Pred ? CBR->getFalseBB() :
                                                     CBR->getTrueBB());
 
-  for (SILBasicBlock *PredOfSucc : Succ->getPreds()) {
-    SILBasicBlock *Exiting = PredOfSucc->getSinglePredecessor();
+  for (SILBasicBlock *PredOfSucc : Succ->getPredecessorBlocks()) {
+    SILBasicBlock *Exiting = PredOfSucc->getSinglePredecessorBlock();
     if (!Exiting)
       Exiting = PredOfSucc;
     if (Loop->contains(Exiting))

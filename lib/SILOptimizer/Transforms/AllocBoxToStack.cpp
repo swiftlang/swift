@@ -53,7 +53,7 @@ static void propagateLiveness(llvm::SmallPtrSetImpl<SILBasicBlock*> &LiveIn,
   // First populate a worklist of predecessors.
   llvm::SmallVector<SILBasicBlock*, 64> Worklist;
   for (auto *BB : LiveIn)
-    for (auto Pred : BB->getPreds())
+    for (auto Pred : BB->getPredecessorBlocks())
       Worklist.push_back(Pred);
 
   // Now propagate liveness backwards until we hit the alloc_box.
@@ -65,7 +65,7 @@ static void propagateLiveness(llvm::SmallPtrSetImpl<SILBasicBlock*> &LiveIn,
     if (BB == DefBB || !LiveIn.insert(BB).second)
       continue;
 
-    for (auto Pred : BB->getPreds())
+    for (auto Pred : BB->getPredecessorBlocks())
       Worklist.push_back(Pred);
   }
 }

@@ -2041,7 +2041,7 @@ void IRGenSILFunction::visitFullApplySite(FullApplySite site) {
     // Zero the error slot to maintain the invariant that it always
     // contains null.  This will frequently become a dead store.
     auto nullError = llvm::Constant::getNullValue(errorValue->getType());
-    if (!tryApplyInst->getErrorBB()->getSinglePredecessor()) {
+    if (!tryApplyInst->getErrorBB()->getSinglePredecessorBlock()) {
       // Only do that here if we can't move the store to the error block.
       // See below.
       Builder.CreateStore(nullError, errorSlot);
@@ -2059,8 +2059,8 @@ void IRGenSILFunction::visitFullApplySite(FullApplySite site) {
     // Set up the PHI nodes on the error edge.
     assert(errorDest.phis.size() == 1);
     errorDest.phis[0]->addIncoming(errorValue, Builder.GetInsertBlock());
-    
-    if (tryApplyInst->getErrorBB()->getSinglePredecessor()) {
+
+    if (tryApplyInst->getErrorBB()->getSinglePredecessorBlock()) {
       // Zeroing out the error slot only in the error block increases the chance
       // that it will become a dead store.
       auto origBB = Builder.GetInsertBlock();

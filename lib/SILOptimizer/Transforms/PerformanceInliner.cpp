@@ -325,8 +325,9 @@ bool SILPerformanceInliner::isProfitableToInline(FullApplySite AI,
     SILBasicBlock *takenBlock = constTracker.getTakenBlock(block->getTerminator());
     if (takenBlock) {
       BlockW.updateBenefit(Benefit, RemovedTerminatorBenefit);
-      domOrder.pushChildrenIf(block, [=] (SILBasicBlock *child) {
-        return child->getSinglePredecessor() != block || child == takenBlock;
+      domOrder.pushChildrenIf(block, [=](SILBasicBlock *child) {
+        return child->getSinglePredecessorBlock() != block ||
+               child == takenBlock;
       });
     } else {
       domOrder.pushChildren(block);

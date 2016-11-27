@@ -48,7 +48,7 @@ static SILBasicBlock *insertPreheader(SILLoop *L, DominanceInfo *DT,
 
   // Before we create the preheader, gather all of the original preds of header.
   llvm::SmallVector<SILBasicBlock *, 8> Preds;
-  for (auto *Pred : Header->getPreds()) {
+  for (auto *Pred : Header->getPredecessorBlocks()) {
     if (!L->contains(Pred)) {
       Preds.push_back(Pred);
     }
@@ -104,7 +104,7 @@ static SILBasicBlock *insertBackedgeBlock(SILLoop *L, DominanceInfo *DT,
 
   // Figure out which basic blocks contain back-edges to the loop header.
   SmallVector<SILBasicBlock*, 4> BackedgeBlocks;
-  for (auto *Pred : Header->getPreds()) {
+  for (auto *Pred : Header->getPredecessorBlocks()) {
     if (Pred == Preheader)
       continue;
     // Branches can be handled trivially and CondBranch edges can be split.

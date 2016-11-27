@@ -1144,7 +1144,7 @@ static bool isSelfInitUse(SILArgument *Arg) {
   // predecessor to the block, and the predecessor instruction is a try_apply
   // of a throwing delegated init.
   auto *BB = Arg->getParent();
-  auto *Pred = BB->getSinglePredecessor();
+  auto *Pred = BB->getSinglePredecessorBlock();
 
   // The two interesting cases are where self.init throws, in which case
   // the argument came from a try_apply, or if self.init is failable,

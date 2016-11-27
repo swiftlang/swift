@@ -211,18 +211,18 @@ public:
   const_succ_iterator succ_begin() const { return getSuccessors().begin(); }
   const_succ_iterator succ_end() const { return getSuccessors().end(); }
 
-  SILBasicBlock *getSingleSuccessor() {
+  SILBasicBlock *getSingleSuccessorBlock() {
     if (succ_empty() || std::next(succ_begin()) != succ_end())
       return nullptr;
     return *succ_begin();
   }
 
-  const SILBasicBlock *getSingleSuccessor() const {
-    return const_cast<SILBasicBlock *>(this)->getSingleSuccessor();
+  const SILBasicBlock *getSingleSuccessorBlock() const {
+    return const_cast<SILBasicBlock *>(this)->getSingleSuccessorBlock();
   }
 
   /// \brief Returns true if \p BB is a successor of this block.
-  bool isSuccessor(SILBasicBlock *BB) const {
+  bool isSuccessorBlock(SILBasicBlock *BB) const {
     auto Range = getSuccessorBlocks();
     return any_of(Range, [&BB](const SILBasicBlock *SuccBB) -> bool {
       return BB == SuccBB;
@@ -256,25 +256,29 @@ public:
   pred_iterator pred_begin() const { return pred_iterator(PredList); }
   pred_iterator pred_end() const { return pred_iterator(); }
 
-  iterator_range<pred_iterator> getPreds() const {
-    return {pred_begin(), pred_end() };
+  iterator_range<pred_iterator> getPredecessorBlocks() const {
+    return {pred_begin(), pred_end()};
   }
 
-  bool isPredecessor(SILBasicBlock *BB) const {
-    return any_of(getPreds(), [&BB](const SILBasicBlock *PredBB) -> bool {
-      return BB == PredBB;
-    });
+  bool isPredecessorBlock(SILBasicBlock *BB) const {
+    return any_of(
+        getPredecessorBlocks(),
+        [&BB](const SILBasicBlock *PredBB) -> bool { return BB == PredBB; });
   }
 
-  SILBasicBlock *getSinglePredecessor() {
+  SILBasicBlock *getSinglePredecessorBlock() {
     if (pred_empty() || std::next(pred_begin()) != pred_end())
       return nullptr;
     return *pred_begin();
   }
 
-  const SILBasicBlock *getSinglePredecessor() const {
-    return const_cast<SILBasicBlock *>(this)->getSinglePredecessor();
+  const SILBasicBlock *getSinglePredecessorBlock() const {
+    return const_cast<SILBasicBlock *>(this)->getSinglePredecessorBlock();
   }
+
+  //===--------------------------------------------------------------------===//
+  // Debugging
+  //===--------------------------------------------------------------------===//
 
   /// Pretty-print the SILBasicBlock.
   void dump() const;

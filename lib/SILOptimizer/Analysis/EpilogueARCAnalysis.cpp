@@ -46,7 +46,7 @@ void EpilogueARCContext::initializeDataflow() {
     SILArgument *A = dyn_cast<SILArgument>(CArg);
     if (A && !A->isFunctionArg()) {
       // Find predecessor and break the SILArgument to predecessors.
-      for (auto X : A->getParent()->getPreds()) {
+      for (auto X : A->getParent()->getPredecessorBlocks()) {
         // Try to find the predecessor edge-value.
         SILValue IA = A->getIncomingValue(X);
         EpilogueARCBlockStates[X]->LocalArg = IA;

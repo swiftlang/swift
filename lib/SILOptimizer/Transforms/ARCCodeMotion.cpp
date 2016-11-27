@@ -375,7 +375,7 @@ bool RetainCodeMotionContext::requireIteration() {
   // genset and killset.
   llvm::SmallPtrSet<SILBasicBlock *, 4> PBBs;
   for (SILBasicBlock *B : PO->getReversePostOrder()) {
-    for (auto X : B->getPreds()) {
+    for (auto X : B->getPredecessorBlocks()) {
       if (!PBBs.count(X))
         return true;
     }
@@ -563,7 +563,7 @@ void RetainCodeMotionContext::computeCodeMotionInsertPoints() {
     for (unsigned i = 0; i < RCRootVault.size(); ++i) {
       if (S->BBSetIn[i])
         continue;
-      for (auto Pred : BB->getPreds()) {
+      for (auto Pred : BB->getPredecessorBlocks()) {
         BlockState *PBB = BlockStates[Pred];
         if (!PBB->BBSetOut[i])
           continue;
@@ -906,7 +906,7 @@ void ReleaseCodeMotionContext::convergeCodeMotionDataFlow() {
     SILBasicBlock *BB = WorkList.pop_back_val();
     HandledBBs.erase(BB);
     if (processBBWithGenKillSet(BB)) {
-      for (auto X : BB->getPreds()) {
+      for (auto X : BB->getPredecessorBlocks()) {
         // We do not push basic block into the worklist if its already 
         // in the worklist.
         if (HandledBBs.count(X))

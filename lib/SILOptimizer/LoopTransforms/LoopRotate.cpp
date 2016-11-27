@@ -233,10 +233,11 @@ static bool isSingleBlockLoop(SILLoop *L) {
   if (BackEdge == Header)
     BackEdge = Blocks[0];
 
-  if (!BackEdge->getSingleSuccessor())
+  if (!BackEdge->getSingleSuccessorBlock())
     return false;
 
-  assert(BackEdge->getSingleSuccessor() == Header && "Loop not well formed");
+  assert(BackEdge->getSingleSuccessorBlock() == Header &&
+         "Loop not well formed");
 
   // Check whether the back-edge block is just a split-edge.
   return ++BackEdge->begin() == BackEdge->end();
@@ -315,7 +316,7 @@ bool swift::rotateLoop(SILLoop *L, DominanceInfo *DT, SILLoopInfo *LI,
   // We don't want to rotate such that we merge two headers of separate loops
   // into one. This can be turned into an assert again once we have guaranteed
   // preheader insertions.
-  if (!NewHeader->getSinglePredecessor() && Header != Latch)
+  if (!NewHeader->getSinglePredecessorBlock() && Header != Latch)
     return false;
 
   // Now that we know we can perform the rotation - move the instructions that

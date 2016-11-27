@@ -351,7 +351,7 @@ void DCE::propagateLiveBlockArgument(SILArgument *Arg) {
   auto *Block = Arg->getParent();
   auto ArgIndex = Arg->getIndex();
 
-  for (auto Pred : Block->getPreds())
+  for (auto Pred : Block->getPredecessorBlocks())
     markTerminatorArgsLive(Pred, Block, ArgIndex);
 }
 
@@ -582,7 +582,7 @@ void DCE::computePredecessorDependence(SILFunction &F) {
     assert(ControllingInfoMap.find(&BB) != ControllingInfoMap.end()
            && "Expected to already have a map entry for block!");
 
-    for (auto Pred : BB.getPreds())
+    for (auto Pred : BB.getPredecessorBlocks())
       if (!PDT->properlyDominates(&BB, Pred)) {
         assert(ControllingInfoMap.find(Pred) != ControllingInfoMap.end() &&
                "Expected to already have a map entry for block!");

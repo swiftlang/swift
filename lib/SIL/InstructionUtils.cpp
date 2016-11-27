@@ -86,7 +86,7 @@ SILValue swift::stripSinglePredecessorArgs(SILValue V) {
     
     // First try and grab the single predecessor of our parent BB. If we don't
     // have one, bail.
-    SILBasicBlock *Pred = BB->getSinglePredecessor();
+    SILBasicBlock *Pred = BB->getSinglePredecessorBlock();
     if (!Pred)
       return V;
     

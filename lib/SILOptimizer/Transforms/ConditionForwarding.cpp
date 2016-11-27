@@ -164,7 +164,7 @@ bool ConditionForwarding::tryOptimize(SwitchEnumInst *SEI) {
     if (isDebugInst(ArgUser))
       continue;
 
-    if (ArgUser->getParent()->getSinglePredecessor() == SEI->getParent()) {
+    if (ArgUser->getParent()->getSinglePredecessorBlock() == SEI->getParent()) {
       continue;
     }
     return false;
@@ -181,8 +181,8 @@ bool ConditionForwarding::tryOptimize(SwitchEnumInst *SEI) {
   // Check if all predecessors of the merging block pass an Enum to its argument
   // and have a single predecessor - the block of the condition.
   SILBasicBlock *CommonBranchBlock = nullptr;
-  for (SILBasicBlock *Pred : BB->getPreds()) {
-    SILBasicBlock *PredPred = Pred->getSinglePredecessor();
+  for (SILBasicBlock *Pred : BB->getPredecessorBlocks()) {
+    SILBasicBlock *PredPred = Pred->getSinglePredecessorBlock();
     if (!PredPred)
       return false;
 
@@ -234,7 +234,7 @@ bool ConditionForwarding::tryOptimize(SwitchEnumInst *SEI) {
       continue;
     }
     SILBasicBlock *UseBlock = ArgUser->getParent();
-    if (UseBlock->getSinglePredecessor() == SEI->getParent()) {
+    if (UseBlock->getSinglePredecessorBlock() == SEI->getParent()) {
       // The Arg is used in a successor block of the switch_enum. To keep things
       // simple, we just create a new block argument and later (see below) we
       // pass the corresponding enum to the block. This argument will be deleted

@@ -1458,7 +1458,7 @@ void LifetimeChecker::handleLoadUseFailure(const DIMemoryUse &Use,
         // Otherwise, there are multiple paths to the epilog block, scan its
         // predecessors to see if there are any where the value is unavailable.
         // If so, we can use its location information for more precision.
-        for (auto pred : LI->getParent()->getPreds()) {
+        for (auto pred : LI->getParent()->getPredecessorBlocks()) {
           auto *TI = pred->getTerminator();
           // Check if this is an early return with uninitialized members.
           if (TI->getLoc().getKind() == SILLocation::ReturnKind &&
@@ -2335,13 +2335,13 @@ computePredsLiveOut(SILBasicBlock *BB) {
   // Collect blocks for which we have to calculate the out-availability.
   // These are the paths from blocks with known out-availability to the BB.
   WorkListType WorkList;
-  for (auto Pred : BB->getPreds()) {
+  for (auto Pred : BB->getPredecessorBlocks()) {
     putIntoWorkList(Pred, WorkList);
   }
   size_t idx = 0;
   while (idx < WorkList.size()) {
     SILBasicBlock *WorkBB = WorkList[idx++];
-    for (auto Pred : WorkBB->getPreds()) {
+    for (auto Pred : WorkBB->getPredecessorBlocks()) {
       putIntoWorkList(Pred, WorkList);
     }
   }
@@ -2365,7 +2365,7 @@ computePredsLiveOut(SILBasicBlock *BB) {
       LiveOutBlockState &BBState = getBlockInfo(WorkBB);
 
       // Merge from the predecessor blocks.
-      for (auto Pred : WorkBB->getPreds()) {
+      for (auto Pred : WorkBB->getPredecessorBlocks()) {
         changed |= BBState.mergeFromPred(getBlockInfo(Pred));
       }
       DEBUG(llvm::dbgs() << "      Block " << WorkBB->getDebugID() << " out: "
@@ -2382,8 +2382,8 @@ computePredsLiveOut(SILBasicBlock *BB) {
 void LifetimeChecker::
 getOutAvailability(SILBasicBlock *BB, AvailabilitySet &Result) {
   computePredsLiveOut(BB);
-  
-  for (auto Pred : BB->getPreds()) {
+
+  for (auto *Pred : BB->getPredecessorBlocks()) {
     // If self was consumed in a predecessor P, don't look at availability
     // at all, because there's no point in making things more conditional
     // than they are. If we enter the current block through P, the self value
@@ -2401,8 +2401,8 @@ getOutAvailability(SILBasicBlock *BB, AvailabilitySet &Result) {
 void LifetimeChecker::
 getOutSelfConsumed(SILBasicBlock *BB, Optional<DIKind> &Result) {
   computePredsLiveOut(BB);
-  
-  for (auto Pred : BB->getPreds())
+
+  for (auto *Pred : BB->getPredecessorBlocks())
     Result = mergeKinds(Result, getBlockInfo(Pred).OutSelfConsumed);
 }
 

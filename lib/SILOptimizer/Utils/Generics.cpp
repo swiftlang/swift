@@ -283,7 +283,7 @@ static ApplySite replaceWithSpecializedCallee(ApplySite AI,
 
   if (auto *TAI = dyn_cast<TryApplyInst>(AI)) {
     SILBasicBlock *ResultBB = TAI->getNormalBB();
-    assert(ResultBB->getSinglePredecessor() == TAI->getParent());
+    assert(ResultBB->getSinglePredecessorBlock() == TAI->getParent());
     auto *NewTAI =
       Builder.createTryApply(Loc, Callee, Callee->getType(), {},
                              Arguments, ResultBB, TAI->getErrorBB());

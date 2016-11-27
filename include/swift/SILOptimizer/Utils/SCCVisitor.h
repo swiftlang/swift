@@ -154,7 +154,7 @@ private:
       auto *BB = A->getParent();
       auto Index = A->getIndex();
 
-      for (auto *Pred : BB->getPreds())
+      for (auto *Pred : BB->getPredecessorBlocks())
         getArgsForTerminator(Pred->getTerminator(), BB, Index, Operands);
       return;
     }
