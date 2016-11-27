@@ -4380,7 +4380,7 @@ FuncDecl *FuncDecl::createImpl(ASTContext &Context,
                                bool Throws, SourceLoc ThrowsLoc,
                                SourceLoc AccessorKeywordLoc,
                                GenericParamList *GenericParams,
-                               unsigned NumParamPatterns, Type Ty,
+                               unsigned NumParamPatterns,
                                DeclContext *Parent,
                                ClangNode ClangN) {
   assert(NumParamPatterns > 0);
@@ -4391,7 +4391,7 @@ FuncDecl *FuncDecl::createImpl(ASTContext &Context,
       FuncDecl(StaticLoc, StaticSpelling, FuncLoc,
                Name, NameLoc, Throws, ThrowsLoc,
                AccessorKeywordLoc, NumParamPatterns,
-               GenericParams, Ty, Parent);
+               GenericParams, Parent);
   if (ClangN)
     D->setClangNode(ClangN);
   return D;
@@ -4405,12 +4405,12 @@ FuncDecl *FuncDecl::createDeserialized(ASTContext &Context,
                                        bool Throws, SourceLoc ThrowsLoc,
                                        SourceLoc AccessorKeywordLoc,
                                        GenericParamList *GenericParams,
-                                       unsigned NumParamPatterns, Type Ty,
+                                       unsigned NumParamPatterns,
                                        DeclContext *Parent) {
   return createImpl(Context, StaticLoc, StaticSpelling, FuncLoc,
                     Name, NameLoc, Throws, ThrowsLoc,
                     AccessorKeywordLoc, GenericParams,
-                    NumParamPatterns, Ty, Parent,
+                    NumParamPatterns, Parent,
                     ClangNode());
 }
 
@@ -4421,7 +4421,7 @@ FuncDecl *FuncDecl::create(ASTContext &Context, SourceLoc StaticLoc,
                            bool Throws, SourceLoc ThrowsLoc,
                            SourceLoc AccessorKeywordLoc,
                            GenericParamList *GenericParams,
-                           ArrayRef<ParameterList*> BodyParams, Type Ty,
+                           ArrayRef<ParameterList*> BodyParams,
                            TypeLoc FnRetType, DeclContext *Parent,
                            ClangNode ClangN) {
   const unsigned NumParamPatterns = BodyParams.size();
@@ -4429,7 +4429,7 @@ FuncDecl *FuncDecl::create(ASTContext &Context, SourceLoc StaticLoc,
       Context, StaticLoc, StaticSpelling, FuncLoc,
       Name, NameLoc, Throws, ThrowsLoc,
       AccessorKeywordLoc, GenericParams,
-      NumParamPatterns, Ty, Parent, ClangN);
+      NumParamPatterns, Parent, ClangN);
   FD->setDeserializedSignature(BodyParams, FnRetType);
   return FD;
 }
@@ -4634,53 +4634,30 @@ SourceRange EnumElementDecl::getSourceRange() const {
 
 bool EnumElementDecl::computeType() {
   EnumDecl *ED = getParentEnum();
-  {
-    Type resultTy = ED->getDeclaredTypeInContext();
+  Type resultTy = ED->getDeclaredInterfaceType();
 
-    if (resultTy->hasError()) {
-      setType(resultTy);
-      setInterfaceType(resultTy);
-      return false;
-    }
-
-    Type argTy = MetatypeType::get(resultTy);
-
-    // The type of the enum element is either (T) -> T or (T) -> ArgType -> T.
-    if (getArgumentType())
-      resultTy = FunctionType::get(getArgumentType(), resultTy);
-
-    if (ED->isGenericContext())
-      resultTy = PolymorphicFunctionType::get(argTy, resultTy,
-                                              ED->getGenericParamsOfContext());
-    else
-      resultTy = FunctionType::get(argTy, resultTy);
-
-    setType(resultTy);
-  }
-  {
-    Type resultTy = ED->getDeclaredInterfaceType();
-
-    if (resultTy->hasError()) {
-      setInterfaceType(resultTy);
-      return false;
-    }
-
-    Type argTy = MetatypeType::get(resultTy);
-
-    // The type of the enum element is either (T) -> T or (T) -> ArgType -> T.
-    if (auto inputTy = getArgumentType())
-      resultTy = FunctionType::get(
-          ArchetypeBuilder::mapTypeOutOfContext(ED, inputTy), resultTy);
-
-    if (auto *genericSig = ED->getGenericSignatureOfContext())
-      resultTy = GenericFunctionType::get(genericSig, argTy, resultTy,
-                                          AnyFunctionType::ExtInfo());
-    else
-      resultTy = FunctionType::get(argTy, resultTy);
-
-    // Record the interface type.
+  if (resultTy->hasError()) {
     setInterfaceType(resultTy);
+    setInvalid();
+    return false;
   }
+
+  Type selfTy = MetatypeType::get(resultTy);
+
+  // The type of the enum element is either (T) -> T or (T) -> ArgType -> T.
+  if (auto inputTy = getArgumentType()) {
+    resultTy = FunctionType::get(
+        ArchetypeBuilder::mapTypeOutOfContext(ED, inputTy), resultTy);
+  }
+
+  if (auto *genericSig = ED->getGenericSignatureOfContext())
+    resultTy = GenericFunctionType::get(genericSig, selfTy, resultTy,
+                                        AnyFunctionType::ExtInfo());
+  else
+    resultTy = FunctionType::get(selfTy, resultTy);
+
+  // Record the interface type.
+  setInterfaceType(resultTy);
 
   return true;
 }

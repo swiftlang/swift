@@ -117,7 +117,7 @@ FuncDecl *DerivedConformance::declareDerivedPropertyGetter(TypeChecker &tc,
                      /*FuncLoc=*/SourceLoc(), DeclName(), /*NameLoc=*/SourceLoc(),
                      /*Throws=*/false, /*ThrowsLoc=*/SourceLoc(),
                      /*AccessorKeywordLoc=*/SourceLoc(),
-                     nullptr, params, Type(),
+                     nullptr, params,
                      TypeLoc::withoutLoc(propertyContextType), parentDC);
   getterDecl->setImplicit();
   getterDecl->setStatic(isStatic);
@@ -129,17 +129,8 @@ FuncDecl *DerivedConformance::declareDerivedPropertyGetter(TypeChecker &tc,
     getterDecl->getAttrs().add(new (C) FinalAttr(/*IsImplicit=*/true));
 
   // Compute the type of the getter.
-  GenericParamList *genericParams = getterDecl->getGenericParamsOfContext();
-  Type type = FunctionType::get(TupleType::getEmpty(C),
-                                propertyContextType);
   Type selfType = getterDecl->computeSelfType();
   selfDecl->overwriteType(selfType);
-  
-  if (genericParams)
-    type = PolymorphicFunctionType::get(selfType, type, genericParams);
-  else
-    type = FunctionType::get(selfType, type);
-  getterDecl->setType(type);
 
   // Compute the interface type of the getter.
   Type interfaceType = FunctionType::get(TupleType::getEmpty(C),
@@ -152,7 +143,7 @@ FuncDecl *DerivedConformance::declareDerivedPropertyGetter(TypeChecker &tc,
                                              interfaceType,
                                              FunctionType::ExtInfo());
   } else
-    interfaceType = type;
+    interfaceType = FunctionType::get(selfInterfaceType, interfaceType);
   getterDecl->setInterfaceType(interfaceType);
   getterDecl->setAccessibility(std::max(typeDecl->getFormalAccess(),
                                         Accessibility::Internal));

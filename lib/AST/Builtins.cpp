@@ -142,8 +142,7 @@ getBuiltinFunction(Identifier Id, ArrayRef<Type> argTypes, Type ResType,
     tupleElts.push_back(argType);
   
   Type ArgType = TupleType::get(tupleElts, Context);
-  Type FnType;
-  FnType = FunctionType::get(ArgType, ResType, Info);
+  Type FnType = FunctionType::get(ArgType, ResType, Info);
 
   Module *M = Context.TheBuiltinModule;
   DeclContext *DC = &M->getMainFile(FileUnitKind::Builtin);
@@ -168,7 +167,7 @@ getBuiltinFunction(Identifier Id, ArrayRef<Type> argTypes, Type ResType,
                              /*Throws=*/false, /*ThrowsLoc=*/SourceLoc(),
                              /*AccessorKeywordLoc=*/SourceLoc(),
                              /*GenericParams=*/nullptr,
-                             paramList, FnType,
+                             paramList,
                              TypeLoc::withoutLoc(ResType), DC);
   FD->setInterfaceType(FnType);
   FD->setImplicit();
@@ -220,11 +219,6 @@ getBuiltinGenericFunction(Identifier Id,
   
   auto *paramList = ParameterList::create(Context, params);
   
-  // Compute the function type.
-  Type FnType = PolymorphicFunctionType::get(paramList->getType(Context),
-                                             ResBodyType, GenericParams,
-                                             AnyFunctionType::ExtInfo());
-  
   DeclName Name(Context, Id, paramList);
   auto func = FuncDecl::create(Context, /*StaticLoc=*/SourceLoc(),
                                StaticSpellingKind::None,
@@ -232,7 +226,7 @@ getBuiltinGenericFunction(Identifier Id,
                                Name, /*NameLoc=*/SourceLoc(),
                                /*Throws=*/false, /*ThrowsLoc=*/SourceLoc(),
                                /*AccessorKeywordLoc=*/SourceLoc(),
-                               GenericParams, paramList, FnType,
+                               GenericParams, paramList,
                                TypeLoc::withoutLoc(ResBodyType), DC);
     
   func->setInterfaceType(InterfaceType);

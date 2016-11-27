@@ -145,7 +145,7 @@ static FuncDecl *createGetterPrototype(AbstractStorageDecl *storage,
       TC.Context, staticLoc, StaticSpellingKind::None, loc, Identifier(), loc,
       /*Throws=*/false, /*ThrowsLoc=*/SourceLoc(),
       /*AccessorKeywordLoc=*/SourceLoc(), /*GenericParams=*/nullptr,
-      getterParams, Type(), TypeLoc::withoutLoc(storageType),
+      getterParams, TypeLoc::withoutLoc(storageType),
       storage->getDeclContext());
   getter->setImplicit();
 
@@ -189,7 +189,7 @@ static FuncDecl *createSetterPrototype(AbstractStorageDecl *storage,
       TC.Context, /*StaticLoc=*/SourceLoc(), StaticSpellingKind::None, loc,
       Identifier(), loc, /*Throws=*/false, /*ThrowsLoc=*/SourceLoc(),
       /*AccessorKeywordLoc=*/SourceLoc(), /*GenericParams=*/nullptr,
-      params, Type(), TypeLoc::withoutLoc(setterRetTy),
+      params, TypeLoc::withoutLoc(setterRetTy),
       storage->getDeclContext());
   setter->setImplicit();
 
@@ -263,7 +263,7 @@ static FuncDecl *createMaterializeForSetPrototype(AbstractStorageDecl *storage,
       ctx, /*StaticLoc=*/SourceLoc(), StaticSpellingKind::None, loc,
       Identifier(), loc, /*Throws=*/false, /*ThrowsLoc=*/SourceLoc(),
       /*AccessorKeywordLoc=*/SourceLoc(), /*GenericParams=*/nullptr,
-      params, Type(), TypeLoc::withoutLoc(retTy), DC);
+      params, TypeLoc::withoutLoc(retTy), DC);
   materializeForSet->setImplicit();
   
   // materializeForSet is mutating and static if the setter is.
@@ -1321,15 +1321,9 @@ void TypeChecker::completePropertyBehaviorParameter(VarDecl *VD,
                                                   DC->getSelfInterfaceType(),
                                                   SubstInterfaceTy,
                                                   AnyFunctionType::ExtInfo());
-      auto genericParams = DC->getGenericParamsOfContext();
-      SubstContextTy = PolymorphicFunctionType::get(DC->getSelfTypeInContext(),
-                                                    SubstContextTy,
-                                                    genericParams);
     } else {
       SubstInterfaceTy = FunctionType::get(DC->getSelfInterfaceType(),
                                            SubstInterfaceTy);
-      SubstContextTy = FunctionType::get(DC->getSelfTypeInContext(),
-                                         SubstContextTy);
     }
   }
   
@@ -1386,7 +1380,6 @@ void TypeChecker::completePropertyBehaviorParameter(VarDecl *VD,
                      /*Throws=*/false, /*ThrowsLoc=*/SourceLoc(),
                      /*AccessorKeywordLoc=*/SourceLoc(),
                      /*GenericParams=*/nullptr, ParamLists,
-                     SubstContextTy,
                      TypeLoc::withoutLoc(SubstBodyResultTy), DC);
 
   Parameter->setInterfaceType(SubstInterfaceTy);
@@ -2119,14 +2112,11 @@ swift::createDesignatedInitOverride(TypeChecker &tc,
   AvailabilityInference::applyInferredAvailableAttrs(ctor, superclassCtor, ctx);
 
   // Configure 'self'.
-  auto selfType = configureImplicitSelf(tc, ctor);
+  configureImplicitSelf(tc, ctor);
 
   // Set the interface type of the initializer.
   ctor->setGenericEnvironment(classDecl->getGenericEnvironmentOfContext());
   tc.configureInterfaceType(ctor, ctor->getGenericSignature());
-
-  // Set the contextual type of the initializer. This will go away one day.
-  configureConstructorType(ctor, selfType, bodyParams->getType(ctx));
 
   if (superclassCtor->isObjC()) {
     // Inherit the @objc name from the superclass initializer, if it

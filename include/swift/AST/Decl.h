@@ -4861,7 +4861,7 @@ class FuncDecl final : public AbstractFunctionDecl,
            bool Throws, SourceLoc ThrowsLoc,
            SourceLoc AccessorKeywordLoc,
            unsigned NumParameterLists,
-           GenericParamList *GenericParams, Type Ty, DeclContext *Parent)
+           GenericParamList *GenericParams, DeclContext *Parent)
     : AbstractFunctionDecl(DeclKind::Func, Parent,
                            Name, NameLoc,
                            Throws, ThrowsLoc,
@@ -4874,7 +4874,6 @@ class FuncDecl final : public AbstractFunctionDecl,
       StaticLoc.isValid() || StaticSpelling != StaticSpellingKind::None;
     FuncDeclBits.StaticSpelling = static_cast<unsigned>(StaticSpelling);
     assert(NumParameterLists > 0 && "Must have at least an empty tuple arg");
-    setType(Ty);
     FuncDeclBits.Mutating = false;
     FuncDeclBits.HasDynamicSelf = false;
     FuncDeclBits.ForcedStaticDispatch = false;
@@ -4890,7 +4889,7 @@ class FuncDecl final : public AbstractFunctionDecl,
                               bool Throws, SourceLoc ThrowsLoc,
                               SourceLoc AccessorKeywordLoc,
                               GenericParamList *GenericParams,
-                              unsigned NumParameterLists, Type Ty,
+                              unsigned NumParameterLists,
                               DeclContext *Parent,
                               ClangNode ClangN);
 
@@ -4903,7 +4902,7 @@ public:
                                       bool Throws, SourceLoc ThrowsLoc,
                                       SourceLoc AccessorKeywordLoc,
                                       GenericParamList *GenericParams,
-                                      unsigned NumParameterLists, Type Ty,
+                                      unsigned NumParameterLists,
                                       DeclContext *Parent);
 
   static FuncDecl *create(ASTContext &Context, SourceLoc StaticLoc,
@@ -4913,7 +4912,7 @@ public:
                           bool Throws, SourceLoc ThrowsLoc,
                           SourceLoc AccessorKeywordLoc,
                           GenericParamList *GenericParams,
-                          ArrayRef<ParameterList *> ParameterLists, Type Ty,
+                          ArrayRef<ParameterList *> ParameterLists,
                           TypeLoc FnRetType, DeclContext *Parent,
                           ClangNode ClangN = ClangNode());
 
@@ -4988,11 +4987,6 @@ public:
 
   /// Retrieve the result interface type of this function.
   Type getResultInterfaceType() const;
-
-  /// Revert to an empty type.
-  void revertType() {
-    overwriteType(Type());
-  }
 
   /// isUnaryOperator - Determine whether this is a unary operator
   /// implementation.  This check is a syntactic rather than type-based check,

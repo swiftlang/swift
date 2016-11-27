@@ -1152,43 +1152,6 @@ Type swift::configureImplicitSelf(TypeChecker &tc,
   return selfTy;
 }
 
-/// Compute the allocating and initializing constructor types for
-/// the given constructor.
-void swift::configureConstructorType(ConstructorDecl *ctor,
-                                     Type selfType,
-                                     Type argType) {
-  Type fnType;
-  Type allocFnType;
-  Type resultType = selfType->getInOutObjectType();
-  if (ctor->getFailability() != OTK_None) {
-    resultType = OptionalType::get(ctor->getFailability(), resultType);
-  }
-
-  AnyFunctionType::ExtInfo extInfo;
-  if (ctor->hasThrows())
-    extInfo = extInfo.withThrows();
-
-  GenericParamList *outerGenericParams =
-      ctor->getDeclContext()->getGenericParamsOfContext();
-
-  if (GenericParamList *innerGenericParams = ctor->getGenericParams()) {
-    innerGenericParams->setOuterParameters(outerGenericParams);
-    fnType = PolymorphicFunctionType::get(argType, resultType,
-                                          innerGenericParams,
-                                          extInfo);
-  } else {
-    fnType = FunctionType::get(argType, resultType, extInfo);
-  }
-  Type selfMetaType = MetatypeType::get(selfType->getInOutObjectType());
-  if (ctor->getDeclContext()->isGenericContext()) {
-    allocFnType = PolymorphicFunctionType::get(selfMetaType, fnType,
-                                               outerGenericParams);
-  } else {
-    allocFnType = FunctionType::get(selfMetaType, fnType);
-  }
-  ctor->setType(allocFnType);
-}
-
 namespace {
 
 class TypeAccessScopeChecker : private TypeWalker {
@@ -4030,7 +3993,6 @@ public:
         for (auto *EED : ED->getAllElements()) {
           auto Res = Elements.insert({ EED->getName(), EED });
           if (!Res.second) {
-            EED->overwriteType(ErrorType::get(TC.Context));
             EED->setInterfaceType(ErrorType::get(TC.Context));
             EED->setInvalid();
             if (auto *RawValueExpr = EED->getRawValueExpr())
@@ -4374,9 +4336,6 @@ public:
   }
 
   bool semaFuncDecl(FuncDecl *FD, GenericTypeResolver *resolver) {
-    if (FD->hasType())
-      return true;
-
     TC.checkForForbiddenPrefix(FD);
 
     FD->setIsBeingTypeChecked();
@@ -4398,62 +4357,22 @@ public:
 
     FD->setIsBeingTypeChecked(false);
 
-    // Checking the function parameter patterns might (recursively)
-    // end up setting the type.
-    if (FD->hasType())
-      return true;
-
     if (badType) {
-      FD->setType(ErrorType::get(TC.Context));
       FD->setInterfaceType(ErrorType::get(TC.Context));
       FD->setInvalid();
       return true;
     }
 
-    Type funcTy = FD->getBodyResultTypeLoc().getType();
-    if (!funcTy) {
-      funcTy = TupleType::getEmpty(TC.Context);
-    }
-
-    // Form the function type by building the curried function type
-    // from the back to the front, "prepending" each of the parameter
-    // patterns.
-    GenericParamList *genericParams = FD->getGenericParams();
-    GenericParamList *outerGenericParams = nullptr;
     auto paramLists = FD->getParameterLists();
-    bool hasSelf = FD->getDeclContext()->isTypeContext();
-    if (FD->getDeclContext()->isGenericContext())
-      outerGenericParams = FD->getDeclContext()->getGenericParamsOfContext();
 
     for (unsigned i = 0, e = paramLists.size(); i != e; ++i) {
       Type argTy = paramLists[e - i - 1]->getType(TC.Context);
       if (!argTy) {
-        FD->setType(ErrorType::get(TC.Context));
         FD->setInterfaceType(ErrorType::get(TC.Context));
         FD->setInvalid();
         return true;
       }
-
-      // Determine the appropriate generic parameters at this level.
-      GenericParamList *params = nullptr;
-      if (e - i - 1 == hasSelf && genericParams) {
-        params = genericParams;
-      } else if (e - i - 1 == 0 && outerGenericParams) {
-        params = outerGenericParams;
-      }
-
-      // 'throws' only applies to the innermost function.
-      AnyFunctionType::ExtInfo Info;
-      if (i == 0 && FD->hasThrows())
-        Info = Info.withThrows();
-      
-      if (params) {
-        funcTy = PolymorphicFunctionType::get(argTy, funcTy, params, Info);
-      } else {
-        funcTy = FunctionType::get(argTy, funcTy, Info);
-      }
     }
-    FD->setType(funcTy);
 
     return false;
   }
@@ -6242,7 +6161,6 @@ public:
     
     if (EED->isBeingTypeChecked()) {
       TC.diagnose(EED->getLoc(), diag::circular_reference);
-      EED->setType(ErrorType::get(TC.Context));
       EED->setInterfaceType(ErrorType::get(TC.Context));
       EED->setInvalid();
       return;
@@ -6263,7 +6181,6 @@ public:
       if (!EED->getArgumentTypeLoc().isNull()) {
         if (TC.validateType(EED->getArgumentTypeLoc(), EED->getDeclContext(),
                             TR_EnumCase)) {
-          EED->overwriteType(ErrorType::get(TC.Context));
           EED->setInterfaceType(ErrorType::get(TC.Context));
           EED->setInvalid();
           return;
@@ -6310,7 +6227,6 @@ public:
     if (EED->getArgumentType() &&
         !EED->getArgumentType()->isMaterializable()) {
       TC.diagnose(EED->getLoc(), diag::enum_element_not_materializable);
-      EED->overwriteType(ErrorType::get(TC.Context));
       EED->setInterfaceType(ErrorType::get(TC.Context));
       EED->setInvalid();
     }
@@ -6399,8 +6315,8 @@ public:
 
   void visitConstructorDecl(ConstructorDecl *CD) {
     if (CD->isInvalid()) {
-      CD->overwriteType(ErrorType::get(TC.Context));
       CD->setInterfaceType(ErrorType::get(TC.Context));
+      CD->setInvalid();
       return;
     }
 
@@ -6469,7 +6385,7 @@ public:
       }
     }
 
-    Type SelfTy = configureImplicitSelf(TC, CD);
+    configureImplicitSelf(TC, CD);
 
     Optional<ArchetypeBuilder> builder;
     if (auto gp = CD->getGenericParams()) {
@@ -6512,13 +6428,9 @@ public:
       // Type check the constructor parameters.
       GenericTypeToArchetypeResolver resolver(CD->getGenericEnvironment());
       if (CD->isInvalid() || semaFuncParamPatterns(CD, &resolver)) {
-        CD->overwriteType(ErrorType::get(TC.Context));
         CD->setInterfaceType(ErrorType::get(TC.Context));
         CD->setInvalid();
       } else {
-        configureConstructorType(CD, SelfTy,
-                                 CD->getParameterList(1)->getType(TC.Context));
-
         if (!CD->getGenericSignatureOfContext())
           TC.configureInterfaceType(CD, CD->getGenericSignature());
       }
@@ -6630,7 +6542,6 @@ public:
 
   void visitDestructorDecl(DestructorDecl *DD) {
     if (DD->isInvalid()) {
-      DD->overwriteType(ErrorType::get(TC.Context));
       DD->setInterfaceType(ErrorType::get(TC.Context));
       return;
     }
@@ -6653,7 +6564,7 @@ public:
       DD->setAccessibility(enclosingClass->getFormalAccess());
     }
 
-    Type SelfTy = configureImplicitSelf(TC, DD);
+    configureImplicitSelf(TC, DD);
 
     if (DD->getDeclContext()->getGenericSignatureOfContext()) {
       (void)TC.validateGenericFuncSignature(DD);
@@ -6663,26 +6574,12 @@ public:
 
     GenericTypeToArchetypeResolver resolver(DD->getGenericEnvironment());
     if (semaFuncParamPatterns(DD, &resolver)) {
-      DD->overwriteType(ErrorType::get(TC.Context));
       DD->setInterfaceType(ErrorType::get(TC.Context));
       DD->setInvalid();
     }
 
     if (!DD->getGenericSignatureOfContext())
       TC.configureInterfaceType(DD, DD->getGenericSignature());
-
-    if (!DD->hasType()) {
-      Type FnTy;
-      if (DD->getDeclContext()->isGenericContext()) {
-        FnTy = PolymorphicFunctionType::get(SelfTy,
-                                            TupleType::getEmpty(TC.Context),
-                            DD->getDeclContext()->getGenericParamsOfContext());
-      } else {
-        FnTy = FunctionType::get(SelfTy, TupleType::getEmpty(TC.Context));
-      }
-
-      DD->setType(FnTy);
-    }
 
     // Do this before markAsObjC() to diagnose @nonobjc better
     validateAttributes(TC, DD);
@@ -7349,7 +7246,6 @@ void TypeChecker::validateDecl(ValueDecl *D, bool resolveTypeParams) {
       validateDecl(container);
       typeCheckDecl(D, true);
     } else {
-      D->setType(ErrorType::get(Context));
       D->setInterfaceType(ErrorType::get(Context));
     }
     break;

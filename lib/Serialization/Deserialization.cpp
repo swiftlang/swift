@@ -2431,7 +2431,6 @@ Decl *ModuleFile::getDecl(DeclID DID, Optional<DeclContext *> ForcedContext) {
     ctor->setParameterLists(bodyParams0->get(0), bodyParams1);
 
     auto interfaceType = getType(interfaceID);
-    ctor->setType(interfaceType);
     ctor->setInterfaceType(interfaceType);
 
     ctor->setGenericEnvironment(genericEnv);
@@ -2624,7 +2623,7 @@ Decl *ModuleFile::getDecl(DeclID DID, Optional<DeclContext *> ForcedContext) {
         /*FuncLoc=*/SourceLoc(), name, /*NameLoc=*/SourceLoc(),
         /*Throws=*/throws, /*ThrowsLoc=*/SourceLoc(),
         /*AccessorKeywordLoc=*/SourceLoc(), genericParams,
-        numParamPatterns, /*type=*/nullptr, DC);
+        numParamPatterns, DC);
     fn->setEarlyAttrValidation();
     declOrOffset = fn;
 
@@ -2658,7 +2657,6 @@ Decl *ModuleFile::getDecl(DeclID DID, Optional<DeclContext *> ForcedContext) {
 
     // Set the interface type.
     auto interfaceType = getType(interfaceTypeID);
-    fn->setType(interfaceType);
     fn->setInterfaceType(interfaceType);
 
     fn->setGenericEnvironment(genericEnv);
@@ -3075,7 +3073,6 @@ Decl *ModuleFile::getDecl(DeclID DID, Optional<DeclContext *> ForcedContext) {
     }
 
     auto interfaceType = getType(interfaceTypeID);
-    elem->setType(interfaceType);
     elem->setInterfaceType(interfaceType);
 
     if (isImplicit)
@@ -3240,7 +3237,6 @@ Decl *ModuleFile::getDecl(DeclID DID, Optional<DeclContext *> ForcedContext) {
     dtor->setSelfDecl(selfParams->get(0));
 
     auto interfaceType = getType(interfaceID);
-    dtor->setType(interfaceType);
     dtor->setInterfaceType(interfaceType);
 
     dtor->setGenericEnvironment(DC->getGenericEnvironmentOfContext());

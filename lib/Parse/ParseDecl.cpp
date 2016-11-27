@@ -3176,7 +3176,7 @@ static FuncDecl *createAccessorFunc(SourceLoc DeclLoc, ParameterList *param,
                              /*NameLoc=*/DeclLoc, /*Throws=*/false,
                              /*ThrowsLoc=*/SourceLoc(), AccessorKeywordLoc,
                              /*GenericParams=*/nullptr,
-                             Params, Type(), ReturnType, P->CurDeclContext);
+                             Params, ReturnType, P->CurDeclContext);
 
   // Non-static set/willSet/didSet/materializeForSet/mutableAddress
   // default to mutating.  get/address default to
@@ -3817,7 +3817,6 @@ void Parser::ParsedAccessors::record(Parser &P, AbstractStorageDecl *storage,
                                      SmallVectorImpl<Decl *> &decls) {
   auto flagInvalidAccessor = [&](FuncDecl *&func) {
     if (func) {
-      func->setType(ErrorType::get(P.Context));
       func->setInterfaceType(ErrorType::get(P.Context));
       func->setInvalid();
     }
@@ -4570,7 +4569,7 @@ Parser::parseDeclFunc(SourceLoc StaticLoc, StaticSpellingKind StaticSpelling,
                           FuncLoc, FullName, NameLoc,
                           /*Throws=*/throwsLoc.isValid(), throwsLoc,
                           /*AccessorKeywordLoc=*/SourceLoc(),
-                          GenericParams, BodyParams, Type(), FuncRetTy,
+                          GenericParams, BodyParams, FuncRetTy,
                           CurDeclContext);
     
     diagnoseOperatorFixityAttributes(*this, Attributes, FD);
