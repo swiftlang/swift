@@ -9,10 +9,12 @@
 // See https://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
 //
 //===----------------------------------------------------------------------===//
-//
-// This file defines a container for scope information used to
-// generate debug info.
-//
+///
+/// \file
+///
+/// This file defines a container for scope information used to
+/// generate debug info.
+///
 //===----------------------------------------------------------------------===//
 
 #ifndef SWIFT_SIL_DEBUGSCOPE_H
