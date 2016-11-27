@@ -5278,7 +5278,7 @@ ConstructorDecl *SwiftDeclConverter::importConstructor(
       continue;
 
     // Resolve the type of the constructor.
-    if (!ctor->hasType())
+    if (!ctor->hasInterfaceType())
       Impl.getTypeResolver()->resolveDeclSignature(ctor);
 
     // If the types don't match, this is a different constructor with
