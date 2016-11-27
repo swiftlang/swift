@@ -617,20 +617,15 @@ bool CheckedCastBrJumpThreading::trySimplify(CheckedCastBranchInst *CCBI) {
 
     // Since we are going to change the BB, add its successors and predecessors
     // for re-processing.
-    for (auto *B : BB->getPredecessorBlocks()) {
-      BlocksForWorklist.push_back(B);
-    }
-    for (auto *B : BB->getSuccessorBlocks()) {
-      BlocksForWorklist.push_back(B);
-    }
+    copy(BB->getPredecessorBlocks(), std::back_inserter(BlocksForWorklist));
+    copy(BB->getSuccessorBlocks(), std::back_inserter(BlocksForWorklist));
+
     // Remember the blocks we are going to change. So that we ignore them
     // for upcoming checked_cast_br instructions.
     BlocksToEdit.insert(BB);
     BlocksToClone.insert(BB);
-    for (auto *B : SuccessPreds)
-      BlocksToEdit.insert(B);
-    for (auto *B : FailurePreds)
-      BlocksToEdit.insert(B);
+    copy(SuccessPreds, std::back_inserter(BlocksToEdit));
+    copy(FailurePreds, std::back_inserter(BlocksToEdit));
 
     // Record what we want to change.
     Edit *edit = new (EditAllocator.Allocate())
