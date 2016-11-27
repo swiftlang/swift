@@ -635,7 +635,7 @@ FindNamedDecls(ASTContext *ast, const StringRef &name, VisitNodeResult &result,
               result._decls.push_back(decl);
               Type decl_type;
               if (decl->hasType()) {
-                decl_type = decl->getType();
+                decl_type = decl->getInterfaceType();
                 MetatypeType *meta_type = decl_type->getAs<MetatypeType>();
                 if (meta_type)
                   decl_type = meta_type->getInstanceType();
@@ -691,7 +691,7 @@ FindNamedDecls(ASTContext *ast, const StringRef &name, VisitNodeResult &result,
         if (decl->hasType()) {
           result._decls.push_back(decl);
           if (decl->hasType()) {
-            result._types.push_back(decl->getType());
+            result._types.push_back(decl->getInterfaceType());
             MetatypeType *meta_type =
                 result._types.back()->getAs<MetatypeType>();
             if (meta_type)

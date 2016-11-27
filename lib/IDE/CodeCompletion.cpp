@@ -935,7 +935,7 @@ calculateTypeRelationForDecl(const Decl *D, Type ExpectedType,
     return CodeCompletionResult::ExpectedTypeRelation::Unrelated;
 
   if (auto FD = dyn_cast<AbstractFunctionDecl>(VD)) {
-    auto funcType = FD->getType()->getAs<AnyFunctionType>();
+    auto funcType = FD->getInterfaceType()->getAs<AnyFunctionType>();
     if (DC->isTypeContext() && funcType && funcType->is<AnyFunctionType>() &&
         !IsImplicitlyCurriedInstanceMethod)
       funcType = funcType->getResult()->getAs<AnyFunctionType>();
@@ -952,7 +952,7 @@ calculateTypeRelationForDecl(const Decl *D, Type ExpectedType,
     return std::max(calculateTypeRelation(NTD->getType(), ExpectedType, DC),
                     calculateTypeRelation(NTD->getDeclaredType(), ExpectedType, DC));
   }
-  return calculateTypeRelation(VD->getType(), ExpectedType, DC);
+  return calculateTypeRelation(VD->getInterfaceType(), ExpectedType, DC);
 }
 
 static CodeCompletionResult::ExpectedTypeRelation
@@ -1482,7 +1482,7 @@ static bool isTopLevelContext(const DeclContext *DC) {
 static Type getReturnTypeFromContext(const DeclContext *DC) {
   if (auto FD = dyn_cast<AbstractFunctionDecl>(DC)) {
     if (FD->hasType()) {
-      if (auto FT = FD->getType()->getAs<FunctionType>()) {
+      if (auto FT = FD->getInterfaceType()->getAs<FunctionType>()) {
         return FT->getResult();
       }
     }
@@ -2677,8 +2677,8 @@ public:
     // Enum element is of function type such as EnumName.type -> Int ->
     // EnumName; however we should show Int -> EnumName as the type
     Type EnumType;
-    if (EED->hasType()) {
-      EnumType = EED->getType();
+    if (EED->hasInterfaceType()) {
+      EnumType = EED->getInterfaceType();
       if (auto FuncType = EnumType->getAs<AnyFunctionType>()) {
         EnumType = FuncType->getResult();
       }
@@ -2809,7 +2809,7 @@ public:
           // type is the typealias instead of the underlying type of the alias.
           Optional<Type> Result = None;
           if (auto AT = MT->getInstanceType()) {
-            if (!CD->getType()->is<ErrorType>() &&
+            if (!CD->getInterfaceType()->is<ErrorType>() &&
                 AT->getKind() == TypeKind::NameAlias &&
                 AT->getDesugaredType() ==
                     CD->getResultInterfaceType().getPointer())
@@ -3677,7 +3677,7 @@ public:
         }
       } else if (isNameHit(VD->getNameStr())) {
         if (VD->hasType())
-          unboxType(VD->getType());
+          unboxType(VD->getInterfaceType());
       }
     }
   };
@@ -3697,7 +3697,7 @@ public:
               return false;
           }
 
-          auto T = VD->getType();
+          auto T = VD->getInterfaceType();
           while (auto FT = T->getAs<AnyFunctionType>())
             T = FT->getResult();
           return T->getCanonicalType() == contextCanT;
@@ -5272,7 +5272,7 @@ void CodeCompletionCallbacksImpl::doneParsing() {
   case CompletionKind::ReturnStmtExpr : {
     SourceLoc Loc = P.Context.SourceMgr.getCodeCompletionLoc();
     if (auto FD = dyn_cast<AbstractFunctionDecl>(CurDeclContext)) {
-      if (auto FT = FD->getType()->getAs<FunctionType>()) {
+      if (auto FT = FD->getInterfaceType()->getAs<FunctionType>()) {
         Lookup.setExpectedTypes(FT->getResult());
       }
     }
