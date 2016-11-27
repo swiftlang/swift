@@ -113,7 +113,7 @@ bool ide::printDeclUSR(const ValueDecl *D, raw_ostream &OS) {
     return Ignore;
   }
 
-  if (!D->hasType())
+  if (!D->hasInterfaceType())
     return true;
 
   // FIXME: mangling 'self' in destructors crashes in mangler.

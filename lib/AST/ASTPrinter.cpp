@@ -2489,7 +2489,7 @@ void PrintAST::printParameterList(ParameterList *PL, Type paramListTy,
 
 void PrintAST::printFunctionParameters(AbstractFunctionDecl *AFD) {
   auto BodyParams = AFD->getParameterLists();
-  auto curTy = AFD->hasType() ? AFD->getInterfaceType() : nullptr;
+  auto curTy = AFD->hasInterfaceType() ? AFD->getInterfaceType() : nullptr;
 
   // Skip over the implicit 'self'.
   if (AFD->getImplicitSelfDecl()) {

@@ -69,7 +69,7 @@ static bool updateOverloadSet(CanTypeSet &overloads,
   for (auto result : decls) {
     if (!isOverloadable(result))
       return false;
-    if (!result->hasType())
+    if (!result->hasInterfaceType())
       continue;
     overloads.insert(result->getInterfaceType()->getCanonicalType());
   }
@@ -85,7 +85,7 @@ static bool updateOverloadSet(NamedCanTypeSet &overloads,
     auto &entry = overloads[result->getName()];
     if (!isOverloadable(result))
       entry.first = ResolutionKind::Exact;
-    else if (!result->hasType())
+    else if (!result->hasInterfaceType())
       continue;
     else
       entry.second.insert(result->getInterfaceType()->getCanonicalType());
@@ -107,7 +107,7 @@ static ResolutionKind recordImportDecls(LazyResolver *typeResolver,
     // may be ambiguous with respect to each other, just not any existing decls.
     std::copy_if(newDecls.begin(), newDecls.end(), std::back_inserter(results),
                  [&](ValueDecl *result) -> bool {
-      if (!result->hasType()) {
+      if (!result->hasInterfaceType()) {
         if (typeResolver) {
           typeResolver->resolveDeclSignature(result);
           if (result->isInvalid())

@@ -70,7 +70,7 @@ public:
   
   bool hasType() const {
     if (auto *AFD = TheFunction.dyn_cast<AbstractFunctionDecl *>())
-      return AFD->hasType();
+      return AFD->hasInterfaceType();
     return !TheFunction.get<AbstractClosureExpr *>()->getType().isNull();
   }
 

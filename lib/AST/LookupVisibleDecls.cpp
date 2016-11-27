@@ -294,10 +294,10 @@ static void doDynamicLookup(VisibleDeclConsumer &Consumer,
         return;
 
       // Ensure that the declaration has a type.
-      if (!D->hasType()) {
+      if (!D->hasInterfaceType()) {
         if (!TypeResolver) return;
         TypeResolver->resolveDeclSignature(D);
-        if (!D->hasType()) return;
+        if (!D->hasInterfaceType()) return;
       }
 
       switch (D->getKind()) {

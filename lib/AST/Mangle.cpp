@@ -486,7 +486,7 @@ Type Mangler::getDeclTypeForMangling(const ValueDecl *decl,
                                 ArrayRef<Requirement> &requirements,
                                 SmallVectorImpl<Requirement> &requirementsBuf) {
   auto &C = decl->getASTContext();
-  if (!decl->hasType())
+  if (!decl->hasInterfaceType())
     return ErrorType::get(C);
 
   Type type = decl->getInterfaceType();

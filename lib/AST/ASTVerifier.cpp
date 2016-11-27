@@ -666,7 +666,7 @@ struct ASTNodeBase {};
       }
       
       if (D->getAttrs().hasAttribute<OverrideAttr>()) {
-        if (!D->isInvalid() && D->hasType() &&
+        if (!D->isInvalid() && D->hasInterfaceType() &&
             !isa<ClassDecl>(D->getDeclContext()) &&
             !isa<ExtensionDecl>(D->getDeclContext())) {
           PrettyStackTraceDecl debugStack("verifying override", D);
@@ -2751,7 +2751,7 @@ struct ASTNodeBase {};
     void checkErrors(ValueDecl *D) {
       PrettyStackTraceDecl debugStack("verifying errors", D);
 
-      if (!D->hasType())
+      if (!D->hasInterfaceType())
         return;
       if (D->getInterfaceType()->hasError() && !D->isInvalid()) {
         Out << "Valid decl has error type!\n";

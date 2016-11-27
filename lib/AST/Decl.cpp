@@ -2417,7 +2417,7 @@ bool ClassDecl::inheritsSuperclassInitializers(LazyResolver *resolver) {
       continue;
 
     // Resolve this initializer, if needed.
-    if (!ctor->hasType())
+    if (!ctor->hasInterfaceType())
       resolver->resolveDeclSignature(ctor);
 
     // Ignore any stub implementations.
@@ -2880,7 +2880,7 @@ bool ProtocolDecl::existentialTypeSupportedSlow(LazyResolver *resolver) {
 
   for (auto member : getMembers()) {
     if (auto vd = dyn_cast<ValueDecl>(member)) {
-      if (resolver && !vd->hasType())
+      if (resolver && !vd->hasInterfaceType())
         resolver->resolveDeclSignature(vd);
     }
 
@@ -4475,7 +4475,7 @@ void FuncDecl::setDeserializedSignature(ArrayRef<ParameterList *> BodyParams,
 }
 
 Type FuncDecl::getResultInterfaceType() const {
-  if (!hasType())
+  if (!hasInterfaceType())
     return nullptr;
 
   Type resultTy = getInterfaceType();
