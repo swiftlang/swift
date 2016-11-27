@@ -1059,7 +1059,7 @@ static void filterValues(Type expectedTy, Module *expectedModule,
                                [=](ValueDecl *value) {
     if (isType != isa<TypeDecl>(value))
       return true;
-    if (!value->hasType())
+    if (!value->hasInterfaceType())
       return true;
     if (canTy && value->getInterfaceType()->getCanonicalType() != canTy)
       return true;
