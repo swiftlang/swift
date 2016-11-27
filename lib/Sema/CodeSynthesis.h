@@ -46,7 +46,7 @@ void makeDynamic(ASTContext &ctx, ValueDecl *D);
 void markAsObjC(TypeChecker &TC, ValueDecl *D,
                 Optional<ObjCReason> isObjC,
                 Optional<ForeignErrorConvention> errorConvention = None);
-Type configureImplicitSelf(TypeChecker &tc,
+void configureImplicitSelf(TypeChecker &tc,
                            AbstractFunctionDecl *func);
 bool checkOverrides(TypeChecker &TC, ValueDecl *decl);
 

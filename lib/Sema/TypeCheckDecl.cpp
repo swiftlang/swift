@@ -1124,9 +1124,7 @@ void swift::makeDynamic(ASTContext &ctx, ValueDecl *D) {
 /// pattern, etc.
 ///
 /// \param func The function whose 'self' is being configured.
-///
-/// \returns the type of 'self'.
-Type swift::configureImplicitSelf(TypeChecker &tc,
+void swift::configureImplicitSelf(TypeChecker &tc,
                                   AbstractFunctionDecl *func) {
   auto selfDecl = func->getImplicitSelfDecl();
 
@@ -1149,7 +1147,6 @@ Type swift::configureImplicitSelf(TypeChecker &tc,
   // Install the self type on the Parameter that contains it.  This ensures that
   // we don't lose it when generic types get reverted.
   selfDecl->getTypeLoc() = TypeLoc::withoutLoc(selfTy);
-  return selfTy;
 }
 
 namespace {
