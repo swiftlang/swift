@@ -449,7 +449,7 @@ private:
 
     Optional<ForeignErrorConvention> errorConvention
       = AFD->getForeignErrorConvention();
-    Type rawMethodTy = AFD->getType()->castTo<AnyFunctionType>()->getResult();
+    Type rawMethodTy = AFD->getInterfaceType()->castTo<AnyFunctionType>()->getResult();
     auto methodTy = rawMethodTy->castTo<FunctionType>();
     auto resultTy = getForeignResultType(AFD, methodTy, errorConvention);
 
@@ -554,9 +554,12 @@ private:
     printDocumentationComment(FD);
     Optional<ForeignErrorConvention> errorConvention
       = FD->getForeignErrorConvention();
-    auto resultTy = getForeignResultType(FD,
-                                         FD->getType()->castTo<FunctionType>(),
-                                         errorConvention);
+    assert(!FD->getGenericSignature() &&
+           "top-level generic functions not supported here");
+    auto resultTy = getForeignResultType(
+        FD,
+        FD->getInterfaceType()->castTo<FunctionType>(),
+        errorConvention);
     
     // The result type may be a partial function type we need to close
     // up later.
@@ -1581,8 +1584,14 @@ class ReferencedTypeFinder : private TypeVisitor<ReferencedTypeFinder> {
     return;
   }
 
-  void visitGenericTypeParamType(GenericTypeParamType *archetype) {
-    llvm_unreachable("unexpected generic type param type in @objc decl");
+  void visitGenericTypeParamType(GenericTypeParamType *param) {
+    // Appears in protocols and in generic ObjC classes.
+    return;
+  }
+
+  void visitDependentMemberType(DependentMemberType *member) {
+    // Appears in protocols and in generic ObjC classes.
+    return;
   }
 
   void visitSubstitutedType(SubstitutedType *sub) {
@@ -1846,7 +1855,7 @@ public:
       }
 
       bool needsToBeIndividuallyDelayed = false;
-      ReferencedTypeFinder::walk(M, VD->getType(),
+      ReferencedTypeFinder::walk(M, VD->getInterfaceType(),
                                  [&](ReferencedTypeFinder &finder,
                                      const TypeDecl *TD) {
         if (TD == container)
