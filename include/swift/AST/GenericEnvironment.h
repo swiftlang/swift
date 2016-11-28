@@ -53,6 +53,16 @@ public:
                           GenericSignature *signature,
                           TypeSubstitutionMap interfaceToArchetypeMap);
 
+  /// Create a new, "incomplete" generic environment that will be populated
+  /// by calls to \c addMapping().
+  static
+  GenericEnvironment *getIncomplete(ASTContext &ctx,
+                                    GenericSignature *signature);
+
+  /// Add a mapping of a generic parameter to a specific type (which may be
+  /// an archetype)
+  void addMapping(GenericTypeParamType *genericParam, Type contextType);
+
   /// Make vanilla new/delete illegal.
   void *operator new(size_t Bytes) = delete;
   void operator delete(void *Data) = delete;

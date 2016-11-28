@@ -2197,21 +2197,39 @@ GenericSignature *ArchetypeBuilder::getGenericSignature() {
 GenericEnvironment *ArchetypeBuilder::getGenericEnvironment(GenericSignature *signature) {
   TypeSubstitutionMap interfaceToArchetypeMap;
 
+  auto genericEnv = GenericEnvironment::getIncomplete(Context, signature);
+  SmallVector<std::pair<const GenericTypeParamKey, PotentialArchetype *>, 2>
+    delayedPAs;
   for (auto pair : Impl->PotentialArchetypes) {
+    // If this potential archetype won't map directly to a primary archetype,
+    // skip it for now.
+    if (pair.second->isConcreteType() ||
+        pair.second->getRepresentative() != pair.second) {
+      delayedPAs.push_back(pair);
+      continue;
+    }
+
+    // Add the mapping for this primary archetype.
+    auto paramTy = pair.second->getGenericParam();
+    auto archetype = pair.second->getType(*this).getAsArchetype();
+    genericEnv->addMapping(paramTy, archetype);
+  }
+
+  // Add the mapping for any potential archetypes we delayed because they
+  // depend on other archetypes.
+  for (auto pair : delayedPAs) {
     auto paramTy = pair.second->getGenericParam();
 
     auto archetypeTy = pair.second->getType(*this).getAsArchetype();
     auto concreteTy = pair.second->getType(*this).getAsConcreteType();
     if (archetypeTy)
-      interfaceToArchetypeMap[paramTy] = archetypeTy;
+      genericEnv->addMapping(paramTy, archetypeTy);
     else if (concreteTy)
-      interfaceToArchetypeMap[paramTy] = concreteTy;
+      genericEnv->addMapping(paramTy, concreteTy);
     else
       llvm_unreachable("broken generic parameter");
   }
 
-
-  return GenericEnvironment::get(Context, signature,
-                                 interfaceToArchetypeMap);
+  return genericEnv;
 }
 

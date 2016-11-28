@@ -3550,8 +3550,19 @@ GenericEnvironment *
 GenericEnvironment::get(ASTContext &ctx,
                         GenericSignature *signature,
                         TypeSubstitutionMap interfaceToArchetypeMap) {
-  return new (ctx) GenericEnvironment(signature,
-                                      interfaceToArchetypeMap);
+  assert(!interfaceToArchetypeMap.empty());
+  assert(interfaceToArchetypeMap.size() == signature->getGenericParams().size()
+         && "incorrect number of parameters");
+
+
+  return new (ctx) GenericEnvironment(signature, interfaceToArchetypeMap);
+}
+
+GenericEnvironment *GenericEnvironment::getIncomplete(
+                                                  ASTContext &ctx,
+                                                  GenericSignature *signature) {
+  TypeSubstitutionMap empty;
+  return new (ctx) GenericEnvironment(signature, empty);
 }
 
 void DeclName::CompoundDeclName::Profile(llvm::FoldingSetNodeID &id,
