@@ -21,7 +21,9 @@
 #include "swift/Runtime/Mutex.h"
 #include "ImageInspection.h"
 #include "Private.h"
+#if !defined(_WIN32)
 #include <dlfcn.h>
+#endif
 
 using namespace swift;
 

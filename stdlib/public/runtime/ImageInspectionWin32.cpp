@@ -22,6 +22,7 @@
 #include "swift/Runtime/Debug.h"
 #include <cstdlib>
 #include <cstring>
+#include <vector>
 
 #define WIN32_LEAN_AND_MEAN
 #define NOMINMAX
@@ -198,8 +199,8 @@ void swift::initializeProtocolConformanceLookup() {
   // FIXME: Find a way to have this continue to happen for dlopen-ed images.
   // rdar://problem/19045112
   const InspectArgs ProtocolConformancesArgs = {
+    addImageProtocolConformanceBlockCallback,
     ProtocolConformancesSection,
-    addImageProtocolConformanceBlockCallback
   };
   _swift_dl_iterate_phdr(_addImageCallback, &ProtocolConformancesArgs);
 }
@@ -210,8 +211,8 @@ void swift::initializeTypeMetadataRecordLookup() {
   // FIXME: Find a way to have this continue to happen for dlopen-ed images.
   // rdar://problem/19045112
   const InspectArgs TypeMetadataRecordsArgs = {
+    addImageTypeMetadataRecordBlockCallback,
     TypeMetadataRecordsSection,
-    addImageTypeMetadataRecordBlockCallback
   };
   _swift_dl_iterate_phdr(_addImageCallback, &TypeMetadataRecordsArgs);
 }
