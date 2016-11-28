@@ -2283,7 +2283,8 @@ bool TypeChecker::typeCheckExprPattern(ExprPattern *EP, DeclContext *DC,
                                          Context.getIdentifier("$match"),
                                          rhsType,
                                          DC);
-  matchVar->setInterfaceType(rhsType);
+  matchVar->setInterfaceType(ArchetypeBuilder::mapTypeOutOfContext(
+      DC, rhsType));
 
   matchVar->setImplicit();
   EP->setMatchVar(matchVar);

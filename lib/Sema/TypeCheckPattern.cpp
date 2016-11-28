@@ -971,7 +971,7 @@ static bool coercePatternViaConditionalDowncast(TypeChecker &tc,
                                             pattern->getLoc(),
                                             tc.Context.getIdentifier("$match"),
                                             type, dc);
-  matchVar->setInterfaceType(type);
+  matchVar->setInterfaceType(ArchetypeBuilder::mapTypeOutOfContext(dc, type));
   matchVar->setHasNonPatternBindingInit();
 
   // Form the cast $match as? T, which produces an optional.

@@ -1705,6 +1705,13 @@ Type ValueDecl::getInterfaceType() const {
 void ValueDecl::setInterfaceType(Type type) {
   assert((type.isNull() || !type->hasTypeVariable()) &&
          "Type variable in interface type");
+
+  // lldb creates global typealiases with archetypes in them.
+  // FIXME: Add an isDebugAlias() flag, like isDebugVar().
+  if (!isa<TypeAliasDecl>(this)) {
+    assert((type.isNull() || !type->hasArchetype()) &&
+           "Archetype in interface type");
+  }
   
   InterfaceTy = type;
 }
