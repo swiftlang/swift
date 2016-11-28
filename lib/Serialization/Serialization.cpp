@@ -2978,7 +2978,7 @@ void Serializer::writeType(Type ty) {
     SmallVector<IdentifierID, 4> nestedTypeNames;
     SmallVector<TypeID, 4> nestedTypes;
     SmallVector<bool, 4> areArchetypes;
-    for (auto next : archetypeTy->getNestedTypes()) {
+    for (auto next : archetypeTy->getAllNestedTypes()) {
       nestedTypeNames.push_back(addIdentifierRef(next.first));
       nestedTypes.push_back(addTypeRef(next.second.getValue()));
       areArchetypes.push_back(!next.second.isConcreteType());

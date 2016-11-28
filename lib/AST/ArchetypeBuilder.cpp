@@ -757,7 +757,7 @@ ArchetypeBuilder::PotentialArchetype::getType(ArchetypeBuilder &builder) {
     arch->setNestedTypes(builder.getASTContext(), FlatNestedTypes);
 
     // Force the resolution of the nested types.
-    (void)arch->getNestedTypes();
+    (void)arch->getAllNestedTypes();
 
     builder.getASTContext().unregisterLazyArchetype(arch);
   }

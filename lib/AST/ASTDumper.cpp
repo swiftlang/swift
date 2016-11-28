@@ -2824,7 +2824,7 @@ namespace {
         printRec("opened_existential", openedExistential);
 
       Indent += 2;
-      for (auto nestedType : T->getNestedTypes(/*resolveTypes=*/false)) {
+      for (auto nestedType : T->getKnownNestedTypes()) {
         OS << "\n";
         OS.indent(Indent) << "(";
         PrintWithColorRAII(OS, TypeFieldColor) << "nested_type";
