@@ -10,8 +10,8 @@
 //
 //===----------------------------------------------------------------------===//
 
-#ifndef SWIFT_SIL_SILSuccessor_H
-#define SWIFT_SIL_SILSuccessor_H
+#ifndef SWIFT_SIL_SILSUCCESSOR_H
+#define SWIFT_SIL_SILSUCCESSOR_H
 
 #include <cassert>
 #include <cstddef>
