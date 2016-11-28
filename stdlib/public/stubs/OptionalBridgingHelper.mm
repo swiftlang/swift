@@ -10,6 +10,9 @@
 //
 //===----------------------------------------------------------------------===//
 
+#include "swift/Runtime/Config.h"
+
+#if SWIFT_OBJC_INTEROP
 #include "swift/Basic/Lazy.h"
 #include "swift/Basic/LLVM.h"
 #include "swift/Runtime/Metadata.h"
@@ -97,3 +100,5 @@ id _swift_Foundation_getOptionalNilSentinelObject(const Metadata *Wrapped) {
 
   return objc_retain(getSentinelForDepth(depth));
 }
+#endif
+

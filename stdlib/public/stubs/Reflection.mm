@@ -11,6 +11,8 @@
 //===----------------------------------------------------------------------===//
 
 #include "swift/Runtime/Config.h"
+
+#if SWIFT_OBJC_INTEROP
 #import <Foundation/Foundation.h>
 
 SWIFT_CC(swift)
@@ -24,4 +26,5 @@ extern "C" bool _swift_stdlib_NSObject_isKindOfClass(
 
   return result;
 }
+#endif
 
