@@ -2848,7 +2848,7 @@ static Type substType(
     
     // For dependent member types, we may need to look up the member if the
     // base is resolved to a non-dependent type.
-    if (auto depMemTy = type->getAs<DependentMemberType>()) {
+    if (auto depMemTy = dyn_cast<DependentMemberType>(type.getPointer())) {
       auto newBase = substType(depMemTy->getBase(), conformances,
                                substitutions, options);
       if (!newBase)
@@ -2860,7 +2860,7 @@ static Type substType(
                                   depMemTy->getName(), options);
     }
     
-    auto substOrig = type->getAs<SubstitutableType>();
+    auto substOrig = dyn_cast<SubstitutableType>(type.getPointer());
     if (!substOrig)
       return type;
 
