@@ -32,6 +32,7 @@
 #include "swift/AST/ReferencedNameTracker.h"
 #include "swift/AST/TypeRefinementContext.h"
 #include "swift/Basic/Dwarf.h"
+#include "swift/Basic/Edit.h"
 #include "swift/Basic/Fallthrough.h"
 #include "swift/Basic/FileSystem.h"
 #include "swift/Basic/LLVMContext.h"
@@ -423,7 +424,7 @@ static bool emitReferenceDependencies(DiagnosticEngine &diags,
     auto rhsMangledName = mangleTypeAsContext(rhs->first.first);
     return lhsMangledName.compare(rhsMangledName);
   });
-  
+
   for (auto &entry : sortedMembers) {
     assert(entry.first.first != nullptr);
     if (entry.first.first->hasAccessibility() &&
@@ -582,7 +583,7 @@ private:
     if (!shouldFix(Kind, Info))
       return;
     for (const auto &Fix : Info.FixIts) {
-      writeEdit(SM, Fix.getRange(), Fix.getText(), *OSPtr);
+      swift::writeEdit(SM, Fix.getRange(), Fix.getText(), *OSPtr);
     }
   }
 
@@ -661,28 +662,6 @@ private:
       return true;
 
     return false;
-  }
-
-  void writeEdit(SourceManager &SM, CharSourceRange Range, StringRef Text,
-                 llvm::raw_ostream &OS) {
-    SourceLoc Loc = Range.getStart();
-    unsigned BufID = SM.findBufferContainingLoc(Loc);
-    unsigned Offset = SM.getLocOffsetInBuffer(Loc, BufID);
-    unsigned Length = Range.getByteLength();
-    SmallString<200> Path =
-      StringRef(SM.getIdentifierForBuffer(BufID));
-
-    OS << " {\n";
-    OS << "  \"file\": \"";
-    OS.write_escaped(Path.str()) << "\",\n";
-    OS << "  \"offset\": " << Offset << ",\n";
-    if (Length != 0)
-      OS << "  \"remove\": " << Length << ",\n";
-    if (!Text.empty()) {
-      OS << "  \"text\": \"";
-      OS.write_escaped(Text) << "\",\n";
-    }
-    OS << " },\n";
   }
 };
 
