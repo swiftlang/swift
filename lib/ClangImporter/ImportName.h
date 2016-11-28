@@ -130,6 +130,8 @@ struct ImportedName {
     case ImportedAccessorKind::SubscriptSetter:
       return true;
     }
+    
+    llvm_unreachable("Invalid ImportedAccessorKind.");
   }
 };
 
