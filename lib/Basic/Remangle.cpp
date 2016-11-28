@@ -1388,18 +1388,6 @@ void Remangler::mangleAssociatedType(Node *node) {
   }
 }
 
-void Remangler::mangleArchetypeRef(Node *node) {
-  Node::IndexType relativeDepth = node->getChild(0)->getIndex();
-  Node::IndexType index = node->getChild(1)->getIndex();
-
-  Out << 'Q';
-  if (relativeDepth != 0) {
-    Out << 'd';
-    mangleIndex(relativeDepth - 1);
-  }
-  mangleIndex(index);
-}
-
 void Remangler::mangleQualifiedArchetype(Node *node) {
   Out << "Qq";
   mangleChildNodes(node); // index, declcontext

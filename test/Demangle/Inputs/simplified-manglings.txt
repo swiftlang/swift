@@ -176,7 +176,7 @@ _TtPMP_ ---> Any.Type
 _TFCs13_NSSwiftArray29canStoreElementsOfDynamicTypefPMP_Sb ---> _NSSwiftArray.canStoreElementsOfDynamicType(Any.Type) -> Bool
 _TFCs13_NSSwiftArrayg17staticElementTypePMP_ ---> _NSSwiftArray.staticElementType.getter
 _TFCs17_DictionaryMirrorg9valueTypePMP_ ---> _DictionaryMirror.valueType.getter
-_TPA__TFFVs11GeneratorOfcuRd__s13GeneratorTyperFqd__GS_x_U_FT_GSqQd___ ---> partial apply for GeneratorOf.(init<A where ...> (A1) -> GeneratorOf<A>).(closure #1)
+_TPA__TFFVs11GeneratorOfcuRd__s13GeneratorTyperFqd__GS_x_U_FT_GSqx_ ---> partial apply for GeneratorOf.(init<A where ...> (A1) -> GeneratorOf<A>).(closure #1)
 _TTSf1cl35_TFF7specgen6callerFSiT_U_FTSiSi_T_Si___TF7specgen12take_closureFFTSiSi_T_T_ ---> specialized take_closure((Int, Int) -> ()) -> ()
 _TTSf1cl35_TFF7specgen6callerFSiT_U_FTSiSi_T_Si___TTSg5Si___TF7specgen12take_closureFFTSiSi_T_T_ ---> specialized specialized take_closure((Int, Int) -> ()) -> ()
 _TTSg5Si___TTSf1cl35_TFF7specgen6callerFSiT_U_FTSiSi_T_Si___TF7specgen12take_closureFFTSiSi_T_T_ ---> specialized specialized take_closure((Int, Int) -> ()) -> ()
@@ -190,8 +190,8 @@ _TTSf2dgs___TTSf2s_d___TFVs11_StringCoreCfVs13_StringBufferS_ ---> specialized s
 _TTSf3d_i_d_i_d_i___TFVs11_StringCoreCfVs13_StringBufferS_ ---> specialized _StringCore.init(_StringBuffer) -> _StringCore
 _TTSf3d_i_n_i_d_i___TFVs11_StringCoreCfVs13_StringBufferS_ ---> specialized _StringCore.init(_StringBuffer) -> _StringCore
 _TFIZvV8mangling10HasVarInit5stateSbiu_KT_Sb ---> static HasVarInit.(state).(variable initialization expression).(implicit closure #1)
-_TFFV23interface_type_mangling18GenericTypeContext23closureInGenericContexturFqd__T_L_3fooFTQd__x_T_ ---> GenericTypeContext.(closureInGenericContext<A> (A1) -> ()).(foo #1)(A1, A) -> ()
-_TFFV23interface_type_mangling18GenericTypeContextg31closureInGenericPropertyContextxL_3fooFT_Q_ ---> GenericTypeContext.(closureInGenericPropertyContext.getter).(foo #1)() -> A
+_TFFV23interface_type_mangling18GenericTypeContext23closureInGenericContexturFqd__T_L_3fooFTqd__x_T_ ---> GenericTypeContext.(closureInGenericContext<A> (A1) -> ()).(foo #1)(A1, A) -> ()
+_TFFV23interface_type_mangling18GenericTypeContextg31closureInGenericPropertyContextxL_3fooFT_x ---> GenericTypeContext.(closureInGenericPropertyContext.getter).(foo #1)() -> A
 _TTWurGV23interface_type_mangling18GenericTypeContextx_S_18GenericWitnessTestS_FS1_23closureInGenericContextu_RxS1_rfqd__T_ ---> protocol witness for GenericWitnessTest.closureInGenericContext<A where ...> (A1) -> () in conformance <A> GenericTypeContext<A>
 _TTWurGV23interface_type_mangling18GenericTypeContextx_S_18GenericWitnessTestS_FS1_g31closureInGenericPropertyContextwx3Tee ---> protocol witness for GenericWitnessTest.closureInGenericPropertyContext.getter in conformance <A> GenericTypeContext<A>
 _TTWurGV23interface_type_mangling18GenericTypeContextx_S_18GenericWitnessTestS_FS1_16twoParamsAtDepthu0_RxS1_rfTqd__1yqd_0__T_ ---> protocol witness for GenericWitnessTest.twoParamsAtDepth<A, B where ...> (A1, y : B1) -> () in conformance <A> GenericTypeContext<A>
