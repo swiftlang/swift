@@ -1478,6 +1478,7 @@ void Mangler::mangleClosureComponents(Type Ty, unsigned discriminator,
   if (!Ty)
     Ty = ErrorType::get(localContext->getASTContext());
 
+  Ty = ArchetypeBuilder::mapTypeOutOfContext(parentContext, Ty);
   mangleType(Ty->getCanonicalType(), /*uncurry*/ 0);
 }
 
