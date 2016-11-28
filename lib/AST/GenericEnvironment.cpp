@@ -5,8 +5,8 @@
 // Copyright (c) 2014 - 2016 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
-// See http://swift.org/LICENSE.txt for license information
-// See http://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
+// See https://swift.org/LICENSE.txt for license information
+// See https://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
 //
 //===----------------------------------------------------------------------===//
 //
@@ -47,12 +47,28 @@ GenericEnvironment::GenericEnvironment(
 
     // If we mapped the generic parameter to an archetype, add it to the
     // reverse mapping.
-    if (auto *archetypeTy = entry.second->getAs<ArchetypeType>())
-      ArchetypeToInterfaceMap[archetypeTy] = entry.first;
+    if (auto *archetypeTy = entry.second->getAs<ArchetypeType>()) {
+      // If we've already recorded an interface type for this archetype, then
+      // multiple generic parameters map to the same archetype. If the
+      // existing entry comes from a later generic parameter, replace it with
+      // the earlier generic parameter. This gives us a deterministic reverse
+      // mapping.
+      auto knownInterfaceType = ArchetypeToInterfaceMap.find(archetypeTy);
+      if (knownInterfaceType != ArchetypeToInterfaceMap.end()) {
+        auto otherGP
+          = knownInterfaceType->second->castTo<GenericTypeParamType>();
+        if (std::make_pair(canParamTy->getDepth(), canParamTy->getIndex())
+              < std::make_pair(otherGP->getDepth(), otherGP->getIndex()))
+          knownInterfaceType->second = entry.first;
+        continue;
+      }
 
-    // FIXME: If multiple generic parameters map to the same archetype,
-    // the reverse mapping order is not deterministic.
+      ArchetypeToInterfaceMap[archetypeTy] = entry.first;
+    }
   }
+
+  // Make sure this generic environment gets destroyed.
+  signature->getASTContext().addDestructorCleanup(*this);
 }
 
 void *GenericEnvironment::operator new(size_t bytes, const ASTContext &ctx) {

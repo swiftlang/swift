@@ -5,8 +5,8 @@
 // Copyright (c) 2014 - 2016 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
-// See http://swift.org/LICENSE.txt for license information
-// See http://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
+// See https://swift.org/LICENSE.txt for license information
+// See https://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
 //
 //===----------------------------------------------------------------------===//
 //
@@ -488,9 +488,6 @@ namespace {
         OS << " default=";
         defaultDef.print(OS);
       }
-      
-      if (decl->isRecursive())
-        OS << " <<RECURSIVE>>";
       
       OS << ")";
     }
@@ -2420,20 +2417,22 @@ public:
 
   void visitTupleTypeRepr(TupleTypeRepr *T) {
     printCommon(T, "type_tuple");
+
+    if (T->hasElementNames()) {
+      OS << " names=";
+      for (unsigned i = 0, end = T->getNumElements(); i != end; ++i) {
+        if (i) OS << ",";
+        auto name = T->getElementName(i);
+        if (T->isNamedParameter(i))
+          OS << (name.empty() ? "_" : "_ " + name.str());
+        else
+          OS << (name.empty() ? "''" : name.str());
+      }
+    }
+
     for (auto elem : T->getElements()) {
       OS << '\n';
       printRec(elem);
-    }
-    OS << ')';
-  }
-
-  void visitNamedTypeRepr(NamedTypeRepr *T) {
-    printCommon(T, "type_named");
-    if (T->hasName())
-      OS << " id=" << T->getName();
-    if (T->getTypeRepr()) {
-      OS << '\n';
-      printRec(T->getTypeRepr());
     }
     OS << ')';
   }
@@ -2825,7 +2824,7 @@ namespace {
         printRec("opened_existential", openedExistential);
 
       Indent += 2;
-      for (auto nestedType : T->getNestedTypes(/*resolveTypes=*/false)) {
+      for (auto nestedType : T->getKnownNestedTypes()) {
         OS << "\n";
         OS.indent(Indent) << "(";
         PrintWithColorRAII(OS, TypeFieldColor) << "nested_type";

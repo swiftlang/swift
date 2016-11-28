@@ -5,8 +5,8 @@
 // Copyright (c) 2014 - 2016 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
-// See http://swift.org/LICENSE.txt for license information
-// See http://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
+// See https://swift.org/LICENSE.txt for license information
+// See https://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
 //
 //===----------------------------------------------------------------------===//
 //
@@ -38,7 +38,7 @@ SILBasicBlock::SILBasicBlock(SILFunction *parent, SILBasicBlock *afterBB)
 }
 SILBasicBlock::~SILBasicBlock() {
   // Invalidate all of the basic block arguments.
-  for (auto *Arg : BBArgList) {
+  for (auto *Arg : ArgumentList) {
     getModule().notifyDeleteHandlers(Arg);
   }
 
@@ -105,41 +105,40 @@ void SILBasicBlock::eraseFromParent() {
 
 /// Replace the ith BB argument with a new one with type Ty (and optional
 /// ValueDecl D).
-SILArgument *SILBasicBlock::replaceBBArg(unsigned i, SILType Ty,
-                                         const ValueDecl *D) {
+SILArgument *SILBasicBlock::replaceArgument(unsigned i, SILType Ty,
+                                            const ValueDecl *D) {
   SILModule &M = getParent()->getModule();
 
-
-  assert(BBArgList[i]->use_empty() && "Expected no uses of the old BB arg!");
+  assert(ArgumentList[i]->use_empty() && "Expected no uses of the old BB arg!");
 
   // Notify the delete handlers that this argument is being deleted.
-  M.notifyDeleteHandlers(BBArgList[i]);
+  M.notifyDeleteHandlers(ArgumentList[i]);
 
   auto *NewArg = new (M) SILArgument(Ty, D);
   NewArg->setParent(this);
 
   // TODO: When we switch to malloc/free allocation we'll be leaking memory
   // here.
-  BBArgList[i] = NewArg;
+  ArgumentList[i] = NewArg;
 
   return NewArg;
 }
 
-SILArgument *SILBasicBlock::createBBArg(SILType Ty, const ValueDecl *D) {
+SILArgument *SILBasicBlock::createArgument(SILType Ty, const ValueDecl *D) {
   return new (getModule()) SILArgument(this, Ty, D);
 }
 
-SILArgument *SILBasicBlock::insertBBArg(bbarg_iterator Iter, SILType Ty,
-                                        const ValueDecl *D) {
+SILArgument *SILBasicBlock::insertArgument(arg_iterator Iter, SILType Ty,
+                                           const ValueDecl *D) {
   return new (getModule()) SILArgument(this, Iter, Ty, D);
 }
 
-void SILBasicBlock::eraseBBArg(int Index) {
-  assert(getBBArg(Index)->use_empty() &&
+void SILBasicBlock::eraseArgument(int Index) {
+  assert(getArgument(Index)->use_empty() &&
          "Erasing block argument that has uses!");
   // Notify the delete handlers that this BB argument is going away.
-  getModule().notifyDeleteHandlers(getBBArg(Index));
-  BBArgList.erase(BBArgList.begin() + Index);
+  getModule().notifyDeleteHandlers(getArgument(Index));
+  ArgumentList.erase(ArgumentList.begin() + Index);
 }
 
 /// \brief Splits a basic block into two at the specified instruction.
@@ -147,7 +146,7 @@ void SILBasicBlock::eraseBBArg(int Index) {
 /// Note that all the instructions BEFORE the specified iterator
 /// stay as part of the original basic block. The old basic block is left
 /// without a terminator.
-SILBasicBlock *SILBasicBlock::splitBasicBlock(iterator I) {
+SILBasicBlock *SILBasicBlock::split(iterator I) {
   SILBasicBlock *New = new (Parent->getModule()) SILBasicBlock(Parent);
   SILFunction::iterator Where = std::next(SILFunction::iterator(this));
   SILFunction::iterator First = SILFunction::iterator(New);

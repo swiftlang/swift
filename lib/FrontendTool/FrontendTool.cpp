@@ -5,8 +5,8 @@
 // Copyright (c) 2014 - 2016 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
-// See http://swift.org/LICENSE.txt for license information
-// See http://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
+// See https://swift.org/LICENSE.txt for license information
+// See https://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
 //
 //===----------------------------------------------------------------------===//
 ///
@@ -32,6 +32,7 @@
 #include "swift/AST/ReferencedNameTracker.h"
 #include "swift/AST/TypeRefinementContext.h"
 #include "swift/Basic/Dwarf.h"
+#include "swift/Basic/Edit.h"
 #include "swift/Basic/Fallthrough.h"
 #include "swift/Basic/FileSystem.h"
 #include "swift/Basic/LLVMContext.h"
@@ -423,7 +424,7 @@ static bool emitReferenceDependencies(DiagnosticEngine &diags,
     auto rhsMangledName = mangleTypeAsContext(rhs->first.first);
     return lhsMangledName.compare(rhsMangledName);
   });
-  
+
   for (auto &entry : sortedMembers) {
     assert(entry.first.first != nullptr);
     if (entry.first.first->hasAccessibility() &&
@@ -582,7 +583,7 @@ private:
     if (!shouldFix(Kind, Info))
       return;
     for (const auto &Fix : Info.FixIts) {
-      writeEdit(SM, Fix.getRange(), Fix.getText(), *OSPtr);
+      swift::writeEdit(SM, Fix.getRange(), Fix.getText(), *OSPtr);
     }
   }
 
@@ -662,28 +663,6 @@ private:
 
     return false;
   }
-
-  void writeEdit(SourceManager &SM, CharSourceRange Range, StringRef Text,
-                 llvm::raw_ostream &OS) {
-    SourceLoc Loc = Range.getStart();
-    unsigned BufID = SM.findBufferContainingLoc(Loc);
-    unsigned Offset = SM.getLocOffsetInBuffer(Loc, BufID);
-    unsigned Length = Range.getByteLength();
-    SmallString<200> Path =
-      StringRef(SM.getIdentifierForBuffer(BufID));
-
-    OS << " {\n";
-    OS << "  \"file\": \"";
-    OS.write_escaped(Path.str()) << "\",\n";
-    OS << "  \"offset\": " << Offset << ",\n";
-    if (Length != 0)
-      OS << "  \"remove\": " << Length << ",\n";
-    if (!Text.empty()) {
-      OS << "  \"text\": \"";
-      OS.write_escaped(Text) << "\",\n";
-    }
-    OS << " },\n";
-  }
 };
 
 } // anonymous namespace
@@ -757,11 +736,15 @@ static bool performCompile(CompilerInstance &Instance,
   if (shouldTrackReferences)
     Instance.setReferencedNameTracker(&nameTracker);
 
-  if (Action == FrontendOptions::DumpParse ||
+  if (Action == FrontendOptions::Parse ||
+      Action == FrontendOptions::DumpParse ||
       Action == FrontendOptions::DumpInterfaceHash)
     Instance.performParseOnly();
   else
     Instance.performSema();
+
+  if (Action == FrontendOptions::Parse)
+    return false;
 
   if (observer) {
     observer->performedSemanticAnalysis(Instance);
@@ -874,8 +857,8 @@ static bool performCompile(CompilerInstance &Instance,
       opts.ImplicitObjCHeaderPath.empty() &&
       !Context.LangOpts.EnableAppExtensionRestrictions;
 
-  // We've just been told to perform a parse, so we can return now.
-  if (Action == FrontendOptions::Parse) {
+  // We've just been told to perform a typecheck, so we can return now.
+  if (Action == FrontendOptions::Typecheck) {
     if (!opts.ObjCHeaderOutputPath.empty())
       return printAsObjC(opts.ObjCHeaderOutputPath, Instance.getMainModule(),
                          opts.ImplicitObjCHeaderPath, moduleIsPublic);

@@ -5,8 +5,8 @@
 // Copyright (c) 2014 - 2016 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
-// See http://swift.org/LICENSE.txt for license information
-// See http://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
+// See https://swift.org/LICENSE.txt for license information
+// See https://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
 //
 //===----------------------------------------------------------------------===//
 //
@@ -576,9 +576,8 @@ TypeBase::gatherAllSubstitutions(Module *module,
     return { };
 
   // If we already have a cached copy of the substitutions, return them.
-  auto *canon = getCanonicalType().getPointer();
-  const ASTContext &ctx = canon->getASTContext();
-  if (auto known = ctx.getSubstitutions(canon, gpContext))
+  const ASTContext &ctx = getASTContext();
+  if (auto known = ctx.getSubstitutions(this, gpContext))
     return *known;
 
   // Compute the set of substitutions.
@@ -586,12 +585,12 @@ TypeBase::gatherAllSubstitutions(Module *module,
 
   // The type itself contains substitutions up to the innermost
   // non-type context.
-  CanType parent(canon);
+  Type parent = this;
   ArrayRef<GenericTypeParamType *> genericParams =
     genericSig->getGenericParams();
   unsigned lastGenericIndex = genericParams.size();
   while (parent) {
-    if (auto boundGeneric = dyn_cast<BoundGenericType>(parent)) {
+    if (auto boundGeneric = parent->getAs<BoundGenericType>()) {
       unsigned index = lastGenericIndex - boundGeneric->getGenericArgs().size();
       for (Type arg : boundGeneric->getGenericArgs()) {
         auto paramTy = genericParams[index++];
@@ -600,12 +599,12 @@ TypeBase::gatherAllSubstitutions(Module *module,
       }
       lastGenericIndex -= boundGeneric->getGenericArgs().size();
 
-      parent = CanType(boundGeneric->getParent());
+      parent = boundGeneric->getParent();
       continue;
     }
 
-    if (auto nominal = dyn_cast<NominalType>(parent)) {
-      parent = CanType(nominal->getParent());
+    if (auto nominal = parent->getAs<NominalType>()) {
+      parent = nominal->getParent();
       continue;
     }
 
@@ -654,16 +653,15 @@ TypeBase::gatherAllSubstitutions(Module *module,
 
   // Before recording substitutions, make sure we didn't end up doing it
   // recursively.
-  if (auto known = ctx.getSubstitutions(canon, gpContext))
+  if (auto known = ctx.getSubstitutions(this, gpContext))
     return *known;
 
   // Copy and record the substitutions.
-  bool hasTypeVariables = canon->hasTypeVariable();
   auto permanentSubs = ctx.AllocateCopy(result,
-                                        hasTypeVariables
+                                        hasTypeVariable()
                                           ? AllocationArena::ConstraintSolver
                                           : AllocationArena::Permanent);
-  ctx.setSubstitutions(canon, gpContext, permanentSubs);
+  ctx.setSubstitutions(this, gpContext, permanentSubs);
   return permanentSubs;
 }
 

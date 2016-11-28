@@ -1,4 +1,4 @@
-// RUN: %target-build-swift -parse %s -Xfrontend -verify
+// RUN: %target-build-swift -typecheck %s -Xfrontend -verify
 
 class TestClass1 {
 #if false

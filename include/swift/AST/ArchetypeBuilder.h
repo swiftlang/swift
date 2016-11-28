@@ -5,8 +5,8 @@
 // Copyright (c) 2014 - 2016 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
-// See http://swift.org/LICENSE.txt for license information
-// See http://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
+// See https://swift.org/LICENSE.txt for license information
+// See https://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
 //
 //===----------------------------------------------------------------------===//
 //
@@ -218,7 +218,6 @@ public:
 
 private:
   PotentialArchetype *addGenericParameter(GenericTypeParamType *GenericParam,
-                                          ProtocolDecl *RootProtocol,
                                           Identifier ParamName);
 
 public:
@@ -357,9 +356,6 @@ class ArchetypeBuilder::PotentialArchetype {
   /// archetype corresponds.
   llvm::PointerUnion<PotentialArchetype*, GenericTypeParamType*> ParentOrParam;
 
-  /// The root protocol with which this potential archetype is associated.
-  ProtocolDecl *RootProtocol = nullptr;
-
   /// \brief The name of this potential archetype or, for an
   /// associated type, the declaration of the associated type to which
   /// this potential archetype has been resolved. Or, for a type alias,
@@ -460,9 +456,8 @@ class ArchetypeBuilder::PotentialArchetype {
 
   /// \brief Construct a new potential archetype for a generic parameter.
   PotentialArchetype(GenericTypeParamType *GenericParam, 
-                     ProtocolDecl *RootProtocol,
                      Identifier Name)
-    : ParentOrParam(GenericParam), RootProtocol(RootProtocol), 
+    : ParentOrParam(GenericParam),
       NameOrAssociatedType(Name), Representative(this), IsRecursive(false),
       Invalid(false), SubstitutingConcreteType(false),
       RecursiveConcreteType(false), RecursiveSuperclassType(false),

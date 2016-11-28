@@ -5,8 +5,8 @@
 // Copyright (c) 2014 - 2016 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
-// See http://swift.org/LICENSE.txt for license information
-// See http://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
+// See https://swift.org/LICENSE.txt for license information
+// See https://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
 //
 //===----------------------------------------------------------------------===//
 //
@@ -38,6 +38,44 @@ struct _SwiftEmptyArrayStorage {
 
 extern SWIFT_RUNTIME_STDLIB_INTERFACE
 struct _SwiftEmptyArrayStorage _swiftEmptyArrayStorage;
+
+struct _SwiftUnsafeBitMap {
+  __swift_uintptr_t *values;
+  __swift_intptr_t bitCount;
+};
+
+struct _SwiftDictionaryBodyStorage {
+  __swift_intptr_t capacity;
+  __swift_intptr_t count;
+  struct _SwiftUnsafeBitMap initializedEntries;
+  void *keys;
+  void *values;
+};
+
+struct _SwiftSetBodyStorage {
+  __swift_intptr_t capacity;
+  __swift_intptr_t count;
+  struct _SwiftUnsafeBitMap initializedEntries;
+  void *keys;
+};
+
+struct _SwiftEmptyDictionaryStorage {
+  struct HeapObject header;
+  struct _SwiftDictionaryBodyStorage body;
+  __swift_uintptr_t entries;
+};
+
+struct _SwiftEmptySetStorage {
+  struct HeapObject header;
+  struct _SwiftSetBodyStorage body;
+  __swift_uintptr_t entries;
+};
+
+extern SWIFT_RUNTIME_STDLIB_INTERFACE
+struct _SwiftEmptyDictionaryStorage _swiftEmptyDictionaryStorage;
+
+extern SWIFT_RUNTIME_STDLIB_INTERFACE
+struct _SwiftEmptySetStorage _swiftEmptySetStorage;
 
 struct _SwiftHashingSecretKey {
   __swift_uint64_t key0;

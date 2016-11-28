@@ -5,8 +5,8 @@
 // Copyright (c) 2014 - 2016 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
-// See http://swift.org/LICENSE.txt for license information
-// See http://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
+// See https://swift.org/LICENSE.txt for license information
+// See https://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
 //
 //===----------------------------------------------------------------------===//
 
@@ -19,8 +19,7 @@
 #include "swift/Basic/SourceManager.h"
 #include "swift/Markup/Markup.h"
 #include "swift/Markup/XMLUtils.h"
-#include "swift/Parse/Lexer.h"
-#include "swift/Syntax/Token.h"
+#include "swift/Parse/Token.h"
 #include "swift/Subsystems.h"
 #include "llvm/Support/MemoryBuffer.h"
 #include "llvm/Support/raw_ostream.h"
@@ -401,23 +400,21 @@ static void replaceObjcDeclarationsWithSwiftOnes(const Decl *D,
 std::string ide::extractPlainTextFromComment(const StringRef Text) {
   LangOptions LangOpts;
   SourceManager SourceMgr;
-
-  swift::Lexer L(LangOpts, SourceMgr, SourceMgr.addMemBufferCopy(Text),
-                 /*Diags=*/nullptr, /*InSILMode=*/false,
-                 // FIXME: Don't need this parameter anymore
-                 swift::CommentRetentionMode::ReturnAsTokens,
-                 /*Offset=*/0, /*EndOffset=*/0);
-  auto eof = L.lex();
-  assert(eof.getKind() == tok::eof);
-
-  auto RawCommentPieces = eof.getRawCommentPieces(SourceMgr);
-  if (RawCommentPieces.empty())
+  auto Tokens = swift::tokenize(LangOpts, SourceMgr,
+                                SourceMgr.addMemBufferCopy(Text));
+  std::vector<SingleRawComment> Comments;
+  Comments.reserve(Tokens.size());
+  for (auto &Tok : Tokens) {
+    if (Tok.is(tok::comment)) {
+      Comments.push_back(SingleRawComment(Tok.getText(), 0));
+    }
+  }
+  if (Comments.empty())
     return {};
 
-  auto RC = RawComment { llvm::makeArrayRef(RawCommentPieces) };
-
+  RawComment Comment(Comments);
   swift::markup::MarkupContext MC;
-  return MC.getLineList(RC).str();
+  return MC.getLineList(Comment).str();
 }
 
 bool ide::getDocumentationCommentAsXML(const Decl *D, raw_ostream &OS) {

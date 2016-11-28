@@ -11,6 +11,7 @@ enum E {}
 
 protocol P {}
 protocol P2 {}
+protocol P3 {}
 protocol AssociatedTypes {
   associatedtype A
   associatedtype B
@@ -63,6 +64,13 @@ TypeNameTests.test("Prints") {
   expectEqual("() -> () -> ()", _typeName(F2.self))
   expectEqual("(() -> ()) -> ()", _typeName(F3.self))
   expectEqual("() -> ()", _typeName((() -> ()).self))
+
+  expectEqual("(main.P) -> main.P2 & main.P3",
+    _typeName(((P) -> P2 & P3).self))
+  expectEqual("() -> main.P & main.P2 & main.P3",
+    _typeName((() -> P & P2 & P3).self))
+  expectEqual("(main.P & main.P2) -> main.P & main.P3",
+    _typeName(((P & P2) -> P3 & P).self))
  
   #if _runtime(_ObjC)
   typealias B = @convention(block) () -> ()

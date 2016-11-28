@@ -1,4 +1,4 @@
-// RUN: %target-swift-frontend %s -parse
+// RUN: %target-swift-frontend %s -typecheck
 
 public enum R<V> {
   case value(V)

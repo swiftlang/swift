@@ -5,8 +5,8 @@
 // Copyright (c) 2014 - 2016 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
-// See http://swift.org/LICENSE.txt for license information
-// See http://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
+// See https://swift.org/LICENSE.txt for license information
+// See https://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
 //
 //===----------------------------------------------------------------------===//
 
@@ -393,8 +393,10 @@ static void printAnnotatedDeclaration(const ValueDecl *VD,
                                       raw_ostream &OS) {
   AnnotatedDeclarationPrinter Printer(OS);
   PrintOptions PO = PrintOptions::printQuickHelpDeclaration();
-  if (BaseTy)
-    PO.setArchetypeSelfTransformForQuickHelp(BaseTy);
+  if (BaseTy) {
+    PO.setBaseType(BaseTy);
+    PO.PrintAsMember = true;
+  }
 
   // If it's implicit, try to find an overridden ValueDecl that's not implicit.
   // This will ensure we can properly annotate TypeRepr with a usr
@@ -413,8 +415,10 @@ void SwiftLangSupport::printFullyAnnotatedDeclaration(const ValueDecl *VD,
                                                       raw_ostream &OS) {
   FullyAnnotatedDeclarationPrinter Printer(OS);
   PrintOptions PO = PrintOptions::printQuickHelpDeclaration();
-  if (BaseTy)
-    PO.setArchetypeSelfTransformForQuickHelp(BaseTy);
+  if (BaseTy) {
+    PO.setBaseType(BaseTy);
+    PO.PrintAsMember = true;
+  }
 
   // If it's implicit, try to find an overridden ValueDecl that's not implicit.
   // This will ensure we can properly annotate TypeRepr with a usr
@@ -439,7 +443,8 @@ printFullyAnnotatedSynthesizedDeclaration(const swift::ValueDecl *VD,
       new SynthesizedExtensionAnalyzer(Target, PO));
     TargetToAnalyzerMap.insert({Target, std::move(Analyzer)});
   }
-  PO.initArchetypeTransformerForSynthesizedExtensions(Target);
+  PO.initForSynthesizedExtension(Target);
+  PO.PrintAsMember = true;
   VD->print(Printer, PO);
 }
 
@@ -742,8 +747,10 @@ static bool passCursorInfoForDecl(const ValueDecl *VD,
         PO.SkipIntroducerKeywords = true;
         PO.ArgAndParamPrinting = PrintOptions::ArgAndParamPrintingMode::ArgumentOnly;
         XMLEscapingPrinter Printer(OS);
-        if (BaseType)
-          PO.setArchetypeSelfTransform(BaseType);
+        if (BaseType) {
+          PO.setBaseType(BaseType);
+          PO.PrintAsMember = true;
+        }
         RelatedDecl->print(Printer, PO);
       } else {
         llvm::SmallString<128> Buf;
@@ -1032,7 +1039,6 @@ static void resolveRange(SwiftLangSupport &Lang,
       Length(Length), Receiver(std::move(Receiver)){ }
 
     void handlePrimaryAST(ASTUnitRef AstUnit) override {
-      auto &CompIns = AstUnit->getCompilerInstance();
       if (trace::enabled()) {
         // FIXME: Implement tracing
       }

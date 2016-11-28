@@ -5,8 +5,8 @@
 // Copyright (c) 2014 - 2016 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
-// See http://swift.org/LICENSE.txt for license information
-// See http://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
+// See https://swift.org/LICENSE.txt for license information
+// See https://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
 //
 //===----------------------------------------------------------------------===//
 
@@ -21,7 +21,7 @@
 #include "swift/Basic/PrimitiveParsing.h"
 #include "swift/ClangImporter/ClangImporter.h"
 #include "swift/ClangImporter/ClangModule.h"
-#include "swift/Syntax/Token.h"
+#include "swift/Parse/Token.h"
 #include "swift/Serialization/ModuleFile.h"
 #include "swift/Subsystems.h"
 #include "swift/Serialization/SerializedModuleLoader.h"
@@ -573,12 +573,10 @@ void swift::ide::printSubmoduleInterface(
                 AdjustedOptions.BracketOptions = {ET.first, false,
                                         Decls.back().first == ET.first, true};
                 if (ET.second)
-                  AdjustedOptions.
-                    initArchetypeTransformerForSynthesizedExtensions(NTD);
+                  AdjustedOptions.initForSynthesizedExtension(NTD);
                 ET.first->print(Printer, AdjustedOptions);
                 if (ET.second)
-                  AdjustedOptions.
-                    clearArchetypeTransformerForSynthesizedExtensions();
+                  AdjustedOptions.clearSynthesizedExtension();
                 if (AdjustedOptions.BracketOptions.shouldCloseExtension(ET.first))
                   Printer << "\n";
               }
@@ -605,12 +603,10 @@ void swift::ide::printSubmoduleInterface(
                 if (AdjustedOptions.BracketOptions.shouldOpenExtension(ET.first))
                   Printer << "\n";
                 if (ET.second)
-                  AdjustedOptions.
-                    initArchetypeTransformerForSynthesizedExtensions(NTD);
+                  AdjustedOptions.initForSynthesizedExtension(NTD);
                 ET.first->print(Printer, AdjustedOptions);
                 if (ET.second)
-                  AdjustedOptions.
-                    clearArchetypeTransformerForSynthesizedExtensions();
+                  AdjustedOptions.clearSynthesizedExtension();
                 if (AdjustedOptions.BracketOptions.shouldCloseExtension(ET.first))
                   Printer << "\n";
             }

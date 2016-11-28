@@ -5,8 +5,8 @@
 // Copyright (c) 2014 - 2016 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
-// See http://swift.org/LICENSE.txt for license information
-// See http://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
+// See https://swift.org/LICENSE.txt for license information
+// See https://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
 //
 //===----------------------------------------------------------------------===//
 
@@ -53,7 +53,7 @@ static void propagateLiveness(llvm::SmallPtrSetImpl<SILBasicBlock*> &LiveIn,
   // First populate a worklist of predecessors.
   llvm::SmallVector<SILBasicBlock*, 64> Worklist;
   for (auto *BB : LiveIn)
-    for (auto Pred : BB->getPreds())
+    for (auto Pred : BB->getPredecessorBlocks())
       Worklist.push_back(Pred);
 
   // Now propagate liveness backwards until we hit the alloc_box.
@@ -65,7 +65,7 @@ static void propagateLiveness(llvm::SmallPtrSetImpl<SILBasicBlock*> &LiveIn,
     if (BB == DefBB || !LiveIn.insert(BB).second)
       continue;
 
-    for (auto Pred : BB->getPreds())
+    for (auto Pred : BB->getPredecessorBlocks())
       Worklist.push_back(Pred);
   }
 }
@@ -272,7 +272,7 @@ static SILArgument *getParameterForOperand(SILFunction *F, Operand *O) {
   auto &Entry = F->front();
   size_t ParamIndex = getParameterIndexForOperand(O);
 
-  return Entry.getBBArg(ParamIndex);
+  return Entry.getArgument(ParamIndex);
 }
 
 /// Return a pointer to the SILFunction called by Call if we can
@@ -585,20 +585,19 @@ PromotedParamCloner::initCloned(SILFunction *Orig, IsFragile_t Fragile,
 void
 PromotedParamCloner::populateCloned() {
   SILFunction *Cloned = getCloned();
-  SILModule &M = Cloned->getModule();
 
   // Create arguments for the entry block
   SILBasicBlock *OrigEntryBB = &*Orig->begin();
-  SILBasicBlock *ClonedEntryBB = new (M) SILBasicBlock(Cloned);
+  SILBasicBlock *ClonedEntryBB = Cloned->createBasicBlock();
   unsigned ArgNo = 0;
-  auto I = OrigEntryBB->bbarg_begin(), E = OrigEntryBB->bbarg_end();
+  auto I = OrigEntryBB->args_begin(), E = OrigEntryBB->args_end();
   while (I != E) {
     if (count(PromotedParamIndices, ArgNo)) {
       // Create a new argument with the promoted type.
       auto promotedTy = (*I)->getType().castTo<SILBoxType>()
         ->getBoxedAddressType();
-      auto promotedArg = new (M)
-        SILArgument(ClonedEntryBB, promotedTy, (*I)->getDecl());
+      auto *promotedArg =
+          ClonedEntryBB->createArgument(promotedTy, (*I)->getDecl());
       PromotedParameters.insert(*I);
       
       // Map any projections of the box to the promoted argument.
@@ -611,7 +610,7 @@ PromotedParamCloner::populateCloned() {
     } else {
       // Create a new argument which copies the original argument.
       SILValue MappedValue =
-        new (M) SILArgument(ClonedEntryBB, (*I)->getType(), (*I)->getDecl());
+          ClonedEntryBB->createArgument((*I)->getType(), (*I)->getDecl());
       ValueMap.insert(std::make_pair(*I, MappedValue));
     }
     ++ArgNo;

@@ -5,8 +5,8 @@
 // Copyright (c) 2014 - 2016 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
-// See http://swift.org/LICENSE.txt for license information
-// See http://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
+// See https://swift.org/LICENSE.txt for license information
+// See https://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
 //
 //===----------------------------------------------------------------------===//
 
@@ -89,9 +89,9 @@ bool SILInliner::inlineFunction(FullApplySite AI, ArrayRef<SILValue> Args) {
   // Clear argument map and map ApplyInst arguments to the arguments of the
   // callee's entry block.
   ValueMap.clear();
-  assert(CalleeEntryBB->bbarg_size() == Args.size() &&
+  assert(CalleeEntryBB->args_size() == Args.size() &&
          "Unexpected number of arguments to entry block of function?");
-  auto BAI = CalleeEntryBB->bbarg_begin();
+  auto BAI = CalleeEntryBB->args_begin();
   for (auto AI = Args.begin(), AE = Args.end(); AI != AE; ++AI, ++BAI)
     ValueMap.insert(std::make_pair(*BAI, *AI));
 
@@ -127,7 +127,7 @@ bool SILInliner::inlineFunction(FullApplySite AI, ArrayRef<SILValue> Args) {
     SILBasicBlock *CallerBB = AI.getParent();
     // Split the BB and do NOT create a branch between the old and new
     // BBs; we will create the appropriate terminator manually later.
-    ReturnToBB = CallerBB->splitBasicBlock(InsertPoint);
+    ReturnToBB = CallerBB->split(InsertPoint);
     // Place the return-to BB after all the other mapped BBs.
     if (InsertBeforeBB)
       F.getBlocks().splice(SILFunction::iterator(InsertBeforeBB), F.getBlocks(),
@@ -137,8 +137,7 @@ bool SILInliner::inlineFunction(FullApplySite AI, ArrayRef<SILValue> Args) {
                            SILFunction::iterator(ReturnToBB));
 
     // Create an argument on the return-to BB representing the returned value.
-    auto *RetArg = new (F.getModule()) SILArgument(ReturnToBB,
-                                            AI.getInstruction()->getType());
+    auto *RetArg = ReturnToBB->createArgument(AI.getInstruction()->getType());
     // Replace all uses of the ApplyInst with the new argument.
     AI.getInstruction()->replaceAllUsesWith(RetArg);
   }

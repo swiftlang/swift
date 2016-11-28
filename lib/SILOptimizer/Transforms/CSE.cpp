@@ -5,8 +5,8 @@
 // Copyright (c) 2014 - 2016 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
-// See http://swift.org/LICENSE.txt for license information
-// See http://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
+// See https://swift.org/LICENSE.txt for license information
+// See https://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
 //
 //===----------------------------------------------------------------------===//
 //
@@ -601,7 +601,7 @@ namespace {
 static void updateBasicBlockArgTypes(SILBasicBlock *BB,
                                      TypeSubstitutionMap &TypeSubstMap) {
   // Check types of all BB arguments.
-  for (auto &Arg : BB->getBBArgs()) {
+  for (auto &Arg : BB->getArguments()) {
     if (!Arg->getType().getSwiftRValueType()->hasOpenedExistential())
       continue;
     // Type of this BB argument uses an opened existential.
@@ -623,7 +623,7 @@ static void updateBasicBlockArgTypes(SILBasicBlock *BB,
     // Then replace all uses by an undef.
     Arg->replaceAllUsesWith(SILUndef::get(Arg->getType(), BB->getModule()));
     // Replace the type of the BB argument.
-    BB->replaceBBArg(Arg->getIndex(), NewArgType, Arg->getDecl());
+    BB->replaceArgument(Arg->getIndex(), NewArgType, Arg->getDecl());
     // Restore all uses to refer to the BB argument with updated type.
     for (auto ArgUse : OriginalArgUses) {
       ArgUse->set(Arg);
@@ -667,7 +667,7 @@ bool CSE::processOpenExistentialRef(SILInstruction *Inst, ValueBase *V,
     // those uses by the new opened archetype.
     auto Successors = User->getParent()->getSuccessorBlocks();
     for (auto Successor : Successors) {
-      if (Successor->bbarg_empty())
+      if (Successor->args_empty())
         continue;
       // If a BB has any arguments, update their types if necessary.
       updateBasicBlockArgTypes(Successor, TypeSubstMap);

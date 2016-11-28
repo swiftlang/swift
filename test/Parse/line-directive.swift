@@ -1,4 +1,4 @@
-// RUN: %target-parse-verify-swift
+// RUN: %target-typecheck-verify-swift
 
 let x = 0 // We need this because of the #sourceLocation-ends-with-a-newline requirement.
 

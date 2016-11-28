@@ -5,8 +5,8 @@
 // Copyright (c) 2014 - 2016 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
-// See http://swift.org/LICENSE.txt for license information
-// See http://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
+// See https://swift.org/LICENSE.txt for license information
+// See https://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
 //
 //===----------------------------------------------------------------------===//
 //
@@ -50,12 +50,8 @@ Parser::parseGenericParameters(SourceLoc LAngleLoc) {
 
     // Parse attributes.
     DeclAttributes attributes;
-    auto RCPieces = Tok.getRawCommentPieces(Context.SourceMgr);
-    if (!RCPieces.empty()) {
-      auto CopiedPieces = Context.AllocateCopy(llvm::makeArrayRef(RCPieces));
-      auto RC = RawComment { CopiedPieces };
-      attributes.add(new (Context) RawDocCommentAttr { RC });
-    }
+    if (Tok.hasComment())
+      attributes.add(new (Context) RawDocCommentAttr(Tok.getCommentRange()));
     bool foundCCTokenInAttr;
     parseDeclAttributeList(attributes, foundCCTokenInAttr);
 
@@ -71,7 +67,7 @@ Parser::parseGenericParameters(SourceLoc LAngleLoc) {
     // Parse the ':' followed by a type.
     SmallVector<TypeLoc, 1> Inherited;
     if (Tok.is(tok::colon)) {
-      (void)consumeLoc();
+      (void)consumeToken();
       ParserResult<TypeRepr> Ty;
       
       if (Tok.isAny(tok::identifier, tok::code_complete, tok::kw_protocol, tok::kw_Any)) {
@@ -81,7 +77,7 @@ Parser::parseGenericParameters(SourceLoc LAngleLoc) {
         diagnose(Tok, diag::unexpected_class_constraint);
         diagnose(Tok, diag::suggest_anyobject, Name)
           .fixItReplace(Tok.getLoc(), "AnyObject");
-        consumeLoc();
+        consumeToken();
         Invalid = true;
       } else {
         diagnose(Tok, diag::expected_generics_type_restriction, Name);
@@ -248,7 +244,7 @@ ParserStatus Parser::parseGenericWhereClause(
                bool &FirstTypeInComplete) {
   ParserStatus Status;
   // Parse the 'where'.
-  WhereLoc = consumeLoc(tok::kw_where);
+  WhereLoc = consumeToken(tok::kw_where);
   FirstTypeInComplete = false;
   do {
     // Parse the leading type-identifier.
@@ -264,7 +260,7 @@ ParserStatus Parser::parseGenericWhereClause(
 
     if (Tok.is(tok::colon)) {
       // A conformance-requirement.
-      SourceLoc ColonLoc = consumeLoc();
+      SourceLoc ColonLoc = consumeToken();
 
       // Parse the protocol or composition.
       ParserResult<TypeRepr> Protocol = parseTypeForInheritance(
@@ -282,13 +278,13 @@ ParserStatus Parser::parseGenericWhereClause(
       Requirements.push_back(RequirementRepr::getTypeConstraint(FirstType.get(),
                                                      ColonLoc, Protocol.get()));
     } else if ((Tok.isAnyOperator() && Tok.getText() == "==") ||
-                Tok.is(tok::equal)) {
+               Tok.is(tok::equal)) {
       // A same-type-requirement
       if (Tok.is(tok::equal)) {
         diagnose(Tok, diag::requires_single_equal)
           .fixItReplace(SourceRange(Tok.getLoc()), "==");
       }
-      SourceLoc EqualLoc = consumeLoc();
+      SourceLoc EqualLoc = consumeToken();
 
       // Parse the second type.
       ParserResult<TypeRepr> SecondType = parseType();

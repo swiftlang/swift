@@ -2,7 +2,7 @@
 //
 // REQUIRES: nonexecutable_test
 //
-// RUN: %target-swift-frontend -parse %s
+// RUN: %target-swift-frontend -typecheck %s
 // RUN: %target-swift-ide-test -print-module -module-to-print=Swift -source-filename %s -print-interface > %t.txt
 // RUN: %FileCheck -check-prefix=CHECK-ARGC %s < %t.txt
 // RUN: %FileCheck %s < %t.txt

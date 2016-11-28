@@ -5,8 +5,8 @@
 // Copyright (c) 2014 - 2016 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
-// See http://swift.org/LICENSE.txt for license information
-// See http://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
+// See https://swift.org/LICENSE.txt for license information
+// See https://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
 //
 //===----------------------------------------------------------------------===//
 //
@@ -193,15 +193,14 @@ Lexer::Lexer(const LangOptions &Options,
     if (Ptr >= BufferStart && Ptr <= BufferEnd)
       CodeCompletionPtr = Ptr;
   }
-
-  NextToken = syntax::Token {};
 }
 
 void Lexer::primeLexer() {
-  if (CurPtr == BufferStart)
-    LeadingTrivia = { syntax::Trivia::startOfFile(getSourceLoc(CurPtr)) };
   assert(NextToken.is(tok::NUM_TOKENS));
   lexImpl();
+  assert((NextToken.isAtStartOfLine() || CurPtr != BufferStart) &&
+         "The token should be at the beginning of the line, "
+         "or we should be lexing from the middle of the buffer");
 }
 
 void Lexer::initSubLexer(Lexer &Parent, State BeginState, State EndState) {
@@ -232,7 +231,7 @@ InFlightDiagnostic Lexer::diagnose(const char *Loc, Diagnostic Diag) {
   return InFlightDiagnostic();
 }
 
-syntax::Token Lexer::getTokenAt(SourceLoc Loc) {
+Token Lexer::getTokenAt(SourceLoc Loc) {
   assert(BufferID == static_cast<unsigned>(
                          SourceMgr.findBufferContainingLoc(Loc)) &&
          "location from the wrong buffer");
@@ -240,7 +239,9 @@ syntax::Token Lexer::getTokenAt(SourceLoc Loc) {
   Lexer L(LangOpts, SourceMgr, BufferID, Diags, InSILMode,
           CommentRetentionMode::None);
   L.restoreState(State(Loc));
-  return L.lex();
+  Token Result;
+  L.lex(Result);
+  return Result;
 }
 
 void Lexer::formToken(tok Kind, const char *TokStart) {
@@ -249,28 +250,16 @@ void Lexer::formToken(tok Kind, const char *TokStart) {
 
   // When we are lexing a subrange from the middle of a file buffer, we will
   // run past the end of the range, but will stay within the file.  Check if
-  // we are past the imaginary EOF, and synthesize a tok::eof
-  // in this case.
-  if (Kind != tok::eof && ArtificialEOF &&
-      TokStart >= ArtificialEOF) {
+  // we are past the imaginary EOF, and synthesize a tok::eof in this case.
+  if (Kind != tok::eof && ArtificialEOF && TokStart >= ArtificialEOF) {
     Kind = tok::eof;
   }
   unsigned CommentLength = 0;
   if (RetainComments == CommentRetentionMode::AttachToNextToken && SeenComment)
     CommentLength = TokStart - LastCommentBlockStart;
 
-  StringRef TokenText(TokStart, CurPtr-TokStart);
-
-  lexTrivia(TrailingTrivia, /* StopAtFirstNewline */ true);
-
-  NextToken = syntax::Token { Kind, TokenText, LeadingTrivia, TrailingTrivia,
-                              getSourceLoc(TokStart) };
-  if (!TrailingTrivia.empty() &&
-      TrailingTrivia.front().getKind() == syntax::TriviaKind::Backtick)
-    ++CurPtr;
-  LeadingTrivia.clear();
-  TrailingTrivia.clear();
-  // CommentLength omitted - TODO: double check uses
+  NextToken.setToken(Kind, StringRef(TokStart, CurPtr-TokStart),
+                     CommentLength);
 }
 
 Lexer::State Lexer::getStateForBeginningOfTokenLoc(SourceLoc Loc) const {
@@ -317,42 +306,12 @@ static void diagnoseEmbeddedNul(DiagnosticEngine *Diags, const char *Ptr) {
       .fixItRemoveChars(NulLoc, NulEndLoc);
 }
 
-void Lexer::skipUpToEndOfLine() {
-  while (1) {
-    switch (*CurPtr) {
-    case '\n':
-    case '\r':
-      return;
-    default:
-      // If this is a "high" UTF-8 character, validate it.
-      if (*((signed char *)CurPtr) < 0) {
-        const char *CharStart = CurPtr;
-        if (validateUTF8CharacterAndAdvance(CurPtr, BufferEnd) == ~0U)
-          diagnose(CharStart, diag::lex_invalid_utf8);
-        else
-          continue;
-      }
-      break;   // Otherwise, eat other characters.
-    case 0:
-      // If this is a random nul character in the middle of a buffer, skip it as
-      // whitespace.
-      if (CurPtr != BufferEnd) {
-        diagnoseEmbeddedNul(Diags, CurPtr);
-        break;
-      }
-
-      // Otherwise, the last line of the file does not have a newline.
-      return;
-    }
-    ++CurPtr;
-  }
-}
-
 void Lexer::skipToEndOfLine() {
   while (1) {
     switch (*CurPtr++) {
     case '\n':
     case '\r':
+      NextToken.setAtStartOfLine(true);
       return;  // If we found the end of the line, return.
     default:
       // If this is a "high" UTF-8 character, validate it.
@@ -379,7 +338,6 @@ void Lexer::skipToEndOfLine() {
 }
 
 void Lexer::skipSlashSlashComment() {
-  llvm_unreachable("Don't skip comments!");
   assert(CurPtr[-1] == '/' && CurPtr[0] == '/' && "Not a // comment");
   skipToEndOfLine();
 }
@@ -393,15 +351,15 @@ void Lexer::skipHashbang() {
 /// skipSlashStarComment - /**/ comments are skipped (treated as whitespace).
 /// Note that (unlike in C) block comments can be nested.
 void Lexer::skipSlashStarComment() {
-  auto Start = CurPtr;
-  assert(*Start == '/' && Start[1] == '*' && "Not a /* comment");
+  const char *StartPtr = CurPtr-1;
+  assert(CurPtr[-1] == '/' && CurPtr[0] == '*' && "Not a /* comment");
   // Make sure to advance over the * so that we don't incorrectly handle /*/ as
   // the beginning and end of the comment.
-  CurPtr += 2;
-
+  ++CurPtr;
+  
   // /**/ comments can be nested, keep track of how deep we've gone.
   unsigned Depth = 1;
-
+  
   while (1) {
     switch (*CurPtr++) {
     case '*':
@@ -422,7 +380,7 @@ void Lexer::skipSlashStarComment() {
 
     case '\n':
     case '\r':
-      // NextToken.setAtStartOfLine(true);
+      NextToken.setAtStartOfLine(true);
       break;
 
     default:
@@ -442,7 +400,7 @@ void Lexer::skipSlashStarComment() {
         diagnoseEmbeddedNul(Diags, CurPtr-1);
         break;
       }
-
+      
       // Otherwise, we have an unterminated /* comment.
       --CurPtr;
 
@@ -454,7 +412,7 @@ void Lexer::skipSlashStarComment() {
       const char *EOL = (CurPtr[-1] == '\n') ? (CurPtr - 1) : CurPtr;
       diagnose(EOL, diag::lex_unterminated_block_comment)
         .fixItInsert(getSourceLoc(EOL), Terminator);
-      diagnose(Start, diag::lex_comment_start);
+      diagnose(StartPtr, diag::lex_comment_start);
       return;
     }
   }
@@ -586,21 +544,17 @@ bool Lexer::isOperator(StringRef string) {
 
 
 tok Lexer::kindOfIdentifier(StringRef Str, bool InSILMode) {
-  auto Kind = llvm::StringSwitch<tok>(Str)
+  tok Kind = llvm::StringSwitch<tok>(Str)
 #define KEYWORD(kw) \
     .Case(#kw, tok::kw_##kw)
 #include "swift/Parse/Tokens.def"
     .Default(tok::identifier);
 
   // These keywords are only active in SIL mode.
-  if ((Kind == tok::kw_sil ||
-       Kind == tok::kw_sil_stage ||
-       Kind == tok::kw_sil_vtable ||
-       Kind == tok::kw_sil_global ||
-       Kind == tok::kw_sil_witness_table ||
-       Kind == tok::kw_sil_default_witness_table ||
-       Kind == tok::kw_sil_coverage_map ||
-       Kind == tok::kw_undef) &&
+  if ((Kind == tok::kw_sil || Kind == tok::kw_sil_stage ||
+       Kind == tok::kw_sil_vtable || Kind == tok::kw_sil_global ||
+       Kind == tok::kw_sil_witness_table || Kind == tok::kw_sil_default_witness_table ||
+       Kind == tok::kw_sil_coverage_map || Kind == tok::kw_undef) &&
       !InSILMode)
     Kind = tok::identifier;
   return Kind;
@@ -617,7 +571,7 @@ void Lexer::lexIdentifier() {
   // Lex [a-zA-Z_$0-9[[:XID_Continue:]]]*
   while (advanceIfValidContinuationOfIdentifier(CurPtr, BufferEnd));
 
-  auto Kind = kindOfIdentifier(StringRef(TokStart, CurPtr-TokStart), InSILMode);
+  tok Kind = kindOfIdentifier(StringRef(TokStart, CurPtr-TokStart), InSILMode);
   return formToken(Kind, TokStart);
 }
 
@@ -646,17 +600,16 @@ void Lexer::lexHash() {
     ++tmpPtr;
 
   // Map the character sequence onto
-  auto Kind = llvm::StringSwitch<tok>(StringRef(CurPtr,
-                                                              tmpPtr-CurPtr))
+  tok Kind = llvm::StringSwitch<tok>(StringRef(CurPtr, tmpPtr-CurPtr))
 #define KEYWORD(kw)
 #define POUND_KEYWORD(id) \
   .Case(#id, tok::pound_##id)
 #include "swift/Parse/Tokens.def"
   .Default(tok::pound);
 
-  // If we didn't find a match, then just return tok::pound.
-  // This is highly dubious in terms of error recovery, but is useful for code
-  // completion and SIL parsing.
+  // If we didn't find a match, then just return tok::pound.  This is highly
+  // dubious in terms of error recovery, but is useful for code completion and
+  // SIL parsing.
   if (Kind == tok::pound)
     return formToken(tok::pound, TokStart);
 
@@ -745,7 +698,7 @@ void Lexer::lexOperatorIdentifier() {
   } while (advanceIfValidContinuationOfOperator(CurPtr, BufferEnd));
 
   if (CurPtr-TokStart > 2) {
-    // If there is a "//" or "/*" in the middle of an identifier token,
+    // If there is a "//" or "/*" in the middle of an identifier token, 
     // it starts a comment.
     for (auto Ptr = TokStart+1; Ptr != CurPtr-1; ++Ptr) {
       if (Ptr[0] == '/' && (Ptr[1] == '/' || Ptr[1] == '*')) {
@@ -772,8 +725,7 @@ void Lexer::lexOperatorIdentifier() {
         else
           d.fixItInsert(getSourceLoc(TokStart+1), " ");
       }
-      // always emit 'tok::equal' to avoid trickle down
-      // parse errors
+      // always emit 'tok::equal' to avoid trickle down parse errors
       return formToken(tok::equal, TokStart);
     case '&':
       if (leftBound == rightBound || leftBound)
@@ -794,8 +746,7 @@ void Lexer::lexOperatorIdentifier() {
         ++AfterHorzWhitespace;
 
       // First, when we are code completing "x. <ESC>", then make sure to return
-      // a tok::period, since that is what the user is wanting
-      // to know about.
+      // a tok::period, since that is what the user is wanting to know about.
       if (*AfterHorzWhitespace == '\0' &&
           AfterHorzWhitespace == CodeCompletionPtr) {
         diagnose(TokStart, diag::expected_member_name);
@@ -831,10 +782,9 @@ void Lexer::lexOperatorIdentifier() {
       return formToken(tok::unknown, TokStart);
     }
   } else {
-    auto Pos = StringRef(TokStart, CurPtr-TokStart).find("//");
     // Verify there is no "*/" in the middle of the identifier token, we reject
     // it as potentially ending a block comment.
-    Pos = StringRef(TokStart, CurPtr-TokStart).find("*/");
+    auto Pos = StringRef(TokStart, CurPtr-TokStart).find("*/");
     if (Pos != StringRef::npos) {
       diagnose(TokStart+Pos, diag::lex_unexpected_block_comment_end);
       return formToken(tok::unknown, TokStart);
@@ -1421,11 +1371,6 @@ void Lexer::lexEscapedIdentifier() {
   
   const char *Quote = CurPtr-1;
 
-  auto Backtick = syntax::Trivia(syntax::TriviaKind::Backtick,
-                                 String::createUnmanaged(StringRef(Quote, 1)),
-                                 getSourceLoc(Quote));
-  LeadingTrivia.push_back(Backtick);
-
   // Check whether we have an identifier followed by another backtick, in which
   // case this is an escaped identifier.
   const char *IdentifierStart = CurPtr;
@@ -1435,10 +1380,9 @@ void Lexer::lexEscapedIdentifier() {
 
     // If we have the terminating "`", it's an escaped identifier.
     if (*CurPtr == '`') {
-      auto Backtick = syntax::Trivia(syntax::TriviaKind::Backtick,
-        String::createUnmanaged(StringRef(CurPtr, 1)), getSourceLoc(CurPtr));
-      TrailingTrivia.push_front(Backtick);
-      formToken(tok::identifier, IdentifierStart);
+      ++CurPtr;
+      formToken(tok::identifier, Quote);
+      NextToken.setEscapedIdentifier(true);
       return;
     }
   }
@@ -1593,7 +1537,7 @@ StringRef Lexer::getEncodedStringSegment(StringRef Bytes,
 }
 
 void Lexer::getStringLiteralSegments(
-              const syntax::Token &Str,
+              const Token &Str,
               SmallVectorImpl<StringSegment> &Segments,
               DiagnosticEngine *Diags) {
   assert(Str.is(tok::string_literal));
@@ -1652,13 +1596,13 @@ void Lexer::lexImpl() {
   assert(CurPtr >= BufferStart &&
          CurPtr <= BufferEnd && "Current pointer out of range!");
 
+  NextToken.setAtStartOfLine(CurPtr == BufferStart);
+
   // Remember where we started so that we can find the comment range.
   LastCommentBlockStart = CurPtr;
   SeenComment = false;
 
 Restart:
-  lexTrivia(LeadingTrivia);
-
   // Remember the start of the token so we can form the text range.
   const char *TokStart = CurPtr;
   
@@ -1715,9 +1659,16 @@ Restart:
     return formToken(tok::unknown, TokStart);
   }
 
+  case '\n':
+  case '\r':
+    NextToken.setAtStartOfLine(true);
+    goto Restart;  // Skip whitespace.
+
+  case ' ':
+  case '\t':
   case '\f':
   case '\v':
-    goto Restart; // Skip form-feed and vertical tab.
+    goto Restart;  // Skip whitespace.
 
   case -1:
   case -2:
@@ -1772,10 +1723,18 @@ Restart:
       // Operator characters.
   case '/':
     if (CurPtr[0] == '/') {  // "//"
-      llvm_unreachable("Don't skip comments!");
+      skipSlashSlashComment();
+      SeenComment = true;
+      if (isKeepingComments())
+        return formToken(tok::comment, TokStart);
+      goto Restart;
     }
     if (CurPtr[0] == '*') { // "/*"
-      llvm_unreachable("Don't skip comments!");
+      skipSlashStarComment();
+      SeenComment = true;
+      if (isKeepingComments())
+        return formToken(tok::comment, TokStart);
+      goto Restart;
     }
     return lexOperatorIdentifier();
   case '%':
@@ -1844,154 +1803,15 @@ Restart:
   }
 }
 
-Optional<syntax::Trivia> Lexer::lexWhitespace(bool StopAtFirstNewline) {
-
-  auto Start = CurPtr;
-  auto Last = *Start;
-
-  if (Start == BufferEnd)
-    return None;
-
-  while (CurPtr != BufferEnd) {
-    auto c = *CurPtr;
-    if (syntax::isWhitespace(c)) {
-      if (StopAtFirstNewline && syntax::isNewline(c)) {
-        break;
-      }
-      // If this is a new kind of whitespace, pinch off
-      // a piece of trivia.
-      if (c != *Start)
-        break;
-
-      Last = c;
-      ++CurPtr;
-    } else {
-      break;
-    }
-  }
-
-  unsigned Length = CurPtr - Start;
-
-  if (Length == 0)
-    return None;
-
-  switch (Last) {
-    case '\n':
-    case '\r':
-      return syntax::Trivia {
-        syntax::TriviaKind::Newline,
-        String::createUnmanaged({ Start, Length }),
-        getSourceLoc(Start)
-      };
-    case ' ':
-      return syntax::Trivia {
-        syntax::TriviaKind::Space,
-        String::createUnmanaged({ Start, Length }),
-        getSourceLoc(Start)
-      };
-    case '\t':
-      return syntax::Trivia {
-        syntax::TriviaKind::Tab,
-        String::createUnmanaged({ Start, Length }),
-        getSourceLoc(Start)
-      };
-    default:
-      return None;
-  }
-}
-
-Optional<syntax::Trivia> Lexer::lexSingleLineComment(syntax::TriviaKind Kind) {
-  auto Start = CurPtr;
-  skipUpToEndOfLine();
-
-  unsigned Length = CurPtr - Start;
-
-  if (Length == 0)
-    return None;
-
-  return Optional<syntax::Trivia>({
-    Kind,
-    String::createUnmanaged({ Start, Length }),
-    getSourceLoc(Start)
-  });
-}
-
-Optional<swift::syntax::Trivia>
-Lexer::lexBlockComment(syntax::TriviaKind Kind) {
-  auto Start = CurPtr;
-  skipSlashStarComment();
-  unsigned Length = CurPtr - Start;
-  if (Length == 0)
-    return None;
-
-  return Optional<syntax::Trivia>({
-    Kind,
-    String::createUnmanaged({ Start, Length }),
-    getSourceLoc(Start)
-  });
-}
-
-Optional<swift::syntax::Trivia> Lexer::lexComment() {
-  if (CurPtr >= BufferEnd)
-    return None;
-
-  if (BufferEnd - CurPtr < 2)
-    return None;
-
-  StringRef Prefix { CurPtr, 2 };
-
-  if (Prefix == "//")
-    return lexSingleLineComment(syntax::TriviaKind::Comment);
-
-  if (Prefix == "/*")
-    return lexBlockComment(syntax::TriviaKind::Comment);
-
-  return None;
-}
-
-Optional<swift::syntax::Trivia> Lexer::lexDocComment() {
-  if (CurPtr >= BufferEnd)
-    return None;
-
-  if ((BufferEnd - CurPtr) < 3)
-    return None;
-
-  StringRef Prefix { CurPtr, 3 };
-
-  if (Prefix.startswith("///"))
-    return lexSingleLineComment(syntax::TriviaKind::DocComment);
-
-  if (Prefix.startswith("/**"))
-    return lexBlockComment(syntax::TriviaKind::DocComment);
-
-  return None;
-}
-
-void Lexer::lexTrivia(std::deque<syntax::Trivia> &TriviaList,
-                      bool StopAtFirstNewline) {
-  while (CurPtr != BufferEnd) {
-    if (auto Whitespace = lexWhitespace(StopAtFirstNewline)) {
-      TriviaList.push_back(Whitespace.getValue());
-    } else if (auto DocComment = lexDocComment()) {
-      TriviaList.push_back(DocComment.getValue());
-    } else if (auto Comment = lexComment()) {
-      TriviaList.push_back(Comment.getValue());
-    } else {
-      return;
-    }
-  }
-}
-
-Optional<syntax::Token>
-Lexer::getTokenAtLocation(const SourceManager &SM, SourceLoc Loc) {
+Token Lexer::getTokenAtLocation(const SourceManager &SM, SourceLoc Loc) {
   // Don't try to do anything with an invalid location.
   if (!Loc.isValid())
-    return None;
+    return Token();
 
   // Figure out which buffer contains this location.
   int BufferID = SM.findBufferContainingLoc(Loc);
   if (BufferID < 0)
-    return None;
+    return Token();
   
   // Use fake language options; language options only affect validity
   // and the exact token produced.
@@ -2008,10 +1828,7 @@ Lexer::getTokenAtLocation(const SourceManager &SM, SourceLoc Loc) {
 }
 
 SourceLoc Lexer::getLocForEndOfToken(const SourceManager &SM, SourceLoc Loc) {
-  auto Tok = getTokenAtLocation(SM, Loc);
-  if (!Tok.hasValue())
-    return SourceLoc();
-  return Loc.getAdvancedLocOrInvalid(Tok.getValue().getWidth());
+  return Loc.getAdvancedLocOrInvalid(getTokenAtLocation(SM, Loc).getLength());
 }
 
 
@@ -2029,10 +1846,9 @@ static SourceLoc getLocForStartOfTokenInBuf(SourceManager &SM,
           CommentRetentionMode::None, BufferStart, BufferEnd);
 
   // Lex tokens until we find the token that contains the source location.
-  syntax::Token
-  Tok;
+  Token Tok;
   do {
-    Tok = L.lex();
+    L.lex(Tok);
 
     unsigned TokOffs = SM.getLocOffsetInBuffer(Tok.getLoc(), BufferID);
     if (TokOffs > Offset) {
@@ -2041,7 +1857,7 @@ static SourceLoc getLocForStartOfTokenInBuf(SourceManager &SM,
       break;
     }
 
-    if (Offset < TokOffs + Tok.getWidth()) {
+    if (Offset < TokOffs+Tok.getLength()) {
       // Current token encompasses our source location.
 
       if (Tok.is(tok::string_literal)) {

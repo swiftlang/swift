@@ -1,4 +1,4 @@
-// RUN: %target-parse-verify-swift
+// RUN: %target-typecheck-verify-swift
 
 @discardableResult
 func takeFunc(_ f: (Int) -> Int) -> Int {}

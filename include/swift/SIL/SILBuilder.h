@@ -5,8 +5,8 @@
 // Copyright (c) 2014 - 2016 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
-// See http://swift.org/LICENSE.txt for license information
-// See http://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
+// See https://swift.org/LICENSE.txt for license information
+// See https://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
 //
 //===----------------------------------------------------------------------===//
 
@@ -1640,7 +1640,6 @@ private:
   }
 
   void appendOperandTypeName(SILType OpdTy, llvm::SmallString<16> &Name) {
-    auto &C = getASTContext();
     if (auto BuiltinIntTy =
             dyn_cast<BuiltinIntegerType>(OpdTy.getSwiftRValueType())) {
       if (BuiltinIntTy == BuiltinIntegerType::getWordType(getASTContext())) {
@@ -1650,7 +1649,7 @@ private:
         Name += "_Int" + llvm::utostr(NumBits);
       }
     } else {
-      assert(OpdTy.getSwiftRValueType() == C.TheRawPointerType);
+      assert(OpdTy.getSwiftRValueType() == getASTContext().TheRawPointerType);
       Name += "_RawPointer";
     }
   }

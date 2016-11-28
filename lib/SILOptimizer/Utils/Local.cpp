@@ -5,8 +5,8 @@
 // Copyright (c) 2014 - 2016 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
-// See http://swift.org/LICENSE.txt for license information
-// See http://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
+// See https://swift.org/LICENSE.txt for license information
+// See https://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
 //
 //===----------------------------------------------------------------------===//
 #include "swift/SILOptimizer/Utils/Local.h"
@@ -407,10 +407,10 @@ TermInst *swift::addArgumentToBranch(SILValue Val, SILBasicBlock *Dest,
 
     if (Dest == CBI->getTrueBB()) {
       TrueArgs.push_back(Val);
-      assert(TrueArgs.size() == Dest->getNumBBArg());
+      assert(TrueArgs.size() == Dest->getNumArguments());
     } else {
       FalseArgs.push_back(Val);
-      assert(FalseArgs.size() == Dest->getNumBBArg());
+      assert(FalseArgs.size() == Dest->getNumArguments());
     }
 
     return Builder.createCondBranch(CBI->getLoc(), CBI->getCondition(),
@@ -425,7 +425,7 @@ TermInst *swift::addArgumentToBranch(SILValue Val, SILBasicBlock *Dest,
       Args.push_back(A);
 
     Args.push_back(Val);
-    assert(Args.size() == Dest->getNumBBArg());
+    assert(Args.size() == Dest->getNumArguments());
     return Builder.createBranch(BI->getLoc(), BI->getDestBB(), Args);
   }
 
@@ -580,8 +580,8 @@ Optional<SILValue> swift::castValueToABICompatibleType(SILBuilder *B, SILLocatio
     auto *SomeBB = B->getFunction().createBasicBlock();
     auto *CurBB = B->getInsertionPoint()->getParent();
 
-    auto *ContBB = CurBB->splitBasicBlock(B->getInsertionPoint());
-    ContBB->createBBArg(DestTy,nullptr);
+    auto *ContBB = CurBB->split(B->getInsertionPoint());
+    ContBB->createArgument(DestTy, nullptr);
 
     SmallVector<std::pair<EnumElementDecl *, SILBasicBlock *>, 1> CaseBBs;
     CaseBBs.push_back(std::make_pair(SomeDecl, SomeBB));
@@ -607,7 +607,7 @@ Optional<SILValue> swift::castValueToABICompatibleType(SILBuilder *B, SILLocatio
     B->createBranch(Loc, ContBB, {CastedValue});
     B->setInsertionPoint(ContBB->begin());
 
-    CastedValue = ContBB->getBBArg(0);
+    CastedValue = ContBB->getArgument(0);
     return CastedValue;
   }
 
@@ -1180,7 +1180,7 @@ void ValueLifetimeAnalysis::propagateLiveness() {
     if (BB == DefBB)
       continue;
 
-    for (SILBasicBlock *Pred : BB->getPreds()) {
+    for (SILBasicBlock *Pred : BB->getPredecessorBlocks()) {
       // If it's already in the set, then we've already queued and/or
       // processed the predecessors.
       if (LiveBlocks.insert(Pred))
@@ -1252,7 +1252,7 @@ bool ValueLifetimeAnalysis::computeFrontier(Frontier &Fr, Mode mode) {
     bool needSplit = false;
     // If the value is live only in part of the predecessor blocks we have to
     // split those predecessor edges.
-    for (SILBasicBlock *Pred : FrontierBB->getPreds()) {
+    for (SILBasicBlock *Pred : FrontierBB->getPredecessorBlocks()) {
       if (!LiveOutBlocks.count(Pred)) {
         needSplit = true;
         break;
@@ -1444,20 +1444,20 @@ optimizeBridgedObjCToSwiftCast(SILInstruction *Inst,
       // from ObjCTy to _ObjectiveCBridgeable._ObjectiveCType.
       if (isConditional) {
         SILBasicBlock *CastSuccessBB = Inst->getFunction()->createBasicBlock();
-        CastSuccessBB->createBBArg(SILBridgedTy);
+        CastSuccessBB->createArgument(SILBridgedTy);
         Builder.createBranch(Loc, CastSuccessBB, SILValue(Load));
         Builder.setInsertionPoint(CastSuccessBB);
-        SrcOp = CastSuccessBB->getBBArg(0);
+        SrcOp = CastSuccessBB->getArgument(0);
       } else {
         SrcOp = Load;
       }
     } else if (isConditional) {
       SILBasicBlock *CastSuccessBB = Inst->getFunction()->createBasicBlock();
-      CastSuccessBB->createBBArg(SILBridgedTy);
+      CastSuccessBB->createArgument(SILBridgedTy);
       NewI = Builder.createCheckedCastBranch(Loc, false, Load, SILBridgedTy,
                                              CastSuccessBB, ConvFailBB);
       Builder.setInsertionPoint(CastSuccessBB);
-      SrcOp = CastSuccessBB->getBBArg(0);
+      SrcOp = CastSuccessBB->getArgument(0);
     } else {
       NewI = Builder.createUnconditionalCheckedCast(Loc, Load,
                                                     SILBridgedTy);
@@ -2044,7 +2044,7 @@ CastOptimizer::simplifyCheckedCastBranchInst(CheckedCastBranchInst *Inst) {
   // Replace by unconditional_cast, followed by a branch.
   // The unconditional_cast can be skipped, if the result of a cast
   // is not used afterwards.
-  bool ResultNotUsed = SuccessBB->getBBArg(0)->use_empty();
+  bool ResultNotUsed = SuccessBB->getArgument(0)->use_empty();
   SILValue CastedValue;
   if (Op->getType() != LoweredTargetType) {
     if (!ResultNotUsed) {
@@ -2136,18 +2136,18 @@ optimizeCheckedCastAddrBranchInst(CheckedCastAddrBranchInst *Inst) {
         MI = dyn_cast<MetatypeInst>(Src);
 
       if (MI) {
-        if (SuccessBB->getSinglePredecessor()
-            && canUseScalarCheckedCastInstructions(Inst->getModule(),
-                MI->getType().getSwiftRValueType(),
+        if (SuccessBB->getSinglePredecessorBlock() &&
+            canUseScalarCheckedCastInstructions(
+                Inst->getModule(), MI->getType().getSwiftRValueType(),
                 Dest->getType().getObjectType().getSwiftRValueType())) {
           SILBuilderWithScope B(Inst);
           auto NewI = B.createCheckedCastBranch(
               Loc, false /*isExact*/, MI,
               Dest->getType().getObjectType(), SuccessBB, FailureBB);
-          SuccessBB->createBBArg(Dest->getType().getObjectType(), nullptr);
+          SuccessBB->createArgument(Dest->getType().getObjectType(), nullptr);
           B.setInsertionPoint(SuccessBB->begin());
           // Store the result
-          B.createStore(Loc, SuccessBB->getBBArg(0), Dest,
+          B.createStore(Loc, SuccessBB->getArgument(0), Dest,
                         StoreOwnershipQualifier::Unqualified);
           EraseInstAction(Inst);
           return NewI;

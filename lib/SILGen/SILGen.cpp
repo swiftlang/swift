@@ -5,8 +5,8 @@
 // Copyright (c) 2014 - 2016 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
-// See http://swift.org/LICENSE.txt for license information
-// See http://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
+// See https://swift.org/LICENSE.txt for license information
+// See https://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
 //
 //===----------------------------------------------------------------------===//
 
@@ -1230,10 +1230,8 @@ static void emitTopLevelProlog(SILGenFunction &gen, SILLocation loc) {
   // Create the argc and argv arguments.
   auto &C = gen.getASTContext();
   auto FnTy = gen.F.getLoweredFunctionType();
-  auto argc = new (gen.F.getModule()) SILArgument(
-                                  entry, FnTy->getParameters()[0].getSILType());
-  auto argv = new (gen.F.getModule()) SILArgument(
-                                  entry, FnTy->getParameters()[1].getSILType());
+  auto *argc = entry->createArgument(FnTy->getParameters()[0].getSILType());
+  auto *argv = entry->createArgument(FnTy->getParameters()[1].getSILType());
 
   // If the standard library provides a _stdlib_didEnterMain intrinsic, call it
   // first thing.
@@ -1366,7 +1364,7 @@ public:
         auto returnBB = gen.createBasicBlock();
         if (gen.B.hasValidInsertionPoint())
           gen.B.createBranch(returnLoc, returnBB, returnValue);
-        returnValue = returnBB->createBBArg(returnType);
+        returnValue = returnBB->createArgument(returnType);
         gen.B.emitBlock(returnBB);
 
         // Emit the rethrow block.
@@ -1374,7 +1372,7 @@ public:
                                     FunctionSection::Postmatter);
 
         // Log the error.
-        SILValue error = rethrowBB->getBBArg(0);
+        SILValue error = rethrowBB->getArgument(0);
         gen.B.createBuiltin(moduleLoc,
                             sgm.getASTContext().getIdentifier("errorInMain"),
                             sgm.Types.getEmptyTupleType(), {}, {error});

@@ -1,4 +1,4 @@
-// RUN: not %target-swift-frontend %s -parse
+// RUN: not %target-swift-frontend %s -typecheck
 
 func ignore<T>(_ parser: (String) -> (T, String)?) -> (String) -> ((), String)? {
 	return { parser($0).map { _ in () } }

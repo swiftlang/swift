@@ -1,5 +1,5 @@
-// RUN: %target-parse-verify-swift -swift-version 4
-// RUN: %target-parse-verify-swift -enable-astscope-lookup -swift-version 4
+// RUN: %target-typecheck-verify-swift -swift-version 4
+// RUN: %target-typecheck-verify-swift -enable-astscope-lookup -swift-version 4
 
 // Types in expression contexts must be followed by a member access or
 // constructor call.
@@ -211,27 +211,27 @@ func testFunctionCollectionTypes() {
   _ = [String: (Int) -> Int]()
   _ = [String: (Int, Int) -> Int]()
 
-  _ = [1 -> Int]() // expected-error{{expected type before '->'}}
-  _ = [Int -> 1]() // expected-error{{expected type after '->'}}
+  _ = [1 -> Int]() // expected-error {{expected type before '->'}}
+  _ = [Int -> 1]() // expected-error {{expected type after '->'}}
 
   // Should parse () as void type when before or after arrow
   _ = [() -> Int]()
   _ = [(Int) -> ()]()
 
-  _ = [(Int) throws -> Int]()
-  _ = [(Int) -> throws Int]() // expected-error{{'throws' may only occur before '->'}}
-  _ = [Int throws Int]() // expected-error{{'throws' may only occur before '->'}}
+  _ = 2 + () -> Int // expected-error {{expected type before '->'}}
+  _ = () -> (Int, Int).2 // expected-error {{expected type after '->'}}
+  _ = (Int) -> Int // expected-error {{expected member name or constructor call after type name}} expected-note{{add arguments after the type to construct a value of the type}} expected-note{{use '.self' to reference the type object}}
 
-  let _ = (Int) -> Int // expected-error{{expected member name or constructor call after type name}} expected-note{{add arguments after the type to construct a value of the type}} expected-note{{use '.self' to reference the type object}}
-  let _ = 2 + () -> Int // expected-error{{expected type before '->'}}
-  let _ = () -> (Int, Int).2 // expected-error{{expected type after '->'}}
+  _ = [(Int) throws -> Int]()
+  let _ = [(Int) -> throws Int]() // expected-error{{'throws' may only occur before '->'}}
+  let _ = [Int throws Int](); // expected-error{{'throws' may only occur before '->'}} expected-error {{consecutive statements on a line must be separated by ';'}}
 }
 
 protocol P1 {}
 protocol P2 {}
 protocol P3 {}
 func compositionType() {
-  let _ = P1 & P2 // expected-error {{expected member name or constructor call after type name}} expected-note{{use '.self'}} {{18-18=.self}} FIXME(don't emit this): expected-note{{add arguments}} {{18-18=()}} 
+  _ = P1 & P2 // expected-error {{expected member name or constructor call after type name}} expected-note{{use '.self'}} {{14-14=.self}} FIXME(don't emit this): expected-note{{add arguments}} {{14-14=()}}
   _ = P1 & P2.self // expected-error {{binary operator '&' cannot be applied to operands of type 'P1.Protocol' and 'P2.Protocol'}} expected-note {{overloads for '&' exist }}
   _ = (P1 & P2).self // Ok.
   _ = (P1 & (P2)).self // FIXME: OK? while `typealias P = P1 & (P2)` is rejected.
@@ -240,4 +240,34 @@ func compositionType() {
   _ = (P1? & P2).self // expected-error {{non-protocol type 'P1?' cannot be used within a protocol composition}}
 
   _ = (P1 & P2.Type).self // expected-error {{non-protocol type 'P2.Type' cannot be used within a protocol composition}}
+
+  _ = P1 & P2 -> P3
+  // expected-error @-1 {{single argument function types require parentheses}} {{7-7=(}} {{14-14=)}}
+  // expected-error @-2 {{expected member name or constructor call after type name}}
+  // FIXME(add parenthesis): expected-note @-3 {{use '.self'}} {{20-20=.self}}
+  // FIXME(don't emit this): expected-note @-4 {{add arguments}} {{20-20=()}}
+
+  _ = P1 & P2 -> P3 & P1 -> Int
+  // expected-error @-1 {{single argument function types require parentheses}} {{18-18=(}} {{25-25=)}}
+  // expected-error @-2 {{single argument function types require parentheses}} {{7-7=(}} {{14-14=)}}
+  // expected-error @-3 {{expected member name or constructor call after type name}}
+  // FIXME(add parenthesis): expected-note @-4 {{use '.self'}} {{32-32=.self}}
+  // FIXME(don't emit this): expected-note @-5 {{add arguments}} {{32-32=()}}
+
+  _ = (() -> P1 & P2).self // Ok
+  _ = (P1 & P2 -> P3 & P2).self // expected-error {{single argument function types require parentheses}} {{8-8=(}} {{15-15=)}}
+  _ = ((P1 & P2) -> (P3 & P2) -> P1 & Any).self // Ok
+}
+
+func complexSequence() {
+  // (assign_expr
+  //   (discard_assignment_expr)
+  //   (try_expr
+  //     (type_expr typerepr='P1 & P2 throws -> P3 & P1')))
+  _ = try P1 & P2 throws -> P3 & P1
+  // expected-warning @-1 {{no calls to throwing functions occur within 'try' expression}}
+  // expected-error @-2 {{single argument function types require parentheses}} {{none}} {{11-11=(}} {{18-18=)}}
+  // expected-error @-3 {{expected member name or constructor call after type name}}
+  // expected-note @-4 {{add arguments after the type to construct a value of the type}} {{36-36=()}}
+  // expected-note @-5 {{use '.self' to reference the type object}} {{36-36=.self}}
 }

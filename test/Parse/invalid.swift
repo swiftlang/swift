@@ -1,4 +1,4 @@
-// RUN: %target-parse-verify-swift
+// RUN: %target-typecheck-verify-swift
 
 func foo(_ a: Int) {
   // expected-error @+1 {{invalid character in source file}} {{8-9= }}
@@ -120,3 +120,9 @@ struct Weak<T: class> { // expected-error {{'class' constraint can only appear o
   weak var value: T // expected-error {{'weak' may only be applied to class and class-bound protocol types}}
   // expected-error@-1 {{use of undeclared type 'T'}}
 }
+
+let x: () = ()
+!() // expected-error {{missing argument for parameter #1 in call}}
+!(()) // expected-error {{cannot convert value of type '()' to expected argument type 'Bool'}}
+!(x) // expected-error {{cannot convert value of type '()' to expected argument type 'Bool'}}
+!x // expected-error {{cannot convert value of type '()' to expected argument type 'Bool'}}

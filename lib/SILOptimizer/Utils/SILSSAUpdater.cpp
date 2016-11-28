@@ -5,8 +5,8 @@
 // Copyright (c) 2014 - 2016 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
-// See http://swift.org/LICENSE.txt for license information
-// See http://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
+// See https://swift.org/LICENSE.txt for license information
+// See https://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
 //
 //===----------------------------------------------------------------------===//
 
@@ -152,7 +152,7 @@ isEquivalentPHI(SILArgument *PHI,
                 llvm::SmallDenseMap<SILBasicBlock *, SILValue, 8> &ValueMap) {
   SILBasicBlock *PhiBB = PHI->getParent();
   size_t Idx = PHI->getIndex();
-  for (auto *PredBB : PhiBB->getPreds()) {
+  for (auto *PredBB : PhiBB->getPredecessorBlocks()) {
     auto DesiredVal = ValueMap[PredBB];
     OperandValueArrayRef EdgeValues =
         getEdgeValuesForTerminator(PredBB->getTerminator(), PhiBB);
@@ -177,7 +177,7 @@ SILValue SILSSAUpdater::GetValueInMiddleOfBlock(SILBasicBlock *BB) {
   // SSAUpdater can modify TerminatorInst and therefore invalidate the
   // predecessor iterator. Find all the predecessors before the SSA update.
   SmallVector<SILBasicBlock *, 4> Preds;
-  for (auto *PredBB: BB->getPreds()) {
+  for (auto *PredBB : BB->getPredecessorBlocks()) {
     Preds.push_back(PredBB);
   }
 
@@ -199,17 +199,17 @@ SILValue SILSSAUpdater::GetValueInMiddleOfBlock(SILBasicBlock *BB) {
     return SingularValue;
 
   // Check if we already have an equivalent phi.
-  if (!BB->getBBArgs().empty()) {
+  if (!BB->getArguments().empty()) {
     llvm::SmallDenseMap<SILBasicBlock *, SILValue, 8> ValueMap(PredVals.begin(),
                                                                PredVals.end());
-    for (auto *Arg : BB->getBBArgs())
+    for (auto *Arg : BB->getArguments())
       if (isEquivalentPHI(Arg, ValueMap))
         return Arg;
 
   }
 
   // Create a new phi node.
-  SILArgument *PHI(new (BB->getModule()) SILArgument(BB, ValType));
+  SILArgument *PHI(BB->createArgument(ValType));
   for (auto &EV : PredVals)
     addNewEdgeValueToBranch(EV.first->getTerminator(), BB, EV.second);
 
@@ -238,12 +238,13 @@ public:
   /// can be used in the SSAUpdaterImpl.
   class PhiIt {
   private:
-    SILBasicBlock::bbarg_iterator It;
+    SILBasicBlock::arg_iterator It;
+
   public:
     explicit PhiIt(SILBasicBlock *B) // begin iterator
-        : It(B->bbarg_begin()) {}
+        : It(B->args_begin()) {}
     PhiIt(SILBasicBlock *B, bool) // end iterator
-        : It(B->bbarg_end()) {}
+        : It(B->args_end()) {}
     PhiIt &operator++() { ++It; return *this; }
 
     operator SILArgument *() { return *It; }
@@ -313,7 +314,7 @@ public:
   static SILValue CreateEmptyPHI(SILBasicBlock *BB, unsigned NumPreds,
                                  SILSSAUpdater *Updater) {
     // Add the argument to the block.
-    SILValue PHI(new (BB->getModule()) SILArgument(BB, Updater->ValType));
+    SILValue PHI(BB->createArgument(Updater->ValType));
 
     // Mark all predecessor blocks with the sentinel undef value.
     SmallVector<SILBasicBlock*, 4> Preds(BB->pred_begin(), BB->pred_end());
@@ -356,7 +357,7 @@ public:
       size_t PhiIdx = PHI->getIndex();
 
       // If all predecessor edges are 'not set' this is a new phi.
-      for (auto *PredBB : PhiBB->getPreds()) {
+      for (auto *PredBB : PhiBB->getPredecessorBlocks()) {
         OperandValueArrayRef Edges =
             getEdgeValuesForTerminator(PredBB->getTerminator(), PhiBB);
 
@@ -489,10 +490,10 @@ static StructInst *replaceBBArgWithStruct(
   SmallVector<unsigned, 4> ArgIdxForOper;
   for (unsigned OperIdx : indices(FirstSI->getElements())) {
     bool FoundMatchingArgIdx = false;
-    for (unsigned ArgIdx : indices(PhiBB->getBBArgs())) {
+    for (unsigned ArgIdx : indices(PhiBB->getArguments())) {
       SmallVectorImpl<SILValue>::const_iterator AVIter = ArgValues.begin();
       bool TryNextArgIdx = false;
-      for (SILBasicBlock *PredBB : PhiBB->getPreds()) {
+      for (SILBasicBlock *PredBB : PhiBB->getPredecessorBlocks()) {
         // All argument values must be StructInst.
         auto *PredSI = dyn_cast<StructInst>(*AVIter++);
         if (!PredSI)
@@ -517,7 +518,7 @@ static StructInst *replaceBBArgWithStruct(
 
   SmallVector<SILValue, 4> StructArgs;
   for (auto ArgIdx : ArgIdxForOper)
-    StructArgs.push_back(PhiBB->getBBArg(ArgIdx));
+    StructArgs.push_back(PhiBB->getArgument(ArgIdx));
 
   SILBuilder Builder(PhiBB, PhiBB->begin());
   return Builder.createStruct(cast<StructInst>(ArgValues[0])->getLoc(),

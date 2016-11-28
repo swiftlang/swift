@@ -5,8 +5,8 @@
 // Copyright (c) 2014 - 2016 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
-// See http://swift.org/LICENSE.txt for license information
-// See http://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
+// See https://swift.org/LICENSE.txt for license information
+// See https://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
 //
 //===----------------------------------------------------------------------===//
 //
@@ -776,11 +776,11 @@ swift::decomposeArgType(Type type, ArrayRef<Identifier> argumentLabels) {
   case TypeKind::Tuple: {
     auto tupleTy = cast<TupleType>(type.getPointer());
 
-    // If we have one argument label but a tuple argument with != 1 element,
+    // If we have one argument label but a tuple argument with > 1 element,
     // put the whole tuple into the argument.
     // FIXME: This horribleness is due to the mis-modeling of arguments as
     // ParenType or TupleType.
-    if (argumentLabels.size() == 1 && tupleTy->getNumElements() != 1) {
+    if (argumentLabels.size() == 1 && tupleTy->getNumElements() > 1) {
       // Break out to do the default thing below.
       break;
     }
@@ -2490,41 +2490,34 @@ Type TupleType::getVarArgsBaseType() const {
 }
 
 
-CanArchetypeType ArchetypeType::getNew(const ASTContext &Ctx,
-                                       ArchetypeType *Parent,
-                                       AssocTypeOrProtocolType AssocTypeOrProto,
-                                       Identifier Name,
-                                       ArrayRef<Type> ConformsTo,
-                                       Type Superclass,
-                                       bool isRecursive) {
-  // Gather the set of protocol declarations to which this archetype conforms.
-  SmallVector<ProtocolDecl *, 4> ConformsToProtos;
-  for (auto P : ConformsTo) {
-    addProtocols(P, ConformsToProtos);
-  }
-  ProtocolType::canonicalizeProtocols(ConformsToProtos);
-
-  auto arena = AllocationArena::Permanent;
-  return CanArchetypeType(
-           new (Ctx, arena) ArchetypeType(Ctx, Parent, AssocTypeOrProto, Name,
-                                          Ctx.AllocateCopy(ConformsToProtos),
-                                          Superclass, isRecursive));
-}
-
-CanArchetypeType
-ArchetypeType::getNew(const ASTContext &Ctx, ArchetypeType *Parent,
-                      AssocTypeOrProtocolType AssocTypeOrProto,
-                      Identifier Name,
-                      SmallVectorImpl<ProtocolDecl *> &ConformsTo,
-                      Type Superclass, bool isRecursive) {
+CanArchetypeType ArchetypeType::getNew(
+                                   const ASTContext &Ctx,
+                                   ArchetypeType *Parent,
+                                   AssociatedTypeDecl *AssocType,
+                                   SmallVectorImpl<ProtocolDecl *> &ConformsTo,
+                                   Type Superclass) {
   // Gather the set of protocol declarations to which this archetype conforms.
   ProtocolType::canonicalizeProtocols(ConformsTo);
 
   auto arena = AllocationArena::Permanent;
   return CanArchetypeType(
-           new (Ctx, arena) ArchetypeType(Ctx, Parent, AssocTypeOrProto, Name,
+           new (Ctx, arena) ArchetypeType(Ctx, Parent, AssocType,
                                           Ctx.AllocateCopy(ConformsTo),
-                                          Superclass, isRecursive));
+                                          Superclass));
+}
+
+CanArchetypeType
+ArchetypeType::getNew(const ASTContext &Ctx, Identifier Name,
+                      SmallVectorImpl<ProtocolDecl *> &ConformsTo,
+                      Type Superclass) {
+  // Gather the set of protocol declarations to which this archetype conforms.
+  ProtocolType::canonicalizeProtocols(ConformsTo);
+
+  auto arena = AllocationArena::Permanent;
+  return CanArchetypeType(
+           new (Ctx, arena) ArchetypeType(Ctx, nullptr, Name,
+                                          Ctx.AllocateCopy(ConformsTo),
+                                          Superclass));
 }
 
 bool ArchetypeType::requiresClass() const {
@@ -2573,37 +2566,11 @@ namespace {
 ArchetypeType::NestedType ArchetypeType::getNestedType(Identifier Name) const {
   auto Pos = std::lower_bound(NestedTypes.begin(), NestedTypes.end(), Name,
                               OrderArchetypeByName());
-  if ((Pos == NestedTypes.end() || Pos->first != Name) && this->isRecursive) {
-    if (Name == this->getName()) {
-      NestedType rec = NestedType::forArchetype((ArchetypeType*)this);
-    
-      return rec;
-    } else {
-      auto conformances = this->getConformsTo();
-      
-      for (auto conformance : conformances) {
-        auto conformanceType = conformance->getType().getPointer();
-        
-        if (auto metatypeType = dyn_cast<MetatypeType>(conformanceType)) {
-          conformanceType = metatypeType->getInstanceType().getPointer();
-          
-          if (auto protocolType = dyn_cast<ProtocolType>(conformanceType)) {
-            conformanceType = protocolType->getDecl()
-                                          ->getSelfTypeInContext().getPointer();
-          }
-        }
-        
-        if (auto conformedArchetype = dyn_cast<ArchetypeType>(conformanceType)){
-          return conformedArchetype->getNestedType(Name);
-        }
-      }
-    }
-  }
-
-  if (Pos == NestedTypes.end() || Pos->first != Name)
+  if (Pos == NestedTypes.end() || Pos->first != Name) {
     return NestedType::forConcreteType(
              ErrorType::get(
                const_cast<ArchetypeType *>(this)->getASTContext()));
+  }
 
   // If the type is null, lazily resolve it. 
   if (!Pos->second) {
@@ -2620,7 +2587,7 @@ bool ArchetypeType::hasNestedType(Identifier Name) const {
 }
 
 ArrayRef<std::pair<Identifier, ArchetypeType::NestedType>>
-ArchetypeType::getNestedTypes(bool resolveTypes) const {
+ArchetypeType::getAllNestedTypes(bool resolveTypes) const {
   if (resolveTypes) {
     for (auto &nested : NestedTypes) {
       if (!nested.second)
@@ -2646,6 +2613,13 @@ static void collectFullName(const ArchetypeType *Archetype,
   }
   Result.append(Archetype->getName().str().begin(),
                 Archetype->getName().str().end());
+}
+
+Identifier ArchetypeType::getName() const {
+  if (auto assocType = getAssocType())
+    return assocType->getName();
+
+  return AssocTypeOrName.get<Identifier>();
 }
 
 std::string ArchetypeType::getFullName() const {
@@ -2934,8 +2908,9 @@ Type Type::subst(const SubstitutionMap &substitutions,
   return substType(*this, &substitutions, substitutions.getMap(), options);
 }
 
-static Type getSuperClassForDeclInternal(Type t, const ClassDecl *baseClass,
-                                         LazyResolver *resolver) {
+Type TypeBase::getSuperclassForDecl(const ClassDecl *baseClass,
+                                    LazyResolver *resolver) {
+  Type t(this);
   while (t) {
     auto *derivedClass = t->getClassOrBoundGenericClass();
     assert(derivedClass && "expected a class here");
@@ -2945,49 +2920,7 @@ static Type getSuperClassForDeclInternal(Type t, const ClassDecl *baseClass,
 
     t = t->getSuperclass(resolver);
   }
-  return t;
-}
-
-Type TypeBase::getSuperclassForDecl(const ClassDecl *baseClass,
-                                    LazyResolver *resolver) {
-  if (auto result = getSuperClassForDeclInternal(Type(this), baseClass,
-                                                 resolver)) {
-    return result;
-  }
   llvm_unreachable("no inheritance relationship between given classes");
-}
-
-bool TypeBase::canTreatContextAsMember(const DeclContext *dc) {
-  Type baseTy(getRValueType());
-
-  if (auto metaBase = baseTy->getAs<AnyMetatypeType>()) {
-    baseTy = metaBase->getInstanceType()->getRValueType();
-  }
-
-  if (!baseTy->getAnyNominal())
-    return false;
-
-  // If the context is a protocol or its extensions, the base type should conform
-  // to that protocol.
-  if (auto Prot = dc->getAsProtocolOrProtocolExtensionContext()) {
-    for (auto Conf : baseTy->getAnyNominal()->getAllConformances()) {
-      if (Conf->getProtocol() == Prot)
-        return true;
-    }
-  }
-
-  // If the context is a nominal type context or one of its extensions, the base
-  // type should be either exactly that nominal type of sub-class of that type.
-  if (auto ownerNominal = dc->getAsNominalTypeOrNominalTypeExtensionContext()) {
-    LazyResolver *resolver = dc->getASTContext().getLazyResolver();
-    if (auto *ownerClass = dyn_cast<ClassDecl>(ownerNominal))
-      baseTy = getSuperClassForDeclInternal(Type(this), ownerClass, resolver);
-    if (baseTy && baseTy->getAnyNominal() == ownerNominal)
-      return true;
-  }
-
-  // The context cannot be treated as part of the type.
-  return false;
 }
 
 TypeSubstitutionMap TypeBase::getMemberSubstitutions(const DeclContext *dc) {

@@ -5,8 +5,8 @@
 // Copyright (c) 2014 - 2016 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
-// See http://swift.org/LICENSE.txt for license information
-// See http://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
+// See https://swift.org/LICENSE.txt for license information
+// See https://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
 //
 //===----------------------------------------------------------------------===//
 //
@@ -498,8 +498,8 @@ void SILGenFunction::emitClosure(AbstractClosureExpr *ace) {
 
 void SILGenFunction::emitArtificialTopLevel(ClassDecl *mainClass) {
   // Load argc and argv from the entry point arguments.
-  SILValue argc = F.begin()->getBBArg(0);
-  SILValue argv = F.begin()->getBBArg(1);
+  SILValue argc = F.begin()->getArgument(0);
+  SILValue argv = F.begin()->getArgument(1);
 
   switch (mainClass->getArtificialMainKind()) {
   case ArtificialMainKind::UIApplicationMain: {
@@ -690,7 +690,7 @@ static void forwardCaptureArgs(SILGenFunction &gen,
                                SmallVectorImpl<SILValue> &args,
                                CapturedValue capture) {
   auto addSILArgument = [&](SILType t, ValueDecl *d) {
-    args.push_back(new (gen.SGM.M) SILArgument(gen.F.begin(), t, d));
+    args.push_back(gen.F.begin()->createArgument(t, d));
   };
 
   auto *vd = capture.getDecl();
@@ -786,8 +786,8 @@ void SILGenFunction::emitCurryThunk(ValueDecl *vd,
            && "currying constructor at level other than one?!");
     F.setBare(IsBare);
     auto selfMetaTy = vd->getType()->getAs<AnyFunctionType>()->getInput();
-    auto metatypeVal = new (F.getModule()) SILArgument(F.begin(),
-                                            getLoweredLoadableType(selfMetaTy));
+    auto metatypeVal =
+        F.begin()->createArgument(getLoweredLoadableType(selfMetaTy));
     curriedArgs.push_back(metatypeVal);
 
   } else if (auto fd = dyn_cast<AbstractFunctionDecl>(vd)) {

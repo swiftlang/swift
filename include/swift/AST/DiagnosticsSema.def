@@ -5,8 +5,8 @@
 // Copyright (c) 2014 - 2016 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
-// See http://swift.org/LICENSE.txt for license information
-// See http://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
+// See https://swift.org/LICENSE.txt for license information
+// See https://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
 //
 //===----------------------------------------------------------------------===//
 //
@@ -122,11 +122,19 @@ ERROR(candidate_inaccessible,none,
       "'%select{private|fileprivate|internal|PUBLIC}1' protection level",
       (DeclName, Accessibility))
 
+NOTE(note_candidate_inaccessible,none,
+     "%0 is inaccessible due to "
+     "'%select{private|fileprivate|internal|PUBLIC}1' protection level",
+     (DeclName, Accessibility))
+
 ERROR(init_candidate_inaccessible,none,
       "%0 initializer is inaccessible due to "
       "'%select{private|fileprivate|internal|PUBLIC}1' protection level",
       (Type, Accessibility))
 
+ERROR(all_candidates_inaccessible,none,
+      "all %0 candidates are inaccessible",
+      (DeclName))
 
 ERROR(cannot_pass_rvalue_mutating_subelement,none,
       "cannot use mutating member on immutable value: %0",
@@ -1291,6 +1299,10 @@ ERROR(requirement_restricts_self,none,
       "%0 requirement %1 cannot add constraint '%2%select{:|:| ==|:}3 %4' on "
       "'Self'",
       (DescriptiveDeclKind, DeclName, StringRef, unsigned, StringRef))
+WARNING(requirement_restricts_self_swift3,none,
+        "adding constraint '%2%select{:|:| ==|:}3 %4' on 'Self' via %0 "
+        "requirement %1 is deprecated in Swift 3",
+        (DescriptiveDeclKind, DeclName, StringRef, unsigned, StringRef))
 ERROR(witness_argument_name_mismatch,none,
       "%select{method|initializer}0 %1 has different argument names from those "
       "required by protocol %2 (%3)", (bool, DeclName, Type, DeclName))
@@ -1581,6 +1593,11 @@ NOTE(overridden_here_with_type,none,
      "overridden declaration here has type %0", (Type))
 ERROR(missing_override,none,
       "overriding declaration requires an 'override' keyword", ())
+
+ERROR(multiple_override,none,
+      "%0 has already been overridden", (DeclName))
+NOTE(multiple_override_prev,none,
+     "%0 previously overridden here", (DeclName))
 
 ERROR(override_unavailable,none,
       "cannot override %0 which has been marked unavailable", (Identifier))

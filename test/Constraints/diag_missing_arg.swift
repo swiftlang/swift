@@ -1,4 +1,4 @@
-// RUN: %target-parse-verify-swift
+// RUN: %target-typecheck-verify-swift
 
 func nonNamedFunc(_ x: Int) {} // expected-note * {{here}}
 nonNamedFunc() // expected-error {{missing argument for parameter #1 in call}} {{14-14=<#Int#>}}

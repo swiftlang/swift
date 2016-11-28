@@ -1,4 +1,4 @@
-// RUN: %target-parse-verify-swift %clang-importer-sdk
+// RUN: %target-typecheck-verify-swift %clang-importer-sdk
 
 import ctypes
 
@@ -227,4 +227,11 @@ func testArrays() {
   // that's probably beyond us for a while.
   staticBoundsArray([])
   staticBoundsArray(nil) // no-error
+}
+
+func testVaList() {
+  withVaList([]) {
+    hasVaList($0) // okay
+  }
+  hasVaList(nil) // expected-error {{nil is not compatible with expected argument type 'CVaListPointer'}}
 }

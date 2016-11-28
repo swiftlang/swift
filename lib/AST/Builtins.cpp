@@ -5,8 +5,8 @@
 // Copyright (c) 2014 - 2016 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
-// See http://swift.org/LICENSE.txt for license information
-// See http://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
+// See https://swift.org/LICENSE.txt for license information
+// See https://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
 //
 //===----------------------------------------------------------------------===//
 //
@@ -432,10 +432,8 @@ static std::pair<ArchetypeType*, GenericTypeParamDecl*>
 createGenericParam(ASTContext &ctx, const char *name, unsigned index) {
   Module *M = ctx.TheBuiltinModule;
   Identifier ident = ctx.getIdentifier(name);
-  ArchetypeType *archetype
-    = ArchetypeType::getNew(ctx, nullptr,
-                            static_cast<AssociatedTypeDecl *>(nullptr),
-                            ident, ArrayRef<Type>(), Type(), false);
+  SmallVector<ProtocolDecl *, 1> protos;
+  ArchetypeType *archetype = ArchetypeType::getNew(ctx, ident, protos, Type());
   auto genericParam =
     new (ctx) GenericTypeParamDecl(&M->getMainFile(FileUnitKind::Builtin),
                                    ident, SourceLoc(), 0, index);

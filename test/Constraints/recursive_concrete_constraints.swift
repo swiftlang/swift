@@ -1,4 +1,4 @@
-// RUN: %target-parse-verify-swift
+// RUN: %target-typecheck-verify-swift
 
 struct S<A: Collection> : Collection where A.Index == Int {
   typealias Element = A.Iterator.Element

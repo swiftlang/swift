@@ -5,8 +5,8 @@
 // Copyright (c) 2014 - 2016 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
-// See http://swift.org/LICENSE.txt for license information
-// See http://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
+// See https://swift.org/LICENSE.txt for license information
+// See https://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
 //
 //===----------------------------------------------------------------------===//
 //
@@ -614,13 +614,12 @@ ArchetypeBuilder::PotentialArchetype::getType(ArchetypeBuilder &builder) {
     return representative->ArchetypeOrConcreteType;
   }
   
-  ArchetypeType::AssocTypeOrProtocolType assocTypeOrProto = RootProtocol;
+  AssociatedTypeDecl *assocType = nullptr;
+
   // Allocate a new archetype.
   ArchetypeType *ParentArchetype = nullptr;
   auto &mod = builder.getModule();
   if (auto parent = getParent()) {
-    assert(assocTypeOrProto.isNull() &&
-           "root protocol type given for non-root archetype");
     auto parentTy = parent->getType(builder);
     if (!parentTy)
       return NestedType::forConcreteType(
@@ -671,7 +670,7 @@ ArchetypeBuilder::PotentialArchetype::getType(ArchetypeBuilder &builder) {
       }
     }
 
-    assocTypeOrProto = getResolvedAssociatedType();
+    assocType = getResolvedAssociatedType();
   }
 
   // If we ended up building our parent archetype, then we'll have
@@ -712,10 +711,24 @@ ArchetypeBuilder::PotentialArchetype::getType(ArchetypeBuilder &builder) {
     }
   }
 
-  auto arch
-    = ArchetypeType::getNew(builder.getASTContext(), ParentArchetype,
-                            assocTypeOrProto, getName(), Protos,
-                            superclass, isRecursive());
+  ArchetypeType *arch;
+  if (ParentArchetype) {
+    // If we were unable to resolve this as an associated type, produce an
+    // error type.
+    if (!assocType) {
+      representative->ArchetypeOrConcreteType =
+        NestedType::forConcreteType(
+          ErrorType::get(getDependentType(builder, true)));
+
+      return representative->ArchetypeOrConcreteType;
+    }
+
+    arch = ArchetypeType::getNew(builder.getASTContext(), ParentArchetype,
+                                 assocType, Protos, superclass);
+  } else {
+    arch = ArchetypeType::getNew(builder.getASTContext(), getName(), Protos,
+                                 superclass);
+  }
 
   representative->ArchetypeOrConcreteType = NestedType::forArchetype(arch);
   
@@ -744,7 +757,7 @@ ArchetypeBuilder::PotentialArchetype::getType(ArchetypeBuilder &builder) {
     arch->setNestedTypes(builder.getASTContext(), FlatNestedTypes);
 
     // Force the resolution of the nested types.
-    (void)arch->getNestedTypes();
+    (void)arch->getAllNestedTypes();
 
     builder.getASTContext().unregisterLazyArchetype(arch);
   }
@@ -868,7 +881,6 @@ auto ArchetypeBuilder::resolveArchetype(Type type) -> PotentialArchetype * {
 }
 
 auto ArchetypeBuilder::addGenericParameter(GenericTypeParamType *GenericParam,
-                                           ProtocolDecl *RootProtocol,
                                            Identifier ParamName)
        -> PotentialArchetype *
 {
@@ -876,21 +888,15 @@ auto ArchetypeBuilder::addGenericParameter(GenericTypeParamType *GenericParam,
   
   // Create a potential archetype for this type parameter.
   assert(!Impl->PotentialArchetypes[Key]);
-  auto PA = new PotentialArchetype(GenericParam, RootProtocol, ParamName);
+  auto PA = new PotentialArchetype(GenericParam, ParamName);
 
   Impl->PotentialArchetypes[Key] = PA;
   return PA;
 }
 
 void ArchetypeBuilder::addGenericParameter(GenericTypeParamDecl *GenericParam) {
-  ProtocolDecl *RootProtocol = dyn_cast<ProtocolDecl>(GenericParam->getDeclContext());
-  if (!RootProtocol) {
-    if (auto Ext = dyn_cast<ExtensionDecl>(GenericParam->getDeclContext()))
-      RootProtocol = dyn_cast_or_null<ProtocolDecl>(Ext->getExtendedType()->getAnyNominal());
-  }
   addGenericParameter(
         GenericParam->getDeclaredType()->castTo<GenericTypeParamType>(),
-        RootProtocol,
         GenericParam->getName());
 }
 
@@ -912,7 +918,7 @@ void ArchetypeBuilder::addGenericParameter(GenericTypeParamType *GenericParam) {
   if (name.str().startswith("$"))
     name = Context.getIdentifier(name.str().slice(1, name.str().size()));
   
-  addGenericParameter(GenericParam, nullptr, name);
+  addGenericParameter(GenericParam, name);
 }
 
 bool ArchetypeBuilder::addConformanceRequirement(PotentialArchetype *PAT,
@@ -1148,7 +1154,28 @@ static int compareDependentTypes(ArchetypeBuilder::PotentialArchetype * const* p
     return -1;
   }
 
+  // A resolved archetype is always ordered before an unresolved one.
   if (b->getResolvedAssociatedType())
+    return +1;
+
+  // Make sure typealiases are properly ordered, to avoid crashers.
+  // FIXME: Ideally we would eliminate typealiases earlier.
+  if (auto *aa = a->getTypeAliasDecl()) {
+    if (auto *ab = b->getTypeAliasDecl()) {
+      // - by protocol, so t_n_m.`P.T` < t_n_m.`Q.T` (given P < Q)
+      auto protoa = aa->getDeclContext()->getAsProtocolOrProtocolExtensionContext();
+      auto protob = ab->getDeclContext()->getAsProtocolOrProtocolExtensionContext();
+      if (int compareProtocols
+            = ProtocolType::compareProtocols(&protoa, &protob))
+        return compareProtocols;
+    }
+
+    // A resolved archetype is always ordered before an unresolved one.
+    return -1;
+  }
+
+  // A resolved archetype is always ordered before an unresolved one.
+  if (b->getTypeAliasDecl())
     return +1;
 
   // Along the error path where one or both of the potential archetypes was
@@ -1320,7 +1347,6 @@ bool ArchetypeBuilder::addSameTypeRequirementToConcrete(
   }
 
   // Recursively resolve the associated types to their concrete types.
-  RequirementSource nestedSource(RequirementSource::Redundant, Source.getLoc());
   for (auto nested : T->getNestedTypes()) {
     AssociatedTypeDecl *assocType
       = nested.second.front()->getResolvedAssociatedType();
@@ -1329,7 +1355,7 @@ bool ArchetypeBuilder::addSameTypeRequirementToConcrete(
           concreteArchetype->getNestedType(nested.first);
       addSameTypeRequirementToConcrete(nested.second.front(),
                                        witnessType.getValue(),
-                                       nestedSource);
+                                       Source);
     } else {
       assert(conformances.count(assocType->getProtocol()) > 0
              && "missing conformance?");
@@ -1346,11 +1372,11 @@ bool ArchetypeBuilder::addSameTypeRequirementToConcrete(
       if (auto witnessPA = resolveArchetype(witnessType)) {
         addSameTypeRequirementBetweenArchetypes(nested.second.front(),
                                                 witnessPA,
-                                                nestedSource);
+                                                Source);
       } else {
         addSameTypeRequirementToConcrete(nested.second.front(),
                                          witnessType,
-                                         nestedSource);
+                                         Source);
       }
     }
   }

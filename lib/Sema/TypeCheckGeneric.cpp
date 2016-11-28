@@ -5,8 +5,8 @@
 // Copyright (c) 2014 - 2016 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
-// See http://swift.org/LICENSE.txt for license information
-// See http://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
+// See https://swift.org/LICENSE.txt for license information
+// See https://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
 //
 //===----------------------------------------------------------------------===//
 //
@@ -24,6 +24,14 @@ using namespace swift;
 
 Type DependentGenericTypeResolver::resolveGenericTypeParamType(
                                      GenericTypeParamType *gp) {
+  auto gpDecl = gp->getDecl();
+  assert(gpDecl && "Missing generic parameter declaration");
+
+  // Hack: See parseGenericParameters(). When the issue there is fixed,
+  // we won't need the isInvalid() check anymore.
+  if (gpDecl->isInvalid())
+    return ErrorType::get(gpDecl->getASTContext());
+
   // Don't resolve generic parameters.
   return gp;
 }
@@ -113,8 +121,10 @@ Type PartialGenericTypeToArchetypeResolver::resolveGenericTypeParamType(
 
   // Hack: See parseGenericParameters(). When the issue there is fixed,
   // we won't need the isInvalid() check anymore.
-  if (gpDecl->isInvalid() ||
-      !gpDecl->getDeclContext()->isValidGenericContext())
+  if (gpDecl->isInvalid())
+    return ErrorType::get(gpDecl->getASTContext());
+
+  if (!gpDecl->getDeclContext()->isValidGenericContext())
     return Type(gp);
 
   auto *genericEnv = gpDecl->getDeclContext()->getGenericEnvironmentOfContext();
@@ -159,6 +169,14 @@ PartialGenericTypeToArchetypeResolver::resolveTypeOfDecl(TypeDecl *decl) {
 
 Type CompleteGenericTypeResolver::resolveGenericTypeParamType(
                                               GenericTypeParamType *gp) {
+  auto gpDecl = gp->getDecl();
+  assert(gpDecl && "Missing generic parameter declaration");
+
+  // Hack: See parseGenericParameters(). When the issue there is fixed,
+  // we won't need the isInvalid() check anymore.
+  if (gpDecl->isInvalid())
+    return ErrorType::get(gpDecl->getASTContext());
+
   // Retrieve the potential archetype corresponding to this generic type
   // parameter.
   // FIXME: When generic parameters can map down to specific types, do so
@@ -529,13 +547,17 @@ TypeChecker::validateGenericFuncSignature(AbstractFunctionDecl *func) {
           req.getFirstType()->is<GenericTypeParamType>())
         continue;
 
-      diagnose(func, diag::requirement_restricts_self,
+      diagnose(func,
+               Context.LangOpts.EffectiveLanguageVersion[0] >= 4
+                 ? diag::requirement_restricts_self
+                 : diag::requirement_restricts_self_swift3,
                func->getDescriptiveKind(), func->getFullName(),
                req.getFirstType().getString(),
                static_cast<unsigned>(req.getKind()),
                req.getSecondType().getString());
 
-      invalid = true;
+      if (Context.LangOpts.EffectiveLanguageVersion[0] >= 4)
+        invalid = true;
     }
   }
 

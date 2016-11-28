@@ -1,4 +1,4 @@
-// RUN: %target-parse-verify-swift
+// RUN: %target-typecheck-verify-swift
 
 public struct Complex {
   public var real = 0.0, imag = 0.0

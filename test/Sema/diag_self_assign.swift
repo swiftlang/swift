@@ -1,4 +1,4 @@
-// RUN: %target-parse-verify-swift
+// RUN: %target-typecheck-verify-swift
 
 var sa1_global: Int
 sa1_global = sa1_global // expected-error {{assigning a variable to itself}}

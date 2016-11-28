@@ -1,4 +1,4 @@
-// RUN: %target-build-swift -parse %s -Xfrontend -verify
+// RUN: %target-build-swift -typecheck %s -Xfrontend -verify
 // REQUIRES: objc_interop
 
 class Foo {}

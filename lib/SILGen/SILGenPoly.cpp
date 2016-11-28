@@ -5,8 +5,8 @@
 // Copyright (c) 2014 - 2016 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
-// See http://swift.org/LICENSE.txt for license information
-// See http://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
+// See https://swift.org/LICENSE.txt for license information
+// See https://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
 //
 //===----------------------------------------------------------------------===//
 //
@@ -770,14 +770,15 @@ void SILGenFunction::collectThunkParams(SILLocation loc,
   // Add the indirect results.
   for (auto result : F.getLoweredFunctionType()->getIndirectResults()) {
     auto paramTy = F.mapTypeIntoContext(result.getSILType());
-    (void) new (SGM.M) SILArgument(F.begin(), paramTy);
+    SILArgument *arg = F.begin()->createArgument(paramTy);
+    (void)arg;
   }
 
   // Add the parameters.
   auto paramTypes = F.getLoweredFunctionType()->getParameters();
   for (auto param : paramTypes) {
     auto paramTy = F.mapTypeIntoContext(param.getSILType());
-    auto paramValue = new (SGM.M) SILArgument(F.begin(), paramTy);
+    auto paramValue = F.begin()->createArgument(paramTy);
     auto paramMV = manageParam(*this, loc, paramValue, param, allowPlusZero);
     params.push_back(paramMV);
   }
@@ -1388,7 +1389,7 @@ public:
             SmallVectorImpl<SILValue> &innerIndirectResultAddrs) {
     // Assert that the indirect results are set up like we expect.
     assert(innerIndirectResultAddrs.empty());
-    assert(Gen.F.begin()->bbarg_size() >= outerFnType->getNumIndirectResults());
+    assert(Gen.F.begin()->args_size() >= outerFnType->getNumIndirectResults());
 
     innerIndirectResultAddrs.reserve(innerFnType->getNumIndirectResults());
 
@@ -1494,7 +1495,8 @@ private:
 
     SILValue resultAddr;
     if (result.isIndirect()) {
-      resultAddr = Gen.F.begin()->getBBArg(data.NextOuterIndirectResultIndex++);
+      resultAddr =
+          Gen.F.begin()->getArgument(data.NextOuterIndirectResultIndex++);
     }
 
     return { result, resultAddr };

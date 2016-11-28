@@ -1,4 +1,4 @@
-// RUN: %target-parse-verify-swift
+// RUN: %target-typecheck-verify-swift
 
 var êx = "" // expected-error{{invalid UTF-8 found in source file}} {{5-6= }} 
 

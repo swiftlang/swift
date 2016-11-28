@@ -1,4 +1,4 @@
-// RUN: %target-parse-verify-swift
+// RUN: %target-typecheck-verify-swift
 
 final class DictStringInt : ExpressibleByDictionaryLiteral {
   typealias Key = String

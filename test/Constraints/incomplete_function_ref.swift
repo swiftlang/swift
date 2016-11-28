@@ -1,4 +1,4 @@
-// RUN: %target-parse-verify-swift
+// RUN: %target-typecheck-verify-swift
 
 struct MyCollection<Element> {  // expected-note {{'Element' declared as parameter to type 'MyCollection'}}
   func map<T>(_ transform: (Element) -> T) -> MyCollection<T> {

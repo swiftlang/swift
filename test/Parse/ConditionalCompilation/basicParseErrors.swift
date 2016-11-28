@@ -1,4 +1,4 @@
-// RUN: %target-parse-verify-swift -D FOO -D BAZ
+// RUN: %target-typecheck-verify-swift -D FOO -D BAZ
 
 #if FOO == BAZ // expected-error{{expected '&&' or '||' expression}}
 var x = 0

@@ -5,8 +5,8 @@
 // Copyright (c) 2014 - 2016 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
-// See http://swift.org/LICENSE.txt for license information
-// See http://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
+// See https://swift.org/LICENSE.txt for license information
+// See https://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
 //
 //===----------------------------------------------------------------------===//
 //
@@ -1077,7 +1077,7 @@ static void profileArchetypeConstraints(
   }
   
   // Recursively profile nested archetypes.
-  for (auto nested : arch->getNestedTypes()) {
+  for (auto nested : arch->getAllNestedTypes()) {
     profileArchetypeConstraints(nested.second.getValue(), ID, seen);
   }
 }

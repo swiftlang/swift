@@ -1,7 +1,7 @@
 // RUN: rm -rf %t
 // RUN: mkdir -p %t
 // RUN: %target-swift-frontend(mock-sdk: %clang-importer-sdk) -emit-module -o %t %s -import-objc-header %S/Inputs/imported-block-typedefs.h -disable-objc-attr-requires-foundation-module
-// RUN: %target-swift-frontend(mock-sdk: %clang-importer-sdk) -parse-as-library %t/imported-block-typedefs.swiftmodule -parse -emit-objc-header-path %t/imported-block-typedefs-output.h -import-objc-header %S/../Inputs/empty.h -disable-objc-attr-requires-foundation-module
+// RUN: %target-swift-frontend(mock-sdk: %clang-importer-sdk) -parse-as-library %t/imported-block-typedefs.swiftmodule -typecheck -emit-objc-header-path %t/imported-block-typedefs-output.h -import-objc-header %S/../Inputs/empty.h -disable-objc-attr-requires-foundation-module
 // RUN: %FileCheck %s < %t/imported-block-typedefs-output.h
 // RUN: %check-in-clang %t/imported-block-typedefs-output.h -include %S/Inputs/imported-block-typedefs.h
 

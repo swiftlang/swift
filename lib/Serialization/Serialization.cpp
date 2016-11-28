@@ -5,8 +5,8 @@
 // Copyright (c) 2014 - 2016 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
-// See http://swift.org/LICENSE.txt for license information
-// See http://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
+// See https://swift.org/LICENSE.txt for license information
+// See https://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
 //
 //===----------------------------------------------------------------------===//
 
@@ -2962,24 +2962,23 @@ void Serializer::writeType(Type ty) {
     for (auto proto : archetypeTy->getConformsTo())
       conformances.push_back(addDeclRef(proto));
 
-    DeclID assocTypeOrProtoID;
-    if (auto assocType = archetypeTy->getAssocType())
-      assocTypeOrProtoID = addDeclRef(assocType);
+    DeclID assocTypeOrNameID;
+    if (archetypeTy->getParent())
+      assocTypeOrNameID = addDeclRef(archetypeTy->getAssocType());
     else
-      assocTypeOrProtoID = addDeclRef(archetypeTy->getSelfProtocol());
+      assocTypeOrNameID = addIdentifierRef(archetypeTy->getName());
 
     unsigned abbrCode = DeclTypeAbbrCodes[ArchetypeTypeLayout::Code];
     ArchetypeTypeLayout::emitRecord(Out, ScratchRecord, abbrCode,
-                                    addIdentifierRef(archetypeTy->getName()),
                                     parentID,
-                                    assocTypeOrProtoID,
+                                    assocTypeOrNameID,
                                     addTypeRef(archetypeTy->getSuperclass()),
                                     conformances);
 
     SmallVector<IdentifierID, 4> nestedTypeNames;
     SmallVector<TypeID, 4> nestedTypes;
     SmallVector<bool, 4> areArchetypes;
-    for (auto next : archetypeTy->getNestedTypes()) {
+    for (auto next : archetypeTy->getAllNestedTypes()) {
       nestedTypeNames.push_back(addIdentifierRef(next.first));
       nestedTypes.push_back(addTypeRef(next.second.getValue()));
       areArchetypes.push_back(!next.second.isConcreteType());

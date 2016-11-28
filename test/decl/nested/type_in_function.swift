@@ -1,4 +1,4 @@
-// RUN: %target-parse-verify-swift -parse-as-library
+// RUN: %target-typecheck-verify-swift -parse-as-library
 
 // Generic class locally defined in non-generic function (rdar://problem/20116710)
 func f3() {

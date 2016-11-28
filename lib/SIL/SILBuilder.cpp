@@ -5,8 +5,8 @@
 // Copyright (c) 2014 - 2016 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
-// See http://swift.org/LICENSE.txt for license information
-// See http://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
+// See https://swift.org/LICENSE.txt for license information
+// See https://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
 //
 //===----------------------------------------------------------------------===//
 
@@ -118,7 +118,7 @@ void SILBuilder::emitBlock(SILBasicBlock *BB, SILLocation BranchLoc) {
   }
 
   // Fall though from the currently active block into the given block.
-  assert(BB->bbarg_empty() && "cannot fall through to bb with args");
+  assert(BB->args_empty() && "cannot fall through to bb with args");
 
   // This is a fall through into BB, emit the fall through branch.
   createBranch(BranchLoc, BB);
@@ -138,11 +138,11 @@ void SILBuilder::emitBlock(SILBasicBlock *BB, SILLocation BranchLoc) {
 SILBasicBlock *SILBuilder::splitBlockForFallthrough() {
   // If we are concatenating, just create and return a new block.
   if (insertingAtEndOfBlock()) {
-    return new (F.getModule()) SILBasicBlock(&F, BB);
+    return F.createBasicBlock(BB);
   }
 
   // Otherwise we need to split the current block at the insertion point.
-  auto *NewBB = BB->splitBasicBlock(InsertPt);
+  auto *NewBB = BB->split(InsertPt);
   InsertPt = BB->end();
   return NewBB;
 }

@@ -65,6 +65,7 @@ add_swift_library(swiftBasic STATIC
   DemangleWrappers.cpp
   DiagnosticConsumer.cpp
   DiverseStack.cpp
+  Edit.cpp
   EditorPlaceholder.cpp
   FileSystem.cpp
   JSONSerialization.cpp

@@ -5,8 +5,8 @@
 // Copyright (c) 2014 - 2016 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
-// See http://swift.org/LICENSE.txt for license information
-// See http://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
+// See https://swift.org/LICENSE.txt for license information
+// See https://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
 //
 //===----------------------------------------------------------------------===//
 
@@ -814,14 +814,14 @@ static void VisitNodeArchetype(
     }
   }
 
-  SmallVector<Type, 1> conforms_to;
-  if (protocol_list.HasSingleType())
-    conforms_to.push_back(protocol_list.GetFirstType());
+  SmallVector<ProtocolDecl *, 1> conforms_to;
+  if (protocol_list.HasSingleType()) {
+    (void)protocol_list.GetFirstType()->isExistentialType(conforms_to);
+  }
 
   if (ast) {
     result._types.push_back(ArchetypeType::getNew(
-        *ast, nullptr, (AssociatedTypeDecl *)nullptr,
-        ast->getIdentifier(archetype_name), conforms_to, Type()));
+        *ast, ast->getIdentifier(archetype_name), conforms_to, Type()));
   } else {
     result._error = "invalid ASTContext";
   }
@@ -848,9 +848,9 @@ static void VisitNodeArchetypeRef(
     result._types.push_back(result_type);
   else {
     if (ast) {
+      SmallVector<ProtocolDecl *, 1> protocols;
       result._types.push_back(ArchetypeType::getNew(
-          *ast, nullptr, (AssociatedTypeDecl *)nullptr,
-          ast->getIdentifier(archetype_name), ArrayRef<Type>(), Type()));
+          *ast, ast->getIdentifier(archetype_name), protocols, Type()));
     } else {
       result._error = "invalid ASTContext";
     }

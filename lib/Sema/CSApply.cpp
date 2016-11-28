@@ -5,8 +5,8 @@
 // Copyright (c) 2014 - 2016 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
-// See http://swift.org/LICENSE.txt for license information
-// See http://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
+// See https://swift.org/LICENSE.txt for license information
+// See https://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
 //
 //===----------------------------------------------------------------------===//
 //
@@ -4463,6 +4463,43 @@ Expr *ExprRewriter::coerceExistential(Expr *expr, Type toType,
     
     auto result = new (ctx) ErasureExpr(archetypeVal, toType, conformances);
     return new (ctx) OpenExistentialExpr(expr, archetypeVal, result);
+  }
+
+  // If the type we are trying to coerce is a tuple, let's look through
+  // its elements to see if there are any LValue types present, such requires
+  // load or address-of operation first before proceeding with erasure.
+  if (auto tupleType = fromType->getAs<TupleType>()) {
+    bool coerceToRValue = false;
+    for (auto element : tupleType->getElements()) {
+      if (element.getType()->is<LValueType>()) {
+        coerceToRValue = true;
+        break;
+      }
+    }
+
+    // Tuple has one or more LValue types associated with it,
+    // which requires coercion to RValue, let's perform it here by creating
+    // new tuple type with LValue(s) stripped off and coercing
+    // expression to that type, which would do required transformation.
+    if (coerceToRValue) {
+      SmallVector<TupleTypeElt, 2> elements;
+      for (auto &element : tupleType->getElements())
+        elements.push_back(TupleTypeElt(element.getType()->getRValueType(),
+                                        element.getName(),
+                                        element.getParameterFlags()));
+
+      // New type is guaranteed to be a tuple because source type is one.
+      auto toTuple = TupleType::get(elements, ctx)->castTo<TupleType>();
+      SmallVector<int, 4> sources;
+      SmallVector<unsigned, 4> variadicArgs;
+      bool failed = computeTupleShuffle(tupleType, toTuple,
+                                        sources, variadicArgs);
+      assert(!failed && "Couldn't convert tuple to tuple?");
+      (void)failed;
+
+      coerceTupleToTuple(expr, tupleType, toTuple, locator, sources,
+                         variadicArgs);
+    }
   }
 
   return new (ctx) ErasureExpr(expr, toType, conformances);

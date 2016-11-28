@@ -53,6 +53,9 @@ typedef struct {
   unsigned b[];
 } StructWithFlexibleArray;
 
+#include <stdarg.h>
+extern void hasVaList(va_list args);
+
 //===---
 // Tag decls and typedefs.
 //===---

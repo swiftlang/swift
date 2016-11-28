@@ -5,8 +5,8 @@
 // Copyright (c) 2014 - 2016 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
-// See http://swift.org/LICENSE.txt for license information
-// See http://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
+// See https://swift.org/LICENSE.txt for license information
+// See https://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
 //
 //===----------------------------------------------------------------------===//
 //
@@ -28,6 +28,7 @@
 #include "swift/AST/ParameterList.h"
 #include "swift/AST/Types.h"
 #include "swift/ClangImporter/ClangModule.h"
+#include "swift/Parse/Token.h"
 #include "swift/Basic/Fallthrough.h"
 #include "clang/Sema/Lookup.h"
 #include "clang/Sema/Sema.h"
@@ -1316,6 +1317,19 @@ static Type adjustTypeForConcreteImport(ClangImporter::Implementation &impl,
     // FIXME: This should apply to blocks as well, but Unmanaged is constrained
     // to AnyObject.
     importedType = getUnmanagedType(impl, importedType);
+  }
+
+  // Treat va_list specially: null-unspecified va_list parameters should be
+  // assumed to be non-optional. (Most people don't even think of va_list as a
+  // pointer, and it's not a portable assumption anyway.)
+  if (importKind == ImportTypeKind::Parameter &&
+      optKind == OTK_ImplicitlyUnwrappedOptional) {
+    if (auto *nominal = importedType->getNominalOrBoundGenericNominal()) {
+      if (nominal->getName().str() == "CVaListPointer" &&
+          nominal->getParentModule()->isStdlibModule()) {
+        optKind = OTK_None;
+      }
+    }
   }
 
   // Wrap class, class protocol, function, and metatype types in an

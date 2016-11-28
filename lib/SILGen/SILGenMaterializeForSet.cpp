@@ -5,8 +5,8 @@
 // Copyright (c) 2014 - 2016 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
-// See http://swift.org/LICENSE.txt for license information
-// See http://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
+// See https://swift.org/LICENSE.txt for license information
+// See https://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
 //
 //===----------------------------------------------------------------------===//
 //
@@ -557,7 +557,7 @@ SILFunction *MaterializeForSetEmitter::createCallback(SILFunction &F,
     auto makeParam = [&](unsigned index) -> SILArgument* {
       SILType type = gen.F.mapTypeIntoContext(
           callbackType->getParameters()[index].getSILType());
-      return new (SGM.M) SILArgument(gen.F.begin(), type);
+      return gen.F.begin()->createArgument(type);
     };
 
     // Add arguments for all the parameters.

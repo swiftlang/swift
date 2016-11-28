@@ -1,4 +1,7 @@
-// RUN: %target-sil-opt -assume-parsing-unqualified-ownership-sil %s | %target-sil-opt -assume-parsing-unqualified-ownership-sil | %FileCheck %s
+// RUN: %target-sil-opt -assume-parsing-unqualified-ownership-sil -enable-sil-verify-all=false %s | %target-sil-opt -assume-parsing-unqualified-ownership-sil -enable-sil-verify-all=false | %FileCheck %s
+//
+// FIXME: Enable sil-verify-all in both commands above:
+//        SIL Parsing fails on vtables: <rdar://problem/24060338> Identify problems with textual SIL and fix them.
 
 sil_stage raw // CHECK: sil_stage raw
 

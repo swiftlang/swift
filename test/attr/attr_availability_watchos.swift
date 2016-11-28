@@ -1,4 +1,4 @@
-// RUN: %swift -parse -verify -parse-stdlib -target i386-apple-watchos2.0 %s
+// RUN: %swift -typecheck -verify -parse-stdlib -target i386-apple-watchos2.0 %s
 
 @available(watchOS, introduced: 1.0, deprecated: 1.5, obsoleted: 2.0,
               message: "you don't want to do that anyway")

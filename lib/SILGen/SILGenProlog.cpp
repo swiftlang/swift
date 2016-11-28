@@ -5,8 +5,8 @@
 // Copyright (c) 2014 - 2016 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
-// See http://swift.org/LICENSE.txt for license information
-// See http://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
+// See https://swift.org/LICENSE.txt for license information
+// See https://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
 //
 //===----------------------------------------------------------------------===//
 
@@ -24,7 +24,7 @@ using namespace Lowering;
 SILValue SILGenFunction::emitSelfDecl(VarDecl *selfDecl) {
   // Emit the implicit 'self' argument.
   SILType selfType = getLoweredLoadableType(selfDecl->getType());
-  SILValue selfValue = new (SGM.M) SILArgument(F.begin(), selfType, selfDecl);
+  SILValue selfValue = F.begin()->createArgument(selfType, selfDecl);
   VarLocs[selfDecl] = VarLoc::get(selfValue);
   SILLocation PrologueLoc(selfDecl);
   PrologueLoc.markAsPrologue();
@@ -128,8 +128,8 @@ public:
                             ->mapTypeIntoContext(parameterInfo.getSILType()) &&
            "argument does not have same type as specified by parameter info");
 
-    SILValue arg = new (gen.SGM.M)
-      SILArgument(parent, argType, loc.getAsASTNode<ValueDecl>());
+    SILValue arg =
+        parent->createArgument(argType, loc.getAsASTNode<ValueDecl>());
     ManagedValue mv = getManagedValue(arg, t, parameterInfo);
 
     // If the value is a (possibly optional) ObjC block passed into the entry
@@ -329,8 +329,7 @@ static void makeArgument(Type ty, ParamDecl *decl,
     for (auto fieldType : tupleTy->getElementTypes())
       makeArgument(fieldType, decl, args, gen);
   } else {
-    auto arg = new (gen.F.getModule()) SILArgument(gen.F.begin(),
-                                                   gen.getLoweredType(ty),decl);
+    auto arg = gen.F.begin()->createArgument(gen.getLoweredType(ty), decl);
     args.push_back(arg);
   }
 }
@@ -358,7 +357,7 @@ static void emitCaptureArguments(SILGenFunction &gen, CapturedValue capture,
     auto &lowering = gen.getTypeLowering(VD->getType());
     // Constant decls are captured by value.
     SILType ty = lowering.getLoweredType();
-    SILValue val = new (gen.SGM.M) SILArgument(gen.F.begin(), ty, VD);
+    SILValue val = gen.F.begin()->createArgument(ty, VD);
 
     // If the original variable was settable, then Sema will have treated the
     // VarDecl as an lvalue, even in the closure's use.  As such, we need to
@@ -389,7 +388,7 @@ static void emitCaptureArguments(SILGenFunction &gen, CapturedValue capture,
     SILType ty = gen.getLoweredType(type).getAddressType();
     SILType boxTy = SILType::getPrimitiveObjectType(
       SILBoxType::get(ty.getSwiftRValueType()));
-    SILValue box = new (gen.SGM.M) SILArgument(gen.F.begin(), boxTy, VD);
+    SILValue box = gen.F.begin()->createArgument(boxTy, VD);
     SILValue addr = gen.B.createProjectBox(VD, box, 0);
     gen.VarLocs[VD] = SILGenFunction::VarLoc::get(addr, box);
     gen.B.createDebugValueAddr(Loc, addr, {/*Constant*/false, ArgNo});
@@ -400,7 +399,7 @@ static void emitCaptureArguments(SILGenFunction &gen, CapturedValue capture,
   case CaptureKind::StorageAddress: {
     // Non-escaping stored decls are captured as the address of the value.
     SILType ty = gen.getLoweredType(type).getAddressType();
-    SILValue addr = new (gen.SGM.M) SILArgument(gen.F.begin(), ty, VD);
+    SILValue addr = gen.F.begin()->createArgument(ty, VD);
     gen.VarLocs[VD] = SILGenFunction::VarLoc::get(addr);
     gen.B.createDebugValueAddr(Loc, addr, {/*Constant*/true, ArgNo});
     break;
@@ -424,7 +423,7 @@ void SILGenFunction::emitProlog(AnyFunctionRef TheClosure,
           MetatypeRepresentation::Thick)
               ->getCanonicalType();
       SILType ty = SILType::getPrimitiveObjectType(selfMetatype);
-      SILValue val = new (SGM.M) SILArgument(F.begin(), ty);
+      SILValue val = F.begin()->createArgument(ty);
       (void) val;
 
       return;
@@ -454,11 +453,8 @@ static void emitIndirectResultParameters(SILGenFunction &gen, Type resultType,
                                  ctx.getIdentifier("$return_value"), resultType,
                                  DC);
 
-  auto arg =
-    new (gen.SGM.M) SILArgument(gen.F.begin(), resultTI.getLoweredType(), var);
-  (void) arg;
-
-  
+  auto *arg = gen.F.begin()->createArgument(resultTI.getLoweredType(), var);
+  (void)arg;
 }
 
 unsigned SILGenFunction::emitProlog(ArrayRef<ParameterList *> paramLists,

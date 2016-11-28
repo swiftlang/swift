@@ -1,4 +1,4 @@
-// RUN: %target-parse-verify-swift
+// RUN: %target-typecheck-verify-swift
 
 func f0(_ i: Int, _ d: Double) {} // expected-note{{found this candidate}}
 func f0(_ d: Double, _ i: Int) {} // expected-note{{found this candidate}}
