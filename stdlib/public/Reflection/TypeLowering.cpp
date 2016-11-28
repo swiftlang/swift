@@ -19,6 +19,7 @@
 //===----------------------------------------------------------------------===//
 
 #include "swift/Reflection/TypeLowering.h"
+#include "swift/Basic/Unreachable.h"
 #include "swift/Reflection/TypeRef.h"
 #include "swift/Reflection/TypeRefBuilder.h"
 
@@ -29,12 +30,6 @@
 #else
   #define DEBUG(expr)
 #endif
-
-[[noreturn]]
-static void unreachable(const char *Message) {
-  std::cerr << "fatal error: " << Message << "\n";
-  std::abort();
-}
 
 namespace swift {
 namespace reflection {
@@ -191,7 +186,7 @@ public:
     }
     }
 
-    unreachable("Bad TypeInfo kind");
+    swift_unreachable("Bad TypeInfo kind");
   }
 };
 
@@ -1047,6 +1042,8 @@ public:
       DEBUG(std::cerr << "Invalid field descriptor: "; TR->dump());
       return nullptr;
     }
+
+    swift_unreachable("Unhandled FieldDescriptorKind in switch.");
   }
 
   const TypeInfo *visitNominalTypeRef(const NominalTypeRef *N) {
@@ -1076,6 +1073,8 @@ public:
     case FunctionMetadataConvention::CFunctionPointer:
       return TC.getTypeInfo(TC.getThinFunctionTypeRef());
     }
+
+    swift_unreachable("Unhandled FunctionMetadataConvention in switch.");
   }
 
   const TypeInfo *visitProtocolTypeRef(const ProtocolTypeRef *P) {
@@ -1102,6 +1101,8 @@ public:
     case MetatypeRepresentation::Thick:
       return TC.getTypeInfo(TC.getAnyMetatypeTypeRef());
     }
+
+    swift_unreachable("Unhandled MetatypeRepresentation in switch.");
   }
 
   const TypeInfo *
@@ -1283,6 +1284,8 @@ const TypeInfo *TypeConverter::getClassInstanceTypeInfo(const TypeRef *TR,
     DEBUG(std::cerr << "Invalid field descriptor: "; TR->dump());
     return nullptr;
   }
+
+  swift_unreachable("Unhandled FieldDescriptorKind in switch.");
 }
 
 }  // namespace reflection
