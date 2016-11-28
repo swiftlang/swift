@@ -785,9 +785,20 @@ namespace {
       assert(ExprStack.back() == expr);
       ExprStack.pop_back();
 
-      // Mark the direct callee as being a callee.
-      if (auto call = dyn_cast<CallExpr>(expr))
+      if (auto call = dyn_cast<CallExpr>(expr)) {
+        // If function we are trying to call is "subscript" let's convert
+        // a "function call" into a "subscript call" which would generate
+        // proper constraints and yield better diagnostics in case of failure.
+        if (auto UDE = dyn_cast<UnresolvedDotExpr>(call->getFn())) {
+          auto &ctx = TC.Context;
+          if (UDE->getName().getBaseName() == ctx.Id_subscript) {
+            return SubscriptExpr::create(ctx, UDE->getBase(), call->getArg());
+          }
+        }
+
+        // Mark the direct callee as being a callee.
         markDirectCallee(call->getFn());
+      }
 
       // Fold sequence expressions.
       if (auto seqExpr = dyn_cast<SequenceExpr>(expr)) {
