@@ -252,7 +252,7 @@ protocol P1 {}
 protocol P2 {}
 protocol P3 {}
 func compositionType() {
-  _ = P1 & P2 // expected-error {{expected member name or constructor call after type name}} expected-note{{use '.self'}} {{14-14=.self}}
+  _ = P1 & P2 // expected-error {{expected member name or constructor call after type name}} expected-note{{use '.self'}} {{7-7=(}} {{14-14=).self}}
   _ = P1 & P2.self // expected-error {{binary operator '&' cannot be applied to operands of type 'P1.Protocol' and 'P2.Protocol'}} expected-note {{overloads for '&' exist }}
   _ = (P1 & P2).self // Ok.
   _ = (P1 & (P2)).self // FIXME: OK? while `typealias P = P1 & (P2)` is rejected.
@@ -265,13 +265,13 @@ func compositionType() {
   _ = P1 & P2 -> P3
   // expected-error @-1 {{single argument function types require parentheses}} {{7-7=(}} {{14-14=)}}
   // expected-error @-2 {{expected member name or constructor call after type name}}
-  // FIXME(add parenthesis): expected-note @-3 {{use '.self'}} {{20-20=.self}}
+  // expected-note @-3 {{use '.self'}} {{7-7=(}} {{20-20=).self}}
 
   _ = P1 & P2 -> P3 & P1 -> Int
   // expected-error @-1 {{single argument function types require parentheses}} {{18-18=(}} {{25-25=)}}
   // expected-error @-2 {{single argument function types require parentheses}} {{7-7=(}} {{14-14=)}}
   // expected-error @-3 {{expected member name or constructor call after type name}}
-  // FIXME(add parenthesis): expected-note @-4 {{use '.self'}} {{32-32=.self}}
+  // expected-note @-4 {{use '.self'}} {{7-7=(}} {{32-32=).self}}
 
   _ = (() -> P1 & P2).self // Ok
   _ = (P1 & P2 -> P3 & P2).self // expected-error {{single argument function types require parentheses}} {{8-8=(}} {{15-15=)}}
@@ -287,5 +287,5 @@ func complexSequence() {
   // expected-warning @-1 {{no calls to throwing functions occur within 'try' expression}}
   // expected-error @-2 {{single argument function types require parentheses}} {{none}} {{11-11=(}} {{18-18=)}}
   // expected-error @-3 {{expected member name or constructor call after type name}}
-  // expected-note @-4 {{use '.self' to reference the type object}} {{36-36=.self}}
+  // expected-note @-4 {{use '.self' to reference the type object}} {{11-11=(}} {{36-36=).self}}
 }
