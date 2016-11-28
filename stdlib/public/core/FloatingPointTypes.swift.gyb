@@ -824,14 +824,11 @@ extension ${Self} {
   }
 }
 
-@_transparent
-public prefix func + (x: ${Self}) -> ${Self} {
-  return x
-}
-
-@_transparent
-public prefix func - (x: ${Self}) -> ${Self} {
-  return ${Self}(_bits: Builtin.fneg_FPIEEE${bits}(x._value))
+extension ${Self} {
+  @_transparent
+  public static prefix func - (x: ${Self}) -> ${Self} {
+    return ${Self}(_bits: Builtin.fneg_FPIEEE${bits}(x._value))
+  }
 }
 
 //===----------------------------------------------------------------------===//
