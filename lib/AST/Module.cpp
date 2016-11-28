@@ -84,6 +84,7 @@ void BuiltinUnit::LookupCache::lookupValue(
                                           /*genericparams*/nullptr,
                                           const_cast<BuiltinUnit*>(&M));
       TAD->computeType();
+      TAD->setInterfaceType(TAD->getType());
       TAD->setAccessibility(Accessibility::Public);
       Entry = TAD;
     }

@@ -312,6 +312,7 @@ void REPLChecker::processREPLTopLevelExpr(Expr *E) {
   VarDecl *vd = new (Context) VarDecl(/*static*/ false, /*IsLet*/true,
                                       E->getStartLoc(), name,
                                       E->getType(), &SF);
+  vd->setInterfaceType(E->getType());
   SF.Decls.push_back(vd);
 
   // Create a PatternBindingDecl to bind the expression into the decl.
@@ -384,6 +385,7 @@ void REPLChecker::processREPLTopLevelPatternBinding(PatternBindingDecl *PBD) {
     VarDecl *vd = new (Context) VarDecl(/*static*/ false, /*IsLet*/true,
                                         PBD->getStartLoc(), name,
                                         pattern->getType(), &SF);
+    vd->setInterfaceType(pattern->getType());
     SF.Decls.push_back(vd);
     
 

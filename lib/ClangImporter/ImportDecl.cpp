@@ -126,6 +126,7 @@ createVarWithPattern(ASTContext &cxt, DeclContext *dc, Identifier name, Type ty,
       /*IsLet*/ isLet, SourceLoc(), name, ty, dc);
   if (isImplicit)
     var->setImplicit();
+  var->setInterfaceType(ty);
   var->setAccessibility(Accessibility::Public);
   var->setSetterAccessibility(setterAccessibility);
 
@@ -1201,6 +1202,7 @@ static void makeStructRawValuedWithBridge(
   auto computedVar = new (cxt) VarDecl(
       /*static*/ false,
       /*IsLet*/ false, SourceLoc(), computedVarName, bridgedType, structDecl);
+  computedVar->setInterfaceType(bridgedType);
   computedVar->setImplicit();
   computedVar->setAccessibility(Accessibility::Public);
   computedVar->setSetterAccessibility(Accessibility::Private);
@@ -1518,6 +1520,7 @@ static bool addErrorDomain(NominalTypeDecl *swiftDecl,
   auto errorDomainPropertyDecl = new (C) VarDecl(
       isStatic,
       /*isLet=*/false, SourceLoc(), C.Id_nsErrorDomain, stringTy, swiftDecl);
+  errorDomainPropertyDecl->setInterfaceType(stringTy);
   errorDomainPropertyDecl->setAccessibility(Accessibility::Public);
 
   swiftDecl->addMember(errorDomainPropertyDecl);
@@ -1928,6 +1931,7 @@ namespace {
                               underlying->getDeclaredInterfaceType()),
                             /*genericparams*/nullptr, DC);
               typealias->computeType();
+              typealias->setInterfaceType(typealias->getType());
 
               Impl.SpecialTypedefNames[Decl->getCanonicalDecl()] =
                 MappedTypeNameKind::DefineAndUse;
@@ -1953,6 +1957,7 @@ namespace {
                               proto->getDeclaredInterfaceType()),
                             /*genericparams*/nullptr, DC);
               typealias->computeType();
+              typealias->setInterfaceType(typealias->getType());
 
               Impl.SpecialTypedefNames[Decl->getCanonicalDecl()] =
                 MappedTypeNameKind::DefineAndUse;
@@ -2021,6 +2026,7 @@ namespace {
                                       TypeLoc::withoutLoc(SwiftType),
                                       /*genericparams*/nullptr, DC);
       Result->computeType();
+      Result->setInterfaceType(Result->getType());
 
       // Make Objective-C's 'id' unavailable.
       ASTContext &ctx = DC->getASTContext();
@@ -2196,6 +2202,7 @@ namespace {
                                              errorWrapper);
           nsErrorProp->setImplicit();
           nsErrorProp->setAccessibility(Accessibility::Public);
+          nsErrorProp->setInterfaceType(nsErrorType);
 
           // Create a pattern binding to describe the variable.
           Pattern *nsErrorPattern = createTypedNamedPattern(nsErrorProp);
@@ -2263,6 +2270,7 @@ namespace {
         rawValue->setImplicit();
         rawValue->setAccessibility(Accessibility::Public);
         rawValue->setSetterAccessibility(Accessibility::Private);
+        rawValue->setInterfaceType(underlyingType);
 
         // Create a pattern binding to describe the variable.
         Pattern *varPattern = createTypedNamedPattern(rawValue);
@@ -2289,6 +2297,7 @@ namespace {
                            errorWrapper->getDeclaredInterfaceType()),
                          /*genericSignature=*/nullptr, enumDecl);
           alias->computeType();
+          alias->setInterfaceType(alias->getType());
           enumDecl->addMember(alias);
 
           // Add the 'Code' enum to the error wrapper.
@@ -2782,6 +2791,7 @@ namespace {
                        /*static*/ false, /*IsLet*/ false,
                        Impl.importSourceLoc(decl->getLocStart()),
                        name, type, dc);
+      result->setInterfaceType(type);
 
       // If this is a Swift 2 stub, mark is as such.
       if (swift3Name)
@@ -2973,6 +2983,7 @@ namespace {
                               /*static*/ false, /*IsLet*/ false,
                               Impl.importSourceLoc(decl->getLocation()),
                               name, type, dc);
+      result->setInterfaceType(type);
 
       // Handle attributes.
       if (decl->hasAttr<clang::IBOutletAttr>())
@@ -3045,6 +3056,7 @@ namespace {
                        Impl.shouldImportGlobalAsLet(decl->getType()),
                        Impl.importSourceLoc(decl->getLocation()),
                        name, type, dc);
+      result->setInterfaceType(type);
 
       // If imported as member, the member should be final.
       if (dc->getAsClassOrClassExtensionContext())
@@ -4120,6 +4132,7 @@ namespace {
                     /*genericparams=*/nullptr, dc);
 
       typealias->computeType();
+      typealias->setInterfaceType(typealias->getType());
 
       return typealias;
     }
@@ -4356,6 +4369,7 @@ Decl *SwiftDeclConverter::importSwift2TypeAlias(const clang::NamedDecl *decl,
       Impl.importSourceLoc(decl->getLocation()),
       TypeLoc::withoutLoc(underlyingType), genericParams, dc);
   alias->computeType();
+  alias->setInterfaceType(alias->getType());
   alias->setGenericEnvironment(genericEnv);
 
   // Record that this is the Swift 2 version of this declaration.
@@ -4553,6 +4567,7 @@ Decl *SwiftDeclConverter::importEnumCase(const clang::EnumConstantDecl *decl,
 
   // Give the enum element the appropriate type.
   element->computeType();
+  element->setInterfaceType(element->getType());
 
   Impl.importAttributes(decl, element);
 
@@ -4937,6 +4952,7 @@ SwiftDeclConverter::getImplicitProperty(ImportedName importedName,
   auto property = Impl.createDeclWithClangNode<VarDecl>(
       getter, Accessibility::Public, isStatic,
       /*isLet=*/false, SourceLoc(), propertyName, swiftPropertyType, dc);
+  property->setInterfaceType(swiftPropertyType);
 
   // Note that we've formed this property.
   Impl.FunctionsAsProperties[getter] = property;
@@ -6472,7 +6488,7 @@ void ClangImporter::Implementation::importAttributes(
   // Map __attribute__((warn_unused_result)).
   if (!ClangDecl->hasAttr<clang::WarnUnusedResultAttr>()) {
     if (auto MD = dyn_cast<FuncDecl>(MappedDecl)) {
-      if (!MD->getResultType()->isVoid()) {
+      if (!MD->getResultInterfaceType()->isVoid()) {
         MD->getAttrs().add(new (C) DiscardableResultAttr(/*implicit*/true));
       }
     }
@@ -7057,6 +7073,8 @@ ClangImporter::Implementation::createConstant(Identifier name, DeclContext *dc,
         VarDecl(isStatic, /*IsLet*/ false, SourceLoc(), name, type, dc);
   }
 
+  var->setInterfaceType(type);
+
   // Form the argument patterns.
   SmallVector<ParameterList*, 3> getterArgs;
   
@@ -7159,6 +7177,7 @@ createUnavailableDecl(Identifier name, DeclContext *dc, Type type,
   auto var = createDeclWithClangNode<VarDecl>(ClangN, Accessibility::Public,
                                               isStatic, /*IsLet*/ false,
                                               SourceLoc(), name, type, dc);
+  var->setInterfaceType(type);
   markUnavailable(var, UnavailableMessage);
 
   return var;
