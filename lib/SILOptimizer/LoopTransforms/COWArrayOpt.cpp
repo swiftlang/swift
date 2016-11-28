@@ -1965,7 +1965,7 @@ public:
     // inside the cloned region. The SSAUpdater can't handle critical non
     // cond_br edges.
     for (auto *BB : OutsideBBs) {
-      SmallVector<SILBasicBlock*, 8> Preds(BB->getPreds());
+      SmallVector<SILBasicBlock *, 8> Preds(BB->getPredecessorBlocks());
       for (auto *Pred : Preds)
         if (!isa<CondBranchInst>(Pred->getTerminator()) &&
             !isa<BranchInst>(Pred->getTerminator()))
@@ -2120,7 +2120,8 @@ public:
 
   SILLoop *getLoop() {
     auto *LoopInfo = LoopAnalysis->get(HoistableLoopPreheader->getParent());
-    return LoopInfo->getLoopFor(HoistableLoopPreheader->getSingleSuccessor());
+    return LoopInfo->getLoopFor(
+        HoistableLoopPreheader->getSingleSuccessorBlock());
   }
 
 protected:
@@ -2234,7 +2235,7 @@ void ArrayPropertiesSpecializer::specializeLoopNest() {
       HoistableLoopPreheader->getTerminator(), DomTree, nullptr);
 
   // Get the exit blocks of the original loop.
-  auto *Header = CheckBlock->getSingleSuccessor();
+  auto *Header = CheckBlock->getSingleSuccessorBlock();
   assert(Header);
 
   // Our loop info is not really completely valid anymore since the cloner does

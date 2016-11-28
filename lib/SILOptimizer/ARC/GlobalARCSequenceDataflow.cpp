@@ -123,7 +123,7 @@ void ARCSequenceDataflowEvaluator::mergePredecessors(
   ARCBBState &BBState = DataHandle.getState();
 
   // For each successor of BB...
-  for (SILBasicBlock *PredBB : BB->getPreds()) {
+  for (SILBasicBlock *PredBB : BB->getPredecessorBlocks()) {
 
     // Try to look up the data handle for it. If we don't have any such state,
     // then the predecessor must be unreachable from the entrance and thus is
@@ -295,7 +295,7 @@ bool ARCSequenceDataflowEvaluator::processBBBottomUp(
   // that this block could not have multiple predecessors since otherwise, the
   // edge would be broken.
   llvm::TinyPtrVector<SILInstruction *> PredTerminators;
-  for (SILBasicBlock *PredBB : BB.getPreds()) {
+  for (SILBasicBlock *PredBB : BB.getPredecessorBlocks()) {
     auto *TermInst = PredBB->getTerminator();
     if (!isARCSignificantTerminator(TermInst))
       continue;

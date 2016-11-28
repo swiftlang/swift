@@ -450,7 +450,7 @@ bool swift::isCriticalEdge(TermInst *T, unsigned EdgeIdx) {
 
   SILBasicBlock *DestBB = SrcSuccs[EdgeIdx];
   assert(!DestBB->pred_empty() && "There should be a predecessor");
-  if (DestBB->getSinglePredecessor())
+  if (DestBB->getSinglePredecessorBlock())
     return false;
 
   return true;
@@ -741,7 +741,7 @@ bool swift::mergeBasicBlockWithSuccessor(SILBasicBlock *BB, DominanceInfo *DT,
     return false;
 
   auto *SuccBB = Branch->getDestBB();
-  if (BB == SuccBB || !SuccBB->getSinglePredecessor())
+  if (BB == SuccBB || !SuccBB->getSinglePredecessorBlock())
     return false;
 
   // If there are any BB arguments in the destination, replace them with the

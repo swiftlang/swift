@@ -204,7 +204,7 @@ void LoopRegionFunctionInfo::verify() {
       // If R and OtherR are blocks, then OtherR should be a successor of the
       // real block.
       if (R->isBlock() && OtherR->isBlock())
-        assert(R->getBlock()->isSuccessor(OtherR->getBlock()) &&
+        assert(R->getBlock()->isSuccessorBlock(OtherR->getBlock()) &&
                "Expected either R was not a block or OtherR was a CFG level "
                "successor of R.");
     }
@@ -298,7 +298,7 @@ void LoopRegionFunctionInfo::initializeBlockRegionSuccessors(
 void LoopRegionFunctionInfo::markIrreducibleLoopPredecessorsOfNonLoopHeader(
     BlockTy *NonHeaderBB, RegionTy *NonHeaderBBRegion,
     PostOrderFunctionInfo *PI) {
-  for (BlockTy *Pred : NonHeaderBB->getPreds()) {
+  for (BlockTy *Pred : NonHeaderBB->getPredecessorBlocks()) {
     // If we do not have an RPO number for a predecessor, it is because the
     // predecessor is unreachable and a pass did not clean up after
     // itself. Just ignore it, it will be cleaned up by simplify-cfg.

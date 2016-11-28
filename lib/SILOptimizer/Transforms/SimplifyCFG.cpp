@@ -381,12 +381,12 @@ static bool isKnownEdgeValue(TermInst *Term, SILBasicBlock *SuccBB,
   if (auto *SEI = dyn_cast<SwitchEnumInst>(Term)) {
     if (auto Case = SEI->getUniqueCaseForDestination(SuccBB)) {
       EnumCase = Case.get();
-      return SuccBB->getSinglePredecessor() != nullptr;
+      return SuccBB->getSinglePredecessorBlock() != nullptr;
     }
     return false;
   }
 
-  return SuccBB->getSinglePredecessor() != nullptr;
+  return SuccBB->getSinglePredecessorBlock() != nullptr;
 }
 
 /// Create an enum element by extracting the operand of a switch_enum.
@@ -530,7 +530,7 @@ static bool tryDominatorBasedSimplifications(
       // If the use is a conditional branch/switch then look for an incoming
       // edge that is dominated by DominatingSuccBB.
       if (IsThreadable) {
-        auto Preds = DestBB->getPreds();
+        auto Preds = DestBB->getPredecessorBlocks();
 
         for (SILBasicBlock *PredBB : Preds) {
           if (!isa<BranchInst>(PredBB->getTerminator()))
@@ -742,7 +742,7 @@ bool SimplifyCFG::simplifyAfterDroppingPredecessor(SILBasicBlock *BB) {
   // Make sure that DestBB is in the worklist, as well as its remaining
   // predecessors, since they may not be able to be simplified.
   addToWorklist(BB);
-  for (auto *P : BB->getPreds())
+  for (auto *P : BB->getPredecessorBlocks())
     addToWorklist(P);
 
   return false;
@@ -766,7 +766,7 @@ static NullablePtr<EnumElementDecl> getEnumCase(SILValue Val,
   //   switch_enum %val, case A: bb1, case B: bb2
   // bb1:
   //   use %val   // We know that %val has case A
-  SILBasicBlock *Pred = UsedInBB->getSinglePredecessor();
+  SILBasicBlock *Pred = UsedInBB->getSinglePredecessorBlock();
   int Limit = 3;
   // A very simple dominator check: just walk up the single predecessor chain.
   // The limit is just there to not run into an infinite loop in case of an
@@ -777,7 +777,7 @@ static NullablePtr<EnumElementDecl> getEnumCase(SILValue Val,
         return PredSEI->getUniqueCaseForDestination(UsedInBB);
     }
     UsedInBB = Pred;
-    Pred = UsedInBB->getSinglePredecessor();
+    Pred = UsedInBB->getSinglePredecessorBlock();
   }
 
   // In case of a block argument, recursively check the enum cases of all
@@ -1111,7 +1111,7 @@ bool SimplifyCFG::simplifyBranchBlock(BranchInst *BI) {
 
   // If this block branches to a block with a single predecessor, then
   // merge the DestBB into this BB.
-  if (BB != DestBB && DestBB->getSinglePredecessor()) {
+  if (BB != DestBB && DestBB->getSinglePredecessorBlock()) {
     DEBUG(llvm::dbgs() << "merge bb" << BB->getDebugID() << " with bb" <<
           DestBB->getDebugID() << '\n');
 
@@ -1192,7 +1192,7 @@ static bool wouldIntroduceCriticalEdge(TermInst *T, SILBasicBlock *DestBB) {
     return false;
 
   assert(!DestBB->pred_empty() && "There should be a predecessor");
-  if (DestBB->getSinglePredecessor())
+  if (DestBB->getSinglePredecessorBlock())
     return false;
 
   return true;
@@ -1775,7 +1775,7 @@ bool SimplifyCFG::simplifyUnreachableBlock(UnreachableInst *UI) {
       Dead->eraseFromParent();
 
     if (isOnlyUnreachable(BB))
-      for (auto *P : BB->getPreds())
+      for (auto *P : BB->getPredecessorBlocks())
         addToWorklist(P);
   }
 
@@ -2116,11 +2116,11 @@ static bool tryMoveCondFailToPreds(SILBasicBlock *BB) {
   // Check if some of the predecessor blocks provide a constant for the
   // cond_fail condition. So that the optimization has a positive effect.
   bool somePredsAreConst = false;
-  for (auto *Pred : BB->getPreds()) {
-    
+  for (auto *Pred : BB->getPredecessorBlocks()) {
+
     // The cond_fail must post-dominate the predecessor block. We may not
     // execute the cond_fail speculatively.
-    if (!Pred->getSingleSuccessor())
+    if (!Pred->getSingleSuccessorBlock())
       return false;
 
     // If we already found a constant pred, we do not need to check the incoming
@@ -2139,7 +2139,7 @@ static bool tryMoveCondFailToPreds(SILBasicBlock *BB) {
   DEBUG(llvm::dbgs() << "move to predecessors: " << *CFI);
 
   // Move the cond_fail to the predecessor blocks.
-  for (auto *Pred : BB->getPreds()) {
+  for (auto *Pred : BB->getPredecessorBlocks()) {
     SILValue incoming = condArg->getIncomingValue(Pred);
     SILBuilderWithScope Builder(Pred->getTerminator());
     
@@ -2291,7 +2291,7 @@ static bool shouldTailDuplicate(SILBasicBlock &Block) {
   if (isa<ReturnInst>(Block.getTerminator()))
     return false;
 
-  if (Block.getSinglePredecessor())
+  if (Block.getSinglePredecessorBlock())
     return false;
 
   for (auto &Inst : Block) {
@@ -2419,7 +2419,7 @@ static void removeArgument(SILBasicBlock *BB, unsigned i) {
   // two edges to this block (e.g. a conditional branch where both
   // sides reach this block).
   llvm::SmallPtrSet<SILBasicBlock *, 4> PredBBs;
-  for (auto *Pred : BB->getPreds())
+  for (auto *Pred : BB->getPredecessorBlocks())
     PredBBs.insert(Pred);
 
   for (auto *Pred : PredBBs)
@@ -2834,7 +2834,7 @@ getSwitchEnumPred(SILBasicBlock *BB, SILBasicBlock *PostBB,
 
   // Check if BB is reachable from a single enum case, which means that the
   // immediate predecessor of BB is the switch_enum itself.
-  if (SILBasicBlock *PredBB = BB->getSinglePredecessor()) {
+  if (SILBasicBlock *PredBB = BB->getSinglePredecessorBlock()) {
     // Check if a predecessor BB terminates with a switch_enum instruction
     if (auto *SEI = dyn_cast<SwitchEnumInst>(PredBB->getTerminator())) {
       Blocks.push_back(BB);
@@ -2845,12 +2845,12 @@ getSwitchEnumPred(SILBasicBlock *BB, SILBasicBlock *PostBB,
   // Check if BB is reachable from multiple enum cases. This means that there is
   // a single-branch block for each enum case which branch to BB.
   SILBasicBlock *CommonPredPredBB = nullptr;
-  for (auto PredBB : BB->getPreds()) {
+  for (auto PredBB : BB->getPredecessorBlocks()) {
     TermInst *PredTerm = PredBB->getTerminator();
     if (!isa<BranchInst>(PredTerm) || PredTerm != &*PredBB->begin())
       return nullptr;
 
-    auto *PredPredBB = PredBB->getSinglePredecessor();
+    auto *PredPredBB = PredBB->getSinglePredecessorBlock();
     if (!PredPredBB)
       return nullptr;
 
@@ -2911,7 +2911,7 @@ static bool simplifySwitchEnumToSelectEnum(SILBasicBlock *BB, unsigned ArgNum,
   //   only produces an integer value and does not have any side-effects.
   // Predecessors which do not satisfy these conditions are not included in the
   // BBToValue map (but we don't bail in this case).
-  for (auto P : BB->getPreds()) {
+  for (auto P : BB->getPredecessorBlocks()) {
     // Only handle branch instructions.
     auto *TI = P->getTerminator();
     if (!isa<BranchInst>(TI))
@@ -3087,7 +3087,7 @@ CaseInfo getCaseInfo(SILValue &Input, SILBasicBlock *Pred, unsigned ArgNum) {
   
   // Check if we come to the Pred block by comparing the input value to a
   // constant.
-  SILBasicBlock *CmpBlock = Pred->getSinglePredecessor();
+  SILBasicBlock *CmpBlock = Pred->getSinglePredecessorBlock();
   if (!CmpBlock)
     return CaseInfo;
   
@@ -3181,7 +3181,7 @@ bool simplifyToSelectValue(SILBasicBlock *MergeBlock, unsigned ArgNum,
   SmallPtrSet<SILBasicBlock *, 8> FoundCmpBlocks;
   SmallVector<CaseInfo, 8> CaseInfos;
   SILValue Input;
-  for (auto *Pred : MergeBlock->getPreds()) {
+  for (auto *Pred : MergeBlock->getPredecessorBlocks()) {
     CaseInfo CaseInfo = getCaseInfo(Input, Pred, ArgNum);
     if (!CaseInfo.Result)
       return false;
@@ -3221,7 +3221,7 @@ bool simplifyToSelectValue(SILBasicBlock *MergeBlock, unsigned ArgNum,
           return false;
         }
       }
-      SILBasicBlock *Pred = CaseInfo.CmpOrDefault->getSinglePredecessor();
+      SILBasicBlock *Pred = CaseInfo.CmpOrDefault->getSinglePredecessorBlock();
       if (!Pred || FoundCmpBlocks.count(Pred) == 0) {
         // There may be only a single block whose predecessor we didn't see. And
         // this is the entry block to the CFG pattern.
@@ -3303,7 +3303,7 @@ bool SimplifyCFG::simplifyArgument(SILBasicBlock *BB, unsigned i) {
 
   // For now, just handle the case where all predecessors are
   // unconditional branches.
-  for (auto *Pred : BB->getPreds()) {
+  for (auto *Pred : BB->getPredecessorBlocks()) {
     if (!isa<BranchInst>(Pred->getTerminator()))
       return false;
     auto *Branch = cast<BranchInst>(Pred->getTerminator());
@@ -3327,7 +3327,7 @@ bool SimplifyCFG::simplifyArgument(SILBasicBlock *BB, unsigned i) {
   User->replaceAllUsesWith(NewArg);
 
   // Rewrite the branch operand for each incoming branch.
-  for (auto *Pred : BB->getPreds()) {
+  for (auto *Pred : BB->getPredecessorBlocks()) {
     if (auto *Branch = cast<BranchInst>(Pred->getTerminator())) {
       auto V = getInsertedValue(cast<SILInstruction>(Branch->getArg(i)),
                                 User);
@@ -3376,7 +3376,7 @@ bool SimplifyCFG::simplifyArgs(SILBasicBlock *BB) {
     return false;
 
   // Ignore blocks that are successors of terminators with mandatory args.
-  for (SILBasicBlock *pred : BB->getPreds()) {
+  for (SILBasicBlock *pred : BB->getPredecessorBlocks()) {
     if (hasMandatoryArgument(pred->getTerminator()))
       return false;
   }

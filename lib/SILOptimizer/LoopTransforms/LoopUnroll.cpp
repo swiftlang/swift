@@ -110,7 +110,8 @@ static Optional<uint64_t> getMaxLoopTripCount(SILLoop *Loop,
 
   // Skip a split backedge.
   SILBasicBlock *OrigLatch = Latch;
-  if (!Loop->isLoopExiting(Latch) && !(Latch = Latch->getSinglePredecessor()))
+  if (!Loop->isLoopExiting(Latch) &&
+      !(Latch = Latch->getSinglePredecessorBlock()))
     return None;
   if (!Loop->isLoopExiting(Latch))
     return None;
@@ -215,8 +216,8 @@ static void redirectTerminator(SILBasicBlock *Latch, unsigned CurLoopIter,
     // On the last iteration change the conditional exit to an unconditional
     // one.
     if (CurLoopIter == LastLoopIter) {
-      auto *CondBr =
-          cast<CondBranchInst>(Latch->getSinglePredecessor()->getTerminator());
+      auto *CondBr = cast<CondBranchInst>(
+          Latch->getSinglePredecessorBlock()->getTerminator());
       if (CondBr->getTrueBB() != Latch)
         SILBuilder(CondBr).createBranch(CondBr->getLoc(), CondBr->getTrueBB(),
                                         CondBr->getTrueArgs());

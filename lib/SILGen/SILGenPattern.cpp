@@ -1989,7 +1989,7 @@ void PatternMatchEmission::emitSharedCaseBlocks() {
     // predecessor.  We rely on the SIL CFG here, because unemitted shared case
     // blocks might fallthrough into this one.
     if (!hasFallthroughTo && caseBlock->getCaseLabelItems().size() == 1) {
-      SILBasicBlock *predBB = caseBB->getSinglePredecessor();
+      SILBasicBlock *predBB = caseBB->getSinglePredecessorBlock();
       assert(predBB && "Should only have 1 predecessor because it isn't shared");
       assert(isa<BranchInst>(predBB->getTerminator()) &&
              "Should have uncond branch to shared block");

@@ -1180,7 +1180,7 @@ void ValueLifetimeAnalysis::propagateLiveness() {
     if (BB == DefBB)
       continue;
 
-    for (SILBasicBlock *Pred : BB->getPreds()) {
+    for (SILBasicBlock *Pred : BB->getPredecessorBlocks()) {
       // If it's already in the set, then we've already queued and/or
       // processed the predecessors.
       if (LiveBlocks.insert(Pred))
@@ -1252,7 +1252,7 @@ bool ValueLifetimeAnalysis::computeFrontier(Frontier &Fr, Mode mode) {
     bool needSplit = false;
     // If the value is live only in part of the predecessor blocks we have to
     // split those predecessor edges.
-    for (SILBasicBlock *Pred : FrontierBB->getPreds()) {
+    for (SILBasicBlock *Pred : FrontierBB->getPredecessorBlocks()) {
       if (!LiveOutBlocks.count(Pred)) {
         needSplit = true;
         break;
@@ -2136,9 +2136,9 @@ optimizeCheckedCastAddrBranchInst(CheckedCastAddrBranchInst *Inst) {
         MI = dyn_cast<MetatypeInst>(Src);
 
       if (MI) {
-        if (SuccessBB->getSinglePredecessor()
-            && canUseScalarCheckedCastInstructions(Inst->getModule(),
-                MI->getType().getSwiftRValueType(),
+        if (SuccessBB->getSinglePredecessorBlock() &&
+            canUseScalarCheckedCastInstructions(
+                Inst->getModule(), MI->getType().getSwiftRValueType(),
                 Dest->getType().getObjectType().getSwiftRValueType())) {
           SILBuilderWithScope B(Inst);
           auto NewI = B.createCheckedCastBranch(

@@ -166,7 +166,7 @@ static llvm::Optional<bool> proveNonPayloadedEnumCase(SILBasicBlock *BB,
                                                       SILValue RCIdentity) {
   // Then see if BB has one predecessor... if it does not, return None so we
   // keep searching up the domtree.
-  SILBasicBlock *SinglePred = BB->getSinglePredecessor();
+  SILBasicBlock *SinglePred = BB->getSinglePredecessorBlock();
   if (!SinglePred)
     return None;
 

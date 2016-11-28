@@ -578,8 +578,10 @@ public:
     //         \   |
     //          \  v
     //         [use(x)]
-    if (!TrueBB->getSinglePredecessor()) TrueBB = nullptr;
-    if (!FalseBB->getSinglePredecessor()) FalseBB = nullptr;
+    if (!TrueBB->getSinglePredecessorBlock())
+      TrueBB = nullptr;
+    if (!FalseBB->getSinglePredecessorBlock())
+      FalseBB = nullptr;
 
     // The relationship expressed in the builtin.
     ValueRelation Rel;

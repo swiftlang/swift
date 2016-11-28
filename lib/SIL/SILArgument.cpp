@@ -86,7 +86,7 @@ static SILValue getIncomingValueForPred(const SILBasicBlock *BB,
 
 SILValue SILArgument::getSingleIncomingValue() const {
   const SILBasicBlock *Parent = getParent();
-  const SILBasicBlock *PredBB = Parent->getSinglePredecessor();
+  const SILBasicBlock *PredBB = Parent->getSinglePredecessorBlock();
   if (!PredBB)
     return SILValue();
   return getIncomingValueForPred(Parent, PredBB, getIndex());
@@ -99,7 +99,7 @@ bool SILArgument::getIncomingValues(llvm::SmallVectorImpl<SILValue> &OutArray) {
     return false;
 
   unsigned Index = getIndex();
-  for (SILBasicBlock *Pred : getParent()->getPreds()) {
+  for (SILBasicBlock *Pred : getParent()->getPredecessorBlocks()) {
     SILValue Value = getIncomingValueForPred(Parent, Pred, Index);
     if (!Value)
       return false;
@@ -117,7 +117,7 @@ bool SILArgument::getIncomingValues(
     return false;
 
   unsigned Index = getIndex();
-  for (SILBasicBlock *Pred : getParent()->getPreds()) {
+  for (SILBasicBlock *Pred : getParent()->getPredecessorBlocks()) {
     SILValue Value = getIncomingValueForPred(Parent, Pred, Index);
     if (!Value)
       return false;
@@ -142,7 +142,7 @@ SILValue SILArgument::getIncomingValue(unsigned BBIndex) {
   // We use this funky loop since predecessors are stored in a linked list but
   // we want array like semantics.
   unsigned BBCount = 0;
-  for (SILBasicBlock *Pred : Parent->getPreds()) {
+  for (SILBasicBlock *Pred : Parent->getPredecessorBlocks()) {
     // If BBCount is not BBIndex, continue.
     if (BBCount < BBIndex) {
       BBCount++;

@@ -152,7 +152,7 @@ isEquivalentPHI(SILArgument *PHI,
                 llvm::SmallDenseMap<SILBasicBlock *, SILValue, 8> &ValueMap) {
   SILBasicBlock *PhiBB = PHI->getParent();
   size_t Idx = PHI->getIndex();
-  for (auto *PredBB : PhiBB->getPreds()) {
+  for (auto *PredBB : PhiBB->getPredecessorBlocks()) {
     auto DesiredVal = ValueMap[PredBB];
     OperandValueArrayRef EdgeValues =
         getEdgeValuesForTerminator(PredBB->getTerminator(), PhiBB);
@@ -177,7 +177,7 @@ SILValue SILSSAUpdater::GetValueInMiddleOfBlock(SILBasicBlock *BB) {
   // SSAUpdater can modify TerminatorInst and therefore invalidate the
   // predecessor iterator. Find all the predecessors before the SSA update.
   SmallVector<SILBasicBlock *, 4> Preds;
-  for (auto *PredBB: BB->getPreds()) {
+  for (auto *PredBB : BB->getPredecessorBlocks()) {
     Preds.push_back(PredBB);
   }
 
@@ -357,7 +357,7 @@ public:
       size_t PhiIdx = PHI->getIndex();
 
       // If all predecessor edges are 'not set' this is a new phi.
-      for (auto *PredBB : PhiBB->getPreds()) {
+      for (auto *PredBB : PhiBB->getPredecessorBlocks()) {
         OperandValueArrayRef Edges =
             getEdgeValuesForTerminator(PredBB->getTerminator(), PhiBB);
 
@@ -493,7 +493,7 @@ static StructInst *replaceBBArgWithStruct(
     for (unsigned ArgIdx : indices(PhiBB->getArguments())) {
       SmallVectorImpl<SILValue>::const_iterator AVIter = ArgValues.begin();
       bool TryNextArgIdx = false;
-      for (SILBasicBlock *PredBB : PhiBB->getPreds()) {
+      for (SILBasicBlock *PredBB : PhiBB->getPredecessorBlocks()) {
         // All argument values must be StructInst.
         auto *PredSI = dyn_cast<StructInst>(*AVIter++);
         if (!PredSI)

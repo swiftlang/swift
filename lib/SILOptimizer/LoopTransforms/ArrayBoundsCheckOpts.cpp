@@ -668,7 +668,7 @@ static bool isRangeChecked(SILValue Start, SILValue End,
     return true;
 
   // Look for a branch on EQ around the Preheader.
-  auto *PreheaderPred = Preheader->getSinglePredecessor();
+  auto *PreheaderPred = Preheader->getSinglePredecessorBlock();
   if (!PreheaderPred)
     return false;
   auto *CondBr = dyn_cast<CondBranchInst>(PreheaderPred->getTerminator());
@@ -1182,9 +1182,9 @@ static bool hoistBoundsChecks(SILLoop *Loop, DominanceInfo *DT, SILLoopInfo *LI,
       return Changed;
 
     // Look back a split edge.
-    if (!Loop->isLoopExiting(Latch) && Latch->getSinglePredecessor() &&
-        Loop->isLoopExiting(Latch->getSinglePredecessor()))
-      Latch = Latch->getSinglePredecessor();
+    if (!Loop->isLoopExiting(Latch) && Latch->getSinglePredecessorBlock() &&
+        Loop->isLoopExiting(Latch->getSinglePredecessorBlock()))
+      Latch = Latch->getSinglePredecessorBlock();
     if (Loop->isLoopExiting(Latch) && Latch->getSuccessors().size() == 2) {
       ExitingBlk = Latch;
       ExitBlk = Loop->contains(Latch->getSuccessors()[0])

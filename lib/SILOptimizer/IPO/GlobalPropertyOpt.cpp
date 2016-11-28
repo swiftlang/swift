@@ -400,7 +400,7 @@ void GlobalPropertyOpt::scanInstructions() {
         bool hasPreds = false;
         SILType Type = BBArg->getType();
         if (isArrayType(Type) || isTupleWithArray(Type.getSwiftRValueType())) {
-          for (auto *Pred : BB.getPreds()) {
+          for (auto *Pred : BB.getPredecessorBlocks()) {
             hasPreds = true;
             auto *Term = Pred->getTerminator();
             SILValue PredArg;

@@ -238,7 +238,7 @@ SILValue swift::getInstanceWithExactDynamicType(SILValue S, SILModule &M,
     if (!Arg)
       break;
 
-    auto *SinglePred = Arg->getParent()->getSinglePredecessor();
+    auto *SinglePred = Arg->getParent()->getSinglePredecessorBlock();
     if (!SinglePred) {
       if (!Arg->isFunctionArg())
         break;
@@ -366,7 +366,7 @@ SILType swift::getExactDynamicType(SILValue S, SILModule &M,
       continue;
     }
 
-    auto *SinglePred = Arg->getParent()->getSinglePredecessor();
+    auto *SinglePred = Arg->getParent()->getSinglePredecessorBlock();
     if (SinglePred) {
       // If it is a BB argument received on a success branch
       // of a checked_cast_br, then we know its exact type.
@@ -664,7 +664,7 @@ DevirtualizationResult swift::devirtualizeClassMethod(FullApplySite AI,
     // - re-using a BB would create a critical edge
     // - or, the result of the new apply would be of different
     //   type than the argument of the original normal BB.
-    if (TAI->getNormalBB()->getSinglePredecessor())
+    if (TAI->getNormalBB()->getSinglePredecessorBlock())
       ResultBB = TAI->getNormalBB();
     else {
       ResultBB = B.getFunction().createBasicBlock();
@@ -674,7 +674,7 @@ DevirtualizationResult swift::devirtualizeClassMethod(FullApplySite AI,
     NormalBB = TAI->getNormalBB();
 
     SILBasicBlock *ErrorBB = nullptr;
-    if (TAI->getErrorBB()->getSinglePredecessor())
+    if (TAI->getErrorBB()->getSinglePredecessorBlock())
       ErrorBB = TAI->getErrorBB();
     else {
       ErrorBB = B.getFunction().createBasicBlock();

@@ -622,7 +622,8 @@ findMatchingRetains(SILBasicBlock *BB) {
     // Did not find a retain in this block, try to go to its predecessors.
     if (Kind.first == FindRetainKind::None) {
       // We can not find a retain in a block with no predecessors.
-      if (R.first->getPreds().begin() == R.first->getPreds().end()) {
+      if (R.first->getPredecessorBlocks().begin() ==
+          R.first->getPredecessorBlocks().end()) {
         EpilogueRetainInsts.clear();
         return;
       }
@@ -636,7 +637,7 @@ findMatchingRetains(SILBasicBlock *BB) {
       if (SA && SA->getParent() != R.first)
         SA = nullptr;
 
-      for (auto X : R.first->getPreds()) {
+      for (auto X : R.first->getPredecessorBlocks()) {
         if (HandledBBs.find(X) != HandledBBs.end())
           continue;
         // Try to use the predecessor edge-value.
@@ -875,7 +876,7 @@ static void propagateLiveness(llvm::SmallPtrSetImpl<SILBasicBlock *> &LiveIn,
   // First populate a worklist of predecessors.
   llvm::SmallVector<SILBasicBlock *, 64> Worklist;
   for (auto *BB : LiveIn)
-    for (auto Pred : BB->getPreds())
+    for (auto Pred : BB->getPredecessorBlocks())
       Worklist.push_back(Pred);
 
   // Now propagate liveness backwards until we hit the alloc_box.
@@ -887,7 +888,7 @@ static void propagateLiveness(llvm::SmallPtrSetImpl<SILBasicBlock *> &LiveIn,
     if (BB == DefBB || !LiveIn.insert(BB).second)
       continue;
 
-    for (auto Pred : BB->getPreds())
+    for (auto Pred : BB->getPredecessorBlocks())
       Worklist.push_back(Pred);
   }
 }

@@ -3397,7 +3397,7 @@ public:
       // And its destination block has more than one predecessor.
       SILBasicBlock *DestBB = SrcSuccs[EdgeIdx];
       assert(!DestBB->pred_empty() && "There should be a predecessor");
-      if (DestBB->getSinglePredecessor())
+      if (DestBB->getSinglePredecessorBlock())
         return false;
 
       return true;
@@ -3437,16 +3437,16 @@ public:
     // have this basic block in its predecessor/successor list.
     for (const auto *SuccBB : BB->getSuccessorBlocks()) {
       bool FoundSelfInSuccessor = false;
-      if (SuccBB->isPredecessor(BB)) {
+      if (SuccBB->isPredecessorBlock(BB)) {
         FoundSelfInSuccessor = true;
         break;
       }
       require(FoundSelfInSuccessor, "Must be a predecessor of each successor.");
     }
 
-    for (const SILBasicBlock *PredBB : BB->getPreds()) {
+    for (const SILBasicBlock *PredBB : BB->getPredecessorBlocks()) {
       bool FoundSelfInPredecessor = false;
-      if (PredBB->isSuccessor(BB)) {
+      if (PredBB->isSuccessorBlock(BB)) {
         FoundSelfInPredecessor = true;
         break;
       }

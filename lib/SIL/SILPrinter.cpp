@@ -523,7 +523,7 @@ public:
       *this << "// Preds:";
 
       llvm::SmallVector<ID, 32> PredIDs;
-      for (auto *BBI : BB->getPreds())
+      for (auto *BBI : BB->getPredecessorBlocks())
         PredIDs.push_back(getID(BBI));
 
       // Display the pred ids sorted to give a stable use order in the printer's

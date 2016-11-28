@@ -194,7 +194,7 @@ bool StackPromoter::promote() {
   unsigned Idx = 0;
   while (Idx < ReachableBlocks.size()) {
     SILBasicBlock *BB = ReachableBlocks[Idx++];
-    for (SILBasicBlock *Pred : BB->getPreds())
+    for (SILBasicBlock *Pred : BB->getPredecessorBlocks())
       ReachableBlocks.insert(Pred);
   }
 
@@ -529,7 +529,7 @@ SILBasicBlock *StackPromoter::updateEndBlock(SILBasicBlock *CurrentBB,
   // handled blocks.
   while (!PredsToHandle.empty()) {
     SILBasicBlock *BB = PredsToHandle.pop_back_val();
-    for (SILBasicBlock *Pred : BB->getPreds()) {
+    for (SILBasicBlock *Pred : BB->getPredecessorBlocks()) {
       // Make sure that the EndBlock post-dominates all blocks we are visiting.
       while (!strictlyPostDominates(EndBlock, Pred)) {
         EndBlock = getImmediatePostDom(EndBlock);
