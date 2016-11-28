@@ -1,4 +1,4 @@
-// RUN: %target-parse-verify-swift
+// RUN: %target-typecheck-verify-swift
 
 class Dictionary<K, V> : ExpressibleByDictionaryLiteral { // expected-error {{type 'Dictionary<K, V>' does not conform to protocol 'ExpressibleByDictionaryLiteral'}}
   typealias Key = K

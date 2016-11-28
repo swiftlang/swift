@@ -5,6 +5,6 @@
 // See https://swift.org/LICENSE.txt for license information
 // See https://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
 
-// RUN: not %target-swift-frontend %s -parse
+// RUN: not %target-swift-frontend %s -typecheck
 // Crash type: memory error ("Invalid read of size 8")
 class d{let f=a< class a{extension{struct Q<h:a{protocol P{func<

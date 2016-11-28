@@ -5,5 +5,5 @@
 // See https://swift.org/LICENSE.txt for license information
 // See https://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
 
-// RUN: not %target-swift-frontend %s -parse
+// RUN: not %target-swift-frontend %s -typecheck
 let C{let _={{func b<d{class A{struct S{enum A{func c{{struct S{class A{class A{{}func e{a=a

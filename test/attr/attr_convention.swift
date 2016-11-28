@@ -1,4 +1,4 @@
-// RUN: %target-parse-verify-swift
+// RUN: %target-typecheck-verify-swift
 
 let f1: (Int) -> Int = { $0 }
 let f2: @convention(swift) (Int) -> Int = { $0 }

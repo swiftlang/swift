@@ -736,11 +736,15 @@ static bool performCompile(CompilerInstance &Instance,
   if (shouldTrackReferences)
     Instance.setReferencedNameTracker(&nameTracker);
 
-  if (Action == FrontendOptions::DumpParse ||
+  if (Action == FrontendOptions::Parse ||
+      Action == FrontendOptions::DumpParse ||
       Action == FrontendOptions::DumpInterfaceHash)
     Instance.performParseOnly();
   else
     Instance.performSema();
+
+  if (Action == FrontendOptions::Parse)
+    return false;
 
   if (observer) {
     observer->performedSemanticAnalysis(Instance);
@@ -853,8 +857,8 @@ static bool performCompile(CompilerInstance &Instance,
       opts.ImplicitObjCHeaderPath.empty() &&
       !Context.LangOpts.EnableAppExtensionRestrictions;
 
-  // We've just been told to perform a parse, so we can return now.
-  if (Action == FrontendOptions::Parse) {
+  // We've just been told to perform a typecheck, so we can return now.
+  if (Action == FrontendOptions::Typecheck) {
     if (!opts.ObjCHeaderOutputPath.empty())
       return printAsObjC(opts.ObjCHeaderOutputPath, Instance.getMainModule(),
                          opts.ImplicitObjCHeaderPath, moduleIsPublic);

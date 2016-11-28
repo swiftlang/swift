@@ -6,6 +6,6 @@
 // See https://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
 
 // DUPLICATE-OF: 26832-swift-typechecker-conformstoprotocol.swift
-// RUN: not %target-swift-frontend %s -parse
+// RUN: not %target-swift-frontend %s -typecheck
 // REQUIRES: asserts
 {struct X<a{protocol A{class B<T>:B<T>let h:A

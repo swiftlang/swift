@@ -1,4 +1,4 @@
-// RUN: %target-parse-verify-swift
+// RUN: %target-typecheck-verify-swift
 
 func foo(_ a: Int) {
   // expected-error @+1 {{invalid character in source file}} {{8-9= }}

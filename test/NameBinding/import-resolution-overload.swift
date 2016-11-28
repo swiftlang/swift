@@ -3,7 +3,7 @@
 // RUN: %target-swift-frontend -emit-module -o %t %S/Inputs/overload_intFunctions.swift
 // RUN: %target-swift-frontend -emit-module -o %t %S/Inputs/overload_boolFunctions.swift
 // RUN: %target-swift-frontend -emit-module -o %t %S/Inputs/overload_vars.swift
-// RUN: %target-swift-frontend -parse %s -I %t -sdk "" -verify
+// RUN: %target-swift-frontend -typecheck %s -I %t -sdk "" -verify
 
 // RUN: not %target-swift-frontend -dump-ast %s -I %t -sdk "" > %t.astdump 2>&1
 // RUN: %FileCheck %s < %t.astdump

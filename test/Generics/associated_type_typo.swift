@@ -1,6 +1,6 @@
-// RUN: %target-parse-verify-swift
+// RUN: %target-typecheck-verify-swift
 
-// RUN: not %target-swift-frontend -parse -debug-generic-signatures %s > %t.dump 2>&1 
+// RUN: not %target-swift-frontend -typecheck -debug-generic-signatures %s > %t.dump 2>&1 
 // RUN: %FileCheck -check-prefix CHECK-GENERIC %s < %t.dump
 
 protocol P1 {

@@ -1,12 +1,12 @@
 // RUN: rm -rf %t
 // RUN: mkdir -p %t
 
-// RUN: %target-swift-frontend(mock-sdk: %clang-importer-sdk) -parse -verify %s -DIMPORT_TOP_LEVEL
-// RUN: %target-swift-frontend(mock-sdk: %clang-importer-sdk) -parse -verify %s
+// RUN: %target-swift-frontend(mock-sdk: %clang-importer-sdk) -typecheck -verify %s -DIMPORT_TOP_LEVEL
+// RUN: %target-swift-frontend(mock-sdk: %clang-importer-sdk) -typecheck -verify %s
 
 // RUN: %target-swift-frontend(mock-sdk: %clang-importer-sdk) -emit-module-path %t/submodules.swiftmodule %s -DNO_ERRORS
-// RUN: echo 'import submodules; let s = "\(x), \(y)"' | %target-swift-frontend(mock-sdk: %clang-importer-sdk) -parse - -I %t
-// RUN: echo 'import submodules; let s = "\(x), \(y)"' | not %target-swift-frontend -parse - -I %t 2>&1 | %FileCheck -check-prefix=MISSING %s
+// RUN: echo 'import submodules; let s = "\(x), \(y)"' | %target-swift-frontend(mock-sdk: %clang-importer-sdk) -typecheck - -I %t
+// RUN: echo 'import submodules; let s = "\(x), \(y)"' | not %target-swift-frontend -typecheck - -I %t 2>&1 | %FileCheck -check-prefix=MISSING %s
 
 #if IMPORT_TOP_LEVEL
 import ctypes

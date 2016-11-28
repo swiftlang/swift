@@ -5,7 +5,7 @@
 // See https://swift.org/LICENSE.txt for license information
 // See https://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
 
-// RUN: not %target-swift-frontend %s -parse
+// RUN: not %target-swift-frontend %s -typecheck
 struct c<h:d
 class A:Boolean}{class B<T where k:c<I : {
 struct B:Boolean}}enum S<T where g: Int = Swift.c {

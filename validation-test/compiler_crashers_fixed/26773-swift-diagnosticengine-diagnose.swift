@@ -5,5 +5,5 @@
 // See https://swift.org/LICENSE.txt for license information
 // See https://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
 
-// RUN: not %target-swift-frontend %s -parse
+// RUN: not %target-swift-frontend %s -typecheck
 struct B<T{{}enum k{struct B<T{let a=B{class B{struct a{struct B{{{{{{{[{{{{{{{{{{{{{{{{{{{{{{{{{{{{{[{{{{}{{{{{[{{{{{{}{{[{{{{{{{{b e=

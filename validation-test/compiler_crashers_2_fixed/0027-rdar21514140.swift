@@ -1,4 +1,4 @@
-// RUN: not %target-swift-frontend %s -parse
+// RUN: not %target-swift-frontend %s -typecheck
 
 /// A type that is just a wrapper over some base Sequence
 internal protocol _SequenceWrapper {

@@ -1,4 +1,4 @@
-// RUN: %target-parse-verify-swift
+// RUN: %target-typecheck-verify-swift
 
 
 func _Algorithm<I : IteratorProtocol, S : Sequence>(i: I, s: S) {

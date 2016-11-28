@@ -5,5 +5,5 @@
 // See https://swift.org/LICENSE.txt for license information
 // See https://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
 
-// RUN: not %target-swift-frontend %s -parse
+// RUN: not %target-swift-frontend %s -typecheck
 func b{struct Q<T where g:c{enum S{{}class a{class B{struct B{enum S<a{struct B{class a{struct Q{struct D:Collection

@@ -6,7 +6,7 @@
 // See https://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
 
 // REQUIRES: deterministic-behavior
-// RUN: not --crash %target-swift-frontend %s -parse
+// RUN: not --crash %target-swift-frontend %s -typecheck
 // REQUIRES: SR-3149
 t c
 let : {{

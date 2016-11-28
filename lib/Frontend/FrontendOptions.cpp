@@ -20,6 +20,7 @@ bool FrontendOptions::actionHasOutput() const {
   switch (RequestedAction) {
   case NoneAction:
   case Parse:
+  case Typecheck:
   case DumpParse:
   case DumpAST:
   case DumpInterfaceHash:
@@ -49,6 +50,7 @@ bool FrontendOptions::actionIsImmediate() const {
   switch (RequestedAction) {
   case NoneAction:
   case Parse:
+  case Typecheck:
   case DumpParse:
   case DumpAST:
   case DumpInterfaceHash:

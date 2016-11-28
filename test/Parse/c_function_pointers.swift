@@ -1,4 +1,4 @@
-// RUN: %target-swift-frontend -parse -verify -module-name main %s
+// RUN: %target-swift-frontend -typecheck -verify -module-name main %s
 func global() -> Int { return 0 }
 
 struct S {

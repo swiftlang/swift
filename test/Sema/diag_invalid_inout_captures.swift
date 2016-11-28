@@ -1,4 +1,4 @@
-// RUN: %target-parse-verify-swift
+// RUN: %target-typecheck-verify-swift
 
 func no_escape(_ you_say_price_of_my_love_is: () -> ()) {}
 func do_escape(_ not_a_price_you_are_willing_to_pay: @escaping () -> ()) {}

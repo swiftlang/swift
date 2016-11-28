@@ -1,4 +1,4 @@
-// RUN: %target-parse-verify-swift -I %S/Inputs -enable-source-import
+// RUN: %target-typecheck-verify-swift -I %S/Inputs -enable-source-import
 
 import imported_enums
 

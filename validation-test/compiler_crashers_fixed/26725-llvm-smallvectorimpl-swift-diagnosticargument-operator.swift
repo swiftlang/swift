@@ -5,7 +5,7 @@
 // See https://swift.org/LICENSE.txt for license information
 // See https://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
 
-// RUN: not %target-swift-frontend %s -parse
+// RUN: not %target-swift-frontend %s -typecheck
 // This test fails in the AST verifier, which can be turned off.
 // REQUIRES: swift_ast_verifier
 class a<T where g:d{class A{class A<T>:A{init(){T{

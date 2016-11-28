@@ -136,7 +136,8 @@ public:
 
   enum ActionType {
     NoneAction, ///< No specific action
-    Parse, ///< Parse and type-check only
+    Parse, ///< Parse only
+    Typecheck, ///< Parse and type-check only
     DumpParse, ///< Parse only and dump AST
     DumpInterfaceHash, ///< Parse and dump the interface token hash.
     DumpAST, ///< Parse, type-check, and dump AST

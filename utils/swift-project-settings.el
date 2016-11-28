@@ -354,7 +354,7 @@ compilation order the given file should appear."
         (match-beginning 0) 0)))
 
 (defconst swift-project-common-swiftc-args
-  (list "-parse" "-sdk" swift-project-sdk-path
+  (list "-typecheck" "-sdk" swift-project-sdk-path
         "-F" (concat (file-name-as-directory swift-project-sdk-path) "../../../Developer/Library/Frameworks")
         "-D" "INTERNAL_CHECKS_ENABLED"
         "-no-link-objc-runtime")

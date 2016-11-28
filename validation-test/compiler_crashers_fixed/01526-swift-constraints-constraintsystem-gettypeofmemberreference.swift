@@ -5,7 +5,7 @@
 // See https://swift.org/LICENSE.txt for license information
 // See https://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
 
-// RUN: not %target-swift-frontend %s -parse
+// RUN: not %target-swift-frontend %s -typecheck
 ide func f<Int](b, Any, AnyObject.c<b(A, c() -> {
 }))) {
 init<d) -> T, Any) -> (array: a<T where h, b where I) -> : A, g<j : $0] = {

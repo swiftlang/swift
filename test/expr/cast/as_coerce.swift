@@ -1,4 +1,4 @@
-// RUN: %target-parse-verify-swift
+// RUN: %target-typecheck-verify-swift
 
 // Test the use of 'as' for type coercion (which requires no checking).
 @objc protocol P1 {

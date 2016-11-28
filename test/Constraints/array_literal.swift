@@ -1,4 +1,4 @@
-// RUN: %target-parse-verify-swift
+// RUN: %target-typecheck-verify-swift
 
 struct IntList : ExpressibleByArrayLiteral {
   typealias Element = Int
