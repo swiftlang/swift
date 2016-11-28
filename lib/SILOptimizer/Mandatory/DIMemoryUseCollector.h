@@ -266,7 +266,7 @@ struct DIMemoryUse {
   bool isValid() const { return Inst != nullptr; }
 
   bool usesElement(unsigned i) const {
-    return i >= FirstElement && i < FirstElement+NumElements;
+    return i >= FirstElement && i < static_cast<unsigned>(FirstElement+NumElements);
   }
   
   /// onlyTouchesTrivialElements - Return true if all of the accessed elements

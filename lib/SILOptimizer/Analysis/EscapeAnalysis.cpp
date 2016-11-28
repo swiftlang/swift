@@ -789,6 +789,8 @@ namespace llvm {
         case CGForDotView::PointsTo: return "";
         case CGForDotView::Deferred: return "color=\"gray\"";
       }
+
+      llvm_unreachable("Unhandled CGForDotView in switch.");
     }
   };
 } // end llvm namespace
@@ -823,6 +825,8 @@ const char *EscapeAnalysis::CGNode::getTypeStr() const {
     case NodeType::Argument:   return "Arg";
     case NodeType::Return:     return "Ret";
   }
+
+  llvm_unreachable("Unhandled NodeType in switch.");
 }
 
 void EscapeAnalysis::ConnectionGraph::dump() const {

@@ -455,6 +455,8 @@ SILLinkage swift::getSpecializedLinkage(SILFunction *F, SILLinkage L) {
     // functions from the stdlib which are specialized in another module).
     return SILLinkage::Private;
   }
+
+  llvm_unreachable("Unhandled SILLinkage in switch.");
 }
 
 /// Remove all instructions in the body of \p BB in safe manner by using
@@ -2714,6 +2716,8 @@ bool swift::calleesAreStaticallyKnowable(SILModule &M, SILDeclRef Decl) {
   case Accessibility::Private:
     return true;
   }
+
+  llvm_unreachable("Unhandled Accessibility in switch.");
 }
 
 void swift::hoistAddressProjections(Operand &Op, SILInstruction *InsertBefore,

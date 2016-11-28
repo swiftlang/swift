@@ -87,6 +87,8 @@ SILInstruction *SILCombiner::optimizeBuiltinCanBeObjCClass(BuiltinInst *BI) {
   case TypeTraitResult::CanBe:
     return nullptr;
   }
+
+  llvm_unreachable("Unhandled TypeTraitResult in switch.");
 }
 
 static unsigned getTypeWidth(SILType Ty) {
