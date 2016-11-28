@@ -53,6 +53,9 @@ GenericEnvironment::GenericEnvironment(
     // FIXME: If multiple generic parameters map to the same archetype,
     // the reverse mapping order is not deterministic.
   }
+
+  // Make sure this generic environment gets destroyed.
+  signature->getASTContext().addDestructorCleanup(*this);
 }
 
 void *GenericEnvironment::operator new(size_t bytes, const ASTContext &ctx) {
