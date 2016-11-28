@@ -3637,9 +3637,13 @@ Type ModuleFile::getType(TypeID TID) {
     if (typeOrOffset.isComplete())
       break;
 
-    auto archetype = ArchetypeType::getNew(ctx, parent, assocTypeDecl,
-                                           getIdentifier(nameID), conformances,
-                                           superclass);
+    ArchetypeType *archetype;
+    if (parent)
+      archetype = ArchetypeType::getNew(ctx, parent, assocTypeDecl,
+                                        conformances, superclass);
+    else
+      archetype = ArchetypeType::getNew(ctx, getIdentifier(nameID),
+                                        conformances, superclass);
     typeOrOffset = archetype;
     
     // Read the associated type names.

@@ -432,10 +432,8 @@ static std::pair<ArchetypeType*, GenericTypeParamDecl*>
 createGenericParam(ASTContext &ctx, const char *name, unsigned index) {
   Module *M = ctx.TheBuiltinModule;
   Identifier ident = ctx.getIdentifier(name);
-  ArchetypeType *archetype
-    = ArchetypeType::getNew(ctx, nullptr,
-                            static_cast<AssociatedTypeDecl *>(nullptr),
-                            ident, ArrayRef<Type>(), Type());
+  SmallVector<ProtocolDecl *, 1> protos;
+  ArchetypeType *archetype = ArchetypeType::getNew(ctx, ident, protos, Type());
   auto genericParam =
     new (ctx) GenericTypeParamDecl(&M->getMainFile(FileUnitKind::Builtin),
                                    ident, SourceLoc(), 0, index);

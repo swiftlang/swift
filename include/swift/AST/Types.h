@@ -3822,8 +3822,7 @@ private:
   Type Superclass;
 
   llvm::PointerUnion<ArchetypeType *, TypeBase *> ParentOrOpened;
-  AssociatedTypeDecl *AssocType;
-  Identifier Name;
+  llvm::PointerUnion<AssociatedTypeDecl *, Identifier> AssocTypeOrName;
   MutableArrayRef<std::pair<Identifier, NestedType>> NestedTypes;
 
   /// Set the ID number of this opened existential.
@@ -3842,7 +3841,7 @@ public:
   static CanTypeWrapper<ArchetypeType>
                         getNew(const ASTContext &Ctx, ArchetypeType *Parent,
                                AssociatedTypeDecl *AssocType,
-                               Identifier Name, ArrayRef<Type> ConformsTo,
+                               SmallVectorImpl<ProtocolDecl *> &ConformsTo,
                                Type Superclass);
 
   /// getNew - Create a new archetype with the given name.
@@ -3850,8 +3849,7 @@ public:
   /// The ConformsTo array will be minimized then copied into the ASTContext
   /// by this routine.
   static CanTypeWrapper<ArchetypeType>
-                        getNew(const ASTContext &Ctx, ArchetypeType *Parent,
-                               AssociatedTypeDecl *AssocType,
+                        getNew(const ASTContext &Ctx,
                                Identifier Name,
                                SmallVectorImpl<ProtocolDecl *> &ConformsTo,
                                Type Superclass);
@@ -3874,7 +3872,7 @@ public:
   static CanType getAnyOpened(Type existential);
 
   /// \brief Retrieve the name of this archetype.
-  Identifier getName() const { return Name; }
+  Identifier getName() const;
 
   /// \brief Retrieve the fully-dotted name that should be used to display this
   /// archetype.
@@ -3898,7 +3896,7 @@ public:
   /// be a member of one of the protocols to which the parent archetype
   /// conforms.
   AssociatedTypeDecl *getAssocType() const {
-    return AssocType;
+    return AssocTypeOrName.dyn_cast<AssociatedTypeDecl *>();
   }
 
   /// getConformsTo - Retrieve the set of protocols to which this substitutable
@@ -3970,14 +3968,15 @@ public:
   }
 
 private:
-  ArchetypeType(const ASTContext &Ctx, ArchetypeType *Parent,
-                AssociatedTypeDecl *AssocType,
-                Identifier Name, ArrayRef<ProtocolDecl *> ConformsTo,
-                Type Superclass)
+  ArchetypeType(
+          const ASTContext &Ctx, ArchetypeType *Parent,
+          llvm::PointerUnion<AssociatedTypeDecl *, Identifier> AssocTypeOrName,
+          ArrayRef<ProtocolDecl *> ConformsTo,
+          Type Superclass)
     : SubstitutableType(TypeKind::Archetype, &Ctx,
                         RecursiveTypeProperties::HasArchetype),
       ConformsTo(ConformsTo), Superclass(Superclass), ParentOrOpened(Parent),
-      AssocType(AssocType), Name(Name) { }
+      AssocTypeOrName(AssocTypeOrName) { }
 
   ArchetypeType(const ASTContext &Ctx, 
                 Type Existential,
@@ -3988,8 +3987,7 @@ private:
                           RecursiveTypeProperties::HasArchetype |
                           RecursiveTypeProperties::HasOpenedExistential)),
       ConformsTo(ConformsTo), Superclass(Superclass),
-      ParentOrOpened(Existential.getPointer()),
-      AssocType(nullptr) { }
+      ParentOrOpened(Existential.getPointer()) { }
 };
 BEGIN_CAN_TYPE_WRAPPER(ArchetypeType, SubstitutableType)
 CanArchetypeType getParent() const {

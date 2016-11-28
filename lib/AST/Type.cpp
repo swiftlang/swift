@@ -2490,30 +2490,24 @@ Type TupleType::getVarArgsBaseType() const {
 }
 
 
-CanArchetypeType ArchetypeType::getNew(const ASTContext &Ctx,
-                                       ArchetypeType *Parent,
-                                       AssociatedTypeDecl *AssocType,
-                                       Identifier Name,
-                                       ArrayRef<Type> ConformsTo,
-                                       Type Superclass) {
+CanArchetypeType ArchetypeType::getNew(
+                                   const ASTContext &Ctx,
+                                   ArchetypeType *Parent,
+                                   AssociatedTypeDecl *AssocType,
+                                   SmallVectorImpl<ProtocolDecl *> &ConformsTo,
+                                   Type Superclass) {
   // Gather the set of protocol declarations to which this archetype conforms.
-  SmallVector<ProtocolDecl *, 4> ConformsToProtos;
-  for (auto P : ConformsTo) {
-    addProtocols(P, ConformsToProtos);
-  }
-  ProtocolType::canonicalizeProtocols(ConformsToProtos);
+  ProtocolType::canonicalizeProtocols(ConformsTo);
 
   auto arena = AllocationArena::Permanent;
   return CanArchetypeType(
-           new (Ctx, arena) ArchetypeType(Ctx, Parent, AssocType, Name,
-                                          Ctx.AllocateCopy(ConformsToProtos),
+           new (Ctx, arena) ArchetypeType(Ctx, Parent, AssocType,
+                                          Ctx.AllocateCopy(ConformsTo),
                                           Superclass));
 }
 
 CanArchetypeType
-ArchetypeType::getNew(const ASTContext &Ctx, ArchetypeType *Parent,
-                      AssociatedTypeDecl *AssocType,
-                      Identifier Name,
+ArchetypeType::getNew(const ASTContext &Ctx, Identifier Name,
                       SmallVectorImpl<ProtocolDecl *> &ConformsTo,
                       Type Superclass) {
   // Gather the set of protocol declarations to which this archetype conforms.
@@ -2521,7 +2515,7 @@ ArchetypeType::getNew(const ASTContext &Ctx, ArchetypeType *Parent,
 
   auto arena = AllocationArena::Permanent;
   return CanArchetypeType(
-           new (Ctx, arena) ArchetypeType(Ctx, Parent, AssocType, Name,
+           new (Ctx, arena) ArchetypeType(Ctx, nullptr, Name,
                                           Ctx.AllocateCopy(ConformsTo),
                                           Superclass));
 }
@@ -2619,6 +2613,13 @@ static void collectFullName(const ArchetypeType *Archetype,
   }
   Result.append(Archetype->getName().str().begin(),
                 Archetype->getName().str().end());
+}
+
+Identifier ArchetypeType::getName() const {
+  if (auto assocType = getAssocType())
+    return assocType->getName();
+
+  return AssocTypeOrName.get<Identifier>();
 }
 
 std::string ArchetypeType::getFullName() const {
