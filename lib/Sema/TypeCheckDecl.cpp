@@ -4867,7 +4867,7 @@ public:
       TC.finalizeGenericParamList(gp, sig, env, FD);
     } else if (FD->getDeclContext()->getGenericSignatureOfContext()) {
       (void)TC.validateGenericFuncSignature(FD);
-      if (!FD->hasType()) {
+      if (FD->getGenericEnvironment() == nullptr) {
         // Revert all of the types within the signature of the function.
         TC.revertGenericFuncSignature(FD);
         FD->setGenericEnvironment(
