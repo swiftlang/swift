@@ -539,11 +539,14 @@ static void diagSyntacticUseRestrictions(TypeChecker &TC, const Expr *E,
 
       TC.diagnose(E->getStartLoc(), diag::value_of_metatype_type);
 
-      // Add fix-t to insert '()', unless this is a protocol metatype.
-      bool isProtocolMetatype = false;
+      // Add fix-it to insert '()', only if this is a metatype of
+      // non-existential type and has any initializers.
+      bool isExistential = false;
       if (auto metaTy = E->getType()->getAs<MetatypeType>())
-        isProtocolMetatype = metaTy->getInstanceType()->is<ProtocolType>();
-      if (!isProtocolMetatype) {
+        isExistential = metaTy->getInstanceType()->isAnyExistentialType();
+      if (!isExistential &&
+          !TC.lookupConstructors(const_cast<DeclContext *>(DC),
+                                 E->getType()).empty()) {
         TC.diagnose(E->getEndLoc(), diag::add_parens_to_type)
           .fixItInsertAfter(E->getEndLoc(), "()");
       }
