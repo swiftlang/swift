@@ -3926,13 +3926,26 @@ public:
   /// \brief Check if the archetype contains a nested type with the given name.
   bool hasNestedType(Identifier Name) const;
 
+  /// \brief Retrieve the known nested types of this archetype.
+  ///
+  /// Useful only for debugging dumps; all other queries should attempt to
+  /// find a particular nested type by name, directly, or look at the
+  /// protocols to which this archetype conforms.
+  ArrayRef<std::pair<Identifier, NestedType>>
+  getKnownNestedTypes(bool resolveTypes = true) const {
+    return getAllNestedTypes(/*resolveTypes=*/false);
+  }
+
   /// \brief Retrieve the nested types of this archetype.
   ///
   /// \param resolveTypes Whether to eagerly resolve the nested types
   /// (defaults to \c true). Otherwise, the nested types might be
   /// null.
+  ///
+  /// FIXME: This operation should go away, because it breaks recursive
+  /// protocol constraints.
   ArrayRef<std::pair<Identifier, NestedType>>
-  getNestedTypes(bool resolveTypes = true) const;
+  getAllNestedTypes(bool resolveTypes = true) const;
 
   /// \brief Set the nested types to a copy of the given array of
   /// archetypes, which will first be sorted in place.

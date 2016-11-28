@@ -462,7 +462,10 @@ struct ASTNodeBase {};
           }
 
           // Make sure that none of the nested types are dependent.
-          for (const auto &nested : archetype->getNestedTypes()) {
+          for (const auto &nested : archetype->getKnownNestedTypes()) {
+            if (!nested.second)
+              continue;
+            
             if (auto nestedType = nested.second.getAsConcreteType()) {
               if (nestedType->hasTypeParameter()) {
                 Out << "Nested type " << nested.first.str()

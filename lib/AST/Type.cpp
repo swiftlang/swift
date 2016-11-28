@@ -2587,7 +2587,7 @@ bool ArchetypeType::hasNestedType(Identifier Name) const {
 }
 
 ArrayRef<std::pair<Identifier, ArchetypeType::NestedType>>
-ArchetypeType::getNestedTypes(bool resolveTypes) const {
+ArchetypeType::getAllNestedTypes(bool resolveTypes) const {
   if (resolveTypes) {
     for (auto &nested : NestedTypes) {
       if (!nested.second)
