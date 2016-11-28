@@ -29,7 +29,7 @@ namespace swift {
 /// is not intended to be specialized.
 template<typename T>
 struct IsTriviallyCopyable {
-#if _LIBCPP_VERSION
+#if _LIBCPP_VERSION || (defined(_MSC_VER) && !defined(__clang__))
   // libc++ implements it.
   static const bool value = std::is_trivially_copyable<T>::value;
 #elif __has_feature(is_trivially_copyable)
@@ -41,7 +41,7 @@ struct IsTriviallyCopyable {
 
 template<typename T>
 struct IsTriviallyConstructible {
-#if _LIBCPP_VERSION
+#if _LIBCPP_VERSION || (defined(_MSC_VER) && !defined(__clang__))
   // libc++ implements it.
   static const bool value = std::is_trivially_constructible<T>::value;
 #elif __has_feature(has_trivial_constructor)
@@ -53,7 +53,7 @@ struct IsTriviallyConstructible {
 
 template<typename T>
 struct IsTriviallyDestructible {
-#if _LIBCPP_VERSION
+#if _LIBCPP_VERSION || (defined(_MSC_VER) && !defined(__clang__))
   // libc++ implements it.
   static const bool value = std::is_trivially_destructible<T>::value;
 #elif __has_feature(has_trivial_destructor)

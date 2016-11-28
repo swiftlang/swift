@@ -24,7 +24,7 @@ void SourceManager::verifyAllBuffers() const {
   };
 
   // FIXME: This depends on the buffer IDs chosen by llvm::SourceMgr.
-  __attribute__((used)) static char arbitraryTotal = 0;
+  LLVM_ATTRIBUTE_USED static char arbitraryTotal = 0;
   for (unsigned i = 1, e = LLVMSourceMgr.getNumBuffers(); i <= e; ++i) {
     auto *buffer = LLVMSourceMgr.getMemoryBuffer(i);
     if (buffer->getBufferSize() == 0)

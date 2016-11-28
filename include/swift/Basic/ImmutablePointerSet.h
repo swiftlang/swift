@@ -112,7 +112,7 @@ public:
     return *LowerBound == Ptr;
   }
 
-  using iterator = typename decltype(Data)::iterator;
+  using iterator = typename ArrayRef<PtrTy>::iterator;
   iterator begin() const { return Data.begin(); }
   iterator end() const { return Data.end(); }
 
