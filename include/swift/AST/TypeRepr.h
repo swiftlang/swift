@@ -42,7 +42,10 @@ enum class TypeReprKind : uint8_t {
 
 /// \brief Representation of a type as written in source.
 class alignas(8) TypeRepr {
+  // Fix MSVC error: attempting to reference a deleted function.
+#if !defined(_MSC_VER) || defined(__clang__)
   TypeRepr(const TypeRepr&) = delete;
+#endif
   void operator=(const TypeRepr&) = delete;
 
   class TypeReprBitfields {

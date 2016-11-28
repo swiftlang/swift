@@ -183,7 +183,9 @@ public:
 
   /// Make vanilla new/delete illegal.
   void *operator new(size_t Bytes) = delete;
+#if !defined(_MSC_VER) || defined(__clang__)
   void operator delete(void *Data) = delete;
+#endif
 
   /// Only allow placement new.
   void *operator new(size_t Bytes, void *Mem) {

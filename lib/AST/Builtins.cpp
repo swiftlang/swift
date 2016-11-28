@@ -1316,6 +1316,8 @@ static bool isUnknownOrUnordered(llvm::AtomicOrdering ordering) {
   case AtomicOrdering::SequentiallyConsistent:
     return false;
   }
+
+  llvm_unreachable("Unhandled AtomicOrdering in switch.");
 }
 
 static bool isValidCmpXChgOrdering(StringRef SuccessString, 
