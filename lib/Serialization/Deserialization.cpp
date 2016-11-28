@@ -3607,14 +3607,13 @@ Type ModuleFile::getType(TypeID TID) {
   }
 
   case decls_block::ARCHETYPE_TYPE: {
-    IdentifierID nameID;
     TypeID parentID;
-    DeclID assocTypeID;
+    DeclID assocTypeOrNameID;
     TypeID superclassID;
     ArrayRef<uint64_t> rawConformanceIDs;
 
-    decls_block::ArchetypeTypeLayout::readRecord(scratch, nameID, parentID,
-                                                 assocTypeID,
+    decls_block::ArchetypeTypeLayout::readRecord(scratch, parentID,
+                                                 assocTypeOrNameID,
                                                  superclassID,
                                                  rawConformanceIDs);
 
@@ -3625,8 +3624,6 @@ Type ModuleFile::getType(TypeID TID) {
     if (auto parentType = getType(parentID))
       parent = parentType->castTo<ArchetypeType>();
 
-    auto assocTypeDecl = dyn_cast_or_null<AssociatedTypeDecl>(
-        getDecl(assocTypeID));
 
     superclass = getType(superclassID);
 
@@ -3638,12 +3635,15 @@ Type ModuleFile::getType(TypeID TID) {
       break;
 
     ArchetypeType *archetype;
-    if (parent)
+    if (parent) {
+      auto assocTypeDecl = cast<AssociatedTypeDecl>(getDecl(assocTypeOrNameID));
       archetype = ArchetypeType::getNew(ctx, parent, assocTypeDecl,
                                         conformances, superclass);
-    else
-      archetype = ArchetypeType::getNew(ctx, getIdentifier(nameID),
+    } else {
+      archetype = ArchetypeType::getNew(ctx, getIdentifier(assocTypeOrNameID),
                                         conformances, superclass);
+    }
+
     typeOrOffset = archetype;
     
     // Read the associated type names.
