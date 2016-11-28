@@ -3822,9 +3822,7 @@ private:
   Type Superclass;
 
   llvm::PointerUnion<ArchetypeType *, TypeBase *> ParentOrOpened;
-  AssociatedTypeDecl *AssocType;
-  Identifier Name;
-  unsigned isRecursive: 1;
+  llvm::PointerUnion<AssociatedTypeDecl *, Identifier> AssocTypeOrName;
   MutableArrayRef<std::pair<Identifier, NestedType>> NestedTypes;
 
   /// Set the ID number of this opened existential.
@@ -3843,21 +3841,18 @@ public:
   static CanTypeWrapper<ArchetypeType>
                         getNew(const ASTContext &Ctx, ArchetypeType *Parent,
                                AssociatedTypeDecl *AssocType,
-                               Identifier Name, ArrayRef<Type> ConformsTo,
-                               Type Superclass,
-                               bool isRecursive = false);
+                               SmallVectorImpl<ProtocolDecl *> &ConformsTo,
+                               Type Superclass);
 
   /// getNew - Create a new archetype with the given name.
   ///
   /// The ConformsTo array will be minimized then copied into the ASTContext
   /// by this routine.
   static CanTypeWrapper<ArchetypeType>
-                        getNew(const ASTContext &Ctx, ArchetypeType *Parent,
-                               AssociatedTypeDecl *AssocType,
+                        getNew(const ASTContext &Ctx,
                                Identifier Name,
                                SmallVectorImpl<ProtocolDecl *> &ConformsTo,
-                               Type Superclass,
-                               bool isRecursive = false);
+                               Type Superclass);
 
   /// Create a new archetype that represents the opened type
   /// of an existential value.
@@ -3877,7 +3872,7 @@ public:
   static CanType getAnyOpened(Type existential);
 
   /// \brief Retrieve the name of this archetype.
-  Identifier getName() const { return Name; }
+  Identifier getName() const;
 
   /// \brief Retrieve the fully-dotted name that should be used to display this
   /// archetype.
@@ -3901,7 +3896,7 @@ public:
   /// be a member of one of the protocols to which the parent archetype
   /// conforms.
   AssociatedTypeDecl *getAssocType() const {
-    return AssocType;
+    return AssocTypeOrName.dyn_cast<AssociatedTypeDecl *>();
   }
 
   /// getConformsTo - Retrieve the set of protocols to which this substitutable
@@ -3971,34 +3966,28 @@ public:
   static bool classof(const TypeBase *T) {
     return T->getKind() == TypeKind::Archetype;
   }
-  
-  /// getIsRecursive - The archetype type refers back to itself.
-  bool getIsRecursive() { return this->isRecursive; }
-  
+
 private:
-  ArchetypeType(const ASTContext &Ctx, ArchetypeType *Parent,
-                AssociatedTypeDecl *AssocType,
-                Identifier Name, ArrayRef<ProtocolDecl *> ConformsTo,
-                Type Superclass,
-                bool isRecursive = false)
+  ArchetypeType(
+          const ASTContext &Ctx, ArchetypeType *Parent,
+          llvm::PointerUnion<AssociatedTypeDecl *, Identifier> AssocTypeOrName,
+          ArrayRef<ProtocolDecl *> ConformsTo,
+          Type Superclass)
     : SubstitutableType(TypeKind::Archetype, &Ctx,
                         RecursiveTypeProperties::HasArchetype),
       ConformsTo(ConformsTo), Superclass(Superclass), ParentOrOpened(Parent),
-      AssocType(AssocType), Name(Name),
-      isRecursive(isRecursive) { }
+      AssocTypeOrName(AssocTypeOrName) { }
 
   ArchetypeType(const ASTContext &Ctx, 
                 Type Existential,
                 ArrayRef<ProtocolDecl *> ConformsTo,
-                Type Superclass, bool isRecursive = false)
+                Type Superclass)
     : SubstitutableType(TypeKind::Archetype, &Ctx,
                         RecursiveTypeProperties(
                           RecursiveTypeProperties::HasArchetype |
                           RecursiveTypeProperties::HasOpenedExistential)),
       ConformsTo(ConformsTo), Superclass(Superclass),
-      ParentOrOpened(Existential.getPointer()),
-      AssocType(nullptr),
-      isRecursive(isRecursive) { }
+      ParentOrOpened(Existential.getPointer()) { }
 };
 BEGIN_CAN_TYPE_WRAPPER(ArchetypeType, SubstitutableType)
 CanArchetypeType getParent() const {

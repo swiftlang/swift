@@ -2962,13 +2962,16 @@ void Serializer::writeType(Type ty) {
     for (auto proto : archetypeTy->getConformsTo())
       conformances.push_back(addDeclRef(proto));
 
-    DeclID assocTypeID = addDeclRef(archetypeTy->getAssocType());
+    DeclID assocTypeOrNameID;
+    if (archetypeTy->getParent())
+      assocTypeOrNameID = addDeclRef(archetypeTy->getAssocType());
+    else
+      assocTypeOrNameID = addIdentifierRef(archetypeTy->getName());
 
     unsigned abbrCode = DeclTypeAbbrCodes[ArchetypeTypeLayout::Code];
     ArchetypeTypeLayout::emitRecord(Out, ScratchRecord, abbrCode,
-                                    addIdentifierRef(archetypeTy->getName()),
                                     parentID,
-                                    assocTypeID,
+                                    assocTypeOrNameID,
                                     addTypeRef(archetypeTy->getSuperclass()),
                                     conformances);
 

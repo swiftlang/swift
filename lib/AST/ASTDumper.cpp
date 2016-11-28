@@ -489,9 +489,6 @@ namespace {
         defaultDef.print(OS);
       }
       
-      if (decl->isRecursive())
-        OS << " <<RECURSIVE>>";
-      
       OS << ")";
     }
 

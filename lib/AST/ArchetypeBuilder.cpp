@@ -711,10 +711,24 @@ ArchetypeBuilder::PotentialArchetype::getType(ArchetypeBuilder &builder) {
     }
   }
 
-  auto arch
-    = ArchetypeType::getNew(builder.getASTContext(), ParentArchetype,
-                            assocType, getName(), Protos,
-                            superclass, isRecursive());
+  ArchetypeType *arch;
+  if (ParentArchetype) {
+    // If we were unable to resolve this as an associated type, produce an
+    // error type.
+    if (!assocType) {
+      representative->ArchetypeOrConcreteType =
+        NestedType::forConcreteType(
+          ErrorType::get(getDependentType(builder, true)));
+
+      return representative->ArchetypeOrConcreteType;
+    }
+
+    arch = ArchetypeType::getNew(builder.getASTContext(), ParentArchetype,
+                                 assocType, Protos, superclass);
+  } else {
+    arch = ArchetypeType::getNew(builder.getASTContext(), getName(), Protos,
+                                 superclass);
+  }
 
   representative->ArchetypeOrConcreteType = NestedType::forArchetype(arch);
   
