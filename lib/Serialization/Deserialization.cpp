@@ -3639,7 +3639,7 @@ Type ModuleFile::getType(TypeID TID) {
 
     auto archetype = ArchetypeType::getNew(ctx, parent, assocTypeDecl,
                                            getIdentifier(nameID), conformances,
-                                           superclass, false);
+                                           superclass);
     typeOrOffset = archetype;
     
     // Read the associated type names.

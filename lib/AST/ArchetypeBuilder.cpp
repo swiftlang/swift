@@ -714,7 +714,7 @@ ArchetypeBuilder::PotentialArchetype::getType(ArchetypeBuilder &builder) {
   auto arch
     = ArchetypeType::getNew(builder.getASTContext(), ParentArchetype,
                             assocType, getName(), Protos,
-                            superclass, isRecursive());
+                            superclass);
 
   representative->ArchetypeOrConcreteType = NestedType::forArchetype(arch);
   

@@ -3824,7 +3824,6 @@ private:
   llvm::PointerUnion<ArchetypeType *, TypeBase *> ParentOrOpened;
   AssociatedTypeDecl *AssocType;
   Identifier Name;
-  unsigned isRecursive: 1;
   MutableArrayRef<std::pair<Identifier, NestedType>> NestedTypes;
 
   /// Set the ID number of this opened existential.
@@ -3844,8 +3843,7 @@ public:
                         getNew(const ASTContext &Ctx, ArchetypeType *Parent,
                                AssociatedTypeDecl *AssocType,
                                Identifier Name, ArrayRef<Type> ConformsTo,
-                               Type Superclass,
-                               bool isRecursive = false);
+                               Type Superclass);
 
   /// getNew - Create a new archetype with the given name.
   ///
@@ -3856,8 +3854,7 @@ public:
                                AssociatedTypeDecl *AssocType,
                                Identifier Name,
                                SmallVectorImpl<ProtocolDecl *> &ConformsTo,
-                               Type Superclass,
-                               bool isRecursive = false);
+                               Type Superclass);
 
   /// Create a new archetype that represents the opened type
   /// of an existential value.
@@ -3971,34 +3968,28 @@ public:
   static bool classof(const TypeBase *T) {
     return T->getKind() == TypeKind::Archetype;
   }
-  
-  /// getIsRecursive - The archetype type refers back to itself.
-  bool getIsRecursive() { return this->isRecursive; }
-  
+
 private:
   ArchetypeType(const ASTContext &Ctx, ArchetypeType *Parent,
                 AssociatedTypeDecl *AssocType,
                 Identifier Name, ArrayRef<ProtocolDecl *> ConformsTo,
-                Type Superclass,
-                bool isRecursive = false)
+                Type Superclass)
     : SubstitutableType(TypeKind::Archetype, &Ctx,
                         RecursiveTypeProperties::HasArchetype),
       ConformsTo(ConformsTo), Superclass(Superclass), ParentOrOpened(Parent),
-      AssocType(AssocType), Name(Name),
-      isRecursive(isRecursive) { }
+      AssocType(AssocType), Name(Name) { }
 
   ArchetypeType(const ASTContext &Ctx, 
                 Type Existential,
                 ArrayRef<ProtocolDecl *> ConformsTo,
-                Type Superclass, bool isRecursive = false)
+                Type Superclass)
     : SubstitutableType(TypeKind::Archetype, &Ctx,
                         RecursiveTypeProperties(
                           RecursiveTypeProperties::HasArchetype |
                           RecursiveTypeProperties::HasOpenedExistential)),
       ConformsTo(ConformsTo), Superclass(Superclass),
       ParentOrOpened(Existential.getPointer()),
-      AssocType(nullptr),
-      isRecursive(isRecursive) { }
+      AssocType(nullptr) { }
 };
 BEGIN_CAN_TYPE_WRAPPER(ArchetypeType, SubstitutableType)
 CanArchetypeType getParent() const {

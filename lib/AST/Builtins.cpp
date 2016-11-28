@@ -435,7 +435,7 @@ createGenericParam(ASTContext &ctx, const char *name, unsigned index) {
   ArchetypeType *archetype
     = ArchetypeType::getNew(ctx, nullptr,
                             static_cast<AssociatedTypeDecl *>(nullptr),
-                            ident, ArrayRef<Type>(), Type(), false);
+                            ident, ArrayRef<Type>(), Type());
   auto genericParam =
     new (ctx) GenericTypeParamDecl(&M->getMainFile(FileUnitKind::Builtin),
                                    ident, SourceLoc(), 0, index);
