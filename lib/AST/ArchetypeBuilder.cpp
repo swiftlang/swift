@@ -1439,6 +1439,11 @@ bool ArchetypeBuilder::addAbstractTypeParamRequirements(
                        RequirementSource(kind, loc), *this);
   };
 
+  if (isa<AssociatedTypeDecl>(decl) &&
+      decl->hasType() &&
+      decl->getType()->is<ErrorType>())
+    return false;
+
   // If this is an associated type that already has an archetype assigned,
   // use that information.
   if (isa<AssociatedTypeDecl>(decl) &&
