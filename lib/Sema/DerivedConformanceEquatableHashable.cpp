@@ -67,6 +67,7 @@ static DeclRefExpr *convertEnumToIndex(SmallVectorImpl<ASTNode> &stmts,
   auto indexVar = new (C) VarDecl(/*static*/false, /*let*/false,
                                   SourceLoc(), C.getIdentifier(indexName),
                                   intType, funcDecl);
+  indexVar->setInterfaceType(intType);
   indexVar->setImplicit();
   
   // generate: var indexVar
@@ -147,7 +148,8 @@ static void deriveBodyEquatable_enum_eq(AbstractFunctionDecl *eqDecl) {
   FuncDecl *cmpFunc = C.getEqualIntDecl();
   assert(cmpFunc && "should have a == for int as we already checked for it");
   
-  auto fnType = cast<FunctionType>(cmpFunc->getType()->getCanonicalType());
+  auto fnType = cast<FunctionType>(cmpFunc->getInterfaceType()
+      ->getCanonicalType());
 
   Expr *cmpFuncExpr;
   if (cmpFunc->getDeclContext()->isTypeContext()) {
@@ -234,7 +236,7 @@ deriveEquatable_enum_eq(TypeChecker &tc, Decl *parentDecl, EnumDecl *enumDecl) {
                      /*Throws=*/false, /*ThrowsLoc=*/SourceLoc(),
                      /*AccessorKeywordLoc=*/SourceLoc(),
                      /*GenericParams=*/nullptr,
-                     params, Type(),
+                     params,
                      TypeLoc::withoutLoc(boolTy),
                      parentDC);
   eqDecl->setImplicit();
@@ -258,14 +260,7 @@ deriveEquatable_enum_eq(TypeChecker &tc, Decl *parentDecl, EnumDecl *enumDecl) {
   eqDecl->setBodySynthesizer(&deriveBodyEquatable_enum_eq);
 
   // Compute the type.
-  GenericParamList *genericParams = eqDecl->getGenericParamsOfContext();
   Type paramsTy = params[1]->getType(tc.Context);
-  Type fnTy = FunctionType::get(paramsTy, boolTy);
-  if (genericParams)
-    fnTy = PolymorphicFunctionType::get(selfTy, fnTy, genericParams);
-  else
-    fnTy = FunctionType::get(selfTy, fnTy);
-  eqDecl->setType(fnTy);
 
   // Compute the interface type.
   Type interfaceTy;
@@ -402,24 +397,15 @@ deriveHashable_enum_hashValue(TypeChecker &tc, Decl *parentDecl,
                        /*Throws=*/false, /*ThrowsLoc=*/SourceLoc(),
                        /*AccessorKeywordLoc=*/SourceLoc(),
                        /*GenericParams=*/nullptr, params,
-                       Type(), TypeLoc::withoutLoc(intType), parentDC);
+                       TypeLoc::withoutLoc(intType), parentDC);
   getterDecl->setImplicit();
   getterDecl->setBodySynthesizer(deriveBodyHashable_enum_hashValue);
 
   // Compute the type of hashValue().
-  GenericParamList *genericParams = getterDecl->getGenericParamsOfContext();
   Type methodType = FunctionType::get(TupleType::getEmpty(tc.Context), intType);
   Type selfType = getterDecl->computeSelfType();
   selfDecl->overwriteType(selfType);
-  
-  Type type;
-  if (genericParams)
-    type = PolymorphicFunctionType::get(selfType, methodType, genericParams);
-  else
-    type = FunctionType::get(selfType, methodType);
-  getterDecl->setType(type);
-  getterDecl->setBodyResultType(intType);
-  
+
   // Compute the interface type of hashValue().
   Type interfaceType;
   Type selfIfaceType = getterDecl->computeInterfaceSelfType(false);
@@ -446,6 +432,7 @@ deriveHashable_enum_hashValue(TypeChecker &tc, Decl *parentDecl,
                                            SourceLoc(), C.Id_hashValue,
                                            intType, parentDC);
   hashValueDecl->setImplicit();
+  hashValueDecl->setInterfaceType(intType);
   hashValueDecl->makeComputed(SourceLoc(), getterDecl,
                               nullptr, nullptr, SourceLoc());
   hashValueDecl->setAccessibility(getterDecl->getFormalAccess());

@@ -485,7 +485,7 @@ namespace {
       : DelegatingLazyResolver(TC), NameLoc(nameLoc) {}
 
     void resolveDeclSignature(ValueDecl *VD) override {
-      if (VD->isInvalid() || VD->hasType()) return;
+      if (VD->isInvalid() || VD->hasInterfaceType()) return;
 
       // Don't process a variable if we're within its initializer.
       if (auto var = dyn_cast<VarDecl>(VD)) {

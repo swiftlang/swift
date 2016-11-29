@@ -637,8 +637,8 @@ struct ASTNodeBase {};
       if (D->hasName())
         checkMangling(D);
 
-      if (D->hasType())
-        verifyChecked(D->getType());
+      if (D->hasInterfaceType())
+        verifyChecked(D->getInterfaceType());
 
       if (D->hasAccessibility()) {
         PrettyStackTraceDecl debugStack("verifying access", D);
@@ -666,7 +666,7 @@ struct ASTNodeBase {};
       }
       
       if (D->getAttrs().hasAttribute<OverrideAttr>()) {
-        if (!D->isInvalid() && D->hasType() &&
+        if (!D->isInvalid() && D->hasInterfaceType() &&
             !isa<ClassDecl>(D->getDeclContext()) &&
             !isa<ExtensionDecl>(D->getDeclContext())) {
           PrettyStackTraceDecl debugStack("verifying override", D);
@@ -703,7 +703,8 @@ struct ASTNodeBase {};
       auto func = Functions.back();
       Type resultType;
       if (FuncDecl *FD = dyn_cast<FuncDecl>(func)) {
-        resultType = FD->getResultType();
+        resultType = FD->getResultInterfaceType();
+        resultType = ArchetypeBuilder::mapTypeIntoContext(FD, resultType);
       } else if (auto closure = dyn_cast<AbstractClosureExpr>(func)) {
         resultType = closure->getResultType();
       } else {
@@ -804,7 +805,7 @@ struct ASTNodeBase {};
         E->dump(Out);
         abort();
       }
-      if (E->getType()->is<PolymorphicFunctionType>()) {
+      if (E->getType()->is<GenericFunctionType>()) {
         PrettyStackTraceExpr debugStack(Ctx, "verifying decl reference", E);
         Out << "unspecialized reference with polymorphic type "
           << E->getType().getString() << "\n";
@@ -2020,7 +2021,7 @@ struct ASTNodeBase {};
           CD->getDeclContext()->getDeclaredInterfaceType()->getAnyNominal() 
             != Ctx.getImplicitlyUnwrappedOptionalDecl()) {
         OptionalTypeKind resultOptionality = OTK_None;
-        CD->getResultType()->getAnyOptionalObjectType(resultOptionality);
+        CD->getResultInterfaceType()->getAnyOptionalObjectType(resultOptionality);
         if (resultOptionality != CD->getFailability()) {
           Out << "Initializer has result optionality/failability mismatch\n";
           CD->dump(llvm::errs());
@@ -2164,7 +2165,7 @@ struct ASTNodeBase {};
 
       // If a decl has the Throws bit set, the function type should throw,
       // and vice versa.
-      auto fnTy = AFD->getType()->castTo<AnyFunctionType>();
+      auto fnTy = AFD->getInterfaceType()->castTo<AnyFunctionType>();
       for (unsigned i = 1, e = AFD->getNumParameterLists(); i != e; ++i)
         fnTy = fnTy->getResult()->castTo<AnyFunctionType>();
 
@@ -2750,9 +2751,9 @@ struct ASTNodeBase {};
     void checkErrors(ValueDecl *D) {
       PrettyStackTraceDecl debugStack("verifying errors", D);
 
-      if (!D->hasType())
+      if (!D->hasInterfaceType())
         return;
-      if (D->getType()->hasError() && !D->isInvalid()) {
+      if (D->getInterfaceType()->hasError() && !D->isInvalid()) {
         Out << "Valid decl has error type!\n";
         D->dump(Out);
         abort();

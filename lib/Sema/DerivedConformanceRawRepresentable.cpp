@@ -263,7 +263,6 @@ static ConstructorDecl *deriveRawRepresentable_init(TypeChecker &tc,
   assert(tc.conformsToProtocol(rawType, equatableProto, enumDecl, None));
   (void)equatableProto;
 
-  Type enumType = parentDC->getDeclaredTypeInContext();
   auto *selfDecl = ParamDecl::createUnboundSelf(SourceLoc(), parentDC,
                                          /*static*/false, /*inout*/true);
 
@@ -273,7 +272,6 @@ static ConstructorDecl *deriveRawRepresentable_init(TypeChecker &tc,
   rawDecl->setImplicit();
   auto paramList = ParameterList::createWithoutLoc(rawDecl);
   
-  auto retTy = OptionalType::get(enumType);
   DeclName name(C, C.Id_init, paramList);
   
   auto initDecl =
@@ -288,25 +286,13 @@ static ConstructorDecl *deriveRawRepresentable_init(TypeChecker &tc,
   initDecl->setBodySynthesizer(&deriveBodyRawRepresentable_init);
 
   // Compute the type of the initializer.
-  GenericParamList *genericParams = initDecl->getGenericParamsOfContext();
-  
   TupleTypeElt element(rawType, C.Id_rawValue);
-  auto argType = TupleType::get(element, C);
   TupleTypeElt interfaceElement(rawInterfaceType, C.Id_rawValue);
   auto interfaceArgType = TupleType::get(interfaceElement, C);
   
-  Type type = FunctionType::get(argType, retTy);
-
   Type selfType = initDecl->computeSelfType();
   selfDecl->overwriteType(selfType);
   Type selfMetatype = MetatypeType::get(selfType->getInOutObjectType());
-  
-  Type allocType;
-  if (genericParams)
-    allocType = PolymorphicFunctionType::get(selfMetatype, type, genericParams);
-  else
-    allocType = FunctionType::get(selfMetatype, type);
-  initDecl->setType(allocType);
 
   // Compute the interface type of the initializer.
   Type retInterfaceType
@@ -328,8 +314,8 @@ static ConstructorDecl *deriveRawRepresentable_init(TypeChecker &tc,
                                              interfaceType,
                                              FunctionType::ExtInfo());
   } else {
-    allocIfaceType = FunctionType::get(selfMetatype, type);
-    initIfaceType = FunctionType::get(selfType, type);
+    allocIfaceType = FunctionType::get(selfMetatype, interfaceType);
+    initIfaceType = FunctionType::get(selfType, interfaceType);
   }
   initDecl->setInterfaceType(allocIfaceType);
   initDecl->setInitializerInterfaceType(initIfaceType);

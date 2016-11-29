@@ -210,7 +210,7 @@ Expr *ConstraintLocatorBuilder::trySimplifyToExpr() const {
 static unsigned getNumArgs(ValueDecl *value) {
   if (!isa<FuncDecl>(value)) return ~0U;
 
-  AnyFunctionType *fnTy = value->getType()->castTo<AnyFunctionType>();
+  AnyFunctionType *fnTy = value->getInterfaceType()->castTo<AnyFunctionType>();
   if (value->getDeclContext()->isTypeContext())
     fnTy = fnTy->getResult()->castTo<AnyFunctionType>();
   Type argTy = fnTy->getInput();
@@ -222,7 +222,7 @@ static unsigned getNumArgs(ValueDecl *value) {
 }
 
 static bool matchesDeclRefKind(ValueDecl *value, DeclRefKind refKind) {
-  if (value->getType()->hasError())
+  if (value->getInterfaceType()->hasError())
     return true;
 
   switch (refKind) {
@@ -249,7 +249,7 @@ static bool containsDeclRefKind(LookupResult &lookupResult,
                                 DeclRefKind refKind) {
   for (auto candidate : lookupResult) {
     ValueDecl *D = candidate.Decl;
-    if (!D || !D->hasType())
+    if (!D || !D->hasInterfaceType())
       continue;
     if (matchesDeclRefKind(D, refKind))
       return true;
@@ -473,7 +473,7 @@ resolveDeclRefExpr(UnresolvedDeclRefExpr *UDRE, DeclContext *DC) {
     }
 
     ValueDecl *D = Result.Decl;
-    if (!D->hasType()) validateDecl(D);
+    if (!D->hasInterfaceType()) validateDecl(D);
 
     // FIXME: The source-location checks won't make sense once
     // EnableASTScopeLookup is the default.
@@ -1287,9 +1287,10 @@ void CleanupIllFormedExpressionRAII::doIt(Expr *expr, ASTContext &Context) {
 
     bool walkToDeclPre(Decl *D) override {
       // This handles parameter decls in ClosureExprs.
-      if (auto VD = dyn_cast<ValueDecl>(D)) {
+      if (auto VD = dyn_cast<VarDecl>(D)) {
         if (VD->hasType() && VD->getType()->hasTypeVariable()) {
           VD->overwriteType(ErrorType::get(context));
+          VD->setInterfaceType(ErrorType::get(context));
           VD->setInvalid();
         }
       }
@@ -1897,6 +1898,7 @@ bool TypeChecker::typeCheckBinding(Pattern *&pattern, Expr *&initializer,
         return;
 
       var->overwriteType(ErrorType::get(Context));
+      var->setInterfaceType(ErrorType::get(Context));
       var->setInvalid();
     });
   }
@@ -2227,6 +2229,7 @@ bool TypeChecker::typeCheckStmtCondition(StmtCondition &cond, DeclContext *dc,
         if (var->hasType() && !var->getType()->hasError())
           return;
         var->overwriteType(ErrorType::get(Context));
+        var->setInterfaceType(ErrorType::get(Context));
         var->setInvalid();
       });
     };
@@ -2280,6 +2283,8 @@ bool TypeChecker::typeCheckExprPattern(ExprPattern *EP, DeclContext *DC,
                                          Context.getIdentifier("$match"),
                                          rhsType,
                                          DC);
+  matchVar->setInterfaceType(ArchetypeBuilder::mapTypeOutOfContext(
+      DC, rhsType));
 
   matchVar->setImplicit();
   EP->setMatchVar(matchVar);

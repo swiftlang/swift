@@ -540,7 +540,6 @@ template<> Can##ID##Type SILType::getAs<ID##Type>() const = delete;  \
 template<> Can##ID##Type SILType::castTo<ID##Type>() const = delete; \
 template<> bool SILType::is<ID##Type>() const = delete;
 NON_SIL_TYPE(Function)
-NON_SIL_TYPE(PolymorphicFunction)
 NON_SIL_TYPE(AnyFunction)
 NON_SIL_TYPE(LValue)
 #undef NON_SIL_TYPE

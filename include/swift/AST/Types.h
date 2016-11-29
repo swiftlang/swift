@@ -2253,7 +2253,7 @@ getSILFunctionLanguage(SILFunctionTypeRepresentation rep) {
 /// function may be an arbitrary type.
 ///
 /// There are two kinds of function types:  monomorphic (FunctionType) and
-/// polymorphic (PolymorphicFunctionType). Both type families additionally can
+/// polymorphic (GenericFunctionType). Both type families additionally can
 /// be 'thin', indicating that a function value has no capture context and can be
 /// represented at the binary level as a single function pointer.
 class AnyFunctionType : public TypeBase {
@@ -2538,48 +2538,6 @@ decomposeParamType(Type type, const ValueDecl *paramOwner, unsigned level);
 /// include the types, something like (: , b:, c:)
 std::string getParamListAsString(ArrayRef<CallArgParam> parameters);
 
-/// PolymorphicFunctionType - A polymorphic function type.
-class PolymorphicFunctionType : public AnyFunctionType {
-  // TODO: storing a GenericParamList* here is really the wrong solution;
-  // we should be able to store something readily canonicalizable.
-  GenericParamList *Params;
-public:
-  /// 'Constructor' Factory Function
-  static PolymorphicFunctionType *get(Type input, Type output,
-                                      GenericParamList *params,
-                                      bool throws = false) {
-    return get(input, output, params, ExtInfo().withThrows(throws));
-  }
-
-  static PolymorphicFunctionType *get(Type input, Type output,
-                                      GenericParamList *params,
-                                      const ExtInfo &Info);
-
-  ArrayRef<GenericTypeParamDecl *> getGenericParameters() const;
-
-  GenericParamList &getGenericParams() const { return *Params; }
-
-  // Implement isa/cast/dyncast/etc.
-  static bool classof(const TypeBase *T) {
-    return T->getKind() == TypeKind::PolymorphicFunction;
-  }
-  
-private:
-  PolymorphicFunctionType(Type input, Type output,
-                          GenericParamList *params,
-                          const ExtInfo &Info,
-                          const ASTContext &C,
-                          RecursiveTypeProperties properties);
-};  
-BEGIN_CAN_TYPE_WRAPPER(PolymorphicFunctionType, AnyFunctionType)
-  static CanPolymorphicFunctionType get(CanType input, CanType result,
-                                        GenericParamList *params,
-                                        const ExtInfo &info) {
-    return CanPolymorphicFunctionType(
-             PolymorphicFunctionType::get(input, result, params, info));
-  }
-END_CAN_TYPE_WRAPPER(PolymorphicFunctionType, AnyFunctionType)
-
 /// Describes a generic function type.
 ///
 /// A generic function type describes a function that is polymorphic with
@@ -2587,9 +2545,6 @@ END_CAN_TYPE_WRAPPER(PolymorphicFunctionType, AnyFunctionType)
 /// on those parameters and dependent member types thereof. The input and
 /// output types of the generic function can be expressed in terms of those
 /// generic parameters.
-///
-/// FIXME: \c GenericFunctionType is meant as a replacement for
-/// \c PolymorphicFunctionType.
 class GenericFunctionType : public AnyFunctionType,
                             public llvm::FoldingSetNode
 {

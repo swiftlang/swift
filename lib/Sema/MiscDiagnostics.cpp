@@ -467,7 +467,7 @@ static void diagSyntacticUseRestrictions(TypeChecker &TC, const Expr *E,
     /// its uses are ok.
     void checkNoEscapeParameterUse(DeclRefExpr *DRE, Expr *ParentExpr=nullptr) {
       // This only cares about declarations of noescape function type.
-      auto AFT = DRE->getDecl()->getType()->getAs<AnyFunctionType>();
+      auto AFT = DRE->getDecl()->getInterfaceType()->getAs<AnyFunctionType>();
       if (!AFT || !AFT->isNoEscape())
         return;
 
@@ -1310,9 +1310,14 @@ bool swift::fixItOverrideDeclarationTypes(TypeChecker &TC,
       });
     }
     if (auto *method = dyn_cast<FuncDecl>(decl)) {
+      auto resultType = ArchetypeBuilder::mapTypeIntoContext(
+          method, method->getResultInterfaceType());
+
       auto *baseMethod = cast<FuncDecl>(base);
-      fixedAny |= checkType(method->getBodyResultType(),
-                            baseMethod->getResultType(),
+      auto baseResultType = ArchetypeBuilder::mapTypeIntoContext(
+          baseMethod, baseMethod->getResultInterfaceType());
+
+      fixedAny |= checkType(resultType, baseResultType,
                             method->getBodyResultTypeLoc().getSourceRange());
     }
     return fixedAny;
@@ -3997,7 +4002,7 @@ static OmissionTypeName getTypeNameForOmission(Type type) {
 Optional<DeclName> TypeChecker::omitNeedlessWords(AbstractFunctionDecl *afd) {
   auto &Context = afd->getASTContext();
 
-  if (!afd->hasType())
+  if (!afd->hasInterfaceType())
     validateDecl(afd);
 
   if (afd->isInvalid() || isa<DestructorDecl>(afd))
@@ -4032,7 +4037,8 @@ Optional<DeclName> TypeChecker::omitNeedlessWords(AbstractFunctionDecl *afd) {
   bool returnsSelf = false;
 
   if (auto func = dyn_cast<FuncDecl>(afd)) {
-    resultType = func->getResultType();
+    resultType = func->getResultInterfaceType();
+    resultType = ArchetypeBuilder::mapTypeIntoContext(func, resultType);
     returnsSelf = func->hasDynamicSelf();
   } else if (isa<ConstructorDecl>(afd)) {
     resultType = contextType;

@@ -2489,7 +2489,7 @@ void PrintAST::printParameterList(ParameterList *PL, Type paramListTy,
 
 void PrintAST::printFunctionParameters(AbstractFunctionDecl *AFD) {
   auto BodyParams = AFD->getParameterLists();
-  auto curTy = AFD->hasType() ? AFD->getInterfaceType() : nullptr;
+  auto curTy = AFD->hasInterfaceType() ? AFD->getInterfaceType() : nullptr;
 
   // Skip over the implicit 'self'.
   if (AFD->getImplicitSelfDecl()) {
@@ -3273,7 +3273,6 @@ class TypePrinter : public TypeVisitor<TypePrinter> {
   static bool isSimple(Type type) {
     switch (type->getKind()) {
     case TypeKind::Function:
-    case TypeKind::PolymorphicFunction:
     case TypeKind::GenericFunction:
       return false;
 
@@ -3779,10 +3778,6 @@ public:
     Printer.callPrintStructurePre(PrintStructureKind::FunctionReturnType);
     T->getResult().print(Printer, Options);
     Printer.printStructurePost(PrintStructureKind::FunctionReturnType);
-  }
-
-  void visitPolymorphicFunctionType(PolymorphicFunctionType *T) {
-    Printer << "I'm not a real thing that exists";
   }
 
   void printGenericSignature(const GenericSignature *genericSig,

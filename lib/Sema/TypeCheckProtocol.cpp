@@ -1372,7 +1372,7 @@ bool WitnessChecker::findBestWitness(
       continue;
     }
 
-    if (!witness->hasType())
+    if (!witness->hasInterfaceType())
       TC.validateDecl(witness, true);
 
     auto match = matchWitness(TC, Proto, conformance, DC,
@@ -1819,7 +1819,7 @@ static Type getTypeForDisplay(Module *module, ValueDecl *decl) {
 
   // For a constructor, we only care about the parameter types.
   if (auto ctor = dyn_cast<ConstructorDecl>(decl)) {
-    return ctor->getArgumentType();
+    return ctor->getArgumentInterfaceType();
   }
 
   // We have something function-like, so we want to strip off the 'self'.
@@ -2256,19 +2256,22 @@ void ConformanceChecker::recordTypeWitness(AssociatedTypeDecl *assocType,
                                                     /*genericparams*/nullptr, 
                                                     DC);
     aliasDecl->computeType();
-    aliasDecl->setImplicit();
-    if (type->hasError()) {
-      aliasDecl->setInvalid();
 
-      // If we're recording a failed type witness, keep the sugar around for
-      // code completion.
-      type = aliasDecl->getDeclaredType();
-    } else if (type->hasArchetype()) {
-      Type metaType = MetatypeType::get(type);
+    // Strip off sugar from the interface type if it is dependent.
+    // FIXME: Without this, the stdlib doesn't compile because
+    // 'typealias _Buffer' is insufficiently accessible.
+    if (type->hasArchetype()) {
+      auto metaType = MetatypeType::get(type);
       aliasDecl->setInterfaceType(
         ArchetypeBuilder::mapTypeOutOfContext(DC, metaType));
+    } else {
+      aliasDecl->setInterfaceType(aliasDecl->getType());
     }
-    
+
+    aliasDecl->setImplicit();
+    if (type->hasError())
+      aliasDecl->setInvalid();
+
     // Inject the typealias into the nominal decl that conforms to the protocol.
     if (auto nominal = DC->getAsNominalTypeOrNominalTypeExtensionContext()) {
       TC.computeAccessibility(nominal);
@@ -3024,7 +3027,7 @@ static Type mapErrorTypeToOriginal(Type type) {
 static Type getWitnessTypeForMatching(TypeChecker &tc,
                                       NormalProtocolConformance *conformance,
                                       ValueDecl *witness) {
-  if (!witness->hasType()) {
+  if (!witness->hasInterfaceType()) {
     // Don't cause a recursive type-check of the witness.
     // FIXME: We shouldn't need this.
     if (witness->isBeingTypeChecked())
@@ -3968,7 +3971,7 @@ void ConformanceChecker::resolveSingleWitness(ValueDecl *requirement) {
   SWIFT_DEFER { ResolvingWitnesses.erase(requirement); };
 
   // Make sure we've validated the requirement.
-  if (!requirement->hasType())
+  if (!requirement->hasInterfaceType())
     TC.validateDecl(requirement, true);
 
   if (requirement->isInvalid()) {
@@ -4221,7 +4224,7 @@ void ConformanceChecker::checkConformance() {
     }
 
     // Make sure we've validated the requirement.
-    if (!requirement->hasType())
+    if (!requirement->hasInterfaceType())
       TC.validateDecl(requirement, true);
 
     if (requirement->isInvalid()) {

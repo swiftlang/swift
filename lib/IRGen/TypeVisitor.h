@@ -55,7 +55,6 @@ class ReferenceTypeVisitor : public CanTypeVisitor<ImplClass, RetTy, Args...> {
   // ProtocolComposition
   // Archetype
   // Function
-  // PolymorphicFunction
 };
   
 } // end namespace irgen

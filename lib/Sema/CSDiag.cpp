@@ -792,6 +792,14 @@ static void gatherArgumentLabels(Type type,
   labels.push_back(Identifier());
 }
 
+static Type stripSubstitutedTypes(Type t) {
+  return t.transform([](Type t) -> Type {
+    while (auto *ST = dyn_cast<SubstitutedType>(t.getPointer()))
+      t = ST->getReplacementType();
+    return t;
+  });
+}
+
 namespace {
   /// Each match in an ApplyExpr is evaluated for how close of a match it is.
   /// The result is captured in this enum value, where the earlier entries are
@@ -832,7 +840,21 @@ namespace {
     Type entityType;
 
     UncurriedCandidate(ValueDecl *decl, unsigned level)
-      : declOrExpr(decl), level(level), entityType(decl->getType()) {
+      : declOrExpr(decl), level(level) {
+
+      if (isa<AbstractFunctionDecl>(decl) || isa<EnumElementDecl>(decl)) {
+        entityType = decl->getInterfaceType();
+        if (auto *GFT = entityType->getAs<GenericFunctionType>()) {
+          auto *DC = decl->getInnermostDeclContext();
+          auto *M = DC->getParentModule();
+          auto subs = DC->getGenericEnvironmentOfContext()
+              ->getForwardingSubstitutions(M);
+          entityType = stripSubstitutedTypes(GFT->substGenericArgs(subs));
+        }
+      } else {
+        entityType = decl->getType();
+      }
+
       // For some reason, subscripts and properties don't include their self
       // type.  Tack it on for consistency with other members.
       if (isa<AbstractStorageDecl>(decl)) {
@@ -1190,29 +1212,6 @@ static bool findGenericSubstitutions(DeclContext *dc, Type paramType,
     }
   };
   
-  // If paramType contains any substitutions already, find them and add them
-  // to our list before matching the two types to find more.
-  paramType.findIf([&](Type type) -> bool {
-    if (auto substitution = dyn_cast<SubstitutedType>(type.getPointer())) {
-      Type original = substitution->getOriginal();
-      if (dc && dc->getGenericParamsOfContext() && original->isTypeParameter())
-        original = ArchetypeBuilder::mapTypeIntoContext(dc, original);
-      
-      Type replacement = substitution->getReplacementType();
-      // If the replacement is itself an archetype, then the constraint
-      // system was asserting equivalencies between different levels of
-      // generics, rather than binding a generic to a concrete type (and we
-      // don't/won't have a concrete type). In which case, it is the
-      // replacement we are interested in, since it is the one in our current
-      // context. That generic type should equal itself.
-      if (auto ourGeneric = replacement->getAs<ArchetypeType>())
-        archetypesMap[ourGeneric] = replacement;
-      else if (auto archetype = original->getAs<ArchetypeType>())
-        archetypesMap[archetype] = replacement;
-    }
-    return false;
-  });
-  
   GenericVisitor visitor(dc, archetypesMap);
   return visitor.match(paramType, actualArgType);
 }
@@ -1332,6 +1331,28 @@ CalleeCandidateInfo::evaluateCloseness(DeclContext *dc, Type candArgListType,
         // against the type contained therein.
         if (paramType->is<InOutType>() && argType->is<LValueType>())
           matchType = matchType->getInOutObjectType();
+
+        matchType.findIf([&](Type type) -> bool {
+          if (auto substitution = dyn_cast<SubstitutedType>(type.getPointer())) {
+            Type original = substitution->getOriginal();
+            if (dc && dc->getGenericParamsOfContext() && original->isTypeParameter())
+              original = ArchetypeBuilder::mapTypeIntoContext(dc, original);
+            
+            Type replacement = substitution->getReplacementType();
+            // If the replacement is itself an archetype, then the constraint
+            // system was asserting equivalencies between different levels of
+            // generics, rather than binding a generic to a concrete type (and we
+            // don't/won't have a concrete type). In which case, it is the
+            // replacement we are interested in, since it is the one in our current
+            // context. That generic type should equal itself.
+            if (auto ourGeneric = replacement->getAs<ArchetypeType>())
+              archetypesMap[ourGeneric] = replacement;
+            else if (auto archetype = original->getAs<ArchetypeType>())
+              archetypesMap[archetype] = replacement;
+          }
+          return false;
+        });
+
         matched = findGenericSubstitutions(dc, matchType, rArgType,
                                            archetypesMap);
       }
@@ -1485,7 +1506,7 @@ void CalleeCandidateInfo::collectCalleeCandidates(Expr *fn,
     auto decl = declRefExpr->getDecl();
     candidates.push_back({ decl, getCalleeLevel(decl) });
     
-    if (auto fTy = decl->getType()->getAs<AnyFunctionType>())
+    if (auto fTy = decl->getInterfaceType()->getAs<AnyFunctionType>())
       declName = fTy->getInput()->getRValueInstanceType()->getString()+".init";
     else
       declName = "init";
@@ -1511,7 +1532,7 @@ void CalleeCandidateInfo::collectCalleeCandidates(Expr *fn,
       auto ctors = CS->TC.lookupConstructors(CS->DC, instanceType,
                                        NameLookupFlags::IgnoreAccessibility);
       for (auto ctor : ctors)
-        if (ctor->hasType())
+        if (ctor->hasInterfaceType())
           candidates.push_back({ ctor, 1 });
     }
 
@@ -1886,7 +1907,7 @@ bool CalleeCandidateInfo::diagnoseSimpleErrors(const Expr *E) {
     assert(decl && "Only decl-based candidates may be marked inaccessible");
     if (auto *CD = dyn_cast<ConstructorDecl>(decl)) {
       CS->TC.diagnose(loc, diag::init_candidate_inaccessible,
-                      CD->getResultType(), decl->getFormalAccess());
+                      CD->getResultInterfaceType(), decl->getFormalAccess());
      
     } else {
       CS->TC.diagnose(loc, diag::candidate_inaccessible, decl->getName(),
@@ -3199,8 +3220,10 @@ namespace {
       for (auto patternElt : PatternTypes)
         patternElt.first->setType(patternElt.second);
       
-      for (auto paramDeclElt : ParamDeclTypes)
+      for (auto paramDeclElt : ParamDeclTypes) {
         paramDeclElt.first->overwriteType(paramDeclElt.second);
+        paramDeclElt.first->setInterfaceType(Type());
+      }
       
       for (auto CSE : CollectionSemanticExprs)
         CSE.first->setSemanticExpr(CSE.second);
@@ -3376,7 +3399,7 @@ typeCheckChildIndependently(Expr *subExpr, Type convertType,
 
     // Replace archetypes and type parameters with UnresolvedType.
     if (convertType->hasTypeVariable() || convertType->hasArchetype() ||
-        convertType->isTypeParameter())
+        convertType->hasTypeParameter())
       convertType = replaceArchetypesAndTypeVarsWithUnresolved(convertType);
     
     // If the conversion type contains no info, drop it.

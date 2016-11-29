@@ -664,6 +664,8 @@ public:
       generator = new (TC.Context)
         VarDecl(/*static*/ false, /*IsLet*/ false, S->getInLoc(),
                 TC.Context.getIdentifier(name), generatorTy, DC);
+      generator->setInterfaceType(ArchetypeBuilder::mapTypeOutOfContext(
+          DC, generatorTy));
       generator->setImplicit();
       
       // Create a pattern binding to initialize the generator.
@@ -877,6 +879,7 @@ public:
             // as invalid to silence follow-on errors.
             pattern->forEachVariable([&](VarDecl *VD) {
               VD->overwriteType(ErrorType::get(TC.Context));
+              VD->setInterfaceType(ErrorType::get(TC.Context));
               VD->setInvalid();
             });
           }
@@ -897,8 +900,11 @@ public:
                     TC.diagnose(VD->getLoc(), diag::type_mismatch_multiple_pattern_list,
                                 VD->getType(), expected->getType());
                     VD->overwriteType(ErrorType::get(TC.Context));
+                    VD->setInterfaceType(ErrorType::get(TC.Context));
                     VD->setInvalid();
+
                     expected->overwriteType(ErrorType::get(TC.Context));
+                    expected->setInterfaceType(ErrorType::get(TC.Context));
                     expected->setInvalid();
                   }
                   return;
@@ -995,9 +1001,10 @@ bool TypeChecker::typeCheckCatchPattern(CatchStmt *S, DeclContext *DC) {
       // before we type-check the guard.  (This will probably kill
       // most of the type-checking, but maybe not.)
       pattern->forEachVariable([&](VarDecl *var) {
-            var->overwriteType(ErrorType::get(Context));
-            var->setInvalid();
-        });
+        var->overwriteType(ErrorType::get(Context));
+        var->setInterfaceType(ErrorType::get(Context));
+        var->setInvalid();
+      });
     }
 
     S->setErrorPattern(pattern);

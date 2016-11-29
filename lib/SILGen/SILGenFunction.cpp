@@ -465,7 +465,8 @@ SILGenFunction::emitClosureValue(SILLocation loc, SILDeclRef constant,
 void SILGenFunction::emitFunction(FuncDecl *fd) {
   MagicFunctionName = SILGenModule::getMagicFunctionName(fd);
 
-  Type resultTy = fd->getResultType();
+  Type resultTy = ArchetypeBuilder::mapTypeIntoContext(
+      fd, fd->getResultInterfaceType());
   emitProlog(fd, fd->getParameterLists(), resultTy, fd->hasThrows());
   prepareEpilog(resultTy, fd->hasThrows(), CleanupLocation(fd));
 
@@ -785,7 +786,10 @@ void SILGenFunction::emitCurryThunk(ValueDecl *vd,
     assert(from.uncurryLevel == 0 && to.uncurryLevel == 1
            && "currying constructor at level other than one?!");
     F.setBare(IsBare);
-    auto selfMetaTy = vd->getType()->getAs<AnyFunctionType>()->getInput();
+    auto selfMetaTy = vd->getInterfaceType()->getAs<AnyFunctionType>()
+        ->getInput();
+    selfMetaTy = ArchetypeBuilder::mapTypeIntoContext(
+        vd->getInnermostDeclContext(), selfMetaTy);
     auto metatypeVal =
         F.begin()->createArgument(getLoweredLoadableType(selfMetaTy));
     curriedArgs.push_back(metatypeVal);

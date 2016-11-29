@@ -1576,7 +1576,6 @@ ConstraintSystem::matchTypes(Type type1, Type type2, ConstraintKind kind,
       return matchFunctionTypes(func1, func2, kind, flags, locator);
     }
 
-    case TypeKind::PolymorphicFunction:
     case TypeKind::GenericFunction:
       llvm_unreachable("Polymorphic function type should have been opened");
 
@@ -2260,9 +2259,6 @@ ConstraintSystem::simplifyConstructionConstraint(
     // Break out to handle the actual construction below.
     break;
 
-  case TypeKind::PolymorphicFunction:
-    llvm_unreachable("Polymorphic function type should have been opened");
-
   case TypeKind::UnboundGeneric:
     llvm_unreachable("Unbound generic type should have been opened");
 
@@ -2934,12 +2930,14 @@ performMemberLookup(ConstraintKind constraintKind, DeclName memberName,
       if (favoredType && result.FavoredChoice == ~0U) {
         // Only try and favor monomorphic initializers.
         if (auto fnTypeWithSelf =
-            ctor->getType()->getAs<FunctionType>()) {
+            ctor->getInterfaceType()->getAs<FunctionType>()) {
           
           if (auto fnType =
                   fnTypeWithSelf->getResult()->getAs<FunctionType>()) {
           
             auto argType = fnType->getInput()->getWithoutParens();
+            argType = ArchetypeBuilder::mapTypeIntoContext(
+                ctor.Decl->getInnermostDeclContext(), argType);
             if (argType->isEqual(favoredType))
               result.FavoredChoice = result.ViableCandidates.size();
           }
@@ -3072,7 +3070,7 @@ performMemberLookup(ConstraintKind constraintKind, DeclName memberName,
     }
     
     // If the result's type contains delayed members, we need to force them now.
-    if (auto NT = dyn_cast<NominalType>(cand->getType().getPointer())) {
+    if (auto NT = dyn_cast<NominalType>(cand->getInterfaceType().getPointer())) {
       if (auto *NTD = dyn_cast<NominalTypeDecl>(NT->getDecl())) {
         TC.forceExternalDeclMembers(NTD);
       }

@@ -120,10 +120,10 @@ class NestedGeneric<U> {
 // Ensure that nested closures capture the generic parameters of their nested
 // context.
 
-// CHECK: sil hidden @_TF16generic_closures25nested_closure_in_generic{{.*}} : $@convention(thin) <T> (@in T) -> @out T
-// CHECK:   function_ref [[OUTER_CLOSURE:@_TFF16generic_closures25nested_closure_in_genericurFxxU_FT_Q_]]
+// CHECK: sil hidden @_TF16generic_closures25nested_closure_in_genericurFxx : $@convention(thin) <T> (@in T) -> @out T
+// CHECK:   function_ref [[OUTER_CLOSURE:@_TFF16generic_closures25nested_closure_in_genericurFxxU_FT_x]]
 // CHECK: sil shared [[OUTER_CLOSURE]] : $@convention(thin) <T> (@inout_aliasable T) -> @out T
-// CHECK:   function_ref [[INNER_CLOSURE:@_TFFF16generic_closures25nested_closure_in_genericurFxxU_FT_Q_U_FT_Q_]]
+// CHECK:   function_ref [[INNER_CLOSURE:@_TFFF16generic_closures25nested_closure_in_genericurFxxU_FT_xU_FT_x]]
 // CHECK: sil shared [[INNER_CLOSURE]] : $@convention(thin) <T> (@inout_aliasable T) -> @out T {
 func nested_closure_in_generic<T>(_ x:T) -> T {
   return { { x }() }()
@@ -186,7 +186,7 @@ protocol HasClassAssoc { associatedtype Assoc : Class }
 
 // CHECK-LABEL: sil hidden @_TF16generic_closures34captures_class_constrained_genericuRxS_13HasClassAssocrFTx1fFwx5AssocwxS1__T_
 // CHECK: bb0([[ARG1:%.*]] : $*T, [[ARG2:%.*]] : $@callee_owned (@owned T.Assoc) -> @owned T.Assoc):
-// CHECK: [[GENERIC_FN:%.*]] = function_ref @_TFF16generic_closures34captures_class_constrained_genericuRxS_13HasClassAssocrFTx1fFwx5AssocwxS1__T_U_FT_FQQ_5AssocS2_
+// CHECK: [[GENERIC_FN:%.*]] = function_ref @_TFF16generic_closures34captures_class_constrained_genericuRxS_13HasClassAssocrFTx1fFwx5AssocwxS1__T_U_FT_FwxS1_wxS1_
 // CHECK: [[ARG2_COPY:%.*]] = copy_value [[ARG2]]
 // CHECK: [[CONCRETE_FN:%.*]] = partial_apply [[GENERIC_FN]]<T>([[ARG2_COPY]])
 

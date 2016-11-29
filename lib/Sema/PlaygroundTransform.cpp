@@ -913,6 +913,7 @@ public:
                                         MaybeLoadInitExpr->getType(),
                                         TypeCheckDC);
 
+    VD->setInterfaceType(VD->getType());
     VD->setImplicit();
 
     NamedPattern *NP = new (Context) NamedPattern(VD, /*implicit*/true);

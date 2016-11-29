@@ -294,10 +294,10 @@ static void doDynamicLookup(VisibleDeclConsumer &Consumer,
         return;
 
       // Ensure that the declaration has a type.
-      if (!D->hasType()) {
+      if (!D->hasInterfaceType()) {
         if (!TypeResolver) return;
         TypeResolver->resolveDeclSignature(D);
-        if (!D->hasType()) return;
+        if (!D->hasInterfaceType()) return;
       }
 
       switch (D->getKind()) {
@@ -338,7 +338,7 @@ static void doDynamicLookup(VisibleDeclConsumer &Consumer,
         (void)FD;
 
         // Get the type without the first uncurry level with 'self'.
-        CanType T = D->getType()
+        CanType T = D->getInterfaceType()
                         ->castTo<AnyFunctionType>()
                         ->getResult()
                         ->getCanonicalType();
@@ -350,7 +350,7 @@ static void doDynamicLookup(VisibleDeclConsumer &Consumer,
       }
 
       case DeclKind::Subscript: {
-        auto Signature = D->getType()->getCanonicalType();
+        auto Signature = D->getInterfaceType()->getCanonicalType();
         if (!SubscriptsReported.insert(Signature).second)
           return;
         break;

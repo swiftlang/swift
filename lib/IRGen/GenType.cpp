@@ -1350,7 +1350,6 @@ TypeCacheEntry TypeConverter::convertType(CanType ty) {
   case TypeKind::Tuple:
     return convertTupleType(cast<TupleType>(ty));
   case TypeKind::Function:
-  case TypeKind::PolymorphicFunction:
   case TypeKind::GenericFunction:
     llvm_unreachable("AST FunctionTypes should be lowered by SILGen");
   case TypeKind::SILFunction:

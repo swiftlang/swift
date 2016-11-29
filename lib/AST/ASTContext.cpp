@@ -2901,14 +2901,11 @@ getGenericFunctionRecursiveProperties(Type Input, Type Result) {
 AnyFunctionType *AnyFunctionType::withExtInfo(ExtInfo info) const {
   if (isa<FunctionType>(this))
     return FunctionType::get(getInput(), getResult(), info);
-  if (auto *polyFnTy = dyn_cast<PolymorphicFunctionType>(this))
-    return PolymorphicFunctionType::get(getInput(), getResult(),
-                                        &polyFnTy->getGenericParams(), info);
   if (auto *genFnTy = dyn_cast<GenericFunctionType>(this))
     return GenericFunctionType::get(genFnTy->getGenericSignature(),
                                     getInput(), getResult(), info);
 
-  static_assert(3 - 1 ==
+  static_assert(2 - 1 ==
                   static_cast<int>(TypeKind::Last_AnyFunctionType) -
                     static_cast<int>(TypeKind::First_AnyFunctionType),
                 "unhandled function type");
@@ -2944,34 +2941,6 @@ FunctionType::FunctionType(Type input, Type output,
                   Info)
 { }
 
-
-/// FunctionType::get - Return a uniqued function type with the specified
-/// input and result.
-PolymorphicFunctionType *PolymorphicFunctionType::get(Type input, Type output,
-                                                      GenericParamList *params,
-                                                      const ExtInfo &Info) {
-  auto properties = getFunctionRecursiveProperties(input, output);
-  auto arena = getArena(properties);
-
-  const ASTContext &C = input->getASTContext();
-
-  return new (C, arena) PolymorphicFunctionType(input, output, params,
-                                                Info, C, properties);
-}
-
-PolymorphicFunctionType::PolymorphicFunctionType(Type input, Type output,
-                                                 GenericParamList *params,
-                                                 const ExtInfo &Info,
-                                                 const ASTContext &C,
-                                        RecursiveTypeProperties properties)
-  : AnyFunctionType(TypeKind::PolymorphicFunction,
-                    (input->isCanonical() && output->isCanonical()) ?&C : 0,
-                    input, output, properties,
-                    Info),
-    Params(params)
-{
-  assert(!input->hasTypeVariable() && !output->hasTypeVariable());
-}
 
 void GenericFunctionType::Profile(llvm::FoldingSetNodeID &ID,
                                   GenericSignature *sig,

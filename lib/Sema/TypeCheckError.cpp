@@ -893,7 +893,7 @@ public:
       return result;
     }
     return Context(getKindForFunctionBody(
-        D->getType(), D->getNumParameterLists()));
+        D->getInterfaceType(), D->getNumParameterLists()));
   }
 
   static Context forInitializer(Initializer *init) {
