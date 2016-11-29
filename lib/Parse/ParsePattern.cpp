@@ -229,7 +229,7 @@ Parser::parseParameterClause(SourceLoc &leftParenLoc,
           param.SecondNameLoc.isValid()) {
         diagnose(param.FirstNameLoc, diag::parameter_operator_keyword_argument,
                  isClosure)
-          .fixItRemoveChars(param.FirstNameLoc, param.SecondNameLoc);
+          .fixItRemove(param.FirstNameLoc);
         param.FirstName = param.SecondName;
         param.FirstNameLoc = param.SecondNameLoc;
         param.SecondName = Identifier();
@@ -461,7 +461,7 @@ mapParsedParameters(Parser &parser,
         parser.diagnose(param.FirstNameLoc,
                         diag::parameter_extraneous_double_up,
                         param.FirstName)
-          .fixItRemoveChars(param.FirstNameLoc, param.SecondNameLoc);
+          .fixItRemove(param.FirstNameLoc);
       }
     } else {
       if (isKeywordArgumentByDefault)

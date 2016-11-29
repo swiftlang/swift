@@ -4326,7 +4326,7 @@ ParserStatus Parser::parseDeclVar(ParseDeclOptions Flags,
     if (PBDEntries.size() == 1 && PBDEntries.front().getInit() &&
         !isa<ErrorExpr>(PBDEntries.front().getInit())) {
       auto *init = PBDEntries.front().getInit();
-      inFlightDiag.fixItRemoveChars(TryLoc, VarLoc);
+      inFlightDiag.fixItRemove(TryLoc);
       inFlightDiag.fixItInsert(init->getStartLoc(), "try ");
 
       // Note: We can't use TryLoc here because it's outside the PBD source

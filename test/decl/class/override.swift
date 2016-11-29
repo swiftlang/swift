@@ -169,7 +169,7 @@ class H : G {
 
   func manyA(_: AnyObject, _: AnyObject) {}
   func manyB(_ a: AnyObject, b: AnyObject) {}
-  func manyC(var a: AnyObject,  // expected-error {{parameters may not have the 'var' specifier}} {{14-17=}}
+  func manyC(var a: AnyObject,  // expected-error {{parameters may not have the 'var' specifier}} {{14-18=}}
              var b: AnyObject) {} // expected-error {{parameters may not have the 'var' specifier}} {{14-18=}}
 
   func result() -> AnyObject? { return nil }
