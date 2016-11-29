@@ -174,3 +174,5 @@ class C {
 }
 
 let _ : inout @convention(c) Int -> Int // expected-error {{'inout' may only be used on parameters}}
+func foo3(inout a: Int -> Void) {} // expected-error {{'inout' before a parameter name is not allowed, place it before the parameter type instead}} {{11-16=}} {{20-20=inout }}
+                                   // expected-error @-1 {{single argument function types require parentheses}} {{20-20=(}} {{23-23=)}}
