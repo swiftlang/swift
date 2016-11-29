@@ -4464,23 +4464,6 @@ void FuncDecl::setDeserializedSignature(ArrayRef<ParameterList *> BodyParams,
   this->FnRetType = FnRetType;
 }
 
-Type FuncDecl::getResultType() const {
-  if (!hasType())
-    return nullptr;
-
-  Type resultTy = getType();
-  if (resultTy->hasError())
-    return resultTy;
-
-  for (unsigned i = 0, e = getNumParameterLists(); i != e; ++i)
-    resultTy = resultTy->castTo<AnyFunctionType>()->getResult();
-
-  if (!resultTy)
-    resultTy = TupleType::getEmpty(getASTContext());
-
-  return resultTy;
-}
-
 Type FuncDecl::getResultInterfaceType() const {
   if (!hasType())
     return nullptr;
@@ -4707,17 +4690,10 @@ SourceRange ConstructorDecl::getSourceRange() const {
   return { getConstructorLoc(), End };
 }
 
-Type ConstructorDecl::getArgumentType() const {
-  Type ArgTy = getType();
+Type ConstructorDecl::getArgumentInterfaceType() const {
+  Type ArgTy = getInterfaceType();
   ArgTy = ArgTy->castTo<AnyFunctionType>()->getResult();
   ArgTy = ArgTy->castTo<AnyFunctionType>()->getInput();
-  return ArgTy;
-}
-
-Type ConstructorDecl::getResultType() const {
-  Type ArgTy = getType();
-  ArgTy = ArgTy->castTo<AnyFunctionType>()->getResult();
-  ArgTy = ArgTy->castTo<AnyFunctionType>()->getResult();
   return ArgTy;
 }
 

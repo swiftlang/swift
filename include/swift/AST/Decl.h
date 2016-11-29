@@ -4990,9 +4990,6 @@ public:
   TypeLoc &getBodyResultTypeLoc() { return FnRetType; }
   const TypeLoc &getBodyResultTypeLoc() const { return FnRetType; }
 
-  /// Retrieve the result type of this function.
-  Type getResultType() const;
-
   /// Retrieve the result interface type of this function.
   Type getResultInterfaceType() const;
 
@@ -5405,11 +5402,8 @@ public:
   SourceLoc getStartLoc() const { return getConstructorLoc(); }
   SourceRange getSourceRange() const;
 
-  /// getArgumentType - get the type of the argument tuple
-  Type getArgumentType() const;
-
-  /// \brief Get the type of the constructed object.
-  Type getResultType() const;
+  /// getArgumentInterfaceType - get the interface type of the argument tuple
+  Type getArgumentInterfaceType() const;
 
   /// \brief Get the interface type of the constructed object.
   Type getResultInterfaceType() const;
