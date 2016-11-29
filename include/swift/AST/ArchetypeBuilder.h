@@ -188,9 +188,7 @@ public:
   /// Construct a new archetype builder.
   ///
   /// \param mod The module in which the builder will create archetypes.
-  ///
-  /// \param diags The diagnostics entity to use.
-  ArchetypeBuilder(ModuleDecl &mod, DiagnosticEngine &diags);
+  explicit ArchetypeBuilder(ModuleDecl &mod);
 
   ArchetypeBuilder(ArchetypeBuilder &&);
   ~ArchetypeBuilder();
@@ -306,13 +304,6 @@ public:
   /// For any type that cannot refer to an archetype, this routine returns null.
   PotentialArchetype *resolveArchetype(Type type);
 
-  /// \brief Resolve the given dependent type using our context archetypes.
-  ///
-  /// Given an arbitrary type, this will substitute dependent type parameters
-  /// structurally with their corresponding archetypes and resolve dependent
-  /// member types to the appropriate associated types.
-  Type substDependentType(Type type);
-
   /// Map an interface type to a contextual type.
   static Type mapTypeIntoContext(const DeclContext *dc, Type type);
 
@@ -336,18 +327,6 @@ public:
 
   /// Dump all of the requirements to the given output stream.
   void dump(llvm::raw_ostream &out);
-
-  // In SILFunction.cpp:
-  
-  /// \brief Resolve the given dependent type using our context archetypes.
-  ///
-  /// Given an arbitrary type, this will substitute dependent type parameters
-  /// structurally with their corresponding archetypes and resolve dependent
-  /// member types to the appropriate associated types. It will reabstract
-  /// dependent types according to the abstraction level of their associated
-  /// type requirements.
-  SILType substDependentType(SILModule &M,
-                             SILType type);
 };
 
 class ArchetypeBuilder::PotentialArchetype {
@@ -577,7 +556,11 @@ public:
 
   /// Retrieve the dependent type that describes this potential
   /// archetype.
-  Type getDependentType(ArchetypeBuilder &builder, bool allowUnresolved);
+  ///
+  /// \param allowUnresolved If true, allow the result to contain
+  /// \c DependentMemberType types with a name but no specific associated
+  /// type.
+  Type getDependentType(bool allowUnresolved);
 
   /// True if the potential archetype has been bound by a concrete type
   /// constraint.
@@ -607,11 +590,10 @@ public:
   /// correction. If so, \c getName() retrieves the new name.
   bool wasRenamed() const { return !OrigName.empty(); }
 
-  /// Note that this potential archetype was renamed (due to typo
-  /// correction), providing the new name.
-  void setRenamed(Identifier newName) {
+  /// Note that this potential archetype was is going to be renamed (due to typo
+  /// correction), saving the old name.
+  void saveNameForRenaming() {
     OrigName = getName();
-    NameOrAssociatedType = newName;
   }
 
   /// For a renamed potential archetype, retrieve the original name.

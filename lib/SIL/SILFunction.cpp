@@ -267,9 +267,12 @@ SILType SILFunction::mapTypeIntoContext(SILType type) const {
     type);
 }
 
-SILType ArchetypeBuilder::substDependentType(SILModule &M, SILType type) {
+SILType GenericEnvironment::mapTypeIntoContext(SILModule &M,
+                                               SILType type) const {
   return doSubstDependentSILType(M,
-    [&](CanType t) { return substDependentType(t)->getCanonicalType(); },
+    [&](CanType t) {
+      return mapTypeIntoContext(M.getSwiftModule(), t)->getCanonicalType();
+    },
     type);
 }
 

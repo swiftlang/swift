@@ -4171,7 +4171,7 @@ void ModuleFile::finishNormalConformance(NormalProtocolConformance *conformance,
 
       // Create an archetype builder, which will help us create the
       // synthetic environment.
-      ArchetypeBuilder builder(*getAssociatedModule(), ctx.Diags);
+      ArchetypeBuilder builder(*getAssociatedModule());
       builder.addGenericSignature(syntheticSig, nullptr);
       builder.finalize(SourceLoc());
       syntheticEnv = builder.getGenericEnvironment(syntheticSig);

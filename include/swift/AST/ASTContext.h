@@ -762,8 +762,8 @@ public:
 
   /// Retrieve or create the stored archetype builder for the given
   /// canonical generic signature and module.
-  ArchetypeBuilder *getOrCreateArchetypeBuilder(CanGenericSignature sig,
-                                                ModuleDecl *mod);
+  std::pair<ArchetypeBuilder *, GenericEnvironment *>
+  getOrCreateArchetypeBuilder(CanGenericSignature sig, ModuleDecl *mod);
 
   /// Retrieve the inherited name set for the given class.
   const InheritedNameSet *getAllPropertyNames(ClassDecl *classDecl,
