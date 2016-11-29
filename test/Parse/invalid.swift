@@ -67,8 +67,7 @@ SR698(1, b: 2,) // expected-error {{unexpected ',' separator}}
 func SR979a(a : inout inout Int) {}  // expected-error {{parameter may not have multiple 'inout', 'var', or 'let' specifiers}} {{17-23=}}
 func SR979b(inout inout b: Int) {} // expected-error {{inout' before a parameter name is not allowed, place it before the parameter type instead}} {{13-18=}} {{28-28=inout }} 
 // expected-error@-1 {{parameter may not have multiple 'inout', 'var', or 'let' specifiers}} {{19-25=}}
-func SR979c(let a: inout Int) {}	 // expected-error {{parameter may not have multiple 'inout', 'var', or 'let' specifiers}} {{13-16=}} 
-// expected-error @-1 {{'let' as a parameter attribute is not allowed}} {{13-16=}}
+func SR979c(let a: inout Int) {} // expected-error {{'let' as a parameter attribute is not allowed}} {{13-16=}}
 func SR979d(let let a: Int) {}  // expected-error {{'let' as a parameter attribute is not allowed}} {{13-16=}} 
 // expected-error @-1 {{parameter may not have multiple 'inout', 'var', or 'let' specifiers}} {{17-21=}}
 func SR979e(inout x: inout String) {} // expected-error {{parameter may not have multiple 'inout', 'var', or 'let' specifiers}} {{13-18=}}

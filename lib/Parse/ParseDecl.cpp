@@ -1593,17 +1593,27 @@ bool Parser::parseDeclAttributeList(DeclAttributes &Attributes,
 ///   attribute-list:
 ///     /*empty*/
 ///     attribute-list-clause attribute-list
+///     'inout' attribute-list-clause attribute-list
 ///   attribute-list-clause:
 ///     '@' attribute
 ///     '@' attribute attribute-list-clause
 /// \endverbatim
-bool Parser::parseTypeAttributeListPresent(TypeAttributes &Attributes) {
-  Attributes.AtLoc = Tok.getLoc();
-  do {
-    if (parseToken(tok::at_sign, diag::expected_in_attribute_list) ||
-        parseTypeAttribute(Attributes))
+bool Parser::parseTypeAttributeListPresent(SourceLoc &InOutLoc,
+                                           TypeAttributes &Attributes) {
+  while (Tok.is(tok::kw_inout)) {
+    if (InOutLoc.isValid())
+      diagnose(Tok, diag::parameter_inout_var_let_repeated)
+        .fixItRemove(InOutLoc);
+    InOutLoc = consumeToken();
+  }
+
+  while (Tok.is(tok::at_sign)) {
+    if (Attributes.AtLoc.isInvalid())
+      Attributes.AtLoc = Tok.getLoc();
+    consumeToken();
+    if (parseTypeAttribute(Attributes))
       return true;
-  } while (Tok.is(tok::at_sign));
+  }
   
   return false;
 }

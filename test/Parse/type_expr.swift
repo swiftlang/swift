@@ -243,7 +243,16 @@ func testFunctionCollectionTypes() {
   _ = () -> (Int, Int).2 // expected-error {{expected type after '->'}}
   _ = (Int) -> Int // expected-error {{expected member name or constructor call after type name}} expected-note{{use '.self' to reference the type object}}
 
+  _ = @convention(c) () -> Int // expected-error{{expected member name or constructor call after type name}} expected-note{{use '.self' to reference the type object}}
+  _ = 1 + (@convention(c) () -> Int).self // expected-error{{binary operator '+' cannot be applied to operands of type 'Int' and '(@convention(c) () -> Int).Type'}} // expected-note {{overloads}}
+  _ = (@autoclosure () -> Int) -> (Int, Int).2 // expected-error {{expected type after '->'}}
+  _ = ((@autoclosure () -> Int) -> (Int, Int)).1 // expected-error {{type '(@autoclosure () -> Int) -> (Int, Int)' has no member '1'}}
+  _ = ((inout Int) -> Void).self
+
   _ = [(Int) throws -> Int]()
+  _ = [@convention(swift) (Int) throws -> Int]().count
+  _ = [(inout Int) throws -> (inout () -> Void) -> Void]().count
+  _ = [String: (@autoclosure (Int) -> Int32) -> Void]().keys
   let _ = [(Int) -> throws Int]() // expected-error{{'throws' may only occur before '->'}}
   let _ = [Int throws Int](); // expected-error{{'throws' may only occur before '->'}} expected-error {{consecutive statements on a line must be separated by ';'}}
 }
