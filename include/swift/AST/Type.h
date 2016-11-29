@@ -459,7 +459,11 @@ public:
   // in Decl.h
   explicit CanGenericSignature(GenericSignature *Signature);
   ArrayRef<CanTypeWrapper<GenericTypeParamType>> getGenericParams() const;
-  
+
+  /// Retrieve the canonical generic environment associated with this
+  /// generic signature.
+  GenericEnvironment *getGenericEnvironment(ModuleDecl &module) const;
+
   GenericSignature *operator->() const {
     return Signature;
   }

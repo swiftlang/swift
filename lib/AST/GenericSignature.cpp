@@ -75,7 +75,7 @@ ArchetypeBuilder *GenericSignature::getArchetypeBuilder(ModuleDecl &mod) {
 
   // Archetype builders are stored on the ASTContext.
   return getASTContext().getOrCreateArchetypeBuilder(CanGenericSignature(this),
-                                                     &mod);
+                                                     &mod).first;
 }
 
 bool GenericSignature::isCanonical() const {
@@ -516,4 +516,11 @@ CanType GenericSignature::getCanonicalTypeInContext(Type type, ModuleDecl &mod) 
   auto result = type->getCanonicalType();
   assert(isCanonicalTypeInContext(result, mod));
   return result;
+}
+
+GenericEnvironment *CanGenericSignature::getGenericEnvironment(
+                                                     ModuleDecl &module) const {
+  // Archetype builders are stored on the ASTContext.
+  return module.getASTContext().getOrCreateArchetypeBuilder(*this, &module)
+           .second;
 }

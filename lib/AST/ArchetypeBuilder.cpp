@@ -663,7 +663,7 @@ ArchetypeBuilder::PotentialArchetype::getType(ArchetypeBuilder &builder) {
         // Otherwise, it's a concrete type.
         representative->ArchetypeOrConcreteType
           = NestedType::forConcreteType(
-              builder.substDependentType(memberType));
+              substConcreteTypesForDependentTypes(builder, memberType));
         representative->SameTypeSource = parent->SameTypeSource;
 
         return representative->ArchetypeOrConcreteType;
@@ -706,7 +706,7 @@ ArchetypeBuilder::PotentialArchetype::getType(ArchetypeBuilder &builder) {
       representative->RecursiveSuperclassType = true;
       assert(!Superclass->hasArchetype() &&
              "superclass constraint must use interface types");
-      superclass = builder.substDependentType(Superclass);
+      superclass = substConcreteTypesForDependentTypes(builder, Superclass);
       representative->RecursiveSuperclassType = false;
     }
   }
@@ -2128,10 +2128,6 @@ void ArchetypeBuilder::addGenericSignature(GenericSignature *sig,
   for (auto &reqt : sig->getRequirements()) {
     addRequirement(reqt, source);
   }
-}
-
-Type ArchetypeBuilder::substDependentType(Type type) {
-  return substConcreteTypesForDependentTypes(*this, type);
 }
 
 /// Collect the set of requirements placed on the given generic parameters and

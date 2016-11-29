@@ -172,10 +172,11 @@ public:
   /// Exit a generic context.
   void popGenericContext(CanGenericSignature signature);
 
-  /// Get the ArchetypeBuilder for the current generic context. Fails if there
-  /// is no generic context.
-  ArchetypeBuilder &getArchetypes();
-  
+  /// Retrieve the generic environment for the current generic context.
+  ///
+  /// Fails if there is no generic context.
+  GenericEnvironment *getGenericEnvironment();
+
 private:
   // Debugging aids.
 #ifndef NDEBUG
