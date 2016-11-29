@@ -937,18 +937,10 @@ static void VisitNodeConstructor(
 
             const AnyFunctionType *type_func =
                 type_result._types.front()->getAs<AnyFunctionType>();
-            if (CanType(identifier_func->getResult()
-                            ->getDesugaredType()
-                            ->getCanonicalType()) ==
-                    CanType(type_func->getResult()
-                                ->getDesugaredType()
-                                ->getCanonicalType()) &&
-                CanType(identifier_func->getInput()
-                            ->getDesugaredType()
-                            ->getCanonicalType()) ==
-                    CanType(type_func->getInput()
-                                ->getDesugaredType()
-                                ->getCanonicalType())) {
+            if (identifier_func->getResult()->getCanonicalType() ==
+                    type_func->getResult()->getCanonicalType() &&
+                identifier_func->getInput()->getCanonicalType() ==
+                    type_func->getInput()->getCanonicalType()) {
               result._module = kind_type_result._module;
               result._decls.push_back(kind_type_result._decls[i]);
               result._types.push_back(
@@ -1486,10 +1478,8 @@ static void VisitNodeSetterGetter(
     const AnyFunctionType *type_func =
         type_result._types.front()->getAs<AnyFunctionType>();
 
-    CanType type_result_type(
-        type_func->getResult()->getDesugaredType()->getCanonicalType());
-    CanType type_input_type(
-        type_func->getInput()->getDesugaredType()->getCanonicalType());
+    CanType type_result_type = type_func->getResult()->getCanonicalType();
+    CanType type_input_type = type_func->getInput()->getCanonicalType();
 
     FuncDecl *identifier_func = nullptr;
 
@@ -1527,14 +1517,12 @@ static void VisitNodeSetterGetter(
             const AnyFunctionType *identifier_uncurried_result =
                 identifier_func_type->getResult()->getAs<AnyFunctionType>();
             if (identifier_uncurried_result) {
-              CanType identifier_result_type(
+              CanType identifier_result_type =
                   identifier_uncurried_result->getResult()
-                      ->getDesugaredType()
-                      ->getCanonicalType());
-              CanType identifier_input_type(
+                      ->getCanonicalType();
+              CanType identifier_input_type =
                   identifier_uncurried_result->getInput()
-                      ->getDesugaredType()
-                      ->getCanonicalType());
+                      ->getCanonicalType();
               if (identifier_result_type == type_result_type &&
                   identifier_input_type == type_input_type) {
                 break;
