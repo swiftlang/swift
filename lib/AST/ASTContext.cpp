@@ -1264,7 +1264,7 @@ ASTContext::getOrCreateArchetypeBuilder(CanGenericSignature sig,
     return { known->second.first.get(), known->second.second };
 
   // Create a new archetype builder with the given signature.
-  auto builder = new ArchetypeBuilder(*mod, Diags);
+  auto builder = new ArchetypeBuilder(*mod);
   builder->addGenericSignature(sig, nullptr);
   
   // Store this archetype builder and its generic environment.

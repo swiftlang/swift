@@ -188,9 +188,7 @@ public:
   /// Construct a new archetype builder.
   ///
   /// \param mod The module in which the builder will create archetypes.
-  ///
-  /// \param diags The diagnostics entity to use.
-  ArchetypeBuilder(ModuleDecl &mod, DiagnosticEngine &diags);
+  explicit ArchetypeBuilder(ModuleDecl &mod);
 
   ArchetypeBuilder(ArchetypeBuilder &&);
   ~ArchetypeBuilder();

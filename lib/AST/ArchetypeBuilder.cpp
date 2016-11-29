@@ -558,6 +558,7 @@ ArchetypeType::NestedType
 ArchetypeBuilder::PotentialArchetype::getType(ArchetypeBuilder &builder) {
 
   auto representative = getRepresentative();
+  ASTContext &ctx = getRootParam()->getASTContext();
 
   // Retrieve the archetype from the archetype anchor in this equivalence class.
   // The anchor must not have any concrete parents (otherwise we would just
@@ -576,16 +577,14 @@ ArchetypeBuilder::PotentialArchetype::getType(ArchetypeBuilder &builder) {
         // If we already know the concrete type is recursive, just
         // return an error. It will be diagnosed elsewhere.
         if (representative->RecursiveConcreteType) {
-          return NestedType::forConcreteType(
-                   ErrorType::get(builder.getASTContext()));
+          return NestedType::forConcreteType(ErrorType::get(ctx));
         }
 
         // If we're already substituting a concrete type, mark this
         // potential archetype as having a recursive concrete type.
         if (representative->SubstitutingConcreteType) {
           representative->RecursiveConcreteType = true;
-          return NestedType::forConcreteType(
-                   ErrorType::get(builder.getASTContext()));
+          return NestedType::forConcreteType(ErrorType::get(ctx));
         }
 
         representative->SubstitutingConcreteType = true;
@@ -601,13 +600,12 @@ ArchetypeBuilder::PotentialArchetype::getType(ArchetypeBuilder &builder) {
 
         // Otherwise, we found that the concrete type is recursive,
         // complain and return an error.
-        builder.Diags.diagnose(SameTypeSource->getLoc(),
-                               diag::recursive_same_type_constraint,
-                               getDependentType(builder, false),
-                               concreteType);
+        ctx.Diags.diagnose(SameTypeSource->getLoc(),
+                           diag::recursive_same_type_constraint,
+                           getDependentType(builder, false),
+                           concreteType);
 
-        return NestedType::forConcreteType(
-                 ErrorType::get(builder.getASTContext()));
+        return NestedType::forConcreteType(ErrorType::get(ctx));
       }
     }
 
@@ -622,8 +620,7 @@ ArchetypeBuilder::PotentialArchetype::getType(ArchetypeBuilder &builder) {
   if (auto parent = getParent()) {
     auto parentTy = parent->getType(builder);
     if (!parentTy)
-      return NestedType::forConcreteType(
-               ErrorType::get(builder.getASTContext()));
+      return NestedType::forConcreteType(ErrorType::get(ctx));
 
     ParentArchetype = parentTy.getAsArchetype();
     if (!ParentArchetype) {
@@ -637,7 +634,7 @@ ArchetypeBuilder::PotentialArchetype::getType(ArchetypeBuilder &builder) {
         return representative->ArchetypeOrConcreteType;
       }
 
-      LazyResolver *resolver = builder.getLazyResolver();
+      LazyResolver *resolver = ctx.getLazyResolver();
       assert(resolver && "need a lazy resolver");
       (void) resolver;
 
@@ -650,7 +647,7 @@ ArchetypeBuilder::PotentialArchetype::getType(ArchetypeBuilder &builder) {
       Type memberType = depMemberType->substBaseType(
                           &mod,
                           parent->ArchetypeOrConcreteType.getAsConcreteType(),
-                          builder.getLazyResolver());
+                          resolver);
       if (auto memberPA = builder.resolveArchetype(memberType)) {
         // If the member type maps to an archetype, resolve that archetype.
         if (memberPA->getRepresentative() != getRepresentative()) {
@@ -699,9 +696,9 @@ ArchetypeBuilder::PotentialArchetype::getType(ArchetypeBuilder &builder) {
 
   if (Superclass) {
     if (representative->RecursiveSuperclassType) {
-      builder.Diags.diagnose(SuperclassSource->getLoc(),
-                             diag::recursive_superclass_constraint,
-                             Superclass);
+      ctx.Diags.diagnose(SuperclassSource->getLoc(),
+                         diag::recursive_superclass_constraint,
+                         Superclass);
     } else {
       representative->RecursiveSuperclassType = true;
       assert(!Superclass->hasArchetype() &&
@@ -723,11 +720,10 @@ ArchetypeBuilder::PotentialArchetype::getType(ArchetypeBuilder &builder) {
       return representative->ArchetypeOrConcreteType;
     }
 
-    arch = ArchetypeType::getNew(builder.getASTContext(), ParentArchetype,
-                                 assocType, Protos, superclass);
-  } else {
-    arch = ArchetypeType::getNew(builder.getASTContext(), getName(), Protos,
+    arch = ArchetypeType::getNew(ctx, ParentArchetype, assocType, Protos,
                                  superclass);
+  } else {
+    arch = ArchetypeType::getNew(ctx, getName(), Protos, superclass);
   }
 
   representative->ArchetypeOrConcreteType = NestedType::forArchetype(arch);
@@ -735,7 +731,7 @@ ArchetypeBuilder::PotentialArchetype::getType(ArchetypeBuilder &builder) {
   // Collect the set of nested types of this archetype, and put them into
   // the archetype itself.
   if (!NestedTypes.empty()) {
-    builder.getASTContext().registerLazyArchetype(arch, builder, this);
+    ctx.registerLazyArchetype(arch, builder, this);
     SmallVector<std::pair<Identifier, NestedType>, 4> FlatNestedTypes;
     for (auto Nested : NestedTypes) {
       // Skip type aliases, which are just shortcuts.
@@ -754,12 +750,12 @@ ArchetypeBuilder::PotentialArchetype::getType(ArchetypeBuilder &builder) {
 
       FlatNestedTypes.push_back({ Nested.first, NestedType() });
     }
-    arch->setNestedTypes(builder.getASTContext(), FlatNestedTypes);
+    arch->setNestedTypes(ctx, FlatNestedTypes);
 
     // Force the resolution of the nested types.
     (void)arch->getAllNestedTypes();
 
-    builder.getASTContext().unregisterLazyArchetype(arch);
+    ctx.unregisterLazyArchetype(arch);
   }
 
   return NestedType::forArchetype(arch);
@@ -839,8 +835,8 @@ void ArchetypeBuilder::PotentialArchetype::dump(llvm::raw_ostream &Out,
   }
 }
 
-ArchetypeBuilder::ArchetypeBuilder(Module &mod, DiagnosticEngine &diags)
-  : Mod(mod), Context(mod.getASTContext()), Diags(diags),
+ArchetypeBuilder::ArchetypeBuilder(Module &mod)
+  : Mod(mod), Context(mod.getASTContext()), Diags(Context.Diags),
     Impl(new Implementation)
 {
 }

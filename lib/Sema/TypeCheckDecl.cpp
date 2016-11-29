@@ -710,7 +710,7 @@ static void setBoundVarsTypeError(Pattern *pattern, ASTContext &ctx) {
 
 /// Create a fresh archetype builder.
 ArchetypeBuilder TypeChecker::createArchetypeBuilder(Module *mod) {
-  return ArchetypeBuilder(*mod, Diags);
+  return ArchetypeBuilder(*mod);
 }
 
 /// Expose TypeChecker's handling of GenericParamList to SIL parsing.
@@ -741,7 +741,7 @@ TypeChecker::handleSILGenericParams(GenericParamList *genericParams,
 
     revertGenericParamList(genericParams);
 
-    ArchetypeBuilder builder(*DC->getParentModule(), Diags);
+    ArchetypeBuilder builder(*DC->getParentModule());
     checkGenericParamList(&builder, genericParams, parentSig, parentEnv,
                           nullptr);
     parentSig = genericSig;
