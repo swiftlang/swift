@@ -556,7 +556,11 @@ public:
 
   /// Retrieve the dependent type that describes this potential
   /// archetype.
-  Type getDependentType(ArchetypeBuilder &builder, bool allowUnresolved);
+  ///
+  /// \param allowUnresolved If true, allow the result to contain
+  /// \c DependentMemberType types with a name but no specific associated
+  /// type.
+  Type getDependentType(bool allowUnresolved);
 
   /// True if the potential archetype has been bound by a concrete type
   /// constraint.
@@ -586,11 +590,10 @@ public:
   /// correction. If so, \c getName() retrieves the new name.
   bool wasRenamed() const { return !OrigName.empty(); }
 
-  /// Note that this potential archetype was renamed (due to typo
-  /// correction), providing the new name.
-  void setRenamed(Identifier newName) {
+  /// Note that this potential archetype was is going to be renamed (due to typo
+  /// correction), saving the old name.
+  void saveNameForRenaming() {
     OrigName = getName();
-    NameOrAssociatedType = newName;
   }
 
   /// For a renamed potential archetype, retrieve the original name.

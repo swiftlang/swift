@@ -39,12 +39,11 @@ func typoAssoc4<T : P2>(_: T) where T.Assocp2.assoc : P3 {}
 // CHECK-GENERIC-LABEL: .typoAssoc4@
 // CHECK-GENERIC-NEXT: Requirements:
 // CHECK-GENERIC-NEXT:   T : P2 [explicit
+// CHECK-GENERIC-NEXT:   T[.P2].AssocP2 == T[.P2].AssocP2 [redundant]
 // CHECK-GENERIC-NEXT:   T[.P2].AssocP2 : P1 [protocol
-// CHECK-GENERIC-NEXT:   T[.P2].AssocP2 == T.AssocP2 [redundant]
+// CHECK-GENERIC-NEXT:   T[.P2].AssocP2[.P1].Assoc == T[.P2].AssocP2[.P1].Assoc [redundant
 // CHECK-GENERIC-NEXT:   T[.P2].AssocP2[.P1].Assoc : P3 [explicit
-// CHECK-GENERIC-NEXT:   T[.P2].AssocP2[.P1].Assoc == T[.P2].AssocP2.Assoc [redundant]
 // CHECK-GENERIC-NEXT: Generic signature
-
 
 // <rdar://problem/19620340>
 

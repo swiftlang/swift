@@ -602,7 +602,7 @@ ArchetypeBuilder::PotentialArchetype::getType(ArchetypeBuilder &builder) {
         // complain and return an error.
         ctx.Diags.diagnose(SameTypeSource->getLoc(),
                            diag::recursive_same_type_constraint,
-                           getDependentType(builder, false),
+                           getDependentType(/*allowUnresolved=*/false),
                            concreteType);
 
         return NestedType::forConcreteType(ErrorType::get(ctx));
@@ -639,7 +639,7 @@ ArchetypeBuilder::PotentialArchetype::getType(ArchetypeBuilder &builder) {
       (void) resolver;
 
       // Resolve the member type.
-      auto type = getDependentType(builder, false);
+      auto type = getDependentType(/*allowUnresolved=*/false);
       if (type->hasError())
         return NestedType::forConcreteType(type);
 
@@ -715,7 +715,7 @@ ArchetypeBuilder::PotentialArchetype::getType(ArchetypeBuilder &builder) {
     if (!assocType) {
       representative->ArchetypeOrConcreteType =
         NestedType::forConcreteType(
-          ErrorType::get(getDependentType(builder, true)));
+          ErrorType::get(getDependentType(/*allowUnresolved=*/true)));
 
       return representative->ArchetypeOrConcreteType;
     }
@@ -762,10 +762,9 @@ ArchetypeBuilder::PotentialArchetype::getType(ArchetypeBuilder &builder) {
 }
 
 Type ArchetypeBuilder::PotentialArchetype::getDependentType(
-       ArchetypeBuilder &builder,
-       bool allowUnresolved) {
+                                                        bool allowUnresolved) {
   if (auto parent = getParent()) {
-    Type parentType = parent->getDependentType(builder, allowUnresolved);
+    Type parentType = parent->getDependentType(allowUnresolved);
     if (parentType->hasError())
       return parentType;
 
@@ -773,14 +772,9 @@ Type ArchetypeBuilder::PotentialArchetype::getDependentType(
     if (auto assocType = getResolvedAssociatedType())
       return DependentMemberType::get(parentType, assocType);
 
-    // If typo correction renamed this type, get the renamed type.
-    if (wasRenamed())
-      return parent->getNestedType(getName(), builder)
-               ->getDependentType(builder, allowUnresolved);
-    
     // If we don't allow unresolved dependent member types, fail.
     if (!allowUnresolved)
-      return ErrorType::get(builder.Context);
+      return ErrorType::get(getDependentType(/*allowUnresolved=*/true));
 
     return DependentMemberType::get(parentType, getName());
   }
@@ -988,8 +982,8 @@ bool ArchetypeBuilder::addSuperclassRequirement(PotentialArchetype *T,
             auto *pa = resolveArchetype(t);
             // Why does this happen?
             if (!pa)
-              return ErrorType::get(Context);
-            return pa->getDependentType(*this, false);
+              return ErrorType::get(t);
+            return pa->getDependentType(/*allowUnresolved=*/false);
           }
           return t;
         });
@@ -1891,12 +1885,14 @@ ArchetypeBuilder::finalize(SourceLoc loc, bool allowConcreteGenericParams) {
         return;
       }
 
-      // Set the typo-corrected name.
-      pa->setRenamed(correction);
+      // Note that this is being renamed.
+      pa->saveNameForRenaming();
       Impl->RenamedNestedTypes.push_back(pa);
       
       // Resolve the associated type and merge the potential archetypes.
       auto replacement = pa->getParent()->getNestedType(correction, *this);
+      pa->resolveAssociatedType(replacement->getResolvedAssociatedType(),
+                                *this);
       addSameTypeRequirementBetweenArchetypes(
         pa, replacement,
         RequirementSource(RequirementSource::Redundant, SourceLoc()));
@@ -1910,7 +1906,7 @@ bool ArchetypeBuilder::diagnoseRemainingRenames(SourceLoc loc) {
     if (pa->alreadyDiagnosedRename()) continue;
 
     Diags.diagnose(loc, diag::invalid_member_type_suggest,
-                   pa->getParent()->getDependentType(*this, true),
+                   pa->getParent()->getDependentType(/*allowUnresolved=*/true),
                    pa->getOriginalName(), pa->getName());
     invalid = true;
   }
@@ -2149,7 +2145,7 @@ static void collectRequirements(ArchetypeBuilder &builder,
       return;
     }
 
-    auto depTy = archetype->getDependentType(builder, false);
+    auto depTy = archetype->getDependentType(/*allowUnresolved=*/false);
 
     if (depTy->hasError())
       return;
@@ -2161,7 +2157,7 @@ static void collectRequirements(ArchetypeBuilder &builder,
     } else {
       // ...or to a dependent type.
       repTy = type.get<ArchetypeBuilder::PotentialArchetype *>()
-          ->getDependentType(builder, false);
+          ->getDependentType(/*allowUnresolved=*/false);
     }
 
     if (repTy->hasError())
