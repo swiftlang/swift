@@ -1587,13 +1587,11 @@ namespace {
     }
 
     Type visitIdentityExpr(IdentityExpr *expr) {
-      expr->setType(expr->getSubExpr()->getType());
-      return expr->getType();
+      return expr->getSubExpr()->getType();
     }
 
     Type visitAnyTryExpr(AnyTryExpr *expr) {
-      expr->setType(expr->getSubExpr()->getType());
-      return expr->getType();
+      return expr->getSubExpr()->getType();
     }
 
     Type visitOptionalTryExpr(OptionalTryExpr *expr) {
@@ -1611,14 +1609,12 @@ namespace {
     }
 
     virtual Type visitParenExpr(ParenExpr *expr) {
-      auto &ctx = CS.getASTContext();
-      expr->setType(ParenType::get(ctx, expr->getSubExpr()->getType()));
-      
       if (auto favoredTy = CS.getFavoredType(expr->getSubExpr())) {
         CS.setFavoredType(expr, favoredTy);
       }
-      
-      return expr->getType();
+
+      auto &ctx = CS.getASTContext();
+      return ParenType::get(ctx, expr->getSubExpr()->getType());
     }
 
     Type visitTupleExpr(TupleExpr *expr) {
@@ -1991,8 +1987,7 @@ namespace {
 
     Type visitCaptureListExpr(CaptureListExpr *expr) {
       // The type of the capture list is just the type of its closure.
-      expr->setType(expr->getClosureBody()->getType());
-      return expr->getType();
+      return expr->getClosureBody()->getType();
     }
 
     /// \brief Walk a closure body to determine if it's possible for
@@ -2602,9 +2597,8 @@ namespace {
       CS.addConstraint(ConstraintKind::Conversion,
                        expr->getSrc()->getType(), destTy,
                        CS.getConstraintLocator(expr->getSrc()));
-      
-      expr->setType(TupleType::getEmpty(CS.getASTContext()));
-      return expr->getType();
+
+      return TupleType::getEmpty(CS.getASTContext());
     }
     
     Type visitUnresolvedPatternExpr(UnresolvedPatternExpr *expr) {
