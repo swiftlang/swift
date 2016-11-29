@@ -114,7 +114,7 @@ Type Solution::computeSubstitutions(
                          getConstraintSystem().DC,
                          (ConformanceCheckFlags::InExpression|
                           ConformanceCheckFlags::Used));
-    (void)isOpenedAnyObject;
+    (void)&isOpenedAnyObject;
     assert((conformance ||
             replacement->hasError() ||
             isOpenedAnyObject(replacement) ||
@@ -2139,6 +2139,9 @@ namespace {
       case MagicIdentifierLiteralExpr::DSOHandle:
         return expr;
       }
+
+
+      llvm_unreachable("Unhandled MagicIdentifierLiteralExpr in switch.");
     }
 
     Expr *visitObjectLiteralExpr(ObjectLiteralExpr *expr) {
@@ -2546,6 +2549,8 @@ namespace {
       case OverloadChoiceKind::TypeDecl:
         llvm_unreachable("Nonsensical overload choice");
       }
+
+    llvm_unreachable("Unhandled OverloadChoiceKind in switch.");
     }
     
   public:

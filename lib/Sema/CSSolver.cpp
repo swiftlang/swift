@@ -733,6 +733,8 @@ static bool shouldBindToValueType(Constraint *constraint)
     llvm_unreachable("shouldBindToValueType() may only be called on "
                      "relational constraints");
   }
+
+  llvm_unreachable("Unhandled ConstraintKind in switch.");
 }
 
 /// Find the set of type variables that are inferable from the given type.

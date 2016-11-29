@@ -49,6 +49,8 @@ SourceLoc TypeCheckRequest::getLoc() const {
 
 #undef DELEGATE_GET_LOC
   }
+
+  llvm_unreachable("Unhandled PayloadKind in switch.");
 }
 
 Decl *TypeCheckRequest::getAnchor() const {
@@ -89,6 +91,8 @@ Decl *TypeCheckRequest::getAnchor() const {
 #undef NO_DECL_PAYLOAD
 #undef DECL_PAYLOAD
   }
+
+  llvm_unreachable("Unhandled PayloadKind in switch.");
 }
 
 bool swift::operator==(const TypeCheckRequest &x, const TypeCheckRequest &y) {
@@ -102,4 +106,6 @@ bool swift::operator==(const TypeCheckRequest &x, const TypeCheckRequest &y) {
     return x.get##PayloadName##Payload() == y.get##PayloadName##Payload();
 #include "swift/Sema/TypeCheckRequestPayloads.def"
   }
+
+  llvm_unreachable("Unhandled PayloadKind in switch.");
 }

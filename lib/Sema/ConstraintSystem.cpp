@@ -703,6 +703,8 @@ static unsigned getNumRemovedArgumentLabels(ASTContext &ctx, ValueDecl *decl,
     // Never remove argument labels from a double application.
     return 0;
   }
+
+  llvm_unreachable("Unhandled FunctionRefKind in switch.");
 }
 
 std::pair<Type, Type>

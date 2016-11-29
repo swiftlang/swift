@@ -3080,6 +3080,8 @@ static bool isBridgedToObjectiveCClass(DeclContext *dc, Type type) {
   case ForeignRepresentableKind::StaticBridged:
     return true;
   }
+
+  llvm_unreachable("Unhandled ForeignRepresentableKind in switch.");
 }
 
 bool TypeChecker::isRepresentableInObjC(

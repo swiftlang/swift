@@ -942,6 +942,8 @@ static bool matchFunctionRepresentations(FunctionTypeRepresentation rep1,
   case ConstraintKind::ValueMember:
     return false;
   }
+
+  llvm_unreachable("Unhandled ConstraintKind in switch.");
 }
 
 ConstraintSystem::SolutionKind
@@ -2616,6 +2618,8 @@ ConstraintSystem::simplifyCheckedCastConstraint(
   case CheckedCastKind::Unresolved:
     llvm_unreachable("Not a valid result");
   }
+
+  llvm_unreachable("Unhandled CheckedCastKind in switch.");
 }
 
 ConstraintSystem::SolutionKind
@@ -4031,6 +4035,8 @@ ConstraintSystem::simplifyRestrictedConstraint(
   case SolutionKind::Error:
     return SolutionKind::Error;
   }
+
+  llvm_unreachable("Unhandled SolutionKind in switch.");
 }
 
 bool ConstraintSystem::recordFix(Fix fix, ConstraintLocatorBuilder locator) {
@@ -4092,6 +4098,8 @@ ConstraintSystem::simplifyFixConstraint(Fix fix, Type type1, Type type2,
   case FixKind::CoerceToCheckedCast:
     llvm_unreachable("handled elsewhere");
   }
+
+  llvm_unreachable("Unhandled FixKind in switch.");
 }
 
 ConstraintSystem::SolutionKind
@@ -4144,6 +4152,8 @@ ConstraintSystem::addConstraintImpl(ConstraintKind kind, Type first,
   case ConstraintKind::Disjunction:
     llvm_unreachable("Use the correct addConstraint()");
   }
+
+  llvm_unreachable("Unhandled ConstraintKind in switch.");
 }
 
 void ConstraintSystem::addConstraint(ConstraintKind kind, Type first,
@@ -4278,4 +4288,6 @@ ConstraintSystem::simplifyConstraint(const Constraint &constraint) {
     // Disjunction constraints are never solved here.
     return SolutionKind::Unsolved;
   }
+
+  llvm_unreachable("Unhandled ConstraintKind in switch.");
 }
