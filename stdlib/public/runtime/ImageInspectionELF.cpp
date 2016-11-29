@@ -98,4 +98,17 @@ void swift::initializeTypeMetadataRecordLookup() {
   dl_iterate_phdr(iteratePHDRCallback, &TypeMetadataRecordArgs);
 }
 
+int swift::lookupSymbol(const void *address, SymbolInfo *info) {
+  Dl_info dlinfo;
+  if (dladdr(address, &dlinfo) == 0) {
+    return 0;
+  }
+
+  info->fileName = dlinfo.dli_fname;
+  info->baseAddress = dlinfo.dli_fbase;
+  info->symbolName = dlinfo.dli_sname;
+  info->symbolAddress = dlinfo.dli_saddr;
+  return 1;
+}
+
 #endif // defined(__ELF__) || defined(__ANDROID__)

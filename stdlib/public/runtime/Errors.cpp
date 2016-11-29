@@ -30,6 +30,7 @@
 #include <unistd.h>
 #endif
 #include <stdarg.h>
+#include "ImageInspection.h"
 #include "swift/Runtime/Debug.h"
 #include "swift/Runtime/Mutex.h"
 #include "swift/Basic/Demangle.h"
@@ -38,14 +39,11 @@
 #if !defined(_MSC_VER)
 #include <cxxabi.h>
 #endif
-#if SWIFT_SUPPORTS_BACKTRACE_REPORTING
 
+#if SWIFT_SUPPORTS_BACKTRACE_REPORTING
 // execinfo.h is not available on Android. Checks in this file ensure that
 // fatalError behaves as expected, but without stack traces.
 #include <execinfo.h>
-// We are only using dlfcn.h in code that is invoked on non cygwin/android
-// platforms. So I am putting it here.
-#include <dlfcn.h>
 #endif
 
 #ifdef __APPLE__
@@ -62,26 +60,26 @@ using namespace swift;
 
 #if SWIFT_SUPPORTS_BACKTRACE_REPORTING
 
-static bool getSymbolNameAddr(llvm::StringRef libraryName, Dl_info dlinfo,
+static bool getSymbolNameAddr(llvm::StringRef libraryName, SymbolInfo syminfo,
                               std::string &symbolName, uintptr_t &addrOut) {
 
   // If we failed to find a symbol and thus dlinfo->dli_sname is nullptr, we
   // need to use the hex address.
-  bool hasUnavailableAddress = dlinfo.dli_sname == nullptr;
+  bool hasUnavailableAddress = syminfo.symbolName == nullptr;
 
   if (hasUnavailableAddress) {
     return false;
   }
 
   // Ok, now we know that we have some sort of "real" name. Set the outAddr.
-  addrOut = uintptr_t(dlinfo.dli_saddr);
+  addrOut = uintptr_t(syminfo.symbolAddress);
 
   // First lets try to demangle using cxxabi. If this fails, we will try to
   // demangle with swift. We are taking advantage of __cxa_demangle actually
   // providing failure status instead of just returning the original string like
   // swift demangle.
   int status;
-  char *demangled = abi::__cxa_demangle(dlinfo.dli_sname, 0, 0, &status);
+  char *demangled = abi::__cxa_demangle(syminfo.symbolName, 0, 0, &status);
   if (status == 0) {
     assert(demangled != nullptr && "If __cxa_demangle succeeds, demangled "
                                    "should never be nullptr");
@@ -95,7 +93,7 @@ static bool getSymbolNameAddr(llvm::StringRef libraryName, Dl_info dlinfo,
   // Otherwise, try to demangle with swift. If swift fails to demangle, it will
   // just pass through the original output.
   symbolName = demangleSymbolAsString(
-      dlinfo.dli_sname, strlen(dlinfo.dli_sname),
+      syminfo.symbolName, strlen(syminfo.symbolName),
       Demangle::DemangleOptions::SimplifiedUIDemangleOptions());
   return true;
 }
@@ -103,19 +101,16 @@ static bool getSymbolNameAddr(llvm::StringRef libraryName, Dl_info dlinfo,
 /// This function dumps one line of a stack trace. It is assumed that \p address
 /// is the address of the stack frame at index \p index.
 static void dumpStackTraceEntry(unsigned index, void *framePC) {
-  Dl_info dlinfo;
+  SymbolInfo syminfo;
 
-  // 0 is failure for dladdr. We do not use nullptr since it is an int
-  // argument. This violates normal unix patterns. See man page for dladdr on OS
-  // X.
-  if (0 == dladdr(framePC, &dlinfo)) {
+  // 0 is failure for lookupSymbol
+  if (0 == lookupSymbol(framePC, &syminfo)) {
     return;
   }
 
-  // According to the man page of dladdr, if dladdr returns non-zero, then we
-  // know that it must have fname, fbase set. Thus, we find the library name
-  // here.
-  StringRef libraryName = StringRef(dlinfo.dli_fname).rsplit('/').second;
+  // If lookupSymbol succeeded then fileName is non-null. Thus, we find the
+  // library name here.
+  StringRef libraryName = StringRef(syminfo.fileName).rsplit('/').second;
 
   // Next we get the symbol name that we are going to use in our backtrace.
   std::string symbolName;
@@ -124,7 +119,7 @@ static void dumpStackTraceEntry(unsigned index, void *framePC) {
   // we just get HexAddr + 0.
   uintptr_t symbolAddr = uintptr_t(framePC);
   bool foundSymbol =
-      getSymbolNameAddr(libraryName, dlinfo, symbolName, symbolAddr);
+      getSymbolNameAddr(libraryName, syminfo, symbolName, symbolAddr);
 
   // We do not use %p here for our pointers since the format is implementation
   // defined. This makes it logically impossible to check the output. Forcing
@@ -142,7 +137,7 @@ static void dumpStackTraceEntry(unsigned index, void *framePC) {
                                               "<unavailable> + %td\n";
     fprintf(stderr, backtraceEntryFormat, index, libraryName.data(),
             uintptr_t(framePC),
-            ptrdiff_t(uintptr_t(framePC) - uintptr_t(dlinfo.dli_fbase)));
+            ptrdiff_t(uintptr_t(framePC) - uintptr_t(syminfo.baseAddress)));
   }
 }
 
