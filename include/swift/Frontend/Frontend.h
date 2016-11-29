@@ -263,6 +263,8 @@ public:
     assert(Buf);
     CodeCompletionBuffer = Buf;
     CodeCompletionOffset = Offset;
+    // We don't need typo-correction for code-completion.
+    LangOpts.DisableTypoCorrection = true;
   }
 
   std::pair<llvm::MemoryBuffer *, unsigned> getCodeCompletionPoint() const {
