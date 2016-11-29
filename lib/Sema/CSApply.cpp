@@ -5651,6 +5651,12 @@ Expr *ExprRewriter::coerceToType(Expr *expr, Type toType,
     return new (tc.Context) MetatypeConversionExpr(expr, toMeta);
   }
 
+  // Look through ImplicitlyUnwrappedOptional<T> before coercing expression.
+  if (auto ty = cs.lookThroughImplicitlyUnwrappedOptionalType(fromType)) {
+    expr = coerceImplicitlyUnwrappedOptionalToValue(expr, ty, locator);
+    return coerceToType(expr, toType, locator);
+  }
+
   // Conversion to/from UnresolvedType.
   if (fromType->is<UnresolvedType>() || toType->is<UnresolvedType>())
     return new (tc.Context) UnresolvedTypeConversionExpr(expr, toType);

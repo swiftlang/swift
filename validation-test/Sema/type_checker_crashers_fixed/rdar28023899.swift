@@ -1,4 +1,4 @@
-// RUN: not --crash %target-swift-frontend %s -typecheck
+// RUN: %target-swift-frontend %s -typecheck
 // REQUIRES: asserts
 
 class B : Equatable {
