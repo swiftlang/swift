@@ -5323,7 +5323,6 @@ ParserStatus Parser::parseDeclSubscript(ParseDeclOptions Flags,
                    ElementTy.get(), Indices.get(), Decls);
 
   if (Invalid) {
-    Subscript->setType(ErrorType::get(Context));
     Subscript->setInterfaceType(ErrorType::get(Context));
     Subscript->setInvalid();
   }

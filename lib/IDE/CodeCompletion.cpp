@@ -2584,7 +2584,7 @@ public:
     Builder.addRightBracket();
 
     // Add a type annotation.
-    Type T = SD->getElementType();
+    Type T = SD->getElementInterfaceType();
     if (IsDynamicLookup) {
       // Values of properties that were found on a AnyObject have
       // Optional<T> type.

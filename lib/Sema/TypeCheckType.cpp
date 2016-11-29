@@ -3441,7 +3441,7 @@ bool TypeChecker::isRepresentableInObjC(const SubscriptDecl *SD,
     return false;
 
   // Figure out the type of the indices.
-  Type IndicesType = SD->getIndicesType();
+  Type IndicesType = SD->getIndicesInterfaceType();
   if (auto TupleTy = IndicesType->getAs<TupleType>()) {
     if (TupleTy->getNumElements() == 1 && !TupleTy->getElement(0).isVararg())
       IndicesType = TupleTy->getElementType(0);
@@ -3453,9 +3453,10 @@ bool TypeChecker::isRepresentableInObjC(const SubscriptDecl *SD,
   bool IndicesResult =
     IndicesType->isRepresentableIn(ForeignLanguage::ObjectiveC,
                                    SD->getDeclContext());
-  bool ElementResult =
-    SD->getElementType()->isRepresentableIn(ForeignLanguage::ObjectiveC,
-                                            SD->getDeclContext());
+
+  Type ElementType = SD->getElementInterfaceType();
+  bool ElementResult = ElementType->isRepresentableIn(
+        ForeignLanguage::ObjectiveC, SD->getDeclContext());
   bool Result = IndicesResult && ElementResult;
 
   if (Result && checkObjCInExtensionContext(*this, SD, Diagnose))
@@ -3483,8 +3484,8 @@ bool TypeChecker::isRepresentableInObjC(const SubscriptDecl *SD,
     .highlight(TypeRange);
 
   diagnoseTypeNotRepresentableInObjC(SD->getDeclContext(),
-                                     !IndicesResult? IndicesType
-                                                   : SD->getElementType(),
+                                     !IndicesResult ? IndicesType
+                                                    : ElementType,
                                      TypeRange);
   describeObjCReason(*this, SD, Reason);
 

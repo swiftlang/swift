@@ -5733,7 +5733,6 @@ SwiftDeclConverter::importSubscript(Decl *decl,
 
   // TODO: no good when generics are around
   auto fnType = FunctionType::get(indicesType, elementTy);
-  subscript->setType(fnType);
   subscript->setInterfaceType(fnType);
 
   addObjCAttribute(subscript, None);

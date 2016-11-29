@@ -2360,8 +2360,8 @@ static bool mayLieAboutNonOptionalReturn(SILModule &M,
   // Subscripts of non-optional reference type that were imported from
   // Objective-C.
   if (auto subscript = dyn_cast<SubscriptDecl>(decl)) {
-    assert((isVerbatimNullableTypeInC(M, subscript->getElementType())
-            || subscript->getElementType()->hasArchetype())
+    assert((subscript->getElementInterfaceType()->hasTypeParameter()
+            || isVerbatimNullableTypeInC(M, subscript->getElementInterfaceType()))
            && "subscript's result type is not nullable?!");
     return subscript->hasClangNode();
   }

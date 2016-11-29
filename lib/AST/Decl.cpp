@@ -1652,6 +1652,7 @@ void ValueDecl::setType(Type T) {
 void ValueDecl::overwriteType(Type T) {
   assert(!isa<AbstractFunctionDecl>(this) &&
          !isa<EnumElementDecl>(this) &&
+         !isa<SubscriptDecl>(this) &&
          "functions and enum case constructors only have an interface type");
 
   TypeAndAccess.setPointer(T);
@@ -3970,22 +3971,23 @@ void SubscriptDecl::setIndices(ParameterList *p) {
     Indices->setDeclContextOfParamDecls(this);
 }
 
-Type SubscriptDecl::getIndicesType() const {
-  const auto type = getType();
-  if (type->hasError())
-    return type;
-  return type->castTo<AnyFunctionType>()->getInput();
+Type SubscriptDecl::getIndicesInterfaceType() const {
+  auto indicesTy = getInterfaceType();
+  if (indicesTy->hasError())
+    return indicesTy;
+  return indicesTy->castTo<AnyFunctionType>()->getInput();
 }
 
-Type SubscriptDecl::getIndicesInterfaceType() const {
-  // FIXME: Unfortunate that we can't really capture the generic parameters
-  // here.
-  return getInterfaceType()->castTo<AnyFunctionType>()->getInput();
+Type SubscriptDecl::getElementInterfaceType() const {
+  auto elementTy = getInterfaceType();
+  if (elementTy->hasError())
+    return elementTy;
+  return elementTy->castTo<AnyFunctionType>()->getResult();
 }
 
 ObjCSubscriptKind SubscriptDecl::getObjCSubscriptKind(
                     LazyResolver *resolver) const {
-  auto indexTy = getIndicesType();
+  auto indexTy = getIndicesInterfaceType();
 
   // Look through a named 1-tuple.
   if (auto tupleTy = indexTy->getAs<TupleType>()) {

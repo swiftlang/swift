@@ -82,7 +82,8 @@ static Type getTypeOfStorage(AbstractStorageDecl *storage,
     // None of the transformations done by getTypeOfRValue are
     // necessary for subscripts.
     auto subscript = cast<SubscriptDecl>(storage);
-    return subscript->getElementType();
+    return ArchetypeBuilder::mapTypeIntoContext(
+        storage->getDeclContext(), subscript->getElementInterfaceType());
   }
 }
 

@@ -2646,8 +2646,6 @@ void Serializer::writeDecl(const Decl *D) {
                                 subscript->isImplicit(),
                                 subscript->isObjC(),
                                 (unsigned) accessors.Kind,
-                                addTypeRef(subscript->getType()),
-                                addTypeRef(subscript->getElementType()),
                                 addTypeRef(subscript->getInterfaceType()),
                                 addDeclRef(accessors.Get),
                                 addDeclRef(accessors.Set),
