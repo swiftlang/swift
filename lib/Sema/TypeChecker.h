@@ -966,7 +966,6 @@ public:
 
   void checkDeclAttributesEarly(Decl *D);
   void checkDeclAttributes(Decl *D);
-  void checkTypeModifyingDeclAttributes(VarDecl *var);
 
   void checkAutoClosureAttr(ParamDecl *D, AutoClosureAttr *attr);
   void checkNoEscapeAttr(ParamDecl *D, NoEscapeAttr *attr);

@@ -810,7 +810,6 @@ bool TypeChecker::typeCheckParameterList(ParameterList *PL, DeclContext *DC,
     } else
       param->overwriteType(type);
     
-    checkTypeModifyingDeclAttributes(param);
     if (param->getType()->is<InOutType>()) {
       param->setLet(false);
     }
@@ -1087,7 +1086,6 @@ bool TypeChecker::coercePatternToType(Pattern *&P, DeclContext *dc, Type type,
     else
       var->overwriteType(type);
 
-    checkTypeModifyingDeclAttributes(var);
     if (type->is<InOutType>()) {
       NP->getDecl()->setLet(false);
     }
@@ -1562,7 +1560,6 @@ bool TypeChecker::coerceParameterListToType(ParameterList *P, ClosureExpr *CE,
     if (isValidType(ty) || shouldOverwriteParam(param))
       param->overwriteType(ty);
     
-    checkTypeModifyingDeclAttributes(param);
     return hadError;
   };
 
