@@ -172,3 +172,5 @@ class C {
     let _ : UnsafeMutablePointer<Void> // expected-warning {{UnsafeMutablePointer<Void> has been replaced by UnsafeMutableRawPointer}}{{13-39=UnsafeMutableRawPointer}}
   }
 }
+
+let _ : inout @convention(c) Int -> Int // expected-error {{'inout' may only be used on parameters}}
