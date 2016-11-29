@@ -64,50 +64,37 @@ public func == <T : Strideable>(x: T, y: T) -> Bool {
 
 //===----------------------------------------------------------------------===//
 
-% # Versions constrained to Arithmetic break the ambiguity
-% for arithmetic in [True, False]:
-extension Strideable
-%   if arithmetic:
-  where Self : Arithmetic
-%   end
-{
-  @available(swift, obsoleted: 4.0)
+extension Strideable where Self : _Pointer {
   @_transparent
   public static func + (lhs: Self, rhs: Self.Stride) -> Self {
     return lhs.advanced(by: rhs)
   }
 
-  @available(swift, obsoleted: 4.0)
   @_transparent
   public static func + (lhs: Self.Stride, rhs: Self) -> Self {
     return rhs.advanced(by: lhs)
   }
 
-  @available(swift, obsoleted: 4.0)
   @_transparent
   public static func - (lhs: Self, rhs: Self.Stride) -> Self {
     return lhs.advanced(by: -rhs)
   }
 
-  @available(swift, obsoleted: 4.0)
   @_transparent
   public static func - (lhs: Self, rhs: Self) -> Self.Stride {
     return rhs.distance(to: lhs)
   }
 
-  @available(swift, obsoleted: 4.0)
   @_transparent
   public static func += (lhs: inout Self, rhs: Self.Stride) {
     lhs = lhs.advanced(by: rhs)
   }
 
-  @available(swift, obsoleted: 4.0)
   @_transparent
   public static func -= (lhs: inout Self, rhs: Self.Stride) {
     lhs = lhs.advanced(by: -rhs)
   }
 }
-% end
 
 //===----------------------------------------------------------------------===//
 

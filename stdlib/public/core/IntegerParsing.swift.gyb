@@ -39,7 +39,7 @@ internal func _parseUnsignedAsciiAsUInt64(
 
   _precondition(radix > 1, "Radix must be greater than 1")
   _precondition(
-    radix <= numericCast(10 + lower.count),
+    radix <= (10 + lower.count),
     "Radix exceeds what can be expressed using the English alphabet")
 
   let uRadix = UInt64(bitPattern: Int64(radix))
@@ -47,9 +47,9 @@ internal func _parseUnsignedAsciiAsUInt64(
   for c in u16 {
     let n: UInt64
     switch c {
-    case digit: n = UInt64(c - digit.lowerBound)
-    case lower: n = UInt64(c - lower.lowerBound) + 10
-    case upper: n = UInt64(c - upper.lowerBound) + 10
+    case digit: n = UInt64(extendingOrTruncating: c - digit.lowerBound)
+    case lower: n = UInt64(extendingOrTruncating: c - lower.lowerBound) + 10
+    case upper: n = UInt64(extendingOrTruncating: c - upper.lowerBound) + 10
     default: return nil
     }
     if n >= uRadix { return nil }
