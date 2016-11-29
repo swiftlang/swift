@@ -85,7 +85,12 @@ macro(swift_configure_components)
 
     string(TOUPPER "${component}" var_name_piece)
     string(REPLACE "-" "_" var_name_piece "${var_name_piece}")
-    set(SWIFT_INSTALL_${var_name_piece} TRUE)
+    if("${SWIFT_INSTALL_EXCLUDE_${var_name_piece}}" STREQUAL "")
+      set(SWIFT_INSTALL_EXCLUDE_${var_name_piece} FALSE)
+    endif()
+    if(NOT ${SWIFT_INSTALL_EXCLUDE_${var_name_piece}})
+      set(SWIFT_INSTALL_${var_name_piece} TRUE)
+    endif()
   endforeach()
 endmacro()
 
