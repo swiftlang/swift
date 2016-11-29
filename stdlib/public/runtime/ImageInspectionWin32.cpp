@@ -217,4 +217,22 @@ void swift::initializeTypeMetadataRecordLookup() {
   _swift_dl_iterate_phdr(_addImageCallback, &TypeMetadataRecordsArgs);
 }
 
+
+int swift::lookupSymbol(const void *address, SymbolInfo *info) {
+#if defined(__CYGWIN__)
+  Dl_info dlinfo;
+  if (dladdr(address, &dlinfo) == 0) {
+    return 0;
+  }
+
+  info->fileName = dlinfo.dli_fname;
+  info->baseAddress = dlinfo.dli_fbase;
+  info->symbolName = dli_info.dli_sname;
+  info->symbolAddress = dli_saddr;
+  return 1;
+#else
+  return 0;
+#endif // __CYGWIN__
+}
+
 #endif // defined(_MSC_VER) || defined(__CYGWIN__)

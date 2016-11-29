@@ -21,9 +21,6 @@
 #include "swift/Runtime/Mutex.h"
 #include "ImageInspection.h"
 #include "Private.h"
-#if !defined(_WIN32)
-#include <dlfcn.h>
-#endif
 
 using namespace swift;
 
@@ -37,11 +34,11 @@ static const char *class_getName(const ClassMetadata* type) {
 
 template<> void ProtocolConformanceRecord::dump() const {
   auto symbolName = [&](const void *addr) -> const char * {
-    Dl_info info;
-    int ok = dladdr(addr, &info);
+    SymbolInfo info;
+    int ok = lookupSymbol(addr, &info);
     if (!ok)
       return "<unknown addr>";
-    return info.dli_sname;
+    return info.symbolName;
   };
 
   switch (auto kind = getTypeKind()) {
