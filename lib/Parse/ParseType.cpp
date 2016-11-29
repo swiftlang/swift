@@ -1022,6 +1022,9 @@ bool Parser::canParseGenericArguments() {
 }
 
 bool Parser::canParseType() {
+  // Accept 'inout' at for better recovery.
+  consumeIf(tok::kw_inout);
+
   switch (Tok.getKind()) {
   case tok::kw_Self:
   case tok::kw_Any:
