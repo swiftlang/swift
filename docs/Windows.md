@@ -1,5 +1,42 @@
 # Getting Started with Swift on Windows
 
+## clang (cross-compiling)
+
+### 1. Setup Visual Studio Environment Variables
+Building for Windows requires that the Visual Studio environment variables are
+setup similar to the values on Windows.  The following assumes that
+`WINKIT_ROOT` points to the path where the Windows 10 SDK is available and that
+`VC_ROOT` points to the path where the Visual Studio VC headers and libraries
+are available.  Currently, the runtime has been tested to build against the
+Windows 10 SDK at revision 10.10.586.
+
+```
+export WINKIT_ROOT=".../Windows Kits/10"
+export VC_ROOT=".../Microsoft Visual Studio 14.0/VC"
+export INCLUDE='${VC_ROOT}/include;${WINKIT_ROOT}/Include/10.0.10586.0/ucrt;${WINKIT_ROOT}/Include/10.0.10586.0/um;${WINKIT_ROOT}/Include/10.0.10586.0/shared'
+export LIB='${VC_ROOT}/lib;${WINKIT_ROOT}/Lib/10.0.10586.0/ucrt/x86;${WINKIT_ROOT}/Lib/10.0.10586.0/um/x86'
+```
+
+### 2. Setup `visualc` and `ucrt` modules
+The `visualc.modulemap` located at
+`swift/stdlib/public/Platform/visualc.modulemap` needs to be copied into
+`${VC_ROOT}/include`.  The `ucrt.modulemap` located at
+`swift/stdlib/public/Platform/ucrt.modulemap` needs to be copied into
+`${WINKIT_ROOT}/Include/10.0.10586.0/ucrt`.
+
+### 3. Configure the runtime to be built with the just built clang
+Ensure that we use the tools from the just built LLVM and clang tools to build
+the Windows SDK.  You will need to pass a few extra options to cmake via the
+`build-script` invocation to acheive this.  You will need to expand out the
+path where llvm-ar and llvm-ranlib are built.  These are needed to correctly
+build the static libraries.  Note that cross-compiling will require the use of
+lld.  Ensure that lld-link.exe (lld-link) is available to clang via your path.
+Additionally, the ICU headers and libraries need to be provided for the build.
+
+```
+--extra-cmake-options=-DSWIFT_BUILD_RUNTIME_WITH_HOST_COMPILER=FALSE,-DCMAKE_AR=<path to llvm-ar>,-DCMAKE_RANLIB=<path to llvm-ranlib>,-DSWIFT_SDKS=WINDOWS,-DSWIFT_WINDOWS_ICU_I18N_INCLUDE=<path to ICU i18n includes>,-DSWIFT_WINDOWS_ICU_UC_INCLUDE=<path to ICU UC includes>,-DSWIFT_WINDOWS_ICU_I18N_LIB=<path to ICU i18n lib>,-DSWIFT_WINDOWS_ICU_UC_LIB=<path to ICU UC lib>
+```
+
 ## MSVC
 To be filled in.
 
