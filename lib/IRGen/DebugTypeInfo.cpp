@@ -166,8 +166,6 @@ TypeDecl *DebugTypeInfo::getDecl() const {
     return UBG->getDecl();
   if (auto *BG = dyn_cast<BoundGenericType>(Type))
     return BG->getDecl();
-  if (auto *AT = dyn_cast<AssociatedTypeType>(Type))
-    return AT->getDecl();
   return nullptr;
 }
 

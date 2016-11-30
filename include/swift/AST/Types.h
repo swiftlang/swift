@@ -4064,36 +4064,6 @@ BEGIN_CAN_TYPE_WRAPPER(GenericTypeParamType, SubstitutableType)
   }
 END_CAN_TYPE_WRAPPER(GenericTypeParamType, SubstitutableType)
 
-/// Describes the type of an associated type.
-///
-/// \sa AssociatedTypeDecl
-class AssociatedTypeType : public TypeBase {
-  /// The generic type parameter.
-  AssociatedTypeDecl *AssocType;
-
-public:
-  /// Retrieve the declaration of the associated type.
-  AssociatedTypeDecl *getDecl() const { return AssocType; }
-
-  /// Remove one level of top-level sugar from this type.
-  TypeBase *getSinglyDesugaredType();
-
-  // Implement isa/cast/dyncast/etc.
-  static bool classof(const TypeBase *T) {
-    return T->getKind() == TypeKind::AssociatedType;
-  }
-
-private:
-  friend class AssociatedTypeDecl;
-
-  // These aren't classified as dependent for some reason.
-
-  AssociatedTypeType(AssociatedTypeDecl *assocType)
-    : TypeBase(TypeKind::AssociatedType, nullptr, RecursiveTypeProperties()),
-      AssocType(assocType) { }
-};
-DEFINE_EMPTY_CAN_TYPE_WRAPPER(AssociatedTypeType, Type)
-
 /// SubstitutedType - A type that has been substituted for some other type,
 /// which implies that the replacement type meets all of the requirements of
 /// the original type.

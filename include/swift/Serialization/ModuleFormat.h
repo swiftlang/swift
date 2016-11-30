@@ -54,7 +54,7 @@ const uint16_t VERSION_MAJOR = 0;
 /// in source control, you should also update the comment to briefly
 /// describe what change you made. The content of this comment isn't important;
 /// it just ensures a conflict if two people change the module format.
-const uint16_t VERSION_MINOR = 288; // Last change: remove context type from subscript
+const uint16_t VERSION_MINOR = 289; // Last change: remove AssociatedTypeType
 
 using DeclID = PointerEmbeddedInt<unsigned, 31>;
 using DeclIDField = BCFixed<31>;
@@ -551,11 +551,6 @@ namespace decls_block {
     GENERIC_TYPE_PARAM_TYPE,
     DeclIDField, // generic type parameter decl or depth
     BCVBR<4>     // index + 1, or zero if we have a generic type parameter decl
-  >;
-
-  using AssociatedTypeTypeLayout = BCRecordLayout<
-    ASSOCIATED_TYPE_TYPE,
-    DeclIDField // associated type decl
   >;
 
   using DependentMemberTypeLayout = BCRecordLayout<
