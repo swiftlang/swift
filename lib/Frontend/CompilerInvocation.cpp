@@ -258,6 +258,8 @@ static bool ParseFrontendArgs(FrontendOptions &Opts, ArgList &Args,
       Action = FrontendOptions::EmitSIB;
     } else if (Opt.matches(OPT_emit_sibgen)) {
       Action = FrontendOptions::EmitSIBGen;
+    } else if (Opt.matches(OPT_emit_pch)) {
+      Action = FrontendOptions::EmitPCH;
     } else if (Opt.matches(OPT_parse)) {
       Action = FrontendOptions::Parse;
     } else if (Opt.matches(OPT_typecheck)) {
@@ -484,6 +486,10 @@ static bool ParseFrontendArgs(FrontendOptions &Opts, ArgList &Args,
       Opts.setSingleOutputFilename("-");
       break;
 
+    case FrontendOptions::EmitPCH:
+      Suffix = PCH_EXTENSION;
+      break;
+
     case FrontendOptions::EmitSILGen:
     case FrontendOptions::EmitSIL: {
       if (Opts.OutputFilenames.empty())
@@ -677,6 +683,7 @@ static bool ParseFrontendArgs(FrontendOptions &Opts, ArgList &Args,
     case FrontendOptions::Parse:
     case FrontendOptions::Typecheck:
     case FrontendOptions::EmitModuleOnly:
+    case FrontendOptions::EmitPCH:
     case FrontendOptions::EmitSILGen:
     case FrontendOptions::EmitSIL:
     case FrontendOptions::EmitSIBGen:
@@ -696,6 +703,7 @@ static bool ParseFrontendArgs(FrontendOptions &Opts, ArgList &Args,
     case FrontendOptions::DumpInterfaceHash:
     case FrontendOptions::DumpAST:
     case FrontendOptions::PrintAST:
+    case FrontendOptions::EmitPCH:
     case FrontendOptions::DumpScopeMaps:
     case FrontendOptions::DumpTypeRefinementContexts:
     case FrontendOptions::Immediate:
@@ -727,6 +735,7 @@ static bool ParseFrontendArgs(FrontendOptions &Opts, ArgList &Args,
     case FrontendOptions::DumpInterfaceHash:
     case FrontendOptions::DumpAST:
     case FrontendOptions::PrintAST:
+    case FrontendOptions::EmitPCH:
     case FrontendOptions::DumpScopeMaps:
     case FrontendOptions::DumpTypeRefinementContexts:
     case FrontendOptions::EmitSILGen:
