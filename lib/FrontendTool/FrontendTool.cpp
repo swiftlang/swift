@@ -1073,10 +1073,10 @@ static bool performCompile(CompilerInstance &Instance,
   // something is persisting across calls to performIRGeneration.
   auto &LLVMContext = getGlobalLLVMContext();
   if (PrimarySourceFile) {
-    performIRGeneration(IRGenOpts, *PrimarySourceFile, SM.get(),
+    performIRGeneration(IRGenOpts, *PrimarySourceFile, std::move(SM),
                         opts.getSingleOutputFilename(), LLVMContext);
   } else {
-    performIRGeneration(IRGenOpts, Instance.getMainModule(), SM.get(),
+    performIRGeneration(IRGenOpts, Instance.getMainModule(), std::move(SM),
                         opts.getSingleOutputFilename(), LLVMContext);
   }
 
