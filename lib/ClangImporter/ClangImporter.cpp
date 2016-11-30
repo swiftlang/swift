@@ -662,7 +662,8 @@ ClangImporter::create(ASTContext &ctx,
 
   // Install a Clang module file extension to build Swift name lookup tables.
   invocation->getFrontendOpts().ModuleFileExtensions.push_back(
-      new SwiftNameLookupExtension(importer->Impl.LookupTables,
+      new SwiftNameLookupExtension(importer->Impl.BridgingHeaderLookupTable,
+                                   importer->Impl.LookupTables,
                                    importer->Impl.SwiftContext,
                                    importer->Impl.platformAvailability,
                                    importer->Impl.InferImportAsMember));
