@@ -218,6 +218,14 @@ public:
   std::string getBridgingHeaderContents(StringRef headerPath, off_t &fileSize,
                                         time_t &fileModTime);
 
+  /// Makes a temporary replica of the ClangImporter's CompilerInstance, reads
+  /// an Objective-C header file into the replica and emits a PCH file of its
+  /// content. Delegates to clang for everything except construction of the
+  /// replica.
+  ///
+  /// \sa clang::GeneratePCHAction
+  bool emitBridgingPCH(StringRef headerPath, StringRef outputPCHPath);
+
   const clang::Module *getClangOwningModule(ClangNode Node) const;
   bool hasTypedef(const clang::Decl *typeDecl) const;
 
