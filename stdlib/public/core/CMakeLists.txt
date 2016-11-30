@@ -209,7 +209,8 @@ if(SWIFT_CHECK_ESSENTIAL_STDLIB)
   target_link_libraries(swift_stdlib_essential ${RUNTIME_DEPENDENCY})
 endif()
 
-add_swift_library(swiftCore ${SWIFT_STDLIB_LIBRARY_BUILD_TYPES} IS_STDLIB IS_STDLIB_CORE
+set(swift_core_common_library_parameters
+  swiftCore ${SWIFT_STDLIB_LIBRARY_BUILD_TYPES} IS_STDLIB IS_STDLIB_CORE
   ${SWIFTLIB_SOURCES}
   # The copy_shim_headers target dependency is required to let the
   # build system know that there's a rule to produce the shims
@@ -224,5 +225,17 @@ add_swift_library(swiftCore ${SWIFT_STDLIB_LIBRARY_BUILD_TYPES} IS_STDLIB IS_STD
   LINK_FLAGS ${swift_core_link_flags}
   PRIVATE_LINK_LIBRARIES ${swift_core_private_link_libraries}
   INCORPORATE_OBJECT_LIBRARIES swiftRuntime swiftStdlibStubs
+  INSTALL_IN_COMPONENT stdlib
+  )
+
+add_swift_library(
+  ${swift_core_common_library_parameters}
   FRAMEWORK_DEPENDS ${swift_core_framework_depends}
-  INSTALL_IN_COMPONENT stdlib)
+  TARGET_SDKS ALL_APPLE_PLATFORMS
+  )
+
+add_swift_library(
+  ${swift_core_common_library_parameters}
+  TARGET_SDKS ANDROID CYGWIN FREEBSD LINUX
+  )
+
