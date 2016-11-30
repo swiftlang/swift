@@ -1165,16 +1165,18 @@ namespace importer {
 bool shouldSuppressDeclImport(const clang::Decl *decl);
 
 class SwiftNameLookupExtension : public clang::ModuleFileExtension {
+  std::unique_ptr<SwiftLookupTable> &pchLookupTable;
   LookupTableMap &lookupTables;
   ASTContext &swiftCtx;
   const PlatformAvailability &availability;
   const bool inferImportAsMember;
 
 public:
-  SwiftNameLookupExtension(LookupTableMap &tables, ASTContext &ctx,
+  SwiftNameLookupExtension(std::unique_ptr<SwiftLookupTable> &pchLookupTable,
+                           LookupTableMap &tables, ASTContext &ctx,
                            const PlatformAvailability &avail, bool inferIAM)
-      : lookupTables(tables), swiftCtx(ctx), availability(avail),
-        inferImportAsMember(inferIAM) {}
+      : pchLookupTable(pchLookupTable), lookupTables(tables), swiftCtx(ctx),
+        availability(avail), inferImportAsMember(inferIAM) {}
 
   clang::ModuleFileExtensionMetadata getExtensionMetadata() const override;
   llvm::hash_code hashExtension(llvm::hash_code code) const override;

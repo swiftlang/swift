@@ -1688,15 +1688,23 @@ SwiftNameLookupExtension::createExtensionReader(
   assert(metadata.MajorVersion == SWIFT_LOOKUP_TABLE_VERSION_MAJOR);
   assert(metadata.MinorVersion == SWIFT_LOOKUP_TABLE_VERSION_MINOR);
 
-  // Check whether we already have an entry in the set of lookup tables.
-  auto &entry = lookupTables[mod.ModuleName];
-  if (entry) return nullptr;
+  std::function<void()> onRemove = [](){};
+  std::unique_ptr<SwiftLookupTable> *target = nullptr;
 
-  // Local function used to remove this entry when the reader goes away.
-  std::string moduleName = mod.ModuleName;
-  auto onRemove = [this, moduleName]() {
-    lookupTables.erase(moduleName);
-  };
+  if (mod.Kind == clang::serialization::MK_PCH) {
+    // PCH imports unconditionally overwrite the provided pchLookupTable.
+    target = &pchLookupTable;
+  } else {
+    // Check whether we already have an entry in the set of lookup tables.
+    target = &lookupTables[mod.ModuleName];
+    if (*target) return nullptr;
+
+    // Local function used to remove this entry when the reader goes away.
+    std::string moduleName = mod.ModuleName;
+    onRemove = [this, moduleName]() {
+      lookupTables.erase(moduleName);
+    };
+  }
 
   // Create the reader.
   auto tableReader = SwiftLookupTableReader::create(this, reader, mod, onRemove,
@@ -1704,7 +1712,7 @@ SwiftNameLookupExtension::createExtensionReader(
   if (!tableReader) return nullptr;
 
   // Create the lookup table.
-  entry.reset(new SwiftLookupTable(tableReader.get()));
+  target->reset(new SwiftLookupTable(tableReader.get()));
 
   // Return the new reader.
   return std::move(tableReader);
