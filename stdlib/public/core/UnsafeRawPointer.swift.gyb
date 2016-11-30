@@ -473,17 +473,19 @@ public struct Unsafe${Mutable}RawPointer : Strideable, Hashable, _Pointer {
   }
 }
 
+extension ${Self} {
 /// - Note: This may be more efficient than Strideable's implementation
 ///   calling ${Self}.distance().
-@_transparent
-public func == (lhs: ${Self}, rhs: ${Self}) -> Bool {
-  return Bool(Builtin.cmp_eq_RawPointer(lhs._rawValue, rhs._rawValue))
-}
+  @_transparent
+  public static func == (lhs: ${Self}, rhs: ${Self}) -> Bool {
+    return Bool(Builtin.cmp_eq_RawPointer(lhs._rawValue, rhs._rawValue))
+  }
 
-/// - Note: This is an unsigned comparison unlike Strideable's implementation.
-@_transparent
-public func < (lhs: ${Self}, rhs: ${Self}) -> Bool {
-  return Bool(Builtin.cmp_ult_RawPointer(lhs._rawValue, rhs._rawValue))
+  /// - Note: This is an unsigned comparison unlike Strideable's implementation.
+  @_transparent
+  public static func < (lhs: ${Self}, rhs: ${Self}) -> Bool {
+    return Bool(Builtin.cmp_ult_RawPointer(lhs._rawValue, rhs._rawValue))
+  }
 }
 
 extension Unsafe${Mutable}RawPointer : CustomDebugStringConvertible {
