@@ -311,8 +311,10 @@ FixedTypeInfo::getSpareBitExtraInhabitantIndex(IRGenFunction &IGF,
     llvm::Value *spareIdx
       = emitGatherSpareBits(IGF, SpareBits, val, numOccupiedBits, 31);
     // Unbias by subtracting one.
+
+    uint64_t shifted = static_cast<uint64_t>(1 << numOccupiedBits);
     spareIdx = IGF.Builder.CreateSub(spareIdx,
-            llvm::ConstantInt::get(spareIdx->getType(), 1 << numOccupiedBits));
+            llvm::ConstantInt::get(spareIdx->getType(), shifted));
     idx = IGF.Builder.CreateOr(idx, spareIdx);
   }
   idx = IGF.Builder.CreateZExt(idx, IGF.IGM.Int32Ty);
@@ -743,6 +745,8 @@ IRGenModule::getReferenceObjectTypeInfo(ReferenceCounting refcounting) {
   case ReferenceCounting::ObjC:
     llvm_unreachable("not implemented");
   }
+
+  llvm_unreachable("Not a valid ReferenceCounting.");
 }
 
 const LoadableTypeInfo &IRGenModule::getNativeObjectTypeInfo() {
@@ -1815,6 +1819,8 @@ llvm::Value *IRGenFunction::getLocalSelfMetadata() {
   case ObjectReference:
     return emitDynamicTypeOfOpaqueHeapObject(*this, LocalSelf);
   }
+
+  llvm_unreachable("Not a valid LocalSelfKind.");
 }
 
 void IRGenFunction::setLocalSelfMetadata(llvm::Value *value,

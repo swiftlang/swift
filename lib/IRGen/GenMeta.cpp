@@ -1673,6 +1673,8 @@ namespace {
         // All block types look like Builtin.UnknownObject.
         return emitDirectMetadataRef(C.TheUnknownObjectType);
       }
+
+      llvm_unreachable("Not a valid SILFunctionType.");
     }
 
     llvm::Value *visitAnyMetatypeType(CanAnyMetatypeType type) {
@@ -1698,6 +1700,8 @@ namespace {
         // FIXME: It'd be nice not to need a runtime call here.
         return IGF.emitTypeMetadataRef(type);
       }
+
+      llvm_unreachable("Not a valid MetatypeRepresentation.");
     }
 
     /// Try to find the metatype in local data.
@@ -1852,6 +1856,8 @@ namespace {
         // All block types look like Builtin.UnknownObject.
         return emitFromValueWitnessTable(C.TheUnknownObjectType);
       }
+
+      llvm_unreachable("Not a valid SILFunctionType.");
     }
 
     llvm::Value *visitAnyMetatypeType(CanAnyMetatypeType type) {
@@ -1870,6 +1876,8 @@ namespace {
         return emitFromValueWitnessTable(
                      CanMetatypeType::get(IGF.IGM.Context.TheNativeObjectType));
       }
+
+      llvm_unreachable("Not a valid MetatypeRepresentation.");
     }
 
     llvm::Value *visitAnyClassType(ClassDecl *classDecl) {
@@ -1887,6 +1895,8 @@ namespace {
       case ReferenceCounting::Error:
         llvm_unreachable("classes shouldn't have this kind of refcounting");
       }
+
+      llvm_unreachable("Not a valid ReferenceCounting.");
     }
 
     llvm::Value *visitClassType(CanClassType type) {
@@ -4475,6 +4485,8 @@ static llvm::Value *emitLoadOfHeapMetadataRef(IRGenFunction &IGF,
     return objcClass;
   }
   }
+
+  llvm_unreachable("Not a valid IsaEncoding.");
 }
 
 /// Given an object of class type, produce the heap metadata reference
@@ -5559,6 +5571,8 @@ SpecialProtocol irgen::getSpecialProtocolID(ProtocolDecl *P) {
   case KnownProtocolKind::ErrorCodeProtocol:
     return SpecialProtocol::None;
   }
+
+  llvm_unreachable("Not a valid KnownProtocolKind.");
 }
 
 namespace {
