@@ -59,7 +59,6 @@ case emptyInput
   }
 }
 
-
 extension UTF8 {
   enum Classification : UInt8 {
     @inline(__always)
@@ -101,6 +100,9 @@ extension UTF8 {
     return isValid3BytePrefix(c0, c1) || isValid4BytePrefix(c0, c1)
   }
 
+  // FIXME: Benchmark parse1ForwardOpenCoded vs parse1Forward and decide which
+  // implementation strategy to keep.
+
   /// Parses one scalar forward from `input`.
   ///
   /// - Parameters:
@@ -114,7 +116,7 @@ extension UTF8 {
   ///   - knownCountExceeds3: true if and only if the input is known be at least
   ///     4 elements long.  If so, we can skip end checks.  Note: pass a
   ///     compile-time constant here or you will just slow the algorithm down!
-  static func parseForward<C: Collection>(
+  static func parse1ForwardOpenCoded<C: Collection>(
     _ input: C,
     knownValid: Bool = false,
     knownCountExceeds3: Bool = false
@@ -212,8 +214,12 @@ extension UTF8 {
     return UInt8(_leadingZeros((~x)._value))
   }
 
-  static func maskLeading1s(_ x: UInt8) -> UInt8 {
-    return x & ((1 << (7 &- leading1s(x))) - 1)
+  /// Given a valid leading byte of a multibyte sequence, strip the leading 1
+  /// bits.
+  ///
+  /// - Note: Given any other byte, the result is unspecified.
+  static func maskLeadByte(_ x: UInt8) -> UInt8 {
+    return x & (0b11111 >> (x >> 5 & 1))
   }
   
   /// Parses one scalar forward from `input`.
@@ -221,7 +227,7 @@ extension UTF8 {
   ///   - Parameter knownCountExceeds3: true if and only if the input is known
   ///   be at least 4 elements long.  If so, we can skip end checks.  Note: pass
   ///   a compile-time constant here or you will just slow the algorithm down!
-  static func parseForwardStateMachine<C: Collection>(
+  static func parse1Forward<C: Collection>(
     _ input: C, knownCountExceeds3: Bool = false
   ) -> ParseResult<UInt32, C.Index>
   where C.Iterator.Element == UTF8.CodeUnit {
@@ -246,7 +252,7 @@ extension UTF8 {
     i = j // even if there are errors, we eat 1 byte
 
     // Begin accumulating result
-    var r = UInt32(maskLeading1s(u0))
+    var r = UInt32(maskLeadByte(u0))
 
     
     // Mark one more token recognized and get the next lookahead token iff it
@@ -309,7 +315,7 @@ extension UTF8 {
   ///   - Parameter knownCountExceeds3: true if and only if the input is known
   ///   be at least 4 elements long.  If so, we can skip end checks.  Note: pass
   ///   a compile-time constant here or you will just slow the algorithm down!
-  static func parseReverseStateMachine<C: BidirectionalCollection>(
+  static func parse1Reverse<C: BidirectionalCollection>(
     _ input: C, knownCountExceeds3: Bool = false
   ) -> ParseResult<UInt32, C.Index>
   where C.Iterator.Element == UTF8.CodeUnit,
@@ -352,7 +358,7 @@ extension UTF8 {
     @inline(__always)
     func accept(_ pat: ClosedRange<UInt8>) -> ParseResult<UInt32, C.Index>? {
       if _fastPath(pat.contains(u)) {
-        r |= UInt32(maskLeading1s(u)) << shift
+        r |= UInt32(maskLeadByte(u)) << shift
         return .valid(r, resumptionPoint: j)
       }
       return nil
@@ -556,17 +562,12 @@ struct TestUTF8 : UnicodeCodec {
       while let x = input.next() { buffer.append(x) }
       
       UTF8.parseForward(buffer, using: TestUTF8.parse) {
-        print($0.valid.map { String($0, radix: 16) } ?? String(describing: $0), terminator: " ")
         results.append(
           $0.valid.map { .scalarValue(UnicodeScalar($0)!) } ?? .error
         )
       }
-      print()
-      print("input: \(buffer.map { String($0, radix: 16) })")
-      print("output: \(results)")
     }
-    if let next = results.popFirst() { return next }
-    return .emptyInput
+    return results.popFirst() ?? .emptyInput
   }
 
   /// Encodes a Unicode scalar as a series of code units by calling the given
@@ -643,7 +644,7 @@ func addUTF8Suite(name: String, parser: @escaping UTF8ParseFunction) {
     let ret = checkDecodeUTF(TestUTF8.self, expectedHead, expectedRepairedTail, utf8Str)
 
     var reverseResult: [UInt32] = []
-    UTF8.parseReverse(utf8Str, using: UTF8.parseReverseStateMachine) {
+    UTF8.parseReverse(utf8Str, using: UTF8.parse1Reverse) {
       reverseResult.append($0.valid ?? 0xFFFD)
     }
     let expected = expectedHead + expectedRepairedTail
@@ -1731,11 +1732,11 @@ func addUTF8Suite(name: String, parser: @escaping UTF8ParseFunction) {
 
 addUTF8Suite(
   name: "OpenCodedUTF8Decoder",
-  parser: { UTF8.parseForward($0, knownCountExceeds3: $1) })
+  parser: { UTF8.parse1ForwardOpenCoded($0, knownCountExceeds3: $1) })
 
 addUTF8Suite(
   name: "UnrolledStateMachineUTF8Decoder",
-  parser: UTF8.parseForwardStateMachine)
+  parser: UTF8.parse1Forward)
 
 runAllTests()
 
