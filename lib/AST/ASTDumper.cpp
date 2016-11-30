@@ -528,7 +528,7 @@ namespace {
 
       if (VD->hasInterfaceType()) {
         OS << " interface type='";
-        VD->getInterfaceType()->getCanonicalType().print(OS);
+        VD->getInterfaceType()->print(OS);
         OS << '\'';
       }
 
