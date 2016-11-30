@@ -2196,7 +2196,7 @@ void ClangModuleUnit::lookupObjCMethods(
       results.push_back(func);
 
     // If there is an alternate declaration, also look at it.
-    if (auto alternate = owner.Impl.getAlternateDecl(imported)) {
+    for (auto alternate : owner.Impl.getAlternateDecls(imported)) {
       if (auto func = dyn_cast<AbstractFunctionDecl>(alternate))
         results.push_back(func);
     }
@@ -2585,7 +2585,7 @@ void ClangImporter::Implementation::lookupValue(
 
     // If there is an alternate declaration and the name matches,
     // report this result.
-    if (auto alternate = getAlternateDecl(decl)) {
+    for (auto alternate : getAlternateDecls(decl)) {
       if (alternate->getFullName().matchesRef(name) &&
           alternate->getDeclContext()->isModuleScopeContext()) {
         consumer.foundDecl(alternate, DeclVisibilityKind::VisibleAtTopLevel);
@@ -2649,7 +2649,7 @@ void ClangImporter::Implementation::lookupObjCMembers(
 
     // Check for an alternate declaration; if it's name matches,
     // report it.
-    if (auto alternate = getAlternateDecl(decl)) {
+    for (auto alternate : getAlternateDecls(decl)) {
       if (alternate->getFullName().matchesRef(name)) {
         consumer.foundDecl(alternate, DeclVisibilityKind::DynamicLookup);
         matchedAny = true;

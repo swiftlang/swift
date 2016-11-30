@@ -430,7 +430,7 @@ private:
   /// A mapping from imported declarations to their "alternate" declarations,
   /// for cases where a single Clang declaration is imported to two
   /// different Swift declarations.
-  llvm::DenseMap<Decl *, ValueDecl *> AlternateDecls;
+  llvm::DenseMap<Decl *, TinyPtrVector<ValueDecl *>> AlternateDecls;
 
 public:
   /// \brief Keep track of enum constant values that have been imported.
@@ -447,18 +447,19 @@ public:
 
   /// Retrieve the alternative declaration for the given imported
   /// Swift declaration.
-  ValueDecl *getAlternateDecl(Decl *decl) {
+  TinyPtrVector<ValueDecl *> getAlternateDecls(Decl *decl) {
     auto known = AlternateDecls.find(decl);
-    if (known == AlternateDecls.end()) return nullptr;
+    if (known == AlternateDecls.end()) return {};
     return known->second;
   }
 
-  /// Set the alternative decl
-  void setAlternateDecl(Decl *forDecl, ValueDecl *altDecl) {
-    assert((!AlternateDecls.count(forDecl) ||
-            AlternateDecls[forDecl] == altDecl) &&
-           "clobbering already-set alternative");
-    AlternateDecls[forDecl] = altDecl;
+  /// Add an alternative decl
+  void addAlternateDecl(Decl *forDecl, ValueDecl *altDecl) {
+    auto &vec = AlternateDecls[forDecl];
+    for (auto alt : vec)
+      if (alt == altDecl)
+        return;
+    vec.push_back(altDecl);
   }
 
 private:

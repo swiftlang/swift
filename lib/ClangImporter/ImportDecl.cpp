@@ -3360,13 +3360,13 @@ namespace {
           // declaration.
           if (auto imported = VisitObjCMethodDecl(decl, dc,
                                                   /*forceClassMethod=*/true))
-            Impl.setAlternateDecl(result, cast<ValueDecl>(imported));
+            Impl.addAlternateDecl(result, cast<ValueDecl>(imported));
         } else if (auto factory = importFactoryMethodAsConstructor(
                                     result, decl, selector, dc)) {
           // We imported the factory method as an initializer, so
           // record it as an alternate declaration.
           if (*factory)
-            Impl.setAlternateDecl(result, *factory);
+            Impl.addAlternateDecl(result, *factory);
         }
 
       }
@@ -4971,7 +4971,7 @@ SwiftDeclConverter::getImplicitProperty(ImportedName importedName,
                          SourceLoc());
 
   // Make the property the alternate declaration for the getter.
-  Impl.setAlternateDecl(swiftGetter, property);
+  Impl.addAlternateDecl(swiftGetter, property);
 
   return property;
 }
@@ -5021,7 +5021,7 @@ SwiftDeclConverter::importFactoryMethodAsConstructor(
   /// Record the initializer as an alternative declaration for the
   /// member.
   if (result) {
-    Impl.setAlternateDecl(member, result);
+    Impl.addAlternateDecl(member, result);
 
     if (swift3Name)
       markAsSwift2Variant(result, *swift3Name);
@@ -5736,7 +5736,7 @@ SwiftDeclConverter::importSubscript(Decl *decl,
       TypeLoc::withoutLoc(elementContextTy), dc);
 
   /// Record the subscript as an alternative declaration.
-  Impl.setAlternateDecl(associateWithSetter ? setter : getter, subscript);
+  Impl.addAlternateDecl(associateWithSetter ? setter : getter, subscript);
 
   subscript->makeComputed(SourceLoc(), getterThunk, setterThunk, nullptr,
                           SourceLoc());
@@ -5934,8 +5934,8 @@ void SwiftDeclConverter::importObjCMembers(
       continue;
 
     if (auto objcMethod = dyn_cast<clang::ObjCMethodDecl>(nd)) {
-      // If there is an alternate declaration for this member, add it.
-      if (auto alternate = Impl.getAlternateDecl(member)) {
+      // If there is are alternate declarations for this member, add it.
+      for (auto alternate : Impl.getAlternateDecls(member)) {
         if (alternate->getDeclContext() == member->getDeclContext() &&
             knownMembers.insert(alternate).second)
           members.push_back(alternate);
@@ -6063,7 +6063,7 @@ void SwiftDeclConverter::importMirroredProtocolMembers(
               Impl.importMirroredDecl(objcMethod, dc, useSwift2Name, proto)) {
         members.push_back(imported);
 
-        if (auto alternate = Impl.getAlternateDecl(imported))
+        for (auto alternate : Impl.getAlternateDecls(imported))
           if (imported->getDeclContext() == alternate->getDeclContext())
             members.push_back(alternate);
       }
@@ -6542,7 +6542,7 @@ ClangImporter::Implementation::importDeclImpl(const clang::NamedDecl *ClangDecl,
   if (Result) {
     finalizeDecl(Result);
 
-    if (auto alternate = getAlternateDecl(Result))
+    for (auto alternate : getAlternateDecls(Result))
       finalizeDecl(alternate);
   }
 
@@ -6793,7 +6793,7 @@ ClangImporter::Implementation::importMirroredDecl(const clang::NamedDecl *decl,
     updateMirroredDecl(result);
 
     // Update the alternate declaration as well.
-    if (auto alternate = getAlternateDecl(result))
+    for (auto alternate : getAlternateDecls(result))
       updateMirroredDecl(alternate);
   }
   if (result || !converter.hadForwardDeclaration())
@@ -7193,7 +7193,7 @@ ClangImporter::Implementation::loadAllMembers(Decl *D, uint64_t extra) {
       // Add the member.
       ext->addMember(member);
 
-      if (auto alternate = getAlternateDecl(member)) {
+      for (auto alternate : getAlternateDecls(member)) {
         ext->addMember(alternate);
       }
 
