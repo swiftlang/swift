@@ -1096,7 +1096,7 @@ extension Calendar : CustomDebugStringConvertible, CustomStringConvertible, Cust
         var c: [(label: String?, value: Any)] = []
         c.append((label: "identifier", value: identifier))
         c.append((label: "kind", value: _kindDescription))
-        c.append((label: "locale", value: locale))
+        c.append((label: "locale", value: locale as Any))
         c.append((label: "timeZone", value: timeZone))
         c.append((label: "firstWeekday", value: firstWeekday))
         c.append((label: "minimumDaysInFirstWeek", value: minimumDaysInFirstWeek))
