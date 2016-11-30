@@ -444,6 +444,14 @@ class ArchetypeBuilder::PotentialArchetype {
   /// \brief Recursively build the full name.
   void buildFullName(bool forDebug, SmallVectorImpl<char> &result) const;
 
+  /// Retrieve the generic parameter at the root of this potential archetype.
+  GenericTypeParamType *getRootParam() const {
+    if (auto parent = getParent())
+      return parent->getRootParam();
+
+    return getGenericParam();
+  }
+
 public:
   ~PotentialArchetype();
 
@@ -462,14 +470,6 @@ public:
     return ParentOrParam.dyn_cast<PotentialArchetype *>(); 
   }
 
-  /// Retrieve the generic parameter at the root of this potential archetype.
-  GenericTypeParamType *getRootParam() const {
-    if (auto parent = getParent())
-      return parent->getRootParam();
-
-    return getGenericParam();
-  }
-
   /// Retrieve the associated type to which this potential archetype
   /// has been resolved.
   AssociatedTypeDecl *getResolvedAssociatedType() const {
@@ -483,10 +483,31 @@ public:
 
   /// Retrieve the generic type parameter for this potential
   /// archetype, if it corresponds to a generic parameter.
+  ///
+  /// FIXME: We should weaken this to just a depth/index key.
   GenericTypeParamType *getGenericParam() const {
     return ParentOrParam.dyn_cast<GenericTypeParamType *>(); 
   }
-  
+
+  /// Determine whether this is a generic parameter.
+  bool isGenericParam() const {
+    return ParentOrParam.is<GenericTypeParamType *>();
+  }
+
+  /// Retrieve the generic parameter key for a potential archetype that
+  /// represents this potential archetype.
+  ///
+  /// \pre \c isGenericParam()
+  GenericParamKey getGenericParamKey() const {
+    return getGenericParam();
+  }
+
+  /// Retrieve the generic parameter key for the generic parameter at the
+  /// root of this potential archetype.
+  GenericParamKey getRootGenericParamKey() const {
+    return getRootParam();
+  }
+
   /// Retrieve the type alias.
   TypeAliasDecl *getTypeAliasDecl() const {
     return NameOrAssociatedType.dyn_cast<TypeAliasDecl *>();
@@ -555,10 +576,14 @@ public:
   /// Retrieve the dependent type that describes this potential
   /// archetype.
   ///
+  /// \param genericParams The set of generic parameters to use in the resulting
+  /// dependent type.
+  ///
   /// \param allowUnresolved If true, allow the result to contain
   /// \c DependentMemberType types with a name but no specific associated
   /// type.
-  Type getDependentType(bool allowUnresolved);
+  Type getDependentType(ArrayRef<GenericTypeParamType *> genericParams,
+                        bool allowUnresolved);
 
   /// True if the potential archetype has been bound by a concrete type
   /// constraint.

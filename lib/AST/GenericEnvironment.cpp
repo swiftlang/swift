@@ -36,11 +36,13 @@ GenericEnvironment::GenericEnvironment(
   signature->getASTContext().addDestructorCleanup(*this);
 }
 
-void GenericEnvironment::addMapping(GenericTypeParamType *genericParam,
+void GenericEnvironment::addMapping(GenericParamKey key,
                                     Type contextType) {
   // We're going to pass InterfaceToArchetypeMap to Type::subst(), which
   // expects the keys to be canonical, otherwise it won't be able to
   // find them.
+  auto genericParams = Signature->getGenericParams();
+  auto genericParam = genericParams[key.findIndexIn(genericParams)];
   auto canParamTy =
     cast<GenericTypeParamType>(genericParam->getCanonicalType());
 
@@ -69,7 +71,9 @@ void GenericEnvironment::addMapping(GenericTypeParamType *genericParam,
 }
 
 Optional<Type> GenericEnvironment::getMappingIfPresent(
-                                   GenericTypeParamType *genericParam) const {
+                                                    GenericParamKey key) const {
+  auto genericParam = GenericTypeParamType::get(key.Depth, key.Index,
+                                                Signature->getASTContext());
   auto canParamTy =
     cast<GenericTypeParamType>(genericParam->getCanonicalType());
 

@@ -18,6 +18,7 @@
 #define SWIFT_AST_GENERIC_ENVIRONMENT_H
 
 #include "swift/AST/SubstitutionMap.h"
+#include "swift/AST/GenericParamKey.h"
 #include "swift/AST/GenericSignature.h"
 
 namespace swift {
@@ -64,12 +65,12 @@ public:
 
   /// Add a mapping of a generic parameter to a specific type (which may be
   /// an archetype)
-  void addMapping(GenericTypeParamType *genericParam, Type contextType);
+  void addMapping(GenericParamKey key, Type contextType);
 
   /// Retrieve the mapping for the given generic parameter, if present.
   ///
   /// This is only useful when lazily populating a generic environment.
-  Optional<Type> getMappingIfPresent(GenericTypeParamType *genericParam) const;
+  Optional<Type> getMappingIfPresent(GenericParamKey key) const;
 
   /// Make vanilla new/delete illegal.
   void *operator new(size_t Bytes) = delete;
