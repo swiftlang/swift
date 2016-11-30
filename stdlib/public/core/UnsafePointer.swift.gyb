@@ -486,8 +486,8 @@ extension ${Self} : CustomPlaygroundQuickLookable {
   }
 }
 
-/// - Note: Strideable's implementation is potentially less efficient and cannot
-///   handle misaligned pointers.
+// - Note: Strideable's implementation is potentially less efficient and cannot
+//   handle misaligned pointers.
 @_transparent
 public func == <Pointee>(
   lhs: ${Self}<Pointee>, rhs: ${Self}<Pointee>
@@ -495,18 +495,18 @@ public func == <Pointee>(
   return Bool(Builtin.cmp_eq_RawPointer(lhs._rawValue, rhs._rawValue))
 }
 
-/// - Note: Strideable's implementation is potentially less efficient and cannot
-///   handle misaligned pointers.
-///
-/// - Note: This is an unsigned comparison unlike Strideable's implementation.
+// - Note: Strideable's implementation is potentially less efficient and cannot
+//   handle misaligned pointers.
+//
+// - Note: This is an unsigned comparison unlike Strideable's implementation.
 @_transparent
 public func < <Pointee>(lhs: ${Self}<Pointee>, rhs: ${Self}<Pointee>) -> Bool {
   return Bool(Builtin.cmp_ult_RawPointer(lhs._rawValue, rhs._rawValue))
 }
 
-/// - Note: The following family of operator overloads are redundant
-///   with Strideable. However, optimizer improvements are needed
-///   before they can be removed without affecting performance.
+// - Note: The following family of operator overloads are redundant
+//   with Strideable. However, optimizer improvements are needed
+//   before they can be removed without affecting performance.
 
 /// - Precondition: The result is within bounds of the same allocation.
 @_transparent
