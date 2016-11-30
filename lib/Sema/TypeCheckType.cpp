@@ -661,7 +661,7 @@ static Type resolveTypeDecl(TypeChecker &TC, TypeDecl *typeDecl, SourceLoc loc,
     TC.validateDecl(typeDecl);
 
     // FIXME: More principled handling of circularity.
-    if (!isa<AssociatedTypeDecl>(typeDecl) && !typeDecl->hasType())
+    if (!typeDecl->hasInterfaceType())
       return ErrorType::get(TC.Context);
   }
 
@@ -1107,6 +1107,7 @@ static Type resolveNestedIdentTypeComponent(
   // Phase 2: If a declaration has already been bound, use it.
   if (ValueDecl *decl = comp->getBoundDecl()) {
     auto *typeDecl = cast<TypeDecl>(decl);
+    auto *assocType = dyn_cast<AssociatedTypeDecl>(typeDecl);
 
     Type memberType;
 
@@ -1126,18 +1127,18 @@ static Type resolveNestedIdentTypeComponent(
       return memberType;
     }
 
-    if (isa<AssociatedTypeDecl>(typeDecl) &&
-        !parentTy->is<ArchetypeType>()) {
-      assert(!parentTy->isExistentialType());
+    if (assocType && !assocType->hasInterfaceType())
+      assocType->computeType();
 
-      auto assocType = cast<AssociatedTypeDecl>(typeDecl);
+    if (assocType && !parentTy->is<ArchetypeType>()) {
+      assert(!parentTy->isExistentialType());
 
       // Find the conformance and dig out the type witness.
       ConformanceCheckOptions conformanceOptions;
       if (options.contains(TR_InExpression))
         conformanceOptions |= ConformanceCheckFlags::InExpression;
 
-      auto *protocol = cast<ProtocolDecl>(assocType->getDeclContext());
+      auto *protocol = assocType->getProtocol();
       auto conformance = TC.conformsToProtocol(parentTy, protocol, DC,
                                                conformanceOptions);
       if (!conformance || conformance->isAbstract()) {

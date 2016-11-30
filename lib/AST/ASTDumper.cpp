@@ -516,7 +516,8 @@ namespace {
 
       if (!isa<AbstractFunctionDecl>(VD) &&
           !isa<EnumElementDecl>(VD) &&
-          !isa<SubscriptDecl>(VD)) {
+          !isa<SubscriptDecl>(VD) &&
+          !isa<AbstractTypeParamDecl>(VD)) {
         OS << " type='";
         if (VD->hasType())
           VD->getType().print(OS);

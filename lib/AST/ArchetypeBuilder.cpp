@@ -1453,8 +1453,8 @@ bool ArchetypeBuilder::addAbstractTypeParamRequirements(
   };
 
   if (isa<AssociatedTypeDecl>(decl) &&
-      decl->hasType() &&
-      decl->getType()->is<ErrorType>())
+      decl->hasInterfaceType() &&
+      decl->getInterfaceType()->is<ErrorType>())
     return false;
 
   // If this is an associated type that already has an archetype assigned,

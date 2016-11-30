@@ -1644,6 +1644,25 @@ ValueDecl::getSatisfiedProtocolRequirements(bool Sorted) const {
   return NTD->getSatisfiedProtocolRequirementsForMember(this, Sorted);
 }
 
+bool ValueDecl::hasType() const {
+  assert(!isa<AbstractFunctionDecl>(this) &&
+         !isa<EnumElementDecl>(this) &&
+         !isa<SubscriptDecl>(this) &&
+         !isa<AbstractTypeParamDecl>(this) &&
+         "functions and enum case constructors only have an interface type");
+  return !TypeAndAccess.getPointer().isNull();
+}
+
+Type ValueDecl::getType() const {
+  assert(!isa<AbstractFunctionDecl>(this) &&
+         !isa<EnumElementDecl>(this) &&
+         !isa<SubscriptDecl>(this) &&
+         !isa<AbstractTypeParamDecl>(this) &&
+         "functions and enum case constructors only have an interface type");
+  assert(hasType() && "declaration has no type set yet");
+  return TypeAndAccess.getPointer();
+}
+
 void ValueDecl::setType(Type T) {
   assert(!hasType() && "changing type of declaration");
   overwriteType(T);
@@ -1653,6 +1672,7 @@ void ValueDecl::overwriteType(Type T) {
   assert(!isa<AbstractFunctionDecl>(this) &&
          !isa<EnumElementDecl>(this) &&
          !isa<SubscriptDecl>(this) &&
+         !isa<AbstractTypeParamDecl>(this) &&
          "functions and enum case constructors only have an interface type");
 
   TypeAndAccess.setPointer(T);
@@ -1661,13 +1681,6 @@ void ValueDecl::overwriteType(Type T) {
 }
 
 bool ValueDecl::hasInterfaceType() const {
-  // getInterfaceType() always returns something for associated types.
-  if (isa<AssociatedTypeDecl>(this)) {
-    auto proto = cast<ProtocolDecl>(getDeclContext());
-    auto selfTy = proto->getSelfInterfaceType();
-    return !!selfTy;
-  }
-
   // getInterfaceType() returns the contextual type for ParamDecls which
   // don't have an explicit interface type.
   if (isa<ParamDecl>(this))
@@ -1679,19 +1692,6 @@ bool ValueDecl::hasInterfaceType() const {
 Type ValueDecl::getInterfaceType() const {
   if (InterfaceTy)
     return InterfaceTy;
-
-  if (auto assocType = dyn_cast<AssociatedTypeDecl>(this)) {
-    auto proto = cast<ProtocolDecl>(getDeclContext());
-    auto selfTy = proto->getSelfInterfaceType();
-    if (!selfTy)
-      return Type();
-    auto &ctx = getASTContext();
-    InterfaceTy = DependentMemberType::get(
-                    selfTy,
-                    const_cast<AssociatedTypeDecl *>(assocType));
-    InterfaceTy = MetatypeType::get(InterfaceTy, ctx);
-    return InterfaceTy;
-  }
 
   if (!hasType())
     return Type();
@@ -2257,7 +2257,6 @@ GenericTypeParamDecl::GenericTypeParamDecl(DeclContext *dc, Identifier name,
 {
   auto &ctx = dc->getASTContext();
   auto type = new (ctx, AllocationArena::Permanent) GenericTypeParamType(this);
-  setType(MetatypeType::get(type, ctx));
   setInterfaceType(MetatypeType::get(type, ctx));
 }
 
@@ -2301,8 +2300,12 @@ AssociatedTypeDecl::AssociatedTypeDecl(DeclContext *dc, SourceLoc keywordLoc,
 
 void AssociatedTypeDecl::computeType() {
   auto &ctx = getASTContext();
-  auto type = new (ctx, AllocationArena::Permanent) AssociatedTypeType(this);
-  setType(MetatypeType::get(type, ctx));
+  auto proto = cast<ProtocolDecl>(getDeclContext());
+  auto selfTy = proto->getSelfInterfaceType();
+  if (!selfTy)
+    selfTy = ErrorType::get(ctx);
+  auto interfaceTy = DependentMemberType::get(selfTy, this);
+  setInterfaceType(MetatypeType::get(interfaceTy, ctx));
 }
 
 TypeLoc &AssociatedTypeDecl::getDefaultDefinitionLoc() {

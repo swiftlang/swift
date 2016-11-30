@@ -319,7 +319,11 @@ emitRValueForDecl(SILLocation loc, ConcreteDeclRef declRef, Type ncRefType,
   // If this is a decl that we have an lvalue for, produce and return it.
   ValueDecl *decl = declRef.getDecl();
   
-  if (!ncRefType) ncRefType = decl->getType();
+  if (!ncRefType) {
+    ncRefType = ArchetypeBuilder::mapTypeIntoContext(
+        decl->getInnermostDeclContext(),
+        decl->getInterfaceType());
+  }
   CanType refType = ncRefType->getCanonicalType();
 
   auto getUnmanagedRValue = [&](SILValue value) -> RValue {
@@ -335,7 +339,7 @@ emitRValueForDecl(SILLocation loc, ConcreteDeclRef declRef, Type ncRefType,
 
   // If this is a reference to a type, produce a metatype.
   if (isa<TypeDecl>(decl)) {
-    assert(decl->getType()->is<MetatypeType>() &&
+    assert(refType->is<MetatypeType>() &&
            "type declref does not have metatype type?!");
     return getUnmanagedRValue(B.createMetatype(loc, getLoweredType(refType)));
   }

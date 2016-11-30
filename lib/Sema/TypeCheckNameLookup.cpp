@@ -331,7 +331,7 @@ LookupTypeResult TypeChecker::lookupMemberType(DeclContext *dc,
 
     // FIXME: This should happen before we attempt shadowing checks.
     validateDecl(typeDecl);
-    if (!typeDecl->hasType()) // FIXME: recursion-breaking hack
+    if (!typeDecl->hasInterfaceType()) // FIXME: recursion-breaking hack
       continue;
 
     // If we're looking up a member of a protocol, we must take special care.

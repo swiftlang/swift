@@ -945,7 +945,8 @@ static void checkRedeclaration(TypeChecker &tc, ValueDecl *current) {
       current->setInvalid();
       if (!isa<AbstractFunctionDecl>(current) &&
           !isa<EnumElementDecl>(current) &&
-          !isa<SubscriptDecl>(current))
+          !isa<SubscriptDecl>(current) &&
+          !isa<AbstractTypeParamDecl>(current))
         if (current->hasType())
           current->overwriteType(ErrorType::get(tc.Context));
       if (current->hasInterfaceType())
@@ -6879,12 +6880,12 @@ void TypeChecker::validateDecl(ValueDecl *D, bool resolveTypeParams) {
 
     DeclContext *DC = typeParam->getDeclContext();
 
+    if (assocType && !assocType->hasInterfaceType())
+        assocType->computeType();
+
     if (!resolveTypeParams || DC->isValidGenericContext()) {
       if (assocType) {
         DeclChecker(*this, false, false).visitAssociatedTypeDecl(assocType);
-
-        if (!assocType->hasType())
-          assocType->computeType();
       }
 
       break;
@@ -6903,9 +6904,6 @@ void TypeChecker::validateDecl(ValueDecl *D, bool resolveTypeParams) {
     case DeclContextKind::GenericTypeDecl: {
       auto nominal = cast<GenericTypeDecl>(DC);
       validateDecl(nominal);
-      if (auto assocType = dyn_cast<AssociatedTypeDecl>(typeParam))
-        if (!assocType->hasType())
-          assocType->computeType();
       if (!typeParam->hasAccessibility())
         typeParam->setAccessibility(std::max(nominal->getFormalAccess(),
                                              Accessibility::Internal));
@@ -6925,9 +6923,7 @@ void TypeChecker::validateDecl(ValueDecl *D, bool resolveTypeParams) {
         typeCheckDecl(extension, true);
       auto fn = cast<AbstractFunctionDecl>(DC);
       typeCheckDecl(fn, true);
-      if (auto assocType = dyn_cast<AssociatedTypeDecl>(typeParam))
-        if (!assocType->hasType())
-          assocType->computeType();
+      assert(!assocType && "Associated type inside function?");
       if (!typeParam->hasAccessibility())
         typeParam->setAccessibility(std::max(fn->getFormalAccess(),
                                              Accessibility::Internal));
@@ -7049,7 +7045,7 @@ void TypeChecker::validateDecl(ValueDecl *D, bool resolveTypeParams) {
     // appropriate archetype.
     for (auto member : proto->getMembers()) {
       if (auto assocType = dyn_cast<AssociatedTypeDecl>(member)) {
-        if (!assocType->hasType())
+        if (!assocType->hasInterfaceType())
           assocType->computeType();
       }
     }

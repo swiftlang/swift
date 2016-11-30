@@ -2004,22 +2004,8 @@ public:
   SourceLoc getNameLoc() const { return NameLoc; }
   SourceLoc getLoc() const { return NameLoc; }
 
-  bool hasType() const {
-    assert(!isa<AbstractFunctionDecl>(this) &&
-           !isa<EnumElementDecl>(this) &&
-           !isa<SubscriptDecl>(this) &&
-           "functions and enum case constructors only have an interface type");
-    return !TypeAndAccess.getPointer().isNull();
-  }
-
-  Type getType() const {
-    assert(!isa<AbstractFunctionDecl>(this) &&
-           !isa<EnumElementDecl>(this) &&
-           !isa<SubscriptDecl>(this) &&
-           "functions and enum case constructors only have an interface type");
-    assert(hasType() && "declaration has no type set yet");
-    return TypeAndAccess.getPointer();
-  }
+  bool hasType() const;
+  Type getType() const;
 
   /// Set the type of this declaration for the first time.
   void setType(Type T);
