@@ -2899,14 +2899,14 @@ ResolveWitnessResult ConformanceChecker::resolveTypeWitnessViaLookup(
       tc.diagnose(assocType, diag::no_witnesses_type, assocType->getName());
 
       for (auto candidate : nonViable) {
-        if (candidate.first->getDeclaredType()->hasError())
+        if (candidate.first->getDeclaredInterfaceType()->hasError())
           continue;
 
         tc.diagnose(candidate.first,
                     diag::protocol_witness_nonconform_type,
-                    candidate.first->getDeclaredType(),
-                    candidate.second->getDeclaredType(),
-                    candidate.second->getDeclaredType()->is<ProtocolType>());
+                    candidate.first->getDeclaredInterfaceType(),
+                    candidate.second->getDeclaredInterfaceType(),
+                    candidate.second->getDeclaredInterfaceType()->is<ProtocolType>());
       }
     });
 

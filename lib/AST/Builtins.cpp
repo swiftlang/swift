@@ -192,7 +192,7 @@ getBuiltinGenericFunction(Identifier Id,
   // Compute the interface type.
   SmallVector<GenericTypeParamType *, 1> GenericParamTypes;
   for (auto gp : *GenericParams) {
-    GenericParamTypes.push_back(gp->getDeclaredType()
+    GenericParamTypes.push_back(gp->getDeclaredInterfaceType()
                                   ->castTo<GenericTypeParamType>());
   }
   GenericSignature *Sig =
@@ -479,7 +479,7 @@ namespace {
                                              Archetypes, GenericTypeParams);
 
       for (unsigned i = 0, e = GenericTypeParams.size(); i < e; i++) {
-        auto paramTy = GenericTypeParams[i]->getDeclaredType()
+        auto paramTy = GenericTypeParams[i]->getDeclaredInterfaceType()
           ->getCanonicalType()->castTo<GenericTypeParamType>();
         InterfaceToArchetypeMap[paramTy] = Archetypes[i];
       }
@@ -517,7 +517,8 @@ namespace {
       unsigned Index;
       Type build(GenericSignatureBuilder &builder, bool forBody) const {
         return (forBody ? builder.Archetypes[Index]
-                        : builder.GenericTypeParams[Index]->getDeclaredType());
+                        : builder.GenericTypeParams[Index]
+                            ->getDeclaredInterfaceType());
       }
     };
     struct LambdaGenerator {

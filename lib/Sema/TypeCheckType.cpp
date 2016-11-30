@@ -211,7 +211,8 @@ Type TypeChecker::resolveTypeInContext(
   // If we found a generic parameter, map to the archetype if there is one.
   if (auto genericParam = dyn_cast<GenericTypeParamDecl>(typeDecl)) {
     return resolver->resolveGenericTypeParamType(
-             genericParam->getDeclaredType()->castTo<GenericTypeParamType>());
+        genericParam->getDeclaredInterfaceType()
+            ->castTo<GenericTypeParamType>());
   }
 
   auto nominalType = dyn_cast<NominalTypeDecl>(typeDecl);
@@ -268,8 +269,11 @@ Type TypeChecker::resolveTypeInContext(
 
       // When a nominal type used outside its context, return the unbound
       // generic form of the type.
-      assert(isa<NominalTypeDecl>(typeDecl) || isa<ModuleDecl>(typeDecl));
-      return typeDecl->getDeclaredType();
+      if (auto *nominalDecl = dyn_cast<NominalTypeDecl>(typeDecl))
+        return nominalDecl->getDeclaredType();
+
+      assert(isa<ModuleDecl>(typeDecl));
+      return typeDecl->getDeclaredInterfaceType();
     }
 
     // For the next steps we need our parentDC to be a type context
@@ -570,7 +574,7 @@ Type TypeChecker::applyUnboundGenericArguments(
     // we resolved a generic TypeAlias, for availability diagnostics.
     // A better fix might be to introduce a BoundGenericAliasType
     // which desugars as appropriate.
-    return SubstitutedType::get(TAD->getDeclaredType(), type, Context);
+    return SubstitutedType::get(TAD->getAliasType(), type, Context);
   }
   
   // Form the bound generic type.
@@ -2797,8 +2801,8 @@ Type TypeChecker::substMemberTypeWithBase(Module *module,
                                           Type baseTy) {
   // The declared interface type for a generic type will have the type
   // arguments; strip them off.
-  if (isa<NominalTypeDecl>(member)) {
-    auto memberType = member->getDeclaredType();
+  if (auto *nominalDecl = dyn_cast<NominalTypeDecl>(member)) {
+    auto memberType = nominalDecl->getDeclaredType();
 
     if (baseTy->is<ModuleType>())
       return memberType;
@@ -2848,7 +2852,7 @@ static void lookupAndAddLibraryTypes(TypeChecker &TC,
     for (auto *VD : Results) {
       if (auto *TD = dyn_cast<TypeDecl>(VD)) {
         TC.validateDecl(TD);
-        Types.insert(TD->getDeclaredType()->getCanonicalType());
+        Types.insert(TD->getDeclaredInterfaceType()->getCanonicalType());
       }
     }
     Results.clear();

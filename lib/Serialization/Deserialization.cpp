@@ -3398,7 +3398,7 @@ Type ModuleFile::getType(TypeID TID) {
       return nullptr;
     }
 
-    typeOrOffset = alias->getDeclaredType();
+    typeOrOffset = alias->getAliasType();
     break;
   }
 
@@ -3726,7 +3726,7 @@ Type ModuleFile::getType(TypeID TID) {
       if (typeOrOffset.isComplete())
         break;
 
-      typeOrOffset = genericParam->getDeclaredType();
+      typeOrOffset = genericParam->getDeclaredInterfaceType();
       break;
     }
 
@@ -3749,7 +3749,7 @@ Type ModuleFile::getType(TypeID TID) {
     if (typeOrOffset.isComplete())
       break;
 
-    typeOrOffset = assocType->getDeclaredType();
+    typeOrOffset = assocType->getType()->castTo<MetatypeType>()->getInstanceType();
     break;
   }
 

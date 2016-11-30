@@ -6859,8 +6859,10 @@ static void noteArchetypeSource(const TypeLoc &loc, ArchetypeType *archetype,
 
   auto &tc = cs.getTypeChecker();
   if (FoundDecl) {
-    tc.diagnose(FoundDecl, diag::archetype_declared_in_type,
-                archetype, FoundDecl->getDeclaredType());
+    tc.diagnose(FoundDecl, diag::archetype_declared_in_type, archetype,
+                isa<NominalTypeDecl>(FoundDecl)
+                    ? cast<NominalTypeDecl>(FoundDecl)->getDeclaredType()
+                    : FoundDecl->getDeclaredInterfaceType());
   }
 
   if (FoundGenericTypeBase && !isa<GenericIdentTypeRepr>(FoundGenericTypeBase)){

@@ -125,7 +125,8 @@ GenericTypeParamType *DeclContext::getProtocolSelfType() const {
   auto *param = getProtocolSelf();
   if (!param)
     return nullptr;
-  return param->getDeclaredType()->castTo<GenericTypeParamType>();
+  return param->getDeclaredInterfaceType()
+      ->castTo<GenericTypeParamType>();
 }
 
 enum class DeclTypeKind : unsigned {

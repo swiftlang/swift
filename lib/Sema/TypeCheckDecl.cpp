@@ -214,13 +214,6 @@ static bool canInheritClass(Decl *decl) {
   return false;
 }
 
-/// Retrieve the declared type of a type declaration or extension.
-static Type getDeclaredType(Decl *decl) {
-  if (auto typeDecl = dyn_cast<TypeDecl>(decl))
-    return typeDecl->getDeclaredType();
-  return cast<ExtensionDecl>(decl)->getExtendedType();
-}
-
 // Add implicit conformances to the given declaration.
 static void addImplicitConformances(
               TypeChecker &tc, Decl *decl,
@@ -491,7 +484,10 @@ void TypeChecker::checkInheritanceClause(Decl *decl,
                  isa<ExtensionDecl>(decl)
                    ? diag::extension_class_inheritance
                    : diag::non_class_inheritance,
-                 getDeclaredType(decl), inheritedTy)
+                 isa<ExtensionDecl>(decl)
+                   ? cast<ExtensionDecl>(decl)->getDeclaredInterfaceType()
+                   : cast<TypeDecl>(decl)->getDeclaredInterfaceType(),
+                 inheritedTy)
           .highlight(inherited.getSourceRange());
         inherited.setInvalidType(Context);
         continue;

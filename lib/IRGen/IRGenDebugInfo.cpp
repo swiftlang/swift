@@ -545,17 +545,17 @@ llvm::DIScope *IRGenDebugInfo::getOrCreateContext(DeclContext *DC) {
     // A module may contain multiple files.
     return getOrCreateContext(DC->getParent());
   case DeclContextKind::GenericTypeDecl: {
-    auto *TyDecl = cast<GenericTypeDecl>(DC);
-    auto *Ty = TyDecl->getDeclaredType().getPointer();
+    auto *NTD = cast<NominalTypeDecl>(DC);
+    auto *Ty = NTD->getDeclaredType().getPointer();
     if (auto *DITy = getTypeOrNull(Ty))
       return DITy;
 
     // Create a Forward-declared type.
-    auto Loc = getDebugLoc(SM, TyDecl);
+    auto Loc = getDebugLoc(SM, NTD);
     auto File = getOrCreateFile(Loc.Filename);
     auto Line = Loc.Line;
     auto FwdDecl = DBuilder.createReplaceableCompositeType(
-        llvm::dwarf::DW_TAG_structure_type, TyDecl->getName().str(),
+        llvm::dwarf::DW_TAG_structure_type, NTD->getName().str(),
         getOrCreateContext(DC->getParent()), File, Line,
         llvm::dwarf::DW_LANG_Swift, 0, 0);
     ReplaceMap.emplace_back(

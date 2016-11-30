@@ -1547,7 +1547,7 @@ static int doPrintLocalTypes(const CompilerInvocation &InitInvok,
       std::string MangledName;
       {
         Mangle::Mangler Mangler(/*DWARFMangling*/ true);
-        Mangler.mangleTypeForDebugger(LTD->getDeclaredType(),
+        Mangler.mangleTypeForDebugger(LTD->getDeclaredInterfaceType(),
                                       LTD->getDeclContext());
         MangledName = Mangler.finalize();
       }

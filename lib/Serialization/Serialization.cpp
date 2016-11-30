@@ -4061,7 +4061,7 @@ void Serializer::writeAST(ModuleOrSourceFile DC) {
       hasLocalTypes = true;
 
       Mangle::Mangler DebugMangler(false);
-      DebugMangler.mangleType(TD->getDeclaredType(), 0);
+      DebugMangler.mangleType(TD->getDeclaredInterfaceType(), 0);
       auto MangledName = DebugMangler.finalize();
       assert(!MangledName.empty() && "Mangled type came back empty!");
       localTypeGenerator.insert(MangledName, {

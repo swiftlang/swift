@@ -2219,8 +2219,9 @@ protected:
   }
 
 public:
-  Type getDeclaredType() const;
-
+  /// The type of this declaration's values. For the type of the
+  /// declaration itself, use getInterfaceType(), which returns a
+  /// metatype.
   Type getDeclaredInterfaceType() const;
 
   /// \brief Retrieve the set of protocols that this type inherits (i.e,

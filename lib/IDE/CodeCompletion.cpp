@@ -2620,7 +2620,7 @@ public:
     if (TAD->hasUnderlyingType() && !TAD->getUnderlyingType()->is<ErrorType>())
       addTypeAnnotation(Builder, TAD->getUnderlyingType());
     else {
-      addTypeAnnotation(Builder, TAD->getDeclaredType());
+      addTypeAnnotation(Builder, TAD->getAliasType());
     }
   }
 
@@ -2635,7 +2635,7 @@ public:
     Builder.setAssociatedDecl(GP);
     addLeadingDot(Builder);
     Builder.addTextChunk(GP->getName().str());
-    addTypeAnnotation(Builder, GP->getDeclaredType());
+    addTypeAnnotation(Builder, GP->getDeclaredInterfaceType());
   }
 
   void addAssociatedTypeRef(const AssociatedTypeDecl *AT,

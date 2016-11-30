@@ -247,7 +247,7 @@ Type TypeChecker::lookupBoolType(const DeclContext *dc) {
         return Type();
       }
 
-      auto tyDecl = dyn_cast<TypeDecl>(results.front());
+      auto tyDecl = dyn_cast<NominalTypeDecl>(results.front());
       if (!tyDecl) {
         diagnose(SourceLoc(), diag::broken_bool);
         return Type();

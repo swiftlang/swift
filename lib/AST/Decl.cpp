@@ -1931,38 +1931,19 @@ AccessScope ValueDecl::getFormalAccessScope(const DeclContext *useDC) const {
   llvm_unreachable("unknown accessibility level");
 }
 
-
-Type TypeDecl::getDeclaredType() const {
-  if (auto TAD = dyn_cast<TypeAliasDecl>(this)) {
-    if (TAD->hasType() && TAD->getType()->hasError())
-      return TAD->getType();
-
-    return TAD->getAliasType();
-  }
-  if (auto typeParam = dyn_cast<AbstractTypeParamDecl>(this)) {
-    auto type = typeParam->getType();
-    if (type->hasError())
-      return type;
-
-    return type->castTo<MetatypeType>()->getInstanceType();
-  }
-  if (auto module = dyn_cast<ModuleDecl>(this)) {
-    return ModuleType::get(const_cast<ModuleDecl *>(module));
-  }
-  return cast<NominalTypeDecl>(this)->getDeclaredType();
-}
-
 Type TypeDecl::getDeclaredInterfaceType() const {
-  if (auto NTD = dyn_cast<NominalTypeDecl>(this))
+  if (auto *NTD = dyn_cast<NominalTypeDecl>(this))
     return NTD->getDeclaredInterfaceType();
 
   Type interfaceType = getInterfaceType();
   if (interfaceType.isNull() || interfaceType->hasError())
     return interfaceType;
 
+  if (isa<ModuleDecl>(this))
+    return interfaceType;
+
   return interfaceType->castTo<MetatypeType>()->getInstanceType();
 }
-
 
 bool NominalTypeDecl::hasFixedLayout() const {
   // Private and (unversioned) internal types always have a
@@ -2114,7 +2095,7 @@ static Type computeNominalType(NominalTypeDecl *decl, DeclTypeKind kind) {
       // at the signature.
       SmallVector<Type, 4> args;
       for (auto param : decl->getGenericParams()->getParams())
-        args.push_back(param->getDeclaredType());
+        args.push_back(param->getDeclaredInterfaceType());
 
       return BoundGenericType::get(decl, Ty, args);
     }

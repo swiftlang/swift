@@ -4101,7 +4101,7 @@ namespace {
                     Impl.importSourceLoc(decl->getLocStart()),
                     name,
                     Impl.importSourceLoc(decl->getLocation()),
-                    TypeLoc::withoutLoc(typeDecl->getDeclaredType()),
+                    TypeLoc::withoutLoc(typeDecl->getDeclaredInterfaceType()),
                     /*genericparams=*/nullptr, dc);
 
       typealias->computeType();
@@ -4227,7 +4227,7 @@ static Type findImmutableCFSuperclass(ClangImporter::Implementation &impl,
     return Type();
 
   auto importedSuperclass =
-      cast<TypeDecl>(importedSuperclassDecl)->getDeclaredType();
+      cast<TypeDecl>(importedSuperclassDecl)->getDeclaredInterfaceType();
   assert(importedSuperclass->is<ClassType>() && "must have class type");
   return importedSuperclass;
 }
@@ -6828,12 +6828,6 @@ GenericEnvironment *ClangImporter::Implementation::buildGenericEnvironment(
   }
   // TODO: any need to infer requirements?
   builder.finalize(genericParams->getSourceRange().Start);
-
-  SmallVector<GenericTypeParamType *, 4> genericParamTypes;
-  for (auto param : *genericParams) {
-    genericParamTypes.push_back(
-        param->getDeclaredType()->castTo<GenericTypeParamType>());
-  }
 
   auto *sig = builder.getGenericSignature();
   auto *env = builder.getGenericEnvironment(sig);

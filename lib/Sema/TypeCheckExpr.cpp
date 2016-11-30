@@ -651,7 +651,10 @@ static Type lookupDefaultLiteralType(TypeChecker &TC, DeclContext *dc,
   if (!TD)
     return Type();
   TC.validateDecl(TD);
-  return TD->getDeclaredType();
+
+  if (auto *NTD = dyn_cast<NominalTypeDecl>(TD))
+    return NTD->getDeclaredType();
+  return cast<TypeAliasDecl>(TD)->getAliasType();
 }
 
 Type TypeChecker::getDefaultType(ProtocolDecl *protocol, DeclContext *dc) {

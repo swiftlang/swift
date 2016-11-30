@@ -935,8 +935,8 @@ auto ArchetypeBuilder::addGenericParameter(GenericTypeParamType *GenericParam,
 
 void ArchetypeBuilder::addGenericParameter(GenericTypeParamDecl *GenericParam) {
   addGenericParameter(
-        GenericParam->getDeclaredType()->castTo<GenericTypeParamType>(),
-        GenericParam->getName());
+       GenericParam->getDeclaredInterfaceType()->castTo<GenericTypeParamType>(),
+       GenericParam->getName());
 }
 
 bool ArchetypeBuilder::addGenericParameterRequirements(GenericTypeParamDecl *GenericParam) {

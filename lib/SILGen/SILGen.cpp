@@ -394,7 +394,7 @@ SILFunction *SILGenModule::emitTopLevelFunction(SILLocation Loc) {
   // builtins.
   CanType Int32Ty;
   if (auto Int32Decl = dyn_cast_or_null<TypeDecl>(findStdlibDecl("Int32"))) {
-    Int32Ty = Int32Decl->getDeclaredType()->getCanonicalType();
+    Int32Ty = Int32Decl->getDeclaredInterfaceType()->getCanonicalType();
   } else {
     Int32Ty = CanType(BuiltinIntegerType::get(32, C));
   }
@@ -402,9 +402,10 @@ SILFunction *SILGenModule::emitTopLevelFunction(SILLocation Loc) {
   CanType PtrPtrInt8Ty = C.TheRawPointerType;
   if (auto PointerDecl = C.getUnsafeMutablePointerDecl()) {
     if (auto Int8Decl = cast<TypeDecl>(findStdlibDecl("Int8"))) {
+      Type Int8Ty = Int8Decl->getDeclaredInterfaceType();
       Type PointerInt8Ty = BoundGenericType::get(PointerDecl,
                                                  nullptr,
-                                                 Int8Decl->getDeclaredType());
+                                                 Int8Ty);
       Type OptPointerInt8Ty = OptionalType::get(PointerInt8Ty);
       PtrPtrInt8Ty = BoundGenericType::get(PointerDecl,
                                            nullptr,
