@@ -78,11 +78,11 @@ public:
     
     class TypeCaptureWalker : public TypeWalker {
       AnyFunctionRef AFR;
-      llvm::function_ref<void(Type)> Callback;
+      std::function<void(Type)> Callback;
     public:
       explicit TypeCaptureWalker(AnyFunctionRef AFR,
-                                 llvm::function_ref<void(Type)> callback)
-        : AFR(AFR), Callback(callback) {}
+                                 std::function<void(Type)> callback)
+        : AFR(AFR), Callback(std::move(callback)) {}
     
       Action walkToTypePre(Type ty) override {
         Callback(ty);
