@@ -35,6 +35,7 @@
 #include "swift/Parse/Lexer.h"
 #include "swift/Parse/Parser.h"
 #include "swift/Config.h"
+#include "swift/Strings.h"
 #include "clang/AST/ASTContext.h"
 #include "clang/AST/Mangle.h"
 #include "clang/Basic/CharInfo.h"
@@ -123,9 +124,25 @@ namespace {
     }
   };
 
+  class PCHDeserializationCallbacks : public clang::ASTDeserializationListener {
+    ClangImporter::Implementation &Impl;
+  public:
+    explicit PCHDeserializationCallbacks(ClangImporter::Implementation &impl)
+      : Impl(impl) {}
+    void ModuleImportRead(clang::serialization::SubmoduleID ID,
+                          clang::SourceLocation ImportLoc) {
+      if (Impl.IsReadingBridgingPCH) {
+        Impl.PCHImportedSubmodules.push_back(ID);
+      }
+    }
+  };
+
   class HeaderParsingASTConsumer : public clang::ASTConsumer {
     SmallVector<clang::DeclGroupRef, 4> DeclGroups;
+    PCHDeserializationCallbacks PCHCallbacks;
   public:
+    explicit HeaderParsingASTConsumer(ClangImporter::Implementation &impl)
+      : PCHCallbacks(impl) {}
     void
     HandleTopLevelDeclInObjCContainer(clang::DeclGroupRef decls) override {
       DeclGroups.push_back(decls);
@@ -135,15 +152,40 @@ namespace {
       return DeclGroups;
     }
 
+    clang::ASTDeserializationListener *GetASTDeserializationListener() override {
+      return &PCHCallbacks;
+    }
+
     void reset() {
       DeclGroups.clear();
     }
   };
 
   class ParsingAction : public clang::ASTFrontendAction {
+    ASTContext &Ctx;
+    ClangImporter &Importer;
+    ClangImporter::Implementation &Impl;
+  public:
+    explicit ParsingAction(ASTContext &ctx,
+                           ClangImporter &importer,
+                           ClangImporter::Implementation &impl)
+      : Ctx(ctx), Importer(importer), Impl(impl) {}
     std::unique_ptr<clang::ASTConsumer>
     CreateASTConsumer(clang::CompilerInstance &CI, StringRef InFile) override {
-      return llvm::make_unique<HeaderParsingASTConsumer>();
+      return llvm::make_unique<HeaderParsingASTConsumer>(Impl);
+    }
+    bool BeginSourceFileAction(CompilerInstance &CI,
+                               StringRef Filename) override {
+      // Prefer frameworks over plain headers.
+      // We add search paths here instead of when building the initial invocation
+      // so that (a) we use the same code as search paths for imported modules,
+      // and (b) search paths are always added after -Xcc options.
+      SearchPathOptions &searchPathOpts = Ctx.SearchPathOpts;
+      for (auto path : searchPathOpts.FrameworkSearchPaths)
+        Importer.addSearchPath(path, /*isFramework*/true);
+      for (auto path : searchPathOpts.ImportSearchPaths)
+        Importer.addSearchPath(path, /*isFramework*/false);
+      return true;
     }
   };
 
@@ -317,6 +359,14 @@ getNormalInvocationArguments(std::vector<std::string> &invocationArgStrs,
   SearchPathOptions &searchPathOpts = ctx.SearchPathOpts;
 
   auto languageVersion = ctx.LangOpts.EffectiveLanguageVersion;
+
+  if (llvm::sys::path::extension(importerOpts.BridgingHeader).endswith(
+        PCH_EXTENSION)) {
+    invocationArgStrs.insert(
+      invocationArgStrs.end(),
+        { "-include-pch", importerOpts.BridgingHeader }
+    );
+  }
 
   // Construct the invocation arguments for the current target.
   // Add target-independent options first.
@@ -622,6 +672,11 @@ ClangImporter::create(ASTContext &ctx,
   for (auto &argStr : invocationArgStrs)
     invocationArgs.push_back(argStr.c_str());
 
+  if (llvm::sys::path::extension(importerOpts.BridgingHeader).endswith(
+        PCH_EXTENSION)) {
+    importer->Impl.IsReadingBridgingPCH = true;
+  }
+
   // FIXME: These can't be controlled from the command line.
   llvm::IntrusiveRefCntPtr<clang::DiagnosticOptions> diagnosticOpts{
     new clang::DiagnosticOptions
@@ -681,7 +736,8 @@ ClangImporter::create(ASTContext &ctx,
   instance.setInvocation(&*invocation);
 
   // Create the associated action.
-  importer->Impl.Action.reset(new ParsingAction);
+  importer->Impl.Action.reset(new ParsingAction(ctx, *importer,
+                                                importer->Impl));
   auto *action = importer->Impl.Action.get();
 
   // Execute the action. We effectively inline most of
@@ -736,16 +792,6 @@ ClangImporter::create(ASTContext &ctx,
       importer->Impl.SwiftContext, importer->Impl.platformAvailability,
       importer->Impl.getClangSema(), importer->Impl.InferImportAsMember));
 
-  // Prefer frameworks over plain headers.
-  // We add search paths here instead of when building the initial invocation
-  // so that (a) we use the same code as search paths for imported modules,
-  // and (b) search paths are always added after -Xcc options.
-  SearchPathOptions &searchPathOpts = ctx.SearchPathOpts;
-  for (auto path : searchPathOpts.FrameworkSearchPaths)
-    importer->addSearchPath(path, /*isFramework*/true);
-  for (auto path : searchPathOpts.ImportSearchPaths)
-    importer->addSearchPath(path, /*isFramework*/false);
-
   // FIXME: These decls are not being parsed correctly since (a) some of the
   // callbacks are still being added, and (b) the logic to parse them has
   // changed.
@@ -791,6 +837,8 @@ ClangImporter::create(ASTContext &ctx,
   importer->Impl.ImportedHeaderUnit =
     new (ctx) ClangModuleUnit(*importedHeaderModule, *importer, nullptr);
   importedHeaderModule->addFile(*importer->Impl.ImportedHeaderUnit);
+
+  importer->Impl.IsReadingBridgingPCH = false;
 
   return importer;
 }
@@ -926,6 +974,19 @@ bool ClangImporter::importHeader(StringRef header, ModuleDecl *adapter,
 bool ClangImporter::importBridgingHeader(StringRef header, ModuleDecl *adapter,
                                          SourceLoc diagLoc,
                                          bool trackParsedSymbols) {
+  if (llvm::sys::path::extension(header).endswith(PCH_EXTENSION)) {
+    // We already imported this with -include-pch above, so we should have
+    // collected a bunch of PCH-encoded module imports that we need to
+    // replay to the HeaderImportCallbacks for processing.
+    Impl.ImportedHeaderOwners.push_back(adapter);
+    clang::ASTReader &R = *Impl.Instance->getModuleManager();
+    HeaderImportCallbacks CB(*this, Impl);
+    for (auto ID : Impl.PCHImportedSubmodules) {
+      CB.handleImport(R.getSubmodule(ID));
+    }
+    Impl.PCHImportedSubmodules.clear();
+    return false;
+  }
   clang::FileManager &fileManager = Impl.Instance->getFileManager();
   const clang::FileEntry *headerFile = fileManager.getFile(header,
                                                            /*OpenFile=*/true);
@@ -1273,6 +1334,7 @@ ClangImporter::Implementation::Implementation(ASTContext &ctx,
       ImportForwardDeclarations(opts.ImportForwardDeclarations),
       InferImportAsMember(opts.InferImportAsMember),
       DisableSwiftBridgeAttr(opts.DisableSwiftBridgeAttr),
+      IsReadingBridgingPCH(false),
       CurrentVersion(nameVersionFromOptions(ctx.LangOpts)),
       BridgingHeaderLookupTable(new SwiftLookupTable(nullptr)),
       platformAvailability(ctx.LangOpts),
