@@ -446,10 +446,10 @@ public struct ${Self}<Pointee>
   }
 
   /// Returns `end - self`.
-  public func distance(to x: ${Self}) -> Int {
-    return x - self
   ///
   /// - Precondition: The result is within the bounds of the same allocation.
+  public func distance(to end: ${Self}) -> Int {
+    return end - self
   }
 
   /// Returns `self + n`.
