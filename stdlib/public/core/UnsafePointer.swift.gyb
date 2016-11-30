@@ -432,11 +432,15 @@ public struct ${Self}<Pointee>
   }
 
   /// Returns the next consecutive position.
+  ///
+  /// - Precondition: The result is within the bounds of the same allocation.
   public func successor() -> ${Self} {
     return self + 1
   }
 
   /// Returns the previous consecutive position.
+  ///
+  /// - Precondition: The result is within the bounds of the same allocation.
   public func predecessor() -> ${Self} {
     return self - 1
   }
@@ -444,9 +448,13 @@ public struct ${Self}<Pointee>
   /// Returns `end - self`.
   public func distance(to x: ${Self}) -> Int {
     return x - self
+  ///
+  /// - Precondition: The result is within the bounds of the same allocation.
   }
 
   /// Returns `self + n`.
+  ///
+  /// - Precondition: The result is within the bounds of the same allocation.
   public func advanced(by n: Int) -> ${Self} {
     return self + n
   }
@@ -499,18 +507,22 @@ public func < <Pointee>(lhs: ${Self}<Pointee>, rhs: ${Self}<Pointee>) -> Bool {
 /// - Note: The following family of operator overloads are redundant
 ///   with Strideable. However, optimizer improvements are needed
 ///   before they can be removed without affecting performance.
+
+/// - Precondition: The result is within bounds of the same allocation.
 @_transparent
 public func + <Pointee>(lhs: ${Self}<Pointee>, rhs: Int) -> ${Self}<Pointee> {
   return ${Self}(Builtin.gep_Word(
     lhs._rawValue, rhs._builtinWordValue, Pointee.self))
 }
 
+/// - Precondition: The result is within the bounds of the same allocation.
 @_transparent
 public func + <Pointee>(lhs: Int,
            rhs: ${Self}<Pointee>) -> ${Self}<Pointee> {
   return rhs + lhs
 }
 
+/// - Precondition: The result is within the bounds of the same allocation.
 @_transparent
 public func - <Pointee>(lhs: ${Self}<Pointee>, rhs: Int) -> ${Self}<Pointee> {
   return lhs + -rhs
@@ -524,11 +536,13 @@ public func - <Pointee>(lhs: ${Self}<Pointee>, rhs: ${Self}<Pointee>) -> Int {
     / MemoryLayout<Pointee>.stride
 }
 
+/// - Precondition: The result is within the bounds of the same allocation.
 @_transparent
 public func += <Pointee>(lhs: inout ${Self}<Pointee>, rhs: Int) {
   lhs = lhs + rhs
 }
 
+/// - Precondition: The result is within the bounds of the same allocation.
 @_transparent
 public func -= <Pointee>(lhs: inout ${Self}<Pointee>, rhs: Int) {
   lhs = lhs - rhs
