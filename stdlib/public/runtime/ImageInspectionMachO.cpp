@@ -22,6 +22,7 @@
 #include <mach-o/dyld.h>
 #include <mach-o/getsect.h>
 #include <assert.h>
+#include <dlfcn.h>
 
 using namespace swift;
 
@@ -68,6 +69,19 @@ void swift::initializeTypeMetadataRecordLookup() {
     addImageCallback<TypeMetadataRecordSection,
                      addImageTypeMetadataRecordBlockCallback>);
   
+}
+
+int swift::lookupSymbol(const void *address, SymbolInfo *info) {
+  Dl_info dlinfo;
+  if (dladdr(address, &dlinfo) == 0) {
+    return 0;
+  }
+
+  info->fileName = dlinfo.dli_fname;
+  info->baseAddress = dlinfo.dli_fbase;
+  info->symbolName = dlinfo.dli_sname;
+  info->symbolAddress = dlinfo.dli_saddr;
+  return 1;
 }
 
 #endif // defined(__APPLE__) && defined(__MACH__)

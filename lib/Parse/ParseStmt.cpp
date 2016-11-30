@@ -798,7 +798,7 @@ ParserResult<Stmt> Parser::parseStmtDefer() {
                        /*AccessorKeywordLoc=*/SourceLoc(),
                        /*generic params*/ nullptr,
                        params,
-                       Type(), TypeLoc(),
+                       TypeLoc(),
                        CurDeclContext);
   tempDecl->setImplicit();
   setLocalDiscriminator(tempDecl);

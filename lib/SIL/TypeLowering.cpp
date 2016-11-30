@@ -448,9 +448,10 @@ namespace {
       // because the rest of type lowering doesn't have a generic
       // signature plumbed through.
       if (Sig && type->hasTypeParameter()) {
-        auto builder = M.getASTContext().getOrCreateArchetypeBuilder(
-            Sig, M.getSwiftModule());
-        type = builder->substDependentType(type)->getCanonicalType();
+        type = Sig->getCanonicalSignature()
+          .getGenericEnvironment(*M.getSwiftModule())
+          ->mapTypeIntoContext(M.getSwiftModule(), type)
+          ->getCanonicalType();
       }
 
       return type;

@@ -2521,7 +2521,15 @@ void Serializer::writeDecl(const Decl *D) {
     verifyAttrSerializable(param);
 
     auto contextID = addDeclContextRef(param->getDeclContext());
-    Type type = param->hasType() ? param->getType() : nullptr;
+    Type type, interfaceType;
+
+    if (param->hasType()) {
+      type = param->getType();
+      interfaceType = param->getInterfaceType();
+      // FIXME: Interface types for ParamDecls
+      if (interfaceType->hasArchetype())
+        interfaceType = Type();
+    }
 
     unsigned abbrCode = DeclTypeAbbrCodes[ParamLayout::Code];
     ParamLayout::emitRecord(Out, ScratchRecord, abbrCode,
@@ -2530,7 +2538,7 @@ void Serializer::writeDecl(const Decl *D) {
                             contextID,
                             param->isLet(),
                             addTypeRef(type),
-                            addTypeRef(param->getInterfaceType()));
+                            addTypeRef(interfaceType));
     break;
   }
 
@@ -2561,7 +2569,6 @@ void Serializer::writeDecl(const Decl *D) {
                            fn->hasDynamicSelf(),
                            fn->hasThrows(),
                            fn->getParameterLists().size(),
-                           addTypeRef(fn->getType()),
                            addTypeRef(fn->getInterfaceType()),
                            addDeclRef(fn->getOperatorDecl()),
                            addDeclRef(fn->getOverriddenDecl()),
@@ -2607,7 +2614,6 @@ void Serializer::writeDecl(const Decl *D) {
                                   addIdentifierRef(elem->getName()),
                                   contextID,
                                   addTypeRef(elem->getArgumentType()),
-                                  addTypeRef(elem->getType()),
                                   addTypeRef(elem->getInterfaceType()),
                                   elem->isImplicit(),
                                   (unsigned)RawValueKind,
@@ -2684,7 +2690,6 @@ void Serializer::writeDecl(const Decl *D) {
                                   ctor->hasThrows(),
                                   getStableCtorInitializerKind(
                                     ctor->getInitKind()),
-                                  addTypeRef(ctor->getType()),
                                   addTypeRef(ctor->getInterfaceType()),
                                   addDeclRef(ctor->getOverriddenDecl()),
                                   rawAccessLevel,
@@ -2714,7 +2719,6 @@ void Serializer::writeDecl(const Decl *D) {
                                  contextID,
                                  dtor->isImplicit(),
                                  dtor->isObjC(),
-                                 addTypeRef(dtor->getType()),
                                  addTypeRef(dtor->getInterfaceType()));
     assert(dtor->getParameterLists().size() == 1);
     // Why is this writing out the param list for self?
@@ -3060,23 +3064,6 @@ void Serializer::writeType(Type ty) {
     break;
   }
 
-  case TypeKind::PolymorphicFunction: {
-    auto fnTy = cast<PolymorphicFunctionType>(ty.getPointer());
-    const Decl *genericContext = getGenericContext(&fnTy->getGenericParams());
-    DeclID dID = genericContext ? addDeclRef(genericContext) : DeclID();
-
-    unsigned abbrCode = DeclTypeAbbrCodes[PolymorphicFunctionTypeLayout::Code];
-    PolymorphicFunctionTypeLayout::emitRecord(Out, ScratchRecord, abbrCode,
-            addTypeRef(fnTy->getInput()),
-            addTypeRef(fnTy->getResult()),
-            dID,
-            getRawStableFunctionTypeRepresentation(fnTy->getRepresentation()),
-            fnTy->throws());
-    if (!genericContext)
-      writeGenericParams(&fnTy->getGenericParams());
-    break;
-  }
-
   case TypeKind::GenericFunction: {
     auto fnTy = cast<GenericFunctionType>(ty.getPointer());
     unsigned abbrCode = DeclTypeAbbrCodes[GenericFunctionTypeLayout::Code];
@@ -3304,7 +3291,6 @@ void Serializer::writeAllDeclsAndTypes() {
   registerDeclTypeAbbr<SubstitutedTypeLayout>();
   registerDeclTypeAbbr<BoundGenericTypeLayout>();
   registerDeclTypeAbbr<BoundGenericSubstitutionLayout>();
-  registerDeclTypeAbbr<PolymorphicFunctionTypeLayout>();
   registerDeclTypeAbbr<GenericFunctionTypeLayout>();
   registerDeclTypeAbbr<SILBlockStorageTypeLayout>();
   registerDeclTypeAbbr<SILBoxTypeLayout>();

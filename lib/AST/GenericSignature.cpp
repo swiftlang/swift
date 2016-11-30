@@ -75,7 +75,7 @@ ArchetypeBuilder *GenericSignature::getArchetypeBuilder(ModuleDecl &mod) {
 
   // Archetype builders are stored on the ASTContext.
   return getASTContext().getOrCreateArchetypeBuilder(CanGenericSignature(this),
-                                                     &mod);
+                                                     &mod).first;
 }
 
 bool GenericSignature::isCanonical() const {
@@ -432,11 +432,11 @@ Type GenericSignature::getRepresentative(Type type, ModuleDecl &mod) {
   auto rep = pa->getRepresentative();
   if (rep->isConcreteType()) return rep->getConcreteType();
   if (pa == rep) {
-    assert(rep->getDependentType(builder, /*allowUnresolved*/ false)
+    assert(rep->getDependentType(/*allowUnresolved*/ false)
               ->getCanonicalType() == type->getCanonicalType());
     return type;
   }
-  return rep->getDependentType(builder, /*allowUnresolved*/ false);
+  return rep->getDependentType(/*allowUnresolved*/ false);
 }
 
 bool GenericSignature::areSameTypeParameterInContext(Type type1, Type type2,
@@ -509,11 +509,18 @@ CanType GenericSignature::getCanonicalTypeInContext(Type type, ModuleDecl &mod) 
     if (rep->isConcreteType()) {
       return getCanonicalTypeInContext(rep->getConcreteType(), mod);
     } else {
-      return rep->getDependentType(builder, /*allowUnresolved*/ false);
+      return rep->getDependentType(/*allowUnresolved*/ false);
     }
   });
 
   auto result = type->getCanonicalType();
   assert(isCanonicalTypeInContext(result, mod));
   return result;
+}
+
+GenericEnvironment *CanGenericSignature::getGenericEnvironment(
+                                                     ModuleDecl &module) const {
+  // Archetype builders are stored on the ASTContext.
+  return module.getASTContext().getOrCreateArchetypeBuilder(*this, &module)
+           .second;
 }

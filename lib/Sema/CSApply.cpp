@@ -114,7 +114,7 @@ Type Solution::computeSubstitutions(
                          getConstraintSystem().DC,
                          (ConformanceCheckFlags::InExpression|
                           ConformanceCheckFlags::Used));
-    (void)isOpenedAnyObject;
+    (void)&isOpenedAnyObject;
     assert((conformance ||
             replacement->hasError() ||
             isOpenedAnyObject(replacement) ||
@@ -1233,11 +1233,32 @@ namespace {
                          ConstraintLocatorBuilder locator,
                          bool isImplicit, AccessSemantics semantics) {
       // Determine the declaration selected for this subscript operation.
-      auto selected = getOverloadChoice(
+      auto selected = getOverloadChoiceIfAvailable(
                         cs.getConstraintLocator(
                           locator.withPathElement(
                             ConstraintLocator::SubscriptMember)));
-      auto choice = selected.choice;
+
+      // Handles situation where there was a solution available but it didn't
+      // have a proper overload selected from subscript call, might be because
+      // solver was allowed to return free or unresolved types, which can
+      // happen while running diagnostics on one of the expressions.
+      if (!selected.hasValue()) {
+        auto &tc = cs.TC;
+        auto baseType = base->getType();
+
+        if (auto errorType = baseType->getAs<ErrorType>()) {
+          tc.diagnose(base->getLoc(), diag::cannot_subscript_base,
+                      errorType->getOriginalType())
+              .highlight(base->getSourceRange());
+        } else {
+          tc.diagnose(base->getLoc(), diag::cannot_subscript_ambiguous_base)
+              .highlight(base->getSourceRange());
+        }
+
+        return nullptr;
+      }
+
+      auto choice = selected->choice;
       auto subscript = cast<SubscriptDecl>(choice.getDecl());
 
       auto &tc = cs.getTypeChecker();
@@ -1255,7 +1276,7 @@ namespace {
       // Figure out the index and result types.
       auto containerTy
         = subscript->getDeclContext()->getDeclaredTypeOfContext();
-      auto subscriptTy = simplifyType(selected.openedType);
+      auto subscriptTy = simplifyType(selected->openedType);
       auto indexTy = subscriptTy->castTo<AnyFunctionType>()->getInput();
       auto resultTy = subscriptTy->castTo<AnyFunctionType>()->getResult();
 
@@ -1282,7 +1303,7 @@ namespace {
       // Form the subscript expression.
 
       // Handle dynamic lookup.
-      if (selected.choice.getKind() == OverloadChoiceKind::DeclViaDynamic ||
+      if (choice.getKind() == OverloadChoiceKind::DeclViaDynamic ||
           subscript->getAttrs().hasAttribute<OptionalAttr>()) {
         base = coerceObjectArgumentToType(base, baseTy, subscript,
                                           AccessSemantics::Ordinary, locator);
@@ -1308,13 +1329,13 @@ namespace {
         solution.computeSubstitutions(
           subscript->getInterfaceType(),
           dc,
-          selected.openedFullType,
+          selected->openedFullType,
           getConstraintSystem().getConstraintLocator(
             locator.withPathElement(ConstraintLocator::SubscriptMember)),
           substitutions);
 
         // Convert the base.
-        auto openedFullFnType = selected.openedFullType->castTo<FunctionType>();
+        auto openedFullFnType = selected->openedFullType->castTo<FunctionType>();
         auto openedBaseType = openedFullFnType->getInput();
         containerTy = solution.simplifyType(tc, openedBaseType);
         base = coerceObjectArgumentToType(
@@ -2118,6 +2139,9 @@ namespace {
       case MagicIdentifierLiteralExpr::DSOHandle:
         return expr;
       }
+
+
+      llvm_unreachable("Unhandled MagicIdentifierLiteralExpr in switch.");
     }
 
     Expr *visitObjectLiteralExpr(ObjectLiteralExpr *expr) {
@@ -2525,6 +2549,8 @@ namespace {
       case OverloadChoiceKind::TypeDecl:
         llvm_unreachable("Nonsensical overload choice");
       }
+
+    llvm_unreachable("Unhandled OverloadChoiceKind in switch.");
     }
     
   public:
@@ -3883,7 +3909,7 @@ ConcreteDeclRef Solution::resolveLocatorToDecl(
               if (decl->getInnermostDeclContext()->isGenericContext()) {
                 SmallVector<Substitution, 4> subs;
                 computeSubstitutions(
-                  decl->getType(),
+                  decl->getInterfaceType(),
                   decl->getInnermostDeclContext(),
                   openedType, locator, subs);
                 return ConcreteDeclRef(cs.getASTContext(), decl, subs);
@@ -5630,6 +5656,12 @@ Expr *ExprRewriter::coerceToType(Expr *expr, Type toType,
     return new (tc.Context) MetatypeConversionExpr(expr, toMeta);
   }
 
+  // Look through ImplicitlyUnwrappedOptional<T> before coercing expression.
+  if (auto ty = cs.lookThroughImplicitlyUnwrappedOptionalType(fromType)) {
+    expr = coerceImplicitlyUnwrappedOptionalToValue(expr, ty, locator);
+    return coerceToType(expr, toType, locator);
+  }
+
   // Conversion to/from UnresolvedType.
   if (fromType->is<UnresolvedType>() || toType->is<UnresolvedType>())
     return new (tc.Context) UnresolvedTypeConversionExpr(expr, toType);
@@ -5646,7 +5678,7 @@ static Type adjustSelfTypeForMember(Type baseTy, ValueDecl *member,
   if (auto func = dyn_cast<AbstractFunctionDecl>(member)) {
     // If 'self' is an inout type, turn the base type into an lvalue
     // type with the same qualifiers.
-    auto selfTy = func->getType()->getAs<AnyFunctionType>()->getInput();
+    auto selfTy = func->getInterfaceType()->getAs<AnyFunctionType>()->getInput();
     if (selfTy->is<InOutType>()) {
       // Unless we're looking at a nonmutating existential member.  In which
       // case, the member will be modeled as an inout but ExistentialMemberRef
@@ -6096,8 +6128,6 @@ Expr *ExprRewriter::finishApply(ApplyExpr *apply, Type openedType,
     apply->setType(fnType->getResult());
     apply->setIsSuper(isSuper);
 
-    assert(!apply->getType()->is<PolymorphicFunctionType>() &&
-           "Polymorphic function type slipped through");
     Expr *result = tc.substituteInputSugarTypeForResult(apply);
 
     // Try closing the existential, if there is one.

@@ -82,7 +82,6 @@ static bool isLeafTypeMetadata(CanType type) {
 
   // Functions have component types.
   case TypeKind::Function:
-  case TypeKind::PolymorphicFunction:
   case TypeKind::GenericFunction:  // included for future-proofing
     return false;
 

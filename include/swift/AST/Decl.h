@@ -2003,8 +2003,17 @@ public:
   SourceLoc getNameLoc() const { return NameLoc; }
   SourceLoc getLoc() const { return NameLoc; }
 
-  bool hasType() const { return !TypeAndAccess.getPointer().isNull(); }
+  bool hasType() const {
+    assert(!isa<AbstractFunctionDecl>(this) &&
+           !isa<EnumElementDecl>(this) &&
+           "functions and enum case constructors only have an interface type");
+    return !TypeAndAccess.getPointer().isNull();
+  }
+
   Type getType() const {
+    assert(!isa<AbstractFunctionDecl>(this) &&
+           !isa<EnumElementDecl>(this) &&
+           "functions and enum case constructors only have an interface type");
     assert(hasType() && "declaration has no type set yet");
     return TypeAndAccess.getPointer();
   }
@@ -2097,7 +2106,7 @@ public:
   /// we will substitute in the appropriate archetypes within a particular
   /// context.
   Type getInterfaceType() const;
-  bool hasInterfaceType() const { return !!InterfaceTy; }
+  bool hasInterfaceType() const;
 
   /// Set the interface type for the given value.
   void setInterfaceType(Type type);
@@ -2642,6 +2651,7 @@ class NominalTypeDecl : public GenericTypeDecl, public IterableDeclContext {
 protected:
   Type DeclaredTy;
   Type DeclaredTyInContext;
+  Type DeclaredInterfaceTy;
 
   NominalTypeDecl(DeclKind K, DeclContext *DC, Identifier name,
                   SourceLoc NameLoc,
@@ -2726,16 +2736,13 @@ public:
   /// any generic parameters bound if this is a generic type.
   Type getDeclaredType() const;
 
-  /// getDeclaredType - Retrieve the type declared by this entity, with
+  /// getDeclaredTypeInContext - Retrieve the type declared by this entity, with
   /// context archetypes bound if this is a generic type.
   Type getDeclaredTypeInContext() const;
 
-  /// Get the "interface" type of the given nominal type, which is the
-  /// type used to refer to the nominal type externally.
-  ///
-  /// For a generic type, or a member thereof, this is the a specialization
-  /// of the type using its own generic parameters.
-  Type computeInterfaceType() const;
+  /// getDeclaredInterfaceType - Retrieve the type declared by this entity, with
+  /// generic parameters bound if this is a generic type.
+  Type getDeclaredInterfaceType() const;
 
   /// \brief Add a new extension to this nominal type.
   void addExtension(ExtensionDecl *extension);
@@ -4840,11 +4847,6 @@ class FuncDecl final : public AbstractFunctionDecl,
 
   TypeLoc FnRetType;
 
-  /// The result type as seen from the body of the function.
-  ///
-  /// \sa getBodyResultType()
-  Type BodyResultType;
-  
   /// If this declaration is part of an overload set, determine if we've
   /// searched for a common overload amongst all overloads, or if we've found
   /// one.
@@ -4865,7 +4867,7 @@ class FuncDecl final : public AbstractFunctionDecl,
            bool Throws, SourceLoc ThrowsLoc,
            SourceLoc AccessorKeywordLoc,
            unsigned NumParameterLists,
-           GenericParamList *GenericParams, Type Ty, DeclContext *Parent)
+           GenericParamList *GenericParams, DeclContext *Parent)
     : AbstractFunctionDecl(DeclKind::Func, Parent,
                            Name, NameLoc,
                            Throws, ThrowsLoc,
@@ -4878,7 +4880,6 @@ class FuncDecl final : public AbstractFunctionDecl,
       StaticLoc.isValid() || StaticSpelling != StaticSpellingKind::None;
     FuncDeclBits.StaticSpelling = static_cast<unsigned>(StaticSpelling);
     assert(NumParameterLists > 0 && "Must have at least an empty tuple arg");
-    setType(Ty);
     FuncDeclBits.Mutating = false;
     FuncDeclBits.HasDynamicSelf = false;
     FuncDeclBits.ForcedStaticDispatch = false;
@@ -4894,7 +4895,7 @@ class FuncDecl final : public AbstractFunctionDecl,
                               bool Throws, SourceLoc ThrowsLoc,
                               SourceLoc AccessorKeywordLoc,
                               GenericParamList *GenericParams,
-                              unsigned NumParameterLists, Type Ty,
+                              unsigned NumParameterLists,
                               DeclContext *Parent,
                               ClangNode ClangN);
 
@@ -4907,7 +4908,7 @@ public:
                                       bool Throws, SourceLoc ThrowsLoc,
                                       SourceLoc AccessorKeywordLoc,
                                       GenericParamList *GenericParams,
-                                      unsigned NumParameterLists, Type Ty,
+                                      unsigned NumParameterLists,
                                       DeclContext *Parent);
 
   static FuncDecl *create(ASTContext &Context, SourceLoc StaticLoc,
@@ -4917,7 +4918,7 @@ public:
                           bool Throws, SourceLoc ThrowsLoc,
                           SourceLoc AccessorKeywordLoc,
                           GenericParamList *GenericParams,
-                          ArrayRef<ParameterList *> ParameterLists, Type Ty,
+                          ArrayRef<ParameterList *> ParameterLists,
                           TypeLoc FnRetType, DeclContext *Parent,
                           ClangNode ClangN = ClangNode());
 
@@ -4990,35 +4991,8 @@ public:
   TypeLoc &getBodyResultTypeLoc() { return FnRetType; }
   const TypeLoc &getBodyResultTypeLoc() const { return FnRetType; }
 
-  /// Retrieve the result type of this function.
-  Type getResultType() const;
-
   /// Retrieve the result interface type of this function.
   Type getResultInterfaceType() const;
-
-  /// Retrieve the result type of this function for use within the function
-  /// definition.
-  ///
-  /// FIXME: The statement below is a wish, not reality.
-  /// The "body" result type will only differ from the result type within the
-  /// interface to the function for a polymorphic function, where the interface
-  /// may contain generic parameters while the definition will contain
-  /// the corresponding archetypes.
-  Type getBodyResultType() const { return BodyResultType; }
-
-  /// Set the result type as viewed from the function body.
-  ///
-  /// \sa getBodyResultType
-  void setBodyResultType(Type bodyResultType) {
-    assert(BodyResultType.isNull() && "Already set body result type");
-    BodyResultType = bodyResultType;
-  }
-
-  /// Revert to an empty type.
-  void revertType() {
-    BodyResultType = Type();
-    overwriteType(Type());
-  }
 
   /// isUnaryOperator - Determine whether this is a unary operator
   /// implementation.  This check is a syntactic rather than type-based check,
@@ -5405,11 +5379,8 @@ public:
   SourceLoc getStartLoc() const { return getConstructorLoc(); }
   SourceRange getSourceRange() const;
 
-  /// getArgumentType - get the type of the argument tuple
-  Type getArgumentType() const;
-
-  /// \brief Get the type of the constructed object.
-  Type getResultType() const;
+  /// getArgumentInterfaceType - get the interface type of the argument tuple
+  Type getArgumentInterfaceType() const;
 
   /// \brief Get the interface type of the constructed object.
   Type getResultInterfaceType() const;

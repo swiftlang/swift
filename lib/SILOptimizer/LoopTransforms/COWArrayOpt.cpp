@@ -359,14 +359,14 @@ class COWArrayOpt {
   // make_mutable calls are required within the loop body for that array.
   llvm::SmallDenseMap<SILValue, ApplyInst*> ArrayMakeMutableMap;
 
-  // \brief Transient per-Array user set.
-  //
-  // Track all known array users with the exception of struct_extract users
-  // (checkSafeArrayElementUse prohibits struct_extract users from mutating the
-  // array). During analysis of retains/releases within the loop body, the
-  // users in this set are assumed to cover all possible mutating operations on
-  // the array. If the array escaped through an unknown use, the analysis must
-  // abort earlier.
+  /// \brief Transient per-Array user set.
+  ///
+  /// Track all known array users with the exception of struct_extract users
+  /// (checkSafeArrayElementUse prohibits struct_extract users from mutating the
+  /// array). During analysis of retains/releases within the loop body, the
+  /// users in this set are assumed to cover all possible mutating operations on
+  /// the array. If the array escaped through an unknown use, the analysis must
+  /// abort earlier.
   SmallPtrSet<SILInstruction*, 8> ArrayUserSet;
 
   // When matching retains to releases we must not match the same release twice.
@@ -466,8 +466,8 @@ SmallPtrSetImpl<SILBasicBlock*> &COWArrayOpt::getReachingBlocks() {
 }
 
 
-// \return true if the instruction is a call to a non-mutating array semantic
-// function.
+/// \return true if the instruction is a call to a non-mutating array semantic
+/// function.
 static bool isNonMutatingArraySemanticCall(SILInstruction *Inst) {
   ArraySemanticsCall Call(Inst);
   if (!Call)

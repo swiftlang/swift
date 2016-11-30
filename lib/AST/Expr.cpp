@@ -654,10 +654,12 @@ bool Expr::canAppendCallParentheses() const {
     return !cast<DeclRefExpr>(this)->getDecl()->getName().isOperator();
 
   case ExprKind::SuperRef:
-  case ExprKind::Type:
   case ExprKind::OtherConstructorDeclRef:
   case ExprKind::DotSyntaxBaseIgnored:
     return true;
+
+  case ExprKind::Type:
+    return cast<TypeExpr>(this)->getTypeRepr()->isSimple();
 
   case ExprKind::OverloadedDeclRef: {
     auto *overloadedExpr = cast<OverloadedDeclRefExpr>(this);

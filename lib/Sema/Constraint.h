@@ -491,6 +491,8 @@ public:
     case ConstraintKind::Disjunction:
       return ConstraintClassification::Disjunction;
     }
+
+    llvm_unreachable("Unhandled ConstraintKind in switch.");
   }
 
   /// \brief Retrieve the first type in the constraint.

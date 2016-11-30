@@ -150,6 +150,8 @@ static bool sameOverloadChoice(const OverloadChoice &x,
   case OverloadChoiceKind::TupleIndex:
     return x.getTupleIndex() == y.getTupleIndex();
   }
+
+  llvm_unreachable("Unhandled OverloadChoiceKind in switch.");
 }
 
 /// Compare two declarations to determine whether one is a witness of the other.
@@ -875,8 +877,10 @@ ConstraintSystem::compareSolutions(ConstraintSystem &cs,
             
             // If both are convenience initializers, and the instance type of
             // one is a subtype of the other's, favor the subtype constructor.
-            auto resType1 = ctor1->getResultType();
-            auto resType2 = ctor2->getResultType();
+            auto resType1 = ArchetypeBuilder::mapTypeIntoContext(
+                ctor1, ctor1->getResultInterfaceType());
+            auto resType2 = ArchetypeBuilder::mapTypeIntoContext(
+                ctor2, ctor2->getResultInterfaceType());
             
             if (!resType1->isEqual(resType2)) {
               if (tc.isSubtypeOf(resType1, resType2, cs.DC)) {
@@ -958,7 +962,7 @@ ConstraintSystem::compareSolutions(ConstraintSystem &cs,
       auto check = [](const ValueDecl *VD) -> bool {
         if (!VD->getModuleContext()->isStdlibModule())
           return false;
-        auto fnTy = VD->getType()->castTo<AnyFunctionType>();
+        auto fnTy = VD->getInterfaceType()->castTo<AnyFunctionType>();
         if (!fnTy->getResult()->getAnyOptionalObjectType())
           return false;
 

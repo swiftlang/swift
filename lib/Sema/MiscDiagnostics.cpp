@@ -467,7 +467,7 @@ static void diagSyntacticUseRestrictions(TypeChecker &TC, const Expr *E,
     /// its uses are ok.
     void checkNoEscapeParameterUse(DeclRefExpr *DRE, Expr *ParentExpr=nullptr) {
       // This only cares about declarations of noescape function type.
-      auto AFT = DRE->getDecl()->getType()->getAs<AnyFunctionType>();
+      auto AFT = DRE->getDecl()->getInterfaceType()->getAs<AnyFunctionType>();
       if (!AFT || !AFT->isNoEscape())
         return;
 
@@ -528,9 +528,15 @@ static void diagSyntacticUseRestrictions(TypeChecker &TC, const Expr *E,
         // the missing ".self" as the subexpression of a parenthesized
         // expression, which is a historical bug.
         if (isa<ParenExpr>(ParentExpr) && CallArgs.count(ParentExpr) > 0) {
-          TC.diagnose(E->getEndLoc(), diag::warn_value_of_metatype_missing_self,
-                      E->getType()->getRValueInstanceType())
-            .fixItInsertAfter(E->getEndLoc(), ".self");
+          auto diag = TC.diagnose(E->getEndLoc(),
+              diag::warn_value_of_metatype_missing_self,
+              E->getType()->getRValueInstanceType());
+          if (E->canAppendCallParentheses()) {
+            diag.fixItInsertAfter(E->getEndLoc(), ".self");
+          } else {
+            diag.fixItInsert(E->getStartLoc(), "(");
+            diag.fixItInsertAfter(E->getEndLoc(), ").self");
+          }
           return;
         }
       }
@@ -539,18 +545,26 @@ static void diagSyntacticUseRestrictions(TypeChecker &TC, const Expr *E,
 
       TC.diagnose(E->getStartLoc(), diag::value_of_metatype_type);
 
-      // Add fix-t to insert '()', unless this is a protocol metatype.
-      bool isProtocolMetatype = false;
+      // Add fix-it to insert '()', only if this is a metatype of
+      // non-existential type and has any initializers.
+      bool isExistential = false;
       if (auto metaTy = E->getType()->getAs<MetatypeType>())
-        isProtocolMetatype = metaTy->getInstanceType()->is<ProtocolType>();
-      if (!isProtocolMetatype) {
+        isExistential = metaTy->getInstanceType()->isAnyExistentialType();
+      if (!isExistential &&
+          !TC.lookupConstructors(const_cast<DeclContext *>(DC),
+                                 E->getType()).empty()) {
         TC.diagnose(E->getEndLoc(), diag::add_parens_to_type)
           .fixItInsertAfter(E->getEndLoc(), "()");
       }
 
       // Add fix-it to insert ".self".
-      TC.diagnose(E->getEndLoc(), diag::add_self_to_type)
-        .fixItInsertAfter(E->getEndLoc(), ".self");
+      auto diag = TC.diagnose(E->getEndLoc(), diag::add_self_to_type);
+      if (E->canAppendCallParentheses()) {
+        diag.fixItInsertAfter(E->getEndLoc(), ".self");
+      } else {
+        diag.fixItInsert(E->getStartLoc(), "(");
+        diag.fixItInsertAfter(E->getEndLoc(), ").self");
+      }
     }
 
     void checkUnqualifiedAccessUse(const DeclRefExpr *DRE) {
@@ -1296,9 +1310,14 @@ bool swift::fixItOverrideDeclarationTypes(TypeChecker &TC,
       });
     }
     if (auto *method = dyn_cast<FuncDecl>(decl)) {
+      auto resultType = ArchetypeBuilder::mapTypeIntoContext(
+          method, method->getResultInterfaceType());
+
       auto *baseMethod = cast<FuncDecl>(base);
-      fixedAny |= checkType(method->getBodyResultType(),
-                            baseMethod->getResultType(),
+      auto baseResultType = ArchetypeBuilder::mapTypeIntoContext(
+          baseMethod, baseMethod->getResultInterfaceType());
+
+      fixedAny |= checkType(resultType, baseResultType,
                             method->getBodyResultTypeLoc().getSourceRange());
     }
     return fixedAny;
@@ -3983,7 +4002,7 @@ static OmissionTypeName getTypeNameForOmission(Type type) {
 Optional<DeclName> TypeChecker::omitNeedlessWords(AbstractFunctionDecl *afd) {
   auto &Context = afd->getASTContext();
 
-  if (!afd->hasType())
+  if (!afd->hasInterfaceType())
     validateDecl(afd);
 
   if (afd->isInvalid() || isa<DestructorDecl>(afd))
@@ -4018,7 +4037,8 @@ Optional<DeclName> TypeChecker::omitNeedlessWords(AbstractFunctionDecl *afd) {
   bool returnsSelf = false;
 
   if (auto func = dyn_cast<FuncDecl>(afd)) {
-    resultType = func->getResultType();
+    resultType = func->getResultInterfaceType();
+    resultType = ArchetypeBuilder::mapTypeIntoContext(func, resultType);
     returnsSelf = func->hasDynamicSelf();
   } else if (isa<ConstructorDecl>(afd)) {
     resultType = contextType;

@@ -792,6 +792,14 @@ static void gatherArgumentLabels(Type type,
   labels.push_back(Identifier());
 }
 
+static Type stripSubstitutedTypes(Type t) {
+  return t.transform([](Type t) -> Type {
+    while (auto *ST = dyn_cast<SubstitutedType>(t.getPointer()))
+      t = ST->getReplacementType();
+    return t;
+  });
+}
+
 namespace {
   /// Each match in an ApplyExpr is evaluated for how close of a match it is.
   /// The result is captured in this enum value, where the earlier entries are
@@ -832,7 +840,21 @@ namespace {
     Type entityType;
 
     UncurriedCandidate(ValueDecl *decl, unsigned level)
-      : declOrExpr(decl), level(level), entityType(decl->getType()) {
+      : declOrExpr(decl), level(level) {
+
+      if (isa<AbstractFunctionDecl>(decl) || isa<EnumElementDecl>(decl)) {
+        entityType = decl->getInterfaceType();
+        if (auto *GFT = entityType->getAs<GenericFunctionType>()) {
+          auto *DC = decl->getInnermostDeclContext();
+          auto *M = DC->getParentModule();
+          auto subs = DC->getGenericEnvironmentOfContext()
+              ->getForwardingSubstitutions(M);
+          entityType = stripSubstitutedTypes(GFT->substGenericArgs(subs));
+        }
+      } else {
+        entityType = decl->getType();
+      }
+
       // For some reason, subscripts and properties don't include their self
       // type.  Tack it on for consistency with other members.
       if (isa<AbstractStorageDecl>(decl)) {
@@ -1190,29 +1212,6 @@ static bool findGenericSubstitutions(DeclContext *dc, Type paramType,
     }
   };
   
-  // If paramType contains any substitutions already, find them and add them
-  // to our list before matching the two types to find more.
-  paramType.findIf([&](Type type) -> bool {
-    if (auto substitution = dyn_cast<SubstitutedType>(type.getPointer())) {
-      Type original = substitution->getOriginal();
-      if (dc && dc->getGenericParamsOfContext() && original->isTypeParameter())
-        original = ArchetypeBuilder::mapTypeIntoContext(dc, original);
-      
-      Type replacement = substitution->getReplacementType();
-      // If the replacement is itself an archetype, then the constraint
-      // system was asserting equivalencies between different levels of
-      // generics, rather than binding a generic to a concrete type (and we
-      // don't/won't have a concrete type). In which case, it is the
-      // replacement we are interested in, since it is the one in our current
-      // context. That generic type should equal itself.
-      if (auto ourGeneric = replacement->getAs<ArchetypeType>())
-        archetypesMap[ourGeneric] = replacement;
-      else if (auto archetype = original->getAs<ArchetypeType>())
-        archetypesMap[archetype] = replacement;
-    }
-    return false;
-  });
-  
   GenericVisitor visitor(dc, archetypesMap);
   return visitor.match(paramType, actualArgType);
 }
@@ -1332,6 +1331,28 @@ CalleeCandidateInfo::evaluateCloseness(DeclContext *dc, Type candArgListType,
         // against the type contained therein.
         if (paramType->is<InOutType>() && argType->is<LValueType>())
           matchType = matchType->getInOutObjectType();
+
+        matchType.findIf([&](Type type) -> bool {
+          if (auto substitution = dyn_cast<SubstitutedType>(type.getPointer())) {
+            Type original = substitution->getOriginal();
+            if (dc && dc->getGenericParamsOfContext() && original->isTypeParameter())
+              original = ArchetypeBuilder::mapTypeIntoContext(dc, original);
+            
+            Type replacement = substitution->getReplacementType();
+            // If the replacement is itself an archetype, then the constraint
+            // system was asserting equivalencies between different levels of
+            // generics, rather than binding a generic to a concrete type (and we
+            // don't/won't have a concrete type). In which case, it is the
+            // replacement we are interested in, since it is the one in our current
+            // context. That generic type should equal itself.
+            if (auto ourGeneric = replacement->getAs<ArchetypeType>())
+              archetypesMap[ourGeneric] = replacement;
+            else if (auto archetype = original->getAs<ArchetypeType>())
+              archetypesMap[archetype] = replacement;
+          }
+          return false;
+        });
+
         matched = findGenericSubstitutions(dc, matchType, rArgType,
                                            archetypesMap);
       }
@@ -1485,7 +1506,7 @@ void CalleeCandidateInfo::collectCalleeCandidates(Expr *fn,
     auto decl = declRefExpr->getDecl();
     candidates.push_back({ decl, getCalleeLevel(decl) });
     
-    if (auto fTy = decl->getType()->getAs<AnyFunctionType>())
+    if (auto fTy = decl->getInterfaceType()->getAs<AnyFunctionType>())
       declName = fTy->getInput()->getRValueInstanceType()->getString()+".init";
     else
       declName = "init";
@@ -1511,7 +1532,7 @@ void CalleeCandidateInfo::collectCalleeCandidates(Expr *fn,
       auto ctors = CS->TC.lookupConstructors(CS->DC, instanceType,
                                        NameLookupFlags::IgnoreAccessibility);
       for (auto ctor : ctors)
-        if (ctor->hasType())
+        if (ctor->hasInterfaceType())
           candidates.push_back({ ctor, 1 });
     }
 
@@ -1886,7 +1907,7 @@ bool CalleeCandidateInfo::diagnoseSimpleErrors(const Expr *E) {
     assert(decl && "Only decl-based candidates may be marked inaccessible");
     if (auto *CD = dyn_cast<ConstructorDecl>(decl)) {
       CS->TC.diagnose(loc, diag::init_candidate_inaccessible,
-                      CD->getResultType(), decl->getFormalAccess());
+                      CD->getResultInterfaceType(), decl->getFormalAccess());
      
     } else {
       CS->TC.diagnose(loc, diag::candidate_inaccessible, decl->getName(),
@@ -2064,6 +2085,13 @@ private:
   bool diagnoseNilLiteralComparison(Expr *lhsExpr, Expr *rhsExpr,
                                     CalleeCandidateInfo &calleeInfo,
                                     SourceLoc applyLoc);
+
+  /// Produce diagnostic for failures related to attributes associated with
+  /// candidate functions/methods e.g. mutability.
+  bool diagnoseMethodAttributeFailures(ApplyExpr *expr,
+                                       ArrayRef<Identifier> argLabels,
+                                       bool hasTrailingClosure,
+                                       CalleeCandidateInfo &candidates);
 
   bool visitExpr(Expr *E);
   bool visitIdentityExpr(IdentityExpr *E);
@@ -3192,8 +3220,10 @@ namespace {
       for (auto patternElt : PatternTypes)
         patternElt.first->setType(patternElt.second);
       
-      for (auto paramDeclElt : ParamDeclTypes)
+      for (auto paramDeclElt : ParamDeclTypes) {
         paramDeclElt.first->overwriteType(paramDeclElt.second);
+        paramDeclElt.first->setInterfaceType(Type());
+      }
       
       for (auto CSE : CollectionSemanticExprs)
         CSE.first->setSemanticExpr(CSE.second);
@@ -3369,7 +3399,7 @@ typeCheckChildIndependently(Expr *subExpr, Type convertType,
 
     // Replace archetypes and type parameters with UnresolvedType.
     if (convertType->hasTypeVariable() || convertType->hasArchetype() ||
-        convertType->isTypeParameter())
+        convertType->hasTypeParameter())
       convertType = replaceArchetypesAndTypeVarsWithUnresolved(convertType);
     
     // If the conversion type contains no info, drop it.
@@ -5272,6 +5302,87 @@ bool FailureDiagnosis::diagnoseNilLiteralComparison(
   return true;
 }
 
+bool FailureDiagnosis::diagnoseMethodAttributeFailures(
+    swift::ApplyExpr *callExpr, ArrayRef<Identifier> argLabels,
+    bool hasTrailingClosure, CalleeCandidateInfo &candidates) {
+  auto UDE = dyn_cast<UnresolvedDotExpr>(callExpr->getFn());
+  if (!UDE)
+    return false;
+
+  auto argExpr = callExpr->getArg();
+  auto argType = argExpr->getType();
+
+  // If type of the argument hasn't been established yet, we can't diagnose.
+  if (!argType || isUnresolvedOrTypeVarType(argType))
+    return false;
+
+  // Let's filter our candidate list based on that type.
+  candidates.filterList(argType, argLabels);
+
+  if (candidates.closeness == CC_ExactMatch)
+    return false;
+
+  // And if filtering didn't give an exact match, such means that problem
+  // might be related to function attributes which is best diagnosed by
+  // unviable member candidates, if any.
+  auto base = UDE->getBase();
+  auto baseType = base->getType();
+
+  // This handles following situation:
+  // struct S {
+  //   mutating func f(_ i: Int) {}
+  //   func f(_ f: Float) {}
+  // }
+  //
+  // Given struct has an overloaded method "f" with a single argument of
+  // multiple different types, one of the overloads is marked as
+  // "mutating", which means it can only be applied on LValue base type.
+  // So when struct is used like this:
+  //
+  // let answer: Int = 42
+  // S().f(answer)
+  //
+  // Constraint system generator is going to pick `f(_ f: Float)` as
+  // only possible overload candidate because "base" of the call is immutable
+  // and contextual information about argument type is not available yet.
+  // Such leads to incorrect contextual conversion failure diagnostic because
+  // type of the argument is going to resolved as (Int) no matter what.
+  // To workaround that fact and improve diagnostic of such cases we are going
+  // to try and collect all unviable candidates for a given call and check if
+  // at least one of them matches established argument type before even trying
+  // to re-check argument expression.
+  auto results = CS->performMemberLookup(
+      ConstraintKind::ValueMember, UDE->getName(), baseType,
+      UDE->getFunctionRefKind(), CS->getConstraintLocator(UDE),
+      /*includeInaccessibleMembers=*/false);
+
+  if (results.UnviableCandidates.empty())
+    return false;
+
+  SmallVector<OverloadChoice, 2> choices;
+  for (auto &unviable : results.UnviableCandidates)
+    choices.push_back(OverloadChoice(baseType, unviable.first,
+                                     /*isSpecialized=*/false,
+                                     UDE->getFunctionRefKind()));
+
+  CalleeCandidateInfo unviableCandidates(baseType, choices, hasTrailingClosure,
+                                         CS);
+
+  // Filter list of the unviable candidates based on the
+  // already established type of the argument expression.
+  unviableCandidates.filterList(argType, argLabels);
+
+  // If one of the unviable candidates matches arguments exactly,
+  // that means that actual problem is related to function attributes.
+  if (unviableCandidates.closeness == CC_ExactMatch) {
+    diagnoseUnviableLookupResults(results, baseType, base, UDE->getName(),
+                                  UDE->getNameLoc(), UDE->getLoc());
+    return true;
+  }
+
+  return false;
+}
+
 /// When initializing Unsafe[Mutable]Pointer<T> from Unsafe[Mutable]RawPointer,
 /// issue a diagnostic that refers to the API for binding memory to a type.
 static bool isCastToTypedPointer(ASTContext &Ctx, const Expr *Fn,
@@ -5445,7 +5556,15 @@ bool FailureDiagnosis::visitApplyExpr(ApplyExpr *callExpr) {
   if (diagnoseParameterErrors(calleeInfo, callExpr->getFn(),
                               callExpr->getArg(), argLabels))
     return true;
-  
+
+  // There might be a candidate with correct argument types but it's not
+  // used by constraint solver because it doesn't have correct attributes,
+  // let's try to diagnose such situation there right before type checking
+  // argument expression, because that would overwrite original argument types.
+  if (diagnoseMethodAttributeFailures(callExpr, argLabels, hasTrailingClosure,
+                                      calleeInfo))
+    return true;
+
   Type argType;  // Type of the argument list, if knowable.
   if (auto FTy = fnType->getAs<AnyFunctionType>())
     argType = FTy->getInput();

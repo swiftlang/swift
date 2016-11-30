@@ -365,6 +365,23 @@ ParserResult<Expr> Parser::parseExprSequenceElement(Diag<> message,
     consumeToken();
   }
 
+  // Try to parse '@' sign or 'inout' as a attributed typerepr.
+  if (Tok.isAny(tok::at_sign, tok::kw_inout)) {
+    bool isType = false;
+    {
+      BacktrackingScope backtrack(*this);
+      isType = canParseType();
+    }
+    if (isType) {
+      ParserResult<TypeRepr> ty = parseType();
+      if (ty.isNonNull())
+        return makeParserResult(
+            new (Context) TypeExpr(TypeLoc(ty.get(), Type())));
+      checkForInputIncomplete();
+      return nullptr;
+    }
+  }
+
   ParserResult<Expr> sub = parseExprUnary(message, isExprBasic);
 
   if (hadTry && !sub.hasCodeCompletion() && !sub.isNull()) {

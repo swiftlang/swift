@@ -676,15 +676,14 @@ void TypeConverter::popGenericContext(CanGenericSignature signature) {
   Types.DependentCache.clear();
 }
 
-ArchetypeBuilder &TypeConverter::getArchetypes() {
+GenericEnvironment *TypeConverter::getGenericEnvironment() {
   auto moduleDecl = IGM.getSwiftModule();
   auto genericSig = IGM.getSILTypes().getCurGenericContext();
-  return *moduleDecl->getASTContext()
-      .getOrCreateArchetypeBuilder(genericSig, moduleDecl);
+  return genericSig->getCanonicalSignature().getGenericEnvironment(*moduleDecl);
 }
 
-ArchetypeBuilder &IRGenModule::getContextArchetypes() {
-  return Types.getArchetypes();
+GenericEnvironment *IRGenModule::getGenericEnvironment() {
+  return Types.getGenericEnvironment();
 }
 
 /// Add a temporary forward declaration for a type.  This will live
@@ -1139,10 +1138,10 @@ TypeCacheEntry TypeConverter::getTypeEntry(CanType canonicalTy) {
   auto contextTy = canonicalTy;
   if (contextTy->hasTypeParameter()) {
     // The type we got should be lowered, so lower it like a SILType.
-    contextTy = getArchetypes().substDependentType(IGM.getSILModule(),
-                                   SILType::getPrimitiveAddressType(contextTy))
+    contextTy = getGenericEnvironment()->mapTypeIntoContext(
+                  IGM.getSILModule(),
+                  SILType::getPrimitiveAddressType(contextTy))
       .getSwiftRValueType();
-    
   }
   
   // Fold archetypes to unique exemplars. Any archetype with the same
@@ -1350,7 +1349,6 @@ TypeCacheEntry TypeConverter::convertType(CanType ty) {
   case TypeKind::Tuple:
     return convertTupleType(cast<TupleType>(ty));
   case TypeKind::Function:
-  case TypeKind::PolymorphicFunction:
   case TypeKind::GenericFunction:
     llvm_unreachable("AST FunctionTypes should be lowered by SILGen");
   case TypeKind::SILFunction:

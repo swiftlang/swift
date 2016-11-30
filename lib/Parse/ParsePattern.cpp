@@ -236,59 +236,12 @@ Parser::parseParameterClause(SourceLoc &leftParenLoc,
         param.SecondNameLoc = SourceLoc();
       }
 
-      // (':' ('inout')? type)?
+      // (':' type)?
       if (consumeIf(tok::colon)) {
 
-        SourceLoc postColonLoc = Tok.getLoc();
-
-        bool hasDeprecatedInOut =
-          param.SpecifierKind == ParsedParameter::InOut;
-        bool hasValidInOut = false;
-        
-        while (Tok.is(tok::kw_inout)) {
-          hasValidInOut = true;
-          if (hasSpecifier) {
-            diagnose(Tok.getLoc(), diag::parameter_inout_var_let_repeated)
-              .fixItRemove(param.LetVarInOutLoc);
-            consumeToken(tok::kw_inout);
-          } else {
-            hasSpecifier = true;
-            param.LetVarInOutLoc = consumeToken(tok::kw_inout);
-            param.SpecifierKind = ParsedParameter::InOut;
-          }
-        }
-        if (!hasValidInOut && hasDeprecatedInOut) {
-          diagnose(Tok.getLoc(), diag::inout_as_attr_disallowed)
-            .fixItRemove(param.LetVarInOutLoc)
-            .fixItInsert(postColonLoc, "inout ");
-        }
-        
         auto type = parseType(diag::expected_parameter_type);
         status |= type;
         param.Type = type.getPtrOrNull();
-
-        if (param.SpecifierKind == ParsedParameter::InOut) {
-          if (auto *fnTR = dyn_cast_or_null<FunctionTypeRepr>(param.Type)) {
-            // If the input to the function isn't parenthesized, apply the inout
-            // to the first (only) parameter, as we would in Swift 2. (This
-            // syntax is deprecated in Swift 3.)
-            TypeRepr *argsTR = fnTR->getArgsTypeRepr();
-            if (!isa<TupleTypeRepr>(argsTR)) {
-              auto *newArgsTR =
-                  new (Context) InOutTypeRepr(argsTR, param.LetVarInOutLoc);
-              auto *newTR =
-                  new (Context) FunctionTypeRepr(fnTR->getGenericParams(),
-                                                 newArgsTR,
-                                                 fnTR->getThrowsLoc(),
-                                                 fnTR->getArrowLoc(),
-                                                 fnTR->getResultTypeRepr());
-              newTR->setGenericEnvironment(fnTR->getGenericEnvironment());
-              param.Type = newTR;
-              param.SpecifierKind = ParsedParameter::Let;
-              param.LetVarInOutLoc = SourceLoc();
-            }
-          }
-        }
 
         // If we didn't parse a type, then we already diagnosed that the type
         // was invalid.  Remember that.
@@ -399,9 +352,18 @@ mapParsedParameters(Parser &parser,
     // If a type was provided, create the type for the parameter.
     if (auto type = paramInfo.Type) {
       // If 'inout' was specified, turn the type into an in-out type.
-      if (specifierKind == Parser::ParsedParameter::InOut)
-        type = new (ctx) InOutTypeRepr(type, paramInfo.LetVarInOutLoc);
-
+      if (specifierKind == Parser::ParsedParameter::InOut) {
+        auto InOutLoc = paramInfo.LetVarInOutLoc;
+        if (isa<InOutTypeRepr>(type)) {
+          parser.diagnose(InOutLoc, diag::parameter_inout_var_let_repeated)
+            .fixItRemove(InOutLoc);
+        } else {
+          parser.diagnose(InOutLoc, diag::inout_as_attr_disallowed)
+            .fixItRemove(InOutLoc)
+            .fixItInsert(type->getStartLoc(), "inout ");
+          type = new (ctx) InOutTypeRepr(type, InOutLoc);
+        }
+      }
       param->getTypeLoc() = TypeLoc(type);
     } else if (paramContext != Parser::ParameterContextKind::Closure) {
       // Non-closure parameters require a type.

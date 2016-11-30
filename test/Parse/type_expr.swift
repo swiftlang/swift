@@ -199,6 +199,27 @@ func meta_metatypes() {
   _ = B.Type.self
 }
 
+class E {
+  private init() {}
+}
+
+func inAccessibleInit() {
+  _ = E // expected-error {{expected member name or constructor call after type name}} expected-note {{use '.self'}} {{8-8=.self}}
+}
+
+enum F: Int {
+  case A, B
+}
+
+struct G {
+  var x: Int
+}
+
+func implicitInit() {
+  _ = F // expected-error {{expected member name or constructor call after type name}} expected-note {{add arguments}} {{8-8=()}} expected-note {{use '.self'}} {{8-8=.self}}
+  _ = G // expected-error {{expected member name or constructor call after type name}} expected-note {{add arguments}} {{8-8=()}} expected-note {{use '.self'}} {{8-8=.self}}
+}
+
 // https://bugs.swift.org/browse/SR-502
 func testFunctionCollectionTypes() {
   _ = [(Int) -> Int]()
@@ -220,9 +241,18 @@ func testFunctionCollectionTypes() {
 
   _ = 2 + () -> Int // expected-error {{expected type before '->'}}
   _ = () -> (Int, Int).2 // expected-error {{expected type after '->'}}
-  _ = (Int) -> Int // expected-error {{expected member name or constructor call after type name}} expected-note{{add arguments after the type to construct a value of the type}} expected-note{{use '.self' to reference the type object}}
+  _ = (Int) -> Int // expected-error {{expected member name or constructor call after type name}} expected-note{{use '.self' to reference the type object}}
+
+  _ = @convention(c) () -> Int // expected-error{{expected member name or constructor call after type name}} expected-note{{use '.self' to reference the type object}}
+  _ = 1 + (@convention(c) () -> Int).self // expected-error{{binary operator '+' cannot be applied to operands of type 'Int' and '(@convention(c) () -> Int).Type'}} // expected-note {{overloads}}
+  _ = (@autoclosure () -> Int) -> (Int, Int).2 // expected-error {{expected type after '->'}}
+  _ = ((@autoclosure () -> Int) -> (Int, Int)).1 // expected-error {{type '(@autoclosure () -> Int) -> (Int, Int)' has no member '1'}}
+  _ = ((inout Int) -> Void).self
 
   _ = [(Int) throws -> Int]()
+  _ = [@convention(swift) (Int) throws -> Int]().count
+  _ = [(inout Int) throws -> (inout () -> Void) -> Void]().count
+  _ = [String: (@autoclosure (Int) -> Int32) -> Void]().keys
   let _ = [(Int) -> throws Int]() // expected-error{{'throws' may only occur before '->'}}
   let _ = [Int throws Int](); // expected-error{{'throws' may only occur before '->'}} expected-error {{consecutive statements on a line must be separated by ';'}}
 }
@@ -231,7 +261,7 @@ protocol P1 {}
 protocol P2 {}
 protocol P3 {}
 func compositionType() {
-  _ = P1 & P2 // expected-error {{expected member name or constructor call after type name}} expected-note{{use '.self'}} {{14-14=.self}} FIXME(don't emit this): expected-note{{add arguments}} {{14-14=()}}
+  _ = P1 & P2 // expected-error {{expected member name or constructor call after type name}} expected-note{{use '.self'}} {{7-7=(}} {{14-14=).self}}
   _ = P1 & P2.self // expected-error {{binary operator '&' cannot be applied to operands of type 'P1.Protocol' and 'P2.Protocol'}} expected-note {{overloads for '&' exist }}
   _ = (P1 & P2).self // Ok.
   _ = (P1 & (P2)).self // FIXME: OK? while `typealias P = P1 & (P2)` is rejected.
@@ -244,15 +274,13 @@ func compositionType() {
   _ = P1 & P2 -> P3
   // expected-error @-1 {{single argument function types require parentheses}} {{7-7=(}} {{14-14=)}}
   // expected-error @-2 {{expected member name or constructor call after type name}}
-  // FIXME(add parenthesis): expected-note @-3 {{use '.self'}} {{20-20=.self}}
-  // FIXME(don't emit this): expected-note @-4 {{add arguments}} {{20-20=()}}
+  // expected-note @-3 {{use '.self'}} {{7-7=(}} {{20-20=).self}}
 
   _ = P1 & P2 -> P3 & P1 -> Int
   // expected-error @-1 {{single argument function types require parentheses}} {{18-18=(}} {{25-25=)}}
   // expected-error @-2 {{single argument function types require parentheses}} {{7-7=(}} {{14-14=)}}
   // expected-error @-3 {{expected member name or constructor call after type name}}
-  // FIXME(add parenthesis): expected-note @-4 {{use '.self'}} {{32-32=.self}}
-  // FIXME(don't emit this): expected-note @-5 {{add arguments}} {{32-32=()}}
+  // expected-note @-4 {{use '.self'}} {{7-7=(}} {{32-32=).self}}
 
   _ = (() -> P1 & P2).self // Ok
   _ = (P1 & P2 -> P3 & P2).self // expected-error {{single argument function types require parentheses}} {{8-8=(}} {{15-15=)}}
@@ -268,6 +296,5 @@ func complexSequence() {
   // expected-warning @-1 {{no calls to throwing functions occur within 'try' expression}}
   // expected-error @-2 {{single argument function types require parentheses}} {{none}} {{11-11=(}} {{18-18=)}}
   // expected-error @-3 {{expected member name or constructor call after type name}}
-  // expected-note @-4 {{add arguments after the type to construct a value of the type}} {{36-36=()}}
-  // expected-note @-5 {{use '.self' to reference the type object}} {{36-36=.self}}
+  // expected-note @-4 {{use '.self' to reference the type object}} {{11-11=(}} {{36-36=).self}}
 }

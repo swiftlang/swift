@@ -45,6 +45,8 @@ A<(a:Int, b:UnicodeScalar)>.c()
 A<Runcible & Fungible>.c()
 A<@convention(c) () -> Int32>.c()
 A<(@autoclosure @escaping () -> Int, Int) -> Void>.c()
+_ = [@convention(block) ()  -> Int]().count
+_ = [String: (@escaping (A<B>) -> Int) -> Void]().keys
 
 A<B>(x: 0) // expected-warning{{unused}}
 

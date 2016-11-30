@@ -163,6 +163,8 @@ public:
     case ApplyArgToParam:
       return 2;
     }
+
+    llvm_unreachable("Unhandled PathElementKind in switch.");
   }
 
   /// Flags for efficiently recording certain information about a path.
@@ -213,7 +215,8 @@ public:
     case FunctionResult:
       return IsFunctionConversion;
     }
-    llvm_unreachable("bad path element kind");
+
+    llvm_unreachable("Unhandled PathElementKind in switch.");
   }
 
   template<unsigned N> struct incomplete;
@@ -354,6 +357,8 @@ public:
       case StoredKindAndValue:
         return decodeStorage(storage).first;
       }
+
+      llvm_unreachable("Unhandled StoredKind in switch.");
     }
 
     /// \brief Retrieve the value associated with this path element,

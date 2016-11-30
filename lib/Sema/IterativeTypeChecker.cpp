@@ -53,6 +53,8 @@ bool IterativeTypeChecker::isSatisfied(TypeCheckRequest request) {
 
 #include "swift/Sema/TypeCheckRequestKinds.def"
   }
+
+  llvm_unreachable("Unhandled TypeCheckRequestKind in switch.");
 }
 
 bool IterativeTypeChecker::breakCycle(TypeCheckRequest request) {
@@ -62,7 +64,9 @@ bool IterativeTypeChecker::breakCycle(TypeCheckRequest request) {
     return breakCycleFor##Request(request.get##PayloadName##Payload());
 
 #include "swift/Sema/TypeCheckRequestKinds.def"
-  }  
+  }
+
+  llvm_unreachable("Unhandled TypeCheckRequestKind in switch.");
 }
 
 void IterativeTypeChecker::satisfy(TypeCheckRequest request) {

@@ -2275,15 +2275,6 @@ TypeConverter::getBridgedFunctionType(AbstractionPattern pattern,
     genericSig = gft.getGenericSignature();
   }
 
-  // Remove this when PolymorphicFunctionType goes away.
-  {
-    CanAnyFunctionType innerTy = t;
-    while (innerTy) {
-      assert(!isa<PolymorphicFunctionType>(innerTy));
-      innerTy = dyn_cast<AnyFunctionType>(innerTy.getResult());
-    }
-  }
-
   auto rebuild = [&](CanType input, CanType result) -> CanAnyFunctionType {
     if (genericSig) {
       return CanGenericFunctionType::get(genericSig, input, result, extInfo);
@@ -2430,8 +2421,6 @@ TypeConverter::getLoweredASTFunctionType(CanAnyFunctionType fnType,
   // Merge inputs and generic parameters from the uncurry levels.
   for (;;) {
     inputs.push_back(TupleTypeElt(fnType->getInput()));
-
-    assert(!isa<PolymorphicFunctionType>(fnType));
 
     // The uncurried function calls all of the intermediate function
     // levels and so throws if any of them do.

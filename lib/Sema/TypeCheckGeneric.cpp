@@ -46,7 +46,7 @@ Type DependentGenericTypeResolver::resolveDependentMemberType(
   
   return archetype->getRepresentative()
            ->getNestedType(ref->getIdentifier(), Builder)
-           ->getDependentType(Builder, true);
+           ->getDependentType(/*allowUnresolved=*/true);
 }
 
 Type DependentGenericTypeResolver::resolveSelfAssociatedType(
@@ -58,7 +58,7 @@ Type DependentGenericTypeResolver::resolveSelfAssociatedType(
   
   return archetype->getRepresentative()
            ->getNestedType(assocType->getName(), Builder)
-           ->getDependentType(Builder, true);
+           ->getDependentType(/*allowUnresolved=*/true);
 }
 
 Type DependentGenericTypeResolver::resolveTypeOfContext(DeclContext *dc) {
@@ -258,7 +258,7 @@ Type CompleteGenericTypeResolver::resolveSelfAssociatedType(Type selfTy,
        AssociatedTypeDecl *assocType) {
   return Builder.resolveArchetype(selfTy)->getRepresentative()
            ->getNestedType(assocType->getName(), Builder)
-           ->getDependentType(Builder, false);
+           ->getDependentType(/*allowUnresolved=*/false);
 }
 
 Type CompleteGenericTypeResolver::resolveTypeOfContext(DeclContext *dc) {
@@ -509,7 +509,7 @@ TypeChecker::validateGenericFuncSignature(AbstractFunctionDecl *func) {
 
   // If this triggered a recursive validation, back out: we're done.
   // FIXME: This is an awful hack.
-  if (func->hasType())
+  if (func->hasInterfaceType())
     return nullptr;
 
   // Finalize the generic requirements.
@@ -575,8 +575,8 @@ TypeChecker::validateGenericFuncSignature(AbstractFunctionDecl *func) {
   }
 
   if (invalid) {
-    func->overwriteType(ErrorType::get(Context));
     func->setInterfaceType(ErrorType::get(Context));
+    func->setInvalid();
     // null doesn't mean error here: callers still expect the signature.
     return sig;
   }
@@ -945,12 +945,6 @@ void TypeChecker::revertGenericFuncSignature(AbstractFunctionDecl *func) {
   // Revert the generic parameter list.
   if (func->getGenericParams())
     revertGenericParamList(func->getGenericParams());
-
-  // Clear out the types.
-  if (auto fn = dyn_cast<FuncDecl>(func))
-    fn->revertType();
-  else
-    func->overwriteType(Type());
 }
 
 /// Create a text string that describes the bindings of generic parameters that

@@ -648,7 +648,7 @@ static bool passCursorInfoForDecl(const ValueDecl *VD,
   unsigned USREnd = SS.size();
 
   unsigned TypenameBegin = SS.size();
-  if (VD->hasType()) {
+  if (VD->hasInterfaceType()) {
     llvm::raw_svector_ostream OS(SS);
     PrintOptions Options;
     Options.PrintNameAliasUnderlyingType = true;

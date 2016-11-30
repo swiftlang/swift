@@ -25,50 +25,47 @@ GenericEnvironment::GenericEnvironment(
     TypeSubstitutionMap interfaceToArchetypeMap)
   : Signature(signature)
 {
-
-  assert(!interfaceToArchetypeMap.empty());
-  assert(interfaceToArchetypeMap.size() == signature->getGenericParams().size()
-         && "incorrect number of parameters");
-
   // Build a mapping in both directions, making sure to canonicalize the
   // interface type where it is used as a key, so that substitution can
   // find them, and to preserve sugar otherwise, so that
   // mapTypeOutOfContext() produces a human-readable type.
-  for (auto entry : interfaceToArchetypeMap) {
-    // We're going to pass InterfaceToArchetypeMap to Type::subst(), which
-    // expects the keys to be canonical, otherwise it won't be able to
-    // find them.
-    auto canParamTy = cast<GenericTypeParamType>(entry.first->getCanonicalType());
-    auto contextTy = entry.second;
-
-    auto result = InterfaceToArchetypeMap.insert(
-        std::make_pair(canParamTy, contextTy));
-    assert(result.second && "duplicate generic parameters in environment");
-
-    // If we mapped the generic parameter to an archetype, add it to the
-    // reverse mapping.
-    if (auto *archetypeTy = entry.second->getAs<ArchetypeType>()) {
-      // If we've already recorded an interface type for this archetype, then
-      // multiple generic parameters map to the same archetype. If the
-      // existing entry comes from a later generic parameter, replace it with
-      // the earlier generic parameter. This gives us a deterministic reverse
-      // mapping.
-      auto knownInterfaceType = ArchetypeToInterfaceMap.find(archetypeTy);
-      if (knownInterfaceType != ArchetypeToInterfaceMap.end()) {
-        auto otherGP
-          = knownInterfaceType->second->castTo<GenericTypeParamType>();
-        if (std::make_pair(canParamTy->getDepth(), canParamTy->getIndex())
-              < std::make_pair(otherGP->getDepth(), otherGP->getIndex()))
-          knownInterfaceType->second = entry.first;
-        continue;
-      }
-
-      ArchetypeToInterfaceMap[archetypeTy] = entry.first;
-    }
-  }
+  for (auto entry : interfaceToArchetypeMap)
+    addMapping(entry.first->castTo<GenericTypeParamType>(), entry.second);
 
   // Make sure this generic environment gets destroyed.
   signature->getASTContext().addDestructorCleanup(*this);
+}
+
+void GenericEnvironment::addMapping(GenericTypeParamType *genericParam,
+                                    Type contextType) {
+  // We're going to pass InterfaceToArchetypeMap to Type::subst(), which
+  // expects the keys to be canonical, otherwise it won't be able to
+  // find them.
+  auto canParamTy =
+    cast<GenericTypeParamType>(genericParam->getCanonicalType());
+
+  // Add the mapping form the generic parameter to the context type.
+  assert(InterfaceToArchetypeMap.count(canParamTy) == 0 && "Duplicate entry");
+  InterfaceToArchetypeMap[canParamTy] = contextType;
+
+  // If we mapped the generic parameter to an archetype, add it to the
+  // reverse mapping.
+  auto *archetype = contextType->getAs<ArchetypeType>();
+  if (!archetype) return;
+
+  // Check whether we've already recorded an interface type for this archetype.
+  // If not, record one and we're done.
+  auto result = ArchetypeToInterfaceMap.insert({archetype, genericParam});
+  if (result.second) return;
+
+  // Multiple generic parameters map to the same archetype. If the
+  // existing entry comes from a later generic parameter, replace it with
+  // the earlier generic parameter. This gives us a deterministic reverse
+  // mapping.
+  auto otherGP = result.first->second->castTo<GenericTypeParamType>();
+  if (std::make_pair(canParamTy->getDepth(), canParamTy->getIndex())
+        < std::make_pair(otherGP->getDepth(), otherGP->getIndex()))
+    result.first->second = genericParam;
 }
 
 void *GenericEnvironment::operator new(size_t bytes, const ASTContext &ctx) {

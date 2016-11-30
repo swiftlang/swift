@@ -486,10 +486,16 @@ Type Mangler::getDeclTypeForMangling(const ValueDecl *decl,
                                 ArrayRef<Requirement> &requirements,
                                 SmallVectorImpl<Requirement> &requirementsBuf) {
   auto &C = decl->getASTContext();
-  if (!decl->hasType())
+  if (!decl->hasInterfaceType())
     return ErrorType::get(C);
 
+  // FIXME: Interface types for ParamDecls
   Type type = decl->getInterfaceType();
+  if (type->hasArchetype()) {
+    assert(isa<ParamDecl>(decl));
+    type = ArchetypeBuilder::mapTypeOutOfContext(
+        decl->getDeclContext(), type);
+  }
 
   initialParamDepth = 0;
   CanGenericSignature sig;
@@ -943,9 +949,6 @@ void Mangler::mangleType(Type type, unsigned uncurryLevel) {
       mangleNominalType(tybase->getAnyNominal());
     return;
   }
-
-  case TypeKind::PolymorphicFunction:
-    llvm_unreachable("should not be mangled");
 
   case TypeKind::SILFunction: {
     // <type> ::= 'XF' <impl-function-type>
@@ -1475,6 +1478,7 @@ void Mangler::mangleClosureComponents(Type Ty, unsigned discriminator,
   if (!Ty)
     Ty = ErrorType::get(localContext->getASTContext());
 
+  Ty = ArchetypeBuilder::mapTypeOutOfContext(parentContext, Ty);
   mangleType(Ty->getCanonicalType(), /*uncurry*/ 0);
 }
 

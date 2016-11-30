@@ -1187,8 +1187,8 @@ void CallEmission::emitToMemory(Address addr,
   CanType substResultType = substFnType->getSILResult().getSwiftRValueType();
 
   if (origResultType->hasTypeParameter())
-    origResultType = IGF.IGM.getContextArchetypes()
-      .substDependentType(origResultType)
+    origResultType = IGF.IGM.getGenericEnvironment()
+      ->mapTypeIntoContext(IGF.getSwiftModule(), origResultType)
       ->getCanonicalType();
 
   if (origResultType != substResultType) {

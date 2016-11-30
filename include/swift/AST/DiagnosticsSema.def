@@ -204,6 +204,9 @@ ERROR(cannot_subscript_base,none,
       "cannot subscript a value of type %0",
       (Type))
 
+ERROR(cannot_subscript_ambiguous_base,none,
+      "cannot subscript a value of incorrect or ambiguous type", ())
+
 ERROR(cannot_subscript_nil_literal,none,
       "cannot subscript a nil literal value", ())
 

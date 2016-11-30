@@ -361,7 +361,6 @@ namespace {
 
     Type operator()(Type type) {
       // Swift only supports rank-1 polymorphism.
-      assert(!type->is<PolymorphicFunctionType>());
       assert(!type->is<GenericFunctionType>());
 
       // Preserve parens when opening types.
@@ -704,6 +703,8 @@ static unsigned getNumRemovedArgumentLabels(ASTContext &ctx, ValueDecl *decl,
     // Never remove argument labels from a double application.
     return 0;
   }
+
+  llvm_unreachable("Unhandled FunctionRefKind in switch.");
 }
 
 std::pair<Type, Type>
@@ -771,8 +772,11 @@ ConstraintSystem::getTypeOfReference(ValueDecl *value,
   }
 
   // Determine the type of the value, opening up that type if necessary.
+  bool wantInterfaceType = true;
+  if (isa<VarDecl>(value))
+    wantInterfaceType = !value->getDeclContext()->isLocalContext();
   Type valueType = TC.getUnopenedTypeOfReference(value, Type(), DC, base,
-                                                 /*wantInterfaceType=*/true);
+                                                 wantInterfaceType);
 
   // If this is a let-param whose type is a type variable, this is an untyped
   // closure param that may be bound to an inout type later. References to the

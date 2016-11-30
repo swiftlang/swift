@@ -215,9 +215,11 @@ struct ASTContext::Implementation {
                            ArchetypeBuilder::PotentialArchetype *>>
     LazyArchetypes;
 
-  /// \brief Stored archetype builders.
+  /// \brief Stored archetype builders and their corresponding (canonical)
+  /// generic environments.
   llvm::DenseMap<std::pair<GenericSignature *, ModuleDecl *>,
-                 std::unique_ptr<ArchetypeBuilder>> ArchetypeBuilders;
+  std::pair<std::unique_ptr<ArchetypeBuilder>,
+            GenericEnvironment *>> ArchetypeBuilders;
 
   /// The set of property names that show up in the defining module of a
   /// class.
@@ -1252,23 +1254,25 @@ void ASTContext::getVisibleTopLevelClangModules(
     collectAllModules(Modules);
 }
 
-ArchetypeBuilder *ASTContext::getOrCreateArchetypeBuilder(
-                    CanGenericSignature sig,
-                    ModuleDecl *mod) {
+std::pair<ArchetypeBuilder *, GenericEnvironment *>
+ASTContext::getOrCreateArchetypeBuilder(CanGenericSignature sig,
+                                        ModuleDecl *mod) {
   // Check whether we already have an archetype builder for this
   // signature and module.
   auto known = Impl.ArchetypeBuilders.find({sig, mod});
   if (known != Impl.ArchetypeBuilders.end())
-    return known->second.get();
+    return { known->second.first.get(), known->second.second };
 
   // Create a new archetype builder with the given signature.
-  auto builder = new ArchetypeBuilder(*mod, Diags);
+  auto builder = new ArchetypeBuilder(*mod);
   builder->addGenericSignature(sig, nullptr);
   
-  // Store this archetype builder.
+  // Store this archetype builder and its generic environment.
+  auto genericEnv = builder->getGenericEnvironment(sig);
   Impl.ArchetypeBuilders[{sig, mod}]
-    = std::unique_ptr<ArchetypeBuilder>(builder);
-  return builder;
+    = { std::unique_ptr<ArchetypeBuilder>(builder), genericEnv };
+
+  return { builder, genericEnv };
 }
 
 Module *
@@ -2901,14 +2905,11 @@ getGenericFunctionRecursiveProperties(Type Input, Type Result) {
 AnyFunctionType *AnyFunctionType::withExtInfo(ExtInfo info) const {
   if (isa<FunctionType>(this))
     return FunctionType::get(getInput(), getResult(), info);
-  if (auto *polyFnTy = dyn_cast<PolymorphicFunctionType>(this))
-    return PolymorphicFunctionType::get(getInput(), getResult(),
-                                        &polyFnTy->getGenericParams(), info);
   if (auto *genFnTy = dyn_cast<GenericFunctionType>(this))
     return GenericFunctionType::get(genFnTy->getGenericSignature(),
                                     getInput(), getResult(), info);
 
-  static_assert(3 - 1 ==
+  static_assert(2 - 1 ==
                   static_cast<int>(TypeKind::Last_AnyFunctionType) -
                     static_cast<int>(TypeKind::First_AnyFunctionType),
                 "unhandled function type");
@@ -2944,34 +2945,6 @@ FunctionType::FunctionType(Type input, Type output,
                   Info)
 { }
 
-
-/// FunctionType::get - Return a uniqued function type with the specified
-/// input and result.
-PolymorphicFunctionType *PolymorphicFunctionType::get(Type input, Type output,
-                                                      GenericParamList *params,
-                                                      const ExtInfo &Info) {
-  auto properties = getFunctionRecursiveProperties(input, output);
-  auto arena = getArena(properties);
-
-  const ASTContext &C = input->getASTContext();
-
-  return new (C, arena) PolymorphicFunctionType(input, output, params,
-                                                Info, C, properties);
-}
-
-PolymorphicFunctionType::PolymorphicFunctionType(Type input, Type output,
-                                                 GenericParamList *params,
-                                                 const ExtInfo &Info,
-                                                 const ASTContext &C,
-                                        RecursiveTypeProperties properties)
-  : AnyFunctionType(TypeKind::PolymorphicFunction,
-                    (input->isCanonical() && output->isCanonical()) ?&C : 0,
-                    input, output, properties,
-                    Info),
-    Params(params)
-{
-  assert(!input->hasTypeVariable() && !output->hasTypeVariable());
-}
 
 void GenericFunctionType::Profile(llvm::FoldingSetNodeID &ID,
                                   GenericSignature *sig,
@@ -3581,8 +3554,19 @@ GenericEnvironment *
 GenericEnvironment::get(ASTContext &ctx,
                         GenericSignature *signature,
                         TypeSubstitutionMap interfaceToArchetypeMap) {
-  return new (ctx) GenericEnvironment(signature,
-                                      interfaceToArchetypeMap);
+  assert(!interfaceToArchetypeMap.empty());
+  assert(interfaceToArchetypeMap.size() == signature->getGenericParams().size()
+         && "incorrect number of parameters");
+
+
+  return new (ctx) GenericEnvironment(signature, interfaceToArchetypeMap);
+}
+
+GenericEnvironment *GenericEnvironment::getIncomplete(
+                                                  ASTContext &ctx,
+                                                  GenericSignature *signature) {
+  TypeSubstitutionMap empty;
+  return new (ctx) GenericEnvironment(signature, empty);
 }
 
 void DeclName::CompoundDeclName::Profile(llvm::FoldingSetNodeID &id,

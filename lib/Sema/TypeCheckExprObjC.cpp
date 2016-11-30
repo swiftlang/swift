@@ -61,6 +61,8 @@ Optional<Type> TypeChecker::checkObjCKeyPathExpr(DeclContext *dc,
     case ResolvingDictionary:
       return true;
     }
+
+    llvm_unreachable("Unhandled State in switch.");
   };
 
   // The type of AnyObject, which is used whenever we don't have

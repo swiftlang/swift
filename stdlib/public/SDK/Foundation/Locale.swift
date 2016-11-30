@@ -39,7 +39,9 @@ public struct Locale : Hashable, Equatable, ReferenceConvertible {
 
     /// Returns a locale which tracks the user's current preferences.
     ///
-    /// The autoupdatingCurrent locale will stop auto-updating if mutated. It only compares equal to itself.
+    /// If mutated, this Locale will no longer track the user's preferences.
+    ///
+    /// - note: The autoupdating Locale will only compare equal to another autoupdating Locale.
     public static var autoupdatingCurrent : Locale {
         return Locale(adoptingReference: __NSLocaleAutoupdating(), autoupdating: true)
     }

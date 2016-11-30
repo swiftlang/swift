@@ -1593,17 +1593,27 @@ bool Parser::parseDeclAttributeList(DeclAttributes &Attributes,
 ///   attribute-list:
 ///     /*empty*/
 ///     attribute-list-clause attribute-list
+///     'inout' attribute-list-clause attribute-list
 ///   attribute-list-clause:
 ///     '@' attribute
 ///     '@' attribute attribute-list-clause
 /// \endverbatim
-bool Parser::parseTypeAttributeListPresent(TypeAttributes &Attributes) {
-  Attributes.AtLoc = Tok.getLoc();
-  do {
-    if (parseToken(tok::at_sign, diag::expected_in_attribute_list) ||
-        parseTypeAttribute(Attributes))
+bool Parser::parseTypeAttributeListPresent(SourceLoc &InOutLoc,
+                                           TypeAttributes &Attributes) {
+  while (Tok.is(tok::kw_inout)) {
+    if (InOutLoc.isValid())
+      diagnose(Tok, diag::parameter_inout_var_let_repeated)
+        .fixItRemove(InOutLoc);
+    InOutLoc = consumeToken();
+  }
+
+  while (Tok.is(tok::at_sign)) {
+    if (Attributes.AtLoc.isInvalid())
+      Attributes.AtLoc = Tok.getLoc();
+    consumeToken();
+    if (parseTypeAttribute(Attributes))
       return true;
-  } while (Tok.is(tok::at_sign));
+  }
   
   return false;
 }
@@ -3176,7 +3186,7 @@ static FuncDecl *createAccessorFunc(SourceLoc DeclLoc, ParameterList *param,
                              /*NameLoc=*/DeclLoc, /*Throws=*/false,
                              /*ThrowsLoc=*/SourceLoc(), AccessorKeywordLoc,
                              /*GenericParams=*/nullptr,
-                             Params, Type(), ReturnType, P->CurDeclContext);
+                             Params, ReturnType, P->CurDeclContext);
 
   // Non-static set/willSet/didSet/materializeForSet/mutableAddress
   // default to mutating.  get/address default to
@@ -3817,7 +3827,6 @@ void Parser::ParsedAccessors::record(Parser &P, AbstractStorageDecl *storage,
                                      SmallVectorImpl<Decl *> &decls) {
   auto flagInvalidAccessor = [&](FuncDecl *&func) {
     if (func) {
-      func->setType(ErrorType::get(P.Context));
       func->setInterfaceType(ErrorType::get(P.Context));
       func->setInvalid();
     }
@@ -4570,7 +4579,7 @@ Parser::parseDeclFunc(SourceLoc StaticLoc, StaticSpellingKind StaticSpelling,
                           FuncLoc, FullName, NameLoc,
                           /*Throws=*/throwsLoc.isValid(), throwsLoc,
                           /*AccessorKeywordLoc=*/SourceLoc(),
-                          GenericParams, BodyParams, Type(), FuncRetTy,
+                          GenericParams, BodyParams, FuncRetTy,
                           CurDeclContext);
     
     diagnoseOperatorFixityAttributes(*this, Attributes, FD);
@@ -5315,6 +5324,7 @@ ParserStatus Parser::parseDeclSubscript(ParseDeclOptions Flags,
 
   if (Invalid) {
     Subscript->setType(ErrorType::get(Context));
+    Subscript->setInterfaceType(ErrorType::get(Context));
     Subscript->setInvalid();
   }
 

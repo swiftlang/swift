@@ -111,6 +111,8 @@ static bool isCompatibleImportKind(ImportKind expected, ImportKind actual) {
   case ImportKind::Func:
     return false;
   }
+
+  llvm_unreachable("Unhandled ImportKind in switch.");
 }
 
 static const char *getImportKindString(ImportKind kind) {
@@ -132,6 +134,8 @@ static const char *getImportKindString(ImportKind kind) {
   case ImportKind::Func:
     return "func";
   }
+
+  llvm_unreachable("Unhandled ImportKind in switch.");
 }
 
 static bool shouldImportSelfImportClang(const ImportDecl *ID,

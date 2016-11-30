@@ -839,6 +839,7 @@ inline bool TypeRepr::isSimple() const {
   case TypeReprKind::Error:
   case TypeReprKind::Function:
   case TypeReprKind::InOut:
+  case TypeReprKind::Composition:
     return false;
   case TypeReprKind::SimpleIdent:
   case TypeReprKind::GenericIdent:
@@ -848,7 +849,6 @@ inline bool TypeRepr::isSimple() const {
   case TypeReprKind::Dictionary:
   case TypeReprKind::Optional:
   case TypeReprKind::ImplicitlyUnwrappedOptional:
-  case TypeReprKind::Composition:
   case TypeReprKind::Tuple:
   case TypeReprKind::Fixed:
   case TypeReprKind::Array:
