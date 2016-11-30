@@ -505,10 +505,14 @@ bool DeclContext::isValidGenericContext() const {
 ResilienceExpansion DeclContext::getResilienceExpansion() const {
   for (const auto *dc = this; dc->isLocalContext(); dc = dc->getParent()) {
     if (auto *AFD = dyn_cast<AbstractFunctionDecl>(dc)) {
+      // If the function is a nested function, we will serialize its body if
+      // we serialize the parent's body.
+      if (AFD->getDeclContext()->isLocalContext())
+        continue;
+      
       // If the function is not externally visible, we will not be serializing
       // its body.
-      if (!AFD->getDeclContext()->isLocalContext() &&
-          AFD->getEffectiveAccess() < Accessibility::Public)
+      if (AFD->getEffectiveAccess() < Accessibility::Public)
         break;
 
       // Bodies of public transparent and always-inline functions are
