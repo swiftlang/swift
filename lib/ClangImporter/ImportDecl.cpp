@@ -2725,6 +2725,8 @@ namespace {
         return nullptr;
       }
       }
+      
+      llvm_unreachable("Invalid EnumKind.");
     }
 
 

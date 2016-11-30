@@ -214,6 +214,8 @@ bool SwiftLookupTable::contextRequiresName(ContextKind kind) {
   case ContextKind::TranslationUnit:
     return false;
   }
+
+  llvm_unreachable("Invalid ContextKind.");
 }
 
 /// Try to translate the given Clang declaration into a context.
@@ -293,6 +295,8 @@ SwiftLookupTable::translateContext(EffectiveClangContext context) {
 
     return None;
   }
+
+  llvm_unreachable("Invalid EffectiveClangContext.");
 }
 
 /// Lookup an unresolved context name and resolve it to a Clang

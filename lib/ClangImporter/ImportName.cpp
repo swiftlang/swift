@@ -1094,7 +1094,7 @@ ImportedName NameImporter::importNameImpl(const clang::NamedDecl *D,
   // Objective-C categories and extensions don't have names, despite
   // being "named" declarations.
   if (isa<clang::ObjCCategoryDecl>(D))
-    return {};
+    return ImportedName();
 
   // Dig out the definition, if there is one.
   if (auto def = getDefinitionForClangTypeDecl(D)) {
@@ -1106,7 +1106,7 @@ ImportedName NameImporter::importNameImpl(const clang::NamedDecl *D,
   auto dc = const_cast<clang::DeclContext *>(D->getDeclContext());
   auto effectiveCtx = determineEffectiveContext(D, dc, options);
   if (!effectiveCtx)
-    return {};
+    return ImportedName();
   result.EffectiveContext = effectiveCtx;
 
   // FIXME: ugly to check here, instead perform unified check up front in
@@ -1192,7 +1192,7 @@ ImportedName NameImporter::importNameImpl(const clang::NamedDecl *D,
         if (!shouldImportAsInitializer(method, initPrefixLength,
                                        result.InitKind)) {
           // We cannot import this as an initializer anyway.
-          return {};
+          return ImportedName();
         }
 
         // If this swift_name attribute maps a factory method to an
