@@ -3360,13 +3360,13 @@ namespace {
           // declaration.
           if (auto imported = VisitObjCMethodDecl(decl, dc,
                                                   /*forceClassMethod=*/true))
-            Impl.AlternateDecls[result] = cast<ValueDecl>(imported);
+            Impl.setAlternateDecl(result, cast<ValueDecl>(imported));
         } else if (auto factory = importFactoryMethodAsConstructor(
                                     result, decl, selector, dc)) {
           // We imported the factory method as an initializer, so
           // record it as an alternate declaration.
           if (*factory)
-            Impl.AlternateDecls[result] = *factory;
+            Impl.setAlternateDecl(result, *factory);
         }
 
       }
@@ -4971,7 +4971,7 @@ SwiftDeclConverter::getImplicitProperty(ImportedName importedName,
                          SourceLoc());
 
   // Make the property the alternate declaration for the getter.
-  Impl.AlternateDecls[swiftGetter] = property;
+  Impl.setAlternateDecl(swiftGetter, property);
 
   return property;
 }
@@ -5021,7 +5021,7 @@ SwiftDeclConverter::importFactoryMethodAsConstructor(
   /// Record the initializer as an alternative declaration for the
   /// member.
   if (result) {
-    Impl.AlternateDecls[member] = result;
+    Impl.setAlternateDecl(member, result);
 
     if (swift3Name)
       markAsSwift2Variant(result, *swift3Name);
@@ -5736,7 +5736,7 @@ SwiftDeclConverter::importSubscript(Decl *decl,
       TypeLoc::withoutLoc(elementContextTy), dc);
 
   /// Record the subscript as an alternative declaration.
-  Impl.AlternateDecls[associateWithSetter ? setter : getter] = subscript;
+  Impl.setAlternateDecl(associateWithSetter ? setter : getter, subscript);
 
   subscript->makeComputed(SourceLoc(), getterThunk, setterThunk, nullptr,
                           SourceLoc());
