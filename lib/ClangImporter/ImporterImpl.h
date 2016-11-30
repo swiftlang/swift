@@ -272,6 +272,9 @@ public:
   const bool InferImportAsMember;
   const bool DisableSwiftBridgeAttr;
 
+  bool IsReadingBridgingPCH;
+  llvm::SmallVector<clang::serialization::SubmoduleID, 2> PCHImportedSubmodules;
+
   const Version CurrentVersion;
 
   constexpr static const char * const moduleImportBufferName =

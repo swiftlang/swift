@@ -35,6 +35,9 @@ public:
   /// Equivalent to Clang's -mcpu=.
   std::string TargetCPU;
 
+  // The bridging header or PCH that will be imported.
+  std::string BridgingHeader;
+
   /// \see Mode
   enum class Modes {
     /// Set up Clang for importing modules into Swift and generating IR from
