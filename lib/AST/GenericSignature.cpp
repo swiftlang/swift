@@ -528,21 +528,20 @@ GenericEnvironment *CanGenericSignature::getGenericEnvironment(
 
 unsigned GenericParamKey::findIndexIn(
                   llvm::ArrayRef<GenericTypeParamType *> genericParams) const {
-  // For depth 0, we have random access.
-  if (Depth == 0) {
-    assert(Index < genericParams.size() && "Out-of-bounds generic param key");
-    assert(GenericParamKey(genericParams[Index]) == *this &&
-           "Mismatched generic parameter key");
+  // For depth 0, we have random access. We perform the extra checking so that
+  // we can return
+  if (Depth == 0 && Index < genericParams.size() &&
+      genericParams[Index] == *this)
     return Index;
-  }
 
   // At other depths, perform a binary search.
   unsigned result =
-  std::lower_bound(genericParams.begin(), genericParams.end(), *this,
-                   Ordering())
-  - genericParams.begin();
-  assert(result < genericParams.size() && "Out-of-bounds generic param key");
-  assert(GenericParamKey(genericParams[result]) == *this &&
-         "Mismatched generic parameter key");
-  return result;
+      std::lower_bound(genericParams.begin(), genericParams.end(), *this,
+                       Ordering())
+        - genericParams.begin();
+  if (result < genericParams.size() && genericParams[result] == *this)
+    return result;
+
+  // We didn't find the parameter we were looking for.
+  return genericParams.size();
 }

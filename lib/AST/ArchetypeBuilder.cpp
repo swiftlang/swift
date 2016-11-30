@@ -87,9 +87,11 @@ static void updateRequirementSource(RequirementSource &source,
 }
 
 struct ArchetypeBuilder::Implementation {
-  /// A mapping from generic parameters to the corresponding potential
-  /// archetypes.
-  llvm::MapVector<GenericParamKey, PotentialArchetype*> PotentialArchetypes;
+  /// The generic parameters that this archetype builder is working with.
+  SmallVector<GenericTypeParamType *, 4> GenericParams;
+
+  /// The potential archetypes for the generic parameters in \c GenericParams.
+  SmallVector<PotentialArchetype *, 4> PotentialArchetypes;
 
   /// The number of nested types that haven't yet been resolved to archetypes.
   /// Once all requirements have been added, this will be zero in well-formed
@@ -564,7 +566,7 @@ ArchetypeBuilder::PotentialArchetype::getTypeInContext(
     return archetypeAnchor->getTypeInContext(builder, genericEnv);
 
   auto representative = getRepresentative();
-  ASTContext &ctx = getRootParam()->getASTContext();
+  ASTContext &ctx = genericEnv->getGenericSignature()->getASTContext();
 
   // Return a concrete type or archetype we've already resolved.
   if (Type concreteType = representative->getConcreteType()) {
@@ -903,7 +905,7 @@ ArchetypeBuilder::~ArchetypeBuilder() {
     return;
 
   for (auto PA : Impl->PotentialArchetypes)
-    delete PA.second;
+    delete PA;
 }
 
 LazyResolver *ArchetypeBuilder::getLazyResolver() const { 
@@ -912,12 +914,12 @@ LazyResolver *ArchetypeBuilder::getLazyResolver() const {
 
 auto ArchetypeBuilder::resolveArchetype(Type type) -> PotentialArchetype * {
   if (auto genericParam = type->getAs<GenericTypeParamType>()) {
-    auto known
-      = Impl->PotentialArchetypes.find(GenericParamKey(genericParam));
-    if (known == Impl->PotentialArchetypes.end())
-      return nullptr;
+    unsigned index = GenericParamKey(genericParam).findIndexIn(
+                                                           Impl->GenericParams);
+    if (index < Impl->GenericParams.size())
+      return Impl->PotentialArchetypes[index];
 
-    return known->second;
+    return nullptr;
   }
 
   if (auto dependentMember = type->getAs<DependentMemberType>()) {
@@ -935,13 +937,17 @@ auto ArchetypeBuilder::addGenericParameter(GenericTypeParamType *GenericParam,
                                            Identifier ParamName)
        -> PotentialArchetype *
 {
-  GenericParamKey Key{GenericParam->getDepth(), GenericParam->getIndex()};
-  
-  // Create a potential archetype for this type parameter.
-  assert(!Impl->PotentialArchetypes[Key]);
-  auto PA = new PotentialArchetype(GenericParam, ParamName);
+  GenericParamKey Key(GenericParam);
+  assert(Impl->GenericParams.empty() ||
+         ((Key.Depth == Impl->GenericParams.back()->getDepth() &&
+           Key.Index == Impl->GenericParams.back()->getIndex() + 1) ||
+          (Key.Depth > Impl->GenericParams.back()->getDepth() &&
+           Key.Index == 0)));
 
-  Impl->PotentialArchetypes[Key] = PA;
+  // Create a potential archetype for this type parameter.
+  auto PA = new PotentialArchetype(GenericParam, ParamName);
+  Impl->GenericParams.push_back(GenericParam);
+  Impl->PotentialArchetypes.push_back(PA);
   return PA;
 }
 
@@ -952,8 +958,8 @@ void ArchetypeBuilder::addGenericParameter(GenericTypeParamDecl *GenericParam) {
 }
 
 bool ArchetypeBuilder::addGenericParameterRequirements(GenericTypeParamDecl *GenericParam) {
-  GenericParamKey Key{GenericParam->getDepth(), GenericParam->getIndex()};
-  auto PA = Impl->PotentialArchetypes[Key];
+  GenericParamKey Key(GenericParam);
+  auto PA = Impl->PotentialArchetypes[Key.findIndexIn(Impl->GenericParams)];
   
   // Add the requirements from the declaration.
   llvm::SmallPtrSet<ProtocolDecl *, 8> visited;
@@ -1855,12 +1861,10 @@ ArchetypeBuilder::finalize(SourceLoc loc, bool allowConcreteGenericParams) {
   // with each other.
   if (!allowConcreteGenericParams) {
     unsigned depth = 0;
-    for (const auto &pair : Impl->PotentialArchetypes) {
-      depth = std::max(depth, pair.second->getRootGenericParamKey().Depth);
-    }
+    for (const auto &gp : Impl->GenericParams)
+      depth = std::max(depth, gp->getDepth());
 
-    for (const auto &pair : Impl->PotentialArchetypes) {
-      auto pa = pair.second;
+    for (const auto pa : Impl->PotentialArchetypes) {
       auto rep = pa->getRepresentative();
 
       if (pa->getRootGenericParamKey().Depth < depth)
@@ -1975,9 +1979,9 @@ void ArchetypeBuilder::visitPotentialArchetypes(F f) {
   llvm::SmallPtrSet<PotentialArchetype *, 4> visited;
 
   // Add top-level potential archetypes to the stack.
-  for (const auto &pa : Impl->PotentialArchetypes) {
-    if (visited.insert(pa.second).second)
-      stack.push_back(pa.second);
+  for (const auto pa : Impl->PotentialArchetypes) {
+    if (visited.insert(pa).second)
+      stack.push_back(pa);
   }
 
   // Visit all of the potential archetypes.
@@ -2162,8 +2166,8 @@ void ArchetypeBuilder::addGenericSignature(GenericSignature *sig,
       // type.
       auto contextTy = env->mapTypeIntoContext(param);
       auto key = GenericParamKey(param);
-      assert(Impl->PotentialArchetypes.count(key) && "Missing parameter?");
-      auto *pa = Impl->PotentialArchetypes[key];
+      auto *pa = Impl->PotentialArchetypes[
+                                         key.findIndexIn(Impl->GenericParams)];
       assert(pa == pa->getRepresentative() && "Not the representative");
       pa->ConcreteType = contextTy;
       pa->SameTypeSource = RequirementSource(sourceKind, SourceLoc());
@@ -2224,16 +2228,10 @@ static void collectRequirements(ArchetypeBuilder &builder,
 
 GenericSignature *ArchetypeBuilder::getGenericSignature() {
   // Collect the requirements placed on the generic parameter types.
-  SmallVector<GenericTypeParamType *, 4> genericParamTypes;
-  for (auto pair : Impl->PotentialArchetypes) {
-    auto paramTy = pair.second->getGenericParam();
-    genericParamTypes.push_back(paramTy);
-  }
-
   SmallVector<Requirement, 4> requirements;
-  collectRequirements(*this, genericParamTypes, requirements);
+  collectRequirements(*this, Impl->GenericParams, requirements);
 
-  auto sig = GenericSignature::get(genericParamTypes, requirements);
+  auto sig = GenericSignature::get(Impl->GenericParams, requirements);
   return sig;
 }
 
@@ -2242,11 +2240,10 @@ GenericEnvironment *ArchetypeBuilder::getGenericEnvironment(GenericSignature *si
 
   // Compute the archetypes for the generic parameters.
   auto genericEnv = GenericEnvironment::getIncomplete(Context, signature);
-  for (auto pair : Impl->PotentialArchetypes) {
-    Type contextType =
-      pair.second->getTypeInContext(*this, genericEnv).getValue();
-    if (!genericEnv->getMappingIfPresent(pair.second->getGenericParamKey()))
-      genericEnv->addMapping(pair.second->getGenericParamKey(), contextType);
+  for (auto pa : Impl->PotentialArchetypes) {
+    Type contextType = pa->getTypeInContext(*this, genericEnv).getValue();
+    if (!genericEnv->getMappingIfPresent(pa->getGenericParamKey()))
+      genericEnv->addMapping(pa->getGenericParamKey(), contextType);
   }
 
 #ifndef NDEBUG
