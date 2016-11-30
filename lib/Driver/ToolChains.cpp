@@ -191,6 +191,9 @@ ToolChain::constructInvocation(const CompileJobAction &job,
     case types::TY_Object:
       FrontendModeOption = "-c";
       break;
+    case types::TY_PCH:
+      FrontendModeOption = "-emit-pch";
+      break;
     case types::TY_RawSIL:
       FrontendModeOption = "-emit-silgen";
       break;
@@ -480,6 +483,7 @@ ToolChain::constructInvocation(const BackendJobAction &job,
     case types::TY_RawSIB:
     case types::TY_SIL:
     case types::TY_SIB:
+    case types::TY_PCH:
       llvm_unreachable("Cannot be output from backend job");
     case types::TY_Swift:
     case types::TY_dSYM:
