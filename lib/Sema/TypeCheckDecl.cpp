@@ -650,7 +650,6 @@ static void checkCircularity(TypeChecker &tc, T *decl,
                   path.back()->getName().str());
 
       decl->setInvalid();
-      decl->overwriteType(ErrorType::get(tc.Context));
       decl->setInterfaceType(ErrorType::get(tc.Context));
       breakInheritanceCycle(decl);
       break;
@@ -673,7 +672,6 @@ static void checkCircularity(TypeChecker &tc, T *decl,
 
     // Set this declaration as invalid, then break the cycle somehow.
     decl->setInvalid();
-    decl->overwriteType(ErrorType::get(tc.Context));
     decl->setInterfaceType(ErrorType::get(tc.Context));
     breakInheritanceCycle(decl);
     break;
@@ -946,7 +944,7 @@ static void checkRedeclaration(TypeChecker &tc, ValueDecl *current) {
       if (!isa<AbstractFunctionDecl>(current) &&
           !isa<EnumElementDecl>(current) &&
           !isa<SubscriptDecl>(current) &&
-          !isa<AbstractTypeParamDecl>(current))
+          !isa<TypeDecl>(current))
         if (current->hasType())
           current->overwriteType(ErrorType::get(tc.Context));
       if (current->hasInterfaceType())
@@ -3857,7 +3855,7 @@ public:
     TC.checkDeclAttributesEarly(TAD);
     TC.computeAccessibility(TAD);
     if (!IsSecondPass) {
-      if (!TAD->hasType())
+      if (!TAD->getAliasType())
         TC.validateDecl(TAD);
       
       TypeResolutionOptions options;
@@ -3865,32 +3863,38 @@ public:
         options |= TR_GlobalTypeAlias;
       if (TAD->getFormalAccess() <= Accessibility::FilePrivate)
         options |= TR_KnownNonCascadingDependency;
-      
+
+      bool invalid = false;
       if (TAD->getDeclContext()->isModuleScopeContext()) {
         IterativeTypeChecker ITC(TC);
         ITC.satisfy(requestResolveTypeDecl(TAD));
       } else if (TC.validateType(TAD->getUnderlyingTypeLoc(),
                                  TAD->getDeclContext(), options)) {
         TAD->setInvalid();
-        TAD->overwriteType(ErrorType::get(TC.Context));
         TAD->setInterfaceType(ErrorType::get(TC.Context));
         TAD->getUnderlyingTypeLoc().setInvalidType(TC.Context);
-      }
-
-      // lldb creates global typealiases containing archetypes
-      // sometimes...
-      if (TAD->getType()->getCanonicalType()->hasTypeParameter() ||
-          !TAD->isGenericContext())
-        TAD->setInterfaceType(TAD->getType());
-      else {
-        TAD->setInterfaceType(
-          ArchetypeBuilder::mapTypeOutOfContext(TAD, TAD->getType()));
+        invalid = true;
       }
 
       // We create TypeAliasTypes with invalid underlying types, so we
       // need to propagate recursive properties now.
       TAD->getAliasType()->setRecursiveProperties(
                        TAD->getUnderlyingType()->getRecursiveProperties());
+
+      if (!invalid) {
+        // Map the alias type out of context; if it is not dependent,
+        // we'll keep the sugar.
+        Type interfaceTy = TAD->getAliasType();
+
+        // lldb creates global typealiases containing archetypes
+        // sometimes...
+        if (TAD->getUnderlyingType()->hasArchetype() &&
+            TAD->isGenericContext()) {
+          interfaceTy = ArchetypeBuilder::mapTypeOutOfContext(TAD, interfaceTy);
+        }
+
+        TAD->setInterfaceType(MetatypeType::get(interfaceTy, TC.Context));
+      }
     }
 
     if (IsSecondPass)
@@ -6939,7 +6943,7 @@ void TypeChecker::validateDecl(ValueDecl *D, bool resolveTypeParams) {
     auto typeAlias = cast<TypeAliasDecl>(D);
     
     // Compute the declared type.
-    if (typeAlias->hasType()) {
+    if (typeAlias->getAliasType()) {
       
       // If we have are recursing into validation and already have a type set...
       // but also don't have the underlying type computed, then we are
@@ -6950,7 +6954,6 @@ void TypeChecker::validateDecl(ValueDecl *D, bool resolveTypeParams) {
                  typeAlias->getName());
         typeAlias->getUnderlyingTypeLoc().setInvalidType(Context);
         typeAlias->setInvalid();
-        typeAlias->overwriteType(ErrorType::get(Context));
         typeAlias->setInterfaceType(ErrorType::get(Context));
       }
       return;
@@ -6974,7 +6977,7 @@ void TypeChecker::validateDecl(ValueDecl *D, bool resolveTypeParams) {
   case DeclKind::Struct:
   case DeclKind::Class: {
     auto nominal = cast<NominalTypeDecl>(D);
-    if (nominal->hasType())
+    if (nominal->hasInterfaceType())
       return;
     nominal->computeType();
 
@@ -7015,7 +7018,7 @@ void TypeChecker::validateDecl(ValueDecl *D, bool resolveTypeParams) {
 
   case DeclKind::Protocol: {
     auto proto = cast<ProtocolDecl>(D);
-    if (proto->hasType())
+    if (proto->hasInterfaceType())
       return;
     proto->computeType();
 

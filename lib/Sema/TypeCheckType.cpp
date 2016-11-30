@@ -593,7 +593,8 @@ Type TypeChecker::applyUnboundGenericArguments(
 
     // Check the generic arguments against the generic signature.
     auto genericSig = decl->getGenericSignature();
-    if (!decl->hasType() || decl->isValidatingGenericSignature()) {
+    if (!decl->hasInterfaceType() ||
+        decl->isValidatingGenericSignature()) {
       diagnose(loc, diag::recursive_requirement_reference);
       return nullptr;
     }

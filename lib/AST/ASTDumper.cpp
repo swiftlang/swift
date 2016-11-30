@@ -517,7 +517,7 @@ namespace {
       if (!isa<AbstractFunctionDecl>(VD) &&
           !isa<EnumElementDecl>(VD) &&
           !isa<SubscriptDecl>(VD) &&
-          !isa<AbstractTypeParamDecl>(VD)) {
+          !isa<TypeDecl>(VD)) {
         OS << " type='";
         if (VD->hasType())
           VD->getType().print(OS);
@@ -569,7 +569,7 @@ namespace {
                       llvm::Optional<llvm::raw_ostream::Colors>()) {
       printCommon((ValueDecl *)NTD, Name, Color);
 
-      if (NTD->hasType()) {
+      if (NTD->hasInterfaceType()) {
         if (NTD->hasFixedLayout())
           OS << " @_fixed_layout";
         else

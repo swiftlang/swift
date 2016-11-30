@@ -1648,7 +1648,7 @@ bool ValueDecl::hasType() const {
   assert(!isa<AbstractFunctionDecl>(this) &&
          !isa<EnumElementDecl>(this) &&
          !isa<SubscriptDecl>(this) &&
-         !isa<AbstractTypeParamDecl>(this) &&
+         !isa<TypeDecl>(this) &&
          "functions and enum case constructors only have an interface type");
   return !TypeAndAccess.getPointer().isNull();
 }
@@ -1657,7 +1657,7 @@ Type ValueDecl::getType() const {
   assert(!isa<AbstractFunctionDecl>(this) &&
          !isa<EnumElementDecl>(this) &&
          !isa<SubscriptDecl>(this) &&
-         !isa<AbstractTypeParamDecl>(this) &&
+         !isa<TypeDecl>(this) &&
          "functions and enum case constructors only have an interface type");
   assert(hasType() && "declaration has no type set yet");
   return TypeAndAccess.getPointer();
@@ -1672,7 +1672,7 @@ void ValueDecl::overwriteType(Type T) {
   assert(!isa<AbstractFunctionDecl>(this) &&
          !isa<EnumElementDecl>(this) &&
          !isa<SubscriptDecl>(this) &&
-         !isa<AbstractTypeParamDecl>(this) &&
+         !isa<TypeDecl>(this) &&
          "functions and enum case constructors only have an interface type");
 
   TypeAndAccess.setPointer(T);
@@ -2031,15 +2031,8 @@ void NominalTypeDecl::computeType() {
   Type declaredInterfaceTy = getDeclaredInterfaceType();
   setInterfaceType(MetatypeType::get(declaredInterfaceTy, ctx));
 
-  // If we still don't have a declared type, don't crash -- there's a weird
-  // circular declaration issue in the code.
-  Type declaredTy = getDeclaredType();
-  if (!declaredTy || declaredTy->hasError()) {
-    setType(ErrorType::get(ctx));
-    return;
-  }
-
-  setType(MetatypeType::get(declaredTy, ctx));
+  if (declaredInterfaceTy->hasError())
+    setInvalid();
 }
 
 enum class DeclTypeKind : unsigned {
@@ -2201,17 +2194,12 @@ TypeAliasDecl::TypeAliasDecl(SourceLoc TypeAliasLoc, Identifier Name,
                              SourceLoc NameLoc, TypeLoc UnderlyingTy,
                              GenericParamList *GenericParams, DeclContext *DC)
   : GenericTypeDecl(DeclKind::TypeAlias, DC, Name, NameLoc, {}, GenericParams),
-    TypeAliasLoc(TypeAliasLoc), UnderlyingTy(UnderlyingTy)
-{
-
-  // Set the type of the TypeAlias to the right MetatypeType.
-  ASTContext &Ctx = getASTContext();
-  AliasTy = new (Ctx, AllocationArena::Permanent) NameAliasType(this);
-}
+    AliasTy(nullptr), TypeAliasLoc(TypeAliasLoc), UnderlyingTy(UnderlyingTy) {}
 
 void TypeAliasDecl::computeType() {
-  ASTContext &ctx = getASTContext();
-  setType(MetatypeType::get(AliasTy, ctx));
+  ASTContext &Ctx = getASTContext();
+  assert(!AliasTy && "already called computeType()");
+  AliasTy = new (Ctx, AllocationArena::Permanent) NameAliasType(this);
 }
 
 SourceRange TypeAliasDecl::getSourceRange() const {
@@ -2869,7 +2857,7 @@ bool ProtocolDecl::existentialTypeSupportedSlow(LazyResolver *resolver) {
   ProtocolDeclBits.ExistentialTypeSupported = true;
 
   // Resolve the protocol's type.
-  if (resolver && !hasType())
+  if (resolver && !hasInterfaceType())
     resolver->resolveDeclSignature(this);
 
   for (auto member : getMembers()) {

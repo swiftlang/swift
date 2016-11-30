@@ -1134,10 +1134,8 @@ ConstraintSystem::getTypeOfMemberReference(
       // We want to track if the generic context is represented by a
       // class-bound existential so we won't inappropriately wrap the
       // self type in an inout later on.
-      if (auto metatype = nominal->getType()->getAs<AnyMetatypeType>()) {
-        isClassBoundExistential = metatype->getInstanceType()->
-                                            isClassExistentialType();
-      }
+      isClassBoundExistential = nominal->getDeclaredType()
+          ->isClassExistentialType();
 
       if (outerDC->getAsProtocolOrProtocolExtensionContext()) {
         // Retrieve the type variable for 'Self'.
