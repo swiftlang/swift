@@ -19,7 +19,6 @@
 #if defined(__ELF__) || defined(__ANDROID__)
 
 #include "ImageInspection.h"
-#include "../SwiftShims/Visibility.h"
 #include <elf.h>
 #include <link.h>
 #include <dlfcn.h>
@@ -30,11 +29,11 @@ using namespace swift;
 /// The symbol name in the image that identifies the beginning of the
 /// protocol conformances table.
 static const char ProtocolConformancesSymbol[] =
-  "__swift2_protocol_conformances_start";
+  ".swift2_protocol_conformances_start";
 /// The symbol name in the image that identifies the beginning of the
 /// type metadata record table.
 static const char TypeMetadataRecordsSymbol[] =
-  "__swift2_type_metadata_start";
+  ".swift2_type_metadata_start";
 
 /// Context arguments passed down from dl_iterate_phdr to its callback.
 struct InspectArgs {
@@ -79,7 +78,6 @@ static int iteratePHDRCallback(struct dl_phdr_info *info,
   return 0;
 }
 
-SWIFT_RUNTIME_EXPORT
 void swift::initializeProtocolConformanceLookup() {
   // Search the loaded dls. This only searches the already
   // loaded ones.
@@ -92,7 +90,6 @@ void swift::initializeProtocolConformanceLookup() {
   dl_iterate_phdr(iteratePHDRCallback, &ProtocolConformanceArgs);
 }
 
-SWIFT_RUNTIME_EXPORT
 void swift::initializeTypeMetadataRecordLookup() {
   InspectArgs TypeMetadataRecordArgs = {
     TypeMetadataRecordsSymbol,
@@ -101,7 +98,6 @@ void swift::initializeTypeMetadataRecordLookup() {
   dl_iterate_phdr(iteratePHDRCallback, &TypeMetadataRecordArgs);
 }
 
-SWIFT_RUNTIME_EXPORT
 int swift::lookupSymbol(const void *address, SymbolInfo *info) {
   Dl_info dlinfo;
   if (dladdr(address, &dlinfo) == 0) {

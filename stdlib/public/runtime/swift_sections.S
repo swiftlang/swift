@@ -31,14 +31,14 @@
     .p2align 3
 
 #if defined(SWIFT_BEGIN)
-    .globl __\()\name\()_start
-    .protected __\()\name\()_start
-__\()\name\()_start:
+    .globl .\()\name\()_start
+    .protected .\()\name\()_start
+.\()\name\()_start:
 #if defined(__BIG_ENDIAN__)
     .long 0
-    .long .\()\name\()_end - __\()\name\()_start - 8
+    .long .\()\name\()_end - .\()\name\()_start - 8
 #else
-    .long .\()\name\()_end - __\()\name\()_start - 8
+    .long .\()\name\()_end - .\()\name\()_start - 8
     .long 0
 #endif
 #endif

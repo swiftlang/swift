@@ -15,32 +15,42 @@
 //===----------------------------------------------------------------------===//
 
 #include "ImageInspection.h"
+#include <cstring>
 
 // Currently only tested on linux but should work for any ELF platform
 #if defined(__ELF__) && defined(__linux__)
 
-// These are defined in swift_sections.S
-// Used in swift_sections.S to mark the start of a section
+// These are defined in swift_sections.S to mark the start of a section with the
+// length of the data followed immediately by the section data
+struct alignas(uint64_t) Section;
+extern const Section protocolConformancesStart asm(".swift2_protocol_conformances_start");
+extern const Section typeMetadataStart asm(".swift2_type_metadata_start");
+
 struct SectionInfo {
   uint64_t size;
-  const uint8_t data[0];
+  const char *data;
 };
-extern const SectionInfo __swift2_protocol_conformances_start;
-extern const SectionInfo __swift2_type_metadata_start;
 
+static SectionInfo
+getSectionInfo(const Section *section) {
+  SectionInfo info;
+  memcpy(&info.size, section, sizeof(uint64_t));
+  info.data = reinterpret_cast<const char *>(section) + sizeof(uint64_t);
+  return info;
+}
 
 void
 swift::initializeProtocolConformanceLookup() {
-  addImageProtocolConformanceBlockCallback(
-    __swift2_protocol_conformances_start.data,
-    __swift2_protocol_conformances_start.size);
+  auto protocolConformances = getSectionInfo(&protocolConformancesStart);
+  addImageProtocolConformanceBlockCallback(protocolConformances.data,
+                                           protocolConformances.size);
 }
 
 void
 swift::initializeTypeMetadataRecordLookup() {
-  addImageTypeMetadataRecordBlockCallback(
-    __swift2_type_metadata_start.data,
-    __swift2_type_metadata_start.size);
+  auto typeMetadata = getSectionInfo(&typeMetadataStart);
+  addImageTypeMetadataRecordBlockCallback(typeMetadata.data,
+                                          typeMetadata.size);
 }
 
 // This is called from Errors.cpp when dumping a stack trace entry.
