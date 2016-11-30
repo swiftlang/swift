@@ -595,7 +595,7 @@ static void initLLVMModule(const IRGenModule &IGM) {
 /// All this is done in a single thread.
 static std::unique_ptr<llvm::Module> performIRGeneration(IRGenOptions &Opts,
                                                          swift::Module *M,
-                                                         SILModule *SILMod,
+                                            std::unique_ptr<SILModule> SILMod,
                                                          StringRef ModuleName,
                                                  llvm::LLVMContext &LLVMContext,
                                                        SourceFile *SF = nullptr,
@@ -689,6 +689,9 @@ static std::unique_ptr<llvm::Module> performIRGeneration(IRGenOptions &Opts,
 
   embedBitcode(IGM.getModule(), Opts);
 
+  // Free the memory occupied by the SILModule.
+  SILMod.reset(nullptr);
+
   if (performLLVM(Opts, IGM.Context.Diags, nullptr, IGM.ModuleHash,
                   IGM.getModule(), IGM.TargetMachine.get(),
                   IGM.Context.LangOpts.EffectiveLanguageVersion,
@@ -725,7 +728,7 @@ static void ThreadEntryPoint(IRGenerator *irgen,
 /// All this is done in multiple threads.
 static void performParallelIRGeneration(IRGenOptions &Opts,
                                         swift::Module *M,
-                                        SILModule *SILMod,
+                                        std::unique_ptr<SILModule> SILMod,
                                         StringRef ModuleName, int numThreads) {
 
   IRGenerator irgen(Opts, *SILMod);
@@ -897,6 +900,9 @@ static void performParallelIRGeneration(IRGenOptions &Opts,
   // Bail out if there are any errors.
   if (Ctx.hadError()) return;
 
+  // Free the memory occupied by the SILModule.
+  SILMod.reset(nullptr);
+
   std::vector<std::thread> Threads;
   llvm::sys::Mutex DiagMutex;
 
@@ -916,23 +922,27 @@ static void performParallelIRGeneration(IRGenOptions &Opts,
 
 
 std::unique_ptr<llvm::Module> swift::
-performIRGeneration(IRGenOptions &Opts, swift::Module *M, SILModule *SILMod,
+performIRGeneration(IRGenOptions &Opts, swift::Module *M,
+                    std::unique_ptr<SILModule> SILMod,
                     StringRef ModuleName, llvm::LLVMContext &LLVMContext) {
   int numThreads = SILMod->getOptions().NumThreads;
   if (numThreads != 0) {
-    ::performParallelIRGeneration(Opts, M, SILMod, ModuleName, numThreads);
+    ::performParallelIRGeneration(Opts, M, std::move(SILMod),
+                                  ModuleName, numThreads);
     // TODO: Parallel LLVM compilation cannot be used if a (single) module is
     // needed as return value.
     return nullptr;
   }
-  return ::performIRGeneration(Opts, M, SILMod, ModuleName, LLVMContext);
+  return ::performIRGeneration(Opts, M, std::move(SILMod), ModuleName, LLVMContext);
 }
 
 std::unique_ptr<llvm::Module> swift::
-performIRGeneration(IRGenOptions &Opts, SourceFile &SF, SILModule *SILMod,
+performIRGeneration(IRGenOptions &Opts, SourceFile &SF,
+                    std::unique_ptr<SILModule> SILMod,
                     StringRef ModuleName, llvm::LLVMContext &LLVMContext,
                     unsigned StartElem) {
-  return ::performIRGeneration(Opts, SF.getParentModule(), SILMod, ModuleName,
+  return ::performIRGeneration(Opts, SF.getParentModule(),
+                               std::move(SILMod), ModuleName,
                                LLVMContext, &SF, StartElem);
 }
 
