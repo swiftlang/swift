@@ -305,8 +305,11 @@ class alignas(1 << DeclAlignInBits) Decl {
     /// Whether the decl can be accessed by swift users; for instance,
     /// a.storage for lazy var a is a decl that cannot be accessed.
     unsigned IsUserAccessible : 1;
+    
+    /// \brief Whether this is a closure capture vardecl.
+    unsigned IsClosureCapture : 1;
   };
-  enum { NumVarDeclBits = NumAbstractStorageDeclBits + 5 };
+  enum { NumVarDeclBits = NumAbstractStorageDeclBits + 6 };
   static_assert(NumVarDeclBits <= 32, "fits in an unsigned");
   
   class EnumElementDeclBitfields {
@@ -4096,6 +4099,7 @@ protected:
     VarDeclBits.IsUserAccessible = true;
     VarDeclBits.IsStatic = IsStatic;
     VarDeclBits.IsLet = IsLet;
+    VarDeclBits.IsClosureCapture = false;
     VarDeclBits.IsDebuggerVar = false;
     VarDeclBits.HasNonPatternBindingInit = false;
     setType(Ty);
@@ -4198,6 +4202,10 @@ public:
   /// Is this an immutable 'let' property?
   bool isLet() const { return VarDeclBits.IsLet; }
   void setLet(bool IsLet) { VarDeclBits.IsLet = IsLet; }
+
+  /// Is this a closure capture?
+  bool isClosureCapture() const { return VarDeclBits.IsClosureCapture; }
+  void setIsClosureCapture(bool IsClosureCapture) { VarDeclBits.IsClosureCapture = IsClosureCapture; }
 
   /// Return true if this vardecl has an initial value bound to it in a way
   /// that isn't represented in the AST with an initializer in the pattern

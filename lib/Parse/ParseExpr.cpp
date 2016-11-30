@@ -2155,6 +2155,8 @@ parseClosureSignatureIfPresent(SmallVectorImpl<CaptureListEntry> &captureList,
       auto *VD = new (Context) VarDecl(/*isStatic*/false,
                                        /*isLet*/ownershipKind !=Ownership::Weak,
                                        nameLoc, name, Type(), CurDeclContext);
+      VD->setIsClosureCapture(true);
+
       // Attributes.
       if (ownershipKind != Ownership::Strong)
         VD->getAttrs().add(new (Context) OwnershipAttr(ownershipKind));

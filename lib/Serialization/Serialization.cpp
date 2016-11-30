@@ -2480,6 +2480,7 @@ void Serializer::writeDecl(const Decl *D) {
   case DeclKind::Var: {
     auto var = cast<VarDecl>(D);
     verifyAttrSerializable(var);
+    assert(!var->isClosureCapture() && "should not serialize closure capture vardecls");
 
     auto contextID = addDeclContextRef(var->getDeclContext());
     Type type = var->hasType() ? var->getType() : nullptr;
