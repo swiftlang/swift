@@ -68,6 +68,17 @@ void GenericEnvironment::addMapping(GenericTypeParamType *genericParam,
     result.first->second = genericParam;
 }
 
+Optional<Type> GenericEnvironment::getMappingIfPresent(
+                                   GenericTypeParamType *genericParam) const {
+  auto canParamTy =
+    cast<GenericTypeParamType>(genericParam->getCanonicalType());
+
+  auto found = InterfaceToArchetypeMap.find(canParamTy);
+  if (found == InterfaceToArchetypeMap.end()) return None;
+
+  return found->second;
+}
+
 void *GenericEnvironment::operator new(size_t bytes, const ASTContext &ctx) {
   return ctx.Allocate(bytes, alignof(GenericEnvironment), AllocationArena::Permanent);
 }

@@ -3623,7 +3623,8 @@ Type ModuleFile::getType(TypeID TID) {
       archetype = ArchetypeType::getNew(ctx, parent, assocTypeDecl,
                                         conformances, superclass);
     } else {
-      archetype = ArchetypeType::getNew(ctx, getIdentifier(assocTypeOrNameID),
+      archetype = ArchetypeType::getNew(ctx, nullptr,
+                                        getIdentifier(assocTypeOrNameID),
                                         conformances, superclass);
     }
 

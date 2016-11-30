@@ -740,7 +740,8 @@ static void VisitNodeArchetype(
 
   if (ast) {
     result._types.push_back(ArchetypeType::getNew(
-        *ast, ast->getIdentifier(archetype_name), conforms_to, Type()));
+        *ast, nullptr, ast->getIdentifier(archetype_name), conforms_to,
+        Type()));
   } else {
     result._error = "invalid ASTContext";
   }
@@ -769,7 +770,8 @@ static void VisitNodeArchetypeRef(
     if (ast) {
       SmallVector<ProtocolDecl *, 1> protocols;
       result._types.push_back(ArchetypeType::getNew(
-          *ast, ast->getIdentifier(archetype_name), protocols, Type()));
+        *ast, nullptr, ast->getIdentifier(archetype_name), protocols,
+        Type()));
     } else {
       result._error = "invalid ASTContext";
     }

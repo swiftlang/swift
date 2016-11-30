@@ -22,6 +22,7 @@
 
 namespace swift {
 
+class ArchetypeBuilder;
 class ASTContext;
 class GenericTypeParamType;
 class SILModule;
@@ -29,7 +30,7 @@ class SILType;
 
 /// Describes the mapping between archetypes and interface types for the
 /// generic parameters of a DeclContext.
-class GenericEnvironment final {
+class alignas(1 << DeclAlignInBits) GenericEnvironment final {
   GenericSignature *Signature;
   TypeSubstitutionMap ArchetypeToInterfaceMap;
   TypeSubstitutionMap InterfaceToArchetypeMap;
@@ -65,6 +66,11 @@ public:
   /// an archetype)
   void addMapping(GenericTypeParamType *genericParam, Type contextType);
 
+  /// Retrieve the mapping for the given generic parameter, if present.
+  ///
+  /// This is only useful when lazily populating a generic environment.
+  Optional<Type> getMappingIfPresent(GenericTypeParamType *genericParam) const;
+
   /// Make vanilla new/delete illegal.
   void *operator new(size_t Bytes) = delete;
   void operator delete(void *Data) = delete;
@@ -80,9 +86,6 @@ public:
   Type mapTypeIntoContext(ModuleDecl *M, Type type) const;
 
   /// Map a generic parameter type to a contextual type.
-  ///
-  /// This operation will also reabstract dependent types according to the
-  /// abstraction level of their associated type requirements.
   Type mapTypeIntoContext(GenericTypeParamType *type) const;
 
   /// \brief Map the given SIL interface type to a contextual type.

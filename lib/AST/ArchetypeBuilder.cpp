@@ -26,6 +26,7 @@
 #include "swift/AST/ProtocolConformance.h"
 #include "swift/AST/TypeRepr.h"
 #include "swift/AST/TypeWalker.h"
+#include "swift/Basic/Defer.h"
 #include "llvm/ADT/SetVector.h"
 #include "llvm/ADT/SmallPtrSet.h"
 #include "llvm/ADT/SmallString.h"
@@ -130,6 +131,24 @@ struct ArchetypeBuilder::Implementation {
 
   /// The nested types that have been renamed.
   SmallVector<PotentialArchetype *, 4> RenamedNestedTypes;
+
+  /// Potential archetypes for which we are currently performing
+  /// substitutions of their superclasses. Used to detect recursion in
+  /// superclass substitutions.
+  llvm::DenseSet<std::pair<GenericEnvironment *,
+                           ArchetypeBuilder::PotentialArchetype *>>
+    SuperclassSubs;
+
+  /// Potential archetypes for which we are currently performing
+  /// substitutions of their concrete types. Used to detect recursion in
+  /// concrete type substitutions.
+  llvm::DenseSet<std::pair<GenericEnvironment *,
+                           ArchetypeBuilder::PotentialArchetype *>>
+    ConcreteSubs;
+
+  /// FIXME: Egregious hack to track when we ended up using a "parent"
+  /// archetype, because we end up with broken invariants in that case.
+  bool UsedContextArchetype = false;
 };
 
 ArchetypeBuilder::PotentialArchetype::~PotentialArchetype() {
@@ -363,9 +382,12 @@ auto ArchetypeBuilder::PotentialArchetype::getRepresentative()
 
 bool ArchetypeBuilder::PotentialArchetype::hasConcreteTypeInPath() const {
   for (auto pa = this; pa; pa = pa->getParent()) {
-    if (pa->ArchetypeOrConcreteType.isConcreteType() &&
-        !pa->ArchetypeOrConcreteType.getAsConcreteType()->is<ArchetypeType>())
-      return true;
+    // FIXME: The archetype check here is a hack because we're reusing
+    // archetypes from the outer context.
+    if (Type concreteType = pa->getConcreteType()) {
+      if (!concreteType->is<ArchetypeType>())
+        return true;
+    }
   }
 
   return false;
@@ -479,7 +501,7 @@ auto ArchetypeBuilder::PotentialArchetype::getNestedType(
           // to resolve and get a special diagnosis in finalize.
           continue;
         } else {
-          pa->ArchetypeOrConcreteType = NestedType::forConcreteType(type);
+          pa->ConcreteType = type;
           pa->SameTypeSource = redundantSource;
         }
       } else
@@ -536,10 +558,16 @@ auto ArchetypeBuilder::PotentialArchetype::getNestedType(
 
 /// Replace dependent types with their archetypes or concrete types.
 static Type substConcreteTypesForDependentTypes(ArchetypeBuilder &builder,
+                                                GenericEnvironment *genericEnv,
                                                 Type type) {
+  // FIXME: Use dyn_cast rather than getAs.
+  // FIXME: This should really be "Type::subst()", but we need a way to provide
+  // Type::subst() with generic parameter bindings that are lazily populated
+  // through the archetype builder.
   return type.transform([&](Type type) -> Type {
       if (auto depMemTy = type->getAs<DependentMemberType>()) {
         auto newBase = substConcreteTypesForDependentTypes(builder,
+                                                           genericEnv,
                                                            depMemTy->getBase());
         return depMemTy->substBaseType(&builder.getModule(), newBase,
                                        builder.getLazyResolver());
@@ -547,7 +575,8 @@ static Type substConcreteTypesForDependentTypes(ArchetypeBuilder &builder,
 
       if (auto typeParam = type->getAs<GenericTypeParamType>()) {
         auto potentialArchetype = builder.resolveArchetype(typeParam);
-        return potentialArchetype->getType(builder).getValue();
+        return potentialArchetype->getTypeInContext(builder, genericEnv)
+                 .getValue();
       }
 
       return type;
@@ -555,83 +584,93 @@ static Type substConcreteTypesForDependentTypes(ArchetypeBuilder &builder,
 }
 
 ArchetypeType::NestedType
-ArchetypeBuilder::PotentialArchetype::getType(ArchetypeBuilder &builder) {
-
-  auto representative = getRepresentative();
-  ASTContext &ctx = getRootParam()->getASTContext();
-
+ArchetypeBuilder::PotentialArchetype::getTypeInContext(
+                                               ArchetypeBuilder &builder,
+                                               GenericEnvironment *genericEnv) {
   // Retrieve the archetype from the archetype anchor in this equivalence class.
   // The anchor must not have any concrete parents (otherwise we would just
   // use the representative).
   auto archetypeAnchor = getArchetypeAnchor();
   if (archetypeAnchor != this)
-    return archetypeAnchor->getType(builder);
+    return archetypeAnchor->getTypeInContext(builder, genericEnv);
+
+  auto representative = getRepresentative();
+  ASTContext &ctx = getRootParam()->getASTContext();
 
   // Return a concrete type or archetype we've already resolved.
-  if (representative->ArchetypeOrConcreteType) {
-    // If the concrete type is dependent, substitute dependent types
-    // for archetypes.
-    if (auto concreteType
-          = representative->ArchetypeOrConcreteType.getAsConcreteType()) {
-      if (concreteType->hasTypeParameter()) {
-        // If we already know the concrete type is recursive, just
-        // return an error. It will be diagnosed elsewhere.
-        if (representative->RecursiveConcreteType) {
-          return NestedType::forConcreteType(ErrorType::get(ctx));
-        }
+  if (Type concreteType = representative->getConcreteType()) {
+    // If the concrete type doesn't involve type parameters, just return it.
+    if (!concreteType->hasTypeParameter())
+      return NestedType::forConcreteType(concreteType);
 
-        // If we're already substituting a concrete type, mark this
-        // potential archetype as having a recursive concrete type.
-        if (representative->SubstitutingConcreteType) {
-          representative->RecursiveConcreteType = true;
-          return NestedType::forConcreteType(ErrorType::get(ctx));
-        }
+    // Otherwise, substitute in the archetypes in the environment.
 
-        representative->SubstitutingConcreteType = true;
-        NestedType result = NestedType::forConcreteType(
-                              substConcreteTypesForDependentTypes(
-                                builder,
-                                concreteType));
-        representative->SubstitutingConcreteType = false;
-
-        // If all went well, we're done.
-        if (!representative->RecursiveConcreteType)
-          return result;
-
-        // Otherwise, we found that the concrete type is recursive,
-        // complain and return an error.
-        ctx.Diags.diagnose(SameTypeSource->getLoc(),
+    // If we're already substituting into the concrete type, mark this
+    // potential archetype as having a recursive concrete type.
+    if (representative->RecursiveConcreteType ||
+        !builder.Impl->ConcreteSubs.insert({genericEnv, representative})
+          .second) {
+      // Complain about the recursion, if we haven't done so already.
+      if (!representative->RecursiveConcreteType) {
+        ctx.Diags.diagnose(representative->SameTypeSource->getLoc(),
                            diag::recursive_same_type_constraint,
-                           getDependentType(/*allowUnresolved=*/false),
+                           getDependentType(/*allowUnresolved=*/true),
                            concreteType);
 
-        return NestedType::forConcreteType(ErrorType::get(ctx));
+        representative->RecursiveConcreteType = true;
       }
+
+      return NestedType::forConcreteType(
+                ErrorType::get(getDependentType(/*allowUnresolved=*/true)));
     }
 
-    return representative->ArchetypeOrConcreteType;
-  }
-  
-  AssociatedTypeDecl *assocType = nullptr;
+    SWIFT_DEFER {
+      builder.Impl->ConcreteSubs.erase({genericEnv, representative});
+    };
 
-  // Allocate a new archetype.
+    return NestedType::forConcreteType(
+            substConcreteTypesForDependentTypes(builder, genericEnv,
+                                                concreteType));
+  }
+
+  // Check that we haven't referenced this type while substituting into the
+  // superclass.
+  if (!representative->RecursiveSuperclassType &&
+      representative->getSuperclass() &&
+      builder.Impl->SuperclassSubs.count({genericEnv, representative})
+        > 0) {
+    if (representative->SuperclassSource->getLoc().isValid()) {
+      ctx.Diags.diagnose(representative->SuperclassSource->getLoc(),
+                         diag::recursive_superclass_constraint,
+                         representative->getSuperclass());
+    }
+
+    representative->RecursiveSuperclassType = true;
+    return NestedType::forConcreteType(
+             ErrorType::get(getDependentType(/*allowUnresolved=*/true)));
+  }
+
+  AssociatedTypeDecl *assocType = nullptr;
   ArchetypeType *ParentArchetype = nullptr;
-  auto &mod = builder.getModule();
   if (auto parent = getParent()) {
-    auto parentTy = parent->getType(builder);
+    // For nested types, first substitute into the parent so we can form the
+    // proper nested type.
+    auto &mod = builder.getModule();
+
+    auto parentTy = parent->getTypeInContext(builder, genericEnv);
     if (!parentTy)
       return NestedType::forConcreteType(ErrorType::get(ctx));
 
-    ParentArchetype = parentTy.getAsArchetype();
-    if (!ParentArchetype) {
+    if (Type concreteParent = parentTy.getAsConcreteType()) {
       // We might have an outer archetype as a concrete type here; if so, just
       // return that.
-      ParentArchetype = parentTy.getValue()->getAs<ArchetypeType>();
-      if (ParentArchetype) {
-        representative->ArchetypeOrConcreteType
-          = NestedType::forConcreteType(
-              ParentArchetype->getNestedTypeValue(getName()));
-        return representative->ArchetypeOrConcreteType;
+      // FIXME: This should go away when we fix
+      // ArchetypeBuilder::addGenericSignature() to no longer take a generic
+      // environment.
+      if (auto parentArchetype = concreteParent->getAs<ArchetypeType>()) {
+        builder.Impl->UsedContextArchetype = true;
+        return NestedType::forConcreteType(
+                           parentArchetype->getNestedTypeValue(getName()));
       }
 
       LazyResolver *resolver = ctx.getLazyResolver();
@@ -644,39 +683,51 @@ ArchetypeBuilder::PotentialArchetype::getType(ArchetypeBuilder &builder) {
         return NestedType::forConcreteType(type);
 
       auto depMemberType = type->castTo<DependentMemberType>();
-      Type memberType = depMemberType->substBaseType(
-                          &mod,
-                          parent->ArchetypeOrConcreteType.getAsConcreteType(),
-                          resolver);
+      Type memberType = depMemberType->substBaseType(&mod, parentTy.getValue(),
+                                                     resolver);
+
+      // If the member type maps to an archetype, resolve that archetype.
       if (auto memberPA = builder.resolveArchetype(memberType)) {
-        // If the member type maps to an archetype, resolve that archetype.
-        if (memberPA->getRepresentative() != getRepresentative()) {
-          representative->ArchetypeOrConcreteType = memberPA->getType(builder);
-          return representative->ArchetypeOrConcreteType;
+        if (memberPA->getRepresentative() != representative) {
+          return memberPA->getTypeInContext(builder, genericEnv);
         }
 
         llvm_unreachable("we have no parent archetype");
-      } else {
-        // Otherwise, it's a concrete type.
-        representative->ArchetypeOrConcreteType
-          = NestedType::forConcreteType(
-              substConcreteTypesForDependentTypes(builder, memberType));
-        representative->SameTypeSource = parent->SameTypeSource;
-
-        return representative->ArchetypeOrConcreteType;
       }
+
+
+      // Otherwise, it's a concrete type.
+
+      // FIXME: THIS ASSIGNMENT IS REALLY WEIRD. We shouldn't be discovering
+      // that a same-type constraint affects this so late in the game.
+      representative->SameTypeSource = parent->SameTypeSource;
+
+      return NestedType::forConcreteType(
+               substConcreteTypesForDependentTypes(builder, genericEnv,
+                                                   memberType));
     }
 
+    ParentArchetype = parentTy.getAsArchetype();
+
+    // Check whether the parent already has an nested type with this name. If
+    // so, return it directly.
+    if (auto nested = ParentArchetype->getNestedTypeIfKnown(getName()))
+      return *nested;
+
+    // We will build the archetype below.
     assocType = getResolvedAssociatedType();
+  } else if (auto type = genericEnv->getMappingIfPresent(getGenericParam())) {
+    // We already have a mapping for this generic parameter in the generic
+    // environment. Return it.
+    if (auto archetype = (*type)->getAs<ArchetypeType>())
+      return NestedType::forArchetype(archetype);
   }
 
-  // If we ended up building our parent archetype, then we'll have
-  // already filled in our own archetype.
-  if (auto arch = representative->ArchetypeOrConcreteType.getAsArchetype())
-    return NestedType::forArchetype(arch);
+  // Build a new archetype.
 
+  // Collect the protocol conformances for the archetype.
   SmallVector<ProtocolDecl *, 4> Protos;
-  for (const auto &conforms : ConformsTo) {
+  for (const auto &conforms : representative->getConformsTo()) {
     switch (conforms.second.getKind()) {
     case RequirementSource::Explicit:
     case RequirementSource::Inferred:
@@ -692,48 +743,56 @@ ArchetypeBuilder::PotentialArchetype::getType(ArchetypeBuilder &builder) {
     }
   }
 
-  Type superclass;
-
-  if (Superclass) {
-    if (representative->RecursiveSuperclassType) {
-      ctx.Diags.diagnose(SuperclassSource->getLoc(),
-                         diag::recursive_superclass_constraint,
-                         Superclass);
-    } else {
-      representative->RecursiveSuperclassType = true;
-      assert(!Superclass->hasArchetype() &&
-             "superclass constraint must use interface types");
-      superclass = substConcreteTypesForDependentTypes(builder, Superclass);
-      representative->RecursiveSuperclassType = false;
-    }
-  }
-
+  // Create the archetype.
+  //
+  // Note that we delay the computation of the superclass until after we
+  // create the archetype, in case the superclass references the archetype
+  // itself.
   ArchetypeType *arch;
   if (ParentArchetype) {
     // If we were unable to resolve this as an associated type, produce an
     // error type.
     if (!assocType) {
-      representative->ArchetypeOrConcreteType =
-        NestedType::forConcreteType(
-          ErrorType::get(getDependentType(/*allowUnresolved=*/true)));
-
-      return representative->ArchetypeOrConcreteType;
+      return NestedType::forConcreteType(
+               ErrorType::get(getDependentType(/*allowUnresolved=*/true)));
     }
 
+    // Create a nested archetype.
     arch = ArchetypeType::getNew(ctx, ParentArchetype, assocType, Protos,
-                                 superclass);
+                                 Type());
+
+    // Register this archetype with its parent.
+    ParentArchetype->registerNestedType(getName(),
+                                        NestedType::forArchetype(arch));
   } else {
-    arch = ArchetypeType::getNew(ctx, getName(), Protos, superclass);
+    // Create a top-level archetype.
+    arch = ArchetypeType::getNew(ctx, genericEnv, getName(), Protos, Type());
+
+    // Register the archetype with the generic environment.
+    genericEnv->addMapping(getGenericParam(), arch);
   }
 
-  representative->ArchetypeOrConcreteType = NestedType::forArchetype(arch);
-  
+  // Determine the superclass for the archetype. If it exists and involves
+  // type parameters, substitute them.
+  if (Type superclass = representative->getSuperclass()) {
+    if (superclass->hasTypeParameter()) {
+      (void)builder.Impl->SuperclassSubs.insert({genericEnv, representative});
+      SWIFT_DEFER {
+        builder.Impl->SuperclassSubs.erase({genericEnv, representative});
+      };
+      superclass = substConcreteTypesForDependentTypes(builder, genericEnv,
+                                                       superclass);
+    }
+
+    arch->setSuperclass(superclass);
+  }
+
   // Collect the set of nested types of this archetype, and put them into
   // the archetype itself.
-  if (!NestedTypes.empty()) {
+  if (!representative->getNestedTypes().empty()) {
     ctx.registerLazyArchetype(arch, builder, this);
     SmallVector<std::pair<Identifier, NestedType>, 4> FlatNestedTypes;
-    for (auto Nested : NestedTypes) {
+    for (auto Nested : representative->getNestedTypes()) {
       // Skip type aliases, which are just shortcuts.
       if (Nested.second.front()->getTypeAliasDecl())
         continue;
@@ -759,6 +818,24 @@ ArchetypeBuilder::PotentialArchetype::getType(ArchetypeBuilder &builder) {
   }
 
   return NestedType::forArchetype(arch);
+}
+
+void ArchetypeType::resolveNestedType(
+       std::pair<Identifier, NestedType> &nested) const {
+  auto &ctx = const_cast<ArchetypeType *>(this)->getASTContext();
+  auto lazyArchetype = ctx.getLazyArchetype(this);
+
+  ArchetypeBuilder &builder = *lazyArchetype.first;
+  auto genericEnv = getGenericEnvironment();
+  auto potentialArchetype =
+    lazyArchetype.second->getNestedType(nested.first, builder);
+
+  auto result = potentialArchetype->getTypeInContext(builder, genericEnv);
+  assert(!nested.second ||
+         nested.second.getValue()->isEqual(result.getValue()) ||
+         (nested.second.getValue()->hasError() &&
+          result.getValue()->hasError()));
+  nested.second = result;
 }
 
 Type ArchetypeBuilder::PotentialArchetype::getDependentType(
@@ -1216,8 +1293,8 @@ bool ArchetypeBuilder::addSameTypeRequirementBetweenArchetypes(
     std::swap(T1, T2);
 
   // Merge any concrete constraints.
-  Type concrete1 = T1->ArchetypeOrConcreteType.getAsConcreteType();
-  Type concrete2 = T2->ArchetypeOrConcreteType.getAsConcreteType();
+  Type concrete1 = T1->getConcreteType();
+  Type concrete2 = T2->getConcreteType();
   
   if (concrete1 && concrete2) {
     if (!concrete1->isEqual(concrete2)) {
@@ -1227,14 +1304,14 @@ bool ArchetypeBuilder::addSameTypeRequirementBetweenArchetypes(
       
     }
   } else if (concrete1) {
-    assert(!T2->ArchetypeOrConcreteType
+    assert(!T2->ConcreteType
            && "already formed archetype for concrete-constrained parameter");
-    T2->ArchetypeOrConcreteType = NestedType::forConcreteType(concrete1);
+    T2->ConcreteType = concrete1;
     T2->SameTypeSource = T1->SameTypeSource;
   } else if (concrete2) {
-    assert(!T1->ArchetypeOrConcreteType
+    assert(!T1->ConcreteType
            && "already formed archetype for concrete-constrained parameter");
-    T1->ArchetypeOrConcreteType = NestedType::forConcreteType(concrete2);
+    T1->ConcreteType = concrete2;
     T1->SameTypeSource = T2->SameTypeSource;
   }
 
@@ -1289,12 +1366,9 @@ bool ArchetypeBuilder::addSameTypeRequirementToConcrete(
   // Operate on the representative.
   T = T->getRepresentative();
   
-  assert(!T->ArchetypeOrConcreteType.getAsArchetype()
-         && "already formed archetype for concrete-constrained parameter");
-  
   // If we've already been bound to a type, we're either done, or we have a
   // problem.
-  if (auto oldConcrete = T->ArchetypeOrConcreteType.getAsConcreteType()) {
+  if (auto oldConcrete = T->getConcreteType()) {
     if (!oldConcrete->isEqual(Concrete)) {
       Diags.diagnose(Source.getLoc(), diag::requires_same_type_conflict,
                      T->getName(), oldConcrete, Concrete);
@@ -1322,7 +1396,7 @@ bool ArchetypeBuilder::addSameTypeRequirementToConcrete(
   }
   
   // Record the requirement.
-  T->ArchetypeOrConcreteType = NestedType::forConcreteType(Concrete);
+  T->ConcreteType = Concrete;
   T->SameTypeSource = Source;
 
   // Make sure the concrete type fulfills the superclass requirement
@@ -1819,7 +1893,7 @@ ArchetypeBuilder::finalize(SourceLoc loc, bool allowConcreteGenericParams) {
 
       // Don't allow a generic parameter to be equivalent to a concrete type,
       // because then we don't actually have a parameter.
-      if (rep->ArchetypeOrConcreteType.getAsConcreteType()) {
+      if (rep->getConcreteType()) {
         auto &Source = rep->SameTypeSource;
 
         // For auto-generated locations, we should have diagnosed the problem
@@ -2111,7 +2185,7 @@ void ArchetypeBuilder::addGenericSignature(GenericSignature *sig,
       assert(Impl->PotentialArchetypes.count(key) && "Missing parameter?");
       auto *pa = Impl->PotentialArchetypes[key];
       assert(pa == pa->getRepresentative() && "Not the representative");
-      pa->ArchetypeOrConcreteType = NestedType::forConcreteType(contextTy);
+      pa->ConcreteType = contextTy;
       pa->SameTypeSource = RequirementSource(sourceKind, SourceLoc());
     }
   }
@@ -2185,38 +2259,33 @@ GenericSignature *ArchetypeBuilder::getGenericSignature() {
 GenericEnvironment *ArchetypeBuilder::getGenericEnvironment(GenericSignature *signature) {
   TypeSubstitutionMap interfaceToArchetypeMap;
 
+  // Compute the archetypes for the generic parameters.
   auto genericEnv = GenericEnvironment::getIncomplete(Context, signature);
-  SmallVector<std::pair<const GenericTypeParamKey, PotentialArchetype *>, 2>
-    delayedPAs;
   for (auto pair : Impl->PotentialArchetypes) {
-    // If this potential archetype won't map directly to a primary archetype,
-    // skip it for now.
-    if (pair.second->isConcreteType() ||
-        pair.second->getRepresentative() != pair.second) {
-      delayedPAs.push_back(pair);
-      continue;
-    }
-
-    // Add the mapping for this primary archetype.
-    auto paramTy = pair.second->getGenericParam();
-    auto archetype = pair.second->getType(*this).getAsArchetype();
-    genericEnv->addMapping(paramTy, archetype);
+    Type contextType =
+      pair.second->getTypeInContext(*this, genericEnv).getValue();
+    if (!genericEnv->getMappingIfPresent(pair.second->getGenericParam()))
+      genericEnv->addMapping(pair.second->getGenericParam(), contextType);
   }
 
-  // Add the mapping for any potential archetypes we delayed because they
-  // depend on other archetypes.
-  for (auto pair : delayedPAs) {
-    auto paramTy = pair.second->getGenericParam();
+#ifndef NDEBUG
+  // FIXME: This property should be maintained when there are errors, too.
+  if (!Diags.hadAnyError() && !Impl->UsedContextArchetype) {
+    visitPotentialArchetypes([&](PotentialArchetype *pa) {
+      if (pa->isConcreteType()) return;
 
-    auto archetypeTy = pair.second->getType(*this).getAsArchetype();
-    auto concreteTy = pair.second->getType(*this).getAsConcreteType();
-    if (archetypeTy)
-      genericEnv->addMapping(paramTy, archetypeTy);
-    else if (concreteTy)
-      genericEnv->addMapping(paramTy, concreteTy);
-    else
-      llvm_unreachable("broken generic parameter");
+      auto depTy = pa->getDependentType(/*allowUnresolved=*/false);
+      auto inContext = genericEnv->mapTypeIntoContext(&getModule(), depTy);
+
+      auto repDepTy = pa->getRepresentative()->getDependentType(
+                                                      /*allowUnresolved=*/false);
+      auto repInContext = genericEnv->mapTypeIntoContext(&getModule(), repDepTy);
+      assert((inContext->isEqual(repInContext) ||
+              (inContext->hasError() && repInContext->hasError())) &&
+             "Potential archetype mapping differs from representative!");
+    });
   }
+#endif
 
   return genericEnv;
 }

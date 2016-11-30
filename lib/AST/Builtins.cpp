@@ -427,7 +427,8 @@ createGenericParam(ASTContext &ctx, const char *name, unsigned index) {
   Module *M = ctx.TheBuiltinModule;
   Identifier ident = ctx.getIdentifier(name);
   SmallVector<ProtocolDecl *, 1> protos;
-  ArchetypeType *archetype = ArchetypeType::getNew(ctx, ident, protos, Type());
+  ArchetypeType *archetype = ArchetypeType::getNew(ctx, nullptr, ident, protos,
+                                                   Type());
   auto genericParam =
     new (ctx) GenericTypeParamDecl(&M->getMainFile(FileUnitKind::Builtin),
                                    ident, SourceLoc(), 0, index);

@@ -34,6 +34,7 @@ namespace swift {
   class DeclContext;
   class Expr;
   class ExtensionDecl;
+  class GenericEnvironment;
   class GenericTypeParamDecl;
   class NormalProtocolConformance;
   class OperatorDecl;
@@ -96,6 +97,8 @@ LLVM_DECLARE_TYPE_ALIGNMENT(swift::DeclContext, swift::DeclContextAlignInBits)
 LLVM_DECLARE_TYPE_ALIGNMENT(swift::Expr, swift::ExprAlignInBits)
 LLVM_DECLARE_TYPE_ALIGNMENT(swift::ProtocolConformance, swift::DeclAlignInBits)
 LLVM_DECLARE_TYPE_ALIGNMENT(swift::NormalProtocolConformance,
+                            swift::DeclAlignInBits)
+LLVM_DECLARE_TYPE_ALIGNMENT(swift::GenericEnvironment,
                             swift::DeclAlignInBits)
 
 static_assert(llvm::AlignOf<void*>::Alignment >= 2,
