@@ -280,6 +280,9 @@ class BuildScriptInvocation(object):
         if args.libdispatch_build_variant is None:
             args.libdispatch_build_variant = args.build_variant
 
+        if args.libicu_build_variant is None:
+            args.libicu_build_variant = args.build_variant
+
         # Assertions are enabled by default.
         if args.assertions is None:
             args.assertions = True
@@ -337,6 +340,7 @@ class BuildScriptInvocation(object):
             args.build_xctest = False
             args.build_foundation = False
             args.build_libdispatch = False
+            args.build_libicu = False
             args.build_playgroundlogger = False
             args.build_playgroundsupport = False
 
@@ -585,6 +589,7 @@ class BuildScriptInvocation(object):
             "--lldb-build-type", args.lldb_build_variant,
             "--foundation-build-type", args.foundation_build_variant,
             "--libdispatch-build-type", args.libdispatch_build_variant,
+            "--libicu-build-type", args.libicu_build_variant,
             "--xctest-build-type", args.build_variant,
             "--swift-enable-assertions", str(args.swift_assertions).lower(),
             "--swift-stdlib-enable-assertions", str(
@@ -664,6 +669,8 @@ class BuildScriptInvocation(object):
             impl_args += ["--skip-build-llbuild"]
         if not args.build_libdispatch:
             impl_args += ["--skip-build-libdispatch"]
+        if not args.build_libicu:
+            impl_args += ["--skip-build-libicu"]
         if not args.build_swiftpm:
             impl_args += ["--skip-build-swiftpm"]
         if not args.build_playgroundlogger:
@@ -714,6 +721,7 @@ class BuildScriptInvocation(object):
                           "--skip-test-xctest",
                           "--skip-test-foundation",
                           "--skip-test-libdispatch",
+                          "--skip-test-libicu",
                           "--skip-test-playgroundlogger",
                           "--skip-test-playgroundsupport"]
         if args.skip_test_linux:
@@ -881,6 +889,8 @@ class BuildScriptInvocation(object):
         product_classes = []
         product_classes.append(products.CMark)
         product_classes.append(products.LLVM)
+        if self.args.build_libicu:
+            product_classes.append(products.LibICU)
         product_classes.append(products.Swift)
         if self.args.build_lldb:
             product_classes.append(products.LLDB)
@@ -1130,6 +1140,7 @@ SWIFT_SOURCE_ROOT: a directory containing the source for LLVM, Clang, Swift.
                      /swift-corelibs-xctest      (optional)
                      /swift-corelibs-foundation  (optional)
                      /swift-corelibs-libdispatch (optional)
+                     /icu                        (optional)
 
 SWIFT_BUILD_ROOT: a directory in which to create out-of-tree builds.
                   Defaults to "$SWIFT_SOURCE_ROOT/build/".
@@ -1324,6 +1335,11 @@ details of the setups of other systems or automated environments.""")
         action=arguments.action.optional_bool,
         dest="build_libdispatch")
     projects_group.add_argument(
+        "--libicu",
+        help="build libicu",
+        action=arguments.action.optional_bool,
+        dest="build_libicu")
+    projects_group.add_argument(
         "--playgroundlogger",
         help="build playgroundlogger",
         action="store_true",
@@ -1422,6 +1438,12 @@ details of the setups of other systems or automated environments.""")
         action="store_const",
         const="Debug",
         dest="libdispatch_build_variant")
+    build_variant_override_group.add_argument(
+        "--debug-libicu",
+        help="build the Debug variant of libicu",
+        action="store_const",
+        const="Debug",
+        dest="libicu_build_variant")
 
     assertions_group = parser.add_mutually_exclusive_group(required=False)
     assertions_group.add_argument(
