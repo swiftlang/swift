@@ -21,6 +21,7 @@
 #include "swift/AST/IRGenOptions.h"
 #include "swift/AST/LinkLibrary.h"
 #include "swift/SIL/SILModule.h"
+#include "swift/Basic/Defer.h"
 #include "swift/Basic/Dwarf.h"
 #include "swift/Basic/Platform.h"
 #include "swift/Basic/Timer.h"
@@ -687,16 +688,21 @@ static std::unique_ptr<llvm::Module> performIRGeneration(IRGenOptions &Opts,
   // Bail out if there are any errors.
   if (Ctx.hadError()) return nullptr;
 
-  embedBitcode(IGM.getModule(), Opts);
-
   // Free the memory occupied by the SILModule.
-  SILMod.reset(nullptr);
+  // Execute this task in parallel to the LLVM compilation.
+  auto SILModuleRelease = [&SILMod]() { SILMod.reset(nullptr); };
+  auto Thread = std::thread(SILModuleRelease);
+  // Wait for the thread to terminate.
+  SWIFT_DEFER { Thread.join(); };
+
+  embedBitcode(IGM.getModule(), Opts);
 
   if (performLLVM(Opts, IGM.Context.Diags, nullptr, IGM.ModuleHash,
                   IGM.getModule(), IGM.TargetMachine.get(),
                   IGM.Context.LangOpts.EffectiveLanguageVersion,
                   IGM.OutputFilename))
     return nullptr;
+
   return std::unique_ptr<llvm::Module>(IGM.releaseModule());
 }
 
@@ -900,9 +906,6 @@ static void performParallelIRGeneration(IRGenOptions &Opts,
   // Bail out if there are any errors.
   if (Ctx.hadError()) return;
 
-  // Free the memory occupied by the SILModule.
-  SILMod.reset(nullptr);
-
   std::vector<std::thread> Threads;
   llvm::sys::Mutex DiagMutex;
 
@@ -911,6 +914,11 @@ static void performParallelIRGeneration(IRGenOptions &Opts,
     Threads.push_back(std::thread(ThreadEntryPoint, &irgen, &DiagMutex,
                                   ThreadIdx));
   }
+
+  // Free the memory occupied by the SILModule.
+  // Execute this task in parallel to the LLVM compilation.
+  auto SILModuleRelease = [&SILMod]() { SILMod.reset(nullptr); };
+  Threads.push_back(std::thread(SILModuleRelease));
 
   ThreadEntryPoint(&irgen, &DiagMutex, 0);
 
