@@ -879,6 +879,25 @@ class TestData : TestDataSuper {
         expectNotEqual(anyHashables[0], anyHashables[1])
         expectEqual(anyHashables[1], anyHashables[2])
     }
+
+    func test_noCopyBehavior() {
+        let ptr = UnsafeMutableRawPointer(bitPattern: 0x1)!
+        
+        var deallocated = false
+        autoreleasepool {
+            let data = Data(bytesNoCopy: ptr, count: 1, deallocator: .custom({ (bytes, length) in
+                deallocated = true
+            }))
+            expectFalse(deallocated)
+            let equal = data.withUnsafeBytes { (bytes: UnsafePointer<UInt8>) -> Bool in
+                return ptr == UnsafeMutableRawPointer(mutating: bytes)
+            }
+            
+            expectTrue(equal)
+        }
+        
+        expectTrue(deallocated)
+    }
 }
 
 #if !FOUNDATION_XCTEST
@@ -921,6 +940,7 @@ DataTests.test("test_bufferSizeCalculation") { TestData().test_bufferSizeCalcula
 DataTests.test("test_classForCoder") { TestData().test_classForCoder() }
 DataTests.test("test_AnyHashableContainingData") { TestData().test_AnyHashableContainingData() }
 DataTests.test("test_AnyHashableCreatedFromNSData") { TestData().test_AnyHashableCreatedFromNSData() }
+DataTests.test("test_noCopyBehavior") { TestData().test_noCopyBehavior() }
 
 // XCTest does not have a crash detection, whereas lit does
 DataTests.test("bounding failure subdata") {

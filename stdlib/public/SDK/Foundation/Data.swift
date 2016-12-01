@@ -81,6 +81,7 @@ public final class _DataStorage {
     public var _length: Int
     public var _capacity: Int
     public var _needToZero: Bool
+    public var _deallocator: ((UnsafeMutableRawPointer, Int) -> Void)? = nil
     public var _backing: Backing = .swift
     
     public var bytes: UnsafeRawPointer? {
@@ -152,10 +153,13 @@ public final class _DataStorage {
     
     public func _freeBytes() {
         if let bytes = _bytes {
-            free(bytes)
+            if let dealloc = _deallocator {
+                dealloc(bytes, length)
+            } else {
+                free(bytes)
+            }
         }
     }
-    
     
     public func enumerateBytes(_ block: (_ buffer: UnsafeBufferPointer<UInt8>, _ byteIndex: Data.Index, _ stop: inout Bool) -> Void) {
         var stop: Bool = false
@@ -222,7 +226,16 @@ public final class _DataStorage {
             /* Where calloc/memmove/free fails, realloc might succeed */
             if newBytes == nil {
                 allocateCleared = false
-                newBytes = realloc(_bytes!, newCapacity)
+                if _deallocator != nil {
+                    newBytes = _DataStorage.allocate(newCapacity, true)
+                    if newBytes != nil {
+                        _DataStorage.move(newBytes!, _bytes!, origLength)
+                        _freeBytes()
+                        _deallocator = nil
+                    }
+                } else {
+                    newBytes = realloc(_bytes!, newCapacity)
+                }
             }
             
             /* Try again with minimum length */
@@ -571,16 +584,46 @@ public final class _DataStorage {
     }
     
     
-    public convenience init(bytes: UnsafeMutableRawPointer?, length: Int, copy: Bool, deallocator: ((UnsafeMutableRawPointer, Int) -> Void)?) {
+    public init(bytes: UnsafeMutableRawPointer?, length: Int, copy: Bool, deallocator: ((UnsafeMutableRawPointer, Int) -> Void)?) {
         precondition(length < _DataStorage.maxSize)
-        self.init(capacity: length)
-        _DataStorage.move(_bytes!, bytes, length)
-        if length > 0 {
+        if length == 0 {
+            _capacity = 0
+            _length = 0
+            _needToZero = false
+            _bytes = nil
+            if let dealloc = deallocator,
+               let bytes_ = bytes {
+                dealloc(bytes_, length)
+            }
+        } else if !copy {
+            _capacity = length
+            _length = length
+            _needToZero = false
+            _bytes = bytes
+            _deallocator = deallocator
+        } else if _DataStorage.vmOpsThreshold <= length {
+            _capacity = length
+            _length = length
+            _needToZero = true
+            _bytes = _DataStorage.allocate(length, false)!
+            _DataStorage.move(_bytes!, bytes, length)
+            if let dealloc = deallocator {
+                dealloc(bytes!, length)
+            }
+        } else {
+            var capacity = length
+            if (_DataStorage.vmOpsThreshold <= capacity) {
+                capacity = NSRoundUpToMultipleOfPageSize(capacity)
+            }
+            _length = length
+            _bytes = _DataStorage.allocate(capacity, false)!
+            _capacity = capacity
+            _needToZero = true
+            _DataStorage.move(_bytes!, bytes, length)
             if let dealloc = deallocator {
                 dealloc(bytes!, length)
             }
         }
-        _length = length
     }
     
     public init(immutableReference: NSData) {
