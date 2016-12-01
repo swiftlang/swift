@@ -515,7 +515,9 @@ namespace {
         printGenericParameters(OS, GTD->getGenericParams());
 
       if (!isa<AbstractFunctionDecl>(VD) &&
-          !isa<EnumElementDecl>(VD)) {
+          !isa<EnumElementDecl>(VD) &&
+          !isa<SubscriptDecl>(VD) &&
+          !isa<TypeDecl>(VD)) {
         OS << " type='";
         if (VD->hasType())
           VD->getType().print(OS);
@@ -526,7 +528,7 @@ namespace {
 
       if (VD->hasInterfaceType()) {
         OS << " interface type='";
-        VD->getInterfaceType()->getCanonicalType().print(OS);
+        VD->getInterfaceType()->print(OS);
         OS << '\'';
       }
 
@@ -567,7 +569,7 @@ namespace {
                       llvm::Optional<llvm::raw_ostream::Colors>()) {
       printCommon((ValueDecl *)NTD, Name, Color);
 
-      if (NTD->hasType()) {
+      if (NTD->hasInterfaceType()) {
         if (NTD->hasFixedLayout())
           OS << " @_fixed_layout";
         else
@@ -703,7 +705,6 @@ namespace {
     void visitSubscriptDecl(SubscriptDecl *SD) {
       printCommon(SD, "subscript_decl");
       OS << " storage_kind=" << getStorageKindName(SD->getStorageKind());
-      OS << " element=" << SD->getElementType()->getCanonicalType();
       printAccessors(SD);
       OS << ')';
     }

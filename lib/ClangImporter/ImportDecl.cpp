@@ -660,7 +660,7 @@ makeUnionFieldAccessors(ClangImporter::Implementation &Impl,
     auto inoutSelfRef = new (C) DeclRefExpr(inoutSelfDecl, DeclNameLoc(),
                                             /*implicit*/ true);
     auto inoutSelf = new (C) InOutExpr(SourceLoc(), inoutSelfRef,
-      InOutType::get(importedUnionDecl->getType()), /*implicit*/ true);
+      InOutType::get(importedUnionDecl->getDeclaredType()), /*implicit*/ true);
 
     auto newValueDecl = setterDecl->getParameterList(1)->get(0);
 
@@ -1908,7 +1908,9 @@ namespace {
                               underlying->getDeclaredInterfaceType()),
                             /*genericparams*/nullptr, DC);
               typealias->computeType();
-              typealias->setInterfaceType(typealias->getType());
+              typealias->setInterfaceType(
+                  MetatypeType::get(typealias->getAliasType(),
+                                    Impl.SwiftContext));
 
               Impl.SpecialTypedefNames[Decl->getCanonicalDecl()] =
                 MappedTypeNameKind::DefineAndUse;
@@ -1934,7 +1936,9 @@ namespace {
                               proto->getDeclaredInterfaceType()),
                             /*genericparams*/nullptr, DC);
               typealias->computeType();
-              typealias->setInterfaceType(typealias->getType());
+              typealias->setInterfaceType(
+                  MetatypeType::get(typealias->getAliasType(),
+                                    Impl.SwiftContext));
 
               Impl.SpecialTypedefNames[Decl->getCanonicalDecl()] =
                 MappedTypeNameKind::DefineAndUse;
@@ -2003,13 +2007,14 @@ namespace {
                                       TypeLoc::withoutLoc(SwiftType),
                                       /*genericparams*/nullptr, DC);
       Result->computeType();
-      Result->setInterfaceType(Result->getType());
+      Result->setInterfaceType(
+          MetatypeType::get(Result->getAliasType(),
+                            Impl.SwiftContext));
 
       // Make Objective-C's 'id' unavailable.
-      ASTContext &ctx = DC->getASTContext();
-      if (ctx.LangOpts.EnableObjCInterop && isObjCId(Decl)) {
+      if (Impl.SwiftContext.LangOpts.EnableObjCInterop && isObjCId(Decl)) {
         auto attr = AvailableAttr::createPlatformAgnostic(
-                      ctx,
+                      Impl.SwiftContext,
                       "'id' is not available in Swift; use 'Any'", "",
                       PlatformAgnosticAvailabilityKind::UnavailableInSwift);
         Result->getAttrs().add(attr);
@@ -2274,7 +2279,9 @@ namespace {
                            errorWrapper->getDeclaredInterfaceType()),
                          /*genericSignature=*/nullptr, enumDecl);
           alias->computeType();
-          alias->setInterfaceType(alias->getType());
+          alias->setInterfaceType(
+              MetatypeType::get(alias->getAliasType(),
+                                Impl.SwiftContext));
           enumDecl->addMember(alias);
 
           // Add the 'Code' enum to the error wrapper.
@@ -4101,11 +4108,13 @@ namespace {
                     Impl.importSourceLoc(decl->getLocStart()),
                     name,
                     Impl.importSourceLoc(decl->getLocation()),
-                    TypeLoc::withoutLoc(typeDecl->getDeclaredType()),
+                    TypeLoc::withoutLoc(typeDecl->getDeclaredInterfaceType()),
                     /*genericparams=*/nullptr, dc);
 
       typealias->computeType();
-      typealias->setInterfaceType(typealias->getType());
+      typealias->setInterfaceType(
+          MetatypeType::get(typealias->getAliasType(),
+                            Impl.SwiftContext));
 
       return typealias;
     }
@@ -4227,7 +4236,7 @@ static Type findImmutableCFSuperclass(ClangImporter::Implementation &impl,
     return Type();
 
   auto importedSuperclass =
-      cast<TypeDecl>(importedSuperclassDecl)->getDeclaredType();
+      cast<TypeDecl>(importedSuperclassDecl)->getDeclaredInterfaceType();
   assert(importedSuperclass->is<ClassType>() && "must have class type");
   return importedSuperclass;
 }
@@ -4342,7 +4351,9 @@ Decl *SwiftDeclConverter::importSwift2TypeAlias(const clang::NamedDecl *decl,
       Impl.importSourceLoc(decl->getLocation()),
       TypeLoc::withoutLoc(underlyingType), genericParams, dc);
   alias->computeType();
-  alias->setInterfaceType(alias->getType());
+  alias->setInterfaceType(
+      MetatypeType::get(alias->getAliasType(),
+                        Impl.SwiftContext));
   alias->setGenericEnvironment(genericEnv);
 
   // Record that this is the Swift 2 version of this declaration.
@@ -5733,7 +5744,6 @@ SwiftDeclConverter::importSubscript(Decl *decl,
 
   // TODO: no good when generics are around
   auto fnType = FunctionType::get(indicesType, elementTy);
-  subscript->setType(fnType);
   subscript->setInterfaceType(fnType);
 
   addObjCAttribute(subscript, None);
@@ -6829,12 +6839,6 @@ GenericEnvironment *ClangImporter::Implementation::buildGenericEnvironment(
   }
   // TODO: any need to infer requirements?
   builder.finalize(genericParams->getSourceRange().Start);
-
-  SmallVector<GenericTypeParamType *, 4> genericParamTypes;
-  for (auto param : *genericParams) {
-    genericParamTypes.push_back(
-        param->getDeclaredType()->castTo<GenericTypeParamType>());
-  }
 
   auto *sig = builder.getGenericSignature();
   auto *env = builder.getGenericEnvironment(sig);

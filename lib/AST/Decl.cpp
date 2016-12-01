@@ -1644,6 +1644,25 @@ ValueDecl::getSatisfiedProtocolRequirements(bool Sorted) const {
   return NTD->getSatisfiedProtocolRequirementsForMember(this, Sorted);
 }
 
+bool ValueDecl::hasType() const {
+  assert(!isa<AbstractFunctionDecl>(this) &&
+         !isa<EnumElementDecl>(this) &&
+         !isa<SubscriptDecl>(this) &&
+         !isa<TypeDecl>(this) &&
+         "functions and enum case constructors only have an interface type");
+  return !TypeAndAccess.getPointer().isNull();
+}
+
+Type ValueDecl::getType() const {
+  assert(!isa<AbstractFunctionDecl>(this) &&
+         !isa<EnumElementDecl>(this) &&
+         !isa<SubscriptDecl>(this) &&
+         !isa<TypeDecl>(this) &&
+         "functions and enum case constructors only have an interface type");
+  assert(hasType() && "declaration has no type set yet");
+  return TypeAndAccess.getPointer();
+}
+
 void ValueDecl::setType(Type T) {
   assert(!hasType() && "changing type of declaration");
   overwriteType(T);
@@ -1652,6 +1671,8 @@ void ValueDecl::setType(Type T) {
 void ValueDecl::overwriteType(Type T) {
   assert(!isa<AbstractFunctionDecl>(this) &&
          !isa<EnumElementDecl>(this) &&
+         !isa<SubscriptDecl>(this) &&
+         !isa<TypeDecl>(this) &&
          "functions and enum case constructors only have an interface type");
 
   TypeAndAccess.setPointer(T);
@@ -1660,13 +1681,6 @@ void ValueDecl::overwriteType(Type T) {
 }
 
 bool ValueDecl::hasInterfaceType() const {
-  // getInterfaceType() always returns something for associated types.
-  if (isa<AssociatedTypeDecl>(this)) {
-    auto proto = cast<ProtocolDecl>(getDeclContext());
-    auto selfTy = proto->getSelfInterfaceType();
-    return !!selfTy;
-  }
-
   // getInterfaceType() returns the contextual type for ParamDecls which
   // don't have an explicit interface type.
   if (isa<ParamDecl>(this))
@@ -1678,19 +1692,6 @@ bool ValueDecl::hasInterfaceType() const {
 Type ValueDecl::getInterfaceType() const {
   if (InterfaceTy)
     return InterfaceTy;
-
-  if (auto assocType = dyn_cast<AssociatedTypeDecl>(this)) {
-    auto proto = cast<ProtocolDecl>(getDeclContext());
-    auto selfTy = proto->getSelfInterfaceType();
-    if (!selfTy)
-      return Type();
-    auto &ctx = getASTContext();
-    InterfaceTy = DependentMemberType::get(
-                    selfTy,
-                    const_cast<AssociatedTypeDecl *>(assocType));
-    InterfaceTy = MetatypeType::get(InterfaceTy, ctx);
-    return InterfaceTy;
-  }
 
   if (!hasType())
     return Type();
@@ -1930,38 +1931,19 @@ AccessScope ValueDecl::getFormalAccessScope(const DeclContext *useDC) const {
   llvm_unreachable("unknown accessibility level");
 }
 
-
-Type TypeDecl::getDeclaredType() const {
-  if (auto TAD = dyn_cast<TypeAliasDecl>(this)) {
-    if (TAD->hasType() && TAD->getType()->hasError())
-      return TAD->getType();
-
-    return TAD->getAliasType();
-  }
-  if (auto typeParam = dyn_cast<AbstractTypeParamDecl>(this)) {
-    auto type = typeParam->getType();
-    if (type->hasError())
-      return type;
-
-    return type->castTo<MetatypeType>()->getInstanceType();
-  }
-  if (auto module = dyn_cast<ModuleDecl>(this)) {
-    return ModuleType::get(const_cast<ModuleDecl *>(module));
-  }
-  return cast<NominalTypeDecl>(this)->getDeclaredType();
-}
-
 Type TypeDecl::getDeclaredInterfaceType() const {
-  if (auto NTD = dyn_cast<NominalTypeDecl>(this))
+  if (auto *NTD = dyn_cast<NominalTypeDecl>(this))
     return NTD->getDeclaredInterfaceType();
 
   Type interfaceType = getInterfaceType();
   if (interfaceType.isNull() || interfaceType->hasError())
     return interfaceType;
 
+  if (isa<ModuleDecl>(this))
+    return interfaceType;
+
   return interfaceType->castTo<MetatypeType>()->getInstanceType();
 }
-
 
 bool NominalTypeDecl::hasFixedLayout() const {
   // Private and (unversioned) internal types always have a
@@ -2049,15 +2031,8 @@ void NominalTypeDecl::computeType() {
   Type declaredInterfaceTy = getDeclaredInterfaceType();
   setInterfaceType(MetatypeType::get(declaredInterfaceTy, ctx));
 
-  // If we still don't have a declared type, don't crash -- there's a weird
-  // circular declaration issue in the code.
-  Type declaredTy = getDeclaredType();
-  if (!declaredTy || declaredTy->hasError()) {
-    setType(ErrorType::get(ctx));
-    return;
-  }
-
-  setType(MetatypeType::get(declaredTy, ctx));
+  if (declaredInterfaceTy->hasError())
+    setInvalid();
 }
 
 enum class DeclTypeKind : unsigned {
@@ -2113,7 +2088,7 @@ static Type computeNominalType(NominalTypeDecl *decl, DeclTypeKind kind) {
       // at the signature.
       SmallVector<Type, 4> args;
       for (auto param : decl->getGenericParams()->getParams())
-        args.push_back(param->getDeclaredType());
+        args.push_back(param->getDeclaredInterfaceType());
 
       return BoundGenericType::get(decl, Ty, args);
     }
@@ -2219,17 +2194,12 @@ TypeAliasDecl::TypeAliasDecl(SourceLoc TypeAliasLoc, Identifier Name,
                              SourceLoc NameLoc, TypeLoc UnderlyingTy,
                              GenericParamList *GenericParams, DeclContext *DC)
   : GenericTypeDecl(DeclKind::TypeAlias, DC, Name, NameLoc, {}, GenericParams),
-    TypeAliasLoc(TypeAliasLoc), UnderlyingTy(UnderlyingTy)
-{
-
-  // Set the type of the TypeAlias to the right MetatypeType.
-  ASTContext &Ctx = getASTContext();
-  AliasTy = new (Ctx, AllocationArena::Permanent) NameAliasType(this);
-}
+    AliasTy(nullptr), TypeAliasLoc(TypeAliasLoc), UnderlyingTy(UnderlyingTy) {}
 
 void TypeAliasDecl::computeType() {
-  ASTContext &ctx = getASTContext();
-  setType(MetatypeType::get(AliasTy, ctx));
+  ASTContext &Ctx = getASTContext();
+  assert(!AliasTy && "already called computeType()");
+  AliasTy = new (Ctx, AllocationArena::Permanent) NameAliasType(this);
 }
 
 SourceRange TypeAliasDecl::getSourceRange() const {
@@ -2275,7 +2245,6 @@ GenericTypeParamDecl::GenericTypeParamDecl(DeclContext *dc, Identifier name,
 {
   auto &ctx = dc->getASTContext();
   auto type = new (ctx, AllocationArena::Permanent) GenericTypeParamType(this);
-  setType(MetatypeType::get(type, ctx));
   setInterfaceType(MetatypeType::get(type, ctx));
 }
 
@@ -2301,9 +2270,7 @@ AssociatedTypeDecl::AssociatedTypeDecl(DeclContext *dc, SourceLoc keywordLoc,
                                        TypeLoc defaultDefinition)
   : AbstractTypeParamDecl(DeclKind::AssociatedType, dc, name, nameLoc),
     KeywordLoc(keywordLoc), DefaultDefinition(defaultDefinition)
-{
-  AssociatedTypeDeclBits.Recursive = 0;
-}
+{ }
 
 AssociatedTypeDecl::AssociatedTypeDecl(DeclContext *dc, SourceLoc keywordLoc,
                                        Identifier name, SourceLoc nameLoc,
@@ -2314,13 +2281,16 @@ AssociatedTypeDecl::AssociatedTypeDecl(DeclContext *dc, SourceLoc keywordLoc,
     ResolverContextData(resolverData)
 {
   assert(Resolver && "missing resolver");
-  AssociatedTypeDeclBits.Recursive = 0;
 }
 
 void AssociatedTypeDecl::computeType() {
   auto &ctx = getASTContext();
-  auto type = new (ctx, AllocationArena::Permanent) AssociatedTypeType(this);
-  setType(MetatypeType::get(type, ctx));
+  auto proto = cast<ProtocolDecl>(getDeclContext());
+  auto selfTy = proto->getSelfInterfaceType();
+  if (!selfTy)
+    selfTy = ErrorType::get(ctx);
+  auto interfaceTy = DependentMemberType::get(selfTy, this);
+  setInterfaceType(MetatypeType::get(interfaceTy, ctx));
 }
 
 TypeLoc &AssociatedTypeDecl::getDefaultDefinitionLoc() {
@@ -2339,10 +2309,6 @@ SourceRange AssociatedTypeDecl::getSourceRange() const {
     endLoc = getInherited().back().getSourceRange().End;
   }
   return SourceRange(KeywordLoc, endLoc);
-}
-
-void AssociatedTypeDecl::setIsRecursive() {
-  AssociatedTypeDeclBits.Recursive = true;
 }
 
 EnumDecl::EnumDecl(SourceLoc EnumLoc,
@@ -2884,7 +2850,7 @@ bool ProtocolDecl::existentialTypeSupportedSlow(LazyResolver *resolver) {
   ProtocolDeclBits.ExistentialTypeSupported = true;
 
   // Resolve the protocol's type.
-  if (resolver && !hasType())
+  if (resolver && !hasInterfaceType())
     resolver->resolveDeclSignature(this);
 
   for (auto member : getMembers()) {
@@ -3970,22 +3936,23 @@ void SubscriptDecl::setIndices(ParameterList *p) {
     Indices->setDeclContextOfParamDecls(this);
 }
 
-Type SubscriptDecl::getIndicesType() const {
-  const auto type = getType();
-  if (type->hasError())
-    return type;
-  return type->castTo<AnyFunctionType>()->getInput();
+Type SubscriptDecl::getIndicesInterfaceType() const {
+  auto indicesTy = getInterfaceType();
+  if (indicesTy->hasError())
+    return indicesTy;
+  return indicesTy->castTo<AnyFunctionType>()->getInput();
 }
 
-Type SubscriptDecl::getIndicesInterfaceType() const {
-  // FIXME: Unfortunate that we can't really capture the generic parameters
-  // here.
-  return getInterfaceType()->castTo<AnyFunctionType>()->getInput();
+Type SubscriptDecl::getElementInterfaceType() const {
+  auto elementTy = getInterfaceType();
+  if (elementTy->hasError())
+    return elementTy;
+  return elementTy->castTo<AnyFunctionType>()->getResult();
 }
 
 ObjCSubscriptKind SubscriptDecl::getObjCSubscriptKind(
                     LazyResolver *resolver) const {
-  auto indexTy = getIndicesType();
+  auto indexTy = getIndicesInterfaceType();
 
   // Look through a named 1-tuple.
   if (auto tupleTy = indexTy->getAs<TupleType>()) {
