@@ -394,10 +394,11 @@ TupleTypeRepr::TupleTypeRepr(ArrayRef<TypeRepr *> Elements, SourceRange Parens,
                              ArrayRef<SourceLoc> underscoreLocs,
                              SourceLoc Ellipsis, unsigned EllipsisIdx)
     : TypeRepr(TypeReprKind::Tuple), NumElements(Elements.size()),
-      Parens(Parens), HasEllipsis(Ellipsis.isValid()) {
+      Parens(Parens) {
 
-  NameStatus = ElementNames.empty() ? NotNamed
-             : underscoreLocs.empty() ? HasNames : HasLabels;
+  TupleTypeReprBits.NameStatus = ElementNames.empty() ? NotNamed
+                               : underscoreLocs.empty() ? HasNames : HasLabels;
+  TupleTypeReprBits.HasEllipsis = Ellipsis.isValid();
 
   // Copy elements.
   std::uninitialized_copy(Elements.begin(), Elements.end(),
