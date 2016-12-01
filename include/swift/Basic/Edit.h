@@ -10,11 +10,23 @@
 //
 //===----------------------------------------------------------------------===//
 
+#ifndef SWIFT_BASIC_EDIT_H
+#define SWIFT_BASIC_EDIT_H
+
 #include "swift/Basic/LLVM.h"
+#include "swift/Basic/SourceLoc.h"
+
 namespace swift {
   class SourceManager;
   class CharSourceRange;
 
-  void writeEdit(SourceManager &SM, CharSourceRange Range, StringRef Text,
-                 llvm::raw_ostream &OS);
+  struct SingleEdit {
+    SourceManager &SM;
+    CharSourceRange Range;
+    std::string Text;
+  };
+
+  void writeEditsInJson(ArrayRef<SingleEdit> Edits, llvm::raw_ostream &OS);
 }
+
+#endif // SWIFT_BASIC_EDIT_H
