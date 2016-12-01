@@ -564,18 +564,17 @@ namespace {
 class JSONFixitWriter : public DiagnosticConsumer {
   std::unique_ptr<llvm::raw_ostream> OSPtr;
   bool FixitAll;
+  std::vector<SingleEdit> AllEdits;
 
 public:
   JSONFixitWriter(std::unique_ptr<llvm::raw_ostream> OS,
                   const DiagnosticOptions &DiagOpts)
     : OSPtr(std::move(OS)),
-      FixitAll(DiagOpts.FixitCodeForAllDiagnostics) {
-    *OSPtr << "[\n";
-  }
-  ~JSONFixitWriter() {
-    *OSPtr << "]\n";
-  }
+      FixitAll(DiagOpts.FixitCodeForAllDiagnostics) {}
 
+  ~JSONFixitWriter() {
+    swift::writeEditsInJson(llvm::makeArrayRef(AllEdits), *OSPtr);
+  }
 private:
   void handleDiagnostic(SourceManager &SM, SourceLoc Loc,
                         DiagnosticKind Kind, StringRef Text,
@@ -583,7 +582,7 @@ private:
     if (!shouldFix(Kind, Info))
       return;
     for (const auto &Fix : Info.FixIts) {
-      swift::writeEdit(SM, Fix.getRange(), Fix.getText(), *OSPtr);
+      AllEdits.push_back({SM, Fix.getRange(), Fix.getText()});
     }
   }
 

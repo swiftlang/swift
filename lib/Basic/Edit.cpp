@@ -14,23 +14,30 @@
 #include "swift/Basic/Edit.h"
 #include "swift/Basic/SourceManager.h"
 
-void swift::writeEdit(SourceManager &SM, CharSourceRange Range, StringRef Text,
-                 llvm::raw_ostream &OS) {
-  SourceLoc Loc = Range.getStart();
-  unsigned BufID = SM.findBufferContainingLoc(Loc);
-  unsigned Offset = SM.getLocOffsetInBuffer(Loc, BufID);
-  unsigned Length = Range.getByteLength();
-  StringRef Path(SM.getIdentifierForBuffer(BufID));
+void swift::
+writeEditsInJson(ArrayRef<SingleEdit> AllEdits, llvm::raw_ostream &OS) {
+  OS << "[\n";
+  for (auto &Edit : AllEdits) {
+    SourceManager &SM = Edit.SM;
+    CharSourceRange Range = Edit.Range;
+    StringRef Text = Edit.Text;
+    SourceLoc Loc = Range.getStart();
+    unsigned BufID = SM.findBufferContainingLoc(Loc);
+    unsigned Offset = SM.getLocOffsetInBuffer(Loc, BufID);
+    unsigned Length = Range.getByteLength();
+    StringRef Path(SM.getIdentifierForBuffer(BufID));
 
-  OS << " {\n";
-  OS << "  \"file\": \"";
-  OS.write_escaped(Path) << "\",\n";
-  OS << "  \"offset\": " << Offset << ",\n";
-  if (Length != 0)
-    OS << "  \"remove\": " << Length << ",\n";
-  if (!Text.empty()) {
-    OS << "  \"text\": \"";
-    OS.write_escaped(Text) << "\",\n";
+    OS << " {\n";
+    OS << "  \"file\": \"";
+    OS.write_escaped(Path) << "\",\n";
+    OS << "  \"offset\": " << Offset << ",\n";
+    if (Length != 0)
+      OS << "  \"remove\": " << Length << ",\n";
+    if (!Text.empty()) {
+      OS << "  \"text\": \"";
+      OS.write_escaped(Text) << "\",\n";
+    }
+    OS << " },\n";
   }
-  OS << " },\n";
+  OS << "]\n";
 }
