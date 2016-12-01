@@ -134,6 +134,13 @@ public:
   /// Build an array of substitutions from an interface type substitution map,
   /// using the given function to look up conformances.
   void getSubstitutions(ModuleDecl &mod,
+                        TypeSubstitutionFn substitution,
+                        LookupConformanceFn lookupConformance,
+                        SmallVectorImpl<Substitution> &result) const;
+
+  /// Build an array of substitutions from an interface type substitution map,
+  /// using the given function to look up conformances.
+  void getSubstitutions(ModuleDecl &mod,
                         const TypeSubstitutionMap &subMap,
                         LookupConformanceFn lookupConformance,
                         SmallVectorImpl<Substitution> &result) const;

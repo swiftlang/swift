@@ -46,6 +46,19 @@ class alignas(1 << DeclAlignInBits) GenericEnvironment final {
   
   ArchetypeBuilder *getArchetypeBuilder() const { return Builder; }
   void clearArchetypeBuilder() { Builder = nullptr; }
+
+  /// Query function suitable for use as a \c TypeSubstitutionFn that queries
+  /// the mapping of interface types to archetypes.
+  class QueryInterfaceTypeSubstitutions {
+    const GenericEnvironment *self;
+
+  public:
+    QueryInterfaceTypeSubstitutions(const GenericEnvironment *self)
+      : self(self) { }
+
+    Type operator()(SubstitutableType *type) const;
+  };
+  friend class QueryInterfaceTypeSubstitutions;
   
 public:
   GenericSignature *getGenericSignature() const {

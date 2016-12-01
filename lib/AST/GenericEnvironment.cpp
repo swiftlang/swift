@@ -99,8 +99,20 @@ Type GenericEnvironment::mapTypeOutOfContext(ModuleDecl *M, Type type) const {
   return type;
 }
 
+GenericEnvironment::QueryInterfaceTypeSubstitutions::operator()(
+                                                SubstitutableType *type) const {
+  if (auto gp = type->getCanonicalType()->getAs<GenericTypeParamType>()) {
+    auto known = self->InterfaceToArchetypeMap.find(gp);
+    if (known != self->InterfaceToArchetypeMap.end())
+      return known->second;
+  }
+
+  return Type();
+}
+
 Type GenericEnvironment::mapTypeIntoContext(ModuleDecl *M, Type type) const {
-  type = type.subst(M, InterfaceToArchetypeMap, SubstFlags::AllowLoweredTypes);
+  type = type.subst(M, QueryInterfaceTypeSubstitutions(this),
+                    SubstFlags::AllowLoweredTypes);
   assert((!type->hasTypeParameter() || type->hasError()) &&
          "not fully substituted");
   return type;
@@ -133,7 +145,8 @@ GenericEnvironment::getForwardingSubstitutions(ModuleDecl *M) const {
   };
 
   SmallVector<Substitution, 4> result;
-  getGenericSignature()->getSubstitutions(*M, InterfaceToArchetypeMap,
+  getGenericSignature()->getSubstitutions(*M,
+                                          QueryInterfaceTypeSubstitutions(this),
                                           lookupConformanceFn, result);
   return getGenericSignature()->getASTContext().AllocateCopy(result);
 }
@@ -153,7 +166,8 @@ getSubstitutionMap(ModuleDecl *mod,
   for (auto depTy : getGenericSignature()->getAllDependentTypes()) {
 
     // Map the interface type to a context type.
-    auto contextTy = depTy.subst(mod, InterfaceToArchetypeMap, SubstOptions());
+    auto contextTy = depTy.subst(mod, QueryInterfaceTypeSubstitutions(this),
+                                 SubstOptions());
     auto *archetype = contextTy->castTo<ArchetypeType>();
 
     auto sub = subs.front();

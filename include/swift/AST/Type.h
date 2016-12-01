@@ -19,6 +19,7 @@
 
 #include "llvm/ADT/DenseMap.h"
 #include "llvm/ADT/DenseMapInfo.h"
+#include "llvm/ADT/STLExtras.h"
 #include "swift/Basic/LLVM.h"
 #include "swift/AST/PrintOptions.h"
 #include "swift/AST/TypeAlignments.h"
@@ -51,6 +52,20 @@ class TypeWalker;
 /// \brief Type substitution mapping from substitutable types to their
 /// replacements.
 typedef llvm::DenseMap<SubstitutableType *, Type> TypeSubstitutionMap;
+
+/// Function used to provide substitutions.
+///
+/// \returns A null \c Type to indicate that there is no substitution for
+/// this substitutable type; otherwise, the replacement type.
+typedef llvm::function_ref<Type(SubstitutableType *)> TypeSubstitutionFn;
+
+/// A function object suitable for use as a \c TypeSubstitutionFn that
+/// queries an underlying \c TypeSubstitutionMap.
+struct QueryTypeSubstitutionMap {
+  const TypeSubstitutionMap &substitutions;
+
+  Type operator()(SubstitutableType *type) const;
+};
 
 /// Flags that can be passed when substituting into a type.
 enum class SubstFlags {
@@ -185,6 +200,21 @@ public:
   ///
   /// \returns the substituted type, or a null type if an error occurred.
   Type subst(const SubstitutionMap &substitutions,
+             SubstOptions options = None) const;
+
+  /// Replace references to substitutable types with new, concrete types and
+  /// return the substituted result.
+  ///
+  /// \param module The module to use for conformance lookups.
+  ///
+  /// \param substitutions A function mapping from substitutable types to their
+  /// replacements.
+  ///
+  /// \param options Options that affect the substitutions.
+  ///
+  /// \returns the substituted type, or a null type if an error occurred.
+  Type subst(ModuleDecl *module,
+             TypeSubstitutionFn substitutions,
              SubstOptions options = None) const;
 
   bool isPrivateStdlibType(bool whitelistProtocols=true) const;
