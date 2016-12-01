@@ -24,6 +24,7 @@
 #include "swift/AST/DefaultArgumentKind.h"
 #include "swift/AST/GenericEnvironment.h"
 #include "swift/AST/GenericSignature.h"
+#include "swift/AST/GenericParamKey.h"
 #include "swift/AST/LazyResolver.h"
 #include "swift/AST/TypeAlignments.h"
 #include "swift/AST/Witness.h"
@@ -4013,6 +4014,8 @@ public:
     return OverriddenDecl;
   }
   void setOverriddenDecl(AbstractStorageDecl *over) {
+    // FIXME: Hack due to broken class circulatity checking.
+    if (over == this) return;
     OverriddenDecl = over;
     over->setIsOverridden();
   }
@@ -5092,6 +5095,9 @@ public:
     return OverriddenOrBehaviorParamDecl.dyn_cast<FuncDecl *>();
   }
   void setOverriddenDecl(FuncDecl *over) {
+    // FIXME: Hack due to broken class circulatity checking.
+    if (over == this) return;
+
     // A function cannot be an override if it is also a derived global decl
     // (since derived decls are at global scope).
     assert((!OverriddenOrBehaviorParamDecl
@@ -5519,6 +5525,9 @@ public:
 
   ConstructorDecl *getOverriddenDecl() const { return OverriddenDecl; }
   void setOverriddenDecl(ConstructorDecl *over) {
+    // FIXME: Hack due to broken class circulatity checking.
+    if (over == this) return;
+
     OverriddenDecl = over;
     over->setIsOverridden();
   }
@@ -6000,6 +6009,9 @@ inline bool Decl::isPotentiallyOverridable() const {
     return false;
   }
 }
+
+inline GenericParamKey::GenericParamKey(const GenericTypeParamDecl *d)
+  : Depth(d->getDepth()), Index(d->getIndex()) { }
 
 } // end namespace swift
 

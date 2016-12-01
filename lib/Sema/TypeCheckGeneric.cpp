@@ -46,7 +46,7 @@ Type DependentGenericTypeResolver::resolveDependentMemberType(
   
   return archetype->getRepresentative()
            ->getNestedType(ref->getIdentifier(), Builder)
-           ->getDependentType(/*allowUnresolved=*/true);
+           ->getDependentType(/*FIXME: */{ }, /*allowUnresolved=*/true);
 }
 
 Type DependentGenericTypeResolver::resolveSelfAssociatedType(
@@ -58,7 +58,7 @@ Type DependentGenericTypeResolver::resolveSelfAssociatedType(
   
   return archetype->getRepresentative()
            ->getNestedType(assocType->getName(), Builder)
-           ->getDependentType(/*allowUnresolved=*/true);
+           ->getDependentType(/*FIXME: */{ }, /*allowUnresolved=*/true);
 }
 
 Type DependentGenericTypeResolver::resolveTypeOfContext(DeclContext *dc) {
@@ -258,7 +258,7 @@ Type CompleteGenericTypeResolver::resolveSelfAssociatedType(Type selfTy,
        AssociatedTypeDecl *assocType) {
   return Builder.resolveArchetype(selfTy)->getRepresentative()
            ->getNestedType(assocType->getName(), Builder)
-           ->getDependentType(/*allowUnresolved=*/false);
+           ->getDependentType(/*FIXME: */{ }, /*allowUnresolved=*/false);
 }
 
 Type CompleteGenericTypeResolver::resolveTypeOfContext(DeclContext *dc) {

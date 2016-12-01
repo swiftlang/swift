@@ -2483,7 +2483,9 @@ CanArchetypeType ArchetypeType::getNew(
 }
 
 CanArchetypeType
-ArchetypeType::getNew(const ASTContext &Ctx, Identifier Name,
+ArchetypeType::getNew(const ASTContext &Ctx,
+                      GenericEnvironment *genericEnvironment,
+                      Identifier Name,
                       SmallVectorImpl<ProtocolDecl *> &ConformsTo,
                       Type Superclass) {
   // Gather the set of protocol declarations to which this archetype conforms.
@@ -2491,7 +2493,7 @@ ArchetypeType::getNew(const ASTContext &Ctx, Identifier Name,
 
   auto arena = AllocationArena::Permanent;
   return CanArchetypeType(
-           new (Ctx, arena) ArchetypeType(Ctx, nullptr, Name,
+           new (Ctx, arena) ArchetypeType(Ctx, genericEnvironment, Name,
                                           Ctx.AllocateCopy(ConformsTo),
                                           Superclass));
 }
@@ -2503,15 +2505,6 @@ bool ArchetypeType::requiresClass() const {
     if (conformed->requiresClass())
       return true;
   return false;
-}
-
-void ArchetypeType::resolveNestedType(
-       std::pair<Identifier, NestedType> &nested) const {
-  auto &ctx = const_cast<ArchetypeType *>(this)->getASTContext();
-  auto lazyArchetype = ctx.getLazyArchetype(this);
-  nested.second = lazyArchetype.second->getNestedType(nested.first,
-                                                      *lazyArchetype.first)
-                    ->getType(*lazyArchetype.first);
 }
 
 namespace {
@@ -2556,6 +2549,16 @@ ArchetypeType::NestedType ArchetypeType::getNestedType(Identifier Name) const {
   return Pos->second;
 }
 
+Optional<ArchetypeType::NestedType> ArchetypeType::getNestedTypeIfKnown(
+                                                        Identifier Name) const {
+  auto Pos = std::lower_bound(NestedTypes.begin(), NestedTypes.end(), Name,
+                              OrderArchetypeByName());
+  if (Pos == NestedTypes.end() || Pos->first != Name || !Pos->second)
+    return None;
+
+  return Pos->second;
+}
+
 bool ArchetypeType::hasNestedType(Identifier Name) const {
   auto Pos = std::lower_bound(NestedTypes.begin(), NestedTypes.end(), Name,
                               OrderArchetypeByName());
@@ -2581,6 +2584,18 @@ void ArchetypeType::setNestedTypes(
   NestedTypes = Ctx.AllocateCopy(Nested);
 }
 
+void ArchetypeType::registerNestedType(Identifier name, NestedType nested) {
+  auto found = std::lower_bound(NestedTypes.begin(), NestedTypes.end(), name,
+                                OrderArchetypeByName());
+  assert(found != NestedTypes.end() && found->first == name &&
+         "Unable to find nested type?");
+  assert(!found->second ||
+         found->second.getValue()->isEqual(nested.getValue()) ||
+         (found->second.getValue()->hasError() &&
+          nested.getValue()->hasError()));
+  found->second = nested;
+}
+
 static void collectFullName(const ArchetypeType *Archetype,
                             SmallVectorImpl<char> &Result) {
   if (auto Parent = Archetype->getParent()) {
@@ -2602,6 +2617,13 @@ std::string ArchetypeType::getFullName() const {
   llvm::SmallString<64> Result;
   collectFullName(this, Result);
   return Result.str().str();
+}
+
+GenericEnvironment *ArchetypeType::getGenericEnvironment() const {
+  if (auto parent = getParent())
+    return parent->getGenericEnvironment();
+
+  return ParentOrOpenedOrEnvironment.dyn_cast<GenericEnvironment *>();
 }
 
 void ProtocolCompositionType::Profile(llvm::FoldingSetNodeID &ID,

@@ -18,6 +18,7 @@
 #define SWIFT_TYPES_H
 
 #include "swift/AST/DeclContext.h"
+#include "swift/AST/GenericParamKey.h"
 #include "swift/AST/Ownership.h"
 #include "swift/AST/Requirement.h"
 #include "swift/AST/Substitution.h"
@@ -3776,7 +3777,8 @@ private:
   ArrayRef<ProtocolDecl *> ConformsTo;
   Type Superclass;
 
-  llvm::PointerUnion<ArchetypeType *, TypeBase *> ParentOrOpened;
+  llvm::PointerUnion3<ArchetypeType *, TypeBase *,
+                      GenericEnvironment *> ParentOrOpenedOrEnvironment;
   llvm::PointerUnion<AssociatedTypeDecl *, Identifier> AssocTypeOrName;
   MutableArrayRef<std::pair<Identifier, NestedType>> NestedTypes;
 
@@ -3790,7 +3792,7 @@ private:
   void resolveNestedType(std::pair<Identifier, NestedType> &nested) const;
 
 public:
-  /// getNew - Create a new archetype with the given name.
+  /// getNew - Create a new nested archetype with the given associated type.
   ///
   /// The ConformsTo array will be copied into the ASTContext by this routine.
   static CanTypeWrapper<ArchetypeType>
@@ -3799,12 +3801,13 @@ public:
                                SmallVectorImpl<ProtocolDecl *> &ConformsTo,
                                Type Superclass);
 
-  /// getNew - Create a new archetype with the given name.
+  /// getNew - Create a new primary archetype with the given name.
   ///
   /// The ConformsTo array will be minimized then copied into the ASTContext
   /// by this routine.
   static CanTypeWrapper<ArchetypeType>
                         getNew(const ASTContext &Ctx,
+                               GenericEnvironment *genericEnvironment,
                                Identifier Name,
                                SmallVectorImpl<ProtocolDecl *> &ConformsTo,
                                Type Superclass);
@@ -3836,13 +3839,18 @@ public:
   /// \brief Retrieve the parent of this archetype, or null if this is a
   /// primary archetype.
   ArchetypeType *getParent() const { 
-    return ParentOrOpened.dyn_cast<ArchetypeType *>(); 
+    return ParentOrOpenedOrEnvironment.dyn_cast<ArchetypeType *>();
   }
 
   /// Retrieve the opened existential type 
   Type getOpenedExistentialType() const {
-    return ParentOrOpened.dyn_cast<TypeBase *>();
+    return ParentOrOpenedOrEnvironment.dyn_cast<TypeBase *>();
   }
+
+  /// Retrieve the generic environment in which this archetype resides.
+  ///
+  /// FIXME: Not all archetypes have generic environments, yet.
+  GenericEnvironment *getGenericEnvironment() const;
 
   /// Retrieve the associated type to which this archetype (if it is a nested
   /// archetype) corresponds.
@@ -3866,6 +3874,12 @@ public:
   /// \brief Retrieve the superclass of this type, if such a requirement exists.
   Type getSuperclass() const { return Superclass; }
 
+  /// \brief Set the superclass of this type.
+  ///
+  /// This can only be performed in very narrow cases where the archetype is
+  /// being lazily constructed.
+  void setSuperclass(Type superclass) { Superclass = superclass; }
+
   /// \brief Return true if the archetype has any requirements at all.
   bool hasRequirements() const {
     return !getConformsTo().empty() || getSuperclass();
@@ -3873,7 +3887,13 @@ public:
 
   /// \brief Retrieve the nested type with the given name.
   NestedType getNestedType(Identifier Name) const;
-  
+
+  /// \brief Retrieve the nested type with the given name, if it's already
+  /// known.
+  ///
+  /// This is an implementation detail used by the archetype builder.
+  Optional<NestedType> getNestedTypeIfKnown(Identifier Name) const;
+
   Type getNestedTypeValue(Identifier Name) const {
     return getNestedType(Name).getValue();
   }
@@ -3907,10 +3927,14 @@ public:
   void setNestedTypes(ASTContext &Ctx,
                       MutableArrayRef<std::pair<Identifier, NestedType>> Nested);
 
+  /// Register a nested type with the given name.
+  void registerNestedType(Identifier name, NestedType nested);
+
   /// isPrimary - Determine whether this is the archetype for a 'primary'
-  /// archetype, e.g., 
+  /// archetype, e.g., one that is not nested within another archetype and is
+  /// not an opened existential.
   bool isPrimary() const { 
-    return ParentOrOpened.isNull();
+    return ParentOrOpenedOrEnvironment.is<GenericEnvironment *>();
   }
 
   /// getPrimary - Return the primary archetype parent of this archetype.
@@ -3937,14 +3961,23 @@ public:
 
 private:
   ArchetypeType(
-          const ASTContext &Ctx, ArchetypeType *Parent,
+          const ASTContext &Ctx,
+          llvm::PointerUnion<ArchetypeType *, GenericEnvironment *>
+            ParentOrGenericEnv,
           llvm::PointerUnion<AssociatedTypeDecl *, Identifier> AssocTypeOrName,
           ArrayRef<ProtocolDecl *> ConformsTo,
           Type Superclass)
     : SubstitutableType(TypeKind::Archetype, &Ctx,
                         RecursiveTypeProperties::HasArchetype),
-      ConformsTo(ConformsTo), Superclass(Superclass), ParentOrOpened(Parent),
-      AssocTypeOrName(AssocTypeOrName) { }
+      ConformsTo(ConformsTo), Superclass(Superclass),
+      AssocTypeOrName(AssocTypeOrName) {
+    if (auto parent = ParentOrGenericEnv.dyn_cast<ArchetypeType *>()) {
+      ParentOrOpenedOrEnvironment = parent;
+    } else {
+      ParentOrOpenedOrEnvironment =
+        ParentOrGenericEnv.get<GenericEnvironment *>();
+    }
+  }
 
   ArchetypeType(const ASTContext &Ctx, 
                 Type Existential,
@@ -3955,7 +3988,7 @@ private:
                           RecursiveTypeProperties::HasArchetype |
                           RecursiveTypeProperties::HasOpenedExistential)),
       ConformsTo(ConformsTo), Superclass(Superclass),
-      ParentOrOpened(Existential.getPointer()) { }
+      ParentOrOpenedOrEnvironment(Existential.getPointer()) { }
 };
 BEGIN_CAN_TYPE_WRAPPER(ArchetypeType, SubstitutableType)
 CanArchetypeType getParent() const {
@@ -4595,6 +4628,9 @@ constexpr bool TypeBase::isSugaredType<id##Type>() { \
   return true; \
 }
 #include "swift/AST/TypeNodes.def"
+
+inline GenericParamKey::GenericParamKey(const GenericTypeParamType *p)
+  : Depth(p->getDepth()), Index(p->getIndex()) { }
 
 } // end namespace swift
 
