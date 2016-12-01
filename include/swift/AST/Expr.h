@@ -499,8 +499,6 @@ public:
   SourceLoc getLoc() const { return (SUBEXPR)->getLoc(); } \
   SourceRange getSourceRange() const { return (SUBEXPR)->getSourceRange(); }
 
-  SourceLoc TrailingSemiLoc;
-
   /// getSemanticsProvidingExpr - Find the smallest subexpression
   /// which obeys the property that evaluating it is exactly
   /// equivalent to evaluating this expression.
