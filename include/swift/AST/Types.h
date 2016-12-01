@@ -287,10 +287,11 @@ protected:
   struct ArchetypeTypeBitfields {
     unsigned : NumTypeBaseBits;
 
+    unsigned ExpandedNestedTypes : 1;
     unsigned HasSuperclass : 1;
     unsigned NumProtocols : 16;
   };
-  enum { NumArchetypeTypeBitfields = NumTypeBaseBits + 17 };
+  enum { NumArchetypeTypeBitfields = NumTypeBaseBits + 18 };
   static_assert(NumArchetypeTypeBitfields <= 32, "fits in an unsigned");
 
   struct TypeVariableTypeBitfields {
@@ -3554,6 +3555,16 @@ public:
   /// in the protocol list, then sorting them in some stable order.
   static void canonicalizeProtocols(SmallVectorImpl<ProtocolDecl *> &protocols);
 
+  /// Visit all of the protocols in the given list of protocols, along with their
+  ///
+  /// \param fn Visitor function called for each protocol (just once). If it
+  /// returns \c true, the visit operation will abort and return \c true.
+  ///
+  /// \returns \c true if any invocation of \c fn returns \c true, and \c false
+  /// otherwise.
+  static bool visitAllProtocols(ArrayRef<ProtocolDecl *> protocols,
+                                llvm::function_ref<bool(ProtocolDecl *)> fn);
+
   /// Compare two protocols to provide them with a stable ordering for
   /// use in sorting.
   static int compareProtocols(ProtocolDecl * const* PP1,
@@ -3801,6 +3812,7 @@ private:
   llvm::PointerUnion<AssociatedTypeDecl *, Identifier> AssocTypeOrName;
   MutableArrayRef<std::pair<Identifier, NestedType>> NestedTypes;
 
+  void populateNestedTypes() const;
   void resolveNestedType(std::pair<Identifier, NestedType> &nested) const;
 
 public:
@@ -3936,9 +3948,9 @@ public:
   getAllNestedTypes(bool resolveTypes = true) const;
 
   /// \brief Set the nested types to a copy of the given array of
-  /// archetypes, which will first be sorted in place.
+  /// archetypes.
   void setNestedTypes(ASTContext &Ctx,
-                      MutableArrayRef<std::pair<Identifier, NestedType>> Nested);
+                      ArrayRef<std::pair<Identifier, NestedType>> Nested);
 
   /// Register a nested type with the given name.
   void registerNestedType(Identifier name, NestedType nested);
