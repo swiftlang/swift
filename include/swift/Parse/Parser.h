@@ -723,15 +723,15 @@ public:
                                            DeclAttributes &Attributes);
   ParserStatus parseInheritance(SmallVectorImpl<TypeLoc> &Inherited,
                                 SourceLoc *classRequirementLoc);
+  bool parseDeclList(SourceLoc LBLoc, SourceLoc &RBLoc,
+                     Diag<> ErrorDiag, ParseDeclOptions Options,
+                     llvm::function_ref<void(Decl*)> handler);
   ParserResult<ExtensionDecl> parseDeclExtension(ParseDeclOptions Flags,
                                                  DeclAttributes &Attributes);
   ParserResult<EnumDecl> parseDeclEnum(ParseDeclOptions Flags,
                                        DeclAttributes &Attributes);
   ParserStatus parseDeclEnumCase(ParseDeclOptions Flags, DeclAttributes &Attributes,
                                  SmallVectorImpl<Decl *> &decls);
-  bool parseNominalDeclMembers(SourceLoc LBLoc, SourceLoc &RBLoc,
-                               Diag<> ErrorDiag, ParseDeclOptions flags,
-                               llvm::function_ref<void(Decl*)> handler);
   ParserResult<StructDecl>
   parseDeclStruct(ParseDeclOptions Flags, DeclAttributes &Attributes);
   ParserResult<ClassDecl>

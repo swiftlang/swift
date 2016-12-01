@@ -311,8 +311,6 @@ ParserStatus Parser::parseBraceItems(SmallVectorImpl<ASTNode> &Entries,
 
       for (Decl *D : TmpDecls)
         Entries.push_back(D);
-      if (!TmpDecls.empty())
-        PreviousHadSemi = TmpDecls.back()->TrailingSemiLoc.isValid();
       TmpDecls.clear();
     } else if (Tok.is(tok::pound_if)) {
       SourceLoc StartLoc = Tok.getLoc();
