@@ -18,19 +18,19 @@ extension ${Self} : CustomPlaygroundQuickLookable {
   public var customPlaygroundQuickLook: PlaygroundQuickLook {
     // this code comes straight from the quicklooks
 
-    let data = (self as AnyObject)._copyImageData?()
+    let data = (self as AnyObject)._copyImageData?() as Data?
     // we could send a Raw, but I don't want to make a copy of the
     // bytes for no good reason make an NSImage out of them and
     // send that
 #if os(OSX)
-    if let data = data {
-      return .sprite(NSImage(data: data as Data))
+    if let data = data, let image = NSImage(data: data) {
+      return .sprite(image)
     } else {
       return .sprite(NSImage())
     }
 #elseif os(iOS) || os(watchOS) || os(tvOS)
-    if let data = data {
-      return .sprite(UIImage(data: data as Data))
+    if let data = data, let image = UIImage(data: data) {
+      return .sprite(image)
     } else {
       return .sprite(UIImage())
     }
