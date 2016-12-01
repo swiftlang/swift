@@ -3278,14 +3278,45 @@ case TypeKind::Id:
   }
 
   case TypeKind::SILBox: {
-    auto storageTy = cast<SILBoxType>(base);
-    Type transBoxed = storageTy->getBoxedType().transform(fn);
-    if (!transBoxed)
-      return Type();
-    CanType canTransBoxed = transBoxed->getCanonicalType();
-    if (canTransBoxed != storageTy->getBoxedType())
-      return SILBoxType::get(canTransBoxed);
-    return storageTy;
+    auto boxTy = cast<SILBoxType>(base);
+    // Nothing to do for an unparameterized box layout.
+    if (boxTy->getGenericArgs().empty())
+      return boxTy;
+    
+    SmallVector<Substitution, 4> transArgs;
+    bool didChange = false;
+    for (auto &arg : boxTy->getGenericArgs()) {
+      auto transReplacement = arg.getReplacement().transform(fn);
+      if (!transReplacement)
+        return Type();
+      auto canReplacement = transReplacement->getCanonicalType();
+      if (canReplacement != CanType(arg.getReplacement())) {
+        // FIXME: We need to update the substitution conformances for the
+        // transformed type in the general case. For now, only handle
+        // transformations between generic types with abstract conformances.
+        assert((arg.getConformances().empty()
+                || (std::all_of(arg.getConformances().begin(),
+                                arg.getConformances().end(),
+                                [](ProtocolConformanceRef conformance) -> bool {
+                                  return conformance.isAbstract();
+                                })
+                    && (canReplacement->is<SubstitutableType>()
+                        || canReplacement->is<DependentMemberType>()
+                        || canReplacement->is<GenericTypeParamType>())))
+               && "transforming concrete conformance not implemented");
+        transArgs.push_back(Substitution(canReplacement,
+                                         arg.getConformances()));
+        didChange = true;
+      } else {
+        transArgs.push_back(arg);
+      }
+    }
+    if (!didChange)
+      return boxTy;
+    
+    return SILBoxType::get(boxTy->getASTContext(),
+                           boxTy->getLayout(),
+                           transArgs);
   }
 
   case TypeKind::SILFunction: {

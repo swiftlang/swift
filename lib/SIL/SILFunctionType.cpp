@@ -2183,8 +2183,42 @@ namespace {
       return SILBlockStorageType::get(substCaptureType);
     }
     CanType visitSILBoxType(CanSILBoxType origType) {
-      auto substBoxedType = visit(origType->getBoxedType());
-      return SILBoxType::get(substBoxedType);
+      // TODO: This should eventually go away once SILLayouts are fully
+      // adopted, since a layout should only ever be parameterized by formal
+      // types once the box transition is finished.
+      bool didChange = false;
+      SmallVector<Substitution, 4> substArgs;
+      for (auto &arg : origType->getGenericArgs()) {
+        auto substReplacementTy = visit(CanType(arg.getReplacement()));
+        
+        if (substReplacementTy == CanType(arg.getReplacement())) {
+          substArgs.push_back(arg);
+          continue;
+        }
+        
+        // FIXME: We need to update the substitution conformances for the
+        // transformed type in the general case. For now, only handle
+        // transformations between generic types with abstract conformances.
+        assert((arg.getConformances().empty()
+                || (std::all_of(arg.getConformances().begin(),
+                                arg.getConformances().end(),
+                                [](ProtocolConformanceRef conformance) -> bool {
+                                  return conformance.isAbstract();
+                                })
+                    && (substReplacementTy->is<SubstitutableType>()
+                        || substReplacementTy->is<DependentMemberType>()
+                        || substReplacementTy->is<GenericTypeParamType>())))
+               && "transforming concrete conformance not implemented");
+        substArgs.push_back(Substitution(substReplacementTy,
+                                         arg.getConformances()));
+        didChange = true;
+      }
+      if (!didChange)
+        return origType;
+
+      return SILBoxType::get(origType->getASTContext(),
+                             origType->getLayout(),
+                             substArgs);
     }
 
     /// Optionals need to have their object types substituted by these rules.
