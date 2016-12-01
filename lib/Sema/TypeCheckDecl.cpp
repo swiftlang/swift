@@ -6877,11 +6877,6 @@ void TypeChecker::validateDecl(ValueDecl *D, bool resolveTypeParams) {
   case DeclKind::AssociatedType: {
     auto typeParam = cast<AbstractTypeParamDecl>(D);
     auto assocType = dyn_cast<AssociatedTypeDecl>(typeParam);
-    if (assocType && assocType->isRecursive()) {
-      D->setInvalid();
-      break;
-    }
-
     DeclContext *DC = typeParam->getDeclContext();
 
     if (assocType && !assocType->hasInterfaceType())

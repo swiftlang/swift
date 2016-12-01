@@ -1429,18 +1429,9 @@ bool ArchetypeBuilder::addAbstractTypeParamRequirements(
   auto markRecursive = [&](AssociatedTypeDecl *assocType,
                            ProtocolDecl *proto,
                            SourceLoc loc) {
-    if (!pa->isRecursive() && !assocType->isRecursive()) {
+    if (!pa->isRecursive() && !assocType->isInvalid()) {
       Diags.diagnose(assocType->getLoc(),
                      diag::recursive_requirement_reference);
-        
-      // Mark all associatedtypes in this protocol as recursive (and error-type)
-      // to avoid later crashes dealing with this invalid protocol in other
-      // contexts.
-      auto containingProto =
-        assocType->getDeclContext()->getAsProtocolOrProtocolExtensionContext();
-      for (auto member : containingProto->getMembers())
-        if (auto assocType = dyn_cast<AssociatedTypeDecl>(member))
-          assocType->setIsRecursive();
     }
     pa->setIsRecursive();
 

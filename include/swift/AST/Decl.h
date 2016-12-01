@@ -515,13 +515,8 @@ class alignas(1 << DeclAlignInBits) Decl {
   class AssociatedTypeDeclBitfields {
     friend class AssociatedTypeDecl;
     unsigned : NumTypeDeclBits;
-
-    unsigned Recursive : 1;
-
-    /// Whether or not this declaration is currently being type-checked.
-    unsigned BeingTypeChecked : 1;
   };
-  enum { NumAssociatedTypeDeclBits = NumTypeDeclBits + 2 };
+  enum { NumAssociatedTypeDeclBits = NumTypeDeclBits };
   static_assert(NumAssociatedTypeDeclBits <= 32, "fits in an unsigned");
 
   class ImportDeclBitfields {
@@ -2520,17 +2515,6 @@ public:
 
   SourceLoc getStartLoc() const { return KeywordLoc; }
   SourceRange getSourceRange() const;
-
-  void setIsRecursive();
-  bool isRecursive() { return AssociatedTypeDeclBits.Recursive; }
-
-  /// Whether the declaration is currently being validated.
-  bool isBeingTypeChecked() { return AssociatedTypeDeclBits.BeingTypeChecked; }
-
-  /// Toggle whether or not the declaration is being validated.
-  void setIsBeingTypeChecked(bool ibt = true) {
-    AssociatedTypeDeclBits.BeingTypeChecked = ibt;
-  }
 
   static bool classof(const Decl *D) {
     return D->getKind() == DeclKind::AssociatedType;

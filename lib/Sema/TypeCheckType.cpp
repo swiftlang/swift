@@ -595,7 +595,9 @@ Type TypeChecker::applyUnboundGenericArguments(
     auto genericSig = decl->getGenericSignature();
     if (!decl->hasInterfaceType() ||
         decl->isValidatingGenericSignature()) {
-      diagnose(loc, diag::recursive_requirement_reference);
+      diagnose(loc, diag::recursive_type_reference,
+               decl->getName());
+      diagnose(noteLoc, diag::type_declared_here);
       return nullptr;
     }
 
@@ -662,8 +664,12 @@ static Type resolveTypeDecl(TypeChecker &TC, TypeDecl *typeDecl, SourceLoc loc,
     TC.validateDecl(typeDecl);
 
     // FIXME: More principled handling of circularity.
-    if (!typeDecl->hasInterfaceType())
+    if (!typeDecl->hasInterfaceType()) {
+      TC.diagnose(loc, diag::recursive_type_reference,
+                  typeDecl->getName());
+      TC.diagnose(typeDecl->getLoc(), diag::type_declared_here);
       return ErrorType::get(TC.Context);
+    }
   }
 
   // Resolve the type declaration to a specific type. How this occurs
