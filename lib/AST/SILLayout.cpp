@@ -101,7 +101,7 @@ SILLayout::SILLayout(CanGenericSignature Sig,
 #endif
   auto FieldsMem = getTrailingObjects<SILField>();
   for (unsigned i : indices(Fields)) {
-    new (FieldsMem) SILField(Fields[i]);
+    new (FieldsMem + i) SILField(Fields[i]);
   }
 }
 
