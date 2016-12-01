@@ -246,6 +246,8 @@ class TestCharacterSet : TestCharacterSetSuper {
         let immutableSet = CharacterSet(charactersIn:"abc")
         expectTrue(emptySet.isSubset(of: immutableSet))
         expectTrue(immutableSet.isSuperset(of: emptySet))
+        expectTrue(emptySet.isSubset(of: emptySet))
+        expectTrue(emptySet.isSuperset(of: emptySet))
     }
 }
 
