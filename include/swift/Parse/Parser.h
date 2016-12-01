@@ -603,9 +603,8 @@ public:
   bool parseMatchingToken(tok K, SourceLoc &TokLoc, Diag<> ErrorDiag,
                           SourceLoc OtherLoc);
 
-  /// \brief Parse the list of statements, expressions, or declarations.
+  /// \brief Parse a comma separated list of some elements.
   ParserStatus parseList(tok RightK, SourceLoc LeftLoc, SourceLoc &RightLoc,
-                         tok SeparatorK, bool OptionalSep,
                          bool AllowSepAfterLast, Diag<> ErrorDiag,
                          std::function<ParserStatus()> callback);
 
