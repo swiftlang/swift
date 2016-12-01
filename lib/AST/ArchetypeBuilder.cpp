@@ -786,9 +786,6 @@ ArchetypeBuilder::PotentialArchetype::getTypeInContext(
       FlatNestedTypes.push_back({ Nested.first, NestedType() });
     }
     arch->setNestedTypes(ctx, FlatNestedTypes);
-
-    // Force the resolution of the nested types.
-    (void)arch->getAllNestedTypes();
   }
 
   return NestedType::forArchetype(arch);
@@ -2242,6 +2239,16 @@ GenericEnvironment *ArchetypeBuilder::getGenericEnvironment(
       genericEnv->addMapping(pa->getGenericParamKey(), contextType);
   }
 
+  // Force the creation of all of the archetypes.
+  // FIXME: This isn't a well-formed notion with recursive protocol constraints.
+  visitPotentialArchetypes([&](PotentialArchetype *pa) {
+    if (auto archetype =
+          pa->getTypeInContext(*this, genericEnv).getAsArchetype()) {
+      (void)archetype->getAllNestedTypes();
+    }
+  });
+  genericEnv->clearArchetypeBuilder();
+
 #ifndef NDEBUG
   // FIXME: This property should be maintained when there are errors, too.
   if (!Diags.hadAnyError() && !Impl->UsedContextArchetype) {
@@ -2264,7 +2271,6 @@ GenericEnvironment *ArchetypeBuilder::getGenericEnvironment(
   }
 #endif
 
-  genericEnv->clearArchetypeBuilder();
   return genericEnv;
 }
 
