@@ -5,10 +5,11 @@
 // See https://swift.org/LICENSE.txt for license information
 // See https://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
 
-// RUN: not --crash %target-swift-frontend %s -typecheck
-// REQUIRES: asserts
-{{
-class A:a}protocol a{typealias f:a
-let t:A
-protocol A
-typealias e:a
+// RUN: not %target-swift-frontend %s -typecheck
+protocol a{{
+}associatedtype e:a
+struct A:a{
+struct B
+protocol c
+let c=B
+}class B typealias B
