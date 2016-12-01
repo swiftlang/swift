@@ -524,33 +524,6 @@ auto ArchetypeBuilder::PotentialArchetype::getNestedType(
   return nested.front();
 }
 
-/// Replace dependent types with their archetypes or concrete types.
-static Type substConcreteTypesForDependentTypes(ArchetypeBuilder &builder,
-                                                GenericEnvironment *genericEnv,
-                                                Type type) {
-  // FIXME: Use dyn_cast rather than getAs.
-  // FIXME: This should really be "Type::subst()", but we need a way to provide
-  // Type::subst() with generic parameter bindings that are lazily populated
-  // through the archetype builder.
-  return type.transform([&](Type type) -> Type {
-      if (auto depMemTy = type->getAs<DependentMemberType>()) {
-        auto newBase = substConcreteTypesForDependentTypes(builder,
-                                                           genericEnv,
-                                                           depMemTy->getBase());
-        return depMemTy->substBaseType(&builder.getModule(), newBase,
-                                       builder.getLazyResolver());
-      }
-
-      if (auto typeParam = type->getAs<GenericTypeParamType>()) {
-        auto potentialArchetype = builder.resolveArchetype(typeParam);
-        return potentialArchetype->getTypeInContext(builder, genericEnv)
-                 .getValue();
-      }
-
-      return type;
-  });
-}
-
 ArchetypeType::NestedType
 ArchetypeBuilder::PotentialArchetype::getTypeInContext(
                                                ArchetypeBuilder &builder,
@@ -602,8 +575,8 @@ ArchetypeBuilder::PotentialArchetype::getTypeInContext(
     };
 
     return NestedType::forConcreteType(
-            substConcreteTypesForDependentTypes(builder, genericEnv,
-                                                concreteType));
+                           genericEnv->mapTypeIntoContext(&builder.getModule(),
+                                                          concreteType));
   }
 
   // Check that we haven't referenced this type while substituting into the
@@ -623,6 +596,22 @@ ArchetypeBuilder::PotentialArchetype::getTypeInContext(
              ErrorType::get(getDependentType(genericParams,
                                              /*allowUnresolved=*/true)));
   }
+
+  // Local function to check whether we have a generic parameter that has
+  // already been recorded
+  auto getAlreadyRecoveredGenericParam = [&]() -> Optional<NestedType> {
+    if (!isGenericParam()) return None;
+
+    auto type = genericEnv->getMappingIfPresent(getGenericParamKey());
+    if (!type) return None;
+
+    // We already have a mapping for this generic parameter in the generic
+    // environment. Return it.
+    if (auto archetype = (*type)->getAs<ArchetypeType>())
+      return NestedType::forArchetype(archetype);
+
+    return NestedType::forConcreteType(*type);
+  };
 
   AssociatedTypeDecl *assocType = nullptr;
   ArchetypeType *ParentArchetype = nullptr;
@@ -678,8 +667,8 @@ ArchetypeBuilder::PotentialArchetype::getTypeInContext(
       representative->SameTypeSource = parent->SameTypeSource;
 
       return NestedType::forConcreteType(
-               substConcreteTypesForDependentTypes(builder, genericEnv,
-                                                   memberType));
+                           genericEnv->mapTypeIntoContext(&builder.getModule(),
+                                                          memberType));
     }
 
     ParentArchetype = parentTy.getAsArchetype();
@@ -691,14 +680,25 @@ ArchetypeBuilder::PotentialArchetype::getTypeInContext(
 
     // We will build the archetype below.
     assocType = getResolvedAssociatedType();
-  } else if (auto type =
-               genericEnv->getMappingIfPresent(getGenericParamKey())) {
-    // We already have a mapping for this generic parameter in the generic
-    // environment. Return it.
-    if (auto archetype = (*type)->getAs<ArchetypeType>())
-      return NestedType::forArchetype(archetype);
+  } else if (auto result = getAlreadyRecoveredGenericParam()) {
+    return *result;
+  }
 
-    return NestedType::forConcreteType(*type);
+  // Determine the superclass for the archetype. If it exists and involves
+  // type parameters, substitute them.
+  Type superclass = representative->getSuperclass();
+  if (superclass && superclass->hasTypeParameter()) {
+    (void)builder.Impl->SuperclassSubs.insert({genericEnv, representative});
+    SWIFT_DEFER {
+      builder.Impl->SuperclassSubs.erase({genericEnv, representative});
+    };
+    superclass = genericEnv->mapTypeIntoContext(&builder.getModule(),
+                                                superclass);
+
+    // We might have recursively recorded the archetype; if so, return early.
+    // FIXME: This should be detectable before we end up building archetypes.
+    if (auto result = getAlreadyRecoveredGenericParam())
+      return *result;
   }
 
   // Build a new archetype.
@@ -738,32 +738,18 @@ ArchetypeBuilder::PotentialArchetype::getTypeInContext(
 
     // Create a nested archetype.
     arch = ArchetypeType::getNew(ctx, ParentArchetype, assocType, Protos,
-                                 Type());
+                                 superclass);
 
     // Register this archetype with its parent.
     ParentArchetype->registerNestedType(getName(),
                                         NestedType::forArchetype(arch));
   } else {
     // Create a top-level archetype.
-    arch = ArchetypeType::getNew(ctx, genericEnv, getName(), Protos, Type());
+    arch = ArchetypeType::getNew(ctx, genericEnv, getName(), Protos,
+                                 superclass);
 
     // Register the archetype with the generic environment.
     genericEnv->addMapping(getGenericParamKey(), arch);
-  }
-
-  // Determine the superclass for the archetype. If it exists and involves
-  // type parameters, substitute them.
-  if (Type superclass = representative->getSuperclass()) {
-    if (superclass->hasTypeParameter()) {
-      (void)builder.Impl->SuperclassSubs.insert({genericEnv, representative});
-      SWIFT_DEFER {
-        builder.Impl->SuperclassSubs.erase({genericEnv, representative});
-      };
-      superclass = substConcreteTypesForDependentTypes(builder, genericEnv,
-                                                       superclass);
-    }
-
-    arch->setSuperclass(superclass);
   }
 
   // Collect the set of nested types of this archetype, and put them into
