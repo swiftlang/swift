@@ -815,7 +815,14 @@ internal class _NSSwiftData : NSData {
     }
     
     override var bytes: UnsafeRawPointer {
-        return _backing.bytes!
+        // NSData's byte pointer methods are not annotated for nullability correctly
+        // (but assume non-null by the wrapping macro guards). This placeholder value
+        // is to work-around this bug. Any indirection to the underlying bytes of a NSData
+        // with a length of zero would have been a programmer error anyhow so the actual
+        // return value here is not needed to be an allocated value. This is specifically
+        // needed to live like this to be source compatible with Swift3. Beyond that point
+        // this API may be subject to correction.
+        return _backing.bytes ?? UnsafeRawPointer(bitPattern: 0xBAD0)!
     }
     
     override func copy(with zone: NSZone? = nil) -> Any {
