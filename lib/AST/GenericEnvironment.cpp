@@ -105,9 +105,28 @@ Type GenericEnvironment::QueryInterfaceTypeSubstitutions::operator()(
     auto genericParams = self->Signature->getGenericParams();
     GenericParamKey key(gp);
 
+    // Make sure that this generic parameter is from this environment.
     unsigned index = key.findIndexIn(genericParams);
-    if (index < genericParams.size() && genericParams[index] == key)
-      return self->getContextTypes()[index];
+    if (index == genericParams.size() || genericParams[index] != key)
+      return Type();
+
+    // If the context type isn't already known, lazily create it.
+    Type contextType = self->getContextTypes()[index];
+    if (!contextType) {
+      assert(self->Builder && "Missing archetype builder for lazy query");
+      auto potentialArchetype = self->Builder->resolveArchetype(type);
+
+      auto mutableSelf = const_cast<GenericEnvironment *>(self);
+      contextType =
+        potentialArchetype->getTypeInContext(*mutableSelf->Builder, mutableSelf)
+          .getValue();
+
+      // FIXME: Redundant mapping from key -> index.
+      if (self->getContextTypes()[index].isNull())
+        mutableSelf->addMapping(key, contextType);
+    }
+
+    return contextType;
   }
 
   return Type();
@@ -122,15 +141,10 @@ Type GenericEnvironment::mapTypeIntoContext(ModuleDecl *M, Type type) const {
 }
 
 Type GenericEnvironment::mapTypeIntoContext(GenericTypeParamType *type) const {
-  // Find the index into the parallel arrays of generic parameters and
-  // context types.
-  auto genericParams = Signature->getGenericParams();
-  GenericParamKey key(type);
-  unsigned index = key.findIndexIn(genericParams);
-  assert(genericParams[index] == key && "Bad generic parameter");
-
-  assert(getContextTypes()[index] && "Missing context type");
-  return getContextTypes()[index];
+  auto self = const_cast<GenericEnvironment *>(this);
+  Type result = QueryInterfaceTypeSubstitutions(self)(type);
+  assert(result && "Missing context type for generic parameter");
+  return result;
 }
 
 GenericTypeParamType *GenericEnvironment::getSugaredType(

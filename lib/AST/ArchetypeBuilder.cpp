@@ -697,6 +697,8 @@ ArchetypeBuilder::PotentialArchetype::getTypeInContext(
     // environment. Return it.
     if (auto archetype = (*type)->getAs<ArchetypeType>())
       return NestedType::forArchetype(archetype);
+
+    return NestedType::forConcreteType(*type);
   }
 
   // Build a new archetype.
@@ -2231,21 +2233,20 @@ GenericSignature *ArchetypeBuilder::getGenericSignature() {
 
 GenericEnvironment *ArchetypeBuilder::getGenericEnvironment(
                                                   GenericSignature *signature) {
-  // Compute the archetypes for the generic parameters.
+  // Create the generic environment, which will be lazily populated with
+  // archetypes.
   auto genericEnv = GenericEnvironment::getIncomplete(signature, this);
-  for (auto pa : Impl->PotentialArchetypes) {
-    Type contextType = pa->getTypeInContext(*this, genericEnv).getValue();
-    if (!genericEnv->getMappingIfPresent(pa->getGenericParamKey()))
-      genericEnv->addMapping(pa->getGenericParamKey(), contextType);
-  }
 
   // Force the creation of all of the archetypes.
   // FIXME: This isn't a well-formed notion with recursive protocol constraints.
   visitPotentialArchetypes([&](PotentialArchetype *pa) {
     if (auto archetype =
-          pa->getTypeInContext(*this, genericEnv).getAsArchetype()) {
+          genericEnv->mapTypeIntoContext(
+              &getModule(),
+              pa->getDependentType(signature->getGenericParams(),
+                                   /*allowUnresolved=*/false))
+            ->getAs<ArchetypeType>())
       (void)archetype->getAllNestedTypes();
-    }
   });
   genericEnv->clearArchetypeBuilder();
 
