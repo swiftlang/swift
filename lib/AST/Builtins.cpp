@@ -198,8 +198,7 @@ getBuiltinGenericFunction(Identifier Id,
   GenericSignature *Sig =
     GenericSignature::get(GenericParamTypes, { });
   GenericEnvironment *Env =
-      GenericEnvironment::get(Context, Sig,
-                              InterfaceToArchetypeMap);
+    GenericEnvironment::get(Sig, InterfaceToArchetypeMap);
 
   Type InterfaceType = GenericFunctionType::get(Sig, ArgParamType, ResType,
                                                 AnyFunctionType::ExtInfo());

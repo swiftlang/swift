@@ -75,7 +75,7 @@ ArchetypeBuilder *GenericSignature::getArchetypeBuilder(ModuleDecl &mod) {
 
   // Archetype builders are stored on the ASTContext.
   return getASTContext().getOrCreateArchetypeBuilder(CanGenericSignature(this),
-                                                     &mod).first;
+                                                     &mod);
 }
 
 bool GenericSignature::isCanonical() const {
@@ -290,6 +290,15 @@ SmallVector<Type, 4> GenericSignature::getAllDependentTypes() const {
 void GenericSignature::
 getSubstitutions(ModuleDecl &mod,
                  const TypeSubstitutionMap &subs,
+                 GenericSignature::LookupConformanceFn lookupConformance,
+                 SmallVectorImpl<Substitution> &result) const {
+  getSubstitutions(mod, QueryTypeSubstitutionMap{subs}, lookupConformance,
+                   result);
+}
+
+void GenericSignature::
+getSubstitutions(ModuleDecl &mod,
+                 TypeSubstitutionFn subs,
                  GenericSignature::LookupConformanceFn lookupConformance,
                  SmallVectorImpl<Substitution> &result) const {
   // Enumerate all of the requirements that require substitution.
@@ -522,8 +531,8 @@ CanType GenericSignature::getCanonicalTypeInContext(Type type, ModuleDecl &mod) 
 GenericEnvironment *CanGenericSignature::getGenericEnvironment(
                                                      ModuleDecl &module) const {
   // Archetype builders are stored on the ASTContext.
-  return module.getASTContext().getOrCreateArchetypeBuilder(*this, &module)
-           .second;
+  return module.getASTContext().getOrCreateCanonicalGenericEnvironment(
+           module.getASTContext().getOrCreateArchetypeBuilder(*this, &module));
 }
 
 unsigned GenericParamKey::findIndexIn(

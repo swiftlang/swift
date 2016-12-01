@@ -35,6 +35,16 @@
 #include <iterator>
 using namespace swift;
 
+Type QueryTypeSubstitutionMap::operator()(SubstitutableType *type) const {
+  auto key = type->getCanonicalType()->castTo<SubstitutableType>();
+  auto known = substitutions.find(key);
+  if (known != substitutions.end() && known->second)
+    return known->second;
+
+  // Not known.
+  return Type();
+}
+
 bool TypeLoc::isError() const {
   assert(wasValidated() && "Type not yet validated");
   return getType()->hasError() || getType()->getCanonicalType()->hasError();
@@ -2829,7 +2839,7 @@ Type DependentMemberType::substBaseType(ModuleDecl *module,
 static Type substType(
     Type derivedType,
     llvm::PointerUnion<ModuleDecl *, const SubstitutionMap *> conformances,
-    const TypeSubstitutionMap &substitutions,
+    TypeSubstitutionFn substitutions,
     SubstOptions options) {
   return derivedType.transform([&](Type type) -> Type {
     assert((options.contains(SubstFlags::AllowLoweredTypes) ||
@@ -2858,11 +2868,8 @@ static Type substType(
       return type;
 
     // If we have a substitution for this type, use it.
-    auto key = substOrig->getCanonicalType()->castTo<SubstitutableType>();
-    auto known = substitutions.find(key);
-    if (known != substitutions.end() && known->second)
-      return SubstitutedType::get(type, known->second,
-                                  type->getASTContext());
+    if (auto known = substitutions(substOrig))
+      return SubstitutedType::get(type, known, type->getASTContext());
 
     // For archetypes, we can substitute the parent (if present).
     auto archetype = substOrig->getAs<ArchetypeType>();
@@ -2893,12 +2900,19 @@ static Type substType(
 Type Type::subst(Module *module,
                  const TypeSubstitutionMap &substitutions,
                  SubstOptions options) const {
-  return substType(*this, module, substitutions, options);
+  return substType(*this, module, QueryTypeSubstitutionMap{substitutions}, options);
 }
 
 Type Type::subst(const SubstitutionMap &substitutions,
                  SubstOptions options) const {
-  return substType(*this, &substitutions, substitutions.getMap(), options);
+  return substType(*this, &substitutions,
+                   QueryTypeSubstitutionMap{substitutions.getMap()}, options);
+}
+
+Type Type::subst(ModuleDecl *module,
+                 TypeSubstitutionFn substitutions,
+                 SubstOptions options) const {
+  return substType(*this, module, substitutions, options);
 }
 
 Type TypeBase::getSuperclassForDecl(const ClassDecl *baseClass,

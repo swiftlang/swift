@@ -300,7 +300,7 @@ int swift::RunImmediately(CompilerInstance &CI, const ProcessCmdLine &CmdLine,
   // FIXME: We shouldn't need to use the global context here, but
   // something is persisting across calls to performIRGeneration.
   auto ModuleOwner = performIRGeneration(IRGenOpts, swiftModule,
-                                         std::move(CI.takeSILModule()),
+                                         CI.takeSILModule(),
                                          swiftModule->getName().str(),
                                          getGlobalLLVMContext());
   auto *Module = ModuleOwner.get();

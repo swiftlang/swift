@@ -3874,12 +3874,6 @@ public:
   /// \brief Retrieve the superclass of this type, if such a requirement exists.
   Type getSuperclass() const { return Superclass; }
 
-  /// \brief Set the superclass of this type.
-  ///
-  /// This can only be performed in very narrow cases where the archetype is
-  /// being lazily constructed.
-  void setSuperclass(Type superclass) { Superclass = superclass; }
-
   /// \brief Return true if the archetype has any requirements at all.
   bool hasRequirements() const {
     return !getConformsTo().empty() || getSuperclass();

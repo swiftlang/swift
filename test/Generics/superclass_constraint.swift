@@ -33,7 +33,7 @@ func f9<T : GA<A>>(_: T) where T : GB<A> {}
 func f10<T : GB<A>>(_: T) where T : GA<A> {}
 
 func f11<T : GA<T>>(_: T) { } // expected-error{{superclass constraint 'GA<T>' is recursive}}
-func f12<T : GA<U>, U : GB<T>>(_: T, _: U) { } // expected-error{{superclass constraint 'GA<U>' is recursive}}
+func f12<T : GA<U>, U : GB<T>>(_: T, _: U) { } // expected-error{{superclass constraint 'GB<T>' is recursive}}
 func f13<T : U, U : GA<T>>(_: T, _: U) { } // expected-error{{inheritance from non-protocol, non-class type 'U'}}
 
 // rdar://problem/24730536

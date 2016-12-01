@@ -762,8 +762,13 @@ public:
 
   /// Retrieve or create the stored archetype builder for the given
   /// canonical generic signature and module.
-  std::pair<ArchetypeBuilder *, GenericEnvironment *>
-  getOrCreateArchetypeBuilder(CanGenericSignature sig, ModuleDecl *mod);
+  ArchetypeBuilder *getOrCreateArchetypeBuilder(CanGenericSignature sig,
+                                                ModuleDecl *mod);
+
+  /// Retrieve or create the canonical generic environment of a canonical
+  /// archetype builder.
+  GenericEnvironment *getOrCreateCanonicalGenericEnvironment(
+                                                     ArchetypeBuilder *builder);
 
   /// Retrieve the inherited name set for the given class.
   const InheritedNameSet *getAllPropertyNames(ClassDecl *classDecl,
@@ -795,26 +800,6 @@ private:
   void setSubstitutions(TypeBase *type,
                         DeclContext *gpContext,
                         ArrayRef<Substitution> Subs) const;
-
-  /// Retrieve the archetype builder and potential archetype
-  /// corresponding to the given archetype type.
-  ///
-  /// This facility is only used by the archetype builder when forming
-  /// archetypes.a
-  std::pair<ArchetypeBuilder *, ArchetypeBuilder::PotentialArchetype *>
-  getLazyArchetype(const ArchetypeType *archetype);
-
-  /// Register information for a lazily-constructed archetype.
-  void registerLazyArchetype(
-         const ArchetypeType *archetype,
-         ArchetypeBuilder &builder,
-         ArchetypeBuilder::PotentialArchetype *potentialArchetype);
-
-  /// Unregister information about the given lazily-constructed archetype.
-  void unregisterLazyArchetype(const ArchetypeType *archetype);
-
-  friend class ArchetypeType;
-  friend class ArchetypeBuilder::PotentialArchetype;
 
   /// Provide context-level uniquing for SIL lowered type layouts.
   friend SILLayout;
