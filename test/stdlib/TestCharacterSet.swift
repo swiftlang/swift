@@ -248,6 +248,8 @@ class TestCharacterSet : TestCharacterSetSuper {
         expectTrue(immutableSet.isSuperset(of: emptySet))
         expectTrue(emptySet.isSubset(of: emptySet))
         expectTrue(emptySet.isSuperset(of: emptySet))
+        expectFalse(emptySet.isSuperset(of: immutableSet))
+        expectFalse(immutableSet.isSubset(of: emptySet))
     }
 }
 
