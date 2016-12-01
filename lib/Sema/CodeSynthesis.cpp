@@ -1161,7 +1161,7 @@ void TypeChecker::completePropertyBehaviorStorage(VarDecl *VD,
 
   auto DC = VD->getDeclContext();
   SmallString<64> NameBuf = VD->getName().str();
-  NameBuf += ".storage";
+  NameBuf += "$storage";
   auto StorageName = Context.getIdentifier(NameBuf);
   auto *Storage = new (Context) VarDecl(VD->isStatic(),
                                        /*let*/ !BehaviorStorage->isSettable(DC),
@@ -1289,7 +1289,7 @@ void TypeChecker::completePropertyBehaviorParameter(VarDecl *VD,
   // Create a method to witness the requirement.
   auto DC = VD->getDeclContext();
   SmallString<64> NameBuf = VD->getName().str();
-  NameBuf += ".parameter";
+  NameBuf += "$parameter";
   auto ParameterBaseName = Context.getIdentifier(NameBuf);
 
   // Substitute the requirement type into the conforming context.
@@ -1570,7 +1570,7 @@ void TypeChecker::completeLazyVarImplementation(VarDecl *VD) {
 
   // Create the storage property as an optional of VD's type.
   SmallString<64> NameBuf = VD->getName().str();
-  NameBuf += ".storage";
+  NameBuf += "$storage";
   auto StorageName = Context.getIdentifier(NameBuf);
   auto StorageTy = OptionalType::get(VD->getType());
   auto StorageInterfaceTy = OptionalType::get(VD->getInterfaceType());
