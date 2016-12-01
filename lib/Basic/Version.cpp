@@ -45,12 +45,18 @@
 
 #if __has_include("LLVMRevision.inc")
 # include "LLVMRevision.inc"
+#else
+#warning "LLVMRevision.inc" is missing.
 #endif
 #if __has_include("ClangRevision.inc")
 # include "ClangRevision.inc"
+#else
+#warning "ClangRevision.inc" is missing.
 #endif
 #if __has_include("SwiftRevision.inc")
 # include "SwiftRevision.inc"
+#else
+#warning "SwiftRevision.inc" is missing.
 #endif
 
 namespace swift {
