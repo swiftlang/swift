@@ -3418,7 +3418,7 @@ DependentMemberType *DependentMemberType::get(Type base,
 }
 
 CanArchetypeType ArchetypeType::getOpened(Type existential,
-                                        Optional<UUID> knownID) {
+                                          Optional<UUID> knownID) {
   auto &ctx = existential->getASTContext();
   auto &openedExistentialArchetypes = ctx.Impl.OpenedExistentialArchetypes;
   // If we know the ID already...
@@ -3437,19 +3437,20 @@ CanArchetypeType ArchetypeType::getOpened(Type existential,
     knownID = UUID::fromTime();
   }
 
-  auto arena = AllocationArena::Permanent;
   llvm::SmallVector<ProtocolDecl *, 4> conformsTo;
   assert(existential->isExistentialType());
   existential->getAnyExistentialTypeProtocols(conformsTo);
+  Type superclass = existential->getSuperclass(nullptr);
 
-  // Tail-allocate space for the UUID.
-  void *archetypeBuf = ctx.Allocate(totalSizeToAlloc<UUID>(1),
-                                    alignof(ArchetypeType), arena);
-  
-  auto result = ::new (archetypeBuf) ArchetypeType(ctx, existential,
-                                       ctx.AllocateCopy(conformsTo),
-                                       existential->getSuperclass(nullptr));
-  result->setOpenedExistentialID(*knownID);
+  auto arena = AllocationArena::Permanent;
+  void *mem = ctx.Allocate(
+                totalSizeToAlloc<ProtocolDecl *, Type, UUID>(conformsTo.size(),
+                                                             superclass ? 1 : 0,
+                                                             1),
+                alignof(ArchetypeType), arena);
+
+  auto result = ::new (mem) ArchetypeType(ctx, existential, conformsTo,
+                                          superclass, *knownID);
   openedExistentialArchetypes[*knownID] = result;
 
   return CanArchetypeType(result);

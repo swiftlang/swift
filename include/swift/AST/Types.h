@@ -284,6 +284,15 @@ protected:
   enum { NumAnyFunctionTypeBits = NumTypeBaseBits + 16 };
   static_assert(NumAnyFunctionTypeBits <= 32, "fits in an unsigned");
 
+  struct ArchetypeTypeBitfields {
+    unsigned : NumTypeBaseBits;
+
+    unsigned HasSuperclass : 1;
+    unsigned NumProtocols : 16;
+  };
+  enum { NumArchetypeTypeBitfields = NumTypeBaseBits + 17 };
+  static_assert(NumArchetypeTypeBitfields <= 32, "fits in an unsigned");
+
   struct TypeVariableTypeBitfields {
     unsigned : NumTypeBaseBits;
 
@@ -319,6 +328,7 @@ protected:
     ErrorTypeBitfields ErrorTypeBits;
     AnyFunctionTypeBitfields AnyFunctionTypeBits;
     TypeVariableTypeBitfields TypeVariableTypeBits;
+    ArchetypeTypeBitfields ArchetypeTypeBits;
     SILFunctionTypeBitfields SILFunctionTypeBits;
     AnyMetatypeTypeBitfields AnyMetatypeTypeBits;
   };
@@ -3728,8 +3738,20 @@ DEFINE_EMPTY_CAN_TYPE_WRAPPER(SubstitutableType, Type)
 /// associated types, as well as the runtime type stored within an
 /// existential container.
 class ArchetypeType final : public SubstitutableType,
-    private llvm::TrailingObjects<ArchetypeType, UUID> {
+    private llvm::TrailingObjects<ArchetypeType, ProtocolDecl *, Type, UUID> {
   friend TrailingObjects;
+
+  size_t numTrailingObjects(OverloadToken<ProtocolDecl *>) const {
+    return ArchetypeTypeBits.NumProtocols;
+  }
+
+  size_t numTrailingObjects(OverloadToken<Type>) const {
+    return ArchetypeTypeBits.HasSuperclass ? 1 : 0;
+  }
+
+  size_t numTrailingObjects(OverloadToken<UUID>) const {
+    return getOpenedExistentialType() ? 1 : 0;
+  }
 
 public:
   /// A nested type. Either a dependent associated archetype, or a concrete
@@ -3774,20 +3796,10 @@ public:
   };
   
 private:
-  ArrayRef<ProtocolDecl *> ConformsTo;
-  Type Superclass;
-
   llvm::PointerUnion3<ArchetypeType *, TypeBase *,
                       GenericEnvironment *> ParentOrOpenedOrEnvironment;
   llvm::PointerUnion<AssociatedTypeDecl *, Identifier> AssocTypeOrName;
   MutableArrayRef<std::pair<Identifier, NestedType>> NestedTypes;
-
-  /// Set the ID number of this opened existential.
-  void setOpenedExistentialID(UUID value) {
-    assert(getOpenedExistentialType() && "Not an opened existential archetype");
-    // The UUID is tail-allocated at the end of opened existential archetypes.
-    *getTrailingObjects<UUID>() = value;
-  }
 
   void resolveNestedType(std::pair<Identifier, NestedType> &nested) const;
 
@@ -3864,7 +3876,10 @@ public:
 
   /// getConformsTo - Retrieve the set of protocols to which this substitutable
   /// type shall conform.
-  ArrayRef<ProtocolDecl *> getConformsTo() const { return ConformsTo; }
+  ArrayRef<ProtocolDecl *> getConformsTo() const {
+    return { getTrailingObjects<ProtocolDecl *>(),
+             ArchetypeTypeBits.NumProtocols };
+  }
   
   /// requiresClass - True if the type can only be substituted with class types.
   /// This is true if the type conforms to one or more class protocols or has
@@ -3872,7 +3887,11 @@ public:
   bool requiresClass() const;
 
   /// \brief Retrieve the superclass of this type, if such a requirement exists.
-  Type getSuperclass() const { return Superclass; }
+  Type getSuperclass() const {
+    if (!ArchetypeTypeBits.HasSuperclass) return Type();
+
+    return *getTrailingObjects<Type>();
+  }
 
   /// \brief Return true if the archetype has any requirements at all.
   bool hasRequirements() const {
@@ -3960,29 +3979,11 @@ private:
             ParentOrGenericEnv,
           llvm::PointerUnion<AssociatedTypeDecl *, Identifier> AssocTypeOrName,
           ArrayRef<ProtocolDecl *> ConformsTo,
-          Type Superclass)
-    : SubstitutableType(TypeKind::Archetype, &Ctx,
-                        RecursiveTypeProperties::HasArchetype),
-      ConformsTo(ConformsTo), Superclass(Superclass),
-      AssocTypeOrName(AssocTypeOrName) {
-    if (auto parent = ParentOrGenericEnv.dyn_cast<ArchetypeType *>()) {
-      ParentOrOpenedOrEnvironment = parent;
-    } else {
-      ParentOrOpenedOrEnvironment =
-        ParentOrGenericEnv.get<GenericEnvironment *>();
-    }
-  }
+          Type Superclass);
 
-  ArchetypeType(const ASTContext &Ctx, 
-                Type Existential,
-                ArrayRef<ProtocolDecl *> ConformsTo,
-                Type Superclass)
-    : SubstitutableType(TypeKind::Archetype, &Ctx,
-                        RecursiveTypeProperties(
-                          RecursiveTypeProperties::HasArchetype |
-                          RecursiveTypeProperties::HasOpenedExistential)),
-      ConformsTo(ConformsTo), Superclass(Superclass),
-      ParentOrOpenedOrEnvironment(Existential.getPointer()) { }
+  ArchetypeType(const ASTContext &Ctx, Type Existential,
+                ArrayRef<ProtocolDecl *> ConformsTo, Type Superclass,
+                UUID uuid);
 };
 BEGIN_CAN_TYPE_WRAPPER(ArchetypeType, SubstitutableType)
 CanArchetypeType getParent() const {

@@ -2476,6 +2476,60 @@ Type TupleType::getVarArgsBaseType() const {
 }
 
 
+ArchetypeType::ArchetypeType(
+  const ASTContext &Ctx,
+  llvm::PointerUnion<ArchetypeType *, GenericEnvironment *> ParentOrGenericEnv,
+  llvm::PointerUnion<AssociatedTypeDecl *, Identifier> AssocTypeOrName,
+  ArrayRef<ProtocolDecl *> ConformsTo,
+  Type Superclass)
+    : SubstitutableType(TypeKind::Archetype, &Ctx,
+                        RecursiveTypeProperties::HasArchetype),
+      AssocTypeOrName(AssocTypeOrName) {
+  // Record the parent/generic environment.
+  if (auto parent = ParentOrGenericEnv.dyn_cast<ArchetypeType *>()) {
+    ParentOrOpenedOrEnvironment = parent;
+  } else {
+    ParentOrOpenedOrEnvironment =
+      ParentOrGenericEnv.get<GenericEnvironment *>();
+  }
+
+  // Set up the bits we need for trailing objects to work.
+  ArchetypeTypeBits.HasSuperclass = static_cast<bool>(Superclass);
+  ArchetypeTypeBits.NumProtocols = ConformsTo.size();
+
+  // Record the superclass.
+  if (Superclass)
+    *getTrailingObjects<Type>() = Superclass;
+
+  // Copy the protocols.
+  std::uninitialized_copy(ConformsTo.begin(), ConformsTo.end(),
+                          getTrailingObjects<ProtocolDecl *>());
+}
+
+ArchetypeType::ArchetypeType(const ASTContext &Ctx, Type Existential,
+                             ArrayRef<ProtocolDecl *> ConformsTo,
+                             Type Superclass, UUID uuid)
+  : SubstitutableType(TypeKind::Archetype, &Ctx,
+                      RecursiveTypeProperties(
+                        RecursiveTypeProperties::HasArchetype |
+                        RecursiveTypeProperties::HasOpenedExistential)),
+    ParentOrOpenedOrEnvironment(Existential.getPointer()) {
+  // Set up the bits we need for trailing objects to work.
+  ArchetypeTypeBits.HasSuperclass = static_cast<bool>(Superclass);
+  ArchetypeTypeBits.NumProtocols = ConformsTo.size();
+
+  // Record the superclass.
+  if (Superclass)
+    *getTrailingObjects<Type>() = Superclass;
+
+  // Copy the protocols.
+  std::uninitialized_copy(ConformsTo.begin(), ConformsTo.end(),
+                          getTrailingObjects<ProtocolDecl *>());
+
+  // Record the UUID.
+  *getTrailingObjects<UUID>() = uuid;
+}
+
 CanArchetypeType ArchetypeType::getNew(
                                    const ASTContext &Ctx,
                                    ArchetypeType *Parent,
@@ -2486,10 +2540,14 @@ CanArchetypeType ArchetypeType::getNew(
   ProtocolType::canonicalizeProtocols(ConformsTo);
 
   auto arena = AllocationArena::Permanent;
-  return CanArchetypeType(
-           new (Ctx, arena) ArchetypeType(Ctx, Parent, AssocType,
-                                          Ctx.AllocateCopy(ConformsTo),
-                                          Superclass));
+  void *mem = Ctx.Allocate(
+                totalSizeToAlloc<ProtocolDecl *, Type, UUID>(ConformsTo.size(),
+                                                             Superclass ? 1 : 0,
+                                                             0),
+                alignof(ArchetypeType), arena);
+
+  return CanArchetypeType(new (mem) ArchetypeType(Ctx, Parent, AssocType,
+                                                  ConformsTo, Superclass));
 }
 
 CanArchetypeType
@@ -2502,14 +2560,18 @@ ArchetypeType::getNew(const ASTContext &Ctx,
   ProtocolType::canonicalizeProtocols(ConformsTo);
 
   auto arena = AllocationArena::Permanent;
-  return CanArchetypeType(
-           new (Ctx, arena) ArchetypeType(Ctx, genericEnvironment, Name,
-                                          Ctx.AllocateCopy(ConformsTo),
-                                          Superclass));
+  void *mem = Ctx.Allocate(
+                totalSizeToAlloc<ProtocolDecl *, Type, UUID>(ConformsTo.size(),
+                                                             Superclass ? 1 : 0,
+                                                             0),
+                alignof(ArchetypeType), arena);
+
+  return CanArchetypeType(new (mem) ArchetypeType(Ctx, genericEnvironment, Name,
+                                                  ConformsTo, Superclass));
 }
 
 bool ArchetypeType::requiresClass() const {
-  if (Superclass)
+  if (ArchetypeTypeBits.HasSuperclass)
     return true;
   for (ProtocolDecl *conformed : getConformsTo())
     if (conformed->requiresClass())
