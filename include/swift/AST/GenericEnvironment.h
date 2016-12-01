@@ -20,6 +20,8 @@
 #include "swift/AST/SubstitutionMap.h"
 #include "swift/AST/GenericParamKey.h"
 #include "swift/AST/GenericSignature.h"
+#include "llvm/ADT/ArrayRef.h"
+#include "llvm/Support/TrailingObjects.h"
 
 namespace swift {
 
@@ -31,11 +33,33 @@ class SILType;
 
 /// Describes the mapping between archetypes and interface types for the
 /// generic parameters of a DeclContext.
-class alignas(1 << DeclAlignInBits) GenericEnvironment final {
+class alignas(1 << DeclAlignInBits) GenericEnvironment final
+                  : private llvm::TrailingObjects<GenericEnvironment, Type> {
   GenericSignature *Signature;
   ArchetypeBuilder *Builder;
   TypeSubstitutionMap ArchetypeToInterfaceMap;
-  TypeSubstitutionMap InterfaceToArchetypeMap;
+
+  friend TrailingObjects;
+
+  size_t numTrailingObjects(OverloadToken<Type>) const {
+    return Signature->getGenericParams().size();
+  }
+
+  /// Retrieve the array containing the context types associated with the
+  /// generic parameters, stored in parallel with the generic parameters of the
+  /// generic signature.
+  MutableArrayRef<Type> getContextTypes() {
+    return MutableArrayRef<Type>(getTrailingObjects<Type>(),
+                                 Signature->getGenericParams().size());
+  }
+
+  /// Retrieve the array containing the context types associated with the
+  /// generic parameters, stored in parallel with the generic parameters of the
+  /// generic signature.
+  ArrayRef<Type> getContextTypes() const {
+    return ArrayRef<Type>(getTrailingObjects<Type>(),
+                          Signature->getGenericParams().size());
+  }
 
   GenericEnvironment(GenericSignature *signature,
                      ArchetypeBuilder *builder,
@@ -96,9 +120,11 @@ public:
   void *operator new(size_t Bytes) = delete;
   void operator delete(void *Data) = delete;
 
-  /// Only allow allocation of GenericEnvironments using the allocator
-  /// in ASTContext.
-  void *operator new(size_t bytes, const ASTContext &ctx);
+  /// Only allow placement new.
+  void *operator new(size_t Bytes, void *Mem) {
+    assert(Mem); 
+    return Mem; 
+  }
 
   /// Map a contextual type to an interface type.
   Type mapTypeOutOfContext(ModuleDecl *M, Type type) const;

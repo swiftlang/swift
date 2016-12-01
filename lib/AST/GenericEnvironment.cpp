@@ -26,6 +26,9 @@ GenericEnvironment::GenericEnvironment(
     TypeSubstitutionMap interfaceToArchetypeMap)
   : Signature(signature), Builder(builder)
 {
+  // Clear out the memory that holds the context types.
+  std::uninitialized_fill(getContextTypes().begin(), getContextTypes().end(), Type());
+
   // Build a mapping in both directions, making sure to canonicalize the
   // interface type where it is used as a key, so that substitution can
   // find them, and to preserve sugar otherwise, so that
@@ -39,17 +42,15 @@ GenericEnvironment::GenericEnvironment(
 
 void GenericEnvironment::addMapping(GenericParamKey key,
                                     Type contextType) {
-  // We're going to pass InterfaceToArchetypeMap to Type::subst(), which
-  // expects the keys to be canonical, otherwise it won't be able to
-  // find them.
+  // Find the index into the parallel arrays of generic parameters and
+  // context types.
   auto genericParams = Signature->getGenericParams();
-  auto genericParam = genericParams[key.findIndexIn(genericParams)];
-  auto canParamTy =
-    cast<GenericTypeParamType>(genericParam->getCanonicalType());
+  unsigned index = key.findIndexIn(genericParams);
+  assert(genericParams[index] == key && "Bad generic parameter");
 
-  // Add the mapping form the generic parameter to the context type.
-  assert(InterfaceToArchetypeMap.count(canParamTy) == 0 && "Duplicate entry");
-  InterfaceToArchetypeMap[canParamTy] = contextType;
+  // Add the mapping from the generic parameter to the context type.
+  assert(getContextTypes()[index].isNull() && "Already recoded this mapping");
+  getContextTypes()[index] = contextType;
 
   // If we mapped the generic parameter to an archetype, add it to the
   // reverse mapping.
@@ -58,6 +59,7 @@ void GenericEnvironment::addMapping(GenericParamKey key,
 
   // Check whether we've already recorded an interface type for this archetype.
   // If not, record one and we're done.
+  auto genericParam = genericParams[index];
   auto result = ArchetypeToInterfaceMap.insert({archetype, genericParam});
   if (result.second) return;
 
@@ -66,26 +68,22 @@ void GenericEnvironment::addMapping(GenericParamKey key,
   // the earlier generic parameter. This gives us a deterministic reverse
   // mapping.
   auto otherGP = result.first->second->castTo<GenericTypeParamType>();
-  if (std::make_pair(canParamTy->getDepth(), canParamTy->getIndex())
-        < std::make_pair(otherGP->getDepth(), otherGP->getIndex()))
+  if (GenericParamKey(genericParam) < GenericParamKey(otherGP))
     result.first->second = genericParam;
 }
 
 Optional<Type> GenericEnvironment::getMappingIfPresent(
                                                     GenericParamKey key) const {
-  auto genericParam = GenericTypeParamType::get(key.Depth, key.Index,
-                                                Signature->getASTContext());
-  auto canParamTy =
-    cast<GenericTypeParamType>(genericParam->getCanonicalType());
+  // Find the index into the parallel arrays of generic parameters and
+  // context types.
+  auto genericParams = Signature->getGenericParams();
+  unsigned index = key.findIndexIn(genericParams);
+  assert(genericParams[index] == key && "Bad generic parameter");
 
-  auto found = InterfaceToArchetypeMap.find(canParamTy);
-  if (found == InterfaceToArchetypeMap.end()) return None;
+  if (auto type = getContextTypes()[index])
+    return type;
 
-  return found->second;
-}
-
-void *GenericEnvironment::operator new(size_t bytes, const ASTContext &ctx) {
-  return ctx.Allocate(bytes, alignof(GenericEnvironment), AllocationArena::Permanent);
+  return None;
 }
 
 bool GenericEnvironment::containsPrimaryArchetype(
@@ -99,12 +97,17 @@ Type GenericEnvironment::mapTypeOutOfContext(ModuleDecl *M, Type type) const {
   return type;
 }
 
-GenericEnvironment::QueryInterfaceTypeSubstitutions::operator()(
+Type GenericEnvironment::QueryInterfaceTypeSubstitutions::operator()(
                                                 SubstitutableType *type) const {
   if (auto gp = type->getCanonicalType()->getAs<GenericTypeParamType>()) {
-    auto known = self->InterfaceToArchetypeMap.find(gp);
-    if (known != self->InterfaceToArchetypeMap.end())
-      return known->second;
+    // Find the index into the parallel arrays of generic parameters and
+    // context types.
+    auto genericParams = self->Signature->getGenericParams();
+    GenericParamKey key(gp);
+
+    unsigned index = key.findIndexIn(genericParams);
+    if (index < genericParams.size() && genericParams[index] == key)
+      return self->getContextTypes()[index];
   }
 
   return Type();
@@ -119,12 +122,15 @@ Type GenericEnvironment::mapTypeIntoContext(ModuleDecl *M, Type type) const {
 }
 
 Type GenericEnvironment::mapTypeIntoContext(GenericTypeParamType *type) const {
-  auto canTy = type->getCanonicalType();
-  auto found =
-    InterfaceToArchetypeMap.find(canTy->castTo<GenericTypeParamType>());
-  assert(found != InterfaceToArchetypeMap.end() &&
-         "missing generic parameter");
-  return found->second;
+  // Find the index into the parallel arrays of generic parameters and
+  // context types.
+  auto genericParams = Signature->getGenericParams();
+  GenericParamKey key(type);
+  unsigned index = key.findIndexIn(genericParams);
+  assert(genericParams[index] == key && "Bad generic parameter");
+
+  assert(getContextTypes()[index] && "Missing context type");
+  return getContextTypes()[index];
 }
 
 GenericTypeParamType *GenericEnvironment::getSugaredType(
