@@ -77,7 +77,7 @@
    '("\\(end_borrow\\) %[[:alnum:]] \\(from\\)" (1 font-lock-keyword-face) (2 font-lock-keyword-face))
 
    ;; SIL Instructions - Reference Counting.
-   `(,(regexp-opt '("strong_retain"
+   `(,(regexp-opt '("strong_retain" "strong_retain_autoreleased"
                     "strong_release" "strong_retain_unowned"
                     "unowned_retain" "unowned_release"
                     "load_weak" "store_weak"
