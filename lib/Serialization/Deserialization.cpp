@@ -952,8 +952,7 @@ GenericEnvironment *ModuleFile::readGenericEnvironment(
   assert(!interfaceToArchetypeMap.empty() &&
          "no archetypes in generic function?");
 
-  return GenericEnvironment::get(getContext(), signature,
-                                 interfaceToArchetypeMap);
+  return GenericEnvironment::get(signature, interfaceToArchetypeMap);
 }
 
 GenericEnvironment *ModuleFile::maybeReadGenericEnvironment() {

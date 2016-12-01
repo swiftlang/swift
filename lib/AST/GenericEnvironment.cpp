@@ -22,8 +22,9 @@ using namespace swift;
 
 GenericEnvironment::GenericEnvironment(
     GenericSignature *signature,
+    ArchetypeBuilder *builder,
     TypeSubstitutionMap interfaceToArchetypeMap)
-  : Signature(signature)
+  : Signature(signature), Builder(builder)
 {
   // Build a mapping in both directions, making sure to canonicalize the
   // interface type where it is used as a key, so that substitution can

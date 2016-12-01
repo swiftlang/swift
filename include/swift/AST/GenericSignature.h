@@ -77,6 +77,8 @@ class alignas(1 << TypeAlignInBits) GenericSignature final
   /// Retrieve the archetype builder for the given generic signature.
   ArchetypeBuilder *getArchetypeBuilder(ModuleDecl &mod);
 
+  friend class ArchetypeType;
+
 public:
   /// Create a new generic signature with the given type parameters and
   /// requirements.

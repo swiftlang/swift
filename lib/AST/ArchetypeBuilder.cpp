@@ -767,7 +767,6 @@ ArchetypeBuilder::PotentialArchetype::getTypeInContext(
   // Collect the set of nested types of this archetype, and put them into
   // the archetype itself.
   if (!representative->getNestedTypes().empty()) {
-    ctx.registerLazyArchetype(arch, builder, this);
     SmallVector<std::pair<Identifier, NestedType>, 4> FlatNestedTypes;
     for (auto Nested : representative->getNestedTypes()) {
       // Skip type aliases, which are just shortcuts.
@@ -790,8 +789,6 @@ ArchetypeBuilder::PotentialArchetype::getTypeInContext(
 
     // Force the resolution of the nested types.
     (void)arch->getAllNestedTypes();
-
-    ctx.unregisterLazyArchetype(arch);
   }
 
   return NestedType::forArchetype(arch);
@@ -799,15 +796,15 @@ ArchetypeBuilder::PotentialArchetype::getTypeInContext(
 
 void ArchetypeType::resolveNestedType(
        std::pair<Identifier, NestedType> &nested) const {
-  auto &ctx = const_cast<ArchetypeType *>(this)->getASTContext();
-  auto lazyArchetype = ctx.getLazyArchetype(this);
-
-  ArchetypeBuilder &builder = *lazyArchetype.first;
   auto genericEnv = getGenericEnvironment();
-  auto potentialArchetype =
-    lazyArchetype.second->getNestedType(nested.first, builder);
+  auto &builder = *genericEnv->getArchetypeBuilder();
 
-  auto result = potentialArchetype->getTypeInContext(builder, genericEnv);
+  Type interfaceType =
+    genericEnv->mapTypeOutOfContext(&builder.getModule(),
+                                    const_cast<ArchetypeType *>(this));
+  auto parentPA = builder.resolveArchetype(interfaceType);
+  auto memberPA = parentPA->getNestedType(nested.first, builder);
+  auto result = memberPA->getTypeInContext(builder, genericEnv);
   assert(!nested.second ||
          nested.second.getValue()->isEqual(result.getValue()) ||
          (nested.second.getValue()->hasError() &&
@@ -2235,11 +2232,10 @@ GenericSignature *ArchetypeBuilder::getGenericSignature() {
   return sig;
 }
 
-GenericEnvironment *ArchetypeBuilder::getGenericEnvironment(GenericSignature *signature) {
-  TypeSubstitutionMap interfaceToArchetypeMap;
-
+GenericEnvironment *ArchetypeBuilder::getGenericEnvironment(
+                                                  GenericSignature *signature) {
   // Compute the archetypes for the generic parameters.
-  auto genericEnv = GenericEnvironment::getIncomplete(Context, signature);
+  auto genericEnv = GenericEnvironment::getIncomplete(signature, this);
   for (auto pa : Impl->PotentialArchetypes) {
     Type contextType = pa->getTypeInContext(*this, genericEnv).getValue();
     if (!genericEnv->getMappingIfPresent(pa->getGenericParamKey()))
@@ -2268,6 +2264,7 @@ GenericEnvironment *ArchetypeBuilder::getGenericEnvironment(GenericSignature *si
   }
 #endif
 
+  genericEnv->clearArchetypeBuilder();
   return genericEnv;
 }
 

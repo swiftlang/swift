@@ -33,12 +33,20 @@ class SILType;
 /// generic parameters of a DeclContext.
 class alignas(1 << DeclAlignInBits) GenericEnvironment final {
   GenericSignature *Signature;
+  ArchetypeBuilder *Builder;
   TypeSubstitutionMap ArchetypeToInterfaceMap;
   TypeSubstitutionMap InterfaceToArchetypeMap;
 
   GenericEnvironment(GenericSignature *signature,
+                     ArchetypeBuilder *builder,
                      TypeSubstitutionMap interfaceToArchetypeMap);
 
+  friend class ArchetypeType;
+  friend class ArchetypeBuilder;
+  
+  ArchetypeBuilder *getArchetypeBuilder() const { return Builder; }
+  void clearArchetypeBuilder() { Builder = nullptr; }
+  
 public:
   GenericSignature *getGenericSignature() const {
     return Signature;
@@ -53,15 +61,14 @@ public:
   bool containsPrimaryArchetype(ArchetypeType *archetype) const;
 
   static
-  GenericEnvironment *get(ASTContext &ctx,
-                          GenericSignature *signature,
+  GenericEnvironment *get(GenericSignature *signature,
                           TypeSubstitutionMap interfaceToArchetypeMap);
 
   /// Create a new, "incomplete" generic environment that will be populated
   /// by calls to \c addMapping().
   static
-  GenericEnvironment *getIncomplete(ASTContext &ctx,
-                                    GenericSignature *signature);
+  GenericEnvironment *getIncomplete(GenericSignature *signature,
+                                    ArchetypeBuilder *builder);
 
   /// Add a mapping of a generic parameter to a specific type (which may be
   /// an archetype)

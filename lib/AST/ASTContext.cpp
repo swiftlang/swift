@@ -207,19 +207,16 @@ struct ASTContext::Implementation {
   llvm::DenseMap<Decl *, std::pair<LazyMemberLoader *, uint64_t>>
     ConformanceLoaders;
 
-  /// Mapping from archetypes with lazily-resolved nested types to the
-  /// archetype builder and potential archetype corresponding to that
-  /// archetype.
-  llvm::DenseMap<const ArchetypeType *, 
-                 std::pair<ArchetypeBuilder *,
-                           ArchetypeBuilder::PotentialArchetype *>>
-    LazyArchetypes;
-
-  /// \brief Stored archetype builders and their corresponding (canonical)
-  /// generic environments.
+  /// Stored archetype builders for canonical generic signatures.
   llvm::DenseMap<std::pair<GenericSignature *, ModuleDecl *>,
-  std::pair<std::unique_ptr<ArchetypeBuilder>,
-            GenericEnvironment *>> ArchetypeBuilders;
+                 std::unique_ptr<ArchetypeBuilder>>
+    ArchetypeBuilders;
+
+  /// Canonical generic environments for canonical generic signatures.
+  ///
+  /// The keys are the archetype builders in \c ArchetypeBuilders.
+  llvm::DenseMap<ArchetypeBuilder *, GenericEnvironment *>
+    CanonicalGenericEnvironments;
 
   /// The set of property names that show up in the defining module of a
   /// class.
@@ -1254,25 +1251,36 @@ void ASTContext::getVisibleTopLevelClangModules(
     collectAllModules(Modules);
 }
 
-std::pair<ArchetypeBuilder *, GenericEnvironment *>
-ASTContext::getOrCreateArchetypeBuilder(CanGenericSignature sig,
-                                        ModuleDecl *mod) {
+ArchetypeBuilder *ASTContext::getOrCreateArchetypeBuilder(
+                                                      CanGenericSignature sig,
+                                                      ModuleDecl *mod) {
   // Check whether we already have an archetype builder for this
   // signature and module.
   auto known = Impl.ArchetypeBuilders.find({sig, mod});
   if (known != Impl.ArchetypeBuilders.end())
-    return { known->second.first.get(), known->second.second };
+    return known->second.get();
 
   // Create a new archetype builder with the given signature.
   auto builder = new ArchetypeBuilder(*mod);
   builder->addGenericSignature(sig, nullptr);
-  
-  // Store this archetype builder and its generic environment.
-  auto genericEnv = builder->getGenericEnvironment(sig);
-  Impl.ArchetypeBuilders[{sig, mod}]
-    = { std::unique_ptr<ArchetypeBuilder>(builder), genericEnv };
 
-  return { builder, genericEnv };
+  // Store this archetype builder (no generic environment yet).
+  Impl.ArchetypeBuilders[{sig, mod}] =
+    std::unique_ptr<ArchetypeBuilder>(builder);
+
+  return builder;
+}
+
+GenericEnvironment *ASTContext::getOrCreateCanonicalGenericEnvironment(
+                                                    ArchetypeBuilder *builder) {
+  auto known = Impl.CanonicalGenericEnvironments.find(builder);
+  if (known != Impl.CanonicalGenericEnvironments.find(builder))
+    return known->second;
+
+  auto sig = builder->getGenericSignature();
+  auto env = builder->getGenericEnvironment(sig);
+  Impl.CanonicalGenericEnvironments[builder] = env;
+  return env;
 }
 
 Module *
@@ -3551,22 +3559,24 @@ GenericSignature *GenericSignature::get(ArrayRef<GenericTypeParamType *> params,
 }
 
 GenericEnvironment *
-GenericEnvironment::get(ASTContext &ctx,
-                        GenericSignature *signature,
+GenericEnvironment::get(GenericSignature *signature,
                         TypeSubstitutionMap interfaceToArchetypeMap) {
   assert(!interfaceToArchetypeMap.empty());
   assert(interfaceToArchetypeMap.size() == signature->getGenericParams().size()
          && "incorrect number of parameters");
 
 
-  return new (ctx) GenericEnvironment(signature, interfaceToArchetypeMap);
+  ASTContext &ctx = signature->getASTContext();
+  return new (ctx) GenericEnvironment(signature, nullptr,
+                                      interfaceToArchetypeMap);
 }
 
 GenericEnvironment *GenericEnvironment::getIncomplete(
-                                                  ASTContext &ctx,
-                                                  GenericSignature *signature) {
+                                                  GenericSignature *signature,
+                                                  ArchetypeBuilder *builder) {
   TypeSubstitutionMap empty;
-  return new (ctx) GenericEnvironment(signature, empty);
+  auto &ctx = signature->getASTContext();
+  return new (ctx) GenericEnvironment(signature, builder, empty);
 }
 
 void DeclName::CompoundDeclName::Profile(llvm::FoldingSetNodeID &id,
@@ -3884,27 +3894,6 @@ Type ASTContext::getBridgedToObjC(const DeclContext *dc, Type type,
 
   // No special bridging to Objective-C, but this can become an 'Any'.
   return Type();
-}
-
-std::pair<ArchetypeBuilder *, ArchetypeBuilder::PotentialArchetype *>
-ASTContext::getLazyArchetype(const ArchetypeType *archetype) {
-  auto known = Impl.LazyArchetypes.find(archetype);
-  assert(known != Impl.LazyArchetypes.end());
-  return known->second;
-}
-
-void ASTContext::registerLazyArchetype(
-       const ArchetypeType *archetype,
-       ArchetypeBuilder &builder,
-       ArchetypeBuilder::PotentialArchetype *potentialArchetype) {
-  assert(Impl.LazyArchetypes.count(archetype) == 0);
-  Impl.LazyArchetypes[archetype] = { &builder, potentialArchetype };
-}
-
-void ASTContext::unregisterLazyArchetype(const ArchetypeType *archetype) {
-  auto known = Impl.LazyArchetypes.find(archetype);
-  assert(known != Impl.LazyArchetypes.end());
-  Impl.LazyArchetypes.erase(known);
 }
 
 const InheritedNameSet *ASTContext::getAllPropertyNames(ClassDecl *classDecl,
