@@ -248,8 +248,8 @@ public struct URLResourceValues {
     @available(OSX 10.10, *)
     public var quarantineProperties: [String : Any]? {
         get { return _get(.quarantinePropertiesKey) }
-        // To remove a quarantine property `NSNull` must be passed which is done by explicitly casting the optional to `Any`
-        set { _set(.quarantinePropertiesKey, newValue: newValue as Any) }
+        // To remove a quarantine property `NSNull` must be passed
+        set { _set(.quarantinePropertiesKey, newValue: newValue ?? NSNull()) }
     }
 #endif
     
