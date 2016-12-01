@@ -1022,23 +1022,6 @@ bool ArchetypeBuilder::addSuperclassRequirement(PotentialArchetype *T,
                                                 RequirementSource Source) {
   T = T->getRepresentative();
 
-  if (Superclass->hasArchetype()) {
-    // Map contextual type to interface type.
-    // FIXME: There might be a better way to do this.
-    Superclass = Superclass.transform(
-        [&](Type t) -> Type {
-          if (t->is<ArchetypeType>()) {
-            auto *pa = resolveArchetype(t);
-            // Why does this happen?
-            if (!pa)
-              return ErrorType::get(t);
-            return pa->getDependentType(/*FIXME:*/{ },
-                                        /*allowUnresolved=*/false);
-          }
-          return t;
-        });
-  }
-
   // Make sure the concrete type fulfills the superclass requirement
   // of the archetype.
   if (T->isConcreteType()) {
