@@ -241,15 +241,37 @@ class TestCharacterSet : TestCharacterSetSuper {
         expectEqual(0x6, bitmap[12])
         expectEqual(8192, bitmap.count)
     }
-    func test_superSetOfEmptySet(){
+    func test_supersetOfEmptySet(){
+        let emptySet = CharacterSet()
+        let immutableSet = CharacterSet(charactersIn:"abc")
+        expectTrue(immutableSet.isSuperset(of: emptySet)) 
+        expectTrue(emptySet.isSuperset(of: emptySet))
+        expectFalse(emptySet.isSuperset(of: immutableSet))
+        expectTrue(immutableSet.isStrictSuperset(of: emptySet))
+        expectFalse(emptySet.isStrictSuperset(of: emptySet))
+        expectFalse(emptySet.isStrictSuperset(of: immutableSet)) 
+    }
+    func test_subsetOfEmptySet(){
         let emptySet = CharacterSet()
         let immutableSet = CharacterSet(charactersIn:"abc")
         expectTrue(emptySet.isSubset(of: immutableSet))
-        expectTrue(immutableSet.isSuperset(of: emptySet))
         expectTrue(emptySet.isSubset(of: emptySet))
-        expectTrue(emptySet.isSuperset(of: emptySet))
-        expectFalse(emptySet.isSuperset(of: immutableSet))
         expectFalse(immutableSet.isSubset(of: emptySet))
+        expectTrue(emptySet.isStrictSubset(of: immutableSet))
+        expectFalse(emptySet.isStrictSubset(of: emptySet))
+        expectFalse(immutableSet.isStrictSubset(of: emptySet))
+    }
+    func test_resilienceBugForSupersetOfEmptySet(){
+        // test if a fix or a workaround for rdar://29474937  is applied
+        for i in 1...100{
+            test_supersetOfEmptySet()
+        }
+    }
+    func test_resilienceBugForSubsetOfEmptySet(){
+        // test if a fix or a workaround for rdar://29474937  is applied
+        for i in 1...100{
+            test_supersetOfEmptySet()
+        }
     }
 }
 
@@ -274,7 +296,10 @@ CharacterSetTests.test("test_subtractNonEmptySet") { TestCharacterSet().test_sub
 CharacterSetTests.test("test_symmetricDifference") { TestCharacterSet().test_symmetricDifference() }
 CharacterSetTests.test("test_hasMember") { TestCharacterSet().test_hasMember() }
 CharacterSetTests.test("test_bitmap") { TestCharacterSet().test_bitmap() }
-CharacterSetTests.test("test_superSetOfEmptySet") { TestCharacterSet().test_superSetOfEmptySet() }
+CharacterSetTests.test("test_supersetOfEmptySet") { TestCharacterSet().test_supersetOfEmptySet() }
+CharacterSetTests.test("test_supersetOfEmptySet") { TestCharacterSet().test_subsetOfEmptySet() }
+CharacterSetTests.test("test_supersetOfEmptySet") { TestCharacterSet().test_resilienceBugForSupersetOfEmptySet()() }
+CharacterSetTests.test("test_supersetOfEmptySet") { TestCharacterSet().test_resilienceBugForSubsetOfEmptySet()() }
 runAllTests()
 #endif
 
