@@ -10,7 +10,7 @@
 //
 //===----------------------------------------------------------------------===//
 
-import SwiftShims
+import _SwiftDispatchOverlayShims
 
 public struct DispatchWorkItemFlags : OptionSet, RawRepresentable {
 	public let rawValue: UInt
@@ -39,14 +39,16 @@ public class DispatchWorkItem {
 	internal var _block: _DispatchBlock
 
 	public init(qos: DispatchQoS = .unspecified, flags: DispatchWorkItemFlags = [], block: @escaping @convention(block) () -> ()) {
-		_block =  _swift_dispatch_block_create_with_qos_class(flags.rawValue,
-			qos.qosClass.rawValue.rawValue, Int32(qos.relativePriority), block)
+		_block =  _swift_dispatch_block_create_with_qos_class(
+			__dispatch_block_flags_t(rawValue: flags.rawValue),
+			qos.qosClass.rawValue, Int32(qos.relativePriority), block)
 	}
 
 	// Used by DispatchQueue.synchronously<T> to provide a path through
 	// dispatch_block_t, as we know the lifetime of the block in question.
 	internal init(flags: DispatchWorkItemFlags = [], noescapeBlock: () -> ()) {
-		_block = _swift_dispatch_block_create_noescape(flags.rawValue, noescapeBlock)
+		_block = _swift_dispatch_block_create_noescape(
+			__dispatch_block_flags_t(rawValue: flags.rawValue), noescapeBlock)
 	}
 
 	public func perform() {
