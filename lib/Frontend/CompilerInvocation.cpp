@@ -76,6 +76,8 @@ SourceFileKind CompilerInvocation::getSourceFileKind() const {
   case InputFileKind::IFK_LLVM_IR:
     llvm_unreachable("Trying to convert from unsupported InputFileKind");
   }
+
+  llvm_unreachable("Unhandled InputFileKind in switch.");
 }
 
 // This is a separate function so that it shows up in stack traces.
