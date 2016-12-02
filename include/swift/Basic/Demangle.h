@@ -316,6 +316,8 @@ void mangleIdentifier(const char *data, size_t length,
 /// This should always round-trip perfectly with demangleSymbolAsNode.
 std::string mangleNode(const NodePointer &root);
 
+std::string mangleNodeNew(const NodePointer &root);
+
 /// \brief Transform the node structure to a string.
 ///
 /// Typical usage:
@@ -386,10 +388,19 @@ public:
   }
   
   std::string &&str() && { return std::move(Stream); }
-  
+
+  llvm::StringRef getStringRef() const { return Stream; }
+
+  /// Returns a mutable reference to the last character added to the printer.
+  char &lastChar() { return Stream.back(); }
+
 private:
   std::string Stream;
 };
+
+bool mangleStandardSubstitution(Node *node, DemanglerPrinter &Out);
+bool isSpecialized(Node *node);
+NodePointer getUnspecialized(Node *node);
 
 /// Is a character considered a digit by the demangling grammar?
 ///

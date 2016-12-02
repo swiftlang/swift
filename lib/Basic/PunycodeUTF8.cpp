@@ -11,17 +11,13 @@
 //===----------------------------------------------------------------------===//
 
 #include "swift/Basic/Punycode.h"
+#include "swift/Basic/ManglingUtils.h"
 #include <vector>
 
 using namespace swift;
 
 static bool isContinuationByte(uint8_t unit) {
   return (unit & 0xC0) == 0x80;
-}
-
-static bool isValidSymbolChar(char ch) {
-  return (ch >= 'a' && ch <= 'z') || (ch >= 'A' && ch <= 'Z') ||
-         (ch >= '0' && ch <= '9') || ch == '_' || ch == '$';
 }
 
 /// Reencode well-formed UTF-8 as UTF-32.
@@ -40,7 +36,7 @@ static bool convertUTF8toUTF32(StringRef InputUTF8,
   while (ptr < end) {
     uint8_t first = *ptr++;
     if (first < 0x80) {
-      if (isValidSymbolChar(first) || !mapNonSymbolChars) {
+      if (NewMangling::isValidSymbolChar(first) || !mapNonSymbolChars) {
         OutUTF32.push_back(first);
       } else {
         OutUTF32.push_back((uint32_t)first + 0xD800);

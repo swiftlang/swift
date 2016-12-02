@@ -2375,6 +2375,7 @@ private:
     case Node::Kind::AutoClosureType:
     case Node::Kind::CFunctionPointer:
     case Node::Kind::Constructor:
+    case Node::Kind::CurryThunk:
     case Node::Kind::Deallocator:
     case Node::Kind::DeclContext:
     case Node::Kind::DefaultArgumentInitializer:
@@ -2474,7 +2475,14 @@ private:
     case Node::Kind::Weak:
     case Node::Kind::WillSet:
     case Node::Kind::WitnessTableOffset:
+    case Node::Kind::ReflectionMetadataBuiltinDescriptor:
+    case Node::Kind::ReflectionMetadataFieldDescriptor:
+    case Node::Kind::ReflectionMetadataAssocTypeDescriptor:
+    case Node::Kind::ReflectionMetadataSuperclassDescriptor:
     case Node::Kind::ThrowsAnnotation:
+    case Node::Kind::EmptyList:
+    case Node::Kind::FirstElementMarker:
+    case Node::Kind::VariadicMarker:
       return false;
     }
     unreachable("bad node kind");
@@ -2862,6 +2870,10 @@ void NodePrinter::print(NodePointer pointer, bool asContext, bool suppressType) 
   switch (kind) {
   case Node::Kind::Static:
     Printer << "static ";
+    print(pointer->getChild(0), asContext, suppressType);
+    return;
+  case Node::Kind::CurryThunk:
+    Printer << "curry thunk of ";
     print(pointer->getChild(0), asContext, suppressType);
     return;
   case Node::Kind::Directness:
@@ -3639,10 +3651,35 @@ void NodePrinter::print(NodePointer pointer, bool asContext, bool suppressType) 
     Printer << pointer->getText();
     return;
   }
-  case Node::Kind::ThrowsAnnotation: {
+  case Node::Kind::ReflectionMetadataBuiltinDescriptor:
+    Printer << "reflection metadata builtin descriptor ";
+    print(pointer->getChild(0));
+    return;
+  case Node::Kind::ReflectionMetadataFieldDescriptor:
+    Printer << "reflection metadata field descriptor ";
+    print(pointer->getChild(0));
+    return;
+  case Node::Kind::ReflectionMetadataAssocTypeDescriptor:
+    Printer << "reflection metadata associated type descriptor ";
+    print(pointer->getChild(0));
+    return;
+  case Node::Kind::ReflectionMetadataSuperclassDescriptor:
+    Printer << "reflection metadata superclass descriptor ";
+    print(pointer->getChild(0));
+    return;
+
+  case Node::Kind::ThrowsAnnotation:
     Printer<< " throws ";
     return;
-  }
+  case Node::Kind::EmptyList:
+    Printer << " empty-list ";
+    return;
+  case Node::Kind::FirstElementMarker:
+    Printer << " first-element-marker ";
+    return;
+  case Node::Kind::VariadicMarker:
+    Printer << " variadic-marker ";
+    return;
   }
   unreachable("bad node kind!");
 }
