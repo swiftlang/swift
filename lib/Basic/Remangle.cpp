@@ -653,33 +653,13 @@ void Remangler::mangleDirectness(Node *node) {
 }
 
 void Remangler::mangleValueWitness(Node *node) {
-  auto getString = [](ValueWitnessKind kind) -> StringRef {
-    switch (kind) {
-    case ValueWitnessKind::AllocateBuffer: return "al";
-    case ValueWitnessKind::AssignWithCopy: return "ca";
-    case ValueWitnessKind::AssignWithTake: return "ta";
-    case ValueWitnessKind::DeallocateBuffer: return "de";
-    case ValueWitnessKind::Destroy: return "xx";
-    case ValueWitnessKind::DestroyBuffer: return "XX";
-    case ValueWitnessKind::InitializeBufferWithCopyOfBuffer: return "CP";
-    case ValueWitnessKind::InitializeBufferWithCopy: return "Cp";
-    case ValueWitnessKind::InitializeWithCopy: return "cp";
-    case ValueWitnessKind::InitializeBufferWithTake: return "Tk";
-    case ValueWitnessKind::InitializeWithTake: return "tk";
-    case ValueWitnessKind::ProjectBuffer: return "pr";
-    case ValueWitnessKind::InitializeBufferWithTakeOfBuffer: return "TK";
-    case ValueWitnessKind::DestroyArray: return "Xx";
-    case ValueWitnessKind::InitializeArrayWithCopy: return "Cc";
-    case ValueWitnessKind::InitializeArrayWithTakeFrontToBack: return "Tt";
-    case ValueWitnessKind::InitializeArrayWithTakeBackToFront: return "tT";
-    case ValueWitnessKind::StoreExtraInhabitant: return "xs";
-    case ValueWitnessKind::GetExtraInhabitantIndex: return "xg";
-    case ValueWitnessKind::GetEnumTag: return "ug";
-    case ValueWitnessKind::DestructiveProjectEnumData: return "up";
-    }
-    unreachable("bad value witness kind");
-  };
-  Out << 'w' << getString(ValueWitnessKind(node->getIndex()));
+  const char *Code = nullptr;
+  switch (ValueWitnessKind(node->getIndex())) {
+#define VALUE_WITNESS(MANGLING, NAME) \
+    case ValueWitnessKind::NAME: Code = #MANGLING; break;
+#include "swift/Basic/ValueWitnessMangling.def"
+  }
+  Out << 'w' << Code;
   mangleSingleChildNode(node); // type
 }
 

@@ -108,27 +108,9 @@ static inline char encodeSpecializationPass(SpecializationPass Pass) {
 }
 
 enum class ValueWitnessKind {
-  AllocateBuffer,
-  AssignWithCopy,
-  AssignWithTake,
-  DeallocateBuffer,
-  Destroy,
-  DestroyBuffer,
-  InitializeBufferWithCopyOfBuffer,
-  InitializeBufferWithCopy,
-  InitializeWithCopy,
-  InitializeBufferWithTake,
-  InitializeWithTake,
-  ProjectBuffer,
-  InitializeBufferWithTakeOfBuffer,
-  DestroyArray,
-  InitializeArrayWithCopy,
-  InitializeArrayWithTakeFrontToBack,
-  InitializeArrayWithTakeBackToFront,
-  StoreExtraInhabitant,
-  GetExtraInhabitantIndex,
-  GetEnumTag,
-  DestructiveProjectEnumData,
+#define VALUE_WITNESS(MANGLING, NAME) \
+  NAME,
+#include "swift/Basic/ValueWitnessMangling.def"
 };
 
 enum class Directness {

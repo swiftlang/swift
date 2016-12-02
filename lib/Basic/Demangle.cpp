@@ -284,6 +284,8 @@ static StringRef toString(ValueWitnessKind k) {
     return "getEnumTag";
   case ValueWitnessKind::DestructiveProjectEnumData:
     return "destructiveProjectEnumData";
+  case ValueWitnessKind::DestructiveInjectEnumTag:
+    return "destructiveInjectEnumTag";
   }
   unreachable("bad value witness kind");
 }
@@ -409,54 +411,19 @@ private:
   }
 
   Optional<ValueWitnessKind> demangleValueWitnessKind() {
+    char Code[2];
     if (!Mangled)
       return None;
-    char c1 = Mangled.next();
+    Code[0] = Mangled.next();
     if (!Mangled)
       return None;
-    char c2 = Mangled.next();
-    if (c1 == 'a' && c2 == 'l')
-      return ValueWitnessKind::AllocateBuffer;
-    if (c1 == 'c' && c2 == 'a')
-      return ValueWitnessKind::AssignWithCopy;
-    if (c1 == 't' && c2 == 'a')
-      return ValueWitnessKind::AssignWithTake;
-    if (c1 == 'd' && c2 == 'e')
-      return ValueWitnessKind::DeallocateBuffer;
-    if (c1 == 'x' && c2 == 'x')
-      return ValueWitnessKind::Destroy;
-    if (c1 == 'X' && c2 == 'X')
-      return ValueWitnessKind::DestroyBuffer;
-    if (c1 == 'C' && c2 == 'P')
-      return ValueWitnessKind::InitializeBufferWithCopyOfBuffer;
-    if (c1 == 'C' && c2 == 'p')
-      return ValueWitnessKind::InitializeBufferWithCopy;
-    if (c1 == 'c' && c2 == 'p')
-      return ValueWitnessKind::InitializeWithCopy;
-    if (c1 == 'C' && c2 == 'c')
-      return ValueWitnessKind::InitializeArrayWithCopy;
-    if (c1 == 'T' && c2 == 'K')
-      return ValueWitnessKind::InitializeBufferWithTakeOfBuffer;
-    if (c1 == 'T' && c2 == 'k')
-      return ValueWitnessKind::InitializeBufferWithTake;
-    if (c1 == 't' && c2 == 'k')
-      return ValueWitnessKind::InitializeWithTake;
-    if (c1 == 'T' && c2 == 't')
-      return ValueWitnessKind::InitializeArrayWithTakeFrontToBack;
-    if (c1 == 't' && c2 == 'T')
-      return ValueWitnessKind::InitializeArrayWithTakeBackToFront;
-    if (c1 == 'p' && c2 == 'r')
-      return ValueWitnessKind::ProjectBuffer;
-    if (c1 == 'X' && c2 == 'x')
-      return ValueWitnessKind::DestroyArray;
-    if (c1 == 'x' && c2 == 's')
-      return ValueWitnessKind::StoreExtraInhabitant;
-    if (c1 == 'x' && c2 == 'g')
-      return ValueWitnessKind::GetExtraInhabitantIndex;
-    if (c1 == 'u' && c2 == 'g')
-      return ValueWitnessKind::GetEnumTag;
-    if (c1 == 'u' && c2 == 'p')
-      return ValueWitnessKind::DestructiveProjectEnumData;
+    Code[1] = Mangled.next();
+
+    StringRef CodeStr(Code, 2);
+#define VALUE_WITNESS(MANGLING, NAME) \
+  if (CodeStr == #MANGLING) return ValueWitnessKind::NAME;
+#include "swift/Basic/ValueWitnessMangling.def"
+
     return None;
   }
 

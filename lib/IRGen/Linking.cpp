@@ -34,29 +34,10 @@ static StringRef mangleValueWitness(ValueWitness witness) {
   // opposed to objects) in the arguments.  That doesn't serve any
   // direct purpose, but it's neat.
   switch (witness) {
-  case ValueWitness::AllocateBuffer: return "al";
-  case ValueWitness::AssignWithCopy: return "ca";
-  case ValueWitness::AssignWithTake: return "ta";
-  case ValueWitness::DeallocateBuffer: return "de";
-  case ValueWitness::Destroy: return "xx";
-  case ValueWitness::DestroyBuffer: return "XX";
-  case ValueWitness::DestroyArray: return "Xx";
-  case ValueWitness::InitializeBufferWithCopyOfBuffer: return "CP";
-  case ValueWitness::InitializeBufferWithCopy: return "Cp";
-  case ValueWitness::InitializeWithCopy: return "cp";
-  case ValueWitness::InitializeBufferWithTake: return "Tk";
-  case ValueWitness::InitializeWithTake: return "tk";
-  case ValueWitness::ProjectBuffer: return "pr";
-  case ValueWitness::InitializeBufferWithTakeOfBuffer: return "TK";
-  case ValueWitness::InitializeArrayWithCopy: return "Cc";
-  case ValueWitness::InitializeArrayWithTakeFrontToBack: return "Tt";
-  case ValueWitness::InitializeArrayWithTakeBackToFront: return "tT";
-  case ValueWitness::StoreExtraInhabitant: return "xs";
-  case ValueWitness::GetExtraInhabitantIndex: return "xg";
-  case ValueWitness::GetEnumTag: return "ug";
-  case ValueWitness::DestructiveProjectEnumData: return "up";
-  case ValueWitness::DestructiveInjectEnumTag: return "ui";
-      
+#define VALUE_WITNESS(MANGLING, NAME) \
+    case ValueWitness::NAME: return #MANGLING;
+#include "swift/Basic/ValueWitnessMangling.def"
+
   case ValueWitness::Size:
   case ValueWitness::Flags:
   case ValueWitness::Stride:
