@@ -1999,15 +1999,6 @@ public:
   SourceLoc getNameLoc() const { return NameLoc; }
   SourceLoc getLoc() const { return NameLoc; }
 
-  bool hasType() const;
-  Type getType() const;
-
-  /// Set the type of this declaration for the first time.
-  void setType(Type T);
-
-  /// Overwrite the type of this declaration.
-  void overwriteType(Type T);
-
   bool hasAccessibility() const {
     return TypeAndAccess.getInt().hasValue();
   }
@@ -2080,15 +2071,10 @@ public:
   /// If \p DC is null, returns true only if this declaration is public.
   bool isAccessibleFrom(const DeclContext *DC) const;
 
-  /// Retrieve the "interface" type of this value, which is the type used when
-  /// the declaration is viewed from the outside. For a generic function,
-  /// this will have generic function type using generic parameters rather than
-  /// archetypes, while a generic nominal type's interface type will be the
-  /// generic type specialized with its generic parameters.
-  ///
-  /// FIXME: Eventually, this will simply become the type of the value, and
-  /// we will substitute in the appropriate archetypes within a particular
-  /// context.
+  /// Retrieve the "interface" type of this value, which uses
+  /// GenericTypeParamType if the declaration is generic. For a generic
+  /// function, this will have a GenericFunctionType with a
+  /// GenericSignature inside the type.
   Type getInterfaceType() const;
   bool hasInterfaceType() const;
 
@@ -4080,6 +4066,8 @@ protected:
   /// This is the type specified, including location information.
   TypeLoc typeLoc;
 
+  Type typeInContext;
+
 public:
   VarDecl(bool IsStatic, bool IsLet, SourceLoc NameLoc, Identifier Name,
           Type Ty, DeclContext *DC)
@@ -4097,6 +4085,22 @@ public:
   
   TypeLoc &getTypeLoc() { return typeLoc; }
   TypeLoc getTypeLoc() const { return typeLoc; }
+
+  bool hasType() const {
+    return !!typeInContext;
+  }
+
+  /// Get the type of the variable within its context. If the context is generic,
+  /// this will use archetypes.
+  Type getType() const {
+    assert(typeInContext && "No context type set yet");
+    return typeInContext;
+  }
+
+  /// Set the type of the variable within its context.
+  void setType(Type t);
+
+  void markInvalid();
 
   /// Retrieve the source range of the variable type, or an invalid range if the
   /// variable's type is not explicitly written in the source.

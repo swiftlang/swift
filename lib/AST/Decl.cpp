@@ -1644,47 +1644,11 @@ ValueDecl::getSatisfiedProtocolRequirements(bool Sorted) const {
   return NTD->getSatisfiedProtocolRequirementsForMember(this, Sorted);
 }
 
-bool ValueDecl::hasType() const {
-  assert(!isa<AbstractFunctionDecl>(this) &&
-         !isa<EnumElementDecl>(this) &&
-         !isa<SubscriptDecl>(this) &&
-         !isa<TypeDecl>(this) &&
-         "functions and enum case constructors only have an interface type");
-  return !TypeAndAccess.getPointer().isNull();
-}
-
-Type ValueDecl::getType() const {
-  assert(!isa<AbstractFunctionDecl>(this) &&
-         !isa<EnumElementDecl>(this) &&
-         !isa<SubscriptDecl>(this) &&
-         !isa<TypeDecl>(this) &&
-         "functions and enum case constructors only have an interface type");
-  assert(hasType() && "declaration has no type set yet");
-  return TypeAndAccess.getPointer();
-}
-
-void ValueDecl::setType(Type T) {
-  assert(!hasType() && "changing type of declaration");
-  overwriteType(T);
-}
-
-void ValueDecl::overwriteType(Type T) {
-  assert(!isa<AbstractFunctionDecl>(this) &&
-         !isa<EnumElementDecl>(this) &&
-         !isa<SubscriptDecl>(this) &&
-         !isa<TypeDecl>(this) &&
-         "functions and enum case constructors only have an interface type");
-
-  TypeAndAccess.setPointer(T);
-  if (!T.isNull() && T->hasError())
-    setInvalid();
-}
-
 bool ValueDecl::hasInterfaceType() const {
   // getInterfaceType() returns the contextual type for ParamDecls which
   // don't have an explicit interface type.
-  if (isa<ParamDecl>(this))
-    return hasType();
+  if (auto *PD = dyn_cast<ParamDecl>(this))
+    return PD->hasType();
 
   return !!InterfaceTy;
 }
@@ -1693,14 +1657,11 @@ Type ValueDecl::getInterfaceType() const {
   if (InterfaceTy)
     return InterfaceTy;
 
-  if (!hasType())
-    return Type();
-
   // FIXME: ParamDecls are funky and don't always have an interface type
-  if (isa<ParamDecl>(this))
-    return getType();
+  if (auto *PD = dyn_cast<ParamDecl>(this))
+    return PD->getType();
 
-  llvm_unreachable("decl has context type but no interface type");
+  llvm_unreachable("no interface type was set");
 }
 
 void ValueDecl::setInterfaceType(Type type) {
@@ -3405,6 +3366,19 @@ static bool isSettable(const AbstractStorageDecl *decl) {
     return decl->getSetter() != nullptr;
   }
   llvm_unreachable("bad storage kind");
+}
+
+void VarDecl::setType(Type t) {
+  typeInContext = t;
+  if (t && t->hasError())
+    setInvalid();
+}
+
+void VarDecl::markInvalid() {
+  auto &Ctx = getASTContext();
+  setType(ErrorType::get(Ctx));
+  setInterfaceType(ErrorType::get(Ctx));
+  setInvalid();
 }
 
 /// \brief Returns whether the var is settable in the specified context: this

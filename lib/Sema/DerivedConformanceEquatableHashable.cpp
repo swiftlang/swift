@@ -254,7 +254,7 @@ deriveEquatable_enum_eq(TypeChecker &tc, Decl *parentDecl, EnumDecl *enumDecl) {
 
   // Fill in the 'self' type.
   Type selfTy = eqDecl->computeSelfType();
-  selfDecl->overwriteType(selfTy);
+  selfDecl->setType(selfTy);
 
   eqDecl->setOperatorDecl(op);
   eqDecl->setBodySynthesizer(&deriveBodyEquatable_enum_eq);
@@ -404,7 +404,7 @@ deriveHashable_enum_hashValue(TypeChecker &tc, Decl *parentDecl,
   // Compute the type of hashValue().
   Type methodType = FunctionType::get(TupleType::getEmpty(tc.Context), intType);
   Type selfType = getterDecl->computeSelfType();
-  selfDecl->overwriteType(selfType);
+  selfDecl->setType(selfType);
 
   // Compute the interface type of hashValue().
   Type interfaceType;

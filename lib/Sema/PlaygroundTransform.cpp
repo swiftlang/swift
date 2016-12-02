@@ -462,7 +462,8 @@ public:
     }
     virtual bool walkToDeclPre(Decl *D) {
       if (ValueDecl *VD = dyn_cast<ValueDecl>(D)) {
-        if (!VD->getType() || VD->getType()->hasError()) {
+        if (!VD->hasInterfaceType() ||
+            VD->getInterfaceType()->hasError()) {
           error = true;
           return false;
         }

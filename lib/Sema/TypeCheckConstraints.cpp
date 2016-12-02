@@ -1291,9 +1291,7 @@ void CleanupIllFormedExpressionRAII::doIt(Expr *expr, ASTContext &Context) {
       // This handles parameter decls in ClosureExprs.
       if (auto VD = dyn_cast<VarDecl>(D)) {
         if (VD->hasType() && VD->getType()->hasTypeVariable()) {
-          VD->overwriteType(ErrorType::get(context));
-          VD->setInterfaceType(ErrorType::get(context));
-          VD->setInvalid();
+          VD->markInvalid();
         }
       }
       return true;
@@ -1899,9 +1897,7 @@ bool TypeChecker::typeCheckBinding(Pattern *&pattern, Expr *&initializer,
       if (var->hasType() && !var->getType()->hasError())
         return;
 
-      var->overwriteType(ErrorType::get(Context));
-      var->setInterfaceType(ErrorType::get(Context));
-      var->setInvalid();
+      var->markInvalid();
     });
   }
 
@@ -2230,9 +2226,7 @@ bool TypeChecker::typeCheckStmtCondition(StmtCondition &cond, DeclContext *dc,
         // compute a type for.
         if (var->hasType() && !var->getType()->hasError())
           return;
-        var->overwriteType(ErrorType::get(Context));
-        var->setInterfaceType(ErrorType::get(Context));
-        var->setInvalid();
+        var->markInvalid();
       });
     };
 

@@ -246,7 +246,7 @@ void Constraint::print(llvm::raw_ostream &Out, SourceManager *sm) const {
     auto printDecl = [&] {
       auto decl = overload.getDecl();
       decl->dumpRef(Out);
-      Out << " : " << decl->getType();
+      Out << " : " << decl->getInterfaceType();
       if (!sm || !decl->getLoc().isValid()) return;
       Out << " at ";
       decl->getLoc().print(Out, *sm);

@@ -291,7 +291,7 @@ static ConstructorDecl *deriveRawRepresentable_init(TypeChecker &tc,
   auto interfaceArgType = TupleType::get(interfaceElement, C);
   
   Type selfType = initDecl->computeSelfType();
-  selfDecl->overwriteType(selfType);
+  selfDecl->setType(selfType);
   Type selfMetatype = MetatypeType::get(selfType->getInOutObjectType());
 
   // Compute the interface type of the initializer.

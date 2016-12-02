@@ -700,9 +700,7 @@ static void setBoundVarsTypeError(Pattern *pattern, ASTContext &ctx) {
     if (var->hasType() && !var->getType()->hasError())
       return;
 
-    var->overwriteType(ErrorType::get(ctx));
-    var->setInterfaceType(ErrorType::get(ctx));
-    var->setInvalid();
+    var->markInvalid();
   });
 }
 
@@ -941,12 +939,9 @@ static void checkRedeclaration(TypeChecker &tc, ValueDecl *current) {
 
     const auto markInvalid = [&current, &tc]() {
       current->setInvalid();
-      if (!isa<AbstractFunctionDecl>(current) &&
-          !isa<EnumElementDecl>(current) &&
-          !isa<SubscriptDecl>(current) &&
-          !isa<TypeDecl>(current))
-        if (current->hasType())
-          current->overwriteType(ErrorType::get(tc.Context));
+      if (auto *varDecl = dyn_cast<VarDecl>(current))
+        if (varDecl->hasType())
+          varDecl->setType(ErrorType::get(tc.Context));
       if (current->hasInterfaceType())
         current->setInterfaceType(ErrorType::get(tc.Context));
     };
@@ -1142,7 +1137,7 @@ void swift::configureImplicitSelf(TypeChecker &tc,
   // 'self' is 'let' for reference types (i.e., classes) or when 'self' is
   // neither inout.
   selfDecl->setLet(!selfTy->is<InOutType>());
-  selfDecl->overwriteType(selfTy);
+  selfDecl->setType(selfTy);
   
   // Install the self type on the Parameter that contains it.  This ensures that
   // we don't lose it when generic types get reverted.
@@ -2913,9 +2908,7 @@ static void checkVarBehavior(VarDecl *decl, TypeChecker &TC) {
   
   // Bail out if we didn't resolve type witnesses.
   if (conformance->isInvalid()) {
-    decl->setInvalid();
-    decl->overwriteType(ErrorType::get(TC.Context));
-    decl->setInterfaceType(ErrorType::get(TC.Context));
+    decl->markInvalid();
     return;
   }
 
@@ -3127,9 +3120,7 @@ static void checkVarBehavior(VarDecl *decl, TypeChecker &TC) {
   
   // Bail out if we didn't resolve method witnesses.
   if (conformance->isInvalid()) {
-    decl->setInvalid();
-    decl->overwriteType(ErrorType::get(TC.Context));
-    decl->setInterfaceType(ErrorType::get(TC.Context));
+    decl->markInvalid();
     return;
   }
 
@@ -3151,9 +3142,7 @@ static void checkVarBehavior(VarDecl *decl, TypeChecker &TC) {
                 decl->getInterfaceType());
     TC.diagnose(behavior->ValueDecl->getLoc(),
                 diag::property_behavior_value_decl_here);
-    decl->setInvalid();
-    decl->overwriteType(ErrorType::get(TC.Context));
-    decl->setInterfaceType(ErrorType::get(TC.Context));
+    decl->markInvalid();
     return;
   }
 
@@ -3498,9 +3487,7 @@ public:
     if (!VD->getType()->isMaterializable()) {
       TC.diagnose(VD->getStartLoc(), diag::var_type_not_materializable,
                   VD->getType());
-      VD->overwriteType(ErrorType::get(TC.Context));
-      VD->setInterfaceType(ErrorType::get(TC.Context));
-      VD->setInvalid();
+      VD->markInvalid();
     }
 
     TC.validateDecl(VD);
@@ -3526,15 +3513,11 @@ public:
           !VD->isStatic()) {
         // Enums can only have computed properties.
         TC.diagnose(VD->getLoc(), diag::enum_stored_property);
-        VD->setInvalid();
-        VD->overwriteType(ErrorType::get(TC.Context));
-        VD->setInterfaceType(ErrorType::get(TC.Context));
+        VD->markInvalid();
       } else if (isa<ExtensionDecl>(VD->getDeclContext()) &&
                  !VD->isStatic()) {
         TC.diagnose(VD->getLoc(), diag::extension_stored_property);
-        VD->setInvalid();
-        VD->overwriteType(ErrorType::get(TC.Context));
-        VD->setInterfaceType(ErrorType::get(TC.Context));
+        VD->markInvalid();
       }
       
       // We haven't implemented type-level storage in some contexts.
@@ -3695,8 +3678,7 @@ public:
           PBD->setInvalid();
           var->setInvalid();
           if (!var->hasType()) {
-            var->setType(ErrorType::get(TC.Context));
-            var->setInterfaceType(ErrorType::get(TC.Context));
+            var->markInvalid();
           }
           return;
         }
@@ -3710,8 +3692,7 @@ public:
           PBD->setInvalid();
           var->setInvalid();
           if (!var->hasType()) {
-            var->setType(ErrorType::get(TC.Context));
-            var->setInterfaceType(ErrorType::get(TC.Context));
+            var->markInvalid();
           }
           return;
         }
@@ -3725,8 +3706,7 @@ public:
           PBD->setInvalid();
           var->setInvalid();
           if (!var->hasType()) {
-            var->setType(ErrorType::get(TC.Context));
-            var->setInterfaceType(ErrorType::get(TC.Context));
+            var->markInvalid();
           }
           return;
         }
@@ -4738,10 +4718,10 @@ public:
 
     // Observing accessors (and their generated regular accessors) may have
     // the type of the var inferred.
-    if (AbstractStorageDecl *ASD = FD->getAccessorStorageDecl()) {
-      if (ASD->hasObservers()) {
-        TC.validateDecl(ASD);
-        Type valueTy = ASD->getType()->getReferenceStorageReferent();
+    if (auto *VD = dyn_cast_or_null<VarDecl>(FD->getAccessorStorageDecl())) {
+      if (VD->hasObservers()) {
+        TC.validateDecl(VD);
+        Type valueTy = VD->getType()->getReferenceStorageReferent();
         if (FD->isObservingAccessor() || (FD->isSetter() && FD->isImplicit())) {
           unsigned firstParamIdx = FD->getParent()->isTypeContext();
           auto *firstParamPattern = FD->getParameterList(firstParamIdx);
@@ -7109,8 +7089,7 @@ void TypeChecker::validateDecl(ValueDecl *D, bool resolveTypeParams) {
             configureImplicitSelf(*this, funcDeclContext);
           }
         } else {
-          D->setType(ErrorType::get(Context));
-          D->setInterfaceType(ErrorType::get(Context));
+          VD->markInvalid();
         }      
       } else {
         // FIXME: This case is hit when code completion occurs in a function
@@ -7120,8 +7099,7 @@ void TypeChecker::validateDecl(ValueDecl *D, bool resolveTypeParams) {
         assert(isa<AbstractFunctionDecl>(D->getDeclContext()) ||
                isa<AbstractClosureExpr>(D->getDeclContext()) ||
                isa<TopLevelCodeDecl>(D->getDeclContext()));
-        D->setType(ErrorType::get(Context));
-        D->setInterfaceType(ErrorType::get(Context));
+        VD->markInvalid();
       }
 
       // Make sure the getter and setter have valid types, since they will be

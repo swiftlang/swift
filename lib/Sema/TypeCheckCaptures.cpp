@@ -175,8 +175,8 @@ public:
     // we'd need the metadata to do so.
     if (VD->hasInterfaceType()
         && (!AFR.isObjC()
-            || isa<AbstractFunctionDecl>(VD)
-            || !VD->getType()->hasRetainablePointerRepresentation()))
+            || !isa<VarDecl>(VD)
+            || !cast<VarDecl>(VD)->getType()->hasRetainablePointerRepresentation()))
       checkType(VD->getInterfaceType(), VD->getLoc());
 
     // If VD is a noescape decl, then the closure we're computing this for
@@ -336,8 +336,8 @@ public:
       return { false, DRE };
 
     bool isInOut = (isa<ParamDecl>(D) &&
-                    D->hasType() &&
-                    D->getType()->is<InOutType>());
+                    cast<ParamDecl>(D)->hasType() &&
+                    cast<ParamDecl>(D)->getType()->is<InOutType>());
     bool isNested = false;
     if (auto f = AFR.getAbstractFunctionDecl())
       isNested = f->getDeclContext()->isLocalContext();
@@ -682,7 +682,7 @@ void TypeChecker::computeCaptures(AnyFunctionRef AFR) {
   }
 
   if (AFR.hasType() && !AFR.isObjC()) {
-    finder.checkType(AFR.getInterfaceType(), AFR.getLoc());
+    finder.checkType(AFR.getType(), AFR.getLoc());
   }
 
   // If this is an init(), explicitly walk the initializer values for members of

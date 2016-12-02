@@ -878,9 +878,7 @@ public:
             // If that failed, mark any variables binding pieces of the pattern
             // as invalid to silence follow-on errors.
             pattern->forEachVariable([&](VarDecl *VD) {
-              VD->overwriteType(ErrorType::get(TC.Context));
-              VD->setInterfaceType(ErrorType::get(TC.Context));
-              VD->setInvalid();
+              VD->markInvalid();
             });
           }
           labelItem.setPattern(pattern);
@@ -899,13 +897,8 @@ public:
                   if (!VD->getType()->isEqual(expected->getType())) {
                     TC.diagnose(VD->getLoc(), diag::type_mismatch_multiple_pattern_list,
                                 VD->getType(), expected->getType());
-                    VD->overwriteType(ErrorType::get(TC.Context));
-                    VD->setInterfaceType(ErrorType::get(TC.Context));
-                    VD->setInvalid();
-
-                    expected->overwriteType(ErrorType::get(TC.Context));
-                    expected->setInterfaceType(ErrorType::get(TC.Context));
-                    expected->setInvalid();
+                    VD->markInvalid();
+                    expected->markInvalid();
                   }
                   return;
                 }
@@ -1001,9 +994,7 @@ bool TypeChecker::typeCheckCatchPattern(CatchStmt *S, DeclContext *DC) {
       // before we type-check the guard.  (This will probably kill
       // most of the type-checking, but maybe not.)
       pattern->forEachVariable([&](VarDecl *var) {
-        var->overwriteType(ErrorType::get(Context));
-        var->setInterfaceType(ErrorType::get(Context));
-        var->setInvalid();
+        var->markInvalid();
       });
     }
 

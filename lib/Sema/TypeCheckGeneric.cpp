@@ -945,7 +945,7 @@ void TypeChecker::revertGenericFuncSignature(AbstractFunctionDecl *func) {
     for (auto &param : *paramList) {
       // Clear out the type of the decl.
       if (param->hasType() && !param->isInvalid())
-        param->overwriteType(Type());
+        param->setType(Type());
       revertDependentTypeLoc(param->getTypeLoc());
     }
   }

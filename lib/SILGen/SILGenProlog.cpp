@@ -346,7 +346,6 @@ static void emitCaptureArguments(SILGenFunction &gen, CapturedValue capture,
                                  unsigned ArgNo) {
 
   auto *VD = capture.getDecl();
-  auto type = VD->getType();
   SILLocation Loc(VD);
   Loc.markAsPrologue();
   switch (gen.SGM.Types.getDeclCaptureKind(capture)) {
@@ -354,7 +353,8 @@ static void emitCaptureArguments(SILGenFunction &gen, CapturedValue capture,
     break;
 
   case CaptureKind::Constant: {
-    auto &lowering = gen.getTypeLowering(VD->getType());
+    auto type = cast<VarDecl>(VD)->getType();
+    auto &lowering = gen.getTypeLowering(type);
     // Constant decls are captured by value.
     SILType ty = lowering.getLoweredType();
     SILValue val = gen.F.begin()->createArgument(ty, VD);
@@ -385,6 +385,7 @@ static void emitCaptureArguments(SILGenFunction &gen, CapturedValue capture,
   case CaptureKind::Box: {
     // LValues are captured as a retained @box that owns
     // the captured value.
+    auto type = dyn_cast<VarDecl>(VD)->getType();
     SILType ty = gen.getLoweredType(type).getAddressType();
     SILType boxTy = SILType::getPrimitiveObjectType(
       SILBoxType::get(ty.getSwiftRValueType()));
@@ -398,6 +399,7 @@ static void emitCaptureArguments(SILGenFunction &gen, CapturedValue capture,
   }
   case CaptureKind::StorageAddress: {
     // Non-escaping stored decls are captured as the address of the value.
+    auto type = dyn_cast<VarDecl>(VD)->getType();
     SILType ty = gen.getLoweredType(type).getAddressType();
     SILValue addr = gen.F.begin()->createArgument(ty, VD);
     gen.VarLocs[VD] = SILGenFunction::VarLoc::get(addr);

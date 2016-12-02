@@ -1468,7 +1468,7 @@ static bool addErrorDomain(NominalTypeDecl *swiftDecl,
                                                       false));
   auto stringTy = C.getStringDecl()->getDeclaredType();
   assert(stringTy && "no string type available");
-  if (!swiftValueDecl || !swiftValueDecl->getType()->isEqual(stringTy)) {
+  if (!swiftValueDecl || !swiftValueDecl->getInterfaceType()->isEqual(stringTy)) {
     // Couldn't actually import it as an error enum, fall back to enum
     return false;
   }
@@ -1639,13 +1639,13 @@ applyPropertyOwnership(VarDecl *prop,
   }
   if (attrs & clang::ObjCPropertyDecl::OBJC_PR_weak) {
     prop->getAttrs().add(new (ctx) OwnershipAttr(Ownership::Weak));
-    prop->overwriteType(WeakStorageType::get(prop->getType(), ctx));
+    prop->setType(WeakStorageType::get(prop->getType(), ctx));
     return;
   }
   if ((attrs & clang::ObjCPropertyDecl::OBJC_PR_assign) ||
       (attrs & clang::ObjCPropertyDecl::OBJC_PR_unsafe_unretained)) {
     prop->getAttrs().add(new (ctx) OwnershipAttr(Ownership::Unmanaged));
-    prop->overwriteType(UnmanagedStorageType::get(prop->getType(), ctx));
+    prop->setType(UnmanagedStorageType::get(prop->getType(), ctx));
     return;
   }
 }
