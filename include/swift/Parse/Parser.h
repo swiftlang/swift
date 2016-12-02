@@ -798,9 +798,9 @@ public:
   ParserResult<ProtocolDecl> parseDeclProtocol(ParseDeclOptions Flags,
                                                DeclAttributes &Attributes);
 
-  ParserStatus parseDeclSubscript(ParseDeclOptions Flags,
-                                  DeclAttributes &Attributes,
-                                  SmallVectorImpl<Decl *> &Decls);
+  ParserResult<SubscriptDecl>
+  parseDeclSubscript(ParseDeclOptions Flags, DeclAttributes &Attributes,
+                     SmallVectorImpl<Decl *> &Decls);
 
   ParserResult<ConstructorDecl>
   parseDeclInit(ParseDeclOptions Flags, DeclAttributes &Attributes);
