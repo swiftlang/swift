@@ -6,19 +6,19 @@
 # libicudata
 #
 
-SDK=$1
+# SDK=$1
 OUTPUTFILE=$2
 ICU_STATIC_LIB=$3
 
 
 if [ "${ICU_STATIC_LIB}" == "TRUE" ]; then
-    read -d '' ICU_LIBS <<EOF
+    read -r -d '' ICU_LIBS <<EOF
 -licui18n
 -licuuc
 -licudata
 EOF
 else
-    read -d '' ICU_LIBS <<EOF
+    read -r -d '' ICU_LIBS <<EOF
 -licui18n
 -licuuc
 EOF
