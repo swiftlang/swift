@@ -3085,7 +3085,7 @@ Decl *ModuleFile::getDecl(DeclID DID, Optional<DeclContext *> ForcedContext) {
   case decls_block::SUBSCRIPT_DECL: {
     DeclContextID contextID;
     bool isImplicit, isObjC;
-    TypeID interfaceTypeID;
+    TypeID declTypeID, elemTypeID, interfaceTypeID;
     DeclID getterID, setterID, materializeForSetID;
     DeclID addressorID, mutableAddressorID, willSetID, didSetID;
     DeclID overriddenID;
@@ -3095,6 +3095,7 @@ Decl *ModuleFile::getDecl(DeclID DID, Optional<DeclContext *> ForcedContext) {
 
     decls_block::SubscriptLayout::readRecord(scratch, contextID,
                                              isImplicit, isObjC, rawStorageKind,
+                                             declTypeID, elemTypeID,
                                              interfaceTypeID,
                                              getterID, setterID,
                                              materializeForSetID,
@@ -3118,7 +3119,8 @@ Decl *ModuleFile::getDecl(DeclID DID, Optional<DeclContext *> ForcedContext) {
     declOrOffset = subscript;
 
     subscript->setIndices(readParameterList());
-
+    subscript->getElementTypeLoc() = TypeLoc::withoutLoc(getType(elemTypeID));
+    
     configureStorage(subscript, rawStorageKind,
                      getterID, setterID, materializeForSetID,
                      addressorID, mutableAddressorID, willSetID, didSetID);
@@ -3139,9 +3141,9 @@ Decl *ModuleFile::getDecl(DeclID DID, Optional<DeclContext *> ForcedContext) {
       }
     }
 
-    auto interfaceType = getType(interfaceTypeID);
-    subscript->setInterfaceType(interfaceType);
-
+    subscript->setType(getType(declTypeID));
+    if (auto interfaceType = getType(interfaceTypeID))
+      subscript->setInterfaceType(interfaceType);
     if (isImplicit)
       subscript->setImplicit();
     if (auto overridden = cast_or_null<SubscriptDecl>(getDecl(overriddenID))) {
@@ -3398,7 +3400,7 @@ Type ModuleFile::getType(TypeID TID) {
       return nullptr;
     }
 
-    typeOrOffset = alias->getAliasType();
+    typeOrOffset = alias->getDeclaredType();
     break;
   }
 
@@ -3726,7 +3728,7 @@ Type ModuleFile::getType(TypeID TID) {
       if (typeOrOffset.isComplete())
         break;
 
-      typeOrOffset = genericParam->getDeclaredInterfaceType();
+      typeOrOffset = genericParam->getDeclaredType();
       break;
     }
 
@@ -3749,7 +3751,7 @@ Type ModuleFile::getType(TypeID TID) {
     if (typeOrOffset.isComplete())
       break;
 
-    typeOrOffset = assocType->getType()->castTo<MetatypeType>()->getInstanceType();
+    typeOrOffset = assocType->getDeclaredType();
     break;
   }
 

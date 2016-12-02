@@ -502,7 +502,7 @@ resolveDeclRefExpr(UnresolvedDeclRefExpr *UDRE, DeclContext *DC) {
       return new (Context) DeclRefExpr(ResultValues[0], UDRE->getNameLoc(),
                                        /*implicit=*/false,
                                        AccessSemantics::Ordinary,
-                                       ResultValues[0]->getInterfaceType());
+                                       ResultValues[0]->getType());
     }
 
     return TypeExpr::createForDecl(Loc, cast<TypeDecl>(ResultValues[0]),

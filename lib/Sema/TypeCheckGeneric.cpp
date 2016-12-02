@@ -107,14 +107,10 @@ Type GenericTypeToArchetypeResolver::resolveTypeOfDecl(TypeDecl *decl) {
   // a generic typealias
   if (auto *paramDecl = dyn_cast<GenericTypeParamDecl>(decl)) {
     return decl->getDeclContext()->getGenericEnvironmentOfContext()
-        ->mapTypeIntoContext(paramDecl->getDeclaredInterfaceType()
+        ->mapTypeIntoContext(paramDecl->getDeclaredType()
             ->castTo<GenericTypeParamType>());
   }
-
-  auto *aliasDecl = cast<TypeAliasDecl>(decl);
-  if (aliasDecl->isInvalid())
-    return ErrorType::get(aliasDecl->getASTContext());
-  return aliasDecl->getAliasType();
+  return decl->getDeclaredType();
 }
 
 Type PartialGenericTypeToArchetypeResolver::resolveGenericTypeParamType(
@@ -165,14 +161,10 @@ PartialGenericTypeToArchetypeResolver::resolveTypeOfDecl(TypeDecl *decl) {
   // a generic typealias
   if (auto *paramDecl = dyn_cast<GenericTypeParamDecl>(decl)) {
     return decl->getDeclContext()->getGenericEnvironmentOfContext()
-        ->mapTypeIntoContext(paramDecl->getDeclaredInterfaceType()
+        ->mapTypeIntoContext(paramDecl->getDeclaredType()
             ->castTo<GenericTypeParamType>());
   }
-
-  auto *aliasDecl = cast<TypeAliasDecl>(decl);
-  if (aliasDecl->isInvalid())
-    return ErrorType::get(aliasDecl->getASTContext());
-  return aliasDecl->getAliasType();
+  return decl->getDeclaredType();
 }
 
 Type CompleteGenericTypeResolver::resolveGenericTypeParamType(

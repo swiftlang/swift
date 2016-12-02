@@ -70,7 +70,7 @@ DebugTypeInfo::DebugTypeInfo(TypeDecl *Decl, const TypeInfo &Info)
   if (auto AliasDecl = dyn_cast<TypeAliasDecl>(Decl))
     Type = AliasDecl->getAliasType();
   else
-    Type = Decl->getInterfaceType().getPointer();
+    Type = Decl->getType().getPointer();
 
   initFromTypeInfo(size, align, StorageType, Info);
 }
@@ -83,7 +83,7 @@ DebugTypeInfo::DebugTypeInfo(ValueDecl *Decl, llvm::Type *StorageTy, Size size,
   if (auto AliasDecl = dyn_cast<TypeAliasDecl>(Decl))
     Type = AliasDecl->getAliasType();
   else
-    Type = Decl->getInterfaceType().getPointer();
+    Type = Decl->getType().getPointer();
 
   assert(StorageType && "StorageType is a nullptr");
   assert(align.getValue() != 0);

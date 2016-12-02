@@ -226,9 +226,7 @@ var y: X5<X4, Int> // expected-error{{'X5' requires the types 'X4.AssocP' (aka '
 
 // Recursive generic signature validation.
 class Top {}
-class Bottom<T : Bottom<Top>> {}
-// expected-error@-1 {{type 'Bottom' references itself}}
-// expected-note@-2 {{type declared here}}
+class Bottom<T : Bottom<Top>> {} // expected-error {{type may not reference itself as a requirement}}
 
 // Invalid inheritance clause
 

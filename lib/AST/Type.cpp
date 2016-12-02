@@ -2982,7 +2982,7 @@ TypeSubstitutionMap TypeBase::getMemberSubstitutions(const DeclContext *dc) {
       auto params = curGenericParams->getParams();
       auto args = boundGeneric->getGenericArgs();
       for (unsigned i = 0, n = args.size(); i != n; ++i) {
-        substitutions[params[i]->getDeclaredInterfaceType()->getCanonicalType()
+        substitutions[params[i]->getDeclaredType()->getCanonicalType()
                         ->castTo<GenericTypeParamType>()] = args[i];
       }
 

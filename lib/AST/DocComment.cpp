@@ -18,7 +18,6 @@
 
 #include "swift/AST/Comment.h"
 #include "swift/AST/Decl.h"
-#include "swift/AST/Types.h"
 #include "swift/AST/PrettyStackTrace.h"
 #include "swift/AST/RawComment.h"
 #include "swift/Markup/Markup.h"
@@ -402,7 +401,7 @@ getProtocolRequirementDocComment(swift::markup::MarkupContext &MC,
                                                 const ValueDecl *VD)
     -> const ValueDecl * {
       SmallVector<ValueDecl *, 2> Members;
-      P->lookupQualified(P->getDeclaredType(), VD->getFullName(),
+      P->lookupQualified(P->getType(), VD->getFullName(),
                          NLOptions::NL_ProtocolMembers,
                          /*resolver=*/nullptr, Members);
     SmallVector<const ValueDecl *, 1> ProtocolRequirements;

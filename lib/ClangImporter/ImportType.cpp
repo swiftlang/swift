@@ -723,7 +723,7 @@ namespace {
       if (!decl)
         return nullptr;
 
-      return decl->getDeclaredInterfaceType();
+      return decl->getDeclaredType();
     }
 
     /// Retrieve the 'Code' type for a bridged NSError, or nullptr if
@@ -759,7 +759,7 @@ namespace {
       if (auto codeDecl = getBridgedNSErrorCode(type))
         return codeDecl->getDeclaredInterfaceType();
 
-      return type->getDeclaredInterfaceType();
+      return type->getDeclaredType();
     }
 
     ImportResult VisitEnumType(const clang::EnumType *type) {
@@ -2188,18 +2188,15 @@ Type ClangImporter::Implementation::getNamedSwiftType(Module *module,
   if (results.size() != 1)
     return Type();
 
-  auto decl = dyn_cast<TypeDecl>(results.front());
-  if (!decl)
+  auto type = dyn_cast<TypeDecl>(results.front());
+  if (!type)
     return Type();
 
-  assert(!decl->hasClangNode() && "picked up the original type?");
+  assert(!type->hasClangNode() && "picked up the original type?");
 
   if (auto *typeResolver = getTypeResolver())
-    typeResolver->resolveDeclSignature(decl);
-
-  if (auto *nominalDecl = dyn_cast<NominalTypeDecl>(decl))
-    return nominalDecl->getDeclaredType();
-  return cast<TypeAliasDecl>(decl)->getAliasType();
+    typeResolver->resolveDeclSignature(type);
+  return type->getDeclaredType();
 }
 
 Type ClangImporter::Implementation::getNamedSwiftType(StringRef moduleName,

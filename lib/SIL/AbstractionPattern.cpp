@@ -40,12 +40,9 @@ AbstractionPattern TypeConverter::getAbstractionPattern(AbstractStorageDecl *dec
 }
 
 AbstractionPattern TypeConverter::getAbstractionPattern(SubscriptDecl *decl) {
-  CanGenericSignature genericSig;
-  if (auto sig = decl->getGenericSignatureOfContext())
-    genericSig = sig->getCanonicalSignature();
-  return AbstractionPattern(genericSig,
-                            decl->getElementInterfaceType()
-                                ->getCanonicalType());
+  // TODO: honor the declared type?
+  // TODO: use interface types
+  return AbstractionPattern(decl->getElementType());
 }
 
 AbstractionPattern

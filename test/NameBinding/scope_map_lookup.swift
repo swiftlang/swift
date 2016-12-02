@@ -24,9 +24,7 @@ protocol P1 {
 
 // Protocols involving associated types.
 protocol AProtocol {
-  associatedtype e : e
-  // expected-error@-1 {{type 'e' references itself}}
-  // expected-note@-2 {{type declared here}}
+  associatedtype e : e  // expected-error {{inheritance from non-protocol, non-class type 'Self.e'}}
 }
 
 // Extensions.

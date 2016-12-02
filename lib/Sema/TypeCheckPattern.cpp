@@ -84,7 +84,7 @@ filterForEnumElement(TypeChecker &TC, DeclContext *DC, SourceLoc UseLoc,
       continue;
     }
     // Skip if the enum element was referenced as an instance member
-    if (!result.Base || !result.Base->getInterfaceType()->is<MetatypeType>()) {
+    if (!result.Base || !result.Base->getType()->is<MetatypeType>()) {
       continue;
     }
 

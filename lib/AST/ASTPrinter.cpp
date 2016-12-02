@@ -2769,17 +2769,14 @@ void PrintAST::visitSubscriptDecl(SubscriptDecl *decl) {
   recordDeclLoc(decl, [&]{
     Printer << "subscript";
   }, [&] { // Parameters
-    printParameterList(decl->getIndices(), decl->getIndicesInterfaceType(),
+    printParameterList(decl->getIndices(), decl->getIndicesType(),
                        /*Curried=*/false,
                        /*isAPINameByDefault*/[]()->bool{return false;});
   });
   Printer << " -> ";
 
   Printer.callPrintStructurePre(PrintStructureKind::FunctionReturnType);
-  TypeLoc elementTy = decl->getElementTypeLoc();
-  if (!elementTy.getTypeRepr())
-    elementTy = TypeLoc::withoutLoc(decl->getElementInterfaceType());
-  printTypeLoc(elementTy);
+  printTypeLoc(decl->getElementTypeLoc());
   Printer.printStructurePost(PrintStructureKind::FunctionReturnType);
 
   printAccessors(decl);

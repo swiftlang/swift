@@ -2265,13 +2265,16 @@ void ConformanceChecker::recordTypeWitness(AssociatedTypeDecl *assocType,
                                                     DC);
     aliasDecl->computeType();
 
-    aliasDecl->getAliasType()->setRecursiveProperties(
-        type->getRecursiveProperties());
-
-    Type interfaceTy = aliasDecl->getAliasType();
-    if (interfaceTy->hasArchetype())
-      interfaceTy = ArchetypeBuilder::mapTypeOutOfContext(DC, type);
-    aliasDecl->setInterfaceType(MetatypeType::get(interfaceTy));
+    // Strip off sugar from the interface type if it is dependent.
+    // FIXME: Without this, the stdlib doesn't compile because
+    // 'typealias _Buffer' is insufficiently accessible.
+    if (type->hasArchetype()) {
+      auto metaType = MetatypeType::get(type);
+      aliasDecl->setInterfaceType(
+        ArchetypeBuilder::mapTypeOutOfContext(DC, metaType));
+    } else {
+      aliasDecl->setInterfaceType(aliasDecl->getType());
+    }
 
     aliasDecl->setImplicit();
     if (type->hasError())
@@ -2896,14 +2899,14 @@ ResolveWitnessResult ConformanceChecker::resolveTypeWitnessViaLookup(
       tc.diagnose(assocType, diag::no_witnesses_type, assocType->getName());
 
       for (auto candidate : nonViable) {
-        if (candidate.first->getDeclaredInterfaceType()->hasError())
+        if (candidate.first->getDeclaredType()->hasError())
           continue;
 
         tc.diagnose(candidate.first,
                     diag::protocol_witness_nonconform_type,
-                    candidate.first->getDeclaredInterfaceType(),
-                    candidate.second->getDeclaredInterfaceType(),
-                    candidate.second->getDeclaredInterfaceType()->is<ProtocolType>());
+                    candidate.first->getDeclaredType(),
+                    candidate.second->getDeclaredType(),
+                    candidate.second->getDeclaredType()->is<ProtocolType>());
       }
     });
 

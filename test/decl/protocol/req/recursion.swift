@@ -23,9 +23,7 @@ protocol Y {
 public protocol P {
   associatedtype T
 }
-public struct S<A: P> where A.T == S<A> {}
-// expected-error@-1{{type 'S' references itself}}
-// expected-note@-2{{type declared here}}
+public struct S<A: P> where A.T == S<A> {} // expected-error{{type may not reference itself as a requirement}}
 
 protocol I {
   init() // expected-note 2{{protocol requires initializer 'init()' with type '()'}}
@@ -35,9 +33,8 @@ protocol PI {
   associatedtype T : I
 }
 
-struct SI<A: PI> : I where A : I, A.T == SI<A> {}
-// expected-error@-1{{type 'SI' references itself}}
-// expected-note@-2{{type declared here}}
+struct SI<A: PI> : I where A : I, A.T == SI<A> { // expected-error{{type may not reference itself as a requirement}}
+}
 
 // Used to hit infinite recursion
 struct S4<A: PI> : I where A : I {
