@@ -2690,7 +2690,7 @@ bool SILParser::parseSILInstruction(SILBasicBlock *BB, SILBuilder &B) {
       ResultVal = B.createExistentialMetatype(InstLoc, Ty, Val);
       break;
     case ValueKind::DeallocBoxInst:
-      ResultVal = B.createDeallocBox(InstLoc, Ty, Val);
+      ResultVal = B.createDeallocBox(InstLoc, Val);
       break;
     }
     break;

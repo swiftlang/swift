@@ -1332,8 +1332,7 @@ void SILGenFunction::deallocateUninitializedLocalVariable(SILLocation silLoc,
   if (!loc.value->getType().isAddress()) return;
 
   assert(loc.box && "captured var should have been given a box");
-  B.createDeallocBox(silLoc, loc.value->getType().getObjectType(),
-                     loc.box);
+  B.createDeallocBox(silLoc, loc.box);
 }
 
 namespace {

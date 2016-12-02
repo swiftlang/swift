@@ -4337,15 +4337,8 @@ class DeallocBoxInst :
 {
   friend SILBuilder;
 
-  // TODO: The element type can be derived from a typed box.
-  SILType ElementType;
-
-  DeallocBoxInst(SILDebugLocation DebugLoc, SILType elementType,
-                 SILValue operand)
-      : UnaryInstructionBase(DebugLoc, operand), ElementType(elementType) {}
-
-public:
-  SILType getElementType() const { return ElementType; }
+  DeallocBoxInst(SILDebugLocation DebugLoc, SILValue operand)
+      : UnaryInstructionBase(DebugLoc, operand) {}
 };
 
 /// Deallocate memory allocated for a boxed existential container created by
