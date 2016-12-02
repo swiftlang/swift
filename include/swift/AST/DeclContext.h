@@ -269,12 +269,6 @@ public:
   /// protocol extension.
   ///
   /// Only valid if \c getAsProtocolOrProtocolExtensionContext().
-  GenericTypeParamDecl *getProtocolSelf() const;
-
-  /// \brief Retrieve the generic parameter 'Self' from a protocol or
-  /// protocol extension.
-  ///
-  /// Only valid if \c getAsProtocolOrProtocolExtensionContext().
   GenericTypeParamType *getProtocolSelfType() const;
 
   /// Gets the type being declared by this context.

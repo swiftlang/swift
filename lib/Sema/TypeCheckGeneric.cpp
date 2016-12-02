@@ -488,7 +488,7 @@ static Type getResultType(TypeChecker &TC, FuncDecl *fn, Type resultType) {
 
 /// Determine whether the given type is \c Self, an associated type of \c Self,
 /// or a concrete type.
-static bool isSelfDerivedOrConcrete(Type type) {
+static bool isSelfDerivedOrConcrete(Type protoSelf, Type type) {
   // Check for a concrete type.
   if (!type->hasTypeParameter())
     return true;
@@ -498,8 +498,8 @@ static bool isSelfDerivedOrConcrete(Type type) {
     type = depMem->getBase();
   }
 
-  if (auto gp = type->getAs<GenericTypeParamType>())
-    return gp->getDepth() == 0 && gp->getIndex() == 0;
+  if (type->is<GenericTypeParamType>())
+    return type->isEqual(protoSelf);
 
   return false;
 }
@@ -544,11 +544,12 @@ TypeChecker::validateGenericFuncSignature(AbstractFunctionDecl *func) {
   if (!invalid && func->getGenericParams() &&
       isa<ProtocolDecl>(func->getDeclContext())) {
     auto proto = cast<ProtocolDecl>(func->getDeclContext());
+    auto protoSelf = proto->getSelfInterfaceType();
     for (auto req : sig->getRequirements()) {
       // If one of the types in the requirement is dependent on a non-Self
       // type parameter, this requirement is okay.
-      if (!isSelfDerivedOrConcrete(req.getFirstType()) ||
-          !isSelfDerivedOrConcrete(req.getSecondType()))
+      if (!isSelfDerivedOrConcrete(protoSelf, req.getFirstType()) ||
+          !isSelfDerivedOrConcrete(protoSelf, req.getSecondType()))
         continue;
 
       // The conformance of 'Self' to the protocol is okay.
