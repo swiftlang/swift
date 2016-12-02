@@ -1118,13 +1118,6 @@ void swift::configureImplicitSelf(TypeChecker &tc,
                                   AbstractFunctionDecl *func) {
   auto selfDecl = func->getImplicitSelfDecl();
 
-  // Validate the context.
-  if (auto nominal = dyn_cast<NominalTypeDecl>(func->getDeclContext())) {
-    tc.validateDecl(nominal);
-  } else {
-    tc.validateExtension(cast<ExtensionDecl>(func->getDeclContext()));
-  }
-
   // Compute the type of self.
   Type selfTy = func->computeSelfType();
   assert(selfDecl && selfTy && "Not a method");
