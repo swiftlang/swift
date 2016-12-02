@@ -3278,14 +3278,45 @@ case TypeKind::Id:
   }
 
   case TypeKind::SILBox: {
-    auto storageTy = cast<SILBoxType>(base);
-    Type transBoxed = storageTy->getBoxedType().transform(fn);
-    if (!transBoxed)
-      return Type();
-    CanType canTransBoxed = transBoxed->getCanonicalType();
-    if (canTransBoxed != storageTy->getBoxedType())
-      return SILBoxType::get(canTransBoxed);
-    return storageTy;
+    auto boxTy = cast<SILBoxType>(base);
+    // Nothing to do for an unparameterized box layout.
+    if (boxTy->getGenericArgs().empty())
+      return boxTy;
+    
+    SmallVector<Substitution, 4> transArgs;
+    bool didChange = false;
+    for (auto &arg : boxTy->getGenericArgs()) {
+      auto transReplacement = arg.getReplacement().transform(fn);
+      if (!transReplacement)
+        return Type();
+      auto canReplacement = transReplacement->getCanonicalType();
+      if (canReplacement != CanType(arg.getReplacement())) {
+        // FIXME: We need to update the substitution conformances for the
+        // transformed type in the general case. For now, only handle
+        // transformations between generic types with abstract conformances.
+        assert((arg.getConformances().empty()
+                || (std::all_of(arg.getConformances().begin(),
+                                arg.getConformances().end(),
+                                [](ProtocolConformanceRef conformance) -> bool {
+                                  return conformance.isAbstract();
+                                })
+                    && (canReplacement->is<SubstitutableType>()
+                        || canReplacement->is<DependentMemberType>()
+                        || canReplacement->is<GenericTypeParamType>())))
+               && "transforming concrete conformance not implemented");
+        transArgs.push_back(Substitution(canReplacement,
+                                         arg.getConformances()));
+        didChange = true;
+      } else {
+        transArgs.push_back(arg);
+      }
+    }
+    if (!didChange)
+      return boxTy;
+    
+    return SILBoxType::get(boxTy->getASTContext(),
+                           boxTy->getLayout(),
+                           transArgs);
   }
 
   case TypeKind::SILFunction: {
@@ -3899,4 +3930,54 @@ bool TypeBase::usesNativeReferenceCounting(ResilienceExpansion resilience) {
   }
 
   llvm_unreachable("Unhandled type kind!");
+}
+
+//
+// SILBoxType implementation
+//
+
+void SILBoxType::Profile(llvm::FoldingSetNodeID &id, SILLayout *Layout,
+                         ArrayRef<Substitution> Args) {
+  id.AddPointer(Layout);
+  for (auto &arg : Args) {
+    id.AddPointer(arg.getReplacement().getPointer());
+    for (auto conformance : arg.getConformances())
+      id.AddPointer(conformance.getOpaqueValue());
+  }
+}
+
+SILBoxType::SILBoxType(ASTContext &C,
+                       SILLayout *Layout, ArrayRef<Substitution> Args)
+: TypeBase(TypeKind::SILBox, &C,
+           getRecursivePropertiesFromSubstitutions(Args)),
+  Layout(Layout),
+  NumGenericArgs(Args.size())
+{
+#ifndef NDEBUG
+  // Check that the generic args are reasonable for the box's signature.
+  if (Layout->getGenericSignature())
+    (void)Layout->getGenericSignature()->getSubstitutionMap(Args);
+  for (auto &arg : Args)
+    assert(arg.getReplacement()->isCanonical() &&
+           "box arguments must be canonical types!");
+#endif
+  auto paramsBuf = getTrailingObjects<Substitution>();
+  for (unsigned i = 0; i < NumGenericArgs; ++i)
+    ::new (paramsBuf + i) Substitution(Args[i]);
+}
+
+RecursiveTypeProperties SILBoxType::
+getRecursivePropertiesFromSubstitutions(ArrayRef<Substitution> Params) {
+  RecursiveTypeProperties props;
+  for (auto &param : Params) {
+    props |= param.getReplacement()->getRecursiveProperties();
+  }
+  return props;
+}
+
+/// TODO: Transitional accessor for single-type boxes.
+CanType SILBoxType::getBoxedType() const {
+  assert(getLayout()->getFields().size() == 1
+         && "is not a single-field box");
+  return getFieldLoweredType(0);
 }

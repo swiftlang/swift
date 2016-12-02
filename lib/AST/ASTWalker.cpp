@@ -1562,6 +1562,18 @@ bool Traversal::visitFixedTypeRepr(FixedTypeRepr *T) {
   return false;
 }
 
+bool Traversal::visitSILBoxTypeRepr(SILBoxTypeRepr *T) {
+  for (auto &field : T->getFields()) {
+    if (doIt(field.FieldType))
+      return true;
+  }
+  for (auto &arg : T->getGenericArguments()) {
+    if (doIt(arg))
+      return true;
+  }
+  return false;
+}
+
 Expr *Expr::walk(ASTWalker &walker) {
   return Traversal(walker).doIt(this);
 }

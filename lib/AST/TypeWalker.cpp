@@ -170,8 +170,10 @@ class Traversal : public TypeVisitor<Traversal, bool>
   }
 
   bool visitSILBoxType(SILBoxType *ty) {
-    if (doIt(ty->getBoxedType()))
-      return true;
+    for (auto &arg : ty->getGenericArgs()) {
+      if (doIt(arg.getReplacement()))
+        return true;
+    }
     return false;
   }
 

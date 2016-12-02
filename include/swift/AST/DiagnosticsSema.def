@@ -2840,7 +2840,8 @@ ERROR(unsupported_sil_convention,none,
       "convention '%0' not supported in SIL", (StringRef))
 ERROR(illegal_sil_type,none,
       "type %0 is not a legal SIL value type", (Type))
-
+ERROR(sil_box_arg_mismatch,none,
+      "SIL box type has wrong number of generic arguments for layout", ())
 // SIL Metatypes
 ERROR(sil_metatype_without_repr,none,
       "metatypes in SIL must have @thin, @thick, or @objc_metatype attribute",

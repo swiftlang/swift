@@ -36,19 +36,19 @@ bb0(%0 : $*T):
 sil @tmp2 : $@convention(thin) () -> () {
 bb0:
   %0 = function_ref @tmp : $@convention(thin) <T> () -> (@out T)
-  %1 = alloc_box $@box @thick AnyObject.Type
-  %1a = project_box %1 : $@box @thick AnyObject.Type, 0
-  %2 = alloc_box $@box @objc_metatype AnyObject.Type
-  %2a = project_box %2 : $@box @objc_metatype AnyObject.Type, 0
+  %1 = alloc_box $<τ_0_0> { var τ_0_0 } <@thick AnyObject.Type>
+  %1a = project_box %1 : $<τ_0_0> { var τ_0_0 } <@thick AnyObject.Type>, 0
+  %2 = alloc_box $<τ_0_0> { var τ_0_0 } <@objc_metatype AnyObject.Type>
+  %2a = project_box %2 : $<τ_0_0> { var τ_0_0 } <@objc_metatype AnyObject.Type>, 0
   %4 = apply %0<@thick AnyObject.Type>(%1a) : $@convention(thin) <T> () -> (@out T)
   %5 = apply %0<@objc_metatype AnyObject.Type>(%2a) : $@convention(thin) <T> () -> (@out T)
 
-  %6 = alloc_box $@box @thick Builtin.Int32.Type
-  %6a = project_box %6 : $@box @thick Builtin.Int32.Type, 0
-  %7 = alloc_box $@box @objc_metatype Builtin.Int32.Type
-  %7a = project_box %7 : $@box @objc_metatype Builtin.Int32.Type, 0
-  %8 = alloc_box $@box @thin Builtin.Int32.Type
-  %8a = project_box %8 : $@box @thin Builtin.Int32.Type, 0
+  %6 = alloc_box $<τ_0_0> { var τ_0_0 } <@thick Builtin.Int32.Type>
+  %6a = project_box %6 : $<τ_0_0> { var τ_0_0 } <@thick Builtin.Int32.Type>, 0
+  %7 = alloc_box $<τ_0_0> { var τ_0_0 } <@objc_metatype Builtin.Int32.Type>
+  %7a = project_box %7 : $<τ_0_0> { var τ_0_0 } <@objc_metatype Builtin.Int32.Type>, 0
+  %8 = alloc_box $<τ_0_0> { var τ_0_0 } <@thin Builtin.Int32.Type>
+  %8a = project_box %8 : $<τ_0_0> { var τ_0_0 } <@thin Builtin.Int32.Type>, 0
   %9 = apply %0<@thick Builtin.Int32.Type>(%6a) : $@convention(thin) <T> () -> (@out T)
   %10 = apply %0<@objc_metatype Builtin.Int32.Type>(%7a) : $@convention(thin) <T> () -> (@out T)
   %11 = apply %0<@thin Builtin.Int32.Type>(%8a) : $@convention(thin) <T> () -> (@out T)

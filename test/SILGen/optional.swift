@@ -28,11 +28,11 @@ func testAddrOnlyCallResult<T>(_ f: (() -> T)?) {
 }
 // CHECK-LABEL: sil hidden @{{.*}}testAddrOnlyCallResult{{.*}} : $@convention(thin) <T> (@owned Optional<@callee_owned () -> @out T>) -> ()
 // CHECK:    bb0([[T0:%.*]] : $Optional<@callee_owned () -> @out T>):
-// CHECK: [[F:%.*]] = alloc_box $@box Optional<@callee_owned () -> @out T>, var, name "f"
+// CHECK: [[F:%.*]] = alloc_box $<τ_0_0> { var τ_0_0 } <Optional<@callee_owned () -> @out T>>, var, name "f"
 // CHECK-NEXT: [[PBF:%.*]] = project_box [[F]]
 // CHECK: [[T0_COPY:%.*]] = copy_value [[T0]]
 // CHECK: store [[T0_COPY]] to [init] [[PBF]]
-// CHECK-NEXT: [[X:%.*]] = alloc_box $@box Optional<T>, var, name "x"
+// CHECK-NEXT: [[X:%.*]] = alloc_box $<τ_0_0> { var τ_0_0 } <Optional<T>>, var, name "x"
 // CHECK-NEXT: [[PBX:%.*]] = project_box [[X]]
 // CHECK-NEXT: [[TEMP:%.*]] = init_enum_data_addr [[PBX]]
 //   Check whether 'f' holds a value.

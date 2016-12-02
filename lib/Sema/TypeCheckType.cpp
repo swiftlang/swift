@@ -36,6 +36,8 @@
 #include "llvm/ADT/SmallString.h"
 #include "llvm/ADT/StringSwitch.h"
 #include "llvm/ADT/Twine.h"
+#include "llvm/Support/SaveAndRestore.h"
+
 using namespace swift;
 
 #define DEBUG_TYPE "TypeCheckType"
@@ -1648,6 +1650,8 @@ namespace {
                              TypeResolutionOptions options);
     Type resolveProtocolType(ProtocolTypeRepr *repr,
                              TypeResolutionOptions options);
+    Type resolveSILBoxType(SILBoxTypeRepr *repr,
+                           TypeResolutionOptions options);
 
     Type buildMetatypeType(MetatypeTypeRepr *repr,
                            Type instanceType,
@@ -1729,6 +1733,10 @@ Type TypeResolver::resolveType(TypeRepr *repr, TypeResolutionOptions options) {
       return result;
     }
     return resolveSILFunctionType(cast<FunctionTypeRepr>(repr), options);
+
+  case TypeReprKind::SILBox:
+    assert((options & TR_SILType) && "SILBox repr in non-SIL type context?!");
+    return resolveSILBoxType(cast<SILBoxTypeRepr>(repr), options);
 
   case TypeReprKind::Array:
     return resolveArrayType(cast<ArrayTypeRepr>(repr), options);
@@ -2185,6 +2193,89 @@ Type TypeResolver::resolveASTFunctionType(FunctionTypeRepr *repr,
   return fnTy;
 }
 
+Type TypeResolver::resolveSILBoxType(SILBoxTypeRepr *repr,
+                                     TypeResolutionOptions options) {
+  // Resolve the field types.
+  SmallVector<SILField, 4> fields;
+  {
+    // Resolve field types using the box type's generic environment, if it
+    // has one. (TODO: Field types should never refer to generic parameters
+    // outside the box's own environment; we should really validate that...)
+    Optional<GenericTypeToArchetypeResolver>
+      resolveSILBoxGenericParams;
+    Optional<llvm::SaveAndRestore<GenericTypeResolver*>>
+      useSILBoxGenericEnv;
+    if (auto env = repr->getGenericEnvironment()) {
+      resolveSILBoxGenericParams = GenericTypeToArchetypeResolver(env);
+      useSILBoxGenericEnv.emplace(Resolver, &*resolveSILBoxGenericParams);
+    }
+    
+    for (auto &fieldRepr : repr->getFields()) {
+      auto fieldTy = resolveType(fieldRepr.FieldType, options);
+      fields.push_back({fieldTy->getCanonicalType(), fieldRepr.Mutable});
+    }
+  }
+  
+  // Substitute out parsed context types into interface types.
+  CanGenericSignature genericSig;
+  if (auto *genericEnv = repr->getGenericEnvironment()) {
+    genericSig = repr->getGenericSignature()->getCanonicalSignature();
+    
+    for (auto &field : fields) {
+      auto transTy = genericEnv->mapTypeOutOfContext(DC->getParentModule(),
+                                                     field.getLoweredType());
+      field = {transTy->getCanonicalType(), field.isMutable()};
+    }
+  }
+  
+  // Resolve the generic arguments.
+  // Start by building a TypeSubstitutionMap.
+  SmallVector<Substitution, 4> genericArgs;
+  if (genericSig) {
+    TypeSubstitutionMap genericArgMap;
+    ArrayRef<GenericTypeParamType *> params;
+
+    params = genericSig->getGenericParams();
+    if (repr->getGenericArguments().size() != params.size()) {
+      TC.diagnose(repr->getLoc(), diag::sil_box_arg_mismatch);
+      return ErrorType::get(Context);
+    }
+  
+    for (unsigned i : indices(repr->getGenericArguments())) {
+      auto argTy = resolveType(repr->getGenericArguments()[i], options);
+      genericArgMap.insert({params[i], argTy->getCanonicalType()});
+    }
+    
+    bool ok = true;
+    genericSig->getSubstitutions(*DC->getParentModule(), genericArgMap,
+      [&](CanType depTy, Type replacement, ProtocolType *proto)
+      -> ProtocolConformanceRef {
+        auto result = TC.conformsToProtocol(replacement, proto->getDecl(), DC,
+                                            ConformanceCheckOptions());
+        // TODO: getSubstitutions callback ought to return Optional.
+        if (!result) {
+          ok = false;
+          return ProtocolConformanceRef(proto->getDecl());
+        }
+        
+        return *result;
+      },
+      genericArgs);
+
+    if (!ok)
+      return ErrorType::get(Context);
+    
+    // Canonicalize the replacement types.
+    for (auto &arg : genericArgs) {
+      arg = Substitution(arg.getReplacement()->getCanonicalType(),
+                         arg.getConformances());
+    }
+  }
+  
+  auto layout = SILLayout::get(Context, genericSig, fields);
+  return SILBoxType::get(Context, layout, genericArgs);
+}
+
 Type TypeResolver::resolveSILFunctionType(FunctionTypeRepr *repr,
                                           TypeResolutionOptions options,
                                           SILFunctionType::ExtInfo extInfo,
@@ -2194,45 +2285,63 @@ Type TypeResolver::resolveSILFunctionType(FunctionTypeRepr *repr,
 
   bool hasError = false;
 
+  // Resolve parameter and result types using the function's generic
+  // environment.
   SmallVector<SILParameterInfo, 4> params;
-  if (auto tuple = dyn_cast<TupleTypeRepr>(repr->getArgsTypeRepr())) {
-    // SIL functions cannot be variadic.
-    if (tuple->hasEllipsis()) {
-      TC.diagnose(tuple->getEllipsisLoc(), diag::sil_function_ellipsis);
+  SmallVector<SILResultInfo, 4> results;
+  Optional<SILResultInfo> errorResult;
+  {
+    Optional<GenericTypeToArchetypeResolver>
+      resolveSILFunctionGenericParams;
+    Optional<llvm::SaveAndRestore<GenericTypeResolver*>>
+      useSILFunctionGenericEnv;
+    
+    // Resolve generic params using the function's generic environment, if it
+    // has one.
+    if (auto env = repr->getGenericEnvironment()) {
+      resolveSILFunctionGenericParams = GenericTypeToArchetypeResolver(env);
+      useSILFunctionGenericEnv.emplace(Resolver,
+                                       &*resolveSILFunctionGenericParams);
     }
-    // SIL functions cannot have parameter names.
-    for (auto nameLoc : tuple->getUnderscoreLocs()) {
-      if (nameLoc.isValid())
-        TC.diagnose(nameLoc, diag::sil_function_input_label);
-    }
+    
+    if (auto tuple = dyn_cast<TupleTypeRepr>(repr->getArgsTypeRepr())) {
+      // SIL functions cannot be variadic.
+      if (tuple->hasEllipsis()) {
+        TC.diagnose(tuple->getEllipsisLoc(), diag::sil_function_ellipsis);
+      }
+      // SIL functions cannot have parameter names.
+      for (auto nameLoc : tuple->getUnderscoreLocs()) {
+        if (nameLoc.isValid())
+          TC.diagnose(nameLoc, diag::sil_function_input_label);
+      }
 
-    for (auto elt : tuple->getElements()) {
-      auto param = resolveSILParameter(elt,options | TR_ImmediateFunctionInput);
+      for (auto elt : tuple->getElements()) {
+        auto param = resolveSILParameter(elt,
+                                         options | TR_ImmediateFunctionInput);
+        params.push_back(param);
+        if (!param.getType()) return nullptr;
+
+        if (param.getType()->hasError())
+          hasError = true;
+      }
+    } else {
+      SILParameterInfo param = resolveSILParameter(repr->getArgsTypeRepr(),
+                                           options | TR_ImmediateFunctionInput);
       params.push_back(param);
       if (!param.getType()) return nullptr;
 
       if (param.getType()->hasError())
         hasError = true;
     }
-  } else {
-    SILParameterInfo param = resolveSILParameter(repr->getArgsTypeRepr(),
-                                           options | TR_ImmediateFunctionInput);
-    params.push_back(param);
-    if (!param.getType()) return nullptr;
 
-    if (param.getType()->hasError())
-      hasError = true;
-  }
-
-  SmallVector<SILResultInfo, 4> results;
-  Optional<SILResultInfo> errorResult;
-  {
-    // FIXME: Deal with unsatisfied dependencies.
-    if (resolveSILResults(repr->getResultTypeRepr(), options,
-                          results, errorResult)) {
-      hasError = true;
+    {
+      // FIXME: Deal with unsatisfied dependencies.
+      if (resolveSILResults(repr->getResultTypeRepr(), options,
+                            results, errorResult)) {
+        hasError = true;
+      }
     }
-  }
+  } // restore generic type resolver
 
   if (hasError) {
     return ErrorType::get(Context);

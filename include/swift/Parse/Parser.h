@@ -833,7 +833,8 @@ public:
   
   ParserResult<TypeRepr> parseType();
   ParserResult<TypeRepr> parseType(Diag<> MessageID,
-                                   bool HandleCodeCompletion = true);
+                                   bool HandleCodeCompletion = true,
+                                   bool IsSILFuncDecl = false);
 
   /// \brief Parse any type, but diagnose all types except type-identifier or
   /// type-composition with non-type-identifier.
@@ -864,7 +865,10 @@ public:
   ParserResult<TypeRepr> parseTypeIdentifier();
   ParserResult<TypeRepr> parseOldStyleProtocolComposition();
   ParserResult<CompositionTypeRepr> parseAnyType();
-
+  ParserResult<TypeRepr> parseSILBoxType(GenericParamList *generics,
+                                         const TypeAttributes &attrs,
+                                         Optional<Scope> &GenericsScope);
+  
   ParserResult<TupleTypeRepr> parseTypeTupleBody();
   ParserResult<TypeRepr> parseTypeArray(TypeRepr *Base);
 

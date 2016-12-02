@@ -25,8 +25,8 @@
 //
 //===----------------------------------------------------------------------===//
 
-#include "swift/SIL/SILLayout.h"
-#include "swift/SIL/SILModule.h"
+#include "swift/AST/ASTContext.h"
+#include "swift/AST/SILLayout.h"
 
 using namespace swift;
 
@@ -36,31 +36,6 @@ static bool anyMutable(ArrayRef<SILField> Fields) {
       return true;
   }
   return false;
-}
-
-SILLayout *SILLayout::get(ASTContext &C,
-                          CanGenericSignature Generics,
-                          ArrayRef<SILField> Fields) {
-  // Profile the layout parameters.
-  llvm::FoldingSetNodeID id;
-  Profile(id, Generics, Fields);
-  
-  // Return an existing layout if there is one.
-  void *insertPos;
-  auto *&Layouts = C.getSILLayouts();
-  if (!Layouts)
-    Layouts = new llvm::FoldingSet<SILLayout>;
-  
-  if (auto existing = Layouts->FindNodeOrInsertPos(id, insertPos))
-    return existing;
-  
-  // Allocate a new layout.
-  void *memory = C.Allocate(totalSizeToAlloc<SILField>(Fields.size()),
-                            alignof(SILLayout));
-  
-  auto newLayout = ::new (memory) SILLayout(Generics, Fields);
-  Layouts->InsertNode(newLayout, insertPos);
-  return newLayout;
 }
 
 #ifndef NDEBUG
@@ -101,7 +76,7 @@ SILLayout::SILLayout(CanGenericSignature Sig,
 #endif
   auto FieldsMem = getTrailingObjects<SILField>();
   for (unsigned i : indices(Fields)) {
-    new (FieldsMem) SILField(Fields[i]);
+    new (FieldsMem + i) SILField(Fields[i]);
   }
 }
 

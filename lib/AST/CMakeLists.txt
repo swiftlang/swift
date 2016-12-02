@@ -36,6 +36,7 @@ add_swift_library(swiftAST STATIC
   PrettyStackTrace.cpp
   ProtocolConformance.cpp
   RawComment.cpp
+  SILLayout.cpp
   Stmt.cpp
   SourceEntityWalker.cpp
   Substitution.cpp

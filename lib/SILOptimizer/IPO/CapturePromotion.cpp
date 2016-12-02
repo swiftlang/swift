@@ -364,8 +364,10 @@ computeNewArgInterfaceTypes(SILFunction *F,
     // Perform the proper conversions and then add it to the new parameter list
     // for the type.
     assert(!isIndirectParameter(param.getConvention()));
-    auto paramBoxedTy = param.getSILType().castTo<SILBoxType>()
-      ->getBoxedAddressType();
+    auto paramBoxTy = param.getSILType().castTo<SILBoxType>();
+    assert(paramBoxTy->getLayout()->getFields().size() == 1
+           && "promoting compound box not implemented yet");
+    auto paramBoxedTy = paramBoxTy->getFieldType(0);
     auto &paramTL = F->getModule().Types.getTypeLowering(paramBoxedTy);
     ParameterConvention convention;
     if (paramTL.isPassedIndirectly()) {
@@ -476,8 +478,10 @@ ClosureCloner::populateCloned() {
   while (I != E) {
     if (PromotableIndices.count(ArgNo)) {
       // Handle the case of a promoted capture argument.
-      auto BoxedTy = (*I)->getType().castTo<SILBoxType>()->getBoxedAddressType()
-        .getObjectType();
+      auto BoxTy = (*I)->getType().castTo<SILBoxType>();
+      assert(BoxTy->getLayout()->getFields().size() == 1
+             && "promoting compound box not implemented");
+      auto BoxedTy = BoxTy->getFieldType(0).getObjectType();
       SILValue MappedValue =
           ClonedEntryBB->createArgument(BoxedTy, (*I)->getDecl());
       BoxArgumentMap.insert(std::make_pair(*I, MappedValue));
@@ -786,8 +790,10 @@ examineAllocBoxInst(AllocBoxInst *ABI, ReachabilityInfo &RI,
       // since we currently handle loadable types only.
       // TODO: handle address-only types
       SILModule &M = PAI->getModule();
-      if (BoxArg->getType().castTo<SILBoxType>()->getBoxedAddressType()
-            .isAddressOnly(M))
+      auto BoxTy = BoxArg->getType().castTo<SILBoxType>();
+      assert(BoxTy->getLayout()->getFields().size() == 1
+             && "promoting compound box not implemented yet");
+      if (BoxTy->getFieldType(0).isAddressOnly(M))
         return false;
 
       // Verify that this closure is known not to mutate the captured value; if

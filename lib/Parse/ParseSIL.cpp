@@ -11,6 +11,7 @@
 //===----------------------------------------------------------------------===//
 
 #include "swift/AST/ArchetypeBuilder.h"
+#include "swift/AST/ASTWalker.h"
 #include "swift/AST/GenericEnvironment.h"
 #include "swift/AST/NameLookup.h"
 #include "swift/Basic/Defer.h"
@@ -846,9 +847,9 @@ bool SILParser::parseSILType(SILType &Result,
 
   // If we have a '*', then this is an address type.
   SILValueCategory category = SILValueCategory::Object;
-  if (P.Tok.isAnyOperator() && P.Tok.getText() == "*") {
+  if (P.Tok.isAnyOperator() && P.Tok.getText().startswith("*")) {
     category = SILValueCategory::Address;
-    P.consumeToken();
+    P.consumeStartingCharacterOfCurrentToken();
   }
 
   // Parse attributes.
@@ -863,32 +864,52 @@ bool SILParser::parseSILType(SILType &Result,
     attrs.convention = "thin";
   }
 
-  // If this is part of a function decl, generic parameters are visible in the
-  // function body; otherwise, they are visible when parsing the type.
-  Optional<Scope> GenericsScope;
-  if (!IsFuncDecl)
-    GenericsScope.emplace(&P, ScopeKind::Generics); 
-
-  ParserResult<TypeRepr> TyR = P.parseType(diag::expected_sil_type);
-
-  // Exit the scope introduced for the generic parameters.
-  if (!IsFuncDecl)
-    GenericsScope.reset();
+  ParserResult<TypeRepr> TyR = P.parseType(diag::expected_sil_type,
+                                           /*handleCodeCompletion*/ true,
+                                           /*isSILFuncDecl*/ IsFuncDecl);
 
   if (TyR.isNull())
     return true;
-
-  if (auto fnType = dyn_cast<FunctionTypeRepr>(TyR.get())) {
-    if (auto generics = fnType->getGenericParams()) {
-      GenericEnv = handleSILGenericParams(P.Context, generics, &P.SF);
-      fnType->setGenericEnvironment(GenericEnv);
+  
+  // Resolve the generic environments for parsed generic function and box types.
+  class HandleSILGenericParamsWalker : public ASTWalker {
+    ASTContext &C;
+    SourceFile *SF;
+  public:
+    HandleSILGenericParamsWalker(ASTContext &C,
+                                 SourceFile *SF)
+      : C(C), SF(SF)
+    {}
+    
+    bool walkToTypeReprPre(TypeRepr *T) {
+      if (auto fnType = dyn_cast<FunctionTypeRepr>(T)) {
+        if (auto generics = fnType->getGenericParams()) {
+          auto env = handleSILGenericParams(C, generics, SF);
+          fnType->setGenericEnvironment(env);
+        }
+      }
+      if (auto boxType = dyn_cast<SILBoxTypeRepr>(T)) {
+        if (auto generics = boxType->getGenericParams()) {
+          auto env = handleSILGenericParams(C, generics, SF);
+          boxType->setGenericEnvironment(env);
+        }
+      }
+      return true;
     }
-  }
+  };
+
+  TyR.get()
+    ->walk(HandleSILGenericParamsWalker(P.Context, &P.SF));
+  
+  // Save the top-level function generic environment if there was one.
+  if (auto fnType = dyn_cast<FunctionTypeRepr>(TyR.get()))
+    if (auto env = fnType->getGenericEnvironment())
+      GenericEnv = env;
   
   // Apply attributes to the type.
   TypeLoc Ty = P.applyAttributeToType(TyR.get(), inoutLoc, attrs);
 
-  if (performTypeLocChecking(Ty, /*isSILType=*/true, GenericEnv))
+  if (performTypeLocChecking(Ty, /*isSILType=*/true, nullptr))
     return true;
 
   Result = SILType::getPrimitiveType(Ty.getType()->getCanonicalType(),

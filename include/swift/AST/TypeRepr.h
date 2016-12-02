@@ -859,6 +859,86 @@ private:
   friend class TypeRepr;
 };
 
+/// SIL-only TypeRepr for box types.
+///
+/// Boxes are either concrete: { var Int, let String }
+/// or generic:                <T: Runcible> { var T, let String } <Int>
+class SILBoxTypeRepr : public TypeRepr {
+  GenericParamList *GenericParams;
+  GenericEnvironment *GenericEnv = nullptr;
+
+  SourceLoc LBraceLoc, RBraceLoc;
+  SourceLoc ArgLAngleLoc, ArgRAngleLoc;
+  
+public:
+  struct Field {
+    SourceLoc VarOrLetLoc;
+    bool Mutable;
+    TypeRepr *FieldType;
+  };
+  
+private:
+  ArrayRef<Field> Fields;
+  ArrayRef<TypeRepr *> GenericArgs;
+  
+public:
+  SILBoxTypeRepr(GenericParamList *GenericParams,
+                 SourceLoc LBraceLoc, ArrayRef<Field> Fields,
+                 SourceLoc RBraceLoc,
+                 SourceLoc ArgLAngleLoc, ArrayRef<TypeRepr *> GenericArgs,
+                 SourceLoc ArgRAngleLoc)
+    : TypeRepr(TypeReprKind::SILBox),
+      GenericParams(GenericParams), LBraceLoc(LBraceLoc), RBraceLoc(RBraceLoc),
+      ArgLAngleLoc(ArgLAngleLoc), ArgRAngleLoc(ArgRAngleLoc),
+      Fields(Fields), GenericArgs(GenericArgs)
+  {}  
+  
+  static SILBoxTypeRepr *create(ASTContext &C,
+                      GenericParamList *GenericParams,
+                      SourceLoc LBraceLoc, ArrayRef<Field> Fields,
+                      SourceLoc RBraceLoc,
+                      SourceLoc ArgLAngleLoc, ArrayRef<TypeRepr *> GenericArgs,
+                      SourceLoc ArgRAngleLoc);
+  
+  void setGenericEnvironment(GenericEnvironment *Env) {
+    assert(!GenericEnv);
+    GenericEnv = Env;
+  }
+  
+  ArrayRef<Field> getFields() const {
+    return Fields;
+  }
+  ArrayRef<TypeRepr *> getGenericArguments() const {
+    return GenericArgs;
+  }
+  
+  GenericParamList *getGenericParams() const {
+    return GenericParams;
+  }
+  GenericSignature *getGenericSignature() const {
+    return GenericEnv->getGenericSignature();
+  }
+  GenericEnvironment *getGenericEnvironment() const {
+    return GenericEnv;
+  }
+
+  SourceLoc getLBraceLoc() const { return LBraceLoc; }
+  SourceLoc getRBraceLoc() const { return RBraceLoc; }
+  SourceLoc getArgumentLAngleLoc() const { return ArgLAngleLoc; }
+  SourceLoc getArgumentRAngleLoc() const { return ArgRAngleLoc; }
+
+  static bool classof(const TypeRepr *T) {
+    return T->getKind() == TypeReprKind::SILBox;
+  }
+  static bool classof(const SILBoxTypeRepr *T) { return true; }
+  
+private:
+  SourceLoc getStartLocImpl() const;
+  SourceLoc getEndLocImpl() const;
+  SourceLoc getLocImpl() const;
+  void printImpl(ASTPrinter &Printer, const PrintOptions &Opts) const;
+  friend TypeRepr;
+};
 
 inline bool TypeRepr::isSimple() const {
   switch (getKind()) {
@@ -879,6 +959,7 @@ inline bool TypeRepr::isSimple() const {
   case TypeReprKind::Tuple:
   case TypeReprKind::Fixed:
   case TypeReprKind::Array:
+  case TypeReprKind::SILBox:
     return true;
   }
   llvm_unreachable("bad TypeRepr kind");
