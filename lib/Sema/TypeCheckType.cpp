@@ -211,8 +211,7 @@ Type TypeChecker::resolveTypeInContext(
   // If we found a generic parameter, map to the archetype if there is one.
   if (auto genericParam = dyn_cast<GenericTypeParamDecl>(typeDecl)) {
     return resolver->resolveGenericTypeParamType(
-        genericParam->getDeclaredInterfaceType()
-            ->castTo<GenericTypeParamType>());
+             genericParam->getDeclaredType()->castTo<GenericTypeParamType>());
   }
 
   auto nominalType = dyn_cast<NominalTypeDecl>(typeDecl);
@@ -269,11 +268,8 @@ Type TypeChecker::resolveTypeInContext(
 
       // When a nominal type used outside its context, return the unbound
       // generic form of the type.
-      if (auto *nominalDecl = dyn_cast<NominalTypeDecl>(typeDecl))
-        return nominalDecl->getDeclaredType();
-
-      assert(isa<ModuleDecl>(typeDecl));
-      return typeDecl->getDeclaredInterfaceType();
+      assert(isa<NominalTypeDecl>(typeDecl) || isa<ModuleDecl>(typeDecl));
+      return typeDecl->getDeclaredType();
     }
 
     // For the next steps we need our parentDC to be a type context
@@ -574,7 +570,7 @@ Type TypeChecker::applyUnboundGenericArguments(
     // we resolved a generic TypeAlias, for availability diagnostics.
     // A better fix might be to introduce a BoundGenericAliasType
     // which desugars as appropriate.
-    return SubstitutedType::get(TAD->getAliasType(), type, Context);
+    return SubstitutedType::get(TAD->getDeclaredType(), type, Context);
   }
   
   // Form the bound generic type.
@@ -593,11 +589,8 @@ Type TypeChecker::applyUnboundGenericArguments(
 
     // Check the generic arguments against the generic signature.
     auto genericSig = decl->getGenericSignature();
-    if (!decl->hasInterfaceType() ||
-        decl->isValidatingGenericSignature()) {
-      diagnose(loc, diag::recursive_type_reference,
-               decl->getName());
-      diagnose(noteLoc, diag::type_declared_here);
+    if (!decl->hasType() || decl->isValidatingGenericSignature()) {
+      diagnose(loc, diag::recursive_requirement_reference);
       return nullptr;
     }
 
@@ -664,12 +657,8 @@ static Type resolveTypeDecl(TypeChecker &TC, TypeDecl *typeDecl, SourceLoc loc,
     TC.validateDecl(typeDecl);
 
     // FIXME: More principled handling of circularity.
-    if (!typeDecl->hasInterfaceType()) {
-      TC.diagnose(loc, diag::recursive_type_reference,
-                  typeDecl->getName());
-      TC.diagnose(typeDecl->getLoc(), diag::type_declared_here);
+    if (!isa<AssociatedTypeDecl>(typeDecl) && !typeDecl->hasType())
       return ErrorType::get(TC.Context);
-    }
   }
 
   // Resolve the type declaration to a specific type. How this occurs
@@ -1114,7 +1103,6 @@ static Type resolveNestedIdentTypeComponent(
   // Phase 2: If a declaration has already been bound, use it.
   if (ValueDecl *decl = comp->getBoundDecl()) {
     auto *typeDecl = cast<TypeDecl>(decl);
-    auto *assocType = dyn_cast<AssociatedTypeDecl>(typeDecl);
 
     Type memberType;
 
@@ -1134,18 +1122,18 @@ static Type resolveNestedIdentTypeComponent(
       return memberType;
     }
 
-    if (assocType && !assocType->hasInterfaceType())
-      assocType->computeType();
-
-    if (assocType && !parentTy->is<ArchetypeType>()) {
+    if (isa<AssociatedTypeDecl>(typeDecl) &&
+        !parentTy->is<ArchetypeType>()) {
       assert(!parentTy->isExistentialType());
+
+      auto assocType = cast<AssociatedTypeDecl>(typeDecl);
 
       // Find the conformance and dig out the type witness.
       ConformanceCheckOptions conformanceOptions;
       if (options.contains(TR_InExpression))
         conformanceOptions |= ConformanceCheckFlags::InExpression;
 
-      auto *protocol = assocType->getProtocol();
+      auto *protocol = cast<ProtocolDecl>(assocType->getDeclContext());
       auto conformance = TC.conformsToProtocol(parentTy, protocol, DC,
                                                conformanceOptions);
       if (!conformance || conformance->isAbstract()) {
@@ -2809,8 +2797,8 @@ Type TypeChecker::substMemberTypeWithBase(Module *module,
                                           Type baseTy) {
   // The declared interface type for a generic type will have the type
   // arguments; strip them off.
-  if (auto *nominalDecl = dyn_cast<NominalTypeDecl>(member)) {
-    auto memberType = nominalDecl->getDeclaredType();
+  if (isa<NominalTypeDecl>(member)) {
+    auto memberType = member->getDeclaredType();
 
     if (baseTy->is<ModuleType>())
       return memberType;
@@ -2860,7 +2848,7 @@ static void lookupAndAddLibraryTypes(TypeChecker &TC,
     for (auto *VD : Results) {
       if (auto *TD = dyn_cast<TypeDecl>(VD)) {
         TC.validateDecl(TD);
-        Types.insert(TD->getDeclaredInterfaceType()->getCanonicalType());
+        Types.insert(TD->getDeclaredType()->getCanonicalType());
       }
     }
     Results.clear();
@@ -3453,7 +3441,7 @@ bool TypeChecker::isRepresentableInObjC(const SubscriptDecl *SD,
     return false;
 
   // Figure out the type of the indices.
-  Type IndicesType = SD->getIndicesInterfaceType();
+  Type IndicesType = SD->getIndicesType();
   if (auto TupleTy = IndicesType->getAs<TupleType>()) {
     if (TupleTy->getNumElements() == 1 && !TupleTy->getElement(0).isVararg())
       IndicesType = TupleTy->getElementType(0);
@@ -3465,10 +3453,9 @@ bool TypeChecker::isRepresentableInObjC(const SubscriptDecl *SD,
   bool IndicesResult =
     IndicesType->isRepresentableIn(ForeignLanguage::ObjectiveC,
                                    SD->getDeclContext());
-
-  Type ElementType = SD->getElementInterfaceType();
-  bool ElementResult = ElementType->isRepresentableIn(
-        ForeignLanguage::ObjectiveC, SD->getDeclContext());
+  bool ElementResult =
+    SD->getElementType()->isRepresentableIn(ForeignLanguage::ObjectiveC,
+                                            SD->getDeclContext());
   bool Result = IndicesResult && ElementResult;
 
   if (Result && checkObjCInExtensionContext(*this, SD, Diagnose))
@@ -3496,8 +3483,8 @@ bool TypeChecker::isRepresentableInObjC(const SubscriptDecl *SD,
     .highlight(TypeRange);
 
   diagnoseTypeNotRepresentableInObjC(SD->getDeclContext(),
-                                     !IndicesResult ? IndicesType
-                                                    : ElementType,
+                                     !IndicesResult? IndicesType
+                                                   : SD->getElementType(),
                                      TypeRange);
   describeObjCReason(*this, SD, Reason);
 

@@ -1475,15 +1475,48 @@ bool irgen::requiresObjCMethodDescriptor(ConstructorDecl *constructor) {
 
 bool irgen::requiresObjCPropertyDescriptor(IRGenModule &IGM,
                                            VarDecl *property) {
+  if (!property->isObjC())
+    return false;
+
   // Don't generate a descriptor for a property without any accessors.
   // This is only possible in SIL files because Sema will normally
   // implicitly synthesize accessors for @objc properties.
-  return property->isObjC() && property->getGetter();
+  if (!property->getGetter())
+    return false;
+
+  // Don't expose objc properties for function types we can't bridge.
+  if (auto ft = property->getType()->getAs<AnyFunctionType>())
+    switch (ft->getRepresentation()) {
+    case FunctionType::Representation::Thin:
+      // We can't bridge thin types at all.
+      return false;
+    case FunctionType::Representation::Swift:
+    case FunctionType::Representation::Block:
+    case FunctionType::Representation::CFunctionPointer:
+      return true;
+    }
+  
+  return true;
 }
 
 bool irgen::requiresObjCSubscriptDescriptor(IRGenModule &IGM,
                                             SubscriptDecl *subscript) {
-  return subscript->isObjC();
+  if (!subscript->isObjC())
+    return false;
+  
+  // Don't expose objc properties for function types we can't bridge.
+  if (auto ft = subscript->getElementType()->getAs<AnyFunctionType>())
+    switch (ft->getRepresentation()) {
+    case FunctionType::Representation::Thin:
+      // We can't bridge thin types at all.
+      return false;
+    case FunctionType::Representation::Swift:
+    case FunctionType::Representation::Block:
+    case FunctionType::Representation::CFunctionPointer:
+      return true;
+    }
+  
+  return true;
 }
 
 llvm::Value *IRGenFunction::emitBlockCopyCall(llvm::Value *value) {

@@ -842,21 +842,17 @@ namespace {
     UncurriedCandidate(ValueDecl *decl, unsigned level)
       : declOrExpr(decl), level(level) {
 
-      if (isa<ParamDecl>(decl))
-        entityType = decl->getType();
-      else {
+      if (isa<AbstractFunctionDecl>(decl) || isa<EnumElementDecl>(decl)) {
         entityType = decl->getInterfaceType();
-        auto *DC = decl->getInnermostDeclContext();
         if (auto *GFT = entityType->getAs<GenericFunctionType>()) {
+          auto *DC = decl->getInnermostDeclContext();
           auto *M = DC->getParentModule();
           auto subs = DC->getGenericEnvironmentOfContext()
               ->getForwardingSubstitutions(M);
           entityType = stripSubstitutedTypes(GFT->substGenericArgs(subs));
-        } else {
-          entityType = ArchetypeBuilder::mapTypeIntoContext(
-            DC, entityType);
-          entityType = stripSubstitutedTypes(entityType);
         }
+      } else {
+        entityType = decl->getType();
       }
 
       // For some reason, subscripts and properties don't include their self
@@ -1802,7 +1798,14 @@ suggestPotentialOverloads(SourceLoc loc, bool isResult) {
   // FIXME2: For (T,T) & (Self, Self), emit this as two candidates, one using
   // the LHS and one using the RHS type for T's.
   for (auto cand : candidates) {
-    auto type = isResult ? cand.getResultType() : cand.getArgumentType();
+    Type type;
+
+    if (auto *SD = dyn_cast_or_null<SubscriptDecl>(cand.getDecl())) {
+      type = isResult ? SD->getElementType() : SD->getIndicesType();
+    } else {
+      type = isResult ? cand.getResultType() : cand.getArgumentType();
+    }
+    
     if (type.isNull())
       continue;
     
@@ -6859,10 +6862,8 @@ static void noteArchetypeSource(const TypeLoc &loc, ArchetypeType *archetype,
 
   auto &tc = cs.getTypeChecker();
   if (FoundDecl) {
-    tc.diagnose(FoundDecl, diag::archetype_declared_in_type, archetype,
-                isa<NominalTypeDecl>(FoundDecl)
-                    ? cast<NominalTypeDecl>(FoundDecl)->getDeclaredType()
-                    : FoundDecl->getDeclaredInterfaceType());
+    tc.diagnose(FoundDecl, diag::archetype_declared_in_type,
+                archetype, FoundDecl->getDeclaredType());
   }
 
   if (FoundGenericTypeBase && !isa<GenericIdentTypeRepr>(FoundGenericTypeBase)){

@@ -1331,14 +1331,8 @@ bool swift::fixItOverrideDeclarationTypes(TypeChecker &TC,
              [&](ParamDecl *param, const ParamDecl *baseParam) {
       fixedAny |= fixItOverrideDeclarationTypes(TC, diag, param, baseParam);
     });
-
-    auto resultType = ArchetypeBuilder::mapTypeIntoContext(
-        subscript->getDeclContext(),
-        subscript->getElementInterfaceType());
-    auto baseResultType = ArchetypeBuilder::mapTypeIntoContext(
-        baseSubscript->getDeclContext(),
-        baseSubscript->getElementInterfaceType());
-    fixedAny |= checkType(resultType, baseResultType,
+    fixedAny |= checkType(subscript->getElementType(),
+                          baseSubscript->getElementType(),
                           subscript->getElementTypeLoc().getSourceRange());
     return fixedAny;
   }

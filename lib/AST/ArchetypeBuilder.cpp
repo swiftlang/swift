@@ -935,8 +935,8 @@ auto ArchetypeBuilder::addGenericParameter(GenericTypeParamType *GenericParam,
 
 void ArchetypeBuilder::addGenericParameter(GenericTypeParamDecl *GenericParam) {
   addGenericParameter(
-       GenericParam->getDeclaredInterfaceType()->castTo<GenericTypeParamType>(),
-       GenericParam->getName());
+        GenericParam->getDeclaredType()->castTo<GenericTypeParamType>(),
+        GenericParam->getName());
 }
 
 bool ArchetypeBuilder::addGenericParameterRequirements(GenericTypeParamDecl *GenericParam) {
@@ -1429,9 +1429,18 @@ bool ArchetypeBuilder::addAbstractTypeParamRequirements(
   auto markRecursive = [&](AssociatedTypeDecl *assocType,
                            ProtocolDecl *proto,
                            SourceLoc loc) {
-    if (!pa->isRecursive() && !assocType->isInvalid()) {
+    if (!pa->isRecursive() && !assocType->isRecursive()) {
       Diags.diagnose(assocType->getLoc(),
                      diag::recursive_requirement_reference);
+        
+      // Mark all associatedtypes in this protocol as recursive (and error-type)
+      // to avoid later crashes dealing with this invalid protocol in other
+      // contexts.
+      auto containingProto =
+        assocType->getDeclContext()->getAsProtocolOrProtocolExtensionContext();
+      for (auto member : containingProto->getMembers())
+        if (auto assocType = dyn_cast<AssociatedTypeDecl>(member))
+          assocType->setIsRecursive();
     }
     pa->setIsRecursive();
 
@@ -1444,8 +1453,8 @@ bool ArchetypeBuilder::addAbstractTypeParamRequirements(
   };
 
   if (isa<AssociatedTypeDecl>(decl) &&
-      decl->hasInterfaceType() &&
-      decl->getInterfaceType()->is<ErrorType>())
+      decl->hasType() &&
+      decl->getType()->is<ErrorType>())
     return false;
 
   // If this is an associated type that already has an archetype assigned,

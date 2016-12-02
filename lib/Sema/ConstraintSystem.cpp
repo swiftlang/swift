@@ -1084,11 +1084,8 @@ ConstraintSystem::getTypeOfMemberReference(
     }
 
     // FIXME: Totally bogus fallthrough.
-    Type memberTy = isTypeReference
-        ? assocType->getDeclaredInterfaceType()
-        : assocType->getInterfaceType();
-    memberTy = ArchetypeBuilder::mapTypeIntoContext(
-        assocType->getProtocol(), memberTy);
+    Type memberTy = isTypeReference? assocType->getDeclaredType()
+                                   : assocType->getType();
     auto openedType = FunctionType::get(baseObjTy, memberTy);
     return { openedType, memberTy };
   }
@@ -1134,8 +1131,10 @@ ConstraintSystem::getTypeOfMemberReference(
       // We want to track if the generic context is represented by a
       // class-bound existential so we won't inappropriately wrap the
       // self type in an inout later on.
-      isClassBoundExistential = nominal->getDeclaredType()
-          ->isClassExistentialType();
+      if (auto metatype = nominal->getType()->getAs<AnyMetatypeType>()) {
+        isClassBoundExistential = metatype->getInstanceType()->
+                                            isClassExistentialType();
+      }
 
       if (outerDC->getAsProtocolOrProtocolExtensionContext()) {
         // Retrieve the type variable for 'Self'.

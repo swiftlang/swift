@@ -214,6 +214,13 @@ static bool canInheritClass(Decl *decl) {
   return false;
 }
 
+/// Retrieve the declared type of a type declaration or extension.
+static Type getDeclaredType(Decl *decl) {
+  if (auto typeDecl = dyn_cast<TypeDecl>(decl))
+    return typeDecl->getDeclaredType();
+  return cast<ExtensionDecl>(decl)->getExtendedType();
+}
+
 // Add implicit conformances to the given declaration.
 static void addImplicitConformances(
               TypeChecker &tc, Decl *decl,
@@ -484,10 +491,7 @@ void TypeChecker::checkInheritanceClause(Decl *decl,
                  isa<ExtensionDecl>(decl)
                    ? diag::extension_class_inheritance
                    : diag::non_class_inheritance,
-                 isa<ExtensionDecl>(decl)
-                   ? cast<ExtensionDecl>(decl)->getDeclaredInterfaceType()
-                   : cast<TypeDecl>(decl)->getDeclaredInterfaceType(),
-                 inheritedTy)
+                 getDeclaredType(decl), inheritedTy)
           .highlight(inherited.getSourceRange());
         inherited.setInvalidType(Context);
         continue;
@@ -650,6 +654,7 @@ static void checkCircularity(TypeChecker &tc, T *decl,
                   path.back()->getName().str());
 
       decl->setInvalid();
+      decl->overwriteType(ErrorType::get(tc.Context));
       decl->setInterfaceType(ErrorType::get(tc.Context));
       breakInheritanceCycle(decl);
       break;
@@ -672,6 +677,7 @@ static void checkCircularity(TypeChecker &tc, T *decl,
 
     // Set this declaration as invalid, then break the cycle somehow.
     decl->setInvalid();
+    decl->overwriteType(ErrorType::get(tc.Context));
     decl->setInterfaceType(ErrorType::get(tc.Context));
     breakInheritanceCycle(decl);
     break;
@@ -942,9 +948,7 @@ static void checkRedeclaration(TypeChecker &tc, ValueDecl *current) {
     const auto markInvalid = [&current, &tc]() {
       current->setInvalid();
       if (!isa<AbstractFunctionDecl>(current) &&
-          !isa<EnumElementDecl>(current) &&
-          !isa<SubscriptDecl>(current) &&
-          !isa<TypeDecl>(current))
+          !isa<EnumElementDecl>(current))
         if (current->hasType())
           current->overwriteType(ErrorType::get(tc.Context));
       if (current->hasInterfaceType())
@@ -3745,7 +3749,7 @@ public:
       return;
     }
 
-    if (SD->hasInterfaceType())
+    if (SD->hasType())
       return;
 
     assert(SD->getDeclContext()->isTypeContext() &&
@@ -3760,23 +3764,24 @@ public:
                                            TypeResolutionOptions());
 
     if (isInvalid) {
+      SD->overwriteType(ErrorType::get(TC.Context));
       SD->setInterfaceType(ErrorType::get(TC.Context));
       SD->setInvalid();
     } else {
       // Hack to deal with types already getting set during type validation
       // above.
-      if (SD->hasInterfaceType())
+      if (SD->hasType())
         return;
 
       // Relabel the indices according to the subscript name.
       auto indicesTy = SD->getIndices()->getType(TC.Context);
-      auto elementTy = SD->getElementTypeLoc().getType();
+      SD->setType(FunctionType::get(indicesTy, SD->getElementType()));
 
       // If we're in a generic context, set the interface type.
       auto indicesIfaceTy = ArchetypeBuilder::mapTypeOutOfContext(
                               dc, indicesTy);
       auto elementIfaceTy = ArchetypeBuilder::mapTypeOutOfContext(
-                              dc, elementTy);
+                              dc, SD->getElementType());
       SD->setInterfaceType(FunctionType::get(indicesIfaceTy, elementIfaceTy));
     }
 
@@ -3855,7 +3860,7 @@ public:
     TC.checkDeclAttributesEarly(TAD);
     TC.computeAccessibility(TAD);
     if (!IsSecondPass) {
-      if (!TAD->getAliasType())
+      if (!TAD->hasType())
         TC.validateDecl(TAD);
       
       TypeResolutionOptions options;
@@ -3863,38 +3868,32 @@ public:
         options |= TR_GlobalTypeAlias;
       if (TAD->getFormalAccess() <= Accessibility::FilePrivate)
         options |= TR_KnownNonCascadingDependency;
-
-      bool invalid = false;
+      
       if (TAD->getDeclContext()->isModuleScopeContext()) {
         IterativeTypeChecker ITC(TC);
         ITC.satisfy(requestResolveTypeDecl(TAD));
       } else if (TC.validateType(TAD->getUnderlyingTypeLoc(),
                                  TAD->getDeclContext(), options)) {
         TAD->setInvalid();
+        TAD->overwriteType(ErrorType::get(TC.Context));
         TAD->setInterfaceType(ErrorType::get(TC.Context));
         TAD->getUnderlyingTypeLoc().setInvalidType(TC.Context);
-        invalid = true;
+      }
+
+      // lldb creates global typealiases containing archetypes
+      // sometimes...
+      if (TAD->getType()->getCanonicalType()->hasTypeParameter() ||
+          !TAD->isGenericContext())
+        TAD->setInterfaceType(TAD->getType());
+      else {
+        TAD->setInterfaceType(
+          ArchetypeBuilder::mapTypeOutOfContext(TAD, TAD->getType()));
       }
 
       // We create TypeAliasTypes with invalid underlying types, so we
       // need to propagate recursive properties now.
       TAD->getAliasType()->setRecursiveProperties(
                        TAD->getUnderlyingType()->getRecursiveProperties());
-
-      if (!invalid) {
-        // Map the alias type out of context; if it is not dependent,
-        // we'll keep the sugar.
-        Type interfaceTy = TAD->getAliasType();
-
-        // lldb creates global typealiases containing archetypes
-        // sometimes...
-        if (TAD->getUnderlyingType()->hasArchetype() &&
-            TAD->isGenericContext()) {
-          interfaceTy = ArchetypeBuilder::mapTypeOutOfContext(TAD, interfaceTy);
-        }
-
-        TAD->setInterfaceType(MetatypeType::get(interfaceTy, TC.Context));
-      }
     }
 
     if (IsSecondPass)
@@ -6877,14 +6876,19 @@ void TypeChecker::validateDecl(ValueDecl *D, bool resolveTypeParams) {
   case DeclKind::AssociatedType: {
     auto typeParam = cast<AbstractTypeParamDecl>(D);
     auto assocType = dyn_cast<AssociatedTypeDecl>(typeParam);
-    DeclContext *DC = typeParam->getDeclContext();
+    if (assocType && assocType->isRecursive()) {
+      D->setInvalid();
+      break;
+    }
 
-    if (assocType && !assocType->hasInterfaceType())
-        assocType->computeType();
+    DeclContext *DC = typeParam->getDeclContext();
 
     if (!resolveTypeParams || DC->isValidGenericContext()) {
       if (assocType) {
         DeclChecker(*this, false, false).visitAssociatedTypeDecl(assocType);
+
+        if (!assocType->hasType())
+          assocType->computeType();
       }
 
       break;
@@ -6903,6 +6907,9 @@ void TypeChecker::validateDecl(ValueDecl *D, bool resolveTypeParams) {
     case DeclContextKind::GenericTypeDecl: {
       auto nominal = cast<GenericTypeDecl>(DC);
       validateDecl(nominal);
+      if (auto assocType = dyn_cast<AssociatedTypeDecl>(typeParam))
+        if (!assocType->hasType())
+          assocType->computeType();
       if (!typeParam->hasAccessibility())
         typeParam->setAccessibility(std::max(nominal->getFormalAccess(),
                                              Accessibility::Internal));
@@ -6922,7 +6929,9 @@ void TypeChecker::validateDecl(ValueDecl *D, bool resolveTypeParams) {
         typeCheckDecl(extension, true);
       auto fn = cast<AbstractFunctionDecl>(DC);
       typeCheckDecl(fn, true);
-      assert(!assocType && "Associated type inside function?");
+      if (auto assocType = dyn_cast<AssociatedTypeDecl>(typeParam))
+        if (!assocType->hasType())
+          assocType->computeType();
       if (!typeParam->hasAccessibility())
         typeParam->setAccessibility(std::max(fn->getFormalAccess(),
                                              Accessibility::Internal));
@@ -6938,7 +6947,7 @@ void TypeChecker::validateDecl(ValueDecl *D, bool resolveTypeParams) {
     auto typeAlias = cast<TypeAliasDecl>(D);
     
     // Compute the declared type.
-    if (typeAlias->getAliasType()) {
+    if (typeAlias->hasType()) {
       
       // If we have are recursing into validation and already have a type set...
       // but also don't have the underlying type computed, then we are
@@ -6949,6 +6958,7 @@ void TypeChecker::validateDecl(ValueDecl *D, bool resolveTypeParams) {
                  typeAlias->getName());
         typeAlias->getUnderlyingTypeLoc().setInvalidType(Context);
         typeAlias->setInvalid();
+        typeAlias->overwriteType(ErrorType::get(Context));
         typeAlias->setInterfaceType(ErrorType::get(Context));
       }
       return;
@@ -6972,7 +6982,7 @@ void TypeChecker::validateDecl(ValueDecl *D, bool resolveTypeParams) {
   case DeclKind::Struct:
   case DeclKind::Class: {
     auto nominal = cast<NominalTypeDecl>(D);
-    if (nominal->hasInterfaceType())
+    if (nominal->hasType())
       return;
     nominal->computeType();
 
@@ -7013,7 +7023,7 @@ void TypeChecker::validateDecl(ValueDecl *D, bool resolveTypeParams) {
 
   case DeclKind::Protocol: {
     auto proto = cast<ProtocolDecl>(D);
-    if (proto->hasInterfaceType())
+    if (proto->hasType())
       return;
     proto->computeType();
 
@@ -7043,7 +7053,7 @@ void TypeChecker::validateDecl(ValueDecl *D, bool resolveTypeParams) {
     // appropriate archetype.
     for (auto member : proto->getMembers()) {
       if (auto assocType = dyn_cast<AssociatedTypeDecl>(member)) {
-        if (!assocType->hasInterfaceType())
+        if (!assocType->hasType())
           assocType->computeType();
       }
     }

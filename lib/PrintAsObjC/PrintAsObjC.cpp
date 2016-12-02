@@ -927,7 +927,7 @@ private:
           UnqualifiedLookup lookup(ctx.getIdentifier("NSCopying"), M, nullptr);
           auto type = lookup.getSingleTypeResult();
           if (type && isa<ProtocolDecl>(type)) {
-            NSCopyingType = type->getDeclaredInterfaceType();
+            NSCopyingType = type->getDeclaredType();
           } else {
             NSCopyingType = Type();
           }

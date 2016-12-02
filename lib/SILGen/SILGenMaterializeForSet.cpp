@@ -403,7 +403,7 @@ void MaterializeForSetEmitter::emit(SILGenFunction &gen) {
   // If there's an abstraction difference, we always need to use the
   // get/set pattern.
   AccessStrategy strategy;
-  if (WitnessStorage->getInterfaceType()->is<ReferenceStorageType>() ||
+  if (WitnessStorage->getType()->is<ReferenceStorageType>() ||
       (RequirementStorageType != WitnessStorageType)) {
     strategy = AccessStrategy::DispatchToAccessor;
   } else {

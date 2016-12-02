@@ -113,9 +113,9 @@ static CanType getKnownType(Optional<CanType> &cacheSlot, ASTContext &C,
       if (!typeDecl)
         return CanType();
 
-      assert(typeDecl->hasInterfaceType() &&
+      assert(typeDecl->getDeclaredType() &&
              "bridged type must be type-checked");
-      return typeDecl->getDeclaredInterfaceType()->getCanonicalType();
+      return typeDecl->getDeclaredType()->getCanonicalType();
     })();
   }
   CanType t = *cacheSlot;

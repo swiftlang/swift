@@ -63,8 +63,8 @@ static CanType getNamedSwiftType(Module *stdlib, StringRef name) {
   // that's a real thing.
   if (results.size() == 1) {
     if (auto typeDecl = dyn_cast<TypeDecl>(results[0]))
-      if (typeDecl->hasInterfaceType())
-        return typeDecl->getDeclaredInterfaceType()->getCanonicalType();
+      if (typeDecl->hasType())
+        return typeDecl->getDeclaredType()->getCanonicalType();
   }
   return CanType();
 }
@@ -177,8 +177,7 @@ clang::CanQualType
 GenClangType::convertMemberType(NominalTypeDecl *DC, StringRef memberName) {
   auto memberTypeDecl = cast<TypeDecl>(
     DC->lookupDirect(IGM.Context.getIdentifier(memberName))[0]);
-  auto memberType = memberTypeDecl->getDeclaredInterfaceType()
-      ->getCanonicalType();
+  auto memberType = memberTypeDecl->getDeclaredType()->getCanonicalType();
   return Converter.convert(IGM, memberType);
 }
 

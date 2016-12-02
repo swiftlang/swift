@@ -81,7 +81,7 @@ ProtocolDecl *TypeChecker::getProtocol(SourceLoc loc, KnownProtocolKind kind) {
              Context.getIdentifier(getProtocolName(kind)));
   }
 
-  if (protocol && !protocol->hasInterfaceType()) {
+  if (protocol && !protocol->hasType()) {
     validateDecl(protocol);
     if (protocol->isInvalid())
       return nullptr;
@@ -247,7 +247,7 @@ Type TypeChecker::lookupBoolType(const DeclContext *dc) {
         return Type();
       }
 
-      auto tyDecl = dyn_cast<NominalTypeDecl>(results.front());
+      auto tyDecl = dyn_cast<TypeDecl>(results.front());
       if (!tyDecl) {
         diagnose(SourceLoc(), diag::broken_bool);
         return Type();

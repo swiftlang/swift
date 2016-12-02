@@ -319,11 +319,7 @@ emitRValueForDecl(SILLocation loc, ConcreteDeclRef declRef, Type ncRefType,
   // If this is a decl that we have an lvalue for, produce and return it.
   ValueDecl *decl = declRef.getDecl();
   
-  if (!ncRefType) {
-    ncRefType = ArchetypeBuilder::mapTypeIntoContext(
-        decl->getInnermostDeclContext(),
-        decl->getInterfaceType());
-  }
+  if (!ncRefType) ncRefType = decl->getType();
   CanType refType = ncRefType->getCanonicalType();
 
   auto getUnmanagedRValue = [&](SILValue value) -> RValue {
@@ -339,7 +335,7 @@ emitRValueForDecl(SILLocation loc, ConcreteDeclRef declRef, Type ncRefType,
 
   // If this is a reference to a type, produce a metatype.
   if (isa<TypeDecl>(decl)) {
-    assert(refType->is<MetatypeType>() &&
+    assert(decl->getType()->is<MetatypeType>() &&
            "type declref does not have metatype type?!");
     return getUnmanagedRValue(B.createMetatype(loc, getLoweredType(refType)));
   }
@@ -2364,8 +2360,8 @@ static bool mayLieAboutNonOptionalReturn(SILModule &M,
   // Subscripts of non-optional reference type that were imported from
   // Objective-C.
   if (auto subscript = dyn_cast<SubscriptDecl>(decl)) {
-    assert((subscript->getElementInterfaceType()->hasTypeParameter()
-            || isVerbatimNullableTypeInC(M, subscript->getElementInterfaceType()))
+    assert((isVerbatimNullableTypeInC(M, subscript->getElementType())
+            || subscript->getElementType()->hasArchetype())
            && "subscript's result type is not nullable?!");
     return subscript->hasClangNode();
   }

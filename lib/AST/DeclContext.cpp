@@ -125,8 +125,7 @@ GenericTypeParamType *DeclContext::getProtocolSelfType() const {
   auto *param = getProtocolSelf();
   if (!param)
     return nullptr;
-  return param->getDeclaredInterfaceType()
-      ->castTo<GenericTypeParamType>();
+  return param->getDeclaredType()->castTo<GenericTypeParamType>();
 }
 
 enum class DeclTypeKind : unsigned {
@@ -764,7 +763,7 @@ unsigned DeclContext::printContext(raw_ostream &OS, unsigned indent) const {
   case DeclContextKind::SubscriptDecl: {
     auto *SD = cast<SubscriptDecl>(this);
     OS << " name=" << SD->getName();
-    if (SD->hasInterfaceType())
+    if (SD->hasType())
       OS << " : " << SD->getType();
     else
       OS << " : (no type set)";
