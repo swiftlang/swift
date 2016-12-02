@@ -124,12 +124,16 @@ public:
 
   bool test(unsigned ID) const {
     assert(ID / BITWORD_SIZE < NumBitWords && "block ID out-of-bounds");
-    return Bits[ID / BITWORD_SIZE] & (1L << (ID % BITWORD_SIZE));
+    unsigned int modulus = ID % BITWORD_SIZE;
+    long shifted = 1L << modulus;
+    return Bits[ID / BITWORD_SIZE] & shifted;
   }
 
   void set(unsigned ID) {
+    unsigned int modulus = ID % BITWORD_SIZE;
+    long shifted = 1L << modulus;
     assert(ID / BITWORD_SIZE < NumBitWords && "block ID out-of-bounds");
-    Bits[ID / BITWORD_SIZE] |= 1L << (ID % BITWORD_SIZE);
+    Bits[ID / BITWORD_SIZE] |= shifted;
   }
 
   ReachingBlockSet &operator|=(const ReachingBlockSet &RHS) {

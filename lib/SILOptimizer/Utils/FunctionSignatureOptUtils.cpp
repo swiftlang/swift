@@ -62,6 +62,8 @@ static bool isSpecializableRepresentation(SILFunctionTypeRepresentation Rep) {
   case SILFunctionTypeRepresentation::Block:
     return false;
   }
+
+  llvm_unreachable("Unhandled SILFunctionTypeRepresentation in switch.");
 }
 
 /// Returns true if F is a function which the pass know show to specialize

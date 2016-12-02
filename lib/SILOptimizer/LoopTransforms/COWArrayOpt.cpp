@@ -491,6 +491,8 @@ static bool isNonMutatingArraySemanticCall(SILInstruction *Inst) {
   case ArrayCallKind::kArrayUninitialized:
     return false;
   }
+
+  llvm_unreachable("Unhandled ArrayCallKind in switch.");
 }
 
 /// \return true if the given retain instruction is followed by a release on the
@@ -825,6 +827,8 @@ static bool mayChangeArrayValueToNonUniqueState(ArraySemanticsCall &Call) {
   case ArrayCallKind::kArrayUninitialized:
     return true;
   }
+
+  llvm_unreachable("Unhandled ArrayCallKind in switch.");
 }
 
 /// Check that the array value stored in \p ArrayStruct is released by \Inst.

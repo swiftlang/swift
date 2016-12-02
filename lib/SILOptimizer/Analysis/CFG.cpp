@@ -35,6 +35,8 @@ static bool isSafeNonExitTerminator(TermInst *TI) {
   case TermKind::TryApplyInst:
     return false;
   }
+
+  llvm_unreachable("Unhandled TermKind in switch.");
 }
 
 static bool isTrapNoReturnFunction(ApplyInst *AI) {
