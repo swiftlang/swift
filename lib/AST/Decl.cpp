@@ -3959,12 +3959,19 @@ static Type getSelfTypeForContainer(AbstractFunctionDecl *theMethod,
                                     bool isInitializingCtor,
                                     bool wantInterfaceType) {
   auto *dc = theMethod->getDeclContext();
+  auto &Ctx = dc->getASTContext();
   
   // Determine the type of the container.
-  Type containerTy = wantInterfaceType ? dc->getDeclaredInterfaceType()
+  auto containerTy = wantInterfaceType ? dc->getDeclaredInterfaceType()
                                        : dc->getDeclaredTypeInContext();
-  if (!containerTy)
-    return ErrorType::get(dc->getASTContext());
+  if (!containerTy || containerTy->hasError())
+    return ErrorType::get(Ctx);
+
+  // Determine the type of 'self' inside the container.
+  auto selfTy = wantInterfaceType ? dc->getSelfInterfaceType()
+                                  : dc->getSelfTypeInContext();
+  if (!selfTy || selfTy->hasError())
+    return ErrorType::get(Ctx);
 
   bool isStatic = false;
   bool isMutating = false;
@@ -3977,8 +3984,9 @@ static Type getSelfTypeForContainer(AbstractFunctionDecl *theMethod,
     // The non-interface type of a method that returns DynamicSelf
     // uses DynamicSelf for the type of 'self', which is important
     // when type checking the body of the function.
-    if (!wantInterfaceType)
-      selfTypeOverride = FD->getDynamicSelf();
+    if (!wantInterfaceType && FD->hasDynamicSelf()) {
+      selfTy = DynamicSelfType::get(selfTy, Ctx);
+    }
   } else if (isa<ConstructorDecl>(theMethod)) {
     if (isInitializingCtor) {
       // initializing constructors of value types always have an implicitly
@@ -3993,37 +4001,19 @@ static Type getSelfTypeForContainer(AbstractFunctionDecl *theMethod,
     isMutating = true;
   }
 
-  Type selfTy = selfTypeOverride;
-  if (!selfTy) {
-    // For a protocol, the type of 'self' is the parameter type 'Self', not
-    // the protocol itself.
-    if (containerTy->is<ProtocolType>()) {
-      if (wantInterfaceType)
-        selfTy = dc->getSelfInterfaceType();
-      else
-        selfTy = dc->getSelfTypeInContext();
-    } else
-      selfTy = containerTy;
-  }
-
-  // If the self type couldn't be computed, or is the result of an
-  // upstream error, return an error type.
-  if (!selfTy || selfTy->hasError())
-    return ErrorType::get(dc->getASTContext());
-
   // 'static' functions have 'self' of type metatype<T>.
   if (isStatic)
-    return MetatypeType::get(selfTy, dc->getASTContext());
-  
+    return MetatypeType::get(selfTy, Ctx);
+
   // Reference types have 'self' of type T.
   if (containerTy->hasReferenceSemantics())
     return selfTy;
-  
+
   // Mutating methods are always passed inout so we can receive the side
   // effect.
   if (isMutating)
     return InOutType::get(selfTy);
-  
+
   // Nonmutating methods on structs and enums pass the receiver by value.
   return selfTy;
 }
@@ -4528,23 +4518,6 @@ void DestructorDecl::setSelfDecl(ParamDecl *selfDecl) {
   } else {
     SelfParameter = nullptr;
   }
-}
-
-
-DynamicSelfType *FuncDecl::getDynamicSelf() const {
-  if (!hasDynamicSelf())
-    return nullptr;
-
-  return DynamicSelfType::get(getDeclContext()->getSelfTypeInContext(),
-                              getASTContext());
-}
-
-DynamicSelfType *FuncDecl::getDynamicSelfInterface() const {
-  if (!hasDynamicSelf())
-    return nullptr;
-
-  return DynamicSelfType::get(getDeclContext()->getSelfInterfaceType(),
-                              getASTContext());
 }
 
 SourceRange FuncDecl::getSourceRange() const {

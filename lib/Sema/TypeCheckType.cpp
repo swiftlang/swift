@@ -939,7 +939,9 @@ resolveTopLevelIdentTypeComponent(TypeChecker &TC, DeclContext *DC,
     // The issue is though that ComponentIdentTypeRepr only accepts a ValueDecl
     // while the 'Self' type is more than just a reference to a TypeDecl.
 
-    return func->getDynamicSelf();
+    return DynamicSelfType::get(
+        func->getDeclContext()->getSelfTypeInContext(),
+        TC.Context);
   }
 
   // For lookups within the generic signature, look at the generic
