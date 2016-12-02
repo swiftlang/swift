@@ -4616,6 +4616,7 @@ public:
     if (!selfNominal) return;
 
     // Check the parameters for a reference to 'Self'.
+    auto genericEnv = FD->getGenericEnvironment();
     bool isProtocol = isa<ProtocolDecl>(selfNominal);
     for (auto param : *FD->getParameterList(1)) {
       auto paramType = param->getType();
@@ -4623,7 +4624,10 @@ public:
 
       // Look through 'inout'.
       paramType = paramType->getInOutObjectType();
-
+      if (genericEnv) {
+        paramType = genericEnv->mapTypeOutOfContext(FD->getModuleContext(),
+                                                    paramType);
+      }
       // Look through a metatype reference, if there is one.
       if (auto metatypeType = paramType->getAs<AnyMetatypeType>())
         paramType = metatypeType->getInstanceType();
@@ -4635,11 +4639,6 @@ public:
         // For a protocol, is it the 'Self' type parameter?
         if (auto genericParam = paramType->getAs<GenericTypeParamType>())
           if (genericParam->isEqual(DC->getSelfInterfaceType()))
-            return;
-
-        // ... or the 'Self' archetype?
-        if (auto archetype = paramType->getAs<ArchetypeType>())
-          if (archetype->isEqual(DC->getSelfTypeInContext()))
             return;
       }
     }

@@ -1331,13 +1331,7 @@ void TypeChecker::completePropertyBehaviorParameter(VarDecl *VD,
   // Borrow the parameters from the requirement declaration.
   SmallVector<ParameterList *, 2> ParamLists;
   if (DC->isTypeContext()) {
-    auto self = new (Context) ParamDecl(/*let*/ true, SourceLoc(), SourceLoc(),
-                                        Identifier(), SourceLoc(),
-                                        Context.Id_self,
-                                        DC->getSelfTypeInContext(), DC);
-    self->setInterfaceType(DC->getSelfInterfaceType());
-    self->setImplicit();
-    
+    auto self = ParamDecl::createSelf(SourceLoc(), DC);    
     ParamLists.push_back(ParameterList::create(Context, SourceLoc(),
                                                self, SourceLoc()));
     ParamLists.back()->get(0)->setImplicit();
