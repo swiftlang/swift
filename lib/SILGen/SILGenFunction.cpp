@@ -518,9 +518,9 @@ void SILGenFunction::emitArtificialTopLevel(ClassDecl *mainClass) {
     // we're getting away with it because the types are guaranteed to already
     // be imported.
     ASTContext &ctx = getASTContext();
-    DeclContext *UIKit = ctx.getLoadedModule(ctx.getIdentifier("UIKit"));
+    ModuleDecl *UIKit = ctx.getLoadedModule(ctx.getIdentifier("UIKit"));
     SmallVector<ValueDecl *, 1> results;
-    UIKit->lookupQualified(UIKit->getDeclaredInterfaceType(),
+    UIKit->lookupQualified(UIKit->getInterfaceType(),
                            ctx.getIdentifier("UIApplicationMain"),
                            NL_QualifiedDefault,
                            /*resolver*/nullptr,
