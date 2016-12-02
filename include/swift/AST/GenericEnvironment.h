@@ -22,6 +22,7 @@
 #include "swift/AST/GenericSignature.h"
 #include "llvm/ADT/ArrayRef.h"
 #include "llvm/Support/TrailingObjects.h"
+#include <utility>
 
 namespace swift {
 
@@ -34,14 +35,33 @@ class SILType;
 /// Describes the mapping between archetypes and interface types for the
 /// generic parameters of a DeclContext.
 class alignas(1 << DeclAlignInBits) GenericEnvironment final
-                  : private llvm::TrailingObjects<GenericEnvironment, Type> {
+        : private llvm::TrailingObjects<GenericEnvironment, Type,
+                                        std::pair<ArchetypeType *,
+                                                  GenericTypeParamType *>> {
   GenericSignature *Signature;
   ArchetypeBuilder *Builder;
-  TypeSubstitutionMap ArchetypeToInterfaceMap;
+
+  // The number of generic type parameter -> context type mappings we have
+  // recorded so far. This saturates at the number of generic type parameters,
+  // at which point the archetype-to-interface trailing array is sorted.
+  unsigned NumMappingsRecorded : 16;
+
+  // The number of archetype-to-interface type mappings. This is always <=
+  // \c NumMappingsRecorded.
+  unsigned NumArchetypeToInterfaceMappings : 16;
 
   friend TrailingObjects;
 
+  /// An entry in the array mapping from archetypes to their corresponding
+  /// generic type parameters.
+  typedef std::pair<ArchetypeType *, GenericTypeParamType *>
+                                                    ArchetypeToInterfaceMapping;
+
   size_t numTrailingObjects(OverloadToken<Type>) const {
+    return Signature->getGenericParams().size();
+  }
+
+  size_t numTrailingObjects(OverloadToken<ArchetypeToInterfaceMapping>) const {
     return Signature->getGenericParams().size();
   }
 
@@ -59,6 +79,30 @@ class alignas(1 << DeclAlignInBits) GenericEnvironment final
   ArrayRef<Type> getContextTypes() const {
     return ArrayRef<Type>(getTrailingObjects<Type>(),
                           Signature->getGenericParams().size());
+  }
+
+  /// Retrieve the active set of archetype-to-interface mappings.
+  ArrayRef<ArchetypeToInterfaceMapping>
+                                getActiveArchetypeToInterfaceMappings() const {
+    return { getTrailingObjects<ArchetypeToInterfaceMapping>(),
+             NumArchetypeToInterfaceMappings };
+  }
+
+  /// Retrieve the active set of archetype-to-interface mappings.
+  MutableArrayRef<ArchetypeToInterfaceMapping>
+                                      getActiveArchetypeToInterfaceMappings() {
+    return { getTrailingObjects<ArchetypeToInterfaceMapping>(),
+             NumArchetypeToInterfaceMappings };
+  }
+
+  /// Retrieve the buffer for the archetype-to-interface mappings.
+  ///
+  /// Only the first \c NumArchetypeToInterfaceMappings elements in the buffer
+  /// are valid.
+  MutableArrayRef<ArchetypeToInterfaceMapping>
+                                      getArchetypeToInterfaceMappingsBuffer() {
+    return { getTrailingObjects<ArchetypeToInterfaceMapping>(),
+             Signature->getGenericParams().size() };
   }
 
   GenericEnvironment(GenericSignature *signature,
@@ -83,7 +127,20 @@ class alignas(1 << DeclAlignInBits) GenericEnvironment final
     Type operator()(SubstitutableType *type) const;
   };
   friend class QueryInterfaceTypeSubstitutions;
-  
+
+  /// Query function suitable for use as a \c TypeSubstitutionFn that queries
+  /// the mapping of archetypes back to interface types.
+  class QueryArchetypeToInterfaceSubstitutions {
+    const GenericEnvironment *self;
+
+  public:
+    QueryArchetypeToInterfaceSubstitutions(const GenericEnvironment *self)
+      : self(self) { }
+
+    Type operator()(SubstitutableType *type) const;
+  };
+  friend class QueryArchetypeToInterfaceSubstitutions;
+
 public:
   GenericSignature *getGenericSignature() const {
     return Signature;
