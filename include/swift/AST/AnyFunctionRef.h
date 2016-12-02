@@ -76,14 +76,6 @@ public:
 
   Type getType() const {
     if (auto *AFD = TheFunction.dyn_cast<AbstractFunctionDecl *>())
-      return AFD->getType();
-    return TheFunction.get<AbstractClosureExpr *>()->getType();
-  }
-
-  /// FIXME: This should just be getType() when interface types take over in
-  /// the AST.
-  Type getInterfaceType() const {
-    if (auto *AFD = TheFunction.dyn_cast<AbstractFunctionDecl *>())
       return AFD->getInterfaceType();
     return TheFunction.get<AbstractClosureExpr *>()->getType();
   }

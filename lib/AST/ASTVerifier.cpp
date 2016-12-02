@@ -2410,13 +2410,6 @@ struct ASTNodeBase {};
       abort();
     }
 
-    void checkIsTypeOfRValue(ValueDecl *D, Type rvalueType, const char *what) {
-      auto declType = D->getType();
-      if (auto refType = declType->getAs<ReferenceStorageType>())
-        declType = refType->getReferentType();
-      checkSameType(declType, rvalueType, what);
-    }
-
     void checkSameType(Type T0, Type T1, const char *what) {
       if (T0->getCanonicalType() == T1->getCanonicalType())
         return;

@@ -842,8 +842,8 @@ namespace {
     UncurriedCandidate(ValueDecl *decl, unsigned level)
       : declOrExpr(decl), level(level) {
 
-      if (isa<ParamDecl>(decl))
-        entityType = decl->getType();
+      if (auto *PD = dyn_cast<ParamDecl>(decl))
+        entityType = PD->getType();
       else {
         entityType = decl->getInterfaceType();
         auto *DC = decl->getInnermostDeclContext();
@@ -1202,7 +1202,7 @@ static bool findGenericSubstitutions(DeclContext *dc, Type paramType,
     
     bool mismatch(SubstitutableType *paramType, TypeBase *argType) {
       Type type = paramType;
-      if (dc && dc->getGenericParamsOfContext() && type->isTypeParameter())
+      if (dc && dc->isGenericContext() && type->isTypeParameter())
         type = ArchetypeBuilder::mapTypeIntoContext(dc, paramType);
       
       if (auto archetype = type->getAs<ArchetypeType>()) {
@@ -1339,7 +1339,7 @@ CalleeCandidateInfo::evaluateCloseness(DeclContext *dc, Type candArgListType,
         matchType.findIf([&](Type type) -> bool {
           if (auto substitution = dyn_cast<SubstitutedType>(type.getPointer())) {
             Type original = substitution->getOriginal();
-            if (dc && dc->getGenericParamsOfContext() && original->isTypeParameter())
+            if (dc && dc->isGenericContext() && original->isTypeParameter())
               original = ArchetypeBuilder::mapTypeIntoContext(dc, original);
             
             Type replacement = substitution->getReplacementType();
@@ -3157,7 +3157,8 @@ namespace {
             for (auto P : *CE->getParameters())
               if (P->hasType()) {
                 TS->ParamDeclTypes[P] = P->getType();
-                P->overwriteType(Type());
+                P->setType(Type());
+                P->setInterfaceType(Type());
                 TS->PossiblyInvalidDecls.insert(P);
                 
                 if (P->isInvalid())
@@ -3218,7 +3219,7 @@ namespace {
         patternElt.first->setType(patternElt.second);
       
       for (auto paramDeclElt : ParamDeclTypes) {
-        paramDeclElt.first->overwriteType(paramDeclElt.second);
+        paramDeclElt.first->setType(paramDeclElt.second);
         paramDeclElt.first->setInterfaceType(Type());
       }
       
@@ -3227,7 +3228,7 @@ namespace {
       
       if (!PossiblyInvalidDecls.empty())
         for (auto D : PossiblyInvalidDecls)
-          D->setInvalid(D->getType()->hasError());
+          D->setInvalid(D->getInterfaceType()->hasError());
       
       // Done, don't do redundant work on destruction.
       ExprTypes.clear();
@@ -3267,7 +3268,7 @@ namespace {
 
       if (!PossiblyInvalidDecls.empty())
         for (auto D : PossiblyInvalidDecls)
-          D->setInvalid(D->getType()->hasError());
+          D->setInvalid(D->getInterfaceType()->hasError());
     }
   };
 }
@@ -3522,7 +3523,7 @@ typeCheckArbitrarySubExprIndependently(Expr *subExpr, TCCOptions options) {
       auto VD = param;
       if (VD->getType()->hasTypeVariable() || VD->getType()->hasError() ||
           VD->getType()->getCanonicalType()->hasError())
-        VD->overwriteType(CS->getASTContext().TheUnresolvedType);
+        VD->setType(CS->getASTContext().TheUnresolvedType);
     }
   }
 
@@ -6287,7 +6288,7 @@ bool FailureDiagnosis::visitClosureExpr(ClosureExpr *CE) {
     for (auto VD : *CE->getParameters()) {
       if (VD->getType()->hasTypeVariable() || VD->getType()->hasError() ||
           VD->getType()->getCanonicalType()->hasError())
-        VD->overwriteType(CS->getASTContext().TheUnresolvedType);
+        VD->setType(CS->getASTContext().TheUnresolvedType);
     }
   }
 

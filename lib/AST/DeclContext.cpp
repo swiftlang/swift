@@ -765,7 +765,7 @@ unsigned DeclContext::printContext(raw_ostream &OS, unsigned indent) const {
     auto *SD = cast<SubscriptDecl>(this);
     OS << " name=" << SD->getName();
     if (SD->hasInterfaceType())
-      OS << " : " << SD->getType();
+      OS << " : " << SD->getInterfaceType();
     else
       OS << " : (no type set)";
     break;

@@ -763,8 +763,11 @@ static CanSILFunctionType getSILFunctionType(SILModule &M,
       }
 
       auto *VD = capture.getDecl();
-      auto type = ArchetypeBuilder::mapTypeOutOfContext(
-          function->getAsDeclContext(), VD->getType());
+      auto type = VD->getInterfaceType();
+      // FIXME: Interface types for parameters
+      if (type->hasArchetype())
+        type = ArchetypeBuilder::mapTypeOutOfContext(
+            function->getAsDeclContext(), type);
       auto canType = getCanonicalType(type);
 
       auto &loweredTL = Types.getTypeLowering(

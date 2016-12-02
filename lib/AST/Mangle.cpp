@@ -1109,7 +1109,7 @@ void Mangler::mangleType(Type type, unsigned uncurryLevel) {
         SmallVector<const void *, 4> SortedSubsts(Substitutions.size());
         for (auto S : Substitutions) SortedSubsts[S.second] = S.first;
         for (auto S : SortedSubsts) ContextMangler.addSubstitution(S);
-        while (DC && DC->getGenericParamsOfContext()) {
+        while (DC && DC->isGenericContext()) {
           if (DC->isInnermostContextGeneric() &&
               DC->getGenericParamsOfContext()->getDepth() == GTPT->getDepth())
             break;

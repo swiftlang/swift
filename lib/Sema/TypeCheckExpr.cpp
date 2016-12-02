@@ -498,7 +498,7 @@ Type TypeChecker::getTypeOfRValue(ValueDecl *value, bool wantInterfaceType) {
   if (wantInterfaceType)
     type = value->getInterfaceType();
   else
-    type = value->getType();
+    type = cast<VarDecl>(value)->getType();
 
   // Uses of inout argument values are lvalues.
   if (auto iot = type->getAs<InOutType>())

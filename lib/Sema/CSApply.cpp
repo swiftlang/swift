@@ -2196,9 +2196,10 @@ namespace {
       // Find the overload choice used for this declaration reference.
       auto selected = getOverloadChoiceIfAvailable(locator);
       if (!selected.hasValue()) {
-        assert(expr->getDecl()->getType()->is<UnresolvedType>() &&
+        auto *varDecl = cast<VarDecl>(expr->getDecl());
+        assert(varDecl->getType()->is<UnresolvedType>() &&
                "should only happen for closure arguments in CSDiags");
-        expr->setType(expr->getDecl()->getType());
+        expr->setType(varDecl->getType());
         return expr;
       }
       

@@ -805,10 +805,10 @@ bool TypeChecker::typeCheckParameterList(ParameterList *PL, DeclContext *DC,
     }
     
     if (param->isInvalid()) {
-      param->overwriteType(ErrorType::get(Context));
+      param->setType(ErrorType::get(Context));
       hadError = true;
     } else
-      param->overwriteType(type);
+      param->setType(type);
     
     checkTypeModifyingDeclAttributes(param);
     if (param->getType()->is<InOutType>()) {
@@ -881,9 +881,7 @@ bool TypeChecker::typeCheckPattern(Pattern *P, DeclContext *dc,
     P->setType(ErrorType::get(Context));
     if (auto named = dyn_cast<NamedPattern>(P)) {
       if (auto var = named->getDecl()) {
-        var->setInvalid();
-        var->overwriteType(ErrorType::get(Context));
-        var->setInterfaceType(ErrorType::get(Context));
+        var->markInvalid();
       }
     }
     return true;
@@ -1061,7 +1059,7 @@ bool TypeChecker::coercePatternToType(Pattern *&P, DeclContext *dc, Type type,
     if (!hadError) {
       if (!type->isEqual(TP->getType()) && !type->hasError()) {
         if (options & TR_OverrideType) {
-          TP->overwriteType(type);
+          TP->setType(type);
         } else {
           diagnose(P->getLoc(), diag::pattern_type_mismatch_context, type);
           hadError = true;
@@ -1086,7 +1084,7 @@ bool TypeChecker::coercePatternToType(Pattern *&P, DeclContext *dc, Type type,
     VarDecl *var = NP->getDecl();
     if (var->isInvalid())
       type = ErrorType::get(Context);
-    var->overwriteType(type);
+    var->setType(type);
     if (type->hasTypeParameter())
       var->setInterfaceType(type);
     else
@@ -1550,7 +1548,7 @@ bool TypeChecker::coerceParameterListToType(ParameterList *P, ClosureExpr *CE,
       // Coerce explicitly specified argument type to contextual type
       // only if both types are valid and do not match.
       if (!hadError && isValidType(ty) && !ty->isEqual(paramType))
-        param->overwriteType(ty);
+        param->setType(ty);
     }
 
     if (!ty->isMaterializable()) {
@@ -1566,7 +1564,7 @@ bool TypeChecker::coerceParameterListToType(ParameterList *P, ClosureExpr *CE,
     // trying to coerce argument to contextual type would mean erasing
     // valuable diagnostic information.
     if (isValidType(ty) || shouldOverwriteParam(param))
-      param->overwriteType(ty);
+      param->setType(ty);
     
     checkTypeModifyingDeclAttributes(param);
     return hadError;

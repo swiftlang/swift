@@ -514,13 +514,10 @@ namespace {
       if (GenericTypeDecl *GTD = dyn_cast<GenericTypeDecl>(VD))
         printGenericParameters(OS, GTD->getGenericParams());
 
-      if (!isa<AbstractFunctionDecl>(VD) &&
-          !isa<EnumElementDecl>(VD) &&
-          !isa<SubscriptDecl>(VD) &&
-          !isa<TypeDecl>(VD)) {
+      if (auto *var = dyn_cast<VarDecl>(VD)) {
         OS << " type='";
-        if (VD->hasType())
-          VD->getType().print(OS);
+        if (var->hasType())
+          var->getType().print(OS);
         else
           OS << "<null type>";
         OS << '\'';
