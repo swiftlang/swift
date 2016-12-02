@@ -311,7 +311,7 @@ printFullContextPrefix(ImportedName name,
 
   // Now, let's print out the parent
   assert(newDeclContextNamed && "should of been set");
-  auto parentName = Impl.importFullName(newDeclContextNamed);
+  auto parentName = Impl.importFullName(newDeclContextNamed, name.version);
   printFullContextPrefix(parentName, os, Impl);
   os << parentName.Imported << ".";
 }
@@ -796,6 +796,10 @@ static StringRef determineSwiftNewtypeBaseName(StringRef baseName,
   return baseName;
 }
 
+static bool useSwift2Name(ImportNameOptions options) {
+  return options.contains(ImportNameFlags::Swift2Name);
+}
+
 EffectiveClangContext
 NameImporter::determineEffectiveContext(const clang::NamedDecl *decl,
                                         const clang::DeclContext *dc,
@@ -1096,6 +1100,23 @@ static bool suppressFactoryMethodAsInit(const clang::ObjCMethodDecl *method,
           initKind == CtorInitializerKind::ConvenienceFactory);
 }
 
+static ImportNameVersion mapOptionsToVersion(ImportNameOptions options) {
+  switch (options.toRaw()) {
+  case 0x3:
+    return ImportNameVersion::Raw;
+  case (int)ImportNameFlags::Swift2Name:
+    return ImportNameVersion::Swift2;
+  case (int)ImportNameFlags::SuppressFactoryMethodAsInit:
+    assert(0 && "current name without init was never a valid name");
+    return ImportNameVersion::Raw;
+  case 0:
+    return ImportNameVersion::Swift3;
+  default:
+    assert(0 && "unknown options");
+    return ImportNameVersion::Raw;
+  }
+}
+
 ImportedName NameImporter::importNameImpl(const clang::NamedDecl *D,
                                           ImportNameOptions options) {
   ImportedName result;
@@ -1136,7 +1157,8 @@ ImportedName NameImporter::importNameImpl(const clang::NamedDecl *D,
     SmallVector<const clang::ObjCMethodDecl *, 4> overriddenMethods;
     method->getOverriddenMethods(overriddenMethods);
     for (auto overridden : overriddenMethods) {
-      const auto overriddenName = importName(overridden, options);
+      const auto overriddenName =
+          importName(overridden, mapOptionsToVersion(options));
       if (overriddenName.Imported)
         overriddenNames.push_back({overridden, overriddenName});
     }
@@ -1168,7 +1190,8 @@ ImportedName NameImporter::importNameImpl(const clang::NamedDecl *D,
         if (!knownProperties.insert(overriddenProperty).second)
           continue;
 
-        const auto overriddenName = importName(overriddenProperty, options);
+        const auto overriddenName =
+            importName(overriddenProperty, mapOptionsToVersion(options));
         if (overriddenName.Imported)
           overriddenNames.push_back({overriddenProperty, overriddenName});
       }
@@ -1642,16 +1665,36 @@ NameImporter::importMacroName(const clang::IdentifierInfo *clangIdentifier,
   return swiftCtx.getIdentifier(name);
 }
 
-/// Determine the Swift name for a clang decl
+/// Map version to options
+static ImportNameOptions mapVersionToOptions(ImportNameVersion version) {
+  switch (version) {
+  case ImportNameVersion::Raw:
+    return ImportNameOptions(0x3);
+  case ImportNameVersion::Swift2:
+    return ImportNameOptions(ImportNameFlags::Swift2Name);
+
+  case ImportNameVersion::Swift3:
+    return None;
+  case ImportNameVersion::Swift4:
+    return None;
+  }
+}
+
+static int mapVersionToIndex(ImportNameVersion version) {
+  return int(version);
+}
+
 ImportedName NameImporter::importName(const clang::NamedDecl *decl,
-                                      ImportNameOptions options) {
-  CacheKeyType key(decl, options.toRaw());
+                                      ImportNameVersion version) {
+  auto options = mapVersionToOptions(version);
+  CacheKeyType key(decl, (unsigned)version);
   if (importNameCache.count(key)) {
     ++ImportNameNumCacheHits;
     return importNameCache[key];
   }
   ++ImportNameNumCacheMisses;
   auto res = importNameImpl(decl, options);
+  res.version = version;
   importNameCache[key] = res;
   return res;
 }

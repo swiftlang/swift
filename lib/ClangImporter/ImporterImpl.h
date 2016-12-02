@@ -628,10 +628,9 @@ public:
   /// so it should not be used when referencing Clang symbols.
   ///
   /// \param D The Clang declaration whose name should be imported.
-  importer::ImportedName
-  importFullName(const clang::NamedDecl *D,
-                 importer::ImportNameOptions options = None) {
-    return getNameImporter().importName(D, options);
+  importer::ImportedName importFullName(const clang::NamedDecl *D,
+                                        importer::ImportNameVersion version) {
+    return getNameImporter().importName(D, version);
   }
 
   /// Print an imported name as a string suitable for the swift_name attribute,

@@ -1672,12 +1672,12 @@ namespace {
       if (useSwift2Name) {
         // First, import based on the Swift 3 name. If that fails, we won't
         // do anything.
-        swift3Name = Impl.importFullName(D, None);
+        swift3Name = Impl.importFullName(D, ImportNameVersion::Swift3);
         if (!*swift3Name) return *swift3Name;
 
         // Import using the Swift 2 name. If that fails, or if it's identical
         // to the Swift name, we won't introduce a Swift 2 stub declaration.
-        auto swift2Name = Impl.importFullName(D, ImportNameFlags::Swift2Name);
+        auto swift2Name = Impl.importFullName(D, ImportNameVersion::Swift2);
         if (!swift2Name || swift2Name.Imported == swift3Name->Imported)
           return ImportedName();
 
@@ -1687,7 +1687,7 @@ namespace {
 
       // Just import the Swift 2 name.
       swift3Name = None;
-      return Impl.importFullName(D, None);
+      return Impl.importFullName(D, ImportNameVersion::Swift3);
     }
 
     /// \brief Create a declaration name for anonymous enums, unions and
@@ -3234,10 +3234,7 @@ namespace {
 
       // Directly ask the NameImporter for the non-init variant of the Swift 2
       // name.
-      auto rawOptions =
-          ImportNameOptions(ImportNameFlags::SuppressFactoryMethodAsInit) |
-          ImportNameFlags::Swift2Name;
-      auto rawName = Impl.importFullName(decl, rawOptions);
+      auto rawName = Impl.importFullName(decl, ImportNameVersion::Raw);
       if (!rawName)
         return result;
 
@@ -6245,7 +6242,7 @@ getSwiftNameFromClangName(StringRef replacement) {
   if (!clangDecl)
     return "";
 
-  auto importedName = importFullName(clangDecl, None);
+  auto importedName = importFullName(clangDecl, ImportNameVersion::Swift3);
   if (!importedName)
     return "";
 
@@ -7270,6 +7267,7 @@ ClangImporter::Implementation::getSpecialTypedefKind(clang::TypedefNameDecl *dec
 
 Identifier
 ClangImporter::getEnumConstantName(const clang::EnumConstantDecl *enumConstant){
-  return Impl.importFullName(enumConstant).Imported.getBaseName();
+  return Impl.importFullName(enumConstant, ImportNameVersion::Swift3)
+      .Imported.getBaseName();
 }
 

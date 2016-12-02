@@ -54,12 +54,31 @@ enum class ImportedAccessorKind {
   SubscriptSetter,
 };
 
+/// The name version
+enum class ImportNameVersion : unsigned {
+  /// Names as they appear in C/ObjC
+  Raw = 0,
+
+  /// Names as they appeared in Swift 2 family
+  Swift2,
+
+  /// Names as they appeared in Swift 3 family
+  Swift3,
+
+  /// Names as they appeared in Swift 4 family
+  Swift4,
+};
+enum { NumImportNameVersions = 4 };
+
 /// Describes a name that was imported from Clang.
 struct ImportedName {
   // TODO: pare down in conjunction with ImportName refactoring
 
   /// The imported name.
   DeclName Imported;
+
+  /// The version of Swift this name corresponds to
+  ImportNameVersion version;
 
   /// Whether this name was explicitly specified via a Clang
   /// swift_name attribute.
@@ -168,7 +187,7 @@ class NameImporter {
 
   // TODO: remove when we drop the options (i.e. import all names)
   using CacheKeyType =
-      llvm::PointerIntPair<const clang::NamedDecl *, NumImportNameFlags>;
+      std::pair<const clang::NamedDecl *, unsigned>;
 
   /// Cache for repeated calls
   llvm::DenseMap<CacheKeyType, ImportedName> importNameCache;
@@ -180,9 +199,9 @@ public:
         enumInfos(swiftCtx, clangSema.getPreprocessor()),
         inferImportAsMember(inferIAM) {}
 
-  /// Determine the Swift name for a clang decl
+  /// Determine the Swift name for a Clang decl
   ImportedName importName(const clang::NamedDecl *decl,
-                          ImportNameOptions options);
+                          ImportNameVersion version);
 
   /// Imports the name of the given Clang macro into Swift.
   Identifier importMacroName(const clang::IdentifierInfo *clangIdentifier,
@@ -216,10 +235,6 @@ public:
 
 private:
   bool enableObjCInterop() const { return swiftCtx.LangOpts.EnableObjCInterop; }
-
-  bool useSwift2Name(ImportNameOptions options) const {
-    return options.contains(ImportNameFlags::Swift2Name);
-  }
 
   /// Look for a method that will import to have the same name as the
   /// given method after importing the Nth parameter as an elided error
