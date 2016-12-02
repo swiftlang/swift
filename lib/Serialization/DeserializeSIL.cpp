@@ -804,7 +804,6 @@ bool SILDeserializer::readSILInstruction(SILFunction *Fn, SILBasicBlock *BB,
                     getSILType(MF->getType(TyID2),                             \
                                (SILValueCategory)TyCategory2)));               \
     break;
-  ONETYPE_ONEOPERAND_INST(DeallocBox)
   ONETYPE_ONEOPERAND_INST(ValueMetatype)
   ONETYPE_ONEOPERAND_INST(ExistentialMetatype)
   ONETYPE_ONEOPERAND_INST(AllocValueBuffer)
@@ -812,6 +811,15 @@ bool SILDeserializer::readSILInstruction(SILFunction *Fn, SILBasicBlock *BB,
   ONETYPE_ONEOPERAND_INST(ProjectExistentialBox)
   ONETYPE_ONEOPERAND_INST(DeallocValueBuffer)
 #undef ONETYPE_ONEOPERAND_INST
+  case ValueKind::DeallocBoxInst:
+    assert(RecordKind == SIL_ONE_TYPE_ONE_OPERAND &&
+           "Layout should be OneTypeOneOperand.");
+    ResultVal = Builder.createDeallocBox(Loc,
+                  getLocalValue(ValID,
+                    getSILType(MF->getType(TyID2),
+                               (SILValueCategory)TyCategory2)));
+    break;
+
 #define ONEOPERAND_ONETYPE_INST(ID)           \
   case ValueKind::ID##Inst:                   \
     assert(RecordKind == SIL_ONE_TYPE_ONE_OPERAND &&       \
