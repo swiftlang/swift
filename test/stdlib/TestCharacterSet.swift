@@ -298,8 +298,8 @@ CharacterSetTests.test("test_hasMember") { TestCharacterSet().test_hasMember() }
 CharacterSetTests.test("test_bitmap") { TestCharacterSet().test_bitmap() }
 CharacterSetTests.test("test_supersetOfEmptySet") { TestCharacterSet().test_supersetOfEmptySet() }
 CharacterSetTests.test("test_supersetOfEmptySet") { TestCharacterSet().test_subsetOfEmptySet() }
-CharacterSetTests.test("test_supersetOfEmptySet") { TestCharacterSet().test_resilienceBugForSupersetOfEmptySet()() }
-CharacterSetTests.test("test_supersetOfEmptySet") { TestCharacterSet().test_resilienceBugForSubsetOfEmptySet()() }
+CharacterSetTests.test("test_supersetOfEmptySet") { TestCharacterSet().test_resilienceBugForSupersetOfEmptySet() }
+CharacterSetTests.test("test_supersetOfEmptySet") { TestCharacterSet().test_resilienceBugForSubsetOfEmptySet() }
 runAllTests()
 #endif
 
