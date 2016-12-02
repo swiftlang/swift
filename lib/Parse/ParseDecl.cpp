@@ -2264,8 +2264,11 @@ ParserStatus Parser::parseDecl(ParseDeclOptions Flags,
       break;
     case tok::kw_case: {
       llvm::SmallVector<Decl *, 4> Entries;
-      Status = parseDeclEnumCase(Flags, Attributes, Entries);
+      DeclResult = parseDeclEnumCase(Flags, Attributes, Entries);
+      Status = DeclResult;
       std::for_each(Entries.begin(), Entries.end(), InternalHandler);
+      if (auto *D = DeclResult.getPtrOrNull())
+        markWasHandled(D);
       break;
     }
     case tok::kw_struct:
@@ -4980,9 +4983,10 @@ ParserResult<EnumDecl> Parser::parseDeclEnum(ParseDeclOptions Flags,
 ///   decl-enum-element:
 ///      'case' attribute-list enum-case (',' enum-case)*
 /// \endverbatim
-ParserStatus Parser::parseDeclEnumCase(ParseDeclOptions Flags,
-                                       DeclAttributes &Attributes,
-                                       llvm::SmallVectorImpl<Decl *> &Decls) {
+ParserResult<EnumCaseDecl>
+Parser::parseDeclEnumCase(ParseDeclOptions Flags,
+                          DeclAttributes &Attributes,
+                          llvm::SmallVectorImpl<Decl *> &Decls) {
   ParserStatus Status;
   SourceLoc CaseLoc = consumeToken(tok::kw_case);
 
@@ -5139,7 +5143,7 @@ ParserStatus Parser::parseDeclEnumCase(ParseDeclOptions Flags,
   
   // Insert the element decls.
   std::copy(Elements.begin(), Elements.end(), std::back_inserter(Decls));
-  return Status;
+  return makeParserResult(Status, TheCase);
 }
 
 /// \brief Parse a 'struct' declaration, returning true (and doing no token
