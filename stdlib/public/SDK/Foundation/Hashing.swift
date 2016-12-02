@@ -19,4 +19,4 @@ internal func __CFHashInt(_ i: Int) -> CFHashCode
 internal func __CFHashDouble(_ d: Double) -> CFHashCode
 
 @_silgen_name("CFHashBytes")
-internal func CFHashBytes(_ bytes: UnsafeMutablePointer<UInt8>, _ length: Int) -> CFHashCode
+internal func CFHashBytes(_ bytes: UnsafeMutablePointer<UInt8>?, _ length: Int) -> CFHashCode
