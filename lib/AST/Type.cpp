@@ -1044,6 +1044,37 @@ int ProtocolType::compareProtocols(ProtocolDecl * const* PP1,
   return P1->getName().str().compare(P2->getName().str());
 }
 
+bool ProtocolType::visitAllProtocols(
+                                 ArrayRef<ProtocolDecl *> protocols,
+                                 llvm::function_ref<bool(ProtocolDecl *)> fn) {
+  SmallVector<ProtocolDecl *, 4> stack;
+  SmallPtrSet<ProtocolDecl *, 4> knownProtocols;
+
+  // Prepopulate the stack.
+  for (auto proto : protocols) {
+    if (knownProtocols.insert(proto).second)
+      stack.push_back(proto);
+  }
+  std::reverse(stack.begin(), stack.end());
+
+  while (!stack.empty()) {
+    auto proto = stack.back();
+    stack.pop_back();
+
+    // Visit this protocol.
+    if (fn(proto))
+      return true;
+
+    // Add inherited protocols that we haven't seen already.
+    for (auto inherited : proto->getInheritedProtocols(nullptr)) {
+      if (knownProtocols.insert(inherited).second)
+        stack.push_back(inherited);
+    }
+  }
+
+  return false;
+}
+
 void ProtocolType::canonicalizeProtocols(
        SmallVectorImpl<ProtocolDecl *> &protocols) {
   llvm::SmallDenseMap<ProtocolDecl *, unsigned> known;
@@ -2468,6 +2499,62 @@ Type TupleType::getVarArgsBaseType() const {
 }
 
 
+ArchetypeType::ArchetypeType(
+  const ASTContext &Ctx,
+  llvm::PointerUnion<ArchetypeType *, GenericEnvironment *> ParentOrGenericEnv,
+  llvm::PointerUnion<AssociatedTypeDecl *, Identifier> AssocTypeOrName,
+  ArrayRef<ProtocolDecl *> ConformsTo,
+  Type Superclass)
+    : SubstitutableType(TypeKind::Archetype, &Ctx,
+                        RecursiveTypeProperties::HasArchetype),
+      AssocTypeOrName(AssocTypeOrName) {
+  // Record the parent/generic environment.
+  if (auto parent = ParentOrGenericEnv.dyn_cast<ArchetypeType *>()) {
+    ParentOrOpenedOrEnvironment = parent;
+  } else {
+    ParentOrOpenedOrEnvironment =
+      ParentOrGenericEnv.get<GenericEnvironment *>();
+  }
+
+  // Set up the bits we need for trailing objects to work.
+  ArchetypeTypeBits.ExpandedNestedTypes = false;
+  ArchetypeTypeBits.HasSuperclass = static_cast<bool>(Superclass);
+  ArchetypeTypeBits.NumProtocols = ConformsTo.size();
+
+  // Record the superclass.
+  if (Superclass)
+    *getTrailingObjects<Type>() = Superclass;
+
+  // Copy the protocols.
+  std::uninitialized_copy(ConformsTo.begin(), ConformsTo.end(),
+                          getTrailingObjects<ProtocolDecl *>());
+}
+
+ArchetypeType::ArchetypeType(const ASTContext &Ctx, Type Existential,
+                             ArrayRef<ProtocolDecl *> ConformsTo,
+                             Type Superclass, UUID uuid)
+  : SubstitutableType(TypeKind::Archetype, &Ctx,
+                      RecursiveTypeProperties(
+                        RecursiveTypeProperties::HasArchetype |
+                        RecursiveTypeProperties::HasOpenedExistential)),
+    ParentOrOpenedOrEnvironment(Existential.getPointer()) {
+  // Set up the bits we need for trailing objects to work.
+  ArchetypeTypeBits.ExpandedNestedTypes = false;
+  ArchetypeTypeBits.HasSuperclass = static_cast<bool>(Superclass);
+  ArchetypeTypeBits.NumProtocols = ConformsTo.size();
+
+  // Record the superclass.
+  if (Superclass)
+    *getTrailingObjects<Type>() = Superclass;
+
+  // Copy the protocols.
+  std::uninitialized_copy(ConformsTo.begin(), ConformsTo.end(),
+                          getTrailingObjects<ProtocolDecl *>());
+
+  // Record the UUID.
+  *getTrailingObjects<UUID>() = uuid;
+}
+
 CanArchetypeType ArchetypeType::getNew(
                                    const ASTContext &Ctx,
                                    ArchetypeType *Parent,
@@ -2478,10 +2565,14 @@ CanArchetypeType ArchetypeType::getNew(
   ProtocolType::canonicalizeProtocols(ConformsTo);
 
   auto arena = AllocationArena::Permanent;
-  return CanArchetypeType(
-           new (Ctx, arena) ArchetypeType(Ctx, Parent, AssocType,
-                                          Ctx.AllocateCopy(ConformsTo),
-                                          Superclass));
+  void *mem = Ctx.Allocate(
+                totalSizeToAlloc<ProtocolDecl *, Type, UUID>(ConformsTo.size(),
+                                                             Superclass ? 1 : 0,
+                                                             0),
+                alignof(ArchetypeType), arena);
+
+  return CanArchetypeType(new (mem) ArchetypeType(Ctx, Parent, AssocType,
+                                                  ConformsTo, Superclass));
 }
 
 CanArchetypeType
@@ -2494,14 +2585,18 @@ ArchetypeType::getNew(const ASTContext &Ctx,
   ProtocolType::canonicalizeProtocols(ConformsTo);
 
   auto arena = AllocationArena::Permanent;
-  return CanArchetypeType(
-           new (Ctx, arena) ArchetypeType(Ctx, genericEnvironment, Name,
-                                          Ctx.AllocateCopy(ConformsTo),
-                                          Superclass));
+  void *mem = Ctx.Allocate(
+                totalSizeToAlloc<ProtocolDecl *, Type, UUID>(ConformsTo.size(),
+                                                             Superclass ? 1 : 0,
+                                                             0),
+                alignof(ArchetypeType), arena);
+
+  return CanArchetypeType(new (mem) ArchetypeType(Ctx, genericEnvironment, Name,
+                                                  ConformsTo, Superclass));
 }
 
 bool ArchetypeType::requiresClass() const {
-  if (Superclass)
+  if (ArchetypeTypeBits.HasSuperclass)
     return true;
   for (ProtocolDecl *conformed : getConformsTo())
     if (conformed->requiresClass())
@@ -2534,7 +2629,32 @@ namespace {
   };
 }
 
+void ArchetypeType::populateNestedTypes() const {
+  if (ArchetypeTypeBits.ExpandedNestedTypes) return;
+
+  // Collect the set of nested types of this archetype.
+  SmallVector<std::pair<Identifier, NestedType>, 4> nestedTypes;
+  llvm::SmallPtrSet<Identifier, 4> knownNestedTypes;
+  ProtocolType::visitAllProtocols(getConformsTo(),
+                                  [&](ProtocolDecl *proto) -> bool {
+    for (auto member : proto->getMembers()) {
+      if (auto assocType = dyn_cast<AssociatedTypeDecl>(member)) {
+        if (knownNestedTypes.insert(assocType->getName()).second)
+          nestedTypes.push_back({ assocType->getName(), NestedType() });
+      }
+    }
+
+    return false;
+  });
+
+  // Record the nested types.
+  auto mutableThis = const_cast<ArchetypeType *>(this);
+  mutableThis->setNestedTypes(mutableThis->getASTContext(), nestedTypes);
+}
+
 ArchetypeType::NestedType ArchetypeType::getNestedType(Identifier Name) const {
+  populateNestedTypes();
+
   auto Pos = std::lower_bound(NestedTypes.begin(), NestedTypes.end(), Name,
                               OrderArchetypeByName());
   if (Pos == NestedTypes.end() || Pos->first != Name) {
@@ -2553,6 +2673,8 @@ ArchetypeType::NestedType ArchetypeType::getNestedType(Identifier Name) const {
 
 Optional<ArchetypeType::NestedType> ArchetypeType::getNestedTypeIfKnown(
                                                         Identifier Name) const {
+  populateNestedTypes();
+
   auto Pos = std::lower_bound(NestedTypes.begin(), NestedTypes.end(), Name,
                               OrderArchetypeByName());
   if (Pos == NestedTypes.end() || Pos->first != Name || !Pos->second)
@@ -2562,6 +2684,8 @@ Optional<ArchetypeType::NestedType> ArchetypeType::getNestedTypeIfKnown(
 }
 
 bool ArchetypeType::hasNestedType(Identifier Name) const {
+  populateNestedTypes();
+
   auto Pos = std::lower_bound(NestedTypes.begin(), NestedTypes.end(), Name,
                               OrderArchetypeByName());
   return Pos != NestedTypes.end() && Pos->first == Name;
@@ -2569,6 +2693,8 @@ bool ArchetypeType::hasNestedType(Identifier Name) const {
 
 ArrayRef<std::pair<Identifier, ArchetypeType::NestedType>>
 ArchetypeType::getAllNestedTypes(bool resolveTypes) const {
+  populateNestedTypes();
+
   if (resolveTypes) {
     for (auto &nested : NestedTypes) {
       if (!nested.second)
@@ -2581,12 +2707,16 @@ ArchetypeType::getAllNestedTypes(bool resolveTypes) const {
 
 void ArchetypeType::setNestedTypes(
        ASTContext &Ctx,
-       MutableArrayRef<std::pair<Identifier, NestedType>> Nested) {
-  std::sort(Nested.begin(), Nested.end(), OrderArchetypeByName());
+       ArrayRef<std::pair<Identifier, NestedType>> Nested) {
+  assert(!ArchetypeTypeBits.ExpandedNestedTypes && "Already expanded");
   NestedTypes = Ctx.AllocateCopy(Nested);
+  std::sort(NestedTypes.begin(), NestedTypes.end(), OrderArchetypeByName());
+  ArchetypeTypeBits.ExpandedNestedTypes = true;
 }
 
 void ArchetypeType::registerNestedType(Identifier name, NestedType nested) {
+  populateNestedTypes();
+
   auto found = std::lower_bound(NestedTypes.begin(), NestedTypes.end(), name,
                                 OrderArchetypeByName());
   assert(found != NestedTypes.end() && found->first == name &&

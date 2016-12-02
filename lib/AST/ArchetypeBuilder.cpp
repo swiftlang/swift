@@ -752,30 +752,6 @@ ArchetypeBuilder::PotentialArchetype::getTypeInContext(
     genericEnv->addMapping(getGenericParamKey(), arch);
   }
 
-  // Collect the set of nested types of this archetype, and put them into
-  // the archetype itself.
-  if (!representative->getNestedTypes().empty()) {
-    SmallVector<std::pair<Identifier, NestedType>, 4> FlatNestedTypes;
-    for (auto Nested : representative->getNestedTypes()) {
-      // Skip type aliases, which are just shortcuts.
-      if (Nested.second.front()->getTypeAliasDecl())
-        continue;
-      bool anyNotRenamed = false;
-      for (auto NestedPA : Nested.second) {
-        if (!NestedPA->wasRenamed()) {
-          anyNotRenamed = true;
-          break;
-        }
-      }
-
-      if (!anyNotRenamed)
-        continue;
-
-      FlatNestedTypes.push_back({ Nested.first, NestedType() });
-    }
-    arch->setNestedTypes(ctx, FlatNestedTypes);
-  }
-
   return NestedType::forArchetype(arch);
 }
 
