@@ -3561,14 +3561,16 @@ GenericSignature *GenericSignature::get(ArrayRef<GenericTypeParamType *> params,
 GenericEnvironment *
 GenericEnvironment::get(GenericSignature *signature,
                         TypeSubstitutionMap interfaceToArchetypeMap) {
+  unsigned numGenericParams = signature->getGenericParams().size();
   assert(!interfaceToArchetypeMap.empty());
-  assert(interfaceToArchetypeMap.size() == signature->getGenericParams().size()
+  assert(interfaceToArchetypeMap.size() == numGenericParams
          && "incorrect number of parameters");
 
   ASTContext &ctx = signature->getASTContext();
 
   // Allocate and construct the new environment.
-  size_t bytes = totalSizeToAlloc<Type>(signature->getGenericParams().size());
+  size_t bytes = totalSizeToAlloc<Type, ArchetypeToInterfaceMapping>(
+                                           numGenericParams, numGenericParams);
   void *mem = ctx.Allocate(bytes, alignof(GenericEnvironment));
   return new (mem) GenericEnvironment(signature, nullptr,
                                       interfaceToArchetypeMap);
@@ -3579,8 +3581,11 @@ GenericEnvironment *GenericEnvironment::getIncomplete(
                                                   ArchetypeBuilder *builder) {
   TypeSubstitutionMap empty;
   auto &ctx = signature->getASTContext();
+
   // Allocate and construct the new environment.
-  size_t bytes = totalSizeToAlloc<Type>(signature->getGenericParams().size());
+  unsigned numGenericParams = signature->getGenericParams().size();
+  size_t bytes = totalSizeToAlloc<Type, ArchetypeToInterfaceMapping>(
+                                           numGenericParams, numGenericParams);
   void *mem = ctx.Allocate(bytes, alignof(GenericEnvironment));
   return new (mem) GenericEnvironment(signature, builder, empty);
 }

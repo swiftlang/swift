@@ -26,6 +26,9 @@ GenericEnvironment::GenericEnvironment(
     TypeSubstitutionMap interfaceToArchetypeMap)
   : Signature(signature), Builder(builder)
 {
+  NumMappingsRecorded = 0;
+  NumArchetypeToInterfaceMappings = 0;
+
   // Clear out the memory that holds the context types.
   std::uninitialized_fill(getContextTypes().begin(), getContextTypes().end(), Type());
 
@@ -35,9 +38,6 @@ GenericEnvironment::GenericEnvironment(
   // mapTypeOutOfContext() produces a human-readable type.
   for (auto entry : interfaceToArchetypeMap)
     addMapping(entry.first->castTo<GenericTypeParamType>(), entry.second);
-
-  // Make sure this generic environment gets destroyed.
-  signature->getASTContext().addDestructorCleanup(*this);
 }
 
 void GenericEnvironment::addMapping(GenericParamKey key,
@@ -54,22 +54,52 @@ void GenericEnvironment::addMapping(GenericParamKey key,
 
   // If we mapped the generic parameter to an archetype, add it to the
   // reverse mapping.
-  auto *archetype = contextType->getAs<ArchetypeType>();
-  if (!archetype) return;
+  if (auto *archetype = contextType->getAs<ArchetypeType>()) {
+    auto genericParam = genericParams[index];
 
-  // Check whether we've already recorded an interface type for this archetype.
-  // If not, record one and we're done.
-  auto genericParam = genericParams[index];
-  auto result = ArchetypeToInterfaceMap.insert({archetype, genericParam});
-  if (result.second) return;
+    // Check whether we've already recorded a generic parameter for this
+    // archetype. Note that we always perform a linear search, because we
+    // won't have sorted the list yet.
+    bool found = false;
+    for (auto &mapping : getActiveArchetypeToInterfaceMappings()) {
+      if (mapping.first != archetype) continue;
 
-  // Multiple generic parameters map to the same archetype. If the
-  // existing entry comes from a later generic parameter, replace it with
-  // the earlier generic parameter. This gives us a deterministic reverse
-  // mapping.
-  auto otherGP = result.first->second->castTo<GenericTypeParamType>();
-  if (GenericParamKey(genericParam) < GenericParamKey(otherGP))
-    result.first->second = genericParam;
+      // Multiple generic parameters map to the same archetype. If the
+      // existing entry comes from a later generic parameter, replace it with
+      // the earlier generic parameter. This gives us a deterministic reverse
+      // mapping.
+      auto otherGP = mapping.second->castTo<GenericTypeParamType>();
+      if (GenericParamKey(genericParam) < GenericParamKey(otherGP))
+        mapping.second = genericParam;
+      found = true;
+      break;
+    }
+
+    // If we haven't recorded a generic parameter for this archetype, do so now.
+    if (!found) {
+      void *ptr = getArchetypeToInterfaceMappingsBuffer().data()
+                + NumArchetypeToInterfaceMappings;
+      new (ptr) ArchetypeToInterfaceMapping(archetype, genericParam);
+      ++NumArchetypeToInterfaceMappings;
+    }
+  }
+
+  // Note that we've recorded this mapping.
+  ++NumMappingsRecorded;
+
+  // If we've recorded all of the mappings, go ahead and sort the array of
+  // archetype-to-interface-type mappings.
+  if (NumMappingsRecorded == genericParams.size()) {
+    llvm::array_pod_sort(getActiveArchetypeToInterfaceMappings().begin(),
+                         getActiveArchetypeToInterfaceMappings().end(),
+                         [](const ArchetypeToInterfaceMapping *lhs,
+                            const ArchetypeToInterfaceMapping *rhs) -> int {
+                           std::less<ArchetypeType *> compare;
+                           if (compare(lhs->first, rhs->first)) return -1;
+                           if (compare(rhs->first, lhs->first)) return 1;
+                           return 0;
+                         });
+  }
 }
 
 Optional<Type> GenericEnvironment::getMappingIfPresent(
@@ -88,11 +118,13 @@ Optional<Type> GenericEnvironment::getMappingIfPresent(
 
 bool GenericEnvironment::containsPrimaryArchetype(
                                               ArchetypeType *archetype) const {
-  return ArchetypeToInterfaceMap.count(archetype) > 0;
+  return static_cast<bool>(
+                       QueryArchetypeToInterfaceSubstitutions(this)(archetype));
 }
 
 Type GenericEnvironment::mapTypeOutOfContext(ModuleDecl *M, Type type) const {
-  type = type.subst(M, ArchetypeToInterfaceMap, SubstFlags::AllowLoweredTypes);
+  type = type.subst(M, QueryArchetypeToInterfaceSubstitutions(this),
+                    SubstFlags::AllowLoweredTypes);
   assert(!type->hasArchetype() && "not fully substituted");
   return type;
 }
@@ -128,6 +160,70 @@ Type GenericEnvironment::QueryInterfaceTypeSubstitutions::operator()(
 
     return contextType;
   }
+
+  return Type();
+}
+
+Type GenericEnvironment::QueryArchetypeToInterfaceSubstitutions::operator()(
+                                                SubstitutableType *type) const {
+  auto archetype = type->getAs<ArchetypeType>();
+  if (!archetype) return Type();
+
+  // If not all generic parameters have had their context types recorded,
+  // perform a linear search.
+  auto genericParams = self->Signature->getGenericParams();
+  unsigned numGenericParams = genericParams.size();
+  if (self->NumMappingsRecorded < numGenericParams) {
+    // Search through all of the active archetype-to-interface mappings.
+    for (auto &mapping : self->getActiveArchetypeToInterfaceMappings())
+      if (mapping.first == archetype) return mapping.second;
+
+    // We don't know if the archetype is from a different context or if we
+    // simply haven't recorded it yet. Spin through all of the generic
+    // parameters looking for one that provides this mapping.
+    for (auto gp : genericParams) {
+      // Map the generic parameter into our context. If we get back an
+      // archetype that matches, we're done.
+      auto gpArchetype = self->mapTypeIntoContext(gp)->getAs<ArchetypeType>();
+      if (gpArchetype == archetype) return gp;
+    }
+
+    // We have checked all of the generic parameters and not found anything;
+    // there is no substitution.
+    return Type();
+  }
+
+  // All generic parameters have ad their context types recorded, which means
+  // that the archetypes-to-interface-types array is sorted by address. Use a
+  // binary search.
+  struct MappingComparison {
+    bool operator()(const ArchetypeToInterfaceMapping &lhs,
+                    const ArchetypeType *rhs) const {
+      std::less<const ArchetypeType *> compare;
+
+      return compare(lhs.first, rhs);
+    }
+
+    bool operator()(const ArchetypeType *lhs,
+                    const ArchetypeToInterfaceMapping &rhs) const {
+      std::less<const ArchetypeType *> compare;
+
+      return compare(lhs, rhs.first);
+    }
+
+    bool operator()(const ArchetypeToInterfaceMapping &lhs,
+                    const ArchetypeToInterfaceMapping &rhs) const {
+      std::less<const ArchetypeType *> compare;
+
+      return compare(lhs.first, rhs.first);
+    }
+  } mappingComparison;
+
+  auto mappings = self->getActiveArchetypeToInterfaceMappings();
+  auto known = std::lower_bound(mappings.begin(), mappings.end(), archetype,
+                                mappingComparison);
+  if (known != mappings.end() && known->first == archetype)
+    return known->second;
 
   return Type();
 }
