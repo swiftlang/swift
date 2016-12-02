@@ -1667,19 +1667,17 @@ namespace {
     ///
     /// Note: Use this rather than calling Impl.importFullName directly!
     ImportedName importFullName(const clang::NamedDecl *D,
-                                Optional<ImportedName> &swift3Name,
-                                ImportNameOptions options = None) {
+                                Optional<ImportedName> &swift3Name) {
       // Special handling when we import using the Swift 2 name.
       if (useSwift2Name) {
         // First, import based on the Swift 3 name. If that fails, we won't
         // do anything.
-        swift3Name = Impl.importFullName(D, options);
+        swift3Name = Impl.importFullName(D, None);
         if (!*swift3Name) return *swift3Name;
 
         // Import using the Swift 2 name. If that fails, or if it's identical
         // to the Swift name, we won't introduce a Swift 2 stub declaration.
-        auto swift2Name =
-          Impl.importFullName(D, options | ImportNameFlags::Swift2Name);
+        auto swift2Name = Impl.importFullName(D, ImportNameFlags::Swift2Name);
         if (!swift2Name || swift2Name.Imported == swift3Name->Imported)
           return ImportedName();
 
@@ -1689,7 +1687,7 @@ namespace {
 
       // Just import the Swift 2 name.
       swift3Name = None;
-      return Impl.importFullName(D, options);
+      return Impl.importFullName(D, None);
     }
 
     /// \brief Create a declaration name for anonymous enums, unions and
@@ -1754,6 +1752,12 @@ namespace {
       }
       
       return ImportedName();
+    }
+
+    bool isFactoryInit(ImportedName &name) {
+      return name && name.Imported.getBaseName() == Impl.SwiftContext.Id_init &&
+             (name.InitKind == CtorInitializerKind::Factory ||
+              name.InitKind == CtorInitializerKind::ConvenienceFactory);
     }
 
   public:
@@ -3162,13 +3166,6 @@ namespace {
       return result;
     }
 
-    /// If the given method is a factory method, import it as a constructor
-    Optional<ConstructorDecl *>
-    importFactoryMethodAsConstructor(Decl *member,
-                                     const clang::ObjCMethodDecl *decl,
-                                     ObjCSelector selector,
-                                     DeclContext *dc);
-
     Decl *VisitObjCMethodDecl(const clang::ObjCMethodDecl *decl,
                               DeclContext *dc) {
       return VisitObjCMethodDecl(decl, dc, false);
@@ -3206,13 +3203,71 @@ namespace {
       if (!useSwift2Name && methodAlreadyImported(selector, isInstance, dc))
         return nullptr;
 
+
+      ImportedName importedName;
       Optional<ImportedName> swift3Name;
-      auto importedName
-        = importFullName(decl, swift3Name,
-                         ImportNameFlags::SuppressFactoryMethodAsInit);
+      importedName = importFullName(decl, swift3Name);
       if (!importedName)
         return nullptr;
 
+      // Normal case applies when we're importing an older name, or when we're
+      // not an init
+      if (useSwift2Name || !isFactoryInit(importedName)) {
+        auto result = importNonInitObjCMethodDecl(decl, dc, importedName,
+                                                  selector, forceClassMethod);
+        if (useSwift2Name && result)
+          markAsSwift2Variant(result, *swift3Name);
+        return result;
+      }
+
+      // We don't want to suppress init formation in Swift 3 names. Instead, we
+      // want the normal Swift 3 name, and a "raw" name for diagnostics. The
+      // "raw" name will be imported as unavailable with a more helpful and
+      // specific message.
+      ++NumFactoryMethodsAsInitializers;
+      bool redundant = false;
+      auto result =
+          importConstructor(decl, dc, false, importedName.InitKind,
+                            /*required=*/false, selector, importedName,
+                            {decl->param_begin(), decl->param_size()},
+                            decl->isVariadic(), redundant);
+
+      // Directly ask the NameImporter for the non-init variant of the Swift 2
+      // name.
+      auto rawOptions =
+          ImportNameOptions(ImportNameFlags::SuppressFactoryMethodAsInit) |
+          ImportNameFlags::Swift2Name;
+      auto rawName = Impl.importFullName(decl, rawOptions);
+      if (!rawName)
+        return result;
+
+      auto rawDecl = importNonInitObjCMethodDecl(decl, dc, rawName, selector,
+                                                 forceClassMethod);
+      if (!rawDecl)
+        return result;
+
+      // Mark the raw imported class method "unavailable", with a useful error
+      // message.
+      llvm::SmallString<64> message;
+      llvm::raw_svector_ostream os(message);
+      os << "use object construction '" << decl->getClassInterface()->getName()
+         << "(";
+      for (auto arg : importedName.Imported.getArgumentNames()) {
+        os << arg << ":";
+      }
+      os << ")'";
+      rawDecl->getAttrs().add(AvailableAttr::createPlatformAgnostic(
+          Impl.SwiftContext, Impl.SwiftContext.AllocateCopy(os.str())));
+      markAsSwift2Variant(rawDecl, importedName);
+      Impl.addAlternateDecl(result, cast<ValueDecl>(rawDecl));
+      return result;
+    }
+
+    Decl *importNonInitObjCMethodDecl(const clang::ObjCMethodDecl *decl,
+                                      DeclContext *dc,
+                                      ImportedName importedName,
+                                      ObjCSelector selector,
+                                      bool forceClassMethod) {
       assert(dc->getDeclaredTypeOfContext() && "Method in non-type context?");
       assert(isa<ClangModuleUnit>(dc->getModuleScopeContext()) &&
              "Clang method in Swift context?");
@@ -3224,6 +3279,7 @@ namespace {
         return nullptr;
 
       // Add the implicit 'self' parameter patterns.
+      bool isInstance = decl->isInstanceMethod() && !forceClassMethod;
       SmallVector<ParameterList *, 4> bodyParams;
       auto selfVar =
         ParamDecl::createSelf(SourceLoc(), dc, /*isStatic*/!isInstance);
@@ -3358,20 +3414,9 @@ namespace {
           // declaration.
           if (auto imported = VisitObjCMethodDecl(decl, dc,
                                                   /*forceClassMethod=*/true))
-            Impl.AlternateDecls[result] = cast<ValueDecl>(imported);
-        } else if (auto factory = importFactoryMethodAsConstructor(
-                                    result, decl, selector, dc)) {
-          // We imported the factory method as an initializer, so
-          // record it as an alternate declaration.
-          if (*factory)
-            Impl.AlternateDecls[result] = *factory;
+            Impl.addAlternateDecl(result, cast<ValueDecl>(imported));
         }
-
       }
-
-      // If this is a Swift 2 stub, mark it as such.
-      if (swift3Name)
-        markAsSwift2Variant(result, *swift3Name);
 
       return result;
     }
@@ -4969,63 +5014,9 @@ SwiftDeclConverter::getImplicitProperty(ImportedName importedName,
                          SourceLoc());
 
   // Make the property the alternate declaration for the getter.
-  Impl.AlternateDecls[swiftGetter] = property;
+  Impl.addAlternateDecl(swiftGetter, property);
 
   return property;
-}
-
-Optional<ConstructorDecl *>
-SwiftDeclConverter::importFactoryMethodAsConstructor(
-    Decl *member, const clang::ObjCMethodDecl *decl, ObjCSelector selector,
-    DeclContext *dc) {
-  // Import the full name of the method.
-  Optional<ImportedName> swift3Name;
-  auto importedName = importFullName(decl, swift3Name);
-
-  // Check that we imported an initializer name.
-  DeclName initName = importedName;
-  if (initName.getBaseName() != Impl.SwiftContext.Id_init)
-    return None;
-
-  // ... that came from a factory method.
-  if (importedName.InitKind != CtorInitializerKind::Factory &&
-      importedName.InitKind != CtorInitializerKind::ConvenienceFactory)
-    return None;
-
-  bool redundant = false;
-  auto result = importConstructor(decl, dc, false, importedName.InitKind,
-                                  /*required=*/false, selector, importedName,
-                                  {decl->param_begin(), decl->param_size()},
-                                  decl->isVariadic(), redundant);
-
-  if ((result || redundant) && member) {
-    ++NumFactoryMethodsAsInitializers;
-
-    // Mark the imported class method "unavailable", with a useful error
-    // message.
-    // TODO: Could add a replacement string?
-    llvm::SmallString<64> message;
-    llvm::raw_svector_ostream os(message);
-    os << "use object construction '" << decl->getClassInterface()->getName()
-       << "(";
-    for (auto arg : initName.getArgumentNames()) {
-      os << arg << ":";
-    }
-    os << ")'";
-    member->getAttrs().add(AvailableAttr::createPlatformAgnostic(
-        Impl.SwiftContext, Impl.SwiftContext.AllocateCopy(os.str())));
-  }
-
-  /// Record the initializer as an alternative declaration for the
-  /// member.
-  if (result) {
-    Impl.AlternateDecls[member] = result;
-
-    if (swift3Name)
-      markAsSwift2Variant(result, *swift3Name);
-  }
-
-  return result;
 }
 
 ConstructorDecl *SwiftDeclConverter::importConstructor(
@@ -5734,7 +5725,7 @@ SwiftDeclConverter::importSubscript(Decl *decl,
       TypeLoc::withoutLoc(elementContextTy), dc);
 
   /// Record the subscript as an alternative declaration.
-  Impl.AlternateDecls[associateWithSetter ? setter : getter] = subscript;
+  Impl.addAlternateDecl(associateWithSetter ? setter : getter, subscript);
 
   subscript->makeComputed(SourceLoc(), getterThunk, setterThunk, nullptr,
                           SourceLoc());
@@ -5932,8 +5923,8 @@ void SwiftDeclConverter::importObjCMembers(
       continue;
 
     if (auto objcMethod = dyn_cast<clang::ObjCMethodDecl>(nd)) {
-      // If there is an alternate declaration for this member, add it.
-      if (auto alternate = Impl.getAlternateDecl(member)) {
+      // If there is are alternate declarations for this member, add it.
+      for (auto alternate : Impl.getAlternateDecls(member)) {
         if (alternate->getDeclContext() == member->getDeclContext() &&
             knownMembers.insert(alternate).second)
           members.push_back(alternate);
@@ -6061,7 +6052,7 @@ void SwiftDeclConverter::importMirroredProtocolMembers(
               Impl.importMirroredDecl(objcMethod, dc, useSwift2Name, proto)) {
         members.push_back(imported);
 
-        if (auto alternate = Impl.getAlternateDecl(imported))
+        for (auto alternate : Impl.getAlternateDecls(imported))
           if (imported->getDeclContext() == alternate->getDeclContext())
             members.push_back(alternate);
       }
@@ -6540,7 +6531,7 @@ ClangImporter::Implementation::importDeclImpl(const clang::NamedDecl *ClangDecl,
   if (Result) {
     finalizeDecl(Result);
 
-    if (auto alternate = getAlternateDecl(Result))
+    for (auto alternate : getAlternateDecls(Result))
       finalizeDecl(alternate);
   }
 
@@ -6791,7 +6782,7 @@ ClangImporter::Implementation::importMirroredDecl(const clang::NamedDecl *decl,
     updateMirroredDecl(result);
 
     // Update the alternate declaration as well.
-    if (auto alternate = getAlternateDecl(result))
+    for (auto alternate : getAlternateDecls(result))
       updateMirroredDecl(alternate);
   }
   if (result || !converter.hadForwardDeclaration())
@@ -7191,7 +7182,7 @@ ClangImporter::Implementation::loadAllMembers(Decl *D, uint64_t extra) {
       // Add the member.
       ext->addMember(member);
 
-      if (auto alternate = getAlternateDecl(member)) {
+      for (auto alternate : getAlternateDecls(member)) {
         ext->addMember(alternate);
       }
 

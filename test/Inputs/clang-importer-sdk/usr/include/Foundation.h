@@ -179,7 +179,7 @@ __attribute__((availability(ios,introduced=8.0)))
 @end
 
 @interface NSValue (NSRange)
-+ (NSValue *)valueWithRange:(NSRange)range;
+- (NSValue *)valueWithRange:(NSRange)range;
 @property NSRange rangeValue;
 @end
 
@@ -255,6 +255,7 @@ NSString *NSStringToNSString(NSString *str);
 @end
 
 @interface NSURL : NSObject
+- (instancetype)URLWithString:(NSString *)URLString;
 + (instancetype)URLWithString:(NSString *)URLString;
 @end
 
@@ -710,6 +711,7 @@ typedef NS_OPTIONS(NSUInteger, NSExplicitlyUnavailableOnOSXOptions) {
 @end
 
 @interface NSURLRequest : NSObject
+- (instancetype)requestWithString:(NSString *)URLString;
 + (instancetype)requestWithString:(NSString *)URLString;
 + (instancetype)URLRequestWithURL:(NSURL *)URL;
 @end
@@ -928,7 +930,7 @@ __attribute__((availability(macosx,introduced=10.52)))
 - (nonnull NSString *)stringByAppendingString:(nonnull NSString *)string;
 - (nonnull NSString *)stringWithString:(nonnull NSString *)string;
 - (nullable NSURL *)URLWithAddedString:(nonnull NSString *)string;
-+ (NSString *)stringForCalendarUnits:(NSCalendarUnit)units;
+- (NSString *)stringForCalendarUnits:(NSCalendarUnit)units;
 @end
 
 @interface NSURL (Properties)

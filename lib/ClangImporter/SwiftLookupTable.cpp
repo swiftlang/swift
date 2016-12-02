@@ -16,6 +16,8 @@
 //===----------------------------------------------------------------------===//
 #include "ImporterImpl.h"
 #include "SwiftLookupTable.h"
+#include "swift/AST/DiagnosticEngine.h"
+#include "swift/AST/DiagnosticsClangImporter.h"
 #include "swift/Basic/STLExtras.h"
 #include "swift/Basic/Version.h"
 #include "clang/AST/DeclObjC.h"
@@ -1511,6 +1513,136 @@ SwiftNameLookupExtension::hashExtension(llvm::hash_code code) const {
                             inferImportAsMember);
 }
 
+void importer::addEntryToLookupTable(SwiftLookupTable &table,
+                                     clang::NamedDecl *named,
+                                     NameImporter &nameImporter) {
+  // Determine whether this declaration is suppressed in Swift.
+  if (shouldSuppressDeclImport(named))
+    return;
+
+  // Leave incomplete struct/enum/union types out of the table; Swift only
+  // handles pointers to them.
+  // FIXME: At some point we probably want to be importing incomplete types,
+  // so that pointers to different incomplete types themselves have distinct
+  // types. At that time it will be necessary to make the decision of whether
+  // or not to import an incomplete type declaration based on whether it's
+  // actually the struct backing a CF type:
+  //
+  //    typedef struct CGColor *CGColorRef;
+  //
+  // The best way to do this is probably to change CFDatabase.def to include
+  // struct names when relevant, not just pointer names. That way we can check
+  // both CFDatabase.def and the objc_bridge attribute and cover all our bases.
+  if (auto *tagDecl = dyn_cast<clang::TagDecl>(named)) {
+    if (!tagDecl->getDefinition())
+      return;
+  }
+
+  // If we have a name to import as, add this entry to the table.
+  if (auto importedName = nameImporter.importName(named, None)) {
+    table.addEntry(importedName.Imported, named, importedName.EffectiveContext);
+
+    // Also add the subscript entry, if needed.
+    if (importedName.isSubscriptAccessor())
+      table.addEntry(DeclName(nameImporter.getContext(),
+                              nameImporter.getContext().Id_subscript,
+                              ArrayRef<Identifier>()),
+                     named, importedName.EffectiveContext);
+
+    // Import the Swift 2 name of this entity, and record it as well if it is
+    // different.
+    if (auto swift2Name =
+            nameImporter.importName(named, ImportNameFlags::Swift2Name)) {
+      if (swift2Name.Imported != importedName.Imported)
+        table.addEntry(swift2Name.Imported, named, swift2Name.EffectiveContext);
+    }
+  } else if (auto category = dyn_cast<clang::ObjCCategoryDecl>(named)) {
+    // If the category is invalid, don't add it.
+    if (category->isInvalidDecl())
+      return;
+
+    table.addCategory(category);
+  }
+
+  // Walk the members of any context that can have nested members.
+  if (isa<clang::TagDecl>(named) || isa<clang::ObjCInterfaceDecl>(named) ||
+      isa<clang::ObjCProtocolDecl>(named) ||
+      isa<clang::ObjCCategoryDecl>(named)) {
+    clang::DeclContext *dc = cast<clang::DeclContext>(named);
+    for (auto member : dc->decls()) {
+      if (auto namedMember = dyn_cast<clang::NamedDecl>(member))
+        addEntryToLookupTable(table, namedMember, nameImporter);
+    }
+  }
+}
+
+void importer::addMacrosToLookupTable(SwiftLookupTable &table,
+                                      NameImporter &nameImporter) {
+  auto &pp = nameImporter.getClangPreprocessor();
+  for (const auto &macro : pp.macros(false)) {
+    // Find the local history of this macro directive.
+    clang::MacroDirective *MD = pp.getLocalMacroDirectiveHistory(macro.first);
+
+    // Walk the history.
+    for (; MD; MD = MD->getPrevious()) {
+      // Don't look at any definitions that are followed by undefs.
+      // FIXME: This isn't quite correct across explicit submodules -- one
+      // submodule might define a macro, while another defines and then
+      // undefines the same macro. If they are processed in that order, the
+      // history will have the undef at the end, and we'll miss the first
+      // definition.
+      if (isa<clang::UndefMacroDirective>(MD))
+        break;
+
+      // Only interested in macro definitions.
+      auto *defMD = dyn_cast<clang::DefMacroDirective>(MD);
+      if (!defMD)
+        continue;
+
+      // Is this definition from this module?
+      auto info = defMD->getInfo();
+      if (!info || info->isFromASTFile())
+        continue;
+
+      // If we hit a builtin macro, we're done.
+      if (info->isBuiltinMacro())
+        break;
+
+      // If we hit a macro with invalid or predefined location, we're done.
+      auto loc = defMD->getLocation();
+      if (loc.isInvalid())
+        break;
+      if (pp.getSourceManager().getFileID(loc) == pp.getPredefinesFileID())
+        break;
+
+      // Add this entry.
+      auto name = nameImporter.importMacroName(macro.first, info);
+      if (name.empty())
+        continue;
+      table.addEntry(name, info,
+                     nameImporter.getClangContext().getTranslationUnitDecl(),
+                     &pp);
+    }
+  }
+}
+
+void importer::finalizeLookupTable(SwiftLookupTable &table,
+                                   NameImporter &nameImporter) {
+  // Resolve any unresolved entries.
+  SmallVector<SwiftLookupTable::SingleEntry, 4> unresolved;
+  if (table.resolveUnresolvedEntries(unresolved)) {
+    // Complain about unresolved entries that remain.
+    for (auto entry : unresolved) {
+      auto decl = entry.get<clang::NamedDecl *>();
+      auto swiftName = decl->getAttr<clang::SwiftNameAttr>();
+
+      nameImporter.getContext().Diags.diagnose(
+          SourceLoc(), diag::unresolvable_clang_decl, decl->getNameAsString(),
+          swiftName->getName());
+    }
+  }
+}
+
 void SwiftLookupTableWriter::populateTable(SwiftLookupTable &table,
                                            NameImporter &nameImporter) {
   auto &sema = nameImporter.getClangSema();
@@ -1529,10 +1661,10 @@ void SwiftLookupTableWriter::populateTable(SwiftLookupTable &table,
   }
 
   // Add macros to the lookup table.
-  addMacrosToLookupTable(sema.Context, sema.getPreprocessor(), table, swiftCtx);
+  addMacrosToLookupTable(table, nameImporter);
 
   // Finalize the lookup table, which may fail.
-  finalizeLookupTable(sema.Context, sema.getPreprocessor(), table, swiftCtx);
+  finalizeLookupTable(table, nameImporter);
 };
 
 std::unique_ptr<clang::ModuleFileExtensionWriter>
