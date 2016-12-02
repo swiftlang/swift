@@ -230,8 +230,21 @@ public:
   ResolvedRangeInfo resolve();
   ~RangeResolver();
 };
-} // namespace ide
 
+/// This provides a utility to view a printed name by parsing the components
+/// of that name. The components include a base name and an array of argument
+/// labels.
+class DeclNameViewer {
+  StringRef BaseName;
+  SmallVector<StringRef, 4> Labels;
+public:
+  DeclNameViewer(StringRef Text);
+  StringRef base() const { return BaseName; }
+  llvm::ArrayRef<StringRef> args() const { return llvm::makeArrayRef(Labels); }
+  unsigned partsCount() const { return 1 + Labels.size(); }
+  unsigned commonPartsCount(DeclNameViewer &Other) const;
+};
+} // namespace ide
 } // namespace swift
 
 #endif // SWIFT_IDE_UTILS_H
