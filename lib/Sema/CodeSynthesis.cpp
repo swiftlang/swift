@@ -1789,8 +1789,8 @@ void swift::maybeAddAccessorsToVariable(VarDecl *var, TypeChecker &TC) {
       Type behaviorSelf;
       Type behaviorInterfaceSelf;
       if (dc->isTypeContext()) {
-        behaviorSelf = dc->getSelfTypeInContext();
         behaviorInterfaceSelf = dc->getSelfInterfaceType();
+        behaviorSelf = dc->mapTypeIntoContext(behaviorInterfaceSelf);
         assert(behaviorSelf && "type context doesn't have self type?!");
         if (var->isStatic())
           behaviorSelf = MetatypeType::get(behaviorSelf);
