@@ -118,18 +118,6 @@ struct ilist_traits<::swift::SILVTable> :
 public ilist_default_traits<::swift::SILVTable> {
   typedef ::swift::SILVTable SILVTable;
 
-private:
-  mutable ilist_half_node<SILVTable> Sentinel;
-
-public:
-  SILVTable *createSentinel() const {
-    return static_cast<SILVTable*>(&Sentinel);
-  }
-  void destroySentinel(SILVTable *) const {}
-
-  SILVTable *provideInitialHead() const { return createSentinel(); }
-  SILVTable *ensureHead(SILVTable*) const { return createSentinel(); }
-  static void noteHead(SILVTable*, SILVTable*) {}
   static void deleteNode(SILVTable *VT) { VT->~SILVTable(); }
 
 private:

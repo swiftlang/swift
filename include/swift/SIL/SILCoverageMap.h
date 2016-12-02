@@ -143,18 +143,7 @@ struct ilist_traits<::swift::SILCoverageMap> :
 public ilist_default_traits<::swift::SILCoverageMap> {
   typedef ::swift::SILCoverageMap SILCoverageMap;
 
-private:
-  mutable ilist_half_node<SILCoverageMap> Sentinel;
-
 public:
-  SILCoverageMap *createSentinel() const {
-    return static_cast<SILCoverageMap*>(&Sentinel);
-  }
-  void destroySentinel(SILCoverageMap *) const {}
-
-  SILCoverageMap *provideInitialHead() const { return createSentinel(); }
-  SILCoverageMap *ensureHead(SILCoverageMap*) const { return createSentinel(); }
-  static void noteHead(SILCoverageMap*, SILCoverageMap*) {}
   static void deleteNode(SILCoverageMap *VT) { VT->~SILCoverageMap(); }
 
 private:

@@ -1105,7 +1105,7 @@ ArchetypeType *TypeConverter::getExemplarArchetype(ArchetypeType *t) {
   
   // Otherwise, use this archetype as the exemplar for future similar
   // archetypes.
-  Types.ExemplarArchetypeStorage.push_back({t});
+  Types.ExemplarArchetypeStorage.push_back(new ExemplarArchetype(t));
   Types.ExemplarArchetypes.InsertNode(&Types.ExemplarArchetypeStorage.back(),
                                       insertPos);
   return t;
