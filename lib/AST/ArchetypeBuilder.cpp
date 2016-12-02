@@ -673,7 +673,7 @@ ArchetypeBuilder::PotentialArchetype::getTypeInContext(
 
     ParentArchetype = parentTy.getAsArchetype();
 
-    // Check whether the parent already has an nested type with this name. If
+    // Check whether the parent already has a nested type with this name. If
     // so, return it directly.
     if (auto nested = ParentArchetype->getNestedTypeIfKnown(getName()))
       return *nested;

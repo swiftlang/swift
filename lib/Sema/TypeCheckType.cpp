@@ -2198,7 +2198,7 @@ Type TypeResolver::resolveSILFunctionType(FunctionTypeRepr *repr,
     if (tuple->hasEllipsis()) {
       TC.diagnose(tuple->getEllipsisLoc(), diag::sil_function_ellipsis);
     }
-    // SIL functions cannot have parmeter names.
+    // SIL functions cannot have parameter names.
     for (auto nameLoc : tuple->getUnderscoreLocs()) {
       if (nameLoc.isValid())
         TC.diagnose(nameLoc, diag::sil_function_input_label);
