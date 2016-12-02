@@ -19,19 +19,32 @@ static bool isContinuationByte(uint8_t unit) {
   return (unit & 0xC0) == 0x80;
 }
 
+static bool isValidSymbolChar(char ch) {
+  return (ch >= 'a' && ch <= 'z') || (ch >= 'A' && ch <= 'Z') ||
+         (ch >= '0' && ch <= '9') || ch == '_' || ch == '$';
+}
+
 /// Reencode well-formed UTF-8 as UTF-32.
 ///
 /// This entry point is only called from compiler-internal entry points, so does
 /// only minimal validation. In particular, it does *not* check for overlong
 /// encodings.
+/// If \p mapNonSymbolChars is true, non-symbol ASCII characters (characters
+/// except [$_a-zA-Z0-9]) are also encoded like non-ASCII unicode characters.
+/// Returns false if \p InputUTF8 contains surrogate code points.
 static bool convertUTF8toUTF32(StringRef InputUTF8,
-                               std::vector<uint32_t> &OutUTF32) {
+                               std::vector<uint32_t> &OutUTF32,
+                               bool mapNonSymbolChars) {
   auto ptr = InputUTF8.begin();
   auto end = InputUTF8.end();
   while (ptr < end) {
     uint8_t first = *ptr++;
     if (first < 0x80) {
-      OutUTF32.push_back(first);
+      if (isValidSymbolChar(first) || !mapNonSymbolChars) {
+        OutUTF32.push_back(first);
+      } else {
+        OutUTF32.push_back((uint32_t)first + 0xD800);
+      }
     } else if (first < 0xC0) {
       // Invalid continuation byte.
       return false;
@@ -75,11 +88,12 @@ static bool convertUTF8toUTF32(StringRef InputUTF8,
 }
 
 bool Punycode::encodePunycodeUTF8(StringRef InputUTF8,
-                                  std::string &OutPunycode) {
+                                  std::string &OutPunycode,
+                                  bool mapNonSymbolChars) {
   std::vector<uint32_t> InputCodePoints;
   InputCodePoints.reserve(InputUTF8.size());
   
-  if (!convertUTF8toUTF32(InputUTF8, InputCodePoints))
+  if (!convertUTF8toUTF32(InputUTF8, InputCodePoints, mapNonSymbolChars))
     return false;
   
   return encodePunycode(InputCodePoints, OutPunycode);
