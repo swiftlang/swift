@@ -1340,54 +1340,17 @@ static Type resolveIdentTypeComponent(
                                          unsatisfiedDependency);
 }
 
-static bool checkTypeDeclAvailability(const TypeDecl *TypeDecl,
-                                      IdentTypeRepr *IdType,
-                                      SourceLoc Loc, DeclContext *DC,
-                                      TypeChecker &TC,
-                                      bool AllowPotentiallyUnavailableProtocol){
-  if (isa<ComponentIdentTypeRepr>(IdType)) {
-    return diagnoseDeclAvailability(TypeDecl, TC, DC, Loc,
-                                    AllowPotentiallyUnavailableProtocol,
-                                    false);
-  }
-
-  return false;
-}
-
-
-static bool diagnoseAvailability(Type ty, IdentTypeRepr *IdType, SourceLoc Loc,
+static bool diagnoseAvailability(IdentTypeRepr *IdType,
                                  DeclContext *DC, TypeChecker &TC,
                                  bool AllowPotentiallyUnavailableProtocol) {
-  if (auto *NAT = dyn_cast<NameAliasType>(ty.getPointer())) {
-    if (checkTypeDeclAvailability(NAT->getDecl(), IdType, Loc, DC, TC,
-                                  AllowPotentiallyUnavailableProtocol))
-      return true;
-  }
-
-  if (auto *GPT = dyn_cast<GenericTypeParamType>(ty.getPointer())) {
-    if (auto GP = GPT->getDecl()) {
-      if (checkTypeDeclAvailability(GP, IdType, Loc, DC, TC,
-                                    AllowPotentiallyUnavailableProtocol)) {
+  for (auto comp : IdType->getComponentRange()) {
+    if (auto typeDecl = dyn_cast_or_null<TypeDecl>(comp->getBoundDecl())) {
+      if (diagnoseDeclAvailability(typeDecl, TC, DC, comp->getIdLoc(),
+                                   AllowPotentiallyUnavailableProtocol,
+                                   false))
         return true;
-      }
     }
   }
-
-  // Look through substituted types to diagnose when the original
-  // type is marked unavailable.
-  if (auto *ST = dyn_cast<SubstitutedType>(ty.getPointer())) {
-    if (diagnoseAvailability(ST->getOriginal(), IdType, Loc, DC, TC,
-                             AllowPotentiallyUnavailableProtocol)) {
-      return true;
-    }
-  }
-
-  CanType canTy = ty.getCanonicalTypeOrNull();
-  if (canTy.isNull())
-    return false;
-  if (auto NTD = canTy.getAnyNominal())
-    return checkTypeDeclAvailability(NTD, IdType, Loc, DC, TC,
-                                     AllowPotentiallyUnavailableProtocol);
 
   return false;
 }
@@ -1468,8 +1431,7 @@ Type TypeChecker::resolveIdentifierType(
 
   // Check the availability of the type.
   if (!(options & TR_AllowUnavailable) &&
-      diagnoseAvailability(result, IdType,
-                           Components.back()->getIdLoc(), DC, *this,
+      diagnoseAvailability(IdType, DC, *this,
                            AllowPotentiallyUnavailableProtocol)) {
     Components.back()->setInvalid();
     return ErrorType::get(Context);
