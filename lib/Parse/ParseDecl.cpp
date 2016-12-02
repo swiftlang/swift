@@ -2515,8 +2515,15 @@ static ParserStatus parseIdentifierDeclName(Parser &P, Identifier &Result,
 
   default:
     P.checkForInputIncomplete();
-    if (!D.is(diag::invalid_diagnostic))
-      P.diagnose(P.Tok, D);
+    if (!D.is(diag::invalid_diagnostic)) {
+      if (P.Tok.isKeyword()) {
+        P.diagnose(P.Tok, diag::keyword_cant_be_identifier, P.Tok.getText());
+        P.diagnose(P.Tok, diag::backticks_to_escape)
+          .fixItReplace(P.Tok.getLoc(), "`" + P.Tok.getText().str() + "`");
+      } else {
+        P.diagnose(P.Tok, D);
+      }
+    }
     if (P.Tok.isKeyword() &&
         (P.peekToken().is(ResyncT1) || P.peekToken().is(ResyncT2) ||
          P.peekToken().is(ResyncT3) || P.peekToken().is(ResyncT4) ||
@@ -4792,6 +4799,9 @@ ParserStatus Parser::parseDeclEnumCase(ParseDeclOptions Flags,
     consumeIf(tok::period_prefix, DotLoc);
 
     const bool NameIsNotIdentifier = Tok.isNot(tok::identifier);
+    const bool NameIsKeyword = Tok.isKeyword();
+    StringRef TokText = Tok.getText();
+    SourceLoc TokLoc = Tok.getLoc();
     if (parseIdentifierDeclName(*this, Name, NameLoc, tok::l_paren,
                                 tok::kw_case, tok::colon, tok::r_brace,
                                 diag::invalid_diagnostic).isError()) {
@@ -4821,7 +4831,13 @@ ParserStatus Parser::parseDeclEnumCase(ParseDeclOptions Flags,
         Status.setIsParseError();
         return Status;
       }
-      diagnose(CaseLoc, diag::expected_identifier_in_decl, "enum 'case'");
+      if (NameIsKeyword) {
+        diagnose(TokLoc, diag::keyword_cant_be_identifier, TokText);
+        diagnose(TokLoc, diag::backticks_to_escape)
+          .fixItReplace(TokLoc, "`" + TokText.str() + "`");
+      } else {
+        diagnose(CaseLoc, diag::expected_identifier_in_decl, "enum 'case'");
+      }
     } else if (DotLoc.isValid()) {
       diagnose(DotLoc, diag::enum_case_dot_prefix)
         .fixItRemove(DotLoc);
