@@ -39,6 +39,9 @@ public:
   void print(llvm::raw_ostream &Out) const;
 };
 
+/// Utility function, useful to be called from the debugger.
+void dumpNode(const NodePointer &Root);
+
 NodePointer
 demangleSymbolAsNode(StringRef MangledName,
                      const DemangleOptions &Options = DemangleOptions());
