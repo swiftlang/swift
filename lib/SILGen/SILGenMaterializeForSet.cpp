@@ -201,7 +201,7 @@ public:
                             ArrayRef<Substitution> witnessSubs) {
     auto *dc = witness->getDeclContext();
     Type selfInterfaceType = dc->getSelfInterfaceType();
-    Type selfType = dc->getSelfTypeInContext();
+    Type selfType = witness->computeSelfType()->getRValueInstanceType();
 
     SILDeclRef constant(witness);
     auto constantInfo = SGM.Types.getConstantInfo(constant);
