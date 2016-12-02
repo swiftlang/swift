@@ -1202,7 +1202,7 @@ static bool findGenericSubstitutions(DeclContext *dc, Type paramType,
     
     bool mismatch(SubstitutableType *paramType, TypeBase *argType) {
       Type type = paramType;
-      if (dc && dc->getGenericParamsOfContext() && type->isTypeParameter())
+      if (dc && dc->isGenericContext() && type->isTypeParameter())
         type = ArchetypeBuilder::mapTypeIntoContext(dc, paramType);
       
       if (auto archetype = type->getAs<ArchetypeType>()) {
@@ -1339,7 +1339,7 @@ CalleeCandidateInfo::evaluateCloseness(DeclContext *dc, Type candArgListType,
         matchType.findIf([&](Type type) -> bool {
           if (auto substitution = dyn_cast<SubstitutedType>(type.getPointer())) {
             Type original = substitution->getOriginal();
-            if (dc && dc->getGenericParamsOfContext() && original->isTypeParameter())
+            if (dc && dc->isGenericContext() && original->isTypeParameter())
               original = ArchetypeBuilder::mapTypeIntoContext(dc, original);
             
             Type replacement = substitution->getReplacementType();
