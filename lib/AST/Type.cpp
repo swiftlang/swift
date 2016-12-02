@@ -1430,13 +1430,6 @@ Identifier GenericTypeParamType::getName() const {
   return name;
 }
 
-TypeBase *AssociatedTypeType::getSinglyDesugaredType() {
-  auto protocolSelf = getDecl()->getProtocol()->getSelfTypeInContext();
-  assert(protocolSelf);
-  auto *selfArchetype = protocolSelf->castTo<ArchetypeType>();
-  return selfArchetype->getNestedTypeValue(getDecl()->getName()).getPointer();
-}
-
 const llvm::fltSemantics &BuiltinFloatType::getAPFloatSemantics() const {
   switch (getFPKind()) {
   case BuiltinFloatType::IEEE16:  return APFloat::IEEEhalf;
@@ -1469,7 +1462,6 @@ bool TypeBase::isSpelledLike(Type other) {
   case TypeKind::Class:
   case TypeKind::NameAlias:
   case TypeKind::Substituted:
-  case TypeKind::AssociatedType:
   case TypeKind::GenericTypeParam:
   case TypeKind::DependentMember:
   case TypeKind::DynamicSelf:
@@ -3122,7 +3114,6 @@ case TypeKind::Id:
   case TypeKind::Error:
   case TypeKind::Unresolved:
   case TypeKind::TypeVariable:
-  case TypeKind::AssociatedType:
   case TypeKind::GenericTypeParam:
     return *this;
 

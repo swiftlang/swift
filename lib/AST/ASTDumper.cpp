@@ -2855,12 +2855,6 @@ namespace {
       OS << ")";
     }
 
-    void visitAssociatedTypeType(AssociatedTypeType *T, StringRef label) {
-      printCommon(T, label, "associated_type_type");
-      printField("decl", T->getDecl()->printRef());
-      OS << ")";
-    }
-
     void visitSubstitutedType(SubstitutedType *T, StringRef label) {
       printCommon(T, label, "substituted_type");
       printRec("original", T->getOriginal());

@@ -211,7 +211,6 @@ class TypeMatcher {
     TRIVIAL_CASE(DynamicSelfType)
     TRIVIAL_CASE(ArchetypeType)
     TRIVIAL_CASE(GenericTypeParamType)
-    TRIVIAL_CASE(AssociatedTypeType)
 
     bool visitDependentMemberType(CanDependentMemberType firstDepMember,
                                   Type secondType) {

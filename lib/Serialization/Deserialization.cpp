@@ -3734,25 +3734,6 @@ Type ModuleFile::getType(TypeID TID) {
     break;
   }
 
-  case decls_block::ASSOCIATED_TYPE_TYPE: {
-    DeclID declID;
-
-    decls_block::AssociatedTypeTypeLayout::readRecord(scratch, declID);
-
-    auto assocType = dyn_cast_or_null<AssociatedTypeDecl>(getDecl(declID));
-    if (!assocType) {
-      error();
-      return nullptr;
-    }
-
-    // See if we triggered deserialization through our conformances.
-    if (typeOrOffset.isComplete())
-      break;
-
-    typeOrOffset = assocType->getType()->castTo<MetatypeType>()->getInstanceType();
-    break;
-  }
-
   case decls_block::PROTOCOL_COMPOSITION_TYPE: {
     ArrayRef<uint64_t> rawProtocolIDs;
 
