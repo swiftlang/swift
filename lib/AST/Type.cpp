@@ -375,8 +375,11 @@ bool TypeBase::isUnspecializedGeneric() {
     return cast<SILBlockStorageType>(this)->getCaptureType()
         ->isUnspecializedGeneric();
   case TypeKind::SILBox:
-    return cast<SILBoxType>(this)->getBoxedType()
-        ->isUnspecializedGeneric();
+    for (auto &arg : cast<SILBoxType>(this)->getGenericArgs()) {
+      if (arg.getReplacement()->isUnspecializedGeneric())
+        return true;
+    }
+    return false;
   }
   llvm_unreachable("bad TypeKind");
 }
