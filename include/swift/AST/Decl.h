@@ -2434,10 +2434,6 @@ public:
   SourceLoc getStartLoc() const { return getNameLoc(); }
   SourceRange getSourceRange() const;
 
-  /// Determine whether this is the implicit 'Self' type parameter of
-  /// a protocol.
-  bool isProtocolSelf() const;
-
   static bool classof(const Decl *D) {
     return D->getKind() == DeclKind::GenericTypeParam;
   }

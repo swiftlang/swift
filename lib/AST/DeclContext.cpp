@@ -106,7 +106,7 @@ ProtocolDecl *DeclContext::getAsProtocolExtensionContext() const {
            getAsGenericTypeOrGenericTypeExtensionContext());
 }
 
-GenericTypeParamDecl *DeclContext::getProtocolSelf() const {
+GenericTypeParamType *DeclContext::getProtocolSelfType() const {
   auto *proto = getAsProtocolOrProtocolExtensionContext();
   assert(proto && "not a protocol");
 
@@ -118,14 +118,8 @@ GenericTypeParamDecl *DeclContext::getProtocolSelf() const {
   if (!isInnermostContextGeneric())
     return nullptr;
 
-  return getGenericParamsOfContext()->getParams().front();
-}
-
-GenericTypeParamType *DeclContext::getProtocolSelfType() const {
-  auto *param = getProtocolSelf();
-  if (!param)
-    return nullptr;
-  return param->getDeclaredInterfaceType()
+  return getGenericParamsOfContext()->getParams().front()
+      ->getDeclaredInterfaceType()
       ->castTo<GenericTypeParamType>();
 }
 
