@@ -65,7 +65,7 @@ public struct LazyMapSequence<Base : Sequence, Element>
     return _base.underestimatedCount
   }
 
-  /// Create an instance with elements `transform(x)` for each element
+  /// Creates an instance with elements `transform(x)` for each element
   /// `x` of base.
   internal init(_base: Base, transform: (Base.Iterator.Element) -> Element) {
     self._base = _base
@@ -114,7 +114,7 @@ public struct ${Self}<
   }
 %   end
 
-  /// Access the element at `position`.
+  /// Accesses the element at `position`.
   ///
   /// - Precondition: `position` is a valid position in `self` and
   ///   `position != endIndex`.
@@ -144,10 +144,10 @@ public struct ${Self}<
     return _base.indices
   }
 
-  /// Returns `true` iff `self` is empty.
+  /// A Boolean value indicating whether the collection is empty.
   public var isEmpty: Bool { return _base.isEmpty }
 
-  /// Returns the number of elements.
+  /// The number of elements in the collection.
   ///
   /// - Complexity: O(1) if `Index` conforms to `RandomAccessIndex`;
   ///   O(N) otherwise.

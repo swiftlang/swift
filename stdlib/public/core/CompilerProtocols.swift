@@ -205,10 +205,32 @@ public protocol _ExpressibleByBuiltinFloatLiteral {
   init(_builtinFloatLiteral value: _MaxBuiltinFloatType)
 }
 
-/// Conforming types can be initialized with floating point literals.
+/// A type that can be initialized with a floating-point literal.
+///
+/// The standard library floating-point types---`Float`, `Double`, and
+/// `Float80` where available---all conform to the `ExpressibleByFloatLiteral`
+/// protocol. You can initialize a variable or constant of any of these types
+/// by assigning a floating-point literal.
+///
+///     // Type inferred as 'Double'
+///     let threshold = 6.0
+///
+///     // An array of 'Double'
+///     let measurements = [2.2, 4.1, 3.65, 4.2, 9.1]
+///
+/// Conforming to ExpressibleByFloatLiteral
+/// =======================================
+///
+/// To add `ExpressibleByFloatLiteral` conformance to your custom type,
+/// implement the required initializer.
 public protocol ExpressibleByFloatLiteral {
+  /// A type that can represent a floating-point literal.
+  ///
+  /// Valid types for `FloatLiteralType` are `Float`, `Double`, and `Float80`
+  /// where available.
   associatedtype FloatLiteralType : _ExpressibleByBuiltinFloatLiteral
-  /// Create an instance initialized to `value`.
+  
+  /// Creates an instance initialized to the specified floating-point value.
   init(floatLiteral value: FloatLiteralType)
 }
 
@@ -547,7 +569,7 @@ public protocol ExpressibleByDictionaryLiteral {
   associatedtype Key
   /// The value type of a dictionary literal.
   associatedtype Value
-  /// Create an instance initialized with `elements`.
+  /// Creates an instance initialized with the given key-value pairs.
   init(dictionaryLiteral elements: (Key, Value)...)
 }
 

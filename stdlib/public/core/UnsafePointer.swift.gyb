@@ -40,57 +40,61 @@ public struct ${Self}<Pointee>
   /// The underlying raw (untyped) pointer.
   public let _rawValue: Builtin.RawPointer
 
-  /// Construct ${a_Self} from a builtin raw pointer.
+  /// Creates ${a_Self} from a builtin raw pointer.
   @_transparent
   public init(_ _rawValue : Builtin.RawPointer) {
     self._rawValue = _rawValue
   }
 
-  /// Convert from an opaque pointer to a typed pointer.
+  /// Converts from an opaque pointer to a typed pointer.
   @_transparent
   public init(_ from : OpaquePointer) {
     _rawValue = from._rawValue
   }
 
-  /// Convert from an opaque pointer to a typed pointer.
+  /// Converts from an opaque pointer to a typed pointer.
   ///
-  /// Returns nil if `from` is nil.
+  /// Returns `nil` if `from` is `nil`.
   @_transparent
   public init?(_ from : OpaquePointer?) {
     guard let unwrapped = from else { return nil }
     self.init(unwrapped)
   }
 
-  /// Construct ${a_Self} with a given pattern of bits.
+  /// Creates ${a_Self} with a given pattern of bits.
+  ///
+  /// Returns `nil` if `bitPattern` is zero.
   @_transparent
   public init?(bitPattern: Int) {
     if bitPattern == 0 { return nil }
     self._rawValue = Builtin.inttoptr_Word(bitPattern._builtinWordValue)
   }
 
-  /// Construct ${a_Self} with a given pattern of bits.
+  /// Creates ${a_Self} with a given pattern of bits.
+  ///
+  /// Returns `nil` if `bitPattern` is zero.
   @_transparent
   public init?(bitPattern: UInt) {
     if bitPattern == 0 { return nil }
     self._rawValue = Builtin.inttoptr_Word(bitPattern._builtinWordValue)
   }
 
-  /// Convert from any `UnsafeMutablePointer`, possibly with a
+  /// Converts from any `UnsafeMutablePointer`, possibly with a
   /// different `Pointee`.
   ///
-  /// - Warning: the behavior of accesses to pointee as a type
+  /// - Warning: The behavior of accesses to pointee as a type
   ///   different from that to which it was initialized is undefined.
   @_transparent
   public init<U>(_ from : UnsafeMutablePointer<U>) {
     _rawValue = from._rawValue
   }
 
-  /// Convert from any `UnsafeMutablePointer`, possibly with a
+  /// Converts from any `UnsafeMutablePointer`, possibly with a
   /// different `Pointee`.
   ///
   /// Returns nil if `from` is nil.
   ///
-  /// - Warning: the behavior of accesses to pointee as a type
+  /// - Warning: The behavior of accesses to pointee as a type
   ///   different from that to which it was initialized is undefined.
   @_transparent
   public init?<U>(_ from : UnsafeMutablePointer<U>?) {
@@ -98,22 +102,22 @@ public struct ${Self}<Pointee>
     self.init(unwrapped)
   }
 
-  /// Convert from any `UnsafePointer`, possibly with a
+  /// Converts from any `UnsafePointer`, possibly with a
   /// different `Pointee`.
   ///
-  /// - Warning: the behavior of accesses to pointee as a type
+  /// - Warning: The behavior of accesses to pointee as a type
   ///   different from that to which it was initialized is undefined.
   @_transparent
   public init<U>(_ from : UnsafePointer<U>) {
     _rawValue = from._rawValue
   }
 
-  /// Convert from any `UnsafePointer`, possibly with a
+  /// Converts from any `UnsafePointer`, possibly with a
   /// different `Pointee`.
   ///
-  /// Returns nil if `from` is nil.
+  /// Returns `nil` if `from` is `nil`.
   ///
-  /// - Warning: the behavior of accesses to pointee as a type
+  /// - Warning: The behavior of accesses to pointee as a type
   ///   different from that to which it was initialized is undefined.
   @_transparent
   public init?<U>(_ from : UnsafePointer<U>?) {
@@ -122,7 +126,7 @@ public struct ${Self}<Pointee>
   }
 
 %  if mutable:
-  /// Allocate and point at uninitialized aligned memory for `count`
+  /// Allocates and points at uninitialized aligned memory for `count`
   /// instances of `Pointee`.
   ///
   /// - Postcondition: The pointee is allocated, but not initialized.
@@ -133,7 +137,7 @@ public struct ${Self}<Pointee>
       Builtin.allocRaw(size._builtinWordValue, Builtin.alignof(Pointee.self)))
   }
 
-  /// Deallocate uninitialized memory allocated for `count` instances
+  /// Deallocates uninitialized memory allocated for `count` instances
   /// of `Pointee`.
   ///
   /// - Precondition: The memory is not initialized.
@@ -146,7 +150,7 @@ public struct ${Self}<Pointee>
   }
 %  end
 
-  /// Access the `Pointee` instance referenced by `self`.
+  /// Accesses the `Pointee` instance referenced by `self`.
   ///
   /// - Precondition: the pointee has been initialized with an instance of
   ///   type `Pointee`.
@@ -166,7 +170,7 @@ public struct ${Self}<Pointee>
   }
 
 %  if mutable:
-  /// Initialize `self.pointee` with `count` consecutive copies of `newValue`
+  /// Initializes `self.pointee` with `count` consecutive copies of `newValue`
   ///
   /// - Precondition: The pointee is not initialized.
   ///             `count` is non-negative.
@@ -184,7 +188,7 @@ public struct ${Self}<Pointee>
     }
   }
 
-  /// Retrieve the `pointee`, returning the referenced memory to an
+  /// Retrieves the `pointee`, returning the referenced memory to an
   /// uninitialized state.
   ///
   /// Equivalent to `{ defer { deinitialize() }; return pointee }()`, but
@@ -197,7 +201,7 @@ public struct ${Self}<Pointee>
     return Builtin.take(_rawValue)
   }
 
-  /// Replace `count` initialized `Pointee`s starting at `self` with
+  /// Replaces `count` initialized `Pointee`s starting at `self` with
   /// the `count` `Pointee`s at `source`.
   ///
   /// - Precondition: `count >= 0`
@@ -223,7 +227,7 @@ public struct ${Self}<Pointee>
     }
   }
 
-  /// Initialize memory starting at `self` with `count` `Pointee`s
+  /// Initializes memory starting at `self` with `count` `Pointee`s
   /// beginning at `source`, and returning the source memory to an
   /// uninitialized state.
   ///
@@ -261,7 +265,7 @@ public struct ${Self}<Pointee>
     }
   }
 
-  /// Initialize memory starting at `self` with `count` `Pointee`s
+  /// Initializes memory starting at `self` with `count` `Pointee`s
   /// beginning at `source`, proceeding forward from `self` to `self +
   /// count - 1`.
   ///
@@ -291,7 +295,7 @@ public struct ${Self}<Pointee>
     // }
   }
 
-  /// Initialize memory starting at `self` with the elements of `source`.
+  /// Initializes memory starting at `self` with the elements of `source`.
   ///
   /// - Precondition: The memory at `self..<self + count` is
   ///   uninitialized.
@@ -303,7 +307,7 @@ public struct ${Self}<Pointee>
     source._copyContents(initializing: self)
   }
 
-  /// Replace `count` initialized `Pointee`s starting at `self` with
+  /// Replaces `count` initialized `Pointee`s starting at `self` with
   /// the `count` `Pointee`s starting at `source`, returning the
   /// source memory to an uninitialized state.
   ///
@@ -333,7 +337,7 @@ public struct ${Self}<Pointee>
     // }
   }
 
-  /// De-initialize the `count` `Pointee`s starting at `self`, returning
+  /// De-initializes the `count` `Pointee`s starting at `self`, returning
   /// their memory to an uninitialized state.
   ///
   /// - Precondition: The `Pointee`s at `self..<self + count` are
@@ -348,7 +352,7 @@ public struct ${Self}<Pointee>
   }
 %  end
 
-  /// Access the pointee at `self + i`.
+  /// Accesses the pointee at `self + i`.
   ///
   /// - Precondition: the pointee at `self + i` is initialized.
   public subscript(i: Int) -> Pointee {
@@ -373,13 +377,11 @@ public struct ${Self}<Pointee>
   // Protocol conformance
   //
 
-  /// The hash value.
+  /// The pointer's hash value.
   ///
-  /// **Axiom:** `x == y` implies `x.hashValue == y.hashValue`.
-  ///
-  /// - Note: The hash value is not guaranteed to be stable across
-  ///   different invocations of the same program.  Do not persist the
-  ///   hash value across program runs.
+  /// The hash value is not guaranteed to be stable across different
+  /// invocations of the same program.  Do not persist the hash value across
+  /// program runs.
   public var hashValue: Int {
     return Int(Builtin.ptrtoint_Word(_rawValue))
   }
@@ -394,19 +396,19 @@ public struct ${Self}<Pointee>
     return self - 1
   }
 
-  /// Return `end - self`.
+  /// Returns `end - self`.
   public func distance(to x: ${Self}) -> Int {
     return x - self
   }
 
-  /// Return `self + n`.
+  /// Returns `self + n`.
   public func advanced(by n: Int) -> ${Self} {
     return self + n
   }
 }
 
 extension ${Self} : CustomDebugStringConvertible {
-  /// A textual representation of `self`, suitable for debugging.
+  /// A textual representation of the pointer, suitable for debugging.
   public var debugDescription: String {
     return _rawPointerToString(_rawValue)
   }

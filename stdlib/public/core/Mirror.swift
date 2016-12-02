@@ -594,7 +594,7 @@ internal extension Mirror {
 
 //===--- QuickLooks -------------------------------------------------------===//
 
-/// The sum of types that can be used as a quick look representation.
+/// The sum of types that can be used as a Quick Look representation.
 public enum PlaygroundQuickLook {
   /// Plain text.
   case text(String)
@@ -678,7 +678,7 @@ extension PlaygroundQuickLook {
   /// - Note: If the dynamic type of `subject` has value semantics,
   ///   subsequent mutations of `subject` will not observable in
   ///   `Mirror`.  In general, though, the observability of such
-  /// mutations is unspecified.
+  ///   mutations is unspecified.
   public init(reflecting subject: Any) {
     if let customized = subject as? CustomPlaygroundQuickLookable {
       self = customized.customPlaygroundQuickLook
@@ -697,15 +697,15 @@ extension PlaygroundQuickLook {
   }
 }
 
-/// A type that explicitly supplies its own PlaygroundQuickLook.
+/// A type that explicitly supplies its own playground Quick Look.
 ///
-/// Instances of any type can be `PlaygroundQuickLook(reflect:)`'ed
-/// upon, but if you are not satisfied with the `PlaygroundQuickLook`
-/// supplied for your type by default, you can make it conform to
-/// `CustomPlaygroundQuickLookable` and return a custom
-/// `PlaygroundQuickLook`.
+/// A Quick Look can be created for an instance of any type by using the
+/// `PlaygroundQuickLook(reflecting:)` initializer. If you are not satisfied
+/// with the representation supplied for your type by default, you can make it
+/// conform to the `CustomPlaygroundQuickLookable` protocol and provide a
+/// custom `PlaygroundQuickLook` instance.
 public protocol CustomPlaygroundQuickLookable {
-  /// A custom playground quick look for this instance.
+  /// A custom playground Quick Look for this instance.
   ///
   /// If this type has value semantics, the `PlaygroundQuickLook` instance
   /// should be unaffected by subsequent mutations.

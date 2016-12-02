@@ -121,11 +121,11 @@ public typealias _MaxBuiltinFloatType = Builtin.FPIEEE64
 /// that bridges to an Objective-C class. Many value types in Swift bridge to
 /// Objective-C counterparts, like `String` and `Int`.
 ///
-///     let s: AnyObject = "This is a bridged string."
+///     let s: AnyObject = "This is a bridged string." as NSString
 ///     print(s is NSString)
 ///     // Prints "true"
 ///
-///     let v: AnyObject = 100
+///     let v: AnyObject = 100 as NSNumber
 ///     print(v.dynamicType)
 ///     // Prints "__NSCFNumber"
 ///
@@ -141,34 +141,30 @@ public typealias _MaxBuiltinFloatType = Builtin.FPIEEE64
 /// type and can be cast to that type using one of the type-cast operators
 /// (`as`, `as?`, or `as!`).
 ///
-/// In the code samples that follow, the elements of the `NSArray` instance
-/// `numberObjects` have `AnyObject` as their type. The first example uses the
-/// conditional downcast operator (`as?`) to conditionally cast the first
-/// object in the `numberObjects` array to an instance of Swift's `String`
-/// type.
+/// This example uses the conditional downcast operator (`as?`) to
+/// conditionally cast the `s` constant declared above to an instance of
+/// Swift's `String` type.
 ///
-///     let numberObjects: NSArray = ["one", "two", 3, 4]
-///
-///     let first: AnyObject = numberObjects[0]
-///     if let first = first as? String {
-///         print("The first object, '\(first)', is a String")
+///     if let message = s as? String {
+///         print("Succesful cast to String: \(message)")
 ///     }
-///     // Prints("The first object, 'one', is a String")
+///     // Prints "Succesful cast to String: This is a bridged string."
 ///
 /// If you have prior knowledge that an `AnyObject` instance has a particular
 /// type, you can use the unconditional downcast operator (`as!`). Performing
 /// an invalid cast triggers a runtime error.
 ///
-///     let second = numberObjects.object(at: 1) as! String
-///     print("'\(second)' is also a String")
-///     // Prints "'two' is also a String"
+///     let message = s as! String
+///     print("Succesful cast to String: \(message)")
+///     // Prints "Succesful cast to String: This is a bridged string."
 ///
-///     let badCase = numberObjects.object(at: 2) as! NSDate
+///     let badCase = v as! String
 ///     // Runtime error
 ///
 /// Casting is always safe in the context of a `switch` statement.
 ///
-///     for object in numberObjects {
+///     let mixedArray: [AnyObject] = [s, v]
+///     for object in mixedArray {
 ///         switch object {
 ///         case let x as String:
 ///             print("'\(x)' is a String")
@@ -176,25 +172,8 @@ public typealias _MaxBuiltinFloatType = Builtin.FPIEEE64
 ///             print("'\(object)' is not a String")
 ///         }
 ///     }
-///     // Prints "'one' is a String"
-///     // Prints "'two' is a String"
-///     // Prints "'3' is not a String"
-///     // Prints "'4' is not a String"
-///
-/// You can call a method that takes an `AnyObject` parameter with an instance
-/// of any class, `@objc` protocol, or type that bridges to Objective-C. In
-/// the following example, the `toFind` constant is of type `Int`, which
-/// bridges to `NSNumber` when passed to an `NSArray` method that expects an
-/// `AnyObject` parameter:
-///
-///     let toFind = 3
-///     let i = numberObjects.index(of: toFind)
-///     if i != NSNotFound {
-///         print("Found '\(numberObjects[i])' at index \(i)")
-///     } else {
-///         print("Couldn't find \(toFind)")
-///     }
-///     // Prints "Found '3' at index 2"
+///     // Prints "'This is a bridged string.' is a String"
+///     // Prints "'100' is not a String"
 ///
 /// Accessing Objective-C Methods and Properties
 /// ============================================
@@ -208,7 +187,7 @@ public typealias _MaxBuiltinFloatType = Builtin.FPIEEE64
 /// properties, respectively.
 ///
 /// This example defines an `IntegerRef` type with an `@objc` method named
-/// `getIntegerValue`.
+/// `getIntegerValue()`.
 ///
 ///     class IntegerRef {
 ///         let value: Int
@@ -225,35 +204,36 @@ public typealias _MaxBuiltinFloatType = Builtin.FPIEEE64
 ///         return IntegerRef(100)
 ///     }
 ///
-///     let x: AnyObject = getObject()
+///     let obj: AnyObject = getObject()
 ///
-/// In the example, `x` has a static type of `AnyObject` and a dynamic type of
-/// `IntegerRef`. You can use optional chaining to call the `@objc` method
-/// `getIntegerValue()` on `x` safely. If you're sure of the dynamic type of
-/// `x`, you can call `getIntegerValue()` directly.
+/// In the example, `obj` has a static type of `AnyObject` and a dynamic type
+/// of `IntegerRef`. You can use optional chaining to call the `@objc` method
+/// `getIntegerValue()` on `obj` safely. If you're sure of the dynamic type of
+/// `obj`, you can call `getIntegerValue()` directly.
 ///
-///     let possibleValue = x.getIntegerValue?()
+///     let possibleValue = obj.getIntegerValue?()
 ///     print(possibleValue)
 ///     // Prints "Optional(100)"
 ///
-///     let certainValue = x.getIntegerValue()
+///     let certainValue = obj.getIntegerValue()
 ///     print(certainValue)
 ///     // Prints "100"
 ///
-/// If the dynamic type of `x` doesn't implement a `getIntegerValue()` method,
-/// the system returns a runtime error when you initialize `certainValue`.
+/// If the dynamic type of `obj` doesn't implement a `getIntegerValue()`
+/// method, the system returns a runtime error when you initialize
+/// `certainValue`.
 ///
-/// Alternatively, if you need to test whether `x.getValue()` exists, use
-/// optional binding before calling the method.
+/// Alternatively, if you need to test whether `obj.getIntegerValue()` exists,
+/// use optional binding before calling the method.
 ///
-///     if let f = x.getIntegerValue {
-///         print("The value of 'x' is \(f())")
+///     if let f = obj.getIntegerValue {
+///         print("The value of 'obj' is \(f())")
 ///     } else {
-///         print("'x' does not have a 'getIntegerValue()' method")
+///         print("'obj' does not have a 'getIntegerValue()' method")
 ///     }
-///     // Prints "The value of 'x' is 100"
+///     // Prints "The value of 'obj' is 100"
 ///
-/// - SeeAlso: `AnyClass`, `Any`
+/// - SeeAlso: `AnyClass`
 @objc
 public protocol AnyObject : class {}
 #else
@@ -299,7 +279,7 @@ public protocol AnyObject : class {}
 ///     print(getDefaultValue(NSString.self))
 ///     // Prints "nil"
 ///
-/// - SeeAlso: `AnyObject`, `Any`
+/// - SeeAlso: `AnyObject`
 public typealias AnyClass = AnyObject.Type
 
 /// A type that supports standard bitwise arithmetic operators.

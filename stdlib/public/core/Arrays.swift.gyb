@@ -99,7 +99,7 @@ if True:
 ///
 /// You can call any method on the slices that you might have called on the
 /// `absences` array. To learn which half had more absences, use the
-/// `reduce(_:)` method to calculate each sum.
+/// `reduce(_:_:)` method to calculate each sum.
 ///
 ///     let firstHalfSum = firstHalf.reduce(0, +)
 ///     let secondHalfSum = secondHalf.reduce(0, +)
@@ -168,16 +168,15 @@ if True:
 /// An ordered, random-access collection.
 ///
 /// Arrays are one of the most commonly used data types in an app. You use
-/// arrays to organize your app's data. Specifically, you use the `Array`
-/// type to hold elements of a single type, the array's `Element` type. An
-/// array's elements can be anything from an integer to a string to a
-/// class.
+/// arrays to organize your app's data. Specifically, you use the `Array` type
+/// to hold elements of a single type, the array's `Element` type. An array's
+/// elements can be anything from an integer to a string to a class.
 ///
-/// Swift makes it easy to create arrays in your code using an array
-/// literal: simply surround a comma-separated list of values with square
-/// brackets. Without any other information, Swift creates an array that
-/// includes the specified values, automatically inferring the array's
-/// `Element` type. For example:
+/// Swift makes it easy to create arrays in your code using an array literal:
+/// simply surround a comma separated list of values with square brackets.
+/// Without any other information, Swift creates an array that includes the
+/// specified values, automatically inferring the array's `Element` type. For
+/// example:
 ///
 ///     // An array of 'Int' elements
 ///     let oddNumbers = [1, 3, 5, 7, 9, 11, 13, 15]
@@ -194,8 +193,8 @@ if True:
 ///     // The full type name is also allowed
 ///     var emptyFloats: Array<Float> = Array()
 ///
-/// If you need an array that is preinitialized with a fixed number of
-/// default values, use the `Array(repeating:count:)` initializer.
+/// If you need an array that is preinitialized with a fixed number of default
+/// values, use the `Array(repeating:count:)` initializer.
 ///
 ///     var digitCounts = Array(repeating: 0, count: 10)
 ///     print(digitCounts)
@@ -204,8 +203,8 @@ if True:
 /// Accessing Array Values
 /// ======================
 ///
-/// When you need to perform an operation on all of an array's elements, use
-/// a `for`-`in` loop to iterate through the array's contents.
+/// When you need to perform an operation on all of an array's elements, use a
+/// `for`-`in` loop to iterate through the array's contents.
 ///
 ///     for street in streets {
 ///         print("I don't live on \(street).")
@@ -238,10 +237,10 @@ if True:
 ///     // Prints "nil, nil"
 ///
 /// You can access individual array elements through a subscript. The first
-/// element of a nonempty array is always at index zero. You can
-/// subscript an array with any integer from zero up to, but not including,
-/// the count of the array. Using a negative number or an index equal to or
-/// greater than `count` triggers a runtime error. For example:
+/// element of a nonempty array is always at index zero. You can subscript an
+/// array with any integer from zero up to, but not including, the count of
+/// the array. Using a negative number or an index equal to or greater than
+/// `count` triggers a runtime error. For example:
 ///
 ///     print(oddNumbers[0], oddNumbers[3], separator: ", ")
 ///     // Prints "1, 7"
@@ -255,52 +254,47 @@ if True:
 /// Adding and Removing Elements
 /// ============================
 ///
-/// Suppose you need to store a list of the names of students that are
-/// signed up for a class you're teaching. During the registration period,
-/// you need to add and remove names as students add and drop the class.
+/// Suppose you need to store a list of the names of students that are signed
+/// up for a class you're teaching. During the registration period, you need
+/// to add and remove names as students add and drop the class.
 ///
 ///     var students = ["Ben", "Ivy", "Jordell"]
 ///
-/// More students are signing up. Add single elements to the end of an array
-/// by using the `append(_:)` method. Add multiple elements at once by passing
-/// another array or a sequence of any kind to the `append(contentsOf:)`
-/// method.
+/// To add single elements to the end of an array, use the `append(_:)` method.
+/// Add multiple elements at once by passing another array or a sequence of
+/// any kind to the `append(contentsOf:)` method.
 ///
 ///     students.append("Maxime")
 ///     students.append(contentsOf: ["Shakia", "William"])
+///     // ["Ben", "Ivy", "Jordell", "Maxime", "Shakia", "William"]
 ///
-///     print(students)
-///     // Prints "["Ben", "Ivy", "Jordell", "Maxime", "Shakia", "William"]"
-///
-/// Another last-minute addition! Add new elements into the middle of the
-/// array by using the `insert(_:at:)` method for single elements and
-/// by using `insert(contentsOf:at:)` to insert multiple elements from another
+/// You can add new elements in the middle of an array by using the
+/// `insert(_:at:)` method for single elements and by using
+/// `insert(contentsOf:at:)` to insert multiple elements from another
 /// collection or array literal. The elements at that index and later are
 /// shifted back to make room.
 ///
-///     // Welcome, Liam!
 ///     students.insert("Liam", at: 3)
+///     // ["Ben", "Ivy", "Jordell", "Liam", "Maxime", "Shakia", "William"]
 ///
-/// A couple of students can't take your class after all. Use the
-/// `removeLast()` and `remove(at:)` methods to remove their names
-/// from the array.
+/// To remove elements from an array, use the `remove(at:)`,
+/// `removeSubrange(_:)`, and `removeLast()` methods.
 ///
 ///     // Ben's family is moving to another state
 ///     students.remove(at: 0)
+///     // ["Ivy", "Jordell", "Liam", "Maxime", "Shakia", "William"]
 ///
 ///     // William is signing up for a different class
 ///     students.removeLast()
+///     // ["Ivy", "Jordell", "Liam", "Maxime", "Shakia"]
 ///
-///     print(students)
-///     // Prints "["Ivy", "Jordell", "Liam", "Maxime", "Shakia"]"
-///
-/// On the first day, you learn that Maxime really prefers to go by Max.
-/// Replace an existing element with a new value by assigning to the
+/// You can replace an existing element with a new value by assigning to the
 /// subscript.
 ///
 ///     if let i = students.index(of: "Maxime") {
 ///         students[i] = "Max"
 ///     }
+///     // ["Ivy", "Jordell", "Liam", "Max", "Shakia"]
 ///
 /// Growing the Size of an Array
 /// ----------------------------
@@ -308,21 +302,20 @@ if True:
 /// Every array reserves a specific amount of memory to hold its contents. When
 /// you add elements to an array and that array begins to exceed its reserved
 /// capacity, the array allocates a larger region of memory and copies its
-/// elements into the new storage. The new storage is a multiple of the
-/// old storage's size. This exponential growth strategy means that appending
-/// an element happens in constant time, averaging the performance of many
-/// append operations. Append operations that trigger reallocation have a
-/// performance cost, but they occur less and less often as the array grows
-/// larger.
+/// elements into the new storage. The new storage is a multiple of the old
+/// storage's size. This exponential growth strategy means that appending an
+/// element happens in constant time, averaging the performance of many append
+/// operations. Append operations that trigger reallocation have a performance
+/// cost, but they occur less and less often as the array grows larger.
 ///
-/// If you know approximately how many elements you will need to store, use
-/// the `reserveCapacity(_:)` method before appending to the array to avoid
-/// intermediate reallocations. Use the `capacity` and `count` properties
-/// to determine how many more elements the array can store without
-/// allocating larger storage.
+/// If you know approximately how many elements you will need to store, use the
+/// `reserveCapacity(_:)` method before appending to the array to avoid
+/// intermediate reallocations. Use the `capacity` and `count` properties to
+/// determine how many more elements the array can store without allocating
+/// larger storage.
 ///
-/// For arrays of most `Element` types, this storage is a contiguous block
-/// of memory. For arrays with an `Element` type that is a class or `@objc`
+/// For arrays of most `Element` types, this storage is a contiguous block of
+/// memory. For arrays with an `Element` type that is a class or `@objc`
 /// protocol type, this storage can be a contiguous block of memory or an
 /// instance of `NSArray`. Because any arbitrary subclass of `NSArray` can
 /// become an `Array`, there are no guarantees about representation or
@@ -331,10 +324,10 @@ if True:
 /// Modifying Copies of Arrays
 /// ==========================
 ///
-/// Each array has an independent value that includes the values of all of
-/// its elements. For simple types such as integers and other structures,
-/// this means that when you change a value in one array, the value of that
-/// element does not change in any copies of the array. For example:
+/// Each array has an independent value that includes the values of all of its
+/// elements. For simple types such as integers and other structures, this
+/// means that when you change a value in one array, the value of that element
+/// does not change in any copies of the array. For example:
 ///
 ///     var numbers = [1, 2, 3, 4, 5]
 ///     var numbersCopy = numbers
@@ -344,13 +337,13 @@ if True:
 ///     print(numbersCopy)
 ///     // Prints "[1, 2, 3, 4, 5]"
 ///
-/// If the elements in an array are instances of a class, the semantics are
-/// the same, though they might appear different at first. In this case,
-/// the values stored in the array are references to objects that live
-/// outside the array. If you change a reference to an object in one array,
-/// only that array has a reference to the new object. However, if two
-/// arrays contain references to the same object, you can observe changes
-/// to that object's properties from both arrays. For example:
+/// If the elements in an array are instances of a class, the semantics are the
+/// same, though they might appear different at first. In this case, the
+/// values stored in the array are references to objects that live outside the
+/// array. If you change a reference to an object in one array, only that
+/// array has a reference to the new object. However, if two arrays contain
+/// references to the same object, you can observe changes to that object's
+/// properties from both arrays. For example:
 ///
 ///     // An integer type with reference semantics
 ///     class IntegerReference {
@@ -374,21 +367,21 @@ if True:
 ///
 /// Arrays, like all variable-size collections in the standard library, use
 /// copy-on-write optimization. Multiple copies of an array share the same
-/// storage until you modify one of the copies. When that happens, the
-/// array being modified replaces its storage with a uniquely owned copy of
-/// itself, which is then modified in place. Optimizations are sometimes
-/// applied that can reduce the amount of copying.
+/// storage until you modify one of the copies. When that happens, the array
+/// being modified replaces its storage with a uniquely owned copy of itself,
+/// which is then modified in place. Optimizations are sometimes applied that
+/// can reduce the amount of copying.
 ///
-/// This means that if an array is sharing storage with other copies, the
-/// first mutating operation on that array incurs the cost of copying the
-/// array. An array that is the sole owner of its storage can perform
-/// mutating operations in place.
+/// This means that if an array is sharing storage with other copies, the first
+/// mutating operation on that array incurs the cost of copying the array. An
+/// array that is the sole owner of its storage can perform mutating
+/// operations in place.
 ///
 /// In the example below, a `numbers` array is created along with two copies
 /// that share the same storage. When the original `numbers` array is
 /// modified, it makes a unique copy of its storage before making the
-/// modification. Further modifications to `numbers` are made in place,
-/// while the two copies continue to share the original storage.
+/// modification. Further modifications to `numbers` are made in place, while
+/// the two copies continue to share the original storage.
 ///
 ///     var numbers = [1, 2, 3, 4, 5]
 ///     var firstCopy = numbers
@@ -412,11 +405,11 @@ if True:
 /// Foundation type.
 ///
 /// The following example shows how you can bridge an `Array` instance to
-/// `NSArray` to use the `write(to:atomically:)` method. In this
-/// example, the `colors` array can be bridged to `NSArray` because its
-/// `String` elements bridge to `NSString`. The compiler prevents bridging
-/// the `moreColors` array, on the other hand, because its `Element` type
-/// is `Optional<String>`, which does *not* bridge to a Foundation type.
+/// `NSArray` to use the `write(to:atomically:)` method. In this example, the
+/// `colors` array can be bridged to `NSArray` because its `String` elements
+/// bridge to `NSString`. The compiler prevents bridging the `moreColors`
+/// array, on the other hand, because its `Element` type is
+/// `Optional<String>`, which does *not* bridge to a Foundation type.
 ///
 ///     let colors = ["periwinkle", "rose", "moss"]
 ///     let moreColors: [String?] = ["ochre", "pine"]
@@ -429,17 +422,17 @@ if True:
 ///     // error: cannot convert value of type '[String?]' to type 'NSArray'
 ///
 /// Bridging from `Array` to `NSArray` takes O(1) time and O(1) space if the
-/// array's elements are already instances of a class or an `@objc`
-/// protocol; otherwise, it takes O(n) time and space.
+/// array's elements are already instances of a class or an `@objc` protocol;
+/// otherwise, it takes O(n) time and space.
 ///
 /// Bridging from `NSArray` to `Array` first calls the `copy(with:)`
 /// (`- copyWithZone:` in Objective-C) method on the array to get an immutable
 /// copy and then performs additional Swift bookkeeping work that takes O(1)
-/// time. For instances of `NSArray` that are already immutable,
-/// `copy(with:)` usually returns the same array in O(1) time; otherwise,
-/// the copying performance is unspecified. The instances of `NSArray` and
-/// `Array` share storage using the same copy-on-write optimization that is
-/// used when two instances of `Array` share storage.
+/// time. For instances of `NSArray` that are already immutable, `copy(with:)`
+/// usually returns the same array in O(1) time; otherwise, the copying
+/// performance is unspecified. The instances of `NSArray` and `Array` share
+/// storage using the same copy-on-write optimization that is used when two
+/// instances of `Array` share storage.
 ///
 /// - Note: The `ContiguousArray` and `ArraySlice` types are not bridged;
 ///   instances of those types always have a contiguous block of memory as
@@ -563,9 +556,6 @@ public struct ${Self}<Element>
   ///   If `n` is negative, this is the same value as the result of `-n` calls
   ///   to `index(before:)`.
   ///
-  /// - Precondition:
-  ///   - If `n > 0`, `n <= self.distance(from: i, to: self.endIndex)`
-  ///   - If `n < 0`, `n >= self.distance(from: i, to: self.startIndex)`
   /// - Complexity: O(1)
   public func index(_ i: Int, offsetBy n: Int) -> Int {
     // NOTE: this is a manual specialization of index movement for a Strideable
@@ -660,7 +650,9 @@ public struct ${Self}<Element>
 
   /// Accesses the element at the specified position.
   ///
-  /// For example:
+  /// The following example uses indexed subscripting to update an array's
+  /// second element. After assigning the new value (`"Butler"`) at a specific
+  /// position, that value is immediately available at that same position.
   ///
   ///     var streets = ["Adams", "Bryant", "Channing", "Douglas", "Evarts"]
   ///     streets[1] = "Butler"
@@ -1257,13 +1249,25 @@ extension ${Self} : RangeReplaceableCollection, _ArrayProtocol {
 
   /// Adds a new element at the end of the array.
   ///
+  /// Use this method to append a single element to the end of a mutable array.
+  ///
+  ///     var numbers = [1, 2, 3, 4, 5]
+  ///     numbers.append(100)
+  ///     print(numbers)
+  ///     // Prints "[1, 2, 3, 4, 5, 100]"
+  ///
+  /// Because arrays increase their allocated capacity using an exponential
+  /// strategy, appending a single element to an array is an O(1) operation
+  /// when averaged over many calls to the `append(_:)` method. When an array
+  /// has additional capacity and is not sharing its storage with another
+  /// instance, appending an element is O(1). When an array needs to
+  /// reallocate storage before appending or its storage is shared with
+  /// another copy, appending is O(*n*), where *n* is the length of the array.
+  ///
   /// - Parameter newElement: The element to append to the array.
   ///
-  /// - Complexity: Appending an element to the array averages to O(1) over
-  ///   many additions. When the array needs to reallocate storage before
-  ///   appending or its storage is shared with another copy, appending an
-  ///   element is O(*n*), where *n* is the length of the array. If the array
-  ///   uses a bridged `NSArray` instance as its storage, the efficiency is
+  /// - Complexity: Amortized O(1) over many additions. If the array uses a
+  ///   bridged `NSArray` instance as its storage, the efficiency is
   ///   unspecified.
   public mutating func append(_ newElement: Element) {
     _makeUniqueAndReserveCapacityIfNotUnique()
@@ -1274,8 +1278,8 @@ extension ${Self} : RangeReplaceableCollection, _ArrayProtocol {
 
   /// Adds the elements of a sequence to the end of the array.
   ///
-  /// Use this method to append the elements of a sequence to the end of a
-  /// collection. This example appends the elements of a `Range<Int>` instance
+  /// Use this method to append the elements of a sequence to the end of an
+  /// array. This example appends the elements of a `Range<Int>` instance
   /// to an array of integers.
   ///
   ///     var numbers = [1, 2, 3, 4, 5]
@@ -1306,7 +1310,7 @@ extension ${Self} : RangeReplaceableCollection, _ArrayProtocol {
   /// Adds the elements of a collection to the end of the array.
   ///
   /// Use this method to append the elements of a collection to the end of this
-  /// collection. This example appends the elements of a `Range<Int>` instance
+  /// array. This example appends the elements of a `Range<Int>` instance
   /// to an array of integers.
   ///
   ///     var numbers = [1, 2, 3, 4, 5]
@@ -1339,7 +1343,13 @@ extension ${Self} : RangeReplaceableCollection, _ArrayProtocol {
 
   /// Removes and returns the last element of the array.
   ///
-  /// The array must not be empty.
+  /// The array must not be empty. This example removes the last number from an
+  /// array of `Double` values.
+  ///
+  ///     var measurements: [Double] = [1.1, 1.5, 2.9, 1.2, 1.5, 1.3, 1.2]
+  ///     let removed = measurements.removeLast()
+  ///     print(measurements)
+  ///     // Prints "[1.1, 1.5, 2.9, 1.2, 1.5, 1.3]"
   ///
   /// - Returns: The element that was removed.
   @discardableResult

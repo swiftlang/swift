@@ -377,7 +377,9 @@ public struct ClosedRange<
 
 /// Returns a closed range that contains both of its bounds.
 ///
-/// For example:
+/// Use the closed range operator (`...`) to create a closed range of any type
+/// that conforms to the `Comparable` protocol. This example creates a
+/// `ClosedRange<Character>` from "a" up to, and including, "z".
 ///
 ///     let lowercase = "a"..."z"
 ///     print(lowercase.contains("z"))
@@ -396,11 +398,22 @@ public func ... <Bound : Comparable> (minimum: Bound, maximum: Bound)
 
 /// Returns a countable closed range that contains both of its bounds.
 ///
-/// For example:
-/// 
+/// Use the closed range operator (`...`) to create a closed range of any type
+/// that conforms to the `Strideable` protocol with an associated signed
+/// integer `Stride` type, such as any of the standard library's integer
+/// types. This example creates a `CountableClosedRange<Int>` from zero up to,
+/// and including, nine.
+///
 ///     let singleDigits = 0...9
 ///     print(singleDigits.contains(9))
 ///     // Prints "true"
+///
+/// You can use sequence or collection methods on the `singleDigits` range.
+///
+///     print(singleDigits.count)
+///     // Prints "10"
+///     print(singleDigits.last)
+///     // Prints "9"
 ///
 /// - Parameters:
 ///   - minimum: The lower bound for the range.

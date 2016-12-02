@@ -13,6 +13,8 @@
 extension MutableCollection where Self : BidirectionalCollection {
   /// Reverses the elements of the collection in place.
   ///
+  /// The following example reverses the elements of an array of characters:
+  ///
   ///     var characters: [Character] = ["C", "a", "f", "é"]
   ///     characters.reverse()
   ///     print(cafe.characters)
@@ -65,7 +67,7 @@ public func < <Base : Collection>(
   return lhs.base > rhs.base
 }
 
-/// A Collection that presents the elements of its `Base` collection
+/// A collection that presents the elements of its base collection
 /// in reverse order.
 ///
 /// - Note: This type is the result of `x.reversed()` where `x` is a
@@ -176,7 +178,7 @@ public func < <Base : Collection>(
   return lhs.base > rhs.base
 }
 
-/// A Collection that presents the elements of its `Base` collection
+/// A collection that presents the elements of its base collection
 /// in reverse order.
 ///
 /// - Note: This type is the result of `x.reversed()` where `x` is a
@@ -326,7 +328,7 @@ extension LazyCollectionProtocol
   Self : BidirectionalCollection,
   Elements : BidirectionalCollection {
 
-  /// Returns the elements of `self` in reverse order.
+  /// Returns the elements of the collection in reverse order.
   ///
   /// - Complexity: O(1)
   public func reversed() -> LazyBidirectionalCollection<
@@ -341,7 +343,7 @@ extension LazyCollectionProtocol
   Self : RandomAccessCollection,
   Elements : RandomAccessCollection {
 
-  /// Returns the elements of `self` in reverse order.
+  /// Returns the elements of the collection in reverse order.
   ///
   /// - Complexity: O(1)
   public func reversed() -> LazyRandomAccessCollection<

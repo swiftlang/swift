@@ -20,23 +20,24 @@ import SwiftShims
 ///
 /// You can send the output of the standard library's `print(_:to:)` and
 /// `dump(_:to:)` functions to an instance of a type that conforms to the
-/// `TextOutputStream` protocol instead of to standard output. Swift's `String`
-/// type conforms to `TextOutputStream` already, so you can capture the output
-/// from `print(_:to:)` and `dump(_:to:)` in a string instead of logging it to
-/// standard output.
+/// `TextOutputStream` protocol instead of to standard output. Swift's
+/// `String` type conforms to `TextOutputStream` already, so you can capture
+/// the output from `print(_:to:)` and `dump(_:to:)` in a string instead of
+/// logging it to standard output.
 ///
 ///     var s = ""
-///     for n in 1 ... 5 {
+///     for n in 1...5 {
 ///         print(n, terminator: "", to: &s)
 ///     }
 ///     // s == "12345"
 ///
 /// Conforming to the TextOutputStream Protocol
-/// =======================================
+/// ===========================================
 ///
-/// To make your custom type conform to the `TextOutputStream` protocol, implement
-/// the required `write(_:)` method. Functions that use an `TextOutputStream`
-/// target may call `write(_:)` multiple times per writing operation.
+/// To make your custom type conform to the `TextOutputStream` protocol,
+/// implement the required `write(_:)` method. Functions that use a
+/// `TextOutputStream` target may call `write(_:)` multiple times per writing
+/// operation.
 ///
 /// As an example, here's an implementation of an output stream that converts
 /// any input to its plain ASCII representation before sending it to standard
@@ -104,10 +105,11 @@ public protocol Streamable {
 ///
 /// Types that conform to the `CustomStringConvertible` protocol can provide
 /// their own representation to be used when converting an instance to a
-/// string. The `String(_:)` initializer is the preferred way to convert an
-/// instance of *any* type to a string. If the passed instance conforms to
-/// `CustomStringConvertible`, the `String(_:)` initializer and the
-/// `print(_:)` function use the instance's custom `description` property.
+/// string. The `String(describing:)` initializer is the preferred way to
+/// convert an instance of *any* type to a string. If the passed instance
+/// conforms to `CustomStringConvertible`, the `String(describing:)`
+/// initializer and the `print(_:)` function use the instance's custom
+/// `description` property.
 ///
 /// Accessing a type's `description` property directly or using
 /// `CustomStringConvertible` as a generic constraint is discouraged.
@@ -147,7 +149,8 @@ public protocol CustomStringConvertible {
   /// A textual representation of this instance.
   ///
   /// Instead of accessing this property directly, convert an instance of any
-  /// type to a string by using the `String(_:)` initializer. For example:
+  /// type to a string by using the `String(describing:)` initializer. For
+  /// example:
   ///
   ///     struct Point: CustomStringConvertible {
   ///         let x: Int, y: Int
@@ -158,7 +161,7 @@ public protocol CustomStringConvertible {
   ///     }
   ///
   ///     let p = Point(x: 21, y: 30)
-  ///     let s = String(p)
+  ///     let s = String(describing: p)
   ///     print(s)
   ///     // Prints "(21, 30)"
   ///

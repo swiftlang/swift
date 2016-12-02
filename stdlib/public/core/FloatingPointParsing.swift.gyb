@@ -43,15 +43,86 @@ internal func _isspace_clocale(_ u: UTF16.CodeUnit) -> Bool {
 
 //===--- Parsing ----------------------------------------------------------===//
 extension ${Self} {
-  /// Construct from an ASCII representation.
+  /// Creates a new instance from the given string.
   ///
-  /// Returns the result of calling the POSIX function
-  /// `strto${cFuncSuffix2[bits]}_l` using the "C" locale, unless
-  /// `text` contains non-ASCII text or whitespace, or is not
-  /// completely consumed by the call. Otherwise, returns `nil`.
+  /// The string passed as `text` can represent a real number in decimal or
+  /// hexidecimal format or special floating-point values for infinty and NaN
+  /// ("not a number").
   ///
-  /// See the `strto${cFuncSuffix2[bits]} (3)` man page for details of
-  /// the exact format accepted.
+  /// The given string may begin with a plus or minus sign character (`+` or
+  /// `-`). The allowed formats for each of these representations is then as
+  /// follows:
+  ///
+  /// - A *decimal value* contains the significand, a sequence of decimal
+  ///   digits that may include a decimal point.
+  ///
+  ///       let c = ${Self}("-1.0")
+  ///       // c == -1.0
+  ///
+  ///       let d = ${Self}("28.375")
+  ///       // d == 28.375
+  ///
+  ///   A decimal value may also include an exponent following the significand,
+  ///   indicating the power of 10 by which the significand should be
+  ///   multiplied. If included, the exponent is separated by a single
+  ///   character, `e` or `E`, and consists of an optional plus or minus sign
+  ///   character and a sequence of decimal digits.
+  ///
+  ///       let e = ${Self}("2837.5e-2")
+  ///       // e == 28.375
+  ///
+  /// - A *hexadecimal value* contains the significand, either `0X` or `0x`,
+  ///   followed by a sequence of hexadecimal digits. The significand may
+  ///   include a decimal point.
+  ///
+  ///       let f = ${Self}("0x1c.6")
+  ///       // f == 28.375
+  ///
+  ///   A hexadecimal value may also include an exponent following the
+  ///   significand, indicating the power of 2 by which the significand should
+  ///   be multiplied. If included, the exponent is separated by a single
+  ///   character, `p` or `P`, and consists of an optional plus or minus sign
+  ///   character and a sequence of decimal digits.
+  ///
+  ///       let g = ${Self}("0x1.c6p4")
+  ///       // g == 28.375
+  ///
+  /// - A value of *infinity* contains one of the strings `"inf"` or
+  ///   `"infinity"`, case insensitive.
+  ///
+  ///       let i = ${Self}("inf")
+  ///       // i == ${Self}.infinity
+  ///
+  ///       let j = ${Self}("-Infinity")
+  ///       // j == -${Self}.infinity
+  ///
+  /// - A value of *NaN* contains the string `"nan"`, case insensitive.
+  ///
+  ///       let n = ${Self}("-nan")
+  ///       // n?.isNaN == true
+  ///       // n?.sign == .minus
+  ///
+  ///   An NaN value may also include a payload in parentheses following the
+  ///   `"nan"` keyword. The payload consists of a sequence of decimal digits,
+  ///   or the characters `0X` or `0x` followed by a sequence of hexadecimal
+  ///   digits. If the payload contains any other characters, it is ignored.
+  ///   If the value of the payload is larger than can be stored as the
+  ///   payload of a `${Self}.nan`, the least significant bits are used.
+  ///
+  ///       let p = ${Self}("nan(0x10)")
+  ///       // p?.isNaN == true
+  ///       // String(p!) == "nan(0x10)"
+  ///
+  /// Passing any other format or any additional characters as `text` results
+  /// in `nil`. For example, the following conversions result in `nil`:
+  ///
+  ///     Double(" 5.0")      // Includes whitespace
+  ///     Double("±2.0")      // Invalid character
+  ///     Double("0x1.25e4")  // Incorrect exponent format
+  ///
+  /// - Parameter text: The input string to convert to a `${Self}` instance. If
+  ///   `text` has invalid characters or is in an invalid format, the result
+  ///   is `nil`.
   public init?(_ text: String) {
     let u16 = text.utf16
     func parseNTBS(_ chars: UnsafePointer<CChar>) -> (${Self}, Int) {

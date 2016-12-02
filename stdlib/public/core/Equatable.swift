@@ -183,10 +183,54 @@ public func != <T : Equatable>(lhs: T, rhs: T) -> Bool {
 // Reference comparison
 //===----------------------------------------------------------------------===//
 
-/// Returns `true` iff `lhs` and `rhs` are references to the same object
-/// instance (in other words, are identical pointers).
+/// Returns a Boolean value indicating whether two references point to the same
+/// object instance.
 ///
-/// - SeeAlso: `Equatable`, `==`
+/// This operator tests whether two instances have the same identity, not the
+/// same value. For value equality, see the equal-to operator (`==`) and the
+/// `Equatable` protocol.
+///
+/// The following example defines an `IntegerRef` type; an integer type with
+/// reference semantics.
+///
+///     class IntegerRef: Equatable {
+///         let value: Int
+///         init(_ value: Int) {
+///             self.value = value
+///         }
+///     }
+///
+///     func ==(lhs: IntegerRef, rhs: IntegerRef) -> Bool {
+///         return lhs.value == rhs.value
+///     }
+///
+/// Because `IntegerRef` is a class, its instances can be compared using the
+/// identical-to operator (`===`). In addition, because `IntegerRef` conforms
+/// to the `Equatable` protocol, instances can also be compared using the
+/// equal-to operator (`==`).
+///
+///     let a = IntegerRef(10)
+///     let b = a
+///     print(a == b)
+///     // Prints "true"
+///     print(a === b)
+///     // Prints "true"
+///
+/// The identical-to operator (`===`) returns `false` when comparing two
+/// references to different objects instances, even if the two instances have
+/// the same value.
+///
+///     let c = IntegerRef(10)
+///     print(a == c)
+///     // Prints "true"
+///     print(a === c)
+///     // Prints "false"
+///
+/// - Parameters:
+///   - lhs: A reference to compare.
+///   - rhs: Another reference to compare.
+///
+/// - SeeAlso: `Equatable`, `==`, `!==`
 public func === (lhs: AnyObject?, rhs: AnyObject?) -> Bool {
   switch (lhs, rhs) {
   case let (l?, r?):
@@ -201,6 +245,18 @@ public func === (lhs: AnyObject?, rhs: AnyObject?) -> Bool {
   }
 }
 
+/// Returns a Boolean value indicating whether two references point to
+/// different object instances.
+///
+/// This operator tests whether two instances have different identities, not
+/// different values. For value inequality, see the not-equal-to operator
+/// (`!=`) and the `Equatable` protocol.
+///
+/// - Parameters:
+///   - lhs: A reference to compare.
+///   - rhs: Another reference to compare.
+///
+/// - SeeAlso: `Equatable`, `===`, `!=`
 public func !== (lhs: AnyObject?, rhs: AnyObject?) -> Bool {
   return !(lhs === rhs)
 }

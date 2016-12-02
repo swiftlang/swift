@@ -142,7 +142,7 @@ public struct Unsafe${Mutable}BufferPointer<Element>
     return startIndex..<endIndex
   }
 
-  /// Access the `i`th element in the buffer.
+  /// Accesses the `i`th element in the buffer.
   public subscript(i: Int) -> Element {
     get {
       _debugPrecondition(i >= 0)
@@ -177,7 +177,7 @@ public struct Unsafe${Mutable}BufferPointer<Element>
 %  end
   }
 
-  /// Construct an Unsafe${Mutable}Pointer over the `count` contiguous
+  /// Creates an Unsafe${Mutable}Pointer over the `count` contiguous
   /// `Element` instances beginning at `start`.
   ///
   /// If `start` is nil, `count` must be 0. However, `count` may be 0 even for

@@ -421,6 +421,10 @@ public struct ${Self}<Base : ${BaseRequirements}>
   ///     print(Array(subSequence))
   ///     // Prints "[5, 6, 7, 8, 9]"
   ///
+  /// In this example, the expression `singleDigits.dropFirst(5))` is
+  /// equivalent to calling this initializer with with `singleDigits` and a
+  /// range covering the last five items of `singleDigits.indices`.
+  ///
   /// - Parameters:
   ///   - base: The collection to create a view into.
   ///   - bounds: The range of indices to allow access to in the new slice.
@@ -437,6 +441,23 @@ public struct ${Self}<Base : ${BaseRequirements}>
 %     end
 
   /// The underlying collection of the slice.
+  ///
+  /// You can use a slice's `base` property to access its base collection. The
+  /// following example declares `singleDigits`, a range of single digit
+  /// integers, and then drops the first element to create a slice of that
+  /// range, `singleNonZeroDigits`. The `base` property of the slice is equal
+  /// to `singleDigits`.
+  ///
+  ///     let singleDigits = 0..<10
+  ///     let singleNonZeroDigits = singleDigits.dropFirst()
+  ///     // singleNonZeroDigits is a RandomAccessSlice<CountableRange<Int>>
+  ///
+  ///     print(singleNonZeroDigits.count)
+  ///     // Prints "9"
+  ///     prints(singleNonZeroDigits.base.count)
+  ///     // Prints "10"
+  ///     print(singleDigits == singleNonZeroDigits.base)
+  ///     // Prints "true"
   public var base: Base {
     return _base
   }
