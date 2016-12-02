@@ -16,6 +16,10 @@
 
 #include "swift/Basic/Demangle.h"
 #include "swift/Basic/Fallthrough.h"
+#ifndef NO_NEW_DEMANGLING
+#include "swift/Basic/Demangler.h"
+#include "swift/Basic/ManglingMacros.h"
+#endif
 #include "swift/Strings.h"
 #include "swift/Basic/LLVM.h"
 #include "swift/Basic/Punycode.h"

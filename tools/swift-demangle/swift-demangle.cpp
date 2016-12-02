@@ -15,6 +15,7 @@
 //===----------------------------------------------------------------------===//
 
 #include "swift/Basic/DemangleWrappers.h"
+#include "swift/Basic/ManglingMacros.h"
 #include "llvm/ADT/SmallString.h"
 #include "llvm/Support/CommandLine.h"
 #include "llvm/Support/MemoryBuffer.h"
@@ -104,7 +105,7 @@ static void demangle(llvm::raw_ostream &os, llvm::StringRef name,
 
 static int demangleSTDIN(const swift::Demangle::DemangleOptions &options) {
   // This doesn't handle Unicode symbols, but maybe that's okay.
-  llvm::Regex maybeSymbol("_T[_a-zA-Z0-9$]+");
+  llvm::Regex maybeSymbol("(_T|" MANGLING_PREFIX_STR ")[_a-zA-Z0-9$]+");
 
   while (true) {
     char *inputLine = NULL;
