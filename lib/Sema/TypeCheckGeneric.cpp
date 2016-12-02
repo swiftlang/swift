@@ -466,7 +466,9 @@ static Type getResultType(TypeChecker &TC, FuncDecl *fn, Type resultType) {
 
   // Rewrite dynamic self to the appropriate interface type.
   if (resultType->is<DynamicSelfType>()) {
-    return fn->getDynamicSelfInterface();
+    return DynamicSelfType::get(
+        fn->getDeclContext()->getSelfInterfaceType(),
+        TC.Context);
   }
 
   // Weird hacky special case.
@@ -611,6 +613,8 @@ void TypeChecker::configureInterfaceType(AbstractFunctionDecl *func,
     auto *dc = ctor->getDeclContext();
 
     funcTy = dc->getSelfInterfaceType();
+    if (!funcTy)
+      funcTy = ErrorType::get(Context);
 
     // Adjust result type for failability.
     if (ctor->getFailability() != OTK_None)

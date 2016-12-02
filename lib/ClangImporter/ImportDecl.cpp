@@ -3287,10 +3287,9 @@ namespace {
       // in Swift as DynamicSelf, do so.
       if (decl->hasRelatedResultType()) {
         result->setDynamicSelf(true);
-        resultTy = result->getDynamicSelfInterface();
-        assert(resultTy && "failed to get dynamic self");
+        resultTy = DynamicSelfType::get(dc->getSelfInterfaceType(),
+                                        Impl.SwiftContext);
 
-        Type dynamicSelfTy = result->getDynamicSelfInterface();
         OptionalTypeKind nullability = OTK_ImplicitlyUnwrappedOptional;
         if (auto typeNullability = decl->getReturnType()->getNullability(
                                      Impl.getClangASTContext())) {
@@ -3299,7 +3298,6 @@ namespace {
         }
         if (nullability != OTK_None && !errorConvention.hasValue()) {
           resultTy = OptionalType::get(nullability, resultTy);
-          dynamicSelfTy = OptionalType::get(nullability, dynamicSelfTy);
         }
 
         // Update the method type with the new result type.

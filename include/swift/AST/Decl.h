@@ -5043,15 +5043,6 @@ public:
   void setDynamicSelf(bool hasDynamicSelf) { 
     FuncDeclBits.HasDynamicSelf = hasDynamicSelf;
   }
-  
-  /// Retrieve the dynamic \c Self type for this method, or a null type if
-  /// this method does not have a dynamic \c Self return type.
-  DynamicSelfType *getDynamicSelf() const;
-
-  /// Retrieve the dynamic \c Self interface type for this method, or
-  /// a null type if this method does not have a dynamic \c Self
-  /// return type.
-  DynamicSelfType *getDynamicSelfInterface() const;
 
   /// Determine whether this method has an archetype \c Self return
   /// type. This is when a method defined in a protocol extension
