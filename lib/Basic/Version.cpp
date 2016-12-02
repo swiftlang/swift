@@ -43,22 +43,9 @@
   SWIFT_MAKE_VERSION_STRING(SWIFT_VERSION_MAJOR, SWIFT_VERSION_MINOR)
 #endif
 
-// MSVC doesn't support __has_include
-#if defined(_MSC_VER)
-# include "LLVMRevision.inc"
-# include "ClangRevision.inc"
-# include "SwiftRevision.inc"
-#else
-#if __has_include("LLVMRevision.inc")
-# include "LLVMRevision.inc"
-#endif
-#if __has_include("ClangRevision.inc")
-# include "ClangRevision.inc"
-#endif
-#if __has_include("SwiftRevision.inc")
-# include "SwiftRevision.inc"
-#endif
-#endif
+#include "LLVMRevision.inc"
+#include "ClangRevision.inc"
+#include "SwiftRevision.inc"
 
 namespace swift {
 namespace version {
