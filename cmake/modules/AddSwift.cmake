@@ -2124,3 +2124,8 @@ function(add_swift_host_tool executable)
     endif()
   endif()
 endfunction()
+
+macro(add_swift_tool_symlink name dest component)
+  add_llvm_tool_symlink(${name} ${dest} ALWAYS_GENERATE)
+  llvm_install_symlink(${name} ${dest} ALWAYS_GENERATE COMPONENT ${component})
+endmacro()
