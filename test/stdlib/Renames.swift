@@ -351,10 +351,6 @@ func _TextOutputStream<S : TextOutputStreamable, O : TextOutputStream>(s: S, o: 
   s.writeTo(&o) // expected-error {{'writeTo' has been renamed to 'write(to:)'}} {{5-12=write}} {{13-13=to: }} {{none}}
 }
 
-func _Policy() {
-  func fn<O : BitwiseOperationsType>(_: O) {} // expected-error {{'BitwiseOperationsType' has been renamed to 'BitwiseOperations'}} {{15-36=BitwiseOperations}} {{none}}
-}
-
 func _Print<T, O : TextOutputStream>(x: T, out: O) {
   var out = out
   print(x, toStream: &out) // expected-error {{'print(_:separator:terminator:toStream:)' has been renamed to 'print(_:separator:terminator:to:)'}} {{3-8=print}} {{12-20=to}} {{none}}

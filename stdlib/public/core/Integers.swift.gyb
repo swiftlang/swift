@@ -1810,10 +1810,7 @@ public enum ArithmeticOverflow {
 /// points for arithmetic operations. When you provide just those methods, the
 /// standard library provides default implementations for all other arithmetic
 /// methods and operators.
-public protocol FixedWidthInteger : BinaryInteger
-   // FIXME(integers): remove this along with the BitwiseOperations protocol
-  , BitwiseOperations
-  {
+public protocol FixedWidthInteger : BinaryInteger, BitwiseOperations {
   /// The number of bits used for the underlying binary representation of
   /// values of this type.
   ///
@@ -1928,13 +1925,9 @@ ${operationComment(x.operator)}
   var leadingZeros: Int { get }
 }
 
-// FIXME(integers): this conformance should be removed along with the
-// BitwiseOperations protocol
 extension FixedWidthInteger {
-  /// An instance where every bit is set to zero.
   public static var allZeros: Self { return 0 }
 }
-
 
 //===----------------------------------------------------------------------===//
 //===--- Operators on FixedWidthInteger -----------------------------------===//
@@ -1945,6 +1938,15 @@ extension FixedWidthInteger {
   public static prefix func ~ (x: Self) -> Self {
     return 0 &- x &- 1
   }
+
+  % for x in binaryBitwise:
+
+  @_transparent
+  public static func ${x.operator}= (lhs: inout Self, rhs: Self) {
+    lhs = lhs ${x.operator} rhs
+  }
+
+  % end
 
   % for x in maskingShifts:
 
@@ -2831,20 +2833,6 @@ public func _assumeNonNegative(_ x: ${Self}) -> ${Self} {
   return ${Self}(Builtin.assumeNonNegative_${BuiltinName}(x._value))
 }
 % end
-
-
-#if false
-// FIXME(integers): resolving the ambiguity. Should be gone along with the
-// BitwiseOperations protocol
-% for x in binaryBitwise:
-@_transparent
-public func ${x.operator}= <
-  T : BitwiseOperations
->(lhs: inout T, rhs: T) where T : FixedWidthInteger {
-  lhs = lhs ${x.operator} rhs
-}
-% end
-#endif
 
 
 //===--- end of FIXME(integers) -------------------------------------------===//
