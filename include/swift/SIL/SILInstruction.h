@@ -882,10 +882,9 @@ public:
       Operands[i].~Operand();
     }
   }
-
-  SILType getElementType() const {
-    return SILType::getPrimitiveObjectType(
-        getType().castTo<SILBoxType>()->getBoxedType());
+  
+  CanSILBoxType getBoxType() const {
+    return getType().castTo<SILBoxType>();
   }
 
   /// Return the underlying variable declaration associated with this

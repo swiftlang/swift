@@ -406,7 +406,10 @@ static bool rewriteAllocBoxAsAllocStack(AllocBoxInst *ABI,
   auto &Entry = ABI->getFunction()->front();
   SILBuilder BuildAlloc(&Entry, Entry.begin());
   BuildAlloc.setCurrentDebugScope(ABI->getDebugScope());
-  auto *ASI = BuildAlloc.createAllocStack(ABI->getLoc(), ABI->getElementType(),
+  assert(ABI->getBoxType()->getLayout()->getFields().size() == 1
+         && "rewriting multi-field box not implemented");
+  auto *ASI = BuildAlloc.createAllocStack(ABI->getLoc(),
+                                          ABI->getBoxType()->getFieldType(0),
                                           ABI->getVarInfo());
 
   // Replace all uses of the address of the box's contained value with
@@ -429,7 +432,10 @@ static bool rewriteAllocBoxAsAllocStack(AllocBoxInst *ABI,
       break;
     }
 
-  auto &Lowering = ABI->getModule().getTypeLowering(ABI->getElementType());
+  assert(ABI->getBoxType()->getLayout()->getFields().size() == 1
+         && "promoting multi-field box not implemented");
+  auto &Lowering = ABI->getModule()
+    .getTypeLowering(ABI->getBoxType()->getFieldType(0));
   auto Loc = CleanupLocation::get(ABI->getLoc());
 
   // For non-trivial types, insert destroys for each final release-like
