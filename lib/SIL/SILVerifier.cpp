@@ -1728,7 +1728,8 @@ public:
 
     require(AI->getType().isObject(),
             "result of alloc_box must be an object");
-    verifyOpenedArchetype(AI, AI->getElementType().getSwiftRValueType());
+    for (unsigned field : indices(AI->getBoxType()->getLayout()->getFields()))
+      verifyOpenedArchetype(AI, AI->getBoxType()->getFieldLoweredType(field));
   }
 
   void checkDeallocBoxInst(DeallocBoxInst *DI) {

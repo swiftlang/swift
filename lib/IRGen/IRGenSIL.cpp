@@ -3646,7 +3646,9 @@ void IRGenSILFunction::visitDeallocBoxInst(swift::DeallocBoxInst *i) {
 }
 
 void IRGenSILFunction::visitAllocBoxInst(swift::AllocBoxInst *i) {
-  const TypeInfo &type = getTypeInfo(i->getElementType());
+  assert(i->getBoxType()->getLayout()->getFields().size() == 1
+         && "multi field boxes not implemented yet");
+  const TypeInfo &type = getTypeInfo(i->getBoxType()->getFieldType(0));
 
   // Derive name from SIL location.
   VarDecl *Decl = i->getDecl();
@@ -3676,7 +3678,10 @@ void IRGenSILFunction::visitAllocBoxInst(swift::AllocBoxInst *i) {
     if (Name == IGM.Context.Id_self.str())
       return;
 
-    DebugTypeInfo DbgTy(Decl, i->getElementType().getSwiftType(), type, false);
+    assert(i->getBoxType()->getLayout()->getFields().size() == 1
+           && "box for a local variable should only have one field");
+    DebugTypeInfo DbgTy(Decl, i->getBoxType()->getFieldType(0).getSwiftType(),
+                        type, false);
     IGM.DebugInfo->emitVariableDeclaration(
         Builder,
         emitShadowCopy(boxWithAddr.getAddress(), i->getDebugScope(), Name, 0),
