@@ -28,6 +28,7 @@
 #include "swift/AST/DiagnosticsSema.h"
 #include "swift/AST/IRGenOptions.h"
 #include "swift/AST/Mangle.h"
+#include "swift/AST/ASTMangler.h"
 #include "swift/AST/NameLookup.h"
 #include "swift/AST/ReferencedNameTracker.h"
 #include "swift/AST/TypeRefinementContext.h"
@@ -1291,6 +1292,10 @@ int swift::performFrontend(ArrayRef<const char *> Args,
   bool HadError =
     performCompile(Instance, Invocation, Args, ReturnValue, observer) ||
     Instance.getASTContext().hadError();
+
+  if (!HadError) {
+    NewMangling::printManglingStats();
+  }
 
   if (!HadError && !Invocation.getFrontendOptions().DumpAPIPath.empty()) {
     HadError = dumpAPI(Instance.getMainModule(),

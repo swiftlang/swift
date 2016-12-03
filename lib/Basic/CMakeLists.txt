@@ -65,6 +65,7 @@ add_swift_library(swiftBasic STATIC
   Cache.cpp
   ClusteredBitVector.cpp
   Demangle.cpp
+  Demangler.cpp
   DemangleWrappers.cpp
   DiagnosticConsumer.cpp
   DiverseStack.cpp
@@ -74,6 +75,8 @@ add_swift_library(swiftBasic STATIC
   JSONSerialization.cpp
   LangOptions.cpp
   LLVMContext.cpp
+  Mangler.cpp
+  ManglingUtils.cpp
   Platform.cpp
   PrefixMap.cpp
   PrettyStackTrace.cpp
@@ -83,6 +86,7 @@ add_swift_library(swiftBasic STATIC
   PunycodeUTF8.cpp
   QuotedString.cpp
   Remangle.cpp
+  Remangler.cpp
   SourceLoc.cpp
   StringExtras.cpp
   TaskQueue.cpp

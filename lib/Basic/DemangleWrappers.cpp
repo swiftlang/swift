@@ -55,6 +55,10 @@ void NodeDumper::print(llvm::raw_ostream &Out) const {
   printNode(Out, Root.get(), 0);
 }
 
+void swift::demangle_wrappers::dumpNode(const NodePointer &Root) {
+  NodeDumper(Root).dump();
+}
+
 namespace {
 /// A pretty-stack-trace node for demangling trees.
 class PrettyStackTraceNode : public llvm::PrettyStackTraceEntry {
