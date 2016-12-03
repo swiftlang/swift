@@ -14,17 +14,9 @@ add_swift_host_tool(swift
 
 target_link_libraries(swift edit)
 
-add_custom_command(TARGET swift POST_BUILD
-    COMMAND "${CMAKE_COMMAND}" "-E" "create_symlink" "swift" "swiftc"
-    WORKING_DIRECTORY "${SWIFT_RUNTIME_OUTPUT_INTDIR}")
-
-add_custom_command(TARGET swift POST_BUILD
-    COMMAND "${CMAKE_COMMAND}" "-E" "create_symlink" "swift" "swift-autolink-extract"
-    WORKING_DIRECTORY "${SWIFT_RUNTIME_OUTPUT_INTDIR}")
-
-add_custom_command(TARGET swift POST_BUILD
-    COMMAND "${CMAKE_COMMAND}" "-E" "create_symlink" "swift" "swift-format"
-    WORKING_DIRECTORY "${SWIFT_RUNTIME_OUTPUT_INTDIR}")
+add_llvm_tool_symlink(swiftc swift ALWAYS_GENERATE)
+add_llvm_tool_symlink(swift-autolink-extract swift ALWAYS_GENERATE)
+add_llvm_tool_symlink(swift-format swift ALWAYS_GENERATE)
 
 # If building as part of clang, make sure the headers are installed.
 if(NOT SWIFT_BUILT_STANDALONE)
