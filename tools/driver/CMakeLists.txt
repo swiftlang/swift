@@ -14,9 +14,9 @@ add_swift_host_tool(swift
 
 target_link_libraries(swift edit)
 
-add_llvm_tool_symlink(swiftc swift ALWAYS_GENERATE)
-add_llvm_tool_symlink(swift-autolink-extract swift ALWAYS_GENERATE)
-add_llvm_tool_symlink(swift-format swift ALWAYS_GENERATE)
+add_swift_tool_symlink(swiftc swift compiler)
+add_swift_tool_symlink(swift-autolink-extract swift autolink-driver)
+add_swift_tool_symlink(swift-format swift editor-integration)
 
 # If building as part of clang, make sure the headers are installed.
 if(NOT SWIFT_BUILT_STANDALONE)
@@ -38,12 +38,3 @@ if(SWIFT_HOST_VARIANT MATCHES "${SWIFT_DARWIN_VARIANTS}")
       LINK_FLAGS " -lobjc -Wl,-force_load,\"${SWIFT_REPL_ARCLITE}\"")
 endif()
 
-swift_install_in_component(compiler
-    FILES "${SWIFT_RUNTIME_OUTPUT_INTDIR}/swiftc"
-    DESTINATION "bin")
-swift_install_in_component(autolink-driver
-    FILES "${SWIFT_RUNTIME_OUTPUT_INTDIR}/swift-autolink-extract"
-    DESTINATION "bin")
-swift_install_in_component(editor-integration
-    FILES "${SWIFT_RUNTIME_OUTPUT_INTDIR}/swift-format"
-    DESTINATION "bin")
