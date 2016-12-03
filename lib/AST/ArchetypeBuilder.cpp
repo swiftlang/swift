@@ -426,51 +426,18 @@ auto ArchetypeBuilder::PotentialArchetype::getNestedType(
 
         auto type = alias->getUnderlyingType();
         SmallVector<Identifier, 4> identifiers;
-        
-        if (auto archetype = type->getAs<ArchetypeType>()) {
-          auto containingProtocol = dyn_cast<ProtocolDecl>(alias->getParent());
-          if (!containingProtocol) continue;
-          
-          // Go up archetype parents until we find our containing protocol.
-          while (archetype->getParent()) {
-            identifiers.push_back(archetype->getName());
-            archetype = archetype->getParent();
-          }
-          if (!archetype->isEqual(containingProtocol->getSelfTypeInContext()))
-            continue;
-        } else if (auto dependent = type->getAs<DependentMemberType>()) {
-          do {
-            identifiers.push_back(dependent->getName());
-            dependent = dependent->getBase()->getAs<DependentMemberType>();
-          } while (dependent);
+
+        // Map the type out of its context.
+        if (auto genericEnv = alias->getGenericEnvironmentOfContext()) {
+          type = genericEnv->mapTypeOutOfContext(alias->getModuleContext(),
+                                                 type);
         }
-        
-        if (identifiers.size()) {
-          // Go down our PAs until we find the referenced PA.
-          auto existingPA = this;
-          while (identifiers.size()) {
-            auto identifier = identifiers.back();
-            // If we end up looking for ourselves, don't recurse.
-            if (existingPA == this && identifier == nestedName) {
-              existingPA = pa;
-            } else {
-              existingPA = existingPA->getNestedType(identifier, builder);
-              existingPA = existingPA->getRepresentative();
-            }
-            identifiers.pop_back();
-          }
-          if (pa != existingPA) {
-            pa->Representative = existingPA;
-            pa->Representative->EquivalenceClass.push_back(pa);
-            pa->SameTypeSource = redundantSource;
-          }
-        } else if (type->hasArchetype()) {
-          // This is a complex type involving other associatedtypes, we'll fail
-          // to resolve and get a special diagnosis in finalize.
-          continue;
+
+        if (auto existingPA = builder.resolveArchetype(type)) {
+          builder.addSameTypeRequirementBetweenArchetypes(pa, existingPA,
+                                                          redundantSource);
         } else {
-          pa->ConcreteType = type;
-          pa->SameTypeSource = redundantSource;
+          builder.addSameTypeRequirementToConcrete(pa, type, redundantSource);
         }
       } else
         continue;
@@ -488,17 +455,8 @@ auto ArchetypeBuilder::PotentialArchetype::getNestedType(
           // case we want to make sure the associatedtype is frontmost to
           // generate generics/witness lists correctly, and the alias
           // will be unused/useless for generic constraining anyway.
-          for (auto existing : nested) {
-            existing->Representative = pa;
-            existing->Representative->EquivalenceClass.push_back(existing);
-            existing->SameTypeSource = redundantSource;
-          }
           nested.insert(nested.begin(), pa);
-          NestedTypes[nestedName] = nested;
         } else {
-          pa->Representative = existing->getRepresentative();
-          pa->Representative->EquivalenceClass.push_back(pa);
-          pa->SameTypeSource = redundantSource;
           nested.push_back(pa);
         }
       } else
@@ -1847,25 +1805,10 @@ ArchetypeBuilder::finalize(SourceLoc loc, bool allowConcreteGenericParams) {
     visitPotentialArchetypes([&](PotentialArchetype *pa) {
       // We only care about nested types that haven't been resolved.
       if (pa->getParent() == nullptr || pa->getResolvedAssociatedType() ||
+          pa->getTypeAliasDecl() ||
           /* FIXME: Should be able to handle this earlier */pa->getSuperclass())
         return;
 
-      // If a typealias with this name exists in one of the parent protocols,
-      // give a special diagnosis.
-      auto parentConformances = pa->getParent()->getConformsTo();
-      for (auto &conforms : parentConformances) {
-        for (auto member : conforms.first->getMembers()) {
-          auto typealias = dyn_cast<TypeAliasDecl>(member);
-          if (!typealias || typealias->getName() != pa->getName())
-            continue;
-
-          Context.Diags.diagnose(loc, diag::invalid_member_type_alias,
-                                 pa->getName());
-          pa->setInvalid();
-          return;
-        }
-      }
-      
       // Try to typo correct to a nested type name.
       Identifier correction = typoCorrectNestedType(pa);
       if (correction.empty()) {
@@ -2202,7 +2145,8 @@ GenericEnvironment *ArchetypeBuilder::getGenericEnvironment(
                                                     /*allowUnresolved=*/false);
       auto repInContext = genericEnv->mapTypeIntoContext(&getModule(), repDepTy);
       assert((inContext->isEqual(repInContext) ||
-              (inContext->hasError() && repInContext->hasError())) &&
+              inContext->hasError() ||
+              repInContext->hasError()) &&
              "Potential archetype mapping differs from representative!");
     });
   }

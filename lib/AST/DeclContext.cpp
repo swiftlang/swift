@@ -301,6 +301,20 @@ GenericEnvironment *DeclContext::getGenericEnvironmentOfContext() const {
   }
 }
 
+Type DeclContext::mapTypeIntoContext(Type type) const {
+  if (auto genericEnv = getGenericEnvironmentOfContext())
+    return genericEnv->mapTypeIntoContext(getParentModule(), type);
+
+  return type;
+}
+
+Type DeclContext::mapTypeOutOfContext(Type type) const {
+  if (auto genericEnv = getGenericEnvironmentOfContext())
+    return genericEnv->mapTypeOutOfContext(getParentModule(), type);
+
+  return type;
+}
+
 DeclContext *DeclContext::getLocalContext() {
   if (isLocalContext())
     return this;

@@ -942,7 +942,7 @@ resolveTopLevelIdentTypeComponent(TypeChecker &TC, DeclContext *DC,
     // while the 'Self' type is more than just a reference to a TypeDecl.
 
     return DynamicSelfType::get(
-        func->getDeclContext()->getSelfTypeInContext(),
+        func->computeSelfType()->getRValueInstanceType(),
         TC.Context);
   }
 

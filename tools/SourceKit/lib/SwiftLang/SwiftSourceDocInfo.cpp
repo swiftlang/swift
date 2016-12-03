@@ -1260,8 +1260,10 @@ resolveCursorFromUSR(SwiftLangSupport &Lang, StringRef InputFile, StringRef USR,
       } else if (auto *VD = dyn_cast<ValueDecl>(D)) {
         auto *DC = VD->getDeclContext();
         Type selfTy;
-        if (DC->isTypeContext())
-          selfTy = DC->getSelfTypeInContext();
+        if (DC->isTypeContext()) {
+          selfTy = DC->getSelfInterfaceType();
+          selfTy = VD->getInnermostDeclContext()->mapTypeIntoContext(selfTy);
+        }
         bool Failed =
             passCursorInfoForDecl(VD, MainModule, selfTy, Type(),
                                   /*isRef=*/false, BufferID, Lang, CompInvok,

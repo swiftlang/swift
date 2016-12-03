@@ -232,8 +232,12 @@ Type CompleteGenericTypeResolver::resolveDependentMemberType(
   // If the nested type comes from a type alias, use either the alias's
   // concrete type, or resolve its components down to another dependent member.
   if (auto alias = nestedPA->getTypeAliasDecl()) {
-    return TC.substMemberTypeWithBase(DC->getParentModule(), alias,
-                                      baseTy);
+    Type result = TC.substMemberTypeWithBase(DC->getParentModule(), alias,
+                                             baseTy);
+
+    // FIXME: Introduce a SubstitutedType so availability checking can use it.
+    // This is a horrible hack.
+    return SubstitutedType::get(alias->getAliasType(), result, TC.Context);
   }
   
   Identifier name = ref->getIdentifier();

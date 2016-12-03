@@ -564,9 +564,6 @@ ERROR(invalid_member_type_suggest,none,
 ERROR(invalid_member_reference,none,
       "%0 %1 is not a member type of %2",
       (DescriptiveDeclKind, Identifier, Type))
-ERROR(invalid_member_type_alias,none,
-      "typealias %0 is too complex to be used as a generic constraint; "
-      "use an associatedtype instead", (Identifier))
 ERROR(ambiguous_member_type,none,
       "ambiguous type name %0 in %1", (Identifier, Type))
 ERROR(no_module_type,none,
