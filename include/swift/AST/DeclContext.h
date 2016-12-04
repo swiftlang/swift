@@ -292,12 +292,6 @@ public:
   /// Get the type of `self` in this context.
   ///
   /// - Protocol types return the `Self` archetype.
-  /// - Everything else falls back on getDeclaredTypeOfContext().
-  Type getSelfTypeOfContext() const;
-
-  /// Get the type of `self` in this context.
-  ///
-  /// - Protocol types return the `Self` archetype.
   /// - Everything else falls back on getDeclaredTypeInContext().
   Type getSelfTypeInContext() const;
 

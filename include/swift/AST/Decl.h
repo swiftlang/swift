@@ -4319,9 +4319,7 @@ public:
   /// For a generic context, this also gives the parameter an unbound generic
   /// type with the expectation that type-checking will fill in the context
   /// generic parameters.
-  static ParamDecl *createUnboundSelf(SourceLoc loc, DeclContext *DC,
-                                      bool isStatic = false,
-                                      bool isInOut = false);
+  static ParamDecl *createUnboundSelf(SourceLoc loc, DeclContext *DC);
 
   /// Create an implicit 'self' decl for a method in the specified decl context.
   /// If 'static' is true, then this is self for a static method in the type.
@@ -4724,12 +4722,6 @@ public:
   }
 
   /// \brief If this is a method in a type or extension thereof, compute
-  /// and return the type to be used for the 'self' argument of the type, or an
-  /// empty Type() if no 'self' argument should exist.  This can
-  /// only be used after name binding has resolved types.
-  Type computeSelfType();
-
-  /// \brief If this is a method in a type or extension thereof, compute
   /// and return the type to be used for the 'self' argument of the interface
   /// type, or an empty Type() if no 'self' argument should exist.  This can
   /// only be used after name binding has resolved types.
@@ -4737,7 +4729,12 @@ public:
   /// \param isInitializingCtor Specifies whether we're computing the 'self'
   /// type of an initializing constructor, which accepts an instance 'self'
   /// rather than a metatype 'self'.
-  Type computeInterfaceSelfType(bool isInitializingCtor);
+  ///
+  /// \param wantDynamicSelf Specifies whether the 'self' type should be
+  /// wrapped in a DynamicSelfType, which is the case for the 'self' parameter
+  /// type inside a class method returning 'Self'.
+  Type computeInterfaceSelfType(bool isInitializingCtor=false,
+                                bool wantDynamicSelf=false);
 
   /// \brief This method returns the implicit 'self' decl.
   ///

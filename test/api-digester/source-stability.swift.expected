@@ -31,6 +31,7 @@ Func OptionSet.insert(_:) has return type change from (inserted: Bool, memberAft
 Func OptionSet.remove(_:) has return type change from Self? to Self.Element?
 Func OptionSet.update(with:) has return type change from Self? to Self.Element?
 Func RandomAccessCollection.distance(from:to:) has return type change from Self.IndexDistance to Self.Index.Stride
+Func RandomAccessCollection.index(_:offsetBy:) has 2nd parameter type change from Self.IndexDistance to Self.Index.Stride
 
 /* More DictionaryIndex / SetIndex */
 Func Set.index(after:) has return type change from SetIndex<Element> to Set<Element>.Index

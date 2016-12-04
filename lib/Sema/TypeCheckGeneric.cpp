@@ -61,13 +61,23 @@ Type DependentGenericTypeResolver::resolveSelfAssociatedType(
            ->getDependentType(/*FIXME: */{ }, /*allowUnresolved=*/true);
 }
 
-Type DependentGenericTypeResolver::resolveTypeOfContext(DeclContext *dc) {
-  // FIXME: Should be the interface type of the extension.
+static Type getTypeOfContext(DeclContext *dc, bool wantSelf) {
+  if (wantSelf)
+    return dc->getSelfInterfaceType();
   return dc->getDeclaredInterfaceType();
+}
+
+Type DependentGenericTypeResolver::resolveTypeOfContext(DeclContext *dc,
+                                                        bool wantSelf) {
+  return getTypeOfContext(dc, wantSelf);
 }
 
 Type DependentGenericTypeResolver::resolveTypeOfDecl(TypeDecl *decl) {
   return decl->getDeclaredInterfaceType();
+}
+
+void DependentGenericTypeResolver::recordParamType(ParamDecl *decl, Type type) {
+  // Do nothing
 }
 
 Type GenericTypeToArchetypeResolver::resolveGenericTypeParamType(
@@ -98,8 +108,11 @@ Type GenericTypeToArchetypeResolver::resolveSelfAssociatedType(
   llvm_unreachable("Dependent type after archetype substitution");  
 }
 
-Type GenericTypeToArchetypeResolver::resolveTypeOfContext(DeclContext *dc) {
-  return dc->getDeclaredTypeInContext();
+Type GenericTypeToArchetypeResolver::resolveTypeOfContext(DeclContext *dc,
+                                                          bool wantSelf) {
+  return ArchetypeBuilder::mapTypeIntoContext(
+      dc->getParentModule(), GenericEnv,
+      getTypeOfContext(dc, wantSelf));
 }
 
 Type GenericTypeToArchetypeResolver::resolveTypeOfDecl(TypeDecl *decl) {
@@ -115,6 +128,22 @@ Type GenericTypeToArchetypeResolver::resolveTypeOfDecl(TypeDecl *decl) {
   if (aliasDecl->isInvalid())
     return ErrorType::get(aliasDecl->getASTContext());
   return aliasDecl->getAliasType();
+}
+
+void GenericTypeToArchetypeResolver::recordParamType(ParamDecl *decl, Type type) {
+  decl->setType(type);
+
+  // When type checking a closure or subscript index, this is the only
+  // resolver that runs, so make sure we also set the interface type,
+  // if one was not already set.
+  //
+  // When type checking functions, the CompleteGenericTypeResolver sets
+  // the interface type.
+  if (!decl->hasInterfaceType())
+    decl->setInterfaceType(ArchetypeBuilder::mapTypeOutOfContext(
+        decl->getDeclContext()->getParentModule(),
+        GenericEnv,
+        type));
 }
 
 Type PartialGenericTypeToArchetypeResolver::resolveGenericTypeParamType(
@@ -155,8 +184,11 @@ Type PartialGenericTypeToArchetypeResolver::resolveSelfAssociatedType(
 }
 
 Type
-PartialGenericTypeToArchetypeResolver::resolveTypeOfContext(DeclContext *dc) {
-  return dc->getDeclaredTypeInContext();
+PartialGenericTypeToArchetypeResolver::resolveTypeOfContext(DeclContext *dc,
+                                                            bool wantSelf) {
+  if (dc->isGenericContext() && dc->isValidGenericContext())
+    return dc->mapTypeIntoContext(getTypeOfContext(dc, wantSelf));
+  return getTypeOfContext(dc, wantSelf);
 }
 
 Type
@@ -173,6 +205,12 @@ PartialGenericTypeToArchetypeResolver::resolveTypeOfDecl(TypeDecl *decl) {
   if (aliasDecl->isInvalid())
     return ErrorType::get(aliasDecl->getASTContext());
   return aliasDecl->getAliasType();
+}
+
+void
+PartialGenericTypeToArchetypeResolver::recordParamType(ParamDecl *decl, Type type) {
+  // FIXME: Should do nothing, but used when checking closures
+  decl->setType(type);
 }
 
 Type CompleteGenericTypeResolver::resolveGenericTypeParamType(
@@ -271,13 +309,18 @@ Type CompleteGenericTypeResolver::resolveSelfAssociatedType(Type selfTy,
            ->getDependentType(/*FIXME: */{ }, /*allowUnresolved=*/false);
 }
 
-Type CompleteGenericTypeResolver::resolveTypeOfContext(DeclContext *dc) {
-  // FIXME: Should be the interface type of the extension.
-  return dc->getDeclaredInterfaceType();
+Type CompleteGenericTypeResolver::resolveTypeOfContext(DeclContext *dc,
+                                                       bool wantSelf) {
+  return getTypeOfContext(dc, wantSelf);
 }
 
 Type CompleteGenericTypeResolver::resolveTypeOfDecl(TypeDecl *decl) {
   return decl->getDeclaredInterfaceType();
+}
+
+void
+CompleteGenericTypeResolver::recordParamType(ParamDecl *decl, Type type) {
+  decl->setInterfaceType(type);
 }
 
 /// Check the generic parameters in the given generic parameter list (and its
@@ -442,52 +485,6 @@ static bool checkGenericFuncSignature(TypeChecker &tc,
   return badType;
 }
 
-static Type getResultType(TypeChecker &TC, FuncDecl *fn, Type resultType) {
-  // Look through optional types.
-  OptionalTypeKind optKind;
-  if (auto origValueType = resultType->getAnyOptionalObjectType(optKind)) {
-    // Get the interface type of the result.
-    Type ifaceValueType = getResultType(TC, fn, origValueType);
-
-    // Preserve the optional type's original spelling if the interface
-    // type is the same as the original.
-    if (origValueType.getPointer() == ifaceValueType.getPointer()) {
-      return resultType;
-    }
-
-    // Wrap the interface type in the right kind of optional.
-    switch (optKind) {
-    case OTK_None: llvm_unreachable("impossible");
-    case OTK_Optional:
-      return OptionalType::get(ifaceValueType);
-    case OTK_ImplicitlyUnwrappedOptional:
-      return ImplicitlyUnwrappedOptionalType::get(ifaceValueType);
-    }
-    llvm_unreachable("bad optional kind");
-  }
-
-  // Rewrite dynamic self to the appropriate interface type.
-  if (resultType->is<DynamicSelfType>()) {
-    return DynamicSelfType::get(
-        fn->getDeclContext()->getSelfInterfaceType(),
-        TC.Context);
-  }
-
-  // Weird hacky special case.
-  if (!fn->getBodyResultTypeLoc().hasLocation() &&
-      fn->isGenericContext()) {
-    // FIXME: This should not be rewritten.  This is only needed in cases where
-    // we synthesize a function which returns a generic value.  In that case,
-    // the return type is specified in terms of archetypes, but has no TypeLoc
-    // in the TypeRepr.  Because of this, Sema isn't able to rebuild it in
-    // terms of interface types.  When interface types prevail, this should be
-    // removed.  Until then, we hack the mapping here.
-    return ArchetypeBuilder::mapTypeOutOfContext(fn->getDeclContext(), resultType);
-  }
-
-  return resultType;
-}
-
 /// Determine whether the given type is \c Self, an associated type of \c Self,
 /// or a concrete type.
 static bool isSelfDerivedOrConcrete(Type protoSelf, Type type) {
@@ -605,12 +602,8 @@ void TypeChecker::configureInterfaceType(AbstractFunctionDecl *func,
 
   if (auto fn = dyn_cast<FuncDecl>(func)) {
     funcTy = fn->getBodyResultTypeLoc().getType();
-    
-    if (!funcTy) {
+    if (!funcTy)
       funcTy = TupleType::getEmpty(Context);
-    } else {
-      funcTy = getResultType(*this, fn, funcTy);
-    }
 
   } else if (auto ctor = dyn_cast<ConstructorDecl>(func)) {
     auto *dc = ctor->getDeclContext();
@@ -648,7 +641,7 @@ void TypeChecker::configureInterfaceType(AbstractFunctionDecl *func,
 
     Type selfTy;
     if (i == e-1 && hasSelf) {
-      selfTy = func->computeInterfaceSelfType(/*isInitializingCtor=*/false);
+      selfTy = func->computeInterfaceSelfType();
       // Substitute in our own 'self' parameter.
 
       argTy = selfTy;
@@ -950,9 +943,6 @@ void TypeChecker::revertGenericFuncSignature(AbstractFunctionDecl *func) {
   // Revert the body parameter types.
   for (auto paramList : func->getParameterLists()) {
     for (auto &param : *paramList) {
-      // Clear out the type of the decl.
-      if (param->hasType() && !param->isInvalid())
-        param->setType(Type());
       revertDependentTypeLoc(param->getTypeLoc());
     }
   }

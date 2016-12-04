@@ -395,7 +395,7 @@ Type TypeChecker::resolveTypeInContext(
         stack.push_back(superclassTy);
       else if (auto protoTy = fromType->getAs<ProtocolType>()) {
         for (auto *proto : protoTy->getDecl()->getInheritedProtocols(this))
-          if (auto refinedTy = proto->getDeclaredTypeInContext())
+          if (auto refinedTy = proto->getDeclaredInterfaceType())
             stack.push_back(refinedTy);
       }
     }
@@ -932,9 +932,9 @@ resolveTopLevelIdentTypeComponent(TypeChecker &TC, DeclContext *DC,
     // The issue is though that ComponentIdentTypeRepr only accepts a ValueDecl
     // while the 'Self' type is more than just a reference to a TypeDecl.
 
-    return DynamicSelfType::get(
-        func->computeSelfType()->getRValueInstanceType(),
-        TC.Context);
+    auto selfType = resolver->resolveTypeOfContext(func->getDeclContext(),
+                                                   /*wantSelf=*/true);
+    return DynamicSelfType::get(selfType, TC.Context);
   }
 
   // For lookups within the generic signature, look at the generic
@@ -3050,7 +3050,7 @@ static bool checkObjCInExtensionContext(TypeChecker &tc,
     // parameters.
     // FIXME: This is a current limitation, not inherent. We don't have
     // a concrete class to attach Objective-C category metadata to.
-    Type extendedTy = ED->getDeclaredTypeInContext();
+    Type extendedTy = ED->getDeclaredInterfaceType();
     while (!extendedTy.isNull()) {
       const ClassDecl *CD = extendedTy->getClassOrBoundGenericClass();
       if (!CD)
@@ -3098,7 +3098,7 @@ static bool checkObjCInForeignClassContext(TypeChecker &TC,
                                            ObjCReason Reason) {
   bool Diagnose = (Reason != ObjCReason::DoNotDiagnose);
 
-  auto type = VD->getDeclContext()->getDeclaredTypeInContext();
+  auto type = VD->getDeclContext()->getDeclaredInterfaceType();
   if (!type)
     return false;
 

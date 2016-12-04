@@ -756,13 +756,19 @@ namespace {
       if (!P->getArgumentName().empty())
         OS << " apiName=" << P->getArgumentName();
       
-      OS << " type=";
       if (P->hasType()) {
+        OS << " type=";
         OS << '\'';
         P->getType().print(OS);
         OS << '\'';
-      } else
-        OS << "<null type>";
+      }
+      
+      if (P->hasInterfaceType()) {
+        OS << " interface type=";
+        OS << '\'';
+        P->getInterfaceType().print(OS);
+        OS << '\'';
+      }
       
       if (!P->isLet())
         OS << " mutable";

@@ -73,9 +73,7 @@ public:
   /// DeclContext that needs to be set correctly.  This is automatically handled
   /// when a function is created with this as part of its argument list.
   ///
-  static ParameterList *createUnboundSelf(SourceLoc loc, DeclContext *DC,
-                                          bool isStaticMethod = false,
-                                          bool isInOut = false);
+  static ParameterList *createUnboundSelf(SourceLoc loc, DeclContext *DC);
 
   /// Create an implicit 'self' decl for a method in the specified decl context.
   /// If 'static' is true, then this is self for a static method in the type.

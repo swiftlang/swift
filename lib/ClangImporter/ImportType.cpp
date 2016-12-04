@@ -1636,6 +1636,7 @@ ParameterList *ClangImporter::Implementation::importFunctionParameterList(
     auto param = new (SwiftContext)
         ParamDecl(true, SourceLoc(), SourceLoc(), Identifier(), SourceLoc(),
                   name, paramTy, ImportedHeaderUnit);
+    param->setInterfaceType(paramTy);
 
     param->setVariadic();
     parameters.push_back(param);
@@ -1936,6 +1937,7 @@ Type ClangImporter::Implementation::importMethodType(
                                             SourceLoc(), argName,
                                             SourceLoc(), argName, type,
                                             ImportedHeaderUnit);
+    var->setInterfaceType(type);
     swiftParams.push_back(var);
   };
 

@@ -414,7 +414,7 @@ struct ASTNodeBase {};
 
       // Check for type variables that escaped the type checker.
       if (type->hasTypeVariable()) {
-        Out << "a type variable escaped the type checker";
+        Out << "a type variable escaped the type checker\n";
         abort();
       }
 

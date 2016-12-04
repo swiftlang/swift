@@ -1114,22 +1114,26 @@ void swift::makeDynamic(ASTContext &ctx, ValueDecl *D) {
 /// pattern, etc.
 ///
 /// \param func The function whose 'self' is being configured.
-void swift::configureImplicitSelf(TypeChecker &tc,
+static void configureImplicitSelf(TypeChecker &tc,
                                   AbstractFunctionDecl *func) {
   auto selfDecl = func->getImplicitSelfDecl();
 
   // Compute the type of self.
-  Type selfTy = func->computeSelfType();
-  assert(selfDecl && selfTy && "Not a method");
+  Type selfIfaceTy = func->computeInterfaceSelfType(/*isInitializingCtor*/true);
+  assert(selfDecl && selfIfaceTy && "Not a method");
 
   // 'self' is 'let' for reference types (i.e., classes) or when 'self' is
   // neither inout.
-  selfDecl->setLet(!selfTy->is<InOutType>());
+  selfDecl->setLet(!selfIfaceTy->is<InOutType>());
+
+  selfDecl->setInterfaceType(selfIfaceTy);
+
+  // FIXME: Wrong DeclContext used for mapTypeIntoContext(), because
+  // 'func' doesn't have a generic environment yet.
+  Type selfTy = func->computeInterfaceSelfType(/*isInitializingCtor*/true,
+                                               /*wantDynamicSelf*/true);
+  selfTy = func->getDeclContext()->mapTypeIntoContext(selfTy);
   selfDecl->setType(selfTy);
-  
-  // Install the self type on the Parameter that contains it.  This ensures that
-  // we don't lose it when generic types get reverted.
-  selfDecl->getTypeLoc() = TypeLoc::withoutLoc(selfTy);
 }
 
 namespace {
@@ -3716,16 +3720,22 @@ public:
     if (SD->hasInterfaceType())
       return;
 
-    assert(SD->getDeclContext()->isTypeContext() &&
+    auto dc = SD->getDeclContext();
+    assert(dc->isTypeContext() &&
            "Decl parsing must prevent subscripts outside of types!");
 
     TC.checkDeclAttributesEarly(SD);
     TC.computeAccessibility(SD);
 
-    auto dc = SD->getDeclContext();
-    bool isInvalid = TC.validateType(SD->getElementTypeLoc(), dc);
+    GenericTypeToArchetypeResolver resolver(
+        dc->getGenericEnvironmentOfContext());
+
+    bool isInvalid = TC.validateType(SD->getElementTypeLoc(), dc,
+                                     TypeResolutionOptions(),
+                                     &resolver);
     isInvalid |= TC.typeCheckParameterList(SD->getIndices(), dc,
-                                           TypeResolutionOptions());
+                                           TypeResolutionOptions(),
+                                           &resolver);
 
     if (isInvalid) {
       SD->setInterfaceType(ErrorType::get(TC.Context));
@@ -3736,15 +3746,11 @@ public:
       if (SD->hasInterfaceType())
         return;
 
-      // Relabel the indices according to the subscript name.
-      auto indicesTy = SD->getIndices()->getType(TC.Context);
-      auto elementTy = SD->getElementTypeLoc().getType();
+      auto indicesIfaceTy = SD->getIndices()->getInterfaceType(dc);
 
-      // If we're in a generic context, set the interface type.
-      auto indicesIfaceTy = ArchetypeBuilder::mapTypeOutOfContext(
-                              dc, indicesTy);
-      auto elementIfaceTy = ArchetypeBuilder::mapTypeOutOfContext(
-                              dc, elementTy);
+      auto elementTy = SD->getElementTypeLoc().getType();
+      auto elementIfaceTy = dc->mapTypeOutOfContext(elementTy);
+
       SD->setInterfaceType(FunctionType::get(indicesIfaceTy, elementIfaceTy));
     }
 
@@ -3809,7 +3815,7 @@ public:
 
     // Synthesize materializeForSet in non-protocol contexts.
     if (auto materializeForSet = SD->getMaterializeForSetFunc()) {
-      if (!isa<ProtocolDecl>(SD->getDeclContext())) {
+      if (!isa<ProtocolDecl>(dc)) {
         synthesizeMaterializeForSet(materializeForSet, SD, TC);
         TC.typeCheckDecl(materializeForSet, true);
         TC.typeCheckDecl(materializeForSet, false);
@@ -4616,18 +4622,13 @@ public:
     if (!selfNominal) return;
 
     // Check the parameters for a reference to 'Self'.
-    auto genericEnv = FD->getGenericEnvironment();
     bool isProtocol = isa<ProtocolDecl>(selfNominal);
     for (auto param : *FD->getParameterList(1)) {
-      auto paramType = param->getType();
+      auto paramType = param->getInterfaceType();
       if (!paramType) break;
 
       // Look through 'inout'.
       paramType = paramType->getInOutObjectType();
-      if (genericEnv) {
-        paramType = genericEnv->mapTypeOutOfContext(FD->getModuleContext(),
-                                                    paramType);
-      }
       // Look through a metatype reference, if there is one.
       if (auto metatypeType = paramType->getAs<AnyMetatypeType>())
         paramType = metatypeType->getInstanceType();
@@ -4645,7 +4646,7 @@ public:
 
     // We did not find 'Self'. Complain.
     TC.diagnose(FD, diag::operator_in_unrelated_type,
-                FD->getDeclContext()->getDeclaredTypeInContext(),
+                FD->getDeclContext()->getDeclaredInterfaceType(),
                 isProtocol, FD->getFullName());
   }
 
@@ -4709,12 +4710,15 @@ public:
       if (VD->hasObservers()) {
         TC.validateDecl(VD);
         Type valueTy = VD->getType()->getReferenceStorageReferent();
+        Type valueIfaceTy = VD->getInterfaceType()->getReferenceStorageReferent();
         if (FD->isObservingAccessor() || (FD->isSetter() && FD->isImplicit())) {
           unsigned firstParamIdx = FD->getParent()->isTypeContext();
           auto *firstParamPattern = FD->getParameterList(firstParamIdx);
-          firstParamPattern->get(0)->getTypeLoc().setType(valueTy, true);
+          auto *newValueParam = firstParamPattern->get(0);
+          newValueParam->setType(valueTy);
+          newValueParam->setInterfaceType(valueIfaceTy);
         } else if (FD->isGetter() && FD->isImplicit()) {
-          FD->getBodyResultTypeLoc().setType(valueTy, true);
+          FD->getBodyResultTypeLoc().setType(valueIfaceTy, true);
         }
       }
     }
@@ -7066,18 +7070,6 @@ void TypeChecker::validateDecl(ValueDecl *D, bool resolveTypeParams) {
           
           return;
         }
-      } else if (VD->isSelfParameter()) {
-        // If the variable declaration is for a 'self' parameter, it may be
-        // because the self variable was reverted whilst validating the function
-        // signature.  In that case, reset the type.
-        if (isa<NominalTypeDecl>(VD->getDeclContext()->getParent())) {
-          if (auto funcDeclContext =
-                  dyn_cast<AbstractFunctionDecl>(VD->getDeclContext())) {
-            configureImplicitSelf(*this, funcDeclContext);
-          }
-        } else {
-          VD->markInvalid();
-        }      
       } else {
         // FIXME: This case is hit when code completion occurs in a function
         // parameter list. Previous parameters are definitely in scope, but

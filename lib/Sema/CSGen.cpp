@@ -1878,6 +1878,7 @@ namespace {
           // FIXME: Need a better locator for a pattern as a base.
           Type openedType = CS.openType(type, locator);
           param->setType(openedType);
+          param->setInterfaceType(openedType);
           continue;
         }
 
@@ -1886,6 +1887,7 @@ namespace {
                                         /*options=*/0);
         
         param->setType(ty);
+        param->setInterfaceType(ty);
       }
       
       return params->getType(CS.getASTContext());

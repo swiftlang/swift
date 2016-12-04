@@ -198,7 +198,6 @@ extension Container {
   private class PrivateInnerClass {} // expected-note * {{declared here}}
   fileprivate class PrivateSuperClass: PrivateInnerClass {} // expected-warning {{class should not be declared fileprivate because its superclass is private}} {{none}}
   fileprivate class PrivateGenericUser<T> where T: PrivateInnerClass {} // expected-warning {{generic class should not be declared fileprivate because its generic requirement uses a private type}} {{none}}
-  // FIXME expected-error@-1 {{cannot conform to class protocol 'AnyObject'}}
 }
 
 fileprivate struct SR2579 {

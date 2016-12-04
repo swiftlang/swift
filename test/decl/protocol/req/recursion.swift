@@ -7,11 +7,10 @@ protocol SomeProtocol {
 extension SomeProtocol where T == Optional<T> { } // expected-error{{same-type constraint 'Self.T' == 'Optional<Self.T>' is recursive}}
 
 // rdar://problem/19840527
-// FIXME: Crappy diagnostic
 
-class X<T> where T == X { // expected-error{{non-class type '<<error type>>' cannot conform to class protocol 'AnyObject'}}
+class X<T> where T == X { // expected-error{{same-type constraint 'T' == 'X<T>' is recursive}}
 // expected-error@-1{{same-type requirement makes generic parameter 'T' non-generic}}
-    var type: T { return type(of: self) } // expected-error{{use of undeclared type 'T'}}
+    var type: T { return type(of: self) }
 }
 
 protocol Y {

@@ -664,8 +664,7 @@ public:
       generator = new (TC.Context)
         VarDecl(/*static*/ false, /*IsLet*/ false, S->getInLoc(),
                 TC.Context.getIdentifier(name), generatorTy, DC);
-      generator->setInterfaceType(ArchetypeBuilder::mapTypeOutOfContext(
-          DC, generatorTy));
+      generator->setInterfaceType(DC->mapTypeOutOfContext(generatorTy));
       generator->setImplicit();
       
       // Create a pattern binding to initialize the generator.
@@ -1320,8 +1319,8 @@ static bool checkSuperInit(TypeChecker &tc, ConstructorDecl *fromCtor,
   auto ctor = otherCtorRef->getDecl();
   if (!ctor->isDesignatedInit()) {
     if (!implicitlyGenerated) {
-      auto contextTy = fromCtor->getDeclContext()->getDeclaredTypeInContext();
-      if (auto classTy = contextTy->getClassOrBoundGenericClass()) {
+      auto selfTy = fromCtor->getDeclContext()->getSelfInterfaceType();
+      if (auto classTy = selfTy->getClassOrBoundGenericClass()) {
         assert(classTy->getSuperclass());
         tc.diagnose(apply->getArg()->getLoc(), diag::chain_convenience_init,
                     classTy->getSuperclass());
@@ -1402,8 +1401,8 @@ bool TypeChecker::typeCheckConstructorBodyUntil(ConstructorDecl *ctor,
     return HadError;
 
   // Determine whether we need to introduce a super.init call.
-  auto nominalDecl = ctor->getDeclContext()->getDeclaredTypeInContext()
-    ->getNominalOrBoundGenericNominal();
+  auto nominalDecl = ctor->getDeclContext()
+    ->getAsNominalTypeOrNominalTypeExtensionContext();
   ClassDecl *ClassD = dyn_cast<ClassDecl>(nominalDecl);
   bool wantSuperInitCall = false;
   if (ClassD) {
@@ -1421,7 +1420,7 @@ bool TypeChecker::typeCheckConstructorBodyUntil(ConstructorDecl *ctor,
       /// A convenience initializer cannot chain to a superclass constructor.
       if (ctor->isConvenienceInit()) {
         diagnose(initExpr->getLoc(), diag::delegating_convenience_super_init,
-                 ctor->getDeclContext()->getDeclaredTypeOfContext());
+                 ctor->getDeclContext()->getDeclaredInterfaceType());
       }
 
       SWIFT_FALLTHROUGH;
@@ -1439,7 +1438,7 @@ bool TypeChecker::typeCheckConstructorBodyUntil(ConstructorDecl *ctor,
     if (ctor->isDesignatedInit() && ClassD && isDelegating) {
       diagnose(ctor->getLoc(),
                diag::delegating_designated_init,
-               ctor->getDeclContext()->getDeclaredTypeOfContext())
+               ctor->getDeclContext()->getDeclaredInterfaceType())
         .fixItInsert(ctor->getLoc(), "convenience ");
       diagnose(initExpr->getLoc(), diag::delegation_here);
       ctor->setInitKind(CtorInitializerKind::Convenience);

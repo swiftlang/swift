@@ -782,17 +782,24 @@ static bool validateParameterType(ParamDecl *decl, DeclContext *DC,
 bool TypeChecker::typeCheckParameterList(ParameterList *PL, DeclContext *DC,
                                          TypeResolutionOptions options,
                                          GenericTypeResolver *resolver) {
+  // Make sure we always have a resolver to use.
+  PartialGenericTypeToArchetypeResolver defaultResolver;
+  if (!resolver)
+    resolver = &defaultResolver;
+
   bool hadError = false;
   
   for (auto param : *PL) {
+    if (!param->getTypeLoc().getTypeRepr() &&
+        param->hasInterfaceType()) {
+      hadError |= param->isInvalid();
+      continue;
+    }
+
     hadError |= validateParameterType(param, DC, options, resolver, *this);
     
     auto type = param->getTypeLoc().getType();
-    if (!type && param->hasType()) {
-      type = param->getType();
-      param->getTypeLoc().setType(type);
-    }
-    
+
     // If there was no type specified, and if we're not looking at a
     // ClosureExpr, then we have a parse error (no type was specified).  The
     // parser will have already diagnosed this, but treat this as a type error
@@ -804,14 +811,14 @@ bool TypeChecker::typeCheckParameterList(ParameterList *PL, DeclContext *DC,
       param->setInvalid();
     }
     
-    if (param->isInvalid()) {
-      param->setType(ErrorType::get(Context));
+    if (param->isInvalid() || type->hasError()) {
+      param->markInvalid();
       hadError = true;
     } else
-      param->setType(type);
+      resolver->recordParamType(param, type);
     
     checkTypeModifyingDeclAttributes(param);
-    if (param->getType()->is<InOutType>()) {
+    if (!hadError && type->is<InOutType>()) {
       param->setLet(false);
     }
   }
@@ -969,7 +976,7 @@ static bool coercePatternViaConditionalDowncast(TypeChecker &tc,
                                             pattern->getLoc(),
                                             tc.Context.getIdentifier("$match"),
                                             type, dc);
-  matchVar->setInterfaceType(ArchetypeBuilder::mapTypeOutOfContext(dc, type));
+  matchVar->setInterfaceType(dc->mapTypeOutOfContext(type));
   matchVar->setHasNonPatternBindingInit();
 
   // Form the cast $match as? T, which produces an optional.
@@ -1085,11 +1092,11 @@ bool TypeChecker::coercePatternToType(Pattern *&P, DeclContext *dc, Type type,
     if (var->isInvalid())
       type = ErrorType::get(Context);
     var->setType(type);
+    // FIXME: wtf
     if (type->hasTypeParameter())
       var->setInterfaceType(type);
     else
-      var->setInterfaceType(ArchetypeBuilder::mapTypeOutOfContext(
-          var->getDeclContext(), type));
+      var->setInterfaceType(var->getDeclContext()->mapTypeOutOfContext(type));
 
     checkTypeModifyingDeclAttributes(var);
     if (type->is<InOutType>()) {
@@ -1547,8 +1554,10 @@ bool TypeChecker::coerceParameterListToType(ParameterList *P, ClosureExpr *CE,
       auto paramType = param->getTypeLoc().getType();
       // Coerce explicitly specified argument type to contextual type
       // only if both types are valid and do not match.
-      if (!hadError && isValidType(ty) && !ty->isEqual(paramType))
+      if (!hadError && isValidType(ty) && !ty->isEqual(paramType)) {
         param->setType(ty);
+        param->setInterfaceType(CE->mapTypeOutOfContext(ty));
+      }
     }
 
     if (!ty->isMaterializable()) {
@@ -1563,8 +1572,10 @@ bool TypeChecker::coerceParameterListToType(ParameterList *P, ClosureExpr *CE,
     // If contextual type is invalid and we have a valid argument type
     // trying to coerce argument to contextual type would mean erasing
     // valuable diagnostic information.
-    if (isValidType(ty) || shouldOverwriteParam(param))
+    if (isValidType(ty) || shouldOverwriteParam(param)) {
       param->setType(ty);
+      param->setInterfaceType(CE->mapTypeOutOfContext(ty));
+    }
     
     checkTypeModifyingDeclAttributes(param);
     return hadError;
