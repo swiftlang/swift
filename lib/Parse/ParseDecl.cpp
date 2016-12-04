@@ -2288,7 +2288,11 @@ void Parser::parseDeclDelayed() {
   Scope S(this, DelayedState->takeScope());
   ContextChange CC(*this, DelayedState->ParentContext);
 
-  parseDecl(ParseDeclOptions(DelayedState->Flags), [](Decl *D) {});
+  parseDecl(ParseDeclOptions(DelayedState->Flags), [&](Decl *D) {
+    SmallVector<Decl *, 2> scratch;
+    performDelayedConditionResolution(D, SF, scratch);
+    assert(scratch.empty());
+  });
 }
 
 /// \brief Parse an 'import' declaration, doing no token skipping on error.

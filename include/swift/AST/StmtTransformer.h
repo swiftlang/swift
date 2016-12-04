@@ -1,4 +1,4 @@
-//===--- Stmt.h - Swift Language Statement ASTs -----------------*- C++ -*-===//
+//===--- StmtTransformer.h - Class for transforming Stmts -------*- C++ -*-===//
 //
 // This source file is part of the Swift.org open source project
 //

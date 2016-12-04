@@ -1,6 +1,6 @@
-// RUN: %target-swift-frontend(mock-sdk: %clang-importer-sdk) -parse -verify %s
+// RUN: %target-swift-frontend(mock-sdk: %clang-importer-sdk) -typecheck -verify %s
 
-// XFAIL: linux
+// REQUIRES: objc_interop
 
 class Unique {} 
 
@@ -45,3 +45,30 @@ class Unique {}
 #else
   class Unique {} // This should not happen
 #endif
+
+func keepOn(keepingOn : () -> ()) {
+#if canImport(Foundation)
+  keepingOn()
+#else
+  class Unique {} // This should not happen 
+#endif
+}
+
+keepOn {
+#if !canImport(Swift) || canImport(Foundation)
+  print("")
+#elseif canImport(Swiftz)
+  class Unique {} // This should not happen
+#else
+  class Unique {} // This should not happen
+#endif
+
+  let object : NSObject
+#if canImport(Foundation)
+  object = NSObject()
+#else
+  object = "This should not happen"
+#endif
+  print(object)
+}
+

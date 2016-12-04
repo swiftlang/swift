@@ -21,6 +21,7 @@
 #include "swift/Basic/Version.h"
 #include "swift/Parse/Lexer.h"
 #include "swift/Parse/CodeCompletionCallbacks.h"
+#include "swift/Subsystems.h"
 #include "llvm/ADT/PointerUnion.h"
 #include "llvm/ADT/Twine.h"
 #include "llvm/Support/SaveAndRestore.h"
@@ -491,6 +492,11 @@ void Parser::parseTopLevelCodeDeclDelayed() {
     auto Brace = BraceStmt::create(Context, StartLoc, Result, Tok.getLoc());
     TLCD->setBody(Brace);
   }
+
+  SmallVector<Decl *, 2> ExtraTLCDs;
+  performDelayedConditionResolution(TLCD, SF, ExtraTLCDs);
+  std::vector<Decl *>::iterator pos = std::find(SF.Decls.begin(), SF.Decls.end(), TLCD);
+  SF.Decls.insert(pos + 1, ExtraTLCDs.begin(), ExtraTLCDs.end());
 }
 
 /// Recover from a 'case' or 'default' outside of a 'switch' by consuming up to

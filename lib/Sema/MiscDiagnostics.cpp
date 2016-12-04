@@ -2864,7 +2864,7 @@ void VarDeclUsageChecker::handleIfConfig(IfConfigStmt *ICS) {
   for (auto &clause : ICS->getClauses()) {
     // Active clauses are handled by the normal AST walk.
     if (clause.isActive) continue;
-    
+
     for (auto elt : clause.Elements)
       elt.walk(ConservativeDeclMarker(*this));
   }

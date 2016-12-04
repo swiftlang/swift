@@ -92,6 +92,11 @@ private:
     }
     if (!Parsed && ParserState.hasFunctionBodyState(AFD))
       TheParser.parseAbstractFunctionBodyDelayed(AFD);
+
+    SmallVector<Decl *, 2> scratch;
+    performDelayedConditionResolution(AFD, SF, scratch);
+    assert(scratch.empty());
+
     if (CodeCompletion)
       CodeCompletion->doneParsing();
   }

@@ -16,12 +16,13 @@
 
 #include "swift/AST/ASTContext.h"
 #include "swift/AST/ASTNode.h"
+#include "swift/AST/ASTWalker.h"
 #include "swift/AST/Decl.h"
 #include "swift/AST/Expr.h"
 #include "swift/AST/Module.h"
 #include "swift/AST/NameLookup.h"
 #include "swift/AST/Pattern.h"
-#include "swift/AST/StmtTransformer.h"
+#include "swift/AST/Stmt.h"
 #include "swift/AST/Types.h"
 #include "swift/Parse/Lexer.h"
 #include "swift/Sema/IDETypeChecking.h"
@@ -29,6 +30,7 @@
 #include "TypeChecker.h"
 
 #include <cstdio>
+#include <forward_list>
 #include <random>
 
 using namespace swift;
@@ -53,14 +55,14 @@ public:
   E &operator->() { return Contents; }
 };
 
-class Instrumenter : StmtTransformer {
+class Instrumenter {
 private:
   std::mt19937_64 &RNG;
   ASTContext &Context;
   DeclContext *TypeCheckDC;
   unsigned &TmpNameIndex;
   bool HighPerformance;
-  
+
   struct BracePair {
   public:
     SourceRange BraceRange;
@@ -72,9 +74,10 @@ private:
     };
     TargetKinds TargetKind = TargetKinds::None;
 
-    BracePair(const SourceRange &BR) :
+    BracePair(const SourceRange &BR) : 
       BraceRange(BR) { }
   };
+
   typedef std::forward_list<BracePair> BracePairStack;
 
   BracePairStack BracePairs;
@@ -117,6 +120,7 @@ private:
       BracePairs.front().TargetKind = BracePair::TargetKinds::None;
     }
   };
+
   typedef SmallVector<swift::ASTNode, 3> ElementVector;
 
   // Before a "return," "continue" or similar statement, emit pops of
@@ -136,14 +140,43 @@ private:
     }
     return EI;
   }
+    
+  class ClosureFinder : public ASTWalker {
+  private:
+    Instrumenter &I;
+  public:
+    ClosureFinder (Instrumenter &Inst) : I(Inst) { }
+    virtual std::pair<bool, Stmt*> walkToStmtPre(Stmt *S) {
+      if (isa<BraceStmt>(S)) {
+        return { false, S }; // don't walk into brace statements; we
+                             // need to respect nesting!
+      } else {
+        return { true, S };
+      }
+    }
+    virtual std::pair<bool, Expr*> walkToExprPre(Expr *E) {
+      if (ClosureExpr *CE = dyn_cast<ClosureExpr>(E)) {
+        BraceStmt *B = CE->getBody();
+        if (B) {
+          BraceStmt *NB = I.transformBraceStmt(B);
+          CE->setBody(NB, false);
+          // just with the entry and exit logging this is going to
+          // be more than a single expression!
+        }
+      }
+      return { true, E };
+    }
+  };
+    
+  ClosureFinder CF;
 
 public:
   Instrumenter(ASTContext &C, DeclContext *DC, std::mt19937_64 &RNG, bool HP,
                unsigned &TmpNameIndex)
-      : StmtTransformer(), RNG(RNG), Context(C), TypeCheckDC(DC),
-        TmpNameIndex(TmpNameIndex), HighPerformance(HP) {}
+      : RNG(RNG), Context(C), TypeCheckDC(DC), TmpNameIndex(TmpNameIndex),
+        HighPerformance(HP), CF(*this) {}
 
-  Stmt *transformStmt(Stmt *S) override {
+  Stmt *transformStmt(Stmt *S) { 
     switch (S->getKind()) {
     default:
       return S;
@@ -154,32 +187,145 @@ public:
     case StmtKind::Guard:
       return transformGuardStmt(cast<GuardStmt>(S));
     case StmtKind::While: {
-      TargetKindSetter TKS(BracePairs, BracePair::TargetKinds::Break);
-      return transformWhileStmt(cast<WhileStmt>(S));
-    }
+        TargetKindSetter TKS(BracePairs, BracePair::TargetKinds::Break);
+        return transformWhileStmt(cast<WhileStmt>(S));
+      }
     case StmtKind::RepeatWhile: {
-      TargetKindSetter TKS(BracePairs, BracePair::TargetKinds::Break);
-      return transformRepeatWhileStmt(cast<RepeatWhileStmt>(S));
-    }
+        TargetKindSetter TKS(BracePairs, BracePair::TargetKinds::Break);
+        return transformRepeatWhileStmt(cast<RepeatWhileStmt>(S));
+      }
     case StmtKind::For: {
-      TargetKindSetter TKS(BracePairs, BracePair::TargetKinds::Break);
-      return transformForStmt(cast<ForStmt>(S));
-    }
+        TargetKindSetter TKS(BracePairs, BracePair::TargetKinds::Break);
+        return transformForStmt(cast<ForStmt>(S));
+      }
     case StmtKind::ForEach: {
-      TargetKindSetter TKS(BracePairs, BracePair::TargetKinds::Break);
-      return transformForEachStmt(cast<ForEachStmt>(S));
-    }
+        TargetKindSetter TKS(BracePairs, BracePair::TargetKinds::Break);
+        return transformForEachStmt(cast<ForEachStmt>(S));
+      }
     case StmtKind::Switch: {
-      TargetKindSetter TKS(BracePairs, BracePair::TargetKinds::Fallthrough);
-      return transformSwitchStmt(cast<SwitchStmt>(S));
-    }
+        TargetKindSetter TKS(BracePairs, BracePair::TargetKinds::Fallthrough);
+        return transformSwitchStmt(cast<SwitchStmt>(S));
+      }
     case StmtKind::Do:
       return transformDoStmt(llvm::cast<DoStmt>(S));
     case StmtKind::DoCatch:
       return transformDoCatchStmt(cast<DoCatchStmt>(S));
     }
   }
+    
+  // transform*() return their input if it's unmodified,
+  // or a modified copy of their input otherwise.
+  IfStmt *transformIfStmt(IfStmt *IS) {
+    if (Stmt *TS = IS->getThenStmt()) {
+      Stmt *NTS = transformStmt(TS);
+      if (NTS != TS) {
+        IS->setThenStmt(NTS);
+      }
+    }
 
+    if (Stmt *ES = IS->getElseStmt()) {
+      Stmt *NES = transformStmt(ES);
+      if (NES != ES) {
+        IS->setElseStmt(NES);
+      }
+    }
+
+    return IS;
+  }
+  
+  GuardStmt *transformGuardStmt(GuardStmt *GS) {
+    if (Stmt *BS = GS->getBody())
+      GS->setBody(transformStmt(BS));
+    return GS;
+  }
+
+  WhileStmt *transformWhileStmt(WhileStmt *WS) {
+    if (Stmt *B = WS->getBody()) {
+      Stmt *NB = transformStmt(B);
+      if (NB != B) {
+        WS->setBody(NB);
+      }
+    }
+      
+    return WS;
+  }
+
+  RepeatWhileStmt *transformRepeatWhileStmt(RepeatWhileStmt *RWS) {
+    if (Stmt *B = RWS->getBody()) {
+      Stmt *NB = transformStmt(B);
+      if (NB != B) {
+        RWS->setBody(NB);
+      }
+    }
+      
+    return RWS;
+  }
+
+  ForStmt *transformForStmt(ForStmt *FS) {
+    if (Stmt *B = FS->getBody()) {
+      Stmt *NB = transformStmt(B);
+      if (NB != B) {
+        FS->setBody(NB);
+      }
+    }
+      
+    return FS;
+  }
+
+  ForEachStmt *transformForEachStmt(ForEachStmt *FES) {
+    if (BraceStmt *B = FES->getBody()) {
+      BraceStmt *NB = transformBraceStmt(B);
+      if (NB != B) {
+        FES->setBody(NB);
+      }
+    }
+      
+    return FES;
+  }
+
+  SwitchStmt *transformSwitchStmt(SwitchStmt *SS) {
+    for (CaseStmt *CS : SS->getCases()) {
+      if (Stmt *S = CS->getBody()) {
+        if (auto *B = dyn_cast<BraceStmt>(S)) {
+          BraceStmt *NB = transformBraceStmt(B);
+          if (NB != B) {
+            CS->setBody(NB);
+          }
+        }
+      }
+    }
+      
+    return SS;
+  }
+
+  DoStmt *transformDoStmt(DoStmt *DS) {
+    if (BraceStmt *B = dyn_cast_or_null<BraceStmt>(DS->getBody())) {
+      BraceStmt *NB = transformBraceStmt(B);
+      if (NB != B) {
+        DS->setBody(NB);
+      }
+    }
+    return DS;
+  }
+
+  DoCatchStmt *transformDoCatchStmt(DoCatchStmt *DCS) {
+    if (BraceStmt *B = dyn_cast_or_null<BraceStmt>(DCS->getBody())) {
+      BraceStmt *NB = transformBraceStmt(B);
+      if (NB != B) {
+        DCS->setBody(NB);
+      }
+    }
+    for (CatchStmt *C : DCS->getCatches()) {
+      if (BraceStmt *CB = dyn_cast_or_null<BraceStmt>(C->getBody())) {
+        BraceStmt *NCB = transformBraceStmt(CB);
+        if (NCB != CB) {
+          C->setBody(NCB);
+        }
+      }
+    }
+    return DCS;
+  }
+  
   Decl *transformDecl(Decl *D) {
     if (D->isImplicit())
       return D;
@@ -352,7 +498,7 @@ public:
     return false;
   }
 
-  BraceStmt *transformBraceStmt(BraceStmt *BS, bool TopLevel = false) override {
+  BraceStmt *transformBraceStmt(BraceStmt *BS, bool TopLevel = false) {
     ArrayRef<ASTNode> OriginalElements = BS->getElements();
     typedef SmallVector<swift::ASTNode, 3> ElementVector;
     ElementVector Elements(OriginalElements.begin(),
