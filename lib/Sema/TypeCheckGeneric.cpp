@@ -43,7 +43,7 @@ Type DependentGenericTypeResolver::resolveDependentMemberType(
                                      ComponentIdentTypeRepr *ref) {
   auto archetype = Builder.resolveArchetype(baseTy);
   assert(archetype && "Bad generic context nesting?");
-  
+
   return archetype->getRepresentative()
            ->getNestedType(ref->getIdentifier(), Builder)
            ->getDependentType(/*FIXME: */{ }, /*allowUnresolved=*/true);
@@ -226,18 +226,15 @@ Type CompleteGenericTypeResolver::resolveDependentMemberType(
 
   // If the nested type has been resolved to an associated type, use it.
   if (auto assocType = nestedPA->getResolvedAssociatedType()) {
+    ref->setValue(assocType);
     return DependentMemberType::get(baseTy, assocType);
   }
 
   // If the nested type comes from a type alias, use either the alias's
   // concrete type, or resolve its components down to another dependent member.
   if (auto alias = nestedPA->getTypeAliasDecl()) {
-    Type result = TC.substMemberTypeWithBase(DC->getParentModule(), alias,
-                                             baseTy);
-
-    // FIXME: Introduce a SubstitutedType so availability checking can use it.
-    // This is a horrible hack.
-    return SubstitutedType::get(alias->getAliasType(), result, TC.Context);
+    ref->setValue(alias);
+    return TC.substMemberTypeWithBase(DC->getParentModule(), alias, baseTy);
   }
   
   Identifier name = ref->getIdentifier();
@@ -254,6 +251,7 @@ Type CompleteGenericTypeResolver::resolveDependentMemberType(
         return ErrorType::get(TC.Context);
       }
 
+      ref->setValue(lookup.front().first);
       // FIXME: Record (via type sugar) that this was referenced via baseTy.
       return lookup.front().second;
     }
