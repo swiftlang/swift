@@ -109,8 +109,8 @@ ParameterList *ParameterList::clone(const ASTContext &C,
   return create(C, params);
 }
 
-/// Return a TupleType or ParenType for this parameter list.  This returns a
-/// null type if one of the ParamDecls does not have a type set for it yet.
+/// Return a TupleType or ParenType for this parameter list, written in terms
+/// of contextual archetypes.
 Type ParameterList::getType(const ASTContext &C) const {
   if (size() == 0)
     return TupleType::getEmpty(C);
@@ -118,8 +118,6 @@ Type ParameterList::getType(const ASTContext &C) const {
   SmallVector<TupleTypeElt, 8> argumentInfo;
   
   for (auto P : *this) {
-    if (!P->hasType()) return Type();
-
     argumentInfo.emplace_back(
         P->getType(), P->getArgumentName(),
         ParameterTypeFlags::fromParameterType(P->getType(), P->isVariadic()));
@@ -128,11 +126,9 @@ Type ParameterList::getType(const ASTContext &C) const {
   return TupleType::get(argumentInfo, C);
 }
 
-/// Hack to deal with the fact that Sema/CodeSynthesis.cpp creates ParamDecls
-/// containing contextual types.
-Type ParameterList::getInterfaceType(DeclContext *DC) const {
-  auto &C = DC->getASTContext();
-
+/// Return a TupleType or ParenType for this parameter list, written in terms
+/// of interface types.
+Type ParameterList::getInterfaceType(const ASTContext &C) const {
   if (size() == 0)
     return TupleType::getEmpty(C);
 
@@ -157,10 +153,10 @@ Type ParameterList::getInterfaceType(DeclContext *DC) const {
 ///
 Type ParameterList::getFullInterfaceType(Type resultType,
                                          ArrayRef<ParameterList*> PLL,
-                                         DeclContext *DC) {
+                                         const ASTContext &C) {
   auto result = resultType;
   for (auto PL : reversed(PLL)) {
-    auto paramType = PL->getInterfaceType(DC);
+    auto paramType = PL->getInterfaceType(C);
     result = FunctionType::get(paramType, result);
   }
   return result;

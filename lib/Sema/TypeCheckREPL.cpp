@@ -245,7 +245,7 @@ void REPLChecker::generatePrintOfExpression(StringRef NameStr, Expr *E) {
                                 TypeLoc(), discriminator, newTopLevel);
 
   CE->setType(ParameterList::getFullInterfaceType(
-      TupleType::getEmpty(Context), params, newTopLevel));
+      TupleType::getEmpty(Context), params, Context));
   
   // Convert the pattern to a string we can print.
   llvm::SmallString<16> PrefixString;
