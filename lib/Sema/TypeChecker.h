@@ -1367,19 +1367,17 @@ public:
   /// \param P The pattern to type check.
   /// \param dc The context in which type checking occurs.
   /// \param options Options that control type resolution.
-  /// \param resolver A generic type resolver.
   ///
   /// \returns true if any errors occurred during type checking.
   bool typeCheckPattern(Pattern *P, DeclContext *dc,
-                        TypeResolutionOptions options,
-                        GenericTypeResolver *resolver = nullptr);
+                        TypeResolutionOptions options);
 
   bool typeCheckCatchPattern(CatchStmt *S, DeclContext *dc);
 
   /// Type check a parameter list.
   bool typeCheckParameterList(ParameterList *PL, DeclContext *dc,
                               TypeResolutionOptions options,
-                              GenericTypeResolver *resolver = nullptr);
+                              GenericTypeResolver &resolver);
   
   /// Coerce a pattern to the given type.
   ///

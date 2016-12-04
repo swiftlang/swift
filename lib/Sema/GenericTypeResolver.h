@@ -138,6 +138,9 @@ public:
   explicit GenericTypeToArchetypeResolver(GenericEnvironment *env)
       : GenericEnv(env) { }
 
+  explicit GenericTypeToArchetypeResolver(DeclContext *dc)
+      : GenericEnv(dc->getGenericEnvironmentOfContext()) { }
+
   virtual Type resolveGenericTypeParamType(GenericTypeParamType *gp);
 
   virtual Type resolveDependentMemberType(Type baseTy,

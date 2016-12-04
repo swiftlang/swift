@@ -209,8 +209,7 @@ PartialGenericTypeToArchetypeResolver::resolveTypeOfDecl(TypeDecl *decl) {
 
 void
 PartialGenericTypeToArchetypeResolver::recordParamType(ParamDecl *decl, Type type) {
-  // FIXME: Should do nothing, but used when checking closures
-  decl->setType(type);
+  // Do nothing
 }
 
 Type CompleteGenericTypeResolver::resolveGenericTypeParamType(
@@ -453,7 +452,7 @@ static bool checkGenericFuncSignature(TypeChecker &tc,
   for (auto params : func->getParameterLists()) {
     // Check the pattern.
     if (tc.typeCheckParameterList(params, func, TypeResolutionOptions(),
-                                  &resolver))
+                                  resolver))
       badType = true;
 
     // Infer requirements from the pattern.

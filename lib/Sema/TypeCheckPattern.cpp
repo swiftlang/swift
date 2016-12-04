@@ -412,7 +412,8 @@ public:
   // Member syntax 'T.Element' forms a pattern if 'T' is an enum and the
   // member name is a member of the enum.
   Pattern *visitUnresolvedDotExpr(UnresolvedDotExpr *ude) {
-    GenericTypeToArchetypeResolver resolver(DC->getGenericEnvironmentOfContext());
+    GenericTypeToArchetypeResolver resolver(DC);
+
     SmallVector<ComponentIdentTypeRepr *, 2> components;
     if (!ExprToIdentTypeRepr(components, TC.Context).visit(ude->getBase()))
       return nullptr;
@@ -497,7 +498,7 @@ public:
   //   then required to have keywords for every argument that name properties
   //   of the type.
   Pattern *visitCallExpr(CallExpr *ce) {
-    PartialGenericTypeToArchetypeResolver resolver;
+    GenericTypeToArchetypeResolver resolver(DC);
     
     SmallVector<ComponentIdentTypeRepr *, 2> components;
     if (!ExprToIdentTypeRepr(components, TC.Context).visit(ce->getFn()))
@@ -734,7 +735,7 @@ static void diagnoseAndMigrateVarParameterToBody(ParamDecl *decl,
 
 static bool validateParameterType(ParamDecl *decl, DeclContext *DC,
                                   TypeResolutionOptions options,
-                                  GenericTypeResolver *resolver,
+                                  GenericTypeResolver &resolver,
                                   TypeChecker &TC) {
   if (auto ty = decl->getTypeLoc().getType())
     return ty->hasError();
@@ -751,7 +752,7 @@ static bool validateParameterType(ParamDecl *decl, DeclContext *DC,
   // where parameters are allowed to elide their types.
   if (!decl->getTypeLoc().isNull()) {
     hadError |= TC.validateType(decl->getTypeLoc(), DC,
-                                elementOptions, resolver);
+                                elementOptions, &resolver);
   }
 
   Type Ty = decl->getTypeLoc().getType();
@@ -781,12 +782,7 @@ static bool validateParameterType(ParamDecl *decl, DeclContext *DC,
 /// Type check a parameter list.
 bool TypeChecker::typeCheckParameterList(ParameterList *PL, DeclContext *DC,
                                          TypeResolutionOptions options,
-                                         GenericTypeResolver *resolver) {
-  // Make sure we always have a resolver to use.
-  PartialGenericTypeToArchetypeResolver defaultResolver;
-  if (!resolver)
-    resolver = &defaultResolver;
-
+                                         GenericTypeResolver &resolver) {
   bool hadError = false;
   
   for (auto param : *PL) {
@@ -815,7 +811,7 @@ bool TypeChecker::typeCheckParameterList(ParameterList *PL, DeclContext *DC,
       param->markInvalid();
       hadError = true;
     } else
-      resolver->recordParamType(param, type);
+      resolver.recordParamType(param, type);
     
     checkTypeModifyingDeclAttributes(param);
     if (!hadError && type->is<InOutType>()) {
@@ -828,13 +824,9 @@ bool TypeChecker::typeCheckParameterList(ParameterList *PL, DeclContext *DC,
 
 
 bool TypeChecker::typeCheckPattern(Pattern *P, DeclContext *dc,
-                                   TypeResolutionOptions options,
-                                   GenericTypeResolver *resolver) {
-  // Make sure we always have a resolver to use.
-  PartialGenericTypeToArchetypeResolver defaultResolver;
-  if (!resolver)
-    resolver = &defaultResolver;
-  
+                                   TypeResolutionOptions options) {
+  GenericTypeToArchetypeResolver resolver(dc);
+
   switch (P->getKind()) {
   // Type-check paren patterns by checking the sub-pattern and
   // propagating that type out.
@@ -845,7 +837,7 @@ bool TypeChecker::typeCheckPattern(Pattern *P, DeclContext *dc,
       SP = PP->getSubPattern();
     else
       SP = cast<VarPattern>(P)->getSubPattern();
-    if (typeCheckPattern(SP, dc, options, resolver)) {
+    if (typeCheckPattern(SP, dc, options)) {
       P->setType(ErrorType::get(Context));
       return true;
     }
@@ -862,10 +854,10 @@ bool TypeChecker::typeCheckPattern(Pattern *P, DeclContext *dc,
   // that type.
   case PatternKind::Typed: {
     TypedPattern *TP = cast<TypedPattern>(P);
-    bool hadError = validateTypedPattern(*this, dc, TP, options, resolver);
+    bool hadError = validateTypedPattern(*this, dc, TP, options, &resolver);
     Pattern *subPattern = TP->getSubPattern();
     if (coercePatternToType(subPattern, dc, P->getType(),
-                            options|TR_FromNonInferredPattern, resolver,
+                            options|TR_FromNonInferredPattern, &resolver,
                             TP->getTypeLoc()))
       hadError = true;
     else {
@@ -909,7 +901,7 @@ bool TypeChecker::typeCheckPattern(Pattern *P, DeclContext *dc,
     for (unsigned i = 0, e = tuplePat->getNumElements(); i != e; ++i) {
       TuplePatternElt &elt = tuplePat->getElement(i);
       Pattern *pattern = elt.getPattern();
-      if (typeCheckPattern(pattern, dc, elementOptions, resolver)) {
+      if (typeCheckPattern(pattern, dc, elementOptions)) {
         hadError = true;
         continue;
       }
@@ -1540,6 +1532,8 @@ bool TypeChecker::coerceParameterListToType(ParameterList *P, ClosureExpr *CE,
     return true;
   };
 
+  GenericTypeToArchetypeResolver resolver(CE);
+
   // Sometimes a scalar type gets applied to a single-argument parameter list.
   auto handleParameter = [&](ParamDecl *param, Type ty) -> bool {
     bool hadError = false;
@@ -1547,7 +1541,7 @@ bool TypeChecker::coerceParameterListToType(ParameterList *P, ClosureExpr *CE,
     // Check that the type, if explicitly spelled, is ok.
     if (param->getTypeLoc().getTypeRepr()) {
       hadError |= validateParameterType(param, CE, TypeResolutionOptions(),
-                                        nullptr, *this);
+                                        resolver, *this);
       
       // Now that we've type checked the explicit argument type, see if it
       // agrees with the contextual type.

@@ -3727,15 +3727,14 @@ public:
     TC.checkDeclAttributesEarly(SD);
     TC.computeAccessibility(SD);
 
-    GenericTypeToArchetypeResolver resolver(
-        dc->getGenericEnvironmentOfContext());
+    GenericTypeToArchetypeResolver resolver(dc);
 
     bool isInvalid = TC.validateType(SD->getElementTypeLoc(), dc,
                                      TypeResolutionOptions(),
                                      &resolver);
     isInvalid |= TC.typeCheckParameterList(SD->getIndices(), dc,
                                            TypeResolutionOptions(),
-                                           &resolver);
+                                           resolver);
 
     if (isInvalid) {
       SD->setInterfaceType(ErrorType::get(TC.Context));
@@ -4302,7 +4301,7 @@ public:
   }
 
   bool semaFuncParamPatterns(AbstractFunctionDecl *fd,
-                             GenericTypeResolver *resolver) {
+                             GenericTypeResolver &resolver) {
     bool hadError = false;
     for (auto paramList : fd->getParameterLists()) {
       hadError |= TC.typeCheckParameterList(paramList, fd,
@@ -4313,7 +4312,7 @@ public:
     return hadError;
   }
 
-  bool semaFuncDecl(FuncDecl *FD, GenericTypeResolver *resolver) {
+  bool semaFuncDecl(FuncDecl *FD, GenericTypeResolver &resolver) {
     TC.checkForForbiddenPrefix(FD);
 
     FD->setIsBeingTypeChecked();
@@ -4324,7 +4323,7 @@ public:
       if (FD->hasDynamicSelf())
         options |= TR_DynamicSelfResult;
       if (TC.validateType(FD->getBodyResultTypeLoc(), FD, options,
-                          resolver)) {
+                          &resolver)) {
         badType = true;
       }
     }
@@ -4774,8 +4773,8 @@ public:
     }
 
     // Type check the parameters and return type again, now with archetypes.
-    GenericTypeToArchetypeResolver resolver(FD->getGenericEnvironment());
-    if (semaFuncDecl(FD, &resolver))
+    GenericTypeToArchetypeResolver resolver(FD);
+    if (semaFuncDecl(FD, resolver))
       return;
 
     if (!FD->getGenericSignatureOfContext())
@@ -6400,8 +6399,8 @@ public:
       SWIFT_DEFER { CD->setIsBeingTypeChecked(false); };
 
       // Type check the constructor parameters.
-      GenericTypeToArchetypeResolver resolver(CD->getGenericEnvironment());
-      if (CD->isInvalid() || semaFuncParamPatterns(CD, &resolver)) {
+      GenericTypeToArchetypeResolver resolver(CD);
+      if (CD->isInvalid() || semaFuncParamPatterns(CD, resolver)) {
         CD->setInterfaceType(ErrorType::get(TC.Context));
         CD->setInvalid();
       } else {
@@ -6546,8 +6545,8 @@ public:
           DD->getDeclContext()->getGenericEnvironmentOfContext());
     }
 
-    GenericTypeToArchetypeResolver resolver(DD->getGenericEnvironment());
-    if (semaFuncParamPatterns(DD, &resolver)) {
+    GenericTypeToArchetypeResolver resolver(DD);
+    if (semaFuncParamPatterns(DD, resolver)) {
       DD->setInterfaceType(ErrorType::get(TC.Context));
       DD->setInvalid();
     }
