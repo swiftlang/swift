@@ -17,6 +17,7 @@
 #include "llvm/ADT/Optional.h"
 #include "llvm/ADT/SmallString.h"
 #include "llvm/ADT/StringExtras.h"
+#include "llvm/ADT/STLExtras.h"
 #include "llvm/Support/raw_ostream.h"
 #include "gtest/gtest.h"
 #include <map>
@@ -254,7 +255,7 @@ bool CtorTesterSet::hasLiveTesters() const {
 }
 
 bool CtorTesterSet::numLiveTesters() const {
-  return count_if(Constructed, [](CtorTester *T) -> bool {
+  return llvm::count_if(Constructed, [](CtorTester *T) -> bool {
     assert(T);
     return !T->isIgnorableTester();
   });
