@@ -1009,6 +1009,10 @@ public:
   /// is usable for the given type.
   bool isProtocolExtensionUsable(DeclContext *dc, Type type,
                                  ExtensionDecl *protocolExtension) override;
+ 
+  /// Perform semantic checks on the given generic parameter list.
+  void prepareGenericParamList(GenericParamList *genericParams,
+                               DeclContext *dc);
 
   /// Configure the interface type of a function declaration.
   void configureInterfaceType(AbstractFunctionDecl *func,
@@ -1051,11 +1055,10 @@ public:
                       bool allowConcreteGenericParams,
                       std::function<void(ArchetypeBuilder &)> inferRequirements);
 
-  /// Perform any final semantic checks on the given generic parameter list.
-  void finalizeGenericParamList(GenericParamList *genericParams,
-                                GenericSignature *genericSig,
-                                GenericEnvironment *genericEnv,
-                                DeclContext *dc);
+  /// Store a mapping from archetypes to DeclContexts for debugging.
+  void recordArchetypeContexts(GenericSignature *genericSig,
+                               GenericEnvironment *genericEnv,
+                               DeclContext *dc);
 
   /// Validate the signature of a generic type.
   ///

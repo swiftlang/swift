@@ -714,11 +714,6 @@ TypeChecker::handleSILGenericParams(GenericParamList *genericParams,
     nestedList.push_back(genericParams);
   }
 
-  // We call checkGenericParamList() on all lists, then call
-  // finalizeGenericParamList() on all lists. After finalizeGenericParamList(),
-  // the generic parameters will be assigned to archetypes. That will cause
-  // SameType requirement to have Archetypes inside.
-
   // Since the innermost GenericParamList is in the beginning of the vector,
   // we process in reverse order to handle the outermost list first.
   GenericSignature *parentSig = nullptr;
@@ -726,6 +721,8 @@ TypeChecker::handleSILGenericParams(GenericParamList *genericParams,
 
   for (unsigned i = 0, e = nestedList.size(); i < e; i++) {
     auto genericParams = nestedList.rbegin()[i];
+    prepareGenericParamList(genericParams, DC);
+
     auto *genericSig = validateGenericSignature(genericParams, DC, parentSig,
                                                 /*allowConcreteGenericParams=*/true,
                                                 nullptr);
@@ -737,7 +734,7 @@ TypeChecker::handleSILGenericParams(GenericParamList *genericParams,
                           nullptr);
     parentSig = genericSig;
     parentEnv = builder.getGenericEnvironment(parentSig);
-    finalizeGenericParamList(genericParams, parentSig, parentEnv, DC);
+    recordArchetypeContexts(parentSig, parentEnv, DC);
   }
 
   return parentEnv;
@@ -4757,7 +4754,7 @@ public:
       auto *env = builder.getGenericEnvironment(sig);
       FD->setGenericEnvironment(env);
 
-      TC.finalizeGenericParamList(gp, sig, env, FD);
+      TC.recordArchetypeContexts(sig, env, FD);
     } else if (FD->getDeclContext()->getGenericSignatureOfContext()) {
       (void)TC.validateGenericFuncSignature(FD);
       if (FD->getGenericEnvironment() == nullptr) {
@@ -6383,7 +6380,7 @@ public:
       auto *env = builder.getGenericEnvironment(sig);
       CD->setGenericEnvironment(env);
 
-      TC.finalizeGenericParamList(gp, sig, env, CD);
+      TC.recordArchetypeContexts(sig, env, CD);
     } else if (CD->getDeclContext()->getGenericSignatureOfContext()) {
       (void)TC.validateGenericFuncSignature(CD);
 
@@ -7301,6 +7298,10 @@ checkExtensionGenericParams(TypeChecker &tc, ExtensionDecl *ext, Type type,
                                  ? genericParams->getOuterParameters()
                                  : genericParams);
   }
+
+  if (genericParams)
+    tc.prepareGenericParamList(genericParams, ext);
+
   // Avoid having to remember null checks on parentEnv below.
   GenericSignature *parentSig =
       parentEnv ? parentEnv->getGenericSignature() : nullptr;
@@ -7359,7 +7360,7 @@ checkExtensionGenericParams(TypeChecker &tc, ExtensionDecl *ext, Type type,
 
   auto *env = builder.getGenericEnvironment(sig);
 
-  tc.finalizeGenericParamList(genericParams, sig, env, ext);
+  tc.recordArchetypeContexts(sig, env, ext);
 
   // Compute the final extended type.
   Type resultType;

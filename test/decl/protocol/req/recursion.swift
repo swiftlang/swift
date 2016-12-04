@@ -19,14 +19,30 @@ protocol Y {
 
 // rdar://problem/20000145
 
+// This typechecks now, however there's no way to define a concrete type
+// which satisfies 'A' in the signature of S<A>.
 public protocol P {
   associatedtype T
 }
-public struct S<A: P> where A.T == S<A> {}
-// expected-error@-1{{type 'S' references itself}}
-// expected-note@-2{{type declared here}}
+
+public struct S<A: P> where A.T == S<A> {
+  func f(a: A.T) {
+    g(a: id(t: a))
+    _ = A.T.self
+  }
+
+  func g(a: S<A>) {
+    f(a: id(t: a))
+    _ = S<A>.self
+  }
+
+  func id<T>(t: T) -> T {
+    return t
+  }
+}
 
 protocol I {
+  // FIXME: these are spurious
   init() // expected-note 2{{protocol requires initializer 'init()' with type '()'}}
 }
 
@@ -34,9 +50,26 @@ protocol PI {
   associatedtype T : I
 }
 
-struct SI<A: PI> : I where A : I, A.T == SI<A> {}
-// expected-error@-1{{type 'SI' references itself}}
-// expected-note@-2{{type declared here}}
+struct SI<A: PI> : I where A : I, A.T == SI<A> {
+  func ggg<T : I>(t: T.Type) -> T {
+    return T()
+  }
+
+  func foo() {
+    _ = A()
+
+    // FIXME: bogus errors
+    _ = A.T() // expected-error{{cannot invoke value of type 'SI<A>.Type' with argument list '()'}}
+    _ = SI<A>() // expected-error{{cannot invoke initializer for type 'SI<A>' with no arguments}}
+
+    // FIXME: Strange bug in unqualified lookup
+    _ = ggg(t: A.self) // expected-error{{use of unresolved identifier 'ggg'}}
+    _ = ggg(t: A.T.self) // expected-error{{use of unresolved identifier 'ggg'}}
+
+    _ = self.ggg(t: A.self)
+    _ = self.ggg(t: A.T.self)
+  }
+}
 
 // Used to hit infinite recursion
 struct S4<A: PI> : I where A : I {
