@@ -692,17 +692,8 @@ static Type resolveTypeDecl(TypeChecker &TC, TypeDecl *typeDecl, SourceLoc loc,
   }
 
   // If we found a generic parameter, try to resolve it.
-  // FIXME: Jump through hoops to maintain syntactic sugar. We shouldn't care
-  // about this, because we shouldn't have to do this at all.
-  if (auto genericParam = type->getAs<GenericTypeParamType>()) {
-    auto resolvedGP = resolver->resolveGenericTypeParamType(genericParam);
-    if (auto substituted = dyn_cast<SubstitutedType>(type.getPointer())) {
-      type = SubstitutedType::get(substituted->getOriginal(), resolvedGP,
-                                  TC.Context);
-    } else {
-      type = resolvedGP;
-    }
-  }
+  if (auto genericParam = type->getAs<GenericTypeParamType>())
+    type = resolver->resolveGenericTypeParamType(genericParam);
 
   if (generic && !options.contains(TR_ResolveStructure)) {
     // Apply the generic arguments to the type.
