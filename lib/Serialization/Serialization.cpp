@@ -2545,13 +2545,9 @@ void Serializer::writeDecl(const Decl *D) {
     auto contextID = addDeclContextRef(param->getDeclContext());
     Type type, interfaceType;
 
-    if (param->hasType()) {
+    if (param->hasType())
       type = param->getType();
-      interfaceType = param->getInterfaceType();
-      // FIXME: Interface types for ParamDecls
-      if (interfaceType->hasArchetype())
-        interfaceType = Type();
-    }
+    interfaceType = param->getInterfaceType();
 
     unsigned abbrCode = DeclTypeAbbrCodes[ParamLayout::Code];
     ParamLayout::emitRecord(Out, ScratchRecord, abbrCode,

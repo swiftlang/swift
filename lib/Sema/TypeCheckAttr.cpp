@@ -1559,7 +1559,7 @@ void TypeChecker::checkAutoClosureAttr(ParamDecl *PD, AutoClosureAttr *attr) {
   // The paramdecl should have function type, and we restrict it to functions
   // taking ().
   auto *FTy = PD->getType()->getAs<FunctionType>();
-  if (FTy == 0) {
+  if (!FTy) {
     diagnose(attr->getLocation(), diag::autoclosure_function_type);
     attr->setInvalid();
     return;
@@ -1584,8 +1584,13 @@ void TypeChecker::checkAutoClosureAttr(ParamDecl *PD, AutoClosureAttr *attr) {
   }
 
   // Change the type to include the autoclosure bit.
-  PD->setType(FunctionType::get(FuncTyInput, FTy->getResult(),
-                                FTy->getExtInfo().withIsAutoClosure(true)));
+  PD->setType(
+      FTy->withExtInfo(FTy->getExtInfo().withIsAutoClosure(true)));
+
+  // And the interface type.
+  auto *IfaceFTy = PD->getInterfaceType()->getAs<FunctionType>();
+  PD->setInterfaceType(
+      IfaceFTy->withExtInfo(IfaceFTy->getExtInfo().withIsAutoClosure(true)));
 
   // Autoclosure may imply noescape, so add a noescape attribute if this is a
   // function parameter.

@@ -352,7 +352,7 @@ static ConstructorDecl *
 makeEnumRawValueConstructor(ClangImporter::Implementation &Impl,
                             EnumDecl *enumDecl) {
   ASTContext &C = Impl.SwiftContext;
-  auto enumTy = enumDecl->getDeclaredTypeInContext();
+  auto enumTy = enumDecl->getDeclaredInterfaceType();
   auto metaTy = MetatypeType::get(enumTy);
   
   auto selfDecl = ParamDecl::createSelf(SourceLoc(), enumDecl,
@@ -363,6 +363,8 @@ makeEnumRawValueConstructor(ClangImporter::Implementation &Impl,
                                  SourceLoc(), C.Id_rawValue,
                                  enumDecl->getRawType(),
                                  enumDecl);
+  param->setInterfaceType(enumDecl->getRawType());
+
   auto paramPL = ParameterList::createWithoutLoc(param);
   
   DeclName name(C, C.Id_init, paramPL);
@@ -569,6 +571,7 @@ static FuncDecl *makeFieldSetterDecl(ClangImporter::Implementation &Impl,
                                         Identifier(), SourceLoc(), C.Id_value,
                                         importedFieldDecl->getType(),
                                         importedDecl);
+  newValueDecl->setInterfaceType(importedFieldDecl->getInterfaceType());
 
   ParameterList *params[] = {
     ParameterList::createWithoutLoc(selfDecl),
@@ -972,6 +975,7 @@ createValueConstructor(ClangImporter::Implementation &Impl,
     auto param = new (context)
         ParamDecl(/*IsLet*/ true, SourceLoc(), SourceLoc(), argName,
                   SourceLoc(), var->getName(), var->getType(), structDecl);
+    param->setInterfaceType(var->getInterfaceType());
     valueParameters.push_back(param);
   }
 
@@ -4718,11 +4722,14 @@ SwiftDeclConverter::importGlobalAsInitializer(const clang::FunctionDecl *decl,
   if (argNames.size() == 1 && decl->getNumParams() == 0) {
     // Special case: We need to create an empty first parameter for our
     // argument label
-    parameterList =
-        ParameterList::createWithoutLoc(new (Impl.SwiftContext) ParamDecl(
+    auto *paramDecl =
+        new (Impl.SwiftContext) ParamDecl(
             /*IsLet=*/true, SourceLoc(), SourceLoc(), argNames.front(),
             SourceLoc(), argNames.front(), Impl.SwiftContext.TheEmptyTupleType,
-            dc));
+            dc);
+    paramDecl->setInterfaceType(paramDecl->getType());
+
+    parameterList = ParameterList::createWithoutLoc(paramDecl);
   } else {
     parameterList = Impl.importFunctionParameterList(
         dc, decl, {decl->param_begin(), decl->param_end()}, decl->isVariadic(),

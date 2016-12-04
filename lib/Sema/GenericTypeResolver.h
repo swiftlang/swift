@@ -26,6 +26,7 @@ namespace swift {
 class ArchetypeBuilder;
 class AssociatedTypeDecl;
 class Identifier;
+class ParamDecl;
 class TypeChecker;
 class TypeDecl;
 
@@ -76,8 +77,13 @@ public:
   /// \param dc A context in which type checking occurs, which must be a type
   /// context (i.e., nominal type or extension thereof).
   ///
+  /// \param wantSelf Do we want the type of the context itself (the
+  /// existential type, for protocols) or the type of 'self' inside the
+  /// context (the 'Self' generic parameter, for protocols). Has no effect
+  /// for concrete types.
+  ///
   /// \returns the type of context.
-  virtual Type resolveTypeOfContext(DeclContext *dc) = 0;
+  virtual Type resolveTypeOfContext(DeclContext *dc, bool wantSelf=false) = 0;
 
   /// Retrieve the type when referring to the given type declaration within
   /// its context.
@@ -86,6 +92,9 @@ public:
   ///
   /// \returns the type of the declaration in context..
   virtual Type resolveTypeOfDecl(TypeDecl *decl) = 0;
+
+  /// Set the contextual type or the interface type of the parameter.
+  virtual void recordParamType(ParamDecl *decl, Type ty) = 0;
 };
 
 /// Generic type resolver that leaves all generic types dependent.
@@ -110,9 +119,11 @@ public:
                                          DeclContext *DC,
                                          AssociatedTypeDecl *assocType);
 
-  virtual Type resolveTypeOfContext(DeclContext *dc);
+  virtual Type resolveTypeOfContext(DeclContext *dc, bool wantSelf=false);
 
   virtual Type resolveTypeOfDecl(TypeDecl *decl);
+
+  virtual void recordParamType(ParamDecl *decl, Type ty);
 };
 
 /// Generic type resolver that maps a generic type parameter type to its
@@ -127,6 +138,9 @@ public:
   explicit GenericTypeToArchetypeResolver(GenericEnvironment *env)
       : GenericEnv(env) { }
 
+  explicit GenericTypeToArchetypeResolver(DeclContext *dc)
+      : GenericEnv(dc->getGenericEnvironmentOfContext()) { }
+
   virtual Type resolveGenericTypeParamType(GenericTypeParamType *gp);
 
   virtual Type resolveDependentMemberType(Type baseTy,
@@ -138,9 +152,11 @@ public:
                                          DeclContext *DC,
                                          AssociatedTypeDecl *assocType);
 
-  virtual Type resolveTypeOfContext(DeclContext *dc);
+  virtual Type resolveTypeOfContext(DeclContext *dc, bool wantSelf=false);
 
   virtual Type resolveTypeOfDecl(TypeDecl *decl);
+
+  virtual void recordParamType(ParamDecl *decl, Type ty);
 };
 
 /// Generic type resolver that maps any generic type parameter type that
@@ -165,9 +181,11 @@ public:
                                          DeclContext *DC,
                                          AssociatedTypeDecl *assocType);
 
-  virtual Type resolveTypeOfContext(DeclContext *dc);
+  virtual Type resolveTypeOfContext(DeclContext *dc, bool wantSelf=false);
 
   virtual Type resolveTypeOfDecl(TypeDecl *decl);
+
+  virtual void recordParamType(ParamDecl *decl, Type ty);
 };
 
 /// Generic type resolver that performs complete resolution of dependent
@@ -196,9 +214,11 @@ public:
                                          DeclContext *DC,
                                          AssociatedTypeDecl *assocType);
 
-  virtual Type resolveTypeOfContext(DeclContext *dc);
+  virtual Type resolveTypeOfContext(DeclContext *dc, bool wantSelf=false);
 
   virtual Type resolveTypeOfDecl(TypeDecl *decl);
+
+  virtual void recordParamType(ParamDecl *decl, Type ty);
 };
 
 } // end namespace swift

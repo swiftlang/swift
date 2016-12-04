@@ -1382,13 +1382,7 @@ Type ASTMangler::getDeclTypeForMangling(const ValueDecl *decl,
   if (!decl->hasInterfaceType())
     return ErrorType::get(C)->getCanonicalType();
 
-  // FIXME: Interface types for ParamDecls
   Type type = decl->getInterfaceType();
-  if (type->hasArchetype()) {
-    assert(isa<ParamDecl>(decl));
-    type = ArchetypeBuilder::mapTypeOutOfContext(
-        decl->getDeclContext(), type);
-  }
 
   initialParamDepth = 0;
   CanGenericSignature sig;

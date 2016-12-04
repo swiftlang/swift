@@ -17,6 +17,7 @@
 //===----------------------------------------------------------------------===//
 
 #include "ConstraintSystem.h"
+#include "GenericTypeResolver.h"
 #include "TypeChecker.h"
 #include "MiscDiagnostics.h"
 #include "swift/AST/ASTVisitor.h"
@@ -927,13 +928,19 @@ namespace {
 /// true for single-expression closures, where we want the body to be considered
 /// part of this larger expression.
 bool PreCheckExpression::walkToClosureExprPre(ClosureExpr *closure) {
+  auto *PL = closure->getParameters();
+
   // Validate the parameters.
   TypeResolutionOptions options;
   options |= TR_AllowUnspecifiedTypes;
   options |= TR_AllowUnboundGenerics;
   options |= TR_InExpression;
   bool hadParameterError = false;
-  if (TC.typeCheckParameterList(closure->getParameters(), DC, options)) {
+
+  GenericTypeToArchetypeResolver resolver(
+      closure->getGenericEnvironmentOfContext());
+
+  if (TC.typeCheckParameterList(PL, DC, options, resolver)) {
     closure->setType(ErrorType::get(TC.Context));
 
     // If we encounter an error validating the parameter list, don't bail.
@@ -946,7 +953,7 @@ bool PreCheckExpression::walkToClosureExprPre(ClosureExpr *closure) {
   // Validate the result type, if present.
   if (closure->hasExplicitResultType() &&
       TC.validateType(closure->getExplicitResultTypeLoc(), DC,
-                      TR_InExpression)) {
+                      TR_InExpression, &resolver)) {
     closure->setType(ErrorType::get(TC.Context));
     return false;
   }
@@ -2279,8 +2286,7 @@ bool TypeChecker::typeCheckExprPattern(ExprPattern *EP, DeclContext *DC,
                                          Context.getIdentifier("$match"),
                                          rhsType,
                                          DC);
-  matchVar->setInterfaceType(ArchetypeBuilder::mapTypeOutOfContext(
-      DC, rhsType));
+  matchVar->setInterfaceType(DC->mapTypeOutOfContext(rhsType));
 
   matchVar->setImplicit();
   EP->setMatchVar(matchVar);

@@ -235,6 +235,7 @@ void REPLChecker::generatePrintOfExpression(StringRef NameStr, Expr *E) {
                                          SourceLoc(), Identifier(),
                                          Loc, Context.getIdentifier("arg"),
                                          E->getType(), /*DC*/ newTopLevel);
+  Arg->setInterfaceType(E->getType());
   auto params = ParameterList::createWithoutLoc(Arg);
 
   unsigned discriminator = TLC.claimNextClosureDiscriminator();

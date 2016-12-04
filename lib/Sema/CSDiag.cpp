@@ -3109,6 +3109,7 @@ namespace {
     llvm::DenseMap<TypeLoc*, std::pair<Type, bool>> TypeLocTypes;
     llvm::DenseMap<Pattern*, Type> PatternTypes;
     llvm::DenseMap<ParamDecl*, Type> ParamDeclTypes;
+    llvm::DenseMap<ParamDecl*, Type> ParamDeclInterfaceTypes;
     llvm::DenseMap<CollectionExpr*, Expr*> CollectionSemanticExprs;
     llvm::DenseSet<ValueDecl*> PossiblyInvalidDecls;
     ExprTypeSaverAndEraser(const ExprTypeSaverAndEraser&) = delete;
@@ -3154,16 +3155,20 @@ namespace {
           // remove them so that they'll get regenerated from the
           // associated TypeLocs or resynthesized as fresh typevars.
           if (auto *CE = dyn_cast<ClosureExpr>(expr))
-            for (auto P : *CE->getParameters())
+            for (auto P : *CE->getParameters()) {
               if (P->hasType()) {
                 TS->ParamDeclTypes[P] = P->getType();
                 P->setType(Type());
-                P->setInterfaceType(Type());
-                TS->PossiblyInvalidDecls.insert(P);
-                
-                if (P->isInvalid())
-                  P->setInvalid(false);
               }
+              if (P->hasInterfaceType()) {
+                TS->ParamDeclInterfaceTypes[P] = P->getInterfaceType();
+                P->setInterfaceType(Type());
+              }
+              TS->PossiblyInvalidDecls.insert(P);
+              
+              if (P->isInvalid())
+                P->setInvalid(false);
+            }
           
           // If we have a CollectionExpr with a type checked SemanticExpr,
           // remove it so we can recalculate a new semantic form.
@@ -3218,10 +3223,11 @@ namespace {
       for (auto patternElt : PatternTypes)
         patternElt.first->setType(patternElt.second);
       
-      for (auto paramDeclElt : ParamDeclTypes) {
+      for (auto paramDeclElt : ParamDeclTypes)
         paramDeclElt.first->setType(paramDeclElt.second);
-        paramDeclElt.first->setInterfaceType(Type());
-      }
+      
+      for (auto paramDeclIfaceElt : ParamDeclInterfaceTypes)
+        paramDeclIfaceElt.first->setInterfaceType(paramDeclIfaceElt.second);
       
       for (auto CSE : CollectionSemanticExprs)
         CSE.first->setSemanticExpr(CSE.second);
@@ -3265,6 +3271,10 @@ namespace {
       for (auto paramDeclElt : ParamDeclTypes)
         if (!paramDeclElt.first->hasType())
           paramDeclElt.first->setType(paramDeclElt.second);
+
+      for (auto paramDeclIfaceElt : ParamDeclInterfaceTypes)
+        if (!paramDeclIfaceElt.first->hasInterfaceType())
+          paramDeclIfaceElt.first->setInterfaceType(paramDeclIfaceElt.second);
 
       if (!PossiblyInvalidDecls.empty())
         for (auto D : PossiblyInvalidDecls)
@@ -3522,8 +3532,10 @@ typeCheckArbitrarySubExprIndependently(Expr *subExpr, TCCOptions options) {
     for (auto param : *CE->getParameters()) {
       auto VD = param;
       if (VD->getType()->hasTypeVariable() || VD->getType()->hasError() ||
-          VD->getType()->getCanonicalType()->hasError())
+          VD->getType()->getCanonicalType()->hasError()) {
         VD->setType(CS->getASTContext().TheUnresolvedType);
+        VD->setInterfaceType(VD->getType());
+      }
     }
   }
 
@@ -6287,8 +6299,10 @@ bool FailureDiagnosis::visitClosureExpr(ClosureExpr *CE) {
     // Handle this by rewriting the arguments to UnresolvedType().
     for (auto VD : *CE->getParameters()) {
       if (VD->getType()->hasTypeVariable() || VD->getType()->hasError() ||
-          VD->getType()->getCanonicalType()->hasError())
+          VD->getType()->getCanonicalType()->hasError()) {
         VD->setType(CS->getASTContext().TheUnresolvedType);
+        VD->setInterfaceType(VD->getType());
+      }
     }
   }
 

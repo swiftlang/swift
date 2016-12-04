@@ -50,10 +50,8 @@ ParameterList::create(const ASTContext &C, SourceLoc LParenLoc,
 /// type with the expectation that type-checking will fill in the context
 /// generic parameters.
 ParameterList *ParameterList::createUnboundSelf(SourceLoc loc,
-                                                DeclContext *DC,
-                                                bool isStaticMethod,
-                                                bool isInOut) {
-  auto *PD = ParamDecl::createUnboundSelf(loc, DC, isStaticMethod, isInOut);
+                                                DeclContext *DC) {
+  auto *PD = ParamDecl::createUnboundSelf(loc, DC);
   return create(DC->getASTContext(), PD);
 }
 
@@ -141,17 +139,7 @@ Type ParameterList::getInterfaceType(DeclContext *DC) const {
   SmallVector<TupleTypeElt, 8> argumentInfo;
 
   for (auto P : *this) {
-    assert(P->hasType());
-
-    Type type;
-    // FIXME: Awful predicate because hasInterfaceType() now always
-    // returns true on ParamDecls.
-    if (!P->getInterfaceType()->hasArchetype())
-      type = P->getInterfaceType();
-    else if (!P->getTypeLoc().hasLocation())
-      type = ArchetypeBuilder::mapTypeOutOfContext(DC, P->getType());
-    else
-      type = P->getType();
+    auto type = P->getInterfaceType();
     assert(!type->hasArchetype());
 
     argumentInfo.emplace_back(

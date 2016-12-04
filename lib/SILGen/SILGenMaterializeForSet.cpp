@@ -201,7 +201,7 @@ public:
                             ArrayRef<Substitution> witnessSubs) {
     auto *dc = witness->getDeclContext();
     Type selfInterfaceType = dc->getSelfInterfaceType();
-    Type selfType = witness->computeSelfType()->getRValueInstanceType();
+    Type selfType = witness->mapTypeIntoContext(selfInterfaceType);
 
     SILDeclRef constant(witness);
     auto constantInfo = SGM.Types.getConstantInfo(constant);
@@ -305,7 +305,7 @@ public:
     }
 
     CanType witnessSelfType =
-      Witness->computeInterfaceSelfType(false)->getCanonicalType();
+      Witness->computeInterfaceSelfType()->getCanonicalType();
     witnessSelfType = getSubstWitnessInterfaceType(witnessSelfType);
     if (auto selfTuple = dyn_cast<TupleType>(witnessSelfType)) {
       assert(selfTuple->getNumElements() == 1);
