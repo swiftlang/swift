@@ -153,6 +153,10 @@ namespace {
         ValueDecl *witness;
         auto concrete = conformance->getConcrete();
         if (auto assocType = dyn_cast<AssociatedTypeDecl>(found)) {
+          // If we're validating the protocol recursively, bail out.
+          if (!assocType->hasValidSignature())
+            return;
+
           witness = concrete->getTypeWitnessSubstAndDecl(assocType, &TC)
             .second;
         } else if (isa<TypeAliasDecl>(found)) {

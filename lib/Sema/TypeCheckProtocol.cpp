@@ -769,7 +769,7 @@ matchWitness(TypeChecker &tc,
     return RequirementMatch(witness, MatchKind::KindConflict);
 
   // If the witness is invalid, record that and stop now.
-  if (witness->isInvalid())
+  if (witness->isInvalid() || !witness->hasValidSignature())
     return RequirementMatch(witness, MatchKind::WitnessInvalid);
 
   // Get the requirement and witness attributes.
@@ -1377,7 +1377,7 @@ bool WitnessChecker::findBestWitness(
     }
 
     if (!witness->hasInterfaceType())
-      TC.validateDecl(witness, true);
+      TC.validateDecl(witness);
 
     auto match = matchWitness(TC, Proto, conformance, DC,
                               requirement, witness, reqEnvironment);
@@ -2995,7 +2995,7 @@ ConformanceChecker::inferTypeWitnessesViaValueWitnesses(
 
     // Validate the requirement.
     TC.validateDecl(req);
-    if (req->isInvalid())
+    if (req->isInvalid() || !req->hasValidSignature())
       continue;
       
     // Check whether any of the associated types we care about are
@@ -3039,16 +3039,10 @@ static Type mapErrorTypeToOriginal(Type type) {
 static Type getWitnessTypeForMatching(TypeChecker &tc,
                                       NormalProtocolConformance *conformance,
                                       ValueDecl *witness) {
-  if (!witness->hasInterfaceType()) {
-    // Don't cause a recursive type-check of the witness.
-    // FIXME: We shouldn't need this.
-    if (witness->isBeingTypeChecked())
-      return Type();
-
+  if (!witness->hasInterfaceType())
     tc.validateDecl(witness);
-  }
 
-  if (witness->isInvalid())
+  if (witness->isInvalid() || !witness->hasValidSignature())
     return Type();
 
   if (!witness->getDeclContext()->isTypeContext()) {
@@ -3997,10 +3991,9 @@ void ConformanceChecker::resolveSingleWitness(ValueDecl *requirement) {
 
   // Make sure we've validated the requirement.
   if (!requirement->hasInterfaceType())
-    TC.validateDecl(requirement, true);
+    TC.validateDecl(requirement);
 
-  if (requirement->isInvalid()) {
-    // FIXME: Note that there is no witness?
+  if (requirement->isInvalid() || !requirement->hasValidSignature()) {
     Conformance->setInvalid();
     return;
   }
@@ -4241,9 +4234,9 @@ void ConformanceChecker::checkConformance() {
 
     // Make sure we've validated the requirement.
     if (!requirement->hasInterfaceType())
-      TC.validateDecl(requirement, true);
+      TC.validateDecl(requirement);
 
-    if (requirement->isInvalid()) {
+    if (requirement->isInvalid() || !requirement->hasValidSignature()) {
       Conformance->setInvalid();
       continue;
     }
@@ -4332,7 +4325,7 @@ static void diagnoseConformanceFailure(TypeChecker &TC, Type T,
   // If we're checking conformance of an existential type to a protocol,
   // do a little bit of extra work to produce a better diagnostic.
   if (T->isExistentialType() &&
-      TC.isSubtypeOf(T, Proto->getDeclaredType(), DC)) {
+      TC.containsProtocol(T, Proto, DC, None)) {
 
     if (!T->isObjCExistentialType()) {
       TC.diagnose(ComplainLoc, diag::protocol_does_not_conform_objc,

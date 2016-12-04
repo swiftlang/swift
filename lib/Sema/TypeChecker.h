@@ -767,7 +767,7 @@ public:
                    GenericTypeResolver *resolver = nullptr,
                    UnsatisfiedDependency *unsatisfiedDependency = nullptr);
 
-  void validateDecl(ValueDecl *D, bool resolveTypeParams = false);
+  void validateDecl(ValueDecl *D);
   void validateDecl(OperatorDecl *decl);
   void validateDecl(PrecedenceGroupDecl *decl);
 
@@ -978,7 +978,7 @@ public:
   }
 
   virtual void resolveDeclSignature(ValueDecl *VD) override {
-    validateDecl(VD, true);
+    validateDecl(VD);
   }
 
   virtual void bindExtension(ExtensionDecl *ext) override;

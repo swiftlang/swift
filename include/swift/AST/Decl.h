@@ -215,7 +215,7 @@ bool conflicting(const OverloadSignature& sig1, const OverloadSignature& sig2);
 class alignas(1 << DeclAlignInBits) Decl {
   class DeclBitfields {
     friend class Decl;
-    unsigned Kind : 8;
+    unsigned Kind : 6;
 
     /// \brief Whether this declaration is invalid.
     unsigned Invalid : 1;
@@ -233,10 +233,10 @@ class alignas(1 << DeclAlignInBits) Decl {
     /// FIXME: This is ugly.
     unsigned EarlyAttrValidation : 1;
     
-    /// \brief Whether or not this declaration is currently being type-checked.
-    unsigned BeingTypeChecked : 1;
+    /// \brief Whether this declaration is currently being validated.
+    unsigned BeingValidated : 1;
   };
-  enum { NumDeclBits = 13 };
+  enum { NumDeclBits = 11 };
   static_assert(NumDeclBits <= 32, "fits in an unsigned");
   
   class PatternBindingDeclBitfields {
@@ -632,7 +632,7 @@ protected:
     DeclBits.Implicit = false;
     DeclBits.FromClang = false;
     DeclBits.EarlyAttrValidation = false;
-    DeclBits.BeingTypeChecked = false;
+    DeclBits.BeingValidated = false;
   }
 
   ClangNode getClangNodeImpl() const {
@@ -778,12 +778,16 @@ public:
     DeclBits.EarlyAttrValidation = validated;
   }
   
-  /// Whether the declaration is currently being validated.
-  bool isBeingTypeChecked();
-  
+  /// Whether the declaration has a valid interface type and
+  /// generic signature.
+  bool isBeingValidated() const {
+    return DeclBits.BeingValidated;
+  }
+
   /// Toggle whether or not the declaration is being validated.
-  void setIsBeingTypeChecked(bool ibt = true) {
-    DeclBits.BeingTypeChecked = ibt;
+  void setIsBeingValidated(bool ibv = true) {
+    assert(DeclBits.BeingValidated != ibv);
+    DeclBits.BeingValidated = ibv;
   }
 
   /// \returns the unparsed comment attached to this declaration.
@@ -1522,7 +1526,7 @@ public:
 
   void setInherited(MutableArrayRef<TypeLoc> i) { Inherited = i; }
 
-  /// Whether we already validated this extension.
+  /// Whether we started validating this extension.
   bool validated() const {
     return ExtensionDeclBits.Validated;
   }
@@ -1530,6 +1534,11 @@ public:
   /// Set whether we have validated this extension.
   void setValidated(bool validated = true) {
     ExtensionDeclBits.Validated = validated;
+  }
+
+  /// Whether we have fully checked the extension.
+  bool hasValidSignature() const {
+    return validated() && !isBeingValidated();
   }
 
   /// Whether we already type-checked the inheritance clause.
@@ -2111,7 +2120,11 @@ public:
 
   /// Set the interface type for the given value.
   void setInterfaceType(Type type);
-  
+
+  bool hasValidSignature() const {
+    return hasInterfaceType() && !isBeingValidated();
+  }
+
   /// isSettable - Determine whether references to this decl may appear
   /// on the left-hand side of an assignment or as the operand of a
   /// `&` or 'inout' operator.
@@ -2257,11 +2270,6 @@ class GenericTypeDecl : public TypeDecl, public DeclContext {
   mutable llvm::PointerUnion<GenericSignature *, GenericEnvironment *>
     GenericSigOrEnv;
 
-  /// \brief Whether or not the generic signature of the type declaration is
-  /// currently being validated.
-  // TODO: Merge into GenericSig bits.
-  unsigned ValidatingGenericSignature = false;
-
   /// Lazily populate the generic environment.
   GenericEnvironment *getLazyGenericEnvironmentSlow() const;
 
@@ -2298,14 +2306,6 @@ public:
 
   /// Retrieve the generic context for this type.
   GenericEnvironment *getGenericEnvironment() const;
-
-  void setIsValidatingGenericSignature(bool validating=true) {
-    ValidatingGenericSignature = validating;
-  }
-  
-  bool isValidatingGenericSignature() const {
-    return ValidatingGenericSignature;
-  }
 
   /// Set a lazy generic environment.
   void setLazyGenericEnvironment(LazyMemberLoader *lazyLoader,

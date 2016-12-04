@@ -289,14 +289,33 @@ bool IterativeTypeChecker::isResolveTypeDeclSatisfied(TypeDecl *typeDecl) {
   if (typeDecl->hasInterfaceType())
     return true;
 
+  if (auto typeAliasDecl = dyn_cast<TypeAliasDecl>(typeDecl)) {
+    if (typeAliasDecl->getDeclContext()->isModuleScopeContext() &&
+        typeAliasDecl->getGenericParams() == nullptr) {
+      return typeAliasDecl->hasInterfaceType();
+    }
+  }
+
   // If this request can *never* be satisfied due to recursion,
   // return success and fail elsewhere.
-  if (auto nominal = dyn_cast<NominalTypeDecl>(dc)) {
-    if (nominal->isBeingTypeChecked())
-      return true;
-  } else if (auto ext = dyn_cast<ExtensionDecl>(dc)) {
-    if (ext->isBeingTypeChecked())
-      return true;
+  if (typeDecl->isBeingValidated())
+    return true;
+
+  while (dc) {
+    if (auto nominal = dyn_cast<NominalTypeDecl>(dc)) {
+      if (nominal->isBeingValidated())
+        return true;
+      if (nominal->hasInterfaceType())
+        return false;
+    } else if (auto ext = dyn_cast<ExtensionDecl>(dc)) {
+      if (ext->isBeingValidated())
+        return true;
+      if (ext->validated())
+        return false;
+    } else {
+      break;
+    }
+    dc = dc->getParent();
   }
 
   // Ok, we can try calling validateDecl().
@@ -310,7 +329,7 @@ void IterativeTypeChecker::processResolveTypeDecl(
     if (typeAliasDecl->getDeclContext()->isModuleScopeContext() &&
         typeAliasDecl->getGenericParams() == nullptr) {
       typeAliasDecl->setHasCompletedValidation();
-      
+
       TypeResolutionOptions options;
       if (typeAliasDecl->getFormalAccess() <= Accessibility::FilePrivate)
         options |= TR_KnownNonCascadingDependency;

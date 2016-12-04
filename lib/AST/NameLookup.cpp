@@ -149,33 +149,20 @@ bool swift::removeShadowedDecls(SmallVectorImpl<ValueDecl*> &decls,
     ObjCCollidingConstructors;
   bool anyCollisions = false;
   for (auto decl : decls) {
-    // Determine the signature of this declaration.
-    // FIXME: the canonical type makes a poor signature, because we don't
-    // canonicalize away default arguments and don't canonicalize polymorphic
-    // types well.
-    CanType signature;
-
     // FIXME: Egregious hack to avoid failing when there are no declared types.
-    if (!decl->hasInterfaceType() ||
-        isa<TypeAliasDecl>(decl) ||
-        isa<AbstractTypeParamDecl>(decl)) {
-      // FIXME: Pass this down instead of getting it from the ASTContext.
-      if (typeResolver && !decl->isBeingTypeChecked())
-        typeResolver->resolveDeclSignature(decl);
-      if (!decl->hasInterfaceType())
-        continue;
-      if (auto assocType = dyn_cast<AssociatedTypeDecl>(decl))
-        if (!assocType->getProtocol()->isValidGenericContext())
-          continue;
-    }
+    // FIXME: Pass this down instead of getting it from the ASTContext.
+    if (typeResolver)
+      typeResolver->resolveDeclSignature(decl);
     
     // If the decl is currently being validated, this is likely a recursive
     // reference and we'll want to skip ahead so as to avoid having its type
     // attempt to desugar itself.
-    if (decl->isBeingTypeChecked())
+    if (!decl->hasValidSignature())
       continue;
 
-    signature = decl->getInterfaceType()->getCanonicalType();
+    // FIXME: the canonical type makes a poor signature, because we don't
+    // canonicalize away default arguments.
+    auto signature = decl->getInterfaceType()->getCanonicalType();
 
     // FIXME: The type of a variable or subscript doesn't include
     // enough context to distinguish entities from different
@@ -1497,12 +1484,12 @@ bool DeclContext::lookupQualified(Type type,
   // Allow filtering of the visible declarations based on various
   // criteria.
   bool onlyCompleteObjectInits = false;
-  auto isAcceptableDecl = [&](NominalTypeDecl *current, Decl *decl) -> bool {
+  auto isAcceptableDecl = [&](NominalTypeDecl *current, ValueDecl *decl) -> bool {
     // If the decl is currently being type checked, then we have something
     // cyclic going on.  Instead of poking at parts that are potentially not
     // set up, just assume it is acceptable.  This will make sure we produce an
     // error later.
-    if (decl->isBeingTypeChecked())
+    if (!decl->hasValidSignature())
       return true;
     
     // Filter out designated initializers, if requested.
@@ -1523,8 +1510,7 @@ bool DeclContext::lookupQualified(Type type,
 
     // Check access.
     if (!(options & NL_IgnoreAccessibility))
-      if (auto VD = dyn_cast<ValueDecl>(decl))
-        return VD->isAccessibleFrom(this);
+      return decl->isAccessibleFrom(this);
 
     return true;
   };
@@ -1564,12 +1550,8 @@ bool DeclContext::lookupQualified(Type type,
 
       // Resolve the declaration signature when we find the
       // declaration.
-      if (typeResolver && !decl->isBeingTypeChecked()) {
+      if (typeResolver)
         typeResolver->resolveDeclSignature(decl);
-
-        if (!decl->hasInterfaceType())
-          continue;
-      }
 
       if (isAcceptableDecl(current, decl))
         decls.push_back(decl);
@@ -1635,11 +1617,8 @@ bool DeclContext::lookupQualified(Type type,
       if ((options & NL_OnlyTypes) && !isa<TypeDecl>(decl))
         continue;
 
-      if (typeResolver && !decl->isBeingTypeChecked()) {
+      if (typeResolver)
         typeResolver->resolveDeclSignature(decl);
-        if (!decl->hasInterfaceType())
-          continue;
-      }
 
       // If the declaration has an override, name lookup will also have
       // found the overridden method. Skip this declaration, because we

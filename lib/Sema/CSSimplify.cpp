@@ -2942,7 +2942,7 @@ performMemberLookup(ConstraintKind constraintKind, DeclName memberName,
     bool labelMismatch = false;
     for (auto ctor : ctors) {
       // If the constructor is invalid, we fail entirely to avoid error cascade.
-      TC.validateDecl(ctor, true);
+      TC.validateDecl(ctor);
       if (ctor->isInvalid())
         return result.markErrorAlreadyDiagnosed();
 
@@ -3038,7 +3038,7 @@ performMemberLookup(ConstraintKind constraintKind, DeclName memberName,
       return;
     }
     // If the result is invalid, skip it.
-    TC.validateDecl(cand, true);
+    TC.validateDecl(cand);
     if (cand->isInvalid()) {
       result.markErrorAlreadyDiagnosed();
       return;
@@ -3228,7 +3228,7 @@ retry_after_fail:
                                   memberName, lookupOptions);
     for (auto cand : lookup) {
       // If the result is invalid, skip it.
-      TC.validateDecl(cand, true);
+      TC.validateDecl(cand);
       if (cand->isInvalid()) {
         result.markErrorAlreadyDiagnosed();
         return result;
