@@ -981,10 +981,6 @@ TypeDecl *TypeBase::getDirectlyReferencedTypeDecl() const {
     return nullptr;
   }
 
-  if (auto substituted = dyn_cast<SubstitutedType>(this)) {
-    return substituted->getOriginal()->getDirectlyReferencedTypeDecl();
-  }
-  
   return nullptr;
 }
 

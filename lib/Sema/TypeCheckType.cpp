@@ -1183,11 +1183,6 @@ static Type resolveNestedIdentTypeComponent(
                                                            parentRange,
                                                            comp);
     assert(memberType && "Received null dependent member type");
-    // If we know what type declaration we're referencing, store it.
-    if (auto typeDecl = memberType->getDirectlyReferencedTypeDecl()) {
-      comp->setValue(typeDecl);
-    }
-
     return memberType;
   }
 
