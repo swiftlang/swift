@@ -2705,7 +2705,8 @@ bool swift::calleesAreStaticallyKnowable(SILModule &M, SILDeclRef Decl) {
       // Constructors are special: a derived class in another module can
       // "override" a constructor if its class is "open", although the
       // constructor itself is not open.
-      auto *ND = AFD->getExtensionType()->getNominalOrBoundGenericNominal();
+      auto *ND = AFD->getDeclContext()
+          ->getAsNominalTypeOrNominalTypeExtensionContext();
       if (ND->getEffectiveAccess() == Accessibility::Open)
         return false;
     }

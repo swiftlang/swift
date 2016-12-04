@@ -1622,7 +1622,7 @@ getUncachedSILFunctionTypeForConstant(SILDeclRef constant,
 static bool isClassOrProtocolMethod(ValueDecl *vd) {
   if (!vd->getDeclContext())
     return false;
-  Type contextType = vd->getDeclContext()->getDeclaredTypeInContext();
+  Type contextType = vd->getDeclContext()->getDeclaredInterfaceType();
   if (!contextType)
     return false;
   return contextType->getClassOrBoundGenericClass()

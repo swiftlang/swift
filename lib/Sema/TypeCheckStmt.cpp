@@ -1333,7 +1333,7 @@ static bool checkSuperInit(TypeChecker &tc, ConstructorDecl *fromCtor,
   // For an implicitly generated super.init() call, make sure there's
   // only one designated initializer.
   if (implicitlyGenerated) {
-    auto superclassTy = ctor->getExtensionType();
+    auto superclassTy = ctor->getDeclContext()->getDeclaredInterfaceType();
     auto lookupOptions = defaultConstructorLookupOptions;
     lookupOptions |= NameLookupFlags::KnownPrivate;
 

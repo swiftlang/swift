@@ -6782,7 +6782,7 @@ Expr *Solution::coerceToType(Expr *expr, Type toType,
 // Determine whether this is a variadic witness.
 static bool isVariadicWitness(AbstractFunctionDecl *afd) {
   unsigned index = 0;
-  if (afd->getExtensionType())
+  if (afd->getImplicitSelfDecl())
     ++index;
 
   for (auto param : *afd->getParameterList(index))

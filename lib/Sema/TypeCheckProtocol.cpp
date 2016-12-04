@@ -657,7 +657,7 @@ static bool checkMutating(FuncDecl *requirement, FuncDecl *witness,
                           ValueDecl *witnessDecl) {
   // Witnesses in classes never have mutating conflicts.
   if (auto contextType =
-        witnessDecl->getDeclContext()->getDeclaredTypeInContext())
+        witnessDecl->getDeclContext()->getDeclaredInterfaceType())
     if (contextType->hasReferenceSemantics())
       return false;
   
@@ -5100,7 +5100,7 @@ void TypeChecker::checkConformancesInContext(DeclContext *dc,
 
     // Complain about redundant conformances.
     diagnose(diag.Loc, diag::redundant_conformance,
-             dc->getDeclaredTypeInContext(),
+             dc->getDeclaredInterfaceType(),
              diag.Protocol->getName());
 
     // Special case: explain that 'RawRepresentable' conformance
@@ -5111,13 +5111,13 @@ void TypeChecker::checkConformancesInContext(DeclContext *dc,
           enumDecl->hasRawType()) {
         diagnose(enumDecl->getInherited()[0].getSourceRange().Start,
                  diag::enum_declares_rawrep_with_raw_type,
-                 dc->getDeclaredTypeInContext(), enumDecl->getRawType());
+                 dc->getDeclaredInterfaceType(), enumDecl->getRawType());
         continue;
       }
     }
 
     diagnose(existingDecl, diag::declared_protocol_conformance_here,
-             dc->getDeclaredTypeInContext(),
+             dc->getDeclaredInterfaceType(),
              static_cast<unsigned>(diag.ExistingKind),
              diag.Protocol->getName(),
              diag.ExistingExplicitProtocol->getName());

@@ -1032,14 +1032,13 @@ static void validatePatternBindingDecl(TypeChecker &tc,
   auto StaticSpelling = binding->getStaticSpelling();
   if (StaticSpelling != StaticSpellingKind::None &&
       binding->getDeclContext()->isExtensionContext()) {
-    if (Type T = binding->getDeclContext()->getDeclaredTypeInContext()) {
-      if (auto NTD = T->getAnyNominal()) {
-        if (!isa<ClassDecl>(NTD)) {
-          if (StaticSpelling == StaticSpellingKind::KeywordClass) {
-            tc.diagnose(binding, diag::class_var_not_in_class)
-              .fixItReplace(binding->getStaticLoc(), "static");
-            tc.diagnose(NTD, diag::extended_type_declared_here);
-          }
+    if (auto *NTD = binding->getDeclContext()
+        ->getAsNominalTypeOrNominalTypeExtensionContext()) {
+      if (!isa<ClassDecl>(NTD)) {
+        if (StaticSpelling == StaticSpellingKind::KeywordClass) {
+          tc.diagnose(binding, diag::class_var_not_in_class)
+            .fixItReplace(binding->getStaticLoc(), "static");
+          tc.diagnose(NTD, diag::extended_type_declared_here);
         }
       }
     }
@@ -2135,8 +2134,8 @@ static Optional<ObjCReason> shouldMarkAsObjC(TypeChecker &TC,
   // If this declaration is part of a class with implicitly @objc members,
   // make it implicitly @objc. However, if the declaration cannot be represented
   // as @objc, don't diagnose.
-  Type contextTy = VD->getDeclContext()->getDeclaredTypeInContext();
-  if (auto classDecl = contextTy->getClassOrBoundGenericClass()) {
+  if (auto classDecl = VD->getDeclContext()
+          ->getAsClassOrClassExtensionContext()) {
     // One cannot define @objc members of any foreign classes.
     if (classDecl->isForeign())
       return None;
@@ -3765,9 +3764,9 @@ public:
     }
 
     // Member subscripts need some special validation logic.
-    if (auto contextType = dc->getDeclaredTypeInContext()) {
+    if (auto nominalDecl = dc->getAsNominalTypeOrNominalTypeExtensionContext()) {
       // If this is a class member, mark it final if the class is final.
-      if (auto cls = contextType->getClassOrBoundGenericClass()) {
+      if (auto cls = dyn_cast<ClassDecl>(nominalDecl)) {
         if (cls->isFinal() && !SD->isFinal()) {
           makeFinal(TC.Context, SD);
         }
@@ -4665,14 +4664,13 @@ public:
     auto StaticSpelling = FD->getStaticSpelling();
     if (StaticSpelling != StaticSpellingKind::None &&
         FD->getDeclContext()->isExtensionContext()) {
-      if (Type T = FD->getDeclContext()->getDeclaredTypeInContext()) {
-        if (auto NTD = T->getAnyNominal()) {
-          if (!isa<ClassDecl>(NTD)) {
-            if (StaticSpelling == StaticSpellingKind::KeywordClass) {
-              TC.diagnose(FD, diag::class_func_not_in_class)
-                  .fixItReplace(FD->getStaticLoc(), "static");
-              TC.diagnose(NTD, diag::extended_type_declared_here);
-            }
+      if (auto *NTD = FD->getDeclContext()
+              ->getAsNominalTypeOrNominalTypeExtensionContext()) {
+        if (!isa<ClassDecl>(NTD)) {
+          if (StaticSpelling == StaticSpellingKind::KeywordClass) {
+            TC.diagnose(FD, diag::class_func_not_in_class)
+                .fixItReplace(FD->getStaticLoc(), "static");
+            TC.diagnose(NTD, diag::extended_type_declared_here);
           }
         }
       }
@@ -4848,25 +4846,23 @@ public:
     TC.checkDeclAttributes(FD);
 
     // If this is a class member, mark it final if the class is final.
-    if (auto contextType = FD->getDeclContext()->getDeclaredTypeInContext()) {
-      if (auto cls = contextType->getClassOrBoundGenericClass()) {
-        if (cls->isFinal() && !FD->isAccessor() &&
-            !FD->isFinal() && !FD->isDynamic()) {
-          makeFinal(TC.Context, FD);
+    if (auto cls = FD->getDeclContext()->getAsClassOrClassExtensionContext()) {
+      if (cls->isFinal() && !FD->isAccessor() &&
+          !FD->isFinal() && !FD->isDynamic()) {
+        makeFinal(TC.Context, FD);
+      }
+      // static func declarations in classes are synonyms
+      // for `class final func` declarations.
+      if (FD->getStaticSpelling() == StaticSpellingKind::KeywordStatic) {
+        auto finalAttr = FD->getAttrs().getAttribute<FinalAttr>();
+        if (finalAttr) {
+          auto finalRange = finalAttr->getRange();
+          if (finalRange.isValid())
+            TC.diagnose(finalRange.Start, diag::decl_already_final)
+            .highlight(finalRange)
+            .fixItRemove(finalRange);
         }
-        // static func declarations in classes are synonyms
-        // for `class final func` declarations.
-        if (FD->getStaticSpelling() == StaticSpellingKind::KeywordStatic) {
-          auto finalAttr = FD->getAttrs().getAttribute<FinalAttr>();
-          if (finalAttr) {
-            auto finalRange = finalAttr->getRange();
-            if (finalRange.isValid())
-              TC.diagnose(finalRange.Start, diag::decl_already_final)
-              .highlight(finalRange)
-              .fixItRemove(finalRange);
-          }
-          makeFinal(TC.Context, FD);
-        }
+        makeFinal(TC.Context, FD);
       }
     }
 
@@ -6304,7 +6300,7 @@ public:
     // convenience initializers are only allowed on classes and in
     // extensions thereof.
     if (CD->isConvenienceInit()) {
-      if (auto extType = CD->getExtensionType()) {
+      if (auto extType = CD->getDeclContext()->getDeclaredInterfaceType()) {
         auto extClass = extType->getClassOrBoundGenericClass();
 
         // Forbid convenience inits on Foreign CF types, as Swift does not yet
@@ -6331,7 +6327,7 @@ public:
           CD->setInitKind(CtorInitializerKind::Designated);
         }
       }
-    } else if (auto extType = CD->getExtensionType()) {
+    } else if (auto extType = CD->getDeclContext()->getDeclaredInterfaceType()) {
       // A designated initializer for a class must be written within the class
       // itself.
       if (extType->getClassOrBoundGenericClass() &&
@@ -6452,8 +6448,7 @@ public:
 
     // An initializer is ObjC-compatible if it's explicitly @objc or a member
     // of an ObjC-compatible class.
-    Type ContextTy = CD->getDeclContext()->getDeclaredTypeInContext();
-    if (ContextTy) {
+    if (CD->getDeclContext()->isTypeContext()) {
       Optional<ObjCReason> isObjC = shouldMarkAsObjC(TC, CD,
           /*allowImplicit=*/true);
 
@@ -6480,8 +6475,9 @@ public:
       }
     }
 
-    if (CD->isRequired() && ContextTy) {
-      if (auto nominal = ContextTy->getAnyNominal()) {
+    if (CD->isRequired()) {
+      if (auto nominal = CD->getDeclContext()
+              ->getAsNominalTypeOrNominalTypeExtensionContext()) {
         auto requiredAccess = std::min(nominal->getFormalAccess(),
                                        Accessibility::Public);
         if (requiredAccess == Accessibility::Private)
@@ -6778,11 +6774,11 @@ void TypeChecker::checkDeclCircularity(NominalTypeDecl *decl) {
     if (isa<StructDecl>(decl)) {
       diagnose(decl->getLoc(),
                diag::unsupported_recursive_type,
-               decl->getDeclaredTypeInContext());
+               decl->getDeclaredInterfaceType());
     } else if (isa<EnumDecl>(decl)) {
       diagnose(decl->getLoc(),
                diag::recursive_enum_not_indirect,
-               decl->getDeclaredTypeInContext())
+               decl->getDeclaredInterfaceType())
         .fixItInsert(decl->getStartLoc(), "indirect ");
     }
   }
@@ -7099,7 +7095,8 @@ void TypeChecker::validateDecl(ValueDecl *D, bool resolveTypeParams) {
       }
 
       // Properties need some special validation logic.
-      if (Type contextType = VD->getDeclContext()->getDeclaredTypeInContext()) {
+      if (auto *nominalDecl = VD->getDeclContext()
+              ->getAsNominalTypeOrNominalTypeExtensionContext()) {
         // If this is a property, check if it needs to be exposed to
         // Objective-C.
         Optional<ObjCReason> isObjC = shouldMarkAsObjC(*this, VD);
@@ -7113,7 +7110,7 @@ void TypeChecker::validateDecl(ValueDecl *D, bool resolveTypeParams) {
 
         // If this variable is a class member, mark it final if the
         // class is final, or if it was declared with 'let'.
-        if (auto cls = contextType->getClassOrBoundGenericClass()) {
+        if (auto cls = dyn_cast<ClassDecl>(nominalDecl)) {
           if (cls->isFinal() || VD->isLet()) {
             if (!VD->isFinal() && !VD->isDynamic()) {
               makeFinal(Context, VD);
@@ -7984,7 +7981,7 @@ void TypeChecker::defineDefaultConstructor(NominalTypeDecl *decl) {
   // default-initializable.
   if (isa<ClassDecl>(decl)) {
     // We need to look for a default constructor.
-    if (auto superTy = getSuperClassOf(decl->getDeclaredTypeInContext())) {
+    if (auto superTy = getSuperClassOf(decl->getDeclaredInterfaceType())) {
       // If there are no default ctors for our supertype, we can't do anything.
       auto ctors = lookupConstructors(decl, superTy);
       if (!ctors)

@@ -247,7 +247,7 @@ void AttributeEarlyChecker::visitTransparentAttr(TransparentAttr *attr) {
 void AttributeEarlyChecker::visitMutationAttr(DeclAttribute *attr) {
   FuncDecl *FD = cast<FuncDecl>(D);
 
-  auto contextTy = FD->getDeclContext()->getDeclaredTypeInContext();
+  auto contextTy = FD->getDeclContext()->getDeclaredInterfaceType();
   if (!contextTy)
     return diagnoseAndRemoveAttr(attr, diag::mutating_invalid_global_scope);
 
@@ -268,8 +268,8 @@ void AttributeEarlyChecker::visitMutationAttr(DeclAttribute *attr) {
 
 void AttributeEarlyChecker::visitDynamicAttr(DynamicAttr *attr) {
   // Only instance members of classes can be dynamic.
-  auto contextTy = D->getDeclContext()->getDeclaredTypeInContext();
-  if (!contextTy || !contextTy->getClassOrBoundGenericClass())
+  auto classDecl = D->getDeclContext()->getAsClassOrClassExtensionContext();
+  if (!classDecl)
     return diagnoseAndRemoveAttr(attr, diag::dynamic_not_in_class);
     
   // Members cannot be both dynamic and final.
@@ -317,8 +317,9 @@ void AttributeEarlyChecker::visitSILStoredAttr(SILStoredAttr *attr) {
   auto *VD = cast<VarDecl>(D);
   if (VD->getDeclContext()->getAsClassOrClassExtensionContext())
     return;
-  auto ctx = VD->getDeclContext()->getDeclaredTypeInContext();
-  if (ctx && ctx->getStructOrBoundGenericStruct())
+  auto nominalDecl = VD->getDeclContext()
+      ->getAsNominalTypeOrNominalTypeExtensionContext();
+  if (nominalDecl && isa<StructDecl>(nominalDecl))
     return;
   return diagnoseAndRemoveAttr(attr, diag::invalid_decl_attribute_simple);
 }
@@ -1082,10 +1083,8 @@ void AttributeChecker::visitNSCopyingAttr(NSCopyingAttr *attr) {
   auto *VD = cast<VarDecl>(D);
 
   // It may only be used on class members.
-  auto typeContext = D->getDeclContext()->getDeclaredTypeInContext();
-  auto contextTypeDecl =
-  typeContext ? typeContext->getNominalOrBoundGenericNominal() : nullptr;
-  if (!contextTypeDecl || !isa<ClassDecl>(contextTypeDecl)) {
+  auto classDecl = D->getDeclContext()->getAsClassOrClassExtensionContext();
+  if (!classDecl) {
     TC.diagnose(attr->getLocation(), diag::nscopying_only_on_class_properties);
     attr->setInvalid();
     return;
@@ -1250,7 +1249,7 @@ static bool isObjCClassExtensionInOverlay(DeclContext *dc) {
 void AttributeChecker::visitRequiredAttr(RequiredAttr *attr) {
   // The required attribute only applies to constructors.
   auto ctor = cast<ConstructorDecl>(D);
-  auto parentTy = ctor->getExtensionType();
+  auto parentTy = ctor->getDeclContext()->getDeclaredInterfaceType();
   if (!parentTy) {
     // Constructor outside of nominal type context; we've already complained
     // elsewhere.

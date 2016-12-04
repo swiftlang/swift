@@ -827,13 +827,10 @@ void swift::lookupVisibleDecls(VisibleDeclConsumer &Consumer,
         Consumer.foundDecl(const_cast<ParamDecl*>(AFD->getImplicitSelfDecl()),
                            DeclVisibilityKind::FunctionParameter);
 
-      if (AFD->getExtensionType()) {
-        ExtendedType = AFD->getExtensionType();
+      if (AFD->getDeclContext()->isTypeContext()) {
+        ExtendedType = AFD->getDeclContext()->getSelfTypeInContext();
         BaseDecl = AFD->getImplicitSelfDecl();
         DC = DC->getParent();
-
-        if (DC->getAsProtocolExtensionContext())
-          ExtendedType = DC->getSelfTypeInContext();
 
         if (auto *FD = dyn_cast<FuncDecl>(AFD))
           if (FD->isStatic())

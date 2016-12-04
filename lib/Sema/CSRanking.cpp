@@ -190,7 +190,7 @@ static Comparison compareWitnessAndRequirement(TypeChecker &tc, DeclContext *dc,
   // Determine whether the type of the witness's context conforms to the
   // protocol.
   auto owningType
-    = potentialWitness->getDeclContext()->getDeclaredTypeInContext();
+    = potentialWitness->getDeclContext()->getDeclaredInterfaceType();
   auto conformance = tc.conformsToProtocol(owningType, proto, dc,
                                            ConformanceCheckFlags::InExpression);
   if (!conformance || conformance->isAbstract())
@@ -250,8 +250,8 @@ static SelfTypeRelationship computeSelfTypeRelationship(TypeChecker &tc,
   if (!dc1->isTypeContext() || !dc2->isTypeContext())
     return SelfTypeRelationship::Unrelated;
 
-  Type type1 = dc1->getDeclaredTypeInContext();
-  Type type2 = dc2->getDeclaredTypeInContext();
+  Type type1 = dc1->getDeclaredInterfaceType();
+  Type type2 = dc2->getDeclaredInterfaceType();
 
   // If the types are equal, the answer is simple.
   if (type1->isEqual(type2))

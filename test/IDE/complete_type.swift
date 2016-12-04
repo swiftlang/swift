@@ -438,7 +438,7 @@ typealias FooTypealias = Int
 //===---
 
 // TYPE_IN_PROTOCOL: Begin completions
-// TYPE_IN_PROTOCOL-DAG: Decl[GenericTypeParam]/CurrNominal: Self[#Self#]{{; name=.+$}}
+// TYPE_IN_PROTOCOL-DAG: Decl[GenericTypeParam]/Super: Self[#Self#]{{; name=.+$}}
 // TYPE_IN_PROTOCOL: End completions
 
 protocol TestSelf1 {
