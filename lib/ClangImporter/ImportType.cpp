@@ -2117,7 +2117,7 @@ Type ClangImporter::Implementation::importMethodType(
 
   // Form the function type.
   return FunctionType::get(
-      (*bodyParams)->getInterfaceType(const_cast<DeclContext*>(dc)),
+      (*bodyParams)->getInterfaceType(SwiftContext),
       swiftResultTy, extInfo);
 }
 

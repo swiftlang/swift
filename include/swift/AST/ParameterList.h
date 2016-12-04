@@ -135,21 +135,21 @@ public:
   /// the ParamDecls, so they can be reparented into a new DeclContext.
   ParameterList *clone(const ASTContext &C,
                        OptionSet<CloneFlags> options = None) const;
-  
-  /// Return a TupleType or ParenType for this parameter list.  This returns a
-  /// null type if one of the ParamDecls does not have a type set for it yet.
+
+  /// Return a TupleType or ParenType for this parameter list, written in terms
+  /// of contextual archetypes.
   Type getType(const ASTContext &C) const;
-  
-  /// Return a TupleType or ParenType for this parameter list written in terms
+
+  /// Return a TupleType or ParenType for this parameter list, written in terms
   /// of interface types.
-  Type getInterfaceType(DeclContext *DC) const;
+  Type getInterfaceType(const ASTContext &C) const;
 
   /// Return the full function type for a set of curried parameter lists that
   /// returns the specified result type written in terms of interface types.
   static Type getFullInterfaceType(Type resultType, ArrayRef<ParameterList*> PL,
-                                   DeclContext *DC);
-  
-  
+                                   const ASTContext &C);
+
+
   /// Return the full source range of this parameter.
   SourceRange getSourceRange() const;
   SourceLoc getStartLoc() const { return getSourceRange().Start; }

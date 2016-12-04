@@ -440,7 +440,7 @@ static FuncDecl *makeEnumRawValueGetter(ClangImporter::Implementation &Impl,
   getterDecl->setImplicit();
 
   auto type = ParameterList::getFullInterfaceType(enumDecl->getRawType(),
-                                                  params, enumDecl);
+                                                  params, C);
 
   getterDecl->setInterfaceType(type);
 
@@ -502,8 +502,7 @@ static FuncDecl *makeNewtypeBridgedRawValueGetter(
                      TypeLoc::withoutLoc(computedType), structDecl);
   getterDecl->setImplicit();
 
-  auto type = ParameterList::getFullInterfaceType(computedType, params,
-                                                  structDecl);
+  auto type = ParameterList::getFullInterfaceType(computedType, params, C);
 
   getterDecl->setInterfaceType(type);
 
@@ -552,8 +551,7 @@ static FuncDecl *makeFieldGetterDecl(ClangImporter::Implementation &Impl,
                      TypeLoc::withoutLoc(getterType), importedDecl, clangNode);
   getterDecl->setAccessibility(Accessibility::Public);
 
-  auto type = ParameterList::getFullInterfaceType(getterType, params,
-                                                  importedDecl);
+  auto type = ParameterList::getFullInterfaceType(getterType, params, C);
   getterDecl->setInterfaceType(type);
 
 
@@ -588,8 +586,7 @@ static FuncDecl *makeFieldSetterDecl(ClangImporter::Implementation &Impl,
                      /*GenericParams=*/nullptr, params,
                      TypeLoc::withoutLoc(voidTy), importedDecl, clangNode);
 
-  auto type = ParameterList::getFullInterfaceType(voidTy, params,
-                                                  importedDecl);
+  auto type = ParameterList::getFullInterfaceType(voidTy, params, C);
   setterDecl->setInterfaceType(type);
 
   setterDecl->setAccessibility(Accessibility::Public);
@@ -1262,7 +1259,7 @@ static FuncDecl *buildSubscriptGetterDecl(ClangImporter::Implementation &Impl,
 
   // Form the type of the getter.
   auto getterType =
-      ParameterList::getFullInterfaceType(elementTy, getterArgs, dc);
+      ParameterList::getFullInterfaceType(elementTy, getterArgs, C);
 
   auto interfaceType =
       getGenericMethodType(dc, getterType->castTo<AnyFunctionType>());
@@ -1322,7 +1319,7 @@ static FuncDecl *buildSubscriptSetterDecl(ClangImporter::Implementation &Impl,
 
   // Form the type of the setter.
   Type setterType = ParameterList::getFullInterfaceType(TupleType::getEmpty(C),
-                                                        setterArgs, dc);
+                                                        setterArgs, C);
 
   auto interfaceType =
       getGenericMethodType(dc, setterType->castTo<AnyFunctionType>());
@@ -1486,8 +1483,7 @@ static bool addErrorDomain(NominalTypeDecl *swiftDecl,
       ParameterList::createWithoutLoc(
           ParamDecl::createSelf(SourceLoc(), swiftDecl, isStatic)),
       ParameterList::createEmpty(C)};
-  auto toStringTy = ParameterList::getFullInterfaceType(stringTy, params,
-                                                        swiftDecl);
+  auto toStringTy = ParameterList::getFullInterfaceType(stringTy, params, C);
 
   FuncDecl *getterDecl =
     FuncDecl::create(C, /*StaticLoc=*/SourceLoc(), StaticSpellingKind::None,
@@ -4815,7 +4811,7 @@ Decl *SwiftDeclConverter::importGlobalAsMethod(const clang::FunctionDecl *decl,
   auto swiftResultTy = Impl.importFunctionReturnType(
       dc, decl, decl->getReturnType(), allowNSUIntegerAsInt);
   auto fnType =
-      ParameterList::getFullInterfaceType(swiftResultTy, bodyParams, dc);
+      ParameterList::getFullInterfaceType(swiftResultTy, bodyParams, C);
 
   auto loc = Impl.importSourceLoc(decl->getLocation());
   auto nameLoc = Impl.importSourceLoc(decl->getLocation());
@@ -7048,7 +7044,7 @@ ClangImporter::Implementation::createConstant(Identifier name, DeclContext *dc,
   getterArgs.push_back(ParameterList::createEmpty(C));
 
   // Form the type of the getter.
-  auto getterType = ParameterList::getFullInterfaceType(type, getterArgs, dc);
+  auto getterType = ParameterList::getFullInterfaceType(type, getterArgs, C);
 
   // Create the getter function declaration.
   auto func =

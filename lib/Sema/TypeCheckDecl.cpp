@@ -3742,7 +3742,7 @@ public:
       if (SD->hasInterfaceType())
         return;
 
-      auto indicesIfaceTy = SD->getIndices()->getInterfaceType(dc);
+      auto indicesIfaceTy = SD->getIndices()->getInterfaceType(TC.Context);
 
       auto elementTy = SD->getElementTypeLoc().getType();
       auto elementIfaceTy = dc->mapTypeOutOfContext(elementTy);
@@ -4335,17 +4335,6 @@ public:
       FD->setInterfaceType(ErrorType::get(TC.Context));
       FD->setInvalid();
       return true;
-    }
-
-    auto paramLists = FD->getParameterLists();
-
-    for (unsigned i = 0, e = paramLists.size(); i != e; ++i) {
-      Type argTy = paramLists[e - i - 1]->getType(TC.Context);
-      if (!argTy) {
-        FD->setInterfaceType(ErrorType::get(TC.Context));
-        FD->setInvalid();
-        return true;
-      }
     }
 
     return false;

@@ -1645,12 +1645,12 @@ ValueDecl::getSatisfiedProtocolRequirements(bool Sorted) const {
 }
 
 bool ValueDecl::hasInterfaceType() const {
-  return !!InterfaceTy;
+  return !TypeAndAccess.getPointer().isNull();
 }
 
 Type ValueDecl::getInterfaceType() const {
-  assert(InterfaceTy && "No interface type was set");
-  return InterfaceTy;
+  assert(hasInterfaceType() && "No interface type was set");
+  return TypeAndAccess.getPointer();
 }
 
 void ValueDecl::setInterfaceType(Type type) {
@@ -1668,8 +1668,8 @@ void ValueDecl::setInterfaceType(Type type) {
     assert(!type->hasTypeVariable() &&
            "Archetype in interface type");
   }
-  
-  InterfaceTy = type;
+
+  TypeAndAccess.setPointer(type);
 }
 
 Optional<ObjCSelector> ValueDecl::getObjCRuntimeName() const {
