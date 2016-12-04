@@ -1303,7 +1303,7 @@ bool ArchetypeBuilder::addSameTypeRequirementToConcrete(
       addSameTypeRequirementToConcrete(nested.second.front(),
                                        witnessType.getValue(),
                                        Source);
-    } else {
+    } else if (assocType) {
       assert(conformances.count(assocType->getProtocol()) > 0
              && "missing conformance?");
       auto conformance = conformances.find(assocType->getProtocol())->second;
