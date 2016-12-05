@@ -14,6 +14,7 @@
 #include "swift/AST/Decl.h"
 #include "swift/AST/GenericSignature.h"
 #include "swift/AST/Mangle.h"
+#include "swift/Basic/Mangler.h"
 #include "swift/AST/NameLookup.h"
 #include "swift/Basic/Demangle.h"
 #include "swift/ClangImporter/ClangImporter.h"
@@ -1620,7 +1621,8 @@ static void VisitNodeLocalDeclName(
     Demangle::NodePointer &cur_node, VisitNodeResult &result,
     const VisitNodeResult &generic_context) { // set by GenericType case
   Demangle::NodePointer parent_node = nodes[nodes.size() - 2];
-  std::string remangledNode = Demangle::mangleNode(parent_node);
+  std::string remangledNode = Demangle::mangleNode(parent_node,
+                                                 NewMangling::useNewMangling());
   TypeDecl *decl = result._module.lookupLocalType(remangledNode);
   if (!decl)
     result._error = stringWithFormat("unable to lookup local type %s",
