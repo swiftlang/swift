@@ -295,7 +295,9 @@ void TypeChecker::checkInheritanceClause(Decl *decl,
   }
 
   // Establish a default generic type resolver.
-  PartialGenericTypeToArchetypeResolver defaultResolver;
+  auto genericEnv =
+    decl->getInnermostDeclContext()->getGenericEnvironmentOfContext();
+  GenericTypeToArchetypeResolver defaultResolver(genericEnv);
   if (!resolver)
     resolver = &defaultResolver;
 
@@ -7419,7 +7421,9 @@ checkExtensionGenericParams(TypeChecker &tc, ExtensionDecl *ext, Type type,
   // Validate the generic parameters for the last time.
   tc.revertGenericParamList(genericParams);
   ArchetypeBuilder builder = tc.createArchetypeBuilder(ext->getModuleContext());
-  tc.checkGenericParamList(&builder, genericParams, parentSig, parentEnv, nullptr);
+  PartialGenericTypeToArchetypeResolver resolver;
+  tc.checkGenericParamList(&builder, genericParams, parentSig, parentEnv,
+                           &resolver);
   inferExtendedTypeReqs(builder);
 
   auto *env = builder.getGenericEnvironment(sig);

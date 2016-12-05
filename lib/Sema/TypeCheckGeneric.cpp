@@ -898,7 +898,9 @@ void TypeChecker::validateGenericTypeSignature(GenericTypeDecl *typeDecl) {
     createArchetypeBuilder(typeDecl->getModuleContext());
   auto *parentSig = dc->getGenericSignatureOfContext();
   auto *parentEnv = dc->getGenericEnvironmentOfContext();
-  checkGenericParamList(&builder, gp, parentSig, parentEnv, nullptr);
+
+  DependentGenericTypeResolver resolver(builder);
+  checkGenericParamList(&builder, gp, parentSig, parentEnv, &resolver);
 
   auto *env = builder.getGenericEnvironment(sig);
   typeDecl->setGenericEnvironment(env);

@@ -715,20 +715,15 @@ bool swift::performTypeLocChecking(ASTContext &Ctx, TypeLoc &T,
   if (isSILType)
     options |= TR_SILType;
 
-  // FIXME: Get rid of PartialGenericTypeToArchetypeResolver
   GenericTypeToArchetypeResolver contextResolver(GenericEnv);
-  PartialGenericTypeToArchetypeResolver defaultResolver;
-
-  GenericTypeResolver *resolver =
-      (GenericEnv ? (GenericTypeResolver *) &contextResolver
-                  : (GenericTypeResolver *) &defaultResolver);
 
   if (ProduceDiagnostics) {
-    return TypeChecker(Ctx).validateType(T, DC, options, resolver);
+    return TypeChecker(Ctx).validateType(T, DC, options, &contextResolver);
   } else {
     // Set up a diagnostics engine that swallows diagnostics.
     DiagnosticEngine Diags(Ctx.SourceMgr);
-    return TypeChecker(Ctx, Diags).validateType(T, DC, options, resolver);
+    return TypeChecker(Ctx, Diags).validateType(T, DC, options,
+                                                &contextResolver);
   }
 }
 
