@@ -787,7 +787,8 @@ UnqualifiedLookup::UnqualifiedLookup(DeclName Name, DeclContext *DC,
           DC = I->getParent()->getParent();
           continue;
         } else {
-          assert(isa<TopLevelCodeDecl>(DC) || isa<Initializer>(DC));
+          assert(isa<TopLevelCodeDecl>(DC) || isa<Initializer>(DC) ||
+                 isa<TypeAliasDecl>(DC));
           if (!isCascadingUse.hasValue())
             isCascadingUse = DC->isCascadingContextForLookup(false);
         }

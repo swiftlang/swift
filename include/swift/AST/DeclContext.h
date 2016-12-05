@@ -232,10 +232,7 @@ public:
 
   /// \returns true if this is a type context, e.g., a struct, a class, an
   /// enum, a protocol, or an extension.
-  bool isTypeContext() const {
-    return getContextKind() == DeclContextKind::GenericTypeDecl ||
-           getContextKind() == DeclContextKind::ExtensionDecl;
-  }
+  bool isTypeContext() const;
 
   /// \brief Determine whether this is an extension context.
   bool isExtensionContext() const {

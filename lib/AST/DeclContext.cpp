@@ -357,6 +357,12 @@ AbstractFunctionDecl *DeclContext::getInnermostMethodContext() {
   }
 }
 
+bool DeclContext::isTypeContext() const {
+  return (getContextKind() == DeclContextKind::GenericTypeDecl &&
+          !isa<TypeAliasDecl>(this)) ||
+         getContextKind() == DeclContextKind::ExtensionDecl;
+}
+
 DeclContext *DeclContext::getInnermostTypeContext() {
   DeclContext *Result = this;
   while (true) {
@@ -374,8 +380,14 @@ DeclContext *DeclContext::getInnermostTypeContext() {
     case DeclContextKind::FileUnit:
       return nullptr;
 
-    case DeclContextKind::ExtensionDecl:
     case DeclContextKind::GenericTypeDecl:
+      if (isa<TypeAliasDecl>(Result)) {
+        Result = Result->getParent();
+        continue;
+      }
+      return Result;
+
+    case DeclContextKind::ExtensionDecl:
       return Result;
     }
   }
