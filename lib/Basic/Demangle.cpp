@@ -325,6 +325,12 @@ public:
   ///
   /// \return true if the mangling succeeded
   NodePointer demangleTopLevel() {
+#ifndef NO_NEW_DEMANGLING
+    if (Mangled.str().startswith(MANGLING_PREFIX_STR)) {
+      NewMangling::Demangler D(Mangled.str());
+      return D.demangleTopLevel();
+    }
+#endif
     if (!Mangled.nextIf("_T"))
       return nullptr;
 
