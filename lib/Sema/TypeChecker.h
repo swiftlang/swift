@@ -491,16 +491,13 @@ public:
   /// during type checking.
   llvm::SetVector<NominalTypeDecl *> ValidatedTypes;
 
-  using TypeAccessScopeCacheMap = llvm::DenseMap<Type, AccessScope>;
+  using TypeAccessScopeCacheMap = llvm::DenseMap<const ValueDecl *, AccessScope>;
 
-  /// Caches the outermost scope where a particular type can be used, relative
-  /// to a particular file.
+  /// Caches the outermost scope where a particular declaration can be used,
+  /// relative to a particular file.
   ///
   /// The file is used to handle things like \c \@testable. A null-but-present
   /// value means the type is public.
-  ///
-  /// This can't use CanTypes because typealiases may have more limited types
-  /// than their underlying types.
   llvm::DenseMap<const SourceFile *, TypeAccessScopeCacheMap>
     TypeAccessScopeCache;
 

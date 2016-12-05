@@ -210,3 +210,24 @@ fileprivate struct SR2579 {
   private var outerProperty = Inner().innerProperty // expected-warning {{property should not be declared in this context because its type 'SR2579.Inner.InnerPrivateType' uses a private type}}
   var outerProperty2 = Inner().innerProperty // expected-warning {{property should be declared private because its type 'SR2579.Inner.InnerPrivateType' uses a private type}}
 }
+
+// FIXME: Dependent member lookup of typealiases is not subject
+// to accessibility checking.
+struct Generic<T> {
+  fileprivate typealias Dependent = T
+}
+
+var x: Generic<Int>.Dependent = 3
+// expected-error@-1 {{variable must be declared private or fileprivate because its type uses a fileprivate type}}
+
+func internalFuncWithFileprivateAlias() -> Generic<Int>.Dependent {
+// expected-error@-1 {{function must be declared private or fileprivate because its result uses a fileprivate type}}
+  return 3
+}
+
+private func privateFuncWithFileprivateAlias() -> Generic<Int>.Dependent {
+  return 3
+}
+
+// FIXME: No error here
+var y = privateFuncWithFileprivateAlias()
