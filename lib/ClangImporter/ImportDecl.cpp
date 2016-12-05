@@ -1678,7 +1678,8 @@ namespace {
         // Import using the Swift 2 name. If that fails, or if it's identical
         // to the Swift name, we won't introduce a Swift 2 stub declaration.
         auto swift2Name = Impl.importFullName(D, ImportNameVersion::Swift2);
-        if (!swift2Name || swift2Name.Imported == swift3Name->Imported)
+        if (!swift2Name ||
+            swift2Name.getDeclName() == swift3Name->getDeclName())
           return ImportedName();
 
         // Okay, return the Swift 2 name.
@@ -1744,8 +1745,8 @@ namespace {
             IdStream << "__Unnamed_" << kind
             << "_" << field->getName();
             ImportedName Result;
-            Result.Imported = Impl.SwiftContext.getIdentifier(IdStream.str());
-            Result.EffectiveContext = decl->getDeclContext();
+            Result.setDeclName(Impl.SwiftContext.getIdentifier(IdStream.str()));
+            Result.setEffectiveContext(decl->getDeclContext());
             return Result;
           }
         }
@@ -1755,9 +1756,10 @@ namespace {
     }
 
     bool isFactoryInit(ImportedName &name) {
-      return name && name.Imported.getBaseName() == Impl.SwiftContext.Id_init &&
-             (name.InitKind == CtorInitializerKind::Factory ||
-              name.InitKind == CtorInitializerKind::ConvenienceFactory);
+      return name &&
+             name.getDeclName().getBaseName() == Impl.SwiftContext.Id_init &&
+             (name.getInitKind() == CtorInitializerKind::Factory ||
+              name.getInitKind() == CtorInitializerKind::ConvenienceFactory);
     }
 
   public:
@@ -1816,7 +1818,7 @@ namespace {
         // If we're importing a global as a member, we need to provide the
         // effective context.
         Impl.printSwiftName(swift3Name,
-                            /*fullyQualified=*/swift3Name.ImportAsMember,
+                            /*fullyQualified=*/swift3Name.importAsMember(),
                             os);
       }
 
@@ -1842,7 +1844,7 @@ namespace {
     Decl *VisitTypedefNameDecl(const clang::TypedefNameDecl *Decl) {
       Optional<ImportedName> swift3Name;
       auto importedName = importFullName(Decl, swift3Name);
-      auto Name = importedName.Imported.getBaseName();
+      auto Name = importedName.getDeclName().getBaseName();
       if (Name.empty())
         return nullptr;
 
@@ -1866,17 +1868,16 @@ namespace {
         // 'typedef const void *FooRef;' as CF types if they have the
         // right attributes or match our name whitelist.
         if (!SwiftType) {
-          auto DC = Impl.importDeclContextOf(Decl,
-                                             importedName.EffectiveContext);
+          auto DC = Impl.importDeclContextOf(
+              Decl, importedName.getEffectiveContext());
           if (!DC)
             return nullptr;
 
           if (auto pointee = CFPointeeInfo::classifyTypedef(Decl)) {
             // If the pointee is a record, consider creating a class type.
             if (pointee.isRecord()) {
-              auto swiftClass =
-                  importCFClassType(Decl, Name, pointee,
-                                    importedName.EffectiveContext);
+              auto swiftClass = importCFClassType(
+                  Decl, Name, pointee, importedName.getEffectiveContext());
               if (!swiftClass) return nullptr;
 
               Impl.SpecialTypedefNames[Decl->getCanonicalDecl()] =
@@ -1977,7 +1978,8 @@ namespace {
         }
       }
 
-      auto DC = Impl.importDeclContextOf(Decl, importedName.EffectiveContext);
+      auto DC =
+          Impl.importDeclContextOf(Decl, importedName.getEffectiveContext());
       if (!DC)
         return nullptr;
 
@@ -2080,12 +2082,13 @@ namespace {
       if (swift3Name)
         return importSwift2TypeAlias(decl, importedName, *swift3Name);
 
-      auto dc = Impl.importDeclContextOf(decl, importedName.EffectiveContext);
+      auto dc =
+          Impl.importDeclContextOf(decl, importedName.getEffectiveContext());
       if (!dc)
         return nullptr;
       
       ASTContext &cxt = Impl.SwiftContext;
-      auto name = importedName.Imported.getBaseName();
+      auto name = importedName.getDeclName().getBaseName();
 
       // Create the enum declaration and record it.
       StructDecl *errorWrapper = nullptr;
@@ -2447,12 +2450,13 @@ namespace {
       if (swift3Name)
         return importSwift2TypeAlias(decl, importedName, *swift3Name);
 
-      auto dc = Impl.importDeclContextOf(decl, importedName.EffectiveContext);
+      auto dc =
+          Impl.importDeclContextOf(decl, importedName.getEffectiveContext());
       if (!dc)
         return nullptr;
 
       // Create the struct declaration and record it.
-      auto name = importedName.Imported.getBaseName();
+      auto name = importedName.getDeclName().getBaseName();
       auto result = Impl.createDeclWithClangNode<StructDecl>(decl,
                                  Accessibility::Public,
                                  Impl.importSourceLoc(decl->getLocStart()),
@@ -2645,7 +2649,7 @@ namespace {
       auto importedName = importFullName(decl, swift3Name);
       if (!importedName) return nullptr;
 
-      auto name = importedName.Imported.getBaseName();
+      auto name = importedName.getDeclName().getBaseName();
       if (name.empty())
         return nullptr;
 
@@ -2655,7 +2659,8 @@ namespace {
         // constant with that integral type.
 
         // The context where the constant will be introduced.
-        auto dc = Impl.importDeclContextOf(decl, importedName.EffectiveContext);
+        auto dc =
+            Impl.importDeclContextOf(decl, importedName.getEffectiveContext());
         if (!dc)
           return nullptr;
 
@@ -2692,7 +2697,8 @@ namespace {
         // type. Create a constant with that struct type.
 
         // The context where the constant will be introduced.
-        auto dc = Impl.importDeclContextOf(decl, importedName.EffectiveContext);
+        auto dc =
+            Impl.importDeclContextOf(decl, importedName.getEffectiveContext());
         if (!dc)
           return nullptr;
 
@@ -2762,9 +2768,10 @@ namespace {
       auto importedName = importFullName(decl, swift3Name);
       if (!importedName) return nullptr;
 
-      auto name = importedName.Imported.getBaseName();
+      auto name = importedName.getDeclName().getBaseName();
 
-      auto dc = Impl.importDeclContextOf(decl, importedName.EffectiveContext);
+      auto dc =
+          Impl.importDeclContextOf(decl, importedName.getEffectiveContext());
       if (!dc)
         return nullptr;
 
@@ -2832,7 +2839,7 @@ namespace {
         return nullptr;
 
       AbstractStorageDecl *owningStorage;
-      switch (importedName.AccessorKind) {
+      switch (importedName.getAccessorKind()) {
       case ImportedAccessorKind::None:
         owningStorage = nullptr;
         break;
@@ -2861,23 +2868,25 @@ namespace {
             ImportedName importedName,
             Optional<ImportedName> swift3Name,
             AbstractStorageDecl *owningStorage) {
-      auto dc = Impl.importDeclContextOf(decl, importedName.EffectiveContext);
+      auto dc =
+          Impl.importDeclContextOf(decl, importedName.getEffectiveContext());
       if (!dc)
         return nullptr;
 
-      DeclName name = owningStorage ? DeclName() : importedName.Imported;
-      bool hasCustomName = importedName.HasCustomName;
+      DeclName name = owningStorage ? DeclName() : importedName.getDeclName();
+      bool hasCustomName = importedName.hasCustomName();
 
-      if (importedName.ImportAsMember) {
+      if (importedName.importAsMember()) {
         assert(!swift3Name && "Swift 2 didn't support import-as-member!");
 
         // Handle initializers.
         if (name.getBaseName() == Impl.SwiftContext.Id_init)
           return importGlobalAsInitializer(decl, name, dc,
-                                           importedName.InitKind);
+                                           importedName.getInitKind());
 
         // Everything else is a method.
-        return importGlobalAsMethod(decl, name, dc, importedName.SelfIndex);
+        return importGlobalAsMethod(decl, name, dc,
+                                    importedName.getSelfIndex());
       }
 
       // Import the function type. If we have parameters, make sure their names
@@ -2954,9 +2963,10 @@ namespace {
       auto importedName = importFullName(decl, swift3Name);
       if (!importedName) return nullptr;
 
-      auto name = importedName.Imported.getBaseName();
+      auto name = importedName.getDeclName().getBaseName();
 
-      auto dc = Impl.importDeclContextOf(decl, importedName.EffectiveContext);
+      auto dc =
+          Impl.importDeclContextOf(decl, importedName.getEffectiveContext());
       if (!dc)
         return nullptr;
 
@@ -3007,8 +3017,9 @@ namespace {
       auto importedName = importFullName(decl, swift3Name);
       if (!importedName) return nullptr;
 
-      auto name = importedName.Imported.getBaseName();
-      auto dc = Impl.importDeclContextOf(decl, importedName.EffectiveContext);
+      auto name = importedName.getDeclName().getBaseName();
+      auto dc =
+          Impl.importDeclContextOf(decl, importedName.getEffectiveContext());
       if (!dc)
         return nullptr;
 
@@ -3227,7 +3238,7 @@ namespace {
       ++NumFactoryMethodsAsInitializers;
       bool redundant = false;
       auto result =
-          importConstructor(decl, dc, false, importedName.InitKind,
+          importConstructor(decl, dc, false, importedName.getInitKind(),
                             /*required=*/false, selector, importedName,
                             {decl->param_begin(), decl->param_size()},
                             decl->isVariadic(), redundant);
@@ -3249,7 +3260,7 @@ namespace {
       llvm::raw_svector_ostream os(message);
       os << "use object construction '" << decl->getClassInterface()->getName()
          << "(";
-      for (auto arg : importedName.Imported.getArgumentNames()) {
+      for (auto arg : importedName.getDeclName().getArgumentNames()) {
         os << arg << ":";
       }
       os << ")'";
@@ -3294,7 +3305,7 @@ namespace {
         kind = SpecialMethodKind::NSDictionarySubscriptGetter;
 
       // Import the type that this method will have.
-      DeclName name = importedName.Imported;
+      DeclName name = importedName.getDeclName();
       Optional<ForeignErrorConvention> errorConvention;
       bodyParams.push_back(nullptr);
       auto type = Impl.importMethodType(dc,
@@ -3325,12 +3336,13 @@ namespace {
       }
 
       auto result = FuncDecl::create(
-          Impl.SwiftContext, /*StaticLoc=*/SourceLoc(), StaticSpellingKind::None,
+          Impl.SwiftContext, /*StaticLoc=*/SourceLoc(),
+          StaticSpellingKind::None,
           /*FuncLoc=*/SourceLoc(), name, /*NameLoc=*/SourceLoc(),
-          /*Throws=*/importedName.ErrorInfo.hasValue(), /*ThrowsLoc=*/SourceLoc(),
+          /*Throws=*/importedName.getErrorInfo().hasValue(),
+          /*ThrowsLoc=*/SourceLoc(),
           /*AccessorKeywordLoc=*/SourceLoc(),
-          /*GenericParams=*/nullptr, bodyParams,
-          TypeLoc(), dc, decl);
+          /*GenericParams=*/nullptr, bodyParams, TypeLoc(), dc, decl);
 
       result->setAccessibility(getOverridableAccessibility(dc));
 
@@ -3693,7 +3705,7 @@ namespace {
       if (swift3Name)
         return importSwift2TypeAlias(decl, importedName, *swift3Name);
 
-      Identifier name = importedName.Imported.getBaseName();
+      Identifier name = importedName.getDeclName().getBaseName();
 
       // FIXME: Figure out how to deal with incomplete protocols, since that
       // notion doesn't exist in Swift.
@@ -3710,7 +3722,8 @@ namespace {
 
       decl = decl->getDefinition();
 
-      auto dc = Impl.importDeclContextOf(decl, importedName.EffectiveContext);
+      auto dc =
+          Impl.importDeclContextOf(decl, importedName.getEffectiveContext());
       if (!dc)
         return nullptr;
 
@@ -3778,7 +3791,7 @@ namespace {
       if (swift3Name)
         return importSwift2TypeAlias(decl, importedName, *swift3Name);
 
-      auto name = importedName.Imported.getBaseName();
+      auto name = importedName.getDeclName().getBaseName();
 
       auto createRootClass = [=](DeclContext *dc = nullptr) -> ClassDecl * {
         if (!dc) {
@@ -3847,7 +3860,8 @@ namespace {
       decl = decl->getDefinition();
       assert(decl);
 
-      auto dc = Impl.importDeclContextOf(decl, importedName.EffectiveContext);
+      auto dc =
+          Impl.importDeclContextOf(decl, importedName.getEffectiveContext());
       if (!dc)
         return nullptr;
 
@@ -4017,7 +4031,7 @@ namespace {
       assert(dc);
 
       Optional<ImportedName> swift3Name;
-      auto name = importFullName(decl, swift3Name).Imported.getBaseName();
+      auto name = importFullName(decl, swift3Name).getDeclName().getBaseName();
       if (name.empty())
         return nullptr;
 
@@ -4132,7 +4146,7 @@ namespace {
 
       Optional<ImportedName> swift3Name;
       auto importedName = importFullName(decl, swift3Name);
-      auto name = importedName.Imported.getBaseName();
+      auto name = importedName.getDeclName().getBaseName();
 
       if (name.empty()) return nullptr;
 
@@ -4387,7 +4401,7 @@ Decl *SwiftDeclConverter::importSwift2TypeAlias(const clang::NamedDecl *decl,
   // Create the type alias.
   auto alias = Impl.createDeclWithClangNode<TypeAliasDecl>(
       decl, Accessibility::Public, Impl.importSourceLoc(decl->getLocStart()),
-      swift2Name.Imported.getBaseName(),
+      swift2Name.getDeclName().getBaseName(),
       Impl.importSourceLoc(decl->getLocation()),
       TypeLoc::withoutLoc(underlyingType), genericParams, dc);
   alias->computeType();
@@ -4532,7 +4546,7 @@ Decl *SwiftDeclConverter::importEnumCase(const clang::EnumConstantDecl *decl,
                                          Decl *swift3Decl) {
   auto &context = Impl.SwiftContext;
   Optional<ImportedName> swift3Name;
-  auto name = importFullName(decl, swift3Name).Imported.getBaseName();
+  auto name = importFullName(decl, swift3Name).getDeclName().getBaseName();
   if (name.empty())
     return nullptr;
 
@@ -4603,7 +4617,7 @@ SwiftDeclConverter::importOptionConstant(const clang::EnumConstantDecl *decl,
                                          NominalTypeDecl *theStruct) {
   Optional<ImportedName> swift3Name;
   ImportedName nameInfo = importFullName(decl, swift3Name);
-  Identifier name = nameInfo.Imported.getBaseName();
+  Identifier name = nameInfo.getDeclName().getBaseName();
   if (name.empty())
     return nullptr;
 
@@ -4619,7 +4633,7 @@ SwiftDeclConverter::importOptionConstant(const clang::EnumConstantDecl *decl,
   // NS_OPTIONS members that have a value of 0 (typically named "None") do
   // not operate as a set-like member.  Mark them unavailable with a message
   // that says that they should be used as [].
-  if (decl->getInitVal() == 0 && !nameInfo.HasCustomName &&
+  if (decl->getInitVal() == 0 && !nameInfo.hasCustomName() &&
       !CD->getAttrs().isUnavailable(Impl.SwiftContext)) {
     /// Create an AvailableAttr that indicates specific availability
     /// for all platforms.
@@ -4858,7 +4872,7 @@ SwiftDeclConverter::getImplicitProperty(ImportedName importedName,
   const clang::FunctionDecl *setter = nullptr;
   ImportedName setterName;
   Optional<ImportedName> swift3SetterName;
-  switch (importedName.AccessorKind) {
+  switch (importedName.getAccessorKind()) {
   case ImportedAccessorKind::None:
   case ImportedAccessorKind::SubscriptGetter:
   case ImportedAccessorKind::SubscriptSetter:
@@ -4876,13 +4890,13 @@ SwiftDeclConverter::getImplicitProperty(ImportedName importedName,
   }
 
   // Find the other accessor, if it exists.
-  auto propertyName = importedName.Imported.getBaseName();
+  auto propertyName = importedName.getDeclName().getBaseName();
   auto lookupTable =
       Impl.findLookupTable(*getClangSubmoduleForDecl(accessor));
   assert(lookupTable && "No lookup table?");
   bool foundAccessor = false;
-  for (auto entry :
-       lookupTable->lookup(propertyName.str(), importedName.EffectiveContext)) {
+  for (auto entry : lookupTable->lookup(propertyName.str(),
+                                        importedName.getEffectiveContext())) {
     auto decl = entry.dyn_cast<clang::NamedDecl *>();
     if (!decl)
       continue;
@@ -4930,7 +4944,7 @@ SwiftDeclConverter::getImplicitProperty(ImportedName importedName,
 
   // Retrieve the type of the property that is implied by the getter.
   auto propertyType =
-      getAccessorPropertyType(getter, false, getterName.SelfIndex);
+      getAccessorPropertyType(getter, false, getterName.getSelfIndex());
   if (propertyType.isNull())
     return nullptr;
 
@@ -4938,7 +4952,7 @@ SwiftDeclConverter::getImplicitProperty(ImportedName importedName,
   // matches that of the getter.
   if (setter) {
     auto setterPropertyType =
-        getAccessorPropertyType(setter, true, setterName.SelfIndex);
+        getAccessorPropertyType(setter, true, setterName.getSelfIndex());
     if (setterPropertyType.isNull())
       return nullptr;
 
@@ -4949,13 +4963,13 @@ SwiftDeclConverter::getImplicitProperty(ImportedName importedName,
   }
 
   // Import the property's context.
-  auto dc = Impl.importDeclContextOf(getter, getterName.EffectiveContext);
+  auto dc = Impl.importDeclContextOf(getter, getterName.getEffectiveContext());
   if (!dc)
     return nullptr;
 
   // Is this a static property?
   bool isStatic = false;
-  if (dc->isTypeContext() && !getterName.SelfIndex)
+  if (dc->isTypeContext() && !getterName.getSelfIndex())
     isStatic = true;
 
   // Compute the property type.
@@ -5045,7 +5059,7 @@ ConstructorDecl *SwiftDeclConverter::importConstructor(
     return nullptr;
 
   // If we dropped the variadic, handle it now.
-  if (importedName.DroppedVariadic) {
+  if (importedName.droppedVariadic()) {
     selector = ObjCSelector(Impl.SwiftContext, selector.getNumArgs() - 1,
                             selector.getSelectorPieces().drop_back());
     params = params.drop_back(1);
@@ -5212,7 +5226,7 @@ ConstructorDecl *SwiftDeclConverter::importConstructor(
 
   // Import the type that this method will have.
   Optional<ForeignErrorConvention> errorConvention;
-  DeclName name = importedName.Imported;
+  DeclName name = importedName.getDeclName();
   bodyParams.push_back(nullptr);
   auto type = Impl.importMethodType(
       dc, objcMethod, objcMethod->getReturnType(), args, variadic,
@@ -5324,7 +5338,7 @@ ConstructorDecl *SwiftDeclConverter::importConstructor(
   auto result = Impl.createDeclWithClangNode<ConstructorDecl>(
       objcMethod, Accessibility::Public, name, /*NameLoc=*/SourceLoc(),
       failability, /*FailabilityLoc=*/SourceLoc(),
-      /*Throws=*/importedName.ErrorInfo.hasValue(),
+      /*Throws=*/importedName.getErrorInfo().hasValue(),
       /*ThrowsLoc=*/SourceLoc(), selfVar, bodyParams.back(),
       /*GenericParams=*/nullptr, dc);
 
@@ -6106,7 +6120,7 @@ void SwiftDeclConverter::importInheritedConstructors(
         ImportedName importedName = importFullName(objcMethod, swift3Name);
         assert(!swift3Name &&
                "Import inherited initializers never references swift3name");
-        importedName.HasCustomName = true;
+        importedName.setHasCustomName();
         bool redundant;
         if (auto newCtor =
                 importConstructor(objcMethod, classDecl,
@@ -7268,6 +7282,7 @@ ClangImporter::Implementation::getSpecialTypedefKind(clang::TypedefNameDecl *dec
 Identifier
 ClangImporter::getEnumConstantName(const clang::EnumConstantDecl *enumConstant){
   return Impl.importFullName(enumConstant, ImportNameVersion::Swift3)
-      .Imported.getBaseName();
+      .getDeclName()
+      .getBaseName();
 }
 
