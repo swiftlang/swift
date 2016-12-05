@@ -369,7 +369,6 @@ NodePointer Demangler::demangleIdentifier() {
       return nullptr;
     StringRef Slice = StringRef(Text.data() + Pos, numChars);
     if (isPunycoded) {
-      nextIf('_');
       if (!Punycode::decodePunycodeUTF8(Slice, Identifier))
         return nullptr;
     } else {
@@ -430,11 +429,11 @@ NodePointer Demangler::demangleOperatorIdentifier() {
 NodePointer Demangler::demangleLocalIdentifier() {
   if (nextIf('L')) {
     NodePointer discriminator = popNode(Node::Kind::Identifier);
-    NodePointer name = popNode(Node::Kind::Identifier);
+    NodePointer name = popNode(isDeclName);
     return createWithChildren(Node::Kind::PrivateDeclName, discriminator, name);
   }
   NodePointer discriminator = demangleIndexAsNode();
-  NodePointer name = popNode(Node::Kind::Identifier);
+  NodePointer name = popNode(isDeclName);
   return createWithChildren(Node::Kind::LocalDeclName, discriminator, name);
 }
 

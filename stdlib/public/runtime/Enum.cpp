@@ -115,9 +115,9 @@ swift::swift_initEnumValueWitnessTableSinglePayload(ValueWitnessTable *vwtable,
 #if OPTIONAL_OBJECT_OPTIMIZATION
   auto payloadVWT = payload->getValueWitnesses();
   if (emptyCases == 1
-      && (payloadVWT == &_TWVBo
+      && (payloadVWT == &VALUE_WITNESS_SYM(Bo)
 #if SWIFT_OBJC_INTEROP
-          || payloadVWT == &_TWVBO
+          || payloadVWT == &VALUE_WITNESS_SYM(BO)
 #endif
           )) {
 #define COPY_PAYLOAD_WITNESS(NAME) vwtable->NAME = payloadVWT->NAME;

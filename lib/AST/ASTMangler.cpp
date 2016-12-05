@@ -335,13 +335,15 @@ void ASTMangler::appendDeclName(const ValueDecl *decl) {
     appendIdentifier(translateOperator(decl->getName().str()));
     switch (decl->getAttrs().getUnaryOperatorKind()) {
       case UnaryOperatorKind::Prefix:
-        return appendOperator("op");
+        appendOperator("op");
+        break;
       case UnaryOperatorKind::Postfix:
-        return appendOperator("oP");
+        appendOperator("oP");
+        break;
       case UnaryOperatorKind::None:
-        return appendOperator("oi");
+        appendOperator("oi");
+        break;
     }
-    llvm_unreachable("bad UnaryOperatorKind");
   } else {
     appendIdentifier(decl->getName().str());
   }
@@ -926,12 +928,14 @@ namespace {
 /// assumes that field and global-variable bindings always bind at
 /// least one name, which is probably a reasonable assumption but may
 /// not be adequately enforced.
-static VarDecl *findFirstVariable(PatternBindingDecl *binding) {
+static Optional<VarDecl*> findFirstVariable(PatternBindingDecl *binding) {
   for (auto entry : binding->getPatternList()) {
     auto var = FindFirstVariable().visit(entry.getPattern());
     if (var) return var;
   }
-  llvm_unreachable("pattern-binding bound no variables?");
+  // Pattern-binding bound without variables exists in erroneous code, e.g.
+  // during code completion.
+  return None;
 }
 
 void ASTMangler::appendContext(const DeclContext *ctx) {
@@ -957,8 +961,8 @@ void ASTMangler::appendContext(const DeclContext *ctx) {
     }
     case LocalDeclContextKind::PatternBindingInitializer: {
       auto patternInit = cast<SerializedPatternBindingInitializer>(local);
-      auto var = findFirstVariable(patternInit->getBinding());
-      appendInitializerEntity(var);
+      if (auto var = findFirstVariable(patternInit->getBinding()))
+        appendInitializerEntity(var.getValue());
       return;
     }
     case LocalDeclContextKind::TopLevelCodeDecl:
@@ -1040,8 +1044,9 @@ void ASTMangler::appendContext(const DeclContext *ctx) {
 
     case InitializerKind::PatternBinding: {
       auto patternInit = cast<PatternBindingInitializer>(ctx);
-      auto var = findFirstVariable(patternInit->getBinding());
-      return appendInitializerEntity(var);
+      if (auto var = findFirstVariable(patternInit->getBinding()))
+        appendInitializerEntity(var.getValue());
+      return;
     }
     }
     llvm_unreachable("bad initializer kind");

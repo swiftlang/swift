@@ -44,6 +44,7 @@
 
 #define DEBUG_TYPE "sil-capture-promotion"
 #include "swift/SILOptimizer/PassManager/Passes.h"
+#include "swift/SILOptimizer/Utils/SpecializationMangler.h"
 #include "swift/SIL/Mangle.h"
 #include "swift/SIL/SILCloner.h"
 #include "swift/SIL/TypeSubstCloner.h"
@@ -387,7 +388,8 @@ static std::string getSpecializedName(SILFunction *F,
                                       IndicesSet &PromotableIndices) {
   Mangle::Mangler M;
   auto P = SpecializationPass::CapturePromotion;
-  FunctionSignatureSpecializationMangler FSSM(P, M, Fragile, F);
+  FunctionSignatureSpecializationMangler OldFSSM(P, M, Fragile, F);
+  NewMangling::FunctionSignatureSpecializationMangler NewFSSM(P, Fragile, F);
   CanSILFunctionType FTy = F->getLoweredFunctionType();
 
   ArrayRef<SILParameterInfo> Parameters = FTy->getParameters();
@@ -400,12 +402,14 @@ static std::string getSpecializedName(SILFunction *F,
     unsigned ArgIndex = Index + NumIndirectResults;
     if (!PromotableIndices.count(ArgIndex))
       continue;
-    FSSM.setArgumentBoxToValue(Index);
+    OldFSSM.setArgumentBoxToValue(Index);
+    NewFSSM.setArgumentBoxToValue(Index);
   }
 
-  FSSM.mangle();
-
-  return M.finalize();
+  OldFSSM.mangle();
+  std::string Old = M.finalize();
+  std::string New = NewFSSM.mangle();
+  return NewMangling::selectMangling(Old, New);
 }
 
 /// \brief Create the function corresponding to the clone of the original

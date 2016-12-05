@@ -26,6 +26,7 @@
 #include "swift/AST/Types.h"
 #include "swift/AST/DiagnosticsCommon.h"
 #include "swift/AST/Mangle.h"
+#include "swift/AST/ASTMangler.h"
 #include "swift/SIL/PrettyStackTrace.h"
 #include "swift/SIL/SILArgument.h"
 #include "swift/SIL/SILUndef.h"
@@ -53,6 +54,8 @@ getMaterializeForSetCallbackName(ProtocolConformance *conformance,
   closure.getCaptureInfo().setGenericParamCaptures(true);
 
   Mangle::Mangler mangler;
+  NewMangling::ASTMangler NewMangler;
+  std::string New;
   if (conformance) {
     // Concrete witness thunk for a conformance:
     //
@@ -60,14 +63,19 @@ getMaterializeForSetCallbackName(ProtocolConformance *conformance,
     // within the requirement.
     mangler.append("_TTW");
     mangler.mangleProtocolConformance(conformance);
+    New = NewMangler.mangleClosureWitnessThunk(conformance, &closure);
   } else {
     // Default witness thunk or concrete implementation:
     //
     // Mangle this as if it were a closure within the requirement.
     mangler.append("_T");
+    New = NewMangler.mangleClosureEntity(&closure,
+                                NewMangling::ASTMangler::SymbolKind::Default);
   }
   mangler.mangleClosureEntity(&closure, /*uncurryLevel=*/1);
-  return mangler.finalize();
+  std::string Old = mangler.finalize();
+
+  return NewMangling::selectMangling(Old, New);
 }
 
 /// A helper class for emitting materializeForSet.
