@@ -3881,8 +3881,7 @@ public:
       if (TAD->getDeclContext()->isModuleScopeContext()) {
         IterativeTypeChecker ITC(TC);
         ITC.satisfy(requestResolveTypeDecl(TAD));
-      } else if (TC.validateType(TAD->getUnderlyingTypeLoc(),
-                                 TAD->getDeclContext(), options)) {
+      } else if (TC.validateType(TAD->getUnderlyingTypeLoc(), TAD, options)) {
         TAD->setInvalid();
         TAD->setInterfaceType(ErrorType::get(TC.Context));
         TAD->getUnderlyingTypeLoc().setInvalidType(TC.Context);
