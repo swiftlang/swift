@@ -93,29 +93,40 @@ class ImportedName {
 
     /// Whether this name was explicitly specified via a Clang
     /// swift_name attribute.
-    bool hasCustomName = false;
+    bool hasCustomName;
 
     /// Whether this was one of a special class of Objective-C
     /// initializers for which we drop the variadic argument rather
     /// than refuse to import the initializer.
-    bool droppedVariadic = false;
+    bool droppedVariadic;
 
     /// Whether this is a global being imported as a member
-    bool importAsMember = false;
+    bool importAsMember;
+
+    bool hasSelfIndex;
+
+    bool hasErrorInfo;
 
     /// What kind of accessor this name refers to, if any.
-    ImportedAccessorKind accessorKind = ImportedAccessorKind::None;
+    ImportedAccessorKind accessorKind;
 
     /// For an initializer, the kind of initializer to import.
-    CtorInitializerKind initKind = CtorInitializerKind::Designated;
+    CtorInitializerKind initKind;
 
     /// For names that map Objective-C error handling conventions into
     /// throwing Swift methods, describes how the mapping is performed.
-    Optional<ImportedErrorInfo> errorInfo = None;
+    ImportedErrorInfo errorInfo;
 
     /// For a declaration name that makes the declaration into an
     /// instance member, the index of the "Self" parameter.
-    Optional<unsigned> selfIndex = None;
+    unsigned selfIndex;
+
+    Info()
+        : version(), hasCustomName(false), droppedVariadic(false),
+          importAsMember(false), hasSelfIndex(false), hasErrorInfo(false),
+          accessorKind(ImportedAccessorKind::None),
+          initKind(CtorInitializerKind::Designated), errorInfo(),
+          selfIndex() {}
   } info;
 
 public:
@@ -147,12 +158,18 @@ public:
   /// For names that map Objective-C error handling conventions into
   /// throwing Swift methods, describes how the mapping is performed.
   Optional<ImportedErrorInfo> getErrorInfo() const {
-    return info.errorInfo;
+    if (info.hasErrorInfo)
+      return info.errorInfo;
+    return None;
   }
 
   /// For a declaration name that makes the declaration into an
   /// instance member, the index of the "Self" parameter.
-  Optional<unsigned> getSelfIndex() const { return info.selfIndex; }
+  Optional<unsigned> getSelfIndex() const {
+    if (info.hasSelfIndex)
+      return info.selfIndex;
+    return None;
+  }
 
   /// Whether this name was explicitly specified via a Clang
   /// swift_name attribute.
@@ -200,6 +217,8 @@ public:
     llvm_unreachable("Invalid ImportedAccessorKind.");
   }
 };
+static_assert(sizeof(ImportedName) <= 8 * sizeof(void *),
+              "should fit in a handful of pointers");
 
 /// Strips a trailing "Notification", if present. Returns {} if name doesn't end
 /// in "Notification", or it there would be nothing left.

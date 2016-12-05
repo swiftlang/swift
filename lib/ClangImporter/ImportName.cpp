@@ -1231,8 +1231,10 @@ ImportedName NameImporter::importNameImpl(const clang::NamedDecl *D,
       if (parsedName.isMember()) {
         // FIXME: Make sure this thing is global.
         result.effectiveContext = parsedName.ContextName;
-        if (parsedName.SelfIndex)
-          result.info.selfIndex = parsedName.SelfIndex;
+        if (parsedName.SelfIndex) {
+          result.info.hasSelfIndex = true;
+          result.info.selfIndex = *parsedName.SelfIndex;
+        }
         result.info.importAsMember = true;
 
         if (parsedName.BaseName == "init")
@@ -1250,10 +1252,13 @@ ImportedName NameImporter::importNameImpl(const clang::NamedDecl *D,
         ArrayRef<const clang::ParmVarDecl *> params{method->param_begin(),
                                                     method->param_end()};
 
-        result.info.errorInfo = considerErrorImport(method, parsedName.BaseName,
-                                                    parsedName.ArgumentLabels,
-                                                    params, isInitializer,
-                                                    /*hasCustomName=*/true);
+        if (auto errorInfo = considerErrorImport(method, parsedName.BaseName,
+                                                 parsedName.ArgumentLabels,
+                                                 params, isInitializer,
+                                                 /*hasCustomName=*/true)) {
+          result.info.hasErrorInfo = true;
+          result.info.errorInfo = *errorInfo;
+        }
       }
 
       return result;
@@ -1269,8 +1274,10 @@ ImportedName NameImporter::importNameImpl(const clang::NamedDecl *D,
       result.effectiveContext = inference.effectiveDC;
 
       // Instance or static
-      if (inference.selfIndex)
-        result.info.selfIndex = inference.selfIndex;
+      if (inference.selfIndex) {
+        result.info.hasSelfIndex = true;
+        result.info.selfIndex = *inference.selfIndex;
+      }
 
       // Property
       if (inference.isGetter())
@@ -1413,9 +1420,12 @@ ImportedName NameImporter::importNameImpl(const clang::NamedDecl *D,
       }
     }
 
-    result.info.errorInfo = considerErrorImport(
+    if (auto errorInfo = considerErrorImport(
         objcMethod, baseName, argumentNames, params, isInitializer,
-        /*hasCustomName=*/false);
+        /*hasCustomName=*/false)) {
+        result.info.hasErrorInfo = true;
+        result.info.errorInfo = *errorInfo;
+    }
 
     isFunction = true;
 
@@ -1533,8 +1543,8 @@ ImportedName NameImporter::importNameImpl(const clang::NamedDecl *D,
       (void)omitNeedlessWordsInFunctionName(
           baseName, argumentNames, params, method->getReturnType(),
           method->getDeclContext(), getNonNullArgs(method, params),
-          result.info.errorInfo
-              ? Optional<unsigned>(result.info.errorInfo->ParamIndex)
+          result.getErrorInfo()
+              ? Optional<unsigned>(result.getErrorInfo()->ParamIndex)
               : None,
           method->hasRelatedResultType(), method->isInstanceMethod(), *this);
     }
