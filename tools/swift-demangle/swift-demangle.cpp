@@ -49,6 +49,10 @@ RemangleMode("test-remangle",
            llvm::cl::desc("Remangle test mode (show the remangled string)"));
 
 static llvm::cl::opt<bool>
+RemangleNew("remangle-new",
+           llvm::cl::desc("Remangle the symbol with new mangling scheme"));
+
+static llvm::cl::opt<bool>
 DisableSugar("no-sugar",
            llvm::cl::desc("No sugar mode (disable common language idioms such as ? and [] from the output)"));
 
@@ -104,6 +108,15 @@ static void demangle(llvm::raw_ostream &os, llvm::StringRef name,
     return;
   }
   if (!TreeOnly) {
+    if (RemangleNew) {
+      if (!pointer) {
+        llvm::errs() << "Can't de-mangle " << name << '\n';
+        exit(1);
+      }
+      std::string remangled = swift::Demangle::mangleNodeNew(pointer);
+      llvm::outs() << remangled;
+      return;
+    }
     std::string string = swift::Demangle::nodeToString(pointer, options);
     if (!CompactMode)
       llvm::outs() << name << " ---> ";
