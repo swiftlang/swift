@@ -15,6 +15,7 @@
 #include "Scope.h"
 #include "swift/AST/AST.h"
 #include "swift/AST/Mangle.h"
+#include "swift/AST/ASTMangler.h"
 #include "swift/SIL/FormalLinkage.h"
 
 using namespace swift;
@@ -32,7 +33,12 @@ SILGlobalVariable *SILGenModule::getSILGlobalVariable(VarDecl *gDecl,
   } else {
     Mangler mangler;
     mangler.mangleGlobalVariableFull(gDecl);
-    mangledName = mangler.finalize();
+    std::string Old = mangler.finalize();
+
+    NewMangling::ASTMangler NewMangler;
+    std::string New = NewMangler.mangleGlobalVariableFull(gDecl);
+
+    mangledName = NewMangling::selectMangling(Old, New);
   }
 
   // Check if it is already created, and update linkage if necessary.
@@ -215,7 +221,11 @@ void SILGenModule::emitGlobalInitialization(PatternBindingDecl *pd,
   {
     Mangler tokenMangler;
     tokenMangler.mangleGlobalInit(varDecl, counter, false);
-    onceTokenBuffer = tokenMangler.finalize();
+    std::string Old = tokenMangler.finalize();
+
+    NewMangling::ASTMangler NewMangler;
+    std::string New = NewMangler.mangleGlobalInit(varDecl, counter, false);
+    onceTokenBuffer = NewMangling::selectMangling(Old, New);
   }
 
   auto onceTy = BuiltinIntegerType::getWordType(M.getASTContext());
@@ -234,8 +244,12 @@ void SILGenModule::emitGlobalInitialization(PatternBindingDecl *pd,
   {
     Mangler funcMangler;
     funcMangler.mangleGlobalInit(varDecl, counter, true);
-    onceFuncBuffer = funcMangler.finalize();
-  }
+    std::string Old = funcMangler.finalize();
+
+    NewMangling::ASTMangler NewMangler;
+    std::string New = NewMangler.mangleGlobalInit(varDecl, counter, true);
+    onceFuncBuffer = NewMangling::selectMangling(Old, New);
+}
 
   SILFunction *onceFunc = emitLazyGlobalInitializer(onceFuncBuffer, pd,
                                                     pbdEntry);

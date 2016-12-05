@@ -15,6 +15,7 @@
 #include "swift/SILOptimizer/PassManager/Passes.h"
 #include "swift/SILOptimizer/PassManager/Transforms.h"
 #include "swift/SILOptimizer/Utils/Local.h"
+#include "swift/SILOptimizer/Utils/SpecializationMangler.h"
 #include "swift/SIL/Mangle.h"
 #include "swift/SIL/SILBuilder.h"
 #include "swift/SIL/SILInstruction.h"
@@ -109,8 +110,14 @@ bool UsePrespecialized::replaceByPrespecialized(SILFunction &F) {
       Mangle::Mangler Mangler;
       GenericSpecializationMangler GenericMangler(Mangler, ReferencedF, Subs,
                                                   ReferencedF->isFragile());
+      NewMangling::GenericSpecializationMangler NewGenericMangler(ReferencedF,
+                                              Subs, ReferencedF->isFragile(),
+                                              /*isReAbstracted*/ true);
       GenericMangler.mangle();
-      ClonedName = Mangler.finalize();
+      std::string Old = Mangler.finalize();
+      std::string New = NewGenericMangler.mangle();
+
+      ClonedName = NewMangling::selectMangling(Old, New);
     }
 
     SILFunction *NewF = nullptr;

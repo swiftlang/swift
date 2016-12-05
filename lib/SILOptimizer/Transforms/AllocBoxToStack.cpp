@@ -14,6 +14,7 @@
 #include "swift/SILOptimizer/PassManager/Passes.h"
 #include "swift/SIL/Dominance.h"
 #include "swift/SIL/Mangle.h"
+#include "swift/SILOptimizer/Utils/SpecializationMangler.h"
 #include "swift/SIL/SILArgument.h"
 #include "swift/SIL/SILBuilder.h"
 #include "swift/SIL/SILCloner.h"
@@ -521,11 +522,16 @@ static std::string getClonedName(SILFunction *F,
                                  ParamIndexList &PromotedParamIndices) {
   Mangle::Mangler M;
   auto P = SpecializationPass::AllocBoxToStack;
-  FunctionSignatureSpecializationMangler FSSM(P, M, Fragile, F);
-  for (unsigned i : PromotedParamIndices)
-    FSSM.setArgumentBoxToStack(i);
-  FSSM.mangle();
-  return M.finalize();
+  FunctionSignatureSpecializationMangler OldFSSM(P, M, Fragile, F);
+  NewMangling::FunctionSignatureSpecializationMangler NewFSSM(P, Fragile, F);
+  for (unsigned i : PromotedParamIndices) {
+    OldFSSM.setArgumentBoxToStack(i);
+    NewFSSM.setArgumentBoxToStack(i);
+  }
+  OldFSSM.mangle();
+  std::string Old = M.finalize();
+  std::string New = NewFSSM.mangle();
+  return NewMangling::selectMangling(Old, New);
 }
 
 /// \brief Create the function corresponding to the clone of the
