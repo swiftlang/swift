@@ -1771,7 +1771,7 @@ extension ${Self} {
   public mutating func replaceSubrange<C>(
     _ subrange: Range<Int>,
     with newElements: C
-  ) where C : Collection, C.Iterator.Element == _Buffer.Element {
+  ) where C : Collection, C.Iterator.Element == Element {
 % if Self in ['Array', 'ContiguousArray']:
     _precondition(subrange.lowerBound >= self._buffer.startIndex,
       "${Self} replace: subrange start is negative")
@@ -2291,7 +2291,7 @@ extension ${Self} {
   public mutating func replaceRange<C>(
     _ subRange: Range<Int>,
     with newElements: C
-  ) where C : Collection, C.Iterator.Element == _Buffer.Element {
+  ) where C : Collection, C.Iterator.Element == Element {
     Builtin.unreachable()
   }
 

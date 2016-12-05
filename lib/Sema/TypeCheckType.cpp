@@ -570,13 +570,7 @@ Type TypeChecker::applyUnboundGenericArguments(
       type = ArchetypeBuilder::mapTypeOutOfContext(TAD, TAD->getUnderlyingType());
     }
 
-    type = type.subst(dc->getParentModule(), subs, SubstFlags::UseErrorType);
-
-    // FIXME: return a SubstitutedType to preserve the fact that
-    // we resolved a generic TypeAlias, for availability diagnostics.
-    // A better fix might be to introduce a BoundGenericAliasType
-    // which desugars as appropriate.
-    return SubstitutedType::get(TAD->getAliasType(), type, Context);
+    return type.subst(dc->getParentModule(), subs, SubstFlags::UseErrorType);
   }
   
   // Form the bound generic type.

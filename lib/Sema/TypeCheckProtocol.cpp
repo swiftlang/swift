@@ -2268,9 +2268,7 @@ void ConformanceChecker::recordTypeWitness(AssociatedTypeDecl *assocType,
     aliasDecl->getAliasType()->setRecursiveProperties(
         type->getRecursiveProperties());
 
-    Type interfaceTy = aliasDecl->getAliasType();
-    if (interfaceTy->hasArchetype())
-      interfaceTy = ArchetypeBuilder::mapTypeOutOfContext(DC, type);
+    auto interfaceTy = DC->mapTypeOutOfContext(aliasDecl->getAliasType());
     aliasDecl->setInterfaceType(MetatypeType::get(interfaceTy));
 
     aliasDecl->setImplicit();

@@ -1134,67 +1134,96 @@ static void configureImplicitSelf(TypeChecker &tc,
 
 namespace {
 
-class TypeAccessScopeChecker : private TypeWalker {
-  using TypeAccessScopeCacheMap = TypeChecker::TypeAccessScopeCacheMap;
-  TypeAccessScopeCacheMap &Cache;
+class AccessScopeChecker {
   const SourceFile *File;
-  SmallVector<Optional<AccessScope>, 8> RawScopeStack;
+  TypeChecker::TypeAccessScopeCacheMap &Cache;
 
-  explicit TypeAccessScopeChecker(TypeAccessScopeCacheMap &cache,
-                                  const SourceFile *file)
-      : Cache(cache), File(file) {
-    // Always have something on the stack.
-    RawScopeStack.push_back(None);
-  }
+protected:
+  Optional<AccessScope> Scope;
 
-  bool shouldVisitOriginalSubstitutedType() override { return true; }
+  AccessScopeChecker(const DeclContext *useDC,
+                     decltype(TypeChecker::TypeAccessScopeCache) &caches)
+      : File(useDC->getParentSourceFile()), Cache(caches[File]),
+        Scope(AccessScope::getPublic()) {}
 
-  Action walkToTypePre(Type ty) override {
-    // Assume failure until we post-visit this node.
-    // This will be correct as long as we don't ever have self-referential
-    // Types.
-    auto cached = Cache.find(ty);
+  bool visitDecl(ValueDecl *VD) {
+    if (!VD || isa<GenericTypeParamDecl>(VD))
+      return true;
+
+    // FIXME: Figure out why AssociatedTypeDecls don't always have
+    // accessibility here.
+    if (!VD->hasAccessibility()) {
+      if (isa<AssociatedTypeDecl>(VD))
+        return true;
+    }
+
+    auto cached = Cache.find(VD);
     if (cached != Cache.end()) {
-      Optional<AccessScope> &last = RawScopeStack.back();
-      if (last.hasValue())
-        last = last.getValue().intersectWith(cached->second);
-      return Action::SkipChildren;
+      Scope = Scope->intersectWith(cached->second);
+      return Scope.hasValue();
     }
 
-    auto AS = AccessScope::getPublic();
-    if (auto alias = dyn_cast<NameAliasType>(ty.getPointer()))
-      AS = alias->getDecl()->getFormalAccessScope(File);
-    else if (auto nominal = ty->getAnyNominal())
-      AS = nominal->getFormalAccessScope(File);
-    RawScopeStack.push_back(AS);
+    auto AS = VD->getFormalAccessScope(File);
+    auto result = Cache.insert(std::make_pair(VD, AS));
+    assert(result.second);
+    (void) result;
 
-    return Action::Continue;
+    Scope = Scope->intersectWith(AS);
+    return Scope.hasValue();
+  }
+};
+
+class TypeReprAccessScopeChecker : private ASTWalker, AccessScopeChecker {
+  TypeReprAccessScopeChecker(const DeclContext *useDC,
+                             decltype(TypeChecker::TypeAccessScopeCache) &caches)
+      : AccessScopeChecker(useDC, caches) {}
+
+  bool walkToTypeReprPre(TypeRepr *TR) override {
+    auto CITR = dyn_cast<ComponentIdentTypeRepr>(TR);
+    if (!CITR)
+      return true;
+
+    return visitDecl(CITR->getBoundDecl());
   }
 
-  Action walkToTypePost(Type ty) override {
-    Optional<AccessScope> last = RawScopeStack.pop_back_val();
-    if (last.hasValue()) {
-      Cache.insert(std::make_pair(ty, *last));
-
-      Optional<AccessScope> &prev = RawScopeStack.back();
-      if (prev.hasValue())
-        prev = prev.getValue().intersectWith(*last);
-    }
-
-    return Action::Continue;
+  bool walkToTypeReprPost(TypeRepr *TR) override {
+    return Scope.hasValue();
   }
 
 public:
   static Optional<AccessScope>
-  getAccessScope(Type ty, const DeclContext *useDC,
+  getAccessScope(TypeRepr *TR, const DeclContext *useDC,
                  decltype(TypeChecker::TypeAccessScopeCache) &caches) {
-    const SourceFile *file = useDC->getParentSourceFile();
-    auto &cache = caches[file];
-    ty.walk(TypeAccessScopeChecker(cache, file));
-    auto iter = cache.find(ty);
-    if (iter == cache.end())
-      return None;
-    return iter->second;
+    TypeReprAccessScopeChecker checker(useDC, caches);
+    TR->walk(checker);
+    return checker.Scope;
+  }
+};
+
+class TypeAccessScopeChecker : private TypeWalker, AccessScopeChecker {
+  TypeAccessScopeChecker(const DeclContext *useDC,
+                         decltype(TypeChecker::TypeAccessScopeCache) &caches)
+      : AccessScopeChecker(useDC, caches) {}
+
+  Action walkToTypePre(Type T) {
+    ValueDecl *VD;
+    if (auto *TAD = dyn_cast<NameAliasType>(T.getPointer()))
+      VD = TAD->getDecl();
+    else if (auto *NTD = T->getAnyNominal())
+      VD = NTD;
+    else
+      VD = nullptr;
+
+    return visitDecl(VD) ? Action::Continue : Action::Stop;
+  }
+
+public:
+  static Optional<AccessScope>
+  getAccessScope(Type T, const DeclContext *useDC,
+                 decltype(TypeChecker::TypeAccessScopeCache) &caches) {
+    TypeAccessScopeChecker checker(useDC, caches);
+    T.walk(checker);
+    return checker.Scope;
   }
 };
 
@@ -1223,9 +1252,9 @@ void TypeChecker::computeDefaultAccessibility(ExtensionDecl *ED) {
       if (!TL.getType())
         return Accessibility::Public;
       auto accessScope =
-          TypeAccessScopeChecker::getAccessScope(TL.getType(),
-                                                 ED->getDeclContext(),
-                                                 TypeAccessScopeCache);
+          TypeReprAccessScopeChecker::getAccessScope(TL.getTypeRepr(),
+                                                     ED->getDeclContext(),
+                                                     TypeAccessScopeCache);
       // This is an error case and will be diagnosed elsewhere.
       if (!accessScope.hasValue())
         return Accessibility::Public;
@@ -1406,6 +1435,8 @@ public:
                                            const DeclContext *useDC) {
     assert(!accessScope.isPublic() &&
            "why would we need to find a public access scope?");
+    if (TR == nullptr)
+      return nullptr;
     TypeAccessScopeDiagnoser diagnoser(accessScope, useDC);
     TR->walk(diagnoser);
     return diagnoser.offendingType;
@@ -1446,9 +1477,15 @@ static void checkTypeAccessibilityImpl(
       contextAccessScope.getDeclContext()->isLocalContext())
     return;
 
+  // TypeRepr checking is more accurate, but we must also look at TypeLocs
+  // without a TypeRepr, for example for 'var' declarations with an inferred
+  // type.
   auto typeAccessScope =
-    TypeAccessScopeChecker::getAccessScope(TL.getType(), useDC,
-                                           TC.TypeAccessScopeCache);
+    (TL.getTypeRepr()
+     ? TypeReprAccessScopeChecker::getAccessScope(TL.getTypeRepr(), useDC,
+                                                  TC.TypeAccessScopeCache)
+     : TypeAccessScopeChecker::getAccessScope(TL.getType(), useDC,
+                                              TC.TypeAccessScopeCache));
 
   // Note: This means that the type itself is invalid for this particular
   // context, because it references declarations from two incompatible scopes.
@@ -1461,12 +1498,11 @@ static void checkTypeAccessibilityImpl(
       contextAccessScope.isChildOf(*typeAccessScope))
     return;
 
-  const TypeRepr *complainRepr = nullptr;
-  if (TypeRepr *TR = TL.getTypeRepr()) {
-    complainRepr =
-        TypeAccessScopeDiagnoser::findTypeWithScope(TR, *typeAccessScope,
-                                                    useDC);
-  }
+  const TypeRepr *complainRepr =
+        TypeAccessScopeDiagnoser::findTypeWithScope(
+            TL.getTypeRepr(),
+            *typeAccessScope,
+            useDC);
   diagnose(*typeAccessScope, complainRepr);
 }
 
