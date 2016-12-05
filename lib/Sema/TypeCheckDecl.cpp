@@ -1123,12 +1123,15 @@ static void configureImplicitSelf(TypeChecker &tc,
   selfDecl->setLet(!selfIfaceTy->is<InOutType>());
 
   selfDecl->setInterfaceType(selfIfaceTy);
+}
 
-  // FIXME: Wrong DeclContext used for mapTypeIntoContext(), because
-  // 'func' doesn't have a generic environment yet.
+/// Record the context type of 'self' after the generic environment of
+/// the function has been determined.
+static void recordSelfContextType(AbstractFunctionDecl *func) {
+  auto selfDecl = func->getImplicitSelfDecl();
   Type selfTy = func->computeInterfaceSelfType(/*isInitializingCtor*/true,
                                                /*wantDynamicSelf*/true);
-  selfTy = func->getDeclContext()->mapTypeIntoContext(selfTy);
+  selfTy = func->mapTypeIntoContext(selfTy);
   selfDecl->setType(selfTy);
 }
 
@@ -4797,6 +4800,10 @@ public:
       }
     }
 
+    // Set the context type of 'self'.
+    if (FD->getDeclContext()->isTypeContext())
+      recordSelfContextType(FD);
+
     // Type check the parameters and return type again, now with archetypes.
     GenericTypeToArchetypeResolver resolver(FD);
     if (semaFuncDecl(FD, resolver))
@@ -6417,6 +6424,9 @@ public:
           CD->getDeclContext()->getGenericEnvironmentOfContext());
     }
 
+    // Set the context type of 'self'.
+    recordSelfContextType(CD);
+
     {
       CD->setIsBeingTypeChecked(true);
       SWIFT_DEFER { CD->setIsBeingTypeChecked(false); };
@@ -6567,6 +6577,9 @@ public:
       DD->setGenericEnvironment(
           DD->getDeclContext()->getGenericEnvironmentOfContext());
     }
+
+    // Set the context type of 'self'.
+    recordSelfContextType(DD);
 
     GenericTypeToArchetypeResolver resolver(DD);
     if (semaFuncParamPatterns(DD, resolver)) {
@@ -6825,6 +6838,25 @@ void TypeChecker::checkDeclCircularity(NominalTypeDecl *decl) {
   }
 }
 
+/// Determine whether the given variable is the implicit 'self' parameter for
+/// a function, and return that function if so.
+static AbstractFunctionDecl *isImplicitSelfParam(VarDecl *var){
+  if (!var->isImplicit()) return nullptr;
+
+  auto param = dyn_cast<ParamDecl>(var);
+  if (!param) return nullptr;
+
+  auto func = dyn_cast<AbstractFunctionDecl>(var->getDeclContext());
+  if (!func) return nullptr;
+
+  if (!func->getDeclContext()->isTypeContext()) return nullptr;
+
+  if (param == func->getImplicitSelfDecl())
+    return func;
+
+  return nullptr;
+}
+
 void TypeChecker::validateDecl(ValueDecl *D, bool resolveTypeParams) {
   if (hasEnabledForbiddenTypecheckPrefix())
     checkForForbiddenPrefix(D);
@@ -7063,12 +7095,18 @@ void TypeChecker::validateDecl(ValueDecl *D, bool resolveTypeParams) {
     ValidatedTypes.insert(proto);
     break;
   }
-      
+
   case DeclKind::Var:
   case DeclKind::Param: {
     auto VD = cast<VarDecl>(D);
     if (!VD->hasType()) {
-      if (PatternBindingDecl *PBD = VD->getParentPatternBinding()) {
+      if (auto func = isImplicitSelfParam(VD)) {
+        if (!VD->hasInterfaceType()) {
+          VD->setInterfaceType(ErrorType::get(Context));
+          VD->setInvalid();
+        }
+        recordSelfContextType(func);
+      } else if (PatternBindingDecl *PBD = VD->getParentPatternBinding()) {
         if (PBD->isBeingTypeChecked()) {
           diagnose(VD, diag::pattern_used_in_type, VD->getName());
 
