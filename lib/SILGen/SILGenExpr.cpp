@@ -5,8 +5,8 @@
 // Copyright (c) 2014 - 2016 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
-// See http://swift.org/LICENSE.txt for license information
-// See http://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
+// See https://swift.org/LICENSE.txt for license information
+// See https://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
 //
 //===----------------------------------------------------------------------===//
 
@@ -319,7 +319,11 @@ emitRValueForDecl(SILLocation loc, ConcreteDeclRef declRef, Type ncRefType,
   // If this is a decl that we have an lvalue for, produce and return it.
   ValueDecl *decl = declRef.getDecl();
   
-  if (!ncRefType) ncRefType = decl->getType();
+  if (!ncRefType) {
+    ncRefType = ArchetypeBuilder::mapTypeIntoContext(
+        decl->getInnermostDeclContext(),
+        decl->getInterfaceType());
+  }
   CanType refType = ncRefType->getCanonicalType();
 
   auto getUnmanagedRValue = [&](SILValue value) -> RValue {
@@ -335,7 +339,7 @@ emitRValueForDecl(SILLocation loc, ConcreteDeclRef declRef, Type ncRefType,
 
   // If this is a reference to a type, produce a metatype.
   if (isa<TypeDecl>(decl)) {
-    assert(decl->getType()->is<MetatypeType>() &&
+    assert(refType->is<MetatypeType>() &&
            "type declref does not have metatype type?!");
     return getUnmanagedRValue(B.createMetatype(loc, getLoweredType(refType)));
   }
@@ -829,7 +833,7 @@ RValue RValueEmitter::visitForceTryExpr(ForceTryExpr *E, SGFContext C) {
     SavedInsertionPoint scope(SGF, catchBB, FunctionSection::Postmatter);
 
     ASTContext &ctx = SGF.getASTContext();
-    auto error = catchBB->createBBArg(SILType::getExceptionType(ctx));
+    auto error = catchBB->createArgument(SILType::getExceptionType(ctx));
     SGF.B.createBuiltin(E, ctx.getIdentifier("unexpectedError"),
                         SGF.SGM.Types.getEmptyTupleType(), {}, {error});
     SGF.B.createUnreachable(E);
@@ -913,8 +917,8 @@ RValue RValueEmitter::visitOptionalTryExpr(OptionalTryExpr *E, SGFContext C) {
   // result type.
   SGF.B.emitBlock(catchBB);
   FullExpr catchCleanups(SGF.Cleanups, E);
-  auto *errorArg = catchBB->createBBArg(
-      SILType::getExceptionType(SGF.getASTContext()));
+  auto *errorArg =
+      catchBB->createArgument(SILType::getExceptionType(SGF.getASTContext()));
   (void) SGF.emitManagedRValueWithCleanup(errorArg);
   catchCleanups.pop();
 
@@ -932,7 +936,7 @@ RValue RValueEmitter::visitOptionalTryExpr(OptionalTryExpr *E, SGFContext C) {
   // If this was done in SSA registers, then the value is provided as an
   // argument to the block.
   if (!isByAddress) {
-    auto arg = contBB->createBBArg(optTL.getLoweredType());
+    auto arg = contBB->createArgument(optTL.getLoweredType());
     return RValue(SGF, E, SGF.emitManagedRValueWithCleanup(arg, optTL));
   }
 
@@ -2113,7 +2117,7 @@ static ManagedValue flattenOptional(SILGenFunction &SGF, SILLocation loc,
   if (resultTL.isAddressOnly())
     result = SGF.emitTemporaryAllocation(loc, resultTy);
   else
-    result = contBB->createBBArg(resultTy);
+    result = contBB->createArgument(resultTy);
 
   // Branch on whether the input is optional, this doesn't consume the value.
   auto isPresent = SGF.emitDoesOptionalHaveValue(loc, optVal.getValue());
@@ -2342,8 +2346,8 @@ static bool mayLieAboutNonOptionalReturn(SILModule &M,
   // Functions that return non-optional reference type and were imported from
   // Objective-C.
   if (auto func = dyn_cast<FuncDecl>(decl)) {
-    assert((isVerbatimNullableTypeInC(M, func->getResultType())
-            || func->getResultType()->hasArchetype())
+    assert((func->getResultInterfaceType()->hasTypeParameter()
+            || isVerbatimNullableTypeInC(M, func->getResultInterfaceType()))
            && "func's result type is not nullable?!");
     return func->hasClangNode();
   }
@@ -2360,8 +2364,8 @@ static bool mayLieAboutNonOptionalReturn(SILModule &M,
   // Subscripts of non-optional reference type that were imported from
   // Objective-C.
   if (auto subscript = dyn_cast<SubscriptDecl>(decl)) {
-    assert((isVerbatimNullableTypeInC(M, subscript->getElementType())
-            || subscript->getElementType()->hasArchetype())
+    assert((subscript->getElementInterfaceType()->hasTypeParameter()
+            || isVerbatimNullableTypeInC(M, subscript->getElementInterfaceType()))
            && "subscript's result type is not nullable?!");
     return subscript->hasClangNode();
   }
@@ -2581,9 +2585,9 @@ RValue RValueEmitter::visitIfExpr(IfExpr *E, SGFContext C) {
     
     SILBasicBlock *cont = cond.complete(SGF);
     assert(cont && "no continuation block for if expr?!");
-    
-    SILValue result = cont->bbarg_begin()[0];
-    
+
+    SILValue result = cont->args_begin()[0];
+
     return RValue(SGF, E, SGF.emitManagedRValueWithCleanup(result));
   } else {
     // If the result is address-only, emit the result into a common stack buffer
@@ -3040,7 +3044,7 @@ RValue RValueEmitter::visitOptionalEvaluationExpr(OptionalEvaluationExpr *E,
   // If this was done in SSA registers, then the value is provided as an
   // argument to the block.
   if (!isByAddress) {
-    auto arg = new (SGF.SGM.M) SILArgument(contBB, optTL.getLoweredType());
+    auto arg = contBB->createArgument(optTL.getLoweredType());
     return RValue(SGF, E, SGF.emitManagedRValueWithCleanup(arg, optTL));
   }
   
@@ -3431,8 +3435,9 @@ RValue RValueEmitter::visitPointerToPointerExpr(PointerToPointerExpr *E,
 
   // Get the original pointer value, abstracted to the converter function's
   // expected level.
-  AbstractionPattern origTy(converter->getType()->castTo<AnyFunctionType>()
-                                                ->getInput());
+  AbstractionPattern origTy(converter->getInterfaceType());
+  origTy = origTy.getFunctionInputType();
+
   CanType inputTy = E->getSubExpr()->getType()->getCanonicalType();
   auto &origTL = SGF.getTypeLowering(origTy, inputTy);
   ManagedValue orig = SGF.emitRValueAsOrig(E->getSubExpr(), origTy, origTL);

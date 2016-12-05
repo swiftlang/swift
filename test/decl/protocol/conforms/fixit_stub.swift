@@ -1,4 +1,4 @@
-// RUN: %target-parse-verify-swift
+// RUN: %target-typecheck-verify-swift
 
 protocol Protocol1 {
   func foo(arg1: Int, arg2: String) -> String // expected-note{{protocol requires function 'foo(arg1:arg2:)' with type '(Int, String) -> String'; do you want to add a stub?}} {{27-27=\n    func foo(arg1: Int, arg2: String) -> String {\n        <#code#>\n    \}\n}}
@@ -55,8 +55,8 @@ extension Adopter4: ProtocolWithAssocType2 { //expected-error{{type 'Adopter4' d
 
 
 protocol ProtocolWithSelfRequirement {
-  func foo() -> Self // expected-note{{protocol requires function 'foo()' with type '() -> Self'; do you want to add a stub?}} {{47-47=\n    func foo() -> Adopter5 {\n        <#code#>\n    \}\n}}
-  func foo(lhs: Self, rhs: Self) -> Self //expected-note{{protocol requires function 'foo(lhs:rhs:)' with type '(Adopter5, Adopter5) -> Self'; do you want to add a stub?}} {{47-47=\n    func foo(lhs: Adopter5, rhs: Adopter5) -> Adopter5 {\n        <#code#>\n    \}\n}}
+  func foo() -> Self // expected-note{{protocol requires function 'foo()' with type '() -> Adopter5'; do you want to add a stub?}} {{47-47=\n    func foo() -> Adopter5 {\n        <#code#>\n    \}\n}}
+  func foo(lhs: Self, rhs: Self) -> Self //expected-note{{protocol requires function 'foo(lhs:rhs:)' with type '(Adopter5, Adopter5) -> Adopter5'; do you want to add a stub?}} {{47-47=\n    func foo(lhs: Adopter5, rhs: Adopter5) -> Adopter5 {\n        <#code#>\n    \}\n}}
 }
 
 struct Adopter5: ProtocolWithSelfRequirement { //expected-error{{type 'Adopter5' does not conform to protocol 'ProtocolWithSelfRequirement'}}
@@ -65,8 +65,8 @@ struct Adopter5: ProtocolWithSelfRequirement { //expected-error{{type 'Adopter5'
 
 
 protocol ProtocolWithSelfRequirement2 {
-  func foo() -> Self // expected-note{{protocol requires function 'foo()' with type '() -> Self'; do you want to add a stub?}} {{51-51=\n    func foo() -> Adopter6 {\n        <#code#>\n    \}\n}}
-  func foo(lhs: Self, rhs: Self) -> Self //expected-note{{protocol requires function 'foo(lhs:rhs:)' with type '(Adopter6, Adopter6) -> Self'; do you want to add a stub?}} {{51-51=\n    func foo(lhs: Adopter6, rhs: Adopter6) -> Adopter6 {\n        <#code#>\n    \}\n}}
+  func foo() -> Self // expected-note{{protocol requires function 'foo()' with type '() -> Adopter6'; do you want to add a stub?}} {{51-51=\n    func foo() -> Adopter6 {\n        <#code#>\n    \}\n}}
+  func foo(lhs: Self, rhs: Self) -> Self //expected-note{{protocol requires function 'foo(lhs:rhs:)' with type '(Adopter6, Adopter6) -> Adopter6'; do you want to add a stub?}} {{51-51=\n    func foo(lhs: Adopter6, rhs: Adopter6) -> Adopter6 {\n        <#code#>\n    \}\n}}
 }
 
 struct Adopter6 {}

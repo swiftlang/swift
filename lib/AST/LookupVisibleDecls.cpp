@@ -5,8 +5,8 @@
 // Copyright (c) 2014 - 2016 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
-// See http://swift.org/LICENSE.txt for license information
-// See http://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
+// See https://swift.org/LICENSE.txt for license information
+// See https://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
 //
 //===----------------------------------------------------------------------===//
 //
@@ -294,10 +294,10 @@ static void doDynamicLookup(VisibleDeclConsumer &Consumer,
         return;
 
       // Ensure that the declaration has a type.
-      if (!D->hasType()) {
+      if (!D->hasInterfaceType()) {
         if (!TypeResolver) return;
         TypeResolver->resolveDeclSignature(D);
-        if (!D->hasType()) return;
+        if (!D->hasInterfaceType()) return;
       }
 
       switch (D->getKind()) {
@@ -338,7 +338,7 @@ static void doDynamicLookup(VisibleDeclConsumer &Consumer,
         (void)FD;
 
         // Get the type without the first uncurry level with 'self'.
-        CanType T = D->getType()
+        CanType T = D->getInterfaceType()
                         ->castTo<AnyFunctionType>()
                         ->getResult()
                         ->getCanonicalType();
@@ -350,15 +350,16 @@ static void doDynamicLookup(VisibleDeclConsumer &Consumer,
       }
 
       case DeclKind::Subscript: {
-        auto Signature = D->getType()->getCanonicalType();
+        auto Signature = D->getInterfaceType()->getCanonicalType();
         if (!SubscriptsReported.insert(Signature).second)
           return;
         break;
       }
 
       case DeclKind::Var: {
+        auto *VD = cast<VarDecl>(D);
         auto Signature =
-            std::make_pair(D->getName(), D->getType()->getCanonicalType());
+            std::make_pair(VD->getName(), VD->getType()->getCanonicalType());
         if (!PropertiesReported.insert(Signature).second)
           return;
         break;

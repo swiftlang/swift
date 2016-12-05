@@ -5,8 +5,8 @@
 // Copyright (c) 2014 - 2016 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
-// See http://swift.org/LICENSE.txt for license information
-// See http://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
+// See https://swift.org/LICENSE.txt for license information
+// See https://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
 //
 //===----------------------------------------------------------------------===//
 
@@ -252,7 +252,7 @@ SILBasicBlock *SILDeserializer::getBBForDefinition(SILFunction *Fn,
   SILBasicBlock *&BB = BlocksByID[ID];
   // If the block has never been named yet, just create it.
   if (BB == nullptr)
-    return BB = new (SILMod) SILBasicBlock(Fn, Prev);
+    return BB = Fn->createBasicBlock(Prev);
 
   // If it already exists, it was either a forward reference or a redefinition.
   // The latter should never happen.
@@ -273,7 +273,7 @@ SILBasicBlock *SILDeserializer::getBBForReference(SILFunction *Fn,
     return BB;
 
   // Otherwise, create it and remember that this is a forward reference
-  BB = new (SILMod) SILBasicBlock(Fn);
+  BB = Fn->createBasicBlock();
   UndefinedBlocks[BB] = ID;
   return BB;
 }
@@ -626,9 +626,8 @@ SILBasicBlock *SILDeserializer::readSILBasicBlock(SILFunction *Fn,
     if (!ValId) return nullptr;
 
     auto ArgTy = MF->getType(TyID);
-    auto Arg = new (SILMod) SILArgument(CurrentBB,
-                                        getSILType(ArgTy,
-                                                   (SILValueCategory)Args[I+1]));
+    auto Arg = CurrentBB->createArgument(
+        getSILType(ArgTy, (SILValueCategory)Args[I + 1]));
     LastValueID = LastValueID + 1;
     setLocalValue(Arg, LastValueID);
   }
@@ -805,7 +804,6 @@ bool SILDeserializer::readSILInstruction(SILFunction *Fn, SILBasicBlock *BB,
                     getSILType(MF->getType(TyID2),                             \
                                (SILValueCategory)TyCategory2)));               \
     break;
-  ONETYPE_ONEOPERAND_INST(DeallocBox)
   ONETYPE_ONEOPERAND_INST(ValueMetatype)
   ONETYPE_ONEOPERAND_INST(ExistentialMetatype)
   ONETYPE_ONEOPERAND_INST(AllocValueBuffer)
@@ -813,6 +811,15 @@ bool SILDeserializer::readSILInstruction(SILFunction *Fn, SILBasicBlock *BB,
   ONETYPE_ONEOPERAND_INST(ProjectExistentialBox)
   ONETYPE_ONEOPERAND_INST(DeallocValueBuffer)
 #undef ONETYPE_ONEOPERAND_INST
+  case ValueKind::DeallocBoxInst:
+    assert(RecordKind == SIL_ONE_TYPE_ONE_OPERAND &&
+           "Layout should be OneTypeOneOperand.");
+    ResultVal = Builder.createDeallocBox(Loc,
+                  getLocalValue(ValID,
+                    getSILType(MF->getType(TyID2),
+                               (SILValueCategory)TyCategory2)));
+    break;
+
 #define ONEOPERAND_ONETYPE_INST(ID)           \
   case ValueKind::ID##Inst:                   \
     assert(RecordKind == SIL_ONE_TYPE_ONE_OPERAND &&       \

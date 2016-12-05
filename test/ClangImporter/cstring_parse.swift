@@ -2,7 +2,7 @@
 //
 // RUN: rm -rf %t
 // RUN: mkdir -p %t
-// RUN: %target-swift-frontend(mock-sdk: %clang-importer-sdk) -parse -verify -module-cache-path %t/clang-module-cache -I %S/Inputs %s
+// RUN: %target-swift-frontend(mock-sdk: %clang-importer-sdk) -typecheck -verify -module-cache-path %t/clang-module-cache -I %S/Inputs %s
 // RUN: ls -lR %t/clang-module-cache | %FileCheck %s
 
 // CHECK: cfuncs{{.*}}.pcm

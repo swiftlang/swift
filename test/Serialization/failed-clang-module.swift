@@ -12,8 +12,8 @@
 // RUN: %target-swift-frontend -emit-module %S/Inputs/SwiftModA.swift -module-name MixModA -I %S/Inputs/objcfail -o %t/MixModA.framework/Modules/MixModA.swiftmodule/%target-swiftmodule-name -emit-objc-header -emit-objc-header-path %t/MixModA.framework/Headers/MixModA-Swift.h -module-cache-path %t/mcp
 // RUN: %target-swift-frontend -emit-module %S/Inputs/SwiftModB.swift -module-name SwiftModB -F %t -o %t -module-cache-path %t/mcp
 
-// RUN: %target-swift-frontend -parse %s -I %t -module-cache-path %t/mcp
-// RUN: %target-swift-frontend -parse %s -Xcc -DFAIL -I %t -module-cache-path %t/mcp -show-diagnostics-after-fatal -verify
+// RUN: %target-swift-frontend -typecheck %s -I %t -module-cache-path %t/mcp
+// RUN: %target-swift-frontend -typecheck %s -Xcc -DFAIL -I %t -module-cache-path %t/mcp -show-diagnostics-after-fatal -verify
 
 // XFAIL: linux
 

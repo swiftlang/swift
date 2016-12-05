@@ -5,8 +5,8 @@
 // Copyright (c) 2014 - 2016 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
-// See http://swift.org/LICENSE.txt for license information
-// See http://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
+// See https://swift.org/LICENSE.txt for license information
+// See https://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
 //
 //===----------------------------------------------------------------------===//
 //
@@ -28,7 +28,6 @@
 #include "swift/AST/KnownProtocols.h"
 #include "swift/AST/Ownership.h"
 #include "swift/AST/PlatformKind.h"
-#include "swift/AST/RawComment.h"
 #include "llvm/ADT/SmallVector.h"
 #include "llvm/ADT/StringRef.h"
 #include "llvm/Support/ErrorHandling.h"
@@ -959,15 +958,15 @@ public:
 class RawDocCommentAttr : public DeclAttribute {
   /// Source range of the attached comment.  This comment is located before
   /// the declaration.
-  const RawComment Comment;
+  CharSourceRange CommentRange;
 
 public:
-  RawDocCommentAttr(RawComment Comment)
+  RawDocCommentAttr(CharSourceRange CommentRange)
       : DeclAttribute(DAK_RawDocComment, SourceLoc(), SourceRange(),
                       /*Implicit=*/false),
-        Comment(Comment) {}
+        CommentRange(CommentRange) {}
 
-  const RawComment &getComment() const { return Comment; }
+  CharSourceRange getCommentRange() const { return CommentRange; }
 
   static bool classof(const DeclAttribute *DA) {
     return DA->getKind() == DAK_RawDocComment;

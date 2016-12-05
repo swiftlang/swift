@@ -1,4 +1,4 @@
-// RUN: %target-parse-verify-swift
+// RUN: %target-typecheck-verify-swift
 
 @objc class HasStaticProperties {
   class var staticVar1: Int { return 4 }

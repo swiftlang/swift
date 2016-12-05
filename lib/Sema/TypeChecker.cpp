@@ -5,8 +5,8 @@
 // Copyright (c) 2014 - 2016 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
-// See http://swift.org/LICENSE.txt for license information
-// See http://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
+// See https://swift.org/LICENSE.txt for license information
+// See https://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
 //
 //===----------------------------------------------------------------------===//
 //
@@ -81,7 +81,7 @@ ProtocolDecl *TypeChecker::getProtocol(SourceLoc loc, KnownProtocolKind kind) {
              Context.getIdentifier(getProtocolName(kind)));
   }
 
-  if (protocol && !protocol->hasType()) {
+  if (protocol && !protocol->hasInterfaceType()) {
     validateDecl(protocol);
     if (protocol->isInvalid())
       return nullptr;
@@ -199,7 +199,7 @@ DeclName TypeChecker::getObjectLiteralConstructorName(ObjectLiteralExpr *expr) {
 /// unambiguous name.
 Type TypeChecker::getObjectLiteralParameterType(ObjectLiteralExpr *expr,
                                                 ConstructorDecl *ctor) {
-  Type argType = ctor->getArgumentType();
+  Type argType = ctor->getArgumentInterfaceType();
   auto argTuple = argType->getAs<TupleType>();
   if (!argTuple) return argType;
 
@@ -247,7 +247,7 @@ Type TypeChecker::lookupBoolType(const DeclContext *dc) {
         return Type();
       }
 
-      auto tyDecl = dyn_cast<TypeDecl>(results.front());
+      auto tyDecl = dyn_cast<NominalTypeDecl>(results.front());
       if (!tyDecl) {
         diagnose(SourceLoc(), diag::broken_bool);
         return Type();
@@ -366,7 +366,7 @@ static void bindExtensionDecl(ExtensionDecl *ED, TypeChecker &TC) {
 
   // If the extended type is generic or is a protocol. Clone or create
   // the generic parameters.
-  if (extendedNominal->getGenericParamsOfContext()) {
+  if (extendedNominal->isGenericContext()) {
     if (auto proto = dyn_cast<ProtocolDecl>(extendedNominal)) {
       // For a protocol extension, build the generic parameter list.
       ED->setGenericParams(proto->createGenericParams(ED));
@@ -381,7 +381,7 @@ static void bindExtensionDecl(ExtensionDecl *ED, TypeChecker &TC) {
   // If we have a trailing where clause, deal with it now.
   // For now, trailing where clauses are only permitted on protocol extensions.
   if (auto trailingWhereClause = ED->getTrailingWhereClause()) {
-    if (!extendedNominal->getGenericParamsOfContext()) {
+    if (!extendedNominal->isGenericContext()) {
       // Only generic and protocol types are permitted to have
       // trailing where clauses.
       TC.diagnose(ED, diag::extension_nongeneric_trailing_where, extendedType)

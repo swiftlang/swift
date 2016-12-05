@@ -1,5 +1,5 @@
-// RUN: %target-build-swift -parse %s -Xfrontend -verify
-// RUN: %target-build-swift -parse -parse-as-library %s -Xfrontend -verify
+// RUN: %target-build-swift -typecheck %s -Xfrontend -verify
+// RUN: %target-build-swift -typecheck -parse-as-library %s -Xfrontend -verify
 // REQUIRES: objc_interop
 
 // There was a bug where @objc without Foundation was only diagnosed if it

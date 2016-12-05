@@ -1,4 +1,4 @@
-// RUN: %target-parse-verify-swift -enable-throw-without-try
+// RUN: %target-typecheck-verify-swift -enable-throw-without-try
 
 // Test the -enable-throw-without-try option. Throwing function calls should
 // not require annotation with 'try'.

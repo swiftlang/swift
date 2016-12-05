@@ -5,8 +5,8 @@
 // Copyright (c) 2014 - 2016 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
-// See http://swift.org/LICENSE.txt for license information
-// See http://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
+// See https://swift.org/LICENSE.txt for license information
+// See https://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
 //
 //===----------------------------------------------------------------------===//
 //
@@ -398,6 +398,22 @@ public:
   void dump() const;
 };
 
+namespace importer {
+class NameImporter;
+
+/// Add the given named declaration as an entry to the given Swift name
+/// lookup table, including any of its child entries.
+void addEntryToLookupTable(SwiftLookupTable &table, clang::NamedDecl *named,
+                           NameImporter &);
+
+/// Add the macros from the given Clang preprocessor to the given
+/// Swift name lookup table.
+void addMacrosToLookupTable(SwiftLookupTable &table, NameImporter &);
+
+/// Finalize a lookup table, handling any as-yet-unresolved entries
+/// and emitting diagnostics if necessary.
+void finalizeLookupTable(SwiftLookupTable &table, NameImporter &);
+}
 }
 
 namespace llvm {

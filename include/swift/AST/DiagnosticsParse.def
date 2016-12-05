@@ -5,8 +5,8 @@
 // Copyright (c) 2014 - 2016 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
-// See http://swift.org/LICENSE.txt for license information
-// See http://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
+// See https://swift.org/LICENSE.txt for license information
+// See https://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
 //
 //===----------------------------------------------------------------------===//
 //
@@ -680,6 +680,14 @@ WARNING(deprecated_protocol_composition_single,none,
         "'protocol<...>' composition syntax is deprecated and not needed here", ())
 WARNING(deprecated_any_composition,none,
         "'protocol<>' syntax is deprecated; use 'Any' instead", ())
+
+// SIL box Types
+ERROR(sil_box_expected_var_or_let,none,
+      "expected 'var' or 'let' to introduce SIL box field type", ())
+ERROR(sil_box_expected_r_brace,none,
+      "expected '}' to complete SIL box field type list", ())
+ERROR(sil_box_expected_r_angle,none,
+      "expected '>' to complete SIL box generic argument list", ())
 
 //------------------------------------------------------------------------------
 // Pattern parsing diagnostics

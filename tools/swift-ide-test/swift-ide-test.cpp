@@ -5,8 +5,8 @@
 // Copyright (c) 2014 - 2016 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
-// See http://swift.org/LICENSE.txt for license information
-// See http://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
+// See https://swift.org/LICENSE.txt for license information
+// See https://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
 //
 //===----------------------------------------------------------------------===//
 
@@ -763,11 +763,7 @@ public:
     switch (Kind) {
     case SyntaxNodeKind::Keyword: Id = "kw"; break;
     // Skip identifier.
-    case SyntaxNodeKind::Identifier: {
-      auto var = StringRef(CurrBufPtr, 3);
-      assert(var != "var");
-      return;
-    }
+    case SyntaxNodeKind::Identifier: return;
     case SyntaxNodeKind::DollarIdent: Id = "dollar"; break;
     case SyntaxNodeKind::Integer: Id = "int"; break;
     case SyntaxNodeKind::Floating: Id = "float"; break;
@@ -1549,7 +1545,7 @@ static int doPrintLocalTypes(const CompilerInvocation &InitInvok,
       std::string MangledName;
       {
         Mangle::Mangler Mangler(/*DWARFMangling*/ true);
-        Mangler.mangleTypeForDebugger(LTD->getDeclaredType(),
+        Mangler.mangleTypeForDebugger(LTD->getDeclaredInterfaceType(),
                                       LTD->getDeclContext());
         MangledName = Mangler.finalize();
       }
@@ -2149,12 +2145,8 @@ public:
       return;
     }
     OS << "[";
-    for (auto SRC = RC.Comments.begin(); SRC != RC.Comments.end(); ++SRC) {
-      if (SRC != RC.Comments.begin())
-        OS << "\\n";
-
-      printWithEscaping(SRC->RawText);
-    }
+    for (auto &SRC : RC.Comments)
+      printWithEscaping(SRC.RawText);
     OS << "]";
   }
 

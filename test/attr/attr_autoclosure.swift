@@ -1,5 +1,5 @@
-// RUN: %target-parse-verify-swift
-// RUN: not %target-swift-frontend -parse %s 2>&1 | %FileCheck %s
+// RUN: %target-typecheck-verify-swift
+// RUN: not %target-swift-frontend -typecheck %s 2>&1 | %FileCheck %s
 // No errors at invalid locations!
 // CHECK-NOT: <unknown>:0:
 

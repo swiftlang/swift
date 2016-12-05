@@ -1,4 +1,4 @@
-// RUN: %target-parse-verify-swift
+// RUN: %target-typecheck-verify-swift
 
 typealias rgb = Int32 // expected-note {{declared here}}
 var rgb : rgb? // expected-error {{invalid redeclaration of 'rgb'}}

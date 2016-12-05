@@ -5,8 +5,8 @@
 // Copyright (c) 2014 - 2016 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
-// See http://swift.org/LICENSE.txt for license information
-// See http://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
+// See https://swift.org/LICENSE.txt for license information
+// See https://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
 //
 //===----------------------------------------------------------------------===//
 
@@ -247,9 +247,11 @@ AllocOptimize::AllocOptimize(SILInstruction *TheMemory,
   Releases(Releases) {
   
   // Compute the type of the memory object.
-  if (auto *ABI = dyn_cast<AllocBoxInst>(TheMemory))
-    MemoryType = ABI->getElementType();
-  else {
+  if (auto *ABI = dyn_cast<AllocBoxInst>(TheMemory)) {
+    assert(ABI->getBoxType()->getLayout()->getFields().size() == 1
+           && "optimizing multi-field boxes not implemented");
+    MemoryType = ABI->getBoxType()->getFieldType(0);
+  } else {
     assert(isa<AllocStackInst>(TheMemory));
     MemoryType = cast<AllocStackInst>(TheMemory)->getElementType();
   }

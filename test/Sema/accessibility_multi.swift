@@ -1,4 +1,4 @@
-// RUN: %target-swift-frontend -parse -primary-file %s %S/Inputs/accessibility_multi_other.swift -verify
+// RUN: %target-swift-frontend -typecheck -primary-file %s %S/Inputs/accessibility_multi_other.swift -verify
 func read(_ value: Int) {}
 func reset(_ value: inout Int) { value = 0 }
 

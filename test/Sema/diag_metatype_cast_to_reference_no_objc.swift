@@ -1,4 +1,4 @@
-// RUN: %target-swift-frontend -disable-objc-interop -parse %s -verify
+// RUN: %target-swift-frontend -disable-objc-interop -typecheck %s -verify
 
 class C {}
 

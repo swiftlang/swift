@@ -5,8 +5,8 @@
 // Copyright (c) 2014 - 2016 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
-// See http://swift.org/LICENSE.txt for license information
-// See http://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
+// See https://swift.org/LICENSE.txt for license information
+// See https://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
 //
 //===----------------------------------------------------------------------===//
 //
@@ -19,7 +19,6 @@
 
 #include "swift/Basic/LLVM.h"
 #include "swift/Basic/OptionSet.h"
-#include "swift/Syntax/Token.h"
 #include "llvm/IR/LLVMContext.h"
 #include "llvm/ADT/ArrayRef.h"
 #include "llvm/ADT/Optional.h"
@@ -60,12 +59,7 @@ namespace swift {
   class Token;
   class TopLevelContext;
   struct TypeLoc;
-
-  enum class EOFRetention {
-    KeepEOF,
-    DiscardEOF,
-  };
-
+  
   /// SILParserState - This is a context object used to optionally maintain SIL
   /// parsing context for the parser.
   class SILParserState {
@@ -126,15 +120,12 @@ namespace swift {
                              CodeCompletionCallbacksFactory *Factory);
 
   /// \brief Lex and return a vector of tokens for the given buffer.
-  std::vector<syntax::Token> tokenize(const LangOptions &LangOpts,
-                                      const SourceManager &SM,
-                                      EOFRetention IncludeEOF,
-                                      unsigned BufferID,
-                                      unsigned Offset = 0,
-                                      unsigned EndOffset = 0,
-                                      bool KeepComments = true,
-                                      bool TokenizeInterpolatedString = true,
-                                      ArrayRef<syntax::Token> SplitTokens = {});
+  std::vector<Token> tokenize(const LangOptions &LangOpts,
+                              const SourceManager &SM, unsigned BufferID,
+                              unsigned Offset = 0, unsigned EndOffset = 0,
+                              bool KeepComments = true,
+                              bool TokenizeInterpolatedString = true,
+                              ArrayRef<Token> SplitTokens = ArrayRef<Token>());
 
   /// Once parsing is complete, this walks the AST to resolve imports, record
   /// operators, and do other top-level validation.
@@ -259,13 +250,15 @@ namespace swift {
   /// Turn the given Swift module into either LLVM IR or native code
   /// and return the generated LLVM IR module.
   std::unique_ptr<llvm::Module>
-  performIRGeneration(IRGenOptions &Opts, ModuleDecl *M, SILModule *SILMod,
+  performIRGeneration(IRGenOptions &Opts, ModuleDecl *M,
+                      std::unique_ptr<SILModule> SILMod,
                       StringRef ModuleName, llvm::LLVMContext &LLVMContext);
 
   /// Turn the given Swift module into either LLVM IR or native code
   /// and return the generated LLVM IR module.
   std::unique_ptr<llvm::Module>
-  performIRGeneration(IRGenOptions &Opts, SourceFile &SF, SILModule *SILMod,
+  performIRGeneration(IRGenOptions &Opts, SourceFile &SF,
+                      std::unique_ptr<SILModule> SILMod,
                       StringRef ModuleName, llvm::LLVMContext &LLVMContext,
                       unsigned StartElem = 0);
 

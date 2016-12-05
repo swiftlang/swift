@@ -5,8 +5,8 @@
 // Copyright (c) 2014 - 2016 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
-// See http://swift.org/LICENSE.txt for license information
-// See http://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
+// See https://swift.org/LICENSE.txt for license information
+// See https://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
 //
 //===----------------------------------------------------------------------===//
 //
@@ -882,10 +882,9 @@ public:
       Operands[i].~Operand();
     }
   }
-
-  SILType getElementType() const {
-    return SILType::getPrimitiveObjectType(
-        getType().castTo<SILBoxType>()->getBoxedType());
+  
+  CanSILBoxType getBoxType() const {
+    return getType().castTo<SILBoxType>();
   }
 
   /// Return the underlying variable declaration associated with this
@@ -4337,15 +4336,8 @@ class DeallocBoxInst :
 {
   friend SILBuilder;
 
-  // TODO: The element type can be derived from a typed box.
-  SILType ElementType;
-
-  DeallocBoxInst(SILDebugLocation DebugLoc, SILType elementType,
-                 SILValue operand)
-      : UnaryInstructionBase(DebugLoc, operand), ElementType(elementType) {}
-
-public:
-  SILType getElementType() const { return ElementType; }
+  DeallocBoxInst(SILDebugLocation DebugLoc, SILValue operand)
+      : UnaryInstructionBase(DebugLoc, operand) {}
 };
 
 /// Deallocate memory allocated for a boxed existential container created by

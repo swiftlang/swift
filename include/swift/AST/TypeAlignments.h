@@ -5,8 +5,8 @@
 // Copyright (c) 2014 - 2016 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
-// See http://swift.org/LICENSE.txt for license information
-// See http://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
+// See https://swift.org/LICENSE.txt for license information
+// See https://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
 //
 //===----------------------------------------------------------------------===//
 //
@@ -34,6 +34,7 @@ namespace swift {
   class DeclContext;
   class Expr;
   class ExtensionDecl;
+  class GenericEnvironment;
   class GenericTypeParamDecl;
   class NormalProtocolConformance;
   class OperatorDecl;
@@ -96,6 +97,8 @@ LLVM_DECLARE_TYPE_ALIGNMENT(swift::DeclContext, swift::DeclContextAlignInBits)
 LLVM_DECLARE_TYPE_ALIGNMENT(swift::Expr, swift::ExprAlignInBits)
 LLVM_DECLARE_TYPE_ALIGNMENT(swift::ProtocolConformance, swift::DeclAlignInBits)
 LLVM_DECLARE_TYPE_ALIGNMENT(swift::NormalProtocolConformance,
+                            swift::DeclAlignInBits)
+LLVM_DECLARE_TYPE_ALIGNMENT(swift::GenericEnvironment,
                             swift::DeclAlignInBits)
 
 static_assert(alignof(void*) >= 2, "pointer alignment is too small");

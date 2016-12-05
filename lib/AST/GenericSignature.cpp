@@ -5,8 +5,8 @@
 // Copyright (c) 2014 - 2016 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
-// See http://swift.org/LICENSE.txt for license information
-// See http://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
+// See https://swift.org/LICENSE.txt for license information
+// See https://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
 //
 //===----------------------------------------------------------------------===//
 //
@@ -292,6 +292,15 @@ getSubstitutions(ModuleDecl &mod,
                  const TypeSubstitutionMap &subs,
                  GenericSignature::LookupConformanceFn lookupConformance,
                  SmallVectorImpl<Substitution> &result) const {
+  getSubstitutions(mod, QueryTypeSubstitutionMap{subs}, lookupConformance,
+                   result);
+}
+
+void GenericSignature::
+getSubstitutions(ModuleDecl &mod,
+                 TypeSubstitutionFn subs,
+                 GenericSignature::LookupConformanceFn lookupConformance,
+                 SmallVectorImpl<Substitution> &result) const {
   // Enumerate all of the requirements that require substitution.
   enumeratePairedRequirements([&](Type depTy, ArrayRef<Requirement> reqs) {
     auto &ctx = getASTContext();
@@ -432,11 +441,11 @@ Type GenericSignature::getRepresentative(Type type, ModuleDecl &mod) {
   auto rep = pa->getRepresentative();
   if (rep->isConcreteType()) return rep->getConcreteType();
   if (pa == rep) {
-    assert(rep->getDependentType(builder, /*allowUnresolved*/ false)
+    assert(rep->getDependentType(getGenericParams(), /*allowUnresolved*/ false)
               ->getCanonicalType() == type->getCanonicalType());
     return type;
   }
-  return rep->getDependentType(builder, /*allowUnresolved*/ false);
+  return rep->getDependentType(getGenericParams(), /*allowUnresolved*/ false);
 }
 
 bool GenericSignature::areSameTypeParameterInContext(Type type1, Type type2,
@@ -509,11 +518,39 @@ CanType GenericSignature::getCanonicalTypeInContext(Type type, ModuleDecl &mod) 
     if (rep->isConcreteType()) {
       return getCanonicalTypeInContext(rep->getConcreteType(), mod);
     } else {
-      return rep->getDependentType(builder, /*allowUnresolved*/ false);
+      return rep->getDependentType(getGenericParams(),
+                                   /*allowUnresolved*/ false);
     }
   });
 
   auto result = type->getCanonicalType();
   assert(isCanonicalTypeInContext(result, mod));
   return result;
+}
+
+GenericEnvironment *CanGenericSignature::getGenericEnvironment(
+                                                     ModuleDecl &module) const {
+  // Archetype builders are stored on the ASTContext.
+  return module.getASTContext().getOrCreateCanonicalGenericEnvironment(
+           module.getASTContext().getOrCreateArchetypeBuilder(*this, &module));
+}
+
+unsigned GenericParamKey::findIndexIn(
+                  llvm::ArrayRef<GenericTypeParamType *> genericParams) const {
+  // For depth 0, we have random access. We perform the extra checking so that
+  // we can return
+  if (Depth == 0 && Index < genericParams.size() &&
+      genericParams[Index] == *this)
+    return Index;
+
+  // At other depths, perform a binary search.
+  unsigned result =
+      std::lower_bound(genericParams.begin(), genericParams.end(), *this,
+                       Ordering())
+        - genericParams.begin();
+  if (result < genericParams.size() && genericParams[result] == *this)
+    return result;
+
+  // We didn't find the parameter we were looking for.
+  return genericParams.size();
 }

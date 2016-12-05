@@ -1,4 +1,4 @@
-// RUN: %target-swift-frontend %s -parse
+// RUN: %target-swift-frontend %s -typecheck
 
 enum Pattern {
 case Specific(title: String?, label: String?, value: AnyObject?)

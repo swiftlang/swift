@@ -1,5 +1,5 @@
 // RUN: mkdir -p %t
-// RUN: %target-build-swift %s -Xfrontend -enable-experimental-nested-generic-types -o %t/a.out
+// RUN: %target-build-swift %s -o %t/a.out
 // RUN: %target-run %t/a.out | %FileCheck %s
 // REQUIRES: executable_test
 

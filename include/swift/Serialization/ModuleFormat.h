@@ -5,8 +5,8 @@
 // Copyright (c) 2014 - 2016 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
-// See http://swift.org/LICENSE.txt for license information
-// See http://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
+// See https://swift.org/LICENSE.txt for license information
+// See https://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
 //
 //===----------------------------------------------------------------------===//
 ///
@@ -54,7 +54,7 @@ const uint16_t VERSION_MAJOR = 0;
 /// in source control, you should also update the comment to briefly
 /// describe what change you made. The content of this comment isn't important;
 /// it just ensures a conflict if two people change the module format.
-const uint16_t VERSION_MINOR = 283; // Last change: witness markers removed
+const uint16_t VERSION_MINOR = 289; // Last change: remove AssociatedTypeType
 
 using DeclID = PointerEmbeddedInt<unsigned, 31>;
 using DeclIDField = BCFixed<31>;
@@ -553,11 +553,6 @@ namespace decls_block {
     BCVBR<4>     // index + 1, or zero if we have a generic type parameter decl
   >;
 
-  using AssociatedTypeTypeLayout = BCRecordLayout<
-    ASSOCIATED_TYPE_TYPE,
-    DeclIDField // associated type decl
-  >;
-
   using DependentMemberTypeLayout = BCRecordLayout<
     DEPENDENT_MEMBER_TYPE,
     TypeIDField,      // base type
@@ -624,9 +619,8 @@ namespace decls_block {
 
   using ArchetypeTypeLayout = BCRecordLayout<
     ARCHETYPE_TYPE,
-    IdentifierIDField,   // name
-    TypeIDField,         // index if primary, parent if non-primary
-    DeclIDField,         // associated type or protocol decl
+    TypeIDField,         // parent if non-primary
+    DeclIDField,         // associated type decl if non-primary, name if primary
     TypeIDField,         // superclass
     BCArray<DeclIDField> // conformances
     // Trailed by the nested types record.
@@ -680,16 +674,6 @@ namespace decls_block {
     TypeIDField,  // replacement
     BCVBR<5>
     // Trailed by protocol conformance info (if any)
-  >;
-
-  using PolymorphicFunctionTypeLayout = BCRecordLayout<
-    POLYMORPHIC_FUNCTION_TYPE,
-    TypeIDField, // input
-    TypeIDField, // output
-    DeclIDField, // decl that owns the generic params
-    FunctionTypeRepresentationField, // representation
-    BCFixed<1>   // throws?
-    // Trailed by its generic parameters, if the owning decl ID is 0.
   >;
 
   using GenericFunctionTypeLayout = BCRecordLayout<
@@ -855,7 +839,6 @@ namespace decls_block {
     BCFixed<1>,  // stub implementation?
     BCFixed<1>,  // throws?
     CtorInitializerKindField,  // initializer kind
-    TypeIDField, // type (signature)
     TypeIDField, // type (interface)
     DeclIDField, // overridden decl
     AccessibilityKindField, // accessibility
@@ -909,7 +892,6 @@ namespace decls_block {
     BCFixed<1>,   // has dynamic self?
     BCFixed<1>,   // throws?
     BCVBR<5>,     // number of parameter patterns
-    TypeIDField,  // type (signature)
     TypeIDField,  // interface type
     DeclIDField,  // operator decl
     DeclIDField,  // overridden function
@@ -967,7 +949,6 @@ namespace decls_block {
     IdentifierIDField, // name
     DeclContextIDField,// context decl
     TypeIDField, // argument type
-    TypeIDField, // constructor type
     TypeIDField, // interface type
     BCFixed<1>,  // implicit?
     EnumElementRawValueKindField,  // raw value kind
@@ -981,8 +962,6 @@ namespace decls_block {
     BCFixed<1>,  // implicit?
     BCFixed<1>,  // objc?
     StorageKindField,   // StorageKind
-    TypeIDField, // subscript dummy type
-    TypeIDField, // element type
     TypeIDField, // interface type
     DeclIDField, // getter
     DeclIDField, // setter
@@ -1014,7 +993,6 @@ namespace decls_block {
     DeclContextIDField, // context decl
     BCFixed<1>,  // implicit?
     BCFixed<1>,  // objc?
-    TypeIDField, // type (signature)
     TypeIDField  // interface type
     // Trailed by a pattern for self.
   >;

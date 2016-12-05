@@ -6,7 +6,7 @@ func foo(f f: (() -> ())!) {
 }
 // CHECK: sil hidden @{{.*}}foo{{.*}} : $@convention(thin) (@owned Optional<@callee_owned () -> ()>) -> () {
 // CHECK: bb0([[T0:%.*]] : $Optional<@callee_owned () -> ()>):
-// CHECK:   [[F:%.*]] = alloc_box $@box Optional<@callee_owned () -> ()>
+// CHECK:   [[F:%.*]] = alloc_box $<τ_0_0> { var τ_0_0 } <Optional<@callee_owned () -> ()>>
 // CHECK:   [[PF:%.*]] = project_box [[F]]
 // CHECK:   [[T0_COPY:%.*]] = copy_value [[T0]]
 // CHECK:   store [[T0_COPY]] to [init] [[PF]]

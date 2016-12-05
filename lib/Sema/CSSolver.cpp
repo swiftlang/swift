@@ -5,8 +5,8 @@
 // Copyright (c) 2014 - 2016 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
-// See http://swift.org/LICENSE.txt for license information
-// See http://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
+// See https://swift.org/LICENSE.txt for license information
+// See https://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
 //
 //===----------------------------------------------------------------------===//
 //
@@ -733,6 +733,8 @@ static bool shouldBindToValueType(Constraint *constraint)
     llvm_unreachable("shouldBindToValueType() may only be called on "
                      "relational constraints");
   }
+
+  llvm_unreachable("Unhandled ConstraintKind in switch.");
 }
 
 /// Find the set of type variables that are inferable from the given type.

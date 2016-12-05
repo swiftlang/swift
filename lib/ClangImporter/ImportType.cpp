@@ -5,8 +5,8 @@
 // Copyright (c) 2014 - 2016 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
-// See http://swift.org/LICENSE.txt for license information
-// See http://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
+// See https://swift.org/LICENSE.txt for license information
+// See https://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
 //
 //===----------------------------------------------------------------------===//
 //
@@ -28,6 +28,7 @@
 #include "swift/AST/ParameterList.h"
 #include "swift/AST/Types.h"
 #include "swift/ClangImporter/ClangModule.h"
+#include "swift/Parse/Token.h"
 #include "swift/Basic/Fallthrough.h"
 #include "clang/Sema/Lookup.h"
 #include "clang/Sema/Sema.h"
@@ -139,6 +140,8 @@ namespace {
     case ImportHint::SwiftNewtypeFromCFPointer:
       return true;
     }
+
+    llvm_unreachable("Invalid ImportHint.");
   }
 
   struct ImportResult {
@@ -172,6 +175,8 @@ namespace {
         return OptionalType::get(payloadType);
       return ImplicitlyUnwrappedOptionalType::get(payloadType);
     }
+
+    llvm_unreachable("Invalid OptionalTypeKind.");
   }
 
   class SwiftTypeConverter :
@@ -295,6 +300,8 @@ namespace {
       case clang::BuiltinType::OMPArraySection:
         return Type();
       }
+
+      llvm_unreachable("Invalid BuiltinType.");
     }
 
     ImportResult VisitComplexType(const clang::ComplexType *type) {
@@ -716,7 +723,7 @@ namespace {
       if (!decl)
         return nullptr;
 
-      return decl->getDeclaredType();
+      return decl->getDeclaredInterfaceType();
     }
 
     /// Retrieve the 'Code' type for a bridged NSError, or nullptr if
@@ -752,7 +759,7 @@ namespace {
       if (auto codeDecl = getBridgedNSErrorCode(type))
         return codeDecl->getDeclaredInterfaceType();
 
-      return type->getDeclaredType();
+      return type->getDeclaredInterfaceType();
     }
 
     ImportResult VisitEnumType(const clang::EnumType *type) {
@@ -782,6 +789,8 @@ namespace {
         return getAdjustedTypeDeclReferenceType(decl);
       }
       }
+
+      llvm_unreachable("Invalid EnumKind.");
     }
 
     ImportResult VisitObjCObjectType(const clang::ObjCObjectType *type) {
@@ -1050,6 +1059,8 @@ static bool canBridgeTypes(ImportTypeKind importKind) {
   case ImportTypeKind::BridgedValue:
     return true;
   }
+
+  llvm_unreachable("Invalid ImportTypeKind.");
 }
 
 /// True if the type has known CoreFoundation reference counting semantics.
@@ -1074,6 +1085,8 @@ static bool isCFAudited(ImportTypeKind importKind) {
   case ImportTypeKind::PropertyWithReferenceSemantics:
     return true;
   }
+
+  llvm_unreachable("Invalid ImportTypeKind.");
 }
 
 /// Turn T into Unmanaged<T>.
@@ -1316,6 +1329,19 @@ static Type adjustTypeForConcreteImport(ClangImporter::Implementation &impl,
     // FIXME: This should apply to blocks as well, but Unmanaged is constrained
     // to AnyObject.
     importedType = getUnmanagedType(impl, importedType);
+  }
+
+  // Treat va_list specially: null-unspecified va_list parameters should be
+  // assumed to be non-optional. (Most people don't even think of va_list as a
+  // pointer, and it's not a portable assumption anyway.)
+  if (importKind == ImportTypeKind::Parameter &&
+      optKind == OTK_ImplicitlyUnwrappedOptional) {
+    if (auto *nominal = importedType->getNominalOrBoundGenericNominal()) {
+      if (nominal->getName().str() == "CVaListPointer" &&
+          nominal->getParentModule()->isStdlibModule()) {
+        optKind = OTK_None;
+      }
+    }
   }
 
   // Wrap class, class protocol, function, and metatype types in an
@@ -1610,6 +1636,7 @@ ParameterList *ClangImporter::Implementation::importFunctionParameterList(
     auto param = new (SwiftContext)
         ParamDecl(true, SourceLoc(), SourceLoc(), Identifier(), SourceLoc(),
                   name, paramTy, ImportedHeaderUnit);
+    param->setInterfaceType(paramTy);
 
     param->setVariadic();
     parameters.push_back(param);
@@ -1730,6 +1757,8 @@ adjustResultTypeForThrowingFunction(const ImportedErrorInfo &errorInfo,
   case ForeignErrorConvention::NonNilError:
     return resultTy;
   }
+
+  llvm_unreachable("Invalid ForeignErrorConvention.");
 }
                                      
 /// Produce the foreign error convention from the imported error info,
@@ -1908,6 +1937,7 @@ Type ClangImporter::Implementation::importMethodType(
                                             SourceLoc(), argName,
                                             SourceLoc(), argName, type,
                                             ImportedHeaderUnit);
+    var->setInterfaceType(type);
     swiftParams.push_back(var);
   };
 
@@ -2087,7 +2117,7 @@ Type ClangImporter::Implementation::importMethodType(
 
   // Form the function type.
   return FunctionType::get(
-      (*bodyParams)->getInterfaceType(const_cast<DeclContext*>(dc)),
+      (*bodyParams)->getInterfaceType(SwiftContext),
       swiftResultTy, extInfo);
 }
 
@@ -2160,15 +2190,18 @@ Type ClangImporter::Implementation::getNamedSwiftType(Module *module,
   if (results.size() != 1)
     return Type();
 
-  auto type = dyn_cast<TypeDecl>(results.front());
-  if (!type)
+  auto decl = dyn_cast<TypeDecl>(results.front());
+  if (!decl)
     return Type();
 
-  assert(!type->hasClangNode() && "picked up the original type?");
+  assert(!decl->hasClangNode() && "picked up the original type?");
 
   if (auto *typeResolver = getTypeResolver())
-    typeResolver->resolveDeclSignature(type);
-  return type->getDeclaredType();
+    typeResolver->resolveDeclSignature(decl);
+
+  if (auto *nominalDecl = dyn_cast<NominalTypeDecl>(decl))
+    return nominalDecl->getDeclaredType();
+  return cast<TypeAliasDecl>(decl)->getAliasType();
 }
 
 Type ClangImporter::Implementation::getNamedSwiftType(StringRef moduleName,

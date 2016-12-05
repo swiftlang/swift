@@ -5,8 +5,8 @@
 // Copyright (c) 2014 - 2016 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
-// See http://swift.org/LICENSE.txt for license information
-// See http://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
+// See https://swift.org/LICENSE.txt for license information
+// See https://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
 //
 //===----------------------------------------------------------------------===//
 
@@ -86,13 +86,6 @@ replaceSelfTypeForDynamicLookup(ASTContext &ctx,
                               ctx);
 }
 
-static Type getExistentialArchetype(SILValue existential) {
-  CanType ty = existential->getType().getSwiftRValueType();
-  if (ty->is<ArchetypeType>())
-    return ty;
-  return cast<ProtocolType>(ty)->getDecl()->getSelfTypeInContext();
-}
-
 /// Retrieve the type to use for a method found via dynamic lookup.
 static CanSILFunctionType getDynamicMethodLoweredType(SILGenFunction &gen,
                                            SILValue proto,
@@ -103,7 +96,8 @@ static CanSILFunctionType getDynamicMethodLoweredType(SILGenFunction &gen,
   // Determine the opaque 'self' parameter type.
   CanType selfTy;
   if (methodName.getDecl()->isInstanceMember()) {
-    selfTy = getExistentialArchetype(proto)->getCanonicalType();
+    selfTy = proto->getType().getSwiftRValueType();
+    assert(selfTy->is<ArchetypeType>() && "Dynamic lookup needs an archetype");
   } else {
     selfTy = proto->getType().getSwiftType();
   }
@@ -1684,7 +1678,7 @@ SILValue SILGenFunction::emitApplyWithRethrow(SILLocation loc,
   {
     B.emitBlock(errorBB);
     SILValue error =
-      errorBB->createBBArg(silFnType->getErrorResult().getSILType());
+        errorBB->createArgument(silFnType->getErrorResult().getSILType());
 
     B.createBuiltin(loc, SGM.getASTContext().getIdentifier("willThrow"),
                     SGM.Types.getEmptyTupleType(), {}, {error});
@@ -1695,7 +1689,7 @@ SILValue SILGenFunction::emitApplyWithRethrow(SILLocation loc,
 
   // Enter the normal path.
   B.emitBlock(normalBB);
-  return normalBB->createBBArg(resultType);
+  return normalBB->createArgument(resultType);
 }
 
 static RValue emitStringLiteral(SILGenFunction &SGF, Expr *E, StringRef Str,
@@ -1839,7 +1833,7 @@ static SILValue emitRawApply(SILGenFunction &gen,
   // Otherwise, we need to create a try_apply.
   } else {
     SILBasicBlock *normalBB = gen.createBasicBlock();
-    result = normalBB->createBBArg(resultType);
+    result = normalBB->createArgument(resultType);
 
     SILBasicBlock *errorBB =
       gen.getTryApplyErrorDest(loc, substFnType->getErrorResult(),
@@ -5541,8 +5535,7 @@ RValue SILGenFunction::emitDynamicMemberRefExpr(DynamicMemberRefExpr *e,
     auto dynamicMethodTy = getDynamicMethodLoweredType(*this, operand, member,
                                                        memberFnTy);
     auto loweredMethodTy = SILType::getPrimitiveObjectType(dynamicMethodTy);
-    SILValue memberArg = new (F.getModule()) SILArgument(hasMemberBB,
-                                                         loweredMethodTy);
+    SILValue memberArg = hasMemberBB->createArgument(loweredMethodTy);
 
     // Create the result value.
     SILValue result = emitDynamicPartialApply(*this, e, memberArg, operand,
@@ -5637,8 +5630,7 @@ RValue SILGenFunction::emitDynamicSubscriptExpr(DynamicSubscriptExpr *e,
     auto dynamicMethodTy = getDynamicMethodLoweredType(*this, base, member,
                                                        functionTy);
     auto loweredMethodTy = SILType::getPrimitiveObjectType(dynamicMethodTy);
-    SILValue memberArg = new (F.getModule()) SILArgument(hasMemberBB,
-                                                         loweredMethodTy);
+    SILValue memberArg = hasMemberBB->createArgument(loweredMethodTy);
     // Emit the application of 'self'.
     SILValue result = emitDynamicPartialApply(*this, e, memberArg, base,
                                               cast<FunctionType>(methodTy));

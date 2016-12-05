@@ -5,8 +5,8 @@
 // Copyright (c) 2014 - 2016 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
-// See http://swift.org/LICENSE.txt for license information
-// See http://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
+// See https://swift.org/LICENSE.txt for license information
+// See https://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
 //
 //===----------------------------------------------------------------------===//
 
@@ -1777,7 +1777,7 @@ emitEnumElementDispatch(ArrayRef<RowToSpecialize> rows,
           eltValue = eltTL->emitLoad(SGF.B, loc, eltValue,
                                      LoadOwnershipQualifier::Take);
       } else {
-        eltValue = new (SGF.F.getModule()) SILArgument(caseBB, eltTy);
+        eltValue = caseBB->createArgument(eltTy);
       }
 
       origCMV = getManagedSubobject(SGF, eltValue, *eltTL, eltConsumption);
@@ -1968,7 +1968,7 @@ JumpDest PatternMatchEmission::getSharedCaseBlockDest(CaseStmt *caseBlock,
       pattern->forEachVariable([&](VarDecl *V) {
         if (!V->hasName())
           return;
-        block->createBBArg(SGF.VarLocs[V].value->getType(), V);
+        block->createArgument(SGF.VarLocs[V].value->getType(), V);
       });
     }
   }
@@ -1989,7 +1989,7 @@ void PatternMatchEmission::emitSharedCaseBlocks() {
     // predecessor.  We rely on the SIL CFG here, because unemitted shared case
     // blocks might fallthrough into this one.
     if (!hasFallthroughTo && caseBlock->getCaseLabelItems().size() == 1) {
-      SILBasicBlock *predBB = caseBB->getSinglePredecessor();
+      SILBasicBlock *predBB = caseBB->getSinglePredecessorBlock();
       assert(predBB && "Should only have 1 predecessor because it isn't shared");
       assert(isa<BranchInst>(predBB->getTerminator()) &&
              "Should have uncond branch to shared block");
@@ -2024,7 +2024,7 @@ void PatternMatchEmission::emitSharedCaseBlocks() {
           return;
         if (V->isLet()) {
           // Just emit a let with cleanup.
-          SGF.VarLocs[V].value = caseBB->getBBArg(argIndex++);
+          SGF.VarLocs[V].value = caseBB->getArgument(argIndex++);
           SGF.emitInitializationForVarDecl(V)->finishInitialization(SGF);
         } else {
           // The pattern variables were all emitted as lets and one got passed in,
@@ -2032,7 +2032,8 @@ void PatternMatchEmission::emitSharedCaseBlocks() {
           SGF.VarLocs.erase(V);
           auto newVar = SGF.emitInitializationForVarDecl(V);
           auto loc = SGF.CurrentSILLoc;
-          auto value = ManagedValue::forUnmanaged(caseBB->getBBArg(argIndex++));
+          auto value =
+              ManagedValue::forUnmanaged(caseBB->getArgument(argIndex++));
           auto formalType = V->getType()->getCanonicalType();
           RValue(SGF, loc, formalType, value).forwardInto(SGF, loc, newVar.get());
         }

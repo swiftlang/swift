@@ -5,8 +5,8 @@
 // Copyright (c) 2014 - 2016 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
-// See http://swift.org/LICENSE.txt for license information
-// See http://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
+// See https://swift.org/LICENSE.txt for license information
+// See https://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
 //
 //===----------------------------------------------------------------------===//
 //
@@ -295,7 +295,7 @@ bool IterativeTypeChecker::isResolveTypeDeclSatisfied(TypeDecl *typeDecl) {
 
   // Nominal types.
   auto nominal = cast<NominalTypeDecl>(typeDecl);
-  return nominal->hasType();
+  return nominal->hasInterfaceType();
 }
 
 void IterativeTypeChecker::processResolveTypeDecl(
@@ -304,7 +304,7 @@ void IterativeTypeChecker::processResolveTypeDecl(
   if (auto typeAliasDecl = dyn_cast<TypeAliasDecl>(typeDecl)) {
     if (typeAliasDecl->getDeclContext()->isModuleScopeContext()) {
       // FIXME: This is silly.
-      if (!typeAliasDecl->hasType())
+      if (!typeAliasDecl->getAliasType())
         typeAliasDecl->computeType();
       
       TypeResolutionOptions options;
@@ -318,7 +318,7 @@ void IterativeTypeChecker::processResolveTypeDecl(
                           typeAliasDecl->getDeclContext(),
                           options, nullptr, &unsatisfiedDependency)) {
         typeAliasDecl->setInvalid();
-        typeAliasDecl->overwriteType(ErrorType::get(getASTContext()));
+        typeAliasDecl->setInterfaceType(ErrorType::get(getASTContext()));
         typeAliasDecl->getUnderlyingTypeLoc().setInvalidType(getASTContext());
       }
       
@@ -335,7 +335,7 @@ void IterativeTypeChecker::processResolveTypeDecl(
 bool IterativeTypeChecker::breakCycleForResolveTypeDecl(TypeDecl *typeDecl) {
   if (auto typeAliasDecl = dyn_cast<TypeAliasDecl>(typeDecl)) {
     typeAliasDecl->setInvalid();
-    typeAliasDecl->overwriteType(ErrorType::get(getASTContext()));
+    typeAliasDecl->setInterfaceType(ErrorType::get(getASTContext()));
     typeAliasDecl->getUnderlyingTypeLoc().setInvalidType(getASTContext());
     return true;
   }

@@ -1,4 +1,4 @@
-// RUN: %target-parse-verify-swift -swift-version 4
+// RUN: %target-typecheck-verify-swift -swift-version 4
 
 @escaping var fn : () -> Int = { 4 }  // expected-error {{attribute can only be applied to types, not declarations}}
 func paramDeclEscaping(@escaping fn: (Int) -> Void) {} // expected-error {{attribute can only be applied to types, not declarations}}

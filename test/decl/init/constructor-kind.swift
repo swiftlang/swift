@@ -1,4 +1,4 @@
-// RUN: %target-parse-verify-swift
+// RUN: %target-typecheck-verify-swift
 
 // Test various orderings of constructor calls and assignments to make
 // sure we figure out the constructor kind in various situations.

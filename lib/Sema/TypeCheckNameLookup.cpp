@@ -5,8 +5,8 @@
 // Copyright (c) 2014 - 2016 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
-// See http://swift.org/LICENSE.txt for license information
-// See http://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
+// See https://swift.org/LICENSE.txt for license information
+// See https://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
 //
 //===----------------------------------------------------------------------===//
 //
@@ -331,7 +331,7 @@ LookupTypeResult TypeChecker::lookupMemberType(DeclContext *dc,
 
     // FIXME: This should happen before we attempt shadowing checks.
     validateDecl(typeDecl);
-    if (!typeDecl->hasType()) // FIXME: recursion-breaking hack
+    if (!typeDecl->hasInterfaceType()) // FIXME: recursion-breaking hack
       continue;
 
     // If we're looking up a member of a protocol, we must take special care.
@@ -485,7 +485,7 @@ namespace {
       : DelegatingLazyResolver(TC), NameLoc(nameLoc) {}
 
     void resolveDeclSignature(ValueDecl *VD) override {
-      if (VD->isInvalid() || VD->hasType()) return;
+      if (VD->isInvalid() || VD->hasInterfaceType()) return;
 
       // Don't process a variable if we're within its initializer.
       if (auto var = dyn_cast<VarDecl>(VD)) {

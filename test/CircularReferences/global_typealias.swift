@@ -1,4 +1,4 @@
-// RUN: %target-parse-verify-swift -iterative-type-checker
+// RUN: %target-typecheck-verify-swift -iterative-type-checker
 
 typealias A = B // expected-error{{circular reference}}
 typealias C = D // expected-note{{through reference here}}

@@ -85,7 +85,7 @@ func destroy_pod(_ x: Builtin.RawPointer) {
   // CHECK-NOT: pointer_to_address
   // CHECK-NOT: destroy_addr
   // CHECK-NOT: destroy_value
-  // CHECK: destroy_value [[XBOX]] : $@box
+  // CHECK: destroy_value [[XBOX]] : ${{.*}}{
   // CHECK-NOT: destroy_value
   return Builtin.destroy(Builtin.Int64, x)
   // CHECK: return

@@ -5,8 +5,8 @@
 // Copyright (c) 2014 - 2016 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
-// See http://swift.org/LICENSE.txt for license information
-// See http://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
+// See https://swift.org/LICENSE.txt for license information
+// See https://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
 //
 //===----------------------------------------------------------------------===//
 //
@@ -19,23 +19,8 @@
 #include "swift/Runtime/Concurrent.h"
 #include "swift/Runtime/Metadata.h"
 #include "swift/Runtime/Mutex.h"
+#include "ImageInspection.h"
 #include "Private.h"
-
-#if defined(__APPLE__) && defined(__MACH__)
-#include <mach-o/dyld.h>
-#include <mach-o/getsect.h>
-#elif defined(__ELF__) || defined(__ANDROID__)
-#include <elf.h>
-#include <link.h>
-#endif
-
-#if defined(_MSC_VER)
-#define WIN32_LEAN_AND_MEAN
-#define NOMINMAX
-#include <windows.h>
-#else
-#include <dlfcn.h>
-#endif
 
 using namespace swift;
 
@@ -49,11 +34,11 @@ static const char *class_getName(const ClassMetadata* type) {
 
 template<> void ProtocolConformanceRecord::dump() const {
   auto symbolName = [&](const void *addr) -> const char * {
-    Dl_info info;
-    int ok = dladdr(addr, &info);
+    SymbolInfo info;
+    int ok = lookupSymbol(addr, &info);
     if (!ok)
       return "<unknown addr>";
-    return info.dli_sname;
+    return info.symbolName;
   };
 
   switch (auto kind = getTypeKind()) {
@@ -146,14 +131,6 @@ const {
   }
 }
 
-#if defined(__APPLE__) && defined(__MACH__)
-#define SWIFT_PROTOCOL_CONFORMANCES_SECTION "__swift2_proto"
-#elif defined(__ELF__)
-#define SWIFT_PROTOCOL_CONFORMANCES_SECTION ".swift2_protocol_conformances_start"
-#elif defined(__CYGWIN__) || defined(_MSC_VER)
-#define SWIFT_PROTOCOL_CONFORMANCES_SECTION ".sw2prtc"
-#endif
-
 namespace {
   struct ConformanceSection {
     const ProtocolConformanceRecord *Begin, *End;
@@ -232,19 +209,6 @@ namespace {
 }
 
 // Conformance Cache.
-#if defined(__APPLE__) && defined(__MACH__)
-static void _initializeCallbacksToInspectDylib();
-#else
-namespace swift {
-  void _swift_initializeCallbacksToInspectDylib(
-    void (*fnAddImageBlock)(const uint8_t *, size_t),
-    const char *sectionName);
-}
-
-static void _addImageProtocolConformancesBlock(const uint8_t *conformances,
-                                               size_t conformancesSize);
-#endif
-
 struct ConformanceState {
   ConcurrentMap<ConformanceCacheEntry> Cache;
   std::vector<ConformanceSection> SectionsToScan;
@@ -252,13 +216,7 @@ struct ConformanceState {
   
   ConformanceState() {
     SectionsToScan.reserve(16);
-#if defined(__APPLE__) && defined(__MACH__)
-    _initializeCallbacksToInspectDylib();
-#else
-    _swift_initializeCallbacksToInspectDylib(
-      _addImageProtocolConformancesBlock,
-      SWIFT_PROTOCOL_CONFORMANCES_SECTION);
-#endif
+    initializeProtocolConformanceLookup();
   }
 
   void cacheSuccess(const void *type, const ProtocolDescriptor *proto,
@@ -300,154 +258,23 @@ _registerProtocolConformances(ConformanceState &C,
   C.SectionsToScan.push_back(ConformanceSection{begin, end});
 }
 
-static void _addImageProtocolConformancesBlock(const uint8_t *conformances,
-                                               size_t conformancesSize) {
+void swift::addImageProtocolConformanceBlockCallback(const void *conformances,
+                                                   uintptr_t conformancesSize) {
   assert(conformancesSize % sizeof(ProtocolConformanceRecord) == 0
          && "weird-sized conformances section?!");
 
   // If we have a section, enqueue the conformances for lookup.
+  auto conformanceBytes = reinterpret_cast<const char *>(conformances);
   auto recordsBegin
     = reinterpret_cast<const ProtocolConformanceRecord*>(conformances);
   auto recordsEnd
     = reinterpret_cast<const ProtocolConformanceRecord*>
-                                            (conformances + conformancesSize);
+                                          (conformanceBytes + conformancesSize);
   
   // Conformance cache should always be sufficiently initialized by this point.
   _registerProtocolConformances(Conformances.unsafeGetAlreadyInitialized(),
                                 recordsBegin, recordsEnd);
 }
-
-#if !defined(__APPLE__) || !defined(__MACH__)
-// Common Structure
-struct InspectArgs {
-  void (*fnAddImageBlock)(const uint8_t *, size_t);
-  const char *sectionName;
-};
-#endif
-
-#if defined(__APPLE__) && defined(__MACH__)
-static void _addImageProtocolConformances(const mach_header *mh,
-                                          intptr_t vmaddr_slide) {
-#ifdef __LP64__
-  using mach_header_platform = mach_header_64;
-  assert(mh->magic == MH_MAGIC_64 && "loaded non-64-bit image?!");
-#else
-  using mach_header_platform = mach_header;
-#endif
-  
-  // Look for a __swift2_proto section.
-  unsigned long conformancesSize;
-  const uint8_t *conformances =
-    getsectiondata(reinterpret_cast<const mach_header_platform *>(mh),
-                   SEG_TEXT, SWIFT_PROTOCOL_CONFORMANCES_SECTION,
-                   &conformancesSize);
-  
-  if (!conformances)
-    return;
-  
-  _addImageProtocolConformancesBlock(conformances, conformancesSize);
-}
-
-static void _initializeCallbacksToInspectDylib() {
-  // Install our dyld callback.
-  // Dyld will invoke this on our behalf for all images that have already
-  // been loaded.
-  _dyld_register_func_for_add_image(_addImageProtocolConformances);
-}
-
-#elif defined(__ELF__) || defined(__ANDROID__)
-static int _addImageProtocolConformances(struct dl_phdr_info *info,
-                                          size_t size, void *data) {
-  // inspectArgs contains addImage*Block function and the section name
-  InspectArgs *inspectArgs = reinterpret_cast<InspectArgs *>(data);
-
-  void *handle;
-  if (!info->dlpi_name || info->dlpi_name[0] == '\0') {
-    handle = dlopen(nullptr, RTLD_LAZY);
-  } else
-    handle = dlopen(info->dlpi_name, RTLD_LAZY | RTLD_NOLOAD);
-
-  if (!handle) {
-    // Not a shared library.
-    return 0;
-  }
-
-  auto conformances = reinterpret_cast<const uint8_t*>(
-      dlsym(handle, inspectArgs->sectionName));
-
-  if (!conformances) {
-    // if there are no conformances, don't hold this handle open.
-    dlclose(handle);
-    return 0;
-  }
-
-  // Extract the size of the conformances block from the head of the section
-  auto conformancesSize = *reinterpret_cast<const uint64_t*>(conformances);
-  conformances += sizeof(conformancesSize);
-
-  inspectArgs->fnAddImageBlock(conformances, conformancesSize);
-
-  dlclose(handle);
-  return 0;
-}
-
-void swift::_swift_initializeCallbacksToInspectDylib(
-    void (*fnAddImageBlock)(const uint8_t *, size_t),
-    const char *sectionName) {
-  InspectArgs inspectArgs = {fnAddImageBlock, sectionName};
-
-  // Search the loaded dls. Unlike the above, this only searches the already
-  // loaded ones.
-  // FIXME: Find a way to have this continue to happen after.
-  // rdar://problem/19045112
-  dl_iterate_phdr(_addImageProtocolConformances, &inspectArgs);
-}
-#elif defined(__CYGWIN__) || defined(_MSC_VER)
-static int _addImageProtocolConformances(struct dl_phdr_info *info,
-                                          size_t size, void *data) {
-  InspectArgs *inspectArgs = (InspectArgs *)data;
-  // inspectArgs contains addImage*Block function and the section name
-#if defined(_MSC_VER)
-  HMODULE handle;
-
-  if (!info->dlpi_name || info->dlpi_name[0] == '\0')
-    handle = GetModuleHandle(nullptr);
-  else
-    handle = GetModuleHandle(info->dlpi_name);
-#else
-  void *handle;
-  if (!info->dlpi_name || info->dlpi_name[0] == '\0')
-    handle = dlopen(nullptr, RTLD_LAZY);
-  else
-    handle = dlopen(info->dlpi_name, RTLD_LAZY | RTLD_NOLOAD);
-#endif
-
-  unsigned long conformancesSize;
-  const uint8_t *conformances =
-    _swift_getSectionDataPE(handle, inspectArgs->sectionName,
-                           &conformancesSize);
-
-  if (conformances)
-    inspectArgs->fnAddImageBlock(conformances, conformancesSize);
-
-#if defined(_MSC_VER)
-  FreeLibrary(handle);
-#else
-  dlclose(handle);
-#endif
-  return 0;
-}
-
-void swift::_swift_initializeCallbacksToInspectDylib(
-    void (*fnAddImageBlock)(const uint8_t *, size_t),
-    const char *sectionName) {
-  InspectArgs inspectArgs = {fnAddImageBlock, sectionName};
-
-  _swift_dl_iterate_phdr(_addImageProtocolConformances, &inspectArgs);
-}
-#else
-# error No known mechanism to inspect dynamic libraries on this platform.
-#endif
 
 // This variable is used to signal when a cache was generated and
 // it is correct to avoid a new scan.

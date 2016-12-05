@@ -5,8 +5,8 @@
 // Copyright (c) 2014 - 2016 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
-// See http://swift.org/LICENSE.txt for license information
-// See http://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
+// See https://swift.org/LICENSE.txt for license information
+// See https://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
 //
 //===----------------------------------------------------------------------===//
 //
@@ -58,7 +58,7 @@ static ParserStatus parseDefaultArgument(Parser &P,
                                    unsigned argIndex,
                                    Expr *&init,
                                  Parser::ParameterContextKind paramContext) {
-  SourceLoc equalLoc = P.consumeLoc(tok::equal);
+  SourceLoc equalLoc = P.consumeToken(tok::equal);
 
   // Enter a fresh default-argument context with a meaningless parent.
   // We'll change the parent to the function later after we've created
@@ -129,7 +129,7 @@ static bool startsParameterName(Parser &parser, bool isClosure) {
     return false;
 
   // If the next token can be an argument label or is ':', this is a name.
-  auto nextTok = parser.peekToken();
+  const auto &nextTok = parser.peekToken();
   if (nextTok.is(tok::colon) || nextTok.canBeArgumentLabel())
     return true;
 
@@ -149,11 +149,11 @@ Parser::parseParameterClause(SourceLoc &leftParenLoc,
          rightParenLoc.isInvalid() && "Must start with empty state");
 
   // Consume the starting '(';
-  leftParenLoc = consumeLoc(tok::l_paren);
+  leftParenLoc = consumeToken(tok::l_paren);
 
   // Trivial case: empty parameter list.
   if (Tok.is(tok::r_paren)) {
-    rightParenLoc = consumeLoc(tok::r_paren);
+    rightParenLoc = consumeToken(tok::r_paren);
     return ParserStatus();
   }
 
@@ -193,25 +193,25 @@ Parser::parseParameterClause(SourceLoc &leftParenLoc,
           param.SpecifierKind = Tok.is(tok::kw_inout) ? ParsedParameter::InOut :
                                                         ParsedParameter::Var;
         }
-        param.LetVarInOutLoc = consumeLoc();
+        param.LetVarInOutLoc = consumeToken();
         hasSpecifier = true;
       } else {
         // Redundant specifiers are fairly common, recognize, reject, and recover
         // from this gracefully.
         diagnose(Tok, diag::parameter_inout_var_let_repeated)
           .fixItRemove(Tok.getLoc());
-        consumeLoc();
+        consumeToken();
       }
     }
 
     if (startsParameterName(*this, isClosure)) {
       // identifier-or-none for the first name
       if (Tok.is(tok::kw__)) {
-        param.FirstNameLoc = consumeLoc();
+        param.FirstNameLoc = consumeToken();
       } else {
         assert(Tok.canBeArgumentLabel() && "startsParameterName() lied");
         param.FirstName = Context.getIdentifier(Tok.getText());
-        param.FirstNameLoc = consumeLoc();
+        param.FirstNameLoc = consumeToken();
       }
 
       // identifier-or-none? for the second name
@@ -219,7 +219,7 @@ Parser::parseParameterClause(SourceLoc &leftParenLoc,
         if (!Tok.is(tok::kw__))
           param.SecondName = Context.getIdentifier(Tok.getText());
 
-        param.SecondNameLoc = consumeLoc();
+        param.SecondNameLoc = consumeToken();
       }
 
       // Operators and closures cannot have API names.
@@ -236,59 +236,12 @@ Parser::parseParameterClause(SourceLoc &leftParenLoc,
         param.SecondNameLoc = SourceLoc();
       }
 
-      // (':' ('inout')? type)?
+      // (':' type)?
       if (consumeIf(tok::colon)) {
 
-        SourceLoc postColonLoc = Tok.getLoc();
-
-        bool hasDeprecatedInOut =
-          param.SpecifierKind == ParsedParameter::InOut;
-        bool hasValidInOut = false;
-        
-        while (Tok.is(tok::kw_inout)) {
-          hasValidInOut = true;
-          if (hasSpecifier) {
-            diagnose(Tok.getLoc(), diag::parameter_inout_var_let_repeated)
-              .fixItRemove(param.LetVarInOutLoc);
-            consumeLoc(tok::kw_inout);
-          } else {
-            hasSpecifier = true;
-            param.LetVarInOutLoc = consumeLoc(tok::kw_inout);
-            param.SpecifierKind = ParsedParameter::InOut;
-          }
-        }
-        if (!hasValidInOut && hasDeprecatedInOut) {
-          diagnose(Tok.getLoc(), diag::inout_as_attr_disallowed)
-            .fixItRemove(param.LetVarInOutLoc)
-            .fixItInsert(postColonLoc, "inout ");
-        }
-        
         auto type = parseType(diag::expected_parameter_type);
         status |= type;
         param.Type = type.getPtrOrNull();
-
-        if (param.SpecifierKind == ParsedParameter::InOut) {
-          if (auto *fnTR = dyn_cast_or_null<FunctionTypeRepr>(param.Type)) {
-            // If the input to the function isn't parenthesized, apply the inout
-            // to the first (only) parameter, as we would in Swift 2. (This
-            // syntax is deprecated in Swift 3.)
-            TypeRepr *argsTR = fnTR->getArgsTypeRepr();
-            if (!isa<TupleTypeRepr>(argsTR)) {
-              auto *newArgsTR =
-                  new (Context) InOutTypeRepr(argsTR, param.LetVarInOutLoc);
-              auto *newTR =
-                  new (Context) FunctionTypeRepr(fnTR->getGenericParams(),
-                                                 newArgsTR,
-                                                 fnTR->getThrowsLoc(),
-                                                 fnTR->getArrowLoc(),
-                                                 fnTR->getResultTypeRepr());
-              newTR->setGenericEnvironment(fnTR->getGenericEnvironment());
-              param.Type = newTR;
-              param.SpecifierKind = ParsedParameter::Let;
-              param.LetVarInOutLoc = SourceLoc();
-            }
-          }
-        }
 
         // If we didn't parse a type, then we already diagnosed that the type
         // was invalid.  Remember that.
@@ -302,7 +255,7 @@ Parser::parseParameterClause(SourceLoc &leftParenLoc,
       {
         BacktrackingScope backtrack(*this);
         isBareType = canParseType() && Tok.isAny(tok::comma, tok::r_paren,
-                                                  tok::equal);
+                                                 tok::equal);
       }
 
       if (isBareType) {
@@ -330,7 +283,7 @@ Parser::parseParameterClause(SourceLoc &leftParenLoc,
                         
     // '...'?
     if (Tok.isEllipsis())
-      param.EllipsisLoc = consumeLoc();
+      param.EllipsisLoc = consumeToken();
 
     // ('=' expr)?
     if (Tok.is(tok::equal)) {
@@ -399,9 +352,18 @@ mapParsedParameters(Parser &parser,
     // If a type was provided, create the type for the parameter.
     if (auto type = paramInfo.Type) {
       // If 'inout' was specified, turn the type into an in-out type.
-      if (specifierKind == Parser::ParsedParameter::InOut)
-        type = new (ctx) InOutTypeRepr(type, paramInfo.LetVarInOutLoc);
-
+      if (specifierKind == Parser::ParsedParameter::InOut) {
+        auto InOutLoc = paramInfo.LetVarInOutLoc;
+        if (isa<InOutTypeRepr>(type)) {
+          parser.diagnose(InOutLoc, diag::parameter_inout_var_let_repeated)
+            .fixItRemove(InOutLoc);
+        } else {
+          parser.diagnose(InOutLoc, diag::inout_as_attr_disallowed)
+            .fixItRemove(InOutLoc)
+            .fixItInsert(type->getStartLoc(), "inout ");
+          type = new (ctx) InOutTypeRepr(type, InOutLoc);
+        }
+      }
       param->getTypeLoc() = TypeLoc(type);
     } else if (paramContext != Parser::ParameterContextKind::Closure) {
       // Non-closure parameters require a type.
@@ -649,12 +611,12 @@ Parser::parseFunctionSignature(Identifier SimpleName,
   // Check for the 'throws' keyword.
   rethrows = false;
   if (Tok.is(tok::kw_throws)) {
-    throwsLoc = consumeLoc();
+    throwsLoc = consumeToken();
   } else if (Tok.is(tok::kw_rethrows)) {
-    throwsLoc = consumeLoc();
+    throwsLoc = consumeToken();
     rethrows = true;
   } else if (Tok.is(tok::kw_throw)) {
-    throwsLoc = consumeLoc();
+    throwsLoc = consumeToken();
     diagnose(throwsLoc, diag::throw_in_function_type)
       .fixItReplace(throwsLoc, "throws");
   }
@@ -666,9 +628,9 @@ Parser::parseFunctionSignature(Identifier SimpleName,
       return None;
 
     if (Tok.is(tok::kw_throws)) {
-      throwsLoc = consumeLoc();
+      throwsLoc = consumeToken();
     } else if (Tok.is(tok::kw_rethrows)) {
-      throwsLoc = consumeLoc();
+      throwsLoc = consumeToken();
       rethrows = true;
     }
 
@@ -686,7 +648,7 @@ Parser::parseFunctionSignature(Identifier SimpleName,
       // FixIt ':' to '->'.
       diagnose(Tok, diag::func_decl_expected_arrow)
           .fixItReplace(Tok.getLoc(), " -> ");
-      arrowLoc = consumeLoc(tok::colon);
+      arrowLoc = consumeToken(tok::colon);
     }
 
     // Check for 'throws' and 'rethrows' after the arrow, but
@@ -776,7 +738,7 @@ ParserResult<Pattern> Parser::parseTypedPattern() {
   
   // Now parse an optional type annotation.
   if (Tok.is(tok::colon)) {
-    SourceLoc colonLoc = consumeLoc(tok::colon);
+    SourceLoc colonLoc = consumeToken(tok::colon);
     
     if (result.isNull())  // Recover by creating AnyPattern.
       result = makeParserErrorResult(new (Context) AnyPattern(colonLoc));
@@ -842,7 +804,7 @@ ParserResult<Pattern> Parser::parsePattern() {
     return parsePatternTuple();
     
   case tok::kw__:
-    return makeParserResult(new (Context) AnyPattern(consumeLoc(tok::kw__)));
+    return makeParserResult(new (Context) AnyPattern(consumeToken(tok::kw__)));
     
   case tok::identifier: {
     Identifier name;
@@ -855,14 +817,14 @@ ParserResult<Pattern> Parser::parsePattern() {
     if (!CurDeclContext->getAsNominalTypeOrNominalTypeExtensionContext()) {
       // This cannot be an overridden property, so just eat the token. We cannot
       // code complete anything here -- we expect an identifier.
-      consumeLoc(tok::code_complete);
+      consumeToken(tok::code_complete);
     }
     return nullptr;
     
   case tok::kw_var:
   case tok::kw_let: {
     bool isLet = Tok.is(tok::kw_let);
-    SourceLoc varLoc = consumeLoc();
+    SourceLoc varLoc = consumeToken();
     
     // 'var' and 'let' patterns shouldn't nest.
     if (InVarOrLetPattern == IVOLP_InLet ||
@@ -893,7 +855,7 @@ ParserResult<Pattern> Parser::parsePattern() {
       diagnose(Tok, diag::backticks_to_escape)
         .fixItReplace(Tok.getLoc(), "`" + Tok.getText().str() + "`");
       SourceLoc Loc = Tok.getLoc();
-      consumeLoc();
+      consumeToken();
       return makeParserErrorResult(new (Context) AnyPattern(Loc));
     }
     diagnose(Tok, diag::expected_pattern);
@@ -921,7 +883,7 @@ Parser::parsePatternTupleElement() {
   // If the tuple element has a label, parse it.
   if (Tok.is(tok::identifier) && peekToken().is(tok::colon)) {
     LabelLoc = consumeIdentifier(&Label);
-    consumeLoc(tok::colon);
+    consumeToken(tok::colon);
   }
 
   // Parse the pattern.
@@ -943,7 +905,7 @@ Parser::parsePatternTupleElement() {
 ///     pattern-tuple-element (',' pattern-tuple-body)*
 ParserResult<Pattern> Parser::parsePatternTuple() {
   StructureMarkerRAII ParsingPatternTuple(*this, Tok);
-  SourceLoc LPLoc = consumeLoc(tok::l_paren);
+  SourceLoc LPLoc = consumeToken(tok::l_paren);
   SourceLoc RPLoc;
 
   // Parse all the elements.
@@ -1022,14 +984,14 @@ ParserResult<Pattern> Parser::parseMatchingPattern(bool isExprBasic) {
   if (Tok.isAny(tok::kw_var, tok::kw_let)) {
     assert(Tok.isAny(tok::kw_let, tok::kw_var) && "expects var or let");
     bool isLet = Tok.is(tok::kw_let);
-    SourceLoc varLoc = consumeLoc();
+    SourceLoc varLoc = consumeToken();
     
     return parseMatchingPatternAsLetOrVar(isLet, varLoc, isExprBasic);
   }
   
   // matching-pattern ::= 'is' type
   if (Tok.is(tok::kw_is)) {
-    SourceLoc isLoc = consumeLoc(tok::kw_is);
+    SourceLoc isLoc = consumeToken(tok::kw_is);
     ParserResult<TypeRepr> castType = parseType();
     if (castType.isNull() || castType.hasCodeCompletion())
       return nullptr;
@@ -1096,11 +1058,11 @@ static bool canParsePattern(Parser &P) {
   switch (P.Tok.getKind()) {
   case tok::identifier:
   case tok::kw__:
-    P.consumeLoc();
+    P.consumeToken();
     return true;
   case tok::kw_let:
   case tok::kw_var:
-    P.consumeLoc();
+    P.consumeToken();
     return canParsePattern(P);
   case tok::l_paren:
     return canParsePatternTuple(P);

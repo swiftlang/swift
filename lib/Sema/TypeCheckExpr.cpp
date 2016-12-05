@@ -5,8 +5,8 @@
 // Copyright (c) 2014 - 2016 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
-// See http://swift.org/LICENSE.txt for license information
-// See http://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
+// See https://swift.org/LICENSE.txt for license information
+// See https://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
 //
 //===----------------------------------------------------------------------===//
 //
@@ -498,7 +498,7 @@ Type TypeChecker::getTypeOfRValue(ValueDecl *value, bool wantInterfaceType) {
   if (wantInterfaceType)
     type = value->getInterfaceType();
   else
-    type = value->getType();
+    type = cast<VarDecl>(value)->getType();
 
   // Uses of inout argument values are lvalues.
   if (auto iot = type->getAs<InOutType>())
@@ -651,7 +651,10 @@ static Type lookupDefaultLiteralType(TypeChecker &TC, DeclContext *dc,
   if (!TD)
     return Type();
   TC.validateDecl(TD);
-  return TD->getDeclaredType();
+
+  if (auto *NTD = dyn_cast<NominalTypeDecl>(TD))
+    return NTD->getDeclaredType();
+  return cast<TypeAliasDecl>(TD)->getAliasType();
 }
 
 Type TypeChecker::getDefaultType(ProtocolDecl *protocol, DeclContext *dc) {

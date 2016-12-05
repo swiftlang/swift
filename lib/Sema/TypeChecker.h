@@ -5,8 +5,8 @@
 // Copyright (c) 2014 - 2016 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
-// See http://swift.org/LICENSE.txt for license information
-// See http://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
+// See https://swift.org/LICENSE.txt for license information
+// See https://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
 //
 //===----------------------------------------------------------------------===//
 //
@@ -1009,6 +1009,10 @@ public:
   /// is usable for the given type.
   bool isProtocolExtensionUsable(DeclContext *dc, Type type,
                                  ExtensionDecl *protocolExtension) override;
+ 
+  /// Perform semantic checks on the given generic parameter list.
+  void prepareGenericParamList(GenericParamList *genericParams,
+                               DeclContext *dc);
 
   /// Configure the interface type of a function declaration.
   void configureInterfaceType(AbstractFunctionDecl *func,
@@ -1051,11 +1055,10 @@ public:
                       bool allowConcreteGenericParams,
                       std::function<void(ArchetypeBuilder &)> inferRequirements);
 
-  /// Perform any final semantic checks on the given generic parameter list.
-  void finalizeGenericParamList(GenericParamList *genericParams,
-                                GenericSignature *genericSig,
-                                GenericEnvironment *genericEnv,
-                                DeclContext *dc);
+  /// Store a mapping from archetypes to DeclContexts for debugging.
+  void recordArchetypeContexts(GenericSignature *genericSig,
+                               GenericEnvironment *genericEnv,
+                               DeclContext *dc);
 
   /// Validate the signature of a generic type.
   ///
@@ -1367,19 +1370,17 @@ public:
   /// \param P The pattern to type check.
   /// \param dc The context in which type checking occurs.
   /// \param options Options that control type resolution.
-  /// \param resolver A generic type resolver.
   ///
   /// \returns true if any errors occurred during type checking.
   bool typeCheckPattern(Pattern *P, DeclContext *dc,
-                        TypeResolutionOptions options,
-                        GenericTypeResolver *resolver = nullptr);
+                        TypeResolutionOptions options);
 
   bool typeCheckCatchPattern(CatchStmt *S, DeclContext *dc);
 
   /// Type check a parameter list.
   bool typeCheckParameterList(ParameterList *PL, DeclContext *dc,
                               TypeResolutionOptions options,
-                              GenericTypeResolver *resolver = nullptr);
+                              GenericTypeResolver &resolver);
   
   /// Coerce a pattern to the given type.
   ///

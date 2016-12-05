@@ -5,8 +5,8 @@
 // Copyright (c) 2014 - 2016 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
-// See http://swift.org/LICENSE.txt for license information
-// See http://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
+// See https://swift.org/LICENSE.txt for license information
+// See https://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
 //
 //===----------------------------------------------------------------------===//
 
@@ -26,7 +26,6 @@
 #include "swift/Parse/PersistentParserState.h"
 #include "swift/SIL/SILModule.h"
 #include "swift/SILOptimizer/PassManager/Passes.h"
-#include "swift/Syntax/Token.h"
 #include "llvm/ExecutionEngine/MCJIT.h"
 #include "llvm/IR/Module.h"
 #include "llvm/Transforms/Utils/Cloning.h"
@@ -863,9 +862,11 @@ private:
     // IRGen the current line(s).
     // FIXME: We shouldn't need to use the global context here, but
     // something is persisting across calls to performIRGeneration.
-    auto LineModule =
-        performIRGeneration(IRGenOpts, REPLInputFile, sil.get(), "REPLLine",
-                            getGlobalLLVMContext(), RC.CurIRGenElem);
+    auto LineModule = performIRGeneration(IRGenOpts, REPLInputFile,
+                                          std::move(sil),
+                                          "REPLLine",
+                                          getGlobalLLVMContext(),
+                                          RC.CurIRGenElem);
     RC.CurIRGenElem = RC.CurElem;
     
     if (CI.getASTContext().hadError())
@@ -1017,7 +1018,8 @@ public:
             CI.getSourceMgr().addMemBufferCopy(Line, "<REPL Input>");
         Lexer L(CI.getASTContext().LangOpts,
                 CI.getSourceMgr(), BufferID, nullptr, false /*not SIL*/);
-        auto Tok = L.lex();
+        Token Tok;
+        L.lex(Tok);
         assert(Tok.is(tok::colon));
         
         if (L.peekNextToken().getText() == "help") {
@@ -1051,8 +1053,8 @@ public:
                    L.peekNextToken().getText() == "print_decl") {
           PrintOrDump doPrint = (L.peekNextToken().getText() == "print_decl")
             ? PrintOrDump::Print : PrintOrDump::Dump;
-          Tok = L.lex();
-          Tok = L.lex();
+          L.lex(Tok);
+          L.lex(Tok);
           ASTContext &ctx = CI.getASTContext();
           UnqualifiedLookup lookup(ctx.getIdentifier(Tok.getText()),
                                    &REPLInputFile, nullptr);
@@ -1080,18 +1082,18 @@ public:
         } else if (L.peekNextToken().getText() == "dump_source") {
           llvm::errs() << DumpSource;
         } else if (L.peekNextToken().getText() == "print_module") {
-          Tok = L.lex();
+          L.lex(Tok);
           SmallVector<ImportDecl::AccessPathElement, 4> accessPath;
           ASTContext &ctx = CI.getASTContext();
 
-          Tok = L.lex();
+          L.lex(Tok);
           if (Tok.is(tok::identifier)) {
             accessPath.push_back({ctx.getIdentifier(Tok.getText()),
                                   Tok.getLoc()});
             
             while (L.peekNextToken().is(tok::period)) {
-              Tok = L.lex();
-              Tok = L.lex();
+              L.lex(Tok);
+              L.lex(Tok);
               if (Tok.is(tok::identifier)) {
                 accessPath.push_back({ctx.getIdentifier(Tok.getText()),
                                       Tok.getLoc()});
@@ -1120,10 +1122,10 @@ public:
           }
           
         } else if (L.peekNextToken().getText() == "constraints") {
-          Tok = L.lex();
-          Tok = L.lex();
+          L.lex(Tok);
+          L.lex(Tok);
           if (Tok.getText() == "debug") {
-            Tok = L.lex();
+            L.lex(Tok);
             if (Tok.getText() == "on") {
               CI.getASTContext().LangOpts.DebugConstraintSolver = true;
             } else if (Tok.getText() == "off") {
@@ -1135,8 +1137,8 @@ public:
             llvm::outs() << "Unknown :constraints command; try :help\n";
           }
         } else if (L.peekNextToken().getText() == "autoindent") {
-          Tok = L.lex();
-          Tok = L.lex();
+          L.lex(Tok);
+          L.lex(Tok);
           if (Tok.getText() == "on") {
             Input.Autoindent = true;
           } else if (Tok.getText() == "off") {

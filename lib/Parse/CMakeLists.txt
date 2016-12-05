@@ -10,10 +10,8 @@ add_swift_library(swiftParse STATIC
   ParseType.cpp
   PersistentParserState.cpp
   Scope.cpp
-  Trivia.cpp
   LINK_LIBRARIES
     swiftSIL
     swiftAST
-    swiftSyntax
 )
 

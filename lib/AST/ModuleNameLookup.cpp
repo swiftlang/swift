@@ -5,8 +5,8 @@
 // Copyright (c) 2014 - 2016 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
-// See http://swift.org/LICENSE.txt for license information
-// See http://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
+// See https://swift.org/LICENSE.txt for license information
+// See https://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
 //
 //===----------------------------------------------------------------------===//
 
@@ -49,7 +49,7 @@ static bool isOverloadable(const ValueDecl *VD) {
 static bool isValidOverload(CanTypeSet &overloads, const ValueDecl *VD) {
   if (!isOverloadable(VD))
     return overloads.empty();
-  if (overloads.count(VD->getType()->getCanonicalType()))
+  if (overloads.count(VD->getInterfaceType()->getCanonicalType()))
     return false;
   return true;
 }
@@ -69,9 +69,9 @@ static bool updateOverloadSet(CanTypeSet &overloads,
   for (auto result : decls) {
     if (!isOverloadable(result))
       return false;
-    if (!result->hasType())
+    if (!result->hasInterfaceType())
       continue;
-    overloads.insert(result->getType()->getCanonicalType());
+    overloads.insert(result->getInterfaceType()->getCanonicalType());
   }
   return true;
 }
@@ -85,10 +85,10 @@ static bool updateOverloadSet(NamedCanTypeSet &overloads,
     auto &entry = overloads[result->getName()];
     if (!isOverloadable(result))
       entry.first = ResolutionKind::Exact;
-    else if (!result->hasType())
+    else if (!result->hasInterfaceType())
       continue;
     else
-      entry.second.insert(result->getType()->getCanonicalType());
+      entry.second.insert(result->getInterfaceType()->getCanonicalType());
   }
   return true;
 }
@@ -107,7 +107,7 @@ static ResolutionKind recordImportDecls(LazyResolver *typeResolver,
     // may be ambiguous with respect to each other, just not any existing decls.
     std::copy_if(newDecls.begin(), newDecls.end(), std::back_inserter(results),
                  [&](ValueDecl *result) -> bool {
-      if (!result->hasType()) {
+      if (!result->hasInterfaceType()) {
         if (typeResolver) {
           typeResolver->resolveDeclSignature(result);
           if (result->isInvalid())

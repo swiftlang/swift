@@ -5,8 +5,8 @@
 // Copyright (c) 2014 - 2016 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
-// See http://swift.org/LICENSE.txt for license information
-// See http://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
+// See https://swift.org/LICENSE.txt for license information
+// See https://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
 //
 //===----------------------------------------------------------------------===//
 
@@ -204,6 +204,8 @@ static const Decl *getDeclForContext(const DeclContext *DC) {
   case DeclContextKind::SubscriptDecl:
     return cast<SubscriptDecl>(DC);
   }
+
+  llvm_unreachable("Unhandled DeclContextKind in switch.");
 }
 
 namespace {
@@ -783,6 +785,8 @@ static uint8_t getRawStableDefaultArgumentKind(swift::DefaultArgumentKind kind) 
   CASE(EmptyDictionary)
 #undef CASE
   }
+
+  llvm_unreachable("Unhandled DefaultArgumentKind in switch.");
 }
 
 static uint8_t getRawStableMetatypeRepresentation(AnyMetatypeType *metatype) {
@@ -934,6 +938,8 @@ static uint8_t getRawStableRequirementKind(RequirementKind kind) {
   CASE(SameType)
   }
 #undef CASE
+
+  llvm_unreachable("Unhandled RequirementKind in switch.");
 }
 
 void Serializer::writeGenericRequirements(ArrayRef<Requirement> requirements,
@@ -1283,6 +1289,8 @@ static uint8_t getRawStableOptionalTypeKind(swift::OptionalTypeKind kind) {
     return static_cast<uint8_t>(
              serialization::OptionalTypeKind::ImplicitlyUnwrappedOptional);
   }
+
+  llvm_unreachable("Unhandled OptionalTypeKind in switch.");
 }
 
 static bool shouldSerializeMember(Decl *D) {
@@ -1320,6 +1328,8 @@ static bool shouldSerializeMember(Decl *D) {
   case DeclKind::Func:
     return true;
   }
+
+  llvm_unreachable("Unhandled DeclKind in switch.");
 }
 
 void Serializer::writeMembers(DeclRange members, bool isClass) {
@@ -1386,6 +1396,8 @@ static serialization::AccessorKind getStableAccessorKind(swift::AccessorKind K){
   CASE(MutableAddressor)
 #undef CASE
   }
+
+  llvm_unreachable("Unhandled AccessorKind in switch.");
 }
 
 static serialization::CtorInitializerKind
@@ -1399,6 +1411,8 @@ getStableCtorInitializerKind(swift::CtorInitializerKind K){
       CASE(ConvenienceFactory)
 #undef CASE
   }
+
+  llvm_unreachable("Unhandled CtorInitializerKind in switch.");
 }
 
 void Serializer::writeCrossReference(const DeclContext *DC, uint32_t pathLen) {
@@ -1613,6 +1627,8 @@ static uint8_t getRawStableAssociativity(swift::Associativity assoc) {
   case swift::Associativity::None:
     return serialization::Associativity::NonAssociative;
   }
+
+  llvm_unreachable("Unhandled Associativity in switch.");
 }
 
 static serialization::StaticSpellingKind
@@ -1625,6 +1641,8 @@ getStableStaticSpelling(swift::StaticSpellingKind SS) {
   case swift::StaticSpellingKind::KeywordClass:
     return serialization::StaticSpellingKind::KeywordClass;
   }
+
+  llvm_unreachable("Unhandled StaticSpellingKind in switch.");
 }
 
 static uint8_t getRawStableAccessibility(Accessibility access) {
@@ -1639,6 +1657,8 @@ static uint8_t getRawStableAccessibility(Accessibility access) {
   CASE(Open)
 #undef CASE
   }
+
+  llvm_unreachable("Unhandled AccessibilityKind in switch.");
 }
 
 #ifndef NDEBUG
@@ -2029,6 +2049,8 @@ static ForeignErrorConventionKind getRawStableForeignErrorConventionKind(
   case ForeignErrorConvention::NonNilError:
     return ForeignErrorConventionKind::NonNilError;
   }
+
+  llvm_unreachable("Unhandled ForeignErrorConvention in switch.");
 }
 
 void Serializer::writeForeignErrorConvention(const ForeignErrorConvention &fec){
@@ -2521,7 +2543,11 @@ void Serializer::writeDecl(const Decl *D) {
     verifyAttrSerializable(param);
 
     auto contextID = addDeclContextRef(param->getDeclContext());
-    Type type = param->hasType() ? param->getType() : nullptr;
+    Type type, interfaceType;
+
+    if (param->hasType())
+      type = param->getType();
+    interfaceType = param->getInterfaceType();
 
     unsigned abbrCode = DeclTypeAbbrCodes[ParamLayout::Code];
     ParamLayout::emitRecord(Out, ScratchRecord, abbrCode,
@@ -2530,7 +2556,7 @@ void Serializer::writeDecl(const Decl *D) {
                             contextID,
                             param->isLet(),
                             addTypeRef(type),
-                            addTypeRef(param->getInterfaceType()));
+                            addTypeRef(interfaceType));
     break;
   }
 
@@ -2561,7 +2587,6 @@ void Serializer::writeDecl(const Decl *D) {
                            fn->hasDynamicSelf(),
                            fn->hasThrows(),
                            fn->getParameterLists().size(),
-                           addTypeRef(fn->getType()),
                            addTypeRef(fn->getInterfaceType()),
                            addDeclRef(fn->getOperatorDecl()),
                            addDeclRef(fn->getOverriddenDecl()),
@@ -2607,7 +2632,6 @@ void Serializer::writeDecl(const Decl *D) {
                                   addIdentifierRef(elem->getName()),
                                   contextID,
                                   addTypeRef(elem->getArgumentType()),
-                                  addTypeRef(elem->getType()),
                                   addTypeRef(elem->getInterfaceType()),
                                   elem->isImplicit(),
                                   (unsigned)RawValueKind,
@@ -2640,8 +2664,6 @@ void Serializer::writeDecl(const Decl *D) {
                                 subscript->isImplicit(),
                                 subscript->isObjC(),
                                 (unsigned) accessors.Kind,
-                                addTypeRef(subscript->getType()),
-                                addTypeRef(subscript->getElementType()),
                                 addTypeRef(subscript->getInterfaceType()),
                                 addDeclRef(accessors.Get),
                                 addDeclRef(accessors.Set),
@@ -2684,7 +2706,6 @@ void Serializer::writeDecl(const Decl *D) {
                                   ctor->hasThrows(),
                                   getStableCtorInitializerKind(
                                     ctor->getInitKind()),
-                                  addTypeRef(ctor->getType()),
                                   addTypeRef(ctor->getInterfaceType()),
                                   addDeclRef(ctor->getOverriddenDecl()),
                                   rawAccessLevel,
@@ -2714,7 +2735,6 @@ void Serializer::writeDecl(const Decl *D) {
                                  contextID,
                                  dtor->isImplicit(),
                                  dtor->isObjC(),
-                                 addTypeRef(dtor->getType()),
                                  addTypeRef(dtor->getInterfaceType()));
     assert(dtor->getParameterLists().size() == 1);
     // Why is this writing out the param list for self?
@@ -2962,24 +2982,23 @@ void Serializer::writeType(Type ty) {
     for (auto proto : archetypeTy->getConformsTo())
       conformances.push_back(addDeclRef(proto));
 
-    DeclID assocTypeOrProtoID;
-    if (auto assocType = archetypeTy->getAssocType())
-      assocTypeOrProtoID = addDeclRef(assocType);
+    DeclID assocTypeOrNameID;
+    if (archetypeTy->getParent())
+      assocTypeOrNameID = addDeclRef(archetypeTy->getAssocType());
     else
-      assocTypeOrProtoID = addDeclRef(archetypeTy->getSelfProtocol());
+      assocTypeOrNameID = addIdentifierRef(archetypeTy->getName());
 
     unsigned abbrCode = DeclTypeAbbrCodes[ArchetypeTypeLayout::Code];
     ArchetypeTypeLayout::emitRecord(Out, ScratchRecord, abbrCode,
-                                    addIdentifierRef(archetypeTy->getName()),
                                     parentID,
-                                    assocTypeOrProtoID,
+                                    assocTypeOrNameID,
                                     addTypeRef(archetypeTy->getSuperclass()),
                                     conformances);
 
     SmallVector<IdentifierID, 4> nestedTypeNames;
     SmallVector<TypeID, 4> nestedTypes;
     SmallVector<bool, 4> areArchetypes;
-    for (auto next : archetypeTy->getNestedTypes()) {
+    for (auto next : archetypeTy->getAllNestedTypes()) {
       nestedTypeNames.push_back(addIdentifierRef(next.first));
       nestedTypes.push_back(addTypeRef(next.second.getValue()));
       areArchetypes.push_back(!next.second.isConcreteType());
@@ -3017,14 +3036,6 @@ void Serializer::writeType(Type ty) {
     break;
   }
 
-  case TypeKind::AssociatedType: {
-    auto assocType = cast<AssociatedTypeType>(ty.getPointer());
-    unsigned abbrCode = DeclTypeAbbrCodes[AssociatedTypeTypeLayout::Code];
-    AssociatedTypeTypeLayout::emitRecord(Out, ScratchRecord, abbrCode,
-                                         addDeclRef(assocType->getDecl()));
-    break;
-  }
-
   case TypeKind::Substituted: {
     auto subTy = cast<SubstitutedType>(ty.getPointer());
 
@@ -3058,23 +3069,6 @@ void Serializer::writeType(Type ty) {
            fnTy->isAutoClosure(),
            fnTy->isNoEscape(),
            fnTy->throws());
-    break;
-  }
-
-  case TypeKind::PolymorphicFunction: {
-    auto fnTy = cast<PolymorphicFunctionType>(ty.getPointer());
-    const Decl *genericContext = getGenericContext(&fnTy->getGenericParams());
-    DeclID dID = genericContext ? addDeclRef(genericContext) : DeclID();
-
-    unsigned abbrCode = DeclTypeAbbrCodes[PolymorphicFunctionTypeLayout::Code];
-    PolymorphicFunctionTypeLayout::emitRecord(Out, ScratchRecord, abbrCode,
-            addTypeRef(fnTy->getInput()),
-            addTypeRef(fnTy->getResult()),
-            dID,
-            getRawStableFunctionTypeRepresentation(fnTy->getRepresentation()),
-            fnTy->throws());
-    if (!genericContext)
-      writeGenericParams(&fnTy->getGenericParams());
     break;
   }
 
@@ -3305,7 +3299,6 @@ void Serializer::writeAllDeclsAndTypes() {
   registerDeclTypeAbbr<SubstitutedTypeLayout>();
   registerDeclTypeAbbr<BoundGenericTypeLayout>();
   registerDeclTypeAbbr<BoundGenericSubstitutionLayout>();
-  registerDeclTypeAbbr<PolymorphicFunctionTypeLayout>();
   registerDeclTypeAbbr<GenericFunctionTypeLayout>();
   registerDeclTypeAbbr<SILBlockStorageTypeLayout>();
   registerDeclTypeAbbr<SILBoxTypeLayout>();
@@ -3321,7 +3314,6 @@ void Serializer::writeAllDeclsAndTypes() {
 
   registerDeclTypeAbbr<TypeAliasLayout>();
   registerDeclTypeAbbr<GenericTypeParamTypeLayout>();
-  registerDeclTypeAbbr<AssociatedTypeTypeLayout>();
   registerDeclTypeAbbr<DependentMemberTypeLayout>();
   registerDeclTypeAbbr<StructLayout>();
   registerDeclTypeAbbr<ConstructorLayout>();
@@ -4078,7 +4070,7 @@ void Serializer::writeAST(ModuleOrSourceFile DC) {
       hasLocalTypes = true;
 
       Mangle::Mangler DebugMangler(false);
-      DebugMangler.mangleType(TD->getDeclaredType(), 0);
+      DebugMangler.mangleType(TD->getDeclaredInterfaceType(), 0);
       auto MangledName = DebugMangler.finalize();
       assert(!MangledName.empty() && "Mangled type came back empty!");
       localTypeGenerator.insert(MangledName, {

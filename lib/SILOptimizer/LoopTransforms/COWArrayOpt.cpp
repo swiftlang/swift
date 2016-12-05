@@ -5,8 +5,8 @@
 // Copyright (c) 2014 - 2016 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
-// See http://swift.org/LICENSE.txt for license information
-// See http://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
+// See https://swift.org/LICENSE.txt for license information
+// See https://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
 //
 //===----------------------------------------------------------------------===//
 
@@ -359,14 +359,14 @@ class COWArrayOpt {
   // make_mutable calls are required within the loop body for that array.
   llvm::SmallDenseMap<SILValue, ApplyInst*> ArrayMakeMutableMap;
 
-  // \brief Transient per-Array user set.
-  //
-  // Track all known array users with the exception of struct_extract users
-  // (checkSafeArrayElementUse prohibits struct_extract users from mutating the
-  // array). During analysis of retains/releases within the loop body, the
-  // users in this set are assumed to cover all possible mutating operations on
-  // the array. If the array escaped through an unknown use, the analysis must
-  // abort earlier.
+  /// \brief Transient per-Array user set.
+  ///
+  /// Track all known array users with the exception of struct_extract users
+  /// (checkSafeArrayElementUse prohibits struct_extract users from mutating the
+  /// array). During analysis of retains/releases within the loop body, the
+  /// users in this set are assumed to cover all possible mutating operations on
+  /// the array. If the array escaped through an unknown use, the analysis must
+  /// abort earlier.
   SmallPtrSet<SILInstruction*, 8> ArrayUserSet;
 
   // When matching retains to releases we must not match the same release twice.
@@ -427,7 +427,7 @@ bool COWArrayOpt::checkUniqueArrayContainer(SILValue ArrayContainer) {
     // Check that the argument is passed as an inout type. This means there are
     // no aliases accessible within this function scope.
     auto Params = Function->getLoweredFunctionType()->getParameters();
-    ArrayRef<SILArgument*> FunctionArgs = Function->begin()->getBBArgs();
+    ArrayRef<SILArgument *> FunctionArgs = Function->begin()->getArguments();
     for (unsigned ArgIdx = 0, ArgEnd = Params.size();
          ArgIdx != ArgEnd; ++ArgIdx) {
       if (FunctionArgs[ArgIdx] != Arg)
@@ -466,8 +466,8 @@ SmallPtrSetImpl<SILBasicBlock*> &COWArrayOpt::getReachingBlocks() {
 }
 
 
-// \return true if the instruction is a call to a non-mutating array semantic
-// function.
+/// \return true if the instruction is a call to a non-mutating array semantic
+/// function.
 static bool isNonMutatingArraySemanticCall(SILInstruction *Inst) {
   ArraySemanticsCall Call(Inst);
   if (!Call)
@@ -491,6 +491,8 @@ static bool isNonMutatingArraySemanticCall(SILInstruction *Inst) {
   case ArrayCallKind::kArrayUninitialized:
     return false;
   }
+
+  llvm_unreachable("Unhandled ArrayCallKind in switch.");
 }
 
 /// \return true if the given retain instruction is followed by a release on the
@@ -825,6 +827,8 @@ static bool mayChangeArrayValueToNonUniqueState(ArraySemanticsCall &Call) {
   case ArrayCallKind::kArrayUninitialized:
     return true;
   }
+
+  llvm_unreachable("Unhandled ArrayCallKind in switch.");
 }
 
 /// Check that the array value stored in \p ArrayStruct is released by \Inst.
@@ -1818,7 +1822,7 @@ private:
       // Check that the argument is passed as an inout or by value type. This
       // means there are no aliases accessible within this function scope.
       auto Params = Fun->getLoweredFunctionType()->getParameters();
-      ArrayRef<SILArgument*> FunctionArgs = Fun->begin()->getBBArgs();
+      ArrayRef<SILArgument *> FunctionArgs = Fun->begin()->getArguments();
       for (unsigned ArgIdx = 0, ArgEnd = Params.size(); ArgIdx != ArgEnd;
            ++ArgIdx) {
         if (FunctionArgs[ArgIdx] != Arg)
@@ -1951,9 +1955,7 @@ public:
 
   SILBasicBlock *cloneRegion() {
     assert (DomTree.getNode(StartBB) != nullptr && "Can't cloned dead code");
-
     auto CurFun = StartBB->getParent();
-    auto &Mod = CurFun->getModule();
 
     // We don't want to visit blocks outside of the region. visitSILBasicBlocks
     // checks BBMap before it clones a block. So we mark exiting blocks as
@@ -1966,7 +1968,7 @@ public:
     // inside the cloned region. The SSAUpdater can't handle critical non
     // cond_br edges.
     for (auto *BB : OutsideBBs) {
-      SmallVector<SILBasicBlock*, 8> Preds(BB->getPreds());
+      SmallVector<SILBasicBlock *, 8> Preds(BB->getPredecessorBlocks());
       for (auto *Pred : Preds)
         if (!isa<CondBranchInst>(Pred->getTerminator()) &&
             !isa<BranchInst>(Pred->getTerminator()))
@@ -1974,13 +1976,13 @@ public:
     }
 
     // Create the cloned start basic block.
-    auto *ClonedStartBB = new (Mod) SILBasicBlock(CurFun);
+    auto *ClonedStartBB = CurFun->createBasicBlock();
     BBMap[StartBB] = ClonedStartBB;
 
     // Clone the arguments.
-    for (auto &Arg : StartBB->getBBArgs()) {
+    for (auto &Arg : StartBB->getArguments()) {
       SILValue MappedArg =
-          new (Mod) SILArgument(ClonedStartBB, getOpType(Arg->getType()));
+          ClonedStartBB->createArgument(getOpType(Arg->getType()));
       ValueMap.insert(std::make_pair(Arg, MappedArg));
     }
 
@@ -2090,7 +2092,7 @@ protected:
       auto *OrigBB = Entry.first;
 
       // Update outside used phi values.
-      for (auto *Arg : OrigBB->getBBArgs())
+      for (auto *Arg : OrigBB->getArguments())
         updateSSAForValue(OrigBB, Arg, SSAUp);
 
       // Update outside used instruction values.
@@ -2121,7 +2123,8 @@ public:
 
   SILLoop *getLoop() {
     auto *LoopInfo = LoopAnalysis->get(HoistableLoopPreheader->getParent());
-    return LoopInfo->getLoopFor(HoistableLoopPreheader->getSingleSuccessor());
+    return LoopInfo->getLoopFor(
+        HoistableLoopPreheader->getSingleSuccessorBlock());
   }
 
 protected:
@@ -2235,7 +2238,7 @@ void ArrayPropertiesSpecializer::specializeLoopNest() {
       HoistableLoopPreheader->getTerminator(), DomTree, nullptr);
 
   // Get the exit blocks of the original loop.
-  auto *Header = CheckBlock->getSingleSuccessor();
+  auto *Header = CheckBlock->getSingleSuccessorBlock();
   assert(Header);
 
   // Our loop info is not really completely valid anymore since the cloner does

@@ -5,8 +5,8 @@
 // Copyright (c) 2014 - 2016 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
-// See http://swift.org/LICENSE.txt for license information
-// See http://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
+// See https://swift.org/LICENSE.txt for license information
+// See https://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
 //
 //===----------------------------------------------------------------------===//
 
@@ -500,13 +500,15 @@ public func expectUnreachableCatch(_ error: Error, ${TRACE}) {
 
 public func expectTrue(_ actual: AssertionResult, ${TRACE}) {
   if !actual._isPass {
-    expectationFailure("expected: true", trace: ${trace})
+    expectationFailure(
+      "expected: passed assertion\n\(actual.description)", trace: ${trace})
   }
 }
 
 public func expectFalse(_ actual: AssertionResult, ${TRACE}) {
   if actual._isPass {
-    expectationFailure("expected: false", trace: ${trace})
+    expectationFailure(
+      "expected: failed assertion\n\(actual.description)", trace: ${trace})
   }
 }
 

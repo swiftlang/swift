@@ -5,8 +5,8 @@
 // Copyright (c) 2014 - 2016 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
-// See http://swift.org/LICENSE.txt for license information
-// See http://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
+// See https://swift.org/LICENSE.txt for license information
+// See https://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
 //
 //===----------------------------------------------------------------------===//
 //
@@ -539,17 +539,17 @@ llvm::DIScope *IRGenDebugInfo::getOrCreateContext(DeclContext *DC) {
     // A module may contain multiple files.
     return getOrCreateContext(DC->getParent());
   case DeclContextKind::GenericTypeDecl: {
-    auto *TyDecl = cast<GenericTypeDecl>(DC);
-    auto *Ty = TyDecl->getDeclaredType().getPointer();
+    auto *NTD = cast<NominalTypeDecl>(DC);
+    auto *Ty = NTD->getDeclaredType().getPointer();
     if (auto *DITy = getTypeOrNull(Ty))
       return DITy;
 
     // Create a Forward-declared type.
-    auto Loc = getDebugLoc(SM, TyDecl);
+    auto Loc = getDebugLoc(SM, NTD);
     auto File = getOrCreateFile(Loc.Filename);
     auto Line = Loc.Line;
     auto FwdDecl = DBuilder.createReplaceableCompositeType(
-        llvm::dwarf::DW_TAG_structure_type, TyDecl->getName().str(),
+        llvm::dwarf::DW_TAG_structure_type, NTD->getName().str(),
         getOrCreateContext(DC->getParent()), File, Line,
         llvm::dwarf::DW_LANG_Swift, 0, 0);
     ReplaceMap.emplace_back(
@@ -1131,34 +1131,32 @@ llvm::DINodeArray IRGenDebugInfo::getEnumElements(DebugTypeInfo DbgTy,
   for (auto *ElemDecl : ED->getAllElements()) {
     // FIXME <rdar://problem/14845818> Support enums.
     // Swift Enums can be both like DWARF enums and discriminated unions.
-    if (ElemDecl->hasType()) {
-      DebugTypeInfo ElemDbgTy;
-      if (ED->hasRawType())
-        // An enum with a raw type (enum E : Int {}), similar to a
-        // DWARF enum.
-        //
-        // The storage occupied by the enum may be smaller than the
-        // one of the raw type as long as it is large enough to hold
-        // all enum values. Use the raw type for the debug type, but
-        // the storage size from the enum.
-        ElemDbgTy = DebugTypeInfo(ED->getRawType(), DbgTy.StorageType,
-                                  DbgTy.size, DbgTy.align, ED);
-      else if (ElemDecl->hasArgumentType()) {
-        // A discriminated union. This should really be described as a
-        // DW_TAG_variant_type. For now only describing the data.
-        auto &TI = IGM.getTypeInfoForUnlowered(ElemDecl->getArgumentType());
-        ElemDbgTy = DebugTypeInfo(ElemDecl->getArgumentType(), TI, ED);
-      } else {
-        // Discriminated union case without argument. Fallback to Int
-        // as the element type; there is no storage here.
-        Type IntTy = IGM.Context.getIntDecl()->getDeclaredType();
-        ElemDbgTy = DebugTypeInfo(IntTy, DbgTy.StorageType, 0, 1, ED);
-      }
-      unsigned Offset = 0;
-      auto MTy = createMemberType(ElemDbgTy, ElemDecl->getName().str(), Offset,
-                                  Scope, File, Flags);
-      Elements.push_back(MTy);
+    DebugTypeInfo ElemDbgTy;
+    if (ED->hasRawType())
+      // An enum with a raw type (enum E : Int {}), similar to a
+      // DWARF enum.
+      //
+      // The storage occupied by the enum may be smaller than the
+      // one of the raw type as long as it is large enough to hold
+      // all enum values. Use the raw type for the debug type, but
+      // the storage size from the enum.
+      ElemDbgTy = DebugTypeInfo(ED->getRawType(), DbgTy.StorageType,
+                                DbgTy.size, DbgTy.align, ED);
+    else if (ElemDecl->hasArgumentType()) {
+      // A discriminated union. This should really be described as a
+      // DW_TAG_variant_type. For now only describing the data.
+      auto &TI = IGM.getTypeInfoForUnlowered(ElemDecl->getArgumentType());
+      ElemDbgTy = DebugTypeInfo(ElemDecl->getArgumentType(), TI, ED);
+    } else {
+      // Discriminated union case without argument. Fallback to Int
+      // as the element type; there is no storage here.
+      Type IntTy = IGM.Context.getIntDecl()->getDeclaredType();
+      ElemDbgTy = DebugTypeInfo(IntTy, DbgTy.StorageType, 0, 1, ED);
     }
+    unsigned Offset = 0;
+    auto MTy = createMemberType(ElemDbgTy, ElemDecl->getName().str(), Offset,
+                                Scope, File, Flags);
+    Elements.push_back(MTy);
   }
   return DBuilder.getOrCreateArray(Elements);
 }
@@ -1286,8 +1284,7 @@ IRGenDebugInfo::createFunctionPointer(DebugTypeInfo DbgTy, llvm::DIScope *Scope,
   // FIXME: Handling of generic parameters in SIL type lowering is in flux.
   // DebugInfo doesn't appear to care about the generic context, so just
   // throw it away before lowering.
-  else if (isa<GenericFunctionType>(BaseTy) ||
-           isa<PolymorphicFunctionType>(BaseTy)) {
+  else if (isa<GenericFunctionType>(BaseTy)) {
     auto *fTy = cast<AnyFunctionType>(BaseTy);
     auto *nongenericTy =
         FunctionType::get(fTy->getInput(), fTy->getResult(), fTy->getExtInfo());
@@ -1602,7 +1599,7 @@ llvm::DIType *IRGenDebugInfo::createType(DebugTypeInfo DbgTy,
     // Emit the protocols the archetypes conform to.
     SmallVector<llvm::Metadata *, 4> Protocols;
     for (auto *ProtocolDecl : Archetype->getConformsTo()) {
-      auto PTy = IGM.getLoweredType(ProtocolDecl->getType())
+      auto PTy = IGM.getLoweredType(ProtocolDecl->getInterfaceType())
                      .getSwiftRValueType();
       auto PDbgTy = DebugTypeInfo(ProtocolDecl, IGM.getTypeInfoForLowered(PTy));
       auto PDITy = getOrCreateType(PDbgTy);
@@ -1633,7 +1630,6 @@ llvm::DIType *IRGenDebugInfo::createType(DebugTypeInfo DbgTy,
 
   case TypeKind::SILFunction:
   case TypeKind::Function:
-  case TypeKind::PolymorphicFunction:
  case TypeKind::GenericFunction: {
     if (Opts.DebugInfoKind > IRGenDebugInfoKind::ASTTypes)
       return createFunctionPointer(DbgTy, Scope, SizeInBits, AlignInBits, Flags,
@@ -1748,7 +1744,6 @@ llvm::DIType *IRGenDebugInfo::createType(DebugTypeInfo DbgTy,
 
   // The following types exist primarily for internal use by the type
   // checker.
-  case TypeKind::AssociatedType:
   case TypeKind::Error:
   case TypeKind::Unresolved:
   case TypeKind::LValue:
@@ -1768,7 +1763,6 @@ llvm::DIType *IRGenDebugInfo::createType(DebugTypeInfo DbgTy,
 /// Determine if there exists a name mangling for the given type.
 static bool canMangle(TypeBase *Ty) {
   switch (Ty->getKind()) {
-  case TypeKind::PolymorphicFunction: // Mangler crashes.
   case TypeKind::GenericFunction:     // Not yet supported.
   case TypeKind::SILBlockStorage:     // Not supported at all.
   case TypeKind::SILBox:

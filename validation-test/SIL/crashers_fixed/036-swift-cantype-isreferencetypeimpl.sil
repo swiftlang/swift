@@ -1,0 +1,3 @@
+// RUN: not %target-sil-opt %s
+// REQUIRES: asserts
+func l<X{weak var c:X

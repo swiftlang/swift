@@ -11,6 +11,7 @@ enum E {}
 
 protocol P {}
 protocol P2 {}
+protocol P3 {}
 protocol AssociatedTypes {
   associatedtype A
   associatedtype B
@@ -59,23 +60,30 @@ TypeNameTests.test("Prints") {
   typealias F2 = () -> () -> ()
   typealias F3 = (() -> ()) -> ()
 
-  expectEqual("(()) -> ()", _typeName(F.self))
-  expectEqual("(()) -> (()) -> ()", _typeName(F2.self))
-  expectEqual("(((()) -> ())) -> ()", _typeName(F3.self))
-  expectEqual("(()) -> ()", _typeName((() -> ()).self))
-  
+  expectEqual("() -> ()", _typeName(F.self))
+  expectEqual("() -> () -> ()", _typeName(F2.self))
+  expectEqual("(() -> ()) -> ()", _typeName(F3.self))
+  expectEqual("() -> ()", _typeName((() -> ()).self))
+
+  expectEqual("(main.P) -> main.P2 & main.P3",
+    _typeName(((P) -> P2 & P3).self))
+  expectEqual("() -> main.P & main.P2 & main.P3",
+    _typeName((() -> P & P2 & P3).self))
+  expectEqual("(main.P & main.P2) -> main.P & main.P3",
+    _typeName(((P & P2) -> P3 & P).self))
+ 
   #if _runtime(_ObjC)
   typealias B = @convention(block) () -> ()
   typealias B2 = () -> @convention(block) () -> ()
   typealias B3 = (@convention(block) () -> ()) -> ()
-  expectEqual("@convention(block) (()) -> ()", _typeName(B.self))
-  expectEqual("(()) -> @convention(block) (()) -> ()",
+  expectEqual("@convention(block) () -> ()", _typeName(B.self))
+  expectEqual("() -> @convention(block) () -> ()",
     _typeName(B2.self))
-  expectEqual("((@convention(block) (()) -> ())) -> ()",
+  expectEqual("(@convention(block) () -> ()) -> ()",
     _typeName(B3.self))
   #endif
 
-  expectEqual("((()) -> ()).Type", _typeName(F.Type.self))
+  expectEqual("(() -> ()).Type", _typeName(F.Type.self))
   expectEqual("main.C.Type", _typeName(C.Type.self))
   expectEqual("main.C.Type.Type", _typeName(C.Type.Type.self))
   expectEqual("Any.Type", _typeName(Any.Type.self))
@@ -88,7 +96,7 @@ TypeNameTests.test("Prints") {
 
 
   typealias Tup = (Any, F, C)
-  expectEqual("(Any, (()) -> (), main.C)",
+  expectEqual("(Any, () -> (), main.C)",
     _typeName(Tup.self))
 }
 
@@ -105,15 +113,15 @@ TypeNameTests.test("Inout") {
   expectEqual("(inout Swift.Int) -> ()", _typeName(IF.self))
   expectEqual("(inout Swift.Int) -> (inout Swift.Int) -> ()",
     _typeName(IF2.self))
-  expectEqual("(((inout Swift.Int) -> ())) -> ()",
+  expectEqual("((inout Swift.Int) -> ()) -> ()",
     _typeName(IF3.self))
-  expectEqual("(inout ((Swift.Int) -> ())) -> ()",
+  expectEqual("(inout (Swift.Int) -> ()) -> ()",
     _typeName(IF3a.self))
-  expectEqual("(inout ((Swift.Int) -> ())) -> ()",
+  expectEqual("(inout (Swift.Int) -> ()) -> ()",
     _typeName(IF3b.self))
-  expectEqual("(((inout Swift.Int) -> ())) -> ()",
+  expectEqual("((inout Swift.Int) -> ()) -> ()",
     _typeName(IF3c.self))
-  expectEqual("(inout ((()) -> ())) -> ()",
+  expectEqual("(inout () -> ()) -> ()",
     _typeName(IF4.self))
   expectEqual("(inout Swift.Int, Any) -> ()",
     _typeName(IF5.self))
@@ -144,16 +152,37 @@ TypeNameTests.test("Functions") {
     return curry1Throws
   }
 
-  expectEqual("(()) -> ()",
+  expectEqual("() -> ()",
     _typeName(type(of: curry1)))
-  expectEqual("(()) -> (()) -> ()",
+  expectEqual("() -> () -> ()",
     _typeName(type(of: curry2)))
-  expectEqual("(()) throws -> (()) -> ()",
+  expectEqual("() throws -> () -> ()",
     _typeName(type(of: curry2Throws)))
-  expectEqual("(()) -> (()) throws -> ()",
+  expectEqual("() -> () throws -> ()",
     _typeName(type(of: curry3)))
-  expectEqual("(()) throws -> (()) throws -> ()",
+  expectEqual("() throws -> () throws -> ()",
     _typeName(type(of: curry3Throws)))
+}
+
+class SomeOuterClass {
+  struct SomeInnerStruct {}
+  struct SomeInnerGenericStruct<T> {}
+}
+
+class SomeOuterGenericClass<T> {
+  struct SomeInnerStruct {}
+  struct SomeInnerGenericStruct<U> {}
+}
+
+TypeNameTests.test("Nested") {
+  expectEqual("main.SomeOuterClass.SomeInnerStruct",
+              _typeName(SomeOuterClass.SomeInnerStruct.self));
+  expectEqual("main.SomeOuterClass.SomeInnerGenericStruct<Swift.Int>",
+              _typeName(SomeOuterClass.SomeInnerGenericStruct<Int>.self));
+  expectEqual("main.SomeOuterGenericClass<Swift.Int>.SomeInnerStruct",
+              _typeName(SomeOuterGenericClass<Int>.SomeInnerStruct.self));
+  expectEqual("main.SomeOuterGenericClass<Swift.String>.SomeInnerGenericStruct<Swift.Int>",
+              _typeName(SomeOuterGenericClass<String>.SomeInnerGenericStruct<Int>.self));
 }
 
 runAllTests()

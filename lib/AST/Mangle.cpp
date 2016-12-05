@@ -5,8 +5,8 @@
 // Copyright (c) 2014 - 2016 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
-// See http://swift.org/LICENSE.txt for license information
-// See http://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
+// See https://swift.org/LICENSE.txt for license information
+// See https://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
 //
 //===----------------------------------------------------------------------===//
 //
@@ -486,7 +486,7 @@ Type Mangler::getDeclTypeForMangling(const ValueDecl *decl,
                                 ArrayRef<Requirement> &requirements,
                                 SmallVectorImpl<Requirement> &requirementsBuf) {
   auto &C = decl->getASTContext();
-  if (!decl->hasType())
+  if (!decl->hasInterfaceType())
     return ErrorType::get(C);
 
   Type type = decl->getInterfaceType();
@@ -846,8 +846,6 @@ void Mangler::mangleType(Type type, unsigned uncurryLevel) {
 
   case TypeKind::Paren:
     return mangleSugaredType<ParenType>(type);
-  case TypeKind::AssociatedType:
-    return mangleSugaredType<AssociatedTypeType>(type);
   case TypeKind::Substituted:
     return mangleSugaredType<SubstitutedType>(type);
   case TypeKind::ArraySlice: /* fallthrough */
@@ -943,9 +941,6 @@ void Mangler::mangleType(Type type, unsigned uncurryLevel) {
       mangleNominalType(tybase->getAnyNominal());
     return;
   }
-
-  case TypeKind::PolymorphicFunction:
-    llvm_unreachable("should not be mangled");
 
   case TypeKind::SILFunction: {
     // <type> ::= 'XF' <impl-function-type>
@@ -1108,7 +1103,7 @@ void Mangler::mangleType(Type type, unsigned uncurryLevel) {
         SmallVector<const void *, 4> SortedSubsts(Substitutions.size());
         for (auto S : Substitutions) SortedSubsts[S.second] = S.first;
         for (auto S : SortedSubsts) ContextMangler.addSubstitution(S);
-        while (DC && DC->getGenericParamsOfContext()) {
+        while (DC && DC->isGenericContext()) {
           if (DC->isInnermostContextGeneric() &&
               DC->getGenericParamsOfContext()->getDepth() == GTPT->getDepth())
             break;
@@ -1475,6 +1470,7 @@ void Mangler::mangleClosureComponents(Type Ty, unsigned discriminator,
   if (!Ty)
     Ty = ErrorType::get(localContext->getASTContext());
 
+  Ty = ArchetypeBuilder::mapTypeOutOfContext(parentContext, Ty);
   mangleType(Ty->getCanonicalType(), /*uncurry*/ 0);
 }
 

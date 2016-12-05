@@ -1,4 +1,4 @@
-// RUN: %swift -parse -primary-file %s %S/Inputs/availability_multi_other.swift -verify
+// RUN: %swift -typecheck -primary-file %s %S/Inputs/availability_multi_other.swift -verify
 // REQUIRES: OS=macosx
 
 func callToEnsureNotInScriptMode() { }

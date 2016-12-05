@@ -5,8 +5,8 @@
 // Copyright (c) 2014 - 2016 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
-// See http://swift.org/LICENSE.txt for license information
-// See http://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
+// See https://swift.org/LICENSE.txt for license information
+// See https://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
 //
 //===----------------------------------------------------------------------===//
 //
@@ -810,7 +810,7 @@ static bool isRelaxedIBAction(TypeChecker &TC) {
 void AttributeChecker::visitIBActionAttr(IBActionAttr *attr) {
   // IBActions instance methods must have type Class -> (...) -> ().
   auto *FD = cast<FuncDecl>(D);
-  Type CurriedTy = FD->getType()->castTo<AnyFunctionType>()->getResult();
+  Type CurriedTy = FD->getInterfaceType()->castTo<AnyFunctionType>()->getResult();
   Type ResultTy = CurriedTy->castTo<AnyFunctionType>()->getResult();
   if (!ResultTy->isEqual(TupleType::getEmpty(TC.Context))) {
     TC.diagnose(D, diag::invalid_ibaction_result, ResultTy);
@@ -1559,7 +1559,7 @@ void TypeChecker::checkAutoClosureAttr(ParamDecl *PD, AutoClosureAttr *attr) {
   // The paramdecl should have function type, and we restrict it to functions
   // taking ().
   auto *FTy = PD->getType()->getAs<FunctionType>();
-  if (FTy == 0) {
+  if (!FTy) {
     diagnose(attr->getLocation(), diag::autoclosure_function_type);
     attr->setInvalid();
     return;
@@ -1584,8 +1584,13 @@ void TypeChecker::checkAutoClosureAttr(ParamDecl *PD, AutoClosureAttr *attr) {
   }
 
   // Change the type to include the autoclosure bit.
-  PD->overwriteType(FunctionType::get(FuncTyInput, FTy->getResult(),
-                                    FTy->getExtInfo().withIsAutoClosure(true)));
+  PD->setType(
+      FTy->withExtInfo(FTy->getExtInfo().withIsAutoClosure(true)));
+
+  // And the interface type.
+  auto *IfaceFTy = PD->getInterfaceType()->getAs<FunctionType>();
+  PD->setInterfaceType(
+      IfaceFTy->withExtInfo(IfaceFTy->getExtInfo().withIsAutoClosure(true)));
 
   // Autoclosure may imply noescape, so add a noescape attribute if this is a
   // function parameter.
@@ -1634,13 +1639,14 @@ void TypeChecker::checkNoEscapeAttr(ParamDecl *PD, NoEscapeAttr *attr) {
     return;
 
   // Change the type to include the noescape bit.
-  PD->overwriteType(FunctionType::get(FTy->getInput(), FTy->getResult(),
-                                      FTy->getExtInfo().withNoEscape(true)));
+  PD->setType(FunctionType::get(FTy->getInput(), FTy->getResult(),
+                                FTy->getExtInfo().withNoEscape(true)));
 }
 
 
 void TypeChecker::checkOwnershipAttr(VarDecl *var, OwnershipAttr *attr) {
   Type type = var->getType();
+  Type interfaceType = var->getInterfaceType();
 
   // Just stop if we've already processed this declaration.
   if (type->is<ReferenceStorageType>())
@@ -1699,7 +1705,10 @@ void TypeChecker::checkOwnershipAttr(VarDecl *var, OwnershipAttr *attr) {
   }
 
   // Change the type to the appropriate reference storage type.
-  var->overwriteType(ReferenceStorageType::get(type, ownershipKind, Context));
+  var->setType(ReferenceStorageType::get(
+      type, ownershipKind, Context));
+  var->setInterfaceType(ReferenceStorageType::get(
+      interfaceType, ownershipKind, Context));
 }
 
 Optional<Diag<>>

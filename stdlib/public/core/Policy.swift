@@ -5,8 +5,8 @@
 // Copyright (c) 2014 - 2016 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
-// See http://swift.org/LICENSE.txt for license information
-// See http://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
+// See https://swift.org/LICENSE.txt for license information
+// See https://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
 //
 //===----------------------------------------------------------------------===//
 // Swift Standard Prolog Library.
@@ -559,17 +559,17 @@ public func ~= <T : Equatable>(a: T, b: T) -> Bool {
 // Standard precedence groups
 //===----------------------------------------------------------------------===//
 
-precedencegroup FunctionArrowPrecedence {
-  associativity: right
-}
 precedencegroup AssignmentPrecedence {
   assignment: true
   associativity: right
-  higherThan: FunctionArrowPrecedence
+}
+precedencegroup FunctionArrowPrecedence {
+  associativity: right
+  higherThan: AssignmentPrecedence
 }
 precedencegroup TernaryPrecedence {
   associativity: right
-  higherThan: AssignmentPrecedence
+  higherThan: FunctionArrowPrecedence
 }
 precedencegroup DefaultPrecedence {
   higherThan: TernaryPrecedence

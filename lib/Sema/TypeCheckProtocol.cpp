@@ -5,8 +5,8 @@
 // Copyright (c) 2014 - 2016 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
-// See http://swift.org/LICENSE.txt for license information
-// See http://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
+// See https://swift.org/LICENSE.txt for license information
+// See https://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
 //
 //===----------------------------------------------------------------------===//
 //
@@ -317,6 +317,8 @@ namespace {
         // Warnings at most.
         return false;
       }
+
+      llvm_unreachable("Unhandled OptionalAdjustmentKind in switch.");
     }
 
     /// Retrieve the source location at which the optional is
@@ -389,6 +391,8 @@ namespace {
       case MatchKind::NonObjC:
         return false;
       }
+
+      llvm_unreachable("Unhandled MatchKind in switch.");
     }
 
     /// \brief Determine whether this requirement match has a witness type.
@@ -412,15 +416,19 @@ namespace {
       case MatchKind::NonObjC:
         return false;
       }
+
+      llvm_unreachable("Unhandled MatchKind in switch.");
     }
 
     SmallVector<Substitution, 2> WitnessSubstitutions;
 
     swift::Witness getWitness(ASTContext &ctx,
                               RequirementEnvironment &&reqEnvironment) const {
+      auto environment = reqEnvironment.getSyntheticEnvironment();
+      auto map = reqEnvironment.takeRequirementToSyntheticMap();
       return swift::Witness(this->Witness, WitnessSubstitutions,
-                            reqEnvironment.getSyntheticEnvironment(),
-                            reqEnvironment.takeRequirementToSyntheticMap());
+                            environment,
+                            map);
     }
 
     /// Classify the provided optionality issues for use in diagnostics.
@@ -1016,7 +1024,7 @@ RequirementEnvironment::RequirementEnvironment(
   // Construct an archetype builder by collecting the constraints from the
   // requirement and the context of the conformance together, because both
   // define the capabilities of the requirement.
-  ArchetypeBuilder builder(*conformanceDC->getParentModule(), ctx.Diags);
+  ArchetypeBuilder builder(*conformanceDC->getParentModule());
   SmallVector<GenericTypeParamType*, 4> allGenericParams;
 
   // Add the generic signature of the context of the conformance. This includes
@@ -1110,8 +1118,14 @@ RequirementEnvironment::RequirementEnvironment(
       auto first = reqReq.getFirstType().subst(reqToSyntheticEnvMap);
       auto second = reqReq.getSecondType().subst(reqToSyntheticEnvMap);
 
+      // FIXME: We really want to check hasTypeParameter here, but the
+      // ArchetypeBuilder isn't ready for that.
       if (!first->isTypeParameter()) {
-        assert(second->isTypeParameter());
+        // When the second is not a type parameter either, drop the requirement.
+        // If the types were different, this requirement will be unsatisfiable.
+        if (!second->isTypeParameter()) continue;
+
+        // Put the type parameter first.
         std::swap(first, second);
       }
 
@@ -1366,7 +1380,7 @@ bool WitnessChecker::findBestWitness(
       continue;
     }
 
-    if (!witness->hasType())
+    if (!witness->hasInterfaceType())
       TC.validateDecl(witness, true);
 
     auto match = matchWitness(TC, Proto, conformance, DC,
@@ -1813,7 +1827,7 @@ static Type getTypeForDisplay(Module *module, ValueDecl *decl) {
 
   // For a constructor, we only care about the parameter types.
   if (auto ctor = dyn_cast<ConstructorDecl>(decl)) {
-    return ctor->getArgumentType();
+    return ctor->getArgumentInterfaceType();
   }
 
   // We have something function-like, so we want to strip off the 'self'.
@@ -2250,19 +2264,19 @@ void ConformanceChecker::recordTypeWitness(AssociatedTypeDecl *assocType,
                                                     /*genericparams*/nullptr, 
                                                     DC);
     aliasDecl->computeType();
+
+    aliasDecl->getAliasType()->setRecursiveProperties(
+        type->getRecursiveProperties());
+
+    Type interfaceTy = aliasDecl->getAliasType();
+    if (interfaceTy->hasArchetype())
+      interfaceTy = ArchetypeBuilder::mapTypeOutOfContext(DC, type);
+    aliasDecl->setInterfaceType(MetatypeType::get(interfaceTy));
+
     aliasDecl->setImplicit();
-    if (type->hasError()) {
+    if (type->hasError())
       aliasDecl->setInvalid();
 
-      // If we're recording a failed type witness, keep the sugar around for
-      // code completion.
-      type = aliasDecl->getDeclaredType();
-    } else if (type->hasArchetype()) {
-      Type metaType = MetatypeType::get(type);
-      aliasDecl->setInterfaceType(
-        ArchetypeBuilder::mapTypeOutOfContext(DC, metaType));
-    }
-    
     // Inject the typealias into the nominal decl that conforms to the protocol.
     if (auto nominal = DC->getAsNominalTypeOrNominalTypeExtensionContext()) {
       TC.computeAccessibility(nominal);
@@ -2378,11 +2392,7 @@ static void diagnoseNoWitness(ValueDecl *Requirement, Type RequirementType,
       Options.AccessibilityFilter = Accessibility::Private;
       Options.PrintAccessibility = false;
       Options.FunctionBody = [](const ValueDecl *VD) { return "<#code#>"; };
-      Type SelfType = Adopter->getSelfTypeInContext();
-      if (Adopter->getAsClassOrClassExtensionContext())
-        Options.setArchetypeSelfTransform(SelfType);
-      else
-        Options.setArchetypeAndDynamicSelfTransform(SelfType);
+      Options.setBaseType(Conformance->getType());
       Options.CurrentModule = Adopter->getParentModule();
       if (!Adopter->isExtensionContext()) {
         // Create a variable declaration instead of a computed property in
@@ -2886,14 +2896,14 @@ ResolveWitnessResult ConformanceChecker::resolveTypeWitnessViaLookup(
       tc.diagnose(assocType, diag::no_witnesses_type, assocType->getName());
 
       for (auto candidate : nonViable) {
-        if (candidate.first->getDeclaredType()->hasError())
+        if (candidate.first->getDeclaredInterfaceType()->hasError())
           continue;
 
         tc.diagnose(candidate.first,
                     diag::protocol_witness_nonconform_type,
-                    candidate.first->getDeclaredType(),
-                    candidate.second->getDeclaredType(),
-                    candidate.second->getDeclaredType()->is<ProtocolType>());
+                    candidate.first->getDeclaredInterfaceType(),
+                    candidate.second->getDeclaredInterfaceType(),
+                    candidate.second->getDeclaredInterfaceType()->is<ProtocolType>());
       }
     });
 
@@ -3022,7 +3032,7 @@ static Type mapErrorTypeToOriginal(Type type) {
 static Type getWitnessTypeForMatching(TypeChecker &tc,
                                       NormalProtocolConformance *conformance,
                                       ValueDecl *witness) {
-  if (!witness->hasType()) {
+  if (!witness->hasInterfaceType()) {
     // Don't cause a recursive type-check of the witness.
     // FIXME: We shouldn't need this.
     if (witness->isBeingTypeChecked())
@@ -3966,7 +3976,7 @@ void ConformanceChecker::resolveSingleWitness(ValueDecl *requirement) {
   SWIFT_DEFER { ResolvingWitnesses.erase(requirement); };
 
   // Make sure we've validated the requirement.
-  if (!requirement->hasType())
+  if (!requirement->hasInterfaceType())
     TC.validateDecl(requirement, true);
 
   if (requirement->isInvalid()) {
@@ -4219,7 +4229,7 @@ void ConformanceChecker::checkConformance() {
     }
 
     // Make sure we've validated the requirement.
-    if (!requirement->hasType())
+    if (!requirement->hasInterfaceType())
       TC.validateDecl(requirement, true);
 
     if (requirement->isInvalid()) {

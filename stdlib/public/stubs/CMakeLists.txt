@@ -7,7 +7,6 @@ set(swift_stubs_sources
     UnicodeExtendedGraphemeClusters.cpp.gyb)
 set(swift_stubs_objc_sources
     Availability.mm
-    DispatchShims.mm
     FoundationHelpers.mm
     OptionalBridgingHelper.mm
     Reflection.mm

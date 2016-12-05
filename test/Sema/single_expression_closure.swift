@@ -1,4 +1,4 @@
-// RUN: %target-parse-verify-swift
+// RUN: %target-typecheck-verify-swift
 
 // SR-1062: 
 // Coercion in single expression closure with invalid signature caused segfault

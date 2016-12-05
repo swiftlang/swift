@@ -5,8 +5,8 @@
 // Copyright (c) 2014 - 2016 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
-// See http://swift.org/LICENSE.txt for license information
-// See http://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
+// See https://swift.org/LICENSE.txt for license information
+// See https://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
 //
 //===----------------------------------------------------------------------===//
 //
@@ -950,7 +950,9 @@ namespace {
     unsigned getFixedExtraInhabitantCount(IRGenModule &IGM) const override {
       unsigned bits = cast<FixedTypeInfo>(TI)->getFixedSize().getValueInBits();
       assert(bits < 32 && "freakishly huge no-payload enum");
-      return (1U << bits) - ElementsWithNoPayload.size();
+
+      size_t shifted = static_cast<size_t>(static_cast<size_t>(1) << bits);
+      return shifted - ElementsWithNoPayload.size();
     }
 
     APInt getFixedExtraInhabitantValue(IRGenModule &IGM,
@@ -2088,6 +2090,8 @@ namespace {
       case Normal:
         llvm_unreachable("not a refcounted payload");
       }
+
+      llvm_unreachable("Not a valid CopyDestroyStrategy");
     }
 
     void retainRefcountedPayload(IRGenFunction &IGF,
@@ -2960,6 +2964,8 @@ namespace {
       case Normal:
         llvm_unreachable("not a refcounted payload");
       }
+
+      llvm_unreachable("Not a valid CopyDestroyStrategy.");
     }
 
     void retainRefcountedPayload(IRGenFunction &IGF,
@@ -5669,7 +5675,7 @@ const TypeInfo *TypeConverter::convertEnumType(TypeBase *key, CanType type,
     }
     auto tagBits = strategy->getTagBitsForPayloads();
     assert(tagBits.count() >= 32
-            || (1U << tagBits.count())
+            || static_cast<size_t>(static_cast<size_t>(1) << tagBits.count())
                >= strategy->getElementsWithPayload().size());
     DEBUG(llvm::dbgs() << "  payload tag bits:\t";
           displayBitMask(tagBits));

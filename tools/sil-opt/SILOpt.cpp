@@ -5,8 +5,8 @@
 // Copyright (c) 2014 - 2016 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
-// See http://swift.org/LICENSE.txt for license information
-// See http://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
+// See https://swift.org/LICENSE.txt for license information
+// See https://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
 //
 //===----------------------------------------------------------------------===//
 //
@@ -175,6 +175,9 @@ static void runCommandLineSelectedPasses(SILModule *Module) {
     PM.addPass(Pass);
   }
   PM.run();
+
+  if (Module->getOptions().VerifyAll)
+    Module->verify();
 }
 
 // This function isn't referenced outside its translation unit, but it

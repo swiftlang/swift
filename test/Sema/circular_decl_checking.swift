@@ -1,4 +1,4 @@
-// RUN: %target-parse-verify-swift
+// RUN: %target-typecheck-verify-swift
 
 class HasFunc {
   func HasFunc(_: HasFunc) {
@@ -44,7 +44,9 @@ var TopLevelVar: TopLevelVar? { return nil } // expected-error 2 {{use of undecl
 
 
 protocol AProtocol {
-  associatedtype e : e  // expected-error {{inheritance from non-protocol, non-class type 'Self.e'}}
+  associatedtype e : e
+  // expected-error@-1 {{type 'e' references itself}}
+  // expected-note@-2 {{type declared here}}
 }
 
 

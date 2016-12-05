@@ -5,8 +5,8 @@
 // Copyright (c) 2014 - 2016 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
-// See http://swift.org/LICENSE.txt for license information
-// See http://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
+// See https://swift.org/LICENSE.txt for license information
+// See https://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
 //
 //===----------------------------------------------------------------------===//
 //
@@ -759,12 +759,6 @@ namespace {
 
         return setLocal(type, call);
       }
-    }
-
-    llvm::Value *visitPolymorphicFunctionType(CanPolymorphicFunctionType type) {
-      IGF.unimplemented(SourceLoc(),
-                        "metadata ref for polymorphic function type");
-      return llvm::UndefValue::get(IGF.IGM.TypeMetadataPtrTy);
     }
 
     llvm::Value *visitGenericFunctionType(CanGenericFunctionType type) {
@@ -1679,6 +1673,8 @@ namespace {
         // All block types look like Builtin.UnknownObject.
         return emitDirectMetadataRef(C.TheUnknownObjectType);
       }
+
+      llvm_unreachable("Not a valid SILFunctionType.");
     }
 
     llvm::Value *visitAnyMetatypeType(CanAnyMetatypeType type) {
@@ -1704,6 +1700,8 @@ namespace {
         // FIXME: It'd be nice not to need a runtime call here.
         return IGF.emitTypeMetadataRef(type);
       }
+
+      llvm_unreachable("Not a valid MetatypeRepresentation.");
     }
 
     /// Try to find the metatype in local data.
@@ -1858,6 +1856,8 @@ namespace {
         // All block types look like Builtin.UnknownObject.
         return emitFromValueWitnessTable(C.TheUnknownObjectType);
       }
+
+      llvm_unreachable("Not a valid SILFunctionType.");
     }
 
     llvm::Value *visitAnyMetatypeType(CanAnyMetatypeType type) {
@@ -1876,6 +1876,8 @@ namespace {
         return emitFromValueWitnessTable(
                      CanMetatypeType::get(IGF.IGM.Context.TheNativeObjectType));
       }
+
+      llvm_unreachable("Not a valid MetatypeRepresentation.");
     }
 
     llvm::Value *visitAnyClassType(ClassDecl *classDecl) {
@@ -1893,6 +1895,8 @@ namespace {
       case ReferenceCounting::Error:
         llvm_unreachable("classes shouldn't have this kind of refcounting");
       }
+
+      llvm_unreachable("Not a valid ReferenceCounting.");
     }
 
     llvm::Value *visitClassType(CanClassType type) {
@@ -4481,6 +4485,8 @@ static llvm::Value *emitLoadOfHeapMetadataRef(IRGenFunction &IGF,
     return objcClass;
   }
   }
+
+  llvm_unreachable("Not a valid IsaEncoding.");
 }
 
 /// Given an object of class type, produce the heap metadata reference
@@ -5565,6 +5571,8 @@ SpecialProtocol irgen::getSpecialProtocolID(ProtocolDecl *P) {
   case KnownProtocolKind::ErrorCodeProtocol:
     return SpecialProtocol::None;
   }
+
+  llvm_unreachable("Not a valid KnownProtocolKind.");
 }
 
 namespace {

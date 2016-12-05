@@ -1,5 +1,5 @@
 // RUN: sed -n -e '/VERIFY_BEGIN/,/VERIFY_END$/ p' %s > %t_no_errors.swift
-// RUN: %target-swift-frontend -verify -parse %t_no_errors.swift
+// RUN: %target-swift-frontend -verify -typecheck %t_no_errors.swift
 
 // RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=CONSTRUCTOR_SUPER_NO_DOT_1 > %t.super.txt
 // RUN: %FileCheck %s -check-prefix=COMMON_BASE_A_NO_DOT < %t.super.txt

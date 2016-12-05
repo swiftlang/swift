@@ -1,4 +1,4 @@
-// RUN: %target-swift-frontend(mock-sdk: %clang-importer-sdk) -parse -verify -disable-objc-attr-requires-foundation-module %s
+// RUN: %target-swift-frontend(mock-sdk: %clang-importer-sdk) -typecheck -verify -disable-objc-attr-requires-foundation-module %s
 // RUN: %target-swift-ide-test(mock-sdk: %clang-importer-sdk) -print-usrs -source-filename %s | %FileCheck %s -strict-whitespace
 
 import macros

@@ -5,8 +5,8 @@
 // Copyright (c) 2014 - 2016 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
-// See http://swift.org/LICENSE.txt for license information
-// See http://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
+// See https://swift.org/LICENSE.txt for license information
+// See https://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
 //
 //===----------------------------------------------------------------------===//
 
@@ -1146,7 +1146,7 @@ static SDKNode *constructTypeNode(SDKContext &Ctx, Type T) {
 static SDKNode *constructFunctionNode(SDKContext &Ctx, FuncDecl* FD,
                                       SDKNodeKind Kind, bool SkipFirst) {
   auto Func = SDKNodeInitInfo(Ctx, FD).createSDKNode(Kind);
-  Func->addChild(constructTypeNode(Ctx, FD->getResultType()));
+  Func->addChild(constructTypeNode(Ctx, FD->getResultInterfaceType()));
   for (auto *paramList : FD->getParameterLists()) {
     for (auto param : *paramList)
       Func->addChild(constructTypeNode(Ctx, param->getInterfaceType()));
@@ -1159,7 +1159,7 @@ static SDKNode *constructFunctionNode(SDKContext &Ctx, FuncDecl* FD,
 
 static SDKNode* constructInitNode(SDKContext &Ctx, ConstructorDecl *CD) {
   auto Func = SDKNodeInitInfo(Ctx, CD).createSDKNode(SDKNodeKind::Constructor);
-  Func->addChild(constructTypeNode(Ctx, CD->getResultType()));
+  Func->addChild(constructTypeNode(Ctx, CD->getResultInterfaceType()));
   for (auto *paramList : CD->getParameterLists()) {
     for (auto param : *paramList)
       Func->addChild(constructTypeNode(Ctx, param->getInterfaceType()));
@@ -1544,7 +1544,7 @@ public:
     for (unsigned long i = 0; i < std::max(Left.size(), Right.size()); i ++) {
       auto L = i < Left.size() ? Left[i] : nullptr;
       auto R = i < Right.size() ? Right[i] : nullptr;
-      if (*L == *R)
+      if (L && R && *L == *R)
         continue;
       if (!L || !R)
         Listener.foundRemoveAddMatch(L, R);
@@ -3119,52 +3119,6 @@ struct OverloadedFuncInfo {
   }
 };
 
-/// This provides a utility to view a printed name by parsing the components
-/// of that name. The components include a base name and an array of argument
-/// labels.
-class DeclNameViewer {
-  StringRef BaseName;
-  SmallVector<StringRef, 4> Labels;
-
-public:
-  DeclNameViewer(StringRef Text) {
-    auto ArgStart = Text.find_first_of('(');
-    if (ArgStart == StringRef::npos) {
-      BaseName = Text;
-      return;
-    }
-    BaseName = Text.substr(0, ArgStart);
-    auto ArgEnd = Text.find_last_of(')');
-    assert(ArgEnd != StringRef::npos);
-    StringRef AllArgs = Text.substr(ArgStart + 1, ArgEnd - ArgStart - 1);
-    AllArgs.split(Labels, ":");
-    if (Labels.empty())
-      return;
-    assert(Labels.back().empty());
-    Labels.pop_back();
-  }
-
-  StringRef base() const { return BaseName; }
-
-  llvm::ArrayRef<StringRef> args() const { return llvm::makeArrayRef(Labels); }
-
-  unsigned partsCount() const { return 1 + Labels.size(); }
-
-  unsigned commonParts(DeclNameViewer &Other) const {
-    if (base() != Other.base())
-      return 0;
-    unsigned Result = 1;
-    unsigned Len = std::min(args().size(), Other.args().size());
-    for (unsigned I = 0; I < Len; ++ I) {
-      if (args()[I] == Other.args()[I])
-        Result ++;
-      else
-        return Result;
-    }
-    return Result;
-  }
-};
-
 class OverloadMemberFunctionEmitter : public SDKNodeVisitor {
 
   std::vector<OverloadedFuncInfo> &AllItems;
@@ -3186,7 +3140,7 @@ class OverloadMemberFunctionEmitter : public SDKNodeVisitor {
       DeclNameViewer ChildViewer(C->getPrintedName());
       if (ChildViewer.args().empty())
         continue;
-      if (CurrentViewer.commonParts(ChildViewer) >=
+      if (CurrentViewer.commonPartsCount(ChildViewer) >=
           CurrentViewer.partsCount() - 1) {
         AllItems.emplace_back(Node->getAs<SDKNodeDecl>()->getUsr());
         return;

@@ -5,8 +5,8 @@
 // Copyright (c) 2014 - 2016 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
-// See http://swift.org/LICENSE.txt for license information
-// See http://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
+// See https://swift.org/LICENSE.txt for license information
+// See https://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
 //
 //===----------------------------------------------------------------------===//
 //
@@ -1553,9 +1553,9 @@ public:
   void assignFixedType(TypeVariableType *typeVar, Type type,
                        bool updateState = true);
 
-  // \brief Set the TVO_MustBeMaterializable bit on all type variables
-  // necessary to ensure that the type in question is materializable in a
-  // viable solution.
+  /// \brief Set the TVO_MustBeMaterializable bit on all type variables
+  /// necessary to ensure that the type in question is materializable in a
+  /// viable solution.
   void setMustBeMaterializableRecursive(Type type);
   
   /// \brief Determine if the type in question is an Array<T>.
@@ -1729,8 +1729,7 @@ public:
   ArrayRef<typename std::iterator_traits<It>::value_type>
   allocateCopy(It start, It end) {
     typedef typename std::iterator_traits<It>::value_type T;
-    T *result = (T*)getAllocator().Allocate(sizeof(T)*(end-start),
-                                            __alignof__(T));
+    T *result = (T*)getAllocator().Allocate(sizeof(T)*(end-start), alignof(T));
     unsigned i;
     for (i = 0; start != end; ++start, ++i)
       new (result+i) T(*start);
@@ -2031,7 +2030,7 @@ private:
                                  ConstraintLocatorBuilder locator,
                                  bool isFavored);
 
-  /// \brief Collect the current inactive disjunciton constraints.
+  /// \brief Collect the current inactive disjunction constraints.
   void collectDisjunctions(SmallVectorImpl<Constraint *> &disjunctions);
 
   /// \brief Solve the system of constraints after it has already been

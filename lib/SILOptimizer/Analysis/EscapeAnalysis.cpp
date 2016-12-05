@@ -5,8 +5,8 @@
 // Copyright (c) 2014 - 2016 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
-// See http://swift.org/LICENSE.txt for license information
-// See http://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
+// See https://swift.org/LICENSE.txt for license information
+// See https://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
 //
 //===----------------------------------------------------------------------===//
 
@@ -386,7 +386,7 @@ void EscapeAnalysis::ConnectionGraph::propagateEscapeStates() {
 void EscapeAnalysis::ConnectionGraph::computeUsePoints() {
   // First scan the whole function and add relevant instructions as use-points.
   for (auto &BB : *F) {
-    for (SILArgument *BBArg : BB.getBBArgs()) {
+    for (SILArgument *BBArg : BB.getArguments()) {
       /// In addition to releasing instructions (see below) we also add block
       /// arguments as use points. In case of loops, block arguments can
       /// "extend" the liferange of a reference in upward direction.
@@ -790,6 +790,8 @@ namespace llvm {
         case CGForDotView::PointsTo: return "";
         case CGForDotView::Deferred: return "color=\"gray\"";
       }
+
+      llvm_unreachable("Unhandled CGForDotView in switch.");
     }
   };
 } // end llvm namespace
@@ -824,6 +826,8 @@ const char *EscapeAnalysis::CGNode::getTypeStr() const {
     case NodeType::Argument:   return "Arg";
     case NodeType::Return:     return "Ret";
   }
+
+  llvm_unreachable("Unhandled NodeType in switch.");
 }
 
 void EscapeAnalysis::ConnectionGraph::dump() const {
@@ -990,7 +994,7 @@ static bool linkBBArgs(SILBasicBlock *BB) {
     return false;
   // We don't need to link to the try_apply's normal result argument, because
   // we handle it separately in setAllEscaping() and mergeCalleeGraph().
-  if (SILBasicBlock *SinglePred = BB->getSinglePredecessor()) {
+  if (SILBasicBlock *SinglePred = BB->getSinglePredecessorBlock()) {
     auto *TAI = dyn_cast<TryApplyInst>(SinglePred->getTerminator());
     if (TAI && BB == TAI->getNormalBB())
       return false;
@@ -1084,7 +1088,7 @@ void EscapeAnalysis::buildConnectionGraph(FunctionInfo *FInfo,
 
     // Create defer-edges from the block arguments to it's values in the
     // predecessor's terminator instructions.
-    for (SILArgument *BBArg : BB.getBBArgs()) {
+    for (SILArgument *BBArg : BB.getArguments()) {
       CGNode *ArgNode = ConGraph->getNode(BBArg, this);
       if (!ArgNode)
         continue;
@@ -1592,8 +1596,8 @@ bool EscapeAnalysis::deinitIsKnownToNotCapture(SILValue V) {
 void EscapeAnalysis::setAllEscaping(SILInstruction *I,
                                     ConnectionGraph *ConGraph) {
   if (auto *TAI = dyn_cast<TryApplyInst>(I)) {
-    setEscapesGlobal(ConGraph, TAI->getNormalBB()->getBBArg(0));
-    setEscapesGlobal(ConGraph, TAI->getErrorBB()->getBBArg(0));
+    setEscapesGlobal(ConGraph, TAI->getNormalBB()->getArgument(0));
+    setEscapesGlobal(ConGraph, TAI->getErrorBB()->getArgument(0));
   }
   // Even if the instruction does not write memory we conservatively set all
   // operands to escaping, because they may "escape" to the result value in
@@ -1741,7 +1745,7 @@ bool EscapeAnalysis::mergeCalleeGraph(SILInstruction *AS,
   if (CGNode *RetNd = CalleeGraph->getReturnNodeOrNull()) {
     ValueBase *CallerReturnVal = nullptr;
     if (auto *TAI = dyn_cast<TryApplyInst>(AS)) {
-      CallerReturnVal = TAI->getNormalBB()->getBBArg(0);
+      CallerReturnVal = TAI->getNormalBB()->getArgument(0);
     } else {
       CallerReturnVal = AS;
     }

@@ -5,8 +5,8 @@
 // Copyright (c) 2014 - 2016 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
-// See http://swift.org/LICENSE.txt for license information
-// See http://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
+// See https://swift.org/LICENSE.txt for license information
+// See https://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
 //
 //===----------------------------------------------------------------------===//
 //
@@ -379,7 +379,7 @@ SILCloner<ImplClass>::postProcess(SILInstruction *Orig,
   InstructionMap.insert(std::make_pair(Orig, Cloned));
 }
 
-// \brief Recursively visit a callee's BBs in depth-first preorder (only
+/// \brief Recursively visit a callee's BBs in depth-first preorder (only
 /// processing blocks on the first visit), mapping newly visited BBs to new BBs
 /// in the caller and cloning all instructions into the caller other than
 /// terminators which should be handled separately later by subclasses
@@ -397,12 +397,12 @@ SILCloner<ImplClass>::visitSILBasicBlock(SILBasicBlock* BB) {
     // Only visit a successor that has not already been visited.
     if (BBI == BBMap.end()) {
       // Map the successor to a new BB.
-      auto MappedBB = new (F.getModule()) SILBasicBlock(&F);
+      auto *MappedBB = F.createBasicBlock();
       BBMap.insert(std::make_pair(Succ.getBB(), MappedBB));
       // Create new arguments for each of the original block's arguments.
-      for (auto &Arg : Succ.getBB()->getBBArgs()) {
+      for (auto &Arg : Succ.getBB()->getArguments()) {
         SILValue MappedArg =
-          new (F.getModule()) SILArgument(MappedBB, getOpType(Arg->getType()));
+            MappedBB->createArgument(getOpType(Arg->getType()));
 
         ValueMap.insert(std::make_pair(Arg, MappedArg));
       }
@@ -1700,7 +1700,6 @@ SILCloner<ImplClass>::visitDeallocBoxInst(DeallocBoxInst *Inst) {
   getBuilder().setCurrentDebugScope(getOpScope(Inst->getDebugScope()));
   doPostProcess(Inst,
     getBuilder().createDeallocBox(getOpLocation(Inst->getLoc()),
-                                  getOpType(Inst->getElementType()),
                                   getOpValue(Inst->getOperand())));
 }
 

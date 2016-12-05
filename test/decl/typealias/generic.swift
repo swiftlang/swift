@@ -1,4 +1,4 @@
-// RUN: %target-parse-verify-swift -enable-experimental-nested-generic-types
+// RUN: %target-typecheck-verify-swift
 
 struct MyType<TyA, TyB> { // expected-note {{declared here}}
   var a : TyA, b : TyB

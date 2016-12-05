@@ -5,8 +5,8 @@
 // Copyright (c) 2014 - 2016 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
-// See http://swift.org/LICENSE.txt for license information
-// See http://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
+// See https://swift.org/LICENSE.txt for license information
+// See https://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
 //
 //===----------------------------------------------------------------------===//
 //
@@ -540,7 +540,6 @@ template<> Can##ID##Type SILType::getAs<ID##Type>() const = delete;  \
 template<> Can##ID##Type SILType::castTo<ID##Type>() const = delete; \
 template<> bool SILType::is<ID##Type>() const = delete;
 NON_SIL_TYPE(Function)
-NON_SIL_TYPE(PolymorphicFunction)
 NON_SIL_TYPE(AnyFunction)
 NON_SIL_TYPE(LValue)
 #undef NON_SIL_TYPE
@@ -597,7 +596,18 @@ inline SILType SILBoxType::getBoxedAddressType() const {
 static inline llvm::hash_code hash_value(SILType V) {
   return llvm::hash_value(V.getOpaqueValue());
 }
-  
+ 
+inline SILType SILBoxType::getFieldType(unsigned index) const {
+  return SILType::getPrimitiveAddressType(getFieldLoweredType(index));
+}
+
+inline SILType SILField::getAddressType() const {
+  return SILType::getPrimitiveAddressType(getLoweredType());
+}
+inline SILType SILField::getObjectType() const {
+  return SILType::getPrimitiveObjectType(getLoweredType());
+}
+
 } // end swift namespace
 
 namespace llvm {

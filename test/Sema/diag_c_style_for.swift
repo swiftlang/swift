@@ -1,4 +1,4 @@
-// RUN: %target-parse-verify-swift
+// RUN: %target-typecheck-verify-swift
 
 // expected-error @+1 {{'++' is unavailable: it has been removed in Swift 3}}
 for var a = 0; a < 10; a++ { // expected-error {{C-style for statement has been removed in Swift 3}} {{5-9=}} {{10-13= in }} {{14-20= ..< }} {{22-27=}}
