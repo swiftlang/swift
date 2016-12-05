@@ -198,12 +198,14 @@ namespace {
 /// assumes that field and global-variable bindings always bind at
 /// least one name, which is probably a reasonable assumption but may
 /// not be adequately enforced.
-static VarDecl *findFirstVariable(PatternBindingDecl *binding) {
+static Optional<VarDecl*> findFirstVariable(PatternBindingDecl *binding) {
   for (auto entry : binding->getPatternList()) {
     auto var = FindFirstVariable().visit(entry.getPattern());
     if (var) return var;
   }
-  llvm_unreachable("pattern-binding bound no variables?");
+  // Pattern-binding bound without variables exists in erroneous code, e.g.
+  // during code completion.
+  return None;
 }
 
 void Mangler::mangleContext(const DeclContext *ctx) {
@@ -230,8 +232,8 @@ void Mangler::mangleContext(const DeclContext *ctx) {
     }
     case LocalDeclContextKind::PatternBindingInitializer: {
       auto patternInit = cast<SerializedPatternBindingInitializer>(local);
-      auto var = findFirstVariable(patternInit->getBinding());
-      mangleInitializerEntity(var);
+      if (auto var = findFirstVariable(patternInit->getBinding()))
+        mangleInitializerEntity(var.getValue());
       return;
     }
     case LocalDeclContextKind::TopLevelCodeDecl:
@@ -318,8 +320,8 @@ void Mangler::mangleContext(const DeclContext *ctx) {
 
     case InitializerKind::PatternBinding: {
       auto patternInit = cast<PatternBindingInitializer>(ctx);
-      auto var = findFirstVariable(patternInit->getBinding());
-      mangleInitializerEntity(var);
+      if (auto var = findFirstVariable(patternInit->getBinding()))
+        mangleInitializerEntity(var.getValue());
       return;
     }
     }
