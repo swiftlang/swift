@@ -18,7 +18,7 @@
 #include "swift/AST/Comment.h"
 #include "swift/AST/DebuggerClient.h"
 #include "swift/AST/DiagnosticEngine.h"
-#include "swift/AST/Mangle.h"
+#include "swift/AST/ASTMangler.h"
 #include "swift/AST/PrintOptions.h"
 #include "swift/AST/RawComment.h"
 #include "swift/AST/SourceEntityWalker.h"
@@ -1551,13 +1551,9 @@ static int doPrintLocalTypes(const CompilerInvocation &InitInvok,
 
     // Simulate already having mangled names
     for (auto LTD : LocalTypeDecls) {
-      std::string MangledName;
-      {
-        Mangle::Mangler Mangler(/*DWARFMangling*/ true);
-        Mangler.mangleTypeForDebugger(LTD->getDeclaredInterfaceType(),
-                                      LTD->getDeclContext());
-        MangledName = Mangler.finalize();
-      }
+      std::string MangledName =
+          NewMangling::mangleTypeForDebugger(LTD->getDeclaredInterfaceType(),
+                                             LTD->getDeclContext());
       MangledNames.push_back(MangledName);
     }
 
@@ -2565,9 +2561,7 @@ public:
 
 private:
   void tryDemangleType(Type T, const DeclContext *DC, CharSourceRange range) {
-    Mangle::Mangler Man(/* DWARFMangling */true);
-    Man.mangleTypeForDebugger(T, DC);
-    std::string mangledName(Man.finalize());
+    std::string mangledName(NewMangling::mangleTypeForDebugger(T, DC));
     std::string Error;
     Type ReconstructedType =
         getTypeFromMangledSymbolname(Ctx, mangledName, Error);

@@ -21,7 +21,7 @@
 #include "Linking.h"
 #include "swift/AST/Expr.h"
 #include "swift/AST/IRGenOptions.h"
-#include "swift/AST/Mangle.h"
+#include "swift/AST/ASTMangler.h"
 #include "swift/AST/Module.h"
 #include "swift/AST/ModuleLoader.h"
 #include "swift/AST/Pattern.h"
@@ -1028,9 +1028,9 @@ StringRef IRGenDebugInfo::getMangledName(DebugTypeInfo DbgTy) {
   if (MetadataTypeDecl && DbgTy.getDecl() == MetadataTypeDecl)
     return BumpAllocatedString(DbgTy.getDecl()->getName().str());
 
-  Mangle::Mangler M(/* DWARF */ true);
-  M.mangleTypeForDebugger(DbgTy.getType(), DbgTy.getDeclContext());
-  return BumpAllocatedString(M.finalize());
+  std::string Name = NewMangling::mangleTypeForDebugger(DbgTy.getType(),
+                                                        DbgTy.getDeclContext());
+  return BumpAllocatedString(Name);
 }
 
 llvm::DIDerivedType *
