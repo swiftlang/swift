@@ -369,7 +369,6 @@ NodePointer Demangler::demangleIdentifier() {
       return nullptr;
     StringRef Slice = StringRef(Text.data() + Pos, numChars);
     if (isPunycoded) {
-      nextIf('_');
       if (!Punycode::decodePunycodeUTF8(Slice, Identifier))
         return nullptr;
     } else {
