@@ -1406,7 +1406,7 @@ bool TypeChecker::typeCheckConstructorBodyUntil(ConstructorDecl *ctor,
   // Determine whether we need to introduce a super.init call.
   auto nominalDecl = ctor->getDeclContext()
     ->getAsNominalTypeOrNominalTypeExtensionContext();
-  ClassDecl *ClassD = dyn_cast<ClassDecl>(nominalDecl);
+  ClassDecl *ClassD = dyn_cast_or_null<ClassDecl>(nominalDecl);
   bool wantSuperInitCall = false;
   if (ClassD) {
     bool isDelegating = false;
