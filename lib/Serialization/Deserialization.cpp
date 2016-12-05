@@ -3727,17 +3727,6 @@ Type ModuleFile::getType(TypeID TID) {
     break;
   }
 
-  case decls_block::SUBSTITUTED_TYPE: {
-    TypeID originalID, replacementID;
-
-    decls_block::SubstitutedTypeLayout::readRecord(scratch, originalID,
-                                                   replacementID);
-    typeOrOffset = SubstitutedType::get(getType(originalID),
-                                        getType(replacementID),
-                                        ctx);
-    break;
-  }
-
   case decls_block::DEPENDENT_MEMBER_TYPE: {
     TypeID baseID;
     DeclID assocTypeID;

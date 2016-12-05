@@ -460,8 +460,6 @@ void ASTMangler::appendType(Type type) {
 
     case TypeKind::Paren:
       return appendSugaredType<ParenType>(type);
-    case TypeKind::Substituted:
-      return appendSugaredType<SubstitutedType>(type);
     case TypeKind::ArraySlice: /* fallthrough */
     case TypeKind::Optional:
       return appendSugaredType<SyntaxSugarType>(type);

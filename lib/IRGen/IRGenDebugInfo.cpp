@@ -1704,11 +1704,6 @@ llvm::DIType *IRGenDebugInfo::createType(DebugTypeInfo DbgTy,
                                   File, L.Line, File);
   }
 
-  case TypeKind::Substituted: {
-    auto OrigTy = cast<SubstitutedType>(BaseTy)->getReplacementType();
-    return getOrCreateDesugaredType(OrigTy, DbgTy);
-  }
-
   case TypeKind::Paren: {
     auto Ty = cast<ParenType>(BaseTy)->getUnderlyingType();
     return getOrCreateDesugaredType(Ty, DbgTy);

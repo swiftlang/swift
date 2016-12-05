@@ -3030,16 +3030,6 @@ void Serializer::writeType(Type ty) {
     break;
   }
 
-  case TypeKind::Substituted: {
-    auto subTy = cast<SubstitutedType>(ty.getPointer());
-
-    unsigned abbrCode = DeclTypeAbbrCodes[SubstitutedTypeLayout::Code];
-    SubstitutedTypeLayout::emitRecord(Out, ScratchRecord, abbrCode,
-                                      addTypeRef(subTy->getOriginal()),
-                                      addTypeRef(subTy->getReplacementType()));
-    break;
-  }
-
   case TypeKind::DependentMember: {
     auto dependent = cast<DependentMemberType>(ty.getPointer());
 
@@ -3289,7 +3279,6 @@ void Serializer::writeAllDeclsAndTypes() {
   registerDeclTypeAbbr<ArchetypeNestedTypeNamesLayout>();
   registerDeclTypeAbbr<ArchetypeNestedTypesLayout>();
   registerDeclTypeAbbr<ProtocolCompositionTypeLayout>();
-  registerDeclTypeAbbr<SubstitutedTypeLayout>();
   registerDeclTypeAbbr<BoundGenericTypeLayout>();
   registerDeclTypeAbbr<BoundGenericSubstitutionLayout>();
   registerDeclTypeAbbr<GenericFunctionTypeLayout>();

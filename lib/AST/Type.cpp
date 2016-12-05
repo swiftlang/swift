@@ -533,12 +533,6 @@ public:
     return ParenType::get(pt->getASTContext(), visit(pt->getUnderlyingType()));
   }
 
-  Type visitSubstitutedType(SubstitutedType *st) {
-    return SubstitutedType::get(st->getOriginal(),
-                                visit(st->getReplacementType()),
-                                st->getASTContext());
-  }
-
   Type visitType(TypeBase *t) {
     // Other types should not structurally contain lvalues.
     assert(!t->isLValueType()
@@ -1373,10 +1367,6 @@ Type DictionaryType::getImplementationType() {
   return ImplOrContext.get<Type>();
 }
 
-TypeBase *SubstitutedType::getSinglyDesugaredType() {
-  return getReplacementType().getPointer();
-}
-
 unsigned GenericTypeParamType::getDepth() const {
   if (auto param = getDecl()) {
     return param->getDepth();
@@ -1452,7 +1442,6 @@ bool TypeBase::isSpelledLike(Type other) {
   case TypeKind::Struct:
   case TypeKind::Class:
   case TypeKind::NameAlias:
-  case TypeKind::Substituted:
   case TypeKind::GenericTypeParam:
   case TypeKind::DependentMember:
   case TypeKind::DynamicSelf:
@@ -3493,19 +3482,6 @@ case TypeKind::Id:
       return DependentMemberType::get(dependentBase, assocType);
 
     return DependentMemberType::get(dependentBase, dependent->getName());
-  }
-
-  case TypeKind::Substituted: {
-    auto substAT = cast<SubstitutedType>(base);
-    auto substTy = substAT->getReplacementType().transform(fn);
-    if (!substTy)
-      return Type();
-
-    if (substTy.getPointer() == substAT->getReplacementType().getPointer())
-      return *this;
-
-    return SubstitutedType::get(substAT->getOriginal(), substTy,
-                                Ptr->getASTContext());
   }
 
   case TypeKind::Function: {
