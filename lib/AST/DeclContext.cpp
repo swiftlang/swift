@@ -518,7 +518,10 @@ ResilienceExpansion DeclContext::getResilienceExpansion() const {
       // we serialize the parent's body.
       if (AFD->getDeclContext()->isLocalContext())
         continue;
-      
+
+      if (AFD->isInvalid())
+        break;
+
       // If the function is not externally visible, we will not be serializing
       // its body.
       if (AFD->getEffectiveAccess() < Accessibility::Public)
