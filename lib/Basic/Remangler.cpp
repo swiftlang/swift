@@ -1470,7 +1470,9 @@ void Remangler::mangleTypeMetadataLazyCache(Node *node) {
 
 void Remangler::mangleUncurriedFunctionType(Node *node) {
   mangleFunctionSignature(node);
-  Buffer << "XU";
+  // Mangle as regular function type (there is no "uncurried function type"
+  // in the new mangling scheme).
+  Buffer << 'c';
 }
 
 void Remangler::mangleUnmanaged(Node *node) {
