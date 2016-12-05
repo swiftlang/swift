@@ -430,11 +430,11 @@ NodePointer Demangler::demangleOperatorIdentifier() {
 NodePointer Demangler::demangleLocalIdentifier() {
   if (nextIf('L')) {
     NodePointer discriminator = popNode(Node::Kind::Identifier);
-    NodePointer name = popNode(Node::Kind::Identifier);
+    NodePointer name = popNode(isDeclName);
     return createWithChildren(Node::Kind::PrivateDeclName, discriminator, name);
   }
   NodePointer discriminator = demangleIndexAsNode();
-  NodePointer name = popNode(Node::Kind::Identifier);
+  NodePointer name = popNode(isDeclName);
   return createWithChildren(Node::Kind::LocalDeclName, discriminator, name);
 }
 

@@ -335,13 +335,15 @@ void ASTMangler::appendDeclName(const ValueDecl *decl) {
     appendIdentifier(translateOperator(decl->getName().str()));
     switch (decl->getAttrs().getUnaryOperatorKind()) {
       case UnaryOperatorKind::Prefix:
-        return appendOperator("op");
+        appendOperator("op");
+        break;
       case UnaryOperatorKind::Postfix:
-        return appendOperator("oP");
+        appendOperator("oP");
+        break;
       case UnaryOperatorKind::None:
-        return appendOperator("oi");
+        appendOperator("oi");
+        break;
     }
-    llvm_unreachable("bad UnaryOperatorKind");
   } else {
     appendIdentifier(decl->getName().str());
   }
