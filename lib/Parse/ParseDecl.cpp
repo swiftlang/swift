@@ -2733,11 +2733,14 @@ static ParserStatus parseDeclItem(Parser &P,
       .fixItInsert(endOfPrevious, ";");
   }
 
-  ParserStatus Status = P.parseDecl(Options, handler);
-  if (Status.isError())
+  auto Result = P.parseDecl(Options, handler);
+  if (Result.isParseError())
     P.skipUntilDeclRBrace(tok::semi, tok::pound_endif);
-  PreviousHadSemi = P.consumeIf(tok::semi);
-  return Status;
+  SourceLoc SemiLoc;
+  PreviousHadSemi = P.consumeIf(tok::semi, SemiLoc);
+  if (PreviousHadSemi && Result.isNonNull())
+    Result.get()->TrailingSemiLoc = SemiLoc;
+  return Result;
 }
 
 /// \brief Parse the members in a struct/class/enum/protocol/extension.

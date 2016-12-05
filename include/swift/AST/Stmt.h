@@ -78,6 +78,7 @@ public:
   SourceLoc getEndLoc() const;
   
   SourceRange getSourceRange() const;
+  SourceLoc TrailingSemiLoc;
   
   /// isImplicit - Determines whether this statement was implicitly-generated,
   /// rather than explicitly written in the AST.
