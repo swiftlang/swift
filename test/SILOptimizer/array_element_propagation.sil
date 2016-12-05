@@ -31,6 +31,9 @@ sil [_semantics "array.check_subscript"] @checkSubscript : $@convention(method) 
 sil [_semantics "array.get_element"] @getElement : $@convention(method) (MyInt, MyBool, _MyDependenceToken, @guaranteed MyArray<MyInt>) -> @out MyInt
 sil [_semantics "array.get_element"] @getElement2 : $@convention(method) (MyInt, MyBool, _MyDependenceToken, @guaranteed MyArray<MyInt>) -> MyInt
 sil @unknown_array_use : $@convention(method) (@guaranteed MyArray<MyInt>) -> MyBool
+sil [_semantics "array.uninitialized"] @arrayAdoptStorage : $@convention(thin) (@owned AnyObject, MyInt, @thin Array<MyInt>.Type) -> @owned (Array<MyInt>, UnsafeMutablePointer<MyInt>)
+sil @arrayInit : $@convention(method) (@thin Array<MyInt>.Type) -> @owned Array<MyInt>
+sil [_semantics "array.append_contentsOf"] @arrayAppendContentsOf : $@convention(method) (@owned Array<MyInt>, @inout Array<MyInt>) -> ()
 
 // CHECK-LABEL: sil @propagate01
 // CHECK:    struct $MyInt
@@ -299,4 +302,37 @@ sil @unknown_use : $@convention(thin) () -> () {
   dealloc_stack %26 : $*MyInt
   strong_release %25 : $Builtin.BridgeObject
   return %52 : $()
+}
+
+// CHECK-LABEL: sil @append_contentsOf
+// CHECK:   [[ACFUN:%.*]] = function_ref @arrayAppendContentsOf
+// CHECK-NOT: apply [[ACFUN]]
+// CHECK:   [[AEFUN:%.*]] = function_ref @_TFSa6appendfxT_
+// CHECK:   apply [[AEFUN]]
+// CHECK: return
+sil @append_contentsOf : $@convention(thin) () -> () {
+  %0 = function_ref @swift_bufferAllocate : $@convention(thin) () -> @owned AnyObject
+  %1 = integer_literal $Builtin.Int64, 1
+  %2 = struct $MyInt (%1 : $Builtin.Int64)
+  %3 = apply %0() : $@convention(thin) () -> @owned AnyObject
+  %4 = metatype $@thin Array<MyInt>.Type
+  %5 = function_ref @arrayAdoptStorage : $@convention(thin) (@owned AnyObject, MyInt, @thin Array<MyInt>.Type) -> @owned (Array<MyInt>, UnsafeMutablePointer<MyInt>)
+  %6 = apply %5(%3, %2, %4) : $@convention(thin) (@owned AnyObject, MyInt, @thin Array<MyInt>.Type) -> @owned (Array<MyInt>, UnsafeMutablePointer<MyInt>)
+  %7 = tuple_extract %6 : $(Array<MyInt>, UnsafeMutablePointer<MyInt>), 0
+  %8 = tuple_extract %6 : $(Array<MyInt>, UnsafeMutablePointer<MyInt>), 1
+  %9 = struct_extract %8 : $UnsafeMutablePointer<MyInt>, #UnsafeMutablePointer._rawValue
+  %10 = pointer_to_address %9 : $Builtin.RawPointer to [strict] $*MyInt
+  %11 = integer_literal $Builtin.Int64, 27
+  %12 = struct $MyInt (%11 : $Builtin.Int64)
+  store %12 to %10 : $*MyInt
+  %13 = alloc_stack $Array<MyInt>
+  %14 = metatype $@thin Array<MyInt>.Type
+  %15 = function_ref @arrayInit : $@convention(method) (@thin Array<MyInt>.Type) -> @owned Array<MyInt>
+  %16 = apply %15(%14) : $@convention(method) (@thin Array<MyInt>.Type) -> @owned Array<MyInt>
+  store %16 to %13 : $*Array<MyInt>
+  %17 = function_ref @arrayAppendContentsOf : $@convention(method) (@owned Array<MyInt>, @inout Array<MyInt>) -> ()
+  %18 = apply %17(%7, %13) : $@convention(method) (@owned Array<MyInt>, @inout Array<MyInt>) -> ()
+  dealloc_stack %13 : $*Array<MyInt>
+  %19 = tuple ()
+  return %19 : $()
 }
