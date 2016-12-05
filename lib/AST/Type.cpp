@@ -2951,7 +2951,7 @@ static Type substType(
 
     // If we have a substitution for this type, use it.
     if (auto known = substitutions(substOrig))
-      return SubstitutedType::get(type, known, type->getASTContext());
+      return known;
 
     // For archetypes, we can substitute the parent (if present).
     auto archetype = substOrig->getAs<ArchetypeType>();
@@ -3433,7 +3433,7 @@ case TypeKind::Id:
           alias->getDecl()->getUnderlyingType().getPointer())
       return *this;
 
-    return SubstitutedType::get(*this, underlyingTy, Ptr->getASTContext());
+    return underlyingTy;
   }
 
   case TypeKind::Paren: {
