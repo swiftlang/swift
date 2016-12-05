@@ -196,12 +196,8 @@ void SILGenModule::emitGlobalInitialization(PatternBindingDecl *pd,
                                             unsigned pbdEntry) {
   // Generic and dynamic static properties require lazy initialization, which
   // isn't implemented yet.
-  if (pd->isStatic()) {
-    auto theType = pd->getDeclContext()->getDeclaredTypeInContext();
-    assert(!theType->is<BoundGenericType>()
-           && "generic static properties not implemented");
-    (void)theType;
-  }
+  if (pd->isStatic())
+    assert(!pd->getDeclContext()->isGenericContext());
 
   // Emit the lazy initialization token for the initialization expression.
   auto counter = anonymousSymbolCounter++;

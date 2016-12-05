@@ -197,7 +197,8 @@ bool swift::removeShadowedDecls(SmallVectorImpl<ValueDecl*> &decls,
     if (decl->hasClangNode()) {
       if (auto ctor = dyn_cast<ConstructorDecl>(decl)) {
         auto ctorSignature
-          = std::make_pair(ctor->getExtensionType()->getCanonicalType(),
+          = std::make_pair(ctor->getDeclContext()->getDeclaredInterfaceType()
+                               ->getCanonicalType(),
                            decl->getFullName());
         auto &knownCtors = ObjCCollidingConstructors[ctorSignature];
         if (!knownCtors.empty())
@@ -722,18 +723,17 @@ UnqualifiedLookup::UnqualifiedLookup(DeclName Name, DeclContext *DC,
           if (!isCascadingUse.hasValue() || isCascadingUse.getValue())
             isCascadingUse = AFD->isCascadingContextForLookup(false);
 
-          if (AFD->getExtensionType()) {
-            if (AFD->getDeclContext()->getAsProtocolOrProtocolExtensionContext()) {
-              ExtendedType = AFD->getDeclContext()->getSelfTypeInContext();
+          if (AFD->getDeclContext()->isTypeContext()) {
+            ExtendedType = AFD->getDeclContext()->getSelfTypeInContext();
+            // FIXME: Hack to deal with missing 'Self' archetypes.
+            if (!ExtendedType)
+              if (auto *PD = AFD->getDeclContext()
+                      ->getAsProtocolOrProtocolExtensionContext())
+                ExtendedType = PD->getDeclaredType();
 
-              // Fallback path.
-              if (!ExtendedType)
-                ExtendedType = AFD->getExtensionType();
-            } else {
-              ExtendedType = AFD->getExtensionType();
-            }
             BaseDecl = AFD->getImplicitSelfDecl();
-            MetaBaseDecl = AFD->getExtensionType()->getAnyNominal();
+            MetaBaseDecl = AFD->getDeclContext()
+                ->getAsNominalTypeOrNominalTypeExtensionContext();
             DC = DC->getParent();
 
             if (auto *FD = dyn_cast<FuncDecl>(AFD))

@@ -108,30 +108,18 @@ Type Solution::computeSubstitutions(
   auto lookupConformanceFn =
       [&](CanType original, Type replacement, ProtocolType *protoType)
           -> ProtocolConformanceRef {
+    if (replacement->hasError() ||
+        isOpenedAnyObject(replacement) ||
+        replacement->is<GenericTypeParamType>()) {
+      return ProtocolConformanceRef(protoType->getDecl());
+    }
+
     auto conformance = tc.conformsToProtocol(
                          replacement,
                          protoType->getDecl(),
                          getConstraintSystem().DC,
                          (ConformanceCheckFlags::InExpression|
                           ConformanceCheckFlags::Used));
-    (void)&isOpenedAnyObject;
-    assert((conformance ||
-            replacement->hasError() ||
-            isOpenedAnyObject(replacement) ||
-            replacement->is<GenericTypeParamType>()) &&
-           "Constraint system missed a conformance?");
-
-    // Put an abstract conformance in place if we don't already have one.
-    // FIXME: Feels like a hack
-    if (!conformance &&
-        (replacement->hasDependentProtocolConformances() ||
-         replacement->hasError()))
-      conformance = ProtocolConformanceRef(protoType->getDecl());
-
-    assert(conformance->isConcrete() ||
-           replacement->hasError() ||
-           replacement->hasDependentProtocolConformances());
-
     return *conformance;
   };
 
@@ -190,11 +178,8 @@ static DeclTy *findNamedWitnessImpl(
 
   // For a type with dependent conformance, just return the requirement from
   // the protocol. There are no protocol conformance tables.
-  if (type->hasDependentProtocolConformances()) {
+  if (!conformance->isConcrete())
     return requirement;
-  }
-
-  if (!conformance->isConcrete()) return nullptr;
   auto concrete = conformance->getConcrete();
   // FIXME: Dropping substitutions here.
   return cast_or_null<DeclTy>(concrete->getWitness(requirement, &tc).getDecl());
@@ -859,11 +844,12 @@ namespace {
       }
 
       // Otherwise, we're referring to a member of a type.
-
-      // Is it an archetype member?
-      bool isDependentConformingRef
-            = isa<ProtocolDecl>(member->getDeclContext()) &&
-              baseTy->hasDependentProtocolConformances();
+      Type selfTy;
+      if (isa<ProtocolDecl>(member->getDeclContext()) &&
+          (baseTy->is<ArchetypeType>() || baseTy->isExistentialType()))
+        selfTy = baseTy;
+      else
+        selfTy = containerTy;
 
       // References to properties with accessors and storage usually go
       // through the accessors, but sometimes are direct.
@@ -875,12 +861,7 @@ namespace {
       if (baseIsInstance) {
         // Convert the base to the appropriate container type, turning it
         // into an lvalue if required.
-        Type selfTy;
-        if (isDependentConformingRef)
-          selfTy = baseTy;
-        else
-          selfTy = containerTy;
-        
+
         // If the base is already an lvalue with the right base type, we can
         // pass it as an inout qualified type.
         if (selfTy->isEqual(baseTy))
@@ -892,9 +873,7 @@ namespace {
       } else {
         // Convert the base to an rvalue of the appropriate metatype.
         base = coerceToType(base,
-                            MetatypeType::get(isDependentConformingRef
-                                                ? baseTy
-                                                : containerTy),
+                            MetatypeType::get(selfTy),
                             locator.withPathElement(
                               ConstraintLocator::MemberRefBase));
         if (!base)
@@ -5685,8 +5664,7 @@ static Type adjustSelfTypeForMember(Type baseTy, ValueDecl *member,
       // case, the member will be modeled as an inout but ExistentialMemberRef
       // and ArchetypeMemberRef want to take the base as an rvalue.
       if (auto *fd = dyn_cast<FuncDecl>(func))
-        if (!fd->isMutating() &&
-            baseObjectTy->hasDependentProtocolConformances())
+        if (!fd->isMutating() && baseObjectTy->is<ArchetypeType>())
           return baseObjectTy;
       
       return InOutType::get(baseObjectTy);
@@ -6223,7 +6201,7 @@ Expr *ExprRewriter::finishApply(ApplyExpr *apply, Type openedType,
   // We're constructing a value of nominal type. Look for the constructor or
   // enum element to use.
   assert(ty->getNominalOrBoundGenericNominal() || ty->is<DynamicSelfType>() ||
-         ty->hasDependentProtocolConformances());
+         ty->isExistentialType() || ty->is<ArchetypeType>());
   auto ctorLocator = cs.getConstraintLocator(
                  locator.withPathElement(ConstraintLocator::ApplyFunction)
                         .withPathElement(ConstraintLocator::ConstructorMember));
@@ -6782,7 +6760,7 @@ Expr *Solution::coerceToType(Expr *expr, Type toType,
 // Determine whether this is a variadic witness.
 static bool isVariadicWitness(AbstractFunctionDecl *afd) {
   unsigned index = 0;
-  if (afd->getExtensionType())
+  if (afd->getImplicitSelfDecl())
     ++index;
 
   for (auto param : *afd->getParameterList(index))

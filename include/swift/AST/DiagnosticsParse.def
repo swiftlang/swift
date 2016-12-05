@@ -508,7 +508,8 @@ ERROR(sil_member_lookup_bad_type,none,
 ERROR(sil_member_decl_type_mismatch,none,
       "member defined with mismatching type %0 (expected %1)", (Type, Type))
 ERROR(sil_substitution_mismatch,none,
-      "substitution conformances don't match archetype", ())
+      "substitution replacement type %0 does not conform to protocol %1",
+      (Type, DeclName))
 ERROR(sil_missing_substitutions,none,
       "missing substitutions", ())
 ERROR(sil_too_many_substitutions,none,

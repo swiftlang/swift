@@ -916,9 +916,6 @@ public:
 
   /// Whether this is the AnyObject type.
   bool isAnyObject();
-  
-  /// Whether this is an empty existential composition ("{}").
-  bool isEmptyExistentialComposition();
 
   /// Whether this is an existential composition containing
   /// Error.
@@ -938,16 +935,6 @@ public:
   /// Return whether this type is or can be substituted for a bridgeable
   /// object type.
   TypeTraitResult canBeClass();
-  
-  /// Returns true if the type conforms to protocols using witnesses from the
-  /// environment or from within the value. Generic parameters and existentials
-  /// meet this criteria. In these cases we represent the
-  /// conformance as a null ProtocolConformance* pointer, because there is no
-  /// static conformance associated with the conforming type.
-  bool hasDependentProtocolConformances();
-
-  /// Retrieve the type declaration directly referenced by this type, if any.
-  TypeDecl *getDirectlyReferencedTypeDecl() const;
 
 private:
   // Make vanilla new/delete illegal for Types.
@@ -4616,11 +4603,6 @@ ParameterTypeFlags::fromParameterType(Type paramTy, bool isVariadic) {
 
 inline CanType Type::getCanonicalTypeOrNull() const {
   return isNull() ? CanType() : getPointer()->getCanonicalType();
-}
-
-inline bool TypeBase::hasDependentProtocolConformances() {
-  return is<SubstitutableType>() || is<GenericTypeParamType>()
-      || isAnyExistentialType();
 }
 
 #define TYPE(id, parent)
