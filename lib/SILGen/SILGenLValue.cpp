@@ -880,8 +880,8 @@ namespace {
           CanType type = subscripts.getType();
           SmallVector<ManagedValue, 4> values;
           std::move(subscripts).getAll(values);
-          subscripts = RValue(values, type);
-          borrowedSubscripts = RValue(values, type);
+          subscripts = RValue::withPreExplodedElements(values, type);
+          borrowedSubscripts = RValue::withPreExplodedElements(values, type);
           optSubscripts = &borrowedSubscripts;
         }
         return new GetterSetterComponent(decl, IsSuper, IsDirectAccessorUse,
