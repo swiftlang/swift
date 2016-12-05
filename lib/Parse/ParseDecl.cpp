@@ -855,9 +855,9 @@ bool Parser::parseNewDeclAttribute(DeclAttributes &Attributes, SourceLoc AtLoc,
     //   identifier
     if (!Tok.is(tok::identifier) &&
         !(Tok.isAnyOperator() && Tok.getText() == "*")) {
-        if (Tok.is(tok::code_complete) && CodeCompletion) {
-          CodeCompletion->completeDeclAttrParam(DAK_Available, 0);
-          consumeToken(tok::code_complete);
+      if (Tok.is(tok::code_complete) && CodeCompletion) {
+        CodeCompletion->completeDeclAttrParam(DAK_Available, 0);
+        consumeToken(tok::code_complete);
       }
       diagnose(Tok.getLoc(), diag::attr_availability_platform, AttrName)
         .highlight(SourceRange(Tok.getLoc()));
@@ -2020,10 +2020,15 @@ void Parser::delayParseFromBeginningToHere(ParserPosition BeginParserPosition,
 ///     decl-import
 ///     decl-operator
 /// \endverbatim
-ParserStatus Parser::parseDecl(ParseDeclOptions Flags,
-                               llvm::function_ref<void(Decl*)> Handler) {
-  if (Tok.isAny(tok::pound_sourceLocation, tok::pound_line))
-    return parseLineDirective(Tok.is(tok::pound_line));
+ParserResult<Decl>
+Parser::parseDecl(ParseDeclOptions Flags,
+                  llvm::function_ref<void(Decl*)> Handler) {
+  if (Tok.isAny(tok::pound_sourceLocation, tok::pound_line)) {
+    auto LineDirectiveStatus = parseLineDirective(Tok.is(tok::pound_line));
+    if (LineDirectiveStatus.isError())
+      return LineDirectiveStatus;
+    // If success, go on. line directive never produce decls.
+  }
 
   if (Tok.is(tok::pound_if)) {
     auto IfConfigResult = parseDeclIfConfig(Flags);
@@ -2065,7 +2070,6 @@ ParserStatus Parser::parseDecl(ParseDeclOptions Flags,
   SourceLoc StaticLoc;
   StaticSpellingKind StaticSpelling = StaticSpellingKind::None;
   ParserResult<Decl> DeclResult;
-  ParserStatus Status;
 
   while (1) {
     // Save the original token, in case code-completion needs it.
@@ -2107,7 +2111,6 @@ ParserStatus Parser::parseDecl(ParseDeclOptions Flags,
 
       // Otherwise this is the start of a class declaration.
       DeclResult = parseDeclClass(ClassLoc, Flags, Attributes);
-      Status = DeclResult;
       break;
     }
 
@@ -2230,18 +2233,15 @@ ParserStatus Parser::parseDecl(ParseDeclOptions Flags,
     // Unambiguous top level decls.
     case tok::kw_import:
       DeclResult = parseDeclImport(Flags, Attributes);
-      Status = DeclResult;
       break;
     case tok::kw_extension:
       DeclResult = parseDeclExtension(Flags, Attributes);
-      Status = DeclResult;
       break;
     case tok::kw_let:
     case tok::kw_var: {
       llvm::SmallVector<Decl *, 4> Entries;
       DeclResult = parseDeclVar(Flags, Attributes, Entries, StaticLoc,
                                 StaticSpelling, tryLoc);
-      Status = DeclResult;
       StaticLoc = SourceLoc();   // we handled static if present.
       MayNeedOverrideCompletion = true;
       std::for_each(Entries.begin(), Entries.end(), InternalHandler);
@@ -2251,21 +2251,17 @@ ParserStatus Parser::parseDecl(ParseDeclOptions Flags,
     }
     case tok::kw_typealias:
       DeclResult = parseDeclTypeAlias(Flags, Attributes);
-      Status = DeclResult;
       MayNeedOverrideCompletion = true;
       break;
     case tok::kw_associatedtype:
       DeclResult = parseDeclAssociatedType(Flags, Attributes);
-      Status = DeclResult;
       break;
     case tok::kw_enum:
       DeclResult = parseDeclEnum(Flags, Attributes);
-      Status = DeclResult;
       break;
     case tok::kw_case: {
       llvm::SmallVector<Decl *, 4> Entries;
       DeclResult = parseDeclEnumCase(Flags, Attributes, Entries);
-      Status = DeclResult;
       std::for_each(Entries.begin(), Entries.end(), InternalHandler);
       if (auto *D = DeclResult.getPtrOrNull())
         markWasHandled(D);
@@ -2273,32 +2269,25 @@ ParserStatus Parser::parseDecl(ParseDeclOptions Flags,
     }
     case tok::kw_struct:
       DeclResult = parseDeclStruct(Flags, Attributes);
-      Status = DeclResult;
       break;
     case tok::kw_init:
       DeclResult = parseDeclInit(Flags, Attributes);
-      Status = DeclResult;
       break;
     case tok::kw_deinit:
       DeclResult = parseDeclDeinit(Flags, Attributes);
-      Status = DeclResult;
       break;
     case tok::kw_operator:
       DeclResult = parseDeclOperator(Flags, Attributes);
-      Status = DeclResult;
       break;
     case tok::kw_precedencegroup:
       DeclResult = parseDeclPrecedenceGroup(Flags, Attributes);
-      Status = DeclResult;
       break;
     case tok::kw_protocol:
       DeclResult = parseDeclProtocol(Flags, Attributes);
-      Status = DeclResult;
       break;
 
     case tok::kw_func:
       DeclResult = parseDeclFunc(StaticLoc, StaticSpelling, Flags, Attributes);
-      Status = DeclResult;
       StaticLoc = SourceLoc();   // we handled static if present.
       MayNeedOverrideCompletion = true;
       break;
@@ -2311,7 +2300,6 @@ ParserStatus Parser::parseDecl(ParseDeclOptions Flags,
       }
       llvm::SmallVector<Decl *, 4> Entries;
       DeclResult = parseDeclSubscript(Flags, Attributes, Entries);
-      Status = DeclResult;
       std::for_each(Entries.begin(), Entries.end(), InternalHandler);
       MayNeedOverrideCompletion = true;
       if (auto *D = DeclResult.getPtrOrNull())
@@ -2321,14 +2309,14 @@ ParserStatus Parser::parseDecl(ParseDeclOptions Flags,
 
     case tok::code_complete:
       MayNeedOverrideCompletion = true;
-      Status.setIsParseError();
+      DeclResult = makeParserError();
       // Handled below.
       break;
     }
 
-    if (Status.isError() && MayNeedOverrideCompletion &&
+    if (DeclResult.isParseError() && MayNeedOverrideCompletion &&
         Tok.is(tok::code_complete)) {
-      Status = makeParserCodeCompletionStatus();
+      DeclResult = makeParserCodeCompletionStatus();
       if (CodeCompletion) {
         // If we need to complete an override, collect the keywords already
         // specified so that we do not duplicate them in code completion
@@ -2372,17 +2360,16 @@ ParserStatus Parser::parseDecl(ParseDeclOptions Flags,
                                               false);
     } else {
       delayParseFromBeginningToHere(BeginParserPosition, Flags);
-      return makeParserSuccess();
+      return makeParserError();
     }
   }
 
-  if (Status.hasCodeCompletion() && isCodeCompletionFirstPass() &&
+  if (DeclResult.hasCodeCompletion() && isCodeCompletionFirstPass() &&
       !CurDeclContext->isModuleScopeContext()) {
     // Only consume non-toplevel decls.
     consumeDecl(BeginParserPosition, Flags, /*IsTopLevel=*/false);
 
-    // Pretend that there was no error.
-    return makeParserSuccess();
+    return makeParserError();
   }
 
   if (DeclResult.isNonNull()) {
@@ -2391,16 +2378,16 @@ ParserStatus Parser::parseDecl(ParseDeclOptions Flags,
       InternalHandler(DeclResult.get());
   }
 
-  if (Status.isSuccess()) {
+  if (!DeclResult.isParseError()) {
     // If we parsed 'class' or 'static', but didn't handle it above, complain
     // about it.
     if (StaticLoc.isValid())
-      diagnose(LastDecl->getLoc(), diag::decl_not_static,
+      diagnose(DeclResult.get()->getLoc(), diag::decl_not_static,
                StaticSpelling)
           .fixItRemove(SourceRange(StaticLoc));
   }
 
-  return Status;
+  return DeclResult;
 }
 
 void Parser::parseDeclDelayed() {

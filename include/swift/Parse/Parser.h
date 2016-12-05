@@ -675,8 +675,8 @@ public:
     return AlreadyHandledDecls.erase(D);
   }
 
-  ParserStatus parseDecl(ParseDeclOptions Flags,
-                         llvm::function_ref<void(Decl*)> Handler);
+  ParserResult<Decl> parseDecl(ParseDeclOptions Flags,
+                               llvm::function_ref<void(Decl*)> Handler);
 
   void parseDeclDelayed();
 
