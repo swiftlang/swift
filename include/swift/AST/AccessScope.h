@@ -68,8 +68,11 @@ public:
   /// Returns the narrowest access scope if this and the specified access scope
   /// have common intersection, or None if scopes don't intersect.
   const Optional<AccessScope> intersectWith(AccessScope accessScope) const {
-    if (hasEqualDeclContextWith(accessScope))
-      return *this;
+    if (hasEqualDeclContextWith(accessScope)) {
+      if (isPrivate())
+        return *this;
+      return accessScope;
+    }
     if (isChildOf(accessScope))
       return *this;
     if (accessScope.isChildOf(*this))
