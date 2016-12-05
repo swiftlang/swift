@@ -1591,11 +1591,6 @@ void Mangler::mangleEntity(const ValueDecl *decl,
   assert(!isa<ConstructorDecl>(decl));
   assert(!isa<DestructorDecl>(decl));
 
-  // Avoid mangling nameless entity. This may happen in erroneous code as code
-  // completion.
-  if (!decl->hasName())
-    return;
-
   // entity ::= static? entity-kind context entity-name
   if (decl->isStatic())
     Buffer << 'Z';
@@ -1608,7 +1603,12 @@ void Mangler::mangleEntity(const ValueDecl *decl,
       return mangleAccessorEntity(accessorKind, func->getAddressorKind(),
                                   func->getAccessorStorageDecl());
   }
-  
+
+  // Avoid mangling nameless entity. This may happen in erroneous code as code
+  // completion.
+  if (!decl->hasName())
+    return;
+
   if (isa<VarDecl>(decl)) {
     Buffer << 'v';
   } else if (isa<SubscriptDecl>(decl)) {
