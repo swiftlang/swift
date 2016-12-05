@@ -916,9 +916,6 @@ public:
 
   /// Whether this is the AnyObject type.
   bool isAnyObject();
-  
-  /// Whether this is an empty existential composition ("{}").
-  bool isEmptyExistentialComposition();
 
   /// Whether this is an existential composition containing
   /// Error.

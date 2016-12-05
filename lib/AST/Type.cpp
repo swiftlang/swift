@@ -659,17 +659,6 @@ bool TypeBase::isAnyObject() {
   return false;
 }
 
-bool TypeBase::isEmptyExistentialComposition() {
-  if (auto emtType = ExistentialMetatypeType::get(this)) {
-    if (auto pcType = emtType->getInstanceType()->
-        getAs<ProtocolCompositionType>()) {
-      return pcType->getProtocols().empty();
-    }
-  }
-  
-  return false;
-}
-
 bool TypeBase::isExistentialWithError() {
   // FIXME: Compute this as a bit in TypeBase so this operation isn't
   // overly expensive.

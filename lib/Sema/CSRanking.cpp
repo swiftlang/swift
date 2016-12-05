@@ -392,7 +392,7 @@ static bool hasEmptyExistentialParameterMismatch(ValueDecl *decl1,
       return false;
     
     if (t2->isAnyExistentialType() && !t1->isAnyExistentialType())
-      return t2->isEmptyExistentialComposition();
+      return t2->isAny();
   }
   return false;
 }
