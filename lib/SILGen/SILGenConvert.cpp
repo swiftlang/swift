@@ -310,7 +310,8 @@ SILGenFunction::emitOptionalToOptional(SILLocation loc,
 
     // Inject that into the result type if the result is address-only.
     if (resultTL.isAddressOnly()) {
-      ArgumentSource resultValueRV(loc, RValue(resultValue, resultValueTy));
+      ArgumentSource resultValueRV(loc, RValue(*this, loc,
+                                               resultValueTy, resultValue));
       emitInjectOptionalValueInto(loc, std::move(resultValueRV),
                                   result, resultTL);
     } else {
