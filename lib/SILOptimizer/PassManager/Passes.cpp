@@ -412,6 +412,9 @@ void swift::runSILOptimizationPasses(SILModule &Module) {
   // after FSO.
   PM.addLateReleaseHoisting();
 
+  // Has only an effect if the -assume-single-thread option is specified.
+  PM.addAssumeSingleThreaded();
+
   PM.runOneIteration();
 
   PM.resetAndRemoveTransformations();
@@ -451,6 +454,9 @@ void swift::runSILPassesForOnone(SILModule &Module) {
   // Here we just convert external definitions to declarations. LLVM will
   // eventually remove unused declarations.
   PM.addExternalDefsToDecls();
+
+  // Has only an effect if the -assume-single-thread option is specified.
+  PM.addAssumeSingleThreaded();
 
   // Has only an effect if the -gsil option is specified.
   PM.addSILDebugInfoGenerator();
