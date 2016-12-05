@@ -4671,8 +4671,8 @@ static bool diagnoseImplicitSelfErrors(Expr *fnExpr, Expr *argExpr,
   };
 
   auto getBaseName = [](DeclContext *context) -> DeclName {
-    if (context->isTypeContext()) {
-      auto generic = context->getAsGenericTypeOrGenericTypeExtensionContext();
+    if (auto generic =
+          context->getAsNominalTypeOrNominalTypeExtensionContext()) {
       return generic->getName();
     } else if (context->isModuleScopeContext())
       return context->getParentModule()->getName();

@@ -704,7 +704,7 @@ namespace {
       if (!isa<ConstructorDecl>(fn))
         return false;
       auto *parent =
-        fn->getParent()->getAsGenericTypeOrGenericTypeExtensionContext();
+        fn->getParent()->getAsNominalTypeOrNominalTypeExtensionContext();
       return parent && (isa<ClassDecl>(parent) || isa<ProtocolDecl>(parent));
     }
 

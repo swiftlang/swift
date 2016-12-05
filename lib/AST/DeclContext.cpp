@@ -40,7 +40,7 @@ ASTContext &DeclContext::getASTContext() const {
 }
 
 GenericTypeDecl *
-DeclContext::getAsGenericTypeOrGenericTypeExtensionContext() const {
+DeclContext::getAsTypeOrTypeExtensionContext() const {
   switch (getContextKind()) {
   case DeclContextKind::Module:
   case DeclContextKind::FileUnit:
@@ -78,32 +78,28 @@ DeclContext::getAsGenericTypeOrGenericTypeExtensionContext() const {
 /// extension thereof, return the NominalTypeDecl.
 NominalTypeDecl *DeclContext::
 getAsNominalTypeOrNominalTypeExtensionContext() const {
-  auto decl = getAsGenericTypeOrGenericTypeExtensionContext();
+  auto decl = getAsTypeOrTypeExtensionContext();
   return dyn_cast_or_null<NominalTypeDecl>(decl);
 }
 
 
 ClassDecl *DeclContext::getAsClassOrClassExtensionContext() const {
-  return dyn_cast_or_null<ClassDecl>(
-           getAsGenericTypeOrGenericTypeExtensionContext());
+  return dyn_cast_or_null<ClassDecl>(getAsTypeOrTypeExtensionContext());
 }
 
 EnumDecl *DeclContext::getAsEnumOrEnumExtensionContext() const {
-  return dyn_cast_or_null<EnumDecl>(
-           getAsGenericTypeOrGenericTypeExtensionContext());
+  return dyn_cast_or_null<EnumDecl>(getAsTypeOrTypeExtensionContext());
 }
 
 ProtocolDecl *DeclContext::getAsProtocolOrProtocolExtensionContext() const {
-  return dyn_cast_or_null<ProtocolDecl>(
-           getAsGenericTypeOrGenericTypeExtensionContext());
+  return dyn_cast_or_null<ProtocolDecl>(getAsTypeOrTypeExtensionContext());
 }
 
 ProtocolDecl *DeclContext::getAsProtocolExtensionContext() const {
   if (getContextKind() != DeclContextKind::ExtensionDecl)
     return nullptr;
 
-  return dyn_cast_or_null<ProtocolDecl>(
-           getAsGenericTypeOrGenericTypeExtensionContext());
+  return dyn_cast_or_null<ProtocolDecl>(getAsTypeOrTypeExtensionContext());
 }
 
 GenericTypeParamType *DeclContext::getProtocolSelfType() const {
