@@ -4204,7 +4204,7 @@ ParserStatus Parser::parseDeclVar(ParseDeclOptions Flags,
       if (init.hasCodeCompletion() && isCodeCompletionFirstPass()) {
 
         // Register the end of the init as the end of the delayed parsing.
-        DelayedDeclEnd = init.get() ? init.get()->getEndLoc() : SourceLoc();
+        DelayedDeclEnd = init.getPtrOrNull() ? init.get()->getEndLoc() : SourceLoc();
         return makeParserCodeCompletionStatus();
       }
 
