@@ -289,8 +289,7 @@ void AttributeEarlyChecker::visitIBActionAttr(IBActionAttr *attr) {
 
 void AttributeEarlyChecker::visitIBDesignableAttr(IBDesignableAttr *attr) {
   if (auto *ED = dyn_cast<ExtensionDecl>(D)) {
-    CanType extendedTy = ED->getExtendedType()->getCanonicalType();
-    if (!isa<ClassDecl>(extendedTy->getAnyNominal()))
+    if (!ED->getAsClassOrClassExtensionContext())
       return diagnoseAndRemoveAttr(attr, diag::invalid_ibdesignable_extension);
   }
 }
