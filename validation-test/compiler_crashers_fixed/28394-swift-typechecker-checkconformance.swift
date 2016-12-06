@@ -5,6 +5,6 @@
 // See https://swift.org/LICENSE.txt for license information
 // See https://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
 
-// RUN: not --crash %target-swift-frontend %s -emit-ir
+// RUN: not %target-swift-frontend %s -typecheck
 // REQUIRES: asserts
-{protocol A{class B{}struct Q<f,g where B:T>:A
+class d:a{let c=A}protocol a{struct A{}class S<T{}typealias e:a typealias d:a

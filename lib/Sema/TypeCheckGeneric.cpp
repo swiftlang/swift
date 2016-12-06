@@ -50,9 +50,7 @@ Type DependentGenericTypeResolver::resolveDependentMemberType(
 }
 
 Type DependentGenericTypeResolver::resolveSelfAssociatedType(
-       Type selfTy,
-       DeclContext *DC,
-       AssociatedTypeDecl *assocType) {
+       Type selfTy, AssociatedTypeDecl *assocType) {
   auto archetype = Builder.resolveArchetype(selfTy);
   assert(archetype && "Bad generic context nesting?");
   
@@ -61,15 +59,8 @@ Type DependentGenericTypeResolver::resolveSelfAssociatedType(
            ->getDependentType(/*FIXME: */{ }, /*allowUnresolved=*/true);
 }
 
-static Type getTypeOfContext(DeclContext *dc, bool wantSelf) {
-  if (wantSelf)
-    return dc->getSelfInterfaceType();
-  return dc->getDeclaredInterfaceType();
-}
-
-Type DependentGenericTypeResolver::resolveTypeOfContext(DeclContext *dc,
-                                                        bool wantSelf) {
-  return getTypeOfContext(dc, wantSelf);
+Type DependentGenericTypeResolver::resolveTypeOfContext(DeclContext *dc) {
+  return dc->getSelfInterfaceType();
 }
 
 Type DependentGenericTypeResolver::resolveTypeOfDecl(TypeDecl *decl) {
@@ -106,21 +97,20 @@ Type GenericTypeToArchetypeResolver::resolveDependentMemberType(
 }
 
 Type GenericTypeToArchetypeResolver::resolveSelfAssociatedType(
-       Type selfTy,
-       DeclContext *DC,
-       AssociatedTypeDecl *assocType) {
+       Type selfTy, AssociatedTypeDecl *assocType) {
   llvm_unreachable("Dependent type after archetype substitution");  
 }
 
-Type GenericTypeToArchetypeResolver::resolveTypeOfContext(DeclContext *dc,
-                                                          bool wantSelf) {
+Type GenericTypeToArchetypeResolver::resolveTypeOfContext(DeclContext *dc) {
   // FIXME: Fallback case.
-  if (dc->isGenericContext() && !dc->isValidGenericContext())
-    return getTypeOfContext(dc, wantSelf);
+  if (!isa<ExtensionDecl>(dc) &&
+      dc->isGenericContext() &&
+      !dc->isValidGenericContext())
+    return dc->getSelfInterfaceType();
 
   return ArchetypeBuilder::mapTypeIntoContext(
       dc->getParentModule(), GenericEnv,
-      getTypeOfContext(dc, wantSelf));
+      dc->getSelfInterfaceType());
 }
 
 Type GenericTypeToArchetypeResolver::resolveTypeOfDecl(TypeDecl *decl) {
@@ -242,17 +232,15 @@ Type CompleteGenericTypeResolver::resolveDependentMemberType(
   return ErrorType::get(TC.Context);
 }
 
-Type CompleteGenericTypeResolver::resolveSelfAssociatedType(Type selfTy,
-       DeclContext *DC,
-       AssociatedTypeDecl *assocType) {
+Type CompleteGenericTypeResolver::resolveSelfAssociatedType(
+       Type selfTy, AssociatedTypeDecl *assocType) {
   return Builder.resolveArchetype(selfTy)->getRepresentative()
            ->getNestedType(assocType->getName(), Builder)
            ->getDependentType(/*FIXME: */{ }, /*allowUnresolved=*/false);
 }
 
-Type CompleteGenericTypeResolver::resolveTypeOfContext(DeclContext *dc,
-                                                       bool wantSelf) {
-  return getTypeOfContext(dc, wantSelf);
+Type CompleteGenericTypeResolver::resolveTypeOfContext(DeclContext *dc) {
+  return dc->getSelfInterfaceType();
 }
 
 Type CompleteGenericTypeResolver::resolveTypeOfDecl(TypeDecl *decl) {
