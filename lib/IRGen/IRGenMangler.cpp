@@ -1,4 +1,4 @@
-//===--- IRGenMangler.h - mangling of IRGen symbols -----------------------===//
+//===--- IRGenMangler.cpp - mangling of IRGen symbols ---------------------===//
 //
 // This source file is part of the Swift.org open source project
 //
