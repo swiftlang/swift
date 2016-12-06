@@ -103,7 +103,7 @@ void IterativeTypeChecker::processResolveInheritedClauseEntry(
 
   // Validate the type of this inherited clause entry.
   // FIXME: Recursion into existing type checker.
-  GenericTypeToArchetypeResolver resolver(dc->getGenericEnvironmentOfContext());
+  GenericTypeToArchetypeResolver resolver(dc);
   if (TC.validateType(*inherited, dc, options, &resolver)) {
     inherited->setInvalidType(getASTContext());
   }

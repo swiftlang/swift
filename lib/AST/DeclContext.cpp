@@ -354,8 +354,7 @@ AbstractFunctionDecl *DeclContext::getInnermostMethodContext() {
 }
 
 bool DeclContext::isTypeContext() const {
-  return (getContextKind() == DeclContextKind::GenericTypeDecl &&
-          !isa<TypeAliasDecl>(this)) ||
+  return isa<NominalTypeDecl>(this) ||
          getContextKind() == DeclContextKind::ExtensionDecl;
 }
 

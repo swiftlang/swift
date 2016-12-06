@@ -6846,25 +6846,6 @@ void TypeChecker::checkDeclCircularity(NominalTypeDecl *decl) {
   }
 }
 
-/// Determine whether the given variable is the implicit 'self' parameter for
-/// a function, and return that function if so.
-static AbstractFunctionDecl *isImplicitSelfParam(VarDecl *var){
-  if (!var->isImplicit()) return nullptr;
-
-  auto param = dyn_cast<ParamDecl>(var);
-  if (!param) return nullptr;
-
-  auto func = dyn_cast<AbstractFunctionDecl>(var->getDeclContext());
-  if (!func) return nullptr;
-
-  if (!func->getDeclContext()->isTypeContext()) return nullptr;
-
-  if (param == func->getImplicitSelfDecl())
-    return func;
-
-  return nullptr;
-}
-
 void TypeChecker::validateDecl(ValueDecl *D, bool resolveTypeParams) {
   if (hasEnabledForbiddenTypecheckPrefix())
     checkForForbiddenPrefix(D);
@@ -7112,12 +7093,12 @@ void TypeChecker::validateDecl(ValueDecl *D, bool resolveTypeParams) {
   case DeclKind::Param: {
     auto VD = cast<VarDecl>(D);
     if (!VD->hasType()) {
-      if (auto func = isImplicitSelfParam(VD)) {
+      if (VD->isSelfParameter()) {
         if (!VD->hasInterfaceType()) {
           VD->setInterfaceType(ErrorType::get(Context));
           VD->setInvalid();
         }
-        recordSelfContextType(func);
+        recordSelfContextType(cast<AbstractFunctionDecl>(VD->getDeclContext()));
       } else if (PatternBindingDecl *PBD = VD->getParentPatternBinding()) {
         if (PBD->isBeingTypeChecked()) {
           diagnose(VD, diag::pattern_used_in_type, VD->getName());
