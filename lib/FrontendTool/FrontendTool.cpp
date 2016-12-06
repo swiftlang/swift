@@ -28,6 +28,7 @@
 #include "swift/AST/DiagnosticsSema.h"
 #include "swift/AST/IRGenOptions.h"
 #include "swift/AST/Mangle.h"
+#include "swift/AST/ASTMangler.h"
 #include "swift/AST/NameLookup.h"
 #include "swift/AST/ReferencedNameTracker.h"
 #include "swift/AST/TypeRefinementContext.h"
@@ -197,7 +198,12 @@ static bool extendedTypeIsPrivate(TypeLoc inheritedType) {
 static std::string mangleTypeAsContext(const NominalTypeDecl *type) {
   Mangle::Mangler mangler(/*debug style=*/false, /*Unicode=*/true);
   mangler.mangleContext(type);
-  return mangler.finalize();
+  std::string Old = mangler.finalize();
+
+  NewMangling::ASTMangler NewMangler(/*debug style=*/false, /*Unicode=*/true);
+  std::string New = NewMangler.mangleTypeAsContextUSR(type);
+
+  return NewMangling::selectMangling(Old, New);
 }
 
 /// Emits a Swift-style dependencies file.
@@ -564,18 +570,17 @@ namespace {
 class JSONFixitWriter : public DiagnosticConsumer {
   std::unique_ptr<llvm::raw_ostream> OSPtr;
   bool FixitAll;
+  std::vector<SingleEdit> AllEdits;
 
 public:
   JSONFixitWriter(std::unique_ptr<llvm::raw_ostream> OS,
                   const DiagnosticOptions &DiagOpts)
     : OSPtr(std::move(OS)),
-      FixitAll(DiagOpts.FixitCodeForAllDiagnostics) {
-    *OSPtr << "[\n";
-  }
-  ~JSONFixitWriter() {
-    *OSPtr << "]\n";
-  }
+      FixitAll(DiagOpts.FixitCodeForAllDiagnostics) {}
 
+  ~JSONFixitWriter() {
+    swift::writeEditsInJson(llvm::makeArrayRef(AllEdits), *OSPtr);
+  }
 private:
   void handleDiagnostic(SourceManager &SM, SourceLoc Loc,
                         DiagnosticKind Kind, StringRef Text,
@@ -583,7 +588,7 @@ private:
     if (!shouldFix(Kind, Info))
       return;
     for (const auto &Fix : Info.FixIts) {
-      swift::writeEdit(SM, Fix.getRange(), Fix.getText(), *OSPtr);
+      AllEdits.push_back({SM, Fix.getRange(), Fix.getText()});
     }
   }
 
@@ -1073,10 +1078,10 @@ static bool performCompile(CompilerInstance &Instance,
   // something is persisting across calls to performIRGeneration.
   auto &LLVMContext = getGlobalLLVMContext();
   if (PrimarySourceFile) {
-    performIRGeneration(IRGenOpts, *PrimarySourceFile, SM.get(),
+    performIRGeneration(IRGenOpts, *PrimarySourceFile, std::move(SM),
                         opts.getSingleOutputFilename(), LLVMContext);
   } else {
-    performIRGeneration(IRGenOpts, Instance.getMainModule(), SM.get(),
+    performIRGeneration(IRGenOpts, Instance.getMainModule(), std::move(SM),
                         opts.getSingleOutputFilename(), LLVMContext);
   }
 
@@ -1292,6 +1297,10 @@ int swift::performFrontend(ArrayRef<const char *> Args,
   bool HadError =
     performCompile(Instance, Invocation, Args, ReturnValue, observer) ||
     Instance.getASTContext().hadError();
+
+  if (!HadError) {
+    NewMangling::printManglingStats();
+  }
 
   if (!HadError && !Invocation.getFrontendOptions().DumpAPIPath.empty()) {
     HadError = dumpAPI(Instance.getMainModule(),

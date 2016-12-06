@@ -28,6 +28,8 @@ static ModRefInfo getConservativeModRefForKind(const llvm::Instruction &I) {
 #define KIND(Name, MemBehavior) case RT_ ## Name: return MRI_ ## MemBehavior;
 #include "LLVMSwift.def"
   }
+
+  llvm_unreachable("Not a valid Instruction.");
 }
 
 ModRefInfo SwiftAAResult::getModRefInfo(llvm::ImmutableCallSite CS,

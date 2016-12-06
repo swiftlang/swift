@@ -3827,7 +3827,6 @@ void Parser::ParsedAccessors::record(Parser &P, AbstractStorageDecl *storage,
                                      SmallVectorImpl<Decl *> &decls) {
   auto flagInvalidAccessor = [&](FuncDecl *&func) {
     if (func) {
-      func->setInterfaceType(ErrorType::get(P.Context));
       func->setInvalid();
     }
   };
@@ -4204,7 +4203,7 @@ ParserStatus Parser::parseDeclVar(ParseDeclOptions Flags,
       if (init.hasCodeCompletion() && isCodeCompletionFirstPass()) {
 
         // Register the end of the init as the end of the delayed parsing.
-        DelayedDeclEnd = init.get() ? init.get()->getEndLoc() : SourceLoc();
+        DelayedDeclEnd = init.getPtrOrNull() ? init.get()->getEndLoc() : SourceLoc();
         return makeParserCodeCompletionStatus();
       }
 
@@ -5323,7 +5322,6 @@ ParserStatus Parser::parseDeclSubscript(ParseDeclOptions Flags,
                    ElementTy.get(), Indices.get(), Decls);
 
   if (Invalid) {
-    Subscript->setType(ErrorType::get(Context));
     Subscript->setInterfaceType(ErrorType::get(Context));
     Subscript->setInvalid();
   }

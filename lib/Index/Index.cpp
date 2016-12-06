@@ -49,6 +49,8 @@ printArtificialName(const swift::ValueDecl *VD, llvm::raw_ostream &OS) {
   case AccessorKind::IsMutableAddressor:
     return true;
   }
+
+  llvm_unreachable("Unhandled AccessorKind in switch.");
 }
 
 static bool printDisplayName(const swift::ValueDecl *D, llvm::raw_ostream &OS) {
@@ -573,8 +575,7 @@ bool IndexSwiftASTWalker::passRelatedType(const TypeLoc &Ty) {
   }
 
   if (Ty.getType()) {
-    if (auto nominal = dyn_cast_or_null<NominalTypeDecl>(
-            Ty.getType()->getDirectlyReferencedTypeDecl()))
+    if (auto nominal = Ty.getType()->getAnyNominal())
       if (!passRelated(nominal, Ty.getLoc()))
         return false;
   }
@@ -595,6 +596,8 @@ static SymbolSubKind getSubKindForAccessor(AccessorKind AK) {
   case AccessorKind::IsMaterializeForSet:
     llvm_unreachable("unexpected MaterializeForSet");
   }
+
+  llvm_unreachable("Unhandled AccessorKind in switch.");
 }
 
 bool IndexSwiftASTWalker::reportPseudoAccessor(AbstractStorageDecl *D,
@@ -640,8 +643,7 @@ bool IndexSwiftASTWalker::reportPseudoAccessor(AbstractStorageDecl *D,
 NominalTypeDecl *
 IndexSwiftASTWalker::getTypeLocAsNominalTypeDecl(const TypeLoc &Ty) {
   if (Type T = Ty.getType())
-    return dyn_cast_or_null<NominalTypeDecl>(
-        T->getDirectlyReferencedTypeDecl());
+    return T->getAnyNominal();
   if (IdentTypeRepr *T = dyn_cast_or_null<IdentTypeRepr>(Ty.getTypeRepr())) {
     auto Comp = T->getComponentRange().back();
     if (auto NTD = dyn_cast_or_null<NominalTypeDecl>(Comp->getBoundDecl()))

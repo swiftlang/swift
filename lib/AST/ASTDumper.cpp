@@ -514,11 +514,10 @@ namespace {
       if (GenericTypeDecl *GTD = dyn_cast<GenericTypeDecl>(VD))
         printGenericParameters(OS, GTD->getGenericParams());
 
-      if (!isa<AbstractFunctionDecl>(VD) &&
-          !isa<EnumElementDecl>(VD)) {
+      if (auto *var = dyn_cast<VarDecl>(VD)) {
         OS << " type='";
-        if (VD->hasType())
-          VD->getType().print(OS);
+        if (var->hasType())
+          var->getType().print(OS);
         else
           OS << "<null type>";
         OS << '\'';
@@ -526,7 +525,7 @@ namespace {
 
       if (VD->hasInterfaceType()) {
         OS << " interface type='";
-        VD->getInterfaceType()->getCanonicalType().print(OS);
+        VD->getInterfaceType()->print(OS);
         OS << '\'';
       }
 
@@ -567,7 +566,7 @@ namespace {
                       llvm::Optional<llvm::raw_ostream::Colors>()) {
       printCommon((ValueDecl *)NTD, Name, Color);
 
-      if (NTD->hasType()) {
+      if (NTD->hasInterfaceType()) {
         if (NTD->hasFixedLayout())
           OS << " @_fixed_layout";
         else
@@ -703,7 +702,6 @@ namespace {
     void visitSubscriptDecl(SubscriptDecl *SD) {
       printCommon(SD, "subscript_decl");
       OS << " storage_kind=" << getStorageKindName(SD->getStorageKind());
-      OS << " element=" << SD->getElementType()->getCanonicalType();
       printAccessors(SD);
       OS << ')';
     }
@@ -758,13 +756,19 @@ namespace {
       if (!P->getArgumentName().empty())
         OS << " apiName=" << P->getArgumentName();
       
-      OS << " type=";
       if (P->hasType()) {
+        OS << " type=";
         OS << '\'';
         P->getType().print(OS);
         OS << '\'';
-      } else
-        OS << "<null type>";
+      }
+      
+      if (P->hasInterfaceType()) {
+        OS << " interface type=";
+        OS << '\'';
+        P->getInterfaceType().print(OS);
+        OS << '\'';
+      }
       
       if (!P->isLet())
         OS << " mutable";
@@ -2854,12 +2858,6 @@ namespace {
       OS << ")";
     }
 
-    void visitAssociatedTypeType(AssociatedTypeType *T, StringRef label) {
-      printCommon(T, label, "associated_type_type");
-      printField("decl", T->getDecl()->printRef());
-      OS << ")";
-    }
-
     void visitSubstitutedType(SubstitutedType *T, StringRef label) {
       printCommon(T, label, "substituted_type");
       printRec("original", T->getOriginal());
@@ -2940,7 +2938,7 @@ namespace {
 
     void visitSILFunctionType(SILFunctionType *T, StringRef label) {
       printCommon(T, label, "sil_function_type");
-      // FIXME: Make this useful.
+      // FIXME: Print the structure of the type.
       printField("type", T->getString());
       OS << ")";
     }
@@ -2953,7 +2951,8 @@ namespace {
 
     void visitSILBoxType(SILBoxType *T, StringRef label) {
       printCommon(T, label, "sil_box_type");
-      printRec(T->getBoxedType());
+      // FIXME: Print the structure of the type.
+      printField("type", T->getString());
       OS << ")";
     }
 

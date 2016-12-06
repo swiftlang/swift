@@ -222,6 +222,8 @@ void EnumInfo::determineConstantNamePrefix(ASTContext &ctx,
     case clang::AR_Unavailable:
       return false;
     }
+
+    llvm_unreachable("Invalid AvailabilityAttr.");
   };
 
   // Move to the first non-deprecated enumerator, or non-swift_name'd

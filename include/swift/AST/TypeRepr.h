@@ -45,37 +45,60 @@ class alignas(8) TypeRepr {
   TypeRepr(const TypeRepr&) = delete;
   void operator=(const TypeRepr&) = delete;
 
-  /// \brief The subclass of TypeRepr that this is.
-  unsigned Kind : 6;
+  class TypeReprBitfields {
+    friend class TypeRepr;
+    /// The subclass of TypeRepr that this is.
+    unsigned Kind : 6;
 
-  /// Whether this type representation is known to contain an invalid
-  /// type.
-  unsigned Invalid : 1;
+    /// Whether this type representation is known to contain an invalid
+    /// type.
+    unsigned Invalid : 1;
 
-  /// Whether this type representation had a warning emitted related to it.
-  /// This is a hack related to how we resolve type exprs multiple times in
-  /// generic contexts.
-  unsigned Warned : 1;
-
-  SourceLoc getLocImpl() const { return getStartLoc(); }
+    /// Whether this type representation had a warning emitted related to it.
+    /// This is a hack related to how we resolve type exprs multiple times in
+    /// generic contexts.
+    unsigned Warned : 1;
+  };
+  enum { NumTypeReprBits = 8 };
+  class TupleTypeReprBitfields {
+    friend class TupleTypeRepr;
+    unsigned : NumTypeReprBits;
+    // HasNames, HasLabels?
+    unsigned NameStatus : 2;
+    // Whether this tuple has '...' and its position.
+    unsigned HasEllipsis : 1;
+  };
 
 protected:
-  TypeRepr(TypeReprKind K)
-    : Kind(static_cast<unsigned>(K)), Invalid(false), Warned(false) {}
+  union {
+    TypeReprBitfields TypeReprBits;
+    TupleTypeReprBitfields TupleTypeReprBits;
+  };
+
+  TypeRepr(TypeReprKind K) {
+    TypeReprBits.Kind = static_cast<unsigned>(K);
+    TypeReprBits.Invalid = false;
+    TypeReprBits.Warned = false;
+  }
+
+private:
+  SourceLoc getLocImpl() const { return getStartLoc(); }
 
 public:
-  TypeReprKind getKind() const { return static_cast<TypeReprKind>(Kind); }
+  TypeReprKind getKind() const {
+    return static_cast<TypeReprKind>(TypeReprBits.Kind);
+  }
 
   /// Is this type representation known to be invalid?
-  bool isInvalid() const { return Invalid; }
+  bool isInvalid() const { return TypeReprBits.Invalid; }
 
   /// Note that this type representation describes an invalid type.
-  void setInvalid() { Invalid = true; }
+  void setInvalid() { TypeReprBits.Invalid = true; }
 
   /// If a warning is produced about this type repr, keep track of that so we
   /// don't emit another one upon further reanalysis.
-  bool isWarnedAbout() const { return Warned; }
-  void setWarned() { Warned = true; }
+  bool isWarnedAbout() const { return TypeReprBits.Warned; }
+  void setWarned() { TypeReprBits.Warned = true; }
   
   /// Get the representative location for pointing at this type.
   SourceLoc getLoc() const;
@@ -556,21 +579,21 @@ class TupleTypeRepr final : public TypeRepr,
     NotNamed = 0,
     HasNames = 1,
     HasLabels = 2
-  } NameStatus : 2;
-  bool HasEllipsis : 1;
+  };
   
   size_t numTrailingObjects(OverloadToken<TypeRepr *>) const {
     return NumElements;
   }
   size_t numTrailingObjects(OverloadToken<Identifier>) const {
-    return NameStatus >= HasNames ? NumElements : 0;
+    return TupleTypeReprBits.NameStatus >= HasNames ? NumElements : 0;
   }
   size_t numTrailingObjects(OverloadToken<SourceLoc>) const {
-    switch (NameStatus) {
+    switch (TupleTypeReprBits.NameStatus) {
     case NotNamed: return 0;
     case HasNames: return NumElements;
     case HasLabels: return NumElements + NumElements;
     }
+    llvm_unreachable("all cases should have been handled");
   }
 
   TupleTypeRepr(ArrayRef<TypeRepr *> Elements, SourceRange Parens,
@@ -581,8 +604,12 @@ class TupleTypeRepr final : public TypeRepr,
 public:
 
   unsigned getNumElements() const { return NumElements; }
-  bool hasElementNames() const { return NameStatus >= HasNames; }
-  bool hasUnderscoreLocs() const { return NameStatus == HasLabels; }
+  bool hasElementNames() const {
+    return TupleTypeReprBits.NameStatus >= HasNames;
+  }
+  bool hasUnderscoreLocs() const {
+    return TupleTypeReprBits.NameStatus == HasLabels;
+  }
 
   ArrayRef<TypeRepr *> getElements() const {
     return { getTrailingObjects<TypeRepr *>(), NumElements };
@@ -622,19 +649,19 @@ public:
   }
 
   SourceRange getParens() const { return Parens; }
+
+  bool hasEllipsis() const { return TupleTypeReprBits.HasEllipsis; }
   SourceLoc getEllipsisLoc() const {
-    return HasEllipsis ?
+    return hasEllipsis() ?
       getTrailingObjects<SourceLocAndIdx>()[0].first : SourceLoc();
   }
   unsigned getEllipsisIndex() const {
-    return HasEllipsis ?
+    return hasEllipsis() ?
       getTrailingObjects<SourceLocAndIdx>()[0].second : NumElements;
   }
-  bool hasEllipsis() const { return HasEllipsis; }
-
   void removeEllipsis() {
-    if (HasEllipsis) {
-      HasEllipsis = false;
+    if (hasEllipsis()) {
+      TupleTypeReprBits.HasEllipsis = false;
       getTrailingObjects<SourceLocAndIdx>()[0] = {SourceLoc(), NumElements};
     }
   }
@@ -832,6 +859,86 @@ private:
   friend class TypeRepr;
 };
 
+/// SIL-only TypeRepr for box types.
+///
+/// Boxes are either concrete: { var Int, let String }
+/// or generic:                <T: Runcible> { var T, let String } <Int>
+class SILBoxTypeRepr : public TypeRepr {
+  GenericParamList *GenericParams;
+  GenericEnvironment *GenericEnv = nullptr;
+
+  SourceLoc LBraceLoc, RBraceLoc;
+  SourceLoc ArgLAngleLoc, ArgRAngleLoc;
+  
+public:
+  struct Field {
+    SourceLoc VarOrLetLoc;
+    bool Mutable;
+    TypeRepr *FieldType;
+  };
+  
+private:
+  ArrayRef<Field> Fields;
+  ArrayRef<TypeRepr *> GenericArgs;
+  
+public:
+  SILBoxTypeRepr(GenericParamList *GenericParams,
+                 SourceLoc LBraceLoc, ArrayRef<Field> Fields,
+                 SourceLoc RBraceLoc,
+                 SourceLoc ArgLAngleLoc, ArrayRef<TypeRepr *> GenericArgs,
+                 SourceLoc ArgRAngleLoc)
+    : TypeRepr(TypeReprKind::SILBox),
+      GenericParams(GenericParams), LBraceLoc(LBraceLoc), RBraceLoc(RBraceLoc),
+      ArgLAngleLoc(ArgLAngleLoc), ArgRAngleLoc(ArgRAngleLoc),
+      Fields(Fields), GenericArgs(GenericArgs)
+  {}  
+  
+  static SILBoxTypeRepr *create(ASTContext &C,
+                      GenericParamList *GenericParams,
+                      SourceLoc LBraceLoc, ArrayRef<Field> Fields,
+                      SourceLoc RBraceLoc,
+                      SourceLoc ArgLAngleLoc, ArrayRef<TypeRepr *> GenericArgs,
+                      SourceLoc ArgRAngleLoc);
+  
+  void setGenericEnvironment(GenericEnvironment *Env) {
+    assert(!GenericEnv);
+    GenericEnv = Env;
+  }
+  
+  ArrayRef<Field> getFields() const {
+    return Fields;
+  }
+  ArrayRef<TypeRepr *> getGenericArguments() const {
+    return GenericArgs;
+  }
+  
+  GenericParamList *getGenericParams() const {
+    return GenericParams;
+  }
+  GenericSignature *getGenericSignature() const {
+    return GenericEnv->getGenericSignature();
+  }
+  GenericEnvironment *getGenericEnvironment() const {
+    return GenericEnv;
+  }
+
+  SourceLoc getLBraceLoc() const { return LBraceLoc; }
+  SourceLoc getRBraceLoc() const { return RBraceLoc; }
+  SourceLoc getArgumentLAngleLoc() const { return ArgLAngleLoc; }
+  SourceLoc getArgumentRAngleLoc() const { return ArgRAngleLoc; }
+
+  static bool classof(const TypeRepr *T) {
+    return T->getKind() == TypeReprKind::SILBox;
+  }
+  static bool classof(const SILBoxTypeRepr *T) { return true; }
+  
+private:
+  SourceLoc getStartLocImpl() const;
+  SourceLoc getEndLocImpl() const;
+  SourceLoc getLocImpl() const;
+  void printImpl(ASTPrinter &Printer, const PrintOptions &Opts) const;
+  friend TypeRepr;
+};
 
 inline bool TypeRepr::isSimple() const {
   switch (getKind()) {
@@ -852,6 +959,7 @@ inline bool TypeRepr::isSimple() const {
   case TypeReprKind::Tuple:
   case TypeReprKind::Fixed:
   case TypeReprKind::Array:
+  case TypeReprKind::SILBox:
     return true;
   }
   llvm_unreachable("bad TypeRepr kind");

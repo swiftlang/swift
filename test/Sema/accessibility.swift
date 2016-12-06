@@ -637,3 +637,21 @@ internal struct AssocTypeOuterProblem2 {
     fileprivate typealias Assoc = Int // expected-error {{type alias 'Assoc' must be as accessible as its enclosing type because it matches a requirement in protocol 'AssocTypeProto'}} {{5-16=internal}}
   }
 }
+
+// This code was accepted in Swift 3
+public protocol P {
+  associatedtype Element
+
+  func f() -> Element
+}
+
+struct S<T> : P {
+  func f() -> T { while true {} }
+}
+
+public struct G<T> {
+  typealias A = S<T> // expected-note {{type declared here}}
+
+  public func foo<U : P>(u: U) where U.Element == A.Element {}
+  // expected-error@-1 {{instance method cannot be declared public because its generic requirement uses an internal type}}
+}

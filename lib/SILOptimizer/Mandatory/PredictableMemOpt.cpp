@@ -247,9 +247,11 @@ AllocOptimize::AllocOptimize(SILInstruction *TheMemory,
   Releases(Releases) {
   
   // Compute the type of the memory object.
-  if (auto *ABI = dyn_cast<AllocBoxInst>(TheMemory))
-    MemoryType = ABI->getElementType();
-  else {
+  if (auto *ABI = dyn_cast<AllocBoxInst>(TheMemory)) {
+    assert(ABI->getBoxType()->getLayout()->getFields().size() == 1
+           && "optimizing multi-field boxes not implemented");
+    MemoryType = ABI->getBoxType()->getFieldType(0);
+  } else {
     assert(isa<AllocStackInst>(TheMemory));
     MemoryType = cast<AllocStackInst>(TheMemory)->getElementType();
   }

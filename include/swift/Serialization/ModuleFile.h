@@ -142,7 +142,7 @@ public:
   template <typename T>
   class Serialized {
   private:
-    using RawBitOffset = decltype(DeclTypeCursor.GetCurrentBitNo());
+    using RawBitOffset = uint64_t;
 
     using ImplTy = PointerUnion<T, serialization::BitOffset>;
     ImplTy Value;
@@ -310,7 +310,7 @@ private:
   std::unique_ptr<GroupNameTable> GroupNamesMap;
   std::unique_ptr<SerializedDeclCommentTable> DeclCommentTable;
 
-  struct {
+  struct ModuleBits {
     /// The decl ID of the main class in this module file, if it has one.
     unsigned EntryPointDeclID : 31;
 
@@ -336,7 +336,7 @@ private:
     // Explicitly pad out to the next word boundary.
     unsigned : 0;
   } Bits = {};
-  static_assert(sizeof(Bits) <= 8, "The bit set should be small");
+  static_assert(sizeof(ModuleBits) <= 8, "The bit set should be small");
 
   void setStatus(Status status) {
     Bits.Status = static_cast<unsigned>(status);

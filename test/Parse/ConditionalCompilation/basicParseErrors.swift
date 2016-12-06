@@ -64,3 +64,14 @@ struct S {
 
 #if _endian(mid) // expected-warning {{unknown endianness for build configuration '_endian'}}
 #endif
+
+LABEL: #if true // expected-error {{expected statement}}
+func fn_i() {}
+#endif
+fn_i() // OK
+
+try #if false // expected-error {{expected expression}}
+#else
+func fn_j() {}
+#endif
+fn_j() // OK

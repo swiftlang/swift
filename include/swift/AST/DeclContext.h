@@ -198,7 +198,11 @@ class alignas(1 << DeclContextAlignInBits) DeclContext {
   friend struct ::llvm::cast_convert_val;
   
   static DeclContext *castDeclToDeclContext(const Decl *D);
-  
+
+  /// If this DeclContext is a GenericType declaration or an
+  /// extension thereof, return the GenericTypeDecl.
+  GenericTypeDecl *getAsTypeOrTypeExtensionContext() const;
+
 public:
   DeclContext(DeclContextKind Kind, DeclContext *Parent)
     : ParentAndKind(Parent, Kind) {
@@ -232,19 +236,12 @@ public:
 
   /// \returns true if this is a type context, e.g., a struct, a class, an
   /// enum, a protocol, or an extension.
-  bool isTypeContext() const {
-    return getContextKind() == DeclContextKind::GenericTypeDecl ||
-           getContextKind() == DeclContextKind::ExtensionDecl;
-  }
+  bool isTypeContext() const;
 
   /// \brief Determine whether this is an extension context.
   bool isExtensionContext() const {
     return getContextKind() == DeclContextKind::ExtensionDecl;
   }
-
-  /// If this DeclContext is a GenericType declaration or an
-  /// extension thereof, return the GenericTypeDecl.
-  GenericTypeDecl *getAsGenericTypeOrGenericTypeExtensionContext() const;
 
   /// If this DeclContext is a NominalType declaration or an
   /// extension thereof, return the NominalTypeDecl.
@@ -264,12 +261,6 @@ public:
 
   /// If this DeclContext is a protocol extension, return the extended protocol.
   ProtocolDecl *getAsProtocolExtensionContext() const;
-
-  /// \brief Retrieve the generic parameter 'Self' from a protocol or
-  /// protocol extension.
-  ///
-  /// Only valid if \c getAsProtocolOrProtocolExtensionContext().
-  GenericTypeParamDecl *getProtocolSelf() const;
 
   /// \brief Retrieve the generic parameter 'Self' from a protocol or
   /// protocol extension.
@@ -298,12 +289,6 @@ public:
   /// Get the type of `self` in this context.
   ///
   /// - Protocol types return the `Self` archetype.
-  /// - Everything else falls back on getDeclaredTypeOfContext().
-  Type getSelfTypeOfContext() const;
-
-  /// Get the type of `self` in this context.
-  ///
-  /// - Protocol types return the `Self` archetype.
   /// - Everything else falls back on getDeclaredTypeInContext().
   Type getSelfTypeInContext() const;
 
@@ -326,7 +311,13 @@ public:
   /// \brief Retrieve the innermost archetypes of this context or any
   /// of its parents.
   GenericEnvironment *getGenericEnvironmentOfContext() const;
-  
+
+  /// Map an interface type to a contextual type within this context.
+  Type mapTypeIntoContext(Type type) const;
+
+  /// Map a type within this context to an interface type.
+  Type mapTypeOutOfContext(Type type) const;
+
   /// Returns this or the first local parent context, or nullptr if it is not
   /// contained in one.
   DeclContext *getLocalContext();

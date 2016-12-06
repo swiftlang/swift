@@ -29,6 +29,7 @@
 #include "swift/AST/ModuleLoader.h"
 #include "swift/AST/NameLookup.h"
 #include "swift/AST/RawComment.h"
+#include "swift/AST/SILLayout.h"
 #include "swift/AST/TypeCheckerDebugConsumer.h"
 #include "swift/Basic/Fallthrough.h"
 #include "swift/Basic/SourceManager.h"
@@ -159,6 +160,9 @@ struct ASTContext::Implementation {
   /// func ==(Int, Int) -> Bool
   FuncDecl *EqualIntDecl = nullptr;
 
+  /// func append(Element) -> void
+  FuncDecl *ArrayAppendElementDecl = nullptr;
+
   /// func _unimplementedInitializer(className: StaticString).
   FuncDecl *UnimplementedInitializerDecl = nullptr;
 
@@ -207,19 +211,16 @@ struct ASTContext::Implementation {
   llvm::DenseMap<Decl *, std::pair<LazyMemberLoader *, uint64_t>>
     ConformanceLoaders;
 
-  /// Mapping from archetypes with lazily-resolved nested types to the
-  /// archetype builder and potential archetype corresponding to that
-  /// archetype.
-  llvm::DenseMap<const ArchetypeType *, 
-                 std::pair<ArchetypeBuilder *,
-                           ArchetypeBuilder::PotentialArchetype *>>
-    LazyArchetypes;
-
-  /// \brief Stored archetype builders and their corresponding (canonical)
-  /// generic environments.
+  /// Stored archetype builders for canonical generic signatures.
   llvm::DenseMap<std::pair<GenericSignature *, ModuleDecl *>,
-  std::pair<std::unique_ptr<ArchetypeBuilder>,
-            GenericEnvironment *>> ArchetypeBuilders;
+                 std::unique_ptr<ArchetypeBuilder>>
+    ArchetypeBuilders;
+
+  /// Canonical generic environments for canonical generic signatures.
+  ///
+  /// The keys are the archetype builders in \c ArchetypeBuilders.
+  llvm::DenseMap<ArchetypeBuilder *, GenericEnvironment *>
+    CanonicalGenericEnvironments;
 
   /// The set of property names that show up in the defining module of a
   /// class.
@@ -297,7 +298,7 @@ struct ASTContext::Implementation {
   llvm::FoldingSet<GenericFunctionType> GenericFunctionTypes;
   llvm::FoldingSet<SILFunctionType> SILFunctionTypes;
   llvm::DenseMap<CanType, SILBlockStorageType *> SILBlockStorageTypes;
-  llvm::DenseMap<CanType, SILBoxType *> SILBoxTypes;
+  llvm::FoldingSet<SILBoxType> SILBoxTypes;
   llvm::DenseMap<BuiltinIntegerWidth, BuiltinIntegerType*> IntegerTypes;
   llvm::FoldingSet<ProtocolCompositionType> ProtocolCompositionTypes;
   llvm::FoldingSet<BuiltinVectorType> BuiltinVectorTypes;
@@ -356,7 +357,7 @@ struct ASTContext::Implementation {
     llvm_unreachable("bad AllocationArena");
   }
   
-  llvm::FoldingSet<SILLayout> *SILLayouts = nullptr;
+  llvm::FoldingSet<SILLayout> SILLayouts;
 };
 
 ASTContext::Implementation::Implementation()
@@ -890,6 +891,55 @@ FuncDecl *ASTContext::getEqualIntDecl() const {
   return nullptr;
 }
 
+FuncDecl *ASTContext::getArrayAppendElementDecl() const {
+  if (Impl.ArrayAppendElementDecl)
+    return Impl.ArrayAppendElementDecl;
+
+  auto AppendFunctions = getArrayDecl()->lookupDirect(getIdentifier("append"));
+
+  for (auto CandidateFn : AppendFunctions) {
+    auto FnDecl = dyn_cast<FuncDecl>(CandidateFn);
+    auto Attrs = FnDecl->getAttrs();
+    for (auto *A : Attrs.getAttributes<SemanticsAttr, false>()) {
+      if (A->Value != "array.append_element")
+        continue;
+
+#ifndef NDEBUG
+      auto ParamLists = FnDecl->getParameterLists();
+      assert(ParamLists.size() == 2 && "Should have two parameter lists");
+      assert(ParamLists[0]->size() == 1 &&
+             "First parameter list should have one parameter");
+      auto SelfInOutTy = ParamLists[0]->get(0)->getType()->getAs<InOutType>();
+      assert(SelfInOutTy && "Self parameter should be an inout Type");
+      auto SelfGenericStructTy =
+          SelfInOutTy->getObjectType()->getAs<BoundGenericStructType>();
+      assert(SelfGenericStructTy &&
+             "Self parameter should be a BoundGenericStructType Type");
+      assert(SelfGenericStructTy->getDecl() == getArrayDecl() &&
+             "Self parameter should be an Array");
+
+      assert(ParamLists[1]->size() == 1 &&
+             "Second parameter list should have one parameter");
+      auto ElementType = ParamLists[1]
+                             ->get(0)
+                             ->getType()
+                             ->getAs<ArchetypeType>();
+      assert(ElementType &&
+             "First parameter replacement should be a Archetype");
+      assert(ElementType->getName() == getIdentifier("Element") &&
+             "The Archetype's name should be \"Element\"");
+
+      assert(FnDecl->getResultInterfaceType()->isVoid() &&
+             "The return type should be void");
+#endif
+      Impl.ArrayAppendElementDecl = FnDecl;
+      return FnDecl;
+    }
+  }
+
+  return NULL;
+}
+
 FuncDecl *
 ASTContext::getUnimplementedInitializerDecl(LazyResolver *resolver) const {
   if (Impl.UnimplementedInitializerDecl)
@@ -1254,25 +1304,36 @@ void ASTContext::getVisibleTopLevelClangModules(
     collectAllModules(Modules);
 }
 
-std::pair<ArchetypeBuilder *, GenericEnvironment *>
-ASTContext::getOrCreateArchetypeBuilder(CanGenericSignature sig,
-                                        ModuleDecl *mod) {
+ArchetypeBuilder *ASTContext::getOrCreateArchetypeBuilder(
+                                                      CanGenericSignature sig,
+                                                      ModuleDecl *mod) {
   // Check whether we already have an archetype builder for this
   // signature and module.
   auto known = Impl.ArchetypeBuilders.find({sig, mod});
   if (known != Impl.ArchetypeBuilders.end())
-    return { known->second.first.get(), known->second.second };
+    return known->second.get();
 
   // Create a new archetype builder with the given signature.
   auto builder = new ArchetypeBuilder(*mod);
   builder->addGenericSignature(sig, nullptr);
-  
-  // Store this archetype builder and its generic environment.
-  auto genericEnv = builder->getGenericEnvironment(sig);
-  Impl.ArchetypeBuilders[{sig, mod}]
-    = { std::unique_ptr<ArchetypeBuilder>(builder), genericEnv };
 
-  return { builder, genericEnv };
+  // Store this archetype builder (no generic environment yet).
+  Impl.ArchetypeBuilders[{sig, mod}] =
+    std::unique_ptr<ArchetypeBuilder>(builder);
+
+  return builder;
+}
+
+GenericEnvironment *ASTContext::getOrCreateCanonicalGenericEnvironment(
+                                                    ArchetypeBuilder *builder) {
+  auto known = Impl.CanonicalGenericEnvironments.find(builder);
+  if (known != Impl.CanonicalGenericEnvironments.find(builder))
+    return known->second;
+
+  auto sig = builder->getGenericSignature();
+  auto env = builder->getGenericEnvironment(sig);
+  Impl.CanonicalGenericEnvironments[builder] = env;
+  return env;
 }
 
 Module *
@@ -1506,7 +1567,6 @@ size_t ASTContext::getTotalMemory() const {
     // Impl.GenericFunctionTypes ?
     // Impl.SILFunctionTypes ?
     llvm::capacity_in_bytes(Impl.SILBlockStorageTypes) +
-    llvm::capacity_in_bytes(Impl.SILBoxTypes) +
     llvm::capacity_in_bytes(Impl.IntegerTypes) +
     // Impl.ProtocolCompositionTypes ?
     // Impl.BuiltinVectorTypes ?
@@ -3410,7 +3470,7 @@ DependentMemberType *DependentMemberType::get(Type base,
 }
 
 CanArchetypeType ArchetypeType::getOpened(Type existential,
-                                        Optional<UUID> knownID) {
+                                          Optional<UUID> knownID) {
   auto &ctx = existential->getASTContext();
   auto &openedExistentialArchetypes = ctx.Impl.OpenedExistentialArchetypes;
   // If we know the ID already...
@@ -3429,19 +3489,20 @@ CanArchetypeType ArchetypeType::getOpened(Type existential,
     knownID = UUID::fromTime();
   }
 
-  auto arena = AllocationArena::Permanent;
   llvm::SmallVector<ProtocolDecl *, 4> conformsTo;
   assert(existential->isExistentialType());
   existential->getAnyExistentialTypeProtocols(conformsTo);
+  Type superclass = existential->getSuperclass(nullptr);
 
-  // Tail-allocate space for the UUID.
-  void *archetypeBuf = ctx.Allocate(totalSizeToAlloc<UUID>(1),
-                                    alignof(ArchetypeType), arena);
-  
-  auto result = ::new (archetypeBuf) ArchetypeType(ctx, existential,
-                                       ctx.AllocateCopy(conformsTo),
-                                       existential->getSuperclass(nullptr));
-  result->setOpenedExistentialID(*knownID);
+  auto arena = AllocationArena::Permanent;
+  void *mem = ctx.Allocate(
+                totalSizeToAlloc<ProtocolDecl *, Type, UUID>(conformsTo.size(),
+                                                             superclass ? 1 : 0,
+                                                             1),
+                alignof(ArchetypeType), arena);
+
+  auto result = ::new (mem) ArchetypeType(ctx, existential, conformsTo,
+                                          superclass, *knownID);
   openedExistentialArchetypes[*knownID] = result;
 
   return CanArchetypeType(result);
@@ -3551,22 +3612,35 @@ GenericSignature *GenericSignature::get(ArrayRef<GenericTypeParamType *> params,
 }
 
 GenericEnvironment *
-GenericEnvironment::get(ASTContext &ctx,
-                        GenericSignature *signature,
+GenericEnvironment::get(GenericSignature *signature,
                         TypeSubstitutionMap interfaceToArchetypeMap) {
+  unsigned numGenericParams = signature->getGenericParams().size();
   assert(!interfaceToArchetypeMap.empty());
-  assert(interfaceToArchetypeMap.size() == signature->getGenericParams().size()
+  assert(interfaceToArchetypeMap.size() == numGenericParams
          && "incorrect number of parameters");
 
+  ASTContext &ctx = signature->getASTContext();
 
-  return new (ctx) GenericEnvironment(signature, interfaceToArchetypeMap);
+  // Allocate and construct the new environment.
+  size_t bytes = totalSizeToAlloc<Type, ArchetypeToInterfaceMapping>(
+                                           numGenericParams, numGenericParams);
+  void *mem = ctx.Allocate(bytes, alignof(GenericEnvironment));
+  return new (mem) GenericEnvironment(signature, nullptr,
+                                      interfaceToArchetypeMap);
 }
 
 GenericEnvironment *GenericEnvironment::getIncomplete(
-                                                  ASTContext &ctx,
-                                                  GenericSignature *signature) {
+                                                  GenericSignature *signature,
+                                                  ArchetypeBuilder *builder) {
   TypeSubstitutionMap empty;
-  return new (ctx) GenericEnvironment(signature, empty);
+  auto &ctx = signature->getASTContext();
+
+  // Allocate and construct the new environment.
+  unsigned numGenericParams = signature->getGenericParams().size();
+  size_t bytes = totalSizeToAlloc<Type, ArchetypeToInterfaceMapping>(
+                                           numGenericParams, numGenericParams);
+  void *mem = ctx.Allocate(bytes, alignof(GenericEnvironment));
+  return new (mem) GenericEnvironment(signature, builder, empty);
 }
 
 void DeclName::CompoundDeclName::Profile(llvm::FoldingSetNodeID &id,
@@ -3886,27 +3960,6 @@ Type ASTContext::getBridgedToObjC(const DeclContext *dc, Type type,
   return Type();
 }
 
-std::pair<ArchetypeBuilder *, ArchetypeBuilder::PotentialArchetype *>
-ASTContext::getLazyArchetype(const ArchetypeType *archetype) {
-  auto known = Impl.LazyArchetypes.find(archetype);
-  assert(known != Impl.LazyArchetypes.end());
-  return known->second;
-}
-
-void ASTContext::registerLazyArchetype(
-       const ArchetypeType *archetype,
-       ArchetypeBuilder &builder,
-       ArchetypeBuilder::PotentialArchetype *potentialArchetype) {
-  assert(Impl.LazyArchetypes.count(archetype) == 0);
-  Impl.LazyArchetypes[archetype] = { &builder, potentialArchetype };
-}
-
-void ASTContext::unregisterLazyArchetype(const ArchetypeType *archetype) {
-  auto known = Impl.LazyArchetypes.find(archetype);
-  assert(known != Impl.LazyArchetypes.end());
-  Impl.LazyArchetypes.erase(known);
-}
-
 const InheritedNameSet *ASTContext::getAllPropertyNames(ClassDecl *classDecl,
                                                         bool forInstance) {
   // If this class was defined in Objective-C, perform the lookup based on
@@ -4041,10 +4094,60 @@ CanGenericSignature ASTContext::getSingleGenericParameterSignature() const {
   return canonicalSig;
 }
 
-llvm::FoldingSet<SILLayout> *&ASTContext::getSILLayouts() {
-  return Impl.SILLayouts;
+SILLayout *SILLayout::get(ASTContext &C,
+                          CanGenericSignature Generics,
+                          ArrayRef<SILField> Fields) {
+  // Profile the layout parameters.
+  llvm::FoldingSetNodeID id;
+  Profile(id, Generics, Fields);
+  
+  // Return an existing layout if there is one.
+  void *insertPos;
+  auto &Layouts = C.Impl.SILLayouts;
+  
+  if (auto existing = Layouts.FindNodeOrInsertPos(id, insertPos))
+    return existing;
+  
+  // Allocate a new layout.
+  void *memory = C.Allocate(totalSizeToAlloc<SILField>(Fields.size()),
+                            alignof(SILLayout));
+  
+  auto newLayout = ::new (memory) SILLayout(Generics, Fields);
+  Layouts.InsertNode(newLayout, insertPos);
+  return newLayout;
 }
 
-llvm::DenseMap<CanType, SILBoxType *> &ASTContext::getSILBoxTypes() {
-  return Impl.SILBoxTypes;
+CanSILBoxType SILBoxType::get(ASTContext &C,
+                              SILLayout *Layout,
+                              ArrayRef<Substitution> Args) {
+  llvm::FoldingSetNodeID id;
+  Profile(id, Layout, Args);
+  
+  // Return an existing layout if there is one.
+  void *insertPos;
+  auto &SILBoxTypes = C.Impl.SILBoxTypes;
+
+  if (auto existing = SILBoxTypes.FindNodeOrInsertPos(id, insertPos))
+    return CanSILBoxType(existing);
+
+  void *memory = C.Allocate(totalSizeToAlloc<Substitution>(Args.size()),
+                            alignof(SILBoxType));
+  auto newBox = ::new (memory) SILBoxType(C, Layout, Args);
+  SILBoxTypes.InsertNode(newBox, insertPos);
+  return CanSILBoxType(newBox);
 }
+
+/// TODO: Transitional factory to present the single-type SILBoxType::get
+/// interface.
+CanSILBoxType SILBoxType::get(CanType boxedType) {
+  auto &ctx = boxedType->getASTContext();
+  auto singleGenericParamSignature = ctx.getSingleGenericParameterSignature();
+  auto layout = SILLayout::get(ctx, singleGenericParamSignature,
+                               SILField(CanType(singleGenericParamSignature
+                                  ->getGenericParams()[0]),
+                               /*mutable*/ true));
+
+  return get(boxedType->getASTContext(), layout, Substitution(boxedType, {}));
+}
+
+

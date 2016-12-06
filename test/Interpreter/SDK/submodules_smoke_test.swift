@@ -15,6 +15,8 @@ import AppKit.NSPanGestureRecognizer
 
 @available(OSX, introduced: 10.10)
 typealias PanRecognizer = NSPanGestureRecognizer
+
+@available(OSX, introduced: 10.10)
 typealias PanRecognizer2 = AppKit.NSPanGestureRecognizer
 
 #if !NO_ERROR

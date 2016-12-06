@@ -489,8 +489,12 @@ static bool isNonMutatingArraySemanticCall(SILInstruction *Inst) {
   case ArrayCallKind::kWithUnsafeMutableBufferPointer:
   case ArrayCallKind::kArrayInit:
   case ArrayCallKind::kArrayUninitialized:
+  case ArrayCallKind::kAppendContentsOf:
+  case ArrayCallKind::kAppendElement:
     return false;
   }
+
+  llvm_unreachable("Unhandled ArrayCallKind in switch.");
 }
 
 /// \return true if the given retain instruction is followed by a release on the
@@ -823,8 +827,12 @@ static bool mayChangeArrayValueToNonUniqueState(ArraySemanticsCall &Call) {
   case ArrayCallKind::kWithUnsafeMutableBufferPointer:
   case ArrayCallKind::kArrayInit:
   case ArrayCallKind::kArrayUninitialized:
+  case ArrayCallKind::kAppendContentsOf:
+  case ArrayCallKind::kAppendElement:
     return true;
   }
+
+  llvm_unreachable("Unhandled ArrayCallKind in switch.");
 }
 
 /// Check that the array value stored in \p ArrayStruct is released by \Inst.
@@ -907,7 +915,7 @@ bool COWArrayOpt::isArrayValueReleasedBeforeMutate(
 }
 
 static SILInstruction *getInstBefore(SILInstruction *I) {
-  auto It = SILBasicBlock::reverse_iterator(I->getIterator());
+  auto It = ++I->getIterator().getReverse();
   if (I->getParent()->rend() == It)
     return nullptr;
   return &*It;
@@ -939,8 +947,7 @@ stripValueProjections(SILValue V,
 /// by the array bounds check elimination pass.
 static SILInstruction *
 findPrecedingCheckSubscriptOrMakeMutable(ApplyInst *GetElementAddr) {
-  for (auto ReverseIt =
-           SILBasicBlock::reverse_iterator(GetElementAddr->getIterator()),
+  for (auto ReverseIt = ++GetElementAddr->getIterator().getReverse(),
             End = GetElementAddr->getParent()->rend();
        ReverseIt != End; ++ReverseIt) {
     auto Apply = dyn_cast<ApplyInst>(&*ReverseIt);

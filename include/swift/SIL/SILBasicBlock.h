@@ -45,7 +45,6 @@ private:
   /// The ordered set of instructions in the SILBasicBlock.
   InstListType InstList;
 
-  friend struct llvm::ilist_sentinel_traits<SILBasicBlock>;
   friend struct llvm::ilist_traits<SILBasicBlock>;
   SILBasicBlock() : Parent(nullptr) {}
   void operator=(const SILBasicBlock &) = delete;
@@ -332,26 +331,17 @@ struct ilist_traits<::swift::SILBasicBlock>
 
 private:
   friend class ::swift::SILFunction;
-  mutable ilist_half_node<SILBasicBlock> Sentinel;
 
   SILFunction *Parent;
+  using block_iterator = simple_ilist<SILBasicBlock>::iterator;
 
 public:
-  SILBasicBlock *createSentinel() const {
-    return static_cast<SILBasicBlock *>(&Sentinel);
-  }
-  void destroySentinel(SILBasicBlock *) const {}
-
-  SILBasicBlock *provideInitialHead() const { return createSentinel(); }
-  SILBasicBlock *ensureHead(SILBasicBlock *) const { return createSentinel(); }
-  static void noteHead(SILBasicBlock *, SILBasicBlock *) {}
   static void deleteNode(SILBasicBlock *BB) { BB->~SILBasicBlock(); }
 
   void addNodeToList(SILBasicBlock *BB) {}
 
   void transferNodesFromList(ilist_traits<SILBasicBlock> &SrcTraits,
-                             ilist_iterator<SILBasicBlock> First,
-                             ilist_iterator<SILBasicBlock> Last);
+                             block_iterator First, block_iterator Last);
 
 private:
   static void createNode(const SILBasicBlock &);

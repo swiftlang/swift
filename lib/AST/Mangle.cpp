@@ -198,12 +198,14 @@ namespace {
 /// assumes that field and global-variable bindings always bind at
 /// least one name, which is probably a reasonable assumption but may
 /// not be adequately enforced.
-static VarDecl *findFirstVariable(PatternBindingDecl *binding) {
+static Optional<VarDecl*> findFirstVariable(PatternBindingDecl *binding) {
   for (auto entry : binding->getPatternList()) {
     auto var = FindFirstVariable().visit(entry.getPattern());
     if (var) return var;
   }
-  llvm_unreachable("pattern-binding bound no variables?");
+  // Pattern-binding bound without variables exists in erroneous code, e.g.
+  // during code completion.
+  return None;
 }
 
 void Mangler::mangleContext(const DeclContext *ctx) {
@@ -230,8 +232,8 @@ void Mangler::mangleContext(const DeclContext *ctx) {
     }
     case LocalDeclContextKind::PatternBindingInitializer: {
       auto patternInit = cast<SerializedPatternBindingInitializer>(local);
-      auto var = findFirstVariable(patternInit->getBinding());
-      mangleInitializerEntity(var);
+      if (auto var = findFirstVariable(patternInit->getBinding()))
+        mangleInitializerEntity(var.getValue());
       return;
     }
     case LocalDeclContextKind::TopLevelCodeDecl:
@@ -318,8 +320,8 @@ void Mangler::mangleContext(const DeclContext *ctx) {
 
     case InitializerKind::PatternBinding: {
       auto patternInit = cast<PatternBindingInitializer>(ctx);
-      auto var = findFirstVariable(patternInit->getBinding());
-      mangleInitializerEntity(var);
+      if (auto var = findFirstVariable(patternInit->getBinding()))
+        mangleInitializerEntity(var.getValue());
       return;
     }
     }
@@ -489,13 +491,7 @@ Type Mangler::getDeclTypeForMangling(const ValueDecl *decl,
   if (!decl->hasInterfaceType())
     return ErrorType::get(C);
 
-  // FIXME: Interface types for ParamDecls
   Type type = decl->getInterfaceType();
-  if (type->hasArchetype()) {
-    assert(isa<ParamDecl>(decl));
-    type = ArchetypeBuilder::mapTypeOutOfContext(
-        decl->getDeclContext(), type);
-  }
 
   initialParamDepth = 0;
   CanGenericSignature sig;
@@ -852,8 +848,6 @@ void Mangler::mangleType(Type type, unsigned uncurryLevel) {
 
   case TypeKind::Paren:
     return mangleSugaredType<ParenType>(type);
-  case TypeKind::AssociatedType:
-    return mangleSugaredType<AssociatedTypeType>(type);
   case TypeKind::Substituted:
     return mangleSugaredType<SubstitutedType>(type);
   case TypeKind::ArraySlice: /* fallthrough */
@@ -1111,7 +1105,7 @@ void Mangler::mangleType(Type type, unsigned uncurryLevel) {
         SmallVector<const void *, 4> SortedSubsts(Substitutions.size());
         for (auto S : Substitutions) SortedSubsts[S.second] = S.first;
         for (auto S : SortedSubsts) ContextMangler.addSubstitution(S);
-        while (DC && DC->getGenericParamsOfContext()) {
+        while (DC && DC->isGenericContext()) {
           if (DC->isInnermostContextGeneric() &&
               DC->getGenericParamsOfContext()->getDepth() == GTPT->getDepth())
             break;
@@ -1598,7 +1592,7 @@ void Mangler::mangleEntity(const ValueDecl *decl,
                            unsigned uncurryLevel) {
   assert(!isa<ConstructorDecl>(decl));
   assert(!isa<DestructorDecl>(decl));
-  
+
   // entity ::= static? entity-kind context entity-name
   if (decl->isStatic())
     Buffer << 'Z';
@@ -1611,7 +1605,12 @@ void Mangler::mangleEntity(const ValueDecl *decl,
       return mangleAccessorEntity(accessorKind, func->getAddressorKind(),
                                   func->getAccessorStorageDecl());
   }
-  
+
+  // Avoid mangling nameless entity. This may happen in erroneous code as code
+  // completion.
+  if (!decl->hasName())
+    return;
+
   if (isa<VarDecl>(decl)) {
     Buffer << 'v';
   } else if (isa<SubscriptDecl>(decl)) {

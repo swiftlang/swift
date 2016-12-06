@@ -19,6 +19,7 @@
 #include "swift/AST/DiagnosticsIRGen.h"
 #include "swift/AST/IRGenOptions.h"
 #include "swift/Basic/Dwarf.h"
+#include "swift/Basic/ManglingMacros.h"
 #include "swift/ClangImporter/ClangImporter.h"
 #include "swift/Runtime/RuntimeFnWrappersGen.h"
 #include "swift/Runtime/Config.h"
@@ -378,6 +379,7 @@ IRGenModule::IRGenModule(IRGenerator &irgen,
 
   // Only use the new calling conventions on platforms that support it.
   auto Arch = Triple.getArch();
+  (void)Arch;
   if (SWIFT_RT_USE_RegisterPreservingCC &&
       Arch == llvm::Triple::ArchType::aarch64)
     RegisterPreservingCC = SWIFT_LLVM_CC(RegisterPreservingCC);
@@ -641,8 +643,9 @@ llvm::Constant *IRGenModule::getEmptyTupleMetadata() {
   if (EmptyTupleMetadata)
     return EmptyTupleMetadata;
 
-  EmptyTupleMetadata =
-      Module.getOrInsertGlobal("_TMT_", FullTypeMetadataStructTy);
+  EmptyTupleMetadata = Module.getOrInsertGlobal(
+                          MANGLE_AS_STRING(METADATA_SYM(EMPTY_TUPLE_MANGLING)),
+                          FullTypeMetadataStructTy);
   if (Triple.isOSBinFormatCOFF())
     cast<llvm::GlobalVariable>(EmptyTupleMetadata)
         ->setDLLStorageClass(llvm::GlobalValue::DLLImportStorageClass);

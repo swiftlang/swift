@@ -1107,8 +1107,7 @@ processFunction(SILFunction &F, bool EnableDiagnostics,
 
     // Eagerly DCE. We do this after visiting all users to ensure we don't
     // invalidate the uses iterator.
-    auto UserArray = ArrayRef<SILInstruction *>(&*FoldedUsers.begin(),
-                                                FoldedUsers.size());
+    ArrayRef<SILInstruction *> UserArray = FoldedUsers.getArrayRef();
     if (!UserArray.empty()) {
       InvalidateInstructions = true;
     }

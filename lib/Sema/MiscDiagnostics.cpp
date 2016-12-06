@@ -1295,7 +1295,8 @@ bool swift::fixItOverrideDeclarationTypes(TypeChecker &TC,
 
   if (auto *var = dyn_cast<VarDecl>(decl)) {
     SourceRange typeRange = var->getTypeSourceRangeForDiagnostics();
-    return checkType(var->getType(), base->getType(), typeRange);
+    auto *baseVar = cast<VarDecl>(base);
+    return checkType(var->getType(), baseVar->getType(), typeRange);
   }
 
   if (auto *fn = dyn_cast<AbstractFunctionDecl>(decl)) {
@@ -1331,8 +1332,14 @@ bool swift::fixItOverrideDeclarationTypes(TypeChecker &TC,
              [&](ParamDecl *param, const ParamDecl *baseParam) {
       fixedAny |= fixItOverrideDeclarationTypes(TC, diag, param, baseParam);
     });
-    fixedAny |= checkType(subscript->getElementType(),
-                          baseSubscript->getElementType(),
+
+    auto resultType = ArchetypeBuilder::mapTypeIntoContext(
+        subscript->getDeclContext(),
+        subscript->getElementInterfaceType());
+    auto baseResultType = ArchetypeBuilder::mapTypeIntoContext(
+        baseSubscript->getDeclContext(),
+        baseSubscript->getElementInterfaceType());
+    fixedAny |= checkType(resultType, baseResultType,
                           subscript->getElementTypeLoc().getSourceRange());
     return fixedAny;
   }

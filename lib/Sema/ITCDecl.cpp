@@ -103,7 +103,7 @@ void IterativeTypeChecker::processResolveInheritedClauseEntry(
 
   // Validate the type of this inherited clause entry.
   // FIXME: Recursion into existing type checker.
-  PartialGenericTypeToArchetypeResolver resolver;
+  GenericTypeToArchetypeResolver resolver(dc);
   if (TC.validateType(*inherited, dc, options, &resolver)) {
     inherited->setInvalidType(getASTContext());
   }
@@ -295,7 +295,7 @@ bool IterativeTypeChecker::isResolveTypeDeclSatisfied(TypeDecl *typeDecl) {
 
   // Nominal types.
   auto nominal = cast<NominalTypeDecl>(typeDecl);
-  return nominal->hasType();
+  return nominal->hasInterfaceType();
 }
 
 void IterativeTypeChecker::processResolveTypeDecl(
@@ -304,7 +304,7 @@ void IterativeTypeChecker::processResolveTypeDecl(
   if (auto typeAliasDecl = dyn_cast<TypeAliasDecl>(typeDecl)) {
     if (typeAliasDecl->getDeclContext()->isModuleScopeContext()) {
       // FIXME: This is silly.
-      if (!typeAliasDecl->hasType())
+      if (!typeAliasDecl->getAliasType())
         typeAliasDecl->computeType();
       
       TypeResolutionOptions options;
@@ -314,11 +314,12 @@ void IterativeTypeChecker::processResolveTypeDecl(
 
       // Note: recursion into old type checker is okay when passing in an
       // unsatisfied-dependency callback.
+      GenericTypeToArchetypeResolver resolver(typeAliasDecl);
       if (TC.validateType(typeAliasDecl->getUnderlyingTypeLoc(),
                           typeAliasDecl->getDeclContext(),
-                          options, nullptr, &unsatisfiedDependency)) {
+                          options, &resolver, &unsatisfiedDependency)) {
         typeAliasDecl->setInvalid();
-        typeAliasDecl->overwriteType(ErrorType::get(getASTContext()));
+        typeAliasDecl->setInterfaceType(ErrorType::get(getASTContext()));
         typeAliasDecl->getUnderlyingTypeLoc().setInvalidType(getASTContext());
       }
       
@@ -335,7 +336,7 @@ void IterativeTypeChecker::processResolveTypeDecl(
 bool IterativeTypeChecker::breakCycleForResolveTypeDecl(TypeDecl *typeDecl) {
   if (auto typeAliasDecl = dyn_cast<TypeAliasDecl>(typeDecl)) {
     typeAliasDecl->setInvalid();
-    typeAliasDecl->overwriteType(ErrorType::get(getASTContext()));
+    typeAliasDecl->setInterfaceType(ErrorType::get(getASTContext()));
     typeAliasDecl->getUnderlyingTypeLoc().setInvalidType(getASTContext());
     return true;
   }

@@ -31,8 +31,6 @@ using namespace swift;
 using namespace swift::driver;
 using namespace llvm::opt;
 
-const char * const ToolChain::SWIFT_EXECUTABLE_NAME;
-
 ToolChain::JobContext::JobContext(Compilation &C,
                                   ArrayRef<const Job *> Inputs,
                                   ArrayRef<const Action *> InputActions,
@@ -91,6 +89,9 @@ ToolChain::constructJob(const JobAction &JA,
     case Action::Input:
       llvm_unreachable("not a JobAction");
     }
+
+    // Work around MSVC warning: not all control paths return a value
+    llvm_unreachable("All switch cases are covered");
   }();
 
   // Special-case the Swift frontend.

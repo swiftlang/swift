@@ -299,6 +299,8 @@ public:
         case EscapeState::Global:
           return true;
       }
+
+      llvm_unreachable("Unhandled EscapeState in switch.");
     }
 
     /// Returns the content node if of this node if it exists in the graph.

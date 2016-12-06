@@ -491,16 +491,13 @@ public:
   /// during type checking.
   llvm::SetVector<NominalTypeDecl *> ValidatedTypes;
 
-  using TypeAccessScopeCacheMap = llvm::DenseMap<Type, AccessScope>;
+  using TypeAccessScopeCacheMap = llvm::DenseMap<const ValueDecl *, AccessScope>;
 
-  /// Caches the outermost scope where a particular type can be used, relative
-  /// to a particular file.
+  /// Caches the outermost scope where a particular declaration can be used,
+  /// relative to a particular file.
   ///
   /// The file is used to handle things like \c \@testable. A null-but-present
   /// value means the type is public.
-  ///
-  /// This can't use CanTypes because typealiases may have more limited types
-  /// than their underlying types.
   llvm::DenseMap<const SourceFile *, TypeAccessScopeCacheMap>
     TypeAccessScopeCache;
 
@@ -729,7 +726,7 @@ public:
   /// \param options Options that alter type resolution.
   ///
   /// \param resolver A resolver for generic types. If none is supplied, this
-  /// routine will create a \c PartialGenericTypeToArchetypeResolver to use.
+  /// routine will create a \c GenericTypeToArchetypeResolver to use.
   ///
   /// \returns true if type validation failed, or false otherwise.
   bool validateType(TypeLoc &Loc, DeclContext *DC,
@@ -759,7 +756,7 @@ public:
   /// \param options Options that alter type resolution.
   ///
   /// \param resolver A resolver for generic types. If none is supplied, this
-  /// routine will create a \c PartialGenericTypeToArchetypeResolver to use.
+  /// routine will create a \c GenericTypeToArchetypeResolver to use.
   ///
   /// \param unsatisfiedDependency When non-null, used to check whether
   /// dependencies have been satisfied appropriately.
@@ -1009,6 +1006,10 @@ public:
   /// is usable for the given type.
   bool isProtocolExtensionUsable(DeclContext *dc, Type type,
                                  ExtensionDecl *protocolExtension) override;
+ 
+  /// Perform semantic checks on the given generic parameter list.
+  void prepareGenericParamList(GenericParamList *genericParams,
+                               DeclContext *dc);
 
   /// Configure the interface type of a function declaration.
   void configureInterfaceType(AbstractFunctionDecl *func,
@@ -1051,11 +1052,10 @@ public:
                       bool allowConcreteGenericParams,
                       std::function<void(ArchetypeBuilder &)> inferRequirements);
 
-  /// Perform any final semantic checks on the given generic parameter list.
-  void finalizeGenericParamList(GenericParamList *genericParams,
-                                GenericSignature *genericSig,
-                                GenericEnvironment *genericEnv,
-                                DeclContext *dc);
+  /// Store a mapping from archetypes to DeclContexts for debugging.
+  void recordArchetypeContexts(GenericSignature *genericSig,
+                               GenericEnvironment *genericEnv,
+                               DeclContext *dc);
 
   /// Validate the signature of a generic type.
   ///
@@ -1367,19 +1367,17 @@ public:
   /// \param P The pattern to type check.
   /// \param dc The context in which type checking occurs.
   /// \param options Options that control type resolution.
-  /// \param resolver A generic type resolver.
   ///
   /// \returns true if any errors occurred during type checking.
   bool typeCheckPattern(Pattern *P, DeclContext *dc,
-                        TypeResolutionOptions options,
-                        GenericTypeResolver *resolver = nullptr);
+                        TypeResolutionOptions options);
 
   bool typeCheckCatchPattern(CatchStmt *S, DeclContext *dc);
 
   /// Type check a parameter list.
   bool typeCheckParameterList(ParameterList *PL, DeclContext *dc,
                               TypeResolutionOptions options,
-                              GenericTypeResolver *resolver = nullptr);
+                              GenericTypeResolver &resolver);
   
   /// Coerce a pattern to the given type.
   ///

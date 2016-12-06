@@ -564,9 +564,6 @@ ERROR(invalid_member_type_suggest,none,
 ERROR(invalid_member_reference,none,
       "%0 %1 is not a member type of %2",
       (DescriptiveDeclKind, Identifier, Type))
-ERROR(invalid_member_type_alias,none,
-      "typealias %0 is too complex to be used as a generic constraint; "
-      "use an associatedtype instead", (Identifier))
 ERROR(ambiguous_member_type,none,
       "ambiguous type name %0 in %1", (Identifier, Type))
 ERROR(no_module_type,none,
@@ -835,6 +832,11 @@ ERROR(argument_out_of_order_unnamed_named,none,
 ERROR(argument_out_of_order_unnamed_unnamed,none,
       "unnamed argument #%0 must precede unnamed argument #%1",
       (unsigned, unsigned))
+
+ERROR(member_shadows_global_function,none,
+      "use of %0 refers to %1 %2 rather than %3 %4 in %5 %6",
+      (DeclName, DescriptiveDeclKind, DeclName, DescriptiveDeclKind, DeclName,
+       DescriptiveDeclKind, DeclName))
 
 ERROR(instance_member_use_on_type,none,
       "use of instance member %1 on type %0; "
@@ -1543,6 +1545,8 @@ ERROR(requires_generic_param_made_equal_to_concrete,none,
 ERROR(requires_superclass_conflict,none,
       "generic parameter %0 cannot be a subclass of both %1 and %2",
       (Identifier, Type, Type))
+ERROR(recursive_type_reference,none,
+      "type %0 references itself", (Identifier))
 ERROR(recursive_requirement_reference,none,
       "type may not reference itself as a requirement",())
 ERROR(recursive_same_type_constraint,none,
@@ -2833,7 +2837,8 @@ ERROR(unsupported_sil_convention,none,
       "convention '%0' not supported in SIL", (StringRef))
 ERROR(illegal_sil_type,none,
       "type %0 is not a legal SIL value type", (Type))
-
+ERROR(sil_box_arg_mismatch,none,
+      "SIL box type has wrong number of generic arguments for layout", ())
 // SIL Metatypes
 ERROR(sil_metatype_without_repr,none,
       "metatypes in SIL must have @thin, @thick, or @objc_metatype attribute",

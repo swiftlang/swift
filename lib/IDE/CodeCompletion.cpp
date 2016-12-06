@@ -949,8 +949,9 @@ calculateTypeRelationForDecl(const Decl *D, Type ExpectedType,
     }
   }
   if (auto NTD = dyn_cast<NominalTypeDecl>(VD)) {
-    return std::max(calculateTypeRelation(NTD->getType(), ExpectedType, DC),
-                    calculateTypeRelation(NTD->getDeclaredType(), ExpectedType, DC));
+    return std::max(
+        calculateTypeRelation(NTD->getInterfaceType(), ExpectedType, DC),
+        calculateTypeRelation(NTD->getDeclaredInterfaceType(), ExpectedType, DC));
   }
   return calculateTypeRelation(VD->getInterfaceType(), ExpectedType, DC);
 }
@@ -1341,7 +1342,7 @@ class CodeCompletionCallbacksImpl : public CodeCompletionCallbacks {
     if (auto *NTD = dyn_cast<NominalTypeDecl>(DC)) {
       // First, type check the parent DeclContext.
       typecheckContextImpl(DC->getParent());
-      if (NTD->hasType())
+      if (NTD->hasInterfaceType())
         return true;
       return typeCheckCompletionDecl(cast<NominalTypeDecl>(DC));
     }
@@ -2584,7 +2585,7 @@ public:
     Builder.addRightBracket();
 
     // Add a type annotation.
-    Type T = SD->getElementType();
+    Type T = SD->getElementInterfaceType();
     if (IsDynamicLookup) {
       // Values of properties that were found on a AnyObject have
       // Optional<T> type.
@@ -2620,7 +2621,7 @@ public:
     if (TAD->hasUnderlyingType() && !TAD->getUnderlyingType()->is<ErrorType>())
       addTypeAnnotation(Builder, TAD->getUnderlyingType());
     else {
-      addTypeAnnotation(Builder, TAD->getDeclaredType());
+      addTypeAnnotation(Builder, TAD->getAliasType());
     }
   }
 
@@ -2635,7 +2636,7 @@ public:
     Builder.setAssociatedDecl(GP);
     addLeadingDot(Builder);
     Builder.addTextChunk(GP->getName().str());
-    addTypeAnnotation(Builder, GP->getDeclaredType());
+    addTypeAnnotation(Builder, GP->getDeclaredInterfaceType());
   }
 
   void addAssociatedTypeRef(const AssociatedTypeDecl *AT,
@@ -2855,7 +2856,8 @@ public:
 
       if (auto *NTD = dyn_cast<NominalTypeDecl>(D)) {
         addNominalTypeRef(NTD, Reason);
-        addConstructorCallsForType(NTD->getType(), NTD->getName(), Reason);
+        addConstructorCallsForType(NTD->getInterfaceType(), NTD->getName(),
+                                   Reason);
         return;
       }
 
@@ -2869,7 +2871,7 @@ public:
       if (auto *GP = dyn_cast<GenericTypeParamDecl>(D)) {
         addGenericTypeParamRef(GP, Reason);
         for (auto *protocol : GP->getConformingProtocols())
-          addConstructorCallsForType(protocol->getType(), GP->getName(),
+          addConstructorCallsForType(protocol->getInterfaceType(), GP->getName(),
                                      Reason);
         return;
       }
@@ -2923,7 +2925,8 @@ public:
 
       if (auto *NTD = dyn_cast<NominalTypeDecl>(D)) {
         addNominalTypeRef(NTD, Reason);
-        addConstructorCallsForType(NTD->getType(), NTD->getName(), Reason);
+        addConstructorCallsForType(NTD->getInterfaceType(), NTD->getName(),
+                                   Reason);
         return;
       }
 
@@ -2937,7 +2940,7 @@ public:
       if (auto *GP = dyn_cast<GenericTypeParamDecl>(D)) {
         addGenericTypeParamRef(GP, Reason);
         for (auto *protocol : GP->getConformingProtocols())
-          addConstructorCallsForType(protocol->getType(), GP->getName(),
+          addConstructorCallsForType(protocol->getInterfaceType(), GP->getName(),
                                      Reason);
         return;
       }
@@ -3630,12 +3633,6 @@ public:
       return std::binary_search(SortedNames.begin(), SortedNames.end(), Name);
     }
 
-    void collectEnumElementTypes(EnumElementDecl *EED) {
-      if (isNameHit(EED->getNameStr()) && EED->getType()) {
-        unboxType(EED->getType());
-      }
-    }
-
     void unboxType(Type T) {
       if (T->getKind() == TypeKind::Paren) {
         unboxType(T->getDesugaredType());
@@ -4072,9 +4069,9 @@ public:
 
   void addAccessControl(const ValueDecl *VD,
                         CodeCompletionResultBuilder &Builder) {
-    assert(CurrDeclContext->getAsGenericTypeOrGenericTypeExtensionContext());
+    assert(CurrDeclContext->getAsNominalTypeOrNominalTypeExtensionContext());
     auto AccessibilityOfContext =
-      CurrDeclContext->getAsGenericTypeOrGenericTypeExtensionContext()
+      CurrDeclContext->getAsNominalTypeOrNominalTypeExtensionContext()
         ->getFormalAccess();
     auto Access = std::min(VD->getFormalAccess(), AccessibilityOfContext);
     // Only emit 'public', not needed otherwise.
@@ -4312,7 +4309,7 @@ public:
   }
 
   void getOverrideCompletions(SourceLoc Loc) {
-    if (!CurrDeclContext->getAsGenericTypeOrGenericTypeExtensionContext())
+    if (!CurrDeclContext->getAsNominalTypeOrNominalTypeExtensionContext())
       return;
 
     Type CurrTy = CurrDeclContext->getDeclaredTypeInContext();

@@ -250,13 +250,15 @@ namespace swift {
   /// Turn the given Swift module into either LLVM IR or native code
   /// and return the generated LLVM IR module.
   std::unique_ptr<llvm::Module>
-  performIRGeneration(IRGenOptions &Opts, ModuleDecl *M, SILModule *SILMod,
+  performIRGeneration(IRGenOptions &Opts, ModuleDecl *M,
+                      std::unique_ptr<SILModule> SILMod,
                       StringRef ModuleName, llvm::LLVMContext &LLVMContext);
 
   /// Turn the given Swift module into either LLVM IR or native code
   /// and return the generated LLVM IR module.
   std::unique_ptr<llvm::Module>
-  performIRGeneration(IRGenOptions &Opts, SourceFile &SF, SILModule *SILMod,
+  performIRGeneration(IRGenOptions &Opts, SourceFile &SF,
+                      std::unique_ptr<SILModule> SILMod,
                       StringRef ModuleName, llvm::LLVMContext &LLVMContext,
                       unsigned StartElem = 0);
 

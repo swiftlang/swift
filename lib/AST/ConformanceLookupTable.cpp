@@ -801,8 +801,7 @@ ProtocolConformance *ConformanceLookupTable::getConformance(
     return nullptr;
 
   auto *conformingNominal =
-    cast<NominalTypeDecl>(conformingDC->
-                          getAsGenericTypeOrGenericTypeExtensionContext());
+    conformingDC->getAsNominalTypeOrNominalTypeExtensionContext();
 
   // Form the conformance.
   Type type = entry->getDeclContext()->getDeclaredTypeInContext();

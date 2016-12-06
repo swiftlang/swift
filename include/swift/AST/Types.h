@@ -18,8 +18,10 @@
 #define SWIFT_TYPES_H
 
 #include "swift/AST/DeclContext.h"
+#include "swift/AST/GenericParamKey.h"
 #include "swift/AST/Ownership.h"
 #include "swift/AST/Requirement.h"
+#include "swift/AST/SILLayout.h"
 #include "swift/AST/Substitution.h"
 #include "swift/AST/Type.h"
 #include "swift/AST/TypeAlignments.h"
@@ -283,6 +285,16 @@ protected:
   enum { NumAnyFunctionTypeBits = NumTypeBaseBits + 16 };
   static_assert(NumAnyFunctionTypeBits <= 32, "fits in an unsigned");
 
+  struct ArchetypeTypeBitfields {
+    unsigned : NumTypeBaseBits;
+
+    unsigned ExpandedNestedTypes : 1;
+    unsigned HasSuperclass : 1;
+    unsigned NumProtocols : 16;
+  };
+  enum { NumArchetypeTypeBitfields = NumTypeBaseBits + 18 };
+  static_assert(NumArchetypeTypeBitfields <= 32, "fits in an unsigned");
+
   struct TypeVariableTypeBitfields {
     unsigned : NumTypeBaseBits;
 
@@ -318,6 +330,7 @@ protected:
     ErrorTypeBitfields ErrorTypeBits;
     AnyFunctionTypeBitfields AnyFunctionTypeBits;
     TypeVariableTypeBitfields TypeVariableTypeBits;
+    ArchetypeTypeBitfields ArchetypeTypeBits;
     SILFunctionTypeBitfields SILFunctionTypeBits;
     AnyMetatypeTypeBitfields AnyMetatypeTypeBits;
   };
@@ -903,9 +916,6 @@ public:
 
   /// Whether this is the AnyObject type.
   bool isAnyObject();
-  
-  /// Whether this is an empty existential composition ("{}").
-  bool isEmptyExistentialComposition();
 
   /// Whether this is an existential composition containing
   /// Error.
@@ -925,16 +935,6 @@ public:
   /// Return whether this type is or can be substituted for a bridgeable
   /// object type.
   TypeTraitResult canBeClass();
-  
-  /// Returns true if the type conforms to protocols using witnesses from the
-  /// environment or from within the value. Generic parameters and existentials
-  /// meet this criteria. In these cases we represent the
-  /// conformance as a null ProtocolConformance* pointer, because there is no
-  /// static conformance associated with the conforming type.
-  bool hasDependentProtocolConformances();
-
-  /// Retrieve the type declaration directly referenced by this type, if any.
-  TypeDecl *getDirectlyReferencedTypeDecl() const;
 
 private:
   // Make vanilla new/delete illegal for Types.
@@ -3320,10 +3320,12 @@ class SILBoxType;
 class SILLayout; // From SIL
 typedef CanTypeWrapper<SILBoxType> CanSILBoxType;
 
-/// The SIL-only type @box T, which represents a reference to a (non-class)
+/// The SIL-only type for boxes, which represent a reference to a (non-class)
 /// refcounted value referencing an aggregate with a given lowered layout.
 class SILBoxType final : public TypeBase,
-                         private llvm::TrailingObjects<SILBoxType,Substitution>{
+                         public llvm::FoldingSetNode,
+                         private llvm::TrailingObjects<SILBoxType,Substitution>
+{
   friend TrailingObjects;
   
   SILLayout *Layout;
@@ -3336,25 +3338,47 @@ class SILBoxType final : public TypeBase,
              SILLayout *Layout, ArrayRef<Substitution> Args);
 
 public:
+  static CanSILBoxType get(ASTContext &C,
+                           SILLayout *Layout,
+                           ArrayRef<Substitution> Args);
+
   SILLayout *getLayout() const { return Layout; }
   ArrayRef<Substitution> getGenericArgs() const {
     return llvm::makeArrayRef(getTrailingObjects<Substitution>(),
                               NumGenericArgs);
   }
+  CanType getFieldLoweredType(unsigned index) const {
+    auto fieldTy = getLayout()->getFields()[index].getLoweredType();
+    // Apply generic arguments if the layout is generic.
+    if (!getGenericArgs().empty()) {
+      auto substMap =
+       getLayout()->getGenericSignature()->getSubstitutionMap(getGenericArgs());
+      fieldTy = fieldTy.subst(substMap)->getCanonicalType();
+    }
+    return fieldTy;
+  }
+  SILType getFieldType(unsigned index) const; // In SILType.h
 
   // TODO: SILBoxTypes should be explicitly constructed in terms of specific
   // layouts. As a staging mechanism, we expose the old single-boxed-type
   // interface.
-  // These functions are implemented in the SIL library instead of the AST.
   
   static CanSILBoxType get(CanType BoxedType);
-  CanType getBoxedType() const;
-  // In SILType.h
-  SILType getBoxedAddressType() const;
-  SILType getFieldType(unsigned index) const;
+  CanType getBoxedType() const; // In SILType.h
+  SILType getBoxedAddressType() const; // In SILType.h
 
   static bool classof(const TypeBase *T) {
     return T->getKind() == TypeKind::SILBox;
+  }
+  
+  /// Produce a profile of this box, for use in a folding set.
+  static void Profile(llvm::FoldingSetNodeID &id,
+                      SILLayout *Layout,
+                      ArrayRef<Substitution> Args);
+  
+  /// \brief Produce a profile of this box, for use in a folding set.
+  void Profile(llvm::FoldingSetNodeID &id) {
+    Profile(id, getLayout(), getGenericArgs());
   }
 };
 DEFINE_EMPTY_CAN_TYPE_WRAPPER(SILBoxType, Type)
@@ -3543,6 +3567,16 @@ public:
   /// in the protocol list, then sorting them in some stable order.
   static void canonicalizeProtocols(SmallVectorImpl<ProtocolDecl *> &protocols);
 
+  /// Visit all of the protocols in the given list of protocols, along with their
+  ///
+  /// \param fn Visitor function called for each protocol (just once). If it
+  /// returns \c true, the visit operation will abort and return \c true.
+  ///
+  /// \returns \c true if any invocation of \c fn returns \c true, and \c false
+  /// otherwise.
+  static bool visitAllProtocols(ArrayRef<ProtocolDecl *> protocols,
+                                llvm::function_ref<bool(ProtocolDecl *)> fn);
+
   /// Compare two protocols to provide them with a stable ordering for
   /// use in sorting.
   static int compareProtocols(ProtocolDecl * const* PP1,
@@ -3727,8 +3761,20 @@ DEFINE_EMPTY_CAN_TYPE_WRAPPER(SubstitutableType, Type)
 /// associated types, as well as the runtime type stored within an
 /// existential container.
 class ArchetypeType final : public SubstitutableType,
-    private llvm::TrailingObjects<ArchetypeType, UUID> {
+    private llvm::TrailingObjects<ArchetypeType, ProtocolDecl *, Type, UUID> {
   friend TrailingObjects;
+
+  size_t numTrailingObjects(OverloadToken<ProtocolDecl *>) const {
+    return ArchetypeTypeBits.NumProtocols;
+  }
+
+  size_t numTrailingObjects(OverloadToken<Type>) const {
+    return ArchetypeTypeBits.HasSuperclass ? 1 : 0;
+  }
+
+  size_t numTrailingObjects(OverloadToken<UUID>) const {
+    return getOpenedExistentialType() ? 1 : 0;
+  }
 
 public:
   /// A nested type. Either a dependent associated archetype, or a concrete
@@ -3773,24 +3819,16 @@ public:
   };
   
 private:
-  ArrayRef<ProtocolDecl *> ConformsTo;
-  Type Superclass;
-
-  llvm::PointerUnion<ArchetypeType *, TypeBase *> ParentOrOpened;
+  llvm::PointerUnion3<ArchetypeType *, TypeBase *,
+                      GenericEnvironment *> ParentOrOpenedOrEnvironment;
   llvm::PointerUnion<AssociatedTypeDecl *, Identifier> AssocTypeOrName;
   MutableArrayRef<std::pair<Identifier, NestedType>> NestedTypes;
 
-  /// Set the ID number of this opened existential.
-  void setOpenedExistentialID(UUID value) {
-    assert(getOpenedExistentialType() && "Not an opened existential archetype");
-    // The UUID is tail-allocated at the end of opened existential archetypes.
-    *getTrailingObjects<UUID>() = value;
-  }
-
+  void populateNestedTypes() const;
   void resolveNestedType(std::pair<Identifier, NestedType> &nested) const;
 
 public:
-  /// getNew - Create a new archetype with the given name.
+  /// getNew - Create a new nested archetype with the given associated type.
   ///
   /// The ConformsTo array will be copied into the ASTContext by this routine.
   static CanTypeWrapper<ArchetypeType>
@@ -3799,12 +3837,13 @@ public:
                                SmallVectorImpl<ProtocolDecl *> &ConformsTo,
                                Type Superclass);
 
-  /// getNew - Create a new archetype with the given name.
+  /// getNew - Create a new primary archetype with the given name.
   ///
   /// The ConformsTo array will be minimized then copied into the ASTContext
   /// by this routine.
   static CanTypeWrapper<ArchetypeType>
                         getNew(const ASTContext &Ctx,
+                               GenericEnvironment *genericEnvironment,
                                Identifier Name,
                                SmallVectorImpl<ProtocolDecl *> &ConformsTo,
                                Type Superclass);
@@ -3836,13 +3875,18 @@ public:
   /// \brief Retrieve the parent of this archetype, or null if this is a
   /// primary archetype.
   ArchetypeType *getParent() const { 
-    return ParentOrOpened.dyn_cast<ArchetypeType *>(); 
+    return ParentOrOpenedOrEnvironment.dyn_cast<ArchetypeType *>();
   }
 
   /// Retrieve the opened existential type 
   Type getOpenedExistentialType() const {
-    return ParentOrOpened.dyn_cast<TypeBase *>();
+    return ParentOrOpenedOrEnvironment.dyn_cast<TypeBase *>();
   }
+
+  /// Retrieve the generic environment in which this archetype resides.
+  ///
+  /// FIXME: Not all archetypes have generic environments, yet.
+  GenericEnvironment *getGenericEnvironment() const;
 
   /// Retrieve the associated type to which this archetype (if it is a nested
   /// archetype) corresponds.
@@ -3856,7 +3900,10 @@ public:
 
   /// getConformsTo - Retrieve the set of protocols to which this substitutable
   /// type shall conform.
-  ArrayRef<ProtocolDecl *> getConformsTo() const { return ConformsTo; }
+  ArrayRef<ProtocolDecl *> getConformsTo() const {
+    return { getTrailingObjects<ProtocolDecl *>(),
+             ArchetypeTypeBits.NumProtocols };
+  }
   
   /// requiresClass - True if the type can only be substituted with class types.
   /// This is true if the type conforms to one or more class protocols or has
@@ -3864,7 +3911,11 @@ public:
   bool requiresClass() const;
 
   /// \brief Retrieve the superclass of this type, if such a requirement exists.
-  Type getSuperclass() const { return Superclass; }
+  Type getSuperclass() const {
+    if (!ArchetypeTypeBits.HasSuperclass) return Type();
+
+    return *getTrailingObjects<Type>();
+  }
 
   /// \brief Return true if the archetype has any requirements at all.
   bool hasRequirements() const {
@@ -3873,7 +3924,13 @@ public:
 
   /// \brief Retrieve the nested type with the given name.
   NestedType getNestedType(Identifier Name) const;
-  
+
+  /// \brief Retrieve the nested type with the given name, if it's already
+  /// known.
+  ///
+  /// This is an implementation detail used by the archetype builder.
+  Optional<NestedType> getNestedTypeIfKnown(Identifier Name) const;
+
   Type getNestedTypeValue(Identifier Name) const {
     return getNestedType(Name).getValue();
   }
@@ -3903,14 +3960,18 @@ public:
   getAllNestedTypes(bool resolveTypes = true) const;
 
   /// \brief Set the nested types to a copy of the given array of
-  /// archetypes, which will first be sorted in place.
+  /// archetypes.
   void setNestedTypes(ASTContext &Ctx,
-                      MutableArrayRef<std::pair<Identifier, NestedType>> Nested);
+                      ArrayRef<std::pair<Identifier, NestedType>> Nested);
+
+  /// Register a nested type with the given name.
+  void registerNestedType(Identifier name, NestedType nested);
 
   /// isPrimary - Determine whether this is the archetype for a 'primary'
-  /// archetype, e.g., 
+  /// archetype, e.g., one that is not nested within another archetype and is
+  /// not an opened existential.
   bool isPrimary() const { 
-    return ParentOrOpened.isNull();
+    return ParentOrOpenedOrEnvironment.is<GenericEnvironment *>();
   }
 
   /// getPrimary - Return the primary archetype parent of this archetype.
@@ -3937,25 +3998,16 @@ public:
 
 private:
   ArchetypeType(
-          const ASTContext &Ctx, ArchetypeType *Parent,
+          const ASTContext &Ctx,
+          llvm::PointerUnion<ArchetypeType *, GenericEnvironment *>
+            ParentOrGenericEnv,
           llvm::PointerUnion<AssociatedTypeDecl *, Identifier> AssocTypeOrName,
           ArrayRef<ProtocolDecl *> ConformsTo,
-          Type Superclass)
-    : SubstitutableType(TypeKind::Archetype, &Ctx,
-                        RecursiveTypeProperties::HasArchetype),
-      ConformsTo(ConformsTo), Superclass(Superclass), ParentOrOpened(Parent),
-      AssocTypeOrName(AssocTypeOrName) { }
+          Type Superclass);
 
-  ArchetypeType(const ASTContext &Ctx, 
-                Type Existential,
-                ArrayRef<ProtocolDecl *> ConformsTo,
-                Type Superclass)
-    : SubstitutableType(TypeKind::Archetype, &Ctx,
-                        RecursiveTypeProperties(
-                          RecursiveTypeProperties::HasArchetype |
-                          RecursiveTypeProperties::HasOpenedExistential)),
-      ConformsTo(ConformsTo), Superclass(Superclass),
-      ParentOrOpened(Existential.getPointer()) { }
+  ArchetypeType(const ASTContext &Ctx, Type Existential,
+                ArrayRef<ProtocolDecl *> ConformsTo, Type Superclass,
+                UUID uuid);
 };
 BEGIN_CAN_TYPE_WRAPPER(ArchetypeType, SubstitutableType)
 CanArchetypeType getParent() const {
@@ -4036,36 +4088,6 @@ BEGIN_CAN_TYPE_WRAPPER(GenericTypeParamType, SubstitutableType)
     return CanGenericTypeParamType(GenericTypeParamType::get(depth, index, C));
   }
 END_CAN_TYPE_WRAPPER(GenericTypeParamType, SubstitutableType)
-
-/// Describes the type of an associated type.
-///
-/// \sa AssociatedTypeDecl
-class AssociatedTypeType : public TypeBase {
-  /// The generic type parameter.
-  AssociatedTypeDecl *AssocType;
-
-public:
-  /// Retrieve the declaration of the associated type.
-  AssociatedTypeDecl *getDecl() const { return AssocType; }
-
-  /// Remove one level of top-level sugar from this type.
-  TypeBase *getSinglyDesugaredType();
-
-  // Implement isa/cast/dyncast/etc.
-  static bool classof(const TypeBase *T) {
-    return T->getKind() == TypeKind::AssociatedType;
-  }
-
-private:
-  friend class AssociatedTypeDecl;
-
-  // These aren't classified as dependent for some reason.
-
-  AssociatedTypeType(AssociatedTypeDecl *assocType)
-    : TypeBase(TypeKind::AssociatedType, nullptr, RecursiveTypeProperties()),
-      AssocType(assocType) { }
-};
-DEFINE_EMPTY_CAN_TYPE_WRAPPER(AssociatedTypeType, Type)
 
 /// SubstitutedType - A type that has been substituted for some other type,
 /// which implies that the replacement type meets all of the requirements of
@@ -4583,11 +4605,6 @@ inline CanType Type::getCanonicalTypeOrNull() const {
   return isNull() ? CanType() : getPointer()->getCanonicalType();
 }
 
-inline bool TypeBase::hasDependentProtocolConformances() {
-  return is<SubstitutableType>() || is<GenericTypeParamType>()
-      || isAnyExistentialType();
-}
-
 #define TYPE(id, parent)
 #define SUGARED_TYPE(id, parent) \
 template <> \
@@ -4595,6 +4612,9 @@ constexpr bool TypeBase::isSugaredType<id##Type>() { \
   return true; \
 }
 #include "swift/AST/TypeNodes.def"
+
+inline GenericParamKey::GenericParamKey(const GenericTypeParamType *p)
+  : Depth(p->getDepth()), Index(p->getIndex()) { }
 
 } // end namespace swift
 

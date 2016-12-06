@@ -1292,6 +1292,7 @@ extension ${Self} : RangeReplaceableCollection, _ArrayProtocol {
   /// - Complexity: Amortized O(1) over many additions. If the array uses a
   ///   bridged `NSArray` instance as its storage, the efficiency is
   ///   unspecified.
+  @_semantics("array.append_element")
   public mutating func append(_ newElement: Element) {
     _makeUniqueAndReserveCapacityIfNotUnique()
     let oldCount = _getCount()
@@ -1344,6 +1345,7 @@ extension ${Self} : RangeReplaceableCollection, _ArrayProtocol {
   /// - Parameter newElements: The elements to append to the array.
   ///
   /// - Complexity: O(*n*), where *n* is the length of the resulting array.
+  @_semantics("array.append_contentsOf")
   public mutating func append<C : Collection>(contentsOf newElements: C)
     where C.Iterator.Element == Element {
 
@@ -1769,7 +1771,7 @@ extension ${Self} {
   public mutating func replaceSubrange<C>(
     _ subrange: Range<Int>,
     with newElements: C
-  ) where C : Collection, C.Iterator.Element == _Buffer.Element {
+  ) where C : Collection, C.Iterator.Element == Element {
 % if Self in ['Array', 'ContiguousArray']:
     _precondition(subrange.lowerBound >= self._buffer.startIndex,
       "${Self} replace: subrange start is negative")
@@ -2289,7 +2291,7 @@ extension ${Self} {
   public mutating func replaceRange<C>(
     _ subRange: Range<Int>,
     with newElements: C
-  ) where C : Collection, C.Iterator.Element == _Buffer.Element {
+  ) where C : Collection, C.Iterator.Element == Element {
     Builtin.unreachable()
   }
 

@@ -164,3 +164,10 @@ class DesignedInitSubSub : DesignatedInitSub {
   init(double: Double) { super.init(int: 0) } // okay
   init(string: String) { super.init() } // expected-error {{must call a designated initializer of the superclass 'DesignatedInitSub'}}
 }
+
+// Make sure that our magic doesn't think the class property with the type name is an init
+func classPropertiesAreNotInit() -> ProcessInfo {
+  var procInfo = NSProcessInfo.processInfo // expected-error{{'NSProcessInfo' has been renamed to 'ProcessInfo'}}
+  procInfo = ProcessInfo.processInfo // okay
+  return procInfo
+}

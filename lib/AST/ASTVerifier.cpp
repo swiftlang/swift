@@ -414,7 +414,7 @@ struct ASTNodeBase {};
 
       // Check for type variables that escaped the type checker.
       if (type->hasTypeVariable()) {
-        Out << "a type variable escaped the type checker";
+        Out << "a type variable escaped the type checker\n";
         abort();
       }
 
@@ -2005,7 +2005,7 @@ struct ASTNodeBase {};
     void verifyChecked(ConstructorDecl *CD) {
       PrettyStackTraceDecl debugStack("verifying ConstructorDecl", CD);
 
-      auto *ND = CD->getExtensionType()->getNominalOrBoundGenericNominal();
+      auto *ND = CD->getDeclContext()->getAsNominalTypeOrNominalTypeExtensionContext();
       if (!isa<ClassDecl>(ND) && !isa<StructDecl>(ND) && !isa<EnumDecl>(ND) &&
           !isa<ProtocolDecl>(ND) && !CD->isInvalid()) {
         Out << "ConstructorDecls outside structs, classes or enums "
@@ -2188,7 +2188,7 @@ struct ASTNodeBase {};
     void verifyChecked(DestructorDecl *DD) {
       PrettyStackTraceDecl debugStack("verifying DestructorDecl", DD);
 
-      auto *ND = DD->getExtensionType()->getNominalOrBoundGenericNominal();
+      auto *ND = DD->getDeclContext()->getAsNominalTypeOrNominalTypeExtensionContext();
       if (!isa<ClassDecl>(ND) && !DD->isInvalid()) {
         Out << "DestructorDecls outside classes should be marked invalid";
         abort();
@@ -2408,13 +2408,6 @@ struct ASTNodeBase {};
       type.print(Out);
       Out << "\n";
       abort();
-    }
-
-    void checkIsTypeOfRValue(ValueDecl *D, Type rvalueType, const char *what) {
-      auto declType = D->getType();
-      if (auto refType = declType->getAs<ReferenceStorageType>())
-        declType = refType->getReferentType();
-      checkSameType(declType, rvalueType, what);
     }
 
     void checkSameType(Type T0, Type T1, const char *what) {

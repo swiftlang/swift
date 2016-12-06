@@ -1295,11 +1295,11 @@ namespace {
       // error recovery within a ClosureExpr.  Just create a new type variable
       // for the decl that isn't bound to anything.  This will ensure that it
       // is considered ambiguous.
-      if (isa<VarDecl>(E->getDecl()) &&
-          E->getDecl()->hasType() &&
-          E->getDecl()->getType()->is<UnresolvedType>()) {
-        return CS.createTypeVariable(CS.getConstraintLocator(E),
-                                     TVO_CanBindToLValue);
+      if (auto *VD = dyn_cast<VarDecl>(E->getDecl())) {
+        if (VD->hasType() && VD->getType()->is<UnresolvedType>()) {
+          return CS.createTypeVariable(CS.getConstraintLocator(E),
+                                       TVO_CanBindToLValue);
+        }
       }
 
       // If we're referring to an invalid declaration, don't type-check.
@@ -1321,10 +1321,10 @@ namespace {
                                         E->isSpecialized(),
                                         E->getFunctionRefKind()));
       
-      if (isa<VarDecl>(E->getDecl()) &&
-          E->getDecl()->getType() &&
-          !E->getDecl()->getType()->getAs<TypeVariableType>()) {
-        CS.setFavoredType(E, E->getDecl()->getType().getPointer());
+      if (auto *VD = dyn_cast<VarDecl>(E->getDecl())) {
+        if (VD->getType() && !VD->getType()->is<TypeVariableType>()) {
+          CS.setFavoredType(E, VD->getType().getPointer());
+        }
       }
 
       return tv;
@@ -1877,7 +1877,8 @@ namespace {
         if (auto type = param->getTypeLoc().getType()) {
           // FIXME: Need a better locator for a pattern as a base.
           Type openedType = CS.openType(type, locator);
-          param->overwriteType(openedType);
+          param->setType(openedType);
+          param->setInterfaceType(openedType);
           continue;
         }
 
@@ -1885,7 +1886,8 @@ namespace {
         Type ty = CS.createTypeVariable(CS.getConstraintLocator(locator),
                                         /*options=*/0);
         
-        param->overwriteType(ty);
+        param->setType(ty);
+        param->setInterfaceType(ty);
       }
       
       return params->getType(CS.getASTContext());
@@ -2402,20 +2404,15 @@ namespace {
       return outputTy;
     }
 
-    Type getSuperType(ValueDecl *selfDecl,
+    Type getSuperType(VarDecl *selfDecl,
                       SourceLoc diagLoc,
                       Diag<> diag_not_in_class,
                       Diag<> diag_no_base_class) {
       DeclContext *typeContext = selfDecl->getDeclContext()->getParent();
       assert(typeContext && "constructor without parent context?!");
 
-      // A DC can fail to have a declared type in context when it's invalid.
-      Type declaredType = typeContext->getDeclaredTypeInContext();
-      if (!declaredType)
-        return Type();
-
       auto &tc = CS.getTypeChecker();
-      ClassDecl *classDecl = declaredType->getClassOrBoundGenericClass();
+      ClassDecl *classDecl = typeContext->getAsClassOrClassExtensionContext();
       if (!classDecl) {
         tc.diagnose(diagLoc, diag_not_in_class);
         return Type();
@@ -2425,8 +2422,15 @@ namespace {
         return Type();
       }
 
+      // If the 'self' parameter is not configured, something went
+      // wrong elsewhere and should have been diagnosed already.
+      if (!selfDecl->hasType())
+        return ErrorType::get(tc.Context);
+
+      Type declaredType = selfDecl->getType()->getRValueInstanceType();
       Type superclassTy = declaredType->getSuperclass(&tc);
-      if (selfDecl->hasType() && selfDecl->getType()->is<AnyMetatypeType>())
+
+      if (selfDecl->getType()->is<MetatypeType>())
         superclassTy = MetatypeType::get(superclassTy);
       return superclassTy;
     }
@@ -3226,7 +3230,7 @@ swift::resolveValueMember(DeclContext &DC, Type BaseTy, DeclName Name) {
 
 void swift::collectDefaultImplementationForProtocolMembers(ProtocolDecl *PD,
                     llvm::SmallDenseMap<ValueDecl*, ValueDecl*> &DefaultMap) {
-  Type BaseTy = PD->getDeclaredTypeInContext();
+  Type BaseTy = PD->getDeclaredInterfaceType();
   DeclContext *DC = PD->getDeclContext();
   auto *TC = static_cast<TypeChecker*>(DC->getASTContext().getLazyResolver());
   if (!TC) {

@@ -10,7 +10,10 @@
 //
 //===----------------------------------------------------------------------===//
 
+#define NO_NEW_DEMANGLING
+
 #include "../../../lib/Basic/Demangle.cpp"
+#include "../../../lib/Basic/ManglingUtils.cpp"
 #include "../../../lib/Basic/Punycode.cpp"
 #include "swift/Runtime/Metadata.h"
 #include "Private.h"

@@ -20,6 +20,7 @@
 #include "IRGen.h"
 #include "llvm/IR/Value.h"
 #include "llvm/IR/Argument.h"
+#include "llvm/IR/Function.h"
 #include "llvm/IR/Instruction.h"
 #include "llvm/ADT/ilist.h"
 #include "llvm/IR/DerivedTypes.h"

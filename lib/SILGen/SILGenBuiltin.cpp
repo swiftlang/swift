@@ -262,7 +262,8 @@ static ManagedValue emitBuiltinAssign(SILGenFunction &gen,
                                                /*isStrict*/ true);
   
   // Build the value to be assigned, reconstructing tuples if needed.
-  RValue src(args.slice(0, args.size() - 1), assignFormalType);
+  auto src = RValue::withPreExplodedElements(args.slice(0, args.size() - 1),
+                                             assignFormalType);
   
   std::move(src).assignInto(gen, loc, addr);
 

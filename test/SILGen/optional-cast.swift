@@ -5,7 +5,7 @@ class B : A {}
 
 // CHECK-LABEL: sil hidden @_TF4main3fooFGSqCS_1A_T_ : $@convention(thin) (@owned Optional<A>) -> () {
 // CHECK:    bb0([[ARG:%.*]] : $Optional<A>):
-// CHECK:      [[X:%.*]] = alloc_box $@box Optional<B>, var, name "x"
+// CHECK:      [[X:%.*]] = alloc_box $<τ_0_0> { var τ_0_0 } <Optional<B>>, var, name "x"
 // CHECK-NEXT: [[PB:%.*]] = project_box [[X]]
 //   Check whether the temporary holds a value.
 // CHECK:      [[ARG_COPY:%.*]] = copy_value [[ARG]]
@@ -43,7 +43,7 @@ func foo(_ y : A?) {
 
 // CHECK-LABEL: sil hidden @_TF4main3barFGSqGSqGSqGSqCS_1A____T_ : $@convention(thin) (@owned Optional<Optional<Optional<Optional<A>>>>) -> () {
 // CHECK:    bb0([[ARG:%.*]] : $Optional<Optional<Optional<Optional<A>>>>):
-// CHECK:      [[X:%.*]] = alloc_box $@box Optional<Optional<Optional<B>>>, var, name "x"
+// CHECK:      [[X:%.*]] = alloc_box $<τ_0_0> { var τ_0_0 } <Optional<Optional<Optional<B>>>>, var, name "x"
 // CHECK-NEXT: [[PB:%.*]] = project_box [[X]]
 
 // Check for some(...)
@@ -109,7 +109,7 @@ func bar(_ y : A????) {
 
 // CHECK-LABEL: sil hidden @_TF4main3bazFGSqPs9AnyObject__T_ : $@convention(thin) (@owned Optional<AnyObject>) -> () {
 // CHECK:       bb0([[ARG:%.*]] : $Optional<AnyObject>):
-// CHECK:         [[X:%.*]] = alloc_box $@box Optional<B>, var, name "x"
+// CHECK:         [[X:%.*]] = alloc_box $<τ_0_0> { var τ_0_0 } <Optional<B>>, var, name "x"
 // CHECK-NEXT:    [[PB:%.*]] = project_box [[X]]
 // CHECK-NEXT:    [[ARG_COPY:%.*]] = copy_value [[ARG]]
 // CHECK:         [[T1:%.*]] = select_enum [[ARG_COPY]]
@@ -175,11 +175,11 @@ public struct TestAddressOnlyStruct<T> {
 // CHECK-LABEL: sil hidden @_TF4main35testContextualInitOfNonAddrOnlyTypeFGSqSi_T_
 // CHECK: bb0(%0 : $Optional<Int>):
 // CHECK-NEXT: debug_value %0 : $Optional<Int>, let, name "a"
-// CHECK-NEXT: [[X:%.*]] = alloc_box $@box Optional<Int>, var, name "x"
+// CHECK-NEXT: [[X:%.*]] = alloc_box $<τ_0_0> { var τ_0_0 } <Optional<Int>>, var, name "x"
 // CHECK-NEXT: [[PB:%.*]] = project_box [[X]]
 // CHECK-NEXT: [[CAST:%.*]] = unchecked_addr_cast [[PB]] : $*Optional<Int> to $*Optional<Int>
 // CHECK-NEXT: store %0 to [trivial] [[CAST]] : $*Optional<Int>
-// CHECK-NEXT: destroy_value [[X]] : $@box Optional<Int>
+// CHECK-NEXT: destroy_value [[X]] : $<τ_0_0> { var τ_0_0 } <Optional<Int>>
 func testContextualInitOfNonAddrOnlyType(_ a : Int?) {
   var x: Int! = a
 }

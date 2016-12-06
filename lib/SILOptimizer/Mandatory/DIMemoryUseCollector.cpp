@@ -57,11 +57,13 @@ static unsigned getElementCountRec(CanType T,
 DIMemoryObjectInfo::DIMemoryObjectInfo(SILInstruction *MI) {
   MemoryInst = MI;
   // Compute the type of the memory object.
-  if (auto *ABI = dyn_cast<AllocBoxInst>(MemoryInst))
-    MemorySILType = ABI->getElementType();
-  else if (auto *ASI = dyn_cast<AllocStackInst>(MemoryInst))
+  if (auto *ABI = dyn_cast<AllocBoxInst>(MemoryInst)) {
+    assert(ABI->getBoxType()->getLayout()->getFields().size() == 1
+           && "analyzing multi-field boxes not implemented");
+    MemorySILType = ABI->getBoxType()->getFieldType(0);
+  } else if (auto *ASI = dyn_cast<AllocStackInst>(MemoryInst)) {
     MemorySILType = ASI->getElementType();
-  else {
+  } else {
     auto *MUI = cast<MarkUninitializedInst>(MemoryInst);
     MemorySILType = MUI->getType().getObjectType();
 
@@ -562,13 +564,15 @@ void ElementUseCollector::collectContainerUses(AllocBoxInst *ABI) {
     if (isa<StrongReleaseInst>(User))
       continue;
 
-    if (isa<ProjectBoxInst>(User)) {
-      collectUses(User, 0);
+    if (auto project = dyn_cast<ProjectBoxInst>(User)) {
+      collectUses(User, project->getFieldIndex());
       continue;
     }
 
-    // Other uses of the container are considered escapes of the value.
-    addElementUses(0, ABI->getElementType(), User, DIUseKind::Escape);
+    // Other uses of the container are considered escapes of the values.
+    for (unsigned field : indices(ABI->getBoxType()->getLayout()->getFields()))
+      addElementUses(field, ABI->getBoxType()->getFieldType(field),
+                     User, DIUseKind::Escape);
   }
 }
 

@@ -357,8 +357,9 @@ static void doDynamicLookup(VisibleDeclConsumer &Consumer,
       }
 
       case DeclKind::Var: {
+        auto *VD = cast<VarDecl>(D);
         auto Signature =
-            std::make_pair(D->getName(), D->getType()->getCanonicalType());
+            std::make_pair(VD->getName(), VD->getType()->getCanonicalType());
         if (!PropertiesReported.insert(Signature).second)
           return;
         break;
@@ -826,13 +827,10 @@ void swift::lookupVisibleDecls(VisibleDeclConsumer &Consumer,
         Consumer.foundDecl(const_cast<ParamDecl*>(AFD->getImplicitSelfDecl()),
                            DeclVisibilityKind::FunctionParameter);
 
-      if (AFD->getExtensionType()) {
-        ExtendedType = AFD->getExtensionType();
+      if (AFD->getDeclContext()->isTypeContext()) {
+        ExtendedType = AFD->getDeclContext()->getSelfTypeInContext();
         BaseDecl = AFD->getImplicitSelfDecl();
         DC = DC->getParent();
-
-        if (DC->getAsProtocolExtensionContext())
-          ExtendedType = DC->getSelfTypeInContext();
 
         if (auto *FD = dyn_cast<FuncDecl>(AFD))
           if (FD->isStatic())

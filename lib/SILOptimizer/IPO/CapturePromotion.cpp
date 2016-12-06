@@ -44,6 +44,7 @@
 
 #define DEBUG_TYPE "sil-capture-promotion"
 #include "swift/SILOptimizer/PassManager/Passes.h"
+#include "swift/SILOptimizer/Utils/SpecializationMangler.h"
 #include "swift/SIL/Mangle.h"
 #include "swift/SIL/SILCloner.h"
 #include "swift/SIL/TypeSubstCloner.h"
@@ -124,12 +125,16 @@ public:
 
   bool test(unsigned ID) const {
     assert(ID / BITWORD_SIZE < NumBitWords && "block ID out-of-bounds");
-    return Bits[ID / BITWORD_SIZE] & (1L << (ID % BITWORD_SIZE));
+    unsigned int modulus = ID % BITWORD_SIZE;
+    long shifted = 1L << modulus;
+    return Bits[ID / BITWORD_SIZE] & shifted;
   }
 
   void set(unsigned ID) {
+    unsigned int modulus = ID % BITWORD_SIZE;
+    long shifted = 1L << modulus;
     assert(ID / BITWORD_SIZE < NumBitWords && "block ID out-of-bounds");
-    Bits[ID / BITWORD_SIZE] |= 1L << (ID % BITWORD_SIZE);
+    Bits[ID / BITWORD_SIZE] |= shifted;
   }
 
   ReachingBlockSet &operator|=(const ReachingBlockSet &RHS) {
@@ -360,8 +365,10 @@ computeNewArgInterfaceTypes(SILFunction *F,
     // Perform the proper conversions and then add it to the new parameter list
     // for the type.
     assert(!isIndirectParameter(param.getConvention()));
-    auto paramBoxedTy = param.getSILType().castTo<SILBoxType>()
-      ->getBoxedAddressType();
+    auto paramBoxTy = param.getSILType().castTo<SILBoxType>();
+    assert(paramBoxTy->getLayout()->getFields().size() == 1
+           && "promoting compound box not implemented yet");
+    auto paramBoxedTy = paramBoxTy->getFieldType(0);
     auto &paramTL = F->getModule().Types.getTypeLowering(paramBoxedTy);
     ParameterConvention convention;
     if (paramTL.isPassedIndirectly()) {
@@ -381,7 +388,8 @@ static std::string getSpecializedName(SILFunction *F,
                                       IndicesSet &PromotableIndices) {
   Mangle::Mangler M;
   auto P = SpecializationPass::CapturePromotion;
-  FunctionSignatureSpecializationMangler FSSM(P, M, Fragile, F);
+  FunctionSignatureSpecializationMangler OldFSSM(P, M, Fragile, F);
+  NewMangling::FunctionSignatureSpecializationMangler NewFSSM(P, Fragile, F);
   CanSILFunctionType FTy = F->getLoweredFunctionType();
 
   ArrayRef<SILParameterInfo> Parameters = FTy->getParameters();
@@ -394,12 +402,14 @@ static std::string getSpecializedName(SILFunction *F,
     unsigned ArgIndex = Index + NumIndirectResults;
     if (!PromotableIndices.count(ArgIndex))
       continue;
-    FSSM.setArgumentBoxToValue(Index);
+    OldFSSM.setArgumentBoxToValue(Index);
+    NewFSSM.setArgumentBoxToValue(Index);
   }
 
-  FSSM.mangle();
-
-  return M.finalize();
+  OldFSSM.mangle();
+  std::string Old = M.finalize();
+  std::string New = NewFSSM.mangle();
+  return NewMangling::selectMangling(Old, New);
 }
 
 /// \brief Create the function corresponding to the clone of the original
@@ -472,8 +482,10 @@ ClosureCloner::populateCloned() {
   while (I != E) {
     if (PromotableIndices.count(ArgNo)) {
       // Handle the case of a promoted capture argument.
-      auto BoxedTy = (*I)->getType().castTo<SILBoxType>()->getBoxedAddressType()
-        .getObjectType();
+      auto BoxTy = (*I)->getType().castTo<SILBoxType>();
+      assert(BoxTy->getLayout()->getFields().size() == 1
+             && "promoting compound box not implemented");
+      auto BoxedTy = BoxTy->getFieldType(0).getObjectType();
       SILValue MappedValue =
           ClonedEntryBB->createArgument(BoxedTy, (*I)->getDecl());
       BoxArgumentMap.insert(std::make_pair(*I, MappedValue));
@@ -782,8 +794,10 @@ examineAllocBoxInst(AllocBoxInst *ABI, ReachabilityInfo &RI,
       // since we currently handle loadable types only.
       // TODO: handle address-only types
       SILModule &M = PAI->getModule();
-      if (BoxArg->getType().castTo<SILBoxType>()->getBoxedAddressType()
-            .isAddressOnly(M))
+      auto BoxTy = BoxArg->getType().castTo<SILBoxType>();
+      assert(BoxTy->getLayout()->getFields().size() == 1
+             && "promoting compound box not implemented yet");
+      if (BoxTy->getFieldType(0).isAddressOnly(M))
         return false;
 
       // Verify that this closure is known not to mutate the captured value; if

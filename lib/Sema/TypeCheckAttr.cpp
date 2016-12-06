@@ -247,7 +247,7 @@ void AttributeEarlyChecker::visitTransparentAttr(TransparentAttr *attr) {
 void AttributeEarlyChecker::visitMutationAttr(DeclAttribute *attr) {
   FuncDecl *FD = cast<FuncDecl>(D);
 
-  auto contextTy = FD->getDeclContext()->getDeclaredTypeInContext();
+  auto contextTy = FD->getDeclContext()->getDeclaredInterfaceType();
   if (!contextTy)
     return diagnoseAndRemoveAttr(attr, diag::mutating_invalid_global_scope);
 
@@ -268,8 +268,8 @@ void AttributeEarlyChecker::visitMutationAttr(DeclAttribute *attr) {
 
 void AttributeEarlyChecker::visitDynamicAttr(DynamicAttr *attr) {
   // Only instance members of classes can be dynamic.
-  auto contextTy = D->getDeclContext()->getDeclaredTypeInContext();
-  if (!contextTy || !contextTy->getClassOrBoundGenericClass())
+  auto classDecl = D->getDeclContext()->getAsClassOrClassExtensionContext();
+  if (!classDecl)
     return diagnoseAndRemoveAttr(attr, diag::dynamic_not_in_class);
     
   // Members cannot be both dynamic and final.
@@ -289,8 +289,8 @@ void AttributeEarlyChecker::visitIBActionAttr(IBActionAttr *attr) {
 
 void AttributeEarlyChecker::visitIBDesignableAttr(IBDesignableAttr *attr) {
   if (auto *ED = dyn_cast<ExtensionDecl>(D)) {
-    CanType extendedTy = ED->getExtendedType()->getCanonicalType();
-    if (!isa<ClassDecl>(extendedTy->getAnyNominal()))
+    NominalTypeDecl *extendedType = ED->getExtendedType()->getAnyNominal();
+    if (extendedType && !isa<ClassDecl>(extendedType))
       return diagnoseAndRemoveAttr(attr, diag::invalid_ibdesignable_extension);
   }
 }
@@ -317,8 +317,9 @@ void AttributeEarlyChecker::visitSILStoredAttr(SILStoredAttr *attr) {
   auto *VD = cast<VarDecl>(D);
   if (VD->getDeclContext()->getAsClassOrClassExtensionContext())
     return;
-  auto ctx = VD->getDeclContext()->getDeclaredTypeInContext();
-  if (ctx && ctx->getStructOrBoundGenericStruct())
+  auto nominalDecl = VD->getDeclContext()
+      ->getAsNominalTypeOrNominalTypeExtensionContext();
+  if (nominalDecl && isa<StructDecl>(nominalDecl))
     return;
   return diagnoseAndRemoveAttr(attr, diag::invalid_decl_attribute_simple);
 }
@@ -1082,10 +1083,8 @@ void AttributeChecker::visitNSCopyingAttr(NSCopyingAttr *attr) {
   auto *VD = cast<VarDecl>(D);
 
   // It may only be used on class members.
-  auto typeContext = D->getDeclContext()->getDeclaredTypeInContext();
-  auto contextTypeDecl =
-  typeContext ? typeContext->getNominalOrBoundGenericNominal() : nullptr;
-  if (!contextTypeDecl || !isa<ClassDecl>(contextTypeDecl)) {
+  auto classDecl = D->getDeclContext()->getAsClassOrClassExtensionContext();
+  if (!classDecl) {
     TC.diagnose(attr->getLocation(), diag::nscopying_only_on_class_properties);
     attr->setInvalid();
     return;
@@ -1250,7 +1249,7 @@ static bool isObjCClassExtensionInOverlay(DeclContext *dc) {
 void AttributeChecker::visitRequiredAttr(RequiredAttr *attr) {
   // The required attribute only applies to constructors.
   auto ctor = cast<ConstructorDecl>(D);
-  auto parentTy = ctor->getExtensionType();
+  auto parentTy = ctor->getDeclContext()->getDeclaredInterfaceType();
   if (!parentTy) {
     // Constructor outside of nominal type context; we've already complained
     // elsewhere.
@@ -1559,7 +1558,7 @@ void TypeChecker::checkAutoClosureAttr(ParamDecl *PD, AutoClosureAttr *attr) {
   // The paramdecl should have function type, and we restrict it to functions
   // taking ().
   auto *FTy = PD->getType()->getAs<FunctionType>();
-  if (FTy == 0) {
+  if (!FTy) {
     diagnose(attr->getLocation(), diag::autoclosure_function_type);
     attr->setInvalid();
     return;
@@ -1584,8 +1583,13 @@ void TypeChecker::checkAutoClosureAttr(ParamDecl *PD, AutoClosureAttr *attr) {
   }
 
   // Change the type to include the autoclosure bit.
-  PD->overwriteType(FunctionType::get(FuncTyInput, FTy->getResult(),
-                                    FTy->getExtInfo().withIsAutoClosure(true)));
+  PD->setType(
+      FTy->withExtInfo(FTy->getExtInfo().withIsAutoClosure(true)));
+
+  // And the interface type.
+  auto *IfaceFTy = PD->getInterfaceType()->getAs<FunctionType>();
+  PD->setInterfaceType(
+      IfaceFTy->withExtInfo(IfaceFTy->getExtInfo().withIsAutoClosure(true)));
 
   // Autoclosure may imply noescape, so add a noescape attribute if this is a
   // function parameter.
@@ -1634,8 +1638,8 @@ void TypeChecker::checkNoEscapeAttr(ParamDecl *PD, NoEscapeAttr *attr) {
     return;
 
   // Change the type to include the noescape bit.
-  PD->overwriteType(FunctionType::get(FTy->getInput(), FTy->getResult(),
-                                      FTy->getExtInfo().withNoEscape(true)));
+  PD->setType(FunctionType::get(FTy->getInput(), FTy->getResult(),
+                                FTy->getExtInfo().withNoEscape(true)));
 }
 
 
@@ -1700,7 +1704,7 @@ void TypeChecker::checkOwnershipAttr(VarDecl *var, OwnershipAttr *attr) {
   }
 
   // Change the type to the appropriate reference storage type.
-  var->overwriteType(ReferenceStorageType::get(
+  var->setType(ReferenceStorageType::get(
       type, ownershipKind, Context));
   var->setInterfaceType(ReferenceStorageType::get(
       interfaceType, ownershipKind, Context));

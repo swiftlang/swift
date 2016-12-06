@@ -1444,6 +1444,9 @@ public:
   void removeInactiveConstraint(Constraint *constraint) {
     CG.removeConstraint(constraint);
     InactiveConstraints.erase(constraint);
+
+    if (solverState)
+      solverState->retiredConstraints.push_back(constraint);
   }
 
   /// Retrieve the list of inactive constraints.

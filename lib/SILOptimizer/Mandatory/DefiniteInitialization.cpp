@@ -1809,9 +1809,7 @@ void LifetimeChecker::processUninitializedRelease(SILInstruction *Release,
     
     // dealloc_box the self box if necessary.
     if (ABI) {
-      auto DB = B.createDeallocBox(Loc,
-                                   ABI->getElementType(),
-                                   ABI);
+      auto DB = B.createDeallocBox(Loc, ABI);
       Releases.push_back(DB);
     }
   }

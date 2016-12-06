@@ -21,7 +21,7 @@ namespace swift {
 namespace hashable_support {
 
 extern "C" const ProtocolDescriptor HashableProtocolDescriptor
-  __asm__(SWIFT_QUOTED_SYMBOL_NAME(_TMps8Hashable));
+  __asm__(SWIFT_QUOTED_SYMBOL_NAME(PROTOCOL_DESCR_SYM(s8Hashable)));
 
 struct HashableWitnessTable;
 

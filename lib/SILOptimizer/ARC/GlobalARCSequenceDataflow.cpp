@@ -220,6 +220,8 @@ static bool isARCSignificantTerminator(TermInst *TI) {
   case TermKind::CheckedCastAddrBranchInst:
     return true;
   }
+
+  llvm_unreachable("Unhandled TermKind in switch.");
 }
 
 /// Analyze a single BB for refcount inc/dec instructions.

@@ -192,14 +192,13 @@ getBuiltinGenericFunction(Identifier Id,
   // Compute the interface type.
   SmallVector<GenericTypeParamType *, 1> GenericParamTypes;
   for (auto gp : *GenericParams) {
-    GenericParamTypes.push_back(gp->getDeclaredType()
+    GenericParamTypes.push_back(gp->getDeclaredInterfaceType()
                                   ->castTo<GenericTypeParamType>());
   }
   GenericSignature *Sig =
     GenericSignature::get(GenericParamTypes, { });
   GenericEnvironment *Env =
-      GenericEnvironment::get(Context, Sig,
-                              InterfaceToArchetypeMap);
+    GenericEnvironment::get(Sig, InterfaceToArchetypeMap);
 
   Type InterfaceType = GenericFunctionType::get(Sig, ArgParamType, ResType,
                                                 AnyFunctionType::ExtInfo());
@@ -427,7 +426,8 @@ createGenericParam(ASTContext &ctx, const char *name, unsigned index) {
   Module *M = ctx.TheBuiltinModule;
   Identifier ident = ctx.getIdentifier(name);
   SmallVector<ProtocolDecl *, 1> protos;
-  ArchetypeType *archetype = ArchetypeType::getNew(ctx, ident, protos, Type());
+  ArchetypeType *archetype = ArchetypeType::getNew(ctx, nullptr, ident, protos,
+                                                   Type());
   auto genericParam =
     new (ctx) GenericTypeParamDecl(&M->getMainFile(FileUnitKind::Builtin),
                                    ident, SourceLoc(), 0, index);
@@ -479,7 +479,7 @@ namespace {
                                              Archetypes, GenericTypeParams);
 
       for (unsigned i = 0, e = GenericTypeParams.size(); i < e; i++) {
-        auto paramTy = GenericTypeParams[i]->getDeclaredType()
+        auto paramTy = GenericTypeParams[i]->getDeclaredInterfaceType()
           ->getCanonicalType()->castTo<GenericTypeParamType>();
         InterfaceToArchetypeMap[paramTy] = Archetypes[i];
       }
@@ -517,7 +517,8 @@ namespace {
       unsigned Index;
       Type build(GenericSignatureBuilder &builder, bool forBody) const {
         return (forBody ? builder.Archetypes[Index]
-                        : builder.GenericTypeParams[Index]->getDeclaredType());
+                        : builder.GenericTypeParams[Index]
+                            ->getDeclaredInterfaceType());
       }
     };
     struct LambdaGenerator {

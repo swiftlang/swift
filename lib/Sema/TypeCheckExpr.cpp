@@ -498,7 +498,7 @@ Type TypeChecker::getTypeOfRValue(ValueDecl *value, bool wantInterfaceType) {
   if (wantInterfaceType)
     type = value->getInterfaceType();
   else
-    type = value->getType();
+    type = cast<VarDecl>(value)->getType();
 
   // Uses of inout argument values are lvalues.
   if (auto iot = type->getAs<InOutType>())
@@ -651,7 +651,10 @@ static Type lookupDefaultLiteralType(TypeChecker &TC, DeclContext *dc,
   if (!TD)
     return Type();
   TC.validateDecl(TD);
-  return TD->getDeclaredType();
+
+  if (auto *NTD = dyn_cast<NominalTypeDecl>(TD))
+    return NTD->getDeclaredType();
+  return cast<TypeAliasDecl>(TD)->getAliasType();
 }
 
 Type TypeChecker::getDefaultType(ProtocolDecl *protocol, DeclContext *dc) {

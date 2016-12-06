@@ -266,13 +266,14 @@ void SILGenFunction::emitCaptures(SILLocation loc,
       // let declarations.
       auto Entry = VarLocs[vd];
 
-      auto &tl = getTypeLowering(vd->getType()->getReferenceStorageReferent());
+      auto *var = cast<VarDecl>(vd);
+      auto &tl = getTypeLowering(var->getType()->getReferenceStorageReferent());
       SILValue Val = Entry.value;
 
       if (!Val->getType().isAddress()) {
         // Our 'let' binding can guarantee the lifetime for the callee,
         // if we don't need to do anything more to it.
-        if (canGuarantee && !vd->getType()->is<ReferenceStorageType>()) {
+        if (canGuarantee && !var->getType()->is<ReferenceStorageType>()) {
           auto guaranteed = ManagedValue::forUnmanaged(Val);
           capturedArgs.push_back(guaranteed);
           break;
@@ -289,8 +290,8 @@ void SILGenFunction::emitCaptures(SILLocation loc,
       // If we're capturing an unowned pointer by value, we will have just
       // loaded it into a normal retained class pointer, but we capture it as
       // an unowned pointer.  Convert back now.
-      if (vd->getType()->is<ReferenceStorageType>()) {
-        auto type = getTypeLowering(vd->getType()).getLoweredType();
+      if (var->getType()->is<ReferenceStorageType>()) {
+        auto type = getTypeLowering(var->getType()).getLoweredType();
         Val = emitConversionFromSemanticValue(loc, Val, type);
       }
       
@@ -518,9 +519,9 @@ void SILGenFunction::emitArtificialTopLevel(ClassDecl *mainClass) {
     // we're getting away with it because the types are guaranteed to already
     // be imported.
     ASTContext &ctx = getASTContext();
-    Module *UIKit = ctx.getLoadedModule(ctx.getIdentifier("UIKit"));
+    ModuleDecl *UIKit = ctx.getLoadedModule(ctx.getIdentifier("UIKit"));
     SmallVector<ValueDecl *, 1> results;
-    UIKit->lookupQualified(UIKit->getDeclaredType(),
+    UIKit->lookupQualified(UIKit->getInterfaceType(),
                            ctx.getIdentifier("UIApplicationMain"),
                            NL_QualifiedDefault,
                            /*resolver*/nullptr,
@@ -536,7 +537,8 @@ void SILGenFunction::emitArtificialTopLevel(ClassDecl *mainClass) {
     auto fnTy = UIApplicationMainFn->getLoweredFunctionType();
 
     // Get the class name as a string using NSStringFromClass.
-    CanType mainClassTy = mainClass->getDeclaredTypeInContext()->getCanonicalType();
+    CanType mainClassTy = mainClass->getDeclaredInterfaceType()
+        ->getCanonicalType();
     CanType mainClassMetaty = CanMetatypeType::get(mainClassTy,
                                                    MetatypeRepresentation::ObjC);
     ProtocolDecl *anyObjectProtocol =
@@ -545,7 +547,7 @@ void SILGenFunction::emitArtificialTopLevel(ClassDecl *mainClass) {
       *SGM.M.getSwiftModule()->lookupConformance(mainClassTy, anyObjectProtocol,
                                                 nullptr));
     CanType anyObjectTy = anyObjectProtocol
-      ->getDeclaredTypeInContext()
+      ->getDeclaredInterfaceType()
       ->getCanonicalType();
     CanType anyObjectMetaTy = CanExistentialMetatypeType::get(anyObjectTy,
                                                   MetatypeRepresentation::ObjC);
@@ -700,12 +702,15 @@ static void forwardCaptureArgs(SILGenFunction &gen,
   case CaptureKind::None:
     break;
 
-  case CaptureKind::Constant:
-    addSILArgument(gen.getLoweredType(vd->getType()), vd);
+  case CaptureKind::Constant: {
+    auto *var = dyn_cast<VarDecl>(vd);
+    addSILArgument(gen.getLoweredType(var->getType()), vd);
     break;
+  }
 
   case CaptureKind::Box: {
-    SILType ty = gen.getLoweredType(vd->getType()->getRValueType())
+    auto *var = dyn_cast<VarDecl>(vd);
+    SILType ty = gen.getLoweredType(var->getType()->getRValueType())
       .getAddressType();
     // Forward the captured owning box.
     SILType boxTy = SILType::getPrimitiveObjectType(
@@ -715,7 +720,8 @@ static void forwardCaptureArgs(SILGenFunction &gen,
   }
 
   case CaptureKind::StorageAddress: {
-    SILType ty = gen.getLoweredType(vd->getType()->getRValueType())
+    auto *var = dyn_cast<VarDecl>(vd);
+    SILType ty = gen.getLoweredType(var->getType()->getRValueType())
       .getAddressType();
     // Forward the captured value address.
     addSILArgument(ty, vd);

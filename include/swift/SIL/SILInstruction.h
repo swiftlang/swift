@@ -77,7 +77,6 @@ class SILInstruction : public ValueBase,public llvm::ilist_node<SILInstruction>{
   /// used for debug info and diagnostics.
   SILDebugLocation Location;
 
-  friend llvm::ilist_sentinel_traits<SILInstruction>;
   SILInstruction() = delete;
   void operator=(const SILInstruction &) = delete;
   void operator delete(void *Ptr, size_t) = delete;
@@ -883,10 +882,9 @@ public:
       Operands[i].~Operand();
     }
   }
-
-  SILType getElementType() const {
-    return SILType::getPrimitiveObjectType(
-        getType().castTo<SILBoxType>()->getBoxedType());
+  
+  CanSILBoxType getBoxType() const {
+    return getType().castTo<SILBoxType>();
   }
 
   /// Return the underlying variable declaration associated with this
@@ -4338,15 +4336,8 @@ class DeallocBoxInst :
 {
   friend SILBuilder;
 
-  // TODO: The element type can be derived from a typed box.
-  SILType ElementType;
-
-  DeallocBoxInst(SILDebugLocation DebugLoc, SILType elementType,
-                 SILValue operand)
-      : UnaryInstructionBase(DebugLoc, operand), ElementType(elementType) {}
-
-public:
-  SILType getElementType() const { return ElementType; }
+  DeallocBoxInst(SILDebugLocation DebugLoc, SILValue operand)
+      : UnaryInstructionBase(DebugLoc, operand) {}
 };
 
 /// Deallocate memory allocated for a boxed existential container created by
@@ -5536,19 +5527,11 @@ struct ilist_traits<::swift::SILInstruction> :
   using SILInstruction = ::swift::SILInstruction;
 
 private:
-  mutable ilist_half_node<SILInstruction> Sentinel;
-
   swift::SILBasicBlock *getContainingBlock();
 
-public:
-  SILInstruction *createSentinel() const {
-    return static_cast<SILInstruction*>(&Sentinel);
-  }
-  void destroySentinel(SILInstruction *) const {}
+  using instr_iterator = simple_ilist<SILInstruction>::iterator;
 
-  SILInstruction *provideInitialHead() const { return createSentinel(); }
-  SILInstruction *ensureHead(SILInstruction*) const { return createSentinel(); }
-  static void noteHead(SILInstruction*, SILInstruction*) {}
+public:
   static void deleteNode(SILInstruction *V) {
     SILInstruction::destroy(V);
   }
@@ -5556,8 +5539,7 @@ public:
   void addNodeToList(SILInstruction *I);
   void removeNodeFromList(SILInstruction *I);
   void transferNodesFromList(ilist_traits<SILInstruction> &L2,
-                             ilist_iterator<SILInstruction> first,
-                             ilist_iterator<SILInstruction> last);
+                             instr_iterator first, instr_iterator last);
 
 private:
   void createNode(const SILInstruction &);

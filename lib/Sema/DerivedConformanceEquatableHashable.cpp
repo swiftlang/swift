@@ -209,14 +209,18 @@ deriveEquatable_enum_eq(TypeChecker &tc, Decl *parentDecl, EnumDecl *enumDecl) {
   
   auto parentDC = cast<DeclContext>(parentDecl);
   auto enumTy = parentDC->getDeclaredTypeInContext();
-  
+  auto enumIfaceTy = parentDC->getDeclaredInterfaceType();
+
   auto getParamDecl = [&](StringRef s) -> ParamDecl* {
-    return new (C) ParamDecl(/*isLet*/true, SourceLoc(), SourceLoc(),
-                             Identifier(), SourceLoc(), C.getIdentifier(s),
-                             enumTy, parentDC);
+    auto *param = new (C) ParamDecl(/*isLet*/true, SourceLoc(), SourceLoc(),
+                                    Identifier(), SourceLoc(), C.getIdentifier(s),
+                                    enumTy, parentDC);
+    param->setInterfaceType(enumIfaceTy);
+    return param;
   };
 
-  auto selfDecl = ParamDecl::createUnboundSelf(SourceLoc(), parentDC);
+  auto selfDecl = ParamDecl::createSelf(SourceLoc(), parentDC,
+                                        /*isStatic=*/true);
   
   ParameterList *params[] = {
     ParameterList::createWithoutLoc(selfDecl),
@@ -252,10 +256,6 @@ deriveEquatable_enum_eq(TypeChecker &tc, Decl *parentDecl, EnumDecl *enumDecl) {
     return nullptr;
   }
 
-  // Fill in the 'self' type.
-  Type selfTy = eqDecl->computeSelfType();
-  selfDecl->overwriteType(selfTy);
-
   eqDecl->setOperatorDecl(op);
   eqDecl->setBodySynthesizer(&deriveBodyEquatable_enum_eq);
 
@@ -264,7 +264,7 @@ deriveEquatable_enum_eq(TypeChecker &tc, Decl *parentDecl, EnumDecl *enumDecl) {
 
   // Compute the interface type.
   Type interfaceTy;
-  Type selfIfaceTy = eqDecl->computeInterfaceSelfType(false);
+  Type selfIfaceTy = eqDecl->computeInterfaceSelfType();
   if (auto genericSig = parentDC->getGenericSignatureOfContext()) {
     eqDecl->setGenericEnvironment(parentDC->getGenericEnvironmentOfContext());
 
@@ -383,7 +383,7 @@ deriveHashable_enum_hashValue(TypeChecker &tc, Decl *parentDecl,
     return nullptr;
   }
   
-  auto selfDecl = ParamDecl::createUnboundSelf(SourceLoc(), parentDC);
+  auto selfDecl = ParamDecl::createSelf(SourceLoc(), parentDC);
   
   ParameterList *params[] = {
     ParameterList::createWithoutLoc(selfDecl),
@@ -403,18 +403,16 @@ deriveHashable_enum_hashValue(TypeChecker &tc, Decl *parentDecl,
 
   // Compute the type of hashValue().
   Type methodType = FunctionType::get(TupleType::getEmpty(tc.Context), intType);
-  Type selfType = getterDecl->computeSelfType();
-  selfDecl->overwriteType(selfType);
 
   // Compute the interface type of hashValue().
   Type interfaceType;
-  Type selfIfaceType = getterDecl->computeInterfaceSelfType(false);
+  Type selfIfaceType = getterDecl->computeInterfaceSelfType();
   if (auto sig = parentDC->getGenericSignatureOfContext()) {
     getterDecl->setGenericEnvironment(parentDC->getGenericEnvironmentOfContext());
     interfaceType = GenericFunctionType::get(sig, selfIfaceType, methodType,
                                              AnyFunctionType::ExtInfo());
   } else
-    interfaceType = FunctionType::get(selfType, methodType);
+    interfaceType = FunctionType::get(selfIfaceType, methodType);
   
   getterDecl->setInterfaceType(interfaceType);
   getterDecl->setAccessibility(std::max(Accessibility::Internal,

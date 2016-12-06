@@ -1815,6 +1815,8 @@ bool irgen::hasPolymorphicParameters(CanSILFunctionType ty) {
     // Always carries polymorphic parameters for the Self type.
     return true;
   }
+
+  llvm_unreachable("Not a valid SILFunctionTypeRepresentation.");
 }
 
 static

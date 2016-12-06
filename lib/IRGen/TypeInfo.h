@@ -202,6 +202,8 @@ public:
              "IsFixedSize vs IsAlwaysFixedSize mismatch");
       return IsFixedSize_t(AlwaysFixedSize);
     }
+
+    llvm_unreachable("Not a valid ResilienceExpansion.");
   }
 
   /// Whether this type is known to be loadable in the local

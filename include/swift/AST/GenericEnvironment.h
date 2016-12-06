@@ -18,10 +18,15 @@
 #define SWIFT_AST_GENERIC_ENVIRONMENT_H
 
 #include "swift/AST/SubstitutionMap.h"
+#include "swift/AST/GenericParamKey.h"
 #include "swift/AST/GenericSignature.h"
+#include "llvm/ADT/ArrayRef.h"
+#include "llvm/Support/TrailingObjects.h"
+#include <utility>
 
 namespace swift {
 
+class ArchetypeBuilder;
 class ASTContext;
 class GenericTypeParamType;
 class SILModule;
@@ -29,13 +34,112 @@ class SILType;
 
 /// Describes the mapping between archetypes and interface types for the
 /// generic parameters of a DeclContext.
-class GenericEnvironment final {
+class alignas(1 << DeclAlignInBits) GenericEnvironment final
+        : private llvm::TrailingObjects<GenericEnvironment, Type,
+                                        std::pair<ArchetypeType *,
+                                                  GenericTypeParamType *>> {
   GenericSignature *Signature;
-  TypeSubstitutionMap ArchetypeToInterfaceMap;
-  TypeSubstitutionMap InterfaceToArchetypeMap;
+  ArchetypeBuilder *Builder;
+
+  // The number of generic type parameter -> context type mappings we have
+  // recorded so far. This saturates at the number of generic type parameters,
+  // at which point the archetype-to-interface trailing array is sorted.
+  unsigned NumMappingsRecorded : 16;
+
+  // The number of archetype-to-interface type mappings. This is always <=
+  // \c NumMappingsRecorded.
+  unsigned NumArchetypeToInterfaceMappings : 16;
+
+  friend TrailingObjects;
+
+  /// An entry in the array mapping from archetypes to their corresponding
+  /// generic type parameters.
+  typedef std::pair<ArchetypeType *, GenericTypeParamType *>
+                                                    ArchetypeToInterfaceMapping;
+
+  size_t numTrailingObjects(OverloadToken<Type>) const {
+    return Signature->getGenericParams().size();
+  }
+
+  size_t numTrailingObjects(OverloadToken<ArchetypeToInterfaceMapping>) const {
+    return Signature->getGenericParams().size();
+  }
+
+  /// Retrieve the array containing the context types associated with the
+  /// generic parameters, stored in parallel with the generic parameters of the
+  /// generic signature.
+  MutableArrayRef<Type> getContextTypes() {
+    return MutableArrayRef<Type>(getTrailingObjects<Type>(),
+                                 Signature->getGenericParams().size());
+  }
+
+  /// Retrieve the array containing the context types associated with the
+  /// generic parameters, stored in parallel with the generic parameters of the
+  /// generic signature.
+  ArrayRef<Type> getContextTypes() const {
+    return ArrayRef<Type>(getTrailingObjects<Type>(),
+                          Signature->getGenericParams().size());
+  }
+
+  /// Retrieve the active set of archetype-to-interface mappings.
+  ArrayRef<ArchetypeToInterfaceMapping>
+                                getActiveArchetypeToInterfaceMappings() const {
+    return { getTrailingObjects<ArchetypeToInterfaceMapping>(),
+             NumArchetypeToInterfaceMappings };
+  }
+
+  /// Retrieve the active set of archetype-to-interface mappings.
+  MutableArrayRef<ArchetypeToInterfaceMapping>
+                                      getActiveArchetypeToInterfaceMappings() {
+    return { getTrailingObjects<ArchetypeToInterfaceMapping>(),
+             NumArchetypeToInterfaceMappings };
+  }
+
+  /// Retrieve the buffer for the archetype-to-interface mappings.
+  ///
+  /// Only the first \c NumArchetypeToInterfaceMappings elements in the buffer
+  /// are valid.
+  MutableArrayRef<ArchetypeToInterfaceMapping>
+                                      getArchetypeToInterfaceMappingsBuffer() {
+    return { getTrailingObjects<ArchetypeToInterfaceMapping>(),
+             Signature->getGenericParams().size() };
+  }
 
   GenericEnvironment(GenericSignature *signature,
+                     ArchetypeBuilder *builder,
                      TypeSubstitutionMap interfaceToArchetypeMap);
+
+  friend class ArchetypeType;
+  friend class ArchetypeBuilder;
+  
+  ArchetypeBuilder *getArchetypeBuilder() const { return Builder; }
+  void clearArchetypeBuilder() { Builder = nullptr; }
+
+  /// Query function suitable for use as a \c TypeSubstitutionFn that queries
+  /// the mapping of interface types to archetypes.
+  class QueryInterfaceTypeSubstitutions {
+    const GenericEnvironment *self;
+
+  public:
+    QueryInterfaceTypeSubstitutions(const GenericEnvironment *self)
+      : self(self) { }
+
+    Type operator()(SubstitutableType *type) const;
+  };
+  friend class QueryInterfaceTypeSubstitutions;
+
+  /// Query function suitable for use as a \c TypeSubstitutionFn that queries
+  /// the mapping of archetypes back to interface types.
+  class QueryArchetypeToInterfaceSubstitutions {
+    const GenericEnvironment *self;
+
+  public:
+    QueryArchetypeToInterfaceSubstitutions(const GenericEnvironment *self)
+      : self(self) { }
+
+    Type operator()(SubstitutableType *type) const;
+  };
+  friend class QueryArchetypeToInterfaceSubstitutions;
 
 public:
   GenericSignature *getGenericSignature() const {
@@ -51,27 +155,33 @@ public:
   bool containsPrimaryArchetype(ArchetypeType *archetype) const;
 
   static
-  GenericEnvironment *get(ASTContext &ctx,
-                          GenericSignature *signature,
+  GenericEnvironment *get(GenericSignature *signature,
                           TypeSubstitutionMap interfaceToArchetypeMap);
 
   /// Create a new, "incomplete" generic environment that will be populated
   /// by calls to \c addMapping().
   static
-  GenericEnvironment *getIncomplete(ASTContext &ctx,
-                                    GenericSignature *signature);
+  GenericEnvironment *getIncomplete(GenericSignature *signature,
+                                    ArchetypeBuilder *builder);
 
   /// Add a mapping of a generic parameter to a specific type (which may be
   /// an archetype)
-  void addMapping(GenericTypeParamType *genericParam, Type contextType);
+  void addMapping(GenericParamKey key, Type contextType);
+
+  /// Retrieve the mapping for the given generic parameter, if present.
+  ///
+  /// This is only useful when lazily populating a generic environment.
+  Optional<Type> getMappingIfPresent(GenericParamKey key) const;
 
   /// Make vanilla new/delete illegal.
   void *operator new(size_t Bytes) = delete;
   void operator delete(void *Data) = delete;
 
-  /// Only allow allocation of GenericEnvironments using the allocator
-  /// in ASTContext.
-  void *operator new(size_t bytes, const ASTContext &ctx);
+  /// Only allow placement new.
+  void *operator new(size_t Bytes, void *Mem) {
+    assert(Mem); 
+    return Mem; 
+  }
 
   /// Map a contextual type to an interface type.
   Type mapTypeOutOfContext(ModuleDecl *M, Type type) const;
@@ -80,9 +190,6 @@ public:
   Type mapTypeIntoContext(ModuleDecl *M, Type type) const;
 
   /// Map a generic parameter type to a contextual type.
-  ///
-  /// This operation will also reabstract dependent types according to the
-  /// abstraction level of their associated type requirements.
   Type mapTypeIntoContext(GenericTypeParamType *type) const;
 
   /// \brief Map the given SIL interface type to a contextual type.

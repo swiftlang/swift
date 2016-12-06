@@ -9,8 +9,8 @@ import Swift
 // CHECK-LABEL: sil @_TF4test3fooFT1fGSqFT_T___T_ : $@convention(thin) (@owned Optional<@callee_owned (@in ()) -> @out ()>) -> ()
 sil @_TF4test3fooFT1fGSqFT_T___T_ : $@convention(thin) (@owned Optional<@callee_owned (@in ()) -> @out ()>) -> () {
 bb0(%0 : $Optional<@callee_owned (@in ()) -> @out ()>):
-  %1 = alloc_box $@box Optional<@callee_owned (@in ()) -> @out ()>  // var f    // users: %2, %6, %32
-  %1a = project_box %1 : $@box Optional<@callee_owned (@in ()) -> @out ()>, 0
+  %1 = alloc_box $<τ_0_0> { var τ_0_0 } <Optional<@callee_owned (@in ()) -> @out ()>>  // var f    // users: %2, %6, %32
+  %1a = project_box %1 : $<τ_0_0> { var τ_0_0 } <Optional<@callee_owned (@in ()) -> @out ()>>, 0
   store %0 to [init] %1a : $*Optional<@callee_owned (@in ()) -> @out ()>         // id: %2
   %3 = alloc_stack $Optional<()>                  // users: %22, %28, %30, %31
   %4 = alloc_stack $()                            // users: %12, %22, %25
@@ -40,7 +40,7 @@ bb2:                                              // Preds: bb0
 bb4:                                              // Preds: bb2 bb3
   %30 = load [trivial] %3 : $*Optional<()>
   dealloc_stack %3 : $*Optional<()> // id: %31
-  destroy_value %1 : $@box Optional<@callee_owned (@in ()) -> @out ()>
+  destroy_value %1 : $<τ_0_0> { var τ_0_0 } <Optional<@callee_owned (@in ()) -> @out ()>>
   %33 = tuple ()                                  // user: %34
   return %33 : $()                                // id: %34
 }

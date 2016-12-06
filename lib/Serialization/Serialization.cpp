@@ -204,6 +204,8 @@ static const Decl *getDeclForContext(const DeclContext *DC) {
   case DeclContextKind::SubscriptDecl:
     return cast<SubscriptDecl>(DC);
   }
+
+  llvm_unreachable("Unhandled DeclContextKind in switch.");
 }
 
 namespace {
@@ -783,6 +785,8 @@ static uint8_t getRawStableDefaultArgumentKind(swift::DefaultArgumentKind kind) 
   CASE(EmptyDictionary)
 #undef CASE
   }
+
+  llvm_unreachable("Unhandled DefaultArgumentKind in switch.");
 }
 
 static uint8_t getRawStableMetatypeRepresentation(AnyMetatypeType *metatype) {
@@ -934,6 +938,8 @@ static uint8_t getRawStableRequirementKind(RequirementKind kind) {
   CASE(SameType)
   }
 #undef CASE
+
+  llvm_unreachable("Unhandled RequirementKind in switch.");
 }
 
 void Serializer::writeGenericRequirements(ArrayRef<Requirement> requirements,
@@ -1283,6 +1289,8 @@ static uint8_t getRawStableOptionalTypeKind(swift::OptionalTypeKind kind) {
     return static_cast<uint8_t>(
              serialization::OptionalTypeKind::ImplicitlyUnwrappedOptional);
   }
+
+  llvm_unreachable("Unhandled OptionalTypeKind in switch.");
 }
 
 static bool shouldSerializeMember(Decl *D) {
@@ -1320,6 +1328,8 @@ static bool shouldSerializeMember(Decl *D) {
   case DeclKind::Func:
     return true;
   }
+
+  llvm_unreachable("Unhandled DeclKind in switch.");
 }
 
 void Serializer::writeMembers(DeclRange members, bool isClass) {
@@ -1386,6 +1396,8 @@ static serialization::AccessorKind getStableAccessorKind(swift::AccessorKind K){
   CASE(MutableAddressor)
 #undef CASE
   }
+
+  llvm_unreachable("Unhandled AccessorKind in switch.");
 }
 
 static serialization::CtorInitializerKind
@@ -1399,6 +1411,8 @@ getStableCtorInitializerKind(swift::CtorInitializerKind K){
       CASE(ConvenienceFactory)
 #undef CASE
   }
+
+  llvm_unreachable("Unhandled CtorInitializerKind in switch.");
 }
 
 void Serializer::writeCrossReference(const DeclContext *DC, uint32_t pathLen) {
@@ -1613,6 +1627,8 @@ static uint8_t getRawStableAssociativity(swift::Associativity assoc) {
   case swift::Associativity::None:
     return serialization::Associativity::NonAssociative;
   }
+
+  llvm_unreachable("Unhandled Associativity in switch.");
 }
 
 static serialization::StaticSpellingKind
@@ -1625,6 +1641,8 @@ getStableStaticSpelling(swift::StaticSpellingKind SS) {
   case swift::StaticSpellingKind::KeywordClass:
     return serialization::StaticSpellingKind::KeywordClass;
   }
+
+  llvm_unreachable("Unhandled StaticSpellingKind in switch.");
 }
 
 static uint8_t getRawStableAccessibility(Accessibility access) {
@@ -1639,6 +1657,8 @@ static uint8_t getRawStableAccessibility(Accessibility access) {
   CASE(Open)
 #undef CASE
   }
+
+  llvm_unreachable("Unhandled AccessibilityKind in switch.");
 }
 
 #ifndef NDEBUG
@@ -2029,6 +2049,8 @@ static ForeignErrorConventionKind getRawStableForeignErrorConventionKind(
   case ForeignErrorConvention::NonNilError:
     return ForeignErrorConventionKind::NonNilError;
   }
+
+  llvm_unreachable("Unhandled ForeignErrorConvention in switch.");
 }
 
 void Serializer::writeForeignErrorConvention(const ForeignErrorConvention &fec){
@@ -2523,13 +2545,9 @@ void Serializer::writeDecl(const Decl *D) {
     auto contextID = addDeclContextRef(param->getDeclContext());
     Type type, interfaceType;
 
-    if (param->hasType()) {
+    if (param->hasType())
       type = param->getType();
-      interfaceType = param->getInterfaceType();
-      // FIXME: Interface types for ParamDecls
-      if (interfaceType->hasArchetype())
-        interfaceType = Type();
-    }
+    interfaceType = param->getInterfaceType();
 
     unsigned abbrCode = DeclTypeAbbrCodes[ParamLayout::Code];
     ParamLayout::emitRecord(Out, ScratchRecord, abbrCode,
@@ -2646,8 +2664,6 @@ void Serializer::writeDecl(const Decl *D) {
                                 subscript->isImplicit(),
                                 subscript->isObjC(),
                                 (unsigned) accessors.Kind,
-                                addTypeRef(subscript->getType()),
-                                addTypeRef(subscript->getElementType()),
                                 addTypeRef(subscript->getInterfaceType()),
                                 addDeclRef(accessors.Get),
                                 addDeclRef(accessors.Set),
@@ -3020,14 +3036,6 @@ void Serializer::writeType(Type ty) {
     break;
   }
 
-  case TypeKind::AssociatedType: {
-    auto assocType = cast<AssociatedTypeType>(ty.getPointer());
-    unsigned abbrCode = DeclTypeAbbrCodes[AssociatedTypeTypeLayout::Code];
-    AssociatedTypeTypeLayout::emitRecord(Out, ScratchRecord, abbrCode,
-                                         addDeclRef(assocType->getDecl()));
-    break;
-  }
-
   case TypeKind::Substituted: {
     auto subTy = cast<SubstitutedType>(ty.getPointer());
 
@@ -3306,7 +3314,6 @@ void Serializer::writeAllDeclsAndTypes() {
 
   registerDeclTypeAbbr<TypeAliasLayout>();
   registerDeclTypeAbbr<GenericTypeParamTypeLayout>();
-  registerDeclTypeAbbr<AssociatedTypeTypeLayout>();
   registerDeclTypeAbbr<DependentMemberTypeLayout>();
   registerDeclTypeAbbr<StructLayout>();
   registerDeclTypeAbbr<ConstructorLayout>();
@@ -4063,7 +4070,7 @@ void Serializer::writeAST(ModuleOrSourceFile DC) {
       hasLocalTypes = true;
 
       Mangle::Mangler DebugMangler(false);
-      DebugMangler.mangleType(TD->getDeclaredType(), 0);
+      DebugMangler.mangleType(TD->getDeclaredInterfaceType(), 0);
       auto MangledName = DebugMangler.finalize();
       assert(!MangledName.empty() && "Mangled type came back empty!");
       localTypeGenerator.insert(MangledName, {

@@ -92,6 +92,9 @@ bool types::isTextual(ID Id) {
   case types::TY_INVALID:
     llvm_unreachable("Invalid type ID.");
   }
+
+  // Work around MSVC warning: not all control paths return a value
+  llvm_unreachable("All switch cases are covered");
 }
 
 bool types::isAfterLLVM(ID Id) {
@@ -122,6 +125,9 @@ bool types::isAfterLLVM(ID Id) {
   case types::TY_INVALID:
     llvm_unreachable("Invalid type ID.");
   }
+
+  // Work around MSVC warning: not all control paths return a value
+  llvm_unreachable("All switch cases are covered");
 }
 
 bool types::isPartOfSwiftCompilation(ID Id) {
@@ -152,4 +158,7 @@ bool types::isPartOfSwiftCompilation(ID Id) {
   case types::TY_INVALID:
     llvm_unreachable("Invalid type ID.");
   }
+
+  // Work around MSVC warning: not all control paths return a value
+  llvm_unreachable("All switch cases are covered");
 }

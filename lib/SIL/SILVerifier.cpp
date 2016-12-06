@@ -1409,10 +1409,9 @@ public:
   void checkProjectBoxInst(ProjectBoxInst *I) {
     require(I->getOperand()->getType().isObject(),
             "project_box operand should be a value");
-    require(I->getOperand()->getType().is<SILBoxType>(),
-            "project_box operand should be a @box type");
-    require(I->getType() == I->getOperand()->getType().castTo<SILBoxType>()
-                             ->getBoxedAddressType(),
+    auto boxTy = I->getOperand()->getType().getAs<SILBoxType>();
+    require(boxTy, "project_box operand should be a @box type");
+    require(I->getType() == boxTy->getFieldType(I->getFieldIndex()),
             "project_box result should be address of boxed type");
   }
 
@@ -1724,26 +1723,20 @@ public:
   }
 
   void checkAllocBoxInst(AllocBoxInst *AI) {
-    // TODO: Allow the box to be typed, but for staging purposes, only require
-    // it when -sil-enable-typed-boxes is enabled.
     auto boxTy = AI->getType().getAs<SILBoxType>();
     require(boxTy, "alloc_box must have a @box type");
 
     require(AI->getType().isObject(),
             "result of alloc_box must be an object");
-    verifyOpenedArchetype(AI, AI->getElementType().getSwiftRValueType());
+    for (unsigned field : indices(AI->getBoxType()->getLayout()->getFields()))
+      verifyOpenedArchetype(AI, AI->getBoxType()->getFieldLoweredType(field));
   }
 
   void checkDeallocBoxInst(DeallocBoxInst *DI) {
-    // TODO: Allow the box to be typed, but for staging purposes, only require
-    // it when -sil-enable-typed-boxes is enabled.
     auto boxTy = DI->getOperand()->getType().getAs<SILBoxType>();
     require(boxTy, "operand must be a @box type");
     require(DI->getOperand()->getType().isObject(),
             "operand must be an object");
-    requireSameType(boxTy->getBoxedAddressType().getObjectType(),
-                    DI->getElementType().getObjectType(),
-                    "element type of dealloc_box must match box element type");
   }
 
   void checkDestroyAddrInst(DestroyAddrInst *DI) {

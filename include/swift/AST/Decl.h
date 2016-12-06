@@ -24,6 +24,7 @@
 #include "swift/AST/DefaultArgumentKind.h"
 #include "swift/AST/GenericEnvironment.h"
 #include "swift/AST/GenericSignature.h"
+#include "swift/AST/GenericParamKey.h"
 #include "swift/AST/LazyResolver.h"
 #include "swift/AST/TypeAlignments.h"
 #include "swift/AST/Witness.h"
@@ -514,13 +515,8 @@ class alignas(1 << DeclAlignInBits) Decl {
   class AssociatedTypeDeclBitfields {
     friend class AssociatedTypeDecl;
     unsigned : NumTypeDeclBits;
-
-    unsigned Recursive : 1;
-
-    /// Whether or not this declaration is currently being type-checked.
-    unsigned BeingTypeChecked : 1;
   };
-  enum { NumAssociatedTypeDeclBits = NumTypeDeclBits + 2 };
+  enum { NumAssociatedTypeDeclBits = NumTypeDeclBits };
   static_assert(NumAssociatedTypeDeclBits <= 32, "fits in an unsigned");
 
   class ImportDeclBitfields {
@@ -1947,9 +1943,6 @@ protected:
     ValueDeclBits.CheckedRedeclaration = false;
   }
 
-  /// The interface type, mutable because some subclasses compute this lazily.
-  mutable Type InterfaceTy;
-
 public:
   /// \brief Return true if this is a definition of a decl, not a forward
   /// declaration (e.g. of a function) that is implemented outside of the
@@ -2002,27 +1995,6 @@ public:
 
   SourceLoc getNameLoc() const { return NameLoc; }
   SourceLoc getLoc() const { return NameLoc; }
-
-  bool hasType() const {
-    assert(!isa<AbstractFunctionDecl>(this) &&
-           !isa<EnumElementDecl>(this) &&
-           "functions and enum case constructors only have an interface type");
-    return !TypeAndAccess.getPointer().isNull();
-  }
-
-  Type getType() const {
-    assert(!isa<AbstractFunctionDecl>(this) &&
-           !isa<EnumElementDecl>(this) &&
-           "functions and enum case constructors only have an interface type");
-    assert(hasType() && "declaration has no type set yet");
-    return TypeAndAccess.getPointer();
-  }
-
-  /// Set the type of this declaration for the first time.
-  void setType(Type T);
-
-  /// Overwrite the type of this declaration.
-  void overwriteType(Type T);
 
   bool hasAccessibility() const {
     return TypeAndAccess.getInt().hasValue();
@@ -2096,15 +2068,10 @@ public:
   /// If \p DC is null, returns true only if this declaration is public.
   bool isAccessibleFrom(const DeclContext *DC) const;
 
-  /// Retrieve the "interface" type of this value, which is the type used when
-  /// the declaration is viewed from the outside. For a generic function,
-  /// this will have generic function type using generic parameters rather than
-  /// archetypes, while a generic nominal type's interface type will be the
-  /// generic type specialized with its generic parameters.
-  ///
-  /// FIXME: Eventually, this will simply become the type of the value, and
-  /// we will substitute in the appropriate archetypes within a particular
-  /// context.
+  /// Retrieve the "interface" type of this value, which uses
+  /// GenericTypeParamType if the declaration is generic. For a generic
+  /// function, this will have a GenericFunctionType with a
+  /// GenericSignature inside the type.
   Type getInterfaceType() const;
   bool hasInterfaceType() const;
 
@@ -2216,8 +2183,9 @@ protected:
   }
 
 public:
-  Type getDeclaredType() const;
-
+  /// The type of this declaration's values. For the type of the
+  /// declaration itself, use getInterfaceType(), which returns a
+  /// metatype.
   Type getDeclaredInterfaceType() const;
 
   /// \brief Retrieve the set of protocols that this type inherits (i.e,
@@ -2463,10 +2431,6 @@ public:
   SourceLoc getStartLoc() const { return getNameLoc(); }
   SourceRange getSourceRange() const;
 
-  /// Determine whether this is the implicit 'Self' type parameter of
-  /// a protocol.
-  bool isProtocolSelf() const;
-
   static bool classof(const Decl *D) {
     return D->getKind() == DeclKind::GenericTypeParam;
   }
@@ -2530,17 +2494,6 @@ public:
 
   SourceLoc getStartLoc() const { return KeywordLoc; }
   SourceRange getSourceRange() const;
-
-  void setIsRecursive();
-  bool isRecursive() { return AssociatedTypeDeclBits.Recursive; }
-
-  /// Whether the declaration is currently being validated.
-  bool isBeingTypeChecked() { return AssociatedTypeDeclBits.BeingTypeChecked; }
-
-  /// Toggle whether or not the declaration is being validated.
-  void setIsBeingTypeChecked(bool ibt = true) {
-    AssociatedTypeDeclBits.BeingTypeChecked = ibt;
-  }
 
   static bool classof(const Decl *D) {
     return D->getKind() == DeclKind::AssociatedType;
@@ -4013,6 +3966,8 @@ public:
     return OverriddenDecl;
   }
   void setOverriddenDecl(AbstractStorageDecl *over) {
+    // FIXME: Hack due to broken class circulatity checking.
+    if (over == this) return;
     OverriddenDecl = over;
     over->setIsOverridden();
   }
@@ -4104,6 +4059,8 @@ protected:
   /// This is the type specified, including location information.
   TypeLoc typeLoc;
 
+  Type typeInContext;
+
 public:
   VarDecl(bool IsStatic, bool IsLet, SourceLoc NameLoc, Identifier Name,
           Type Ty, DeclContext *DC)
@@ -4121,6 +4078,22 @@ public:
   
   TypeLoc &getTypeLoc() { return typeLoc; }
   TypeLoc getTypeLoc() const { return typeLoc; }
+
+  bool hasType() const {
+    return !!typeInContext;
+  }
+
+  /// Get the type of the variable within its context. If the context is generic,
+  /// this will use archetypes.
+  Type getType() const {
+    assert(typeInContext && "No context type set yet");
+    return typeInContext;
+  }
+
+  /// Set the type of the variable within its context.
+  void setType(Type t);
+
+  void markInvalid();
 
   /// Retrieve the source range of the variable type, or an invalid range if the
   /// variable's type is not explicitly written in the source.
@@ -4343,9 +4316,7 @@ public:
   /// For a generic context, this also gives the parameter an unbound generic
   /// type with the expectation that type-checking will fill in the context
   /// generic parameters.
-  static ParamDecl *createUnboundSelf(SourceLoc loc, DeclContext *DC,
-                                      bool isStatic = false,
-                                      bool isInOut = false);
+  static ParamDecl *createUnboundSelf(SourceLoc loc, DeclContext *DC);
 
   /// Create an implicit 'self' decl for a method in the specified decl context.
   /// If 'static' is true, then this is self for a static method in the type.
@@ -4426,15 +4397,12 @@ public:
   const ParameterList *getIndices() const { return Indices; }
   void setIndices(ParameterList *p);
 
-  /// Retrieve the type of the indices.
-  Type getIndicesType() const;
-
   /// Retrieve the interface type of the indices.
   Type getIndicesInterfaceType() const;
 
   /// \brief Retrieve the type of the element referenced by a subscript
   /// operation.
-  Type getElementType() const { return ElementTy.getType(); }
+  Type getElementInterfaceType() const;
   TypeLoc &getElementTypeLoc() { return ElementTy; }
   const TypeLoc &getElementTypeLoc() const { return ElementTy; }
 
@@ -4612,10 +4580,6 @@ public:
   // FIXME: Hack that provides names with keyword arguments for accessors.
   DeclName getEffectiveFullName() const;
 
-  /// \brief If this is a method in a type extension for some type,
-  /// return that type, otherwise return Type().
-  Type getExtensionType() const;
-
   /// Returns true if the function has a body written in the source file.
   ///
   /// Note that a true return value does not imply that the body was actually
@@ -4751,12 +4715,6 @@ public:
   }
 
   /// \brief If this is a method in a type or extension thereof, compute
-  /// and return the type to be used for the 'self' argument of the type, or an
-  /// empty Type() if no 'self' argument should exist.  This can
-  /// only be used after name binding has resolved types.
-  Type computeSelfType();
-
-  /// \brief If this is a method in a type or extension thereof, compute
   /// and return the type to be used for the 'self' argument of the interface
   /// type, or an empty Type() if no 'self' argument should exist.  This can
   /// only be used after name binding has resolved types.
@@ -4764,7 +4722,12 @@ public:
   /// \param isInitializingCtor Specifies whether we're computing the 'self'
   /// type of an initializing constructor, which accepts an instance 'self'
   /// rather than a metatype 'self'.
-  Type computeInterfaceSelfType(bool isInitializingCtor);
+  ///
+  /// \param wantDynamicSelf Specifies whether the 'self' type should be
+  /// wrapped in a DynamicSelfType, which is the case for the 'self' parameter
+  /// type inside a class method returning 'Self'.
+  Type computeInterfaceSelfType(bool isInitializingCtor=false,
+                                bool wantDynamicSelf=false);
 
   /// \brief This method returns the implicit 'self' decl.
   ///
@@ -5066,15 +5029,6 @@ public:
   void setDynamicSelf(bool hasDynamicSelf) { 
     FuncDeclBits.HasDynamicSelf = hasDynamicSelf;
   }
-  
-  /// Retrieve the dynamic \c Self type for this method, or a null type if
-  /// this method does not have a dynamic \c Self return type.
-  DynamicSelfType *getDynamicSelf() const;
-
-  /// Retrieve the dynamic \c Self interface type for this method, or
-  /// a null type if this method does not have a dynamic \c Self
-  /// return type.
-  DynamicSelfType *getDynamicSelfInterface() const;
 
   /// Determine whether this method has an archetype \c Self return
   /// type. This is when a method defined in a protocol extension
@@ -5092,6 +5046,9 @@ public:
     return OverriddenOrBehaviorParamDecl.dyn_cast<FuncDecl *>();
   }
   void setOverriddenDecl(FuncDecl *over) {
+    // FIXME: Hack due to broken class circulatity checking.
+    if (over == this) return;
+
     // A function cannot be an override if it is also a derived global decl
     // (since derived decls are at global scope).
     assert((!OverriddenOrBehaviorParamDecl
@@ -5519,6 +5476,9 @@ public:
 
   ConstructorDecl *getOverriddenDecl() const { return OverriddenDecl; }
   void setOverriddenDecl(ConstructorDecl *over) {
+    // FIXME: Hack due to broken class circulatity checking.
+    if (over == this) return;
+
     OverriddenDecl = over;
     over->setIsOverridden();
   }
@@ -6000,6 +5960,9 @@ inline bool Decl::isPotentiallyOverridable() const {
     return false;
   }
 }
+
+inline GenericParamKey::GenericParamKey(const GenericTypeParamDecl *d)
+  : Depth(d->getDepth()), Index(d->getIndex()) { }
 
 } // end namespace swift
 

@@ -35,6 +35,16 @@
 #include <iterator>
 using namespace swift;
 
+Type QueryTypeSubstitutionMap::operator()(SubstitutableType *type) const {
+  auto key = type->getCanonicalType()->castTo<SubstitutableType>();
+  auto known = substitutions.find(key);
+  if (known != substitutions.end() && known->second)
+    return known->second;
+
+  // Not known.
+  return Type();
+}
+
 bool TypeLoc::isError() const {
   assert(wasValidated() && "Type not yet validated");
   return getType()->hasError() || getType()->getCanonicalType()->hasError();
@@ -365,8 +375,11 @@ bool TypeBase::isUnspecializedGeneric() {
     return cast<SILBlockStorageType>(this)->getCaptureType()
         ->isUnspecializedGeneric();
   case TypeKind::SILBox:
-    return cast<SILBoxType>(this)->getBoxedType()
-        ->isUnspecializedGeneric();
+    for (auto &arg : cast<SILBoxType>(this)->getGenericArgs()) {
+      if (arg.getReplacement()->isUnspecializedGeneric())
+        return true;
+    }
+    return false;
   }
   llvm_unreachable("bad TypeKind");
 }
@@ -643,17 +656,6 @@ bool TypeBase::isAnyObject() {
   if (auto proto = getAs<ProtocolType>())
     return proto->getDecl()->isSpecificProtocol(KnownProtocolKind::AnyObject);
 
-  return false;
-}
-
-bool TypeBase::isEmptyExistentialComposition() {
-  if (auto emtType = ExistentialMetatypeType::get(this)) {
-    if (auto pcType = emtType->getInstanceType()->
-        getAs<ProtocolCompositionType>()) {
-      return pcType->getProtocols().empty();
-    }
-  }
-  
   return false;
 }
 
@@ -942,38 +944,6 @@ Type TypeBase::getRValueInstanceType() {
   return type->getInOutObjectType();
 }
 
-TypeDecl *TypeBase::getDirectlyReferencedTypeDecl() const {
-  if (auto module = dyn_cast<ModuleType>(this))
-    return module->getModule();
-
-  if (auto nominal = dyn_cast<NominalType>(this))
-    return nominal->getDecl();
-
-  if (auto bound = dyn_cast<BoundGenericType>(this))
-    return bound->getDecl();
-
-  if (auto unbound = dyn_cast<UnboundGenericType>(this))
-    return unbound->getDecl();
-
-  if (auto alias = dyn_cast<NameAliasType>(this))
-    return alias->getDecl();
-
-  if (auto gp = dyn_cast<GenericTypeParamType>(this))
-    return gp->getDecl();
-
-  if (auto depMem = dyn_cast<DependentMemberType>(this))
-    return depMem->getAssocType();
-
-  if (auto archetype = dyn_cast<ArchetypeType>(this)) {
-    if (auto assoc = archetype->getAssocType())
-      return assoc;
-
-    return nullptr;
-  }
-
-  return nullptr;
-}
-
 /// \brief Collect the protocols in the existential type T into the given
 /// vector.
 static void addProtocols(Type T, SmallVectorImpl<ProtocolDecl *> &Protocols) {
@@ -1032,6 +1002,37 @@ int ProtocolType::compareProtocols(ProtocolDecl * const* PP1,
 
   // Order based on protocol name.
   return P1->getName().str().compare(P2->getName().str());
+}
+
+bool ProtocolType::visitAllProtocols(
+                                 ArrayRef<ProtocolDecl *> protocols,
+                                 llvm::function_ref<bool(ProtocolDecl *)> fn) {
+  SmallVector<ProtocolDecl *, 4> stack;
+  SmallPtrSet<ProtocolDecl *, 4> knownProtocols;
+
+  // Prepopulate the stack.
+  for (auto proto : protocols) {
+    if (knownProtocols.insert(proto).second)
+      stack.push_back(proto);
+  }
+  std::reverse(stack.begin(), stack.end());
+
+  while (!stack.empty()) {
+    auto proto = stack.back();
+    stack.pop_back();
+
+    // Visit this protocol.
+    if (fn(proto))
+      return true;
+
+    // Add inherited protocols that we haven't seen already.
+    for (auto inherited : proto->getInheritedProtocols(nullptr)) {
+      if (knownProtocols.insert(inherited).second)
+        stack.push_back(inherited);
+    }
+  }
+
+  return false;
 }
 
 void ProtocolType::canonicalizeProtocols(
@@ -1420,13 +1421,6 @@ Identifier GenericTypeParamType::getName() const {
   return name;
 }
 
-TypeBase *AssociatedTypeType::getSinglyDesugaredType() {
-  auto protocolSelf = getDecl()->getProtocol()->getSelfTypeInContext();
-  assert(protocolSelf);
-  auto *selfArchetype = protocolSelf->castTo<ArchetypeType>();
-  return selfArchetype->getNestedTypeValue(getDecl()->getName()).getPointer();
-}
-
 const llvm::fltSemantics &BuiltinFloatType::getAPFloatSemantics() const {
   switch (getFPKind()) {
   case BuiltinFloatType::IEEE16:  return APFloat::IEEEhalf;
@@ -1459,7 +1453,6 @@ bool TypeBase::isSpelledLike(Type other) {
   case TypeKind::Class:
   case TypeKind::NameAlias:
   case TypeKind::Substituted:
-  case TypeKind::AssociatedType:
   case TypeKind::GenericTypeParam:
   case TypeKind::DependentMember:
   case TypeKind::DynamicSelf:
@@ -2466,6 +2459,62 @@ Type TupleType::getVarArgsBaseType() const {
 }
 
 
+ArchetypeType::ArchetypeType(
+  const ASTContext &Ctx,
+  llvm::PointerUnion<ArchetypeType *, GenericEnvironment *> ParentOrGenericEnv,
+  llvm::PointerUnion<AssociatedTypeDecl *, Identifier> AssocTypeOrName,
+  ArrayRef<ProtocolDecl *> ConformsTo,
+  Type Superclass)
+    : SubstitutableType(TypeKind::Archetype, &Ctx,
+                        RecursiveTypeProperties::HasArchetype),
+      AssocTypeOrName(AssocTypeOrName) {
+  // Record the parent/generic environment.
+  if (auto parent = ParentOrGenericEnv.dyn_cast<ArchetypeType *>()) {
+    ParentOrOpenedOrEnvironment = parent;
+  } else {
+    ParentOrOpenedOrEnvironment =
+      ParentOrGenericEnv.get<GenericEnvironment *>();
+  }
+
+  // Set up the bits we need for trailing objects to work.
+  ArchetypeTypeBits.ExpandedNestedTypes = false;
+  ArchetypeTypeBits.HasSuperclass = static_cast<bool>(Superclass);
+  ArchetypeTypeBits.NumProtocols = ConformsTo.size();
+
+  // Record the superclass.
+  if (Superclass)
+    *getTrailingObjects<Type>() = Superclass;
+
+  // Copy the protocols.
+  std::uninitialized_copy(ConformsTo.begin(), ConformsTo.end(),
+                          getTrailingObjects<ProtocolDecl *>());
+}
+
+ArchetypeType::ArchetypeType(const ASTContext &Ctx, Type Existential,
+                             ArrayRef<ProtocolDecl *> ConformsTo,
+                             Type Superclass, UUID uuid)
+  : SubstitutableType(TypeKind::Archetype, &Ctx,
+                      RecursiveTypeProperties(
+                        RecursiveTypeProperties::HasArchetype |
+                        RecursiveTypeProperties::HasOpenedExistential)),
+    ParentOrOpenedOrEnvironment(Existential.getPointer()) {
+  // Set up the bits we need for trailing objects to work.
+  ArchetypeTypeBits.ExpandedNestedTypes = false;
+  ArchetypeTypeBits.HasSuperclass = static_cast<bool>(Superclass);
+  ArchetypeTypeBits.NumProtocols = ConformsTo.size();
+
+  // Record the superclass.
+  if (Superclass)
+    *getTrailingObjects<Type>() = Superclass;
+
+  // Copy the protocols.
+  std::uninitialized_copy(ConformsTo.begin(), ConformsTo.end(),
+                          getTrailingObjects<ProtocolDecl *>());
+
+  // Record the UUID.
+  *getTrailingObjects<UUID>() = uuid;
+}
+
 CanArchetypeType ArchetypeType::getNew(
                                    const ASTContext &Ctx,
                                    ArchetypeType *Parent,
@@ -2476,42 +2525,43 @@ CanArchetypeType ArchetypeType::getNew(
   ProtocolType::canonicalizeProtocols(ConformsTo);
 
   auto arena = AllocationArena::Permanent;
-  return CanArchetypeType(
-           new (Ctx, arena) ArchetypeType(Ctx, Parent, AssocType,
-                                          Ctx.AllocateCopy(ConformsTo),
-                                          Superclass));
+  void *mem = Ctx.Allocate(
+                totalSizeToAlloc<ProtocolDecl *, Type, UUID>(ConformsTo.size(),
+                                                             Superclass ? 1 : 0,
+                                                             0),
+                alignof(ArchetypeType), arena);
+
+  return CanArchetypeType(new (mem) ArchetypeType(Ctx, Parent, AssocType,
+                                                  ConformsTo, Superclass));
 }
 
 CanArchetypeType
-ArchetypeType::getNew(const ASTContext &Ctx, Identifier Name,
+ArchetypeType::getNew(const ASTContext &Ctx,
+                      GenericEnvironment *genericEnvironment,
+                      Identifier Name,
                       SmallVectorImpl<ProtocolDecl *> &ConformsTo,
                       Type Superclass) {
   // Gather the set of protocol declarations to which this archetype conforms.
   ProtocolType::canonicalizeProtocols(ConformsTo);
 
   auto arena = AllocationArena::Permanent;
-  return CanArchetypeType(
-           new (Ctx, arena) ArchetypeType(Ctx, nullptr, Name,
-                                          Ctx.AllocateCopy(ConformsTo),
-                                          Superclass));
+  void *mem = Ctx.Allocate(
+                totalSizeToAlloc<ProtocolDecl *, Type, UUID>(ConformsTo.size(),
+                                                             Superclass ? 1 : 0,
+                                                             0),
+                alignof(ArchetypeType), arena);
+
+  return CanArchetypeType(new (mem) ArchetypeType(Ctx, genericEnvironment, Name,
+                                                  ConformsTo, Superclass));
 }
 
 bool ArchetypeType::requiresClass() const {
-  if (Superclass)
+  if (ArchetypeTypeBits.HasSuperclass)
     return true;
   for (ProtocolDecl *conformed : getConformsTo())
     if (conformed->requiresClass())
       return true;
   return false;
-}
-
-void ArchetypeType::resolveNestedType(
-       std::pair<Identifier, NestedType> &nested) const {
-  auto &ctx = const_cast<ArchetypeType *>(this)->getASTContext();
-  auto lazyArchetype = ctx.getLazyArchetype(this);
-  nested.second = lazyArchetype.second->getNestedType(nested.first,
-                                                      *lazyArchetype.first)
-                    ->getType(*lazyArchetype.first);
 }
 
 namespace {
@@ -2539,7 +2589,32 @@ namespace {
   };
 }
 
+void ArchetypeType::populateNestedTypes() const {
+  if (ArchetypeTypeBits.ExpandedNestedTypes) return;
+
+  // Collect the set of nested types of this archetype.
+  SmallVector<std::pair<Identifier, NestedType>, 4> nestedTypes;
+  llvm::SmallPtrSet<Identifier, 4> knownNestedTypes;
+  ProtocolType::visitAllProtocols(getConformsTo(),
+                                  [&](ProtocolDecl *proto) -> bool {
+    for (auto member : proto->getMembers()) {
+      if (auto assocType = dyn_cast<AssociatedTypeDecl>(member)) {
+        if (knownNestedTypes.insert(assocType->getName()).second)
+          nestedTypes.push_back({ assocType->getName(), NestedType() });
+      }
+    }
+
+    return false;
+  });
+
+  // Record the nested types.
+  auto mutableThis = const_cast<ArchetypeType *>(this);
+  mutableThis->setNestedTypes(mutableThis->getASTContext(), nestedTypes);
+}
+
 ArchetypeType::NestedType ArchetypeType::getNestedType(Identifier Name) const {
+  populateNestedTypes();
+
   auto Pos = std::lower_bound(NestedTypes.begin(), NestedTypes.end(), Name,
                               OrderArchetypeByName());
   if (Pos == NestedTypes.end() || Pos->first != Name) {
@@ -2556,7 +2631,21 @@ ArchetypeType::NestedType ArchetypeType::getNestedType(Identifier Name) const {
   return Pos->second;
 }
 
+Optional<ArchetypeType::NestedType> ArchetypeType::getNestedTypeIfKnown(
+                                                        Identifier Name) const {
+  populateNestedTypes();
+
+  auto Pos = std::lower_bound(NestedTypes.begin(), NestedTypes.end(), Name,
+                              OrderArchetypeByName());
+  if (Pos == NestedTypes.end() || Pos->first != Name || !Pos->second)
+    return None;
+
+  return Pos->second;
+}
+
 bool ArchetypeType::hasNestedType(Identifier Name) const {
+  populateNestedTypes();
+
   auto Pos = std::lower_bound(NestedTypes.begin(), NestedTypes.end(), Name,
                               OrderArchetypeByName());
   return Pos != NestedTypes.end() && Pos->first == Name;
@@ -2564,6 +2653,8 @@ bool ArchetypeType::hasNestedType(Identifier Name) const {
 
 ArrayRef<std::pair<Identifier, ArchetypeType::NestedType>>
 ArchetypeType::getAllNestedTypes(bool resolveTypes) const {
+  populateNestedTypes();
+
   if (resolveTypes) {
     for (auto &nested : NestedTypes) {
       if (!nested.second)
@@ -2576,9 +2667,25 @@ ArchetypeType::getAllNestedTypes(bool resolveTypes) const {
 
 void ArchetypeType::setNestedTypes(
        ASTContext &Ctx,
-       MutableArrayRef<std::pair<Identifier, NestedType>> Nested) {
-  std::sort(Nested.begin(), Nested.end(), OrderArchetypeByName());
+       ArrayRef<std::pair<Identifier, NestedType>> Nested) {
+  assert(!ArchetypeTypeBits.ExpandedNestedTypes && "Already expanded");
   NestedTypes = Ctx.AllocateCopy(Nested);
+  std::sort(NestedTypes.begin(), NestedTypes.end(), OrderArchetypeByName());
+  ArchetypeTypeBits.ExpandedNestedTypes = true;
+}
+
+void ArchetypeType::registerNestedType(Identifier name, NestedType nested) {
+  populateNestedTypes();
+
+  auto found = std::lower_bound(NestedTypes.begin(), NestedTypes.end(), name,
+                                OrderArchetypeByName());
+  assert(found != NestedTypes.end() && found->first == name &&
+         "Unable to find nested type?");
+  assert(!found->second ||
+         found->second.getValue()->isEqual(nested.getValue()) ||
+         (found->second.getValue()->hasError() &&
+          nested.getValue()->hasError()));
+  found->second = nested;
 }
 
 static void collectFullName(const ArchetypeType *Archetype,
@@ -2602,6 +2709,13 @@ std::string ArchetypeType::getFullName() const {
   llvm::SmallString<64> Result;
   collectFullName(this, Result);
   return Result.str().str();
+}
+
+GenericEnvironment *ArchetypeType::getGenericEnvironment() const {
+  if (auto parent = getParent())
+    return parent->getGenericEnvironment();
+
+  return ParentOrOpenedOrEnvironment.dyn_cast<GenericEnvironment *>();
 }
 
 void ProtocolCompositionType::Profile(llvm::FoldingSetNodeID &ID,
@@ -2807,7 +2921,7 @@ Type DependentMemberType::substBaseType(ModuleDecl *module,
 static Type substType(
     Type derivedType,
     llvm::PointerUnion<ModuleDecl *, const SubstitutionMap *> conformances,
-    const TypeSubstitutionMap &substitutions,
+    TypeSubstitutionFn substitutions,
     SubstOptions options) {
   return derivedType.transform([&](Type type) -> Type {
     assert((options.contains(SubstFlags::AllowLoweredTypes) ||
@@ -2836,11 +2950,8 @@ static Type substType(
       return type;
 
     // If we have a substitution for this type, use it.
-    auto key = substOrig->getCanonicalType()->castTo<SubstitutableType>();
-    auto known = substitutions.find(key);
-    if (known != substitutions.end() && known->second)
-      return SubstitutedType::get(type, known->second,
-                                  type->getASTContext());
+    if (auto known = substitutions(substOrig))
+      return SubstitutedType::get(type, known, type->getASTContext());
 
     // For archetypes, we can substitute the parent (if present).
     auto archetype = substOrig->getAs<ArchetypeType>();
@@ -2871,12 +2982,19 @@ static Type substType(
 Type Type::subst(Module *module,
                  const TypeSubstitutionMap &substitutions,
                  SubstOptions options) const {
-  return substType(*this, module, substitutions, options);
+  return substType(*this, module, QueryTypeSubstitutionMap{substitutions}, options);
 }
 
 Type Type::subst(const SubstitutionMap &substitutions,
                  SubstOptions options) const {
-  return substType(*this, &substitutions, substitutions.getMap(), options);
+  return substType(*this, &substitutions,
+                   QueryTypeSubstitutionMap{substitutions.getMap()}, options);
+}
+
+Type Type::subst(ModuleDecl *module,
+                 TypeSubstitutionFn substitutions,
+                 SubstOptions options) const {
+  return substType(*this, module, substitutions, options);
 }
 
 Type TypeBase::getSuperclassForDecl(const ClassDecl *baseClass,
@@ -2946,7 +3064,7 @@ TypeSubstitutionMap TypeBase::getMemberSubstitutions(const DeclContext *dc) {
       auto params = curGenericParams->getParams();
       auto args = boundGeneric->getGenericArgs();
       for (unsigned i = 0, n = args.size(); i != n; ++i) {
-        substitutions[params[i]->getDeclaredType()->getCanonicalType()
+        substitutions[params[i]->getDeclaredInterfaceType()->getCanonicalType()
                         ->castTo<GenericTypeParamType>()] = args[i];
       }
 
@@ -3086,7 +3204,6 @@ case TypeKind::Id:
   case TypeKind::Error:
   case TypeKind::Unresolved:
   case TypeKind::TypeVariable:
-  case TypeKind::AssociatedType:
   case TypeKind::GenericTypeParam:
     return *this;
 
@@ -3121,14 +3238,45 @@ case TypeKind::Id:
   }
 
   case TypeKind::SILBox: {
-    auto storageTy = cast<SILBoxType>(base);
-    Type transBoxed = storageTy->getBoxedType().transform(fn);
-    if (!transBoxed)
-      return Type();
-    CanType canTransBoxed = transBoxed->getCanonicalType();
-    if (canTransBoxed != storageTy->getBoxedType())
-      return SILBoxType::get(canTransBoxed);
-    return storageTy;
+    auto boxTy = cast<SILBoxType>(base);
+    // Nothing to do for an unparameterized box layout.
+    if (boxTy->getGenericArgs().empty())
+      return boxTy;
+    
+    SmallVector<Substitution, 4> transArgs;
+    bool didChange = false;
+    for (auto &arg : boxTy->getGenericArgs()) {
+      auto transReplacement = arg.getReplacement().transform(fn);
+      if (!transReplacement)
+        return Type();
+      auto canReplacement = transReplacement->getCanonicalType();
+      if (canReplacement != CanType(arg.getReplacement())) {
+        // FIXME: We need to update the substitution conformances for the
+        // transformed type in the general case. For now, only handle
+        // transformations between generic types with abstract conformances.
+        assert((arg.getConformances().empty()
+                || (std::all_of(arg.getConformances().begin(),
+                                arg.getConformances().end(),
+                                [](ProtocolConformanceRef conformance) -> bool {
+                                  return conformance.isAbstract();
+                                })
+                    && (canReplacement->is<SubstitutableType>()
+                        || canReplacement->is<DependentMemberType>()
+                        || canReplacement->is<GenericTypeParamType>())))
+               && "transforming concrete conformance not implemented");
+        transArgs.push_back(Substitution(canReplacement,
+                                         arg.getConformances()));
+        didChange = true;
+      } else {
+        transArgs.push_back(arg);
+      }
+    }
+    if (!didChange)
+      return boxTy;
+    
+    return SILBoxType::get(boxTy->getASTContext(),
+                           boxTy->getLayout(),
+                           transArgs);
   }
 
   case TypeKind::SILFunction: {
@@ -3742,4 +3890,54 @@ bool TypeBase::usesNativeReferenceCounting(ResilienceExpansion resilience) {
   }
 
   llvm_unreachable("Unhandled type kind!");
+}
+
+//
+// SILBoxType implementation
+//
+
+void SILBoxType::Profile(llvm::FoldingSetNodeID &id, SILLayout *Layout,
+                         ArrayRef<Substitution> Args) {
+  id.AddPointer(Layout);
+  for (auto &arg : Args) {
+    id.AddPointer(arg.getReplacement().getPointer());
+    for (auto conformance : arg.getConformances())
+      id.AddPointer(conformance.getOpaqueValue());
+  }
+}
+
+SILBoxType::SILBoxType(ASTContext &C,
+                       SILLayout *Layout, ArrayRef<Substitution> Args)
+: TypeBase(TypeKind::SILBox, &C,
+           getRecursivePropertiesFromSubstitutions(Args)),
+  Layout(Layout),
+  NumGenericArgs(Args.size())
+{
+#ifndef NDEBUG
+  // Check that the generic args are reasonable for the box's signature.
+  if (Layout->getGenericSignature())
+    (void)Layout->getGenericSignature()->getSubstitutionMap(Args);
+  for (auto &arg : Args)
+    assert(arg.getReplacement()->isCanonical() &&
+           "box arguments must be canonical types!");
+#endif
+  auto paramsBuf = getTrailingObjects<Substitution>();
+  for (unsigned i = 0; i < NumGenericArgs; ++i)
+    ::new (paramsBuf + i) Substitution(Args[i]);
+}
+
+RecursiveTypeProperties SILBoxType::
+getRecursivePropertiesFromSubstitutions(ArrayRef<Substitution> Params) {
+  RecursiveTypeProperties props;
+  for (auto &param : Params) {
+    props |= param.getReplacement()->getRecursiveProperties();
+  }
+  return props;
+}
+
+/// TODO: Transitional accessor for single-type boxes.
+CanType SILBoxType::getBoxedType() const {
+  assert(getLayout()->getFields().size() == 1
+         && "is not a single-field box");
+  return getFieldLoweredType(0);
 }

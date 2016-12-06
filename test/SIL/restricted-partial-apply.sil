@@ -5,29 +5,29 @@ import Builtin
 class C {}
 
 sil @native_object_context : $@convention(thin) (@owned Builtin.NativeObject) -> ()
-sil @box_context : $@convention(thin) (@owned @box Builtin.Word) -> ()
+sil @box_context : $@convention(thin) (@owned <τ_0_0> { var τ_0_0 } <Builtin.Word>) -> ()
 sil @class_context : $@convention(thin) (@owned C) -> ()
 
 sil @g_native_object_context : $@convention(thin) (@guaranteed Builtin.NativeObject) -> ()
-sil @g_box_context : $@convention(thin) (@guaranteed @box Builtin.Word) -> ()
+sil @g_box_context : $@convention(thin) (@guaranteed <τ_0_0> { var τ_0_0 } <Builtin.Word>) -> ()
 sil @g_class_context : $@convention(thin) (@guaranteed C) -> ()
 
-sil @limited_partial_applies : $@convention(thin) (Builtin.NativeObject, @box Builtin.Word, C) -> () {
-entry(%0 : $Builtin.NativeObject, %1 : $@box Builtin.Word, %2 : $C):
+sil @limited_partial_applies : $@convention(thin) (Builtin.NativeObject, <τ_0_0> { var τ_0_0 } <Builtin.Word>, C) -> () {
+entry(%0 : $Builtin.NativeObject, %1 : $<τ_0_0> { var τ_0_0 } <Builtin.Word>, %2 : $C):
   %a = function_ref @native_object_context : $@convention(thin) (@owned Builtin.NativeObject) -> ()
-  %b = function_ref @box_context : $@convention(thin) (@owned @box Builtin.Word) -> ()
+  %b = function_ref @box_context : $@convention(thin) (@owned <τ_0_0> { var τ_0_0 } <Builtin.Word>) -> ()
   %c = function_ref @class_context : $@convention(thin) (@owned C) -> ()
 
   %d = function_ref @g_native_object_context : $@convention(thin) (@guaranteed Builtin.NativeObject) -> ()
-  %e = function_ref @g_box_context : $@convention(thin) (@guaranteed @box Builtin.Word) -> ()
+  %e = function_ref @g_box_context : $@convention(thin) (@guaranteed <τ_0_0> { var τ_0_0 } <Builtin.Word>) -> ()
   %f = function_ref @g_class_context : $@convention(thin) (@guaranteed C) -> ()
 
   %g = partial_apply %a(%0) : $@convention(thin) (@owned Builtin.NativeObject) -> ()
-  %h = partial_apply %b(%1) : $@convention(thin) (@owned @box Builtin.Word) -> ()
+  %h = partial_apply %b(%1) : $@convention(thin) (@owned <τ_0_0> { var τ_0_0 } <Builtin.Word>) -> ()
   %i = partial_apply %c(%2) : $@convention(thin) (@owned C) -> ()
 
   %j = partial_apply [callee_guaranteed] %d(%0) : $@convention(thin) (@guaranteed Builtin.NativeObject) -> ()
-  %k = partial_apply [callee_guaranteed] %e(%1) : $@convention(thin) (@guaranteed @box Builtin.Word) -> ()
+  %k = partial_apply [callee_guaranteed] %e(%1) : $@convention(thin) (@guaranteed <τ_0_0> { var τ_0_0 } <Builtin.Word>) -> ()
   %l = partial_apply [callee_guaranteed] %f(%2) : $@convention(thin) (@guaranteed C) -> ()
 
   return undef : $()

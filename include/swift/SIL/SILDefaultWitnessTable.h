@@ -181,18 +181,7 @@ struct ilist_traits<::swift::SILDefaultWitnessTable> :
 public ilist_default_traits<::swift::SILDefaultWitnessTable> {
   typedef ::swift::SILDefaultWitnessTable SILDefaultWitnessTable;
 
-private:
-  mutable ilist_half_node<SILDefaultWitnessTable> Sentinel;
-
 public:
-  SILDefaultWitnessTable *createSentinel() const {
-    return static_cast<SILDefaultWitnessTable*>(&Sentinel);
-  }
-  void destroySentinel(SILDefaultWitnessTable *) const {}
-
-  SILDefaultWitnessTable *provideInitialHead() const { return createSentinel(); }
-  SILDefaultWitnessTable *ensureHead(SILDefaultWitnessTable*) const { return createSentinel(); }
-  static void noteHead(SILDefaultWitnessTable*, SILDefaultWitnessTable*) {}
   static void deleteNode(SILDefaultWitnessTable *WT) { WT->~SILDefaultWitnessTable(); }
   
 private:

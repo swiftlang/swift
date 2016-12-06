@@ -657,7 +657,7 @@ static bool checkMutating(FuncDecl *requirement, FuncDecl *witness,
                           ValueDecl *witnessDecl) {
   // Witnesses in classes never have mutating conflicts.
   if (auto contextType =
-        witnessDecl->getDeclContext()->getDeclaredTypeInContext())
+        witnessDecl->getDeclContext()->getDeclaredInterfaceType())
     if (contextType->hasReferenceSemantics())
       return false;
   
@@ -2265,16 +2265,11 @@ void ConformanceChecker::recordTypeWitness(AssociatedTypeDecl *assocType,
                                                     DC);
     aliasDecl->computeType();
 
-    // Strip off sugar from the interface type if it is dependent.
-    // FIXME: Without this, the stdlib doesn't compile because
-    // 'typealias _Buffer' is insufficiently accessible.
-    if (type->hasArchetype()) {
-      auto metaType = MetatypeType::get(type);
-      aliasDecl->setInterfaceType(
-        ArchetypeBuilder::mapTypeOutOfContext(DC, metaType));
-    } else {
-      aliasDecl->setInterfaceType(aliasDecl->getType());
-    }
+    aliasDecl->getAliasType()->setRecursiveProperties(
+        type->getRecursiveProperties());
+
+    auto interfaceTy = DC->mapTypeOutOfContext(aliasDecl->getAliasType());
+    aliasDecl->setInterfaceType(MetatypeType::get(interfaceTy));
 
     aliasDecl->setImplicit();
     if (type->hasError())
@@ -2354,8 +2349,7 @@ static void diagnoseNoWitness(ValueDecl *Requirement, Type RequirementType,
 
   Accessibility Access = std::min(
     /* Access of the context */
-    Adopter
-      ->getAsGenericTypeOrGenericTypeExtensionContext()->getFormalAccess(),
+    Adopter->getAsNominalTypeOrNominalTypeExtensionContext()->getFormalAccess(),
     /* Access of the protocol */
     Requirement->getDeclContext()
       ->getAsProtocolOrProtocolExtensionContext()->getFormalAccess());
@@ -2395,7 +2389,7 @@ static void diagnoseNoWitness(ValueDecl *Requirement, Type RequirementType,
       Options.AccessibilityFilter = Accessibility::Private;
       Options.PrintAccessibility = false;
       Options.FunctionBody = [](const ValueDecl *VD) { return "<#code#>"; };
-      Options.setBaseType(Adopter->getSelfTypeInContext());
+      Options.setBaseType(Conformance->getType());
       Options.CurrentModule = Adopter->getParentModule();
       if (!Adopter->isExtensionContext()) {
         // Create a variable declaration instead of a computed property in
@@ -2899,14 +2893,14 @@ ResolveWitnessResult ConformanceChecker::resolveTypeWitnessViaLookup(
       tc.diagnose(assocType, diag::no_witnesses_type, assocType->getName());
 
       for (auto candidate : nonViable) {
-        if (candidate.first->getDeclaredType()->hasError())
+        if (candidate.first->getDeclaredInterfaceType()->hasError())
           continue;
 
         tc.diagnose(candidate.first,
                     diag::protocol_witness_nonconform_type,
-                    candidate.first->getDeclaredType(),
-                    candidate.second->getDeclaredType(),
-                    candidate.second->getDeclaredType()->is<ProtocolType>());
+                    candidate.first->getDeclaredInterfaceType(),
+                    candidate.second->getDeclaredInterfaceType(),
+                    candidate.second->getDeclaredInterfaceType()->is<ProtocolType>());
       }
     });
 
@@ -5103,7 +5097,7 @@ void TypeChecker::checkConformancesInContext(DeclContext *dc,
 
     // Complain about redundant conformances.
     diagnose(diag.Loc, diag::redundant_conformance,
-             dc->getDeclaredTypeInContext(),
+             dc->getDeclaredInterfaceType(),
              diag.Protocol->getName());
 
     // Special case: explain that 'RawRepresentable' conformance
@@ -5114,13 +5108,13 @@ void TypeChecker::checkConformancesInContext(DeclContext *dc,
           enumDecl->hasRawType()) {
         diagnose(enumDecl->getInherited()[0].getSourceRange().Start,
                  diag::enum_declares_rawrep_with_raw_type,
-                 dc->getDeclaredTypeInContext(), enumDecl->getRawType());
+                 dc->getDeclaredInterfaceType(), enumDecl->getRawType());
         continue;
       }
     }
 
     diagnose(existingDecl, diag::declared_protocol_conformance_here,
-             dc->getDeclaredTypeInContext(),
+             dc->getDeclaredInterfaceType(),
              static_cast<unsigned>(diag.ExistingKind),
              diag.Protocol->getName(),
              diag.ExistingExplicitProtocol->getName());

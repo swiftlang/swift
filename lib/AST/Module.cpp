@@ -84,7 +84,7 @@ void BuiltinUnit::LookupCache::lookupValue(
                                           /*genericparams*/nullptr,
                                           const_cast<BuiltinUnit*>(&M));
       TAD->computeType();
-      TAD->setInterfaceType(TAD->getType());
+      TAD->setInterfaceType(MetatypeType::get(TAD->getAliasType(), Ctx));
       TAD->setAccessibility(Accessibility::Public);
       Entry = TAD;
     }
@@ -346,7 +346,6 @@ ModuleDecl::ModuleDecl(Identifier name, ASTContext &ctx)
     Flags({0, 0, 0}), DSOHandle(nullptr) {
   ctx.addDestructorCleanup(*this);
   setImplicit();
-  setType(ModuleType::get(this));
   setInterfaceType(ModuleType::get(this));
   setAccessibility(Accessibility::Public);
 }

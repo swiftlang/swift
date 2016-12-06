@@ -221,6 +221,25 @@ TypeRepr *CloneVisitor::visitFixedTypeRepr(FixedTypeRepr *T) {
   return new (Ctx) FixedTypeRepr(T->getType(), T->getLoc());
 }
 
+TypeRepr *CloneVisitor::visitSILBoxTypeRepr(SILBoxTypeRepr *type) {
+  SmallVector<SILBoxTypeRepr::Field, 4> cloneFields;
+  SmallVector<TypeRepr *, 4> cloneArgs;
+  
+  for (auto &field : type->getFields())
+    cloneFields.push_back({field.VarOrLetLoc, field.Mutable,
+                           visit(field.FieldType)});
+  for (auto *arg : type->getGenericArguments())
+    cloneArgs.push_back(visit(arg));
+  
+  return new (Ctx) SILBoxTypeRepr(/*FIXME: Clone?*/type->getGenericParams(),
+                                type->getLBraceLoc(),
+                                Ctx.AllocateCopy(cloneFields),
+                                type->getRBraceLoc(),
+                                type->getArgumentLAngleLoc(),
+                                Ctx.AllocateCopy(cloneArgs),
+                                type->getArgumentRAngleLoc());
+}
+
 TypeRepr *TypeRepr::clone(const ASTContext &ctx) const {
   CloneVisitor visitor(ctx);
   return visitor.visit(const_cast<TypeRepr *>(this));
@@ -394,10 +413,11 @@ TupleTypeRepr::TupleTypeRepr(ArrayRef<TypeRepr *> Elements, SourceRange Parens,
                              ArrayRef<SourceLoc> underscoreLocs,
                              SourceLoc Ellipsis, unsigned EllipsisIdx)
     : TypeRepr(TypeReprKind::Tuple), NumElements(Elements.size()),
-      Parens(Parens), HasEllipsis(Ellipsis.isValid()) {
+      Parens(Parens) {
 
-  NameStatus = ElementNames.empty() ? NotNamed
-             : underscoreLocs.empty() ? HasNames : HasLabels;
+  TupleTypeReprBits.NameStatus = ElementNames.empty() ? NotNamed
+                               : underscoreLocs.empty() ? HasNames : HasLabels;
+  TupleTypeReprBits.HasEllipsis = Ellipsis.isValid();
 
   // Copy elements.
   std::uninitialized_copy(Elements.begin(), Elements.end(),
@@ -454,6 +474,32 @@ TupleTypeRepr *TupleTypeRepr::createEmpty(const ASTContext &C,
   return create(C, {}, Parens,
       /*ElementNames=*/{}, /*ElementNameLocs=*/{}, /*underscoreLocs=*/{},
       /*Ellipsis=*/SourceLoc(), /*EllipsisIdx=*/0);
+}
+
+SILBoxTypeRepr *SILBoxTypeRepr::create(ASTContext &C,
+                      GenericParamList *GenericParams,
+                      SourceLoc LBraceLoc, ArrayRef<Field> Fields,
+                      SourceLoc RBraceLoc,
+                      SourceLoc ArgLAngleLoc, ArrayRef<TypeRepr *> GenericArgs,
+                      SourceLoc ArgRAngleLoc) {
+  return new (C) SILBoxTypeRepr(GenericParams,
+                                LBraceLoc, C.AllocateCopy(Fields), RBraceLoc,
+                                ArgLAngleLoc, C.AllocateCopy(GenericArgs),
+                                ArgRAngleLoc);
+}
+
+SourceLoc SILBoxTypeRepr::getStartLocImpl() const {
+  if (GenericParams && GenericParams->getSourceRange().isValid())
+    return GenericParams->getSourceRange().Start;
+  return LBraceLoc;
+}
+SourceLoc SILBoxTypeRepr::getEndLocImpl() const {
+  if (ArgRAngleLoc.isValid())
+    return ArgRAngleLoc;
+  return RBraceLoc;
+}
+SourceLoc SILBoxTypeRepr::getLocImpl() const {
+  return LBraceLoc;
 }
 
 void TupleTypeRepr::printImpl(ASTPrinter &Printer,
@@ -540,4 +586,10 @@ void InOutTypeRepr::printImpl(ASTPrinter &Printer,
 void FixedTypeRepr::printImpl(ASTPrinter &Printer,
                               const PrintOptions &Opts) const {
   getType().print(Printer, Opts);
+}
+
+void SILBoxTypeRepr::printImpl(ASTPrinter &Printer,
+                               const PrintOptions &Opts) const {
+  // TODO
+  Printer.printKeyword("sil_box");
 }

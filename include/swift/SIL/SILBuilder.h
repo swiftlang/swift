@@ -1239,16 +1239,10 @@ public:
     return insert(new (F.getModule()) DeallocPartialRefInst(
         getSILDebugLocation(Loc), operand, metatype));
   }
-  DeallocBoxInst *createDeallocBox(SILLocation Loc, SILType eltType,
+  DeallocBoxInst *createDeallocBox(SILLocation Loc,
                                    SILValue operand) {
     return insert(new (F.getModule()) DeallocBoxInst(
-        getSILDebugLocation(Loc), eltType, operand));
-  }
-  DeallocBoxInst *createDeallocBox(SILLocation Loc, SILValue operand) {
-    auto eltType =
-        operand->getType().castTo<SILBoxType>()->getBoxedAddressType();
-    return insert(new (F.getModule()) DeallocBoxInst(
-        getSILDebugLocation(Loc), eltType, operand));
+        getSILDebugLocation(Loc), operand));
   }
   DeallocExistentialBoxInst *createDeallocExistentialBox(SILLocation Loc,
                                                          CanType concreteType,

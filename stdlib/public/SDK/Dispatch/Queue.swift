@@ -12,7 +12,7 @@
 
 // dispatch/queue.h
 
-import SwiftShims
+import _SwiftDispatchOverlayShims
 
 public final class DispatchSpecificKey<T> {
 	public init() {}
@@ -353,9 +353,3 @@ private func _destructDispatchSpecificValue(ptr: UnsafeMutableRawPointer?) {
 		Unmanaged<AnyObject>.fromOpaque(p).release()
 	}
 }
-
-@_silgen_name("_swift_dispatch_queue_concurrent")
-internal func _swift_dispatch_queue_concurrent() -> __OS_dispatch_queue_attr
-
-@_silgen_name("_swift_dispatch_get_main_queue")
-internal func _swift_dispatch_get_main_queue() -> DispatchQueue

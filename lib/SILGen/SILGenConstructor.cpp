@@ -19,6 +19,7 @@
 #include "swift/AST/AST.h"
 #include "swift/AST/GenericEnvironment.h"
 #include "swift/AST/Mangle.h"
+#include "swift/AST/ASTMangler.h"
 #include "swift/SIL/SILArgument.h"
 #include "swift/SIL/SILUndef.h"
 #include "swift/SIL/TypeLowering.h"
@@ -796,7 +797,10 @@ static SILValue getBehaviorInitStorageFn(SILGenFunction &gen,
   {
     Mangler m;
     m.mangleBehaviorInitThunk(behaviorVar);
-    behaviorInitName = m.finalize();
+    std::string Old = m.finalize();
+    NewMangling::ASTMangler NewMangler;
+    std::string New = NewMangler.mangleBehaviorInitThunk(behaviorVar);
+    behaviorInitName = NewMangling::selectMangling(Old, New);
   }
   
   SILFunction *thunkFn;

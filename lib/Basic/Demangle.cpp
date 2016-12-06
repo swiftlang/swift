@@ -16,6 +16,10 @@
 
 #include "swift/Basic/Demangle.h"
 #include "swift/Basic/Fallthrough.h"
+#ifndef NO_NEW_DEMANGLING
+#include "swift/Basic/Demangler.h"
+#include "swift/Basic/ManglingMacros.h"
+#endif
 #include "swift/Strings.h"
 #include "swift/Basic/LLVM.h"
 #include "swift/Basic/Punycode.h"
@@ -284,6 +288,8 @@ static StringRef toString(ValueWitnessKind k) {
     return "getEnumTag";
   case ValueWitnessKind::DestructiveProjectEnumData:
     return "destructiveProjectEnumData";
+  case ValueWitnessKind::DestructiveInjectEnumTag:
+    return "destructiveInjectEnumTag";
   }
   unreachable("bad value witness kind");
 }
@@ -319,6 +325,12 @@ public:
   ///
   /// \return true if the mangling succeeded
   NodePointer demangleTopLevel() {
+#ifndef NO_NEW_DEMANGLING
+    if (Mangled.str().startswith(MANGLING_PREFIX_STR)) {
+      NewMangling::Demangler D(Mangled.str());
+      return D.demangleTopLevel();
+    }
+#endif
     if (!Mangled.nextIf("_T"))
       return nullptr;
 
@@ -409,54 +421,19 @@ private:
   }
 
   Optional<ValueWitnessKind> demangleValueWitnessKind() {
+    char Code[2];
     if (!Mangled)
       return None;
-    char c1 = Mangled.next();
+    Code[0] = Mangled.next();
     if (!Mangled)
       return None;
-    char c2 = Mangled.next();
-    if (c1 == 'a' && c2 == 'l')
-      return ValueWitnessKind::AllocateBuffer;
-    if (c1 == 'c' && c2 == 'a')
-      return ValueWitnessKind::AssignWithCopy;
-    if (c1 == 't' && c2 == 'a')
-      return ValueWitnessKind::AssignWithTake;
-    if (c1 == 'd' && c2 == 'e')
-      return ValueWitnessKind::DeallocateBuffer;
-    if (c1 == 'x' && c2 == 'x')
-      return ValueWitnessKind::Destroy;
-    if (c1 == 'X' && c2 == 'X')
-      return ValueWitnessKind::DestroyBuffer;
-    if (c1 == 'C' && c2 == 'P')
-      return ValueWitnessKind::InitializeBufferWithCopyOfBuffer;
-    if (c1 == 'C' && c2 == 'p')
-      return ValueWitnessKind::InitializeBufferWithCopy;
-    if (c1 == 'c' && c2 == 'p')
-      return ValueWitnessKind::InitializeWithCopy;
-    if (c1 == 'C' && c2 == 'c')
-      return ValueWitnessKind::InitializeArrayWithCopy;
-    if (c1 == 'T' && c2 == 'K')
-      return ValueWitnessKind::InitializeBufferWithTakeOfBuffer;
-    if (c1 == 'T' && c2 == 'k')
-      return ValueWitnessKind::InitializeBufferWithTake;
-    if (c1 == 't' && c2 == 'k')
-      return ValueWitnessKind::InitializeWithTake;
-    if (c1 == 'T' && c2 == 't')
-      return ValueWitnessKind::InitializeArrayWithTakeFrontToBack;
-    if (c1 == 't' && c2 == 'T')
-      return ValueWitnessKind::InitializeArrayWithTakeBackToFront;
-    if (c1 == 'p' && c2 == 'r')
-      return ValueWitnessKind::ProjectBuffer;
-    if (c1 == 'X' && c2 == 'x')
-      return ValueWitnessKind::DestroyArray;
-    if (c1 == 'x' && c2 == 's')
-      return ValueWitnessKind::StoreExtraInhabitant;
-    if (c1 == 'x' && c2 == 'g')
-      return ValueWitnessKind::GetExtraInhabitantIndex;
-    if (c1 == 'u' && c2 == 'g')
-      return ValueWitnessKind::GetEnumTag;
-    if (c1 == 'u' && c2 == 'p')
-      return ValueWitnessKind::DestructiveProjectEnumData;
+    Code[1] = Mangled.next();
+
+    StringRef CodeStr(Code, 2);
+#define VALUE_WITNESS(MANGLING, NAME) \
+  if (CodeStr == #MANGLING) return ValueWitnessKind::NAME;
+#include "swift/Basic/ValueWitnessMangling.def"
+
     return None;
   }
 
@@ -2408,6 +2385,7 @@ private:
     case Node::Kind::AutoClosureType:
     case Node::Kind::CFunctionPointer:
     case Node::Kind::Constructor:
+    case Node::Kind::CurryThunk:
     case Node::Kind::Deallocator:
     case Node::Kind::DeclContext:
     case Node::Kind::DefaultArgumentInitializer:
@@ -2507,7 +2485,14 @@ private:
     case Node::Kind::Weak:
     case Node::Kind::WillSet:
     case Node::Kind::WitnessTableOffset:
+    case Node::Kind::ReflectionMetadataBuiltinDescriptor:
+    case Node::Kind::ReflectionMetadataFieldDescriptor:
+    case Node::Kind::ReflectionMetadataAssocTypeDescriptor:
+    case Node::Kind::ReflectionMetadataSuperclassDescriptor:
     case Node::Kind::ThrowsAnnotation:
+    case Node::Kind::EmptyList:
+    case Node::Kind::FirstElementMarker:
+    case Node::Kind::VariadicMarker:
       return false;
     }
     unreachable("bad node kind");
@@ -2895,6 +2880,10 @@ void NodePrinter::print(NodePointer pointer, bool asContext, bool suppressType) 
   switch (kind) {
   case Node::Kind::Static:
     Printer << "static ";
+    print(pointer->getChild(0), asContext, suppressType);
+    return;
+  case Node::Kind::CurryThunk:
+    Printer << "curry thunk of ";
     print(pointer->getChild(0), asContext, suppressType);
     return;
   case Node::Kind::Directness:
@@ -3672,10 +3661,35 @@ void NodePrinter::print(NodePointer pointer, bool asContext, bool suppressType) 
     Printer << pointer->getText();
     return;
   }
-  case Node::Kind::ThrowsAnnotation: {
+  case Node::Kind::ReflectionMetadataBuiltinDescriptor:
+    Printer << "reflection metadata builtin descriptor ";
+    print(pointer->getChild(0));
+    return;
+  case Node::Kind::ReflectionMetadataFieldDescriptor:
+    Printer << "reflection metadata field descriptor ";
+    print(pointer->getChild(0));
+    return;
+  case Node::Kind::ReflectionMetadataAssocTypeDescriptor:
+    Printer << "reflection metadata associated type descriptor ";
+    print(pointer->getChild(0));
+    return;
+  case Node::Kind::ReflectionMetadataSuperclassDescriptor:
+    Printer << "reflection metadata superclass descriptor ";
+    print(pointer->getChild(0));
+    return;
+
+  case Node::Kind::ThrowsAnnotation:
     Printer<< " throws ";
     return;
-  }
+  case Node::Kind::EmptyList:
+    Printer << " empty-list ";
+    return;
+  case Node::Kind::FirstElementMarker:
+    Printer << " first-element-marker ";
+    return;
+  case Node::Kind::VariadicMarker:
+    Printer << " variadic-marker ";
+    return;
   }
   unreachable("bad node kind!");
 }

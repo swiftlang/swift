@@ -684,10 +684,10 @@ extern "C" id swift_stdlib_getErrorEmbeddedNSErrorIndirect(
 /******************************************************************************/
 
 /// Nominal type descriptor for Swift.AnyHashable.
-extern "C" const NominalTypeDescriptor _TMnVs11AnyHashable;
+extern "C" const NominalTypeDescriptor STRUCT_TYPE_DESCR_SYM(s11AnyHashable);
 
 static bool isAnyHashableType(const StructMetadata *type) {
-  return type->getDescription() == &_TMnVs11AnyHashable;
+  return type->getDescription() == &STRUCT_TYPE_DESCR_SYM(s11AnyHashable);
 }
 
 static bool isAnyHashableType(const Metadata *type) {
@@ -1436,10 +1436,10 @@ static bool _dynamicCastUnknownClassIndirect(OpaqueValue *dest,
 /******************************************************************************/
 
 #if SWIFT_OBJC_INTEROP
-extern "C" const ProtocolDescriptor _TMps5Error;
+extern "C" const ProtocolDescriptor PROTOCOL_DESCR_SYM(s5Error);
 
 static const WitnessTable *findErrorWitness(const Metadata *srcType) {
-  return swift_conformsToProtocol(srcType, &_TMps5Error);
+  return swift_conformsToProtocol(srcType, &PROTOCOL_DESCR_SYM(s5Error));
 }
 #endif
 
@@ -2138,13 +2138,13 @@ static bool tryDynamicCastBoxedSwiftValue(OpaqueValue *dest,
 /******************************************************************************/
 
 /// Nominal type descriptor for Swift.Array.
-extern "C" const NominalTypeDescriptor _TMnSa;
+extern "C" const NominalTypeDescriptor NOMINAL_TYPE_DESCR_SYM(Sa);
 
 /// Nominal type descriptor for Swift.Dictionary.
-extern "C" const NominalTypeDescriptor _TMnVs10Dictionary;
+extern "C" const NominalTypeDescriptor STRUCT_TYPE_DESCR_SYM(s10Dictionary);
 
 /// Nominal type descriptor for Swift.Set.
-extern "C" const NominalTypeDescriptor _TMnVs3Set;
+extern "C" const NominalTypeDescriptor STRUCT_TYPE_DESCR_SYM(s3Set);
 
 SWIFT_CC(swift)
 extern "C"
@@ -2212,10 +2212,10 @@ static bool _dynamicCastStructToStruct(OpaqueValue *destination,
   auto descriptor = sourceType->Description.get();
   auto targetDescriptor = targetType->Description.get();
   if (descriptor != targetDescriptor) {
-    if (descriptor == &_TMnVs11AnyHashable) {
+    if (descriptor == &STRUCT_TYPE_DESCR_SYM(s11AnyHashable)) {
       return _dynamicCastFromAnyHashable(destination, source,
                                          sourceType, targetType, flags);
-    } else if (targetDescriptor == &_TMnVs11AnyHashable) {
+    } else if (targetDescriptor == &STRUCT_TYPE_DESCR_SYM(s11AnyHashable)) {
       return _dynamicCastToAnyHashable(destination, source,
                                        sourceType, targetType, flags);
     } else {
@@ -2229,7 +2229,7 @@ static bool _dynamicCastStructToStruct(OpaqueValue *destination,
   bool result;
 
   // Arrays.
-  if (descriptor == &_TMnSa) {
+  if (descriptor == &NOMINAL_TYPE_DESCR_SYM(Sa)) {
     if (flags & DynamicCastFlags::Unconditional) {
       _swift_arrayDownCastIndirect(source, destination,
                                    sourceArgs[0], targetArgs[0]);
@@ -2241,7 +2241,7 @@ static bool _dynamicCastStructToStruct(OpaqueValue *destination,
     }
 
   // Dictionaries.
-  } else if (descriptor == &_TMnVs10Dictionary) {
+  } else if (descriptor == &STRUCT_TYPE_DESCR_SYM(s10Dictionary)) {
     if (flags & DynamicCastFlags::Unconditional) {
       _swift_dictionaryDownCastIndirect(source, destination,
                                         sourceArgs[0], sourceArgs[1],
@@ -2257,7 +2257,7 @@ static bool _dynamicCastStructToStruct(OpaqueValue *destination,
     }
 
   // Sets.
-  } else if (descriptor == &_TMnVs3Set) {
+  } else if (descriptor == &STRUCT_TYPE_DESCR_SYM(s3Set)) {
     if (flags & DynamicCastFlags::Unconditional) {
       _swift_setDownCastIndirect(source, destination,
                                  sourceArgs[0], targetArgs[0],
@@ -2707,7 +2707,7 @@ struct _ObjectiveCBridgeableWitnessTable {
 
 } // unnamed namespace
 
-extern "C" const ProtocolDescriptor _TMps21_ObjectiveCBridgeable;
+extern "C" const ProtocolDescriptor PROTOCOL_DESCR_SYM(s21_ObjectiveCBridgeable);
 
 /// Dynamic cast from a value type that conforms to the _ObjectiveCBridgeable
 /// protocol to a class type, first by bridging the value to its Objective-C
@@ -2973,12 +2973,16 @@ id _swift_bridgeAnythingNonVerbatimToObjectiveC(OpaqueValue *src,
 // documentation.
 //===----------------------------------------------------------------------===//
 
-extern "C" const _ObjectiveCBridgeableWitnessTable
-_TWPVs19_BridgeableMetatypes21_ObjectiveCBridgeables;
+#define BRIDGING_CONFORMANCE_SYM \
+  SELECT_MANGLING(_TWPVs19_BridgeableMetatypes21_ObjectiveCBridgeables, \
+                  _Ss19_BridgeableMetatypeVs21_ObjectiveCBridgeablesWP)
+
+extern "C" const _ObjectiveCBridgeableWitnessTable BRIDGING_CONFORMANCE_SYM;
 
 static const _ObjectiveCBridgeableWitnessTable *
 findBridgeWitness(const Metadata *T) {
-  auto w = swift_conformsToProtocol(T, &_TMps21_ObjectiveCBridgeable);
+  auto w = swift_conformsToProtocol(T,
+                                &PROTOCOL_DESCR_SYM(s21_ObjectiveCBridgeable));
   if (LLVM_LIKELY(w))
     return reinterpret_cast<const _ObjectiveCBridgeableWitnessTable *>(w);
   // Class and ObjC existential metatypes can be bridged, but metatypes can't
@@ -2988,14 +2992,14 @@ findBridgeWitness(const Metadata *T) {
   case MetadataKind::Metatype: {
     auto metaTy = static_cast<const MetatypeMetadata *>(T);
     if (metaTy->InstanceType->isAnyClass())
-      return &_TWPVs19_BridgeableMetatypes21_ObjectiveCBridgeables;
+      return &BRIDGING_CONFORMANCE_SYM;
     break;
   }
   case MetadataKind::ExistentialMetatype: {
     auto existentialMetaTy =
       static_cast<const ExistentialMetatypeMetadata *>(T);
     if (existentialMetaTy->isObjC())
-      return &_TWPVs19_BridgeableMetatypes21_ObjectiveCBridgeables;
+      return &BRIDGING_CONFORMANCE_SYM;
     break;
   }
 

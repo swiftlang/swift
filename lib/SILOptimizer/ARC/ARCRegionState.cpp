@@ -179,6 +179,8 @@ static bool isARCSignificantTerminator(TermInst *TI) {
   case TermKind::CheckedCastAddrBranchInst:
     return true;
   }
+
+  llvm_unreachable("Unhandled TermKind in switch.");
 }
 
 // Visit each one of our predecessor regions and see if any are blocks that can

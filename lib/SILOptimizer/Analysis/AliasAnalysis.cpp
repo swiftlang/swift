@@ -98,6 +98,8 @@ llvm::raw_ostream &swift::operator<<(llvm::raw_ostream &OS, AliasResult R) {
   case AliasResult::PartialAlias: return OS << "PartialAlias";
   case AliasResult::MustAlias:    return OS << "MustAlias";
   }
+
+  llvm_unreachable("Unhandled AliasResult in switch.");
 }
 
 SILValue getAccessedMemory(SILInstruction *User) {

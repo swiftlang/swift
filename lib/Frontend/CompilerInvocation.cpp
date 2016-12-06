@@ -76,6 +76,8 @@ SourceFileKind CompilerInvocation::getSourceFileKind() const {
   case InputFileKind::IFK_LLVM_IR:
     llvm_unreachable("Trying to convert from unsupported InputFileKind");
   }
+
+  llvm_unreachable("Unhandled InputFileKind in switch.");
 }
 
 // This is a separate function so that it shows up in stack traces.
@@ -1110,6 +1112,10 @@ static bool ParseSILArgs(SILOptions &Opts, ArgList &Args,
       IRGenOpts.Optimize = true;
       Opts.Optimization = SILOptions::SILOptMode::Optimize;
     }
+  }
+
+  if (Args.getLastArg(OPT_AssumeSingleThreaded)) {
+    Opts.AssumeSingleThreaded = true;
   }
 
   // Parse the assert configuration identifier.

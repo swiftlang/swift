@@ -24,7 +24,7 @@ extension INSetClimateSettingsInCarIntent {
     enableAutoMode: Bool? = nil,
     airCirculationMode: INCarAirCirculationMode = .unknown,
     fanSpeedIndex: Int? = nil,
-    fanSpeedPercentage: Int? = nil,
+    fanSpeedPercentage: Double? = nil,
     relativeFanSpeedSetting: INRelativeSetting = .unknown,
     temperature: Measurement<UnitTemperature>? = nil,
     relativeTemperatureSetting: INRelativeSetting = .unknown,
@@ -42,34 +42,34 @@ extension INSetClimateSettingsInCarIntent {
       climateZone: climateZone)
   }
 
-  @nonobjc  
+  @nonobjc
   public final var enableFan: Bool? {
     return __enableFan?.boolValue
   }
 
-  @nonobjc  
+  @nonobjc
   public final var enableAirConditioner: Bool? {
     return __enableAirConditioner?.boolValue
   }
 
-  @nonobjc  
+  @nonobjc
   public final var enableClimateControl: Bool? {
     return __enableClimateControl?.boolValue
   }
 
-  @nonobjc  
+  @nonobjc
   public final var enableAutoMode: Bool? {
     return __enableAutoMode?.boolValue
   }
 
-  @nonobjc  
+  @nonobjc
   public final var fanSpeedIndex: Int? {
     return __fanSpeedIndex?.intValue
   }
 
-  @nonobjc  
-  public final var fanSpeedPercentage: Int? {
-    return __fanSpeedPercentage?.intValue
+  @nonobjc
+  public final var fanSpeedPercentage: Double? {
+    return __fanSpeedPercentage?.doubleValue
   }
 }
 #endif

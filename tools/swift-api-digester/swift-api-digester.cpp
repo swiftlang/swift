@@ -3120,52 +3120,6 @@ struct OverloadedFuncInfo {
   }
 };
 
-/// This provides a utility to view a printed name by parsing the components
-/// of that name. The components include a base name and an array of argument
-/// labels.
-class DeclNameViewer {
-  StringRef BaseName;
-  SmallVector<StringRef, 4> Labels;
-
-public:
-  DeclNameViewer(StringRef Text) {
-    auto ArgStart = Text.find_first_of('(');
-    if (ArgStart == StringRef::npos) {
-      BaseName = Text;
-      return;
-    }
-    BaseName = Text.substr(0, ArgStart);
-    auto ArgEnd = Text.find_last_of(')');
-    assert(ArgEnd != StringRef::npos);
-    StringRef AllArgs = Text.substr(ArgStart + 1, ArgEnd - ArgStart - 1);
-    AllArgs.split(Labels, ":");
-    if (Labels.empty())
-      return;
-    assert(Labels.back().empty());
-    Labels.pop_back();
-  }
-
-  StringRef base() const { return BaseName; }
-
-  llvm::ArrayRef<StringRef> args() const { return llvm::makeArrayRef(Labels); }
-
-  unsigned partsCount() const { return 1 + Labels.size(); }
-
-  unsigned commonParts(DeclNameViewer &Other) const {
-    if (base() != Other.base())
-      return 0;
-    unsigned Result = 1;
-    unsigned Len = std::min(args().size(), Other.args().size());
-    for (unsigned I = 0; I < Len; ++ I) {
-      if (args()[I] == Other.args()[I])
-        Result ++;
-      else
-        return Result;
-    }
-    return Result;
-  }
-};
-
 class OverloadMemberFunctionEmitter : public SDKNodeVisitor {
 
   std::vector<OverloadedFuncInfo> &AllItems;
@@ -3187,7 +3141,7 @@ class OverloadMemberFunctionEmitter : public SDKNodeVisitor {
       DeclNameViewer ChildViewer(C->getPrintedName());
       if (ChildViewer.args().empty())
         continue;
-      if (CurrentViewer.commonParts(ChildViewer) >=
+      if (CurrentViewer.commonPartsCount(ChildViewer) >=
           CurrentViewer.partsCount() - 1) {
         AllItems.emplace_back(Node->getAs<SDKNodeDecl>()->getUsr());
         return;

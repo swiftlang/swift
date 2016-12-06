@@ -27,7 +27,7 @@ The `visualc.modulemap` located at
 ### 3. Configure the runtime to be built with the just built clang
 Ensure that we use the tools from the just built LLVM and clang tools to build
 the Windows SDK.  You will need to pass a few extra options to cmake via the
-`build-script` invocation to acheive this.  You will need to expand out the
+`build-script` invocation to achieve this.  You will need to expand out the
 path where llvm-ar and llvm-ranlib are built.  These are needed to correctly
 build the static libraries.  Note that cross-compiling will require the use of
 lld.  Ensure that lld-link.exe (lld-link) is available to clang via your path.

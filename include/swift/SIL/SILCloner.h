@@ -1700,7 +1700,6 @@ SILCloner<ImplClass>::visitDeallocBoxInst(DeallocBoxInst *Inst) {
   getBuilder().setCurrentDebugScope(getOpScope(Inst->getDebugScope()));
   doPostProcess(Inst,
     getBuilder().createDeallocBox(getOpLocation(Inst->getLoc()),
-                                  getOpType(Inst->getElementType()),
                                   getOpValue(Inst->getOperand())));
 }
 
