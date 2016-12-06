@@ -16,6 +16,9 @@
 //
 //===----------------------------------------------------------------------===//
 
+#include "swift/Runtime/Config.h"
+
+#if SWIFT_OBJC_INTEROP
 #import <CoreFoundation/CoreFoundation.h>
 #include "../SwiftShims/CoreFoundationShims.h"
 
@@ -112,3 +115,5 @@ _swift_shims_CFStringRef
 swift::_swift_stdlib_objcDebugDescription(id _Nonnull nsObject) {
   return [nsObject debugDescription];
 }
+#endif
+
