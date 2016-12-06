@@ -1630,9 +1630,13 @@ getTypeOfExpressionWithoutApplying(Expr *&expr, DeclContext *dc,
   auto &solution = viable[0];
   Type exprType = solution.simplifyType(*this, expr->getType());
 
-  assert(exprType && !exprType->hasError() && "erroneous solution?");
-  assert(!exprType->hasTypeVariable() &&
+  assert(exprType && !exprType->hasTypeVariable() &&
          "free type variable with FreeTypeVariableBinding::GenericParameters?");
+
+  if (exprType->hasError()) {
+    recoverOriginalType();
+    return None;
+  }
 
   // Dig the declaration out of the solution.
   auto semanticExpr = expr->getSemanticsProvidingExpr();
