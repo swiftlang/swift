@@ -1438,6 +1438,16 @@ public protocol BinaryInteger :
   // required number of bits.
   var minimumSignedRepresentationBitWidth: Int { get }
 
+  /// The number of trailing zeros in this value's binary representation.
+  ///
+  /// For example, in a fixed-width integer type with a `bitWidth` value of 8,
+  /// the number -8 has three trailing zeros.
+  ///
+  ///     let x = Int8(bitPattern: 0b1111_1000)
+  ///     // x == -8
+  ///     // x.trailingZeros == 3
+  var trailingZeros: Int { get }
+
 % for x in binaryArithmetic['BinaryInteger']:
   // defaulted using an in-place counterpart, but can be used as an
   // optimization hook
@@ -2550,6 +2560,14 @@ public struct ${Self}
     return Int(
       ${Self}(
         Builtin.int_ctlz_Int${bits}(self._value, false._value)
+      )._lowUWord._value)
+  }
+
+  @_transparent
+  public var trailingZeros: Int {
+    return Int(
+      ${Self}(
+        Builtin.int_cttz_Int${bits}(self._value, false._value)
       )._lowUWord._value)
   }
 
