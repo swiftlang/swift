@@ -601,7 +601,7 @@ void Remangler::mangleDeallocator(Node *node) {
 }
 
 void Remangler::mangleDeclContext(Node *node) {
-  unreachable("handled inline");
+  mangleSingleChildNode(node);
 }
 
 void Remangler::mangleDefaultArgumentInitializer(Node *node) {
@@ -1352,7 +1352,7 @@ void Remangler::mangleProtocolWitnessTableAccessor(Node *node) {
 void Remangler::mangleQualifiedArchetype(Node *node) {
   mangleChildNode(node, 1);
   Buffer << "Qq";
-  mangleIndex(node->getFirstChild().get());
+  mangleNumber(node->getFirstChild().get());
 }
 
 void Remangler::mangleReabstractionThunk(Node *node) {
@@ -1450,7 +1450,7 @@ void Remangler::mangleTypeList(Node *node) {
 }
 
 void Remangler::mangleTypeMangling(Node *node) {
-  unreachable("not used");
+  mangleSingleChildNode(node);
 }
 
 void Remangler::mangleTypeMetadata(Node *node) {
