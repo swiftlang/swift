@@ -623,6 +623,7 @@ static std::unique_ptr<llvm::Module> performIRGeneration(IRGenOptions &Opts,
       IGM.emitProtocolConformances();
       IGM.emitTypeMetadataRecords();
       IGM.emitBuiltinReflectionMetadata();
+      IGM.emitReflectionMetadataVersion();
     }
 
     // Okay, emit any definitions that we suddenly need.

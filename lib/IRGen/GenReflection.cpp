@@ -930,3 +930,14 @@ void IRGenModule::emitFieldMetadataRecord(const NominalTypeDecl *Decl) {
   if (var)
     addUsedGlobal(var);
 }
+
+void IRGenModule::emitReflectionMetadataVersion() {
+  auto Init =
+    llvm::ConstantInt::get(Int16Ty, SWIFT_REFLECTION_METADATA_VERSION);
+  auto Version = new llvm::GlobalVariable(Module, Int16Ty, /*constant*/ true,
+                                          llvm::GlobalValue::LinkOnceODRLinkage,
+                                          Init,
+                                          "__swift_reflection_version");
+  Version->setVisibility(llvm::GlobalValue::HiddenVisibility);
+  addUsedGlobal(Version);
+}
