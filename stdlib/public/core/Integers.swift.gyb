@@ -1857,6 +1857,7 @@ ${overflowOperationComment(x.operator)}
 ${operationComment(x.operator)}
   // FIXME(integers): revisit the doc comment
   static func ${x.operator}(_ lhs: Self, _ rhs: Self) -> Self
+  static func ${x.operator}=(_ lhs: inout Self, _ rhs: Self)
 % end
 
   /// Returns a tuple containing the high and low parts of the result of
@@ -1950,21 +1951,18 @@ extension FixedWidthInteger {
     return 0 &- x &- 1
   }
 
-  % for x in binaryBitwise:
+  % for x in binaryBitwise + maskingShifts:
 
   @_transparent
-  public static func ${x.operator}= (lhs: inout Self, rhs: Self) {
-    lhs = lhs ${x.operator} rhs
+  public static func ${x.operator} (lhs: Self, rhs: Self) -> Self {
+    var lhs = lhs
+    lhs ${x.operator}= rhs
+    return lhs
   }
 
   % end
 
   % for x in maskingShifts:
-
-  @_transparent
-  public static func ${x.operator}= (lhs: inout Self, rhs: Self) {
-    lhs = lhs ${x.operator} rhs
-  }
 
 ${operatorComment(x.operator)}
   public static func ${x.operator} <
@@ -2520,23 +2518,27 @@ public struct ${Self}
 
 % for x in binaryBitwise:
   @_transparent
-  public static func ${x.operator}(_ lhs: ${Self}, _ rhs: ${Self}) -> ${Self} {
-    return ${Self}(
-      Builtin.${x.llvmName}_Int${bits}(lhs._value, rhs._value))
-  }
-
-  @_transparent
   public static func ${x.operator}=(_ lhs: inout ${Self}, _ rhs: ${Self}) {
-    lhs = lhs ${x.operator} rhs
+    lhs = ${Self}(Builtin.${x.llvmName}_Int${bits}(lhs._value, rhs._value))
   }
 % end
 
 % for x in maskingShifts:
   @_transparent
-  public static func ${x.operator}(_ lhs: ${Self}, _ rhs: ${Self}) -> ${Self} {
+  public static func ${x.operator}=(_ lhs: inout ${Self}, _ rhs: ${Self}) {
     let rhs_ = rhs & ${bits - 1}
-    return ${Self}(
+    lhs = ${Self}(
       Builtin.${x.llvmName(signed)}_Int${bits}(lhs._value, rhs_._value))
+  }
+
+  // FIXME(integers): this overload is not necessary, as there is one in the
+  // protocol extension. But omitting it makes a lot of expressions too complex
+  // to typecheck.
+  @_transparent
+  public static func ${x.operator}(_ lhs: ${Self}, _ rhs: ${Self}) -> ${Self} {
+    var lhs = lhs
+    lhs ${x.operator}= rhs
+    return lhs
   }
 % end
 
