@@ -41,7 +41,7 @@ using namespace NewMangling;
 std::string NewMangling::mangleTypeForDebugger(Type Ty, const DeclContext *DC) {
   if (useNewMangling()) {
     ASTMangler::ASTMangler NewMangler(/* DWARF */ true);
-    return NewMangler.mangleType(Ty, DC);
+    return NewMangler.mangleTypeForDebugger(Ty, DC);
   }
   Mangle::Mangler OldMangler(/* DWARF */ true);
   OldMangler.mangleTypeForDebugger(Ty, DC);
@@ -258,7 +258,7 @@ std::string ASTMangler::mangleReabstructionThunkHelper(
   return finalize();
 }
 
-std::string ASTMangler::mangleType(Type Ty, const DeclContext *DC) {
+std::string ASTMangler::mangleTypeForDebugger(Type Ty, const DeclContext *DC) {
   assert(DWARFMangling && "DWARFMangling expected when mangling for debugger");
 
   beginMangling();
@@ -267,6 +267,7 @@ std::string ASTMangler::mangleType(Type Ty, const DeclContext *DC) {
   DeclCtx = DC;
 
   appendType(Ty);
+  appendOperator("D");
   return finalize();
 }
 

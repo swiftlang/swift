@@ -113,7 +113,7 @@ public:
                                              Type FromType, Type ToType,
                                              ModuleDecl *Module);
 
-  std::string mangleType(Type decl, const DeclContext *DC);
+  std::string mangleTypeForDebugger(Type decl, const DeclContext *DC);
 
   std::string mangleTypeAsUSR(Type type);
 

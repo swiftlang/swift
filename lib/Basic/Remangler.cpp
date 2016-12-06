@@ -1451,6 +1451,7 @@ void Remangler::mangleTypeList(Node *node) {
 
 void Remangler::mangleTypeMangling(Node *node) {
   mangleSingleChildNode(node);
+  Buffer << 'D';
 }
 
 void Remangler::mangleTypeMetadata(Node *node) {

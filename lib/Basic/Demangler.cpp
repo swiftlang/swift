@@ -176,6 +176,8 @@ NodePointer Demangler::demangleOperator() {
     case 'A': return demangleMultiSubstitutions();
     case 'B': return demangleBuiltinType();
     case 'C': return demangleNominalType(Node::Kind::Class);
+    case 'D': return createWithChild(Node::Kind::TypeMangling,
+                                     popNode(Node::Kind::Type));
     case 'E': return demangleExtensionContext();
     case 'F': return demanglePlainFunction();
     case 'G': return demangleBoundGenericType();
