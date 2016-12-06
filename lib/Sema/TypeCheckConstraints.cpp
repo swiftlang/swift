@@ -937,8 +937,7 @@ bool PreCheckExpression::walkToClosureExprPre(ClosureExpr *closure) {
   options |= TR_InExpression;
   bool hadParameterError = false;
 
-  GenericTypeToArchetypeResolver resolver(
-      closure->getGenericEnvironmentOfContext());
+  GenericTypeToArchetypeResolver resolver(closure);
 
   if (TC.typeCheckParameterList(PL, DC, options, resolver)) {
     closure->setType(ErrorType::get(TC.Context));

@@ -295,7 +295,9 @@ void TypeChecker::checkInheritanceClause(Decl *decl,
   }
 
   // Establish a default generic type resolver.
-  PartialGenericTypeToArchetypeResolver defaultResolver;
+  auto genericEnv =
+    decl->getInnermostDeclContext()->getGenericEnvironmentOfContext();
+  GenericTypeToArchetypeResolver defaultResolver(genericEnv);
   if (!resolver)
     resolver = &defaultResolver;
 
@@ -730,11 +732,18 @@ TypeChecker::handleSILGenericParams(GenericParamList *genericParams,
     revertGenericParamList(genericParams);
 
     ArchetypeBuilder builder(*DC->getParentModule());
+    CompleteGenericTypeResolver completeResolver(*this, builder);
     checkGenericParamList(&builder, genericParams, parentSig, parentEnv,
-                          nullptr);
+                          &completeResolver);
     parentSig = genericSig;
     parentEnv = builder.getGenericEnvironment(parentSig);
     recordArchetypeContexts(parentSig, parentEnv, DC);
+
+    // Compute the final set of archetypes.
+    revertGenericParamList(genericParams);
+    GenericTypeToArchetypeResolver archetypeResolver(parentEnv);
+    checkGenericParamList(nullptr, genericParams, parentSig, parentEnv,
+                          &archetypeResolver);
   }
 
   return parentEnv;
@@ -1123,12 +1132,15 @@ static void configureImplicitSelf(TypeChecker &tc,
   selfDecl->setLet(!selfIfaceTy->is<InOutType>());
 
   selfDecl->setInterfaceType(selfIfaceTy);
+}
 
-  // FIXME: Wrong DeclContext used for mapTypeIntoContext(), because
-  // 'func' doesn't have a generic environment yet.
+/// Record the context type of 'self' after the generic environment of
+/// the function has been determined.
+static void recordSelfContextType(AbstractFunctionDecl *func) {
+  auto selfDecl = func->getImplicitSelfDecl();
   Type selfTy = func->computeInterfaceSelfType(/*isInitializingCtor*/true,
                                                /*wantDynamicSelf*/true);
-  selfTy = func->getDeclContext()->mapTypeIntoContext(selfTy);
+  selfTy = func->mapTypeIntoContext(selfTy);
   selfDecl->setType(selfTy);
 }
 
@@ -3878,8 +3890,7 @@ public:
       if (TAD->getDeclContext()->isModuleScopeContext()) {
         IterativeTypeChecker ITC(TC);
         ITC.satisfy(requestResolveTypeDecl(TAD));
-      } else if (TC.validateType(TAD->getUnderlyingTypeLoc(),
-                                 TAD->getDeclContext(), options)) {
+      } else if (TC.validateType(TAD->getUnderlyingTypeLoc(), TAD, options)) {
         TAD->setInvalid();
         TAD->setInterfaceType(ErrorType::get(TC.Context));
         TAD->getUnderlyingTypeLoc().setInvalidType(TC.Context);
@@ -4796,6 +4807,10 @@ public:
         return;
       }
     }
+
+    // Set the context type of 'self'.
+    if (FD->getDeclContext()->isTypeContext())
+      recordSelfContextType(FD);
 
     // Type check the parameters and return type again, now with archetypes.
     GenericTypeToArchetypeResolver resolver(FD);
@@ -6417,6 +6432,9 @@ public:
           CD->getDeclContext()->getGenericEnvironmentOfContext());
     }
 
+    // Set the context type of 'self'.
+    recordSelfContextType(CD);
+
     {
       CD->setIsBeingTypeChecked(true);
       SWIFT_DEFER { CD->setIsBeingTypeChecked(false); };
@@ -6567,6 +6585,9 @@ public:
       DD->setGenericEnvironment(
           DD->getDeclContext()->getGenericEnvironmentOfContext());
     }
+
+    // Set the context type of 'self'.
+    recordSelfContextType(DD);
 
     GenericTypeToArchetypeResolver resolver(DD);
     if (semaFuncParamPatterns(DD, resolver)) {
@@ -7010,6 +7031,10 @@ void TypeChecker::validateDecl(ValueDecl *D, bool resolveTypeParams) {
       return;
     proto->computeType();
 
+    auto iBTC = proto->isBeingTypeChecked();
+    proto->setIsBeingTypeChecked();
+    SWIFT_DEFER { proto->setIsBeingTypeChecked(iBTC); };
+
     // Resolve the inheritance clauses for each of the associated
     // types.
     for (auto member : proto->getMembers()) {
@@ -7063,12 +7088,18 @@ void TypeChecker::validateDecl(ValueDecl *D, bool resolveTypeParams) {
     ValidatedTypes.insert(proto);
     break;
   }
-      
+
   case DeclKind::Var:
   case DeclKind::Param: {
     auto VD = cast<VarDecl>(D);
     if (!VD->hasType()) {
-      if (PatternBindingDecl *PBD = VD->getParentPatternBinding()) {
+      if (VD->isSelfParameter()) {
+        if (!VD->hasInterfaceType()) {
+          VD->setInterfaceType(ErrorType::get(Context));
+          VD->setInvalid();
+        }
+        recordSelfContextType(cast<AbstractFunctionDecl>(VD->getDeclContext()));
+      } else if (PatternBindingDecl *PBD = VD->getParentPatternBinding()) {
         if (PBD->isBeingTypeChecked()) {
           diagnose(VD, diag::pattern_used_in_type, VD->getName());
 
@@ -7379,15 +7410,27 @@ checkExtensionGenericParams(TypeChecker &tc, ExtensionDecl *ext, Type type,
                                           /*allowConcreteGenericParams=*/true,
                                           inferExtendedTypeReqs);
 
-  // Validate the generic parameters for the last time.
+  // Validate the generic parameters for the penultimate time to get an
+  // environment where we have the parent archetypes.
   tc.revertGenericParamList(genericParams);
   ArchetypeBuilder builder = tc.createArchetypeBuilder(ext->getModuleContext());
-  tc.checkGenericParamList(&builder, genericParams, parentSig, parentEnv, nullptr);
+  DependentGenericTypeResolver completeResolver(builder);
+  tc.checkGenericParamList(&builder, genericParams, parentSig, parentEnv,
+                           &completeResolver);
   inferExtendedTypeReqs(builder);
+  (void)builder.finalize(genericParams->getSourceRange().Start,
+                         /*allowConcreteGenericParams=*/true);
 
   auto *env = builder.getGenericEnvironment(sig);
-
   tc.recordArchetypeContexts(sig, env, ext);
+
+  // Validate the generic parameters for the last time, to splat down
+  // actual archetypes.
+  tc.revertGenericParamList(genericParams);
+  GenericTypeToArchetypeResolver archetypeResolver(env);
+  tc.checkGenericParamList(nullptr, genericParams, parentSig, parentEnv,
+                           &archetypeResolver);
+
 
   // Compute the final extended type.
   Type resultType;

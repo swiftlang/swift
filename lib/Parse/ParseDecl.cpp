@@ -3827,7 +3827,6 @@ void Parser::ParsedAccessors::record(Parser &P, AbstractStorageDecl *storage,
                                      SmallVectorImpl<Decl *> &decls) {
   auto flagInvalidAccessor = [&](FuncDecl *&func) {
     if (func) {
-      func->setInterfaceType(ErrorType::get(P.Context));
       func->setInvalid();
     }
   };

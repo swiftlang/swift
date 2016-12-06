@@ -201,7 +201,7 @@ Type TypeChecker::resolveTypeInContext(
        bool isSpecialized,
        GenericTypeResolver *resolver,
        UnsatisfiedDependency *unsatisfiedDependency) {
-  PartialGenericTypeToArchetypeResolver defaultResolver;
+  GenericTypeToArchetypeResolver defaultResolver(fromDC);
   if (!resolver)
     resolver = &defaultResolver;
 
@@ -528,7 +528,7 @@ Type TypeChecker::applyUnboundGenericArguments(
          "invalid arguments, use applyGenericArguments for diagnostic emitting");
 
   // Make sure we always have a resolver to use.
-  PartialGenericTypeToArchetypeResolver defaultResolver;
+  GenericTypeToArchetypeResolver defaultResolver(dc);
   if (!resolver)
     resolver = &defaultResolver;
 
@@ -1611,7 +1611,7 @@ Type TypeChecker::resolveType(TypeRepr *TyR, DeclContext *DC,
   PrettyStackTraceTypeRepr stackTrace(Context, "resolving", TyR);
 
   // Make sure we always have a resolver to use.
-  PartialGenericTypeToArchetypeResolver defaultResolver;
+  GenericTypeToArchetypeResolver defaultResolver(DC);
   if (!resolver)
     resolver = &defaultResolver;
 

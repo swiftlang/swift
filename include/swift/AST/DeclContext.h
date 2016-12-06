@@ -198,7 +198,11 @@ class alignas(1 << DeclContextAlignInBits) DeclContext {
   friend struct ::llvm::cast_convert_val;
   
   static DeclContext *castDeclToDeclContext(const Decl *D);
-  
+
+  /// If this DeclContext is a GenericType declaration or an
+  /// extension thereof, return the GenericTypeDecl.
+  GenericTypeDecl *getAsTypeOrTypeExtensionContext() const;
+
 public:
   DeclContext(DeclContextKind Kind, DeclContext *Parent)
     : ParentAndKind(Parent, Kind) {
@@ -232,19 +236,12 @@ public:
 
   /// \returns true if this is a type context, e.g., a struct, a class, an
   /// enum, a protocol, or an extension.
-  bool isTypeContext() const {
-    return getContextKind() == DeclContextKind::GenericTypeDecl ||
-           getContextKind() == DeclContextKind::ExtensionDecl;
-  }
+  bool isTypeContext() const;
 
   /// \brief Determine whether this is an extension context.
   bool isExtensionContext() const {
     return getContextKind() == DeclContextKind::ExtensionDecl;
   }
-
-  /// If this DeclContext is a GenericType declaration or an
-  /// extension thereof, return the GenericTypeDecl.
-  GenericTypeDecl *getAsGenericTypeOrGenericTypeExtensionContext() const;
 
   /// If this DeclContext is a NominalType declaration or an
   /// extension thereof, return the NominalTypeDecl.

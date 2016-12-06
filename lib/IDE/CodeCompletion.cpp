@@ -4069,9 +4069,9 @@ public:
 
   void addAccessControl(const ValueDecl *VD,
                         CodeCompletionResultBuilder &Builder) {
-    assert(CurrDeclContext->getAsGenericTypeOrGenericTypeExtensionContext());
+    assert(CurrDeclContext->getAsNominalTypeOrNominalTypeExtensionContext());
     auto AccessibilityOfContext =
-      CurrDeclContext->getAsGenericTypeOrGenericTypeExtensionContext()
+      CurrDeclContext->getAsNominalTypeOrNominalTypeExtensionContext()
         ->getFormalAccess();
     auto Access = std::min(VD->getFormalAccess(), AccessibilityOfContext);
     // Only emit 'public', not needed otherwise.
@@ -4309,7 +4309,7 @@ public:
   }
 
   void getOverrideCompletions(SourceLoc Loc) {
-    if (!CurrDeclContext->getAsGenericTypeOrGenericTypeExtensionContext())
+    if (!CurrDeclContext->getAsNominalTypeOrNominalTypeExtensionContext())
       return;
 
     Type CurrTy = CurrDeclContext->getDeclaredTypeInContext();

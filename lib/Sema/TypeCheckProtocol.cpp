@@ -2349,8 +2349,7 @@ static void diagnoseNoWitness(ValueDecl *Requirement, Type RequirementType,
 
   Accessibility Access = std::min(
     /* Access of the context */
-    Adopter
-      ->getAsGenericTypeOrGenericTypeExtensionContext()->getFormalAccess(),
+    Adopter->getAsNominalTypeOrNominalTypeExtensionContext()->getFormalAccess(),
     /* Access of the protocol */
     Requirement->getDeclContext()
       ->getAsProtocolOrProtocolExtensionContext()->getFormalAccess());

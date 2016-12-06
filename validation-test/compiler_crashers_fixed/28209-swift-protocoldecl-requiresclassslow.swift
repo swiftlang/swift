@@ -1,4 +1,4 @@
-// RUN: not --crash %target-swift-frontend %s -typecheck
+// RUN: not %target-swift-frontend %s -typecheck
 // REQUIRES: asserts
 
 // Distributed under the terms of the MIT license
