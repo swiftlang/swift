@@ -5,8 +5,17 @@
 // See https://swift.org/LICENSE.txt for license information
 // See https://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
 
-// RUN: not --crash %target-swift-frontend %s -typecheck
-enum ST:d
-protocol a{typealias d:A.B{
+// RUN: not %target-swift-frontend %s -typecheck
+// REQUIRES: asserts
 {
-}}struct A:a{}func d:d typealias B}typealias d:a
+class A{
+let f=a{
+}
+protocol c{typealias e:A
+protocol A{
+struct A{
+let f={
+struct h{
+func a
+func a:e
+a

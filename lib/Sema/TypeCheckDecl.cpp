@@ -7050,6 +7050,10 @@ void TypeChecker::validateDecl(ValueDecl *D, bool resolveTypeParams) {
       return;
     proto->computeType();
 
+    auto iBTC = proto->isBeingTypeChecked();
+    proto->setIsBeingTypeChecked();
+    SWIFT_DEFER { proto->setIsBeingTypeChecked(iBTC); };
+
     // Resolve the inheritance clauses for each of the associated
     // types.
     for (auto member : proto->getMembers()) {

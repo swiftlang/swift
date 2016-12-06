@@ -87,13 +87,14 @@ Type GenericTypeToArchetypeResolver::resolveGenericTypeParamType(
 
   // Hack: See parseGenericParameters(). When the issue there is fixed,
   // we won't need the isInvalid() check anymore.
-  if (gpDecl->isInvalid())
+  if (gpDecl->isInvalid() || !GenericEnv)
     return ErrorType::get(gpDecl->getASTContext());
 
-  if (auto *Env = GenericEnv)
-    return Env->mapTypeIntoContext(gp);
+  auto type = GenericEnv->getMappingIfPresent(gp);
+  if (!type)
+    return ErrorType::get(gpDecl->getASTContext());;
 
-  return ErrorType::get(gpDecl->getASTContext());
+  return *type;
 }
 
 Type GenericTypeToArchetypeResolver::resolveDependentMemberType(
@@ -113,6 +114,10 @@ Type GenericTypeToArchetypeResolver::resolveSelfAssociatedType(
 
 Type GenericTypeToArchetypeResolver::resolveTypeOfContext(DeclContext *dc,
                                                           bool wantSelf) {
+  // FIXME: Fallback case.
+  if (dc->isGenericContext() && !dc->isValidGenericContext())
+    return getTypeOfContext(dc, wantSelf);
+
   return ArchetypeBuilder::mapTypeIntoContext(
       dc->getParentModule(), GenericEnv,
       getTypeOfContext(dc, wantSelf));
