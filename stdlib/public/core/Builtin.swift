@@ -72,22 +72,6 @@ internal func _roundUp(_ offset: Int, toAlignment alignment: Int) -> Int {
   return Int(_roundUpImpl(UInt(bitPattern: offset), toAlignment: alignment))
 }
 
-// This function takes a raw pointer and returns a typed pointer. It implicitly
-// assumes that memory at the returned pointer is bound to `Destination` type.
-@_versioned
-internal func _roundUp<DestinationType>(
-  _ pointer: UnsafeMutableRawPointer,
-  toAlignmentOf destinationType: DestinationType.Type
-) -> UnsafeMutablePointer<DestinationType> {
-  // Note: unsafe unwrap is safe because this operation can only increase the
-  // value, and can not produce a null pointer.
-  return UnsafeMutablePointer<DestinationType>(
-    bitPattern: _roundUpImpl(
-      UInt(bitPattern: pointer),
-      toAlignment: MemoryLayout<DestinationType>.alignment)
-  ).unsafelyUnwrapped
-}
-
 /// Returns a tri-state of 0 = no, 1 = yes, 2 = maybe.
 @_transparent
 public // @testable
