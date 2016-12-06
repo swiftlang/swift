@@ -693,11 +693,12 @@ void swift::performWholeModuleTypeChecking(SourceFile &SF) {
 bool swift::performTypeLocChecking(ASTContext &Ctx, TypeLoc &T,
                                    DeclContext *DC,
                                    bool ProduceDiagnostics) {
-  return performTypeLocChecking(Ctx, T,
-                                /*isSILMode=*/false,
-                                /*isSILType=*/false,
-                                /*GenericEnv=*/nullptr,
-                                DC, ProduceDiagnostics);
+  return performTypeLocChecking(
+                            Ctx, T,
+                            /*isSILMode=*/false,
+                            /*isSILType=*/false,
+                            /*GenericEnv=*/DC->getGenericEnvironmentOfContext(),
+                            DC, ProduceDiagnostics);
 }
 
 bool swift::performTypeLocChecking(ASTContext &Ctx, TypeLoc &T,
