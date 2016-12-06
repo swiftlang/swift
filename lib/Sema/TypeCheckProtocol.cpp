@@ -2263,6 +2263,7 @@ void ConformanceChecker::recordTypeWitness(AssociatedTypeDecl *assocType,
                                                     TypeLoc::withoutLoc(type),
                                                     /*genericparams*/nullptr, 
                                                     DC);
+    aliasDecl->setGenericEnvironment(DC->getGenericEnvironmentOfContext());
     aliasDecl->computeType();
 
     aliasDecl->getAliasType()->setRecursiveProperties(
