@@ -90,7 +90,10 @@ Type GenericTypeToArchetypeResolver::resolveGenericTypeParamType(
   if (gpDecl->isInvalid())
     return ErrorType::get(gpDecl->getASTContext());
 
-  return GenericEnv->mapTypeIntoContext(gp);
+  if (auto *Env = GenericEnv)
+    return Env->mapTypeIntoContext(gp);
+
+  return ErrorType::get(gpDecl->getASTContext());
 }
 
 Type GenericTypeToArchetypeResolver::resolveDependentMemberType(
