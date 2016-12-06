@@ -206,9 +206,8 @@ GenericParamList *DeclContext::getGenericParamsOfContext() const {
       continue;
 
     case DeclContextKind::ExtensionDecl:
-      if (auto GP = cast<ExtensionDecl>(dc)->getGenericParams())
-        return GP;
-      continue;
+      // Extensions do not capture outer generic parameters.
+      return cast<ExtensionDecl>(dc)->getGenericParams();
     }
     llvm_unreachable("bad DeclContextKind");
   }
@@ -247,9 +246,8 @@ GenericSignature *DeclContext::getGenericSignatureOfContext() const {
 
     case DeclContextKind::ExtensionDecl: {
       auto ED = cast<ExtensionDecl>(dc);
-      if (auto genericSig = ED->getGenericSignature())
-        return genericSig;
-      continue;
+      // Extensions do not capture outer generic parameters.
+      return ED->getGenericSignature();
     }
     }
     llvm_unreachable("bad DeclContextKind");
@@ -288,9 +286,8 @@ GenericEnvironment *DeclContext::getGenericEnvironmentOfContext() const {
 
     case DeclContextKind::ExtensionDecl: {
       auto ED = cast<ExtensionDecl>(dc);
-      if (auto genericCtx = ED->getGenericEnvironment())
-        return genericCtx;
-      continue;
+      // Extensions do not capture outer generic parameters.
+      return ED->getGenericEnvironment();
     }
     }
     llvm_unreachable("bad DeclContextKind");
@@ -468,17 +465,20 @@ bool DeclContext::isGenericContext() const {
     case DeclContextKind::AbstractFunctionDecl:
       if (cast<AbstractFunctionDecl>(dc)->getGenericParams())
         return true;
+      // Check parent context.
       continue;
 
     case DeclContextKind::GenericTypeDecl:
       if (cast<GenericTypeDecl>(dc)->getGenericParams())
         return true;
+      // Check parent context.
       continue;
 
     case DeclContextKind::ExtensionDecl:
       if (cast<ExtensionDecl>(dc)->getGenericParams())
         return true;
-      continue;
+      // Extensions do not capture outer generic parameters.
+      return false;
     }
     llvm_unreachable("bad decl context kind");
   }
