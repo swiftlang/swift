@@ -409,6 +409,9 @@ namespace {
 
       if (D->isImplicit())
         PrintWithColorRAII(OS, DeclModifierColor) << " implicit";
+
+      if (D->TrailingSemiLoc.isValid())
+        PrintWithColorRAII(OS, DeclModifierColor) << " trailing_semi";
     }
 
     void printInherited(ArrayRef<TypeLoc> Inherited) {
@@ -1297,6 +1300,20 @@ public:
     }
   }
 
+  raw_ostream &printCommon(Stmt *S, const char *Name) {
+    OS.indent(Indent);
+    PrintWithColorRAII(OS, ParenthesisColor) << '(';
+    PrintWithColorRAII(OS, StmtColor) << Name;
+
+    if (S->isImplicit())
+      OS << " implicit";
+
+    if (S->TrailingSemiLoc.isValid())
+      OS << " trailing_semi";
+
+    return OS;
+  }
+
   void visitBraceStmt(BraceStmt *S) {
     printASTNodes(S->getElements(), "brace_stmt");
   }
@@ -1318,9 +1335,7 @@ public:
   }
 
   void visitReturnStmt(ReturnStmt *S) {
-    OS.indent(Indent);
-    PrintWithColorRAII(OS, ParenthesisColor) << '(';
-    PrintWithColorRAII(OS, StmtColor) << "return_stmt";
+    printCommon(S, "return_stmt");
     if (S->hasResult()) {
       OS << '\n';
       printRec(S->getResult());
@@ -1329,9 +1344,7 @@ public:
   }
 
   void visitDeferStmt(DeferStmt *S) {
-    OS.indent(Indent);
-    PrintWithColorRAII(OS, ParenthesisColor) << '(';
-    PrintWithColorRAII(OS, StmtColor) << "defer_stmt\n";
+    printCommon(S, "defer_stmt") << '\n';
     printRec(S->getTempDecl());
     OS << '\n';
     printRec(S->getCallExpr());
@@ -1339,9 +1352,7 @@ public:
   }
 
   void visitIfStmt(IfStmt *S) {
-    OS.indent(Indent);
-    PrintWithColorRAII(OS, ParenthesisColor) << '(';
-    PrintWithColorRAII(OS, StmtColor) << "if_stmt\n";
+    printCommon(S, "if_stmt") << '\n';
     for (auto elt : S->getCond())
       printRec(elt);
     OS << '\n';
@@ -1354,9 +1365,7 @@ public:
   }
 
   void visitGuardStmt(GuardStmt *S) {
-    OS.indent(Indent);
-    PrintWithColorRAII(OS, ParenthesisColor) << '(';
-    PrintWithColorRAII(OS, StmtColor) << "guard_stmt\n";
+    printCommon(S, "guard_stmt") << '\n';
     for (auto elt : S->getCond())
       printRec(elt);
     OS << '\n';
@@ -1365,11 +1374,10 @@ public:
   }
 
   void visitIfConfigStmt(IfConfigStmt *S) {
-    OS.indent(Indent);
-    PrintWithColorRAII(OS, ParenthesisColor) << '(';
-    PrintWithColorRAII(OS, StmtColor) << "#if_stmt\n";
+    printCommon(S, "#if_stmt");
     Indent += 2;
     for (auto &Clause : S->getClauses()) {
+      OS << '\n';
       OS.indent(Indent);
       if (Clause.Cond) {
         PrintWithColorRAII(OS, ParenthesisColor) << '(';
@@ -1390,17 +1398,13 @@ public:
   }
 
   void visitDoStmt(DoStmt *S) {
-    OS.indent(Indent);
-    PrintWithColorRAII(OS, ParenthesisColor) << '(';
-    PrintWithColorRAII(OS, StmtColor) << "do_stmt\n";
+    printCommon(S, "do_stmt") << '\n';
     printRec(S->getBody());
     PrintWithColorRAII(OS, ParenthesisColor) << ')';
   }
 
   void visitWhileStmt(WhileStmt *S) {
-    OS.indent(Indent);
-    PrintWithColorRAII(OS, ParenthesisColor) << '(';
-    PrintWithColorRAII(OS, StmtColor) << "while_stmt\n";
+    printCommon(S, "while_stmt") << '\n';
     for (auto elt : S->getCond())
       printRec(elt);
     OS << '\n';
@@ -1409,18 +1413,14 @@ public:
   }
 
   void visitRepeatWhileStmt(RepeatWhileStmt *S) {
-    OS.indent(Indent);
-    PrintWithColorRAII(OS, ParenthesisColor) << '(';
-    PrintWithColorRAII(OS, StmtColor) << "do_while_stmt\n";
+    printCommon(S, "repeat_while_stmt") << '\n';
     printRec(S->getBody());
     OS << '\n';
     printRec(S->getCond());
     PrintWithColorRAII(OS, ParenthesisColor) << ')';
   }
   void visitForStmt(ForStmt *S) {
-    OS.indent(Indent);
-    PrintWithColorRAII(OS, ParenthesisColor) << '(';
-    PrintWithColorRAII(OS, StmtColor) << "for_stmt\n";
+    printCommon(S, "for_stmt") << '\n';
     if (!S->getInitializerVarDecls().empty()) {
       for (auto D : S->getInitializerVarDecls()) {
         printRec(D);
@@ -1449,9 +1449,7 @@ public:
     PrintWithColorRAII(OS, ParenthesisColor) << ')';
   }
   void visitForEachStmt(ForEachStmt *S) {
-    OS.indent(Indent);
-    PrintWithColorRAII(OS, ParenthesisColor) << '(';
-    OS << "for_each_stmt\n";
+    printCommon(S, "for_each_stmt") << '\n';
     printRec(S->getPattern());
     OS << '\n';
     if (S->getWhere()) {
@@ -1477,27 +1475,19 @@ public:
     PrintWithColorRAII(OS, ParenthesisColor) << ')';
   }
   void visitBreakStmt(BreakStmt *S) {
-    OS.indent(Indent);
-    PrintWithColorRAII(OS, ParenthesisColor) << '(';
-    PrintWithColorRAII(OS, StmtColor) << "break_stmt";
+    printCommon(S, "break_stmt");
     PrintWithColorRAII(OS, ParenthesisColor) << ')';
   }
   void visitContinueStmt(ContinueStmt *S) {
-    OS.indent(Indent);
-    PrintWithColorRAII(OS, ParenthesisColor) << '(';
-    PrintWithColorRAII(OS, StmtColor) << "continue_stmt";
+    printCommon(S, "continue_stmt");
     PrintWithColorRAII(OS, ParenthesisColor) << ')';
   }
   void visitFallthroughStmt(FallthroughStmt *S) {
-    OS.indent(Indent);
-    PrintWithColorRAII(OS, ParenthesisColor) << '(';
-    PrintWithColorRAII(OS, StmtColor) << "fallthrough_stmt";
+    printCommon(S, "fallthrough_stmt");
     PrintWithColorRAII(OS, ParenthesisColor) << ')';
   }
   void visitSwitchStmt(SwitchStmt *S) {
-    OS.indent(Indent);
-    PrintWithColorRAII(OS, ParenthesisColor) << '(';
-    PrintWithColorRAII(OS, StmtColor) << "switch_stmt\n";
+    printCommon(S, "switch_stmt") << '\n';
     printRec(S->getSubjectExpr());
     for (CaseStmt *C : S->getCases()) {
       OS << '\n';
@@ -1506,9 +1496,7 @@ public:
     PrintWithColorRAII(OS, ParenthesisColor) << ')';
   }
   void visitCaseStmt(CaseStmt *S) {
-    OS.indent(Indent);
-    PrintWithColorRAII(OS, ParenthesisColor) << '(';
-    PrintWithColorRAII(OS, StmtColor) << "case_stmt";
+    printCommon(S, "case_stmt");
     for (const auto &LabelItem : S->getCaseLabelItems()) {
       OS << '\n';
       OS.indent(Indent + 2);
@@ -1529,24 +1517,18 @@ public:
     PrintWithColorRAII(OS, ParenthesisColor) << ')';
   }
   void visitFailStmt(FailStmt *S) {
-    OS.indent(Indent);
-    PrintWithColorRAII(OS, ParenthesisColor) << '(';
-    PrintWithColorRAII(OS, StmtColor) << "fail_stmt";
+    printCommon(S, "fail_stmt");
     PrintWithColorRAII(OS, ParenthesisColor) << ')';
   }
 
   void visitThrowStmt(ThrowStmt *S) {
-    OS.indent(Indent);
-    PrintWithColorRAII(OS, ParenthesisColor) << '(';
-    PrintWithColorRAII(OS, StmtColor) << "throw_stmt\n";
+    printCommon(S, "throw_stmt") << '\n';
     printRec(S->getSubExpr());
     PrintWithColorRAII(OS, ParenthesisColor) << ')';
   }
 
   void visitDoCatchStmt(DoCatchStmt *S) {
-    OS.indent(Indent);
-    PrintWithColorRAII(OS, ParenthesisColor) << '(';
-    PrintWithColorRAII(OS, StmtColor) << "do_catch_stmt\n";
+    printCommon(S, "do_catch_stmt") << '\n';
     printRec(S->getBody());
     OS << '\n';
     Indent += 2;
@@ -1560,9 +1542,7 @@ public:
     }
   }
   void visitCatchStmt(CatchStmt *clause) {
-    OS.indent(Indent);
-    PrintWithColorRAII(OS, ParenthesisColor) << '(';
-    PrintWithColorRAII(OS, StmtColor) << "catch\n";
+    printCommon(clause, "catch") << '\n';
     printRec(clause->getErrorPattern());
     if (auto guard = clause->getGuardExpr()) {
       OS << '\n';
@@ -1669,6 +1649,9 @@ public:
                 Ctx.SourceMgr, /*PrintText=*/false);
       }
     }
+
+    if (E->TrailingSemiLoc.isValid())
+      OS << " trailing_semi";
 
     return OS;
   }
