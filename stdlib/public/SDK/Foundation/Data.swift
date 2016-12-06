@@ -38,7 +38,7 @@ public final class _DataStorage {
         case mutable(NSMutableData) // This will often (perhaps always) be NSConcreteMutableData
         
         // These are reserved for foregin sources where neither Swift nor Foundation are fully certain whom they belong
-        // to from a object inheritance standpoint, this means that all bets are off and the values of bytes, mutableBytes,
+        // to from an object inheritance standpoint, this means that all bets are off and the values of bytes, mutableBytes,
         // and length cannot be cached. This also means that all methods are expected to dynamically dispatch out to the
         // backing reference.
         case customReference(NSData) // tracks data references that are only known to be immutable
