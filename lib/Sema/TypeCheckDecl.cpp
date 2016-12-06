@@ -732,11 +732,18 @@ TypeChecker::handleSILGenericParams(GenericParamList *genericParams,
     revertGenericParamList(genericParams);
 
     ArchetypeBuilder builder(*DC->getParentModule());
+    CompleteGenericTypeResolver completeResolver(*this, builder);
     checkGenericParamList(&builder, genericParams, parentSig, parentEnv,
-                          nullptr);
+                          &completeResolver);
     parentSig = genericSig;
     parentEnv = builder.getGenericEnvironment(parentSig);
     recordArchetypeContexts(parentSig, parentEnv, DC);
+
+    // Compute the final set of archetypes.
+    revertGenericParamList(genericParams);
+    GenericTypeToArchetypeResolver archetypeResolver(parentEnv);
+    checkGenericParamList(nullptr, genericParams, parentSig, parentEnv,
+                          &archetypeResolver);
   }
 
   return parentEnv;

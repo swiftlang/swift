@@ -726,7 +726,7 @@ public:
   /// \param options Options that alter type resolution.
   ///
   /// \param resolver A resolver for generic types. If none is supplied, this
-  /// routine will create a \c PartialGenericTypeToArchetypeResolver to use.
+  /// routine will create a \c GenericTypeToArchetypeResolver to use.
   ///
   /// \returns true if type validation failed, or false otherwise.
   bool validateType(TypeLoc &Loc, DeclContext *DC,
@@ -756,7 +756,7 @@ public:
   /// \param options Options that alter type resolution.
   ///
   /// \param resolver A resolver for generic types. If none is supplied, this
-  /// routine will create a \c PartialGenericTypeToArchetypeResolver to use.
+  /// routine will create a \c GenericTypeToArchetypeResolver to use.
   ///
   /// \param unsatisfiedDependency When non-null, used to check whether
   /// dependencies have been satisfied appropriately.
