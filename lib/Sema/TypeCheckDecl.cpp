@@ -1236,6 +1236,9 @@ void TypeChecker::computeDefaultAccessibility(ExtensionDecl *ED) {
 
   validateExtension(ED);
 
+  if (ED->hasDefaultAccessibility())
+    return;
+
   Accessibility maxAccess = Accessibility::Public;
 
   if (!ED->getExtendedType().isNull() &&
@@ -1374,8 +1377,10 @@ void TypeChecker::computeAccessibility(ValueDecl *D) {
     case DeclContextKind::ExtensionDecl: {
       auto extension = cast<ExtensionDecl>(DC);
       computeDefaultAccessibility(extension);
-      auto access = extension->getDefaultAccessibility();
-      D->setAccessibility(access);
+      if (!D->hasAccessibility()) {
+        auto access = extension->getDefaultAccessibility();
+        D->setAccessibility(access);
+      }
     }
     }
   }
