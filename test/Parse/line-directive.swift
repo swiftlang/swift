@@ -31,3 +31,12 @@ public struct S { // expected-note{{in declaration of 'S'}}
 
 #sourceLocation()
 
+// expected-error@+1 {{expected expression}}
+try #sourceLocation(file: "try.swift", line: 100)
+#sourceLocation()
+
+// expected-error@+3 {{expected statement}}
+// expected-error@+2 {{#line directive was renamed to #sourceLocation}}
+LABEL:
+#line 200 "labeled.swift"
+#sourceLocation()
