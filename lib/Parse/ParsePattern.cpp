@@ -749,7 +749,9 @@ ParserResult<Pattern> Parser::parseTypedPattern() {
     if (!Ty.isNull()) {
       // Attempt to diagnose initializer calls incorrectly written
       // as typed patterns, such as "var x: [Int]()".
-      if (Tok.isFollowingLParen()) {
+      // Disable this tentative parse when in code-completion mode, otherwise
+      // code-completion may enter the delayed-decl state twice.
+      if (Tok.isFollowingLParen() && !L->isCodeCompletion()) {
         BacktrackingScope backtrack(*this);
         
         // Create a local context if needed so we can parse trailing closures.
