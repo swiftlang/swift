@@ -85,17 +85,18 @@ Type Solution::computeSubstitutions(
        SmallVectorImpl<Substitution> &result) const {
   auto &tc = getConstraintSystem().getTypeChecker();
 
+  // Produce the concrete form of the opened type.
+  Type type = simplifyType(tc, openedType);
+
   // Gather the substitutions from dependent types to concrete types.
   auto openedTypes = OpenedTypes.find(locator);
-  assert(openedTypes != OpenedTypes.end() && "Missing opened type information");
+  if (openedTypes == OpenedTypes.end())
+    return type;
   TypeSubstitutionMap subs;
   for (const auto &opened : openedTypes->second) {
     subs[opened.first->castTo<GenericTypeParamType>()] =
       getFixedType(opened.second);
   }
-
-  // Produce the concrete form of the opened type.
-  Type type = simplifyType(tc, openedType);
 
   auto mod = getConstraintSystem().DC->getParentModule();
   GenericSignature *sig;
