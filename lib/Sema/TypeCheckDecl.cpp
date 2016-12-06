@@ -7418,17 +7418,27 @@ checkExtensionGenericParams(TypeChecker &tc, ExtensionDecl *ext, Type type,
                                           /*allowConcreteGenericParams=*/true,
                                           inferExtendedTypeReqs);
 
-  // Validate the generic parameters for the last time.
+  // Validate the generic parameters for the penultimate time to get an
+  // environment where we have the parent archetypes.
   tc.revertGenericParamList(genericParams);
   ArchetypeBuilder builder = tc.createArchetypeBuilder(ext->getModuleContext());
-  PartialGenericTypeToArchetypeResolver resolver;
+  DependentGenericTypeResolver completeResolver(builder);
   tc.checkGenericParamList(&builder, genericParams, parentSig, parentEnv,
-                           &resolver);
+                           &completeResolver);
   inferExtendedTypeReqs(builder);
+  (void)builder.finalize(genericParams->getSourceRange().Start,
+                         /*allowConcreteGenericParams=*/true);
 
   auto *env = builder.getGenericEnvironment(sig);
-
   tc.recordArchetypeContexts(sig, env, ext);
+
+  // Validate the generic parameters for the last time, to splat down
+  // actual archetypes.
+  tc.revertGenericParamList(genericParams);
+  GenericTypeToArchetypeResolver archetypeResolver(env);
+  tc.checkGenericParamList(nullptr, genericParams, parentSig, parentEnv,
+                           &archetypeResolver);
+
 
   // Compute the final extended type.
   Type resultType;
