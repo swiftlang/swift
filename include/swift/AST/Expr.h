@@ -749,10 +749,6 @@ public:
       Expr(ExprKind::CodeCompletion, /*Implicit=*/true, Ty),
       Range(Range) {}
 
-  CodeCompletionExpr(CharSourceRange Range, Type Ty = Type()) :
-      Expr(ExprKind::CodeCompletion, /*Implicit=*/true, Ty),
-      Range(SourceRange(Range.getStart(), Range.getEnd())) {}
-
   SourceRange getSourceRange() const { return Range; }
 
   static bool classof(const Expr *E) {

@@ -1224,10 +1224,9 @@ ParserStatus Parser::parseStmtCondition(StmtCondition &Condition,
     
     // Handle code completion after the #.
     if (Tok.is(tok::pound) && peekToken().is(tok::code_complete)) {
-      auto PoundPos = consumeToken();
+      consumeToken(); // '#' token.
       auto CodeCompletionPos = consumeToken();
-      auto Expr = new (Context) CodeCompletionExpr(CharSourceRange(SourceMgr,
-                                           PoundPos, CodeCompletionPos));
+      auto Expr = new (Context) CodeCompletionExpr(CodeCompletionPos);
       if (CodeCompletion)
         CodeCompletion->completeAfterPound(Expr, ParentKind);
       result.push_back(Expr);
