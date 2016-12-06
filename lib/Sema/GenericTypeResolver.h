@@ -159,35 +159,6 @@ public:
   virtual void recordParamType(ParamDecl *decl, Type ty);
 };
 
-/// Generic type resolver that maps any generic type parameter type that
-/// has an underlying archetype to its corresponding archetype.
-///
-/// This generic type resolver replaces generic type parameter types that
-/// have archetypes with their archetypes, and leaves all other generic
-/// type parameter types unchanged. It is used for the initial type-checks of
-/// generic functions (and other generic declarations).
-///
-/// FIXME: This is not a long-term solution.
-class PartialGenericTypeToArchetypeResolver : public GenericTypeResolver {
-public:
-  virtual Type resolveGenericTypeParamType(GenericTypeParamType *gp);
-
-  virtual Type resolveDependentMemberType(Type baseTy,
-                                          DeclContext *DC,
-                                          SourceRange baseRange,
-                                          ComponentIdentTypeRepr *ref);
-
-  virtual Type resolveSelfAssociatedType(Type selfTy,
-                                         DeclContext *DC,
-                                         AssociatedTypeDecl *assocType);
-
-  virtual Type resolveTypeOfContext(DeclContext *dc, bool wantSelf=false);
-
-  virtual Type resolveTypeOfDecl(TypeDecl *decl);
-
-  virtual void recordParamType(ParamDecl *decl, Type ty);
-};
-
 /// Generic type resolver that performs complete resolution of dependent
 /// types based on a given archetype builder.
 ///
