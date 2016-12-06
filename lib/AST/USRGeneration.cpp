@@ -135,8 +135,10 @@ bool ide::printDeclUSR(const ValueDecl *D, raw_ostream &OS) {
   } else if (isa<TypeAliasDecl>(VD) || isa<AssociatedTypeDecl>(VD)) {
     Mangler.mangleContextOf(VD);
     Mangler.mangleDeclName(VD);
-  } else {
+  } else if (!VD->isInvalid()) {
     Mangler.mangleEntity(VD, /*uncurryingLevel=*/0);
+  } else {
+    return true;
   }
 
   Mangler.finalize(OS);
