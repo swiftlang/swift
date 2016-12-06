@@ -1668,6 +1668,10 @@ void Remangler::mangleReflectionMetadataSuperclassDescriptor(Node *node) {
   Out << "MRc";
 }
 
+void Remangler::mangleGenericTypeParamDecl(Node *node) {
+  unreachable("todo");
+}
+
 void Remangler::mangleCurryThunk(Node *node, EntityContext &ctx) {
   Out << "<curry-thunk>";
 }

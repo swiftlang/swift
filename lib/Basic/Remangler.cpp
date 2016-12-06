@@ -975,6 +975,11 @@ void Remangler::mangleGenericTypeMetadataPattern(Node *node) {
   Buffer << "MP";
 }
 
+void Remangler::mangleGenericTypeParamDecl(Node *node) {
+  mangleChildNodes(node);
+  Buffer << "fp";
+}
+
 void Remangler::mangleGetter(Node *node) {
   mangleChildNodes(node);
   Buffer << "fg";
