@@ -3963,6 +3963,17 @@ void ConformanceChecker::resolveSingleTypeWitness(
   }
 }
 
+// Not all protocol members are requirements.
+static bool isRequirement(ValueDecl *requirement) {
+  if (auto *FD = dyn_cast<FuncDecl>(requirement))
+    if (FD->isAccessor())
+      return false;
+  if (isa<TypeAliasDecl>(requirement) ||
+      isa<NominalTypeDecl>(requirement))
+    return false;
+  return true;
+}
+
 void ConformanceChecker::resolveSingleWitness(ValueDecl *requirement) {
   assert(!isa<AssociatedTypeDecl>(requirement) && "Not a value witness");
   assert(!Conformance->hasWitness(requirement) && "Already resolved");
@@ -3982,12 +3993,7 @@ void ConformanceChecker::resolveSingleWitness(ValueDecl *requirement) {
     return;
   }
 
-  // If this is a getter/setter for a funcdecl, ignore it.
-  if (auto *FD = dyn_cast<FuncDecl>(requirement))
-    if (FD->isAccessor())
-      return;
-  // If this is a typealias, it does not need a witness check.
-  if (isa<TypeAliasDecl>(requirement))
+  if (!isRequirement(requirement))
     return;
 
   // Resolve all associated types before trying to resolve this witness.
@@ -4132,15 +4138,11 @@ void ConformanceChecker::checkConformance() {
       continue;
 
     // Associated type requirements handled above.
-    if (isa<AssociatedTypeDecl>(requirement))
+    if (isa<TypeDecl>(requirement))
       continue;
 
     // Type aliases don't have requirements themselves.
-    if (isa<TypeAliasDecl>(requirement))
-      continue;
-
-    // Nominal types nested inside protocols are not requirements.
-    if (isa<NominalTypeDecl>(requirement))
+    if (!isRequirement(requirement))
       continue;
 
     /// Local function to finalize the witness.
@@ -5468,14 +5470,20 @@ void TypeChecker::inferDefaultWitnesses(ProtocolDecl *proto) {
   DefaultWitnessChecker checker(*this, proto);
 
   for (auto *requirement : proto->getMembers()) {
-    if (isa<AssociatedTypeDecl>(requirement))
-      continue;
-
     if (requirement->isInvalid())
       continue;
 
-    if (auto *valueDecl = dyn_cast<ValueDecl>(requirement))
-      checker.resolveWitnessViaLookup(valueDecl);
+    auto *valueDecl = dyn_cast<ValueDecl>(requirement);
+    if (!valueDecl)
+      continue;
+
+    if (isa<TypeDecl>(valueDecl))
+      continue;
+
+    if (!isRequirement(valueDecl))
+      continue;
+
+    checker.resolveWitnessViaLookup(valueDecl);
   }
 }
 
