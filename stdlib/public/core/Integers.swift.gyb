@@ -2103,7 +2103,7 @@ ${unsafeOperationComment(x.operator)}
         // masking is OK here because this we have already ensured
         // that Self.bitWidth > ${word_bits}.  Not masking results in
         // infinite recursion.
-        result &<<= ${word_bits}
+        result &<<= (${word_bits} as Self)
         result |= Self(_truncatingBits: source.word(at: n))
         n -= 1
       }
@@ -2611,7 +2611,7 @@ public struct ${Self}
       return (self &>> ${Self}(_truncatingBits: shift))._lowUWord
     }
 % if signed:
-    return self < 0 ? ~0 : 0
+    return self < (0 as ${Self}) ? ~0 : 0
 % else:
     return 0
 % end
