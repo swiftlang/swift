@@ -4705,9 +4705,9 @@ namespace {
       : super(IGM, theDecl) {}
 
     CanType getParentType() const {
-      Type parentType =
-        Target->getDeclContext()->getDeclaredTypeInContext();
-      return (parentType ? parentType->getCanonicalType() : CanType());
+      Type type = Target->getDeclaredTypeInContext();
+      Type parentType = type->getNominalParent();
+      return parentType ? parentType->getCanonicalType() : CanType();
     }
 
   public:
