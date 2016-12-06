@@ -3026,6 +3026,10 @@ TypeSubstitutionMap TypeBase::getMemberSubstitutions(const DeclContext *dc) {
   // don't miss out on NRVO anywhere.
   TypeSubstitutionMap substitutions;
 
+  // Look through non-type contexts.
+  while (!dc->isTypeContext())
+    dc = dc->getParent();
+
   // If the member is part of a protocol or extension thereof, we need
   // to substitute in the type of Self.
   if (dc->getAsProtocolOrProtocolExtensionContext()) {
