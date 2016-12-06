@@ -1815,6 +1815,7 @@ bool Parser::isStartOfDecl() {
 void Parser::consumeDecl(ParserPosition BeginParserPosition,
                          ParseDeclOptions Flags,
                          bool IsTopLevel) {
+  SourceLoc CurrentLoc = Tok.getLoc();
   backtrackToPosition(BeginParserPosition);
   SourceLoc BeginLoc = Tok.getLoc();
   // Consume tokens up to code completion token.
@@ -1829,6 +1830,9 @@ void Parser::consumeDecl(ParserPosition BeginParserPosition,
   State->delayDecl(PersistentParserState::DelayedDeclKind::Decl, Flags.toRaw(),
                    CurDeclContext, { BeginLoc, EndLoc },
                    BeginParserPosition.PreviousLoc);
+
+  while (SourceMgr.isBeforeInBuffer(Tok.getLoc(), CurrentLoc))
+    consumeToken();
 
   if (IsTopLevel) {
     // Skip the rest of the file to prevent the parser from constructing the
