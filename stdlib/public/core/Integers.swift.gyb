@@ -1853,6 +1853,25 @@ ${overflowOperationComment(x.operator)}
   ) -> (partialValue: Self, overflow: ArithmeticOverflow)
 % end
 
+  /// Returns the inverse of the bits set in the argument.
+  ///
+  /// The bitwise NOT operator (`~`) is a prefix operator that returns a value
+  /// in which all the bits of its argument are flipped: Bits that are `1` in
+  /// the argument are `0` in the result, and bits that are `0` in the argument
+  /// are `1` in the result. This is equivalent to the inverse of a set. For
+  /// example:
+  ///
+  ///     let x: UInt8 = 5        // 0b00000101
+  ///     let notX = ~x           // 0b11111010
+  ///
+  /// Performing a bitwise NOT operation on 0 returns a value with every bit
+  /// set to `1`.
+  ///
+  ///     let allOnes = ~UInt8.min   // 0b11111111
+  ///
+  /// - Complexity: O(1).
+  static prefix func ~ (_ x: Self) -> Self
+
 % for x in binaryBitwise + maskingShifts:
 ${operationComment(x.operator)}
   // FIXME(integers): revisit the doc comment
