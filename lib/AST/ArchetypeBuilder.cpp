@@ -213,12 +213,14 @@ static ProtocolConformance *getSuperConformance(
                                           builder.getLazyResolver());
   if (!conformance) return nullptr;
 
+  auto superclassSource = pa->getSuperclassSource();
   // Conformance to this protocol is redundant; update the requirement source
   // appropriately.
   updateRequirementSource(
     conformsSource,
     RequirementSource(RequirementSource::Inherited,
-                      pa->getSuperclassSource().getLoc()));
+                      pa->getSuperclassSource().getLoc(),
+                      superclassSource.getDecl()));
   return conformance->getConcrete();
 }
 
@@ -281,7 +283,8 @@ bool ArchetypeBuilder::PotentialArchetype::addConformance(
                                                               builder);
 
   RequirementSource redundantSource(RequirementSource::Redundant,
-                                    source.getLoc());
+                                    source.getLoc(),
+                                    source.getDecl());
 
   // Check whether any associated types in this protocol resolve
   // nested types of this potential archetype.
@@ -396,8 +399,6 @@ auto ArchetypeBuilder::PotentialArchetype::getNestedType(
     return NestedTypes[nestedName].front();
   }
 
-  RequirementSource redundantSource(RequirementSource::Redundant,
-                                    SourceLoc());
 
   // Attempt to resolve this nested type to an associated type
   // of one of the protocols to which the parent potential
@@ -405,6 +406,10 @@ auto ArchetypeBuilder::PotentialArchetype::getNestedType(
   for (auto &conforms : ConformsTo) {
     for (auto member : conforms.first->lookupDirect(nestedName)) {
       PotentialArchetype *pa;
+
+      RequirementSource redundantSource(RequirementSource::Redundant,
+                                        SourceLoc(),
+                                        member);
       
       if (auto assocType = dyn_cast<AssociatedTypeDecl>(member)) {
         // Resolve this nested type to this associated type.
@@ -880,7 +885,8 @@ bool ArchetypeBuilder::addConformanceRequirement(PotentialArchetype *PAT,
   if (!T->addConformance(Proto, /*updateExistingSource=*/true, Source, *this))
     return false;
 
-  RequirementSource InnerSource(RequirementSource::Redundant, Source.getLoc());
+  RequirementSource InnerSource(RequirementSource::Redundant, Source.getLoc(),
+                                Source.getDecl());
   
   bool inserted = Visited.insert(Proto).second;
   assert(inserted);
@@ -956,7 +962,7 @@ bool ArchetypeBuilder::addSuperclassRequirement(PotentialArchetype *T,
           if (nested == nestedTypes.end()) continue;
 
           RequirementSource redundantSource(RequirementSource::Inherited,
-                                            Source.getLoc());
+                                            Source.getLoc(), Source.getDecl());
 
           for (auto nestedPA : nested->second) {
             if (nestedPA->getResolvedAssociatedType() == assocType)
@@ -1196,7 +1202,8 @@ bool ArchetypeBuilder::addSameTypeRequirementBetweenArchetypes(
   }
 
   // Recursively merge the associated types of T2 into T1.
-  RequirementSource redundantSource(RequirementSource::Redundant, SourceLoc());
+  RequirementSource redundantSource(RequirementSource::Redundant, SourceLoc(),
+                                    Source.getDecl());
   for (auto T2Nested : T2->NestedTypes) {
     auto T1Nested = T1->getNestedType(T2Nested.first, *this);
     if (addSameTypeRequirementBetweenArchetypes(T1Nested,
@@ -1340,7 +1347,7 @@ bool ArchetypeBuilder::addAbstractTypeParamRequirements(
 
     // FIXME: Drop this protocol.
     pa->addConformance(proto, /*updateExistingSource=*/true,
-                       RequirementSource(kind, loc), *this);
+                       RequirementSource(kind, loc, decl), *this);
   };
 
   if (isa<AssociatedTypeDecl>(decl) &&
@@ -1362,7 +1369,7 @@ bool ArchetypeBuilder::addAbstractTypeParamRequirements(
       // Superclass requirement.
       if (auto superclass = archetype->getSuperclass()) {
         if (addSuperclassRequirement(pa, superclass,
-                                     RequirementSource(kind, loc)))
+                                     RequirementSource(kind, loc, decl)))
           return true;
       }
 
@@ -1375,7 +1382,7 @@ bool ArchetypeBuilder::addAbstractTypeParamRequirements(
           continue;
         }
 
-        if (addConformanceRequirement(pa, proto, RequirementSource(kind, loc),
+        if (addConformanceRequirement(pa, proto, RequirementSource(kind, loc, decl),
                                       visited))
           return true;
       }
@@ -1399,14 +1406,14 @@ bool ArchetypeBuilder::addAbstractTypeParamRequirements(
       }
 
       return addConformanceRequirement(pa, protocolType->getDecl(),
-                                       RequirementSource(kind, loc),
+                                       RequirementSource(kind, loc, decl),
                                        visited);
     }
 
     // Superclass requirement.
     if (inheritedType->getClassOrBoundGenericClass()) {
       return addSuperclassRequirement(pa, inheritedType,
-                                      RequirementSource(kind, loc));
+                                      RequirementSource(kind, loc, decl));
     }
 
     // Note: anything else is an error, to be diagnosed later.
@@ -1440,7 +1447,8 @@ bool ArchetypeBuilder::visitInherited(
   return isInvalid;
 }
 
-bool ArchetypeBuilder::addRequirement(const RequirementRepr &Req) {
+bool ArchetypeBuilder::addRequirement(const RequirementRepr &Req,
+                                      Decl *ParentDecl) {
   switch (Req.getKind()) {
   case RequirementReprKind::TypeConstraint: {
     PotentialArchetype *PA = resolveArchetype(Req.getSubject());
@@ -1454,7 +1462,8 @@ bool ArchetypeBuilder::addRequirement(const RequirementRepr &Req) {
 
     // Check whether this is a supertype requirement.
     RequirementSource source(RequirementSource::Explicit,
-                             Req.getConstraintLoc().getSourceRange().Start);
+                             Req.getConstraintLoc().getSourceRange().Start,
+                             ParentDecl);
     if (Req.getConstraint()->getClassOrBoundGenericClass()) {
       return addSuperclassRequirement(PA, Req.getConstraint(), source);
     }
@@ -1474,10 +1483,11 @@ bool ArchetypeBuilder::addRequirement(const RequirementRepr &Req) {
   }
 
   case RequirementReprKind::SameType:
-    return addSameTypeRequirement(Req.getFirstType(), 
+    return addSameTypeRequirement(Req.getFirstType(),
                                   Req.getSecondType(),
                                   RequirementSource(RequirementSource::Explicit,
-                                                    Req.getEqualLoc()));
+                                                    Req.getEqualLoc(),
+                                                    ParentDecl));
   }
 
   llvm_unreachable("Unhandled requirement?");
@@ -1526,6 +1536,7 @@ void ArchetypeBuilder::addRequirement(const Requirement &req,
 class ArchetypeBuilder::InferRequirementsWalker : public TypeWalker {
   ArchetypeBuilder &Builder;
   SourceLoc Loc;
+  Decl *ParentDecl;
   unsigned Depth;
 
   /// We cannot add requirements to archetypes from outer generic parameter
@@ -1539,8 +1550,9 @@ class ArchetypeBuilder::InferRequirementsWalker : public TypeWalker {
 public:
   InferRequirementsWalker(ArchetypeBuilder &builder,
                           SourceLoc loc,
+                          Decl *decl,
                           unsigned Depth)
-    : Builder(builder), Loc(loc), Depth(Depth) { }
+    : Builder(builder), Loc(loc), ParentDecl(decl), Depth(Depth) { }
 
   virtual Action walkToTypePost(Type ty) override { 
     auto boundGeneric = ty->getAs<BoundGenericType>();
@@ -1563,7 +1575,7 @@ public:
     }
 
     // Handle the requirements.
-    RequirementSource source(RequirementSource::Inferred, Loc);
+    RequirementSource source(RequirementSource::Inferred, Loc, ParentDecl);
     for (const auto &req : genericSig->getRequirements()) {
       switch (req.getKind()) {
       case RequirementKind::SameType: {
@@ -1637,25 +1649,27 @@ public:
   }
 };
 
-void ArchetypeBuilder::inferRequirements(TypeLoc type,
+void ArchetypeBuilder::inferRequirements(Decl *decl,
+                                         TypeLoc type,
                                          GenericParamList *genericParams) {
   if (!type.getType())
     return;
   if (genericParams == nullptr)
     return;
   // FIXME: Crummy source-location information.
-  InferRequirementsWalker walker(*this, type.getSourceRange().Start,
+  InferRequirementsWalker walker(*this, type.getSourceRange().Start, decl,
                                  genericParams->getDepth());
   type.getType().walk(walker);
 }
 
-void ArchetypeBuilder::inferRequirements(ParameterList *params,
+void ArchetypeBuilder::inferRequirements(Decl *decl,
+                                         ParameterList *params,
                                          GenericParamList *genericParams) {
   if (genericParams == nullptr)
     return;
   
   for (auto P : *params)
-    inferRequirements(P->getTypeLoc(), genericParams);
+    inferRequirements(decl, P->getTypeLoc(), genericParams);
 }
 
 /// Perform typo correction on the given nested type, producing the
@@ -1788,11 +1802,11 @@ ArchetypeBuilder::finalize(SourceLoc loc, bool allowConcreteGenericParams) {
       
       // Resolve the associated type and merge the potential archetypes.
       auto replacement = pa->getParent()->getNestedType(correction, *this);
-      pa->resolveAssociatedType(replacement->getResolvedAssociatedType(),
-                                *this);
+      auto assocType = replacement->getResolvedAssociatedType();
+      pa->resolveAssociatedType(assocType, *this);
       addSameTypeRequirementBetweenArchetypes(
         pa, replacement,
-        RequirementSource(RequirementSource::Redundant, SourceLoc()));
+        RequirementSource(RequirementSource::Redundant, SourceLoc(), assocType));
     });
   }
 }
@@ -1994,14 +2008,15 @@ ArchetypeBuilder::mapTypeOutOfContext(ModuleDecl *M,
   return env->mapTypeOutOfContext(M, type);
 }
 
-void ArchetypeBuilder::addGenericSignature(GenericSignature *sig) {
+void ArchetypeBuilder::addGenericSignature(GenericSignature *sig,
+                                           Decl *decl) {
   if (!sig) return;
   
   RequirementSource::Kind sourceKind = RequirementSource::Explicit;
   for (auto param : sig->getGenericParams())
     addGenericParameter(param);
 
-  RequirementSource source(sourceKind, SourceLoc());
+  RequirementSource source(sourceKind, SourceLoc(), decl);
   for (auto &reqt : sig->getRequirements()) {
     addRequirement(reqt, source);
   }

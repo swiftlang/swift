@@ -710,7 +710,6 @@ ArchetypeBuilder TypeChecker::createArchetypeBuilder(Module *mod) {
 GenericEnvironment *
 TypeChecker::handleSILGenericParams(GenericParamList *genericParams,
                                     DeclContext *DC) {
-
   SmallVector<GenericParamList *, 2> nestedList;
   for (; genericParams; genericParams = genericParams->getOuterParameters()) {
     nestedList.push_back(genericParams);
@@ -732,7 +731,7 @@ TypeChecker::handleSILGenericParams(GenericParamList *genericParams,
     // Compute the final set of archetypes.
     revertGenericParamList(genericParams);
     GenericTypeToArchetypeResolver archetypeResolver(parentEnv);
-    checkGenericParamList(nullptr, genericParams, parentSig,
+    checkGenericParamList(nullptr, nullptr, genericParams, parentSig,
                           &archetypeResolver);
   }
 
@@ -4760,16 +4759,16 @@ public:
       ArchetypeBuilder builder =
         TC.createArchetypeBuilder(FD->getModuleContext());
       auto *parentSig = FD->getDeclContext()->getGenericSignatureOfContext();
-      TC.checkGenericParamList(&builder, gp, parentSig, nullptr);
+      TC.checkGenericParamList(&builder, FD, gp, parentSig, nullptr);
 
       // Infer requirements from parameter patterns.
       for (auto pattern : FD->getParameterLists()) {
-        builder.inferRequirements(pattern, gp);
+        builder.inferRequirements(FD, pattern, gp);
       }
 
       // Infer requirements from the result type.
       if (!FD->getBodyResultTypeLoc().isNull()) {
-        builder.inferRequirements(FD->getBodyResultTypeLoc(), gp);
+        builder.inferRequirements(FD, FD->getBodyResultTypeLoc(), gp);
       }
 
       // Revert the types within the signature so it can be type-checked with
@@ -6390,10 +6389,10 @@ public:
 
       auto builder = TC.createArchetypeBuilder(CD->getModuleContext());
       auto *parentSig = CD->getDeclContext()->getGenericSignatureOfContext();
-      TC.checkGenericParamList(&builder, gp, parentSig, nullptr);
+      TC.checkGenericParamList(&builder, CD, gp, parentSig, nullptr);
 
       // Infer requirements from the parameters of the constructor.
-      builder.inferRequirements(CD->getParameterList(1), gp);
+      builder.inferRequirements(CD, CD->getParameterList(1), gp);
 
       // Revert the types within the signature so it can be type-checked with
       // archetypes below.
@@ -7376,7 +7375,7 @@ checkExtensionGenericParams(TypeChecker &tc, ExtensionDecl *ext, Type type,
     while (auto next = outermostList->getOuterParameters())
       outermostList = next;
 
-    builder.inferRequirements(TypeLoc::withoutLoc(extInterfaceType), outermostList);
+    builder.inferRequirements(ext, TypeLoc::withoutLoc(extInterfaceType), outermostList);
   };
 
   ext->setIsBeingTypeChecked(true);
@@ -7395,7 +7394,7 @@ checkExtensionGenericParams(TypeChecker &tc, ExtensionDecl *ext, Type type,
   });
   GenericTypeToArchetypeResolver archetypeResolver(env);
   visitOuterToInner(genericParams, [&](GenericParamList *gpList) {
-    tc.checkGenericParamList(nullptr, gpList, nullptr, &archetypeResolver);
+    tc.checkGenericParamList(nullptr, ext, gpList, nullptr, &archetypeResolver);
   });
 
   Type extContextType =

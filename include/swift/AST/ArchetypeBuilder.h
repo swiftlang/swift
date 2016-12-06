@@ -85,7 +85,7 @@ public:
     Inherited,
   };
 
-  RequirementSource(Kind kind, SourceLoc loc) : StoredKind(kind), Loc(loc) { }
+  RequirementSource(Kind kind, SourceLoc loc, Decl *decl) : StoredKind(kind), Loc(loc), StoredDecl(decl) { }
 
   /// Retrieve the kind of requirement source.
   Kind getKind() const { return StoredKind; }
@@ -95,6 +95,8 @@ public:
 
   /// Retrieve the source location at which the requirement originated.
   SourceLoc getLoc() const { return Loc; }
+
+  Decl *getDecl() const { return StoredDecl; }
 
   LLVM_ATTRIBUTE_DEPRECATED(
       void dump(SourceManager *srcMgr) const,
@@ -106,6 +108,7 @@ public:
 private:
   Kind StoredKind;
   SourceLoc Loc;
+  Decl *StoredDecl;
 };
 
 /// \brief Collects a set of requirements of generic parameters, both explicitly
@@ -235,7 +238,8 @@ public:
   ///
   /// \returns true if this requirement makes the set of requirements
   /// inconsistent, in which case a diagnostic will have been issued.
-  bool addRequirement(const RequirementRepr &Req);
+  bool addRequirement(const RequirementRepr &Req,
+                      Decl *ParentDecl);
 
   /// \brief Add an already-checked requirement.
   ///
@@ -244,7 +248,7 @@ public:
   void addRequirement(const Requirement &req, RequirementSource source);
   
   /// \brief Add all of a generic signature's parameters and requirements.
-  void addGenericSignature(GenericSignature *sig);
+  void addGenericSignature(GenericSignature *sig, Decl *decl);
 
   /// \brief Build the generic signature.
   GenericSignature *getGenericSignature();
@@ -264,7 +268,7 @@ public:
   /// where \c Dictionary requires that its key type be \c Hashable,
   /// the requirement \c K : Hashable is inferred from the parameter type,
   /// because the type \c Dictionary<K,V> cannot be formed without it.
-  void inferRequirements(TypeLoc type, GenericParamList *genericParams);
+  void inferRequirements(Decl * decl, TypeLoc type, GenericParamList *genericParams);
 
   /// Infer requirements from the given pattern, recursively.
   ///
@@ -278,7 +282,8 @@ public:
   /// where \c Dictionary requires that its key type be \c Hashable,
   /// the requirement \c K : Hashable is inferred from the parameter type,
   /// because the type \c Dictionary<K,V> cannot be formed without it.
-  void inferRequirements(ParameterList *params,GenericParamList *genericParams);
+  void inferRequirements(Decl *decl, ParameterList *params,
+                         GenericParamList *genericParams);
 
   /// Finalize the set of requirements, performing any remaining checking
   /// required before generating archetypes.

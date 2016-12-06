@@ -1262,7 +1262,7 @@ ArchetypeBuilder *ASTContext::getOrCreateArchetypeBuilder(
 
   // Create a new archetype builder with the given signature.
   auto builder = new ArchetypeBuilder(*mod);
-  builder->addGenericSignature(sig);
+  builder->addGenericSignature(sig, nullptr);
 
   // Store this archetype builder (no generic environment yet).
   Impl.ArchetypeBuilders[{sig, mod}] =

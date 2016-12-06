@@ -1033,7 +1033,7 @@ public:
   ///
   /// \param genericParams The generic parameters to validate.
   ///
-  /// \param dc The declaration context in which to perform the validation.
+  /// \param dc The declaration in which the validation is being performed
   ///
   /// \param outerSignature The generic signature of the outer
   /// context, if not available as part of the \c dc argument (used
@@ -1080,6 +1080,7 @@ public:
   /// Check the generic parameters in the given generic parameter list (and its
   /// parent generic parameter lists) according to the given resolver.
   void checkGenericParamList(ArchetypeBuilder *builder,
+                             Decl *parentDecl,
                              GenericParamList *genericParams,
                              GenericSignature *parentSig,
                              GenericTypeResolver *resolver);

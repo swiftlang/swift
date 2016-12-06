@@ -4258,6 +4258,8 @@ void ModuleFile::finishNormalConformance(NormalProtocolConformance *conformance,
                                               typeCount, inheritedCount,
                                               rawIDs);
 
+  auto DC = getDeclContext(contextID);
+
   // Skip trailing inherited conformances.
   while (inheritedCount--)
     (void)readConformance(DeclTypeCursor);
@@ -4297,7 +4299,8 @@ void ModuleFile::finishNormalConformance(NormalProtocolConformance *conformance,
       // Create an archetype builder, which will help us create the
       // synthetic environment.
       ArchetypeBuilder builder(*getAssociatedModule());
-      builder.addGenericSignature(syntheticSig);
+      builder.addGenericSignature(syntheticSig,
+                                  DC->getInnermostDeclarationDeclContext());
       builder.finalize(SourceLoc());
       syntheticEnv = builder.getGenericEnvironment(syntheticSig);
     }
