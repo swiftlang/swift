@@ -337,7 +337,7 @@ enum class DiscriminatorMatch {
   Matches,
   Different
 };
-}
+} // end anonymous namespace
 
 static DiscriminatorMatch matchDiscriminator(Identifier discriminator,
                                              const ValueDecl *value) {
@@ -1054,7 +1054,7 @@ namespace {
     /// The set of methods with the given selector.
     llvm::TinyPtrVector<AbstractFunctionDecl *> Methods;
   };
-}
+} // end anonymous namespace
 
 /// Class member lookup table, which is a member lookup table with a second
 /// table for lookup based on Objective-C selector.

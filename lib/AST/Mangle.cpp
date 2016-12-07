@@ -56,7 +56,7 @@ namespace {
       return (out << '_');
     }
   };        
-}
+} // end anonymous namespace
 
 // Translates operator fixity to demangler operators.
 static Demangle::OperatorKind TranslateOperator(OperatorFixity fixity) {

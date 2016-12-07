@@ -2753,7 +2753,7 @@ struct ASTNodeBase {};
       }
     }
   };
-}
+} // end anonymous namespace
 
 void swift::verify(SourceFile &SF) {
 #if !(defined(NDEBUG) || defined(SWIFT_DISABLE_AST_VERIFIER))

@@ -67,7 +67,7 @@ enum LocalDiagID : uint32_t {
 #include "swift/AST/DiagnosticsAll.def"
   NumDiags
 };
-}
+} // end anonymous namespace
 
 // TODO: categorization
 static StoredDiagnosticInfo storedDiagnosticInfos[] = {

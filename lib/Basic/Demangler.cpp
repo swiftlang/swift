@@ -1525,6 +1525,6 @@ NodePointer Demangler::demangleValueWitness() {
   return addChild(VW, popNode(Node::Kind::Type));
 }
 
-} // namespace NewMangler
-} // namespace swift
+} // end namespace NewMangler
+} // end namespace swift
 

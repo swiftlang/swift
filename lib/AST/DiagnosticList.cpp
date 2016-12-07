@@ -29,5 +29,5 @@ namespace swift {
 #define DIAG(KIND,ID,Options,Text,Signature) \
     detail::DiagWithArguments<void Signature>::type ID = { DiagID::ID };
 #include "swift/AST/DiagnosticsAll.def"
-  }
-}
+  } // end namespace diag
+} // end namespace swift

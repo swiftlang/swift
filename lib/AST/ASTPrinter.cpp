@@ -430,7 +430,7 @@ hasMergeGroup(MergeGroupKind Kind) {
   }
   return false;
 }
-}
+} // end anonymous namespace
 
 PrintOptions PrintOptions::printTypeInterface(Type T) {
   PrintOptions result = printInterface();

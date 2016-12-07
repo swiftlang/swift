@@ -196,7 +196,7 @@ public:
     return Action::Continue;
   }
 };
-};
+} // end anonymous namespace
 
 
 AvailabilityContext AvailabilityInference::inferForType(Type t) {

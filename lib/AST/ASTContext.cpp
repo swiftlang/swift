@@ -74,7 +74,7 @@ namespace {
     Import = 1 << 0,
     Framework = 1 << 1
   };
-}
+} // end anonymous namespace
 
 using AssociativityCacheType =
   llvm::DenseMap<std::pair<PrecedenceGroupDecl *, PrecedenceGroupDecl *>,
