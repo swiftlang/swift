@@ -135,6 +135,12 @@ struct d0100_FooStruct {
   func instanceFuncWithDefaultArg2(a: Int = 0, b: Double = 0) {}
 // PASS_COMMON-NEXT: {{^}}  func instanceFuncWithDefaultArg2(a: Int = default, b: Double = default){{$}}
 
+  func instanceFuncWithDefaultArg3(a: [Int] = [], b: Double? = nil, c: [String:String] = [:]) {}
+// PASS_COMMON-NEXT: {{^}}  func instanceFuncWithDefaultArg3(a: [Int] = [], b: Double? = nil, c: [String : String] = [:]){{$}}
+
+  func instanceFuncWithDefaultArg4(a: [Int] = [1], b: Double? = 2.0, c: [String:String] = ["foo":"bar"]) {}
+// PASS_COMMON-NEXT: {{^}}  func instanceFuncWithDefaultArg4(a: [Int] = default, b: Double? = default, c: [String : String] = default){{$}}
+
   func varargInstanceFunc0(v: Int...) {}
 // PASS_COMMON-NEXT: {{^}}  func varargInstanceFunc0(v: Int...){{$}}
 
