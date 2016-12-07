@@ -1281,12 +1281,12 @@ void Remangler::mangleOwningMutableAddressor(Node *node) {
 }
 
 void Remangler::manglePartialApplyForwarder(Node *node) {
-  mangleChildNodes(node);
+  mangleChildNodesReversed(node);
   Buffer << "TA";
 }
 
 void Remangler::manglePartialApplyObjCForwarder(Node *node) {
-  mangleChildNodes(node);
+  mangleChildNodesReversed(node);
   Buffer << "Ta";
 }
 

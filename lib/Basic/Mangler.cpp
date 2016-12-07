@@ -78,6 +78,7 @@ static bool areTreesEqual(Demangle::NodePointer Old, Demangle::NodePointer New) 
       case Demangle::Node::Kind::ReflectionMetadataFieldDescriptor:
       case Demangle::Node::Kind::ReflectionMetadataAssocTypeDescriptor:
       case Demangle::Node::Kind::ReflectionMetadataSuperclassDescriptor:
+      case Demangle::Node::Kind::PartialApplyForwarder:
         return true;
       default:
         return false;
