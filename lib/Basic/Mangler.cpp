@@ -180,9 +180,12 @@ std::string NewMangling::selectMangling(const std::string &Old,
       std::string Remangled = mangleNodeNew(NewNode);
       if (New != Remangled) {
         bool isEqual = false;
-        if (containsDependentAssociatedTypeRef(NewNode)) {
+        if (containsDependentAssociatedTypeRef(NewNode) ||
+            // Does the mangling contain an identifier which is the name of
+            // an old-mangled function?
+            New.find("_T") != std::string::npos) {
           NodePointer RemangledNode = demangleSymbolAsNode(Remangled);
-          isEqual = areTreesEqual(RemangledNode, NewNode);
+          isEqual = areTreesEqual(NewNode, RemangledNode);
         }
         if (!isEqual) {
           llvm::errs() << "Remangling failed at #" << numCmp << ":\n"
