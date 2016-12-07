@@ -1497,7 +1497,6 @@ struct ASTNodeBase {};
         return TT->getElementType(i);
       };
 
-      unsigned varargsIndex = 0;
       Type varargsType;
       unsigned callerDefaultArgIndex = 0;
       for (unsigned i = 0, e = E->getElementMapping().size(); i != e; ++i) {
@@ -1505,7 +1504,6 @@ struct ASTNodeBase {};
         if (subElem == TupleShuffleExpr::DefaultInitialize)
           continue;
         if (subElem == TupleShuffleExpr::Variadic) {
-          varargsIndex = i;
           varargsType = TT->getElement(i).getVarargBaseTy();
           break;
         }
