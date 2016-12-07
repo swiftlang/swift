@@ -5260,12 +5260,6 @@ ParserStatus Parser::parseDeclSubscript(ParseDeclOptions Flags,
   ParserStatus Status;
   SourceLoc SubscriptLoc = consumeToken(tok::kw_subscript);
 
-  // parameter-clause
-  if (Tok.isNot(tok::l_paren)) {
-    diagnose(Tok, diag::expected_lparen_subscript);
-    return makeParserError();
-  }
-
   SmallVector<Identifier, 4> argumentNames;
   ParserResult<ParameterList> Indices
     = parseSingleParameterClause(ParameterContextKind::Subscript,
@@ -5275,7 +5269,8 @@ ParserStatus Parser::parseDeclSubscript(ParseDeclOptions Flags,
   
   // '->'
   if (!Tok.is(tok::arrow)) {
-    diagnose(Tok, diag::expected_arrow_subscript);
+    if (!Indices.isParseError())
+      diagnose(Tok, diag::expected_arrow_subscript);
     return makeParserError();
   }
   SourceLoc ArrowLoc = consumeToken();
@@ -5368,16 +5363,15 @@ Parser::parseDeclInit(ParseDeclOptions Flags, DeclAttributes &Attributes) {
     return makeParserCodeCompletionStatus();
 
   // Parse the parameters.
-  // FIXME: handle code completion in Arguments.
   DefaultArgumentInfo DefaultArgs(/*inTypeContext*/true);
-  ParameterList *BodyPattern;
-  DeclName FullName;
-  ParserStatus SignatureStatus
-    = parseConstructorArguments(FullName, BodyPattern, DefaultArgs);
+  llvm::SmallVector<Identifier, 4> namePieces;
+  ParserResult<ParameterList> Params
+    = parseSingleParameterClause(ParameterContextKind::Initializer,
+                                 &namePieces, &DefaultArgs);
 
-  if (SignatureStatus.hasCodeCompletion() && !CodeCompletion) {
+  if (Params.hasCodeCompletion() && !CodeCompletion) {
     // Trigger delayed parsing, no need to continue.
-    return SignatureStatus;
+    return makeParserCodeCompletionStatus();
   }
 
   // Protocol initializer arguments may not have default values.
@@ -5404,12 +5398,13 @@ Parser::parseDeclInit(ParseDeclOptions Flags, DeclAttributes &Attributes) {
   }
   
   auto *SelfDecl = ParamDecl::createUnboundSelf(ConstructorLoc, CurDeclContext);
+  DeclName FullName(Context, Context.Id_init, namePieces);
 
   Scope S2(this, ScopeKind::ConstructorBody);
   auto *CD = new (Context) ConstructorDecl(FullName, ConstructorLoc,
                                            Failability, FailabilityLoc,
                                            throwsLoc.isValid(), throwsLoc,
-                                           SelfDecl, BodyPattern,
+                                           SelfDecl, Params.get(),
                                            GenericParams,
                                            CurDeclContext);
   
@@ -5423,16 +5418,16 @@ Parser::parseDeclInit(ParseDeclOptions Flags, DeclAttributes &Attributes) {
   DefaultArgs.setFunctionContext(CD);
 
   // Pass the function signature to code completion.
-  if (SignatureStatus.hasCodeCompletion())
+  if (Params.hasCodeCompletion())
     CodeCompletion->setDelayedParsedDecl(CD);
 
-  if (ConstructorsNotAllowed || SignatureStatus.isError()) {
+  if (ConstructorsNotAllowed || Params.isParseError()) {
     // Tell the type checker not to touch this constructor.
     CD->setInvalid();
   }
   
   addToScope(SelfDecl);
-  addParametersToScope(BodyPattern);
+  addParametersToScope(Params.get());
 
   // '{'
   if (Tok.is(tok::l_brace)) {
