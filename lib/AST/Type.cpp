@@ -3186,12 +3186,14 @@ static bool transformSILParameter(SILParameterInfo &param, bool &changed,
 }
 
 Type Type::transform(llvm::function_ref<Type(Type)> fn) const {
-  // Transform this type node.
-  Type transformed = fn(*this);
+  if (!isa<ParenType>(getPointer())) {
+    // Transform this type node.
+    Type transformed = fn(*this);
 
-  // If the client changed the type, we're done.
-  if (!transformed || transformed.getPointer() != getPointer())
-    return transformed;
+    // If the client changed the type, we're done.
+    if (!transformed || transformed.getPointer() != getPointer())
+      return transformed;
+  }
 
   // Recursive into children of this type.
   TypeBase *base = getPointer();

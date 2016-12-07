@@ -363,11 +363,6 @@ namespace {
       // Swift only supports rank-1 polymorphism.
       assert(!type->is<GenericFunctionType>());
 
-      // Preserve parens when opening types.
-      if (isa<ParenType>(type.getPointer())) {
-        return type;
-      }
-
       // Replace a generic type parameter with its corresponding type variable.
       if (auto genericParam = type->getAs<GenericTypeParamType>()) {
         auto known = replacements.find(genericParam->getCanonicalType());
