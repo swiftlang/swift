@@ -733,7 +733,7 @@ TypeChecker::handleSILGenericParams(GenericParamList *genericParams,
 
     ArchetypeBuilder builder(*DC->getParentModule());
     CompleteGenericTypeResolver completeResolver(*this, builder);
-    checkGenericParamList(&builder, genericParams, parentSig, parentEnv,
+    checkGenericParamList(&builder, genericParams, parentSig,
                           &completeResolver);
     parentSig = genericSig;
     parentEnv = builder.getGenericEnvironment(parentSig);
@@ -742,7 +742,7 @@ TypeChecker::handleSILGenericParams(GenericParamList *genericParams,
     // Compute the final set of archetypes.
     revertGenericParamList(genericParams);
     GenericTypeToArchetypeResolver archetypeResolver(parentEnv);
-    checkGenericParamList(nullptr, genericParams, parentSig, parentEnv,
+    checkGenericParamList(nullptr, genericParams, parentSig,
                           &archetypeResolver);
   }
 
@@ -4772,8 +4772,7 @@ public:
       ArchetypeBuilder builder =
         TC.createArchetypeBuilder(FD->getModuleContext());
       auto *parentSig = FD->getDeclContext()->getGenericSignatureOfContext();
-      auto *parentEnv = FD->getDeclContext()->getGenericEnvironmentOfContext();
-      TC.checkGenericParamList(&builder, gp, parentSig, parentEnv, nullptr);
+      TC.checkGenericParamList(&builder, gp, parentSig, nullptr);
 
       // Infer requirements from parameter patterns.
       for (auto pattern : FD->getParameterLists()) {
@@ -6407,8 +6406,7 @@ public:
 
       auto builder = TC.createArchetypeBuilder(CD->getModuleContext());
       auto *parentSig = CD->getDeclContext()->getGenericSignatureOfContext();
-      auto *parentEnv = CD->getDeclContext()->getGenericEnvironmentOfContext();
-      TC.checkGenericParamList(&builder, gp, parentSig, parentEnv, nullptr);
+      TC.checkGenericParamList(&builder, gp, parentSig, nullptr);
 
       // Infer requirements from the parameters of the constructor.
       builder.inferRequirements(CD->getParameterList(1), gp);
@@ -7429,8 +7427,7 @@ checkExtensionGenericParams(TypeChecker &tc, ExtensionDecl *ext, Type type,
   ArchetypeBuilder builder = tc.createArchetypeBuilder(ext->getModuleContext());
   DependentGenericTypeResolver completeResolver(builder);
   visitOuterToInner(genericParams, [&](GenericParamList *gpList) {
-    tc.checkGenericParamList(&builder, gpList, nullptr, nullptr,
-                             &completeResolver);
+    tc.checkGenericParamList(&builder, gpList, nullptr, &completeResolver);
   });
   inferExtendedTypeReqs(builder);
   (void)builder.finalize(genericParams->getSourceRange().Start,
@@ -7446,8 +7443,7 @@ checkExtensionGenericParams(TypeChecker &tc, ExtensionDecl *ext, Type type,
   });
   GenericTypeToArchetypeResolver archetypeResolver(env);
   visitOuterToInner(genericParams, [&](GenericParamList *gpList) {
-    tc.checkGenericParamList(nullptr, gpList, nullptr, nullptr,
-                             &archetypeResolver);
+    tc.checkGenericParamList(nullptr, gpList, nullptr, &archetypeResolver);
   });
 
   // FIXME: The canonical type here is a workaround because having SubstitedType

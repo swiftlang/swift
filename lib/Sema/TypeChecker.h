@@ -1067,7 +1067,6 @@ public:
   void checkGenericParamList(ArchetypeBuilder *builder,
                              GenericParamList *genericParams,
                              GenericSignature *parentSig,
-                             GenericEnvironment *parentEnv,
                              GenericTypeResolver *resolver);
 
   /// Check the given set of generic arguments against the requirements in a

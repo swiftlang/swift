@@ -244,8 +244,7 @@ public:
   void addRequirement(const Requirement &req, RequirementSource source);
   
   /// \brief Add all of a generic signature's parameters and requirements.
-  void addGenericSignature(GenericSignature *sig,
-                           GenericEnvironment *genericEnv);
+  void addGenericSignature(GenericSignature *sig);
 
   /// \brief Build the generic signature.
   GenericSignature *getGenericSignature();
