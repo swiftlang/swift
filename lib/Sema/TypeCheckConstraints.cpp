@@ -2197,6 +2197,21 @@ bool TypeChecker::typeCheckCondition(Expr *&expr, DeclContext *dc) {
     virtual Expr *appliedSolution(constraints::Solution &solution,
                                   Expr *expr) {
       auto &cs = solution.getConstraintSystem();
+
+      // Since conversion constraint is going to enforce actual coercion
+      // only in some cases e.g. function application, we need to explicitly
+      // coerce expression to boolean type here before proceeding.
+      if (!expr->getType()->isBool()) {
+        auto boolDecl = cs.getASTContext().getBoolDecl();
+        if (!boolDecl)
+          return nullptr;
+
+        expr = solution.coerceToType(expr, boolDecl->getDeclaredType(),
+                                     cs.getConstraintLocator(expr));
+        if (!expr)
+          return nullptr;
+      }
+
       return solution.convertBooleanTypeToBuiltinI1(expr,
                                             cs.getConstraintLocator(OrigExpr));
     }

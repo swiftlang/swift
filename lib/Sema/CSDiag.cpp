@@ -3057,7 +3057,8 @@ bool FailureDiagnosis::diagnoseGeneralConversionFailure(Constraint *constraint){
   // Due to migration reasons, types used to conform to BooleanType, which
   // contain a member var 'boolValue', now does not convert to Bool. This block
   // tries to add a specific diagnosis/fixit to explicitly invoke 'boolValue'.
-  if (toType->isBool()) {
+  if ((fromType->is<MetatypeType>() ||
+       fromType->getRValueType()->getAnyNominal()) && toType->isBool()) {
     auto LookupResult = CS->TC.lookupMember(CS->DC, fromType,
       DeclName(CS->TC.Context.getIdentifier("boolValue")));
     if (!LookupResult.empty()) {
