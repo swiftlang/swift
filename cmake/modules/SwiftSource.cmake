@@ -10,7 +10,7 @@ function(handle_swift_sources
     dependency_module_target_out_var_name
     sourcesvar externalvar name)
   cmake_parse_arguments(SWIFTSOURCES
-      "IS_MAIN;IS_STDLIB;IS_STDLIB_CORE;IS_SDK_OVERLAY"
+      "IS_MAIN;IS_STDLIB;IS_STDLIB_CORE;IS_SDK_OVERLAY;EMBED_BITCODE"
       "SDK;ARCHITECTURE;INSTALL_IN_COMPONENT"
       "DEPENDS;API_NOTES;COMPILE_FLAGS;MODULE_NAME"
       ${ARGN})
@@ -20,6 +20,8 @@ function(handle_swift_sources
                  IS_STDLIB_CORE_arg)
   translate_flag(${SWIFTSOURCES_IS_SDK_OVERLAY} "IS_SDK_OVERLAY"
                  IS_SDK_OVERLAY_arg)
+  translate_flag(${SWIFTSOURCES_EMBED_BITCODE} "EMBED_BITCODE"
+                 EMBED_BITCODE_arg)
 
   if(SWIFTSOURCES_IS_MAIN)
     set(SWIFTSOURCES_INSTALL_IN_COMPONENT never_install)
@@ -94,6 +96,7 @@ function(handle_swift_sources
         ${IS_STDLIB_arg}
         ${IS_STDLIB_CORE_arg}
         ${IS_SDK_OVERLAY_arg}
+        ${EMBED_BITCODE_arg}
         ${STATIC_arg}
         INSTALL_IN_COMPONENT "${SWIFTSOURCES_INSTALL_IN_COMPONENT}")
     set("${dependency_target_out_var_name}" "${dependency_target}" PARENT_SCOPE)
@@ -138,11 +141,12 @@ endfunction()
 #     [MODULE_NAME]                     # The module name.
 #     [IS_STDLIB]                       # Install produced files.
 #     [EMIT_SIB]                        # Emit the file as a sib file instead of a .o
+#     [EMBED_BITCODE]                   # Embed LLVM bitcode into the .o files
 #     )
 function(_compile_swift_files
          dependency_target_out_var_name dependency_module_target_out_var_name)
   cmake_parse_arguments(SWIFTFILE
-    "IS_MAIN;IS_STDLIB;IS_STDLIB_CORE;IS_SDK_OVERLAY;EMIT_SIB"
+    "IS_MAIN;IS_STDLIB;IS_STDLIB_CORE;IS_SDK_OVERLAY;EMIT_SIB;EMBED_BITCODE"
     "OUTPUT;MODULE_NAME;INSTALL_IN_COMPONENT"
     "SOURCES;FLAGS;DEPENDS;SDK;ARCHITECTURE;API_NOTES;OPT_FLAGS;MODULE_DIR"
     ${ARGN})
@@ -362,6 +366,11 @@ function(_compile_swift_files
     set(output_option "-o" ${first_output})
   endif()
 
+  set(embed_bitcode_option)
+  if (SWIFTFILE_EMBED_BITCODE)
+    set(embed_bitcode_option "-embed-bitcode")
+  endif()
+
   set(main_command "-c")
   if (SWIFTFILE_EMIT_SIB)
     # Change the command to emit-sib if we are asked to emit sib
@@ -429,7 +438,7 @@ function(_compile_swift_files
       COMMAND
         "${line_directive_tool}" "${source_files}" --
         "${swift_compiler_tool}" "${main_command}" ${swift_flags}
-        ${output_option} "${source_files}"
+        ${output_option} ${embed_bitcode_option} "${source_files}"
       ${command_touch_standard_outputs}
       OUTPUT ${standard_outputs}
       DEPENDS
