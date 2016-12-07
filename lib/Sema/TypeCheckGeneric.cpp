@@ -692,12 +692,13 @@ static void visitOuterToInner(
   visitor(genericParams);
 }
 
-GenericSignature *TypeChecker::validateGenericSignature(
-                    GenericParamList *genericParams,
-                    DeclContext *dc,
-                    GenericSignature *parentSig,
-                    bool allowConcreteGenericParams,
-                    std::function<void(ArchetypeBuilder &)> inferRequirements) {
+GenericEnvironment *TypeChecker::checkGenericEnvironment(
+                      GenericParamList *genericParams,
+                      DeclContext *dc,
+                      GenericSignature *parentSig,
+                      bool allowConcreteGenericParams,
+                      llvm::function_ref<void(ArchetypeBuilder &)>
+                        inferRequirements) {
   assert(genericParams && "Missing generic parameters?");
   bool recursivelyVisitGenericParams =
     genericParams->getOuterParameters() && !parentSig;
@@ -720,8 +721,7 @@ GenericSignature *TypeChecker::validateGenericSignature(
   }
 
   /// Perform any necessary requirement inference.
-  if (inferRequirements)
-    inferRequirements(builder);
+  inferRequirements(builder);
 
   // Finalize the generic requirements.
   (void)builder.finalize(genericParams->getSourceRange().Start,
@@ -748,6 +748,13 @@ GenericSignature *TypeChecker::validateGenericSignature(
     checkGenericParamList(nullptr, genericParams, parentSig,
                           &completeResolver);
   }
+
+  /// Perform any necessary requirement inference.
+  inferRequirements(builder);
+
+  // Finalize the generic requirements.
+  (void)builder.finalize(genericParams->getSourceRange().Start,
+                         allowConcreteGenericParams);
   (void)builder.diagnoseRemainingRenames(genericParams->getSourceRange().Start);
 
   // Record the generic type parameter types and the requirements.
@@ -766,7 +773,8 @@ GenericSignature *TypeChecker::validateGenericSignature(
     llvm::errs() << "\n";
   }
 
-  return sig;
+  // Form the generic environment.
+  return builder.getGenericEnvironment(sig);
 }
 
 static void revertDependentTypeLoc(TypeLoc &tl) {
@@ -784,11 +792,11 @@ static void revertDependentTypeLoc(TypeLoc &tl) {
 
 /// Store a mapping from archetypes to DeclContexts for debugging.
 void
-TypeChecker::recordArchetypeContexts(GenericSignature *genericSig,
-                                     GenericEnvironment *genericEnv,
+TypeChecker::recordArchetypeContexts(GenericEnvironment *genericEnv,
                                      DeclContext *dc) {
 #ifndef NDEBUG
   // Record archetype contexts.
+  auto genericSig = genericEnv->getGenericSignature();
   for (auto *paramTy : genericSig->getGenericParams()) {
     auto contextTy = genericEnv->mapTypeIntoContext(
         paramTy->castTo<GenericTypeParamType>());
@@ -847,24 +855,10 @@ void TypeChecker::validateGenericTypeSignature(GenericTypeDecl *typeDecl) {
 
   prepareGenericParamList(gp, typeDecl);
 
-  auto *sig = validateGenericSignature(gp, dc, dc->getGenericSignatureOfContext(),
-                                       /*allowConcreteGenericParams=*/false,
-                                       nullptr);
-  assert(sig->getInnermostGenericParams().size()
-           == typeDecl->getGenericParams()->size());
-  revertGenericParamList(gp);
-
-  ArchetypeBuilder builder =
-    createArchetypeBuilder(typeDecl->getModuleContext());
-  auto *parentSig = dc->getGenericSignatureOfContext();
-
-  DependentGenericTypeResolver resolver(builder);
-  checkGenericParamList(&builder, gp, parentSig, &resolver);
-
-  auto *env = builder.getGenericEnvironment(sig);
+  auto *env = checkGenericEnvironment(gp, dc, dc->getGenericSignatureOfContext(),
+                                      /*allowConcreteGenericParams=*/false);
   typeDecl->setGenericEnvironment(env);
-
-  recordArchetypeContexts(sig, env, typeDecl);
+  recordArchetypeContexts(env, typeDecl);
 }
 
 void TypeChecker::revertGenericFuncSignature(AbstractFunctionDecl *func) {

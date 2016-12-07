@@ -466,7 +466,7 @@ struct ASTNodeBase {};
             if (!nested.second)
               continue;
             
-            if (auto nestedType = nested.second.getAsConcreteType()) {
+            if (auto nestedType = nested.second) {
               if (nestedType->hasTypeParameter()) {
                 Out << "Nested type " << nested.first.str()
                     << " of archetype " << archetype->getString()
@@ -476,7 +476,7 @@ struct ASTNodeBase {};
               }
             }
 
-            verifyChecked(nested.second.getValue(), visitedArchetypes);
+            verifyChecked(nested.second, visitedArchetypes);
           }
         }
 

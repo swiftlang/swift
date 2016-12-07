@@ -797,7 +797,7 @@ static void VisitNodeAssociatedTypeRef(
         Identifier identifier = ast->getIdentifier(ident->getText());
         Type nested;
         if (archetype->hasNestedType(identifier))
-          nested = archetype->getNestedTypeValue(identifier);
+          nested = archetype->getNestedType(identifier);
         if (nested) {
           result._types.push_back(nested);
           result._module = type_result._module;

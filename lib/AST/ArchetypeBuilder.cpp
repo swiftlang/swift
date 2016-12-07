@@ -37,8 +37,6 @@
 using namespace swift;
 using llvm::DenseMap;
 
-using NestedType = ArchetypeType::NestedType;
-
 void RequirementSource::dump(SourceManager *srcMgr) const {
   dump(llvm::errs(), srcMgr);
 }
@@ -114,10 +112,6 @@ struct ArchetypeBuilder::Implementation {
   llvm::DenseSet<std::pair<GenericEnvironment *,
                            ArchetypeBuilder::PotentialArchetype *>>
     ConcreteSubs;
-
-  /// FIXME: Egregious hack to track when we ended up using a "parent"
-  /// archetype, because we end up with broken invariants in that case.
-  bool UsedContextArchetype = false;
 };
 
 ArchetypeBuilder::PotentialArchetype::~PotentialArchetype() {
@@ -482,8 +476,7 @@ auto ArchetypeBuilder::PotentialArchetype::getNestedType(
   return nested.front();
 }
 
-ArchetypeType::NestedType
-ArchetypeBuilder::PotentialArchetype::getTypeInContext(
+Type ArchetypeBuilder::PotentialArchetype::getTypeInContext(
                                                ArchetypeBuilder &builder,
                                                GenericEnvironment *genericEnv) {
   ArrayRef<GenericTypeParamType *> genericParams =
@@ -503,7 +496,7 @@ ArchetypeBuilder::PotentialArchetype::getTypeInContext(
   if (Type concreteType = representative->getConcreteType()) {
     // If the concrete type doesn't involve type parameters, just return it.
     if (!concreteType->hasTypeParameter())
-      return NestedType::forConcreteType(concreteType);
+      return concreteType;
 
     // Otherwise, substitute in the archetypes in the environment.
 
@@ -523,18 +516,15 @@ ArchetypeBuilder::PotentialArchetype::getTypeInContext(
         representative->RecursiveConcreteType = true;
       }
 
-      return NestedType::forConcreteType(
-                ErrorType::get(getDependentType(genericParams,
-                                                /*allowUnresolved=*/true)));
+      return ErrorType::get(getDependentType(genericParams,
+                                             /*allowUnresolved=*/true));
     }
 
     SWIFT_DEFER {
       builder.Impl->ConcreteSubs.erase({genericEnv, representative});
     };
 
-    return NestedType::forConcreteType(
-                           genericEnv->mapTypeIntoContext(&builder.getModule(),
-                                                          concreteType));
+    return genericEnv->mapTypeIntoContext(&builder.getModule(), concreteType);
   }
 
   // Check that we haven't referenced this type while substituting into the
@@ -550,14 +540,13 @@ ArchetypeBuilder::PotentialArchetype::getTypeInContext(
     }
 
     representative->RecursiveSuperclassType = true;
-    return NestedType::forConcreteType(
-             ErrorType::get(getDependentType(genericParams,
-                                             /*allowUnresolved=*/true)));
+    return ErrorType::get(getDependentType(genericParams,
+                                           /*allowUnresolved=*/true));
   }
 
   // Local function to check whether we have a generic parameter that has
   // already been recorded
-  auto getAlreadyRecoveredGenericParam = [&]() -> Optional<NestedType> {
+  auto getAlreadyRecoveredGenericParam = [&]() -> Optional<Type> {
     if (!isGenericParam()) return None;
 
     auto type = genericEnv->getMappingIfPresent(getGenericParamKey());
@@ -565,10 +554,7 @@ ArchetypeBuilder::PotentialArchetype::getTypeInContext(
 
     // We already have a mapping for this generic parameter in the generic
     // environment. Return it.
-    if (auto archetype = (*type)->getAs<ArchetypeType>())
-      return NestedType::forArchetype(archetype);
-
-    return NestedType::forConcreteType(*type);
+    return *type;
   };
 
   AssociatedTypeDecl *assocType = nullptr;
@@ -580,33 +566,22 @@ ArchetypeBuilder::PotentialArchetype::getTypeInContext(
 
     auto parentTy = parent->getTypeInContext(builder, genericEnv);
     if (!parentTy)
-      return NestedType::forConcreteType(ErrorType::get(ctx));
+      return ErrorType::get(getDependentType(genericParams,
+                                             /*allowUnresolved=*/true));
 
-    if (Type concreteParent = parentTy.getAsConcreteType()) {
-      // We might have an outer archetype as a concrete type here; if so, just
-      // return that.
-      // FIXME: This should go away when we fix
-      // ArchetypeBuilder::addGenericSignature() to no longer take a generic
-      // environment.
-      if (auto parentArchetype = concreteParent->getAs<ArchetypeType>()) {
-        builder.Impl->UsedContextArchetype = true;
-        return NestedType::forConcreteType(
-                           parentArchetype->getNestedTypeValue(getName()));
-      }
-
+    ParentArchetype = parentTy->getAs<ArchetypeType>();
+    if (!ParentArchetype) {
       LazyResolver *resolver = ctx.getLazyResolver();
       assert(resolver && "need a lazy resolver");
       (void) resolver;
 
       // Resolve the member type.
-      auto type = getDependentType(genericParams,
-                                   /*allowUnresolved=*/false);
+      auto type = getDependentType(genericParams, /*allowUnresolved=*/false);
       if (type->hasError())
-        return NestedType::forConcreteType(type);
+        return type;
 
       auto depMemberType = type->castTo<DependentMemberType>();
-      Type memberType = depMemberType->substBaseType(&mod, parentTy.getValue(),
-                                                     resolver);
+      Type memberType = depMemberType->substBaseType(&mod, parentTy, resolver);
 
       // If the member type maps to an archetype, resolve that archetype.
       if (auto memberPA = builder.resolveArchetype(memberType)) {
@@ -624,12 +599,8 @@ ArchetypeBuilder::PotentialArchetype::getTypeInContext(
       // that a same-type constraint affects this so late in the game.
       representative->SameTypeSource = parent->SameTypeSource;
 
-      return NestedType::forConcreteType(
-                           genericEnv->mapTypeIntoContext(&builder.getModule(),
-                                                          memberType));
+      return genericEnv->mapTypeIntoContext(&builder.getModule(), memberType);
     }
-
-    ParentArchetype = parentTy.getAsArchetype();
 
     // Check whether the parent already has a nested type with this name. If
     // so, return it directly.
@@ -689,9 +660,8 @@ ArchetypeBuilder::PotentialArchetype::getTypeInContext(
     // If we were unable to resolve this as an associated type, produce an
     // error type.
     if (!assocType) {
-      return NestedType::forConcreteType(
-               ErrorType::get(getDependentType(genericParams,
-                                               /*allowUnresolved=*/true)));
+      return ErrorType::get(getDependentType(genericParams,
+                                             /*allowUnresolved=*/true));
     }
 
     // Create a nested archetype.
@@ -699,8 +669,7 @@ ArchetypeBuilder::PotentialArchetype::getTypeInContext(
                                  superclass);
 
     // Register this archetype with its parent.
-    ParentArchetype->registerNestedType(getName(),
-                                        NestedType::forArchetype(arch));
+    ParentArchetype->registerNestedType(getName(), arch);
   } else {
     // Create a top-level archetype.
     arch = ArchetypeType::getNew(ctx, genericEnv, getName(), Protos,
@@ -710,11 +679,11 @@ ArchetypeBuilder::PotentialArchetype::getTypeInContext(
     genericEnv->addMapping(getGenericParamKey(), arch);
   }
 
-  return NestedType::forArchetype(arch);
+  return arch;
 }
 
 void ArchetypeType::resolveNestedType(
-       std::pair<Identifier, NestedType> &nested) const {
+                                    std::pair<Identifier, Type> &nested) const {
   auto genericEnv = getGenericEnvironment();
   auto &builder = *genericEnv->getArchetypeBuilder();
 
@@ -725,9 +694,8 @@ void ArchetypeType::resolveNestedType(
   auto memberPA = parentPA->getNestedType(nested.first, builder);
   auto result = memberPA->getTypeInContext(builder, genericEnv);
   assert(!nested.second ||
-         nested.second.getValue()->isEqual(result.getValue()) ||
-         (nested.second.getValue()->hasError() &&
-          result.getValue()->hasError()));
+         nested.second->isEqual(result) ||
+         (nested.second->hasError() && result->hasError()));
   nested.second = result;
 }
 
@@ -1298,10 +1266,8 @@ bool ArchetypeBuilder::addSameTypeRequirementToConcrete(
     AssociatedTypeDecl *assocType
       = nested.second.front()->getResolvedAssociatedType();
     if (auto *concreteArchetype = Concrete->getAs<ArchetypeType>()) {
-      ArchetypeType::NestedType witnessType =
-          concreteArchetype->getNestedType(nested.first);
-      addSameTypeRequirementToConcrete(nested.second.front(),
-                                       witnessType.getValue(),
+      Type witnessType = concreteArchetype->getNestedType(nested.first);
+      addSameTypeRequirementToConcrete(nested.second.front(), witnessType,
                                        Source);
     } else {
       assert(conformances.count(assocType->getProtocol()) > 0
@@ -2117,7 +2083,7 @@ GenericEnvironment *ArchetypeBuilder::getGenericEnvironment(
 
 #ifndef NDEBUG
   // FIXME: This property should be maintained when there are errors, too.
-  if (!Diags.hadAnyError() && !Impl->UsedContextArchetype) {
+  if (!Diags.hadAnyError()) {
     auto genericParams = signature->getGenericParams();
     visitPotentialArchetypes([&](PotentialArchetype *pa) {
       if (pa->isConcreteType()) return;

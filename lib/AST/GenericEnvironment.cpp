@@ -150,8 +150,8 @@ Type GenericEnvironment::QueryInterfaceTypeSubstitutions::operator()(
 
       auto mutableSelf = const_cast<GenericEnvironment *>(self);
       contextType =
-        potentialArchetype->getTypeInContext(*mutableSelf->Builder, mutableSelf)
-          .getValue();
+        potentialArchetype->getTypeInContext(*mutableSelf->Builder,
+                                             mutableSelf);
 
       // FIXME: Redundant mapping from key -> index.
       if (self->getContextTypes()[index].isNull())
@@ -229,11 +229,12 @@ Type GenericEnvironment::QueryArchetypeToInterfaceSubstitutions::operator()(
 }
 
 Type GenericEnvironment::mapTypeIntoContext(ModuleDecl *M, Type type) const {
-  type = type.subst(M, QueryInterfaceTypeSubstitutions(this),
-                    SubstFlags::AllowLoweredTypes);
-  assert((!type->hasTypeParameter() || type->hasError()) &&
+  Type result = type.subst(M, QueryInterfaceTypeSubstitutions(this),
+                           (SubstFlags::AllowLoweredTypes|
+                            SubstFlags::UseErrorType));
+  assert((!result->hasTypeParameter() || result->hasError()) &&
          "not fully substituted");
-  return type;
+  return result;
 }
 
 Type GenericEnvironment::mapTypeIntoContext(GenericTypeParamType *type) const {

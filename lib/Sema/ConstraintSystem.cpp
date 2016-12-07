@@ -1054,7 +1054,7 @@ ConstraintSystem::getTypeOfMemberReference(
 
     // Refer to a member of the archetype directly.
     if (auto archetype = baseObjTy->getAs<ArchetypeType>()) {
-      Type memberTy = archetype->getNestedTypeValue(value->getName());
+      Type memberTy = archetype->getNestedType(value->getName());
       if (!isTypeReference)
         memberTy = MetatypeType::get(memberTy);
 

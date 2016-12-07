@@ -2834,13 +2834,10 @@ namespace {
         OS << "=";
         OS << nestedType.first.str() << " ";
         if (!nestedType.second) {
-          PrintWithColorRAII(OS, TypeColor) << "unresolved";          
-        } else if (auto concrete = nestedType.second.getAsConcreteType()) {
-          PrintWithColorRAII(OS, TypeColor) << "concrete";
-          OS << "=" << concrete.getString();
+          PrintWithColorRAII(OS, TypeColor) << "<<unresolved>>";
         } else {
-          PrintWithColorRAII(OS, TypeColor) << "archetype";
-          OS << "=" << static_cast<void *>(nestedType.second.getAsArchetype());
+          PrintWithColorRAII(OS, TypeColor);
+          OS << "=" << nestedType.second.getString();
         }
         OS << ")";
       }

@@ -2567,19 +2567,18 @@ bool ArchetypeType::requiresClass() const {
 namespace {
   /// \brief Function object that orders archetypes by name.
   struct OrderArchetypeByName {
-    using NestedType = ArchetypeType::NestedType;
-    bool operator()(std::pair<Identifier, NestedType> X,
-                    std::pair<Identifier, NestedType> Y) const {
+    bool operator()(std::pair<Identifier, Type> X,
+                    std::pair<Identifier, Type> Y) const {
       return X.first.str() < Y.first.str();
     }
 
-    bool operator()(std::pair<Identifier, NestedType> X,
+    bool operator()(std::pair<Identifier, Type> X,
                     Identifier Y) const {
       return X.first.str() < Y.str();
     }
 
     bool operator()(Identifier X,
-                    std::pair<Identifier, NestedType> Y) const {
+                    std::pair<Identifier, Type> Y) const {
       return X.str() < Y.first.str();
     }
 
@@ -2593,14 +2592,14 @@ void ArchetypeType::populateNestedTypes() const {
   if (ArchetypeTypeBits.ExpandedNestedTypes) return;
 
   // Collect the set of nested types of this archetype.
-  SmallVector<std::pair<Identifier, NestedType>, 4> nestedTypes;
+  SmallVector<std::pair<Identifier, Type>, 4> nestedTypes;
   llvm::SmallPtrSet<Identifier, 4> knownNestedTypes;
   ProtocolType::visitAllProtocols(getConformsTo(),
                                   [&](ProtocolDecl *proto) -> bool {
     for (auto member : proto->getMembers()) {
       if (auto assocType = dyn_cast<AssociatedTypeDecl>(member)) {
         if (knownNestedTypes.insert(assocType->getName()).second)
-          nestedTypes.push_back({ assocType->getName(), NestedType() });
+          nestedTypes.push_back({ assocType->getName(), Type() });
       }
     }
 
@@ -2612,15 +2611,13 @@ void ArchetypeType::populateNestedTypes() const {
   mutableThis->setNestedTypes(mutableThis->getASTContext(), nestedTypes);
 }
 
-ArchetypeType::NestedType ArchetypeType::getNestedType(Identifier Name) const {
+Type ArchetypeType::getNestedType(Identifier Name) const {
   populateNestedTypes();
 
   auto Pos = std::lower_bound(NestedTypes.begin(), NestedTypes.end(), Name,
                               OrderArchetypeByName());
   if (Pos == NestedTypes.end() || Pos->first != Name) {
-    return NestedType::forConcreteType(
-             ErrorType::get(
-               const_cast<ArchetypeType *>(this)->getASTContext()));
+    return ErrorType::get(const_cast<ArchetypeType *>(this)->getASTContext());
   }
 
   // If the type is null, lazily resolve it. 
@@ -2631,8 +2628,7 @@ ArchetypeType::NestedType ArchetypeType::getNestedType(Identifier Name) const {
   return Pos->second;
 }
 
-Optional<ArchetypeType::NestedType> ArchetypeType::getNestedTypeIfKnown(
-                                                        Identifier Name) const {
+Optional<Type> ArchetypeType::getNestedTypeIfKnown(Identifier Name) const {
   populateNestedTypes();
 
   auto Pos = std::lower_bound(NestedTypes.begin(), NestedTypes.end(), Name,
@@ -2651,7 +2647,7 @@ bool ArchetypeType::hasNestedType(Identifier Name) const {
   return Pos != NestedTypes.end() && Pos->first == Name;
 }
 
-ArrayRef<std::pair<Identifier, ArchetypeType::NestedType>>
+ArrayRef<std::pair<Identifier, Type>>
 ArchetypeType::getAllNestedTypes(bool resolveTypes) const {
   populateNestedTypes();
 
@@ -2666,15 +2662,15 @@ ArchetypeType::getAllNestedTypes(bool resolveTypes) const {
 }
 
 void ArchetypeType::setNestedTypes(
-       ASTContext &Ctx,
-       ArrayRef<std::pair<Identifier, NestedType>> Nested) {
+                                 ASTContext &Ctx,
+                                 ArrayRef<std::pair<Identifier, Type>> Nested) {
   assert(!ArchetypeTypeBits.ExpandedNestedTypes && "Already expanded");
   NestedTypes = Ctx.AllocateCopy(Nested);
   std::sort(NestedTypes.begin(), NestedTypes.end(), OrderArchetypeByName());
   ArchetypeTypeBits.ExpandedNestedTypes = true;
 }
 
-void ArchetypeType::registerNestedType(Identifier name, NestedType nested) {
+void ArchetypeType::registerNestedType(Identifier name, Type nested) {
   populateNestedTypes();
 
   auto found = std::lower_bound(NestedTypes.begin(), NestedTypes.end(), name,
@@ -2682,9 +2678,8 @@ void ArchetypeType::registerNestedType(Identifier name, NestedType nested) {
   assert(found != NestedTypes.end() && found->first == name &&
          "Unable to find nested type?");
   assert(!found->second ||
-         found->second.getValue()->isEqual(nested.getValue()) ||
-         (found->second.getValue()->hasError() &&
-          nested.getValue()->hasError()));
+         found->second->isEqual(nested) ||
+         (found->second->hasError() && nested->hasError()));
   found->second = nested;
 }
 
@@ -2831,7 +2826,7 @@ static Type getMemberForBaseType(ConformanceSource conformances,
   // given name.
   if (auto archetypeParent = substBase->getAs<ArchetypeType>()) {
     if (archetypeParent->hasNestedType(name))
-      return archetypeParent->getNestedTypeValue(name);
+      return archetypeParent->getNestedType(name);
 
     // If looking for an associated type and the archetype is constrained to a
     // class, continue to the default associated type lookup
