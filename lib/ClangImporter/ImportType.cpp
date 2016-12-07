@@ -1824,13 +1824,11 @@ getForeignErrorInfo(ForeignErrorConvention::Info errorInfo,
 Type ClangImporter::Implementation::importMethodType(
        const DeclContext *dc,
        const clang::ObjCMethodDecl *clangDecl,
-       clang::QualType resultType,
        ArrayRef<const clang::ParmVarDecl *> params,
-       bool isVariadic, bool isNoReturn,
+       bool isVariadic,
        bool isFromSystemModule,
        ParameterList **bodyParams,
        ImportedName importedName,
-       DeclName &methodName,
        Optional<ForeignErrorConvention> &foreignErrorInfo,
        SpecialMethodKind kind) {
 
@@ -1913,6 +1911,7 @@ Type ClangImporter::Implementation::importMethodType(
       }
     }
 
+    clang::QualType resultType = clangDecl->getReturnType();
     swiftResultTy = importType(resultType, resultKind,
                                allowNSUIntegerAsIntInResult,
                                /*isFullyBridgeable*/true,
@@ -1979,7 +1978,7 @@ Type ClangImporter::Implementation::importMethodType(
   unsigned numEffectiveParams = params.size();
   if (errorInfo) --numEffectiveParams;
 
-  auto argNames = methodName.getArgumentNames();
+  auto argNames = importedName.getDeclName().getArgumentNames();
   unsigned nameIndex = 0;
   for (size_t paramIndex = 0; paramIndex != params.size(); paramIndex++) {
     auto param = params[paramIndex];
@@ -2100,9 +2099,10 @@ Type ClangImporter::Implementation::importMethodType(
            errorInfo->ErrorParameterIndex == params.size() - 1);
 
       auto defaultArg = inferDefaultArgument(
-          param->getType(), optionalityOfParam, methodName.getBaseName(),
-          numEffectiveParams, name.empty() ? StringRef() : name.str(),
-          paramIndex == 0, isLastParameter, getNameImporter());
+          param->getType(), optionalityOfParam,
+          importedName.getDeclName().getBaseName(), numEffectiveParams,
+          name.empty() ? StringRef() : name.str(), paramIndex == 0,
+          isLastParameter, getNameImporter());
       if (defaultArg != DefaultArgumentKind::None)
         paramInfo->setDefaultArgumentKind(defaultArg);
     }
@@ -2135,7 +2135,7 @@ Type ClangImporter::Implementation::importMethodType(
   // Form the parameter list.
   *bodyParams = ParameterList::create(SwiftContext, swiftParams);
 
-  if (isNoReturn) {
+  if (clangDecl->hasAttr<clang::NoReturnAttr>()) {
     origSwiftResultTy = SwiftContext.getNeverType();
     swiftResultTy = SwiftContext.getNeverType();
   }

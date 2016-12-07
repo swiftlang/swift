@@ -3309,20 +3309,16 @@ namespace {
         kind = SpecialMethodKind::NSDictionarySubscriptGetter;
 
       // Import the type that this method will have.
-      DeclName name = importedName.getDeclName();
       Optional<ForeignErrorConvention> errorConvention;
       bodyParams.push_back(nullptr);
       auto type = Impl.importMethodType(dc,
                                         decl,
-                                        decl->getReturnType(),
                                         { decl->param_begin(),
                                           decl->param_size() },
                                         decl->isVariadic(),
-                                        decl->hasAttr<clang::NoReturnAttr>(),
                                         isInSystemModule(dc),
                                         &bodyParams.back(),
                                         importedName,
-                                        name,
                                         errorConvention,
                                         kind);
       if (!type)
@@ -3341,11 +3337,10 @@ namespace {
 
       auto result = FuncDecl::create(
           Impl.SwiftContext, /*StaticLoc=*/SourceLoc(),
-          StaticSpellingKind::None,
-          /*FuncLoc=*/SourceLoc(), name, /*NameLoc=*/SourceLoc(),
+          StaticSpellingKind::None, /*FuncLoc=*/SourceLoc(),
+          importedName.getDeclName(), /*NameLoc=*/SourceLoc(),
           /*Throws=*/importedName.getErrorInfo().hasValue(),
-          /*ThrowsLoc=*/SourceLoc(),
-          /*AccessorKeywordLoc=*/SourceLoc(),
+          /*ThrowsLoc=*/SourceLoc(), /*AccessorKeywordLoc=*/SourceLoc(),
           /*GenericParams=*/nullptr, bodyParams, TypeLoc(), dc, decl);
 
       result->setAccessibility(getOverridableAccessibility(dc));
@@ -5232,12 +5227,10 @@ ConstructorDecl *SwiftDeclConverter::importConstructor(
 
   // Import the type that this method will have.
   Optional<ForeignErrorConvention> errorConvention;
-  DeclName name = importedName.getDeclName();
   bodyParams.push_back(nullptr);
   auto type = Impl.importMethodType(
-      dc, objcMethod, objcMethod->getReturnType(), args, variadic,
-      objcMethod->hasAttr<clang::NoReturnAttr>(), isInSystemModule(dc),
-      &bodyParams.back(), importedName, name, errorConvention,
+      dc, objcMethod, args, variadic, isInSystemModule(dc),
+      &bodyParams.back(), importedName, errorConvention,
       SpecialMethodKind::Constructor);
   if (!type)
     return nullptr;
@@ -5265,7 +5258,7 @@ ConstructorDecl *SwiftDeclConverter::importConstructor(
                             ->getResult()
                             ->castTo<AnyFunctionType>()
                             ->getInput();
-  for (auto other : ownerNominal->lookupDirect(name)) {
+  for (auto other : ownerNominal->lookupDirect(importedName.getDeclName())) {
     auto ctor = dyn_cast<ConstructorDecl>(other);
     if (!ctor || ctor->isInvalid() ||
         ctor->getAttrs().isUnavailable(Impl.SwiftContext) ||
@@ -5342,8 +5335,8 @@ ConstructorDecl *SwiftDeclConverter::importConstructor(
 
   // Create the actual constructor.
   auto result = Impl.createDeclWithClangNode<ConstructorDecl>(
-      objcMethod, Accessibility::Public, name, /*NameLoc=*/SourceLoc(),
-      failability, /*FailabilityLoc=*/SourceLoc(),
+      objcMethod, Accessibility::Public, importedName.getDeclName(),
+      /*NameLoc=*/SourceLoc(), failability, /*FailabilityLoc=*/SourceLoc(),
       /*Throws=*/importedName.getErrorInfo().hasValue(),
       /*ThrowsLoc=*/SourceLoc(), selfVar, bodyParams.back(),
       /*GenericParams=*/nullptr, dc);
