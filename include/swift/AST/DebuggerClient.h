@@ -37,7 +37,7 @@ public:
   // in the global context rather than the current context.
   // This question will only be asked if the decl's current context
   // is a function marked with the LLDBDebuggerFunction attribute.
-  virtual bool shouldGlobalize(Identifier Name, DeclKind kind) = 0;
+  virtual bool shouldGlobalize(DeclName Name, DeclKind kind) = 0;
   
   virtual void didGlobalize (Decl *Decl) = 0;
 
@@ -48,7 +48,7 @@ public:
   /// be consulted first.  Return true if results have been added
   /// to RV.
   /// FIXME: I don't think this ever does anything useful.
-  virtual bool lookupOverrides(Identifier Name, DeclContext *DC,
+  virtual bool lookupOverrides(DeclName Name, DeclContext *DC,
                                SourceLoc Loc, bool IsTypeLookup,
                                ResultVector &RV) = 0;
  
@@ -57,7 +57,7 @@ public:
   /// gets a chance to add names to the list of candidates that
   /// have been found in the external module lookup.  
 
-  virtual bool lookupAdditions(Identifier Name, DeclContext *DC,
+  virtual bool lookupAdditions(DeclName Name, DeclContext *DC,
                                SourceLoc Loc, bool IsTypeLookup,
                                ResultVector &RV) = 0;
 

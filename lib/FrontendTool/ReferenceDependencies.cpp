@@ -136,7 +136,7 @@ bool swift::emitReferenceDependencies(DiagnosticEngine &diags,
     return true;
   }
 
-  auto escape = [](Identifier name) -> std::string {
+  auto escape = [](DeclName name) -> std::string {
     return llvm::yaml::escape(name.str());
   };
 
@@ -204,7 +204,7 @@ bool swift::emitReferenceDependencies(DiagnosticEngine &diags,
           NTD->getFormalAccess() <= Accessibility::FilePrivate) {
         break;
       }
-      out << "- \"" << escape(NTD->getName()) << "\"\n";
+      out << "- \"" << escape(NTD->getBaseName()) << "\"\n";
       extendedNominals[NTD] |= true;
       findNominalsAndOperators(extendedNominals, memberOperatorDecls,
                                NTD->getMembers());
@@ -221,7 +221,7 @@ bool swift::emitReferenceDependencies(DiagnosticEngine &diags,
           VD->getFormalAccess() <= Accessibility::FilePrivate) {
         break;
       }
-      out << "- \"" << escape(VD->getName()) << "\"\n";
+      out << "- \"" << escape(VD->getBaseName()) << "\"\n";
       break;
     }
 
@@ -245,7 +245,7 @@ bool swift::emitReferenceDependencies(DiagnosticEngine &diags,
 
   // This is also part of "provides-top-level".
   for (auto *operatorFunction : memberOperatorDecls)
-    out << "- \"" << escape(operatorFunction->getName()) << "\"\n";
+    out << "- \"" << escape(operatorFunction->getBaseName()) << "\"\n";
 
   out << "provides-nominal:\n";
   for (auto entry : extendedNominals) {
@@ -275,7 +275,7 @@ bool swift::emitReferenceDependencies(DiagnosticEngine &diags,
         continue;
       }
       out << "- [\"" << mangledName << "\", \""
-          << escape(VD->getName()) << "\"]\n";
+          << escape(VD->getBaseName()) << "\"]\n";
     }
   }
 
@@ -286,14 +286,14 @@ bool swift::emitReferenceDependencies(DiagnosticEngine &diags,
     out << "provides-dynamic-lookup:\n";
     class NameCollector : public VisibleDeclConsumer {
     private:
-      SmallVector<Identifier, 16> names;
+      SmallVector<DeclName, 16> names;
     public:
       void foundDecl(ValueDecl *VD, DeclVisibilityKind Reason) override {
-        names.push_back(VD->getName());
+        names.push_back(VD->getBaseName());
       }
-      ArrayRef<Identifier> getNames() {
+      ArrayRef<DeclName> getNames() {
         llvm::array_pod_sort(names.begin(), names.end(),
-                             [](const Identifier *lhs, const Identifier *rhs) {
+                             [](const DeclName *lhs, const DeclName *rhs) {
           return lhs->compare(*rhs);
         });
         names.erase(std::unique(names.begin(), names.end()), names.end());
@@ -302,28 +302,28 @@ bool swift::emitReferenceDependencies(DiagnosticEngine &diags,
     };
     NameCollector collector;
     SF->lookupClassMembers({}, collector);
-    for (Identifier name : collector.getNames()) {
+    for (DeclName name : collector.getNames()) {
       out << "- \"" << escape(name) << "\"\n";
     }
   }
 
   ReferencedNameTracker *tracker = SF->getReferencedNameTracker();
 
-  auto sortedByIdentifier =
-      [](const llvm::DenseMap<Identifier, bool> map) ->
-        SmallVector<std::pair<Identifier, bool>, 16> {
-    SmallVector<std::pair<Identifier, bool>, 16> pairs{map.begin(), map.end()};
+  auto sortedByName =
+      [](const llvm::DenseMap<DeclName, bool> map) ->
+        SmallVector<std::pair<DeclName, bool>, 16> {
+    SmallVector<std::pair<DeclName, bool>, 16> pairs{map.begin(), map.end()};
     llvm::array_pod_sort(pairs.begin(), pairs.end(),
-                         [](const std::pair<Identifier, bool> *first,
-                            const std::pair<Identifier, bool> *second) -> int {
+                         [](const std::pair<DeclName, bool> *first,
+                            const std::pair<DeclName, bool> *second) -> int {
       return first->first.compare(second->first);
     });
     return pairs;
   };
 
   out << "depends-top-level:\n";
-  for (auto &entry : sortedByIdentifier(tracker->getTopLevelNames())) {
-    assert(!entry.first.empty());
+  for (auto &entry : sortedByName(tracker->getTopLevelNames())) {
+    assert(entry.first);
     out << "- ";
     if (!entry.second)
       out << "!private ";
@@ -342,8 +342,9 @@ bool swift::emitReferenceDependencies(DiagnosticEngine &diags,
     if (lhs->first.first == rhs->first.first)
       return lhs->first.second.compare(rhs->first.second);
 
-    if (lhs->first.first->getName() != rhs->first.first->getName())
-      return lhs->first.first->getName().compare(rhs->first.first->getName());
+    if (lhs->first.first->getBaseName() != rhs->first.first->getBaseName())
+      return lhs->first.first->getBaseName()
+               .compare(rhs->first.first->getBaseName());
 
     // Break type name ties by mangled name.
     auto lhsMangledName = mangleTypeAsContext(lhs->first.first);
@@ -363,7 +364,7 @@ bool swift::emitReferenceDependencies(DiagnosticEngine &diags,
     out << "[\"";
     out << mangleTypeAsContext(entry.first.first);
     out << "\", \"";
-    if (!entry.first.second.empty())
+    if (entry.first.second)
       out << escape(entry.first.second);
     out << "\"]\n";
   }
@@ -389,8 +390,8 @@ bool swift::emitReferenceDependencies(DiagnosticEngine &diags,
   }
 
   out << "depends-dynamic-lookup:\n";
-  for (auto &entry : sortedByIdentifier(tracker->getDynamicLookupNames())) {
-    assert(!entry.first.empty());
+  for (auto &entry : sortedByName(tracker->getDynamicLookupNames())) {
+    assert(entry.first);
     out << "- ";
     if (!entry.second)
       out << "!private ";

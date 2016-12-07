@@ -132,7 +132,7 @@ static void nmModule(SILModule *M) {
     std::vector<StringRef> VTableNames;
     llvm::transform(M->getVTables(), std::back_inserter(VTableNames),
                     [](const SILVTable &VT) -> StringRef {
-                      return VT.getClass()->getName().str();
+                      return VT.getClass()->getBaseName().str();
                     });
     printAndSortNames(VTableNames, 'V');
   }
@@ -223,7 +223,7 @@ int main(int argc, char **argv) {
         CI.getASTContext(), CI.getSILModule(), nullptr);
 
     if (extendedInfo.isSIB())
-      SL->getAllForModule(CI.getMainModule()->getName(), nullptr);
+      SL->getAllForModule(CI.getMainModule()->getIdentifier(), nullptr);
     else
       SL->getAll();
   }

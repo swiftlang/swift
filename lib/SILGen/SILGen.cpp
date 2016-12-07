@@ -1278,7 +1278,7 @@ public:
       toplevel->setDebugScope(new (sgm.M) SILDebugScope(TopLevelLoc, toplevel));
 
       sgm.TopLevelSGF = new SILGenFunction(sgm, *toplevel);
-      sgm.TopLevelSGF->MagicFunctionName = sgm.SwiftModule->getName();
+      sgm.TopLevelSGF->MagicFunctionName = sgm.SwiftModule->getIdentifier();
       sgm.TopLevelSGF->prepareEpilog(Type(), false,
                                  CleanupLocation::getModuleCleanupLocation());
 
@@ -1442,7 +1442,7 @@ SILModule::constructSIL(Module *mod, SILOptions &options, FileUnit *SF,
       SGM.emitSourceFile(file, startElem.getValueOr(0));
     } else if (auto *file = dyn_cast<SerializedASTFile>(SF)) {
       if (file->isSIB())
-        M->getSILLoader()->getAllForModule(mod->getName(), file);
+        M->getSILLoader()->getAllForModule(mod->getIdentifier(), file);
     }
   } else {
     for (auto file : mod->getFiles()) {
@@ -1460,7 +1460,7 @@ SILModule::constructSIL(Module *mod, SILOptions &options, FileUnit *SF,
       return SASTF && SASTF->isSIB();
     });
     if (hasSIB)
-      M->getSILLoader()->getAllForModule(mod->getName(), nullptr);
+      M->getSILLoader()->getAllForModule(mod->getIdentifier(), nullptr);
   }
 
   // Emit external definitions used by this module.

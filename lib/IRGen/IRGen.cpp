@@ -671,7 +671,7 @@ static std::unique_ptr<llvm::Module> performIRGeneration(IRGenOptions &Opts,
         continue;
       prev = next;
 
-      if (next->getName() == M->getName())
+      if (next->getIdentifier() == M->getIdentifier())
         continue;
 
       next->collectLinkLibraries([&](LinkLibrary linkLib) {
@@ -840,7 +840,7 @@ static void performParallelIRGeneration(IRGenOptions &Opts,
       continue;
     prev = next;
     
-    if (next->getName() == M->getName())
+    if (next->getIdentifier() == M->getIdentifier())
       continue;
     
     next->collectLinkLibraries([&](LinkLibrary linkLib) {

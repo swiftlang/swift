@@ -431,7 +431,8 @@ static OwnedAddress emitAddressAtOffset(IRGenFunction &IGF,
   auto &fieldTI =
     IGF.getTypeInfo(baseType.getFieldType(field, IGF.getSILModule()));
   auto addr = IGF.emitByteOffsetGEP(base, offset, fieldTI,
-                              base->getName() + "." + field->getName().str());
+                              base->getName() + "." +
+                              field->getBaseName().str());
   return OwnedAddress(addr, base);
 }
 
@@ -1108,7 +1109,7 @@ namespace {
       // Find the module the extension is declared in.
       Module *TheModule = TheExtension->getParentModule();
 
-      os << TheModule->getName();
+      os << TheModule->getIdentifier();
       
       unsigned categoryCount = CategoryCounts[{getClass(), TheModule}]++;
       if (categoryCount > 0)
@@ -1610,7 +1611,7 @@ namespace {
       }
 
       // TODO: clang puts this in __TEXT,__objc_methname,cstring_literals
-      auto name = IGM.getAddrOfGlobalString(ivar->getName().str());
+      auto name = IGM.getAddrOfGlobalString(ivar->getBaseName().str());
 
       // TODO: clang puts this in __TEXT,__objc_methtype,cstring_literals
       auto typeEncode = IGM.getAddrOfGlobalString("");
@@ -1764,7 +1765,7 @@ namespace {
       
       // If the property has storage, emit the ivar name last.
       if (prop->hasStorage())
-        outs << ",V" << prop->getName();
+        outs << ",V" << prop->getBaseName();
     }
 
     /// struct property_t {

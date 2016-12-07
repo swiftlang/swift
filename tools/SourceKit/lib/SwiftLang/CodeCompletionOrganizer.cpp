@@ -335,7 +335,7 @@ ImportDepth::ImportDepth(ASTContext &context, CompilerInvocation &invocation) {
   main->getImportedModules(mainImports, Module::ImportFilter::Private);
   for (auto &import : mainImports) {
     uint8_t depth = 1;
-    if (auxImports.count(import.second->getName().str()))
+    if (auxImports.count(import.second->getIdentifier().str()))
       depth = 0;
     worklist.emplace_back(import.second, depth);
   }
@@ -355,7 +355,7 @@ ImportDepth::ImportDepth(ASTContext &context, CompilerInvocation &invocation) {
     if (CM) {
       depths[CM->getFullModuleName()] = depth;
     } else {
-      depths[module->getName().str()] = depth;
+      depths[module->getIdentifier().str()] = depth;
     }
 
     // Add imports to the worklist.

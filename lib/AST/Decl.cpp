@@ -188,7 +188,7 @@ DescriptiveDeclKind Decl::getDescriptiveKind() const {
        return DescriptiveDeclKind::MaterializeForSet;
      }
 
-     if (!func->getName().empty() && func->getName().isOperator())
+     if (func->isOperator())
        return DescriptiveDeclKind::OperatorFunction;
 
      if (func->getDeclContext()->isLocalContext())
@@ -2597,7 +2597,7 @@ EnumCaseDecl *EnumCaseDecl::create(SourceLoc CaseLoc,
 EnumElementDecl *EnumDecl::getElement(Identifier Name) const {
   // FIXME: Linear search is not great for large enum decls.
   for (EnumElementDecl *Elt : getAllElements())
-    if (Elt->getName() == Name)
+    if (Elt->getBaseName() == Name)
       return Elt;
   return nullptr;
 }
@@ -3609,7 +3609,7 @@ Pattern *VarDecl::getParentPattern() const {
 bool VarDecl::isSelfParameter() const {
   // Note: we need to check the isImplicit() bit here to make sure that we
   // don't classify explicit parameters declared with `self` as the self param.
-  return isa<ParamDecl>(this) && getName() == getASTContext().Id_self &&
+  return isa<ParamDecl>(this) && getBaseName() == getASTContext().Id_self &&
          isImplicit();
 }
 
@@ -3643,8 +3643,8 @@ bool AbstractStorageDecl::requiresForeignGetterAndSetter() const {
 
 
 bool VarDecl::isAnonClosureParam() const {
-  auto name = getName();
-  if (name.empty())
+  auto name = getBaseName();
+  if (!name)
     return false;
 
   auto nameStr = name.str();
@@ -3671,7 +3671,7 @@ Identifier VarDecl::getObjCPropertyName() const {
       return name->getSelectorPieces()[0];
   }
 
-  return getName();
+  return getBaseName().getIdentifier();
 }
 
 ObjCSelector VarDecl::getDefaultObjCGetterSelector(ASTContext &ctx,
@@ -3745,7 +3745,7 @@ ParamDecl::ParamDecl(bool isLet,
 /// Intentionally not defined as a copy constructor to avoid accidental copies.
 ParamDecl::ParamDecl(ParamDecl *PD)
   : VarDecl(DeclKind::Param, /*IsStatic=*/false, PD->isLet(), PD->getNameLoc(),
-            PD->getName(), PD->hasType() ? PD->getType() : Type(),
+            PD->getBaseName(), PD->hasType() ? PD->getType() : Type(),
             PD->getDeclContext()),
     ArgumentName(PD->getArgumentName()),
     ArgumentNameLoc(PD->getArgumentNameLoc()),
@@ -4099,7 +4099,7 @@ DeclName AbstractFunctionDecl::getEffectiveFullName() const {
         case AccessorKind::IsMutableAddressor:
         case AccessorKind::IsGetter:
           return subscript ? subscript->getFullName()
-                           : DeclName(ctx, afd->getName(),
+                           : DeclName(ctx, afd->getBaseName().getIdentifier(),
                                       ArrayRef<Identifier>());
 
         case AccessorKind::IsSetter:
@@ -4117,7 +4117,7 @@ DeclName AbstractFunctionDecl::getEffectiveFullName() const {
             argNames.append(subscript->getFullName().getArgumentNames().begin(),
                             subscript->getFullName().getArgumentNames().end());
           }
-          return DeclName(ctx, afd->getName(), argNames);
+          return DeclName(ctx, afd->getBaseName().getIdentifier(), argNames);
         }
       }
     }
@@ -4279,12 +4279,12 @@ ObjCSelector AbstractFunctionDecl::getObjCSelector(
 
   // If we have no arguments, it's a nullary selector.
   if (numSelectorPieces == 0) {
-    return ObjCSelector(ctx, 0, getName());
+    return ObjCSelector(ctx, 0, getBaseName().getIdentifier());
   }
 
- // If it's a unary selector with no name for the first argument, we're done.
+  // If it's a unary selector with no name for the first argument, we're done.
   if (numSelectorPieces == 1 && argNames.size() == 1 && argNames[0].empty()) {
-    return ObjCSelector(ctx, 1, getName());
+    return ObjCSelector(ctx, 1, getBaseName().getIdentifier());
   }
 
   /// Collect the selector pieces.
@@ -4309,7 +4309,7 @@ ObjCSelector AbstractFunctionDecl::getObjCSelector(
 
     // For the first selector piece, attach either the first parameter
     // or "AndReturnError" to the base name, if appropriate.
-    auto firstPiece = getName();
+    auto firstPiece = getBaseName().getIdentifier();
     llvm::SmallString<32> scratch;
     scratch += firstPiece.str();
     if (errorConvention && piece == errorConvention->getErrorParameterIndex()) {
@@ -4767,7 +4767,7 @@ ConstructorDecl::getDelegatingOrChainedInitKind(DiagnosticEngine *diags,
       } else if (auto *CRE = dyn_cast<ConstructorRefCallExpr>(Callee)) {
         arg = CRE->getArg();
       } else if (auto *dotExpr = dyn_cast<UnresolvedDotExpr>(Callee)) {
-        if (dotExpr->getName().getBaseName().str() != "init")
+        if (dotExpr->getName().getBaseName() != "init")
           return { true, E };
 
         arg = dotExpr->getBase();
@@ -4931,7 +4931,7 @@ void PrecedenceGroupDecl::collectOperatorKeywordRanges(
 }
 
 bool FuncDecl::isDeferBody() const {
-  return getName() == getASTContext().getIdentifier("$defer");
+  return getBaseName() == getASTContext().getIdentifier("$defer");
 }
 
 Type TypeBase::getSwiftNewtypeUnderlyingType() {
@@ -4947,7 +4947,7 @@ Type TypeBase::getSwiftNewtypeUnderlyingType() {
   // Underlying type is the type of rawValue
   for (auto member : structDecl->getMembers())
     if (auto varDecl = dyn_cast<VarDecl>(member))
-      if (varDecl->getName() == getASTContext().Id_rawValue)
+      if (varDecl->getBaseName() == getASTContext().Id_rawValue)
         return varDecl->getType();
 
   return {};

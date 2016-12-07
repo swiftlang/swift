@@ -56,11 +56,11 @@ findReferencedDecl(Expr *expr, DeclNameLoc &loc) {
 
 static bool isArithmeticOperatorDecl(ValueDecl *vd) {
   return vd && 
-  (vd->getName().str() == "+" ||
-   vd->getName().str() == "-" ||
-   vd->getName().str() == "*" ||
-   vd->getName().str() == "/" ||
-   vd->getName().str() == "%");
+  (vd->getBaseName() == "+" ||
+   vd->getBaseName() == "-" ||
+   vd->getBaseName() == "*" ||
+   vd->getBaseName() == "/" ||
+   vd->getBaseName() == "%");
 }
 
 static bool mergeRepresentativeEquivalenceClasses(ConstraintSystem &CS,
@@ -332,8 +332,8 @@ namespace {
         if (acp1 == acp2)
           continue;
 
-        if (acp1->getDecl()->getName().str() ==
-              acp2->getDecl()->getName().str()) {
+        if (acp1->getDecl()->getBaseName() ==
+              acp2->getDecl()->getBaseName()) {
 
           auto tyvar1 = CS.getType(acp1)->getAs<TypeVariableType>();
           auto tyvar2 = CS.getType(acp2)->getAs<TypeVariableType>();
@@ -414,8 +414,8 @@ namespace {
               if (!isArithmeticOperatorDecl(ODR1->getDecls()[0]))
                 return;
 
-              if (ODR1->getDecls()[0]->getName().str() != 
-                   ODR2->getDecls()[0]->getName().str())
+              if (ODR1->getDecls()[0]->getBaseName() !=
+                   ODR2->getDecls()[0]->getBaseName())
                 return;
 
               // All things equal, we can merge the tyvars for the function
@@ -1541,13 +1541,13 @@ namespace {
           if (specializations.size() > typeVars.size()) {
             tc.diagnose(expr->getSubExpr()->getLoc(),
                         diag::type_parameter_count_mismatch,
-                        bgt->getDecl()->getName(),
+                        bgt->getDecl()->getBaseName(),
                         typeVars.size(), specializations.size(),
                         false)
               .highlight(SourceRange(expr->getLAngleLoc(),
                                      expr->getRAngleLoc()));
             tc.diagnose(bgt->getDecl(), diag::generic_type_declared_here,
-                        bgt->getDecl()->getName());
+                        bgt->getDecl()->getBaseName());
             return Type();
           }
 

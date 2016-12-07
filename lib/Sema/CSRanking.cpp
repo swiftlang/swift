@@ -956,8 +956,8 @@ ConstraintSystem::compareSolutions(ConstraintSystem &cs,
 
     // FIXME: Lousy hack for ?? to prefer the catamorphism (flattening)
     // over the mplus (non-flattening) overload if all else is equal.
-    if (decl1->getName().str() == "??") {
-      assert(decl2->getName().str() == "??");
+    if (decl1->getBaseName() == "??") {
+      assert(decl2->getBaseName() == "??");
 
       auto check = [](const ValueDecl *VD) -> bool {
         if (!VD->getModuleContext()->isStdlibModule())
@@ -1094,12 +1094,12 @@ ConstraintSystem::compareSolutions(ConstraintSystem &cs,
     // declarations.
     if (!(score1 || score2)) {
       if (auto nominalType2 = type2->getNominalOrBoundGenericNominal()) {
-        if ((nominalType2->getName() ==
+        if ((nominalType2->getBaseName() ==
              cs.TC.Context.Id_OptionalNilComparisonType)) {
           ++score1;
         }
       } else if (auto nominalType1 = type1->getNominalOrBoundGenericNominal()) {
-        if ((nominalType1->getName() ==
+        if ((nominalType1->getBaseName() ==
              cs.TC.Context.Id_OptionalNilComparisonType)) {
           ++score2;
         }

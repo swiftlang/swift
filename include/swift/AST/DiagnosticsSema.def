@@ -572,7 +572,7 @@ ERROR(ambiguous_module_type,none,
       "ambiguous type name %0 in module %1", (Identifier, Identifier))
 ERROR(use_nonmatching_operator,none,
       "%0 is not a %select{binary|prefix unary|postfix unary}1 operator",
-      (Identifier, unsigned))
+      (DeclName, unsigned))
 
 ERROR(unspaced_binary_operator_fixit,none,
       "missing whitespace between %0 and %1 operators",
@@ -594,15 +594,15 @@ ERROR(use_undeclared_type,none,
 ERROR(use_undeclared_type_did_you_mean,none,
       "use of undeclared type %0; did you mean to use '%1'?", (Identifier, StringRef))
 NOTE(note_typo_candidate,none,
-     "did you mean '%0'?", (StringRef))
+     "did you mean %0?", (DeclName))
 NOTE(note_typo_candidate_implicit_member,none,
-     "did you mean the implicitly-synthesized %1 '%0'?", (StringRef, StringRef))
+     "did you mean the implicitly-synthesized %1 %0?", (DeclName, StringRef))
 NOTE(note_remapped_type,none,
      "did you mean to use '%0'?", (StringRef))
 ERROR(identifier_init_failure,none,
-      "could not infer type for %0", (Identifier))
+      "could not infer type for %0", (DeclName))
 ERROR(pattern_used_in_type,none,
-      "%0 used within its own type", (Identifier))
+      "%0 used within its own type", (DeclName))
 NOTE(note_module_as_type,none,
      "cannot use module %0 as a type", (Identifier))
 
@@ -618,7 +618,7 @@ ERROR(use_local_before_declaration,none,
       "use of local variable %0 before its declaration", (DeclName))
 ERROR(unsupported_existential_type,none,
       "protocol %0 can only be used as a generic constraint because it has "
-      "Self or associated type requirements", (Identifier))
+      "Self or associated type requirements", (DeclName))
 
 ERROR(decl_does_not_exist_in_module,none,
       "%select{**MODULE**|type|struct|class|enum|protocol|variable|function}0 "
@@ -657,10 +657,10 @@ ERROR(invalid_arg_count_for_operator,none,
 ERROR(operator_in_local_scope,none,
       "operator functions can only be declared at global or in type scope", ())
 ERROR(nonstatic_operator_in_type,none,
-      "operator %0 declared in type %1 must be 'static'", (Identifier, Type))
+      "operator %0 declared in type %1 must be 'static'", (DeclName, Type))
 ERROR(nonfinal_operator_in_class,none,
       "operator %0 declared in non-final class %1 must be 'final'",
-      (Identifier, Type))
+      (DeclName, Type))
 ERROR(operator_in_unrelated_type,none,
       "member operator %2%select{| of protocol %0}1 must have at least one "
       "argument of type %select{%0|'Self'}1", (Type, bool, DeclName))
@@ -728,10 +728,10 @@ ERROR(did_not_call_function_value,none,
       ())
 ERROR(did_not_call_function,none,
       "function %0 was used as a property; add () to call it",
-      (Identifier))
+      (DeclName))
 ERROR(did_not_call_method,none,
       "method %0 was used as a property; add () to call it",
-      (Identifier))
+      (DeclName))
 
 ERROR(init_not_instance_member,none,
       "'init' is a member of the type; use 'type(of: ...)' to initialize "
@@ -771,13 +771,13 @@ ERROR(optional_chain_isnt_chaining,none,
 ERROR(pattern_in_expr,none,
       "%0 cannot appear in an expression", (PatternKind))
 NOTE(note_call_to_operator,none,
-     "in call to operator %0", (Identifier))
+     "in call to operator %0", (DeclName))
 NOTE(note_call_to_func,none,
-     "in call to function %0", (Identifier))
+     "in call to function %0", (DeclName))
 NOTE(note_call_to_initializer,none,
      "in call to initializer", ())
 NOTE(note_init_parameter,none,
-     "in initialization of parameter %0", (Identifier))
+     "in initialization of parameter %0", (DeclName))
 
 
 ERROR(missing_nullary_call,none,
@@ -921,7 +921,7 @@ ERROR(attr_decl_attr_now_on_type,none,
 ERROR(operator_not_func,none,
       "operators must be declared with 'func'", ())
 ERROR(redefining_builtin_operator,none,
-      "cannot declare a custom %0 '%1' operator", (StringRef, StringRef))
+      "cannot declare a custom %0 %1 operator", (StringRef, DeclName))
 ERROR(attribute_requires_operator_identifier,none,
       "'%0' requires a function with an operator identifier", (StringRef))
 ERROR(attribute_requires_single_argument,none,
@@ -1059,15 +1059,15 @@ ERROR(unavailable_method_non_objc_protocol,none,
       ())
 ERROR(missing_in_class_init_1,none,
       "stored property %0 requires an initial value%select{| or should be "
-      "@NSManaged}1", (Identifier, bool))
+      "@NSManaged}1", (DeclName, bool))
 ERROR(missing_in_class_init_2,none,
       "stored properties %0 and %1 require initial values%select{| or should "
       "be @NSManaged}2",
-      (Identifier, Identifier, bool))
+      (DeclName, DeclName, bool))
 ERROR(missing_in_class_init_3plus,none,
       "stored properties %0, %1, %select{and %2|%2, and others}3 "
       "require initial values%select{| or should be @NSManaged}4",
-      (Identifier, Identifier, Identifier, bool, bool))
+      (DeclName, DeclName, DeclName, bool, bool))
 NOTE(requires_stored_property_inits_here,none,
      "%select{superclass|class}1 %0 requires all stored properties to have "
      "initial values%select{| or use @NSManaged}2", (Type, bool, bool))
@@ -1076,15 +1076,15 @@ ERROR(class_without_init,none,
 NOTE(note_no_in_class_init_1,none,
      "stored property %0 without initial value prevents synthesized "
      "initializers",
-     (Identifier))
+     (DeclName))
 NOTE(note_no_in_class_init_2,none,
      "stored properties %0 and %1 without initial values prevent synthesized "
      "initializers",
-     (Identifier, Identifier))
+     (DeclName, DeclName))
 NOTE(note_no_in_class_init_3plus,none,
      "stored properties %0, %1, %select{and %2|%2, and others}3 "
      "without initial values prevent synthesized initializers",
-     (Identifier, Identifier, Identifier, bool))
+     (DeclName, DeclName, DeclName, bool))
 ERROR(missing_unimplemented_init_runtime,none,
       "standard library error: missing _unimplementedInitializer", ())
 ERROR(missing_undefined_runtime,none,
@@ -1102,7 +1102,7 @@ ERROR(alignment_not_power_of_two,none,
 
 // Indirect enums
 ERROR(indirect_case_without_payload,none,
-      "enum case %0 without associated value cannot be 'indirect'", (Identifier))
+      "enum case %0 without associated value cannot be 'indirect'", (DeclName))
 ERROR(indirect_case_in_indirect_enum,none,
       "enum case in 'indirect' enum cannot also be 'indirect'", ())
 
@@ -1159,20 +1159,20 @@ ERROR(pattern_binds_no_variables,none,
 // Generic types
 ERROR(unsupported_type_nested_in_generic_function,none,
       "type %0 cannot be nested in generic function %1",
-      (Identifier, Identifier))
+      (DeclName, DeclName))
 ERROR(unsupported_type_nested_in_protocol,none,
       "type %0 cannot be nested in protocol %1",
-      (Identifier, Identifier))
+      (DeclName, DeclName))
 ERROR(unsupported_type_nested_in_protocol_extension,none,
       "type %0 cannot be nested in protocol extension of %1",
-      (Identifier, Identifier))
+      (DeclName, DeclName))
 ERROR(unsupported_nested_protocol,none,
       "protocol %0 cannot be nested inside another declaration",
-      (Identifier))
+      (DeclName))
 
 // Type aliases
 ERROR(circular_type_alias,none,
-      "type alias %0 circularly references itself", (Identifier))
+      "type alias %0 circularly references itself", (DeclName))
 ERROR(type_alias_underlying_type_access,none,
       "type alias %select{must be declared %select{"
       "%select{private|fileprivate|internal|PUBLIC}2|private or fileprivate}3"
@@ -1237,7 +1237,7 @@ ERROR(extension_metatype,none,
       "cannot extend a metatype %0", (Type))
 ERROR(extension_specialization,none,
       "constrained extension must be declared on the unspecialized generic "
-      "type %0 with constraints specified by a 'where' clause", (Identifier))
+      "type %0 with constraints specified by a 'where' clause", (DeclName))
 ERROR(extension_stored_property,none,
       "extensions may not contain stored properties", ())
 ERROR(extension_nongeneric_trailing_where,none,
@@ -1386,7 +1386,7 @@ NOTE(ambiguous_witnesses_wrong_name,none,
      "%select{initializers named %1|functions named %1|properties named %1|"
      "subscript operators}0 with type %2", (RequirementKind, DeclName, Type))
 NOTE(no_witnesses_type,none,
-     "protocol requires nested type %0; do you want to add it?", (Identifier))
+     "protocol requires nested type %0; do you want to add it?", (DeclName))
 NOTE(default_associated_type_req_fail,none,
      "default type %0 for associated type %1 (from protocol %2) "
      "does not %select{inherit from|conform to}4 %3",
@@ -1421,7 +1421,7 @@ NOTE(associated_type_deduction_witness,none,
 NOTE(associated_type_deduction_default,none,
      "using associated type default %0", (Type))
 NOTE(ambiguous_witnesses_type,none,
-     "multiple matching types named %0", (Identifier))
+     "multiple matching types named %0", (DeclName))
 NOTE(protocol_witness_exact_match,none,
      "candidate exactly matches%0", (StringRef))
 NOTE(protocol_witness_renamed,none,
@@ -1509,15 +1509,15 @@ NOTE(optional_req_near_match_accessibility,none,
 // Protocols and existentials
 ERROR(assoc_type_outside_of_protocol,none,
       "associated type %0 can only be used with a concrete type or "
-      "generic parameter base", (Identifier))
+      "generic parameter base", (DeclName))
 ERROR(typealias_outside_of_protocol,none,
       "typealias %0 can only be used with a concrete type or "
-      "generic parameter base", (Identifier))
+      "generic parameter base", (DeclName))
 
 ERROR(circular_protocol_def,none,
       "circular protocol inheritance %0", (StringRef))
 NOTE(protocol_here,none,
-     "protocol %0 declared here", (Identifier))
+     "protocol %0 declared here", (DeclName))
 ERROR(protocol_composition_not_protocol,none,
       "non-protocol type %0 cannot be used within a protocol composition", (Type))
 ERROR(objc_protocol_inherits_non_objc_protocol,none,
@@ -1546,7 +1546,7 @@ ERROR(requires_superclass_conflict,none,
       "generic parameter %0 cannot be a subclass of both %1 and %2",
       (Identifier, Type, Type))
 ERROR(recursive_type_reference,none,
-      "type %0 references itself", (Identifier))
+      "type %0 references itself", (DeclName))
 ERROR(recursive_requirement_reference,none,
       "type may not reference itself as a requirement",())
 ERROR(recursive_same_type_constraint,none,
@@ -1558,7 +1558,7 @@ ERROR(requires_same_type_conflict,none,
       (Identifier, Type, Type))
 ERROR(requires_generic_param_same_type_does_not_conform,none,
       "same-type constraint type %0 does not conform to required protocol %1",
-      (Type, Identifier))
+      (Type, DeclName))
 
 ERROR(generic_param_access,none,
       "%0 %select{must be declared %select{"
@@ -1607,22 +1607,22 @@ NOTE(multiple_override_prev,none,
      "%0 previously overridden here", (DeclName))
 
 ERROR(override_unavailable,none,
-      "cannot override %0 which has been marked unavailable", (Identifier))
+      "cannot override %0 which has been marked unavailable", (DeclName))
 ERROR(override_unavailable_msg, none,
       "cannot override %0 which has been marked unavailable: %1",
-      (Identifier, StringRef))
+      (DeclName, StringRef))
 
 ERROR(override_less_available,none,
       "overriding %0 must be as available as declaration it overrides",
-      (Identifier))
+      (DeclName))
 
 ERROR(override_accessor_less_available,none,
       "overriding %0 for %1 must be as available as declaration it overrides",
-      (DescriptiveDeclKind, Identifier))
+      (DescriptiveDeclKind, DeclName))
 
 ERROR(override_let_property,none,
       "cannot override immutable 'let' property %0 with the getter of a 'var'",
-      (Identifier))
+      (DeclName))
 
 
 ERROR(override_not_accessible,none,
@@ -1665,14 +1665,14 @@ ERROR(override_nonclass_decl,none,
       "'override' can only be specified on class members", ())
 ERROR(override_property_type_mismatch,none,
       "property %0 with type %1 cannot override a property with type %2",
-      (Identifier, Type, Type))
+      (DeclName, Type, Type))
 ERROR(override_with_stored_property,none,
-      "cannot override with a stored property %0", (Identifier))
+      "cannot override with a stored property %0", (DeclName))
 ERROR(observing_readonly_property,none,
-      "cannot observe read-only property %0; it can't change", (Identifier))
+      "cannot observe read-only property %0; it can't change", (DeclName))
 ERROR(override_mutable_with_readonly_property,none,
       "cannot override mutable property with read-only property %0",
-      (Identifier))
+      (DeclName))
 ERROR(override_argument_name_mismatch,none,
       "argument names for %select{method|initializer}0 %1 do not match those "
       "of overridden %select{method|initializer}0 %2",
@@ -1717,7 +1717,7 @@ ERROR(iuo_in_illegal_position,none,
 
 ERROR(override_mutable_covariant_property,none,
       "cannot override mutable property %0 of type %1 with covariant type %2",
-      (Identifier, Type, Type))
+      (DeclName, Type, Type))
 ERROR(override_mutable_covariant_subscript,none,
       "cannot override mutable subscript of type %0 with covariant type %1",
       (Type, Type))
@@ -1753,17 +1753,17 @@ ERROR(superclass_of_open_not_open,none,
 ERROR(circular_class_inheritance,none,
       "circular class inheritance %0", (StringRef))
 NOTE(class_here,none,
-     "class %0 declared here", (Identifier))
+     "class %0 declared here", (DeclName))
 ERROR(inheritance_from_final_class,none,
-      "inheritance from a final class %0", (Identifier))
+      "inheritance from a final class %0", (DeclName))
 ERROR(inheritance_from_unspecialized_objc_generic_class,none,
       "inheritance from a generic Objective-C class %0 must bind "
-      "type parameters of %0 to specific concrete types", (Identifier))
+      "type parameters of %0 to specific concrete types", (DeclName))
 ERROR(inheritance_from_cf_class,none,
-      "cannot inherit from Core Foundation type %0", (Identifier))
+      "cannot inherit from Core Foundation type %0", (DeclName))
 ERROR(inheritance_from_objc_runtime_visible_class,none,
       "cannot inherit from class %0 because it is only visible via the "
-      "Objective-C runtime", (Identifier))
+      "Objective-C runtime", (DeclName))
 
 
 // Enums
@@ -1812,7 +1812,7 @@ WARNING(enum_raw_type_access_warn,none,
         (bool, Accessibility, Accessibility, bool))
 
 NOTE(enum_here,none,
-     "enum %0 declared here", (Identifier))
+     "enum %0 declared here", (DeclName))
 ERROR(empty_enum_raw_type,none,
       "an enum with no cases cannot declare a raw type", ())
 ERROR(enum_raw_value_without_raw_type,none,
@@ -1864,7 +1864,7 @@ ERROR(dynamic_self_non_method,none,
 ERROR(dynamic_self_struct_enum,none,
       "%select{struct|enum}0 method cannot return 'Self'; "
       "did you mean to use the %select{struct|enum}0 type %1?",
-      (int, Identifier))
+      (int, DeclName))
 
 // Duplicate declarations
 ERROR(duplicate_enum_element,none,
@@ -1885,47 +1885,47 @@ ERROR(property_behavior_protocol_no_initStorage,none,
       (Type, Type))
 ERROR(property_behavior_unknown_requirement,none,
       "property behavior protocol %0 has non-behavior requirement %1",
-      (Identifier, Identifier))
+      (DeclName, DeclName))
 NOTE(property_behavior_unknown_requirement_here,none,
      "declared here", ())
 NOTE(self_conformance_required_by_property_behavior,none,
      "conformance to %0 required to contain an instance property with "
      "behavior %1",
-     (Identifier, Identifier))
+     (DeclName, DeclName))
 NOTE(value_conformance_required_by_property_behavior,none,
      "behavior %1 requires property type to conform to protocol %0",
-     (Identifier, Identifier))
+     (DeclName, DeclName))
 ERROR(property_behavior_with_self_requirement_not_in_type,none,
       "property behavior %0 can only be used on instance properties "
       "because it has 'Self' requirements",
-      (Identifier))
+      (DeclName))
 ERROR(property_behavior_with_feature_not_supported,none,
       "property behavior %0 with %1 is not supported outside of "
       "type contexts",
-      (Identifier, StringRef))
+      (DeclName, StringRef))
 ERROR(property_behavior_value_type_doesnt_match,none,
       "property behavior %0 provides 'value' property implementation with "
       "type %1 that doesn't match type %2 of declared property %3",
-      (Identifier, Type, Identifier, Type))
+      (DeclName, Type, DeclName, Type))
 NOTE(property_behavior_value_decl_here,none,
      "'value' property declared here", ())
 ERROR(property_behavior_invalid_parameter_reqt,none,
       "property behavior %0 has a 'parameter' requirement that is "
-      "static or generic", (Identifier))
+      "static or generic", (DeclName))
 ERROR(property_behavior_requires_parameter,none,
       "property behavior %0 requires a parameter in the declaration of %1",
-      (Identifier, Identifier))
+      (DeclName, DeclName))
 ERROR(property_behavior_invalid_initializer,none,
       "initializer expression provided, but property behavior %0 does not "
       "use it",
-      (Identifier))
+      (DeclName))
 ERROR(property_behavior_unsupported_initializer,none,
       "property behaviors do not support destructuring initialization of "
       "multiple properties", ())
 ERROR(property_behavior_invalid_parameter,none,
       "parameter expression provided, but property behavior %0 does not "
       "use it",
-      (Identifier))
+      (DeclName))
 ERROR(property_behavior_conformance_broken,none,
       "property behavior for %0 in type %1 is broken", (DeclName, Type))
 
@@ -2311,11 +2311,11 @@ ERROR(not_a_generic_type,none,
 ERROR(type_parameter_count_mismatch,none,
       "generic type %0 specialized with %select{too many|too few}3 type "
       "parameters (got %2, but expected %1)",
-      (Identifier, unsigned, unsigned, bool))
+      (DeclName, unsigned, unsigned, bool))
 ERROR(generic_type_requires_arguments,none,
       "reference to generic type %0 requires arguments in <...>", (Type))
 NOTE(generic_type_declared_here,none,
-     "generic type %0 declared here", (Identifier))
+     "generic type %0 declared here", (DeclName))
 ERROR(cannot_partially_specialize_generic_function,none,
      "cannot partially specialize a generic function", ())
 
@@ -2349,21 +2349,21 @@ ERROR(self_assignment_prop,none,
       "assigning a property to itself", ())
 ERROR(property_use_in_closure_without_explicit_self,none,
       "reference to property %0 in closure requires explicit 'self.' to make"
-      " capture semantics explicit", (Identifier))
+      " capture semantics explicit", (DeclName))
 ERROR(method_call_in_closure_without_explicit_self,none,
       "call to method %0 in closure requires explicit 'self.' to make"
-      " capture semantics explicit", (Identifier))
+      " capture semantics explicit", (DeclName))
 ERROR(implicit_use_of_self_in_closure,none,
       "implicit use of 'self' in closure; use 'self.' to make"
       " capture semantics explicit", ())
 ERROR(capture_before_declaration,none,
-      "cannot capture %0 before it is declared", (Identifier))
+      "cannot capture %0 before it is declared", (DeclName))
 ERROR(transitive_capture_before_declaration,none,
       "cannot capture %0, which would use %1 before it is declared",
-      (Identifier, Identifier))
+      (DeclName, DeclName))
 NOTE(transitive_capture_through_here,none,
      "%0, declared here, captures %1",
-     (Identifier, Identifier))
+     (DeclName, DeclName))
 
 ERROR(closure_implicit_capture_without_noescape,none,
       "escaping closures can only capture inout parameters explicitly by value",
@@ -2379,12 +2379,12 @@ ERROR(nested_function_escaping_inout_capture,none,
 
 WARNING(recursive_accessor_reference,none,
         "attempting to %select{access|modify}1 %0 within its own "
-        "%select{getter|setter}1", (Identifier, bool))
+        "%select{getter|setter}1", (DeclName, bool))
 NOTE(recursive_accessor_reference_silence,none,
      "access 'self' explicitly to silence this warning", ())
 WARNING(store_in_willset,none,
         "attempting to store to property %0 within its own willSet, which is "
-        "about to be overwritten by the new value", (Identifier))
+        "about to be overwritten by the new value", (DeclName))
 
 ERROR(tuple_splat_use,none,
       "passing %0 arguments to a callee as a single tuple value has been removed in Swift 3",
@@ -2406,15 +2406,15 @@ NOTE(add_self_to_type,none,
 
 WARNING(warn_unqualified_access,none,
         "use of %0 treated as a reference to %1 in %2 %3",
-        (Identifier, DescriptiveDeclKind, DescriptiveDeclKind, DeclName))
+        (DeclName, DescriptiveDeclKind, DescriptiveDeclKind, DeclName))
 NOTE(fix_unqualified_access_member,none,
      "use 'self.' to silence this warning", ())
 NOTE(fix_unqualified_access_top_level,none,
      "use '%0' to reference the %1",
-     (StringRef, DescriptiveDeclKind, Identifier))
+     (StringRef, DescriptiveDeclKind, DeclName))
 NOTE(fix_unqualified_access_top_level_multi,none,
      "use '%0' to reference the %1 in module %2",
-     (StringRef, DescriptiveDeclKind, Identifier))
+     (StringRef, DescriptiveDeclKind, DeclName))
 
 WARNING(use_of_qq_on_non_optional_value,none,
         "left side of nil coalescing operator '?""?' has non-optional type %0, "
@@ -2449,33 +2449,33 @@ NOTE(silence_optional_in_interpolation_segment_call,none,
 
 ERROR(invalid_noescape_use,none,
       "non-escaping %select{value|parameter}1 %0 may only be called",
-      (Identifier, bool))
+      (DeclName, bool))
 NOTE(noescape_autoclosure,none,
     "parameter %0 is implicitly non-escaping because it was declared @autoclosure",
-     (Identifier))
+     (DeclName))
 NOTE(noescape_parameter,none,
     "parameter %0 is implicitly non-escaping",
-     (Identifier))
+     (DeclName))
 
 ERROR(closure_noescape_use,none,
       "closure use of non-escaping parameter %0 may allow it to escape",
-      (Identifier))
+      (DeclName))
 ERROR(decl_closure_noescape_use,none,
       "declaration closing over non-escaping parameter %0 may allow it to escape",
-      (Identifier))
+      (DeclName))
 ERROR(passing_noescape_to_escaping,none,
       "passing non-escaping parameter %0 to function expecting an @escaping closure",
-      (Identifier))
+      (DeclName))
 ERROR(assigning_noescape_to_escaping,none,
       "assigning non-escaping parameter %0 to an @escaping closure",
-      (Identifier))
+      (DeclName))
 ERROR(general_noescape_to_escaping,none,
       "using non-escaping parameter %0 in a context expecting an @escaping closure",
-      (Identifier))
+      (DeclName))
 
 ERROR(capture_across_type_decl,none,
       "%0 declaration cannot close over value %1 defined in outer scope",
-      (DescriptiveDeclKind, Identifier))
+      (DescriptiveDeclKind, DeclName))
 
 //------------------------------------------------------------------------------
 // Type Check Statements
@@ -2643,7 +2643,7 @@ ERROR(ambiguous_enum_pattern_type,none,
       "when matching value of type %1", (Type, Type))
 WARNING(type_inferred_to_undesirable_type,none,
         "%select{variable|constant}2 %0 inferred to have type %1, "
-        "which may be unexpected", (Identifier, Type, bool))
+        "which may be unexpected", (DeclName, Type, bool))
 NOTE(add_explicit_type_annotation_to_silence,none,
      "add an explicit type annotation to silence this warning", ())
 ERROR(isa_pattern_value,none,
@@ -2746,7 +2746,7 @@ ERROR(bool_intrinsics_not_found,none,
       "broken standard library: cannot find intrinsic operations on Bool", ())
 ERROR(self_in_nominal,none,
       "'Self' is only available in a protocol or as the result of a "
-      "method in a class; did you mean %0?", (Identifier))
+      "method in a class; did you mean %0?", (DeclName))
 ERROR(class_super_access,none,
       "class %select{must be declared %select{"
       "%select{private|fileprivate|internal|PUBLIC}2|private or fileprivate}3"
@@ -2997,7 +2997,7 @@ ERROR(objc_invalid_on_failing_init,none,
 ERROR(objc_in_objc_runtime_visible,none,
       "%0 cannot be %" OBJC_ATTR_SELECT "1 because class %2 is only visible "
       "via the Objective-C runtime",
-      (DescriptiveDeclKind, unsigned, Identifier))
+      (DescriptiveDeclKind, unsigned, DeclName))
 
 ERROR(objc_override_method_selector_mismatch,none,
       "Objective-C method has a different selector from the "
@@ -3016,7 +3016,7 @@ NOTE(objc_ambiguous_inference_candidate,none,
 
 ERROR(nonlocal_bridged_to_objc,none,
       "conformance of %0 to %1 can only be written in module %2",
-      (Identifier, Identifier, Identifier))
+      (DeclName, DeclName, Identifier))
 
 ERROR(broken_bridged_to_objc_protocol,none,
       "_BridgedToObjectiveC protocol is broken", ())
@@ -3228,29 +3228,29 @@ NOTE(availability_conformance_introduced_here, none,
 WARNING(pbd_never_used_stmtcond, none,
         "value %0 was defined but never used; consider replacing "
         "with boolean test",
-        (Identifier))
+        (DeclName))
 
 WARNING(pbd_never_used, none,
         "initialization of %select{variable|immutable value}1 %0 was never used"
         "; consider replacing with assignment to '_' or removing it",
-        (Identifier, unsigned))
+        (DeclName, unsigned))
 
 
 WARNING(capture_never_used, none,
         "capture %0 was never used",
-        (Identifier))
+        (DeclName))
 
 WARNING(variable_never_used, none,
         "%select{variable|immutable value}1 %0 was never used; "
         "consider replacing with '_' or removing it",
-        (Identifier, unsigned))
+        (DeclName, unsigned))
 WARNING(variable_never_mutated, none,
         "%select{variable|parameter}1 %0 was never mutated; "
         "consider changing to 'let' constant",
-        (Identifier, unsigned))
+        (DeclName, unsigned))
 WARNING(variable_never_read, none,
         "%select{variable|parameter}1 %0 was written to, but never read",
-        (Identifier, unsigned))
+        (DeclName, unsigned))
 
 WARNING(extraneous_default_args_in_call, none,
         "call to %0 has extraneous arguments that could use defaults",

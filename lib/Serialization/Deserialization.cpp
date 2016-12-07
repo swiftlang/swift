@@ -69,7 +69,7 @@ namespace {
         os << "While deserializing ";
 
         if (auto VD = dyn_cast<ValueDecl>(DeclOrOffset.get())) {
-          os << "'" << VD->getName() << "' (" << IDAndKind{VD, ID} << ")";
+          os << "'" << VD->getBaseName() << "' (" << IDAndKind{VD, ID} << ")";
         } else if (auto ED = dyn_cast<ExtensionDecl>(DeclOrOffset.get())) {
           os << "extension of '" << ED->getExtendedType() << "' ("
              << IDAndKind{ED, ID} << ")";
@@ -120,7 +120,8 @@ namespace {
           break;
         case Kind::Extension:
           if (getDataAs<Module *>())
-            os << "in an extension in module '" << getDataAs<Module *>()->getName()
+            os << "in an extension in module '"
+               << getDataAs<Module *>()->getIdentifier()
                << "'";
           else
             os << "in an extension in any module";
@@ -224,7 +225,7 @@ namespace {
     }
 
     virtual void print(raw_ostream &os) const override {
-      os << "Cross-reference to module '" << baseM.getName() << "'\n";
+      os << "Cross-reference to module '" << baseM.getIdentifier() << "'\n";
       for (auto &piece : path) {
         os << "\t... ";
         piece.print(os);
@@ -395,7 +396,7 @@ Pattern *ModuleFile::maybeReadPattern(DeclContext *owningDC) {
       assert(kind == decls_block::TUPLE_PATTERN_ELT);
 
       // FIXME: Add something for this record or remove it.
-      IdentifierID labelID;
+      DeclNameID labelID;
       TuplePatternEltLayout::readRecord(scratch, labelID);
       Identifier label = getIdentifier(labelID);
 
@@ -988,15 +989,15 @@ ModuleFile::readGenericEnvironmentPieces(
     }
     case SIL_GENERIC_ENVIRONMENT: {
       uint64_t rawTypeIDs[2];
-      IdentifierID IID;
-      SILGenericEnvironmentLayout::readRecord(scratch, IID,
+      DeclNameID DID;
+      SILGenericEnvironmentLayout::readRecord(scratch, DID,
                                               rawTypeIDs[0], rawTypeIDs[1]);
 
       auto paramTy = getType(rawTypeIDs[0])->castTo<GenericTypeParamType>();
       auto contextTy = getType(rawTypeIDs[1]);
 
       // Cons up a sugared type for this generic parameter
-      Identifier name = getIdentifier(IID);
+      Identifier name = getIdentifier(DID);
       auto paramDecl = createDecl<GenericTypeParamDecl>(getAssociatedModule(),
                                                         name,
                                                         SourceLoc(),
@@ -1233,17 +1234,17 @@ Decl *ModuleFile::resolveCrossReference(Module *M, uint32_t pathLen) {
   switch (recordID) {
   case XREF_TYPE_PATH_PIECE:
   case XREF_VALUE_PATH_PIECE: {
-    IdentifierID IID;
+    DeclNameID DID;
     TypeID TID = 0;
     bool isType = (recordID == XREF_TYPE_PATH_PIECE);
     bool onlyInNominal = false;
     bool inProtocolExt = false;
     if (isType)
-      XRefTypePathPieceLayout::readRecord(scratch, IID, onlyInNominal);
+      XRefTypePathPieceLayout::readRecord(scratch, DID, onlyInNominal);
     else
-      XRefValuePathPieceLayout::readRecord(scratch, TID, IID, inProtocolExt);
+      XRefValuePathPieceLayout::readRecord(scratch, TID, DID, inProtocolExt);
 
-    Identifier name = getIdentifier(IID);
+    Identifier name = getIdentifier(DID);
     pathTrace.addValue(name);
 
     Type filterTy = getType(TID);
@@ -1264,8 +1265,8 @@ Decl *ModuleFile::resolveCrossReference(Module *M, uint32_t pathLen) {
     // has to go through this path, but it's an option we toggle for
     // testing.
     if (values.empty() && !retrying &&
-        (M->getName().str() == "ObjectiveC" ||
-         M->getName().str() == "Foundation")) {
+        (M->getIdentifier().str() == "ObjectiveC" ||
+         M->getIdentifier().str() == "Foundation")) {
       if (name.str().startswith("NS")) {
         if (name.str().size() > 2 && name.str() != "NSCocoaError") {
           auto known = getKnownFoundationEntity(name.str());
@@ -1293,11 +1294,11 @@ Decl *ModuleFile::resolveCrossReference(Module *M, uint32_t pathLen) {
     llvm_unreachable("can only extend a nominal");
 
   case XREF_OPERATOR_OR_ACCESSOR_PATH_PIECE: {
-    IdentifierID IID;
+    DeclNameID DID;
     uint8_t rawOpKind;
-    XRefOperatorOrAccessorPathPieceLayout::readRecord(scratch, IID, rawOpKind);
+    XRefOperatorOrAccessorPathPieceLayout::readRecord(scratch, DID, rawOpKind);
 
-    Identifier opName = getIdentifier(IID);
+    Identifier opName = getIdentifier(DID);
     pathTrace.addOperator(opName);
 
     switch (rawOpKind) {
@@ -1354,24 +1355,24 @@ Decl *ModuleFile::resolveCrossReference(Module *M, uint32_t pathLen) {
     case XREF_VALUE_PATH_PIECE:
     case XREF_INITIALIZER_PATH_PIECE: {
       TypeID TID = 0;
-      Identifier memberName;
+      Identifier memberID;
       Optional<swift::CtorInitializerKind> ctorInit;
       bool isType = false;
       bool onlyInNominal = false;
       bool inProtocolExt = false;
       switch (recordID) {
       case XREF_TYPE_PATH_PIECE: {
-        IdentifierID IID;
-        XRefTypePathPieceLayout::readRecord(scratch, IID, onlyInNominal);
-        memberName = getIdentifier(IID);
+        DeclNameID DID;
+        XRefTypePathPieceLayout::readRecord(scratch, DID, onlyInNominal);
+        memberID = getIdentifier(DID);
         isType = true;
         break;
       }
 
       case XREF_VALUE_PATH_PIECE: {
-        IdentifierID IID;
-        XRefValuePathPieceLayout::readRecord(scratch, TID, IID, inProtocolExt);
-        memberName = getIdentifier(IID);
+        DeclNameID DID;
+        XRefValuePathPieceLayout::readRecord(scratch, TID, DID, inProtocolExt);
+        memberID = getIdentifier(DID);
         break;
       }
 
@@ -1379,7 +1380,7 @@ Decl *ModuleFile::resolveCrossReference(Module *M, uint32_t pathLen) {
         uint8_t kind;
         XRefInitializerPathPieceLayout::readRecord(scratch, TID, inProtocolExt,
                                                    kind);
-        memberName = getContext().Id_init;
+        memberID = getContext().Id_init;
         ctorInit = getActualCtorInitializerKind(kind);
         break;
       }
@@ -1388,7 +1389,7 @@ Decl *ModuleFile::resolveCrossReference(Module *M, uint32_t pathLen) {
         llvm_unreachable("Unhandled path piece");
       }
 
-      pathTrace.addValue(memberName);
+      pathTrace.addValue(memberID);
 
       Type filterTy = getType(TID);
       if (!isType)
@@ -1407,6 +1408,7 @@ Decl *ModuleFile::resolveCrossReference(Module *M, uint32_t pathLen) {
         return nullptr;
       }
 
+      DeclName memberName = DeclName(memberID);
       auto members = nominal->lookupDirect(memberName, onlyInNominal);
       values.append(members.begin(), members.end());
       filterValues(filterTy, M, genericSig, isType, inProtocolExt, ctorInit,
@@ -1577,11 +1579,11 @@ Decl *ModuleFile::resolveCrossReference(Module *M, uint32_t pathLen) {
   return values.front();
 }
 
-Identifier ModuleFile::getIdentifier(IdentifierID IID) {
-  if (IID == 0)
+Identifier ModuleFile::getIdentifier(DeclNameID DID) {
+  if (DID == 0)
     return Identifier();
 
-  size_t rawID = IID - NUM_SPECIAL_MODULES;
+  size_t rawID = DID - NUM_SPECIAL_MODULES;
   assert(rawID < Identifiers.size() && "invalid identifier ID");
   auto identRecord = Identifiers[rawID];
 
@@ -1764,7 +1766,7 @@ Module *ModuleFile::getModule(ArrayRef<Identifier> name) {
 
   // FIXME: duplicated from NameBinder::getModule
   if (name.size() == 1 &&
-      name.front() == FileContext->getParentModule()->getName()) {
+      name.front() == FileContext->getParentModule()->getIdentifier()) {
     if (!ShadowedModule) {
       auto importer = getContext().getClangModuleLoader();
       assert(importer && "no way to import shadowed module");
@@ -2115,7 +2117,7 @@ Decl *ModuleFile::getDecl(DeclID DID, Optional<DeclContext *> ForcedContext) {
       
       case decls_block::SwiftNativeObjCRuntimeBase_DECL_ATTR: {
         bool isImplicit;
-        IdentifierID nameID;
+        DeclNameID nameID;
         serialization::decls_block::SwiftNativeObjCRuntimeBaseDeclAttrLayout
           ::readRecord(scratch, isImplicit, nameID);
         
@@ -2279,7 +2281,7 @@ Decl *ModuleFile::getDecl(DeclID DID, Optional<DeclContext *> ForcedContext) {
       AddAttribute(Attr);
 
     } else if (recordID == decls_block::PRIVATE_DISCRIMINATOR) {
-      IdentifierID discriminatorID;
+      DeclNameID discriminatorID;
       decls_block::PrivateDiscriminatorLayout::readRecord(scratch,
                                                           discriminatorID);
       privateDiscriminatorRAII.discriminator = getIdentifier(discriminatorID);
@@ -2304,7 +2306,7 @@ Decl *ModuleFile::getDecl(DeclID DID, Optional<DeclContext *> ForcedContext) {
 
   switch (recordID) {
   case decls_block::TYPE_ALIAS_DECL: {
-    IdentifierID nameID;
+    DeclNameID nameID;
     DeclContextID contextID;
     TypeID underlyingTypeID, interfaceTypeID;
     bool isImplicit;
@@ -2350,7 +2352,7 @@ Decl *ModuleFile::getDecl(DeclID DID, Optional<DeclContext *> ForcedContext) {
   }
 
   case decls_block::GENERIC_TYPE_PARAM_DECL: {
-    IdentifierID nameID;
+    DeclNameID nameID;
     DeclContextID contextID;
     bool isImplicit;
     unsigned depth;
@@ -2381,7 +2383,7 @@ Decl *ModuleFile::getDecl(DeclID DID, Optional<DeclContext *> ForcedContext) {
   }
 
   case decls_block::ASSOCIATED_TYPE_DECL: {
-    IdentifierID nameID;
+    DeclNameID nameID;
     DeclContextID contextID;
     TypeID defaultDefinitionID;
     bool isImplicit;
@@ -2419,7 +2421,7 @@ Decl *ModuleFile::getDecl(DeclID DID, Optional<DeclContext *> ForcedContext) {
   }
 
   case decls_block::STRUCT_DECL: {
-    IdentifierID nameID;
+    DeclNameID nameID;
     DeclContextID contextID;
     bool isImplicit;
     uint8_t rawAccessLevel;
@@ -2574,7 +2576,7 @@ Decl *ModuleFile::getDecl(DeclID DID, Optional<DeclContext *> ForcedContext) {
   }
 
   case decls_block::VAR_DECL: {
-    IdentifierID nameID;
+    DeclNameID nameID;
     DeclContextID contextID;
     bool isImplicit, isObjC, isStatic, isLet, hasNonPatternBindingInit;
     uint8_t storageKind, rawAccessLevel, rawSetterAccessLevel;
@@ -2637,7 +2639,7 @@ Decl *ModuleFile::getDecl(DeclID DID, Optional<DeclContext *> ForcedContext) {
   }
 
   case decls_block::PARAM_DECL: {
-    IdentifierID argNameID, paramNameID;
+    DeclNameID argNameID, paramNameID;
     DeclContextID contextID;
     bool isLet;
     TypeID interfaceTypeID;
@@ -2843,7 +2845,7 @@ Decl *ModuleFile::getDecl(DeclID DID, Optional<DeclContext *> ForcedContext) {
   }
 
   case decls_block::PROTOCOL_DECL: {
-    IdentifierID nameID;
+    DeclNameID nameID;
     DeclContextID contextID;
     bool isImplicit, isClassBounded, isObjC;
     uint8_t rawAccessLevel;
@@ -2898,7 +2900,7 @@ Decl *ModuleFile::getDecl(DeclID DID, Optional<DeclContext *> ForcedContext) {
   }
 
   case decls_block::PREFIX_OPERATOR_DECL: {
-    IdentifierID nameID;
+    DeclNameID nameID;
     DeclContextID contextID;
 
     decls_block::PrefixOperatorLayout::readRecord(scratch, nameID,
@@ -2911,7 +2913,7 @@ Decl *ModuleFile::getDecl(DeclID DID, Optional<DeclContext *> ForcedContext) {
   }
 
   case decls_block::POSTFIX_OPERATOR_DECL: {
-    IdentifierID nameID;
+    DeclNameID nameID;
     DeclContextID contextID;
 
     decls_block::PostfixOperatorLayout::readRecord(scratch, nameID,
@@ -2925,7 +2927,7 @@ Decl *ModuleFile::getDecl(DeclID DID, Optional<DeclContext *> ForcedContext) {
   }
 
   case decls_block::INFIX_OPERATOR_DECL: {
-    IdentifierID nameID;
+    DeclNameID nameID;
     DeclContextID contextID;
     DeclID precedenceGroupID;
 
@@ -2956,7 +2958,7 @@ Decl *ModuleFile::getDecl(DeclID DID, Optional<DeclContext *> ForcedContext) {
   }
 
   case decls_block::PRECEDENCE_GROUP_DECL: {
-    IdentifierID nameID;
+    DeclNameID nameID;
     DeclContextID contextID;
     uint8_t rawAssociativity;
     bool assignment;
@@ -3021,7 +3023,7 @@ Decl *ModuleFile::getDecl(DeclID DID, Optional<DeclContext *> ForcedContext) {
   }
 
   case decls_block::CLASS_DECL: {
-    IdentifierID nameID;
+    DeclNameID nameID;
     DeclContextID contextID;
     bool isImplicit, isObjC, requiresStoredPropertyInits;
     TypeID superclassID;
@@ -3081,7 +3083,7 @@ Decl *ModuleFile::getDecl(DeclID DID, Optional<DeclContext *> ForcedContext) {
   }
 
   case decls_block::ENUM_DECL: {
-    IdentifierID nameID;
+    DeclNameID nameID;
     DeclContextID contextID;
     bool isImplicit;
     TypeID rawTypeID;
@@ -3134,7 +3136,7 @@ Decl *ModuleFile::getDecl(DeclID DID, Optional<DeclContext *> ForcedContext) {
   }
 
   case decls_block::ENUM_ELEMENT_DECL: {
-    IdentifierID nameID;
+    DeclNameID nameID;
     DeclContextID contextID;
     TypeID argTypeID, interfaceTypeID;
     bool isImplicit; bool isNegative;
@@ -3550,7 +3552,7 @@ Type ModuleFile::getType(TypeID TID) {
       if (recordID != decls_block::TUPLE_TYPE_ELT)
         break;
 
-      IdentifierID nameID;
+      DeclNameID nameID;
       TypeID typeID;
       bool isVariadic, isAutoClosure, isEscaping;
       decls_block::TupleTypeEltLayout::readRecord(
@@ -3772,7 +3774,7 @@ Type ModuleFile::getType(TypeID TID) {
     // Build the nested types array.
     SmallVector<std::pair<Identifier, Type>, 4> nestedTypes;
     for_each(rawNameIDs, rawTypeIDs,
-             [&](IdentifierID nameID, TypeID nestedID) {
+             [&](DeclNameID nameID, TypeID nestedID) {
       Type type = getType(nestedID);
       nestedTypes.push_back(std::make_pair(getIdentifier(nameID), type));
     });

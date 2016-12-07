@@ -93,7 +93,7 @@ bool SemaAnnotator::walkToDeclPre(Decl *D) {
 
   if (ValueDecl *VD = dyn_cast<ValueDecl>(D)) {
     if (VD->hasName())
-      NameLen = VD->getName().getLength();
+      NameLen = VD->getBaseName().getIdentifier().getLength();
 
   } else if (ExtensionDecl *ED = dyn_cast<ExtensionDecl>(D)) {
     SourceRange SR = ED->getExtendedTypeLoc().getSourceRange();
@@ -208,7 +208,7 @@ std::pair<bool, Expr *> SemaAnnotator::walkToExprPre(Expr *E) {
   if (DeclRefExpr *DRE = dyn_cast<DeclRefExpr>(E)) {
     if (auto *module = dyn_cast<ModuleDecl>(DRE->getDecl())) {
       if (!passReference(ModuleEntity(module),
-                         std::make_pair(module->getName(), E->getLoc())))
+                         std::make_pair(module->getIdentifier(), E->getLoc())))
         return { false, nullptr };
     } else if (!passReference(DRE->getDecl(), DRE->getType(),
                               DRE->getNameLoc())) {

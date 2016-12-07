@@ -50,7 +50,7 @@ ERROR(error_no_group_info,none,
 
 NOTE(previous_decldef,none,
      "previous %select{declaration|definition}0 of %1 is here",
-     (bool, Identifier))
+     (bool, DeclName))
 
 
 // Generic disambiguation

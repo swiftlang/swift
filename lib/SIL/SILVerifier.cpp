@@ -3193,9 +3193,10 @@ public:
     require(classTy.isObject(), "objc_protocol must produce a value");
     auto classDecl = classTy.getClassOrBoundGenericClass();
     require(classDecl, "objc_protocol must produce a class instance");
-    require(classDecl->getName() == F.getASTContext().Id_Protocol,
+    require(classDecl->getBaseName() == F.getASTContext().Id_Protocol,
             "objc_protocol must produce an instance of ObjectiveC.Protocol class");
-    require(classDecl->getModuleContext()->getName() == F.getASTContext().Id_ObjectiveC,
+    require(classDecl->getModuleContext()->getIdentifier() ==
+            F.getASTContext().Id_ObjectiveC,
             "objc_protocol must produce an instance of ObjectiveC.Protocol class");
   }
   
@@ -3714,7 +3715,8 @@ void SILModule::verify() const {
   unsigned EntriesSZ = 0;
   for (const SILVTable &vt : getVTables()) {
     if (!vtableClasses.insert(vt.getClass()).second) {
-      llvm::errs() << "Vtable redefined: " << vt.getClass()->getName() << "!\n";
+      llvm::errs() << "Vtable redefined: " << vt.getClass()->getBaseName()
+                   << "!\n";
       assert(false && "triggering standard assertion failure routine");
     }
     vt.verify(*this);

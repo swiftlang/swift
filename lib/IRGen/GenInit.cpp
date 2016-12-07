@@ -44,7 +44,7 @@ Address IRGenModule::emitSILGlobalVariable(SILGlobalVariable *var) {
       DebugTypeInfo DbgTy(var->getDecl(), var->getLoweredType().getSwiftType(),
                           Int8Ty, Size(0), Alignment(1));
       DebugInfo->emitGlobalVariableDeclaration(
-          nullptr, var->getDecl()->getName().str(), "", DbgTy,
+          nullptr, var->getDecl()->getBaseName().str(), "", DbgTy,
           var->getLinkage() != SILLinkage::Public, SILLocation(var->getDecl()));
     }
     return ti.getUndefAddress();

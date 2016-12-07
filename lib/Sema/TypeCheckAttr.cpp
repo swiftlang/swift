@@ -188,7 +188,8 @@ public:
       // An indirect case should have a payload.
       if (caseDecl->getArgumentTypeLoc().isNull())
         TC.diagnose(attr->getLocation(),
-                    diag::indirect_case_without_payload, caseDecl->getName());
+                    diag::indirect_case_without_payload,
+                    caseDecl->getBaseName());
       // If the enum is already indirect, its cases don't need to be.
       else if (caseDecl->getParentEnum()->getAttrs()
                  .hasAttribute<IndirectAttr>())
@@ -1035,7 +1036,7 @@ void AttributeChecker::checkOperatorAttribute(DeclAttribute *attr) {
     // Reject attempts to define builtin operators.
     if (isBuiltinOperator(OD->getName().str(), attr)) {
       TC.diagnose(D->getStartLoc(), diag::redefining_builtin_operator,
-                  attr->getAttrName(), OD->getName().str());
+                  attr->getAttrName(), OD->getName());
       attr->setInvalid();
       return;
     }
@@ -1054,7 +1055,7 @@ void AttributeChecker::checkOperatorAttribute(DeclAttribute *attr) {
 
   // Only functions with an operator identifier can be declared with as an
   // operator.
-  if (!FD->getName().isOperator()) {
+  if (!FD->isOperator()) {
     TC.diagnose(D->getStartLoc(), diag::attribute_requires_operator_identifier,
                 attr->getAttrName());
     attr->setInvalid();
@@ -1062,9 +1063,9 @@ void AttributeChecker::checkOperatorAttribute(DeclAttribute *attr) {
   }
 
   // Reject attempts to define builtin operators.
-  if (isBuiltinOperator(FD->getName().str(), attr)) {
+  if (isBuiltinOperator(FD->getBaseName().str(), attr)) {
     TC.diagnose(D->getStartLoc(), diag::redefining_builtin_operator,
-                attr->getAttrName(), FD->getName().str());
+                attr->getAttrName(), FD->getBaseName());
     attr->setInvalid();
     return;
   }
@@ -1412,7 +1413,7 @@ void AttributeChecker::visitSpecializeAttr(SpecializeAttr *attr) {
     numTypes = genericSig->getGenericParams().size();
   if (numTypes != attr->getTypeLocs().size()) {
     TC.diagnose(attr->getLocation(), diag::type_parameter_count_mismatch,
-                FD->getName(), numTypes, attr->getTypeLocs().size(),
+                FD->getBaseName(), numTypes, attr->getTypeLocs().size(),
                 numTypes > attr->getTypeLocs().size());
     attr->setInvalid();
     return;

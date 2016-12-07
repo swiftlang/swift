@@ -304,7 +304,7 @@ int main(int argc, char **argv) {
         CI.getASTContext(), CI.getSILModule(), nullptr);
 
     if (extendedInfo.isSIB())
-      SL->getAllForModule(CI.getMainModule()->getName(), nullptr);
+      SL->getAllForModule(CI.getMainModule()->getIdentifier(), nullptr);
     else
       SL->getAll();
   }
@@ -361,7 +361,7 @@ int main(int argc, char **argv) {
       OutputFile = ModuleName;
       llvm::sys::path::replace_extension(OutputFile, SIB_EXTENSION);
     } else {
-      OutputFile = CI.getMainModule()->getName().str();
+      OutputFile = CI.getMainModule()->getIdentifier().str();
       llvm::sys::path::replace_extension(OutputFile, SIB_EXTENSION);
     }
 

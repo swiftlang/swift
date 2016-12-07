@@ -242,7 +242,7 @@ void CompilerInstance::performSema() {
   const FrontendOptions &options = Invocation.getFrontendOptions();
   const InputFileKind Kind = Invocation.getInputKind();
   Module *MainModule = getMainModule();
-  Context->LoadedModules[MainModule->getName()] = MainModule;
+  Context->LoadedModules[MainModule->getIdentifier()] = MainModule;
 
   auto modImpKind = SourceFile::ImplicitModuleImportKind::Stdlib;
 
@@ -300,11 +300,12 @@ void CompilerInstance::performSema() {
   Module *underlying = nullptr;
   if (options.ImportUnderlyingModule) {
     underlying = clangImporter->loadModule(SourceLoc(),
-                                           std::make_pair(MainModule->getName(),
-                                                          SourceLoc()));
+                                           std::make_pair(
+                                             MainModule->getIdentifier(),
+                                             SourceLoc()));
     if (!underlying) {
       Diagnostics.diagnose(SourceLoc(), diag::error_underlying_module_not_found,
-                           MainModule->getName());
+                           MainModule->getIdentifier());
     }
   }
 
@@ -549,7 +550,7 @@ void CompilerInstance::performSema() {
 void CompilerInstance::performParseOnly() {
   const InputFileKind Kind = Invocation.getInputKind();
   Module *MainModule = getMainModule();
-  Context->LoadedModules[MainModule->getName()] = MainModule;
+  Context->LoadedModules[MainModule->getIdentifier()] = MainModule;
 
   assert((Kind == InputFileKind::IFK_Swift || Kind == InputFileKind::IFK_Swift_Library) &&
     "only supports parsing a single .swift file");

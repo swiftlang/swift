@@ -433,7 +433,7 @@ namespace {
     }
 
     void print(raw_ostream &OS) const override {
-      OS << "RefElementComponent(" << Field->getName() << ")\n";
+      OS << "RefElementComponent(" << Field->getBaseName() << ")\n";
     }
   };
 
@@ -477,7 +477,7 @@ namespace {
       return ManagedValue::forLValue(Res);
     }
     void print(raw_ostream &OS) const override {
-      OS << "StructElementComponent(" << Field->getName() << ")\n";
+      OS << "StructElementComponent(" << Field->getBaseName() << ")\n";
     }
   };
 
@@ -567,7 +567,7 @@ static bool isReadNoneFunction(const Expr *e) {
   if (auto *dre = dyn_cast<DeclRefExpr>(e)) {
     DeclName name = dre->getDecl()->getFullName();
     return (name.getArgumentNames().size() == 1 &&
-            name.getBaseName().str() == "init" &&
+            name == "init" &&
             !name.getArgumentNames()[0].empty() &&
             (name.getArgumentNames()[0].str() == "integerLiteral" ||
              name.getArgumentNames()[0].str() == "_builtinIntegerLiteral"));
@@ -733,7 +733,7 @@ namespace {
     }
 
     void printBase(raw_ostream &OS, StringRef name) const {
-      OS << name << "(" << decl->getName() << ")";
+      OS << name << "(" << decl->getBaseName() << ")";
       if (IsSuper) OS << " isSuper";
       if (IsDirectAccessorUse) OS << " isDirectAccessorUse";
       if (subscriptIndexExpr) {
@@ -1083,7 +1083,8 @@ namespace {
       // If this is a simple property access, then we must have a conflict.
       if (!subscripts) {
         assert(isa<VarDecl>(decl));
-        gen.SGM.diagnose(loc1, diag::writeback_overlap_property,decl->getName())
+        gen.SGM.diagnose(loc1, diag::writeback_overlap_property,
+                         decl->getBaseName())
            .highlight(loc1.getSourceRange());
         gen.SGM.diagnose(loc2, diag::writebackoverlap_note)
            .highlight(loc2.getSourceRange());
@@ -1548,7 +1549,7 @@ LValue SILGenLValue::visitRec(Expr *e, AccessKind accessKind) {
       // this handles the case in initializers where there is actually a stack
       // allocation for it as well.
       if (isa<ParamDecl>(DRE->getDecl()) &&
-          DRE->getDecl()->getName().str() == "self" &&
+          DRE->getDecl()->getBaseName() == "self" &&
           DRE->getDecl()->isImplicit()) {
         Ctx = SGFContext::AllowGuaranteedPlusZero;
       } else if (auto *VD = dyn_cast<VarDecl>(DRE->getDecl())) {

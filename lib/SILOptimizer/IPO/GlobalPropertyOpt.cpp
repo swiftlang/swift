@@ -69,7 +69,7 @@ class GlobalPropertyOpt {
 #ifndef NDEBUG
     friend raw_ostream &operator<<(raw_ostream &os, const Entry &entry) {
       if (entry.Field) {
-        os << "field " << entry.Field->getName() << '\n';
+        os << "field " << entry.Field->getBaseName() << '\n';
       } else if (!entry.Value) {
         os << "unknown-address\n";
       } else if (auto *Inst = dyn_cast<SILInstruction>(entry.Value)) {

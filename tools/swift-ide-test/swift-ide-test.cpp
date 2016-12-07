@@ -103,17 +103,17 @@ class NullDebuggerClient : public DebuggerClient {
 public:
   using DebuggerClient::DebuggerClient;
 
-  bool shouldGlobalize(Identifier Name, DeclKind Kind) override {
+  bool shouldGlobalize(DeclName Name, DeclKind Kind) override {
     return false;
   }
   void didGlobalize(Decl *D) override {}
-  bool lookupOverrides(Identifier Name, DeclContext *DC,
+  bool lookupOverrides(DeclName Name, DeclContext *DC,
                        SourceLoc Loc, bool IsTypeLookup,
                        ResultVector &RV) override {
     return false;
   }
 
-  bool lookupAdditions(Identifier Name, DeclContext *DC,
+  bool lookupAdditions(DeclName Name, DeclContext *DC,
                        SourceLoc Loc, bool IsTypeLookup,
                        ResultVector &RV) override {
     return false;
@@ -1980,7 +1980,7 @@ public:
     if (auto *VD = dyn_cast<ValueDecl>(D)) {
       OS.indent(IndentLevel * 2);
       OS << Decl::getKindName(VD->getKind()) << "Decl '''"
-         << VD->getName().str() << "''' ";
+         << VD->getBaseName() << "''' ";
       VD->getInterfaceType().print(OS, Options);
       OS << "\n";
     }
@@ -2098,13 +2098,13 @@ public:
 
   void printDeclName(const ValueDecl *VD) {
     if (auto *NTD = dyn_cast<NominalTypeDecl>(VD->getDeclContext())) {
-      Identifier Id = NTD->getName();
+      Identifier Id = NTD->getIdentifier();
       if (!Id.empty())
         OS << Id.str() << ".";
     }
-    Identifier Id = VD->getName();
-    if (!Id.empty()) {
-      OS << Id.str();
+    DeclName Name = VD->getBaseName();
+    if (Name) {
+      OS << Name;
       return;
     }
     if (auto FD = dyn_cast<FuncDecl>(VD)) {
@@ -2376,7 +2376,7 @@ static int doPrintModuleImports(const CompilerInvocation &InitInvok,
 
     SmallVector<Module::ImportedModule, 16> scratch;
     M->forAllVisibleModules({}, [&](const Module::ImportedModule &next) {
-      llvm::outs() << next.second->getName();
+      llvm::outs() << next.second->getBaseName();
       if (isClangModule(next.second))
         llvm::outs() << " (Clang)";
       llvm::outs() << ":\n";
@@ -2384,7 +2384,7 @@ static int doPrintModuleImports(const CompilerInvocation &InitInvok,
       scratch.clear();
       next.second->getImportedModules(scratch, Module::ImportFilter::Public);
       for (auto &import : scratch) {
-        llvm::outs() << "\t" << import.second->getName();
+        llvm::outs() << "\t" << import.second->getBaseName();
         for (auto accessPathPiece : import.first) {
           llvm::outs() << "." << accessPathPiece.first;
         }

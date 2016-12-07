@@ -1830,7 +1830,7 @@ struct ASTNodeBase {};
         if (!type->is<ArchetypeType>() && !type->isAnyExistentialType()) {
           Out << "type " << type
               << " should not have an abstract conformance to "
-              << conformance.getRequirement()->getName();
+              << conformance.getRequirement()->getBaseName();
           abort();
         }
 
@@ -1872,7 +1872,7 @@ struct ASTNodeBase {};
       case ProtocolConformanceState::Checking:
         dumpRef(decl);
         Out << " has a protocol conformance that is still being checked "
-            << conformance->getProtocol()->getName().str() << "\n";
+            << conformance->getProtocol()->getBaseName() << "\n";
         abort();
       }
 
@@ -1898,8 +1898,8 @@ struct ASTNodeBase {};
       auto proto = conformance->getProtocol();
       if (normal->getDeclContext() != conformingDC) {
         Out << "AST verification error: conformance of "
-            << nominal->getName().str() << " to protocol "
-            << proto->getName().str() << " is in the wrong context.\n"
+            << nominal->getBaseName() << " to protocol "
+            << proto->getBaseName() << " is in the wrong context.\n"
             << "Owning context:\n";
         conformingDC->printContext(Out);
         Out << "Conformance context:\n";
@@ -1913,8 +1913,8 @@ struct ASTNodeBase {};
           if (!normal->hasTypeWitness(assocType)) {
             dumpRef(decl);
             Out << " is missing type witness for "
-                << conformance->getProtocol()->getName().str() 
-                << "." << assocType->getName().str()
+                << conformance->getProtocol()->getBaseName()
+                << "." << assocType->getBaseName()
                 << "\n";
             abort();
           }
@@ -1941,8 +1941,8 @@ struct ASTNodeBase {};
           if (!normal->hasWitness(req)) {
             dumpRef(decl);
             Out << " is missing witness for "
-                << conformance->getProtocol()->getName().str() 
-                << "." << req->getName().str()
+                << conformance->getProtocol()->getBaseName()
+                << "." << req->getBaseName()
                 << "\n";
             abort();
           }

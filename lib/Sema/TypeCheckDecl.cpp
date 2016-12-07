@@ -539,7 +539,8 @@ void TypeChecker::checkInheritanceClause(Decl *decl,
     for (unsigned i = 0, n = allProtocols.size(); i != n; /*in loop*/) {
       if (allProtocols[i] == proto || allProtocols[i]->inheritsFrom(proto)) {
         if (!diagnosedCircularity) {
-          diagnose(proto, diag::circular_protocol_def, proto->getName().str());
+          diagnose(proto, diag::circular_protocol_def,
+                   proto->getBaseName().str());
           diagnosedCircularity = true;
         }
 
@@ -621,7 +622,7 @@ static void breakInheritanceCycle(EnumDecl *enumDecl) {
 template<typename T>
 static void checkCircularity(TypeChecker &tc, T *decl,
                              Diag<StringRef> circularDiag,
-                             Diag<Identifier> declHereDiag,
+                             Diag<DeclName> declHereDiag,
                              SmallVectorImpl<T *> &path) {
   switch (decl->getCircularityCheck()) {
   case CircularityCheck::Checked:
@@ -644,7 +645,7 @@ static void checkCircularity(TypeChecker &tc, T *decl,
     if (path.end() - cycleStart == 1) {
       tc.diagnose(path.back()->getLoc(),
                   circularDiag,
-                  path.back()->getName().str());
+                  path.back()->getBaseName().str());
 
       decl->setInvalid();
       decl->setInterfaceType(ErrorType::get(tc.Context));
@@ -657,14 +658,14 @@ static void checkCircularity(TypeChecker &tc, T *decl,
     for (auto i = cycleStart, iEnd = path.end(); i != iEnd; ++i) {
       if (!pathStr.empty())
         pathStr += " -> ";
-      pathStr += ("'" + (*i)->getName().str() + "'").str();
+      pathStr += ("'" + (*i)->getBaseName().str() + "'").str();
     }
-    pathStr += (" -> '" + decl->getName().str() + "'").str();
+    pathStr += (" -> '" + decl->getBaseName().str() + "'").str();
 
     // Diagnose the cycle.
     tc.diagnose(decl->getLoc(), circularDiag, pathStr);
     for (auto i = cycleStart + 1, iEnd = path.end(); i != iEnd; ++i) {
-      tc.diagnose(*i, declHereDiag, (*i)->getName());
+      tc.diagnose(*i, declHereDiag, (*i)->getBaseName());
     }
 
     // Set this declaration as invalid, then break the cycle somehow.
@@ -885,7 +886,7 @@ static void checkRedeclaration(TypeChecker &tc, ValueDecl *current) {
     if (auto nominal = currentDC->getAsNominalTypeOrNominalTypeExtensionContext()) {
       otherDefinitions = nominal->lookupDirect(current->getBaseName());
       if (tracker)
-        tracker->addUsedMember({nominal, current->getName()}, isCascading);
+        tracker->addUsedMember({nominal, current->getBaseName()}, isCascading);
     }
   } else {
     // Look within a module context.
@@ -894,7 +895,7 @@ static void checkRedeclaration(TypeChecker &tc, ValueDecl *current) {
                                                 otherDefinitionsVec);
     otherDefinitions = otherDefinitionsVec;
     if (tracker)
-      tracker->addTopLevelName(current->getName(), isCascading);
+      tracker->addTopLevelName(current->getBaseName(), isCascading);
   }
 
   // Compare this signature against the signature of other
@@ -2854,7 +2855,7 @@ static void checkVarBehavior(VarDecl *decl, TypeChecker &TC) {
     if (!dc->isTypeContext() || decl->isStatic()) {
       TC.diagnose(behavior->getLoc(),
                   diag::property_behavior_with_self_requirement_not_in_type,
-                  behaviorProto->getName());
+                  behaviorProto->getBaseName());
       break;
     }
     
@@ -2878,8 +2879,8 @@ static void checkVarBehavior(VarDecl *decl, TypeChecker &TC) {
       // Add some notes that the conformance is behavior-driven.
       TC.diagnose(behavior->getLoc(),
                   diag::self_conformance_required_by_property_behavior,
-                  refinedProto->getName(),
-                  behaviorProto->getName());
+                  refinedProto->getBaseName(),
+                  behaviorProto->getBaseName());
       conformance->setInvalid();
     }
   }
@@ -2890,8 +2891,8 @@ static void checkVarBehavior(VarDecl *decl, TypeChecker &TC) {
     // Diagnose requirements that can't be satisfied from the behavior decl.
     TC.diagnose(behavior->getLoc(),
                 diag::property_behavior_unknown_requirement,
-                behaviorProto->getName(),
-                requirement->getName());
+                behaviorProto->getBaseName(),
+                requirement->getBaseName());
     TC.diagnose(requirement->getLoc(),
                 diag::property_behavior_unknown_requirement_here);
     conformance->setInvalid();
@@ -2908,7 +2909,7 @@ static void checkVarBehavior(VarDecl *decl, TypeChecker &TC) {
       continue;
   
     // Match a Value associated type requirement to the property type.
-    if (assocTy->getName() != TC.Context.Id_Value) {
+    if (assocTy->getBaseName() != TC.Context.Id_Value) {
       unknownRequirement(assocTy);
       continue;
     }
@@ -2928,8 +2929,8 @@ static void checkVarBehavior(VarDecl *decl, TypeChecker &TC) {
         conformance->setInvalid();
         TC.diagnose(behavior->getLoc(),
                     diag::value_conformance_required_by_property_behavior,
-                    proto->getName(),
-                    behaviorProto->getName());
+                    proto->getBaseName(),
+                    behaviorProto->getBaseName());
         goto next_requirement;
       }
       valueConformances.push_back(*valueConformance);
@@ -2987,7 +2988,7 @@ static void checkVarBehavior(VarDecl *decl, TypeChecker &TC) {
     
     if (auto varReqt = dyn_cast<VarDecl>(requirement)) {
       // Match a storage requirement.
-      if (varReqt->getName() == TC.Context.Id_storage) {
+      if (varReqt->getBaseName() == TC.Context.Id_storage) {
         TC.validateDecl(varReqt);
 
         auto storageTy = varReqt->getInterfaceType();
@@ -3054,7 +3055,7 @@ static void checkVarBehavior(VarDecl *decl, TypeChecker &TC) {
         if (!dc->isTypeContext()) {
           TC.diagnose(behavior->getLoc(),
                       diag::property_behavior_with_feature_not_supported,
-                      behaviorProto->getName(), "storage");
+                      behaviorProto->getBaseName(), "storage");
           conformance->setInvalid();
           continue;
         }
@@ -3091,7 +3092,7 @@ static void checkVarBehavior(VarDecl *decl, TypeChecker &TC) {
         continue;
       
       // Handle a parameter block requirement.
-      if (func->getName() == TC.Context.Id_parameter) {
+      if (func->getBaseName() == TC.Context.Id_parameter) {
         requiresParameter = true;
         
         TC.validateDecl(func);
@@ -3101,7 +3102,7 @@ static void checkVarBehavior(VarDecl *decl, TypeChecker &TC) {
         if (func->isStatic() || func->isGeneric() || func->isMutating()) {
           TC.diagnose(behavior->getLoc(),
                       diag::property_behavior_invalid_parameter_reqt,
-                      behaviorProto->getName());
+                      behaviorProto->getBaseName());
           TC.diagnose(varReqt->getLoc(),
                       diag::property_behavior_protocol_reqt_here,
                       TC.Context.Id_parameter);
@@ -3113,8 +3114,8 @@ static void checkVarBehavior(VarDecl *decl, TypeChecker &TC) {
         if (!decl->getBehavior()->Param) {
           TC.diagnose(behavior->getLoc(),
                       diag::property_behavior_requires_parameter,
-                      behaviorProto->getName(),
-                      decl->getName());
+                      behaviorProto->getBaseName(),
+                      decl->getBaseName());
           conformance->setInvalid();
           continue;
         }
@@ -3123,7 +3124,7 @@ static void checkVarBehavior(VarDecl *decl, TypeChecker &TC) {
         if (!dc->isTypeContext()) {
           TC.diagnose(behavior->getLoc(),
                       diag::property_behavior_with_feature_not_supported,
-                      behaviorProto->getName(), "parameter requirement");
+                      behaviorProto->getBaseName(), "parameter requirement");
           conformance->setInvalid();
           continue;
         }
@@ -3145,7 +3146,7 @@ static void checkVarBehavior(VarDecl *decl, TypeChecker &TC) {
   if (decl->getParentInitializer()) {
     TC.diagnose(decl->getParentInitializer()->getLoc(),
                 diag::property_behavior_invalid_initializer,
-                behaviorProto->getName());
+                behaviorProto->getBaseName());
   }
   
   // If the property was declared with a parameter, but the behavior didn't
@@ -3155,7 +3156,7 @@ static void checkVarBehavior(VarDecl *decl, TypeChecker &TC) {
   if (!requiresParameter && decl->getBehavior()->Param) {
     TC.diagnose(decl->getBehavior()->Param->getLoc(),
                 diag::property_behavior_invalid_parameter,
-                behaviorProto->getName());
+                behaviorProto->getBaseName());
   }
   
   // Bail out if we didn't resolve method witnesses.
@@ -3176,9 +3177,9 @@ static void checkVarBehavior(VarDecl *decl, TypeChecker &TC) {
   if (!substValueTy->isEqual(decl->getInterfaceType())) {
     TC.diagnose(behavior->getLoc(),
                 diag::property_behavior_value_type_doesnt_match,
-                behaviorProto->getName(),
+                behaviorProto->getBaseName(),
                 substValueTy,
-                decl->getName(),
+                decl->getBaseName(),
                 decl->getInterfaceType());
     TC.diagnose(behavior->ValueDecl->getLoc(),
                 diag::property_behavior_value_decl_here);
@@ -3910,7 +3911,8 @@ public:
 
       if (!assocType->isInvalid()) {
         assocType->setInvalid();
-        TC.diagnose(assocType->getLoc(), diag::circular_type_alias, assocType->getName());
+        TC.diagnose(assocType->getLoc(), diag::circular_type_alias,
+                    assocType->getBaseName());
       }
       return;
     }
@@ -3938,7 +3940,7 @@ public:
         !NTD->getParent()->isModuleScopeContext()) {
       TC.diagnose(NTD->getLoc(),
                   diag::unsupported_nested_protocol,
-                  NTD->getName());
+                  NTD->getBaseName());
       return true;
     }
 
@@ -3949,13 +3951,13 @@ public:
         if (DC->getAsProtocolExtensionContext()) {
           TC.diagnose(NTD->getLoc(),
                       diag::unsupported_type_nested_in_protocol_extension,
-                      NTD->getName(),
-                      proto->getName());
+                      NTD->getBaseName(),
+                      proto->getBaseName());
         } else {
           TC.diagnose(NTD->getLoc(),
                       diag::unsupported_type_nested_in_protocol,
-                      NTD->getName(),
-                      proto->getName());
+                      NTD->getBaseName(),
+                      proto->getBaseName());
         }
         NTD->setInvalid();
         return true;
@@ -3966,8 +3968,8 @@ public:
         if (auto AFD = dyn_cast<AbstractFunctionDecl>(DC)) {
           TC.diagnose(NTD->getLoc(),
                       diag::unsupported_type_nested_in_generic_function,
-                      NTD->getName(),
-                      AFD->getName());
+                      NTD->getBaseName(),
+                      AFD->getBaseName());
           return true;
         }
       }
@@ -3995,9 +3997,9 @@ public:
       }
       {
         // Check for duplicate enum members.
-        llvm::DenseMap<Identifier, EnumElementDecl *> Elements;
+        llvm::DenseMap<DeclName, EnumElementDecl *> Elements;
         for (auto *EED : ED->getAllElements()) {
-          auto Res = Elements.insert({ EED->getName(), EED });
+          auto Res = Elements.insert({ EED->getBaseName(), EED });
           if (!Res.second) {
             EED->setInterfaceType(ErrorType::get(TC.Context));
             EED->setInvalid();
@@ -4007,7 +4009,7 @@ public:
             auto PreviousEED = Res.first->second;
             TC.diagnose(EED->getLoc(), diag::duplicate_enum_element);
             TC.diagnose(PreviousEED->getLoc(),
-                        diag::previous_decldef, true, EED->getName());
+                        diag::previous_decldef, true, EED->getBaseName());
           }
         }
       }
@@ -4110,24 +4112,25 @@ public:
 
       case 1:
         TC.diagnose(pbd->getLoc(), diag::missing_in_class_init_1,
-                    vars[0]->getName(), suggestNSManaged);
+                    vars[0]->getBaseName(), suggestNSManaged);
         break;
 
       case 2:
         TC.diagnose(pbd->getLoc(), diag::missing_in_class_init_2,
-                    vars[0]->getName(), vars[1]->getName(), suggestNSManaged);
+                    vars[0]->getBaseName(), vars[1]->getBaseName(),
+                    suggestNSManaged);
         break;
 
       case 3:
         TC.diagnose(pbd->getLoc(), diag::missing_in_class_init_3plus,
-                    vars[0]->getName(), vars[1]->getName(), vars[2]->getName(),
-                    false, suggestNSManaged);
+                    vars[0]->getBaseName(), vars[1]->getBaseName(),
+                    vars[2]->getBaseName(), false, suggestNSManaged);
         break;
 
       default:
         TC.diagnose(pbd->getLoc(), diag::missing_in_class_init_3plus,
-                    vars[0]->getName(), vars[1]->getName(), vars[2]->getName(),
-                    true, suggestNSManaged);
+                    vars[0]->getBaseName(), vars[1]->getBaseName(),
+                    vars[2]->getBaseName(), true, suggestNSManaged);
         break;
       }
 
@@ -4214,7 +4217,7 @@ public:
 
         if (Super->isFinal()) {
           TC.diagnose(CD, diag::inheritance_from_final_class,
-                      Super->getName());
+                      Super->getBaseName());
           // FIXME: should this really be skipping the rest of decl-checking?
           return;
         }
@@ -4223,7 +4226,7 @@ public:
             && superclassTy->hasTypeParameter()) {
           TC.diagnose(CD,
                       diag::inheritance_from_unspecialized_objc_generic_class,
-                      Super->getName());
+                      Super->getBaseName());
         }
 
         switch (Super->getForeignClassKind()) {
@@ -4231,12 +4234,12 @@ public:
           break;
         case ClassDecl::ForeignKind::CFType:
           TC.diagnose(CD, diag::inheritance_from_cf_class,
-                      Super->getName());
+                      Super->getBaseName());
           isInvalidSuperclass = true;
           break;
         case ClassDecl::ForeignKind::RuntimeOnly:
           TC.diagnose(CD, diag::inheritance_from_objc_runtime_visible_class,
-                      Super->getName());
+                      Super->getBaseName());
           isInvalidSuperclass = true;
           break;
         }
@@ -4378,7 +4381,7 @@ public:
   /// the corresponding operator declaration.
   void bindFuncDeclToOperator(FuncDecl *FD) {
     OperatorDecl *op = nullptr;
-    auto operatorName = FD->getFullName().getBaseName();
+    auto operatorName = FD->getFullName().getIdentifier();
 
     // Check for static/final/class when we're in a type.
     auto dc = FD->getDeclContext();
@@ -4609,8 +4612,8 @@ public:
       else
         llvm_unreachable("Unknown nominal type");
       TC.diagnose(simpleRepr->getIdLoc(), diag::dynamic_self_struct_enum,
-                  which, nominal->getName())
-        .fixItReplace(simpleRepr->getIdLoc(), nominal->getName().str());
+                  which, nominal->getBaseName())
+        .fixItReplace(simpleRepr->getIdLoc(), nominal->getBaseName().str());
       simpleRepr->setInvalid();
       return true;
     }
@@ -5710,7 +5713,7 @@ public:
                                      OverrideMatchMode::Strict,
                                      &TC)) {
           TC.diagnose(property, diag::override_property_type_mismatch,
-                      property->getName(), propertyTy, parentPropertyTy);
+                      property->getBaseName(), propertyTy, parentPropertyTy);
           noteFixableMismatchedTypes(TC, decl, matchDecl);
           TC.diagnose(matchDecl, diag::property_override_here);
           return true;
@@ -5728,7 +5731,7 @@ public:
         if (cast<AbstractStorageDecl>(matchDecl)->getSetter() &&
             !IsSilentDifference) {
           TC.diagnose(property, diag::override_mutable_covariant_property,
-                      property->getName(), parentPropertyTy, propertyTy);
+                      property->getBaseName(), parentPropertyTy, propertyTy);
           TC.diagnose(matchDecl, diag::property_override_here);
           return true;
         }
@@ -5966,13 +5969,14 @@ public:
       if (FD->isAccessor()) {
         TC.diagnose(override, diag::override_accessor_less_available,
                     FD->getDescriptiveKind(),
-                    FD->getAccessorStorageDecl()->getName());
+                    FD->getAccessorStorageDecl()->getBaseName());
         TC.diagnose(base, diag::overridden_here);
         return true;
       }
     }
 
-    TC.diagnose(override, diag::override_less_available, override->getName());
+    TC.diagnose(override, diag::override_less_available,
+                override->getBaseName());
     TC.diagnose(base, diag::overridden_here);
 
     return true;
@@ -5991,7 +5995,7 @@ public:
       // Make sure that the overriding property doesn't have storage.
       if (overrideASD->hasStorage() && !overrideASD->hasObservers()) {
         TC.diagnose(overrideASD, diag::override_with_stored_property,
-                    overrideASD->getName());
+                    overrideASD->getBaseName());
         TC.diagnose(baseASD, diag::property_override_here);
         return true;
       }
@@ -6006,7 +6010,7 @@ public:
       }
       if (overrideASD->hasObservers() && !baseIsSettable) {
         TC.diagnose(overrideASD, diag::observing_readonly_property,
-                    overrideASD->getName());
+                    overrideASD->getBaseName());
         TC.diagnose(baseASD, diag::property_override_here);
         return true;
       }
@@ -6016,7 +6020,7 @@ public:
       // setter but override the getter, and that would be surprising at best.
       if (baseIsSettable && !override->isSettable(override->getDeclContext())) {
         TC.diagnose(overrideASD, diag::override_mutable_with_readonly_property,
-                    overrideASD->getName());
+                    overrideASD->getBaseName());
         TC.diagnose(baseASD, diag::property_override_here);
         return true;
       }
@@ -6027,7 +6031,7 @@ public:
       // property.
       if (isa<VarDecl>(baseASD) && cast<VarDecl>(baseASD)->isLet()) {
         TC.diagnose(overrideASD, diag::override_let_property,
-                    overrideASD->getName());
+                    overrideASD->getBaseName());
         TC.diagnose(baseASD, diag::property_override_here);
         return true;
       }
@@ -6940,7 +6944,7 @@ void TypeChecker::validateDecl(ValueDecl *D, bool resolveTypeParams) {
       // type.  Reject this with a circularity diagnostic.
       if (!typeAlias->hasUnderlyingType()) {
         diagnose(typeAlias->getLoc(), diag::circular_type_alias,
-                 typeAlias->getName());
+                 typeAlias->getBaseName());
         typeAlias->getUnderlyingTypeLoc().setInvalidType(Context);
         typeAlias->setInvalid();
         typeAlias->setInterfaceType(ErrorType::get(Context));
@@ -7044,7 +7048,7 @@ void TypeChecker::validateDecl(ValueDecl *D, bool resolveTypeParams) {
                    diag::objc_protocol_inherits_non_objc_protocol,
                    proto->getDeclaredType(), inherited->getDeclaredType());
           diagnose(inherited->getLoc(), diag::protocol_here,
-                   inherited->getName());
+                   inherited->getBaseName());
           isObjC = None;
         }
       }
@@ -7068,7 +7072,7 @@ void TypeChecker::validateDecl(ValueDecl *D, bool resolveTypeParams) {
         recordSelfContextType(cast<AbstractFunctionDecl>(VD->getDeclContext()));
       } else if (PatternBindingDecl *PBD = VD->getParentPatternBinding()) {
         if (PBD->isBeingTypeChecked()) {
-          diagnose(VD, diag::pattern_used_in_type, VD->getName());
+          diagnose(VD, diag::pattern_used_in_type, VD->getBaseName());
 
         } else {
           for (unsigned i = 0, e = PBD->getNumPatternEntries(); i != e; ++i)
@@ -7473,7 +7477,7 @@ void TypeChecker::validateExtension(ExtensionDecl *ext) {
       // we could end up being unable to resolve the generic signature.
       diagnose(ext->getLoc(), diag::extension_protocol_via_typealias, proto)
         .fixItReplace(ext->getExtendedTypeLoc().getSourceRange(),
-                      proto->getDecl()->getName().str());
+                      proto->getDecl()->getBaseName().str());
       ext->setInvalid();
       ext->getExtendedTypeLoc().setInvalidType(Context);
       return;
@@ -7619,21 +7623,24 @@ static void diagnoseClassWithoutInitializers(TypeChecker &tc,
       switch (vars.size()) {
       case 1:
         diag.emplace(tc.diagnose(varLoc, diag::note_no_in_class_init_1,
-                                 vars[0]->getName()));
+                                 vars[0]->getBaseName()));
         break;
       case 2:
         diag.emplace(tc.diagnose(varLoc, diag::note_no_in_class_init_2,
-                                 vars[0]->getName(), vars[1]->getName()));
+                                 vars[0]->getBaseName(),
+                                 vars[1]->getBaseName()));
         break;
       case 3:
         diag.emplace(tc.diagnose(varLoc, diag::note_no_in_class_init_3plus,
-                                 vars[0]->getName(), vars[1]->getName(), 
-                                 vars[2]->getName(), false));
+                                 vars[0]->getBaseName(),
+                                 vars[1]->getBaseName(),
+                                 vars[2]->getBaseName(), false));
         break;
       default:
         diag.emplace(tc.diagnose(varLoc, diag::note_no_in_class_init_3plus,
-                                 vars[0]->getName(), vars[1]->getName(), 
-                                 vars[2]->getName(), true));
+                                 vars[0]->getBaseName(),
+                                 vars[1]->getBaseName(),
+                                 vars[2]->getBaseName(), true));
         break;
       }
 

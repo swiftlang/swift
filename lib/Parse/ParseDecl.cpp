@@ -1851,7 +1851,7 @@ void Parser::setLocalDiscriminator(ValueDecl *D) {
   if (getScopeInfo().isStaticallyInactiveConfigBlock())
     return;
 
-  Identifier name = D->getName();
+  DeclName name = D->getBaseName();
   unsigned discriminator = CurLocalContext->claimNextNamedDiscriminator(name);
   D->setLocalDiscriminator(discriminator);
 }
@@ -2081,7 +2081,7 @@ ParserStatus Parser::parseDecl(ParseDeclOptions Flags,
       if (CurDeclContext) {
         if (auto nominal = dyn_cast<NominalTypeDecl>(CurDeclContext)) {
           diagnose(nominal->getLoc(), diag::note_in_decl_extension, false,
-                   nominal->getName());
+                   nominal->getBaseName());
         } else if (auto extension = dyn_cast<ExtensionDecl>(CurDeclContext)) {
           if (auto repr = extension->getExtendedTypeLoc().getTypeRepr()) {
             if (auto idRepr = dyn_cast<IdentTypeRepr>(repr)) {

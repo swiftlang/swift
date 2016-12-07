@@ -1140,7 +1140,7 @@ void TypeChecker::completePropertyBehaviorStorage(VarDecl *VD,
   assert(SubstStorageContextTy && "storage type substitution failed?!");
 
   auto DC = VD->getDeclContext();
-  SmallString<64> NameBuf = VD->getName().str();
+  SmallString<64> NameBuf = VD->getBaseName().str();
   NameBuf += ".storage";
   auto StorageName = Context.getIdentifier(NameBuf);
   auto *Storage = new (Context) VarDecl(VD->isStatic(),
@@ -1268,7 +1268,7 @@ void TypeChecker::completePropertyBehaviorParameter(VarDecl *VD,
                                  ArrayRef<Substitution> SelfContextSubs) {
   // Create a method to witness the requirement.
   auto DC = VD->getDeclContext();
-  SmallString<64> NameBuf = VD->getName().str();
+  SmallString<64> NameBuf = VD->getBaseName().str();
   NameBuf += ".parameter";
   auto ParameterBaseName = Context.getIdentifier(NameBuf);
 
@@ -1378,7 +1378,7 @@ void TypeChecker::completePropertyBehaviorParameter(VarDecl *VD,
     auto expr = new (Context) DeclRefExpr(param, DeclNameLoc(),
                                           /*implicit*/ true);
     argRefs.push_back(expr);
-    argNames.push_back(DeclaredParams->get(i)->getName());
+    argNames.push_back(DeclaredParams->get(i)->getIdentifier());
   }
   auto apply = CallExpr::createImplicit(Context, VD->getBehavior()->Param,
                                         argRefs, argNames);
@@ -1536,7 +1536,7 @@ void TypeChecker::completeLazyVarImplementation(VarDecl *VD) {
   assert(!VD->isStatic() && "Static vars are already lazy on their own");
 
   // Create the storage property as an optional of VD's type.
-  SmallString<64> NameBuf = VD->getName().str();
+  SmallString<64> NameBuf = VD->getBaseName().str();
   NameBuf += ".storage";
   auto StorageName = Context.getIdentifier(NameBuf);
   auto StorageTy = OptionalType::get(VD->getType());
@@ -1909,8 +1909,9 @@ ConstructorDecl *swift::createImplicitConstructor(TypeChecker &tc,
 
       // Create the parameter.
       auto *arg = new (context) ParamDecl(/*IsLet*/true, SourceLoc(), 
-                                          Loc, var->getName(),
-                                          Loc, var->getName(), varType, decl);
+                                  Loc, var->getBaseName().getIdentifier(),
+                                  Loc, var->getBaseName().getIdentifier(),
+                                  varType, decl);
       arg->setInterfaceType(varInterfaceType);
       arg->setImplicit();
       
@@ -1974,10 +1975,11 @@ static void createStubBody(TypeChecker &tc, ConstructorDecl *ctor) {
                                           /*Implicit=*/true);
 
   llvm::SmallString<64> buffer;
+  StringRef moduleName = classDecl->getModuleContext()->getIdentifier().str();
   StringRef fullClassName = tc.Context.AllocateCopy(
-                              (classDecl->getModuleContext()->getName().str() +
-                               "." +
-                               classDecl->getName().str()).toStringRef(buffer));
+                              (moduleName + "." +
+                                classDecl->getBaseName().str())
+                              .toStringRef(buffer));
 
   Expr *className = new (tc.Context) StringLiteralExpr(fullClassName, loc,
                                                        /*Implicit=*/true);

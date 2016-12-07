@@ -680,7 +680,7 @@ namespace {
           break;
         }
         if (binding.DefaultedProtocol)
-          out << "(default from " << (*binding.DefaultedProtocol)->getName()
+          out << "(default from " << (*binding.DefaultedProtocol)->getBaseName()
               << ") ";
         out << type.getString();
       }, [&]() { out << " "; });
@@ -2226,12 +2226,11 @@ static bool shortCircuitDisjunctionAt(Constraint *constraint,
   // overloaded operators.
   if (constraint->getKind() == ConstraintKind::BindOverload &&
       constraint->getOverloadChoice().getKind() == OverloadChoiceKind::Decl &&
-      constraint->getOverloadChoice().getDecl()->getName().isOperator() &&
+      constraint->getOverloadChoice().getDecl()->isOperator() &&
       successfulConstraint->getKind() == ConstraintKind::BindOverload &&
       successfulConstraint->getOverloadChoice().getKind()
         == OverloadChoiceKind::Decl &&
-      successfulConstraint->getOverloadChoice().getDecl()->getName()
-        .isOperator() &&
+      successfulConstraint->getOverloadChoice().getDecl()->isOperator() &&
       constraint->getOverloadChoice().getDecl()->getInterfaceType()
         ->is<GenericFunctionType>() &&
       !successfulConstraint->getOverloadChoice().getDecl()->getInterfaceType()

@@ -356,13 +356,13 @@ static bool initDocEntityInfo(const Decl *D, const Decl *SynthesizedTarget,
         auto FirstPart = DocRef.substr(0, DocRef.find(Open) + (Open).size());
         auto SecondPart = DocRef.substr(FirstPart.size());
         auto ExtendedName = ((ExtensionDecl*)D)->getExtendedType()->
-          getAnyNominal()->getName().str();
+          getAnyNominal()->getBaseName().str();
         assert(SecondPart.startswith(ExtendedName));
         SecondPart = SecondPart.substr(ExtendedName.size());
         llvm::SmallString<128> UpdatedDocBuffer;
         UpdatedDocBuffer.append(FirstPart);
-        UpdatedDocBuffer.append(((NominalTypeDecl*)SynthesizedTarget)->getName().
-                                str());
+        UpdatedDocBuffer.append(((NominalTypeDecl*)SynthesizedTarget)->
+          getBaseName().str());
         UpdatedDocBuffer.append(SecondPart);
         OS << UpdatedDocBuffer;
       } else
@@ -665,11 +665,11 @@ public:
     if (Node.Kind == SyntaxStructureKind::Parameter) {
       auto Param = dyn_cast<ParamDecl>(Node.Dcl);
 
-      auto passAnnotation = [&](UIdent Kind, SourceLoc Loc, Identifier Name) {
+      auto passAnnotation = [&](UIdent Kind, SourceLoc Loc, DeclName Name) {
         if (Loc.isInvalid())
           return;
         unsigned Offset = SM.getLocOffsetInBuffer(Loc, BufferID);
-        unsigned Length = Name.empty() ? 1 : Name.getLength();
+        unsigned Length = Name ? Name.str().size() : 1;
         reportRefsUntil(Offset);
 
         DocEntityInfo Info;
@@ -687,7 +687,7 @@ public:
 
       // Parameter
       static UIdent KindParameter("source.lang.swift.syntaxtype.parameter");
-      passAnnotation(KindParameter, Param->getNameLoc(), Param->getName());
+      passAnnotation(KindParameter, Param->getNameLoc(), Param->getBaseName());
       LastParamLoc = Param->getNameLoc();
     }
 
