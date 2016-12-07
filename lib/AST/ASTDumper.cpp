@@ -3050,7 +3050,7 @@ namespace {
 
 #undef TRIVIAL_TYPE_PRINTER
   };
-}
+} // end anonymous namespace
 
 void Type::dump() const {
   // Make sure to print type variables.

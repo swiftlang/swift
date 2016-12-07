@@ -81,7 +81,7 @@ namespace {
       return { S->getStartLoc(), S->getEndLoc() };
     }
   };
-}
+} // end anonymous namespace
 
 template <class T> static SourceRange getSourceRangeImpl(const T *S) {
   static_assert(isOverriddenFromStmt(&T::getSourceRange) ||

@@ -381,7 +381,7 @@ static void doDynamicLookup(VisibleDeclConsumer &Consumer,
 
 namespace {
   typedef llvm::SmallPtrSet<TypeDecl *, 8> VisitedSet;
-}
+} // end anonymous namespace
 
 static DeclVisibilityKind getReasonForSuper(DeclVisibilityKind Reason) {
   switch (Reason) {

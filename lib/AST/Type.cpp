@@ -2587,7 +2587,7 @@ namespace {
       return X.str() < Y.str();
     }
   };
-}
+} // end anonymous namespace
 
 void ArchetypeType::populateNestedTypes() const {
   if (ArchetypeTypeBits.ExpandedNestedTypes) return;

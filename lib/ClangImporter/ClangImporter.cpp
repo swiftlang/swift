@@ -165,7 +165,7 @@ namespace {
       return MemoryBuffer_Malloc;
     }
   };
-}
+} // end anonymous namespace
 
 namespace {
 class BridgingPPTracker : public clang::PPCallbacks {
@@ -234,7 +234,7 @@ private:
     Impl.BridgeHeaderMacros.push_back(MacroNameTok.getIdentifierInfo());
   }
 };
-}
+} // end anonymous namespace
 
 void ClangImporter::Implementation::addBridgeHeaderTopLevelDecls(
     clang::Decl *D) {

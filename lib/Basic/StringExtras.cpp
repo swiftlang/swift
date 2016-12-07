@@ -996,7 +996,7 @@ static bool isVacuousPreposition(StringRef beforePreposition,
 
 namespace {
   typedef std::reverse_iterator<camel_case::WordIterator> ReverseWordIterator;
-}
+} // end anonymous namespace
 
 /// Find the last preposition in the given word.
 static ReverseWordIterator findLastPreposition(ReverseWordIterator first,

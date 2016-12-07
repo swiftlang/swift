@@ -78,7 +78,7 @@ private:
   }
 };
 
-}
+} // end anonymous namespace
 
 bool SemaAnnotator::walkToDeclPre(Decl *D) {
   if (isDone())

@@ -554,7 +554,7 @@ namespace {
       }
     };
   };
-}
+} // end anonymous namespace
 
 static GenericSignatureBuilder::ConcreteGenerator
 makeConcrete(Type type) {

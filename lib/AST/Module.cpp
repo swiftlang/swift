@@ -874,7 +874,7 @@ namespace {
       return container.lookupPrecedenceGroup(name);
     }
   };
-}
+} // end anonymous namespace
 
 /// A helper class to sneak around C++ access control rules.
 class SourceFile::Impl {

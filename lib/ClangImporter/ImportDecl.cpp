@@ -63,8 +63,8 @@ namespace inferred_attributes {
   enum {
     requires_stored_property_inits = 0x01
   };
-}
-}
+} // end namespace inferred_attributes
+} // end namespace swift
 
 namespace {
 enum class MakeStructRawValuedFlags {
