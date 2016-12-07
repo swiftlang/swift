@@ -63,8 +63,8 @@ void *TypeBase::operator new(size_t bytes, const ASTContext &ctx,
 }
 
 bool CanType::isActuallyCanonicalOrNull() const {
-  return getPointer() == 0 || 
-         getPointer() == llvm::DenseMapInfo<TypeBase*>::getTombstoneKey() ||
+  return getPointer() == nullptr ||
+         getPointer() == llvm::DenseMapInfo<TypeBase *>::getTombstoneKey() ||
          getPointer()->isCanonical();
 }
 
@@ -1056,7 +1056,7 @@ void ProtocolType::canonicalizeProtocols(
     }
     
     // We have seen this protocol before; zap this occurrence.
-    protocols[I] = 0;
+    protocols[I] = nullptr;
     zappedAny = true;
   }
   
@@ -1093,7 +1093,7 @@ CanType TypeBase::getCanonicalType() {
     return CanType(CT);
 
   // Otherwise, compute and cache it.
-  TypeBase *Result = 0;
+  TypeBase *Result = nullptr;
   switch (getKind()) {
 #define ALWAYS_CANONICAL_TYPE(id, parent) case TypeKind::id:
 #define TYPE(id, parent)

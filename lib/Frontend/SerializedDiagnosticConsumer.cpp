@@ -145,7 +145,7 @@ public:
     // Write the generated bitstream to "Out".
     State->OS->write((char *)&State->Buffer.front(), State->Buffer.size());
     State->OS->flush();
-    State->OS.reset(0);
+    State->OS.reset(nullptr);
   }
 
   virtual void handleDiagnostic(SourceManager &SM, SourceLoc Loc,
@@ -303,7 +303,7 @@ static void emitBlockID(unsigned ID, const char *Name,
   Stream.EmitRecord(llvm::bitc::BLOCKINFO_CODE_SETBID, Record);
 
   // Emit the block name if present.
-  if (Name == 0 || Name[0] == 0)
+  if (Name == nullptr || Name[0] == 0)
     return;
 
   Record.clear();

@@ -334,7 +334,7 @@ static bool constantFoldTerminator(SILBasicBlock &BB,
   if (SwitchValueInst *SUI = dyn_cast<SwitchValueInst>(TI)) {
     if (IntegerLiteralInst *SwitchVal =
           dyn_cast<IntegerLiteralInst>(SUI->getOperand())) {
-      SILBasicBlock *TheSuccessorBlock = 0;
+      SILBasicBlock *TheSuccessorBlock = nullptr;
       for (unsigned Idx = 0; Idx < SUI->getNumCases(); ++Idx) {
         APInt AI;
         SILValue EI;

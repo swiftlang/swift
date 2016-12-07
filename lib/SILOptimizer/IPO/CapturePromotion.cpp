@@ -83,7 +83,7 @@ public:
     uint64_t *Bits;
     unsigned NumBitWords; // Words per row.
 
-    ReachingBlockMatrix(): Bits(0), NumBitWords(0) {}
+    ReachingBlockMatrix() : Bits(nullptr), NumBitWords(0) {}
 
     bool empty() const { return !Bits; }
   };
@@ -97,7 +97,7 @@ public:
   }
   static void deallocateMatrix(ReachingBlockMatrix &M) {
     delete [] M.Bits;
-    M.Bits = 0;
+    M.Bits = nullptr;
     M.NumBitWords = 0;
   }
   static ReachingBlockSet allocateSet(unsigned NumBlocks) {
@@ -108,7 +108,7 @@ public:
   }
   static void deallocateSet(ReachingBlockSet &S) {
     delete [] S.Bits;
-    S.Bits = 0;
+    S.Bits = nullptr;
     S.NumBitWords = 0;
   }
 
@@ -117,7 +117,7 @@ private:
   unsigned NumBitWords;
 
 public:
-  ReachingBlockSet(): Bits(0), NumBitWords(0) {}
+  ReachingBlockSet() : Bits(nullptr), NumBitWords(0) {}
 
   ReachingBlockSet(unsigned BlockID, ReachingBlockMatrix &M)
     : Bits(&M.Bits[BlockID * M.NumBitWords]),

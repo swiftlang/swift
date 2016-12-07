@@ -900,7 +900,7 @@ private:
     EE->finalizeObject();
 
     for (auto InitFn : InitFns)
-      EE->runFunctionAsMain(InitFn, CmdLine, 0);
+      EE->runFunctionAsMain(InitFn, CmdLine, nullptr);
     InitFns.clear();
     
     // FIXME: The way we do this is really ugly... we should be able to
@@ -910,8 +910,8 @@ private:
       RanGlobalInitializers = true;
     }
     llvm::Function *EntryFn = TempModule->getFunction("main");
-    EE->runFunctionAsMain(EntryFn, CmdLine, 0);
-    
+    EE->runFunctionAsMain(EntryFn, CmdLine, nullptr);
+
     return true;
   }
 
