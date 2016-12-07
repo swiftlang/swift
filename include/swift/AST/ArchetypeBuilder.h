@@ -569,8 +569,8 @@ public:
 
   /// \brief Retrieve (or build) the type corresponding to the potential
   /// archetype within the given generic environment.
-  ArchetypeType::NestedType getTypeInContext(ArchetypeBuilder &builder,
-                                             GenericEnvironment *genericEnv);
+  Type getTypeInContext(ArchetypeBuilder &builder,
+                        GenericEnvironment *genericEnv);
 
   /// Retrieve the dependent type that describes this potential
   /// archetype.

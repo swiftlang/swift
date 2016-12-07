@@ -3877,8 +3877,7 @@ Type ASTContext::getBridgedToObjC(const DeclContext *dc, Type type,
                type, *conformance, Id_ObjectiveCType,
                getLazyResolver());
     } else {
-      return type->castTo<ArchetypeType>()->getNestedType(Id_ObjectiveCType)
-        .getValue();
+      return type->castTo<ArchetypeType>()->getNestedType(Id_ObjectiveCType);
     }
   }
 

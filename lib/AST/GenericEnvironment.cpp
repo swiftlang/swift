@@ -150,8 +150,8 @@ Type GenericEnvironment::QueryInterfaceTypeSubstitutions::operator()(
 
       auto mutableSelf = const_cast<GenericEnvironment *>(self);
       contextType =
-        potentialArchetype->getTypeInContext(*mutableSelf->Builder, mutableSelf)
-          .getValue();
+        potentialArchetype->getTypeInContext(*mutableSelf->Builder,
+                                             mutableSelf);
 
       // FIXME: Redundant mapping from key -> index.
       if (self->getContextTypes()[index].isNull())
