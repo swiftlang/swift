@@ -86,18 +86,18 @@ public:
   /// C'tor.
   StackAllocationPromoter(AllocStackInst *Asi, DominanceInfo *Di,
                           DomTreeLevelMap &DomTreeLevels, SILBuilder &B)
-      : ASI(Asi), DSI(0), DT(Di), DomTreeLevels(DomTreeLevels), B(B) {
-        // Scan the users in search of a deallocation instruction.
-        for (auto UI = ASI->use_begin(), E = ASI->use_end(); UI != E; ++UI)
-          if (DeallocStackInst *D = dyn_cast<DeallocStackInst>(UI->getUser())) {
-            // Don't record multiple dealloc instructions.
-            if (DSI) {
-              DSI = 0;
-              break;
-            }
-            // Record the deallocation instruction.
-            DSI = D;
-          }
+      : ASI(Asi), DSI(nullptr), DT(Di), DomTreeLevels(DomTreeLevels), B(B) {
+    // Scan the users in search of a deallocation instruction.
+    for (auto UI = ASI->use_begin(), E = ASI->use_end(); UI != E; ++UI)
+      if (DeallocStackInst *D = dyn_cast<DeallocStackInst>(UI->getUser())) {
+        // Don't record multiple dealloc instructions.
+        if (DSI) {
+          DSI = nullptr;
+          break;
+        }
+        // Record the deallocation instruction.
+        DSI = D;
+      }
       }
 
   /// Promote the Allocation.

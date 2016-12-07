@@ -478,13 +478,12 @@ void FunctionSignatureTransform::createFunctionSignatureOptimizedFunction() {
     linkage = SILLinkage::Shared;
 
   DEBUG(llvm::dbgs() << "  -> create specialized function " << Name << "\n");
-  
+
   NewF = M.createFunction(
-      linkage, Name,
-      createOptimizedSILFunctionType(), nullptr, F->getLocation(), F->isBare(),
-      F->isTransparent(), F->isFragile(), F->isThunk(), F->getClassVisibility(),
-      F->getInlineStrategy(), F->getEffectsKind(), 0, F->getDebugScope(),
-      F->getDeclContext());
+      linkage, Name, createOptimizedSILFunctionType(), nullptr,
+      F->getLocation(), F->isBare(), F->isTransparent(), F->isFragile(),
+      F->isThunk(), F->getClassVisibility(), F->getInlineStrategy(),
+      F->getEffectsKind(), nullptr, F->getDebugScope(), F->getDeclContext());
   if (F->hasUnqualifiedOwnership()) {
     NewF->setUnqualifiedOwnership();
   }
@@ -538,11 +537,11 @@ void FunctionSignatureTransform::createFunctionSignatureOptimizedFunction() {
     // We need a try_apply to call a function with an error result.
     SILFunction *Thunk = ThunkBody->getParent();
     SILBasicBlock *NormalBlock = Thunk->createBasicBlock();
-    ReturnValue = NormalBlock->createArgument(ResultType, 0);
+    ReturnValue = NormalBlock->createArgument(ResultType, nullptr);
     SILBasicBlock *ErrorBlock = Thunk->createBasicBlock();
     SILType Error =
         SILType::getPrimitiveObjectType(FunctionTy->getErrorResult().getType());
-    auto *ErrorArg = ErrorBlock->createArgument(Error, 0);
+    auto *ErrorArg = ErrorBlock->createArgument(Error, nullptr);
     Builder.createTryApply(Loc, FRI, LoweredType, ArrayRef<Substitution>(),
                            ThunkArgs, NormalBlock, ErrorBlock);
 

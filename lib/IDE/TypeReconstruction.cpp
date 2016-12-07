@@ -482,7 +482,7 @@ static bool FindFirstNamedDeclWithKind(
           name_ident, ast->getIdentifier(priv_decl_id.getValue().c_str()),
           decls);
     else
-      result._module.lookupQualified(name_ident, NLOptions(), NULL, decls);
+      result._module.lookupQualified(name_ident, NLOptions(), nullptr, decls);
     if (!decls.empty()) {
       bool check_type_aliases = false;
       // Look for an exact match first
@@ -1854,7 +1854,7 @@ static void VisitNodeTupleElement(
     ASTContext *ast, std::vector<Demangle::NodePointer> &nodes,
     Demangle::NodePointer &cur_node, VisitNodeResult &result,
     const VisitNodeResult &generic_context) { // set by GenericType case
-  const char *tuple_name = NULL;
+  const char *tuple_name = nullptr;
   VisitNodeResult tuple_type_result;
   Demangle::Node::iterator end = cur_node->end();
   for (Demangle::Node::iterator pos = cur_node->begin(); pos != end; ++pos) {
@@ -1896,7 +1896,7 @@ static void VisitNodeTypeList(
       VisitNode(ast, nodes, type_result, generic_context);
       if (type_result._error.empty() && type_result._types.size() == 1) {
         if (type_result._decls.empty())
-          result._decls.push_back(NULL);
+          result._decls.push_back(nullptr);
         else
           result._decls.push_back(type_result._decls.front());
         result._types.push_back(type_result._types.front());

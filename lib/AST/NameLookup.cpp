@@ -684,8 +684,8 @@ UnqualifiedLookup::UnqualifiedLookup(DeclName Name, DeclContext *DC,
       // scope, and if so, whether this is a reference to one of them.
       // FIXME: We should persist this information between lookups.
       while (!DC->isModuleScopeContext()) {
-        ValueDecl *BaseDecl = 0;
-        ValueDecl *MetaBaseDecl = 0;
+        ValueDecl *BaseDecl = nullptr;
+        ValueDecl *MetaBaseDecl = nullptr;
         GenericParamList *GenericParams = nullptr;
         Type ExtendedType;
         bool isTypeLookup = false;

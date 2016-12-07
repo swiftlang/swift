@@ -549,7 +549,7 @@ resolveDeclRefExpr(UnresolvedDeclRefExpr *UDRE, DeclContext *DC) {
 
   ResultValues.clear();
   bool AllMemberRefs = true;
-  ValueDecl *Base = 0;
+  ValueDecl *Base = nullptr;
   for (auto Result : Lookup) {
     // Track the base for member declarations.
     if (Result.Base && !isa<ModuleDecl>(Result.Base)) {

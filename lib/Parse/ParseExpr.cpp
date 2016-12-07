@@ -1917,7 +1917,7 @@ Expr *Parser::parseExprIdentifier() {
   }
   
   Expr *E;
-  if (D == 0) {
+  if (D == nullptr) {
     if (name.getBaseName().isEditorPlaceholder())
       return parseExprEditorPlaceholder(IdentTok, name.getBaseName());
 

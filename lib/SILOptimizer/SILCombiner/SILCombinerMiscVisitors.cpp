@@ -114,7 +114,7 @@ SILInstruction *SILCombiner::visitSwitchEnumAddrInst(SwitchEnumAddrInst *SEAI) {
     Cases.push_back(SEAI->getCase(i));
 
   Builder.setCurrentDebugScope(SEAI->getDebugScope());
-  SILBasicBlock *Default = SEAI->hasDefault() ? SEAI->getDefaultBB() : 0;
+  SILBasicBlock *Default = SEAI->hasDefault() ? SEAI->getDefaultBB() : nullptr;
   LoadInst *EnumVal = Builder.createLoad(SEAI->getLoc(), SEAI->getOperand(),
                                          LoadOwnershipQualifier::Unqualified);
   Builder.createSwitchEnum(SEAI->getLoc(), EnumVal, Default, Cases);

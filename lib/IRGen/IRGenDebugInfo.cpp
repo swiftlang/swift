@@ -362,7 +362,7 @@ void IRGenDebugInfo::setEntryPointLoc(IRBuilder &Builder) {
 }
 
 llvm::DIScope *IRGenDebugInfo::getOrCreateScope(const SILDebugScope *DS) {
-  if (DS == 0)
+  if (DS == nullptr)
     return MainFile;
 
   // Try to find it in the cache first.

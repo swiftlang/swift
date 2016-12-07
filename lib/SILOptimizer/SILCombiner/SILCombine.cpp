@@ -130,7 +130,7 @@ bool SILCombiner::doOneIteration(SILFunction &F, unsigned Iteration) {
     // instead of shifting all members of the worklist towards the front. This
     // check makes sure that if we run into any such residual null pointers, we
     // skip them.
-    if (I == 0)
+    if (I == nullptr)
       continue;
 
     // Check to see if we can DCE the instruction.
@@ -254,7 +254,7 @@ bool SILCombiner::runOnFunction(SILFunction &F) {
 // New to the worklist.
 SILInstruction *SILCombiner::insertNewInstBefore(SILInstruction *New,
                                                  SILInstruction &Old) {
-  assert(New && New->getParent() == 0 &&
+  assert(New && New->getParent() == nullptr &&
          "New instruction already inserted into a basic block!");
   SILBasicBlock *BB = Old.getParent();
   BB->insert(&Old, New);  // Insert inst

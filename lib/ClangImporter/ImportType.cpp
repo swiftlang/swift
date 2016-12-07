@@ -2255,7 +2255,7 @@ Decl *ClangImporter::Implementation::importDeclByName(StringRef name) {
   clang::LookupResult lookupResult(sema, clangName, clang::SourceLocation(),
                                    clang::Sema::LookupOrdinaryName);
   lookupResult.setAllowHidden(true);
-  if (!sema.LookupName(lookupResult, /*Scope=*/0)) {
+  if (!sema.LookupName(lookupResult, /*Scope=*/nullptr)) {
     return nullptr;
   }
 
@@ -2308,7 +2308,7 @@ static Type getNamedProtocolType(ClangImporter::Implementation &impl,
   clang::LookupResult lookupResult(sema, clangName, clang::SourceLocation(),
                                    clang::Sema::LookupObjCProtocolName);
   lookupResult.setAllowHidden(true);
-  if (!sema.LookupName(lookupResult, /*Scope=*/0))
+  if (!sema.LookupName(lookupResult, /*Scope=*/nullptr))
     return Type();
 
   for (auto decl : lookupResult) {

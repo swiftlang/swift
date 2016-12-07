@@ -32,13 +32,13 @@ struct BuiltinExtraInfoTy {
 };
 
 static const BuiltinExtraInfoTy BuiltinExtraInfo[] = {
-  {0},
+    {nullptr},
 #define BUILTIN(Id, Name, Attrs) {Attrs},
 #include "swift/AST/Builtins.def"
 };
 
 bool BuiltinInfo::isReadNone() const {
-  return strchr(BuiltinExtraInfo[(unsigned)ID].Attributes, 'n') != 0;
+  return strchr(BuiltinExtraInfo[(unsigned)ID].Attributes, 'n') != nullptr;
 }
 
 bool IntrinsicInfo::hasAttribute(llvm::Attribute::AttrKind Kind) const {

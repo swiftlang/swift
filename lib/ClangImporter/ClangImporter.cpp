@@ -2712,7 +2712,7 @@ EffectiveClangContext ClangImporter::Implementation::getEffectiveClangContext(
     clang::LookupResult lookupResult(sema, clangName,
                                      clang::SourceLocation(),
                                      clang::Sema::LookupOrdinaryName);
-    if (sema.LookupName(lookupResult, /*Scope=*/0)) {
+    if (sema.LookupName(lookupResult, /*Scope=*/nullptr)) {
       // FIXME: Filter based on access path? C++ access control?
       for (auto clangDecl : lookupResult) {
         if (auto objcClass = dyn_cast<clang::ObjCInterfaceDecl>(clangDecl))
