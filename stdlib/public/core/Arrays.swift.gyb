@@ -1292,6 +1292,7 @@ extension ${Self} : RangeReplaceableCollection, _ArrayProtocol {
   /// - Complexity: Amortized O(1) over many additions. If the array uses a
   ///   bridged `NSArray` instance as its storage, the efficiency is
   ///   unspecified.
+  @_semantics("array.append_element")
   public mutating func append(_ newElement: Element) {
     _makeUniqueAndReserveCapacityIfNotUnique()
     let oldCount = _getCount()
@@ -1344,6 +1345,7 @@ extension ${Self} : RangeReplaceableCollection, _ArrayProtocol {
   /// - Parameter newElements: The elements to append to the array.
   ///
   /// - Complexity: O(*n*), where *n* is the length of the resulting array.
+  @_semantics("array.append_contentsOf")
   public mutating func append<C : Collection>(contentsOf newElements: C)
     where C.Iterator.Element == Element {
 

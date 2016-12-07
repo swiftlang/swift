@@ -157,4 +157,15 @@ public func run_ArrayAppendRepeatCol(_ N: Int) {
   }
 }
 
-
+// Concatenate a single element array
+@inline(never)
+public func run_ArrayConcat(_ N: Int) {
+  for _ in 0..<N {
+    for _ in 0..<10 {
+       var nums = [Int]()
+       for _ in 0..<40000 {
+         nums += [1]
+       }
+    }
+  }
+}
