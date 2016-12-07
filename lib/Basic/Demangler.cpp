@@ -1251,10 +1251,10 @@ NodePointer Demangler::demangleWitness() {
                                 Conf, Name);
     }
     case 'T': {
-      NodePointer ProtoTy = createWithChild(Node::Kind::Type, popProtocol());
+      NodePointer ProtoTy = popNode(Node::Kind::Type);
       NodePointer Name = popNode(isDeclName);
       NodePointer Conf = popProtocolConformance();
-      return createWithChildren(Node::Kind::AssociatedTypeMetadataAccessor,
+      return createWithChildren(Node::Kind::AssociatedTypeWitnessTableAccessor,
                                 Conf, Name, ProtoTy);
     }
     default:
