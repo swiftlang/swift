@@ -725,19 +725,10 @@ TypeChecker::handleSILGenericParams(GenericParamList *genericParams,
     auto genericParams = nestedList.rbegin()[i];
     prepareGenericParamList(genericParams, DC);
 
-    auto *genericSig = validateGenericSignature(genericParams, DC, parentSig,
-                                                /*allowConcreteGenericParams=*/true,
-                                                nullptr);
-
-    revertGenericParamList(genericParams);
-
-    ArchetypeBuilder builder(*DC->getParentModule());
-    CompleteGenericTypeResolver completeResolver(*this, builder);
-    checkGenericParamList(&builder, genericParams, parentSig,
-                          &completeResolver);
-    parentSig = genericSig;
-    parentEnv = builder.getGenericEnvironment(parentSig);
-    recordArchetypeContexts(parentSig, parentEnv, DC);
+    parentEnv = checkGenericEnvironment(genericParams, DC, parentSig,
+                                        /*allowConcreteGenericParams=*/true);
+    parentSig = parentEnv->getGenericSignature();
+    recordArchetypeContexts(parentEnv, DC);
 
     // Compute the final set of archetypes.
     revertGenericParamList(genericParams);
@@ -4792,7 +4783,7 @@ public:
       auto *env = builder.getGenericEnvironment(sig);
       FD->setGenericEnvironment(env);
 
-      TC.recordArchetypeContexts(sig, env, FD);
+      TC.recordArchetypeContexts(env, FD);
     } else if (FD->getDeclContext()->getGenericSignatureOfContext()) {
       (void)TC.validateGenericFuncSignature(FD);
       if (FD->getGenericEnvironment() == nullptr) {
@@ -6419,7 +6410,7 @@ public:
       auto *env = builder.getGenericEnvironment(sig);
       CD->setGenericEnvironment(env);
 
-      TC.recordArchetypeContexts(sig, env, CD);
+      TC.recordArchetypeContexts(env, CD);
     } else if (CD->getDeclContext()->getGenericSignatureOfContext()) {
       (void)TC.validateGenericFuncSignature(CD);
 
@@ -7414,27 +7405,11 @@ checkExtensionGenericParams(TypeChecker &tc, ExtensionDecl *ext, Type type,
   SWIFT_DEFER { ext->setIsBeingTypeChecked(false); };
 
   // Validate the generic type signature.
-  auto *sig = tc.validateGenericSignature(genericParams,
-                                          ext->getDeclContext(), nullptr,
-                                          /*allowConcreteGenericParams=*/true,
-                                          inferExtendedTypeReqs);
-
-  // Validate the generic parameters for the penultimate time to get an
-  // environment where we have the parent archetypes.
-  visitOuterToInner(genericParams, [&](GenericParamList *gpList) {
-    tc.revertGenericParamList(gpList);
-  });
-  ArchetypeBuilder builder = tc.createArchetypeBuilder(ext->getModuleContext());
-  DependentGenericTypeResolver completeResolver(builder);
-  visitOuterToInner(genericParams, [&](GenericParamList *gpList) {
-    tc.checkGenericParamList(&builder, gpList, nullptr, &completeResolver);
-  });
-  inferExtendedTypeReqs(builder);
-  (void)builder.finalize(genericParams->getSourceRange().Start,
-                         /*allowConcreteGenericParams=*/true);
-
-  auto *env = builder.getGenericEnvironment(sig);
-  tc.recordArchetypeContexts(sig, env, ext);
+  auto *env = tc.checkGenericEnvironment(genericParams,
+                                         ext->getDeclContext(), nullptr,
+                                         /*allowConcreteGenericParams=*/true,
+                                         inferExtendedTypeReqs);
+  tc.recordArchetypeContexts(env, ext);
 
   // Validate the generic parameters for the last time, to splat down
   // actual archetypes.
@@ -7446,8 +7421,8 @@ checkExtensionGenericParams(TypeChecker &tc, ExtensionDecl *ext, Type type,
     tc.checkGenericParamList(nullptr, gpList, nullptr, &archetypeResolver);
   });
 
-  // FIXME: The canonical type here is a workaround because having SubstitedType
-  // with archetypes breaks deserialization.
+  // FIXME: The canonical type here is a workaround because having
+  // SubstitutedType with archetypes breaks deserialization.
   Type extContextType =
     env->mapTypeIntoContext(ext->getModuleContext(), extInterfaceType)
       ->getCanonicalType();

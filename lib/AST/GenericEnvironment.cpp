@@ -229,11 +229,12 @@ Type GenericEnvironment::QueryArchetypeToInterfaceSubstitutions::operator()(
 }
 
 Type GenericEnvironment::mapTypeIntoContext(ModuleDecl *M, Type type) const {
-  type = type.subst(M, QueryInterfaceTypeSubstitutions(this),
-                    SubstFlags::AllowLoweredTypes);
-  assert((!type->hasTypeParameter() || type->hasError()) &&
+  Type result = type.subst(M, QueryInterfaceTypeSubstitutions(this),
+                           (SubstFlags::AllowLoweredTypes|
+                            SubstFlags::UseErrorType));
+  assert((!result->hasTypeParameter() || result->hasError()) &&
          "not fully substituted");
-  return type;
+  return result;
 }
 
 Type GenericEnvironment::mapTypeIntoContext(GenericTypeParamType *type) const {
