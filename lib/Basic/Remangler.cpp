@@ -762,7 +762,7 @@ void Remangler::mangleEnum(Node *node) {
 }
 
 void Remangler::mangleErrorType(Node *node) {
-  Buffer << "ERR";
+  Buffer << "Xe";
 }
 
 void Remangler::mangleExistentialMetatype(Node *node) {

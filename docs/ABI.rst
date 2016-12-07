@@ -1008,6 +1008,7 @@ Types
   type ::= type 'XM' METATYPE-REPR           // metatype with representation
   type ::= type 'Xp'                         // existential metatype without representation
   type ::= type 'Xm' METATYPE-REPR           // existential metatype with representation
+  type ::= 'Xe'                              // error or unresolved type
 
 
   FUNCTION-KIND ::= 'f'                      // @thin function type

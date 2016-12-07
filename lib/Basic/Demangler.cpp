@@ -1337,6 +1337,8 @@ NodePointer Demangler::demangleSpecialType() {
       }
       return createType(boxTy);
     }
+    case 'e':
+      return createType(NodeFactory::create(Node::Kind::ErrorType, std::string()));
     default:
       return nullptr;
   }

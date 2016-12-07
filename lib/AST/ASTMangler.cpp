@@ -404,7 +404,7 @@ void ASTMangler::appendType(Type type) {
 
     case TypeKind::Error:
     case TypeKind::Unresolved:
-      Buffer << ".ERR.";
+      appendOperator("Xe");
       return;
 
       // We don't care about these types being a bit verbose because we
