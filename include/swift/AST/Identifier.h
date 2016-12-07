@@ -20,6 +20,7 @@
 #include "swift/Basic/LLVM.h"
 #include "llvm/ADT/FoldingSet.h"
 #include "llvm/ADT/PointerUnion.h"
+#include "llvm/ADT/StringExtras.h"
 #include "llvm/Support/TrailingObjects.h"
 
 namespace llvm {
@@ -380,7 +381,20 @@ public:
   int compare(DeclName other) const;
 
   friend bool operator==(DeclName lhs, DeclName rhs) {
-    return lhs.getOpaqueValue() == rhs.getOpaqueValue();
+    if (lhs.isSimpleName() != rhs.isSimpleName())
+      return false;
+    if (lhs.getIdentifier() != rhs.getIdentifier())
+      return false;
+    
+    auto lhsArgNames = lhs.getArgumentNames();
+    auto rhsArgNames = rhs.getArgumentNames();
+    if (lhsArgNames.size() != rhsArgNames.size())
+      return false;
+    for (unsigned i = 0; i < lhsArgNames.size(); i++) {
+      if (lhsArgNames[i] != rhsArgNames[i])
+        return false;
+    }
+    return true;
   }
 
   friend bool operator!=(DeclName lhs, DeclName rhs) {
@@ -410,10 +424,15 @@ public:
   bool operator !=(StringRef other) {
     return !getBaseName().isSimpleName(other);
   }
-  
-  void *getOpaqueValue() const { return SimpleOrCompound.getOpaqueValue(); }
-  static DeclName getFromOpaqueValue(void *p) { return DeclName(p); }
 
+  bool operator ==(Identifier other) {
+    return getBaseName().isSimpleName(other);
+  }
+  
+  bool operator !=(Identifier other) {
+    return !getBaseName().isSimpleName(other);
+  }
+  
   /// Get a string representation of the name,
   ///
   /// \param scratch Scratch space to use.
@@ -502,11 +521,6 @@ public:
   /// \param scratch Scratch space to use.
   StringRef getString(llvm::SmallVectorImpl<char> &scratch) const;
 
-  void *getOpaqueValue() const { return Storage.getOpaqueValue(); }
-  static ObjCSelector getFromOpaqueValue(void *p) {
-    return ObjCSelector(DeclName::getFromOpaqueValue(p));
-  }
-
   /// Dump this selector to standard error.
   LLVM_ATTRIBUTE_DEPRECATED(void dump() const,
                             "only for use within the debugger");
@@ -518,7 +532,7 @@ public:
   }
 
   friend bool operator==(ObjCSelector lhs, ObjCSelector rhs) {
-    return lhs.getOpaqueValue() == rhs.getOpaqueValue();
+    return lhs.Storage == rhs.Storage;
   }
 
   friend bool operator!=(ObjCSelector lhs, ObjCSelector rhs) {
@@ -545,7 +559,6 @@ public:
 } // end namespace swift
 
 namespace llvm {
-  // DeclNames hash just like pointers.
   template<> struct DenseMapInfo<swift::DeclName> {
     static swift::DeclName getEmptyKey() {
       return swift::Identifier::getEmptyKey();
@@ -554,14 +567,21 @@ namespace llvm {
       return swift::Identifier::getTombstoneKey();
     }
     static unsigned getHashValue(swift::DeclName Val) {
-      return DenseMapInfo<void*>::getHashValue(Val.getOpaqueValue());
+      unsigned H = 0;
+      H ^= static_cast<unsigned>(Val.isSimpleName());
+      H ^= llvm::HashString(Val.getIdentifier().get());
+      
+      auto argNames = Val.getArgumentNames();
+      for (unsigned i = 0; i < argNames.size(); i++) {
+        H ^= llvm::HashString(argNames[i].get());
+      }
+      return H;
     }
     static bool isEqual(swift::DeclName LHS, swift::DeclName RHS) {
-      return LHS.getOpaqueValue() == RHS.getOpaqueValue();
+      return LHS == RHS;
     }
   };  
 
-  // ObjCSelectors hash just like pointers.
   template<> struct DenseMapInfo<swift::ObjCSelector> {
     static swift::ObjCSelector getEmptyKey() {
       return swift::ObjCSelector(DenseMapInfo<swift::DeclName>::getEmptyKey());
@@ -571,10 +591,10 @@ namespace llvm {
                DenseMapInfo<swift::DeclName>::getTombstoneKey());
     }
     static unsigned getHashValue(swift::ObjCSelector Val) {
-      return DenseMapInfo<void*>::getHashValue(Val.getOpaqueValue());
+      return DenseMapInfo<swift::DeclName>::getHashValue(Val.Storage);
     }
     static bool isEqual(swift::ObjCSelector LHS, swift::ObjCSelector RHS) {
-      return LHS.getOpaqueValue() == RHS.getOpaqueValue();
+      return LHS == RHS;
     }
   };
 } // end namespace llvm

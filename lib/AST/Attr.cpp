@@ -569,12 +569,11 @@ ObjCAttr::ObjCAttr(SourceLoc atLoc, SourceRange baseRange,
                    Optional<ObjCSelector> name, SourceRange parenRange,
                    ArrayRef<SourceLoc> nameLocs)
   : DeclAttribute(DAK_ObjC, atLoc, baseRange, /*Implicit=*/false),
-    NameData(nullptr)
+    Name(name)
 {
   if (name) {
     // Store the name.
     assert(name->getNumSelectorPieces() == nameLocs.size());
-    NameData = name->getOpaqueValue();
 
     // Store location information.
     ObjCAttrBits.HasTrailingLocationInfo = true;

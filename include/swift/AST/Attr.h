@@ -688,21 +688,16 @@ class ObjCAttr final : public DeclAttribute,
     private llvm::TrailingObjects<ObjCAttr, SourceLoc> {
   friend TrailingObjects;
 
-  /// The Objective-C name associated with this entity, stored in its opaque
-  /// representation so that we can use null as an indicator for "no name".
-  void *NameData;
+  /// The Objective-C name associated with this entity
+  Optional<ObjCSelector> Name;
 
   /// Create an implicit @objc attribute with the given (optional) name.
   explicit ObjCAttr(Optional<ObjCSelector> name, bool implicitName)
     : DeclAttribute(DAK_ObjC, SourceLoc(), SourceRange(), /*Implicit=*/true),
-      NameData(nullptr)
+      Name(name)
   {
     ObjCAttrBits.HasTrailingLocationInfo = false;
     ObjCAttrBits.ImplicitName = implicitName;
-
-    if (name) {
-      NameData = name->getOpaqueValue();
-    }
   }
 
   /// Create an @objc attribute written in the source.
@@ -777,14 +772,11 @@ public:
                                   bool isNameImplicit);
 
   /// Determine whether this attribute has a name associated with it.
-  bool hasName() const { return NameData != nullptr; }
+  bool hasName() const { return Name.hasValue(); }
 
   /// Retrieve the name of this entity, if specified.
   Optional<ObjCSelector> getName() const {
-    if (!hasName())
-      return None;
-
-    return ObjCSelector::getFromOpaqueValue(NameData);
+    return Name;
   }
 
   /// Determine whether the name associated with this attribute was
@@ -802,13 +794,13 @@ public:
       ObjCAttrBits.HasTrailingLocationInfo = false;
     }
 
-    NameData = name.getOpaqueValue();
+    Name = name;
     ObjCAttrBits.ImplicitName = implicit;
   }
 
   /// Clear the name of this entity.
   void clearName() {
-    NameData = nullptr;
+    Name = None;
   }
 
   /// Retrieve the source locations for the names in a non-implicit
