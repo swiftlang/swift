@@ -720,7 +720,8 @@ public:
     bool shouldSubst = !BaseTy->hasUnboundGenericType() &&
                        !isa<AnyMetatypeType>(BaseTy.getPointer()) &&
                        !BaseTy->isAnyExistentialType() &&
-                       !BaseTy->hasTypeVariable();
+                       !BaseTy->hasTypeVariable() &&
+                       VD->getDeclContext()->isTypeContext();
     ModuleDecl *M = DC->getParentModule();
 
     auto FoundSignature = VD->getOverloadSignature();

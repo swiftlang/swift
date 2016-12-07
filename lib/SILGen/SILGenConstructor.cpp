@@ -257,9 +257,9 @@ void SILGenFunction::emitValueConstructor(ConstructorDecl *ctor) {
 
   // If this is not a delegating constructor, emit member initializers.
   if (!isDelegating) {
-    auto *dc = ctor->getDeclContext();
-    auto *nominal = dc->getAsNominalTypeOrNominalTypeExtensionContext();
-    emitMemberInitializers(dc, selfDecl, nominal);
+    auto *typeDC = ctor->getDeclContext();
+    auto *nominal = typeDC->getAsNominalTypeOrNominalTypeExtensionContext();
+    emitMemberInitializers(ctor, selfDecl, nominal);
   }
 
   emitProfilerIncrement(ctor->getBody());
@@ -648,7 +648,7 @@ void SILGenFunction::emitClassConstructorInitializer(ConstructorDecl *ctor) {
     // Note that 'self' has been fully initialized at this point.
   } else {
     // Emit the member initializers.
-    emitMemberInitializers(dc, selfDecl, selfClassDecl);
+    emitMemberInitializers(ctor, selfDecl, selfClassDecl);
   }
 
   emitProfilerIncrement(ctor->getBody());
@@ -888,7 +888,32 @@ void SILGenFunction::emitMemberInitializers(DeclContext *dc,
         ArrayRef<Substitution> subs;
         auto *genericEnv = dc->getGenericEnvironmentOfContext();
         if (genericEnv) {
-          subs = genericEnv->getForwardingSubstitutions(SGM.SwiftModule);
+          DeclContext *typeDC = dc;
+          while (!typeDC->isTypeContext())
+            typeDC = typeDC->getParent();
+
+          // Generate a set of substitutions for the initialization function,
+          // whose generic signature is that of the type context, and whose
+          // replacement types are the archetypes of the initializer itself.
+          auto typeGenericSig = typeDC->getGenericSignatureOfContext();
+          SmallVector<Substitution, 4> subsVec;
+          typeGenericSig->getSubstitutions(
+                       *SGM.SwiftModule,
+                       [&](SubstitutableType *type) {
+                         if (auto gp = type->getAs<GenericTypeParamType>()) {
+                           return genericEnv->mapTypeIntoContext(gp);
+                         }
+
+                         return Type(type);
+                       },
+                       [](CanType dependentType,
+                           Type conformingReplacementType,
+                           ProtocolType *conformedProtocol) {
+                         return ProtocolConformanceRef(
+                                  conformedProtocol->getDecl());
+                       },
+                       subsVec);
+          subs = SGM.getASTContext().AllocateCopy(subsVec);
         }
 
         // Get the type of the initialization result, in terms

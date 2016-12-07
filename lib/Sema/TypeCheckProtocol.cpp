@@ -1037,7 +1037,7 @@ RequirementEnvironment::RequirementEnvironment(
     conformanceSig = conformanceSig->getCanonicalSignature();
     allGenericParams.append(conformanceSig->getGenericParams().begin(),
                             conformanceSig->getGenericParams().end());
-    builder.addGenericSignature(conformanceSig, nullptr);
+    builder.addGenericSignature(conformanceSig);
     depth = allGenericParams.back()->getDepth() + 1;
   }
 
@@ -2263,6 +2263,7 @@ void ConformanceChecker::recordTypeWitness(AssociatedTypeDecl *assocType,
                                                     TypeLoc::withoutLoc(type),
                                                     /*genericparams*/nullptr, 
                                                     DC);
+    aliasDecl->setGenericEnvironment(DC->getGenericEnvironmentOfContext());
     aliasDecl->computeType();
 
     aliasDecl->getAliasType()->setRecursiveProperties(
@@ -3049,7 +3050,7 @@ static Type getWitnessTypeForMatching(TypeChecker &tc,
   // Retrieve the set of substitutions to be applied to the witness.
   Type model = conformance->getType();
   TypeSubstitutionMap substitutions = model->getMemberSubstitutions(
-                                        witness->getDeclContext());
+                                        witness->getInnermostDeclContext());
   if (substitutions.empty())
     return witness->getInterfaceType();
 

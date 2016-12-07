@@ -733,7 +733,7 @@ TypeChecker::handleSILGenericParams(GenericParamList *genericParams,
 
     ArchetypeBuilder builder(*DC->getParentModule());
     CompleteGenericTypeResolver completeResolver(*this, builder);
-    checkGenericParamList(&builder, genericParams, parentSig, parentEnv,
+    checkGenericParamList(&builder, genericParams, parentSig,
                           &completeResolver);
     parentSig = genericSig;
     parentEnv = builder.getGenericEnvironment(parentSig);
@@ -742,7 +742,7 @@ TypeChecker::handleSILGenericParams(GenericParamList *genericParams,
     // Compute the final set of archetypes.
     revertGenericParamList(genericParams);
     GenericTypeToArchetypeResolver archetypeResolver(parentEnv);
-    checkGenericParamList(nullptr, genericParams, parentSig, parentEnv,
+    checkGenericParamList(nullptr, genericParams, parentSig,
                           &archetypeResolver);
   }
 
@@ -4772,8 +4772,7 @@ public:
       ArchetypeBuilder builder =
         TC.createArchetypeBuilder(FD->getModuleContext());
       auto *parentSig = FD->getDeclContext()->getGenericSignatureOfContext();
-      auto *parentEnv = FD->getDeclContext()->getGenericEnvironmentOfContext();
-      TC.checkGenericParamList(&builder, gp, parentSig, parentEnv, nullptr);
+      TC.checkGenericParamList(&builder, gp, parentSig, nullptr);
 
       // Infer requirements from parameter patterns.
       for (auto pattern : FD->getParameterLists()) {
@@ -6407,8 +6406,7 @@ public:
 
       auto builder = TC.createArchetypeBuilder(CD->getModuleContext());
       auto *parentSig = CD->getDeclContext()->getGenericSignatureOfContext();
-      auto *parentEnv = CD->getDeclContext()->getGenericEnvironmentOfContext();
-      TC.checkGenericParamList(&builder, gp, parentSig, parentEnv, nullptr);
+      TC.checkGenericParamList(&builder, gp, parentSig, nullptr);
 
       // Infer requirements from the parameters of the constructor.
       builder.inferRequirements(CD->getParameterList(1), gp);
@@ -7327,11 +7325,10 @@ void TypeChecker::validateAccessibility(ValueDecl *D) {
   assert(D->hasAccessibility());
 }
 
-/// Check the generic parameters of an extension, recursively handling all of
-/// the parameter lists within the extension.
-static std::tuple<GenericEnvironment *, Type>
-checkExtensionGenericParams(TypeChecker &tc, ExtensionDecl *ext, Type type,
-                            GenericParamList *genericParams) {
+/// Form the interface type of an extension from the raw type and the
+/// extension's list of generic parameters.
+static Type formExtensionInterfaceType(Type type,
+                                       GenericParamList *genericParams) {
   // Find the nominal type declaration and its parent type.
   Type parentType;
   NominalTypeDecl *nominal;
@@ -7347,58 +7344,70 @@ checkExtensionGenericParams(TypeChecker &tc, ExtensionDecl *ext, Type type,
     nominal = nominalType->getDecl();
   }
 
-  // Recurse to check the parent type, if there is one.
-  GenericEnvironment *parentEnv = nullptr;
-  Type newParentType = parentType;
+  // Reconstruct the parent, if there is one.
   if (parentType) {
-    std::tie(parentEnv, newParentType) = checkExtensionGenericParams(
-        tc, ext, parentType, nominal->getGenericParams()
+    // Build the nested extension type.
+    auto parentGenericParams = nominal->getGenericParams()
                                  ? genericParams->getOuterParameters()
-                                 : genericParams);
+                                 : genericParams;
+    parentType = formExtensionInterfaceType(parentType, parentGenericParams);
   }
-
-  if (genericParams)
-    tc.prepareGenericParamList(genericParams, ext);
-
-  // Avoid having to remember null checks on parentEnv below.
-  GenericSignature *parentSig =
-      parentEnv ? parentEnv->getGenericSignature() : nullptr;
 
   // If we don't have generic parameters at this level, just build the result.
-  if (!nominal->getGenericParams()) {
-    Type resultType = NominalType::get(nominal, newParentType, tc.Context);
+  if (!nominal->getGenericParams() || isa<ProtocolDecl>(nominal)) {
+    Type resultType = NominalType::get(nominal, parentType,
+                                       nominal->getASTContext());
 
     // If the parent was unchanged, return the original pointer.
-    if (resultType->isEqual(type))
-      resultType = type;
-
-    return std::make_tuple(parentEnv, resultType);
+    return resultType->isEqual(type) ? type : resultType;
   }
 
-  // Local function used to infer requirements from the extended type.
-  TypeLoc extendedTypeInfer;
-  auto inferExtendedTypeReqs = [&](ArchetypeBuilder &builder) {
-    if (extendedTypeInfer.isNull()) {
-      if (isa<ProtocolDecl>(nominal)) {
-        // Simple case: protocols don't form bound generic types.
-        extendedTypeInfer.setType(nominal->getDeclaredInterfaceType());
-      } else if (nominal->getGenericParams()) {
-        SmallVector<Type, 2> genericArgs;
-        for (auto gp : *genericParams) {
-          genericArgs.push_back(gp->getDeclaredInterfaceType());
-        }
+  // Form the bound generic type with the type parameters provided.
+  SmallVector<Type, 2> genericArgs;
+  for (auto gp : *genericParams) {
+    genericArgs.push_back(gp->getDeclaredInterfaceType());
+  }
 
-        extendedTypeInfer.setType(BoundGenericType::get(nominal,
-                                                        newParentType,
-                                                        genericArgs));
-      } else {
-        extendedTypeInfer.setType(NominalType::get(nominal,
-                                                   newParentType,
-                                                   tc.Context));
-      }
-    }
-    
-    builder.inferRequirements(extendedTypeInfer, genericParams);
+  Type resultType = BoundGenericType::get(nominal, parentType, genericArgs);
+  return resultType->isEqual(type) ? type : resultType;
+}
+
+/// Visit the given generic parameter lists from the outermost to the innermost,
+/// calling the visitor function for each list.
+static void visitOuterToInner(
+                      GenericParamList *genericParams,
+                      llvm::function_ref<void(GenericParamList *)> visitor) {
+  if (auto outerGenericParams = genericParams->getOuterParameters())
+    visitOuterToInner(outerGenericParams, visitor);
+
+  visitor(genericParams);
+}
+
+/// Check the generic parameters of an extension, recursively handling all of
+/// the parameter lists within the extension.
+static std::pair<GenericEnvironment *, Type>
+checkExtensionGenericParams(TypeChecker &tc, ExtensionDecl *ext, Type type,
+                            GenericParamList *genericParams) {
+  // Form the interface type of the extension.
+  Type extInterfaceType = formExtensionInterfaceType(type, genericParams);
+
+  // Prepare all of the generic parameter lists for generic signature
+  // validation.
+  visitOuterToInner(genericParams, [&](GenericParamList *gpList) {
+    tc.prepareGenericParamList(gpList, ext);
+  });
+
+  // Local function used to infer requirements from the extended type.
+  auto inferExtendedTypeReqs = [&](ArchetypeBuilder &builder) {
+    // Find the outermost generic parameter list. This tricks the inference
+    // into performing inference for all levels of generic parameters.
+    // FIXME: This is a hack. The inference shouldn't arbitrarily limit what it
+    // can infer.
+    GenericParamList *outermostList = genericParams;
+    while (auto next = outermostList->getOuterParameters())
+      outermostList = next;
+
+    builder.inferRequirements(TypeLoc::withoutLoc(extInterfaceType), outermostList);
   };
 
   ext->setIsBeingTypeChecked(true);
@@ -7406,17 +7415,20 @@ checkExtensionGenericParams(TypeChecker &tc, ExtensionDecl *ext, Type type,
 
   // Validate the generic type signature.
   auto *sig = tc.validateGenericSignature(genericParams,
-                                          ext->getDeclContext(), parentSig,
+                                          ext->getDeclContext(), nullptr,
                                           /*allowConcreteGenericParams=*/true,
                                           inferExtendedTypeReqs);
 
   // Validate the generic parameters for the penultimate time to get an
   // environment where we have the parent archetypes.
-  tc.revertGenericParamList(genericParams);
+  visitOuterToInner(genericParams, [&](GenericParamList *gpList) {
+    tc.revertGenericParamList(gpList);
+  });
   ArchetypeBuilder builder = tc.createArchetypeBuilder(ext->getModuleContext());
   DependentGenericTypeResolver completeResolver(builder);
-  tc.checkGenericParamList(&builder, genericParams, parentSig, parentEnv,
-                           &completeResolver);
+  visitOuterToInner(genericParams, [&](GenericParamList *gpList) {
+    tc.checkGenericParamList(&builder, gpList, nullptr, &completeResolver);
+  });
   inferExtendedTypeReqs(builder);
   (void)builder.finalize(genericParams->getSourceRange().Start,
                          /*allowConcreteGenericParams=*/true);
@@ -7426,33 +7438,20 @@ checkExtensionGenericParams(TypeChecker &tc, ExtensionDecl *ext, Type type,
 
   // Validate the generic parameters for the last time, to splat down
   // actual archetypes.
-  tc.revertGenericParamList(genericParams);
+  visitOuterToInner(genericParams, [&](GenericParamList *gpList) {
+    tc.revertGenericParamList(gpList);
+  });
   GenericTypeToArchetypeResolver archetypeResolver(env);
-  tc.checkGenericParamList(nullptr, genericParams, parentSig, parentEnv,
-                           &archetypeResolver);
+  visitOuterToInner(genericParams, [&](GenericParamList *gpList) {
+    tc.checkGenericParamList(nullptr, gpList, nullptr, &archetypeResolver);
+  });
 
-
-  // Compute the final extended type.
-  Type resultType;
-
-  if (isa<ProtocolDecl>(nominal)) {
-    // Retain type sugar if it's there.
-    resultType = nominal->getDeclaredType();
-  } else if (nominal->getGenericParams()) {
-    SmallVector<Type, 2> genericArgs;
-    for (auto gp : sig->getInnermostGenericParams()) {
-      genericArgs.push_back(env->mapTypeIntoContext(gp));
-    }
-    resultType = BoundGenericType::get(nominal, newParentType, genericArgs);
-  } else {
-    resultType = NominalType::get(nominal, newParentType, tc.Context);
-  }
-
-  // If the desugared type didn't change, preserve sugar.
-  if (resultType->isEqual(type))
-    resultType = type;
-
-  return std::make_tuple(env, resultType);
+  // FIXME: The canonical type here is a workaround because having SubstitedType
+  // with archetypes breaks deserialization.
+  Type extContextType =
+    env->mapTypeIntoContext(ext->getModuleContext(), extInterfaceType)
+      ->getCanonicalType();
+  return { env, extContextType };
 }
 
 // FIXME: In TypeChecker.cpp; only needed because LLDB creates

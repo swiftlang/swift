@@ -2028,26 +2028,12 @@ ArchetypeBuilder::mapTypeOutOfContext(ModuleDecl *M,
   return env->mapTypeOutOfContext(M, type);
 }
 
-void ArchetypeBuilder::addGenericSignature(GenericSignature *sig,
-                                           GenericEnvironment *env) {
+void ArchetypeBuilder::addGenericSignature(GenericSignature *sig) {
   if (!sig) return;
   
   RequirementSource::Kind sourceKind = RequirementSource::Explicit;
-  for (auto param : sig->getGenericParams()) {
+  for (auto param : sig->getGenericParams())
     addGenericParameter(param);
-
-    if (env) {
-      // If this generic parameter has an archetype, use it as the concrete
-      // type.
-      auto contextTy = env->mapTypeIntoContext(param);
-      auto key = GenericParamKey(param);
-      auto *pa = Impl->PotentialArchetypes[
-                                         key.findIndexIn(Impl->GenericParams)];
-      assert(pa == pa->getRepresentative() && "Not the representative");
-      pa->ConcreteType = contextTy;
-      pa->SameTypeSource = RequirementSource(sourceKind, SourceLoc());
-    }
-  }
 
   RequirementSource source(sourceKind, SourceLoc());
   for (auto &reqt : sig->getRequirements()) {

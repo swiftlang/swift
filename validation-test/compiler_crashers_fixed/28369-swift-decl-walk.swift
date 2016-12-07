@@ -7,11 +7,11 @@
 
 // Credits: https://twitter.com/kiliankoe/status/752090953977036800
 
-// RUN: not --crash %target-swift-frontend %s -typecheck
-// XFAIL: *
+// RUN: %target-swift-frontend %s -typecheck
 protocol P {
 }
 struct A<T> {
-    func a<B where T: P>() -> B {
+    func a<B where T: P>(b: B) -> B {
+      return b
     }
 }

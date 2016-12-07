@@ -238,6 +238,12 @@ findDeclContextForType(TypeChecker &TC,
     if (!needsBaseType) {
       if (ownerDC == parentDC)
         return std::make_tuple(ownerDC, nullptr, true);
+
+      // FIXME: Horrible hack. Don't allow us to reference a generic parameter
+      // or from a context outside a ProtocolDecl.
+      if (isa<ProtocolDecl>(parentDC) && isa<GenericTypeParamDecl>(typeDecl))
+        return std::make_tuple(nullptr, nullptr, false);
+
       continue;
     }
 
@@ -307,6 +313,11 @@ findDeclContextForType(TypeChecker &TC,
         }
       }
     }
+
+    // FIXME: Horrible hack. Don't allow us to reference an associated type
+    // from a context outside a ProtocolDecl.
+    if (isa<ProtocolDecl>(parentDC) && isa<AssociatedTypeDecl>(typeDecl))
+      return std::make_tuple(nullptr, nullptr, false);
   }
 
   assert(false && "Should have found context by now");

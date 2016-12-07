@@ -257,12 +257,11 @@ CompleteGenericTypeResolver::recordParamType(ParamDecl *decl, Type type) {
 void TypeChecker::checkGenericParamList(ArchetypeBuilder *builder,
                                         GenericParamList *genericParams,
                                         GenericSignature *parentSig,
-                                        GenericEnvironment *parentEnv,
                                         GenericTypeResolver *resolver) {
   // If there is a parent context, add the generic parameters and requirements
   // from that context.
   if (builder)
-    builder->addGenericSignature(parentSig, parentEnv);
+    builder->addGenericSignature(parentSig);
 
   // If there aren't any generic parameters at this level, we're done.
   if (!genericParams)
@@ -370,10 +369,10 @@ static bool checkGenericFuncSignature(TypeChecker &tc,
   // Check the generic parameter list.
   auto genericParams = func->getGenericParams();
 
-  tc.checkGenericParamList(builder, genericParams,
-                           func->getDeclContext()->getGenericSignatureOfContext(),
-                           nullptr,
-                           &resolver);
+  tc.checkGenericParamList(
+                         builder, genericParams,
+                         func->getDeclContext()->getGenericSignatureOfContext(),
+                         &resolver);
 
   // Check the parameter patterns.
   for (auto params : func->getParameterLists()) {
@@ -682,6 +681,17 @@ void TypeChecker::configureInterfaceType(AbstractFunctionDecl *func,
   }
 }
 
+/// Visit the given generic parameter lists from the outermost to the innermost,
+/// calling the visitor function for each list.
+static void visitOuterToInner(
+                      GenericParamList *genericParams,
+                      llvm::function_ref<void(GenericParamList *)> visitor) {
+  if (auto outerGenericParams = genericParams->getOuterParameters())
+    visitOuterToInner(outerGenericParams, visitor);
+
+  visitor(genericParams);
+}
+
 GenericSignature *TypeChecker::validateGenericSignature(
                     GenericParamList *genericParams,
                     DeclContext *dc,
@@ -689,6 +699,8 @@ GenericSignature *TypeChecker::validateGenericSignature(
                     bool allowConcreteGenericParams,
                     std::function<void(ArchetypeBuilder &)> inferRequirements) {
   assert(genericParams && "Missing generic parameters?");
+  bool recursivelyVisitGenericParams =
+    genericParams->getOuterParameters() && !parentSig;
 
   // Create the archetype builder.
   Module *module = dc->getParentModule();
@@ -696,9 +708,16 @@ GenericSignature *TypeChecker::validateGenericSignature(
 
   // Type check the generic parameters, treating all generic type
   // parameters as dependent, unresolved.
-  DependentGenericTypeResolver dependentResolver(builder);  
-  checkGenericParamList(&builder, genericParams, parentSig,
-                        nullptr, &dependentResolver);
+  DependentGenericTypeResolver dependentResolver(builder);
+  if (recursivelyVisitGenericParams) {
+    visitOuterToInner(genericParams,
+                      [&](GenericParamList *gpList) {
+      checkGenericParamList(&builder, gpList, nullptr, &dependentResolver);
+    });
+  } else {
+    checkGenericParamList(&builder, genericParams, parentSig,
+                          &dependentResolver);
+  }
 
   /// Perform any necessary requirement inference.
   if (inferRequirements)
@@ -711,10 +730,24 @@ GenericSignature *TypeChecker::validateGenericSignature(
   // The archetype builder now has all of the requirements, although there might
   // still be errors that have not yet been diagnosed. Revert the signature
   // and type-check it again, completely.
-  revertGenericParamList(genericParams);
+  if (recursivelyVisitGenericParams) {
+    visitOuterToInner(genericParams,
+                      [&](GenericParamList *gpList) {
+      revertGenericParamList(gpList);
+    });
+  } else {
+    revertGenericParamList(genericParams);
+  }
   CompleteGenericTypeResolver completeResolver(*this, builder);
-  checkGenericParamList(nullptr, genericParams, nullptr,
-                        nullptr, &completeResolver);
+  if (recursivelyVisitGenericParams) {
+    visitOuterToInner(genericParams,
+                      [&](GenericParamList *gpList) {
+      checkGenericParamList(nullptr, gpList, nullptr, &completeResolver);
+    });
+  } else {
+    checkGenericParamList(nullptr, genericParams, parentSig,
+                          &completeResolver);
+  }
   (void)builder.diagnoseRemainingRenames(genericParams->getSourceRange().Start);
 
   // Record the generic type parameter types and the requirements.
@@ -756,7 +789,7 @@ TypeChecker::recordArchetypeContexts(GenericSignature *genericSig,
                                      DeclContext *dc) {
 #ifndef NDEBUG
   // Record archetype contexts.
-  for (auto *paramTy : genericSig->getInnermostGenericParams()) {
+  for (auto *paramTy : genericSig->getGenericParams()) {
     auto contextTy = genericEnv->mapTypeIntoContext(
         paramTy->castTo<GenericTypeParamType>());
     if (auto *archetype = contextTy->getAs<ArchetypeType>())
@@ -824,10 +857,9 @@ void TypeChecker::validateGenericTypeSignature(GenericTypeDecl *typeDecl) {
   ArchetypeBuilder builder =
     createArchetypeBuilder(typeDecl->getModuleContext());
   auto *parentSig = dc->getGenericSignatureOfContext();
-  auto *parentEnv = dc->getGenericEnvironmentOfContext();
 
   DependentGenericTypeResolver resolver(builder);
-  checkGenericParamList(&builder, gp, parentSig, parentEnv, &resolver);
+  checkGenericParamList(&builder, gp, parentSig, &resolver);
 
   auto *env = builder.getGenericEnvironment(sig);
   typeDecl->setGenericEnvironment(env);
