@@ -107,6 +107,4 @@ updated without updating swift.py?")
 
     @property
     def _compile_db_flags(self):
-        if not self.args.compilation_db:
-            return []
         return ['-DCMAKE_EXPORT_COMPILE_COMMANDS=TRUE']
