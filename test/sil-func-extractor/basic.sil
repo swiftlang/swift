@@ -1,4 +1,4 @@
-// RUN: %target-sil-extract -assume-parsing-unqualified-ownership-sil %s -func=use_before_init | %FileCheck %s
+// RUN: %target-sil-func-extractor -assume-parsing-unqualified-ownership-sil %s -func=use_before_init | %FileCheck %s
 
 import Builtin
 import Swift
