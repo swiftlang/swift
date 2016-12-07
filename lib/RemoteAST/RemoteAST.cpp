@@ -154,7 +154,7 @@ public:
 
     // Make a generic type repr that's been resolved to this decl.
     TypeReprList genericArgReprs(args);
-    GenericIdentTypeRepr genericRepr(SourceLoc(), decl->getName(),
+    GenericIdentTypeRepr genericRepr(SourceLoc(), decl->getIdentifier(),
                                      genericArgReprs.getList(), SourceRange());
     genericRepr.setValue(decl);
 
@@ -177,7 +177,7 @@ public:
 
         GenericRepr(BoundGenericType *type)
           : GenericArgs(type->getGenericArgs()),
-            Ident(SourceLoc(), type->getDecl()->getName(),
+            Ident(SourceLoc(), type->getDecl()->getIdentifier(),
                   GenericArgs.getList(), SourceRange()) {
           Ident.setValue(type->getDecl());
         }
@@ -208,7 +208,7 @@ public:
         } else {
           auto nominal = p->castTo<NominalType>();
           simpleComponents.emplace_back(SourceLoc(),
-                                        nominal->getDecl()->getName());
+                                        nominal->getDecl()->getIdentifier());
           componentReprs.push_back(&simpleComponents.back());
         }
       }
@@ -758,7 +758,7 @@ private:
   /// known to be stored.
   VarDecl *findField(NominalTypeDecl *typeDecl, StringRef memberName) {
     for (auto field : typeDecl->getStoredProperties()) {
-      if (field->getName().str() == memberName)
+      if (field->getBaseName().str() == memberName)
         return field;
     }
     return nullptr;

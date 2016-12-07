@@ -158,8 +158,9 @@ struct ExprToIdentTypeRepr : public ASTVisitor<ExprToIdentTypeRepr, bool>
     
     // Get the declared type.
     if (auto *td = dyn_cast<TypeDecl>(dre->getDecl())) {
+      Identifier ident = dre->getDecl()->getBaseName().getIdentifier();
       components.push_back(
-        new (C) SimpleIdentTypeRepr(dre->getLoc(), dre->getDecl()->getName()));
+        new (C) SimpleIdentTypeRepr(dre->getLoc(), ident));
       components.back()->setValue(td);
       return true;
     }
@@ -171,7 +172,7 @@ struct ExprToIdentTypeRepr : public ASTVisitor<ExprToIdentTypeRepr, bool>
     // Track the AST location of the component.
     components.push_back(
       new (C) SimpleIdentTypeRepr(udre->getLoc(),
-                                  udre->getName().getBaseName()));
+                                  udre->getName().getIdentifier()));
     return true;
   }
   
@@ -183,7 +184,8 @@ struct ExprToIdentTypeRepr : public ASTVisitor<ExprToIdentTypeRepr, bool>
 
     // Track the AST location of the new component.
     components.push_back(
-      new (C) SimpleIdentTypeRepr(ude->getLoc(), ude->getName().getBaseName()));
+      new (C) SimpleIdentTypeRepr(ude->getLoc(),
+                                  ude->getName().getIdentifier()));
     return true;
   }
   
@@ -404,7 +406,7 @@ public:
     return new (TC.Context) EnumElementPattern(
                               TypeLoc(), ume->getDotLoc(),
                               ume->getNameLoc().getBaseNameLoc(),
-                              ume->getName().getBaseName(),
+                              ume->getName().getIdentifier(),
                               nullptr,
                               subPattern);
   }
@@ -431,7 +433,7 @@ public:
 
     // FIXME: Argument labels?
     EnumElementDecl *referencedElement
-      = lookupEnumMemberElement(TC, DC, ty, ude->getName().getBaseName(),
+      = lookupEnumMemberElement(TC, DC, ty, ude->getName().getIdentifier(),
                                 ude->getLoc());
     if (!referencedElement)
       return nullptr;
@@ -444,7 +446,7 @@ public:
                                                ude->getDotLoc(),
                                                ude->getNameLoc()
                                                  .getBaseNameLoc(),
-                                               ude->getName().getBaseName(),
+                                               ude->getName().getIdentifier(),
                                                referencedElement,
                                                nullptr);
   }
@@ -460,7 +462,7 @@ public:
                             elt->getParentEnum()->getDeclaredTypeInContext());
     return new (TC.Context) EnumElementPattern(loc, SourceLoc(),
                                                de->getLoc(),
-                                               elt->getName(),
+                                               elt->getIdentifier(),
                                                elt,
                                                nullptr);
   }
@@ -472,7 +474,7 @@ public:
     // Try looking up an enum element in context.
     if (EnumElementDecl *referencedElement
         = lookupUnqualifiedEnumMemberElement(TC, DC,
-                                             ude->getName().getBaseName(),
+                                             ude->getName().getIdentifier(),
                                              ude->getLoc())) {
       auto *enumDecl = referencedElement->getParentEnum();
       auto enumTy = enumDecl->getDeclaredTypeInContext();
@@ -480,7 +482,7 @@ public:
       
       return new (TC.Context) EnumElementPattern(loc, SourceLoc(),
                                                  ude->getLoc(),
-                                                 ude->getName().getBaseName(),
+                                                 ude->getName().getIdentifier(),
                                                  referencedElement,
                                                  nullptr);
     }
@@ -1129,7 +1131,7 @@ bool TypeChecker::coercePatternToType(Pattern *&P, DeclContext *dc, Type type,
         !(options & TR_EnumerationVariable) &&
         !(options & TR_EditorPlaceholder)) {
       diagnose(NP->getLoc(), diag::type_inferred_to_undesirable_type,
-               NP->getDecl()->getName(), type, NP->getDecl()->isLet());
+               NP->getDecl()->getBaseName(), type, NP->getDecl()->isLet());
       diagnose(NP->getLoc(), diag::add_explicit_type_annotation_to_silence);
     }
 
@@ -1241,7 +1243,7 @@ bool TypeChecker::coercePatternToType(Pattern *&P, DeclContext *dc, Type type,
         auto *NoneEnumElement = Context.getOptionalNoneDecl(Kind);
         P = new (Context) EnumElementPattern(TypeLoc::withoutLoc(type),
                                              NLE->getLoc(), NLE->getLoc(),
-                                             NoneEnumElement->getName(),
+                                             NoneEnumElement->getIdentifier(),
                                              NoneEnumElement, nullptr, false);
         return coercePatternToType(P, dc, type, options, resolver);
       }

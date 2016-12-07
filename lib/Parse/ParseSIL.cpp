@@ -200,6 +200,31 @@ namespace {
                             Diag<DiagArgTypes...> ID, ArgTypes... Args) {
       return parseSILIdentifier(Result, L, Diagnostic(ID, Args...));
     }
+    
+    bool parseSILDeclName(DeclName &Result, SourceLoc &Loc,
+                          const Diagnostic &D) {
+      Identifier Id;
+      if (parseSILIdentifier(Id, Loc, D)) {
+        Result = Id;
+        return true;
+      }
+      Result = Id;
+      return false;
+    }
+    
+    template<typename ...DiagArgTypes, typename ...ArgTypes>
+    bool parseSILDeclName(DeclName &Result, Diag<DiagArgTypes...> ID,
+                          ArgTypes... Args) {
+      SourceLoc L;
+      return parseSILDeclName(Result, L, Diagnostic(ID, Args...));
+    }
+    
+    template<typename ...DiagArgTypes, typename ...ArgTypes>
+    bool parseSILDeclName(DeclName &Result, SourceLoc &L,
+                          Diag<DiagArgTypes...> ID, ArgTypes... Args) {
+      return parseSILDeclName(Result, L, Diagnostic(ID, Args...));
+    }
+
 
     bool parseVerbatim(StringRef identifier);
 
@@ -786,7 +811,7 @@ bool SILParser::performTypeLocChecking(TypeLoc &T, bool IsSILType,
 
 /// Find the top-level ValueDecl or Module given a name.
 static llvm::PointerUnion<ValueDecl*, Module*> lookupTopDecl(Parser &P,
-             Identifier Name) {
+             DeclName Name) {
   // Use UnqualifiedLookup to look through all of the imports.
   // We have to lie and say we're done with parsing to make this happen.
   assert(P.SF.ASTStage == SourceFile::Parsing &&
@@ -800,7 +825,7 @@ static llvm::PointerUnion<ValueDecl*, Module*> lookupTopDecl(Parser &P,
 }
 
 /// Find the ValueDecl given an interface type and a member name.
-static ValueDecl *lookupMember(Parser &P, Type Ty, Identifier Name,
+static ValueDecl *lookupMember(Parser &P, Type Ty, DeclName Name,
                                SourceLoc Loc,
                                SmallVectorImpl<ValueDecl *> &Lookup,
                                bool ExpectMultipleResults) {
@@ -935,14 +960,14 @@ bool SILParser::parseSILDottedPath(ValueDecl *&Decl,
 bool SILParser::parseSILDottedPathWithoutPound(ValueDecl *&Decl,
                                    SmallVectorImpl<ValueDecl *> &values) {
   // Handle sil-dotted-path.
-  Identifier Id;
-  SmallVector<Identifier, 4> FullName;
+  DeclName Name;
+  SmallVector<DeclName, 4> FullName;
   SmallVector<SourceLoc, 4> Locs;
   do {
     Locs.push_back(P.Tok.getLoc());
-    if (parseSILIdentifier(Id, diag::expected_sil_constant))
+    if (parseSILDeclName(Name, diag::expected_sil_constant))
       return true;
-    FullName.push_back(Id);
+    FullName.push_back(Name);
   } while (P.consumeIf(tok::period));
 
   // Look up ValueDecl from a dotted path.
@@ -1298,7 +1323,7 @@ static bool getConformancesForSubstitution(Parser &P,
     }
 
     P.diagnose(loc, diag::sil_substitution_mismatch, subReplacement,
-               proto->getName());
+               proto->getBaseName());
     return true;
   }
 
@@ -4217,9 +4242,9 @@ bool Parser::parseSILVTable() {
   SILParser VTableState(*this);
 
   // Parse the class name.
-  Identifier Name;
+  DeclName Name;
   SourceLoc Loc;
-  if (VTableState.parseSILIdentifier(Name, Loc,
+  if (VTableState.parseSILDeclName(Name, Loc,
                                      diag::expected_sil_value_name))
     return true;
 
@@ -4249,7 +4274,7 @@ bool Parser::parseSILVTable() {
   if (Tok.isNot(tok::r_brace)) {
     do {
       SILDeclRef Ref;
-      Identifier FuncName;
+      DeclName FuncName;
       SourceLoc FuncLoc;
       if (VTableState.parseSILDeclRef(Ref))
         return true;
@@ -4258,7 +4283,7 @@ bool Parser::parseSILVTable() {
         consumeToken();
       } else {
         if (parseToken(tok::colon, diag::expected_sil_vtable_colon) ||
-          VTableState.parseSILIdentifier(FuncName, FuncLoc,
+          VTableState.parseSILDeclName(FuncName, FuncLoc,
                                          diag::expected_sil_value_name))
         return true;
         Func = SIL->M->lookUpFunction(FuncName.str());
@@ -4622,7 +4647,7 @@ bool Parser::parseSILWitnessTable() {
       }
 
       SILDeclRef Ref;
-      Identifier FuncName;
+      DeclName FuncName;
       SourceLoc FuncLoc;
       if (WitnessState.parseSILDeclRef(Ref) ||
           parseToken(tok::colon, diag::expected_sil_witness_colon))
@@ -4633,7 +4658,7 @@ bool Parser::parseSILWitnessTable() {
         consumeToken();
       } else {
         if (parseToken(tok::at_sign, diag::expected_sil_function_name) ||
-            WitnessState.parseSILIdentifier(FuncName, FuncLoc,
+            WitnessState.parseSILDeclName(FuncName, FuncLoc,
                                         diag::expected_sil_value_name))
           return true;
 
@@ -4717,14 +4742,14 @@ bool Parser::parseSILDefaultWitnessTable() {
       }
 
       SILDeclRef Ref;
-      Identifier FuncName;
+      DeclName FuncName;
       SourceLoc FuncLoc;
       if (WitnessState.parseSILDeclRef(Ref) ||
           parseToken(tok::colon, diag::expected_sil_witness_colon))
         return true;
       
       if (parseToken(tok::at_sign, diag::expected_sil_function_name) ||
-          WitnessState.parseSILIdentifier(FuncName, FuncLoc,
+          WitnessState.parseSILDeclName(FuncName, FuncLoc,
                                       diag::expected_sil_value_name))
         return true;
 
@@ -4822,9 +4847,9 @@ bool Parser::parseSILCoverageMap() {
     return true;
 
   // Parse the covered name.
-  Identifier FuncName;
+  DeclName FuncName;
   SourceLoc FuncLoc;
-  if (State.parseSILIdentifier(FuncName, FuncLoc,
+  if (State.parseSILDeclName(FuncName, FuncLoc,
                                diag::expected_sil_value_name))
     return true;
 

@@ -225,9 +225,9 @@ public:
     case LookupKind::Crawler:
       return ConstString("Crawler");
     case LookupKind::SwiftModule:
-      return ConstString(_module->getName().get());
+      return ConstString(_module->getIdentifier().get());
     case LookupKind::Decl:
-      return ConstString(_decl->getName().get());
+      return ConstString(_decl->getIdentifier().get());
     case LookupKind::Extension:
       SmallString<64> builder;
       builder.append("ext ");
@@ -547,7 +547,7 @@ FindNamedDecls(ASTContext *ast, const StringRef &name, VisitNodeResult &result,
         if (decls.empty()) {
           result._error = stringWithFormat(
               "no decl found in '%s' (DeclKind=%u)", name.str().c_str(),
-              nominal_decl->getName().get(), (uint32_t)nominal_decl->getKind());
+              nominal_decl->getBaseName().str(), (uint32_t)nominal_decl->getKind());
         } else {
           for (ValueDecl *decl : decls) {
             if (decl->hasInterfaceType()) {

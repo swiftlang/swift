@@ -97,10 +97,10 @@ void Mangler::mangleIdentifier(StringRef str, OperatorFixity fixity,
 }
 
 /// Mangle an identifier into the buffer.
-void Mangler::mangleIdentifier(Identifier ident, OperatorFixity fixity) {
-  StringRef str = ident.str();
+void Mangler::mangleDeclName(DeclName name, OperatorFixity fixity) {
+  StringRef str = name.str();
   assert(!str.empty() && "mangling an empty identifier!");
-  return mangleIdentifier(str, fixity, ident.isOperator());
+  return mangleIdentifier(str, fixity, name.isOperator());
 }
 
 bool Mangler::tryMangleSubstitution(const void *ptr) {
@@ -350,7 +350,7 @@ void Mangler::mangleModule(const Module *module) {
   if (tryMangleSubstitution(module)) return;
 
   // context ::= identifier
-  mangleIdentifier(module->getName());
+  mangleDeclName(module->getIdentifier());
 
   addSubstitution(module);
 }
@@ -368,7 +368,7 @@ void Mangler::bindGenericParameters(const DeclContext *DC) {
 }
 
 static OperatorFixity getDeclFixity(const ValueDecl *decl) {
-  if (!decl->getName().isOperator())
+  if (!decl->isOperator())
     return OperatorFixity::NotOperator;
 
   switch (decl->getAttrs().getUnaryOperatorKind()) {
@@ -428,12 +428,12 @@ void Mangler::mangleDeclName(const ValueDecl *decl) {
            "not a valid identifier");
 
     Buffer << 'P';
-    mangleIdentifier(discriminator);
+    mangleDeclName(discriminator);
     // Fall through to mangle the name.
   }
 
   // decl-name ::= identifier
-  mangleIdentifier(decl->getName(), getDeclFixity(decl));
+  mangleDeclName(decl->getBaseName(), getDeclFixity(decl));
 }
 
 void Mangler::mangleTypeForDebugger(Type Ty, const DeclContext *DC) {
@@ -725,7 +725,7 @@ void Mangler::mangleAssociatedTypeName(DependentMemberType *dmt,
     Buffer << 'P';
     mangleProtocolName(assocTy->getProtocol());
   }
-  mangleIdentifier(assocTy->getName());
+  mangleDeclName(assocTy->getBaseName());
 
   addSubstitution(assocTy);
 }
@@ -912,7 +912,7 @@ void Mangler::mangleType(Type type, unsigned uncurryLevel) {
       Buffer << 'T';
     for (auto &field : tuple->getElements()) {
       if (field.hasName())
-        mangleIdentifier(field.getName());
+        mangleDeclName(field.getName());
       mangleType(field.getType(), 0);
     }
     Buffer << '_';
@@ -1077,7 +1077,7 @@ void Mangler::mangleType(Type type, unsigned uncurryLevel) {
              && "child archetype has no associated type?!");
 
       mangleType(parent, 0);
-      mangleIdentifier(archetype->getName());
+      mangleDeclName(archetype->getName());
       addSubstitution(archetype);
       return;
     }
@@ -1350,7 +1350,7 @@ bool Mangler::tryMangleStandardSubstitution(const NominalTypeDecl *decl) {
   // Standard substitutions shouldn't start with 's' (because that's
   // reserved for the swift module itself) or a digit or '_'.
 
-  StringRef name = decl->getName().str();
+  auto name = decl->getBaseName();
   if (name == "Int") {
     Buffer << "Si";
     return true;
@@ -1648,10 +1648,9 @@ void Mangler::mangleProtocolConformance(const ProtocolConformance *conformance){
     auto topLevelContext =
       conformance->getDeclContext()->getModuleScopeContext();
     auto fileUnit = cast<FileUnit>(topLevelContext);
-    mangleIdentifier(
-                    fileUnit->getDiscriminatorForPrivateValue(behaviorStorage));
+    mangleDeclName(fileUnit->getDiscriminatorForPrivateValue(behaviorStorage));
     mangleContextOf(behaviorStorage);
-    mangleIdentifier(behaviorStorage->getName());
+    mangleDeclName(behaviorStorage->getBaseName());
     mangleProtocolName(conformance->getProtocol());
     return;
   }
@@ -1732,7 +1731,7 @@ void Mangler::mangleGlobalInit(const VarDecl *decl, int counter,
          "not a valid identifier");
   
   Buffer << "globalinit_";
-  mangleIdentifier(discriminator);
+  mangleDeclName(discriminator);
   Buffer << (isInitFunc ? "_func" : "_token");
   Buffer << counter;
 }
@@ -1748,7 +1747,7 @@ void Mangler::mangleBehaviorInitThunk(const VarDecl *decl) {
          "not a valid identifier");
   
   Buffer << "_TTB";
-  mangleIdentifier(discriminator);
+  mangleDeclName(discriminator);
   mangleContextOf(decl);
-  mangleIdentifier(decl->getName());
+  mangleDeclName(decl->getBaseName());
 }

@@ -318,9 +318,9 @@ void SILSerializer::writeSILFunction(const SILFunction &F, bool DeclOnly) {
                      << " FnID " << FnID << "\n");
   DEBUG(llvm::dbgs() << "Serialized SIL:\n"; F.dump());
 
-  SmallVector<IdentifierID, 1> SemanticsIDs;
+  SmallVector<DeclNameID, 1> SemanticsIDs;
   for (auto SemanticAttr : F.getSemanticsAttrs()) {
-    SemanticsIDs.push_back(S.addIdentifierRef(Ctx.getIdentifier(SemanticAttr)));
+    SemanticsIDs.push_back(S.addDeclNameRef(Ctx.getIdentifier(SemanticAttr)));
   }
 
   SILLinkage Linkage = F.getLinkage();
@@ -740,7 +740,7 @@ void SILSerializer::writeSILInstruction(const SILInstruction &SI) {
                              BI->getSubstitutions().size(),
                              S.addTypeRef(BI->getType().getSwiftRValueType()),
                              (unsigned)BI->getType().getCategory(),
-                             S.addIdentifierRef(BI->getName()),
+                             S.addDeclNameRef(BI->getName()),
                              Args);
     S.writeSubstitutions(BI->getSubstitutions(), SILAbbrCodes);
     break;
@@ -813,7 +813,7 @@ void SILSerializer::writeSILInstruction(const SILInstruction &SI) {
     SILOneOperandLayout::emitRecord(Out, ScratchRecord,
         SILAbbrCodes[SILOneOperandLayout::Code],
         (unsigned)SI.getKind(), 0, 0, 0,
-        S.addIdentifierRef(
+        S.addDeclNameRef(
             Ctx.getIdentifier(AGI->getReferencedGlobal()->getName())));
     break;
   }
@@ -825,7 +825,7 @@ void SILSerializer::writeSILInstruction(const SILInstruction &SI) {
         (unsigned)SI.getKind(), 0,
         S.addTypeRef(GAI->getType().getSwiftRValueType()),
         (unsigned)GAI->getType().getCategory(),
-        S.addIdentifierRef(
+        S.addDeclNameRef(
             Ctx.getIdentifier(GAI->getReferencedGlobal()->getName())));
     break;
   }
@@ -1057,7 +1057,7 @@ void SILSerializer::writeSILInstruction(const SILInstruction &SI) {
         (unsigned)SI.getKind(), 0,
         S.addTypeRef(FRI->getType().getSwiftRValueType()),
         (unsigned)FRI->getType().getCategory(),
-        S.addIdentifierRef(Ctx.getIdentifier(ReferencedFunction->getName())));
+        S.addDeclNameRef(Ctx.getIdentifier(ReferencedFunction->getName())));
 
     // Make sure we declare the referenced function.
     addReferencedSILFunction(ReferencedFunction);
@@ -1116,7 +1116,7 @@ void SILSerializer::writeSILInstruction(const SILInstruction &SI) {
     unsigned encoding = toStableStringEncoding(SLI->getEncoding());
     SILOneOperandLayout::emitRecord(Out, ScratchRecord, abbrCode,
                                     (unsigned)SI.getKind(), encoding, 0, 0,
-                                    S.addIdentifierRef(Ctx.getIdentifier(Str)));
+                                    S.addDeclNameRef(Ctx.getIdentifier(Str)));
     break;
   }
   case ValueKind::FloatLiteralInst:
@@ -1141,7 +1141,7 @@ void SILSerializer::writeSILInstruction(const SILInstruction &SI) {
         (unsigned)SI.getKind(), 0,
         S.addTypeRef(Ty.getSwiftRValueType()),
         (unsigned)Ty.getCategory(),
-        S.addIdentifierRef(Ctx.getIdentifier(Str)));
+        S.addDeclNameRef(Ctx.getIdentifier(Str)));
     break;
   }
   case ValueKind::MarkFunctionEscapeInst: {
@@ -1732,7 +1732,7 @@ void SILSerializer::writeSILGlobalVar(const SILGlobalVariable &g) {
 }
 
 void SILSerializer::writeSILVTable(const SILVTable &vt) {
-  VTableList[vt.getClass()->getName()] = NextVTableID++;
+  VTableList[vt.getClass()->getIdentifier()] = NextVTableID++;
   VTableOffset.push_back(Out.GetCurrentBitNo());
   VTableLayout::emitRecord(Out, ScratchRecord, SILAbbrCodes[VTableLayout::Code],
                            S.addDeclRef(vt.getClass()));
@@ -1745,7 +1745,7 @@ void SILSerializer::writeSILVTable(const SILVTable &vt) {
     VTableEntryLayout::emitRecord(Out, ScratchRecord,
         SILAbbrCodes[VTableEntryLayout::Code],
         // SILFunction name
-        S.addIdentifierRef(Ctx.getIdentifier(entry.second->getName())),
+        S.addDeclNameRef(Ctx.getIdentifier(entry.second->getName())),
         ListOfValues);
   }
 }
@@ -1801,10 +1801,10 @@ void SILSerializer::writeSILWitnessTable(const SILWitnessTable &wt) {
     auto &methodWitness = entry.getMethodWitness();
     SmallVector<ValueID, 4> ListOfValues;
     handleSILDeclRef(S, methodWitness.Requirement, ListOfValues);
-    IdentifierID witnessID = 0;
+    DeclNameID witnessID = 0;
     if (SILFunction *witness = methodWitness.Witness) {
       addReferencedSILFunction(witness, true);
-      witnessID = S.addIdentifierRef(Ctx.getIdentifier(witness->getName()));
+      witnessID = S.addDeclNameRef(Ctx.getIdentifier(witness->getName()));
     }
     WitnessMethodEntryLayout::emitRecord(Out, ScratchRecord,
         SILAbbrCodes[WitnessMethodEntryLayout::Code],
@@ -1839,7 +1839,7 @@ writeSILDefaultWitnessTable(const SILDefaultWitnessTable &wt) {
     handleSILDeclRef(S, entry.getRequirement(), ListOfValues);
     SILFunction *witness = entry.getWitness();
     addReferencedSILFunction(witness, true);
-    IdentifierID witnessID = S.addIdentifierRef(
+    DeclNameID witnessID = S.addDeclNameRef(
         Ctx.getIdentifier(witness->getName()));
     DefaultWitnessTableEntryLayout::emitRecord(Out, ScratchRecord,
         SILAbbrCodes[DefaultWitnessTableEntryLayout::Code],
@@ -1947,7 +1947,7 @@ void SILSerializer::writeSILBlock(const SILModule *SILMod) {
   // Emit only declarations if it is a module with pre-specializations.
   // And only do it in optimized builds.
   bool emitDeclarationsForOnoneSupport =
-      SILMod->getSwiftModule()->getName().str() == SWIFT_ONONE_SUPPORT &&
+      SILMod->getSwiftModule()->getIdentifier().str() == SWIFT_ONONE_SUPPORT &&
       SILMod->getOptions().Optimization > SILOptions::SILOptMode::Debug;
 
   // Go through all the SILFunctions in SILMod and write out any

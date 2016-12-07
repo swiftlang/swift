@@ -135,8 +135,8 @@ void ArchetypeBuilder::PotentialArchetype::buildFullName(
       if (auto assocType = getResolvedAssociatedType()) {
         result.push_back('[');
         result.push_back('.');
-        result.append(assocType->getProtocol()->getName().str().begin(), 
-                      assocType->getProtocol()->getName().str().end());
+        result.append(assocType->getProtocol()->getBaseName().str().begin(),
+                      assocType->getProtocol()->getBaseName().str().end());
         result.push_back(']');
       }
     }
@@ -148,9 +148,9 @@ void ArchetypeBuilder::PotentialArchetype::buildFullName(
 
 Identifier ArchetypeBuilder::PotentialArchetype::getName() const { 
   if (auto assocType = NameOrAssociatedType.dyn_cast<AssociatedTypeDecl *>())
-    return assocType->getName();
+    return assocType->getIdentifier();
   if (auto typeAlias = NameOrAssociatedType.dyn_cast<TypeAliasDecl *>())
-    return typeAlias->getName();
+    return typeAlias->getIdentifier();
   return NameOrAssociatedType.get<Identifier>();
 }
 
@@ -179,7 +179,7 @@ void ArchetypeBuilder::PotentialArchetype::resolveAssociatedType(
   assert(!NameOrAssociatedType.is<AssociatedTypeDecl *>() &&
          "associated type is already resolved");
   NameOrAssociatedType = assocType;
-  assert(assocType->getName() == getName());
+  assert(assocType->getBaseName() == getName());
   assert(builder.Impl->NumUnresolvedNestedTypes > 0 &&
          "Mismatch in number of unresolved nested types");
   --builder.Impl->NumUnresolvedNestedTypes;
@@ -290,7 +290,7 @@ bool ArchetypeBuilder::PotentialArchetype::addConformance(
     if (!assocType)
       continue;
 
-    auto known = NestedTypes.find(assocType->getName());
+    auto known = NestedTypes.find(assocType->getIdentifier());
     if (known == NestedTypes.end())
       continue;
 
@@ -756,7 +756,7 @@ void ArchetypeBuilder::PotentialArchetype::dump(llvm::raw_ostream &Out,
       else
         Out << " & ";
 
-      Out << ProtoAndSource.first->getName().str() << " [";
+      Out << ProtoAndSource.first->getBaseName() << " [";
       ProtoAndSource.second.dump(Out, SrcMgr);
       Out << "]";
     }
@@ -838,7 +838,7 @@ auto ArchetypeBuilder::addGenericParameter(GenericTypeParamType *GenericParam,
 void ArchetypeBuilder::addGenericParameter(GenericTypeParamDecl *GenericParam) {
   addGenericParameter(
        GenericParam->getDeclaredInterfaceType()->castTo<GenericTypeParamType>(),
-       GenericParam->getName());
+       GenericParam->getIdentifier());
 }
 
 bool ArchetypeBuilder::addGenericParameterRequirements(GenericTypeParamDecl *GenericParam) {
@@ -901,7 +901,7 @@ bool ArchetypeBuilder::addConformanceRequirement(PotentialArchetype *PAT,
   for (auto Member : Proto->getMembers()) {
     if (auto AssocType = dyn_cast<AssociatedTypeDecl>(Member)) {
       // Add requirements placed directly on this associated type.
-      auto AssocPA = T->getNestedType(AssocType->getName(), *this);
+      auto AssocPA = T->getNestedType(AssocType->getIdentifier(), *this);
       if (AssocPA != T) {
         if (addAbstractTypeParamRequirements(AssocType, AssocPA,
                                              RequirementSource::Protocol,
@@ -952,7 +952,7 @@ bool ArchetypeBuilder::addSuperclassRequirement(PotentialArchetype *T,
           if (!assocType) continue;
 
           const auto &nestedTypes = T->getNestedTypes();
-          auto nested = nestedTypes.find(assocType->getName());
+          auto nested = nestedTypes.find(assocType->getIdentifier());
           if (nested == nestedTypes.end()) continue;
 
           RequirementSource redundantSource(RequirementSource::Inherited,
@@ -1236,7 +1236,7 @@ bool ArchetypeBuilder::addSameTypeRequirementToConcrete(
       if (!conformance) {
         Diags.diagnose(Source.getLoc(),
                        diag::requires_generic_param_same_type_does_not_conform,
-                       Concrete, protocol->getName());
+                       Concrete, protocol->getBaseName());
         return true;
       }
 
@@ -1676,19 +1676,19 @@ static Identifier typoCorrectNestedType(
       if (!assocType)
         continue;
 
-      unsigned dist = name.edit_distance(assocType->getName().str(),
+      unsigned dist = name.edit_distance(assocType->getBaseName().str(),
                                          /*allowReplacements=*/true,
                                          maxScore);
       assert(dist > 0 && "nested type should have matched associated type");
       if (bestEditDistance == 0 || dist == bestEditDistance) {
         bestEditDistance = dist;
         maxScore = bestEditDistance;
-        bestMatches.push_back(assocType->getName());
+        bestMatches.push_back(assocType->getIdentifier());
       } else if (dist < bestEditDistance) {
         bestEditDistance = dist;
         maxScore = bestEditDistance;
         bestMatches.clear();
-        bestMatches.push_back(assocType->getName());
+        bestMatches.push_back(assocType->getIdentifier());
       }
     }
   }

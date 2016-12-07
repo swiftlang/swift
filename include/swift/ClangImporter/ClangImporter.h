@@ -242,7 +242,7 @@ public:
   ///
   /// This is mostly an implementation detail of the importer, but is also
   /// used by the debugger.
-  Identifier getEnumConstantName(const clang::EnumConstantDecl *enumConstant);
+  DeclName getEnumConstantName(const clang::EnumConstantDecl *enumConstant);
 
   /// Writes the mangled name of \p clangDecl to \p os.
   void getMangledName(raw_ostream &os, const clang::NamedDecl *clangDecl) const;

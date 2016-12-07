@@ -483,20 +483,21 @@ static void diagSyntacticUseRestrictions(TypeChecker &TC, const Expr *E,
         return;
 
       TC.diagnose(DRE->getStartLoc(), diag::invalid_noescape_use,
-                  DRE->getDecl()->getName(), isa<ParamDecl>(DRE->getDecl()));
+                  DRE->getDecl()->getBaseName(),
+                  isa<ParamDecl>(DRE->getDecl()));
 
       // If we're a parameter, emit a helpful fixit to add @escaping
       auto paramDecl = dyn_cast<ParamDecl>(DRE->getDecl());
       auto isAutoClosure = AFT->isAutoClosure();
       if (paramDecl && !isAutoClosure) {
         TC.diagnose(paramDecl->getStartLoc(), diag::noescape_parameter,
-                    paramDecl->getName())
+                    paramDecl->getBaseName())
             .fixItInsert(paramDecl->getTypeLoc().getSourceRange().Start,
                          "@escaping ");
       } else if (isAutoClosure)
         // TODO: add in a fixit for autoclosure
         TC.diagnose(DRE->getDecl()->getLoc(), diag::noescape_autoclosure,
-                    DRE->getDecl()->getName());
+                    DRE->getDecl()->getBaseName());
     }
 
     // Diagnose metatype values that don't appear as part of a property,
@@ -592,7 +593,7 @@ static void diagSyntacticUseRestrictions(TypeChecker &TC, const Expr *E,
       }
 
       TC.diagnose(DRE->getLoc(), diag::warn_unqualified_access,
-                  VD->getName(), VD->getDescriptiveKind(),
+                  VD->getBaseName(), VD->getDescriptiveKind(),
                   declParent->getDescriptiveKind(), declParent->getFullName());
       TC.diagnose(VD, diag::decl_declared_here, VD->getFullName());
 
@@ -620,7 +621,7 @@ static void diagSyntacticUseRestrictions(TypeChecker &TC, const Expr *E,
       llvm::array_pod_sort(sortedResults.begin(), sortedResults.end(),
                            [](const ModuleValuePair *lhs,
                               const ModuleValuePair *rhs) {
-        return lhs->first->getName().compare(rhs->first->getName());
+        return lhs->first->getBaseName().compare(rhs->first->getBaseName());
       });
 
       auto topLevelDiag = diag::fix_unqualified_access_top_level;
@@ -630,11 +631,11 @@ static void diagSyntacticUseRestrictions(TypeChecker &TC, const Expr *E,
       for (const ModuleValuePair &pair : sortedResults) {
         DescriptiveDeclKind k = pair.second->getDescriptiveKind();
 
-        SmallString<32> namePlusDot = pair.first->getName().str();
+        SmallString<32> namePlusDot = pair.first->getIdentifier().str();
         namePlusDot.push_back('.');
 
         TC.diagnose(DRE->getLoc(), topLevelDiag,
-                    namePlusDot, k, pair.first->getName())
+                    namePlusDot, k, pair.first->getIdentifier())
           .fixItInsert(DRE->getStartLoc(), namePlusDot);
       }
     }
@@ -676,7 +677,7 @@ static void diagSyntacticUseRestrictions(TypeChecker &TC, const Expr *E,
       
       auto lhs = args->getElement(0);
       auto rhs = args->getElement(1);
-      auto calleeName = DRE->getDecl()->getName().str();
+      auto calleeName = DRE->getDecl()->getBaseName();
       
       Expr *subExpr = nullptr;
       if (calleeName == "??" &&
@@ -782,7 +783,7 @@ static void diagRecursivePropertyAccess(TypeChecker &TC, const Expr *E,
 
             if (shouldDiagnose) {
               TC.diagnose(subExpr->getLoc(), diag::recursive_accessor_reference,
-                          Var->getName(), Accessor->isSetter());
+                          Var->getBaseName(), Accessor->isSetter());
             }
           }
           
@@ -791,7 +792,8 @@ static void diagRecursivePropertyAccess(TypeChecker &TC, const Expr *E,
           if (isStore &&
               DRE->getAccessSemantics() == AccessSemantics::DirectToStorage &&
               Accessor->getAccessorKind() == AccessorKind::IsWillSet) {
-            TC.diagnose(E->getLoc(), diag::store_in_willset, Var->getName());
+            TC.diagnose(E->getLoc(), diag::store_in_willset,
+                          Var->getBaseName());
           }
         }
 
@@ -814,7 +816,7 @@ static void diagRecursivePropertyAccess(TypeChecker &TC, const Expr *E,
 
             if (shouldDiagnose) {
               TC.diagnose(subExpr->getLoc(), diag::recursive_accessor_reference,
-                          Var->getName(), Accessor->isSetter());
+                          Var->getBaseName(), Accessor->isSetter());
               TC.diagnose(subExpr->getLoc(),
                           diag::recursive_accessor_reference_silence)
               .fixItInsert(subExpr->getStartLoc(), "self.");
@@ -827,7 +829,7 @@ static void diagRecursivePropertyAccess(TypeChecker &TC, const Expr *E,
               MRE->getAccessSemantics() == AccessSemantics::DirectToStorage &&
               Accessor->getAccessorKind() == AccessorKind::IsWillSet) {
               TC.diagnose(subExpr->getLoc(), diag::store_in_willset,
-                          Var->getName());
+                          Var->getBaseName());
           }
         }
 
@@ -903,7 +905,7 @@ static void diagnoseImplicitSelfUseInClosure(TypeChecker &TC, const Expr *E,
         if (isImplicitSelfUse(MRE->getBase())) {
           TC.diagnose(MRE->getLoc(),
                       diag::property_use_in_closure_without_explicit_self,
-                      MRE->getMember().getDecl()->getName())
+                      MRE->getMember().getDecl()->getBaseName())
             .fixItInsert(MRE->getLoc(), "self.");
           return { false, E };
         }
@@ -915,7 +917,7 @@ static void diagnoseImplicitSelfUseInClosure(TypeChecker &TC, const Expr *E,
           auto MethodExpr = cast<DeclRefExpr>(DSCE->getFn());
           TC.diagnose(DSCE->getLoc(),
                       diag::method_call_in_closure_without_explicit_self,
-                      MethodExpr->getDecl()->getName())
+                      MethodExpr->getDecl()->getBaseName())
             .fixItInsert(DSCE->getLoc(), "self.");
           return { false, E };
         }
@@ -975,12 +977,12 @@ bool TypeChecker::getDefaultGenericArgumentsString(
         return;
       }
 
-      genericParamText << "<#" << genericParam->getName() << ": ";
+      genericParamText << "<#" << genericParam->getBaseName() << ": ";
       superclass.print(genericParamText);
       for (const ProtocolDecl *proto : protocols) {
         if (proto->isSpecificProtocol(KnownProtocolKind::AnyObject))
           continue;
-        genericParamText << " & " << proto->getName();
+        genericParamText << " & " << proto->getBaseName();
       }
       genericParamText << "#>";
       return;
@@ -994,14 +996,14 @@ bool TypeChecker::getDefaultGenericArgumentsString(
     if (protocols.size() == 1 &&
         (protocols.front()->isObjC() ||
          protocols.front()->isSpecificProtocol(KnownProtocolKind::AnyObject))) {
-      genericParamText << protocols.front()->getName();
+      genericParamText << protocols.front()->getBaseName();
       return;
     }
 
-    genericParamText << "<#" << genericParam->getName() << ": ";
+    genericParamText << "<#" << genericParam->getBaseName() << ": ";
     interleave(protocols,
                [&](const ProtocolDecl *proto) {
-                 genericParamText << proto->getName();
+                 genericParamText << proto->getBaseName();
                },
                [&] { genericParamText << " & "; });
     genericParamText << "#>";
@@ -1795,10 +1797,10 @@ void TypeChecker::diagnoseUnavailableOverride(ValueDecl *override,
                                               const AvailableAttr *attr) {
   if (attr->Rename.empty()) {
     if (attr->Message.empty())
-      diagnose(override, diag::override_unavailable, override->getName());
+      diagnose(override, diag::override_unavailable, override->getBaseName());
     else
       diagnose(override, diag::override_unavailable_msg,
-               override->getName(), attr->Message);
+               override->getBaseName(), attr->Message);
     diagnose(base, diag::availability_marked_unavailable,
              base->getFullName());
     return;
@@ -2439,7 +2441,7 @@ public:
     }
     
     // If the variable is already unnamed, ignore it.
-    if (!VD->hasName() || VD->getName().str() == "_")
+    if (!VD->hasName() || VD->getBaseName() == "_")
       return false;
     
     return true;
@@ -2575,7 +2577,7 @@ VarDeclUsageChecker::~VarDeclUsageChecker() {
       // a narrow case.
       if (access & RK_CaptureList) {
         TC.diagnose(var->getLoc(), diag::capture_never_used,
-                    var->getName());
+                    var->getBaseName());
         continue;
       }
       
@@ -2592,7 +2594,7 @@ VarDeclUsageChecker::~VarDeclUsageChecker() {
               pbd->getStartLoc(),
               pbd->getPatternList()[0].getPattern()->getEndLoc());
           TC.diagnose(var->getLoc(), diag::pbd_never_used,
-                      var->getName(), varKind)
+                      var->getBaseName(), varKind)
             .fixItReplace(replaceRange, "_");
           continue;
         }
@@ -2628,7 +2630,7 @@ VarDeclUsageChecker::~VarDeclUsageChecker() {
                   
                   auto diagIF = TC.diagnose(var->getLoc(),
                                             diag::pbd_never_used_stmtcond,
-                                            var->getName());
+                                            var->getBaseName());
                   auto introducerLoc = SC->getCond()[0].getIntroducerLoc();
                   diagIF.fixItReplaceChars(introducerLoc,
                                            initExpr->getStartLoc(),
@@ -2655,7 +2657,7 @@ VarDeclUsageChecker::~VarDeclUsageChecker() {
       // Just rewrite the one variable with a _.
       unsigned varKind = var->isLet();
       TC.diagnose(var->getLoc(), diag::variable_never_used,
-                  var->getName(), varKind)
+                  var->getBaseName(), varKind)
         .fixItReplace(var->getLoc(), "_");
       continue;
     }
@@ -2689,17 +2691,17 @@ VarDeclUsageChecker::~VarDeclUsageChecker() {
       unsigned varKind = isa<ParamDecl>(var);
       if (FixItLoc.isInvalid())
         TC.diagnose(var->getLoc(), diag::variable_never_mutated,
-                    var->getName(), varKind);
+                    var->getBaseName(), varKind);
       else
         TC.diagnose(var->getLoc(), diag::variable_never_mutated,
-                    var->getName(), varKind)
+                    var->getBaseName(), varKind)
           .fixItReplace(FixItLoc, "let");
       continue;
     }
     
     // If this is a variable that was only written to, emit a warning.
     if ((access & RK_Read) == 0) {
-      TC.diagnose(var->getLoc(), diag::variable_never_read, var->getName(),
+      TC.diagnose(var->getLoc(), diag::variable_never_read, var->getBaseName(),
                   isa<ParamDecl>(var));
       continue;
     }
@@ -3600,7 +3602,7 @@ public:
           name = bestMethod->getFullName();
         }
 
-        out << nominal->getName().str() << "." << name.getBaseName().str();
+        out << nominal->getBaseName() << "." << name.getBaseName();
         auto argNames = name.getArgumentNames();
 
         // Only print the parentheses if there are some argument
@@ -3965,7 +3967,7 @@ static OmissionTypeName getTypeNameForOmission(Type type) {
       if (!args.empty() &&
           (bound->getDecl() == ctx.getArrayDecl() ||
            bound->getDecl() == ctx.getSetDecl())) {
-        return OmissionTypeName(nominal->getName().str(),
+        return OmissionTypeName(nominal->getBaseName().str(),
                                 getOptions(bound),
                                 getTypeNameForOmission(args[0]).Name);
       }
@@ -3975,13 +3977,13 @@ static OmissionTypeName getTypeNameForOmission(Type type) {
     if (type->isAnyObject())
       return "Object";
 
-    return OmissionTypeName(nominal->getName().str(), getOptions(type));
+    return OmissionTypeName(nominal->getBaseName().str(), getOptions(type));
   }
 
   // Generic type parameters.
   if (auto genericParamTy = type->getAs<GenericTypeParamType>()) {
     if (auto genericParam = genericParamTy->getDecl())
-      return genericParam->getName().str();
+      return genericParam->getBaseName().str();
 
     return "";
   }
@@ -4055,8 +4057,8 @@ Optional<DeclName> TypeChecker::omitNeedlessWords(AbstractFunctionDecl *afd) {
   // Figure out the first parameter name.
   StringRef firstParamName;
   auto params = afd->getParameterList(afd->getImplicitSelfDecl() ? 1 : 0);
-  if (params->size() != 0 && !params->get(0)->getName().empty())
-    firstParamName = params->get(0)->getName().str();
+  if (params->size() != 0 && params->get(0)->getBaseName())
+    firstParamName = params->get(0)->getBaseName().str();
 
   // Find the set of property names.
   const InheritedNameSet *allPropertyNames = nullptr;
@@ -4088,7 +4090,7 @@ Optional<DeclName> TypeChecker::omitNeedlessWords(AbstractFunctionDecl *afd) {
   };
 
   Identifier newBaseName = getReplacementIdentifier(baseNameStr,
-                                                    name.getBaseName());
+                                                    name.getIdentifier());
   SmallVector<Identifier, 4> newArgNames;
   auto oldArgNames = name.getArgumentNames();
   for (unsigned i = 0, n = argNameStrs.size(); i != n; ++i) {
@@ -4108,10 +4110,10 @@ Optional<Identifier> TypeChecker::omitNeedlessWords(VarDecl *var) {
   if (var->isInvalid() || !var->hasType())
     return None;
 
-  if (var->getName().empty())
+  if (!var->getBaseName())
     return None;
 
-  auto name = var->getName().str();
+  auto name = var->getBaseName().str();
 
   // Dig out the context type.
   Type contextType = var->getDeclContext()->getDeclaredInterfaceType();

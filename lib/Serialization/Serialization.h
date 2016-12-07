@@ -92,7 +92,7 @@ private:
   llvm::DenseMap<DeclTypeUnion, DeclIDAndForce> DeclAndTypeIDs;
 
   /// A map from Identifiers to their serialized IDs.
-  llvm::DenseMap<Identifier, IdentifierID> IdentifierIDs;
+  llvm::DenseMap<DeclName, DeclNameID> DeclNameIDs;
 
   /// A map from DeclContexts to their serialized IDs.
   llvm::DenseMap<const DeclContext*, DeclContextID> DeclContextIDs;
@@ -111,7 +111,7 @@ public:
   using DeclTableData = SmallVector<std::pair<uint8_t, DeclID>, 4>;
   /// The in-memory representation of what will eventually be an on-disk hash
   /// table.
-  using DeclTable = llvm::MapVector<Identifier, DeclTableData>;
+  using DeclTable = llvm::MapVector<DeclName, DeclTableData>;
 
   /// Returns the declaration the given generic parameter list is associated
   /// with.
@@ -145,7 +145,7 @@ private:
   std::queue<const NormalProtocolConformance *> NormalConformancesToWrite;
 
   /// All identifiers that need to be serialized.
-  std::vector<Identifier> IdentifiersToWrite;
+  std::vector<DeclName> IdentifiersToWrite;
 
   /// The abbreviation code for each record in the "decls-and-types" block.
   ///
@@ -364,7 +364,7 @@ public:
   /// The Identifier will be scheduled for serialization if necessary.
   ///
   /// \returns The ID for the given Identifier in this module.
-  IdentifierID addIdentifierRef(Identifier ident);
+  DeclNameID addDeclNameRef(DeclName ident);
 
   /// Records the use of the given Decl.
   ///
@@ -398,7 +398,7 @@ public:
   ///
   /// \returns The ID for the identifier for the module's name, or one of the
   /// special module codes defined above.
-  IdentifierID addModuleRef(const ModuleDecl *M);
+  DeclNameID addModuleRef(const ModuleDecl *M);
 
   /// Writes a list of generic substitutions. abbrCode is needed to support
   /// usage out of decl block.

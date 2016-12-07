@@ -1319,13 +1319,13 @@ WitnessChecker::lookupValueWitnesses(ValueDecl *req, bool *ignoringNames) {
   assert(!isa<AssociatedTypeDecl>(req) && "Not for lookup for type witnesses*");
   
   SmallVector<ValueDecl *, 4> witnesses;
-  if (req->getName().isOperator()) {
+  if (req->isOperator()) {
     // Operator lookup is always global.
     auto lookupOptions = defaultUnqualifiedLookupOptions;
     if (!DC->isCascadingContextForLookup(false))
       lookupOptions |= NameLookupFlags::KnownPrivate;
     auto lookup = TC.lookupUnqualified(DC->getModuleScopeContext(),
-                                       req->getName(),
+                                       req->getBaseName(),
                                        SourceLoc(),
                                        lookupOptions);
     for (auto candidate : lookup) {
@@ -1342,7 +1342,7 @@ WitnessChecker::lookupValueWitnesses(ValueDecl *req, bool *ignoringNames) {
     // If we didn't find anything with the appropriate name, look
     // again using only the base name.
     if (candidates.empty() && ignoringNames) {
-      candidates = TC.lookupMember(DC, Adoptee, req->getName(),
+      candidates = TC.lookupMember(DC, Adoptee, req->getBaseName(),
                                    lookupOptions);
       *ignoringNames = true;
     }
@@ -1606,17 +1606,17 @@ namespace {
       for (const auto &inferred : Inferred) {
         out << "\n";
         out.indent(indent + 2);
-        out << inferred.first->getName() << " := "
+        out << inferred.first->getBaseName() << " := "
             << inferred.second.getString();
       }
 
       for (const auto &inferred : NonViable) {
         out << "\n";
         out.indent(indent + 2);
-        out << std::get<0>(inferred)->getName() << " := "
+        out << std::get<0>(inferred)->getBaseName() << " := "
             << std::get<1>(inferred).getString();
         if (auto nominal = std::get<2>(inferred).getProtocolOrClass())
-          out << " [failed constraint " << nominal->getName() << "]";
+          out << " [failed constraint " << nominal->getBaseName() << "]";
       }
 
       out << ")";
@@ -1812,7 +1812,7 @@ static void addAssocTypeDeductionString(llvm::SmallString<128> &str,
   else
     str += ", ";
 
-  str += assocType->getName().str();
+  str += assocType->getBaseName().str();
   str += " = ";
   str += deduced.getString();
 }
@@ -2231,7 +2231,7 @@ void ConformanceChecker::recordTypeWitness(AssociatedTypeDecl *assocType,
                                 typeDecl->getDescriptiveKind(),
                                 typeDecl->getFullName(),
                                 requiredAccess,
-                                proto->getName());
+                                proto->getBaseName());
         fixItAccessibility(diag, typeDecl, requiredAccess);
       });
     }
@@ -2258,7 +2258,7 @@ void ConformanceChecker::recordTypeWitness(AssociatedTypeDecl *assocType,
     }
 
     auto aliasDecl = new (TC.Context) TypeAliasDecl(SourceLoc(),
-                                                    assocType->getName(),
+                                                    assocType->getIdentifier(),
                                                     SourceLoc(),
                                                     TypeLoc::withoutLoc(type),
                                                     /*genericparams*/nullptr, 
@@ -2358,11 +2358,11 @@ static void diagnoseNoWitness(ValueDecl *Requirement, Type RequirementType,
     Printer << "public ";
 
   if (auto MissingTypeWitness = dyn_cast<AssociatedTypeDecl>(Requirement)) {
-    Printer << "typealias " << MissingTypeWitness->getName() << " = <#type#>";
+    Printer << "typealias " << MissingTypeWitness->getBaseName() << " = <#type#>";
     Printer << "\n";
 
     TC.diagnose(MissingTypeWitness, diag::no_witnesses_type,
-                MissingTypeWitness->getName())
+                MissingTypeWitness->getBaseName())
       .fixItInsertAfter(FixitLocation, FixitStream.str());
   } else {
     bool AddFixit = true;
@@ -2520,7 +2520,7 @@ ConformanceChecker::resolveWitnessViaLookup(ValueDecl *requirement) {
                                 isSetter,
                                 requiredAccess,
                                 protoAccessScope.accessibilityForDiagnostics(),
-                                proto->getName());
+                                proto->getBaseName());
         fixItAccessibility(diag, witness, requiredAccess, isSetter);
       });
       break;
@@ -2805,7 +2805,7 @@ ResolveWitnessResult ConformanceChecker::resolveWitnessViaDefault(
     // Point out the requirement that wasn't met.
     tc.diagnose(requirement, diag::no_witnesses,
                 getRequirementKind(requirement),
-                requirement->getName(),
+                requirement->getBaseName(),
                 reqType, false);
     });
 
@@ -2840,7 +2840,7 @@ static CheckTypeWitnessResult checkTypeWitness(TypeChecker &tc, DeclContext *dc,
 ResolveWitnessResult ConformanceChecker::resolveTypeWitnessViaLookup(
                        AssociatedTypeDecl *assocType) {
   // Look for a member type with the same name as the associated type.
-  auto candidates = TC.lookupMemberType(DC, Adoptee, assocType->getName(),
+  auto candidates = TC.lookupMemberType(DC, Adoptee, assocType->getIdentifier(),
                                         /*lookupOptions=*/None);
 
   // If there aren't any candidates, we're done.
@@ -2877,7 +2877,7 @@ ResolveWitnessResult ConformanceChecker::resolveTypeWitnessViaLookup(
       [assocType, viable](TypeChecker &tc,
                           NormalProtocolConformance *conformance) {
         tc.diagnose(assocType, diag::ambiguous_witnesses_type,
-                    assocType->getName());
+                    assocType->getBaseName());
 
         for (auto candidate : viable)
           tc.diagnose(candidate.first, diag::protocol_witness_type);
@@ -2891,7 +2891,7 @@ ResolveWitnessResult ConformanceChecker::resolveTypeWitnessViaLookup(
   diagnoseOrDefer(assocType, true,
     [assocType, nonViable](TypeChecker &tc,
                            NormalProtocolConformance *conformance) {
-      tc.diagnose(assocType, diag::no_witnesses_type, assocType->getName());
+      tc.diagnose(assocType, diag::no_witnesses_type, assocType->getBaseName());
 
       for (auto candidate : nonViable) {
         if (candidate.first->getDeclaredInterfaceType()->hasError())
@@ -4302,9 +4302,11 @@ void ConformanceChecker::checkConformance() {
       if (!TC.Context.isTypeBridgedInExternalModule(nominal)) {
         auto nominalModule = nominal->getParentModule();
         auto conformanceModule = DC->getParentModule();
-        if (nominalModule->getName() != conformanceModule->getName()) {
-          TC.diagnose(Loc, diag::nonlocal_bridged_to_objc, nominal->getName(),
-                      Proto->getName(), nominalModule->getName());
+        if (nominalModule->getIdentifier() !=
+              conformanceModule->getIdentifier()) {
+          TC.diagnose(Loc, diag::nonlocal_bridged_to_objc,
+                      nominal->getBaseName(), Proto->getBaseName(),
+                      nominalModule->getIdentifier());
         }
       }
     }
@@ -4764,17 +4766,17 @@ static Optional<unsigned> scorePotentiallyMatchingNames(DeclName lhs,
   // function, include its text along with the base name's text.
   unsigned score;
   if (lhs.getArgumentNames().empty() || !isFunc) {
-    score = scoreIdentifiers(lhs.getBaseName(), rhs.getBaseName(), limit);
+    score = scoreIdentifiers(lhs.getIdentifier(), rhs.getIdentifier(), limit);
   } else {
     llvm::SmallString<16> lhsScratch;
     StringRef lhsFirstName =
-      combineBaseNameAndFirstArgument(lhs.getBaseName(),
+      combineBaseNameAndFirstArgument(lhs.getIdentifier(),
                                       lhs.getArgumentNames()[0],
                                       lhsScratch);
 
     llvm::SmallString<16> rhsScratch;
     StringRef rhsFirstName =
-      combineBaseNameAndFirstArgument(rhs.getBaseName(),
+      combineBaseNameAndFirstArgument(rhs.getIdentifier(),
                                       rhs.getArgumentNames()[0],
                                       rhsScratch);
 
@@ -4908,7 +4910,7 @@ canSuppressPotentialWitnessWarningWithNonObjC(ValueDecl *requirement,
 /// argument labels.
 static unsigned getNameLength(DeclName name) {
   unsigned length = 0;
-  if (!name.getBaseName().empty()) length += name.getBaseName().str().size();
+  if (name.getBaseName()) length += name.getBaseName().str().size();
   for (auto arg : name.getArgumentNames()) {
     if (!arg.empty())
       length += arg.str().size();
@@ -5101,7 +5103,7 @@ void TypeChecker::checkConformancesInContext(DeclContext *dc,
     // Complain about redundant conformances.
     diagnose(diag.Loc, diag::redundant_conformance,
              dc->getDeclaredInterfaceType(),
-             diag.Protocol->getName());
+             diag.Protocol->getBaseName());
 
     // Special case: explain that 'RawRepresentable' conformance
     // is implied for enums which already declare a raw type.
@@ -5119,8 +5121,8 @@ void TypeChecker::checkConformancesInContext(DeclContext *dc,
     diagnose(existingDecl, diag::declared_protocol_conformance_here,
              dc->getDeclaredInterfaceType(),
              static_cast<unsigned>(diag.ExistingKind),
-             diag.Protocol->getName(),
-             diag.ExistingExplicitProtocol->getName());
+             diag.Protocol->getBaseName(),
+             diag.ExistingExplicitProtocol->getBaseName());
   }
 
   // If there were any unsatisfied requirements, check whether there

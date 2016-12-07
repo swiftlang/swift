@@ -1717,8 +1717,8 @@ ConstraintSystem::matchTypes(Type type1, Type type2, ConstraintKind kind,
         // Protocol class type.
         auto isProtocolClassType = [&](Type t) -> bool {
           if (auto classDecl = t->getClassOrBoundGenericClass())
-            if (classDecl->getName() == getASTContext().Id_Protocol
-                && classDecl->getModuleContext()->getName()
+            if (classDecl->getBaseName() == getASTContext().Id_Protocol
+                && classDecl->getModuleContext()->getIdentifier()
                     == getASTContext().Id_ObjectiveC)
               return true;
           return false;
@@ -1794,7 +1794,7 @@ ConstraintSystem::matchTypes(Type type1, Type type2, ConstraintKind kind,
         // Allow bridged conversions to CVarArg through NSObject.
         if (!isBridgeableTargetType && type2->isExistentialType()) {
           if (auto nominalType = type2->getAs<NominalType>())
-            isBridgeableTargetType = nominalType->getDecl()->getName() ==
+            isBridgeableTargetType = nominalType->getDecl()->getBaseName() ==
                                         TC.Context.Id_CVarArg;
         }
         
@@ -2802,7 +2802,7 @@ performMemberLookup(ConstraintKind constraintKind, DeclName memberName,
         Value < baseTuple->getNumElements()) {
       fieldIdx = Value;
     } else {
-      fieldIdx = baseTuple->getNamedElementId(memberName.getBaseName());
+      fieldIdx = baseTuple->getNamedElementId(memberName.getIdentifier());
     }
     
     if (fieldIdx == -1)
@@ -2826,7 +2826,7 @@ performMemberLookup(ConstraintKind constraintKind, DeclName memberName,
     // anything else, because the cost of the general search is so
     // high.
     if (baseObjTy->isAnyObject() && argumentLabels) {
-      memberName = DeclName(TC.Context, memberName.getBaseName(),
+      memberName = DeclName(TC.Context, memberName.getIdentifier(),
                             argumentLabels->Labels);
       argumentLabels.reset();
     }
@@ -3135,7 +3135,7 @@ retry_after_fail:
         if (module == foundationModule)
           continue;
       } else if (ClangModuleUnit::hasClangModule(module) &&
-                 module->getName().str() == "Foundation") {
+                 module->getIdentifier().str() == "Foundation") {
         // Cache the foundation module name so we don't need to look
         // for it again.
         foundationModule = module;

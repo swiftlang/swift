@@ -264,7 +264,7 @@ bool swift::immediate::IRGenImportedModules(
     // something is persisting across calls to performIRGeneration.
     auto SubModule = performIRGeneration(IRGenOpts, import,
                                          std::move(SILMod),
-                                         import->getName().str(),
+                                         import->getIdentifier().str(),
                                          getGlobalLLVMContext());
 
     if (CI.getASTContext().hadError()) {
@@ -284,7 +284,8 @@ bool swift::immediate::IRGenImportedModules(
     // FIXME: This is an ugly hack; need to figure out how this should
     // actually work.
     SmallVector<char, 20> NameBuf;
-    StringRef InitFnName = (import->getName().str() + ".init").toStringRef(NameBuf);
+    StringRef InitFnName = (import->getIdentifier().str() + ".init")
+                             .toStringRef(NameBuf);
     llvm::Function *InitFn = Module.getFunction(InitFnName);
     if (InitFn)
       InitFns.push_back(InitFn);
@@ -303,7 +304,7 @@ int swift::RunImmediately(CompilerInstance &CI, const ProcessCmdLine &CmdLine,
   // something is persisting across calls to performIRGeneration.
   auto ModuleOwner = performIRGeneration(IRGenOpts, swiftModule,
                                          CI.takeSILModule(),
-                                         swiftModule->getName().str(),
+                                         swiftModule->getIdentifier().str(),
                                          getGlobalLLVMContext());
   auto *Module = ModuleOwner.get();
 

@@ -485,7 +485,7 @@ void swift::ide::getLocationInfo(const ValueDecl *VD,
       NameLen = getCharLength(SM, R);
     } else {
       if (VD->hasName()) {
-        NameLen = VD->getName().getLength();
+        NameLen = VD->getBaseName().str().size();
       } else {
         NameLen = getCharLength(SM, VD->getLoc());
       }

@@ -1414,8 +1414,8 @@ FOREACH_FAMILY(GET_LABEL)
 /// Note that this will never derive the Init family, which is too dangerous
 /// to leave to chance. Swift functions starting with "init" are always
 /// emitted as if they are part of the "none" family.
-static SelectorFamily getSelectorFamily(Identifier name) {
-  StringRef text = name.get();
+static SelectorFamily getSelectorFamily(DeclName name) {
+  StringRef text = name.str();
   while (!text.empty() && text[0] == '_') text = text.substr(1);
 
   /// Does the given selector start with the given string as a
@@ -1449,12 +1449,12 @@ static SelectorFamily getSelectorFamily(SILDeclRef c) {
     auto *FD = cast<FuncDecl>(c.getDecl());
     switch (FD->getAccessorKind()) {
     case AccessorKind::NotAccessor:
-      return getSelectorFamily(FD->getName());
+      return getSelectorFamily(FD->getBaseName());
     case AccessorKind::IsGetter:
       // Getter selectors can belong to families if their name begins with the
       // wrong thing.
       if (FD->getAccessorStorageDecl()->isObjC() || c.isForeign)
-        return getSelectorFamily(FD->getAccessorStorageDecl()->getName());
+        return getSelectorFamily(FD->getAccessorStorageDecl()->getBaseName());
       return SelectorFamily::None;
 
       // Other accessors are never selector family members.

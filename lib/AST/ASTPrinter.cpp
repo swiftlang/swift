@@ -615,10 +615,10 @@ static bool escapeKeywordInContext(StringRef keyword, PrintNameContext context){
   }
 }
 
-void ASTPrinter::printName(Identifier Name, PrintNameContext Context) {
+void ASTPrinter::printName(DeclName Name, PrintNameContext Context) {
   callPrintNamePre(Context);
 
-  if (Name.empty()) {
+  if (!Name) {
     *this << "_";
     printNamePost(Context);
     return;
@@ -1287,7 +1287,7 @@ void PrintAST::printSingleDepthOfGenericSignature(
           printType(param);
       } else if (auto *GP = param->getDecl()) {
         Printer.callPrintStructurePre(PrintStructureKind::GenericParameter, GP);
-        Printer.printName(GP->getName(), PrintNameContext::GenericParameter);
+        Printer.printName(GP->getBaseName(), PrintNameContext::GenericParameter);
         Printer.printStructurePost(PrintStructureKind::GenericParameter, GP);
       } else {
         printType(param);
@@ -1999,7 +1999,7 @@ static void printExtendedTypeName(Type ExtendedType, ASTPrinter &Printer,
     return;
   }
 
-  Printer.printTypeRef(ExtendedType, Nominal, Nominal->getName());
+  Printer.printTypeRef(ExtendedType, Nominal, Nominal->getIdentifier());
 }
 
 void PrintAST::
@@ -2134,7 +2134,7 @@ void PrintAST::visitTypeAliasDecl(TypeAliasDecl *decl) {
     Printer << tok::kw_typealias << " ";
   recordDeclLoc(decl,
     [&]{
-      Printer.printName(decl->getName());
+      Printer.printName(decl->getBaseName());
     }, [&]{ // Signature
       if (decl->getGenericParams())
         if (auto *genericSig = decl->getGenericSignature())
@@ -2156,7 +2156,7 @@ void PrintAST::visitTypeAliasDecl(TypeAliasDecl *decl) {
 
 void PrintAST::visitGenericTypeParamDecl(GenericTypeParamDecl *decl) {
   recordDeclLoc(decl, [&] {
-    Printer.printName(decl->getName(), PrintNameContext::GenericParameter);
+    Printer.printName(decl->getBaseName(), PrintNameContext::GenericParameter);
   });
 
   printInherited(decl, decl->getInherited(), { });
@@ -2169,7 +2169,7 @@ void PrintAST::visitAssociatedTypeDecl(AssociatedTypeDecl *decl) {
     Printer << tok::kw_associatedtype << " ";
   recordDeclLoc(decl,
     [&]{
-      Printer.printName(decl->getName());
+      Printer.printName(decl->getBaseName());
     });
 
   printInherited(decl, decl->getInherited(), { });
@@ -2194,7 +2194,7 @@ void PrintAST::visitEnumDecl(EnumDecl *decl) {
       Printer << tok::kw_enum << " ";
     recordDeclLoc(decl,
       [&]{
-        Printer.printName(decl->getName());
+        Printer.printName(decl->getBaseName());
       }, [&]{ // Signature
         printNominalDeclGenericParams(decl);
       });
@@ -2221,7 +2221,7 @@ void PrintAST::visitStructDecl(StructDecl *decl) {
       Printer << tok::kw_struct << " ";
     recordDeclLoc(decl,
       [&]{
-        Printer.printName(decl->getName());
+        Printer.printName(decl->getBaseName());
       }, [&]{ // Signature
         printNominalDeclGenericParams(decl);
       });
@@ -2248,7 +2248,7 @@ void PrintAST::visitClassDecl(ClassDecl *decl) {
       Printer << tok::kw_class << " ";
     recordDeclLoc(decl,
       [&]{
-        Printer.printName(decl->getName());
+        Printer.printName(decl->getBaseName());
       }, [&]{ // Signature
         printNominalDeclGenericParams(decl);
       });
@@ -2277,7 +2277,7 @@ void PrintAST::visitProtocolDecl(ProtocolDecl *decl) {
       Printer << tok::kw_protocol << " ";
     recordDeclLoc(decl,
       [&]{
-        Printer.printName(decl->getName());
+        Printer.printName(decl->getBaseName());
       });
 
     // Figure out whether we need an explicit 'class' in the inheritance.
@@ -2336,7 +2336,7 @@ void PrintAST::visitVarDecl(VarDecl *decl) {
   }
   recordDeclLoc(decl,
     [&]{
-      Printer.printName(decl->getName());
+      Printer.printName(decl->getBaseName());
     });
   if (decl->hasType()) {
     Printer << ": ";
@@ -2364,7 +2364,7 @@ void PrintAST::printOneParameter(const ParamDecl *param,
   auto printArgName = [&]() {
     // Print argument name.
     auto ArgName = param->getArgumentName();
-    auto BodyName = param->getName();
+    auto BodyName = param->getBaseName();
     switch (Options.ArgAndParamPrinting) {
     case PrintOptions::ArgAndParamPrintingMode::ArgumentOnly:
       Printer.printName(ArgName, PrintNameContext::FunctionParameterExternal);
@@ -2588,8 +2588,8 @@ void PrintAST::visitFuncDecl(FuncDecl *decl) {
 
           auto params = decl->getParameterLists().back();
           if (params->size() != 0 && !params->get(0)->isImplicit()) {
-            auto Name = params->get(0)->getName();
-            if (!Name.empty()) {
+            auto Name = params->get(0)->getBaseName();
+            if (Name) {
               Printer << "(";
               Printer.printName(Name);
               Printer << ")";
@@ -2647,7 +2647,7 @@ void PrintAST::visitFuncDecl(FuncDecl *decl) {
           if (!decl->hasName())
             Printer << "<anonymous>";
           else
-            Printer.printName(decl->getName());
+            Printer.printName(decl->getBaseName());
         }, [&] { // Parameters
           if (decl->isGeneric())
             if (auto *genericSig = decl->getGenericSignature())
@@ -2700,7 +2700,7 @@ void PrintAST::visitFuncDecl(FuncDecl *decl) {
 void PrintAST::printEnumElement(EnumElementDecl *elt) {
   recordDeclLoc(elt,
     [&]{
-      Printer.printName(elt->getName());
+      Printer.printName(elt->getBaseName());
     });
 
   if (elt->hasArgumentType()) {
@@ -3278,14 +3278,14 @@ class TypePrinter : public TypeVisitor<TypePrinter> {
   template <typename T>
   void printModuleContext(T *Ty) {
     Module *Mod = Ty->getDecl()->getModuleContext();
-    Printer.printModuleRef(Mod, Mod->getName());
+    Printer.printModuleRef(Mod, Mod->getIdentifier());
     Printer << ".";
   }
 
   template <typename T>
   void printTypeDeclName(T *Ty) {
     TypeDecl *TD = Ty->getDecl();
-    Printer.printTypeRef(Ty, TD, TD->getName());
+    Printer.printTypeRef(Ty, TD, TD->getIdentifier());
   }
 
   // FIXME: we should have a callback that would tell us
@@ -3293,7 +3293,8 @@ class TypePrinter : public TypeVisitor<TypePrinter> {
   bool isLLDBExpressionModule(Module *M) {
     if (!M)
       return false;
-    return M->getName().str().startswith(LLDB_EXPRESSIONS_MODULE_NAME_PREFIX);
+    return M->getIdentifier().str()
+             .startswith(LLDB_EXPRESSIONS_MODULE_NAME_PREFIX);
   }
 
   bool shouldPrintFullyQualified(TypeBase *T) {
@@ -3318,7 +3319,7 @@ class TypePrinter : public TypeVisitor<TypePrinter> {
 
     // Don't print qualifiers for types from the standard library.
     if (M->isStdlibModule() ||
-        M->getName() == M->getASTContext().Id_ObjectiveC ||
+        M->getIdentifier() == M->getASTContext().Id_ObjectiveC ||
         M->isSystemModule() ||
         isLLDBExpressionModule(M))
       return false;
@@ -3581,7 +3582,7 @@ public:
 
   void visitModuleType(ModuleType *T) {
     Printer << "module<";
-    Printer.printModuleRef(T->getModule(), T->getModule()->getName());
+    Printer.printModuleRef(T->getModule(), T->getModule()->getIdentifier());
     Printer << ">";
   }
 
@@ -4207,8 +4208,9 @@ void ProtocolConformance::printName(llvm::raw_ostream &os,
   switch (getKind()) {
   case ProtocolConformanceKind::Normal: {
     auto normal = cast<NormalProtocolConformance>(this);
-    os << normal->getProtocol()->getName()
-       << " module " << normal->getDeclContext()->getParentModule()->getName();
+    os << normal->getProtocol()->getBaseName()
+       << " module "
+       << normal->getDeclContext()->getParentModule()->getIdentifier();
     break;
   }
   case ProtocolConformanceKind::Specialized: {

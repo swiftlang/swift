@@ -119,7 +119,7 @@ public:
 
   /// Returns the name directly bound by this pattern, or the null
   /// identifier if the pattern does not bind a name directly.
-  Identifier getBoundName() const;
+  DeclName getBoundName() const;
 
   /// If this pattern binds a single variable without any
   /// destructuring or conditionalizing, return that variable.
@@ -314,7 +314,7 @@ public:
   }
 
   VarDecl *getDecl() const { return Var; }
-  Identifier getBoundName() const;
+  DeclName getBoundName() const;
   StringRef getNameStr() const { return Var->getNameStr(); }
 
   SourceLoc getLoc() const { return Var->getLoc(); }

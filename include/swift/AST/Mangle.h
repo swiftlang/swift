@@ -146,7 +146,7 @@ private:
   void mangleFunctionType(AnyFunctionType *fn, unsigned uncurryingLevel);
   void mangleProtocolList(ArrayRef<ProtocolDecl*> protocols);
   void mangleProtocolList(ArrayRef<Type> protocols);
-  void mangleIdentifier(Identifier ident,
+  void mangleDeclName(DeclName name,
                         OperatorFixity fixity = OperatorFixity::NotOperator);
 
   void mangleClosureComponents(Type Ty, unsigned discriminator, bool isImplicit,

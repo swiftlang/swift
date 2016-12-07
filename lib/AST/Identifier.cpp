@@ -27,15 +27,8 @@ raw_ostream &llvm::operator<<(raw_ostream &OS, Identifier I) {
   return OS << I.get();
 }
 
-raw_ostream &llvm::operator<<(raw_ostream &OS, DeclName I) {
-  if (I.isSimpleName())
-    return OS << I.getBaseName();
-
-  OS << I.getBaseName() << "(";
-  for (auto c : I.getArgumentNames()) {
-    OS << c << ':';
-  }
-  OS << ")";
+raw_ostream &llvm::operator<<(raw_ostream &OS, DeclName D) {
+  D.print(OS);
   return OS;
 }
 
@@ -81,7 +74,7 @@ int Identifier::compare(Identifier other) const {
 
 int DeclName::compare(DeclName other) const {
   // Compare base names.
-  if (int result = getBaseName().compare(other.getBaseName()))
+  if (int result = getIdentifier().compare(other.getIdentifier()))
     return result;
 
   // Compare argument names.
@@ -116,7 +109,7 @@ StringRef DeclName::getString(llvm::SmallVectorImpl<char> &scratch,
 llvm::raw_ostream &DeclName::print(llvm::raw_ostream &os,
                                    bool skipEmptyArgumentNames) const {
   // Print the base name.
-  os << getBaseName();
+  os << getIdentifier();
 
   // If this is a simple name, we're done.
   if (isSimpleName())

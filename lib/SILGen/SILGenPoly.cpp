@@ -328,8 +328,8 @@ static bool isProtocolClass(Type t) {
     return false;
 
   ASTContext &ctx = classDecl->getASTContext();
-  return (classDecl->getName() == ctx.Id_Protocol &&
-          classDecl->getModuleContext()->getName() == ctx.Id_ObjectiveC);
+  return (classDecl->getBaseName() == ctx.Id_Protocol &&
+          classDecl->getModuleContext()->getBaseName() == ctx.Id_ObjectiveC);
 };
 
 static ManagedValue emitManagedLoad(SILGenFunction &gen, SILLocation loc,

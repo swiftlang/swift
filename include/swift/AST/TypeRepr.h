@@ -260,7 +260,7 @@ public:
   /// Return true if this has been name-bound already.
   bool isBound() const { return IdOrDecl.is<ValueDecl *>(); }
 
-  ValueDecl *getBoundDecl() const { return IdOrDecl.dyn_cast<ValueDecl*>(); }
+  ValueDecl *getBoundDecl() const { return IdOrDecl.dyn_cast<ValueDecl *>(); }
 
   void setValue(ValueDecl *VD) { IdOrDecl = VD; }
 

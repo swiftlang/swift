@@ -228,7 +228,7 @@ FileUnit *SerializedModuleLoader::loadAST(
     if (diagnoseDifferentLanguageVersion(loadInfo.shortVersion))
       break;
     Ctx.Diags.diagnose(*diagLoc, diag::serialization_module_too_old,
-                       M.getName(), moduleBufferID);
+                       M.getIdentifier(), moduleBufferID);
     break;
   case serialization::Status::Malformed:
     Ctx.Diags.diagnose(*diagLoc, diag::serialization_malformed_module,
@@ -289,7 +289,7 @@ FileUnit *SerializedModuleLoader::loadAST(
 
   case serialization::Status::MissingShadowedModule: {
     Ctx.Diags.diagnose(*diagLoc, diag::serialization_missing_shadowed_module,
-                       M.getName());
+                       M.getIdentifier());
     if (Ctx.SearchPathOpts.SDKPath.empty() &&
         llvm::Triple(llvm::sys::getProcessTriple()).isMacOSX()) {
       Ctx.Diags.diagnose(SourceLoc(), diag::sema_no_import_no_sdk);
@@ -301,7 +301,8 @@ FileUnit *SerializedModuleLoader::loadAST(
   case serialization::Status::FailedToLoadBridgingHeader:
     // We already emitted a diagnostic about the bridging header. Just emit
     // a generic message here.
-    Ctx.Diags.diagnose(*diagLoc, diag::serialization_load_failed, M.getName());
+    Ctx.Diags.diagnose(*diagLoc, diag::serialization_load_failed,
+                       M.getIdentifier());
     break;
 
   case serialization::Status::NameMismatch: {
@@ -311,7 +312,7 @@ FileUnit *SerializedModuleLoader::loadAST(
     if (Ctx.LangOpts.DebuggerSupport)
       diagKind = diag::serialization_name_mismatch_repl;
     Ctx.Diags.diagnose(*diagLoc, diagKind,
-                       loadInfo.name, M.getName());
+                       loadInfo.name, M.getIdentifier());
     break;
   }
 

@@ -364,7 +364,7 @@ emitRValueForDecl(SILLocation loc, ConcreteDeclRef declRef, Type ncRefType,
 
       // 'self' may need to be taken during an 'init' delegation.
       if (!C.isGuaranteedPlusZeroOk() &&
-          var->getName() == getASTContext().Id_self) {
+          var->getBaseName() == getASTContext().Id_self) {
         switch (SelfInitDelegationState) {
         case NormalSelf:
           // Don't consume self.

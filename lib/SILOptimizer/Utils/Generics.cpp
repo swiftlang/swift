@@ -646,7 +646,8 @@ static bool linkSpecialization(SILModule &M, SILFunction *F) {
   // Do not remove functions from the white-list. Keep them around.
   // Change their linkage to public, so that other applications can refer to it.
   if (M.getOptions().Optimization >= SILOptions::SILOptMode::Optimize &&
-      F->getModule().getSwiftModule()->getName().str() == SWIFT_ONONE_SUPPORT) {
+      F->getModule().getSwiftModule()->getIdentifier().str() ==
+        SWIFT_ONONE_SUPPORT) {
     if (isWhitelistedSpecialization(F->getName())) {
       keepSpecializationAsPublic(F);
       return true;

@@ -298,13 +298,13 @@ namespace {
 class ModuleFile::DeclTableInfo {
 public:
   using internal_key_type = StringRef;
-  using external_key_type = Identifier;
+  using external_key_type = DeclName;
   using data_type = SmallVector<std::pair<uint8_t, DeclID>, 8>;
   using hash_value_type = uint32_t;
   using offset_type = unsigned;
 
-  internal_key_type GetInternalKey(external_key_type ID) {
-    return ID.str();
+  internal_key_type GetInternalKey(external_key_type Name) {
+    return Name.serializationString();
   }
 
   hash_value_type ComputeHash(internal_key_type key) {
@@ -1041,7 +1041,7 @@ Status ModuleFile::associateWithFileContext(FileUnit *file,
   assert(!FileContext && "already associated with an AST module");
   FileContext = file;
 
-  if (file->getParentModule()->getName().str() != Name)
+  if (file->getParentModule()->getIdentifier().str() != Name)
     return error(Status::NameMismatch);
 
   ASTContext &ctx = getContext();
@@ -1105,7 +1105,7 @@ Status ModuleFile::associateWithFileContext(FileUnit *file,
     if (!module || module->failedToLoad()) {
       // If we're missing the module we're shadowing, treat that specially.
       if (modulePath.size() == 1 &&
-          modulePath.front() == file->getParentModule()->getName()) {
+          modulePath.front() == file->getParentModule()->getIdentifier()) {
         return error(Status::MissingShadowedModule);
       }
 
@@ -1347,7 +1347,7 @@ void ModuleFile::loadExtensions(NominalTypeDecl *nominal) {
   if (!ExtensionDecls)
     return;
 
-  auto iter = ExtensionDecls->find(nominal->getName());
+  auto iter = ExtensionDecls->find(nominal->getIdentifier());
   if (iter == ExtensionDecls->end())
     return;
 
@@ -1415,7 +1415,7 @@ void ModuleFile::lookupClassMember(Module::AccessPathTy accessPath,
         while (!dc->getParent()->isModuleScopeContext())
           dc = dc->getParent();
         if (auto nominal = dc->getAsNominalTypeOrNominalTypeExtensionContext())
-          if (nominal->getName() == accessPath.front().first)
+          if (nominal->getBaseName() == accessPath.front().first)
             results.push_back(vd);
       }
     } else {
@@ -1428,7 +1428,7 @@ void ModuleFile::lookupClassMember(Module::AccessPathTy accessPath,
         while (!dc->getParent()->isModuleScopeContext())
           dc = dc->getParent();
         if (auto nominal = dc->getAsNominalTypeOrNominalTypeExtensionContext())
-          if (nominal->getName() == accessPath.front().first)
+          if (nominal->getBaseName() == accessPath.front().first)
             results.push_back(vd);
       }
     }
@@ -1457,7 +1457,7 @@ void ModuleFile::lookupClassMembers(Module::AccessPathTy accessPath,
         while (!dc->getParent()->isModuleScopeContext())
           dc = dc->getParent();
         if (auto nominal = dc->getAsNominalTypeOrNominalTypeExtensionContext())
-          if (nominal->getName() == accessPath.front().first)
+          if (nominal->getBaseName() == accessPath.front().first)
             consumer.foundDecl(vd, DeclVisibilityKind::DynamicLookup);
       }
     }

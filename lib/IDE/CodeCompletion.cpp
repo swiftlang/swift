@@ -296,7 +296,7 @@ static bool shouldHideDeclFromCompletionResults(const ValueDecl *D) {
   }
 
   // Hide editor placeholders.
-  if (D->getName().isEditorPlaceholder())
+  if (D->getBaseName().isEditorPlaceholder())
     return true;
 
   return false;
@@ -1066,7 +1066,7 @@ CodeCompletionResult *CodeCompletionResultBuilder::takeResult() {
         } else {
           ModuleName = copyString(
               *Sink.Allocator,
-              CurrentModule.get<const swift::Module *>()->getName().str());
+              CurrentModule.get<const swift::Module *>()->getIdentifier().str());
         }
         Sink.LastModule.first = CurrentModule.getOpaqueValue();
         Sink.LastModule.second = ModuleName;
@@ -2030,7 +2030,7 @@ public:
         shouldHideDeclFromCompletionResults(VD))
       return;
 
-    StringRef Name = VD->getName().get();
+    StringRef Name = VD->getBaseName().str();
     assert(!Name.empty() && "name should not be empty");
 
     CommandWordsPairs Pairs;
@@ -2044,7 +2044,7 @@ public:
     setClangDeclKeywords(VD, Pairs, Builder);
     // Add a type annotation.
     Type VarType = getTypeOfMember(VD);
-    if (VD->getName() == Ctx.Id_self) {
+    if (VD->getBaseName() == Ctx.Id_self) {
       // Strip inout from 'self'.  It is useful to show inout for function
       // parameters.  But for 'self' it is just noise.
       VarType = VarType->getInOutObjectType();
@@ -2216,7 +2216,7 @@ public:
         if (BodyParams) {
           // If we have a local name for the parameter, pass in that as well.
           auto argName = BodyParams->get(i)->getArgumentName();
-          auto bodyName = BodyParams->get(i)->getName();
+          auto bodyName = BodyParams->get(i)->getIdentifier();
           Builder.addCallParameter(argName, bodyName, ParamType, TupleElt.isVararg(),
                                    true);
         } else {
@@ -2236,7 +2236,7 @@ public:
       modifiedBuilder = true;
       if (BodyParams) {
         auto argName = BodyParams->get(0)->getArgumentName();
-        auto bodyName = BodyParams->get(0)->getName();
+        auto bodyName = BodyParams->get(0)->getIdentifier();
         Builder.addCallParameter(argName, bodyName, T,
                                  /*IsVarArg*/false, true);
       } else
@@ -2371,13 +2371,13 @@ public:
   }
 
   void addMethodCall(const FuncDecl *FD, DeclVisibilityKind Reason) {
-    if (FD->getName().empty())
+    if (!FD->getBaseName())
       return;
     foundFunction(FD);
     bool IsImplicitlyCurriedInstanceMethod =
         isImplicitlyCurriedInstanceMethod(FD);
 
-    StringRef Name = FD->getName().get();
+    StringRef Name = FD->getBaseName().str();
     assert(!Name.empty() && "name should not be empty");
 
     unsigned FirstIndex = 0;
@@ -2604,7 +2604,7 @@ public:
     Builder.setAssociatedDecl(NTD);
     setClangDeclKeywords(NTD, Pairs, Builder);
     addLeadingDot(Builder);
-    Builder.addTextChunk(NTD->getName().str());
+    Builder.addTextChunk(NTD->getBaseName().str());
     addTypeAnnotation(Builder, NTD->getDeclaredType());
   }
 
@@ -2617,7 +2617,7 @@ public:
     Builder.setAssociatedDecl(TAD);
     setClangDeclKeywords(TAD, Pairs, Builder);
     addLeadingDot(Builder);
-    Builder.addTextChunk(TAD->getName().str());
+    Builder.addTextChunk(TAD->getBaseName().str());
     if (TAD->hasUnderlyingType() && !TAD->getUnderlyingType()->is<ErrorType>())
       addTypeAnnotation(Builder, TAD->getUnderlyingType());
     else {
@@ -2635,7 +2635,7 @@ public:
     setClangDeclKeywords(GP, Pairs, Builder);
     Builder.setAssociatedDecl(GP);
     addLeadingDot(Builder);
-    Builder.addTextChunk(GP->getName().str());
+    Builder.addTextChunk(GP->getBaseName().str());
     addTypeAnnotation(Builder, GP->getDeclaredInterfaceType());
   }
 
@@ -2649,7 +2649,7 @@ public:
     setClangDeclKeywords(AT, Pairs, Builder);
     Builder.setAssociatedDecl(AT);
     addLeadingDot(Builder);
-    Builder.addTextChunk(AT->getName().str());
+    Builder.addTextChunk(AT->getBaseName().str());
     if (Type T = getAssociatedTypeType(AT))
       addTypeAnnotation(Builder, T);
   }
@@ -2671,7 +2671,7 @@ public:
     Builder.setAssociatedDecl(EED);
     setClangDeclKeywords(EED, Pairs, Builder);
     addLeadingDot(Builder);
-    Builder.addTextChunk(EED->getName().str());
+    Builder.addTextChunk(EED->getBaseName().str());
     if (EED->hasArgumentType())
       addPatternFromType(Builder, EED->getArgumentType());
 
@@ -2856,23 +2856,23 @@ public:
 
       if (auto *NTD = dyn_cast<NominalTypeDecl>(D)) {
         addNominalTypeRef(NTD, Reason);
-        addConstructorCallsForType(NTD->getInterfaceType(), NTD->getName(),
-                                   Reason);
+        addConstructorCallsForType(NTD->getInterfaceType(),
+                                   NTD->getIdentifier(), Reason);
         return;
       }
 
       if (auto *TAD = dyn_cast<TypeAliasDecl>(D)) {
         addTypeAliasRef(TAD, Reason);
-        addConstructorCallsForType(TAD->getUnderlyingType(), TAD->getName(),
-                                   Reason);
+        addConstructorCallsForType(TAD->getUnderlyingType(),
+                                   TAD->getIdentifier(), Reason);
         return;
       }
 
       if (auto *GP = dyn_cast<GenericTypeParamDecl>(D)) {
         addGenericTypeParamRef(GP, Reason);
         for (auto *protocol : GP->getConformingProtocols())
-          addConstructorCallsForType(protocol->getInterfaceType(), GP->getName(),
-                                     Reason);
+          addConstructorCallsForType(protocol->getInterfaceType(),
+                                     GP->getIdentifier(), Reason);
         return;
       }
 
@@ -2925,23 +2925,23 @@ public:
 
       if (auto *NTD = dyn_cast<NominalTypeDecl>(D)) {
         addNominalTypeRef(NTD, Reason);
-        addConstructorCallsForType(NTD->getInterfaceType(), NTD->getName(),
-                                   Reason);
+        addConstructorCallsForType(NTD->getInterfaceType(),
+                                   NTD->getIdentifier(), Reason);
         return;
       }
 
       if (auto *TAD = dyn_cast<TypeAliasDecl>(D)) {
         addTypeAliasRef(TAD, Reason);
-        addConstructorCallsForType(TAD->getUnderlyingType(), TAD->getName(),
-                                   Reason);
+        addConstructorCallsForType(TAD->getUnderlyingType(),
+                                   TAD->getIdentifier(), Reason);
         return;
       }
 
       if (auto *GP = dyn_cast<GenericTypeParamDecl>(D)) {
         addGenericTypeParamRef(GP, Reason);
         for (auto *protocol : GP->getConformingProtocols())
-          addConstructorCallsForType(protocol->getInterfaceType(), GP->getName(),
-                                     Reason);
+          addConstructorCallsForType(protocol->getInterfaceType(),
+                                     GP->getIdentifier(), Reason);
         return;
       }
 
@@ -3314,7 +3314,7 @@ public:
         if (op->getName().str() == "??")
           return;
         if (auto NT = CCE.getType()->getNominalOrBoundGenericNominal()) {
-          if (NT->getName() ==
+          if (NT->getBaseName() ==
               CurrDeclContext->getASTContext().Id_OptionalNilComparisonType)
             return;
         }
@@ -3605,8 +3605,9 @@ public:
         T = T->lookThroughAllAnyOptionalTypes();
         if (auto structDecl = T->getStructOrBoundGenericStruct()) {
           if (!addedSelector &&
-              structDecl->getName() == Ctx.Id_Selector &&
-              structDecl->getParentModule()->getName() == Ctx.Id_ObjectiveC) {
+              structDecl->getBaseName() == Ctx.Id_Selector &&
+              structDecl->getParentModule()->getIdentifier() ==
+                Ctx.Id_ObjectiveC) {
             addPoundSelector(/*needPound=*/true);
             if (addedKeyPath) break;
             addedSelector = true;
@@ -4154,7 +4155,7 @@ public:
       addAccessControl(ATD, Builder);
     if (!hasTypealiasIntroducer)
       Builder.addDeclIntroducer("typealias ");
-    Builder.addTextChunk(ATD->getName().str());
+    Builder.addTextChunk(ATD->getBaseName().str());
     Builder.addTextChunk(" = ");
     Builder.addSimpleNamedParameter("Type");
   }
@@ -4209,7 +4210,7 @@ public:
     if (Reason == DeclVisibilityKind::MemberOfCurrentNominal) {
       if (D->getKind() == DeclKind::TypeAlias) {
         ValueDecl *VD = dyn_cast<ValueDecl>(D);
-        SatisfiedAssociatedTypes.insert(VD->getName().str());
+        SatisfiedAssociatedTypes.insert(VD->getBaseName().str());
       }
       return;
     }
@@ -5049,7 +5050,7 @@ void CodeCompletionCallbacksImpl::doneParsing() {
     Lookup.setIsStaticMetatype(ParsedExpr->isStaticallyDerivedMetatype());
   }
   if (auto *DRE = dyn_cast_or_null<DeclRefExpr>(ParsedExpr)) {
-    Lookup.setIsSelfRefExpr(DRE->getDecl()->getName() == Context.Id_self);
+    Lookup.setIsSelfRefExpr(DRE->getDecl()->getBaseName() == Context.Id_self);
   }
 
   if (isInsideObjCSelector())
@@ -5328,7 +5329,8 @@ void CodeCompletionCallbacksImpl::doneParsing() {
       // module loading, for example, the module file is corrupted.
       if (!ModuleFilename.empty()) {
         auto &Ctx = TheModule->getASTContext();
-        CodeCompletionCache::Key K{ModuleFilename, TheModule->getName().str(),
+        CodeCompletionCache::Key K{ModuleFilename,
+                                   TheModule->getIdentifier().str(),
                                    AccessPath, Request.NeedLeadingDot,
                                    SF.hasTestableImport(TheModule),
                                    Ctx.LangOpts.CodeCompleteInitsInPostfixExpr};

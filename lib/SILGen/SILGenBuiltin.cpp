@@ -964,7 +964,7 @@ SpecializedEmitter::forDecl(SILGenModule &SGM, SILDeclRef function) {
   if (!isa<BuiltinUnit>(decl->getDeclContext()))
     return None;
 
-  const BuiltinInfo &builtin = SGM.M.getBuiltinInfo(decl->getName());
+  const BuiltinInfo &builtin = SGM.M.getBuiltinInfo(decl->getBaseName());
   switch (builtin.ID) {
   // All the non-SIL, non-type-trait builtins should use the
   // named-builtin logic, which just emits the builtin as a call to a
@@ -979,7 +979,7 @@ SpecializedEmitter::forDecl(SILGenModule &SGM, SILDeclRef function) {
 #define BUILTIN_TYPE_TRAIT_OPERATION(Id, Name)
 #include "swift/AST/Builtins.def"
   case BuiltinValueKind::None:
-    return SpecializedEmitter(decl->getName());
+    return SpecializedEmitter(decl->getBaseName());
 
   // Do a second pass over Builtins.def, ignoring all the cases for
   // which we emitted something above.

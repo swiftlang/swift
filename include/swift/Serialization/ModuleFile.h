@@ -679,7 +679,7 @@ public:
   Type getType(serialization::TypeID TID);
 
   /// Returns the identifier with the given ID, deserializing it if needed.
-  Identifier getIdentifier(serialization::IdentifierID IID);
+  Identifier getIdentifier(serialization::DeclNameID DID);
 
   /// Returns the decl with the given ID, deserializing it if needed.
   ///

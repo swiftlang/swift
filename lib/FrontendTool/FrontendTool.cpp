@@ -234,7 +234,7 @@ static bool emitReferenceDependencies(DiagnosticEngine &diags,
     return true;
   }
 
-  auto escape = [](Identifier name) -> std::string {
+  auto escape = [](DeclName name) -> std::string {
     return llvm::yaml::escape(name.str());
   };
 
@@ -302,7 +302,7 @@ static bool emitReferenceDependencies(DiagnosticEngine &diags,
           NTD->getFormalAccess() <= Accessibility::FilePrivate) {
         break;
       }
-      out << "- \"" << escape(NTD->getName()) << "\"\n";
+      out << "- \"" << escape(NTD->getBaseName()) << "\"\n";
       extendedNominals[NTD] |= true;
       findNominalsAndOperators(extendedNominals, memberOperatorDecls,
                                NTD->getMembers());
@@ -319,7 +319,7 @@ static bool emitReferenceDependencies(DiagnosticEngine &diags,
           VD->getFormalAccess() <= Accessibility::FilePrivate) {
         break;
       }
-      out << "- \"" << escape(VD->getName()) << "\"\n";
+      out << "- \"" << escape(VD->getBaseName()) << "\"\n";
       break;
     }
 
@@ -343,7 +343,7 @@ static bool emitReferenceDependencies(DiagnosticEngine &diags,
 
   // This is also part of "provides-top-level".
   for (auto *operatorFunction : memberOperatorDecls)
-    out << "- \"" << escape(operatorFunction->getName()) << "\"\n";
+    out << "- \"" << escape(operatorFunction->getBaseName()) << "\"\n";
 
   out << "provides-nominal:\n";
   for (auto entry : extendedNominals) {
@@ -373,7 +373,7 @@ static bool emitReferenceDependencies(DiagnosticEngine &diags,
         continue;
       }
       out << "- [\"" << mangledName << "\", \""
-          << escape(VD->getName()) << "\"]\n";
+          << escape(VD->getBaseName()) << "\"]\n";
     }
   }
 
@@ -385,13 +385,13 @@ static bool emitReferenceDependencies(DiagnosticEngine &diags,
     class ValueDeclPrinter : public VisibleDeclConsumer {
     private:
       raw_ostream &out;
-      std::string (*escape)(Identifier);
+      std::string (*escape)(DeclName);
     public:
       ValueDeclPrinter(raw_ostream &out, decltype(escape) escape)
         : out(out), escape(escape) {}
 
       void foundDecl(ValueDecl *VD, DeclVisibilityKind Reason) override {
-        out << "- \"" << escape(VD->getName()) << "\"\n";
+        out << "- \"" << escape(VD->getBaseName()) << "\"\n";
       }
     };
     ValueDeclPrinter printer(out, escape);
@@ -403,7 +403,7 @@ static bool emitReferenceDependencies(DiagnosticEngine &diags,
   // FIXME: Sort these?
   out << "depends-top-level:\n";
   for (auto &entry : tracker->getTopLevelNames()) {
-    assert(!entry.first.empty());
+    assert(entry.first);
     out << "- ";
     if (!entry.second)
       out << "!private ";
@@ -422,8 +422,9 @@ static bool emitReferenceDependencies(DiagnosticEngine &diags,
     if (lhs->first.first == rhs->first.first)
       return lhs->first.second.compare(rhs->first.second);
 
-    if (lhs->first.first->getName() != rhs->first.first->getName())
-      return lhs->first.first->getName().compare(rhs->first.first->getName());
+    if (lhs->first.first->getBaseName() != rhs->first.first->getBaseName())
+      return lhs->first.first->getBaseName().compare(
+               rhs->first.first->getBaseName());
 
     // Break type name ties by mangled name.
     auto lhsMangledName = mangleTypeAsContext(lhs->first.first);
@@ -443,7 +444,7 @@ static bool emitReferenceDependencies(DiagnosticEngine &diags,
     out << "[\"";
     out << mangleTypeAsContext(entry.first.first);
     out << "\", \"";
-    if (!entry.first.second.empty())
+    if (entry.first.second)
       out << escape(entry.first.second);
     out << "\"]\n";
   }
@@ -471,7 +472,7 @@ static bool emitReferenceDependencies(DiagnosticEngine &diags,
   // FIXME: Sort these?
   out << "depends-dynamic-lookup:\n";
   for (auto &entry : tracker->getDynamicLookupNames()) {
-    assert(!entry.first.empty());
+    assert(entry.first);
     out << "- ";
     if (!entry.second)
       out << "!private ";

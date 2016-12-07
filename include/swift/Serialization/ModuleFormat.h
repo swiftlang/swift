@@ -64,7 +64,7 @@ using TypeID = DeclID;
 using TypeIDField = DeclIDField;
 
 // IdentifierID must be the same as DeclID because it is stored in the same way.
-using IdentifierID = DeclID;
+using DeclNameID = DeclID;
 using IdentifierIDField = DeclIDField;
 
 // DeclContextID must be the same as DeclID because it is stored in the same way.
@@ -77,7 +77,7 @@ using NormalConformanceID = DeclID;
 using NormalConformanceIDField = DeclIDField;
 
 // ModuleID must be the same as IdentifierID because it is stored the same way.
-using ModuleID = IdentifierID;
+using ModuleID = DeclNameID;
 using ModuleIDField = IdentifierIDField;
 
 using BitOffset = PointerEmbeddedInt<unsigned, 31>;

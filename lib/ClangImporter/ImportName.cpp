@@ -1230,7 +1230,9 @@ ImportedName NameImporter::importNameImpl(const clang::NamedDecl *D,
       // Handle globals treated as members.
       if (parsedName.isMember()) {
         // FIXME: Make sure this thing is global.
-        result.effectiveContext = parsedName.ContextName;
+        DeclName contextName = DeclName(getContext()
+                                        .getIdentifier(parsedName.ContextName));
+        result.effectiveContext = contextName;
         if (parsedName.SelfIndex)
           result.info.selfIndex = parsedName.SelfIndex;
         result.info.importAsMember = true;

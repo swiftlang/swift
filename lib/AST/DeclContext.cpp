@@ -737,7 +737,7 @@ unsigned DeclContext::printContext(raw_ostream &OS, unsigned indent) const {
 
   switch (getContextKind()) {
   case DeclContextKind::Module:
-    OS << " name=" << cast<Module>(this)->getName();
+    OS << " name=" << cast<Module>(this)->getIdentifier();
     break;
   case DeclContextKind::FileUnit:
     switch (cast<FileUnit>(this)->getKind()) {
@@ -761,7 +761,7 @@ unsigned DeclContext::printContext(raw_ostream &OS, unsigned indent) const {
     OS << " : " << cast<AbstractClosureExpr>(this)->getType();
     break;
   case DeclContextKind::GenericTypeDecl:
-    OS << " name=" << cast<GenericTypeDecl>(this)->getName();
+    OS << " name=" << cast<GenericTypeDecl>(this)->getBaseName();
     break;
   case DeclContextKind::ExtensionDecl:
     OS << " line=" << getLineNumber(cast<ExtensionDecl>(this));
@@ -772,7 +772,7 @@ unsigned DeclContext::printContext(raw_ostream &OS, unsigned indent) const {
     break;
   case DeclContextKind::AbstractFunctionDecl: {
     auto *AFD = cast<AbstractFunctionDecl>(this);
-    OS << " name=" << AFD->getName();
+    OS << " name=" << AFD->getBaseName();
     if (AFD->hasInterfaceType())
       OS << " : " << AFD->getInterfaceType();
     else
@@ -781,7 +781,7 @@ unsigned DeclContext::printContext(raw_ostream &OS, unsigned indent) const {
   }
   case DeclContextKind::SubscriptDecl: {
     auto *SD = cast<SubscriptDecl>(this);
-    OS << " name=" << SD->getName();
+    OS << " name=" << SD->getBaseName();
     if (SD->hasInterfaceType())
       OS << " : " << SD->getInterfaceType();
     else

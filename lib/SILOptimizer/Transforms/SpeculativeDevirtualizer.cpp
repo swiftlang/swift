@@ -356,7 +356,7 @@ static bool tryToSpeculateTarget(FullApplySite AI,
     }
 
     DEBUG(llvm::dbgs() << "Inserting monomorphic speculative call for class " <<
-          CD->getName() << "\n");
+          CD->getBaseName() << "\n");
     return !!speculateMonomorphicTarget(AI, SubType, LastCCBI);
   }
 
@@ -399,7 +399,7 @@ static bool tryToSpeculateTarget(FullApplySite AI,
   // Number of subclasses which cannot be handled by checked_cast_br checks.
   int NotHandledSubsNum = 0;
   if (Subs.size() > MaxNumSpeculativeTargets) {
-    DEBUG(llvm::dbgs() << "Class " << CD->getName() << " has too many ("
+    DEBUG(llvm::dbgs() << "Class " << CD->getBaseName() << " has too many ("
                        << Subs.size() << ") subclasses. Performing speculative "
                          "devirtualization only for the first "
                        << MaxNumSpeculativeTargets << " of them.\n");
@@ -408,7 +408,7 @@ static bool tryToSpeculateTarget(FullApplySite AI,
     Subs.erase(&Subs[MaxNumSpeculativeTargets], Subs.end());
   }
 
-  DEBUG(llvm::dbgs() << "Class " << CD->getName() << " is a superclass. "
+  DEBUG(llvm::dbgs() << "Class " << CD->getBaseName() << " is a superclass. "
         "Inserting polymorphic speculative call.\n");
 
   // Try to devirtualize the static class of instance
@@ -467,7 +467,7 @@ static bool tryToSpeculateTarget(FullApplySite AI,
 
   for (auto S : Subs) {
     DEBUG(llvm::dbgs() << "Inserting a speculative call for class "
-          << CD->getName() << " and subclass " << S->getName() << "\n");
+          << CD->getBaseName() << " and subclass " << S->getBaseName() << "\n");
 
     CanType CanClassType = S->getDeclaredType()->getCanonicalType();
     SILType ClassType = SILType::getPrimitiveObjectType(CanClassType);
