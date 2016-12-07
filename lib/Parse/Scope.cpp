@@ -32,6 +32,7 @@ static bool isResolvableScope(ScopeKind SK) {
   case ScopeKind::ClassBody:
   case ScopeKind::ProtocolBody:
   case ScopeKind::TopLevel:
+  case ScopeKind::InheritanceClause:
     return false;
   case ScopeKind::FunctionBody:
   case ScopeKind::Generics:

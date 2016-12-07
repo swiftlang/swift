@@ -2410,6 +2410,7 @@ ParserResult<ImportDecl> Parser::parseDeclImport(ParseDeclOptions Flags,
 /// \endverbatim
 ParserStatus Parser::parseInheritance(SmallVectorImpl<TypeLoc> &Inherited,
                                       SourceLoc *classRequirementLoc) {
+  Scope S(this, ScopeKind::InheritanceClause);
   consumeToken(tok::colon);
 
   // Clear out the class requirement location.
