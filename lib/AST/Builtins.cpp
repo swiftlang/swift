@@ -183,7 +183,7 @@ getBuiltinGenericFunction(Identifier Id,
                           Type ResType,
                           Type ResBodyType,
                           GenericParamList *GenericParams,
-                          TypeSubstitutionMap InterfaceToArchetypeMap) {
+                          GenericEnvironment *Env) {
   assert(GenericParams && "Missing generic parameters");
   auto &Context = ResType->getASTContext();
 
@@ -195,10 +195,7 @@ getBuiltinGenericFunction(Identifier Id,
     GenericParamTypes.push_back(gp->getDeclaredInterfaceType()
                                   ->castTo<GenericTypeParamType>());
   }
-  GenericSignature *Sig =
-    GenericSignature::get(GenericParamTypes, { });
-  GenericEnvironment *Env =
-    GenericEnvironment::get(Sig, InterfaceToArchetypeMap);
+  GenericSignature *Sig = Env->getGenericSignature();
 
   Type InterfaceType = GenericFunctionType::get(Sig, ArgParamType, ResType,
                                                 AnyFunctionType::ExtInfo());
@@ -421,32 +418,26 @@ static const char * const GenericParamNames[] = {
   "Z"
 };
 
-static std::pair<ArchetypeType*, GenericTypeParamDecl*>
+static GenericTypeParamDecl*
 createGenericParam(ASTContext &ctx, const char *name, unsigned index) {
   Module *M = ctx.TheBuiltinModule;
   Identifier ident = ctx.getIdentifier(name);
   SmallVector<ProtocolDecl *, 1> protos;
-  ArchetypeType *archetype = ArchetypeType::getNew(ctx, nullptr, ident, protos,
-                                                   Type());
   auto genericParam =
     new (ctx) GenericTypeParamDecl(&M->getMainFile(FileUnitKind::Builtin),
                                    ident, SourceLoc(), 0, index);
-  return std::make_pair(archetype, genericParam);
+  return genericParam;
 }
 
 /// Create a generic parameter list with multiple generic parameters.
 static GenericParamList *getGenericParams(ASTContext &ctx,
                                           unsigned numParameters,
-                       SmallVectorImpl<ArchetypeType*> &archetypes,
                        SmallVectorImpl<GenericTypeParamDecl*> &genericParams) {
   assert(numParameters <= llvm::array_lengthof(GenericParamNames));
   assert(genericParams.empty());
 
-  for (unsigned i = 0; i != numParameters; ++i) {
-    auto archetypeAndParam = createGenericParam(ctx, GenericParamNames[i], i);
-    archetypes.push_back(archetypeAndParam.first);
-    genericParams.push_back(archetypeAndParam.second);
-  }
+  for (unsigned i = 0; i != numParameters; ++i)
+    genericParams.push_back(createGenericParam(ctx, GenericParamNames[i], i));
 
   auto paramList = GenericParamList::create(ctx, SourceLoc(), genericParams,
                                             SourceLoc());
@@ -460,11 +451,9 @@ namespace {
 
   private:
     GenericParamList *TheGenericParamList;
-
     SmallVector<GenericTypeParamDecl*, 2> GenericTypeParams;
-    SmallVector<ArchetypeType*, 2> Archetypes;
 
-    TypeSubstitutionMap InterfaceToArchetypeMap;
+    GenericEnvironment *GenericEnv = nullptr;
 
     SmallVector<TupleTypeElt, 4> InterfaceParams;
     SmallVector<Type, 4> BodyParams;
@@ -476,13 +465,15 @@ namespace {
     GenericSignatureBuilder(ASTContext &ctx, unsigned numGenericParams = 1)
         : Context(ctx) {
       TheGenericParamList = getGenericParams(ctx, numGenericParams,
-                                             Archetypes, GenericTypeParams);
+                                             GenericTypeParams);
 
-      for (unsigned i = 0, e = GenericTypeParams.size(); i < e; i++) {
-        auto paramTy = GenericTypeParams[i]->getDeclaredInterfaceType()
-          ->getCanonicalType()->castTo<GenericTypeParamType>();
-        InterfaceToArchetypeMap[paramTy] = Archetypes[i];
-      }
+      ArchetypeBuilder Builder(*ctx.TheBuiltinModule);
+      for (auto gp : GenericTypeParams)
+        Builder.addGenericParameter(gp);
+
+      Builder.finalize(SourceLoc());
+      auto sig = Builder.getGenericSignature();
+      GenericEnv = Builder.getGenericEnvironment(sig);
     }
 
     template <class G>
@@ -501,7 +492,7 @@ namespace {
       return getBuiltinGenericFunction(name, InterfaceParams, BodyParams,
                                        InterfaceResult, BodyResult,
                                        TheGenericParamList,
-                                       InterfaceToArchetypeMap);
+                                       GenericEnv);
     }
 
     // Don't use these generator classes directly; call the make{...}
@@ -516,9 +507,14 @@ namespace {
     struct ParameterGenerator {
       unsigned Index;
       Type build(GenericSignatureBuilder &builder, bool forBody) const {
-        return (forBody ? builder.Archetypes[Index]
-                        : builder.GenericTypeParams[Index]
-                            ->getDeclaredInterfaceType());
+        auto gpType =
+          builder.GenericTypeParams[Index]->getDeclaredInterfaceType();
+        if (forBody) {
+          return builder.GenericEnv->mapTypeIntoContext(
+                                        gpType->castTo<GenericTypeParamType>());
+        }
+
+        return gpType;
       }
     };
     struct LambdaGenerator {
