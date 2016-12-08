@@ -40,6 +40,26 @@ GenericEnvironment::GenericEnvironment(
     addMapping(entry.first->castTo<GenericTypeParamType>(), entry.second);
 }
 
+void GenericEnvironment::setOwningDeclContext(DeclContext *newNowningDC) {
+  if (!OwningDC) {
+    OwningDC = newNowningDC;
+    return;
+  }
+
+  if (!newNowningDC || OwningDC == newNowningDC)
+    return;
+
+  // If we have found a outer context sharing the same generic environment,
+  // use that.
+  if (OwningDC->isChildContextOf(newNowningDC)) {
+    OwningDC = newNowningDC;
+    return;
+  }
+
+  // Otherwise, we have an inner context sharing the envirtonment.
+  assert(newNowningDC->isChildContextOf(OwningDC) && "Not an inner context");
+}
+
 void GenericEnvironment::addMapping(GenericParamKey key,
                                     Type contextType) {
   // Find the index into the parallel arrays of generic parameters and

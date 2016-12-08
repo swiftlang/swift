@@ -790,23 +790,6 @@ static void revertDependentTypeLoc(TypeLoc &tl) {
   tl.setType(Type(), /*validated=*/false);
 }
 
-/// Store a mapping from archetypes to DeclContexts for debugging.
-void
-TypeChecker::recordArchetypeContexts(GenericEnvironment *genericEnv,
-                                     DeclContext *dc) {
-#ifndef NDEBUG
-  // Record archetype contexts.
-  auto genericSig = genericEnv->getGenericSignature();
-  for (auto *paramTy : genericSig->getGenericParams()) {
-    auto contextTy = genericEnv->mapTypeIntoContext(
-        paramTy->castTo<GenericTypeParamType>());
-    if (auto *archetype = contextTy->getAs<ArchetypeType>())
-      if (Context.ArchetypeContexts.count(archetype) == 0)
-        Context.ArchetypeContexts[archetype] = dc;
-  }
-#endif
-}
-
 /// Revert the dependent types within the given generic parameter list.
 void TypeChecker::revertGenericParamList(GenericParamList *genericParams) {
   // Revert the inherited clause of the generic parameter list.
@@ -858,7 +841,6 @@ void TypeChecker::validateGenericTypeSignature(GenericTypeDecl *typeDecl) {
   auto *env = checkGenericEnvironment(gp, dc, dc->getGenericSignatureOfContext(),
                                       /*allowConcreteGenericParams=*/false);
   typeDecl->setGenericEnvironment(env);
-  recordArchetypeContexts(env, typeDecl);
 }
 
 void TypeChecker::revertGenericFuncSignature(AbstractFunctionDecl *func) {

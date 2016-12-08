@@ -451,11 +451,12 @@ struct ASTNodeBase {};
             Out << "AST verification error: archetype "
                 << archetype->getString() << " not allowed in this context\n";
 
-            auto knownDC = Ctx.ArchetypeContexts.find(parent);
-            if (knownDC != Ctx.ArchetypeContexts.end()) {
-              llvm::errs() << "archetype came from:\n";
-              knownDC->second->dumpContext();
-              llvm::errs() << "\n";
+            if (auto env = parent->getGenericEnvironment()) {
+              if (auto owningDC = env->getOwningDeclContext()) {
+                llvm::errs() << "archetype came from:\n";
+                owningDC->dumpContext();
+                llvm::errs() << "\n";
+              }
             }
 
             return true;

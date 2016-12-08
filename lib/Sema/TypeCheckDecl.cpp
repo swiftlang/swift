@@ -728,7 +728,6 @@ TypeChecker::handleSILGenericParams(GenericParamList *genericParams,
     parentEnv = checkGenericEnvironment(genericParams, DC, parentSig,
                                         /*allowConcreteGenericParams=*/true);
     parentSig = parentEnv->getGenericSignature();
-    recordArchetypeContexts(parentEnv, DC);
 
     // Compute the final set of archetypes.
     revertGenericParamList(genericParams);
@@ -4782,8 +4781,6 @@ public:
       // Assign archetypes.
       auto *env = builder.getGenericEnvironment(sig);
       FD->setGenericEnvironment(env);
-
-      TC.recordArchetypeContexts(env, FD);
     } else if (FD->getDeclContext()->getGenericSignatureOfContext()) {
       (void)TC.validateGenericFuncSignature(FD);
       if (FD->getGenericEnvironment() == nullptr) {
@@ -6409,8 +6406,6 @@ public:
       // Assign archetypes.
       auto *env = builder.getGenericEnvironment(sig);
       CD->setGenericEnvironment(env);
-
-      TC.recordArchetypeContexts(env, CD);
     } else if (CD->getDeclContext()->getGenericSignatureOfContext()) {
       (void)TC.validateGenericFuncSignature(CD);
 
@@ -7409,7 +7404,6 @@ checkExtensionGenericParams(TypeChecker &tc, ExtensionDecl *ext, Type type,
                                          ext->getDeclContext(), nullptr,
                                          /*allowConcreteGenericParams=*/true,
                                          inferExtendedTypeReqs);
-  tc.recordArchetypeContexts(env, ext);
 
   // Validate the generic parameters for the last time, to splat down
   // actual archetypes.
