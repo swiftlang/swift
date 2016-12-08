@@ -49,7 +49,7 @@ void GenericEnvironment::setOwningDeclContext(DeclContext *newNowningDC) {
   if (!newNowningDC || OwningDC == newNowningDC)
     return;
 
-  // If we have found a outer context sharing the same generic environment,
+  // If we have found an outer context sharing the same generic environment,
   // use that.
   if (OwningDC->isChildContextOf(newNowningDC)) {
     OwningDC = newNowningDC;
