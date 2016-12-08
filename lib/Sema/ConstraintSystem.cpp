@@ -1054,7 +1054,7 @@ ConstraintSystem::getTypeOfMemberReference(
 
     // Refer to a member of the archetype directly.
     if (auto archetype = baseObjTy->getAs<ArchetypeType>()) {
-      Type memberTy = archetype->getNestedTypeValue(value->getName());
+      Type memberTy = archetype->getNestedType(value->getName());
       if (!isTypeReference)
         memberTy = MetatypeType::get(memberTy);
 
@@ -1513,7 +1513,7 @@ Type ConstraintSystem::simplifyType(Type type) {
 
     // If this is a dependent member type for which we end up simplifying
     // the base to a non-type-variable, perform lookup.
-    if (auto depMemTy = type->getAs<DependentMemberType>()) {
+    if (auto depMemTy = dyn_cast<DependentMemberType>(type.getPointer())) {
       // Simplify the base.
       Type newBase = simplifyType(depMemTy->getBase());
       if (!newBase) return type;
@@ -1586,7 +1586,7 @@ Type Solution::simplifyType(TypeChecker &tc, Type type) const {
 
     // If this is a dependent member type for which we end up simplifying
     // the base to a non-type-variable, perform lookup.
-    if (auto depMemTy = type->getAs<DependentMemberType>()) {
+    if (auto depMemTy = dyn_cast<DependentMemberType>(type.getPointer())) {
       // Simplify the base.
       Type newBase = simplifyType(tc, depMemTy->getBase());
       if (!newBase) return type;

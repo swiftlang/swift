@@ -63,8 +63,8 @@ void *TypeBase::operator new(size_t bytes, const ASTContext &ctx,
 }
 
 bool CanType::isActuallyCanonicalOrNull() const {
-  return getPointer() == 0 || 
-         getPointer() == llvm::DenseMapInfo<TypeBase*>::getTombstoneKey() ||
+  return getPointer() == nullptr ||
+         getPointer() == llvm::DenseMapInfo<TypeBase *>::getTombstoneKey() ||
          getPointer()->isCanonical();
 }
 
@@ -531,12 +531,6 @@ public:
   
   Type visitParenType(ParenType *pt) {
     return ParenType::get(pt->getASTContext(), visit(pt->getUnderlyingType()));
-  }
-
-  Type visitSubstitutedType(SubstitutedType *st) {
-    return SubstitutedType::get(st->getOriginal(),
-                                visit(st->getReplacementType()),
-                                st->getASTContext());
   }
 
   Type visitType(TypeBase *t) {
@@ -1056,7 +1050,7 @@ void ProtocolType::canonicalizeProtocols(
     }
     
     // We have seen this protocol before; zap this occurrence.
-    protocols[I] = 0;
+    protocols[I] = nullptr;
     zappedAny = true;
   }
   
@@ -1093,7 +1087,7 @@ CanType TypeBase::getCanonicalType() {
     return CanType(CT);
 
   // Otherwise, compute and cache it.
-  TypeBase *Result = 0;
+  TypeBase *Result = nullptr;
   switch (getKind()) {
 #define ALWAYS_CANONICAL_TYPE(id, parent) case TypeKind::id:
 #define TYPE(id, parent)
@@ -1373,10 +1367,6 @@ Type DictionaryType::getImplementationType() {
   return ImplOrContext.get<Type>();
 }
 
-TypeBase *SubstitutedType::getSinglyDesugaredType() {
-  return getReplacementType().getPointer();
-}
-
 unsigned GenericTypeParamType::getDepth() const {
   if (auto param = getDecl()) {
     return param->getDepth();
@@ -1452,7 +1442,6 @@ bool TypeBase::isSpelledLike(Type other) {
   case TypeKind::Struct:
   case TypeKind::Class:
   case TypeKind::NameAlias:
-  case TypeKind::Substituted:
   case TypeKind::GenericTypeParam:
   case TypeKind::DependentMember:
   case TypeKind::DynamicSelf:
@@ -2567,19 +2556,18 @@ bool ArchetypeType::requiresClass() const {
 namespace {
   /// \brief Function object that orders archetypes by name.
   struct OrderArchetypeByName {
-    using NestedType = ArchetypeType::NestedType;
-    bool operator()(std::pair<Identifier, NestedType> X,
-                    std::pair<Identifier, NestedType> Y) const {
+    bool operator()(std::pair<Identifier, Type> X,
+                    std::pair<Identifier, Type> Y) const {
       return X.first.str() < Y.first.str();
     }
 
-    bool operator()(std::pair<Identifier, NestedType> X,
+    bool operator()(std::pair<Identifier, Type> X,
                     Identifier Y) const {
       return X.first.str() < Y.str();
     }
 
     bool operator()(Identifier X,
-                    std::pair<Identifier, NestedType> Y) const {
+                    std::pair<Identifier, Type> Y) const {
       return X.str() < Y.first.str();
     }
 
@@ -2587,20 +2575,20 @@ namespace {
       return X.str() < Y.str();
     }
   };
-}
+} // end anonymous namespace
 
 void ArchetypeType::populateNestedTypes() const {
   if (ArchetypeTypeBits.ExpandedNestedTypes) return;
 
   // Collect the set of nested types of this archetype.
-  SmallVector<std::pair<Identifier, NestedType>, 4> nestedTypes;
+  SmallVector<std::pair<Identifier, Type>, 4> nestedTypes;
   llvm::SmallPtrSet<Identifier, 4> knownNestedTypes;
   ProtocolType::visitAllProtocols(getConformsTo(),
                                   [&](ProtocolDecl *proto) -> bool {
     for (auto member : proto->getMembers()) {
       if (auto assocType = dyn_cast<AssociatedTypeDecl>(member)) {
         if (knownNestedTypes.insert(assocType->getName()).second)
-          nestedTypes.push_back({ assocType->getName(), NestedType() });
+          nestedTypes.push_back({ assocType->getName(), Type() });
       }
     }
 
@@ -2612,15 +2600,13 @@ void ArchetypeType::populateNestedTypes() const {
   mutableThis->setNestedTypes(mutableThis->getASTContext(), nestedTypes);
 }
 
-ArchetypeType::NestedType ArchetypeType::getNestedType(Identifier Name) const {
+Type ArchetypeType::getNestedType(Identifier Name) const {
   populateNestedTypes();
 
   auto Pos = std::lower_bound(NestedTypes.begin(), NestedTypes.end(), Name,
                               OrderArchetypeByName());
   if (Pos == NestedTypes.end() || Pos->first != Name) {
-    return NestedType::forConcreteType(
-             ErrorType::get(
-               const_cast<ArchetypeType *>(this)->getASTContext()));
+    return ErrorType::get(const_cast<ArchetypeType *>(this)->getASTContext());
   }
 
   // If the type is null, lazily resolve it. 
@@ -2631,8 +2617,7 @@ ArchetypeType::NestedType ArchetypeType::getNestedType(Identifier Name) const {
   return Pos->second;
 }
 
-Optional<ArchetypeType::NestedType> ArchetypeType::getNestedTypeIfKnown(
-                                                        Identifier Name) const {
+Optional<Type> ArchetypeType::getNestedTypeIfKnown(Identifier Name) const {
   populateNestedTypes();
 
   auto Pos = std::lower_bound(NestedTypes.begin(), NestedTypes.end(), Name,
@@ -2651,7 +2636,7 @@ bool ArchetypeType::hasNestedType(Identifier Name) const {
   return Pos != NestedTypes.end() && Pos->first == Name;
 }
 
-ArrayRef<std::pair<Identifier, ArchetypeType::NestedType>>
+ArrayRef<std::pair<Identifier, Type>>
 ArchetypeType::getAllNestedTypes(bool resolveTypes) const {
   populateNestedTypes();
 
@@ -2666,15 +2651,15 @@ ArchetypeType::getAllNestedTypes(bool resolveTypes) const {
 }
 
 void ArchetypeType::setNestedTypes(
-       ASTContext &Ctx,
-       ArrayRef<std::pair<Identifier, NestedType>> Nested) {
+                                 ASTContext &Ctx,
+                                 ArrayRef<std::pair<Identifier, Type>> Nested) {
   assert(!ArchetypeTypeBits.ExpandedNestedTypes && "Already expanded");
   NestedTypes = Ctx.AllocateCopy(Nested);
   std::sort(NestedTypes.begin(), NestedTypes.end(), OrderArchetypeByName());
   ArchetypeTypeBits.ExpandedNestedTypes = true;
 }
 
-void ArchetypeType::registerNestedType(Identifier name, NestedType nested) {
+void ArchetypeType::registerNestedType(Identifier name, Type nested) {
   populateNestedTypes();
 
   auto found = std::lower_bound(NestedTypes.begin(), NestedTypes.end(), name,
@@ -2682,9 +2667,8 @@ void ArchetypeType::registerNestedType(Identifier name, NestedType nested) {
   assert(found != NestedTypes.end() && found->first == name &&
          "Unable to find nested type?");
   assert(!found->second ||
-         found->second.getValue()->isEqual(nested.getValue()) ||
-         (found->second.getValue()->hasError() &&
-          nested.getValue()->hasError()));
+         found->second->isEqual(nested) ||
+         (found->second->hasError() && nested->hasError()));
   found->second = nested;
 }
 
@@ -2831,7 +2815,7 @@ static Type getMemberForBaseType(ConformanceSource conformances,
   // given name.
   if (auto archetypeParent = substBase->getAs<ArchetypeType>()) {
     if (archetypeParent->hasNestedType(name))
-      return archetypeParent->getNestedTypeValue(name);
+      return archetypeParent->getNestedType(name);
 
     // If looking for an associated type and the archetype is constrained to a
     // class, continue to the default associated type lookup
@@ -2951,7 +2935,7 @@ static Type substType(
 
     // If we have a substitution for this type, use it.
     if (auto known = substitutions(substOrig))
-      return SubstitutedType::get(type, known, type->getASTContext());
+      return known;
 
     // For archetypes, we can substitute the parent (if present).
     auto archetype = substOrig->getAs<ArchetypeType>();
@@ -3025,6 +3009,10 @@ TypeSubstitutionMap TypeBase::getMemberSubstitutions(const DeclContext *dc) {
   // The resulting set of substitutions. Always use this to ensure we
   // don't miss out on NRVO anywhere.
   TypeSubstitutionMap substitutions;
+
+  // Look through non-type contexts.
+  while (!dc->isTypeContext())
+    dc = dc->getParent();
 
   // If the member is part of a protocol or extension thereof, we need
   // to substitute in the type of Self.
@@ -3429,7 +3417,7 @@ case TypeKind::Id:
           alias->getDecl()->getUnderlyingType().getPointer())
       return *this;
 
-    return SubstitutedType::get(*this, underlyingTy, Ptr->getASTContext());
+    return underlyingTy;
   }
 
   case TypeKind::Paren: {
@@ -3494,19 +3482,6 @@ case TypeKind::Id:
       return DependentMemberType::get(dependentBase, assocType);
 
     return DependentMemberType::get(dependentBase, dependent->getName());
-  }
-
-  case TypeKind::Substituted: {
-    auto substAT = cast<SubstitutedType>(base);
-    auto substTy = substAT->getReplacementType().transform(fn);
-    if (!substTy)
-      return Type();
-
-    if (substTy.getPointer() == substAT->getReplacementType().getPointer())
-      return *this;
-
-    return SubstitutedType::get(substAT->getOriginal(), substTy,
-                                Ptr->getASTContext());
   }
 
   case TypeKind::Function: {

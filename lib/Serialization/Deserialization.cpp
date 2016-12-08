@@ -3647,24 +3647,6 @@ Type ModuleFile::getType(TypeID TID) {
     decls_block::ArchetypeNestedTypeNamesLayout::readRecord(scratch,
                                                             rawNameIDs);
     
-    // Read whether the associated types are dependent archetypes.
-    entry = DeclTypeCursor.advance();
-    if (entry.Kind != llvm::BitstreamEntry::Record) {
-      error();
-      break;
-    }
-    
-    SmallVector<uint64_t, 16> scratch2;
-    kind = DeclTypeCursor.readRecord(entry.ID, scratch2);
-    if (kind != decls_block::ARCHETYPE_NESTED_TYPES_ARE_ARCHETYPES) {
-      error();
-      break;
-    }
-    
-    ArrayRef<uint64_t> areArchetypes;
-    decls_block::ArchetypeNestedTypesAreArchetypesLayout
-      ::readRecord(scratch2, areArchetypes);
-    
     // Read the associated type ids.
     entry = DeclTypeCursor.advance();
     if (entry.Kind != llvm::BitstreamEntry::Record) {
@@ -3672,26 +3654,22 @@ Type ModuleFile::getType(TypeID TID) {
       break;
     }
 
-    SmallVector<uint64_t, 16> scratch3;
-    kind = DeclTypeCursor.readRecord(entry.ID, scratch3);
+    SmallVector<uint64_t, 16> scratch2;
+    kind = DeclTypeCursor.readRecord(entry.ID, scratch2);
     if (kind != decls_block::ARCHETYPE_NESTED_TYPES) {
       error();
       break;
     }
 
     ArrayRef<uint64_t> rawTypeIDs;
-    decls_block::ArchetypeNestedTypesLayout::readRecord(scratch3, rawTypeIDs);
+    decls_block::ArchetypeNestedTypesLayout::readRecord(scratch2, rawTypeIDs);
     
     // Build the nested types array.
-    SmallVector<std::pair<Identifier, ArchetypeType::NestedType>, 4>
-      nestedTypes;
-    for_each3(rawNameIDs, areArchetypes, rawTypeIDs,
-              [&](IdentifierID nameID, bool isArchetype, TypeID nestedID) {
+    SmallVector<std::pair<Identifier, Type>, 4> nestedTypes;
+    for_each(rawNameIDs, rawTypeIDs,
+             [&](IdentifierID nameID, TypeID nestedID) {
       Type type = getType(nestedID);
-      auto nestedTy = (isArchetype
-          ? ArchetypeType::NestedType::forArchetype(type->castTo<ArchetypeType>())
-          : ArchetypeType::NestedType::forConcreteType(type));
-      nestedTypes.push_back(std::make_pair(getIdentifier(nameID), nestedTy));
+      nestedTypes.push_back(std::make_pair(getIdentifier(nameID), type));
     });
     archetype->setNestedTypes(ctx, nestedTypes);
 
@@ -3746,17 +3724,6 @@ Type ModuleFile::getType(TypeID TID) {
       protocols.push_back(getType(protoID));
 
     typeOrOffset = ProtocolCompositionType::get(ctx, protocols);
-    break;
-  }
-
-  case decls_block::SUBSTITUTED_TYPE: {
-    TypeID originalID, replacementID;
-
-    decls_block::SubstitutedTypeLayout::readRecord(scratch, originalID,
-                                                   replacementID);
-    typeOrOffset = SubstitutedType::get(getType(originalID),
-                                        getType(replacementID),
-                                        ctx);
     break;
   }
 
@@ -4153,7 +4120,7 @@ void ModuleFile::finishNormalConformance(NormalProtocolConformance *conformance,
       // Create an archetype builder, which will help us create the
       // synthetic environment.
       ArchetypeBuilder builder(*getAssociatedModule());
-      builder.addGenericSignature(syntheticSig, nullptr);
+      builder.addGenericSignature(syntheticSig);
       builder.finalize(SourceLoc());
       syntheticEnv = builder.getGenericEnvironment(syntheticSig);
     }

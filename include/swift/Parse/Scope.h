@@ -69,6 +69,7 @@ enum class ScopeKind {
   ProtocolBody,
   ConstructorBody,
   DestructorBody,
+  InheritanceClause,
 
   Brace,
   TopLevel,

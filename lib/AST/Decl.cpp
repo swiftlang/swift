@@ -1999,6 +1999,22 @@ enum class DeclTypeKind : unsigned {
 static Type computeNominalType(NominalTypeDecl *decl, DeclTypeKind kind) {
   ASTContext &ctx = decl->getASTContext();
 
+  // Handle the declared type in context.
+  if (kind == DeclTypeKind::DeclaredTypeInContext) {
+    auto interfaceType =
+      computeNominalType(decl, DeclTypeKind::DeclaredInterfaceType);
+
+    if (!decl->isGenericContext())
+      return interfaceType;
+
+    auto *genericEnv = decl->getGenericEnvironmentOfContext();
+    if (genericEnv == nullptr)
+      return ErrorType::get(ctx);
+
+    return genericEnv->mapTypeIntoContext(decl->getModuleContext(),
+                                          interfaceType)->getCanonicalType();
+  }
+
   // Get the parent type.
   Type Ty;
   DeclContext *dc = decl->getDeclContext();
@@ -2008,8 +2024,7 @@ static Type computeNominalType(NominalTypeDecl *decl, DeclTypeKind kind) {
       Ty = dc->getDeclaredTypeOfContext();
       break;
     case DeclTypeKind::DeclaredTypeInContext:
-      Ty = dc->getDeclaredTypeInContext();
-      break;
+      llvm_unreachable("Handled above");
     case DeclTypeKind::DeclaredInterfaceType:
       Ty = dc->getDeclaredInterfaceType();
       break;
@@ -2024,18 +2039,8 @@ static Type computeNominalType(NominalTypeDecl *decl, DeclTypeKind kind) {
     switch (kind) {
     case DeclTypeKind::DeclaredType:
       return UnboundGenericType::get(decl, Ty, ctx);
-    case DeclTypeKind::DeclaredTypeInContext: {
-      auto *genericEnv = decl->getGenericEnvironment();
-      auto *genericSig = decl->getGenericSignature();
-      if (genericEnv == nullptr)
-        return ErrorType::get(ctx);
-
-      SmallVector<Type, 4> args;
-      for (auto param : genericSig->getInnermostGenericParams())
-        args.push_back(genericEnv->mapTypeIntoContext(param));
-
-      return BoundGenericType::get(decl, Ty, args);
-    }
+    case DeclTypeKind::DeclaredTypeInContext:
+      llvm_unreachable("Handled above");
     case DeclTypeKind::DeclaredInterfaceType: {
       // Note that here, we need to be able to produce a type
       // before the decl has been validated, so we rely on

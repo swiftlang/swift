@@ -865,14 +865,11 @@ ASTScope *ASTScope::createIfNeeded(const ASTScope *parent, Decl *decl) {
   if (decl->isImplicit()) return nullptr;
 
   // Accessors are always nested within their abstract storage declaration.
-  bool isAccessor = false;
   if (auto func = dyn_cast<FuncDecl>(decl)) {
-    if (func->isAccessor()) {
-      isAccessor = true;
-      if (!parentDirectDescendedFromAbstractStorageDecl(
-             parent, func->getAccessorStorageDecl()))
-        return nullptr;
-    }
+    if (func->isAccessor() &&
+        !parentDirectDescendedFromAbstractStorageDecl(
+            parent, func->getAccessorStorageDecl()))
+      return nullptr;
   }
 
   ASTContext &ctx = decl->getASTContext();

@@ -432,7 +432,7 @@ namespace {
       return;
     }
   }
-}
+} // end anonymous namespace
 
 bool ConformanceLookupTable::addProtocol(NominalTypeDecl *nominal,
                                          ProtocolDecl *protocol, SourceLoc loc,

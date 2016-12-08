@@ -151,7 +151,7 @@ namespace {
       }
     }
   };
-}
+} // end anonymous namespace
 
 static size_t deepHash(Node *node) {
   DeepHasher hasher;
@@ -302,7 +302,7 @@ namespace {
     void mangleDependentGenericParamIndex(Node *node);
     void mangleConstrainedType(Node *node);
   };
-}
+} // end anonymous namespace
 
 #define NODE(ID)
 #define CONTEXT_NODE(ID)                        \

@@ -1,4 +1,4 @@
-//===--- AssumeSingleThreaded.cpp - Assume single-threaded execution  ---===//
+//===--- AssumeSingleThreaded.cpp - Assume single-threaded execution  -----===//
 //
 // This source file is part of the Swift.org open source project
 //

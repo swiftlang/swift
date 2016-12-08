@@ -2997,20 +2997,14 @@ void Serializer::writeType(Type ty) {
 
     SmallVector<IdentifierID, 4> nestedTypeNames;
     SmallVector<TypeID, 4> nestedTypes;
-    SmallVector<bool, 4> areArchetypes;
     for (auto next : archetypeTy->getAllNestedTypes()) {
       nestedTypeNames.push_back(addIdentifierRef(next.first));
-      nestedTypes.push_back(addTypeRef(next.second.getValue()));
-      areArchetypes.push_back(!next.second.isConcreteType());
+      nestedTypes.push_back(addTypeRef(next.second));
     }
 
     abbrCode = DeclTypeAbbrCodes[ArchetypeNestedTypeNamesLayout::Code];
     ArchetypeNestedTypeNamesLayout::emitRecord(Out, ScratchRecord, abbrCode,
                                                nestedTypeNames);
-
-    abbrCode = DeclTypeAbbrCodes[ArchetypeNestedTypesAreArchetypesLayout::Code];
-    ArchetypeNestedTypesAreArchetypesLayout::emitRecord(Out, ScratchRecord,
-                                                        abbrCode, areArchetypes);
 
     abbrCode = DeclTypeAbbrCodes[ArchetypeNestedTypesLayout::Code];
     ArchetypeNestedTypesLayout::emitRecord(Out, ScratchRecord, abbrCode,
@@ -3033,16 +3027,6 @@ void Serializer::writeType(Type ty) {
     }
     GenericTypeParamTypeLayout::emitRecord(Out, ScratchRecord, abbrCode,
                                            declIDOrDepth, indexPlusOne);
-    break;
-  }
-
-  case TypeKind::Substituted: {
-    auto subTy = cast<SubstitutedType>(ty.getPointer());
-
-    unsigned abbrCode = DeclTypeAbbrCodes[SubstitutedTypeLayout::Code];
-    SubstitutedTypeLayout::emitRecord(Out, ScratchRecord, abbrCode,
-                                      addTypeRef(subTy->getOriginal()),
-                                      addTypeRef(subTy->getReplacementType()));
     break;
   }
 
@@ -3293,10 +3277,8 @@ void Serializer::writeAllDeclsAndTypes() {
   registerDeclTypeAbbr<InOutTypeLayout>();
   registerDeclTypeAbbr<ArchetypeTypeLayout>();
   registerDeclTypeAbbr<ArchetypeNestedTypeNamesLayout>();
-  registerDeclTypeAbbr<ArchetypeNestedTypesAreArchetypesLayout>();
   registerDeclTypeAbbr<ArchetypeNestedTypesLayout>();
   registerDeclTypeAbbr<ProtocolCompositionTypeLayout>();
-  registerDeclTypeAbbr<SubstitutedTypeLayout>();
   registerDeclTypeAbbr<BoundGenericTypeLayout>();
   registerDeclTypeAbbr<BoundGenericSubstitutionLayout>();
   registerDeclTypeAbbr<GenericFunctionTypeLayout>();

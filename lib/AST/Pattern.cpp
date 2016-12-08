@@ -135,7 +135,7 @@ namespace {
       return P;
     }
   };
-}
+} // end anonymous namespace
 
 
 /// \brief apply the specified function to all variables referenced in this

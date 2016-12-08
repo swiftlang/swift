@@ -162,7 +162,7 @@ ProtocolConformance::getTypeWitnessByName(Type type,
   // For an archetype, retrieve the nested type with the appropriate
   // name. There are no conformance tables.
   if (auto archetype = type->getAs<ArchetypeType>()) {
-    return archetype->getNestedTypeValue(name);
+    return archetype->getNestedType(name);
   }
 
   // Find the named requirement.

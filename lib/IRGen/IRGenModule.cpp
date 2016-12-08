@@ -119,25 +119,17 @@ static clang::CodeGenerator *createClangCodeGenerator(ASTContext &Context,
 
 IRGenModule::IRGenModule(IRGenerator &irgen,
                          std::unique_ptr<llvm::TargetMachine> &&target,
-                         SourceFile *SF,
-                         llvm::LLVMContext &LLVMContext,
-                         StringRef ModuleName,
-                         StringRef OutputFilename)
-  : IRGen(irgen),
-    Context(irgen.SIL.getASTContext()),
-    ClangCodeGen(createClangCodeGenerator(Context, LLVMContext,
-                                          irgen.Opts, ModuleName)),
-    Module(*ClangCodeGen->GetModule()),
-    LLVMContext(Module.getContext()),
-    DataLayout(target->createDataLayout()),
-    Triple(Context.LangOpts.Target),
-    TargetMachine(std::move(target)),
-    OutputFilename(OutputFilename),
-    TargetInfo(SwiftTargetInfo::get(*this)),
-    DebugInfo(0), ModuleHash(nullptr),
-    ObjCInterop(Context.LangOpts.EnableObjCInterop),
-    Types(*new TypeConverter(*this))
-{
+                         SourceFile *SF, llvm::LLVMContext &LLVMContext,
+                         StringRef ModuleName, StringRef OutputFilename)
+    : IRGen(irgen), Context(irgen.SIL.getASTContext()),
+      ClangCodeGen(createClangCodeGenerator(Context, LLVMContext, irgen.Opts,
+                                            ModuleName)),
+      Module(*ClangCodeGen->GetModule()), LLVMContext(Module.getContext()),
+      DataLayout(target->createDataLayout()), Triple(Context.LangOpts.Target),
+      TargetMachine(std::move(target)), OutputFilename(OutputFilename),
+      TargetInfo(SwiftTargetInfo::get(*this)), DebugInfo(nullptr),
+      ModuleHash(nullptr), ObjCInterop(Context.LangOpts.EnableObjCInterop),
+      Types(*new TypeConverter(*this)) {
   irgen.addGenModule(SF, this);
 
   auto &opts = irgen.Opts;
@@ -524,9 +516,9 @@ llvm::Constant *swift::getWrapperFn(llvm::Module &Module,
     auto fnTy = fun->getFunctionType();
     auto fnPtrTy = llvm::PointerType::getUnqual(fnTy);
 
-    auto *globalFnPtr =
-        new llvm::GlobalVariable(Module, fnPtrTy, false,
-                                 llvm::GlobalValue::ExternalLinkage, 0, symbol);
+    auto *globalFnPtr = new llvm::GlobalVariable(
+        Module, fnPtrTy, false, llvm::GlobalValue::ExternalLinkage, nullptr,
+        symbol);
     if (llvm::Triple(Module.getTargetTriple()).isOSBinFormatCOFF())
       globalFnPtr->setDLLStorageClass(llvm::GlobalValue::DLLImportStorageClass);
 

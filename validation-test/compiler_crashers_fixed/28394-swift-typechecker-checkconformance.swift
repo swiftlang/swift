@@ -5,13 +5,6 @@
 // See https://swift.org/LICENSE.txt for license information
 // See https://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
 
-// Credits: https://twitter.com/kiliankoe/status/752090953977036800
-
-// RUN: not --crash %target-swift-frontend %s -typecheck
-// XFAIL: *
-protocol P {
-}
-struct A<T> {
-    func a<B where T: P>() -> B {
-    }
-}
+// RUN: not %target-swift-frontend %s -typecheck
+// REQUIRES: asserts
+class d:a{let c=A}protocol a{struct A{}class S<T{}typealias e:a typealias d:a

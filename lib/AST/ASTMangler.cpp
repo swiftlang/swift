@@ -5,8 +5,8 @@
 // Copyright (c) 2014 - 2016 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
-// See http://swift.org/LICENSE.txt for license information
-// See http://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
+// See https://swift.org/LICENSE.txt for license information
+// See https://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
 //
 //===----------------------------------------------------------------------===//
 //
@@ -460,8 +460,6 @@ void ASTMangler::appendType(Type type) {
 
     case TypeKind::Paren:
       return appendSugaredType<ParenType>(type);
-    case TypeKind::Substituted:
-      return appendSugaredType<SubstitutedType>(type);
     case TypeKind::ArraySlice: /* fallthrough */
     case TypeKind::Optional:
       return appendSugaredType<SyntaxSugarType>(type);
@@ -922,7 +920,7 @@ namespace {
 #define PATTERN(ID, BASE)
 #include "swift/AST/PatternNodes.def"
   };
-}
+} // end anonymous namespace
 
 /// Find the first identifier bound by the given binding.  This
 /// assumes that field and global-variable bindings always bind at

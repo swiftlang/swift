@@ -5,6 +5,13 @@
 // See https://swift.org/LICENSE.txt for license information
 // See https://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
 
-// RUN: not --crash %target-swift-frontend %s -emit-ir
-// REQUIRES: asserts
-{protocol A{class B{}struct Q<f,g where B:T>:A
+// Credits: https://twitter.com/kiliankoe/status/752090953977036800
+
+// RUN: %target-swift-frontend %s -typecheck
+protocol P {
+}
+struct A<T> {
+    func a<B where T: P>(b: B) -> B {
+      return b
+    }
+}

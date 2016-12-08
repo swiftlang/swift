@@ -1028,8 +1028,7 @@ public:
   /// Revert the dependent types within the given generic parameter list.
   void revertGenericParamList(GenericParamList *genericParams);
 
-  /// Validate the given generic parameters to produce a generic
-  /// signature.
+  /// Construct a new generic environonment for the given declaration context.
   ///
   /// \param genericParams The generic parameters to validate.
   ///
@@ -1041,21 +1040,36 @@ public:
   ///
   /// \param inferRequirements When non-empty, callback that will be invoked
   /// to perform any additional requirement inference that contributes to the
-  /// generic signature.
+  /// generic environment..
   ///
-  /// \returns the generic signature that captures the generic
-  /// parameters and inferred requirements.
-  GenericSignature *validateGenericSignature(
-                      GenericParamList *genericParams,
-                      DeclContext *dc,
-                      GenericSignature *outerSignature,
-                      bool allowConcreteGenericParams,
-                      std::function<void(ArchetypeBuilder &)> inferRequirements);
+  /// \returns the resulting generic environment.
+  GenericEnvironment *checkGenericEnvironment(
+                        GenericParamList *genericParams,
+                        DeclContext *dc,
+                        GenericSignature *outerSignature,
+                        bool allowConcreteGenericParams,
+                        llvm::function_ref<void(ArchetypeBuilder &)>
+                          inferRequirements);
 
-  /// Store a mapping from archetypes to DeclContexts for debugging.
-  void recordArchetypeContexts(GenericSignature *genericSig,
-                               GenericEnvironment *genericEnv,
-                               DeclContext *dc);
+  /// Construct a new generic environonment for the given declaration context.
+  ///
+  /// \param genericParams The generic parameters to validate.
+  ///
+  /// \param dc The declaration context in which to perform the validation.
+  ///
+  /// \param outerSignature The generic signature of the outer
+  /// context, if not available as part of the \c dc argument (used
+  /// for SIL parsing).
+  /// \returns the resulting generic environment.
+  GenericEnvironment *checkGenericEnvironment(
+                        GenericParamList *genericParams,
+                        DeclContext *dc,
+                        GenericSignature *outerSignature,
+                        bool allowConcreteGenericParams) {
+    return checkGenericEnvironment(genericParams, dc, outerSignature,
+                                   allowConcreteGenericParams,
+                                   [&](ArchetypeBuilder &) { });
+  }
 
   /// Validate the signature of a generic type.
   ///
@@ -1067,7 +1081,6 @@ public:
   void checkGenericParamList(ArchetypeBuilder *builder,
                              GenericParamList *genericParams,
                              GenericSignature *parentSig,
-                             GenericEnvironment *parentEnv,
                              GenericTypeResolver *resolver);
 
   /// Check the given set of generic arguments against the requirements in a

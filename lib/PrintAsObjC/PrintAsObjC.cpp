@@ -1453,11 +1453,6 @@ private:
     visitPart(PT->getSinglyDesugaredType(), optionalKind);
   }
 
-  void visitSubstitutedType(SubstitutedType *ST, 
-                            Optional<OptionalTypeKind> optionalKind) {
-    visitPart(ST->getSinglyDesugaredType(), optionalKind);
-  }
-
   void visitSyntaxSugarType(SyntaxSugarType *SST, 
                             Optional<OptionalTypeKind> optionalKind) {
     visitPart(SST->getSinglyDesugaredType(), optionalKind);
@@ -1590,10 +1585,6 @@ class ReferencedTypeFinder : public TypeVisitor<ReferencedTypeFinder> {
   void visitDependentMemberType(DependentMemberType *member) {
     // Appears in protocols and in generic ObjC classes.
     return;
-  }
-
-  void visitSubstitutedType(SubstitutedType *sub) {
-    visit(sub->getSinglyDesugaredType());
   }
 
   void visitAnyFunctionType(AnyFunctionType *fnTy) {

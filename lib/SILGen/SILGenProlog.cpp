@@ -348,12 +348,24 @@ static void emitCaptureArguments(SILGenFunction &gen, CapturedValue capture,
   auto *VD = capture.getDecl();
   SILLocation Loc(VD);
   Loc.markAsPrologue();
+
+  // Local function to get the captured variable type within the capturing
+  // context.
+  auto getVarTypeInCaptureContext = [&]() -> Type {
+    auto interfaceType = cast<VarDecl>(VD)->getInterfaceType();
+    if (!interfaceType->hasTypeParameter()) return interfaceType;
+
+    auto genericEnv = gen.F.getGenericEnvironment();
+    return genericEnv->mapTypeIntoContext(gen.F.getModule().getSwiftModule(),
+                                          interfaceType);
+  };
+
   switch (gen.SGM.Types.getDeclCaptureKind(capture)) {
   case CaptureKind::None:
     break;
 
   case CaptureKind::Constant: {
-    auto type = cast<VarDecl>(VD)->getType();
+    auto type = getVarTypeInCaptureContext();
     auto &lowering = gen.getTypeLowering(type);
     // Constant decls are captured by value.
     SILType ty = lowering.getLoweredType();
@@ -385,7 +397,7 @@ static void emitCaptureArguments(SILGenFunction &gen, CapturedValue capture,
   case CaptureKind::Box: {
     // LValues are captured as a retained @box that owns
     // the captured value.
-    auto type = dyn_cast<VarDecl>(VD)->getType();
+    auto type = getVarTypeInCaptureContext();
     SILType ty = gen.getLoweredType(type).getAddressType();
     SILType boxTy = SILType::getPrimitiveObjectType(
       SILBoxType::get(ty.getSwiftRValueType()));
@@ -399,7 +411,7 @@ static void emitCaptureArguments(SILGenFunction &gen, CapturedValue capture,
   }
   case CaptureKind::StorageAddress: {
     // Non-escaping stored decls are captured as the address of the value.
-    auto type = dyn_cast<VarDecl>(VD)->getType();
+    auto type = getVarTypeInCaptureContext();
     SILType ty = gen.getLoweredType(type).getAddressType();
     SILValue addr = gen.F.begin()->createArgument(ty, VD);
     gen.VarLocs[VD] = SILGenFunction::VarLoc::get(addr);

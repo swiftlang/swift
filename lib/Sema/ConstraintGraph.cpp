@@ -36,7 +36,7 @@ ConstraintGraph::~ConstraintGraph() {
   for (unsigned i = 0, n = TypeVariables.size(); i != n; ++i) {
     auto &impl = TypeVariables[i]->getImpl();
     delete impl.getGraphNode();
-    impl.setGraphNode(0);
+    impl.setGraphNode(nullptr);
   }
 }
 
@@ -319,7 +319,7 @@ void ConstraintGraph::removeNode(TypeVariableType *typeVar) {
   auto &impl = typeVar->getImpl();
   unsigned index = impl.getGraphIndex();
   delete impl.getGraphNode();
-  impl.setGraphNode(0);
+  impl.setGraphNode(nullptr);
 
   // Remove this type variable from the list.
   unsigned lastIndex = TypeVariables.size()-1;
