@@ -25,6 +25,7 @@
 #include "swift/Frontend/FrontendOptions.h"
 #include "swift/Basic/LLVM.h"
 #include "llvm/ADT/MapVector.h"
+#include "llvm/ADT/SetVector.h"
 #include "llvm/ADT/SmallVector.h"
 #include "llvm/Support/FileSystem.h"
 #include "llvm/Support/YAMLParser.h"
@@ -283,27 +284,45 @@ bool swift::emitReferenceDependencies(DiagnosticEngine &diags,
     // We should (a) see if there's a cheaper way to keep it up to date,
     // and/or (b) see if we can fast-path cases where there's no ObjC involved.
     out << "provides-dynamic-lookup:\n";
-    class ValueDeclPrinter : public VisibleDeclConsumer {
+    class NameCollector : public VisibleDeclConsumer {
     private:
-      raw_ostream &out;
-      std::string (*escape)(Identifier);
+      SmallVector<Identifier, 16> names;
     public:
-      ValueDeclPrinter(raw_ostream &out, decltype(escape) escape)
-        : out(out), escape(escape) {}
-
       void foundDecl(ValueDecl *VD, DeclVisibilityKind Reason) override {
-        out << "- \"" << escape(VD->getName()) << "\"\n";
+        names.push_back(VD->getName());
+      }
+      ArrayRef<Identifier> getNames() {
+        llvm::array_pod_sort(names.begin(), names.end(),
+                             [](const Identifier *lhs, const Identifier *rhs) {
+          return lhs->compare(*rhs);
+        });
+        names.erase(std::unique(names.begin(), names.end()), names.end());
+        return names;
       }
     };
-    ValueDeclPrinter printer(out, escape);
-    SF->lookupClassMembers({}, printer);
+    NameCollector collector;
+    SF->lookupClassMembers({}, collector);
+    for (Identifier name : collector.getNames()) {
+      out << "- \"" << escape(name) << "\"\n";
+    }
   }
 
   ReferencedNameTracker *tracker = SF->getReferencedNameTracker();
 
-  // FIXME: Sort these?
+  auto sortedByIdentifier =
+      [](const llvm::DenseMap<Identifier, bool> map) ->
+        SmallVector<std::pair<Identifier, bool>, 16> {
+    SmallVector<std::pair<Identifier, bool>, 16> pairs{map.begin(), map.end()};
+    llvm::array_pod_sort(pairs.begin(), pairs.end(),
+                         [](const std::pair<Identifier, bool> *first,
+                            const std::pair<Identifier, bool> *second) -> int {
+      return first->first.compare(second->first);
+    });
+    return pairs;
+  };
+
   out << "depends-top-level:\n";
-  for (auto &entry : tracker->getTopLevelNames()) {
+  for (auto &entry : sortedByIdentifier(tracker->getTopLevelNames())) {
     assert(!entry.first.empty());
     out << "- ";
     if (!entry.second)
@@ -369,9 +388,8 @@ bool swift::emitReferenceDependencies(DiagnosticEngine &diags,
     out << "\"\n";
   }
 
-  // FIXME: Sort these?
   out << "depends-dynamic-lookup:\n";
-  for (auto &entry : tracker->getDynamicLookupNames()) {
+  for (auto &entry : sortedByIdentifier(tracker->getDynamicLookupNames())) {
     assert(!entry.first.empty());
     out << "- ";
     if (!entry.second)
