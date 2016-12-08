@@ -287,15 +287,15 @@ printFullContextPrefix(ImportedName name,
                        llvm::raw_ostream &os,
                        ClangImporter::Implementation &Impl) {
   const clang::NamedDecl *newDeclContextNamed = nullptr;
-  switch (name.EffectiveContext.getKind()) {
+  switch (name.getEffectiveContext().getKind()) {
   case EffectiveClangContext::UnresolvedContext:
-    os << name.EffectiveContext.getUnresolvedName() << ".";
+    os << name.getEffectiveContext().getUnresolvedName() << ".";
     // And we're done!
     return;
 
   case EffectiveClangContext::DeclContext: {
-    auto namedDecl =
-        dyn_cast<clang::NamedDecl>(name.EffectiveContext.getAsDeclContext());
+    auto namedDecl = dyn_cast<clang::NamedDecl>(
+        name.getEffectiveContext().getAsDeclContext());
     if (!namedDecl) {
       // We're done
       return;
@@ -305,15 +305,15 @@ printFullContextPrefix(ImportedName name,
   }
 
   case EffectiveClangContext::TypedefContext:
-    newDeclContextNamed = name.EffectiveContext.getTypedefName();
+    newDeclContextNamed = name.getEffectiveContext().getTypedefName();
     break;
   }
 
   // Now, let's print out the parent
   assert(newDeclContextNamed && "should of been set");
-  auto parentName = Impl.importFullName(newDeclContextNamed);
+  auto parentName = Impl.importFullName(newDeclContextNamed, name.getVersion());
   printFullContextPrefix(parentName, os, Impl);
-  os << parentName.Imported << ".";
+  os << parentName.getDeclName() << ".";
 }
 
 void ClangImporter::Implementation::printSwiftName(ImportedName name,
@@ -322,7 +322,7 @@ void ClangImporter::Implementation::printSwiftName(ImportedName name,
   // Property accessors.
   bool isGetter = false;
   bool isSetter = false;
-  switch (name.AccessorKind) {
+  switch (name.getAccessorKind()) {
   case ImportedAccessorKind::None:
     break;
 
@@ -343,23 +343,24 @@ void ClangImporter::Implementation::printSwiftName(ImportedName name,
     printFullContextPrefix(name, os, *this);
 
   // Base name.
-  os << name.Imported.getBaseName().str();
+  os << name.getDeclName().getBaseName().str();
 
   // Determine the number of argument labels we'll be producing.
-  auto argumentNames = name.Imported.getArgumentNames();
+  auto argumentNames = name.getDeclName().getArgumentNames();
   unsigned numArguments = argumentNames.size();
-  if (name.SelfIndex) ++numArguments;
+  if (name.getSelfIndex()) ++numArguments;
   if (isSetter) ++numArguments;
 
   // If the result is a simple name that is not a getter, we're done.
-  if (numArguments == 0 && name.Imported.isSimpleName() && !isGetter) return;
+  if (numArguments == 0 && name.getDeclName().isSimpleName() && !isGetter)
+    return;
 
   // We need to produce a function name.
   os << "(";
   unsigned currentArgName = 0;
   for (unsigned i = 0; i != numArguments; ++i) {
     // The "self" parameter.
-    if (name.SelfIndex && *name.SelfIndex == i) {
+    if (name.getSelfIndex() && *name.getSelfIndex() == i) {
       os << "self:";
       continue;
     }
@@ -417,14 +418,13 @@ namespace {
     typedef std::pair<const DeclType *, ImportedName> OverriddenName;
     llvm::SmallPtrSet<DeclName, 4> known;
     (void)known.insert(DeclName());
-    overriddenNames.erase(std::remove_if(overriddenNames.begin(),
-                                         overriddenNames.end(),
-                                         [&](OverriddenName overridden) {
-                                           return !known.insert(
-                                                     overridden.second.Imported)
-                                             .second;
-                                         }),
-                          overriddenNames.end());
+    overriddenNames.erase(
+        std::remove_if(overriddenNames.begin(), overriddenNames.end(),
+                       [&](OverriddenName overridden) {
+                         return !known.insert(overridden.second.getDeclName())
+                                     .second;
+                       }),
+        overriddenNames.end());
 
     if (overriddenNames.size() < 2)
       return;
@@ -449,26 +449,6 @@ namespace {
                            overriddenNames[i].first->getDeclContext()));
     }
   }
-}
-
-/// Determine whether the given Objective-C class, or any of its
-/// superclasses, either has or inherits a swift_bridge attribute.
-static bool
-hasOrInheritsSwiftBridgeAttr(const clang::ObjCInterfaceDecl *objcClass) {
-  do {
-    // Look at the definition, if there is one.
-    if (auto def = objcClass->getDefinition())
-      objcClass = def;
-
-    // Check for the swift_bridge attribute.
-    if (objcClass->hasAttr<clang::SwiftBridgeAttr>())
-      return true;
-
-    // Follow the superclass chain.
-    objcClass = objcClass->getSuperClass();
-  } while (objcClass);
-
-  return false;
 }
 
 /// Skip a leading 'k' in a 'kConstant' pattern
@@ -796,6 +776,10 @@ static StringRef determineSwiftNewtypeBaseName(StringRef baseName,
   return baseName;
 }
 
+static bool useSwift2Name(ImportNameOptions options) {
+  return options.contains(ImportNameFlags::Swift2Name);
+}
+
 EffectiveClangContext
 NameImporter::determineEffectiveContext(const clang::NamedDecl *decl,
                                         const clang::DeclContext *dc,
@@ -1096,6 +1080,23 @@ static bool suppressFactoryMethodAsInit(const clang::ObjCMethodDecl *method,
           initKind == CtorInitializerKind::ConvenienceFactory);
 }
 
+static ImportNameVersion mapOptionsToVersion(ImportNameOptions options) {
+  switch (options.toRaw()) {
+  case 0x3:
+    return ImportNameVersion::Raw;
+  case (int)ImportNameFlags::Swift2Name:
+    return ImportNameVersion::Swift2;
+  case (int)ImportNameFlags::SuppressFactoryMethodAsInit:
+    assert(0 && "current name without init was never a valid name");
+    return ImportNameVersion::Raw;
+  case 0:
+    return ImportNameVersion::Swift3;
+  default:
+    assert(0 && "unknown options");
+    return ImportNameVersion::Raw;
+  }
+}
+
 ImportedName NameImporter::importNameImpl(const clang::NamedDecl *D,
                                           ImportNameOptions options) {
   ImportedName result;
@@ -1119,12 +1120,12 @@ ImportedName NameImporter::importNameImpl(const clang::NamedDecl *D,
   auto effectiveCtx = determineEffectiveContext(D, dc, options);
   if (!effectiveCtx)
     return ImportedName();
-  result.EffectiveContext = effectiveCtx;
+  result.effectiveContext = effectiveCtx;
 
   // FIXME: ugly to check here, instead perform unified check up front in
   // containing struct...
   if (findSwiftNewtype(D, clangSema, useSwift2Name(options)))
-    result.ImportAsMember = true;
+    result.info.importAsMember = true;
 
   // Find the original method/property declaration and retrieve the
   // name from there.
@@ -1136,8 +1137,9 @@ ImportedName NameImporter::importNameImpl(const clang::NamedDecl *D,
     SmallVector<const clang::ObjCMethodDecl *, 4> overriddenMethods;
     method->getOverriddenMethods(overriddenMethods);
     for (auto overridden : overriddenMethods) {
-      const auto overriddenName = importName(overridden, options);
-      if (overriddenName.Imported)
+      const auto overriddenName =
+          importName(overridden, mapOptionsToVersion(options));
+      if (overriddenName.getDeclName())
         overriddenNames.push_back({overridden, overriddenName});
     }
 
@@ -1145,7 +1147,7 @@ ImportedName NameImporter::importNameImpl(const clang::NamedDecl *D,
     if (!overriddenNames.empty()) {
       if (overriddenNames.size() > 1)
         mergeOverriddenNames(swiftCtx, method, overriddenNames);
-      overriddenNames[0].second.EffectiveContext = result.EffectiveContext;
+      overriddenNames[0].second.effectiveContext = result.effectiveContext;
       return overriddenNames[0].second;
     }
   } else if (auto property = dyn_cast<clang::ObjCPropertyDecl>(D)) {
@@ -1168,8 +1170,9 @@ ImportedName NameImporter::importNameImpl(const clang::NamedDecl *D,
         if (!knownProperties.insert(overriddenProperty).second)
           continue;
 
-        const auto overriddenName = importName(overriddenProperty, options);
-        if (overriddenName.Imported)
+        const auto overriddenName =
+            importName(overriddenProperty, mapOptionsToVersion(options));
+        if (overriddenName.getDeclName())
           overriddenNames.push_back({overriddenProperty, overriddenName});
       }
 
@@ -1177,7 +1180,7 @@ ImportedName NameImporter::importNameImpl(const clang::NamedDecl *D,
       if (!overriddenNames.empty()) {
         if (overriddenNames.size() > 1)
           mergeOverriddenNames(swiftCtx, property, overriddenNames);
-        overriddenNames[0].second.EffectiveContext = result.EffectiveContext;
+        overriddenNames[0].second.effectiveContext = result.effectiveContext;
         return overriddenNames[0].second;
       }
     }
@@ -1202,7 +1205,7 @@ ImportedName NameImporter::importNameImpl(const clang::NamedDecl *D,
       unsigned initPrefixLength;
       if (parsedName.BaseName == "init" && parsedName.IsFunctionName) {
         if (!shouldImportAsInitializer(method, initPrefixLength,
-                                       result.InitKind)) {
+                                       result.info.initKind)) {
           // We cannot import this as an initializer anyway.
           return ImportedName();
         }
@@ -1210,7 +1213,8 @@ ImportedName NameImporter::importNameImpl(const clang::NamedDecl *D,
         // If this swift_name attribute maps a factory method to an
         // initializer and we were asked not to do so, ignore the
         // custom name.
-        if (suppressFactoryMethodAsInit(method, options, result.InitKind)) {
+        if (suppressFactoryMethodAsInit(method, options,
+                                        result.getInitKind())) {
           skipCustomName = true;
         } else {
           // Note that this is an initializer.
@@ -1220,36 +1224,36 @@ ImportedName NameImporter::importNameImpl(const clang::NamedDecl *D,
     }
 
     if (!skipCustomName) {
-      result.HasCustomName = true;
-      result.Imported = parsedName.formDeclName(swiftCtx);
+      result.info.hasCustomName = true;
+      result.declName = parsedName.formDeclName(swiftCtx);
 
       // Handle globals treated as members.
       if (parsedName.isMember()) {
         // FIXME: Make sure this thing is global.
-        result.EffectiveContext = parsedName.ContextName;
+        result.effectiveContext = parsedName.ContextName;
         if (parsedName.SelfIndex)
-          result.SelfIndex = parsedName.SelfIndex;
-        result.ImportAsMember = true;
+          result.info.selfIndex = parsedName.SelfIndex;
+        result.info.importAsMember = true;
 
         if (parsedName.BaseName == "init")
-          result.InitKind = CtorInitializerKind::Factory;
+          result.info.initKind = CtorInitializerKind::Factory;
       }
 
       // Map property getters/setters.
       if (parsedName.IsGetter)
-        result.AccessorKind = ImportedAccessorKind::PropertyGetter;
+        result.info.accessorKind = ImportedAccessorKind::PropertyGetter;
       else if (parsedName.IsSetter)
-        result.AccessorKind = ImportedAccessorKind::PropertySetter;
+        result.info.accessorKind = ImportedAccessorKind::PropertySetter;
 
       if (method && parsedName.IsFunctionName) {
         // Get the parameters.
         ArrayRef<const clang::ParmVarDecl *> params{method->param_begin(),
                                                     method->param_end()};
 
-        result.ErrorInfo = considerErrorImport(method, parsedName.BaseName,
-                                               parsedName.ArgumentLabels,
-                                               params, isInitializer,
-                                               /*hasCustomName=*/true);
+        result.info.errorInfo = considerErrorImport(method, parsedName.BaseName,
+                                                    parsedName.ArgumentLabels,
+                                                    params, isInitializer,
+                                                    /*hasCustomName=*/true);
       }
 
       return result;
@@ -1260,24 +1264,24 @@ ImportedName NameImporter::importNameImpl(const clang::NamedDecl *D,
              dc->isTranslationUnit()) {
     auto inference = IAMResult::infer(swiftCtx, clangSema, D);
     if (inference.isImportAsMember()) {
-      result.ImportAsMember = true;
-      result.Imported = inference.name;
-      result.EffectiveContext = inference.effectiveDC;
+      result.info.importAsMember = true;
+      result.declName = inference.name;
+      result.effectiveContext = inference.effectiveDC;
 
       // Instance or static
       if (inference.selfIndex)
-        result.SelfIndex = inference.selfIndex;
+        result.info.selfIndex = inference.selfIndex;
 
       // Property
       if (inference.isGetter())
-        result.AccessorKind = ImportedAccessorKind::PropertyGetter;
+        result.info.accessorKind = ImportedAccessorKind::PropertyGetter;
       else if (inference.isSetter())
-        result.AccessorKind = ImportedAccessorKind::PropertySetter;
+        result.info.accessorKind = ImportedAccessorKind::PropertySetter;
 
       // Inits are factory. These C functions are neither convenience nor
       // designated, as they return a fully formed object of that type.
       if (inference.isInit())
-        result.InitKind = CtorInitializerKind::Factory;
+        result.info.initKind = CtorInitializerKind::Factory;
 
       return result;
     }
@@ -1336,12 +1340,12 @@ ImportedName NameImporter::importNameImpl(const clang::NamedDecl *D,
   case clang::DeclarationName::ObjCZeroArgSelector: {
     auto objcMethod = cast<clang::ObjCMethodDecl>(D);
     isInitializer = shouldImportAsInitializer(objcMethod, initializerPrefixLen,
-                                              result.InitKind);
+                                              result.info.initKind);
 
     // If we would import a factory method as an initializer but were
     // asked not to, don't consider this as an initializer.
-    if (isInitializer &&
-        suppressFactoryMethodAsInit(objcMethod, options, result.InitKind)) {
+    if (isInitializer && suppressFactoryMethodAsInit(objcMethod, options,
+                                                     result.getInitKind())) {
       isInitializer = false;
     }
 
@@ -1360,7 +1364,7 @@ ImportedName NameImporter::importNameImpl(const clang::NamedDecl *D,
     unsigned numArgs = selector.getNumArgs();
     if (objcMethod->isVariadic() && shouldMakeSelectorNonVariadic(selector)) {
       --numArgs;
-      result.DroppedVariadic = true;
+      result.info.droppedVariadic = true;
       params = params.drop_back(1);
     }
 
@@ -1409,9 +1413,9 @@ ImportedName NameImporter::importNameImpl(const clang::NamedDecl *D,
       }
     }
 
-    result.ErrorInfo = considerErrorImport(objcMethod, baseName, argumentNames,
-                                           params, isInitializer,
-                                           /*hasCustomName=*/false);
+    result.info.errorInfo = considerErrorImport(
+        objcMethod, baseName, argumentNames, params, isInitializer,
+        /*hasCustomName=*/false);
 
     isFunction = true;
 
@@ -1422,12 +1426,12 @@ ImportedName NameImporter::importNameImpl(const clang::NamedDecl *D,
                                {"objectAtIndexedSubscript"}) ||
           isNonNullarySelector(objcMethod->getSelector(),
                                {"objectForKeyedSubscript"}))
-        result.AccessorKind = ImportedAccessorKind::SubscriptGetter;
+        result.info.accessorKind = ImportedAccessorKind::SubscriptGetter;
       else if (isNonNullarySelector(objcMethod->getSelector(),
                                     {"setObject", "atIndexedSubscript"}) ||
                isNonNullarySelector(objcMethod->getSelector(),
                                     {"setObject", "forKeyedSubscript"}))
-        result.AccessorKind = ImportedAccessorKind::SubscriptSetter;
+        result.info.accessorKind = ImportedAccessorKind::SubscriptSetter;
     }
 
     break;
@@ -1492,37 +1496,12 @@ ImportedName NameImporter::importNameImpl(const clang::NamedDecl *D,
   // swift_newtype-ed declarations may have common words with the type name
   // stripped.
   if (auto newtypeDecl = findSwiftNewtype(D, clangSema, swift2Name)) {
-    result.ImportAsMember = true;
+    result.info.importAsMember = true;
     baseName = determineSwiftNewtypeBaseName(baseName, newtypeDecl->getName(),
                                              strippedPrefix);
   }
 
   if (!result.isSubscriptAccessor() && !swift2Name) {
-    // Check whether the module in which the declaration resides has a
-    // module prefix and will map into Swift as a type. If so, strip
-    // that prefix off when present.
-    if (D->getDeclContext()->getRedeclContext()->isFileContext() &&
-        (isa<clang::TypeDecl>(D) ||
-         (isa<clang::ObjCInterfaceDecl>(D) &&
-          !hasOrInheritsSwiftBridgeAttr(cast<clang::ObjCInterfaceDecl>(D))) ||
-         isa<clang::ObjCProtocolDecl>(D)) &&
-        !isUnavailableInSwift(D, availability, enableObjCInterop())) {
-      // Find the original declaration, from which we can determine
-      // the owning module.
-      const clang::Decl *owningD = D->getCanonicalDecl();
-      if (auto def =
-              getDefinitionForClangTypeDecl(D)) {
-        if (*def)
-          owningD = *def;
-      }
-
-      SmallString<32> moduleName;
-      if (auto module = owningD->getImportedOwningModule())
-        moduleName = module->getTopLevelModuleName();
-      else
-        moduleName = owningD->getASTContext().getLangOpts().CurrentModule;
-    }
-
     // Objective-C properties.
     if (auto objcProperty = dyn_cast<clang::ObjCPropertyDecl>(D)) {
       auto contextType = getClangDeclContextType(
@@ -1554,8 +1533,9 @@ ImportedName NameImporter::importNameImpl(const clang::NamedDecl *D,
       (void)omitNeedlessWordsInFunctionName(
           baseName, argumentNames, params, method->getReturnType(),
           method->getDeclContext(), getNonNullArgs(method, params),
-          result.ErrorInfo ? Optional<unsigned>(result.ErrorInfo->ParamIndex)
-                           : None,
+          result.info.errorInfo
+              ? Optional<unsigned>(result.info.errorInfo->ParamIndex)
+              : None,
           method->hasRelatedResultType(), method->isInstanceMethod(), *this);
     }
 
@@ -1572,8 +1552,8 @@ ImportedName NameImporter::importNameImpl(const clang::NamedDecl *D,
   if (shouldBeSwiftPrivate(D, clangSema)) {
     // Special case: empty arg factory, "for historical reasons", is not private
     if (isInitializer && argumentNames.empty() &&
-        (result.InitKind == CtorInitializerKind::Factory ||
-         result.InitKind == CtorInitializerKind::ConvenienceFactory))
+        (result.getInitKind() == CtorInitializerKind::Factory ||
+         result.getInitKind() == CtorInitializerKind::ConvenienceFactory))
       return result;
 
     // Make the given name private.
@@ -1595,7 +1575,7 @@ ImportedName NameImporter::importNameImpl(const clang::NamedDecl *D,
     }
   }
 
-  result.Imported = formDeclName(swiftCtx, baseName, argumentNames, isFunction);
+  result.declName = formDeclName(swiftCtx, baseName, argumentNames, isFunction);
   return result;
 }
 
@@ -1642,16 +1622,32 @@ NameImporter::importMacroName(const clang::IdentifierInfo *clangIdentifier,
   return swiftCtx.getIdentifier(name);
 }
 
-/// Determine the Swift name for a clang decl
+/// Map version to options
+static ImportNameOptions mapVersionToOptions(ImportNameVersion version) {
+  switch (version) {
+  case ImportNameVersion::Raw:
+    return ImportNameOptions(0x3);
+  case ImportNameVersion::Swift2:
+    return ImportNameOptions(ImportNameFlags::Swift2Name);
+
+  case ImportNameVersion::Swift3:
+    return None;
+  case ImportNameVersion::Swift4:
+    return None;
+  }
+}
+
 ImportedName NameImporter::importName(const clang::NamedDecl *decl,
-                                      ImportNameOptions options) {
-  CacheKeyType key(decl, options.toRaw());
+                                      ImportNameVersion version) {
+  auto options = mapVersionToOptions(version);
+  CacheKeyType key(decl, (unsigned)version);
   if (importNameCache.count(key)) {
     ++ImportNameNumCacheHits;
     return importNameCache[key];
   }
   ++ImportNameNumCacheMisses;
   auto res = importNameImpl(decl, options);
+  res.info.version = version;
   importNameCache[key] = res;
   return res;
 }
