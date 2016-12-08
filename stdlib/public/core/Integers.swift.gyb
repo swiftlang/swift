@@ -2185,8 +2185,11 @@ extension UnsignedInteger where Self : FixedWidthInteger {
     if T.isSigned {
       _precondition(source >= 0, "Negative value is not representable")
     }
-    _precondition(source <= Self.max,
-      "Not enough bits to represent a signed value")
+    // This check is potentially removable by the optimizer
+    if source.bitWidth > Self.bitWidth {
+      _precondition(source <= Self.max,
+        "Not enough bits to represent a signed value")
+    }
     self.init(extendingOrTruncating: source)
   }
 
@@ -2196,7 +2199,9 @@ extension UnsignedInteger where Self : FixedWidthInteger {
     if T.isSigned {
       _precondition(source >= 0, "Negative value is not representable")
     }
-    if source > Self.max {
+    // The width check can be eliminated by the optimizer
+    if source.bitWidth > Self.bitWidth &&
+       source > Self.max {
       return nil
     }
     self.init(extendingOrTruncating: source)
@@ -2242,8 +2247,12 @@ extension SignedInteger where Self : FixedWidthInteger {
       _precondition(source >= Self.min,
         "Not enough bits to represent a signed value")
     }
-    _precondition(source <= Self.max,
-      "Not enough bits to represent a signed value")
+    // This check is potentially removable by the optimizer
+    if (source.bitWidth > Self.bitWidth) ||
+       (source.bitWidth == Self.bitWidth && !T.isSigned) {
+      _precondition(source <= Self.max,
+        "Not enough bits to represent a signed value")
+    }
     self.init(extendingOrTruncating: source)
   }
 
@@ -2253,7 +2262,10 @@ extension SignedInteger where Self : FixedWidthInteger {
     if T.isSigned && source < Self.min {
       return nil
     }
-    if source > Self.max {
+    // The width check can be eliminated by the optimizer
+    if (source.bitWidth > Self.bitWidth ||
+        (source.bitWidth == Self.bitWidth && !T.isSigned)) &&
+       source > Self.max {
       return nil
     }
     self.init(extendingOrTruncating: source)
