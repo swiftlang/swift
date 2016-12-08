@@ -2855,13 +2855,6 @@ namespace {
       OS << ")";
     }
 
-    void visitSubstitutedType(SubstitutedType *T, StringRef label) {
-      printCommon(T, label, "substituted_type");
-      printRec("original", T->getOriginal());
-      printRec("replacement", T->getReplacementType());
-      OS << ")";
-    }
-
     void visitDependentMemberType(DependentMemberType *T, StringRef label) {
       printCommon(T, label, "dependent_member_type");
       if (auto assocType = T->getAssocType()) {

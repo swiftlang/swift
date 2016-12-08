@@ -4001,10 +4001,6 @@ public:
     }
   }
 
-  void visitSubstitutedType(SubstitutedType *T) {
-    visit(T->getReplacementType());
-  }
-
   void visitDependentMemberType(DependentMemberType *T) {
     visit(T->getBase());
     Printer << ".";

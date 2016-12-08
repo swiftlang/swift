@@ -4042,38 +4042,6 @@ BEGIN_CAN_TYPE_WRAPPER(GenericTypeParamType, SubstitutableType)
   }
 END_CAN_TYPE_WRAPPER(GenericTypeParamType, SubstitutableType)
 
-/// SubstitutedType - A type that has been substituted for some other type,
-/// which implies that the replacement type meets all of the requirements of
-/// the original type.
-class SubstitutedType : public TypeBase {
-  // SubstitutedTypes are never canonical.
-  explicit SubstitutedType(Type Original, Type Replacement,
-                           RecursiveTypeProperties properties)
-    : TypeBase(TypeKind::Substituted, nullptr, properties),
-      Original(Original), Replacement(Replacement) {}
-  
-  Type Original;
-  Type Replacement;
-  
-public:
-  static SubstitutedType *get(Type Original, Type Replacement,
-                              const ASTContext &C);
-  
-  /// \brief Retrieve the original type that is being replaced.
-  Type getOriginal() const { return Original; }
-  
-  /// \brief Retrieve the replacement type.
-  Type getReplacementType() const { return Replacement; }
-  
-  /// Remove one level of top-level sugar from this type.
-  TypeBase *getSinglyDesugaredType();
-
-  // Implement isa/cast/dyncast/etc.
-  static bool classof(const TypeBase *T) {
-    return T->getKind() == TypeKind::Substituted;
-  }
-};
-
 /// A type that refers to a member type of some type that is dependent on a
 /// generic parameter.
 class DependentMemberType : public TypeBase {

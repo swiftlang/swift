@@ -372,12 +372,6 @@ static void formatDiagnosticArgument(StringRef Modifier,
     // cases to avoid too much noise.
     bool showAKA = !type->isCanonical();
 
-    // Substituted types are uninteresting sugar that prevents the heuristics
-    // below from kicking in.
-    if (showAKA)
-      if (auto *ST = dyn_cast<SubstitutedType>(type.getPointer()))
-        type = ST->getReplacementType();
-
     // If we're complaining about a function type, don't "aka" just because of
     // differences in the argument or result types.
     if (showAKA && type->is<AnyFunctionType>() &&

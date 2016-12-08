@@ -54,7 +54,7 @@ const uint16_t VERSION_MAJOR = 0;
 /// in source control, you should also update the comment to briefly
 /// describe what change you made. The content of this comment isn't important;
 /// it just ensures a conflict if two people change the module format.
-const uint16_t VERSION_MINOR = 290; // Last change: archetype nested types
+const uint16_t VERSION_MINOR = 291; // Last change: remove SubstitutedType
 
 using DeclID = PointerEmbeddedInt<unsigned, 31>;
 using DeclIDField = BCFixed<31>;
@@ -649,12 +649,6 @@ namespace decls_block {
   using ProtocolCompositionTypeLayout = BCRecordLayout<
     PROTOCOL_COMPOSITION_TYPE,
     BCArray<TypeIDField> // protocols
-  >;
-
-  using SubstitutedTypeLayout = BCRecordLayout<
-    SUBSTITUTED_TYPE,
-    TypeIDField, // original
-    TypeIDField  // substitution
   >;
 
   using BoundGenericTypeLayout = BCRecordLayout<
