@@ -1232,7 +1232,6 @@ static Type resolveNestedIdentTypeComponent(
   }
 
   // If we didn't find anything, complain.
-  bool recovered = false;
   Type memberType;
   TypeDecl *member = nullptr;
   if (!memberTypes) {
@@ -1249,7 +1248,6 @@ static Type resolveNestedIdentTypeComponent(
       return ErrorType::get(TC.Context);
     }
 
-    recovered = true;
     memberType = ty;
     member = cast_or_null<TypeDecl>(comp->getBoundDecl());
   } else {
