@@ -92,8 +92,16 @@ bool SemaAnnotator::walkToDeclPre(Decl *D) {
   unsigned NameLen = 0;
 
   if (ValueDecl *VD = dyn_cast<ValueDecl>(D)) {
-    if (VD->hasName())
-      NameLen = VD->getBaseName().getIdentifier().getLength();
+    if (VD->hasName()) {
+      switch (VD->getBaseName().getKind()) {
+        case swift::DeclNameKind::Normal:
+          NameLen = VD->getBaseName().getIdentifier().getLength();
+          break;
+        case swift::DeclNameKind::Subscript:
+          NameLen = 9; // subscript
+          break;
+      }
+    }
 
   } else if (ExtensionDecl *ED = dyn_cast<ExtensionDecl>(D)) {
     SourceRange SR = ED->getExtendedTypeLoc().getSourceRange();

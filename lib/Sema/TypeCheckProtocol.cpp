@@ -4765,22 +4765,30 @@ static Optional<unsigned> scorePotentiallyMatchingNames(DeclName lhs,
   // Score the base name match. If there is a first argument for a
   // function, include its text along with the base name's text.
   unsigned score;
-  if (lhs.getArgumentNames().empty() || !isFunc) {
-    score = scoreIdentifiers(lhs.getIdentifier(), rhs.getIdentifier(), limit);
+  if (!lhs.isSpecialName() && !rhs.isSpecialName()) {
+    if (lhs.getArgumentNames().empty() || !isFunc) {
+      score = scoreIdentifiers(lhs.getIdentifier(), rhs.getIdentifier(), limit);
+    } else {
+      llvm::SmallString<16> lhsScratch;
+      StringRef lhsFirstName =
+        combineBaseNameAndFirstArgument(lhs.getIdentifier(),
+                                        lhs.getArgumentNames()[0],
+                                        lhsScratch);
+
+      llvm::SmallString<16> rhsScratch;
+      StringRef rhsFirstName =
+        combineBaseNameAndFirstArgument(rhs.getIdentifier(),
+                                        rhs.getArgumentNames()[0],
+                                        rhsScratch);
+
+      score = lhsFirstName.edit_distance(rhsFirstName.str(), true, limit);
+    }
   } else {
-    llvm::SmallString<16> lhsScratch;
-    StringRef lhsFirstName =
-      combineBaseNameAndFirstArgument(lhs.getIdentifier(),
-                                      lhs.getArgumentNames()[0],
-                                      lhsScratch);
-
-    llvm::SmallString<16> rhsScratch;
-    StringRef rhsFirstName =
-      combineBaseNameAndFirstArgument(rhs.getIdentifier(),
-                                      rhs.getArgumentNames()[0],
-                                      rhsScratch);
-
-    score = lhsFirstName.edit_distance(rhsFirstName.str(), true, limit);
+    if (lhs.getKind() == rhs.getKind()) {
+      score = 0;
+    } else {
+      return None;
+    }
   }
   if (score > limit) return None;
 

@@ -4018,7 +4018,7 @@ Optional<DeclName> TypeChecker::omitNeedlessWords(AbstractFunctionDecl *afd) {
     return None;
 
   DeclName name = afd->getFullName();
-  if (!name)
+  if (!name || name.isSpecialName())
     return None;
 
   // String'ify the arguments.
@@ -4110,7 +4110,7 @@ Optional<Identifier> TypeChecker::omitNeedlessWords(VarDecl *var) {
   if (var->isInvalid() || !var->hasType())
     return None;
 
-  if (!var->getBaseName())
+  if (!var->getBaseName() || var->getBaseName().isSpecialName())
     return None;
 
   auto name = var->getBaseName().str();

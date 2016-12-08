@@ -77,7 +77,7 @@ void BuiltinUnit::LookupCache::lookupValue(
   
   ValueDecl *&Entry = Cache[Name];
   ASTContext &Ctx = M.getParentModule()->getASTContext();
-  if (!Entry) {
+  if (!Entry && !Name.isSpecialName()) {
     if (Type Ty = getBuiltinType(Ctx, Name.str())) {
       auto *TAD = new (Ctx) TypeAliasDecl(SourceLoc(), Name.getIdentifier(),
                                           SourceLoc(), TypeLoc::withoutLoc(Ty),
@@ -90,7 +90,7 @@ void BuiltinUnit::LookupCache::lookupValue(
     }
   }
 
-  if (!Entry)
+  if (!Entry && !Name.isSpecialName())
     Entry = getBuiltinValueDecl(Ctx, Name.getIdentifier());
 
   if (Entry)

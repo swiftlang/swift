@@ -2914,7 +2914,14 @@ namespace {
       if (name && name.isSimpleName()) {
         assert(hasCustomName && "imported function with simple name?");
         // Just fill in empty argument labels.
-        name = DeclName(Impl.SwiftContext, name.getIdentifier(), bodyParams);
+        switch (name.getKind()) {
+          case DeclNameKind::Normal:
+            name =DeclName(Impl.SwiftContext, name.getIdentifier(), bodyParams);
+            break;
+          case DeclNameKind::Subscript:
+            name = DeclName::createSubscript(Impl.SwiftContext, bodyParams);
+            break;
+        }
       }
 
       // FIXME: Poor location info.
@@ -5740,7 +5747,7 @@ SwiftDeclConverter::importSubscript(Decl *decl,
   // Build the subscript declaration.
   auto &C = Impl.SwiftContext;
   auto bodyParams = getterThunk->getParameterList(1)->clone(C);
-  DeclName name(C, C.Id_subscript, {Identifier()});
+  DeclName name = DeclName::createSubscript(C, {Identifier()});
   auto subscript = Impl.createDeclWithClangNode<SubscriptDecl>(
       getter->getClangNode(), getOverridableAccessibility(dc), name,
       decl->getLoc(), bodyParams, decl->getLoc(),

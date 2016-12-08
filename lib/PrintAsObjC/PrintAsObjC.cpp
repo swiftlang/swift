@@ -72,6 +72,8 @@ static bool isClangKeyword(DeclName name) {
 
   if (!name)
     return false;
+  if (name.isSpecialName())
+    return false;
   return keywords.find(name.str()) != keywords.end();
 }
 

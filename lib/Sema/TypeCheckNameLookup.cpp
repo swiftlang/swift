@@ -435,6 +435,11 @@ static unsigned getCallEditDistance(DeclName argName, DeclName paramName,
   // TODO: maybe ignore certain kinds of missing / present labels for the
   //   first argument label?
   // TODO: word-based rather than character-based?
+  if (argName.getKind() != paramName.getKind())
+    return UnreasonableCallEditDistance;
+  if (argName.isSpecialName())
+    return 0;
+  
   StringRef argBase = argName.getBaseName().str();
   StringRef paramBase = paramName.getBaseName().str();
 

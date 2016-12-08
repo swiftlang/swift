@@ -208,7 +208,14 @@ namespace {
         Result = Id;
         return true;
       }
-      Result = Id;
+      // FIXME: Method with the name 'subscript' are encoded as the same string
+      // as special subscript DeclNames. We should encode subscript names
+      // differently in SIL
+      if (Id == P.Context.Id_subscript) {
+        Result = DeclName::createSubscript();
+      } else {
+        Result = Id;
+      }
       return false;
     }
     

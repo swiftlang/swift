@@ -205,6 +205,14 @@ namespace llvm {
 
 namespace swift {
   
+enum class DeclNameKind {
+  /// The name consists of an identifier and possibly arguments or is empty iff
+  /// the identifier is empty
+  Normal,
+  /// The name represents a subscript and doesn't have an identifier
+  Subscript,
+};
+  
 /// A declaration name, which may comprise one or more identifier pieces.
 class DeclName {
   friend class ASTContext;
@@ -245,9 +253,16 @@ class DeclName {
   // base name for a zero-argument compound name.
   typedef llvm::PointerIntPair<Identifier, 1, bool> IdentifierAndCompound;
 
+  /// The name of a subscript DeclName to be returned by the \c str() method
+  static const std::string subscriptName;
+  
   // Either a single identifier piece stored inline (with a bit to say whether
   // it is simple or compound), or a reference to a compound declaration name.
   llvm::PointerUnion<IdentifierAndCompound, CompoundDeclName*> SimpleOrCompound;
+  
+  /// Is this DeclName a special one (subscript etc.) or represented by an
+  /// identifier?
+  DeclNameKind Kind;
   
   DeclName(void *Opaque)
     : SimpleOrCompound(decltype(SimpleOrCompound)::getFromOpaqueValue(Opaque))
@@ -258,11 +273,13 @@ class DeclName {
   
 public:
   /// Build a null name.
-  DeclName() : SimpleOrCompound(IdentifierAndCompound()) {}
+  DeclName() : SimpleOrCompound(IdentifierAndCompound()),
+               Kind(DeclNameKind::Normal) {}
   
   /// Build a simple value name with one component.
   /*implicit*/ DeclName(Identifier simpleName)
-    : SimpleOrCompound(IdentifierAndCompound(simpleName, false)) {}
+    : SimpleOrCompound(IdentifierAndCompound(simpleName, false)),
+      Kind(DeclNameKind::Normal) {}
   
   /// Build a compound value name given a base name and a set of argument names.
   DeclName(ASTContext &C, Identifier baseName,
@@ -290,12 +307,33 @@ public:
   DeclName getBaseName() const {
     DeclName base;
     if (auto compound = SimpleOrCompound.dyn_cast<CompoundDeclName*>()) {
-     base = compound->BaseName;
+      base = compound->BaseName;
     } else {
       base = SimpleOrCompound.get<IdentifierAndCompound>().getPointer();
     }
+    base.Kind = Kind;
     return base;
   }
+  
+  /// Create a new subscript \c DeclName with no arguments
+  static DeclName createSubscript() {
+    auto name = DeclName();
+    name.Kind = DeclNameKind::Subscript;
+    return name;
+  }
+  
+  /// Create a compound subscript \c DeclName and a set of argument names.
+  static DeclName createSubscript(ASTContext &C,
+                                  ArrayRef<Identifier> argumentNames) {
+    auto name = DeclName(C, Identifier(), argumentNames);
+    name.Kind = DeclNameKind::Subscript;
+    return name;
+  }
+  
+  /// Create a compound value name for a subscript and a set of argument names
+  /// extracted from a parameter list.
+  static DeclName createSubscript(ASTContext &C,
+                                  ParameterList *paramList);
   
   /// Retrieve the names of the arguments, if there are any.
   ArrayRef<Identifier> getArgumentNames() const {
@@ -306,6 +344,8 @@ public:
   }
 
   explicit operator bool() const {
+    if (isSpecialName())
+      return true;
     if (SimpleOrCompound.dyn_cast<CompoundDeclName*>())
       return true;
     return !SimpleOrCompound.get<IdentifierAndCompound>().getPointer().empty();
@@ -330,13 +370,14 @@ public:
   /// True if this name is a simple one-component name identical to the
   /// given identifier.
   bool isSimpleName(Identifier name) const {
-    return isSimpleName() && getIdentifier() == name;
+    return isSimpleName() && !isSpecialName() && getIdentifier() == name;
   }
   
   /// True if this name is a simple one-component name equal to the
   /// given string.
   bool isSimpleName(StringRef name) const {
-    return isSimpleName() && getIdentifier().str().equals(name);
+    return isSimpleName() && !isSpecialName() &&
+             getIdentifier().str().equals(name);
   }
   
   bool isEditorPlaceholder() const {
@@ -345,8 +386,15 @@ public:
   
   /// True if this name is an operator.
   bool isOperator() const {
+    if (isSpecialName())
+      return false;
     return getIdentifier().isOperator();
   }
+  
+  DeclNameKind getKind() const { return Kind; }
+  
+  /// True if this DeclName does not have a dedicated identifier
+  bool isSpecialName() const { return Kind != DeclNameKind::Normal; }
   
   /// True if this name should be found by a decl ref or member ref under the
   /// name specified by 'refName'.
@@ -355,13 +403,17 @@ public:
   /// matches a simple name lookup or when the full compound name matches.
   bool matchesRef(DeclName refName) const {
     // Identical names always match.
-    if (SimpleOrCompound == refName.SimpleOrCompound)
+    if (SimpleOrCompound == refName.SimpleOrCompound && Kind == refName.Kind)
       return true;
     // If the reference is a simple name, try simple name matching.
-    if (refName.isSimpleName())
-      return refName.getBaseName() == getBaseName();
-    // The names don't match.
-    return false;
+    if (!isSpecialName()) {
+      if (refName.isSimpleName())
+        return refName.getIdentifier() == getIdentifier();
+      // The names don't match.
+      return false;
+    } else {
+      return refName.Kind == Kind;
+    }
   }
   
   /// Add a DeclName to a lookup table so that it can be found by its simple
@@ -381,10 +433,13 @@ public:
   int compare(DeclName other) const;
 
   friend bool operator==(DeclName lhs, DeclName rhs) {
+    if (lhs.Kind != rhs.Kind)
+      return false;
     if (lhs.isSimpleName() != rhs.isSimpleName())
       return false;
-    if (lhs.getIdentifier() != rhs.getIdentifier())
-      return false;
+    if (lhs.Kind == DeclNameKind::Normal)
+      if (lhs.getIdentifier() != rhs.getIdentifier())
+        return false;
     
     auto lhsArgNames = lhs.getArgumentNames();
     auto rhsArgNames = rhs.getArgumentNames();
@@ -438,15 +493,27 @@ public:
   /// \param scratch Scratch space to use.
   StringRef getString(llvm::SmallVectorImpl<char> &scratch,
                       bool skipEmptyArgumentNames = false) const;
-
-  /// Return the string representation of the name
+  
+  /// Return the string representation of the base name (i.e. without
+  /// arguements). Special \c DeclNames return their string representation.
   StringRef str() const {
-    return getIdentifier().str();
+    switch (Kind) {
+      case DeclNameKind::Normal:
+        return getIdentifier().str();
+      case DeclNameKind::Subscript:
+        return subscriptName;
+    }
   }
   
-  /// Return the string representation of the name used for serialization
+  /// Return the string representation of the name used for serialization. This
+  /// encodes special \c DeclNames with a leading '$'
   StringRef serializationString() const {
-    return getIdentifier().str();
+    switch (getKind()) {
+      case DeclNameKind::Normal:
+        return getIdentifier().str();
+      case DeclNameKind::Subscript:
+        return "$subscript";
+    }
   }
   
   /// Print the representation of this declaration name to the given
@@ -568,8 +635,10 @@ namespace llvm {
     }
     static unsigned getHashValue(swift::DeclName Val) {
       unsigned H = 0;
+      H ^= static_cast<unsigned>(Val.getKind()) << 1;
       H ^= static_cast<unsigned>(Val.isSimpleName());
-      H ^= llvm::HashString(Val.getIdentifier().get());
+      if (!Val.isSpecialName())
+        H ^= llvm::HashString(Val.getIdentifier().get());
       
       auto argNames = Val.getArgumentNames();
       for (unsigned i = 0; i < argNames.size(); i++) {

@@ -5283,7 +5283,7 @@ ParserStatus Parser::parseDeclSubscript(ParseDeclOptions Flags,
 
   
   // Build an AST for the subscript declaration.
-  DeclName name = DeclName(Context, Context.Id_subscript, argumentNames);
+  DeclName name = DeclName::createSubscript(Context, argumentNames);
   auto *Subscript = new (Context) SubscriptDecl(name,
                                                 SubscriptLoc, Indices.get(),
                                                 ArrowLoc, ElementTy.get(),

@@ -3557,6 +3557,8 @@ bool VarDecl::isAnonClosureParam() const {
   if (!name)
     return false;
 
+  if (name.isSpecialName())
+    return false;
   auto nameStr = name.str();
   if (nameStr.empty())
     return false;
@@ -3982,9 +3984,13 @@ DeclName AbstractFunctionDecl::getEffectiveFullName() const {
         case AccessorKind::IsAddressor:
         case AccessorKind::IsMutableAddressor:
         case AccessorKind::IsGetter:
-          return subscript ? subscript->getFullName()
-                           : DeclName(ctx, afd->getBaseName().getIdentifier(),
-                                      ArrayRef<Identifier>());
+          if (subscript)
+            return subscript->getFullName();
+          
+          assert(!afd->getBaseName().isSpecialName() &&
+                 "Normal function should have a normal DeclName");
+          return DeclName(ctx, afd->getBaseName().getIdentifier(),
+                          ArrayRef<Identifier>());
 
         case AccessorKind::IsSetter:
         case AccessorKind::IsMaterializeForSet:
@@ -4000,7 +4006,10 @@ DeclName AbstractFunctionDecl::getEffectiveFullName() const {
           if (subscript) {
             argNames.append(subscript->getFullName().getArgumentNames().begin(),
                             subscript->getFullName().getArgumentNames().end());
+            return DeclName::createSubscript(ctx, argNames);
           }
+          assert(!afd->getBaseName().isSpecialName() &&
+                 "Normal function should have a normal DeclName");
           return DeclName(ctx, afd->getBaseName().getIdentifier(), argNames);
         }
       }
@@ -4193,6 +4202,8 @@ ObjCSelector AbstractFunctionDecl::getObjCSelector(
 
     // For the first selector piece, attach either the first parameter
     // or "AndReturnError" to the base name, if appropriate.
+    assert(!getBaseName().isSpecialName() &&
+           "Special DeclNames can't occur in ObjC selectors");
     auto firstPiece = getBaseName().getIdentifier();
     llvm::SmallString<32> scratch;
     scratch += firstPiece.str();

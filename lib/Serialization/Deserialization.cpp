@@ -20,6 +20,7 @@
 #include "swift/ClangImporter/ClangImporter.h"
 #include "swift/Parse/Parser.h"
 #include "swift/Serialization/BCReadingExtras.h"
+#include "llvm/ADT/StringSwitch.h"
 #include "llvm/Support/raw_ostream.h"
 
 using namespace swift;
@@ -1305,7 +1306,10 @@ Decl *ModuleFile::resolveCrossReference(Module *M, uint32_t pathLen) {
         return nullptr;
       }
 
-      DeclName memberName = DeclName(memberID);
+      DeclName memberName = llvm::StringSwitch<DeclName>(memberID.get())
+        .Case("$subscript", DeclName::createSubscript())
+        .Default(DeclName(memberID));
+      
       auto members = nominal->lookupDirect(memberName, onlyInNominal);
       values.append(members.begin(), members.end());
       filterValues(filterTy, M, genericSig, isType, inProtocolExt, ctorInit,
@@ -3116,7 +3120,7 @@ Decl *ModuleFile::getDecl(DeclID DID, Optional<DeclContext *> ForcedContext) {
     for (auto argNameID : argNameIDs)
       argNames.push_back(getIdentifier(argNameID));
 
-    DeclName name(ctx, ctx.Id_subscript, argNames);
+    DeclName name = DeclName::createSubscript(ctx, argNames);
     auto subscript = createDecl<SubscriptDecl>(name, SourceLoc(), nullptr,
                                                SourceLoc(), TypeLoc(), DC);
     declOrOffset = subscript;

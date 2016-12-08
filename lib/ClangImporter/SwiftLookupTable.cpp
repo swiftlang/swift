@@ -1445,7 +1445,10 @@ SmallVector<DeclName, 4> SwiftLookupTableReader::getBaseNames(ASTContext &ctx) {
   auto table = static_cast<SerializedBaseNameToEntitiesTable*>(SerializedTable);
   SmallVector<DeclName, 4> results;
   for (auto key : table->keys()) {
-    results.push_back(DeclName(ctx.getIdentifier(key)));
+    DeclName name = llvm::StringSwitch<DeclName>(key)
+      .Case("$subscript", DeclName::createSubscript())
+      .Default(DeclName(ctx.getIdentifier(key)));
+    results.push_back(name);
   }
   return results;
 }
@@ -1546,9 +1549,8 @@ void importer::addEntryToLookupTable(SwiftLookupTable &table,
 
     // Also add the subscript entry, if needed.
     if (importedName.isSubscriptAccessor())
-      table.addEntry(DeclName(nameImporter.getContext(),
-                              nameImporter.getContext().Id_subscript,
-                              ArrayRef<Identifier>()),
+      table.addEntry(DeclName::createSubscript(nameImporter.getContext(),
+                                               ArrayRef<Identifier>()),
                      named, importedName.getEffectiveContext());
 
     // Import the Swift 2 name of this entity, and record it as well if it is

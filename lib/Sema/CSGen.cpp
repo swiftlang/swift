@@ -1036,8 +1036,6 @@ namespace {
     /// \brief Add constraints for a subscript operation.
     Type addSubscriptConstraints(Expr *expr, Expr *base, Expr *index,
                                  ValueDecl *decl) {
-      ASTContext &Context = CS.getASTContext();
-
       // Locators used in this expression.
       auto indexLocator
         = CS.getConstraintLocator(expr, ConstraintLocator::SubscriptIndex);
@@ -1129,7 +1127,8 @@ namespace {
                               FunctionRefKind::DoubleApply);
         CS.addBindOverloadConstraint(fnTy, choice, subscriptMemberLocator);
       } else {
-        CS.addValueMemberConstraint(baseTy, Context.Id_subscript,
+        DeclName subscriptName = DeclName::createSubscript();
+        CS.addValueMemberConstraint(baseTy, subscriptName,
                                     fnTy, FunctionRefKind::DoubleApply,
                                     subscriptMemberLocator);
       }

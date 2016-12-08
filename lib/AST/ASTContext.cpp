@@ -3570,6 +3570,8 @@ void DeclName::CompoundDeclName::Profile(llvm::FoldingSetNodeID &id,
 
 void DeclName::initialize(ASTContext &C, Identifier baseName,
                           ArrayRef<Identifier> argumentNames) {
+  Kind = DeclNameKind::Normal;
+  
   if (argumentNames.size() == 0) {
     SimpleOrCompound = IdentifierAndCompound(baseName, true);
     return;
@@ -3604,6 +3606,14 @@ DeclName::DeclName(ASTContext &C, Identifier baseName,
   for (auto P : *paramList)
     names.push_back(P->getArgumentName());
   initialize(C, baseName, names);
+}
+
+DeclName DeclName::createSubscript(ASTContext &C, ParameterList *paramList) {
+  SmallVector<Identifier, 4> names;
+  
+  for (auto P : *paramList)
+    names.push_back(P->getArgumentName());
+  return createSubscript(C, names);
 }
 
 /// Find the implementation of the named type in the given module.
