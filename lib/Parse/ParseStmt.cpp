@@ -2128,7 +2128,6 @@ ParserResult<Stmt> Parser::parseStmtForCStyle(SourceLoc ForLoc,
 
   ParserStatus Status;
 
-  bool HaveFirst = false;
   ParserResult<Expr> First;
   SmallVector<Decl*, 2> FirstDecls;
   ParserResult<Expr> Second;
@@ -2164,7 +2163,6 @@ ParserResult<Stmt> Parser::parseStmtForCStyle(SourceLoc ForLoc,
     SmallVector<Expr *, 1> FirstExprs;
 
     // Parse the first expression.
-    HaveFirst = true;
     First = parseExpr(diag::expected_init_for_stmt);
     Status |= First;
     if (First.isNull() || First.hasCodeCompletion())
