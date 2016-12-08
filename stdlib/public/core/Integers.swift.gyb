@@ -2122,6 +2122,7 @@ ${unsafeOperationComment(x.operator)}
 %   callLabel = x.firstArg + ': ' if not x.firstArg == '_' else ''
 %   if x.kind != '/':
 ${operatorComment('&' + x.operator)}
+  @_transparent
   public static func &${x.operator} (lhs: Self, rhs: Self) -> Self {
     return lhs.${x.name}WithOverflow(${callLabel}rhs).partialValue
   }
@@ -2488,8 +2489,8 @@ public struct ${Self}
     // No LLVM primitives for checking overflow of division
     // operations, so we check manually.
     if _slowPath(
-      other == 0
-      ${'|| self == %s.min && other == -1' % Self if signed else ''}
+      other == (0 as ${Self})
+      ${'|| self == %s.min && other == (-1 as %s)' % (Self, Self) if signed else ''}
     ) {
       return (partialValue: self, overflow: .overflow)
     }
@@ -2513,7 +2514,7 @@ public struct ${Self}
 
   @_transparent
   public static func %=(_ lhs: inout ${Self}, _ rhs: ${Self}) {
-    if _slowPath(rhs == 0) {
+    if _slowPath(rhs == (0 as ${Self})) {
       preconditionFailure("Remainder of division by zero")
     }
 
