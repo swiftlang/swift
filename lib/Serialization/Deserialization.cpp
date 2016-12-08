@@ -452,6 +452,51 @@ Pattern *ModuleFile::maybeReadPattern() {
   }
 }
 
+SILLayout *ModuleFile::readSILLayout(llvm::BitstreamCursor &Cursor) {
+  using namespace decls_block;
+
+  SmallVector<uint64_t, 16> scratch;
+
+  auto next = Cursor.advance(AF_DontPopBlockAtEnd);
+  assert(next.Kind == llvm::BitstreamEntry::Record);
+
+  unsigned kind = Cursor.readRecord(next.ID, scratch);
+  switch (kind) {
+  case decls_block::SIL_LAYOUT: {
+    unsigned numFields;
+    ArrayRef<uint64_t> types;
+    decls_block::SILLayoutLayout::readRecord(scratch, numFields, types);
+    
+    SmallVector<SILField, 4> fields;
+    for (auto fieldInfo : types.slice(0, numFields)) {
+      bool isMutable = fieldInfo & 0x80000000U;
+      auto typeId = fieldInfo & 0x7FFFFFFFU;
+      fields.push_back(
+        SILField(getType(typeId)->getCanonicalType(),
+                 isMutable));
+    }
+    
+    SmallVector<GenericTypeParamType*, 4> genericParams;
+    for (auto typeId : types.slice(numFields)) {
+      auto type = getType(typeId)->castTo<GenericTypeParamType>();
+      genericParams.push_back(type);
+    }
+    
+    SmallVector<Requirement, 4> requirements;
+    readGenericRequirements(requirements, DeclTypeCursor);
+    CanGenericSignature sig;
+    if (!genericParams.empty() || !requirements.empty()) {
+      sig = GenericSignature::get(genericParams, requirements)
+        ->getCanonicalSignature();
+    }
+    return SILLayout::get(getContext(), sig, fields);
+  }
+  default:
+    error();
+    return nullptr;
+  }
+}
+
 ProtocolConformanceRef ModuleFile::readConformance(
                                              llvm::BitstreamCursor &Cursor,
                                              GenericEnvironment *genericEnv) {
@@ -3254,7 +3299,7 @@ Decl *ModuleFile::getDecl(DeclID DID, Optional<DeclContext *> ForcedContext) {
     declOrOffset = resolveCrossReference(getModule(baseModuleID), pathLen);
     break;
   }
-
+  
   default:
     // We don't know how to deserialize this kind of decl.
     error();
@@ -3368,7 +3413,7 @@ Type ModuleFile::getType(TypeID TID) {
   if (TID == 0)
     return Type();
 
-  assert(TID <= Types.size() && "invalid decl ID");
+  assert(TID <= Types.size() && "invalid type ID");
   auto &typeOrOffset = Types[TID-1];
 
   if (typeOrOffset.isComplete())
@@ -3814,10 +3859,82 @@ Type ModuleFile::getType(TypeID TID) {
   }
 
   case decls_block::SIL_BOX_TYPE: {
-    TypeID boxID;
+    SILLayoutID layoutID;
+    ArrayRef<uint64_t> args;
 
-    decls_block::SILBoxTypeLayout::readRecord(scratch, boxID);
-    typeOrOffset = SILBoxType::get(getType(boxID)->getCanonicalType());
+    decls_block::SILBoxTypeLayout::readRecord(scratch, layoutID, args);
+    
+    // Get the layout.
+    auto getLayout = [&]() -> SILLayout * {
+      assert(layoutID > 0 && layoutID <= SILLayouts.size()
+             && "invalid layout ID");
+
+      auto &layoutOrOffset = SILLayouts[layoutID - 1];
+      if (layoutOrOffset.isComplete()) {
+        return layoutOrOffset;
+      }
+      
+      BCOffsetRAII saveOffset(DeclTypeCursor);
+      DeclTypeCursor.JumpToBit(layoutOrOffset);
+      auto layout = readSILLayout(DeclTypeCursor);
+      if (!layout) {
+        error();
+        return nullptr;
+      }
+      layoutOrOffset = layout;
+      return layout;
+    };
+    
+    auto layout = getLayout();
+    if (!layout)
+      return nullptr;
+    
+    SmallVector<Substitution, 4> genericArgs;
+    if (auto sig = layout->getGenericSignature()) {
+      if (args.size() != sig->getGenericParams().size()) {
+        error();
+        return nullptr;
+      }
+      TypeSubstitutionMap mappings;
+      
+      for (unsigned i : indices(args)) {
+        mappings[sig->getGenericParams()[i]] =
+          getType(args[i])->getCanonicalType();
+      }
+      
+      bool ok = true;
+      sig->getSubstitutions(*getAssociatedModule(), mappings,
+        [&](CanType depTy, Type replacementTy, ProtocolType *proto)
+        -> ProtocolConformanceRef {
+          if (replacementTy->is<SubstitutableType>()
+              || replacementTy->is<DependentMemberType>())
+            return ProtocolConformanceRef(proto->getDecl());
+          
+          auto conformance = getAssociatedModule()
+            ->lookupConformance(replacementTy, proto->getDecl(), nullptr);
+          if (!conformance) {
+            error();
+            ok = false;
+            return ProtocolConformanceRef(proto->getDecl());
+          }
+          return *conformance;
+        },
+        genericArgs);
+      if (!ok)
+        return nullptr;
+      
+      for (auto &arg : genericArgs) {
+        arg = Substitution(arg.getReplacement()->getCanonicalType(),
+                           arg.getConformances());
+      }
+    } else {
+      if (args.size() != 0) {
+        error();
+        return nullptr;
+      }
+    }
+    
+    typeOrOffset = SILBoxType::get(getContext(), layout, genericArgs);
     break;
   }
       
