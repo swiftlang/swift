@@ -5469,6 +5469,7 @@ Expr *ExprRewriter::coerceToType(Expr *expr, Type toType,
                                         expr->getLoc(),
                                         fromTuple->getElementType(0));
       expr->setImplicit(true);
+      return expr;
     }
   }
 
