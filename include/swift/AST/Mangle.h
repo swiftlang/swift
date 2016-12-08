@@ -142,6 +142,11 @@ public:
   void mangleIdentifier(StringRef ref,
                         OperatorFixity fixity = OperatorFixity::NotOperator,
                         bool isOperator=false);
+
+  /// This checks whether a given array of generic type parameters are in a
+  /// good order. Returns true on good order; false on malformed order.
+  static bool checkGenericParamsOrder(ArrayRef<GenericTypeParamType *> params);
+
 private:
   void mangleFunctionType(AnyFunctionType *fn, unsigned uncurryingLevel);
   void mangleProtocolList(ArrayRef<ProtocolDecl*> protocols);

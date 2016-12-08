@@ -568,7 +568,8 @@ void Mangler::mangleDeclType(const ValueDecl *decl,
                                      requirements, requirementsBuf);
 
   // Mangle the generic signature, if any.
-  if (!genericParams.empty() || !requirements.empty()) {
+  if ((!genericParams.empty() || !requirements.empty()) &&
+      checkGenericParamsOrder(genericParams)) {
     Buffer << 'u';
     mangleGenericSignatureParts(genericParams, initialParamDepth,
                                 requirements);
@@ -589,6 +590,24 @@ void Mangler::mangleConstrainedType(CanType type) {
     return;
   }
   mangleType(type, 0);
+}
+
+bool Mangler::
+checkGenericParamsOrder(ArrayRef<swift::GenericTypeParamType *> params) {
+  unsigned depth = 0;
+  unsigned count = 0;
+  for (auto param : params) {
+    if (param->getDepth() > depth) {
+      depth = param->getDepth();
+      count = 0;
+    } else if (param->getDepth() < depth) {
+      return false;
+    }
+    if (param->getIndex() != count)
+      return false;
+    count ++;
+  }
+  return true;
 }
 
 void Mangler::mangleGenericSignatureParts(

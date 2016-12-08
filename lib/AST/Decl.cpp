@@ -2185,7 +2185,7 @@ ArrayRef<ProtocolDecl *>
 AbstractTypeParamDecl::getConformingProtocols() const {
   auto *dc = getDeclContext();
   if (!dc->isValidGenericContext())
-    return nullptr;
+    return {};
 
   auto contextTy = dc->mapTypeIntoContext(getDeclaredInterfaceType());
   if (auto *archetype = contextTy->getAs<ArchetypeType>())
