@@ -1253,7 +1253,7 @@ NodePointer Demangler::demangleWitness() {
 }
 
 NodePointer Demangler::demangleSpecialType() {
-  switch (nextChar()) {
+  switch (auto specialChar = nextChar()) {
     case 'f':
       return popFunctionType(Node::Kind::ThinFunctionType);
     case 'K':
@@ -1293,6 +1293,48 @@ NodePointer Demangler::demangleSpecialType() {
     case 'p':
       return createType(createWithChild(Node::Kind::ExistentialMetatype,
                                         popNode(Node::Kind::Type)));
+    case 'X':
+    case 'x': {
+      // SIL box types.
+      NodePointer signature, genericArgs;
+      if (specialChar == 'X') {
+        signature = popNode(Node::Kind::DependentGenericSignature);
+        if (!signature)
+          return nullptr;
+        genericArgs = popTypeList();
+        if (!genericArgs)
+          return nullptr;
+      }
+      
+      auto fieldTypes = popTypeList();
+      if (!fieldTypes)
+        return nullptr;
+      // Build layout.
+      auto layout = NodeFactory::create(Node::Kind::SILBoxLayout);
+      for (unsigned i = 0, e = fieldTypes->getNumChildren(); i < e; ++i) {
+        auto fieldType = fieldTypes->getChild(i);
+        assert(fieldType->getKind() == Node::Kind::Type);
+        bool isMutable = false;
+        // 'inout' typelist mangling is used to represent mutable fields.
+        if (fieldType->getChild(0)->getKind() == Node::Kind::InOut) {
+          isMutable = true;
+          fieldType = createType(fieldType->getChild(0)->getChild(0));
+        }
+        auto field = NodeFactory::create(isMutable
+                                         ? Node::Kind::SILBoxMutableField
+                                         : Node::Kind::SILBoxImmutableField);
+        field->addChild(fieldType);
+        layout->addChild(field);
+      }
+      auto boxTy = NodeFactory::create(Node::Kind::SILBoxTypeWithLayout);
+      boxTy->addChild(layout);
+      if (signature) {
+        boxTy->addChild(signature);
+        assert(genericArgs);
+        boxTy->addChild(genericArgs);
+      }
+      return createType(boxTy);
+    }
     default:
       return nullptr;
   }

@@ -1684,6 +1684,59 @@ void Remangler::mangleVariadicMarker(Node *node) {
   Out << "<vararg>";
 }
 
+void Remangler::mangleSILBoxTypeWithLayout(Node *node) {
+  assert(node->getKind() == Node::Kind::SILBoxTypeWithLayout);
+  assert(node->getNumChildren() == 1 || node->getNumChildren() == 3);
+  Out << "XB";
+  auto layout = node->getChild(0);
+  assert(layout->getKind() == Node::Kind::SILBoxLayout);
+  NodePointer signature, genericArgs;
+  if (node->getNumChildren() == 3) {
+    signature = node->getChild(1);
+    assert(signature->getKind() == Node::Kind::DependentGenericSignature);
+    genericArgs = node->getChild(2);
+    assert(genericArgs->getKind() == Node::Kind::TypeList);
+    
+    Out << 'G';
+    mangleDependentGenericSignature(signature.get());
+  }
+  mangleSILBoxLayout(layout.get());
+  if (genericArgs) {
+    for (unsigned i = 0; i < genericArgs->getNumChildren(); ++i) {
+      auto type = genericArgs->getChild(i);
+      assert(genericArgs->getKind() == Node::Kind::Type);
+      mangleType(type.get());
+    }
+    Out << '_';  
+  }
+}
+
+void Remangler::mangleSILBoxLayout(Node *node) {
+  assert(node->getKind() == Node::Kind::SILBoxLayout);
+  for (unsigned i = 0; i < node->getNumChildren(); ++i) {
+    auto field = node->getChild(i);
+    assert(node->getKind() == Node::Kind::SILBoxImmutableField
+           || node->getKind() == Node::Kind::SILBoxMutableField);
+    mangle(node->getChild(i).get());
+    
+  }
+  Out << '_';
+}
+
+void Remangler::mangleSILBoxMutableField(Node *node) {
+  Out << 'm';
+  assert(node->getNumChildren() == 1
+         && node->getChild(0)->getKind() == Node::Kind::Type);
+  mangleType(node->getChild(0).get());
+}
+
+void Remangler::mangleSILBoxImmutableField(Node *node) {
+  Out << 'i';
+  assert(node->getNumChildren() == 1
+         && node->getChild(0)->getKind() == Node::Kind::Type);
+  mangleType(node->getChild(0).get());
+}
+
 /// The top-level interface to the remangler.
 std::string Demangle::mangleNode(const NodePointer &node) {
   if (!node) return "";
