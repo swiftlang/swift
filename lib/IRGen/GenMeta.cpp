@@ -4707,7 +4707,7 @@ namespace {
     CanType getParentType() const {
       Type type = Target->getDeclaredTypeInContext();
       Type parentType = type->getNominalParent();
-      return parentType ? parentType->getCanonicalType() : CanType();
+      return parentType.getCanonicalTypeOrNull();
     }
 
   public:

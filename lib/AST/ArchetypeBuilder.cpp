@@ -546,11 +546,11 @@ Type ArchetypeBuilder::PotentialArchetype::getTypeInContext(
 
   // Local function to check whether we have a generic parameter that has
   // already been recorded
-  auto getAlreadyRecoveredGenericParam = [&]() -> Optional<Type> {
-    if (!isGenericParam()) return None;
+  auto getAlreadyRecoveredGenericParam = [&]() -> Type {
+    if (!isGenericParam()) return Type();
 
     auto type = genericEnv->getMappingIfPresent(getGenericParamKey());
-    if (!type) return None;
+    if (!type) return Type();
 
     // We already have a mapping for this generic parameter in the generic
     // environment. Return it.
@@ -610,7 +610,7 @@ Type ArchetypeBuilder::PotentialArchetype::getTypeInContext(
     // We will build the archetype below.
     assocType = getResolvedAssociatedType();
   } else if (auto result = getAlreadyRecoveredGenericParam()) {
-    return *result;
+    return result;
   }
 
   // Determine the superclass for the archetype. If it exists and involves
@@ -627,7 +627,7 @@ Type ArchetypeBuilder::PotentialArchetype::getTypeInContext(
     // We might have recursively recorded the archetype; if so, return early.
     // FIXME: This should be detectable before we end up building archetypes.
     if (auto result = getAlreadyRecoveredGenericParam())
-      return *result;
+      return result;
   }
 
   // Build a new archetype.
