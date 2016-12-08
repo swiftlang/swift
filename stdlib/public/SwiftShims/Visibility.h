@@ -18,7 +18,11 @@
 #ifndef SWIFT_STDLIB_SHIMS_VISIBILITY_H
 #define SWIFT_STDLIB_SHIMS_VISIBILITY_H
 
-#if defined(__has_feature) && __has_feature(nullability)
+#if !defined(__has_feature)
+#define __has_feature(x) false
+#endif
+
+#if __has_feature(nullability)
 // Provide macros to temporarily suppress warning about the use of
 // _Nullable and _Nonnull.
 # define SWIFT_BEGIN_NULLABILITY_ANNOTATIONS                        \
