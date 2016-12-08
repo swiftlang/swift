@@ -82,7 +82,8 @@ class SwiftTestCase(unittest.TestCase):
             toolchain=self.toolchain,
             source_dir='/path/to/src',
             build_dir='/path/to/build')
-        self.assertEqual(swift.cmake_options, ['-DCMAKE_EXPORT_COMPILE_COMMANDS=TRUE'])
+        self.assertEqual(swift.cmake_options, [
+                         '-DCMAKE_EXPORT_COMPILE_COMMANDS=TRUE'])
 
     def test_swift_runtime_tsan(self):
         self.args.enable_tsan_runtime = True
@@ -240,7 +241,7 @@ class SwiftTestCase(unittest.TestCase):
         self.assertEqual(
             ['-DSWIFT_BENCHMARK_NUM_ONONE_ITERATIONS=20',
              '-DSWIFT_BENCHMARK_NUM_O_ITERATIONS=3'],
-        [x for x in swift.cmake_options if 'SWIFT_BENCHMARK_NUM' in x])
+            [x for x in swift.cmake_options if 'SWIFT_BENCHMARK_NUM' in x])
         self.args.benchmark_num_onone_iterations = 3
 
         self.args.benchmark_num_o_iterations = 30
@@ -276,4 +277,5 @@ class SwiftTestCase(unittest.TestCase):
             build_dir='/path/to/build')
         self.assertEqual(
             ['-DSWIFT_STDLIB_ENABLE_SIL_OWNERSHIP=TRUE'],
-            [x for x in swift.cmake_options if 'SWIFT_STDLIB_ENABLE_SIL_OWNERSHIP' in x])
+            [x for x in swift.cmake_options
+             if 'SWIFT_STDLIB_ENABLE_SIL_OWNERSHIP' in x])
