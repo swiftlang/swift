@@ -2366,7 +2366,7 @@ bool FailureDiagnosis::diagnoseGeneralMemberFailure(Constraint *constraint) {
   MemberLookupResult result = CS->performMemberLookup(
       constraint->getKind(), memberName, baseTy,
       constraint->getFunctionRefKind(), constraint->getLocator(),
-      /*includeInaccessibleMembers*/ true);
+      /*includeInaccessibleMembers*/ true, /*includeSpecialNames*/ true);
 
   switch (result.OverallResult) {
   case MemberLookupResult::Unsolved:      
@@ -2785,6 +2785,12 @@ diagnoseUnviableLookupResults(MemberLookupResult &result, Type baseObjTy,
     case MemberLookupResult::UR_DestructorInaccessible: {
       diagnose(nameLoc, diag::destructor_not_accessible);
       return;
+    }
+    case MemberLookupResult::UR_SubscriptAsIdentifier: {
+      diagnose(nameLoc.getBaseNameLoc(),
+               diag::subscript_not_accessible_via_keyword);
+      return;
+      
     }
     }
   }
@@ -5254,7 +5260,8 @@ bool FailureDiagnosis::visitSubscriptExpr(SubscriptExpr *SE) {
   MemberLookupResult result =
     CS->performMemberLookup(ConstraintKind::ValueMember, subscriptName,
                             baseType, FunctionRefKind::DoubleApply, locator,
-                            /*includeInaccessibleMembers*/true);
+                            /*includeInaccessibleMembers*/true,
+                            /*includeSpecialNames*/false);
 
   
   switch (result.OverallResult) {
@@ -5541,7 +5548,8 @@ bool FailureDiagnosis::diagnoseMethodAttributeFailures(
   auto results = CS->performMemberLookup(
       ConstraintKind::ValueMember, UDE->getName(), baseType,
       UDE->getFunctionRefKind(), CS->getConstraintLocator(UDE),
-      /*includeInaccessibleMembers=*/false);
+      /*includeInaccessibleMembers=*/false,
+      /*includeSpecialNames*/false);
 
   if (results.UnviableCandidates.empty())
     return false;
@@ -6635,7 +6643,8 @@ bool FailureDiagnosis::visitUnresolvedMemberExpr(UnresolvedMemberExpr *E) {
                             baseObjTy,
                             memberConstraint->getFunctionRefKind(),
                             memberConstraint->getLocator(),
-                            /*includeInaccessibleMembers*/true);
+                            /*includeInaccessibleMembers*/true,
+                            /*includeSpecialNames*/true);
 
   switch (result.OverallResult) {
   case MemberLookupResult::Unsolved:

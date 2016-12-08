@@ -3208,7 +3208,7 @@ swift::resolveValueMember(DeclContext &DC, Type BaseTy, DeclName Name) {
   ConstraintSystem CS(*TC, &DC, None);
   MemberLookupResult LookupResult = CS.performMemberLookup(
     ConstraintKind::ValueMember, Name, BaseTy, FunctionRefKind::DoubleApply,
-    nullptr, false);
+    nullptr, false, false);
   if (LookupResult.ViableCandidates.empty())
     return Result;
   ConstraintLocator *Locator = CS.getConstraintLocator(nullptr);

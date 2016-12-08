@@ -136,6 +136,9 @@ ERROR(all_candidates_inaccessible,none,
       "all %0 candidates are inaccessible",
       (DeclName))
 
+ERROR(subscript_not_accessible_via_keyword,none,
+      "subscripts can only be accessed with square bracket notation", ())
+
 ERROR(cannot_pass_rvalue_mutating_subelement,none,
       "cannot use mutating member on immutable value: %0",
       (StringRef))

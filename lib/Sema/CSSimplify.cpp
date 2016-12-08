@@ -2716,11 +2716,16 @@ getArgumentLabels(ConstraintSystem &cs, ConstraintLocatorBuilder locator) {
 /// If includeInaccessibleMembers is set to true, this burns compile time to
 /// try to identify and classify inaccessible members that may be being
 /// referenced.
+///
+/// If includeSpecialNames is set to true, it will also look up special names
+/// for their string representation (e.g. subscript decls for the 'subscript'
+/// identifier).
 MemberLookupResult ConstraintSystem::
 performMemberLookup(ConstraintKind constraintKind, DeclName memberName,
                     Type baseTy, FunctionRefKind functionRefKind,
                     ConstraintLocator *memberLocator,
-                    bool includeInaccessibleMembers) {
+                    bool includeInaccessibleMembers,
+                    bool includeSpecialNames) {
   Type baseObjTy = baseTy->getRValueType();
 
   // Dig out the instance type and figure out what members of the instance type
@@ -3195,6 +3200,36 @@ retry_after_fail:
     }
   }
   
+  // Lookup special DeclNames for their string represenation if we have found
+  // nothing this far
+  if (result.ViableCandidates.empty() && result.UnviableCandidates.empty() &&
+      includeInaccessibleMembers) {
+    NameLookupOptions lookupOptions = defaultMemberLookupOptions;
+    
+    DeclName newLookupName;
+    MemberLookupResult::UnviableReason reason;
+    
+    if (memberName == getASTContext().Id_subscript) {
+      newLookupName = DeclName::createSubscript();
+      reason = MemberLookupResult::UR_SubscriptAsIdentifier;
+    }
+    
+    if (newLookupName) {
+      auto lookup = TC.lookupMember(DC, baseObjTy->getCanonicalType(),
+                                    newLookupName, lookupOptions);
+      for (auto cand : lookup) {
+        // If the result is invalid, skip it.
+        TC.validateDecl(cand, true);
+        if (cand->isInvalid()) {
+          result.markErrorAlreadyDiagnosed();
+          return result;
+        }
+        
+        result.addUnviable(cand, reason);
+      }
+    }
+  }
+  
   return result;
 }
 
@@ -3227,7 +3262,8 @@ ConstraintSystem::simplifyMemberConstraint(ConstraintKind kind,
   auto locator = getConstraintLocator(locatorB);
   MemberLookupResult result =
     performMemberLookup(kind, member, baseTy, functionRefKind, locator,
-                        /*includeInaccessibleMembers*/false);
+                        /*includeInaccessibleMembers*/false,
+                        /*includeSpecialNames*/false);
   
   switch (result.OverallResult) {
   case MemberLookupResult::Unsolved:
