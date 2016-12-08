@@ -325,7 +325,7 @@ int swift::RunImmediately(CompilerInstance &CI, const ProcessCmdLine &CmdLine,
   using ArgOverride = void (*)(const char **, int);
 #if defined(_WIN32)
   auto module = static_cast<HMODULE>(stdlib);
-  auto emplaceProcessArgs = static_cast<ArgOverride>(
+  auto emplaceProcessArgs = reinterpret_cast<ArgOverride>(
     GetProcAddress(module, "_swift_stdlib_overrideUnsafeArgvArgc"));
   if (emplaceProcessArgs == nullptr)
     return -1;
