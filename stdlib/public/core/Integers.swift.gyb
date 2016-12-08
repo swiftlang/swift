@@ -2158,10 +2158,18 @@ extension UnsignedInteger {
   public static var isSigned: Bool { return false }
 
   public var description: String {
-    if self == 0 {
+    if self.bitWidth <= ${word_bits} {
+      return _uint64ToString(UInt64(extendingOrTruncating: self))
+    }
+    if self == (0 as Self) {
       return "0"
     }
+    return renderNonZeroDescription()
+  }
 
+  // FIXME(integers): perhaps a faster implementation is possible
+  @_transparent
+  internal func renderNonZeroDescription() -> String {
     let ascii0 = 48
     var buf: [UnicodeScalar] = []
 
@@ -2216,7 +2224,6 @@ extension UnsignedInteger where Self : FixedWidthInteger {
   public static var min: Self {
     return 0
   }
-
 }
 
 
@@ -2231,8 +2238,12 @@ public protocol SignedInteger : BinaryInteger, SignedArithmetic {
 
 extension SignedInteger {
   public var description: String {
-    let base = String(describing: magnitude)
-    return self < 0 ? "-" + base : base
+    if self.bitWidth <= ${word_bits} {
+      return _int64ToString(Int64(extendingOrTruncating: self))
+    }
+
+    let base = magnitude.description
+    return self < (0 as Self) ? "-" + base : base
   }
 
   @_transparent
