@@ -203,10 +203,6 @@ public:
   /// The name of the SwiftShims module "SwiftShims".
   Identifier SwiftShimsModuleName;
 
-  /// Note: in non-NDEBUG builds, tracks the context of each primary
-  /// archetype type, which can be very useful for debugging.
-  llvm::DenseMap<ArchetypeType *, DeclContext *> ArchetypeContexts;
-
   // Define the set of known identifiers.
 #define IDENTIFIER_WITH_NAME(Name, IdStr) Identifier Id_##Name;
 #include "swift/AST/KnownIdentifiers.def"

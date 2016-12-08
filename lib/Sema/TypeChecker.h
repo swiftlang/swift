@@ -1071,10 +1071,6 @@ public:
                                    [&](ArchetypeBuilder &) { });
   }
 
-  /// Store a mapping from archetypes to DeclContexts for debugging.
-  void recordArchetypeContexts(GenericEnvironment *genericEnv,
-                               DeclContext *dc);
-
   /// Validate the signature of a generic type.
   ///
   /// \param nominal The generic type.

@@ -1466,6 +1466,9 @@ public:
   void setGenericEnvironment(GenericEnvironment *env) {
     assert(!GenericEnv && "Already have generic context");
     GenericEnv = env;
+
+    if (GenericEnv)
+      GenericEnv->setOwningDeclContext(this);
   }
 
   /// Retrieve the generic requirements.
@@ -2275,6 +2278,9 @@ public:
   void setGenericEnvironment(GenericEnvironment *env) {
     assert(!this->GenericEnv && "already have generic context?");
     this->GenericEnv = env;
+
+    if (GenericEnv)
+      GenericEnv->setOwningDeclContext(this);
   }
 
   // Resolve ambiguity due to multiple base classes.
@@ -4558,6 +4564,9 @@ public:
   void setGenericEnvironment(GenericEnvironment *GenericEnv) {
     assert(!this->GenericEnv && "already have generic context?");
     this->GenericEnv = GenericEnv;
+
+    if (GenericEnv)
+      GenericEnv->setOwningDeclContext(this);
   }
 
   // Expose our import as member status

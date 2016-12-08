@@ -2386,13 +2386,9 @@ void ASTContext::dumpArchetypeContext(ArchetypeType *archetype,
   if (archetype->isOpenedExistential())
     return;
 
-  archetype = archetype->getPrimary();
-  if (!archetype)
-    return;
-
-  auto knownDC = ArchetypeContexts.find(archetype);
-  if (knownDC != ArchetypeContexts.end())
-    knownDC->second->printContext(os, indent);
+  if (auto env = archetype->getGenericEnvironment())
+    if (auto owningDC = env->getOwningDeclContext())
+      owningDC->printContext(os, indent);
 }
 
 //===----------------------------------------------------------------------===//
