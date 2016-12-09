@@ -657,9 +657,35 @@ void ASTMangler::appendType(Type type) {
       appendFunctionType(cast<FunctionType>(tybase));
       return;
       
-    case TypeKind::SILBox:
-      appendType(cast<SILBoxType>(tybase)->getBoxedType());
-      return appendOperator("Xb");
+    case TypeKind::SILBox: {
+      auto box = cast<SILBoxType>(tybase);
+      auto layout = box->getLayout();
+      SmallVector<TupleTypeElt, 4> fieldsList;
+      for (auto &field : layout->getFields()) {
+        auto fieldTy = field.getLoweredType();
+        // Use the `inout` mangling to represent a mutable field.
+        if (field.isMutable())
+          fieldTy = CanInOutType::get(fieldTy);
+        fieldsList.push_back(TupleTypeElt(fieldTy));
+      }
+      appendTypeList(TupleType::get(fieldsList, tybase->getASTContext())
+                       ->getCanonicalType());
+
+      if (auto sig = layout->getGenericSignature()) {
+        fieldsList.clear();
+        for (auto &arg : box->getGenericArgs()) {
+          fieldsList.push_back(TupleTypeElt(arg.getReplacement()));
+        }
+        appendTypeList(TupleType::get(fieldsList, tybase->getASTContext())
+                         ->getCanonicalType());
+        appendGenericSignature(sig);
+        appendOperator("XX");
+      } else {
+        appendOperator("Xx");
+      }
+
+      return;
+    }
 
     case TypeKind::SILBlockStorage:
       llvm_unreachable("should never be mangled");

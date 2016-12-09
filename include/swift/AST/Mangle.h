@@ -95,6 +95,7 @@ public:
   void mangleBoundGenericType(Type type);
   void mangleProtocolDecl(const ProtocolDecl *protocol);
   void mangleType(Type type, unsigned uncurryingLevel);
+  void mangleLegacyBoxType(CanType fieldType);
   void mangleDirectness(bool isIndirect);
   void mangleProtocolName(const ProtocolDecl *protocol);
   void mangleProtocolConformance(const ProtocolConformance *conformance);

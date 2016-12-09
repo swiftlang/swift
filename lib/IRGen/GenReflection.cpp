@@ -216,7 +216,15 @@ protected:
                             /*usePunyCode*/ true,
                             /*OptimizeProtocolNames*/ false);
     mangler.setModuleContext(ModuleContext);
-    mangler.mangleType(type, 0);
+    
+    // TODO: As a compatibility hack, mangle single-field boxes with the legacy
+    // mangling in reflection metadata.
+    auto boxTy = dyn_cast<SILBoxType>(type);
+    if (boxTy && boxTy->getLayout()->getFields().size() == 1) {
+      mangler.mangleLegacyBoxType(boxTy->getFieldLoweredType(0));
+    } else {
+      mangler.mangleType(type, 0);
+    }
     auto mangledName = IGM.getAddrOfStringForTypeRef(mangler.finalize());
     addRelativeAddress(mangledName);
   }
