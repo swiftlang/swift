@@ -5,8 +5,8 @@
 // Copyright (c) 2014 - 2016 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
-// See http://swift.org/LICENSE.txt for license information
-// See http://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
+// See https://swift.org/LICENSE.txt for license information
+// See https://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
 //
 //===----------------------------------------------------------------------===//
 //
@@ -58,6 +58,8 @@ enum class ConstraintKind : char {
   /// type is an lvalue type with the same object type. Otherwise, the two
   /// types must be the same type.
   BindParam,
+  /// \brief Binds the first type to the element type of the second type.
+  BindToPointerType,
   /// \brief The first type is a subtype of the second type, i.e., a value
   /// of the type of the first type can be used wherever a value of the
   /// second type is expected.
@@ -81,6 +83,9 @@ enum class ConstraintKind : char {
   /// \brief The first type must conform to the second type (which is a
   /// protocol type).
   ConformsTo,
+  /// \brief The first type describes a literal that conforms to the second
+  /// type, which is one of the known expressible-by-literal protocols.
+  LiteralConformsTo,
   /// A checked cast from the first type to the second.
   CheckedCast,
   /// \brief The first type can act as the Self type of the second type (which
@@ -109,14 +114,6 @@ enum class ConstraintKind : char {
   /// name, and the type of that member, when referenced as a value, is the
   /// second type.
   UnresolvedValueMember,
-  /// \brief The first type has a type member with the given name, and the
-  /// type of that member, when referenced as a type, is the second type.
-  TypeMember,
-  /// \brief The first type must be an archetype.
-  Archetype,
-  /// \brief The first type is a class or an archetype of a class-bound
-  /// protocol.
-  Class,
   /// \brief The first type can be defaulted to the second (which currently
   /// cannot be dependent).  This is more like a type property than a
   /// relational constraint.
@@ -138,7 +135,8 @@ enum class ConstraintClassification : char {
   /// it a reference type.
   Member,
 
-  /// \brief A property of a single type, such as whether it is an archetype.
+  /// \brief A property of a single type, such as whether it is defaultable to
+  /// a particular type.
   TypeProperty,
 
   /// \brief A disjunction constraint.
@@ -465,6 +463,7 @@ public:
     case ConstraintKind::Bind:
     case ConstraintKind::Equal:
     case ConstraintKind::BindParam:
+    case ConstraintKind::BindToPointerType:
     case ConstraintKind::Subtype:
     case ConstraintKind::Conversion:
     case ConstraintKind::ExplicitConversion:
@@ -473,6 +472,7 @@ public:
     case ConstraintKind::OperatorArgumentTupleConversion:
     case ConstraintKind::OperatorArgumentConversion:
     case ConstraintKind::ConformsTo:
+    case ConstraintKind::LiteralConformsTo:
     case ConstraintKind::CheckedCast:
     case ConstraintKind::SelfObjectOfProtocol:
     case ConstraintKind::ApplicableFunction:
@@ -482,11 +482,8 @@ public:
 
     case ConstraintKind::ValueMember:
     case ConstraintKind::UnresolvedValueMember:
-    case ConstraintKind::TypeMember:
       return ConstraintClassification::Member;
 
-    case ConstraintKind::Archetype:
-    case ConstraintKind::Class:
     case ConstraintKind::DynamicTypeOf:
     case ConstraintKind::Defaultable:
       return ConstraintClassification::TypeProperty;
@@ -494,6 +491,8 @@ public:
     case ConstraintKind::Disjunction:
       return ConstraintClassification::Disjunction;
     }
+
+    llvm_unreachable("Unhandled ConstraintKind in switch.");
   }
 
   /// \brief Retrieve the first type in the constraint.
@@ -518,16 +517,14 @@ public:
   /// \brief Retrieve the name of the member for a member constraint.
   DeclName getMember() const {
     assert(Kind == ConstraintKind::ValueMember ||
-           Kind == ConstraintKind::UnresolvedValueMember ||
-           Kind == ConstraintKind::TypeMember);
+           Kind == ConstraintKind::UnresolvedValueMember);
     return Types.Member;
   }
 
   /// \brief Determine whether this constraint kind has a second type.
   static bool hasMember(ConstraintKind kind) {
     return kind == ConstraintKind::ValueMember
-        || kind == ConstraintKind::UnresolvedValueMember
-        || kind == ConstraintKind::TypeMember;
+        || kind == ConstraintKind::UnresolvedValueMember;
   }
 
   /// Determine the kind of function reference we have for a member reference.
@@ -589,16 +586,6 @@ struct ilist_traits<swift::constraints::Constraint>
 
   static Element *createNode(const Element &V) = delete;
   static void deleteNode(Element *V) { /* never deleted */ }
-
-  Element *createSentinel() const { return static_cast<Element *>(&Sentinel); }
-  static void destroySentinel(Element *) {}
-
-  Element *provideInitialHead() const { return createSentinel(); }
-  Element *ensureHead(Element *) const { return createSentinel(); }
-  static void noteHead(Element *, Element *) {}
-
-private:
-  mutable ilist_half_node<Element> Sentinel;
 };
 
 } // end namespace llvm

@@ -5,8 +5,8 @@
 // Copyright (c) 2014 - 2016 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
-// See http://swift.org/LICENSE.txt for license information
-// See http://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
+// See https://swift.org/LICENSE.txt for license information
+// See https://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
 //
 //===----------------------------------------------------------------------===//
 
@@ -93,7 +93,7 @@ public struct FlattenSequence<Base : Sequence> : Sequence
   public func makeIterator() -> FlattenIterator<Base.Iterator> {
     return FlattenIterator(_base: _base.makeIterator())
   }
-  
+
   internal var _base: Base
 }
 
@@ -126,7 +126,7 @@ extension Sequence where Iterator.Element : Sequence {
   public func joined() -> FlattenSequence<Self> {
     return FlattenSequence(_base: self)
   }
-  
+
   @available(*, unavailable, renamed: "joined()")
   public func flatten() -> FlattenSequence<Self> {
     Builtin.unreachable()
@@ -187,14 +187,14 @@ public struct ${Index}<BaseElements>
 
 extension ${Index} : Comparable {
   public static func == (
-    lhs: ${Index}<BaseElements>, 
+    lhs: ${Index}<BaseElements>,
     rhs: ${Index}<BaseElements>
   ) -> Bool {
     return lhs._outer == rhs._outer && lhs._inner == rhs._inner
   }
 
   public static func < (
-    lhs: ${Index}<BaseElements>, 
+    lhs: ${Index}<BaseElements>,
     rhs: ${Index}<BaseElements>
   ) -> Bool {
     // FIXME: swift-3-indexing-model: tests.
@@ -250,7 +250,7 @@ public struct ${Collection}<Base> : ${collectionForTraversal(traversal)}
   public typealias Index = ${Index}<Base>
 
   public typealias IndexDistance = Base.IndexDistance
-  
+
   /// Creates a flattened view of `base`.
   public init(_ base: Base) {
     self._base = base
@@ -405,7 +405,7 @@ extension ${collectionForTraversal(traversal)}
   public func joined() -> ${Collection}<Self> {
     return ${Collection}(self)
   }
-  
+
   @available(*, unavailable, renamed: "joined()")
   public func flatten() -> ${Collection}<Self> {
     Builtin.unreachable()
@@ -423,7 +423,7 @@ extension LazyCollectionProtocol
   public func joined() -> LazyCollection<${Collection}<Elements>> {
     return ${Collection}(elements).lazy
   }
-  
+
   @available(*, unavailable, renamed: "joined()")
   public func flatten() -> LazyCollection<${Collection}<Elements>> {
     Builtin.unreachable()

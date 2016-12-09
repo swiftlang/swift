@@ -20,15 +20,16 @@ func if_no_else() {
   if let x = foo() {
   // CHECK: [[YES]]([[VAL:%[0-9]+]] : $String):
   // CHECK:   [[A:%.*]] = function_ref @_TF16if_while_binding
-  // CHECK:   retain_value [[VAL]]
-  // CHECK:   apply [[A]]([[VAL]])
-  // CHECK:   release_value [[VAL]]
+  // CHECK:   [[VAL_COPY:%.*]] = copy_value [[VAL]]
+  // CHECK:   apply [[A]]([[VAL_COPY]])
+  // CHECK:   destroy_value [[VAL]]
   // CHECK:   br [[CONT]]
     a(x)
   }
   // CHECK: [[CONT]]:
   // CHECK-NEXT:   tuple ()
 }
+// CHECK: } // end sil function '_TF16if_while_binding10if_no_else{{.*}}'
 
 // CHECK-LABEL: sil hidden @_TF16if_while_binding13if_else_chainFT_T_ : $@convention(thin) () -> () {
 func if_else_chain() {
@@ -39,16 +40,16 @@ func if_else_chain() {
   // CHECK: [[YESX]]([[VAL:%[0-9]+]] : $String):
   // CHECK:   debug_value [[VAL]] : $String, let, name "x"
   // CHECK:   [[A:%.*]] = function_ref @_TF16if_while_binding
-  // CHECK:   retain_value [[VAL]]
-  // CHECK:   apply [[A]]([[VAL]])
-  // CHECK:   release_value [[VAL]]
+  // CHECK:   [[VAL_COPY:%.*]] = copy_value [[VAL]]
+  // CHECK:   apply [[A]]([[VAL_COPY]])
+  // CHECK:   destroy_value [[VAL]]
   // CHECK:   br [[CONT_X:bb[0-9]+]]
     a(x)
   // CHECK: [[NOX]]:
-  // CHECK:   alloc_box $String, var, name "y"
+  // CHECK:   alloc_box $<τ_0_0> { var τ_0_0 } <String>, var, name "y"
   // CHECK:   switch_enum {{.*}} : $Optional<String>, case #Optional.some!enumelt.1: [[YESY:bb[0-9]+]], default [[ELSE1:bb[0-9]+]]
     // CHECK: [[ELSE1]]:
-    // CHECK:   dealloc_box {{.*}} $@box String
+    // CHECK:   dealloc_box {{.*}} $<τ_0_0> { var τ_0_0 } <String>
     // CHECK:   br [[ELSE:bb[0-9]+]]
   } else if var y = bar() {
   // CHECK: [[YESY]]([[VAL:%[0-9]+]] : $String):
@@ -79,12 +80,12 @@ func while_loop() {
   // CHECK: [[YES]]([[Y:%[0-9]+]] : $String):
       a(y)
       break
-      // CHECK: release_value [[Y]]
-      // CHECK: release_value [[X]]
+      // CHECK: destroy_value [[Y]]
+      // CHECK: destroy_value [[X]]
       // CHECK:     br [[LOOP_EXIT]]
     }
   // CHECK: [[NO]]:
-  // CHECK:   release_value [[X]]
+  // CHECK:   destroy_value [[X]]
   // CHECK:   br [[LOOP_ENTRY]]
   }
   // CHECK: [[LOOP_EXIT]]:
@@ -111,7 +112,7 @@ func while_loop() {
 // CHECK:         dealloc_stack [[X]]
 // CHECK:         br [[COND]]
 // CHECK:       [[DONE]]:
-// CHECK:         strong_release %0
+// CHECK:         destroy_value %0
 func while_loop_generic<T>(_ source: () -> T?) {
   while let x = source() {
   }
@@ -130,15 +131,16 @@ func while_loop_multi() {
   // CHECK:   switch_enum {{.*}}, case #Optional.some!enumelt.1: [[LOOP_BODY:bb.*]], default [[LOOP_EXIT2a:bb[0-9]+]]
 
   // CHECK: [[LOOP_EXIT2a]]:
-  // CHECK: release_value [[A]]
+  // CHECK: destroy_value [[A]]
   // CHECK: br [[LOOP_EXIT0]]
 
   // CHECK: [[LOOP_BODY]]([[B:%[0-9]+]] : $String):
   while let a = foo(), let b = bar() {
     // CHECK:   debug_value [[B]] : $String, let, name "b"
-    // CHECK:   debug_value [[A]] : $String, let, name "c"
-    // CHECK:   release_value [[B]]
-    // CHECK:   release_value [[A]]
+    // CHECK:   [[A_COPY:%.*]] = copy_value [[A]]
+    // CHECK:   debug_value [[A_COPY]] : $String, let, name "c"
+    // CHECK:   destroy_value [[A_COPY]]
+    // CHECK:   destroy_value [[B]]
     // CHECK:   br [[LOOP_ENTRY]]
     let c = a
   }
@@ -153,21 +155,21 @@ func if_multi() {
 
   // CHECK: [[CHECKBUF2]]([[A:%[0-9]+]] : $String):
   // CHECK:   debug_value [[A]] : $String, let, name "a"
-  // CHECK:   [[B:%[0-9]+]] = alloc_box $String, var, name "b"
+  // CHECK:   [[B:%[0-9]+]] = alloc_box $<τ_0_0> { var τ_0_0 } <String>, var, name "b"
   // CHECK:   [[PB:%[0-9]+]] = project_box [[B]]
   // CHECK:   switch_enum {{.*}}, case #Optional.some!enumelt.1: [[IF_BODY:bb.*]], default [[IF_EXIT1a:bb[0-9]+]]
 
   // CHECK: [[IF_EXIT1a]]:
-  // CHECK:   dealloc_box {{.*}} $@box String
-  // CHECK:   release_value [[A]]
+  // CHECK:   dealloc_box {{.*}} $<τ_0_0> { var τ_0_0 } <String>
+  // CHECK:   destroy_value [[A]]
   // CHECK:   br [[IF_DONE]]
 
   // CHECK: [[IF_BODY]]([[BVAL:%[0-9]+]] : $String):
   if let a = foo(), var b = bar() {
-    // CHECK:   store [[BVAL]] to [[PB]] : $*String
+    // CHECK:   store [[BVAL]] to [init] [[PB]] : $*String
     // CHECK:   debug_value {{.*}} : $String, let, name "c"
-    // CHECK:   strong_release [[B]]
-    // CHECK:   release_value [[A]]
+    // CHECK:   destroy_value [[B]]
+    // CHECK:   destroy_value [[A]]
     // CHECK:   br [[IF_DONE]]
     let c = a
   }
@@ -181,21 +183,21 @@ func if_multi_else() {
   // CHECK:   switch_enum {{.*}}, case #Optional.some!enumelt.1: [[CHECKBUF2:bb.*]], default [[ELSE:bb[0-9]+]]
   // CHECK: [[CHECKBUF2]]([[A:%[0-9]+]] : $String):
   // CHECK:   debug_value [[A]] : $String, let, name "a"
-  // CHECK:   [[B:%[0-9]+]] = alloc_box $String, var, name "b"
+  // CHECK:   [[B:%[0-9]+]] = alloc_box $<τ_0_0> { var τ_0_0 } <String>, var, name "b"
   // CHECK:   [[PB:%[0-9]+]] = project_box [[B]]
   // CHECK:   switch_enum {{.*}}, case #Optional.some!enumelt.1: [[IF_BODY:bb.*]], default [[IF_EXIT1a:bb[0-9]+]]
   
     // CHECK: [[IF_EXIT1a]]:
-    // CHECK:   dealloc_box {{.*}} $@box String
-    // CHECK:   release_value [[A]]
+    // CHECK:   dealloc_box {{.*}} $<τ_0_0> { var τ_0_0 } <String>
+    // CHECK:   destroy_value [[A]]
     // CHECK:   br [[ELSE]]
 
   // CHECK: [[IF_BODY]]([[BVAL:%[0-9]+]] : $String):
   if let a = foo(), var b = bar() {
-    // CHECK:   store [[BVAL]] to [[PB]] : $*String
+    // CHECK:   store [[BVAL]] to [init] [[PB]] : $*String
     // CHECK:   debug_value {{.*}} : $String, let, name "c"
-    // CHECK:   strong_release [[B]]
-    // CHECK:   release_value [[A]]
+    // CHECK:   destroy_value [[B]]
+    // CHECK:   destroy_value [[A]]
     // CHECK:   br [[IF_DONE:bb[0-9]+]]
     let c = a
   } else {
@@ -214,25 +216,25 @@ func if_multi_where() {
   // CHECK:   switch_enum {{.*}}, case #Optional.some!enumelt.1: [[CHECKBUF2:bb.*]], default [[ELSE:bb[0-9]+]]
   // CHECK: [[CHECKBUF2]]([[A:%[0-9]+]] : $String):
   // CHECK:   debug_value [[A]] : $String, let, name "a"
-  // CHECK:   [[BBOX:%[0-9]+]] = alloc_box $String, var, name "b"
+  // CHECK:   [[BBOX:%[0-9]+]] = alloc_box $<τ_0_0> { var τ_0_0 } <String>, var, name "b"
   // CHECK:   [[PB:%[0-9]+]] = project_box [[BBOX]]
   // CHECK:   switch_enum {{.*}}, case #Optional.some!enumelt.1: [[CHECK_WHERE:bb.*]], default [[IF_EXIT1a:bb[0-9]+]]
   // CHECK: [[IF_EXIT1a]]:
-  // CHECK:   dealloc_box {{.*}} $@box String
-  // CHECK:   release_value [[A]]
+  // CHECK:   dealloc_box {{.*}} $<τ_0_0> { var τ_0_0 } <String>
+  // CHECK:   destroy_value [[A]]
   // CHECK:   br [[ELSE]]
 
   // CHECK: [[CHECK_WHERE]]([[B:%[0-9]+]] : $String):
   // CHECK:   function_ref Swift.Bool._getBuiltinLogicValue () -> Builtin.Int1
   // CHECK:   cond_br {{.*}}, [[IF_BODY:bb[0-9]+]], [[IF_EXIT3:bb[0-9]+]]
   // CHECK: [[IF_EXIT3]]:
-  // CHECK:   strong_release [[BBOX]]
-  // CHECK:   release_value [[A]]
+  // CHECK:   destroy_value [[BBOX]]
+  // CHECK:   destroy_value [[A]]
   // CHECK:   br [[IF_DONE:bb[0-9]+]]
   if let a = foo(), var b = bar(), a == b {
     // CHECK: [[IF_BODY]]:
-    // CHECK:   strong_release [[BBOX]]
-    // CHECK:   release_value [[A]]
+    // CHECK:   destroy_value [[BBOX]]
+    // CHECK:   destroy_value [[A]]
     // CHECK:   br [[IF_DONE]]
     let c = a
   }
@@ -242,13 +244,13 @@ func if_multi_where() {
 }
 
 
-// <rdar://problem/19797158> Swift 1.2's "if" has 2 behaviours. They could be unified.
+// <rdar://problem/19797158> Swift 1.2's "if" has 2 behaviors. They could be unified.
 // CHECK-LABEL: sil hidden @_TF16if_while_binding18if_leading_booleanFSiT_
 func if_leading_boolean(_ a : Int) {
   // Test the boolean condition.
   
   // CHECK: debug_value %0 : $Int, let, name "a"
-  // CHECK: [[EQRESULT:%[0-9]+]] = apply {{.*}}(%0, %0) : $@convention(thin) (Int, Int) -> Bool
+  // CHECK: [[EQRESULT:%[0-9]+]] = apply {{.*}}(%0, %0{{.*}}) : $@convention({{.*}}) (Int, Int{{.*}}) -> Bool
 
   // CHECK-NEXT: [[EQRESULTI1:%[0-9]+]] = apply %2([[EQRESULT]]) : $@convention(method) (Bool) -> Builtin.Int1
   // CHECK-NEXT: cond_br [[EQRESULTI1]], [[CHECKFOO:bb[0-9]+]], [[IFDONE:bb[0-9]+]]
@@ -260,10 +262,12 @@ func if_leading_boolean(_ a : Int) {
   // CHECK:   switch_enum [[OPTRESULT]] : $Optional<String>, case #Optional.some!enumelt.1: [[SUCCESS:bb.*]], default [[IF_DONE:bb[0-9]+]]
 
 // CHECK: [[SUCCESS]]([[B:%[0-9]+]] : $String):
-  // CHECK-NEXT:   debug_value [[B:%[0-9]+]] : $String, let, name "b"
-  // CHECK-NEXT:   debug_value [[B:%[0-9]+]] : $String, let, name "c"
-  // CHECK-NEXT:   release_value [[B]]
-  // CHECK-NEXT:   br [[IFDONE]]
+  // CHECK:   debug_value [[B]] : $String, let, name "b"
+  // CHECK:   [[B_COPY:%.*]] = copy_value [[B]]
+  // CHECK:   debug_value [[B_COPY]] : $String, let, name "c"
+  // CHECK:   destroy_value [[B_COPY]]
+  // CHECK:   destroy_value [[B]]
+  // CHECK:   br [[IFDONE]]
   if a == a, let b = foo() {
     let c = b
   }
@@ -279,36 +283,35 @@ class DerivedClass : BaseClass {}
 
 // CHECK-LABEL: sil hidden @_TF16if_while_binding20testAsPatternInIfLetFGSqCS_9BaseClass_T_
 func testAsPatternInIfLet(_ a : BaseClass?) {
-  // CHECK: bb0(%0 : $Optional<BaseClass>):
-  // CHECK-NEXT:   debug_value %0 : $Optional<BaseClass>, let, name "a"
-  // CHECK-NEXT:   retain_value %0 : $Optional<BaseClass>
-  // CHECK-NEXT:   switch_enum %0 : $Optional<BaseClass>, case #Optional.some!enumelt.1: [[OPTPRESENTBB:bb[0-9]+]], default [[NILBB:bb[0-9]+]]
-  
-  // CHECK:      [[OPTPRESENTBB]](%4 : $BaseClass):
-  // CHECK-NEXT:   checked_cast_br %4 : $BaseClass to $DerivedClass, [[ISDERIVEDBB:bb[0-9]+]], [[ISBASEBB:bb[0-9]+]]
+  // CHECK: bb0([[ARG:%.*]] : $Optional<BaseClass>):
+  // CHECK:   debug_value [[ARG]] : $Optional<BaseClass>, let, name "a"
+  // CHECK:   [[ARG_COPY:%.*]] = copy_value [[ARG]] : $Optional<BaseClass>
+  // CHECK:   switch_enum [[ARG_COPY]] : $Optional<BaseClass>, case #Optional.some!enumelt.1: [[OPTPRESENTBB:bb[0-9]+]], default [[NILBB:bb[0-9]+]]
 
-  // CHECK:      [[ISDERIVEDBB]](%6 : $DerivedClass):
-  // CHECK:    enum $Optional<DerivedClass>, #Optional.some!enumelt.1, %6 : $DerivedClass
-  // CHECK:    br [[MERGE:bb[0-9]+]](
+  // CHECK: [[OPTPRESENTBB]]([[CLS:%.*]] : $BaseClass):
+  // CHECK:   checked_cast_br [[CLS]] : $BaseClass to $DerivedClass, [[ISDERIVEDBB:bb[0-9]+]], [[ISBASEBB:bb[0-9]+]]
+
+  // CHECK: [[ISDERIVEDBB]]([[DERIVED_CLS:%.*]] : $DerivedClass):
+  // CHECK:   [[DERIVED_CLS_SOME:%.*]] = enum $Optional<DerivedClass>, #Optional.some!enumelt.1, [[DERIVED_CLS]] : $DerivedClass
+  // CHECK:   br [[MERGE:bb[0-9]+]]([[DERIVED_CLS_SOME]] : $Optional<DerivedClass>)
 
   // CHECK: [[ISBASEBB]]:
-  // CHECK:    strong_release %4 : $BaseClass
-  // CHECK: = enum $Optional<DerivedClass>, #Optional.none!enumelt
-  // CHECK: br [[MERGE]](
+  // CHECK:   destroy_value [[CLS]] : $BaseClass
+  // CHECK:   = enum $Optional<DerivedClass>, #Optional.none!enumelt
+  // CHECK:   br [[MERGE]](
 
   // CHECK: [[MERGE]]([[OPTVAL:%[0-9]+]] : $Optional<DerivedClass>):
   // CHECK:    switch_enum [[OPTVAL]] : $Optional<DerivedClass>, case #Optional.some!enumelt.1: [[ISDERIVEDBB:bb[0-9]+]], default [[NILBB:bb[0-9]+]]
 
-  // CHECK:      [[ISDERIVEDBB]]([[DERIVEDVAL:%[0-9]+]] : $DerivedClass):
-  // CHECK-NEXT:   debug_value [[DERIVEDVAL]] : $DerivedClass
-  // CHECK-NEXT:   strong_release [[DERIVEDVAL]] : $DerivedClass
-  // CHECK-NEXT:   br [[NILBB]]
-   
+  // CHECK: [[ISDERIVEDBB]]([[DERIVEDVAL:%[0-9]+]] : $DerivedClass):
+  // CHECK:   debug_value [[DERIVEDVAL]] : $DerivedClass
+  // CHECK:   destroy_value [[DERIVEDVAL]] : $DerivedClass
+  // CHECK:   br [[NILBB]]
   
-  // CHECK:      [[NILBB]]:
-  // CHECK-NEXT:   release_value %0 : $Optional<BaseClass>
-  // CHECK-NEXT:   tuple ()
-  // CHECK-NEXT:   return
+  // CHECK: [[NILBB]]:
+  // CHECK:   destroy_value [[ARG]] : $Optional<BaseClass>
+  // CHECK:   tuple ()
+  // CHECK:   return
   if case let b as DerivedClass = a {
 
   }

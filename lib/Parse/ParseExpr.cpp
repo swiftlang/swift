@@ -5,8 +5,8 @@
 // Copyright (c) 2014 - 2016 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
-// See http://swift.org/LICENSE.txt for license information
-// See http://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
+// See https://swift.org/LICENSE.txt for license information
+// See https://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
 //
 //===----------------------------------------------------------------------===//
 //
@@ -363,6 +363,23 @@ ParserResult<Expr> Parser::parseExprSequenceElement(Diag<> message,
   if (hadTry && Tok.isAny(tok::exclaim_postfix, tok::question_postfix)) {
     trySuffix = Tok;
     consumeToken();
+  }
+
+  // Try to parse '@' sign or 'inout' as a attributed typerepr.
+  if (Tok.isAny(tok::at_sign, tok::kw_inout)) {
+    bool isType = false;
+    {
+      BacktrackingScope backtrack(*this);
+      isType = canParseType();
+    }
+    if (isType) {
+      ParserResult<TypeRepr> ty = parseType();
+      if (ty.isNonNull())
+        return makeParserResult(
+            new (Context) TypeExpr(TypeLoc(ty.get(), Type())));
+      checkForInputIncomplete();
+      return nullptr;
+    }
   }
 
   ParserResult<Expr> sub = parseExprUnary(message, isExprBasic);
@@ -743,10 +760,10 @@ ParserResult<Expr> Parser::parseExprSuper(bool isExprBasic) {
                                             /*Implicit=*/false))
     : cast<Expr>(new (Context) ErrorExpr(superLoc));
   
-  if (Tok.is(tok::period)) {
+  if (Tok.isAny(tok::period, tok::period_prefix)) {
     // 'super.' must be followed by a member or initializer ref.
 
-    SourceLoc dotLoc = consumeToken(tok::period);
+    SourceLoc dotLoc = consumeToken();
     
     if (Tok.is(tok::code_complete)) {
       if (CodeCompletion) {
@@ -858,8 +875,11 @@ static bool isStartOfGetSetAccessor(Parser &P) {
   P.consumeToken(tok::l_brace);
 
   // Eat attributes, if present.
-  if (!P.canParseAttributes())
-    return false;
+  while (P.consumeIf(tok::at_sign)) {
+    if (!P.consumeIf(tok::identifier)) return false;
+    // Eat paren after attribute name; e.g. @foo(x)
+    if (P.Tok.is(tok::l_paren)) P.skipSingle();
+  }
 
   // Check if we have 'didSet'/'willSet' after attributes.
   return P.Tok.isContextualKeyword("didSet") ||
@@ -1382,9 +1402,11 @@ ParserResult<Expr> Parser::parseExprPostfix(Diag<> ID, bool isExprBasic) {
 #include "swift/Parse/Tokens.def"
 
   case tok::code_complete:
-    Result = makeParserResult(new (Context) CodeCompletionExpr(Tok.getRange()));
+    Result = makeParserResult(new (Context) CodeCompletionExpr(Tok.getLoc()));
     Result.setHasCodeCompletion();
-    if (CodeCompletion)
+    if (CodeCompletion &&
+        // We cannot code complete anything after var/let.
+        (!InVarOrLetPattern || InVarOrLetPattern == IVOLP_InMatchingPattern))
       CodeCompletion->completePostfixExprBeginning(dyn_cast<CodeCompletionExpr>(
         Result.get()));
     consumeToken(tok::code_complete);
@@ -1426,8 +1448,9 @@ ParserResult<Expr> Parser::parseExprPostfix(Diag<> ID, bool isExprBasic) {
         SourceLoc nameLoc = consumeToken(tok::integer_literal);
         
         // Don't allow '.<integer literal>' following a numeric literal
-        // expression.
-        if (Result.isNonNull() && isa<NumberLiteralExpr>(Result.get())) {
+        // expression (unless in #if env, for 1.2.3.4 version numbers)
+        if (!InPoundIfEnvironment &&
+            Result.isNonNull() && isa<NumberLiteralExpr>(Result.get())) {
           diagnose(nameLoc, diag::numeric_literal_numeric_member)
             .highlight(Result.get()->getSourceRange());
           continue;
@@ -1449,9 +1472,8 @@ ParserResult<Expr> Parser::parseExprPostfix(Diag<> ID, bool isExprBasic) {
 
       // Handle the deprecated 'x.dynamicType' and migrate it to `type(of: x)`
       if (Tok.getText() == "dynamicType") {
-        BacktrackingScope backtrackScope(*this);
         auto range = Result.get()->getSourceRange();
-        auto dynamicTypeExprRange = SourceRange(TokLoc, consumeToken());
+        auto dynamicTypeExprRange = SourceRange(TokLoc, Tok.getLoc());
         diagnose(TokLoc, diag::expr_dynamictype_deprecated)
           .highlight(dynamicTypeExprRange)
           .fixItReplace(dynamicTypeExprRange, ")")
@@ -1895,7 +1917,7 @@ Expr *Parser::parseExprIdentifier() {
   }
   
   Expr *E;
-  if (D == 0) {
+  if (D == nullptr) {
     if (name.getBaseName().isEditorPlaceholder())
       return parseExprEditorPlaceholder(IdentTok, name.getBaseName());
 
@@ -2461,7 +2483,7 @@ ParserResult<Expr> Parser::parseExprList(tok leftTok, tok rightTok) {
                                       rightLoc,
                                       trailingClosure);
 
-  // A tuple with a single, unlabelled element is just parentheses.
+  // A tuple with a single, unlabeled element is just parentheses.
   if (subExprs.size() == 1 &&
       (subExprNames.empty() || subExprNames[0].empty())) {
     return makeParserResult(
@@ -2725,7 +2747,7 @@ Parser::parseExprCallSuffix(ParserResult<Expr> fn, bool isExprBasic) {
   // callback.
   if (peekToken().is(tok::code_complete) && CodeCompletion) {
     consumeToken(tok::l_paren);
-    auto CCE = new (Context) CodeCompletionExpr(Tok.getRange());
+    auto CCE = new (Context) CodeCompletionExpr(Tok.getLoc());
     auto Result = makeParserResult(
       CallExpr::create(Context, fn.get(), SourceLoc(),
                        { CCE },
@@ -2966,7 +2988,8 @@ void Parser::addParametersToScope(ParameterList *PL) {
 ///
 ///  availability-spec:
 ///     '*'
-///     version-constraint-spec
+///     language-version-constraint-spec
+///     platform-version-constraint-spec
 ParserResult<AvailabilitySpec> Parser::parseAvailabilitySpec() {
   if (Tok.isBinaryOperator() && Tok.getText() == "*") {
     SourceLoc StarLoc = Tok.getLoc();
@@ -2974,15 +2997,42 @@ ParserResult<AvailabilitySpec> Parser::parseAvailabilitySpec() {
 
     return makeParserResult(new (Context) OtherPlatformAvailabilitySpec(StarLoc));
   }
-  return parseVersionConstraintSpec();
+  if (Tok.isIdentifierOrUnderscore() && Tok.getText() == "swift") {
+    return parseLanguageVersionConstraintSpec();
+  }
+
+  return parsePlatformVersionConstraintSpec();
 }
 
-/// Parse version constraint specification.
+/// Parse language-version constraint specification.
 ///
-///  version-constraint-spec:
+///  language-version-constraint-spec:
+///     "swift" version-tuple
+ParserResult<LanguageVersionConstraintAvailabilitySpec>
+Parser::parseLanguageVersionConstraintSpec() {
+  SourceLoc SwiftLoc;
+  clang::VersionTuple Version;
+  SourceRange VersionRange;
+  if (!(Tok.isIdentifierOrUnderscore() && Tok.getText() == "swift"))
+    return nullptr;
+
+  SwiftLoc = Tok.getLoc();
+  consumeToken();
+  if (parseVersionTuple(Version, VersionRange,
+                        diag::avail_query_expected_version_number)) {
+    return nullptr;
+  }
+  return makeParserResult(new (Context)
+                          LanguageVersionConstraintAvailabilitySpec(
+                            SwiftLoc, Version, VersionRange));
+}
+
+/// Parse platform-version constraint specification.
+///
+///  platform-version-constraint-spec:
 ///     identifier version-comparison version-tuple
-ParserResult<VersionConstraintAvailabilitySpec>
-Parser::parseVersionConstraintSpec() {
+ParserResult<PlatformVersionConstraintAvailabilitySpec>
+Parser::parsePlatformVersionConstraintSpec() {
   Identifier PlatformIdentifier;
   SourceLoc PlatformLoc;
   if (Tok.is(tok::code_complete)) {
@@ -3021,7 +3071,7 @@ Parser::parseVersionConstraintSpec() {
     return nullptr;
   }
 
-  return makeParserResult(new (Context) VersionConstraintAvailabilitySpec(
+  return makeParserResult(new (Context) PlatformVersionConstraintAvailabilitySpec(
       Platform.getValue(), PlatformLoc, Version, VersionRange));
 }
 

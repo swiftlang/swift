@@ -5,8 +5,8 @@
 // Copyright (c) 2014 - 2016 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
-// See http://swift.org/LICENSE.txt for license information
-// See http://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
+// See https://swift.org/LICENSE.txt for license information
+// See https://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
 //
 //===----------------------------------------------------------------------===//
 //
@@ -17,6 +17,7 @@
 
 #include "swift/Subsystems.h"
 #include "TypeChecker.h"
+#include "GenericTypeResolver.h"
 #include "swift/AST/ASTWalker.h"
 #include "swift/AST/ASTVisitor.h"
 #include "swift/AST/Attr.h"
@@ -80,7 +81,7 @@ ProtocolDecl *TypeChecker::getProtocol(SourceLoc loc, KnownProtocolKind kind) {
              Context.getIdentifier(getProtocolName(kind)));
   }
 
-  if (protocol && !protocol->hasType()) {
+  if (protocol && !protocol->hasInterfaceType()) {
     validateDecl(protocol);
     if (protocol->isInvalid())
       return nullptr;
@@ -198,7 +199,7 @@ DeclName TypeChecker::getObjectLiteralConstructorName(ObjectLiteralExpr *expr) {
 /// unambiguous name.
 Type TypeChecker::getObjectLiteralParameterType(ObjectLiteralExpr *expr,
                                                 ConstructorDecl *ctor) {
-  Type argType = ctor->getArgumentType();
+  Type argType = ctor->getArgumentInterfaceType();
   auto argTuple = argType->getAs<TupleType>();
   if (!argTuple) return argType;
 
@@ -246,7 +247,7 @@ Type TypeChecker::lookupBoolType(const DeclContext *dc) {
         return Type();
       }
 
-      auto tyDecl = dyn_cast<TypeDecl>(results.front());
+      auto tyDecl = dyn_cast<NominalTypeDecl>(results.front());
       if (!tyDecl) {
         diagnose(SourceLoc(), diag::broken_bool);
         return Type();
@@ -264,8 +265,7 @@ namespace swift {
 /// of the requirements, because they will be inferred.
 GenericParamList *cloneGenericParams(ASTContext &ctx,
                                      DeclContext *dc,
-                                     GenericParamList *fromParams,
-                                     GenericParamList *outerParams) {
+                                     GenericParamList *fromParams) {
   // Clone generic parameters.
   SmallVector<GenericTypeParamDecl *, 2> toGenericParams;
   for (auto fromGP : *fromParams) {
@@ -282,7 +282,12 @@ GenericParamList *cloneGenericParams(ASTContext &ctx,
 
   auto toParams = GenericParamList::create(ctx, SourceLoc(), toGenericParams,
                                            SourceLoc());
+
+  auto outerParams = fromParams->getOuterParameters();
+  if (outerParams != nullptr)
+    outerParams = cloneGenericParams(ctx, dc, outerParams);
   toParams->setOuterParameters(outerParams);
+
   return toParams;
 }
 }
@@ -318,6 +323,15 @@ static void bindExtensionDecl(ExtensionDecl *ED, TypeChecker &TC) {
   // Dig out the extended type.
   auto extendedType = ED->getExtendedType();
 
+  // Hack to allow extending a generic typealias.
+  if (auto *unboundGeneric = extendedType->getAs<UnboundGenericType>()) {
+    if (auto *aliasDecl = dyn_cast<TypeAliasDecl>(unboundGeneric->getDecl())) {
+      extendedType = aliasDecl->getUnderlyingType()->getAnyNominal()
+          ->getDeclaredType();
+      ED->getExtendedTypeLoc().setType(extendedType);
+    }
+  }
+
   // Handle easy cases.
 
   // Cannot extend a metatype.
@@ -352,7 +366,7 @@ static void bindExtensionDecl(ExtensionDecl *ED, TypeChecker &TC) {
 
   // If the extended type is generic or is a protocol. Clone or create
   // the generic parameters.
-  if (extendedNominal->getGenericParams()) {
+  if (extendedNominal->isGenericContext()) {
     if (auto proto = dyn_cast<ProtocolDecl>(extendedNominal)) {
       // For a protocol extension, build the generic parameter list.
       ED->setGenericParams(proto->createGenericParams(ED));
@@ -360,15 +374,14 @@ static void bindExtensionDecl(ExtensionDecl *ED, TypeChecker &TC) {
       // Clone the existing generic parameter list.
       ED->setGenericParams(
         cloneGenericParams(TC.Context, ED,
-                           extendedNominal->getGenericParams(),
-                           nullptr));
+                           extendedNominal->getGenericParamsOfContext()));
     }
   }
 
   // If we have a trailing where clause, deal with it now.
   // For now, trailing where clauses are only permitted on protocol extensions.
   if (auto trailingWhereClause = ED->getTrailingWhereClause()) {
-    if (!extendedNominal->getGenericParams()) {
+    if (!extendedNominal->isGenericContext()) {
       // Only generic and protocol types are permitted to have
       // trailing where clauses.
       TC.diagnose(ED, diag::extension_nongeneric_trailing_where, extendedType)
@@ -504,6 +517,7 @@ static void typeCheckFunctionsAndExternalDecls(TypeChecker &TC) {
 
   } while (currentFunctionIdx < TC.definedFunctions.size() ||
            currentExternalDef < TC.Context.ExternalDefinitions.size() ||
+           !TC.ValidatedTypes.empty() ||
            !TC.UsedConformances.empty());
 
   // FIXME: Horrible hack. Store this somewhere more appropriate.
@@ -679,15 +693,18 @@ void swift::performWholeModuleTypeChecking(SourceFile &SF) {
 bool swift::performTypeLocChecking(ASTContext &Ctx, TypeLoc &T,
                                    DeclContext *DC,
                                    bool ProduceDiagnostics) {
-  return performTypeLocChecking(Ctx, T,
-                                /*isSILMode=*/false,
-                                /*isSILType=*/false,
-                                DC, ProduceDiagnostics);
+  return performTypeLocChecking(
+                            Ctx, T,
+                            /*isSILMode=*/false,
+                            /*isSILType=*/false,
+                            /*GenericEnv=*/DC->getGenericEnvironmentOfContext(),
+                            DC, ProduceDiagnostics);
 }
 
 bool swift::performTypeLocChecking(ASTContext &Ctx, TypeLoc &T,
                                    bool isSILMode,
                                    bool isSILType,
+                                   GenericEnvironment *GenericEnv,
                                    DeclContext *DC,
                                    bool ProduceDiagnostics) {
   TypeResolutionOptions options;
@@ -699,19 +716,21 @@ bool swift::performTypeLocChecking(ASTContext &Ctx, TypeLoc &T,
   if (isSILType)
     options |= TR_SILType;
 
+  GenericTypeToArchetypeResolver contextResolver(GenericEnv);
+
   if (ProduceDiagnostics) {
-    return TypeChecker(Ctx).validateType(T, DC, options);
+    return TypeChecker(Ctx).validateType(T, DC, options, &contextResolver);
   } else {
     // Set up a diagnostics engine that swallows diagnostics.
     DiagnosticEngine Diags(Ctx.SourceMgr);
-    return TypeChecker(Ctx, Diags).validateType(T, DC, options);
+    return TypeChecker(Ctx, Diags).validateType(T, DC, options,
+                                                &contextResolver);
   }
 }
 
 /// Expose TypeChecker's handling of GenericParamList to SIL parsing.
-std::pair<GenericSignature *, GenericEnvironment *>
-swift::handleSILGenericParams(ASTContext &Ctx,
-                              GenericParamList *genericParams,
+GenericEnvironment *
+swift::handleSILGenericParams(ASTContext &Ctx, GenericParamList *genericParams,
                               DeclContext *DC) {
   return TypeChecker(Ctx).handleSILGenericParams(genericParams, DC);
 }
@@ -725,39 +744,6 @@ bool swift::typeCheckCompletionDecl(Decl *D) {
 
   TC.typeCheckDecl(D, true);
   return true;
-}
-
-bool swift::isConvertibleTo(Type Ty1, Type Ty2, DeclContext &DC) {
-  auto &Ctx = DC.getASTContext();
-
-  // We try to reuse the type checker associated with the ast context first.
-  if (Ctx.getLazyResolver()) {
-    TypeChecker *TC = static_cast<TypeChecker*>(Ctx.getLazyResolver());
-    return TC->isConvertibleTo(Ty1, Ty2, &DC);
-  } else {
-    DiagnosticEngine Diags(Ctx.SourceMgr);
-    return (new TypeChecker(Ctx, Diags))->isConvertibleTo(Ty1, Ty2, &DC);
-  }
-}
-
-Type swift::lookUpTypeInContext(DeclContext *DC, StringRef Name) {
-  auto &Ctx = DC->getASTContext();
-  auto ReturnResult = [](UnqualifiedLookup &Lookup) {
-    if (auto Result = Lookup.getSingleTypeResult())
-      return Result->getDeclaredType();
-    return Type();
-  };
-  if (Ctx.getLazyResolver()) {
-    UnqualifiedLookup Lookup(DeclName(Ctx.getIdentifier(Name)), DC,
-                             Ctx.getLazyResolver(), false, SourceLoc(), true);
-    return ReturnResult(Lookup);
-  } else {
-    DiagnosticEngine Diags(Ctx.SourceMgr);
-    LazyResolver *Resolver = new TypeChecker(Ctx, Diags);
-    UnqualifiedLookup Lookup(DeclName(Ctx.getIdentifier(Name)), DC,
-                             Resolver, false, SourceLoc(), true);
-    return ReturnResult(Lookup);
-  }
 }
 
 static Optional<Type> getTypeOfCompletionContextExpr(
@@ -786,7 +772,7 @@ static Optional<Type> getTypeOfCompletionContextExpr(
 
   // Try to recover if we've made any progress.
   if (parsedExpr && !isa<ErrorExpr>(parsedExpr) && parsedExpr->getType() &&
-      !parsedExpr->getType()->is<ErrorType>() &&
+      !parsedExpr->getType()->hasError() &&
       parsedExpr->getType().getCanonicalTypeOrNull() != originalType) {
     return parsedExpr->getType();
   }
@@ -1405,7 +1391,7 @@ private:
         continue;
       }
 
-      auto *VersionSpec = dyn_cast<VersionConstraintAvailabilitySpec>(Spec);
+      auto *VersionSpec = dyn_cast<PlatformVersionConstraintAvailabilitySpec>(Spec);
       if (!VersionSpec)
         continue;
 
@@ -1429,7 +1415,7 @@ private:
       return AvailabilityContext::alwaysAvailable();
     }
 
-    auto *VersionSpec = cast<VersionConstraintAvailabilitySpec>(Spec);
+    auto *VersionSpec = cast<PlatformVersionConstraintAvailabilitySpec>(Spec);
     return AvailabilityContext(VersionRange::allGTE(VersionSpec->getVersion()));
   }
 

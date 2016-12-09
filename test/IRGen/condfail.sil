@@ -1,5 +1,5 @@
-// RUN: %target-swift-frontend -primary-file %s -O -g -S  | %FileCheck %s --check-prefix CHECK --check-prefix CHECK-%target-cpu --check-prefix CHECK-OPT-%target-os
-// RUN: %target-swift-frontend -primary-file %s -g -S  | %FileCheck %s --check-prefix CHECK --check-prefix CHECK-%target-cpu --check-prefix CHECK-NOOPT-%target-os
+// RUN: %target-swift-frontend -assume-parsing-unqualified-ownership-sil -primary-file %s -O -g -S  | %FileCheck %s --check-prefix CHECK --check-prefix CHECK-%target-cpu --check-prefix CHECK-OPT-%target-os
+// RUN: %target-swift-frontend -assume-parsing-unqualified-ownership-sil -primary-file %s -g -S  | %FileCheck %s --check-prefix CHECK --check-prefix CHECK-%target-cpu --check-prefix CHECK-NOOPT-%target-os
 
 import Builtin
 import Swift
@@ -7,7 +7,15 @@ import Swift
 // Make sure we emit two traps.
 
 // CHECK-LABEL:       test_cond_fail:
-// CHECK:             .cfi_startproc
+
+// CHECK-x86_64:      .cfi_startproc
+// CHECK-i386:        .cfi_startproc
+// CHECK-arm64:       .cfi_startproc
+// CHECK-armv7:       Lfunc_begin
+// CHECK-armv7s:      Lfunc_begin
+// CHECK-powerpc64:   .cfi_startproc
+// CHECK-powerpc64le: .cfi_startproc
+// CHECK-s390x:       .cfi_startproc
 // CHECK-OPT-macosx:  ## InlineAsm Start
 // CHECK-OPT-macosx:  ## InlineAsm End
 // CHECK-OPT-linux:   ##APP
@@ -24,7 +32,14 @@ import Swift
 // CHECK-powerpc64:   trap
 // CHECK-powerpc64le: trap
 // CHECK-s390x:       trap
-// CHECK-NOT:         .cfi_endproc
+// CHECK-NOT-x86_64:      .cfi_endproc
+// CHECK-NOT-i386:        .cfi_endproc
+// CHECK-NOT-arm64:       .cfi_endproc
+// CHECK-NOT-armv7:       Lfunc_end
+// CHECK-NOT-armv7s:      Lfunc_end
+// CHECK-NOT-powerpc64:   .cfi_endproc
+// CHECK-NOT-powerpc64le: .cfi_endproc
+// CHECK-NOT-s390x:       .cfi_endproc
 // CHECK-OPT-macosx:  ## InlineAsm Start
 // CHECK-OPT-macosx:  ## InlineAsm End
 // CHECK-OPT-linux:   ##APP
@@ -41,7 +56,14 @@ import Swift
 // CHECK-powerpc64:   trap
 // CHECK-powerpc64le: trap
 // CHECK-s390x:       trap
-// CHECK:             .cfi_endproc
+// CHECK-x86_64:      .cfi_endproc
+// CHECK-i386:        .cfi_endproc
+// CHECK-arm64:       .cfi_endproc
+// CHECK-armv7:       Lfunc_end
+// CHECK-armv7s:      Lfunc_end
+// CHECK-powerpc64:   .cfi_endproc
+// CHECK-powerpc64le: .cfi_endproc
+// CHECK-s390x:       .cfi_endproc
 sil hidden @test_cond_fail : $@convention(thin) (Int32) -> Int32 {
 bb0(%0 : $Int32):
   %2 = integer_literal $Builtin.Int32, 1

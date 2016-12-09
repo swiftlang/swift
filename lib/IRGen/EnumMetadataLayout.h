@@ -5,8 +5,8 @@
 // Copyright (c) 2014 - 2016 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
-// See http://swift.org/LICENSE.txt for license information
-// See http://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
+// See https://swift.org/LICENSE.txt for license information
+// See https://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
 //
 //===----------------------------------------------------------------------===//
 //
@@ -52,15 +52,15 @@ public:
     // emitParentMetadataRef.
 
     // Instantiation-specific.
-    
+
+    // Add fields for generic cases.
+    asImpl().addGenericFields(Target, Target->getDeclaredTypeInContext());
+
     // Reserve a word to cache the payload size if the type has dynamic layout.
     auto &strategy = getEnumImplStrategy(IGM,
            Target->DeclContext::getDeclaredTypeInContext()->getCanonicalType());
     if (strategy.needsPayloadSizeInMetadata())
       asImpl().addPayloadSize();
-    
-    // Add fields for generic cases.
-    asImpl().addGenericFields(Target, Target->getDeclaredTypeInContext());
   }
 };
 

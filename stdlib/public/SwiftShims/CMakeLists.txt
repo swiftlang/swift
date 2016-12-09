@@ -1,7 +1,6 @@
 set(sources
   AssertionReporting.h
   CoreFoundationShims.h
-  DispatchShims.h
   FoundationShims.h
   GlobalObjects.h
   HeapObject.h
@@ -14,6 +13,14 @@ set(sources
   SwiftStdint.h
   UnicodeShims.h
   Visibility.h
+
+  DispatchOverlayShims.h
+  ObjectiveCOverlayShims.h
+  OSOverlayShims.h
+  SafariServicesOverlayShims.h
+  XCTestOverlayShims.h
+  XPCOverlayShims.h
+
   module.modulemap
   )
 set(output_dir "${SWIFTLIB_DIR}/shims")
@@ -66,7 +73,7 @@ if(SWIFT_BUILT_STANDALONE)
     endif()
   endforeach()
   if("${clang_headers_location}" STREQUAL "")
-    message(FATAL_ERROR "Clang headers were not found")
+    message(FATAL_ERROR "Clang headers were not found in any of the following locations: ${clang_headers_locations}")
   endif()
 else() # NOT SWIFT_BUILT_STANDALONE
   set(clang_headers_location "${LLVM_LIBRARY_DIR}/clang/${CLANG_VERSION}")
@@ -80,22 +87,8 @@ add_custom_command_target(unused_var
       "${clang_headers_location}"
       "${SWIFTLIB_DIR}/clang"
 
-    # Create a broken symlink that points to '../clang/$VERSION'.  It is not
-    # used when running Swift tools from the build tree directly, but we will
-    # install it in such a way that it points to Clang installation.  If the 
-    # link can be resolved, CMake would try to follow it when installing the
-    # project under certain conditions.
-    COMMAND
-      "${CMAKE_COMMAND}" "-E" "make_directory" "${SWIFTLIB_DIR}/install-tmp/install-tmp"
-    COMMAND
-      "${CMAKE_COMMAND}" "-E" "remove"
-      "${SWIFTLIB_DIR}/install-tmp/install-tmp/clang"
-    COMMAND
-      "${CMAKE_COMMAND}" "-E" "create_symlink"
-      "../clang/${CLANG_VERSION}"
-      "${SWIFTLIB_DIR}/install-tmp/install-tmp/clang"
     CUSTOM_TARGET_NAME "symlink_clang_headers"
-    OUTPUT "${SWIFTLIB_DIR}/clang" "${SWIFTLIB_DIR}/install-tmp/install-tmp/clang"
+    OUTPUT "${SWIFTLIB_DIR}/clang"
     COMMENT "Symlinking Clang resource headers into ${SWIFTLIB_DIR}/clang")
 add_dependencies(copy_shim_headers symlink_clang_headers)
 
@@ -110,10 +103,10 @@ swift_install_in_component(clang-builtin-headers
     DESTINATION "lib/swift/clang"
     PATTERN "*.h")
 
-# Alternatively, install a symbolic link to the Clang resource directory.
-swift_install_in_component(clang-resource-dir-symlink
-    DIRECTORY "${CMAKE_BINARY_DIR}/${CMAKE_CFG_INTDIR}/lib/swift/install-tmp/install-tmp/clang"
-    DESTINATION "lib/swift")
+swift_install_symlink_component(clang-resource-dir-symlink
+  LINK_NAME clang
+  TARGET ../clang/${CLANG_VERSION}
+  DESTINATION "lib/swift")
 
 # Possibly install Clang headers under Clang's resource directory in case we
 # need to use a different version of the headers than the installed Clang. This

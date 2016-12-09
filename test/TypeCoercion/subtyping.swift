@@ -1,4 +1,4 @@
-// RUN: %target-parse-verify-swift
+// RUN: %target-typecheck-verify-swift
 
 protocol CustomStringConvertible {
   func print()
@@ -36,9 +36,9 @@ func protocolConformance(ac1: @autoclosure () -> CustomStringConvertible,
   accept_creates_Printable(ac1)
   accept_creates_Printable({ ac2() })
   accept_creates_Printable({ ip1() })
-  accept_creates_FormattedPrintable(ac1) // expected-error{{cannot convert value of type '@autoclosure () -> CustomStringConvertible' to expected argument type '() -> FormattedPrintable'}}
+  accept_creates_FormattedPrintable(ac1) // expected-error{{cannot convert value of type '() -> CustomStringConvertible' to expected argument type '() -> FormattedPrintable'}}
   accept_creates_FormattedPrintable(ac2)
-  accept_creates_FormattedPrintable(ip1) // expected-error{{cannot convert value of type '@autoclosure () -> IsPrintable1' to expected argument type '() -> FormattedPrintable'}}
+  accept_creates_FormattedPrintable(ip1) // expected-error{{cannot convert value of type '() -> IsPrintable1' to expected argument type '() -> FormattedPrintable'}}
 }
 
 func p_gen_to_fp(_: () -> CustomStringConvertible) -> FormattedPrintable {}

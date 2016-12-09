@@ -1,4 +1,4 @@
-// RUN: %target-sil-opt %s -dead-store-elim -max-partial-store-count=2 -enable-sil-verify-all | %FileCheck %s
+// RUN: %target-sil-opt -assume-parsing-unqualified-ownership-sil %s -dead-store-elim -max-partial-store-count=2 -enable-sil-verify-all | %FileCheck %s
 
 sil_stage canonical
 
@@ -57,7 +57,7 @@ struct S4 {
  init(a: Int, b: Int)
  init()
 }
- 
+
 struct S5 {
  var x: S4
  var y: Int
@@ -88,7 +88,7 @@ struct S7 {
 class SelfLoop {
   var a: SelfLoop
   init()
-   deinit 
+   deinit
 }
 
 struct S8 {
@@ -107,7 +107,7 @@ class foo {
 class AB {
   var value: Int
   init(value: Int)
-   deinit 
+   deinit
 }
 
 
@@ -141,9 +141,9 @@ sil @S9_init : $@convention(thin) (@thin S9.Type) -> S9
 sil @escaped_a : $@convention(thin) () -> Builtin.RawPointer
 
 // CHECK-LABEL: sil hidden @dead_store_across_fixlifetime_inst
-// CHECK: bb0 
+// CHECK: bb0
 // CHECK-NOT: {{ store}}
-// CHECK: {{ store}} 
+// CHECK: {{ store}}
 sil hidden @dead_store_across_fixlifetime_inst : $@convention(thin) (@owned AB, Int) -> () {
 bb0(%0 : $AB, %1 : $Int):
   %2 = ref_element_addr %0 : $AB, #AB.value
@@ -176,7 +176,7 @@ bb0:
 //
 // CHECK-LABEL: blocking_read_on_local_store
 // CHECK: bb0
-// CHECK: {{ store}} 
+// CHECK: {{ store}}
 // CHECK: return
 sil hidden @blocking_read_on_local_store : $@convention(thin) () -> () {
 bb0:
@@ -191,14 +191,14 @@ bb0:
 }
 
 // CHECK-LABEL: sil @store_after_store
-// CHECK: bb0 
+// CHECK: bb0
 // CHECK: {{ store}}
 // CHECK-NOT: {{ store}}
 // CHECK: return
 sil @store_after_store : $@convention(thin) (@owned B) -> () {
 bb0(%0 : $B):
-  %1 = alloc_box $B
-  %1a = project_box %1 : $@box B
+  %1 = alloc_box $<τ_0_0> { var τ_0_0 } <B>
+  %1a = project_box %1 : $<τ_0_0> { var τ_0_0 } <B>, 0
   %2 = store %0 to %1a : $*B
   %3 = store %0 to %1a : $*B
   %4 = tuple()
@@ -306,7 +306,7 @@ bb2:
 // be turned to a debug_value and thus act as a read on the memory
 // location..
 //
-// CHECK-LABEL: blocking_debug_value_addr_on_dead_store 
+// CHECK-LABEL: blocking_debug_value_addr_on_dead_store
 // CHECK: bb0
 // CHECK: {{ store}}
 // CHECK: debug_value_addr
@@ -837,7 +837,7 @@ bb3:
 // CHECK: {{ store}}
 // CHECK: {{ store}}
 // CHECK-NOT: {{ store}}
-// CHECK: load 
+// CHECK: load
 sil hidden @dead_store_simple_tuple : $@convention(thin) () -> Int {
 bb0:
   %0 = alloc_stack $(a: Int, b: Int), var, name "x"
@@ -931,9 +931,9 @@ bb1:
 bb2:
   %32 = function_ref @foo_user : $@convention(thin) (@guaranteed foo) -> ()
   %33 = apply %32(%3) : $@convention(thin) (@guaranteed foo) -> ()
-  %120 = integer_literal $Builtin.Int64, 12        
-  %121 = struct $Int (%120 : $Builtin.Int64)        
-  store %121 to %6 : $*Int                        
+  %120 = integer_literal $Builtin.Int64, 12
+  %121 = struct $Int (%120 : $Builtin.Int64)
+  store %121 to %6 : $*Int
   %124 = tuple ()
   br bb4
 
@@ -1102,7 +1102,7 @@ bb0(%0 : $*S6):
 ///
 /// CHECK-LABEL: sil hidden @discontiguous_partial_dead_store_simple_large_struct
 /// CHECK: store
-/// CHECK: store 
+/// CHECK: store
 sil hidden @discontiguous_partial_dead_store_simple_large_struct : $@convention(thin) (@inout S7) -> () {
 bb0(%0 : $*S7):
   %1 = function_ref @S7_init : $@convention(thin) (@thin S7.Type) -> S7
@@ -1117,12 +1117,12 @@ bb0(%0 : $*S7):
   return %9 : $()
 }
 
-/// We are not performing partial dead store for store %3 to %0#1 : $*S7, 
+/// We are not performing partial dead store for store %3 to %0#1 : $*S7,
 /// i.e. too many stores generated, but make sure we track the store correctly
 /// so that we can get rid of  store %56 to %57 : $*Int.
 ///
 /// CHECK-LABEL : partial_dead_store_bail_out_proper_propagation
-/// CHECK: bb0 
+/// CHECK: bb0
 /// CHECK-NOT: {{ store}}
 /// CHECK: function_ref
 sil hidden @partial_dead_store_bail_out_proper_propagation : $@convention(thin) () -> () {
@@ -1149,10 +1149,10 @@ bb0:
 /// we have a case which partial dead store miscompiles a program,
 /// in that case the bitvector is not tracked correctly and we end
 /// up deleting the entire larger store, store %3 to %0#1 : $*S3 in
-/// this case. 
+/// this case.
 ///
 /// CHECK-LABEL: partial_dead_store_simple_struct
-/// CHECK: apply 
+/// CHECK: apply
 /// CHECK-NEXT: struct_extract
 sil hidden @partial_dead_store_simple_struct : $@convention(thin) (@inout S3) -> () {
 bb0(%0 : $*S3):
@@ -1175,21 +1175,21 @@ bb0(%0 : $*S3):
 /// CHECK-LABEL: self_loop_class_type_expansion
 /// CHECK: [[RET0:%.+]] = struct_extract
 /// CHECK: [[RET1:%.+]] = struct_element_addr
-/// CHECK-NEXT: store [[RET0:%.+]] to [[RET1:%.+]] : $*SelfLoop  
+/// CHECK-NEXT: store [[RET0:%.+]] to [[RET1:%.+]] : $*SelfLoop
 sil hidden @self_loop_class_type_expansion : $@convention(thin) (@inout S8) -> () {
 bb0(%0 : $*S8):
   %1 = function_ref @S8_init : $@convention(thin) (@thin S8.Type) -> @owned S8
   %2 = metatype $@thin S8.Type
   %3 = apply %1(%2) : $@convention(thin) (@thin S8.Type) -> @owned S8
   store %3 to %0 : $*S8
-  %5 = integer_literal $Builtin.Int64, 12       
-  %6 = struct $Int (%5 : $Builtin.Int64)         
-  %7 = struct_element_addr %0 : $*S8, #S8.k   
-  store %6 to %7 : $*Int  
-  %9 = struct_extract %3 : $S8, #S8.i 
+  %5 = integer_literal $Builtin.Int64, 12
+  %6 = struct $Int (%5 : $Builtin.Int64)
+  %7 = struct_element_addr %0 : $*S8, #S8.k
+  store %6 to %7 : $*Int
+  %9 = struct_extract %3 : $S8, #S8.i
   %10 = struct $S8 (%9 : $SelfLoop, %6 : $Int)
   release_value %10 : $S8
-  %12 = tuple ()                                
+  %12 = tuple ()
   return %12 : $()
 }
 
@@ -1244,7 +1244,7 @@ bb1:
   %12 = struct_extract %0 : $Bool, #Bool.value
   cond_br %12, bb1, bb2
 
-bb2: 
+bb2:
   %14 = integer_literal $Builtin.Int64, 2
   %15 = struct $Int (%14 : $Builtin.Int64)
   %16 = struct_element_addr %2 : $*S1, #S1.a
@@ -1301,11 +1301,11 @@ bb0(%0 : $Optional<@thick Any.Type>):
 
 /// Make sure we DO get rid of the store as a dead store, i.e. no read to a store
 /// to a local variable.
-/// 
+///
 /// CHECK-LABEL: local_dead_store
 /// CHECK: load
 /// CHECK-NOT: {{ store}}
-/// CHECK: return 
+/// CHECK: return
 sil @local_dead_store : $@convention(thin) (Optional<@thick Any.Type>) -> Int {
 bb0(%0 : $Optional<@thick Any.Type>):
   %2 = alloc_stack $Optional<@thick Any.Type>
@@ -1320,10 +1320,10 @@ bb0(%0 : $Optional<@thick Any.Type>):
 /// we have a case which partial dead store miscompiles a program,
 /// in that case the bitvector is not tracked correctly and we end
 /// up deleting the entire larger store, store %3 to %0#1 : $*S3 in
-/// this case. 
+/// this case.
 ///
 /// CHECK-LABEL: partial_dead_store_in_nested_struct
-/// CHECK: apply 
+/// CHECK: apply
 /// CHECK-NEXT: struct_extract
 sil hidden @partial_dead_store_in_nested_struct : $@convention(thin) (@inout S9) -> () {
 bb0(%0 : $*S9):

@@ -5,20 +5,21 @@
 // Copyright (c) 2014 - 2016 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
-// See http://swift.org/LICENSE.txt for license information
-// See http://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
+// See https://swift.org/LICENSE.txt for license information
+// See https://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
 //
 //===----------------------------------------------------------------------===//
 
-#ifndef SIL_TypeLowering_h
-#define SIL_TypeLowering_h
+#ifndef SWIFT_SIL_TYPELOWERING_H
+#define SWIFT_SIL_TYPELOWERING_H
 
-#include "swift/AST/CaptureInfo.h"
 #include "swift/ABI/MetadataValues.h"
+#include "swift/AST/CaptureInfo.h"
 #include "swift/SIL/AbstractionPattern.h"
+#include "swift/SIL/SILDeclRef.h"
+#include "swift/SIL/SILInstruction.h"
 #include "swift/SIL/SILLocation.h"
 #include "swift/SIL/SILValue.h"
-#include "swift/SIL/SILDeclRef.h"
 #include "llvm/ADT/DenseMap.h"
 #include "llvm/ADT/Hashing.h"
 #include "llvm/ADT/SmallVector.h"
@@ -209,6 +210,21 @@ public:
                                SILValue addr,
                                IsInitialization_t isInit) const = 0;
 
+  /// Emit a store of \p value into \p addr given the StoreOwnershipQualifier
+  /// qual.
+  ///
+  /// This abstracts over the differences in between trivial and non-trivial
+  /// types.
+  virtual void emitStore(SILBuilder &B, SILLocation loc, SILValue value,
+                         SILValue addr, StoreOwnershipQualifier qual) const = 0;
+
+  /// Emit a load from \p addr given the LoadOwnershipQualifier \p qual.
+  ///
+  /// This abstracts over the differences in between trivial and non-trivial
+  /// types.
+  virtual SILValue emitLoad(SILBuilder &B, SILLocation loc, SILValue addr,
+                            LoadOwnershipQualifier qual) const = 0;
+
   /// Put an exact copy of the value in the source address in the
   /// destination address.
   virtual void emitCopyInto(SILBuilder &B,
@@ -230,16 +246,12 @@ public:
   virtual void emitDestroyRValue(SILBuilder &B, SILLocation loc,
                                  SILValue value) const = 0;
 
-  enum class LoweringStyle {
-    Shallow,
-    Deep,
-    DeepNoEnum
-  };
+  enum class LoweringStyle { Shallow, Deep };
 
   /// Emit a lowered 'release_value' operation.
   ///
   /// This type must be loadable.
-  virtual void emitLoweredReleaseValue(SILBuilder &B, SILLocation loc,
+  virtual void emitLoweredDestroyValue(SILBuilder &B, SILLocation loc,
                                        SILValue value,
                                        LoweringStyle loweringStyle) const = 0;
 
@@ -247,32 +259,24 @@ public:
                                     SILValue value,
                                     LoweringStyle loweringStyle) const {
     if (loweringStyle != LoweringStyle::Shallow)
-      return emitLoweredReleaseValue(B, loc, value, loweringStyle);
-    return emitReleaseValue(B, loc, value);
+      return emitLoweredDestroyValue(B, loc, value, loweringStyle);
+    return emitDestroyValue(B, loc, value);
   }
 
   /// Emit a lowered 'release_value' operation.
   ///
   /// This type must be loadable.
-  void emitLoweredReleaseValueShallow(SILBuilder &B, SILLocation loc,
+  void emitLoweredDestroyValueShallow(SILBuilder &B, SILLocation loc,
                                       SILValue value) const {
-    emitLoweredReleaseValue(B, loc, value, LoweringStyle::Shallow);
+    emitLoweredDestroyValue(B, loc, value, LoweringStyle::Shallow);
   }
 
   /// Emit a lowered 'release_value' operation.
   ///
   /// This type must be loadable.
-  void emitLoweredReleaseValueDeep(SILBuilder &B, SILLocation loc,
+  void emitLoweredDestroyValueDeep(SILBuilder &B, SILLocation loc,
                                    SILValue value) const {
-    emitLoweredReleaseValue(B, loc, value, LoweringStyle::Deep);
-  }
-
-  /// Emit a lowered 'release_value' operation.
-  ///
-  /// This type must be loadable.
-  void emitLoweredReleaseValueDeepNoEnum(SILBuilder &B, SILLocation loc,
-                                         SILValue value) const {
-    emitLoweredReleaseValue(B, loc, value, LoweringStyle::DeepNoEnum);
+    emitLoweredDestroyValue(B, loc, value, LoweringStyle::Deep);
   }
 
   /// Given a primitively loaded value of this type (which must be
@@ -283,57 +287,50 @@ public:
   /// example, it performs an unowned_release on a value of [unknown]
   /// type.  It is therefore not necessarily the right thing to do on
   /// a semantic load.
-  virtual void emitReleaseValue(SILBuilder &B, SILLocation loc,
+  virtual void emitDestroyValue(SILBuilder &B, SILLocation loc,
                                 SILValue value) const = 0;
 
   /// Emit a lowered 'retain_value' operation.
   ///
   /// This type must be loadable.
-  virtual void emitLoweredRetainValue(SILBuilder &B, SILLocation loc,
-                                    SILValue value,
-                                    LoweringStyle style) const = 0;
+  virtual SILValue emitLoweredCopyValue(SILBuilder &B, SILLocation loc,
+                                        SILValue value,
+                                        LoweringStyle style) const = 0;
 
   /// Emit a lowered 'retain_value' operation.
   ///
   /// This type must be loadable.
-  void emitLoweredRetainValueShallow(SILBuilder &B, SILLocation loc,
-                                   SILValue value) const {
-    emitLoweredRetainValue(B, loc, value, LoweringStyle::Shallow);
+  SILValue emitLoweredCopyValueShallow(SILBuilder &B, SILLocation loc,
+                                       SILValue value) const {
+    return emitLoweredCopyValue(B, loc, value, LoweringStyle::Shallow);
   }
 
   /// Emit a lowered 'retain_value' operation.
   ///
   /// This type must be loadable.
-  void emitLoweredRetainValueDeep(SILBuilder &B, SILLocation loc,
-                                SILValue value) const {
-    emitLoweredRetainValue(B, loc, value, LoweringStyle::Deep);
-  }
-
-  /// Emit a lowered 'retain_value' operation.
-  ///
-  /// This type must be loadable.
-  void emitLoweredRetainValueDeepNoEnum(SILBuilder &B, SILLocation loc,
-                                      SILValue value) const {
-    emitLoweredRetainValue(B, loc, value, LoweringStyle::DeepNoEnum);
+  SILValue emitLoweredCopyValueDeep(SILBuilder &B, SILLocation loc,
+                                    SILValue value) const {
+    return emitLoweredCopyValue(B, loc, value, LoweringStyle::Deep);
   }
 
   /// Given a primitively loaded value of this type (which must be
-  /// loadable), +1 it.
+  /// loadable), Perform a copy of this value. This is equivalent to performing
+  /// +1 on class values.
   ///
   /// This should be used for duplicating a value from place to place
   /// with exactly the same semantics.  For example, it performs an
   /// unowned_retain on a value of [unknown] type.  It is therefore
   /// not necessarily the right thing to do on a semantic load.
-  virtual void emitRetainValue(SILBuilder &B, SILLocation loc,
-                             SILValue value) const = 0;
+  virtual SILValue emitCopyValue(SILBuilder &B, SILLocation loc,
+                                 SILValue value) const = 0;
 
-  void emitLoweredCopyChildValue(SILBuilder &B, SILLocation loc,
-                                 SILValue value,
-                                 LoweringStyle style) const {
+  SILValue emitLoweredCopyChildValue(SILBuilder &B, SILLocation loc,
+                                     SILValue value,
+                                     LoweringStyle style) const {
     if (style != LoweringStyle::Shallow) {
-      emitLoweredRetainValue(B, loc, value, style);
+      return emitLoweredCopyValue(B, loc, value, style);
     } else {
-      emitRetainValue(B, loc, value);
+      return emitCopyValue(B, loc, value);
     }
   }
 
@@ -765,6 +762,7 @@ public:
   /// Get the capture list from a closure, with transitive function captures
   /// flattened.
   CaptureInfo getLoweredLocalCaptures(AnyFunctionRef fn);
+  bool hasLoweredLocalCaptures(AnyFunctionRef fn);
 
   enum class ABIDifference : uint8_t {
     // No ABI differences, function can be trivially bitcast to result type.

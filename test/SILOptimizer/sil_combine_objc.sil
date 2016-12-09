@@ -1,5 +1,8 @@
-// RUN: %target-sil-opt -enable-sil-verify-all %s -sil-combine -verify-skip-unreachable-must-be-last | %FileCheck %s
+// RUN: %target-sil-opt -assume-parsing-unqualified-ownership-sil -enable-sil-verify-all %s -sil-combine -verify-skip-unreachable-must-be-last | %FileCheck %s
 // REQUIRES: objc_interop
+
+// FIXME: https://bugs.swift.org/browse/SR-2808
+// XFAIL: resilient_stdlib
 
 sil_stage canonical
 
@@ -7,7 +10,7 @@ import Builtin
 import Swift
 
 class ZZZ {
-  @objc deinit 
+  @objc deinit
   init()
 }
 
@@ -130,7 +133,7 @@ bb0(%0 : $*_HeapBuffer<C, Int>):
 }
 
 // Check that it does not crash the compiler.
-// Int is ObjC-bridgeable in this case, but its conformance is not know, 
+// Int is ObjC-bridgeable in this case, but its conformance is not know,
 // because Foundation is not imported yet.
 // Therefore the cast may succeed from the compiler point of view.
 // CHECK-LABEL: sil @cast_of_class_to_int
@@ -141,7 +144,7 @@ bb0(%0 : $C):
   %1 = alloc_stack $Int
   %2 = alloc_stack $C
   store %0 to %2 : $*C
-  unconditional_checked_cast_addr take_always C in %2 : $*C to Int in %1 : $*Int 
+  unconditional_checked_cast_addr take_always C in %2 : $*C to Int in %1 : $*Int
   %4 = load %1 : $*Int
   dealloc_stack %2 : $*C
   dealloc_stack %1 : $*Int

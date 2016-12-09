@@ -5,8 +5,8 @@
 // Copyright (c) 2014 - 2016 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
-// See http://swift.org/LICENSE.txt for license information
-// See http://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
+// See https://swift.org/LICENSE.txt for license information
+// See https://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
 //
 //===----------------------------------------------------------------------===//
 
@@ -1408,14 +1408,14 @@ private:
       if (auto *FTR = dyn_cast<FunctionTypeRepr>(T)) {
         FoundFunctionTypeRepr = true;
         if (auto *TTR = dyn_cast_or_null<TupleTypeRepr>(FTR->getArgsTypeRepr())) {
-          for (auto *ArgTR : TTR->getElements()) {
+          for (unsigned i = 0, end = TTR->getNumElements(); i != end; ++i) {
+            auto *ArgTR = TTR->getElement(i);
             CharSourceRange NR;
             CharSourceRange TR;
-            auto *NTR = dyn_cast<NamedTypeRepr>(ArgTR);
-            if (NTR && NTR->hasName()) {
-              NR = CharSourceRange(NTR->getNameLoc(),
-                                   NTR->getName().getLength());
-              ArgTR = NTR->getTypeRepr();
+            auto name = TTR->getElementName(i);
+            if (!name.empty()) {
+              NR = CharSourceRange(TTR->getElementNameLoc(i),
+                                   name.getLength());
             }
             SourceLoc SRE = Lexer::getLocForEndOfToken(SM,
                                                        ArgTR->getEndLoc());
@@ -1447,7 +1447,7 @@ private:
   bool containClosure(Expr *E) {
     if (E->getStartLoc().isInvalid())
       return false;
-    EditorPlaceholderExpr *Found;
+    EditorPlaceholderExpr *Found = nullptr;
     ClosureInfo Info;
     ClosureTypeWalker ClosureWalker(SM, Info);
     PlaceholderFinder Finder(E->getStartLoc(), Found);

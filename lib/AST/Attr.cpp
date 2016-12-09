@@ -5,8 +5,8 @@
 // Copyright (c) 2014 - 2016 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
-// See http://swift.org/LICENSE.txt for license information
-// See http://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
+// See https://swift.org/LICENSE.txt for license information
+// See https://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
 //
 //===----------------------------------------------------------------------===//
 //
@@ -85,15 +85,24 @@ bool DeclAttribute::canAttributeAppearOnDeclKind(DeclAttrKind DAK, DeclKind DK) 
   llvm_unreachable("bad DeclKind");
 }
 
-bool DeclAttributes::isUnavailableInCurrentSwift() const {
+bool
+DeclAttributes::isUnavailableInSwiftVersion(
+  const version::Version &effectiveVersion) const {
+  clang::VersionTuple vers = effectiveVersion;
   for (auto attr : *this) {
     if (auto available = dyn_cast<AvailableAttr>(attr)) {
       if (available->isInvalid())
         continue;
 
-      if (available->getUnconditionalAvailability() ==
-            UnconditionalAvailabilityKind::UnavailableInCurrentSwift)
-        return true;
+      if (available->getPlatformAgnosticAvailability() ==
+          PlatformAgnosticAvailabilityKind::SwiftVersionSpecific) {
+        if (available->Introduced.hasValue() &&
+            available->Introduced.getValue() > vers)
+          return true;
+        if (available->Obsoleted.hasValue() &&
+            available->Obsoleted.getValue() <= vers)
+          return true;
+      }
     }
   }
 
@@ -110,21 +119,21 @@ const AvailableAttr *DeclAttributes::getUnavailable(
         continue;
 
       // If this attribute doesn't apply to the active platform, we're done.
-      if (!AvAttr->isActivePlatform(ctx))
+      if (!AvAttr->isActivePlatform(ctx) &&
+          !AvAttr->isLanguageVersionSpecific())
         continue;
 
       // Unconditional unavailable.
       if (AvAttr->isUnconditionallyUnavailable())
         return AvAttr;
 
-      auto MinVersion = ctx.LangOpts.getMinPlatformVersion();
-      switch (AvAttr->getMinVersionAvailability(MinVersion)) {
-      case MinVersionComparison::Available:
-      case MinVersionComparison::PotentiallyUnavailable:
+      switch (AvAttr->getVersionAvailability(ctx)) {
+      case AvailableVersionComparison::Available:
+      case AvailableVersionComparison::PotentiallyUnavailable:
         break;
 
-      case MinVersionComparison::Obsoleted:
-      case MinVersionComparison::Unavailable:
+      case AvailableVersionComparison::Obsoleted:
+      case AvailableVersionComparison::Unavailable:
         conditional = AvAttr;
         break;
       }
@@ -140,7 +149,8 @@ DeclAttributes::getDeprecated(const ASTContext &ctx) const {
       if (AvAttr->isInvalid())
         continue;
 
-      if (!AvAttr->isActivePlatform(ctx))
+      if (!AvAttr->isActivePlatform(ctx) &&
+          !AvAttr->isLanguageVersionSpecific())
         continue;
 
       // Unconditional deprecated.
@@ -151,7 +161,10 @@ DeclAttributes::getDeprecated(const ASTContext &ctx) const {
       if (!DeprecatedVersion.hasValue())
         continue;
 
-      auto MinVersion = ctx.LangOpts.getMinPlatformVersion();
+      clang::VersionTuple MinVersion =
+        AvAttr->isLanguageVersionSpecific() ?
+        ctx.LangOpts.EffectiveLanguageVersion :
+        ctx.LangOpts.getMinPlatformVersion();
 
       // We treat the declaration as deprecated if it is deprecated on
       // all deployment targets.
@@ -197,7 +210,8 @@ static bool isShortAvailable(const DeclAttribute *DA) {
   if (!AvailAttr->Rename.empty())
     return false;
 
-  if (AvailAttr->Unconditional != UnconditionalAvailabilityKind::None)
+  if (AvailAttr->PlatformAgnostic != PlatformAgnosticAvailabilityKind::None &&
+      !AvailAttr->isLanguageVersionSpecific())
     return false;
 
   return true;
@@ -216,15 +230,22 @@ static void printShortFormAvailable(ArrayRef<const DeclAttribute *> Attrs,
   assert(!Attrs.empty());
 
   Printer << "@available(";
-  for (auto *DA : Attrs) {
-    auto *AvailAttr = cast<AvailableAttr>(DA);
-    assert(AvailAttr->Introduced.hasValue());
-
-    Printer << platformString(AvailAttr->Platform) << " "
-            << AvailAttr->Introduced.getValue().getAsString() << ", ";
+  auto FirstAvail = dyn_cast<AvailableAttr>(Attrs[0]);
+  if (Attrs.size() == 1 &&
+      FirstAvail->isLanguageVersionSpecific()) {
+    assert(FirstAvail->Introduced.hasValue());
+    Printer << "swift "
+            << FirstAvail->Introduced.getValue().getAsString()
+            << ")";
+  } else {
+    for (auto *DA : Attrs) {
+      auto *AvailAttr = cast<AvailableAttr>(DA);
+      assert(AvailAttr->Introduced.hasValue());
+      Printer << platformString(AvailAttr->Platform) << " "
+              << AvailAttr->Introduced.getValue().getAsString() << ", ";
+    }
+    Printer << "*)";
   }
-
-  Printer << "*)";
   Printer.printNewline();
 }
 
@@ -357,7 +378,10 @@ bool DeclAttribute::printImpl(ASTPrinter &Printer, const PrintOptions &Options) 
     Printer.printAttrName("@available");
     Printer << "(";
     auto Attr = cast<AvailableAttr>(this);
-    Printer << Attr->platformString();
+    if (Attr->isLanguageVersionSpecific())
+      Printer << "swift";
+    else
+      Printer << Attr->platformString();
 
     if (Attr->isUnconditionallyUnavailable())
       Printer << ", unavailable";
@@ -379,8 +403,8 @@ bool DeclAttribute::printImpl(ASTPrinter &Printer, const PrintOptions &Options) 
     // the generated interface.
     if (!Attr->Message.empty())
       Printer << ", message: \"" << Attr->Message << "\"";
-    else if (Attr->getUnconditionalAvailability()
-               == UnconditionalAvailabilityKind::UnavailableInSwift)
+    else if (Attr->getPlatformAgnosticAvailability()
+               == PlatformAgnosticAvailabilityKind::UnavailableInSwift)
       Printer << ", message: \"Not available in Swift\"";
 
     Printer << ")";
@@ -643,65 +667,95 @@ ObjCAttr *ObjCAttr::clone(ASTContext &context) const {
 }
 
 AvailableAttr *
-AvailableAttr::createUnconditional(ASTContext &C,
+AvailableAttr::createPlatformAgnostic(ASTContext &C,
                                    StringRef Message,
                                    StringRef Rename,
-                                   UnconditionalAvailabilityKind Reason) {
-  assert(Reason != UnconditionalAvailabilityKind::None);
+                                   PlatformAgnosticAvailabilityKind Kind,
+                                   clang::VersionTuple Obsoleted) {
+  assert(Kind != PlatformAgnosticAvailabilityKind::None);
   clang::VersionTuple NoVersion;
+  if (Kind == PlatformAgnosticAvailabilityKind::SwiftVersionSpecific) {
+    assert(!Obsoleted.empty());
+  }
   return new (C) AvailableAttr(
     SourceLoc(), SourceRange(), PlatformKind::none, Message, Rename,
-    NoVersion, NoVersion, NoVersion, Reason, /* isImplicit */ false);
+    NoVersion, NoVersion, Obsoleted, Kind, /* isImplicit */ false);
 }
 
 bool AvailableAttr::isActivePlatform(const ASTContext &ctx) const {
   return isPlatformActive(Platform, ctx.LangOpts);
 }
 
+bool AvailableAttr::isLanguageVersionSpecific() const {
+  if (PlatformAgnostic ==
+      PlatformAgnosticAvailabilityKind::SwiftVersionSpecific)
+    {
+      assert(Platform == PlatformKind::none &&
+             (Introduced.hasValue() ||
+              Deprecated.hasValue() ||
+              Obsoleted.hasValue()));
+      return true;
+    }
+  return false;
+}
+
 bool AvailableAttr::isUnconditionallyUnavailable() const {
-  switch (Unconditional) {
-  case UnconditionalAvailabilityKind::None:
-  case UnconditionalAvailabilityKind::Deprecated:
+  switch (PlatformAgnostic) {
+  case PlatformAgnosticAvailabilityKind::None:
+  case PlatformAgnosticAvailabilityKind::Deprecated:
+  case PlatformAgnosticAvailabilityKind::SwiftVersionSpecific:
     return false;
 
-  case UnconditionalAvailabilityKind::Unavailable:
-  case UnconditionalAvailabilityKind::UnavailableInSwift:
-  case UnconditionalAvailabilityKind::UnavailableInCurrentSwift:
+  case PlatformAgnosticAvailabilityKind::Unavailable:
+  case PlatformAgnosticAvailabilityKind::UnavailableInSwift:
     return true;
   }
 }
 
 bool AvailableAttr::isUnconditionallyDeprecated() const {
-  switch (Unconditional) {
-  case UnconditionalAvailabilityKind::None:
-  case UnconditionalAvailabilityKind::Unavailable:
-  case UnconditionalAvailabilityKind::UnavailableInSwift:
-  case UnconditionalAvailabilityKind::UnavailableInCurrentSwift:
+  switch (PlatformAgnostic) {
+  case PlatformAgnosticAvailabilityKind::None:
+  case PlatformAgnosticAvailabilityKind::Unavailable:
+  case PlatformAgnosticAvailabilityKind::UnavailableInSwift:
+  case PlatformAgnosticAvailabilityKind::SwiftVersionSpecific:
     return false;
 
-  case UnconditionalAvailabilityKind::Deprecated:
+  case PlatformAgnosticAvailabilityKind::Deprecated:
     return true;
   }
 }
 
-MinVersionComparison AvailableAttr::getMinVersionAvailability(
-                       clang::VersionTuple minVersion) const {
+AvailableVersionComparison AvailableAttr::getVersionAvailability(
+  const ASTContext &ctx) const {
+
   // Unconditional unavailability.
   if (isUnconditionallyUnavailable())
-    return MinVersionComparison::Unavailable;
+    return AvailableVersionComparison::Unavailable;
 
-  // If this entity was obsoleted before or at the minimum platform version,
+  clang::VersionTuple queryVersion =
+    isLanguageVersionSpecific() ?
+    ctx.LangOpts.EffectiveLanguageVersion :
+    ctx.LangOpts.getMinPlatformVersion();
+
+  // If this entity was obsoleted before or at the query platform version,
   // consider it obsolete.
-  if (Obsoleted && *Obsoleted <= minVersion)
-    return MinVersionComparison::Obsoleted;
+  if (Obsoleted && *Obsoleted <= queryVersion)
+    return AvailableVersionComparison::Obsoleted;
 
-  // If this entity was introduced after the minimum platform version, it's
-  // availability can only be determined dynamically.
-  if (Introduced && *Introduced > minVersion)
-    return MinVersionComparison::PotentiallyUnavailable;
+  // If this entity was introduced after the query version and we're doing a
+  // platform comparison, true availability can only be determined dynamically;
+  // if we're doing a _language_ version check, the query version is a
+  // static requirement, so we treat "introduced later" as just plain
+  // unavailable.
+  if (Introduced && *Introduced > queryVersion) {
+    if (isLanguageVersionSpecific())
+      return AvailableVersionComparison::Unavailable;
+    else
+      return AvailableVersionComparison::PotentiallyUnavailable;
+  }
 
   // The entity is available.
-  return MinVersionComparison::Available;
+  return AvailableVersionComparison::Available;
 }
 
 const AvailableAttr *AvailableAttr::isUnavailable(const Decl *D) {

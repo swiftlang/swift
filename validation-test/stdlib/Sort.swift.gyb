@@ -15,8 +15,8 @@ var Algorithm = TestSuite("Algorithm")
 // check correctness of sorting itself.
 func expectSortedCollection(_ sortedAry: [Int], _ originalAry: [Int]) {
   expectEqual(sortedAry.count, originalAry.count)
-  var sortedVals = [Int:Int]()
-  var originalVals = [Int:Int]()
+  var sortedVals = [Int: Int]()
+  var originalVals = [Int: Int]()
   // Keep track of what values we have in sortedAry.
   for e in sortedAry {
     if let v = sortedVals[e] {
@@ -58,7 +58,7 @@ func expectSortedCollection(_ sortedAry: ArraySlice<Int>, _ originalAry: ArraySl
 
 class OffsetCollection : MutableCollection, RandomAccessCollection {
   typealias Indices = CountableRange<Int>
-  
+
   let offset: Int
   var data: [Int] = []
   let forward: Bool

@@ -5,8 +5,8 @@
 // Copyright (c) 2014 - 2016 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
-// See http://swift.org/LICENSE.txt for license information
-// See http://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
+// See https://swift.org/LICENSE.txt for license information
+// See https://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
 //
 //===----------------------------------------------------------------------===//
 
@@ -81,7 +81,7 @@ func _fatalErrorFlags() -> UInt32 {
 @inline(never)
 @_semantics("stdlib_binary_only")
 func _assertionFailed(
-  // FIXME(ABI): add argument labels to conform to API guidelines.
+  // FIXME(ABI)#18 : add argument labels to conform to API guidelines.
   _ prefix: StaticString, _ message: StaticString,
   _ file: StaticString, _ line: UInt,
   flags: UInt32
@@ -113,7 +113,7 @@ func _assertionFailed(
 @inline(never)
 @_semantics("stdlib_binary_only")
 func _assertionFailed(
-  // FIXME(ABI): add argument labels to conform to API guidelines.
+  // FIXME(ABI)#19 : add argument labels to conform to API guidelines.
   _ prefix: StaticString, _ message: String,
   _ file: StaticString, _ line: UInt,
   flags: UInt32
@@ -146,7 +146,7 @@ func _assertionFailed(
 @_semantics("stdlib_binary_only")
 @_semantics("arc.programtermination_point")
 func _fatalErrorMessage(
-  // FIXME(ABI): add argument labels to conform to API guidelines.
+  // FIXME(ABI)#20 : add argument labels to conform to API guidelines.
   _ prefix: StaticString, _ message: StaticString,
   _ file: StaticString, _ line: UInt,
   flags: UInt32
@@ -229,7 +229,7 @@ func _unimplementedInitializer(className: StaticString,
   Builtin.int_trap()
 }
 
-// FIXME(ABI): rename to something descriptive.
+// FIXME(ABI)#21 (Type Checker): rename to something descriptive.
 public // COMPILER_INTRINSIC
 func _undefined<T>(
   _ message: @autoclosure () -> String = String(),

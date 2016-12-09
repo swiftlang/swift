@@ -1,4 +1,4 @@
-// RUN: %target-parse-verify-swift
+// RUN: %target-typecheck-verify-swift
 
 prefix operator +++ {} // expected-warning {{operator should no longer be declared with body}} {{20-23=}}
 postfix operator +++ {} // expected-warning {{operator should no longer be declared with body}} {{21-24=}}
@@ -38,6 +38,11 @@ prefix operator // expected-error {{expected operator name in operator declarati
 
 ;
 prefix operator %%+
+
+prefix operator ??
+postfix operator ?? // expected-error {{expected operator name in operator declaration}}
+prefix operator !!
+postfix operator !! // expected-error {{expected operator name in operator declaration}}
 
 infix operator +++=
 infix operator *** : A

@@ -5,8 +5,8 @@
 // Copyright (c) 2016 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
-// See http://swift.org/LICENSE.txt for license information
-// See http://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
+// See https://swift.org/LICENSE.txt for license information
+// See https://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
 //
 //===----------------------------------------------------------------------===//
 
@@ -19,7 +19,7 @@
 @available(*, deprecated, message: "it will be removed in Swift 4.0.  Please use 'BidirectionalCollection' instead")
 public typealias BidirectionalIndexable = _BidirectionalIndexable
 public protocol _BidirectionalIndexable : _Indexable {
-  // FIXME(ABI)(compiler limitation): there is no reason for this protocol
+  // FIXME(ABI)#22 (Recursive Protocol Constraints): there is no reason for this protocol
   // to exist apart from missing compiler features that we emulate with it.
   // rdar://problem/20531108
   //
@@ -86,14 +86,20 @@ public protocol BidirectionalCollection
   /// elements.
   associatedtype SubSequence : _BidirectionalIndexable, Collection
     = BidirectionalSlice<Self>
-  // FIXME(compiler limitation):
+  // FIXME(ABI)#93 (Recursive Protocol Constraints):
+  // FIXME(ABI)#94 (Associated Types with where clauses):
+  // This is dependent on both recursive protocol constraints AND associated 
+  // types with where clauses.
   // associatedtype SubSequence : BidirectionalCollection
 
   /// A type that can represent the indices that are valid for subscripting the
   /// collection, in ascending order.
   associatedtype Indices : _BidirectionalIndexable, Collection
     = DefaultBidirectionalIndices<Self>
-  // FIXME(compiler limitation):
+  // FIXME(ABI)#95 (Recursive Protocol Constraints):
+  // FIXME(ABI)#96 (Associated Types with where clauses):
+  // This is dependent on both recursive protocol constraints AND associated 
+  // types with where clauses.
   // associatedtype Indices : BidirectionalCollection
 
   /// The indices that are valid for subscripting the collection, in ascending
@@ -128,6 +134,29 @@ public protocol BidirectionalCollection
   ///     
   /// - Complexity: O(1)
   var last: Iterator.Element? { get }
+
+  /// Accesses a contiguous subrange of the collection's elements.
+  ///
+  /// The accessed slice uses the same indices for the same elements as the
+  /// original collection uses. Always use the slice's `startIndex` property
+  /// instead of assuming that its indices start at a particular value.
+  ///
+  /// This example demonstrates getting a slice of an array of strings, finding
+  /// the index of one of the strings in the slice, and then using that index
+  /// in the original array.
+  ///
+  ///     let streets = ["Adams", "Bryant", "Channing", "Douglas", "Evarts"]
+  ///     let streetsSlice = streets[2 ..< streets.endIndex]
+  ///     print(streetsSlice)
+  ///     // Prints "["Channing", "Douglas", "Evarts"]"
+  ///
+  ///     let index = streetsSlice.index(of: "Evarts")    // 4
+  ///     print(streets[index!])
+  ///     // Prints "Evarts"
+  ///
+  /// - Parameter bounds: A range of the collection's indices. The bounds of
+  ///   the range must be valid indices of the collection.
+  subscript(bounds: Range<Index>) -> SubSequence { get }
 }
 
 /// Default implementation for bidirectional collections.
@@ -198,6 +227,10 @@ extension BidirectionalCollection where SubSequence == BidirectionalSlice<Self> 
 
 extension BidirectionalCollection where SubSequence == Self {
   /// Removes and returns the last element of the collection.
+  /// 
+  /// Use `popLast()` to remove the last element of a collection that might be empty.
+  ///
+  /// The `removeLast()` method must be used only on a nonempty collection.
   ///
   /// - Returns: The last element of the collection if the collection has one
   ///   or more elements; otherwise, `nil`.
@@ -214,6 +247,9 @@ extension BidirectionalCollection where SubSequence == Self {
   /// Removes and returns the last element of the collection.
   ///
   /// The collection must not be empty.
+  ///
+  /// To remove the last element of a collection that might be empty, 
+  /// use the `popLast()` method instead.
   ///
   /// - Returns: The last element of the collection.
   ///

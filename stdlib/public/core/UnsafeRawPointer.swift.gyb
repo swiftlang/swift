@@ -5,8 +5,8 @@
 // Copyright (c) 2014 - 2016 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
-// See http://swift.org/LICENSE.txt for license information
-// See http://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
+// See https://swift.org/LICENSE.txt for license information
+// See https://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
 //
 //===----------------------------------------------------------------------===//
 
@@ -165,7 +165,7 @@ public struct Unsafe${Mutable}RawPointer : Strideable, Hashable, _Pointer {
     Builtin.deallocRaw(
       _rawValue, bytes._builtinWordValue, alignedTo._builtinWordValue)
   }
-  
+
   /// Binds the allocated memory to type `T` and returns an
   /// `Unsafe${Mutable}Pointer<T>` to the bound memory at `self`.
   ///
@@ -173,8 +173,9 @@ public struct Unsafe${Mutable}RawPointer : Strideable, Hashable, _Pointer {
   ///   that is layout compatible with `T`.
   /// - Postcondition: The memory is bound to 'T' starting at `self` continuing
   ///   through `self` + `count` * `MemoryLayout<T>.stride`
-  /// - Warning: Binding memory to a type is potentially undefined if the
-  ///   memory is ever accessed as an unrelated type.
+  /// - Warning: A memory location may only be bound to one type at a time.
+  ///   The behavior of accessing memory as type `U` while it is bound to an
+  ///   unrelated type `T` is undefined.
   @_transparent
   @discardableResult
   public func bindMemory<T>(to type: T.Type, capacity count: Int)
@@ -190,7 +191,7 @@ public struct Unsafe${Mutable}RawPointer : Strideable, Hashable, _Pointer {
   ///   unspecified capacity.
   ///
   /// - Warning: Accessing memory via the returned pointer is undefined if the
-  ///   if the memory has not been bound to `T`.
+  ///   memory has not been bound to `T`.
   @_transparent
   public func assumingMemoryBound<T>(to: T.Type) -> Unsafe${Mutable}Pointer<T> {
     return Unsafe${Mutable}Pointer<T>(_rawValue)
@@ -377,7 +378,7 @@ public struct Unsafe${Mutable}RawPointer : Strideable, Hashable, _Pointer {
 
 %  if mutable:
   /// Stores a value's bytes into raw memory at `self + offset`.
-  ///  
+  ///
   /// - Precondition: The underlying pointer plus `offset` is properly
   ///   aligned for storing type `T`.
   ///
@@ -386,7 +387,7 @@ public struct Unsafe${Mutable}RawPointer : Strideable, Hashable, _Pointer {
   /// - Precondition: The memory is uninitialized, or initialized to
   ///   some trivial type `U` such that `T` and `U` are mutually layout
   ///   compatible.
-  /// 
+  ///
   /// - Postcondition: The memory is initialized to raw bytes. If the
   ///   memory is bound to type `U`, then it now contains a value of
   ///   type `U`.
@@ -423,9 +424,9 @@ public struct Unsafe${Mutable}RawPointer : Strideable, Hashable, _Pointer {
         /*volatile:*/ false._value)
     }
   }
-  
+
   /// Copies `count` bytes from `source` into memory at `self`.
-  ///  
+  ///
   /// - Precondition: `count` is non-negative.
   ///
   /// - Precondition: The memory at `source..<source + count` is
@@ -468,21 +469,23 @@ public struct Unsafe${Mutable}RawPointer : Strideable, Hashable, _Pointer {
 
   /// Returns `self + n`.
   public func advanced(by n: Int) -> ${Self} {
-    return ${Self}(Builtin.gep_Word(_rawValue, n._builtinWordValue))
+    return ${Self}(Builtin.gepRaw_Word(_rawValue, n._builtinWordValue))
   }
 }
 
+extension ${Self} {
 /// - Note: This may be more efficient than Strideable's implementation
 ///   calling ${Self}.distance().
-@_transparent
-public func == (lhs: ${Self}, rhs: ${Self}) -> Bool {
-  return Bool(Builtin.cmp_eq_RawPointer(lhs._rawValue, rhs._rawValue))
-}
+  @_transparent
+  public static func == (lhs: ${Self}, rhs: ${Self}) -> Bool {
+    return Bool(Builtin.cmp_eq_RawPointer(lhs._rawValue, rhs._rawValue))
+  }
 
-/// - Note: This is an unsigned comparison unlike Strideable's implementation.
-@_transparent
-public func < (lhs: ${Self}, rhs: ${Self}) -> Bool {
-  return Bool(Builtin.cmp_ult_RawPointer(lhs._rawValue, rhs._rawValue))
+  /// - Note: This is an unsigned comparison unlike Strideable's implementation.
+  @_transparent
+  public static func < (lhs: ${Self}, rhs: ${Self}) -> Bool {
+    return Bool(Builtin.cmp_ult_RawPointer(lhs._rawValue, rhs._rawValue))
+  }
 }
 
 extension Unsafe${Mutable}RawPointer : CustomDebugStringConvertible {

@@ -1,6 +1,6 @@
-// RUN: %target-sil-opt -enable-sil-verify-all -loop-rotate -dce -simplify-cfg -abcopts -enable-abcopts=1 %s | %FileCheck %s
-// RUN: %target-sil-opt -enable-sil-verify-all -loop-rotate -dce -simplify-cfg -abcopts -dce -enable-abcopts -enable-abc-hoisting %s | %FileCheck %s --check-prefix=HOIST
-// RUN: %target-sil-opt -enable-sil-verify-all  -abcopts  %s | %FileCheck %s --check-prefix=RANGECHECK
+// RUN: %target-sil-opt -assume-parsing-unqualified-ownership-sil -enable-sil-verify-all -loop-rotate -dce -simplify-cfg -abcopts -enable-abcopts=1 %s | %FileCheck %s
+// RUN: %target-sil-opt -assume-parsing-unqualified-ownership-sil -enable-sil-verify-all -loop-rotate -dce -simplify-cfg -abcopts -dce -enable-abcopts -enable-abc-hoisting %s | %FileCheck %s --check-prefix=HOIST
+// RUN: %target-sil-opt -assume-parsing-unqualified-ownership-sil -enable-sil-verify-all  -abcopts  %s | %FileCheck %s --check-prefix=RANGECHECK
 
 sil_stage canonical
 
@@ -49,7 +49,7 @@ bb0(%0 : $*ArrayInt, %1 : $*ArrayInt):
   // CHECK: [[CHECKBOUNDS:%[0-9]+]] = function_ref @checkbounds
   // CHECK: [[LD1:%[0-9]+]] = load %0
 
-  %2 = function_ref @checkbounds : $@convention(method) (Int32, Bool, @owned ArrayInt) -> _DependenceToken 
+  %2 = function_ref @checkbounds : $@convention(method) (Int32, Bool, @owned ArrayInt) -> _DependenceToken
   %3 = load %0 : $*ArrayInt
   %4 = struct_extract %3 : $ArrayInt, #ArrayInt.buffer
   %5 = struct_extract %4 : $ArrayIntBuffer, #ArrayIntBuffer.storage
@@ -440,6 +440,67 @@ bb3:
   %23 = struct $Int32 (%4 : $Builtin.Int32)
   return %23 : $Int32
 }
+
+// HOIST-LABEL: sil @always_false_hoist
+// HOIST: bb4
+// HOIST:   builtin "sadd_with_overflow_Int32"
+// HOIST:   tuple_extract
+// HOIST-NOT: builtin "cmp_slt_Int32"
+// HOIST-NOT: builtin "cmp_sle_Int32"
+// HOIST-NOT: builtin "cmp_eq_Int32"
+// HOIST:   cond_fail
+// HOIST:   cond_fail
+// HOIST:   cond_fail
+// HOIST:   cond_fail
+// HOIST:   builtin "cmp_eq_Int32"
+// HOIST:   cond_br
+// HOIST: }
+sil @always_false_hoist : $@convention(thin) (@owned Array<Int>) -> () {
+bb0(%0 : $Array<Int>):
+  %z0 = integer_literal $Builtin.Int32, 0
+  %f1 = function_ref @getCount2 : $@convention(method) (@owned Array<Int>) -> Int32
+  retain_value %0 : $Array<Int>
+  %t1 = apply %f1(%0) : $@convention(method) (@owned Array<Int>) -> Int32
+  %c1 = struct_extract %t1 : $Int32, #Int32._value
+  %t2 = builtin "cmp_eq_Int32"(%z0 : $Builtin.Int32, %c1 : $Builtin.Int32) : $Builtin.Int1
+  cond_br %t2, bb5, bb1
+
+bb1:
+  br bb2(%z0 : $Builtin.Int32)
+
+bb2(%i0 : $Builtin.Int32):
+  cond_br undef, bb3, bb4
+
+bb3:
+  %f2 = function_ref @checkbounds2 : $@convention(method) (Int32, Bool, @owned Array<Int>) -> _DependenceToken
+  retain_value %0 : $Array<Int>
+  %t3 = struct $Int32(%i0 : $Builtin.Int32)
+
+  br bb4
+
+bb4:
+  %t5 = integer_literal $Builtin.Int1, 0
+  %i2 = integer_literal $Builtin.Int32, 1
+  %t6 = builtin "sadd_with_overflow_Int32"(%i0 : $Builtin.Int32, %i2 : $Builtin.Int32, %t5 : $Builtin.Int1) : $(Builtin.Int32, Builtin.Int1)
+  %t7 = tuple_extract %t6 : $(Builtin.Int32, Builtin.Int1), 0
+  %t8 = tuple_extract %t6 : $(Builtin.Int32, Builtin.Int1), 1
+  cond_fail %t8 : $Builtin.Int1
+  %af1 = builtin "cmp_slt_Int32"(%i0 : $Builtin.Int32, %z0 : $Builtin.Int32) : $Builtin.Int1
+  cond_fail %af1 : $Builtin.Int1
+  %af2 = builtin "cmp_slt_Int32"(%t7 : $Builtin.Int32, %z0 : $Builtin.Int32) : $Builtin.Int1
+  cond_fail %af2 : $Builtin.Int1
+  %af3 = builtin "cmp_sle_Int32"(%t7 : $Builtin.Int32, %z0 : $Builtin.Int32) : $Builtin.Int1
+  cond_fail %af3 : $Builtin.Int1
+  %af4 = builtin "cmp_eq_Int32"(%t7 : $Builtin.Int32, %z0 : $Builtin.Int32) : $Builtin.Int1
+  cond_fail %af4 : $Builtin.Int1
+  %8 = builtin "cmp_eq_Int32"(%t7 : $Builtin.Int32, %c1 : $Builtin.Int32) : $Builtin.Int1
+  cond_br %8, bb5, bb2(%t7 : $Builtin.Int32)
+
+bb5:
+  %r1 = tuple ()
+  return %r1 : $()
+}
+
 
 // HOIST-LABEL: sil @hoistinvariant
 
@@ -1175,4 +1236,51 @@ bb4:
   cond_fail %24 : $Builtin.Int1
   %28 = builtin "cmp_eq_Int64"(%23 : $Builtin.Int64, %0 : $Builtin.Int64) : $Builtin.Int1
   cond_br %28, bb2, bb3(%23 : $Builtin.Int64)
+}
+
+// Don't assert when we have an isNativeTypeChecked parameter that is not a
+// constant or an array semantic call. It is valid for it to be a phi node.
+sil @bb_arg_is_native2 : $@convention(thin) (Int32, @inout ArrayInt, Builtin.Int1) -> Int32 {
+bb0(%0 : $Int32, %1 : $*ArrayInt, %2 : $Builtin.Int1):
+  cond_br %2, bb1, bb2
+
+bb1:
+  %4 = integer_literal $Builtin.Int1, -1
+  %5 = struct $Bool (%4 : $Builtin.Int1)
+  br bb3(%5 : $Bool)
+
+bb2:
+  %7 = integer_literal $Builtin.Int1, -1
+  %8 = struct $Bool (%7 : $Builtin.Int1)
+  br bb3(%8 : $Bool)
+
+bb3(%10 : $Bool):
+  %11 = struct_extract %0 : $Int32, #Int32._value
+  %12 = integer_literal $Builtin.Int32, 0
+  %13 = builtin "cmp_eq_Int32"(%12 : $Builtin.Int32, %11 : $Builtin.Int32) : $Builtin.Int1
+  cond_br %13, bb6(%12 : $Builtin.Int32), bb4
+
+bb4:
+  br bb5(%12 : $Builtin.Int32)
+
+bb5(%16 : $Builtin.Int32):
+  %17 = struct $Int32 (%16 : $Builtin.Int32)
+  %18 = function_ref @checkbounds : $@convention(method) (Int32, Bool, @owned ArrayInt) -> _DependenceToken
+  %19 = load %1 : $*ArrayInt
+  %20 = struct_extract %19 : $ArrayInt, #ArrayInt.buffer
+  %21 = struct_extract %20 : $ArrayIntBuffer, #ArrayIntBuffer.storage
+  retain_value %21 : $Builtin.NativeObject
+  %23 = apply %18(%17, %10, %19) : $@convention(method) (Int32, Bool, @owned ArrayInt) -> _DependenceToken
+  %24 = integer_literal $Builtin.Int32, 1
+  %25 = integer_literal $Builtin.Int1, -1
+  %26 = builtin "sadd_with_overflow_Int32"(%16 : $Builtin.Int32, %24 : $Builtin.Int32, %25 : $Builtin.Int1) : $(Builtin.Int32, Builtin.Int1)
+  %27 = tuple_extract %26 : $(Builtin.Int32, Builtin.Int1), 0
+  %28 = tuple_extract %26 : $(Builtin.Int32, Builtin.Int1), 1
+  cond_fail %28 : $Builtin.Int1
+  %30 = builtin "cmp_eq_Int32"(%27 : $Builtin.Int32, %11 : $Builtin.Int32) : $Builtin.Int1
+  cond_br %30, bb6(%27 : $Builtin.Int32), bb5(%27 : $Builtin.Int32)
+
+bb6(%32 : $Builtin.Int32):
+  %33 = struct $Int32 (%32 : $Builtin.Int32)
+  return %33 : $Int32
 }

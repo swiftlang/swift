@@ -5,8 +5,8 @@
 // Copyright (c) 2014 - 2016 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
-// See http://swift.org/LICENSE.txt for license information
-// See http://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
+// See https://swift.org/LICENSE.txt for license information
+// See https://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
 //
 //===----------------------------------------------------------------------===//
 
@@ -75,7 +75,6 @@ protected:
     // a pipeline, as it may break some optimizations.
     if (F->isKeepAsPublic()) {
       F->setLinkage(SILLinkage::Public);
-      F->setFragile(IsFragile_t::IsNotFragile);
       DEBUG(llvm::dbgs() << "DFE: Preserve the specialization "
                          << F->getName() << '\n');
       return true;
@@ -468,6 +467,30 @@ class ExternalFunctionDefinitionsElimination : FunctionLivenessComputation {
     /// Therefore there is no need for a liveness computation.
     /// The next line can be just replaced by:
     /// return false;
+
+    // Keep all transparent functions alive. This is important because we have
+    // to generate code for transparent functions.
+    // Here we handle the special case if a transparent function is referenced
+    // from a non-externally-available function (i.e. a function for which we
+    // generate code). And those function is only reachable through a
+    // vtable/witness-table. In such a case we would not visit the transparent
+    // function in findAliveFunctions() because we don't consider vtables/
+    // witness-tables as anchors.
+    for (SILFunction &F : *Module) {
+      if (isAvailableExternally(F.getLinkage()))
+        continue;
+
+      for (SILBasicBlock &BB : F) {
+        for (SILInstruction &I : BB) {
+          if (auto *FRI = dyn_cast<FunctionRefInst>(&I)) {
+            SILFunction *RefF = FRI->getReferencedFunction();
+            if (RefF->isTransparent() && RefF->isFragile())
+              ensureAlive(RefF);
+          }
+        }
+      }
+    }
+
     return FunctionLivenessComputation::findAliveFunctions();
   }
 

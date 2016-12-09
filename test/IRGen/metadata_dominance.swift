@@ -1,5 +1,5 @@
-// RUN: %target-swift-frontend -emit-ir -primary-file %s | %FileCheck %s
-// RUN: %target-swift-frontend -O -emit-ir -primary-file %s | %FileCheck %s --check-prefix=CHECK-OPT
+// RUN: %target-swift-frontend -assume-parsing-unqualified-ownership-sil -emit-ir -primary-file %s | %FileCheck %s
+// RUN: %target-swift-frontend -assume-parsing-unqualified-ownership-sil -O -emit-ir -primary-file %s | %FileCheck %s --check-prefix=CHECK-OPT
 
 func use_metadata<F>(_ f: F) {}
 
@@ -80,5 +80,5 @@ func testMakeFoo(_ p: P) -> Foo.Type {
 // conformance metadata_dominance.Foo : metadata_dominance.P should not use the Self type
 // as the type of the object to be created. It should dynamically obtain the type.
 // CHECK-OPT-LABEL: define hidden %C18metadata_dominance3Foo* @_TTWC18metadata_dominance3FooS_1PS_FS1_7makeFoofT_S0_
-// CHECK-OPT-NOT: tail call noalias %swift.refcounted* @rt_swift_allocObject(%swift.type* %Self
+// CHECK-OPT-NOT: tail call noalias %swift.refcounted* @swift_rt_swift_allocObject(%swift.type* %Self
 

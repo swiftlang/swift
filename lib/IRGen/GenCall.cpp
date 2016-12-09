@@ -5,8 +5,8 @@
 // Copyright (c) 2014 - 2016 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
-// See http://swift.org/LICENSE.txt for license information
-// See http://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
+// See https://swift.org/LICENSE.txt for license information
+// See https://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
 //
 //===----------------------------------------------------------------------===//
 //
@@ -150,7 +150,7 @@ llvm::CallingConv::ID irgen::expandCallingConv(IRGenModule &IGM,
 
   case SILFunctionTypeRepresentation::Method:
   case SILFunctionTypeRepresentation::WitnessMethod:
-    SWIFT_FALLTHROUGH;
+  case SILFunctionTypeRepresentation::Closure:
   case SILFunctionTypeRepresentation::Thin:
   case SILFunctionTypeRepresentation::Thick:
     return getFreestandingConvention(IGM);
@@ -317,6 +317,8 @@ llvm::Type *SignatureExpansion::expandDirectResult() {
     return schema.getScalarResultType(IGM);
   }
   }
+
+  llvm_unreachable("Not a valid SILFunctionLanguage.");
 }
 
 static const clang::FieldDecl *
@@ -539,6 +541,8 @@ namespace {
         return convertFloatingType(Ctx.getTargetInfo().getDoubleFormat());
       case clang::BuiltinType::LongDouble:
         return convertFloatingType(Ctx.getTargetInfo().getLongDoubleFormat());
+      case clang::BuiltinType::Float128:
+        return convertFloatingType(Ctx.getTargetInfo().getFloat128Format());
 
       // nullptr_t -> void*
       case clang::BuiltinType::NullPtr:
@@ -731,6 +735,7 @@ llvm::Type *SignatureExpansion::expandExternalSignatureTypes() {
   case SILFunctionTypeRepresentation::Thick:
   case SILFunctionTypeRepresentation::Method:
   case SILFunctionTypeRepresentation::WitnessMethod:
+  case SILFunctionTypeRepresentation::Closure:
     llvm_unreachable("not a C representation");
   }
 
@@ -963,6 +968,7 @@ void SignatureExpansion::expandParameters() {
       case SILFunctionType::Representation::WitnessMethod:
       case SILFunctionType::Representation::ObjCMethod:
       case SILFunctionType::Representation::Thin:
+      case SILFunctionType::Representation::Closure:
         return FnType->hasErrorResult();
 
       case SILFunctionType::Representation::Thick:
@@ -1183,8 +1189,8 @@ void CallEmission::emitToMemory(Address addr,
   CanType substResultType = substFnType->getSILResult().getSwiftRValueType();
 
   if (origResultType->hasTypeParameter())
-    origResultType = IGF.IGM.getContextArchetypes()
-      .substDependentType(origResultType)
+    origResultType = IGF.IGM.getGenericEnvironment()
+      ->mapTypeIntoContext(IGF.getSwiftModule(), origResultType)
       ->getCanonicalType();
 
   if (origResultType != substResultType) {
@@ -1856,6 +1862,7 @@ void CallEmission::setArgs(Explosion &arg, WitnessMetadata *witnessMetadata) {
     Args.rbegin()[0] = witnessMetadata->SelfWitnessTable;
     SWIFT_FALLTHROUGH;
 
+  case SILFunctionTypeRepresentation::Closure:
   case SILFunctionTypeRepresentation::Method:
   case SILFunctionTypeRepresentation::Thin:
   case SILFunctionTypeRepresentation::Thick: {

@@ -1,5 +1,5 @@
-// RUN: %target-swift-frontend -I %S/../Inputs -enable-source-import -emit-ir -enable-resilience %s | %FileCheck %s
-// RUN: %target-swift-frontend -I %S/../Inputs -enable-source-import -emit-ir -enable-resilience -O %s
+// RUN: %target-swift-frontend -assume-parsing-unqualified-ownership-sil -I %S/../Inputs -enable-source-import -emit-ir -enable-resilience %s | %FileCheck %s
+// RUN: %target-swift-frontend -assume-parsing-unqualified-ownership-sil -I %S/../Inputs -enable-source-import -emit-ir -enable-resilience -O %s
 
 import resilient_struct
 import resilient_enum
@@ -139,6 +139,26 @@ public struct StructWithIndirectResilientEnum {
 // CHECK-NEXT: [[FIELD_PAYLOAD:%.*]] = load [[INT]], [[INT]]* [[FIELD_PAYLOAD_PTR]]
 // CHECK-NEXT: ret [[INT]] [[FIELD_PAYLOAD]]
 
+
+// Partial application of methods on resilient value types
+
+public struct ResilientStructWithMethod {
+  public func method() {}
+}
+
+// Corner case -- type is address-only in SIL, but empty in IRGen
+
+// CHECK-LABEL: define{{( protected)?}} void @_TF17struct_resilience29partialApplyOfResilientMethodFT1rVS_25ResilientStructWithMethod_T_(%V17struct_resilience25ResilientStructWithMethod* noalias nocapture)
+public func partialApplyOfResilientMethod(r: ResilientStructWithMethod) {
+  _ = r.method
+}
+
+// Type is address-only in SIL, and resilient in IRGen
+
+// CHECK-LABEL: define{{( protected)?}} void @_TF17struct_resilience29partialApplyOfResilientMethodFT1sV16resilient_struct4Size_T_(%swift.opaque* noalias nocapture)
+public func partialApplyOfResilientMethod(s: Size) {
+  _ = s.method
+}
 
 // Public metadata accessor for our resilient struct
 

@@ -5,8 +5,8 @@
 // Copyright (c) 2014 - 2016 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
-// See http://swift.org/LICENSE.txt for license information
-// See http://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
+// See https://swift.org/LICENSE.txt for license information
+// See https://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
 //
 //===----------------------------------------------------------------------===//
 //
@@ -46,8 +46,6 @@ namespace swift {
 
   bool canPossiblyConvertTo(Type T1, Type T2, DeclContext &DC);
 
-  Type lookUpTypeInContext(DeclContext *DC, StringRef Name);
-
   void collectDefaultImplementationForProtocolMembers(ProtocolDecl *PD,
                         llvm::SmallDenseMap<ValueDecl*, ValueDecl*> &DefaultMap);
 
@@ -56,11 +54,6 @@ namespace swift {
   /// \returns true on success, false on error.
   bool typeCheckUnresolvedExpr(DeclContext &DC, Expr* E,
                                Expr *P, SmallVectorImpl<Type> &PossibleTypes);
-
-  /// \brief Given the base type and the trailing identifiers, this function tries
-  /// to infer the type of BaseType.Name1.Name2.Name3
-  /// \returns Resolved type on success, nullptr on error.
-  Type checkMemberType(DeclContext &DC, Type BaseTy, ArrayRef<Identifier> Names);
 
   struct ResolveMemberResult {
     ValueDecl *Favored = nullptr;

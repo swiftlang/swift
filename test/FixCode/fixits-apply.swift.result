@@ -1,4 +1,4 @@
-// RUN: not %swift -parse -target %target-triple %s -emit-fixits-path %t.remap -I %S/Inputs
+// RUN: not %swift -typecheck -target %target-triple %s -emit-fixits-path %t.remap -I %S/Inputs
 // RUN: c-arcmt-test %t.remap | arcmt-test -verify-transformed-files %s.result
 
 class Base {}
@@ -45,7 +45,7 @@ func testMask2(a: UInt64) {
   sendIt(MyEventMask2(rawValue: a))
 }
 func testMask3(a: MyEventMask2) {
-  testMask1(a: UInt64(a.rawValue))
+  testMask1(a: Int(a.rawValue))
 }
 func testMask4(a: MyEventMask2) {
   testMask2(a: a.rawValue)
@@ -69,13 +69,17 @@ func testMask10(a: Int?) {
   sendIt(a) // no fix, nullability mismatch.
 }
 func testMask11(a: MyEventMask2?) {
-  testMask7(a: a.map { UInt64($0.rawValue) })
+  testMask7(a: a.map { Int($0.rawValue) })
 }
 func testMask12(a: MyEventMask2?) {
   testMask8(a: a.map { $0.rawValue })
 }
 func testMask13(a: MyEventMask2?) {
   testMask1(a: a) // no fix, nullability mismatch.
+}
+func testMask14() {
+  sendIt(MyEventMask2(rawValue: 1))
+  sendItOpt(MyEventMask2(rawValue: 2))
 }
 
 struct Wrapper {
@@ -94,6 +98,29 @@ struct SomeName : RawRepresentable {
 func testPassSomeName(_: SomeName) {}
 func testConvertSomeName(s: String) {
   testPassSomeName(SomeName(rawValue: "\(s)}"))
+}
+
+class WrappedClass {}
+class WrappedClassSub: WrappedClass {}
+struct ClassWrapper : RawRepresentable {
+  var rawValue: WrappedClass
+}
+func testPassAnyObject(_: AnyObject) {}
+func testPassAnyObjectOpt(_: AnyObject?) {}
+func testPassWrappedSub(_: WrappedClassSub) {}
+func testConvertClassWrapper(_ x: ClassWrapper, _ sub: WrappedClassSub) {
+  testPassAnyObject(x.rawValue)
+  testPassAnyObjectOpt(x.rawValue)
+  testPassWrappedSub(x)
+
+  let iuo: ClassWrapper! = x
+  testPassAnyObject(iuo)
+  testPassAnyObjectOpt(iuo.map { $0.rawValue })
+
+  let _: ClassWrapper = ClassWrapper(rawValue: sub)
+  let _: ClassWrapper = ClassWrapper(rawValue: x.rawValue)
+  // FIXME: This one inserts 'as!', which is incorrect.
+  let _: ClassWrapper = sub as AnyObject as! ClassWrapper
 }
 
 enum MyEnumType : UInt32 {
@@ -188,10 +215,14 @@ var graph: Graph2<Node, Node2>
 
 @objc protocol ObjCProt { }
 class Graph3<NodeType : ObjCProt> {}
-var graph: Graph3<AnyObject>
+var graph: Graph3<ObjCProt>
 
-class GraphNoFix<NodeType : SomeProt> {}
-var graph: GraphNoFix
+class Graph4<NodeType : SomeProt> {}
+var graph: Graph4<<#NodeType: SomeProt#>>
+var graphAgain = Graph4<<#NodeType: SomeProt#>>()
+
+class GraphCombo<NodeType : SomeProt & ObjCProt> {}
+var graph: GraphCombo<<#NodeType: ObjCProt & SomeProt#>>
 
 func evilCommas(s: String) {
   _ = s[s.startIndex..<<#editorplaceholder#>]
@@ -210,7 +241,7 @@ protocol NonObjCProtocol {}
   @IBOutlet private var ibout3: NonObjCProtocol!
   @IBOutlet private let ibout4: IBIssues!
   @IBOutlet private var ibout5: [[IBIssues]]!
-  @IBOutlet private var ibout6: [String:String]!
+  @IBOutlet private var ibout6: [String: String]!
   @IBInspectable static private var ibinspect1: IBIssues!
   @IBAction static func ibact() {}
 }
@@ -277,4 +308,8 @@ func testBoolValue(a : BoolFoo) {
 protocol P1 {}
 protocol P2 {}
 var a : (P1 & P2)?
-var a2 : (P1)= 17 as! P1
+var a2 : P1= 17 as! P1
+
+class TestOptionalMethodFixit {
+  func test() {}
+}

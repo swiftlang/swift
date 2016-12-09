@@ -5,8 +5,8 @@
 // Copyright (c) 2014 - 2016 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
-// See http://swift.org/LICENSE.txt for license information
-// See http://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
+// See https://swift.org/LICENSE.txt for license information
+// See https://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
 //
 //===----------------------------------------------------------------------===//
 
@@ -24,19 +24,13 @@ namespace swift {
   class AbstractFunctionDecl;
   class ApplyExpr;
   class AvailableAttr;
+  class CallExpr;
   class DeclContext;
   class Expr;
   class InFlightDiagnostic;
   class Stmt;
   class TypeChecker;
   class ValueDecl;
-
-/// Returns the access level associated with \p accessScope, for diagnostic
-/// purposes.
-///
-/// \sa ValueDecl::getFormalAccessScope
-Accessibility
-accessibilityFromScopeForDiagnostics(const DeclContext *accessScope);
 
 /// \brief Emit diagnostics for syntactic restrictions on a given expression.
 void performSyntacticExprDiagnostics(TypeChecker &TC, const Expr *E,
@@ -73,6 +67,7 @@ bool diagnoseArgumentLabelError(TypeChecker &TC, const Expr *expr,
 void fixItAvailableAttrRename(TypeChecker &TC,
                               InFlightDiagnostic &diag,
                               SourceRange referenceRange,
+                              const ValueDecl *renamedDecl,
                               const AvailableAttr *attr,
                               const ApplyExpr *call);
 
@@ -85,6 +80,23 @@ bool fixItOverrideDeclarationTypes(TypeChecker &TC,
                                    InFlightDiagnostic &diag,
                                    ValueDecl *decl,
                                    const ValueDecl *base);
+
+/// Emit fix-its to enclose trailing closure in argument parens.
+void fixItEncloseTrailingClosure(TypeChecker &TC,
+                                 InFlightDiagnostic &diag,
+                                 const CallExpr *call,
+                                 Identifier closureLabel);
+
+/// Run the Availability-diagnostics algorithm otherwise used in an expr
+/// context, but for non-expr contexts such as TypeDecls referenced from
+/// TypeReprs.
+bool diagnoseDeclAvailability(const ValueDecl *Decl,
+                              TypeChecker &TC,
+                              DeclContext *DC,
+                              SourceRange R,
+                              bool AllowPotentiallyUnavailableProtocol,
+                              bool SignalOnPotentialUnavailability);
+
 } // namespace swift
 
 #endif // SWIFT_SEMA_MISC_DIAGNOSTICS_H

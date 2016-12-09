@@ -5,8 +5,8 @@
 // Copyright (c) 2014 - 2016 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
-// See http://swift.org/LICENSE.txt for license information
-// See http://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
+// See https://swift.org/LICENSE.txt for license information
+// See https://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
 //
 //===----------------------------------------------------------------------===//
 
@@ -49,23 +49,25 @@ SILFunction *GenericCloner::initCloned(SILFunction *Orig,
   for (auto &Attr : Orig->getSemanticsAttrs()) {
     NewF->addSemanticsAttr(Attr);
   }
+  if (Orig->hasUnqualifiedOwnership()) {
+    NewF->setUnqualifiedOwnership();
+  }
   return NewF;
 }
 
 void GenericCloner::populateCloned() {
   SILFunction *Cloned = getCloned();
-  SILModule &M = Cloned->getModule();
 
   // Create arguments for the entry block.
   SILBasicBlock *OrigEntryBB = &*Original.begin();
-  SILBasicBlock *ClonedEntryBB = new (M) SILBasicBlock(Cloned);
+  SILBasicBlock *ClonedEntryBB = Cloned->createBasicBlock();
   getBuilder().setInsertionPoint(ClonedEntryBB);
 
   llvm::SmallVector<AllocStackInst *, 8> AllocStacks;
   AllocStackInst *ReturnValueAddr = nullptr;
 
   // Create the entry basic block with the function arguments.
-  auto I = OrigEntryBB->bbarg_begin(), E = OrigEntryBB->bbarg_end();
+  auto I = OrigEntryBB->args_begin(), E = OrigEntryBB->args_end();
   int ArgIdx = 0;
   while (I != E) {
     SILArgument *OrigArg = *I;
@@ -87,8 +89,9 @@ void GenericCloner::populateCloned() {
       } else {
         // Store the new direct parameter to the alloc_stack.
         auto *NewArg =
-          new (M) SILArgument(ClonedEntryBB, mappedType, OrigArg->getDecl());
-        getBuilder().createStore(Loc, NewArg, ASI);
+            ClonedEntryBB->createArgument(mappedType, OrigArg->getDecl());
+        getBuilder().createStore(Loc, NewArg, ASI,
+                                 StoreOwnershipQualifier::Unqualified);
 
         // Try to create a new debug_value from an existing debug_value_addr.
         for (Operand *ArgUse : OrigArg->getUses()) {
@@ -101,7 +104,7 @@ void GenericCloner::populateCloned() {
       }
     } else {
       auto *NewArg =
-        new (M) SILArgument(ClonedEntryBB, mappedType, OrigArg->getDecl());
+          ClonedEntryBB->createArgument(mappedType, OrigArg->getDecl());
       ValueMap[OrigArg] = NewArg;
     }
     ++I;
@@ -122,8 +125,9 @@ void GenericCloner::populateCloned() {
       if (ReturnValueAddr) {
         // The result is converted from indirect to direct. We have to load the
         // returned value from the alloc_stack.
-        ReturnValue = getBuilder().createLoad(ReturnValueAddr->getLoc(),
-                                              ReturnValueAddr);
+        ReturnValue =
+            getBuilder().createLoad(ReturnValueAddr->getLoc(), ReturnValueAddr,
+                                    LoadOwnershipQualifier::Unqualified);
       }
       for (AllocStackInst *ASI : reverse(AllocStacks)) {
         getBuilder().createDeallocStack(ASI->getLoc(), ASI);

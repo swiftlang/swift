@@ -298,9 +298,9 @@ func checkPtr(
   _ m: Bool
 ) -> (Check) -> Void {
   return {
-    checkPointerCorrectness($0, m) { destPtr in 
+    checkPointerCorrectness($0, m) { destPtr in
       return { f(destPtr)(UnsafeMutablePointer($0), $1) }
-    } 
+    }
   }
 }
 
@@ -457,12 +457,16 @@ ${SelfName}TestSuite.test("Comparable") {
 % for SelfName in ['UnsafePointer', 'UnsafeMutablePointer']:
 
 ${SelfName}TestSuite.test("withMemoryRebound") {
-  let mutablePtr = UnsafeMutablePointer<Int>.allocate(capacity: 4)
-  let ptrI = ${SelfName}<Int>(mutablePtr)
+  let mutablePtrI = UnsafeMutablePointer<Int>.allocate(capacity: 4)
+  defer { mutablePtrI.deallocate(capacity: 4) }
+  let ptrI = ${SelfName}<Int>(mutablePtrI)
   ptrI.withMemoryRebound(to: UInt.self, capacity: 4) {
-    expectType(UInt.self, &$0.pointee)
+    // Make sure the closure argument isa $SelfName
+    var ptrU: ${SelfName}<UInt> = $0
+    // and that the element type is UInt.
+    var mutablePtrU = UnsafeMutablePointer(mutating: ptrU)
+    expectType(UInt.self, &mutablePtrU.pointee)
   }
-  mutablePtr.deallocate(capacity: 4)
 }
 
 % end

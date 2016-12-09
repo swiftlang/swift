@@ -5,8 +5,8 @@
 ;; Copyright (c) 2014 - 2016 Apple Inc. and the Swift project authors
 ;; Licensed under Apache License v2.0 with Runtime Library Exception
 ;;
-;; See http://swift.org/LICENSE.txt for license information
-;; See http://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
+;; See https://swift.org/LICENSE.txt for license information
+;; See https://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
 ;;
 ;;===----------------------------------------------------------------------===;;
 
@@ -50,6 +50,9 @@
                     "destroyer" "globalaccessor" "objc") 'words) .
                     font-lock-keyword-face)
 
+   ;; Highlight attributes written in [...].
+   '("\\[\\(.+\\)\\]" 1 font-lock-keyword-face)
+
    ;; SIL Instructions - Allocation/Deallocation.
    `(,(regexp-opt '("alloc_stack" "alloc_ref" "alloc_ref_dynamic" "alloc_box"
                     "alloc_value_buffer" "alloc_global"
@@ -64,9 +67,14 @@
 
    ;; SIL Instructions - Accessing Memory.
    `(,(regexp-opt '("load" "store" "assign"  "mark_uninitialized"
+                    "mark_uninitialized_behavior"
                     "mark_function_escape" "copy_addr" "destroy_addr"
                     "index_addr" "index_raw_pointer" "bind_memory" "to")
                   'words) . font-lock-keyword-face)
+
+   ;; SIL Instructions - Borrowing
+   '("load_borrow" . font-lock-keyword-face)
+   '("\\(end_borrow\\) %[[:alnum:]] \\(from\\)" (1 font-lock-keyword-face) (2 font-lock-keyword-face))
 
    ;; SIL Instructions - Reference Counting.
    `(,(regexp-opt '("strong_retain"
@@ -99,7 +107,7 @@
    `(,(regexp-opt '("retain_value" "release_value" "tuple" "tuple_extract"
                     "tuple_element_addr" "struct" "struct_extract"
                     "struct_element_addr" "ref_element_addr"
-                    "autorelease_value")
+                    "autorelease_value" "copy_value" "destroy_value")
                   'words) . font-lock-keyword-face)
    ;; Enums. *NOTE* We do not include enum itself here since enum is a
    ;; swift declaration as well handled at the top.
@@ -109,9 +117,11 @@
                   'words) . font-lock-keyword-face)
    ;; Protocol and Protocol Composition Types
    `(,(regexp-opt '("init_existential_addr" "deinit_existential_addr"
-                    "open_existential_addr"
-                    "init_existential_ref"
-                    "open_existential_ref")
+                    "open_existential_addr" "alloc_existential_box"
+                    "init_existential_ref" "project_existential_box"
+                    "open_existential_ref" "open_existential_box"
+                    "open_existential_metatype"
+                    "objc_protocol")
                   'words) . font-lock-keyword-face)
    ;; Unchecked Conversions
    `(,(regexp-opt '("upcast"

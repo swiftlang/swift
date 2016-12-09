@@ -1,4 +1,4 @@
-// RUN: %target-parse-verify-swift
+// RUN: %target-typecheck-verify-swift
 
 // Test availability attributes on UnsafePointer initializers.
 // Assume the original source contains no UnsafeRawPointer types.
@@ -107,4 +107,33 @@ func unsafePointerConversionAvailability(
   _ = UnsafePointer<Int>(oupi)
   _ = UnsafePointer<Int>(oumps) // expected-error {{'init' is unavailable: use 'withMemoryRebound(to:capacity:_)' to temporarily view memory as another layout-compatible type.}}
   _ = UnsafePointer<Int>(oups)  // expected-error {{'init' is unavailable: use 'withMemoryRebound(to:capacity:_)' to temporarily view memory as another layout-compatible type.}}
+}
+
+func unsafeRawBufferPointerConversions(
+  mrp: UnsafeMutableRawPointer,
+  rp: UnsafeRawPointer,
+  mrbp: UnsafeMutableRawBufferPointer,
+  rbp: UnsafeRawBufferPointer,
+  mbpi: UnsafeMutableBufferPointer<Int>,
+  bpi: UnsafeBufferPointer<Int>) {
+
+  let omrp: UnsafeMutableRawPointer? = mrp
+  let orp: UnsafeRawPointer? = rp
+
+  _ = UnsafeMutableRawBufferPointer(start: mrp, count: 1)
+  _ = UnsafeRawBufferPointer(start: mrp, count: 1)
+  _ = UnsafeMutableRawBufferPointer(start: rp, count: 1) // expected-error {{cannot convert value of type 'UnsafeRawPointer' to expected argument type 'UnsafeMutableRawPointer?'}}
+  _ = UnsafeRawBufferPointer(start: rp, count: 1)
+  _ = UnsafeMutableRawBufferPointer(mrbp)
+  _ = UnsafeRawBufferPointer(mrbp)
+  _ = UnsafeMutableRawBufferPointer(rbp) // expected-error {{cannot invoke initializer for type 'UnsafeMutableRawBufferPointer' with an argument list of type '(UnsafeRawBufferPointer)'}} expected-note {{overloads for 'UnsafeMutableRawBufferPointer' exist with these partially matching parameter lists: (UnsafeMutableRawBufferPointer), (UnsafeMutableBufferPointer<T>)}}
+  _ = UnsafeRawBufferPointer(rbp)
+  _ = UnsafeMutableRawBufferPointer(mbpi)
+  _ = UnsafeRawBufferPointer(mbpi)
+  _ = UnsafeMutableRawBufferPointer(bpi) // expected-error {{cannot invoke initializer for type 'UnsafeMutableRawBufferPointer' with an argument list of type '(UnsafeBufferPointer<Int>)'}} expected-note {{overloads for 'UnsafeMutableRawBufferPointer' exist with these partially matching parameter lists: (UnsafeMutableRawBufferPointer), (UnsafeMutableBufferPointer<T>)}}
+  _ = UnsafeRawBufferPointer(bpi)
+  _ = UnsafeMutableRawBufferPointer(start: omrp, count: 1)
+  _ = UnsafeRawBufferPointer(start: omrp, count: 1)
+  _ = UnsafeMutableRawBufferPointer(start: orp, count: 1) // expected-error {{cannot convert value of type 'UnsafeRawPointer?' to expected argument type 'UnsafeMutableRawPointer?'}}
+  _ = UnsafeRawBufferPointer(start: orp, count: 1)
 }

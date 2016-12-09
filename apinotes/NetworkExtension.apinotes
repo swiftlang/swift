@@ -2,10 +2,10 @@
 Name: NetworkExtension
 Tags:
 - Name: NEAppProxyFlowError
-  SwiftName: NEAppProxyErrorDomain
+  NSErrorDomain: NEAppProxyErrorDomain
 - Name: NEFilterError
-  SwiftName: NEFilterErrorDomain
+  NSErrorDomain: NEFilterErrorDomain
 - Name: NETunnelProviderError
-  SwiftName: NETunnelProviderErrorDomain
+  NSErrorDomain: NETunnelProviderErrorDomain
 - Name: NEVPNError
-  SwiftName: NEVPNErrorDomain
+  NSErrorDomain: NEVPNErrorDomain

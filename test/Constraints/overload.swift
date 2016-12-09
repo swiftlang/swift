@@ -1,4 +1,4 @@
-// RUN: %target-parse-verify-swift
+// RUN: %target-typecheck-verify-swift
 
 func markUsed<T>(_ t: T) {}
 
@@ -129,9 +129,13 @@ func test20886179(_ handlers: [(Int) -> Void], buttonIndex: Int) {
 func overloaded_identity(_ a : Int) -> Int {}
 func overloaded_identity(_ b : Float) -> Float {}
 
-func test_contextual_result() {
-  return overloaded_identity()  // expected-error {{no 'overloaded_identity' candidates produce the expected contextual result type '()'}}
-  // expected-note @-1 {{overloads for 'overloaded_identity' exist with these result types: Int, Float}}
+func test_contextual_result_1() {
+  return overloaded_identity()  // expected-error {{cannot invoke 'overloaded_identity' with no arguments}}
+  // expected-note @-1 {{overloads for 'overloaded_identity' exist with these partially matching parameter lists: (Int), (Float)}}
+}
+
+func test_contextual_result_2() {
+  return overloaded_identity(1)  // expected-error {{unexpected non-void return value in void function}}
 }
 
 // rdar://problem/24128153
@@ -161,3 +165,13 @@ struct X2 {
 
 let x2 = X2(Int.self)
 let x2check: X2 = x2 // expected-error{{value of optional type 'X2?' not unwrapped; did you mean to use '!' or '?'?}}
+
+// rdar://problem/28051973
+struct R_28051973 {
+  mutating func f(_ i: Int) {}
+  @available(*, deprecated, message: "deprecated")
+  func f(_ f: Float) {}
+}
+
+let r28051973: Int = 42
+R_28051973().f(r28051973) // expected-error {{cannot use mutating member on immutable value: function call returns immutable value}}

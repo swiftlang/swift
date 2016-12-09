@@ -1,4 +1,4 @@
-// RUN: %target-parse-verify-swift
+// RUN: %target-typecheck-verify-swift
 
 @noescape var fn : () -> Int = { 4 }  // expected-error {{@noescape may only be used on 'parameter' declarations}} {{1-11=}}
 
@@ -198,7 +198,7 @@ struct S : P2 {
   func each(_ transform: @noescape (Int) -> ()) { // expected-warning{{@noescape is the default and is deprecated}} {{26-36=}}
     overloadedEach(self,  // expected-error {{cannot invoke 'overloadedEach' with an argument list of type '(S, (Int) -> (), Int)'}}
                    transform, 1)
-    // expected-note @-2 {{overloads for 'overloadedEach' exist with these partially matching parameter lists: (O, (O.Element) -> (), T), (P, (P.Element) -> (), T)}}
+    // expected-note @-2 {{overloads for 'overloadedEach' exist with these partially matching parameter lists: (O, @escaping (O.Element) -> (), T), (P, @escaping (P.Element) -> (), T)}}
   }
 }
 

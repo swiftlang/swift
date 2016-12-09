@@ -1,4 +1,4 @@
-// RUN: %target-swift-frontend -primary-file %s -gnone -emit-ir | %FileCheck %s --check-prefix=CHECK --check-prefix=CHECK-%target-ptrsize
+// RUN: %target-swift-frontend -assume-parsing-unqualified-ownership-sil -primary-file %s -gnone -emit-ir | %FileCheck %s --check-prefix=CHECK --check-prefix=CHECK-%target-ptrsize
 
 // REQUIRES: CPU=x86_64
 
@@ -20,10 +20,10 @@ bb0(%0 : $Optional<() -> ()>):
   // CHECK: br i1 [[T0]], label
   // CHECK: [[FNPTR:%.*]] = inttoptr [[WORD]] %0 to i8*
   // CHECK: [[CTX:%.*]] = inttoptr [[WORD]] %1 to %swift.refcounted*
-  // CHECK: call void @rt_swift_retain(%swift.refcounted* [[CTX]])
+  // CHECK: call void @swift_rt_swift_retain(%swift.refcounted* [[CTX]])
   // CHECK: br label
   retain_value %0 : $Optional<() -> ()>
-  
+
   // CHECK: icmp eq i64 %0, 0
   switch_enum %0 : $Optional<() -> ()>, case #Optional.some!enumelt.1: bb1, case #Optional.none!enumelt: bb2
 

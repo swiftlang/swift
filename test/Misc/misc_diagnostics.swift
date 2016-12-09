@@ -1,14 +1,14 @@
-// RUN: %target-parse-verify-swift
+// RUN: %target-typecheck-verify-swift
 
 // REQUIRES: objc_interop
 
 import Foundation
 import CoreGraphics
 
-var roomName : String? = nil
+var roomName : String?
 
 if let realRoomName = roomName as! NSString { // expected-error {{initializer for conditional binding must have Optional type, not 'NSString'}} expected-warning {{cast from 'String?' to unrelated type 'NSString' always fails}}
-			
+
 }
 
 var pi = 3.14159265358979
@@ -30,11 +30,10 @@ var b: Int = [1, 2, 3] // expected-error{{contextual type 'Int' cannot be used w
 var f1: Float = 2.0
 var f2: Float = 3.0
 
-var dd: Double = f1 - f2 // expected-error{{binary operator '-' cannot be applied to two 'Float' operands}} // expected-note{{expected an argument list of type '(Double, Double)'}}
+var dd: Double = f1 - f2 // expected-error{{cannot convert value of type 'Float' to specified type 'Double'}}
 
 func f() -> Bool {
-  return 1 + 1 // expected-error{{no '+' candidates produce the expected contextual result type 'Bool'}}
-  // expected-note @-1 {{overloads for '+' exist with these result types: UInt8, Int8, UInt16, Int16, UInt32, Int32, UInt64, Int64, UInt, Int, Float, Double}}
+  return 1 + 1 // expected-error{{cannot convert return expression of type 'Int' to return type 'Bool'}}
 }
 
 // Test that nested diagnostics are properly surfaced.
@@ -51,7 +50,8 @@ struct MyArray<Element> {}
 class A {
     var a: MyArray<Int>
     init() {
-        a = MyArray<Int // expected-error{{'<' produces 'Bool', not the expected contextual result type 'MyArray<Int>'}}
+        a = MyArray<Int // expected-error{{binary operator '<' cannot be applied to operands of type 'MyArray<_>.Type' and 'Int.Type'}}
+	// expected-note @-1 {{overloads for '<' exist with these partially matching parameter lists:}}
     }
 }
 
@@ -60,7 +60,7 @@ func retV() { return true } // expected-error {{unexpected non-void return value
 func retAI() -> Int {
     let a = [""]
     let b = [""]
-    return (a + b) // expected-error{{binary operator '+' cannot be applied to two '[String]' operands}} // expected-note{{expected an argument list of type '(Int, Int)'}}
+    return (a + b) // expected-error{{cannot convert return expression of type '[String]' to return type 'Int'}}
 }
 
 func bad_return1() {
@@ -72,8 +72,8 @@ func bad_return2() -> (Int, Int) {
 }
 
 // <rdar://problem/14096697> QoI: Diagnostics for trying to return values from void functions
-func bad_return3(lhs:Int, rhs:Int) {
-  return lhs != 0  // expected-error {{'!=' produces 'Bool', not the expected contextual result type '()'}}
+func bad_return3(lhs: Int, rhs: Int) {
+  return lhs != 0  // expected-error {{unexpected non-void return value in void function}}
 }
 
 class MyBadReturnClass {
@@ -81,7 +81,7 @@ class MyBadReturnClass {
 }
 
 func ==(lhs:MyBadReturnClass, rhs:MyBadReturnClass) {
-  return MyBadReturnClass.intProperty == MyBadReturnClass.intProperty  // expected-error{{binary operator '==' cannot be applied to two 'Int' operands}} // expected-note{{expected an argument list of type '(MyBadReturnClass, MyBadReturnClass)'}}
+  return MyBadReturnClass.intProperty == MyBadReturnClass.intProperty  // expected-error{{unexpected non-void return value in void function}}
 }
 
 

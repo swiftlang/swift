@@ -1,15 +1,15 @@
 module gizmo { header "Gizmo.h" }
 
-module ObjectiveC { 
-  header "BridgeTestObjectiveC.h" 
+module ObjectiveC {
+  header "BridgeTestObjectiveC.h"
 }
 
 module CoreCooling {
   header "CoreCooling.h"
 }
 
-module Foundation { 
-  header "BridgeTestFoundation.h" 
+module Foundation {
+  header "BridgeTestFoundation.h"
 }
 
 module CoreFoundation {

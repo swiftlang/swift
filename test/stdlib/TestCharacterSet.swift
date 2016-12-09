@@ -1,8 +1,8 @@
 // Copyright (c) 2014 - 2016 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
-// See http://swift.org/LICENSE.txt for license information
-// See http://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
+// See https://swift.org/LICENSE.txt for license information
+// See https://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
 //
 //===----------------------------------------------------------------------===//
 //
@@ -101,7 +101,19 @@ class TestCharacterSet : TestCharacterSetSuper {
         let result = testString.trimmingCharacters(in: asciiLowercase)
         expectEqual(result, expected)
     }
-    
+
+    func testClosedRanges_SR_2988() {
+      // "CharacterSet.insert(charactersIn: ClosedRange) crashes on a closed ClosedRange<UnicodeScalar> containing U+D7FF"
+      let problematicChar = UnicodeScalar(0xD7FF)!
+      let range = capitalA...problematicChar
+      var characters = CharacterSet(charactersIn: range) // this should not crash
+      expectTrue(characters.contains(problematicChar))
+      characters.remove(charactersIn: range) // this should not crash
+      expectTrue(!characters.contains(problematicChar))
+      characters.insert(charactersIn: range) // this should not crash
+      expectTrue(characters.contains(problematicChar))
+    }
+
     func testInsertAndRemove() {
         var asciiUppercase = CharacterSet(charactersIn: UnicodeScalar(0x41)!...UnicodeScalar(0x5A)!)
         expectTrue(asciiUppercase.contains(UnicodeScalar(0x49)!))
@@ -192,6 +204,33 @@ class TestCharacterSet : TestCharacterSetSuper {
         expectEqual(expected, union)
     }
 
+    func test_subtracting() {
+        let difference = CharacterSet(charactersIn: "abc").subtracting(CharacterSet(charactersIn: "b"))
+        let expected = CharacterSet(charactersIn: "ac")
+        expectEqual(expected, difference)
+    }
+
+    func test_subtractEmptySet() {
+        var mutableSet = CharacterSet(charactersIn: "abc")
+        let emptySet = CharacterSet()
+        mutableSet.subtract(emptySet)
+        let expected = CharacterSet(charactersIn: "abc")
+        expectEqual(expected, mutableSet)
+    }
+
+    func test_subtractNonEmptySet() {
+        var mutableSet = CharacterSet()
+        let nonEmptySet = CharacterSet(charactersIn: "abc")
+        mutableSet.subtract(nonEmptySet)
+        expectTrue(mutableSet.isEmpty)
+    }
+
+    func test_symmetricDifference() {
+        let symmetricDifference = CharacterSet(charactersIn: "ac").symmetricDifference(CharacterSet(charactersIn: "b"))
+        let expected = CharacterSet(charactersIn: "abc")
+        expectEqual(expected, symmetricDifference)
+    }
+
     func test_hasMember() {
         let contains = CharacterSet.letters.hasMember(inPlane: 1)
         expectTrue(contains)
@@ -219,6 +258,10 @@ CharacterSetTests.test("test_AnyHashableContainingCharacterSet") { TestCharacter
 CharacterSetTests.test("test_AnyHashableCreatedFromNSCharacterSet") { TestCharacterSet().test_AnyHashableCreatedFromNSCharacterSet() }
 CharacterSetTests.test("test_superSet") { TestCharacterSet().test_superSet() }
 CharacterSetTests.test("test_union") { TestCharacterSet().test_union() }
+CharacterSetTests.test("test_subtracting") { TestCharacterSet().test_subtracting() }
+CharacterSetTests.test("test_subtractEmptySet") { TestCharacterSet().test_subtractEmptySet() }
+CharacterSetTests.test("test_subtractNonEmptySet") { TestCharacterSet().test_subtractNonEmptySet() }
+CharacterSetTests.test("test_symmetricDifference") { TestCharacterSet().test_symmetricDifference() }
 CharacterSetTests.test("test_hasMember") { TestCharacterSet().test_hasMember() }
 CharacterSetTests.test("test_bitmap") { TestCharacterSet().test_bitmap() }
 runAllTests()

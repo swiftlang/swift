@@ -5,8 +5,8 @@
 // Copyright (c) 2014 - 2016 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
-// See http://swift.org/LICENSE.txt for license information
-// See http://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
+// See https://swift.org/LICENSE.txt for license information
+// See https://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
 //
 //===----------------------------------------------------------------------===//
 //
@@ -258,7 +258,7 @@ namespace {
 
     ObjCClassCacheEntry(const ClassMetadata *theClass) {
       Data.setKind(MetadataKind::ObjCClassWrapper);
-      Data.ValueWitnesses = &_TWVBO;
+      Data.ValueWitnesses = &VALUE_WITNESS_SYM(BO);
       Data.Class = theClass;
     }
 
@@ -286,6 +286,11 @@ static SimpleGlobalCache<ObjCClassCacheEntry> ObjCClassWrappers;
 
 const Metadata *
 swift::swift_getObjCClassMetadata(const ClassMetadata *theClass) {
+  // Make calls resilient against receiving a null Objective-C class. This can
+  // happen when classes are weakly linked and not available.
+  if (theClass == nullptr)
+    return nullptr;
+
   // If the class pointer is valid as metadata, no translation is required.
   if (theClass->isTypeMetadata()) {
     return theClass;
@@ -426,19 +431,19 @@ FunctionCacheEntry::FunctionCacheEntry(Key key) {
   // so they share a value witness table.
   switch (flags.getConvention()) {
   case FunctionMetadataConvention::Swift:
-    Data.ValueWitnesses = &_TWVFT_T_;
+    Data.ValueWitnesses = &VALUE_WITNESS_SYM(FUNCTION_MANGLING);
     break;
 
   case FunctionMetadataConvention::Thin:
   case FunctionMetadataConvention::CFunctionPointer:
-    Data.ValueWitnesses = &_TWVXfT_T_;
+    Data.ValueWitnesses = &VALUE_WITNESS_SYM(THIN_FUNCTION_MANGLING);
     break;
 
   case FunctionMetadataConvention::Block:
 #if SWIFT_OBJC_INTEROP
     // Blocks are ObjC objects, so can share the Builtin.UnknownObject value
     // witnesses.
-    Data.ValueWitnesses = &_TWVBO;
+    Data.ValueWitnesses = &VALUE_WITNESS_SYM(BO);
 #else
     assert(false && "objc block without objc interop?");
 #endif
@@ -993,7 +998,7 @@ swift::swift_getTupleTypeMetadata(size_t numElements,
                                   const ValueWitnessTable *proposedWitnesses) {
   // Bypass the cache for the empty tuple. We might reasonably get called
   // by generic code, like a demangler that produces type objects.
-  if (numElements == 0) return &_TMT_;
+  if (numElements == 0) return &METADATA_SYM(EMPTY_TUPLE_MANGLING);
 
   // Search the cache.
   TupleCacheEntry::Key key = { numElements, elements, labels };
@@ -1032,13 +1037,13 @@ TupleCacheEntry::TupleCacheEntry(const Key &key,
     } else if (layout.flags.isInlineStorage()
                && layout.flags.isPOD()) {
       if (layout.size == 8 && layout.flags.getAlignmentMask() == 7)
-        proposedWitnesses = &_TWVBi64_;
+        proposedWitnesses = &VALUE_WITNESS_SYM(Bi64_);
       else if (layout.size == 4 && layout.flags.getAlignmentMask() == 3)
-        proposedWitnesses = &_TWVBi32_;
+        proposedWitnesses = &VALUE_WITNESS_SYM(Bi32_);
       else if (layout.size == 2 && layout.flags.getAlignmentMask() == 1)
-        proposedWitnesses = &_TWVBi16_;
+        proposedWitnesses = &VALUE_WITNESS_SYM(Bi16_);
       else if (layout.size == 1)
-        proposedWitnesses = &_TWVBi8_;
+        proposedWitnesses = &VALUE_WITNESS_SYM(Bi8_);
       else
         proposedWitnesses = &tuple_witnesses_pod_inline;
     } else if (layout.flags.isInlineStorage()
@@ -1287,22 +1292,22 @@ void swift::installCommonValueWitnesses(ValueWitnessTable *vwtable) {
       return;
       
     case sizeWithAlignmentMask(1, 0):
-      commonVWT = &_TWVBi8_;
+      commonVWT = &VALUE_WITNESS_SYM(Bi8_);
       break;
     case sizeWithAlignmentMask(2, 1):
-      commonVWT = &_TWVBi16_;
+      commonVWT = &VALUE_WITNESS_SYM(Bi16_);
       break;
     case sizeWithAlignmentMask(4, 3):
-      commonVWT = &_TWVBi32_;
+      commonVWT = &VALUE_WITNESS_SYM(Bi32_);
       break;
     case sizeWithAlignmentMask(8, 7):
-      commonVWT = &_TWVBi64_;
+      commonVWT = &VALUE_WITNESS_SYM(Bi64_);
       break;
     case sizeWithAlignmentMask(16, 15):
-      commonVWT = &_TWVBi128_;
+      commonVWT = &VALUE_WITNESS_SYM(Bi128_);
       break;
     case sizeWithAlignmentMask(32, 31):
-      commonVWT = &_TWVBi256_;
+      commonVWT = &VALUE_WITNESS_SYM(Bi256_);
       break;
     }
     
@@ -2122,9 +2127,9 @@ static const ExtraInhabitantsValueWitnessTable *
 getClassExistentialValueWitnesses(unsigned numWitnessTables) {
   if (numWitnessTables == 0) {
 #if SWIFT_OBJC_INTEROP
-    return &_TWVBO;
+    return &VALUE_WITNESS_SYM(BO);
 #else
-    return &_TWVBo;
+    return &VALUE_WITNESS_SYM(Bo);
 #endif
   }
   if (numWitnessTables == 1)
@@ -2176,10 +2181,10 @@ getExistentialValueWitnesses(ProtocolClassConstraint classConstraint,
   case SpecialProtocol::Error:
 #if SWIFT_OBJC_INTEROP
     // Error always has a single-ObjC-refcounted representation.
-    return &_TWVBO;
+    return &VALUE_WITNESS_SYM(BO);
 #else
     // Without ObjC interop, Error is native-refcounted.
-    return &_TWVBo;
+    return &VALUE_WITNESS_SYM(Bo);
 #endif
       
   // Other existentials use standard representation.

@@ -5,8 +5,8 @@
 // Copyright (c) 2014 - 2016 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
-// See http://swift.org/LICENSE.txt for license information
-// See http://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
+// See https://swift.org/LICENSE.txt for license information
+// See https://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
 //
 //===----------------------------------------------------------------------===//
 
@@ -43,8 +43,8 @@ public var _stdlib_PTHREAD_BARRIER_SERIAL_THREAD: CInt {
 }
 
 public struct _stdlib_pthread_barrier_t {
-  var mutex: UnsafeMutablePointer<pthread_mutex_t>? = nil
-  var cond: UnsafeMutablePointer<pthread_cond_t>? = nil
+  var mutex: UnsafeMutablePointer<pthread_mutex_t>?
+  var cond: UnsafeMutablePointer<pthread_cond_t>?
 
   /// The number of threads to synchronize.
   var count: CUnsignedInt = 0

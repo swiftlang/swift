@@ -5,8 +5,8 @@
 // Copyright (c) 2014 - 2016 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
-// See http://swift.org/LICENSE.txt for license information
-// See http://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
+// See https://swift.org/LICENSE.txt for license information
+// See https://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
 //
 //===----------------------------------------------------------------------===//
 //
@@ -51,6 +51,11 @@ public:
   /// the given protocol conformance.
   virtual void resolveWitness(const NormalProtocolConformance *conformance,
                               ValueDecl *requirement) = 0;
+
+  /// Resolve an inherited conformance.
+  virtual ProtocolConformance *resolveInheritedConformance(
+                                 const NormalProtocolConformance *conformance,
+                                 ProtocolDecl *inherited) = 0;
 
   /// Resolve a member type.
   ///
@@ -133,6 +138,11 @@ public:
     Principal.resolveWitness(conformance, requirement);
   }
 
+  ProtocolConformance *resolveInheritedConformance(
+                         const NormalProtocolConformance *conformance,
+                         ProtocolDecl *inherited) override {
+    return Principal.resolveInheritedConformance(conformance, inherited);
+  }
 
   Type resolveMemberType(DeclContext *dc, Type type, Identifier name) override {
     return Principal.resolveMemberType(dc, type, name);

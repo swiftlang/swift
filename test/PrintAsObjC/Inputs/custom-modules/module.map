@@ -19,6 +19,11 @@ module Base {
   }
 }
 
+module SingleGenericClass {
+  header "SingleGenericClass.h"
+  export *
+}
+
 module OverrideBase [system] {
   header "override.h"
   export *

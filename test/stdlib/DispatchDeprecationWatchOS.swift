@@ -1,4 +1,4 @@
-// RUN: %swift -parse -target i386-apple-watchos2.0 -verify -sdk %sdk %s
+// RUN: %swift -typecheck -target i386-apple-watchos2.0 -verify -sdk %sdk %s
 // REQUIRES: OS=watchos
 // REQUIRES: objc_interop
 

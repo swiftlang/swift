@@ -5,8 +5,8 @@
 // Copyright (c) 2014 - 2016 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
-// See http://swift.org/LICENSE.txt for license information
-// See http://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
+// See https://swift.org/LICENSE.txt for license information
+// See https://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
 //
 //===----------------------------------------------------------------------===//
 //
@@ -53,6 +53,7 @@ Constraint::Constraint(ConstraintKind Kind, Type First, Type Second,
   case ConstraintKind::Bind:
   case ConstraintKind::Equal:
   case ConstraintKind::BindParam:
+  case ConstraintKind::BindToPointerType:
   case ConstraintKind::Subtype:
   case ConstraintKind::Conversion:
   case ConstraintKind::ExplicitConversion:
@@ -61,6 +62,7 @@ Constraint::Constraint(ConstraintKind Kind, Type First, Type Second,
   case ConstraintKind::OperatorArgumentTupleConversion:
   case ConstraintKind::OperatorArgumentConversion:
   case ConstraintKind::ConformsTo:
+  case ConstraintKind::LiteralConformsTo:
   case ConstraintKind::CheckedCast:
   case ConstraintKind::SelfObjectOfProtocol:
   case ConstraintKind::DynamicTypeOf:
@@ -75,16 +77,9 @@ Constraint::Constraint(ConstraintKind Kind, Type First, Type Second,
     assert(!Member && "Relational constraint cannot have a member");
     break;
 
-  case ConstraintKind::TypeMember:
   case ConstraintKind::ValueMember:
   case ConstraintKind::UnresolvedValueMember:
     assert(Member && "Member constraint has no member");
-    break;
-
-  case ConstraintKind::Archetype:
-  case ConstraintKind::Class:
-    assert(!Member && "Type property cannot have a member");
-    assert(Second.isNull() && "Type property with second type");
     break;
 
   case ConstraintKind::Defaultable:
@@ -144,6 +139,7 @@ Constraint::Constraint(ConstraintKind kind, Fix fix,
 
 ProtocolDecl *Constraint::getProtocol() const {
   assert((Kind == ConstraintKind::ConformsTo ||
+          Kind == ConstraintKind::LiteralConformsTo ||
           Kind == ConstraintKind::SelfObjectOfProtocol)
           && "Not a conformance constraint");
   return Types.Second->castTo<ProtocolType>()->getDecl();
@@ -154,6 +150,7 @@ Constraint *Constraint::clone(ConstraintSystem &cs) const {
   case ConstraintKind::Bind:
   case ConstraintKind::Equal:
   case ConstraintKind::BindParam:
+  case ConstraintKind::BindToPointerType:
   case ConstraintKind::Subtype:
   case ConstraintKind::Conversion:
   case ConstraintKind::ExplicitConversion:
@@ -162,6 +159,7 @@ Constraint *Constraint::clone(ConstraintSystem &cs) const {
   case ConstraintKind::OperatorArgumentTupleConversion:
   case ConstraintKind::OperatorArgumentConversion:
   case ConstraintKind::ConformsTo:
+  case ConstraintKind::LiteralConformsTo:
   case ConstraintKind::CheckedCast:
   case ConstraintKind::DynamicTypeOf:
   case ConstraintKind::SelfObjectOfProtocol:
@@ -176,22 +174,18 @@ Constraint *Constraint::clone(ConstraintSystem &cs) const {
 
   case ConstraintKind::ValueMember:
   case ConstraintKind::UnresolvedValueMember:
-  case ConstraintKind::TypeMember:
-    return create(cs, getKind(), getFirstType(), Type(), getMember(), 
+    return create(cs, getKind(), getFirstType(), getSecondType(), getMember(),
                   getFunctionRefKind(), getLocator());
 
   case ConstraintKind::Defaultable:
     return create(cs, getKind(), getFirstType(), getSecondType(),
                   getMember(), getFunctionRefKind(), getLocator());
 
-  case ConstraintKind::Archetype:
-  case ConstraintKind::Class:
-    return create(cs, getKind(), getFirstType(), Type(), DeclName(),
-                  FunctionRefKind::Compound, getLocator());
-
   case ConstraintKind::Disjunction:
     return createDisjunction(cs, getNestedConstraints(), getLocator());
   }
+
+  llvm_unreachable("Unhandled ConstraintKind in switch.");
 }
 
 void Constraint::print(llvm::raw_ostream &Out, SourceManager *sm) const {
@@ -227,6 +221,7 @@ void Constraint::print(llvm::raw_ostream &Out, SourceManager *sm) const {
   case ConstraintKind::Bind: Out << " bind "; break;
   case ConstraintKind::Equal: Out << " equal "; break;
   case ConstraintKind::BindParam: Out << " bind param "; break;
+  case ConstraintKind::BindToPointerType: Out << " bind to pointer "; break;
   case ConstraintKind::Subtype: Out << " subtype "; break;
   case ConstraintKind::Conversion: Out << " conv "; break;
   case ConstraintKind::ExplicitConversion: Out << " expl conv "; break;
@@ -238,6 +233,7 @@ void Constraint::print(llvm::raw_ostream &Out, SourceManager *sm) const {
   case ConstraintKind::OperatorArgumentConversion:
       Out << " operator arg conv "; break;
   case ConstraintKind::ConformsTo: Out << " conforms to "; break;
+  case ConstraintKind::LiteralConformsTo: Out << " literal conforms to "; break;
   case ConstraintKind::CheckedCast: Out << " checked cast to "; break;
   case ConstraintKind::SelfObjectOfProtocol: Out << " Self type of "; break;
   case ConstraintKind::ApplicableFunction: Out << " applicable fn "; break;
@@ -250,7 +246,7 @@ void Constraint::print(llvm::raw_ostream &Out, SourceManager *sm) const {
     auto printDecl = [&] {
       auto decl = overload.getDecl();
       decl->dumpRef(Out);
-      Out << " : " << decl->getType();
+      Out << " : " << decl->getInterfaceType();
       if (!sm || !decl->getLoc().isValid()) return;
       Out << " at ";
       decl->getLoc().print(Out, *sm);
@@ -295,17 +291,6 @@ void Constraint::print(llvm::raw_ostream &Out, SourceManager *sm) const {
   case ConstraintKind::UnresolvedValueMember:
     Out << "[(implicit) ." << Types.Member << ": value] == ";
     break;
-  case ConstraintKind::TypeMember:
-    Out << "[." << Types.Member << ": type] == ";
-    break;
-  case ConstraintKind::Archetype:
-    Out << " is an archetype";
-    skipSecond = true;
-    break;
-  case ConstraintKind::Class:
-    Out << " is a class";
-    skipSecond = true;
-    break;
   case ConstraintKind::Defaultable:
     Out << " can default to ";
     break;
@@ -341,8 +326,15 @@ void Constraint::dump(ConstraintSystem *CS) const {
   // Print all type variables as $T0 instead of _ here.
   llvm::SaveAndRestore<bool> X(CS->getASTContext().LangOpts.
                                DebugConstraintSolver, true);
-  
+  // Disabled MSVC warning: only for use within the debugger
+#if defined(_MSC_VER)
+#pragma warning(push)
+#pragma warning(disable: 4996)
+#endif
   dump(&CS->getASTContext().SourceMgr);
+#if defined(_MSC_VER)
+#pragma warning(pop)
+#endif
 }
 
 
@@ -434,6 +426,8 @@ StringRef Fix::getName(FixKind kind) {
   case FixKind::CoerceToCheckedCast:
     return "fix: as to as!";
   }
+
+  llvm_unreachable("Unhandled FixKind in switch.");
 }
 
 void Fix::print(llvm::raw_ostream &Out, ConstraintSystem *cs) const {
@@ -464,6 +458,7 @@ gatherReferencedTypeVars(Constraint *constraint,
   case ConstraintKind::ApplicableFunction:
   case ConstraintKind::Bind:
   case ConstraintKind::BindParam:
+  case ConstraintKind::BindToPointerType:
   case ConstraintKind::ArgumentConversion:
   case ConstraintKind::Conversion:
   case ConstraintKind::ExplicitConversion:
@@ -473,7 +468,6 @@ gatherReferencedTypeVars(Constraint *constraint,
   case ConstraintKind::CheckedCast:
   case ConstraintKind::Equal:
   case ConstraintKind::Subtype:
-  case ConstraintKind::TypeMember:
   case ConstraintKind::UnresolvedValueMember:
   case ConstraintKind::ValueMember:
   case ConstraintKind::DynamicTypeOf:
@@ -482,10 +476,9 @@ gatherReferencedTypeVars(Constraint *constraint,
     constraint->getSecondType()->getTypeVariables(typeVars);
     SWIFT_FALLTHROUGH;
 
-  case ConstraintKind::Archetype:
   case ConstraintKind::BindOverload:
-  case ConstraintKind::Class:
   case ConstraintKind::ConformsTo:
+  case ConstraintKind::LiteralConformsTo:
   case ConstraintKind::SelfObjectOfProtocol:
     constraint->getFirstType()->getTypeVariables(typeVars);
 
@@ -522,6 +515,12 @@ Constraint *Constraint::create(ConstraintSystem &cs, ConstraintKind kind,
   if (second && second->hasTypeVariable())
     second->getTypeVariables(typeVars);
   uniqueTypeVariables(typeVars);
+
+  // Conformance constraints expect a protocol on the right-hand side, always.
+  assert((kind != ConstraintKind::ConformsTo &&
+          kind != ConstraintKind::LiteralConformsTo &&
+          kind != ConstraintKind::SelfObjectOfProtocol) ||
+         second->is<ProtocolType>());
 
   // Create the constraint.
   unsigned size = totalSizeToAlloc<TypeVariableType*>(typeVars.size());

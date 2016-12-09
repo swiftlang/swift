@@ -5,12 +5,12 @@
 // Copyright (c) 2014 - 2016 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
-// See http://swift.org/LICENSE.txt for license information
-// See http://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
+// See https://swift.org/LICENSE.txt for license information
+// See https://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
 //
 //===----------------------------------------------------------------------===//
 //
-// This file implements semantic analysis for expressions, analysing an
+// This file implements semantic analysis for expressions, analyzing an
 // expression tree in post-order, bottom-up, from leaves up to the root.
 //
 //===----------------------------------------------------------------------===//
@@ -54,8 +54,7 @@ static void substituteInputSugarArgumentType(Type argTy, CanType resultTy,
 
   // If this type is parenthesized, remove the parens.  We don't want to
   // propagate parens from arguments to the result type.
-  if (auto *PT = dyn_cast<ParenType>(argTy.getPointer()))
-    argTy = PT->getUnderlyingType();
+  argTy = argTy->getWithoutParens();
   
   // If this is the first match against the sugar type we found, use it.
   if (!resultSugarTy) {
@@ -74,7 +73,7 @@ static void substituteInputSugarArgumentType(Type argTy, CanType resultTy,
 /// an apply, do so.
 ///
 Expr *TypeChecker::substituteInputSugarTypeForResult(ApplyExpr *E) {
-  if (!E->getType() || E->getType()->is<ErrorType>())
+  if (!E->getType() || E->getType()->hasError())
     return E;
   
   Type resultTy = E->getFn()->getType()->castTo<FunctionType>()->getResult();
@@ -499,7 +498,7 @@ Type TypeChecker::getTypeOfRValue(ValueDecl *value, bool wantInterfaceType) {
   if (wantInterfaceType)
     type = value->getInterfaceType();
   else
-    type = value->getType();
+    type = cast<VarDecl>(value)->getType();
 
   // Uses of inout argument values are lvalues.
   if (auto iot = type->getAs<InOutType>())
@@ -606,6 +605,16 @@ Type TypeChecker::getUnopenedTypeOfReference(ValueDecl *value, Type baseType,
     }
   }
 
+  // If we're dealing with contextual types, and we referenced this type from
+  // a different context, map the type.
+  if (!wantInterfaceType && requestedType->hasArchetype()) {
+    auto valueDC = value->getDeclContext();
+    if (valueDC != UseDC) {
+      Type mapped = valueDC->mapTypeOutOfContext(requestedType);
+      requestedType = UseDC->mapTypeIntoContext(mapped);
+    }
+  }
+
   return requestedType;
 }
 
@@ -652,7 +661,10 @@ static Type lookupDefaultLiteralType(TypeChecker &TC, DeclContext *dc,
   if (!TD)
     return Type();
   TC.validateDecl(TD);
-  return TD->getDeclaredType();
+
+  if (auto *NTD = dyn_cast<NominalTypeDecl>(TD))
+    return NTD->getDeclaredType();
+  return cast<TypeAliasDecl>(TD)->getAliasType();
 }
 
 Type TypeChecker::getDefaultType(ProtocolDecl *protocol, DeclContext *dc) {

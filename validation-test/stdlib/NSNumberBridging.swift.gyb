@@ -107,7 +107,7 @@ NSNumberTests.test("isTypePreservingNSNumber(_:)") {
 }
 
 NSNumberTests.test("_SwiftTypePreservingNSNumber.classForCoder") {
-  // Check that internal subclass is not achived.
+  // Check that internal subclass is not archived.
   let n: NSNumber = (42 as Int)._bridgeToObjectiveC()
   expectTrue(isTypePreservingNSNumber(n))
   expectEqual("NSNumber", String(describing: n.classForCoder))

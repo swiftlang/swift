@@ -5,8 +5,8 @@
 // Copyright (c) 2014 - 2016 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
-// See http://swift.org/LICENSE.txt for license information
-// See http://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
+// See https://swift.org/LICENSE.txt for license information
+// See https://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
 //
 //===----------------------------------------------------------------------===//
 //
@@ -127,6 +127,11 @@ namespace {
         return None;
       }
       llvm_unreachable("bad element layout kind");
+    }
+
+    unsigned getElementStructIndex(IRGenModule &IGM, unsigned fieldNo) const {
+      const TupleFieldInfo &field = asImpl().getFields()[fieldNo];
+      return field.getStructIndex();
     }
 
     void initializeFromParams(IRGenFunction &IGF, Explosion &params,
@@ -405,4 +410,9 @@ Optional<Size> irgen::getFixedTupleElementOffset(IRGenModule &IGM,
                                                  unsigned fieldNo) {
   // Macro happens to work with IGM, too.
   FOR_TUPLE_IMPL(IGM, tupleType, getFixedElementOffset, fieldNo);
+}
+
+unsigned irgen::getTupleElementStructIndex(IRGenModule &IGM, SILType tupleType,
+                                           unsigned fieldNo) {
+  FOR_TUPLE_IMPL(IGM, tupleType, getElementStructIndex, fieldNo);
 }

@@ -5,12 +5,12 @@
 // Copyright (c) 2014 - 2016 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
-// See http://swift.org/LICENSE.txt for license information
-// See http://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
+// See https://swift.org/LICENSE.txt for license information
+// See https://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
 //
 //===----------------------------------------------------------------------===//
 //
-// This file implements semantic analysis for patterns, analysing a
+// This file implements semantic analysis for patterns, analyzing a
 // pattern tree in both bottom-up and top-down ways.
 //
 //===----------------------------------------------------------------------===//
@@ -84,7 +84,7 @@ filterForEnumElement(TypeChecker &TC, DeclContext *DC, SourceLoc UseLoc,
       continue;
     }
     // Skip if the enum element was referenced as an instance member
-    if (!result.Base || !result.Base->getType()->is<MetatypeType>()) {
+    if (!result.Base || !result.Base->getInterfaceType()->is<MetatypeType>()) {
       continue;
     }
 
@@ -412,7 +412,8 @@ public:
   // Member syntax 'T.Element' forms a pattern if 'T' is an enum and the
   // member name is a member of the enum.
   Pattern *visitUnresolvedDotExpr(UnresolvedDotExpr *ude) {
-    GenericTypeToArchetypeResolver resolver;
+    GenericTypeToArchetypeResolver resolver(DC);
+
     SmallVector<ComponentIdentTypeRepr *, 2> components;
     if (!ExprToIdentTypeRepr(components, TC.Context).visit(ude->getBase()))
       return nullptr;
@@ -497,7 +498,7 @@ public:
   //   then required to have keywords for every argument that name properties
   //   of the type.
   Pattern *visitCallExpr(CallExpr *ce) {
-    PartialGenericTypeToArchetypeResolver resolver(TC);
+    GenericTypeToArchetypeResolver resolver(DC);
     
     SmallVector<ComponentIdentTypeRepr *, 2> components;
     if (!ExprToIdentTypeRepr(components, TC.Context).visit(ce->getFn()))
@@ -652,7 +653,7 @@ static bool validateTypedPattern(TypeChecker &TC, DeclContext *DC,
                                  TypeResolutionOptions options,
                                  GenericTypeResolver *resolver) {
   if (TP->hasType())
-    return TP->getType()->is<ErrorType>();
+    return TP->getType()->hasError();
 
   TypeLoc &TL = TP->getTypeLoc();
   bool hadError = TC.validateType(TL, DC, options, resolver);
@@ -734,32 +735,38 @@ static void diagnoseAndMigrateVarParameterToBody(ParamDecl *decl,
 
 static bool validateParameterType(ParamDecl *decl, DeclContext *DC,
                                   TypeResolutionOptions options,
-                                  GenericTypeResolver *resolver,
+                                  GenericTypeResolver &resolver,
                                   TypeChecker &TC) {
   if (auto ty = decl->getTypeLoc().getType())
-    return ty->is<ErrorType>();
-  
-  bool hadError = TC.validateType(decl->getTypeLoc(), DC,
-                                  options|TR_FunctionInput, resolver);
-  
+    return ty->hasError();
+
+  // If the element is a variadic parameter, resolve the parameter type as if
+  // it were in non-parameter position, since we want functions to be
+  // @escaping in this case.
+  auto elementOptions = (options |
+                         (decl->isVariadic() ? TR_VariadicFunctionInput
+                                             : TR_FunctionInput));
+  bool hadError = false;
+
+  // We might have a null typeLoc if this is a closure parameter list,
+  // where parameters are allowed to elide their types.
+  if (!decl->getTypeLoc().isNull()) {
+    hadError |= TC.validateType(decl->getTypeLoc(), DC,
+                                elementOptions, &resolver);
+  }
+
   Type Ty = decl->getTypeLoc().getType();
-  if (decl->isVariadic() && !hadError) {
-    // If isn't legal to declare something both inout and variadic.
-    if (Ty->is<InOutType>()) {
-      TC.diagnose(decl->getStartLoc(), diag::inout_cant_be_variadic);
+  if (decl->isVariadic() && !Ty.isNull() && !hadError) {
+    Ty = TC.getArraySliceType(decl->getStartLoc(), Ty);
+    if (Ty.isNull()) {
       hadError = true;
-    } else {
-      Ty = TC.getArraySliceType(decl->getStartLoc(), Ty);
-      if (Ty.isNull()) {
-        hadError = true;
-      }
     }
     decl->getTypeLoc().setType(Ty);
   }
   // If the param is not a 'let' and it is not an 'inout'.
   // It must be a 'var'. Provide helpful diagnostics like a shadow copy
   // in the function body to fix the 'var' attribute.
-  if (!decl->isLet() && !Ty->is<InOutType>() && !hadError) {
+  if (!decl->isLet() && (Ty.isNull() || !Ty->is<InOutType>()) && !hadError) {
     auto func = dyn_cast_or_null<AbstractFunctionDecl>(DC);
     diagnoseAndMigrateVarParameterToBody(decl, func, TC);
     decl->setInvalid();
@@ -768,26 +775,27 @@ static bool validateParameterType(ParamDecl *decl, DeclContext *DC,
 
   if (hadError)
     decl->getTypeLoc().setType(ErrorType::get(TC.Context), /*validated*/true);
-  
+
   return hadError;
 }
 
 /// Type check a parameter list.
 bool TypeChecker::typeCheckParameterList(ParameterList *PL, DeclContext *DC,
                                          TypeResolutionOptions options,
-                                         GenericTypeResolver *resolver) {
+                                         GenericTypeResolver &resolver) {
   bool hadError = false;
   
   for (auto param : *PL) {
-    if (param->getTypeLoc().getTypeRepr())
-      hadError |= validateParameterType(param, DC, options, resolver, *this);
+    if (!param->getTypeLoc().getTypeRepr() &&
+        param->hasInterfaceType()) {
+      hadError |= param->isInvalid();
+      continue;
+    }
+
+    hadError |= validateParameterType(param, DC, options, resolver, *this);
     
     auto type = param->getTypeLoc().getType();
-    if (!type && param->hasType()) {
-      type = param->getType();
-      param->getTypeLoc().setType(type);
-    }
-    
+
     // If there was no type specified, and if we're not looking at a
     // ClosureExpr, then we have a parse error (no type was specified).  The
     // parser will have already diagnosed this, but treat this as a type error
@@ -799,14 +807,14 @@ bool TypeChecker::typeCheckParameterList(ParameterList *PL, DeclContext *DC,
       param->setInvalid();
     }
     
-    if (param->isInvalid()) {
-      param->overwriteType(ErrorType::get(Context));
+    if (param->isInvalid() || type->hasError()) {
+      param->markInvalid();
       hadError = true;
     } else
-      param->overwriteType(type);
+      resolver.recordParamType(param, type);
     
     checkTypeModifyingDeclAttributes(param);
-    if (param->getType()->is<InOutType>()) {
+    if (!hadError && type->is<InOutType>()) {
       param->setLet(false);
     }
   }
@@ -816,13 +824,9 @@ bool TypeChecker::typeCheckParameterList(ParameterList *PL, DeclContext *DC,
 
 
 bool TypeChecker::typeCheckPattern(Pattern *P, DeclContext *dc,
-                                   TypeResolutionOptions options,
-                                   GenericTypeResolver *resolver) {
-  // Make sure we always have a resolver to use.
-  PartialGenericTypeToArchetypeResolver defaultResolver(*this);
-  if (!resolver)
-    resolver = &defaultResolver;
-  
+                                   TypeResolutionOptions options) {
+  GenericTypeToArchetypeResolver resolver(dc);
+
   switch (P->getKind()) {
   // Type-check paren patterns by checking the sub-pattern and
   // propagating that type out.
@@ -833,7 +837,7 @@ bool TypeChecker::typeCheckPattern(Pattern *P, DeclContext *dc,
       SP = PP->getSubPattern();
     else
       SP = cast<VarPattern>(P)->getSubPattern();
-    if (typeCheckPattern(SP, dc, options, resolver)) {
+    if (typeCheckPattern(SP, dc, options)) {
       P->setType(ErrorType::get(Context));
       return true;
     }
@@ -850,10 +854,10 @@ bool TypeChecker::typeCheckPattern(Pattern *P, DeclContext *dc,
   // that type.
   case PatternKind::Typed: {
     TypedPattern *TP = cast<TypedPattern>(P);
-    bool hadError = validateTypedPattern(*this, dc, TP, options, resolver);
+    bool hadError = validateTypedPattern(*this, dc, TP, options, &resolver);
     Pattern *subPattern = TP->getSubPattern();
     if (coercePatternToType(subPattern, dc, P->getType(),
-                            options|TR_FromNonInferredPattern, resolver,
+                            options|TR_FromNonInferredPattern, &resolver,
                             TP->getTypeLoc()))
       hadError = true;
     else {
@@ -876,8 +880,7 @@ bool TypeChecker::typeCheckPattern(Pattern *P, DeclContext *dc,
     P->setType(ErrorType::get(Context));
     if (auto named = dyn_cast<NamedPattern>(P)) {
       if (auto var = named->getDecl()) {
-        var->setInvalid();
-        var->overwriteType(ErrorType::get(Context));
+        var->markInvalid();
       }
     }
     return true;
@@ -898,7 +901,7 @@ bool TypeChecker::typeCheckPattern(Pattern *P, DeclContext *dc,
     for (unsigned i = 0, e = tuplePat->getNumElements(); i != e; ++i) {
       TuplePatternElt &elt = tuplePat->getElement(i);
       Pattern *pattern = elt.getPattern();
-      if (typeCheckPattern(pattern, dc, elementOptions, resolver)) {
+      if (typeCheckPattern(pattern, dc, elementOptions)) {
         hadError = true;
         continue;
       }
@@ -965,6 +968,7 @@ static bool coercePatternViaConditionalDowncast(TypeChecker &tc,
                                             pattern->getLoc(),
                                             tc.Context.getIdentifier("$match"),
                                             type, dc);
+  matchVar->setInterfaceType(dc->mapTypeOutOfContext(type));
   matchVar->setHasNonPatternBindingInit();
 
   // Form the cast $match as? T, which produces an optional.
@@ -1052,9 +1056,9 @@ bool TypeChecker::coercePatternToType(Pattern *&P, DeclContext *dc, Type type,
     TypedPattern *TP = cast<TypedPattern>(P);
     bool hadError = validateTypedPattern(*this, dc, TP, options, resolver);
     if (!hadError) {
-      if (!type->isEqual(TP->getType()) && !type->is<ErrorType>()) {
+      if (!type->isEqual(TP->getType()) && !type->hasError()) {
         if (options & TR_OverrideType) {
-          TP->overwriteType(type);
+          TP->setType(type);
         } else {
           diagnose(P->getLoc(), diag::pattern_type_mismatch_context, type);
           hadError = true;
@@ -1078,16 +1082,20 @@ bool TypeChecker::coercePatternToType(Pattern *&P, DeclContext *dc, Type type,
     NamedPattern *NP = cast<NamedPattern>(P);
     VarDecl *var = NP->getDecl();
     if (var->isInvalid())
-      var->overwriteType(ErrorType::get(Context));
+      type = ErrorType::get(Context);
+    var->setType(type);
+    // FIXME: wtf
+    if (type->hasTypeParameter())
+      var->setInterfaceType(type);
     else
-      var->overwriteType(type);
+      var->setInterfaceType(var->getDeclContext()->mapTypeOutOfContext(type));
 
     checkTypeModifyingDeclAttributes(var);
     if (type->is<InOutType>()) {
       NP->getDecl()->setLet(false);
     }
     if (var->getAttrs().hasAttribute<OwnershipAttr>())
-      type = getTypeOfRValue(var, true);
+      type = getTypeOfRValue(var, false);
     else if (!var->isInvalid())
       type = var->getType();
     P->setType(type);
@@ -1135,7 +1143,7 @@ bool TypeChecker::coercePatternToType(Pattern *&P, DeclContext *dc, Type type,
   // TODO: permit implicit conversions?
   case PatternKind::Tuple: {
     TuplePattern *TP = cast<TuplePattern>(P);
-    bool hadError = type->is<ErrorType>();
+    bool hadError = type->hasError();
     
     // Sometimes a paren is just a paren. If the tuple pattern has a single
     // element, we can reduce it to a paren pattern.
@@ -1284,7 +1292,7 @@ bool TypeChecker::coercePatternToType(Pattern *&P, DeclContext *dc, Type type,
                              IP->getLoc(),
                              IP->getLoc(),IP->getCastTypeLoc().getSourceRange(),
                              [](Type) { return false; },
-                             /*suppressDiagnostics=*/ type->is<ErrorType>());
+                             /*suppressDiagnostics=*/ type->hasError());
     switch (castKind) {
     case CheckedCastKind::Unresolved:
       return false;
@@ -1343,7 +1351,7 @@ bool TypeChecker::coercePatternToType(Pattern *&P, DeclContext *dc, Type type,
                                       EEP->getLoc());
       }
       if (!elt) {
-        if (!type->is<ErrorType>()) {
+        if (!type->hasError()) {
           // Lowercasing of Swift.Optional's cases is handled in the
           // standard library itself, not through the clang importer,
           // so we have to do this check here. Additionally, .Some
@@ -1503,7 +1511,28 @@ bool TypeChecker::coercePatternToType(Pattern *&P, DeclContext *dc, Type type,
 bool TypeChecker::coerceParameterListToType(ParameterList *P, ClosureExpr *CE,
                                             AnyFunctionType *FN) {
   Type paramListType = FN->getInput();
-  bool hadError = paramListType->is<ErrorType>();
+  bool hadError = paramListType->hasError();
+
+  // Local function to check if the given type is valid e.g. doesn't have
+  // errors, type variables or unresolved types related to it.
+  auto isValidType = [](Type type) -> bool {
+    return !(type.isNull() || type->hasError() || type->hasUnresolvedType() ||
+             type->hasTypeVariable());
+  };
+
+  // Local function to check whether type of given parameter
+  // should be coerced to a given contextual type or not.
+  auto shouldOverwriteParam = [&](ParamDecl *param) -> bool {
+    if (param->isInvalid())
+      return true;
+
+    if (auto type = param->getTypeLoc().getType())
+      return !isValidType(type);
+
+    return true;
+  };
+
+  GenericTypeToArchetypeResolver resolver(CE);
 
   // Sometimes a scalar type gets applied to a single-argument parameter list.
   auto handleParameter = [&](ParamDecl *param, Type ty) -> bool {
@@ -1512,13 +1541,17 @@ bool TypeChecker::coerceParameterListToType(ParameterList *P, ClosureExpr *CE,
     // Check that the type, if explicitly spelled, is ok.
     if (param->getTypeLoc().getTypeRepr()) {
       hadError |= validateParameterType(param, CE, TypeResolutionOptions(),
-                                        nullptr, *this);
+                                        resolver, *this);
       
       // Now that we've type checked the explicit argument type, see if it
       // agrees with the contextual type.
-      if (!hadError && !ty->isEqual(param->getTypeLoc().getType()) &&
-          !ty->is<ErrorType>())
-        param->overwriteType(ty);
+      auto paramType = param->getTypeLoc().getType();
+      // Coerce explicitly specified argument type to contextual type
+      // only if both types are valid and do not match.
+      if (!hadError && isValidType(ty) && !ty->isEqual(paramType)) {
+        param->setType(ty);
+        param->setInterfaceType(CE->mapTypeOutOfContext(ty));
+      }
     }
 
     if (!ty->isMaterializable()) {
@@ -1529,11 +1562,14 @@ bool TypeChecker::coerceParameterListToType(ParameterList *P, ClosureExpr *CE,
                  diag::param_type_non_materializable_tuple, ty);
       }
     }
-    
-    if (param->isInvalid())
-      param->overwriteType(ErrorType::get(Context));
-    else
-      param->overwriteType(ty);
+
+    // If contextual type is invalid and we have a valid argument type
+    // trying to coerce argument to contextual type would mean erasing
+    // valuable diagnostic information.
+    if (isValidType(ty) || shouldOverwriteParam(param)) {
+      param->setType(ty);
+      param->setInterfaceType(CE->mapTypeOutOfContext(ty));
+    }
     
     checkTypeModifyingDeclAttributes(param);
     return hadError;

@@ -5,8 +5,8 @@
 // Copyright (c) 2014 - 2016 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
-// See http://swift.org/LICENSE.txt for license information
-// See http://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
+// See https://swift.org/LICENSE.txt for license information
+// See https://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
 //
 //===----------------------------------------------------------------------===//
 //
@@ -32,6 +32,7 @@ static bool isResolvableScope(ScopeKind SK) {
   case ScopeKind::ClassBody:
   case ScopeKind::ProtocolBody:
   case ScopeKind::TopLevel:
+  case ScopeKind::InheritanceClause:
     return false;
   case ScopeKind::FunctionBody:
   case ScopeKind::Generics:
@@ -50,11 +51,10 @@ static bool isResolvableScope(ScopeKind SK) {
 }
 
 Scope::Scope(Parser *P, ScopeKind SC, bool InactiveConfigBlock)
-  : SI(P->getScopeInfo()),
-    HTScope(SI.HT, SI.CurScope ? &SI.CurScope->HTScope : 0),
-    PrevScope(SI.CurScope),
-    PrevResolvableDepth(SI.ResolvableDepth),
-    Kind(SC), IsInactiveConfigBlock(InactiveConfigBlock) {
+    : SI(P->getScopeInfo()),
+      HTScope(SI.HT, SI.CurScope ? &SI.CurScope->HTScope : nullptr),
+      PrevScope(SI.CurScope), PrevResolvableDepth(SI.ResolvableDepth), Kind(SC),
+      IsInactiveConfigBlock(InactiveConfigBlock) {
   assert(PrevScope || Kind == ScopeKind::TopLevel);
   
   if (SI.CurScope) {

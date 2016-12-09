@@ -5,8 +5,8 @@
 // Copyright (c) 2014 - 2016 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
-// See http://swift.org/LICENSE.txt for license information
-// See http://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
+// See https://swift.org/LICENSE.txt for license information
+// See https://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
 //
 //===----------------------------------------------------------------------===//
 
@@ -32,6 +32,16 @@ namespace swift {
 class SILOpenedArchetypesTracker : public DeleteNotificationHandler {
 public:
   typedef llvm::DenseMap<Type, SILValue> OpenedArchetypeDefsMap;
+
+  SILOpenedArchetypesTracker(SILOpenedArchetypesTracker &Tracker)
+      : SILOpenedArchetypesTracker(Tracker.F, Tracker) {}
+
+  SILOpenedArchetypesTracker(const SILOpenedArchetypesTracker &Tracker)
+      : SILOpenedArchetypesTracker(Tracker.F) {
+    assert(Tracker.getOpenedArchetypeDefs().empty() &&
+           "Only empty const SILOpenedArchetypesTracker can be copied");
+  }
+
   // Re-use pre-populated map if available.
   SILOpenedArchetypesTracker(const SILFunction &F,
                              SILOpenedArchetypesTracker &Tracker)
@@ -105,6 +115,9 @@ public:
   }
 
 private:
+  // Never copy
+  SILOpenedArchetypesTracker &operator = (const SILOpenedArchetypesTracker &) = delete;
+
   /// The function whose opened archetypes are being tracked.
   /// Used only for verification purposes.
   const SILFunction &F;

@@ -135,7 +135,7 @@ CharacterTests.test("literal") {
 }
 
 CharacterTests.test("sizeof") {
-  // FIXME(ABI): should be 8.
+  // FIXME(ABI)#164: should be 8.
   // <rdar://problem/16754935> MemoryLayout<Character>.size is 9, should be 8
 
   let size1 = MemoryLayout<Character>.size

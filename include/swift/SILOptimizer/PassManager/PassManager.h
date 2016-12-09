@@ -5,8 +5,8 @@
 // Copyright (c) 2014 - 2016 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
-// See http://swift.org/LICENSE.txt for license information
-// See http://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
+// See https://swift.org/LICENSE.txt for license information
+// See https://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
 //
 //===----------------------------------------------------------------------===//
 
@@ -77,7 +77,7 @@ class SILPassManager {
 
   /// Stores for each function the number of levels of specializations it is
   /// derived from an original function. E.g. if a function is a signature
-  /// optimized specialization of a generic specialiation, it has level 2.
+  /// optimized specialization of a generic specialization, it has level 2.
   /// This is used to avoid an infinite amount of functions pushed on the
   /// worklist (e.g. caused by a bug in a specializing optimization).
   llvm::DenseMap<SILFunction *, int> DerivationLevels;

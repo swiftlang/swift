@@ -14,7 +14,7 @@ func trap() -> Never {
 // CHECK: alloc_global @_Tv8toplevel1xSi
 // CHECK: [[X:%[0-9]+]] = global_addr @_Tv8toplevel1xSi : $*Int
 // CHECK: integer_literal $Builtin.Int2048, 999
-// CHECK: store {{.*}} to [[X]]
+// CHECK: store {{.*}} to [trivial] [[X]]
 
 var x = 999
 
@@ -49,7 +49,7 @@ if x == 5 {
 }
 
 // CHECK: [[MERGE]]:
-// CHECK: load [[COUNTMUI]]
+// CHECK: load [trivial] [[COUNTMUI]]
 markUsed(count)
 
 
@@ -74,10 +74,10 @@ print_y()
 // CHECK-LABEL: function_ref toplevel.A.__allocating_init
 // CHECK: switch_enum {{%.+}} : $Optional<A>, case #Optional.some!enumelt.1: [[SOME_CASE:.+]], default
 // CHECK: [[SOME_CASE]]([[VALUE:%.+]] : $A):
-// CHECK: store [[VALUE]] to [[BOX:%.+]] : $*A
-// CHECK-NOT: release
+// CHECK: store [[VALUE]] to [init] [[BOX:%.+]] : $*A
+// CHECK-NOT: destroy_value
 // CHECK: [[SINK:%.+]] = function_ref @_TF8toplevel8markUsedurFxT_
-// CHECK-NOT: release
+// CHECK-NOT: destroy_value
 // CHECK: apply [[SINK]]<A>({{%.+}})
 class A {}
 guard var a = Optional(A()) else { trap() }

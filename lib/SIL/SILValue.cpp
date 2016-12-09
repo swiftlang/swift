@@ -5,8 +5,8 @@
 // Copyright (c) 2014 - 2016 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
-// See http://swift.org/LICENSE.txt for license information
-// See http://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
+// See https://swift.org/LICENSE.txt for license information
+// See https://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
 //
 //===----------------------------------------------------------------------===//
 
@@ -31,10 +31,29 @@ static_assert(sizeof(SILValue) == sizeof(uintptr_t),
 //                              Utility Methods
 //===----------------------------------------------------------------------===//
 
-SILBasicBlock *ValueBase::getParentBB() {
-  if (auto Inst = dyn_cast<SILInstruction>(this))
+SILBasicBlock *ValueBase::getParentBlock() const {
+  auto *NonConstThis = const_cast<ValueBase *>(this);
+  if (auto *Inst = dyn_cast<SILInstruction>(NonConstThis))
     return Inst->getParent();
-  if (auto Arg = dyn_cast<SILArgument>(this))
+  if (auto *Arg = dyn_cast<SILArgument>(NonConstThis))
     return Arg->getParent();
+  return nullptr;
+}
+
+SILFunction *ValueBase::getFunction() const {
+  auto *NonConstThis = const_cast<ValueBase *>(this);
+  if (auto *Inst = dyn_cast<SILInstruction>(NonConstThis))
+    return Inst->getFunction();
+  if (auto *Arg = dyn_cast<SILArgument>(NonConstThis))
+    return Arg->getFunction();
+  return nullptr;
+}
+
+SILModule *ValueBase::getModule() const {
+  auto *NonConstThis = const_cast<ValueBase *>(this);
+  if (auto *Inst = dyn_cast<SILInstruction>(NonConstThis))
+    return &Inst->getModule();
+  if (auto *Arg = dyn_cast<SILArgument>(NonConstThis))
+    return &Arg->getModule();
   return nullptr;
 }

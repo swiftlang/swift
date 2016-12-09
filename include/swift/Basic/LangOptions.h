@@ -5,8 +5,8 @@
 // Copyright (c) 2014 - 2016 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
-// See http://swift.org/LICENSE.txt for license information
-// See http://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
+// See https://swift.org/LICENSE.txt for license information
+// See https://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
 //
 //===----------------------------------------------------------------------===//
 //
@@ -19,6 +19,7 @@
 #define SWIFT_BASIC_LANGOPTIONS_H
 
 #include "swift/Basic/LLVM.h"
+#include "swift/Basic/Version.h"
 #include "clang/Basic/VersionTuple.h"
 #include "llvm/ADT/ArrayRef.h"
 #include "llvm/ADT/SmallVector.h"
@@ -41,8 +42,14 @@ namespace swift {
     /// Language features
     ///
 
+    /// \brief User-overridable language version to compile for.
+    version::Version EffectiveLanguageVersion = version::Version::getCurrentLanguageVersion();
+
     /// \brief Disable API availability checking.
     bool DisableAvailabilityChecking = false;
+
+    /// \brief Disable typo correction.
+    bool DisableTypoCorrection = false;
     
     /// Should access control be respected?
     bool EnableAccessControl = true;
@@ -134,8 +141,10 @@ namespace swift {
     /// \brief Enable experimental property behavior feature.
     bool EnableExperimentalPropertyBehaviors = false;
 
-    /// \brief Enable experimental nested generic types feature.
-    bool EnableExperimentalNestedGenericTypes = false;
+    /// \brief Staging flag for class resilience, which we do not want to enable
+    /// fully until more code is in place, to allow the standard library to be
+    /// tested with value type resilience only.
+    bool EnableClassResilience = false;
 
     /// Should we check the target OSs of serialized modules to see that they're
     /// new enough?
@@ -216,6 +225,11 @@ namespace swift {
 
     ArrayRef<std::string> getCustomConditionalCompilationFlags() const {
       return CustomConditionalCompilationFlags;
+    }
+
+    /// Whether our effective Swift version is in the Swift 3 family
+    bool isSwiftVersion3() const {
+      return EffectiveLanguageVersion.isVersion3();
     }
 
     /// Returns true if the 'os' platform condition argument represents

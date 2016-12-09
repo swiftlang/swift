@@ -5,8 +5,8 @@
 // Copyright (c) 2014 - 2016 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
-// See http://swift.org/LICENSE.txt for license information
-// See http://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
+// See https://swift.org/LICENSE.txt for license information
+// See https://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
 //
 //===----------------------------------------------------------------------===//
 //
@@ -102,6 +102,13 @@ HeapNonFixedOffsets::HeapNonFixedOffsets(IRGenFunction &IGF,
       case ElementLayout::Kind::NonFixed:
         // Start calculating non-fixed offsets from the end of the first fixed
         // field.
+        if (i == 0) {
+          totalAlign = elt.getType().getAlignmentMask(IGF, eltTy);
+          offset = totalAlign;
+          Offsets.push_back(totalAlign);
+          break;
+        }
+
         assert(i > 0 && "shouldn't begin with a non-fixed field");
         auto &prevElt = layout.getElement(i-1);
         auto prevType = layout.getElementTypes()[i-1];
@@ -1034,6 +1041,8 @@ llvm::Type *IRGenModule::getReferenceType(ReferenceCounting refcounting) {
   case ReferenceCounting::Error:
     return ErrorPtrTy;
   }
+
+  llvm_unreachable("Not a valid ReferenceCounting.");
 }
 
 #define DEFINE_BINARY_OPERATION(KIND, RESULT, TYPE1, TYPE2)                    \
@@ -1542,7 +1551,10 @@ public:
 
 const TypeInfo *TypeConverter::convertBoxType(SILBoxType *T) {
   // We can share a type info for all dynamic-sized heap metadata.
-  auto &eltTI = IGM.getTypeInfoForLowered(T->getBoxedType());
+  // TODO: Multi-field boxes
+  assert(T->getLayout()->getFields().size() == 1
+         && "multi-field boxes not implemented yet");
+  auto &eltTI = IGM.getTypeInfoForLowered(T->getFieldLoweredType(0));
   if (!eltTI.isFixedSize()) {
     if (!NonFixedBoxTI)
       NonFixedBoxTI = new NonFixedBoxTypeInfo(IGM);

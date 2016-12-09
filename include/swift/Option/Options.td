@@ -5,8 +5,8 @@
 // Copyright (c) 2014 - 2016 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
-// See http://swift.org/LICENSE.txt for license information
-// See http://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
+// See https://swift.org/LICENSE.txt for license information
+// See https://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
 //
 //===----------------------------------------------------------------------===//
 //
@@ -133,6 +133,10 @@ def j : JoinedOrSeparate<["-"], "j">, Flags<[DoesNotAffectIncrementalBuild]>,
 def sdk : Separate<["-"], "sdk">, Flags<[FrontendOption]>,
   HelpText<"Compile against <sdk>">, MetaVarName<"<sdk>">;
 
+def swift_version : Separate<["-"], "swift-version">, Flags<[FrontendOption]>,
+  HelpText<"Interpret input according to a specific Swift language version number">,
+  MetaVarName<"<vers>">;
+
 def tools_directory : Separate<["-"], "tools-directory">,
   Flags<[FrontendOption, NoInteractiveOption, DoesNotAffectIncrementalBuild]>,
   HelpText<"Look for external executables (ld, clang, binutils) in <directory>">, MetaVarName<"<directory>">;
@@ -226,7 +230,7 @@ def import_cf_types : Flag<["-"], "import-cf-types">,
 
 def solver_memory_threshold : Separate<["-"], "solver-memory-threshold">,
   Flags<[FrontendOption, HelpHidden, DoesNotAffectIncrementalBuild]>,
-  HelpText<"Set the upper bound for memory consumption, in bytes, by the constraint solver">;   
+  HelpText<"Set the upper bound for memory consumption, in bytes, by the constraint solver">;
 
 def disable_swift_bridge_attr : Flag<["-"], "disable-swift-bridge-attr">,
   Flags<[FrontendOption, HelpHidden]>,
@@ -278,6 +282,12 @@ def no_static_stdlib: Flag<["-"], "no-static-stdlib">,
   Flags<[HelpHidden]>,
   HelpText<"Don't statically link the Swift standard library">;
 
+def static_executable : Flag<["-"], "static-executable">,
+  HelpText<"Statically link the executable">;
+def no_static_executable : Flag<["-"], "no-static-executable">,
+  Flags<[HelpHidden]>,
+  HelpText<"Don't statically link the executable">;
+
 def use_ld : Joined<["-"], "use-ld=">,
   Flags<[DoesNotAffectIncrementalBuild]>,
   HelpText<"Specifies the linker to be used">;
@@ -301,6 +311,10 @@ def Oplayground : Flag<["-"], "Oplayground">, Group<O_Group>,
   Flags<[HelpHidden, FrontendOption]>,
   HelpText<"Compile with optimizations appropriate for a playground">;
 
+def AssumeSingleThreaded : Flag<["-"], "assume-single-threaded">,
+  Flags<[FrontendOption, HelpHidden]>,
+  HelpText<"Assume that code will be executed in a single-threaded "
+           "environment">;
 
 // Debug info options
 
@@ -329,23 +343,28 @@ def AssertConfig : Separate<["-"], "assert-config">,
 def code_formatting_Group : OptionGroup<"<code formatting options>">;
 
 def use_tabs : Flag<["-"], "use-tabs">, Group<code_formatting_Group>,
-  Flags<[SwiftFormatOption]>,
+  Flags<[NoInteractiveOption, NoBatchOption, SwiftFormatOption]>,
   HelpText<"Use tabs for indentation.">;
 
+def indent_switch_case : Flag<["-"], "indent-switch-case">,
+  Group<code_formatting_Group>,
+  Flags<[NoInteractiveOption, NoBatchOption, SwiftFormatOption]>,
+  HelpText<"Indent cases in switch statements.">;
+
 def in_place : Flag<["-"], "in-place">, Group<code_formatting_Group>,
-  Flags<[SwiftFormatOption]>,
+  Flags<[NoInteractiveOption, NoBatchOption, SwiftFormatOption]>,
   HelpText<"Overwrite input file with formatted file.">;
 
 def tab_width : Separate<["-"], "tab-width">, Group<code_formatting_Group>,
-  Flags<[SwiftFormatOption]>,
+  Flags<[NoInteractiveOption, NoBatchOption, SwiftFormatOption]>,
   HelpText<"Width of tab character.">, MetaVarName<"<n>">;
 
 def indent_width : Separate<["-"], "indent-width">, Group<code_formatting_Group>,
-  Flags<[SwiftFormatOption]>,
+  Flags<[NoInteractiveOption, NoBatchOption, SwiftFormatOption]>,
   HelpText<"Number of characters to indent.">, MetaVarName<"<n>">;
 
 def line_range : Separate<["-"], "line-range">, Group<code_formatting_Group>,
-  Flags<[SwiftFormatOption]>,
+  Flags<[NoInteractiveOption, NoBatchOption, SwiftFormatOption]>,
   HelpText<"<start line>:<end line>. Formats a range of lines (1-based). "
            "Can only be used with one input file.">, MetaVarName<"<n:n>">;
 
@@ -414,8 +433,11 @@ def fixit_all : Flag<["-"], "fixit-all">,
   Flags<[FrontendOption, NoInteractiveOption, DoesNotAffectIncrementalBuild]>;
 
 // No Output Modes
-def parse : Flag<["-"], "parse">,
+def parse: Flag<["-"], "parse">,
   HelpText<"Parse input file(s)">, ModeOpt,
+  Flags<[FrontendOption, NoInteractiveOption, DoesNotAffectIncrementalBuild]>;
+def typecheck : Flag<["-"], "typecheck">,
+  HelpText<"Parse and type-check input file(s)">, ModeOpt,
   Flags<[FrontendOption, NoInteractiveOption, DoesNotAffectIncrementalBuild]>;
 def dump_parse : Flag<["-"], "dump-parse">,
   HelpText<"Parse input file(s) and dump AST(s)">, ModeOpt,

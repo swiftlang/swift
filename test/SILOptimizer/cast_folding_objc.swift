@@ -25,7 +25,7 @@ struct CX: _ObjectiveCBridgeable {
 
   static func _unconditionallyBridgeFromObjectiveC(_ source: ObjCX?)
       -> CX {
-    var result: CX? = nil
+    var result: CX?
     _forceBridgeFromObjectiveC(source!, result: &result)
     return result!
   }

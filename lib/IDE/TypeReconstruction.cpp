@@ -5,8 +5,8 @@
 // Copyright (c) 2014 - 2016 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
-// See http://swift.org/LICENSE.txt for license information
-// See http://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
+// See https://swift.org/LICENSE.txt for license information
+// See https://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
 //
 //===----------------------------------------------------------------------===//
 
@@ -46,68 +46,6 @@ static std::string stringWithFormat(const std::string fmt_str, ...) {
       break;
   }
   return std::string(formatted.get());
-}
-
-static TypeBase *GetTemplateArgument(TypeBase *type, size_t arg_idx) {
-  if (type) {
-    CanType swift_can_type = type->getDesugaredType()->getCanonicalType();
-
-    const TypeKind type_kind = swift_can_type->getKind();
-    switch (type_kind) {
-    case TypeKind::UnboundGeneric: {
-      UnboundGenericType *unbound_generic_type =
-          swift_can_type->getAs<UnboundGenericType>();
-      if (!unbound_generic_type)
-        break;
-      auto *nominal_type_decl = unbound_generic_type->getDecl();
-      if (!nominal_type_decl)
-        break;
-      GenericSignature *generic_sig =
-          nominal_type_decl->getGenericSignature();
-      if (!generic_sig)
-        break;
-      for (auto depTy : generic_sig->getAllDependentTypes()) {
-        if (arg_idx == 0) {
-          return ArchetypeBuilder::mapTypeIntoContext(
-              nominal_type_decl, depTy)->castTo<ArchetypeType>();
-        }
-
-        arg_idx--;
-      }
-
-      // Index was out of bounds...
-      break;
-    }
-    case TypeKind::BoundGenericClass:
-    case TypeKind::BoundGenericStruct:
-    case TypeKind::BoundGenericEnum: {
-      BoundGenericType *bound_generic_type =
-          swift_can_type->getAs<BoundGenericType>();
-      if (!bound_generic_type)
-        break;
-      const ArrayRef<Substitution> &substitutions =
-          bound_generic_type->gatherAllSubstitutions(nullptr, nullptr);
-      if (arg_idx >= substitutions.size())
-        break;
-      const Substitution &substitution = substitutions[arg_idx];
-      return substitution.getReplacement().getPointer();
-    }
-    case TypeKind::PolymorphicFunction: {
-      PolymorphicFunctionType *polymorphic_func_type =
-          swift_can_type->getAs<PolymorphicFunctionType>();
-      if (!polymorphic_func_type)
-        break;
-      if (arg_idx >= polymorphic_func_type->getGenericParameters().size())
-        break;
-      return polymorphic_func_type->getGenericParameters()[arg_idx]
-          ->getArchetype();
-    } break;
-    default:
-      break;
-    }
-  }
-
-  return nullptr;
 }
 
 class DeclsLookupSource {
@@ -236,6 +174,10 @@ public:
       }
     } else if (_type == LookupKind::SwiftModule)
       _module->lookupValue(path, name, kind, result);
+    else if (_type == LookupKind::Extension) {
+      auto results = _extension._decl->lookupDirect(DeclName(name));
+      result.append(results.begin(), results.end());
+    }
     return;
   }
 
@@ -372,21 +314,9 @@ public:
     return (this->operator bool()) && (_type == LookupKind::Extension);
   }
 
-  Type GetQualifiedArchetype(size_t index, ASTContext *ast) {
-    if (this->operator bool() && ast) {
-      switch (_type) {
-      case LookupKind::Extension: {
-        TypeBase *type_ptr = _extension._decl->getType().getPointer();
-        if (MetatypeType *metatype_ptr = type_ptr->getAs<MetatypeType>())
-          type_ptr = metatype_ptr->getInstanceType().getPointer();
-        TypeBase *archetype = GetTemplateArgument(type_ptr, index);
-        return Type(archetype);
-      } break;
-      default:
-        break;
-      }
-    }
-    return Type();
+  NominalTypeDecl *GetExtendedDecl() {
+    assert(IsExtension());
+    return _extension._decl;
   }
 
 private:
@@ -505,8 +435,8 @@ static bool FindFirstNamedDeclWithKind(
           if (curr_decl_kind == decl_kind) {
             result._decls.back() = decl;
             Type decl_type;
-            if (decl->hasType()) {
-              decl_type = decl->getType();
+            if (decl->hasInterfaceType()) {
+              decl_type = decl->getInterfaceType();
               MetatypeType *meta_type = decl_type->getAs<MetatypeType>();
               if (meta_type)
                 decl_type = meta_type->getInstanceType();
@@ -527,8 +457,8 @@ static bool FindFirstNamedDeclWithKind(
             if (curr_decl_kind == DeclKind::TypeAlias) {
               result._decls.back() = decl;
               Type decl_type;
-              if (decl->hasType()) {
-                decl_type = decl->getType();
+              if (decl->hasInterfaceType()) {
+                decl_type = decl->getInterfaceType();
                 MetatypeType *meta_type = decl_type->getAs<MetatypeType>();
                 if (meta_type)
                   decl_type = meta_type->getInstanceType();
@@ -552,7 +482,7 @@ static bool FindFirstNamedDeclWithKind(
           name_ident, ast->getIdentifier(priv_decl_id.getValue().c_str()),
           decls);
     else
-      result._module.lookupQualified(name_ident, NLOptions(), NULL, decls);
+      result._module.lookupQualified(name_ident, NLOptions(), nullptr, decls);
     if (!decls.empty()) {
       bool check_type_aliases = false;
       // Look for an exact match first
@@ -560,8 +490,8 @@ static bool FindFirstNamedDeclWithKind(
         const DeclKind curr_decl_kind = decl->getKind();
         if (curr_decl_kind == decl_kind) {
           result._decls.assign(1, decl);
-          if (decl->hasType()) {
-            result._types.assign(1, decl->getType());
+          if (decl->hasInterfaceType()) {
+            result._types.assign(1, decl->getInterfaceType());
             MetatypeType *meta_type =
                 result._types.back()->getAs<MetatypeType>();
             if (meta_type)
@@ -578,8 +508,8 @@ static bool FindFirstNamedDeclWithKind(
         for (auto decl : decls) {
           if (decl->getKind() == DeclKind::TypeAlias) {
             result._decls.assign(1, decl);
-            if (decl->hasType()) {
-              result._types.assign(1, decl->getType());
+            if (decl->hasInterfaceType()) {
+              result._types.assign(1, decl->getInterfaceType());
               MetatypeType *meta_type =
                   result._types.back()->getAs<MetatypeType>();
               if (meta_type)
@@ -620,11 +550,11 @@ FindNamedDecls(ASTContext *ast, const StringRef &name, VisitNodeResult &result,
               nominal_decl->getName().get(), (uint32_t)nominal_decl->getKind());
         } else {
           for (ValueDecl *decl : decls) {
-            if (decl->hasType()) {
+            if (decl->hasInterfaceType()) {
               result._decls.push_back(decl);
               Type decl_type;
-              if (decl->hasType()) {
-                decl_type = decl->getType();
+              if (decl->hasInterfaceType()) {
+                decl_type = decl->getInterfaceType();
                 MetatypeType *meta_type = decl_type->getAs<MetatypeType>();
                 if (meta_type)
                   decl_type = meta_type->getInstanceType();
@@ -650,7 +580,7 @@ FindNamedDecls(ASTContext *ast, const StringRef &name, VisitNodeResult &result,
           for (auto decl : lookup.Results) {
             auto *VD = decl.getValueDecl();
             result._decls.push_back(VD);
-            result._types.push_back(VD->getType());
+            result._types.push_back(VD->getInterfaceType());
           }
         }
         return result._decls.size();
@@ -677,10 +607,10 @@ FindNamedDecls(ASTContext *ast, const StringRef &name, VisitNodeResult &result,
                            name.str().c_str(), result._module.GetName().data());
     } else {
       for (auto decl : decls) {
-        if (decl->hasType()) {
+        if (decl->hasInterfaceType()) {
           result._decls.push_back(decl);
-          if (decl->hasType()) {
-            result._types.push_back(decl->getType());
+          if (decl->hasInterfaceType()) {
+            result._types.push_back(decl->getInterfaceType());
             MetatypeType *meta_type =
                 result._types.back()->getAs<MetatypeType>();
             if (meta_type)
@@ -803,14 +733,15 @@ static void VisitNodeArchetype(
     }
   }
 
-  SmallVector<Type, 1> conforms_to;
-  if (protocol_list.HasSingleType())
-    conforms_to.push_back(protocol_list.GetFirstType());
+  SmallVector<ProtocolDecl *, 1> conforms_to;
+  if (protocol_list.HasSingleType()) {
+    (void)protocol_list.GetFirstType()->isExistentialType(conforms_to);
+  }
 
   if (ast) {
     result._types.push_back(ArchetypeType::getNew(
-        *ast, nullptr, (AssociatedTypeDecl *)nullptr,
-        ast->getIdentifier(archetype_name), conforms_to, Type()));
+        *ast, nullptr, ast->getIdentifier(archetype_name), conforms_to,
+        Type()));
   } else {
     result._error = "invalid ASTContext";
   }
@@ -837,9 +768,10 @@ static void VisitNodeArchetypeRef(
     result._types.push_back(result_type);
   else {
     if (ast) {
+      SmallVector<ProtocolDecl *, 1> protocols;
       result._types.push_back(ArchetypeType::getNew(
-          *ast, nullptr, (AssociatedTypeDecl *)nullptr,
-          ast->getIdentifier(archetype_name), ArrayRef<Type>(), Type()));
+        *ast, nullptr, ast->getIdentifier(archetype_name), protocols,
+        Type()));
     } else {
       result._error = "invalid ASTContext";
     }
@@ -863,13 +795,13 @@ static void VisitNodeAssociatedTypeRef(
       ArchetypeType *archetype = type->getAs<ArchetypeType>();
       if (archetype) {
         Identifier identifier = ast->getIdentifier(ident->getText());
-        if (archetype->hasNestedType(identifier)) {
-          Type nested = archetype->getNestedTypeValue(identifier);
-          if (nested) {
-            result._types.push_back(nested);
-            result._module = type_result._module;
-            return;
-          }
+        Type nested;
+        if (archetype->hasNestedType(identifier))
+          nested = archetype->getNestedType(identifier);
+        if (nested) {
+          result._types.push_back(nested);
+          result._module = type_result._module;
+          return;
         }
       }
     }
@@ -1005,18 +937,10 @@ static void VisitNodeConstructor(
 
             const AnyFunctionType *type_func =
                 type_result._types.front()->getAs<AnyFunctionType>();
-            if (CanType(identifier_func->getResult()
-                            ->getDesugaredType()
-                            ->getCanonicalType()) ==
-                    CanType(type_func->getResult()
-                                ->getDesugaredType()
-                                ->getCanonicalType()) &&
-                CanType(identifier_func->getInput()
-                            ->getDesugaredType()
-                            ->getCanonicalType()) ==
-                    CanType(type_func->getInput()
-                                ->getDesugaredType()
-                                ->getCanonicalType())) {
+            if (identifier_func->getResult()->getCanonicalType() ==
+                    type_func->getResult()->getCanonicalType() &&
+                identifier_func->getInput()->getCanonicalType() ==
+                    type_func->getInput()->getCanonicalType()) {
               result._module = kind_type_result._module;
               result._decls.push_back(kind_type_result._decls[i]);
               result._types.push_back(
@@ -1141,7 +1065,7 @@ static void VisitNodeDeclContext(
     if (func_decl) {
       result._module = found_decls._module;
       result._decls.push_back(func_decl);
-      result._types.push_back(func_decl->getType().getPointer());
+      result._types.push_back(func_decl->getInterfaceType().getPointer());
     } else
       result._error = "could not find a matching function for the DeclContext";
     break;
@@ -1223,6 +1147,7 @@ static void VisitNodeExtension(
     case Demangle::Node::Kind::Class:
     case Demangle::Node::Kind::Enum:
     case Demangle::Node::Kind::Structure:
+    case Demangle::Node::Kind::Protocol:
       nodes.push_back((*pos));
       VisitNode(ast, nodes, type_result, generic_context);
       break;
@@ -1313,6 +1238,8 @@ static void VisitNodeFunction(
     case Demangle::Node::Kind::Enum:
     case Demangle::Node::Kind::Module:
     case Demangle::Node::Kind::Structure:
+    case Demangle::Node::Kind::Protocol:
+    case Demangle::Node::Kind::Extension:
       nodes.push_back((*pos));
       VisitNode(ast, nodes, decl_scope_result, generic_context);
       break;
@@ -1551,10 +1478,8 @@ static void VisitNodeSetterGetter(
     const AnyFunctionType *type_func =
         type_result._types.front()->getAs<AnyFunctionType>();
 
-    CanType type_result_type(
-        type_func->getResult()->getDesugaredType()->getCanonicalType());
-    CanType type_input_type(
-        type_func->getInput()->getDesugaredType()->getCanonicalType());
+    CanType type_result_type = type_func->getResult()->getCanonicalType();
+    CanType type_input_type = type_func->getInput()->getCanonicalType();
 
     FuncDecl *identifier_func = nullptr;
 
@@ -1580,9 +1505,9 @@ static void VisitNodeSetterGetter(
           break;
         }
 
-        if (identifier_func && identifier_func->getType()) {
+        if (identifier_func && identifier_func->getInterfaceType()) {
           const AnyFunctionType *identifier_func_type =
-              identifier_func->getType()->getAs<AnyFunctionType>();
+              identifier_func->getInterfaceType()->getAs<AnyFunctionType>();
           if (identifier_func_type) {
             // Swift function types are formally functions that take the class
             // and return the method,
@@ -1592,14 +1517,12 @@ static void VisitNodeSetterGetter(
             const AnyFunctionType *identifier_uncurried_result =
                 identifier_func_type->getResult()->getAs<AnyFunctionType>();
             if (identifier_uncurried_result) {
-              CanType identifier_result_type(
+              CanType identifier_result_type =
                   identifier_uncurried_result->getResult()
-                      ->getDesugaredType()
-                      ->getCanonicalType());
-              CanType identifier_input_type(
+                      ->getCanonicalType();
+              CanType identifier_input_type =
                   identifier_uncurried_result->getInput()
-                      ->getDesugaredType()
-                      ->getCanonicalType());
+                      ->getCanonicalType();
               if (identifier_result_type == type_result_type &&
                   identifier_input_type == type_input_type) {
                 break;
@@ -1614,7 +1537,7 @@ static void VisitNodeSetterGetter(
     if (identifier_func) {
       result._decls.push_back(identifier_func);
       result._types.push_back(FixCallingConv(
-          identifier_func, identifier_func->getType().getPointer()));
+          identifier_func, identifier_func->getInterfaceType().getPointer()));
     } else {
       result._error = "could not find a matching subscript signature";
     }
@@ -1661,7 +1584,7 @@ static void VisitNodeSetterGetter(
       if (decl) {
         result._decls.push_back(decl);
         result._types.push_back(
-            FixCallingConv(decl, decl->getType().getPointer()));
+            FixCallingConv(decl, decl->getInterfaceType().getPointer()));
       } else {
         result._error = stringWithFormat(
             "could not retrieve %s for variable %s",
@@ -1710,7 +1633,7 @@ static void VisitNodeLocalDeclName(
       result._types.pop_back();
 
     result._decls.push_back(decl);
-    auto type = decl->getType();
+    auto type = decl->getInterfaceType();
     if (MetatypeType *metatype =
             dyn_cast_or_null<MetatypeType>(type.getPointer()))
       type = metatype->getInstanceType();
@@ -1903,80 +1826,27 @@ static void VisitNodeQualifiedArchetype(
       }
     }
     if (index != 0xFFFFFFFFFFFFFFFF) {
-      if (type_result._types.size() == 1 && type_result._decls.size() == 1) {
-        // given a method defined as func ... (args) -> (ret) {...}
-        // the Swift type system represents it as
-        // (SomeTypeMoniker) -> (args) -> (ret), where SomeTypeMoniker is an
-        // appropriately crafted
-        // reference to the type that contains the method (e.g. for a struct, an
-        // @inout StructType)
-        // For a qualified archetype of a method, we do not care about the
-        // first-level function, but about
-        // the returned function, which is the thing whose archetypes we truly
-        // care to extract
-        // TODO: this might be a generally useful operation, but it requires a
-        // Decl as well as a type
-        // to be reliably performed, and as such we cannot just put it in
-        // CompilerType as of now
-        // (consider, func foo (@inout StructType) -> (Int) -> () vs struct
-        // StructType {func foo(Int) -> ()} to see why)
-        TypeBase *type_ptr = type_result._types[0].getPointer();
-        Decl *decl_ptr = type_result._decls[0];
-        // if this is a function...
-        if (type_ptr && type_ptr->is<AnyFunctionType>()) {
-          // if this is defined in a type...
-          if (decl_ptr->getDeclContext()->isTypeContext()) {
-            // if I can get the function type from it
-            if (auto func_type = dyn_cast_or_null<AnyFunctionType>(type_ptr)) {
-              // and it has a return type which is itself a function
-              auto return_func_type = dyn_cast_or_null<AnyFunctionType>(
-                  func_type->getResult().getPointer());
-              if (return_func_type)
-                type_ptr =
-                    return_func_type; // then use IT as our source of archetypes
-            }
+      Decl *decl_ptr = nullptr;
+      if (type_result._decls.size() == 1) {
+        decl_ptr = type_result._decls[0];
+      } else if (type_result._module.IsExtension()) {
+        decl_ptr = type_result._module.GetExtendedDecl();
+      }
+
+      if (decl_ptr) {
+        auto *dc = decl_ptr->getInnermostDeclContext();
+        auto *sig = dc->getGenericSignatureOfContext();
+        if (sig) {
+          auto params = sig->getInnermostGenericParams();
+          if (index < params.size()) {
+            auto argTy = ArchetypeBuilder::mapTypeIntoContext(
+                dc, params[index])->getAs<ArchetypeType>();
+            if (argTy)
+              result._types.push_back(argTy);
           }
         }
-        TypeBase *arg_type = GetTemplateArgument(type_ptr, index);
-        result._types.push_back(Type(arg_type));
-      } else if (type_result._module.IsExtension()) {
-        result._types.push_back(
-            type_result._module.GetQualifiedArchetype(index, ast));
       }
     }
-  }
-}
-
-static void VisitNodeSelfTypeRef(
-    ASTContext *ast, std::vector<Demangle::NodePointer> &nodes,
-    Demangle::NodePointer &cur_node, VisitNodeResult &result,
-    const VisitNodeResult &generic_context) { // set by GenericType case
-  nodes.push_back(cur_node->getFirstChild());
-  VisitNodeResult type_result;
-  VisitNode(ast, nodes, type_result, generic_context);
-  if (type_result.HasSingleType()) {
-    Type supposed_protocol_type(type_result.GetFirstType());
-    ProtocolType *protocol_type = supposed_protocol_type->getAs<ProtocolType>();
-    ProtocolDecl *protocol_decl =
-        protocol_type ? protocol_type->getDecl() : nullptr;
-    if (protocol_decl) {
-      ArchetypeType::AssocTypeOrProtocolType assoc_protocol_type(protocol_decl);
-      if (ast) {
-        CanTypeWrapper<ArchetypeType> self_type = ArchetypeType::getNew(
-            *ast, nullptr, assoc_protocol_type, ast->getIdentifier("Self"),
-            {supposed_protocol_type}, Type(), false);
-        if (self_type.getPointer())
-          result._types.push_back(Type(self_type));
-        else
-          result._error = "referent type cannot be made into an archetype";
-      } else {
-        result._error = "invalid ASTContext";
-      }
-    } else {
-      result._error = "referent type does not resolve to a protocol";
-    }
-  } else {
-    result._error = "couldn't resolve referent type";
   }
 }
 
@@ -1984,7 +1854,7 @@ static void VisitNodeTupleElement(
     ASTContext *ast, std::vector<Demangle::NodePointer> &nodes,
     Demangle::NodePointer &cur_node, VisitNodeResult &result,
     const VisitNodeResult &generic_context) { // set by GenericType case
-  const char *tuple_name = NULL;
+  const char *tuple_name = nullptr;
   VisitNodeResult tuple_type_result;
   Demangle::Node::iterator end = cur_node->end();
   for (Demangle::Node::iterator pos = cur_node->begin(); pos != end; ++pos) {
@@ -2026,7 +1896,7 @@ static void VisitNodeTypeList(
       VisitNode(ast, nodes, type_result, generic_context);
       if (type_result._error.empty() && type_result._types.size() == 1) {
         if (type_result._decls.empty())
-          result._decls.push_back(NULL);
+          result._decls.push_back(nullptr);
         else
           result._decls.push_back(type_result._decls.front());
         result._types.push_back(type_result._types.front());
@@ -2241,10 +2111,6 @@ static void visitNodeImpl(
 
   case Demangle::Node::Kind::QualifiedArchetype:
     VisitNodeQualifiedArchetype(ast, nodes, node, result, genericContext);
-    break;
-
-  case Demangle::Node::Kind::SelfTypeRef:
-    VisitNodeSelfTypeRef(ast, nodes, node, result, genericContext);
     break;
 
   case Demangle::Node::Kind::TupleElement:

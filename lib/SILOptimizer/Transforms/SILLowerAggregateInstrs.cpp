@@ -5,8 +5,8 @@
 // Copyright (c) 2014 - 2016 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
-// See http://swift.org/LICENSE.txt for license information
-// See http://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
+// See https://swift.org/LICENSE.txt for license information
+// See https://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
 //
 //===----------------------------------------------------------------------===//
 //
@@ -81,7 +81,8 @@ static bool expandCopyAddr(CopyAddrInst *CA) {
   SILBuilderWithScope Builder(CA);
 
   // %new = load %0 : $*T
-  LoadInst *New = Builder.createLoad(CA->getLoc(), Source);
+  LoadInst *New = Builder.createLoad(CA->getLoc(), Source,
+                                     LoadOwnershipQualifier::Unqualified);
 
   SILValue Destination = CA->getDest();
 
@@ -98,7 +99,8 @@ static bool expandCopyAddr(CopyAddrInst *CA) {
     IsInitialization_t IsInit = CA->isInitializationOfDest();
     LoadInst *Old = nullptr;
     if (IsInitialization_t::IsNotInitialization == IsInit) {
-      Old = Builder.createLoad(CA->getLoc(), Destination);
+      Old = Builder.createLoad(CA->getLoc(), Destination,
+                               LoadOwnershipQualifier::Unqualified);
     }
 
     // If we are not taking and have a reference type:
@@ -107,8 +109,8 @@ static bool expandCopyAddr(CopyAddrInst *CA) {
     //   retain_value %new : $*T
     IsTake_t IsTake = CA->isTakeOfSrc();
     if (IsTake_t::IsNotTake == IsTake) {
-      TL.emitLoweredRetainValue(Builder, CA->getLoc(), New,
-                              TypeLowering::LoweringStyle::DeepNoEnum);
+      TL.emitLoweredCopyValue(Builder, CA->getLoc(), New,
+                              TypeLowering::LoweringStyle::Deep);
     }
 
     // If we are not initializing:
@@ -116,13 +118,14 @@ static bool expandCopyAddr(CopyAddrInst *CA) {
     //   *or*
     // release_value %old : $*T
     if (Old) {
-      TL.emitLoweredReleaseValue(Builder, CA->getLoc(), Old,
-                                 TypeLowering::LoweringStyle::DeepNoEnum);
+      TL.emitLoweredDestroyValue(Builder, CA->getLoc(), Old,
+                                 TypeLowering::LoweringStyle::Deep);
     }
   }
 
   // Create the store.
-  Builder.createStore(CA->getLoc(), New, Destination);
+  Builder.createStore(CA->getLoc(), New, Destination,
+                      StoreOwnershipQualifier::Unqualified);
 
   ++NumExpand;
   return true;
@@ -144,10 +147,11 @@ static bool expandDestroyAddr(DestroyAddrInst *DA) {
   // If we have a non-trivial type...
   if (!Type.isTrivial(Module)) {
     // If we have a type with reference semantics, emit a load/strong release.
-    LoadInst *LI = Builder.createLoad(DA->getLoc(), Addr);
+    LoadInst *LI = Builder.createLoad(DA->getLoc(), Addr,
+                                      LoadOwnershipQualifier::Unqualified);
     auto &TL = Module.getTypeLowering(Type);
-    TL.emitLoweredReleaseValue(Builder, DA->getLoc(), LI,
-                               TypeLowering::LoweringStyle::DeepNoEnum);
+    TL.emitLoweredDestroyValue(Builder, DA->getLoc(), LI,
+                               TypeLowering::LoweringStyle::Deep);
   }
 
   ++NumExpand;
@@ -168,8 +172,8 @@ static bool expandReleaseValue(ReleaseValueInst *DV) {
          "release_value should never be called on a non-loadable type.");
 
   auto &TL = Module.getTypeLowering(Type);
-  TL.emitLoweredReleaseValue(Builder, DV->getLoc(), Value,
-                             TypeLowering::LoweringStyle::DeepNoEnum);
+  TL.emitLoweredDestroyValue(Builder, DV->getLoc(), Value,
+                             TypeLowering::LoweringStyle::Deep);
 
   DEBUG(llvm::dbgs() << "    Expanding Destroy Value: " << *DV);
 
@@ -191,9 +195,9 @@ static bool expandRetainValue(RetainValueInst *CV) {
          "types.");
 
   auto &TL = Module.getTypeLowering(Type);
-  TL.emitLoweredRetainValue(Builder, CV->getLoc(), Value,
-                          TypeLowering::LoweringStyle::DeepNoEnum);
-  
+  TL.emitLoweredCopyValue(Builder, CV->getLoc(), Value,
+                          TypeLowering::LoweringStyle::Deep);
+
   DEBUG(llvm::dbgs() << "    Expanding Copy Value: " << *CV);
 
   ++NumExpand;

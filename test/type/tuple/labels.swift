@@ -1,4 +1,4 @@
-// RUN: %target-swift-frontend -module-name TestModule -parse -verify %s
+// RUN: %target-swift-frontend -module-name TestModule -typecheck -verify %s
 
 typealias Tuple1 = (a: Int,
                     b _: Int, // expected-error{{tuple element cannot have two labels}}{{22-24=}}

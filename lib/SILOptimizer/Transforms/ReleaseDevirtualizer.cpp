@@ -5,8 +5,8 @@
 // Copyright (c) 2014 - 2016 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
-// See http://swift.org/LICENSE.txt for license information
-// See http://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
+// See https://swift.org/LICENSE.txt for license information
+// See https://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
 //
 //===----------------------------------------------------------------------===//
 
@@ -24,6 +24,7 @@ using namespace swift;
 namespace {
 
 /// Devirtualizes release instructions which are known to destruct the object.
+///
 /// This means, it replaces a sequence of
 ///    %x = alloc_ref [stack] $X
 ///      ...
@@ -36,10 +37,6 @@ namespace {
 ///    %d = function_ref @dealloc_of_X
 ///    %a = apply %d(%x)
 ///    dealloc_ref [stack] %x
-///
-/// It also works for array buffers, where the allocation/deallocation is done
-/// by calls to the swift_bufferAllocateOnStack/swift_bufferDeallocateFromStack
-/// functions.
 ///
 /// The optimization is only done for stack promoted objects because they are
 /// known to have no associated objects (which are not explicitly released
@@ -56,10 +53,6 @@ private:
   /// Devirtualize releases of array buffers.
   bool devirtualizeReleaseOfObject(SILInstruction *ReleaseInst,
                                    DeallocRefInst *DeallocInst);
-
-  /// Devirtualize releases of swift objects.
-  bool devirtualizeReleaseOfBuffer(SILInstruction *ReleaseInst,
-                                   ApplyInst *DeallocCall);
 
   /// Replace the release-instruction \p ReleaseInst with an explicit call to
   /// the deallocating destructor of \p AllocType for \p object.
@@ -88,11 +81,6 @@ void ReleaseDevirtualizer::run() {
       if (LastRelease) {
         if (auto *DRI = dyn_cast<DeallocRefInst>(&I)) {
           Changed |= devirtualizeReleaseOfObject(LastRelease, DRI);
-          LastRelease = nullptr;
-          continue;
-        }
-        if (auto *AI = dyn_cast<ApplyInst>(&I)) {
-          Changed |= devirtualizeReleaseOfBuffer(LastRelease, AI);
           LastRelease = nullptr;
           continue;
         }
@@ -137,51 +125,6 @@ devirtualizeReleaseOfObject(SILInstruction *ReleaseInst,
 
   SILType AllocType = ARI->getType();
   return createDeallocCall(AllocType, ReleaseInst, ARI);
-}
-
-bool ReleaseDevirtualizer::
-devirtualizeReleaseOfBuffer(SILInstruction *ReleaseInst,
-                            ApplyInst *DeallocCall) {
-
-  DEBUG(llvm::dbgs() << "  try to devirtualize " << *ReleaseInst);
-
-  // Is this a deallocation of a buffer?
-  SILFunction *DeallocFn = DeallocCall->getReferencedFunction();
-  if (!DeallocFn || DeallocFn->getName() != "swift_bufferDeallocateFromStack")
-    return false;
-
-  // Is the deallocation call paired with an allocation call?
-  ApplyInst *AllocAI = dyn_cast<ApplyInst>(DeallocCall->getArgument(0));
-  if (!AllocAI || AllocAI->getNumArguments() < 1)
-    return false;
-
-  SILFunction *AllocFunc = AllocAI->getReferencedFunction();
-  if (!AllocFunc || AllocFunc->getName() != "swift_bufferAllocateOnStack")
-    return false;
-
-  // Can we find the buffer type which is allocated? It's metatype is passed
-  // as first argument to the allocation function.
-  auto *IEMTI = dyn_cast<InitExistentialMetatypeInst>(AllocAI->getArgument(0));
-  if (!IEMTI)
-    return false;
-
-  SILType MType = IEMTI->getOperand()->getType();
-  auto *MetaType = MType.getSwiftRValueType()->getAs<AnyMetatypeType>();
-  if (!MetaType)
-    return false;
-
-  // Is the allocated buffer a class type? This should always be the case.
-  auto *ClType = MetaType->getInstanceType()->getAs<BoundGenericClassType>();
-  if (!ClType)
-    return false;
-
-  // Does the last release really release the allocated buffer?
-  SILValue rcRoot = RCIA->getRCIdentityRoot(ReleaseInst->getOperand(0));
-  if (rcRoot != AllocAI)
-    return false;
-
-  SILType SILClType = SILType::getPrimitiveObjectType(CanType(ClType));
-  return createDeallocCall(SILClType, ReleaseInst, AllocAI);
 }
 
 bool ReleaseDevirtualizer::createDeallocCall(SILType AllocType,

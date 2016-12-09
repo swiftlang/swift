@@ -5,18 +5,22 @@
 // Copyright (c) 2014 - 2016 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
-// See http://swift.org/LICENSE.txt for license information
-// See http://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
+// See https://swift.org/LICENSE.txt for license information
+// See https://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
 //
 //===----------------------------------------------------------------------===//
 
-#include <Foundation/Foundation.h>
+#include "swift/Runtime/Config.h"
+
+#if SWIFT_OBJC_INTEROP
 #include "swift/Basic/Lazy.h"
 #include "swift/Basic/LLVM.h"
 #include "swift/Runtime/Metadata.h"
 #include "swift/Runtime/Mutex.h"
 #include "swift/Runtime/ObjCBridge.h"
 #include <vector>
+#import <Foundation/Foundation.h>
+#import <CoreFoundation/CoreFoundation.h>
 
 using namespace swift;
 
@@ -31,11 +35,9 @@ using namespace swift;
 @implementation _SwiftNull : NSObject
 
 - (NSString*)description {
-  return [NSString stringWithFormat:@"<_SwiftNull %u>", self->depth];
-}
-
-- (void)dealloc {
-  [super dealloc];
+  return [NSString stringWithFormat:@"<%@ %p depth = %u>", [self class],
+                                                           self,
+                                                           self->depth];
 }
 
 @end
@@ -52,7 +54,7 @@ static Lazy<SwiftNullSentinelCache> Sentinels;
 static id getSentinelForDepth(unsigned depth) {
   // For unnested optionals, use NSNull.
   if (depth == 1)
-    return SWIFT_LAZY_CONSTANT([NSNull null]);
+    return (id)kCFNull;
   // Otherwise, make up our own sentinel.
   // See if we created one for this depth.
   auto &theSentinels = Sentinels.get();
@@ -95,6 +97,8 @@ id _swift_Foundation_getOptionalNilSentinelObject(const Metadata *Wrapped) {
     ++depth;
     Wrapped = cast<EnumMetadata>(Wrapped)->getGenericArgs()[0];
   }
-  
+
   return objc_retain(getSentinelForDepth(depth));
 }
+#endif
+

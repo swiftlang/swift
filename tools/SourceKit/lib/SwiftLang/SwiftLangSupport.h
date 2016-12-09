@@ -5,8 +5,8 @@
 // Copyright (c) 2014 - 2016 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
-// See http://swift.org/LICENSE.txt for license information
-// See http://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
+// See https://swift.org/LICENSE.txt for license information
+// See https://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
 //
 //===----------------------------------------------------------------------===//
 
@@ -47,6 +47,7 @@ namespace ide {
   enum class SyntaxNodeKind : uint8_t;
   enum class SyntaxStructureKind : uint8_t;
   enum class SyntaxStructureElementKind : uint8_t;
+  enum class RangeKind : int8_t;
   class CodeCompletionConsumer;
 }
 }
@@ -253,6 +254,8 @@ public:
                                            swift::index::SymbolSubKindSet subKinds,
                                            bool isRef);
 
+  static SourceKit::UIdent getUIDForRangeKind(swift::ide::RangeKind Kind);
+
   static std::vector<UIdent> UIDsFromDeclAttributes(const swift::DeclAttributes &Attrs);
 
 
@@ -376,6 +379,10 @@ public:
   void getCursorInfo(StringRef Filename, unsigned Offset,
                      ArrayRef<const char *> Args,
                      std::function<void(const CursorInfo &)> Receiver) override;
+
+  void getRangeInfo(StringRef Filename, unsigned Offset, unsigned Length,
+                    ArrayRef<const char *> Args,
+                    std::function<void(const RangeInfo&)> Receiver) override;
 
   void getCursorInfoFromUSR(
       StringRef Filename, StringRef USR, ArrayRef<const char *> Args,

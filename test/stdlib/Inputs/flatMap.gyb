@@ -59,7 +59,7 @@ ${Test}.test("flatMap/${Kind}/Lazy") {
       + "once per element")
     % end
   }
-  
+
   for test in flatMapToOptionalTests {
     let s = ${Minimal}<OpaqueValue<Int>>(elements:
       test.sequence.map(OpaqueValue.init))

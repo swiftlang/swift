@@ -5,8 +5,8 @@
 // Copyright (c) 2014 - 2016 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
-// See http://swift.org/LICENSE.txt for license information
-// See http://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
+// See https://swift.org/LICENSE.txt for license information
+// See https://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
 //
 //===----------------------------------------------------------------------===//
 //
@@ -324,12 +324,8 @@ class alignas(8) Expr {
     /// True if closure parameters were synthesized from anonymous closure
     /// variables.
     unsigned HasAnonymousClosureVars : 1;
-    
-    /// True if this is a closure created as a result of a void contextual
-    /// conversion.
-    unsigned IsVoidConversionClosure : 1;
   };
-  enum { NumClosureExprBits = NumAbstractClosureExprBits + 2 };
+  enum { NumClosureExprBits = NumAbstractClosureExprBits + 1 };
   static_assert(NumClosureExprBits <= 32, "fits in an unsigned");
 
   class BindOptionalExprBitfields {
@@ -752,10 +748,6 @@ public:
   CodeCompletionExpr(SourceRange Range, Type Ty = Type()) :
       Expr(ExprKind::CodeCompletion, /*Implicit=*/true, Ty),
       Range(Range) {}
-
-  CodeCompletionExpr(CharSourceRange Range, Type Ty = Type()) :
-      Expr(ExprKind::CodeCompletion, /*Implicit=*/true, Ty),
-      Range(SourceRange(Range.getStart(), Range.getEnd())) {}
 
   SourceRange getSourceRange() const { return Range; }
 
@@ -1753,7 +1745,7 @@ public:
 /// bar.foo.  These always have unresolved type.
 class UnresolvedMemberExpr final
     : public Expr,
-      public TrailingCallArguments<UnresolvedMemberExpr>  {
+      public TrailingCallArguments<UnresolvedMemberExpr> {
   SourceLoc DotLoc;
   DeclNameLoc NameLoc;
   DeclName Name;
@@ -2059,8 +2051,7 @@ public:
   SourceLoc getLParenLoc() const { return LParenLoc; }
   SourceLoc getRParenLoc() const { return RParenLoc; }
 
-  SourceLoc getStartLoc() const;
-  SourceLoc getEndLoc() const;
+  SourceRange getSourceRange() const;
 
   /// \brief Whether this expression has a trailing closure as its argument.
   bool hasTrailingClosure() const { return TupleExprBits.HasTrailingClosure; }
@@ -3375,7 +3366,6 @@ public:
       Body(nullptr) {
     setParameterList(params);
     ClosureExprBits.HasAnonymousClosureVars = false;
-    ClosureExprBits.IsVoidConversionClosure = false;
   }
 
   SourceRange getSourceRange() const;
@@ -3401,18 +3391,6 @@ public:
     ClosureExprBits.HasAnonymousClosureVars = true;
   }
   
-  /// \brief Determine if this closure was created to satisfy a contextual
-  /// conversion to a void function type.
-  bool isVoidConversionClosure() const {
-    return ClosureExprBits.IsVoidConversionClosure;
-  }
-  
-  /// \brief Indicate that this closure was created to satisfy a contextual
-  /// conversion to a void function type.
-  void setIsVoidConversionClosure() {
-    ClosureExprBits.IsVoidConversionClosure = true;
-  }
-
   /// \brief Determine whether this closure expression has an
   /// explicitly-specified result type.
   bool hasExplicitResultType() const { return ArrowLoc.isValid(); }
@@ -4266,11 +4244,13 @@ public:
   SourceLoc getLoc() const { return EqualLoc; }
   SourceLoc getStartLoc() const {
     if (!isFolded()) return EqualLoc;
-    return (Dest->isImplicit() ? Src->getStartLoc() : Dest->getStartLoc());
+    return ( Dest->getStartLoc().isValid()
+           ? Dest->getStartLoc()
+           : Src->getStartLoc());
   }
   SourceLoc getEndLoc() const {
     if (!isFolded()) return EqualLoc;
-    return (Src->isImplicit() ? Dest->getEndLoc() : Src->getEndLoc());
+    return (Src->getEndLoc().isValid() ? Src->getEndLoc() : Dest->getEndLoc());
   }
   
   /// True if the node has been processed by binary expression folding.

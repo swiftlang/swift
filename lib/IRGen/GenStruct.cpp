@@ -5,8 +5,8 @@
 // Copyright (c) 2014 - 2016 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
-// See http://swift.org/LICENSE.txt for license information
-// See http://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
+// See https://swift.org/LICENSE.txt for license information
+// See https://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
 //
 //===----------------------------------------------------------------------===//
 //
@@ -183,6 +183,11 @@ namespace {
         return asImpl().getNonFixedFieldAccessStrategy(IGM, T, fieldInfo);
       }
       llvm_unreachable("bad field layout kind");
+    }
+
+    unsigned getFieldIndex(IRGenModule &IGM, VarDecl *field) const {
+      auto &fieldInfo = getFieldInfo(field);
+      return fieldInfo.getStructIndex();
     }
 
     // For now, just use extra inhabitants from the first field.
@@ -826,9 +831,20 @@ irgen::getPhysicalStructMemberAccessStrategy(IRGenModule &IGM,
   FOR_STRUCT_IMPL(IGM, baseType, getFieldAccessStrategy, baseType, field);
 }
 
+unsigned irgen::getPhysicalStructFieldIndex(IRGenModule &IGM, SILType baseType,
+                                            VarDecl *field) {
+  FOR_STRUCT_IMPL(IGM, baseType, getFieldIndex, field);
+}
+
 void IRGenModule::emitStructDecl(StructDecl *st) {
   emitStructMetadata(*this, st);
   emitNestedTypeDecls(st->getMembers());
+
+  if (shouldEmitOpaqueTypeMetadataRecord(st)) {
+    emitOpaqueTypeMetadataRecord(st);
+    return;
+  }
+
   emitFieldMetadataRecord(st);
 }
 

@@ -2,13 +2,16 @@
 
 // REQUIRES: optimized_stdlib
 
+// FIXME: https://bugs.swift.org/browse/SR-2808
+// XFAIL: resilient_stdlib
+
 // Check that pre-specialization works at -Onone.
 // This test requires the standard library to be compiled with pre-specializations!
 
 // CHECK-LABEL: sil [noinline] @_TF13prespecialize4testFTRGSaSi_4sizeSi_T_ 
 //
 // function_ref specialized Collection<A where ...>.makeIterator() -> IndexingIterator<A>
-// CHECK: function_ref @_TTSgq5GVs14CountableRangeSi_GS_Si_s10Collections___TFesRxs10Collectionwx8IteratorzGVs16IndexingIteratorx_wx8_ElementzWxS0_7Element_rS_12makeIteratorfT_GS1_x_
+// CHECK: function_ref @_TTSgq5SiSis10ComparablesSis11_Strideables___TFVs14CountableRangeCfT15uncheckedBoundsT5lowerx5upperx__GS_x_
 //
 // function_ref specialized IndexingIterator.next() -> A._Element?
 // CHECK: function_ref @_TTSgq5GVs14CountableRangeSi_GS_Si_s14_IndexableBases___TFVs16IndexingIterator4nextfT_GSqwx8_Element_

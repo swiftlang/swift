@@ -5,8 +5,8 @@
 // Copyright (c) 2014 - 2016 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
-// See http://swift.org/LICENSE.txt for license information
-// See http://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
+// See https://swift.org/LICENSE.txt for license information
+// See https://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
 //
 //===----------------------------------------------------------------------===//
 //
@@ -59,7 +59,7 @@ void SILInstruction::setDebugScope(SILBuilder &B, const SILDebugScope *DS) {
 // reconstruct the BB from the 'self' pointer of the trait.
 SILBasicBlock *llvm::ilist_traits<SILInstruction>::getContainingBlock() {
   size_t Offset(
-      size_t(&((SILBasicBlock *)0->*SILBasicBlock::getSublistAccess())));
+      size_t(&((SILBasicBlock *)nullptr->*SILBasicBlock::getSublistAccess())));
   iplist<SILInstruction> *Anchor(static_cast<iplist<SILInstruction> *>(this));
   return reinterpret_cast<SILBasicBlock *>(reinterpret_cast<char *>(Anchor) -
                                            Offset);
@@ -67,20 +67,19 @@ SILBasicBlock *llvm::ilist_traits<SILInstruction>::getContainingBlock() {
 
 
 void llvm::ilist_traits<SILInstruction>::addNodeToList(SILInstruction *I) {
-  assert(I->ParentBB == 0 && "Already in a list!");
+  assert(I->ParentBB == nullptr && "Already in a list!");
   I->ParentBB = getContainingBlock();
 }
 
 void llvm::ilist_traits<SILInstruction>::removeNodeFromList(SILInstruction *I) {
   // When an instruction is removed from a BB, clear the parent pointer.
   assert(I->ParentBB && "Not in a list!");
-  I->ParentBB = 0;
+  I->ParentBB = nullptr;
 }
 
 void llvm::ilist_traits<SILInstruction>::
 transferNodesFromList(llvm::ilist_traits<SILInstruction> &L2,
-                      llvm::ilist_iterator<SILInstruction> first,
-                      llvm::ilist_iterator<SILInstruction> last) {
+                      instr_iterator first, instr_iterator last) {
   // If transferring instructions within the same basic block, no reason to
   // update their parent pointers.
   SILBasicBlock *ThisParent = getContainingBlock();
@@ -238,6 +237,15 @@ namespace {
     }
 
     bool visitAllocRefInst(const AllocRefInst *RHS) {
+      auto *LHSInst = cast<AllocRefInst>(LHS);
+      auto LHSTypes = LHSInst->getTailAllocatedTypes();
+      auto RHSTypes = RHS->getTailAllocatedTypes();
+      unsigned NumTypes = LHSTypes.size();
+      assert(NumTypes == RHSTypes.size());
+      for (unsigned Idx = 0; Idx < NumTypes; ++Idx) {
+        if (LHSTypes[Idx] != RHSTypes[Idx])
+          return false;
+      }
       return true;
     }
 
@@ -271,12 +279,18 @@ namespace {
     }
 
     bool visitLoadInst(const LoadInst *RHS) {
-      return true;
+      auto LHSQualifier = cast<LoadInst>(LHS)->getOwnershipQualifier();
+      return LHSQualifier == RHS->getOwnershipQualifier();
     }
+
+    bool visitLoadBorrowInst(const LoadBorrowInst *RHS) { return true; }
+
+    bool visitEndBorrowInst(const EndBorrowInst *RHS) { return true; }
 
     bool visitStoreInst(const StoreInst *RHS) {
       auto *X = cast<StoreInst>(LHS);
-      return (X->getSrc() == RHS->getSrc() && X->getDest() == RHS->getDest());
+      return X->getSrc() == RHS->getSrc() && X->getDest() == RHS->getDest() &&
+        X->getOwnershipQualifier() == RHS->getOwnershipQualifier();
     }
 
     bool visitBindMemoryInst(const BindMemoryInst *RHS) {
@@ -344,6 +358,13 @@ namespace {
       if (X->getField() != RHS->getField())
         return false;
       if (X->getOperand() != RHS->getOperand())
+        return false;
+      return true;
+    }
+
+    bool visitRefTailAddrInst(RefTailAddrInst *RHS) {
+      auto *X = cast<RefTailAddrInst>(LHS);
+      if (X->getTailType() != RHS->getTailType())
         return false;
       return true;
     }
@@ -416,6 +437,13 @@ namespace {
     bool visitIndexAddrInst(IndexAddrInst *RHS) {
       // We have already compared the operands/types, so we should have equality
       // at this point.
+      return true;
+    }
+
+    bool visitTailAddrInst(TailAddrInst *RHS) {
+      auto *X = cast<TailAddrInst>(LHS);
+      if (X->getTailType() != RHS->getTailType())
+        return false;
       return true;
     }
 
@@ -650,12 +678,12 @@ namespace {
     ArrayRef<Operand> visit##CLASS(const CLASS *I) {                    \
       llvm_unreachable("accessing non-instruction " #CLASS);            \
     }
-#define INST(CLASS, PARENT, MEMBEHAVIOR, RELEASINGBEHAVIOR) \
-    ArrayRef<Operand> visit##CLASS(const CLASS *I) {                    \
-      ASSERT_IMPLEMENTS(CLASS, SILInstruction, getAllOperands,          \
-                        ArrayRef<Operand>() const);                     \
-      return I->getAllOperands();                                       \
-    }
+#define INST(CLASS, PARENT, TEXTUALNAME, MEMBEHAVIOR, RELEASINGBEHAVIOR)       \
+  ArrayRef<Operand> visit##CLASS(const CLASS *I) {                             \
+    ASSERT_IMPLEMENTS(CLASS, SILInstruction, getAllOperands,                   \
+                      ArrayRef<Operand>() const);                              \
+    return I->getAllOperands();                                                \
+  }
 #include "swift/SIL/SILNodes.def"
   };
 
@@ -667,12 +695,12 @@ namespace {
     MutableArrayRef<Operand> visit##CLASS(const CLASS *I) {             \
       llvm_unreachable("accessing non-instruction " #CLASS);            \
     }
-#define INST(CLASS, PARENT, MEMBEHAVIOR, RELEASINGBEHAVIOR) \
-    MutableArrayRef<Operand> visit##CLASS(CLASS *I) {                   \
-      ASSERT_IMPLEMENTS(CLASS, SILInstruction, getAllOperands,          \
-                        MutableArrayRef<Operand>());                    \
-      return I->getAllOperands();                                       \
-    }
+#define INST(CLASS, PARENT, TEXTUALNAME, MEMBEHAVIOR, RELEASINGBEHAVIOR)       \
+  MutableArrayRef<Operand> visit##CLASS(CLASS *I) {                            \
+    ASSERT_IMPLEMENTS(CLASS, SILInstruction, getAllOperands,                   \
+                      MutableArrayRef<Operand>());                             \
+    return I->getAllOperands();                                                \
+  }
 #include "swift/SIL/SILNodes.def"
   };
 
@@ -688,13 +716,13 @@ namespace {
     ArrayRef<Operand> visit##CLASS(const CLASS *I) {                    \
       llvm_unreachable("accessing non-instruction " #CLASS);            \
     }
-#define INST(CLASS, PARENT, MEMBEHAVIOR, RELEASINGBEHAVIOR)                    \
-    ArrayRef<Operand> visit##CLASS(const CLASS *I) {                           \
-      if (!IMPLEMENTS_METHOD(CLASS, SILInstruction, getTypeDependentOperands, \
-                             ArrayRef<Operand>() const))                       \
-        return {};                                                             \
-      return I->getTypeDependentOperands();                                 \
-    }
+#define INST(CLASS, PARENT, TEXTUALNAME, MEMBEHAVIOR, RELEASINGBEHAVIOR)       \
+  ArrayRef<Operand> visit##CLASS(const CLASS *I) {                             \
+    if (!IMPLEMENTS_METHOD(CLASS, SILInstruction, getTypeDependentOperands,    \
+                           ArrayRef<Operand>() const))                         \
+      return {};                                                               \
+    return I->getTypeDependentOperands();                                      \
+  }
 #include "swift/SIL/SILNodes.def"
   };
 
@@ -706,13 +734,13 @@ namespace {
     MutableArrayRef<Operand> visit##CLASS(const CLASS *I) {             \
       llvm_unreachable("accessing non-instruction " #CLASS);            \
     }
-#define INST(CLASS, PARENT, MEMBEHAVIOR, RELEASINGBEHAVIOR)                    \
-    MutableArrayRef<Operand> visit##CLASS(CLASS *I) {                          \
-      if (!IMPLEMENTS_METHOD(CLASS, SILInstruction, getTypeDependentOperands, \
-                             MutableArrayRef<Operand>()))                      \
-        return {};                                                             \
-      return I->getTypeDependentOperands();                                 \
-    }
+#define INST(CLASS, PARENT, TEXTUALNAME, MEMBEHAVIOR, RELEASINGBEHAVIOR)       \
+  MutableArrayRef<Operand> visit##CLASS(CLASS *I) {                            \
+    if (!IMPLEMENTS_METHOD(CLASS, SILInstruction, getTypeDependentOperands,    \
+                           MutableArrayRef<Operand>()))                        \
+      return {};                                                               \
+    return I->getTypeDependentOperands();                                      \
+  }
 #include "swift/SIL/SILNodes.def"
   };
 } // end anonymous namespace
@@ -776,8 +804,9 @@ SILInstruction::MemoryBehavior SILInstruction::getMemoryBehavior() const {
   }
 
   switch (getKind()) {
-#define INST(CLASS, PARENT, MEMBEHAVIOR, RELEASINGBEHAVIOR) \
-  case ValueKind::CLASS: return MemoryBehavior::MEMBEHAVIOR;
+#define INST(CLASS, PARENT, TEXTUALNAME, MEMBEHAVIOR, RELEASINGBEHAVIOR)       \
+  case ValueKind::CLASS:                                                       \
+    return MemoryBehavior::MEMBEHAVIOR;
 #include "swift/SIL/SILNodes.def"
   case ValueKind::SILArgument:
   case ValueKind::SILUndef:
@@ -788,8 +817,9 @@ SILInstruction::MemoryBehavior SILInstruction::getMemoryBehavior() const {
 
 SILInstruction::ReleasingBehavior SILInstruction::getReleasingBehavior() const {
   switch (getKind()) {
-#define INST(CLASS, PARENT, MEMBEHAVIOR, RELEASINGBEHAVIOR) \
-  case ValueKind::CLASS: return ReleasingBehavior::RELEASINGBEHAVIOR;
+#define INST(CLASS, PARENT, TEXTUALNAME, MEMBEHAVIOR, RELEASINGBEHAVIOR)       \
+  case ValueKind::CLASS:                                                       \
+    return ReleasingBehavior::RELEASINGBEHAVIOR;
 #include "swift/SIL/SILNodes.def"
  case ValueKind::SILArgument:
  case ValueKind::SILUndef:
@@ -953,6 +983,10 @@ SILInstruction *SILInstruction::clone(SILInstruction *InsertPt) {
 bool SILInstruction::isTriviallyDuplicatable() const {
   if (isa<AllocStackInst>(this) || isa<DeallocStackInst>(this)) {
     return false;
+  }
+  if (auto *ARI = dyn_cast<AllocRefInst>(this)) {
+    if (ARI->canAllocOnStack())
+      return false;
   }
 
   if (isa<OpenExistentialAddrInst>(this) ||

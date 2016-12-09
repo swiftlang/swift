@@ -1,4 +1,4 @@
-// RUN: %target-parse-verify-swift
+// RUN: %target-typecheck-verify-swift
 
 func foo(_ a: Int) {
   // expected-error @+1 {{invalid character in source file}} {{8-9= }}
@@ -15,20 +15,18 @@ func test2(inout let x : Int) {}  // expected-error {{parameter may not have mul
 func test3(f : (inout _ x : Int) -> Void) {} // expected-error {{'inout' before a parameter name is not allowed, place it before the parameter type instead}}
 
 func test3() {
-  undeclared_func( // expected-error {{use of unresolved identifier 'undeclared_func'}} expected-note {{to match this opening '('}} expected-error {{expected ',' separator}} {{19-19=,}}
-} // expected-error {{expected expression in list of expressions}} expected-error {{expected ')' in expression list}}
+  undeclared_func( // expected-error {{use of unresolved identifier 'undeclared_func'}}
+} // expected-error {{expected expression in list of expressions}}
 
 func runAction() {} // expected-note {{did you mean 'runAction'?}}
 
 // rdar://16601779
 func foo() {
-  runAction(SKAction.sequence() // expected-error {{use of unresolved identifier 'SKAction'}}  expected-note {{to match this opening '('}} expected-error {{expected ',' separator}} {{32-32=,}}
+  runAction(SKAction.sequence() // expected-error {{use of unresolved identifier 'SKAction'}} expected-error {{expected ',' separator}} {{32-32=,}}
     
-    // expected-error @+2 {{expected ',' separator}} {{12-12=,}}
-    // expected-error @+1 {{expected ',' separator}} {{12-12=,}}
     skview!
     // expected-error @-1 {{use of unresolved identifier 'skview'}}
-} // expected-error {{expected expression in list of expressions}} expected-error {{expected ')' in expression list}}
+}
 
 super.init() // expected-error {{'super' cannot be used outside of class members}}
 
@@ -40,15 +38,12 @@ switch state { // expected-error {{use of unresolved identifier 'state'}}
 // rdar://18926814
 func test4() {
   let abc = 123
-  _ = " >> \( abc } ) << "   // expected-note {{to match this opening '('}}  expected-error {{expected ')' in expression list}}  expected-error {{expected ',' separator}} {{18-18=,}} expected-error {{expected ',' separator}} {{18-18=,}}  expected-error {{expected expression in list of expressions}}  expected-error {{extra tokens after interpolated string expression}}
+  _ = " >> \( abc } ) << " // expected-error {{expected ',' separator}} {{18-18=,}}  expected-error {{expected expression in list of expressions}}  expected-error {{extra tokens after interpolated string expression}}
 
 }
 
 // rdar://problem/18507467
 func d(_ b: String -> <T>() -> T) {} // expected-error {{expected type for function result}}
-// expected-error @-1 {{expected ',' separator}} {{22-22=,}}
-// expected-error @-2 {{expected parameter name followed by ':'}}
-// expected-error @-3 {{expected ',' separator}}
 
 
 // <rdar://problem/22143680> QoI: terrible diagnostic when trying to form a generic protocol
@@ -72,8 +67,7 @@ SR698(1, b: 2,) // expected-error {{unexpected ',' separator}}
 func SR979a(a : inout inout Int) {}  // expected-error {{parameter may not have multiple 'inout', 'var', or 'let' specifiers}} {{17-23=}}
 func SR979b(inout inout b: Int) {} // expected-error {{inout' before a parameter name is not allowed, place it before the parameter type instead}} {{13-18=}} {{28-28=inout }} 
 // expected-error@-1 {{parameter may not have multiple 'inout', 'var', or 'let' specifiers}} {{19-25=}}
-func SR979c(let a: inout Int) {}	 // expected-error {{parameter may not have multiple 'inout', 'var', or 'let' specifiers}} {{13-16=}} 
-// expected-error @-1 {{'let' as a parameter attribute is not allowed}} {{13-16=}}
+func SR979c(let a: inout Int) {} // expected-error {{'let' as a parameter attribute is not allowed}} {{13-16=}}
 func SR979d(let let a: Int) {}  // expected-error {{'let' as a parameter attribute is not allowed}} {{13-16=}} 
 // expected-error @-1 {{parameter may not have multiple 'inout', 'var', or 'let' specifiers}} {{17-21=}}
 func SR979e(inout x: inout String) {} // expected-error {{parameter may not have multiple 'inout', 'var', or 'let' specifiers}} {{13-18=}}
@@ -125,3 +119,9 @@ struct Weak<T: class> { // expected-error {{'class' constraint can only appear o
   weak var value: T // expected-error {{'weak' may only be applied to class and class-bound protocol types}}
   // expected-error@-1 {{use of undeclared type 'T'}}
 }
+
+let x: () = ()
+!() // expected-error {{missing argument for parameter #1 in call}}
+!(()) // expected-error {{cannot convert value of type '()' to expected argument type 'Bool'}}
+!(x) // expected-error {{cannot convert value of type '()' to expected argument type 'Bool'}}
+!x // expected-error {{cannot convert value of type '()' to expected argument type 'Bool'}}

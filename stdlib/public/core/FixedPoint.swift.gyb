@@ -5,8 +5,8 @@
 // Copyright (c) 2014 - 2016 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
-// See http://swift.org/LICENSE.txt for license information
-// See http://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
+// See https://swift.org/LICENSE.txt for license information
+// See https://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
 //
 //===----------------------------------------------------------------------===//
 
@@ -89,13 +89,13 @@ public protocol SignedInteger : _SignedInteger, Integer {
 }
 
 extension SignedInteger {
-  // FIXME(ABI): using Int as the return value is wrong.
+  // FIXME(ABI)#29 : using Int as the return value is wrong.
   @_transparent
   public func distance(to other: Self) -> Int {
     return numericCast((numericCast(other) as IntMax) - numericCast(self))
   }
 
-  // FIXME(ABI): using Int as the return value is wrong.
+  // FIXME(ABI)#30 : using Int as the argument is wrong.
   @_transparent
   public func advanced(by n: Int) -> Self {
     return numericCast((numericCast(self) as IntMax) + numericCast(n))
@@ -125,13 +125,13 @@ public protocol UnsignedInteger : _DisallowMixedSignArithmetic, Integer {
 }
 
 extension UnsignedInteger {
-  // FIXME(ABI): using Int as the return value is wrong.
+  // FIXME(ABI)#31 : using Int as the return value is wrong.
   @_transparent
   public func distance(to other: Self) -> Int {
     return numericCast((numericCast(other) as IntMax) - numericCast(self))
   }
 
-  // FIXME(ABI): using Int as the return value is wrong.
+  // FIXME(ABI)#32 : using Int as the return value is wrong.
   @_transparent
   public func advanced(by n: Int) -> Self {
     return numericCast((numericCast(self) as IntMax) + numericCast(n))
@@ -430,7 +430,6 @@ extension ${Self} {
 }
 
 % if signed:
-@_transparent
 extension ${Self} : SignedNumber {}
 % end
 
@@ -460,7 +459,7 @@ fixed_fixed_conversion_function = gyb.parse_template("fixed_fixed_conversion_fun
 %       else: # Smaller size input, unsigned to signed or unsigned to unsigned.
   result = (Builtin.${srcExt}_Int${srcBits}_Int${bits}(src), false._value)
 %       end
-% 
+%
 % if not safelyConvertible:
   ${error_check}
 % end
@@ -475,7 +474,6 @@ fixed_fixed_conversion_function = gyb.parse_template("fixed_fixed_conversion_fun
 %    (srcSign, srcExt) = ('s', 'sext') if srcSigned else ('u', 'zext')
 %    safelyConvertible = (srcBits < bits and (srcSign == sign or signed)) or (srcBits == bits and srcSign == sign)
 
-@_transparent
 extension ${Self} {
 
   @_transparent
@@ -487,11 +485,11 @@ extension ${Self} {
         )
     }
   }
-    
+
 % if safelyConvertible:
   @available(*, message: "Converting ${Src} to ${Self} will always succeed.")
 % end
-  @_transparent 
+  @_transparent
   public init?(exactly value: ${Src}) {
     ${gyb.execute_template(
         fixed_fixed_conversion_function,
@@ -672,9 +670,9 @@ public func ${op}=(lhs: inout ${Self}, rhs: ${Self}) {
 % end
 
 // Bitwise operations
-@_transparent
 extension ${Self} : BitwiseOperations {
   /// The empty bitset of type `${Self}`.
+  @_transparent
   public static var allZeros: ${Self} { return 0 }
 }
 

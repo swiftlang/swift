@@ -1,4 +1,4 @@
-// RUN: %target-parse-verify-swift
+// RUN: %target-typecheck-verify-swift
 
 func makeIncrementor(amount: Int) -> () -> Int {
   func incrementor() -> Int {
@@ -78,11 +78,14 @@ func outOfOrderEnum() {
 }
 
 func captureInClosure() {
-  var x = { (i: Int) in 
-    currentTotal += i // expected-error{{use of local variable 'currentTotal' before its declaration}}
+  let x = { (i: Int) in
+    currentTotal += i // expected-error{{cannot capture 'currentTotal' before it is declared}}
   }
 
   var currentTotal = 0 // expected-note{{'currentTotal' declared here}}
+
+  _ = x
+  currentTotal += 1
 }
 
 class X { 

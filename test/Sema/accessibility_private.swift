@@ -1,4 +1,4 @@
-// RUN: %target-parse-verify-swift
+// RUN: %target-typecheck-verify-swift
 
 class Container {
   private func foo() {} // expected-note * {{declared here}}
@@ -15,7 +15,7 @@ class Container {
     _ = self.bar
     self.bar = 5
 
-    privateExtensionMethod() // FIXME expected-error {{use of unresolved identifier 'privateExtensionMethod'}}
+    privateExtensionMethod() // expected-error {{'privateExtensionMethod' is inaccessible due to 'private' protection level}}
     self.privateExtensionMethod() // expected-error {{'privateExtensionMethod' is inaccessible due to 'private' protection level}}
 
     _ = PrivateInner()
@@ -54,23 +54,23 @@ extension Container {
   private func privateExtensionMethod() {} // expected-note * {{declared here}}
 
   func extensionTest() {
-    foo() // FIXME expected-error {{use of unresolved identifier 'foo'}}
+    foo() // expected-error {{'foo' is inaccessible due to 'private' protection level}}
     self.foo() // expected-error {{'foo' is inaccessible due to 'private' protection level}}
 
-    _ = bar // FIXME expected-error {{use of unresolved identifier 'bar'}}
-    bar = 5 // FIXME expected-error {{use of unresolved identifier 'bar'}}
+    _ = bar // expected-error {{'bar' is inaccessible due to 'private' protection level}}
+    bar = 5 // expected-error {{'bar' is inaccessible due to 'private' protection level}}
     _ = self.bar // expected-error {{'bar' is inaccessible due to 'private' protection level}}
     self.bar = 5 // expected-error {{'bar' is inaccessible due to 'private' protection level}}
 
     privateExtensionMethod()
     self.privateExtensionMethod()
 
-    _ = PrivateInner() // FIXME expected-error {{use of unresolved identifier 'PrivateInner'}}
+    _ = PrivateInner() // expected-error {{'PrivateInner' is inaccessible due to 'private' protection level}}
     _ = Container.PrivateInner() // expected-error {{'PrivateInner' is inaccessible due to 'private' protection level}}
   }
 
   // FIXME: Why do these errors happen twice?
-  var extensionInner: PrivateInner? { return nil } // FIXME expected-error 2 {{use of undeclared type 'PrivateInner'}}
+  var extensionInner: PrivateInner? { return nil } // expected-error 2 {{'PrivateInner' is inaccessible due to 'private' protection level}}
   var extensionInnerQualified: Container.PrivateInner? { return nil } // expected-error 2 {{'PrivateInner' is inaccessible due to 'private' protection level}}
 }
 
@@ -81,33 +81,35 @@ extension Container.Inner {
     obj.bar = 5 // expected-error {{'bar' is inaccessible due to 'private' protection level}}
     obj.privateExtensionMethod() // expected-error {{'privateExtensionMethod' is inaccessible due to 'private' protection level}}
 
-    _ = PrivateInner() // FIXME expected-error {{use of unresolved identifier 'PrivateInner'}}
+    // FIXME: Unqualified lookup won't look into Container from here.
+    _ = PrivateInner() // expected-error {{use of unresolved identifier 'PrivateInner'}}
     _ = Container.PrivateInner() // expected-error {{'PrivateInner' is inaccessible due to 'private' protection level}}
   }
 
   // FIXME: Why do these errors happen twice?
-  var inner: PrivateInner? { return nil } // FIXME expected-error 2 {{use of undeclared type 'PrivateInner'}}
+  // FIXME: Unqualified lookup won't look into Container from here.
+  var inner: PrivateInner? { return nil } // expected-error 2 {{use of undeclared type 'PrivateInner'}}
   var innerQualified: Container.PrivateInner? { return nil } // expected-error 2 {{'PrivateInner' is inaccessible due to 'private' protection level}}
 }
 
 class Sub : Container {
   func subTest() {
-    foo() // FIXME expected-error {{use of unresolved identifier 'foo'}}
+    foo() // expected-error {{'foo' is inaccessible due to 'private' protection level}}
     self.foo() // expected-error {{'foo' is inaccessible due to 'private' protection level}}
 
-    _ = bar // FIXME expected-error {{use of unresolved identifier 'bar'}}
-    bar = 5 // FIXME expected-error {{use of unresolved identifier 'bar'}}
+    _ = bar // expected-error {{'bar' is inaccessible due to 'private' protection level}}
+    bar = 5 // expected-error {{'bar' is inaccessible due to 'private' protection level}}
     _ = self.bar // expected-error {{'bar' is inaccessible due to 'private' protection level}}
     self.bar = 5 // expected-error {{'bar' is inaccessible due to 'private' protection level}}
 
-    privateExtensionMethod() // FIXME expected-error {{use of unresolved identifier 'privateExtensionMethod'}}
+    privateExtensionMethod() // expected-error {{'privateExtensionMethod' is inaccessible due to 'private' protection level}}
     self.privateExtensionMethod() // expected-error {{'privateExtensionMethod' is inaccessible due to 'private' protection level}}
 
-    _ = PrivateInner() // FIXME expected-error {{use of unresolved identifier 'PrivateInner'}}
+    _ = PrivateInner() // expected-error {{'PrivateInner' is inaccessible due to 'private' protection level}}
     _ = Container.PrivateInner() // expected-error {{'PrivateInner' is inaccessible due to 'private' protection level}}
   }
 
-  var subInner: PrivateInner? // FIXME expected-error {{use of undeclared type 'PrivateInner'}}
+  var subInner: PrivateInner? // expected-error {{'PrivateInner' is inaccessible due to 'private' protection level}}
   var subInnerQualified: Container.PrivateInner? // expected-error {{'PrivateInner' is inaccessible due to 'private' protection level}}
 }
 
@@ -154,9 +156,78 @@ extension Container {
 }
 extension Container {
   func test() {
-    let a: ExtensionConflictingType? = nil // FIXME expected-error {{use of undeclared type 'ExtensionConflictingType'}}
+    let a: ExtensionConflictingType? = nil // expected-error {{'ExtensionConflictingType' is inaccessible due to 'private' protection level}}
     let b: Container.ExtensionConflictingType? = nil // expected-error {{'ExtensionConflictingType' is inaccessible due to 'private' protection level}}
-    _ = ExtensionConflictingType() // FIXME expected-error {{use of unresolved identifier 'ExtensionConflictingType'}}
+    _ = ExtensionConflictingType() // expected-error {{'ExtensionConflictingType' is inaccessible due to 'private' protection level}}
     _ = Container.ExtensionConflictingType() // expected-error {{'ExtensionConflictingType' is inaccessible due to 'private' protection level}}
   }
 }
+
+// All of these should be errors, but didn't have the correct behavior in Swift 
+// 3.0GM.
+extension Container {
+  private struct VeryPrivateStruct { // expected-note * {{type declared here}}
+    private typealias VeryPrivateType = Int // expected-note * {{type declared here}}
+    var privateVar: VeryPrivateType { fatalError() } // expected-warning {{property should be declared private because its type uses a private type}}
+    var privateVar2 = VeryPrivateType() // expected-warning {{property should be declared private because its type 'Container.VeryPrivateStruct.VeryPrivateType' (aka 'Int') uses a private type}}
+    typealias PrivateAlias = VeryPrivateType // expected-warning {{type alias should be declared private because its underlying type uses a private type}}
+    subscript(_: VeryPrivateType) -> Void { return () } // expected-warning {{subscript should be declared private because its index uses a private type}}
+    func privateMethod(_: VeryPrivateType) -> Void {} // expected-warning {{method should be declared private because its parameter uses a private type}} {{none}}
+    enum PrivateRawValue: VeryPrivateType { // expected-warning {{enum should be declared private because its raw type uses a private type}} {{none}}
+      case A
+    }
+    enum PrivatePayload {
+      case A(VeryPrivateType) // expected-warning {{enum case in an internal enum uses a private type}} {{none}}
+    }
+
+    private class PrivateInnerClass {} // expected-note * {{declared here}}
+    class PrivateSuper: PrivateInnerClass {} // expected-warning {{class should be declared private because its superclass is private}} {{none}}
+  }
+
+  fileprivate var privateVar: VeryPrivateStruct { fatalError() } // expected-warning {{property should not be declared fileprivate because its type uses a private type}} {{none}}
+  fileprivate typealias PrivateAlias = VeryPrivateStruct // expected-warning {{type alias should not be declared fileprivate because its underlying type uses a private type}} {{none}}
+  fileprivate subscript(_: VeryPrivateStruct) -> Void { return () } // expected-warning {{subscript should not be declared fileprivate because its index uses a private type}} {{none}}
+  fileprivate func privateMethod(_: VeryPrivateStruct) -> Void {} // expected-warning {{method should not be declared fileprivate because its parameter uses a private type}} {{none}}
+  fileprivate enum PrivateRawValue: VeryPrivateStruct {} // expected-warning {{enum should not be declared fileprivate because its raw type uses a private type}} {{none}}
+  // expected-error@-1 {{raw type 'Container.VeryPrivateStruct' is not expressible by any literal}}
+  // expected-error@-2 {{'Container.PrivateRawValue' declares raw type 'Container.VeryPrivateStruct', but does not conform to RawRepresentable and conformance could not be synthesized}}
+  fileprivate enum PrivatePayload {
+    case A(VeryPrivateStruct) // expected-warning {{enum case in an internal enum uses a private type}} {{none}}
+  }
+
+  private class PrivateInnerClass {} // expected-note * {{declared here}}
+  fileprivate class PrivateSuperClass: PrivateInnerClass {} // expected-warning {{class should not be declared fileprivate because its superclass is private}} {{none}}
+  fileprivate class PrivateGenericUser<T> where T: PrivateInnerClass {} // expected-warning {{generic class should not be declared fileprivate because its generic requirement uses a private type}} {{none}}
+}
+
+fileprivate struct SR2579 {
+  private struct Inner {
+    private struct InnerPrivateType {}
+    var innerProperty = InnerPrivateType() // expected-warning {{property should be declared private because its type 'SR2579.Inner.InnerPrivateType' uses a private type}}
+  }
+  // FIXME: We need better errors when one access violation results in more
+  // downstream.
+  private var outerProperty = Inner().innerProperty // expected-warning {{property should not be declared in this context because its type 'SR2579.Inner.InnerPrivateType' uses a private type}}
+  var outerProperty2 = Inner().innerProperty // expected-warning {{property should be declared private because its type 'SR2579.Inner.InnerPrivateType' uses a private type}}
+}
+
+// FIXME: Dependent member lookup of typealiases is not subject
+// to accessibility checking.
+struct Generic<T> {
+  fileprivate typealias Dependent = T
+}
+
+var x: Generic<Int>.Dependent = 3
+// expected-error@-1 {{variable must be declared private or fileprivate because its type uses a fileprivate type}}
+
+func internalFuncWithFileprivateAlias() -> Generic<Int>.Dependent {
+// expected-error@-1 {{function must be declared private or fileprivate because its result uses a fileprivate type}}
+  return 3
+}
+
+private func privateFuncWithFileprivateAlias() -> Generic<Int>.Dependent {
+  return 3
+}
+
+// FIXME: No error here
+var y = privateFuncWithFileprivateAlias()

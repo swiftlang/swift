@@ -1,15 +1,15 @@
 add_swift_library(swiftSema STATIC
-  CodeSynthesis.cpp
-  Constraint.cpp
-  ConstraintGraph.cpp
-  ConstraintLocator.cpp
-  ConstraintSystem.cpp
   CSApply.cpp
   CSDiag.cpp
   CSGen.cpp
   CSRanking.cpp
   CSSimplify.cpp
   CSSolver.cpp
+  CodeSynthesis.cpp
+  Constraint.cpp
+  ConstraintGraph.cpp
+  ConstraintLocator.cpp
+  ConstraintSystem.cpp
   DerivedConformanceEquatableHashable.cpp
   DerivedConformanceError.cpp
   DerivedConformanceRawRepresentable.cpp
@@ -23,10 +23,9 @@ add_swift_library(swiftSema STATIC
   PlaygroundTransform.cpp
   SourceLoader.cpp
   TypeCheckAttr.cpp
+  TypeCheckCaptures.cpp
   TypeCheckConstraints.cpp
   TypeCheckDecl.cpp
-  TypeChecker.cpp
-  TypeCheckCaptures.cpp
   TypeCheckError.cpp
   TypeCheckExpr.cpp
   TypeCheckExprObjC.cpp
@@ -38,6 +37,7 @@ add_swift_library(swiftSema STATIC
   TypeCheckRequest.cpp
   TypeCheckStmt.cpp
   TypeCheckType.cpp
+  TypeChecker.cpp
   LINK_LIBRARIES
     swiftParse
     swiftAST)

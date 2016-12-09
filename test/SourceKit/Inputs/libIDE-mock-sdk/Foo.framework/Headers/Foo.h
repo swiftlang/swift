@@ -44,6 +44,7 @@ struct FooStruct1 {
   int x;
   double y;
 };
+typedef struct FooStruct1 *FooStruct1Pointer;
 
 typedef struct FooStruct2 {
   int x;
@@ -177,6 +178,7 @@ int redeclaredInMultipleModulesFunc1(int a);
 
 @class BarForwardDeclaredClass;
 enum BarforwardDeclaredEnum;
+typedef int typedef_int_t;
 
 /* FOO_MACRO_1 is the answer */
 #define FOO_MACRO_1 0
@@ -184,6 +186,17 @@ enum BarforwardDeclaredEnum;
 #define FOO_MACRO_3 (-1) // Don't use FOO_MACRO_3 on Saturdays.
 #define FOO_MACRO_4 0xffffffffu
 #define FOO_MACRO_5 0xffffffffffffffffull
+#define FOO_MACRO_6 ((typedef_int_t) 42)
+#define FOO_MACRO_7 ((typedef_int_t) -1)
+#define FOO_MACRO_8 ((char) 8)
+#define FOO_MACRO_9 ((int) 9)
+#define FOO_MACRO_10 ((short) 10)
+#define FOO_MACRO_11 ((long) 11)
+#define FOO_MACRO_OR (FOO_MACRO_2 | FOO_MACRO_6)
+#define FOO_MACRO_AND (FOO_MACRO_2 & FOO_MACRO_6)
+#define FOO_MACRO_BITWIDTH (FOO_MACRO_4 & FOO_MACRO_5)
+#define FOO_MACRO_SIGNED (FOO_MACRO_2 & FOO_MACRO_4)
+#define FOO_MACRO_TYPEDEF ((FooStruct1Pointer) 1)
 
 #define FOO_MACRO_UNDEF_1 0
 #undef FOO_MACRO_UNDEF_1
@@ -257,5 +270,14 @@ struct _InternalStruct {
 
 typedef struct __attribute__((objc_bridge(id))) __FooCFType *FooCFTypeRef;
 void FooCFTypeRelease(FooCFTypeRef);
+
+
+#define __AVAILABILITY_INTERNAL_DEPRECATED_MSG(_msg)  __attribute__((deprecated(_msg)))
+#define AB_DEPRECATED(msg) __AVAILABILITY_INTERNAL_DEPRECATED_MSG(msg)
+
+typedef CF_ENUM(long, ABAuthorizationStatus) {
+    kABAuthorizationStatusNotDetermined = 0,    // deprecated, use CNAuthorizationStatusNotDetermined
+    kABAuthorizationStatusRestricted,           // deprecated, use CNAuthorizationStatusRestricted
+} AB_DEPRECATED("use CNAuthorizationStatus");
 
 #endif /* ! __FOO_H__ */

@@ -5,8 +5,8 @@
 // Copyright (c) 2014 - 2016 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
-// See http://swift.org/LICENSE.txt for license information
-// See http://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
+// See https://swift.org/LICENSE.txt for license information
+// See https://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
 //
 //===----------------------------------------------------------------------===//
 
@@ -683,7 +683,7 @@ public struct IndexSet : ReferenceConvertible, Equatable, BidirectionalCollectio
     public func filteredIndexSet(in range : Range<Element>, includeInteger: (Element) throws -> Bool) rethrows -> IndexSet {
         let r : NSRange = _toNSRange(range)
         return try _handle.map {
-            var error : Error? = nil
+            var error : Error?
             let result = $0.indexes(in: r, options: [], passingTest: { (i, stop) -> Bool in
                 do {
                     let include = try includeInteger(i)

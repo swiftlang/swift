@@ -1,4 +1,4 @@
-// RUN: %target-parse-verify-swift
+// RUN: %target-typecheck-verify-swift
 
 import StdlibUnittest
 import StdlibCollectionUnittest
@@ -65,9 +65,8 @@ struct GoodIndexable : Indexable {
 }
 
 
-// expected-warning@+3 {{'Indexable' is deprecated: it will be removed in Swift 4.0.  Please use 'Collection' instead}}
-// expected-error@+2 {{type 'BadIndexable1' does not conform to protocol '_IndexableBase'}}
-// expected-error@+1 {{type 'BadIndexable1' does not conform to protocol '_Indexable'}}
+// expected-warning@+2 {{'Indexable' is deprecated: it will be removed in Swift 4.0.  Please use 'Collection' instead}}
+// expected-error@+1 {{type 'BadIndexable1' does not conform to protocol '_IndexableBase'}}
 struct BadIndexable1 : Indexable {
   func index(after i: Int) -> Int { return i + 1 }
   var startIndex: Int { return 0 }
@@ -116,3 +115,27 @@ struct BadBidirectionalIndexable : BidirectionalIndexable {
   // expected-error@+1 {{'index(after:)' has different argument names from those required by protocol '_BidirectionalIndexable' ('index(before:)'}}
   func index(after i: Int) -> Int { return 0 }
 }
+
+//
+// Check that RangeReplaceableCollection.SubSequence is defaulted.
+//
+
+struct RangeReplaceableCollection_SubSequence_IsDefaulted : RangeReplaceableCollection {
+  var startIndex: Int { fatalError() }
+  var endIndex: Int { fatalError() }
+
+  subscript(pos: Int) -> Int { return 0 }
+
+  func index(after: Int) -> Int { fatalError() }
+  func index(before: Int) -> Int { fatalError() }
+  func index(_: Int, offsetBy: Int) -> Int { fatalError() }
+  func distance(from: Int, to: Int) -> Int { fatalError() }
+
+  mutating func replaceSubrange<C>(
+    _ subrange: Range<Int>,
+    with newElements: C
+  ) where C : Collection, C.Iterator.Element == Int {
+    fatalError()
+  }
+}
+

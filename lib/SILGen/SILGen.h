@@ -5,8 +5,8 @@
 // Copyright (c) 2014 - 2016 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
-// See http://swift.org/LICENSE.txt for license information
-// See http://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
+// See https://swift.org/LICENSE.txt for license information
+// See https://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
 //
 //===----------------------------------------------------------------------===//
 
@@ -315,9 +315,9 @@ public:
   SILFunction *emitProtocolWitness(ProtocolConformance *conformance,
                                    SILLinkage linkage,
                                    SILDeclRef requirement,
-                                   SILDeclRef witness,
+                                   SILDeclRef witnessRef,
                                    IsFreeFunctionWitness_t isFree,
-                                   ArrayRef<Substitution> witnessSubs);
+                                   Witness witness);
 
   /// Emit the default witness table for a resilient protocol.
   void emitDefaultWitnessTable(ProtocolDecl *protocol);
@@ -433,6 +433,11 @@ public:
   /// function or closure at top level refers to script globals.
   void emitMarkFunctionEscapeForTopLevelCodeGlobals(SILLocation loc,
                                                 const CaptureInfo &captureInfo);
+
+  /// Get the substitutions necessary to invoke a non-member (global or local)
+  /// property.
+  ArrayRef<Substitution>
+  getNonMemberVarDeclSubstitutions(VarDecl *var);
 
 private:
   /// Emit the deallocator for a class that uses the objc allocator.

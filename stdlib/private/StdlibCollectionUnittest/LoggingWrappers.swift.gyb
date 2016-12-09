@@ -5,8 +5,8 @@
 // Copyright (c) 2014 - 2016 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
-// See http://swift.org/LICENSE.txt for license information
-// See http://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
+// See https://swift.org/LICENSE.txt for license information
+// See https://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
 //
 //===----------------------------------------------------------------------===//
 
@@ -31,7 +31,7 @@ extension LoggingType {
   public var log: Log.Type {
     return Log.self
   }
-  
+
   public var selfType: Any.Type {
     return type(of: self)
   }
@@ -54,16 +54,16 @@ public struct LoggingIterator<Base : IteratorProtocol>
   : IteratorProtocol, LoggingType {
 
   public typealias Log = IteratorLog
-  
+
   public init(wrapping base: Base) {
     self.base = base
   }
-  
+
   public mutating func next() -> Base.Element? {
     Log.next[selfType] += 1
     return base.next()
   }
-  
+
   public var base: Base
 }
 
@@ -257,7 +257,7 @@ public struct ${Self}<
     Log.dropLast[selfType] += 1
     return base.dropLast(n)
   }
-  
+
   public func drop(
     while predicate: (Base.Iterator.Element) throws -> Bool
   ) rethrows -> SubSequence {
@@ -269,7 +269,7 @@ public struct ${Self}<
     Log.prefixMaxLength[selfType] += 1
     return base.prefix(maxLength)
   }
-  
+
   public func prefix(
     while predicate: (Base.Iterator.Element) throws -> Bool
   ) rethrows -> SubSequence {

@@ -5,8 +5,8 @@
 // Copyright (c) 2014 - 2016 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
-// See http://swift.org/LICENSE.txt for license information
-// See http://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
+// See https://swift.org/LICENSE.txt for license information
+// See https://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
 //
 //===----------------------------------------------------------------------===//
 //
@@ -398,88 +398,22 @@ public:
   void dump() const;
 };
 
-/// Module file extension writer for the Swift lookup tables.
-class SwiftLookupTableWriter : public clang::ModuleFileExtensionWriter {
-  clang::ASTWriter &Writer;
-  std::function<void(clang::Sema &, SwiftLookupTable &)> PopulateTable;
+namespace importer {
+class NameImporter;
 
-public:
-  SwiftLookupTableWriter(
-    clang::ModuleFileExtension *extension,
-    std::function<void(clang::Sema &, SwiftLookupTable &)> populateTable,
-    clang::ASTWriter &writer)
-      : ModuleFileExtensionWriter(extension), Writer(writer),
-        PopulateTable(std::move(populateTable)) { }
+/// Add the given named declaration as an entry to the given Swift name
+/// lookup table, including any of its child entries.
+void addEntryToLookupTable(SwiftLookupTable &table, clang::NamedDecl *named,
+                           NameImporter &);
 
-  void writeExtensionContents(clang::Sema &sema,
-                              llvm::BitstreamWriter &stream) override;
-};
+/// Add the macros from the given Clang preprocessor to the given
+/// Swift name lookup table.
+void addMacrosToLookupTable(SwiftLookupTable &table, NameImporter &);
 
-/// Module file extension reader for the Swift lookup tables.
-class SwiftLookupTableReader : public clang::ModuleFileExtensionReader {
-  clang::ASTReader &Reader;
-  clang::serialization::ModuleFile &ModuleFile;
-  std::function<void()> OnRemove;
-
-  void *SerializedTable;
-  ArrayRef<clang::serialization::DeclID> Categories;
-  void *GlobalsAsMembersTable;
-
-  SwiftLookupTableReader(clang::ModuleFileExtension *extension,
-                         clang::ASTReader &reader,
-                         clang::serialization::ModuleFile &moduleFile,
-                         std::function<void()> onRemove,
-                         void *serializedTable,
-                         ArrayRef<clang::serialization::DeclID> categories,
-                         void *globalsAsMembersTable)
-    : ModuleFileExtensionReader(extension), Reader(reader),
-      ModuleFile(moduleFile), OnRemove(onRemove),
-      SerializedTable(serializedTable), Categories(categories),
-      GlobalsAsMembersTable(globalsAsMembersTable) { }
-
-public:
-  /// Create a new lookup table reader for the given AST reader and stream
-  /// position.
-  static std::unique_ptr<SwiftLookupTableReader>
-  create(clang::ModuleFileExtension *extension, clang::ASTReader &reader,
-         clang::serialization::ModuleFile &moduleFile,
-         std::function<void()> onRemove,
-         const llvm::BitstreamCursor &stream);
-
-  ~SwiftLookupTableReader();
-
-  /// Retrieve the AST reader associated with this lookup table reader.
-  clang::ASTReader &getASTReader() const { return Reader; }
-
-  /// Retrieve the module file associated with this lookup table reader.
-  clang::serialization::ModuleFile &getModuleFile() { return ModuleFile; }
-
-  /// Retrieve the set of base names that are stored in the on-disk hash table.
-  SmallVector<StringRef, 4> getBaseNames();
-
-  /// Retrieve the set of entries associated with the given base name.
-  ///
-  /// \returns true if we found anything, false otherwise.
-  bool lookup(StringRef baseName,
-              SmallVectorImpl<SwiftLookupTable::FullTableEntry> &entries);
-
-  /// Retrieve the declaration IDs of the categories.
-  ArrayRef<clang::serialization::DeclID> categories() const {
-    return Categories;
-  }
-
-  /// Retrieve the set of contexts that have globals-as-members
-  /// injected into them.
-  SmallVector<SwiftLookupTable::StoredContext, 4> getGlobalsAsMembersContexts();
-
-  /// Retrieve the set of global declarations that are going to be
-  /// imported as members into the given context.
-  ///
-  /// \returns true if we found anything, false otherwise.
-  bool lookupGlobalsAsMembers(SwiftLookupTable::StoredContext context,
-                              SmallVectorImpl<uintptr_t> &entries);
-};
-
+/// Finalize a lookup table, handling any as-yet-unresolved entries
+/// and emitting diagnostics if necessary.
+void finalizeLookupTable(SwiftLookupTable &table, NameImporter &);
+}
 }
 
 namespace llvm {

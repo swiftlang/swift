@@ -1,6 +1,6 @@
 // Verify errors in this file to ensure that parse and type checker errors
 // occur where we expect them.
-// RUN: %target-parse-verify-swift -show-diagnostics-after-fatal %s
+// RUN: %target-typecheck-verify-swift -show-diagnostics-after-fatal %s
 
 // RUN: %target-swift-ide-test -print-ast-typechecked -source-filename %s -prefer-type-repr=false > %t.printed.txt
 // RUN: %FileCheck %s -strict-whitespace < %t.printed.txt
@@ -218,3 +218,10 @@ class OuterContext {
 // CHECK:   func protocolFunc()
   }
 }
+
+static func topLevelStaticFunc() {} // expected-error {{static methods may only be declared on a type}}
+// NO-TYPEPR: {{^}}func topLevelStaticFunc() -> <<error type>>{{$}}
+// TYPEPR: {{^}}func topLevelStaticFunc() {{$}}
+
+static var topLevelStaticVar = 42 // expected-error {{static properties may only be declared on a type}}
+// CHECK: {{^}}var topLevelStaticVar: Int{{$}}

@@ -5,8 +5,8 @@
 // Copyright (c) 2014 - 2016 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
-// See http://swift.org/LICENSE.txt for license information
-// See http://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
+// See https://swift.org/LICENSE.txt for license information
+// See https://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
 //
 //===----------------------------------------------------------------------===//
 
@@ -78,7 +78,7 @@ public struct LazyMapSequence<Base : Sequence, Element>
 
 //===--- Collections ------------------------------------------------------===//
 
-// FIXME(ABI)(compiler limitation): `LazyMap*Collection` types should be
+// FIXME(ABI)#45 (Conditional Conformance): `LazyMap*Collection` types should be
 // collapsed into one `LazyMapCollection` using conditional conformances.
 // Maybe even combined with `LazyMapSequence`.
 // rdar://problem/17144340
@@ -95,7 +95,7 @@ public struct ${Self}<
   Base : ${collectionForTraversal(Traversal)}, Element
 > : LazyCollectionProtocol, ${collectionForTraversal(Traversal)} {
 
-  // FIXME(compiler limitation): should be inferrable.
+  // FIXME(compiler limitation): should be inferable.
   public typealias Index = Base.Index
 
   public var startIndex: Base.Index { return _base.startIndex }
@@ -127,7 +127,7 @@ public struct ${Self}<
     return ${Slice}(base: self, bounds: bounds)
   }
 
-  // FIXME(ABI)(compiler limitation): we actually want to add:
+  // FIXME(ABI)#46 (Associated Types with where clauses): we actually want to add:
   //
   //   typealias SubSequence = ${Self}<Base.SubSequence, Element>
   //
@@ -150,8 +150,13 @@ public struct ${Self}<
 
   /// The number of elements in the collection.
   ///
-  /// - Complexity: O(1) if `Index` conforms to `RandomAccessIndex`;
-  ///   O(*n*) otherwise.
+  /// To check whether the collection is empty, use its `isEmpty` property
+  /// instead of comparing `count` to zero. Unless the collection guarantees
+  /// random-access performance, calculating `count` can be an O(*n*)
+  /// operation.
+  ///
+  /// - Complexity: O(1) if `Index` conforms to `RandomAccessIndex`; O(*n*)
+  ///   otherwise.
   public var count: Base.IndexDistance {
     return _base.count
   }

@@ -5,8 +5,8 @@
 // Copyright (c) 2014 - 2016 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
-// See http://swift.org/LICENSE.txt for license information
-// See http://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
+// See https://swift.org/LICENSE.txt for license information
+// See https://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
 //
 //===----------------------------------------------------------------------===//
 
@@ -27,7 +27,7 @@ import SwiftShims
 /// - Returns: The string of characters read from standard input. If EOF has
 ///   already been reached when `readLine()` is called, the result is `nil`.
 public func readLine(strippingNewline: Bool = true) -> String? {
-  var linePtrVar: UnsafeMutablePointer<UInt8>? = nil
+  var linePtrVar: UnsafeMutablePointer<UInt8>?
   var readBytes = swift_stdlib_readLine_stdin(&linePtrVar)
   if readBytes == -1 {
     return nil

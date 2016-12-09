@@ -5,8 +5,8 @@
 // Copyright (c) 2014 - 2016 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
-// See http://swift.org/LICENSE.txt for license information
-// See http://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
+// See https://swift.org/LICENSE.txt for license information
+// See https://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
 //
 //===----------------------------------------------------------------------===//
 
@@ -98,7 +98,7 @@ public struct ${Self} {
     self._value = Builtin.sitofp_Int64_FPIEEE${bits}(zero._value)
   }
 
-  @_transparent 
+  @_transparent
   public // @testable
   init(_bits v: Builtin.FPIEEE${bits}) {
     self._value = v
@@ -668,6 +668,7 @@ extension ${Self}: BinaryFloatingPoint {
   public var significandWidth: Int {
     let trailingZeros = significandBitPattern.countTrailingZeros
     if isNormal {
+      guard significandBitPattern != 0 else { return 0 }
       return ${Self}.significandBitCount - trailingZeros
     }
     if isSubnormal {
@@ -695,8 +696,8 @@ extension ${Self}: BinaryFloatingPoint {
   }
 }
 
-@_transparent
 extension ${Self} : _ExpressibleByBuiltinIntegerLiteral, ExpressibleByIntegerLiteral {
+  @_transparent
   public
   init(_builtinIntegerLiteral value: Builtin.Int${builtinIntLiteralBits}){
     self = ${Self}(_bits: Builtin.itofp_with_overflow_Int${builtinIntLiteralBits}_FPIEEE${bits}(value))
@@ -715,6 +716,7 @@ extension ${Self} : _ExpressibleByBuiltinIntegerLiteral, ExpressibleByIntegerLit
   ///     // x == 100.0
   ///
   /// - Parameter value: The new value.
+  @_transparent
   public init(integerLiteral value: Int64) {
     self = ${Self}(_bits: Builtin.sitofp_Int64_FPIEEE${bits}(value._value))
   }
@@ -723,8 +725,8 @@ extension ${Self} : _ExpressibleByBuiltinIntegerLiteral, ExpressibleByIntegerLit
 #if !os(Windows) && (arch(i386) || arch(x86_64))
 
 % builtinFloatLiteralBits = 80
-@_transparent
 extension ${Self} : _ExpressibleByBuiltinFloatLiteral {
+  @_transparent
   public
   init(_builtinFloatLiteral value: Builtin.FPIEEE${builtinFloatLiteralBits}) {
 %   if bits == builtinFloatLiteralBits:
@@ -741,8 +743,8 @@ extension ${Self} : _ExpressibleByBuiltinFloatLiteral {
 #else
 
 % builtinFloatLiteralBits = 64
-@_transparent
 extension ${Self} : _ExpressibleByBuiltinFloatLiteral {
+  @_transparent
   public
   init(_builtinFloatLiteral value: Builtin.FPIEEE${builtinFloatLiteralBits}) {
 %   if bits == builtinFloatLiteralBits:
@@ -830,12 +832,12 @@ public prefix func - (x: ${Self}) -> ${Self} {
 //===----------------------------------------------------------------------===//
 
 // Construction from integers.
-@_transparent
 extension ${Self} {
 % for (srcBits, srcSigned) in allInts():
 %    That = intName(srcBits, srcSigned)
 %    ThatBuiltinName = builtinIntName(srcBits)
 %    sign = 's' if srcSigned else 'u'
+  @_transparent
   public init(_ v: ${That}) {
     _value = Builtin.${sign}itofp_${ThatBuiltinName}_FPIEEE${bits}(v._value)
   }
@@ -843,7 +845,6 @@ extension ${Self} {
 }
 
 // Construction from other floating point numbers.
-@_transparent
 extension ${Self} {
 % for src_type in all_floating_point_types():
 %   srcBits = src_type.bits
@@ -885,7 +886,7 @@ extension ${Self} {
     _value = other._value
 %   end
   }
-  
+
   /// Creates a new instance initialized to the given value, if it can be
   /// represented without rounding.
   ///
@@ -904,7 +905,7 @@ extension ${Self} {
   @inline(__always)
   public init?(exactly other: ${That}) {
     self.init(other)
-    // Converting the infinity value is considered value preserving. 
+    // Converting the infinity value is considered value preserving.
     // In other cases, check that we can round-trip and get the same value.
     // NaN always fails.
     if ${That}(self) != other {
@@ -972,7 +973,6 @@ public func /= (lhs: inout ${Self}, rhs: ${Self}) {
 // Strideable Conformance
 //===----------------------------------------------------------------------===//
 
-@_transparent
 extension ${Self} : Strideable {
   /// Returns the distance from this value to the specified value.
   ///
@@ -993,7 +993,7 @@ extension ${Self} : Strideable {
   public func distance(to other: ${Self}) -> ${Self} {
     return other - self
   }
-  
+
   /// Returns a new value advanced by the given distance.
   ///
   /// For two values `x` and `d`, the result of a `x.advanced(by: d)` is equal
@@ -1056,11 +1056,12 @@ public postfix func -- (lhs: inout ${Self}) -> ${Self} {
   fatalError("-- is not available")
 }
 
-extension ${Self} {		
-  @available(*, unavailable, message: "Please use the `abs(_:)` free function")		
-  public static func abs(_ x: ${Self}) -> ${Self} {		
-    fatalError("unavailable")		
-  }		
+extension ${Self} {
+  @available(swift, deprecated: 3.1, obsoleted: 4.0, message: "Please use the `abs(_:)` free function")
+  @_transparent
+  public static func abs(_ x: ${Self}) -> ${Self} {
+    return x.magnitude
+  }
 }
 
 % if bits == 80:

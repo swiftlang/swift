@@ -5,8 +5,8 @@
 // Copyright (c) 2014 - 2016 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
-// See http://swift.org/LICENSE.txt for license information
-// See http://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
+// See https://swift.org/LICENSE.txt for license information
+// See https://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
 //
 //===----------------------------------------------------------------------===//
 
@@ -71,35 +71,21 @@ SILFunction *SILFunction::create(SILModule &M, SILLinkage linkage,
   return fn;
 }
 
-SILFunction::SILFunction(SILModule &Module, SILLinkage Linkage,
-                         StringRef Name, CanSILFunctionType LoweredType,
+SILFunction::SILFunction(SILModule &Module, SILLinkage Linkage, StringRef Name,
+                         CanSILFunctionType LoweredType,
                          GenericEnvironment *genericEnv,
-                         Optional<SILLocation> Loc,
-                         IsBare_t isBareSILFunction,
-                         IsTransparent_t isTrans,
-                         IsFragile_t isFragile,
-                         IsThunk_t isThunk,
-                         ClassVisibility_t classVisibility,
+                         Optional<SILLocation> Loc, IsBare_t isBareSILFunction,
+                         IsTransparent_t isTrans, IsFragile_t isFragile,
+                         IsThunk_t isThunk, ClassVisibility_t classVisibility,
                          Inline_t inlineStrategy, EffectsKind E,
                          SILFunction *InsertBefore,
-                         const SILDebugScope *DebugScope,
-                         DeclContext *DC)
-  : Module(Module),
-    Name(Name),
-    LoweredType(LoweredType),
-    GenericEnv(genericEnv),
-    DeclCtx(DC),
-    DebugScope(DebugScope),
-    Bare(isBareSILFunction),
-    Transparent(isTrans),
-    Fragile(isFragile),
-    Thunk(isThunk),
-    ClassVisibility(classVisibility),
-    GlobalInitFlag(false),
-    InlineStrategy(inlineStrategy),
-    Linkage(unsigned(Linkage)),
-    KeepAsPublic(false),
-    EffectsKindAttr(E) {
+                         const SILDebugScope *DebugScope, DeclContext *DC)
+    : Module(Module), Name(Name), LoweredType(LoweredType),
+      GenericEnv(genericEnv), DeclCtx(DC), DebugScope(DebugScope),
+      Bare(isBareSILFunction), Transparent(isTrans), Fragile(isFragile),
+      Thunk(isThunk), ClassVisibility(classVisibility), GlobalInitFlag(false),
+      InlineStrategy(inlineStrategy), Linkage(unsigned(Linkage)),
+      KeepAsPublic(false), EffectsKindAttr(E) {
   if (InsertBefore)
     Module.functions.insert(SILModule::iterator(InsertBefore), this);
   else
@@ -166,7 +152,7 @@ void SILFunction::numberValues(llvm::DenseMap<const ValueBase*,
                                unsigned> &ValueToNumberMap) const {
   unsigned idx = 0;
   for (auto &BB : *this) {
-    for (auto I = BB.bbarg_begin(), E = BB.bbarg_end(); I != E; ++I)
+    for (auto I = BB.args_begin(), E = BB.args_end(); I != E; ++I)
       ValueToNumberMap[*I] = idx++;
     
     for (auto &I : BB)
@@ -211,7 +197,7 @@ struct SubstDependentSILType
     // its context substitution against the associated type's abstraction
     // pattern.
     CanType astTy = Subst(t);
-    AbstractionPattern origTy(t->getAssocType()->getArchetype());
+    auto origTy = AbstractionPattern::getOpaque();
     
     return M.Types.getLoweredType(origTy, astTy)
       .getSwiftRValueType();
@@ -281,9 +267,12 @@ SILType SILFunction::mapTypeIntoContext(SILType type) const {
     type);
 }
 
-SILType ArchetypeBuilder::substDependentType(SILModule &M, SILType type) {
+SILType GenericEnvironment::mapTypeIntoContext(SILModule &M,
+                                               SILType type) const {
   return doSubstDependentSILType(M,
-    [&](CanType t) { return substDependentType(t)->getCanonicalType(); },
+    [&](CanType t) {
+      return mapTypeIntoContext(M.getSwiftModule(), t)->getCanonicalType();
+    },
     type);
 }
 
@@ -300,6 +289,10 @@ bool SILFunction::isNoReturnFunction() const {
 
 SILBasicBlock *SILFunction::createBasicBlock() {
   return new (getModule()) SILBasicBlock(this);
+}
+
+SILBasicBlock *SILFunction::createBasicBlock(SILBasicBlock *AfterBlock) {
+  return new (getModule()) SILBasicBlock(this, AfterBlock);
 }
 
 //===----------------------------------------------------------------------===//
@@ -561,9 +554,8 @@ ArrayRef<Substitution> SILFunction::getForwardingSubstitutions() {
   if (!env)
     return {};
 
-  auto sig = getLoweredFunctionType()->getGenericSignature();
   auto *M = getModule().getSwiftModule();
-  ForwardingSubs = env->getForwardingSubstitutions(M, sig);
+  ForwardingSubs = env->getForwardingSubstitutions(M);
 
   return *ForwardingSubs;
 }

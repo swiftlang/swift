@@ -7,8 +7,8 @@
 extern const NSString *const MyErrorDomain;
 /// This is my cool error code.
 typedef NS_ERROR_ENUM(int, MyErrorCode, MyErrorDomain) {
-	/// This is first error.
-	MyErrFirst,
-	/// This is second error.
-	MyErrSecond,
+  /// This is first error.
+  MyErrFirst,
+  /// This is second error.
+  MyErrSecond,
 };

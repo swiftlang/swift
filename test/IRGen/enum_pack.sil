@@ -1,4 +1,4 @@
-// RUN: %target-swift-frontend -emit-ir %s
+// RUN: %target-swift-frontend -assume-parsing-unqualified-ownership-sil -emit-ir %s
 
 // This is a compile-only test. It checks if IRGen does not crash when packing
 // and unpacking enums (e.g. optionals) which contain empty structs as payloads.
@@ -9,7 +9,7 @@ import Builtin
 import Swift
 
 public struct ECurve {
-    
+
     public func point () -> ECPoint?
 }
 
@@ -17,7 +17,7 @@ public struct ECPoint {
     public let curve: ECurve
 
     public var coordinate: Int32
-    
+
     init(curve: ECurve)
 }
 

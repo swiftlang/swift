@@ -1,4 +1,4 @@
-// RUN: %target-parse-verify-swift
+// RUN: %target-typecheck-verify-swift
 
 protocol P {
   associatedtype SomeType
@@ -60,7 +60,7 @@ f1(
    )
 
 f3(
-   f2 // expected-error {{cannot convert value of type '((@escaping (Int) -> Int)) -> Int' to expected argument type '(@escaping (Int) -> Float) -> Int'}}
+   f2 // expected-error {{cannot convert value of type '(@escaping ((Int) -> Int)) -> Int' to expected argument type '(@escaping (Int) -> Float) -> Int'}}
    )
 
 f4(i, d) // expected-error {{extra argument in call}}
@@ -178,8 +178,7 @@ func perform<T>() {}  // expected-error {{generic parameter 'T' is not used in f
 
 // <rdar://problem/17080659> Error Message QOI - wrong return type in an overload
 func recArea(_ h: Int, w : Int) {
-  return h * w  // expected-error {{no '*' candidates produce the expected contextual result type '()'}}
-  // expected-note @-1 {{overloads for '*' exist with these result types: UInt8, Int8, UInt16, Int16, UInt32, Int32, UInt64, Int64, UInt, Int, Float, Double}}
+  return h * w  // expected-error {{unexpected non-void return value in void function}}
 }
 
 // <rdar://problem/17224804> QoI: Error In Ternary Condition is Wrong
@@ -671,8 +670,7 @@ func r24251022() {
 func overloadSetResultType(_ a : Int, b : Int) -> Int {
   // https://twitter.com/_jlfischer/status/712337382175952896
   // TODO: <rdar://problem/27391581> QoI: Nonsensical "binary operator '&&' cannot be applied to two 'Bool' operands"
-  return a == b && 1 == 2  // expected-error {{binary operator '&&' cannot be applied to two 'Bool' operands}}
-  // expected-note @-1 {{expected an argument list of type '(Bool, @autoclosure () throws -> Bool)'}}
+  return a == b && 1 == 2  // expected-error {{cannot convert return expression of type 'Bool' to return type 'Int'}}
 }
 
 // <rdar://problem/21523291> compiler error message for mutating immutable field is incorrect
@@ -713,16 +711,16 @@ func nilComparison(i: Int, o: AnyObject) {
   _ = o !== nil // expected-warning {{comparing non-optional value of type 'AnyObject' to nil always returns true}}
 }
 
-// FIXME: Bad diagnostic
-func secondArgumentNotLabeled(a:Int, _ b: Int) { }
+func secondArgumentNotLabeled(a: Int, _ b: Int) { }
 secondArgumentNotLabeled(10, 20)
-// expected-error@-1 {{unnamed argument #2 must precede unnamed argument #1}}
+// expected-error@-1 {{missing argument label 'a' in call}}
 
 // <rdar://problem/23709100> QoI: incorrect ambiguity error due to implicit conversion
 func testImplConversion(a : Float?) -> Bool {}
 func testImplConversion(a : Int?) -> Bool {
   let someInt = 42
-  let a : Int = testImplConversion(someInt) // expected-error {{'testImplConversion' produces 'Bool', not the expected contextual result type 'Int'}}
+  let a : Int = testImplConversion(someInt) // expected-error {{argument labels '(_:)' do not match any available overloads}}
+  // expected-note @-1 {{overloads for 'testImplConversion' exist with these partially matching parameter lists: (a: Float?), (a: Int?)}}
 }
 
 // <rdar://problem/23752537> QoI: Bogus error message: Binary operator '&&' cannot be applied to two 'Bool' operands
@@ -734,12 +732,16 @@ class Foo23752537 {
 extension Foo23752537 {
   func isEquivalent(other: Foo23752537) {
     // TODO: <rdar://problem/27391581> QoI: Nonsensical "binary operator '&&' cannot be applied to two 'Bool' operands"
-    // expected-error @+1 {{binary operator '&&' cannot be applied to two 'Bool' operands}}
+    // expected-error @+1 {{unexpected non-void return value in void function}}
     return (self.title != other.title && self.message != other.message)
-    // expected-note @-1 {{expected an argument list of type '(Bool, @autoclosure () throws -> Bool)'}}
   }
 }
 
+// <rdar://problem/27391581> QoI: Nonsensical "binary operator '&&' cannot be applied to two 'Bool' operands"
+func rdar27391581(_ a : Int, b : Int) -> Int {
+  return a == b && b != 0
+  // expected-error @-1 {{cannot convert return expression of type 'Bool' to return type 'Int'}}
+}
 
 // <rdar://problem/22276040> QoI: not great error message with "withUnsafePointer" sametype constraints
 func read2(_ p: UnsafeMutableRawPointer, maxLength: Int) {}
@@ -757,7 +759,7 @@ func f23213302() {
 
 // <rdar://problem/24202058> QoI: Return of call to overloaded function in void-return context
 func rdar24202058(a : Int) {
-  return a <= 480 // expected-error {{'<=' produces 'Bool', not the expected contextual result type '()'}}
+  return a <= 480 // expected-error {{unexpected non-void return value in void function}}
 }
 
 // SR-1752: Warning about unused result with ternary operator
@@ -766,7 +768,7 @@ struct SR1752 {
   func foo() {}
 }
 
-let sr1752: SR1752? = nil
+let sr1752: SR1752?
 
 true ? nil : sr1752?.foo() // don't generate a warning about unused result since foo returns Void
 
@@ -780,3 +782,126 @@ struct rdar27891805 {
 try rdar27891805(contentsOfURL: nil, usedEncoding: nil)
 // expected-error@-1 {{argument labels '(contentsOfURL:, usedEncoding:)' do not match any available overloads}}
 // expected-note@-2 {{overloads for 'rdar27891805' exist with these partially matching parameter lists: (contentsOf: String, encoding: String), (contentsOf: String, usedEncoding: inout String)}}
+
+// Make sure RawRepresentable fix-its don't crash in the presence of type variables
+class NSCache<K, V> {
+  func object(forKey: K) -> V? {}
+}
+
+class CacheValue {
+  func value(x: Int) -> Int {} // expected-note {{found this candidate}}
+  func value(y: String) -> String {} // expected-note {{found this candidate}}
+}
+
+func valueForKey<K>(_ key: K) -> CacheValue? {
+  let cache = NSCache<K, CacheValue>()
+  return cache.object(forKey: key)?.value // expected-error {{ambiguous reference to member 'value(x:)'}}
+}
+
+// SR-2242: poor diagnostic when argument label is omitted
+
+func r27212391(x: Int, _ y: Int) {
+  let _: Int = x + y
+}
+
+func r27212391(a: Int, x: Int, _ y: Int) {
+  let _: Int = a + x + y
+}
+
+r27212391(3, 5)             // expected-error {{missing argument label 'x' in call}}
+r27212391(3, y: 5)          // expected-error {{missing argument label 'x' in call}}
+r27212391(3, x: 5)          // expected-error {{argument 'x' must precede unnamed argument #1}}
+r27212391(y: 3, x: 5)       // expected-error {{argument 'x' must precede argument 'y'}}
+r27212391(y: 3, 5)          // expected-error {{incorrect argument label in call (have 'y:_:', expected 'x:_:')}}
+r27212391(x: 3, x: 5)       // expected-error {{extraneous argument label 'x:' in call}}
+r27212391(a: 1, 3, y: 5)    // expected-error {{missing argument label 'x' in call}}
+r27212391(1, x: 3, y: 5)    // expected-error {{missing argument label 'a' in call}}
+r27212391(a: 1, y: 3, x: 5) // expected-error {{argument 'x' must precede argument 'y'}}
+r27212391(a: 1, 3, x: 5)    // expected-error {{argument 'x' must precede unnamed argument #2}}
+
+// SR-1255
+func foo1255_1() {
+  return true || false // expected-error {{unexpected non-void return value in void function}}
+}
+func foo1255_2() -> Int {
+  return true || false // expected-error {{cannot convert return expression of type 'Bool' to return type 'Int'}}
+}
+
+// SR-2505: "Call arguments did not match up" assertion
+
+func sr_2505(_ a: Any) {} // expected-note {{}}
+sr_2505()          // expected-error {{missing argument for parameter #1 in call}}
+sr_2505(a: 1)      // expected-error {{extraneous argument label 'a:' in call}}
+sr_2505(1, 2)      // expected-error {{extra argument in call}}
+sr_2505(a: 1, 2)   // expected-error {{extra argument in call}}
+
+struct C_2505 {
+  init(_ arg: Any) {
+  }
+}
+
+protocol P_2505 {
+}
+
+extension C_2505 {
+  init<T>(from: [T]) where T: P_2505 {
+  }
+}
+
+class C2_2505: P_2505 {
+}
+
+let c_2505 = C_2505(arg: [C2_2505()]) // expected-error {{argument labels '(arg:)' do not match any available overloads}} expected-note {{overloads for 'C_2505' exist}}
+
+// Diagnostic message for initialization with binary operations as right side
+let foo1255_3: String = 1 + 2 + 3 // expected-error {{cannot convert value of type 'Int' to specified type 'String'}}
+let foo1255_4: Dictionary<String, String> = ["hello": 1 + 2] // expected-error {{cannot convert value of type 'Int' to expected dictionary value type 'String'}}
+let foo1255_5: Dictionary<String, String> = [(1 + 2): "world"] // expected-error {{cannot convert value of type 'Int' to expected dictionary key type 'String'}}
+let foo1255_6: [String] = [1 + 2 + 3] // expected-error {{cannot convert value of type 'Int' to expected element type 'String'}}
+
+// SR-2208
+struct Foo2208 {
+  func bar(value: UInt) {}
+}
+
+func test2208() {
+  let foo = Foo2208()
+  let a: Int = 1
+  let b: Int = 2
+  let result = a / b
+  foo.bar(value: a / b)  // expected-error {{cannot convert value of type 'Int' to expected argument type 'UInt'}}
+  foo.bar(value: result) // expected-error {{cannot convert value of type 'Int' to expected argument type 'UInt'}}
+  foo.bar(value: UInt(result)) // Ok
+}
+
+// SR-2164: Erroneous diagnostic when unable to infer generic type
+
+struct SR_2164<A, B> { // expected-note 3 {{'B' declared as parameter to type 'SR_2164'}} expected-note 2 {{'A' declared as parameter to type 'SR_2164'}} expected-note * {{generic type 'SR_2164' declared here}}
+  init(a: A) {}
+  init(b: B) {}
+  init(c: Int) {}
+  init(_ d: A) {}
+  init(e: A?) {}
+}
+
+struct SR_2164_Array<A, B> { // expected-note {{'B' declared as parameter to type 'SR_2164_Array'}} expected-note * {{generic type 'SR_2164_Array' declared here}}
+  init(_ a: [A]) {}
+}
+
+struct SR_2164_Dict<A: Hashable, B> { // expected-note {{'B' declared as parameter to type 'SR_2164_Dict'}} expected-note * {{generic type 'SR_2164_Dict' declared here}}
+  init(a: [A: Double]) {}
+}
+
+SR_2164(a: 0) // expected-error {{generic parameter 'B' could not be inferred}} expected-note {{explicitly specify the generic arguments to fix this issue}}
+SR_2164(b: 1) // expected-error {{generic parameter 'A' could not be inferred}} expected-note {{explicitly specify the generic arguments to fix this issue}}
+SR_2164(c: 2) // expected-error {{generic parameter 'A' could not be inferred}} expected-note {{explicitly specify the generic arguments to fix this issue}}
+SR_2164(3) // expected-error {{generic parameter 'B' could not be inferred}} expected-note {{explicitly specify the generic arguments to fix this issue}}
+SR_2164_Array([4]) // expected-error {{generic parameter 'B' could not be inferred}} expected-note {{explicitly specify the generic arguments to fix this issue}}
+SR_2164(e: 5) // expected-error {{generic parameter 'B' could not be inferred}} expected-note {{explicitly specify the generic arguments to fix this issue}}
+SR_2164_Dict(a: ["pi": 3.14]) // expected-error {{generic parameter 'B' could not be inferred}} expected-note {{explicitly specify the generic arguments to fix this issue}}
+SR_2164<Int>(a: 0) // expected-error {{generic type 'SR_2164' specialized with too few type parameters (got 1, but expected 2)}}
+SR_2164<Int>(b: 1) // expected-error {{generic type 'SR_2164' specialized with too few type parameters (got 1, but expected 2)}}
+let _ = SR_2164<Int, Bool>(a: 0)    // Ok
+let _ = SR_2164<Int, Bool>(b: true) // Ok
+SR_2164<Int, Bool, Float>(a: 0) // expected-error {{generic type 'SR_2164' specialized with too many type parameters (got 3, but expected 2)}}
+SR_2164<Int, Bool, Float>(b: 0) // expected-error {{generic type 'SR_2164' specialized with too many type parameters (got 3, but expected 2)}}

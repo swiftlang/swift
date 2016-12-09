@@ -5,8 +5,8 @@
 // Copyright (c) 2014 - 2016 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
-// See http://swift.org/LICENSE.txt for license information
-// See http://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
+// See https://swift.org/LICENSE.txt for license information
+// See https://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
 //
 //===----------------------------------------------------------------------===//
 
@@ -130,7 +130,7 @@ bool canCastValueToABICompatibleType(SILModule &M,
 /// Returns a project_box if it is the next instruction after \p ABI and
 /// and has \p ABI as operand. Otherwise it creates a new project_box right
 /// after \p ABI and returns it.
-ProjectBoxInst *getOrCreateProjectBox(AllocBoxInst *ABI);
+ProjectBoxInst *getOrCreateProjectBox(AllocBoxInst *ABI, unsigned Index);
 
 /// Replace an apply with an instruction that produces the same value,
 /// then delete the apply and the instructions that produce its callee
@@ -368,16 +368,17 @@ public:
     auto *Fn = BI->getFunction();
     auto *SrcBB = BI->getParent();
     auto *DestBB = BI->getDestBB();
-    auto *EdgeBB = new (Fn->getModule()) SILBasicBlock(Fn, SrcBB);
+    auto *EdgeBB = Fn->createBasicBlock(SrcBB);
 
     // Create block arguments.
     unsigned ArgIdx = 0;
     for (auto Arg : BI->getArgs()) {
-      assert(Arg->getType() == DestBB->getBBArg(ArgIdx)->getType() &&
+      assert(Arg->getType() == DestBB->getArgument(ArgIdx)->getType() &&
              "Types must match");
-      auto *BlockArg = EdgeBB->createBBArg(Arg->getType());
-      ValueMap[DestBB->getBBArg(ArgIdx)] = SILValue(BlockArg);
-      AvailVals.push_back(std::make_pair(DestBB->getBBArg(ArgIdx), BlockArg));
+      auto *BlockArg = EdgeBB->createArgument(Arg->getType());
+      ValueMap[DestBB->getArgument(ArgIdx)] = SILValue(BlockArg);
+      AvailVals.push_back(
+          std::make_pair(DestBB->getArgument(ArgIdx), BlockArg));
       ++ArgIdx;
     }
 
@@ -406,18 +407,18 @@ class BasicBlockCloner : public BaseThreadingCloner {
         // Create a new BB that is to be used as a target
         // for cloning.
         To = From->getParent()->createBasicBlock();
-        for (auto *Arg : FromBB->getBBArgs()) {
-          To->createBBArg(Arg->getType(), Arg->getDecl());
+        for (auto *Arg : FromBB->getArguments()) {
+          To->createArgument(Arg->getType(), Arg->getDecl());
         }
       }
       DestBB = To;
 
       // Populate the value map so that uses of the BBArgs in the SrcBB are
       // replaced with the BBArgs of the DestBB.
-      for (unsigned i = 0, e = FromBB->bbarg_size(); i != e; ++i) {
-        ValueMap[FromBB->getBBArg(i)] = DestBB->getBBArg(i);
+      for (unsigned i = 0, e = FromBB->args_size(); i != e; ++i) {
+        ValueMap[FromBB->getArgument(i)] = DestBB->getArgument(i);
         AvailVals.push_back(
-            std::make_pair(FromBB->getBBArg(i), DestBB->getBBArg(i)));
+            std::make_pair(FromBB->getArgument(i), DestBB->getArgument(i)));
       }
     }
 

@@ -20,12 +20,43 @@ CHANGELOG
 Swift 3.1
 ---------
 
+* [SR-1446](https://bugs.swift.org/browse/SR-1446)
+
+  Nested types may now appear inside generic types, and nested types may have their own generic parameters:
+
+  ```swift
+  struct OuterNonGeneric {
+      struct InnerGeneric<T> {}
+  }
+
+  struct OuterGeneric<T> {
+      struct InnerNonGeneric {}
+
+      struct InnerGeneric<T> {}
+  }
+
+  extension OuterNonGeneric.InnerGeneric {}
+  extension OuterGeneric.InnerNonGeneric {}
+  extension OuterGeneric.InnerGeneric {}
+  ```
+
+* [SR-1009](https://bugs.swift.org/browse/SR-1009):
+
+  Constrained extensions allow same-type constraints between generic parameters and concrete types. This enables you to create extensions, for example, on `Array` with `Int` elements:
+
+  ```swift
+  extension Array where Element == Int { }
+  ```
+
 * [SE-0045][]:
 
-  The `Sequence` protocol adds new members `prefix(while:)` and
-  `drop(while:)`.  `prefix(while:)` requests the longest subsequence
-  satisfying a predicate.  `drop(while:)` requests the remaining subsequence
-  after dropping the longest subsequence satisfying a predicate.
+  The `Sequence` protocol adds two new members `prefix(while:)` and
+  `drop(while:)` for common utility. `prefix(while:)` requests the longest subsequence
+  satisfying a predicate.  `drop(while:)` requests the remaining
+  subsequence after dropping the longest subsequence satisfying a
+  predicate.
+
+**Add new entries to the top of this file, not here!**
 
 Swift 3.0
 ---------
@@ -47,9 +78,9 @@ Swift 3.0
 * [SE-0125][]:
 
   The functions `isUniquelyReferenced()` and `isUniquelyReferencedNonObjC()`
-  have been removed. Call the function `isKnownUniquelyReferenced()` instead. 
-  
-  Classes using `isUniquelyReferenced()` needed to inherit from `NonObjectiveCBase`. The `NonObjectiveCBase` class has been removed. 
+  have been removed. Call the function `isKnownUniquelyReferenced()` instead.
+
+  Classes using `isUniquelyReferenced()` needed to inherit from `NonObjectiveCBase`. The `NonObjectiveCBase` class has been removed.
 
   The method `ManagedBufferPointer.holdsUniqueReference` has been renamed to
   `ManagedBufferPointer.isUniqueReference`.
@@ -121,9 +152,9 @@ Swift 3.0
   to `UnsafePointer<U>` has been disallowed. `Unsafe[Mutable]RawPointer`
   provides an API for untyped memory access, and an API for binding memory
   to a type. Binding memory allows for safe conversion between pointer types.
-  
+
   For detailed instructions on how to migrate your code to the new API refer to the [UnsafeRawPointer migration guide](https://swift.org/migration-guide/se-0107-migrate.html). See also: See `bindMemory(to:capacity:)`, `assumingMemoryBound(to:)`, and
-  `withMemoryRebound(to:capacity:)`. 
+  `withMemoryRebound(to:capacity:)`.
 
 * [SE-0096][]:
 
@@ -198,22 +229,15 @@ using the `.dynamicType` member to retrieve the type of an expression should mig
 
 * [SE-0025][]:
 
-  A declaration marked as `private` can now only be accessed within the lexical
-  scope it is declared in (essentially the enclosing curly braces `{}`).
-  A `private` declaration at the top level of a file can be accessed anywhere
-  in that file, as in Swift 2. The access level formerly known as `private` is
-  now called `fileprivate`.
+  The access level formerly known as `private` is now called `fileprivate`. A Swift 3 declaration marked `private` can no longer be accessed outside its lexical scope (essentially its enclosing curly braces `{}`). A `private` declaration at the top level of a file can be accessed anywhere within the same file, as it could in Swift 2.
 
 * [SE-0131][]:
 
-  The standard library provides a new type `AnyHashable` for use in heterogenous
-  hashed collections. Untyped `NSDictionary` and `NSSet` APIs from Objective-C
-  now import as `[AnyHashable: Any]` and `Set<AnyHashable>`.
+  The standard library introduces the `AnyHashable` type for use in hashed heterogeneous collections. Untyped `NSDictionary` and `NSSet` Objective-C APIs now import as `[AnyHashable: Any]` and `Set<AnyHashable>`.
 
 * [SE-0102][]:
 
-  The `@noreturn` attribute on function declarations and function types has been
-  removed, in favor of an empty `Never` type:
+  Swift removes the `@noreturn` attribute on function declarations and replaces the attribute with an empty `Never` type:
 
   ```swift
   @noreturn func fatalError(msg: String) { ... }  // old
@@ -225,15 +249,11 @@ using the `.dynamicType` member to retrieve the type of an expression should mig
 
 * [SE-0116][]:
 
-  Objective-C APIs using `id` now import into Swift as `Any` instead of as `AnyObject`.
-  Similarly, APIs using untyped `NSArray` and `NSDictionary` import as `[Any]` and
-  `[AnyHashable: Any]`, respectively.
+  Swift now imports Objective-C `id` APIs as `Any`. In Swift 2, `id` imported as `AnyObject`. Swift also imports untyped `NSArray` and `NSDictionary` as `[Any]` and `[AnyHashable: Any]`, respectively.
 
 * [SE-0072][]:
 
-  Bridging conversions are no longer implicit. The conversion from a Swift value type to
-  its corresponding object can be forced with `as`, e.g. `string as NSString`. Any Swift
-  value can also be converted to its boxed `id` representation with `as AnyObject`.
+  Swift eliminates implicit bridging conversions. Use `as` to force the conversion from a Swift value type to its corresponding object. For example, use `string as NSString`. Use `as AnyObject` to convert a Swift value to its boxed `id` representation.
 
 * Collection subtype conversions and dynamic casts now work with protocol types:
 
@@ -246,40 +266,36 @@ using the `.dynamicType` member to retrieve the type of an expression should mig
 
 * [SR-2131](https://bugs.swift.org/browse/SR-2131):
 
-  The `hasPrefix` and `hasSuffix` functions now consider the empty string to be a
-  prefix and suffix of all strings.
+  The `hasPrefix` and `hasSuffix` functions now consider the empty string to be a prefix and suffix of all strings.
 
 * [SE-0128][]:
 
-  Some UnicodeScalar initializers (ones that are non-failable) now return an Optional,
-  i.e., in case a UnicodeScalar can not be constructed, nil is returned.
+  Some non-failable UnicodeScalar initializers now return an Optional. When a UnicodeScalar cannot be constructed, these initializers return nil.
 
   ```swift
   // Old
   var string = ""
-  let codepoint: UInt32 = 55357 // this is invalid
-  let ucode = UnicodeScalar(codepoint) // Program crashes at this point.
+  let codepoint: UInt32 = 55357 // Invalid
+  let ucode = UnicodeScalar(codepoint) // Program crashes here.
   string.append(ucode)
   ```
 
-  After marking the initializer as failable, users can write code like this
-  and the program will execute fine even if the codepoint isn't valid.
+  The updated initializers allow users to write code that safely works around invalid codepoints, like this example:
 
   ```swift
   // New
   var string = ""
-  let codepoint: UInt32 = 55357 // this is invalid
+  let codepoint: UInt32 = 55357 // Invalid
   if let ucode = UnicodeScalar(codepoint) {
-    string.append(ucode)
+      string.append(ucode)
   } else {
-    // do something else
+      // do something else
   }
   ```
 
 * [SE-0095][]:
 
-  The `protocol<...>` composition construct has been removed. In its
-  place, an infix type operator `&` has been introduced.
+  Swift removes the `protocol<...>` composition construct and introduces an infix type operator `&` in its place.
 
   ```swift
   let a: Foo & Bar
@@ -289,13 +305,11 @@ using the `.dynamicType` member to retrieve the type of an expression should mig
   typealias G = GenericStruct<Foo & Bar>
   ```
 
-  The empty protocol composition, the `Any` type, was previously
-  defined as being `protocol<>`. This has been removed from the
-  standard library and `Any` is now a keyword with the same behaviour.
+  Swift previously defined the empty protocol composition (the `Any` type) as `protocol<>`. This definition has been removed from the standard library. The `Any` keyword behavior remains unchanged.
 
 * [SE-0091][]:
 
-  Operators can now be defined within types or extensions thereof. For example:
+  Swift permits you to define operators within types or their extensions. For example:
 
   ```swift
   struct Foo: Equatable {
@@ -307,10 +321,8 @@ using the `.dynamicType` member to retrieve the type of an expression should mig
   }
   ```
 
-  Such operators must be declared as `static` (or, within a class, `class
-  final`), and have the same signature as their global counterparts. As part of
-  this change, operator requirements declared in protocols must also be
-  explicitly declared `static`:
+  You must declare these operators as `static` (or, within a class, `class
+  final`) and they must use the same signature as their global counterparts. As part of this change, protocol-declared operator requirements must be declared `static` explicitly:
 
   ```swift
   protocol Equatable {
@@ -318,7 +330,7 @@ using the `.dynamicType` member to retrieve the type of an expression should mig
   }
   ```
 
-  Note that the type checker performance optimization described by [SE-0091][]
+  Note: The type checker performance optimization described by [SE-0091][]
   is not yet implemented.
 
 * [SE-0099][]:
@@ -338,30 +350,31 @@ using the `.dynamicType` member to retrieve the type of an expression should mig
 
 * [SE-0112][]:
 
-  The `NSError` type is now bridged to the Swift `Error` protocol type
-  (formerly called `ErrorProtocol` in Swift 3, `ErrorType` in Swift 2)
-  in Objective-C APIs, much like other Objective-C types are
-  bridged to Swift (e.g., `NSString` being bridged to `String`). For
+  The `NSError` type now bridges to the Swift `Error` protocol type (formerly `ErrorProtocol` in Swift 3, `ErrorType` in Swift 2)
+  in Objective-C APIs. `NSError` now bridges like other Objective-C types, e.g., `NSString` bridges to `String`.
+
+  For
   example, the `UIApplicationDelegate` method
   `applicate(_:didFailToRegisterForRemoteNotificationsWithError:)`
-  changes from accepting an `NSError` argument:
+  previously accepted an `NSError` argument:
 
   ```swift
   optional func application(_ application: UIApplication,
     didFailToRegisterForRemoteNotificationsWithError error: NSError)
   ```
 
-  to accepting an `Error` argument:
+ Now it accepts an `Error` argument:
 
   ```swift
   optional func application(_ application: UIApplication,
     didFailToRegisterForRemoteNotificationsWithError error: Error)
   ```
 
-  Additionally, error types imported from Cocoa[Touch] maintain all of
-  the information in the corresponding `NSError`, so it is no longer
-  necessary to `catch let as NSError` to extract (e.g.) the user-info
-  dictionary. Specific also error types contain typed accessors for
+  Error types imported from Cocoa[Touch] maintain all of
+  the information in the corresponding `NSError`. You no longer `catch let as NSError` to extract, for example, the user-info
+  dictionary.
+
+  Specific error types now contain typed accessors for
   their common user-info keys. For example:
 
   ```swift
@@ -370,7 +383,7 @@ using the `.dynamicType` member to retrieve the type of an expression should mig
   }
   ```
 
-  Finally, Swift-defined error types can provide localized error
+  Swift-defined error types can now provide localized error
   descriptions by adopting the new `LocalizedError` protocol, e.g.,
 
   ```swift
@@ -385,14 +398,13 @@ using the `.dynamicType` member to retrieve the type of an expression should mig
   }
   ```
 
-  Similarly, the new `RecoverableError` and `CustomNSError` protocols
+  New `RecoverableError` and `CustomNSError` protocols
   allow additional control over the handling of the error.
 
 * [SE-0060][]:
 
-  Function parameters with default arguments must now be specified in
-  declaration order. A call site must always supply the arguments it provides
-  to a function in their declared order:
+  Function parameters with defaulted arguments are specified in
+  declaration order. Call sites must now supply those arguments using that order:
 
     ```swift
     func requiredArguments(a: Int, b: Int, c: Int) {}
@@ -404,8 +416,7 @@ using the `.dynamicType` member to retrieve the type of an expression should mig
     defaultArguments(b: 0, a: 1, c: 2) // error
     ```
 
-    Arbitrary labeled parameters with default arguments may still be elided, as
-    long as the specified arguments follow declaration order:
+    Labeled parameters with default arguments may still be elided, so long as included arguments follow declaration order:
 
     ```swift
     defaultArguments(a: 0) // ok
@@ -416,13 +427,11 @@ using the `.dynamicType` member to retrieve the type of an expression should mig
     defaultArguments(c: 1, b: 2) // error
     ```
 
-* Traps from force-unwrapping nil `Optional`s now show the source location
-  of the force unwrap operator.
+* Traps from force-unwrapping nil `Optional`s now show the source location of the force unwrap operator.
 
 * [SE-0093][]:
 
-  Slice types now have a `base` property that allows public readonly access
-  to their base collections.
+  Slice types add a `base` property that allows public readonly access to their base collections.
 
 * Nested generic functions may now capture bindings from the environment, for example:
 
@@ -453,9 +462,7 @@ using the `.dynamicType` member to retrieve the type of an expression should mig
 
 * [SE-0081][]:
 
-  "Move `where` clause to end of declaration" is implemented, allowing you to
-  write `where` clauses after the signature for a declaration, but before its
-  body.  For example, before:
+  "Move `where` clause to end of declaration" is now implemented. This change allows you to write `where` clauses after a declaration signature and before its body.  For example, before this change was implemented, you'd write:
 
     ```swift
     func anyCommonElements<T : SequenceType, U : SequenceType
@@ -466,7 +473,7 @@ using the `.dynamicType` member to retrieve the type of an expression should mig
     }
     ```
 
-  after:
+  Now the `where` clause appears just before the body:
 
     ```swift
     func anyCommonElements<T : SequenceType, U : SequenceType>(lhs: T, _ rhs: U) -> Bool
@@ -476,22 +483,18 @@ using the `.dynamicType` member to retrieve the type of an expression should mig
     }
     ```
 
-  The old form is still accepted for compatibility, but will eventually be rejected.
+  The old form is currently accepted for compatibility. It will eventually be rejected.
 
 * [SE-0071][]:
 
-  "Allow (most) keywords in member references" is implemented.  This allows the
-  use of members after a dot without backticks, e.g. "foo.default".
+  "Allow (most) keywords in member references" is implemented.  This change allows the use of members after a dot without backticks, e.g. "foo.default", even though `default` is a keyword for `switch` statements.
 
 * [SE-0057][]:
 
   Objective-C lightweight generic classes are now imported as generic types
-  in Swift. Because Objective-C generics are not represented at runtime,
-  there are some limitations on what can be done with them in Swift:
+  in Swift. Some limitations apply because Objective-C generics are not represented at runtime:
 
-  - If an ObjC generic class is used in a checked `as?`, `as!`, or `is` cast,
-    the generic parameters are not checked at runtime. The cast succeeds if the
-    operand is an instance of the ObjC class, regardless of parameters.
+  - When an ObjC generic class is used in a checked `as?`, `as!`, or `is` cast, the generic parameters are not checked at runtime. The cast succeeds if the operand is an instance of the ObjC class, regardless of parameters.
 
     ```swift
     let x = NSFoo<NSNumber>(value: NSNumber(integer: 0))
@@ -499,8 +502,7 @@ using the `.dynamicType` member to retrieve the type of an expression should mig
     let z = y as! NSFoo<NSString> // Succeeds
     ```
 
-  - Swift subclasses can only inherit an ObjC generic class if its generic
-    parameters are fully specified.
+  - Swift subclasses can only inherit from an ObjC generic class when its generic parameters are fully specified.
 
     ```swift
     // Error: Can't inherit ObjC generic class with unbound parameter T
@@ -510,9 +512,7 @@ using the `.dynamicType` member to retrieve the type of an expression should mig
     class SwiftFoo2<T>: NSFoo<NSString> { }
     ```
 
-  - Swift can extend ObjC generic classes, but the extensions cannot be
-    constrained, and definitions inside the extension do not have access to
-    the class's generic parameters.
+  - Swift can extend ObjC generic classes but the extensions cannot be constrained, and definitions inside the extension don't have access to the class's generic parameters.
 
     ```swift
     extension NSFoo {
@@ -527,33 +527,21 @@ using the `.dynamicType` member to retrieve the type of an expression should mig
     }
     ```
 
-  - Foundation container classes `NS[Mutable]Array`, `NS[Mutable]Set`, and
-    `NS[Mutable]Dictionary` are still imported as nongeneric classes for
-    the time being.
+  - Foundation container classes `NS[Mutable]Array`, `NS[Mutable]Set`, and `NS[Mutable]Dictionary` are still imported as nongeneric classes for the time being.
 
 * [SE-0036][]:
 
   Enum elements can no longer be accessed as instance members in instance methods.
 
-* As part of the changes for [SE-0055][] (see below), the *pointee* types of
-  imported pointers (e.g. the `id` in `id *`) are no longer assumed to always
-  be `_Nullable` even if annotated otherwise. However, an implicit or explicit
-  annotation of `_Null_unspecified` on a pointee type is still imported as
-  `Optional`.
+  * As part of the changes for [SE-0055][] (see below), the *pointee* types of imported pointers (e.g. the `id` in `id *`) are no longer assumed to always be `_Nullable` even if annotated otherwise.
+  * An implicit or explicit annotation of `_Null_unspecified` on a pointee type still imports as `Optional`.
 
 * [SE-0055][]:
 
   The types `UnsafePointer`, `UnsafeMutablePointer`,
-  `AutoreleasingUnsafeMutablePointer`, `OpaquePointer`, `Selector`, and `Zone`
-  (formerly `NSZone`) now represent non-nullable pointers, i.e. pointers that
-  are never `nil`. A nullable pointer is now represented using `Optional`, e.g.
-  `UnsafePointer<Int>?` For types imported from C, non-object pointers (such as
-  `int *`) now have their nullability taken into account.
+  `AutoreleasingUnsafeMutablePointer`, `OpaquePointer`, `Selector`, and `Zone` (formerly `NSZone`) now represent non-nullable pointers, i.e. pointers that are never `nil`. A nullable pointer is now represented using `Optional`, e.g. `UnsafePointer<Int>?` For types imported from C, non-object pointers (such as `int *`) now have their nullability taken into account.
 
-  One possible area of difficulty is passing a nullable pointer to a function
-  that uses C variadics. Swift will not permit this directly, so as a
-  workaround please use the following idiom to pass it as a pointer-sized
-  integer value instead:
+  One possible area of difficulty is passing a nullable pointer to a function that uses C variadics. Swift will not permit this directly. As a workaround, use the following idiom to pass a pointer-sized integer value instead:
 
   ```swift
   unsafeBitCast(nullablePointer, to: Int.self)
@@ -561,10 +549,7 @@ using the `.dynamicType` member to retrieve the type of an expression should mig
 
 * [SE-0046][]:
 
-  Function parameters now have consistent labelling across all function
-  parameters. With this update the first parameter declarations will
-  now match the existing behavior of the second and later parameters.
-  This change makes the language simpler.
+  Function parameters adopt consistent labeling across all function parameters. With this update, first parameter declarations match the existing behavior of the second and later parameters. This change makes the language simpler.
 
   Functions that were written and called as follows:
 
@@ -576,7 +561,7 @@ using the `.dynamicType` member to retrieve the type of an expression should mig
   bar(a: 3, b: 4)
   ```
 
-  will now be written as (to achieve the same behavior):
+  Are now written as follows with the same behavior at call sites:
 
   ```swift
   func foo(_ x: Int, y: Int) {}
@@ -588,27 +573,24 @@ using the `.dynamicType` member to retrieve the type of an expression should mig
 
 * [SE-0037][]:
 
-  Comments are now treated as whitespace when determining whether an operator is
-  prefix, postfix, or binary. For example, these now work:
+  Comments are now treated as whitespace when determining whether an operator is prefix, postfix, or binary. For example, these now work:
 
   ```swift
   if /*comment*/!foo { ... }
   1 +/*comment*/2
   ```
 
-  This also means that comments can no longer appear between a unary operator
-  and its argument.
+  Comments can no longer appear between a unary operator and its argument.
+
   ```swift
   foo/* comment */! // no longer works
   ```
 
-  Any parse errors resulting from this change can be resolved by moving the
-  comment outside of the expression.
+ Parse errors resulting from this change can be resolved by moving the comment outside the expression.
 
 * [SE-0031][]:
 
-  The location of the inout attribute has been moved to after the `:` and
-  before the parameter type.
+  The location of the inout attribute moves to after the colon (`:`) and before the parameter type.
 
   ```swift
   func foo(inout x: Int) {
@@ -624,13 +606,11 @@ using the `.dynamicType` member to retrieve the type of an expression should mig
 
 * [SE-0053][]:
 
-  `let` is no longer accepted as a parameter attribute for functions.
-  The compiler provides a fixit to remove it from the function declaration.
+  `let` is no longer accepted as a parameter attribute for functions. The compiler provides a fixit to remove it from the function declaration.
 
 * [SE-0003][]:
 
-  `var` is no longer accepted as a parameter attribute for functions.
-  The compiler provides a fixit to create a shadow copy in the function body.
+  `var` is no longer accepted as a parameter attribute for functions. The compiler provides a fixit to create a shadow copy in the function body.
 
   ```swift
   func foo(var x: Int) {
@@ -645,20 +625,39 @@ using the `.dynamicType` member to retrieve the type of an expression should mig
   }
   ```
 
-* The "none" members of imported NS_OPTIONS option sets are marked as unavailable
-  when they are imported.  Use `[]` to make an empty option set, instead of a
-  None member.
+* The "none" members of imported NS_OPTIONS option sets are marked as unavailable when they are imported.  Use `[]` to make an empty option set, instead of a None member.
 
-* [SE-0043][] landed, adding the ability to declare variables in multiple
-  patterns in cases.
+* [SE-0043][]
 
-* Renamification landed, so the Clang importer imports ObjC symbols
-  substantially differently.  *Someone should expand on this point.*
+  Adds the ability to declare variables in multiple patterns in cases.
 
-* [SE-0040][] landed, changing attributes from using `=` in parameters lists
+* [SE-0005][]
+
+  Allows the Clang importer to import ObjC symbols using substantially different Swift-like naming paradigms:
+
+  * These updates generalize the use of `swift_name`, allowing arbitrary C and Objective-C entity import names. This adds fine-grained control over the import process.
+  * Redundant type names are pruned (`documentForURL(_: NSURL)` becomes `document(for: URL)`). Selectors are guaranteed to never be empty, to be transformed into Swift keywords, to be vacuously named (like `get`, `set`, `with`, `for`). Additional pruning rules preserve readability and sense.
+  * Common arguments are sensibly defaulted where the Objective-C API strongly hints at the need for a default argument. (For example,  nullable trailing closures default to `nil`, option sets to `[]`, and `NSDictionary` parameters to `[:]`.) First argument labels are added for defaulted arguments.
+  * Boolean properties are prepended with `is`, and read as assertions on the receiver.
+  * Non-type values, including enumerators, are lowercased.
+  * Classes that implement `compare(_:) -> NSComparisonResult` automatically import as `Comparable`.
+
+* [SE-0040][]
+
+  Attributes change from using `=` in parameters lists
   to using `:`, aligning with function call syntax.
 
-* Generic typealiases are now supported, e.g.:
+  ```
+  // before
+  @available(*, unavailable, renamed="MyRenamedProtocol")
+
+  // after
+  @available(*, unavailable, renamed: "MyRenamedProtocol")
+  ```
+
+* [SE-0048][]
+
+  Generic typealiases are now supported. For example:
 
   ```swift
   typealias StringDictionary<T> = Dictionary<String, T>
@@ -666,13 +665,12 @@ using the `.dynamicType` member to retrieve the type of an expression should mig
   typealias MatchingTriple<T> = (T, T, T)
   typealias BackwardTriple<T1, T2, T3> = (T3, T2, T1)
   ```
+
   etc.
 
-* The `@noescape` attribute has been extended to be a more general type attribute.
-  You can now declare values of `@noescape` function type, e.g. in manually
-  curried function signatures.  You can now also declare local variables of
-  `@noescape` type, and use `@noescape` in `typealiases`.  For example, this is now
-  valid code:
+* [SE-0049][]
+
+  The `@noescape` attribute is extended to be a more general type attribute. You can now declare values of `@noescape` function type, e.g. in manually curried function signatures.  You can now also declare local variables of `@noescape` type, and use `@noescape` in `typealiases`.  For example, this is now valid code:
 
   ```swift
   func apply<T, U>(@noescape f: T -> U,
@@ -681,23 +679,30 @@ using the `.dynamicType` member to retrieve the type of an expression should mig
   }
   ```
 
-* [SE-0034][] has renamed the `#line` directive (which resets the logical
-  source location for diagnostics and debug information) to `#sourceLocation`.
+* [SE-0034][]
 
-* Curried function syntax has been removed, and now produces a compile-time
-  error.
+  The `#line` directive (which resets the logical
+  source location for diagnostics and debug information) is renamed to `#sourceLocation`.
 
-* Generic signatures can now contain superclass requirements with generic
-  parameter types, for example:
+* [SE-0002][]
+
+  Curried function syntax (with successive parenthesized groups of arguments) is removed, and now produces a compile-time error. Use chained functional return types instead.
+
+```
+// Before
+public func project(function f: FunctionType)(p0: CGPoint, p1: CGPoint)(x: CGFloat) -> CGPoint
+
+// After
+public func project(function f: FunctionType) -> (p0: CGPoint, p1: CGPoint) -> (x: CGFloat) -> CGPoint
+```
+
+* Generic signatures can now contain superclass requirements with generic parameter types, for example:
 
   ```swift
   func f<Food : Chunks<Meat>, Meat : Molerat>(f: Food, m: Meat) {}
   ```
 
-* Section markers are created in ELF binaries through special objects during link time.
-  These objects allow for the deletion of `swift.ld` and the use of non-BFD linkers.
-  A new argument to swiftc is provided to select the linker used, and the gold linker
-  is set as the default for arm-based platforms.
+* Section markers are created in ELF binaries through special objects during link time. These objects allow for the deletion of `swift.ld` and the use of non-BFD linkers. A new argument to swiftc is provided to select the linker used, and the gold linker is set as the default for arm-based platforms.
 
 * Catch blocks in `rethrows` functions may now `throw` errors. For example:
 
@@ -710,6 +715,7 @@ using the `.dynamicType` member to retrieve the type of an expression should mig
         }
     }
     ```
+
 * Throwing closure arguments of a rethrowing function may now be optional. For example:
 
     ```swift
@@ -720,8 +726,7 @@ using the `.dynamicType` member to retrieve the type of an expression should mig
 
 * [SE-0064][]:
 
-  The Objective-C selectors for the getter or setter of a property can now be
-  referenced with `#selector`. For example:
+  The Objective-C selectors for the getter or setter of a property can now be referenced with `#selector`. For example:
 
     ```swift
     let sel1 = #selector(getter: UIView.backgroundColor) // sel1 has type Selector
@@ -735,8 +740,6 @@ using the `.dynamicType` member to retrieve the type of an expression should mig
     ```swift
     person.valueForKeyPath(#keyPath(Person.bestFriend.lastName))
     ```
-
-**If you are adding a new entry, add it to the top of the file, not here!**
 
 Swift 2.2
 ---------
@@ -3663,7 +3666,7 @@ Swift 1.0
   accepts inouts or `nil`:
 
     ```swift
-    var error: NSError? = nil
+    var error: NSError?
     let words = NSString.stringWithContentsOfFile("/usr/share/dict/words",
       encoding: .UTF8StringEncoding,
       error: &error)

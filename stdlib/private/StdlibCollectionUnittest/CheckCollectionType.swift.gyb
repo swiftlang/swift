@@ -5,8 +5,8 @@
 // Copyright (c) 2014 - 2016 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
-// See http://swift.org/LICENSE.txt for license information
-// See http://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
+// See https://swift.org/LICENSE.txt for license information
+// See https://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
 //
 //===----------------------------------------------------------------------===//
 
@@ -47,7 +47,7 @@ public struct PrefixThroughTest {
   public let position: Int
   public let expected: [Int]
   public let loc: SourceLoc
-  
+
   init(
     collection: [Int], position: Int, expected: [Int],
     file: String = #file, line: UInt = #line
@@ -153,7 +153,7 @@ public let subscriptRangeTests = [
     collection: [ 1010, 2020, 3030, 4040, 5050 ],
     bounds: 0..<2,
     count: 5),
-  
+
   // Slice an empty suffix.
   SubscriptRangeTest(
     expected: [],
@@ -332,7 +332,7 @@ public struct IndexOffsetByTest {
   public let distance: Int
   public let limit: Int?
   public let expectedOffset: Int?
-  
+
   public let loc: SourceLoc
 
   public init(
@@ -404,7 +404,7 @@ public struct IndexAfterTest {
   public init(start: Int, end: Int, file: String = #file, line: UInt = #line) {
     self.start = start
     self.end = end
-    self.loc = SourceLoc(file, line, 
+    self.loc = SourceLoc(file, line,
       comment: "index(after:) and formIndex(after:) test data")
   }
 }
@@ -471,7 +471,7 @@ internal enum _SubSequenceSubscriptOnRangeMode {
 %{
   from gyb_stdlib_support import collectionForTraversal
   def testConstraints(protocol):
-    return '''    
+    return '''
     C : %(protocol)s,
     CollectionWithEquatableElement : %(protocol)s,
     CollectionWithEquatableElement.SubSequence : Collection,
@@ -507,16 +507,16 @@ internal enum _SubSequenceSubscriptOnRangeMode {
 
     resiliencyChecks: CollectionMisuseResiliencyChecks = .all,
     outOfBoundsIndexOffset: Int = 1,
-    outOfBoundsSubscriptOffset: Int = 1, 
+    outOfBoundsSubscriptOffset: Int = 1,
     collectionIsBidirectional: Bool
   '''
-  
+
   import re
   forwardTestArgs = ',\n    '.join(
     [ x.group(1) + ': ' + x.group(1)
       for x in re.finditer(r'([a-zA-Z0-9_]+):', testParams) ]
   ).replace('testNamePrefix: ', '\n    ')
-}% 
+}%
 extension TestSuite {
   public func addCollectionTests<
     C, CollectionWithEquatableElement
@@ -1209,7 +1209,7 @@ extension TestSuite {
     //          index(before: of i: Index) -> Index
     //          formIndex(before: i: inout Index)
 
-    // FIXME: swift-3-indexing-model - 
+    // FIXME: swift-3-indexing-model -
     //   enhance the following for negative direction?
     //          advance(i: Index, by n: IndexDistance) -> Index
     //          advance(
@@ -1516,7 +1516,7 @@ extension TestSuite {
     }
 
     addBidirectionalCollectionTests(${forwardTestArgs})
-    
+
     testNamePrefix += String(describing: C.Type.self)
 
     func makeWrappedCollection(_ elements: [OpaqueValue<Int>]) -> C {

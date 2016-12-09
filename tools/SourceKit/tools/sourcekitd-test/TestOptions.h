@@ -5,8 +5,8 @@
 // Copyright (c) 2014 - 2016 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
-// See http://swift.org/LICENSE.txt for license information
-// See http://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
+// See https://swift.org/LICENSE.txt for license information
+// See https://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
 //
 //===----------------------------------------------------------------------===//
 
@@ -32,6 +32,7 @@ enum class SourceKitRequest {
   CodeCompleteCacheOnDisk,
   CodeCompleteSetPopularAPI,
   CursorInfo,
+  RangeInfo,
   RelatedIdents,
   SyntaxMap,
   Structure,
@@ -62,6 +63,8 @@ struct TestOptions {
   std::string InterestedUSR;
   unsigned Line = 0;
   unsigned Col = 0;
+  unsigned EndLine = 0;
+  unsigned EndCol = 0;
   unsigned Offset = 0;
   unsigned Length = 0;
   llvm::Optional<std::string> ReplaceText;

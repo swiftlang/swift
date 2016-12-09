@@ -5,8 +5,8 @@
 // Copyright (c) 2014 - 2016 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
-// See http://swift.org/LICENSE.txt for license information
-// See http://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
+// See https://swift.org/LICENSE.txt for license information
+// See https://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
 //
 //===----------------------------------------------------------------------===//
 
@@ -15,6 +15,7 @@
 #include "swift/Strings.h"
 #include "swift/SILOptimizer/Utils/Generics.h"
 #include "swift/SILOptimizer/Utils/GenericCloner.h"
+#include "swift/SILOptimizer/Utils/SpecializationMangler.h"
 #include "swift/SIL/DebugUtils.h"
 #include "swift/AST/GenericEnvironment.h"
 
@@ -189,10 +190,15 @@ GenericFuncSpecializer::GenericFuncSpecializer(SILFunction *GenericFunc,
   assert(GenericFunc->isDefinition() && "Expected definition to specialize!");
 
   Mangle::Mangler Mangler;
-  GenericSpecializationMangler GenericMangler(Mangler, GenericFunc,
+  GenericSpecializationMangler OldGenericMangler(Mangler, GenericFunc,
                                               ParamSubs, Fragile);
-  GenericMangler.mangle();
-  ClonedName = Mangler.finalize();
+  OldGenericMangler.mangle();
+  std::string Old = Mangler.finalize();
+
+  NewMangling::GenericSpecializationMangler NewGenericMangler(GenericFunc,
+                          ParamSubs, Fragile, /*isReAbstracted*/ true);
+  std::string New = NewGenericMangler.mangle();
+  ClonedName = NewMangling::selectMangling(Old, New);
 
   DEBUG(llvm::dbgs() << "    Specialized function " << ClonedName << '\n');
 }
@@ -229,7 +235,7 @@ SILFunction *GenericFuncSpecializer::tryCreateSpecialization() {
   SILFunction * SpecializedF =
     GenericCloner::cloneFunction(GenericFunc, Fragile, ReInfo,
                                  ParamSubs, ClonedName);
-
+  assert(SpecializedF->hasUnqualifiedOwnership());
   // Check if this specialization should be linked for prespecialization.
   linkSpecialization(M, SpecializedF);
   return SpecializedF;
@@ -271,7 +277,8 @@ static ApplySite replaceWithSpecializedCallee(ApplySite AI,
       } else {
         // An argument is converted from indirect to direct. Instead of the
         // address we pass the loaded value.
-        SILValue Val = Builder.createLoad(Loc, Op.get());
+        SILValue Val = Builder.createLoad(Loc, Op.get(),
+                                          LoadOwnershipQualifier::Unqualified);
         Arguments.push_back(Val);
       }
     } else {
@@ -282,21 +289,21 @@ static ApplySite replaceWithSpecializedCallee(ApplySite AI,
 
   if (auto *TAI = dyn_cast<TryApplyInst>(AI)) {
     SILBasicBlock *ResultBB = TAI->getNormalBB();
-    assert(ResultBB->getSinglePredecessor() == TAI->getParent());
+    assert(ResultBB->getSinglePredecessorBlock() == TAI->getParent());
     auto *NewTAI =
       Builder.createTryApply(Loc, Callee, Callee->getType(), {},
                              Arguments, ResultBB, TAI->getErrorBB());
     if (StoreResultTo) {
       // The original normal result of the try_apply is an empty tuple.
-      assert(ResultBB->getNumBBArg() == 1);
+      assert(ResultBB->getNumArguments() == 1);
       Builder.setInsertionPoint(ResultBB->begin());
-      fixUsedVoidType(ResultBB->getBBArg(0), Loc, Builder);
+      fixUsedVoidType(ResultBB->getArgument(0), Loc, Builder);
 
-
-      SILArgument *Arg =
-        ResultBB->replaceBBArg(0, StoreResultTo->getType().getObjectType());
+      SILArgument *Arg = ResultBB->replaceArgument(
+          0, StoreResultTo->getType().getObjectType());
       // Store the direct result to the original result address.
-      Builder.createStore(Loc, Arg, StoreResultTo);
+      Builder.createStore(Loc, Arg, StoreResultTo,
+                          StoreOwnershipQualifier::Unqualified);
     }
     return NewTAI;
   }
@@ -305,7 +312,8 @@ static ApplySite replaceWithSpecializedCallee(ApplySite AI,
     if (StoreResultTo) {
       // Store the direct result to the original result address.
       fixUsedVoidType(A, Loc, Builder);
-      Builder.createStore(Loc, NewAI, StoreResultTo);
+      Builder.createStore(Loc, NewAI, StoreResultTo,
+                          StoreOwnershipQualifier::Unqualified);
     }
     A->replaceAllUsesWith(NewAI);
     return NewAI;
@@ -352,52 +360,69 @@ static SILFunction *createReabstractionThunk(const ReabstractionInfo &ReInfo,
   std::string ThunkName;
   {
     Mangle::Mangler M;
-    GenericSpecializationMangler Mangler(M, OrigF,
+    GenericSpecializationMangler OldMangler(M, OrigF,
                               OrigPAI->getSubstitutions(), Fragile,
                               GenericSpecializationMangler::NotReabstracted);
-    Mangler.mangle();
-    ThunkName = M.finalize();
+    OldMangler.mangle();
+    std::string Old = M.finalize();
+
+    NewMangling::GenericSpecializationMangler NewMangler(OrigF,
+                  OrigPAI->getSubstitutions(), Fragile,
+                  /*isReAbstracted*/ false);
+    std::string New = NewMangler.mangle();
+    ThunkName = NewMangling::selectMangling(Old, New);
   }
 
   auto Loc = RegularLocation::getAutoGeneratedLocation();
   SILFunction *Thunk =
-    M.getOrCreateSharedFunction(Loc, ThunkName, ReInfo.getSubstitutedType(),
-                              IsBare, IsTransparent, Fragile,
-                              IsThunk);
+      M.getOrCreateSharedFunction(Loc, ThunkName, ReInfo.getSubstitutedType(),
+                                  IsBare, IsTransparent, Fragile, IsThunk);
 
   // Re-use an existing thunk.
   if (!Thunk->empty())
     return Thunk;
 
-  SILBasicBlock *EntryBB = new (M) SILBasicBlock(Thunk);
+  SILBasicBlock *EntryBB = Thunk->createBasicBlock();
   SILBuilder Builder(EntryBB);
   SILBasicBlock *SpecEntryBB = &*SpecializedFunc->begin();
   CanSILFunctionType SpecType = SpecializedFunc->getLoweredFunctionType();
   SILArgument *ReturnValueAddr = nullptr;
 
+  // If the original specialized function had unqualified ownership, set the
+  // thunk to have unqualified ownership as well.
+  //
+  // This is a stop gap measure to allow for easy inlining. We could always make
+  // the Thunk qualified, but then we would need to either fix the inliner to
+  // inline qualified into unqualified functions /or/ have the
+  // OwnershipModelEliminator run as part of the normal compilation pipeline
+  // (which we are not doing yet).
+  if (SpecializedFunc->hasUnqualifiedOwnership()) {
+    Thunk->setUnqualifiedOwnership();
+  }
+
   // Convert indirect to direct parameters/results.
   SmallVector<SILValue, 4> Arguments;
-  auto SpecArgIter = SpecEntryBB->bbarg_begin();
+  auto SpecArgIter = SpecEntryBB->args_begin();
   for (unsigned Idx = 0; Idx < ReInfo.getNumArguments(); Idx++) {
     if (ReInfo.isArgConverted(Idx)) {
       if (ReInfo.isResultIndex(Idx)) {
         // Store the result later.
         SILType Ty = SpecType->getSILResult().getAddressType();
-        ReturnValueAddr = new (M) SILArgument(EntryBB, Ty);
+        ReturnValueAddr = EntryBB->createArgument(Ty);
       } else {
         // Instead of passing the address, pass the loaded value.
         SILArgument *SpecArg = *SpecArgIter++;
         SILType Ty = SpecArg->getType().getAddressType();
-        SILArgument *NewArg = new (M) SILArgument(EntryBB, Ty,
-                                                  SpecArg->getDecl());
-        auto *ArgVal = Builder.createLoad(Loc, NewArg);
+        SILArgument *NewArg = EntryBB->createArgument(Ty, SpecArg->getDecl());
+        auto *ArgVal = Builder.createLoad(Loc, NewArg,
+                                          LoadOwnershipQualifier::Unqualified);
         Arguments.push_back(ArgVal);
       }
     } else {
       // No change to the argument.
       SILArgument *SpecArg = *SpecArgIter++;
-      SILArgument *NewArg = new (M) SILArgument(EntryBB, SpecArg->getType(),
-                                                SpecArg->getDecl());
+      SILArgument *NewArg =
+          EntryBB->createArgument(SpecArg->getType(), SpecArg->getDecl());
       Arguments.push_back(NewArg);
     }
   }
@@ -406,15 +431,15 @@ static SILFunction *createReabstractionThunk(const ReabstractionInfo &ReInfo,
   SILValue ReturnValue;
   if (SpecType->hasErrorResult()) {
     // Create the logic for calling a throwing function.
-    SILBasicBlock *NormalBB = new (M) SILBasicBlock(Thunk);
-    SILBasicBlock *ErrorBB = new (M) SILBasicBlock(Thunk);
+    SILBasicBlock *NormalBB = Thunk->createBasicBlock();
+    SILBasicBlock *ErrorBB = Thunk->createBasicBlock();
     Builder.createTryApply(Loc, FRI, SpecializedFunc->getLoweredType(),
                            {}, Arguments, NormalBB, ErrorBB);
-    auto *ErrorVal = new (M) SILArgument(ErrorBB,
-                                         SpecType->getErrorResult().getSILType());
+    auto *ErrorVal =
+        ErrorBB->createArgument(SpecType->getErrorResult().getSILType());
     Builder.setInsertionPoint(ErrorBB);
     Builder.createThrow(Loc, ErrorVal);
-    ReturnValue = new (M) SILArgument(NormalBB, SpecType->getSILResult());
+    ReturnValue = NormalBB->createArgument(SpecType->getSILResult());
     Builder.setInsertionPoint(NormalBB);
   } else {
     ReturnValue = Builder.createApply(Loc, FRI, SpecializedFunc->getLoweredType(),
@@ -422,7 +447,8 @@ static SILFunction *createReabstractionThunk(const ReabstractionInfo &ReInfo,
   }
   if (ReturnValueAddr) {
     // Need to store the direct results to the original indirect address.
-    Builder.createStore(Loc, ReturnValue, ReturnValueAddr);
+    Builder.createStore(Loc, ReturnValue, ReturnValueAddr,
+                        StoreOwnershipQualifier::Unqualified);
     SILType VoidTy = OrigPAI->getSubstCalleeType()->getSILResult();
     assert(VoidTy.isVoid());
     ReturnValue = Builder.createTuple(Loc, VoidTy, { });
@@ -512,6 +538,7 @@ void swift::trySpecializeApplyOfGeneric(
     if (!SpecializedF)
       return;
 
+    assert(SpecializedF->hasUnqualifiedOwnership());
     NewFunctions.push_back(SpecializedF);
   }
 
@@ -628,37 +655,37 @@ static bool linkSpecialization(SILModule &M, SILFunction *F) {
   return false;
 }
 
+// The whitelist of classes and functions from the stdlib,
+// whose specializations we want to preserve.
+static const char *const WhitelistedSpecializations[] = {
+    "Array",
+    "_ArrayBuffer",
+    "_ContiguousArrayBuffer",
+    "Range",
+    "RangeIterator",
+    "CountableRange",
+    "CountableRangeIterator",
+    "ClosedRange",
+    "ClosedRangeIterator",
+    "CountableClosedRange",
+    "CountableClosedRangeIterator",
+    "IndexingIterator",
+    "Collection",
+    "MutableCollection",
+    "BidirectionalCollection",
+    "RandomAccessCollection",
+    "RangeReplaceableCollection",
+    "_allocateUninitializedArray",
+    "UTF8",
+    "UTF16",
+    "String",
+    "_StringBuffer",
+    "_toStringReadOnlyPrintable",
+};
+
 /// Check of a given name could be a name of a white-listed
 /// specialization.
 bool swift::isWhitelistedSpecialization(StringRef SpecName) {
-  // The whitelist of classes and functions from the stdlib,
-  // whose specializations we want to preserve.
-  ArrayRef<StringRef> Whitelist = {
-      "Array",
-      "_ArrayBuffer",
-      "_ContiguousArrayBuffer",
-      "Range",
-      "RangeIterator",
-      "CountableRange",
-      "CountableRangeIterator",
-      "ClosedRange",
-      "ClosedRangeIterator",
-      "CountableClosedRange",
-      "CountableClosedRangeIterator",
-      "IndexingIterator",
-      "Collection",
-      "MutableCollection",
-      "BidirectionalCollection",
-      "RandomAccessCollection",
-      "RangeReplaceableCollection",
-      "_allocateUninitializedArray",
-      "UTF8",
-      "UTF16",
-      "String",
-      "_StringBuffer",
-      "_toStringReadOnlyPrintable",
-  };
-
   // TODO: Once there is an efficient API to check if
   // a given symbol is a specialization of a specific type,
   // use it instead. Doing demangling just for this check
@@ -701,7 +728,8 @@ bool swift::isWhitelistedSpecialization(StringRef SpecName) {
 
   pos += OfStr.size();
 
-  for (auto Name: Whitelist) {
+  for (auto NameStr: WhitelistedSpecializations) {
+    StringRef Name = NameStr;
     auto pos1 = DemangledName.find(Name, pos);
     if (pos1 == pos && !isalpha(DemangledName[pos1+Name.size()])) {
       return true;

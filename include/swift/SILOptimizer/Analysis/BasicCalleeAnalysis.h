@@ -5,8 +5,8 @@
 // Copyright (c) 2014 - 2016 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
-// See http://swift.org/LICENSE.txt for license information
-// See http://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
+// See https://swift.org/LICENSE.txt for license information
+// See https://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
 //
 //===----------------------------------------------------------------------===//
 
@@ -101,6 +101,9 @@ public:
   /// Return the list of callees that can potentially be called at the
   /// given apply site.
   CalleeList getCalleeList(FullApplySite FAS) const;
+  /// Return the list of callees that can potentially be called at the
+  /// given instruction. E.g. it could be destructors.
+  CalleeList getCalleeList(SILInstruction *I) const;
 
 private:
   void enumerateFunctionsInModule();
@@ -140,6 +143,13 @@ public:
       Cache = llvm::make_unique<CalleeCache>(M);
 
     return Cache->getCalleeList(FAS);
+  }
+
+  CalleeList getCalleeList(SILInstruction *I) {
+    if (!Cache)
+      Cache = llvm::make_unique<CalleeCache>(M);
+
+    return Cache->getCalleeList(I);
   }
 };
 

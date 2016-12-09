@@ -14,14 +14,14 @@ public func rangeExtension(_ b: Bool) {
     // CHECK: llvm.dbg.value(metadata i32 [[I]], i64 0, metadata
     // CHECK: llvm.dbg.value(metadata i32 [[J:.*]], i64 0, metadata
     use(j)
-    // CHECK: {{(asm sideeffect "", "r".*)|(zext i32)}} [[J]]
-    // CHECK: asm sideeffect "", "r"
+    // CHECK-DAG: {{(asm sideeffect "", "r".*)|(zext i32)}} [[J]]
+    // CHECK-DAG: asm sideeffect "", "r"
   }
   let z = getInt32()
   use(z)
-  // CHECK: llvm.dbg.value(metadata i32 [[I]], i64 0, metadata
   // CHECK-NOT: llvm.dbg.value(metadata i32 [[J]], i64 0, metadata
-  // CHECK: llvm.dbg.value(metadata i32 [[Z:.*]], i64 0, metadata
-  // CHECK: asm sideeffect "", "r"
-  // CHECK: {{(asm sideeffect "", "r".*)|(zext i32)}} [[I]]
+  // CHECK-DAG: llvm.dbg.value(metadata i32 [[I]], i64 0, metadata
+  // CHECK-DAG: llvm.dbg.value(metadata i32 [[Z:.*]], i64 0, metadata
+  // CHECK-DAG: {{(asm sideeffect "", "r".*)|(zext i32)}} [[I]]
+  // CHECK-DAG: asm sideeffect "", "r"
 }

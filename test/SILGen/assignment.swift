@@ -8,7 +8,7 @@ struct B { var owner: C }
 var a = A()
 
 // CHECK: assign {{%.*}} to {{%.*}} : $*A
-// CHECK: release_value {{%.*}} : $B
+// CHECK: destroy_value {{%.*}} : $B
 (a, _) = (A(), B(owner: C()))
 
 class D { var child: C = C() }

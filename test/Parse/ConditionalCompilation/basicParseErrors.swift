@@ -1,4 +1,4 @@
-// RUN: %target-parse-verify-swift -D FOO -D BAZ
+// RUN: %target-typecheck-verify-swift -D FOO -D BAZ
 
 #if FOO == BAZ // expected-error{{expected '&&' or '||' expression}}
 var x = 0
@@ -64,3 +64,14 @@ struct S {
 
 #if _endian(mid) // expected-warning {{unknown endianness for build configuration '_endian'}}
 #endif
+
+LABEL: #if true // expected-error {{expected statement}}
+func fn_i() {}
+#endif
+fn_i() // OK
+
+try #if false // expected-error {{expected expression}}
+#else
+func fn_j() {}
+#endif
+fn_j() // OK

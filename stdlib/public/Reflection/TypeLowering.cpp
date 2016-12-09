@@ -5,8 +5,8 @@
 // Copyright (c) 2014 - 2016 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
-// See http://swift.org/LICENSE.txt for license information
-// See http://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
+// See https://swift.org/LICENSE.txt for license information
+// See https://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
 //
 //===----------------------------------------------------------------------===//
 //
@@ -378,6 +378,8 @@ public:
 unsigned RecordTypeInfoBuilder::addField(unsigned fieldSize,
                                          unsigned fieldAlignment,
                                          unsigned numExtraInhabitants) {
+  assert(fieldAlignment > 0);
+
   // Align the current size appropriately
   Size = ((Size + fieldAlignment - 1) & ~(fieldAlignment - 1));
 
@@ -778,13 +780,13 @@ public:
 
   MetatypeRepresentation
   visitGenericTypeParameterTypeRef(const GenericTypeParameterTypeRef *GTP) {
-    unreachable("Must have concrete TypeRef");
+    DEBUG(std::cerr << "Unresolved generic TypeRef: "; GTP->dump());
     return MetatypeRepresentation::Unknown;
   }
 
   MetatypeRepresentation
   visitDependentMemberTypeRef(const DependentMemberTypeRef *DM) {
-    unreachable("Must have concrete TypeRef");
+    DEBUG(std::cerr << "Unresolved generic TypeRef: "; DM->dump());
     return MetatypeRepresentation::Unknown;
   }
 
@@ -873,7 +875,7 @@ class EnumTypeInfoBuilder {
 
 public:
   EnumTypeInfoBuilder(TypeConverter &TC)
-    : TC(TC), Size(0), Alignment(0), NumExtraInhabitants(0),
+    : TC(TC), Size(0), Alignment(1), NumExtraInhabitants(0),
       Kind(RecordKind::Invalid), Invalid(false) {}
 
   const TypeInfo *build(const TypeRef *TR, const FieldDescriptor *FD) {
@@ -1122,13 +1124,13 @@ public:
 
   const TypeInfo *
   visitGenericTypeParameterTypeRef(const GenericTypeParameterTypeRef *GTP) {
-    unreachable("Must have concrete TypeRef");
+    DEBUG(std::cerr << "Unresolved generic TypeRef: "; GTP->dump());
     return nullptr;
   }
 
   const TypeInfo *
   visitDependentMemberTypeRef(const DependentMemberTypeRef *DM) {
-    unreachable("Must have concrete TypeRef");
+    DEBUG(std::cerr << "Unresolved generic TypeRef: "; DM->dump());
     return nullptr;
   }
 
@@ -1249,8 +1251,7 @@ const TypeInfo *TypeConverter::getTypeInfo(const TypeRef *TR) {
 }
 
 const TypeInfo *TypeConverter::getClassInstanceTypeInfo(const TypeRef *TR,
-                                                        unsigned start,
-                                                        unsigned align) {
+                                                        unsigned start) {
   const FieldDescriptor *FD = getBuilder().getFieldTypeInfo(TR);
   if (FD == nullptr) {
     DEBUG(std::cerr << "No field descriptor: "; TR->dump());
@@ -1264,9 +1265,9 @@ const TypeInfo *TypeConverter::getClassInstanceTypeInfo(const TypeRef *TR,
     // TypeRef to make field types concrete.
     RecordTypeInfoBuilder builder(*this, RecordKind::ClassInstance);
 
-    // Start layout from the given instance start offset.
-    // Extra inhabitants do not matter for a class instance payload.
-    builder.addField(start, align, /*numExtraInhabitants=*/0);
+    // Start layout from the given instance start offset. This should
+    // be the superclass instance size.
+    builder.addField(start, 1, /*numExtraInhabitants=*/0);
 
     for (auto Field : getBuilder().getFieldTypeRefs(TR, FD))
       builder.addField(Field.Name, Field.TR);

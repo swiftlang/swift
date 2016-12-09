@@ -5,8 +5,8 @@
 // Copyright (c) 2014 - 2016 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
-// See http://swift.org/LICENSE.txt for license information
-// See http://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
+// See https://swift.org/LICENSE.txt for license information
+// See https://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
 //
 //===----------------------------------------------------------------------===//
 ///
@@ -21,17 +21,18 @@
 //===----------------------------------------------------------------------===//
 
 #include "swift/FrontendTool/FrontendTool.h"
+#include "ReferenceDependencies.h"
 
 #include "swift/Subsystems.h"
 #include "swift/AST/ASTScope.h"
 #include "swift/AST/DiagnosticsFrontend.h"
 #include "swift/AST/DiagnosticsSema.h"
 #include "swift/AST/IRGenOptions.h"
-#include "swift/AST/Mangle.h"
-#include "swift/AST/NameLookup.h"
+#include "swift/AST/ASTMangler.h"
 #include "swift/AST/ReferencedNameTracker.h"
 #include "swift/AST/TypeRefinementContext.h"
 #include "swift/Basic/Dwarf.h"
+#include "swift/Basic/Edit.h"
 #include "swift/Basic/Fallthrough.h"
 #include "swift/Basic/FileSystem.h"
 #include "swift/Basic/LLVMContext.h"
@@ -57,12 +58,10 @@
 #include "llvm/IRReader/IRReader.h"
 #include "llvm/Option/Option.h"
 #include "llvm/Option/OptTable.h"
-#include "llvm/Support/FileSystem.h"
 #include "llvm/Support/Path.h"
 #include "llvm/Support/raw_ostream.h"
 #include "llvm/Support/TargetSelect.h"
 #include "llvm/Support/Timer.h"
-#include "llvm/Support/YAMLParser.h"
 
 #include <memory>
 #include <unordered_set>
@@ -123,356 +122,6 @@ static bool emitMakeDependencies(DiagnosticEngine &diags,
       out << ' ' << escape(path);
     out << '\n';
   });
-
-  return false;
-}
-
-static void findNominalsAndOperators(
-    llvm::MapVector<const NominalTypeDecl *, bool> &foundNominals,
-    llvm::SmallVectorImpl<const FuncDecl *> &foundOperators,
-    DeclRange members) {
-  for (const Decl *D : members) {
-    auto *VD = dyn_cast<ValueDecl>(D);
-    if (!VD)
-      continue;
-
-    if (VD->hasAccessibility() &&
-        VD->getFormalAccess() <= Accessibility::FilePrivate) {
-      continue;
-    }
-
-    if (VD->getFullName().isOperator()) {
-      foundOperators.push_back(cast<FuncDecl>(VD));
-      continue;
-    }
-
-    auto nominal = dyn_cast<NominalTypeDecl>(D);
-    if (!nominal)
-      continue;
-    foundNominals[nominal] |= true;
-    findNominalsAndOperators(foundNominals, foundOperators,
-                             nominal->getMembers());
-  }
-}
-
-static bool declIsPrivate(const Decl *member) {
-  auto *VD = dyn_cast<ValueDecl>(member);
-  if (!VD) {
-    switch (member->getKind()) {
-    case DeclKind::Import:
-    case DeclKind::PatternBinding:
-    case DeclKind::EnumCase:
-    case DeclKind::TopLevelCode:
-    case DeclKind::IfConfig:
-      return true;
-
-    case DeclKind::Extension:
-    case DeclKind::InfixOperator:
-    case DeclKind::PrefixOperator:
-    case DeclKind::PostfixOperator:
-      return false;
-
-    default:
-      llvm_unreachable("everything else is a ValueDecl");
-    }
-  }
-
-  return VD->getFormalAccess() <= Accessibility::FilePrivate;
-}
-
-static bool extendedTypeIsPrivate(TypeLoc inheritedType) {
-  if (!inheritedType.getType())
-    return true;
-
-  SmallVector<ProtocolDecl *, 2> protocols;
-  if (!inheritedType.getType()->isAnyExistentialType(protocols)) {
-    // Be conservative. We don't know how to deal with other extended types.
-    return false;
-  }
-
-  return std::all_of(protocols.begin(), protocols.end(), declIsPrivate);
-}
-
-static std::string mangleTypeAsContext(const NominalTypeDecl *type) {
-  Mangle::Mangler mangler(/*debug style=*/false, /*Unicode=*/true);
-  mangler.mangleContext(type);
-  return mangler.finalize();
-}
-
-/// Emits a Swift-style dependencies file.
-static bool emitReferenceDependencies(DiagnosticEngine &diags,
-                                      SourceFile *SF,
-                                      DependencyTracker &depTracker,
-                                      const FrontendOptions &opts) {
-  if (!SF) {
-    diags.diagnose(SourceLoc(),
-                   diag::emit_reference_dependencies_without_primary_file);
-    return true;
-  }
-
-  std::error_code EC;
-  llvm::raw_fd_ostream out(opts.ReferenceDependenciesFilePath, EC,
-                           llvm::sys::fs::F_None);
-
-  if (out.has_error() || EC) {
-    diags.diagnose(SourceLoc(), diag::error_opening_output,
-                   opts.ReferenceDependenciesFilePath, EC.message());
-    out.clear_error();
-    return true;
-  }
-
-  auto escape = [](Identifier name) -> std::string {
-    return llvm::yaml::escape(name.str());
-  };
-
-  out << "### Swift dependencies file v0 ###\n";
-
-  llvm::MapVector<const NominalTypeDecl *, bool> extendedNominals;
-  llvm::SmallVector<const FuncDecl *, 8> memberOperatorDecls;
-  llvm::SmallVector<const ExtensionDecl *, 8> extensionsWithJustMembers;
-
-  out << "provides-top-level:\n";
-  for (const Decl *D : SF->Decls) {
-    switch (D->getKind()) {
-    case DeclKind::Module:
-      break;
-
-    case DeclKind::Import:
-      // FIXME: Handle re-exported decls.
-      break;
-
-    case DeclKind::Extension: {
-      auto *ED = cast<ExtensionDecl>(D);
-      auto *NTD = ED->getExtendedType()->getAnyNominal();
-      if (!NTD)
-        break;
-      if (NTD->hasAccessibility() &&
-          NTD->getFormalAccess() <= Accessibility::FilePrivate) {
-        break;
-      }
-
-      bool justMembers = std::all_of(ED->getInherited().begin(),
-                                     ED->getInherited().end(),
-                                     extendedTypeIsPrivate);
-      if (justMembers) {
-        if (std::all_of(ED->getMembers().begin(), ED->getMembers().end(),
-                        declIsPrivate)) {
-          break;
-        } else {
-          extensionsWithJustMembers.push_back(ED);
-        }
-      }
-      extendedNominals[NTD] |= !justMembers;
-      findNominalsAndOperators(extendedNominals, memberOperatorDecls,
-                               ED->getMembers());
-      break;
-    }
-
-    case DeclKind::InfixOperator:
-    case DeclKind::PrefixOperator:
-    case DeclKind::PostfixOperator:
-      out << "- \"" << escape(cast<OperatorDecl>(D)->getName()) << "\"\n";
-      break;
-
-    case DeclKind::PrecedenceGroup:
-      out << "- \"" << escape(cast<PrecedenceGroupDecl>(D)->getName()) << "\"\n";
-      break;
-
-    case DeclKind::Enum:
-    case DeclKind::Struct:
-    case DeclKind::Class:
-    case DeclKind::Protocol: {
-      auto *NTD = cast<NominalTypeDecl>(D);
-      if (!NTD->hasName())
-        break;
-      if (NTD->hasAccessibility() &&
-          NTD->getFormalAccess() <= Accessibility::FilePrivate) {
-        break;
-      }
-      out << "- \"" << escape(NTD->getName()) << "\"\n";
-      extendedNominals[NTD] |= true;
-      findNominalsAndOperators(extendedNominals, memberOperatorDecls,
-                               NTD->getMembers());
-      break;
-    }
-
-    case DeclKind::TypeAlias:
-    case DeclKind::Var:
-    case DeclKind::Func: {
-      auto *VD = cast<ValueDecl>(D);
-      if (!VD->hasName())
-        break;
-      if (VD->hasAccessibility() &&
-          VD->getFormalAccess() <= Accessibility::FilePrivate) {
-        break;
-      }
-      out << "- \"" << escape(VD->getName()) << "\"\n";
-      break;
-    }
-
-    case DeclKind::PatternBinding:
-    case DeclKind::TopLevelCode:
-    case DeclKind::IfConfig:
-      // No action necessary.
-      break;
-
-    case DeclKind::EnumCase:
-    case DeclKind::GenericTypeParam:
-    case DeclKind::AssociatedType:
-    case DeclKind::Param:
-    case DeclKind::Subscript:
-    case DeclKind::Constructor:
-    case DeclKind::Destructor:
-    case DeclKind::EnumElement:
-      llvm_unreachable("cannot appear at the top level of a file");
-    }
-  }
-
-  // This is also part of "provides-top-level".
-  for (auto *operatorFunction : memberOperatorDecls)
-    out << "- \"" << escape(operatorFunction->getName()) << "\"\n";
-
-  out << "provides-nominal:\n";
-  for (auto entry : extendedNominals) {
-    if (!entry.second)
-      continue;
-    out << "- \"";
-    out << mangleTypeAsContext(entry.first);
-    out << "\"\n";
-  }
-
-  out << "provides-member:\n";
-  for (auto entry : extendedNominals) {
-    out << "- [\"";
-    out << mangleTypeAsContext(entry.first);
-    out << "\", \"\"]\n";
-  }
-
-  // This is also part of "provides-member".
-  for (auto *ED : extensionsWithJustMembers) {
-    auto mangledName = mangleTypeAsContext(
-                                        ED->getExtendedType()->getAnyNominal());
-
-    for (auto *member : ED->getMembers()) {
-      auto *VD = dyn_cast<ValueDecl>(member);
-      if (!VD || !VD->hasName() ||
-          VD->getFormalAccess() <= Accessibility::FilePrivate) {
-        continue;
-      }
-      out << "- [\"" << mangledName << "\", \""
-          << escape(VD->getName()) << "\"]\n";
-    }
-  }
-
-  if (SF->getASTContext().LangOpts.EnableObjCInterop) {
-    // FIXME: This requires a traversal of the whole file to compute.
-    // We should (a) see if there's a cheaper way to keep it up to date,
-    // and/or (b) see if we can fast-path cases where there's no ObjC involved.
-    out << "provides-dynamic-lookup:\n";
-    class ValueDeclPrinter : public VisibleDeclConsumer {
-    private:
-      raw_ostream &out;
-      std::string (*escape)(Identifier);
-    public:
-      ValueDeclPrinter(raw_ostream &out, decltype(escape) escape)
-        : out(out), escape(escape) {}
-
-      void foundDecl(ValueDecl *VD, DeclVisibilityKind Reason) override {
-        out << "- \"" << escape(VD->getName()) << "\"\n";
-      }
-    };
-    ValueDeclPrinter printer(out, escape);
-    SF->lookupClassMembers({}, printer);
-  }
-
-  ReferencedNameTracker *tracker = SF->getReferencedNameTracker();
-
-  // FIXME: Sort these?
-  out << "depends-top-level:\n";
-  for (auto &entry : tracker->getTopLevelNames()) {
-    assert(!entry.first.empty());
-    out << "- ";
-    if (!entry.second)
-      out << "!private ";
-    out << "\"" << escape(entry.first) << "\"\n";
-  }
-
-  out << "depends-member:\n";
-  auto &memberLookupTable = tracker->getUsedMembers();
-  using TableEntryTy = std::pair<ReferencedNameTracker::MemberPair, bool>;
-  std::vector<TableEntryTy> sortedMembers{
-    memberLookupTable.begin(), memberLookupTable.end()
-  };
-  llvm::array_pod_sort(sortedMembers.begin(), sortedMembers.end(),
-                       [](const TableEntryTy *lhs,
-                          const TableEntryTy *rhs) -> int {
-    if (lhs->first.first == rhs->first.first)
-      return lhs->first.second.compare(rhs->first.second);
-
-    if (lhs->first.first->getName() != rhs->first.first->getName())
-      return lhs->first.first->getName().compare(rhs->first.first->getName());
-
-    // Break type name ties by mangled name.
-    auto lhsMangledName = mangleTypeAsContext(lhs->first.first);
-    auto rhsMangledName = mangleTypeAsContext(rhs->first.first);
-    return lhsMangledName.compare(rhsMangledName);
-  });
-  
-  for (auto &entry : sortedMembers) {
-    assert(entry.first.first != nullptr);
-    if (entry.first.first->hasAccessibility() &&
-        entry.first.first->getFormalAccess() <= Accessibility::FilePrivate)
-      continue;
-
-    out << "- ";
-    if (!entry.second)
-      out << "!private ";
-    out << "[\"";
-    out << mangleTypeAsContext(entry.first.first);
-    out << "\", \"";
-    if (!entry.first.second.empty())
-      out << escape(entry.first.second);
-    out << "\"]\n";
-  }
-
-  out << "depends-nominal:\n";
-  for (auto i = sortedMembers.begin(), e = sortedMembers.end(); i != e; ++i) {
-    bool isCascading = i->second;
-    while (i+1 != e && i[0].first.first == i[1].first.first) {
-      ++i;
-      isCascading |= i->second;
-    }
-
-    if (i->first.first->hasAccessibility() &&
-        i->first.first->getFormalAccess() <= Accessibility::FilePrivate)
-      continue;
-
-    out << "- ";
-    if (!isCascading)
-      out << "!private ";
-    out << "\"";
-    out <<  mangleTypeAsContext(i->first.first);
-    out << "\"\n";
-  }
-
-  // FIXME: Sort these?
-  out << "depends-dynamic-lookup:\n";
-  for (auto &entry : tracker->getDynamicLookupNames()) {
-    assert(!entry.first.empty());
-    out << "- ";
-    if (!entry.second)
-      out << "!private ";
-    out << "\"" << escape(entry.first) << "\"\n";
-  }
-
-  out << "depends-external:\n";
-  for (auto &entry : depTracker.getDependencies()) {
-    out << "- \"" << llvm::yaml::escape(entry) << "\"\n";
-  }
-
-  llvm::SmallString<32> interfaceHash;
-  SF->getInterfaceHash(interfaceHash);
-  out << "interface-hash: \"" << interfaceHash << "\"\n";
 
   return false;
 }
@@ -557,18 +206,17 @@ namespace {
 class JSONFixitWriter : public DiagnosticConsumer {
   std::unique_ptr<llvm::raw_ostream> OSPtr;
   bool FixitAll;
+  std::vector<SingleEdit> AllEdits;
 
 public:
   JSONFixitWriter(std::unique_ptr<llvm::raw_ostream> OS,
                   const DiagnosticOptions &DiagOpts)
     : OSPtr(std::move(OS)),
-      FixitAll(DiagOpts.FixitCodeForAllDiagnostics) {
-    *OSPtr << "[\n";
-  }
-  ~JSONFixitWriter() {
-    *OSPtr << "]\n";
-  }
+      FixitAll(DiagOpts.FixitCodeForAllDiagnostics) {}
 
+  ~JSONFixitWriter() {
+    swift::writeEditsInJson(llvm::makeArrayRef(AllEdits), *OSPtr);
+  }
 private:
   void handleDiagnostic(SourceManager &SM, SourceLoc Loc,
                         DiagnosticKind Kind, StringRef Text,
@@ -576,7 +224,7 @@ private:
     if (!shouldFix(Kind, Info))
       return;
     for (const auto &Fix : Info.FixIts) {
-      writeEdit(SM, Fix.getRange(), Fix.getText(), *OSPtr);
+      AllEdits.push_back({SM, Fix.getRange(), Fix.getText()});
     }
   }
 
@@ -623,7 +271,7 @@ private:
     if (Info.ID == diag::init_not_instance_member.ID)
       return false;
     // Renaming enum cases interacts poorly with the swift migrator by
-    // reverting changes made by the mgirator.
+    // reverting changes made by the migrator.
     if (Info.ID == diag::could_not_find_enum_case.ID)
       return false;
 
@@ -650,32 +298,11 @@ private:
         Info.ID == diag::deprecated_protocol_composition.ID ||
         Info.ID == diag::deprecated_protocol_composition_single.ID ||
         Info.ID == diag::deprecated_any_composition.ID ||
-        Info.ID == diag::deprecated_operator_body.ID)
+        Info.ID == diag::deprecated_operator_body.ID ||
+        Info.ID == diag::unbound_generic_parameter_explicit_fix.ID)
       return true;
 
     return false;
-  }
-
-  void writeEdit(SourceManager &SM, CharSourceRange Range, StringRef Text,
-                 llvm::raw_ostream &OS) {
-    SourceLoc Loc = Range.getStart();
-    unsigned BufID = SM.findBufferContainingLoc(Loc);
-    unsigned Offset = SM.getLocOffsetInBuffer(Loc, BufID);
-    unsigned Length = Range.getByteLength();
-    SmallString<200> Path =
-      StringRef(SM.getIdentifierForBuffer(BufID));
-
-    OS << " {\n";
-    OS << "  \"file\": \"";
-    OS.write_escaped(Path.str()) << "\",\n";
-    OS << "  \"offset\": " << Offset << ",\n";
-    if (Length != 0)
-      OS << "  \"remove\": " << Length << ",\n";
-    if (!Text.empty()) {
-      OS << "  \"text\": \"";
-      OS.write_escaped(Text) << "\",\n";
-    }
-    OS << " },\n";
   }
 };
 
@@ -750,11 +377,15 @@ static bool performCompile(CompilerInstance &Instance,
   if (shouldTrackReferences)
     Instance.setReferencedNameTracker(&nameTracker);
 
-  if (Action == FrontendOptions::DumpParse ||
+  if (Action == FrontendOptions::Parse ||
+      Action == FrontendOptions::DumpParse ||
       Action == FrontendOptions::DumpInterfaceHash)
     Instance.performParseOnly();
   else
     Instance.performSema();
+
+  if (Action == FrontendOptions::Parse)
+    return false;
 
   if (observer) {
     observer->performedSemanticAnalysis(Instance);
@@ -867,8 +498,8 @@ static bool performCompile(CompilerInstance &Instance,
       opts.ImplicitObjCHeaderPath.empty() &&
       !Context.LangOpts.EnableAppExtensionRestrictions;
 
-  // We've just been told to perform a parse, so we can return now.
-  if (Action == FrontendOptions::Parse) {
+  // We've just been told to perform a typecheck, so we can return now.
+  if (Action == FrontendOptions::Typecheck) {
     if (!opts.ObjCHeaderOutputPath.empty())
       return printAsObjC(opts.ObjCHeaderOutputPath, Instance.getMainModule(),
                          opts.ImplicitObjCHeaderPath, moduleIsPublic);
@@ -934,6 +565,11 @@ static bool performCompile(CompilerInstance &Instance,
     if (observer) {
       observer->performedSILDiagnostics(*SM);
     }
+  } else {
+    // Even if we are not supposed to run the diagnostic passes, we still need
+    // to run the ownership evaluator.
+    if (runSILOwnershipEliminatorPass(*SM))
+      return true;
   }
 
   // Now if we are asked to link all, link all.
@@ -1078,10 +714,10 @@ static bool performCompile(CompilerInstance &Instance,
   // something is persisting across calls to performIRGeneration.
   auto &LLVMContext = getGlobalLLVMContext();
   if (PrimarySourceFile) {
-    performIRGeneration(IRGenOpts, *PrimarySourceFile, SM.get(),
+    performIRGeneration(IRGenOpts, *PrimarySourceFile, std::move(SM),
                         opts.getSingleOutputFilename(), LLVMContext);
   } else {
-    performIRGeneration(IRGenOpts, Instance.getMainModule(), SM.get(),
+    performIRGeneration(IRGenOpts, Instance.getMainModule(), std::move(SM),
                         opts.getSingleOutputFilename(), LLVMContext);
   }
 
@@ -1209,8 +845,12 @@ int swift::performFrontend(ArrayRef<const char *> Args,
     return 1;
   }
 
-  // TODO: reorder, if possible, so that diagnostics emitted during
-  // CompilerInvocation::parseArgs are included in the serialized file.
+  // Because the serialized diagnostics consumer is initialized here,
+  // diagnostics emitted above, within CompilerInvocation::parseArgs, are never
+  // serialized. This is a non-issue because, in nearly all cases, frontend
+  // arguments are generated by the driver, not directly by a user. The driver
+  // is responsible for emitting diagnostics for its own errors. See SR-2683
+  // for details.
   std::unique_ptr<DiagnosticConsumer> SerializedConsumer;
   {
     const std::string &SerializedDiagnosticsPath =
@@ -1293,6 +933,10 @@ int swift::performFrontend(ArrayRef<const char *> Args,
   bool HadError =
     performCompile(Instance, Invocation, Args, ReturnValue, observer) ||
     Instance.getASTContext().hadError();
+
+  if (!HadError) {
+    NewMangling::printManglingStats();
+  }
 
   if (!HadError && !Invocation.getFrontendOptions().DumpAPIPath.empty()) {
     HadError = dumpAPI(Instance.getMainModule(),

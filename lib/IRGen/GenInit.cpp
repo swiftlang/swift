@@ -5,8 +5,8 @@
 // Copyright (c) 2014 - 2016 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
-// See http://swift.org/LICENSE.txt for license information
-// See http://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
+// See https://swift.org/LICENSE.txt for license information
+// See https://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
 //
 //===----------------------------------------------------------------------===//
 //
@@ -41,11 +41,10 @@ Address IRGenModule::emitSILGlobalVariable(SILGlobalVariable *var) {
   // just return undef.
   if (ti.isKnownEmpty(ResilienceExpansion::Minimal)) {
     if (DebugInfo && var->getDecl()) {
-      auto Zero = llvm::ConstantInt::get(Int64Ty, 0);
       DebugTypeInfo DbgTy(var->getDecl(), var->getLoweredType().getSwiftType(),
                           Int8Ty, Size(0), Alignment(1));
       DebugInfo->emitGlobalVariableDeclaration(
-          Zero, var->getDecl()->getName().str(), "", DbgTy,
+          nullptr, var->getDecl()->getName().str(), "", DbgTy,
           var->getLinkage() != SILLinkage::Public, SILLocation(var->getDecl()));
     }
     return ti.getUndefAddress();

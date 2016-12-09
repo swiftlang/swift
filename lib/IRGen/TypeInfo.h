@@ -5,8 +5,8 @@
 // Copyright (c) 2014 - 2016 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
-// See http://swift.org/LICENSE.txt for license information
-// See http://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
+// See https://swift.org/LICENSE.txt for license information
+// See https://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
 //
 //===----------------------------------------------------------------------===//
 //
@@ -202,6 +202,8 @@ public:
              "IsFixedSize vs IsAlwaysFixedSize mismatch");
       return IsFixedSize_t(AlwaysFixedSize);
     }
+
+    llvm_unreachable("Not a valid ResilienceExpansion.");
   }
 
   /// Whether this type is known to be loadable in the local
@@ -450,7 +452,11 @@ public:
   /// Index into an array of objects of this type.
   Address indexArray(IRGenFunction &IGF, Address base, llvm::Value *offset,
                      SILType T) const;
-  
+
+  /// Round up the address value \p base to the alignment of type \p T. 
+  Address roundUpToTypeAlignment(IRGenFunction &IGF, Address base,
+                                 SILType T) const;
+
   /// Destroy an array of objects of this type in memory.
   virtual void destroyArray(IRGenFunction &IGF, Address base,
                             llvm::Value *count, SILType T) const;

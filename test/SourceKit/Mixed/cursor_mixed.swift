@@ -9,6 +9,6 @@ func test(_ b : Base) {
 // CHECK: source.lang.swift.ref.function.method.instance ({{.*}}Mixed.framework/Headers/Mixed.h:5:9-5:23)
 // CHECK: doIt(_:)
 // CHECK: c:objc(cs)Base(im)doIt:
-// CHECK: (Base) -> (Int32) -> Void
+// CHECK: (Base) -> (Int32) -> ()
 // CHECK: Mixed
 // CHECK: <Declaration>func doIt(_ arg: <Type usr="s:Vs5Int32">Int32</Type>)</Declaration>

@@ -5,8 +5,8 @@
 // Copyright (c) 2014 - 2016 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
-// See http://swift.org/LICENSE.txt for license information
-// See http://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
+// See https://swift.org/LICENSE.txt for license information
+// See https://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
 //
 //===----------------------------------------------------------------------===//
 
@@ -43,7 +43,7 @@ public struct TimeZone : Hashable, Equatable, ReferenceConvertible {
     
     /// The time zone currently used by the system, automatically updating to the user's current preference.
     ///
-    /// If this time zone is mutated, then it no longer tracks the application time zone.
+    /// If this time zone is mutated, then it no longer tracks the system time zone.
     ///
     /// The autoupdating time zone only compares equal to itself.
     public static var autoupdatingCurrent : TimeZone {
@@ -270,7 +270,7 @@ extension TimeZone : _ObjectiveCBridgeable {
     }
     
     public static func _unconditionallyBridgeFromObjectiveC(_ source: NSTimeZone?) -> TimeZone {
-        var result: TimeZone? = nil
+        var result: TimeZone?
         _forceBridgeFromObjectiveC(source!, result: &result)
         return result!
     }

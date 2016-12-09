@@ -1,4 +1,4 @@
-// RUN: %target-parse-verify-swift
+// RUN: %target-typecheck-verify-swift
 
 /* outer block comment starts here expected-note{{comment started here}}
   /* inner block comment starts and ends here */

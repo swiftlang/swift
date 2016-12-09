@@ -1,4 +1,4 @@
-// RUN: %target-parse-verify-swift
+// RUN: %target-typecheck-verify-swift
 // RUN: %target-swift-ide-test -print-ast-typechecked -source-filename=%s -disable-objc-attr-requires-foundation-module | %FileCheck %s
 
 struct S<T> {}
@@ -22,6 +22,9 @@ public func oneGenericParam<T>(_ t: T) -> T {
 public func twoGenericParams<T, U>(_ t: T, u: U) -> (T, U) {
   return (t, u)
 }
+
+@_specialize(Int) // expected-error{{generic type 'nonGenericParam' specialized with too many type parameters (got 1, but expected 0)}}
+func nonGenericParam(x: Int) {}
 
 // Specialize contextual types.
 // ----------------------------
@@ -66,12 +69,12 @@ struct FloatElement : HasElt {
   typealias Element = Float
 }
 @_specialize(FloatElement)
-@_specialize(IntElement) // expected-error{{'<T : HasElt where T.Element == Float> (T) -> ()' requires the types 'IntElement.Element' (aka 'Int') and 'Float' be equivalent}}
+@_specialize(IntElement) // expected-error{{'<T where T : HasElt, T.Element == Float> (T) -> ()' requires the types 'IntElement.Element' (aka 'Int') and 'Float' be equivalent}}
 func sameTypeRequirement<T : HasElt>(_ t: T) where T.Element == Float {}
 
 class Base {}
 class Sub : Base {}
 class NonSub {}
 @_specialize(Sub)
-@_specialize(NonSub) // expected-error{{'<T : Base> (T) -> ()' requires that 'NonSub' inherit from 'Base'}}
+@_specialize(NonSub) // expected-error{{'<T where T : Base> (T) -> ()' requires that 'NonSub' inherit from 'Base'}}
 func superTypeRequirement<T : Base>(_ t: T) {}

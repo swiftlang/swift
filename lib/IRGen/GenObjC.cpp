@@ -5,8 +5,8 @@
 // Copyright (c) 2014 - 2016 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
-// See http://swift.org/LICENSE.txt for license information
-// See http://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
+// See https://swift.org/LICENSE.txt for license information
+// See https://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
 //
 //===----------------------------------------------------------------------===//
 //
@@ -729,60 +729,21 @@ void irgen::addObjCMethodCallImplicitArguments(IRGenFunction &IGF,
   args.add(IGF.emitObjCSelectorRefLoad(selector.str()));
 }
 
-/// Return the formal type that we would use for +allocWithZone:.
-static CanSILFunctionType getAllocObjectFormalType(ASTContext &ctx,
-                                                   CanType classType) {
-  SILParameterInfo inputs[] = {
-    SILParameterInfo(CanType(ctx.TheRawPointerType), /* (NSZone*), kindof */
-                     ParameterConvention::Direct_Unowned),
-    SILParameterInfo(CanType(MetatypeType::get(classType,
-                                               MetatypeRepresentation::Thick)),
-                     ParameterConvention::Direct_Unowned)
-  };
-  auto result = SILResultInfo(classType, ResultConvention::Owned);
-  auto extInfo = SILFunctionType::ExtInfo(SILFunctionType::Representation::ObjCMethod,
-                                          /*pseudogeneric*/ true);
-
-  return SILFunctionType::get(nullptr, extInfo,
-                              /*callee*/ ParameterConvention::Direct_Unowned,
-                              inputs, result, None, ctx);
-}
-
 /// Call [self allocWithZone: nil].
 llvm::Value *irgen::emitObjCAllocObjectCall(IRGenFunction &IGF,
                                             llvm::Value *self,
                                             CanType classType) {
-  // Compute the formal type that we expect +allocWithZone: to have.
-  auto formalType = getAllocObjectFormalType(IGF.IGM.Context, classType);
+  // Get an appropriately-cast function pointer.
+  auto fn = IGF.IGM.getObjCAllocWithZoneFn();
 
-  // Compute the appropriate LLVM type for the function.
-  ForeignFunctionInfo foreignInfo;
-  llvm::AttributeSet attrs;
-  auto fnTy = IGF.IGM.getFunctionType(formalType, attrs, &foreignInfo);
-
-  // Get the messenger function.
-  llvm::Constant *messenger = IGF.IGM.getObjCMsgSendFn();
-  messenger = llvm::ConstantExpr::getBitCast(messenger, fnTy->getPointerTo());
-
-  // Prepare the call.
-  CallEmission emission(IGF, Callee::forKnownFunction(formalType,
-                                                      formalType, {},
-                                                      messenger, nullptr,
-                                                      foreignInfo));
-
-  // Emit the arguments.
-  {
-    Explosion args;
-    args.add(self);
-    args.add(IGF.emitObjCSelectorRefLoad("allocWithZone:"));
-    args.add(llvm::ConstantPointerNull::get(IGF.IGM.Int8PtrTy));
-    emission.setArgs(args);
+  if (self->getType() != IGF.IGM.ObjCClassPtrTy) {
+    auto fnTy = llvm::FunctionType::get(self->getType(), self->getType(),
+                                        false)->getPointerTo();
+    fn = llvm::ConstantExpr::getBitCast(fn, fnTy);
   }
-
-  // Emit the call.
-  Explosion out;
-  emission.emitToExplosion(out);
-  return out.claimNext();
+  
+  auto call = IGF.Builder.CreateCall(fn, self);
+  return call;
 }
 
 static llvm::Function *emitObjCPartialApplicationForwarder(IRGenModule &IGM,
@@ -883,6 +844,36 @@ static llvm::Function *emitObjCPartialApplicationForwarder(IRGenModule &IGM,
     }
   }
 
+  // Translate direct parameters passed indirectly.
+  Explosion translatedParams;
+
+  // We already handled self.
+  assert(origMethodType->hasSelfParam());
+  auto origParamInfos = origMethodType->getParameters();
+  origParamInfos = origParamInfos.drop_back();
+
+  for (auto info : origParamInfos) {
+    // Addresses consist of a single pointer argument.
+    if (isIndirectParameter(info.getConvention())) {
+      translatedParams.add(params.claimNext());
+      continue;
+    }
+    // Otherwise, we have a loadable type that can either be passed directly or
+    // indirectly.
+    assert(info.getSILType().isObject());
+    auto &ti = cast<LoadableTypeInfo>(IGM.getTypeInfo(info.getSILType()));
+    auto schema = ti.getSchema();
+
+    // Load the indirectly passed parameter.
+    if (schema.requiresIndirectParameter(IGM)) {
+      Address paramAddr = ti.getAddressForPointer(params.claimNext());
+      ti.loadAsTake(subIGF, paramAddr, translatedParams);
+      continue;
+    }
+    // Pass along the value.
+    ti.reexplode(subIGF, params, translatedParams);
+  }
+
   // Prepare the call to the underlying method.
   
   CallEmission emission
@@ -899,7 +890,7 @@ static llvm::Function *emitObjCPartialApplicationForwarder(IRGenModule &IGM,
 
   addObjCMethodCallImplicitArguments(subIGF, args, method.getMethod(), self,
                                      method.getSearchType());
-  args.add(params.claimAll());
+  args.add(translatedParams.claimAll());
   emission.setArgs(args);
   
   // Cleanup that always has to occur after the function call.
@@ -1484,48 +1475,15 @@ bool irgen::requiresObjCMethodDescriptor(ConstructorDecl *constructor) {
 
 bool irgen::requiresObjCPropertyDescriptor(IRGenModule &IGM,
                                            VarDecl *property) {
-  if (!property->isObjC())
-    return false;
-
   // Don't generate a descriptor for a property without any accessors.
   // This is only possible in SIL files because Sema will normally
   // implicitly synthesize accessors for @objc properties.
-  if (!property->getGetter())
-    return false;
-
-  // Don't expose objc properties for function types we can't bridge.
-  if (auto ft = property->getType()->getAs<AnyFunctionType>())
-    switch (ft->getRepresentation()) {
-    case FunctionType::Representation::Thin:
-      // We can't bridge thin types at all.
-      return false;
-    case FunctionType::Representation::Swift:
-    case FunctionType::Representation::Block:
-    case FunctionType::Representation::CFunctionPointer:
-      return true;
-    }
-  
-  return true;
+  return property->isObjC() && property->getGetter();
 }
 
 bool irgen::requiresObjCSubscriptDescriptor(IRGenModule &IGM,
                                             SubscriptDecl *subscript) {
-  if (!subscript->isObjC())
-    return false;
-  
-  // Don't expose objc properties for function types we can't bridge.
-  if (auto ft = subscript->getElementType()->getAs<AnyFunctionType>())
-    switch (ft->getRepresentation()) {
-    case FunctionType::Representation::Thin:
-      // We can't bridge thin types at all.
-      return false;
-    case FunctionType::Representation::Swift:
-    case FunctionType::Representation::Block:
-    case FunctionType::Representation::CFunctionPointer:
-      return true;
-    }
-  
-  return true;
+  return subscript->isObjC();
 }
 
 llvm::Value *IRGenFunction::emitBlockCopyCall(llvm::Value *value) {

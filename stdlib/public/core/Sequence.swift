@@ -5,8 +5,8 @@
 // Copyright (c) 2014 - 2016 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
-// See http://swift.org/LICENSE.txt for license information
-// See http://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
+// See https://swift.org/LICENSE.txt for license information
+// See https://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
 //
 //===----------------------------------------------------------------------===//
 
@@ -179,10 +179,10 @@ public protocol IteratorProtocol {
   associatedtype Element
 
   /// Advances to the next element and returns it, or `nil` if no next element
-  /// exists.  Once `nil` has been returned, all subsequent calls return `nil`.
+  /// exists.
   ///
   /// Repeatedly calling this method returns, in order, all the elements of the
-  /// underlying sequence.  As soon as the sequence has run out of elements, all
+  /// underlying sequence. As soon as the sequence has run out of elements, all
   /// subsequent calls return `nil`.
   ///
   /// You must not call this method if any other copy of this iterator has been
@@ -203,7 +203,7 @@ public protocol IteratorProtocol {
   ///     // Prints "5"
   ///     // Prints "7"
   ///
-  /// - Returns: The next element in the underlying sequence if a next element
+  /// - Returns: The next element in the underlying sequence, if a next element
   ///   exists; otherwise, `nil`.
   mutating func next() -> Element?
 }
@@ -334,7 +334,8 @@ public protocol Sequence {
 
   /// A type that represents a subsequence of some of the sequence's elements.
   associatedtype SubSequence
-  // FIXME(compiler limitation):
+  // FIXME(ABI)#104 (Recursive Protocol Constraints):
+  // FIXME(ABI)#105 (Associated Types with where clauses):
   // associatedtype SubSequence : Sequence
   //   where
   //   Iterator.Element == SubSequence.Iterator.Element,
@@ -501,12 +502,26 @@ public protocol Sequence {
   ///   with at most `maxLength` elements.
   func prefix(_ maxLength: Int) -> SubSequence
   
-  /// Returns a subsequence containing the initial elements until `predicate`
-  /// returns `false` and skipping the remaining elements.
+  /// Returns a subsequence containing the initial, consecutive elements that
+  /// satisfy the given predicate.
   ///
-  /// - Parameter predicate: A closure that takes an element of the
-  ///   sequence as its argument and returns a Boolean value indicating
-  ///   whether the element is a match.
+  /// The following example uses the `prefix(while:)` method to find the
+  /// positive numbers at the beginning of the `numbers` array. Every element
+  /// of `numbers` up to, but not including, the first negative value is
+  /// included in the result.
+  ///
+  ///     let numbers = [3, 7, 4, -2, 9, -6, 10, 1]
+  ///     let positivePrefix = numbers.prefix(while: { $0 > 0 })
+  ///     // positivePrefix == [3, 7, 4]
+  ///
+  /// If `predicate` matches every element in the sequence, the resulting
+  /// sequence contains every element of the sequence.
+  ///
+  /// - Parameter predicate: A closure that takes an element of the sequence as
+  ///   its argument and returns a Boolean value indicating whether the
+  ///   element should be included in the result.
+  /// - Returns: A subsequence of the initial, consecutive elements that
+  ///   satisfy `predicate`.
   ///
   /// - Complexity: O(*n*), where *n* is the length of the collection.
   func prefix(
@@ -879,13 +894,15 @@ extension Sequence {
         ringBuffer.append(element)
       } else {
         ringBuffer[i] = element
-        i = ringBuffer.index(after: i) % maxLength
+        i += 1
+        i %= maxLength
       }
     }
 
     if i != ringBuffer.startIndex {
-      return AnySequence(
-        [ringBuffer[i..<ringBuffer.endIndex], ringBuffer[0..<i]].joined())
+      let s0 = ringBuffer[i..<ringBuffer.endIndex]
+      let s1 = ringBuffer[0..<i]
+      return AnySequence([s0, s1].joined())
     }
     return AnySequence(ringBuffer)
   }
@@ -1048,16 +1065,26 @@ internal enum _StopIteration : Error {
 
 extension Sequence {
   /// Returns the first element of the sequence that satisfies the given
-  /// predicate or nil if no such element is found.
+  /// predicate.
   ///
-  /// - Parameter predicate: A closure that takes an element of the
-  ///   sequence as its argument and returns a Boolean value indicating
-  ///   whether the element is a match.
-  /// - Returns: The first match or `nil` if there was no match.
+  /// The following example uses the `first(where:)` method to find the first
+  /// negative number in an array of integers:
+  ///
+  ///     let numbers = [3, 7, 4, -2, 9, -6, 10, 1]
+  ///     if let firstNegative = numbers.first(where: { $0 < 0 }) {
+  ///         print("The first negative number is \(firstNegative).")
+  ///     }
+  ///     // Prints "The first negative number is -2."
+  ///
+  /// - Parameter predicate: A closure that takes an element of the sequence as
+  ///   its argument and returns a Boolean value indicating whether the
+  ///   element is a match.
+  /// - Returns: The first element of the sequence that satisfies `predicate`,
+  ///   or `nil` if there is no element that satisfies `predicate`.
   public func first(
     where predicate: (Iterator.Element) throws -> Bool
   ) rethrows -> Iterator.Element? {
-    var foundElement: Iterator.Element? = nil
+    var foundElement: Iterator.Element?
     do {
       try self.forEach {
         if try predicate($0) {
@@ -1201,15 +1228,29 @@ extension Sequence where
     return AnySequence(result)
   }
   
-  /// Returns a subsequence by skipping elements while `predicate` returns
-  /// `true` and returning the remaining elements.
+  /// Returns a subsequence by skipping the initial, consecutive elements that
+  /// satisfy the given predicate.
   ///
-  /// - Parameter predicate: A closure that takes an element of the
-  ///   sequence as its argument and returns `true` if the element should
-  ///		be skipped or `false` if it should be included. Once the predicate
-  ///		returns `false` it will not be called again.
+  /// The following example uses the `drop(while:)` method to skip over the
+  /// positive numbers at the beginning of the `numbers` array. The result
+  /// begins with the first element of `numbers` that does not satisfy
+  /// `predicate`.
+  ///
+  ///     let numbers = [3, 7, 4, -2, 9, -6, 10, 1]
+  ///     let startingWithNegative = numbers.drop(while: { $0 > 0 })
+  ///     // startingWithNegative == [-2, 9, -6, 10, 1]
+  ///
+  /// If `predicate` matches every element in the sequence, the result is an
+  /// empty sequence.
+  ///
+  /// - Parameter predicate: A closure that takes an element of the sequence as
+  ///   its argument and returns a Boolean value indicating whether the
+  ///   element should be included in the result.
+  /// - Returns: A subsequence starting after the initial, consecutive elements
+  ///   that satisfy `predicate`.
   ///
   /// - Complexity: O(*n*), where *n* is the length of the collection.
+  /// - SeeAlso: `prefix(while:)`
   public func drop(
     while predicate: (Iterator.Element) throws -> Bool
   ) rethrows -> AnySequence<Iterator.Element> {
@@ -1245,15 +1286,29 @@ extension Sequence where
       _PrefixSequence(_iterator: makeIterator(), maxLength: maxLength))
   }
   
-  /// Returns a subsequence containing the initial elements until `predicate`
-  /// returns `false` and skipping the remaining elements.
+  /// Returns a subsequence containing the initial, consecutive elements that
+  /// satisfy the given predicate.
   ///
-  /// - Parameter predicate: A closure that takes an element of the
-  ///   sequence as its argument and returns `true` if the element should
-  ///   be included or `false` if it should be excluded. Once the predicate
-  ///   returns `false` it will not be called again.
+  /// The following example uses the `prefix(while:)` method to find the
+  /// positive numbers at the beginning of the `numbers` array. Every element
+  /// of `numbers` up to, but not including, the first negative value is
+  /// included in the result.
+  ///
+  ///     let numbers = [3, 7, 4, -2, 9, -6, 10, 1]
+  ///     let positivePrefix = numbers.prefix(while: { $0 > 0 })
+  ///     // positivePrefix == [3, 7, 4]
+  ///
+  /// If `predicate` matches every element in the sequence, the resulting
+  /// sequence contains every element of the sequence.
+  ///
+  /// - Parameter predicate: A closure that takes an element of the sequence as
+  ///   its argument and returns a Boolean value indicating whether the
+  ///   element should be included in the result.
+  /// - Returns: A subsequence of the initial, consecutive elements that
+  ///   satisfy `predicate`.
   ///
   /// - Complexity: O(*n*), where *n* is the length of the collection.
+  /// - SeeAlso: `drop(while:)`
   public func prefix(
     while predicate: (Iterator.Element) throws -> Bool
   ) rethrows -> AnySequence<Iterator.Element> {

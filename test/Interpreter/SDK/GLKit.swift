@@ -8,6 +8,9 @@
 // UNSUPPORTED: CPU=i386
 // REQUIRES: objc_interop
 
+// GLKit is not available on watchOS.
+// UNSUPPORTED: OS=watchos
+
 import GLKit
 
 func printV4(_ v: GLKVector4) {

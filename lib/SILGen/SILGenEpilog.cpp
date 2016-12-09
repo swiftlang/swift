@@ -5,8 +5,8 @@
 // Copyright (c) 2014 - 2016 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
-// See http://swift.org/LICENSE.txt for license information
-// See http://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
+// See https://swift.org/LICENSE.txt for license information
+// See https://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
 //
 //===----------------------------------------------------------------------===//
 
@@ -28,7 +28,7 @@ void SILGenFunction::prepareEpilog(Type resultType, bool isThrowing,
     NeedsReturn = (F.getLoweredFunctionType()->getNumAllResults() != 0);
     for (auto directResult : F.getLoweredFunctionType()->getDirectResults()) {
       SILType resultType = F.mapTypeIntoContext(directResult.getSILType());
-      new (F.getModule()) SILArgument(epilogBB, resultType);
+      epilogBB->createArgument(resultType);
     }
   }
 
@@ -42,7 +42,7 @@ void SILGenFunction::prepareEpilog(Type resultType, bool isThrowing,
 void SILGenFunction::prepareRethrowEpilog(CleanupLocation cleanupLoc) {
   auto exnType = SILType::getExceptionType(getASTContext());
   SILBasicBlock *rethrowBB = createBasicBlock(FunctionSection::Postmatter);
-  new (F.getModule()) SILArgument(rethrowBB, exnType);
+  rethrowBB->createArgument(exnType);
   ThrowDest = JumpDest(rethrowBB, getCleanupsDepth(), cleanupLoc);
 }
 
@@ -100,13 +100,13 @@ SILGenFunction::emitEpilogBB(SILLocation TopLevel) {
     // Steal the branch argument as the return value if present.
     SILBasicBlock *pred = *epilogBB->pred_begin();
     BranchInst *predBranch = cast<BranchInst>(pred->getTerminator());
-    assert(predBranch->getArgs().size() == epilogBB->bbarg_size() &&
+    assert(predBranch->getArgs().size() == epilogBB->args_size() &&
            "epilog predecessor arguments does not match block params");
 
     for (auto index : indices(predBranch->getArgs())) {
       SILValue result = predBranch->getArgs()[index];
       directResults.push_back(result);
-      epilogBB->getBBArg(index)->replaceAllUsesWith(result);
+      epilogBB->getArgument(index)->replaceAllUsesWith(result);
     }
 
     // If we are optimizing, we should use the return location from the single,
@@ -130,13 +130,12 @@ SILGenFunction::emitEpilogBB(SILLocation TopLevel) {
     B.setInsertionPoint(pred);
   } else {
     // Move the epilog block to the end of the ordinary section.
-    auto endOfOrdinarySection =
-      (StartOfPostmatter ? SILFunction::iterator(StartOfPostmatter) : F.end());
+    auto endOfOrdinarySection = StartOfPostmatter;
     B.moveBlockTo(epilogBB, endOfOrdinarySection);
 
     // Emit the epilog into the epilog bb. Its arguments are the
     // direct results.
-    directResults.append(epilogBB->bbarg_begin(), epilogBB->bbarg_end());
+    directResults.append(epilogBB->args_begin(), epilogBB->args_end());
 
     // If we are falling through from the current block, the return is implicit.
     B.emitBlock(epilogBB, ImplicitReturnFromTopLevel);
@@ -222,7 +221,7 @@ void SILGenFunction::emitRethrowEpilog(SILLocation topLevel) {
   }
 
   SILLocation throwLoc = topLevel;
-  SILValue exn = rethrowBB->bbarg_begin()[0];
+  SILValue exn = rethrowBB->args_begin()[0];
   bool reposition = true;
 
   // If the rethrow destination has a single branch predecessor,

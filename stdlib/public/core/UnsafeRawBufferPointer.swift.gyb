@@ -1,0 +1,387 @@
+//===--- UnsafeRawBufferPointer.swift.gyb ---------------------*- swift -*-===//
+//
+// This source file is part of the Swift.org open source project
+//
+// Copyright (c) 2014 - 2016 Apple Inc. and the Swift project authors
+// Licensed under Apache License v2.0 with Runtime Library Exception
+//
+// See https://swift.org/LICENSE.txt for license information
+// See https://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
+//
+//===----------------------------------------------------------------------===//
+
+%import gyb
+
+% for mutable in (True, False):
+%  Self = 'UnsafeMutableRawBufferPointer' if mutable else 'UnsafeRawBufferPointer'
+%  Mutable = 'Mutable' if mutable else ''
+
+/// A non-owning view over a region of memory as a Collection of bytes.
+///
+/// Each 8-bit byte in memory is viewed as a `UInt8` value independent of the
+/// type of values held in that memory.
+///
+/// Reads and writes on memory via `UnsafeRawBufferPointer` are untyped
+/// operations. Accessing this Collection's bytes does not bind the
+/// underlying memory to `UInt8`. The underlying memory must be bound
+/// to some trivial type whenever it is accessed via a typed operation.
+///
+/// - Note: A trivial type can be copied with just a bit-for-bit copy without
+///   any indirection or reference-counting operations.  Generally, native Swift
+///   types that do not contain strong or weak references or other forms of
+///   indirection are trivial, as are imported C structs and enums. Copying
+///   memory that contains values of nontrivial type can only be done safely
+///   with a typed pointer. Copying bytes directly from nontrivial in-memory
+///   values does not produce valid copies and can only be done by calling a C
+///   API such as memmove.
+///
+/// In addition to the `Collection` interface, the following subset of
+/// `Unsafe${Mutable}RawPointer`'s interface to raw memory is
+/// provided with debug mode bounds checks:
+/// - `load(fromByteOffset:as:)`,
+%  if mutable:
+/// - `storeBytes(of:toByteOffset:as:)`
+/// - `copyBytes(from:count:)`
+%  end
+///
+/// This is only a view into memory and does not own the memory. Copying a value
+/// of type `Unsafe${Mutable}Bytes` does not copy the underlying
+/// memory. However, initializing another collection, such as `[UInt8]`, with an
+/// `Unsafe${Mutable}Bytes` into copies bytes out of memory.
+///
+/// Example:
+/// ```swift
+///   // View a slice of memory at someBytes. Nothing is copied.
+///   var destBytes = someBytes[0..<n]
+///
+///   // Copy the slice of memory into a buffer of UInt8.
+///   var byteArray = [UInt8](destBytes)
+///
+///   // Copy another slice of memory into the buffer.
+///   byteArray += someBytes[n..<m]
+/// ```
+///
+%  if mutable:
+/// Assigning into a range of subscripts copies bytes into the memory.
+///
+/// Example (continued):
+/// ```swift
+///   // Copy another slice of memory back into the original slice.
+///   destBytes[0..<n] = someBytes[m..<(m+n)]
+/// ```
+///
+%  end
+/// TODO: Specialize `index` and `formIndex` and
+/// `_failEarlyRangeCheck` as in `UnsafeBufferPointer`.
+public struct Unsafe${Mutable}RawBufferPointer
+  : ${Mutable}Collection, RandomAccessCollection {
+
+  public typealias Index = Int
+  public typealias IndexDistance = Int
+  public typealias SubSequence = ${Self}
+
+  /// An iterator over the bytes viewed by `${Self}`.
+  public struct Iterator : IteratorProtocol, Sequence {
+
+    /// Advances to the next byte and returns it, or `nil` if no next byte
+    /// exists.
+    ///
+    /// Once `nil` has been returned, all subsequent calls return `nil`.
+    public mutating func next() -> UInt8? {
+      if _position == _end { return nil }
+
+      let result = _position!.load(as: UInt8.self)
+      _position! += 1
+      return result
+    }
+
+    internal var _position, _end: UnsafeRawPointer?
+  }
+
+%  if mutable:
+  /// Allocate memory for `size` bytes with word alignment.
+  ///
+  /// - Postcondition: The memory is allocated, but not initialized.
+  public static func allocate(count size: Int
+  ) -> UnsafeMutableRawBufferPointer {
+    return UnsafeMutableRawBufferPointer(
+      start: UnsafeMutableRawPointer.allocate(
+        bytes: size, alignedTo: MemoryLayout<UInt>.alignment),
+      count: size)
+  }
+%  end # mutable
+
+  /// Deallocate this memory allocated for `bytes` number of bytes.
+  ///
+  /// - Precondition: The memory is not initialized.
+  ///
+  /// - Postcondition: The memory has been deallocated.
+  public func deallocate() {
+    _position?.deallocate(
+      bytes: count, alignedTo: MemoryLayout<UInt>.alignment)
+  }
+
+  /// Reads raw bytes from memory at `self + offset` and constructs a
+  /// value of type `T`.
+  ///
+  /// - Precondition: `offset + MemoryLayout<T>.size < self.count`
+  ///
+  /// - Precondition: The underlying pointer plus `offset` is properly
+  ///   aligned for accessing `T`.
+  ///
+  /// - Precondition: The memory is initialized to a value of some type `U`
+  ///   such that `T` is layout compatible with `U`.
+  public func load<T>(fromByteOffset offset: Int = 0, as type: T.Type) -> T {
+    _debugPrecondition(offset >= 0, "${Self}.load with negative offset")
+    _debugPrecondition(offset + MemoryLayout<T>.size <= self.count,
+      "${Self}.load out of bounds")
+    return baseAddress!.load(fromByteOffset: offset, as: T.self)
+  }
+
+%  if mutable:
+  /// Stores a value's bytes into raw memory at `self + offset`.
+  ///
+  /// - Precondition: `offset + MemoryLayout<T>.size < self.count`
+  ///
+  /// - Precondition: The underlying pointer plus `offset` is properly
+  ///   aligned for storing type `T`.
+  ///
+  /// - Precondition: `T` is a trivial type.
+  ///
+  /// - Precondition: The memory is uninitialized, or initialized to
+  ///   some trivial type `U` such that `T` and `U` are mutually layout
+  ///   compatible.
+  ///
+  /// - Postcondition: The memory is initialized to raw bytes. If the
+  ///   memory is bound to type `U`, then it now contains a value of
+  ///   type `U`.
+  ///
+  /// - Note: A trivial type can be copied with just a bit-for-bit
+  ///   copy without any indirection or reference-counting operations.
+  ///   Generally, native Swift types that do not contain strong or
+  ///   weak references or other forms of indirection are trivial, as
+  ///   are imported C structs and enums.
+  public func storeBytes<T>(
+    of value: T, toByteOffset offset: Int = 0, as: T.Type
+  ) {
+    _debugPrecondition(offset >= 0, "${Self}.storeBytes with negative offset")
+    _debugPrecondition(offset + MemoryLayout<T>.size <= self.count,
+      "${Self}.storeBytes out of bounds")
+
+    baseAddress!.storeBytes(of: value, toByteOffset: offset, as: T.self)
+  }
+
+  /// Copies `count` bytes from `source` into memory at `self`.
+  ///
+  /// - Precondition: `count` is non-negative.
+  ///
+  /// - Precondition: The memory at `source..<source + count` is
+  ///   initialized to some trivial type `T`.
+  ///
+  /// - Precondition: If the memory at `self..<self+count` is bound to
+  ///   a type `U`, then `U` is a trivial type, the underlying
+  ///   pointers `source` and `self` are properly aligned for type
+  ///   `U`, and `count` is a multiple of `MemoryLayout<U>.stride`.
+  ///
+  /// - Postcondition: The memory at `self..<self+count` is
+  ///   initialized to raw bytes. If the memory is bound to type `U`,
+  ///   then it contains values of type `U`.
+  public func copyBytes(from source: UnsafeRawBufferPointer) {
+    _debugPrecondition(source.count <= self.count,
+      "${Self}.copyBytes source has too many elements")
+    baseAddress?.copyBytes(from: source.baseAddress!, count: source.count)
+  }
+
+  /// Copies from a collection of `UInt8` into memory at `self`.
+  ///
+  /// - Precondition: `source.count <= self.count`.
+  ///
+  /// - Precondition: If the memory at `self..<self+count` is bound to
+  ///   a type `U`, then `U` is a trivial type, the underlying pointer
+  ///   at `self` is properly aligned for type `U`, and `source.count`
+  ///   is a multiple of `MemoryLayout<U>.stride`.
+  ///
+  /// - Postcondition: The memory at `self..<self+count` is
+  ///   initialized to raw bytes. If the memory is bound to type `U`,
+  ///   then it contains values of type `U`.
+  public func copyBytes<C : Collection>(from source: C
+  ) where C.Iterator.Element == UInt8 {
+    _debugPrecondition(numericCast(source.count) <= self.count,
+      "${Self}.copyBytes source has too many elements")
+    guard let position = _position else {
+      return
+    }
+    for (index, byteValue) in source.enumerated() {
+      position.storeBytes(
+        of: byteValue, toByteOffset: index, as: UInt8.self)
+    }
+  }
+%  end # mutable
+
+  /// Creates an `${Self}` over `count` contiguous bytes beginning at `start`.
+  ///
+  /// If `start` is nil, `count` must be 0. However, `count` may be 0 even for
+  /// a nonzero `start`.
+  public init(start: Unsafe${Mutable}RawPointer?, count: Int) {
+    _precondition(count >= 0, "${Self} with negative count")
+    _precondition(count == 0 || start != nil,
+      "${Self} has a nil start and nonzero count")
+    _position = start
+    _end = start.map { $0 + count }
+  }
+
+  /// Converts UnsafeMutableRawBufferPointer to UnsafeRawBufferPointer.
+  public init(_ bytes: UnsafeMutableRawBufferPointer) {
+    self.init(start: bytes.baseAddress, count: bytes.count)
+  }
+
+%  if mutable:
+  /// Converts UnsafeRawBufferPointer to UnsafeMutableRawBufferPointer.
+  public init(mutating bytes: UnsafeRawBufferPointer) {
+    self.init(start: UnsafeMutableRawPointer(mutating: bytes.baseAddress),
+      count: bytes.count)
+  }
+%  else:
+  /// Converts UnsafeRawBufferPointer to UnsafeMutableRawBufferPointer.
+  public init(_ bytes: UnsafeRawBufferPointer) {
+    self.init(start: bytes.baseAddress, count: bytes.count)
+  }
+%  end # !mutable
+
+  /// Creates an `${Self}` over the contiguous bytes in `buffer`.
+  ///
+  /// - Precondition: `T` is a trivial type.
+  public init<T>(_ buffer: UnsafeMutableBufferPointer<T>) {
+    self.init(start: buffer.baseAddress!,
+      count: buffer.count * MemoryLayout<T>.stride)
+  }
+
+%  if not mutable:
+  /// Creates an `${Self}` view over the contiguous memory in `buffer`.
+  ///
+  /// - Precondition: `T` is a trivial type.
+  public init<T>(_ buffer: UnsafeBufferPointer<T>) {
+    self.init(start: buffer.baseAddress!,
+      count: buffer.count * MemoryLayout<T>.stride)
+  }
+%  end # !mutable
+
+  /// Always zero, which is the index of the first byte in a
+  /// non-empty buffer.
+  public var startIndex: Int {
+    return 0
+  }
+
+  /// The "past the end" position---that is, the position one greater than the
+  /// last valid subscript argument.
+  ///
+  /// The `endIndex` property of an `Unsafe${Mutable}RawBufferPointer`
+  /// instance is always identical to `count`.
+  public var endIndex: Int {
+    return count
+  }
+
+  public typealias Indices = CountableRange<Int>
+
+  public var indices: Indices {
+    return startIndex..<endIndex
+  }
+
+  /// Accesses the `i`th byte in the memory region as a `UInt8` value.
+  public subscript(i: Int) -> UInt8 {
+    get {
+      _debugPrecondition(i >= 0)
+      _debugPrecondition(i < endIndex)
+      return _position!.load(fromByteOffset: i, as: UInt8.self)
+    }
+%  if mutable:
+    nonmutating set {
+      _debugPrecondition(i >= 0)
+      _debugPrecondition(i < endIndex)
+      _position!.storeBytes(of: newValue, toByteOffset: i, as: UInt8.self)
+    }
+%  end # mutable
+  }
+
+  /// Accesses the bytes in the memory region within `bounds` as a `UInt8`
+  /// values.
+  public subscript(bounds: Range<Int>) -> Unsafe${Mutable}RawBufferPointer {
+    get {
+      _debugPrecondition(bounds.lowerBound >= startIndex)
+      _debugPrecondition(bounds.upperBound <= endIndex)
+      return Unsafe${Mutable}RawBufferPointer(
+        start: baseAddress.map { $0 + bounds.lowerBound },
+        count: bounds.count)
+    }
+%  if mutable:
+    nonmutating set {
+      _debugPrecondition(bounds.lowerBound >= startIndex)
+      _debugPrecondition(bounds.upperBound <= endIndex)
+      _debugPrecondition(bounds.count == newValue.count)
+
+      if newValue.count > 0 {
+        (baseAddress! + bounds.lowerBound).copyBytes(
+          from: newValue.baseAddress!,
+          count: newValue.count)
+      }
+    }
+%  end # mutable
+  }
+
+  /// Returns an iterator over the bytes of this sequence.
+  ///
+  /// - Complexity: O(1).
+  public func makeIterator() -> Iterator {
+    return Iterator(_position: _position, _end: _end)
+  }
+
+  /// A pointer to the first byte of the buffer.
+  public var baseAddress: Unsafe${Mutable}RawPointer? {
+    return _position
+  }
+
+  /// The number of bytes in the buffer.
+  public var count: Int {
+    if let pos = _position {
+      return _end! - pos
+    }
+    return 0
+  }
+
+  let _position, _end: Unsafe${Mutable}RawPointer?
+}
+
+extension Unsafe${Mutable}RawBufferPointer : CustomDebugStringConvertible {
+  /// A textual representation of `self`, suitable for debugging.
+  public var debugDescription: String {
+    return "${Self}"
+      + "(start: \(_position.map(String.init(describing:)) ?? "nil"), count: \(count))"
+  }
+}
+
+/// Invokes `body` with an `${Self}` argument and returns the
+/// result.
+%  if mutable:
+public func withUnsafeMutableBytes<T, Result>(
+  of arg: inout T,
+  _ body: (UnsafeMutableRawBufferPointer) throws -> Result
+) rethrows -> Result
+{
+  return try withUnsafeMutablePointer(to: &arg) {
+    return try body(UnsafeMutableRawBufferPointer(
+        start: $0, count: MemoryLayout<T>.size))
+  }
+}
+%  else:
+public func withUnsafeBytes<T, Result>(
+  of arg: inout T,
+  _ body: (UnsafeRawBufferPointer) throws -> Result
+) rethrows -> Result
+{
+  return try withUnsafePointer(to: &arg) {
+    try body(UnsafeRawBufferPointer(start: $0, count: MemoryLayout<T>.size))
+  }
+}
+%  end # mutable
+
+% end # for mutable

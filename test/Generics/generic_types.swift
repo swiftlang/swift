@@ -1,4 +1,4 @@
-// RUN: %target-parse-verify-swift
+// RUN: %target-typecheck-verify-swift
 
 protocol MyFormattedPrintable {
   func myFormat() -> String
@@ -226,7 +226,9 @@ var y: X5<X4, Int> // expected-error{{'X5' requires the types 'X4.AssocP' (aka '
 
 // Recursive generic signature validation.
 class Top {}
-class Bottom<T : Bottom<Top>> {} // expected-error {{type may not reference itself as a requirement}}
+class Bottom<T : Bottom<Top>> {}
+// expected-error@-1 {{type 'Bottom' references itself}}
+// expected-note@-2 {{type declared here}}
 
 // Invalid inheritance clause
 
@@ -237,4 +239,4 @@ struct UnsolvableInheritance2<T : U.A, U : T.A> {}
 // expected-error@-1 {{inheritance from non-protocol, non-class type 'U.A'}}
 // expected-error@-2 {{inheritance from non-protocol, non-class type 'T.A'}}
 
-enum X7<T> where X7.X : G { case X } // expected-error{{'X' is not a member type of 'X7<T>'}}
+enum X7<T> where X7.X : G { case X } // expected-error{{enum element 'X' is not a member type of 'X7<T>'}}

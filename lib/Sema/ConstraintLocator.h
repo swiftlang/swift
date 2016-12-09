@@ -5,8 +5,8 @@
 // Copyright (c) 2014 - 2016 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
-// See http://swift.org/LICENSE.txt for license information
-// See http://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
+// See https://swift.org/LICENSE.txt for license information
+// See https://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
 //
 //===----------------------------------------------------------------------===//
 //
@@ -163,6 +163,8 @@ public:
     case ApplyArgToParam:
       return 2;
     }
+
+    llvm_unreachable("Unhandled PathElementKind in switch.");
   }
 
   /// Flags for efficiently recording certain information about a path.
@@ -213,7 +215,8 @@ public:
     case FunctionResult:
       return IsFunctionConversion;
     }
-    llvm_unreachable("bad path element kind");
+
+    llvm_unreachable("Unhandled PathElementKind in switch.");
   }
 
   template<unsigned N> struct incomplete;
@@ -354,6 +357,8 @@ public:
       case StoredKindAndValue:
         return decodeStorage(storage).first;
       }
+
+      llvm_unreachable("Unhandled StoredKind in switch.");
     }
 
     /// \brief Retrieve the value associated with this path element,

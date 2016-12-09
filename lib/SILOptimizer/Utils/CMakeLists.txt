@@ -9,7 +9,9 @@ set(UTILS_SOURCES
   Utils/LoadStoreOptUtils.cpp
   Utils/Local.cpp
   Utils/LoopUtils.cpp
+  Utils/PerformanceInlinerUtils.cpp
   Utils/SILInliner.cpp
   Utils/SILSSAUpdater.cpp
+  Utils/SpecializationMangler.cpp
   PARENT_SCOPE)
 

@@ -5,8 +5,8 @@
 // Copyright (c) 2014 - 2016 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
-// See http://swift.org/LICENSE.txt for license information
-// See http://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
+// See https://swift.org/LICENSE.txt for license information
+// See https://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
 //
 //===----------------------------------------------------------------------===//
 
@@ -463,6 +463,8 @@ const BuiltinInfo &SILModule::getBuiltinInfo(Identifier ID) {
     Info.ID = BuiltinValueKind::AtomicLoad;
   else if (OperationName.startswith("atomicstore_"))
     Info.ID = BuiltinValueKind::AtomicStore;
+  else if (OperationName.startswith("allocWithTailElems_"))
+    Info.ID = BuiltinValueKind::AllocWithTailElems;
   else {
     // Switch through the rest of builtins.
     Info.ID = llvm::StringSwitch<BuiltinValueKind>(OperationName)
@@ -482,10 +484,6 @@ SILFunction *SILModule::lookUpFunction(SILDeclRef fnRef) {
 
 bool SILModule::linkFunction(SILFunction *Fun, SILModule::LinkingMode Mode) {
   return SILLinkerVisitor(*this, getSILLoader(), Mode).processFunction(Fun);
-}
-
-bool SILModule::linkFunction(SILDeclRef Decl, SILModule::LinkingMode Mode) {
-  return SILLinkerVisitor(*this, getSILLoader(), Mode).processDeclRef(Decl);
 }
 
 bool SILModule::linkFunction(StringRef Name, SILModule::LinkingMode Mode) {

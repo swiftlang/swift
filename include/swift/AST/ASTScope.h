@@ -5,8 +5,8 @@
 // Copyright (c) 2014 - 2016 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
-// See http://swift.org/LICENSE.txt for license information
-// See http://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
+// See https://swift.org/LICENSE.txt for license information
+// See https://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
 //
 //===----------------------------------------------------------------------===//
 //
@@ -188,7 +188,7 @@ class ASTScope {
 
       /// The next element that should be considered in the source file.
       ///
-      /// This accomodates the expansion of source files.
+      /// This accommodates the expansion of source files.
       mutable unsigned nextElement;
     } sourceFile;
 
@@ -613,7 +613,7 @@ public:
   /// \seealso getDeclContext().
   DeclContext *getInnermostEnclosingDeclContext() const;
 
-  /// Retrueve the declarations whose names are directly bound by this scope.
+  /// Retrieve the declarations whose names are directly bound by this scope.
   ///
   /// The declarations bound in this scope aren't available in the immediate
   /// parent of this scope, but will still be visible in child scopes (unless

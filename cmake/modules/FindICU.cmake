@@ -8,7 +8,7 @@ set(ICU_REQUIRED)
 foreach(MODULE ${ICU_FIND_COMPONENTS})
   string(TOUPPER "${MODULE}" MODULE)
   string(TOLOWER "${MODULE}" module)
-  list(APPEND ICU_REQUIRED 
+  list(APPEND ICU_REQUIRED
     ICU_${MODULE}_INCLUDE_DIR ICU_${MODULE}_LIBRARIES)
 
   pkg_check_modules(PC_ICU_${MODULE} QUIET icu-${module})
@@ -27,6 +27,7 @@ endforeach()
 
 foreach(sdk ANDROID;FREEBSD;LINUX;WINDOWS)
   foreach(MODULE ${ICU_FIND_COMPONENTS})
+    string(TOUPPER "${MODULE}" MODULE)
     if("${SWIFT_${sdk}_ICU_${MODULE}_INCLUDE}" STREQUAL "")
       set(SWIFT_${sdk}_ICU_${MODULE}_INCLUDE ${ICU_${MODULE}_INCLUDE_DIRS})
     endif()

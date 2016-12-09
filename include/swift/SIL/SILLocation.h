@@ -5,8 +5,8 @@
 // Copyright (c) 2014 - 2016 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
-// See http://swift.org/LICENSE.txt for license information
-// See http://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
+// See https://swift.org/LICENSE.txt for license information
+// See https://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
 //
 //===----------------------------------------------------------------------===//
 
@@ -90,8 +90,13 @@ public:
     const char *Filename;
 
     DebugLoc(unsigned Line = 0, unsigned Column = 0,
-             const char *Filename = nullptr) : Line(Line), Column(Column),
-                                               Filename(Filename) { }
+             const char *Filename = nullptr)
+        : Line(Line), Column(Column), Filename(Filename) {}
+
+    inline bool operator==(const DebugLoc &R) const {
+      return Line == R.Line && Column == R.Column &&
+             StringRef(Filename).equals(R.Filename);
+    }
   };
 
 protected:

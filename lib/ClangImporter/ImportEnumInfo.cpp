@@ -5,8 +5,8 @@
 // Copyright (c) 2014 - 2016 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
-// See http://swift.org/LICENSE.txt for license information
-// See http://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
+// See https://swift.org/LICENSE.txt for license information
+// See https://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
 //
 //===----------------------------------------------------------------------===//
 //
@@ -24,6 +24,11 @@
 #include "clang/AST/Decl.h"
 #include "clang/Lex/MacroInfo.h"
 #include "clang/Lex/Preprocessor.h"
+
+#include "llvm/ADT/Statistic.h"
+#define DEBUG_TYPE "Enum Info"
+STATISTIC(EnumInfoNumCacheHits, "# of times the enum info cache was hit");
+STATISTIC(EnumInfoNumCacheMisses, "# of times the enum info cache was missed");
 
 using namespace swift;
 using namespace importer;
@@ -47,7 +52,7 @@ void EnumInfo::classifyEnum(ASTContext &ctx, const clang::EnumDecl *decl,
   }
 
   // Was the enum declared using *_ENUM or *_OPTIONS?
-  // FIXME: Use Clang attributes instead of grovelling the macro expansion loc.
+  // FIXME: Use Clang attributes instead of groveling the macro expansion loc.
   auto loc = decl->getLocStart();
   if (loc.isMacroID()) {
     StringRef MacroName = pp.getImmediateMacroName(loc);
@@ -217,6 +222,8 @@ void EnumInfo::determineConstantNamePrefix(ASTContext &ctx,
     case clang::AR_Unavailable:
       return false;
     }
+
+    llvm_unreachable("Invalid AvailabilityAttr.");
   };
 
   // Move to the first non-deprecated enumerator, or non-swift_name'd
@@ -288,25 +295,13 @@ void EnumInfo::determineConstantNamePrefix(ASTContext &ctx,
   constantNamePrefix = ctx.AllocateCopy(commonPrefix);
 }
 
-StringRef EnumInfoCache::getEnumInfoKey(const clang::EnumDecl *decl,
-                                        SmallVectorImpl<char> &scratch) {
-  StringRef moduleName;
-  if (auto moduleOpt = getClangSubmoduleForDecl(decl)) {
-    if (*moduleOpt)
-      moduleName = (*moduleOpt)->getTopLevelModuleName();
+EnumInfo EnumInfoCache::getEnumInfo(const clang::EnumDecl *decl) {
+  if (enumInfos.count(decl)) {
+    ++EnumInfoNumCacheHits;
+    return enumInfos[decl];
   }
-  if (moduleName.empty())
-    moduleName = decl->getASTContext().getLangOpts().CurrentModule;
-
-  StringRef enumName = decl->getDeclName()
-                           ? decl->getName()
-                           : decl->getTypedefNameForAnonDecl()->getName();
-
-  if (moduleName.empty())
-    return enumName;
-
-  scratch.append(moduleName.begin(), moduleName.end());
-  scratch.push_back('.');
-  scratch.append(enumName.begin(), enumName.end());
-  return StringRef(scratch.data(), scratch.size());
+  ++EnumInfoNumCacheMisses;
+  EnumInfo enumInfo(swiftCtx, decl, clangPP);
+  enumInfos[decl] = enumInfo;
+  return enumInfo;
 }

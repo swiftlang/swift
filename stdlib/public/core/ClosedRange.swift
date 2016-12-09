@@ -5,8 +5,8 @@
 // Copyright (c) 2014 - 2016 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
-// See http://swift.org/LICENSE.txt for license information
-// See http://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
+// See https://swift.org/LICENSE.txt for license information
+// See https://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
 //
 //===----------------------------------------------------------------------===//
 
@@ -22,7 +22,7 @@ internal enum _ClosedRangeIndexRepresentation<Bound>
   case inRange(Bound)
 }
 
-// FIXME(ABI)(compiler limitation): should be a nested type in
+// FIXME(ABI)#23 (Nesting types in generics): should be a nested type in
 // `ClosedRange`.
 /// A position in a `CountableClosedRange` instance.
 public struct ClosedRangeIndex<Bound>
@@ -233,11 +233,11 @@ public struct CountableClosedRange<Bound> : RandomAccessCollection
     case .pastEnd:
       if n == 0 {
         return i
-      } else if n > 0 {
-        _preconditionFailure("Advancing past end index")
-      } else {
+      } 
+      if n < 0 {
         return index(ClosedRangeIndex(upperBound), offsetBy: (n + 1))
       }
+      _preconditionFailure("Advancing past end index")
     }
   }
 

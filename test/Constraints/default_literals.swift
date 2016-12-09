@@ -1,4 +1,4 @@
-// RUN: %target-parse-verify-swift
+// RUN: %target-typecheck-verify-swift
 
 func acceptInt(_ : inout Int) {}
 func acceptDouble(_ : inout Double) {}

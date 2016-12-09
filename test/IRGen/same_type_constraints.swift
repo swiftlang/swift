@@ -1,4 +1,4 @@
-// RUN: %target-swift-frontend -emit-ir -primary-file %s -disable-objc-attr-requires-foundation-module | %FileCheck %s
+// RUN: %target-swift-frontend -assume-parsing-unqualified-ownership-sil -emit-ir -primary-file %s -disable-objc-attr-requires-foundation-module | %FileCheck %s
 
 // <rdar://problem/21665983> IRGen crash with protocol extension involving same-type constraint to X<T>
 public struct DefaultFoo<T> {
@@ -41,4 +41,20 @@ public class GenericKlazz<T: DataType, R: E> : E where R.Data == T
   init() {
      d = Dict()
   }
+}
+
+// This used to hit an infinite loop - <rdar://problem/27018457>
+public protocol CodingType {
+    associatedtype ValueType
+}
+
+public protocol ValueCoding {
+    associatedtype Coder: CodingType
+}
+
+func foo<Self>(s: Self)
+where Self : CodingType,
+      Self.ValueType: ValueCoding,
+      Self.ValueType.Coder == Self {
+  print(Self.ValueType.self)
 }

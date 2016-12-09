@@ -1,8 +1,8 @@
 // Copyright (c) 2014 - 2016 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
-// See http://swift.org/LICENSE.txt for license information
-// See http://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
+// See https://swift.org/LICENSE.txt for license information
+// See https://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
 //
 //===----------------------------------------------------------------------===//
 //
@@ -20,15 +20,29 @@ import StdlibUnittest
 class TestUserInfoSuper : NSObject { }
 #endif
 
-struct SubStruct {
+struct SubStruct: Equatable {
     var i: Int
     var str: String
+
+    static func ==(lhs: SubStruct, rhs: SubStruct) -> Bool {
+        return lhs.i == rhs.i && 
+               lhs.str == rhs.str
+    }
 }
 
-struct SomeStructure {
+struct SomeStructure: Hashable {
     var i: Int
     var str: String
     var sub: SubStruct
+
+    static func ==(lhs: SomeStructure, rhs: SomeStructure) -> Bool {
+        return lhs.i == rhs.i && 
+               lhs.str == rhs.str && 
+               lhs.sub == rhs.sub
+    }
+
+    // FIXME: we don't care about this, but Any only finds == on Hashables
+    var hashValue: Int { return i }
 }
 
 /*

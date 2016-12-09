@@ -56,6 +56,7 @@
           key.entities: [
             {
               key.kind: source.lang.swift.decl.function.accessor.getter,
+              key.name: "getter:text",
               key.usr: "s:FO15index_enum_case1Eg4textSS",
               key.line: 8,
               key.column: 22,

@@ -180,7 +180,7 @@ func testFindFuncParam2<Foo : FooProtocol>(fooParam: FooStruct, foo: Foo) {
   #^FIND_FUNC_PARAM_2^#
 // FIND_FUNC_PARAM_2: Begin completions
 // FIND_FUNC_PARAM_2-DAG: Decl[GenericTypeParam]/Local: Foo[#Foo#]{{; name=.+$}}
-// FIND_FUNC_PARAM_2-DAG: Decl[LocalVar]/Local:         foo[#Foo#]{{; name=.+$}}
+// FIND_FUNC_PARAM_2-DAG: Decl[LocalVar]/Local:         foo[#FooProtocol#]{{; name=.+$}}
 // FIND_FUNC_PARAM_2: End completions
 }
 

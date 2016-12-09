@@ -1,10 +1,26 @@
-// RUN: %target-swift-frontend -primary-file %s -emit-ir | %FileCheck %s
+// RUN: %target-swift-frontend -assume-parsing-unqualified-ownership-sil -primary-file %s -emit-ir | %FileCheck %s
 sil_stage canonical
 
 public protocol P {}
 public class C : P {}
 public class D<T : P> {}
 class E {}
+
+public protocol Observable {
+  associatedtype Result
+  func subscribe<T: Observer>(o: T) -> ()
+}
+
+public protocol Observer {
+  associatedtype Result
+}
+
+sil hidden @witness_method : $@convention(thin) <S where S : Observable><O where O : Observer, S.Result == O.Result> (@in S) -> @owned @callee_owned (@in O) -> () {
+bb0(%0 : $*S):
+  %1 = witness_method $S, #Observable.subscribe!1 : $@convention(witness_method) <τ_0_0 where τ_0_0 : Observable><τ_1_0 where τ_1_0 : Observer, τ_0_0.Result == τ_1_0.Result> (@in τ_1_0, @in_guaranteed τ_0_0) -> ()
+  %2 = partial_apply %1<S, O>(%0) : $@convention(witness_method) <τ_0_0 where τ_0_0 : Observable><τ_1_0 where τ_1_0 : Observer, τ_0_0.Result == τ_1_0.Result> (@in τ_1_0, @in_guaranteed τ_0_0) -> ()
+  return %2 : $@callee_owned (@in O) -> ()
+}
 
 // CHECK-LABEL: define internal %GC23partial_apply_forwarder1DCS_1C_* @_TPA_unspecialized_uncurried(%swift.refcounted*
 // CHECK: [[TYPE:%.*]] = call %swift.type* @_TMaC23partial_apply_forwarder1C()

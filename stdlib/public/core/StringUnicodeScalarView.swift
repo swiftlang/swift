@@ -5,8 +5,8 @@
 // Copyright (c) 2014 - 2016 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
-// See http://swift.org/LICENSE.txt for license information
-// See http://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
+// See https://swift.org/LICENSE.txt for license information
+// See https://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
 //
 //===----------------------------------------------------------------------===//
 
@@ -62,8 +62,9 @@ extension String {
     CustomStringConvertible,
     CustomDebugStringConvertible
   {
-    internal init(_ _core: _StringCore) {
+    internal init(_ _core: _StringCore, coreOffset: Int = 0) {
       self._core = _core
+      self._coreOffset = coreOffset
     }
 
     internal struct _ScratchIterator : IteratorProtocol {
@@ -109,12 +110,24 @@ extension String {
       @_versioned internal var _position: Int
     }
 
+    /// Translates a `_core` index into a `UnicodeScalarIndex` using this view's
+    /// `_coreOffset`.
+    internal func _fromCoreIndex(_ i: Int) -> Index {
+      return Index(_position: i + _coreOffset)
+    }
+    
+    /// Translates a `UnicodeScalarIndex` into a `_core` index using this view's
+    /// `_coreOffset`.
+    internal func _toCoreIndex(_ i: Index) -> Int {
+      return i._position - _coreOffset
+    }
+    
     /// The position of the first Unicode scalar value if the string is
     /// nonempty.
     ///
     /// If the string is empty, `startIndex` is equal to `endIndex`.
     public var startIndex: Index {
-      return Index(_position: _core.startIndex)
+      return _fromCoreIndex(_core.startIndex)
     }
 
     /// The "past the end" position---that is, the position one greater than
@@ -122,31 +135,32 @@ extension String {
     ///
     /// In an empty Unicode scalars view, `endIndex` is equal to `startIndex`.
     public var endIndex: Index {
-      return Index(_position: _core.endIndex)
+      return _fromCoreIndex(_core.endIndex)
     }
 
     /// Returns the next consecutive location after `i`.
     ///
     /// - Precondition: The next location exists.
     public func index(after i: Index) -> Index {
-      var scratch = _ScratchIterator(_core, i._position)
+      let i = _toCoreIndex(i)
+      var scratch = _ScratchIterator(_core, i)
       var decoder = UTF16()
       let (_, length) = decoder._decodeOne(&scratch)
-      return Index(_position: i._position + length)
+      return _fromCoreIndex(i + length)
     }
 
     /// Returns the previous consecutive location before `i`.
     ///
     /// - Precondition: The previous location exists.
     public func index(before i: Index) -> Index {
-      var i = i._position - 1
+      var i = _toCoreIndex(i) - 1
       let codeUnit = _core[i]
       if _slowPath((codeUnit >> 10) == 0b1101_11) {
         if i != 0 && (_core[i - 1] >> 10) == 0b1101_10 {
           i -= 1
         }
       }
-      return Index(_position: i)
+      return _fromCoreIndex(i)
     }
 
     /// Accesses the Unicode scalar value at the given position.
@@ -166,7 +180,7 @@ extension String {
     /// - Parameter position: A valid index of the character view. `position`
     ///   must be less than the view's end index.
     public subscript(position: Index) -> UnicodeScalar {
-      var scratch = _ScratchIterator(_core, position._position)
+      var scratch = _ScratchIterator(_core, _toCoreIndex(position))
       var decoder = UTF16()
       switch decoder.decode(&scratch) {
       case .scalarValue(let us):
@@ -192,8 +206,9 @@ extension String {
     /// - Complexity: O(*n*) if the underlying string is bridged from
     ///   Objective-C, where *n* is the length of the string; otherwise, O(1).
     public subscript(r: Range<Index>) -> UnicodeScalarView {
-      return UnicodeScalarView(
-        _core[r.lowerBound._position..<r.upperBound._position])
+      let rawSubRange = _toCoreIndex(r.lowerBound)..<_toCoreIndex(r.upperBound)
+      return UnicodeScalarView(_core[rawSubRange],
+        coreOffset: r.lowerBound._position)
     }
 
     /// An iterator over the Unicode scalars that make up a `UnicodeScalarView`
@@ -270,7 +285,7 @@ extension String {
     }
 
     public var description: String {
-      return String(_core[startIndex._position..<endIndex._position])
+      return String(_core)
     }
 
     public var debugDescription: String {
@@ -278,6 +293,12 @@ extension String {
     }
 
     internal var _core: _StringCore
+    
+    /// The offset of this view's `_core` from an original core. This works
+    /// around the fact that `_StringCore` is always zero-indexed.
+    /// `_coreOffset` should be subtracted from `UnicodeScalarIndex._position`
+    /// before that value is used as a `_core` index.
+    internal var _coreOffset: Int
   }
 
   /// Creates a string corresponding to the given collection of Unicode
@@ -391,9 +412,8 @@ extension String.UnicodeScalarView : RangeReplaceableCollection {
     _ bounds: Range<Index>,
     with newElements: C
   ) where C : Collection, C.Iterator.Element == UnicodeScalar {
-    let rawSubRange: Range<Int> =
-      bounds.lowerBound._position
-      ..< bounds.upperBound._position
+    let rawSubRange: Range<Int> = _toCoreIndex(bounds.lowerBound) ..<
+      _toCoreIndex(bounds.upperBound)
     let lazyUTF16 = newElements.lazy.flatMap { $0.utf16 }
     _core.replaceSubrange(rawSubRange, with: lazyUTF16)
   }
@@ -577,7 +597,7 @@ extension String.UnicodeScalarIndex {
 }
 
 extension String.UnicodeScalarView {
-  // FIXME(ABI): don't make this function inlineable.  Grapheme cluster
+  // NOTE: Don't make this function inlineable.  Grapheme cluster
   // segmentation uses a completely different algorithm in Unicode 9.0.
   internal func _isOnGraphemeClusterBoundary(_ i: Index) -> Bool {
     if i == startIndex || i == endIndex {

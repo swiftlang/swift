@@ -5,8 +5,8 @@
 // Copyright (c) 2014 - 2016 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
-// See http://swift.org/LICENSE.txt for license information
-// See http://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
+// See https://swift.org/LICENSE.txt for license information
+// See https://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
 //
 //===----------------------------------------------------------------------===//
 //
@@ -108,8 +108,20 @@ public:
   /// conventions.
   bool EnableGuaranteedClosureContexts = false;
 
+  /// Don't generate code using partial_apply in SIL generation.
+  bool DisableSILPartialApply = false;
+
   /// The name of the SIL outputfile if compiled with SIL debugging (-gsil).
   std::string SILOutputFileNameForDebugging;
+
+  /// If set to true, compile with the SIL Ownership Model enabled.
+  bool EnableSILOwnership = false;
+
+  /// When parsing SIL, assume unqualified ownership.
+  bool AssumeUnqualifiedOwnershipWhenParsing = false;
+
+  /// Assume that code will be executed in a single-threaded environment.
+  bool AssumeSingleThreaded = false;
 };
 
 } // end namespace swift

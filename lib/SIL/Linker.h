@@ -5,8 +5,8 @@
 // Copyright (c) 2014 - 2016 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
-// See http://swift.org/LICENSE.txt for license information
-// See http://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
+// See https://swift.org/LICENSE.txt for license information
+// See https://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
 //
 //===----------------------------------------------------------------------===//
 
@@ -61,10 +61,6 @@ public:
   /// Process Name, try to check if there is a declaration of a function
   /// with this Name.
   bool hasFunction(StringRef Name, SILLinkage Linkage);
-
-  /// Process Decl, recursively deserializing any thing that
-  /// the SILFunction corresponding to Decl may reference.
-  bool processDeclRef(SILDeclRef Decl);
 
   /// Deserialize the VTable mapped to C if it exists and all SIL the VTable
   /// transitively references.

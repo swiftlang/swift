@@ -5,8 +5,8 @@
 // Copyright (c) 2014 - 2016 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
-// See http://swift.org/LICENSE.txt for license information
-// See http://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
+// See https://swift.org/LICENSE.txt for license information
+// See https://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
 //
 //===----------------------------------------------------------------------===//
 ///
@@ -18,6 +18,7 @@
 
 #include "swift/AST/Comment.h"
 #include "swift/AST/Decl.h"
+#include "swift/AST/Types.h"
 #include "swift/AST/PrettyStackTrace.h"
 #include "swift/AST/RawComment.h"
 #include "swift/Markup/Markup.h"
@@ -401,7 +402,7 @@ getProtocolRequirementDocComment(swift::markup::MarkupContext &MC,
                                                 const ValueDecl *VD)
     -> const ValueDecl * {
       SmallVector<ValueDecl *, 2> Members;
-      P->lookupQualified(P->getType(), VD->getFullName(),
+      P->lookupQualified(P->getDeclaredType(), VD->getFullName(),
                          NLOptions::NL_ProtocolMembers,
                          /*resolver=*/nullptr, Members);
     SmallVector<const ValueDecl *, 1> ProtocolRequirements;
@@ -422,10 +423,6 @@ getProtocolRequirementDocComment(swift::markup::MarkupContext &MC,
     SmallVector<const ValueDecl *, 4> RequirementsWithDocs;
     if (auto Requirement = getSingleRequirementWithNonemptyDoc(ProtoExt, VD))
       RequirementsWithDocs.push_back(Requirement);
-
-    for (auto Proto : ProtoExt->getInheritedProtocols(/*resolver=*/nullptr))
-      if (auto Requirement = getSingleRequirementWithNonemptyDoc(Proto, VD))
-        RequirementsWithDocs.push_back(Requirement);
 
     if (RequirementsWithDocs.size() == 1)
       return getSingleDocComment(MC, RequirementsWithDocs.front());

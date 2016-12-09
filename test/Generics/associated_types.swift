@@ -1,4 +1,4 @@
-// RUN: %target-parse-verify-swift
+// RUN: %target-typecheck-verify-swift
 
 // Deduction of associated types.
 protocol Fooable {
@@ -160,7 +160,7 @@ protocol A {
 }
 
 protocol B : A {
-  associatedtype e : A = C<Self> // expected-note {{default type 'C<C<a>>' for associated type 'e' (from protocol 'B') does not conform to 'A'}}
+  associatedtype e : A = C<Self>
 }
 
 extension B {
@@ -168,8 +168,14 @@ extension B {
   }
 }
 
-struct C<a : B> : B { // expected-error {{type 'C<a>' does not conform to protocol 'B'}}
+struct C<a : B> : B {
 }
+
+struct CC : B {
+  typealias e = CC
+}
+
+C<CC>().c()
 
 // SR-511
 protocol sr511 {
@@ -178,3 +184,19 @@ protocol sr511 {
 
 associatedtype Foo = Int // expected-error {{associated types can only be defined in a protocol; define a type or introduce a 'typealias' to satisfy an associated type requirement}}
 
+// rdar://problem/29207581
+protocol P {
+  associatedtype A
+  static var isP : Bool { get }
+}
+
+protocol M {
+  associatedtype B : P
+}
+
+extension M {
+  func g<C : P>(in c_: C)
+  where Self.B == C.A, C.A.A : P { // *clearly* implies Self.B.A : P
+    _ = B.A.isP
+  }
+}

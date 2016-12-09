@@ -1,4 +1,4 @@
-// RUN: %target-swift-frontend %s -gnone -emit-ir | %FileCheck %s --check-prefix=CHECK --check-prefix=CHECK-%target-ptrsize
+// RUN: %target-swift-frontend -assume-parsing-unqualified-ownership-sil %s -gnone -emit-ir | %FileCheck %s --check-prefix=CHECK --check-prefix=CHECK-%target-ptrsize
 
 // REQUIRES: CPU=x86_64
 
@@ -27,6 +27,8 @@ enum SinglePayloadNontrivial {
   case b
   case c
 }
+
+sil @single_payload_nontrivial_user : $@convention(thin) (@owned SinglePayloadNontrivial) -> ()
 
 enum MultiPayloadTrivial {
   case payload1(Builtin.Int64)
@@ -185,9 +187,11 @@ enum GenericFixedLayout<T> {
 // CHECK:   %swift.type** null
 // CHECK: }>
 
-sil @single_payload_nontrivial_copy_destroy : $(SinglePayloadNontrivial) -> () {
+sil @single_payload_nontrivial_copy_destroy : $(@owned SinglePayloadNontrivial) -> () {
 bb0(%0 : $SinglePayloadNontrivial):
   retain_value %0 : $SinglePayloadNontrivial
+  %1 = function_ref @single_payload_nontrivial_user : $@convention(thin) (@owned SinglePayloadNontrivial) -> ()
+  apply %1(%0) : $@convention(thin) (@owned SinglePayloadNontrivial) -> ()
   release_value %0 : $SinglePayloadNontrivial
   %v = tuple ()
   return %v : $()
@@ -200,7 +204,7 @@ bb0(%0 : $SinglePayloadNontrivial):
 // CHECK-NEXT:   i64 4, label [[NOT_PRESENT]]
 // CHECK-NEXT: ]
 // CHECK:      [[T0:%.*]] = inttoptr i64 [[V:%.*]] to %swift.refcounted*
-// CHECK-NEXT: call void @rt_swift_retain(%swift.refcounted* [[T0]])
+// CHECK-NEXT: call void @swift_rt_swift_retain(%swift.refcounted* [[T0]])
 // CHECK-NEXT: br label [[NOT_PRESENT]]
 // CHECK:      switch i64 %0, label [[PRESENT:%.*]] [
 // CHECK-NEXT:   i64 0, label [[NOT_PRESENT:%.*]]
@@ -208,7 +212,7 @@ bb0(%0 : $SinglePayloadNontrivial):
 // CHECK-NEXT:   i64 4, label [[NOT_PRESENT]]
 // CHECK-NEXT: ]
 // CHECK:      [[T0:%.*]] = inttoptr i64 [[V:%.*]] to %swift.refcounted*
-// CHECK-NEXT: call void @rt_swift_release(%swift.refcounted* [[T0]])
+// CHECK-NEXT: call void @swift_rt_swift_release(%swift.refcounted* [[T0]])
 // CHECK-NEXT: br label [[NOT_PRESENT]]
 // CHECK:      ret void
 
@@ -231,8 +235,8 @@ bb0(%0 : $SinglePayloadNontrivial):
 // CHECK-LABEL: define linkonce_odr hidden i32 @_TwugO20enum_value_semantics9NoPayload
 // CHECK:      [[SELF:%.*]] = bitcast %swift.opaque* %value to %O20enum_value_semantics9NoPayload*
 // CHECK-NEXT: [[TAG_ADDR:%.*]] = getelementptr inbounds %O20enum_value_semantics9NoPayload, %O20enum_value_semantics9NoPayload* [[SELF]], i32 0, i32 0
-// CHECK-NEXT: [[TAG:%.*]] = load i2, i2* [[TAG_ADDR]], align 1
-// CHECK-NEXT: [[RESULT:%.*]] = zext i2 %2 to i32
+// CHECK-NEXT: [[TAG:%.*]] = load i8, i8* [[TAG_ADDR]], align 1
+// CHECK-NEXT: [[RESULT:%.*]] = zext i8 %2 to i32
 // CHECK-NEXT: ret i32 [[RESULT]]
 
 
@@ -244,9 +248,9 @@ bb0(%0 : $SinglePayloadNontrivial):
 // -- NoPayload destructiveInjectEnumTag
 // CHECK-LABEL: define linkonce_odr hidden void @_TwuiO20enum_value_semantics9NoPayload
 // CHECK:      [[SELF:%.*]] = bitcast %swift.opaque* %value to %O20enum_value_semantics9NoPayload*
-// CHECK-NEXT: [[TAG:%.*]] = trunc i32 %tag to i2
+// CHECK-NEXT: [[TAG:%.*]] = trunc i32 %tag to i8
 // CHECK-NEXT: [[TAG_ADDR:%.*]] = getelementptr inbounds %O20enum_value_semantics9NoPayload, %O20enum_value_semantics9NoPayload* [[SELF]], i32 0, i32 0
-// CHECK-NEXT: store i2 [[TAG]], i2* [[TAG_ADDR]], align 1
+// CHECK-NEXT: store i8 [[TAG]], i8* [[TAG_ADDR]], align 1
 // CHECK-NEXT: ret void
 
 
@@ -276,7 +280,7 @@ bb0(%0 : $SinglePayloadNontrivial):
 // CHECK-LABEL: define linkonce_odr hidden i32 @_TwugO20enum_value_semantics20SinglePayloadTrivial
 // CHECK:      [[SELF:%.*]] = bitcast %swift.opaque* %value to %O20enum_value_semantics20SinglePayloadTrivial*
 // CHECK-NEXT: [[OPAQUE:%.*]] = bitcast %O20enum_value_semantics20SinglePayloadTrivial* [[SELF]] to %swift.opaque*
-// CHECK-NEXT: [[TAG:%.*]] = call i32 @rt_swift_getEnumCaseSinglePayload(%swift.opaque* [[OPAQUE]], %swift.type* getelementptr inbounds (%swift.full_type, %swift.full_type* @_TMBi64_, i32 0, i32 1), i32 3)
+// CHECK-NEXT: [[TAG:%.*]] = call i32 @swift_rt_swift_getEnumCaseSinglePayload(%swift.opaque* [[OPAQUE]], %swift.type* getelementptr inbounds (%swift.full_type, %swift.full_type* @_TMBi64_, i32 0, i32 1), i32 3)
 // CHECK-NEXT: ret i32 [[TAG]]
 
 
@@ -294,7 +298,7 @@ bb0(%0 : $SinglePayloadNontrivial):
 // CHECK-LABEL: define linkonce_odr hidden void @_TwuiO20enum_value_semantics20SinglePayloadTrivial
 // CHECK:      [[SELF:%.*]] = bitcast %swift.opaque* %value to %O20enum_value_semantics20SinglePayloadTrivial*
 // CHECK-NEXT: [[OPAQUE:%.*]] = bitcast %O20enum_value_semantics20SinglePayloadTrivial* [[SELF]] to %swift.opaque*
-// CHECK-NEXT: call void @rt_swift_storeEnumTagSinglePayload(%swift.opaque* [[OPAQUE]], %swift.type* getelementptr inbounds (%swift.full_type, %swift.full_type* @_TMBi64_, i32 0, i32 1), i32 %tag, i32 3)
+// CHECK-NEXT: call void @swift_rt_swift_storeEnumTagSinglePayload(%swift.opaque* [[OPAQUE]], %swift.type* getelementptr inbounds (%swift.full_type, %swift.full_type* @_TMBi64_, i32 0, i32 1), i32 %tag, i32 3)
 // CHECK-NEXT: ret void
 
 
@@ -312,7 +316,7 @@ bb0(%0 : $SinglePayloadNontrivial):
 // CHECK:      ; <label>:[[RELEASE_PAYLOAD]]
 // CHECK-NEXT: [[DATA_ADDR:%.*]] = bitcast %O20enum_value_semantics23SinglePayloadNontrivial* [[ADDR]] to %swift.refcounted**
 // CHECK-NEXT: [[DATA:%.*]] = load %swift.refcounted*, %swift.refcounted** [[DATA_ADDR]], align 8
-// CHECK-NEXT: call void @rt_swift_release(%swift.refcounted* [[DATA]])
+// CHECK-NEXT: call void @swift_rt_swift_release(%swift.refcounted* [[DATA]])
 // CHECK-NEXT: br label %[[DONE]]
 
 // CHECK:      ; <label>:[[DONE]]
@@ -335,9 +339,9 @@ bb0(%0 : $SinglePayloadNontrivial):
 
 //   -- Load the high bits of the tag from the extra tag area
 // CHECK-NEXT: [[EXTRA_TAG_ADDR_TMP:%.*]] = getelementptr inbounds %O20enum_value_semantics19MultiPayloadTrivial, %O20enum_value_semantics19MultiPayloadTrivial* [[SELF]], i32 0, i32 1
-// CHECK-NEXT: [[EXTRA_TAG_ADDR:%.*]] = bitcast [1 x i8]* [[EXTRA_TAG_ADDR_TMP]] to i2*
-// CHECK-NEXT: [[EXTRA_TAG_TMP:%.*]] = load i2, i2* [[EXTRA_TAG_ADDR]], align 8
-// CHECK-NEXT: [[EXTRA_TAG:%.*]] = zext i2 [[EXTRA_TAG_TMP]] to i32
+// CHECK-NEXT: [[EXTRA_TAG_ADDR:%.*]] = bitcast [1 x i8]* [[EXTRA_TAG_ADDR_TMP]] to i8*
+// CHECK-NEXT: [[EXTRA_TAG_TMP:%.*]] = load i8, i8* [[EXTRA_TAG_ADDR]], align 8
+// CHECK-NEXT: [[EXTRA_TAG:%.*]] = zext i8 [[EXTRA_TAG_TMP]] to i32
 
 //   -- Form tag for the payload case, or the high bits of no-payload case
 // CHECK-NEXT: [[PAYLOAD_TAG:%.*]] = sub i32 [[EXTRA_TAG]], 2
@@ -374,18 +378,18 @@ bb0(%0 : $SinglePayloadNontrivial):
 
 //   -- Store the high bits of the tag in the extra tag area
 // CHECK-NEXT: [[EXTRA_TAG_ADDR_TMP:%.*]] = getelementptr inbounds %O20enum_value_semantics19MultiPayloadTrivial, %O20enum_value_semantics19MultiPayloadTrivial* [[SELF]], i32 0, i32 1
-// CHECK-NEXT: [[EXTRA_TAG_ADDR:%.*]] = bitcast [1 x i8]* [[EXTRA_TAG_ADDR_TMP]] to i2*
-// CHECK-NEXT: store i2 -2, i2* [[EXTRA_TAG_ADDR]], align 8
+// CHECK-NEXT: [[EXTRA_TAG_ADDR:%.*]] = bitcast [1 x i8]* [[EXTRA_TAG_ADDR_TMP]] to i8*
+// CHECK-NEXT: store i8 2, i8* [[EXTRA_TAG_ADDR]], align 8
 // CHECK-NEXT: br label %[[DONE:.*]]
 
 // CHECK:      ; <label>:[[HAS_PAYLOAD]]
 
 //   -- Store the tag in the extra tag area
 // CHECK-NEXT: [[PAYLOAD_TAG:%.*]] = add i32 %tag, 2
-// CHECK-NEXT: [[TAG:%.*]] = trunc i32 [[PAYLOAD_TAG]] to i2
+// CHECK-NEXT: [[TAG:%.*]] = trunc i32 [[PAYLOAD_TAG]] to i8
 // CHECK-NEXT: [[EXTRA_TAG_ADDR_TMP:%.*]] = getelementptr inbounds %O20enum_value_semantics19MultiPayloadTrivial, %O20enum_value_semantics19MultiPayloadTrivial* [[SELF]], i32 0, i32 1
-// CHECK-NEXT: [[EXTRA_TAG_ADDR:%.*]] = bitcast [1 x i8]* [[EXTRA_TAG_ADDR_TMP]] to i2*
-// CHECK-NEXT: store i2 [[TAG]], i2* [[EXTRA_TAG_ADDR]], align 8
+// CHECK-NEXT: [[EXTRA_TAG_ADDR:%.*]] = bitcast [1 x i8]* [[EXTRA_TAG_ADDR_TMP]] to i8*
+// CHECK-NEXT: store i8 [[TAG]], i8* [[EXTRA_TAG_ADDR]], align 8
 // CHECK-NEXT: br label %[[DONE]]
 
 // CHECK:      ; <label>:[[DONE]]
@@ -441,8 +445,8 @@ bb0(%0 : $SinglePayloadNontrivial):
 
 //   -- Load the tag from the extra tag area
 // CHECK-NEXT: [[EXTRA_TAG_ADDR:%.*]] = getelementptr inbounds %O20enum_value_semantics24MultiPayloadEmptyPayload, %O20enum_value_semantics24MultiPayloadEmptyPayload* [[SELF]], i32 0, i32 0
-// CHECK-NEXT: [[EXTRA_TAG_TMP:%.*]] = load i3, i3* [[EXTRA_TAG_ADDR]], align 1
-// CHECK-NEXT: [[EXTRA_TAG:%.*]] = zext i3 [[EXTRA_TAG_TMP]] to i32
+// CHECK-NEXT: [[EXTRA_TAG_TMP:%.*]] = load i8, i8* [[EXTRA_TAG_ADDR]], align 1
+// CHECK-NEXT: [[EXTRA_TAG:%.*]] = zext i8 [[EXTRA_TAG_TMP]] to i32
 // CHECK-NEXT: ret i32 [[EXTRA_TAG]]
 
 
@@ -456,9 +460,9 @@ bb0(%0 : $SinglePayloadNontrivial):
 // CHECK:      [[SELF:%.*]] = bitcast %swift.opaque* %value to %O20enum_value_semantics24MultiPayloadEmptyPayload*
 
 //   -- Store the tag in the extra tag area
-// CHECK-NEXT: [[TAG:%.*]] = trunc i32 %tag to i3
+// CHECK-NEXT: [[TAG:%.*]] = trunc i32 %tag to i8
 // CHECK-NEXT: [[EXTRA_TAG_ADDR:%.*]] = getelementptr inbounds %O20enum_value_semantics24MultiPayloadEmptyPayload, %O20enum_value_semantics24MultiPayloadEmptyPayload* [[SELF]], i32 0, i32 0
-// CHECK-NEXT: store i3 [[TAG]], i3* [[EXTRA_TAG_ADDR]], align 1
+// CHECK-NEXT: store i8 [[TAG]], i8* [[EXTRA_TAG_ADDR]], align 1
 // CHECK-NEXT: ret void
 
 
@@ -476,15 +480,15 @@ bb0(%0 : $SinglePayloadNontrivial):
 // CHECK-NEXT: [[PAYLOAD_1_ADDR:%.*]] = getelementptr
 // CHECK-NEXT: [[PAYLOAD_1:%.*]] = load i64, i64* [[PAYLOAD_1_ADDR]], align 8
 // CHECK-NEXT: [[T0:%.*]] = getelementptr inbounds %O20enum_value_semantics22MultiPayloadNontrivial, %O20enum_value_semantics22MultiPayloadNontrivial* %0, i32 0, i32 1
-// CHECK-NEXT: [[TAG_ADDR:%.*]] = bitcast [1 x i8]* [[T0]] to i3*
-// CHECK-NEXT: [[TAG:%.*]] = load i3, i3* [[TAG_ADDR]], align 8
-// CHECK-NEXT: switch i3 [[TAG]], label %[[END:[0-9]+]] [
-// CHECK:        i3 0, label %[[PAYLOAD1_DESTROY:[0-9]+]]
-// CHECK:        i3 2, label %[[PAYLOAD3_DESTROY:[0-9]+]]
+// CHECK-NEXT: [[TAG_ADDR:%.*]] = bitcast [1 x i8]* [[T0]] to i8*
+// CHECK-NEXT: [[TAG:%.*]] = load i8, i8* [[TAG_ADDR]], align 8
+// CHECK-NEXT: switch i8 [[TAG]], label %[[END:[0-9]+]] [
+// CHECK:        i8 0, label %[[PAYLOAD1_DESTROY:[0-9]+]]
+// CHECK:        i8 2, label %[[PAYLOAD3_DESTROY:[0-9]+]]
 // CHECK:      ]
 // CHECK:      ; <label>:[[PAYLOAD1_DESTROY]]
 // CHECK-NEXT: [[PAYLOAD1_VAL:%.*]] = inttoptr i64 [[PAYLOAD_0]] to %swift.refcounted*
-// CHECK-NEXT: call void @rt_swift_release(%swift.refcounted* [[PAYLOAD1_VAL]])
+// CHECK-NEXT: call void @swift_rt_swift_release(%swift.refcounted* [[PAYLOAD1_VAL]])
 // CHECK-NEXT: br label %[[END]]
 // CHECK:      ; <label>:[[PAYLOAD3_DESTROY]]
 // CHECK-NEXT: [[PAYLOAD3_1_VAL:%.*]] = inttoptr i64 [[PAYLOAD_1]] to %objc_object*
@@ -533,13 +537,13 @@ bb0(%0 : $SinglePayloadNontrivial):
 // CHECK-NEXT: [[PAYLOAD_0:%.*]] = load i64, i64* [[PAYLOAD_0_ADDR]], align 8
 // CHECK-NEXT: [[PAYLOAD_1_ADDR:%.*]] = getelementptr
 // CHECK-NEXT: [[PAYLOAD_1:%.*]] = load i64, i64* [[PAYLOAD_1_ADDR]], align 8
-// CHECK:      switch i2 [[SPARE_BITS:%.*]], label %[[END:[0-9]+]] [
-// CHECK:        i2 0, label %[[PAYLOAD1_DESTROY:[0-9]+]]
-// CHECK:        i2 -2, label %[[PAYLOAD3_DESTROY:[0-9]+]]
+// CHECK:      switch i8 [[SPARE_BITS:%.*]], label %[[END:[0-9]+]] [
+// CHECK:        i8 0, label %[[PAYLOAD1_DESTROY:[0-9]+]]
+// CHECK:        i8 2, label %[[PAYLOAD3_DESTROY:[0-9]+]]
 // CHECK:      ]
 // CHECK:      ; <label>:[[PAYLOAD1_DESTROY]]
 // CHECK-NEXT: [[PAYLOAD1_VAL:%.*]] = inttoptr i64 [[PAYLOAD_0]] to %swift.refcounted*
-// CHECK-NEXT: call void @rt_swift_release(%swift.refcounted* [[PAYLOAD1_VAL]])
+// CHECK-NEXT: call void @swift_rt_swift_release(%swift.refcounted* [[PAYLOAD1_VAL]])
 // CHECK-NEXT: br label %[[END]]
 // CHECK:      ; <label>:[[PAYLOAD3_DESTROY]]
 // CHECK-NEXT: [[MASKED:%.*]] = and i64 [[PAYLOAD_1]]
@@ -561,9 +565,10 @@ bb0(%0 : $SinglePayloadNontrivial):
 // CHECK-NEXT: [[SECOND:%.*]] = load i64, i64* [[SECOND_ADDR]], align 8
 
 //   -- Get the high bits of the tag from the spare bits
-// CHECK-NEXT: [[SPARE_TAG_TMP2:%.*]] = lshr i64 [[SECOND]], 62
-// CHECK-NEXT: [[SPARE_TAG_TMP:%.*]] = trunc i64 [[SPARE_TAG_TMP2]] to i2
-// CHECK-NEXT: [[SPARE_TAG:%.*]] = zext i2 [[SPARE_TAG_TMP]] to i32
+// CHECK-NEXT: [[SPARE_TAG_TMP:%.*]] = lshr i64 [[SECOND]], 62
+// CHECK-NEXT: [[SPARE_TAG_TMP2:%.*]] = trunc i64 [[SPARE_TAG_TMP]] to i8
+// CHECK-NEXT: [[SPARE_TAG_TMP3:%.*]] = and i8 [[SPARE_TAG_TMP2]], 3
+// CHECK-NEXT: [[SPARE_TAG:%.*]] = zext i8 [[SPARE_TAG_TMP3]] to i32
 // CHECK-NEXT: [[PAYLOAD_TAG:%.*]] = sub i32 [[SPARE_TAG]], 3
 
 //   -- Get the low bits of the tag from the payload area
@@ -671,14 +676,14 @@ bb0(%0 : $SinglePayloadNontrivial):
 
 //   -- Load the high bits of the tag from the spare bits area
 // CHECK-NEXT: [[SPARE_BITS_TMP2:%.*]] = lshr i64 [[PAYLOAD]], 63
-// CHECK-NEXT: [[SPARE_BITS_TMP:%.*]] = trunc i64 [[SPARE_BITS_TMP2]] to i2
-// CHECK-NEXT: [[SPARE_BITS:%.*]] = and i2 [[SPARE_BITS_TMP]], 1
-// CHECK-NEXT: [[EXTRA_TAG:%.*]] = zext i1 [[EXTRA_TAG_TMP]] to i2
+// CHECK-NEXT: [[SPARE_BITS_TMP:%.*]] = trunc i64 [[SPARE_BITS_TMP2]] to i8
+// CHECK-NEXT: [[SPARE_BITS:%.*]] = and i8 [[SPARE_BITS_TMP]], 1
+// CHECK-NEXT: [[EXTRA_TAG:%.*]] = zext i1 [[EXTRA_TAG_TMP]] to i8
 
 //   -- Combine high bits and low bits to form tag
-// CHECK-NEXT: [[TAG_TMP:%.*]] = shl i2 [[EXTRA_TAG]], 1
-// CHECK-NEXT: [[TAG:%.*]] = or i2 [[SPARE_BITS]], [[TAG_TMP]] 
-// CHECK-NEXT: [[RESULT:%.*]] = zext i2 [[TAG]] to i32
+// CHECK-NEXT: [[TAG_TMP:%.*]] = shl i8 [[EXTRA_TAG]], 1
+// CHECK-NEXT: [[TAG:%.*]] = or i8 [[SPARE_BITS]], [[TAG_TMP]]
+// CHECK-NEXT: [[RESULT:%.*]] = zext i8 [[TAG]] to i32
 // CHECK-NEXT: [[PAYLOAD_TAG:%.*]] = sub i32 [[RESULT]],
 // CHECK-NEXT: ret i32 [[PAYLOAD_TAG]]
 

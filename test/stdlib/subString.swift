@@ -5,11 +5,10 @@ import StdlibUnittest
 
 var SubstringTests = TestSuite("SubstringTests")
 
-func checkMatch<S: Collection, T: Collection
+func checkMatch<S: Collection, T: Collection>(_ x: S, _ y: T, _ i: S.Index)
   where S.Index == T.Index, S.Iterator.Element == T.Iterator.Element,
-  S.Iterator.Element: Equatable>(
-  _ x: S, _ y: T, _ i: S.Index) {
-  
+  S.Iterator.Element: Equatable
+{
   expectEqual(x[i], y[i])
 }
 
@@ -25,9 +24,7 @@ SubstringTests.test("String") {
   expectEqual(s3, "cd")
 }
 
-SubstringTests.test("CharacterView")
-  .xfail(.always("CharacterView slices don't share indices"))
-  .code {
+SubstringTests.test("CharacterView") {
   let s = "abcdefg"
   var t = s.characters.dropFirst(2)
   var u = t.dropFirst(2)
@@ -41,6 +38,11 @@ SubstringTests.test("CharacterView")
   checkMatch(t, u, u.index(after: u.startIndex))
   checkMatch(t, u, u.index(before: u.endIndex))
   
+  expectEqual("", String(t.dropFirst(10)))
+  expectEqual("", String(t.dropLast(10)))
+  expectEqual("", String(u.dropFirst(10)))
+  expectEqual("", String(u.dropLast(10)))
+  
   t.replaceSubrange(t.startIndex...t.startIndex, with: ["C"])
   u.replaceSubrange(u.startIndex...u.startIndex, with: ["E"])
   expectEqual(String(u), "Efg")
@@ -48,9 +50,7 @@ SubstringTests.test("CharacterView")
   expectEqual(s, "abcdefg")
 }
 
-SubstringTests.test("UnicodeScalars")
-  .xfail(.always("UnicodeScalarsView slices don't share indices"))
-  .code {
+SubstringTests.test("UnicodeScalars") {
   let s = "abcdefg"
   var t = s.unicodeScalars.dropFirst(2)
   var u = t.dropFirst(2)
@@ -64,6 +64,11 @@ SubstringTests.test("UnicodeScalars")
   checkMatch(t, u, u.index(after: u.startIndex))
   checkMatch(t, u, u.index(before: u.endIndex))
   
+  expectEqual("", String(t.dropFirst(10)))
+  expectEqual("", String(t.dropLast(10)))
+  expectEqual("", String(u.dropFirst(10)))
+  expectEqual("", String(u.dropLast(10)))
+  
   t.replaceSubrange(t.startIndex...t.startIndex, with: ["C"])
   u.replaceSubrange(u.startIndex...u.startIndex, with: ["E"])
   expectEqual(String(u), "Efg")
@@ -71,9 +76,7 @@ SubstringTests.test("UnicodeScalars")
   expectEqual(s, "abcdefg")
 }
 
-SubstringTests.test("UTF16View")
-  .xfail(.always("UTF16View slices don't share indices"))
-  .code {
+SubstringTests.test("UTF16View") {
   let s = "abcdefg"
   let t = s.utf16.dropFirst(2)
   let u = t.dropFirst(2)
@@ -86,6 +89,11 @@ SubstringTests.test("UTF16View")
   checkMatch(t, u, u.startIndex)
   checkMatch(t, u, u.index(after: u.startIndex))
   checkMatch(t, u, u.index(before: u.endIndex))
+  
+  expectEqual("", String(t.dropFirst(10))!)
+  expectEqual("", String(t.dropLast(10))!)
+  expectEqual("", String(u.dropFirst(10))!)
+  expectEqual("", String(u.dropLast(10))!)
 }
 
 SubstringTests.test("UTF8View") {
@@ -99,6 +107,11 @@ SubstringTests.test("UTF8View") {
   checkMatch(s.utf8, t, u.startIndex)
   checkMatch(t, u, u.startIndex)
   checkMatch(t, u, u.index(after: u.startIndex))
+
+  expectEqual("", String(t.dropFirst(10))!)
+  expectEqual("", String(t.dropLast(10))!)
+  expectEqual("", String(u.dropFirst(10))!)
+  expectEqual("", String(u.dropLast(10))!)
 }
 
 runAllTests()

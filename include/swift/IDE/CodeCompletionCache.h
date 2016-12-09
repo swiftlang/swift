@@ -5,8 +5,8 @@
 // Copyright (c) 2014 - 2016 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
-// See http://swift.org/LICENSE.txt for license information
-// See http://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
+// See https://swift.org/LICENSE.txt for license information
+// See https://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
 //
 //===----------------------------------------------------------------------===//
 
@@ -16,6 +16,7 @@
 #include "swift/IDE/CodeCompletion.h"
 #include "swift/Basic/ThreadSafeRefCounted.h"
 #include "llvm/ADT/IntrusiveRefCntPtr.h"
+#include <system_error>
 
 namespace swift {
 namespace ide {
@@ -39,13 +40,15 @@ public:
     std::vector<std::string> AccessPath;
     bool ResultsHaveLeadingDot;
     bool ForTestableLookup;
+    bool CodeCompleteInitsInPostfixExpr;
 
     friend bool operator==(const Key &LHS, const Key &RHS) {
       return LHS.ModuleFilename == RHS.ModuleFilename &&
-      LHS.ModuleName == RHS.ModuleName &&
-      LHS.AccessPath == RHS.AccessPath &&
-      LHS.ResultsHaveLeadingDot == RHS.ResultsHaveLeadingDot &&
-      LHS.ForTestableLookup == RHS.ForTestableLookup;
+        LHS.ModuleName == RHS.ModuleName &&
+        LHS.AccessPath == RHS.AccessPath &&
+        LHS.ResultsHaveLeadingDot == RHS.ResultsHaveLeadingDot &&
+        LHS.ForTestableLookup == RHS.ForTestableLookup &&
+        LHS.CodeCompleteInitsInPostfixExpr == RHS.CodeCompleteInitsInPostfixExpr;
     }
   };
 
@@ -101,10 +104,10 @@ template<>
 struct DenseMapInfo<swift::ide::CodeCompletionCache::Key> {
   using KeyTy = swift::ide::CodeCompletionCache::Key;
   static inline KeyTy getEmptyKey() {
-    return KeyTy{"", "", {}, false, false};
+    return KeyTy{"", "", {}, false, false, false};
   }
   static inline KeyTy getTombstoneKey() {
-    return KeyTy{"", "", {}, true, false};
+    return KeyTy{"", "", {}, true, false, false};
   }
   static unsigned getHashValue(const KeyTy &Val) {
     size_t H = 0;

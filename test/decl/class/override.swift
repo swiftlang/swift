@@ -1,4 +1,4 @@
-// RUN: %target-parse-verify-swift -parse-as-library
+// RUN: %target-typecheck-verify-swift -parse-as-library
 
 class A {
   func ret_sametype() -> Int { return 0 }
@@ -251,4 +251,29 @@ class OverridesWithMismatchedConcreteDerived<T>:
 class OverridesWithConcreteDerived:
     OverriddenWithConcreteDerived<Int> {
   override func foo() -> ConcreteDerived {}
+}
+
+
+// <rdar://problem/24646184>
+class Ty {}
+class SubTy : Ty {}
+class Base24646184 {
+  init(_: SubTy) { }
+  func foo(_: SubTy) { }
+
+  init(ok: Ty) { }
+  init(ok: SubTy) { }
+  func foo(ok: Ty) { }
+  func foo(ok: SubTy) { }
+}
+class Derived24646184 : Base24646184 {
+  override init(_: Ty) { } // expected-note {{'init' previously overridden here}}
+  override init(_: SubTy) { } // expected-error {{'init' has already been overridden}}
+  override func foo(_: Ty) { } // expected-note {{'foo' previously overridden here}}
+  override func foo(_: SubTy) { } // expected-error {{'foo' has already been overridden}}
+
+  override init(ok: Ty) { }
+  override init(ok: SubTy) { }
+  override func foo(ok: Ty) { }
+  override func foo(ok: SubTy) { }
 }

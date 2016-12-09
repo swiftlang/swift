@@ -5,8 +5,8 @@
 // Copyright (c) 2014 - 2016 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
-// See http://swift.org/LICENSE.txt for license information
-// See http://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
+// See https://swift.org/LICENSE.txt for license information
+// See https://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
 //
 //===----------------------------------------------------------------------===//
 //
@@ -111,7 +111,7 @@ namespace {
       return { E->getStartLoc(), E->getEndLoc() };
     }
   };
-}
+} // end anonymous namespace
 
 template <class T> static SourceRange getSourceRangeImpl(const T *E) {
   static_assert(isOverriddenFromExpr(&T::getSourceRange) ||
@@ -654,10 +654,12 @@ bool Expr::canAppendCallParentheses() const {
     return !cast<DeclRefExpr>(this)->getDecl()->getName().isOperator();
 
   case ExprKind::SuperRef:
-  case ExprKind::Type:
   case ExprKind::OtherConstructorDeclRef:
   case ExprKind::DotSyntaxBaseIgnored:
     return true;
+
+  case ExprKind::Type:
+    return cast<TypeExpr>(this)->getTypeRepr()->isSimple();
 
   case ExprKind::OverloadedDeclRef: {
     auto *overloadedExpr = cast<OverloadedDeclRefExpr>(this);
@@ -950,7 +952,7 @@ APInt IntegerLiteralExpr::getValue(StringRef Text, unsigned BitWidth) {
 
 APInt IntegerLiteralExpr::getValue() const {
   assert(!getType().isNull() && "Semantic analysis has not completed");
-  assert(!getType()->is<ErrorType>() && "Should have a valid type");
+  assert(!getType()->hasError() && "Should have a valid type");
   return getIntegerLiteralValue(
       isNegative(), getDigitsText(),
       getType()->castTo<BuiltinIntegerType>()->getGreatestWidth());
@@ -980,7 +982,7 @@ APFloat FloatLiteralExpr::getValue(StringRef Text,
 
 llvm::APFloat FloatLiteralExpr::getValue() const {
   assert(!getType().isNull() && "Semantic analysis has not completed");
-  assert(!getType()->is<ErrorType>() && "Should have a valid type");
+  assert(!getType()->hasError() && "Should have a valid type");
 
   return getFloatLiteralValue(isNegative(), getDigitsText(),
                   getType()->castTo<BuiltinFloatType>()->getAPFloatSemantics());
@@ -1314,18 +1316,44 @@ SequenceExpr *SequenceExpr::create(ASTContext &ctx, ArrayRef<Expr*> elements) {
   return ::new(Buffer) SequenceExpr(elements);
 }
 
-SourceLoc TupleExpr::getStartLoc() const {
-  if (LParenLoc.isValid()) return LParenLoc;
-  if (getNumElements() == 0) return SourceLoc();
-  return getElement(0)->getStartLoc();
-}
-
-SourceLoc TupleExpr::getEndLoc() const {
-  if (hasTrailingClosure() || RParenLoc.isInvalid()) {
-    if (getNumElements() == 0) return SourceLoc();
-    return getElements().back()->getEndLoc();
+SourceRange TupleExpr::getSourceRange() const {
+  SourceLoc start = SourceLoc();
+  SourceLoc end = SourceLoc();
+  if (LParenLoc.isValid()) {
+    start = LParenLoc;
+  } else if (getNumElements() == 0) {
+    return { SourceLoc(), SourceLoc() };
+  } else {
+    // Scan forward for the first valid source loc.
+    for (Expr *expr : getElements()) {
+      start = expr->getStartLoc();
+      if (start.isValid()) {
+        break;
+      }
+    }
   }
-  return RParenLoc;
+  
+  if (hasTrailingClosure() || RParenLoc.isInvalid()) {
+    if (getNumElements() == 0) {
+      return { SourceLoc(), SourceLoc() };
+    } else {
+      // Scan backwards for a valid source loc.
+      for (Expr *expr : reversed(getElements())) {
+        end = expr->getEndLoc();
+        if (end.isValid()) {
+          break;
+        }
+      }
+    }
+  } else {
+    end = RParenLoc;
+  }
+  
+  if (start.isValid() && end.isValid()) {
+    return { start, end };
+  } else {
+    return { SourceLoc(), SourceLoc() };
+  }
 }
 
 TupleExpr::TupleExpr(SourceLoc LParenLoc, ArrayRef<Expr *> SubExprs,
@@ -1773,14 +1801,14 @@ void AbstractClosureExpr::setParameterList(ParameterList *P) {
 
 
 Type AbstractClosureExpr::getResultType() const {
-  if (getType()->is<ErrorType>())
+  if (getType()->hasError())
     return getType();
 
   return getType()->castTo<FunctionType>()->getResult();
 }
 
 bool AbstractClosureExpr::isBodyThrowing() const {
-  if (getType()->is<ErrorType>())
+  if (getType()->hasError())
     return false;
 
   return getType()->castTo<FunctionType>()->getExtInfo().throws();
@@ -1811,22 +1839,20 @@ FORWARD_SOURCE_LOCS_TO(ClosureExpr, Body.getPointer())
 
 Expr *ClosureExpr::getSingleExpressionBody() const {
   assert(hasSingleExpressionBody() && "Not a single-expression body");
-  if (!isVoidConversionClosure()) {
-    return cast<ReturnStmt>(getBody()->getElement(0).get<Stmt *>())
-             ->getResult();
-  } else {
-    return getBody()->getElement(0).get<Expr *>();
-  }
+  auto body = getBody()->getElement(0);
+  if (body.is<Stmt *>())
+    return cast<ReturnStmt>(body.get<Stmt *>())->getResult();
+  return body.get<Expr *>();
 }
 
 void ClosureExpr::setSingleExpressionBody(Expr *NewBody) {
   assert(hasSingleExpressionBody() && "Not a single-expression body");
-  if (!isVoidConversionClosure()) {
-    cast<ReturnStmt>(getBody()->getElement(0).get<Stmt *>())
-      ->setResult(NewBody);
-  } else {
-    return getBody()->setElement(0, NewBody);
+  auto body = getBody()->getElement(0);
+  if (body.is<Stmt *>()) {
+    cast<ReturnStmt>(body.get<Stmt *>())->setResult(NewBody);
+    return;
   }
+  getBody()->setElement(0, NewBody);
 }
 
 FORWARD_SOURCE_LOCS_TO(AutoClosureExpr, Body)
@@ -1859,10 +1885,13 @@ TypeExpr::TypeExpr(Type Ty)
 // The type of a TypeExpr is always a metatype type.  Return the instance
 // type or null if not set yet.
 Type TypeExpr::getInstanceType() const {
-  if (!getType() || getType()->is<ErrorType>())
+  if (!getType())
     return Type();
-  
-  return getType()->castTo<MetatypeType>()->getInstanceType();
+
+  if (auto metaType = getType()->getAs<MetatypeType>())
+    return metaType->getInstanceType();
+
+  return ErrorType::get(getType()->getASTContext());
 }
 
 

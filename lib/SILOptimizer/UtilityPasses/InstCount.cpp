@@ -5,8 +5,8 @@
 // Copyright (c) 2014 - 2016 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
-// See http://swift.org/LICENSE.txt for license information
-// See http://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
+// See https://swift.org/LICENSE.txt for license information
+// See https://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
 //
 //===----------------------------------------------------------------------===//
 //
@@ -57,8 +57,8 @@ STATISTIC(TotalSpecializedInsts, "Number of instructions (of all types) in "
           "specialized functions");
 
 // Individual instruction statistics
-#define INST(Id, Parent, MemBehavior, ReleasingBehavior) \
-  STATISTIC(Num ## Id, "Number of " #Id);
+#define INST(Id, Parent, TextualName, MemBehavior, ReleasingBehavior)          \
+  STATISTIC(Num##Id, "Number of " #Id);
 #include "swift/SIL/SILNodes.def"
 
 namespace {
@@ -80,7 +80,7 @@ struct InstCountVisitor : SILVisitor<InstCountVisitor> {
 
   void visitValueBase(ValueBase *V) { }
 
-#define INST(Id, Parent, MemBehavior, ReleasingBehavior)                       \
+#define INST(Id, Parent, TextualName, MemBehavior, ReleasingBehavior)          \
   void visit##Id(Id *I) {                                                      \
     ++Num##Id;                                                                 \
     ++InstCount;                                                               \

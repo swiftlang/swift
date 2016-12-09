@@ -5,8 +5,8 @@
 // Copyright (c) 2014 - 2016 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
-// See http://swift.org/LICENSE.txt for license information
-// See http://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
+// See https://swift.org/LICENSE.txt for license information
+// See https://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
 //
 //===----------------------------------------------------------------------===//
 
@@ -21,7 +21,9 @@ namespace sourcekitd {
 class CompactArrayBuilderImpl {
 public:
   std::unique_ptr<llvm::MemoryBuffer> createBuffer() const;
+  void appendTo(llvm::SmallVectorImpl<char> &Buf) const;
 
+  size_t sizeInBytes() const;
   bool empty() const;
 
 protected:
@@ -35,30 +37,12 @@ protected:
 
 private:
   unsigned getOffsetForString(llvm::StringRef Str);
+  void copyInto(char *BufPtr, size_t Length) const;
 
   llvm::SmallVector<uint8_t, 256> EntriesBuffer;
   llvm::SmallString<256> StringBuffer;
 };
 
-template <typename ...EntryTypes>
-class CompactArrayBuilder : public CompactArrayBuilderImpl {
-public:
-  void addEntry(EntryTypes... Args) {
-    add(Args...);
-  }
-
-private:
-  template <typename T, typename ...Targs>
-  void add(T Val, Targs... Args) {
-    add(Val);
-    add(Args...);
-  }
-
-  template <typename T>
-  void add(T Val) {
-    addImpl(Val);
-  }
-};
 
 template <typename T>
 struct CompactArrayField {
@@ -86,6 +70,31 @@ struct CompactArrayEntriesSizer<T> {
   static constexpr size_t getByteSize() {
     return CompactArrayField<T>::getByteSize();
   }
+};
+
+template <typename ...EntryTypes>
+class CompactArrayBuilder : public CompactArrayBuilderImpl {
+public:
+  void addEntry(EntryTypes... Args) {
+    add(Args...);
+    count += 1;
+  }
+
+  size_t size() const { return count; }
+
+private:
+  template <typename T, typename ...Targs>
+  void add(T Val, Targs... Args) {
+    add(Val);
+    add(Args...);
+  }
+
+  template <typename T>
+  void add(T Val) {
+    addImpl(Val);
+  }
+
+  size_t count = 0;
 };
 
 class CompactArrayReaderImpl {

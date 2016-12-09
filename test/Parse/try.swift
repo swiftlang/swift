@@ -1,4 +1,4 @@
-// RUN: %target-parse-verify-swift
+// RUN: %target-typecheck-verify-swift
 
 // Intentionally has lower precedence than assignments and ?:
 infix operator %%%% : LowPrecedence
@@ -6,7 +6,7 @@ precedencegroup LowPrecedence {
   associativity: none
   lowerThan: AssignmentPrecedence
 }
-func %%%%<T,U>(x:T, y:U) -> Int { return 0 }
+func %%%%<T, U>(x: T, y: U) -> Int { return 0 }
 
 // Intentionally has lower precedence between assignments and ?:
 infix operator %%% : MiddlingPrecedence
@@ -15,7 +15,7 @@ precedencegroup MiddlingPrecedence {
   higherThan: AssignmentPrecedence
   lowerThan: TernaryPrecedence
 }
-func %%%<T,U>(x:T, y:U) -> Int { return 1 }
+func %%%<T, U>(x: T, y: U) -> Int { return 1 }
 
 func foo() throws -> Int { return 0 }
 func bar() throws -> Int { return 0 }

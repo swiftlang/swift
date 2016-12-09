@@ -5,8 +5,8 @@
 // Copyright (c) 2014 - 2016 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
-// See http://swift.org/LICENSE.txt for license information
-// See http://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
+// See https://swift.org/LICENSE.txt for license information
+// See https://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
 //
 //===----------------------------------------------------------------------===//
 
@@ -14,7 +14,7 @@
 
 extension UnsafeBufferPointer {
   /// Initialize an `UnsafeBufferPointer<Element>` from an `AudioBuffer`.
-  /// Binds the the buffer's memory type to `Element`.
+  /// Binds the buffer's memory type to `Element`.
   public init(_ audioBuffer: AudioBuffer) {
     let count = Int(audioBuffer.mDataByteSize) / MemoryLayout<Element>.stride
     let elementPtr = audioBuffer.mData?.bindMemory(

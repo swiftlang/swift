@@ -5,8 +5,8 @@
 // Copyright (c) 2014 - 2016 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
-// See http://swift.org/LICENSE.txt for license information
-// See http://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
+// See https://swift.org/LICENSE.txt for license information
+// See https://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
 //
 //===----------------------------------------------------------------------===//
 
@@ -293,7 +293,7 @@ public struct ${Self}<Pointee>
     _debugPrecondition(
       count >= 0, "${Self}.initialize with negative count")
     _debugPrecondition(
-      UnsafePointer(self) + count <= source || 
+      UnsafePointer(self) + count <= source ||
       source + count <= UnsafePointer(self),
       "${Self}.initialize overlapping range")
     Builtin.copyArray(
@@ -366,20 +366,33 @@ public struct ${Self}<Pointee>
 %  end
 
   /// Rebinds memory at `self` to type `T` with capacity to hold `count`
-  /// adjacent `T` values while executing the `body` closure. After executing
-  /// the closure, rebinds memory back to `Pointee`.
+  /// adjacent `T` values while executing the `body` closure.
+  ///
+  /// After executing the closure, rebinds memory back to `Pointee`.
   ///
   /// - Precondition: Type 'T' is layout compatible with type 'Pointee'.
   /// - Precondition: The memory `self..<self + count * MemoryLayout<T>.stride`
   ///   is bound to `Pointee`.
+  ///
+  /// Accessing `${Self}<T>.pointee` requires that the memory be "bound" to
+  /// type `T`.  A memory location may only be bound to one type at a time, so
+  /// accessing the same memory as an unrelated type without first rebinding the
+  /// memory is undefined. `self` may not be accessed within the `body` closure
+  /// because memory is no longer bound to `Pointee` while it executes. The
+  /// closure's `${Self}<T>` argument must not escape the closure because memory
+  /// is only temporarily bound to `T`.
+  ///
+  /// To persistently bind this memory to a different type, first obtain a
+  /// raw pointer to the memory, then invoke the `bindMemory` API:
+  /// `UnsafeRawPointer(typedPointer).bindMemory(to:capacity:)`.
   public func withMemoryRebound<T, Result>(to: T.Type, capacity count: Int,
-    _ body: (UnsafeMutablePointer<T>) throws -> Result
+    _ body: (${Self}<T>) throws -> Result
   ) rethrows -> Result {
     Builtin.bindMemory(_rawValue, count._builtinWordValue, T.self)
     defer {
       Builtin.bindMemory(_rawValue, count._builtinWordValue, Pointee.self)
     }
-    return try body(UnsafeMutablePointer<T>(_rawValue))
+    return try body(${Self}<T>(_rawValue))
   }
 
   /// Accesses the pointee at `self + i`.
@@ -419,21 +432,29 @@ public struct ${Self}<Pointee>
   }
 
   /// Returns the next consecutive position.
+  ///
+  /// - Precondition: The result is within the bounds of the same allocation.
   public func successor() -> ${Self} {
     return self + 1
   }
 
   /// Returns the previous consecutive position.
+  ///
+  /// - Precondition: The result is within the bounds of the same allocation.
   public func predecessor() -> ${Self} {
     return self - 1
   }
 
   /// Returns `end - self`.
-  public func distance(to x: ${Self}) -> Int {
-    return x - self
+  ///
+  /// - Precondition: The result is within the bounds of the same allocation.
+  public func distance(to end: ${Self}) -> Int {
+    return end - self
   }
 
   /// Returns `self + n`.
+  ///
+  /// - Precondition: The result is within the bounds of the same allocation.
   public func advanced(by n: Int) -> ${Self} {
     return self + n
   }
@@ -465,60 +486,65 @@ extension ${Self} : CustomPlaygroundQuickLookable {
   }
 }
 
-/// - Note: Strideable's implementation is potentially less efficient and cannot
-///   handle misaligned pointers.
-@_transparent
-public func == <Pointee>(
-  lhs: ${Self}<Pointee>, rhs: ${Self}<Pointee>
-) -> Bool {
-  return Bool(Builtin.cmp_eq_RawPointer(lhs._rawValue, rhs._rawValue))
-}
+extension ${Self} {
+  // - Note: Strideable's implementation is potentially less efficient and cannot
+  //   handle misaligned pointers.
+  @_transparent
+  public static func == (lhs: ${Self}<Pointee>, rhs: ${Self}<Pointee>) -> Bool {
+    return Bool(Builtin.cmp_eq_RawPointer(lhs._rawValue, rhs._rawValue))
+  }
 
-/// - Note: Strideable's implementation is potentially less efficient and cannot
-///   handle misaligned pointers.
-///
-/// - Note: This is an unsigned comparison unlike Strideable's implementation.
-@_transparent
-public func < <Pointee>(lhs: ${Self}<Pointee>, rhs: ${Self}<Pointee>) -> Bool {
-  return Bool(Builtin.cmp_ult_RawPointer(lhs._rawValue, rhs._rawValue))
-}
+  // - Note: Strideable's implementation is potentially less efficient and
+  // cannot handle misaligned pointers.
+  //
+  // - Note: This is an unsigned comparison unlike Strideable's implementation.
+  @_transparent
+  public static func < (lhs: ${Self}<Pointee>, rhs: ${Self}<Pointee>) -> Bool {
+    return Bool(Builtin.cmp_ult_RawPointer(lhs._rawValue, rhs._rawValue))
+  }
 
-/// - Note: The following family of operator overloads are redundant
-///   with Strideable. However, optimizer improvements are needed
-///   before they can be removed without affecting performance.
-@_transparent
-public func + <Pointee>(lhs: ${Self}<Pointee>, rhs: Int) -> ${Self}<Pointee> {
-  return ${Self}(Builtin.gep_Word(
-    lhs._rawValue, (rhs &* MemoryLayout<Pointee>.stride)._builtinWordValue))
-}
+  // - Note: The following family of operator overloads are redundant
+  //   with Strideable. However, optimizer improvements are needed
+  //   before they can be removed without affecting performance.
 
-@_transparent
-public func + <Pointee>(lhs: Int,
-           rhs: ${Self}<Pointee>) -> ${Self}<Pointee> {
-  return rhs + lhs
-}
+  /// - Precondition: The result is within bounds of the same allocation.
+  @_transparent
+  public static func + (lhs: ${Self}<Pointee>, rhs: Int) -> ${Self}<Pointee> {
+    return ${Self}(Builtin.gep_Word(
+      lhs._rawValue, rhs._builtinWordValue, Pointee.self))
+  }
 
-@_transparent
-public func - <Pointee>(lhs: ${Self}<Pointee>, rhs: Int) -> ${Self}<Pointee> {
-  return lhs + -rhs
-}
+  /// - Precondition: The result is within the bounds of the same allocation.
+  @_transparent
+  public static func + (lhs: Int, rhs: ${Self}<Pointee>) -> ${Self}<Pointee> {
+    return rhs + lhs
+  }
 
-@_transparent
-public func - <Pointee>(lhs: ${Self}<Pointee>, rhs: ${Self}<Pointee>) -> Int {
-  return
-    Int(Builtin.sub_Word(Builtin.ptrtoint_Word(lhs._rawValue),
-                         Builtin.ptrtoint_Word(rhs._rawValue)))
-    / MemoryLayout<Pointee>.stride
-}
+  /// - Precondition: The result is within the bounds of the same allocation.
+  @_transparent
+  public static func - (lhs: ${Self}<Pointee>, rhs: Int) -> ${Self}<Pointee> {
+    return lhs + -rhs
+  }
 
-@_transparent
-public func += <Pointee>(lhs: inout ${Self}<Pointee>, rhs: Int) {
-  lhs = lhs + rhs
-}
+  @_transparent
+  public static func - (lhs: ${Self}<Pointee>, rhs: ${Self}<Pointee>) -> Int {
+    return
+      Int(Builtin.sub_Word(Builtin.ptrtoint_Word(lhs._rawValue),
+                           Builtin.ptrtoint_Word(rhs._rawValue)))
+      / MemoryLayout<Pointee>.stride
+  }
 
-@_transparent
-public func -= <Pointee>(lhs: inout ${Self}<Pointee>, rhs: Int) {
-  lhs = lhs - rhs
+  /// - Precondition: The result is within the bounds of the same allocation.
+  @_transparent
+  public static func += (lhs: inout ${Self}<Pointee>, rhs: Int) {
+    lhs = lhs + rhs
+  }
+
+  /// - Precondition: The result is within the bounds of the same allocation.
+  @_transparent
+  public static func -= (lhs: inout ${Self}<Pointee>, rhs: Int) {
+    lhs = lhs - rhs
+  }
 }
 
 extension ${Self} {
@@ -639,7 +665,7 @@ extension ${Self} {
     count: Int) {
     Builtin.unreachable()
   }
-  
+
   @available(*, unavailable, renamed: "moveAssign(from:count:)")
   public func moveAssignFrom(_ source: UnsafePointer<Pointee>, count: Int) {
     Builtin.unreachable()

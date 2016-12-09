@@ -5,8 +5,8 @@
 // Copyright (c) 2014 - 2016 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
-// See http://swift.org/LICENSE.txt for license information
-// See http://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
+// See https://swift.org/LICENSE.txt for license information
+// See https://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
 //
 //===----------------------------------------------------------------------===//
 //
@@ -253,7 +253,7 @@ RValue Transform::transform(RValue &&input,
     auto result = transform(std::move(input).getScalarValue(),
                             inputOrigType, inputSubstType,
                             outputOrigType, outputSubstType, ctxt);
-    return RValue(result, outputSubstType);
+    return RValue(SGF, Loc, outputSubstType, result);
   }
 
   // Okay, we have a tuple.  The output type will also be a tuple unless
@@ -275,7 +275,8 @@ RValue Transform::transform(RValue &&input,
   SmallVector<InitializationPtr, 4> eltInitsBuffer;
   MutableArrayRef<InitializationPtr> eltInits;
   auto tupleInit = ctxt.getEmitInto();
-  if (!ctxt.getEmitInto()->canSplitIntoTupleElements()) {
+  if (!ctxt.getEmitInto()
+      || !ctxt.getEmitInto()->canSplitIntoTupleElements()) {
     tupleInit = nullptr;
   } else {
     eltInits = tupleInit->splitIntoTupleElements(SGF, Loc, outputTupleType,
@@ -316,7 +317,7 @@ RValue Transform::transform(RValue &&input,
     return RValue();
   }
 
-  return RValue(outputExpansion, outputTupleType);
+  return RValue::withPreExplodedElements(outputExpansion, outputTupleType);
 }
 
 // Single @objc protocol value metatypes can be converted to the ObjC
@@ -334,7 +335,9 @@ static bool isProtocolClass(Type t) {
 static ManagedValue emitManagedLoad(SILGenFunction &gen, SILLocation loc,
                                     ManagedValue addr,
                                     const TypeLowering &addrTL) {
-  auto loadedValue = gen.B.createLoad(loc, addr.forward(gen));
+  // SEMANTIC ARC TODO: When the verifier is finished, revisit this.
+  auto loadedValue = addrTL.emitLoad(gen.B, loc, addr.forward(gen),
+                                     LoadOwnershipQualifier::Take);
   return gen.emitManagedRValueWithCleanup(loadedValue, addrTL);
 }
 
@@ -520,6 +523,21 @@ ManagedValue Transform::transform(ManagedValue v,
     return emitTransformExistential(SGF, Loc, v,
                                     inputSubstType, outputSubstType,
                                     ctxt);
+  }
+
+  // - T : Hashable to AnyHashable
+  if (isa<StructType>(outputSubstType) &&
+      outputSubstType->getAnyNominal() ==
+        SGF.getASTContext().getAnyHashableDecl()) {
+    auto *protocol = SGF.getASTContext().getProtocol(
+        KnownProtocolKind::Hashable);
+    auto conformance = SGF.SGM.M.getSwiftModule()->lookupConformance(
+        inputSubstType, protocol, nullptr);
+    auto result = SGF.emitAnyHashableErasure(Loc, v, inputSubstType,
+                                             *conformance, ctxt);
+    if (result.isInContext())
+      return ManagedValue::forInContext();
+    return std::move(result).getAsSingleValue(SGF, Loc);
   }
 
   // Should have handled the conversion in one of the cases above.
@@ -721,8 +739,8 @@ static ManagedValue manageParam(SILGenFunction &gen,
   // Unowned parameters are only guaranteed at the instant of the call, so we
   // must retain them even if we're in a context that can accept a +0 value.
   case ParameterConvention::Direct_Unowned:
-    gen.getTypeLowering(paramValue->getType())
-          .emitRetainValue(gen.B, loc, paramValue);
+    paramValue = gen.getTypeLowering(paramValue->getType())
+        .emitCopyValue(gen.B, loc, paramValue);
     SWIFT_FALLTHROUGH;
   case ParameterConvention::Direct_Owned:
     return gen.emitManagedRValueWithCleanup(paramValue);
@@ -752,14 +770,15 @@ void SILGenFunction::collectThunkParams(SILLocation loc,
   // Add the indirect results.
   for (auto result : F.getLoweredFunctionType()->getIndirectResults()) {
     auto paramTy = F.mapTypeIntoContext(result.getSILType());
-    (void) new (SGM.M) SILArgument(F.begin(), paramTy);
+    SILArgument *arg = F.begin()->createArgument(paramTy);
+    (void)arg;
   }
 
   // Add the parameters.
   auto paramTypes = F.getLoweredFunctionType()->getParameters();
   for (auto param : paramTypes) {
     auto paramTy = F.mapTypeIntoContext(param.getSILType());
-    auto paramValue = new (SGM.M) SILArgument(F.begin(), paramTy);
+    auto paramValue = F.begin()->createArgument(paramTy);
     auto paramMV = manageParam(*this, loc, paramValue, param, allowPlusZero);
     params.push_back(paramMV);
   }
@@ -1370,7 +1389,7 @@ public:
             SmallVectorImpl<SILValue> &innerIndirectResultAddrs) {
     // Assert that the indirect results are set up like we expect.
     assert(innerIndirectResultAddrs.empty());
-    assert(Gen.F.begin()->bbarg_size() >= outerFnType->getNumIndirectResults());
+    assert(Gen.F.begin()->args_size() >= outerFnType->getNumIndirectResults());
 
     innerIndirectResultAddrs.reserve(innerFnType->getNumIndirectResults());
 
@@ -1476,7 +1495,8 @@ private:
 
     SILValue resultAddr;
     if (result.isIndirect()) {
-      resultAddr = Gen.F.begin()->getBBArg(data.NextOuterIndirectResultIndex++);
+      resultAddr =
+          Gen.F.begin()->getArgument(data.NextOuterIndirectResultIndex++);
     }
 
     return { result, resultAddr };
@@ -2104,8 +2124,7 @@ void ResultPlanner::execute(ArrayRef<SILValue> innerDirectResults,
                        "reabstraction of returns_inner_pointer function");
       SWIFT_FALLTHROUGH;
     case ResultConvention::Unowned:
-      resultTL.emitRetainValue(Gen.B, Loc, resultValue);
-      return Gen.emitManagedRValueWithCleanup(resultValue, resultTL);
+      return Gen.emitManagedRetain(Loc, resultValue, resultTL);
     }
     llvm_unreachable("bad result convention!");
   };
@@ -2166,7 +2185,9 @@ void ResultPlanner::execute(ArrayRef<SILValue> innerDirectResults,
 
     case Operation::DirectToIndirect: {
       auto result = claimNextInnerDirectResult(op.InnerResult);
-      Gen.B.createStore(Loc, result.forward(Gen), op.OuterResultAddr);
+      Gen.B.emitStoreValueOperation(Loc, result.forward(Gen),
+                                    op.OuterResultAddr,
+                                    StoreOwnershipQualifier::Init);
       continue;
     }
 
@@ -2174,7 +2195,9 @@ void ResultPlanner::execute(ArrayRef<SILValue> innerDirectResults,
       auto resultAddr = op.InnerResultAddr;
       auto &resultTL = Gen.getTypeLowering(resultAddr->getType());
       auto result = Gen.emitManagedRValueWithCleanup(
-                                 Gen.B.createLoad(Loc, resultAddr), resultTL);
+          resultTL.emitLoad(Gen.B, Loc, resultAddr,
+                            LoadOwnershipQualifier::Take),
+          resultTL);
       addOuterDirectResult(result, op.OuterResult);
       continue;
     }
@@ -2314,11 +2337,24 @@ CanSILFunctionType SILGenFunction::buildThunkType(
   // on the result type.
   assert(expectedType->getExtInfo().hasContext());
 
-  // Just use the generic signature from the context.
-  // This isn't necessarily optimal.
-  auto genericSig = F.getLoweredFunctionType()->getGenericSignature();
-  auto subsArray = F.getForwardingSubstitutions();
-  subs.append(subsArray.begin(), subsArray.end());
+  auto extInfo = expectedType->getExtInfo()
+    .withRepresentation(SILFunctionType::Representation::Thin);
+
+  // Use the generic signature from the context if the thunk involves
+  // generic parameters.
+  CanGenericSignature genericSig;
+  GenericEnvironment *genericEnv = nullptr;
+  if (expectedType->hasArchetype() || sourceType->hasArchetype()) {
+    genericSig = F.getLoweredFunctionType()->getGenericSignature();
+    genericEnv = F.getGenericEnvironment();
+    auto subsArray = F.getForwardingSubstitutions();
+    subs.append(subsArray.begin(), subsArray.end());
+
+    // If our parent function was pseudogeneric, this thunk must also be
+    // pseudogeneric, since we have no way to pass generic parameters.
+    if (F.getLoweredFunctionType()->isPseudogeneric())
+      extInfo = extInfo.withIsPseudogeneric();
+  }
 
   // Add the function type as the parameter.
   SmallVector<SILParameterInfo, 4> params;
@@ -2328,10 +2364,7 @@ CanSILFunctionType SILGenFunction::buildThunkType(
                     sourceType->getExtInfo().hasContext()
                       ? DefaultThickCalleeConvention
                       : ParameterConvention::Direct_Unowned});
-  
-  auto extInfo = expectedType->getExtInfo()
-    .withRepresentation(SILFunctionType::Representation::Thin);
-  
+
   // Map the parameter and expected types out of context to get the interface
   // type of the thunk.
   SmallVector<SILParameterInfo, 4> interfaceParams;
@@ -2401,10 +2434,15 @@ static ManagedValue createThunk(SILGenFunction &gen,
   // Declare the thunk.
   SmallVector<Substitution, 4> substitutions;
   CanSILFunctionType substFnType;
+
   auto thunkType = gen.buildThunkType(fn, expectedType,
                                   substFnType, substitutions);
+  auto genericEnv = gen.F.getGenericEnvironment();
+  if (!thunkType->isPolymorphic())
+    genericEnv = nullptr;
+
   auto thunk = gen.SGM.getOrCreateReabstractionThunk(
-                                       gen.F.getGenericEnvironment(),
+                                       genericEnv,
                                        thunkType,
                                        fn.getType().castTo<SILFunctionType>(),
                                        expectedType,
@@ -2413,7 +2451,7 @@ static ManagedValue createThunk(SILGenFunction &gen,
   // Build it if necessary.
   if (thunk->empty()) {
     // Borrow the context archetypes from the enclosing function.
-    thunk->setGenericEnvironment(gen.F.getGenericEnvironment());
+    thunk->setGenericEnvironment(genericEnv);
     SILGenFunction thunkSGF(gen.SGM, *thunk);
     auto loc = RegularLocation::getAutoGeneratedLocation();
     buildThunkBody(thunkSGF, loc,

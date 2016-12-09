@@ -1,6 +1,7 @@
-// RUN: %target-parse-verify-swift
+// RUN: %target-typecheck-verify-swift -swift-version 4
 
-@escaping var fn : () -> Int = { 4 }  // expected-error {{@escaping may only be used on 'parameter' declarations}} {{1-11=}}
+@escaping var fn : () -> Int = { 4 }  // expected-error {{attribute can only be applied to types, not declarations}}
+func paramDeclEscaping(@escaping fn: (Int) -> Void) {} // expected-error {{attribute can only be applied to types, not declarations}}
 
 func wrongParamType(a: @escaping Int) {} // expected-error {{@escaping attribute only applies to function types}}
 
@@ -32,13 +33,13 @@ struct StoresClosure {
     closure = fn // expected-error{{assigning non-escaping parameter 'fn' to an @escaping closure}}
   }
 
-  func arrayPack(_ fn: () -> Int) -> [()->Int] {
+  func arrayPack(_ fn: () -> Int) -> [() -> Int] {
     // expected-note@-1{{parameter 'fn' is implicitly non-escaping}} {{24-24=@escaping }}
 
     return [fn] // expected-error{{using non-escaping parameter 'fn' in a context expecting an @escaping closure}}
   }
 
-  func arrayPack(_ fn: @escaping () -> Int, _ fn2 : () -> Int) -> [()->Int] {
+  func arrayPack(_ fn: @escaping () -> Int, _ fn2 : () -> Int) -> [() -> Int] {
     // expected-note@-1{{parameter 'fn2' is implicitly non-escaping}} {{53-53=@escaping }}
 
     return [fn, fn2] // expected-error{{using non-escaping parameter 'fn2' in a context expecting an @escaping closure}}
@@ -125,5 +126,35 @@ func testModuloOptionalness() {
   var deepOptionalClosure: (() -> Void)???
   func setDeepOptionalClosure(_ fn: () -> Void) { // expected-note {{parameter 'fn' is implicitly non-escaping}} {{37-37=@escaping }}
     deepOptionalClosure = fn // expected-error{{assigning non-escaping parameter 'fn' to an @escaping closure}}
+  }
+}
+
+// Check that functions in vararg position are @escaping
+func takesEscapingFunction(fn: @escaping () -> ()) {}
+func takesArrayOfFunctions(array: [() -> ()]) {}
+
+func takesVarargsOfFunctions(fns: () -> ()...) {
+  takesArrayOfFunctions(array: fns)
+  for fn in fns {
+    takesEscapingFunction(fn: fn)
+  }
+}
+
+func takesVarargsOfFunctionsExplicitEscaping(fns: @escaping () -> ()...) {} // expected-error{{@escaping attribute may only be used in function parameter position}}
+
+func takesNoEscapeFunction(fn: () -> ()) { // expected-note {{parameter 'fn' is implicitly non-escaping}}
+  takesVarargsOfFunctions(fns: fn) // expected-error {{passing non-escaping parameter 'fn' to function expecting an @escaping closure}}
+}
+
+
+class FooClass {
+  var stored : Optional<(()->Int)->Void> = nil
+  var computed : (()->Int)->Void {
+    get { return stored! }
+    set(newValue) { stored = newValue } // ok
+  }
+  var computedEscaping : (@escaping ()->Int)->Void {
+    get { return stored! }
+    set(newValue) { stored = newValue } // expected-error{{cannot assign value of type '(@escaping () -> Int) -> Void' to type 'Optional<(() -> Int) -> Void>' (aka 'Optional<(() -> Int) -> ()>')}}
   }
 }

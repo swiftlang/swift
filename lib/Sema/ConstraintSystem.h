@@ -5,8 +5,8 @@
 // Copyright (c) 2014 - 2016 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
-// See http://swift.org/LICENSE.txt for license information
-// See http://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
+// See https://swift.org/LICENSE.txt for license information
+// See https://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
 //
 //===----------------------------------------------------------------------===//
 //
@@ -158,12 +158,6 @@ class TypeVariableType::Implementation {
   friend class constraints::SavedTypeVariableBinding;
 
 public:
-  
-  /// \brief If this type variable is an opened literal expression, keep track
-  /// of the associated literal conformance for optimization and diagnostic
-  /// purposes.
-  ProtocolDecl *literalConformanceProto = nullptr;
-  
   explicit Implementation(constraints::ConstraintLocator *locator,
                           unsigned options)
     : Options(options), locator(locator),
@@ -354,49 +348,6 @@ public:
 namespace constraints {
 
 struct ResolvedOverloadSetListItem;
-
-/// \brief The kind of type matching to perform in matchTypes().
-enum class TypeMatchKind : char {
-  /// \brief Bind the types together directly.
-  BindType,
-  /// \brief Binds to a pointer element type.
-  BindToPointerType,
-  /// \brief Bind the type of a function parameter to the type of a reference
-  /// to it from within the function body. The param type is an inout type iff
-  /// the reference type is an lvalue type with the same object type.
-  /// Otherwise, the two types must be the same type.
-  BindParamType,
-  /// \brief Require the types to match exactly, but strips lvalueness from
-  /// a type when binding to a type variable.
-  SameType,
-  /// \brief Require that the first type conform to the second type (which
-  /// must be a protocol).
-  ConformsTo,
-  /// \brief Require the first type to be a subtype of the second type
-  /// (or be an exact match or trivial subtype).
-  Subtype,
-  /// \brief Requires the first type to be convertible to the second type,
-  /// which includes exact matches and both forms of subtyping.
-  Conversion,
-  /// \brief Requires the first type to be explicitly convertible to the second
-  /// type, which includes all forms of conversion included in Conversion, in
-  /// addition to bridging conversions.
-  ExplicitConversion,
-  /// \brief Requires the first type to be the element of an argument tuple
-  /// that is convertible to the second type, which represents the corresponding
-  /// element of the parameter tuple.
-  ArgumentConversion,
-  /// Requires the first type to be an argument type (tuple) that can be
-  /// converted to the second type, which represents the parameter type (tuple).
-  ArgumentTupleConversion,
-  /// \brief Requires the first type to be convertible to the second type,
-  /// which includes exact matches, both forms of subtyping, and inserting
-  /// address-of to convert implicit lvalues to inout arguments.  This is
-  /// used by assignment operators.
-  OperatorArgumentConversion,
-  /// Like \c ArgumentTupleConversion, but for operators.
-  OperatorArgumentTupleConversion,
-};
 
 /// \brief The result of comparing two constraint systems that are a solutions
 /// to the given set of constraints.
@@ -598,8 +549,8 @@ public:
   llvm::SmallDenseMap<ConstraintLocator *, ArchetypeType *>
     OpenedExistentialTypes;
 
-  /// The type variables that were bound via a Defaultable constraint.
-  llvm::SmallPtrSet<TypeVariableType *, 8> DefaultedTypeVariables;
+  /// The locators of \c Defaultable constraints whose defaults were used.
+  llvm::SmallPtrSet<ConstraintLocator *, 8> DefaultedConstraints;
 
   /// \brief Simplify the given type by substituting all occurrences of
   /// type variables for their fixed types.
@@ -851,6 +802,9 @@ struct MemberLookupResult {
     
     /// The member is inaccessible (e.g. a private member in another file).
     UR_Inaccessible,
+    
+    // A type's destructor cannot be referenced
+    UR_DestructorInaccessible,
   };
   
   /// This is a list of considered, but rejected, candidates, along with a
@@ -925,7 +879,8 @@ private:
     MemberLookups;
 
   /// Cached sets of "alternative" literal types.
-  Optional<ArrayRef<Type>> AlternativeLiteralTypes[12];
+  static const unsigned NumAlternativeLiteralTypes = 13;
+  Optional<ArrayRef<Type>> AlternativeLiteralTypes[NumAlternativeLiteralTypes];
 
   /// \brief Folding set containing all of the locators used in this
   /// constraint system.
@@ -937,10 +892,6 @@ private:
   /// The current fixed score for this constraint system and the (partial)
   /// solution it represents.
   Score CurrentScore;
-
-  /// Whether this constraint system is processing a favored
-  /// constraint.
-  bool HandlingFavoredConstraint = false;
 
   SmallVector<TypeVariableType *, 16> TypeVariables;
 
@@ -1000,24 +951,12 @@ private:
     OpenedExistentialTypes;
 
 public:
-  /// The type variables that were bound via a Defaultable constraint.
-  SmallVector<TypeVariableType *, 8> DefaultedTypeVariables;
-
-  /// The type variable used to describe the element type of the given array
-  /// literal.
-  llvm::SmallDenseMap<ArrayExpr *, TypeVariableType *>
-    ArrayElementTypeVariables;
-
-
-  /// The type variables used to describe the key and value types of the given
-  /// dictionary literal.
-  llvm::SmallDenseMap<DictionaryExpr *,
-                      std::pair<TypeVariableType *, TypeVariableType *>>
-    DictionaryElementTypeVariables;
+  /// The locators of \c Defaultable constraints whose defaults were used.
+  SmallVector<ConstraintLocator *, 8> DefaultedConstraints;
 
 private:
   /// \brief Describe the candidate expression for partial solving.
-  /// This class used used by shrink & solve methods which apply
+  /// This class used by shrink & solve methods which apply
   /// variation of directional path consistency algorithm in attempt
   /// to reduce scopes of the overload sets (disjunctions) in the system.
   class Candidate {
@@ -1034,13 +973,13 @@ private:
               ContextualTypePurpose ctp = ContextualTypePurpose::CTP_Unused)
         : E(expr), TC(cs.TC), DC(cs.DC), CT(ct), CTP(ctp) {}
 
-    /// \brief Return underlaying expression.
+    /// \brief Return underlying expression.
     Expr *getExpr() const { return E; }
 
     /// \brief Try to solve this candidate sub-expression
     /// and re-write it's OSR domains afterwards.
     ///
-    /// \returs true on solver failure, false otherwise.
+    /// \returns true on solver failure, false otherwise.
     bool solve();
 
     /// \brief Apply solutions found by solver as reduced OSR sets for
@@ -1114,14 +1053,6 @@ public:
   /// that locator.
   llvm::DenseMap<ConstraintLocator *, ArgumentLabelState> ArgumentLabels;
 
-  /// FIXME: This is a workaround for the way we perform protocol
-  /// conformance checking for generic requirements, where we re-use
-  /// the archetypes of the requirement (rather than, say, building
-  /// new archetypes) to match up with the witness. Those archetypes
-  /// can end up with references to the outer archetypes (of the
-  /// associated types), which need to be replaced.
-  TypeVariableType *SelfTypeVar = nullptr;
-
   /// \brief The set of additional attributes inferred for a FunctionType.  Note
   /// that this is not state kept as part of SolverState, so it only supports
   /// function attributes that need to be set invariant of the actual typing of
@@ -1176,8 +1107,8 @@ public:
     /// The length of \c OpenedExistentialTypes.
     unsigned numOpenedExistentialTypes;
 
-    /// The length of \c DefaultedTypeVariables.
-    unsigned numDefaultedTypeVariables;
+    /// The length of \c DefaultedConstraints.
+    unsigned numDefaultedConstraints;
 
     /// The previous score.
     Score PreviousScore;
@@ -1247,7 +1178,7 @@ private:
   ///
   /// \returns null when we aren't currently solving the system.
   SavedTypeVariableBindings *getSavedBindings() const {
-    return solverState? &solverState->savedBindings : nullptr;
+    return solverState ? &solverState->savedBindings : nullptr;
   }
 
   /// Add a new type variable that was already created.
@@ -1272,12 +1203,7 @@ public:
 
   /// \brief Create a new type variable.
   TypeVariableType *createTypeVariable(ConstraintLocator *locator,
-                                       unsigned options) {
-    auto tv = TypeVariableType::getNew(TC.Context, assignTypeVariableID(),
-                                       locator, options);
-    addTypeVariable(tv);
-    return tv;
-  }
+                                       unsigned options);
 
   /// Retrieve the set of active type variables.
   ArrayRef<TypeVariableType *> getTypeVariables() const {
@@ -1393,48 +1319,48 @@ public:
   /// emits an error message.
   void diagnoseFailureForExpr(Expr *expr);
 
-  /// \brief Add a newly-allocated constraint after attempting to simplify
-  /// it.
-  ///
-  /// \param isExternallySolved Whether this constraint is being solved
-  /// as an eager simplification, outside of the simplify() loop.
-  ///
-  /// \param simplifyExisting Whether we're simplifying an existing
-  /// constraint rather than introducing a new constraint.
-  ///
-  /// \returns true if this constraint was solved.
-  bool addConstraint(Constraint *constraint,
-                     bool isExternallySolved = false,
-                     bool simplifyExisting = false);
-
   /// \brief Add a constraint to the constraint system.
   void addConstraint(ConstraintKind kind, Type first, Type second,
-                     ConstraintLocator *locator, bool isFavored = false) {
-    assert(first && "Missing first type");
-    assert(second && "Missing second type");
-    auto c = Constraint::create(*this, kind, first, second, DeclName(),
-                                FunctionRefKind::Compound, locator);
-    if (isFavored) c->setFavored();
-    addConstraint(c);
-  }
+                     ConstraintLocatorBuilder locator,
+                     bool isFavored = false);
+
+  /// Add a new constraint with a restriction on its application.
+  void addRestrictedConstraint(ConstraintKind kind,
+                               ConversionRestrictionKind restriction,
+                               Type first, Type second,
+                               ConstraintLocatorBuilder locator);
 
   /// Add a constraint that binds an overload set to a specific choice.
   void addBindOverloadConstraint(Type boundTy, OverloadChoice choice,
                                  ConstraintLocator *locator) {
-    addConstraint(Constraint::createBindOverload(*this, boundTy, choice, 
-                                                 locator));
+    resolveOverload(locator, boundTy, choice);
   }
 
   /// \brief Add a value member constraint to the constraint system.
   void addValueMemberConstraint(Type baseTy, DeclName name, Type memberTy,
                                 FunctionRefKind functionRefKind,
-                                ConstraintLocator *locator) {
+                                ConstraintLocatorBuilder locator) {
     assert(baseTy);
     assert(memberTy);
     assert(name);
-    addConstraint(Constraint::create(*this, ConstraintKind::ValueMember,
-                                     baseTy, memberTy, name, functionRefKind,
-                                     locator));
+    switch (simplifyMemberConstraint(ConstraintKind::ValueMember, baseTy, name,
+                                     memberTy, functionRefKind,
+                                     TMF_GenerateConstraints, locator)) {
+    case SolutionKind::Unsolved:
+      llvm_unreachable("Unsolved result when generating constraints!");
+
+    case SolutionKind::Solved:
+      break;
+
+    case SolutionKind::Error:
+      if (shouldAddNewFailingConstraint()) {
+        addNewFailingConstraint(
+          Constraint::create(*this, ConstraintKind::ValueMember, baseTy,
+                             memberTy, name, functionRefKind,
+                             getConstraintLocator(locator)));
+      }
+      break;
+    }
   }
 
   /// \brief Add a value member constraint for an UnresolvedMemberRef
@@ -1442,47 +1368,86 @@ public:
   void addUnresolvedValueMemberConstraint(Type baseTy, DeclName name,
                                           Type memberTy,
                                           FunctionRefKind functionRefKind,
-                                          ConstraintLocator *locator) {
+                                          ConstraintLocatorBuilder locator) {
     assert(baseTy);
     assert(memberTy);
     assert(name);
-    addConstraint(Constraint::create(*this,
-                                     ConstraintKind::UnresolvedValueMember,
-                                     baseTy, memberTy, name, functionRefKind,
-                                     locator));
+    switch (simplifyMemberConstraint(ConstraintKind::UnresolvedValueMember,
+                                     baseTy, name, memberTy, functionRefKind,
+                                     TMF_GenerateConstraints, locator)) {
+    case SolutionKind::Unsolved:
+      llvm_unreachable("Unsolved result when generating constraints!");
+
+    case SolutionKind::Solved:
+      break;
+
+    case SolutionKind::Error:
+      if (shouldAddNewFailingConstraint()) {
+        addNewFailingConstraint(
+          Constraint::create(*this, ConstraintKind::UnresolvedValueMember,
+                             baseTy, memberTy, name, functionRefKind,
+                             getConstraintLocator(locator)));
+      }
+      break;
+    }
   }
 
-  /// \brief Add an archetype constraint.
-  void addArchetypeConstraint(Type baseTy, ConstraintLocator *locator) {
-    assert(baseTy);
-    addConstraint(Constraint::create(*this, ConstraintKind::Archetype,
-                                     baseTy, Type(), DeclName(),
-                                     FunctionRefKind::Compound, locator));
+  /// \brief Add a disjunction constraint.
+  void addDisjunctionConstraint(ArrayRef<Constraint *> constraints,
+                                ConstraintLocatorBuilder locator,
+                                RememberChoice_t rememberChoice = ForgetChoice,
+                                bool isFavored = false) {
+    auto constraint =
+      Constraint::createDisjunction(*this, constraints,
+                                    getConstraintLocator(locator),
+                                    rememberChoice);
+    if (isFavored)
+      constraint->setFavored();
+
+    addUnsolvedConstraint(constraint);
   }
-  
+
+  /// Whether we should add a new constraint to capture a failure.
+  bool shouldAddNewFailingConstraint() const {
+    // Only do this at the top level.
+    return !failedConstraint;
+  }
+
+  /// Add a new constraint that we know fails.
+  void addNewFailingConstraint(Constraint *constraint) {
+    assert(shouldAddNewFailingConstraint());
+    failedConstraint = constraint;
+    failedConstraint->setActive(false);
+
+    // Record this as a newly-generated constraint.
+    if (solverState) {
+      solverState->generatedConstraints.push_back(constraint);
+      solverState->retiredConstraints.push_back(constraint);
+    }
+  }
+
+  /// \brief Add a newly-generated constraint that is known not to be solvable
+  /// right now.
+  void addUnsolvedConstraint(Constraint *constraint) {
+    // We couldn't solve this constraint; add it to the pile.
+    InactiveConstraints.push_back(constraint);
+
+    // Add this constraint to the constraint graph.
+    CG.addConstraint(constraint);
+
+    // Record this as a newly-generated constraint.
+    if (solverState)
+      solverState->generatedConstraints.push_back(constraint);
+  }
+
   /// \brief Remove an inactive constraint from the current constraint graph.
   void removeInactiveConstraint(Constraint *constraint) {
     CG.removeConstraint(constraint);
     InactiveConstraints.erase(constraint);
-  }
 
-  /// Retrieve the type that corresponds to the given member of the
-  /// given base type, which may be a newly-created type variable.
-  ///
-  /// \param baseTypeVar The base type variable whose member is being queried.
-  ///
-  /// \param assocType The associated type we're referencing.
-  ///
-  /// \param locator The location used to describe this member access.
-  ///
-  /// \param options Options to be supplied to type variable creation if 
-  /// a new type is created.
-  ///
-  /// \returns the type variable representing the member type.
-  TypeVariableType *getMemberType(TypeVariableType *baseTypeVar, 
-                                  AssociatedTypeDecl *assocType,
-                                  ConstraintLocatorBuilder locator,
-                                  unsigned options);
+    if (solverState)
+      solverState->retiredConstraints.push_back(constraint);
+  }
 
   /// Retrieve the list of inactive constraints.
   ConstraintList &getConstraints() { return InactiveConstraints; }
@@ -1506,6 +1471,30 @@ public:
                                TypeVariableType *typeVar2,
                                bool updateWorkList = true);
 
+  /// \brief Flags that direct type matching.
+  enum TypeMatchFlags {
+    /// \brief Indicates that we are in a context where we should be
+    /// generating constraints for any unsolvable problems.
+    ///
+    /// This flag is automatically introduced when type matching destructures
+    /// a type constructor (tuple, function type, etc.), solving that
+    /// constraint while potentially generating others.
+    TMF_GenerateConstraints = 0x01,
+
+    /// Indicates that we are applying a fix.
+    TMF_ApplyingFix = 0x02,
+
+    /// Indicates we're matching an operator parameter.
+    TMF_ApplyingOperatorParameter = 0x4,
+
+    /// Indicates we're unwrapping an optional type for a value-to-optional
+    /// conversion.
+    TMF_UnwrappingOptional = 0x8,
+  };
+
+  /// Options that govern how type matching should proceed.
+  typedef OptionSet<TypeMatchFlags> TypeMatchOptions;
+
   /// \brief Retrieve the fixed type corresponding to the given type variable,
   /// or a null type if there is no fixed type.
   Type getFixedType(TypeVariableType *typeVar) {
@@ -1518,16 +1507,42 @@ public:
   ///
   /// \param type The type to simplify.
   ///
-  /// \param typeVar Will receive the type variable at which simplification 
-  /// stopped, which has no fixed type.
+  /// \param wantRValue Whether this routine should look through
+  /// lvalues at each step.
+  ///
+  /// param retainParens Whether to retain parentheses.
+  Type getFixedTypeRecursive(Type type, bool wantRValue,
+                             bool retainParens = false) {
+    TypeMatchOptions flags = None;
+    return getFixedTypeRecursive(type, flags, wantRValue, retainParens);
+  }
+
+  /// Retrieve the fixed type corresponding to a given type variable,
+  /// recursively, until we hit something that isn't a type variable
+  /// or a type variable that doesn't have a fixed type.
+  ///
+  /// \param type The type to simplify.
+  ///
+  /// \param flags When simplifying one of the types that is part of a
+  /// constraint we are examining, the set of flags that governs the
+  /// simplification. The set of flags may be both queried and mutated.
   ///
   /// \param wantRValue Whether this routine should look through
   /// lvalues at each step.
   ///
   /// param retainParens Whether to retain parentheses.
-  Type getFixedTypeRecursive(Type type, TypeVariableType *&typeVar,
+  Type getFixedTypeRecursive(Type type, TypeMatchOptions &flags,
                              bool wantRValue,
                              bool retainParens = false);
+
+  /// Determine whether the given type variable occurs within the given type.
+  ///
+  /// This routine assumes that the type has already been fully simplified.
+  ///
+  /// \param involvesOtherTypeVariables if non-null, records whether any other
+  /// type variables are present in the type.
+  static bool typeVarOccursInType(TypeVariableType *typeVar, Type type,
+                                  bool *involvesOtherTypeVariables = nullptr);
 
   /// \brief Assign a fixed type to the given type variable.
   ///
@@ -1541,9 +1556,9 @@ public:
   void assignFixedType(TypeVariableType *typeVar, Type type,
                        bool updateState = true);
 
-  // \brief Set the TVO_MustBeMaterializable bit on all type variables
-  // necessary to ensure that the type in question is materializable in a
-  // viable solution.
+  /// \brief Set the TVO_MustBeMaterializable bit on all type variables
+  /// necessary to ensure that the type in question is materializable in a
+  /// viable solution.
   void setMustBeMaterializableRecursive(Type type);
   
   /// \brief Determine if the type in question is an Array<T>.
@@ -1674,11 +1689,6 @@ public:
                           ConstraintLocatorBuilder locator,
                           const DeclRefExpr *base = nullptr);
 
-  /// Replace the 'Self' type in the archetype with the appropriate
-  /// type variable, if needed.
-  /// FIXME: See the documentation of SelfTypeVar.
-  Type replaceSelfTypeInArchetype(ArchetypeType *archetype);
-
   /// \brief Retrieve the type of a reference to the given value declaration,
   /// as a member with a base of the given type.
   ///
@@ -1722,8 +1732,7 @@ public:
   ArrayRef<typename std::iterator_traits<It>::value_type>
   allocateCopy(It start, It end) {
     typedef typename std::iterator_traits<It>::value_type T;
-    T *result = (T*)getAllocator().Allocate(sizeof(T)*(end-start),
-                                            __alignof__(T));
+    T *result = (T*)getAllocator().Allocate(sizeof(T)*(end-start), alignof(T));
     unsigned i;
     for (i = 0; start != end; ++start, ++i)
       new (result+i) T(*start);
@@ -1773,44 +1782,20 @@ public:
   /// destination of an assignment statement.
   Type computeAssignDestType(Expr *dest, SourceLoc equalLoc);
 
-public:
-  /// \brief Flags that direct type matching.
-  enum TypeMatchFlags {
-    TMF_None = 0,
-
-    /// \brief Indicates that we are in a context where we should be
-    /// generating constraints for any unsolvable problems.
-    ///
-    /// This flag is automatically introduced when type matching destructures
-    /// a type constructor (tuple, function type, etc.), solving that
-    /// constraint while potentially generating others.
-    TMF_GenerateConstraints = 0x01,
-
-    /// Indicates that we are applying a fix.
-    TMF_ApplyingFix = 0x02,
-    
-    /// Indicates we're matching an operator parameter.
-    TMF_ApplyingOperatorParameter = 0x4,
-    
-    /// Indicates we're unwrapping an optional type for a value-to-optional
-    /// conversion.
-    TMF_UnwrappingOptional = 0x8,
-  };
-
-private:
   /// \brief Subroutine of \c matchTypes(), which matches up two tuple types.
   ///
   /// \returns the result of performing the tuple-to-tuple conversion.
   SolutionKind matchTupleTypes(TupleType *tuple1, TupleType *tuple2,
-                                         TypeMatchKind kind, unsigned flags,
-                                         ConstraintLocatorBuilder locator);
+                               ConstraintKind kind, TypeMatchOptions flags,
+                               ConstraintLocatorBuilder locator);
 
   /// \brief Subroutine of \c matchTypes(), which matches a scalar type to
   /// a tuple type.
   ///
   /// \returns the result of performing the scalar-to-tuple conversion.
   SolutionKind matchScalarToTupleTypes(Type type1, TupleType *tuple2,
-                                       TypeMatchKind kind, unsigned flags,
+                                       ConstraintKind kind,
+                                       TypeMatchOptions flags,
                                        ConstraintLocatorBuilder locator);
 
   /// \brief Subroutine of \c matchTypes(), which extracts a scalar value from
@@ -1818,19 +1803,20 @@ private:
   ///
   /// \returns the result of performing the tuple-to-scalar conversion.
   SolutionKind matchTupleToScalarTypes(TupleType *tuple1, Type type2,
-                                       TypeMatchKind kind, unsigned flags,
+                                       ConstraintKind kind,
+                                       TypeMatchOptions flags,
                                        ConstraintLocatorBuilder locator);
 
   /// \brief Subroutine of \c matchTypes(), which matches up two function
   /// types.
   SolutionKind matchFunctionTypes(FunctionType *func1, FunctionType *func2,
-                                  TypeMatchKind kind, unsigned flags,
+                                  ConstraintKind kind, TypeMatchOptions flags,
                                   ConstraintLocatorBuilder locator);
 
   /// \brief Subroutine of \c matchTypes(), which matches up a value to a
   /// superclass.
   SolutionKind matchSuperclassTypes(Type type1, Type type2,
-                                    TypeMatchKind kind, unsigned flags,
+                                    ConstraintKind kind, TypeMatchOptions flags,
                                     ConstraintLocatorBuilder locator);
 
   /// \brief Subroutine of \c matchTypes(), which matches up two types that
@@ -1846,7 +1832,8 @@ private:
   /// but when matching the instance type of a metatype with the instance type
   /// of an existential metatype, since we want an actual conformance check.
   SolutionKind matchExistentialTypes(Type type1, Type type2,
-                                     ConstraintKind kind, unsigned flags,
+                                     ConstraintKind kind,
+                                     TypeMatchOptions flags,
                                      ConstraintLocatorBuilder locator);
 
 public: // FIXME: public due to statics in CSSimplify.cpp
@@ -1867,8 +1854,9 @@ public: // FIXME: public due to statics in CSSimplify.cpp
   /// the specific types being matched.
   ///
   /// \returns the result of attempting to solve this constraint.
-  SolutionKind matchTypes(Type type1, Type type2, TypeMatchKind kind,
-                          unsigned flags, ConstraintLocatorBuilder locator);
+  SolutionKind matchTypes(Type type1, Type type2, ConstraintKind kind,
+                          TypeMatchOptions flags,
+                          ConstraintLocatorBuilder locator);
 
 public:
   /// \brief Resolve the given overload set to the given choice.
@@ -1880,9 +1868,21 @@ public:
   ///
   /// The resulting types can be compared canonically, so long as additional
   /// type equivalence requirements aren't introduced between comparisons.
-  Type simplifyType(Type type){
-    llvm::SmallPtrSet<TypeVariableType *, 16> substituting;
-   return simplifyType(type, substituting);
+  Type simplifyType(Type type);
+
+  /// \brief Simplify a type, by replacing type variables with either their
+  /// fixed types (if available) or their representatives.
+  ///
+  /// \param flags If the simplified type has changed, this will be updated
+  /// to include \c TMF_GenerateConstraints.
+  ///
+  /// The resulting types can be compared canonically, so long as additional
+  /// type equivalence requirements aren't introduced between comparisons.
+  Type simplifyType(Type type, TypeMatchOptions &flags) {
+    Type result = simplifyType(type);
+    if (result.getPointer() != type.getPointer())
+      flags |= TMF_GenerateConstraints;
+    return result;
   }
 
   /// Given a ValueMember, UnresolvedValueMember, or TypeMember constraint,
@@ -1899,22 +1899,7 @@ public:
                                          ConstraintLocator *memberLocator,
                                          bool includeInaccessibleMembers);
 
-private:
-
-  /// \brief Simplify a type, by replacing type variables with either their
-  /// fixed types (if available) or their representatives.
-  ///
-  /// \param type the type to be simplified.
-  ///
-  /// \param substituting the set of type variables that we're already
-  /// substituting for. These type variables will not be substituted again,
-  /// to avoid infinite recursion.
-  ///
-  /// The resulting types can be compared canonically, so long as additional
-  /// type equivalence requirements aren't introduced between comparisons.
-  Type simplifyType(Type type,
-                    llvm::SmallPtrSet<TypeVariableType *, 16> &substituting);
-  
+private:  
   /// \brief Attempt to simplify the given construction constraint.
   ///
   /// \param valueType The type being constructed.
@@ -1930,7 +1915,7 @@ private:
   /// occurred.
   SolutionKind simplifyConstructionConstraint(Type valueType, 
                                               FunctionType *fnType,
-                                              unsigned flags,
+                                              TypeMatchOptions flags,
                                               FunctionRefKind functionRefKind,
                                               ConstraintLocator *locator);
 
@@ -1944,7 +1929,8 @@ private:
   SolutionKind simplifyConformsToConstraint(Type type, ProtocolDecl *protocol,
                                             ConstraintKind kind,
                                             ConstraintLocatorBuilder locator,
-                                            unsigned flags);
+                                            TypeMatchOptions flags);
+
   /// \brief Attempt to simplify the given conformance constraint.
   ///
   /// \param type The type being testing.
@@ -1958,48 +1944,70 @@ private:
   SolutionKind simplifyConformsToConstraint(Type type, Type protocol,
                                             ConstraintKind kind,
                                             ConstraintLocatorBuilder locator,
-                                            unsigned flags);
+                                            TypeMatchOptions flags);
 
   /// Attempt to simplify a checked-cast constraint.
   SolutionKind simplifyCheckedCastConstraint(Type fromType, Type toType,
+                                             TypeMatchOptions flags,
                                              ConstraintLocatorBuilder locator);
 
   /// \brief Attempt to simplify the given member constraint.
-  SolutionKind simplifyMemberConstraint(const Constraint &constraint);
+  SolutionKind simplifyMemberConstraint(ConstraintKind kind,
+                                        Type baseType, DeclName member,
+                                        Type memberType,
+                                        FunctionRefKind functionRefKind,
+                                        TypeMatchOptions flags,
+                                        ConstraintLocatorBuilder locator);
 
   
   /// \brief Attempt to simplify the optional object constraint.
-  SolutionKind simplifyOptionalObjectConstraint(const Constraint &constraint);
+  SolutionKind simplifyOptionalObjectConstraint(
+                                          Type first, Type second,
+                                          TypeMatchOptions flags,
+                                          ConstraintLocatorBuilder locator);
 
   /// \brief Attempt to simplify the ApplicableFunction constraint.
-  SolutionKind simplifyApplicableFnConstraint(const Constraint &constraint);
+  SolutionKind simplifyApplicableFnConstraint(
+                                      Type type1,
+                                      Type type2,
+                                      TypeMatchOptions flags,
+                                      ConstraintLocatorBuilder locator);
 
   /// \brief Attempt to simplify the given DynamicTypeOf constraint.
-  SolutionKind simplifyDynamicTypeOfConstraint(const Constraint &constraint);
+  SolutionKind simplifyDynamicTypeOfConstraint(
+                                         Type type1, Type type2,
+                                         TypeMatchOptions flags,
+                                         ConstraintLocatorBuilder locator);
 
-  /// \brief Attempt to simplify the given archetype constraint.
-  SolutionKind simplifyArchetypeConstraint(const Constraint &constraint);
-
-  /// \brief Attempt to simplify the given class constraint.
-  SolutionKind simplifyClassConstraint(const Constraint &constraint);
-  
   /// \brief Attempt to simplify the given defaultable constraint.
-  SolutionKind simplifyDefaultableConstraint(const Constraint &c);
+  SolutionKind simplifyDefaultableConstraint(Type first, Type second,
+                                             TypeMatchOptions flags,
+                                             ConstraintLocatorBuilder locator);
 
   /// \brief Simplify a conversion constraint by applying the given
   /// reduction rule, which is known to apply at the outermost level.
-  SolutionKind simplifyRestrictedConstraint(ConversionRestrictionKind restriction,
-                                            Type type1, Type type2,
-                                            TypeMatchKind matchKind,
-                                            unsigned flags,
-                                            ConstraintLocatorBuilder locator);
+  SolutionKind simplifyRestrictedConstraintImpl(
+                 ConversionRestrictionKind restriction,
+                 Type type1, Type type2,
+                 ConstraintKind matchKind,
+                 TypeMatchOptions flags,
+                 ConstraintLocatorBuilder locator);
+
+  /// \brief Simplify a conversion constraint by applying the given
+  /// reduction rule, which is known to apply at the outermost level.
+  SolutionKind simplifyRestrictedConstraint(
+                 ConversionRestrictionKind restriction,
+                 Type type1, Type type2,
+                 ConstraintKind matchKind,
+                 TypeMatchOptions flags,
+                 ConstraintLocatorBuilder locator);
 
 public: // FIXME: Public for use by static functions.
   /// \brief Simplify a conversion constraint with a fix applied to it.
   SolutionKind simplifyFixConstraint(Fix fix,
                                      Type type1, Type type2,
-                                     TypeMatchKind matchKind,
-                                     unsigned flags,
+                                     ConstraintKind matchKind,
+                                     TypeMatchOptions flags,
                                      ConstraintLocatorBuilder locator);
 
 public:
@@ -2020,6 +2028,14 @@ public:
   SolutionKind simplifyConstraint(const Constraint &constraint);
 
 private:
+  /// \brief Add a constraint to the constraint system.
+  SolutionKind addConstraintImpl(ConstraintKind kind, Type first, Type second,
+                                 ConstraintLocatorBuilder locator,
+                                 bool isFavored);
+
+  /// \brief Collect the current inactive disjunction constraints.
+  void collectDisjunctions(SmallVectorImpl<Constraint *> &disjunctions);
+
   /// \brief Solve the system of constraints after it has already been
   /// simplified.
   ///
@@ -2033,7 +2049,7 @@ private:
                        FreeTypeVariableBinding allowFreeTypeVariables);
 
   /// \brief Find reduced domains of disjunction constraints for given
-  /// expression, this is achived to solving individual sub-expressions
+  /// expression, this is achieved to solving individual sub-expressions
   /// and combining resolving types. Such algorithm is called directional
   /// path consistency because it goes from children to parents for all
   /// related sub-expressions taking union of their domains.
@@ -2052,7 +2068,7 @@ private:
   /// \param allowFreeTypeVariables How to bind free type variables in
   /// the solution.
   ///
-  /// \returns Error is an error occured, Solved is system is consistent
+  /// \returns Error is an error occurred, Solved is system is consistent
   /// and solutions were found, Unsolved otherwise.
   SolutionKind solve(Expr *&expr,
                      Type convertType,
@@ -2242,6 +2258,11 @@ public:
   /// \param paramIdx The index of the parameter that is missing an argument.
   virtual void missingArgument(unsigned paramIdx);
 
+  /// Indicate that there was no label given when one was expected by parameter.
+  ///
+  /// \param paramIndex The index of the parameter that is missing a label.
+  virtual void missingLabel(unsigned paramIndex);
+
   /// Indicates that an argument is out-of-order with respect to a previously-
   /// seen argument.
   ///
@@ -2366,7 +2387,7 @@ public:
       }
 
       std::pair<bool, Pattern*> walkToPatternPre(Pattern *P) override {
-        TS->Patterns.insert({ P, P->getType() });
+        TS->Patterns.insert({ P, P->hasType() ? P->getType() : Type() });
         return { true, P };
       }
 

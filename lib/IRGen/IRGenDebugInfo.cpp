@@ -5,8 +5,8 @@
 // Copyright (c) 2014 - 2016 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
-// See http://swift.org/LICENSE.txt for license information
-// See http://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
+// See https://swift.org/LICENSE.txt for license information
+// See https://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
 //
 //===----------------------------------------------------------------------===//
 //
@@ -121,7 +121,8 @@ IRGenDebugInfo::IRGenDebugInfo(const IRGenOptions &Opts,
   }
 
   unsigned Lang = llvm::dwarf::DW_LANG_Swift;
-  std::string Producer = version::getSwiftFullVersion();
+  std::string Producer = version::getSwiftFullVersion(
+    IGM.Context.LangOpts.EffectiveLanguageVersion);
   bool IsOptimized = Opts.Optimize;
   StringRef Flags = Opts.DWARFDebugFlags;
   unsigned Major, Minor;
@@ -361,7 +362,7 @@ void IRGenDebugInfo::setEntryPointLoc(IRBuilder &Builder) {
 }
 
 llvm::DIScope *IRGenDebugInfo::getOrCreateScope(const SILDebugScope *DS) {
-  if (DS == 0)
+  if (DS == nullptr)
     return MainFile;
 
   // Try to find it in the cache first.
@@ -535,10 +536,8 @@ llvm::DIScope *IRGenDebugInfo::getOrCreateContext(DeclContext *DC) {
   case DeclContextKind::Initializer:
   case DeclContextKind::ExtensionDecl:
   case DeclContextKind::SubscriptDecl:
-    return getOrCreateContext(DC->getParent());
-
   case DeclContextKind::TopLevelCodeDecl:
-    return getEntryPointFn();
+    return getOrCreateContext(DC->getParent());
 
   case DeclContextKind::Module:
     return getOrCreateModule({Module::AccessPathTy(), cast<ModuleDecl>(DC)});
@@ -546,17 +545,17 @@ llvm::DIScope *IRGenDebugInfo::getOrCreateContext(DeclContext *DC) {
     // A module may contain multiple files.
     return getOrCreateContext(DC->getParent());
   case DeclContextKind::GenericTypeDecl: {
-    auto *TyDecl = cast<GenericTypeDecl>(DC);
-    auto *Ty = TyDecl->getDeclaredType().getPointer();
+    auto *NTD = cast<NominalTypeDecl>(DC);
+    auto *Ty = NTD->getDeclaredType().getPointer();
     if (auto *DITy = getTypeOrNull(Ty))
       return DITy;
 
     // Create a Forward-declared type.
-    auto Loc = getDebugLoc(SM, TyDecl);
+    auto Loc = getDebugLoc(SM, NTD);
     auto File = getOrCreateFile(Loc.Filename);
     auto Line = Loc.Line;
     auto FwdDecl = DBuilder.createReplaceableCompositeType(
-        llvm::dwarf::DW_TAG_structure_type, TyDecl->getName().str(),
+        llvm::dwarf::DW_TAG_structure_type, NTD->getName().str(),
         getOrCreateContext(DC->getParent()), File, Line,
         llvm::dwarf::DW_LANG_Swift, 0, 0);
     ReplaceMap.emplace_back(
@@ -911,27 +910,22 @@ void IRGenDebugInfo::emitVariableDeclaration(
   if (Artificial || DITy->isArtificial() || DITy == InternalType)
     Flags |= llvm::DINode::FlagArtificial;
 
-  // Create the descriptor for the variable.
-  llvm::DILocalVariable *Var = nullptr;
-
-  /// This could be Opts.Optimize if we would also unique DIVariables here.
+  // This could be Opts.Optimize if we would also unique DIVariables here.
   bool Optimized = false;
-  Var = (ArgNo > 0)
-    ? DBuilder.createParameterVariable(Scope, Name, ArgNo, Unit, Line, DITy,
-                                       Optimized, Flags)
-    : DBuilder.createAutoVariable(Scope, Name, Unit, Line, DITy,
-                                  Optimized, Flags);
-
-  // Insert a debug intrinsic into the current block.
-  auto *BB = Builder.GetInsertBlock();
-  bool IsPiece = Storage.size() > 1;
-  uint64_t SizeOfByte = CI.getTargetInfo().getCharWidth();
-  unsigned VarSizeInBits = getSizeInBits(Var);
+  // Create the descriptor for the variable.
+  llvm::DILocalVariable *Var =
+      (ArgNo > 0)
+          ? DBuilder.createParameterVariable(Scope, Name, ArgNo, Unit, Line,
+                                             DITy, Optimized, Flags)
+          : DBuilder.createAutoVariable(Scope, Name, Unit, Line, DITy,
+                                        Optimized, Flags);
 
   // Running variables for the current/previous piece.
-  unsigned SizeInBits = 0;
+  bool IsPiece = Storage.size() > 1;
+  uint64_t SizeOfByte = CI.getTargetInfo().getCharWidth();
   unsigned AlignInBits = SizeOfByte;
   unsigned OffsetInBits = 0;
+  unsigned SizeInBits = 0;
 
   for (llvm::Value *Piece : Storage) {
     SmallVector<uint64_t, 3> Operands;
@@ -941,7 +935,7 @@ void IRGenDebugInfo::emitVariableDeclaration(
     // There are variables without storage, such as "struct { func foo() {} }".
     // Emit them as constant 0.
     if (isa<llvm::UndefValue>(Piece))
-      Piece = llvm::ConstantInt::get(llvm::Type::getInt64Ty(M.getContext()), 0);
+      Piece = llvm::ConstantInt::get(IGM.Int64Ty, 0);
 
     if (IsPiece) {
       // Advance the offset and align it for the next piece.
@@ -953,30 +947,25 @@ void IRGenDebugInfo::emitVariableDeclaration(
 
       // Sanity checks.
       assert(SizeInBits && "zero-sized piece");
-      assert(SizeInBits < VarSizeInBits && "piece covers entire var");
-      assert(OffsetInBits+SizeInBits <= VarSizeInBits && "pars > totum");
-      (void) VarSizeInBits;
+      assert(SizeInBits < getSizeInBits(Var) && "piece covers entire var");
+      assert(OffsetInBits+SizeInBits <= getSizeInBits(Var) && "pars > totum");
 
       // Add the piece DWARF expression.
       Operands.push_back(llvm::dwarf::DW_OP_bit_piece);
       Operands.push_back(OffsetInBits);
       Operands.push_back(SizeInBits);
     }
-    emitDbgIntrinsic(BB, Piece, Var, DBuilder.createExpression(Operands), Line,
-                     Loc.Column, Scope, DS);
+    emitDbgIntrinsic(Builder, Piece, Var, DBuilder.createExpression(Operands),
+                     Line, Loc.Column, Scope, DS);
   }
 
   // Emit locationless intrinsic for variables that were optimized away.
-  if (Storage.size() == 0) {
-    auto Zero =
-        llvm::ConstantInt::get(llvm::Type::getInt64Ty(M.getContext()), 0);
-    emitDbgIntrinsic(BB, Zero, Var, DBuilder.createExpression(), Line,
-                     Loc.Column, Scope, DS);
-  }
+  if (Storage.size() == 0)
+    emitDbgIntrinsic(Builder, llvm::ConstantInt::get(IGM.Int64Ty, 0), Var,
+                     DBuilder.createExpression(), Line, Loc.Column, Scope, DS);
 }
 
-void IRGenDebugInfo::emitDbgIntrinsic(llvm::BasicBlock *BB,
-                                      llvm::Value *Storage,
+void IRGenDebugInfo::emitDbgIntrinsic(IRBuilder &Builder, llvm::Value *Storage,
                                       llvm::DILocalVariable *Var,
                                       llvm::DIExpression *Expr, unsigned Line,
                                       unsigned Col, llvm::DILocalScope *Scope,
@@ -984,28 +973,40 @@ void IRGenDebugInfo::emitDbgIntrinsic(llvm::BasicBlock *BB,
   // Set the location/scope of the intrinsic.
   auto *InlinedAt = createInlinedAt(DS);
   auto DL = llvm::DebugLoc::get(Line, Col, Scope, InlinedAt);
+  auto *BB = Builder.GetInsertBlock();
 
   // An alloca may only be described by exactly one dbg.declare.
   if (isa<llvm::AllocaInst>(Storage) && llvm::FindAllocaDbgDeclare(Storage))
     return;
-
+  
   // A dbg.declare is only meaningful if there is a single alloca for
   // the variable that is live throughout the function. With SIL
   // optimizations this is not guaranteed and a variable can end up in
   // two allocas (for example, one function inlined twice).
-  if (isa<llvm::AllocaInst>(Storage))
+  if (isa<llvm::AllocaInst>(Storage)) {
     DBuilder.insertDeclare(Storage, Var, Expr, DL, BB);
-  else
-    DBuilder.insertDbgValueIntrinsic(Storage, 0, Var, Expr, DL, BB);
+    return;
+  }
+
+  // If the storage is an instruction, insert the dbg.value directly after it.
+  if (auto *I = dyn_cast<llvm::Instruction>(Storage)) {
+    auto InsPt = std::next(I->getIterator());
+    auto E = I->getParent()->end();
+    while (InsPt != E && isa<llvm::PHINode>(&*InsPt))
+        ++InsPt;
+    if (InsPt != E) {
+      DBuilder.insertDbgValueIntrinsic(Storage, 0, Var, Expr, DL, &*InsPt);
+      return;
+    }
+  }
+
+  // Otherwise just insert it at the current insertion point.
+  DBuilder.insertDbgValueIntrinsic(Storage, 0, Var, Expr, DL, BB);
 }
 
-
-void IRGenDebugInfo::emitGlobalVariableDeclaration(llvm::Constant *Var,
-                                                   StringRef Name,
-                                                   StringRef LinkageName,
-                                                   DebugTypeInfo DbgTy,
-                                                   bool IsLocalToUnit,
-                                                   Optional<SILLocation> Loc) {
+void IRGenDebugInfo::emitGlobalVariableDeclaration(
+    llvm::GlobalVariable *Var, StringRef Name, StringRef LinkageName,
+    DebugTypeInfo DbgTy, bool IsLocalToUnit, Optional<SILLocation> Loc) {
   if (Opts.DebugInfoKind <= IRGenDebugInfoKind::LineTables)
     return;
 
@@ -1021,8 +1022,11 @@ void IRGenDebugInfo::emitGlobalVariableDeclaration(llvm::Constant *Var,
   auto File = getOrCreateFile(L.Filename);
 
   // Emit it as global variable of the current module.
-  DBuilder.createGlobalVariable(MainModule, Name, LinkageName, File, L.Line, Ty,
-                                IsLocalToUnit, Var, nullptr);
+  auto *Expr = Var ? nullptr : DBuilder.createConstantValueExpression(0);
+  auto *GV = DBuilder.createGlobalVariable(MainModule, Name, LinkageName, File,
+                                           L.Line, Ty, IsLocalToUnit, Expr);
+  if (Var)
+    Var->addDebugInfo(GV);
 }
 
 StringRef IRGenDebugInfo::getMangledName(DebugTypeInfo DbgTy) {
@@ -1131,34 +1135,32 @@ llvm::DINodeArray IRGenDebugInfo::getEnumElements(DebugTypeInfo DbgTy,
   for (auto *ElemDecl : ED->getAllElements()) {
     // FIXME <rdar://problem/14845818> Support enums.
     // Swift Enums can be both like DWARF enums and discriminated unions.
-    if (ElemDecl->hasType()) {
-      DebugTypeInfo ElemDbgTy;
-      if (ED->hasRawType())
-        // An enum with a raw type (enum E : Int {}), similar to a
-        // DWARF enum.
-        //
-        // The storage occupied by the enum may be smaller than the
-        // one of the raw type as long as it is large enough to hold
-        // all enum values. Use the raw type for the debug type, but
-        // the storage size from the enum.
-        ElemDbgTy = DebugTypeInfo(ED->getRawType(), DbgTy.StorageType,
-                                  DbgTy.size, DbgTy.align, ED);
-      else if (ElemDecl->hasArgumentType()) {
-        // A discriminated union. This should really be described as a
-        // DW_TAG_variant_type. For now only describing the data.
-        auto &TI = IGM.getTypeInfoForUnlowered(ElemDecl->getArgumentType());
-        ElemDbgTy = DebugTypeInfo(ElemDecl->getArgumentType(), TI, ED);
-      } else {
-        // Discriminated union case without argument. Fallback to Int
-        // as the element type; there is no storage here.
-        Type IntTy = IGM.Context.getIntDecl()->getDeclaredType();
-        ElemDbgTy = DebugTypeInfo(IntTy, DbgTy.StorageType, 0, 1, ED);
-      }
-      unsigned Offset = 0;
-      auto MTy = createMemberType(ElemDbgTy, ElemDecl->getName().str(), Offset,
-                                  Scope, File, Flags);
-      Elements.push_back(MTy);
+    DebugTypeInfo ElemDbgTy;
+    if (ED->hasRawType())
+      // An enum with a raw type (enum E : Int {}), similar to a
+      // DWARF enum.
+      //
+      // The storage occupied by the enum may be smaller than the
+      // one of the raw type as long as it is large enough to hold
+      // all enum values. Use the raw type for the debug type, but
+      // the storage size from the enum.
+      ElemDbgTy = DebugTypeInfo(ED->getRawType(), DbgTy.StorageType,
+                                DbgTy.size, DbgTy.align, ED);
+    else if (ElemDecl->hasArgumentType()) {
+      // A discriminated union. This should really be described as a
+      // DW_TAG_variant_type. For now only describing the data.
+      auto &TI = IGM.getTypeInfoForUnlowered(ElemDecl->getArgumentType());
+      ElemDbgTy = DebugTypeInfo(ElemDecl->getArgumentType(), TI, ED);
+    } else {
+      // Discriminated union case without argument. Fallback to Int
+      // as the element type; there is no storage here.
+      Type IntTy = IGM.Context.getIntDecl()->getDeclaredType();
+      ElemDbgTy = DebugTypeInfo(IntTy, DbgTy.StorageType, 0, 1, ED);
     }
+    unsigned Offset = 0;
+    auto MTy = createMemberType(ElemDbgTy, ElemDecl->getName().str(), Offset,
+                                Scope, File, Flags);
+    Elements.push_back(MTy);
   }
   return DBuilder.getOrCreateArray(Elements);
 }
@@ -1282,8 +1284,7 @@ IRGenDebugInfo::createFunctionPointer(DebugTypeInfo DbgTy, llvm::DIScope *Scope,
   // FIXME: Handling of generic parameters in SIL type lowering is in flux.
   // DebugInfo doesn't appear to care about the generic context, so just
   // throw it away before lowering.
-  else if (isa<GenericFunctionType>(BaseTy) ||
-           isa<PolymorphicFunctionType>(BaseTy)) {
+  else if (isa<GenericFunctionType>(BaseTy)) {
     auto *fTy = cast<AnyFunctionType>(BaseTy);
     auto *nongenericTy =
         FunctionType::get(fTy->getInput(), fTy->getResult(), fTy->getExtInfo());
@@ -1475,6 +1476,7 @@ llvm::DIType *IRGenDebugInfo::createType(DebugTypeInfo DbgTy,
 
       // Use "__ObjC" as default for implicit decls.
       // FIXME: Do something more clever based on the decl's mangled name.
+      std::string FullModuleNameBuffer;
       StringRef ModulePath;
       StringRef ModuleName = "__ObjC";
       if (auto *OwningModule = ClangDecl->getImportedOwningModule())
@@ -1484,7 +1486,8 @@ llvm::DIType *IRGenDebugInfo::createType(DebugTypeInfo DbgTy,
         if (auto *ClangModule = SwiftModule->findUnderlyingClangModule()) {
           // FIXME: Clang submodules are not handled here.
           // FIXME: Clang module config macros are not handled here.
-          ModuleName = ClangModule->getFullModuleName();
+          FullModuleNameBuffer = ClangModule->getFullModuleName();
+          ModuleName = FullModuleNameBuffer;
           // FIXME: A clang module's Directory is supposed to be the
           // directory containing the module map, but ClangImporter
           // sets it to the module cache directory.
@@ -1594,7 +1597,7 @@ llvm::DIType *IRGenDebugInfo::createType(DebugTypeInfo DbgTy,
     // Emit the protocols the archetypes conform to.
     SmallVector<llvm::Metadata *, 4> Protocols;
     for (auto *ProtocolDecl : Archetype->getConformsTo()) {
-      auto PTy = IGM.getLoweredType(ProtocolDecl->getType())
+      auto PTy = IGM.getLoweredType(ProtocolDecl->getInterfaceType())
                      .getSwiftRValueType();
       auto PDbgTy = DebugTypeInfo(ProtocolDecl, IGM.getTypeInfoForLowered(PTy));
       auto PDITy = getOrCreateType(PDbgTy);
@@ -1625,7 +1628,6 @@ llvm::DIType *IRGenDebugInfo::createType(DebugTypeInfo DbgTy,
 
   case TypeKind::SILFunction:
   case TypeKind::Function:
-  case TypeKind::PolymorphicFunction:
  case TypeKind::GenericFunction: {
     if (Opts.DebugInfoKind > IRGenDebugInfoKind::ASTTypes)
       return createFunctionPointer(DbgTy, Scope, SizeInBits, AlignInBits, Flags,
@@ -1702,11 +1704,6 @@ llvm::DIType *IRGenDebugInfo::createType(DebugTypeInfo DbgTy,
                                   File, L.Line, File);
   }
 
-  case TypeKind::Substituted: {
-    auto OrigTy = cast<SubstitutedType>(BaseTy)->getReplacementType();
-    return getOrCreateDesugaredType(OrigTy, DbgTy);
-  }
-
   case TypeKind::Paren: {
     auto Ty = cast<ParenType>(BaseTy)->getUnderlyingType();
     return getOrCreateDesugaredType(Ty, DbgTy);
@@ -1740,7 +1737,6 @@ llvm::DIType *IRGenDebugInfo::createType(DebugTypeInfo DbgTy,
 
   // The following types exist primarily for internal use by the type
   // checker.
-  case TypeKind::AssociatedType:
   case TypeKind::Error:
   case TypeKind::Unresolved:
   case TypeKind::LValue:
@@ -1761,7 +1757,6 @@ llvm::DIType *IRGenDebugInfo::createType(DebugTypeInfo DbgTy,
 /// Determine if there exists a name mangling for the given type.
 static bool canMangle(TypeBase *Ty) {
   switch (Ty->getKind()) {
-  case TypeKind::PolymorphicFunction: // Mangler crashes.
   case TypeKind::GenericFunction:     // Not yet supported.
   case TypeKind::SILBlockStorage:     // Not supported at all.
   case TypeKind::SILBox:

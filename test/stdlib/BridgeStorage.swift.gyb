@@ -5,8 +5,8 @@
 // Copyright (c) 2014 - 2016 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
-// See http://swift.org/LICENSE.txt for license information
-// See http://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
+// See https://swift.org/LICENSE.txt for license information
+// See https://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
 //
 //===----------------------------------------------------------------------===//
 //
@@ -119,10 +119,10 @@ var unTaggedNSString : NSString {
 % for Self in ['_BridgeStorage']:
 allTests.test("${Self}") {
   typealias B = ${Self}<C, NSString>
-  
+
   let oy: NSString = "oy"
   expectTrue(B(objC: oy).objCInstance == oy)
-  
+
   for i in 0..<2 {
     do {
       var b = B(native: C(), bits: i)
@@ -134,7 +134,7 @@ allTests.test("${Self}") {
       }
       expectEqual(i, b.spareBits)
     }
-    
+
     do {
       let c = C()
       var b = B(native: c, bits: i)
@@ -148,12 +148,12 @@ allTests.test("${Self}") {
         expectFalse(b.isUniquelyReferenced_native_noSpareBits())
       }
     }
-    
+
   }
-  
+
   var b = B(native: C(), bits: 0)
   expectTrue(b.isUniquelyReferencedNative())
-  
+
   // Add a reference and verify that it's still native but no longer unique
   var c = b
   expectFalse(b.isUniquelyReferencedNative())
@@ -165,7 +165,7 @@ allTests.test("${Self}") {
   expectTrue(bb.nativeInstance === n)
   expectTrue(bb.isNative)
   expectFalse(bb.isObjC)
-  
+
   var d = B(objC: taggedNSString)
   expectFalse(d.isUniquelyReferencedNative())
   expectFalse(d.isNative)

@@ -5,8 +5,8 @@
 // Copyright (c) 2014 - 2016 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
-// See http://swift.org/LICENSE.txt for license information
-// See http://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
+// See https://swift.org/LICENSE.txt for license information
+// See https://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
 //
 //===----------------------------------------------------------------------===//
 //
@@ -19,6 +19,7 @@
 #include "swift/AST/DiagnosticsIRGen.h"
 #include "swift/AST/IRGenOptions.h"
 #include "swift/Basic/Dwarf.h"
+#include "swift/Basic/ManglingMacros.h"
 #include "swift/ClangImporter/ClangImporter.h"
 #include "swift/Runtime/RuntimeFnWrappersGen.h"
 #include "swift/Runtime/Config.h"
@@ -118,25 +119,17 @@ static clang::CodeGenerator *createClangCodeGenerator(ASTContext &Context,
 
 IRGenModule::IRGenModule(IRGenerator &irgen,
                          std::unique_ptr<llvm::TargetMachine> &&target,
-                         SourceFile *SF,
-                         llvm::LLVMContext &LLVMContext,
-                         StringRef ModuleName,
-                         StringRef OutputFilename)
-  : IRGen(irgen),
-    Context(irgen.SIL.getASTContext()),
-    ClangCodeGen(createClangCodeGenerator(Context, LLVMContext,
-                                          irgen.Opts, ModuleName)),
-    Module(*ClangCodeGen->GetModule()),
-    LLVMContext(Module.getContext()),
-    DataLayout(target->createDataLayout()),
-    Triple(Context.LangOpts.Target),
-    TargetMachine(std::move(target)),
-    OutputFilename(OutputFilename),
-    TargetInfo(SwiftTargetInfo::get(*this)),
-    DebugInfo(0), ModuleHash(nullptr),
-    ObjCInterop(Context.LangOpts.EnableObjCInterop),
-    Types(*new TypeConverter(*this))
-{
+                         SourceFile *SF, llvm::LLVMContext &LLVMContext,
+                         StringRef ModuleName, StringRef OutputFilename)
+    : IRGen(irgen), Context(irgen.SIL.getASTContext()),
+      ClangCodeGen(createClangCodeGenerator(Context, LLVMContext, irgen.Opts,
+                                            ModuleName)),
+      Module(*ClangCodeGen->GetModule()), LLVMContext(Module.getContext()),
+      DataLayout(target->createDataLayout()), Triple(Context.LangOpts.Target),
+      TargetMachine(std::move(target)), OutputFilename(OutputFilename),
+      TargetInfo(SwiftTargetInfo::get(*this)), DebugInfo(nullptr),
+      ModuleHash(nullptr), ObjCInterop(Context.LangOpts.EnableObjCInterop),
+      Types(*new TypeConverter(*this)) {
   irgen.addGenModule(SF, this);
 
   auto &opts = irgen.Opts;
@@ -378,6 +371,7 @@ IRGenModule::IRGenModule(IRGenerator &irgen,
 
   // Only use the new calling conventions on platforms that support it.
   auto Arch = Triple.getArch();
+  (void)Arch;
   if (SWIFT_RT_USE_RegisterPreservingCC &&
       Arch == llvm::Triple::ArchType::aarch64)
     RegisterPreservingCC = SWIFT_LLVM_CC(RegisterPreservingCC);
@@ -522,9 +516,9 @@ llvm::Constant *swift::getWrapperFn(llvm::Module &Module,
     auto fnTy = fun->getFunctionType();
     auto fnPtrTy = llvm::PointerType::getUnqual(fnTy);
 
-    auto *globalFnPtr =
-        new llvm::GlobalVariable(Module, fnPtrTy, false,
-                                 llvm::GlobalValue::ExternalLinkage, 0, symbol);
+    auto *globalFnPtr = new llvm::GlobalVariable(
+        Module, fnPtrTy, false, llvm::GlobalValue::ExternalLinkage, nullptr,
+        symbol);
     if (llvm::Triple(Module.getTargetTriple()).isOSBinFormatCOFF())
       globalFnPtr->setDLLStorageClass(llvm::GlobalValue::DLLImportStorageClass);
 
@@ -641,8 +635,9 @@ llvm::Constant *IRGenModule::getEmptyTupleMetadata() {
   if (EmptyTupleMetadata)
     return EmptyTupleMetadata;
 
-  EmptyTupleMetadata =
-      Module.getOrInsertGlobal("_TMT_", FullTypeMetadataStructTy);
+  EmptyTupleMetadata = Module.getOrInsertGlobal(
+                          MANGLE_AS_STRING(METADATA_SYM(EMPTY_TUPLE_MANGLING)),
+                          FullTypeMetadataStructTy);
   if (Triple.isOSBinFormatCOFF())
     cast<llvm::GlobalVariable>(EmptyTupleMetadata)
         ->setDLLStorageClass(llvm::GlobalValue::DLLImportStorageClass);

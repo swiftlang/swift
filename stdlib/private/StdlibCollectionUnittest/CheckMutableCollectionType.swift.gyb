@@ -5,8 +5,8 @@
 // Copyright (c) 2014 - 2016 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
-// See http://swift.org/LICENSE.txt for license information
-// See http://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
+// See https://swift.org/LICENSE.txt for license information
+// See https://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
 //
 //===----------------------------------------------------------------------===//
 
@@ -712,7 +712,7 @@ self.test("\(testNamePrefix).partition/InvalidOrderings") {
     CollectionWithEquatableElement.SubSequence.Iterator.Element
       == CollectionWithEquatableElement.Iterator.Element,
     CollectionWithComparableElement.Iterator.Element : Comparable {
-    
+
     var testNamePrefix = testNamePrefix
 
     if !checksAdded.insert(
@@ -869,7 +869,7 @@ self.test("\(testNamePrefix).partition/DispatchesThrough_withUnsafeMutableBuffer
       == CollectionWithEquatableElement.Iterator.Element,
     CollectionWithComparableElement.Iterator.Element : Comparable,
     CollectionWithComparableElement.SubSequence.Indices.Iterator.Element == CollectionWithComparableElement.Index {
-    
+
     var testNamePrefix = testNamePrefix
 
     if !checksAdded.insert(

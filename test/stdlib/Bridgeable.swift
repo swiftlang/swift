@@ -7,7 +7,7 @@
 public extension _ObjectiveCBridgeable {
   static func _unconditionallyBridgeFromObjectiveC(_ source: _ObjectiveCType?)
       -> Self {
-    var result: Self? = nil
+    var result: Self?
     _forceBridgeFromObjectiveC(source!, result: &result)
     return result!
   }
@@ -34,7 +34,7 @@ func testBridging<T>(_ x: T, _ name: String) {
   var b : String
   let result = _bridgeAnythingToObjectiveC(x)
   b = "bridged as " + (
-    (result as? C) != nil ? "C" : (result as? T) != nil ? "itself" : "an unknown type")
+    result is C ? "C" : result is T ? "itself" : "an unknown type")
   print("\(name) instance \(b)")
 }
 

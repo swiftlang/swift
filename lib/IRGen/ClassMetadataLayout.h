@@ -5,8 +5,8 @@
 // Copyright (c) 2014 - 2016 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
-// See http://swift.org/LICENSE.txt for license information
-// See http://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
+// See https://swift.org/LICENSE.txt for license information
+// See https://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
 //
 //===----------------------------------------------------------------------===//
 //
@@ -88,7 +88,8 @@ private:
       // Skip superclass fields if superclass is resilient.
       // FIXME: Needs runtime support to ensure the field offset vector is
       // populated correctly.
-      if (!IGM.isResilient(superclassDecl, ResilienceExpansion::Maximal)) {
+      if (!IGM.Context.LangOpts.EnableClassResilience ||
+          !IGM.isResilient(superclassDecl, ResilienceExpansion::Maximal)) {
         addClassMembers(superclassDecl, superclass);
       }
     }

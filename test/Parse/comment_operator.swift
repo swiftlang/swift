@@ -1,4 +1,4 @@
-// RUN: %target-swift-frontend -parse -verify -module-name main %s
+// RUN: %target-swift-frontend -typecheck -verify -module-name main %s
 
 // Tests for interaction between comments & operators from SE-0037
 // which defined comments to be whitespace for operator arity rules.
@@ -27,3 +27,9 @@ func test6() { _ = 1+/* */2 }                 // expected-error {{'+' is not a p
 _ = foo!// this is dangerous
 _ = 1 +/**/ 2
 _ = 1 +/* hi */2
+
+// Ensure built-in operators are properly tokenized.
+_ =/**/2
+_/**/= 2
+typealias A = () ->/* */()
+func test7(x: Int) { _ = x./* desc */ } // expected-error {{expected member name following '.'}}

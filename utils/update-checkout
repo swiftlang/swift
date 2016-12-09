@@ -6,8 +6,8 @@
 # Copyright (c) 2014 - 2016 Apple Inc. and the Swift project authors
 # Licensed under Apache License v2.0 with Runtime Library Exception
 #
-# See http://swift.org/LICENSE.txt for license information
-# See http://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
+# See https://swift.org/LICENSE.txt for license information
+# See https://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
 
 from __future__ import print_function
 
@@ -82,42 +82,74 @@ def update_single_repository(repo_path, branch, reset_to_remote, should_clean,
                    echo=True)
 
 
-def update_all_repositories(args, config, scheme_name, cross_repos_pr):
+def update_repository_to_tag(args, repo_name, repo_path, tag_name):
+    with shell.pushd(repo_path, dry_run=False, echo=False):
+        tag_exists = shell.capture(['git', 'ls-remote', '--tags',
+                                    'origin', tag_name], echo=False)
+        if not tag_exists:
+            print("--- Skipping '" + repo_name + "' ---")
+            return
+        update_single_repository(repo_path,
+                                 tag_name,
+                                 args.reset_to_remote,
+                                 args.clean,
+                                 cross_repo=True)
+
+
+def update_repository_to_scheme(
+        args, config, repo_name, repo_path, scheme_name, cross_repos_pr):
+    cross_repo = False
     repo_branch = scheme_name
+    # This loop is only correct, since we know that each alias set has
+    # unique contents. This is checked by verify config. Thus the first
+    # branch scheme data that has scheme_name as one of its aliases is
+    # the only possible correct answer.
+    for v in config['branch-schemes'].values():
+        if scheme_name not in v['aliases']:
+            continue
+        repo_branch = v['repos'][repo_name]
+        remote_repo_id = config['repos'][repo_name]['remote']['id']
+        if remote_repo_id in cross_repos_pr:
+            cross_repo = True
+            pr_id = cross_repos_pr[remote_repo_id]
+            repo_branch = "ci_pr_{0}".format(pr_id)
+            with shell.pushd(repo_path, dry_run=False, echo=False):
+                shell.call(["git", "checkout", v['repos'][repo_name]],
+                           echo=True)
+                shell.capture(["git", "branch", "-D", repo_branch],
+                              echo=True, allow_non_zero_exit=True)
+                shell.call(["git", "fetch", "origin",
+                            "pull/{0}/merge:{1}"
+                            .format(pr_id, repo_branch)], echo=True)
+        break
+    update_single_repository(repo_path,
+                             repo_branch,
+                             args.reset_to_remote,
+                             args.clean,
+                             cross_repo)
+
+
+def update_all_repositories(args, config, scheme_name, cross_repos_pr):
     for repo_name in config['repos'].keys():
-        cross_repo = False
         if repo_name in args.skip_repository_list:
             print("--- Skipping '" + repo_name + "' ---")
             continue
         repo_path = os.path.join(SWIFT_SOURCE_ROOT, repo_name)
-        if scheme_name:
-            # This loop is only correct, since we know that each alias set has
-            # unique contents. This is checked by verify config. Thus the first
-            # branch scheme data that has scheme_name as one of its aliases is
-            # the only possible correct answer.
-            for v in config['branch-schemes'].values():
-                if scheme_name not in v['aliases']:
-                    continue
-                repo_branch = v['repos'][repo_name]
-                remote_repo_id = config['repos'][repo_name]['remote']['id']
-                if remote_repo_id in cross_repos_pr:
-                    cross_repo = True
-                    pr_id = cross_repos_pr[remote_repo_id]
-                    repo_branch = "ci_pr_{0}".format(pr_id)
-                    with shell.pushd(repo_path, dry_run=False, echo=False):
-                        shell.call(["git", "checkout", v['repos'][repo_name]],
-                                   echo=True)
-                        shell.capture(["git", "branch", "-D", repo_branch],
-                                      echo=True, allow_non_zero_exit=True)
-                        shell.call(["git", "fetch", "origin",
-                                    "pull/{0}/merge:{1}"
-                                    .format(pr_id, repo_branch)], echo=True)
-                break
-        update_single_repository(repo_path,
-                                 repo_branch,
-                                 args.reset_to_remote,
-                                 args.clean,
-                                 cross_repo)
+        if args.tag:
+            update_repository_to_tag(args, repo_name, repo_path, args.tag)
+        elif scheme_name:
+            update_repository_to_scheme(args,
+                                        config,
+                                        repo_name,
+                                        repo_path,
+                                        scheme_name,
+                                        cross_repos_pr)
+        else:
+            update_single_repository(repo_path,
+                                     branch=None,
+                                     reset_to_remote=args.reset_to_remote,
+                                     should_clean=args.clean,
+                                     cross_repo=False)
 
 
 def obtain_additional_swift_sources(
@@ -169,6 +201,20 @@ def obtain_additional_swift_sources(
                      dry_run=False, echo=False):
         shell.call(["git", "submodule", "update", "--recursive"],
                    echo=False)
+
+
+def dump_repo_hashes(config):
+    max_len = reduce(lambda acc, x: max(acc, len(x)),
+                     config['repos'].keys(), 0)
+    fmt = "{:<%r}{}" % (max_len+5)
+    for repo_name, repo_info in sorted(config['repos'].items(),
+                                       key=lambda x: x[0]):
+        with shell.pushd(os.path.join(SWIFT_SOURCE_ROOT, repo_name),
+                         dry_run=False,
+                         echo=False):
+            h = shell.capture(["git", "log", "--oneline", "-n", "1"],
+                              echo=False).strip()
+            print(fmt.format(repo_name, h))
 
 
 def validate_config(config):
@@ -242,6 +288,14 @@ By default, updates your checkouts of Swift, SourceKit, LLDB, and SwiftPM.""")
         free-form GitHub-style comment.""",
         metavar='GITHUB-COMMENT',
         dest='github_comment')
+    parser.add_argument(
+        '--dump-hashes',
+        action='store_true',
+        help='Dump the git hashes of all repositories being tracked')
+    parser.add_argument(
+        "--tag",
+        help="""Check out each repository to the specified tag.""",
+        metavar='TAG-NAME')
     args = parser.parse_args()
 
     clone = args.clone
@@ -254,12 +308,16 @@ By default, updates your checkouts of Swift, SourceKit, LLDB, and SwiftPM.""")
         config = json.load(f)
     validate_config(config)
 
+    if args.dump_hashes:
+        dump_repo_hashes(config)
+        return 0
+
     cross_repos_pr = {}
     if github_comment:
         regex_pr = r'(apple/[-a-zA-Z0-9_]+/pull/\d+|apple/[-a-zA-Z0-9_]+#\d+)'
         repos_with_pr = re.findall(regex_pr, github_comment)
         print("Found related pull requests:", str(repos_with_pr))
-        repos_with_pr = [pr.replace('/pull/','#') for pr in repos_with_pr]
+        repos_with_pr = [pr.replace('/pull/', '#') for pr in repos_with_pr]
         cross_repos_pr = dict(pr.split('#') for pr in repos_with_pr)
 
     if clone or clone_with_ssh:

@@ -5,8 +5,8 @@
 // Copyright (c) 2014 - 2016 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
-// See http://swift.org/LICENSE.txt for license information
-// See http://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
+// See https://swift.org/LICENSE.txt for license information
+// See https://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
 //
 //===----------------------------------------------------------------------===//
 // RUN: rm -rf %t
@@ -653,10 +653,10 @@ mirrors.test("Addressing") {
   expectEqual(2, m0.descendant(1) as? Int)
   expectEqual(3, m0.descendant(2) as? Int)
   
-  let m1 = Mirror(reflecting: (a: ["one", "two", "three"], b: 4))
+  let m1 = Mirror(reflecting: (a: ["one", "two", "three"], 4))
   let ott0 = m1.descendant(0) as? [String]
   expectNotNil(ott0)
-  let ott1 = m1.descendant(".0") as? [String]
+  let ott1 = m1.descendant("a") as? [String]
   expectNotNil(ott1)
   if ott0 != nil && ott1 != nil {
     expectEqualSequence(ott0!, ott1!)
@@ -666,7 +666,7 @@ mirrors.test("Addressing") {
   expectEqual("one", m1.descendant(0, 0) as? String)
   expectEqual("two", m1.descendant(0, 1) as? String)
   expectEqual("three", m1.descendant(0, 2) as? String)
-  expectEqual("one", m1.descendant(".0", 0) as? String)
+  expectEqual("one", m1.descendant("a", 0) as? String)
 
   struct Zee : CustomReflectable {
     var customMirror: Mirror {
@@ -680,7 +680,7 @@ mirrors.test("Addressing") {
     (a: [], b: Zee())]
 
   let m = Mirror(reflecting: x)
-  let two = m.descendant(0, ".0", 1)
+  let two = m.descendant(0, "a", 1)
   expectEqual("two", two as? String)
   expectEqual(1, m.descendant(1, 1, "bark") as? Int)
   expectEqual(0, m.descendant(1, 1, "bite") as? Int)

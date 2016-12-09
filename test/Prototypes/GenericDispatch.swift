@@ -5,8 +5,8 @@
 // Copyright (c) 2014 - 2016 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
-// See http://swift.org/LICENSE.txt for license information
-// See http://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
+// See https://swift.org/LICENSE.txt for license information
+// See https://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
 //
 //===----------------------------------------------------------------------===//
 //
@@ -89,7 +89,7 @@ protocol D : R {
 
 // Dispatch to D's distance() requirement
 // Only the author of D needs to see this implementation.
-func ~> <I: D>(x:I, args: (_Distance, (I))) -> Int {
+func ~> <I: D>(x: I, args: (_Distance, (I))) -> Int {
   let other = args.1
   return x.distance(other)
 }

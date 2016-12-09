@@ -26,8 +26,9 @@ func functionWithResilientTypes(_ s: Size, f: (Size) -> Size) -> Size {
 // CHECK:         [[RESULT:%.*]] = apply [[FN]]([[SIZE_BOX]])
   _ = s.h
 
+// CHECK:         [[COPIED_CLOSURE:%.*]] = copy_value %2
 // CHECK:         copy_addr %1 to [initialization] [[SIZE_BOX:%.*]] : $*Size
-// CHECK:         apply %2(%0, [[SIZE_BOX]])
+// CHECK:         apply [[COPIED_CLOSURE]](%0, [[SIZE_BOX]])
 // CHECK:         return
   return f(s)
 }
@@ -66,7 +67,8 @@ func functionWithFixedLayoutTypes(_ p: Point, f: (Point) -> Point) -> Point {
 // CHECK:         [[RESULT:%.*]] = struct_extract %0 : $Point, #Point.y
   _ = p.y
 
-// CHECK:         [[NEW_POINT:%.*]] = apply %1(%0)
+// CHECK:         [[COPIED_CLOSURE:%.*]] = copy_value %1
+// CHECK:         [[NEW_POINT:%.*]] = apply [[COPIED_CLOSURE]](%0)
 // CHECK:         return [[NEW_POINT]]
   return f(p)
 }
@@ -134,17 +136,18 @@ public func functionWithMyResilientTypes(_ s: MySize, f: (MySize) -> MySize) -> 
   var s2 = s
 
 // CHECK:         [[SRC_ADDR:%.*]] = struct_element_addr %1 : $*MySize, #MySize.w
-// CHECK:         [[SRC:%.*]] = load [[SRC_ADDR]] : $*Int
+// CHECK:         [[SRC:%.*]] = load [trivial] [[SRC_ADDR]] : $*Int
 // CHECK:         [[DEST_ADDR:%.*]] = struct_element_addr [[SIZE_BOX]] : $*MySize, #MySize.w
 // CHECK:         assign [[SRC]] to [[DEST_ADDR]] : $*Int
   s2.w = s.w
 
 // CHECK:         [[RESULT_ADDR:%.*]] = struct_element_addr %1 : $*MySize, #MySize.h
-// CHECK:         [[RESULT:%.*]] = load [[RESULT_ADDR]] : $*Int
+// CHECK:         [[RESULT:%.*]] = load_borrow [[RESULT_ADDR]] : $*Int
   _ = s.h
 
+// CHECK:         [[CLOSURE_COPY:%.*]] = copy_value %2
 // CHECK:         copy_addr %1 to [initialization] [[SIZE_BOX:%.*]] : $*MySize
-// CHECK:         apply %2(%0, [[SIZE_BOX]])
+// CHECK:         apply [[CLOSURE_COPY]](%0, [[SIZE_BOX]])
 // CHECK:         return
   return f(s)
 }
@@ -170,7 +173,7 @@ public func functionWithMyResilientTypes(_ s: MySize, f: (MySize) -> MySize) -> 
 // CHECK-LABEL: sil [transparent] [fragile] @_TF17struct_resilience30publicTransparentLocalFunctionFVS_6MySizeFT_Si : $@convention(thin) (@in MySize) -> @owned @callee_owned () -> Int
 @_transparent public func publicTransparentLocalFunction(_ s: MySize) -> () -> Int {
 
-// CHECK-LABEL: sil shared [fragile] @_TFF17struct_resilience30publicTransparentLocalFunctionFVS_6MySizeFT_SiU_FT_Si : $@convention(thin) (@owned @box MySize) -> Int
+// CHECK-LABEL: sil shared [fragile] @_TFF17struct_resilience30publicTransparentLocalFunctionFVS_6MySizeFT_SiU_FT_Si : $@convention(thin) (@owned <τ_0_0> { var τ_0_0 } <MySize>) -> Int
 // CHECK: function_ref @_TFV17struct_resilience6MySizeg1wSi : $@convention(method) (@in_guaranteed MySize) -> Int
 // CHECK: return {{.*}} : $Int
 
@@ -179,14 +182,15 @@ public func functionWithMyResilientTypes(_ s: MySize, f: (MySize) -> MySize) -> 
 }
 
 // CHECK-LABEL: sil hidden [transparent] @_TF17struct_resilience27internalTransparentFunctionFVS_6MySizeSi : $@convention(thin) (@in MySize) -> Int
+// CHECK: bb0([[ARG:%.*]] : $*MySize):
 @_transparent func internalTransparentFunction(_ s: MySize) -> Int {
 
   // The body of an internal transparent function will not be inlined into
   // other resilience domains, so we can access storage directly
 
-// CHECK:         [[W_ADDR:%.*]] = struct_element_addr %0 : $*MySize, #MySize.w
-// CHECK-NEXT:    [[RESULT:%.*]] = load [[W_ADDR]] : $*Int
-// CHECK-NEXT:    destroy_addr %0
+// CHECK:         [[W_ADDR:%.*]] = struct_element_addr [[ARG]] : $*MySize, #MySize.w
+// CHECK-NEXT:    [[RESULT:%.*]] = load [trivial] [[W_ADDR]] : $*Int
+// CHECK-NEXT:    destroy_addr [[ARG]]
 // CHECK-NEXT:    return [[RESULT]]
   return s.w
 }

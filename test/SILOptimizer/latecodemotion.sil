@@ -1,4 +1,4 @@
-// RUN: %target-sil-opt -enable-sil-verify-all %s -late-codemotion -release-hoisting -retain-sinking -disable-with-critical-edge=1  | %FileCheck %s
+// RUN: %target-sil-opt -assume-parsing-unqualified-ownership-sil -enable-sil-verify-all %s -late-codemotion -release-hoisting -retain-sinking -disable-with-critical-edge=1  | %FileCheck %s
 
 import Builtin
 import Swift
@@ -359,7 +359,7 @@ bb3(%6 : $Builtin.Int32):
 // CHECK-NEXT: dealloc_stack
 // CHECK-NEXT: switch_enum
 // CHECK: bb1({{.*}}):
-// CHECK-NEXT: retain_value
+// CHECK: strong_retain
 // CHECK: bb2:
 // CHECK-NOT: unchecked_enum_data
 // CHECK-NOT: retain_value
@@ -558,7 +558,7 @@ bb3:
 // CHECK-NEXT: select_enum
 // CHECK-NEXT: cond_br
 // CHECK: bb1:
-// CHECK-NEXT: retain_value
+// CHECK: strong_retain
 // CHECK-NOT: retain_value
 // CHECK: bb2:
 // CHECK-NOT: unchecked_enum_data
@@ -855,7 +855,7 @@ bb0(%0 : $FakeOptional<Builtin.NativeObject>):
 
 // CHECK-LABEL: sil @enum_simplification_test2 : $@convention(thin) (FakeOptional<Builtin.NativeObject>) -> () {
 // CHECK: bb0
-// CHECK: retain_value
+// CHECK: strong_retain
 // CHECK: release_value
 sil @enum_simplification_test2 : $@convention(thin) (FakeOptional<Builtin.NativeObject>) -> () {
 bb0(%0 : $FakeOptional<Builtin.NativeObject>):
@@ -1329,7 +1329,7 @@ bb3:
 // CHECK: br bb3
 // CHECK: bb3:
 // CHECK-NOT: strong_release
-// CHECK: return 
+// CHECK: return
 sil @hoist_release_across_local_memory_use : $@convention(thin) (Builtin.NativeObject) ->() {
 bb0(%0 : $Builtin.NativeObject):
   %1 = alloc_stack $A

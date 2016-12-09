@@ -12,7 +12,7 @@ import StdlibUnittest
 
 
 // Note: in this file, we need to go through opaque functions to load
-// constants.  This is to check runtime behaviour and ensure the constant is
+// constants.  This is to check runtime behavior and ensure the constant is
 // not folded.
 
 func expectOverflow<T>(
@@ -20,7 +20,7 @@ func expectOverflow<T>(
   //===--- TRACE boilerplate ----------------------------------------------===//
   _ message: @autoclosure () -> String = "",
     showFrame: Bool = true,
-    stackTrace: SourceLocStack = SourceLocStack(),  
+    stackTrace: SourceLocStack = SourceLocStack(),
     file: String = #file, line: UInt = #line
 ) {
   expectTrue(
@@ -33,7 +33,7 @@ func expectNoOverflow<T>(
   //===--- TRACE boilerplate ----------------------------------------------===//
   _ message: @autoclosure () -> String = "",
     showFrame: Bool = true,
-    stackTrace: SourceLocStack = SourceLocStack(),  
+    stackTrace: SourceLocStack = SourceLocStack(),
     file: String = #file, line: UInt = #line
 ) {
   expectFalse(

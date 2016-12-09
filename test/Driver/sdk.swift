@@ -42,6 +42,6 @@
 // SDKWARNING: warning: no such SDK: '{{.*}}/Inputs/nonexistent-sdk'
 // SDKWARNING: -sdk {{.*}}/Inputs/nonexistent-sdk
 
-// RUN: %swiftc_driver -driver-print-jobs -parse -sdk %S/../Inputs/clang-importer-sdk -module-cache-path /path/to/cache %s 2>&1 | %FileCheck %s --check-prefix=CACHE-PATH
+// RUN: %swiftc_driver -driver-print-jobs -typecheck -sdk %S/../Inputs/clang-importer-sdk -module-cache-path /path/to/cache %s 2>&1 | %FileCheck %s --check-prefix=CACHE-PATH
 
 // CACHE-PATH: -module-cache-path /path/to/cache

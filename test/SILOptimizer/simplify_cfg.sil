@@ -1,4 +1,4 @@
-// RUN: %target-sil-opt -enable-sil-verify-all %s -simplify-cfg | %FileCheck %s
+// RUN: %target-sil-opt -assume-parsing-unqualified-ownership-sil -enable-sil-verify-all %s -simplify-cfg | %FileCheck %s
 // FIXME: Update for select_enum change.
 
 import Builtin
@@ -55,8 +55,8 @@ bb1:
 
 // CHECK-LABEL: @release_in_nonarcinert_termination_block
 // CHECK: bb0
-// CHECK: strong_release 
-// CHECK: apply 
+// CHECK: strong_release
+// CHECK: apply
 // CHECK: unreachable
 sil @release_in_nonarcinert_termination_block : $(@owned foo) -> () {
 bb0(%0 : $foo):
@@ -437,7 +437,7 @@ bb1:
 
 bb2:
   br bb4(%2 : $Int64)
-  
+
 bb4(%4 : $Int64):
   %55 = function_ref @external_f : $@convention(thin) () -> ()
   apply %55() : $@convention(thin) () -> ()
@@ -529,7 +529,7 @@ bb1:
 bb2:
   apply %f1() : $@convention(thin) () -> ()
   br bb3(%1 : $Int64)
-  
+
 bb3(%a1 : $Int64):
   return %a1 : $Int64
 }
@@ -649,8 +649,8 @@ class C {
   init(v: Int32)
 }
 
-// CHECK-LABEL: @redundant_switch_enum
-sil @redundant_switch_enum : $@convention(thin) (@owned Optional<C>) -> Int32 {
+// CHECK-LABEL: @redundant_switchenum
+sil @redundant_switchenum : $@convention(thin) (@owned Optional<C>) -> Int32 {
 bb0(%0 : $Optional<C>):
   switch_enum %0 : $Optional<C>, case #Optional.some!enumelt.1: bb1, case #Optional.none!enumelt: bb2
 
@@ -1246,6 +1246,48 @@ bb7:
   br bb1
 }
 
+sil @unknown2 : $@convention(thin) () -> ()
+
+// CHECK-LABEL: no_checked_cast_br_threading_with_alloc_ref_stack
+// CHECK: checked_cast_br
+// CHECK: apply
+// CHECK: apply
+// CHECK: checked_cast_br
+// CHECK: apply
+// CHECK: apply
+// CHECK: return
+sil @no_checked_cast_br_threading_with_alloc_ref_stack : $@convention(method) (@guaranteed Base) -> () {
+bb0(%0 : $Base):
+  %fu = function_ref @unknown : $@convention(thin) () -> ()
+  %fu2 = function_ref @unknown2 : $@convention(thin) () -> ()
+  checked_cast_br [exact] %0 : $Base to $Base, bb1, bb2
+
+bb1(%1 : $Base):
+  apply %fu() : $@convention(thin) () -> ()
+  br bb3
+
+bb2:
+  apply %fu2() : $@convention(thin) () -> ()
+  br bb3
+
+bb3:
+  %a = alloc_ref [stack] $Base
+  checked_cast_br [exact] %0 : $Base to $Base, bb4, bb5
+
+bb4(%2 : $Base):
+  apply %fu() : $@convention(thin) () -> ()
+  br bb6
+
+bb5:
+  apply %fu2() : $@convention(thin) () -> ()
+  br bb6
+
+bb6:
+  dealloc_ref [stack] %a : $Base
+  %r = tuple()
+  return %r : $()
+}
+
 
 // CHECK-LABEL: sil @jumpthread_switch_enum
 // CHECK-NOT: switch_enum
@@ -1563,7 +1605,7 @@ enum IntEnum : Int32 {
 // CHECK-DAG: [[X11:%[0-9]+]] = enum $Optional<IntEnum>, #Optional.some!enumelt.1, [[X10]] : $IntEnum
 // CHECK-DAG: [[X12:%[0-9]+]] = enum $IntEnum, #IntEnum.E0!enumelt
 // CHECK-DAG: [[X13:%[0-9]+]] = enum $Optional<IntEnum>, #Optional.some!enumelt.1, [[X12]] : $IntEnum
-// CHECK-DAG: [[X14:%[0-9]+]] = select_value %0 : $Builtin.Int32, case [[X6]]: [[X8]], case [[X9]]: [[X11]], case [[X2]]: [[X13]], default [[X5]] : $Optional<IntEnum> 
+// CHECK-DAG: [[X14:%[0-9]+]] = select_value %0 : $Builtin.Int32, case [[X6]]: [[X8]], case [[X9]]: [[X11]], case [[X2]]: [[X13]], default [[X5]] : $Optional<IntEnum>
 // CHECK-DAG: return [[X14]] : $Optional<IntEnum>
 sil @create_select_value : $@convention(thin) (Builtin.Int32) -> Optional<IntEnum> {
 bb0(%0 : $Builtin.Int32):
@@ -2590,8 +2632,8 @@ bb2(%16 : $Error):
 // CHECK: br bb1([[PB]] : $*Builtin.Int32)
 sil @simplified_branch_arg_has_result_value_1 : $@convention(thin) (@in Builtin.Int32) -> Builtin.Int32 {
 entry(%0 : $*Builtin.Int32):
-  %b = alloc_box $Builtin.Int32
-  %p = project_box %b : $@box Builtin.Int32
+  %b = alloc_box $<τ_0_0> { var τ_0_0 } <Builtin.Int32>
+  %p = project_box %b : $<τ_0_0> { var τ_0_0 } <Builtin.Int32>, 0
   %i = integer_literal $Builtin.Int32, 0
   store %i to %p : $*Builtin.Int32
   br bb1(%p : $*Builtin.Int32)

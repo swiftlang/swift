@@ -17,7 +17,7 @@ hasNoPrototype()
 // CHECK:   [[NSOBJECT_CTOR:%.*]] = function_ref @_TFCSo8NSObjectC{{.*}} : $@convention(method) (@thick NSObject.Type) -> @owned NSObject
 // CHECK:   [[ANSIBLE:%.*]] = apply [[ANSIBLE_CTOR]]
 // CHECK:   [[NSANSE_RESULT:%.*]] = apply [[NSANSE]]([[ANSIBLE]])
-// CHECK:   release_value [[ANSIBLE]] : $Optional<Ansible>
+// CHECK:   destroy_value [[ANSIBLE]] : $Optional<Ansible>
 // -- Referencing unapplied C function goes through a thunk
 // CHECK:   [[NSANSE:%.*]] = function_ref @_TTOFSC6NSAnseFGSQCSo7Ansible_GSQS__ : $@convention(thin) (@owned Optional<Ansible>) -> @owned Optional<Ansible>
 // -- Referencing unprototyped C function passes no parameters
@@ -36,7 +36,7 @@ hasNoPrototype()
 // CHECK: bb0(%0 : $Optional<Ansible>):
 // CHECK:   %1 = function_ref @NSAnse : $@convention(c) (Optional<Ansible>) -> @autoreleased Optional<Ansible>
 // CHECK:   %2 = apply %1(%0) : $@convention(c) (Optional<Ansible>) -> @autoreleased Optional<Ansible>
-// CHECK:   release_value %0 : $Optional<Ansible>
+// CHECK:   destroy_value %0 : $Optional<Ansible>
 // CHECK:   return %2 : $Optional<Ansible>
 // CHECK: }
 

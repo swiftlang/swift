@@ -5,8 +5,8 @@
 // Copyright (c) 2014 - 2016 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
-// See http://swift.org/LICENSE.txt for license information
-// See http://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
+// See https://swift.org/LICENSE.txt for license information
+// See https://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
 //
 //===----------------------------------------------------------------------===//
 //
@@ -21,6 +21,7 @@
 #include "swift/AST/Builtins.h"
 #include "swift/AST/Module.h"
 #include "swift/AST/SILOptions.h"
+#include "swift/AST/SILLayout.h"
 #include "swift/Basic/LangOptions.h"
 #include "swift/Basic/Range.h"
 #include "swift/SIL/SILCoverageMap.h"
@@ -91,6 +92,7 @@ private:
   friend class SILDefaultWitnessTable;
   friend class SILFunction;
   friend class SILGlobalVariable;
+  friend class SILLayout;
   friend class SILType;
   friend class SILVTable;
   friend class SILUndef;
@@ -131,6 +133,10 @@ private:
 
   /// The list of SILVTables in the module.
   VTableListType vtables;
+
+  /// This is a cache of vtable entries for quick look-up
+  llvm::DenseMap<std::pair<const SILVTable *, SILDeclRef>, SILFunction *>
+      VTableEntryCache;
 
   /// Lookup table for SIL witness tables from conformances.
   llvm::DenseMap<const NormalProtocolConformance *, SILWitnessTable *>
@@ -415,13 +421,6 @@ public:
   ///
   /// \return false if the linking failed.
   bool linkFunction(SILFunction *Fun,
-                    LinkingMode LinkAll = LinkingMode::LinkNormal);
-
-  /// Attempt to link a function by declaration. Returns true if linking
-  /// succeeded, false otherwise.
-  ///
-  /// \return false if the linking failed.
-  bool linkFunction(SILDeclRef Decl,
                     LinkingMode LinkAll = LinkingMode::LinkNormal);
 
   /// Attempt to link a function by mangled name. Returns true if linking

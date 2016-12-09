@@ -5,8 +5,8 @@
 // Copyright (c) 2014 - 2016 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
-// See http://swift.org/LICENSE.txt for license information
-// See http://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
+// See https://swift.org/LICENSE.txt for license information
+// See https://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
 //
 //===----------------------------------------------------------------------===//
 %# Ignore the following admonition; it applies to the resulting .swift file only
@@ -47,7 +47,7 @@ public protocol IntegerArithmetic : _IntegerArithmetic, Comparable {
   /// arithmetic overflow (except in -Ounchecked builds).
   static func ${op} (lhs: Self, rhs: Self) -> Self
 % end
-  
+
   /// Explicitly convert to `IntMax`, trapping on overflow (except in
   /// -Ounchecked builds).
   func toIntMax() -> IntMax
@@ -97,7 +97,7 @@ public protocol SignedNumber : Comparable, ExpressibleByIntegerLiteral {
 
   /// Returns the difference between `lhs` and `rhs`.
   static func - (lhs: Self, rhs: Self) -> Self
-  
+
   // Do not use this operator directly; call abs(x) instead
   static func ~> (_:Self,_:(_Abs, ())) -> Self
 }

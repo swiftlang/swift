@@ -5,8 +5,8 @@
 // Copyright (c) 2014 - 2016 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
-// See http://swift.org/LICENSE.txt for license information
-// See http://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
+// See https://swift.org/LICENSE.txt for license information
+// See https://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
 //
 //===----------------------------------------------------------------------===//
 
@@ -99,7 +99,7 @@ static void fixupReferenceCounts(SILBasicBlock::iterator I, SILLocation Loc,
   // consumed by the closure body.
   for (auto &CaptureArg : CaptureArgs)
     if (!CaptureArg->getType().isAddress())
-      B.emitRetainValueOperation(Loc, CaptureArg);
+      B.emitCopyValueOperation(Loc, CaptureArg);
 }
 
 /// \brief Removes instructions that create the callee value if they are no
@@ -284,6 +284,7 @@ getCalleeFunction(FullApplySite AI, bool &IsThick,
   case SILFunctionTypeRepresentation::Thick:
   case SILFunctionTypeRepresentation::Thin:
   case SILFunctionTypeRepresentation::Method:
+  case SILFunctionTypeRepresentation::Closure:
   case SILFunctionTypeRepresentation::WitnessMethod:
     break;
     
@@ -359,7 +360,7 @@ runOnFunctionRecursively(SILFunction *F, FullApplySite AI,
         if (auto *II = dyn_cast<SILInstruction>(NewInst))
           I = II->getIterator();
         else
-          I = NewInst->getParentBB()->begin();
+          I = NewInst->getParentBlock()->begin();
         auto NewAI = FullApplySite::isa(NewInstPair.second.getInstruction());
         if (!NewAI)
           continue;

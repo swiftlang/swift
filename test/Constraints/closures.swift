@@ -1,4 +1,4 @@
-// RUN: %target-parse-verify-swift
+// RUN: %target-typecheck-verify-swift
 
 func myMap<T1, T2>(_ array: [T1], _ fn: (T1) -> T2) -> [T2] {}
 
@@ -238,7 +238,7 @@ func ident<T>(_ t: T) -> T {}
 var c = ident({1.DOESNT_EXIST}) // error: expected-error {{value of type 'Int' has no member 'DOESNT_EXIST'}}
 
 // <rdar://problem/20712541> QoI: Int/UInt mismatch produces useless error inside a block
-var afterMessageCount : Int? = nil
+var afterMessageCount : Int?
 
 func uintFunc() -> UInt {}
 func takeVoidVoidFn(_ a : () -> ()) {}
@@ -324,3 +324,62 @@ func r20789423() {
 }
 
 let f: (Int, Int) -> Void = { x in }  // expected-error {{contextual closure type specifies '(Int, Int)', but 1 was used in closure body, try adding extra parentheses around the single tuple argument}}
+
+// Make sure that behavior related to allowing trailing closures to match functions
+// with Any as a final parameter is the same after the changes made by SR-2505, namely:
+// that we continue to select function that does _not_ have Any as a final parameter in
+// presence of other possibilities.
+
+protocol SR_2505_Initable { init() }
+struct SR_2505_II : SR_2505_Initable {}
+
+protocol P_SR_2505 {
+  associatedtype T: SR_2505_Initable
+}
+
+extension P_SR_2505 {
+  func test(it o: (T) -> Bool) -> Bool {
+    return o(T.self())
+  }
+}
+
+class C_SR_2505 : P_SR_2505 {
+  typealias T = SR_2505_II
+
+  func test(_ o: Any) -> Bool {
+    return false
+  }
+
+  func call(_ c: C_SR_2505) -> Bool {
+    return c.test { o in test(o) }
+  }
+}
+
+let _ = C_SR_2505().call(C_SR_2505())
+
+// <rdar://problem/28909024> Returning incorrect result type from method invocation can result in nonsense diagnostic
+extension Collection {
+  func r28909024(_ predicate: (Iterator.Element)->Bool) -> Index {
+    return startIndex
+  }
+}
+func fn_r28909024(n: Int) {
+  return (0..<10).r28909024 { // expected-error {{unexpected non-void return value in void function}}
+    _ in true
+  }
+}
+
+// SR-2994: Unexpected ambiguous expression in closure with generics
+struct S_2994 {
+  var dataOffset: Int
+}
+class C_2994<R> {
+  init(arg: (R) -> Void) {}
+}
+func f_2994(arg: String) {}
+func g_2994(arg: Int) -> Double {
+  return 2
+}
+C_2994<S_2994>(arg: { (r: S_2994) in f_2994(arg: g_2994(arg: r.dataOffset)) }) // expected-error {{cannot convert value of type 'Double' to expected argument type 'String'}}
+
+let _ = { $0[$1] }(1, 1) // expected-error {{cannot subscript a value of incorrect or ambiguous type}}

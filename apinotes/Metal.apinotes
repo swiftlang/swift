@@ -2,11 +2,11 @@
 Name: Metal
 Tags:
 - Name: MTLCommandBufferError
-  SwiftName: MTLCommandBufferErrorDomain
+  NSErrorDomain: MTLCommandBufferErrorDomain
 - Name: MTLLibraryError
-  SwiftName: MTLLibraryErrorDomain
+  NSErrorDomain: MTLLibraryErrorDomain
 - Name: MTLRenderPipelineError
-  SwiftName: MTLRenderPipelineErrorDomain
+  NSErrorDomain: MTLRenderPipelineErrorDomain
 Enumerators:
 - Name: MTLResourceStorageModeShared
   SwiftName: storageModeShared

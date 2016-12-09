@@ -1,4 +1,4 @@
-// RUN: %target-parse-verify-swift -I %S/Inputs -enable-source-import
+// RUN: %target-typecheck-verify-swift -I %S/Inputs -enable-source-import
 
 import imported_enums
 
@@ -13,7 +13,7 @@ var x:Int
 func square(_ x: Int) -> Int { return x*x }
 
 struct A<B> {
-  struct C<D> { } // expected-error{{generic type 'C' cannot be nested in type 'A'}}
+  struct C<D> { }
 }
 
 switch x {
@@ -143,7 +143,7 @@ case .Foo: // expected-error{{enum case 'Foo' not found in type 'Int'}}
 }
 
 struct ContainsEnum {
-  enum Possible<T> { // expected-error{{generic type 'Possible' cannot be nested in type 'ContainsEnum'}}
+  enum Possible<T> {
     case Naught
     case Mere(T)
     case Twain(T, T)
@@ -151,7 +151,7 @@ struct ContainsEnum {
 
   func member(_ n: Possible<Int>) {
     switch n {
-    case ContainsEnum.Possible<Int>.Naught, // expected-error{{cannot specialize a non-generic definition}} expected-note {{while parsing this '<' as a type parameter bracket}}
+    case ContainsEnum.Possible<Int>.Naught,
          ContainsEnum.Possible.Naught,
          Possible<Int>.Naught,
          Possible.Naught,
@@ -163,7 +163,7 @@ struct ContainsEnum {
 
 func nonmemberAccessesMemberType(_ n: ContainsEnum.Possible<Int>) {
   switch n {
-  case ContainsEnum.Possible<Int>.Naught, // expected-error{{cannot specialize a non-generic definition}} expected-note {{while parsing this '<' as a type parameter bracket}}
+  case ContainsEnum.Possible<Int>.Naught,
        .Naught:
     ()
   }
@@ -288,8 +288,8 @@ default:
 
 
 // Optional patterns.
-let op1 : Int? = nil
-let op2 : Int?? = nil
+let op1 : Int?
+let op2 : Int??
 
 switch op1 {
 case nil: break
@@ -308,7 +308,7 @@ case (_?)?: break
 
 // <rdar://problem/20365753> Bogus diagnostic "refutable pattern match can fail"
 let (responseObject: Int?) = op1
-// expected-error @-1 2 {{expected ',' separator}} {{25-25=,}} {{25-25=,}}
+// expected-error @-1 {{expected ',' separator}} {{25-25=,}}
 // expected-error @-2 {{expected pattern}}
 
 

@@ -5,8 +5,8 @@
 // Copyright (c) 2014 - 2016 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
-// See http://swift.org/LICENSE.txt for license information
-// See http://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
+// See https://swift.org/LICENSE.txt for license information
+// See https://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
 //
 //===----------------------------------------------------------------------===//
 //
@@ -21,12 +21,6 @@
 
 using namespace swift;
 using namespace reflection;
-
-[[noreturn]]
-static void unreachable(const char *Message) {
-  std::cerr << "fatal error: " << Message << "\n";
-  std::abort();
-}
 
 class PrintTypeRef : public TypeRefVisitor<PrintTypeRef, void> {
   std::ostream &OS;
@@ -354,14 +348,9 @@ bool TypeRef::isConcreteAfterSubstitutions(
 
 unsigned NominalTypeTrait::getDepth() const {
   if (auto P = Parent) {
-    switch (P->getKind()) {
-    case TypeRefKind::Nominal:
-      return 1 + cast<NominalTypeRef>(P)->getDepth();
-    case TypeRefKind::BoundGeneric:
-      return 1 + cast<BoundGenericTypeRef>(P)->getDepth();
-    default:
-      unreachable("Asked for depth on non-nominal typeref");
-    }
+    if (auto *Nominal = dyn_cast<NominalTypeRef>(P))
+      return 1 + Nominal->getDepth();
+    return 1 + cast<BoundGenericTypeRef>(P)->getDepth();
   }
 
   return 0;
@@ -640,7 +629,8 @@ public:
   const TypeRef *
   visitGenericTypeParameterTypeRef(const GenericTypeParameterTypeRef *GTP) {
     auto found = Substitutions.find({GTP->getDepth(), GTP->getIndex()});
-    assert(found != Substitutions.end());
+    if (found == Substitutions.end())
+      return GTP;
     assert(found->second->isConcrete());
 
     // When substituting a concrete type containing a metatype into a
@@ -656,23 +646,37 @@ public:
 
     const TypeRef *TypeWitness = nullptr;
 
-    // Get the original type of the witness from the conformance.
-    switch (SubstBase->getKind()) {
-    case TypeRefKind::Nominal: {
-      auto Nominal = cast<NominalTypeRef>(SubstBase);
-      TypeWitness = Builder.getDependentMemberTypeRef(Nominal->getMangledName(), DM);
-      break;
-    }
-    case TypeRefKind::BoundGeneric: {
-      auto BG = cast<BoundGenericTypeRef>(SubstBase);
-      TypeWitness = Builder.getDependentMemberTypeRef(BG->getMangledName(), DM);
-      break;
-    }
-    default:
-      unreachable("Unknown base type");
+    while (TypeWitness == nullptr) {
+      auto &Member = DM->getMember();
+      auto *Protocol = DM->getProtocol();
+
+      // Get the original type of the witness from the conformance.
+      if (auto *Nominal = dyn_cast<NominalTypeRef>(SubstBase)) {
+        TypeWitness = Builder.lookupTypeWitness(Nominal->getMangledName(),
+                                                Member, Protocol);
+      } else {
+        auto BG = cast<BoundGenericTypeRef>(SubstBase);
+        TypeWitness = Builder.lookupTypeWitness(BG->getMangledName(),
+                                                Member, Protocol);
+      }
+
+      if (TypeWitness != nullptr)
+        break;
+
+      // If we didn't find the member type, check the superclass.
+      auto *Superclass = Builder.lookupSuperclass(SubstBase);
+      if (Superclass == nullptr)
+        break;
+
+      SubstBase = Superclass;
     }
 
-    assert(TypeWitness);
+    // We didn't find the member type, so return something to let the
+    // caller know we're dealing with incomplete metadata.
+    if (TypeWitness == nullptr)
+      return Builder.createDependentMemberType(DM->getMember(),
+                                               SubstBase,
+                                               DM->getProtocol());
 
     // Apply base type substitutions to get the fully-substituted nested type.
     auto *Subst = TypeWitness->subst(Builder, SubstBase->getSubstMap());
@@ -713,9 +717,7 @@ public:
 
 const TypeRef *
 TypeRef::subst(TypeRefBuilder &Builder, const GenericArgumentMap &Subs) const {
-  const TypeRef *Result = TypeRefSubstitution(Builder, Subs).visit(this);
-  assert(Result->isConcrete());
-  return Result;
+  return TypeRefSubstitution(Builder, Subs).visit(this);
 }
 
 bool TypeRef::deriveSubstitutions(GenericArgumentMap &Subs,

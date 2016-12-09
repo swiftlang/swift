@@ -1,4 +1,4 @@
-// RUN: %target-parse-verify-swift
+// RUN: %target-typecheck-verify-swift
 
 // SR-139:
 // Infinite recursion parsing bitwise operators
@@ -35,7 +35,7 @@ func test_seconds() {
 }
 
 // SR-2102:
-// DictionaryExpr was too complex to be solved in resonable time
+// DictionaryExpr was too complex to be solved in reasonable time
 
 let M_PI: Double = 3.1415926535897931
 let M_E : Double = 2.7182818284590451

@@ -1,4 +1,4 @@
-// RUN: %target-parse-verify-swift
+// RUN: %target-typecheck-verify-swift
 
 class HasFunc {
   func HasFunc(_: HasFunc) {
@@ -44,7 +44,9 @@ var TopLevelVar: TopLevelVar? { return nil } // expected-error 2 {{use of undecl
 
 
 protocol AProtocol {
-  associatedtype e : e  // expected-error {{inheritance from non-protocol, non-class type 'Self.e'}}
+  associatedtype e : e
+  // expected-error@-1 {{type 'e' references itself}}
+  // expected-note@-2 {{type declared here}}
 }
 
 
@@ -66,3 +68,13 @@ struct SomeStruct<A> {
   typealias A = A // expected-error {{type alias 'A' circularly references itself}}
 }
 
+// <rdar://problem/27680407> Infinite recursion when using fully-qualified associatedtype name that has not been defined with typealias
+protocol rdar27680407Proto {
+  associatedtype T // expected-note {{protocol requires nested type 'T'; do you want to add it?}}
+
+  init(value: T)
+}
+
+struct rdar27680407Struct : rdar27680407Proto { // expected-error {{type 'rdar27680407Struct' does not conform to protocol 'rdar27680407Proto'}}
+  init(value: rdar27680407Struct.T) {}
+}

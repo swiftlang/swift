@@ -1,0 +1,4 @@
+// RUN: not --crash %target-sil-opt %s
+// REQUIRES: asserts
+struct I:b:typealias b:a
+typealias a=f

@@ -5,8 +5,8 @@
 // Copyright (c) 2014 - 2016 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
-// See http://swift.org/LICENSE.txt for license information
-// See http://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
+// See https://swift.org/LICENSE.txt for license information
+// See https://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
 //
 //===----------------------------------------------------------------------===//
 //
@@ -55,6 +55,8 @@ DevirtualizationResult devirtualizeClassMethod(FullApplySite AI,
 DevirtualizationResult tryDevirtualizeClassMethod(FullApplySite AI,
                                                   SILValue ClassInstance);
 DevirtualizationResult tryDevirtualizeWitnessMethod(ApplySite AI); 
+/// Check if an upcast is legal.
+bool isLegalUpcast(SILType FromTy, SILType ToTy);
 }
 
 #endif

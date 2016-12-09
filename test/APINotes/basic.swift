@@ -1,5 +1,6 @@
-// RUN: %target-parse-verify-swift -I %S/Inputs/custom-modules
+// RUN: %target-typecheck-verify-swift -I %S/Inputs/custom-modules -F %S/Inputs/custom-frameworks
 import APINotesTest
+import APINotesFrameworkTest
 
 func testSwiftName() {
   moveTo(x: 0, y: 0, z: 0)
@@ -17,4 +18,8 @@ func testSwiftName() {
   let rect2: RectStruct // expected-error{{'RectStruct' has been renamed to 'Rect'}}
 
   let d: Double = __will_be_private
+
+  // From APINotesFrameworkTest.
+  jumpTo(x: 0, y: 0, z: 0)
+  jumpTo(0, 0, 0) // expected-error{{missing argument labels 'x:y:z:' in call}}
 }

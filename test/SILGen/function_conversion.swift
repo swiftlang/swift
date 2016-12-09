@@ -24,8 +24,12 @@ func cToBlock(_ arg: @escaping @convention(c) (Int) -> Int) -> @convention(block
 // ==== Throws variance
 
 // CHECK-LABEL: sil hidden @_TF19function_conversion12funcToThrowsFFT_T_FzT_T_ : $@convention(thin) (@owned @callee_owned () -> ()) -> @owned @callee_owned () -> @error Error
-// CHECK:         [[FUNC:%.*]] = convert_function %0 : $@callee_owned () -> () to $@callee_owned () -> @error Error
-// CHECK:         return [[FUNC]]
+// CHECK: bb0([[ARG:%.*]] : $@callee_owned () -> ()):
+// CHECK:   [[ARG_COPY:%.*]] = copy_value [[ARG]]
+// CHECK:   [[FUNC:%.*]] = convert_function [[ARG_COPY]] : $@callee_owned () -> () to $@callee_owned () -> @error Error
+// CHECK:   destroy_value [[ARG]]
+// CHECK:   return [[FUNC]]
+// CHECK: } // end sil function '_TF19function_conversion12funcToThrowsFFT_T_FzT_T_'
 func funcToThrows(_ x: @escaping () -> ()) -> () throws -> () {
   return x
 }
@@ -51,16 +55,23 @@ func thinToThrows() {
 class Feral {}
 class Domesticated : Feral {}
 
-// CHECK-LABEL: sil hidden @_TF19function_conversion12funcToUpcastFFT_CS_12DomesticatedFT_CS_5Feral : $@convention(thin) (@owned @callee_owned () -> @owned Domesticated) -> @owned @callee_owned () -> @owned Feral
-// CHECK:         [[FUNC:%.*]] = convert_function %0 : $@callee_owned () -> @owned Domesticated to $@callee_owned () -> @owned Feral
-// CHECK:         return [[FUNC]]
+// CHECK-LABEL: sil hidden @_TF19function_conversion12funcToUpcastFFT_CS_12DomesticatedFT_CS_5Feral : $@convention(thin) (@owned @callee_owned () -> @owned Domesticated) -> @owned @callee_owned () -> @owned Feral {
+// CHECK: bb0([[ARG:%.*]] : $@callee_owned () -> @owned Domesticated):
+// CHECK:   [[ARG_COPY:%.*]] = copy_value [[ARG]]
+// CHECK:   [[FUNC:%.*]] = convert_function [[ARG_COPY]] : $@callee_owned () -> @owned Domesticated to $@callee_owned () -> @owned Feral
+// CHECK:   destroy_value [[ARG]]
+// CHECK:   return [[FUNC]]
+// CHECK: } // end sil function '_TF19function_conversion12funcToUpcastFFT_CS_12DomesticatedFT_CS_5Feral'
 func funcToUpcast(_ x: @escaping () -> Domesticated) -> () -> Feral {
   return x
 }
 
 // CHECK-LABEL: sil hidden @_TF19function_conversion12funcToUpcastFFCS_5FeralT_FCS_12DomesticatedT_ : $@convention(thin) (@owned @callee_owned (@owned Feral) -> ()) -> @owned @callee_owned (@owned Domesticated) -> ()
-// CHECK:         [[FUNC:%.*]] = convert_function %0 : $@callee_owned (@owned Feral) -> () to $@callee_owned (@owned Domesticated) -> (){{.*}} // user: %3
-// CHECK:         return [[FUNC]]
+// CHECK: bb0([[ARG:%.*]] :
+// CHECK:   [[ARG_COPY:%.*]] = copy_value [[ARG]]
+// CHECK:   [[FUNC:%.*]] = convert_function [[ARG_COPY]] : $@callee_owned (@owned Feral) -> () to $@callee_owned (@owned Domesticated) -> (){{.*}}
+// CHECK:   destroy_value [[ARG]]
+// CHECK:   return [[FUNC]]
 func funcToUpcast(_ x: @escaping (Feral) -> ()) -> (Domesticated) -> () {
   return x
 }
@@ -324,9 +335,14 @@ func convUpcastMetatype(_ c4: @escaping (Parent.Type, Trivial?) -> Child.Type,
 // ==== Function to existential -- make sure we maximally abstract it
 
 // CHECK-LABEL: sil hidden @_TF19function_conversion19convFuncExistentialFFP_FSiSiT_ : $@convention(thin) (@owned @callee_owned (@in Any) -> @owned @callee_owned (Int) -> Int) -> ()
+// CHECK: bb0([[ARG:%.*]] :
+// CHECK:   [[ARG_COPY:%.*]] = copy_value [[ARG]]
+// CHECK:   [[REABSTRACT_THUNK:%.*]] = function_ref @_TTRXFo_iP__oXFo_dSi_dSi__XFo_oXFo_dSi_dSi__iP__
+// CHECK:   [[PA:%.*]] = partial_apply [[REABSTRACT_THUNK]]([[ARG_COPY]])
+// CHECK:   destroy_value [[PA]]
+// CHECK:   destroy_value [[ARG]]
+// CHECK: } // end sil function '_TF19function_conversion19convFuncExistentialFFP_FSiSiT_'
 func convFuncExistential(_ f1: @escaping (Any) -> (Int) -> Int) {
-// CHECK:         function_ref @_TTRXFo_iP__oXFo_dSi_dSi__XFo_oXFo_dSi_dSi__iP__
-// CHECK:         partial_apply %3(%0)
   let _: ((Int) -> Int) -> Any = f1
 }
 
@@ -344,9 +360,9 @@ func convFuncExistential(_ f1: @escaping (Any) -> (Int) -> Int) {
 // CHECK:         return
 
 // CHECK-LABEL: sil shared [transparent] [reabstraction_thunk] @_TTRXFo_dSi_dSi_XFo_iSi_iSi_ : $@convention(thin) (@in Int, @owned @callee_owned (Int) -> Int) -> @out Int
-// CHECK:         load %1 : $*Int
+// CHECK:         load [trivial] %1 : $*Int
 // CHECK-NEXT:    apply %2(%3)
-// CHECK-NEXT:    store {{.*}} to %0
+// CHECK-NEXT:    store {{.*}} to [trivial] %0
 // CHECK:         return
 
 // ==== Class-bound archetype upcast
@@ -406,4 +422,26 @@ func convTupleScalar(_ f1: @escaping (Q) -> (),
 
 func convTupleScalarOpaque<T>(_ f: @escaping (T...) -> ()) -> ((_ args: T...) -> ())? {
   return f
+}
+
+// ==== Make sure we support AnyHashable erasure
+
+// CHECK-LABEL: sil hidden @_TF19function_conversion15convAnyHashableuRxs8HashablerFT1tx_T_
+// CHECK:         function_ref @_TFF19function_conversion15convAnyHashableuRxs8HashablerFT1tx_T_U_FTVs11AnyHashableS1__Sb
+// CHECK:         function_ref @_TTRGRxs8HashablerXFo_iVs11AnyHashableiS0__dSb_XFo_ixix_dSb_
+
+// CHECK-LABEL: sil shared [transparent] [reabstraction_thunk] @_TTRGRxs8HashablerXFo_iVs11AnyHashableiS0__dSb_XFo_ixix_dSb_ : $@convention(thin) <T where T : Hashable> (@in T, @in T, @owned @callee_owned (@in AnyHashable, @in AnyHashable) -> Bool) -> Bool
+// CHECK:         alloc_stack $AnyHashable
+// CHECK:         function_ref @_swift_convertToAnyHashable
+// CHECK:         apply {{.*}}<T>
+// CHECK:         alloc_stack $AnyHashable
+// CHECK:         function_ref @_swift_convertToAnyHashable
+// CHECK:         apply {{.*}}<T>
+// CHECK:         return
+
+
+func convAnyHashable<T : Hashable>(t: T) {
+  let fn: (T, T) -> Bool = {
+    (x: AnyHashable, y: AnyHashable) in x == y
+  }
 }

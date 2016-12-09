@@ -154,24 +154,25 @@ class Singleton : NSObject {
 
 class HasUnmanaged : NSObject {
   // CHECK-LABEL: sil hidden [transparent] [thunk] @_TToFC15objc_properties12HasUnmanagedg3refGSqGVs9UnmanagedPs9AnyObject___
-  // CHECK: [[NATIVE:%.+]] = function_ref @_TFC15objc_properties12HasUnmanagedg3refGSqGVs9UnmanagedPs9AnyObject___
-  // CHECK: [[RESULT:%.+]] = apply [[NATIVE]](%0)
+  // CHECK: bb0([[CLS:%.*]] : $HasUnmanaged):
+  // CHECK:     [[CLS_COPY:%.*]] = copy_value [[CLS]]
+  // CHECK:     [[NATIVE:%.+]] = function_ref @_TFC15objc_properties12HasUnmanagedg3refGSqGVs9UnmanagedPs9AnyObject___
+  // CHECK:     [[RESULT:%.+]] = apply [[NATIVE]]([[CLS_COPY]])
   // CHECK-NOT: {{(retain|release)}}
-  // CHECK: strong_release %0 : $HasUnmanaged
+  // CHECK:     destroy_value [[CLS_COPY]] : $HasUnmanaged
   // CHECK-NOT: {{(retain|release)}}
-  // CHECK: return [[RESULT]] : $Optional<Unmanaged<AnyObject>>
+  // CHECK:     return [[RESULT]] : $Optional<Unmanaged<AnyObject>>
+  // CHECK: } // end sil function '_TToFC15objc_properties12HasUnmanagedg3refGSqGVs9UnmanagedPs9AnyObject___'
 
   // CHECK-LABEL: sil hidden [transparent] [thunk] @_TToFC15objc_properties12HasUnmanageds3refGSqGVs9UnmanagedPs9AnyObject___
-  // CHECK-NOT: {{(retain|release)}}
-  // CHECK: strong_retain %1 : $HasUnmanaged
-  // CHECK-NOT: {{(retain|release)}}
-  // CHECK: [[NATIVE:%.+]] = function_ref @_TFC15objc_properties12HasUnmanageds3refGSqGVs9UnmanagedPs9AnyObject___
-  // CHECK-NOT: {{(retain|release)}}
-  // CHECK: apply [[NATIVE]](%0, %1)
-  // CHECK-NOT: {{(retain|release)}}
-  // CHECK: strong_release %1 : $HasUnmanaged
-  // CHECK-NOT: {{(retain|release)}}
-  // CHECK: return
+  // CHECK: bb0([[NEW_VALUE:%.*]] : $Optional<Unmanaged<AnyObject>>, [[SELF:%.*]] : $HasUnmanaged):
+  // CHECK-NEXT: [[SELF_COPY:%.*]] = copy_value [[SELF]] : $HasUnmanaged
+  // CHECK-NEXT: // function_ref
+  // CHECK-NEXT: [[NATIVE:%.+]] = function_ref @_TFC15objc_properties12HasUnmanageds3refGSqGVs9UnmanagedPs9AnyObject___
+  // CHECK-NEXT: [[RESULT:%.*]] = apply [[NATIVE]]([[NEW_VALUE]], [[SELF_COPY]])
+  // CHECK-NEXT: destroy_value [[SELF_COPY]] : $HasUnmanaged
+  // CHECK-NEXT: return [[RESULT:%.*]]
+  // CHECK: } // end sil function '_TToFC15objc_properties12HasUnmanageds3refGSqGVs9UnmanagedPs9AnyObject___'
   var ref: Unmanaged<AnyObject>?
 }
 

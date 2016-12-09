@@ -1,4 +1,4 @@
-// RUN: %target-parse-verify-swift
+// RUN: %target-typecheck-verify-swift
 
 // Positive and negative tests for String index types
 func acceptsCollection<I: Collection>(_: I) {}

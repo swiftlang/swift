@@ -5,8 +5,8 @@
 // Copyright (c) 2014 - 2016 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
-// See http://swift.org/LICENSE.txt for license information
-// See http://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
+// See https://swift.org/LICENSE.txt for license information
+// See https://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
 //
 //===----------------------------------------------------------------------===//
 //
@@ -505,6 +505,8 @@ public:
     case ReferenceCounting::Error:
       llvm_unreachable("unowned references to this type are not supported");
     }
+
+    llvm_unreachable("Not a valid ReferenceCounting.");
   }
   
   /// Return the spare bit mask to use for types that comprise heap object
@@ -728,6 +730,14 @@ private:
 
 //--- Remote reflection metadata --------------------------------------------
 public:
+  /// Section names.
+  std::string FieldTypeSection;
+  std::string BuiltinTypeSection;
+  std::string AssociatedTypeSection;
+  std::string CaptureDescriptorSection;
+  std::string ReflectionStringsSection;
+  std::string ReflectionTypeRefSection;
+
   /// Builtin types referenced by types in this module when emitting
   /// reflection metadata.
   llvm::SetVector<CanType> BuiltinTypes;
@@ -763,6 +773,10 @@ public:
   /// from this module.
   void emitOpaqueTypeMetadataRecord(const NominalTypeDecl *nominalDecl);
 
+  /// Some nominal type declarations require us to emit a fixed-size type
+  /// descriptor, because they have special layout considerations.
+  bool shouldEmitOpaqueTypeMetadataRecord(const NominalTypeDecl *nominalDecl);
+
   /// Emit reflection metadata records for builtin and imported types referenced
   /// from this module.
   void emitBuiltinReflectionMetadata();
@@ -770,12 +784,12 @@ public:
   /// Emit a symbol identifying the reflection metadata version.
   void emitReflectionMetadataVersion();
 
-  std::string getBuiltinTypeMetadataSectionName();
-  std::string getFieldTypeMetadataSectionName();
-  std::string getAssociatedTypeMetadataSectionName();
-  std::string getCaptureDescriptorMetadataSectionName();
-  std::string getReflectionStringsSectionName();
-  std::string getReflectionTypeRefSectionName();
+  const char *getBuiltinTypeMetadataSectionName();
+  const char *getFieldTypeMetadataSectionName();
+  const char *getAssociatedTypeMetadataSectionName();
+  const char *getCaptureDescriptorMetadataSectionName();
+  const char *getReflectionStringsSectionName();
+  const char *getReflectionTypeRefSectionName();
 
 //--- Runtime ---------------------------------------------------------------
 public:
@@ -946,9 +960,10 @@ public:
 
   StringRef mangleType(CanType type, SmallVectorImpl<char> &buffer);
  
-  // Get the ArchetypeBuilder for the currently active generic context. Crashes
-  // if there is no generic context.
-  ArchetypeBuilder &getContextArchetypes();
+  /// Retrieve the generic environment for the current generic context.
+  ///
+  /// Fails if there is no generic context.
+  GenericEnvironment *getGenericEnvironment();
 
   ConstantReference
   getAddrOfLLVMVariableOrGOTEquivalent(LinkEntity entity, Alignment alignment,

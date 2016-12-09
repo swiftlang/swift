@@ -5,8 +5,8 @@
 // Copyright (c) 2014 - 2016 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
-// See http://swift.org/LICENSE.txt for license information
-// See http://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
+// See https://swift.org/LICENSE.txt for license information
+// See https://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
 //
 //===----------------------------------------------------------------------===//
 
@@ -55,12 +55,42 @@ tests.test("wrapped value") {
   let unwrappedBridged = unwrapped as AnyObject
   let wrappedBridged = wrapped as AnyObject
   let doubleWrappedBridged = doubleWrapped as AnyObject
-  expectTrue(unwrappedBridged.isEqual(to: wrappedBridged)
-             && wrappedBridged.isEqual(to: doubleWrappedBridged))
+  expectTrue(unwrappedBridged.isEqual(wrappedBridged)
+             && wrappedBridged.isEqual(doubleWrappedBridged))
 
   let unwrappedCastBack = cast(unwrappedBridged, to: String.self)
   let wrappedCastBack = cast(wrappedBridged, to: Optional<String>.self)
   let doubleWrappedCastBack = cast(doubleWrappedBridged, to: Optional<String?>.self)
+
+  expectEqual(unwrapped, unwrappedCastBack)
+  expectEqual(wrapped, wrappedCastBack)
+  expectEqual(doubleWrapped, doubleWrappedCastBack)
+}
+
+struct NotBridged: Hashable {
+  var x: Int
+
+  var hashValue: Int { return x }
+
+  static func ==(x: NotBridged, y: NotBridged) -> Bool {
+    return x.x == y.x
+  }
+}
+
+tests.test("wrapped boxed value") {
+  let unwrapped = NotBridged(x: 1738)
+  let wrapped = Optional(unwrapped)
+  let doubleWrapped = Optional(wrapped)
+
+  let unwrappedBridged = unwrapped as AnyObject
+  let wrappedBridged = wrapped as AnyObject
+  let doubleWrappedBridged = doubleWrapped as AnyObject
+  expectTrue(unwrappedBridged.isEqual(wrappedBridged))
+  expectTrue(wrappedBridged.isEqual(doubleWrappedBridged))
+
+  let unwrappedCastBack = cast(unwrappedBridged, to: NotBridged.self)
+  let wrappedCastBack = cast(wrappedBridged, to: Optional<NotBridged>.self)
+  let doubleWrappedCastBack = cast(doubleWrappedBridged, to: Optional<NotBridged?>.self)
 
   expectEqual(unwrapped, unwrappedCastBack)
   expectEqual(wrapped, wrappedCastBack)
@@ -129,6 +159,16 @@ tests.test("collection of Optional") {
     expectTrue((nsArray[0] as AnyObject) === holeyArray[0]!)
     expectTrue((nsArray[1] as AnyObject) === NSNull())
     expectTrue((nsArray[2] as AnyObject) === holeyArray[2]!)
+  }
+}
+
+tests.test("NSArray of NSNull") {
+  let holeyNSArray: NSArray = [LifetimeTracked(2), NSNull(), LifetimeTracked(3)]
+  autoreleasepool {
+    let swiftArray = holeyNSArray as! [LifetimeTracked?]
+    expectTrue(swiftArray[0]! === holeyNSArray[0] as AnyObject)
+    expectTrue(swiftArray[1]  == nil)
+    expectTrue(swiftArray[2]! === holeyNSArray[2] as AnyObject)
   }
 }
 

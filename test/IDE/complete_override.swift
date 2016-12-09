@@ -1,5 +1,5 @@
 // RUN: sed -n -e '1,/NO_ERRORS_UP_TO_HERE$/ p' %s > %t_no_errors.swift
-// RUN: %target-swift-frontend -parse -verify -disable-objc-attr-requires-foundation-module %t_no_errors.swift
+// RUN: %target-swift-frontend -typecheck -verify -disable-objc-attr-requires-foundation-module %t_no_errors.swift
 
 // RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=CLASS_PA -code-completion-keywords=false > %t.txt
 // RUN: %FileCheck %s -check-prefix=CLASS_PA < %t.txt
@@ -508,12 +508,12 @@ class Deprecated2 : Deprecated1 {
 // DEPRECATED_1: Decl[InstanceMethod]/Super/NotRecommended: deprecated() {|};
 
 class EscapingBase {
-  func method(_ x: @escaping (@escaping ()->()) -> (@escaping ()->())) -> (@escaping (@escaping ()->() )->()) { }
+  func method(_ x: @escaping (@escaping ()->()) -> (()->())) -> (@escaping (@escaping ()->() )->()) { }
 }
 class Escaping : EscapingBase {
   override func #^ESCAPING_1^#
 }
-// ESCAPING_1: Decl[InstanceMethod]/Super:         method(_ x: @escaping (@escaping () -> ()) -> (@escaping () -> ())) -> ((@escaping () -> ()) -> ()) {|};
+// ESCAPING_1: Decl[InstanceMethod]/Super:         method(_ x: @escaping (@escaping () -> ()) -> (() -> ())) -> ((@escaping () -> ()) -> ()) {|};
 
 class OverrideBase {
   init(x: Int) {}

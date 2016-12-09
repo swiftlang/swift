@@ -5,8 +5,8 @@
 // Copyright (c) 2014 - 2016 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
-// See http://swift.org/LICENSE.txt for license information
-// See http://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
+// See https://swift.org/LICENSE.txt for license information
+// See https://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
 //
 //===----------------------------------------------------------------------===//
 
@@ -1384,7 +1384,8 @@ emitTupleDispatch(ArrayRef<RowToSpecialize> rows, ConsumableManagedValue src,
     if (tupleSILTy.isAddress()) {
       member = SGF.B.createTupleElementAddr(loc, v, i, fieldTy);
       if (!fieldTL.isAddressOnly())
-        member = SGF.B.createLoad(loc, member);
+        member =
+            fieldTL.emitLoad(SGF.B, loc, member, LoadOwnershipQualifier::Take);
     } else {
       member = SGF.B.createTupleExtract(loc, v, i, fieldTy);
     }
@@ -1454,8 +1455,9 @@ emitCastOperand(SILGenFunction &SGF, SILLocation loc,
     // Okay, if all we need to do is drop the value in an address,
     // this is easy.
     if (!hasAbstraction) {
-      SGF.B.createStore(loc, src.getFinalManagedValue().forward(SGF),
-                        init->getAddress());
+      SGF.B.emitStoreValueOperation(
+          loc, src.getFinalManagedValue().forward(SGF), init->getAddress(),
+          StoreOwnershipQualifier::Init);
       init->finishInitialization(SGF);
       ConsumableManagedValue result =
         { init->getManagedAddress(), src.getFinalConsumption() };
@@ -1772,9 +1774,10 @@ emitEnumElementDispatch(ArrayRef<RowToSpecialize> rows,
         
         // Load a loadable data value.
         if (eltTL->isLoadable())
-          eltValue = SGF.B.createLoad(loc, eltValue);
+          eltValue = eltTL->emitLoad(SGF.B, loc, eltValue,
+                                     LoadOwnershipQualifier::Take);
       } else {
-        eltValue = new (SGF.F.getModule()) SILArgument(caseBB, eltTy);
+        eltValue = caseBB->createArgument(eltTy);
       }
 
       origCMV = getManagedSubobject(SGF, eltValue, *eltTL, eltConsumption);
@@ -1783,10 +1786,10 @@ emitEnumElementDispatch(ArrayRef<RowToSpecialize> rows,
       // If the payload is boxed, project it.
 
       if (elt->isIndirect() || elt->getParentEnum()->isIndirect()) {
-        SILValue boxedValue = SGF.B.createProjectBox(loc, origCMV.getValue());
+        SILValue boxedValue = SGF.B.createProjectBox(loc, origCMV.getValue(), 0);
         eltTL = &SGF.getTypeLowering(boxedValue->getType());
         if (eltTL->isLoadable())
-          boxedValue = SGF.B.createLoad(loc, boxedValue);
+          boxedValue = SGF.B.createLoadBorrow(loc, boxedValue);
 
         // The boxed value may be shared, so we always have to copy it.
         eltCMV = getManagedSubobject(SGF, boxedValue, *eltTL,
@@ -1965,7 +1968,7 @@ JumpDest PatternMatchEmission::getSharedCaseBlockDest(CaseStmt *caseBlock,
       pattern->forEachVariable([&](VarDecl *V) {
         if (!V->hasName())
           return;
-        block->createBBArg(SGF.VarLocs[V].value->getType(), V);
+        block->createArgument(SGF.VarLocs[V].value->getType(), V);
       });
     }
   }
@@ -1986,7 +1989,7 @@ void PatternMatchEmission::emitSharedCaseBlocks() {
     // predecessor.  We rely on the SIL CFG here, because unemitted shared case
     // blocks might fallthrough into this one.
     if (!hasFallthroughTo && caseBlock->getCaseLabelItems().size() == 1) {
-      SILBasicBlock *predBB = caseBB->getSinglePredecessor();
+      SILBasicBlock *predBB = caseBB->getSinglePredecessorBlock();
       assert(predBB && "Should only have 1 predecessor because it isn't shared");
       assert(isa<BranchInst>(predBB->getTerminator()) &&
              "Should have uncond branch to shared block");
@@ -2021,7 +2024,7 @@ void PatternMatchEmission::emitSharedCaseBlocks() {
           return;
         if (V->isLet()) {
           // Just emit a let with cleanup.
-          SGF.VarLocs[V].value = caseBB->getBBArg(argIndex++);
+          SGF.VarLocs[V].value = caseBB->getArgument(argIndex++);
           SGF.emitInitializationForVarDecl(V)->finishInitialization(SGF);
         } else {
           // The pattern variables were all emitted as lets and one got passed in,
@@ -2029,7 +2032,8 @@ void PatternMatchEmission::emitSharedCaseBlocks() {
           SGF.VarLocs.erase(V);
           auto newVar = SGF.emitInitializationForVarDecl(V);
           auto loc = SGF.CurrentSILLoc;
-          auto value = ManagedValue::forUnmanaged(caseBB->getBBArg(argIndex++));
+          auto value =
+              ManagedValue::forUnmanaged(caseBB->getArgument(argIndex++));
           auto formalType = V->getType()->getCanonicalType();
           RValue(SGF, loc, formalType, value).forwardInto(SGF, loc, newVar.get());
         }
@@ -2176,14 +2180,14 @@ void SILGenFunction::emitSwitchStmt(SwitchStmt *S) {
         for (auto var : Vars) {
           if (var->hasName() && var->getName() == expected->getName()) {
             auto value = VarLocs[var].value;
-            args.push_back(value);
             
             for (auto cmv : argArray) {
               if (cmv.getValue() == value) {
-                B.createRetainValue(CurrentSILLoc, value, Atomicity::Atomic);
+                value = B.emitCopyValueOperation(CurrentSILLoc, value);
                 break;
               }
             }
+            args.push_back(value);
             break;
           }
         }

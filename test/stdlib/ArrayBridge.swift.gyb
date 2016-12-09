@@ -5,8 +5,8 @@
 // Copyright (c) 2014 - 2016 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
-// See http://swift.org/LICENSE.txt for license information
-// See http://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
+// See https://swift.org/LICENSE.txt for license information
+// See https://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
 //
 //===----------------------------------------------------------------------===//
 
@@ -15,7 +15,7 @@
 //
 // RUN: %gyb %s -o %t/ArrayBridge.swift
 // RUN: %target-clang %S/Inputs/ArrayBridge/ArrayBridge.m -c -o %t/ArrayBridgeObjC.o -g
-// RUN:  %line-directive %t/ArrayBridge.swift -- %target-build-swift %t/ArrayBridge.swift -I %S/Inputs/ArrayBridge/ -Xlinker %t/ArrayBridgeObjC.o -o %t/ArrayBridge -- 
+// RUN:  %line-directive %t/ArrayBridge.swift -- %target-build-swift %t/ArrayBridge.swift -I %S/Inputs/ArrayBridge/ -Xlinker %t/ArrayBridgeObjC.o -o %t/ArrayBridge --
 
 // RUN: %target-run %t/ArrayBridge
 // REQUIRES: executable_test
@@ -51,7 +51,7 @@ class Base : NSObject, Fooable {
     serialNumber = nextBaseSerialNumber
     self.value = value
   }
-  
+
   deinit {
     assert(serialNumber > 0, "double destruction!")
     trackedCount -= 1
@@ -61,7 +61,7 @@ class Base : NSObject, Fooable {
   override func isEqual(_ other: Any?) -> Bool {
     return (other as? Base)?.value == self.value
   }
-  
+
   var value: Int
   var serialNumber: Int
 }
@@ -104,7 +104,7 @@ struct BridgeableValue : _ObjectiveCBridgeable, Equatable {
 
   static func _unconditionallyBridgeFromObjectiveC(_ source: Subclass?)
       -> BridgeableValue {
-    var result: BridgeableValue? = nil
+    var result: BridgeableValue?
     _forceBridgeFromObjectiveC(source!, result: &result)
     return result!
   }
@@ -112,17 +112,17 @@ struct BridgeableValue : _ObjectiveCBridgeable, Equatable {
   init(_ value: Int) {
     self.trak = Base(value)
   }
-  
+
   static func resetStats() {
     bridgeFromOperationCount = 0
     bridgeToOperationCount = 0
   }
-  
+
   var trak: Base
 }
 
 func == (lhs: BridgeableValue, rhs: BridgeableValue) -> Bool {
-  return lhs.trak.value == rhs.trak.value 
+  return lhs.trak.value == rhs.trak.value
 }
 
 // A class used to test various Objective-C thunks.
@@ -130,11 +130,11 @@ class Thunks : NSObject {
   func createSubclass(_ value: Int) -> AnyObject {
     return Subclass(value)
   }
-  
+
   @objc func acceptSubclassArray(
     _ x: [Subclass],
     expecting expected: NSArray
-  )  {
+  ) {
     expectEqualSequence(
       expected.lazy.map { ObjectIdentifier($0 as AnyObject) },
       x.lazy.map { ObjectIdentifier($0 as AnyObject) }
@@ -160,7 +160,7 @@ class Thunks : NSObject {
       produced.lazy.map { ObjectIdentifier($0 as AnyObject) }
     )
   }
-  
+
   @objc func acceptBridgeableValueArray(_ raw: NSArray) {
     let x = raw as! [BridgeableValue]
     expectEqualSequence(
@@ -176,7 +176,7 @@ class Thunks : NSObject {
     }
     return array as NSArray
   }
-  
+
   @objc func checkProducedBridgeableValueArray(_ produced: NSArray) {
     expectEqualSequence(
       0..<5,
@@ -233,7 +233,7 @@ tests.test("Another/${Any}") {
   let nsArrayOfBase: NSArray = NSArray(object: Base(42))
 
   // NSArray can be unconditionally cast to [${Any}]...
-  
+
   let nsArrayOfBaseConvertedToAnyArray = nsArrayOfBase
   % if Any == 'Any':
   // FIXME: nsArrayOfBase as [Any] doesn't
@@ -257,7 +257,7 @@ tests.test("Another/${Any}") {
 
   let subclassInBaseBuffer: [Base] = [Subclass(44), Subclass(55)]
   let subclass2 = subclassInBaseBuffer
-  
+
   // Explicit downcast-ability is based on element type, not buffer type
   expectNotNil(subclassInBaseBuffer as? [Subclass])
 
@@ -291,9 +291,9 @@ tests.test("Another/${Any}") {
 // BridgeableValue conforms to _ObjectiveCBridgeable
 //===----------------------------------------------------------------------===//
 tests.test("testExplicitlyBridged/${Any}") {
-  
+
   let bridgeableValues = [BridgeableValue(42), BridgeableValue(17)]
-  
+
   let bridgeableValuesAsNSArray = bridgeableValues as NSArray
   expectEqual(2, bridgeableValuesAsNSArray.count)
   expectEqual(42, (bridgeableValuesAsNSArray[0] as AnyObject).value)
@@ -324,7 +324,7 @@ tests.test("testExplicitlyBridged/${Any}") {
   // ...and bridge *that* back
   let bridgedBackSwifts = Swift._forceBridgeFromObjectiveC(
     cocoaBridgeableValues, [BridgeableValue].self)
-  
+
   // Expect equal, but distinctly created instances
   expectEqualSequence(bridgeableValues, bridgedBackSwifts)
   expectFalse(
@@ -382,7 +382,7 @@ tests.test("testExplicitlyBridged/${Any}") {
   as [AnyObject]
   %end
   as [${Any}]
-  
+
   if let downcasted = wrappedCocoaBridgeableValues as? [Subclass] {
     expectEqualSequence(expectedSubclasses, downcasted)
   }
@@ -436,16 +436,16 @@ tests.test("testRoundTrip") {
       return result as NSArray
     }
   }
-  
+
   let test = Test()
-  
+
   let array = [
     BridgeableValue(10), BridgeableValue(20), BridgeableValue(30),
     BridgeableValue(40), BridgeableValue(50) ]
-  
+
   BridgeableValue.resetStats()
   _ = test.call(array as NSArray)
-  
+
   expectEqual(0, bridgeFromOperationCount)
   expectEqual(0, bridgeToOperationCount)
 }

@@ -10,6 +10,7 @@ add_swift_library(swiftIRGen STATIC
   GenClangDecl.cpp
   GenClangType.cpp
   GenClass.cpp
+  GenConstant.cpp
   GenControl.cpp
   GenCoverage.cpp
   GenDecl.cpp
@@ -31,6 +32,7 @@ add_swift_library(swiftIRGen STATIC
   IRGen.cpp
   IRGenDebugInfo.cpp
   IRGenFunction.cpp
+  IRGenMangler.cpp
   IRGenModule.cpp
   IRGenSIL.cpp
   Linking.cpp

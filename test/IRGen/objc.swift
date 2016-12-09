@@ -39,7 +39,7 @@ struct id {
 class MyBlammo : Blammo {
   func foo() {}
 // CHECK:  define hidden void @_TFC4objc8MyBlammo3foofT_T_([[MYBLAMMO]]*) {{.*}} {
-// CHECK:    call {{.*}} @rt_swift_release
+// CHECK:    call {{.*}} @swift_rt_swift_release
 // CHECK:    ret void
 }
 
@@ -68,6 +68,9 @@ class Octogenarian : Contrarian {
   @objc override func eviscerate() {}
 }
 
+@_silgen_name("unknown")
+func unknown(_ x: id) -> id
+
 // CHECK:    define hidden %objc_object* @_TF4objc5test0{{.*}}(%objc_object*)
 // CHECK-NOT:  call {{.*}} @swift_unknownRetain
 // CHECK:      call {{.*}} @swift_unknownRetain
@@ -77,13 +80,14 @@ class Octogenarian : Contrarian {
 func test0(_ arg: id) -> id {
   var x : id
   x = arg
+  unknown(x)
   var y = x
   return y
 }
 
 func test1(_ cell: Blammo) {}
 // CHECK:  define hidden void @_TF4objc5test1{{.*}}([[BLAMMO]]*) {{.*}} {
-// CHECK:    call {{.*}} @rt_swift_release
+// CHECK:    call {{.*}} @swift_rt_swift_release
 // CHECK:    ret void
 
 

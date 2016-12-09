@@ -5,8 +5,8 @@
 // Copyright (c) 2014 - 2016 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
-// See http://swift.org/LICENSE.txt for license information
-// See http://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
+// See https://swift.org/LICENSE.txt for license information
+// See https://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
 //
 //===----------------------------------------------------------------------===//
 //
@@ -62,9 +62,6 @@ namespace irgen {
   /// metadata?
   bool hasKnownSwiftMetadata(IRGenModule &IGM, CanType theType);
 
-  /// Is the given class known to have an implementation in Swift?
-  bool hasKnownSwiftImplementation(IRGenModule &IGM, ClassDecl *theClass);
-  
   /// Is the given method known to be callable by vtable dispatch?
   bool hasKnownVTableEntry(IRGenModule &IGM, AbstractFunctionDecl *theMethod);
 

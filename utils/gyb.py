@@ -65,7 +65,8 @@ tokenize_re = re.compile(
     ^
     (?:
       (?P<gybLines>
-        (?P<_indent> [\ \t]* % (?! [{%] ) [\ \t]* ) (?! [\ \t] | ''' + linesClose + r''' ) .*
+        (?P<_indent> [\ \t]* % (?! [{%] ) [\ \t]* ) (?! [\ \t] | ''' +
+    linesClose + r''' ) .*
         ( \n (?P=_indent) (?! ''' + linesClose + r''' ) .* ) *
       )
       | (?P<gybLinesClose> [\ \t]* % [ \t]* ''' + linesClose + r''' )
@@ -375,6 +376,7 @@ def code_starts_with_dedent_keyword(source_lines):
 
 
 class ParseContext(object):
+
     """State carried through a parse of a template"""
 
     filename = ''
@@ -543,6 +545,7 @@ class ParseContext(object):
 
 
 class ExecutionContext(object):
+
     """State we pass around during execution of a template"""
 
     def __init__(self, line_directive='// ###sourceLocation',
@@ -578,6 +581,7 @@ class ExecutionContext(object):
 
 
 class ASTNode(object):
+
     """Abstract base class for template AST nodes"""
 
     def __init__(self):
@@ -600,6 +604,7 @@ class ASTNode(object):
 
 
 class Block(ASTNode):
+
     """A sequence of other AST nodes, to be executed in order"""
 
     children = []
@@ -623,6 +628,7 @@ class Block(ASTNode):
 
 
 class Literal(ASTNode):
+
     """An AST node that generates literal text"""
 
     def __init__(self, context):
@@ -642,6 +648,7 @@ class Literal(ASTNode):
 
 
 class Code(ASTNode):
+
     """An AST node that is evaluated as Python"""
 
     code = None

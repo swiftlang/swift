@@ -3,7 +3,7 @@
 // RUN: %target-swift-frontend %S/Inputs/placement_module_A.swift -emit-module -parse-as-library -o %t
 // RUN: %target-swift-frontend -I %t %S/Inputs/placement_module_B.swift -emit-module -parse-as-library -o %t
 
-// RUN: %target-swift-frontend -parse -primary-file %s %S/Inputs/placement_2.swift -I %t -verify
+// RUN: %target-swift-frontend -typecheck -primary-file %s %S/Inputs/placement_2.swift -I %t -verify
 
 // Tests for the placement of conformances as well as conflicts
 // between conformances that come from different sources.

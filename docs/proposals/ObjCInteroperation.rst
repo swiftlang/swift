@@ -237,23 +237,23 @@ category replacing an existing method implementation is "rude"
     actually a serious problem, if we .  We can have some sort of
     ``@dynamic`` annotation for
 
-    I don't think that requiring some sort of ``@dynamic`` 
+    I don't think that requiring some sort of ``@dynamic``
 
     That one, central restriction is that we must remove or constrain the
     ability to dynamically add and replace method implementations on
     existing classes.  It's reasonable to request some sort of ``@dynamic``
     annotation for cases where this is absolutely required.
 
-    One interesting corner case 
+    One interesting corner case
 
     don't think anybody will weep too heavily if we scale back those ObjC
     runtime functions to say that either you can't use them on Swift classes
-    or 
+    or
 
     restriction: removing the general ability to dynamically add and
     replace method implementations on an existing class.
 
-    There's a tension here.  
+    There's a tension here.
 
 Point of Allocation
 ~~~~~~~~~~~~~~~~~~~
@@ -280,10 +280,10 @@ We can reason forward from the point of allocation.
     then we know the dynamic class at that point.  That's relatively
     easy to deal with.
 
-    * 
+    *
 
   If we can restrict the ability to
-    change the dynamic class, or at least restrict 
+    change the dynamic class, or at least restrict
 
 
 Access Control
@@ -320,19 +320,19 @@ Using Swift Classes from Objective-C
 
 
 
-open the question of 
+open the question of
 
 
 Because we intentionally hide the
 difference between a stored property and its underlying storage,
 
 
-For another example, code 
-class might access 
+For another example, code
+class might access
 
 In both cases, t makes sense to organize the code that way,
 but Objective-C punishes the performance of that code in order to
-reserve the language's 
+reserve the language's
 
 
 
@@ -345,7 +345,7 @@ logic can go in one place.
 
 Reserving that
 flexibility in the code is often good sense, and reserving it across
-API boundaries is good language design, but it's silly 
+API boundaries is good language design, but it's silly
 not actually
 
 Well-factored object-oriented code often contains a large number of
@@ -356,22 +356,22 @@ easier to later extend or maintain, but serve no current purpose.
 In
 typical object-oriented code, many operations are split into several
 small methods in order to improve code organization and reserve the
-ability to 
+ability to
 
-Conscientious developers 
-
-
+Conscientious developers
 
 
 
 
-    
+
+
+
 
 
 runtime calls
 cached-offset calculation for the ivar location.
 
-restriction, there's general acceptance that the 
+restriction, there's general acceptance that the
 
 is necessary to make ivar
 accesses not ridiculously expensive.  Because of that, there's general
@@ -414,25 +414,25 @@ not a valid object of the class
   message send.  This includes semantic annotations like ARC ownership
   conventions and the ``noreturn`` attribute.  Otherwise, there are no
   semantic restrictions on what any particular method can do.
-    
+
 
  signature of the method implementation's
     pr signature is not compatible with the signature at which the
     method was invoked.
-    
+
 
 , in which case the runtime searches
   the class hierarchy of the object, from most to least derived,
-  and calls the method 
+  and calls the method
 
 
 In Objective-C, every object has a class and every class has a
 collection of methods.  The high-level semantics are essentially
-those 
+those
 
 .. nonsense ReST
 
-     class is essentially a hashtable of selectors to 
+     class is essentially a hashtable of selectors to
     We propose a new attribute, ``@public``, that can adorn any
     declaration not local to a function.  For the purpose of standard
     library development, even just parsing this attribute without
@@ -520,14 +520,14 @@ conformance is not also declared ``@public``.::
     func g()
   }
 
-  struct X : P { // OK, X is not @public, so neither is its 
+  struct X : P { // OK, X is not @public, so neither is its
     func f() {}  // conformance to P, and therefore f
     func g() {}  // can be non-@public
   }
 
   protocol P1 {}
 
-  @public struct Y : P1 {} // Y is @public so its 
+  @public struct Y : P1 {} // Y is @public so its
                            // conformance to P1 is, too.
 
   @public
@@ -549,7 +549,7 @@ A Related Naming Change
 
 The existing ``@exported`` attribute for imports should be renamed
 ``@public`` with no change in functionality.
-          
+
 Future Directions
 =================
 

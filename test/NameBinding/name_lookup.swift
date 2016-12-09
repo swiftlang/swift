@@ -1,4 +1,4 @@
-// RUN: %target-parse-verify-swift
+// RUN: %target-typecheck-verify-swift
 
 class ThisBase1 {
   init() { }
@@ -518,7 +518,7 @@ class r16954496 {
 
 
 
-// <rdar://problem/27413116> [Swift] Using static constant defined in enum when in switch statement doesnt compile
+// <rdar://problem/27413116> [Swift] Using static constant defined in enum when in switch statement doesn't compile
 enum MyEnum {
   case one
   case two

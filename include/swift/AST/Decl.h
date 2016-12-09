@@ -5,8 +5,8 @@
 // Copyright (c) 2014 - 2016 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
-// See http://swift.org/LICENSE.txt for license information
-// See http://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
+// See https://swift.org/LICENSE.txt for license information
+// See https://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
 //
 //===----------------------------------------------------------------------===//
 //
@@ -17,13 +17,17 @@
 #ifndef SWIFT_DECL_H
 #define SWIFT_DECL_H
 
+#include "swift/AST/AccessScope.h"
 #include "swift/AST/CaptureInfo.h"
 #include "swift/AST/ClangNode.h"
 #include "swift/AST/ConcreteDeclRef.h"
 #include "swift/AST/DefaultArgumentKind.h"
+#include "swift/AST/GenericEnvironment.h"
 #include "swift/AST/GenericSignature.h"
+#include "swift/AST/GenericParamKey.h"
 #include "swift/AST/LazyResolver.h"
 #include "swift/AST/TypeAlignments.h"
+#include "swift/AST/Witness.h"
 #include "swift/Basic/OptionalEnum.h"
 #include "swift/Basic/Range.h"
 #include "llvm/ADT/DenseMap.h"
@@ -70,7 +74,7 @@ namespace swift {
   class SubscriptDecl;
   class ValueDecl;
   class VarDecl;
-  
+
 enum class DeclKind : uint8_t {
 #define DECL(Id, Parent) Id,
 #define DECL_RANGE(Id, FirstId, LastId) \
@@ -511,13 +515,8 @@ class alignas(1 << DeclAlignInBits) Decl {
   class AssociatedTypeDeclBitfields {
     friend class AssociatedTypeDecl;
     unsigned : NumTypeDeclBits;
-
-    unsigned Recursive : 1;
-
-    /// Whether or not this declaration is currently being type-checked.
-    unsigned BeingTypeChecked : 1;
   };
-  enum { NumAssociatedTypeDeclBits = NumTypeDeclBits + 2 };
+  enum { NumAssociatedTypeDeclBits = NumTypeDeclBits };
   static_assert(NumAssociatedTypeDeclBits <= 32, "fits in an unsigned");
 
   class ImportDeclBitfields {
@@ -731,10 +730,6 @@ public:
   bool shouldPrintInContext(const PrintOptions &PO) const;
 
   bool walk(ASTWalker &walker);
-
-  /// \brief Should this declaration be treated as if annotated with transparent
-  /// attribute.
-  bool isTransparent() const;
 
   /// \brief Return whether this declaration has been determined invalid.
   bool isInvalid() const { return DeclBits.Invalid; }
@@ -1025,20 +1020,6 @@ public:
     return SeparatorLoc;
   }
 
-  /// Set during deserialization; used to print out the requirements accurately
-  /// for the generated interface.
-  StringRef getAsWrittenString() const {
-    return AsWrittenString;
-  }
-  void setAsWrittenString(StringRef Str) {
-    AsWrittenString = Str;
-  }
-
-  /// Further analyze the written string, if it's not empty, to collect the first
-  /// type, the second type and the requirement kind.
-  Optional<std::tuple<StringRef, StringRef, RequirementReprKind>>
-  getAsAnalyzedWrittenString() const;
-
   SourceRange getSourceRange() const {
     return SourceRange(Types[0].getSourceRange().Start,
                        Types[1].getSourceRange().End);
@@ -1048,7 +1029,6 @@ public:
       void dump() const LLVM_ATTRIBUTE_USED,
       "only for use within the debugger");
   void print(raw_ostream &OS) const;
-  void printAsWritten(raw_ostream &OS) const;
 };
   
 /// GenericParamList - A list of generic parameters that is part of a generic
@@ -1389,16 +1369,6 @@ class ExtensionDecl final : public Decl, public DeclContext,
   /// The generic parameters of the extension.
   GenericParamList *GenericParams = nullptr;
 
-  /// \brief The generic signature of this extension.
-  ///
-  /// This is the semantic representation of a generic parameters and the
-  /// requirements placed on them.
-  ///
-  /// FIXME: The generic parameters here are also derivable from
-  /// \c GenericParams. However, we likely want to make \c GenericParams
-  /// the parsed representation, and not part of the module file.
-  GenericSignature *GenericSig = nullptr;
-
   /// \brief The generic context of this extension.
   ///
   /// This is the mapping between interface types and archetypes for the
@@ -1485,12 +1455,8 @@ public:
   }
 
   /// Retrieve the generic signature for this extension.
-  GenericSignature *getGenericSignature() const { return GenericSig; }
-
-  /// Set the generic signature of this extension.
-  void setGenericSignature(GenericSignature *sig) {
-    assert(!GenericSig && "Already have generic signature");
-    GenericSig = sig;
+  GenericSignature *getGenericSignature() const {
+    return GenericEnv ? GenericEnv->getGenericSignature() : nullptr;
   }
 
   /// Retrieve the generic context for this extension.
@@ -1500,6 +1466,9 @@ public:
   void setGenericEnvironment(GenericEnvironment *env) {
     assert(!GenericEnv && "Already have generic context");
     GenericEnv = env;
+
+    if (GenericEnv)
+      GenericEnv->setOwningDeclContext(this);
   }
 
   /// Retrieve the generic requirements.
@@ -1702,14 +1671,17 @@ public:
   // Return the first variable initialized by this pattern.
   VarDecl *getAnchoringVarDecl() const;
 
-  // Retrieve the declaration context for the intializer.
+  // Retrieve the declaration context for the initializer.
   DeclContext *getInitContext() const { return InitContext; }
 
   /// Override the initializer context.
   void setInitContext(DeclContext *dc) { InitContext = dc; }
 
   /// Retrieve the source range covered by this pattern binding.
-  SourceRange getSourceRange() const;
+  ///
+  /// \param omitAccessors Whether the computation should omit the accessors
+  /// from the source range.
+  SourceRange getSourceRange(bool omitAccessors = false) const;
 };
 
 /// \brief This decl contains a pattern and optional initializer for a set
@@ -1974,9 +1946,6 @@ protected:
     ValueDeclBits.CheckedRedeclaration = false;
   }
 
-  /// The interface type, mutable because some subclasses compute this lazily.
-  mutable Type InterfaceTy;
-
 public:
   /// \brief Return true if this is a definition of a decl, not a forward
   /// declaration (e.g. of a function) that is implemented outside of the
@@ -2030,18 +1999,6 @@ public:
   SourceLoc getNameLoc() const { return NameLoc; }
   SourceLoc getLoc() const { return NameLoc; }
 
-  bool hasType() const { return !TypeAndAccess.getPointer().isNull(); }
-  Type getType() const {
-    assert(hasType() && "declaration has no type set yet");
-    return TypeAndAccess.getPointer();
-  }
-
-  /// Set the type of this declaration for the first time.
-  void setType(Type T);
-
-  /// Overwrite the type of this declaration.
-  void overwriteType(Type T);
-
   bool hasAccessibility() const {
     return TypeAndAccess.getInt().hasValue();
   }
@@ -2080,7 +2037,7 @@ public:
   ///
   /// \sa getFormalAccess
   /// \sa isAccessibleFrom
-  const DeclContext *
+  AccessScope
   getFormalAccessScope(const DeclContext *useDC = nullptr) const;
 
   /// Returns the access level that actually controls how a declaration should
@@ -2114,17 +2071,12 @@ public:
   /// If \p DC is null, returns true only if this declaration is public.
   bool isAccessibleFrom(const DeclContext *DC) const;
 
-  /// Retrieve the "interface" type of this value, which is the type used when
-  /// the declaration is viewed from the outside. For a generic function,
-  /// this will have generic function type using generic parameters rather than
-  /// archetypes, while a generic nominal type's interface type will be the
-  /// generic type specialized with its generic parameters.
-  ///
-  /// FIXME: Eventually, this will simply become the type of the value, and
-  /// we will substitute in the appropriate archetypes within a particular
-  /// context.
+  /// Retrieve the "interface" type of this value, which uses
+  /// GenericTypeParamType if the declaration is generic. For a generic
+  /// function, this will have a GenericFunctionType with a
+  /// GenericSignature inside the type.
   Type getInterfaceType() const;
-  bool hasInterfaceType() const { return !!InterfaceTy; }
+  bool hasInterfaceType() const;
 
   /// Set the interface type for the given value.
   void setInterfaceType(Type type);
@@ -2234,8 +2186,9 @@ protected:
   }
 
 public:
-  Type getDeclaredType() const;
-
+  /// The type of this declaration's values. For the type of the
+  /// declaration itself, use getInterfaceType(), which returns a
+  /// metatype.
   Type getDeclaredInterfaceType() const;
 
   /// \brief Retrieve the set of protocols that this type inherits (i.e,
@@ -2266,16 +2219,6 @@ public:
 class GenericTypeDecl : public TypeDecl, public DeclContext {
   GenericParamList *GenericParams = nullptr;
 
-  /// \brief The generic signature of this type.
-  ///
-  /// This is the semantic representation of a generic parameters and the
-  /// requirements placed on them.
-  ///
-  /// FIXME: The generic parameters here are also derivable from
-  /// \c GenericParams. However, we likely want to make \c GenericParams
-  /// the parsed representation, and not part of the module file.
-  GenericSignature *GenericSig = nullptr;
-
   /// \brief The generic context of this type.
   ///
   /// This is the mapping between interface types and archetypes for the
@@ -2299,31 +2242,25 @@ public:
   /// this function is not generic.
   void setGenericParams(GenericParamList *params);
 
-  /// Set the generic signature of this type.
-  void setGenericSignature(GenericSignature *sig) {
-    assert(!GenericSig && "Already have generic signature");
-    GenericSig = sig;
-  }
-
   /// Retrieve the innermost generic parameter types.
   ArrayRef<GenericTypeParamType *> getInnermostGenericParamTypes() const {
-    if (!GenericSig)
+    if (auto sig = getGenericSignature())
+      return sig->getInnermostGenericParams();
+    else
       return { };
-
-    return GenericSig->getInnermostGenericParams();
   }
 
   /// Retrieve the generic requirements.
   ArrayRef<Requirement> getGenericRequirements() const {
-    if (!GenericSig)
+    if (auto sig = getGenericSignature())
+      return sig->getRequirements();
+    else
       return { };
-
-    return GenericSig->getRequirements();
   }
 
   /// Retrieve the generic signature.
   GenericSignature *getGenericSignature() const {
-    return GenericSig;
+    return GenericEnv ? GenericEnv->getGenericSignature() : nullptr;
   }
   
   void setIsValidatingGenericSignature(bool validating=true) {
@@ -2341,6 +2278,9 @@ public:
   void setGenericEnvironment(GenericEnvironment *env) {
     assert(!this->GenericEnv && "already have generic context?");
     this->GenericEnv = env;
+
+    if (GenericEnv)
+      GenericEnv->setOwningDeclContext(this);
   }
 
   // Resolve ambiguity due to multiple base classes.
@@ -2417,29 +2357,18 @@ public:
 /// whose common purpose is to anchor the abstract type parameter and specify
 /// requirements for any corresponding type argument.
 class AbstractTypeParamDecl : public TypeDecl {
-  /// The archetype describing this abstract type parameter within its scope.
-  ArchetypeType *Archetype;
-
 protected:
   AbstractTypeParamDecl(DeclKind kind, DeclContext *dc, Identifier name,
                         SourceLoc NameLoc)
-    : TypeDecl(kind, dc, name, NameLoc, { }), Archetype(nullptr) { }
+    : TypeDecl(kind, dc, name, NameLoc, { }) { }
 
 public:
   /// Return the superclass of the generic parameter.
   Type getSuperclass() const;
 
-  /// Retrieve the archetype that describes this abstract type parameter
-  /// within its scope.
-  ArchetypeType *getArchetype() const { return Archetype; }
-
-  /// Set the archetype used to describe this abstract type parameter within
-  /// its scope.
-  void setArchetype(ArchetypeType *archetype) { Archetype = archetype; }
-
   /// Retrieve the set of protocols to which this abstract type
   /// parameter conforms.
-  ArrayRef<ProtocolDecl *> getConformingProtocols(LazyResolver *resolver) const;
+  ArrayRef<ProtocolDecl *> getConformingProtocols() const;
 
   static bool classof(const Decl *D) {
     return D->getKind() >= DeclKind::First_AbstractTypeParamDecl &&
@@ -2508,10 +2437,6 @@ public:
   SourceLoc getStartLoc() const { return getNameLoc(); }
   SourceRange getSourceRange() const;
 
-  /// Determine whether this is the implicit 'Self' type parameter of
-  /// a protocol.
-  bool isProtocolSelf() const;
-
   static bool classof(const Decl *D) {
     return D->getKind() == DeclKind::GenericTypeParam;
   }
@@ -2575,17 +2500,6 @@ public:
 
   SourceLoc getStartLoc() const { return KeywordLoc; }
   SourceRange getSourceRange() const;
-
-  void setIsRecursive();
-  bool isRecursive() { return AssociatedTypeDeclBits.Recursive; }
-
-  /// Whether the declaration is currently being validated.
-  bool isBeingTypeChecked() { return AssociatedTypeDeclBits.BeingTypeChecked; }
-
-  /// Toggle whether or not the declaration is being validated.
-  void setIsBeingTypeChecked(bool ibt = true) {
-    AssociatedTypeDeclBits.BeingTypeChecked = ibt;
-  }
 
   static bool classof(const Decl *D) {
     return D->getKind() == DeclKind::AssociatedType;
@@ -2696,6 +2610,7 @@ class NominalTypeDecl : public GenericTypeDecl, public IterableDeclContext {
 protected:
   Type DeclaredTy;
   Type DeclaredTyInContext;
+  Type DeclaredInterfaceTy;
 
   NominalTypeDecl(DeclKind K, DeclContext *DC, Identifier name,
                   SourceLoc NameLoc,
@@ -2780,16 +2695,13 @@ public:
   /// any generic parameters bound if this is a generic type.
   Type getDeclaredType() const;
 
-  /// getDeclaredType - Retrieve the type declared by this entity, with
+  /// getDeclaredTypeInContext - Retrieve the type declared by this entity, with
   /// context archetypes bound if this is a generic type.
   Type getDeclaredTypeInContext() const;
 
-  /// Get the "interface" type of the given nominal type, which is the
-  /// type used to refer to the nominal type externally.
-  ///
-  /// For a generic type, or a member thereof, this is the a specialization
-  /// of the type using its own generic parameters.
-  Type computeInterfaceType() const;
+  /// getDeclaredInterfaceType - Retrieve the type declared by this entity, with
+  /// generic parameters bound if this is a generic type.
+  Type getDeclaredInterfaceType() const;
 
   /// \brief Add a new extension to this nominal type.
   void addExtension(ExtensionDecl *extension);
@@ -3291,6 +3203,11 @@ public:
   bool usesObjCGenericsModel() const {
     return isObjC() && hasClangNode() && isGenericContext();
   }
+  
+  /// True if the class is known to be implemented in Swift.
+  bool hasKnownSwiftImplementation() const {
+    return !hasClangNode();
+  }
 };
 
 
@@ -3351,7 +3268,7 @@ class ProtocolDecl : public NominalTypeDecl {
 
   ArrayRef<ProtocolDecl *> InheritedProtocols;
 
-  llvm::DenseMap<ValueDecl *, ConcreteDeclRef> DefaultWitnesses;
+  llvm::DenseMap<ValueDecl *, Witness> DefaultWitnesses;
 
   /// True if the protocol has requirements that cannot be satisfied (e.g.
   /// because they could not be imported from Objective-C).
@@ -3500,10 +3417,10 @@ public:
 
   /// Returns the default witness for a requirement, or nullptr if there is
   /// no default.
-  ConcreteDeclRef getDefaultWitness(ValueDecl *requirement) const;
+  Witness getDefaultWitness(ValueDecl *requirement) const;
 
   /// Record the default witness for a requirement.
-  void setDefaultWitness(ValueDecl *requirement, ConcreteDeclRef witness);
+  void setDefaultWitness(ValueDecl *requirement, Witness witness);
 
   /// Set the list of inherited protocols.
   void setInheritedProtocols(ArrayRef<ProtocolDecl *> protocols) {
@@ -3801,6 +3718,10 @@ protected:
   }
 public:
 
+  /// \brief Should this declaration be treated as if annotated with transparent
+  /// attribute.
+  bool isTransparent() const;
+
   /// \brief Determine whether this storage is a static member, if it
   /// is a member.  Currently only variables can be static.
   inline bool isStatic() const; // defined in this header
@@ -4051,6 +3972,8 @@ public:
     return OverriddenDecl;
   }
   void setOverriddenDecl(AbstractStorageDecl *over) {
+    // FIXME: Hack due to broken class circulatity checking.
+    if (over == this) return;
     OverriddenDecl = over;
     over->setIsOverridden();
   }
@@ -4142,6 +4065,8 @@ protected:
   /// This is the type specified, including location information.
   TypeLoc typeLoc;
 
+  Type typeInContext;
+
 public:
   VarDecl(bool IsStatic, bool IsLet, SourceLoc NameLoc, Identifier Name,
           Type Ty, DeclContext *DC)
@@ -4159,6 +4084,22 @@ public:
   
   TypeLoc &getTypeLoc() { return typeLoc; }
   TypeLoc getTypeLoc() const { return typeLoc; }
+
+  bool hasType() const {
+    return !!typeInContext;
+  }
+
+  /// Get the type of the variable within its context. If the context is generic,
+  /// this will use archetypes.
+  Type getType() const {
+    assert(typeInContext && "No context type set yet");
+    return typeInContext;
+  }
+
+  /// Set the type of the variable within its context.
+  void setType(Type t);
+
+  void markInvalid();
 
   /// Retrieve the source range of the variable type, or an invalid range if the
   /// variable's type is not explicitly written in the source.
@@ -4381,9 +4322,7 @@ public:
   /// For a generic context, this also gives the parameter an unbound generic
   /// type with the expectation that type-checking will fill in the context
   /// generic parameters.
-  static ParamDecl *createUnboundSelf(SourceLoc loc, DeclContext *DC,
-                                      bool isStatic = false,
-                                      bool isInOut = false);
+  static ParamDecl *createUnboundSelf(SourceLoc loc, DeclContext *DC);
 
   /// Create an implicit 'self' decl for a method in the specified decl context.
   /// If 'static' is true, then this is self for a static method in the type.
@@ -4464,15 +4403,12 @@ public:
   const ParameterList *getIndices() const { return Indices; }
   void setIndices(ParameterList *p);
 
-  /// Retrieve the type of the indices.
-  Type getIndicesType() const;
-
   /// Retrieve the interface type of the indices.
   Type getIndicesInterfaceType() const;
 
   /// \brief Retrieve the type of the element referenced by a subscript
   /// operation.
-  Type getElementType() const { return ElementTy.getType(); }
+  Type getElementInterfaceType() const;
   TypeLoc &getElementTypeLoc() { return ElementTy; }
   const TypeLoc &getElementTypeLoc() const { return ElementTy; }
 
@@ -4578,7 +4514,6 @@ protected:
   };
 
   GenericParamList *GenericParams;
-  GenericSignature *GenericSig;
   GenericEnvironment *GenericEnv;
 
   CaptureInfo Captures;
@@ -4588,15 +4523,14 @@ protected:
 
   ImportAsMemberStatus IAMStatus;
 
-  AbstractFunctionDecl(DeclKind Kind, DeclContext *Parent,
-                       DeclName Name, SourceLoc NameLoc,
-                       bool Throws, SourceLoc ThrowsLoc,
+  AbstractFunctionDecl(DeclKind Kind, DeclContext *Parent, DeclName Name,
+                       SourceLoc NameLoc, bool Throws, SourceLoc ThrowsLoc,
                        unsigned NumParameterLists,
                        GenericParamList *GenericParams)
       : ValueDecl(Kind, Parent, Name, NameLoc),
         DeclContext(DeclContextKind::AbstractFunctionDecl, Parent),
-        Body(nullptr), GenericParams(nullptr), GenericSig(nullptr),
-        GenericEnv(nullptr), ThrowsLoc(ThrowsLoc) {
+        Body(nullptr), GenericParams(nullptr), GenericEnv(nullptr),
+        ThrowsLoc(ThrowsLoc) {
     setBodyKind(BodyKind::None);
     setGenericParams(GenericParams);
     AbstractFunctionDeclBits.NumParameterLists = NumParameterLists;
@@ -4612,15 +4546,15 @@ protected:
   }
 
   void setGenericParams(GenericParamList *GenericParams);
-  
+
 public:
-  void setGenericSignature(GenericSignature *GenericSig) {
-    assert(!this->GenericSig && "already have signature?");
-    this->GenericSig = GenericSig;
-  }
-  
+
+  /// \brief Should this declaration be treated as if annotated with transparent
+  /// attribute.
+  bool isTransparent() const;
+
   GenericSignature *getGenericSignature() const {
-    return GenericSig;
+    return GenericEnv ? GenericEnv->getGenericSignature() : nullptr;
   }
 
   /// Retrieve the generic context for this function.
@@ -4630,6 +4564,9 @@ public:
   void setGenericEnvironment(GenericEnvironment *GenericEnv) {
     assert(!this->GenericEnv && "already have generic context?");
     this->GenericEnv = GenericEnv;
+
+    if (GenericEnv)
+      GenericEnv->setOwningDeclContext(this);
   }
 
   // Expose our import as member status
@@ -4651,10 +4588,6 @@ public:
 
   // FIXME: Hack that provides names with keyword arguments for accessors.
   DeclName getEffectiveFullName() const;
-
-  /// \brief If this is a method in a type extension for some type,
-  /// return that type, otherwise return Type().
-  Type getExtensionType() const;
 
   /// Returns true if the function has a body written in the source file.
   ///
@@ -4791,12 +4724,6 @@ public:
   }
 
   /// \brief If this is a method in a type or extension thereof, compute
-  /// and return the type to be used for the 'self' argument of the type, or an
-  /// empty Type() if no 'self' argument should exist.  This can
-  /// only be used after name binding has resolved types.
-  Type computeSelfType();
-
-  /// \brief If this is a method in a type or extension thereof, compute
   /// and return the type to be used for the 'self' argument of the interface
   /// type, or an empty Type() if no 'self' argument should exist.  This can
   /// only be used after name binding has resolved types.
@@ -4804,7 +4731,12 @@ public:
   /// \param isInitializingCtor Specifies whether we're computing the 'self'
   /// type of an initializing constructor, which accepts an instance 'self'
   /// rather than a metatype 'self'.
-  Type computeInterfaceSelfType(bool isInitializingCtor);
+  ///
+  /// \param wantDynamicSelf Specifies whether the 'self' type should be
+  /// wrapped in a DynamicSelfType, which is the case for the 'self' parameter
+  /// type inside a class method returning 'Self'.
+  Type computeInterfaceSelfType(bool isInitializingCtor=false,
+                                bool wantDynamicSelf=false);
 
   /// \brief This method returns the implicit 'self' decl.
   ///
@@ -4887,11 +4819,6 @@ class FuncDecl final : public AbstractFunctionDecl,
 
   TypeLoc FnRetType;
 
-  /// The result type as seen from the body of the function.
-  ///
-  /// \sa getBodyResultType()
-  Type BodyResultType;
-  
   /// If this declaration is part of an overload set, determine if we've
   /// searched for a common overload amongst all overloads, or if we've found
   /// one.
@@ -4912,7 +4839,7 @@ class FuncDecl final : public AbstractFunctionDecl,
            bool Throws, SourceLoc ThrowsLoc,
            SourceLoc AccessorKeywordLoc,
            unsigned NumParameterLists,
-           GenericParamList *GenericParams, Type Ty, DeclContext *Parent)
+           GenericParamList *GenericParams, DeclContext *Parent)
     : AbstractFunctionDecl(DeclKind::Func, Parent,
                            Name, NameLoc,
                            Throws, ThrowsLoc,
@@ -4925,7 +4852,6 @@ class FuncDecl final : public AbstractFunctionDecl,
       StaticLoc.isValid() || StaticSpelling != StaticSpellingKind::None;
     FuncDeclBits.StaticSpelling = static_cast<unsigned>(StaticSpelling);
     assert(NumParameterLists > 0 && "Must have at least an empty tuple arg");
-    setType(Ty);
     FuncDeclBits.Mutating = false;
     FuncDeclBits.HasDynamicSelf = false;
     FuncDeclBits.ForcedStaticDispatch = false;
@@ -4941,7 +4867,7 @@ class FuncDecl final : public AbstractFunctionDecl,
                               bool Throws, SourceLoc ThrowsLoc,
                               SourceLoc AccessorKeywordLoc,
                               GenericParamList *GenericParams,
-                              unsigned NumParameterLists, Type Ty,
+                              unsigned NumParameterLists,
                               DeclContext *Parent,
                               ClangNode ClangN);
 
@@ -4954,7 +4880,7 @@ public:
                                       bool Throws, SourceLoc ThrowsLoc,
                                       SourceLoc AccessorKeywordLoc,
                                       GenericParamList *GenericParams,
-                                      unsigned NumParameterLists, Type Ty,
+                                      unsigned NumParameterLists,
                                       DeclContext *Parent);
 
   static FuncDecl *create(ASTContext &Context, SourceLoc StaticLoc,
@@ -4964,7 +4890,7 @@ public:
                           bool Throws, SourceLoc ThrowsLoc,
                           SourceLoc AccessorKeywordLoc,
                           GenericParamList *GenericParams,
-                          ArrayRef<ParameterList *> ParameterLists, Type Ty,
+                          ArrayRef<ParameterList *> ParameterLists,
                           TypeLoc FnRetType, DeclContext *Parent,
                           ClangNode ClangN = ClangNode());
 
@@ -5037,34 +4963,8 @@ public:
   TypeLoc &getBodyResultTypeLoc() { return FnRetType; }
   const TypeLoc &getBodyResultTypeLoc() const { return FnRetType; }
 
-  /// Retrieve the result type of this function.
-  ///
-  /// \sa getBodyResultType
-  Type getResultType() const;
-
-  /// Retrieve the result type of this function for use within the function
-  /// definition.
-  ///
-  /// FIXME: The statement below is a wish, not reality.
-  /// The "body" result type will only differ from the result type within the
-  /// interface to the function for a polymorphic function, where the interface
-  /// may contain generic parameters while the definition will contain
-  /// the corresponding archetypes.
-  Type getBodyResultType() const { return BodyResultType; }
-
-  /// Set the result type as viewed from the function body.
-  ///
-  /// \sa getBodyResultType
-  void setBodyResultType(Type bodyResultType) {
-    assert(BodyResultType.isNull() && "Already set body result type");
-    BodyResultType = bodyResultType;
-  }
-
-  /// Revert to an empty type.
-  void revertType() {
-    BodyResultType = Type();
-    overwriteType(Type());
-  }
+  /// Retrieve the result interface type of this function.
+  Type getResultInterfaceType() const;
 
   /// isUnaryOperator - Determine whether this is a unary operator
   /// implementation.  This check is a syntactic rather than type-based check,
@@ -5138,15 +5038,6 @@ public:
   void setDynamicSelf(bool hasDynamicSelf) { 
     FuncDeclBits.HasDynamicSelf = hasDynamicSelf;
   }
-  
-  /// Retrieve the dynamic \c Self type for this method, or a null type if
-  /// this method does not have a dynamic \c Self return type.
-  DynamicSelfType *getDynamicSelf() const;
-
-  /// Retrieve the dynamic \c Self interface type for this method, or
-  /// a null type if this method does not have a dynamic \c Self
-  /// return type.
-  DynamicSelfType *getDynamicSelfInterface() const;
 
   /// Determine whether this method has an archetype \c Self return
   /// type. This is when a method defined in a protocol extension
@@ -5164,6 +5055,9 @@ public:
     return OverriddenOrBehaviorParamDecl.dyn_cast<FuncDecl *>();
   }
   void setOverriddenDecl(FuncDecl *over) {
+    // FIXME: Hack due to broken class circulatity checking.
+    if (over == this) return;
+
     // A function cannot be an override if it is also a derived global decl
     // (since derived decls are at global scope).
     assert((!OverriddenOrBehaviorParamDecl
@@ -5451,11 +5345,11 @@ public:
   SourceLoc getStartLoc() const { return getConstructorLoc(); }
   SourceRange getSourceRange() const;
 
-  /// getArgumentType - get the type of the argument tuple
-  Type getArgumentType() const;
+  /// getArgumentInterfaceType - get the interface type of the argument tuple
+  Type getArgumentInterfaceType() const;
 
-  /// \brief Get the type of the constructed object.
-  Type getResultType() const;
+  /// \brief Get the interface type of the constructed object.
+  Type getResultInterfaceType() const;
 
   /// Get the interface type of the initializing constructor.
   Type getInitializerInterfaceType();
@@ -5591,6 +5485,9 @@ public:
 
   ConstructorDecl *getOverriddenDecl() const { return OverriddenDecl; }
   void setOverriddenDecl(ConstructorDecl *over) {
+    // FIXME: Hack due to broken class circulatity checking.
+    if (over == this) return;
+
     OverriddenDecl = over;
     over->setIsOverridden();
   }
@@ -6057,10 +5954,10 @@ inline bool ValueDecl::isImportAsMember() const {
 }
 
 inline ArrayRef<Requirement> ExtensionDecl::getGenericRequirements() const {
-  if (!GenericSig)
+  if (auto sig = getGenericSignature())
+    return sig->getRequirements();
+  else
     return { };
-
-  return GenericSig->getRequirements();
 }
 
 inline bool Decl::isPotentiallyOverridable() const {
@@ -6072,6 +5969,9 @@ inline bool Decl::isPotentiallyOverridable() const {
     return false;
   }
 }
+
+inline GenericParamKey::GenericParamKey(const GenericTypeParamDecl *d)
+  : Depth(d->getDepth()), Index(d->getIndex()) { }
 
 } // end namespace swift
 

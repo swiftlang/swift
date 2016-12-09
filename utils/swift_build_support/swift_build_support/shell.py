@@ -5,8 +5,8 @@
 # Copyright (c) 2014 - 2016 Apple Inc. and the Swift project authors
 # Licensed under Apache License v2.0 with Runtime Library Exception
 #
-# See http://swift.org/LICENSE.txt for license information
-# See http://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
+# See https://swift.org/LICENSE.txt for license information
+# See https://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
 # ----------------------------------------------------------------------------
 """
 Centralized command line and file system interface for the build script.
@@ -123,6 +123,8 @@ def capture(command, stderr=None, env=None, dry_run=None, echo=True,
             "command terminated with a non-zero exit status " +
             str(e.returncode) + ", aborting")
     except OSError as e:
+        if optional:
+            return None
         diagnostics.fatal(
             "could not execute '" + quote_command(command) +
             "': " + e.strerror)

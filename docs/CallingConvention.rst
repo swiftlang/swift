@@ -59,8 +59,8 @@ of an l-value, but Swift does, so it's pertinent.
 In general, the terms "pass-by-X" and "call-by-X" are used
 interchangeably.  It's unfortunate, because these conventions are
 argument specific, and functions can be passed multiple arguments
-that are each handled in a different way.  As such, we'll prefer 
-"pass-by-X" for consistency and to emphasize that these conventions 
+that are each handled in a different way.  As such, we'll prefer
+"pass-by-X" for consistency and to emphasize that these conventions
 are argument-specific.
 
 Pass-by-reference
@@ -278,7 +278,7 @@ considering here:
   This is optimal if the caller has responsibility for the value and
   doesn't need it after the call.  This is an extremely common
   situation; for example, it comes up whenever a call result is
-  immediately used an argument.  By giving the callee responsibility
+  immediately used as an argument.  By giving the callee responsibility
   for the value, this convention allows the callee to use the value at
   a later point without taking any extra action to keep it alive.
 

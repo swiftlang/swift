@@ -5,8 +5,8 @@
 // Copyright (c) 2014 - 2016 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
-// See http://swift.org/LICENSE.txt for license information
-// See http://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
+// See https://swift.org/LICENSE.txt for license information
+// See https://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
 //
 //===----------------------------------------------------------------------===//
 
@@ -52,6 +52,7 @@ bool swift::hasNonTrivialNonDebugUse(SILArgument *Arg) {
 static bool isSpecializableRepresentation(SILFunctionTypeRepresentation Rep) {
   switch (Rep) {
   case SILFunctionTypeRepresentation::Method:
+  case SILFunctionTypeRepresentation::Closure:
   case SILFunctionTypeRepresentation::Thin:
   case SILFunctionTypeRepresentation::Thick:
   case SILFunctionTypeRepresentation::CFunctionPointer:
@@ -61,6 +62,8 @@ static bool isSpecializableRepresentation(SILFunctionTypeRepresentation Rep) {
   case SILFunctionTypeRepresentation::Block:
     return false;
   }
+
+  llvm_unreachable("Unhandled SILFunctionTypeRepresentation in switch.");
 }
 
 /// Returns true if F is a function which the pass know show to specialize

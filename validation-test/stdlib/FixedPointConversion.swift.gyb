@@ -67,7 +67,7 @@ from SwiftFloatingPointTypes import all_floating_point_types
 
 %     for testValue in [selfMin, selfMax, selfMin - 1, selfMax + 1, otherMin, otherMax]:
 
-%       if testValue < otherMin or testValue > otherMax: 
+%       if testValue < otherMin or testValue > otherMax:
 %          # Can't construct `other` value, do nothing and continue.
 
 %       elif testValue >= selfMin and testValue <= selfMax:
@@ -119,8 +119,8 @@ FixedPointConversionFailure.test("${Other}To${Self}Conversion/dest=${testValue}"
 %     end
 
 %     for testValue in [repr(value) for value in [selfMin, selfMax, selfMin - 0.1, selfMax + 0.1, otherMin, otherMax, 0.0, -0.0, 0.1, -0.1]]:
-        
-%       if testValue < otherMin or testValue > otherMax: 
+
+%       if testValue < otherMin or testValue > otherMax:
 %         # Can't construct `other` value to test from, do nothing and continue.
 
 %       elif testValue >= selfMin and testValue <= selfMax and testValue % 1 == 0 and testValue != -0.0:

@@ -1,0 +1,2 @@
+// RUN: not %target-sil-opt %s
+protocol f{func<extension{func<

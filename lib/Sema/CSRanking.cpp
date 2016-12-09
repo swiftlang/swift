@@ -5,8 +5,8 @@
 // Copyright (c) 2014 - 2016 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
-// See http://swift.org/LICENSE.txt for license information
-// See http://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
+// See https://swift.org/LICENSE.txt for license information
+// See https://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
 //
 //===----------------------------------------------------------------------===//
 //
@@ -106,24 +106,6 @@ llvm::raw_ostream &constraints::operator<<(llvm::raw_ostream &out,
   return out;
 }
 
-/// \brief Remove the initializers from any tuple types within the
-/// given type.
-static Type stripInitializers(Type origType) {
-  return origType.transform([&](Type type) -> Type {
-             if (auto tupleTy = type->getAs<TupleType>()) {
-               SmallVector<TupleTypeElt, 4> fields;
-               for (const auto &field : tupleTy->getElements()) {
-                 fields.push_back(TupleTypeElt(field.getType(),
-                                               field.getName(),
-                                               field.isVararg()));
-                                               
-               }
-               return TupleType::get(fields, type->getASTContext());
-             }
-             return type;
-           });
-}
-
 ///\ brief Compare two declarations for equality when they are used.
 ///
 static bool sameDecl(Decl *decl1, Decl *decl2) {
@@ -168,6 +150,8 @@ static bool sameOverloadChoice(const OverloadChoice &x,
   case OverloadChoiceKind::TupleIndex:
     return x.getTupleIndex() == y.getTupleIndex();
   }
+
+  llvm_unreachable("Unhandled OverloadChoiceKind in switch.");
 }
 
 /// Compare two declarations to determine whether one is a witness of the other.
@@ -206,16 +190,16 @@ static Comparison compareWitnessAndRequirement(TypeChecker &tc, DeclContext *dc,
   // Determine whether the type of the witness's context conforms to the
   // protocol.
   auto owningType
-    = potentialWitness->getDeclContext()->getDeclaredTypeInContext();
-  ProtocolConformance *conformance = nullptr;
-  if (!tc.conformsToProtocol(owningType, proto, dc,
-                             ConformanceCheckFlags::InExpression, &conformance) ||
-      !conformance)
+    = potentialWitness->getDeclContext()->getDeclaredInterfaceType();
+  auto conformance = tc.conformsToProtocol(owningType, proto, dc,
+                                           ConformanceCheckFlags::InExpression);
+  if (!conformance || conformance->isAbstract())
     return Comparison::Unordered;
 
   // If the witness and the potential witness are not the same, there's no
   // ordering here.
-  if (conformance->getWitness(req, &tc).getDecl() != potentialWitness)
+  if (conformance->getConcrete()->getWitness(req, &tc).getDecl()
+        != potentialWitness)
     return Comparison::Unordered;
 
   // We have a requirement/witness match.
@@ -266,8 +250,8 @@ static SelfTypeRelationship computeSelfTypeRelationship(TypeChecker &tc,
   if (!dc1->isTypeContext() || !dc2->isTypeContext())
     return SelfTypeRelationship::Unrelated;
 
-  Type type1 = dc1->getDeclaredTypeInContext();
-  Type type2 = dc2->getDeclaredTypeInContext();
+  Type type1 = dc1->getDeclaredInterfaceType();
+  Type type2 = dc2->getDeclaredInterfaceType();
 
   // If the types are equal, the answer is simple.
   if (type1->isEqual(type2))
@@ -349,10 +333,8 @@ static bool isDeclMoreConstrainedThan(ValueDecl *decl1, ValueDecl *decl2) {
           auto p1 = params1[i];
           auto p2 = params2[i];
           
-          int np1 = static_cast<int>
-          (p1->getArchetype()->getConformsTo().size());
-          int np2 = static_cast<int>
-          (p2->getArchetype()->getConformsTo().size());
+          int np1 = static_cast<int>(p1->getConformingProtocols().size());
+          int np2 = static_cast<int>(p2->getConformingProtocols().size());
           int aDelta = np1 - np2;
           
           if (aDelta)
@@ -410,7 +392,7 @@ static bool hasEmptyExistentialParameterMismatch(ValueDecl *decl1,
       return false;
     
     if (t2->isAnyExistentialType() && !t1->isAnyExistentialType())
-      return t2->isEmptyExistentialComposition();
+      return t2->isAny();
   }
   return false;
 }
@@ -689,7 +671,8 @@ static bool isDeclAsSpecializedAs(TypeChecker &tc, DeclContext *dc,
             // We need either a default argument or a variadic
             // argument for the first declaration to be more
             // specialized.
-            if (!params2[i].HasDefaultArgument && !params2[i].Variadic)
+            if (!params2[i].HasDefaultArgument &&
+                !params2[i].isVariadic())
               return false;
 
             fewerEffectiveParameters = true;
@@ -700,10 +683,10 @@ static bool isDeclAsSpecializedAs(TypeChecker &tc, DeclContext *dc,
           if (params1[i].Label != params2[i].Label) return false;
 
           // If one parameter is variadic and the other is not...
-          if (params1[i].Variadic != params2[i].Variadic) {
+          if (params1[i].isVariadic() != params2[i].isVariadic()) {
             // If the first parameter is the variadic one, it's not
             // more specialized.
-            if (params1[i].Variadic) return false;
+            if (params1[i].isVariadic()) return false;
 
             fewerEffectiveParameters = true;
           }
@@ -894,8 +877,10 @@ ConstraintSystem::compareSolutions(ConstraintSystem &cs,
             
             // If both are convenience initializers, and the instance type of
             // one is a subtype of the other's, favor the subtype constructor.
-            auto resType1 = ctor1->getResultType();
-            auto resType2 = ctor2->getResultType();
+            auto resType1 = ArchetypeBuilder::mapTypeIntoContext(
+                ctor1, ctor1->getResultInterfaceType());
+            auto resType2 = ArchetypeBuilder::mapTypeIntoContext(
+                ctor2, ctor2->getResultInterfaceType());
             
             if (!resType1->isEqual(resType2)) {
               if (tc.isSubtypeOf(resType1, resType2, cs.DC)) {
@@ -977,7 +962,7 @@ ConstraintSystem::compareSolutions(ConstraintSystem &cs,
       auto check = [](const ValueDecl *VD) -> bool {
         if (!VD->getModuleContext()->isStdlibModule())
           return false;
-        auto fnTy = VD->getType()->castTo<AnyFunctionType>();
+        auto fnTy = VD->getInterfaceType()->castTo<AnyFunctionType>();
         if (!fnTy->getResult()->getAnyOptionalObjectType())
           return false;
 
@@ -1011,11 +996,6 @@ ConstraintSystem::compareSolutions(ConstraintSystem &cs,
 
     auto type1 = binding.bindings[idx1];
     auto type2 = binding.bindings[idx2];
-
-    // Strip any initializers from tuples in the type; they aren't
-    // to be compared.
-    type1 = stripInitializers(type1);
-    type2 = stripInitializers(type2);
 
     // If the types are equivalent, there's nothing more to do.
     if (type1->isEqual(type2))

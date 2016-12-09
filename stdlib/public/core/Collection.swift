@@ -5,8 +5,8 @@
 // Copyright (c) 2014 - 2016 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
-// See http://swift.org/LICENSE.txt for license information
-// See http://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
+// See https://swift.org/LICENSE.txt for license information
+// See https://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
 //
 //===----------------------------------------------------------------------===//
 
@@ -18,7 +18,7 @@
 @available(*, deprecated, message: "it will be removed in Swift 4.0.  Please use 'Collection' instead")
 public typealias IndexableBase = _IndexableBase
 public protocol _IndexableBase {
-  // FIXME(ABI)(compiler limitation): there is no reason for this protocol
+  // FIXME(ABI)#24 (Recursive Protocol Constraints): there is no reason for this protocol
   // to exist apart from missing compiler features that we emulate with it.
   // rdar://problem/20531108
   //
@@ -85,6 +85,8 @@ public protocol _IndexableBase {
   /// - Parameter position: The position of the element to access. `position`
   ///   must be a valid index of the collection that is not equal to the
   ///   `endIndex` property.
+  ///
+  /// - Complexity: O(1)
   subscript(position: Index) -> _Element { get }
 
   // WORKAROUND: rdar://25214066
@@ -97,6 +99,8 @@ public protocol _IndexableBase {
   /// - Parameter bounds: A range of the collection's indices. The upper and
   ///   lower bounds of the `bounds` range must be valid indices of the
   ///   collection.
+  ///
+  /// - Complexity: O(1)
   subscript(bounds: Range<Index>) -> SubSequence { get }
   
   /// Performs a range check in O(1), or a no-op when a range check is not
@@ -116,6 +120,8 @@ public protocol _IndexableBase {
   ///
   /// - Complexity: O(1).
   func _failEarlyRangeCheck(_ index: Index, bounds: Range<Index>)
+
+  func _failEarlyRangeCheck(_ index: Index, bounds: ClosedRange<Index>)
 
   /// Performs a range check in O(1), or a no-op when a range check is not
   /// implementable in O(1).
@@ -142,6 +148,10 @@ public protocol _IndexableBase {
 
   /// Returns the position immediately after the given index.
   ///
+  /// The successor of an index must be well-defined. For an index `i` into a
+  /// collection `c`, calling `c.index(after: i)` returns the same index every
+  /// time.
+  ///
   /// - Parameter i: A valid index of the collection. `i` must be less than
   ///   `endIndex`.
   /// - Returns: The index value immediately after `i`.
@@ -151,6 +161,8 @@ public protocol _IndexableBase {
   ///
   /// - Parameter i: A valid index of the collection. `i` must be less than
   ///   `endIndex`.
+  ///
+  /// - SeeAlso: `index(after:)`
   func formIndex(after i: inout Index)
 }
 
@@ -357,7 +369,8 @@ public protocol _Indexable : _IndexableBase {
 ///     // Prints "20.0"
 public struct IndexingIterator<
   Elements : _IndexableBase
-  // FIXME(compiler limitation):
+  // FIXME(ABI)#97 (Recursive Protocol Constraints):
+  // Should be written as:
   // Elements : Collection
 > : IteratorProtocol, Sequence {
 
@@ -372,7 +385,7 @@ public struct IndexingIterator<
   /// exists.
   ///
   /// Repeatedly calling this method returns all the elements of the underlying
-  /// sequence in order.  As soon as the sequence has run out of elements, all
+  /// sequence in order. As soon as the sequence has run out of elements, all
   /// subsequent calls return `nil`.
   ///
   /// This example shows how an iterator can be used explicitly to emulate a
@@ -558,7 +571,8 @@ public protocol Collection : _Indexable, Sequence {
   /// protocol, but it is restated here with stricter constraints. In a
   /// collection, the subsequence should also conform to `Collection`.
   associatedtype SubSequence : _IndexableBase, Sequence = Slice<Self>
-  // FIXME(compiler limitation):
+  // FIXME(ABI)#98 (Recursive Protocol Constraints):
+  // FIXME(ABI)#99 (Associated Types with where clauses):
   // associatedtype SubSequence : Collection
   //   where
   //   Iterator.Element == SubSequence.Iterator.Element,
@@ -589,6 +603,8 @@ public protocol Collection : _Indexable, Sequence {
   /// - Parameter position: The position of the element to access. `position`
   ///   must be a valid index of the collection that is not equal to the
   ///   `endIndex` property.
+  ///
+  /// - Complexity: O(1)
   subscript(position: Index) -> Iterator.Element { get }
 
   /// Accesses a contiguous subrange of the collection's elements.
@@ -612,13 +628,16 @@ public protocol Collection : _Indexable, Sequence {
   ///
   /// - Parameter bounds: A range of the collection's indices. The bounds of
   ///   the range must be valid indices of the collection.
+  ///
+  /// - Complexity: O(1)
   subscript(bounds: Range<Index>) -> SubSequence { get }
 
   /// A type that can represent the indices that are valid for subscripting the
   /// collection, in ascending order.
   associatedtype Indices : _Indexable, Sequence = DefaultIndices<Self>
 
-  // FIXME(compiler limitation):
+  // FIXME(ABI)#68 (Associated Types with where clauses):
+  // FIXME(ABI)#100 (Recursive Protocol Constraints):
   // associatedtype Indices : Collection
   //   where
   //   Indices.Iterator.Element == Index,
@@ -742,6 +761,11 @@ public protocol Collection : _Indexable, Sequence {
   var isEmpty: Bool { get }
 
   /// The number of elements in the collection.
+  ///
+  /// To check whether a collection is empty, use its `isEmpty` property
+  /// instead of comparing `count` to zero. Unless the collection guarantees
+  /// random-access performance, calculating `count` can be an O(*n*)
+  /// operation.
   ///
   /// - Complexity: O(1) if the collection conforms to
   ///   `RandomAccessCollection`; otherwise, O(*n*), where *n* is the length
@@ -879,6 +903,16 @@ extension _Indexable {
     _precondition(
       index < bounds.upperBound,
       "out of bounds: index >= endIndex")
+  }
+
+  public func _failEarlyRangeCheck(_ index: Index, bounds: ClosedRange<Index>) {
+    // FIXME: swift-3-indexing-model: tests.
+    _precondition(
+      bounds.lowerBound <= index,
+      "out of bounds: index < startIndex")
+    _precondition(
+      index <= bounds.upperBound,
+      "out of bounds: index > endIndex")
   }
 
   public func _failEarlyRangeCheck(_ range: Range<Index>, bounds: Range<Index>) {
@@ -1118,6 +1152,8 @@ extension Collection where SubSequence == Slice<Self> {
   ///
   /// - Parameter bounds: A range of the collection's indices. The bounds of
   ///   the range must be valid indices of the collection.
+  ///
+  /// - Complexity: O(1)
   public subscript(bounds: Range<Index>) -> Slice<Self> {
     _failEarlyRangeCheck(bounds, bounds: startIndex..<endIndex)
     return Slice(base: self, bounds: bounds)
@@ -1201,6 +1237,11 @@ extension Collection {
 
   /// The number of elements in the collection.
   ///
+  /// To check whether a collection is empty, use its `isEmpty` property
+  /// instead of comparing `count` to zero. Unless the collection guarantees
+  /// random-access performance, calculating `count` can be an O(*n*)
+  /// operation.
+  ///
   /// - Complexity: O(1) if the collection conforms to
   ///   `RandomAccessCollection`; otherwise, O(*n*), where *n* is the length
   ///   of the collection.
@@ -1266,7 +1307,7 @@ extension Collection {
       formIndex(after: &i)
     }
 
-    _expectEnd(i, self)
+    _expectEnd(of: self, is: i)
     return Array(result)
   }
 

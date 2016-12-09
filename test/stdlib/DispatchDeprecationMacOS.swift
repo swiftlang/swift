@@ -1,4 +1,4 @@
-// RUN: %swift -parse -target x86_64-apple-macosx10.9 -verify -sdk %sdk %s
+// RUN: %swift -typecheck -target x86_64-apple-macosx10.9 -verify -sdk %sdk %s
 // REQUIRES: OS=macosx
 // REQUIRES: objc_interop
 

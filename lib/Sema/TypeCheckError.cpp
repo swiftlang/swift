@@ -5,8 +5,8 @@
 // Copyright (c) 2014 - 2016 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
-// See http://swift.org/LICENSE.txt for license information
-// See http://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
+// See https://swift.org/LICENSE.txt for license information
+// See https://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
 //
 //===----------------------------------------------------------------------===//
 //
@@ -210,6 +210,13 @@ public:
     } else if (auto apply = dyn_cast<ApplyExpr>(E)) {
       recurse = asImpl().checkApply(apply);
     }
+    // Error handling validation (via checkTopLevelErrorHandling) happens after
+    // type checking. If an unchecked expression is still around, the code was
+    // invalid.
+#define UNCHECKED_EXPR(KIND, BASE) \
+    else if (isa<KIND##Expr>(E)) return {false, nullptr};
+#include "swift/AST/ExprNodes.def"
+
     return {bool(recurse), E};
   }
 
@@ -392,7 +399,7 @@ public:
   Classification classifyApply(ApplyExpr *E) {
     // An apply expression is a potential throw site if the function throws.
     // But if the expression didn't type-check, suppress diagnostics.
-    if (!E->getType() || E->getType()->is<ErrorType>())
+    if (!E->getType() || E->getType()->hasError())
       return Classification::forInvalidCode();
     auto type = E->getFn()->getType();
     if (!type) return Classification::forInvalidCode();
@@ -408,7 +415,7 @@ public:
 
     // If any of the arguments didn't type check, fail.
     for (auto arg : args) {
-      if (!arg->getType() || arg->getType()->is<ErrorType>())
+      if (!arg->getType() || arg->getType()->hasError())
         return Classification::forInvalidCode();
     }
 
@@ -790,7 +797,7 @@ private:
   /// 'rethrows' function to throw.
   static Classification classifyArgumentByType(Type paramType,
                                                PotentialReason reason) {
-    if (!paramType || paramType->is<ErrorType>())
+    if (!paramType || paramType->hasError())
       return Classification::forInvalidCode();
     if (auto fnType = paramType->getAs<AnyFunctionType>()) {
       if (fnType->throws()) {
@@ -886,7 +893,7 @@ public:
       return result;
     }
     return Context(getKindForFunctionBody(
-        D->getType(), D->getNumParameterLists()));
+        D->getInterfaceType(), D->getNumParameterLists()));
   }
 
   static Context forInitializer(Initializer *init) {

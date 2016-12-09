@@ -1,4 +1,4 @@
-// RUN: %target-parse-verify-swift
+// RUN: %target-typecheck-verify-swift
 
 import Swift
 
@@ -131,7 +131,7 @@ func enumMetatypeMember(_ opt: Int?) {
 
 // Reference a Type member. <rdar://problem/15034920>
 class G<T> {
-  class In { // expected-error{{nested in generic type}}
+  class In {
     class func foo() {}
   }
 }
@@ -580,3 +580,53 @@ enum SomeErrorType {
   }
 }
 
+// SR-2193: QoI: better diagnostic when a decl exists, but is not a type
+
+enum SR_2193_Error: Error {
+  case Boom
+}
+
+do {
+  throw SR_2193_Error.Boom
+} catch let e as SR_2193_Error.Boom { // expected-error {{enum element 'Boom' is not a member type of 'SR_2193_Error'}}
+}
+
+// rdar://problem/25341015
+extension Sequence {
+  func r25341015_1() -> Int {
+    return max(1, 2) // expected-error {{use of 'max' refers to instance method 'max(by:)' rather than global function 'max' in module 'Swift'}} expected-note {{use 'Swift.' to reference the global function in module 'Swift'}}
+  }
+}
+
+class C_25341015 {
+  static func baz(_ x: Int, _ y: Int) {} // expected-note {{'baz' declared here}}
+  func baz() {}
+  func qux() {
+    baz(1, 2) // expected-error {{use of 'baz' refers to instance method 'baz()' rather than static method 'baz' in class 'C_25341015'}} expected-note {{use 'C_25341015.' to reference the static method}}
+  }
+}
+
+struct S_25341015 {
+  static func foo(_ x: Int, y: Int) {} // expected-note {{'foo(_:y:)' declared here}}
+
+  func foo(z: Int) {}
+  func bar() {
+    foo(1, y: 2) // expected-error {{use of 'foo' refers to instance method 'foo(z:)' rather than static method 'foo(_:y:)' in struct 'S_25341015'}} expected-note {{use 'S_25341015.' to reference the static method}}
+  }
+}
+
+func r25341015() {
+  func baz(_ x: Int, _ y: Int) {}
+  class Bar {
+    func baz() {}
+    func qux() {
+      baz(1, 2) // expected-error {{argument passed to call that takes no arguments}}
+    }
+  }
+}
+
+func r25341015_local(x: Int, y: Int) {}
+func r25341015_inner() {
+  func r25341015_local() {}
+  r25341015_local(x: 1, y: 2) // expected-error {{argument passed to call that takes no arguments}}
+}

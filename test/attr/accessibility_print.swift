@@ -269,17 +269,17 @@ extension HA_PublicProtocol {
   func unconstrained() {}
 } // CHECK: {{^[}]}}
 
-// CHECK-LABEL: extension HA_PublicProtocol where Assoc == HA_PublicStruct {
+// CHECK-LABEL: extension HA_PublicProtocol where Self.Assoc == HA_PublicStruct {
 extension HA_PublicProtocol where Assoc == HA_PublicStruct {
   // CHECK: internal func constrained()
   func constrained() {}
 } // CHECK: {{^[}]}}
-// CHECK-LABEL: extension HA_PublicProtocol where Assoc == HB_InternalStruct {
+// CHECK-LABEL: extension HA_PublicProtocol where Self.Assoc == HB_InternalStruct {
 extension HA_PublicProtocol where Assoc == HB_InternalStruct {
   // CHECK: internal func constrained()
   func constrained() {}
 } // CHECK: {{^[}]}}
-// CHECK-LABEL: extension HA_PublicProtocol where Assoc == HC_PrivateStruct {
+// CHECK-LABEL: extension HA_PublicProtocol where Self.Assoc == HC_PrivateStruct {
 extension HA_PublicProtocol where Assoc == HC_PrivateStruct {
   // CHECK: private func constrained()
   func constrained() {}
@@ -289,17 +289,17 @@ extension HB_InternalProtocol {
   // CHECK: internal func unconstrained()
   func unconstrained() {}
 } // CHECK: {{^[}]}}
-// CHECK-LABEL: extension HB_InternalProtocol where Assoc == HA_PublicStruct {
+// CHECK-LABEL: extension HB_InternalProtocol where Self.Assoc == HA_PublicStruct {
 extension HB_InternalProtocol where Assoc == HA_PublicStruct {
   // CHECK: internal func constrained()
   func constrained() {}
 } // CHECK: {{^[}]}}
-// CHECK-LABEL: extension HB_InternalProtocol where Assoc == HB_InternalStruct {
+// CHECK-LABEL: extension HB_InternalProtocol where Self.Assoc == HB_InternalStruct {
 extension HB_InternalProtocol where Assoc == HB_InternalStruct {
   // CHECK: internal func constrained()
   func constrained() {}
 } // CHECK: {{^[}]}}
-// CHECK-LABEL: extension HB_InternalProtocol where Assoc == HC_PrivateStruct {
+// CHECK-LABEL: extension HB_InternalProtocol where Self.Assoc == HC_PrivateStruct {
 extension HB_InternalProtocol where Assoc == HC_PrivateStruct {
   // CHECK: private func constrained()
   func constrained() {}
@@ -309,17 +309,17 @@ extension HC_PrivateProtocol {
   // CHECK: internal func unconstrained()
   func unconstrained() {}
 } // CHECK: {{^[}]}}
-// CHECK-LABEL: extension HC_PrivateProtocol where Assoc == HA_PublicStruct {
+// CHECK-LABEL: extension HC_PrivateProtocol where Self.Assoc == HA_PublicStruct {
 extension HC_PrivateProtocol where Assoc == HA_PublicStruct {
   // CHECK: private func constrained()
   func constrained() {}
 } // CHECK: {{^[}]}}
-// CHECK-LABEL: extension HC_PrivateProtocol where Assoc == HB_InternalStruct {
+// CHECK-LABEL: extension HC_PrivateProtocol where Self.Assoc == HB_InternalStruct {
 extension HC_PrivateProtocol where Assoc == HB_InternalStruct {
   // CHECK: private func constrained()
   func constrained() {}
 } // CHECK: {{^[}]}}
-// CHECK-LABEL: extension HC_PrivateProtocol where Assoc == HC_PrivateStruct {
+// CHECK-LABEL: extension HC_PrivateProtocol where Self.Assoc == HC_PrivateStruct {
 extension HC_PrivateProtocol where Assoc == HC_PrivateStruct {
   // CHECK: private func constrained()
   func constrained() {}

@@ -14,7 +14,7 @@ class ObservedValue: NSObject {
 class ValueObserver: NSObject {
 	private var observeContext = 0
 	let observedValue: ObservedValue
-	
+
 	init(value: ObservedValue) {
 		observedValue = value
 		super.init()
@@ -24,7 +24,7 @@ class ValueObserver: NSObject {
 	deinit {
 		observedValue.removeObserver(self, forKeyPath: "amount")
 	}
-	
+
 	override func observeValue(forKeyPath keyPath: String?, of object: Any?, change: [NSKeyValueChangeKey : Any]?, context: UnsafeMutableRawPointer?) {
 		if context == &observeContext {
       if let change_ = change {

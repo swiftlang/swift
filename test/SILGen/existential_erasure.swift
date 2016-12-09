@@ -105,12 +105,12 @@ func errorHandler(_ e: Error) throws -> Error {
 // CHECK:  try_apply [[FUNC]]<[[OPEN_TYPE]]>([[ADDR]], [[OPEN]])
 //
 // CHECK: bb1
-// CHECK:  strong_release %0 : $Error
+// CHECK:  destroy_value %0 : $Error
 // CHECK:  return [[RESULT]] : $Error
 //
 // CHECK: bb2([[FAILURE:%.*]] : $Error):
 // CHECK:  dealloc_existential_box [[RESULT]]
-// CHECK:  strong_release %0 : $Error
+// CHECK:  destroy_value %0 : $Error
 // CHECK:  throw [[FAILURE]] : $Error
 //
   return try e.returnOrThrowSelf()

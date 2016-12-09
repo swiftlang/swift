@@ -5,8 +5,8 @@
 // Copyright (c) 2014 - 2016 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
-// See http://swift.org/LICENSE.txt for license information
-// See http://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
+// See https://swift.org/LICENSE.txt for license information
+// See https://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
 //
 //===----------------------------------------------------------------------===//
 
@@ -36,7 +36,7 @@ func findSubstring(_ string: String, _ substring: String) -> String.Index? {
 #else
   // FIXME(performance): This is a very non-optimal algorithm, with a worst
   // case of O((n-m)*m). When non-objc String has a match function that's better,
-  // this should be removed in favour of using that.
+  // this should be removed in favor of using that.
 
   // Operate on unicode scalars rather than codeunits.
   let haystack = string.unicodeScalars

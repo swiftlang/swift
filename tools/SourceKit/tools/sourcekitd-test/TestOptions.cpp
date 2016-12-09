@@ -5,8 +5,8 @@
 // Copyright (c) 2014 - 2016 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
-// See http://swift.org/LICENSE.txt for license information
-// See http://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
+// See https://swift.org/LICENSE.txt for license information
+// See https://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
 //
 //===----------------------------------------------------------------------===//
 
@@ -130,6 +130,7 @@ bool TestOptions::parseArgs(llvm::ArrayRef<const char *> Args) {
         .Case("print-diags", SourceKitRequest::PrintDiags)
         .Case("extract-comment", SourceKitRequest::ExtractComment)
         .Case("module-groups", SourceKitRequest::ModuleGroups)
+        .Case("range", SourceKitRequest::RangeInfo)
         .Default(SourceKitRequest::None);
       if (Request == SourceKitRequest::None) {
         llvm::errs() << "error: invalid request, expected one of "
@@ -137,7 +138,7 @@ bool TestOptions::parseArgs(llvm::ArrayRef<const char *> Args) {
                "complete.update/complete.cache.ondisk/complete.cache.setpopularapi/"
                "cursor/related-idents/syntax-map/structure/format/expand-placeholder/"
                "doc-info/sema/interface-gen/interface-gen-openfind-usr/find-interface/"
-               "open/edit/print-annotations/print-diags/extract-comment/module-groups\n";
+               "open/edit/print-annotations/print-diags/extract-comment/module-groups/range\n";
         return true;
       }
       break;
@@ -160,6 +161,13 @@ bool TestOptions::parseArgs(llvm::ArrayRef<const char *> Args) {
       auto linecol = parseLineCol(InputArg->getValue());
       Line = linecol.first;
       Col = linecol.second;
+      break;
+    }
+
+    case OPT_end_pos: {
+      auto linecol = parseLineCol(InputArg->getValue());
+      EndLine = linecol.first;
+      EndCol = linecol.second;
       break;
     }
 

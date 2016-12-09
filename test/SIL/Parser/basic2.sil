@@ -1,0 +1,16 @@
+// RUN: %target-sil-opt %s | %target-sil-opt | %FileCheck %s
+
+struct Val {
+}
+
+// CHECK-LABEL: sil @test_copy_release_value
+sil @test_copy_release_value : $(Val) -> (Val) {
+// CHECK: bb0([[T0:%[0-9]+]] : $Val):
+bb0(%0 : $Val):
+  %1 = copy_value %0 : $Val
+  destroy_value %0 : $Val
+  return %1 : $Val
+// CHECK-NEXT: [[COPY_RESULT:%.*]] = copy_value [[T0]] : $Val
+// CHECK-NEXT: destroy_value [[T0]] : $Val
+// CHECK-NEXT: return [[COPY_RESULT]]
+}

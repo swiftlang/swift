@@ -5,8 +5,8 @@
 // Copyright (c) 2014 - 2016 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
-// See http://swift.org/LICENSE.txt for license information
-// See http://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
+// See https://swift.org/LICENSE.txt for license information
+// See https://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
 //
 //===----------------------------------------------------------------------===//
 
@@ -14,6 +14,7 @@
 #define SWIFT_AST_ANY_FUNCTION_REF_H
 
 #include "swift/Basic/LLVM.h"
+#include "swift/AST/ArchetypeBuilder.h"
 #include "swift/AST/Decl.h"
 #include "swift/AST/Expr.h"
 #include "swift/AST/Types.h"
@@ -69,19 +70,11 @@ public:
   
   bool hasType() const {
     if (auto *AFD = TheFunction.dyn_cast<AbstractFunctionDecl *>())
-      return AFD->hasType();
+      return AFD->hasInterfaceType();
     return !TheFunction.get<AbstractClosureExpr *>()->getType().isNull();
   }
 
   Type getType() const {
-    if (auto *AFD = TheFunction.dyn_cast<AbstractFunctionDecl *>())
-      return AFD->getType();
-    return TheFunction.get<AbstractClosureExpr *>()->getType();
-  }
-  
-  /// FIXME: This should just be getType() when interface types take over in
-  /// the AST.
-  Type getInterfaceType() const {
     if (auto *AFD = TheFunction.dyn_cast<AbstractFunctionDecl *>())
       return AFD->getInterfaceType();
     return TheFunction.get<AbstractClosureExpr *>()->getType();
@@ -90,7 +83,8 @@ public:
   Type getBodyResultType() const {
     if (auto *AFD = TheFunction.dyn_cast<AbstractFunctionDecl *>()) {
       if (auto *FD = dyn_cast<FuncDecl>(AFD))
-        return FD->getBodyResultType();
+        return ArchetypeBuilder::mapTypeIntoContext(
+            FD, FD->getResultInterfaceType());
       return TupleType::getEmpty(AFD->getASTContext());
     }
     return TheFunction.get<AbstractClosureExpr *>()->getResultType();
@@ -132,7 +126,7 @@ public:
 
 
     auto *CE = TheFunction.get<AbstractClosureExpr *>();
-    if (!CE->getType() || CE->getType()->is<ErrorType>())
+    if (!CE->getType() || CE->getType()->hasError())
       return false;
     return CE->getType()->castTo<FunctionType>()->isNoEscape();
   }

@@ -15,7 +15,7 @@ func empty_array_test() {
 //CHECK-NEXT: tuple
 //CHECK-NEXT: return
 func empty_dic_test() {
-  let unused : [Int:Int] = [:]
+  let unused : [Int: Int] = [:]
 }
 
 //CHECK-LABEL: sil hidden @_TF17unused_containers18unused_string_testFT_T_

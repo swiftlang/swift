@@ -1,6 +1,6 @@
-// RUN: %target-swift-frontend -emit-ir %s | %FileCheck %s
-// RUN: %target-swift-frontend -disable-reflection-names -emit-ir %s | %FileCheck %s --check-prefix=STRIP_REFLECTION_NAMES
-// RUN: %target-swift-frontend -disable-reflection-metadata -emit-ir %s | %FileCheck %s --check-prefix=STRIP_REFLECTION_METADATA
+// RUN: %target-swift-frontend -assume-parsing-unqualified-ownership-sil -emit-ir %s | %FileCheck %s
+// RUN: %target-swift-frontend -assume-parsing-unqualified-ownership-sil -disable-reflection-names -emit-ir %s | %FileCheck %s --check-prefix=STRIP_REFLECTION_NAMES
+// RUN: %target-swift-frontend -assume-parsing-unqualified-ownership-sil -disable-reflection-metadata -emit-ir %s | %FileCheck %s --check-prefix=STRIP_REFLECTION_METADATA
 
 // STRIP_REFLECTION_NAMES_DAG: {{.*}}swift3_reflect
 // STRIP_REFLECTION_NAMES_DAG: {{.*}}swift3_fieldmd
@@ -37,7 +37,7 @@
 // CHECK-DAG: private constant [3 x i8] c"GS\00", section "{{[^"]*}}swift3_reflstr{{[^"]*}}"
 // CHECK-DAG: private constant [3 x i8] c"GE\00", section "{{[^"]*}}swift3_reflstr{{[^"]*}}"
 
-// CHECK-DAG: @"\01l__swift3_capture_descriptor" = private constant <{ {{.*}} }> <{ i32 1, i32 1, i32 2, {{.*}} }>
+// CHECK-DAG: @"\01l__swift3_reflection_descriptor" = private constant <{ {{.*}} }> <{ i32 1, i32 1, i32 2, {{.*}} }>
 
 // CHECK-DAG: @_TMRfP19reflection_metadata10MyProtocol_ = internal constant {{.*}}swift3_fieldmd
 // CHECK-DAG: @_TMRfC19reflection_metadata7MyClass = internal constant {{.*}}swift3_fieldmd

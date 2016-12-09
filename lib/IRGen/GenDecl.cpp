@@ -5,8 +5,8 @@
 // Copyright (c) 2014 - 2016 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
-// See http://swift.org/LICENSE.txt for license information
-// See http://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
+// See https://swift.org/LICENSE.txt for license information
+// See https://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
 //
 //===----------------------------------------------------------------------===//
 //
@@ -1148,11 +1148,15 @@ SILLinkage LinkEntity::getLinkage(IRGenModule &IGM,
           == SILLinkage::Shared)
       return SILLinkage::Shared;
     return SILLinkage::Private;
+  case Kind::ReflectionSuperclassDescriptor:
+    if (getDeclLinkage(getDecl()) == FormalLinkage::PublicNonUnique)
+      return SILLinkage::Shared;
+    return SILLinkage::Private;
   }
   llvm_unreachable("bad link entity kind");
 }
 
-static bool isAvailableExternally(IRGenModule &IGM, DeclContext *dc) {
+static bool isAvailableExternally(IRGenModule &IGM, const DeclContext *dc) {
   dc = dc->getModuleScopeContext();
   if (isa<ClangModuleUnit>(dc) ||
       dc == IGM.getSILModule().getAssociatedContext())
@@ -1160,7 +1164,7 @@ static bool isAvailableExternally(IRGenModule &IGM, DeclContext *dc) {
   return true;
 }
 
-static bool isAvailableExternally(IRGenModule &IGM, Decl *decl) {
+static bool isAvailableExternally(IRGenModule &IGM, const Decl *decl) {
   return isAvailableExternally(IGM, decl->getDeclContext());
 }
 
@@ -1214,6 +1218,7 @@ bool LinkEntity::isAvailableExternally(IRGenModule &IGM) const {
   case Kind::ReflectionBuiltinDescriptor:
   case Kind::ReflectionFieldDescriptor:
   case Kind::ReflectionAssociatedTypeDescriptor:
+  case Kind::ReflectionSuperclassDescriptor:
     llvm_unreachable("Relative reference to unsupported link entity");
   }
   llvm_unreachable("bad link entity kind");
@@ -2169,17 +2174,27 @@ llvm::Constant *IRGenModule::emitProtocolConformances() {
                   getPointerAlignment(), ProtocolDescriptorStructTy);
     auto typeEntity = getTypeEntityInfo(*this,
                                     conformance->getType()->getCanonicalType());
-    auto flags = typeEntity.flags
-        .withConformanceKind(ProtocolConformanceReferenceKind::WitnessTable);
+    auto flags = typeEntity.flags;
 
-    // If the conformance is in this object's table, then the witness table
-    // should also be in this object file, so we can always directly reference
-    // it.
-    // TODO: Should use accessor kind for lazy conformances
-    // TODO: Produce a relative reference to a private generator function
-    // if the witness table requires lazy initialization, instantiation, or
-    // conditional conformance checking.
-    auto witnessTableVar = getAddrOfWitnessTable(conformance);
+    llvm::Constant *witnessTableVar;
+
+    if (!isResilient(conformance->getProtocol(),
+                     ResilienceExpansion::Maximal)) {
+      flags = flags.withConformanceKind(
+          ProtocolConformanceReferenceKind::WitnessTable);
+
+      // If the conformance is in this object's table, then the witness table
+      // should also be in this object file, so we can always directly reference
+      // it.
+      witnessTableVar = getAddrOfWitnessTable(conformance);
+    } else {
+      flags = flags.withConformanceKind(
+          ProtocolConformanceReferenceKind::WitnessTableAccessor);
+
+      witnessTableVar = getAddrOfWitnessTableAccessFunction(
+          conformance, ForDefinition);
+    }
+
     auto witnessTableRef =
       ConstantReference(witnessTableVar, ConstantReference::Direct);
 
@@ -2895,6 +2910,17 @@ Address IRGenFunction::createAlloca(llvm::Type *type,
                                     const llvm::Twine &name) {
   llvm::AllocaInst *alloca = new llvm::AllocaInst(type, name, AllocaIP);
   alloca->setAlignment(alignment.getValue());
+  return Address(alloca, alignment);
+}
+
+/// Create an allocation of an array on the stack.
+Address IRGenFunction::createAlloca(llvm::Type *type,
+                                    llvm::Value *ArraySize,
+                                    Alignment alignment,
+                                    const llvm::Twine &name) {
+  llvm::AllocaInst *alloca = new llvm::AllocaInst(type, ArraySize,
+                                                  alignment.getValue(), name,
+                                                  AllocaIP);
   return Address(alloca, alignment);
 }
 

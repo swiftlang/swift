@@ -5,8 +5,8 @@
 // Copyright (c) 2014 - 2016 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
-// See http://swift.org/LICENSE.txt for license information
-// See http://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
+// See https://swift.org/LICENSE.txt for license information
+// See https://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
 //
 //===----------------------------------------------------------------------===//
 // RUN: %target-run-simple-swiftgyb
@@ -23,7 +23,7 @@ var LazyTestSuite = TestSuite("Lazy")
 protocol TestProtocol1 {}
 
 //===----------------------------------------------------------------------===//
-// Repeated
+// repeatElement(), Repeated<Element>
 //===----------------------------------------------------------------------===//
 
 // Check that the generic parameter is called 'Element'.
@@ -33,20 +33,40 @@ extension Repeated where Element : TestProtocol1 {
   }
 }
 
-LazyTestSuite.test("Repeated") {
-  checkRandomAccessCollection(
-    [] as Array<OpaqueValue<Int>>,
-    repeatElement(OpaqueValue(42), count: 0))
-    { $0.value == $1.value }
+LazyTestSuite.test("Repeated/AssociatedTypes") {
+  typealias Subject = Repeated<OpaqueValue<Int>>
+  expectRandomAccessCollectionAssociatedTypes(
+    collectionType: Subject.self,
+    iteratorType: IndexingIterator<Subject>.self,
+    subSequenceType: RandomAccessSlice<Subject>.self,
+    indexType: Int.self,
+    indexDistanceType: Int.self,
+    indicesType: CountableRange<Int>.self)
+}
 
-  checkRandomAccessCollection(
-    [ OpaqueValue(42) ] as Array<OpaqueValue<Int>>,
-    repeatElement(OpaqueValue(42), count: 1))
-    { $0.value == $1.value }
+LazyTestSuite.test("repeatedValue()/TypeInference") {
+  var r = repeatElement(OpaqueValue(42), count: 42)
+  expectType(Repeated<OpaqueValue<Int>>.self, &r)
+}
 
+LazyTestSuite.test("repeatedValue()/NegativeCount") {
+  expectCrashLater()
+  _ = repeatElement(OpaqueValue(42), count: -1)
+}
+
+LazyTestSuite.test("Repeated")
+  .forEach(in: [ 0, 1, 3 ]) {
+  count in
+
+  let c = repeatElement(OpaqueValue(42), count: count)
+  expectEqual(0, c.startIndex)
+  expectEqual(count, c.endIndex)
+  expectEqual(count, c.count)
+  expectEqual(42, c.repeatedValue.value)
+
+  let expected = (0..<count).map { _ in OpaqueValue(42) }
   checkRandomAccessCollection(
-    [ OpaqueValue(42), OpaqueValue(42), OpaqueValue(42) ] as Array<OpaqueValue<Int>>,
-    repeatElement(OpaqueValue(42), count: 3))
+    expected, c)
     { $0.value == $1.value }
 }
 
@@ -840,7 +860,7 @@ tests.test("LazyMapCollection/AssociatedTypes") {
   expectCollectionAssociatedTypes(
     collectionType: Subject.self,
     iteratorType: LazyMapIterator<Base.Iterator, OpaqueValue<Int32>>.self,
-    // FIXME(ABI): SubSequence should be `LazyMapCollection<Base.Slice>`.
+    // FIXME(ABI)#77 (Associated Types with where clauses): SubSequence should be `LazyMapCollection<Base.Slice>`.
     subSequenceType: Slice<Subject>.self,
     indexType: Base.Index.self,
     indexDistanceType: Base.IndexDistance.self,
@@ -853,7 +873,7 @@ tests.test("LazyMapBidirectionalCollection/AssociatedTypes") {
   expectBidirectionalCollectionAssociatedTypes(
     collectionType: Subject.self,
     iteratorType: LazyMapIterator<Base.Iterator, OpaqueValue<Int32>>.self,
-    // FIXME(ABI): SubSequence should be `LazyMapBidirectionalCollection<Base.Slice>`.
+    // FIXME(ABI)#78 (Associated Types with where clauses): SubSequence should be `LazyMapBidirectionalCollection<Base.Slice>`.
     subSequenceType: BidirectionalSlice<Subject>.self,
     indexType: Base.Index.self,
     indexDistanceType: Base.IndexDistance.self,
@@ -866,7 +886,7 @@ tests.test("LazyMapRandomAccessCollection/AssociatedTypes") {
   expectRandomAccessCollectionAssociatedTypes(
     collectionType: Subject.self,
     iteratorType: LazyMapIterator<Base.Iterator, OpaqueValue<Int32>>.self,
-    // FIXME(ABI): SubSequence should be `LazyMapRandomAccessCollection<Base.Slice>`.
+    // FIXME(ABI)#79 (Associated Types with where clauses): SubSequence should be `LazyMapRandomAccessCollection<Base.Slice>`.
     subSequenceType: RandomAccessSlice<Subject>.self,
     indexType: Base.Index.self,
     indexDistanceType: Base.IndexDistance.self,
@@ -1137,7 +1157,7 @@ tests.test("LazyFilterCollection/AssociatedTypes") {
   expectCollectionAssociatedTypes(
     collectionType: Subject.self,
     iteratorType: LazyFilterIterator<Base.Iterator>.self,
-    // FIXME(ABI): SubSequence should be `LazyFilterCollection<Base.Slice>`.
+    // FIXME(ABI)#80 (Associated Types with where clauses): SubSequence should be `LazyFilterCollection<Base.Slice>`.
     subSequenceType: Slice<Subject>.self,
     indexType: LazyFilterIndex<Base>.self,
     indexDistanceType: Base.IndexDistance.self,
@@ -1150,7 +1170,7 @@ tests.test("LazyFilterBidirectionalCollection/AssociatedTypes") {
   expectBidirectionalCollectionAssociatedTypes(
     collectionType: Subject.self,
     iteratorType: LazyFilterIterator<Base.Iterator>.self,
-    // FIXME(ABI): SubSequence should be `LazyFilterBidirectionalCollection<Base.Slice>`.
+    // FIXME(ABI)#81 (Associated Types with where clauses): SubSequence should be `LazyFilterBidirectionalCollection<Base.Slice>`.
     subSequenceType: BidirectionalSlice<Subject>.self,
     indexType: LazyFilterIndex<Base>.self,
     indexDistanceType: Base.IndexDistance.self,
@@ -1346,7 +1366,7 @@ tests.test("LazyPrefixWhileBidirectionalCollection/AssociatedTypes") {
   expectBidirectionalCollectionAssociatedTypes(
     collectionType: Subject.self,
     iteratorType: LazyPrefixWhileIterator<Base.Iterator>.self,
-    // FIXME(ABI): SubSequence should be `LazyFilterBidirectionalCollection<Base.Slice>`.
+    // FIXME(ABI)#82 (Associated Types with where clauses): SubSequence should be `LazyFilterBidirectionalCollection<Base.Slice>`.
     subSequenceType: BidirectionalSlice<Subject>.self,
     indexType: LazyPrefixWhileIndex<Base>.self,
     indexDistanceType: Base.IndexDistance.self,
@@ -1406,7 +1426,7 @@ tests.test("LazyDropWhileBidirectionalCollection/AssociatedTypes") {
   expectBidirectionalCollectionAssociatedTypes(
     collectionType: Subject.self,
     iteratorType: LazyDropWhileIterator<Base.Iterator>.self,
-    // FIXME(ABI): SubSequence should be `LazyFilterBidirectionalCollection<Base.Slice>`.
+    // FIXME(ABI)#83 (Associated Types with where clauses): SubSequence should be `LazyFilterBidirectionalCollection<Base.Slice>`.
     subSequenceType: BidirectionalSlice<Subject>.self,
     indexType: LazyDropWhileIndex<Base>.self,
     indexDistanceType: Base.IndexDistance.self,

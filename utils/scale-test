@@ -1,0 +1,294 @@
+#!/usr/bin/env python
+#
+# -*- python -*-
+#
+# Runs a .gyb scale-testing file repeatedly through swiftc while varying a
+# scaling variable 'N', collects json stats from the compiler, transforms the
+# problem to log-space and runs a linear regression to estimate the exponent on
+# the stat's growth curve relative to N.
+#
+# The estimate will be more accurate as N increases, so if you get a
+# not-terribly-convincing estimate, try increasing --begin and --end to larger
+# values.
+#
+
+import argparse
+import json
+import os
+import os.path
+import shutil
+import subprocess
+import sys
+import tempfile
+import gyb
+
+
+def find_which(p):
+    for d in os.environ["PATH"].split(os.pathsep):
+        full = os.path.join(d, p)
+        if os.path.isfile(full) and os.access(full, os.X_OK):
+            return full
+    return p
+
+
+# Evidently the debug-symbol reader in dtrace is sufficiently slow and/or buggy
+# that attempting to inject probes into a binary w/ debuginfo is asking for a
+# failed run (possibly racing with probe insertion, or probing the stabs
+# entries, see rdar://problem/7037927 or rdar://problem/11490861 respectively),
+# so we sniff the presence of debug symbols here.
+def has_debuginfo(swiftc):
+    swiftc = find_which(swiftc)
+    for line in subprocess.check_output(
+            ["dwarfdump", "--file-stats", swiftc]).splitlines():
+        if '%' not in line:
+            continue
+        fields = line.split()
+        if fields[8] != '0.00%' or fields[10] != '0.00%':
+            return True
+    return False
+
+
+def write_input_file(args, ast, d, n):
+    fname = "in%d.swift" % n
+    pathname = os.path.join(d, fname)
+    with open(pathname, 'w+') as f:
+        f.write(gyb.execute_template(ast, '', N=n))
+    return fname
+
+
+def run_once_with_primary(args, ast, rng, primary_idx):
+    r = {}
+    try:
+        if args.tmpdir is not None and not os.path.exists(args.tmpdir):
+            os.makedirs(args.tmpdir, 0700)
+        d = tempfile.mkdtemp(dir=args.tmpdir)
+        inputs = [write_input_file(args, ast, d, i) for i in rng]
+        primary = inputs[primary_idx]
+        ofile = "out.o"
+
+        mode = "-c"
+        if args.typecheck:
+            mode = "-typechec"
+
+        focus = ["-primary-file", primary]
+        if args.whole_module_optimization:
+            focus = ['-whole-module-optimization']
+
+        opts = []
+        if args.optimize:
+            opts = ['-O']
+        elif args.optimize_none:
+            opts = ['-Onone']
+        elif args.optimize_unchecked:
+            opts = ['-Ounchecked']
+
+        extra = args.Xfrontend[:]
+        if args.debuginfo:
+            extra.append('-g')
+
+        command = [args.swiftc_binary,
+                   "-frontend", mode,
+                   "-o", ofile] + opts + focus + extra + inputs
+
+        if args.trace:
+            print "running: " + " ".join(command)
+
+        if args.dtrace:
+            trace = "trace.txt"
+            script = ("pid$target:swiftc:*%s*:entry { @[probefunc] = count() }"
+                      % args.select)
+            subprocess.check_call(
+                ["sudo", "dtrace", "-q",
+                 "-o", trace,
+                 "-b", "256",
+                 "-n", script,
+                 "-c", " ".join(command)], cwd=d)
+            r = {fields[0]: int(fields[1]) for fields in
+                 [line.split() for line in open(os.path.join(d, trace))]
+                 if len(fields) == 2}
+        else:
+            if args.debug:
+                command = ["lldb", "--"] + command
+            stats = "stats.json"
+            argv = command + ["-Xllvm", "-stats",
+                              "-Xllvm", "-stats-json",
+                              "-Xllvm", "-info-output-file=" + stats]
+            subprocess.check_call(argv, cwd=d)
+            with open(os.path.join(d, stats)) as f:
+                r = json.load(f)
+    finally:
+        shutil.rmtree(d)
+
+    return {k: v for (k, v) in r.items() if args.select in k}
+
+
+def run_once(args, ast, rng):
+    if args.sum_multi:
+        cumulative = {}
+        for i in range(len(rng)):
+            tmp = run_once_with_primary(args, ast, rng, i)
+            for (k, v) in tmp.items():
+                if k in cumulative:
+                    cumulative[k] += v
+                else:
+                    cumulative[k] = v
+        return cumulative
+    else:
+        return run_once_with_primary(args, ast, rng, -1)
+
+
+def run_many(args):
+
+    if args.dtrace and has_debuginfo(args.swiftc_binary):
+        print ""
+        print "**************************************************"
+        print ""
+        print "dtrace is unreliable on binaries w/ debug symbols"
+        print "please run 'strip -S %s'" % args.swiftc_binary
+        print "or pass a different --swiftc-binary"
+        print ""
+        print "**************************************************"
+        print ""
+        exit(1)
+
+    ast = gyb.parse_template(args.file.name, args.file.read())
+    rng = range(args.begin, args.end, args.step)
+    if args.multi_file or args.sum_multi:
+        return (rng, [run_once(args, ast, range(i)) for i in rng])
+    else:
+        return (rng, [run_once(args, ast, [r]) for r in rng])
+
+
+def linear_regression(x, y):
+    # By the book: https://en.wikipedia.org/wiki/Simple_linear_regression
+    n = len(x)
+    assert n == len(y)
+    if n == 0:
+        return 0, 0
+    sum_x = sum(x)
+    sum_y = sum(y)
+    sum_prod = sum(a * b for a, b in zip(x, y))
+    sum_x_sq = sum(a ** 2 for a in x)
+    mean_x = sum_x/n
+    mean_y = sum_y/n
+    mean_prod = sum_prod/n
+    mean_x_sq = sum_x_sq/n
+    covar_xy = mean_prod - mean_x * mean_y
+    var_x = mean_x_sq - mean_x**2
+    slope = covar_xy / var_x
+    inter = mean_y - slope * mean_x
+    return slope, inter
+
+
+def report(args, rng, runs):
+    import math
+    bad = False
+    keys = set.intersection(*[set(j.keys()) for j in runs])
+    if len(keys) == 0:
+        print "No data found"
+        if len(args.select) != 0:
+            "(perhaps try a different --select?)"
+        return True
+    x = [math.log(n) for n in rng]
+    rows = []
+    for k in keys:
+        vals = [r[k] for r in runs]
+        bounded = [max(v, 1) for v in vals]
+        y = [math.log(b) for b in bounded]
+        b, a = linear_regression(x, y)
+        b = 0 if abs(b) < 1e-9 else b
+        rows.append((b, k, vals))
+    rows.sort()
+    for (b, k, vals) in rows:
+        if b >= args.threshold:
+            bad = True
+        if not args.quiet or b >= args.threshold:
+            print "O(n^%1.1f) : %s" % (b, k)
+            if args.values:
+                print "                = ", vals
+    return bad
+
+
+def main():
+    parser = argparse.ArgumentParser()
+    parser.add_argument(
+        'file', type=argparse.FileType(),
+        help='Path to GYB template file (defaults to stdin)', nargs='?',
+        default=sys.stdin)
+    parser.add_argument(
+        '--values', action='store_true',
+        default=False, help='print stat values')
+    parser.add_argument(
+        '--trace', action='store_true',
+        default=False, help='trace compiler invocations')
+    parser.add_argument(
+        '--quiet', action='store_true',
+        default=False, help='only print superlinear stats')
+    parser.add_argument(
+        '--threshold', type=float,
+        default=1.2, help='exponent beyond which to consider "bad scaling"')
+    parser.add_argument(
+        '-typecheck', '--typecheck', action='store_true',
+        default=False, help='only run compiler with -typecheck')
+    parser.add_argument(
+        '-g', '--debuginfo', action='store_true',
+        default=False, help='run compiler with -g')
+    parser.add_argument(
+        '-wmo', '--whole-module-optimization', action='store_true',
+        default=False, help='run compiler with -whole-module-optimization')
+    parser.add_argument(
+        '--dtrace', action='store_true',
+        default=False, help='use dtrace to sample all functions')
+    parser.add_argument(
+        '-Xfrontend', action='append',
+        default=[], help='pass additional args to frontend jobs')
+    parser.add_argument(
+        '--begin', type=int,
+        default=10, help='first value for N')
+    parser.add_argument(
+        '--end', type=int,
+        default=100, help='last value for N')
+    parser.add_argument(
+        '--step', type=int,
+        default=10, help='step value for N')
+    parser.add_argument(
+        '--swiftc-binary',
+        default="swiftc", help='swift binary to execute')
+    parser.add_argument(
+        '--tmpdir', type=str,
+        default=None, help='directory to create tempfiles in')
+    parser.add_argument(
+        '--select',
+        default="", help='substring of counters/symbols to limit attention to')
+    parser.add_argument(
+        '--debug', action='store_true',
+        default=False, help='invoke lldb on each scale test')
+
+    group = parser.add_mutually_exclusive_group()
+    group.add_argument(
+        '-O', '--optimize', action='store_true',
+        default=False, help='run compiler with -O')
+    group.add_argument(
+        '-Onone', '--optimize-none', action='store_true',
+        default=False, help='run compiler with -Onone')
+    group.add_argument(
+        '-Ounchecked', '--optimize-unchecked', action='store_true',
+        default=False, help='run compiler with -Ounchecked')
+
+    group = parser.add_mutually_exclusive_group()
+    group.add_argument(
+        '--multi-file', action='store_true',
+        default=False, help='vary number of input files as well')
+    group.add_argument(
+        '--sum-multi', action='store_true',
+        default=False, help='simulate a multi-primary run and sum stats')
+
+    args = parser.parse_args(sys.argv[1:])
+    (rng, runs) = run_many(args)
+    if report(args, rng, runs):
+        exit(1)
+    exit(0)
+
+
+if __name__ == '__main__':
+    main()

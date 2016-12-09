@@ -5,8 +5,8 @@
 // Copyright (c) 2014 - 2016 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
-// See http://swift.org/LICENSE.txt for license information
-// See http://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
+// See https://swift.org/LICENSE.txt for license information
+// See https://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
 //
 //===----------------------------------------------------------------------===//
 
@@ -48,7 +48,8 @@ public enum CommandLine {
     = (0..<Int(argc)).map { String(cString: _unsafeArgv[$0]!) }
 }
 
-// FIXME(ABI): Remove this and the entrypoints in SILGen.
+// FIXME(ABI)#25 : Remove this and the entrypoints in SILGen.
+// rdar://problem/19696522
 @_transparent
 public // COMPILER_INTRINSIC
 func _stdlib_didEnterMain(

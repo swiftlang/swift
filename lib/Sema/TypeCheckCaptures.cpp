@@ -5,8 +5,8 @@
 // Copyright (c) 2014 - 2016 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
-// See http://swift.org/LICENSE.txt for license information
-// See http://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
+// See https://swift.org/LICENSE.txt for license information
+// See https://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
 //
 //===----------------------------------------------------------------------===//
 //
@@ -78,11 +78,11 @@ public:
     
     class TypeCaptureWalker : public TypeWalker {
       AnyFunctionRef AFR;
-      llvm::function_ref<void(Type)> Callback;
+      std::function<void(Type)> Callback;
     public:
       explicit TypeCaptureWalker(AnyFunctionRef AFR,
-                                 llvm::function_ref<void(Type)> callback)
-        : AFR(AFR), Callback(callback) {}
+                                 std::function<void(Type)> callback)
+        : AFR(AFR), Callback(std::move(callback)) {}
     
       Action walkToTypePre(Type ty) override {
         Callback(ty);
@@ -127,14 +127,27 @@ public:
     // Perhaps this entire analysis should happen at the SILGen level,
     // instead, but even there we don't really have enough information to
     // perform it accurately.
-    if (type->hasArchetype()) {
+    if (type->hasArchetype() || type->hasTypeParameter()) {
       type.walk(TypeCaptureWalker(AFR, [&](Type t) {
-        if (t->is<ArchetypeType>() &&
+        if ((t->is<ArchetypeType>() ||
+             t->is<GenericTypeParamType>()) &&
             !t->isOpenedExistential() &&
-          GenericParamCaptureLoc.isInvalid()) {
+            GenericParamCaptureLoc.isInvalid()) {
           GenericParamCaptureLoc = loc;
         }
       }));
+    }
+
+    if (auto *gft = type->getAs<GenericFunctionType>()) {
+      TypeCaptureWalker walker(AFR, [&](Type t) {
+        if (t->is<GenericTypeParamType>() &&
+            GenericParamCaptureLoc.isInvalid()) {
+          GenericParamCaptureLoc = loc;
+        }
+      });
+
+      gft->getInput().walk(walker);
+      gft->getResult().walk(walker);
     }
   }
 
@@ -160,15 +173,17 @@ public:
 
     // Visit the type of the capture, if it isn't a class reference, since
     // we'd need the metadata to do so.
-    if (VD->hasType()
+    if (VD->hasInterfaceType()
         && (!AFR.isObjC()
-            || !VD->getType()->hasRetainablePointerRepresentation()))
-      checkType(VD->getType(), VD->getLoc());
+            || !isa<VarDecl>(VD)
+            || !cast<VarDecl>(VD)->getType()->hasRetainablePointerRepresentation()))
+      checkType(VD->getInterfaceType(), VD->getLoc());
 
     // If VD is a noescape decl, then the closure we're computing this for
     // must also be noescape.
-    if (VD->hasType() && VD->getType()->is<AnyFunctionType>() &&
-        VD->getType()->castTo<AnyFunctionType>()->isNoEscape() &&
+    if (VD->hasInterfaceType() &&
+        VD->getInterfaceType()->is<AnyFunctionType>() &&
+        VD->getInterfaceType()->castTo<AnyFunctionType>()->isNoEscape() &&
         !capture.isNoEscape() &&
         // Don't repeatedly diagnose the same thing.
         Diagnosed.insert(VD).second) {
@@ -183,7 +198,7 @@ public:
       // If we're a parameter, emit a helpful fixit to add @escaping
       auto paramDecl = dyn_cast<ParamDecl>(VD);
       bool isAutoClosure =
-          VD->getType()->castTo<AnyFunctionType>()->isAutoClosure();
+          VD->getInterfaceType()->castTo<AnyFunctionType>()->isAutoClosure();
       if (paramDecl && !isAutoClosure) {
         TC.diagnose(paramDecl->getStartLoc(), diag::noescape_parameter,
                     paramDecl->getName())
@@ -320,7 +335,9 @@ public:
     if (!validateForwardCapture(DRE->getDecl()))
       return { false, DRE };
 
-    bool isInOut = D->hasType() && D->getInterfaceType()->is<InOutType>();
+    bool isInOut = (isa<ParamDecl>(D) &&
+                    cast<ParamDecl>(D)->hasType() &&
+                    cast<ParamDecl>(D)->getType()->is<InOutType>());
     bool isNested = false;
     if (auto f = AFR.getAbstractFunctionDecl())
       isNested = f->getDeclContext()->isLocalContext();
@@ -413,7 +430,7 @@ public:
     if (!AFR.isObjC())
       return true;
 
-    if (!E->getType() || E->getType()->is<ErrorType>())
+    if (!E->getType() || E->getType()->hasError())
       return false;
 
     // We can use Objective-C generics in limited ways without reifying
@@ -536,6 +553,12 @@ public:
     // Casting to an ObjC class doesn't require the metadata of its type
     // parameters, if any.
     if (auto cast = dyn_cast<CheckedCastExpr>(E)) {
+      // If we failed to resolve the written type, we've emitted an
+      // earlier diagnostic and should bail.
+      auto toTy = cast->getCastTypeLoc().getType();
+      if (!toTy || toTy->hasError())
+        return false;
+
       if (auto clas = dyn_cast_or_null<ClassDecl>(
                          cast->getCastTypeLoc().getType()->getAnyNominal())) {
         if (clas->usesObjCGenericsModel()) {
@@ -636,9 +659,11 @@ void TypeChecker::computeCaptures(AnyFunctionRef AFR) {
 
   unsigned inoutCount = 0;
   for (auto C: Captures) {
-    if (auto type = C.getDecl()->getInterfaceType())
-      if (isa<InOutType>(type.getPointer()))
-        inoutCount++;
+    if (auto PD = dyn_cast<ParamDecl>(C.getDecl()))
+      if (PD->hasType())
+        if (auto type = PD->getType())
+          if (isa<InOutType>(type.getPointer()))
+            inoutCount++;
   }
 
   if (inoutCount > 0) {

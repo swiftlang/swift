@@ -1,5 +1,5 @@
-// RUN: %swift -parse -parse-as-library -target x86_64-apple-macosx10.51 %clang-importer-sdk -I %S/Inputs/custom-modules %s -verify
-// RUN: %swift -parse -parse-as-library -target x86_64-apple-macosx10.51 %clang-importer-sdk -I %S/Inputs/custom-modules %s 2>&1 | %FileCheck %s '--implicit-check-not=<unknown>:0'
+// RUN: %swift -typecheck -parse-as-library -target x86_64-apple-macosx10.51 %clang-importer-sdk -I %S/Inputs/custom-modules %s -verify
+// RUN: %swift -typecheck -parse-as-library -target x86_64-apple-macosx10.51 %clang-importer-sdk -I %S/Inputs/custom-modules %s 2>&1 | %FileCheck %s '--implicit-check-not=<unknown>:0'
 //
 // This test requires a target of OS X 10.51 or later to test deprecation
 // diagnostics because (1) we only emit deprecation warnings if a symbol is
@@ -123,7 +123,7 @@ func annotatedHasReturnDeprecatedIn10_51() -> ClassDeprecatedIn10_51 {
 var globalWithDeprecatedType : ClassDeprecatedIn10_51? = nil // expected-warning {{ClassDeprecatedIn10_51' was deprecated in OS X 10.51}}
 
 @available(OSX, introduced: 10.8, deprecated: 10.51)
-var annotatedGlobalWithDeprecatedType : ClassDeprecatedIn10_51? = nil
+var annotatedGlobalWithDeprecatedType : ClassDeprecatedIn10_51?
 
 
 enum EnumWithDeprecatedCasePayload {

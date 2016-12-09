@@ -5,13 +5,14 @@
 // Copyright (c) 2014 - 2016 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
-// See http://swift.org/LICENSE.txt for license information
-// See http://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
+// See https://swift.org/LICENSE.txt for license information
+// See https://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
 //
 //===----------------------------------------------------------------------===//
 
 @_exported
 import ObjectiveC
+import _SwiftObjectiveCOverlayShims
 
 //===----------------------------------------------------------------------===//
 // Objective-C Primitive Types
@@ -180,18 +181,12 @@ typealias Zone = NSZone
 // @autoreleasepool substitute
 //===----------------------------------------------------------------------===//
 
-@_silgen_name("_swift_objc_autoreleasePoolPush")
-func __pushAutoreleasePool() -> OpaquePointer
-
-@_silgen_name("_swift_objc_autoreleasePoolPop")
-func __popAutoreleasePool(_ pool: OpaquePointer)
-
 public func autoreleasepool<Result>(
   invoking body: () throws -> Result
 ) rethrows -> Result {
-  let pool = __pushAutoreleasePool()
+  let pool = _swift_objc_autoreleasePoolPush()
   defer {
-    __popAutoreleasePool(pool)
+    _swift_objc_autoreleasePoolPop(pool)
   }
   return try body()
 }

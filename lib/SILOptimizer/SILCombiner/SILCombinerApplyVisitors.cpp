@@ -5,8 +5,8 @@
 // Copyright (c) 2014 - 2016 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
-// See http://swift.org/LICENSE.txt for license information
-// See http://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
+// See https://swift.org/LICENSE.txt for license information
+// See https://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
 //
 //===----------------------------------------------------------------------===//
 
@@ -91,22 +91,6 @@ SILInstruction *SILCombiner::visitPartialApplyInst(PartialApplyInst *PAI) {
   return nullptr;
 }
 
-static bool canCombinePartialApply(const PartialApplyInst *PAI) {
-  // Only process partial apply if the callee is a known function.
-  auto *FRI = dyn_cast<FunctionRefInst>(PAI->getCallee());
-  if (!FRI)
-    return false;
-
-  // Make sure that the substitution list of the PAI does not contain any
-  // archetypes.
-  ArrayRef<Substitution> Subs = PAI->getSubstitutions();
-  for (Substitution S : Subs)
-    if (S.getReplacement()->getCanonicalType()->hasArchetype())
-      return false;
-
-  return true;
-}
-
 // Helper class performing the apply{partial_apply(x,y)}(z) -> apply(z,x,y)
 // peephole.
 class PartialApplyCombiner {
@@ -132,9 +116,6 @@ class PartialApplyCombiner {
 
   SILBuilder &Builder;
 
-  // Function referenced by partial_apply.
-  FunctionRefInst *FRI;
-
   SILCombiner *SilCombiner;
 
   bool processSingleApply(FullApplySite AI);
@@ -146,7 +127,7 @@ public:
   PartialApplyCombiner(PartialApplyInst *PAI, SILBuilder &Builder,
                        SILCombiner *SilCombiner)
       : isFirstTime(true), PAI(PAI), Builder(Builder),
-        FRI(nullptr), SilCombiner(SilCombiner) {}
+        SilCombiner(SilCombiner) {}
   SILInstruction *combine();
 };
 
@@ -244,7 +225,8 @@ void PartialApplyCombiner::releaseTemporaries() {
     for (auto *EndPoint : PAFrontier) {
       Builder.setInsertionPoint(EndPoint);
       if (!TmpType.isAddressOnly(PAI->getModule())) {
-        auto *Load = Builder.createLoad(PAI->getLoc(), Op);
+        auto *Load = Builder.createLoad(PAI->getLoc(), Op,
+                                        LoadOwnershipQualifier::Unqualified);
         Builder.createReleaseValue(PAI->getLoc(), Load, Atomicity::Atomic);
       } else {
         Builder.createDestroyAddr(PAI->getLoc(), Op);
@@ -280,10 +262,8 @@ bool PartialApplyCombiner::processSingleApply(FullApplySite AI) {
   for (auto Op : PAI->getArguments()) {
     auto Arg = Op;
     // If there is new temporary for this argument, use it instead.
-    if (isa<AllocStackInst>(Arg)) {
-      if (ArgToTmp.count(Arg)) {
-        Op = ArgToTmp.lookup(Arg);
-      }
+    if (ArgToTmp.count(Arg)) {
+      Op = ArgToTmp.lookup(Arg);
     }
     Args.push_back(Op);
   }
@@ -305,7 +285,7 @@ bool PartialApplyCombiner::processSingleApply(FullApplySite AI) {
     SILValue Arg = PartialApplyArgs[i];
     if (!Arg->getType().isAddress()) {
       // Retain the argument as the callee may consume it.
-      Builder.emitRetainValueOperation(PAI->getLoc(), Arg);
+      Arg = Builder.emitCopyValueOperation(PAI->getLoc(), Arg);
       // For non consumed parameters (e.g. guaranteed), we also need to
       // insert releases after each apply instruction that we create.
       if (!ParamInfo[ParamInfo.size() - PartialApplyArgs.size() + i].
@@ -314,44 +294,43 @@ bool PartialApplyCombiner::processSingleApply(FullApplySite AI) {
     }
   }
 
-  auto *F = FRI->getReferencedFunction();
-  SILType FnType = F->getLoweredType();
-  SILType ResultTy = F->getLoweredFunctionType()->getSILResult();
+  auto Callee = PAI->getCallee();
+  auto FnType = PAI->getSubstCalleeSILType();
+  SILType ResultTy = PAI->getSubstCalleeType()->getSILResult();
   ArrayRef<Substitution> Subs = PAI->getSubstitutions();
-  if (!Subs.empty()) {
-    FnType = FnType.substGenericArgs(PAI->getModule(), Subs);
-    ResultTy = FnType.getAs<SILFunctionType>()->getSILResult();
-  }
+
+  // The partial_apply might be substituting in an open existential type.
+  Builder.addOpenedArchetypeOperands(PAI);
 
   FullApplySite NAI;
   if (auto *TAI = dyn_cast<TryApplyInst>(AI))
     NAI =
-      Builder.createTryApply(AI.getLoc(), FRI, FnType, Subs, Args,
+      Builder.createTryApply(AI.getLoc(), Callee, FnType, Subs, Args,
                               TAI->getNormalBB(), TAI->getErrorBB());
   else
     NAI =
-      Builder.createApply(AI.getLoc(), FRI, FnType, ResultTy, Subs, Args,
-                           cast<ApplyInst>(AI)->isNonThrowing());
+      Builder.createApply(AI.getLoc(), Callee, FnType, ResultTy, Subs, Args,
+                          cast<ApplyInst>(AI)->isNonThrowing());
 
   // We also need to release the partial_apply instruction itself because it
   // is consumed by the apply_instruction.
   if (auto *TAI = dyn_cast<TryApplyInst>(AI)) {
     Builder.setInsertionPoint(TAI->getNormalBB()->begin());
     for (auto Arg : ToBeReleasedArgs) {
-      Builder.emitReleaseValueOperation(PAI->getLoc(), Arg);
+      Builder.emitDestroyValueOperation(PAI->getLoc(), Arg);
     }
     Builder.createStrongRelease(AI.getLoc(), PAI, Atomicity::Atomic);
     Builder.setInsertionPoint(TAI->getErrorBB()->begin());
     // Release the non-consumed parameters.
     for (auto Arg : ToBeReleasedArgs) {
-      Builder.emitReleaseValueOperation(PAI->getLoc(), Arg);
+      Builder.emitDestroyValueOperation(PAI->getLoc(), Arg);
     }
     Builder.createStrongRelease(AI.getLoc(), PAI, Atomicity::Atomic);
     Builder.setInsertionPoint(AI.getInstruction());
   } else {
     // Release the non-consumed parameters.
     for (auto Arg : ToBeReleasedArgs) {
-      Builder.emitReleaseValueOperation(PAI->getLoc(), Arg);
+      Builder.emitDestroyValueOperation(PAI->getLoc(), Arg);
     }
     Builder.createStrongRelease(AI.getLoc(), PAI, Atomicity::Atomic);
   }
@@ -365,11 +344,11 @@ bool PartialApplyCombiner::processSingleApply(FullApplySite AI) {
 /// by iterating over all uses of the partial_apply and searching
 /// for the pattern to transform.
 SILInstruction *PartialApplyCombiner::combine() {
-  if (!canCombinePartialApply(PAI))
-    return nullptr;
-
-  // Only process partial apply if the callee is a known function.
-  FRI = dyn_cast<FunctionRefInst>(PAI->getCallee());
+  // We need to model @unowned_inner_pointer better before we can do the
+  // peephole here.
+  for (auto R : PAI->getSubstCalleeType()->getAllResults())
+    if (R.getConvention() == ResultConvention::UnownedInnerPointer)
+      return nullptr;
 
   // Iterate over all uses of the partial_apply
   // and look for applies that use it as a callee.
@@ -713,7 +692,7 @@ SILCombiner::createApplyWithConcreteType(FullApplySite AI,
     NewSubstCalleeType = SILType::getPrimitiveObjectType(SFT);
   } else {
     TypeSubstitutionMap TypeSubstitutions;
-    TypeSubstitutions[OpenedArchetype.getPointer()] = ConcreteType;
+    TypeSubstitutions[OpenedArchetype->castTo<ArchetypeType>()] = ConcreteType;
     NewSubstCalleeType = SubstCalleeType.subst(AI.getModule(),
                                                AI.getModule().getSwiftModule(),
                                                TypeSubstitutions);
@@ -893,12 +872,17 @@ SILCombiner::propagateConcreteTypeOfInitExistential(FullApplySite AI,
       return nullptr;
   }
 
-  // Obtain the protocol whose which should be used by the conformance.
+  // The lookup type is not an opened existential type,
+  // thus it cannot be made more concrete.
+  if (!WMI->getLookupType()->isOpenedExistential())
+    return nullptr;
+
+  // Obtain the protocol which should be used by the conformance.
   auto *PD = WMI->getLookupProtocol();
 
   // Propagate the concrete type into a callee-operand, which is a
   // witness_method instruction.
-  auto PropagateIntoOperand = [this, &WMI](CanType ConcreteType,
+  auto PropagateIntoOperand = [this, &WMI, &AI](CanType ConcreteType,
                                            ProtocolConformanceRef Conformance) {
     // Keep around the dependence on the open instruction unless we've
     // actually eliminated the use.
@@ -907,8 +891,15 @@ SILCombiner::propagateConcreteTypeOfInitExistential(FullApplySite AI,
                                                 Conformance, WMI->getMember(),
                                                 WMI->getType(),
                                                 WMI->isVolatile());
-    replaceInstUsesWith(*WMI, NewWMI);
-    eraseInstFromFunction(*WMI);
+    // Replace only uses of the witness_method in the apply that is going to
+    // be changed.
+    MutableArrayRef<Operand> Operands = AI.getInstruction()->getAllOperands();
+    for (auto &Op : Operands) {
+      if (Op.get() == WMI)
+         Op.set(NewWMI); 
+    }
+    if (WMI->use_empty())
+      eraseInstFromFunction(*WMI);
   };
 
   // Try to perform the propagation.
@@ -1220,9 +1211,9 @@ isTryApplyResultNotUsed(UserListTy &AcceptedUses, TryApplyInst *TAI) {
   }
 
   // Check if the normal and error results only have ARC operations as uses.
-  if (!recursivelyCollectARCUsers(AcceptedUses, NormalBB->getBBArg(0)))
+  if (!recursivelyCollectARCUsers(AcceptedUses, NormalBB->getArgument(0)))
     return false;
-  if (!recursivelyCollectARCUsers(AcceptedUses, ErrorBB->getBBArg(0)))
+  if (!recursivelyCollectARCUsers(AcceptedUses, ErrorBB->getArgument(0)))
     return false;
 
   SmallPtrSet<SILInstruction *, 8> UsesSet;
@@ -1270,8 +1261,8 @@ SILInstruction *SILCombiner::visitTryApplyInst(TryApplyInst *AI) {
                 SILType::getBuiltinIntegerType(1, Builder.getASTContext()), 0);
       Builder.createCondBranch(Loc, TrueLit, NormalBB, ErrorBB);
 
-      NormalBB->eraseBBArg(0);
-      ErrorBB->eraseBBArg(0);
+      NormalBB->eraseArgument(0);
+      ErrorBB->eraseArgument(0);
       return nullptr;
     }
     // We found a user that we can't handle.

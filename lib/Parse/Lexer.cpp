@@ -5,8 +5,8 @@
 // Copyright (c) 2014 - 2016 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
-// See http://swift.org/LICENSE.txt for license information
-// See http://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
+// See https://swift.org/LICENSE.txt for license information
+// See https://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
 //
 //===----------------------------------------------------------------------===//
 //
@@ -96,7 +96,9 @@ static unsigned CLO8(unsigned char C) {
 /// isStartOfUTF8Character - Return true if this isn't a UTF8 continuation
 /// character, which will be of the form 0b10XXXXXX
 static bool isStartOfUTF8Character(unsigned char C) {
-  return (signed char)C >= 0 || C >= 0xC0;  // C0 = 0b11000000
+  // RFC 2279: The octet values FE and FF never appear.
+  // RFC 3629: The octet values C0, C1, F5 to FF never appear.
+  return C <= 0x80 || (C >= 0xC2 && C < 0xF5);
 }
 
 /// validateUTF8CharacterAndAdvance - Given a pointer to the starting byte of a
@@ -117,11 +119,7 @@ static uint32_t validateUTF8CharacterAndAdvance(const char *&Ptr,
   
   // If this is 0b10XXXXXX, then it is a continuation character.
   if (EncodedBytes == 1 ||
-      // If the number of encoded bytes is > 4, then this is an invalid
-      // character in the range of 0xF5 and above.  These would start an
-      // encoding for something that couldn't be represented with UTF16
-      // digraphs, so Unicode rejects them.
-      EncodedBytes > 4) {
+      !isStartOfUTF8Character(CurByte)) {
     // Skip until we get the start of another character.  This is guaranteed to
     // at least stop at the nul at the end of the buffer.
     while (Ptr < End && !isStartOfUTF8Character(*Ptr))
@@ -474,7 +472,7 @@ static bool isValidIdentifierContinuationCodePoint(uint32_t c) {
 static bool isValidIdentifierStartCodePoint(uint32_t c) {
   if (!isValidIdentifierContinuationCodePoint(c))
     return false;
-  if (c < 0x80 && (isDigit(c) || c == '$'))
+  if (c < 0x80 && isDigit(c))
     return false;
 
   // N1518: Recommendations for extended identifier characters for C and C++
@@ -697,6 +695,17 @@ void Lexer::lexOperatorIdentifier() {
       break;
   } while (advanceIfValidContinuationOfOperator(CurPtr, BufferEnd));
 
+  if (CurPtr-TokStart > 2) {
+    // If there is a "//" or "/*" in the middle of an identifier token, 
+    // it starts a comment.
+    for (auto Ptr = TokStart+1; Ptr != CurPtr-1; ++Ptr) {
+      if (Ptr[0] == '/' && (Ptr[1] == '/' || Ptr[1] == '*')) {
+        CurPtr = Ptr;
+        break;
+      }
+    }
+  }
+
   // Decide between the binary, prefix, and postfix cases.
   // It's binary if either both sides are bound or both sides are not bound.
   // Otherwise, it's postfix if left-bound and prefix if right-bound.
@@ -771,27 +780,9 @@ void Lexer::lexOperatorIdentifier() {
       return formToken(tok::unknown, TokStart);
     }
   } else {
-    // If there is a "//" in the middle of an identifier token, it starts
-    // a single-line comment.
-    auto Pos = StringRef(TokStart, CurPtr-TokStart).find("//");
-    if (Pos != StringRef::npos) {
-      CurPtr = TokStart+Pos;
-      // Next token is a comment, which counts as whitespace.
-      rightBound = false;
-    }
-
-    // If there is a "/*" in the middle of an identifier token, it starts
-    // a multi-line comment.
-    Pos = StringRef(TokStart, CurPtr-TokStart).find("/*");
-    if (Pos != StringRef::npos) {
-      CurPtr = TokStart+Pos;
-      // Next token is a comment, which counts as whitespace.
-      rightBound = false;
-    }
-
     // Verify there is no "*/" in the middle of the identifier token, we reject
     // it as potentially ending a block comment.
-    Pos = StringRef(TokStart, CurPtr-TokStart).find("*/");
+    auto Pos = StringRef(TokStart, CurPtr-TokStart).find("*/");
     if (Pos != StringRef::npos) {
       diagnose(TokStart+Pos, diag::lex_unexpected_block_comment_end);
       return formToken(tok::unknown, TokStart);
@@ -826,10 +817,15 @@ void Lexer::lexDollarIdent() {
     }
   }
 
-  // It's always an error to see a standalone $
   if (CurPtr == tokStart + 1) {
-    diagnose(tokStart, diag::expected_dollar_numeric);
-    return formToken(tok::unknown, tokStart);
+    // It is always an error to see a standalone '$' when not in Swift 3
+    // compatibility mode.
+    if (!LangOpts.isSwiftVersion3()) {
+      // Offer to replace '$' with '`$`'.
+      diagnose(tokStart, diag::standalone_dollar_identifier)
+        .fixItReplaceChars(getSourceLoc(tokStart), getSourceLoc(CurPtr), "`$`");
+    }
+    return formToken(tok::identifier, tokStart);
   }
 
   // We reserve $nonNumeric for persistent bindings in the debugger.
@@ -1865,7 +1861,7 @@ static SourceLoc getLocForStartOfTokenInBuf(SourceManager &SM,
       if (Tok.is(tok::string_literal)) {
         assert(!InInterpolatedString);
         SmallVector<Lexer::StringSegment, 4> Segments;
-        Lexer::getStringLiteralSegments(Tok, Segments, /*Diags=*/0);
+        Lexer::getStringLiteralSegments(Tok, Segments, /*Diags=*/nullptr);
         for (auto &Seg : Segments) {
           unsigned SegOffs = SM.getLocOffsetInBuffer(Seg.Loc, BufferID);
           unsigned SegEnd = SegOffs+Seg.Length;
@@ -1901,6 +1897,15 @@ static const char *findStartOfLine(const char *bufStart, const char *current) {
   }
 
   return current;
+}
+
+SourceLoc Lexer::getLocForStartOfToken(SourceManager &SM, SourceLoc Loc) {
+  Optional<unsigned> BufferIdOp = SM.getIDForBufferIdentifier(SM.
+    getBufferIdentifierForLoc(Loc));
+  if (!BufferIdOp.hasValue())
+    return SourceLoc();
+  return getLocForStartOfToken(SM, BufferIdOp.getValue(),
+    SM.getLocOffsetInBuffer(Loc, BufferIdOp.getValue()));
 }
 
 SourceLoc Lexer::getLocForStartOfToken(SourceManager &SM, unsigned BufferID,

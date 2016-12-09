@@ -5,14 +5,15 @@
 // Copyright (c) 2014 - 2016 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
-// See http://swift.org/LICENSE.txt for license information
-// See http://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
+// See https://swift.org/LICENSE.txt for license information
+// See https://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
 //
 //===----------------------------------------------------------------------===//
 
 #include "swift/AST/AST.h"
 #include "swift/AST/ASTWalker.h"
 #include "swift/AST/SourceEntityWalker.h"
+#include "swift/Parse/Parser.h"
 #include "swift/Frontend/Frontend.h"
 #include "swift/Basic/SourceManager.h"
 #include "swift/IDE/Formatting.h"
@@ -26,6 +27,17 @@ namespace {
 struct SiblingAlignInfo {
   SourceLoc Loc;
   bool ExtraIndent;
+};
+
+struct TokenInfo {
+  const Token *StartOfLineTarget;
+  const Token *StartOfLineBeforeTarget;
+  TokenInfo(const Token *StartOfLineTarget,
+            const Token *StartOfLineBeforeTarget) :
+    StartOfLineTarget(StartOfLineTarget),
+    StartOfLineBeforeTarget(StartOfLineBeforeTarget) {}
+  TokenInfo() : TokenInfo(nullptr, nullptr) {}
+  operator bool() { return StartOfLineTarget && StartOfLineBeforeTarget; }
 };
 
 typedef llvm::SmallString<64> StringBuilder;
@@ -74,6 +86,14 @@ public:
 
   bool IsInCommentLine() {
     return InCommentLine;
+  }
+
+  bool isSwitchControlStmt(unsigned LineIndex, StringRef Text) {
+    if (!isSwitchContext())
+      return false;
+    StringRef LineText = swift::ide::getTrimmedTextForLine(LineIndex, Text);
+    return LineText.startswith("break") || LineText.startswith("continue") ||
+      LineText.startswith("return") || LineText.startswith("fallthrough");
   }
 
   void padToSiblingColumn(StringBuilder &Builder) {
@@ -236,9 +256,17 @@ public:
     return E->getEndLoc().isValid() && SM.getLineNumber(E->getEndLoc()) == Line;
   };
 
-  bool shouldAddIndentForLine(unsigned Line) {
+  bool shouldAddIndentForLine(unsigned Line, TokenInfo TInfo,
+                              const CodeFormatOptions &FmtOptions) {
     if (Cursor == Stack.rend())
       return false;
+
+    if (TInfo) {
+      if (TInfo.StartOfLineTarget->getKind() == tok::l_brace &&
+          isKeywordPossibleDeclStart(*TInfo.StartOfLineBeforeTarget) &&
+          TInfo.StartOfLineBeforeTarget->isKeyword())
+        return false;
+    }
 
     // Handle switch / case, indent unless at a case label.
     if (CaseStmt *Case = dyn_cast_or_null<CaseStmt>(Cursor->getAsStmt())) {
@@ -257,7 +285,7 @@ public:
       // case xyz: <-- No indent here, should be at same level as switch.
       Stmt *AtStmtStart = Start.getAsStmt();
       if (AtStmtStart && isa<CaseStmt>(AtStmtStart))
-        return false;
+        return FmtOptions.IndentSwitchCase;
 
       // If we're at the open brace of the switch, don't add an indent.
       // For example:
@@ -273,7 +301,7 @@ public:
           // // case comment <-- No indent here.
           // case 0:
           if (SM.getLineAndColumn(Case->swift::Stmt::getStartLoc()).first == Line + 1)
-            return false;
+            return FmtOptions.IndentSwitchCase;
         }
       }
     }
@@ -712,6 +740,10 @@ public:
                          InCommentLine, SCollector.getSiblingInfo());
   }
 
+  ArrayRef<Token> getTokens() {
+    return llvm::makeArrayRef(Tokens);
+  }
+
   bool walkToDeclPre(Decl *D, CharSourceRange Range) override {
     SourceLoc Start = D->getStartLoc();
     SourceLoc End = D->getEndLoc();
@@ -759,7 +791,7 @@ public:
 
   std::pair<LineRange, std::string> indent(unsigned LineIndex,
                                            FormatContext &FC,
-                                           StringRef Text) {
+                                           StringRef Text, TokenInfo ToInfo) {
 
     // If having sibling locs to align with, respect siblings.
     if (FC.HasSibling()) {
@@ -790,8 +822,18 @@ public:
       ExpandedIndent -= ExpandedIndent % Width;
     };
 
-    if (LineAndColumn.second > 0 && FC.shouldAddIndentForLine(LineIndex))
+    if (LineAndColumn.second > 0 &&
+        FC.shouldAddIndentForLine(LineIndex, ToInfo, FmtOptions))
       AddIndentFunc();
+
+    // Control statements in switch align with the rest of the block in case.
+    // For example:
+    // switch ... {
+    //   case xyz:
+    //     break <-- Extra indent level here.
+    if (FmtOptions.IndentSwitchCase && FC.isSwitchControlStmt(LineIndex, Text))
+      AddIndentFunc();
+
     if (FC.IsInDocCommentBlock()) {
 
       // Inside doc comment block, the indent is one space, e.g.
@@ -817,6 +859,40 @@ public:
 
 };
 
+class TokenInfoCollector {
+  SourceManager &SM;
+  ArrayRef<Token> Tokens;
+  unsigned Line;
+
+  struct Comparator {
+    SourceManager &SM;
+    Comparator(SourceManager &SM) : SM(SM) {}
+    bool operator()(const Token &T, unsigned Line) const {
+      return SM.getLineNumber(T.getLoc()) < Line;
+    }
+    bool operator()(unsigned Line, const Token &T) const {
+      return Line < SM.getLineNumber(T.getLoc());
+    }
+  };
+
+public:
+  TokenInfoCollector(SourceManager &SM, ArrayRef<Token> Tokens,
+         unsigned Line) : SM(SM), Tokens(Tokens), Line(Line) {}
+
+  TokenInfo collect() {
+    if (Line == 0)
+      return TokenInfo();
+    Comparator Comp(SM);
+    auto LineMatch = [this] (const Token* T, unsigned Line) {
+      return T != Tokens.end() && SM.getLineNumber(T->getLoc()) == Line;
+    };
+    auto TargetIt = std::lower_bound(Tokens.begin(), Tokens.end(), Line, Comp);
+    auto LineBefore = std::lower_bound(Tokens.begin(), TargetIt, Line - 1, Comp);
+    if (LineMatch(TargetIt, Line) && LineMatch(LineBefore, Line - 1))
+      return TokenInfo(TargetIt, LineBefore);
+    return TokenInfo();
+  }
+};
 } //anonymous namespace
 
 size_t swift::ide::getOffsetOfLine(unsigned LineIndex, StringRef Text) {
@@ -888,6 +964,8 @@ std::pair<LineRange, std::string> swift::ide::reformat(LineRange Range,
     .getAdvancedLoc(Offset);
   FormatContext FC = walker.walkToLocation(Loc);
   CodeFormatter CF(Options);
-  return CF.indent(Range.startLine(), FC, Text);
+  unsigned Line = Range.startLine();
+  return CF.indent(Line, FC, Text, TokenInfoCollector(SM, walker.getTokens(),
+                                                      Line).collect());
 }
 

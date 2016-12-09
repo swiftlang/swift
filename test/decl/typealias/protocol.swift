@@ -1,4 +1,4 @@
-// RUN: %target-parse-verify-swift
+// RUN: %target-typecheck-verify-swift
 
 // Tests for typealias inside protocols
 
@@ -110,7 +110,7 @@ protocol P2 {
     associatedtype B
 }
 
-func go3<T : P1, U : P2>(_ x: T) -> U where T.F == U.B { // expected-error {{typealias 'F' is too complex to be used as a generic constraint; use an associatedtype instead}} expected-error {{'F' is not a member type of 'T'}}
+func go3<T : P1, U : P2>(_ x: T) -> U where T.F == U.B {
 }
 
 // Specific diagnosis for things that look like Swift 2.x typealiases
@@ -179,3 +179,12 @@ struct S7 : P7 {
     _ = Y.self
   }
 }
+
+protocol P8 {
+  associatedtype B
+
+  @available(*, unavailable, renamed: "B")
+  typealias A = B // expected-note{{'A' has been explicitly marked unavailable here}}
+}
+
+func testP8<T: P8>(_: T) where T.A == Int { } // expected-error{{'A' has been renamed to 'B'}}{{34-35=B}}

@@ -6,8 +6,8 @@
 ## Copyright (c) 2014 - 2016 Apple Inc. and the Swift project authors
 ## Licensed under Apache License v2.0 with Runtime Library Exception
 ##
-## See http://swift.org/LICENSE.txt for license information
-## See http://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
+## See https://swift.org/LICENSE.txt for license information
+## See https://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
 #
 #===------------------------------------------------------------------------===#
 
@@ -54,6 +54,7 @@ KNOWN_SETTINGS=(
     lldb-extra-xcodebuild-args  ""               "extra command line args to pass to lldb xcodebuild"
     lldb-test-cc                ""               "CC to use for building LLDB testsuite test inferiors.  Defaults to just-built, in-tree clang.  If set to 'host-toolchain', sets it to same as host-cc."
     lldb-test-with-curses       ""               "run test lldb test runner using curses terminal control"
+    lldb-test-swift-only        ""               "when running lldb tests, only include Swift-specific tests"
     lldb-no-debugserver         ""               "delete debugserver after building it, and don't try to codesign it"
     lldb-use-system-debugserver ""               "don't try to codesign debugserver, and use the system's debugserver instead"
     llvm-build-type             "Debug"          "the CMake build variant for LLVM and Clang (Debug, RelWithDebInfo, Release, MinSizeRel).  Defaults to Debug."
@@ -73,6 +74,7 @@ KNOWN_SETTINGS=(
     llbuild-build-type          "Debug"          "the CMake build variant for llbuild"
     foundation-build-type       "Debug"          "the build variant for Foundation"
     libdispatch-build-type      "Debug"          "the build variant for libdispatch"
+    libicu-build-type           "Debug"          "the build variant for libicu"
     playgroundlogger-build-type "Debug"          "the build variant for PlaygroundLogger"
     playgroundsupport-build-type "Debug"         "the build variant for PlaygroundSupport"
     xctest-build-type           "Debug"          "the build variant for xctest"
@@ -81,7 +83,7 @@ KNOWN_SETTINGS=(
     cmake                       ""               "path to the cmake binary"
     distcc                      ""               "use distcc in pump mode"
     distcc-pump                 ""               "the path to distcc pump executable. This argument is required if distcc is set."
-    build-runtime-with-host-compiler   "1"       "use the host c++ compiler to build everything"
+    build-runtime-with-host-compiler   ""        "use the host c++ compiler to build everything"
     cmake-generator             "Unix Makefiles" "kind of build system to generate; see output of 'cmake --help' for choices"
     verbose-build               ""               "print the commands executed during the build"
     install-prefix              ""               "installation prefix"
@@ -116,6 +118,7 @@ KNOWN_SETTINGS=(
     skip-build-xctest           ""               "set to skip building xctest"
     skip-build-foundation       ""               "set to skip building foundation"
     skip-build-libdispatch      ""               "set to skip building libdispatch"
+    skip-build-libicu           ""               "set to skip building libicu"
     skip-build-benchmarks       ""               "set to skip building Swift Benchmark Suite"
     skip-build-playgroundlogger ""               "set to skip building PlaygroundLogger"
     skip-build-playgroundsupport ""              "set to skip building PlaygroundSupport"
@@ -127,6 +130,7 @@ KNOWN_SETTINGS=(
     skip-test-xctest            ""               "set to skip testing xctest"
     skip-test-foundation        ""               "set to skip testing foundation"
     skip-test-libdispatch       ""               "set to skip testing libdispatch"
+    skip-test-libicu            ""               "set to skip testing libicu"
     skip-test-playgroundlogger  ""               "set to skip testing PlaygroundLogger"
     skip-test-playgroundsupport ""               "set to skip testing PlaygroundSupport"
     skip-test-linux             ""               "set to skip testing Swift stdlibs for Linux"
@@ -166,7 +170,7 @@ KNOWN_SETTINGS=(
     native-swift-tools-path     ""               "directory that contains Swift tools that are executable on the build machine"
     compiler-vendor             "none"           "compiler vendor name [none,apple]"
     clang-user-visible-version  "3.8.0"          "user-visible version of the embedded Clang and LLVM compilers"
-    swift-user-visible-version  "3.0"            "user-visible version of the Swift language"
+    swift-user-visible-version  "3.1"            "user-visible version of the Swift language"
     swift-compiler-version      ""               "string that indicates a compiler version for Swift"
     clang-compiler-version      ""               "string that indicates a compiler version for Clang"
     embed-bitcode-section       "0"              "embed an LLVM bitcode section in stdlib/overlay binaries for supported platforms"
@@ -180,6 +184,7 @@ KNOWN_SETTINGS=(
     install-xctest              ""               "whether to install xctest"
     install-foundation          ""               "whether to install foundation"
     install-libdispatch         ""               "whether to install libdispatch"
+    install-libicu              ""               "whether to install libicu"
     install-playgroundlogger    ""               "whether to install PlaygroundLogger"
     install-playgroundsupport   ""               "whether to install PlaygroundSupport"
     darwin-install-extract-symbols ""            "whether to extract symbols with dsymutil during installations"
@@ -208,6 +213,7 @@ KNOWN_SETTINGS=(
     darwin-toolchain-application-cert  ""        "Application Cert name to codesign xctoolchain"
     darwin-toolchain-installer-cert    ""        "Installer Cert name to create installer pkg"
     darwin-toolchain-installer-package ""        "The path to installer pkg"
+    darwin-sdk-deployment-targets      ""        "semicolon-separated list of triples like 'fookit-ios-9.0;barkit-watchos-9.0'"
     build-jobs                         ""        "The number of parallel build jobs to use"
     darwin-toolchain-alias             ""        "Swift alias for toolchain"
     android-ndk                        ""        "An absolute path to the NDK that will be used as a libc implementation for Android builds"
@@ -224,6 +230,7 @@ KNOWN_SETTINGS=(
     ninja-cmake-options                ""        "CMake options used for all ninja targets"
     foundation-cmake-options           ""        "CMake options used for all foundation targets"
     libdispatch-cmake-options          ""        "CMake options used for all libdispatch targets"
+    libicu-cmake-options               ""        "CMake options used for all libicu targets"
     llbuild-cmake-options              ""        "CMake options used for all llbuild targets"
     lldb-cmake-options                 ""        "CMake options used for all lldb targets"
     llvm-cmake-options                 ""        "CMake options used for all llvm targets"
@@ -237,8 +244,10 @@ KNOWN_SETTINGS=(
     user-config-args            ""               "**Renamed to --extra-cmake-options**: User-supplied arguments to cmake when used to do configuration."
     only-execute                       "all"     "Only execute the named action (see implementation)"
     llvm-lit-args                      ""        "If set, override the lit args passed to LLVM"
+    clang-profile-instr-use            ""        "If set, profile file to use for clang PGO"
     coverage-db                        ""        "If set, coverage database to use when prioritizing testing"
     build-toolchain-only               ""        "If set, only build the necessary tools to build an external toolchain"
+    skip-local-host-install            ""        "If we are cross-compiling multiple targets, skip an install pass locally if the hosts match"
 )
 
 # Centralized access point for traced command invocation.
@@ -322,6 +331,17 @@ function is_llvm_lto_enabled() {
 function is_swift_lto_enabled() {
     if [[ "${SWIFT_TOOLS_ENABLE_LTO}" == "thin" ]] ||
        [[ "${SWIFT_TOOLS_ENABLE_LTO}" == "full" ]]; then
+        echo "TRUE"
+    else
+        echo "FALSE"
+    fi
+}
+
+# Enable module-builds of llvm only when asan is disabled.
+# FIXME: rdar://problem/28356072
+function is_llvm_module_build_enabled() {
+    if [[ "$(true_false ${LLVM_ENABLE_MODULES})" == "TRUE" ]] &&
+       [[ "$(true_false ${ENABLE_ASAN})" == "FALSE" ]]; then
         echo "TRUE"
     else
         echo "FALSE"
@@ -418,12 +438,12 @@ function set_build_options_for_host() {
                     ;;
                 linux-armv6)
                     SWIFT_HOST_VARIANT_ARCH="armv6"
-                    SWIFT_HOST_TRIPLE="armv6-linux-gnueabihf"
+                    SWIFT_HOST_TRIPLE="armv6-unknown-linux-gnueabihf"
                     llvm_target_arch="ARM"
                     ;;
                 linux-armv7)
                     SWIFT_HOST_VARIANT_ARCH="armv7"
-                    SWIFT_HOST_TRIPLE="armv7-linux-gnueabihf"
+                    SWIFT_HOST_TRIPLE="armv7-unknown-linux-gnueabihf"
                     llvm_target_arch="ARM"
                     ;;
                 linux-aarch64)
@@ -628,6 +648,18 @@ function set_build_options_for_host() {
                     ;;
             esac
 
+            if [[ "${DARWIN_SDK_DEPLOYMENT_TARGETS}" != "" ]]; then
+                local IFS=";"; DARWIN_SDK_DEPLOYMENT_TARGETS=($DARWIN_SDK_DEPLOYMENT_TARGETS)
+
+                for target in "${DARWIN_SDK_DEPLOYMENT_TARGETS[@]}"; do
+                    local IFS="-"; triple=($target)
+                    sdk_target=$(toupper ${triple[0]}_${triple[1]})
+                    swift_cmake_options+=(
+                        "-DSWIFTLIB_DEPLOYMENT_VERSION_${sdk_target}=${triple[2]}"
+                    )
+                done
+            fi
+
             llvm_cmake_options=(
                 -DCMAKE_OSX_DEPLOYMENT_TARGET:STRING="${cmake_osx_deployment_target}"
                 -DCMAKE_OSX_SYSROOT:PATH="$(xcrun --sdk ${xcrun_sdk_name} --show-sdk-path)"
@@ -636,7 +668,7 @@ function set_build_options_for_host() {
                 -DCOMPILER_RT_ENABLE_WATCHOS:BOOL=FALSE
                 -DCOMPILER_RT_ENABLE_TVOS:BOOL=FALSE
                 -DSANITIZER_MIN_OSX_VERSION="${cmake_osx_deployment_target}"
-                -DLLVM_ENABLE_MODULES:BOOL="$(true_false ${LLVM_ENABLE_MODULES})"
+                -DLLVM_ENABLE_MODULES:BOOL="$(is_llvm_module_build_enabled)"
             )
             if [[ $(is_llvm_lto_enabled) == "TRUE" ]]; then
                 if [[ $(cmake_needs_to_specify_standard_computed_defaults) == "TRUE" ]]; then
@@ -659,7 +691,12 @@ function set_build_options_for_host() {
                     )
                 fi
 
+                llvm_cmake_options+=(
+                    -DLLVM_ENABLE_MODULE_DEBUGGING:BOOL=NO
+                )
+
                 swift_cmake_options+=(
+                    -DLLVM_ENABLE_MODULE_DEBUGGING:BOOL=NO
                     "-DSWIFT_PARALLEL_LINK_JOBS=${SWIFT_TOOLS_NUM_PARALLEL_LTO_LINK_JOBS}"
                 )
             fi
@@ -729,6 +766,12 @@ function set_build_options_for_host() {
         )
     fi
 
+    if [[ "${CLANG_PROFILE_INSTR_USE}" ]]; then
+        llvm_cmake_options+=(
+            -DLLVM_PROFDATA_FILE="${CLANG_PROFILE_INSTR_USE}"
+        )
+    fi
+
     swift_cmake_options+=(
         -DCOVERAGE_DB="${COVERAGE_DB}"
     )
@@ -760,7 +803,7 @@ function configure_default_options() {
         local default_value="${KNOWN_SETTINGS[$((i+1))]}"
 
         # Find the variable name in our lookup table.
-        local varname="${known_setting_varnames[$((i/3))]]}"
+        local varname="${known_setting_varnames[$((i/3))]}"
 
         # Establish the associative array mapping.
         eval "${setting//-/_}_VARNAME=${varname}"
@@ -1157,6 +1200,7 @@ SWIFTPM_SOURCE_DIR="${WORKSPACE}/swiftpm"
 XCTEST_SOURCE_DIR="${WORKSPACE}/swift-corelibs-xctest"
 FOUNDATION_SOURCE_DIR="${WORKSPACE}/swift-corelibs-foundation"
 LIBDISPATCH_SOURCE_DIR="${WORKSPACE}/swift-corelibs-libdispatch"
+LIBICU_SOURCE_DIR="${WORKSPACE}/icu"
 PLAYGROUNDLOGGER_SOURCE_DIR="${WORKSPACE}/swift-xcode-playground-support/PlaygroundLogger"
 PLAYGROUNDSUPPORT_SOURCE_DIR="${WORKSPACE}/swift-xcode-playground-support/PlaygroundSupport"
 
@@ -1187,6 +1231,11 @@ fi
 
 if [[ ! "${SKIP_BUILD_LIBDISPATCH}" && ! -d ${LIBDISPATCH_SOURCE_DIR} ]]; then
     echo "Couldn't find libdispatch source directory."
+    exit 1
+fi
+
+if [[ ! "${SKIP_BUILD_LIBICU}" && ! -d ${LIBICU_SOURCE_DIR} ]]; then
+    echo "Couldn't find libicu source directory."
     exit 1
 fi
 
@@ -1221,7 +1270,11 @@ if [ -e "${WORKSPACE}/compiler-rt" ] ; then
     fi
 fi
 
-PRODUCTS=(cmark llvm swift)
+PRODUCTS=(cmark llvm)
+if [[ ! "${SKIP_BUILD_LIBICU}" ]] ; then
+     PRODUCTS=("${PRODUCTS[@]}" libicu)
+fi
+PRODUCTS=("${PRODUCTS[@]}" swift)
 if [[ ! "${SKIP_BUILD_LLDB}" ]] ; then
      PRODUCTS=("${PRODUCTS[@]}" lldb)
 fi
@@ -1250,6 +1303,18 @@ fi
 if [[ ! "${SKIP_BUILD_SWIFTPM}" ]] ; then
      PRODUCTS=("${PRODUCTS[@]}" swiftpm)
 fi
+
+# Checks if a given product is enabled (i.e. part of $PRODUCTS array)
+function contains_product() {
+  local current_product
+  for current_product in "${PRODUCTS[@]}"; do
+    if [[ "$current_product" == "$1" ]]; then
+      return 0
+    fi
+  done
+  return 1
+}
+
 
 # get_host_specific_variable(host, name)
 #
@@ -1461,6 +1526,24 @@ eval COMMON_CMAKE_OPTIONS=(${COMMON_CMAKE_OPTIONS})
 eval EXTRA_CMAKE_OPTIONS=(${EXTRA_CMAKE_OPTIONS})
 eval BUILD_ARGS=(${BUILD_ARGS})
 
+if [[ -n "${DISTCC}" ]]; then
+    if [[ "$(uname -s)" == "Darwin" ]] ; then
+        # These are normally deduced by CMake, but when the compiler is set to
+        # distcc which is installed elsewhere, we need to set them explicitly.
+        COMMON_CMAKE_OPTIONS=(
+            "${COMMON_CMAKE_OPTIONS[@]}" "-DCMAKE_AR=$(xcrun_find_tool ar)"
+            "-DCMAKE_LINKER=$(xcrun_find_tool ld)"
+            "-DCMAKE_NM=$(xcrun_find_tool nm)"
+            "-DCMAKE_OBJDUMP=$(xcrun_find_tool objdump)"
+            "-DCMAKE_RANLIB=$(xcrun_find_tool ranlib)"
+            "-DCMAKE_STRIP=$(xcrun_find_tool strip)"
+        )
+    fi
+fi
+
+eval CMAKE_BUILD=("${DISTCC_PUMP}" "${CMAKE}" "--build")
+
+
 if [[ "${CMAKE_GENERATOR}" == "Xcode" ]]; then
     BUILD_TARGET_FLAG="-target"
 fi
@@ -1503,6 +1586,8 @@ function build_directory_bin() {
             libdispatch)
                 echo "${root}/${LIBDISPATCH_BUILD_TYPE}/bin"
                 ;;
+            libicu)
+                ;;
             playgroundlogger)
                 # FIXME: var name for build type
                 echo "${root}/${PLAYGROUNDLOGGER_BUILD_TYPE}/bin"
@@ -1522,6 +1607,12 @@ function build_directory_bin() {
 
 function is_cmake_release_build_type() {
     if [[ "$1" == "Release" || "$1" == "RelWithDebInfo" ]] ; then
+        echo 1
+    fi
+}
+
+function is_cmake_debuginfo_build_type() {
+    if [[ "$1" == "Debug" || "$1" == "RelWithDebInfo" ]] ; then
         echo 1
     fi
 }
@@ -1568,8 +1659,12 @@ function llvm_c_flags() {
     if [[ $(is_cmake_release_build_type "${LLVM_BUILD_TYPE}") ]] ; then
         echo -n " -fno-stack-protector"
     fi
-    if [[ $(is_llvm_lto_enabled) == "TRUE" ]] ; then
-        echo -n " -gline-tables-only"
+    if [[ $(is_cmake_debuginfo_build_type "${LLVM_BUILD_TYPE}") ]] ; then
+        if [[ $(is_llvm_lto_enabled) == "TRUE" ]] ; then
+            echo -n " -gline-tables-only"
+        else
+            echo -n " -g"
+        fi
     fi
 }
 
@@ -1621,6 +1716,8 @@ function cmake_config_opt() {
                 ;;            
             libdispatch)
                 ;;
+            libicu)
+                ;;
             playgroundlogger)
                 # FIXME: var name
                 echo "--config ${PLAYGROUNDLOGGER_BUILD_TYPE}"
@@ -1644,6 +1741,9 @@ function set_swiftpm_bootstrap_command() {
         if [[ ! "${SKIP_BUILD_LIBDISPATCH}" ]] ; then
             LIBDISPATCH_BUILD_DIR="$(build_directory ${host} libdispatch)"
             LIBDISPATCH_BUILD_ARGS="--libdispatch-source-dir=${LIBDISPATCH_SOURCE_DIR} --libdispatch-build-dir=${LIBDISPATCH_BUILD_DIR}"
+        fi
+        if [[ ! "${SKIP_BUILD_LIBICU}" ]] ; then
+            LIBICU_BUILD_DIR="$(build_directory ${host} libicu)"
         fi
         if [[ ! "${SKIP_BUILD_XCTEST}" ]] ; then
             XCTEST_BUILD_DIR=$(build_directory ${host} xctest)
@@ -1675,6 +1775,43 @@ function set_swiftpm_bootstrap_command() {
             swiftpm_bootstrap_command+=(
                 --xctest="${XCTEST_BUILD_DIR}")
         fi
+    fi
+}
+
+# Construct the appropriate options to pass to an Xcode
+# build of any LLDB target.
+function set_lldb_xcodebuild_options() {
+    llvm_build_dir=$(build_directory ${host} llvm)
+    cmark_build_dir=$(build_directory ${host} cmark)
+    lldb_build_dir=$(build_directory ${host} lldb)
+    swift_build_dir=$(build_directory ${host} swift)
+
+    lldb_xcodebuild_options=(
+        LLDB_PATH_TO_LLVM_SOURCE="${LLVM_SOURCE_DIR}"
+        LLDB_PATH_TO_CLANG_SOURCE="${CLANG_SOURCE_DIR}"
+        LLDB_PATH_TO_SWIFT_SOURCE="${SWIFT_SOURCE_DIR}"
+        LLDB_PATH_TO_LLVM_BUILD="${llvm_build_dir}"
+        LLDB_PATH_TO_CLANG_BUILD="${llvm_build_dir}"
+        LLDB_PATH_TO_SWIFT_BUILD="${swift_build_dir}"
+        LLDB_PATH_TO_CMARK_BUILD="${cmark_build_dir}"
+        LLDB_IS_BUILDBOT_BUILD="${LLDB_IS_BUILDBOT_BUILD}"
+        LLDB_BUILD_DATE="\"${LLDB_BUILD_DATE}\""
+        SYMROOT="${lldb_build_dir}"
+        OBJROOT="${lldb_build_dir}"
+        ${LLDB_EXTRA_XCODEBUILD_ARGS}
+    )
+    if [[ "${LLDB_NO_DEBUGSERVER}" ]] ; then
+        lldb_xcodebuild_options=(
+            "${lldb_xcodebuild_options[@]}"
+            DEBUGSERVER_DISABLE_CODESIGN="1"
+            DEBUGSERVER_DELETE_AFTER_BUILD="1"
+        )
+    fi
+    if [[ "${LLDB_USE_SYSTEM_DEBUGSERVER}" ]] ; then
+        lldb_xcodebuild_options=(
+            "${lldb_xcodebuild_options[@]}"
+            DEBUGSERVER_USE_FROM_SYSTEM="1"
+        )
     fi
 }
 
@@ -1852,6 +1989,8 @@ for host in "${ALL_HOSTS[@]}"; do
                     "${cmake_options[@]}"
                     -DCMAKE_C_FLAGS="$(llvm_c_flags ${host})"
                     -DCMAKE_CXX_FLAGS="$(llvm_c_flags ${host})"
+                    -DCMAKE_C_FLAGS_RELWITHDEBINFO="-O2 -DNDEBUG"
+                    -DCMAKE_CXX_FLAGS_RELWITHDEBINFO="-O2 -DNDEBUG"
                     -DCMAKE_BUILD_TYPE:STRING="${LLVM_BUILD_TYPE}"
                     -DLLVM_TOOL_SWIFT_BUILD:BOOL=NO
                     -DLLVM_INCLUDE_DOCS:BOOL=TRUE
@@ -1965,6 +2104,8 @@ for host in "${ALL_HOSTS[@]}"; do
                     "${cmake_options[@]}"
                     -DCMAKE_C_FLAGS="$(swift_c_flags ${host})"
                     -DCMAKE_CXX_FLAGS="$(swift_c_flags ${host})"
+                    -DCMAKE_C_FLAGS_RELWITHDEBINFO="-O2 -DNDEBUG"
+                    -DCMAKE_CXX_FLAGS_RELWITHDEBINFO="-O2 -DNDEBUG"
                     -DCMAKE_BUILD_TYPE:STRING="${SWIFT_BUILD_TYPE}"
                     -DLLVM_ENABLE_ASSERTIONS:BOOL=$(true_false "${SWIFT_ENABLE_ASSERTIONS}")
                     -DSWIFT_ANALYZE_CODE_COVERAGE:STRING=$(toupper "${SWIFT_ANALYZE_CODE_COVERAGE}")
@@ -2024,6 +2165,14 @@ for host in "${ALL_HOSTS[@]}"; do
                     -DSWIFT_PATH_TO_LIBDISPATCH_BUILD:PATH="$(build_directory ${host} libdispatch)"
                 )
 
+                if [[ ! "${SKIP_BUILD_LIBICU}" ]] ; then
+                    cmake_options=(
+                        "${cmake_options[@]}"
+                        -DSWIFT_PATH_TO_LIBICU_SOURCE:PATH="${LIBICU_SOURCE_DIR}"
+                        -DSWIFT_PATH_TO_LIBICU_BUILD:PATH="$(build_directory ${host} libicu)"
+                    )
+                fi
+
                 if [[ "${CMAKE_GENERATOR}" == "Xcode" ]] ; then
                     cmake_options=(
                         "${cmake_options[@]}"
@@ -2047,6 +2196,15 @@ for host in "${ALL_HOSTS[@]}"; do
                         "${cmake_options[@]}"
                         -DSWIFT_PRIMARY_VARIANT_SDK:STRING="${SWIFT_PRIMARY_VARIANT_SDK}"
                         -DSWIFT_PRIMARY_VARIANT_ARCH:STRING="${SWIFT_PRIMARY_VARIANT_ARCH}"
+                    )
+                fi
+
+                if contains_product "lldb" ; then
+                    lldb_build_dir=$(build_directory ${host} lldb)
+                    cmake_options=(
+                        "${cmake_options[@]}"
+                        -DLLDB_ENABLE:BOOL=TRUE
+                        -DLLDB_BUILD_DIR:STRING="${lldb_build_dir}"
                     )
                 fi
 
@@ -2158,33 +2316,7 @@ for host in "${ALL_HOSTS[@]}"; do
                         ;;
                     macosx-*)
                         # Set up flags to pass to xcodebuild
-                        lldb_xcodebuild_options=(
-                            LLDB_PATH_TO_LLVM_SOURCE="${LLVM_SOURCE_DIR}"
-                            LLDB_PATH_TO_CLANG_SOURCE="${CLANG_SOURCE_DIR}"
-                            LLDB_PATH_TO_SWIFT_SOURCE="${SWIFT_SOURCE_DIR}"
-                            LLDB_PATH_TO_LLVM_BUILD="${llvm_build_dir}"
-                            LLDB_PATH_TO_CLANG_BUILD="${llvm_build_dir}"
-                            LLDB_PATH_TO_SWIFT_BUILD="${swift_build_dir}"
-                            LLDB_PATH_TO_CMARK_BUILD="${cmark_build_dir}"
-                            LLDB_IS_BUILDBOT_BUILD="${LLDB_IS_BUILDBOT_BUILD}"
-                            LLDB_BUILD_DATE="\"${LLDB_BUILD_DATE}\""
-                            SYMROOT="${lldb_build_dir}"
-                            OBJROOT="${lldb_build_dir}"
-                            ${LLDB_EXTRA_XCODEBUILD_ARGS}
-                        )
-                        if [[ "${LLDB_NO_DEBUGSERVER}" ]] ; then
-                            lldb_xcodebuild_options=(
-                                "${lldb_xcodebuild_options[@]}"
-                                DEBUGSERVER_DISABLE_CODESIGN="1"
-                                DEBUGSERVER_DELETE_AFTER_BUILD="1"
-                            )
-                        fi
-                        if [[ "${LLDB_USE_SYSTEM_DEBUGSERVER}" ]] ; then
-                            lldb_xcodebuild_options=(
-                                "${lldb_xcodebuild_options[@]}"
-                                DEBUGSERVER_USE_FROM_SYSTEM="1"
-                            )
-                        fi
+                        set_lldb_xcodebuild_options
                         set_lldb_build_mode
                         with_pushd ${source_dir} \
                             call xcodebuild -target desktop -configuration ${LLDB_BUILD_MODE} ${lldb_xcodebuild_options[@]}
@@ -2331,6 +2463,58 @@ for host in "${ALL_HOSTS[@]}"; do
                 # libdispatch builds itself and doesn't use cmake
                 continue
                 ;;
+            libicu)
+                SWIFT_BUILD_PATH=$(build_directory ${host} swift)
+                LIBICU_BUILD_DIR=$(build_directory ${host} ${product})
+                ICU_TMPINSTALL=$LIBICU_BUILD_DIR/tmp_install
+                ICU_TMPLIBDIR="${SWIFT_BUILD_PATH}/lib/swift/${SWIFT_HOST_VARIANT}/${SWIFT_HOST_VARIANT_ARCH}"
+                if [[ "${RECONFIGURE}" || ! -f "${LIBICU_BUILD_DIR}"/config.status ]]; then
+                    echo "Reconfiguring libicu"
+                    if [[ "$LIBICU_BUILD_TYPE" == "Release" ]] ; then
+                        icu_build_variant_arg="--enable-release"
+                    elif [[ "$LIBICU_BUILD_TYPE" == "RelWithDebInfo" ]]; then
+                        icu_build_variant_arg="--enable-release"
+                    else
+                        icu_build_variant_arg="--enable-debug"
+                    fi
+                    call mkdir -p "${LIBICU_BUILD_DIR}"
+                    with_pushd "${LIBICU_BUILD_DIR}" \
+                        call "${LIBICU_SOURCE_DIR}"/source/configure \
+                        ${icu_build_variant_arg} --prefix=${ICU_TMPINSTALL} \
+                        --libdir=${ICU_TMPLIBDIR} \
+                        --enable-shared --enable-static \
+                        --enable-strict --disable-icuio \
+                        --disable-plugins --disable-dyload --disable-extras \
+                        --disable-samples --with-data-packaging=auto
+                else
+                    echo "Skipping reconfiguration of libicu"
+                fi
+                with_pushd "${LIBICU_BUILD_DIR}" \
+                    call make install
+                ICU_LIBDIR="$(build_directory ${host} swift)/lib/swift/${SWIFT_HOST_VARIANT}/${SWIFT_HOST_VARIANT_ARCH}"
+                ICU_LIBDIR_STATIC="$(build_directory ${host} swift)/lib/swift_static/${SWIFT_HOST_VARIANT}"
+                ICU_LIBDIR_STATIC_ARCH="$(build_directory ${host} swift)/lib/swift_static/${SWIFT_HOST_VARIANT}/${SWIFT_HOST_VARIANT_ARCH}"
+                mkdir -p "${ICU_LIBDIR_STATIC_ARCH}"
+                # Copy the static libs into the swift_static directory
+                for l in uc i18n data
+                do
+                    lib="${ICU_LIBDIR}/libicu${l}.a"
+                    cp "${lib}" "${ICU_LIBDIR_STATIC}"
+                    cp "${lib}" "${ICU_LIBDIR_STATIC_ARCH}"
+                done
+
+                # Set the PKG_CONFIG_PATH so that core-foundation can find the libraries and
+                # header files
+                export PKG_CONFIG_PATH="${ICU_TMPLIBDIR}/pkgconfig"
+                swift_cmake_options=(
+                    "${swift_cmake_options[@]}"
+                    -DSWIFT_${SWIFT_HOST_VARIANT_SDK}_ICU_UC_INCLUDE:STRING="${ICU_TMPINSTALL}/include"
+                    -DSWIFT_${SWIFT_HOST_VARIANT_SDK}_ICU_I18N_INCLUDE:STRING="${ICU_TMPINSTALL}/include"
+                    -DSWIFT_${SWIFT_HOST_VARIANT_SDK}_ICU_STATICLIB:BOOL=TRUE
+                )
+                # libicu builds itself and doesn't use cmake
+                continue
+                ;;
             playgroundlogger)
                 PLAYGROUNDLOGGER_BUILD_DIR=$(build_directory ${host} ${product})
                 SWIFTC_BIN="$(build_directory_bin ${host} swift)/swiftc"
@@ -2360,10 +2544,6 @@ for host in "${ALL_HOSTS[@]}"; do
                 exit 1
                 ;;
         esac
-
-        # Clean the product-local module cache.
-        call rm -rf "${module_cache}"
-        call mkdir -p "${module_cache}"
 
         # Compute the generator output file to check for, to determine if we
         # must reconfigure. We only handle Ninja for now.
@@ -2420,10 +2600,10 @@ for host in "${ALL_HOSTS[@]}"; do
 
                 # Xcode can't restart itself if it turns out we need to reconfigure.
                 # Do an advance build to handle that.
-                call ${DISTCC_PUMP} "${CMAKE}" --build "${build_dir}" $(cmake_config_opt ${product})
+                call "${CMAKE_BUILD[@]}" "${build_dir}" $(cmake_config_opt ${product})
             fi
 
-            call ${DISTCC_PUMP} "${CMAKE}" --build "${build_dir}" $(cmake_config_opt ${product}) -- "${BUILD_ARGS[@]}" ${build_targets[@]}
+            call "${CMAKE_BUILD[@]}" "${build_dir}" $(cmake_config_opt ${product}) -- "${BUILD_ARGS[@]}" ${build_targets[@]}
         fi
     done
 done
@@ -2495,6 +2675,24 @@ for host in "${ALL_HOSTS[@]}"; do
                     continue
                 fi
                 lldb_build_dir=$(build_directory ${host} lldb)
+
+                # Run the gtests.
+                if [[ "$(uname -s)" == "Darwin" ]] ; then
+                    set_lldb_xcodebuild_options
+                    # Run the LLDB unittests (gtests).
+                    with_pushd ${LLDB_SOURCE_DIR} \
+                               call xcodebuild -scheme lldb-gtest -configuration ${LLDB_BUILD_MODE} ${lldb_xcodebuild_options[@]}
+                    rc=$?
+                    if [[ "$rc" -ne 0 ]] ; then
+                        >&2 echo "error: LLDB gtests failed"
+                        exit 1
+                    fi
+                else
+                    # FIXME run the gtests on other platforms.
+                    # There should be a CMake target for this already.
+                    echo Run LLDB gtests here.
+                fi
+
                 swift_build_dir=$(build_directory ${host} swift)
                 # Setup lldb executable path
                 if [[ "$(uname -s)" == "Darwin" ]] ; then
@@ -2526,6 +2724,13 @@ for host in "${ALL_HOSTS[@]}"; do
                     fi
                 fi
 
+                # Handle test subdirectory clause
+                if [[ "${LLDB_TEST_SWIFT_ONLY}" ]]; then
+                    LLDB_TEST_SUBDIR_CLAUSE="--test-subdir lang/swift"
+                else
+                    LLDB_TEST_SUBDIR_CLAUSE=""
+                fi
+
                 # figure out which C/C++ compiler we should use for building test inferiors.
                 if [[ "${LLDB_TEST_CC}" == "host-toolchain" ]]; then
                     # Use the host toolchain: i.e. the toolchain specified by HOST_CC
@@ -2540,7 +2745,14 @@ for host in "${ALL_HOSTS[@]}"; do
                 
                 call mkdir -p "${results_dir}"
                 with_pushd "${results_dir}" \
-                    call env SWIFTCC="$(build_directory $LOCAL_HOST swift)/bin/swiftc" SWIFTLIBS="${swift_build_dir}/lib/swift" "${LLDB_SOURCE_DIR}"/test/dotest.py --executable "${lldb_executable}" --rerun-all-issues ${LLDB_DOTEST_CC_OPTS} ${LLDB_FORMATTER_OPTS}
+                           call env SWIFTCC="$(build_directory $LOCAL_HOST swift)/bin/swiftc" \
+                           SWIFTLIBS="${swift_build_dir}/lib/swift" \
+                           "${LLDB_SOURCE_DIR}"/test/dotest.py \
+                           --executable "${lldb_executable}" \
+                           --rerun-all-issues \
+                           ${LLDB_TEST_SUBDIR_CLAUSE} \
+                           ${LLDB_DOTEST_CC_OPTS} \
+                           ${LLDB_FORMATTER_OPTS}
                 continue
                 ;;
             llbuild)
@@ -2624,6 +2836,17 @@ for host in "${ALL_HOSTS[@]}"; do
                 echo "--- Finished tests for ${product} ---"
                 continue
                 ;;
+            libicu)
+                if [[ "${SKIP_TEST_LIBICU}" ]]; then
+                    continue
+                fi
+                LIBICU_BUILD_DIR=$(build_directory ${host} ${product})
+                echo "--- Running tests for ${product} ---"
+                with_pushd "${LIBICU_BUILD_DIR}/test" \
+                    call make
+                echo "--- Finished tests for ${product} ---"
+                continue
+                ;;
            playgroundlogger)
                SWIFT_DYLIB_PATH=$(build_directory ${host} swift)/lib/swift/macosx/
                PLAYGROUNDLOGGER_FRAMEWORK_PATH=$(build_directory ${host} ${product})
@@ -2645,11 +2868,11 @@ for host in "${ALL_HOSTS[@]}"; do
 
         trap "tests_busted ${product} ''" ERR
         build_dir=$(build_directory ${host} ${product})
-        build_cmd=("${CMAKE}" --build "${build_dir}" $(cmake_config_opt ${product}) -- "${BUILD_ARGS[@]}")
+        build_cmd=("${CMAKE_BUILD[@]}" "${build_dir}" $(cmake_config_opt ${product}) -- "${BUILD_ARGS[@]}")
 
         if [[ "${executable_target}" != "" ]]; then
             echo "--- Building tests for ${product} ---"
-            call ${DISTCC_PUMP} "${build_cmd[@]}" ${BUILD_TARGET_FLAG} "${executable_target}"
+            call "${build_cmd[@]}" ${BUILD_TARGET_FLAG} "${executable_target}"
         fi
 
         # We can only run tests built for the host machine, because
@@ -2668,14 +2891,19 @@ for host in "${ALL_HOSTS[@]}"; do
                 # NOTE: In dry-run mode, build_dir might not exist yet. In that
                 #       case, -n query will fail. So, in dry-run mode,
                 #       we don't expand test script.
-                if [[ ! "${DRY_RUN}" && "${CMAKE_GENERATOR}" == Ninja ]] && !( "${build_cmd[@]}" --version 2>&1 | grep -i -q llbuild ); then
+                if [[ ! "${DRY_RUN}" && "${CMAKE_GENERATOR}" == Ninja ]] && !( "${build_cmd[@]}" --version 2>&1 | grep -i -q llbuild ) && [[ -z "${DISTCC_PUMP}" ]]; then
                     # Ninja buffers command output to avoid scrambling the output
                     # of parallel jobs, which is awesome... except that it
                     # interferes with the progress meter when testing.  Instead of
                     # executing ninja directly, have it dump the commands it would
                     # run, strip Ninja's progress prefix with sed, and tell the
                     # shell to execute that.
-                    sh -e -x -c "$("${build_cmd[@]}" -n -v ${target} | sed -e 's/[^]]*] //')"
+                    # However, if we do this in a subshell in the ``sh -e -x -c`` line,
+                    # errors in the command will not stop the script as they should.
+                    echo "Generating dry run test command from: ${build_cmd[@]} -n -v ${target}"
+                    dry_run_command_output="$(${build_cmd[@]} -n -v ${target} | sed -e 's/[^]]*] //')"
+                    echo "Test command: ${dry_run_command_output}"
+                    sh -e -x -c "${dry_run_command_output}"
                 else
                     call "${build_cmd[@]}" ${BUILD_TARGET_FLAG} ${target}
                 fi
@@ -2695,6 +2923,11 @@ LIPO_SRC_DIRS=()
 for host in "${ALL_HOSTS[@]}"; do
     # Skip this pass when the only action to execute can't match.
     if ! [[ $(should_execute_host_actions_for_phase ${host} install) ]]; then
+        continue
+    fi
+
+    # Skip this pass if flag is set and we are cross compiling and it's the local host.
+    if [[ "${SKIP_LOCAL_HOST_INSTALL}" ]] && [[ $(has_cross_compile_hosts) ]] && [[ ${host} == ${LOCAL_HOST} ]]; then
         continue
     fi
 
@@ -2854,6 +3087,32 @@ for host in "${ALL_HOSTS[@]}"; do
                 # As libdispatch installation is self-contained, we break early here.
                 continue
                 ;;
+            libicu)
+                if [[ -z "${INSTALL_LIBICU}" ]]; then
+                    continue
+                fi
+                if [[ -z "${INSTALL_DESTDIR}" ]] ; then
+                    echo "--install-destdir is required to install products."
+                    exit 1
+                fi
+                echo "--- Installing ${product} ---"
+                LIBICU_BUILD_DIR=$(build_directory ${host} ${product})
+                ICU_LIBDIR="$(build_directory ${host} swift)/lib/swift/${SWIFT_HOST_VARIANT}/${SWIFT_HOST_VARIANT_ARCH}"
+                LIBICU_DEST_DIR="$(get_host_install_destdir ${host})$(get_host_install_prefix ${host})lib/swift/${SWIFT_HOST_VARIANT}"
+                LIBICU_DEST_DIR_STATIC="$(get_host_install_destdir ${host})$(get_host_install_prefix ${host})lib/swift_static/${SWIFT_HOST_VARIANT}"
+                mkdir -p ${LIBICU_DEST_DIR}
+                mkdir -p ${LIBICU_DEST_DIR_STATIC}
+                for l in uc i18n data
+                do
+                    lib=${ICU_LIBDIR}/libicu${l}
+                    echo "${lib} => ${LIBICU_DEST_DIR}"
+                    cp -d ${lib}.so ${lib}.so.* ${LIBICU_DEST_DIR}
+                    cp -d ${lib}.so ${lib}.so.* ${LIBICU_DEST_DIR}
+                    cp -d ${lib}.a ${LIBICU_DEST_DIR_STATIC}
+                    cp -d ${lib}.a ${LIBICU_DEST_DIR_STATIC}
+                done
+                continue
+                ;;
             playgroundlogger)
                 if [[ -z "${INSTALL_PLAYGROUNDLOGGER}" ]] ; then
                     continue
@@ -2926,7 +3185,7 @@ for host in "${ALL_HOSTS[@]}"; do
         echo "--- Installing ${product} ---"
         build_dir=$(build_directory ${host} ${product})
 
-        call env DESTDIR="${host_install_destdir}" "${CMAKE}" --build "${build_dir}" -- ${INSTALL_TARGETS}
+        call env DESTDIR="${host_install_destdir}" "${CMAKE_BUILD[@]}" "${build_dir}" -- ${INSTALL_TARGETS}
     done
 
     if [[ "${DARWIN_INSTALL_EXTRACT_SYMBOLS}" ]] && [[ $(host_has_darwin_symbols ${host}) ]]; then

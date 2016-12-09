@@ -5,82 +5,83 @@
 // Copyright (c) 2014 - 2016 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
-// See http://swift.org/LICENSE.txt for license information
-// See http://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
+// See https://swift.org/LICENSE.txt for license information
+// See https://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
 //
 //===----------------------------------------------------------------------===//
 
 @_exported import XPC
+import _SwiftXPCOverlayShims
 
 //===----------------------------------------------------------------------===//
 // XPC Types
 //===----------------------------------------------------------------------===//
 public var XPC_TYPE_CONNECTION: xpc_type_t {
-	return _swift_xpc_type_connection()
+	return _swift_xpc_type_CONNECTION()
 }
 
 public var XPC_TYPE_ENDPOINT: xpc_type_t {
-	return _swift_xpc_type_endpoint()
+	return _swift_xpc_type_ENDPOINT()
 }
 
 public var XPC_TYPE_NULL: xpc_type_t {
-	return _swift_xpc_type_null()
+	return _swift_xpc_type_NULL()
 }
 
 public var XPC_TYPE_BOOL: xpc_type_t {
-	return _swift_xpc_type_bool()
+	return _swift_xpc_type_BOOL()
 }
 
 public var XPC_TYPE_INT64: xpc_type_t {
-	return _swift_xpc_type_int64()
+	return _swift_xpc_type_INT64()
 }
 
 public var XPC_TYPE_UINT64: xpc_type_t {
-	return _swift_xpc_type_uint64()
+	return _swift_xpc_type_UINT64()
 }
 
 public var XPC_TYPE_DOUBLE: xpc_type_t {
-	return _swift_xpc_type_double()
+	return _swift_xpc_type_DOUBLE()
 }
 
 public var XPC_TYPE_DATE: xpc_type_t {
-	return _swift_xpc_type_date()
+	return _swift_xpc_type_DATE()
 }
 
 public var XPC_TYPE_DATA: xpc_type_t {
-	return _swift_xpc_type_data()
+	return _swift_xpc_type_DATA()
 }
 
 public var XPC_TYPE_STRING: xpc_type_t {
-	return _swift_xpc_type_string()
+	return _swift_xpc_type_STRING()
 }
 
 public var XPC_TYPE_UUID: xpc_type_t {
-	return _swift_xpc_type_uuid()
+	return _swift_xpc_type_UUID()
 }
 
 public var XPC_TYPE_FD: xpc_type_t {
-	return _swift_xpc_type_fd()
+	return _swift_xpc_type_FD()
 }
 
 public var XPC_TYPE_SHMEM: xpc_type_t {
-	return _swift_xpc_type_shmem()
+	return _swift_xpc_type_SHMEM()
 }
 
 public var XPC_TYPE_ARRAY: xpc_type_t {
-	return _swift_xpc_type_array()
+	return _swift_xpc_type_ARRAY()
 }
 
 public var XPC_TYPE_DICTIONARY: xpc_type_t {
-	return _swift_xpc_type_dictionary()
+	return _swift_xpc_type_DICTIONARY()
 }
 
 public var XPC_TYPE_ERROR: xpc_type_t {
-	return _swift_xpc_type_error()
+	return _swift_xpc_type_ERROR()
 }
 
 public var XPC_TYPE_ACTIVITY: xpc_type_t {
-	return _swift_xpc_type_activity()
+	return _swift_xpc_type_ACTIVITY()
 }
 
 //===----------------------------------------------------------------------===//
@@ -103,63 +104,6 @@ public var XPC_ARRAY_APPEND: size_t {
 	return -1
 }
 
-@_silgen_name("_swift_xpc_bool_true")
-internal func _swift_xpc_bool_true() -> xpc_object_t
-
-@_silgen_name("_swift_xpc_bool_false")
-internal func _swift_xpc_bool_false() -> xpc_object_t
-
-@_silgen_name("_swift_xpc_type_CONNECTION")
-internal func _swift_xpc_type_connection() -> xpc_type_t
-
-@_silgen_name("_swift_xpc_type_ENDPOINT")
-internal func _swift_xpc_type_endpoint() -> xpc_type_t
-
-@_silgen_name("_swift_xpc_type_NULL")
-internal func _swift_xpc_type_null() -> xpc_type_t
-
-@_silgen_name("_swift_xpc_type_BOOL")
-internal func _swift_xpc_type_bool() -> xpc_type_t
-
-@_silgen_name("_swift_xpc_type_INT64")
-internal func _swift_xpc_type_int64() -> xpc_type_t
-
-@_silgen_name("_swift_xpc_type_UINT64")
-internal func _swift_xpc_type_uint64() -> xpc_type_t
-
-@_silgen_name("_swift_xpc_type_DOUBLE")
-internal func _swift_xpc_type_double() -> xpc_type_t
-
-@_silgen_name("_swift_xpc_type_DATE")
-internal func _swift_xpc_type_date() -> xpc_type_t
-
-@_silgen_name("_swift_xpc_type_DATA")
-internal func _swift_xpc_type_data() -> xpc_type_t
-
-@_silgen_name("_swift_xpc_type_STRING")
-internal func _swift_xpc_type_string() -> xpc_type_t
-
-@_silgen_name("_swift_xpc_type_UUID")
-internal func _swift_xpc_type_uuid() -> xpc_type_t
-
-@_silgen_name("_swift_xpc_type_FD")
-internal func _swift_xpc_type_fd() -> xpc_type_t
-
-@_silgen_name("_swift_xpc_type_SHMEM")
-internal func _swift_xpc_type_shmem() -> xpc_type_t
-
-@_silgen_name("_swift_xpc_type_ARRAY")
-internal func _swift_xpc_type_array() -> xpc_type_t
-
-@_silgen_name("_swift_xpc_type_DICTIONARY")
-internal func _swift_xpc_type_dictionary() -> xpc_type_t
-
-@_silgen_name("_swift_xpc_type_ERROR")
-internal func _swift_xpc_type_error() -> xpc_type_t
-
-@_silgen_name("_swift_xpc_type_ACTIVITY")
-internal func _swift_xpc_type_activity() -> xpc_type_t
-
 // xpc/connection.h
 
 public var XPC_ERROR_CONNECTION_INTERRUPTED: xpc_object_t {
@@ -173,12 +117,3 @@ public var XPC_ERROR_CONNECTION_INVALID: xpc_object_t {
 public var XPC_ERROR_TERMINATION_IMMINENT: xpc_object_t {
 	return _swift_xpc_connection_termination_imminent()
 }
-
-@_silgen_name("_swift_xpc_connection_interrupted")
-internal func _swift_xpc_connection_interrupted() -> xpc_object_t
-
-@_silgen_name("_swift_xpc_connection_invalid")
-internal func _swift_xpc_connection_invalid() -> xpc_object_t
-
-@_silgen_name("_swift_xpc_connection_termination_imminent")
-internal func _swift_xpc_connection_termination_imminent() -> xpc_object_t

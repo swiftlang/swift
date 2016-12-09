@@ -78,6 +78,19 @@ func testFinal(_ obj: FinalGizmo) -> String {
   return obj.y
 }
 
+// SR-2673: @NSManaged property can't satisfy protocol requirement
+@objc protocol ObjCProto {
+  var managedProp: String { get set }
+  var managedExtProp: AnyObject { get }
+}
+
+class ProtoAdopter: Gizmo, ObjCProto {
+  @NSManaged var managedProp: String
+}
+extension ProtoAdopter {
+  @NSManaged var managedExtProp: AnyObject
+}
+
 
 // CHECK-NOT: sil hidden @_TToFC19objc_attr_NSManaged10SwiftGizmog1xCS_1X : $@convention(objc_method) (SwiftGizmo) -> @autoreleased X
 // CHECK-NOT: sil hidden @_TToFC19objc_attr_NSManaged10SwiftGizmos1xCS_1X
@@ -100,3 +113,7 @@ func testFinal(_ obj: FinalGizmo) -> String {
 // CHECK-NEXT:   #SwiftGizmo.init!initializer.1: _TFC19objc_attr_NSManaged10FinalGizmoc
 // CHECK-NEXT:   #FinalGizmo.deinit!deallocator: _TFC19objc_attr_NSManaged10FinalGizmoD
 // CHECK-NEXT: }
+
+// CHECK-LABEL: sil_vtable ProtoAdopter {
+// CHECK-NOT: managed{{.*}}Prop
+// CHECK: {{^}$}}

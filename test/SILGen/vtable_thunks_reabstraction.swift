@@ -92,3 +92,33 @@ class ConcreteOptional<X>: Opaque<S?> {
   override func variantOptionality(x: S??) -> S? { return x! }
 }
  */
+
+// Make sure we remap the method's innermost generic parameters
+// to the correct depth
+class GenericBase<T> {
+  func doStuff<U>(t: T, u: U) {}
+  init<U>(t: T, u: U) {}
+}
+
+class ConcreteSub : GenericBase<Int> {
+  override func doStuff<U>(t: Int, u: U) {
+    super.doStuff(t: t, u: u)
+  }
+  override init<U>(t: Int, u: U) {
+    super.init(t: t, u: u)
+  }
+}
+
+class ConcreteBase {
+  init<U>(t: Int, u: U) {}
+  func doStuff<U>(t: Int, u: U) {}
+}
+
+class GenericSub<T> : ConcreteBase {
+  override init<U>(t: Int, u: U) {
+    super.init(t: t, u: u)
+  }
+  override func doStuff<U>(t: Int, u: U) {
+    super.doStuff(t: t, u: u)
+  }
+}

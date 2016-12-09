@@ -15,7 +15,7 @@
 // RUN: %target-swift-ide-test(mock-sdk: -sdk %S/../Inputs/clang-importer-sdk -I %t) -print-module -source-filename %s -module-to-print=Foundation -function-definitions=false -prefer-type-repr=true  -skip-parameter-names > %t.Foundation.txt
 // RUN: %FileCheck %s -check-prefix=CHECK-FOUNDATION -strict-whitespace < %t.Foundation.txt
 
-// RUN: %target-swift-ide-test(mock-sdk: -sdk %S/../Inputs/clang-importer-sdk -I %t -I %S/../ClangModules/Inputs/custom-modules) -print-module -source-filename %s -module-to-print=CoreCooling -function-definitions=false -prefer-type-repr=true  -skip-parameter-names > %t.CoreCooling.txt
+// RUN: %target-swift-ide-test(mock-sdk: -sdk %S/../Inputs/clang-importer-sdk -I %t -I %S/../ClangImporter/Inputs/custom-modules) -print-module -source-filename %s -module-to-print=CoreCooling -function-definitions=false -prefer-type-repr=true  -skip-parameter-names > %t.CoreCooling.txt
 // RUN: %FileCheck %s -check-prefix=CHECK-CORECOOLING -strict-whitespace < %t.CoreCooling.txt
 
 // RUN: %target-swift-ide-test(mock-sdk: -sdk %S/../Inputs/clang-importer-sdk -I %t -I %S/Inputs/custom-modules) -print-module -source-filename %s -module-to-print=OmitNeedlessWords -function-definitions=false -prefer-type-repr=true  -skip-parameter-names > %t.OmitNeedlessWords.txt 2> %t.OmitNeedlessWords.diagnostics.txt
@@ -54,7 +54,7 @@
 // CHECK-FOUNDATION: init(array: [Any])
 
 // Note: struct name matching; don't drop "With".
-// CHECK-FOUNDATION: class func withRange(_: NSRange) -> NSValue
+// CHECK-FOUNDATION: func withRange(_: NSRange) -> NSValue
 
 // Note: built-in types.
 // CHECK-FOUNDATION: func add(_: Double) -> NSNumber
@@ -78,7 +78,7 @@
 // CHECK-FOUNDATION: func someMethod(deprecatedOptions: NSDeprecatedOptions = [])
 
 // Note: class name matching; don't drop "With".
-// CHECK-FOUNDATION: class func withString(_: String!) -> Self!
+// CHECK-FOUNDATION: func withString(_: String!) -> Self!
 
 // Note: lowercasing enum constants.
 // CHECK-FOUNDATION: enum CountStyle : Int {
@@ -88,7 +88,7 @@
 // CHECK-FOUNDATION-NEXT: case binary
 
 // Note: Make sure NSURL works in various places
-// CHECK-FOUNDATION: open(_: NSURL!, completionHandler: (@escaping (Bool) -> Void)!)
+// CHECK-FOUNDATION: open(_: NSURL!, completionHandler: ((Bool) -> Void)!)
 
 // Note: property name stripping property type.
 // CHECK-FOUNDATION: var uppercased: String
@@ -117,7 +117,7 @@
 // CHECK-FOUNDATION: func url(withAddedString: String) -> NSURL?
 
 // Note: NSCalendarUnits is not a set of "Options".
-// CHECK-FOUNDATION: class func forCalendarUnits(_: NSCalendar.Unit) -> String!
+// CHECK-FOUNDATION: func forCalendarUnits(_: NSCalendar.Unit) -> String!
 
 // Note: <property type>By<gerund> --> <gerund>.
 // CHECK-FOUNDATION: var deletingLastPathComponent: NSURL? { get }
@@ -131,11 +131,11 @@
 // CHECK-FOUNDATION: static var reverse: NSEnumerationOptions
 
 // Note: usingBlock -> body
-// CHECK-FOUNDATION: func enumerateObjects(_: (@escaping (Any?, Int, UnsafeMutablePointer<ObjCBool>?) -> Void)!)
-// CHECK-FOUNDATION: func enumerateObjects(options: NSEnumerationOptions = [], using: (@escaping (Any?, Int, UnsafeMutablePointer<ObjCBool>?) -> Void)!)
+// CHECK-FOUNDATION: func enumerateObjects(_: ((Any?, Int, UnsafeMutablePointer<ObjCBool>?) -> Void)!)
+// CHECK-FOUNDATION: func enumerateObjects(options: NSEnumerationOptions = [], using: ((Any?, Int, UnsafeMutablePointer<ObjCBool>?) -> Void)!)
 
 // Note: WithBlock -> body, nullable closures default to nil.
-// CHECK-FOUNDATION: func enumerateObjectsRandomly(block: (@escaping (Any?, Int, UnsafeMutablePointer<ObjCBool>?) -> Void)? = nil)
+// CHECK-FOUNDATION: func enumerateObjectsRandomly(block: ((Any?, Int, UnsafeMutablePointer<ObjCBool>?) -> Void)? = nil)
 
 // Note: id<Proto> treated as "Proto".
 // CHECK-FOUNDATION: func doSomething(with: NSCopying)

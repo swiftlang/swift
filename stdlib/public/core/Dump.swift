@@ -5,8 +5,8 @@
 // Copyright (c) 2014 - 2016 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
-// See http://swift.org/LICENSE.txt for license information
-// See http://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
+// See https://swift.org/LICENSE.txt for license information
+// See https://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
 //
 //===----------------------------------------------------------------------===//
 
@@ -76,8 +76,8 @@ internal func _dump_unlocked<TargetStream : TextOutputStream>(
   target.write(bullet)
   target.write(" ")
 
-  if let nam = name {
-    target.write(nam)
+  if let name = name {
+    target.write(name)
     target.write(": ")
   }
   // This takes the place of the old mirror API's 'summary' property

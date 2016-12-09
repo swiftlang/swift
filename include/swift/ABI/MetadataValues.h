@@ -5,8 +5,8 @@
 // Copyright (c) 2014 - 2016 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
-// See http://swift.org/LICENSE.txt for license information
-// See http://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
+// See https://swift.org/LICENSE.txt for license information
+// See https://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
 //
 //===----------------------------------------------------------------------===//
 //
@@ -170,7 +170,7 @@ public:
   constexpr TypeMetadataRecordFlags(int_type Data) : Data(Data) {}
   
   constexpr TypeMetadataRecordKind getTypeKind() const {
-    return TypeMetadataRecordKind((Data >> TypeKindShift) & TypeKindMask);
+    return TypeMetadataRecordKind((Data & TypeKindMask) >> TypeKindShift);
   }
   constexpr TypeMetadataRecordFlags withTypeKind(
                                         TypeMetadataRecordKind ptk) const {
@@ -199,8 +199,8 @@ public:
                      (Data & ~TypeKindMask) | (int_type(ptk) << TypeKindShift));
   }
   constexpr ProtocolConformanceReferenceKind getConformanceKind() const {
-    return ProtocolConformanceReferenceKind((Data >> ConformanceKindShift)
-                                     & ConformanceKindMask);
+    return ProtocolConformanceReferenceKind((Data & ConformanceKindMask)
+                                     >> ConformanceKindShift);
   }
   constexpr ProtocolConformanceFlags withConformanceKind(
                                   ProtocolConformanceReferenceKind pck) const {

@@ -4,6 +4,7 @@
 
 import UIKit
 import StdlibUnittest
+import StdlibUnittestFoundationExtras
 
 let UIKitTests = TestSuite("UIKit")
 
@@ -93,6 +94,17 @@ UIKitTests.test("CustomPlaygroundQuickLookable") {
   default: expectUnreachable(
     "TestChildView custom quicklookable should have been invoked")
   }
+}
+
+UIKitTests.test("NSValue bridging") {
+  expectBridgeToNSValue(UIEdgeInsets(top: 17, left: 38, bottom: 6, right: 79),
+                        nsValueInitializer: { NSValue(uiEdgeInsets: $0) },
+                        nsValueGetter: { $0.uiEdgeInsetsValue },
+                        equal: (==))
+  expectBridgeToNSValue(UIOffset(horizontal: 17, vertical: 38),
+                        nsValueInitializer: { NSValue(uiOffset: $0) },
+                        nsValueGetter: { $0.uiOffsetValue },
+                        equal: (==))
 }
 
 runAllTests()

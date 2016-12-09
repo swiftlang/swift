@@ -13,13 +13,13 @@
 // FIXME: END -enable-source-import hackaround
 
 
-// RUN: %target-swift-frontend(mock-sdk: -sdk %S/../Inputs/clang-importer-sdk -I %t) -emit-module -o %t %s -disable-objc-attr-requires-foundation-module
-// RUN: %target-swift-frontend(mock-sdk: -sdk %S/../Inputs/clang-importer-sdk -I %t) -parse-as-library %t/classes.swiftmodule -parse -emit-objc-header-path %t/classes.h -import-objc-header %S/../Inputs/empty.h -disable-objc-attr-requires-foundation-module
+// RUN: %target-swift-frontend(mock-sdk: -sdk %S/../Inputs/clang-importer-sdk -I %t) -emit-module -I %S/Inputs/custom-modules -o %t %s -disable-objc-attr-requires-foundation-module
+// RUN: %target-swift-frontend(mock-sdk: -sdk %S/../Inputs/clang-importer-sdk -I %t) -parse-as-library %t/classes.swiftmodule -typecheck -I %S/Inputs/custom-modules -emit-objc-header-path %t/classes.h -import-objc-header %S/../Inputs/empty.h -disable-objc-attr-requires-foundation-module
 // RUN: %FileCheck %s < %t/classes.h
 // RUN: %FileCheck --check-prefix=NEGATIVE %s < %t/classes.h
-// RUN: %check-in-clang %t/classes.h
-// RUN: not %check-in-clang -fno-modules -Qunused-arguments %t/classes.h
-// RUN: %check-in-clang -fno-modules -Qunused-arguments %t/classes.h -include Foundation.h -include CoreFoundation.h -include objc_generics.h
+// RUN: %check-in-clang -I %S/Inputs/custom-modules/ %t/classes.h
+// RUN: not %check-in-clang -I %S/Inputs/custom-modules/ -fno-modules -Qunused-arguments %t/classes.h
+// RUN: %check-in-clang -I %S/Inputs/custom-modules/ -fno-modules -Qunused-arguments %t/classes.h -include Foundation.h -include CoreFoundation.h -include objc_generics.h -include SingleGenericClass.h
 
 // CHECK-NOT: AppKit;
 // CHECK-NOT: Properties;
@@ -28,12 +28,14 @@
 // CHECK-NEXT: @import CoreGraphics;
 // CHECK-NEXT: @import CoreFoundation;
 // CHECK-NEXT: @import objc_generics;
+// CHECK-NEXT: @import SingleGenericClass;
 // CHECK-NOT: AppKit;
 // CHECK-NOT: Swift;
 import Foundation
 import objc_generics
 import AppKit // only used in implementations
 import CoreFoundation
+import SingleGenericClass
 
 // CHECK-LABEL: @interface A1{{$}}
 // CHECK-NEXT: init
@@ -291,7 +293,7 @@ typealias AliasForNSRect = NSRect
   func cf(_ x: CFTree, str: CFString, str2: CFMutableString, obj: CFAliasForType) -> CFTypeRef? { return nil }
 
   func appKitInImplementation() {
-    let _ : NSResponder? = nil
+    let _ : NSResponder?
   }
 
   func returnsURL() -> NSURL? { return nil }
@@ -379,18 +381,18 @@ class MyObject : NSObject {}
   // CHECK-NEXT: init
   // CHECK-NEXT: @end
   @objc class Inner2 {
-    var ref: NestedMembers? = nil
+    var ref: NestedMembers?
   }
 
-  var ref2: Inner2? = nil
-  var ref3: Inner3? = nil
+  var ref2: Inner2?
+  var ref3: Inner3?
 
   // CHECK-LABEL: @interface Inner3
   // CHECK-NEXT: @property (nonatomic, strong) NestedMembers * _Nullable ref;
   // CHECK-NEXT: init
   // CHECK-NEXT: @end
   @objc class Inner3 {
-    var ref: NestedMembers? = nil
+    var ref: NestedMembers?
   }
 }
 
@@ -715,6 +717,9 @@ public class NonObjCClass { }
   typealias Dipper = Spoon
   // CHECK: - (FungibleContainer<FungibleObject> * _Nonnull)fungibleContainerWithAliases:(FungibleContainer<Spoon *> * _Nullable)x;
   @objc func fungibleContainerWithAliases(_ x: FungibleContainer<Dipper>?) -> FungibleContainer<FungibleObject> { fatalError("") }
+
+  // CHECK: - (void)referenceSingleGenericClass:(SingleImportedObjCGeneric<id> * _Nullable)_;
+  func referenceSingleGenericClass(_: SingleImportedObjCGeneric<AnyObject>?) {}
 }
 // CHECK: @end
 

@@ -5,8 +5,8 @@
 // Copyright (c) 2014 - 2016 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
-// See http://swift.org/LICENSE.txt for license information
-// See http://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
+// See https://swift.org/LICENSE.txt for license information
+// See https://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
 //
 //===----------------------------------------------------------------------===//
 //
@@ -61,6 +61,8 @@ Optional<Type> TypeChecker::checkObjCKeyPathExpr(DeclContext *dc,
     case ResolvingDictionary:
       return true;
     }
+
+    llvm_unreachable("Unhandled State in switch.");
   };
 
   // The type of AnyObject, which is used whenever we don't have
@@ -161,7 +163,8 @@ Optional<Type> TypeChecker::checkObjCKeyPathExpr(DeclContext *dc,
   
   // Local function to perform name lookup for the current index.
   auto performLookup = [&](unsigned idx, Identifier componentName,
-                           SourceLoc componentNameLoc) -> LookupResult {
+                           SourceLoc componentNameLoc,
+                           Type &lookupType) -> LookupResult {
     if (state == Beginning)
       return lookupUnqualified(dc, componentName, componentNameLoc);
 
@@ -170,7 +173,6 @@ Optional<Type> TypeChecker::checkObjCKeyPathExpr(DeclContext *dc,
     // Determine the type in which the lookup should occur. If we have
     // a bridged value type, this will be the Objective-C class to
     // which it is bridged.
-    Type lookupType;
     if (auto bridgedClass = Context.getBridgedToObjC(dc, currentType))
       lookupType = bridgedClass;
     else
@@ -210,15 +212,17 @@ Optional<Type> TypeChecker::checkObjCKeyPathExpr(DeclContext *dc,
     }
 
     // Look for this component.
-    LookupResult lookup = performLookup(idx, componentName, componentNameLoc);
+    Type lookupType;
+    LookupResult lookup = performLookup(idx, componentName, componentNameLoc,
+                                        lookupType);
 
     // If we didn't find anything, try to apply typo-correction.
     bool resultsAreFromTypoCorrection = false;
     if (!lookup) {
-      performTypoCorrection(dc, DeclRefKind::Ordinary, currentType,
+      performTypoCorrection(dc, DeclRefKind::Ordinary, lookupType,
                             componentName, componentNameLoc,
-                            (currentType ? defaultMemberTypeLookupOptions
-                                         : defaultUnqualifiedLookupOptions),
+                            (lookupType ? defaultMemberTypeLookupOptions
+                                        : defaultUnqualifiedLookupOptions),
                             lookup);
 
       if (currentType)
@@ -263,7 +267,7 @@ Optional<Type> TypeChecker::checkObjCKeyPathExpr(DeclContext *dc,
       if (resultsAreFromTypoCorrection)
         break;
 
-      if (currentType)
+      if (lookupType)
         diagnose(componentNameLoc, diag::ambiguous_member_overload_set,
                  componentName);
       else
@@ -325,9 +329,9 @@ Optional<Type> TypeChecker::checkObjCKeyPathExpr(DeclContext *dc,
       }
 
       Type newType;
-      if (currentType && !currentType->isAnyObject()) {
-        newType = currentType->getTypeOfMember(dc->getParentModule(), type,
-                                               this);
+      if (lookupType && !lookupType->isAnyObject()) {
+        newType = lookupType->getTypeOfMember(dc->getParentModule(), type,
+                                              this);
       } else {
         newType = type->getDeclaredInterfaceType();
       }

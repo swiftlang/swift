@@ -1,4 +1,4 @@
-// RUN: %target-parse-verify-swift
+// RUN: %target-typecheck-verify-swift
 
 var var_redecl1: Int // expected-note {{previously declared here}}
 var_redecl1 = 0
@@ -229,6 +229,25 @@ func throwsFuncParam(_ fn: () -> ()) { }
 // @escaping
 func escaping(x: @escaping (Int) -> Int) { } // expected-note{{previously declared}}
 func escaping(x: (Int) -> Int) { } // expected-error{{invalid redeclaration of 'escaping(x:)'}}
+func escaping(_ x: @escaping (Int) -> Int) { } // expected-note{{previously declared}}
+func escaping(_ x: (Int) -> Int) { } // expected-error{{invalid redeclaration of 'escaping'}}
+func escaping(a: Int, _ x: @escaping (Int) -> Int) { } // expected-note{{previously declared}}
+func escaping(a: Int, _ x: (Int) -> Int) { } // expected-error{{invalid redeclaration of 'escaping(a:_:)'}}
+
+func escaping(_ a: (Int) -> Int, _ x: (Int) -> Int) { }
+  // expected-note@-1{{previously declared}}
+  // expected-note@-2{{previously declared}}
+  // expected-note@-3{{previously declared}}
+func escaping(_ a: (Int) -> Int, _ x: @escaping (Int) -> Int) { } // expected-error{{invalid redeclaration of 'escaping'}}
+func escaping(_ a: @escaping (Int) -> Int, _ x: (Int) -> Int) { } // expected-error{{invalid redeclaration of 'escaping'}}
+func escaping(_ a: @escaping (Int) -> Int, _ x: @escaping (Int) -> Int) { } // expected-error{{invalid redeclaration of 'escaping'}}
+
+struct Escaping {
+  func escaping(_ x: @escaping (Int) -> Int) { } // expected-note{{previously declared}}
+  func escaping(_ x: (Int) -> Int) { } // expected-error{{invalid redeclaration of 'escaping'}}
+  func escaping(a: Int, _ x: @escaping (Int) -> Int) { } // expected-note{{previously declared}}
+  func escaping(a: Int, _ x: (Int) -> Int) { } // expected-error{{invalid redeclaration of 'escaping(a:_:)'}}
+}
 
 // @autoclosure
 func autoclosure(f: () -> Int) { }

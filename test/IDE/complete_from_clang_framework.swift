@@ -123,7 +123,7 @@ func testSwiftCompletions(foo: SwiftStruct) {
 // CLANG_BAR: End completions
 
 // CLANG_BOTH_FOO_BAR: Begin completions
-// CLANG_BOTH_FOO_BAR-DAG: Decl[FreeFunction]/OtherModule[Bar]: redeclaredInMultipleModulesFunc1({#(a): Int32#})[#Int32#]{{; name=.+$}}
+// CLANG_BOTH_FOO_BAR-DAG: Decl[FreeFunction]/OtherModule[{{(Foo|Bar)}}]: redeclaredInMultipleModulesFunc1({#(a): Int32#})[#Int32#]{{; name=.+$}}
 // CLANG_BOTH_FOO_BAR: End completions
 
 // CLANG_QUAL_FOO_NEGATIVE-NOT: bar
@@ -131,7 +131,7 @@ func testSwiftCompletions(foo: SwiftStruct) {
 // CLANG_QUAL_FOO_NEGATIVE-NOT: BAR
 
 // CLANG_QUAL_BAR_NEGATIVE-NOT: foo
-// CLANG_QUAL_BAR_NEGATIVE-NOT: Foo
+// CLANG_QUAL_BAR_NEGATIVE-NOT: :{{.*}}Foo
 // CLANG_QUAL_BAR_NEGATIVE-NOT: FOO
 
 func testClangModule() {
@@ -169,7 +169,7 @@ func testCompleteModuleQualifiedFoo2() {
 // CLANG_QUAL_FOO_2-DAG: Decl[FreeFunction]/OtherModule[FooHelper]: .fooHelperFunc1({#(a): Int32#})[#Int32#]{{; name=.+$}}
 // CLANG_QUAL_FOO_2-DAG: Decl[FreeFunction]/OtherModule[FooHelper.FooHelperSub]: .fooHelperSubFunc1({#(a): Int32#})[#Int32#]{{; name=.+$}}
 // CLANG_QUAL_FOO_2-DAG: Decl[FreeFunction]/OtherModule[Foo.FooSub]: .fooSubFunc1({#(a): Int32#})[#Int32#]{{; name=.+$}}
-// CLANG_QUAL_FOO_2-DAG: Decl[FreeFunction]/OtherModule[Bar]: .redeclaredInMultipleModulesFunc1({#(a): Int32#})[#Int32#]{{; name=.+$}}
+// CLANG_QUAL_FOO_2-DAG: Decl[FreeFunction]/OtherModule[{{(Foo|Bar)}}]: .redeclaredInMultipleModulesFunc1({#(a): Int32#})[#Int32#]{{; name=.+$}}
 // CLANG_QUAL_FOO_2-DAG: Decl[FreeFunction]/OtherModule[Foo]: .theLastDeclInFoo()[#Void#]{{; name=.+$}}
 // CLANG_QUAL_FOO_2-DAG: Decl[GlobalVar]/OtherModule[Foo]:    .FOO_MACRO_1[#Int32#]{{; name=.+$}}
 // CLANG_QUAL_FOO_2-DAG: Decl[GlobalVar]/OtherModule[Foo]:    .FOO_MACRO_2[#Int32#]{{; name=.+$}}

@@ -5,8 +5,8 @@
 // Copyright (c) 2014 - 2016 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
-// See http://swift.org/LICENSE.txt for license information
-// See http://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
+// See https://swift.org/LICENSE.txt for license information
+// See https://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
 //
 //===----------------------------------------------------------------------===//
 
@@ -70,22 +70,6 @@ internal func _roundUp(_ offset: UInt, toAlignment alignment: Int) -> UInt {
 internal func _roundUp(_ offset: Int, toAlignment alignment: Int) -> Int {
   _sanityCheck(offset >= 0)
   return Int(_roundUpImpl(UInt(bitPattern: offset), toAlignment: alignment))
-}
-
-// This function takes a raw pointer and returns a typed pointer. It implicitly
-// assumes that memory at the returned pointer is bound to `Destination` type.
-@_versioned
-internal func _roundUp<DestinationType>(
-  _ pointer: UnsafeMutableRawPointer,
-  toAlignmentOf destinationType: DestinationType.Type
-) -> UnsafeMutablePointer<DestinationType> {
-  // Note: unsafe unwrap is safe because this operation can only increase the
-  // value, and can not produce a null pointer.
-  return UnsafeMutablePointer<DestinationType>(
-    bitPattern: _roundUpImpl(
-      UInt(bitPattern: pointer),
-      toAlignment: MemoryLayout<DestinationType>.alignment)
-  ).unsafelyUnwrapped
 }
 
 /// Returns a tri-state of 0 = no, 1 = yes, 2 = maybe.
@@ -175,18 +159,18 @@ func _swift_isClassOrObjCExistentialType<T>(_ x: T.Type) -> Bool
 @_versioned
 @inline(__always)
 internal func _isClassOrObjCExistential<T>(_ x: T.Type) -> Bool {
-  let tmp = _canBeClass(x)
 
+  switch _canBeClass(x) {
   // Is not a class.
-  if tmp == 0 {
+  case 0:
     return false
   // Is a class.
-  } else if tmp == 1 {
+  case 1:
     return true
-  }
-
   // Maybe a class.
-  return _swift_isClassOrObjCExistentialType(x)
+  default:
+    return _swift_isClassOrObjCExistentialType(x)
+  }
 }
 
 /// Returns an `UnsafePointer` to the storage used for `object`.  There's
@@ -283,6 +267,7 @@ public func _onFastPath() {
 // Declare it here instead of RuntimeShims.h, because we need to specify
 // the type of argument to be AnyClass. This is currently not possible
 // when using RuntimeShims.h
+@_versioned
 @_silgen_name("swift_objc_class_usesNativeSwiftReferenceCounting")
 func _usesNativeSwiftReferenceCounting(_ theClass: AnyClass) -> Bool
 #else
@@ -480,6 +465,7 @@ internal func _makeBridgeObject(
   )
 }
 
+@_versioned
 @_silgen_name("_swift_class_getSuperclass")
 internal func _swift_class_getSuperclass(_ t: AnyClass) -> AnyClass?
 

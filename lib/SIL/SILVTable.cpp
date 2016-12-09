@@ -5,8 +5,8 @@
 // Copyright (c) 2014 - 2016 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
-// See http://swift.org/LICENSE.txt for license information
-// See http://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
+// See https://swift.org/LICENSE.txt for license information
+// See https://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
 //
 //===----------------------------------------------------------------------===//
 //
@@ -33,25 +33,28 @@ SILVTable *SILVTable::create(SILModule &M, ClassDecl *Class,
   SILVTable *vt = ::new (buf) SILVTable(Class, Entries);
   M.vtables.push_back(vt);
   M.VTableMap[Class] = vt;
+  // Update the Module's cache with new vtable + vtable entries:
+  for (auto &entry : Entries) {
+    M.VTableEntryCache.insert({{vt, entry.first}, entry.second});
+  }
   return vt;
 }
 
 SILFunction *
 SILVTable::getImplementation(SILModule &M, SILDeclRef method) const {
-  // FIXME: We should build a sidetable cache in the module. Linear lookup here
-  // is lame.
-  
-  for (auto &entry : getEntries()) {
-    // Check whether this mapping matches either the given decl directly or
-    // one of its overridden decl.
-    SILDeclRef m = method;
-    do {
-      if (entry.first == m)
-        return entry.second;
-    } while ((m = m.getOverridden()));
-  }
-  
+  SILDeclRef m = method;
+  do {
+    auto entry = M.VTableEntryCache.find({this, m});
+    if (entry != M.VTableEntryCache.end()) {
+      return (*entry).second;
+    }
+  } while ((m = m.getOverridden()));
   return nullptr;
+}
+
+void SILVTable::removeFromVTableCache(Pair &entry) {
+  SILModule &M = entry.second->getModule();
+  M.VTableEntryCache.erase({this, entry.first});
 }
 
 SILVTable::SILVTable(ClassDecl *c, ArrayRef<Pair> entries)

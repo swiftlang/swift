@@ -5,8 +5,8 @@
 // Copyright (c) 2014 - 2016 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
-// See http://swift.org/LICENSE.txt for license information
-// See http://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
+// See https://swift.org/LICENSE.txt for license information
+// See https://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
 //
 //===----------------------------------------------------------------------===//
 
@@ -95,6 +95,13 @@ Projection::Projection(SILInstruction *I) : Value() {
            REAI->getType());
     break;
   }
+  case ValueKind::RefTailAddrInst: {
+    auto *RTAI = cast<RefTailAddrInst>(I);
+    auto *Ty = RTAI->getTailType().getSwiftRValueType().getPointer();
+    Value = ValueTy(ProjectionKind::TailElems, Ty);
+    assert(getKind() == ProjectionKind::TailElems);
+    break;
+  }
   case ValueKind::ProjectBoxInst: {
     auto *PBI = cast<ProjectBoxInst>(I);
     Value = ValueTy(ProjectionKind::Box, (unsigned)0);
@@ -147,11 +154,9 @@ Projection::Projection(SILInstruction *I) : Value() {
     // updated and a MaxLargeIndex will need to be used here. Currently we
     // represent large Indexes using a 64 bit integer, so we don't need to mess
     // with anything.
-    unsigned NewIndex = ~0;
+    unsigned NewIndex = 0;
     auto *IAI = cast<IndexAddrInst>(I);
     if (getIntegerIndex(IAI->getIndex(), NewIndex)) {
-      assert(NewIndex != unsigned(~0) && "NewIndex should have been changed "
-                                         "by getIntegerIndex?!");
       Value = ValueTy(ProjectionKind::Index, NewIndex);
       assert(getKind() == ProjectionKind::Index);
       assert(getIndex() == NewIndex);
@@ -212,6 +217,8 @@ Projection::createObjectProjection(SILBuilder &B, SILLocation Loc,
     return B.createUncheckedEnumData(Loc, Base, getEnumElementDecl(BaseTy));
   case ProjectionKind::Class:
     return nullptr;
+  case ProjectionKind::TailElems:
+    return nullptr;
   case ProjectionKind::Box:
     return nullptr;
   case ProjectionKind::Upcast:
@@ -253,8 +260,10 @@ Projection::createAddressProjection(SILBuilder &B, SILLocation Loc,
                                              getEnumElementDecl(BaseTy));
   case ProjectionKind::Class:
     return B.createRefElementAddr(Loc, Base, getVarDecl(BaseTy));
+  case ProjectionKind::TailElems:
+    return B.createRefTailAddr(Loc, Base, getCastType(BaseTy));
   case ProjectionKind::Box:
-    return B.createProjectBox(Loc, Base);
+    return B.createProjectBox(Loc, Base, getIndex());
   case ProjectionKind::Upcast:
     return B.createUpcast(Loc, Base, getCastType(BaseTy));
   case ProjectionKind::RefCast:
@@ -309,15 +318,16 @@ void Projection::getFirstLevelProjections(SILType Ty, SILModule &Mod,
   }
 
   if (auto Box = Ty.getAs<SILBoxType>()) {
-    Projection P(ProjectionKind::Box, (unsigned)0);
-    DEBUG(ProjectionPath X(Ty);
-          assert(X.getMostDerivedType(Mod) == Ty);
-          X.append(P);
-          assert(X.getMostDerivedType(Mod) == SILType::getPrimitiveAddressType(
-                                                Box->getBoxedType()));
-          X.verify(Mod););
-    (void) Box;
-    Out.push_back(P);
+    for (unsigned field : indices(Box->getLayout()->getFields())) {
+      Projection P(ProjectionKind::Box, field);
+      DEBUG(ProjectionPath X(Ty);
+            assert(X.getMostDerivedType(Mod) == Ty);
+            X.append(P);
+            assert(X.getMostDerivedType(Mod) == Box->getFieldType(field));
+            X.verify(Mod););
+      (void)Box;
+      Out.push_back(P);
+    }
     return;
   }
 }
@@ -825,6 +835,7 @@ SILValue Projection::getOperandForAggregate(SILInstruction *I) const {
       }
       break;
     case ProjectionKind::Class:
+    case ProjectionKind::TailElems:
     case ProjectionKind::Box:
     case ProjectionKind::Upcast:
     case ProjectionKind::RefCast:

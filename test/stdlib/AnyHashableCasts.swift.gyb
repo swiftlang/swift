@@ -9,6 +9,10 @@
 
 import StdlibUnittest
 
+#if _runtime(_ObjC)
+import Foundation
+#endif
+
 var AnyHashableCasts = TestSuite("AnyHashableCasts")
 
 protocol Implemented {}
@@ -106,10 +110,47 @@ AnyHashableCasts.test("${valueExpr} as ${coercedType} as? ${castType}") {
     } else {
 %if expected:
       expectUnreachable()
-%end    
+%end
     }
   }
 }
 % end
+
+#if _runtime(_ObjC)
+// A wrapper type around a String that bridges to NSString.
+struct StringWrapper1 : _SwiftNewtypeWrapper, Hashable, _ObjectiveCBridgeable {
+  let rawValue: String
+}
+
+// A wrapper type around a String that bridges to NSString.
+struct StringWrapper2 : _SwiftNewtypeWrapper, Hashable, _ObjectiveCBridgeable {
+  let rawValue: String
+}
+
+AnyHashableCasts.test("Wrappers around bridged types") {
+  let wrapper1Hello: AnyHashable = StringWrapper1(rawValue: "hello")
+  let stringHello: AnyHashable = "hello" as String
+  let nsStringHello: AnyHashable = "hello" as NSString
+
+  // Casting from Swift wrapper maintains type identity
+  expectNotNil(wrapper1Hello as? StringWrapper1)
+  expectNil(wrapper1Hello as? StringWrapper2)
+  expectNil(wrapper1Hello as? String)
+  expectNotNil(wrapper1Hello as? NSString)
+
+  // Casting from String maintains type identity
+  expectNil(stringHello as? StringWrapper1)
+  expectNil(stringHello as? StringWrapper2)
+  expectNotNil(stringHello as? String)
+  expectNotNil(stringHello as? NSString)
+
+  // Casting form NSString works with anything.
+  expectNotNil(nsStringHello as? StringWrapper1)
+  expectNotNil(nsStringHello as? StringWrapper2)
+  expectNotNil(nsStringHello as? String)
+  expectNotNil(nsStringHello as? NSString)
+}
+
+#endif
 
 runAllTests()

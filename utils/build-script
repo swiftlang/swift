@@ -6,8 +6,8 @@
 # Copyright (c) 2014 - 2016 Apple Inc. and the Swift project authors
 # Licensed under Apache License v2.0 with Runtime Library Exception
 #
-# See http://swift.org/LICENSE.txt for license information
-# See http://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
+# See https://swift.org/LICENSE.txt for license information
+# See https://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
 
 from __future__ import print_function
 
@@ -73,6 +73,7 @@ def call_without_sleeping(command, env=None, dry_run=False, echo=False):
 
 
 class HostSpecificConfiguration(object):
+
     """Configuration information for an individual host."""
 
     def __init__(self, host_target, invocation):
@@ -89,7 +90,7 @@ class HostSpecificConfiguration(object):
             else:
                 stdlib_targets_to_build = set(
                     args.build_stdlib_deployment_targets).intersection(
-                        set(args.stdlib_deployment_targets))
+                    set(args.stdlib_deployment_targets))
         else:
             # Otherwise, this is a host we are building as part of
             # cross-compiling, so we only need the target itself.
@@ -185,6 +186,7 @@ class HostSpecificConfiguration(object):
 
 
 class BuildScriptInvocation(object):
+
     """Represent a single build script invocation."""
 
     @staticmethod
@@ -278,6 +280,9 @@ class BuildScriptInvocation(object):
         if args.libdispatch_build_variant is None:
             args.libdispatch_build_variant = args.build_variant
 
+        if args.libicu_build_variant is None:
+            args.libicu_build_variant = args.build_variant
+
         # Assertions are enabled by default.
         if args.assertions is None:
             args.assertions = True
@@ -335,6 +340,7 @@ class BuildScriptInvocation(object):
             args.build_xctest = False
             args.build_foundation = False
             args.build_libdispatch = False
+            args.build_libicu = False
             args.build_playgroundlogger = False
             args.build_playgroundsupport = False
 
@@ -583,6 +589,7 @@ class BuildScriptInvocation(object):
             "--lldb-build-type", args.lldb_build_variant,
             "--foundation-build-type", args.foundation_build_variant,
             "--libdispatch-build-type", args.libdispatch_build_variant,
+            "--libicu-build-type", args.libicu_build_variant,
             "--xctest-build-type", args.build_variant,
             "--swift-enable-assertions", str(args.swift_assertions).lower(),
             "--swift-stdlib-enable-assertions", str(
@@ -662,6 +669,8 @@ class BuildScriptInvocation(object):
             impl_args += ["--skip-build-llbuild"]
         if not args.build_libdispatch:
             impl_args += ["--skip-build-libdispatch"]
+        if not args.build_libicu:
+            impl_args += ["--skip-build-libicu"]
         if not args.build_swiftpm:
             impl_args += ["--skip-build-swiftpm"]
         if not args.build_playgroundlogger:
@@ -712,6 +721,7 @@ class BuildScriptInvocation(object):
                           "--skip-test-xctest",
                           "--skip-test-foundation",
                           "--skip-test-libdispatch",
+                          "--skip-test-libicu",
                           "--skip-test-playgroundlogger",
                           "--skip-test-playgroundsupport"]
         if args.skip_test_linux:
@@ -808,11 +818,20 @@ class BuildScriptInvocation(object):
         if args.dry_run:
             impl_args += ["--dry-run"]
 
+        if args.clang_profile_instr_use:
+            impl_args += [
+                "--clang-profile-instr-use=%s" %
+                os.path.abspath(args.clang_profile_instr_use)
+            ]
+
         if args.lit_args:
             impl_args += ["--llvm-lit-args=%s" % args.lit_args]
 
         if args.coverage_db:
-            impl_args += ["--coverage-db=%s" % args.coverage_db]
+            impl_args += [
+                "--coverage-db=%s" %
+                os.path.abspath(args.coverage_db)
+            ]
 
         # Compute the set of host-specific variables, which we pass through to
         # the build script via environment variables.
@@ -870,6 +889,8 @@ class BuildScriptInvocation(object):
         product_classes = []
         product_classes.append(products.CMark)
         product_classes.append(products.LLVM)
+        if self.args.build_libicu:
+            product_classes.append(products.LibICU)
         product_classes.append(products.Swift)
         if self.args.build_lldb:
             product_classes.append(products.LLDB)
@@ -1119,6 +1140,7 @@ SWIFT_SOURCE_ROOT: a directory containing the source for LLVM, Clang, Swift.
                      /swift-corelibs-xctest      (optional)
                      /swift-corelibs-foundation  (optional)
                      /swift-corelibs-libdispatch (optional)
+                     /icu                        (optional)
 
 SWIFT_BUILD_ROOT: a directory in which to create out-of-tree builds.
                   Defaults to "$SWIFT_SOURCE_ROOT/build/".
@@ -1128,7 +1150,7 @@ Preparing to run this script
 
   See README.md for instructions on cloning Swift subprojects.
 
-If you intend to use the -l, -L, --lldb, or --lldb-debug options.
+If you intend to use the -l, -L, --lldb, or --debug-lldb options.
 
 That's it; you're ready to go!
 
@@ -1313,6 +1335,11 @@ details of the setups of other systems or automated environments.""")
         action=arguments.action.optional_bool,
         dest="build_libdispatch")
     projects_group.add_argument(
+        "--libicu",
+        help="build libicu",
+        action=arguments.action.optional_bool,
+        dest="build_libicu")
+    projects_group.add_argument(
         "--playgroundlogger",
         help="build playgroundlogger",
         action="store_true",
@@ -1411,6 +1438,12 @@ details of the setups of other systems or automated environments.""")
         action="store_const",
         const="Debug",
         dest="libdispatch_build_variant")
+    build_variant_override_group.add_argument(
+        "--debug-libicu",
+        help="build the Debug variant of libicu",
+        action="store_const",
+        const="Debug",
+        dest="libicu_build_variant")
 
     assertions_group = parser.add_mutually_exclusive_group(required=False)
     assertions_group.add_argument(
@@ -1483,7 +1516,7 @@ details of the setups of other systems or automated environments.""")
         const=False,
         dest="lldb_assertions")
 
-    # FIXME: This should be one option using a choices.
+    # FIXME: This should be one option using choices=[...]
     cmake_generator_group = parser.add_argument_group(
         title="Select the CMake generator")
     cmake_generator_group.add_argument(
@@ -1552,6 +1585,15 @@ details of the setups of other systems or automated environments.""")
         "-B", "--benchmark",
         help="run the Swift Benchmark Suite after building",
         action="store_true")
+    run_tests_group.add_argument(
+        "--benchmark-num-o-iterations",
+        help="if the Swift Benchmark Suite is run after building, run N \
+iterations with -O",
+        metavar='N', type=int, default=3)
+    run_tests_group.add_argument(
+        "--benchmark-num-onone-iterations",
+        help="if the Swift Benchmark Suite is run after building, run N \
+        iterations with -Onone", metavar='N', type=int, default=3)
     run_tests_group.add_argument(
         "--skip-test-osx",
         help="skip testing Swift stdlibs for Mac OS X",
@@ -1983,6 +2025,11 @@ details of the setups of other systems or automated environments.""")
         const='full',
         dest='lto_type')
 
+    parser.add_argument(
+        "--clang-profile-instr-use",
+        help="profile file to use for clang PGO",
+        metavar="PATH")
+
     default_max_lto_link_job_counts = host.max_lto_link_job_counts()
     parser.add_argument(
         "--llvm-max-parallel-lto-link-jobs",
@@ -1997,6 +2044,10 @@ details of the setups of other systems or automated environments.""")
              "swift tools.",
         metavar="COUNT",
         default=default_max_lto_link_job_counts['swift'])
+
+    parser.add_argument("--enable-sil-ownership",
+                        help="Enable the SIL ownership model",
+                        action='store_true')
 
     parser.add_argument(
         # Explicitly unavailable options here.

@@ -5,8 +5,8 @@
 // Copyright (c) 2014 - 2016 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
-// See http://swift.org/LICENSE.txt for license information
-// See http://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
+// See https://swift.org/LICENSE.txt for license information
+// See https://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
 //
 //===----------------------------------------------------------------------===//
 //
@@ -132,7 +132,7 @@ ASTScope::ASTScope(const ASTScope *parent, ArrayRef<ASTScope *> children)
 
   // Add child nodes, reparenting them to this node.
   storedChildren.reserve(children.size());
-  for (auto child : children ) {
+  for (auto child : children) {
     child->parentAndExpanded.setPointer(this);
     storedChildren.push_back(child);
   }
@@ -277,6 +277,18 @@ void ASTScope::expand() const {
     return stoleContinuation;
   };
 
+  // Local function to add the accessors of the variables in the given pattern
+  // as children.
+  auto addAccessors = [&](Pattern *pattern) {
+    // Create children for the accessors of any variables in the pattern that
+    // have them.
+    pattern->forEachVariable([&](VarDecl *var) {
+      if (hasAccessors(var)) {
+        addChild(new (ctx) ASTScope(this, var));
+      }
+    });
+  };
+
   if (!parentAndExpanded.getInt()) {
   // Expand the children in the current scope.
   switch (getKind()) {
@@ -365,39 +377,20 @@ void ASTScope::expand() const {
       patternBinding.decl->getPatternList()[patternBinding.entry];
 
     // Create a child for the initializer, if present.
-    ASTScope *initChild = nullptr;
     if (patternEntry.getInitAsWritten() &&
         patternEntry.getInitAsWritten()->getSourceRange().isValid()) {
-      initChild = new (ctx) ASTScope(ASTScopeKind::PatternInitializer, this,
-                                     patternBinding.decl, patternBinding.entry);
+      addChild(new (ctx) ASTScope(ASTScopeKind::PatternInitializer, this,
+                                  patternBinding.decl, patternBinding.entry));
     }
-
-    // Create children for the accessors of any variables in the pattern that
-    // have them.
-    patternEntry.getPattern()->forEachVariable([&](VarDecl *var) {
-      if (hasAccessors(var)) {
-        // If there is an initializer child that precedes this node (the
-        // normal case), add teh initializer child first.
-        if (initChild &&
-            ctx.SourceMgr.isBeforeInBuffer(
-                                 patternEntry.getInitAsWritten()->getEndLoc(),
-                                 var->getBracesRange().Start)) {
-          addChild(initChild);
-          initChild = nullptr;
-        }
-
-        addChild(new (ctx) ASTScope(this, var));
-      }
-    });
-
-    // If an initializer child remains, add it now.
-    if (initChild)
-      addChild(initChild);
 
     // If there is an active continuation, nest the remaining pattern bindings.
     if (getActiveContinuation()) {
+      // Note: the accessors will follow the pattern binding.
       addChild(new (ctx) ASTScope(ASTScopeKind::AfterPatternBinding, this,
                                   patternBinding.decl, patternBinding.entry));
+    } else {
+      // Otherwise, add the accessors immediately.
+      addAccessors(patternEntry.getPattern());
     }
     break;
   }
@@ -413,6 +406,12 @@ void ASTScope::expand() const {
   }
 
   case ASTScopeKind::AfterPatternBinding: {
+    const auto &patternEntry =
+      patternBinding.decl->getPatternList()[patternBinding.entry];
+
+    // Add accessors for the variables in this pattern.
+    addAccessors(patternEntry.getPattern());
+
     // Create a child for the next pattern binding.
     if (auto child = createIfNeeded(this, patternBinding.decl))
       addChild(child);
@@ -593,7 +592,7 @@ void ASTScope::expand() const {
     break;
 
   case ASTScopeKind::Accessors: {
-    // Add children for all of the the explicitly-written accessors.
+    // Add children for all of the explicitly-written accessors.
     SmallVector<ASTScope *, 4> accessors;
     auto addAccessor = [&](FuncDecl *accessor) {
       if (!accessor) return;
@@ -866,14 +865,11 @@ ASTScope *ASTScope::createIfNeeded(const ASTScope *parent, Decl *decl) {
   if (decl->isImplicit()) return nullptr;
 
   // Accessors are always nested within their abstract storage declaration.
-  bool isAccessor = false;
   if (auto func = dyn_cast<FuncDecl>(decl)) {
-    if (func->isAccessor()) {
-      isAccessor = true;
-      if (!parentDirectDescendedFromAbstractStorageDecl(
-             parent, func->getAccessorStorageDecl()))
-        return nullptr;
-    }
+    if (func->isAccessor() &&
+        !parentDirectDescendedFromAbstractStorageDecl(
+            parent, func->getAccessorStorageDecl()))
+      return nullptr;
   }
 
   ASTContext &ctx = decl->getASTContext();
@@ -1248,6 +1244,8 @@ bool ASTScope::canStealContinuation() const {
   case ASTScopeKind::ForStmt:
   case ASTScopeKind::ForStmtInitializer:
   case ASTScopeKind::Closure:
+  case ASTScopeKind::TypeDecl:
+  case ASTScopeKind::AbstractFunctionDecl:
     // These node kinds don't introduce names that would be visible in a
     // continuation.
     return false;
@@ -1262,8 +1260,6 @@ bool ASTScope::canStealContinuation() const {
     return getParent()->getKind() == ASTScopeKind::TopLevelCode;
 
   case ASTScopeKind::AfterPatternBinding:
-  case ASTScopeKind::TypeDecl:
-  case ASTScopeKind::AbstractFunctionDecl:
   case ASTScopeKind::PatternBinding:
     // Declarations always steal continuations.
     return true;
@@ -1421,9 +1417,14 @@ SourceRange ASTScope::getSourceRangeImpl() const {
     return typeDecl->getSourceRange();
 
   case ASTScopeKind::ExtensionGenericParams: {
-    // The generic parameters of an extension are available from the trailing
+    // The generic parameters of an extension are available from the ':' of
+    // the inheritance clause (if available), or else that from the
     // 'where' (if present) or from the start of the body.
+    // FIXME: Approximating the ':' with the start of the first inherited entry.
     SourceLoc startLoc;
+    if (!extension->getInherited().empty() &&
+        extension->getInherited().front().getSourceRange().Start.isValid())
+      startLoc = extension->getInherited().front().getSourceRange().Start;
     if (auto trailingWhere = extension->getTrailingWhereClause())
       startLoc = trailingWhere->getWhereLoc();
     else
@@ -1504,10 +1505,6 @@ SourceRange ASTScope::getSourceRangeImpl() const {
     const auto &patternEntry =
       patternBinding.decl->getPatternList()[patternBinding.entry];
 
-    // We expect a continuation here.
-    assert(!patternBinding.decl->getDeclContext()->isLocalContext() ||
-           getHistoricalContinuation());
-
     return patternEntry.getSourceRange();
   }
 
@@ -1522,11 +1519,8 @@ SourceRange ASTScope::getSourceRangeImpl() const {
     const auto &patternEntry =
       patternBinding.decl->getPatternList()[patternBinding.entry];
 
-    // We expect a continuation here.
-    assert(getHistoricalContinuation());
-
-    // The scope of the binding begins at the end of the binding.
-    return SourceRange(patternEntry.getSourceRange().End);
+    return SourceRange(patternEntry.getSourceRange(/*omitAccessors*/true).End,
+                       patternEntry.getSourceRange().End);
   }
 
   case ASTScopeKind::BraceStmt:
@@ -1546,8 +1540,6 @@ SourceRange ASTScope::getSourceRangeImpl() const {
     // For a guard continuation, the scope extends from the end of the 'else'
     // to the end of the continuation.
     if (conditionalClause.isGuardContinuation) {
-      // We expect a continuation here.
-      assert(getHistoricalContinuation());
       const ASTScope *guard = this;
       do {
         guard = guard->getParent();
@@ -1799,11 +1791,12 @@ SmallVector<ValueDecl *, 4> ASTScope::getLocalBindings() const {
   switch (getKind()) {
   case ASTScopeKind::Preexpanded:
   case ASTScopeKind::SourceFile:
+  case ASTScopeKind::AbstractFunctionDecl:
+  case ASTScopeKind::TypeDecl:
   case ASTScopeKind::TypeOrExtensionBody:
   case ASTScopeKind::DefaultArgument:
   case ASTScopeKind::AbstractFunctionBody:
   case ASTScopeKind::PatternBinding:
-  case ASTScopeKind::BraceStmt:
   case ASTScopeKind::IfStmt:
   case ASTScopeKind::GuardStmt:
   case ASTScopeKind::RepeatWhileStmt:
@@ -1816,12 +1809,13 @@ SmallVector<ValueDecl *, 4> ASTScope::getLocalBindings() const {
     // No local declarations.
     break;
 
-  case ASTScopeKind::TypeDecl:
-    if (getHistoricalContinuation())
-      result.push_back(typeDecl);
-    break;
+  case ASTScopeKind::ExtensionGenericParams: {
+    // If the source range containing the extension parameters is empty,
+    // do nothing.
+    SourceRange range = getSourceRangeImpl();
+    if (range.Start == range.End)
+      break;
 
-  case ASTScopeKind::ExtensionGenericParams:
     // Bind this extension, if we haven't done so already.
     if (!extension->getExtendedType())
       if (auto resolver = extension->getASTContext().getLazyResolver())
@@ -1835,6 +1829,7 @@ SmallVector<ValueDecl *, 4> ASTScope::getLocalBindings() const {
         result.push_back(param);
     }
     break;
+  }
 
   case ASTScopeKind::GenericParams:
     result.push_back(genericParams.params->getParams()[genericParams.index]);
@@ -1850,20 +1845,20 @@ SmallVector<ValueDecl *, 4> ASTScope::getLocalBindings() const {
     handlePattern(patternBinding.decl->getPattern(patternBinding.entry));
     break;
 
-  case ASTScopeKind::AbstractFunctionDecl:
-    // FIXME: This allows overloading to work in top-level code, but is probably
-    // incorrect. We should likely use
-    //
-    //   if (getHistoricalContext())
-    //
-    // and name lookup should apply the normal name-hiding rules.
-    if (abstractFunction->getDeclContext()->isLocalContext())
-      result.push_back(abstractFunction);
-    break;
-
   case ASTScopeKind::ConditionalClause:
     handlePattern(conditionalClause.stmt->getCond()[conditionalClause.index]
                     .getPatternOrNull());
+    break;
+
+  case ASTScopeKind::BraceStmt:
+    // All types and functions are visible anywhere within their brace
+    // statements. It's up to capture analysis to determine what is usable.
+    for (auto element : braceStmt.stmt->getElements()) {
+      if (auto decl = element.dyn_cast<Decl *>()) {
+        if (isa<AbstractFunctionDecl>(decl) || isa<TypeDecl>(decl))
+          result.push_back(cast<ValueDecl>(decl));
+      }
+    }
     break;
 
   case ASTScopeKind::ForEachPattern:
@@ -1887,6 +1882,8 @@ SmallVector<ValueDecl *, 4> ASTScope::getLocalBindings() const {
     break;
 
   case ASTScopeKind::PatternInitializer:
+    // FIXME: This causes recursion that we cannot yet handle.
+#if false
     // 'self' is available within the pattern initializer of a 'lazy' variable.
     if (auto singleVar = patternBinding.decl->getSingleVar()) {
       if (singleVar->getAttrs().hasAttribute<LazyAttr>() &&
@@ -1904,6 +1901,7 @@ SmallVector<ValueDecl *, 4> ASTScope::getLocalBindings() const {
             result.push_back(self);
       }
     }
+#endif
     break;
 
   case ASTScopeKind::Closure:

@@ -30,11 +30,11 @@ Swift-to-Java bridging.
 To follow along with this guide, you'll need:
 
 1. A Linux environment capable of building Swift from source, specifically
-   Ubuntu 15.10 (Ubuntu 14.04 is [not currently supported](Swift Android libicuuc link step fails on Ubuntu 14.04)).
+   Ubuntu 15.10 (Ubuntu 14.04 is [not currently supported](https://bugs.swift.org/browse/SR-1321), [nor is 16.04](https://bugs.swift.org/browse/SR-1321)).
    The stdlib is currently only buildable for Android from a Linux environment.
    Before attempting to build for Android, please make sure you are able to build
    for Linux by following the instructions in the Swift project README.
-2. The latest version of the Android NDK (r12 at the time of this writing),
+2. The latest version of the Android NDK (r13 at the time of this writing),
    available to download here:
    http://developer.android.com/ndk/downloads/index.html.
 3. An Android device with remote debugging enabled. We require remote
@@ -52,7 +52,7 @@ the Swift stdlib for Android requires the libiconv and libicu libraries.
 However, you'll need versions of these libraries that work on Android devices.
 
 You may download prebuilt copies of these dependencies, built for Ubuntu 15.10
-and Android NDK r12. Click [here](https://github.com/SwiftAndroid/libiconv-libicu-android/releases/download/android-ndk-r12/libiconv-libicu-armeabi-v7a-ubuntu-15.10-ndk-r12.tar.gz)
+and Android NDK r13. Click [here](https://github.com/SwiftAndroid/libiconv-libicu-android/releases/download/android-ndk-r13/libiconv-libicu-armeabi-v7a-ubuntu-15.10-ndk-r13.tar.gz)
 to download, then unzip the archive file.
 
 Alternatively, you may choose to build libiconv and libicu for Android yourself:
@@ -81,7 +81,7 @@ Android NDK, as well as the directories that contain the `libicuuc.so` and
 $ utils/build-script \
     -R \                                       # Build in ReleaseAssert mode.
     --android \                                # Build for Android.
-    --android-ndk /path/to/android-ndk-r12 \   # Path to an Android NDK.
+    --android-ndk /path/to/android-ndk-r13 \   # Path to an Android NDK.
     --android-api-level 21 \                   # The Android API level to target. Swift only supports 21 or greater.
     --android-icu-uc /path/to/libicu-android/armeabi-v7a \
     --android-icu-uc-include /path/to/libicu-android/armeabi-v7a/icu/source/common \
@@ -102,7 +102,7 @@ gold linker in the Android NDK into your `PATH`:
 
 ```
 $ sudo ln -s \
-    /path/to/android-ndk-r12/toolchains/arm-linux-androideabi-4.9/prebuilt/linux-x86_64/arm-linux-androideabi/bin/ld.gold \
+    /path/to/android-ndk-r13/toolchains/arm-linux-androideabi-4.9/prebuilt/linux-x86_64/arm-linux-androideabi/bin/ld.gold \
     /usr/bin/armv7-none-linux-androideabi-ld.gold
 ```
 
@@ -112,9 +112,9 @@ source file, targeting Android:
 ```
 $ build/Ninja-ReleaseAssert/swift-linux-x86_64/bin/swiftc \                      # The Swift compiler built in the previous step.
     -target armv7-none-linux-androideabi \                                       # Targeting android-armv7.
-    -sdk /path/to/android-ndk-r12/platforms/android-21/arch-arm \                # Use the same NDK path and API version as you used to build the stdlib in the previous step.
-    -L /path/to/android-ndk-r12/sources/cxx-stl/llvm-libc++/libs/armeabi-v7a \   # Link the Android NDK's libc++ and libgcc.
-    -L /path/to/android-ndk-r12/toolchains/arm-linux-androideabi-4.9/prebuilt/linux-x86_64/lib/gcc/arm-linux-androideabi/4.9 \
+    -sdk /path/to/android-ndk-r13/platforms/android-21/arch-arm \                # Use the same NDK path and API version as you used to build the stdlib in the previous step.
+    -L /path/to/android-ndk-r13/sources/cxx-stl/llvm-libc++/libs/armeabi-v7a \   # Link the Android NDK's libc++ and libgcc.
+    -L /path/to/android-ndk-r13/toolchains/arm-linux-androideabi-4.9/prebuilt/linux-x86_64/lib/gcc/arm-linux-androideabi/4.9 \
     hello.swift
 ```
 
@@ -155,7 +155,7 @@ $ adb push build/Ninja-ReleaseAssert/swift-linux-x86_64/lib/swift/android/libswi
 In addition, you'll also need to copy the Android NDK's libc++:
 
 ```
-$ adb push /path/to/android-ndk-r12/sources/cxx-stl/llvm-libc++/libs/armeabi-v7a/libc++_shared.so /data/local/tmp
+$ adb push /path/to/android-ndk-r13/sources/cxx-stl/llvm-libc++/libs/armeabi-v7a/libc++_shared.so /data/local/tmp
 ```
 
 Finally, you'll need to copy the `hello` executable you built in the
@@ -198,7 +198,7 @@ $ utils/build-script \
   -R \                                           # Build in ReleaseAssert mode.
   -T \                                           # Run all tests.
   --android \                                    # Build for Android.
-  --android-ndk ~/android-ndk-r12 \              # Path to an Android NDK.
+  --android-ndk ~/android-ndk-r13 \              # Path to an Android NDK.
   --android-ndk-version 21 \
   --android-icu-uc ~/libicu-android/armeabi-v7a/libicuuc.so \
   --android-icu-uc-include ~/libicu-android/armeabi-v7a/icu/source/common \

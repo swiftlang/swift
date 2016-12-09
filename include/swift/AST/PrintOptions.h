@@ -5,8 +5,8 @@
 // Copyright (c) 2014 - 2016 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
-// See http://swift.org/LICENSE.txt for license information
-// See http://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
+// See https://swift.org/LICENSE.txt for license information
+// See https://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
 //
 //===----------------------------------------------------------------------===//
 
@@ -16,6 +16,7 @@
 #include "swift/Basic/STLExtras.h"
 #include "swift/AST/AttrKind.h"
 #include "swift/AST/Identifier.h"
+#include "llvm/ADT/Optional.h"
 #include <limits.h>
 #include <vector>
 
@@ -31,32 +32,21 @@ class DeclContext;
 class Type;
 class ModuleDecl;
 enum DeclAttrKind : unsigned;
-class PrinterTypeTransformer;
 class SynthesizedExtensionAnalyzer;
 struct PrintOptions;
 
 /// Necessary information for archetype transformation during printing.
 struct TypeTransformContext {
-  Type getTypeBase();
-  NominalTypeDecl *getNominal();
-  PrinterTypeTransformer *getTransformer();
-  bool isPrintingSynthesizedExtension();
-  bool isPrintingTypeInterface();
-  TypeTransformContext(PrinterTypeTransformer *Transformer);
-  TypeTransformContext(PrinterTypeTransformer *Transformer,
-                            Type T);
-  TypeTransformContext(PrinterTypeTransformer *Transformer,
-                            NominalTypeDecl *NTD,
-                            SynthesizedExtensionAnalyzer *Analyzer);
-  Type transform(Type Input);
-  StringRef transform(StringRef Input);
+  TypeBase *BaseType;
+  NominalTypeDecl *Nominal = nullptr;
 
-  bool shouldPrintRequirement(ExtensionDecl *ED, StringRef Req);
+  explicit TypeTransformContext(Type T);
+  explicit TypeTransformContext(NominalTypeDecl* NTD);
 
-  ~TypeTransformContext();
-private:
-  struct Implementation;
-  Implementation &Impl;
+  Type getBaseType() const;
+  NominalTypeDecl *getNominal() const;
+
+  bool isPrintingSynthesizedExtension() const;
 };
 
 typedef std::pair<ExtensionDecl*, bool> ExtensionAndIsSynthesized;
@@ -245,6 +235,9 @@ struct PrintOptions {
   /// protocol requirements.
   bool SkipOverrides = false;
 
+  /// Whether to skip parameter type attributes
+  bool SkipParameterTypeAttributes = false;
+
   /// Whether to print a long attribute like '\@available' on a separate line
   /// from the declaration or other attributes.
   bool PrintLongAttrsOnSeparateLines = false;
@@ -292,12 +285,6 @@ struct PrintOptions {
   /// Whether we are printing part of SIL body.
   bool PrintInSILBody = false;
 
-  /// Whether to print the types as if they appear as function parameters. This
-  /// governs whether we print a function type with an explicit @escaping. This
-  /// is also set and restored internally when visiting a type in a parameter
-  /// position.
-  bool PrintAsInParamType = false;
-
   /// Whether to use an empty line to separate two members in a single decl.
   bool EmptyLineBetweenMembers = false;
 
@@ -336,6 +323,10 @@ struct PrintOptions {
   /// formatting.
   bool PrintOriginalSourceText = false;
 
+  /// When printing a name alias type, whether print the underlying type instead
+  /// of the alias.
+  bool PrintNameAliasUnderlyingType = false;
+
   /// \brief Print dependent types as references into this generic environment.
   GenericEnvironment *GenericEnv = nullptr;
 
@@ -347,7 +338,9 @@ struct PrintOptions {
   ModuleDecl *CurrentModule = nullptr;
 
   /// \brief The information for converting archetypes to specialized types.
-  std::shared_ptr<TypeTransformContext> TransformContext;
+  llvm::Optional<TypeTransformContext> TransformContext;
+
+  bool PrintAsMember = false;
 
   /// \brief If this is not \c nullptr then functions (including accessors and
   /// constructors) will be printed with a body that is determined by this
@@ -410,18 +403,13 @@ struct PrintOptions {
     return result;
   }
 
-  static PrintOptions printTypeInterface(Type T, DeclContext *DC);
+  static PrintOptions printTypeInterface(Type T);
 
-  void setArchetypeSelfTransform(Type T, DeclContext *DC);
+  void setBaseType(Type T);
 
-  void setArchetypeSelfTransformForQuickHelp(Type T, DeclContext *DC);
+  void initForSynthesizedExtension(NominalTypeDecl *D);
 
-  void setArchetypeAndDynamicSelfTransform(Type T, DeclContext *DC);
-
-  void initArchetypeTransformerForSynthesizedExtensions(NominalTypeDecl *D,
-                                    SynthesizedExtensionAnalyzer *SynAnalyzer);
-
-  void clearArchetypeTransformerForSynthesizedExtensions();
+  void clearSynthesizedExtension();
 
   /// Retrieve the print options that are suitable to print the testable interface.
   static PrintOptions printTestableInterface() {

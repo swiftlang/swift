@@ -1,53 +1,42 @@
-;===--- .dir-locals.el ---------------------------------------------------===;
-;
-; This source file is part of the Swift.org open source project
-;
-; Copyright (c) 2014 - 2016 Apple Inc. and the Swift project authors
-; Licensed under Apache License v2.0 with Runtime Library Exception
-;
-; See http://swift.org/LICENSE.txt for license information
-; See http://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
-;
-;===----------------------------------------------------------------------===;
 ;;; Directory Local Variables
-;;; See Info node `(emacs) Directory Variables' for more information.
+;;; For more information see (info "(emacs) Directory Variables")
 
 ((nil
+  (eval let*
+        ((x (dir-locals-find-file default-directory))
+         (this-directory (if (listp x) (car x) (file-name-directory x))))
+        (unless (featurep 'swift-project-settings)
+          (add-to-list 'load-path
+                       (concat this-directory "utils")
+                       :append)
+          (let ((swift-project-directory this-directory))
+            (require 'swift-project-settings)))
+        (set (make-local-variable 'swift-project-directory)
+         this-directory)
+        )
   (tab-width . 2)
   (fill-column . 80)
-  (eval .
-        ;; Load the Swift project's settings.  To suppress this action
-        ;; you can put "(provide 'swift-project-settings)" in your
-        ;; .emacs
-        (unless (featurep 'swift-project-settings)
-          ;; Make sure the project's own utils directory is in the
-          ;; load path, but don't override any one the user might have
-          ;; set up.
-          (add-to-list
-           'load-path
-           (concat
-            (let ((dlff (dir-locals-find-file default-directory)))
-              (if (listp dlff) (car dlff) (file-name-directory dlff)))
-            "utils")
-           :append)
-            ;; Load our project's settings -- indirectly brings in swift-mode
-          (require 'swift-project-settings)))
-  (c-file-style . "swift")
-  )
+  (c-file-style . "swift"))
  (c++-mode
-  (whitespace-style . (face lines indentation:space))
-  (eval . (whitespace-mode)))
- (objc-mode
-  (whitespace-style . (face lines indentation:space))
-  (eval . (whitespace-mode)))
+  (whitespace-style face lines indentation:space))
  (c-mode
-  (whitespace-style . (face lines indentation:space))
-  (eval . (whitespace-mode)))
+  (whitespace-style face lines indentation:space))
+ (objc-mode
+  (whitespace-style face lines indentation:space))
+ (prog-mode
+  (eval add-hook 'prog-mode-hook
+        (lambda nil
+          (whitespace-mode 1))
+        (not :APPEND)
+        :BUFFER-LOCAL))
  (swift-mode
-  (whitespace-style . (face lines indentation:space))
-  (eval . (whitespace-mode))
+  (swift-find-executable-fn . swift-project-executable-find)
+  (swift-syntax-check-fn . swift-project-swift-syntax-check)
+  (whitespace-style face lines indentation:space)
   (swift-basic-offset . 2)
   (tab-always-indent . t)))
+
+
 
 ;; Local Variables:
 ;; eval: (whitespace-mode -1)

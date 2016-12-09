@@ -18,7 +18,9 @@
 // RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=PLAIN_TOP_LEVEL_1 > %t.toplevel.txt
 // RUN: %FileCheck %s -check-prefix=PLAIN_TOP_LEVEL < %t.toplevel.txt
 // RUN: %FileCheck %s -check-prefix=PLAIN_TOP_LEVEL_NO_DUPLICATES < %t.toplevel.txt
+// RUN: %FileCheck %s -check-prefix=NEGATIVE < %t.toplevel.txt
 // RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=PLAIN_TOP_LEVEL_2 | %FileCheck %s -check-prefix=PLAIN_TOP_LEVEL
+// RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=PLAIN_TOP_LEVEL_2 | %FileCheck %s -check-prefix=NEGATIVE
 
 // RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=TOP_LEVEL_CLOSURE_1 | %FileCheck %s -check-prefix=TOP_LEVEL_CLOSURE_1
 
@@ -45,34 +47,42 @@
 // RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=TOP_LEVEL_VAR_TYPE_5 > %t.toplevel.5.txt
 // RUN: %FileCheck %s -check-prefix=TOP_LEVEL_VAR_TYPE_1 < %t.toplevel.5.txt
 // RUN: %FileCheck %s -check-prefix=TOP_LEVEL_VAR_TYPE_NEGATIVE_1 < %t.toplevel.5.txt
+// RUN: %FileCheck %s -check-prefix=NEGATIVE < %t.toplevel.5.txt
 
 // RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=TOP_LEVEL_VAR_TYPE_5 > %t.toplevel.5.txt
 // RUN: %FileCheck %s -check-prefix=TOP_LEVEL_VAR_TYPE_1 < %t.toplevel.5.txt
 // RUN: %FileCheck %s -check-prefix=TOP_LEVEL_VAR_TYPE_NEGATIVE_1 < %t.toplevel.5.txt
+// RUN: %FileCheck %s -check-prefix=NEGATIVE < %t.toplevel.5.txt
 
 // RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=TOP_LEVEL_VAR_TYPE_6 > %t.toplevel.6.txt
 // RUN: %FileCheck %s -check-prefix=TOP_LEVEL_VAR_TYPE_1 < %t.toplevel.6.txt
 // RUN: %FileCheck %s -check-prefix=TOP_LEVEL_VAR_TYPE_NEGATIVE_1 < %t.toplevel.6.txt
+// RUN: %FileCheck %s -check-prefix=NEGATIVE < %t.toplevel.6.txt
 
 // RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=TOP_LEVEL_EXPR_TYPE_1 > %t.toplevel-expr.1.txt
 // RUN: %FileCheck %s -check-prefix=TOP_LEVEL_VAR_TYPE_1 < %t.toplevel-expr.1.txt
 // RUN: %FileCheck %s -check-prefix=TOP_LEVEL_VAR_TYPE_NEGATIVE_1 < %t.toplevel-expr.1.txt
+// RUN: %FileCheck %s -check-prefix=NEGATIVE < %t.toplevel-expr.1.txt
 
 // RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=TOP_LEVEL_EXPR_TYPE_2 > %t.toplevel-expr.2.txt
 // RUN: %FileCheck %s -check-prefix=TOP_LEVEL_VAR_TYPE_1 < %t.toplevel-expr.2.txt
 // RUN: %FileCheck %s -check-prefix=TOP_LEVEL_VAR_TYPE_NEGATIVE_1 < %t.toplevel-expr.2.txt
+// RUN: %FileCheck %s -check-prefix=NEGATIVE < %t.toplevel-expr.2.txt
 
 // RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=TOP_LEVEL_EXPR_TYPE_3 > %t.toplevel-expr.3.txt
 // RUN: %FileCheck %s -check-prefix=TOP_LEVEL_VAR_TYPE_1 < %t.toplevel-expr.3.txt
 // RUN: %FileCheck %s -check-prefix=TOP_LEVEL_VAR_TYPE_NEGATIVE_1 < %t.toplevel-expr.3.txt
+// RUN: %FileCheck %s -check-prefix=NEGATIVE < %t.toplevel-expr.3.txt
 
 // RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=TOP_LEVEL_EXPR_TYPE_4 > %t.toplevel-expr.4.txt
 // RUN: %FileCheck %s -check-prefix=TOP_LEVEL_VAR_TYPE_1 < %t.toplevel-expr.4.txt
 // RUN: %FileCheck %s -check-prefix=TOP_LEVEL_VAR_TYPE_NEGATIVE_1 < %t.toplevel-expr.4.txt
+// RUN: %FileCheck %s -check-prefix=NEGATIVE < %t.toplevel-expr.4.txt
 
 // RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=TOP_LEVEL_EXPR_TYPE_2 > %t.toplevel-expr.2.txt
 // RUN: %FileCheck %s -check-prefix=TOP_LEVEL_VAR_TYPE_1 < %t.toplevel-expr.2.txt
 // RUN: %FileCheck %s -check-prefix=TOP_LEVEL_VAR_TYPE_NEGATIVE_1 < %t.toplevel-expr.2.txt
+// RUN: %FileCheck %s -check-prefix=NEGATIVE < %t.toplevel-expr.2.txt
 
 // RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=TOP_LEVEL_STMT_1 | %FileCheck %s -check-prefix=PLAIN_TOP_LEVEL
 // RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=TOP_LEVEL_STMT_2 | %FileCheck %s -check-prefix=PLAIN_TOP_LEVEL
@@ -143,7 +153,6 @@ fooObject#^TYPE_CHECKED_EXPR_1^#
 // TYPE_CHECKED_EXPR_1: Begin completions
 // TYPE_CHECKED_EXPR_1-NEXT: Decl[InstanceVar]/CurrNominal: .instanceVar[#Int#]{{; name=.+$}}
 // TYPE_CHECKED_EXPR_1-NEXT: Decl[InstanceMethod]/CurrNominal: .instanceFunc({#(a): Int#})[#Void#]{{; name=.+$}}
-// TYPE_CHECKED_EXPR_1-NEXT: Decl[InstanceMethod]/CurrNominal: .instanceFuncAtEOF()[#Void#]; name=instanceFuncAtEOF()
 // TYPE_CHECKED_EXPR_1-NEXT: BuiltinOperator/None:                     = {#FooStruct#}[#Void#];
 // TYPE_CHECKED_EXPR_1-NEXT: End completions
 
@@ -156,7 +165,6 @@ fooObject#^TYPE_CHECKED_EXPR_2^#
 // TYPE_CHECKED_EXPR_2: Begin completions
 // TYPE_CHECKED_EXPR_2-NEXT: Decl[InstanceVar]/CurrNominal: .instanceVar[#Int#]{{; name=.+$}}
 // TYPE_CHECKED_EXPR_2-NEXT: Decl[InstanceMethod]/CurrNominal: .instanceFunc({#(a): Int#})[#Void#]{{; name=.+$}}
-// TYPE_CHECKED_EXPR_2-NEXT: Decl[InstanceMethod]/CurrNominal: .instanceFuncAtEOF()[#Void#]; name=instanceFuncAtEOF()
 // TYPE_CHECKED_EXPR_2-NEXT: BuiltinOperator/None:                     = {#FooStruct#}[#Void#];
 // TYPE_CHECKED_EXPR_2-NEXT: End completions
 
@@ -166,7 +174,6 @@ fooObject#^TYPE_CHECKED_EXPR_3^#.bar
 // TYPE_CHECKED_EXPR_3: Begin completions
 // TYPE_CHECKED_EXPR_3-NEXT: Decl[InstanceVar]/CurrNominal: .instanceVar[#Int#]{{; name=.+$}}
 // TYPE_CHECKED_EXPR_3-NEXT: Decl[InstanceMethod]/CurrNominal: .instanceFunc({#(a): Int#})[#Void#]{{; name=.+$}}
-// TYPE_CHECKED_EXPR_3-NEXT: Decl[InstanceMethod]/CurrNominal: .instanceFuncAtEOF()[#Void#]; name=instanceFuncAtEOF()
 // TYPE_CHECKED_EXPR_3-NEXT: BuiltinOperator/None:                     = {#FooStruct#}[#Void#];
 // TYPE_CHECKED_EXPR_3-NEXT: End completions
 
@@ -176,7 +183,6 @@ fooObject.#^TYPE_CHECKED_EXPR_4^#
 // TYPE_CHECKED_EXPR_4: Begin completions
 // TYPE_CHECKED_EXPR_4-NEXT: Decl[InstanceVar]/CurrNominal: instanceVar[#Int#]{{; name=.+$}}
 // TYPE_CHECKED_EXPR_4-NEXT: Decl[InstanceMethod]/CurrNominal: instanceFunc({#(a): Int#})[#Void#]{{; name=.+$}}
-// TYPE_CHECKED_EXPR_4-NEXT: Decl[InstanceMethod]/CurrNominal: instanceFuncAtEOF()[#Void#]; name=instanceFuncAtEOF()
 // TYPE_CHECKED_EXPR_4-NEXT: End completions
 
 func resyncParser5() {}
@@ -185,7 +191,6 @@ fooObject.#^TYPE_CHECKED_EXPR_5^#.bar
 // TYPE_CHECKED_EXPR_5: Begin completions
 // TYPE_CHECKED_EXPR_5-NEXT: Decl[InstanceVar]/CurrNominal: instanceVar[#Int#]{{; name=.+$}}
 // TYPE_CHECKED_EXPR_5-NEXT: Decl[InstanceMethod]/CurrNominal: instanceFunc({#(a): Int#})[#Void#]{{; name=.+$}}
-// TYPE_CHECKED_EXPR_5-NEXT: Decl[InstanceMethod]/CurrNominal: instanceFuncAtEOF()[#Void#]; name=instanceFuncAtEOF()
 // TYPE_CHECKED_EXPR_5-NEXT: End completions
 
 func resyncParser6() {}
@@ -208,7 +213,6 @@ fooObjectWithErrorInInit.#^TYPE_CHECKED_EXPR_WITH_ERROR_IN_INIT_1^#
 // TYPE_CHECKED_EXPR_WITH_ERROR_IN_INIT_1: Begin completions
 // TYPE_CHECKED_EXPR_WITH_ERROR_IN_INIT_1-NEXT: Decl[InstanceVar]/CurrNominal: instanceVar[#Int#]{{; name=.+$}}
 // TYPE_CHECKED_EXPR_WITH_ERROR_IN_INIT_1-NEXT: Decl[InstanceMethod]/CurrNominal: instanceFunc({#(a): Int#})[#Void#]{{; name=.+$}}
-// TYPE_CHECKED_EXPR_WITH_ERROR_IN_INIT_1-NEXT: Decl[InstanceMethod]/CurrNominal: instanceFuncAtEOF()[#Void#]; name=instanceFuncAtEOF()
 // TYPE_CHECKED_EXPR_WITH_ERROR_IN_INIT_1-NEXT: End completions
 
 func resyncParser6a() {}
@@ -392,8 +396,8 @@ func resyncParserB11() {}
 // rdar://21346928
 func optStr() -> String? { return nil }
 let x = (optStr() ?? "autoclosure").#^TOP_LEVEL_AUTOCLOSURE_1^#
-// AUTOCLOSURE_STRING: Decl[InstanceVar]/CurrNominal:      utf16[#String.UTF16View#]
 // AUTOCLOSURE_STRING: Decl[InstanceVar]/CurrNominal:      characters[#String.CharacterView#]
+// AUTOCLOSURE_STRING: Decl[InstanceVar]/CurrNominal:      utf16[#String.UTF16View#]
 // AUTOCLOSURE_STRING: Decl[InstanceVar]/CurrNominal:      utf8[#String.UTF8View#]
 
 func resyncParserB12() {}

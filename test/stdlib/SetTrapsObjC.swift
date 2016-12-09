@@ -105,7 +105,7 @@ struct TestBridgedKeyTy : Hashable, _ObjectiveCBridgeable {
 
   static func _unconditionallyBridgeFromObjectiveC(_ source: TestObjCKeyTy?)
       -> TestBridgedKeyTy {
-    var result: TestBridgedKeyTy? = nil
+    var result: TestBridgedKeyTy?
     _forceBridgeFromObjectiveC(source!, result: &result)
     return result!
   }

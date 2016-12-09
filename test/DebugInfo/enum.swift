@@ -1,8 +1,6 @@
 // RUN: %target-swift-frontend -primary-file %s -emit-ir -g -o - | %FileCheck %s
 // RUN: %target-swift-frontend -primary-file %s -emit-ir -gdwarf-types -o - | %FileCheck %s --check-prefix=DWARF
 
-// CHECK: ![[EMPTY:.*]] = !{}
-
 protocol P {}
 
 enum Either {
@@ -11,6 +9,7 @@ enum Either {
 // CHECK-SAME:             line: [[@LINE-3]],
 // CHECK-SAME:             size: {{328|168}},
 }
+// CHECK: ![[EMPTY:.*]] = !{}
 // DWARF: ![[INT:.*]] = !DICompositeType({{.*}}identifier: "_TtSi"
 let E : Either = .Neither;
 

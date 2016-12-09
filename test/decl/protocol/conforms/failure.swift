@@ -1,4 +1,4 @@
-// RUN: %target-parse-verify-swift
+// RUN: %target-typecheck-verify-swift
 
 protocol P1 {
   func foo() // expected-note {{protocol requires function 'foo()'}}
@@ -75,9 +75,9 @@ struct P5Conformer : P5 { // expected-error {{does not conform}}
 
 
 protocol P6Base {
-  associatedtype Foo
+  associatedtype Foo // expected-note {{protocol requires nested type 'Foo'; do you want to add it?}}
   func foo()
-  func bar() -> Foo // expected-note{{protocol requires function 'bar()' }}
+  func bar() -> Foo
 }
 extension P6Base {
 }
@@ -85,7 +85,7 @@ protocol P6 : P6Base {
   associatedtype Bar // expected-note {{protocol requires nested type 'Bar'}}
 }
 extension P6 {
-  func bar() -> Bar? { return nil } // expected-note{{candidate has non-matching type}}
+  func bar() -> Bar? { return nil }
 }
 
 struct P6Conformer : P6 { // expected-error 2 {{does not conform}}

@@ -5,8 +5,8 @@
 // Copyright (c) 2014 - 2016 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
-// See http://swift.org/LICENSE.txt for license information
-// See http://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
+// See https://swift.org/LICENSE.txt for license information
+// See https://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
 //
 //===----------------------------------------------------------------------===//
 
@@ -140,7 +140,8 @@ namespace {
         //emission.
         scalarOperandValue = operand.forward(SGF);
         if (scalarOperandValue->getType().isAddress()) {
-          scalarOperandValue = SGF.B.createLoad(Loc, scalarOperandValue);
+          scalarOperandValue = SGF.B.emitLoadValueOperation(
+              Loc, scalarOperandValue, LoadOwnershipQualifier::Take);
         }
         SGF.B.createCheckedCastBranch(Loc, /*exact*/ false, scalarOperandValue,
                                       origTargetTL.getLoweredType(),
@@ -157,8 +158,8 @@ namespace {
           result = finishFromResultBuffer(hasAbstraction, resultBuffer,
                                           abstraction, origTargetTL, ctx);
         } else {
-          SILValue argument = new (SGF.F.getModule())
-            SILArgument(trueBB, origTargetTL.getLoweredType());
+          SILValue argument =
+              trueBB->createArgument(origTargetTL.getLoweredType());
           result = finishFromResultScalar(hasAbstraction, argument, consumption,
                                           abstraction, origTargetTL, ctx);
         }
@@ -175,7 +176,7 @@ namespace {
         // If we're using the scalar strategy, handle the consumption rules.
         if (Strategy != CastStrategy::Address &&
             shouldDestroyOnFailure(consumption)) {
-          SGF.B.emitReleaseValueOperation(Loc, scalarOperandValue);
+          SGF.B.emitDestroyValueOperation(Loc, scalarOperandValue);
         }
 
         handleFalse();
@@ -233,7 +234,7 @@ namespace {
                                         SGFContext ctx) {
       // Retain the result if this is copy-on-success.
       if (!shouldTakeOnSuccess(consumption))
-        origTargetTL.emitRetainValue(SGF.B, Loc, value);
+        value = origTargetTL.emitCopyValue(SGF.B, Loc, value);
 
       // Enter a cleanup for the +1 result.
       ManagedValue result
@@ -363,7 +364,8 @@ adjustForConditionalCheckedCastOperand(SILLocation loc, ManagedValue src,
     // Okay, if all we need to do is drop the value in an address,
     // this is easy.
     if (!hasAbstraction) {
-      SGF.B.createStore(loc, src.forward(SGF), init->getAddress());
+      SGF.B.emitStoreValueOperation(loc, src.forward(SGF), init->getAddress(),
+                                    StoreOwnershipQualifier::Init);
       init->finishInitialization(SGF);
       return init->getManagedAddress();
     }
@@ -497,8 +499,7 @@ RValue Lowering::emitConditionalCheckedCast(SILGenFunction &SGF,
   if (resultObjectTemp) {
     result = SGF.manageBufferForExprResult(resultBuffer, resultTL, C);
   } else {
-    auto argument =
-      new (SGF.F.getModule()) SILArgument(contBB, resultTL.getLoweredType());
+    auto argument = contBB->createArgument(resultTL.getLoweredType());
     result = SGF.emitManagedRValueWithCleanup(argument, resultTL);
   }
 
@@ -547,7 +548,7 @@ SILValue Lowering::emitIsa(SILGenFunction &SGF, SILLocation loc,
     });
 
   auto contBB = scope.exit();
-  auto isa = new (SGF.SGM.M) SILArgument(contBB, i1Ty);
+  auto isa = contBB->createArgument(i1Ty);
   return isa;
 }
 

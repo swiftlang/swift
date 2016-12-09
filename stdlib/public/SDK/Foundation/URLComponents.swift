@@ -5,8 +5,8 @@
 // Copyright (c) 2014 - 2016 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
-// See http://swift.org/LICENSE.txt for license information
-// See http://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
+// See https://swift.org/LICENSE.txt for license information
+// See https://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
 //
 //===----------------------------------------------------------------------===//
 
@@ -284,7 +284,7 @@ public struct URLComponents : ReferenceConvertible, Hashable, Equatable, _Mutabl
     ///
     /// The setter combines an array containing any number of `URLQueryItem`s, each of which represents a single key-value pair, into a query string and sets the `URLComponents` query property. Passing an empty array sets the query component of the `URLComponents` to an empty string. Passing nil removes the query component of the `URLComponents`.
     ///
-    /// - note: If a name-value pair in a query is empty (i.e. the query string starts with '&', ends with '&', or has "&&" within it), you get a `URLQueryItem` with a zero-length name and and a nil value. If a query's name-value pair has nothing before the equals sign, you get a zero-length name. If a query's name-value pair has nothing after the equals sign, you get a zero-length value. If a query's name-value pair has no equals sign, the query name-value pair string is the name and you get a nil value.
+    /// - note: If a name-value pair in a query is empty (i.e. the query string starts with '&', ends with '&', or has "&&" within it), you get a `URLQueryItem` with a zero-length name and a nil value. If a query's name-value pair has nothing before the equals sign, you get a zero-length name. If a query's name-value pair has nothing after the equals sign, you get a zero-length value. If a query's name-value pair has no equals sign, the query name-value pair string is the name and you get a nil value.
     @available(OSX 10.10, iOS 8.0, *)
     public var queryItems: [URLQueryItem]? {
         get { return _handle.map { $0.queryItems?.map { return $0 as URLQueryItem } } }
@@ -334,7 +334,7 @@ extension URLComponents : CustomStringConvertible, CustomDebugStringConvertible,
         
         c.append((label: "path", value: self.path))
         if #available(OSX 10.10, iOS 8.0, *) {
-            if let qi = self.queryItems { c.append((label: "queryItems", value: qi )) }
+            if let qi = self.queryItems { c.append((label: "queryItems", value: qi)) }
         }
         if let f = self.fragment { c.append((label: "fragment", value: f)) }
         let m = Mirror(self, children: c, displayStyle: Mirror.DisplayStyle.struct)
@@ -364,7 +364,7 @@ extension URLComponents : _ObjectiveCBridgeable {
     }
 
     public static func _unconditionallyBridgeFromObjectiveC(_ source: NSURLComponents?) -> URLComponents {
-        var result: URLComponents? = nil
+        var result: URLComponents?
         _forceBridgeFromObjectiveC(source!, result: &result)
         return result!
     }
@@ -457,7 +457,7 @@ extension URLQueryItem : _ObjectiveCBridgeable {
     }
 
     public static func _unconditionallyBridgeFromObjectiveC(_ source: NSURLQueryItem?) -> URLQueryItem {
-        var result: URLQueryItem? = nil
+        var result: URLQueryItem?
         _forceBridgeFromObjectiveC(source!, result: &result)
         return result!
     }

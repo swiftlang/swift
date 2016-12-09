@@ -5,8 +5,8 @@
 // Copyright (c) 2014 - 2016 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
-// See http://swift.org/LICENSE.txt for license information
-// See http://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
+// See https://swift.org/LICENSE.txt for license information
+// See https://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
 //
 //===----------------------------------------------------------------------===//
 
@@ -249,7 +249,8 @@ ManagedValue SILGenFunction::emitUncheckedGetOptionalValueFrom(SILLocation loc,
                                         someDecl, origPayloadTy);
   
     if (optTL.isLoadable())
-      payloadVal = B.createLoad(loc, payloadVal);
+      payloadVal =
+          optTL.emitLoad(B, loc, payloadVal, LoadOwnershipQualifier::Take);
   }
 
   // Produce a correctly managed value.
@@ -280,9 +281,8 @@ SILGenFunction::emitOptionalToOptional(SILLocation loc,
   if (resultTL.isAddressOnly())
     result = emitTemporaryAllocation(loc, resultTy);
   else
-    result = new (F.getModule()) SILArgument(contBB, resultTL.getLoweredType());
+    result = contBB->createArgument(resultTL.getLoweredType());
 
-  
   // Branch on whether the input is optional, this doesn't consume the value.
   auto isPresent = emitDoesOptionalHaveValue(loc, input.getValue());
   B.createCondBranch(loc, isPresent, isPresentBB, isNotPresentBB);
@@ -310,7 +310,8 @@ SILGenFunction::emitOptionalToOptional(SILLocation loc,
 
     // Inject that into the result type if the result is address-only.
     if (resultTL.isAddressOnly()) {
-      ArgumentSource resultValueRV(loc, RValue(resultValue, resultValueTy));
+      ArgumentSource resultValueRV(loc, RValue(*this, loc,
+                                               resultValueTy, resultValue));
       emitInjectOptionalValueInto(loc, std::move(resultValueRV),
                                   result, resultTL);
     } else {
@@ -358,7 +359,8 @@ SILGenFunction::emitPointerToPointer(SILLocation loc,
   // The generic function currently always requires indirection, but pointers
   // are always loadable.
   auto origBuf = emitTemporaryAllocation(loc, input.getType());
-  B.createStore(loc, input.forward(*this), origBuf);
+  B.emitStoreValueOperation(loc, input.forward(*this), origBuf,
+                            StoreOwnershipQualifier::Init);
   auto origValue = emitManagedBufferWithCleanup(origBuf);
   
   // Invoke the conversion intrinsic to convert to the destination type.
@@ -521,7 +523,7 @@ ManagedValue SILGenFunction::emitExistentialErasure(
         // layering reasons, so perform an unchecked cast down to NSError.
         SILType anyObjectTy =
           potentialNSError.getType().getAnyOptionalObjectType();
-        SILValue nsError = isPresentBB->createBBArg(anyObjectTy);
+        SILValue nsError = isPresentBB->createArgument(anyObjectTy);
         nsError = B.createUncheckedRefCast(loc, nsError, 
                                            getLoweredType(nsErrorType));
 
@@ -553,7 +555,7 @@ ManagedValue SILGenFunction::emitExistentialErasure(
       B.emitBlock(contBB);
 
       SILValue existentialResult =
-        contBB->createBBArg(existentialTL.getLoweredType());
+          contBB->createArgument(existentialTL.getLoweredType());
       return emitManagedRValueWithCleanup(existentialResult, existentialTL);
     }
   }
@@ -717,8 +719,7 @@ ManagedValue SILGenFunction::emitProtocolMetatypeToObject(SILLocation loc,
   // reference when we use it to prevent it being released and attempting to
   // deallocate itself. It doesn't matter if we ever actually clean up that
   // retain though.
-  B.createStrongRetain(loc, value, Atomicity::Atomic);
-  
+  value = B.createCopyValue(loc, value);
   return ManagedValue::forUnmanaged(value);
 }
 

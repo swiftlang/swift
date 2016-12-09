@@ -5,8 +5,8 @@
 // Copyright (c) 2014 - 2016 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
-// See http://swift.org/LICENSE.txt for license information
-// See http://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
+// See https://swift.org/LICENSE.txt for license information
+// See https://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
 //
 //===----------------------------------------------------------------------===//
 
@@ -18,7 +18,7 @@
 @available(*, deprecated, message: "it will be removed in Swift 4.0.  Please use 'MutableCollection' instead")
 public typealias MutableIndexable = _MutableIndexable
 public protocol _MutableIndexable : _Indexable {
-  // FIXME(ABI)(compiler limitation): there is no reason for this protocol
+  // FIXME(ABI)#52 (Recursive Protocol Constraints): there is no reason for this protocol
   // to exist apart from missing compiler features that we emulate with it.
   // rdar://problem/20531108
   //
@@ -323,7 +323,7 @@ public protocol MutableCollection : _MutableIndexable, Collection {
   mutating func _withUnsafeMutableBufferPointerIfSupported<R>(
     _ body: (UnsafeMutablePointer<Iterator.Element>, Int) throws -> R
   ) rethrows -> R?
-  // FIXME(ABI)(compiler limitation): the signature should use
+  // FIXME(ABI)#53 (Type Checker): the signature should use
   // UnsafeMutableBufferPointer, but the compiler can't handle that.
   //
   // <rdar://problem/21933004> Restore the signature of

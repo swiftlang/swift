@@ -1,6 +1,6 @@
 // RUN: rm -rf %t && mkdir -p %t
 // RUN: %build-irgen-test-overlays
-// RUN: %target-swift-frontend(mock-sdk: -sdk %S/Inputs -I %t) %s -emit-ir -disable-objc-attr-requires-foundation-module | %FileCheck %s --check-prefix=CHECK --check-prefix=CHECK-%target-ptrsize
+// RUN: %target-swift-frontend(mock-sdk: -sdk %S/Inputs -I %t) %s -emit-ir -assume-parsing-unqualified-ownership-sil -disable-objc-attr-requires-foundation-module | %FileCheck %s --check-prefix=CHECK --check-prefix=CHECK-%target-ptrsize
 
 // REQUIRES: CPU=x86_64
 // REQUIRES: objc_interop
@@ -12,7 +12,8 @@ import gizmo
 
 @objc class ObjCClass : BaseClassForMethodFamilies {
   func method(x: Int) {}
-  
+  func method2(r: NSRect) {}
+
   override func fakeInitFamily() -> ObjCClass { return self }
 }
 sil_vtable ObjCClass {}
@@ -36,6 +37,11 @@ bb0(%0 : $Int, %1 : $ObjCClass):
   %v = tuple()
   return %v : $()
 }
+sil @_TToFC13partial_apply9ObjCClass7method2fT1rVSC6NSRect_T_ : $@convention(objc_method) (NSRect, ObjCClass) -> () {
+bb0(%0 : $NSRect, %1 : $ObjCClass):
+  %v = tuple()
+  return %v : $()
+}
 
 sil @_TToFC13partial_apply9ObjCClass14fakeInitFamilyfT_S0_ : $@convention(objc_method) (@owned ObjCClass) -> @owned ObjCClass {
 bb0(%0 : $ObjCClass):
@@ -44,7 +50,7 @@ bb0(%0 : $ObjCClass):
 
 // CHECK-LABEL: define{{( protected)?}} { i8*, %swift.refcounted* } @indirect_partial_apply(i8*, %swift.refcounted*, i64) {{.*}} {
 // CHECK: entry:
-// CHECK:   [[OBJ:%.*]] = call noalias %swift.refcounted* @rt_swift_allocObject(%swift.type* getelementptr inbounds (%swift.full_boxmetadata, %swift.full_boxmetadata* @metadata, i32 0, i32 2), i64 40, i64 7)
+// CHECK:   [[OBJ:%.*]] = call noalias %swift.refcounted* @swift_rt_swift_allocObject(%swift.type* getelementptr inbounds (%swift.full_boxmetadata, %swift.full_boxmetadata* @metadata, i32 0, i32 2), i64 40, i64 7)
 // CHECK:   [[DATA_ADDR:%.*]] = bitcast %swift.refcounted* [[OBJ]] to [[DATA_TYPE:<{ %swift.refcounted, i64, %swift.refcounted\*, i8\* }>]]*
 // CHECK:   [[X_ADDR:%.*]] = getelementptr inbounds [[DATA_TYPE]], [[DATA_TYPE]]* [[DATA_ADDR]], i32 0, i32 1
 // CHECK:   store i64 %2, i64* [[X_ADDR]], align 8
@@ -77,7 +83,7 @@ entry(%f : $@callee_owned (Builtin.Word) -> (), %x : $Builtin.Word):
 
 // CHECK-LABEL: define{{( protected)?}} { i8*, %swift.refcounted* } @objc_partial_apply(%C13partial_apply9ObjCClass*) {{.*}} {
 // CHECK: entry:
-// CHECK:   [[OBJ:%.*]] = call noalias %swift.refcounted* @rt_swift_allocObject(%swift.type* getelementptr inbounds (%swift.full_boxmetadata, %swift.full_boxmetadata* @metadata.2, i32 0, i32 2), i64 24, i64 7)
+// CHECK:   [[OBJ:%.*]] = call noalias %swift.refcounted* @swift_rt_swift_allocObject(%swift.type* getelementptr inbounds (%swift.full_boxmetadata, %swift.full_boxmetadata* @metadata.2, i32 0, i32 2), i64 24, i64 7)
 // CHECK:   [[DATA_ADDR:%.*]] = bitcast %swift.refcounted* [[OBJ]] to [[DATA_TYPE:<{ %swift.refcounted, %C13partial_apply9ObjCClass\* }>]]*
 // CHECK:   [[X_ADDR:%.*]] = getelementptr inbounds [[DATA_TYPE]], [[DATA_TYPE]]* [[DATA_ADDR]], i32 0, i32 1
 // CHECK:   store %C13partial_apply9ObjCClass* %0, %C13partial_apply9ObjCClass** [[X_ADDR]], align 8
@@ -107,6 +113,27 @@ entry(%c : $ObjCClass):
   return %p : $@callee_owned Int -> ()
 }
 
+// CHECK-LABEL: define{{.*}} { i8*, %swift.refcounted* } @objc_partial_apply_indirect_sil_argument(%C13partial_apply9ObjCClass*) {{.*}}
+// CHECK:  [[CTX:%.*]] = call noalias %swift.refcounted* @swift_rt_swift_allocObject
+// CHECK:  [[CTX_ADDR:%.*]] = bitcast %swift.refcounted* [[CTX]] to [[CTXTYPE:<{ %swift.refcounted, %C13partial_apply9ObjCClass\* }>]]*
+// CHECK:  [[SELF_ADDR:%.*]] = getelementptr inbounds [[CTXTYPE]], [[CTXTYPE]]* [[CTX_ADDR]], i32 0, i32 1
+// CHECK:  store %C13partial_apply9ObjCClass* %0, %C13partial_apply9ObjCClass** [[SELF_ADDR]]
+// CHECK:  [[CLOSURE:%.*]] = insertvalue { i8*, %swift.refcounted* } { i8* bitcast (void (%VSC6NSRect*, %swift.refcounted*)* [[OBJC_PARTIAL_APPLY_STUB2:@_TPA[A-Za-z0-9_.]*]] to i8*), %swift.refcounted* undef }, %swift.refcounted* [[CTX]], 1
+// CHECK:  ret { i8*, %swift.refcounted* } [[CLOSURE]]
+// CHECK:}
+// CHECK: define internal void [[OBJC_PARTIAL_APPLY_STUB2]](%VSC6NSRect* noalias nocapture dereferenceable(32), %swift.refcounted*
+// CHECK:  [[TMP:%.*]] = alloca %VSC6NSRect
+// CHECK:  [[ORIGIN:%.*]] = getelementptr inbounds %VSC6NSRect, %VSC6NSRect* %0
+// CHECK:  [[ORIGINX:%.*]] = getelementptr inbounds %VSC7NSPoint, %VSC7NSPoint* [[ORIGIN]]
+// CHECK:  [[ORIGINXVAL:%*]] = getelementptr inbounds %Sd, %Sd* [[ORIGINX]]
+// CHECK:  [[VAL:%.*]] = load double, double* [[ORIGINXVAL]]
+sil @objc_partial_apply_indirect_sil_argument : $@convention(thin) ObjCClass -> @callee_owned NSRect -> () {
+entry(%c : $ObjCClass):
+  %m = class_method [volatile] %c : $ObjCClass, #ObjCClass.method2!1.foreign : (ObjCClass) -> (NSRect) -> () , $@convention(objc_method) (NSRect, ObjCClass) -> ()
+  %p = partial_apply %m(%c) : $@convention(objc_method) (NSRect, ObjCClass) -> ()
+  return %p : $@callee_owned NSRect -> ()
+}
+
 // CHECK-LABEL: define{{( protected)?}} { i8*, %swift.refcounted* } @objc_partial_apply_consumes_self(%C13partial_apply9ObjCClass*) {{.*}} {
 // CHECK:         bitcast %swift.refcounted* {{%.*}} to [[DATA_TYPE:<{ %swift.refcounted, %C13partial_apply9ObjCClass\* }>]]*
 // CHECK:         insertvalue {{.*}} [[OBJC_CONSUMES_SELF_PARTIAL_APPLY_STUB:@_TPA[A-Za-z0-9_.]*]]
@@ -119,7 +146,7 @@ entry(%c : $ObjCClass):
 // CHECK:   [[I8PTRSELF:%.*]] = bitcast %C13partial_apply9ObjCClass* [[SELF]] to [[OPAQUE4:%.*]]*
 // CHECK:   call [[OPAQUE3:%.*]]* bitcast (void ()* @objc_msgSend to [[OPAQUE3]]* ([[OPAQUE4:%.*]]*, i8*)*)([[OPAQUE4]]* [[I8PTRSELF]], i8* [[CMD]])
 // CHECK-NOT: release
-// CHECK:   call void @rt_swift_release(%swift.refcounted* %0)
+// CHECK:   call void @swift_rt_swift_release(%swift.refcounted* %0)
 // CHECK-NOT: release
 // CHECK:   ret void
 // CHECK: }
@@ -181,7 +208,7 @@ entry(%c : $SwiftClass):
 sil @partially_applyable_to_pure_objc : $@convention(thin) Gizmo -> ()
 
 // CHECK: define{{( protected)?}} { i8*, %swift.refcounted* } @partial_apply_pure_objc
-// CHECK:   @rt_swift_allocObject
+// CHECK:   @swift_rt_swift_allocObject
 sil @partial_apply_pure_objc : $@convention(thin) Gizmo -> @callee_owned () -> () {
 entry(%c : $Gizmo):
   %f = function_ref @partially_applyable_to_pure_objc : $@convention(thin) Gizmo -> ()
@@ -269,7 +296,7 @@ sil public_external @indirect_guaranteed_captured_class_param : $@convention(thi
 // CHECK-NOT:     release
 // CHECK:         [[RESULT:%.*]] = call i64 @indirect_guaranteed_captured_class_param(i64 %0, %C13partial_apply10SwiftClass** noalias nocapture dereferenceable({{.*}}) [[X_CAST]]
 // CHECK-NOT:     retain
-// CHECK:         call void @rt_swift_release(%swift.refcounted* %1)
+// CHECK:         call void @swift_rt_swift_release(%swift.refcounted* %1)
 // CHECK:         ret i64 [[RESULT]]
 
 sil @partial_apply_indirect_guaranteed_class_param : $@convention(thin) (@in SwiftClass) -> @callee_owned (Int) -> Int {
@@ -318,7 +345,7 @@ struct SwiftClassPair { var x: SwiftClass, y: SwiftClass }
 sil public_external @guaranteed_captured_class_pair_param : $@convention(thin) (Int, @guaranteed SwiftClassPair) -> Int
 
 // CHECK-LABEL: define{{( protected)?}} { i8*, %swift.refcounted* } @partial_apply_guaranteed_class_pair_param(%C13partial_apply10SwiftClass*, %C13partial_apply10SwiftClass*)
-// CHECK:         [[CONTEXT_OBJ:%.*]] = call noalias %swift.refcounted* @rt_swift_allocObject
+// CHECK:         [[CONTEXT_OBJ:%.*]] = call noalias %swift.refcounted* @swift_rt_swift_allocObject
 // CHECK:         [[PAIR_ADDR:%.*]] = getelementptr
 // CHECK-NEXT:    [[X_ADDR:%.*]] = getelementptr inbounds %V13partial_apply14SwiftClassPair, %V13partial_apply14SwiftClassPair* [[PAIR_ADDR]], i32 0, i32 0
 // CHECK-NEXT:    store %C13partial_apply10SwiftClass* %0, %C13partial_apply10SwiftClass** [[X_ADDR]], align
@@ -349,7 +376,7 @@ bb0(%x : $SwiftClassPair):
 sil public_external @indirect_guaranteed_captured_class_pair_param : $@convention(thin) (Int, @in_guaranteed SwiftClassPair) -> Int
 
 // CHECK-LABEL: define{{( protected)?}} { i8*, %swift.refcounted* } @partial_apply_indirect_guaranteed_class_pair_param(%V13partial_apply14SwiftClassPair* noalias nocapture dereferenceable({{.*}}))
-// CHECK:         [[CONTEXT_OBJ:%.*]] = call noalias %swift.refcounted* @rt_swift_allocObject
+// CHECK:         [[CONTEXT_OBJ:%.*]] = call noalias %swift.refcounted* @swift_rt_swift_allocObject
 // CHECK-NOT:     {{retain|release}}
 // CHECK:         [[T0:%.*]] = insertvalue {{.*}} [[PARTIAL_APPLY_FORWARDER:@_TPA_[A-Za-z0-9_]+]] {{.*}} [[CONTEXT_OBJ]]
 // CHECK:         ret {{.*}} [[T0]]
@@ -372,7 +399,7 @@ bb0(%x : $*SwiftClassPair):
 sil public_external @indirect_consumed_captured_class_pair_param : $@convention(thin) (Int, @in SwiftClassPair) -> Int
 
 // CHECK-LABEL: define{{( protected)?}} { i8*, %swift.refcounted* } @partial_apply_indirect_consumed_class_pair_param(%V13partial_apply14SwiftClassPair* noalias nocapture dereferenceable({{.*}}))
-// CHECK:         [[CONTEXT_OBJ:%.*]] = call noalias %swift.refcounted* @rt_swift_allocObject
+// CHECK:         [[CONTEXT_OBJ:%.*]] = call noalias %swift.refcounted* @swift_rt_swift_allocObject
 // CHECK-NOT:     {{retain|release}}
 // CHECK:         [[T0:%.*]] = insertvalue {{.*}} [[PARTIAL_APPLY_FORWARDER:@_TPA_[A-Za-z0-9_]+]] {{.*}} [[CONTEXT_OBJ]]
 // CHECK:         ret {{.*}} [[T0]]
@@ -434,7 +461,7 @@ sil public_external @captured_fixed_and_dependent_params : $@convention(thin) <A
 // CHECK-32:      [[TOTAL_ALIGN:%.*]] = or [[WORD]] [[TOTAL_ALIGN_1]], 3
 
 // -- Allocate using the total size and alignment.
-// CHECK:         [[BOX:%.*]] = call noalias %swift.refcounted* @rt_swift_allocObject(%swift.type* {{.*}}, [[WORD]] [[TOTAL_SIZE]], [[WORD]] [[TOTAL_ALIGN]])
+// CHECK:         [[BOX:%.*]] = call noalias %swift.refcounted* @swift_rt_swift_allocObject(%swift.type* {{.*}}, [[WORD]] [[TOTAL_SIZE]], [[WORD]] [[TOTAL_ALIGN]])
 // CHECK:         [[BOX_DATA:%.*]] = bitcast %swift.refcounted* [[BOX]]
 // -- metadata
 // CHECK:         getelementptr inbounds {{.*}} [[BOX_DATA]], i32 0, i32 1
@@ -525,17 +552,17 @@ bb0(%0 : $Base):
  return %5 : $()
 }
 
-sil public_external @partial_empty_box : $@convention(thin) (@owned @box (), @inout ()) -> ()
+sil public_external @partial_empty_box : $@convention(thin) (@owned <τ_0_0> { var τ_0_0 } <()>, @inout ()) -> ()
 
 // CHECK-LABEL: define{{( protected)?}} void @empty_box()
 sil @empty_box : $@convention(thin) () -> () {
 entry:
   // CHECK: store %swift.refcounted* null
   // CHECK: store %swift.opaque* undef
-  %b = alloc_box $()
-  %ba = project_box %b : $@box ()
-  %f = function_ref @partial_empty_box : $@convention(thin) (@owned @box (), @inout ()) -> ()
-  %g = partial_apply %f(%b, %ba) : $@convention(thin) (@owned @box (), @inout ()) -> ()
+  %b = alloc_box $<τ_0_0> { var τ_0_0 } <()>
+  %ba = project_box %b : $<τ_0_0> { var τ_0_0 } <()>, 0
+  %f = function_ref @partial_empty_box : $@convention(thin) (@owned <τ_0_0> { var τ_0_0 } <()>, @inout ()) -> ()
+  %g = partial_apply %f(%b, %ba) : $@convention(thin) (@owned <τ_0_0> { var τ_0_0 } <()>, @inout ()) -> ()
   return undef : $()
 }
 
@@ -548,12 +575,12 @@ sil hidden_external @complex_generic_function : $@convention(thin) <T where T : 
 sil @partial_apply_complex_generic_function : $@convention(thin) <T where T : P2, T.Y : P2> (Int) -> () {
 bb0(%0 : $Int):
   %fn = function_ref @complex_generic_function : $@convention(thin) <T where T : P2, T.Y : P2> (Int) -> ()
-  %pa = partial_apply %fn <T, T.Y, T.Y.X, T.Y.Y, T.Y.Y.X>(%0) : $@convention(thin) <T where T : P2, T.Y : P1, T.Y : P2, T.Y.X : P0, T.Y.Y : P1, T.Y.Y.X : P0> (Int) -> ()
+  %pa = partial_apply %fn <T, T.Y>(%0) : $@convention(thin) <T where T : P2, T.Y : P1, T.Y : P2> (Int) -> ()
   %result = tuple ()
   return %result : $()
 }
 // CHECK-LABEL: define void @partial_apply_complex_generic_function(i64, %swift.type* %T, i8** %T.P2, i8** %T.Y.P2)
-// CHECK:      [[T0:%.*]] = call noalias %swift.refcounted* @rt_swift_allocObject(%swift.type* {{.*}}, i64 48, i64 7)
+// CHECK:      [[T0:%.*]] = call noalias %swift.refcounted* @swift_rt_swift_allocObject(%swift.type* {{.*}}, i64 48, i64 7)
 // CHECK-NEXT: [[T1:%.*]] = bitcast %swift.refcounted* [[T0]] to <{ %swift.refcounted, [24 x i8], %Si }>*
 // CHECK-NEXT: [[T2:%.*]] = getelementptr inbounds <{ %swift.refcounted, [24 x i8], %Si }>, <{ %swift.refcounted, [24 x i8], %Si }>* [[T1]], i32 0, i32 1
 // CHECK-NEXT: [[BUFFER:%.*]] = bitcast [24 x i8]* [[T2]] to %swift.type**

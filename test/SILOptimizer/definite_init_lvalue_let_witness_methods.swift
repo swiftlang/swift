@@ -14,7 +14,7 @@ struct TestStruct: TestProtocol {
     var foo: Int
 }
 
-// Mark: - Case1: Illegaly mutating let property of class in initializer
+// Mark: - Case1: Illegally mutating let property of class in initializer
 
 class TestClass {
     let testObject: TestProtocol // expected-note {{change 'let' to 'var' to make it mutable}}
@@ -24,7 +24,7 @@ class TestClass {
     }
 }
 
-// Mark: - Case2: Illegaly mutating global let constant
+// Mark: - Case2: Illegally mutating global let constant
 
 let testObject: TestProtocol  // expected-note {{change 'let' to 'var' to make it mutable}}
 testObject = TestStruct(foo: 42)
@@ -37,7 +37,7 @@ extension TestProtocol {
     }
 }
 
-// Mark: - Case3: Illegaly muatating let constant in a function scope
+// Mark: - Case3: Illegally muatating let constant in a function scope
 
 let testObject2: TestProtocol  // expected-note {{change 'let' to 'var' to make it mutable}}
 testObject2 = TestStruct(foo: 42)
@@ -50,7 +50,7 @@ func testFunc() {
     testObject.foo = 666 // expected-error {{cannot perform mutating operation: 'testObject' is a 'let' constant}}
 }
 
-// Mark: - Case4: Illegaly passing a let constants property as an inout parameter
+// Mark: - Case4: Illegally passing a let constants property as an inout parameter
 
 let testObject3: TestProtocol  // expected-note {{change 'let' to 'var' to make it mutable}}
 testObject3 = TestStruct(foo: 42)

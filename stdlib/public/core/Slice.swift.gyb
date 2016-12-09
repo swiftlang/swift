@@ -5,8 +5,8 @@
 // Copyright (c) 2014 - 2016 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
-// See http://swift.org/LICENSE.txt for license information
-// See http://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
+// See https://swift.org/LICENSE.txt for license information
+// See https://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
 //
 //===----------------------------------------------------------------------===//
 
@@ -86,11 +86,11 @@ def get_slice_doc_comment(Self):
 """ % {"SliceType": Self}
 }%
 
-// FIXME(ABI)(compiler limitation): There should be just one slice type
+// FIXME(ABI)#66 (Conditional Conformance): There should be just one slice type
 // that has conditional conformances to `BidirectionalCollection`,
 // `RandomAccessCollection`, `RangeReplaceableCollection`, and
 // `MutableCollection`.
-// rdar://problem/17144340
+// rdar://problem/21935030
 
 % for Traversal in TRAVERSALS:
 %   for Mutable in [ False, True ]:
@@ -161,7 +161,7 @@ public struct ${Self}<Base : ${BaseRequirements}>
 %     end
   }
 
-  // FIXME(ABI)(compiler limitation):
+  // FIXME(ABI)#67 (Associated Types with where clauses):
   //
   //   public typealias Indices = Base.Indices
   //   public var indices: Indices { ... }
@@ -252,7 +252,7 @@ public struct ${Self}<Base : ${BaseRequirements}>
     let newSliceCount: IndexDistance =
       _base.distance(from: _startIndex, to: subRange.lowerBound)
       + _base.distance(from: subRange.upperBound, to: _endIndex)
-      + numericCast(newElements.count)
+      + (numericCast(newElements.count) as IndexDistance)
     _base.replaceSubrange(subRange, with: newElements)
     _startIndex = _base.index(_base.startIndex, offsetBy: sliceOffset)
     _endIndex = _base.index(_startIndex, offsetBy: newSliceCount)
@@ -261,7 +261,7 @@ public struct ${Self}<Base : ${BaseRequirements}>
       let newSliceCount: IndexDistance =
         _base.distance(from: _startIndex, to: subRange.lowerBound)
         + _base.distance(from: subRange.upperBound, to: _endIndex)
-        + numericCast(newElements.count)
+        + (numericCast(newElements.count) as IndexDistance)
       _base.replaceSubrange(subRange, with: newElements)
       _startIndex = _base.startIndex
       _endIndex = _base.index(_startIndex, offsetBy: newSliceCount)
@@ -270,7 +270,7 @@ public struct ${Self}<Base : ${BaseRequirements}>
       let lastValidIndex = _base.index(before: subRange.lowerBound)
       let newEndIndexOffset =
         _base.distance(from: subRange.upperBound, to: _endIndex)
-        + numericCast(newElements.count) + 1
+        + (numericCast(newElements.count) as IndexDistance) + 1
       _base.replaceSubrange(subRange, with: newElements)
       if shouldUpdateStartIndex {
         _startIndex = _base.index(after: lastValidIndex)
@@ -318,14 +318,14 @@ public struct ${Self}<Base : ${BaseRequirements}>
     let sliceOffset: IndexDistance =
       _base.distance(from: _base.startIndex, to: _startIndex)
     let newSliceCount: IndexDistance =
-      count + numericCast(newElements.count)
+      count + (numericCast(newElements.count) as IndexDistance)
     _base.insert(contentsOf: newElements, at: i)
     _startIndex = _base.index(_base.startIndex, offsetBy: sliceOffset)
     _endIndex = _base.index(_startIndex, offsetBy: newSliceCount)
 %     else:
     if i == _base.startIndex {
       let newSliceCount: IndexDistance =
-        count + numericCast(newElements.count)
+        count + (numericCast(newElements.count) as IndexDistance)
       _base.insert(contentsOf: newElements, at: i)
       _startIndex = _base.startIndex
       _endIndex = _base.index(_startIndex, offsetBy: newSliceCount)
@@ -334,7 +334,7 @@ public struct ${Self}<Base : ${BaseRequirements}>
       let lastValidIndex = _base.index(before: i)
       let newEndIndexOffset =
         _base.distance(from: i, to: _endIndex)
-        + numericCast(newElements.count) + 1
+        + (numericCast(newElements.count) as IndexDistance) + 1
       _base.insert(contentsOf: newElements, at: i)
       if shouldUpdateStartIndex {
         _startIndex = _base.index(after: lastValidIndex)
@@ -423,7 +423,7 @@ public struct ${Self}<Base : ${BaseRequirements}>
   ///     // Prints "[5, 6, 7, 8, 9]"
   ///
   /// In this example, the expression `singleDigits.dropFirst(5))` is
-  /// equivalent to calling this initializer with with `singleDigits` and a
+  /// equivalent to calling this initializer with `singleDigits` and a
   /// range covering the last five items of `singleDigits.indices`.
   ///
   /// - Parameters:

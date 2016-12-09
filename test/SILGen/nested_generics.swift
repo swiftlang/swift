@@ -1,7 +1,7 @@
-// RUN: %target-swift-frontend -Xllvm -sil-full-demangle -emit-silgen -enable-experimental-nested-generic-types -parse-as-library %s | %FileCheck %s
-// RUN: %target-swift-frontend -Xllvm -sil-full-demangle -emit-sil -enable-experimental-nested-generic-types -parse-as-library %s > /dev/null
-// RUN: %target-swift-frontend -Xllvm -sil-full-demangle -emit-sil -O -enable-experimental-nested-generic-types -parse-as-library %s > /dev/null
-// RUN: %target-swift-frontend -Xllvm -sil-full-demangle -emit-ir -enable-experimental-nested-generic-types -parse-as-library %s > /dev/null
+// RUN: %target-swift-frontend -Xllvm -sil-full-demangle -emit-silgen -parse-as-library %s | %FileCheck %s
+// RUN: %target-swift-frontend -Xllvm -sil-full-demangle -emit-sil -parse-as-library %s > /dev/null
+// RUN: %target-swift-frontend -Xllvm -sil-full-demangle -emit-sil -O -parse-as-library %s > /dev/null
+// RUN: %target-swift-frontend -Xllvm -sil-full-demangle -emit-ir -parse-as-library %s > /dev/null
 
 // TODO:
 // - test generated SIL -- mostly we're just testing mangling here
@@ -202,8 +202,40 @@ func calls() {
 
 }
 
+protocol ProtocolWithGenericRequirement {
+  associatedtype T
+  associatedtype U
+  func method<V>(t: T, u: U, v: V) -> (T, U, V)
+}
+
+class OuterRing<T> {
+  class InnerRing<U> : ProtocolWithGenericRequirement {
+    func method<V>(t: T, u: U, v: V) -> (T, U, V) {
+      return (t, u, v)
+    }
+  }
+}
+
+class SubclassOfInner<T, U> : OuterRing<T>.InnerRing<U> {
+  override func method<V>(t: T, u: U, v: V) -> (T, U, V) {
+    return super.method(t: t, u: u, v: v)
+  }
+}
+
 // CHECK-LABEL: // reabstraction thunk helper from @callee_owned (@owned nested_generics.Pizzas<nested_generics.Pepper>.NewYork) -> (@unowned nested_generics.HotDogs.American) to @callee_owned (@owned nested_generics.Pizzas<nested_generics.Pepper>.NewYork) -> (@out nested_generics.HotDogs.American)
 // CHECK-LABEL: sil shared [transparent] [reabstraction_thunk] @_TTRXFo_oGCV15nested_generics6Pizzas7NewYorkVS_6Pepper___dVCS_7HotDogs8American_XFo_oGS1_S2____iS4__ : $@convention(thin) (@owned Pizzas<Pepper>.NewYork, @owned @callee_owned (@owned Pizzas<Pepper>.NewYork) -> HotDogs.American) -> @out HotDogs.American
+
+// CHECK-LABEL: sil hidden [transparent] [thunk] @_TTWu__rGCC15nested_generics9OuterRing9InnerRingx_qd___S_30ProtocolWithGenericRequirementS_FS2_6methodurfT1twx1T1uwx1U1vqd___TwxS3_wxS4_qd___ : $@convention(witness_method) <τ_0_0><τ_1_0><τ_2_0> (@in τ_0_0, @in τ_1_0, @in τ_2_0, @in_guaranteed OuterRing<τ_0_0>.InnerRing<τ_1_0>) -> (@out τ_0_0, @out τ_1_0, @out τ_2_0) {
+// CHECK: bb0([[T:%[0-9]+]] : $*τ_0_0, [[U:%[0-9]+]] : $*τ_1_0, [[V:%[0-9]+]] : $*τ_2_0, [[TOut:%[0-9]+]] : $*τ_0_0, [[UOut:%[0-9]+]] : $*τ_1_0, [[VOut:%[0-9]+]] : $*τ_2_0, [[SELF:%[0-9]+]] : $*OuterRing<τ_0_0>.InnerRing<τ_1_0>):
+// CHECK:   [[SELF_COPY:%[0-9]+]] = alloc_stack $OuterRing<τ_0_0>.InnerRing<τ_1_0>
+// CHECK:   copy_addr [[SELF]] to [initialization] [[SELF_COPY]] : $*OuterRing<τ_0_0>.InnerRing<τ_1_0>
+// CHECK:   [[SELF_COPY_VAL:%[0-9]+]] = load [take] [[SELF_COPY]] : $*OuterRing<τ_0_0>.InnerRing<τ_1_0>
+// CHECK:   [[METHOD:%[0-9]+]] = class_method [[SELF_COPY_VAL]] : $OuterRing<τ_0_0>.InnerRing<τ_1_0>, #OuterRing.InnerRing.method!1 : <T><U><V> (OuterRing<T>.InnerRing<U>) -> (T, U, V) -> (T, U, V) , $@convention(method) <τ_0_0><τ_1_0><τ_2_0> (@in τ_0_0, @in τ_1_0, @in τ_2_0, @guaranteed OuterRing<τ_0_0>.InnerRing<τ_1_0>) -> (@out τ_0_0, @out τ_1_0, @out τ_2_0)
+// CHECK:   apply [[METHOD]]<τ_0_0, τ_1_0, τ_2_0>([[T]], [[U]], [[V]], [[TOut]], [[UOut]], [[VOut]], [[SELF_COPY_VAL]]) : $@convention(method) <τ_0_0><τ_1_0><τ_2_0> (@in τ_0_0, @in τ_1_0, @in τ_2_0, @guaranteed OuterRing<τ_0_0>.InnerRing<τ_1_0>) -> (@out τ_0_0, @out τ_1_0, @out τ_2_0)
+// CHECK:   [[RESULT:%[0-9]+]] = tuple ()
+// CHECK:   destroy_value [[SELF_COPY_VAL]] : $OuterRing<τ_0_0>.InnerRing<τ_1_0>
+// CHECK:   dealloc_stack [[SELF_COPY]] : $*OuterRing<τ_0_0>.InnerRing<τ_1_0>
+// CHECK:   return [[RESULT]] : $()
 
 // CHECK: sil_witness_table hidden <Spices> Deli<Spices>.Pepperoni: CuredMeat module nested_generics {
 // CHECK: }

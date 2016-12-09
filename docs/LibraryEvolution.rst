@@ -180,7 +180,7 @@ versioning information as well. A *versioned entity* represents anything with a
 runtime presence that a client may rely on; its version records when the entity
 was first exposed publicly in its library. Put another way, it is the oldest
 version of the library where the entity may be used.
-  
+
 - Classes, structs, enums, and protocols may all be versioned entities.
 - Methods, properties, subscripts, and initializers may be versioned entities.
 - Top-level functions, variables, and constants may be versioned entities.
@@ -555,7 +555,7 @@ clients to access them more efficiently. This restricts changes a fair amount:
   break existing clients.
 - Changing the body of an accessor is a `binary-compatible source-breaking
   change`.
-- Adding/removing observing accessors is likewise a `binary-compatible 
+- Adding/removing observing accessors is likewise a `binary-compatible
   source-breaking change`.
 - Changing the initial value of a stored variable is still permitted.
 - Changing the value of a constant is a `binary-compatible source-breaking
@@ -735,8 +735,9 @@ properties in a ``@fixedContents`` struct are implicitly declared
   vice versa.
 - Changing the body of any *existing* methods, initializers, computed property
   accessors, or non-instance stored property accessors is permitted. Changing
-  the body of a stored instance property observing accessor is only permitted
-  if the property is not `versioned <versioned entity>`.
+  the body of a stored instance property observing accessor is permitted if the
+  property is not `versioned <versioned entity>`, and considered a
+  `binary-compatible source-breaking change` if it is.
 - Adding or removing observing accessors from any
   `versioned <versioned entity>` stored instance properties (public or
   non-public) is not permitted.
@@ -903,11 +904,14 @@ not handle new cases well.
 Protocols
 ~~~~~~~~~
 
-There are very few safe changes to make to protocols:
+There are very few safe changes to make to protocols and their members:
 
 - A new non-type requirement may be added to a protocol, as long as it has an
   unconstrained default implementation.
 - A new associated type may be added to a protocol, as long as it has a default.
+  As with any other declarations, newly-added associated types must be marked
+  with ``@available`` specifying when they were introduced.
+- A default may be added to an associated type.
 - A new optional requirement may be added to an ``@objc`` protocol.
 - All members may be reordered, including associated types.
 - Changing *internal* parameter names of function and subscript requirements
@@ -922,6 +926,8 @@ All other changes to the protocol itself are forbidden, including:
 
 - Making an existing requirement optional.
 - Making a non-``@objc`` protocol ``@objc`` or vice versa.
+- Adding or removing constraints from an associated type.
+- Removing a default from an associated type.
 
 Protocol extensions may be more freely modified; `see below`__.
 
@@ -978,7 +984,7 @@ Finally, classes allow the following changes that do not apply to structs:
   implementation.
 - A non-final override of a method, subscript, property, or initializer may be
   removed as long as the generic parameters, formal parameters, and return type
-  *exactly* match the overridden declaration. Any existing callers should 
+  *exactly* match the overridden declaration. Any existing callers should
   automatically use the superclass implementation.
 - Within an ``open`` class, any public method, subscript, or property may be
   marked ``open`` if it is not already marked ``final``.
@@ -1162,7 +1168,8 @@ Extensions
 Non-protocol extensions largely follow the same rules as the types they extend.
 The following changes are permitted:
 
-- Adding new extensions and removing empty extensions.
+- Adding new extensions and removing empty extensions (that is, extensions that
+  declare neither members nor protocol conformances).
 - Moving a member from one extension to another within the same module, as long
   as both extensions have the exact same constraints.
 - Moving a member from an unconstrained extension to the declaration of the
@@ -1170,6 +1177,8 @@ The following changes are permitted:
   is permitted for all members except stored properties, although note that
   moving all initializers out of a type declaration may cause a new one to be
   implicitly synthesized.
+- Adding a new protocol conformance (with proper availability annotations).
+- Removing conformances to non-public protocols.
 
 Adding, removing, reordering, and modifying members follow the same rules as
 the base type; see the sections on structs, enums, and classes above.
@@ -1582,7 +1591,7 @@ Open Issues
 ===========
 
 There are still a number of known issues with the model described in this
-document. We should endeavour to account for each of them, and if we can't come
+document. We should endeavor to account for each of them, and if we can't come
 up with a satisfactory implementation we should at least make sure that they
 will not turn into pitfalls for library or client developers.
 
@@ -1645,7 +1654,7 @@ Recompiling changes a protocol's implementation
       @available(2.0)
       func equip() { print("Equipped.") }
     }
-    
+
     extension Wearable where Self: MagicType {
       @available(2.0)
       func equip() { print("You put it on.") }
@@ -1755,7 +1764,7 @@ Glossary
     errors when a client is recompiled. In most cases, a client that *hasn't*
     been recompiled may use the new behavior or the old behavior, or even a
     mix of both; however, this will always be deterministic (same behavior when
-    a program is re-run) and will not break Swift's memory-safety and 
+    a program is re-run) and will not break Swift's memory-safety and
     type-safety guarantees. It is recommended that these kinds of changes are
     avoided just like those that break binary compatibility.
 

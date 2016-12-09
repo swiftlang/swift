@@ -5,8 +5,8 @@
 // Copyright (c) 2014 - 2016 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
-// See http://swift.org/LICENSE.txt for license information
-// See http://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
+// See https://swift.org/LICENSE.txt for license information
+// See https://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
 //
 //===----------------------------------------------------------------------===//
 ///
@@ -123,7 +123,7 @@ int apinotes_main(ArrayRef<const char *> Args) {
     llvm::raw_fd_ostream os(OutputFilename, EC,
                             llvm::sys::fs::OpenFlags::F_None);
 
-    if (api_notes::compileAPINotes(input, os, targetOS))
+    if (api_notes::compileAPINotes(input, /*sourceFile=*/nullptr, os, targetOS))
       return 1;
     
     os.flush();

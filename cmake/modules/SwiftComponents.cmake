@@ -79,14 +79,15 @@ macro(swift_configure_components)
   endforeach()
 
   foreach(component ${SWIFT_INSTALL_COMPONENTS})
-    list(FIND _SWIFT_DEFINED_COMPONENTS "${component}" index)
-    if(${index} EQUAL -1)
+    if(NOT "${component}" IN_LIST _SWIFT_DEFINED_COMPONENTS)
       message(FATAL_ERROR "unknown install component: ${component}")
     endif()
 
     string(TOUPPER "${component}" var_name_piece)
     string(REPLACE "-" "_" var_name_piece "${var_name_piece}")
-    set(SWIFT_INSTALL_${var_name_piece} TRUE)
+    if(NOT SWIFT_INSTALL_EXCLUDE_${var_name_piece})
+      set(SWIFT_INSTALL_${var_name_piece} TRUE)
+    endif()
   endforeach()
 endmacro()
 
@@ -96,8 +97,7 @@ function(swift_is_installing_component component result_var_name)
   if("${component}" STREQUAL "never_install")
     set("${result_var_name}" FALSE PARENT_SCOPE)
   else()
-    list(FIND _SWIFT_DEFINED_COMPONENTS "${component}" index)
-    if(${index} EQUAL -1)
+    if(NOT "${component}" IN_LIST _SWIFT_DEFINED_COMPONENTS)
       message(FATAL_ERROR "unknown install component: ${component}")
     endif()
 
@@ -121,4 +121,30 @@ function(swift_install_in_component component)
   if(is_installing)
     install(${ARGN})
   endif()
+endfunction()
+
+function(swift_install_symlink_component component)
+  cmake_parse_arguments(
+      ARG # prefix
+      "" # options
+      "LINK_NAME;TARGET;DESTINATION" # single-value args
+      "" # multi-value args
+      ${ARGN})
+  precondition(ARG_LINK_NAME MESSAGE "LINK_NAME is required")
+  precondition(ARG_TARGET MESSAGE "TARGET is required")
+  precondition(ARG_DESTINATION MESSAGE "DESTINATION is required")
+
+  swift_is_installing_component("${component}" is_installing)
+  if (NOT is_installing)
+    return()
+  endif()
+
+  if(EXISTS ${LLVM_CMAKE_DIR}/LLVMInstallSymlink.cmake)
+    set(INSTALL_SYMLINK ${LLVM_CMAKE_DIR}/LLVMInstallSymlink.cmake)
+  endif()
+  precondition(INSTALL_SYMLINK
+    MESSAGE "LLVMInstallSymlink script must be available.")
+
+  install(SCRIPT ${INSTALL_SYMLINK}
+          CODE "install_symlink(${ARG_LINK_NAME} ${ARG_TARGET} ${ARG_DESTINATION})")
 endfunction()

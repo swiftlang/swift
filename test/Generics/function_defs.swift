@@ -1,4 +1,4 @@
-// RUN: %target-parse-verify-swift
+// RUN: %target-typecheck-verify-swift
 
 //===----------------------------------------------------------------------===//
 // Type-check function definitions
@@ -294,5 +294,5 @@ func badTypeConformance1<T>(_: T) where Int : EqualComparable {} // expected-err
 
 func badTypeConformance2<T>(_: T) where T.Blarg : EqualComparable { } // expected-error{{'Blarg' is not a member type of 'T'}}
 
-func badSameType<T, U : GeneratesAnElement, V>(_ : T) // expected-error{{generic parameter 'V' is not used in function signature}}
+func badSameType<T, U : GeneratesAnElement, V>(_ : T)
   where T == U.Element, U.Element == V {} // expected-error{{same-type requirement makes generic parameters 'T' and 'V' equivalent}}

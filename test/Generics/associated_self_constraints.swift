@@ -1,4 +1,4 @@
-// RUN: %target-parse-verify-swift
+// RUN: %target-typecheck-verify-swift
 
 protocol Observer {
     associatedtype Value
@@ -19,9 +19,9 @@ class Subject<T>: Observer, Observable {
     
     // Observer implementation
     
-    var onNextFunc: ((T) -> Void)? = nil
-    var onCompletedFunc: (() -> Void)? = nil
-    var onErrorFunc: ((String) -> Void)? = nil
+    var onNextFunc: ((T) -> Void)?
+    var onCompletedFunc: (() -> Void)?
+    var onErrorFunc: ((String) -> Void)?
     
     func onNext(_ item: T) -> Void {
         onNextFunc?(item)

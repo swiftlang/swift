@@ -1,4 +1,4 @@
-// RUN: %target-parse-verify-swift
+// RUN: %target-typecheck-verify-swift
 
 class C : B { } // expected-error{{circular class inheritance 'C' -> 'B' -> 'A' -> 'C'}}
 class B : A { } // expected-note{{class 'B' declared here}}
@@ -19,7 +19,7 @@ class Left : Right.Hand {
   class Hand {}
 }
 
-class Right : Left.Hand { // expected-error {{'Hand' is not a member type of 'Left'}}
+class Right : Left.Hand { // expected-error {{class 'Hand' is not a member type of 'Left'}}
   class Hand {}
 }
 

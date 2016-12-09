@@ -51,6 +51,10 @@ class Meltdown : Error {
 
 class GrilledCheese : Meltdown {}
 
+func labeledTuple() -> (x: Int, y: Int, Double) {
+  return (x: 1, y: 1, 3.14159)
+}
+
 // CHECK: Beads?
 classMetatype(type(of: B()))
 // CHECK: Deeds?
@@ -81,3 +85,5 @@ print(boxedExistentialMetatype(Meltdown()))
 print(boxedExistentialMetatype(GrilledCheese()))
 // CHECK: GrilledCheese
 print(boxedExistentialMetatype(GrilledCheese() as Meltdown))
+// CHECK: (x : Int, y : Int, Double)
+print(type(of: labeledTuple()))

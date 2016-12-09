@@ -5,8 +5,8 @@
 // Copyright (c) 2014 - 2016 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
-// See http://swift.org/LICENSE.txt for license information
-// See http://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
+// See https://swift.org/LICENSE.txt for license information
+// See https://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
 //
 //===----------------------------------------------------------------------===//
 
@@ -114,6 +114,17 @@ public func _stdlib_select(
   }
 }
 #endif
+
+
+/// Swift-y wrapper around pipe(2)
+public func _stdlib_pipe() -> (readEnd: CInt, writeEnd: CInt, error: CInt) {
+  var fds: [CInt] = [0, 0]
+  let ret = fds.withUnsafeMutableBufferPointer { unsafeFds -> CInt in
+    pipe(unsafeFds.baseAddress)
+  }
+  return (readEnd: fds[0], writeEnd: fds[1], error: ret)
+}
+
 
 //
 // Functions missing in `Darwin` module.

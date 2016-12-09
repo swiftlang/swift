@@ -5,8 +5,8 @@
 // Copyright (c) 2014 - 2016 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
-// See http://swift.org/LICENSE.txt for license information
-// See http://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
+// See https://swift.org/LICENSE.txt for license information
+// See https://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
 //
 //===----------------------------------------------------------------------===//
 //
@@ -463,6 +463,12 @@ static ValueDecl *importMacro(ClangImporter::Implementation &impl,
         auto firstMacroInfo = impl.getClangPreprocessor().getMacroInfo(firstID);
         auto secondMacroInfo = impl.getClangPreprocessor().getMacroInfo(
                                                                       secondID);
+        auto firstIdentifier =
+            impl.getNameImporter().importMacroName(firstID, firstMacroInfo);
+        auto secondIdentifier =
+            impl.getNameImporter().importMacroName(secondID, secondMacroInfo);
+        impl.importMacro(firstIdentifier, firstMacroInfo);
+        impl.importMacro(secondIdentifier, secondMacroInfo);
         auto firstIterator = impl.ImportedMacroConstants.find(firstMacroInfo);
         if (firstIterator == impl.ImportedMacroConstants.end()) {
           return nullptr;

@@ -5,8 +5,8 @@
 // Copyright (c) 2014 - 2016 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
-// See http://swift.org/LICENSE.txt for license information
-// See http://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
+// See https://swift.org/LICENSE.txt for license information
+// See https://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
 //
 //===----------------------------------------------------------------------===//
 //
@@ -85,6 +85,7 @@ namespace swift {
   class Substitution;
   class TypeCheckerDebugConsumer;
   class DocComment;
+  class SILBoxType;
 
   enum class KnownProtocolKind : uint8_t;
 
@@ -120,11 +121,6 @@ enum class KnownFoundationEntity {
 /// entity name.
 Optional<KnownFoundationEntity> getKnownFoundationEntity(StringRef name);
 
-/// Callback function used when referring to a type member of a given
-/// type variable.
-typedef std::function<Type(TypeVariableType *, AssociatedTypeDecl *)>
-  GetTypeVariableMemberCallback;
-
 /// \brief Introduces a new constraint checker arena, whose lifetime is
 /// tied to the lifetime of this RAII object.
 class ConstraintCheckerArenaRAII {
@@ -141,8 +137,7 @@ public:
   /// \param allocator The allocator used for allocating any data that
   /// goes into the constraint checker arena.
   ConstraintCheckerArenaRAII(ASTContext &self,
-                             llvm::BumpPtrAllocator &allocator,
-                             GetTypeVariableMemberCallback getTypeMember);
+                             llvm::BumpPtrAllocator &allocator);
 
   ConstraintCheckerArenaRAII(const ConstraintCheckerArenaRAII &) = delete;
   ConstraintCheckerArenaRAII(ConstraintCheckerArenaRAII &&) = delete;
@@ -155,6 +150,8 @@ public:
 
   ~ConstraintCheckerArenaRAII();
 };
+
+class SILLayout; // From SIL
 
 /// \brief Describes either a nominal type declaration or an extension
 /// declaration.
@@ -171,7 +168,7 @@ public:
   struct Implementation;
   Implementation &Impl;
   
-  friend class ConstraintCheckerArenaRAII;
+  friend ConstraintCheckerArenaRAII;
 public:
   ASTContext(LangOptions &langOpts, SearchPathOptions &SearchPathOpts,
              SourceManager &SourceMgr, DiagnosticEngine &Diags);
@@ -205,10 +202,6 @@ public:
 
   /// The name of the SwiftShims module "SwiftShims".
   Identifier SwiftShimsModuleName;
-
-  /// Note: in non-NDEBUG builds, tracks the context of each primary
-  /// archetype type, which can be very useful for debugging.
-  llvm::DenseMap<ArchetypeType *, DeclContext *> ArchetypeContexts;
 
   // Define the set of known identifiers.
 #define IDENTIFIER_WITH_NAME(Name, IdStr) Identifier Id_##Name;
@@ -363,47 +356,13 @@ public:
   ProtocolDecl *getErrorDecl() const;
   CanType getExceptionType() const;
   
-  /// Retrieve the declaration of Swift.Bool.
-  NominalTypeDecl *getBoolDecl() const;
-  
-  /// Retrieve the declaration of Swift.Int.
-  NominalTypeDecl *getIntDecl() const;
-
-  /// Retrieve the declaration of Swift.UInt.
-  NominalTypeDecl *getUIntDecl() const;
-
-  /// Retrieve the declaration of Swift.Float.
-  NominalTypeDecl *getFloatDecl() const;
-
-  /// Retrieve the declaration of Swift.Double.
-  NominalTypeDecl *getDoubleDecl() const;
-
-  /// Retrieve the declaration of Swift.String.
-  NominalTypeDecl *getStringDecl() const;
-
-  /// Retrieve the declaration of Swift.Array<T>.
-  NominalTypeDecl *getArrayDecl() const;
-
-  /// Retrieve the declaration of Swift.Set<T>.
-  NominalTypeDecl *getSetDecl() const;
-
-  /// Retrieve the declaration of Swift.Sequence<T>.
-  NominalTypeDecl *getSequenceDecl() const;
-
-  /// Retrieve the declaration of Swift.Dictionary<K, V>.
-  NominalTypeDecl *getDictionaryDecl() const;
-
-  /// Retrieve the declaration of Swift.AnyHashable.
-  NominalTypeDecl *getAnyHashableDecl() const;
+#define KNOWN_STDLIB_TYPE_DECL(NAME, DECL_CLASS, NUM_GENERIC_PARAMS) \
+  /** Retrieve the declaration of Swift.NAME. */ \
+  DECL_CLASS *get##NAME##Decl() const;
+#include "swift/AST/KnownStdlibTypes.def"
 
   /// Retrieve the declaration of Swift.Optional or ImplicitlyUnwrappedOptional.
   EnumDecl *getOptionalDecl(OptionalTypeKind kind) const;
-
-  /// Retrieve the declaration of Swift.Optional<T>.
-  EnumDecl *getOptionalDecl() const;
-
-  /// Retrieve the declaration of Swift.ImplicitlyUnwrappedOptional<T>.
-  EnumDecl *getImplicitlyUnwrappedOptionalDecl() const;
 
   /// Retrieve the declaration of Swift.Optional<T>.Some.
   EnumElementDecl *getOptionalSomeDecl() const;
@@ -420,35 +379,10 @@ public:
   EnumElementDecl *getOptionalSomeDecl(OptionalTypeKind kind) const;
   EnumElementDecl *getOptionalNoneDecl(OptionalTypeKind kind) const;
 
-  /// Retrieve the declaration of Swift.OptionSet.
-  NominalTypeDecl *getOptionSetDecl() const;
-  
-  /// Retrieve the declaration of Swift.COpaquePointer.
-  NominalTypeDecl *getOpaquePointerDecl() const;
-
-  /// Retrieve the declaration of Swift.UnsafeMutableRawPointer.
-  NominalTypeDecl *getUnsafeMutableRawPointerDecl() const;
-
-  /// Retrieve the declaration of Swift.UnsafeRawPointer.
-  NominalTypeDecl *getUnsafeRawPointerDecl() const;
-
-  /// Retrieve the declaration of Swift.UnsafeMutablePointer<T>.
-  NominalTypeDecl *getUnsafeMutablePointerDecl() const;
-
-  /// Retrieve the declaration of Swift.UnsafePointer<T>.
-  NominalTypeDecl *getUnsafePointerDecl() const;
-
-  /// Retrieve the declaration of Swift.AutoreleasingUnsafeMutablePointer<T>.
-  NominalTypeDecl *getAutoreleasingUnsafeMutablePointerDecl() const;
-
-  /// Retrieve the declaration of Swift.Unmanaged<T>.
-  NominalTypeDecl *getUnmanagedDecl() const;
-
   /// Retrieve the declaration of the "pointee" property of a pointer type.
   VarDecl *getPointerPointeePropertyDecl(PointerTypeKind ptrKind) const;
 
-  /// Retrieve the declaration of Swift.Never.
-  NominalTypeDecl *getNeverDecl() const;
+  /// Retrieve the type Swift.Never.
   CanType getNeverType() const;
 
   /// Retrieve the declaration of Swift.Void.
@@ -490,7 +424,7 @@ public:
   FuncDecl *getGetBoolDecl(LazyResolver *resolver) const;
 
   /// Retrieve the declaration of Swift.==(Int, Int) -> Bool.
-  FuncDecl *getEqualIntDecl(LazyResolver *resolver) const;
+  FuncDecl *getEqualIntDecl() const;
   
   /// Retrieve the declaration of Swift._unimplementedInitializer.
   FuncDecl *getUnimplementedInitializerDecl(LazyResolver *resolver) const;
@@ -510,9 +444,9 @@ public:
   ProtocolDecl *getProtocol(KnownProtocolKind kind) const;
   
   /// Determine whether the given nominal type is one of the standard
-  /// library types that is known a priori to be bridged to a
-  /// Foundation.
-  bool isStandardLibraryTypeBridgedInFoundation(NominalTypeDecl *nominal) const;
+  /// library or Cocoa framework types that is known to be bridged by another
+  /// module's overlay, for layering or implementation detail reasons.
+  bool isTypeBridgedInExternalModule(NominalTypeDecl *nominal) const;
 
   /// Get the Objective-C type that a Swift type bridges to, if any.
   /// 
@@ -575,13 +509,6 @@ public:
   const CanType TheIEEE128Type;           /// 128-bit IEEE floating point
   const CanType ThePPC128Type;            /// 128-bit PowerPC 2xDouble
   
-  /// Retrieve a type member of the given base type variable.
-  ///
-  /// Note that this routine is only usable when a constraint system
-  /// is active.
-  Type getTypeVariableMemberType(TypeVariableType *baseTypeVar, 
-                                 AssociatedTypeDecl *assocType);
-
   /// Adds a search path to SearchPathOpts, unless it is already present.
   ///
   /// Does any proper bookkeeping to keep all module loaders up to date as well.
@@ -834,6 +761,11 @@ public:
   ArchetypeBuilder *getOrCreateArchetypeBuilder(CanGenericSignature sig,
                                                 ModuleDecl *mod);
 
+  /// Retrieve or create the canonical generic environment of a canonical
+  /// archetype builder.
+  GenericEnvironment *getOrCreateCanonicalGenericEnvironment(
+                                                     ArchetypeBuilder *builder);
+
   /// Retrieve the inherited name set for the given class.
   const InheritedNameSet *getAllPropertyNames(ClassDecl *classDecl,
                                               bool forInstance);
@@ -843,15 +775,22 @@ public:
                             clang::ObjCInterfaceDecl *classDecl,
                             bool forInstance);
 
+  /// Retrieve a generic signature with a single unconstrained type parameter,
+  /// like `<T>`.
+  CanGenericSignature getSingleGenericParameterSignature() const;
+  
+  /// Whether our effective Swift version is in the Swift 3 family
+  bool isSwiftVersion3() const { return LangOpts.isSwiftVersion3(); }
+
 private:
-  friend class Decl;
+  friend Decl;
   Optional<RawComment> getRawComment(const Decl *D);
   void setRawComment(const Decl *D, RawComment RC);
 
   Optional<StringRef> getBriefComment(const Decl *D);
   void setBriefComment(const Decl *D, StringRef Comment);
 
-  friend class TypeBase;
+  friend TypeBase;
 
   /// \brief Set the substitutions for the given bound generic type.
   void setSubstitutions(TypeBase *type,
@@ -875,8 +814,12 @@ private:
   /// Unregister information about the given lazily-constructed archetype.
   void unregisterLazyArchetype(const ArchetypeType *archetype);
 
-  friend class ArchetypeType;
-  friend class ArchetypeBuilder::PotentialArchetype;
+  friend ArchetypeType;
+  friend ArchetypeBuilder::PotentialArchetype;
+
+  /// Provide context-level uniquing for SIL lowered type layouts and boxes.
+  friend SILLayout;
+  friend SILBoxType;
 };
 
 /// Retrieve information about the given Objective-C method for

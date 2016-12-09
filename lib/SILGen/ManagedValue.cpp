@@ -5,8 +5,8 @@
 // Copyright (c) 2014 - 2016 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
-// See http://swift.org/LICENSE.txt for license information
-// See http://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
+// See https://swift.org/LICENSE.txt for license information
+// See https://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
 //
 //===----------------------------------------------------------------------===//
 //
@@ -33,8 +33,7 @@ ManagedValue ManagedValue::copy(SILGenFunction &gen, SILLocation l) {
   assert(!lowering.isTrivial() && "trivial value has cleanup?");
   
   if (!lowering.isAddressOnly()) {
-    lowering.emitRetainValue(gen.B, l, getValue());
-    return gen.emitManagedRValueWithCleanup(getValue(), lowering);
+    return gen.emitManagedRetain(l, getValue(), lowering);
   }
   
   SILValue buf = gen.emitTemporaryAllocation(l, getType());
@@ -44,15 +43,16 @@ ManagedValue ManagedValue::copy(SILGenFunction &gen, SILLocation l) {
 
 /// Store a copy of this value with independent ownership into the given
 /// uninitialized address.
-void ManagedValue::copyInto(SILGenFunction &gen, SILValue dest, SILLocation L) {
+void ManagedValue::copyInto(SILGenFunction &gen, SILValue dest,
+                            SILLocation loc) {
   auto &lowering = gen.getTypeLowering(getType());
   if (lowering.isAddressOnly()) {
-    gen.B.createCopyAddr(L, getValue(), dest,
-                         IsNotTake, IsInitialization);
+    gen.B.createCopyAddr(loc, getValue(), dest, IsNotTake, IsInitialization);
     return;
   }
-  lowering.emitRetainValue(gen.B, L, getValue());
-  gen.B.createStore(L, getValue(), dest);
+
+  SILValue copy = lowering.emitCopyValue(gen.B, loc, getValue());
+  lowering.emitStoreOfCopy(gen.B, loc, copy, dest, IsInitialization);
 }
 
 /// This is the same operation as 'copy', but works on +0 values that don't
@@ -65,8 +65,7 @@ ManagedValue ManagedValue::copyUnmanaged(SILGenFunction &gen, SILLocation loc) {
   
   SILValue result;
   if (!lowering.isAddressOnly()) {
-    lowering.emitRetainValue(gen.B, loc, getValue());
-    result = getValue();
+    result = lowering.emitCopyValue(gen.B, loc, getValue());
   } else {
     result = gen.emitTemporaryAllocation(loc, getType());
     gen.B.createCopyAddr(loc, getValue(), result, IsNotTake,IsInitialization);

@@ -5,8 +5,8 @@
 // Copyright (c) 2014 - 2016 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
-// See http://swift.org/LICENSE.txt for license information
-// See http://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
+// See https://swift.org/LICENSE.txt for license information
+// See https://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
 //
 //===----------------------------------------------------------------------===//
 //
@@ -15,7 +15,7 @@
 //
 //===----------------------------------------------------------------------===//
 
-// FIXME(ABI): The character string view should have a custom iterator type to
+// FIXME(ABI)#70 : The character string view should have a custom iterator type to
 // allow performance optimizations of linear traversals.
 
 extension String {
@@ -29,7 +29,7 @@ extension String {
   /// `CharacterView` collection is a `Character` instance.
   ///
   ///     let flowers = "Flowers 💐"
-  ///     for c in flowers {
+  ///     for c in flowers.characters {
   ///         print(c)
   ///     }
   ///     // F
@@ -54,14 +54,22 @@ extension String {
   public struct CharacterView {
     internal var _core: _StringCore
 
+    /// The offset of this view's `_core` from an original core. This works
+    /// around the fact that `_StringCore` is always zero-indexed.
+    /// `_coreOffset` should be subtracted from `UnicodeScalarIndex._position`
+    /// before that value is used as a `_core` index.
+    internal var _coreOffset: Int
+
     /// Creates a view of the given string.
     public init(_ text: String) {
       self._core = text._core
+      self._coreOffset = 0
     }
     
     public // @testable
-    init(_ _core: _StringCore) {
+    init(_ _core: _StringCore, coreOffset: Int = 0) {
       self._core = _core
+      self._coreOffset = coreOffset
     }
   }
 
@@ -78,12 +86,12 @@ extension String {
   /// Applies the given closure to a mutable view of the string's characters.
   ///
   /// Do not use the string that is the target of this method inside the
-  /// closure passed to `body`, as it may not have its correct value. 
-  /// Instead, use the closure's `String.CharacterView` argument.
+  /// closure passed to `body`, as it may not have its correct value. Instead,
+  /// use the closure's `CharacterView` argument.
   ///
-  /// This example below uses the `withMutableCharacters(_:)` method to truncate
-  /// the string `str` at the first space and to return the remainder of the
-  /// string.
+  /// This example below uses the `withMutableCharacters(_:)` method to
+  /// truncate the string `str` at the first space and to return the remainder
+  /// of the string.
   ///
   ///     var str = "All this happened, more or less."
   ///     let afterSpace = str.withMutableCharacters { chars -> String.CharacterView in
@@ -101,6 +109,8 @@ extension String {
   ///     // Prints "this happened, more or less."
   ///
   /// - Parameter body: A closure that takes a character view as its argument.
+  ///   The `CharacterView` argument is valid only for the duration of the
+  ///   closure's execution.
   /// - Returns: The return value of the `body` closure, if any, is the return
   ///   value of this method.
   public mutating func withMutableCharacters<R>(
@@ -119,7 +129,7 @@ extension String {
   /// Creates a string from the given character view.
   ///
   /// Use this initializer to recover a string after performing a collection
-  /// slicing operation on a character view.
+  /// slicing operation on a string's character view.
   ///
   ///     let poem = "'Twas brillig, and the slithy toves / " +
   ///                "Did gyre and gimbal in the wabe: / " +
@@ -139,7 +149,7 @@ extension String {
 extension String.CharacterView : BidirectionalCollection {
   internal typealias UnicodeScalarView = String.UnicodeScalarView
   internal var unicodeScalars: UnicodeScalarView {
-    return UnicodeScalarView(_core)
+    return UnicodeScalarView(_core, coreOffset: _coreOffset)
   }
   
   /// A position in a string's `CharacterView` instance.
@@ -236,17 +246,17 @@ extension String.CharacterView : BidirectionalCollection {
     )
   }
 
-  // FIXME(ABI): don't make this function inlineable.  Grapheme cluster
+  // NOTE: don't make this function inlineable.  Grapheme cluster
   // segmentation uses a completely different algorithm in Unicode 9.0.
   //
   /// Returns the length of the first extended grapheme cluster in UTF-16
   /// code units.
-  @inline(never)
+  @inline(never) // Don't remove, see above.
   internal func _measureExtendedGraphemeClusterForward(
     from start: UnicodeScalarView.Index
   ) -> Int {
     var start = start
-    let end = UnicodeScalarView.Index(_position: _core.count)
+    let end = unicodeScalars.endIndex
     if start == end {
       return 0
     }
@@ -279,16 +289,16 @@ extension String.CharacterView : BidirectionalCollection {
     return start._position - startIndexUTF16
   }
 
-  // FIXME(ABI): don't make this function inlineable.  Grapheme cluster
+  // NOTE: don't make this function inlineable.  Grapheme cluster
   // segmentation uses a completely different algorithm in Unicode 9.0.
   //
   /// Returns the length of the previous extended grapheme cluster in UTF-16
   /// code units.
-  @inline(never)
+  @inline(never) // Don't remove, see above.
   internal func _measureExtendedGraphemeClusterBackward(
     from end: UnicodeScalarView.Index
   ) -> Int {
-    let start = UnicodeScalarView.Index(_position: 0)
+    let start = unicodeScalars.startIndex
     if start == end {
       return 0
     }
@@ -363,8 +373,8 @@ extension String.CharacterView : RangeReplaceableCollection {
     with newElements: C
   ) where C : Collection, C.Iterator.Element == Character {
     let rawSubRange: Range<Int> =
-      bounds.lowerBound._base._position
-      ..< bounds.upperBound._base._position
+      bounds.lowerBound._base._position - _coreOffset
+      ..< bounds.upperBound._base._position - _coreOffset
     let lazyUTF16 = newElements.lazy.flatMap { $0.utf16 }
     _core.replaceSubrange(rawSubRange, with: lazyUTF16)
   }
@@ -436,10 +446,9 @@ extension String.CharacterView {
   /// - Complexity: O(*n*) if the underlying string is bridged from
   ///   Objective-C, where *n* is the length of the string; otherwise, O(1).
   public subscript(bounds: Range<Index>) -> String.CharacterView {
-    let unicodeScalarRange =
-      bounds.lowerBound._base..<bounds.upperBound._base
-    return String.CharacterView(
-      String(_core).unicodeScalars[unicodeScalarRange]._core)
+    let unicodeScalarRange = bounds.lowerBound._base..<bounds.upperBound._base
+    return String.CharacterView(unicodeScalars[unicodeScalarRange]._core,
+      coreOffset: unicodeScalarRange.lowerBound._position)
   }
 }
 

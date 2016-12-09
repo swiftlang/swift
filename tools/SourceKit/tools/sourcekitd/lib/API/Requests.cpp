@@ -5,13 +5,14 @@
 // Copyright (c) 2014 - 2016 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
-// See http://swift.org/LICENSE.txt for license information
-// See http://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
+// See https://swift.org/LICENSE.txt for license information
+// See https://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
 //
 //===----------------------------------------------------------------------===//
 
 #include "DictionaryKeys.h"
 #include "sourcekitd/CodeCompletionResultsArray.h"
+#include "sourcekitd/DocStructureArray.h"
 #include "sourcekitd/DocSupportAnnotationArray.h"
 #include "sourcekitd/TokenAnnotationsArray.h"
 
@@ -80,6 +81,7 @@ static LazySKDUID RequestCodeCompleteSetPopularAPI(
 static LazySKDUID
     RequestCodeCompleteSetCustom("source.request.codecomplete.setcustom");
 static LazySKDUID RequestCursorInfo("source.request.cursorinfo");
+static LazySKDUID RequestRangeInfo("source.request.rangeinfo");
 static LazySKDUID RequestRelatedIdents("source.request.relatedidents");
 static LazySKDUID RequestEditorOpen("source.request.editor.open");
 static LazySKDUID RequestEditorOpenInterface(
@@ -165,6 +167,8 @@ static sourcekitd_response_t reportDocInfo(llvm::MemoryBuffer *InputBuf,
                                            ArrayRef<const char *> Args);
 
 static void reportCursorInfo(const CursorInfo &Info, ResponseReceiver Rec);
+
+static void reportRangeInfo(const RangeInfo &Info, ResponseReceiver Rec);
 
 static void findRelatedIdents(StringRef Filename,
                               int64_t Offset,
@@ -734,6 +738,21 @@ handleSemanticRequest(RequestDict Req,
 
     return Rec(createErrorRequestInvalid(
         "either 'key.offset' or 'key.usr' is required"));
+  }
+
+  if (ReqUID == RequestRangeInfo) {
+    LangSupport &Lang = getGlobalContext().getSwiftLangSupport();
+    int64_t Offset;
+    int64_t Length;
+    if (!Req.getInt64(KeyOffset, Offset, /*isOptional=*/false)) {
+      if (!Req.getInt64(KeyLength, Length, /*isOptional=*/false)) {
+        return Lang.getRangeInfo(*SourceFile, Offset, Length, Args,
+          [Rec](const RangeInfo &Info) { reportRangeInfo(Info, Rec); });
+      }
+    }
+
+    return Rec(createErrorRequestInvalid(
+      "'key.offset' or 'key.length' is required"));
   }
 
   if (ReqUID == RequestRelatedIdents) {
@@ -1350,6 +1369,21 @@ static void reportCursorInfo(const CursorInfo &Info, ResponseReceiver Rec) {
 }
 
 //===----------------------------------------------------------------------===//
+// ReportRangeInfo
+//===----------------------------------------------------------------------===//
+
+static void reportRangeInfo(const RangeInfo &Info, ResponseReceiver Rec) {
+  if (Info.IsCancelled)
+    return Rec(createErrorRequestCancelled());
+  ResponseBuilder RespBuilder;
+  auto Elem = RespBuilder.getDictionary();
+  Elem.set(KeyKind, Info.RangeKind);
+  Elem.set(KeyTypeName, Info.ExprType);
+  Elem.set(KeyRangeContent, Info.RangeContent);
+  Rec(RespBuilder.createResponse());
+}
+
+//===----------------------------------------------------------------------===//
 // FindRelatedIdents
 //===----------------------------------------------------------------------===//
 
@@ -1703,35 +1737,25 @@ class SKEditorConsumer : public EditorConsumer {
   ResponseBuilder RespBuilder;
 
   ResponseBuilder::Dictionary Dict;
+  DocStructureArrayBuilder DocStructure;
   TokenAnnotationsArrayBuilder SyntaxMap;
   TokenAnnotationsArrayBuilder SemanticAnnotations;
 
-  struct StructureNode {
-    ResponseBuilder::Dictionary Dict;
-    ResponseBuilder::Array SubStructures;
-    ResponseBuilder::Array Elements;
-
-    explicit StructureNode(ResponseBuilder::Dictionary Dict) : Dict(Dict) {}
-  };
-  std::vector<StructureNode> Structures;
   ResponseBuilder::Array Diags;
   sourcekitd_response_t Error = nullptr;
 
   bool EnableSyntaxMap;
+  bool EnableStructure;
   bool EnableDiagnostics;
   bool SyntacticOnly;
 
 public:
-  SKEditorConsumer(bool EnableSyntaxMap,
-                   bool EnableStructure, bool EnableDiagnostics,
-                   bool SyntacticOnly)
-  : EnableSyntaxMap(EnableSyntaxMap),
-    EnableDiagnostics(EnableDiagnostics),
-    SyntacticOnly(SyntacticOnly) {
+  SKEditorConsumer(bool EnableSyntaxMap, bool EnableStructure,
+                   bool EnableDiagnostics, bool SyntacticOnly)
+      : EnableSyntaxMap(EnableSyntaxMap), EnableStructure(EnableStructure),
+        EnableDiagnostics(EnableDiagnostics), SyntacticOnly(SyntacticOnly) {
 
     Dict = RespBuilder.getDictionary();
-    if (EnableStructure)
-      Structures.push_back(StructureNode{Dict});
   }
 
   SKEditorConsumer(ResponseReceiver RespReceiver, bool EnableSyntaxMap,
@@ -1931,6 +1955,10 @@ sourcekitd_response_t SKEditorConsumer::createResponse() {
         CustomBufferKind::TokenAnnotationsArray,
         SemanticAnnotations.createBuffer());
   }
+  if (EnableStructure) {
+    Dict.setCustomBuffer(KeySubStructure, CustomBufferKind::DocStructureArray,
+                         DocStructure.createBuffer());
+  }
 
   return RespBuilder.createResponse();
 }
@@ -1977,76 +2005,26 @@ SKEditorConsumer::beginDocumentSubStructure(unsigned Offset,
                                             StringRef SelectorName,
                                             ArrayRef<StringRef> InheritedTypes,
                                             ArrayRef<UIdent> Attrs) {
-  if (Structures.empty())
-    return true;
-
-  auto &Parent = Structures.back();
-  if (Parent.SubStructures.isNull())
-    Parent.SubStructures = Parent.Dict.setArray(KeySubStructure);
-  auto Node = Parent.SubStructures.appendDictionary();
-  Node.set(KeyOffset, Offset);
-  Node.set(KeyLength, Length);
-  Node.set(KeyKind, Kind);
-  if (AccessLevel.isValid())
-    Node.set(KeyAccessibility, AccessLevel);
-  if (SetterAccessLevel.isValid())
-    Node.set(KeySetterAccessibility, SetterAccessLevel);
-  Node.set(KeyNameOffset, NameOffset);
-  Node.set(KeyNameLength, NameLength);
-  if (BodyOffset != 0 || BodyLength !=0) {
-    Node.set(KeyBodyOffset, BodyOffset);
-    Node.set(KeyBodyLength, BodyLength);
+  if (EnableStructure) {
+    DocStructure.beginSubStructure(
+        Offset, Length, Kind, AccessLevel, SetterAccessLevel, NameOffset,
+        NameLength, BodyOffset, BodyLength, DisplayName, TypeName, RuntimeName,
+        SelectorName, InheritedTypes, Attrs);
   }
-
-  if (!DisplayName.empty())
-    Node.set(KeyName, DisplayName);
-
-  if (!TypeName.empty())
-    Node.set(KeyTypeName,TypeName);
-
-  if (!RuntimeName.empty())
-    Node.set(KeyRuntimeName, RuntimeName);
-
-  if (!SelectorName.empty())
-    Node.set(KeySelectorName, SelectorName);
-
-  if (!InheritedTypes.empty()) {
-    auto TypeArray = Node.setArray(KeyInheritedTypes);
-    for (const StringRef &TypeName : InheritedTypes) {
-      TypeArray.appendDictionary().set(KeyName, TypeName);
-    }
-  }
-  if (!Attrs.empty()) {
-    auto AttrArray = Node.setArray(KeyAttributes);
-    for (auto Attr : Attrs) {
-      auto AttrDict = AttrArray.appendDictionary();
-      AttrDict.set(KeyAttribute, Attr);
-    }
-  }
-  Structures.push_back(StructureNode{Node});
   return true;
 }
 
 bool SKEditorConsumer::endDocumentSubStructure() {
-  if (!Structures.empty())
-    Structures.pop_back();
-
+  if (EnableStructure)
+    DocStructure.endSubStructure();
   return true;
 }
 
 bool SKEditorConsumer::handleDocumentSubStructureElement(UIdent Kind,
                                                          unsigned Offset,
                                                          unsigned Length) {
-  if (Structures.empty())
-    return true;
-
-  auto &Parent = Structures.back();
-  if (Parent.Elements.isNull())
-    Parent.Elements = Parent.Dict.setArray(KeyElements);
-  auto Node = Parent.Elements.appendDictionary();
-  Node.set(KeyKind, Kind);
-  Node.set(KeyOffset, Offset);
-  Node.set(KeyLength, Length);
+  if (EnableStructure)
+    DocStructure.addElement(Kind, Offset, Length);
   return true;
 }
 

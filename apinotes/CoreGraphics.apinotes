@@ -90,7 +90,7 @@ Functions:
   # replaced by Equatable / ==
   SwiftName: CGAffineTransform.__equalTo(self:_:)
   SwiftPrivate: true
-  
+
 # CGBitmapContext
 - Name: CGBitmapContextCreateWithData
   SwiftName: CGContext.init(data:width:height:bitsPerComponent:bytesPerRow:space:bitmapInfo:releaseCallback:releaseInfo:)
@@ -114,7 +114,7 @@ Functions:
   SwiftName: getter:CGContext.alphaInfo(self:)
 - Name: CGBitmapContextCreateImage
   SwiftName: CGContext.makeImage(self:)
-  
+
 # CGColor
 #
 - Name: CGColorCreate
@@ -409,7 +409,7 @@ Functions:
 - Name: CGGetLastMouseDelta
   # replaced by a version that returns CGVector instead of using out-pointers
   SwiftPrivate: true
-  
+
 # CGEvent
 - Name: CGEventCreateFromData
   SwiftName: CGEvent.init(withDataAllocator:data:)
@@ -421,7 +421,7 @@ Functions:
   SwiftName: CGEvent.postToPid(_:self:)
 - Name: CGEventCreateSourceFromEvent
   SwiftName: CGEventSource.init(event:)
-  
+
 # CGFont
 - Name: CGFontCreateWithDataProvider
   SwiftName: CGFont.init(_:)
@@ -443,7 +443,7 @@ Functions:
   SwiftName: CGFont.table(self:for:)
 - Name: CGFontCreateCopyWithVariations
   SwiftName: CGFont.copy(self:withVariations:)
-  
+
 # CGGeometry
 - Name: CGPointCreateDictionaryRepresentation
   SwiftName: getter:CGPoint.dictionaryRepresentation(self:)
@@ -474,7 +474,7 @@ Functions:
   # hide in favor of an init (can't map to initializer because out-pointer)
   SwiftName: CGRect.__setFromDictionaryRepresentation(_:_:)
   SwiftPrivate: true
-  
+
 # CGGradient
 - Name: CGGradientCreateWithColorComponents
   SwiftName: CGGradient.init(colorSpace:colorComponents:locations:count:)
@@ -557,7 +557,7 @@ Functions:
 # CGPSConverter
 - Name: CGPSConverterIsConverting
   SwiftName: getter:CGPSConverter.isConverting(self:)
-  
+
 # CGPath
 - Name: CGPathCreateCopy
   SwiftName: CGPath.copy(self:)

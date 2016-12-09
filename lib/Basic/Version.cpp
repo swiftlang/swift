@@ -5,8 +5,8 @@
 // Copyright (c) 2014 - 2016 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
-// See http://swift.org/LICENSE.txt for license information
-// See http://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
+// See https://swift.org/LICENSE.txt for license information
+// See https://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
 //
 //===----------------------------------------------------------------------===//
 //
@@ -43,15 +43,9 @@
   SWIFT_MAKE_VERSION_STRING(SWIFT_VERSION_MAJOR, SWIFT_VERSION_MINOR)
 #endif
 
-#if __has_include("LLVMRevision.inc")
-# include "LLVMRevision.inc"
-#endif
-#if __has_include("ClangRevision.inc")
-# include "ClangRevision.inc"
-#endif
-#if __has_include("SwiftRevision.inc")
-# include "SwiftRevision.inc"
-#endif
+#include "LLVMRevision.inc"
+#include "ClangRevision.inc"
+#include "SwiftRevision.inc"
 
 namespace swift {
 namespace version {
@@ -285,6 +279,53 @@ Version::preprocessorDefinition(StringRef macroName,
   return define;
 }
 
+Version::operator clang::VersionTuple() const
+{
+  switch (Components.size()) {
+ case 0:
+   return clang::VersionTuple();
+ case 1:
+   return clang::VersionTuple((unsigned)Components[0]);
+ case 2:
+   return clang::VersionTuple((unsigned)Components[0],
+                              (unsigned)Components[1]);
+ case 3:
+   return clang::VersionTuple((unsigned)Components[0],
+                              (unsigned)Components[1],
+                              (unsigned)Components[2]);
+ case 4:
+ case 5:
+   return clang::VersionTuple((unsigned)Components[0],
+                              (unsigned)Components[1],
+                              (unsigned)Components[2],
+                              (unsigned)Components[3]);
+ default:
+   llvm_unreachable("swift::version::Version with 6 or more components");
+  }
+}
+
+bool Version::isValidEffectiveLanguageVersion() const {
+  for (auto verStr : getValidEffectiveVersions()) {
+    auto v = parseVersionString(verStr, SourceLoc(), nullptr);
+    assert(v.hasValue());
+    // In this case, use logical-equality _and_ precision-equality. We do not
+    // want to permit users requesting effective language versions more precise
+    // than our whitelist (eg. we permit 3 but not 3.0 or 3.0.0), since
+    // accepting such an argument promises more than we're able to deliver.
+    if (v == *this && v.getValue().size() == size())
+      return true;
+  }
+  return false;
+}
+
+Version Version::asMajorVersion() const {
+  if (empty())
+    return {};
+  Version res;
+  res.Components.push_back(Components[0]);
+  return res;
+}
+
 bool operator>=(const class Version &lhs,
                 const class Version &rhs) {
 
@@ -293,22 +334,37 @@ bool operator>=(const class Version &lhs,
   if (lhs.empty())
     return true;
 
-  auto n = std::min(lhs.size(), rhs.size());
+  auto n = std::max(lhs.size(), rhs.size());
 
   for (size_t i = 0; i < n; ++i) {
-    if (lhs[i] < rhs[i])
+    auto lv = i < lhs.size() ? lhs[i] : 0;
+    auto rv = i < rhs.size() ? rhs[i] : 0;
+    if (lv < rv)
       return false;
-    else if (lhs[i] > rhs[i])
+    else if (lv > rv)
       return true;
   }
-  return lhs.size() >= rhs.size();
+  // Equality
+  return true;
+}
+
+bool operator==(const class Version &lhs,
+                const class Version &rhs) {
+  auto n = std::max(lhs.size(), rhs.size());
+  for (size_t i = 0; i < n; ++i) {
+    auto lv = i < lhs.size() ? lhs[i] : 0;
+    auto rv = i < rhs.size() ? rhs[i] : 0;
+    if (lv != rv)
+      return false;
+  }
+  return true;
 }
 
 std::pair<unsigned, unsigned> getSwiftNumericVersion() {
   return { SWIFT_VERSION_MAJOR, SWIFT_VERSION_MINOR };
 }
 
-std::string getSwiftFullVersion() {
+std::string getSwiftFullVersion(Version effectiveVersion) {
   std::string buf;
   llvm::raw_string_ostream OS(buf);
 
@@ -320,6 +376,10 @@ std::string getSwiftFullVersion() {
 #ifndef SWIFT_COMPILER_VERSION
   OS << "-dev";
 #endif
+
+  if (!(effectiveVersion == Version::getCurrentLanguageVersion())) {
+    OS << " effective-" << effectiveVersion;
+  }
 
 #if defined(SWIFT_COMPILER_VERSION)
   OS << " (swiftlang-" SWIFT_COMPILER_VERSION;
@@ -335,9 +395,17 @@ std::string getSwiftFullVersion() {
 #endif
 
   // Suppress unused function warning
-  (void) printFullRevisionString;
+  (void)&printFullRevisionString;
 
   return OS.str();
+}
+
+std::string getSwiftRevision() {
+#ifdef SWIFT_REVISION
+  return SWIFT_REVISION;
+#else
+  return "";
+#endif
 }
 
 } // end namespace version

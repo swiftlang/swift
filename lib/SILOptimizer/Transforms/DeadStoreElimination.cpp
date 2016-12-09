@@ -5,8 +5,8 @@
 // Copyright (c) 2014 - 2016 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
-// See http://swift.org/LICENSE.txt for license information
-// See http://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
+// See https://swift.org/LICENSE.txt for license information
+// See https://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
 //
 //===----------------------------------------------------------------------===//
 ///
@@ -590,7 +590,7 @@ void DSEContext::processBasicBlockForGenKillSet(SILBasicBlock *BB) {
   }
 
   // Handle SILArgument for base invalidation.
-  ArrayRef<SILArgument *> Args = BB->getBBArgs();
+  ArrayRef<SILArgument *> Args = BB->getArguments();
   for (auto &X : Args) {
     invalidateBase(X, BBState, DSEKind::BuildGenKillSet);
   }
@@ -633,7 +633,7 @@ void DSEContext::processBasicBlockForDSE(SILBasicBlock *BB, bool Optimistic) {
   }
 
   // Handle SILArgument for base invalidation.
-  ArrayRef<SILArgument *> Args = BB->getBBArgs();
+  ArrayRef<SILArgument *> Args = BB->getArguments();
   for (auto &X : Args) {
     invalidateBase(X, S, DSEKind::BuildGenKillSet);
   }
@@ -1115,7 +1115,7 @@ void DSEContext::runIterativeDSE() {
     SILBasicBlock *BB = WorkList.pop_back_val();
     HandledBBs.erase(BB);
     if (processBasicBlockWithGenKillSet(BB)) {
-      for (auto X : BB->getPreds()) {
+      for (auto X : BB->getPredecessorBlocks()) {
         // We do not push basic block into the worklist if its already 
         // in the worklist.
         if (HandledBBs.find(X) != HandledBBs.end())
@@ -1194,7 +1194,8 @@ bool DSEContext::run() {
       SILInstruction *Inst = cast<SILInstruction>(I->first);
       auto *IT = &*std::next(Inst->getIterator());
       SILBuilderWithScope Builder(IT);
-      Builder.createStore(Inst->getLoc(), I->second, Inst);
+      Builder.createStore(Inst->getLoc(), I->second, Inst,
+                          StoreOwnershipQualifier::Unqualified);
     }
     // Delete the dead stores.
     for (auto &I : getBlockState(&BB)->DeadStores) {

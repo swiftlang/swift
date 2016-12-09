@@ -5,8 +5,8 @@
 // Copyright (c) 2014 - 2016 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
-// See http://swift.org/LICENSE.txt for license information
-// See http://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
+// See https://swift.org/LICENSE.txt for license information
+// See https://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
 //
 //===----------------------------------------------------------------------===//
 
@@ -90,8 +90,7 @@ bool swift::ArraySemanticsCall::isValidSignature() {
         return false;
 
       StringRef AllocFuncName = AllocFn->getName();
-      if (AllocFuncName != "swift_bufferAllocate" &&
-          AllocFuncName != "swift_bufferAllocateOnStack")
+      if (AllocFuncName != "swift_bufferAllocate")
         return false;
 
       if (!hasOneNonDebugUse(AllocBufferAI))
@@ -258,7 +257,7 @@ static bool canHoistArrayArgument(ApplyInst *SemanticsCall, SILValue Arr,
     return false;
 
   ValueBase *SelfVal = Arr;
-  auto *SelfBB = SelfVal->getParentBB();
+  auto *SelfBB = SelfVal->getParentBlock();
   if (DT->dominates(SelfBB, InsertBefore->getParent()))
     return true;
 
@@ -268,7 +267,7 @@ static bool canHoistArrayArgument(ApplyInst *SemanticsCall, SILValue Arr,
     auto Val = LI->getOperand();
     bool DoesNotDominate;
     StructElementAddrInst *SEI;
-    while ((DoesNotDominate = !DT->dominates(Val->getParentBB(),
+    while ((DoesNotDominate = !DT->dominates(Val->getParentBlock(),
                                              InsertBefore->getParent())) &&
            (SEI = dyn_cast<StructElementAddrInst>(Val)))
       Val = SEI->getOperand();
@@ -326,7 +325,7 @@ bool swift::ArraySemanticsCall::canHoist(SILInstruction *InsertBefore,
 static SILValue copyArrayLoad(SILValue ArrayStructValue,
                                SILInstruction *InsertBefore,
                                DominanceInfo *DT) {
-  if (DT->dominates(ArrayStructValue->getParentBB(),
+  if (DT->dominates(ArrayStructValue->getParentBlock(),
                     InsertBefore->getParent()))
     return ArrayStructValue;
 
@@ -335,7 +334,7 @@ static SILValue copyArrayLoad(SILValue ArrayStructValue,
   // Recursively move struct_element_addr.
   ValueBase *Val = LI->getOperand();
   auto *InsertPt = InsertBefore;
-  while (!DT->dominates(Val->getParentBB(), InsertBefore->getParent())) {
+  while (!DT->dominates(Val->getParentBlock(), InsertBefore->getParent())) {
     auto *Inst = cast<StructElementAddrInst>(Val);
     Inst->moveBefore(InsertPt);
     Val = Inst->getOperand();
@@ -579,7 +578,8 @@ SILValue swift::ArraySemanticsCall::getInitializationCount() const {
     // argument. The count is the second argument.
     // A call to _allocateUninitialized has the count as first argument.
     SILValue Arg0 = SemanticsCall->getArgument(0);
-    if (Arg0->getType().isExistentialType())
+    if (Arg0->getType().isExistentialType() ||
+        Arg0->getType().hasReferenceSemantics())
       return SemanticsCall->getArgument(1);
     else return SemanticsCall->getArgument(0);
   }
@@ -665,7 +665,7 @@ bool swift::ArraySemanticsCall::replaceByValue(SILValue V) {
   SILBuilderWithScope Builder(SemanticsCall);
   auto &ValLowering = Builder.getModule().getTypeLowering(V->getType());
   if (hasGetElementDirectResult()) {
-    ValLowering.emitRetainValue(Builder, SemanticsCall->getLoc(), V);
+    ValLowering.emitCopyValue(Builder, SemanticsCall->getLoc(), V);
     SemanticsCall->replaceAllUsesWith(V);
   } else {
     auto Dest = SemanticsCall->getArgument(0);
@@ -675,7 +675,7 @@ bool swift::ArraySemanticsCall::replaceByValue(SILValue V) {
     if (!ASI)
       return false;
 
-    ValLowering.emitRetainValue(Builder, SemanticsCall->getLoc(), V);
+    ValLowering.emitCopyValue(Builder, SemanticsCall->getLoc(), V);
     ValLowering.emitStoreOfCopy(Builder, SemanticsCall->getLoc(), V, Dest,
                                 IsInitialization_t::IsInitialization);
   }

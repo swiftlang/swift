@@ -5,8 +5,8 @@
 // Copyright (c) 2014 - 2016 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
-// See http://swift.org/LICENSE.txt for license information
-// See http://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
+// See https://swift.org/LICENSE.txt for license information
+// See https://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
 //
 //===----------------------------------------------------------------------===//
 //
@@ -29,6 +29,8 @@ IDENTIFIER(Any)
 IDENTIFIER(atIndexedSubscript)
 IDENTIFIER_(bridgeToObjectiveC)
 IDENTIFIER_WITH_NAME(code_, "_code")
+IDENTIFIER(CoreGraphics)
+IDENTIFIER(CoreMedia)
 IDENTIFIER(CGFloat)
 IDENTIFIER(CVarArg)
 IDENTIFIER(Darwin)
@@ -43,6 +45,7 @@ IDENTIFIER(hashValue)
 IDENTIFIER(init)
 IDENTIFIER(initStorage)
 IDENTIFIER(initialValue)
+IDENTIFIER(Key)
 IDENTIFIER(makeIterator)
 IDENTIFIER(Iterator)
 IDENTIFIER(load)

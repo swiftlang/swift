@@ -5,8 +5,8 @@
 // Copyright (c) 2014 - 2016 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
-// See http://swift.org/LICENSE.txt for license information
-// See http://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
+// See https://swift.org/LICENSE.txt for license information
+// See https://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
 //
 //===----------------------------------------------------------------------===//
 //
@@ -103,7 +103,7 @@ void IterativeTypeChecker::processResolveInheritedClauseEntry(
 
   // Validate the type of this inherited clause entry.
   // FIXME: Recursion into existing type checker.
-  PartialGenericTypeToArchetypeResolver resolver(TC);
+  GenericTypeToArchetypeResolver resolver(dc);
   if (TC.validateType(*inherited, dc, options, &resolver)) {
     inherited->setInvalidType(getASTContext());
   }
@@ -242,7 +242,7 @@ void IterativeTypeChecker::processInheritedProtocols(
         if (inheritedProtocol == protocol ||
             inheritedProtocol->inheritsFrom(protocol)) {
           if (!diagnosedCircularity &&
-			  !protocol->isInheritedProtocolsValid()) {
+              !protocol->isInheritedProtocolsValid()) {
             diagnose(protocol,
                      diag::circular_protocol_def, protocol->getName().str())
                     .fixItRemove(inherited.getSourceRange());
@@ -286,7 +286,7 @@ bool IterativeTypeChecker::isResolveTypeDeclSatisfied(TypeDecl *typeDecl) {
 
   if (auto typeParam = dyn_cast<AbstractTypeParamDecl>(typeDecl)) {
     // FIXME: Deal with these.
-    return typeParam->getArchetype();
+    return typeParam->getDeclContext()->isValidGenericContext();
   }
 
   // Module types are always fully resolved.
@@ -295,7 +295,7 @@ bool IterativeTypeChecker::isResolveTypeDeclSatisfied(TypeDecl *typeDecl) {
 
   // Nominal types.
   auto nominal = cast<NominalTypeDecl>(typeDecl);
-  return nominal->hasType();
+  return nominal->hasInterfaceType();
 }
 
 void IterativeTypeChecker::processResolveTypeDecl(
@@ -304,7 +304,7 @@ void IterativeTypeChecker::processResolveTypeDecl(
   if (auto typeAliasDecl = dyn_cast<TypeAliasDecl>(typeDecl)) {
     if (typeAliasDecl->getDeclContext()->isModuleScopeContext()) {
       // FIXME: This is silly.
-      if (!typeAliasDecl->hasType())
+      if (!typeAliasDecl->getAliasType())
         typeAliasDecl->computeType();
       
       TypeResolutionOptions options;
@@ -314,11 +314,12 @@ void IterativeTypeChecker::processResolveTypeDecl(
 
       // Note: recursion into old type checker is okay when passing in an
       // unsatisfied-dependency callback.
+      GenericTypeToArchetypeResolver resolver(typeAliasDecl);
       if (TC.validateType(typeAliasDecl->getUnderlyingTypeLoc(),
                           typeAliasDecl->getDeclContext(),
-                          options, nullptr, &unsatisfiedDependency)) {
+                          options, &resolver, &unsatisfiedDependency)) {
         typeAliasDecl->setInvalid();
-        typeAliasDecl->overwriteType(ErrorType::get(getASTContext()));
+        typeAliasDecl->setInterfaceType(ErrorType::get(getASTContext()));
         typeAliasDecl->getUnderlyingTypeLoc().setInvalidType(getASTContext());
       }
       
@@ -335,7 +336,7 @@ void IterativeTypeChecker::processResolveTypeDecl(
 bool IterativeTypeChecker::breakCycleForResolveTypeDecl(TypeDecl *typeDecl) {
   if (auto typeAliasDecl = dyn_cast<TypeAliasDecl>(typeDecl)) {
     typeAliasDecl->setInvalid();
-    typeAliasDecl->overwriteType(ErrorType::get(getASTContext()));
+    typeAliasDecl->setInterfaceType(ErrorType::get(getASTContext()));
     typeAliasDecl->getUnderlyingTypeLoc().setInvalidType(getASTContext());
     return true;
   }

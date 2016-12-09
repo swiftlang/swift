@@ -160,7 +160,7 @@ extension NSDogcow {
   @NSManaged var woof: Int
 }
 
-class  SwiftSubGizmo : SwiftBaseGizmo {
+class SwiftSubGizmo : SwiftBaseGizmo {
 
   // Don't crash on this call. Emit an objC method call to super.
   //

@@ -1,4 +1,4 @@
-// RUN: not %swift -parse -target %target-triple %s -emit-fixits-path %t.remap -I %S/Inputs
+// RUN: not %swift -typecheck -target %target-triple %s -emit-fixits-path %t.remap -I %S/Inputs
 // RUN: c-arcmt-test %t.remap | arcmt-test -verify-transformed-files %s.result
 
 class Base {}
@@ -77,6 +77,10 @@ func testMask12(a: MyEventMask2?) {
 func testMask13(a: MyEventMask2?) {
   testMask1(a: a) // no fix, nullability mismatch.
 }
+func testMask14() {
+  sendIt(1)
+  sendItOpt(2)
+}
 
 struct Wrapper {
   typealias InnerMask = MyEventMask2
@@ -94,6 +98,29 @@ struct SomeName : RawRepresentable {
 func testPassSomeName(_: SomeName) {}
 func testConvertSomeName(s: String) {
   testPassSomeName("\(s)}")
+}
+
+class WrappedClass {}
+class WrappedClassSub: WrappedClass {}
+struct ClassWrapper : RawRepresentable {
+  var rawValue: WrappedClass
+}
+func testPassAnyObject(_: AnyObject) {}
+func testPassAnyObjectOpt(_: AnyObject?) {}
+func testPassWrappedSub(_: WrappedClassSub) {}
+func testConvertClassWrapper(_ x: ClassWrapper, _ sub: WrappedClassSub) {
+  testPassAnyObject(x)
+  testPassAnyObjectOpt(x)
+  testPassWrappedSub(x)
+
+  let iuo: ClassWrapper! = x
+  testPassAnyObject(iuo)
+  testPassAnyObjectOpt(iuo)
+
+  let _: ClassWrapper = sub
+  let _: ClassWrapper = x.rawValue
+  // FIXME: This one inserts 'as!', which is incorrect.
+  let _: ClassWrapper = sub as AnyObject
 }
 
 enum MyEnumType : UInt32 {
@@ -187,8 +214,12 @@ var graph: Graph2
 class Graph3<NodeType : ObjCProt> {}
 var graph: Graph3
 
-class GraphNoFix<NodeType : SomeProt> {}
-var graph: GraphNoFix
+class Graph4<NodeType : SomeProt> {}
+var graph: Graph4
+var graphAgain = Graph4()
+
+class GraphCombo<NodeType : SomeProt & ObjCProt> {}
+var graph: GraphCombo
 
 func evilCommas(s: String) {
   _ = s[s.startIndex..<<#editorplaceholder#>]
@@ -207,7 +238,7 @@ protocol NonObjCProtocol {}
   @IBOutlet private var ibout3: NonObjCProtocol!
   @IBOutlet private let ibout4: IBIssues!
   @IBOutlet private var ibout5: [[IBIssues]]!
-  @IBOutlet private var ibout6: [String:String]!
+  @IBOutlet private var ibout6: [String: String]!
   @IBInspectable static private var ibinspect1: IBIssues!
   @IBAction static func ibact() {}
 }
@@ -275,3 +306,7 @@ protocol P1 {}
 protocol P2 {}
 var a : protocol<P1, P2>?
 var a2 : protocol<P1>= 17
+
+class TestOptionalMethodFixit {
+  optional func test() {}
+}

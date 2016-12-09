@@ -5,8 +5,8 @@
 // Copyright (c) 2014 - 2016 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
-// See http://swift.org/LICENSE.txt for license information
-// See http://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
+// See https://swift.org/LICENSE.txt for license information
+// See https://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
 //
 //===----------------------------------------------------------------------===//
 
@@ -117,18 +117,8 @@ class SILArgument : public ValueBase {
 
   SILBasicBlock *ParentBB;
   const ValueDecl *Decl;
+
 public:
-  SILArgument(SILBasicBlock *ParentBB, SILType Ty, const ValueDecl *D=nullptr);
-  SILArgument(SILBasicBlock *ParentBB, SILBasicBlock::bbarg_iterator Pos,
-              SILType Ty, const ValueDecl *D=nullptr);
-
-  SILArgument(SILFunction::iterator ParentBB, SILType Ty,
-              const ValueDecl *D = nullptr)
-      : SILArgument(&*ParentBB, Ty, D) {}
-  SILArgument(SILFunction::iterator ParentBB, SILBasicBlock::bbarg_iterator Pos,
-              SILType Ty, const ValueDecl *D = nullptr)
-      : SILArgument(&*ParentBB, Pos, Ty, D) {}
-
   SILBasicBlock *getParent() { return ParentBB; }
   const SILBasicBlock *getParent() const { return ParentBB; }
 
@@ -149,7 +139,7 @@ public:
   }
 
   unsigned getIndex() const {
-    ArrayRef<SILArgument *> Args = getParent()->getBBArgs();
+    ArrayRef<SILArgument *> Args = getParent()->getArguments();
     for (unsigned i = 0, e = Args.size(); i != e; ++i)
       if (Args[i] == this)
         return i;
@@ -230,10 +220,16 @@ public:
   }
 
 private:
+  friend class SILBasicBlock;
+
+  SILArgument(SILBasicBlock *ParentBB, SILType Ty,
+              const ValueDecl *D = nullptr);
+  SILArgument(SILBasicBlock *ParentBB, SILBasicBlock::arg_iterator Pos,
+              SILType Ty, const ValueDecl *D = nullptr);
+
   // A special constructor, only intended for use in SILBasicBlock::replaceBBArg.
   explicit SILArgument(SILType Ty, const ValueDecl *D =nullptr) :
     ValueBase(ValueKind::SILArgument, Ty), ParentBB(nullptr), Decl(D) {}
-  friend class SILBasicBlock;
   void setParent(SILBasicBlock *P) { ParentBB = P; }
 };
 

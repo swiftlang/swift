@@ -5,8 +5,8 @@
 // Copyright (c) 2014 - 2016 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
-// See http://swift.org/LICENSE.txt for license information
-// See http://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
+// See https://swift.org/LICENSE.txt for license information
+// See https://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
 //
 //===----------------------------------------------------------------------===//
 //
@@ -19,8 +19,6 @@
 
 #include "swift/AST/ASTContext.h"
 #include "swift/AST/Decl.h"
-#include "clang/AST/Attr.h"
-#include "clang/Basic/SourceLocation.h"
 #include "llvm/ADT/APSInt.h"
 #include "llvm/ADT/DenseMap.h"
 
@@ -99,54 +97,29 @@ private:
 /// Provide a cache of enum infos, so that we don't have to re-calculate their
 /// information.
 class EnumInfoCache {
-  // TODO: reference a single preprocessor, that is different Clangs get
-  // different caches. This will then have the advantage that we can instead of
-  // caching names, cache Decls.
+  ASTContext &swiftCtx;
+  clang::Preprocessor &clangPP;
 
-  /// Cache enum infos, referenced with a dotted Clang name
-  /// "ModuleName.EnumName".
-  llvm::StringMap<importer::EnumInfo> enumInfos;
-
-  /// Retrieve the key to use when looking for enum information.
-  StringRef getEnumInfoKey(const clang::EnumDecl *decl,
-                           SmallVectorImpl<char> &scratch);
+  llvm::DenseMap<const clang::EnumDecl *, EnumInfo> enumInfos;
 
   // Never copy
   EnumInfoCache(const EnumInfoCache &) = delete;
-  EnumInfoCache &operator=(const EnumInfoCache &) = delete;
+  EnumInfoCache &operator = (const EnumInfoCache &) = delete;
 
 public:
-  EnumInfoCache() = default;
+  EnumInfoCache(ASTContext &swiftContext, clang::Preprocessor &cpp)
+      : swiftCtx(swiftContext), clangPP(cpp) {}
 
-  importer::EnumInfo getEnumInfo(ASTContext &ctx, const clang::EnumDecl *decl,
-                                 clang::Preprocessor &preprocessor) {
-    // If there is no name for linkage, the computation is trivial and we
-    // wouldn't be able to perform name-based caching anyway.
-    if (!decl->hasNameForLinkage())
-      return importer::EnumInfo(ctx, decl, preprocessor);
+  EnumInfo getEnumInfo(const clang::EnumDecl *decl);
 
-    SmallString<32> keyScratch;
-    auto key = getEnumInfoKey(decl, keyScratch);
-    auto known = enumInfos.find(key);
-    if (known != enumInfos.end())
-      return known->second;
-
-    importer::EnumInfo enumInfo(ctx, decl, preprocessor);
-    enumInfos[key] = enumInfo;
-    return enumInfo;
-  }
-
-  importer::EnumKind getEnumKind(ASTContext &ctx, const clang::EnumDecl *decl,
-                                 clang::Preprocessor &preprocessor) {
-    return getEnumInfo(ctx, decl, preprocessor).getKind();
+  EnumKind getEnumKind(const clang::EnumDecl *decl) {
+    return getEnumInfo(decl).getKind();
   }
 
   /// The prefix to be stripped from the names of the enum constants within the
   /// given enum.
-  StringRef getEnumConstantNamePrefix(ASTContext &ctx,
-                                      const clang::EnumDecl *decl,
-                                      clang::Preprocessor &preprocessor) {
-    return getEnumInfo(ctx, decl, preprocessor).getConstantNamePrefix();
+  StringRef getEnumConstantNamePrefix(const clang::EnumDecl *decl) {
+    return getEnumInfo(decl).getConstantNamePrefix();
   }
 };
 

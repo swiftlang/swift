@@ -5,8 +5,8 @@
 // Copyright (c) 2014 - 2016 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
-// See http://swift.org/LICENSE.txt for license information
-// See http://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
+// See https://swift.org/LICENSE.txt for license information
+// See https://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
 //
 //===----------------------------------------------------------------------===//
 
@@ -287,8 +287,22 @@ public struct URLResourceValues {
     /// The quarantine properties as defined in LSQuarantine.h. To remove quarantine information from a file, pass `nil` as the value when setting this property.
     @available(OSX 10.10, *)
     public var quarantineProperties: [String : Any]? {
-        get { return _get(.quarantinePropertiesKey) }
-        set { _set(.quarantinePropertiesKey, newValue: newValue as NSObject?) }
+        get {
+            // If a caller has caused us to stash NSNull in the dictionary (via set), make sure to return nil instead of NSNull
+            if let isNull = _values[.quarantinePropertiesKey] as? NSNull {
+                return nil
+            } else {
+                return _values[.quarantinePropertiesKey] as? [String : Any]
+            }
+        }
+        set {
+            if let v = newValue {
+                _set(.quarantinePropertiesKey, newValue: newValue as NSObject?)
+            } else {
+                // Set to NSNull, a special case for deleting quarantine properties
+                _set(.quarantinePropertiesKey, newValue: NSNull())
+            }
+        }
     }
 #endif
     
@@ -965,7 +979,7 @@ public struct URL : ReferenceConvertible, Equatable {
     ///
     /// This method synchronously checks if the resource's backing store is reachable. Checking reachability is appropriate when making decisions that do not require other immediate operations on the resource, e.g. periodic maintenance of UI state that depends on the existence of a specific document. When performing operations such as opening a file or copying resource properties, it is more efficient to simply try the operation and handle failures. This method is currently applicable only to URLs for file system resources. For other URL types, `false` is returned.
     public func checkResourceIsReachable() throws -> Bool {
-        var error : NSError? = nil
+        var error : NSError?
         let result = _url.checkResourceIsReachableAndReturnError(&error)
         if let e = error {
             throw e
@@ -979,7 +993,7 @@ public struct URL : ReferenceConvertible, Equatable {
     /// This method synchronously checks if the resource's backing store is reachable. Checking reachability is appropriate when making decisions that do not require other immediate operations on the resource, e.g. periodic maintenance of UI state that depends on the existence of a specific document. When performing operations such as opening a file or copying resource properties, it is more efficient to simply try the operation and handle failures. This method is currently applicable only to URLs for file system resources. For other URL types, `false` is returned.
     @available(OSX 10.10, iOS 8.0, *)
     public func checkPromisedItemIsReachable() throws -> Bool {
-        var error : NSError? = nil
+        var error : NSError?
         let result = _url.checkPromisedItemIsReachableAndReturnError(&error)
         if let e = error {
             throw e
@@ -1059,12 +1073,7 @@ public struct URL : ReferenceConvertible, Equatable {
     public func setResourceValues(_ keyedValues: [URLResourceKey : AnyObject]) throws {
         fatalError()
     }
-    
-    @available(*, unavailable, message: "Use struct URLResourceValues and URL.resourceValues(forKeys:) instead")
-    public func resourceValues(forKeys keys: [URLResourceKey]) throws -> [URLResourceKey : AnyObject] {
-        fatalError()
-    }
-    
+        
     @available(*, unavailable, message: "Use struct URLResourceValues and URL.setResourceValues(_:) instead")
     public func getResourceValue(_ value: AutoreleasingUnsafeMutablePointer<AnyObject?>, forKey key: URLResourceKey) throws {
         fatalError()
@@ -1151,7 +1160,7 @@ extension URL : _ObjectiveCBridgeable {
     }
 
     public static func _unconditionallyBridgeFromObjectiveC(_ source: NSURL?) -> URL {
-        var result: URL? = nil
+        var result: URL?
         _forceBridgeFromObjectiveC(source!, result: &result)
         return result!
     }

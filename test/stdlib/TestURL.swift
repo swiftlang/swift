@@ -1,8 +1,8 @@
 // Copyright (c) 2014 - 2016 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
-// See http://swift.org/LICENSE.txt for license information
-// See http://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
+// See https://swift.org/LICENSE.txt for license information
+// See https://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
 //
 //===----------------------------------------------------------------------===//
 //
@@ -53,7 +53,7 @@ class TestURL : TestURLSuper {
             expectTrue(false, "Unable to write data")
         }
         
-        // Modify an existing resource values
+        // Modify an existing resource value
         do {
             var resourceValues = try file.resourceValues(forKeys: [.nameKey])
             expectNotNil(resourceValues.name)
@@ -64,8 +64,64 @@ class TestURL : TestURLSuper {
             try file.setResourceValues(resourceValues)
         } catch {
             expectTrue(false, "Unable to set resources")
-        }        
+        }
     }
+    
+#if os(OSX)
+    func testQuarantineProperties() {
+        // Test the quarantine stuff; it has special logic
+        if #available(OSX 10.11, iOS 9.0, *) {
+            // Create a temporary file
+            var file = URL(fileURLWithPath: NSTemporaryDirectory())
+            let name = "my_great_file" + UUID().uuidString
+            file.appendPathComponent(name)
+            let data = Data(bytes: [1, 2, 3, 4, 5])
+            do {
+                try data.write(to: file)
+            } catch {
+                expectTrue(false, "Unable to write data")
+            }
+
+            // Set the quarantine info on a file
+            do {
+                var resourceValues = URLResourceValues()
+                resourceValues.quarantineProperties = ["LSQuarantineAgentName" : "TestURL"]
+                try file.setResourceValues(resourceValues)
+            } catch {
+                expectTrue(false, "Unable to set quarantine info")
+            }
+            
+            // Get the quarantine info back
+            do {
+                var resourceValues = try file.resourceValues(forKeys: [.quarantinePropertiesKey])
+                expectEqual(resourceValues.quarantineProperties?["LSQuarantineAgentName"] as? String, "TestURL")
+            } catch {
+                expectTrue(false, "Unable to get quarantine info")
+            }
+            
+            // Clear the quarantine info
+            do {
+                var resourceValues = URLResourceValues()
+                resourceValues.quarantineProperties = nil // this effectively sets a flag
+                try file.setResourceValues(resourceValues)
+                
+                // Make sure that the resourceValues property returns nil
+                expectNil(resourceValues.quarantineProperties)
+            } catch {
+                expectTrue(false, "Unable to clear quarantine info")
+            }
+
+            // Get the quarantine info back again
+            do {
+                var resourceValues = try file.resourceValues(forKeys: [.quarantinePropertiesKey])
+                expectNil(resourceValues.quarantineProperties)
+            } catch {
+                expectTrue(false, "Unable to get quarantine info after clearing")
+            }
+
+        }
+    }
+#endif
     
     func testMoreSetProperties() {
         // Create a temporary file
@@ -327,6 +383,9 @@ var URLTests = TestSuite("TestURL")
 URLTests.test("testBasics") { TestURL().testBasics() }
 URLTests.test("testProperties") { TestURL().testProperties() }
 URLTests.test("testSetProperties") { TestURL().testSetProperties() }
+#if os(OSX)
+URLTests.test("testQuarantineProperties") { TestURL().testQuarantineProperties() }
+#endif
 URLTests.test("testMoreSetProperties") { TestURL().testMoreSetProperties() }
 URLTests.test("testURLComponents") { TestURL().testURLComponents() }
 URLTests.test("testURLResourceValues") { TestURL().testURLResourceValues() }

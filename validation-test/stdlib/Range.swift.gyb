@@ -228,7 +228,7 @@ let offsetByTests: [OffsetByTest] = [
     advanceFromEnd: true),
   OffsetByTest(advanceBy: -10, newOpenIndex: 10, newClosedIndex: 11,
     advanceFromEnd: true),
-  OffsetByTest(advanceBy: -11, newClosedIndex: 10, 
+  OffsetByTest(advanceBy: -11, newClosedIndex: 10,
     advanceFromEnd: true),
   OffsetByTest(advanceBy: 0, newOpenIndex: 20, newClosedIndex: 21,
     advanceFromEnd: true),
@@ -246,7 +246,7 @@ struct IndexDistanceTest {
   // between open and closed ranges.
   let leftIndex: Int?
   let rightIndex: Int?
-  
+
   let loc: SourceLoc
   let openDistance: Int
   let closedDistance: Int
@@ -555,7 +555,7 @@ ${TestSuite}.test("index(after:)/semantics").forEach(in: [3, 5, 10, 12, 86]) {
   let end = ${Bound}(endValue)
   let range: ${Self}<${Bound}> = start${op}end
   var idx = range.startIndex
-  var previousValue: Int? = nil
+  var previousValue: Int?
 
   for _ in 0${op}(endValue - 1) {
     // Advance the index to the last in-range position.
@@ -592,7 +592,7 @@ ${TestSuite}.test("index(before:)/semantics").forEach(in: [3, 5, 10, 12, 86]) {
   let end = ${Bound}(endValue)
   let range: ${Self}<${Bound}> = start${op}end
   var idx = range.endIndex
-  var previousValue: Int? = nil
+  var previousValue: Int?
 
   for _ in 0${op}(endValue) {
     // Advance the index backwards until we reach `startIndex`.

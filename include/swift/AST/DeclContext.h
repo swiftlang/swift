@@ -5,8 +5,8 @@
 // Copyright (c) 2014 - 2016 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
-// See http://swift.org/LICENSE.txt for license information
-// See http://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
+// See https://swift.org/LICENSE.txt for license information
+// See https://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
 //
 //===----------------------------------------------------------------------===//
 //
@@ -198,7 +198,11 @@ class alignas(1 << DeclContextAlignInBits) DeclContext {
   friend struct ::llvm::cast_convert_val;
   
   static DeclContext *castDeclToDeclContext(const Decl *D);
-  
+
+  /// If this DeclContext is a GenericType declaration or an
+  /// extension thereof, return the GenericTypeDecl.
+  GenericTypeDecl *getAsTypeOrTypeExtensionContext() const;
+
 public:
   DeclContext(DeclContextKind Kind, DeclContext *Parent)
     : ParentAndKind(Parent, Kind) {
@@ -232,19 +236,12 @@ public:
 
   /// \returns true if this is a type context, e.g., a struct, a class, an
   /// enum, a protocol, or an extension.
-  bool isTypeContext() const {
-    return getContextKind() == DeclContextKind::GenericTypeDecl ||
-           getContextKind() == DeclContextKind::ExtensionDecl;
-  }
+  bool isTypeContext() const;
 
   /// \brief Determine whether this is an extension context.
   bool isExtensionContext() const {
     return getContextKind() == DeclContextKind::ExtensionDecl;
   }
-
-  /// If this DeclContext is a GenericType declaration or an
-  /// extension thereof, return the GenericTypeDecl.
-  GenericTypeDecl *getAsGenericTypeOrGenericTypeExtensionContext() const;
 
   /// If this DeclContext is a NominalType declaration or an
   /// extension thereof, return the NominalTypeDecl.
@@ -269,21 +266,37 @@ public:
   /// protocol extension.
   ///
   /// Only valid if \c getAsProtocolOrProtocolExtensionContext().
-  GenericTypeParamDecl *getProtocolSelf() const;
+  GenericTypeParamType *getProtocolSelfType() const;
 
-  /// getDeclaredTypeOfContext - For a type context, retrieves the declared
-  /// type of the context. Returns a null type for non-type contexts.
+  /// Gets the type being declared by this context.
+  ///
+  /// - Generic types returns an unbound generic type.
+  /// - Non-type contexts returns a null type.
   Type getDeclaredTypeOfContext() const;
 
-  /// getDeclaredTypeInContext - For a type context, retrieves the declared
-  /// type of the context as visible from within the context. Returns a null
-  /// type for non-type contexts.
+  /// Gets the type being declared by this context.
+  ///
+  /// - Generic types return a bound generic type using archetypes.
+  /// - Non-type contexts return a null type.
   Type getDeclaredTypeInContext() const;
   
-  /// getDeclaredInterfaceType - For a type context, retrieves the interface
-  /// type of the context as seen from outside the context. Returns a null
-  /// type for non-type contexts.
+  /// Gets the type being declared by this context.
+  ///
+  /// - Generic types return a bound generic type using interface types.
+  /// - Non-type contexts return a null type.
   Type getDeclaredInterfaceType() const;
+
+  /// Get the type of `self` in this context.
+  ///
+  /// - Protocol types return the `Self` archetype.
+  /// - Everything else falls back on getDeclaredTypeInContext().
+  Type getSelfTypeInContext() const;
+
+  /// Get the type of `self` in this context.
+  ///
+  /// - Protocol types return the `Self` interface type.
+  /// - Everything else falls back on getDeclaredInterfaceType().
+  Type getSelfInterfaceType() const;
 
   /// \brief Retrieve the innermost generic parameters of this context or any
   /// of its parents.
@@ -298,7 +311,13 @@ public:
   /// \brief Retrieve the innermost archetypes of this context or any
   /// of its parents.
   GenericEnvironment *getGenericEnvironmentOfContext() const;
-  
+
+  /// Map an interface type to a contextual type within this context.
+  Type mapTypeIntoContext(Type type) const;
+
+  /// Map a type within this context to an interface type.
+  Type mapTypeOutOfContext(Type type) const;
+
   /// Returns this or the first local parent context, or nullptr if it is not
   /// contained in one.
   DeclContext *getLocalContext();
@@ -370,6 +389,11 @@ public:
   /// Determine whether this declaration context is generic, meaning that it or
   /// any of its parents have generic parameters.
   bool isGenericContext() const;
+
+  /// Determine whether this declaration context is a generic context that has
+  /// been fully type checked, meaning it has a valid GenericSignature and
+  /// GenericEnvironment.
+  bool isValidGenericContext() const;
 
   /// Determine whether the innermost context is generic.
   bool isInnermostContextGeneric() const;
@@ -473,14 +497,7 @@ public:
 
   void dumpContext() const;
   unsigned printContext(llvm::raw_ostream &OS, unsigned indent = 0) const;
-  
-  /// Get the type of `self` in this declaration context, if there is a
-  /// `self`.
-  Type getSelfTypeInContext() const;
-  /// Get the interface type of `self` in this declaration context, if there is
-  /// a `self`.
-  Type getSelfInterfaceType() const;
-  
+
   // Only allow allocation of DeclContext using the allocator in ASTContext.
   void *operator new(size_t Bytes, ASTContext &C,
                      unsigned Alignment = alignof(DeclContext));

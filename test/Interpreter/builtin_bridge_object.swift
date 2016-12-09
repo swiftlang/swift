@@ -182,7 +182,7 @@ if true {
   print(MemoryLayout<Optional<Builtin.BridgeObject>>.size
             == MemoryLayout<Builtin.BridgeObject>.size)
 
-  var bo: Builtin.BridgeObject? = nil
+  var bo: Builtin.BridgeObject?
 
   // CHECK-NEXT: none
   hitOptionalSpecifically(bo)

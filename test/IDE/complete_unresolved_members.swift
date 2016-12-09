@@ -208,6 +208,8 @@ var Container = OptionTakerContainer1()
 Container.OptionSetTaker1(.#^UNRESOLVED_19^#
 Container.EnumTaker1(.#^UNRESOLVED_20^#
 
+func parserSync() {}
+
 // UNRESOLVED_4: Begin completions
 // UNRESOLVED_4-DAG: Decl[StaticVar]/CurrNominal:        Option1[#SomeOptions1#]; name=Option1
 // UNRESOLVED_4-DAG: Decl[StaticVar]/CurrNominal:        Option2[#SomeOptions1#]; name=Option2

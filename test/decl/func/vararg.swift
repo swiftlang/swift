@@ -1,4 +1,4 @@
-// RUN: %target-parse-verify-swift
+// RUN: %target-typecheck-verify-swift
 
 var t1a: (Int...) = (1) // expected-error{{cannot create a variadic tuple}}
 var t2d: (Double = 0.0) = 1 // expected-error {{default argument not permitted in a tuple type}} {{18-23=}}
@@ -19,7 +19,7 @@ f3({ print($0) })
 func f4(_ a: Int..., b: Int) { }
 
 // rdar://16008564
-func inoutVariadic(_ i: inout Int...) {  // expected-error {{inout arguments cannot be variadic}}
+func inoutVariadic(_ i: inout Int...) {  // expected-error {{'inout' may not be used on variadic parameters}}
 }
 
 // rdar://19722429

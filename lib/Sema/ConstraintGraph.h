@@ -5,8 +5,8 @@
 // Copyright (c) 2014 - 2016 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
-// See http://swift.org/LICENSE.txt for license information
-// See http://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
+// See https://swift.org/LICENSE.txt for license information
+// See https://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
 //
 //===----------------------------------------------------------------------===//
 //
@@ -122,16 +122,6 @@ private:
   /// Remove a type variable from the fixed-binding relationship.
   void removeFixedBinding(TypeVariableType *typeVar);
 
-  /// Retrieves the member type of this type variable that corresponds
-  /// to the given name.
-  ///
-  /// \param name The name of the type member.
-  ///
-  /// \param create If the member does not already exist, this
-  /// callback will be invoked to create it.
-  TypeVariableType *getMemberType(Identifier name,
-                                  std::function<TypeVariableType *()> create);
-
   /// The type variable this node represents.
   TypeVariableType *TypeVar;
 
@@ -157,14 +147,6 @@ private:
   /// Note that this field is only valid for type variables that
   /// are representatives of their equivalence classes.
   mutable SmallVector<TypeVariableType *, 2> EquivalenceClass;
-
-  /// A set of (name, type variable) pairs representing the member types of 
-  /// the given type variable.
-  llvm::SmallVector<std::pair<Identifier, TypeVariableType *>, 2> MemberTypes;
-
-  /// A mapping from the names of members of this type variable to an
-  /// index into the \c MemberTypes vector.
-  llvm::SmallDenseMap<Identifier, unsigned> MemberTypeIndex;
 
   /// Print this graph node.
   void print(llvm::raw_ostream &out, unsigned indent);
@@ -216,22 +198,6 @@ public:
 
   /// Remove a constraint from the graph.
   void removeConstraint(Constraint *constraint);
-
-  /// Retrieves the member type of a type variable that corresponds to
-  /// the given name.
-  ///
-  /// \param typeVar The type variable.
-  ///
-  /// \param name The name of the type member.
-  ///
-  /// \param create If the member does not already exist, this
-  /// callback will be invoked to create it.
-  ///
-  /// \returns the type variable representing the named member of the
-  /// given type variable.
-  TypeVariableType *getMemberType(TypeVariableType *typeVar,
-                                  Identifier name,
-                                  std::function<TypeVariableType *()> create);
 
   /// Merge the two nodes for the two given type variables.
   ///
@@ -335,8 +301,6 @@ private:
     ExtendedEquivalenceClass,
     /// Added a fixed binding for a type variable.
     BoundTypeVariable,
-    /// Added a member type.
-    AddedMemberType
   };
 
   /// A change made to the constraint graph.
@@ -366,14 +330,6 @@ private:
         /// The fixed type to which the type variable was bound.
         TypeBase *FixedType;
       } Binding;
-
-      struct {
-        /// The type variable whose member type was created.
-        TypeVariableType *TypeVar;
-
-        /// The name of the member.
-        Identifier Name;
-      } MemberType;
     };
 
   public:
@@ -394,9 +350,6 @@ private:
 
     /// Create a change that bound a type variable to a fixed type.
     static Change boundTypeVariable(TypeVariableType *typeVar, Type fixed);
-
-    /// Create a change that added a member type with the given name.
-    static Change addedMemberType(TypeVariableType *typeVar, Identifier name);
 
     /// Undo this change, reverting the constraint graph to the state it
     /// had prior to this change.

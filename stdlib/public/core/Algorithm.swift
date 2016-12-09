@@ -5,8 +5,8 @@
 // Copyright (c) 2014 - 2016 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
-// See http://swift.org/LICENSE.txt for license information
-// See http://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
+// See https://swift.org/LICENSE.txt for license information
+// See https://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
 //
 //===----------------------------------------------------------------------===//
 
@@ -106,8 +106,9 @@ public struct EnumeratedIterator<
   /// Once `nil` has been returned, all subsequent calls return `nil`.
   public mutating func next() -> Element? {
     guard let b = _base.next() else { return nil }
-    defer { _count += 1 }
-    return (offset: _count, element: b)
+    let result = (offset: _count, element: b)
+    _count += 1 
+    return result
   }
 }
 

@@ -1,5 +1,5 @@
-// RUN: %target-swift-frontend -I %S/../Inputs -enable-source-import -emit-ir -enable-resilience %s | %FileCheck %s
-// RUN: %target-swift-frontend -I %S/../Inputs -enable-source-import -emit-ir -enable-resilience -O %s
+// RUN: %target-swift-frontend -assume-parsing-unqualified-ownership-sil -I %S/../Inputs -enable-source-import -emit-ir -enable-resilience %s | %FileCheck %s
+// RUN: %target-swift-frontend -assume-parsing-unqualified-ownership-sil -I %S/../Inputs -enable-source-import -emit-ir -enable-resilience -O %s
 
 import resilient_enum
 import resilient_struct
@@ -195,7 +195,7 @@ public func reabstraction<T>(_ f: (Medium) -> T) {}
 // CHECK-LABEL: define{{( protected)?}} void @_TF15enum_resilience25resilientEnumPartialApplyFFO14resilient_enum6MediumSiT_(i8*, %swift.refcounted*)
 public func resilientEnumPartialApply(_ f: (Medium) -> Int) {
 
-// CHECK:     [[CONTEXT:%.*]] = call noalias %swift.refcounted* @rt_swift_allocObject
+// CHECK:     [[CONTEXT:%.*]] = call noalias %swift.refcounted* @swift_rt_swift_allocObject
 // CHECK:     call void @_TF15enum_resilience13reabstractionurFFO14resilient_enum6MediumxT_(i8* bitcast (void (%Si*, %swift.opaque*, %swift.refcounted*)* @_TPA__TTRXFo_iO14resilient_enum6Medium_dSi_XFo_iS0__iSi_ to i8*), %swift.refcounted* [[CONTEXT:%.*]], %swift.type* @_TMSi)
   reabstraction(f)
 
@@ -238,5 +238,18 @@ public func getResilientEnumType() -> Any.Type {
 // CHECK: cont:
 // CHECK-NEXT: [[RESULT:%.*]] = phi %swift.type* [ [[METADATA]], %entry ], [ [[METADATA2]], %cacheIsNull ]
 // CHECK-NEXT: ret %swift.type* [[RESULT]]
+
+// Methods inside extensions of resilient enums fish out type parameters
+// from metadata -- make sure we can do that
+extension ResilientMultiPayloadGenericEnum {
+
+// CHECK-LABEL: define{{( protected)?}} %swift.type* @_TFE15enum_resilienceO14resilient_enum32ResilientMultiPayloadGenericEnum16getTypeParameterfT_Mx(%swift.type* %"ResilientMultiPayloadGenericEnum<T>", %swift.opaque* noalias nocapture)
+// CHECK: [[METADATA:%.*]] = bitcast %swift.type* %"ResilientMultiPayloadGenericEnum<T>" to %swift.type**
+// CHECK-NEXT: [[T_ADDR:%.*]] = getelementptr inbounds %swift.type*, %swift.type** [[METADATA]], [[INT]] 3
+// CHECK-NEXT: [[T:%.*]] = load %swift.type*, %swift.type** [[T_ADDR]]
+  public func getTypeParameter() -> T.Type {
+    return T.self
+  }
+}
 
 // CHECK-LABEL: define{{( protected)?}} private void @initialize_metadata_EnumWithResilientPayload(i8*)

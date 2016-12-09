@@ -5,8 +5,8 @@
 // Copyright (c) 2014 - 2016 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
-// See http://swift.org/LICENSE.txt for license information
-// See http://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
+// See https://swift.org/LICENSE.txt for license information
+// See https://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
 //
 //===----------------------------------------------------------------------===//
 //
@@ -71,6 +71,10 @@ EnableResilience("enable-resilience",
                  llvm::cl::desc("Compile the module to export resilient "
                                 "interfaces for all public declarations by "
                                 "default"));
+
+static llvm::cl::opt<bool>
+EnableSILOwnershipOpt("enable-sil-ownership",
+                 llvm::cl::desc("Compile the module with sil-ownership initially enabled for all functions"));
 
 static llvm::cl::opt<std::string>
 ResourceDir("resource-dir",
@@ -139,7 +143,7 @@ static llvm::cl::opt<std::string>
 ModuleCachePath("module-cache-path", llvm::cl::desc("Clang module cache path"));
 
 static llvm::cl::opt<bool>
-EnableSILSortOutput("sil-sort-output", llvm::cl::Hidden,
+EnableSILSortOutput("emit-sorted-sil", llvm::cl::Hidden,
                     llvm::cl::init(false),
                     llvm::cl::desc("Sort Functions, VTables, Globals, "
                                    "WitnessTables by name to ease diffing."));
@@ -160,6 +164,11 @@ ASTVerifierProcessId("ast-verifier-process-id", llvm::cl::Hidden,
 static llvm::cl::opt<bool>
 PerformWMO("wmo", llvm::cl::desc("Enable whole-module optimizations"));
 
+static llvm::cl::opt<bool>
+AssumeUnqualifiedOwnershipWhenParsing(
+    "assume-parsing-unqualified-ownership-sil", llvm::cl::Hidden, llvm::cl::init(false),
+    llvm::cl::desc("Assume all parsed functions have unqualified ownership"));
+
 static void runCommandLineSelectedPasses(SILModule *Module) {
   SILPassManager PM(Module);
 
@@ -167,6 +176,9 @@ static void runCommandLineSelectedPasses(SILModule *Module) {
     PM.addPass(Pass);
   }
   PM.run();
+
+  if (Module->getOptions().VerifyAll)
+    Module->verify();
 }
 
 // This function isn't referenced outside its translation unit, but it
@@ -227,7 +239,9 @@ int main(int argc, char **argv) {
   SILOpts.AssertConfig = AssertConfId;
   if (OptimizationGroup != OptGroup::Diagnostics)
     SILOpts.Optimization = SILOptions::SILOptMode::Optimize;
-
+  SILOpts.EnableSILOwnership = EnableSILOwnershipOpt;
+  SILOpts.AssumeUnqualifiedOwnershipWhenParsing =
+    AssumeUnqualifiedOwnershipWhenParsing;
 
   // Load the input file.
   llvm::ErrorOr<std::unique_ptr<llvm::MemoryBuffer>> FileBufOrErr =

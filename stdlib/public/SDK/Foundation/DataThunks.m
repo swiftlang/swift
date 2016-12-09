@@ -5,8 +5,8 @@
 // Copyright (c) 2014 - 2016 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
-// See http://swift.org/LICENSE.txt for license information
-// See http://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
+// See https://swift.org/LICENSE.txt for license information
+// See https://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
 //
 //===----------------------------------------------------------------------===//
 
@@ -38,16 +38,16 @@ void __NSDataInvokeDeallocatorFree(void *mem, NSUInteger length) {
 static int __NSFileProtectionClassForOptions(NSUInteger options) {
     int result;
     switch (options & NSDataWritingFileProtectionMask) {
-        case NSDataWritingFileProtectionComplete:	// Class A
+        case NSDataWritingFileProtectionComplete:  // Class A
             result = 1;
             break;
-        case NSDataWritingFileProtectionCompleteUnlessOpen:	// Class B
+        case NSDataWritingFileProtectionCompleteUnlessOpen:  // Class B
             result = 2;
             break;
-        case NSDataWritingFileProtectionCompleteUntilFirstUserAuthentication:	// Class C
+        case NSDataWritingFileProtectionCompleteUntilFirstUserAuthentication:  // Class C
             result = 3;
             break;
-        case NSDataWritingFileProtectionNone:	// Class D
+        case NSDataWritingFileProtectionNone:  // Class D
             result = 4;
             break;
         default:
@@ -97,20 +97,20 @@ extern NSError *_NSErrorWithFilePathAndErrno(NSInteger posixErrno, id pathOrURL,
 SWIFT_CC(swift)
 BOOL _NSWriteDataToFile_Swift(NSURL * NS_RELEASES_ARGUMENT url, NSData * NS_RELEASES_ARGUMENT data, NSDataWritingOptions writingOptions, NSError **errorPtr) {
     assert((writingOptions & NSDataWritingAtomic) == 0);
-    
+
     NSString *path = url.path;
     char cpath[1026];
-    
+
     if (![path getFileSystemRepresentation:cpath maxLength:1024]) {
         if (errorPtr) *errorPtr = _NSErrorWithFilePath(NSFileWriteInvalidFileNameError, path);
         return NO;
     }
-    
+
     int protectionClass = 0;
 #if TARGET_OS_IPHONE && !TARGET_OS_SIMULATOR
     protectionClass = __NSFileProtectionClassForOptions(writingOptions);
 #endif
-    
+
     int flags = O_WRONLY|O_CREAT|O_TRUNC;
     if (writingOptions & NSDataWritingWithoutOverwriting) {
         flags |= O_EXCL;
@@ -122,7 +122,7 @@ BOOL _NSWriteDataToFile_Swift(NSURL * NS_RELEASES_ARGUMENT url, NSData * NS_RELE
         [data release];
         return NO;
     }
-    
+
     __block BOOL writingFailed = NO;
     __block int32_t saveerr = 0;
     NSUInteger dataLength = [data length];

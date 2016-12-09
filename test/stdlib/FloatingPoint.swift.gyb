@@ -3,6 +3,9 @@
 // RUN: %line-directive %t/FloatingPoint.swift -- %target-run %t/a.out
 // REQUIRES: executable_test
 
+// FIXME: https://bugs.swift.org/browse/SR-2808
+// XFAIL: resilient_stdlib
+
 %{
 from gyb_stdlib_unittest_support import TRACE, stackTrace, trace
 }%
@@ -383,14 +386,26 @@ FloatingPoint.test("${Self}.addingProduct") {
 }
 
 FloatingPoint.test("${Self}/LosslessStringConvertible") {
-  let instances = [ 
+  let instances = [
     1.0, -1.0,
     0.0, -0.0,
-    ${Self}.infinity, -${Self}.infinity 
+    ${Self}.infinity, -${Self}.infinity
   ]
 
   checkLosslessStringConvertible(instances)
   expectTrue(Float(String(Float.nan))!.isNaN)
+}
+
+FloatingPoint.test("${Self}.significandWidth") {
+  expectEqual(-1, ${Self}(0).significandWidth)
+  expectEqual(-1, ${Self}.infinity.significandWidth)
+  expectEqual(-1, ${Self}.nan.significandWidth)
+  expectEqual(${Self}.significandBitCount, ${Self}(1).nextUp.significandWidth)
+  expectEqual(${Self}.significandBitCount, ${Self}(1).nextDown.significandWidth)
+  expectEqual(0, ${Self}.ulpOfOne.significandWidth)
+  expectEqual(0, ${Self}(1).significandWidth)
+  expectEqual(0, ${Self}(2).significandWidth)
+  expectEqual(1, ${Self}(3).significandWidth)
 }
 % if Self == 'Float80':
 #endif
@@ -511,7 +526,7 @@ func checkFloatingPointComparison_${FloatSelf}(
   //===--- TRACE boilerplate ----------------------------------------------===//
   // @autoclosure _ message: () -> String = "",
   showFrame: Bool = true,
-  stackTrace: SourceLocStack = SourceLocStack(),  
+  stackTrace: SourceLocStack = SourceLocStack(),
   file: String = #file, line: UInt = #line
 ) {
   let newTrace = stackTrace.pushIf(showFrame, file: file, line: line)

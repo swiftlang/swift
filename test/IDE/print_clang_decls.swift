@@ -120,8 +120,8 @@
 // CHECK-NULLABILITY: class SomeClass {
 // CHECK-NULLABILITY:   class func methodA(_ obj: SomeClass?) -> Any{{$}}
 // CHECK-NULLABILITY:   func methodA(_ obj: SomeClass?) -> Any{{$}}
-// CHECK-NULLABILITY:   class func methodB(_ block: (@escaping (Int32, Int32) -> Int32)? = nil) -> Any{{$}}
-// CHECK-NULLABILITY:   func methodB(_ block: (@escaping (Int32, Int32) -> Int32)? = nil) -> Any{{$}}
+// CHECK-NULLABILITY:   class func methodB(_ block: ((Int32, Int32) -> Int32)? = nil) -> Any{{$}}
+// CHECK-NULLABILITY:   func methodB(_ block: ((Int32, Int32) -> Int32)? = nil) -> Any{{$}}
 // CHECK-NULLABILITY:   func methodC() -> Any?
 // CHECK-NULLABILITY:   var property: Any?
 // CHECK-NULLABILITY:   func stringMethod() -> String{{$}}

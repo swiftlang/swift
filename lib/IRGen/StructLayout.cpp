@@ -5,8 +5,8 @@
 // Copyright (c) 2014 - 2016 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
-// See http://swift.org/LICENSE.txt for license information
-// See http://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
+// See https://swift.org/LICENSE.txt for license information
+// See https://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
 //
 //===----------------------------------------------------------------------===//
 //
@@ -41,16 +41,6 @@ static bool requiresHeapHeader(LayoutKind kind) {
 /// Return the size of the standard heap header.
 Size irgen::getHeapHeaderSize(IRGenModule &IGM) {
   return IGM.getPointerSize() + Size(8);
-}
-
-/// Add the fields for the standard heap header to the given layout.
-void irgen::addHeapHeaderToLayout(IRGenModule &IGM,
-                                  Size &size, Alignment &align,
-                                  SmallVectorImpl<llvm::Type*> &fields) {
-  assert(size.isZero() && align.isOne() && fields.empty());
-  size = getHeapHeaderSize(IGM);
-  align = IGM.getPointerAlignment();
-  fields.push_back(IGM.RefCountedStructTy);
 }
 
 /// Perform structure layout on the given types.

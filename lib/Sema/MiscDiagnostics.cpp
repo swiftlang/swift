@@ -5,8 +5,8 @@
 // Copyright (c) 2014 - 2016 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
-// See http://swift.org/LICENSE.txt for license information
-// See http://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
+// See https://swift.org/LICENSE.txt for license information
+// See https://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
 //
 //===----------------------------------------------------------------------===//
 //
@@ -141,7 +141,7 @@ static void diagSyntacticUseRestrictions(TypeChecker &TC, const Expr *E,
     };
 
     // Partial applications of functions that are not permitted.  This is
-    // tracked in post-order and unravelled as subsequent applications complete
+    // tracked in post-order and unraveled as subsequent applications complete
     // the call (or not).
     llvm::SmallDenseMap<Expr*, PartialApplication,2> InvalidPartialApplications;
 
@@ -299,12 +299,17 @@ static void diagSyntacticUseRestrictions(TypeChecker &TC, const Expr *E,
 
         // The argument is either a ParenExpr or TupleExpr.
         ArrayRef<Expr*> arguments;
+        SmallVector<Expr *, 1> Scratch;
         if (auto *TE = dyn_cast<TupleExpr>(Arg))
           arguments = TE->getElements();
-        else if (auto *PE = dyn_cast<ParenExpr>(Arg))
-          arguments = PE->getSubExpr();
-        else
-          arguments = Call->getArg();
+        else if (auto *PE = dyn_cast<ParenExpr>(Arg)) {
+          Scratch.push_back(PE->getSubExpr());
+          arguments = makeArrayRef(Scratch);
+        }
+        else {
+          Scratch.push_back(Call->getArg());
+          arguments = makeArrayRef(Scratch);
+        }
 
         // Check each argument.
         for (auto arg : arguments) {
@@ -346,14 +351,14 @@ static void diagSyntacticUseRestrictions(TypeChecker &TC, const Expr *E,
       /// Diagnose a '_' that isn't on the immediate LHS of an assignment.
       if (auto *DAE = dyn_cast<DiscardAssignmentExpr>(E)) {
         if (!CorrectDiscardAssignmentExprs.count(DAE) &&
-            !DAE->getType()->is<ErrorType>())
+            !DAE->getType()->hasError())
           TC.diagnose(DAE->getLoc(), diag::discard_expr_outside_of_assignment);
       }
 
       // Diagnose an '&' that isn't in an argument lists.
       if (auto *IOE = dyn_cast<InOutExpr>(E)) {
         if (!IOE->isImplicit() && !AcceptableInOutExprs.count(IOE) &&
-            !IOE->getType()->is<ErrorType>())
+            !IOE->getType()->hasError())
           TC.diagnose(IOE->getLoc(), diag::inout_expr_outside_of_call)
             .highlight(IOE->getSubExpr()->getSourceRange());
       }
@@ -387,7 +392,7 @@ static void diagSyntacticUseRestrictions(TypeChecker &TC, const Expr *E,
         TC.diagnose(c->getLoc(), diag::collection_literal_empty)
           .highlight(c->getSourceRange());
       else {
-        TC.diagnose(c->getLoc(), diag::collection_literal_heterogenous,
+        TC.diagnose(c->getLoc(), diag::collection_literal_heterogeneous,
                     c->getType())
           .highlight(c->getSourceRange())
           .fixItInsertAfter(c->getEndLoc(), " as " + c->getType()->getString());
@@ -462,7 +467,7 @@ static void diagSyntacticUseRestrictions(TypeChecker &TC, const Expr *E,
     /// its uses are ok.
     void checkNoEscapeParameterUse(DeclRefExpr *DRE, Expr *ParentExpr=nullptr) {
       // This only cares about declarations of noescape function type.
-      auto AFT = DRE->getDecl()->getType()->getAs<AnyFunctionType>();
+      auto AFT = DRE->getDecl()->getInterfaceType()->getAs<AnyFunctionType>();
       if (!AFT || !AFT->isNoEscape())
         return;
 
@@ -523,9 +528,15 @@ static void diagSyntacticUseRestrictions(TypeChecker &TC, const Expr *E,
         // the missing ".self" as the subexpression of a parenthesized
         // expression, which is a historical bug.
         if (isa<ParenExpr>(ParentExpr) && CallArgs.count(ParentExpr) > 0) {
-          TC.diagnose(E->getEndLoc(), diag::warn_value_of_metatype_missing_self,
-                      E->getType()->getRValueInstanceType())
-            .fixItInsertAfter(E->getEndLoc(), ".self");
+          auto diag = TC.diagnose(E->getEndLoc(),
+              diag::warn_value_of_metatype_missing_self,
+              E->getType()->getRValueInstanceType());
+          if (E->canAppendCallParentheses()) {
+            diag.fixItInsertAfter(E->getEndLoc(), ".self");
+          } else {
+            diag.fixItInsert(E->getStartLoc(), "(");
+            diag.fixItInsertAfter(E->getEndLoc(), ").self");
+          }
           return;
         }
       }
@@ -534,18 +545,26 @@ static void diagSyntacticUseRestrictions(TypeChecker &TC, const Expr *E,
 
       TC.diagnose(E->getStartLoc(), diag::value_of_metatype_type);
 
-      // Add fix-t to insert '()', unless this is a protocol metatype.
-      bool isProtocolMetatype = false;
+      // Add fix-it to insert '()', only if this is a metatype of
+      // non-existential type and has any initializers.
+      bool isExistential = false;
       if (auto metaTy = E->getType()->getAs<MetatypeType>())
-        isProtocolMetatype = metaTy->getInstanceType()->is<ProtocolType>();
-      if (!isProtocolMetatype) {
+        isExistential = metaTy->getInstanceType()->isAnyExistentialType();
+      if (!isExistential &&
+          !TC.lookupConstructors(const_cast<DeclContext *>(DC),
+                                 E->getType()).empty()) {
         TC.diagnose(E->getEndLoc(), diag::add_parens_to_type)
           .fixItInsertAfter(E->getEndLoc(), "()");
       }
 
       // Add fix-it to insert ".self".
-      TC.diagnose(E->getEndLoc(), diag::add_self_to_type)
-        .fixItInsertAfter(E->getEndLoc(), ".self");
+      auto diag = TC.diagnose(E->getEndLoc(), diag::add_self_to_type);
+      if (E->canAppendCallParentheses()) {
+        diag.fixItInsertAfter(E->getEndLoc(), ".self");
+      } else {
+        diag.fixItInsert(E->getStartLoc(), "(");
+        diag.fixItInsertAfter(E->getEndLoc(), ").self");
+      }
     }
 
     void checkUnqualifiedAccessUse(const DeclRefExpr *DRE) {
@@ -932,6 +951,69 @@ static void diagnoseImplicitSelfUseInClosure(TypeChecker &TC, const Expr *E,
   const_cast<Expr *>(E)->walk(DiagnoseWalker(TC, isAlreadyInClosure));
 }
 
+bool TypeChecker::getDefaultGenericArgumentsString(
+    SmallVectorImpl<char> &buf,
+    const swift::GenericTypeDecl *typeDecl,
+    llvm::function_ref<Type(const GenericTypeParamDecl *)> getPreferredType) {
+  llvm::raw_svector_ostream genericParamText{buf};
+  genericParamText << "<";
+
+  auto printGenericParamSummary =
+      [&](const GenericTypeParamType *genericParamTy) {
+    const GenericTypeParamDecl *genericParam = genericParamTy->getDecl();
+    if (Type result = getPreferredType(genericParam)) {
+      result.print(genericParamText);
+      return;
+    }
+
+    ArrayRef<ProtocolDecl *> protocols =
+        genericParam->getConformingProtocols();
+
+    if (Type superclass = genericParam->getSuperclass()) {
+      if (protocols.empty()) {
+        superclass.print(genericParamText);
+        return;
+      }
+
+      genericParamText << "<#" << genericParam->getName() << ": ";
+      superclass.print(genericParamText);
+      for (const ProtocolDecl *proto : protocols) {
+        if (proto->isSpecificProtocol(KnownProtocolKind::AnyObject))
+          continue;
+        genericParamText << " & " << proto->getName();
+      }
+      genericParamText << "#>";
+      return;
+    }
+
+    if (protocols.empty()) {
+      genericParamText << Context.Id_Any;
+      return;
+    }
+
+    if (protocols.size() == 1 &&
+        (protocols.front()->isObjC() ||
+         protocols.front()->isSpecificProtocol(KnownProtocolKind::AnyObject))) {
+      genericParamText << protocols.front()->getName();
+      return;
+    }
+
+    genericParamText << "<#" << genericParam->getName() << ": ";
+    interleave(protocols,
+               [&](const ProtocolDecl *proto) {
+                 genericParamText << proto->getName();
+               },
+               [&] { genericParamText << " & "; });
+    genericParamText << "#>";
+  };
+
+  interleave(typeDecl->getInnermostGenericParamTypes(),
+             printGenericParamSummary, [&]{ genericParamText << ", "; });
+
+  genericParamText << ">";
+  return true;
+}
+
 /// Diagnose an argument labeling issue, returning true if we successfully
 /// diagnosed the issue.
 bool swift::diagnoseArgumentLabelError(TypeChecker &TC, const Expr *expr,
@@ -956,7 +1038,7 @@ bool swift::diagnoseArgumentLabelError(TypeChecker &TC, const Expr *expr,
       // This is probably a conversion from a value of labeled tuple type to
       // a scalar.
       // FIXME: We want this issue to disappear completely when single-element
-      // labelled tuples go away.
+      // labeled tuples go away.
       if (auto tupleTy = expr->getType()->getRValueType()->getAs<TupleType>()) {
         int scalarFieldIdx = tupleTy->getElementForScalarInit();
         if (scalarFieldIdx >= 0) {
@@ -1197,7 +1279,7 @@ bool swift::fixItOverrideDeclarationTypes(TypeChecker &TC,
     if (overrideFnTy && baseFnTy &&
         // The overriding function type should be no escaping.
         overrideFnTy->getExtInfo().isNoEscape() &&
-        // The overriden function type should be escaping.
+        // The overridden function type should be escaping.
         !baseFnTy->getExtInfo().isNoEscape()) {
       diag.fixItInsert(typeRange.Start, "@escaping ");
       return true;
@@ -1213,7 +1295,8 @@ bool swift::fixItOverrideDeclarationTypes(TypeChecker &TC,
 
   if (auto *var = dyn_cast<VarDecl>(decl)) {
     SourceRange typeRange = var->getTypeSourceRangeForDiagnostics();
-    return checkType(var->getType(), base->getType(), typeRange);
+    auto *baseVar = cast<VarDecl>(base);
+    return checkType(var->getType(), baseVar->getType(), typeRange);
   }
 
   if (auto *fn = dyn_cast<AbstractFunctionDecl>(decl)) {
@@ -1228,9 +1311,14 @@ bool swift::fixItOverrideDeclarationTypes(TypeChecker &TC,
       });
     }
     if (auto *method = dyn_cast<FuncDecl>(decl)) {
+      auto resultType = ArchetypeBuilder::mapTypeIntoContext(
+          method, method->getResultInterfaceType());
+
       auto *baseMethod = cast<FuncDecl>(base);
-      fixedAny |= checkType(method->getBodyResultType(),
-                            baseMethod->getResultType(),
+      auto baseResultType = ArchetypeBuilder::mapTypeIntoContext(
+          baseMethod, baseMethod->getResultInterfaceType());
+
+      fixedAny |= checkType(resultType, baseResultType,
                             method->getBodyResultTypeLoc().getSourceRange());
     }
     return fixedAny;
@@ -1244,8 +1332,14 @@ bool swift::fixItOverrideDeclarationTypes(TypeChecker &TC,
              [&](ParamDecl *param, const ParamDecl *baseParam) {
       fixedAny |= fixItOverrideDeclarationTypes(TC, diag, param, baseParam);
     });
-    fixedAny |= checkType(subscript->getElementType(),
-                          baseSubscript->getElementType(),
+
+    auto resultType = ArchetypeBuilder::mapTypeIntoContext(
+        subscript->getDeclContext(),
+        subscript->getElementInterfaceType());
+    auto baseResultType = ArchetypeBuilder::mapTypeIntoContext(
+        baseSubscript->getDeclContext(),
+        baseSubscript->getElementInterfaceType());
+    fixedAny |= checkType(resultType, baseResultType,
                           subscript->getElementTypeLoc().getSourceRange());
     return fixedAny;
   }
@@ -1262,6 +1356,7 @@ bool swift::fixItOverrideDeclarationTypes(TypeChecker &TC,
 void swift::fixItAvailableAttrRename(TypeChecker &TC,
                                      InFlightDiagnostic &diag,
                                      SourceRange referenceRange,
+                                     const ValueDecl *renamedDecl,
                                      const AvailableAttr *attr,
                                      const ApplyExpr *call) {
   ParsedDeclName parsed = swift::parseDeclName(attr->Rename);
@@ -1416,7 +1511,8 @@ void swift::fixItAvailableAttrRename(TypeChecker &TC,
       baseReplace += '.';
     }
     baseReplace += parsed.BaseName;
-    if (parsed.IsFunctionName && parsed.ArgumentLabels.empty() && !call) {
+    if (parsed.IsFunctionName && parsed.ArgumentLabels.empty() &&
+        isa<VarDecl>(renamedDecl)) {
       // If we're going from a var to a function with no arguments, emit an
       // empty parameter list.
       baseReplace += "()";
@@ -1623,11 +1719,14 @@ describeRename(ASTContext &ctx, const AvailableAttr *attr, const ValueDecl *D,
   return ReplacementDeclKind::None;
 }
 
-void TypeChecker::diagnoseDeprecated(SourceRange ReferenceRange,
-                                     const DeclContext *ReferenceDC,
-                                     const AvailableAttr *Attr,
-                                     DeclName Name,
-                                     const ApplyExpr *Call) {
+void TypeChecker::diagnoseIfDeprecated(SourceRange ReferenceRange,
+                                       const DeclContext *ReferenceDC,
+                                       const ValueDecl *DeprecatedDecl,
+                                       const ApplyExpr *Call) {
+  const AvailableAttr *Attr = TypeChecker::getDeprecated(DeprecatedDecl);
+  if (!Attr)
+    return;
+
   // We match the behavior of clang to not report deprecation warnings
   // inside declarations that are themselves deprecated on all deployment
   // targets.
@@ -1646,6 +1745,7 @@ void TypeChecker::diagnoseDeprecated(SourceRange ReferenceRange,
     }
   }
 
+  DeclName Name = DeprecatedDecl->getFullName();
   StringRef Platform = Attr->prettyPlatformString();
   clang::VersionTuple DeprecatedVersion;
   if (Attr->Deprecated)
@@ -1684,7 +1784,8 @@ void TypeChecker::diagnoseDeprecated(SourceRange ReferenceRange,
     auto renameDiag = diagnose(ReferenceRange.Start,
                                diag::note_deprecated_rename,
                                newName);
-    fixItAvailableAttrRename(*this, renameDiag, ReferenceRange, Attr, Call);
+    fixItAvailableAttrRename(*this, renameDiag, ReferenceRange, DeprecatedDecl,
+                             Attr, Call);
   }
 }
 
@@ -1740,7 +1841,7 @@ bool TypeChecker::diagnoseExplicitUnavailability(const ValueDecl *D,
                                                  const ApplyExpr *call) {
   return diagnoseExplicitUnavailability(D, R, DC,
                                         [=](InFlightDiagnostic &diag) {
-    fixItAvailableAttrRename(*this, diag, R, AvailableAttr::isUnavailable(D),
+    fixItAvailableAttrRename(*this, diag, R, D, AvailableAttr::isUnavailable(D),
                              call);
   });
 }
@@ -1767,16 +1868,16 @@ bool TypeChecker::diagnoseExplicitUnavailability(
   SourceLoc Loc = R.Start;
   auto Name = D->getFullName();
 
-  switch (Attr->getUnconditionalAvailability()) {
-  case UnconditionalAvailabilityKind::Deprecated:
+  switch (Attr->getPlatformAgnosticAvailability()) {
+  case PlatformAgnosticAvailabilityKind::Deprecated:
     break;
 
-  case UnconditionalAvailabilityKind::None:
-  case UnconditionalAvailabilityKind::Unavailable:
-  case UnconditionalAvailabilityKind::UnavailableInCurrentSwift:
-  case UnconditionalAvailabilityKind::UnavailableInSwift: {
-    bool inSwift = (Attr->getUnconditionalAvailability() ==
-                    UnconditionalAvailabilityKind::UnavailableInSwift);
+  case PlatformAgnosticAvailabilityKind::None:
+  case PlatformAgnosticAvailabilityKind::Unavailable:
+  case PlatformAgnosticAvailabilityKind::SwiftVersionSpecific:
+  case PlatformAgnosticAvailabilityKind::UnavailableInSwift: {
+    bool inSwift = (Attr->getPlatformAgnosticAvailability() ==
+                    PlatformAgnosticAvailabilityKind::UnavailableInSwift);
 
     if (!Attr->Rename.empty()) {
       SmallString<32> newNameBuf;
@@ -1792,9 +1893,10 @@ bool TypeChecker::diagnoseExplicitUnavailability(
                              newName);
         attachRenameFixIts(diag);
       } else {
+        EncodedDiagnosticMessage EncodedMessage(Attr->Message);
         auto diag = diagnose(Loc, diag::availability_decl_unavailable_rename_msg,
                              Name, replaceKind.hasValue(), rawReplaceKind,
-                             newName, Attr->Message);
+                             newName, EncodedMessage.Message);
         attachRenameFixIts(diag);
       }
     } else if (Attr->Message.empty()) {
@@ -1812,22 +1914,27 @@ bool TypeChecker::diagnoseExplicitUnavailability(
   }
   }
 
-  auto MinVersion = Context.LangOpts.getMinPlatformVersion();
-  switch (Attr->getMinVersionAvailability(MinVersion)) {
-  case MinVersionComparison::Available:
-  case MinVersionComparison::PotentiallyUnavailable:
+  switch (Attr->getVersionAvailability(Context)) {
+  case AvailableVersionComparison::Available:
+  case AvailableVersionComparison::PotentiallyUnavailable:
     llvm_unreachable("These aren't considered unavailable");
 
-  case MinVersionComparison::Unavailable:
-    diagnose(D, diag::availability_marked_unavailable, Name)
+  case AvailableVersionComparison::Unavailable:
+    if (Attr->isLanguageVersionSpecific()
+        && Attr->Introduced.hasValue())
+      diagnose(D, diag::availability_introduced_in_swift, Name,
+               *Attr->Introduced).highlight(Attr->getRange());
+    else
+      diagnose(D, diag::availability_marked_unavailable, Name)
         .highlight(Attr->getRange());
     break;
 
-  case MinVersionComparison::Obsoleted:
+  case AvailableVersionComparison::Obsoleted:
     // FIXME: Use of the platformString here is non-awesome for application
     // extensions.
     diagnose(D, diag::availability_obsoleted, Name,
-             Attr->prettyPlatformString(),
+             (Attr->isLanguageVersionSpecific() ?
+              "Swift" : Attr->prettyPlatformString()),
              *Attr->Obsoleted).highlight(Attr->getRange());
     break;
   }
@@ -1911,9 +2018,12 @@ public:
     return E;
   }
 
-private:
   bool diagAvailability(const ValueDecl *D, SourceRange R,
-                        const ApplyExpr *call = nullptr);
+                        const ApplyExpr *call = nullptr,
+                        bool AllowPotentiallyUnavailableProtocol = false,
+                        bool SignalOnPotentialUnavailability = true);
+
+private:
   bool diagnoseIncDecRemoval(const ValueDecl *D, SourceRange R,
                              const AvailableAttr *Attr);
   bool diagnoseMemoryLayoutMigration(const ValueDecl *D, SourceRange R,
@@ -2049,11 +2159,12 @@ private:
 };
 }
 
-
 /// Diagnose uses of unavailable declarations. Returns true if a diagnostic
 /// was emitted.
 bool AvailabilityWalker::diagAvailability(const ValueDecl *D, SourceRange R,
-                                          const ApplyExpr *call) {
+                                          const ApplyExpr *call,
+                                          bool AllowPotentiallyUnavailableProtocol,
+                                          bool SignalOnPotentialUnavailability) {
   if (!D)
     return false;
 
@@ -2068,15 +2179,17 @@ bool AvailabilityWalker::diagAvailability(const ValueDecl *D, SourceRange R,
     return true;
 
   // Diagnose for deprecation
-  if (const AvailableAttr *Attr = TypeChecker::getDeprecated(D)) {
-    TC.diagnoseDeprecated(R, DC, Attr, D->getFullName(), call);
-  }
+  TC.diagnoseIfDeprecated(R, DC, D, call);
 
-  // Diagnose for potential unavailability
+  if (AllowPotentiallyUnavailableProtocol && isa<ProtocolDecl>(D))
+    return false;
+
+  // Diagnose (and possibly signal) for potential unavailability
   auto maybeUnavail = TC.checkDeclarationAvailability(D, R.Start, DC);
   if (maybeUnavail.hasValue()) {
     TC.diagnosePotentialUnavailability(D, R, DC, maybeUnavail.getValue());
-    return true;
+    if (SignalOnPotentialUnavailability)
+      return true;
   }
   return false;
 }
@@ -2159,74 +2272,64 @@ bool AvailabilityWalker::diagnoseIncDecRemoval(const ValueDecl *D,
   return false;
 }
 
-/// If this is a call to an unavailable sizeof family functions, diagnose it
+/// If this is a call to an unavailable sizeof family function, diagnose it
 /// with a fixit hint and return true. If not, or if we fail, return false.
 bool AvailabilityWalker::diagnoseMemoryLayoutMigration(const ValueDecl *D,
-                                               SourceRange R,
-                                               const AvailableAttr *Attr,
-                                               const ApplyExpr *call) {
+                                                       SourceRange R,
+                                                       const AvailableAttr *Attr,
+                                                       const ApplyExpr *call) {
 
   if (!D->getModuleContext()->isStdlibModule())
     return false;
 
-  std::pair<StringRef, bool> KindValue
-    = llvm::StringSwitch<std::pair<StringRef, bool>>(D->getNameStr())
-      .Case("sizeof", {"size", false})
-      .Case("alignof", {"alignment", false})
-      .Case("strideof", {"stride", false})
-      .Default({});
-
-  if (KindValue.first.empty())
+  StringRef Property = llvm::StringSwitch<StringRef>(D->getNameStr())
+    .Case("sizeof", "size")
+    .Case("alignof", "alignment")
+    .Case("strideof", "stride")
+    .Default(StringRef());
+  if (Property.empty())
     return false;
-
-  auto Kind = KindValue.first;
-  auto isValue = KindValue.second;
 
   auto args = dyn_cast<ParenExpr>(call->getArg());
   if (!args)
     return false;
-
-  auto subject = args->getSubExpr();
-  if (!isValue) {
-    // sizeof(type(of: x)) is equivalent to sizeofValue(x)
-    if (auto DTE = dyn_cast<DynamicTypeExpr>(subject)) {
-      subject = DTE->getBase();
-      isValue = true;
-    }
-  }
 
   EncodedDiagnosticMessage EncodedMessage(Attr->Message);
   auto diag = TC.diagnose(R.Start, diag::availability_decl_unavailable_msg,
                           D->getFullName(), EncodedMessage.Message);
   diag.highlight(R);
 
+  auto subject = args->getSubExpr();
+
   StringRef Prefix = "MemoryLayout<";
   StringRef Suffix = ">.";
-  if (isValue) {
-    auto valueType = subject->getType()->getRValueType();
-    if (!valueType || valueType->is<ErrorType>()) {
-      // If we don't have a suitable argument, we cannot emit a fix-it.
+
+  if (auto DTE = dyn_cast<DynamicTypeExpr>(subject)) {
+    // Replace `sizeof(type(of: x))` with `MemoryLayout<X>.size`, where `X` is
+    // the static type of `x`. The previous spelling misleadingly hinted that
+    // `sizeof(_:)` might return the size of the *dynamic* type of `x`, when
+    // it is not the case.
+    auto valueType = DTE->getBase()->getType()->getRValueType();
+    if (!valueType || valueType->hasError()) {
+      // If we don't have a suitable argument, we can't emit a fixit.
       return true;
     }
-
-    // NOTE: We are destructively replacing the source text here.
-    // `sizeof(type(of: doSomething()))` => `MemoryLayout<T>.size`, where T is
-    // the return type of `doSomething()`. If that function has any side
-    // effects, this replacement will break the source.
+    // Note that in rare circumstances we may be destructively replacing the
+    // source text. For example, we'd replace `sizeof(type(of: doSomething()))`
+    // with `MemoryLayout<T>.size`, if T is the return type of `doSomething()`.
     diag.fixItReplace(call->getSourceRange(),
-      (Prefix + valueType->getString() + Suffix + Kind).str());
+                   (Prefix + valueType->getString() + Suffix + Property).str());
   } else {
     SourceRange PrefixRange(call->getStartLoc(), args->getLParenLoc());
     SourceRange SuffixRange(args->getRParenLoc());
 
-    // We must truncate `.self`.
-    // E.g. sizeof(T.self) => MemoryLayout<T>.size
+    // We must remove `.self`.
     if (auto *DSE = dyn_cast<DotSelfExpr>(subject))
       SuffixRange.Start = DSE->getDotLoc();
 
     diag
       .fixItReplace(PrefixRange, Prefix)
-      .fixItReplace(SuffixRange, (Suffix + Kind).str());
+      .fixItReplace(SuffixRange, (Suffix + Property).str());
   }
 
   return true;
@@ -2482,11 +2585,15 @@ VarDeclUsageChecker::~VarDeclUsageChecker() {
       //  ->
       //    _ = foo()
       if (auto *pbd = var->getParentPatternBinding())
-        if (pbd->getSingleVar() == var && pbd->getInit(0) != nullptr) {
+        if (pbd->getSingleVar() == var && pbd->getInit(0) != nullptr &&
+            !isa<TypedPattern>(pbd->getPatternList()[0].getPattern())) {
           unsigned varKind = var->isLet();
+          SourceRange replaceRange(
+              pbd->getStartLoc(),
+              pbd->getPatternList()[0].getPattern()->getEndLoc());
           TC.diagnose(var->getLoc(), diag::pbd_never_used,
                       var->getName(), varKind)
-            .fixItReplace(SourceRange(pbd->getLoc(), var->getLoc()), "_");
+            .fixItReplace(replaceRange, "_");
           continue;
         }
       
@@ -2630,7 +2737,7 @@ markBaseOfAbstractStorageDeclStore(Expr *base, ConcreteDeclRef decl) {
 void VarDeclUsageChecker::markStoredOrInOutExpr(Expr *E, unsigned Flags) {
   // Sema leaves some subexpressions null, which seems really unfortunate.  It
   // should replace them with ErrorExpr.
-  if (E == nullptr || !E->getType() || E->getType()->is<ErrorType>()) {
+  if (E == nullptr || !E->getType() || E->getType()->hasError()) {
     sawError = true;
     return;
   }
@@ -2698,7 +2805,7 @@ void VarDeclUsageChecker::markStoredOrInOutExpr(Expr *E, unsigned Flags) {
 std::pair<bool, Expr *> VarDeclUsageChecker::walkToExprPre(Expr *E) {
   // Sema leaves some subexpressions null, which seems really unfortunate.  It
   // should replace them with ErrorExpr.
-  if (E == nullptr || !E->getType() || E->getType()->is<ErrorType>()) {
+  if (E == nullptr || !E->getType() || E->getType()->hasError()) {
     sawError = true;
     return { false, E };
   }
@@ -3040,6 +3147,51 @@ static void checkSwitch(TypeChecker &TC, const SwitchStmt *stmt) {
   }
 }
 
+void swift::fixItEncloseTrailingClosure(TypeChecker &TC,
+                                        InFlightDiagnostic &diag,
+                                        const CallExpr *call,
+                                        Identifier closureLabel) {
+  auto argsExpr = call->getArg();
+  if (auto TSE = dyn_cast<TupleShuffleExpr>(argsExpr))
+    argsExpr = TSE->getSubExpr();
+
+  SmallString<32> replacement;
+  SourceLoc lastLoc;
+  SourceRange closureRange;
+  if (auto PE = dyn_cast<ParenExpr>(argsExpr)) {
+    assert(PE->hasTrailingClosure() && "must have trailing closure");
+    closureRange = PE->getSubExpr()->getSourceRange();
+    lastLoc = PE->getLParenLoc(); // e.g funcName() { 1 }
+    if (!lastLoc.isValid()) {
+      // Bare trailing closure: e.g. funcName { 1 }
+      replacement = "(";
+      lastLoc = call->getFn()->getEndLoc();
+    }
+  } else if (auto TE = dyn_cast<TupleExpr>(argsExpr)) {
+    // Tuple + trailing closure: e.g. funcName(x: 1) { 1 }
+    assert(TE->hasTrailingClosure() && "must have trailing closure");
+    auto numElements = TE->getNumElements();
+    assert(numElements >= 2 && "Unexpected num of elements in TupleExpr");
+    closureRange = TE->getElement(numElements - 1)->getSourceRange();
+    lastLoc = TE->getElement(numElements - 2)->getEndLoc();
+    replacement = ", ";
+  } else {
+    // Can't be here.
+    return;
+  }
+
+  // Add argument label of the closure.
+  if (!closureLabel.empty()) {
+    replacement += closureLabel.str();
+    replacement += ": ";
+  }
+
+  lastLoc = Lexer::getLocForEndOfToken(TC.Context.SourceMgr, lastLoc);
+  diag
+    .fixItReplaceChars(lastLoc, closureRange.Start, replacement)
+    .fixItInsertAfter(closureRange.End, ")");
+}
+
 // Perform checkStmtConditionTrailingClosure for single expression.
 static void checkStmtConditionTrailingClosure(TypeChecker &TC, const Expr *E) {
   if (E == nullptr || isa<ErrorExpr>(E)) return;
@@ -3049,63 +3201,31 @@ static void checkStmtConditionTrailingClosure(TypeChecker &TC, const Expr *E) {
     TypeChecker &TC;
 
     void diagnoseIt(const CallExpr *E) {
+      if (!E->hasTrailingClosure()) return;
+
       auto argsExpr = E->getArg();
       auto argsTy = argsExpr->getType();
-
       // Ignore invalid argument type. Some diagnostics are already emitted.
-      if (!argsTy || argsTy->is<ErrorType>()) return;
+      if (!argsTy || argsTy->hasError()) return;
 
       if (auto TSE = dyn_cast<TupleShuffleExpr>(argsExpr))
         argsExpr = TSE->getSubExpr();
 
-      SmallString<16> replacement;
-      SourceLoc lastLoc;
-      SourceRange closureRange;
-      if (auto PE = dyn_cast<ParenExpr>(argsExpr)) {
-        // Ignore non-trailing-closure.
-        if (!PE->hasTrailingClosure()) return;
+      SourceLoc closureLoc;
+      if (auto PE = dyn_cast<ParenExpr>(argsExpr))
+        closureLoc = PE->getSubExpr()->getStartLoc();
+      else if (auto TE = dyn_cast<TupleExpr>(argsExpr))
+        closureLoc = TE->getElements().back()->getStartLoc();
 
-        closureRange = PE->getSubExpr()->getSourceRange();
-        lastLoc = PE->getLParenLoc();
-        if (lastLoc.isValid()) {
-          // Empty paren: e.g. if funcName() { 1 } { ... }
-          replacement = "";
-        } else {
-          // Bare trailing closure: e.g. if funcName { 1 } { ... }
-          replacement = "(";
-          lastLoc = E->getFn()->getEndLoc();
-        }
-      } else if (auto TE = dyn_cast<TupleExpr>(argsExpr)) {
-        // Ignore non-trailing-closure.
-        if (!TE->hasTrailingClosure()) return;
-
-        // Tuple + trailing closure: e.g. if funcName(x: 1) { 1 } { ... }
-        auto numElements = TE->getNumElements();
-        assert(numElements >= 2 && "Unexpected num of elements in TupleExpr");
-        closureRange = TE->getElement(numElements - 1)->getSourceRange();
-        lastLoc = TE->getElement(numElements - 2)->getEndLoc();
-        replacement = ", ";
-      } else {
-        // Can't be here.
-        return;
-      }
-
-      // Add argument label of the closure that is going to be enclosed in
-      // parens.
+      Identifier closureLabel;
       if (auto TT = argsTy->getAs<TupleType>()) {
         assert(TT->getNumElements() != 0 && "Unexpected empty TupleType");
-        auto closureLabel = TT->getElement(TT->getNumElements() - 1).getName();
-        if (!closureLabel.empty()) {
-          replacement += closureLabel.str();
-          replacement += ": ";
-        }
+        closureLabel = TT->getElement(TT->getNumElements() - 1).getName();
       }
 
-      // Emit diagnostics.
-      lastLoc = Lexer::getLocForEndOfToken(TC.Context.SourceMgr, lastLoc);
-      TC.diagnose(closureRange.Start, diag::trailing_closure_requires_parens)
-        .fixItReplaceChars(lastLoc, closureRange.Start, replacement)
-        .fixItInsertAfter(closureRange.End, ")");
+      auto diag = TC.diagnose(closureLoc,
+                              diag::trailing_closure_requires_parens);
+      fixItEncloseTrailingClosure(TC, diag, E, closureLabel);
     }
 
   public:
@@ -3590,7 +3710,86 @@ checkImplicitPromotionsInCondition(const StmtConditionElement &cond,
       .highlight(subExpr->getSourceRange());
   }
 }
-        
+
+static void diagnoseUnintendedOptionalBehavior(TypeChecker &TC, const Expr *E,
+                                               const DeclContext *DC) {
+  if (!E || isa<ErrorExpr>(E) || !E->getType())
+    return;
+
+  class UnintendedOptionalBehaviorWalker : public ASTWalker {
+    TypeChecker &TC;
+    SmallPtrSet<Expr *, 4> ErasureCoercedToAny;
+
+    virtual std::pair<bool, Expr *> walkToExprPre(Expr *E) {
+      if (!E || isa<ErrorExpr>(E) || !E->getType())
+        return { false, E };
+
+      if (auto *coercion = dyn_cast<CoerceExpr>(E)) {
+        if (E->getType()->isAny() && isa<ErasureExpr>(coercion->getSubExpr()))
+          ErasureCoercedToAny.insert(coercion->getSubExpr());
+      } else if (isa<ErasureExpr>(E) && !ErasureCoercedToAny.count(E) &&
+                 E->getType()->isAny()) {
+        auto subExpr = cast<ErasureExpr>(E)->getSubExpr();
+        auto erasedTy = subExpr->getType();
+        if (erasedTy->getOptionalObjectType()) {
+          TC.diagnose(subExpr->getStartLoc(), diag::optional_to_any_coercion,
+                      erasedTy)
+              .highlight(subExpr->getSourceRange());
+
+          TC.diagnose(subExpr->getLoc(), diag::default_optional_to_any)
+              .highlight(subExpr->getSourceRange())
+              .fixItInsertAfter(subExpr->getEndLoc(), " ?? <#default value#>");
+          TC.diagnose(subExpr->getLoc(), diag::force_optional_to_any)
+              .highlight(subExpr->getSourceRange())
+              .fixItInsertAfter(subExpr->getEndLoc(), "!");
+          TC.diagnose(subExpr->getLoc(), diag::silence_optional_to_any)
+              .highlight(subExpr->getSourceRange())
+              .fixItInsertAfter(subExpr->getEndLoc(), " as Any");
+        }
+      } else if (auto *literal = dyn_cast<InterpolatedStringLiteralExpr>(E)) {
+        // Warn about interpolated segments that contain optionals.
+        for (auto &segment : literal->getSegments()) {
+          // Allow explicit casts.
+          if (auto paren = dyn_cast<ParenExpr>(segment)) {
+            if (isa<ExplicitCastExpr>(paren->getSubExpr())) {
+              continue;
+            }
+          }
+
+          // Bail out if we don't have an optional.
+          if (!segment->getType()->getRValueType()->getOptionalObjectType()) {
+            continue;
+          }
+
+          TC.diagnose(segment->getStartLoc(),
+                      diag::optional_in_string_interpolation_segment)
+              .highlight(segment->getSourceRange());
+
+          // Suggest 'String(describing: <expr>)'.
+          auto segmentStart = segment->getStartLoc().getAdvancedLoc(1);
+          TC.diagnose(segment->getLoc(),
+                      diag::silence_optional_in_interpolation_segment_call)
+            .highlight(segment->getSourceRange())
+            .fixItInsert(segmentStart, "String(describing: ")
+            .fixItInsert(segment->getEndLoc(), ")");
+
+          // Suggest inserting a default value. 
+          TC.diagnose(segment->getLoc(), diag::default_optional_to_any)
+            .highlight(segment->getSourceRange())
+            .fixItInsert(segment->getEndLoc(), " ?? <#default value#>");
+        }
+      }
+      return { true, E };
+    }
+
+  public:
+    UnintendedOptionalBehaviorWalker(TypeChecker &tc) : TC(tc) { }
+  };
+
+  UnintendedOptionalBehaviorWalker Walker(TC);
+  const_cast<Expr *>(E)->walk(Walker);
+}
+
 //===----------------------------------------------------------------------===//
 // High-level entry points.
 //===----------------------------------------------------------------------===//
@@ -3603,6 +3802,7 @@ void swift::performSyntacticExprDiagnostics(TypeChecker &TC, const Expr *E,
   diagSyntacticUseRestrictions(TC, E, DC, isExprStmt);
   diagRecursivePropertyAccess(TC, E, DC);
   diagnoseImplicitSelfUseInClosure(TC, E, DC);
+  diagnoseUnintendedOptionalBehavior(TC, E, DC);
   if (!TC.getLangOpts().DisableAvailabilityChecking)
     diagAvailability(TC, E, const_cast<DeclContext*>(DC));
   if (TC.Context.LangOpts.EnableObjCInterop)
@@ -3629,19 +3829,6 @@ void swift::performStmtDiagnostics(TypeChecker &TC, const Stmt *S) {
 //===----------------------------------------------------------------------===//
 // Utility functions
 //===----------------------------------------------------------------------===//
-
-
-Accessibility
-swift::accessibilityFromScopeForDiagnostics(const DeclContext *accessScope) {
-  if (!accessScope)
-    return Accessibility::Public;
-  if (isa<ModuleDecl>(accessScope))
-    return Accessibility::Internal;
-  if (accessScope->isModuleScopeContext()) {
-    return Accessibility::FilePrivate;
-  }
-  return Accessibility::Private;
-}
 
 void swift::fixItAccessibility(InFlightDiagnostic &diag, ValueDecl *VD,
                                Accessibility desiredAccess, bool isForSetter) {
@@ -3758,10 +3945,7 @@ static OmissionTypeName getTypeNameForOmission(Type type) {
     }
 
     // Look through parentheses.
-    if (auto parenTy = dyn_cast<ParenType>(type.getPointer())) {
-      type = parenTy->getUnderlyingType();
-      continue;
-    }
+    type = type->getWithoutParens();
 
     // Look through optionals.
     if (auto optObjectTy = type->getAnyOptionalObjectType()) {
@@ -3825,7 +4009,7 @@ static OmissionTypeName getTypeNameForOmission(Type type) {
 Optional<DeclName> TypeChecker::omitNeedlessWords(AbstractFunctionDecl *afd) {
   auto &Context = afd->getASTContext();
 
-  if (!afd->hasType())
+  if (!afd->hasInterfaceType())
     validateDecl(afd);
 
   if (afd->isInvalid() || isa<DestructorDecl>(afd))
@@ -3860,7 +4044,8 @@ Optional<DeclName> TypeChecker::omitNeedlessWords(AbstractFunctionDecl *afd) {
   bool returnsSelf = false;
 
   if (auto func = dyn_cast<FuncDecl>(afd)) {
-    resultType = func->getResultType();
+    resultType = func->getResultInterfaceType();
+    resultType = ArchetypeBuilder::mapTypeIntoContext(func, resultType);
     returnsSelf = func->hasDynamicSelf();
   } else if (isa<ConstructorDecl>(afd)) {
     resultType = contextType;
@@ -3960,4 +4145,21 @@ Optional<Identifier> TypeChecker::omitNeedlessWords(VarDecl *var) {
   }
 
   return None;
+}
+
+
+/// Run the Availability-diagnostics algorithm otherwise used in an expr
+/// context, but for non-expr contexts such as TypeDecls referenced from
+/// TypeReprs.
+bool swift::diagnoseDeclAvailability(const ValueDecl *Decl,
+                                     TypeChecker &TC,
+                                     DeclContext *DC,
+                                     SourceRange R,
+                                     bool AllowPotentiallyUnavailableProtocol,
+                                     bool SignalOnPotentialUnavailability)
+{
+  AvailabilityWalker AW(TC, DC);
+  return AW.diagAvailability(Decl, R, nullptr,
+                             AllowPotentiallyUnavailableProtocol,
+                             SignalOnPotentialUnavailability);
 }

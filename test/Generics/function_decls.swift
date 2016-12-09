@@ -1,4 +1,4 @@
-// RUN: %target-parse-verify-swift
+// RUN: %target-typecheck-verify-swift
 
 //===----------------------------------------------------------------------===//
 // Generic function declarations
@@ -20,9 +20,9 @@ func f8<T> (x: Int) {} //expected-error{{generic parameter 'T' is not used in fu
 
 public class A<X> {
   init<T>(){} //expected-error{{generic parameter 'T' is not used in function signature}}
-  public func f9<T, U>(x:T, y:X) {} //expected-error{{generic parameter 'U' is not used in function signature}}
-  public func f10(x:Int) {}
-  public func f11<T, U>(x:X, y:T) {} //expected-error{{generic parameter 'U' is not used in function signature}}
+  public func f9<T, U>(x: T, y: X) {} //expected-error{{generic parameter 'U' is not used in function signature}}
+  public func f10(x: Int) {}
+  public func f11<T, U>(x: X, y: T) {} //expected-error{{generic parameter 'U' is not used in function signature}}
 }
 
 protocol P { associatedtype A }

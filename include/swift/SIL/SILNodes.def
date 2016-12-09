@@ -5,8 +5,8 @@
 // Copyright (c) 2014 - 2016 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
-// See http://swift.org/LICENSE.txt for license information
-// See http://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
+// See https://swift.org/LICENSE.txt for license information
+// See https://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
 //
 //===----------------------------------------------------------------------===//
 //
@@ -21,26 +21,29 @@
 #define VALUE(Id, Parent)
 #endif
 
-/// INST(Id, Parent, MemBehavior, MayRelease)
+/// INST(Id, Parent, TextualName, MemBehavior, MayRelease)
+///
 ///   The expression enumerator value is a ValueKind.  The node's class name is
 ///   Id, and the name of its base class (in the SILInstruction hierarchy) is
-///   Parent. MemBehavior is an enum value that reflects the memory behavior of
-///   the instruction. MayRelease indicates whether the execution of the
-///   instruction may result in memory being released.
+///   Parent. TextualName is the textual name of the instruction. MemBehavior is
+///   an enum value that reflects the memory behavior of the
+///   instruction. MayRelease indicates whether the execution of the instruction
+///   may result in memory being released.
 #ifndef INST
-#define INST(Id, Parent, MemBehavior, MayRelease) VALUE(Id, Parent)
+#define INST(Id, Parent, TextualName, MemBehavior, MayRelease) VALUE(Id, Parent)
 #endif
 
-/// TERMINATOR(Id, Parent, MemBehavior, MayRelease)
-///   Expands for terminator instructions. The expression enumerator value is
-///   a ValueKind.  The node's class name is Id, and the name of its base class
-///   (in the SILInstruction hierarchy) is Parent. MemBehavior is an enum value
-///   that reflects the memory behavior of the instruction. MayRelease
-///   indicates whether the execution of the instruction may result in memory
-///   being released.
+/// TERMINATOR(Id, Parent, TextualName, MemBehavior, MayRelease)
+///   Expands for terminator instructions. The expression enumerator value is a
+///   ValueKind.  The node's class name is Id, and the name of its base class
+///   (in the SILInstruction hierarchy) is Parent. TextualName is the name of
+///   the instruction in textual SIL.  MemBehavior is an enum value that
+///   reflects the memory behavior of the instruction. MayRelease indicates
+///   whether the execution of the instruction may result in memory being
+///   released.
 #ifndef TERMINATOR
-#define TERMINATOR(Id, Parent, MemBehavior, MayRelease) \
-  INST(Id, Parent, MemBehavior, MayRelease)
+#define TERMINATOR(Id, Parent, TextualName, MemBehavior, MayRelease)     \
+      INST(Id, Parent, TextualName, MemBehavior, MayRelease)
 #endif
 
 /// An abstract instruction is an abstract base class in the hierarchy;
@@ -68,202 +71,208 @@ VALUE(SILUndef, ValueBase)
 ABSTRACT_VALUE(SILInstruction, ValueBase)
   // Allocation instructions.
   ABSTRACT_VALUE(AllocationInst, SILInstruction)
-    INST(AllocStackInst, AllocationInst, None, DoesNotRelease)
-    INST(AllocRefInst, AllocationInst, None, DoesNotRelease)
-    INST(AllocRefDynamicInst, AllocationInst, None, DoesNotRelease)
-    INST(AllocValueBufferInst, AllocationInst, None, DoesNotRelease)
-    INST(AllocBoxInst, AllocationInst, None, DoesNotRelease)
-    INST(AllocExistentialBoxInst, AllocationInst, MayWrite, DoesNotRelease)
+    INST(AllocStackInst, AllocationInst, alloc_stack, None, DoesNotRelease)
+    INST(AllocRefInst, AllocationInst, alloc_ref, None, DoesNotRelease)
+    INST(AllocRefDynamicInst, AllocationInst, alloc_ref_dynamic, None, DoesNotRelease)
+    INST(AllocValueBufferInst, AllocationInst, alloc_value_buffer, None, DoesNotRelease)
+    INST(AllocBoxInst, AllocationInst, alloc_box, None, DoesNotRelease)
+    INST(AllocExistentialBoxInst, AllocationInst, alloc_existential_box, MayWrite, DoesNotRelease)
     VALUE_RANGE(AllocationInst, AllocStackInst, AllocExistentialBoxInst)
 
   // Deallocation instructions.
   ABSTRACT_VALUE(DeallocationInst, SILInstruction)
-    INST(DeallocStackInst, DeallocationInst, MayHaveSideEffects, DoesNotRelease)
-    INST(DeallocRefInst, DeallocationInst, MayHaveSideEffects, DoesNotRelease)
-    INST(DeallocPartialRefInst, DeallocationInst, MayHaveSideEffects,
+    INST(DeallocStackInst, DeallocationInst, dealloc_stack, MayHaveSideEffects, DoesNotRelease)
+    INST(DeallocRefInst, DeallocationInst, dealloc_ref, MayHaveSideEffects, DoesNotRelease)
+    INST(DeallocPartialRefInst, DeallocationInst, dealloc_partial_ref, MayHaveSideEffects,
          DoesNotRelease)
-    INST(DeallocValueBufferInst, DeallocationInst, MayHaveSideEffects,
+    INST(DeallocValueBufferInst, DeallocationInst, dealloc_value_buffer, MayHaveSideEffects,
          DoesNotRelease)
-    INST(DeallocBoxInst, DeallocationInst, MayHaveSideEffects, DoesNotRelease)
-    INST(DeallocExistentialBoxInst, DeallocationInst, MayHaveSideEffects,
+    INST(DeallocBoxInst, DeallocationInst, dealloc_box, MayHaveSideEffects, DoesNotRelease)
+    INST(DeallocExistentialBoxInst, DeallocationInst, dealloc_existential_box, MayHaveSideEffects,
          DoesNotRelease)
     VALUE_RANGE(DeallocationInst, DeallocStackInst, DeallocExistentialBoxInst)
 
   // Accessing memory
-  INST(LoadInst, SILInstruction, MayRead, DoesNotRelease)
-  INST(LoadUnownedInst, SILInstruction, MayRead, DoesNotRelease)
-  INST(LoadWeakInst, SILInstruction, MayRead, DoesNotRelease)
-  INST(StoreInst, SILInstruction, MayWrite, DoesNotRelease)
-  INST(AssignInst, SILInstruction, MayWrite, DoesNotRelease)
-  INST(MarkUninitializedInst, SILInstruction, None, DoesNotRelease)
-  INST(MarkUninitializedBehaviorInst, SILInstruction, None, DoesNotRelease)
-  INST(MarkFunctionEscapeInst, SILInstruction, None, DoesNotRelease)
-  INST(DebugValueInst, SILInstruction, None, DoesNotRelease)
-  INST(DebugValueAddrInst, SILInstruction, None, DoesNotRelease)
-  INST(StoreUnownedInst, SILInstruction, MayWrite, DoesNotRelease)
-  INST(StoreWeakInst, SILInstruction, MayWrite, DoesNotRelease)
-  INST(CopyAddrInst, SILInstruction, MayHaveSideEffects, MayRelease)
-  INST(DestroyAddrInst, SILInstruction, MayHaveSideEffects, MayRelease)
-  INST(ProjectValueBufferInst, SILInstruction, MayRead, DoesNotRelease)
-  INST(ProjectBoxInst, SILInstruction, None, DoesNotRelease)
-  INST(ProjectExistentialBoxInst, SILInstruction, None, DoesNotRelease)
+  INST(LoadInst, SILInstruction, load, MayRead, DoesNotRelease)
+  INST(LoadBorrowInst, SILInstruction, load_borrow, MayRead, DoesNotRelease)
+  INST(EndBorrowInst, SILInstruction, end_borrow, MayHaveSideEffects, DoesNotRelease)
+  INST(LoadUnownedInst, SILInstruction, load_unowned, MayRead, DoesNotRelease)
+  INST(LoadWeakInst, SILInstruction, load_weak, MayRead, DoesNotRelease)
+  INST(StoreInst, SILInstruction, store, MayWrite, DoesNotRelease)
+  INST(AssignInst, SILInstruction, assign, MayWrite, DoesNotRelease)
+  INST(MarkUninitializedInst, SILInstruction, mark_uninitialized, None, DoesNotRelease)
+  INST(MarkUninitializedBehaviorInst, SILInstruction, mark_uninitialized_behavior, None, DoesNotRelease)
+  INST(MarkFunctionEscapeInst, SILInstruction, mark_function_escape, None, DoesNotRelease)
+  INST(DebugValueInst, SILInstruction, debug_value, None, DoesNotRelease)
+  INST(DebugValueAddrInst, SILInstruction, debug_value_addr, None, DoesNotRelease)
+  INST(StoreUnownedInst, SILInstruction, store_unowned, MayWrite, DoesNotRelease)
+  INST(StoreWeakInst, SILInstruction, store_weak, MayWrite, DoesNotRelease)
+  INST(CopyAddrInst, SILInstruction, copy_addr, MayHaveSideEffects, MayRelease)
+  INST(DestroyAddrInst, SILInstruction, destroy_addr, MayHaveSideEffects, MayRelease)
+  INST(ProjectValueBufferInst, SILInstruction, project_value_buffer, MayRead, DoesNotRelease)
+  INST(ProjectBoxInst, SILInstruction, project_box, None, DoesNotRelease)
+  INST(ProjectExistentialBoxInst, SILInstruction, project_existential_box, None, DoesNotRelease)
   ABSTRACT_VALUE(IndexingInst, SILInstruction)
-    INST(IndexAddrInst, IndexingInst, None, DoesNotRelease)
-    INST(IndexRawPointerInst, IndexingInst, None, DoesNotRelease)
+    INST(IndexAddrInst, IndexingInst, index_addr, None, DoesNotRelease)
+    INST(TailAddrInst, IndexingInst, tail_addr, None, DoesNotRelease)
+    INST(IndexRawPointerInst, IndexingInst, index_raw_pointer, None, DoesNotRelease)
     VALUE_RANGE(IndexingInst, IndexAddrInst, IndexRawPointerInst)
 
   // BindMemory has no physical side effect. Semantically it writes to
   // its affected memory region because any reads or writes accessing
   // that memory must be dependent on the bind operation.
-  INST(BindMemoryInst, SILInstruction, MayWrite, DoesNotRelease)
+  INST(BindMemoryInst, SILInstruction, bind_memory, MayWrite, DoesNotRelease)
 
   // Reference Counting
   ABSTRACT_VALUE(RefCountingInst, SILInstruction)
-    INST(StrongRetainInst, RefCountingInst, MayHaveSideEffects, DoesNotRelease)
-    INST(StrongReleaseInst, RefCountingInst, MayHaveSideEffects, MayRelease)
-    INST(StrongRetainUnownedInst, RefCountingInst, MayHaveSideEffects,
+    INST(StrongRetainInst, RefCountingInst, strong_retain, MayHaveSideEffects, DoesNotRelease)
+    INST(StrongReleaseInst, RefCountingInst, strong_release, MayHaveSideEffects, MayRelease)
+    INST(StrongRetainUnownedInst, RefCountingInst, strong_retain_unowned, MayHaveSideEffects,
          DoesNotRelease)
-    INST(StrongPinInst, SILInstruction, MayHaveSideEffects, DoesNotRelease)
-    INST(StrongUnpinInst, SILInstruction, MayHaveSideEffects, DoesNotRelease)
-    INST(UnownedRetainInst, RefCountingInst, MayHaveSideEffects, DoesNotRelease)
-    INST(UnownedReleaseInst, RefCountingInst, MayHaveSideEffects,
+    INST(StrongPinInst, SILInstruction, strong_pin, MayHaveSideEffects, DoesNotRelease)
+    INST(StrongUnpinInst, SILInstruction, strong_unpin, MayHaveSideEffects, DoesNotRelease)
+    INST(UnownedRetainInst, RefCountingInst, unowned_retain, MayHaveSideEffects, DoesNotRelease)
+    INST(UnownedReleaseInst, RefCountingInst, unowned_release, MayHaveSideEffects,
          MayRelease)
-    INST(RetainValueInst, RefCountingInst, MayHaveSideEffects, DoesNotRelease)
-    INST(ReleaseValueInst, RefCountingInst, MayHaveSideEffects, MayRelease)
-    INST(SetDeallocatingInst, RefCountingInst, MayHaveSideEffects,
+    INST(RetainValueInst, RefCountingInst, retain_value, MayHaveSideEffects, DoesNotRelease)
+    INST(ReleaseValueInst, RefCountingInst, release_value, MayHaveSideEffects, MayRelease)
+    INST(SetDeallocatingInst, RefCountingInst, set_deallocating, MayHaveSideEffects,
          DoesNotRelease)
-    INST(AutoreleaseValueInst, RefCountingInst, MayHaveSideEffects,
+    INST(AutoreleaseValueInst, RefCountingInst, autorelease_value, MayHaveSideEffects,
          DoesNotRelease)
     VALUE_RANGE(RefCountingInst, StrongRetainInst, AutoreleaseValueInst)
   // FIXME: Is MayHaveSideEffects appropriate?
-  INST(FixLifetimeInst, SILInstruction, MayHaveSideEffects, DoesNotRelease)
-  INST(MarkDependenceInst, SILInstruction, None, DoesNotRelease)
-  INST(CopyBlockInst, SILInstruction, MayHaveSideEffects, DoesNotRelease)
+  INST(FixLifetimeInst, SILInstruction, fix_lifetime, MayHaveSideEffects, DoesNotRelease)
+  INST(MarkDependenceInst, SILInstruction, mark_dependence, None, DoesNotRelease)
+  INST(CopyBlockInst, SILInstruction, copy_block, MayHaveSideEffects, DoesNotRelease)
+  INST(CopyValueInst, SILInstruction, copy_value, MayHaveSideEffects, DoesNotRelease)
+  INST(DestroyValueInst, SILInstruction, destroy_value, MayHaveSideEffects, MayRelease)
 
   // IsUnique does not actually write to memory but should be modeled
   // as such. Its operand is a pointer to an object reference. The
   // optimizer should not assume that the same object is pointed to after
   // the isUnique instruction. It appears to write a new object reference.
-  INST(IsUniqueInst, SILInstruction, MayHaveSideEffects, DoesNotRelease)
-  INST(IsUniqueOrPinnedInst, SILInstruction, MayHaveSideEffects, DoesNotRelease)
+  INST(IsUniqueInst, SILInstruction, is_unique, MayHaveSideEffects, DoesNotRelease)
+  INST(IsUniqueOrPinnedInst, SILInstruction, is_unique_or_pinned, MayHaveSideEffects, DoesNotRelease)
 
-  INST(AllocGlobalInst, SILInstruction, MayHaveSideEffects, DoesNotRelease)
+  INST(AllocGlobalInst, SILInstruction, alloc_global, MayHaveSideEffects, DoesNotRelease)
 
   // Literals
   ABSTRACT_VALUE(LiteralInst, SILInstruction)
-    INST(FunctionRefInst, LiteralInst, None, DoesNotRelease)
-    INST(GlobalAddrInst, LiteralInst, None, DoesNotRelease)
-    INST(IntegerLiteralInst, LiteralInst, None, DoesNotRelease)
-    INST(FloatLiteralInst, LiteralInst, None, DoesNotRelease)
-    INST(StringLiteralInst, LiteralInst, None, DoesNotRelease)
+    INST(FunctionRefInst, LiteralInst, function_ref, None, DoesNotRelease)
+    INST(GlobalAddrInst, LiteralInst, global_addr, None, DoesNotRelease)
+    INST(IntegerLiteralInst, LiteralInst, integer_literal, None, DoesNotRelease)
+    INST(FloatLiteralInst, LiteralInst, float_literal, None, DoesNotRelease)
+    INST(StringLiteralInst, LiteralInst, string_literal, None, DoesNotRelease)
     VALUE_RANGE(LiteralInst, FunctionRefInst, StringLiteralInst)
 
   // Dynamic Dispatch
   ABSTRACT_VALUE(MethodInst, SILInstruction)
-    INST(ClassMethodInst, MethodInst, None, DoesNotRelease)
-    INST(SuperMethodInst, MethodInst, None, DoesNotRelease)
-    INST(WitnessMethodInst, MethodInst, None, DoesNotRelease)
-    INST(DynamicMethodInst, MethodInst, None, DoesNotRelease)
+    INST(ClassMethodInst, MethodInst, class_method, None, DoesNotRelease)
+    INST(SuperMethodInst, MethodInst, super_method, None, DoesNotRelease)
+    INST(WitnessMethodInst, MethodInst, witness_method, None, DoesNotRelease)
+    INST(DynamicMethodInst, MethodInst, dynamic_method, None, DoesNotRelease)
     VALUE_RANGE(MethodInst, ClassMethodInst, DynamicMethodInst)
 
   // Function Application
-  INST(ApplyInst, SILInstruction, MayHaveSideEffects, MayRelease)
-  INST(PartialApplyInst, SILInstruction, MayHaveSideEffects, DoesNotRelease)
-  INST(BuiltinInst, SILInstruction, MayHaveSideEffects, MayRelease)
+  INST(ApplyInst, SILInstruction, apply, MayHaveSideEffects, MayRelease)
+  INST(PartialApplyInst, SILInstruction, partial_apply, MayHaveSideEffects, DoesNotRelease)
+  INST(BuiltinInst, SILInstruction, builtin, MayHaveSideEffects, MayRelease)
 
   // Metatypes
-  INST(MetatypeInst, SILInstruction, None, DoesNotRelease)
-  INST(ValueMetatypeInst, SILInstruction, None, DoesNotRelease)
-  INST(ExistentialMetatypeInst, SILInstruction, None, DoesNotRelease)
-  INST(ObjCProtocolInst, SILInstruction, None, DoesNotRelease)
+  INST(MetatypeInst, SILInstruction, metatype, None, DoesNotRelease)
+  INST(ValueMetatypeInst, SILInstruction, value_metatype, None, DoesNotRelease)
+  INST(ExistentialMetatypeInst, SILInstruction, existential_metatype, None, DoesNotRelease)
+  INST(ObjCProtocolInst, SILInstruction, objc_protocol, None, DoesNotRelease)
 
   // Aggregate Types
-  INST(TupleInst, SILInstruction, None, DoesNotRelease)
-  INST(TupleExtractInst, SILInstruction, None, DoesNotRelease)
-  INST(TupleElementAddrInst, SILInstruction, None, DoesNotRelease)
-  INST(StructInst, SILInstruction, None, DoesNotRelease)
-  INST(StructExtractInst, SILInstruction, None, DoesNotRelease)
-  INST(StructElementAddrInst, SILInstruction, None, DoesNotRelease)
-  INST(RefElementAddrInst, SILInstruction, None, DoesNotRelease)
+  INST(TupleInst, SILInstruction, tuple, None, DoesNotRelease)
+  INST(TupleExtractInst, SILInstruction, tuple_extract, None, DoesNotRelease)
+  INST(TupleElementAddrInst, SILInstruction, tuple_element_addr, None, DoesNotRelease)
+  INST(StructInst, SILInstruction, struct, None, DoesNotRelease)
+  INST(StructExtractInst, SILInstruction, struct_extract, None, DoesNotRelease)
+  INST(StructElementAddrInst, SILInstruction, struct_element_addr, None, DoesNotRelease)
+  INST(RefElementAddrInst, SILInstruction, ref_element_addr, None, DoesNotRelease)
+  INST(RefTailAddrInst, SILInstruction, ref_tail_addr, None, DoesNotRelease)
 
   // Enums
-  INST(EnumInst, SILInstruction, None, DoesNotRelease)
-  INST(UncheckedEnumDataInst, SILInstruction, None, DoesNotRelease)
-  INST(InitEnumDataAddrInst, SILInstruction, None, DoesNotRelease)
-  INST(UncheckedTakeEnumDataAddrInst, SILInstruction, MayWrite, DoesNotRelease)
-  INST(InjectEnumAddrInst, SILInstruction, MayWrite, DoesNotRelease)
-  INST(SelectEnumInst, SILInstruction, None, DoesNotRelease)
-  INST(SelectEnumAddrInst, SILInstruction, MayRead, DoesNotRelease)
-  INST(SelectValueInst, SILInstruction, None, DoesNotRelease)
+  INST(EnumInst, SILInstruction, enum, None, DoesNotRelease)
+  INST(UncheckedEnumDataInst, SILInstruction, unchecked_enum_data, None, DoesNotRelease)
+  INST(InitEnumDataAddrInst, SILInstruction, init_enum_data_addr, None, DoesNotRelease)
+  INST(UncheckedTakeEnumDataAddrInst, SILInstruction, unchecked_take_enum_data_addr, MayWrite, DoesNotRelease)
+  INST(InjectEnumAddrInst, SILInstruction, inject_enum_addr, MayWrite, DoesNotRelease)
+  INST(SelectEnumInst, SILInstruction, select_enum, None, DoesNotRelease)
+  INST(SelectEnumAddrInst, SILInstruction, select_enum_addr, MayRead, DoesNotRelease)
+  INST(SelectValueInst, SILInstruction, select_value, None, DoesNotRelease)
 
   // Protocol and Protocol Composition Types
-  INST(InitExistentialAddrInst, SILInstruction, MayWrite, DoesNotRelease)
-  INST(DeinitExistentialAddrInst, SILInstruction, MayHaveSideEffects,
+  INST(InitExistentialAddrInst, SILInstruction, init_existential_addr, MayWrite, DoesNotRelease)
+  INST(DeinitExistentialAddrInst, SILInstruction, deinit_existential_addr, MayHaveSideEffects,
        DoesNotRelease)
-  INST(OpenExistentialAddrInst, SILInstruction, MayRead, DoesNotRelease)
-  INST(InitExistentialRefInst, SILInstruction, None, DoesNotRelease)
-  INST(OpenExistentialRefInst, SILInstruction, None, DoesNotRelease)
-  INST(InitExistentialMetatypeInst, SILInstruction, None, DoesNotRelease)
-  INST(OpenExistentialMetatypeInst, SILInstruction, None, DoesNotRelease)
-  INST(OpenExistentialBoxInst, SILInstruction, MayRead, DoesNotRelease)
+  INST(OpenExistentialAddrInst, SILInstruction, open_existential_addr, MayRead, DoesNotRelease)
+  INST(InitExistentialRefInst, SILInstruction, init_existential_ref, None, DoesNotRelease)
+  INST(OpenExistentialRefInst, SILInstruction, open_existential_ref, None, DoesNotRelease)
+  INST(InitExistentialMetatypeInst, SILInstruction, init_existential_metatype, None, DoesNotRelease)
+  INST(OpenExistentialMetatypeInst, SILInstruction, open_existential_metatype, None, DoesNotRelease)
+  INST(OpenExistentialBoxInst, SILInstruction, open_existential_box, MayRead, DoesNotRelease)
 
   // Blocks
-  INST(ProjectBlockStorageInst, SILInstruction, None, DoesNotRelease)
-  INST(InitBlockStorageHeaderInst, SILInstruction, None, DoesNotRelease)
+  INST(ProjectBlockStorageInst, SILInstruction, project_block_storage, None, DoesNotRelease)
+  INST(InitBlockStorageHeaderInst, SILInstruction, init_block_storage_header, None, DoesNotRelease)
 
   // Conversions
   ABSTRACT_VALUE(ConversionInst, SILInstruction)
-    INST(UpcastInst, ConversionInst, None, DoesNotRelease)
-    INST(AddressToPointerInst, ConversionInst, None, DoesNotRelease)
-    INST(PointerToAddressInst, ConversionInst, None, DoesNotRelease)
-    INST(UncheckedRefCastInst, ConversionInst, None, DoesNotRelease)
-    INST(UncheckedAddrCastInst, ConversionInst, None, DoesNotRelease)
-    INST(UncheckedTrivialBitCastInst, ConversionInst, None, DoesNotRelease)
-    INST(UncheckedBitwiseCastInst, ConversionInst, None, DoesNotRelease)
-    INST(RefToRawPointerInst, ConversionInst, None, DoesNotRelease)
-    INST(RawPointerToRefInst, ConversionInst, None, DoesNotRelease)
-    INST(RefToUnownedInst, ConversionInst, None, DoesNotRelease)
-    INST(UnownedToRefInst, ConversionInst, None, DoesNotRelease)
-    INST(RefToUnmanagedInst, ConversionInst, None, DoesNotRelease)
-    INST(UnmanagedToRefInst, ConversionInst, None, DoesNotRelease)
-    INST(ConvertFunctionInst, ConversionInst, None, DoesNotRelease)
-    INST(ThinFunctionToPointerInst, ConversionInst, None, DoesNotRelease)
-    INST(PointerToThinFunctionInst, ConversionInst, None, DoesNotRelease)
-    INST(RefToBridgeObjectInst, ConversionInst, None, DoesNotRelease)
-    INST(BridgeObjectToRefInst, ConversionInst, None, DoesNotRelease)
-    INST(BridgeObjectToWordInst, ConversionInst, None, DoesNotRelease)
-    INST(ThinToThickFunctionInst, ConversionInst, None, DoesNotRelease)
-    INST(ThickToObjCMetatypeInst, ConversionInst, None, DoesNotRelease)
-    INST(ObjCToThickMetatypeInst, ConversionInst, None, DoesNotRelease)
-    INST(ObjCMetatypeToObjectInst, ConversionInst, None, DoesNotRelease)
-    INST(ObjCExistentialMetatypeToObjectInst, ConversionInst, None,
+    INST(UpcastInst, ConversionInst, upcast, None, DoesNotRelease)
+    INST(AddressToPointerInst, ConversionInst, address_to_pointer, None, DoesNotRelease)
+    INST(PointerToAddressInst, ConversionInst, pointer_to_address, None, DoesNotRelease)
+    INST(UncheckedRefCastInst, ConversionInst, unchecked_ref_cast, None, DoesNotRelease)
+    INST(UncheckedAddrCastInst, ConversionInst, unchecked_addr_cast, None, DoesNotRelease)
+    INST(UncheckedTrivialBitCastInst, ConversionInst, unchecked_trivial_bit_cast, None, DoesNotRelease)
+    INST(UncheckedBitwiseCastInst, ConversionInst, unchecked_bitwise_cast, None, DoesNotRelease)
+    INST(RefToRawPointerInst, ConversionInst, ref_to_raw_pointer, None, DoesNotRelease)
+    INST(RawPointerToRefInst, ConversionInst, raw_pointer_to_ref, None, DoesNotRelease)
+    INST(RefToUnownedInst, ConversionInst, ref_to_unowned, None, DoesNotRelease)
+    INST(UnownedToRefInst, ConversionInst, unowned_to_ref, None, DoesNotRelease)
+    INST(RefToUnmanagedInst, ConversionInst, ref_to_unmanaged, None, DoesNotRelease)
+    INST(UnmanagedToRefInst, ConversionInst, unmanaged_to_ref, None, DoesNotRelease)
+    INST(ConvertFunctionInst, ConversionInst, convert_function, None, DoesNotRelease)
+    INST(ThinFunctionToPointerInst, ConversionInst, thin_function_to_pointer, None, DoesNotRelease)
+    INST(PointerToThinFunctionInst, ConversionInst, pointer_to_thin_function, None, DoesNotRelease)
+    INST(RefToBridgeObjectInst, ConversionInst, ref_to_bridge_object, None, DoesNotRelease)
+    INST(BridgeObjectToRefInst, ConversionInst, bridge_object_to_ref, None, DoesNotRelease)
+    INST(BridgeObjectToWordInst, ConversionInst, bridge_object_to_word, None, DoesNotRelease)
+    INST(ThinToThickFunctionInst, ConversionInst, thin_to_thick_function, None, DoesNotRelease)
+    INST(ThickToObjCMetatypeInst, ConversionInst, thick_to_objc_metatype, None, DoesNotRelease)
+    INST(ObjCToThickMetatypeInst, ConversionInst, objc_to_thick_metatype, None, DoesNotRelease)
+    INST(ObjCMetatypeToObjectInst, ConversionInst, objc_metatype_to_object, None, DoesNotRelease)
+    INST(ObjCExistentialMetatypeToObjectInst, ConversionInst, objc_existential_metatype_to_object, None,
          DoesNotRelease)
-    INST(UnconditionalCheckedCastInst, ConversionInst, None, DoesNotRelease)
+    INST(UnconditionalCheckedCastInst, ConversionInst, unconditional_checked_cast, None, DoesNotRelease)
     VALUE_RANGE(ConversionInst, UpcastInst, UnconditionalCheckedCastInst)
-  INST(IsNonnullInst, SILInstruction, None, DoesNotRelease)
-  INST(UnconditionalCheckedCastAddrInst, SILInstruction, MayHaveSideEffects,
+  INST(IsNonnullInst, SILInstruction, is_nonnull, None, DoesNotRelease)
+  INST(UnconditionalCheckedCastAddrInst, SILInstruction, unconditional_checked_cast_addr, MayHaveSideEffects,
        MayRelease)
-  INST(UncheckedRefCastAddrInst, SILInstruction, MayHaveSideEffects,
+  INST(UncheckedRefCastAddrInst, SILInstruction, unchecked_ref_cast_addr, MayHaveSideEffects,
        DoesNotRelease)
 
   // Runtime failure
   // FIXME: Special MemBehavior for runtime failure?
-  INST(CondFailInst, SILInstruction, MayHaveSideEffects, DoesNotRelease)
+  INST(CondFailInst, SILInstruction, cond_fail, MayHaveSideEffects, DoesNotRelease)
 
   // Terminators
   ABSTRACT_VALUE(TermInst, SILInstruction)
-    TERMINATOR(UnreachableInst, TermInst, None, DoesNotRelease)
-    TERMINATOR(ReturnInst, TermInst, None, DoesNotRelease)
-    TERMINATOR(ThrowInst, TermInst, None, DoesNotRelease)
-    TERMINATOR(TryApplyInst, TermInst, MayHaveSideEffects, MayRelease)
-    TERMINATOR(BranchInst, TermInst, None, DoesNotRelease)
-    TERMINATOR(CondBranchInst, TermInst, None, DoesNotRelease)
-    TERMINATOR(SwitchValueInst, TermInst, None, DoesNotRelease)
-    TERMINATOR(SwitchEnumInst, TermInst, None, DoesNotRelease)
-    TERMINATOR(SwitchEnumAddrInst, TermInst, MayRead, DoesNotRelease)
-    TERMINATOR(DynamicMethodBranchInst, TermInst, None, DoesNotRelease)
-    TERMINATOR(CheckedCastBranchInst, TermInst, None, DoesNotRelease)
-    TERMINATOR(CheckedCastAddrBranchInst, TermInst, MayHaveSideEffects,
+    TERMINATOR(UnreachableInst, TermInst, unreachable, None, DoesNotRelease)
+    TERMINATOR(ReturnInst, TermInst, return, None, DoesNotRelease)
+    TERMINATOR(ThrowInst, TermInst, throw, None, DoesNotRelease)
+    TERMINATOR(TryApplyInst, TermInst, try_apply, MayHaveSideEffects, MayRelease)
+    TERMINATOR(BranchInst, TermInst, br, None, DoesNotRelease)
+    TERMINATOR(CondBranchInst, TermInst, cond_br, None, DoesNotRelease)
+    TERMINATOR(SwitchValueInst, TermInst, switch_value, None, DoesNotRelease)
+    TERMINATOR(SwitchEnumInst, TermInst, switch_enum, None, DoesNotRelease)
+    TERMINATOR(SwitchEnumAddrInst, TermInst, switch_enum_addr, MayRead, DoesNotRelease)
+    TERMINATOR(DynamicMethodBranchInst, TermInst, dynamic_method_br, None, DoesNotRelease)
+    TERMINATOR(CheckedCastBranchInst, TermInst, checked_cast_br, None, DoesNotRelease)
+    TERMINATOR(CheckedCastAddrBranchInst, TermInst, checked_cast_addr_br, MayHaveSideEffects,
                MayRelease)
     VALUE_RANGE(TermInst, UnreachableInst, CheckedCastAddrBranchInst)
 

@@ -5,8 +5,8 @@
 // Copyright (c) 2014 - 2016 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
-// See http://swift.org/LICENSE.txt for license information
-// See http://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
+// See https://swift.org/LICENSE.txt for license information
+// See https://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
 //
 //===----------------------------------------------------------------------===//
 //
@@ -19,6 +19,7 @@
 
 #include "llvm/ADT/DenseMap.h"
 #include "llvm/ADT/DenseMapInfo.h"
+#include "llvm/ADT/STLExtras.h"
 #include "swift/Basic/LLVM.h"
 #include "swift/AST/PrintOptions.h"
 #include "swift/AST/TypeAlignments.h"
@@ -42,6 +43,7 @@ class NormalProtocolConformance;
 enum OptionalTypeKind : unsigned;
 class ProtocolDecl;
 class StructDecl;
+class SubstitutableType;
 class SubstitutionMap;
 class TypeBase;
 class Type;
@@ -49,19 +51,35 @@ class TypeWalker;
 
 /// \brief Type substitution mapping from substitutable types to their
 /// replacements.
-typedef llvm::DenseMap<TypeBase *, Type> TypeSubstitutionMap;
+typedef llvm::DenseMap<SubstitutableType *, Type> TypeSubstitutionMap;
+
+/// Function used to provide substitutions.
+///
+/// \returns A null \c Type to indicate that there is no substitution for
+/// this substitutable type; otherwise, the replacement type.
+typedef llvm::function_ref<Type(SubstitutableType *)> TypeSubstitutionFn;
+
+/// A function object suitable for use as a \c TypeSubstitutionFn that
+/// queries an underlying \c TypeSubstitutionMap.
+struct QueryTypeSubstitutionMap {
+  const TypeSubstitutionMap &substitutions;
+
+  Type operator()(SubstitutableType *type) const;
+};
 
 /// Flags that can be passed when substituting into a type.
 enum class SubstFlags {
   /// If a type cannot be produced because some member type is
-  /// missing, return the identity type rather than a null type.
-  IgnoreMissing = 0x01,
+  /// missing, place an 'error' type into the position of the base.
+  UseErrorType = 0x01,
   /// Allow substitutions to recurse into SILFunctionTypes.
   /// Normally, SILType::subst() should be used for lowered
   /// types, however in special cases where the substitution
   /// is just changing between contextual and interface type
   /// representations, using Type::subst() is allowed.
   AllowLoweredTypes = 0x02,
+  /// Map member types to their desugared witness type.
+  DesugarMemberTypes = 0x04,
 };
 
 /// Options for performing substitutions into a type.
@@ -170,7 +188,7 @@ public:
   /// \returns the substituted type, or a null type if an error occurred.
   Type subst(ModuleDecl *module,
              const TypeSubstitutionMap &substitutions,
-             SubstOptions options) const;
+             SubstOptions options = None) const;
 
   /// Replace references to substitutable types with new, concrete types and
   /// return the substituted result.
@@ -182,7 +200,22 @@ public:
   ///
   /// \returns the substituted type, or a null type if an error occurred.
   Type subst(const SubstitutionMap &substitutions,
-             SubstOptions options) const;
+             SubstOptions options = None) const;
+
+  /// Replace references to substitutable types with new, concrete types and
+  /// return the substituted result.
+  ///
+  /// \param module The module to use for conformance lookups.
+  ///
+  /// \param substitutions A function mapping from substitutable types to their
+  /// replacements.
+  ///
+  /// \param options Options that affect the substitutions.
+  ///
+  /// \returns the substituted type, or a null type if an error occurred.
+  Type subst(ModuleDecl *module,
+             TypeSubstitutionFn substitutions,
+             SubstOptions options = None) const;
 
   bool isPrivateStdlibType(bool whitelistProtocols=true) const;
 
@@ -456,7 +489,11 @@ public:
   // in Decl.h
   explicit CanGenericSignature(GenericSignature *Signature);
   ArrayRef<CanTypeWrapper<GenericTypeParamType>> getGenericParams() const;
-  
+
+  /// Retrieve the canonical generic environment associated with this
+  /// generic signature.
+  GenericEnvironment *getGenericEnvironment(ModuleDecl &module) const;
+
   GenericSignature *operator->() const {
     return Signature;
   }
@@ -536,6 +573,19 @@ namespace llvm {
       return swift::CanType((swift::TypeBase*)P);
     }
   };
+
+  template<>
+  class PointerLikeTypeTraits<swift::CanGenericSignature> {
+  public:
+    static inline swift::CanGenericSignature getFromVoidPointer(void *P) {
+      return swift::CanGenericSignature((swift::GenericSignature*)P);
+    }
+    static inline void *getAsVoidPointer(swift::CanGenericSignature S) {
+      return (void*)S.getPointer();
+    }
+    enum { NumLowBitsAvailable = swift::TypeAlignInBits };
+  };
+  
 } // end namespace llvm
 
 #endif

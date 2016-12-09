@@ -32,6 +32,6 @@ var i: Int = b.my_identity()
 // CHECK-EXPANDED-NEXT:       `-AfterPatternBinding {{.*}} entry 0 [6:15 - [[EOF]]] expanded
 // CHECK-EXPANDED-NEXT:         `-TopLevelCode {{.*}} [8:1 - [[EOF]]] expanded
 // CHECK-EXPANDED: `-ConditionalClause {{.*}} index 0 guard-continuation [9:1 - [[EOF]]] expanded
-// CHECK-EXPANDED-NEXT:                 `-AbstractFunctionDecl {{.*}} foo() [11:1 - [[EOF]]] expanded
+// CHECK-EXPANDED-NEXT:                 |-AbstractFunctionDecl {{.*}} foo() [11:1 - 11:13] expanded
 // CHECK-EXPANDED: `-AfterPatternBinding {{.*}} entry 0 [13:9 - [[EOF]]] expanded
-// CHECK-EXPANDED-NEXT:                           `-TypeDecl {{.*}} T [15:1 - [[EOF]]] expanded
+// CHECK-EXPANDED-NEXT:                           |-TypeDecl {{.*}} T [15:1 - 15:15] expanded

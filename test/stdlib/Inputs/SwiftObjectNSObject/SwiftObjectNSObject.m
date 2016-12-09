@@ -5,8 +5,8 @@
 // Copyright (c) 2014 - 2016 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
-// See http://swift.org/LICENSE.txt for license information
-// See http://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
+// See https://swift.org/LICENSE.txt for license information
+// See https://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
 //
 //===----------------------------------------------------------------------===//
 
@@ -68,7 +68,7 @@ static int Errors;
 }
 @end
 
-void TestSwiftObjectNSObject(id c, id d) 
+void TestSwiftObjectNSObject(id c, id d)
 {
   printf("TestSwiftObjectNSObject\n");
 
@@ -84,7 +84,7 @@ void TestSwiftObjectNSObject(id c, id d)
   printf("Check connectivity.\n");
 
   expectTrue (S && C && D && S_meta && C_meta && D_meta && c && d);
-  NSSet *distinctnessCheck = 
+  NSSet *distinctnessCheck =
     [NSSet setWithObjects:c, d, S, C, D, S_meta, C_meta, D_meta, nil];
   expectTrue (distinctnessCheck.count == 8);
 
@@ -150,7 +150,7 @@ void TestSwiftObjectNSObject(id c, id d)
 
   printf("NSObjectProtocol.hash\n");
 
-  expectTrue ([d hash] + [c hash] + [D hash] + [C hash] + [S hash] + 
+  expectTrue ([d hash] + [c hash] + [D hash] + [C hash] + [S hash] +
               [D_meta hash] + [C_meta hash] + [S_meta hash] != 0);
 
 
@@ -452,11 +452,11 @@ void TestSwiftObjectNSObject(id c, id d)
   expectTrue ([D performSelector:sel2 withObject:@1 withObject:@2] == D);
   expectTrue ([C performSelector:sel2 withObject:@1 withObject:@2] == C);
   expectTrue ([S performSelector:sel2 withObject:@1 withObject:@2] == S);
-  expectTrue ([D_meta performSelector:sel2 
+  expectTrue ([D_meta performSelector:sel2
                            withObject:@1 withObject:@2] == D_meta);
-  expectTrue ([C_meta performSelector:sel2 
+  expectTrue ([C_meta performSelector:sel2
                            withObject:@1 withObject:@2] == C_meta);
-  expectTrue ([S_meta performSelector:sel2 
+  expectTrue ([S_meta performSelector:sel2
                            withObject:@1 withObject:@2] == S_meta);
 
 

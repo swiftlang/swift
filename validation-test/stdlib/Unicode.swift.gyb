@@ -1546,6 +1546,7 @@ class NonContiguousNSString : NSString {
     fatalError("don't call this initializer")
   }
 
+  @nonobjc
   convenience init(_ utf8: [UInt8]) {
     var encoded = [UInt16]()
     let output: (UInt16) -> Void = { encoded.append($0) }
@@ -1560,11 +1561,13 @@ class NonContiguousNSString : NSString {
     self.init(encoded)
   }
 
+  @nonobjc
   init(_ value: [UInt16]) {
     _value = value
     super.init()
   }
 
+  @nonobjc
   convenience init(_ scalars: [UInt32]) {
     var encoded = [UInt16]()
     let output: (UInt16) -> Void = { encoded.append($0) }

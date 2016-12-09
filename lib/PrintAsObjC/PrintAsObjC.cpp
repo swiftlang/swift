@@ -5,8 +5,8 @@
 // Copyright (c) 2014 - 2016 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
-// See http://swift.org/LICENSE.txt for license information
-// See http://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
+// See https://swift.org/LICENSE.txt for license information
+// See https://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
 //
 //===----------------------------------------------------------------------===//
 
@@ -159,7 +159,7 @@ public:
 
   void print(const Decl *D) {
     PrettyStackTraceDecl trace("printing", D);
-    visit(const_cast<Decl *>(D));
+    ASTVisitor::visit(const_cast<Decl *>(D));
   }
 
   void printAdHocCategory(iterator_range<const ValueDecl * const *> members) {
@@ -194,8 +194,6 @@ public:
   }
 
 private:
-  using ASTVisitor::visit;
-
   /// Prints a protocol adoption list: <code>&lt;NSCoding, NSCopying&gt;</code>
   ///
   /// This method filters out non-ObjC protocols, along with the special
@@ -241,7 +239,7 @@ private:
         protocolMembersOptional = VD->getAttrs().hasAttribute<OptionalAttr>();
         os << (protocolMembersOptional ? "@optional\n" : "@required\n");
       }
-      visit(const_cast<ValueDecl*>(VD));
+      ASTVisitor::visit(const_cast<ValueDecl*>(VD));
     }
   }
 
@@ -449,7 +447,7 @@ private:
 
     Optional<ForeignErrorConvention> errorConvention
       = AFD->getForeignErrorConvention();
-    Type rawMethodTy = AFD->getType()->castTo<AnyFunctionType>()->getResult();
+    Type rawMethodTy = AFD->getInterfaceType()->castTo<AnyFunctionType>()->getResult();
     auto methodTy = rawMethodTy->castTo<FunctionType>();
     auto resultTy = getForeignResultType(AFD, methodTy, errorConvention);
 
@@ -465,7 +463,8 @@ private:
       } else {
         auto func = cast<FuncDecl>(AFD);
         OptionalTypeKind optionalKind;
-        (void)func->getResultType()->getAnyOptionalObjectType(optionalKind);
+        (void)func->getResultInterfaceType()
+            ->getAnyOptionalObjectType(optionalKind);
         printNullability(optionalKind,
                          NullabilityPrintKind::ContextSensitive);
       }
@@ -553,9 +552,12 @@ private:
     printDocumentationComment(FD);
     Optional<ForeignErrorConvention> errorConvention
       = FD->getForeignErrorConvention();
-    auto resultTy = getForeignResultType(FD,
-                                         FD->getType()->castTo<FunctionType>(),
-                                         errorConvention);
+    assert(!FD->getGenericSignature() &&
+           "top-level generic functions not supported here");
+    auto resultTy = getForeignResultType(
+        FD,
+        FD->getInterfaceType()->castTo<FunctionType>(),
+        errorConvention);
     
     // The result type may be a partial function type we need to close
     // up later.
@@ -817,7 +819,7 @@ private:
       break;
     case NullabilityPrintKind::After:
       os << ' ';
-      [[clang::fallthrough]];
+      LLVM_FALLTHROUGH;
     case NullabilityPrintKind::Before:
       switch (*kind) {
       case OTK_None:
@@ -875,7 +877,7 @@ private:
     auto conformance = conformances.front();
     Type objcType = ProtocolConformance::getTypeWitnessByName(
                       nominal->getDeclaredType(),
-                      conformance,
+                      ProtocolConformanceRef(conformance),
                       ctx.Id_ObjectiveCType,
                       nullptr);
     if (!objcType) return nullptr;
@@ -923,7 +925,7 @@ private:
           UnqualifiedLookup lookup(ctx.getIdentifier("NSCopying"), M, nullptr);
           auto type = lookup.getSingleTypeResult();
           if (type && isa<ProtocolDecl>(type)) {
-            NSCopyingType = type->getDeclaredType();
+            NSCopyingType = type->getDeclaredInterfaceType();
           } else {
             NSCopyingType = Type();
           }
@@ -1451,11 +1453,6 @@ private:
     visitPart(PT->getSinglyDesugaredType(), optionalKind);
   }
 
-  void visitSubstitutedType(SubstitutedType *ST, 
-                            Optional<OptionalTypeKind> optionalKind) {
-    visitPart(ST->getSinglyDesugaredType(), optionalKind);
-  }
-
   void visitSyntaxSugarType(SyntaxSugarType *SST, 
                             Optional<OptionalTypeKind> optionalKind) {
     visitPart(SST->getSinglyDesugaredType(), optionalKind);
@@ -1532,12 +1529,12 @@ public:
   }
 };
 
-class ReferencedTypeFinder : private TypeVisitor<ReferencedTypeFinder> {
+class ReferencedTypeFinder : public TypeVisitor<ReferencedTypeFinder> {
   friend TypeVisitor;
 
   ModuleDecl &M;
   llvm::function_ref<void(ReferencedTypeFinder &, const TypeDecl *)> Callback;
-  bool IsWithinConstrainedObjCGeneric = false;
+  bool NeedsDefinition = false;
 
   ReferencedTypeFinder(ModuleDecl &mod, decltype(Callback) callback)
     : M(mod), Callback(callback) {}
@@ -1580,12 +1577,14 @@ class ReferencedTypeFinder : private TypeVisitor<ReferencedTypeFinder> {
     return;
   }
 
-  void visitGenericTypeParamType(GenericTypeParamType *archetype) {
-    llvm_unreachable("unexpected generic type param type in @objc decl");
+  void visitGenericTypeParamType(GenericTypeParamType *param) {
+    // Appears in protocols and in generic ObjC classes.
+    return;
   }
 
-  void visitSubstitutedType(SubstitutedType *sub) {
-    visit(sub->getSinglyDesugaredType());
+  void visitDependentMemberType(DependentMemberType *member) {
+    // Appears in protocols and in generic ObjC classes.
+    return;
   }
 
   void visitAnyFunctionType(AnyFunctionType *fnTy) {
@@ -1637,6 +1636,11 @@ class ReferencedTypeFinder : private TypeVisitor<ReferencedTypeFinder> {
 
   void visitBoundGenericType(BoundGenericType *boundGeneric) {
     auto *decl = boundGeneric->getDecl();
+
+    NeedsDefinition = true;
+    Callback(*this, decl);
+    NeedsDefinition = false;
+
     bool isObjCGeneric = decl->hasClangNode();
     auto *sig = decl->getGenericSignature();
 
@@ -1644,22 +1648,17 @@ class ReferencedTypeFinder : private TypeVisitor<ReferencedTypeFinder> {
              sig->getInnermostGenericParams(),
              [&](Type argTy, GenericTypeParamType *paramTy) {
       if (isObjCGeneric && isConstrained(M, sig, paramTy))
-        IsWithinConstrainedObjCGeneric = true;
+        NeedsDefinition = true;
       visit(argTy);
-      IsWithinConstrainedObjCGeneric = false;
+      NeedsDefinition = false;
     });
-
-    // Ignore the base type; that either can't be exposed to Objective-C or
-    // was an Objective-C type to begin with. Every bound generic Swift type we
-    // care about gets mapped to a particular construct in Objective-C.
-    // (For example, Optional<NSFoo> is mapped to NSFoo *.)
   }
 
 public:
   using TypeVisitor::visit;
 
-  bool isWithinConstrainedObjCGeneric() const {
-    return IsWithinConstrainedObjCGeneric;
+  bool needsDefinition() const {
+    return NeedsDefinition;
   }
 
   static void walk(ModuleDecl &mod, Type ty, decltype(Callback) callback) {
@@ -1772,6 +1771,8 @@ public:
     case EmissionState::Defined:
       return true;
     }
+
+    llvm_unreachable("Unhandled EmissionState in switch.");
   }
 
   void forwardDeclare(const NominalTypeDecl *NTD,
@@ -1845,14 +1846,13 @@ public:
       }
 
       bool needsToBeIndividuallyDelayed = false;
-      ReferencedTypeFinder::walk(M, VD->getType(),
+      ReferencedTypeFinder::walk(M, VD->getInterfaceType(),
                                  [&](ReferencedTypeFinder &finder,
                                      const TypeDecl *TD) {
         if (TD == container)
           return;
 
-        if (finder.isWithinConstrainedObjCGeneric() &&
-            isa<NominalTypeDecl>(TD)) {
+        if (finder.needsDefinition() && isa<NominalTypeDecl>(TD)) {
           // We can delay individual members of classes; do so if necessary.
           if (isa<ClassDecl>(container)) {
             if (!tryRequire(TD)) {
@@ -2037,7 +2037,8 @@ public:
   }
 
   void writePrologue(raw_ostream &out) {
-    out << "// Generated by " << version::getSwiftFullVersion() << "\n"
+    out << "// Generated by " << version::getSwiftFullVersion(
+      M.getASTContext().LangOpts.EffectiveLanguageVersion) << "\n"
            "#pragma clang diagnostic push\n"
            "\n"
            "#if defined(__has_include) && "

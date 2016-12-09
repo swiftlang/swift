@@ -5,8 +5,8 @@
 // Copyright (c) 2014 - 2016 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
-// See http://swift.org/LICENSE.txt for license information
-// See http://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
+// See https://swift.org/LICENSE.txt for license information
+// See https://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
 //
 //===----------------------------------------------------------------------===//
 
@@ -273,9 +273,10 @@ bool SwiftARCContractImpl::run() {
       case RT_UnknownReleaseN:
       case RT_BridgeReleaseN:
         llvm_unreachable("These are only created by LLVMARCContract !");
-      // Delete all fix lifetime instructions. After llvm-ir they have no use
-      // and show up as calls in the final binary.
+      // Delete all fix lifetime and end borrow instructions. After llvm-ir they
+      // have no use and show up as calls in the final binary.
       case RT_FixLifetime:
+      case RT_EndBorrow:
         Inst.eraseFromParent();
         ++NumNoopDeleted;
         continue;

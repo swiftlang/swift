@@ -86,7 +86,7 @@ something like this::
   protocol NaiveIteratorProtocol {
     typealias Element
     var current() -> Element      // get the current element
-    mutating func advance()       // advance to the next element       
+    mutating func advance()       // advance to the next element
     var isExhausted: Bool         // detect whether there are more elements
   }
 
@@ -123,7 +123,7 @@ implement a generic `for`\ …\ `in` loop.
   support for buffering would fit nicely into the scheme, should it
   prove important::
 
-    public protocol BufferedIteratorProtocol 
+    public protocol BufferedIteratorProtocol
       : IteratorProtocol {
       var latest: Element? {get}
     }
@@ -140,9 +140,9 @@ implement a generic `for`\ …\ `in` loop.
       }
       public func next() -> Element? {
         latest = _baseIterator.next() ?? latest
-        return latest 
+        return latest
       }
-      public private(set) var latest: I.Element? = nil
+      public private(set) var latest: I.Element?
       private var _baseIterator: I
     }
 
@@ -156,7 +156,7 @@ end.  For example::
   // Return an array containing the elements of `source`, with
   // `separator` interposed between each consecutive pair.
   func array<S: SequenceType>(
-    _ source: S, 
+    _ source: S,
     withSeparator separator: S.Iterator.Element
   ) -> [S.Iterator.Element] {
     var result: [S.Iterator.Element] = []
@@ -215,7 +215,7 @@ Collections
 
 A **collection** is a stable sequence with addressable "positions,"
 represented by an associated `Index` type::
- 
+
   protocol CollectionType : SequenceType {
     typealias Index : ForwardIndexType             // a position
     subscript(i: Index) -> Iterator.Element {get}

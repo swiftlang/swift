@@ -5,8 +5,8 @@
 // Copyright (c) 2014 - 2016 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
-// See http://swift.org/LICENSE.txt for license information
-// See http://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
+// See https://swift.org/LICENSE.txt for license information
+// See https://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
 //
 //===----------------------------------------------------------------------===//
 
@@ -195,16 +195,56 @@ private:
   bool visitSubscriptReference(ValueDecl *D, CharSourceRange Range,
                                bool IsOpenBracket) override;
 };
-} // namespace ide
 
-class ArchetypeTransformer {
-  struct Implementation;
-  Implementation &Impl;
-public:
-  ArchetypeTransformer(DeclContext *DC, Type Ty);
-  llvm::function_ref<Type(Type)> getTransformerFunc();
-  ~ArchetypeTransformer();
+enum class RangeKind : int8_t{
+  Invalid = -1,
+  SingleExpression,
+  SingleStatement,
+  SingleDecl,
+
+  MultiStatement,
 };
+
+struct ResolvedRangeInfo {
+  RangeKind Kind;
+  Type Ty;
+  StringRef Content;
+  ResolvedRangeInfo(RangeKind Kind, Type Ty, StringRef Content): Kind(Kind),
+    Ty(Ty), Content(Content) {}
+  ResolvedRangeInfo(): ResolvedRangeInfo(RangeKind::Invalid, Type(), StringRef()) {}
+  void print(llvm::raw_ostream &OS);
+};
+
+class RangeResolver : public SourceEntityWalker {
+  struct Implementation;
+  Implementation *Impl;
+  bool walkToExprPre(Expr *E) override;
+  bool walkToExprPost(Expr *E) override;
+  bool walkToStmtPre(Stmt *S) override;
+  bool walkToStmtPost(Stmt *S) override;
+  bool walkToDeclPre(Decl *D, CharSourceRange Range) override;
+  bool walkToDeclPost(Decl *D) override;
+public:
+  RangeResolver(SourceFile &File, SourceLoc Start, SourceLoc End);
+  RangeResolver(SourceFile &File, unsigned Offset, unsigned Length);
+  ResolvedRangeInfo resolve();
+  ~RangeResolver();
+};
+
+/// This provides a utility to view a printed name by parsing the components
+/// of that name. The components include a base name and an array of argument
+/// labels.
+class DeclNameViewer {
+  StringRef BaseName;
+  SmallVector<StringRef, 4> Labels;
+public:
+  DeclNameViewer(StringRef Text);
+  StringRef base() const { return BaseName; }
+  llvm::ArrayRef<StringRef> args() const { return llvm::makeArrayRef(Labels); }
+  unsigned partsCount() const { return 1 + Labels.size(); }
+  unsigned commonPartsCount(DeclNameViewer &Other) const;
+};
+} // namespace ide
 } // namespace swift
 
 #endif // SWIFT_IDE_UTILS_H

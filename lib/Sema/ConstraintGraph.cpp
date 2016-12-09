@@ -5,8 +5,8 @@
 // Copyright (c) 2014 - 2016 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
-// See http://swift.org/LICENSE.txt for license information
-// See http://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
+// See https://swift.org/LICENSE.txt for license information
+// See https://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
 //
 //===----------------------------------------------------------------------===//
 //
@@ -36,7 +36,7 @@ ConstraintGraph::~ConstraintGraph() {
   for (unsigned i = 0, n = TypeVariables.size(); i != n; ++i) {
     auto &impl = TypeVariables[i]->getImpl();
     delete impl.getGraphNode();
-    impl.setGraphNode(0);
+    impl.setGraphNode(nullptr);
   }
 }
 
@@ -215,19 +215,6 @@ void ConstraintGraphNode::removeFixedBinding(TypeVariableType *typeVar) {
   });
 }
 
-TypeVariableType *
-ConstraintGraphNode::getMemberType(Identifier name,
-                                   std::function<TypeVariableType *()> create) {
-  auto known = MemberTypeIndex.find(name);
-  if (known != MemberTypeIndex.end())
-    return MemberTypes[known->second].second;
-
-  auto memberType = create();
-  MemberTypeIndex.insert({name, MemberTypes.size()});
-  MemberTypes.push_back({name, memberType});
-  return memberType;
-}
-
 #pragma mark Graph scope management
 ConstraintGraphScope::ConstraintGraphScope(ConstraintGraph &CG)
   : CG(CG), ParentScope(CG.ActiveScope), NumChanges(CG.Changes.size())
@@ -292,16 +279,6 @@ ConstraintGraph::Change::boundTypeVariable(TypeVariableType *typeVar,
   return result;
 }
 
-ConstraintGraph::Change
-ConstraintGraph::Change::addedMemberType(TypeVariableType *typeVar,
-                                         Identifier name) {
-  Change result;
-  result.Kind = ChangeKind::AddedMemberType;
-  result.MemberType.TypeVar = typeVar;
-  result.MemberType.Name = name;
-  return result;
-}
-
 void ConstraintGraph::Change::undo(ConstraintGraph &cg) {
   /// Temporarily change the active scope to null, so we don't record
   /// any changes made while performing the undo operation.
@@ -332,27 +309,6 @@ void ConstraintGraph::Change::undo(ConstraintGraph &cg) {
   case ChangeKind::BoundTypeVariable:
     cg.unbindTypeVariable(Binding.TypeVar, Binding.FixedType);
     break;
-
-  case ChangeKind::AddedMemberType: {
-    auto &node = cg[MemberType.TypeVar];
-
-    // Erase the member type entry from the 
-    auto known = node.MemberTypeIndex.find(MemberType.Name);
-    assert(known != node.MemberTypeIndex.end() && "Constraint graph corrupted");
-    unsigned index = known->second;
-    node.MemberTypeIndex.erase(known);
-
-    // If this was not the last member type, swap it with the last
-    // member type.
-    if (index != node.MemberTypes.size()-1) {
-      node.MemberTypes[index] = node.MemberTypes.back();
-      node.MemberTypeIndex[node.MemberTypes[index].first] = index;
-    }
-     
-    // Pop off the last member type.
-    node.MemberTypes.pop_back();
-    break;
-  }
   }
 }
 
@@ -363,7 +319,7 @@ void ConstraintGraph::removeNode(TypeVariableType *typeVar) {
   auto &impl = typeVar->getImpl();
   unsigned index = impl.getGraphIndex();
   delete impl.getGraphNode();
-  impl.setGraphNode(0);
+  impl.setGraphNode(nullptr);
 
   // Remove this type variable from the list.
   unsigned lastIndex = TypeVariables.size()-1;
@@ -424,21 +380,6 @@ void ConstraintGraph::removeConstraint(Constraint *constraint) {
     Changes.push_back(Change::removedConstraint(constraint));
 }
 
-TypeVariableType *ConstraintGraph::getMemberType(
-                    TypeVariableType *typeVar,
-                    Identifier name,
-                    std::function<TypeVariableType *()> create) {
-  auto repTypeVar = CS.getRepresentative(typeVar);
-  auto &node = (*this)[repTypeVar];
-  
-  return node.getMemberType(name, [&]() {
-    auto memberTypeVar = create();  
-    if (ActiveScope)
-      Changes.push_back(Change::addedMemberType(repTypeVar, name));
-    return memberTypeVar;
-  });
-}
-
 void ConstraintGraph::mergeNodes(TypeVariableType *typeVar1, 
                                  TypeVariableType *typeVar2) {
   assert(CS.getRepresentative(typeVar1) == CS.getRepresentative(typeVar2) &&
@@ -462,44 +403,6 @@ void ConstraintGraph::mergeNodes(TypeVariableType *typeVar1,
   // Merge equivalence class from the non-representative type variable.
   auto &nonRepNode = (*this)[typeVarNonRep];
   repNode.addToEquivalenceClass(nonRepNode.getEquivalenceClassUnsafe());
-
-  // Merge member types.
-  for (auto newEquivTypeVar : nonRepNode.getEquivalenceClassUnsafe()) {
-    auto &newEquivNode = newEquivTypeVar == typeVarNonRep
-                           ? nonRepNode
-                           : (*this)[newEquivTypeVar];
-    for (auto memberType : newEquivNode.MemberTypes) {
-      auto repKnown = repNode.MemberTypeIndex.find(memberType.first);
-      if (repKnown == repNode.MemberTypeIndex.end()) {
-        // We haven't seen this member type before. Add it.
-        repNode.MemberTypeIndex.insert({memberType.first, 
-                                        repNode.MemberTypes.size()});
-        repNode.MemberTypes.push_back(memberType);
-        if (ActiveScope)
-          Changes.push_back(Change::addedMemberType(typeVarRep, 
-                                                    memberType.first));
-        continue;
-      }
-
-      // We have seen this member before. If the type variables are
-      // the same, do nothing. This is a fast-patch check.
-      auto repMemberTypeVar = repNode.MemberTypes[repKnown->second].second;
-      if (repMemberTypeVar == memberType.second)
-        continue;
-
-      // Find the representatives for the member type variables.
-      repMemberTypeVar = CS.getRepresentative(repMemberTypeVar);
-      auto otherMemberTypeVar = CS.getRepresentative(memberType.second);
-
-      // If the representatives are equivalent, do nothing.
-      if (repMemberTypeVar == otherMemberTypeVar)
-        continue;
-
-      // We have two different type variables representing the same
-      // member type; merge them.
-      CS.mergeEquivalenceClasses(repMemberTypeVar, otherMemberTypeVar);
-    }
-  }
 }
 
 void ConstraintGraph::bindTypeVariable(TypeVariableType *typeVar, Type fixed) {
@@ -513,6 +416,8 @@ void ConstraintGraph::bindTypeVariable(TypeVariableType *typeVar, Type fixed) {
   auto &node = (*this)[typeVar];
   for (auto otherTypeVar : typeVars) {
     if (knownTypeVars.insert(otherTypeVar).second) {
+      if (typeVar == otherTypeVar) continue;
+
       (*this)[otherTypeVar].addFixedBinding(typeVar);
       node.addFixedBinding(otherTypeVar);
     }
@@ -692,21 +597,22 @@ unsigned ConstraintGraph::computeConnectedComponents(
 /// edge in the graph.
 static bool shouldContractEdge(ConstraintKind kind) {
   switch (kind) {
-    case ConstraintKind::Bind:
-    case ConstraintKind::BindParam:
-    case ConstraintKind::Equal:
-    case ConstraintKind::BindOverload:
+  case ConstraintKind::Bind:
+  case ConstraintKind::BindParam:
+  case ConstraintKind::BindToPointerType:
+  case ConstraintKind::Equal:
+  case ConstraintKind::BindOverload:
 
-    // We currently only allow subtype contractions for the purpose of 
-    // parameter binding constraints.
-    // TODO: We do this because of how inout parameter bindings are handled
-    // for implicit closure parameters. We should consider adjusting our
-    // current approach to unlock more opportunities for subtype contractions.
-    case ConstraintKind::Subtype:
-      return true;
+  // We currently only allow subtype contractions for the purpose of 
+  // parameter binding constraints.
+  // TODO: We do this because of how inout parameter bindings are handled
+  // for implicit closure parameters. We should consider adjusting our
+  // current approach to unlock more opportunities for subtype contractions.
+  case ConstraintKind::Subtype:
+    return true;
 
-    default:
-      return false;
+  default:
+    return false;
   }
 }
 
@@ -731,7 +637,7 @@ static bool isStrictInoutSubtypeConstraint(Constraint *constraint) {
   if (!iot)
     return false;
 
-  return iot->getObjectType()->getAs<TypeVariableType>() == nullptr;
+  return !iot->getObjectType()->isTypeVariableOrMember();
 }
 
 bool ConstraintGraph::contractEdges() {
@@ -924,22 +830,11 @@ void ConstraintGraphNode::print(llvm::raw_ostream &out, unsigned indent) {
     }
     out << "\n";
   }
-
-  // Print member types.
-  if (!MemberTypes.empty()) {
-    out.indent(indent + 2);
-    out << "Member types:\n";
-    for (auto memberType : MemberTypes) {
-      out.indent(indent + 4);
-      out << memberType.first.str() << " -> ";
-      memberType.second->print(out);
-      out << "\n";
-    }
-    out << "\n";
-  }
 }
 
 void ConstraintGraphNode::dump() {
+  llvm::SaveAndRestore<bool>
+    debug(TypeVar->getASTContext().LangOpts.DebugConstraintSolver, true);
   print(llvm::dbgs(), 0);
 }
 
@@ -951,6 +846,8 @@ void ConstraintGraph::print(llvm::raw_ostream &out) {
 }
 
 void ConstraintGraph::dump() {
+  llvm::SaveAndRestore<bool>
+    debug(CS.getASTContext().LangOpts.DebugConstraintSolver, true);
   print(llvm::dbgs());
 }
 
@@ -1025,11 +922,6 @@ static void printValue(llvm::raw_ostream &os, unsigned value) {
   os << value;
 }
 
-/// Print an identifier value.
-static void printValue(llvm::raw_ostream &os, Identifier value) {
-  os << value.str();
-}
-
 void ConstraintGraphNode::verify(ConstraintGraph &cg) {
 #define require(condition, complaint) _require(condition, complaint, cg, this)
 #define requireWithContext(condition, complaint, context) \
@@ -1064,14 +956,6 @@ void ConstraintGraphNode::verify(ConstraintGraph &cg) {
             "adjacency information should have been removed");
     require(info.second.NumConstraints <= Constraints.size(),
             "adjacency information has higher degree than # of constraints");
-  }
-
-  // Verify that the member types haven't gotten out of sync.
-  for (auto index : MemberTypeIndex) {
-    require(index.second < MemberTypes.size(), 
-            "member type index out-of-range");
-    requireSameValue(index.first, MemberTypes[index.second].first,
-                     "member type index map provides wrong index into vector");
   }
 
   // Based on the constraints we have, build up a representation of what

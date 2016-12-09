@@ -206,7 +206,7 @@ Classes:
   - Selector: 'shuffledArrayWithRandomSource:'
     SwiftName: shuffled(using:)
     MethodKind: Instance
-- Name: GKARC4RandomSource 
+- Name: GKARC4RandomSource
   Methods:
   - Selector: 'dropValuesWithCount:'
     SwiftName: dropValues(_:)

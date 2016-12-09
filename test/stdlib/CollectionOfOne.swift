@@ -1,8 +1,6 @@
 // RUN: %target-run-simple-swift
 // REQUIRES: executable_test
-// REQUIRES: objc_interop
 
-import Foundation
 import StdlibUnittest
 
 let OneTests = TestSuite("CollectionOfOne")

@@ -165,6 +165,7 @@ array.uninitialized(count: Builtin.Word) -> (Array<Element>, Builtin.RawPointer)
   The caller is responsible for writing the elements to the element storage.
 
 array.props.isCocoa/needsElementTypeCheck -> Bool
+
   Reads storage descriptors properties (isCocoa, needsElementTypeCheck).
   This is not control dependent or guarded. The optimizer has
   semantic knowledge of the state transfer those properties cannot make:
@@ -288,9 +289,9 @@ string.concat(lhs: String, rhs: String) -> String
   This operation can be optimized away in case of both operands
   being string literals. In this case, it can be replaced by
   a string literal representing a concatenation of both operands.
-  
+
 string.makeUTF8(start: RawPointer, utf8CodeUnitCount: Word, isASCII: Int1) -> String
-  
+
   Converts a built-in UTF8-encoded string literal into a string.
 
 string.makeUTF16(start: RawPointer, utf16CodeUnitCount: Word) -> String

@@ -9,7 +9,7 @@ Swift Program Structure and Compilation Model
 =============================================
 
 .. warning:: This is a very early design document discussing the features of
-  a Swift build model and modules system. It should not be taken as a plan of 
+  a Swift build model and modules system. It should not be taken as a plan of
   record.
 
 Commentary

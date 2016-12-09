@@ -5,8 +5,8 @@
 // Copyright (c) 2014 - 2016 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
-// See http://swift.org/LICENSE.txt for license information
-// See http://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
+// See https://swift.org/LICENSE.txt for license information
+// See https://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
 //
 //===----------------------------------------------------------------------===//
 //
@@ -33,7 +33,7 @@ using namespace Lowering;
 SILFunction *SILGenModule::getDynamicThunk(SILDeclRef constant,
                                            SILConstantInfo constantInfo) {
   // Mangle the constant with a _TTD header.
-  auto name = constant.mangle("_TTD");
+  auto name = constant.mangle(SILDeclRef::ManglingKind::DynamicThunk);
 
   IsFragile_t isFragile = IsNotFragile;
   if (makeModuleFragile)
@@ -80,7 +80,7 @@ SILGenModule::emitVTableMethod(SILDeclRef derived, SILDeclRef base) {
   // TODO: If we allocated a new vtable slot for the derived method, then
   // further derived methods would potentially need multiple thunks, and we
   // would need to mangle the base method into the symbol as well.
-  auto name = derived.mangle("_TTV");
+  auto name = derived.mangle(SILDeclRef::ManglingKind::VTableMethod);
 
   // If we already emitted this thunk, reuse it.
   // TODO: Allocating new vtable slots for derived methods with different ABIs

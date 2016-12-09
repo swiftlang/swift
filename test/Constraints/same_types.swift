@@ -1,4 +1,4 @@
-// RUN: %target-parse-verify-swift
+// RUN: %target-typecheck-verify-swift
 
 protocol Fooable {
   associatedtype Foo
@@ -111,7 +111,7 @@ func testAssocTypeEquivalence<T: Fooable>(_ fooable: T) -> X.Type
 }
 
 func fail6<T>(_ t: T) -> Int where T == Int { // expected-error{{same-type requirement makes generic parameter 'T' non-generic}}
-  return t // expected-error{{cannot convert return expression of type 'T' to return type 'Int'}}
+  return t
 }
 
 func test8<T: Barrable, U: Barrable>(_ t: T, u: U) -> (Y, Y, X, X)
@@ -130,9 +130,7 @@ func rdar19137463<T>(_ t: T) where T.a == T {} // expected-error{{'a' is not a m
 rdar19137463(1)
 
 
-// FIXME: Terrible diagnostic
-
-struct Brunch<U : Fooable> where U.Foo == X {} // expected-note{{requirement specified as 'U.Foo' == 'X' [with U = BadFooable]}}
+struct Brunch<U : Fooable> where U.Foo == X {}
 
 struct BadFooable : Fooable {
   typealias Foo = DoesNotExist // expected-error{{use of undeclared type 'DoesNotExist'}}
@@ -140,5 +138,67 @@ struct BadFooable : Fooable {
 }
 
 func bogusInOutError(d: inout Brunch<BadFooable>) {}
-// expected-error@-1{{'Brunch' requires the types '<<error type>>' and 'X' be equivalent}}
 
+// Some interesting invalid cases that used to crash
+protocol P {
+  associatedtype A
+  associatedtype B
+}
+
+struct Q : P {
+  typealias A = Int
+  typealias B = Int
+}
+
+struct S1<T : P> {
+  func foo<X, Y>(x: X, y: Y) where X == T.A, Y == T.B {
+    print(X.self)
+    print(Y.self)
+    print(x)
+    print(y)
+  }
+}
+S1<Q>().foo(x: 1, y: 2)
+
+struct S2<T : P> where T.A == T.B {
+  // expected-error@+1 {{same-type requirement makes generic parameters 'X' and 'Y' equivalent}}
+  func foo<X, Y>(x: X, y: Y) where X == T.A, Y == T.B {
+    print(X.self)
+    print(Y.self)
+    print(x)
+    print(y)
+  }
+}
+S2<Q>().foo(x: 1, y: 2)
+
+struct S3<T : P> {
+  // expected-error@+1 {{same-type requirement makes generic parameters 'X' and 'Y' equivalent}}
+  func foo<X, Y>(x: X, y: Y) where X == T.A, Y == T.A {}
+}
+S3<Q>().foo(x: 1, y: 2)
+
+// Secondaries can be equated OK, even if we're imposing
+// new conformances onto an outer secondary
+
+protocol PPP {}
+
+protocol PP {
+  associatedtype A : PPP
+}
+
+struct SSS : PPP {}
+struct SS : PP { typealias A = SSS }
+
+struct QQ : P {
+  typealias A = SSS
+  typealias B = Int
+}
+
+struct S4<T : P> {
+  func foo<X : PP>(x: X) where X.A == T.A {
+    print(x)
+    print(X.self)
+  }
+}
+
+S4<QQ>().foo(x: SS())

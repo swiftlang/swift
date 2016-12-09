@@ -5,8 +5,8 @@
 // Copyright (c) 2014 - 2016 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
-// See http://swift.org/LICENSE.txt for license information
-// See http://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
+// See https://swift.org/LICENSE.txt for license information
+// See https://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
 //
 //===----------------------------------------------------------------------===//
 //
@@ -18,6 +18,9 @@
 //
 //===----------------------------------------------------------------------===//
 
+#include "swift/Runtime/Config.h"
+
+#if SWIFT_OBJC_INTEROP
 #include "SwiftObject.h"
 #include "SwiftValue.h"
 #include "swift/Basic/Lazy.h"
@@ -29,10 +32,6 @@
 #include "SwiftHashableSupport.h"
 #include <objc/runtime.h>
 #include <Foundation/Foundation.h>
-
-#if !SWIFT_OBJC_INTEROP
-#error "This file should only be compiled when ObjC interop is enabled."
-#endif
 
 using namespace swift;
 using namespace swift::hashable_support;
@@ -200,7 +199,7 @@ _SwiftValue *swift::bridgeAnythingToSwiftValueObject(OpaqueValue *src,
     srcType->vw_initializeWithTake(payload, src);
   else
     srcType->vw_initializeWithCopy(payload, src);
-  
+
   return instance;
 }
 
@@ -264,7 +263,7 @@ swift::findSwiftValueConformances(const ProtocolDescriptorList &protocols,
 - (id)copyWithZone:(NSZone *)zone {
   // Instances are immutable, so we can just retain.
   return objc_retain(self);
-  
+
   /* TODO: If we're able to become a SwiftObject subclass in the future,
    * change to this:
    swift_retain((HeapObject*)self);
@@ -305,7 +304,7 @@ swift::findSwiftValueConformances(const ProtocolDescriptorList &protocols,
   }
 
   if (![other isKindOfClass:getSwiftValueClass()]) {
-    return self == other;
+    return NO;
   }
 
   auto selfHeader = getSwiftValueHeader(self);
@@ -314,12 +313,12 @@ swift::findSwiftValueConformances(const ProtocolDescriptorList &protocols,
   auto hashableBaseType = selfHeader->getHashableBaseType();
   if (!hashableBaseType ||
       otherHeader->getHashableBaseType() != hashableBaseType) {
-    return self == other;
+    return NO;
   }
 
   auto hashableConformance = selfHeader->getHashableConformance();
   if (!hashableConformance) {
-    return self == other;
+    return NO;
   }
 
   return swift_stdlib_Hashable_isEqual_indirect(
@@ -347,7 +346,7 @@ static NSString *getValueDescription(_SwiftValue *self) {
   const Metadata *type;
   const OpaqueValue *value;
   std::tie(type, value) = getValueFromSwiftValue(self);
-  
+
   // Copy the value, since it will be consumed by getSummary.
   ValueBuffer copyBuf;
   auto copy = type->vw_initializeBufferWithCopy(&copyBuf,
@@ -372,7 +371,7 @@ static NSString *getValueDescription(_SwiftValue *self) {
 - (NSString *)_swiftTypeName {
   TwoWordPair<const char *, uintptr_t> typeName
     = swift_getTypeName(getSwiftValueTypeMetadata(self), true);
-  
+
   return [NSString stringWithUTF8String: typeName.first];
 }
 - (const OpaqueValue *)_swiftValue {
@@ -380,6 +379,7 @@ static NSString *getValueDescription(_SwiftValue *self) {
 }
 
 @end
+#endif
 
 // TODO: We could pick specialized _SwiftValue subclasses for trivial types
 // or for types with known size and alignment characteristics. Probably

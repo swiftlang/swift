@@ -5,8 +5,8 @@
 // Copyright (c) 2014 - 2016 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
-// See http://swift.org/LICENSE.txt for license information
-// See http://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
+// See https://swift.org/LICENSE.txt for license information
+// See https://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
 //
 //===----------------------------------------------------------------------===//
 // RUN: %target-run-stdlib-swift
@@ -426,7 +426,7 @@ final class _ForkJoinWorkerThread {
   }
 
   internal func startAsync() {
-    var queue: DispatchQueue? = nil
+    var queue: DispatchQueue?
     if #available(OSX 10.10, iOS 8.0, *) {
       queue = DispatchQueue.global(qos: .background)
     } else {
@@ -539,7 +539,7 @@ internal protocol _Future {
 }
 
 public class ForkJoinTaskBase {
-  final internal var _pool: ForkJoinPool? = nil
+  final internal var _pool: ForkJoinPool?
 
   // FIXME(performance): there is no need to create heavy-weight
   // synchronization primitives every time.  We could start with a lightweight
@@ -582,7 +582,7 @@ public class ForkJoinTaskBase {
 
 final public class ForkJoinTask<Result> : ForkJoinTaskBase, _Future {
   internal let _task: () -> Result
-  internal var _result: Result? = nil
+  internal var _result: Result?
 
   public init(_task: @escaping () -> Result) {
     self._task = _task

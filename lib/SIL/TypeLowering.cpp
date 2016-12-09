@@ -5,8 +5,8 @@
 // Copyright (c) 2014 - 2016 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
-// See http://swift.org/LICENSE.txt for license information
-// See http://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
+// See https://swift.org/LICENSE.txt for license information
+// See https://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
 //
 //===----------------------------------------------------------------------===//
 
@@ -120,6 +120,10 @@ CaptureKind TypeConverter::getDeclCaptureKind(CapturedValue capture) {
       // by its address (like a var) instead.
       if (var->isLet() && !getTypeLowering(var->getType()).isAddressOnly())
         return CaptureKind::Constant;
+
+      if (var->getType()->is<InOutType>()) {
+        return CaptureKind::StorageAddress;
+      }
 
       // If we're capturing into a non-escaping closure, we can generally just
       // capture the address of the value as no-escape.
@@ -444,9 +448,10 @@ namespace {
       // because the rest of type lowering doesn't have a generic
       // signature plumbed through.
       if (Sig && type->hasTypeParameter()) {
-        auto builder = M.getASTContext().getOrCreateArchetypeBuilder(
-            Sig, M.getSwiftModule());
-        type = builder->substDependentType(type)->getCanonicalType();
+        type = Sig->getCanonicalSignature()
+          .getGenericEnvironment(*M.getSwiftModule())
+          ->mapTypeIntoContext(M.getSwiftModule(), type)
+          ->getCanonicalType();
       }
 
       return type;
@@ -490,13 +495,13 @@ namespace {
   public:
     void emitDestroyAddress(SILBuilder &B, SILLocation loc,
                             SILValue addr) const override {
-      SILValue value = B.createLoad(loc, addr);
-      emitReleaseValue(B, loc, value);
+      SILValue value = emitLoad(B, loc, addr, LoadOwnershipQualifier::Take);
+      emitDestroyValue(B, loc, value);
     }
 
     void emitDestroyRValue(SILBuilder &B, SILLocation loc,
                            SILValue value) const override {
-      emitReleaseValue(B, loc, value);
+      emitDestroyValue(B, loc, value);
     }
 
     void emitCopyInto(SILBuilder &B, SILLocation loc,
@@ -515,13 +520,29 @@ namespace {
 
     SILValue emitLoadOfCopy(SILBuilder &B, SILLocation loc, SILValue addr,
                             IsTake_t isTake) const override {
-      return B.createLoad(loc, addr);
+      return emitLoad(B, loc, addr, LoadOwnershipQualifier::Trivial);
     }
 
     void emitStoreOfCopy(SILBuilder &B, SILLocation loc,
                          SILValue value, SILValue addr,
                          IsInitialization_t isInit) const override {
-      B.createStore(loc, value, addr);
+      emitStore(B, loc, value, addr, StoreOwnershipQualifier::Trivial);
+    }
+
+    void emitStore(SILBuilder &B, SILLocation loc, SILValue value,
+                   SILValue addr, StoreOwnershipQualifier qual) const override {
+      if (B.getFunction().hasQualifiedOwnership()) {
+        B.createStore(loc, value, addr, StoreOwnershipQualifier::Trivial);
+        return;
+      }
+      B.createStore(loc, value, addr, StoreOwnershipQualifier::Unqualified);
+    }
+
+    SILValue emitLoad(SILBuilder &B, SILLocation loc, SILValue addr,
+                      LoadOwnershipQualifier qual) const override {
+      if (B.getFunction().hasQualifiedOwnership())
+        return B.createLoad(loc, addr, LoadOwnershipQualifier::Trivial);
+      return B.createLoad(loc, addr, LoadOwnershipQualifier::Unqualified);
     }
 
     void emitDestroyAddress(SILBuilder &B, SILLocation loc,
@@ -529,24 +550,25 @@ namespace {
       // Trivial
     }
 
-    void emitLoweredReleaseValue(SILBuilder &B, SILLocation loc,
-                                 SILValue value,
+    void emitLoweredDestroyValue(SILBuilder &B, SILLocation loc, SILValue value,
                                  LoweringStyle loweringStyle) const override {
       // Trivial
     }
 
-    void emitLoweredRetainValue(SILBuilder &B, SILLocation loc,
-                              SILValue value,
-                              LoweringStyle style) const override {
+    SILValue emitLoweredCopyValue(SILBuilder &B, SILLocation loc,
+                                  SILValue value,
+                                  LoweringStyle style) const override {
       // Trivial
+      return value;
     }
 
-    void emitRetainValue(SILBuilder &B, SILLocation loc,
-                       SILValue value) const override {
+    SILValue emitCopyValue(SILBuilder &B, SILLocation loc,
+                           SILValue value) const override {
       // Trivial
+      return value;
     }
 
-    void emitReleaseValue(SILBuilder &B, SILLocation loc,
+    void emitDestroyValue(SILBuilder &B, SILLocation loc,
                           SILValue value) const override {
       // Trivial
     }
@@ -560,18 +582,57 @@ namespace {
 
     SILValue emitLoadOfCopy(SILBuilder &B, SILLocation loc,
                             SILValue addr, IsTake_t isTake) const override {
-      SILValue value = B.createLoad(loc, addr);
-      if (!isTake) emitRetainValue(B, loc, value);
-      return value;
+      auto qual =
+          isTake ? LoadOwnershipQualifier::Take : LoadOwnershipQualifier::Copy;
+      return emitLoad(B, loc, addr, qual);
     }
 
     void emitStoreOfCopy(SILBuilder &B, SILLocation loc,
                          SILValue newValue, SILValue addr,
                          IsInitialization_t isInit) const override {
-      SILValue oldValue;
-      if (!isInit) oldValue = B.createLoad(loc, addr);
-      B.createStore(loc, newValue, addr);
-      if (!isInit) emitReleaseValue(B, loc, oldValue);
+      auto qual = isInit ? StoreOwnershipQualifier::Init
+                         : StoreOwnershipQualifier::Assign;
+      emitStore(B, loc, newValue, addr, qual);
+    }
+
+    void emitStore(SILBuilder &B, SILLocation loc, SILValue value,
+                   SILValue addr, StoreOwnershipQualifier qual) const override {
+      if (B.getFunction().hasQualifiedOwnership()) {
+        B.createStore(loc, value, addr, qual);
+        return;
+      }
+
+      if (qual != StoreOwnershipQualifier::Assign) {
+        B.createStore(loc, value, addr, StoreOwnershipQualifier::Unqualified);
+        return;
+      }
+
+      // If the ownership qualifier is [assign], then we need to eliminate the
+      // old value.
+      //
+      // 1. Load old value.
+      // 2. Store new value.
+      // 3. Release old value.
+      SILValue old =
+          B.createLoad(loc, addr, LoadOwnershipQualifier::Unqualified);
+      B.createStore(loc, value, addr, StoreOwnershipQualifier::Unqualified);
+      B.emitDestroyValueOperation(loc, old);
+    }
+
+    SILValue emitLoad(SILBuilder &B, SILLocation loc, SILValue addr,
+                      LoadOwnershipQualifier qual) const override {
+      if (B.getFunction().hasQualifiedOwnership())
+        return B.createLoad(loc, addr, qual);
+
+      SILValue loadValue =
+          B.createLoad(loc, addr, LoadOwnershipQualifier::Unqualified);
+
+      // If we do not have a copy, just return the value...
+      if (qual != LoadOwnershipQualifier::Copy)
+        return loadValue;
+
+      // Otherwise, emit the copy value operation.
+      return B.emitCopyValueOperation(loc, loadValue);
     }
   };
 
@@ -610,6 +671,9 @@ namespace {
       : NonTrivialLoadableTypeLowering(SILType::getPrimitiveObjectType(type),
                                        IsNotReferenceCounted) {
     }
+
+    virtual SILValue rebuildAggregate(SILBuilder &B, SILLocation loc,
+                                      ArrayRef<SILValue> values) const = 0;
 
     ArrayRef<Child> getChildren(SILModule &M) const {
       if (Children.data() == nullptr) {
@@ -653,44 +717,56 @@ namespace {
         });
     }
 
-    void emitRetainValue(SILBuilder &B, SILLocation loc,
-                       SILValue aggValue) const override {
-      B.createRetainValue(loc, aggValue, Atomicity::Atomic);
+    SILValue emitCopyValue(SILBuilder &B, SILLocation loc,
+                           SILValue value) const override {
+      if (B.getFunction().hasQualifiedOwnership())
+        return B.createCopyValue(loc, value);
+      B.createRetainValue(loc, value, Atomicity::Atomic);
+      return value;
     }
 
-    void emitLoweredRetainValue(SILBuilder &B, SILLocation loc,
-                              SILValue aggValue,
-                              LoweringStyle style) const override {
+    SILValue emitLoweredCopyValue(SILBuilder &B, SILLocation loc,
+                                  SILValue aggValue,
+                                  LoweringStyle style) const override {
+      llvm::SmallVector<SILValue, 8> loweredChildValues;
       for (auto &child : getChildren(B.getModule())) {
         auto &childLowering = child.getLowering();
         SILValue childValue = asImpl().emitRValueProject(B, loc, aggValue,
                                                          child.getIndex(),
                                                          childLowering);
         if (!childLowering.isTrivial()) {
-          childLowering.emitLoweredCopyChildValue(B, loc, childValue, style);
+          SILValue loweredChildValue = childLowering.emitLoweredCopyChildValue(
+              B, loc, childValue, style);
+          loweredChildValues.push_back(loweredChildValue);
+        } else {
+          loweredChildValues.push_back(childValue);
         }
       }
+
+      return rebuildAggregate(B, loc, loweredChildValues);
     }
 
-    void emitReleaseValue(SILBuilder &B, SILLocation loc,
+    void emitDestroyValue(SILBuilder &B, SILLocation loc,
                           SILValue aggValue) const override {
+      if (B.getFunction().hasQualifiedOwnership()) {
+        B.createDestroyValue(loc, aggValue);
+        return;
+      }
+
       B.emitReleaseValueAndFold(loc, aggValue);
     }
 
-    void emitLoweredReleaseValue(SILBuilder &B, SILLocation loc,
+    void emitLoweredDestroyValue(SILBuilder &B, SILLocation loc,
                                  SILValue aggValue,
                                  LoweringStyle loweringStyle) const override {
       SimpleOperationTy Fn;
 
       switch(loweringStyle) {
       case LoweringStyle::Shallow:
-        Fn = &TypeLowering::emitReleaseValue;
+        Fn = &TypeLowering::emitDestroyValue;
         break;
       case LoweringStyle::Deep:
-        Fn = &TypeLowering::emitLoweredReleaseValueDeep;
-        break;
-      case LoweringStyle::DeepNoEnum:
-        Fn = &TypeLowering::emitLoweredReleaseValueDeepNoEnum;
+        Fn = &TypeLowering::emitLoweredDestroyValueDeep;
         break;
       }
 
@@ -713,7 +789,7 @@ namespace {
     }
 
     SILValue rebuildAggregate(SILBuilder &B, SILLocation loc,
-                              ArrayRef<SILValue> values) const {
+                              ArrayRef<SILValue> values) const override {
       return B.createTuple(loc, getLoweredType(), values);
     }
   
@@ -748,7 +824,7 @@ namespace {
     }
 
     SILValue rebuildAggregate(SILBuilder &B, SILLocation loc,
-                              ArrayRef<SILValue> values) const {
+                              ArrayRef<SILValue> values) const override {
       return B.createStruct(loc, getLoweredType(), values);
     }
         
@@ -769,139 +845,46 @@ namespace {
   /// A lowering for loadable but non-trivial enum types.
   class LoadableEnumTypeLowering final : public NonTrivialLoadableTypeLowering {
   public:
-    /// A non-trivial case of the enum.
-    class NonTrivialElement {
-      /// The non-trivial element.
-      EnumElementDecl *element;
-      
-      /// Its type lowering.
-      const TypeLowering *lowering;
-      
-    public:
-      NonTrivialElement(EnumElementDecl *element, const TypeLowering &lowering)
-        : element(element), lowering(&lowering) {}
-      
-      const TypeLowering &getLowering() const { return *lowering; }
-      EnumElementDecl *getElement() const { return element; }
-    };
-    
-  private:
-
-    using SimpleOperationTy = void (*)(SILBuilder &B, SILLocation loc, SILValue value,
-                                       const TypeLowering &valueLowering,
-                                       SILBasicBlock *dest);
-
-    /// Emit a value semantics operation for each nontrivial case of the enum.
-    template <typename T>
-    void ifNonTrivialElement(SILBuilder &B, SILLocation loc, SILValue value,
-                             const T &operation) const {
-      SmallVector<std::pair<EnumElementDecl*,SILBasicBlock*>, 4> nonTrivialBBs;
-      
-      auto &M = B.getFunction().getModule();
-
-      // Create all the blocks up front, so we can set up our switch_enum.
-      auto nonTrivialElts = getNonTrivialElements(M);
-      for (auto &elt : nonTrivialElts) {
-        auto bb = new (M) SILBasicBlock(&B.getFunction());
-        auto argTy = elt.getLowering().getLoweredType();
-        new (M) SILArgument(bb, argTy);
-        nonTrivialBBs.push_back({elt.getElement(), bb});
-      }
-
-      // If we are appending to the end of a block being constructed, then we
-      // create a new basic block to continue cons'ing up code.  If we're
-      // emitting this operation into the middle of existing code, we split the
-      // block.
-      SILBasicBlock *doneBB = B.splitBlockForFallthrough();
-      B.createSwitchEnum(loc, value, doneBB, nonTrivialBBs);
-      
-      for (size_t i = 0; i < nonTrivialBBs.size(); ++i) {
-        SILBasicBlock *bb = nonTrivialBBs[i].second;
-        const TypeLowering &lowering = nonTrivialElts[i].getLowering();
-        B.emitBlock(bb);
-        operation(B, loc, bb->getBBArgs()[0], lowering, doneBB);
-      }
-      
-      B.emitBlock(doneBB);
-    }
-    
-    /// A reference to the lazily-allocated array of non-trivial enum cases.
-    mutable ArrayRef<NonTrivialElement> NonTrivialElements = {};
-    
-  public:
     LoadableEnumTypeLowering(CanType type)
       : NonTrivialLoadableTypeLowering(SILType::getPrimitiveObjectType(type),
-                                       IsNotReferenceCounted)
-    {
-    }
-    
-    ArrayRef<NonTrivialElement> getNonTrivialElements(SILModule &M) const {
-      SILType silTy = getLoweredType();
-      EnumDecl *enumDecl = silTy.getEnumOrBoundGenericEnum();
-      assert(enumDecl);
-      
-      if (NonTrivialElements.data() == nullptr) {
-        SmallVector<NonTrivialElement, 4> elts;
-        
-        for (auto elt : enumDecl->getAllElements()) {
-          if (!elt->hasArgumentType()) continue;
-          SILType substTy = silTy.getEnumElementType(elt, M);
-          elts.push_back(NonTrivialElement{elt,
-                                     M.Types.getTypeLowering(substTy)});
-        }
-        
-        auto isDependent = IsDependent_t(silTy.hasTypeParameter());
-        
-        auto buf = operator new(sizeof(NonTrivialElement) * elts.size(),
-                                M.Types, isDependent);
-        memcpy(buf, elts.data(), sizeof(NonTrivialElement) * elts.size());
-        NonTrivialElements = {reinterpret_cast<NonTrivialElement*>(buf),
-                              elts.size()};
-      }
-      return NonTrivialElements;
-    }
+                                       IsNotReferenceCounted) {}
 
-    void emitRetainValue(SILBuilder &B, SILLocation loc,
-                       SILValue value) const override {
+    SILValue emitCopyValue(SILBuilder &B, SILLocation loc,
+                           SILValue value) const override {
+      if (B.getFunction().hasQualifiedOwnership())
+        return B.createCopyValue(loc, value);
       B.createRetainValue(loc, value, Atomicity::Atomic);
+      return value;
     }
 
-    void emitLoweredRetainValue(SILBuilder &B, SILLocation loc,
-                              SILValue value,
-                              LoweringStyle style) const override {
-      if (style == LoweringStyle::Shallow ||
-          style == LoweringStyle::DeepNoEnum) {
-        B.createRetainValue(loc, value, Atomicity::Atomic);
-      } else {
-        ifNonTrivialElement(B, loc, value,
-          [&](SILBuilder &B, SILLocation loc, SILValue child,
-              const TypeLowering &childLowering, SILBasicBlock *dest) {
-            childLowering.emitLoweredCopyChildValue(B, loc, child, style);
-            B.createBranch(loc, dest);
-          });
-      }
+    SILValue emitLoweredCopyValue(SILBuilder &B, SILLocation loc,
+                                  SILValue value,
+                                  LoweringStyle style) const override {
+      if (B.getFunction().hasQualifiedOwnership())
+        return B.createCopyValue(loc, value);
+      B.createRetainValue(loc, value, Atomicity::Atomic);
+      return value;
     }
-    
-    void emitReleaseValue(SILBuilder &B, SILLocation loc,
+
+    void emitDestroyValue(SILBuilder &B, SILLocation loc,
                           SILValue value) const override {
+      if (B.getFunction().hasQualifiedOwnership()) {
+        B.createDestroyValue(loc, value);
+        return;
+      }
       B.emitReleaseValueAndFold(loc, value);
     }
 
-    void emitLoweredReleaseValue(SILBuilder &B, SILLocation loc,
-                                 SILValue value,
+    void emitLoweredDestroyValue(SILBuilder &B, SILLocation loc, SILValue value,
                                  LoweringStyle style) const override {
       assert(style != LoweringStyle::Shallow &&
              "This method should never be called when performing a shallow "
              "destroy value.");
-      if (style == LoweringStyle::DeepNoEnum)
-        B.emitReleaseValueAndFold(loc, value);
-      else
-        ifNonTrivialElement(B, loc, value,
-          [&](SILBuilder &B, SILLocation loc, SILValue child,
-             const TypeLowering &childLowering, SILBasicBlock *dest) {
-             childLowering.emitLoweredDestroyChildValue(B, loc, child, style);
-             B.createBranch(loc, dest);
-          });
+      if (B.getFunction().hasQualifiedOwnership()) {
+        B.createDestroyValue(loc, value);
+        return;
+      }
+      B.emitReleaseValueAndFold(loc, value);
     }
   };
 
@@ -910,16 +893,15 @@ namespace {
     LeafLoadableTypeLowering(SILType type, IsReferenceCounted_t isRefCounted)
       : NonTrivialLoadableTypeLowering(type, isRefCounted) {}
 
-    void emitLoweredRetainValue(SILBuilder &B, SILLocation loc,
-                              SILValue value,
-                              LoweringStyle style) const override {
-      emitRetainValue(B, loc, value);
+    SILValue emitLoweredCopyValue(SILBuilder &B, SILLocation loc,
+                                  SILValue value,
+                                  LoweringStyle style) const override {
+      return emitCopyValue(B, loc, value);
     }
 
-    void emitLoweredReleaseValue(SILBuilder &B, SILLocation loc,
-                                 SILValue value,
+    void emitLoweredDestroyValue(SILBuilder &B, SILLocation loc, SILValue value,
                                  LoweringStyle style) const override {
-      emitReleaseValue(B, loc, value);
+      emitDestroyValue(B, loc, value);
     }
   };
 
@@ -930,14 +912,24 @@ namespace {
     ReferenceTypeLowering(SILType type)
       : LeafLoadableTypeLowering(type, IsReferenceCounted) {}
 
-    void emitRetainValue(SILBuilder &B, SILLocation loc,
-                       SILValue value) const override {
-      if (!isa<FunctionRefInst>(value))
-        B.createStrongRetain(loc, value, Atomicity::Atomic);
+    SILValue emitCopyValue(SILBuilder &B, SILLocation loc,
+                           SILValue value) const override {
+      if (isa<FunctionRefInst>(value))
+        return value;
+
+      if (B.getFunction().hasQualifiedOwnership())
+        return B.createCopyValue(loc, value);
+
+      B.createStrongRetain(loc, value, Atomicity::Atomic);
+      return value;
     }
 
-    void emitReleaseValue(SILBuilder &B, SILLocation loc,
+    void emitDestroyValue(SILBuilder &B, SILLocation loc,
                           SILValue value) const override {
+      if (B.getFunction().hasQualifiedOwnership()) {
+        B.createDestroyValue(loc, value);
+        return;
+      }
       B.emitStrongReleaseAndFold(loc, value);
     }
   };
@@ -948,13 +940,21 @@ namespace {
     LoadableUnownedTypeLowering(SILType type)
       : LeafLoadableTypeLowering(type, IsReferenceCounted) {}
 
-    void emitRetainValue(SILBuilder &B, SILLocation loc,
-                       SILValue value) const override {
+    SILValue emitCopyValue(SILBuilder &B, SILLocation loc,
+                           SILValue value) const override {
+      if (B.getFunction().hasQualifiedOwnership())
+        return B.createCopyValue(loc, value);
+
       B.createUnownedRetain(loc, value, Atomicity::Atomic);
+      return value;
     }
 
-    void emitReleaseValue(SILBuilder &B, SILLocation loc,
+    void emitDestroyValue(SILBuilder &B, SILLocation loc,
                           SILValue value) const override {
+      if (B.getFunction().hasQualifiedOwnership()) {
+        B.createDestroyValue(loc, value);
+        return;
+      }
       B.createUnownedRelease(loc, value, Atomicity::Atomic);
     }
   };
@@ -983,6 +983,16 @@ namespace {
       llvm_unreachable("calling emitStoreOfCopy on non-loadable type");
     }
 
+    void emitStore(SILBuilder &B, SILLocation loc, SILValue value,
+                   SILValue addr, StoreOwnershipQualifier qual) const override {
+      llvm_unreachable("calling emitStore on non-loadable type");
+    }
+
+    SILValue emitLoad(SILBuilder &B, SILLocation loc, SILValue addr,
+                      LoadOwnershipQualifier qual) const override {
+      llvm_unreachable("calling emitLoad on non-loadable type");
+    }
+
     void emitDestroyAddress(SILBuilder &B, SILLocation loc,
                             SILValue addr) const override {
       B.emitDestroyAddrAndFold(loc, addr);
@@ -993,24 +1003,23 @@ namespace {
       B.emitDestroyAddrAndFold(loc, value);
     }
 
-    void emitRetainValue(SILBuilder &B, SILLocation loc,
-                       SILValue value) const override {
+    SILValue emitCopyValue(SILBuilder &B, SILLocation loc,
+                           SILValue value) const override {
       llvm_unreachable("type is not loadable!");
     }
 
-    void emitLoweredRetainValue(SILBuilder &B, SILLocation loc,
-                              SILValue value,
-                              LoweringStyle style) const override {
+    SILValue emitLoweredCopyValue(SILBuilder &B, SILLocation loc,
+                                  SILValue value,
+                                  LoweringStyle style) const override {
       llvm_unreachable("type is not loadable!");
     }
 
-    void emitReleaseValue(SILBuilder &B, SILLocation loc,
+    void emitDestroyValue(SILBuilder &B, SILLocation loc,
                           SILValue value) const override {
       llvm_unreachable("type is not loadable!");
     }
 
-    void emitLoweredReleaseValue(SILBuilder &B, SILLocation loc,
-                                 SILValue value,
+    void emitLoweredDestroyValue(SILBuilder &B, SILLocation loc, SILValue value,
                                  LoweringStyle style) const override {
       llvm_unreachable("type is not loadable!");
     }
@@ -1678,11 +1687,10 @@ TypeConverter::getEffectiveGenericEnvironment(AnyFunctionRef fn,
                                               CaptureInfo captureInfo) {
   auto dc = fn.getAsDeclContext();
 
-  if (dc->getParent()->isLocalContext() &&
-      !captureInfo.hasGenericParamCaptures())
-    return nullptr;
+  if (getEffectiveGenericSignature(fn, captureInfo))
+    return dc->getGenericEnvironmentOfContext();
 
-  return dc->getGenericEnvironmentOfContext();
+  return nullptr;
 }
 
 CanGenericSignature
@@ -1694,8 +1702,11 @@ TypeConverter::getEffectiveGenericSignature(AnyFunctionRef fn,
       !captureInfo.hasGenericParamCaptures())
     return nullptr;
 
-  if (auto sig = dc->getGenericSignatureOfContext())
+  if (auto sig = dc->getGenericSignatureOfContext()) {
+    if (sig->areAllParamsConcrete())
+      return nullptr;
     return sig->getCanonicalSignature();
+  }
 
   return nullptr;
 }
@@ -1716,7 +1727,7 @@ TypeConverter::getFunctionInterfaceTypeWithCaptures(CanAnyFunctionType funcType,
 
   // If we don't have any local captures (including function captures),
   // there's no context to apply.
-  if (!theClosure.getCaptureInfo().hasLocalCaptures()) {
+  if (!hasLoweredLocalCaptures(theClosure)) {
     if (!genericSig)
       return CanFunctionType::get(funcType.getInput(),
                                   funcType.getResult(),
@@ -1785,14 +1796,23 @@ CanAnyFunctionType TypeConverter::makeConstantInterfaceType(SILDeclRef c) {
     return getFunctionInterfaceTypeWithCaptures(funcTy, func);
   }
 
-  case SILDeclRef::Kind::Allocator:
   case SILDeclRef::Kind::EnumElement:
     return cast<AnyFunctionType>(vd->getInterfaceType()->getCanonicalType());
   
-  case SILDeclRef::Kind::Initializer:
-    return cast<AnyFunctionType>(cast<ConstructorDecl>(vd)
-                           ->getInitializerInterfaceType()->getCanonicalType());
-  
+  case SILDeclRef::Kind::Allocator: {
+    auto *cd = cast<ConstructorDecl>(vd);
+    auto funcTy = cast<AnyFunctionType>(
+                                   cd->getInterfaceType()->getCanonicalType());
+    return getFunctionInterfaceTypeWithCaptures(funcTy, cd);
+  }
+
+  case SILDeclRef::Kind::Initializer: {
+    auto *cd = cast<ConstructorDecl>(vd);
+    auto funcTy = cast<AnyFunctionType>(
+                         cd->getInitializerInterfaceType()->getCanonicalType());
+    return getFunctionInterfaceTypeWithCaptures(funcTy, cd);
+  }
+
   case SILDeclRef::Kind::Destroyer:
   case SILDeclRef::Kind::Deallocator:
     return getDestructorInterfaceType(cast<DestructorDecl>(vd),
@@ -1856,7 +1876,8 @@ TypeConverter::getConstantGenericEnvironment(SILDeclRef c) {
   case SILDeclRef::Kind::Destroyer:
   case SILDeclRef::Kind::Deallocator: {
     auto *afd = cast<AbstractFunctionDecl>(vd);
-    return afd->getGenericEnvironmentOfContext();
+    auto captureInfo = getLoweredLocalCaptures(afd);
+    return getEffectiveGenericEnvironment(afd, captureInfo);
   }
   case SILDeclRef::Kind::GlobalAccessor:
   case SILDeclRef::Kind::GlobalGetter: {
@@ -1990,17 +2011,32 @@ getMaterializeForSetCallbackType(AbstractStorageDecl *storage,
     }
   }
 
+  CanType canSelfType;
+  CanType canSelfMetatypeType;
+  if (genericSig) {
+    canSelfType = genericSig->getCanonicalTypeInContext(
+        selfType, *M.getSwiftModule());
+    canSelfMetatypeType = genericSig->getCanonicalTypeInContext(
+        selfMetatypeType, *M.getSwiftModule());
+  } else {
+    canSelfType = selfType->getCanonicalType();
+    canSelfMetatypeType = selfMetatypeType->getCanonicalType();
+  }
+
   // Create the SILFunctionType for the callback.
   SILParameterInfo params[] = {
     { ctx.TheRawPointerType, ParameterConvention::Direct_Unowned },
     { ctx.TheUnsafeValueBufferType, ParameterConvention::Indirect_Inout },
-    { selfType->getCanonicalType(), ParameterConvention::Indirect_Inout },
-    { selfMetatypeType->getCanonicalType(), ParameterConvention::Direct_Unowned },
+    { canSelfType, ParameterConvention::Indirect_Inout },
+    { canSelfMetatypeType, ParameterConvention::Direct_Unowned },
   };
   ArrayRef<SILResultInfo> results = {};
   auto extInfo = 
     SILFunctionType::ExtInfo()
       .withRepresentation(SILFunctionTypeRepresentation::Thin);
+
+  if (genericSig && genericSig->areAllParamsConcrete())
+    genericSig = nullptr;
 
   return SILFunctionType::get(genericSig, extInfo,
                    /*callee*/ ParameterConvention::Direct_Unowned,
@@ -2014,6 +2050,11 @@ getAnyFunctionRefFromCapture(CapturedValue capture) {
   if (auto *afd = dyn_cast<AbstractFunctionDecl>(capture.getDecl()))
     return AnyFunctionRef(afd);
   return None;
+}
+
+bool
+TypeConverter::hasLoweredLocalCaptures(AnyFunctionRef fn) {
+  return !getLoweredLocalCaptures(fn).getCaptures().empty();
 }
 
 CaptureInfo

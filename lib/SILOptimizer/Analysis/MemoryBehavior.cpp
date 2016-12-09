@@ -5,8 +5,8 @@
 // Copyright (c) 2014 - 2016 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
-// See http://swift.org/LICENSE.txt for license information
-// See http://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
+// See https://swift.org/LICENSE.txt for license information
+// See https://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
 //
 //===----------------------------------------------------------------------===//
 
@@ -101,6 +101,7 @@ public:
   MemBehavior visitStrongReleaseInst(StrongReleaseInst *BI);
   MemBehavior visitUnownedReleaseInst(UnownedReleaseInst *BI);
   MemBehavior visitReleaseValueInst(ReleaseValueInst *BI);
+  MemBehavior visitSetDeallocatingInst(SetDeallocatingInst *BI);
 
   // Instructions which are none if our SILValue does not alias one of its
   // arguments. If we cannot prove such a thing, return the relevant memory
@@ -294,6 +295,10 @@ MemBehavior MemoryBehaviorVisitor::visitReleaseValueInst(ReleaseValueInst *SI) {
   if (!EA->canEscapeTo(V, SI))
     return MemBehavior::None;
   return MemBehavior::MayHaveSideEffects;
+}
+
+MemBehavior MemoryBehaviorVisitor::visitSetDeallocatingInst(SetDeallocatingInst *SDI) {
+  return MemBehavior::None;
 }
 
 //===----------------------------------------------------------------------===//

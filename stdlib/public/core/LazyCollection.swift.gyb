@@ -5,8 +5,8 @@
 // Copyright (c) 2014 - 2016 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
-// See http://swift.org/LICENSE.txt for license information
-// See http://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
+// See https://swift.org/LICENSE.txt for license information
+// See https://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
 //
 //===----------------------------------------------------------------------===//
 
@@ -22,7 +22,7 @@
 /// methods that return lazy wrappers that are themselves
 /// `LazyCollectionProtocol`s.
 ///
-/// - See Also: `LazySequenceProtocol`, `LazyCollection`
+/// - SeeAlso: `LazySequenceProtocol`, `LazyCollection`
 public protocol LazyCollectionProtocol
   : Collection, LazySequenceProtocol {
   /// A `Collection` that can contain the same elements as this one,
@@ -62,7 +62,7 @@ public struct ${Self}<Base : ${TraversalCollection}> : LazyCollectionProtocol {
   /// Valid indices consist of the position of every element and a
   /// "past the end" position that's not valid for use as a subscript.
   public typealias Index = Base.Index
-  
+
   /// Creates an instance with `base` as its underlying Collection
   /// instance.
   internal init(_base: Base) {
@@ -75,14 +75,14 @@ public struct ${Self}<Base : ${TraversalCollection}> : LazyCollectionProtocol {
 /// Forward implementations to the base collection, to pick up any
 /// optimizations it might implement.
 extension ${Self} : Sequence {
-  
+
   /// Returns an iterator over the elements of this sequence.
   ///
   /// - Complexity: O(1).
   public func makeIterator() -> Base.Iterator {
     return _base.makeIterator()
   }
-  
+
   /// Returns a value less than or equal to the number of elements in
   /// `self`, **nondestructively**.
   ///
@@ -93,7 +93,7 @@ extension ${Self} : Sequence {
      -> ContiguousArray<Base.Iterator.Element> {
     return _base._copyToContiguousArray()
   }
-  
+
   @discardableResult
   public func _copyContents(
     initializing ptr: UnsafeMutablePointer<Base.Iterator.Element>
@@ -103,7 +103,7 @@ extension ${Self} : Sequence {
 
   public func _customContainsEquatableElement(
     _ element: Base.Iterator.Element
-  ) -> Bool? { 
+  ) -> Bool? {
     return _base._customContainsEquatableElement(element)
   }
 }
@@ -115,7 +115,7 @@ extension ${Self} : ${TraversalCollection} {
   public var startIndex: Base.Index {
     return _base.startIndex
   }
-  
+
   /// The collection's "past the end" position---that is, the position one
   /// greater than the last valid subscript argument.
   ///
@@ -149,7 +149,7 @@ extension ${Self} : ${TraversalCollection} {
   public subscript(bounds: Range<Index>) -> ${Self}<${Slice}<Base>> {
     return ${Slice}(base: _base, bounds: bounds).lazy
   }
-  
+
   /// A Boolean value indicating whether the collection is empty.
   public var isEmpty: Bool {
     return _base.isEmpty
@@ -157,15 +157,20 @@ extension ${Self} : ${TraversalCollection} {
 
   /// Returns the number of elements.
   ///
+  /// To check whether a collection is empty, use its `isEmpty` property
+  /// instead of comparing `count` to zero. Unless the collection guarantees
+  /// random-access performance, calculating `count` can be an O(*n*)
+  /// operation.
+  ///
   /// - Complexity: O(1) if `Self` conforms to `RandomAccessCollection`;
   ///   O(*n*) otherwise.
   public var count: Base.IndexDistance {
     return _base.count
   }
-  
+
   // The following requirement enables dispatching for index(of:) when
   // the element type is Equatable.
-  
+
   /// Returns `Optional(Optional(index))` if an element was found;
   /// `nil` otherwise.
   ///
@@ -219,7 +224,7 @@ extension ${TraversalCollection} {
   /// intermediate operations from allocating storage, or when you only
   /// need a part of the final collection to avoid unnecessary computation.
   ///
-  /// - See Also: `LazySequenceProtocol`, `LazyCollectionProtocol`.
+  /// - SeeAlso: `LazySequenceProtocol`, `LazyCollectionProtocol`.
   public var lazy: ${Self}<Self> {
     return ${Self}(_base: self)
   }
