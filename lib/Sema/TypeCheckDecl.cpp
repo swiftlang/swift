@@ -4524,7 +4524,12 @@ public:
     auto typeRepr = func->getBodyResultTypeLoc().getTypeRepr();
     if (!typeRepr)
       return false;
-      
+
+    // 'Self' on a property accessor is not dynamic 'Self'...even on a read-only
+    // property. We could implement it as such in the future.
+    if (func->isAccessor())
+      return false;
+
     return checkDynamicSelfReturn(func, typeRepr, 0);
   }
 
