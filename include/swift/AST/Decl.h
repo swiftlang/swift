@@ -3316,9 +3316,9 @@ public:
 
   /// Specify that this protocol is class-bounded, e.g., because it was
   /// annotated with the 'class' keyword.
-  void setRequiresClass() {
+  void setRequiresClass(bool requiresClass = true) {
     ProtocolDeclBits.RequiresClassValid = true;
-    ProtocolDeclBits.RequiresClass = true;
+    ProtocolDeclBits.RequiresClass = requiresClass;
   }
 
   /// Determine whether an existential conforming to this protocol can be

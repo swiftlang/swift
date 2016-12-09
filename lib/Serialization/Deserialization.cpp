@@ -2808,8 +2808,7 @@ Decl *ModuleFile::getDecl(DeclID DID, Optional<DeclContext *> ForcedContext) {
                                           getIdentifier(nameID), None);
     declOrOffset = proto;
 
-    if (isClassBounded)
-      proto->setRequiresClass();
+    proto->setRequiresClass(isClassBounded);
     
     if (auto accessLevel = getActualAccessibility(rawAccessLevel)) {
       proto->setAccessibility(*accessLevel);
