@@ -8,6 +8,11 @@ else()
   set(CMAKE_C_COMPILER "${SWIFT_NATIVE_LLVM_TOOLS_PATH}/clang")
   set(CMAKE_CXX_COMPILER_ARG1 "")
   set(CMAKE_C_COMPILER_ARG1 "")
+  # The sanitizers require using the same version of the compiler for
+  # everything and there are various places where we link runtime code with
+  # code built by the host compiler. Disable sanitizers for the runtime for
+  # now.
+  append("-fno-sanitize=all" CMAKE_C_FLAGS CMAKE_CXX_FLAGS)
 endif()
 
 set(SWIFT_STDLIB_LIBRARY_BUILD_TYPES)

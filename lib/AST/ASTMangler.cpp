@@ -657,9 +657,35 @@ void ASTMangler::appendType(Type type) {
       appendFunctionType(cast<FunctionType>(tybase));
       return;
       
-    case TypeKind::SILBox:
-      appendType(cast<SILBoxType>(tybase)->getBoxedType());
-      return appendOperator("Xb");
+    case TypeKind::SILBox: {
+      auto box = cast<SILBoxType>(tybase);
+      auto layout = box->getLayout();
+      SmallVector<TupleTypeElt, 4> fieldsList;
+      for (auto &field : layout->getFields()) {
+        auto fieldTy = field.getLoweredType();
+        // Use the `inout` mangling to represent a mutable field.
+        if (field.isMutable())
+          fieldTy = CanInOutType::get(fieldTy);
+        fieldsList.push_back(TupleTypeElt(fieldTy));
+      }
+      appendTypeList(TupleType::get(fieldsList, tybase->getASTContext())
+                       ->getCanonicalType());
+
+      if (auto sig = layout->getGenericSignature()) {
+        fieldsList.clear();
+        for (auto &arg : box->getGenericArgs()) {
+          fieldsList.push_back(TupleTypeElt(arg.getReplacement()));
+        }
+        appendTypeList(TupleType::get(fieldsList, tybase->getASTContext())
+                         ->getCanonicalType());
+        appendGenericSignature(sig);
+        appendOperator("XX");
+      } else {
+        appendOperator("Xx");
+      }
+
+      return;
+    }
 
     case TypeKind::SILBlockStorage:
       llvm_unreachable("should never be mangled");
@@ -1297,6 +1323,11 @@ void ASTMangler::appendGenericSignatureParts(
   appendOperator("r", StringRef(OpStorage.data(), OpStorage.size()));
 }
 
+bool ASTMangler::
+checkGenericParamsOrder(ArrayRef<GenericTypeParamType *> params) {
+  return Mangle::Mangler::checkGenericParamsOrder(params);
+}
+
 void ASTMangler::appendAssociatedTypeName(DependentMemberType *dmt) {
   auto assocTy = dmt->getAssocType();
 
@@ -1462,9 +1493,11 @@ void ASTMangler::appendDeclType(const ValueDecl *decl) {
 
   // Mangle the generic signature, if any.
   if (!genericParams.empty() || !requirements.empty()) {
-    appendGenericSignatureParts(genericParams, initialParamDepth,
-                                requirements);
-    appendOperator("u");
+    if (checkGenericParamsOrder(genericParams)) {
+      appendGenericSignatureParts(genericParams, initialParamDepth,
+                                  requirements);
+      appendOperator("u");
+    }
   }
 }
 
@@ -1642,8 +1675,9 @@ void ASTMangler::appendEntity(const ValueDecl *decl) {
 
   // Mangle the generic signature, if any.
   if (!genericParams.empty() || !requirements.empty()) {
-    appendGenericSignatureParts(genericParams, initialParamDepth,
-                                requirements);
+    if (checkGenericParamsOrder(genericParams))
+      appendGenericSignatureParts(genericParams, initialParamDepth,
+                                  requirements);
   }
   appendOperator("F");
   if (decl->isStatic())

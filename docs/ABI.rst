@@ -998,12 +998,16 @@ Types
   type ::= type 'Xu'                         // @unowned(unsafe) type
   type ::= type 'Xw'                         // @weak type
   type ::= impl-function-type 'XF'           // function implementation type (currently unused)
-  type ::= type 'Xb'                         // SIL @box type
+  type ::= type 'Xb'                         // SIL @box type (deprecated)
+  type ::= type-list 'Xx'                    // SIL box type
+  type ::= type-list type-list generic-signature 'XX'
+                                             // Generic SIL box type
   type ::= type 'XD'                         // dynamic self type
   type ::= type 'm'                          // metatype without representation
   type ::= type 'XM' METATYPE-REPR           // metatype with representation
   type ::= type 'Xp'                         // existential metatype without representation
   type ::= type 'Xm' METATYPE-REPR           // existential metatype with representation
+
 
   FUNCTION-KIND ::= 'f'                      // @thin function type
   FUNCTION-KIND ::= 'U'                      // uncurried function type (currently not used) 

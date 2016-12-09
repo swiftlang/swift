@@ -48,6 +48,8 @@ static bool isResolvableScope(ScopeKind SK) {
   case ScopeKind::WhileVars:
     return true;
   }
+
+  llvm_unreachable("Unhandled ScopeKind in switch.");
 }
 
 Scope::Scope(Parser *P, ScopeKind SC, bool InactiveConfigBlock)

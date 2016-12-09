@@ -3566,10 +3566,6 @@ namespace {
           // The point at which we will insert the modifier.
           SourceLoc modifierLoc = E->getSubExpr()->getStartLoc();
 
-          // Make sure we have the accessors.
-          tc.synthesizeAccessorsForStorage(var,
-                                           /*wantMaterializeForSet=*/false);
-
           // If the property is settable, we don't know whether the
           // user wanted the getter or setter. Provide notes for each.
           if (isSettable) {
@@ -5469,6 +5465,7 @@ Expr *ExprRewriter::coerceToType(Expr *expr, Type toType,
                                         expr->getLoc(),
                                         fromTuple->getElementType(0));
       expr->setImplicit(true);
+      return expr;
     }
   }
 

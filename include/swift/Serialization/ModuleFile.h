@@ -250,6 +250,9 @@ private:
   /// Normal protocol conformances referenced by this module.
   std::vector<Serialized<NormalProtocolConformance *>> NormalConformances;
 
+  /// SILLayouts referenced by this module.
+  std::vector<Serialized<SILLayout *>> SILLayouts;
+
   /// Types referenced by this module.
   std::vector<Serialized<Type>> Types;
 
@@ -716,6 +719,9 @@ public:
   ProtocolConformanceRef readConformance(llvm::BitstreamCursor &Cursor,
                                          GenericEnvironment *genericEnv =
                                            nullptr);
+  
+  /// Read a SILLayout from the given cursor.
+  SILLayout *readSILLayout(llvm::BitstreamCursor &Cursor);
 
   /// Read the given normal conformance from the current module file.
   NormalProtocolConformance *

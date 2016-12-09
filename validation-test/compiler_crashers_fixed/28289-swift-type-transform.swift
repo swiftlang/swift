@@ -6,6 +6,5 @@
 // See https://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
 
 // RUN: not %target-swift-frontend %s -typecheck
-// REQUIRES: asserts
 {class B<t{typealias d<a>:S<a>class a:d
 class S<o

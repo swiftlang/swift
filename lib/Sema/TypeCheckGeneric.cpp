@@ -836,6 +836,8 @@ void TypeChecker::validateGenericTypeSignature(GenericTypeDecl *typeDecl) {
     return;
   }
 
+  gp->setOuterParameters(dc->getGenericParamsOfContext());
+
   prepareGenericParamList(gp, typeDecl);
 
   auto *env = checkGenericEnvironment(gp, dc, dc->getGenericSignatureOfContext(),

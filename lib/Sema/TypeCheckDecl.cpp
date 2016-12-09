@@ -3602,15 +3602,6 @@ public:
       synthesizeSetterForMutableAddressedStorage(VD, TC);
     }
 
-    // Synthesize materializeForSet in non-protocol contexts.
-    if (auto materializeForSet = VD->getMaterializeForSetFunc()) {
-      if (!isa<ProtocolDecl>(VD->getDeclContext())) {
-        synthesizeMaterializeForSet(materializeForSet, VD, TC);
-        TC.typeCheckDecl(materializeForSet, true);
-        TC.typeCheckDecl(materializeForSet, false);
-      }
-    }
-
     // Typecheck any accessors that were previously synthesized
     // (that were previously only validated at point of synthesis)
     if (auto getter = VD->getGetter()) {
@@ -3824,16 +3815,15 @@ public:
       markAsObjC(TC, SD, isObjC);
     }
 
-    // If this variable is marked final and has a getter or setter, mark the
+    if (SD->hasAccessorFunctions())
+      maybeAddMaterializeForSet(SD, TC);
+
+    // If this subscript is marked final and has a getter or setter, mark the
     // getter and setter as final as well.
     if (SD->isFinal()) {
       makeFinal(TC.Context, SD->getGetter());
       makeFinal(TC.Context, SD->getSetter());
       makeFinal(TC.Context, SD->getMaterializeForSetFunc());
-    }
-
-    if (SD->hasAccessorFunctions()) {
-      maybeAddMaterializeForSet(SD, TC);
     }
 
     // Make sure the getter and setter have valid types, since they will be
@@ -3842,6 +3832,8 @@ public:
       TC.validateDecl(getter);
     if (auto setter = SD->getSetter())
       TC.validateDecl(setter);
+    if (auto materializeForSet = SD->getMaterializeForSetFunc())
+      TC.validateDecl(materializeForSet);
 
     // If this is a get+mutableAddress property, synthesize the setter body.
     if (SD->getStorageKind() == SubscriptDecl::ComputedWithMutableAddress &&
@@ -3850,15 +3842,6 @@ public:
     }
 
     inferDynamic(TC.Context, SD);
-
-    // Synthesize materializeForSet in non-protocol contexts.
-    if (auto materializeForSet = SD->getMaterializeForSetFunc()) {
-      if (!isa<ProtocolDecl>(dc)) {
-        synthesizeMaterializeForSet(materializeForSet, SD, TC);
-        TC.typeCheckDecl(materializeForSet, true);
-        TC.typeCheckDecl(materializeForSet, false);
-      }
-    }
 
     TC.checkDeclAttributes(SD);
   }
@@ -6106,9 +6089,7 @@ public:
       overridingASD->setOverriddenDecl(baseASD);
 
       // Make sure we get consistent overrides for the accessors as well.
-      if (!baseASD->hasAccessorFunctions())
-        addTrivialAccessorsToStorage(baseASD, TC);
-      maybeAddMaterializeForSet(overridingASD, TC);
+      assert(baseASD->hasAccessorFunctions());
 
       auto recordAccessorOverride = [&](AccessorKind kind) {
         // We need the same accessor on both.
@@ -6954,11 +6935,6 @@ void TypeChecker::validateDecl(ValueDecl *D, bool resolveTypeParams) {
     typeAlias->computeType();
 
     // Check generic parameters, if needed.
-    if (auto gp = typeAlias->getGenericParams()) {
-      gp->setOuterParameters(
-                     typeAlias->getDeclContext()->getGenericParamsOfContext());
-    }
-
     validateGenericTypeSignature(typeAlias);
     
     // Otherwise, perform the heavy lifting now.
@@ -6975,11 +6951,6 @@ void TypeChecker::validateDecl(ValueDecl *D, bool resolveTypeParams) {
     nominal->computeType();
 
     // Check generic parameters, if needed.
-    if (auto gp = nominal->getGenericParams()) {
-      gp->setOuterParameters(
-        nominal->getDeclContext()->getGenericParamsOfContext());
-    }
-
     validateGenericTypeSignature(nominal);
 
     checkInheritanceClause(D);
@@ -7032,9 +7003,6 @@ void TypeChecker::validateDecl(ValueDecl *D, bool resolveTypeParams) {
     (void) gp;
 
     validateGenericTypeSignature(proto);
-
-    assert(gp->getOuterParameters() ==
-           proto->getDeclContext()->getGenericParamsOfContext());
 
     // Record inherited protocols.
     resolveInheritedProtocols(proto);
@@ -7117,17 +7085,7 @@ void TypeChecker::validateDecl(ValueDecl *D, bool resolveTypeParams) {
                isa<TopLevelCodeDecl>(D->getDeclContext()));
         VD->markInvalid();
       }
-
-      // Make sure the getter and setter have valid types, since they will be
-      // used by SILGen for any accesses to this variable.
-      if (auto getter = VD->getGetter())
-        validateDecl(getter);
-      if (auto setter = VD->getSetter())
-        validateDecl(setter);
     }
-
-    // Synthesize accessors as necessary.
-    maybeAddAccessorsToVariable(VD, *this);
 
     if (!VD->didEarlyAttrValidation()) {
       checkDeclAttributesEarly(VD);
@@ -7190,6 +7148,20 @@ void TypeChecker::validateDecl(ValueDecl *D, bool resolveTypeParams) {
         }
       }
 
+      // Synthesize accessors as necessary.
+      maybeAddAccessorsToVariable(VD, *this);
+
+      if (VD->hasAccessorFunctions())
+        maybeAddMaterializeForSet(VD, *this);
+
+      // Make sure the getter and setter have valid types, since they will be
+      // used by SILGen for any accesses to this variable.
+      if (auto getter = VD->getGetter())
+        validateDecl(getter);
+      if (auto setter = VD->getSetter())
+        validateDecl(setter);
+      if (auto materializeForSet = VD->getMaterializeForSetFunc())
+        validateDecl(materializeForSet);
 
       // If this variable is marked final and has a getter or setter, mark the
       // getter and setter as final as well.
@@ -7201,10 +7173,6 @@ void TypeChecker::validateDecl(ValueDecl *D, bool resolveTypeParams) {
         makeDynamic(Context, VD->getGetter());
         makeDynamic(Context, VD->getSetter());
         // Skip materializeForSet -- it won't be used with a dynamic property.
-      }
-
-      if (VD->hasAccessorFunctions()) {
-        maybeAddMaterializeForSet(VD, *this);
       }
     }
 
@@ -7415,11 +7383,8 @@ checkExtensionGenericParams(TypeChecker &tc, ExtensionDecl *ext, Type type,
     tc.checkGenericParamList(nullptr, gpList, nullptr, &archetypeResolver);
   });
 
-  // FIXME: The canonical type here is a workaround because having
-  // SubstitutedType with archetypes breaks deserialization.
   Type extContextType =
-    env->mapTypeIntoContext(ext->getModuleContext(), extInterfaceType)
-      ->getCanonicalType();
+    env->mapTypeIntoContext(ext->getModuleContext(), extInterfaceType);
   return { env, extContextType };
 }
 

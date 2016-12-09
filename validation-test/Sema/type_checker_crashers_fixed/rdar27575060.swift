@@ -1,5 +1,4 @@
 // RUN: %target-swift-frontend %s -parse
-// REQUIRES: asserts
 
 func f(_ x: Any...) {}
 

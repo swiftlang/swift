@@ -313,6 +313,11 @@ class TypeDecoder {
         return BuiltType();
       return Builder.createSILBoxType(base);
     }
+    case NodeKind::SILBoxTypeWithLayout: {
+      // TODO: Implement SILBoxTypeRefs with layout. As a stopgap, specify the
+      // NativeObject type ref.
+      return Builder.createBuiltinType("Bo");
+    }
     default:
       return BuiltType();
     }

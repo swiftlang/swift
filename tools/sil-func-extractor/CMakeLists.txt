@@ -1,5 +1,5 @@
-add_swift_host_tool(sil-extract
-  SILExtract.cpp
+add_swift_host_tool(sil-func-extractor
+  SILFunctionExtractor.cpp
   LINK_LIBRARIES
     swiftFrontend
     swiftSILGen

@@ -1,0 +1,77 @@
+// RUN: %target-sil-func-extractor -assume-parsing-unqualified-ownership-sil %s -func=f2 -func=f5 -func=f6 -func=f8 | %FileCheck %s
+// RUN: %target-sil-func-extractor -assume-parsing-unqualified-ownership-sil %s -invert -func=f2 -func=f5 -func=f6 -func=f8 | %FileCheck -check-prefix=INVERSE %s
+// RUN: %target-sil-func-extractor -assume-parsing-unqualified-ownership-sil %s -func=f2 -func=f5 -func-file=%S/functions_to_preserve | %FileCheck %s
+
+import Builtin
+
+// CHECK-NOT: sil @f1 : $@convention(thin) () -> ()
+// INVERSE: sil @f1
+sil @f1 : $@convention(thin) () -> () {
+bb0:
+  %0 = tuple()
+  return %0 : $()
+}
+
+// CHECK: sil @f2 : $@convention(thin) () -> () {
+// INVERSE-NOT: sil @f2 : $@convention(thin) () -> () {
+sil @f2 : $@convention(thin) () -> () {
+bb0:
+  %0 = tuple()
+  return %0 : $()
+}
+
+// CHECK-NOT: sil @f3 : $@convention(thin) () -> () {
+// INVERSE: sil @f3 : $@convention(thin) () -> () {
+sil @f3 : $@convention(thin) () -> () {
+bb0:
+  %0 = tuple()
+  return %0 : $()
+}
+
+// CHECK-NOT: sil @f4 : $@convention(thin) () -> () {
+// INVERSE: sil @f4 : $@convention(thin) () -> () {
+sil @f4 : $@convention(thin) () -> () {
+bb0:
+  %0 = tuple()
+  return %0 : $()
+}
+
+// CHECK: sil @f5 : $@convention(thin) () -> () {
+// INVERSE-NOT: sil @f5 : $@convention(thin) () -> () {
+sil @f5 : $@convention(thin) () -> () {
+bb0:
+  %0 = tuple()
+  return %0 : $()
+}
+
+// CHECK: sil @f6 : $@convention(thin) () -> () {
+// INVERSE-NOT: sil @f6 : $@convention(thin) () -> () {
+sil @f6 : $@convention(thin) () -> () {
+bb0:
+  %0 = tuple()
+  return %0 : $()
+}
+
+// CHECK-NOT: sil @f7 : $@convention(thin) () -> () {
+// INVERSE: sil @f7 : $@convention(thin) () -> () {
+sil @f7 : $@convention(thin) () -> () {
+bb0:
+  %0 = tuple()
+  return %0 : $()
+}
+
+// CHECK: sil @f8 : $@convention(thin) () -> () {
+// INVERSE-NOT: sil @f8 : $@convention(thin) () -> () {
+sil @f8 : $@convention(thin) () -> () {
+bb0:
+  %0 = tuple()
+  return %0 : $()
+}
+
+// CHECK-NOT: sil @f9 : $@convention(thin) () -> () {
+// INVERSE: sil @f9 : $@convention(thin) () -> () {
+sil @f9 : $@convention(thin) () -> () {
+bb0:
+  %0 = tuple()
+  return %0 : $()
+}

@@ -1138,13 +1138,6 @@ public:
   /// enum with a raw type.
   void addImplicitEnumConformances(EnumDecl *ED);
 
-  /// Ensure that the specified \c storage has accessors.
-  ///
-  /// \param wantMaterializeForSet Whether we need materializeForSet
-  /// synthesized.
-  void synthesizeAccessorsForStorage(AbstractStorageDecl *storage,
-                                     bool wantMaterializeForSet);
-
   /// The specified AbstractStorageDecl \c storage was just found to satisfy
   /// the protocol property \c requirement.  Ensure that it has the full
   /// complement of accessors.
