@@ -1,3 +1,4 @@
+// REQUIRES: rdar://29591753
 // RUN: rm -rf %t.mod && mkdir -p %t.mod
 // RUN: rm -rf %t.sdk && mkdir -p %t.sdk
 // RUN: rm -rf %t.module-cache && mkdir -p %t.module-cache
