@@ -103,6 +103,16 @@ class ClassWithCustomNameSub : ClassWithCustomName {}
   func isKind(of aClass: AnyClass) -> Bool { return false }
 }
 
+// CHECK-LABEL: @interface DiscardableResult : NSObject
+// CHECK-NEXT: - (NSInteger)nonDiscardable:(NSInteger)x SWIFT_WARN_UNUSED_RESULT;
+// CHECK-NEXT: - (NSInteger)discardable:(NSInteger)x;
+// CHECK-NEXT: - (nonnull instancetype)init OBJC_DESIGNATED_INITIALIZER;
+// CHECK-NEXT: @end
+class DiscardableResult : NSObject {
+  func nonDiscardable(_ x: Int) -> Int { return x }
+  @discardableResult func discardable(_ x: Int) -> Int { return x }
+}
+
 // CHECK-LABEL: @interface Initializers
 // CHECK-NEXT: - (nonnull instancetype)init OBJC_DESIGNATED_INITIALIZER;
 // CHECK-NEXT: - (nonnull instancetype)initWithInt:(NSInteger)_;
