@@ -3364,8 +3364,6 @@ public:
   // interface.
   
   static CanSILBoxType get(CanType BoxedType);
-  CanType getBoxedType() const; // In SILType.h
-  SILType getBoxedAddressType() const; // In SILType.h
 
   static bool classof(const TypeBase *T) {
     return T->getKind() == TypeKind::SILBox;

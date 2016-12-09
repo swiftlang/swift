@@ -1596,7 +1596,9 @@ const TypeInfo *TypeConverter::convertBoxType(SILBoxType *T) {
   // TODO: Other common shapes? Optional-of-Refcounted would be nice.
 
   // Produce a tailored box metadata for the type.
-  return new FixedBoxTypeInfo(IGM, T->getBoxedAddressType());
+  assert(T->getLayout()->getFields().size() == 1
+         && "multi-field boxes not implemented yet");
+  return new FixedBoxTypeInfo(IGM, T->getFieldType(0));
 }
 
 OwnedAddress
@@ -1604,9 +1606,11 @@ irgen::emitAllocateBox(IRGenFunction &IGF, CanSILBoxType boxType,
                        CanSILBoxType boxInterfaceType,
                        const llvm::Twine &name) {
   auto &boxTI = IGF.getTypeInfoForLowered(boxType).as<BoxTypeInfo>();
+  assert(boxType->getLayout()->getFields().size() == 1
+         && "multi-field boxes not implemented yet");
   return boxTI.allocate(IGF,
-                        boxType->getBoxedAddressType(),
-                        boxInterfaceType->getBoxedAddressType(),
+                        boxType->getFieldType(0),
+                        boxInterfaceType->getFieldType(0),
                         name);
 }
 
@@ -1614,14 +1618,18 @@ void irgen::emitDeallocateBox(IRGenFunction &IGF,
                               llvm::Value *box,
                               CanSILBoxType boxType) {
   auto &boxTI = IGF.getTypeInfoForLowered(boxType).as<BoxTypeInfo>();
-  return boxTI.deallocate(IGF, box, boxType->getBoxedAddressType());
+  assert(boxType->getLayout()->getFields().size() == 1
+         && "multi-field boxes not implemented yet");
+  return boxTI.deallocate(IGF, box, boxType->getFieldType(0));
 }
 
 Address irgen::emitProjectBox(IRGenFunction &IGF,
                               llvm::Value *box,
                               CanSILBoxType boxType) {
   auto &boxTI = IGF.getTypeInfoForLowered(boxType).as<BoxTypeInfo>();
-  return boxTI.project(IGF, box, boxType->getBoxedAddressType());
+  assert(boxType->getLayout()->getFields().size() == 1
+         && "multi-field boxes not implemented yet");
+  return boxTI.project(IGF, box, boxType->getFieldType(0));
 }
 
 #define DEFINE_VALUE_OP(ID)                                           \
