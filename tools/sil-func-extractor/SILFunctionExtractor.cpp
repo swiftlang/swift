@@ -282,85 +282,87 @@ int main(int argc, char **argv) {
       SL->getAll();
   }
 
-  if (!FunctionNames.empty()) {
-    // For efficient usage, we separate our names into two separate sorted
-    // lists, one of managled names, and one of unmangled names.
-    std::vector<std::string> Names;
-    std::copy(FunctionNames.begin(), FunctionNames.end(),
-              std::back_inserter(Names));
+  if (FunctionNames.empty())
+    return CI.getASTContext().hadError();
 
-    // First partition our function names into mangled/demangled arrays.
-    auto FirstDemangledName = std::partition(
-        Names.begin(), Names.end(), [](const std::string &Name) -> bool {
-          return StringRef(Name).startswith("_T");
-        });
+  // For efficient usage, we separate our names into two separate sorted
+  // lists, one of managled names, and one of unmangled names.
+  std::vector<std::string> Names;
+  std::copy(FunctionNames.begin(), FunctionNames.end(),
+            std::back_inserter(Names));
 
-    // Then grab offsets to avoid any issues with iterator invalidation when we
-    // sort.
-    unsigned NumMangled = std::distance(Names.begin(), FirstDemangledName);
-    unsigned NumNames = Names.size();
+  // First partition our function names into mangled/demangled arrays.
+  auto FirstDemangledName = std::partition(
+      Names.begin(), Names.end(), [](const std::string &Name) -> bool {
+        return StringRef(Name).startswith("_T");
+      });
 
-    // Then sort the two partitioned arrays.
-    std::sort(Names.begin(), FirstDemangledName);
-    std::sort(FirstDemangledName, Names.end());
+  // Then grab offsets to avoid any issues with iterator invalidation when we
+  // sort.
+  unsigned NumMangled = std::distance(Names.begin(), FirstDemangledName);
+  unsigned NumNames = Names.size();
 
-    // Finally construct our ArrayRefs into the sorted std::vector for our
-    // mangled and demangled names.
-    ArrayRef<std::string> MangledNames(&*Names.begin(), NumMangled);
-    ArrayRef<std::string> DemangledNames(&*std::next(Names.begin(), NumMangled),
-                                         NumNames - NumMangled);
+  // Then sort the two partitioned arrays.
+  std::sort(Names.begin(), FirstDemangledName);
+  std::sort(FirstDemangledName, Names.end());
 
-    DEBUG(llvm::errs() << "MangledNames to keep:\n";
-          std::for_each(MangledNames.begin(), MangledNames.end(),
-                        [](const std::string &str) {
-                          llvm::errs() << "    " << str << '\n';
-                        }));
-    DEBUG(llvm::errs() << "DemangledNames to keep:\n";
-          std::for_each(DemangledNames.begin(), DemangledNames.end(),
-                        [](const std::string &str) {
-                          llvm::errs() << "    " << str << '\n';
-                        }));
+  // Finally construct our ArrayRefs into the sorted std::vector for our
+  // mangled and demangled names.
+  ArrayRef<std::string> MangledNames(&*Names.begin(), NumMangled);
+  ArrayRef<std::string> DemangledNames(&*std::next(Names.begin(), NumMangled),
+                                       NumNames - NumMangled);
 
-    removeUnwantedFunctions(CI.getSILModule(), MangledNames, DemangledNames);
-  }
+  DEBUG(llvm::errs() << "MangledNames to keep:\n";
+        std::for_each(MangledNames.begin(), MangledNames.end(),
+                      [](const std::string &str) {
+                        llvm::errs() << "    " << str << '\n';
+                      }));
+  DEBUG(llvm::errs() << "DemangledNames to keep:\n";
+        std::for_each(DemangledNames.begin(), DemangledNames.end(),
+                      [](const std::string &str) {
+                        llvm::errs() << "    " << str << '\n';
+                      }));
 
-  if (EmitSIB) {
-    llvm::SmallString<128> OutputFile;
-    if (OutputFilename.size()) {
-      OutputFile = OutputFilename;
-    } else if (ModuleName.size()) {
-      OutputFile = ModuleName;
-      llvm::sys::path::replace_extension(OutputFile, SIB_EXTENSION);
-    } else {
-      OutputFile = CI.getMainModule()->getName().str();
-      llvm::sys::path::replace_extension(OutputFile, SIB_EXTENSION);
-    }
+  removeUnwantedFunctions(CI.getSILModule(), MangledNames, DemangledNames);
+}
 
-    SerializationOptions serializationOpts;
-    serializationOpts.OutputPath = OutputFile.c_str();
-    serializationOpts.SerializeAllSIL = true;
-    serializationOpts.IsSIB = true;
-
-    serialize(CI.getMainModule(), serializationOpts, CI.getSILModule());
+if (EmitSIB) {
+  llvm::SmallString<128> OutputFile;
+  if (OutputFilename.size()) {
+    OutputFile = OutputFilename;
+  } else if (ModuleName.size()) {
+    OutputFile = ModuleName;
+    llvm::sys::path::replace_extension(OutputFile, SIB_EXTENSION);
   } else {
-    const StringRef OutputFile = OutputFilename.size() ?
-                                   StringRef(OutputFilename) : "-";
-
-    if (OutputFile == "-") {
-      CI.getSILModule()->print(llvm::outs(), EmitVerboseSIL, CI.getMainModule(),
-                               EnableSILSortOutput, !DisableASTDump);
-    } else {
-      std::error_code EC;
-      llvm::raw_fd_ostream OS(OutputFile, EC, llvm::sys::fs::F_None);
-      if (EC) {
-        llvm::errs() << "while opening '" << OutputFile << "': "
-                     << EC.message() << '\n';
-        return 1;
-      }
-      CI.getSILModule()->print(OS, EmitVerboseSIL, CI.getMainModule(),
-                               EnableSILSortOutput, !DisableASTDump);
-    }
+    OutputFile = CI.getMainModule()->getName().str();
+    llvm::sys::path::replace_extension(OutputFile, SIB_EXTENSION);
   }
 
-  return CI.getASTContext().hadError();
+  SerializationOptions serializationOpts;
+  serializationOpts.OutputPath = OutputFile.c_str();
+  serializationOpts.SerializeAllSIL = true;
+  serializationOpts.IsSIB = true;
+
+  serialize(CI.getMainModule(), serializationOpts, CI.getSILModule());
+ } else {
+  const StringRef OutputFile = OutputFilename.size() ?
+    StringRef(OutputFilename) : "-";
+
+  if (OutputFile == "-") {
+    CI.getSILModule()->print(llvm::outs(), EmitVerboseSIL, CI.getMainModule(),
+                             EnableSILSortOutput, !DisableASTDump);
+  } else {
+    std::error_code EC;
+    llvm::raw_fd_ostream OS(OutputFile, EC, llvm::sys::fs::F_None);
+    if (EC) {
+      llvm::errs() << "while opening '" << OutputFile << "': "
+                   << EC.message() << '\n';
+      return 1;
+    }
+    CI.getSILModule()->print(OS, EmitVerboseSIL, CI.getMainModule(),
+                             EnableSILSortOutput, !DisableASTDump);
+  }
+ }
+
+
 }
