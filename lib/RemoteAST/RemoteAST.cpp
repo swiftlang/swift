@@ -22,6 +22,7 @@
 #include "swift/AST/Module.h"
 #include "swift/AST/NameLookup.h"
 #include "swift/AST/Types.h"
+#include "swift/Basic/Mangler.h"
 #include "swift/ClangImporter/ClangImporter.h"
 
 // TODO: Develop a proper interface for this.
@@ -481,7 +482,7 @@ RemoteASTTypeBuilder::createNominalTypeDecl(const Demangle::NodePointer &node) {
   auto DC = findDeclContext(node);
   if (!DC) {
     return fail<NominalTypeDecl*>(Failure::CouldNotResolveTypeDecl,
-                                  Demangle::mangleNode(node));
+                    Demangle::mangleNode(node, NewMangling::useNewMangling()));
   }
 
   auto decl = dyn_cast<NominalTypeDecl>(DC);
@@ -545,7 +546,8 @@ RemoteASTTypeBuilder::findDeclContext(const Demangle::NodePointer &node) {
       if (!module) return nullptr;
 
       // Look up the local type by its mangling.
-      auto mangledName = Demangle::mangleNode(node);
+      auto mangledName = Demangle::mangleNode(node,
+                                              NewMangling::useNewMangling());
       auto decl = module->lookupLocalType(mangledName);
       if (!decl) return nullptr;
 

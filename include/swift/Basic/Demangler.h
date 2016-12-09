@@ -166,12 +166,6 @@ private:
     return createWithChild(kind, popNode(Node::Kind::Type));
   }
 
-  NodePointer swapWith(Node::Kind kind) {
-    NodePointer Nd = popNode();
-    pushNode(NodeFactory::create(kind));
-    return Nd;
-  }
-
   NodePointer changeKind(NodePointer Node, Node::Kind NewKind);
 
   NodePointer demangleOperator();

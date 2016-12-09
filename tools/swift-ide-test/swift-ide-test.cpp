@@ -23,6 +23,7 @@
 #include "swift/AST/RawComment.h"
 #include "swift/AST/SourceEntityWalker.h"
 #include "swift/AST/USRGeneration.h"
+#include "swift/AST/ASTMangler.h"
 #include "swift/Basic/Demangle.h"
 #include "swift/Basic/DemangleWrappers.h"
 #include "swift/Basic/DiagnosticConsumer.h"
@@ -1585,7 +1586,8 @@ static int doPrintLocalTypes(const CompilerInvocation &InitInvok,
       while (node->getKind() != NodeKind::LocalDeclName)
         node = node->getChild(1); // local decl name
 
-      auto remangled = Demangle::mangleNode(typeNode);
+      auto remangled = Demangle::mangleNode(typeNode,
+                                            NewMangling::useNewMangling());
 
       auto LTD = M->lookupLocalType(remangled);
 

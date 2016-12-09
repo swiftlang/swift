@@ -601,7 +601,7 @@ void Remangler::mangleDeallocator(Node *node) {
 }
 
 void Remangler::mangleDeclContext(Node *node) {
-  unreachable("handled inline");
+  mangleSingleChildNode(node);
 }
 
 void Remangler::mangleDefaultArgumentInitializer(Node *node) {
@@ -762,7 +762,7 @@ void Remangler::mangleEnum(Node *node) {
 }
 
 void Remangler::mangleErrorType(Node *node) {
-  Buffer << "ERR";
+  Buffer << "Xe";
 }
 
 void Remangler::mangleExistentialMetatype(Node *node) {
@@ -973,6 +973,11 @@ void Remangler::mangleGenericSpecializationParam(Node *node) {
 void Remangler::mangleGenericTypeMetadataPattern(Node *node) {
   mangleSingleChildNode(node);
   Buffer << "MP";
+}
+
+void Remangler::mangleGenericTypeParamDecl(Node *node) {
+  mangleChildNodes(node);
+  Buffer << "fp";
 }
 
 void Remangler::mangleGetter(Node *node) {
@@ -1276,12 +1281,12 @@ void Remangler::mangleOwningMutableAddressor(Node *node) {
 }
 
 void Remangler::manglePartialApplyForwarder(Node *node) {
-  mangleChildNodes(node);
+  mangleChildNodesReversed(node);
   Buffer << "TA";
 }
 
 void Remangler::manglePartialApplyObjCForwarder(Node *node) {
-  mangleChildNodes(node);
+  mangleChildNodesReversed(node);
   Buffer << "Ta";
 }
 
@@ -1352,7 +1357,7 @@ void Remangler::mangleProtocolWitnessTableAccessor(Node *node) {
 void Remangler::mangleQualifiedArchetype(Node *node) {
   mangleChildNode(node, 1);
   Buffer << "Qq";
-  mangleIndex(node->getFirstChild().get());
+  mangleNumber(node->getFirstChild().get());
 }
 
 void Remangler::mangleReabstractionThunk(Node *node) {
@@ -1450,7 +1455,8 @@ void Remangler::mangleTypeList(Node *node) {
 }
 
 void Remangler::mangleTypeMangling(Node *node) {
-  unreachable("not used");
+  mangleSingleChildNode(node);
+  Buffer << 'D';
 }
 
 void Remangler::mangleTypeMetadata(Node *node) {
@@ -1470,7 +1476,9 @@ void Remangler::mangleTypeMetadataLazyCache(Node *node) {
 
 void Remangler::mangleUncurriedFunctionType(Node *node) {
   mangleFunctionSignature(node);
-  Buffer << "XU";
+  // Mangle as regular function type (there is no "uncurried function type"
+  // in the new mangling scheme).
+  Buffer << 'c';
 }
 
 void Remangler::mangleUnmanaged(Node *node) {

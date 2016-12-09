@@ -817,6 +817,7 @@ types where the metadata itself has unknown layout.)
   global ::= global 'TD'                 // dynamic dispatch thunk
   global ::= global 'Td'                 // direct method reference thunk
   global ::= global 'TV'                 // vtable override thunk
+  global ::= type 'D'                    // type mangling for the debugger. TODO: check if we really need this
   global ::= protocol-conformance entity 'TW' // protocol witness thunk
   global ::= context identifier identifier 'TB' // property behavior initializer thunk (not used currently)
   global ::= context identifier identifier 'Tb' // property behavior setter thunk (not used currently)
@@ -1007,6 +1008,7 @@ Types
   type ::= type 'XM' METATYPE-REPR           // metatype with representation
   type ::= type 'Xp'                         // existential metatype without representation
   type ::= type 'Xm' METATYPE-REPR           // existential metatype with representation
+  type ::= 'Xe'                              // error or unresolved type
 
 
   FUNCTION-KIND ::= 'f'                      // @thin function type

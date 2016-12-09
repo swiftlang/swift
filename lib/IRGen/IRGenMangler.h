@@ -147,6 +147,7 @@ public:
     return mangleNominalTypeSymbol(Decl, "MC");
   }
 
+  std::string manglePartialApplyForwarder(StringRef FuncName);
 
 protected:
 

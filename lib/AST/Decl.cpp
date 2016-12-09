@@ -2421,6 +2421,9 @@ ObjCClassKind ClassDecl::checkObjCAncestry() const {
 static StringRef mangleObjCRuntimeName(const NominalTypeDecl *nominal,
                                        llvm::SmallVectorImpl<char> &buffer) {
   {
+    // TODO: Mangling: Use new mangling scheme as soon as the ObjC runtime
+    // can demangle it.
+
     // Mangle the type.
     Mangle::Mangler mangler(false/*dwarf*/, false/*punycode*/);
 

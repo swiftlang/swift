@@ -84,15 +84,23 @@ static void demangle(llvm::raw_ostream &os, llvm::StringRef name,
     swift::demangle_wrappers::NodeDumper(pointer).print(llvm::outs());
   }
   if (RemangleMode) {
-    if (hadLeadingUnderscore) llvm::outs() << '_';
-    // Just reprint the original mangled name if it didn't demangle.
-    // This makes it easier to share the same database between the
-    // mangling and demangling tests.
+    std::string remangled;
     if (!pointer) {
-      llvm::outs() << name;
+      // Just reprint the original mangled name if it didn't demangle.
+      // This makes it easier to share the same database between the
+      // mangling and demangling tests.
+      remangled = name;
     } else {
-      llvm::outs() << swift::Demangle::mangleNode(pointer);
+      remangled = swift::Demangle::mangleNode(pointer,
+                                        /*NewMangling*/ name.startswith("_S"));
+      if (name != remangled) {
+        llvm::errs() << "\nError: re-mangled name \n  " << remangled
+                     << "\ndoes not match original name\n  " << name << '\n';
+        exit(1);
+      }
     }
+    if (hadLeadingUnderscore) llvm::outs() << '_';
+    llvm::outs() << remangled;
     return;
   }
   if (!TreeOnly) {
