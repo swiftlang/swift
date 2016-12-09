@@ -6,17 +6,17 @@ struct GS<T> {
 // CHECK: decl: struct GS<T> for 'T' usr=s:tV14swift_ide_test2GS1TMx
 
   let a: T.Nope
-// CHECK: decl: let a: <<error type>>
+// CHECK: decl: FAILURE for 'a' usr=s:
   let b: T
 // CHECK: decl: let b: T
 }
 
 let global1: GS
-// CHECK: decl: let global1: <<error type>>
+// CHECK: decl: FAILURE for 'global1' usr=s:
 let global2 = GS().x
-// CHECK: decl: let global2: <<error type>>
+// CHECK: decl: FAILURE for 'global2' usr=s:
 let global3 = GS<Int>(a: 1, b: 2).b
-// CHECK: decl: let global3: <<error type>>
+// CHECK: decl: FAILURE for 'global3' usr=s:
 
 protocol P {
 // FIXME: missing protocol entries?
