@@ -379,6 +379,16 @@ IdentifierID Serializer::addModuleRef(const Module *M) {
   return addIdentifierRef(M->getName());
 }
 
+SILLayoutID Serializer::addSILLayoutRef(SILLayout *layout) {
+  auto &id = SILLayouts[layout];
+  if (id != 0)
+    return id;
+  
+  id = ++LastSILLayoutID;
+  SILLayoutsToWrite.push(layout);
+  return id;
+}
+
 NormalConformanceID Serializer::addConformanceRef(
                       const NormalProtocolConformance *conformance) {
   assert(conformance->getDeclContext()->getParentModule() == M &&
@@ -476,6 +486,7 @@ void Serializer::writeBlockInfoBlock() {
   BLOCK_RECORD(index_block, DECL_CONTEXT_OFFSETS);
   BLOCK_RECORD(index_block, LOCAL_TYPE_DECLS);
   BLOCK_RECORD(index_block, NORMAL_CONFORMANCE_OFFSETS);
+  BLOCK_RECORD(index_block, SIL_LAYOUT_OFFSETS);
   BLOCK_RECORD(index_block, PRECEDENCE_GROUPS);
 
   BLOCK(SIL_BLOCK);
@@ -1011,6 +1022,42 @@ void Serializer::writeGenericEnvironment(
     writeGenericRequirements(env->getGenericSignature()->getRequirements(),
                              abbrCodes);
   }
+}
+
+void Serializer::writeSILLayout(SILLayout *layout) {
+  using namespace decls_block;
+  auto foundLayoutID = SILLayouts.find(layout);
+  assert(foundLayoutID != SILLayouts.end() && "layout not referenced properly");
+  auto layoutID = foundLayoutID->second;
+  assert(layoutID - 1 == SILLayoutOffsets.size());
+  SILLayoutOffsets.push_back(Out.GetCurrentBitNo());
+  
+  SmallVector<unsigned, 16> data;
+  // Save field types.
+  for (auto &field : layout->getFields()) {
+    unsigned typeRef = addTypeRef(field.getLoweredType());
+    // Set the high bit if mutable.
+    if (field.isMutable())
+      typeRef |= 0x80000000U;
+    data.push_back(typeRef);
+  }
+  
+  // Save generic params.
+  if (auto sig = layout->getGenericSignature()) {
+    for (auto param : sig->getGenericParams()) {
+      data.push_back(addTypeRef(param));
+    }
+  }
+  
+  unsigned abbrCode
+    = DeclTypeAbbrCodes[SILLayoutLayout::Code];
+
+  SILLayoutLayout::emitRecord(Out, ScratchRecord, abbrCode,
+                              layout->getFields().size(),
+                              data);
+  // Emit requirements.
+  if (auto sig = layout->getGenericSignature())
+    writeGenericRequirements(sig->getRequirements(), DeclTypeAbbrCodes);
 }
 
 void Serializer::writeNormalConformance(
@@ -3088,8 +3135,14 @@ void Serializer::writeType(Type ty) {
     auto boxTy = cast<SILBoxType>(ty.getPointer());
 
     unsigned abbrCode = DeclTypeAbbrCodes[SILBoxTypeLayout::Code];
+    SILLayoutID layoutRef = addSILLayoutRef(boxTy->getLayout());
+    
+    SmallVector<TypeID, 4> genericArgs;
+    for (auto &arg : boxTy->getGenericArgs())
+      genericArgs.push_back(addTypeRef(arg.getReplacement()));
+    
     SILBoxTypeLayout::emitRecord(Out, ScratchRecord, abbrCode,
-                                 addTypeRef(boxTy->getBoxedType()));
+                                 layoutRef, genericArgs);
     break;
   }
       
@@ -3352,6 +3405,8 @@ void Serializer::writeAllDeclsAndTypes() {
   registerDeclTypeAbbr<NormalProtocolConformanceIdLayout>();
   registerDeclTypeAbbr<ProtocolConformanceXrefLayout>();
 
+  registerDeclTypeAbbr<SILLayoutLayout>();
+
   registerDeclTypeAbbr<LocalDiscriminatorLayout>();
   registerDeclTypeAbbr<PrivateDiscriminatorLayout>();
   registerDeclTypeAbbr<MembersLayout>();
@@ -3391,10 +3446,17 @@ void Serializer::writeAllDeclsAndTypes() {
       NormalConformancesToWrite.pop();
       writeNormalConformance(next);
     }
+    
+    while (!SILLayoutsToWrite.empty()) {
+      auto next = SILLayoutsToWrite.front();
+      SILLayoutsToWrite.pop();
+      writeSILLayout(next);
+    }
   } while (!DeclsAndTypesToWrite.empty() ||
            !LocalDeclContextsToWrite.empty() ||
            !DeclContextsToWrite.empty() ||
-           !NormalConformancesToWrite.empty());
+           !NormalConformancesToWrite.empty() ||
+           !SILLayoutsToWrite.empty());
 }
 
 void Serializer::writeAllIdentifiers() {
@@ -4080,6 +4142,7 @@ void Serializer::writeAST(ModuleOrSourceFile DC) {
     writeOffsets(Offsets, DeclContextOffsets);
     writeOffsets(Offsets, LocalDeclContextOffsets);
     writeOffsets(Offsets, NormalConformanceOffsets);
+    writeOffsets(Offsets, SILLayoutOffsets);
 
     index_block::DeclListLayout DeclList(Out);
     writeDeclTable(DeclList, index_block::TOP_LEVEL_DECLS, topLevelDecls);

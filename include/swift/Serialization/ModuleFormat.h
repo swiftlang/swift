@@ -54,7 +54,7 @@ const uint16_t VERSION_MAJOR = 0;
 /// in source control, you should also update the comment to briefly
 /// describe what change you made. The content of this comment isn't important;
 /// it just ensures a conflict if two people change the module format.
-const uint16_t VERSION_MINOR = 291; // Last change: remove SubstitutedType
+const uint16_t VERSION_MINOR = 292; // Last change: SILBoxType layout
 
 using DeclID = PointerEmbeddedInt<unsigned, 31>;
 using DeclIDField = BCFixed<31>;
@@ -62,6 +62,8 @@ using DeclIDField = BCFixed<31>;
 // TypeID must be the same as DeclID because it is stored in the same way.
 using TypeID = DeclID;
 using TypeIDField = DeclIDField;
+
+using TypeIDWithBitField = BCFixed<32>;
 
 // IdentifierID must be the same as DeclID because it is stored in the same way.
 using IdentifierID = DeclID;
@@ -79,6 +81,10 @@ using NormalConformanceIDField = DeclIDField;
 // ModuleID must be the same as IdentifierID because it is stored the same way.
 using ModuleID = IdentifierID;
 using ModuleIDField = IdentifierIDField;
+
+// SILLayoutID must be the same as DeclID because it is stored in the same way.
+using SILLayoutID = DeclID;
+using SILLayoutIDField = DeclIDField;
 
 using BitOffset = PointerEmbeddedInt<unsigned, 31>;
 using BitOffsetField = BCFixed<31>;
@@ -695,9 +701,18 @@ namespace decls_block {
     TypeIDField            // capture type
   >;
 
+  using SILLayoutLayout = BCRecordLayout<
+    SIL_LAYOUT,
+    BCFixed<31>,                // number of fields
+    BCArray<TypeIDWithBitField> // field types with mutability
+                                // followed by generic parameters
+                                // trailed by generic requirements, if any
+  >;
+
   using SILBoxTypeLayout = BCRecordLayout<
     SIL_BOX_TYPE,
-    TypeIDField            // capture type
+    SILLayoutIDField,    // layout
+    BCArray<TypeIDField> // generic arguments
   >;
 
   template <unsigned Code>
@@ -1417,23 +1432,31 @@ namespace index_block {
     DECL_CONTEXT_OFFSETS,
     LOCAL_TYPE_DECLS,
     NORMAL_CONFORMANCE_OFFSETS,
+    SIL_LAYOUT_OFFSETS,
 
     PRECEDENCE_GROUPS,
+    
+    LastRecordKind = PRECEDENCE_GROUPS,
   };
+  
+  constexpr const unsigned RecordIDFieldWidth = 5;
+  static_assert(LastRecordKind < (1 << RecordIDFieldWidth),
+                "not enough bits for all record kinds");
+  using RecordIDField = BCFixed<RecordIDFieldWidth>;
 
   using OffsetsLayout = BCGenericRecordLayout<
-    BCFixed<4>,  // record ID
+    RecordIDField, // record ID
     BCArray<BitOffsetField>
   >;
 
   using DeclListLayout = BCGenericRecordLayout<
-    BCFixed<4>,  // record ID
+    RecordIDField, // record ID
     BCVBR<16>,  // table offset within the blob (see below)
     BCBlob  // map from identifier strings to decl kinds / decl IDs
   >;
 
   using GroupNamesLayout = BCGenericRecordLayout<
-    BCFixed<4>,  // record ID
+    RecordIDField, // record ID
     BCBlob       // actual names
   >;
 
