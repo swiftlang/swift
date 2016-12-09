@@ -90,6 +90,12 @@ static llvm::cl::opt<std::string>
 static llvm::cl::opt<std::string> Triple("target",
                                          llvm::cl::desc("target triple"));
 
+static llvm::cl::opt<bool>
+EnableSILSortOutput("emit-sorted-sil", llvm::cl::Hidden,
+                    llvm::cl::init(false),
+                    llvm::cl::desc("Sort Functions, VTables, Globals, "
+                                   "WitnessTables by name to ease diffing."));
+
 static llvm::cl::opt<bool> AssumeUnqualifiedOwnershipWhenParsing(
     "assume-parsing-unqualified-ownership-sil", llvm::cl::Hidden,
     llvm::cl::init(false),
