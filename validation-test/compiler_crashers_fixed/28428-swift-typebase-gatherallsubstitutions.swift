@@ -6,7 +6,6 @@
 // See https://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
 
 // RUN: not %target-swift-frontend %s -typecheck
-// REQUIRES: asserts
 {
 protocol C{class B
 class a{class a{func a{protocol A:d
