@@ -20,6 +20,7 @@
 //===----------------------------------------------------------------------===//
 
 #define DEBUG_TYPE "sil-func-extractor"
+#include "swift/Strings.h"
 #include "swift/Basic/Demangle.h"
 #include "swift/Basic/LLVM.h"
 #include "swift/Basic/LLVMInitialize.h"
@@ -32,6 +33,7 @@
 #include "swift/SILOptimizer/PassManager/PassManager.h"
 #include "swift/SILOptimizer/PassManager/Passes.h"
 #include "swift/Serialization/SerializedModuleLoader.h"
+#include "swift/Serialization/SerializationOptions.h"
 #include "swift/Serialization/SerializedSILLoader.h"
 #include "swift/Subsystems.h"
 #include "llvm/Support/CommandLine.h"
@@ -58,6 +60,10 @@ static llvm::cl::opt<bool>
 
 static llvm::cl::list<std::string>
     FunctionNames("func", llvm::cl::desc("Function names to extract."));
+
+static llvm::cl::opt<bool>
+EmitSIB("emit-sib",
+        llvm::cl::desc("Emit a sib file as output instead of a sil file"));
 
 static llvm::cl::opt<bool> InvertMatch(
     "invert",
@@ -95,6 +101,11 @@ EnableSILSortOutput("emit-sorted-sil", llvm::cl::Hidden,
                     llvm::cl::init(false),
                     llvm::cl::desc("Sort Functions, VTables, Globals, "
                                    "WitnessTables by name to ease diffing."));
+
+static llvm::cl::opt<bool>
+DisableASTDump("sil-disable-ast-dump", llvm::cl::Hidden,
+               llvm::cl::init(false),
+               llvm::cl::desc("Do not dump AST."));
 
 static llvm::cl::opt<bool> AssumeUnqualifiedOwnershipWhenParsing(
     "assume-parsing-unqualified-ownership-sil", llvm::cl::Hidden,
@@ -313,14 +324,43 @@ int main(int argc, char **argv) {
     removeUnwantedFunctions(CI.getSILModule(), MangledNames, DemangledNames);
   }
 
-  std::error_code EC;
-  llvm::raw_fd_ostream OS(OutputFilename, EC, llvm::sys::fs::F_None);
-  if (EC) {
-    llvm::errs() << "while opening '" << OutputFilename << "': " << EC.message()
-                 << '\n';
-    return 1;
+  if (EmitSIB) {
+    llvm::SmallString<128> OutputFile;
+    if (OutputFilename.size()) {
+      OutputFile = OutputFilename;
+    } else if (ModuleName.size()) {
+      OutputFile = ModuleName;
+      llvm::sys::path::replace_extension(OutputFile, SIB_EXTENSION);
+    } else {
+      OutputFile = CI.getMainModule()->getName().str();
+      llvm::sys::path::replace_extension(OutputFile, SIB_EXTENSION);
+    }
+
+    SerializationOptions serializationOpts;
+    serializationOpts.OutputPath = OutputFile.c_str();
+    serializationOpts.SerializeAllSIL = true;
+    serializationOpts.IsSIB = true;
+
+    serialize(CI.getMainModule(), serializationOpts, CI.getSILModule());
+  } else {
+    const StringRef OutputFile = OutputFilename.size() ?
+                                   StringRef(OutputFilename) : "-";
+
+    if (OutputFile == "-") {
+      CI.getSILModule()->print(llvm::outs(), EmitVerboseSIL, CI.getMainModule(),
+                               EnableSILSortOutput, !DisableASTDump);
+    } else {
+      std::error_code EC;
+      llvm::raw_fd_ostream OS(OutputFile, EC, llvm::sys::fs::F_None);
+      if (EC) {
+        llvm::errs() << "while opening '" << OutputFile << "': "
+                     << EC.message() << '\n';
+        return 1;
+      }
+      CI.getSILModule()->print(OS, EmitVerboseSIL, CI.getMainModule(),
+                               EnableSILSortOutput, !DisableASTDump);
+    }
   }
-  CI.getSILModule()->print(OS, EmitVerboseSIL, CI.getMainModule());
 
   return CI.getASTContext().hadError();
 }
