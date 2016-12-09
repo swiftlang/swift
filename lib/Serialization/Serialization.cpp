@@ -2551,7 +2551,6 @@ void Serializer::writeDecl(const Decl *D) {
     verifyAttrSerializable(var);
 
     auto contextID = addDeclContextRef(var->getDeclContext());
-    Type type = var->hasType() ? var->getType() : nullptr;
 
     Accessors accessors = getAccessors(var);
     uint8_t rawAccessLevel =
@@ -2571,7 +2570,6 @@ void Serializer::writeDecl(const Decl *D) {
                           var->isLet(),
                           var->hasNonPatternBindingInit(),
                           (unsigned) accessors.Kind,
-                          addTypeRef(type),
                           addTypeRef(var->getInterfaceType()),
                           addDeclRef(accessors.Get),
                           addDeclRef(accessors.Set),

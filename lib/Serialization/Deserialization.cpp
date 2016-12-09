@@ -2516,14 +2516,14 @@ Decl *ModuleFile::getDecl(DeclID DID, Optional<DeclContext *> ForcedContext) {
     DeclContextID contextID;
     bool isImplicit, isObjC, isStatic, isLet, hasNonPatternBindingInit;
     uint8_t storageKind, rawAccessLevel, rawSetterAccessLevel;
-    TypeID typeID, interfaceTypeID;
+    TypeID interfaceTypeID;
     DeclID getterID, setterID, materializeForSetID, willSetID, didSetID;
     DeclID addressorID, mutableAddressorID, overriddenID;
 
     decls_block::VarLayout::readRecord(scratch, nameID, contextID,
                                        isImplicit, isObjC, isStatic, isLet,
                                        hasNonPatternBindingInit, storageKind,
-                                       typeID, interfaceTypeID, getterID,
+                                       interfaceTypeID, getterID,
                                        setterID, materializeForSetID,
                                        addressorID, mutableAddressorID,
                                        willSetID, didSetID, overriddenID,
@@ -2533,19 +2533,15 @@ Decl *ModuleFile::getDecl(DeclID DID, Optional<DeclContext *> ForcedContext) {
     if (declOrOffset.isComplete())
       return declOrOffset;
 
-    auto type = getType(typeID);
-    if (declOrOffset.isComplete())
-      return declOrOffset;
-
     auto var = createDecl<VarDecl>(isStatic, isLet, SourceLoc(),
-                                   getIdentifier(nameID), type, DC);
+                                   getIdentifier(nameID), Type(), DC);
     var->setHasNonPatternBindingInit(hasNonPatternBindingInit);
     declOrOffset = var;
 
-    if (auto interfaceType = getType(interfaceTypeID))
-      var->setInterfaceType(interfaceType);
+    Type interfaceType = getType(interfaceTypeID);
+    var->setInterfaceType(interfaceType);
 
-    if (auto referenceStorage = type->getAs<ReferenceStorageType>())
+    if (auto referenceStorage = interfaceType->getAs<ReferenceStorageType>())
       AddAttribute(new (ctx) OwnershipAttr(referenceStorage->getOwnership()));
 
     configureStorage(var, storageKind, getterID, setterID, materializeForSetID,

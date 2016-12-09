@@ -54,7 +54,7 @@ const uint16_t VERSION_MAJOR = 0;
 /// in source control, you should also update the comment to briefly
 /// describe what change you made. The content of this comment isn't important;
 /// it just ensures a conflict if two people change the module format.
-const uint16_t VERSION_MINOR = 293; // Last change: parameter context types
+const uint16_t VERSION_MINOR = 294; // Last change: no variable context types
 
 using DeclID = PointerEmbeddedInt<unsigned, 31>;
 using DeclIDField = BCFixed<31>;
@@ -861,7 +861,6 @@ namespace decls_block {
     BCFixed<1>,   // isLet?
     BCFixed<1>,   // HasNonPatternBindingInit?
     StorageKindField,   // StorageKind
-    TypeIDField,  // type
     TypeIDField,  // interface type
     DeclIDField,  // getter
     DeclIDField,  // setter
