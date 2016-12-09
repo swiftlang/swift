@@ -4065,7 +4065,10 @@ protected:
   /// This is the type specified, including location information.
   TypeLoc typeLoc;
 
-  Type typeInContext;
+  mutable Type typeInContext;
+
+  /// Compute the type in context from the interface type.
+  Type computeTypeInContextSlow() const;
 
 public:
   VarDecl(bool IsStatic, bool IsLet, SourceLoc NameLoc, Identifier Name,
@@ -4086,13 +4089,17 @@ public:
   TypeLoc getTypeLoc() const { return typeLoc; }
 
   bool hasType() const {
-    return !!typeInContext;
+    // We have a type if either the type has been computed already or if
+    // this is a deserialized declaration with an interface type.
+    return typeInContext ||
+      (hasInterfaceType() && !getDeclContext()->getParentSourceFile());
   }
 
   /// Get the type of the variable within its context. If the context is generic,
   /// this will use archetypes.
   Type getType() const {
-    assert(typeInContext && "No context type set yet");
+    if (!typeInContext)
+      return computeTypeInContextSlow();
     return typeInContext;
   }
 

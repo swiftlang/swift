@@ -2590,11 +2590,7 @@ void Serializer::writeDecl(const Decl *D) {
     verifyAttrSerializable(param);
 
     auto contextID = addDeclContextRef(param->getDeclContext());
-    Type type, interfaceType;
-
-    if (param->hasType())
-      type = param->getType();
-    interfaceType = param->getInterfaceType();
+    Type interfaceType = param->getInterfaceType();
 
     unsigned abbrCode = DeclTypeAbbrCodes[ParamLayout::Code];
     ParamLayout::emitRecord(Out, ScratchRecord, abbrCode,
@@ -2602,7 +2598,6 @@ void Serializer::writeDecl(const Decl *D) {
                             addIdentifierRef(param->getName()),
                             contextID,
                             param->isLet(),
-                            addTypeRef(type),
                             addTypeRef(interfaceType));
     break;
   }

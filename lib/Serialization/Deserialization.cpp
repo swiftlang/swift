@@ -2582,29 +2582,22 @@ Decl *ModuleFile::getDecl(DeclID DID, Optional<DeclContext *> ForcedContext) {
     IdentifierID argNameID, paramNameID;
     DeclContextID contextID;
     bool isLet;
-    TypeID typeID, interfaceTypeID;
+    TypeID interfaceTypeID;
 
     decls_block::ParamLayout::readRecord(scratch, argNameID, paramNameID,
-                                         contextID, isLet, typeID,
-                                         interfaceTypeID);
+                                         contextID, isLet, interfaceTypeID);
 
     auto DC = ForcedContext ? *ForcedContext : getDeclContext(contextID);
     if (declOrOffset.isComplete())
       return declOrOffset;
 
-    auto type = getType(typeID);
-    if (declOrOffset.isComplete())
-      return declOrOffset;
-
     auto param = createDecl<ParamDecl>(isLet, SourceLoc(), SourceLoc(),
                                        getIdentifier(argNameID), SourceLoc(),
-                                       getIdentifier(paramNameID), type, DC);
+                                       getIdentifier(paramNameID), Type(), DC);
 
     declOrOffset = param;
 
-    if (auto interfaceType = getType(interfaceTypeID))
-      param->setInterfaceType(interfaceType);
-
+    param->setInterfaceType(getType(interfaceTypeID));
     break;
   }
 
