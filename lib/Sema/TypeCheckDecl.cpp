@@ -7415,11 +7415,8 @@ checkExtensionGenericParams(TypeChecker &tc, ExtensionDecl *ext, Type type,
     tc.checkGenericParamList(nullptr, gpList, nullptr, &archetypeResolver);
   });
 
-  // FIXME: The canonical type here is a workaround because having
-  // SubstitutedType with archetypes breaks deserialization.
   Type extContextType =
-    env->mapTypeIntoContext(ext->getModuleContext(), extInterfaceType)
-      ->getCanonicalType();
+    env->mapTypeIntoContext(ext->getModuleContext(), extInterfaceType);
   return { env, extContextType };
 }
 
