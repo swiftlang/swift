@@ -141,6 +141,7 @@ public:
         Callback = nullptr;
 
       getAllSILFunctions();
+      getAllSILGlobalVariables();
       getAllVTables();
       getAllWitnessTables();
       getAllDefaultWitnessTables();
@@ -148,6 +149,10 @@ public:
 
     /// Deserialize all SILFunctions inside the module and add them to SILMod.
     void getAllSILFunctions();
+
+    /// Deserialize all SILGlobalVariables inside the module and add them to
+    /// SILMod.
+    void getAllSILGlobalVariables();
 
     /// Deserialize all VTables inside the module and add them to SILMod.
     void getAllVTables();
