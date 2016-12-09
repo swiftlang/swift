@@ -54,10 +54,10 @@ class BuiltinUnit::LookupCache {
   /// single hashtable for both types and values as a minor
   /// optimization; this prevents us from having both a builtin type
   /// and a builtin value with the same name, but that's okay.
-  llvm::DenseMap<Identifier, ValueDecl*> Cache;
+  llvm::DenseMap<DeclName, ValueDecl*> Cache;
 
 public:
-  void lookupValue(Identifier Name, NLKind LookupKind, const BuiltinUnit &M,
+  void lookupValue(DeclName Name, NLKind LookupKind, const BuiltinUnit &M,
                    SmallVectorImpl<ValueDecl*> &Result);
 };
 
@@ -70,17 +70,17 @@ BuiltinUnit::LookupCache &BuiltinUnit::getCache() const {
 }
 
 void BuiltinUnit::LookupCache::lookupValue(
-       Identifier Name, NLKind LookupKind, const BuiltinUnit &M,
+       DeclName Name, NLKind LookupKind, const BuiltinUnit &M,
        SmallVectorImpl<ValueDecl*> &Result) {
   // Only qualified lookup ever finds anything in the builtin module.
   if (LookupKind != NLKind::QualifiedLookup) return;
   
   ValueDecl *&Entry = Cache[Name];
   ASTContext &Ctx = M.getParentModule()->getASTContext();
-  if (!Entry) {
+  if (!Entry && !Name.isSpecialName()) {
     if (Type Ty = getBuiltinType(Ctx, Name.str())) {
-      auto *TAD = new (Ctx) TypeAliasDecl(SourceLoc(), Name, SourceLoc(),
-                                          TypeLoc::withoutLoc(Ty),
+      auto *TAD = new (Ctx) TypeAliasDecl(SourceLoc(), Name.getIdentifier(),
+                                          SourceLoc(), TypeLoc::withoutLoc(Ty),
                                           /*genericparams*/nullptr,
                                           const_cast<BuiltinUnit*>(&M));
       TAD->computeType();
@@ -90,8 +90,8 @@ void BuiltinUnit::LookupCache::lookupValue(
     }
   }
 
-  if (!Entry)
-    Entry = getBuiltinValueDecl(Ctx, Name);
+  if (!Entry && !Name.isSpecialName())
+    Entry = getBuiltinValueDecl(Ctx, Name.getIdentifier());
 
   if (Entry)
     Result.push_back(Entry);
@@ -179,7 +179,7 @@ void SourceLookupCache::doPopulateCache(Range decls,
                                         bool onlyOperators) {
   for (Decl *D : decls) {
     if (ValueDecl *VD = dyn_cast<ValueDecl>(D))
-      if (onlyOperators ? VD->getName().isOperator() : VD->hasName()) {
+      if (onlyOperators ? VD->isOperator() : VD->hasName()) {
         // Cache the value under both its compound name and its full name.
         TopLevelValues.add(VD);
       }
@@ -282,7 +282,7 @@ void SourceLookupCache::lookupClassMembers(AccessPathTy accessPath,
       for (ValueDecl *vd : member.second) {
         Type ty = vd->getDeclContext()->getDeclaredTypeOfContext();
         if (auto nominal = ty->getAnyNominal())
-          if (nominal->getName() == accessPath.front().first)
+          if (nominal->getBaseName() == accessPath.front().first)
             consumer.foundDecl(vd, DeclVisibilityKind::DynamicLookup);
       }
     }
@@ -317,7 +317,7 @@ void SourceLookupCache::lookupClassMember(AccessPathTy accessPath,
     for (ValueDecl *vd : iter->second) {
       Type ty = vd->getDeclContext()->getDeclaredTypeOfContext();
       if (auto nominal = ty->getAnyNominal())
-        if (nominal->getName() == accessPath.front().first)
+        if (nominal->getBaseName() == accessPath.front().first)
           results.push_back(vd);
     }
     return;
@@ -1130,11 +1130,11 @@ StringRef Module::getModuleFilename() const {
 }
 
 bool Module::isStdlibModule() const {
-  return !getParent() && getName() == getASTContext().StdlibModuleName;
+  return !getParent() && getIdentifier() == getASTContext().StdlibModuleName;
 }
 
 bool Module::isSwiftShimsModule() const {
-  return !getParent() && getName() == getASTContext().SwiftShimsModuleName;
+  return !getParent() && getIdentifier() == getASTContext().SwiftShimsModuleName;
 }
 
 bool Module::isBuiltinModule() const {
@@ -1526,7 +1526,7 @@ SourceFile::getDiscriminatorForPrivateValue(const ValueDecl *D) const {
   // discriminator invariant across source checkout locations.
   // FIXME: Use a faster hash here? We don't need security, just uniqueness.
   llvm::MD5 hash;
-  hash.update(getParentModule()->getName().str());
+  hash.update(getParentModule()->getIdentifier().str());
   hash.update(llvm::sys::path::filename(name));
   llvm::MD5::MD5Result result;
   hash.final(result);
@@ -1576,14 +1576,14 @@ getClangModule(llvm::PointerUnion<const Module *, const void *> Union) {
 StringRef ModuleEntity::getName() const {
   assert(!Mod.isNull());
   if (auto SwiftMod = Mod.dyn_cast<const Module*>())
-    return SwiftMod->getName().str();
+    return SwiftMod->getIdentifier().str();
   return getClangModule(Mod)->Name;
 }
 
 std::string ModuleEntity::getFullName() const {
   assert(!Mod.isNull());
   if (auto SwiftMod = Mod.dyn_cast<const Module*>())
-    return SwiftMod->getName().str();
+    return SwiftMod->getIdentifier().str();
   return getClangModule(Mod)->getFullModuleName();
 }
 

@@ -152,11 +152,11 @@ llvm::Constant *EnumImplStrategy::emitCaseNames() const {
   // Build the list of case names, payload followed by no-payload.
   llvm::SmallString<64> fieldNames;
   for (auto &payloadCase : getElementsWithPayload()) {
-    fieldNames.append(payloadCase.decl->getName().str());
+    fieldNames.append(payloadCase.decl->getBaseName().str());
     fieldNames.push_back('\0');
   }
   for (auto &noPayloadCase : getElementsWithNoPayload()) {
-    fieldNames.append(noPayloadCase.decl->getName().str());
+    fieldNames.append(noPayloadCase.decl->getBaseName().str());
     fieldNames.push_back('\0');
   }
   // The final null terminator is provided by getAddrOfGlobalString.
@@ -5666,7 +5666,8 @@ const TypeInfo *TypeConverter::convertEnumType(TypeBase *key, CanType type,
     for (auto &elt : strategy->getElementsWithNoPayload()) {
       auto bitPattern = strategy->getBitPatternForNoPayloadElement(elt.decl);
       assert(bitPattern.size() == fixedTI->getFixedSize().getValueInBits());
-      DEBUG(llvm::dbgs() << "  no-payload case " << elt.decl->getName().str()
+      DEBUG(llvm::dbgs() << "  no-payload case "
+                         << elt.decl->getBaseName()
                          << ":\t";
             displayBitMask(bitPattern));
 

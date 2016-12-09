@@ -40,12 +40,12 @@ using namespace swift;
 
 static bool isNSObjectOrAnyHashable(ASTContext &ctx, Type type) {
   if (auto classDecl = type->getClassOrBoundGenericClass()) {
-    return classDecl->getName()
+    return classDecl->getBaseName()
              == ctx.getSwiftId(KnownFoundationEntity::NSObject) &&
-           classDecl->getModuleContext()->getName() == ctx.Id_ObjectiveC;
+           classDecl->getModuleContext()->getIdentifier() == ctx.Id_ObjectiveC;
   }
   if (auto nomDecl = type->getAnyNominal()) {
-    return nomDecl->getName() == ctx.getIdentifier("AnyHashable") &&
+    return nomDecl->getBaseName() == ctx.getIdentifier("AnyHashable") &&
       nomDecl->getModuleContext() == ctx.getStdlibModule();
   }
 
@@ -57,7 +57,7 @@ static bool isAnyObjectOrAny(Type type) {
 }
 
 /// Returns true if \p name matches a keyword in any Clang language mode.
-static bool isClangKeyword(Identifier name) {
+static bool isClangKeyword(DeclName name) {
   static const llvm::StringSet<> keywords = []{
     llvm::StringSet<> set;
     // FIXME: clang::IdentifierInfo /nearly/ has the API we need to do this
@@ -70,7 +70,9 @@ static bool isClangKeyword(Identifier name) {
     return set;
   }();
 
-  if (name.empty())
+  if (!name)
+    return false;
+  if (name.isSpecialName())
     return false;
   return keywords.find(name.str()) != keywords.end();
 }
@@ -111,7 +113,7 @@ static StringRef getNameForObjC(const ValueDecl *VD,
         return anonTypedef->getIdentifier()->getName();
   }
 
-  return VD->getName().str();
+  return VD->getBaseName().str();
 }
 
 /// Returns true if the given selector might be mistaken for an init method
@@ -134,7 +136,7 @@ class ObjCPrinter : private DeclVisitor<ObjCPrinter>,
   friend TypeVisitor;
 
   using NameAndOptional = std::pair<StringRef, bool>;
-  llvm::DenseMap<std::pair<Identifier, Identifier>, NameAndOptional>
+  llvm::DenseMap<std::pair<Identifier, DeclName>, NameAndOptional>
     specialNames;
   Identifier ID_CFTypeRef;
 
@@ -173,7 +175,8 @@ public:
     }
 
     os << "@interface " << getNameForObjC(baseClass)
-    << " (SWIFT_EXTENSION(" << origDC->getParentModule()->getName() << "))\n";
+       << " (SWIFT_EXTENSION(" << origDC->getParentModule()->getIdentifier()
+       << "))\n";
     printMembers</*allowDelayed*/true>(members);
     os << "@end\n\n";
   }
@@ -260,9 +263,9 @@ private:
     if (customName.empty()) {
       llvm::SmallString<32> scratch;
       os << "SWIFT_CLASS(\"" << CD->getObjCRuntimeName(scratch) << "\")\n"
-         << "@interface " << CD->getName();
+         << "@interface " << CD->getBaseName();
     } else {
-      os << "SWIFT_CLASS_NAMED(\"" << CD->getName() << "\")\n"
+      os << "SWIFT_CLASS_NAMED(\"" << CD->getBaseName() << "\")\n"
          << "@interface " << customName;
     }
 
@@ -278,7 +281,7 @@ private:
     auto baseClass = ED->getExtendedType()->getClassOrBoundGenericClass();
 
     os << "@interface " << getNameForObjC(baseClass)
-       << " (SWIFT_EXTENSION(" << ED->getModuleContext()->getName() << "))";
+       << " (SWIFT_EXTENSION(" << ED->getModuleContext()->getBaseName() << "))";
     printProtocols(ED->getLocalProtocols(ConformanceLookupKind::OnlyExplicit));
     os << "\n";
     printMembers(ED->getMembers());
@@ -292,9 +295,9 @@ private:
     if (customName.empty()) {
       llvm::SmallString<32> scratch;
       os << "SWIFT_PROTOCOL(\"" << PD->getObjCRuntimeName(scratch) << "\")\n"
-         << "@protocol " << PD->getName();
+         << "@protocol " << PD->getBaseName();
     } else {
-      os << "SWIFT_PROTOCOL_NAMED(\"" << PD->getName() << "\")\n"
+      os << "SWIFT_PROTOCOL_NAMED(\"" << PD->getBaseName() << "\")\n"
          << "@protocol " << customName;
     }
 
@@ -317,10 +320,10 @@ private:
     }
     print(ED->getRawType(), OTK_None);
     if (customName.empty()) {
-      os << ", " << ED->getName();
+      os << ", " << ED->getBaseName();
     } else {
       os << ", " << customName
-         << ", \"" << ED->getName() << "\"";
+         << ", \"" << ED->getBaseName() << "\"";
     }
     os << ") {\n";
     for (auto Elt : ED->getAllElements()) {
@@ -332,16 +335,16 @@ private:
       StringRef customEltName = getNameForObjC(Elt, CustomNamesOnly);
       if (customEltName.empty()) {
         if (customName.empty()) {
-          os << ED->getName();
+          os << ED->getBaseName();
         } else {
           os << customName;
         }
 
         SmallString<16> scratch;
-        os << camel_case::toSentencecase(Elt->getName().str(), scratch);
+        os << camel_case::toSentencecase(Elt->getBaseName().str(), scratch);
       } else {
         os << customEltName
-           << " SWIFT_COMPILE_NAME(\"" << Elt->getName() << "\")";
+           << " SWIFT_COMPILE_NAME(\"" << Elt->getBaseName() << "\")";
       }
       
       if (auto ILE = cast_or_null<IntegerLiteralExpr>(Elt->getRawValueExpr())) {
@@ -372,7 +375,7 @@ private:
     if (!param->hasName()) {
       os << "_";
     } else {
-      Identifier name = param->getName();
+      DeclName name = param->getBaseName();
       os << name;
       if (isClangKeyword(name))
         os << "_";
@@ -573,7 +576,7 @@ private:
     auto params = FD->getParameterLists().back();
     interleave(*params,
                [&](const ParamDecl *param) {
-                 print(param->getType(), OTK_None, param->getName(),
+                 print(param->getType(), OTK_None, param->getBaseName(),
                        IsFunctionParam);
                },
                [&]{ os << ", "; });
@@ -625,7 +628,7 @@ private:
       ty = TAD->getUnderlyingType();
     }
 
-    return TAD && TAD->getName() == ID_CFTypeRef && TAD->hasClangNode();
+    return TAD && TAD->getBaseName() == ID_CFTypeRef && TAD->hasClangNode();
   }
 
   void visitVarDecl(VarDecl *VD) {
@@ -1059,8 +1062,8 @@ private:
                     "SIMD elements is changed");
     }
 
-    Identifier moduleName = typeDecl->getModuleContext()->getName();
-    Identifier name = typeDecl->getName();
+    Identifier moduleName = typeDecl->getModuleContext()->getIdentifier();
+    DeclName name = typeDecl->getBaseName();
     auto iter = specialNames.find({moduleName, name});
     if (iter == specialNames.end())
       return nullptr;
@@ -1115,7 +1118,7 @@ private:
     }
 
     if (alias->isObjC()) {
-      os << alias->getName();
+      os << alias->getBaseName();
       return;
     }
 
@@ -1508,7 +1511,7 @@ private:
   /// visitPart().
 public:
   void print(Type ty, Optional<OptionalTypeKind> optionalKind, 
-             Identifier name = Identifier(),
+             DeclName name = DeclName(),
              IsFunctionParam_t isFuncParam = IsNotFunctionParam) {
     PrettyStackTraceType trace(M.getASTContext(), "printing", ty);
 
@@ -1520,7 +1523,7 @@ public:
 
     PrintMultiPartType multiPart(*this);
     visitPart(ty, optionalKind);
-    if (!name.empty()) {
+    if (name) {
       os << ' ' << name;
       if (isClangKeyword(name)) {
         os << '_';
@@ -1720,7 +1723,7 @@ public:
     if (otherModule->isStdlibModule())
       return true;
     // Don't need a module for SIMD types in C.
-    if (otherModule->getName() == M.getASTContext().Id_simd)
+    if (otherModule->getIdentifier() == M.getASTContext().Id_simd)
       return true;
 
     // If there's a Clang node, see if it comes from an explicit submodule.
@@ -2025,11 +2028,12 @@ public:
       bool hasDomainCase = std::any_of(ED->getAllElements().begin(),
                                        ED->getAllElements().end(),
                                        [](const EnumElementDecl *elem) {
-        return elem->getName().str() == "Domain";
+        return elem->getBaseName() == "Domain";
       });
       if (!hasDomainCase) {
         os << "static NSString * _Nonnull const " << getNameForObjC(ED)
-           << "Domain = @\"" << M.getName() << "." << ED->getName() << "\";\n";
+           << "Domain = @\"" << M.getIdentifier() << "." << ED->getBaseName()
+           << "\";\n";
       }
     }
 
@@ -2185,7 +2189,7 @@ public:
 
   bool isUnderlyingModule(Module *import) {
     if (bridgingHeader.empty())
-      return import != &M && import->getName() == M.getName();
+      return import != &M && import->getIdentifier() == M.getIdentifier();
 
     auto importer =
       static_cast<ClangImporter *>(import->getASTContext()
@@ -2201,7 +2205,7 @@ public:
     bool includeUnderlying = false;
     for (auto import : imports) {
       if (auto *swiftModule = import.dyn_cast<Module *>()) {
-        auto Name = swiftModule->getName();
+        auto Name = swiftModule->getIdentifier();
         if (isUnderlyingModule(swiftModule)) {
           includeUnderlying = true;
           continue;
@@ -2228,8 +2232,8 @@ public:
 
     if (includeUnderlying) {
       if (bridgingHeader.empty())
-        out << "#import <" << M.getName().str() << '/' << M.getName().str()
-            << ".h>\n\n";
+        out << "#import <" << M.getIdentifier().str() << '/'
+            << M.getIdentifier().str() << ".h>\n\n";
       else
         out << "#import \"" << bridgingHeader << "\"\n\n";
     }
@@ -2266,11 +2270,11 @@ public:
 
       auto getSortName = [](const Decl *D) -> StringRef {
         if (auto VD = dyn_cast<ValueDecl>(D))
-          return VD->getName().str();
+          return VD->getBaseName().str();
 
         if (auto ED = dyn_cast<ExtensionDecl>(D)) {
           auto baseClass = ED->getExtendedType()->getClassOrBoundGenericClass();
-          return baseClass->getName().str();
+          return baseClass->getBaseName().str();
         }
         llvm_unreachable("unknown top-level ObjC decl");
       };
@@ -2311,12 +2315,12 @@ public:
         std::mismatch(lhsProtos.begin(), lhsProtos.end(), rhsProtos.begin(),
                       [getSortName] (const ProtocolDecl *nextLHSProto,
                                      const ProtocolDecl *nextRHSProto) {
-        return nextLHSProto->getName() != nextRHSProto->getName();
+        return nextLHSProto->getBaseName() != nextRHSProto->getBaseName();
       });
       if (mismatch.first == lhsProtos.end())
         return Equivalent;
-      StringRef lhsProtoName = (*mismatch.first)->getName().str();
-      return lhsProtoName.compare((*mismatch.second)->getName().str());
+      DeclName lhsProtoName = (*mismatch.first)->getBaseName();
+      return lhsProtoName.compare((*mismatch.second)->getBaseName());
     });
 
     assert(declsToWrite.empty());

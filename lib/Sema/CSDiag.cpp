@@ -668,7 +668,7 @@ static void diagnoseSubElementFailure(Expr *destExpr,
   // problematic decl, we can produce a nice tailored diagnostic.
   if (auto *VD = dyn_cast_or_null<VarDecl>(immInfo.second)) {
     std::string message = "'";
-    message += VD->getName().str().str();
+    message += VD->getBaseName().str();
     message += "'";
  
     if (VD->isImplicit())
@@ -709,7 +709,7 @@ static void diagnoseSubElementFailure(Expr *destExpr,
   // If we're trying to set an unapplied method, say that.
   if (auto *VD = dyn_cast_or_null<ValueDecl>(immInfo.second)) {
     std::string message = "'";
-    message += VD->getName().str().str();
+    message += VD->getBaseName().str();
     message += "'";
     
     if (auto *AFD = dyn_cast<AbstractFunctionDecl>(VD))
@@ -748,7 +748,7 @@ static void diagnoseSubElementFailure(Expr *destExpr,
 
     if (auto *DRE =
           dyn_cast<DeclRefExpr>(AE->getFn()->getValueProvidingExpr()))
-      name = std::string("'") + DRE->getDecl()->getName().str().str() + "'";
+      name = std::string("'") + DRE->getDecl()->getBaseName().str().str() + "'";
 
     TC.diagnose(loc, diagID, name + " returns immutable value")
       .highlight(AE->getSourceRange());
@@ -1904,7 +1904,7 @@ bool CalleeCandidateInfo::diagnoseSimpleErrors(const Expr *E) {
                       CD->getResultInterfaceType(), decl->getFormalAccess());
      
     } else {
-      CS->TC.diagnose(loc, diag::candidate_inaccessible, decl->getName(),
+      CS->TC.diagnose(loc, diag::candidate_inaccessible, decl->getBaseName(),
                       decl->getFormalAccess());
     }
     for (auto cand : candidates) {
@@ -2296,7 +2296,7 @@ bool FailureDiagnosis::diagnoseGeneralMemberFailure(Constraint *constraint) {
   
   if (auto moduleTy = baseObjTy->getAs<ModuleType>()) {
     diagnose(anchor->getLoc(), diag::no_member_of_module,
-             moduleTy->getModule()->getName(), memberName)
+             moduleTy->getModule()->getIdentifier(), memberName)
       .highlight(anchor->getSourceRange()).highlight(memberRange);
     return true;
   }
@@ -2313,7 +2313,7 @@ bool FailureDiagnosis::diagnoseGeneralMemberFailure(Constraint *constraint) {
     
       if (auto *DRE = dyn_cast<DeclRefExpr>(anchor)) {
         diagnose(anchor->getLoc(), diag::did_not_call_function,
-                 DRE->getDecl()->getName())
+                 DRE->getDecl()->getBaseName())
           .fixItInsertAfter(insertLoc, "()");
         return true;
       }
@@ -2321,7 +2321,7 @@ bool FailureDiagnosis::diagnoseGeneralMemberFailure(Constraint *constraint) {
       if (auto *DSCE = dyn_cast<DotSyntaxCallExpr>(anchor))
         if (auto *DRE = dyn_cast<DeclRefExpr>(DSCE->getFn())) {
           diagnose(anchor->getLoc(), diag::did_not_call_method,
-                   DRE->getDecl()->getName())
+                   DRE->getDecl()->getBaseName())
             .fixItInsertAfter(insertLoc, "()");
           return true;
         }
@@ -2341,7 +2341,7 @@ bool FailureDiagnosis::diagnoseGeneralMemberFailure(Constraint *constraint) {
     if (!nameStr.getAsInteger(10, Value) && Value < tuple->getNumElements()) {
       fieldIdx = Value;
     } else {
-      fieldIdx = tuple->getNamedElementId(memberName.getBaseName());
+      fieldIdx = tuple->getNamedElementId(memberName.getIdentifier());
     }
 
     if (fieldIdx != -1)
@@ -2366,7 +2366,7 @@ bool FailureDiagnosis::diagnoseGeneralMemberFailure(Constraint *constraint) {
   MemberLookupResult result = CS->performMemberLookup(
       constraint->getKind(), memberName, baseTy,
       constraint->getFunctionRefKind(), constraint->getLocator(),
-      /*includeInaccessibleMembers*/ true);
+      /*includeInaccessibleMembers*/ true, /*includeSpecialNames*/ true);
 
   switch (result.OverallResult) {
   case MemberLookupResult::Unsolved:      
@@ -2555,7 +2555,7 @@ diagnoseTypeMemberOnInstanceLookup(Type baseObjTy,
         // Fetch any declaration to check if the name is '~='
         ValueDecl *decl0 = overloadedFn->getDecls()[0];
 
-        if (decl0->getName() == decl0->getASTContext().Id_MatchOperator) {
+        if (decl0->getBaseName() == decl0->getASTContext().Id_MatchOperator) {
           assert(binaryExpr->getArg()->getElements().size() == 2);
 
           // If the rhs of '~=' is the enum type, a single dot suffixes
@@ -2576,7 +2576,7 @@ diagnoseTypeMemberOnInstanceLookup(Type baseObjTy,
       ->getAsNominalTypeOrNominalTypeExtensionContext();
   SmallString<32> typeName;
   llvm::raw_svector_ostream typeNameStream(typeName);
-  typeNameStream << nominal->getName() << ".";
+  typeNameStream << nominal->getBaseName() << ".";
 
   Diag->fixItInsert(loc, typeNameStream.str());
   return;
@@ -2630,7 +2630,7 @@ diagnoseUnviableLookupResults(MemberLookupResult &result, Type baseObjTy,
     };
 
     // TODO: This should handle tuple member lookups, like x.1231 as well.
-    if (memberName.isSimpleName("subscript")) {
+    if (memberName.getKind() == DeclNameKind::Subscript) {
       diagnose(loc, diag::type_not_subscriptable, baseObjTy)
         .highlight(baseRange);
     } else if (auto MTT = baseObjTy->getAs<MetatypeType>()) {
@@ -2775,7 +2775,7 @@ diagnoseUnviableLookupResults(MemberLookupResult &result, Type baseObjTy,
     case MemberLookupResult::UR_Inaccessible: {
       auto decl = result.UnviableCandidates[0].first;
       // FIXME: What if the unviable candidates have different levels of access?
-      diagnose(nameLoc, diag::candidate_inaccessible, decl->getName(),
+      diagnose(nameLoc, diag::candidate_inaccessible, decl->getBaseName(),
                decl->getFormalAccess());
       for (auto cand : result.UnviableCandidates)
         diagnose(cand.first, diag::decl_declared_here, memberName);
@@ -2785,6 +2785,12 @@ diagnoseUnviableLookupResults(MemberLookupResult &result, Type baseObjTy,
     case MemberLookupResult::UR_DestructorInaccessible: {
       diagnose(nameLoc, diag::destructor_not_accessible);
       return;
+    }
+    case MemberLookupResult::UR_SubscriptAsIdentifier: {
+      diagnose(nameLoc.getBaseNameLoc(),
+               diag::subscript_not_accessible_via_keyword);
+      return;
+      
     }
     }
   }
@@ -3890,16 +3896,16 @@ static bool tryDiagnoseNonEscapingParameterToEscaping(Expr *expr, Type srcType,
   switch (CS->getContextualTypePurpose()) {
   case CTP_CallArgument:
     CS->TC.diagnose(declRef->getLoc(), diag::passing_noescape_to_escaping,
-                    paramDecl->getName());
+                    paramDecl->getBaseName());
     break;
   case CTP_AssignSource:
     CS->TC.diagnose(declRef->getLoc(), diag::assigning_noescape_to_escaping,
-                    paramDecl->getName());
+                    paramDecl->getBaseName());
     break;
 
   default:
     CS->TC.diagnose(declRef->getLoc(), diag::general_noescape_to_escaping,
-                    paramDecl->getName());
+                    paramDecl->getBaseName());
     break;
   }
 
@@ -3907,7 +3913,7 @@ static bool tryDiagnoseNonEscapingParameterToEscaping(Expr *expr, Type srcType,
   InFlightDiagnostic note = CS->TC.diagnose(
       paramDecl->getLoc(), srcFT->isAutoClosure() ? diag::noescape_autoclosure
                                                   : diag::noescape_parameter,
-      paramDecl->getName());
+      paramDecl->getBaseName());
 
   if (!srcFT->isAutoClosure()) {
     note.fixItInsert(paramDecl->getTypeLoc().getSourceRange().Start,
@@ -4614,7 +4620,7 @@ static bool diagnoseImplicitSelfErrors(Expr *fnExpr, Expr *argExpr,
     return false;
 
   auto baseDecl = baseExpr->getDecl();
-  if (!baseExpr->isImplicit() || baseDecl->getName() != TC.Context.Id_self)
+  if (!baseExpr->isImplicit() || baseDecl->getBaseName() != TC.Context.Id_self)
     return false;
 
   // Our base expression is an implicit 'self.' reference e.g.
@@ -4673,9 +4679,9 @@ static bool diagnoseImplicitSelfErrors(Expr *fnExpr, Expr *argExpr,
   auto getBaseName = [](DeclContext *context) -> DeclName {
     if (auto generic =
           context->getAsNominalTypeOrNominalTypeExtensionContext()) {
-      return generic->getName();
+      return generic->getBaseName();
     } else if (context->isModuleScopeContext())
-      return context->getParentModule()->getName();
+      return context->getParentModule()->getIdentifier();
     else
       llvm_unreachable("Unsupported base");
   };
@@ -5249,12 +5255,13 @@ bool FailureDiagnosis::visitSubscriptExpr(SubscriptExpr *SE) {
   auto locator =
     CS->getConstraintLocator(SE, ConstraintLocator::SubscriptMember);
 
-  auto subscriptName = CS->getASTContext().Id_subscript;
+  auto subscriptName = DeclName::createSubscript();
   
   MemberLookupResult result =
     CS->performMemberLookup(ConstraintKind::ValueMember, subscriptName,
                             baseType, FunctionRefKind::DoubleApply, locator,
-                            /*includeInaccessibleMembers*/true);
+                            /*includeInaccessibleMembers*/true,
+                            /*includeSpecialNames*/false);
 
   
   switch (result.OverallResult) {
@@ -5541,7 +5548,8 @@ bool FailureDiagnosis::diagnoseMethodAttributeFailures(
   auto results = CS->performMemberLookup(
       ConstraintKind::ValueMember, UDE->getName(), baseType,
       UDE->getFunctionRefKind(), CS->getConstraintLocator(UDE),
-      /*includeInaccessibleMembers=*/false);
+      /*includeInaccessibleMembers=*/false,
+      /*includeSpecialNames*/false);
 
   if (results.UnviableCandidates.empty())
     return false;
@@ -6635,7 +6643,8 @@ bool FailureDiagnosis::visitUnresolvedMemberExpr(UnresolvedMemberExpr *E) {
                             baseObjTy,
                             memberConstraint->getFunctionRefKind(),
                             memberConstraint->getLocator(),
-                            /*includeInaccessibleMembers*/true);
+                            /*includeInaccessibleMembers*/true,
+                            /*includeSpecialNames*/true);
 
   switch (result.OverallResult) {
   case MemberLookupResult::Unsolved:
@@ -7348,10 +7357,9 @@ void FailureDiagnosis::diagnoseUnboundArchetype(ArchetypeType *archetype,
   
   auto decl = resolved.getDecl();
   if (isa<FuncDecl>(decl)) {
-    auto name = decl->getName();
-    auto diagID = name.isOperator() ? diag::note_call_to_operator
-    : diag::note_call_to_func;
-    tc.diagnose(decl, diagID, name);
+    auto diagID = decl->isOperator() ? diag::note_call_to_operator
+                                     : diag::note_call_to_func;
+    tc.diagnose(decl, diagID, decl->getBaseName());
     return;
   }
   
@@ -7362,7 +7370,7 @@ void FailureDiagnosis::diagnoseUnboundArchetype(ArchetypeType *archetype,
   }
   
   if (isa<ParamDecl>(decl)) {
-    tc.diagnose(decl, diag::note_init_parameter, decl->getName());
+    tc.diagnose(decl, diag::note_init_parameter, decl->getBaseName());
     return;
   }
   

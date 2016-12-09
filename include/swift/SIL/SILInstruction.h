@@ -566,7 +566,7 @@ public:
 
   SILDebugVariable get(VarDecl *VD, const char *buf) const {
     if (VD)
-      return {VD->getName().empty() ? "" : VD->getName().str(), VD->isLet(),
+      return {VD->getBaseName() ? VD->getBaseName().str() : "", VD->isLet(),
               getArgNo()};
     else
       return {getName(buf), isLet(), getArgNo()};

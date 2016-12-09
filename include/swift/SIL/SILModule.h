@@ -165,7 +165,7 @@ private:
   llvm::DenseMap<Identifier, IntrinsicInfo> IntrinsicIDCache;
 
   /// This is a cache of builtin Function declarations to numeric ID mappings.
-  llvm::DenseMap<Identifier, BuiltinInfo> BuiltinIDCache;
+  llvm::DenseMap<DeclName, BuiltinInfo> BuiltinIDCache;
 
   /// This is the set of undef values we've created, for uniquing purposes.
   llvm::DenseMap<SILType, SILUndef *> UndefValues;
@@ -603,7 +603,7 @@ public:
   ///
   /// \returns Returns builtin info of BuiltinValueKind::None kind if the
   /// declaration is not a builtin.
-  const BuiltinInfo &getBuiltinInfo(Identifier ID);
+  const BuiltinInfo &getBuiltinInfo(DeclName Name);
 };
 
 inline llvm::raw_ostream &operator<<(llvm::raw_ostream &OS, const SILModule &M){

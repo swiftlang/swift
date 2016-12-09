@@ -197,7 +197,7 @@ std::string ASTMangler::mangleBehaviorInitThunk(const VarDecl *decl) {
          "not a valid identifier");
 
   appendContextOf(decl);
-  appendIdentifier(decl->getName().str());
+  appendIdentifier(decl->getBaseName().str());
   appendIdentifier(discriminator.str());
   appendOperator("TB");
   return finalize();
@@ -331,8 +331,8 @@ static bool isInPrivateOrLocalContext(const ValueDecl *D) {
 }
 
 void ASTMangler::appendDeclName(const ValueDecl *decl) {
-  if (decl->getName().isOperator()) {
-    appendIdentifier(translateOperator(decl->getName().str()));
+  if (decl->isOperator()) {
+    appendIdentifier(translateOperator(decl->getBaseName().str()));
     switch (decl->getAttrs().getUnaryOperatorKind()) {
       case UnaryOperatorKind::Prefix:
         appendOperator("op");
@@ -345,7 +345,7 @@ void ASTMangler::appendDeclName(const ValueDecl *decl) {
         break;
     }
   } else {
-    appendIdentifier(decl->getName().str());
+    appendIdentifier(decl->getBaseName().str());
   }
 
   if (decl->getDeclContext()->isLocalContext()) {
@@ -1064,7 +1064,7 @@ void ASTMangler::appendModule(const Module *module) {
   if (module->isStdlibModule())
     return appendOperator("s");
 
-  StringRef ModName = module->getName().str();
+  StringRef ModName = module->getIdentifier().str();
   if (ModName == MANGLING_MODULE_OBJC)
     return appendOperator("So");
   if (ModName == MANGLING_MODULE_C)
@@ -1306,7 +1306,7 @@ void ASTMangler::appendAssociatedTypeName(DependentMemberType *dmt) {
   // FIXME: We ought to be able to get to the generic signature from a
   // dependent type, but can't yet. Shouldn't need this side channel.
 
-  appendIdentifier(assocTy->getName().str());
+  appendIdentifier(assocTy->getBaseName().str());
   if (!OptimizeProtocolNames || !CurGenericSignature || !Mod
       || CurGenericSignature->getConformsTo(dmt->getBase(), *Mod).size() > 1) {
     appendNominalType(assocTy->getProtocol());
@@ -1474,7 +1474,7 @@ bool ASTMangler::tryAppendStandardSubstitution(const NominalTypeDecl *decl) {
   if (!dc->isModuleScopeContext() || !dc->getParentModule()->isStdlibModule())
     return false;
 
-  StringRef name = decl->getName().str();
+  StringRef name = decl->getBaseName().str();
   if (name == "Int") {
     appendOperator("Si");
     return true;
@@ -1660,7 +1660,7 @@ void ASTMangler::appendProtocolConformance(const ProtocolConformance *conformanc
     appendIdentifier(
               fileUnit->getDiscriminatorForPrivateValue(behaviorStorage).str());
     appendProtocolName(conformance->getProtocol());
-    appendIdentifier(behaviorStorage->getName().str());
+    appendIdentifier(behaviorStorage->getBaseName().str());
   } else {
     appendType(conformance->getInterfaceType()->getCanonicalType());
     appendProtocolName(conformance->getProtocol());

@@ -92,8 +92,16 @@ bool SemaAnnotator::walkToDeclPre(Decl *D) {
   unsigned NameLen = 0;
 
   if (ValueDecl *VD = dyn_cast<ValueDecl>(D)) {
-    if (VD->hasName())
-      NameLen = VD->getName().getLength();
+    if (VD->hasName()) {
+      switch (VD->getBaseName().getKind()) {
+        case swift::DeclNameKind::Normal:
+          NameLen = VD->getBaseName().getIdentifier().getLength();
+          break;
+        case swift::DeclNameKind::Subscript:
+          NameLen = 9; // subscript
+          break;
+      }
+    }
 
   } else if (ExtensionDecl *ED = dyn_cast<ExtensionDecl>(D)) {
     SourceRange SR = ED->getExtendedTypeLoc().getSourceRange();
@@ -208,7 +216,7 @@ std::pair<bool, Expr *> SemaAnnotator::walkToExprPre(Expr *E) {
   if (DeclRefExpr *DRE = dyn_cast<DeclRefExpr>(E)) {
     if (auto *module = dyn_cast<ModuleDecl>(DRE->getDecl())) {
       if (!passReference(ModuleEntity(module),
-                         std::make_pair(module->getName(), E->getLoc())))
+                         std::make_pair(module->getIdentifier(), E->getLoc())))
         return { false, nullptr };
     } else if (!passReference(DRE->getDecl(), DRE->getType(),
                               DRE->getNameLoc())) {

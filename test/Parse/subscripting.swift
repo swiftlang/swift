@@ -179,3 +179,22 @@ struct A9 {
     return 1
   }
 }
+
+// SR-2575: Trying to access a subscript using the subscript keyword
+
+struct SR2575 {
+  subscript(x: Int) -> Int {
+    return 1
+  }
+}
+
+let sr2575 = SR2575()
+do {
+  _ = sr2575.subscript(4) // expected-error {{subscripts can only be accessed with square bracket notation}}
+}
+do {
+  _ = sr2575.subscript // expected-error {{subscripts can only be accessed with square bracket notation}}
+}
+do {
+  _ = SR2575.subscript // expected-error {{subscripts can only be accessed with square bracket notation}}
+}

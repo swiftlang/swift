@@ -77,11 +77,11 @@ private:
   union {
     EarlyEmitter *TheEarlyEmitter;
     LateEmitter *TheLateEmitter;
-    Identifier TheBuiltinName;
+    DeclName TheBuiltinName;
   };
 
 public:
-  /*implicit*/ SpecializedEmitter(Identifier builtinName)
+  /*implicit*/ SpecializedEmitter(DeclName builtinName)
     : TheKind(Kind::NamedBuiltin), TheBuiltinName(builtinName) {}
 
   /*implicit*/ SpecializedEmitter(EarlyEmitter *emitter)
@@ -107,7 +107,7 @@ public:
   }
 
   bool isNamedBuiltin() const { return TheKind == Kind::NamedBuiltin; }
-  Identifier getBuiltinName() const {
+  DeclName getBuiltinName() const {
     assert(isNamedBuiltin());
     return TheBuiltinName;
   }

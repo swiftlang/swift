@@ -651,7 +651,7 @@ bool Expr::canAppendCallParentheses() const {
     return true;
 
   case ExprKind::DeclRef:
-    return !cast<DeclRefExpr>(this)->getDecl()->getName().isOperator();
+    return !cast<DeclRefExpr>(this)->getDecl()->isOperator();
 
   case ExprKind::SuperRef:
   case ExprKind::OtherConstructorDeclRef:
@@ -665,7 +665,7 @@ bool Expr::canAppendCallParentheses() const {
     auto *overloadedExpr = cast<OverloadedDeclRefExpr>(this);
     if (overloadedExpr->getDecls().empty())
       return false;
-    return !overloadedExpr->getDecls().front()->getName().isOperator();
+    return !overloadedExpr->getDecls().front()->isOperator();
   }
 
   case ExprKind::UnresolvedDeclRef:
@@ -1900,7 +1900,7 @@ TypeExpr *TypeExpr::createForDecl(SourceLoc Loc, TypeDecl *Decl,
                                   bool isImplicit) {
   ASTContext &C = Decl->getASTContext();
   assert(Loc.isValid());
-  auto *Repr = new (C) SimpleIdentTypeRepr(Loc, Decl->getName());
+  auto *Repr = new (C) SimpleIdentTypeRepr(Loc, Decl->getIdentifier());
   Repr->setValue(Decl);
   auto result = new (C) TypeExpr(TypeLoc(Repr, Type()));
   if (isImplicit)
@@ -1913,7 +1913,7 @@ TypeExpr *TypeExpr::createForSpecializedDecl(SourceLoc Loc, TypeDecl *D,
                                              SourceRange AngleLocs) {
   ASTContext &C = D->getASTContext();
   assert(Loc.isValid());
-  auto *Repr = new (C) GenericIdentTypeRepr(Loc, D->getName(),
+  auto *Repr = new (C) GenericIdentTypeRepr(Loc, D->getIdentifier(),
                                             args, AngleLocs);
   Repr->setValue(D);
   return new (C) TypeExpr(TypeLoc(Repr, Type()));
@@ -1963,7 +1963,7 @@ ObjCKeyPathExpr::ObjCKeyPathExpr(SourceLoc keywordLoc, SourceLoc lParenLoc,
 
 Identifier ObjCKeyPathExpr::getComponentName(unsigned i) const {
   if (auto decl = getComponentDecl(i))
-    return decl->getFullName().getBaseName();
+    return decl->getFullName().getIdentifier();
 
   return getComponents()[i].get<Identifier>();
 }

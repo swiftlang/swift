@@ -83,20 +83,20 @@ DeclName SILGenModule::getMagicFunctionName(DeclContext *dc) {
     return getMagicFunctionName(init->getParent());
   }
   if (auto nominal = dyn_cast<NominalTypeDecl>(dc)) {
-    return nominal->getName();
+    return nominal->getBaseName();
   }
   if (auto tl = dyn_cast<TopLevelCodeDecl>(dc)) {
-    return tl->getModuleContext()->getName();
+    return tl->getModuleContext()->getIdentifier();
   }
   if (auto fu = dyn_cast<FileUnit>(dc)) {
-    return fu->getParentModule()->getName();
+    return fu->getParentModule()->getIdentifier();
   }
   if (auto m = dyn_cast<Module>(dc)) {
-    return m->getName();
+    return m->getIdentifier();
   }
   if (auto e = dyn_cast<ExtensionDecl>(dc)) {
     assert(e->getExtendedType()->getAnyNominal() && "extension for nonnominal");
-    return e->getExtendedType()->getAnyNominal()->getName();
+    return e->getExtendedType()->getAnyNominal()->getBaseName();
   }
   llvm_unreachable("unexpected #function context");
 }

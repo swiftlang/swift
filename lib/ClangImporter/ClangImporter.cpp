@@ -1134,7 +1134,7 @@ Module *ClangImporter::Implementation::finishLoadingClangModule(
   if (clangModule->isSubModule()) {
     finishLoadingClangModule(owner, clangModule->getTopLevelModule(), true);
   } else {
-    Module *&loaded = SwiftContext.LoadedModules[result->getName()];
+    Module *&loaded = SwiftContext.LoadedModules[result->getIdentifier()];
     if (!loaded)
       loaded = result;
   }
@@ -1289,10 +1289,10 @@ ClangImporter::Implementation::importSourceRange(clang::SourceRange loc) {
 #pragma mark Importing names
 
 clang::DeclarationName
-ClangImporter::Implementation::exportName(Identifier name) {
+ClangImporter::Implementation::exportName(DeclName name) {
   // FIXME: When we start dealing with C++, we can map over some operator
   // names.
-  if (name.empty() || name.isOperator())
+  if (!name || name.isOperator())
     return clang::DeclarationName();
 
   // Map the identifier. If it's some kind of keyword, it can't be mapped.
@@ -1301,22 +1301,6 @@ ClangImporter::Implementation::exportName(Identifier name) {
     return clang::DeclarationName();
 
   return ident;
-}
-
-namespace llvm {
-  // An Identifier is "pointer like".
-  template<typename T> class PointerLikeTypeTraits;
-  template<>
-  class PointerLikeTypeTraits<swift::DeclName> {
-  public:
-    static inline void *getAsVoidPointer(swift::DeclName name) {
-      return name.getOpaqueValue();
-    }
-    static inline swift::DeclName getFromVoidPointer(void *ptr) {
-      return swift::DeclName::getFromOpaqueValue(ptr);
-    }
-    enum { NumLowBitsAvailable = 0 };
-  };
 }
 
 Identifier
@@ -2331,12 +2315,12 @@ Module *ClangModuleUnit::getAdapterModule() const {
     // FIXME: Include proper source location.
     Module *M = getParentModule();
     ASTContext &Ctx = M->getASTContext();
-    auto adapter = Ctx.getModule(Module::AccessPathTy({M->getName(),
+    auto adapter = Ctx.getModule(Module::AccessPathTy({M->getIdentifier(),
                                                        SourceLoc()}));
     if (adapter == M) {
       adapter = nullptr;
     } else {
-      auto &sharedModuleRef = Ctx.LoadedModules[M->getName()];
+      auto &sharedModuleRef = Ctx.LoadedModules[M->getIdentifier()];
       assert(!sharedModuleRef || sharedModuleRef == adapter ||
              sharedModuleRef == M);
       sharedModuleRef = adapter;
@@ -2551,7 +2535,7 @@ void ClangImporter::Implementation::lookupValue(
   auto &clangCtx = getClangASTContext();
   auto clangTU = clangCtx.getTranslationUnitDecl();
 
-  for (auto entry : table.lookup(name.getBaseName().str(), clangTU)) {
+  for (auto entry : table.lookup(name.getBaseName(), clangTU)) {
     // If the entry is not visible, skip it.
     if (!isVisibleClangEntry(clangCtx, entry)) continue;
 
@@ -2564,7 +2548,7 @@ void ClangImporter::Implementation::lookupValue(
     } else {
       // Try to import a macro.
       auto clangMacro = entry.get<clang::MacroInfo *>();
-      decl = importMacro(name.getBaseName(), clangMacro);
+      decl = importMacro(name.getIdentifier(), clangMacro);
       if (!decl) continue;
     }
 
@@ -2615,12 +2599,12 @@ void ClangImporter::Implementation::lookupVisibleDecls(
        SwiftLookupTable &table,
        VisibleDeclConsumer &consumer) {
   // Retrieve and sort all of the base names in this particular table.
-  auto baseNames = table.allBaseNames();
+  auto baseNames = table.allBaseNames(SwiftContext);
   llvm::array_pod_sort(baseNames.begin(), baseNames.end());
 
   // Look for namespace-scope entities with each base name.
   for (auto baseName : baseNames) {
-    lookupValue(table, SwiftContext.getIdentifier(baseName), consumer);
+    lookupValue(table, baseName, consumer);
   }
 }
 
@@ -2629,7 +2613,7 @@ void ClangImporter::Implementation::lookupObjCMembers(
        DeclName name,
        VisibleDeclConsumer &consumer) {
   auto &clangCtx = getClangASTContext();
-  auto baseName = name.getBaseName().str();
+  auto baseName = name.getBaseName();
 
   for (auto clangDecl : table.lookupObjCMembers(baseName)) {
     // If the entry is not visible, skip it.
@@ -2672,12 +2656,12 @@ void ClangImporter::Implementation::lookupAllObjCMembers(
        SwiftLookupTable &table,
        VisibleDeclConsumer &consumer) {
   // Retrieve and sort all of the base names in this particular table.
-  auto baseNames = table.allBaseNames();
+  auto baseNames = table.allBaseNames(SwiftContext);
   llvm::array_pod_sort(baseNames.begin(), baseNames.end());
 
   // Look for Objective-C members with each base name.
   for (auto baseName : baseNames) {
-    lookupObjCMembers(table, SwiftContext.getIdentifier(baseName), consumer);
+    lookupObjCMembers(table, baseName, consumer);
   }
 }
 
@@ -2703,7 +2687,7 @@ EffectiveClangContext ClangImporter::Implementation::getEffectiveClangContext(
   if (nominal->isObjC()) {
     // Map the name. If we can't represent the Swift name in Clang.
     // FIXME: We should be using the Objective-C name here!
-    auto clangName = exportName(nominal->getName());
+    auto clangName = exportName(nominal->getBaseName());
     if (!clangName)
       return EffectiveClangContext();
 
@@ -2741,7 +2725,7 @@ void ClangImporter::Implementation::dumpSwiftLookupTables() {
   // Print out the lookup tables for the various modules.
   for (auto moduleName : moduleNames) {
     llvm::errs() << "<<" << moduleName << " lookup table>>\n";
-    LookupTables[moduleName]->deserializeAll();
+    LookupTables[moduleName]->deserializeAll(SwiftContext);
     LookupTables[moduleName]->dump();
   }
 

@@ -1180,14 +1180,14 @@ static Type adjustTypeForConcreteImport(ClangImporter::Implementation &impl,
       return Type();
 
     // FIXME: Avoid string comparison by caching this identifier.
-    if (elementClass->getName().str() !=
+    if (elementClass->getBaseName() !=
           impl.SwiftContext.getSwiftName(KnownFoundationEntity::NSError))
       return Type();
 
     Module *foundationModule = impl.tryLoadFoundationModule();
     if (!foundationModule ||
-        foundationModule->getName()
-          != elementClass->getModuleContext()->getName())
+        foundationModule->getIdentifier()
+          != elementClass->getModuleContext()->getIdentifier())
       return Type();
 
     return impl.getNamedSwiftType(
@@ -1337,7 +1337,7 @@ static Type adjustTypeForConcreteImport(ClangImporter::Implementation &impl,
   if (importKind == ImportTypeKind::Parameter &&
       optKind == OTK_ImplicitlyUnwrappedOptional) {
     if (auto *nominal = importedType->getNominalOrBoundGenericNominal()) {
-      if (nominal->getName().str() == "CVaListPointer" &&
+      if (nominal->getBaseName() == "CVaListPointer" &&
           nominal->getParentModule()->isStdlibModule()) {
         optKind = OTK_None;
       }
@@ -1602,7 +1602,7 @@ ParameterList *ClangImporter::Implementation::importFunctionParameterList(
     }
 
     // Figure out the name for this parameter.
-    Identifier bodyName = importFullName(param, ImportNameVersion::Swift3)
+    DeclName bodyName = importFullName(param, ImportNameVersion::Swift3)
                               .getDeclName()
                               .getBaseName();
 
@@ -1616,8 +1616,8 @@ ParameterList *ClangImporter::Implementation::importFunctionParameterList(
     auto paramInfo = createDeclWithClangNode<ParamDecl>(
         param, Accessibility::Private,
         /*IsLet*/ true, SourceLoc(), SourceLoc(), name,
-        importSourceLoc(param->getLocation()), bodyName, swiftParamTy,
-        ImportedHeaderUnit);
+        importSourceLoc(param->getLocation()), bodyName.getIdentifier(),
+        swiftParamTy, ImportedHeaderUnit);
     paramInfo->setInterfaceType(
         ArchetypeBuilder::mapTypeOutOfContext(dc, swiftParamTy));
 
@@ -1658,7 +1658,7 @@ static bool isObjCMethodResultAudited(const clang::Decl *decl) {
 
 DefaultArgumentKind ClangImporter::Implementation::inferDefaultArgument(
     clang::QualType type, OptionalTypeKind clangOptionality,
-    Identifier baseName, unsigned numParams, StringRef argumentLabel,
+    DeclName baseName, unsigned numParams, StringRef argumentLabel,
     bool isFirstParameter, bool isLastParameter, NameImporter &nameImporter) {
   // Don't introduce a default argument for setters with only a single
   // parameter.
@@ -1704,7 +1704,7 @@ DefaultArgumentKind ClangImporter::Implementation::inferDefaultArgument(
     if (auto objcClass = objcPtrTy->getInterfaceDecl()) {
       if (objcClass->getName() == "NSDictionary") {
         StringRef searchStr = argumentLabel;
-        if (searchStr.empty() && !baseName.empty())
+        if (searchStr.empty() && baseName)
           searchStr = baseName.str();
 
         auto emptyDictionaryKind = DefaultArgumentKind::EmptyDictionary;
@@ -2028,7 +2028,7 @@ Type ClangImporter::Implementation::importMethodType(
     }
 
     // Figure out the name for this parameter.
-    Identifier bodyName = importFullName(param, ImportNameVersion::Swift3)
+    DeclName bodyName = importFullName(param, ImportNameVersion::Swift3)
                               .getDeclName()
                               .getBaseName();
 
@@ -2049,8 +2049,8 @@ Type ClangImporter::Implementation::importMethodType(
                                            /*IsLet*/ true,
                                            SourceLoc(), SourceLoc(), name,
                                            importSourceLoc(param->getLocation()),
-                                           bodyName, swiftParamTy,
-                                           ImportedHeaderUnit);
+                                           bodyName.getIdentifier(),
+                                           swiftParamTy, ImportedHeaderUnit);
     paramInfo->setInterfaceType(
         ArchetypeBuilder::mapTypeOutOfContext(dc, swiftParamTy));
 

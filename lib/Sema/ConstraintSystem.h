@@ -805,6 +805,9 @@ struct MemberLookupResult {
     
     // A type's destructor cannot be referenced
     UR_DestructorInaccessible,
+    
+    /// Subscript is trying to be accessed using the subscript keyword
+    UR_SubscriptAsIdentifier,
   };
   
   /// This is a list of considered, but rejected, candidates, along with a
@@ -1893,11 +1896,16 @@ public:
   /// If includeInaccessibleMembers is set to true, this burns compile time to
   /// try to identify and classify inaccessible members that may be being
   /// referenced.
+  ///
+  /// If includeSpecialNames is set to true, it will also look up special names
+  /// for their string representation (e.g. subscript decls for the 'subscript'
+  /// identifier).
   MemberLookupResult performMemberLookup(ConstraintKind constraintKind,
                                          DeclName memberName, Type baseTy,
                                          FunctionRefKind functionRefKind,
                                          ConstraintLocator *memberLocator,
-                                         bool includeInaccessibleMembers);
+                                         bool includeInaccessibleMembers,
+                                         bool includeSpecialNames);
 
 private:  
   /// \brief Attempt to simplify the given construction constraint.

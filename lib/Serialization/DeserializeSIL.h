@@ -110,7 +110,7 @@ namespace swift {
 
 public:
     Identifier getModuleIdentifier() const {
-      return MF->getAssociatedModule()->getName();
+      return MF->getAssociatedModule()->getIdentifier();
     }
     FileUnit *getFile() const {
       return MF->getFile();

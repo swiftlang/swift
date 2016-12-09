@@ -459,7 +459,8 @@ void walkRelatedDecls(const ValueDecl *VD, const FnTy &Fn) {
   // For now we use UnqualifiedLookup to fetch other declarations with the same
   // base name.
   auto TypeResolver = VD->getASTContext().getLazyResolver();
-  UnqualifiedLookup Lookup(VD->getName(), VD->getDeclContext(), TypeResolver);
+  UnqualifiedLookup Lookup(VD->getBaseName(), VD->getDeclContext(),
+                           TypeResolver);
   for (auto result : Lookup.Results) {
     ValueDecl *RelatedVD = result.getValueDecl();
     if (RelatedVD->getAttrs().isUnavailable(VD->getASTContext()))
@@ -776,7 +777,7 @@ static bool passCursorInfoForDecl(const ValueDecl *VD,
     auto ClangMod = Importer->getClangOwningModule(ClangNode);
     ModuleName = ClangMod->getFullModuleName();
   } else if (VD->getLoc().isInvalid() && VD->getModuleContext() != MainModule) {
-    ModuleName = VD->getModuleContext()->getName().str();
+    ModuleName = VD->getModuleContext()->getIdentifier().str();
   }
   StringRef ModuleInterfaceName;
   if (auto IFaceGenRef = Lang.getIFaceGenContexts().find(ModuleName, Invok))
@@ -1451,7 +1452,7 @@ void SwiftLangSupport::findRelatedIdentifiersInFile(
              isa<DestructorDecl>(VD) ||
              isa<SubscriptDecl>(VD)))
           return;
-        if (VD->getName().isOperator())
+        if (VD->isOperator())
           return;
 
         RelatedIdScanner Scanner(SrcFile, BufferID, VD, Ranges);

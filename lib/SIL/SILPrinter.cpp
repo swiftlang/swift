@@ -151,7 +151,7 @@ static void printFullContext(const DeclContext *Context, raw_ostream &Buffer) {
   switch (Context->getContextKind()) {
   case DeclContextKind::Module:
     if (Context == cast<Module>(Context)->getASTContext().TheBuiltinModule)
-      Buffer << cast<Module>(Context)->getName() << ".";
+      Buffer << cast<Module>(Context)->getIdentifier() << ".";
     return;
 
   case DeclContextKind::FileUnit:
@@ -176,7 +176,7 @@ static void printFullContext(const DeclContext *Context, raw_ostream &Buffer) {
   case DeclContextKind::GenericTypeDecl: {
     auto *generic = cast<GenericTypeDecl>(Context);
     printFullContext(generic->getDeclContext(), Buffer);
-    Buffer << generic->getName() << ".";
+    Buffer << generic->getBaseName() << ".";
     return;
   }
 
@@ -210,7 +210,7 @@ static void printFullContext(const DeclContext *Context, raw_ostream &Buffer) {
         break;
     }
     printFullContext(ExtNominal->getDeclContext(), Buffer);
-    Buffer << ExtNominal->getName() << ".";
+    Buffer << ExtNominal->getBaseName() << ".";
     return;
   }
   
@@ -235,9 +235,9 @@ static void printValueDecl(ValueDecl *Decl, raw_ostream &OS) {
   assert(Decl->hasName());
 
   if (Decl->isOperator())
-    OS << '"' << Decl->getName() << '"';
+    OS << '"' << Decl->getBaseName() << '"';
   else
-    OS << Decl->getName();
+    OS << Decl->getBaseName();
 }
 
 /// SILDeclRef uses sigil "#" and prints the fully qualified dotted path.
@@ -1251,7 +1251,8 @@ public:
     printUncheckedConversionInst(CI, CI->getOperand());
   }
   void visitObjCProtocolInst(ObjCProtocolInst *CI) {
-    *this << "#" << CI->getProtocol()->getName() << " : " << CI->getType();
+    *this << "#" << CI->getProtocol()->getBaseName().str() << " : "
+          << CI->getType();
   }
   
   void visitRefToBridgeObjectInst(RefToBridgeObjectInst *I) {
@@ -1364,17 +1365,17 @@ public:
   void visitStructExtractInst(StructExtractInst *EI) {
     *this << getIDAndType(EI->getOperand()) << ", #";
     printFullContext(EI->getField()->getDeclContext(), PrintState.OS);
-    *this << EI->getField()->getName().get();
+    *this << EI->getField()->getBaseName().str();
   }
   void visitStructElementAddrInst(StructElementAddrInst *EI) {
     *this << getIDAndType(EI->getOperand()) << ", #";
     printFullContext(EI->getField()->getDeclContext(), PrintState.OS);
-    *this << EI->getField()->getName().get();
+    *this << EI->getField()->getBaseName().str();
   }
   void visitRefElementAddrInst(RefElementAddrInst *EI) {
     *this << getIDAndType(EI->getOperand()) << ", #";
     printFullContext(EI->getField()->getDeclContext(), PrintState.OS);
-    *this << EI->getField()->getName().get();
+    *this << EI->getField()->getBaseName().str();
   }
 
   void visitRefTailAddrInst(RefTailAddrInst *RTAI) {
@@ -1985,8 +1986,8 @@ static void printSILVTables(SILPrintContext &Ctx,
     vtables.push_back(&vt);
   std::sort(vtables.begin(), vtables.end(),
     [] (const SILVTable *v1, const SILVTable *v2) -> bool {
-      StringRef Name1 = v1->getClass()->getName().str();
-      StringRef Name2 = v2->getClass()->getName().str();
+      StringRef Name1 = v1->getClass()->getBaseName().str();
+      StringRef Name2 = v2->getClass()->getBaseName().str();
       return Name1.compare(Name2) == -1;
     }
   );
@@ -2032,8 +2033,8 @@ printSILDefaultWitnessTables(SILPrintContext &Ctx,
   std::sort(witnesstables.begin(), witnesstables.end(),
     [] (const SILDefaultWitnessTable *w1,
         const SILDefaultWitnessTable *w2) -> bool {
-      return w1->getProtocol()->getName()
-          .compare(w2->getProtocol()->getName()) == -1;
+      return w1->getProtocol()->getBaseName()
+          .compare(w2->getProtocol()->getBaseName()) == -1;
     }
   );
   for (const SILDefaultWitnessTable *wt : witnesstables)
@@ -2125,7 +2126,7 @@ void ValueBase::printInContext(llvm::raw_ostream &OS) const {
 }
 
 void SILVTable::print(llvm::raw_ostream &OS, bool Verbose) const {
-  OS << "sil_vtable " << getClass()->getName() << " {\n";
+  OS << "sil_vtable " << getClass()->getBaseName() << " {\n";
   for (auto &entry : getEntries()) {
     OS << "  ";
     entry.first.print(OS);
@@ -2179,7 +2180,7 @@ void SILWitnessTable::print(llvm::raw_ostream &OS, bool Verbose) const {
       // associated_type AssociatedTypeName: ConformingType
       auto &assocWitness = witness.getAssociatedTypeWitness();
       OS << "associated_type ";
-      OS << assocWitness.Requirement->getName() << ": ";
+      OS << assocWitness.Requirement->getBaseName() << ": ";
       assocWitness.Witness->print(OS, PrintOptions::printSIL());
       break;
     }
@@ -2187,8 +2188,8 @@ void SILWitnessTable::print(llvm::raw_ostream &OS, bool Verbose) const {
       // associated_type_protocol (AssociatedTypeName: Protocol): <conformance>
       auto &assocProtoWitness = witness.getAssociatedTypeProtocolWitness();
       OS << "associated_type_protocol ("
-         << assocProtoWitness.Requirement->getName() << ": "
-         << assocProtoWitness.Protocol->getName() << "): ";
+         << assocProtoWitness.Requirement->getBaseName() << ": "
+         << assocProtoWitness.Protocol->getBaseName() << "): ";
       if (assocProtoWitness.Witness.isConcrete())
         assocProtoWitness.Witness.getConcrete()->printName(OS, Options);
       else
@@ -2199,14 +2200,14 @@ void SILWitnessTable::print(llvm::raw_ostream &OS, bool Verbose) const {
       // base_protocol Protocol: <conformance>
       auto &baseProtoWitness = witness.getBaseProtocolWitness();
       OS << "base_protocol "
-         << baseProtoWitness.Requirement->getName() << ": ";
+         << baseProtoWitness.Requirement->getBaseName() << ": ";
       baseProtoWitness.Witness->printName(OS, Options);
       break;
     }
     case MissingOptional: {
       // optional requirement 'declref': <<not present>>
       OS << "optional requirement '"
-         << witness.getMissingOptionalWitness().Witness->getName()
+         << witness.getMissingOptionalWitness().Witness->getBaseName()
          << "': <<not present>>";
       break;
     }
@@ -2225,7 +2226,7 @@ void SILDefaultWitnessTable::print(llvm::raw_ostream &OS, bool Verbose) const {
   // sil_default_witness_table [<Linkage>] <Protocol> <MinSize>
   OS << "sil_default_witness_table ";
   printLinkage(OS, getLinkage(), ForDefinition);
-  OS << getProtocol()->getName() << " {\n";
+  OS << getProtocol()->getBaseName() << " {\n";
   
   for (auto &witness : getEntries()) {
     if (!witness.isValid()) {

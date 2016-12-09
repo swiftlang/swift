@@ -545,7 +545,7 @@ EnumDecl *ASTContext::getOptionalDecl(OptionalTypeKind kind) const {
 
 static EnumElementDecl *findEnumElement(EnumDecl *e, Identifier name) {
   for (auto elt : e->getAllElements()) {
-    if (elt->getName() == name)
+    if (elt->getBaseName() == name)
       return elt;
   }
   return nullptr;
@@ -836,7 +836,7 @@ FuncDecl *ASTContext::getGetBoolDecl(LazyResolver *resolver) const {
   auto nominalType = dyn_cast<NominalType>(output);
   if (!nominalType ||
       nominalType.getParent() ||
-      nominalType->getDecl()->getName().str() != "Bool")
+      nominalType->getDecl()->getBaseName() != "Bool")
     return nullptr;
 
   Impl.GetBoolDecl = decl;
@@ -1579,7 +1579,7 @@ namespace {
       Module *lhsModule = lhs->getDeclContext()->getParentModule();
       Module *rhsModule = rhs->getDeclContext()->getParentModule();
       if (lhsModule != rhsModule) {
-        return lhsModule->getName().str() < rhsModule->getName().str();
+        return lhsModule->getBaseName() < rhsModule->getBaseName();
       }
 
       // If the two declarations are in the same source file, order based on
@@ -1715,7 +1715,7 @@ bool swift::fixDeclarationName(InFlightDiagnostic &diag, ValueDecl *decl,
         param->getArgumentNameLoc().isValid()) {
       // ... but the internal parameter name was right. Just zap the
       // incorrect explicit specialization.
-      if (param->getName() == targetArg) {
+      if (param->getBaseName() == targetArg) {
         diag.fixItRemoveChars(param->getArgumentNameLoc(),
                               param->getLoc());
         continue;
@@ -1823,7 +1823,7 @@ void ASTContext::diagnoseAttrsRequiringFoundation(SourceFile &SF) {
     return;
 
   SF.forAllVisibleModules([&](Module::ImportedModule import) {
-    if (import.second->getName() == Id_Foundation)
+    if (import.second->getIdentifier() == Id_Foundation)
       ImportsFoundationModule = true;
   });
 
@@ -2196,7 +2196,7 @@ bool ASTContext::diagnoseObjCMethodConflicts(SourceFile &sf) {
         Diags.diagnose(conflictingDecl, diag::objc_redecl_same,
                        diagInfo.first, diagInfo.second, selector);
         Diags.diagnose(originalDecl, diag::invalid_redecl_prev,
-                       originalDecl->getName());
+                       originalDecl->getBaseName());
       } else {
         Diags.diagnose(conflictingDecl, diag::objc_redecl,
                        diagInfo.first,
@@ -3570,6 +3570,8 @@ void DeclName::CompoundDeclName::Profile(llvm::FoldingSetNodeID &id,
 
 void DeclName::initialize(ASTContext &C, Identifier baseName,
                           ArrayRef<Identifier> argumentNames) {
+  Kind = DeclNameKind::Normal;
+  
   if (argumentNames.size() == 0) {
     SimpleOrCompound = IdentifierAndCompound(baseName, true);
     return;
@@ -3604,6 +3606,14 @@ DeclName::DeclName(ASTContext &C, Identifier baseName,
   for (auto P : *paramList)
     names.push_back(P->getArgumentName());
   initialize(C, baseName, names);
+}
+
+DeclName DeclName::createSubscript(ASTContext &C, ParameterList *paramList) {
+  SmallVector<Identifier, 4> names;
+  
+  for (auto P : *paramList)
+    names.push_back(P->getArgumentName());
+  return createSubscript(C, names);
 }
 
 /// Find the implementation of the named type in the given module.
@@ -3790,13 +3800,13 @@ bool ASTContext::isTypeBridgedInExternalModule(
           // NSValue and NSNumber, so to avoid circular dependencies, the
           // bridging implementations of CG types appear in the Foundation
           // module.
-          nominal->getParentModule()->getName() == Id_CoreGraphics ||
+          nominal->getParentModule()->getIdentifier() == Id_CoreGraphics ||
           // CoreMedia is a dependency of AVFoundation, but the bridged
           // NSValue implementations for CMTime, CMTimeRange, and
           // CMTimeMapping are provided by AVFoundation, and AVFoundation
           // gets upset if you don't use the NSValue subclasses its factory
           // methods instantiate.
-          nominal->getParentModule()->getName() == Id_CoreMedia);
+          nominal->getParentModule()->getIdentifier() == Id_CoreMedia);
 }
 
 Type ASTContext::getBridgedToObjC(const DeclContext *dc, Type type,
@@ -3910,10 +3920,10 @@ const InheritedNameSet *ASTContext::getAllPropertyNames(ClassDecl *classDecl,
   auto addProperties = [&](DeclRange members) {
     for (auto member : members) {
       auto var = dyn_cast<VarDecl>(member);
-      if (!var || var->getName().empty()) continue;
+      if (!var || !var->getBaseName()) continue;
       if (var->isInstanceMember() != forInstance) continue;
 
-      known->second->add(var->getName().str());
+      known->second->add(var->getBaseName().str());
     }
   };
 

@@ -620,7 +620,7 @@ public:
                                          const clang::NamedDecl *decl);
 
   /// \brief Converts the given Swift identifier for Clang.
-  clang::DeclarationName exportName(Identifier name);
+  clang::DeclarationName exportName(DeclName name);
 
   /// Imports the full name of the given Clang declaration into Swift.
   ///
@@ -759,7 +759,7 @@ public:
   /// \param value The value of the named constant.
   /// \param convertKind How to convert the constant to the given type.
   /// \param isStatic Whether the constant should be a static member of \p dc.
-  ValueDecl *createConstant(Identifier name, DeclContext *dc,
+  ValueDecl *createConstant(DeclName name, DeclContext *dc,
                             Type type, const clang::APValue &value,
                             ConstantConvertKind convertKind,
                             bool isStatic,
@@ -773,7 +773,7 @@ public:
   /// \param value The value of the named constant.
   /// \param convertKind How to convert the constant to the given type.
   /// \param isStatic Whether the constant should be a static member of \p dc.
-  ValueDecl *createConstant(Identifier name, DeclContext *dc,
+  ValueDecl *createConstant(DeclName name, DeclContext *dc,
                             Type type, StringRef value,
                             ConstantConvertKind convertKind,
                             bool isStatic,
@@ -787,7 +787,7 @@ public:
   /// \param valueExpr An expression to use as the value of the constant.
   /// \param convertKind How to convert the constant to the given type.
   /// \param isStatic Whether the constant should be a static member of \p dc.
-  ValueDecl *createConstant(Identifier name, DeclContext *dc,
+  ValueDecl *createConstant(DeclName name, DeclContext *dc,
                             Type type, Expr *valueExpr,
                             ConstantConvertKind convertKind,
                             bool isStatic,
@@ -977,7 +977,7 @@ public:
   /// given Clang \c type, \c baseName, and optionality.
   static DefaultArgumentKind
   inferDefaultArgument(clang::QualType type, OptionalTypeKind clangOptionality,
-                       Identifier baseName, unsigned numParams,
+                       DeclName baseName, unsigned numParams,
                        StringRef argumentLabel, bool isFirstParameter,
                        bool isLastParameter, importer::NameImporter &);
 

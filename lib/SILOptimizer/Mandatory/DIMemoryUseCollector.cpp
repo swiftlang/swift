@@ -245,7 +245,7 @@ getPathStringToElement(unsigned Element, std::string &Result) const {
     Result = "self";
   else if (ValueDecl *VD =
         dyn_cast_or_null<ValueDecl>(getLoc().getAsASTNode<Decl>()))
-    Result = VD->getName().str();
+    Result = VD->getBaseName().str();
   else
     Result = "<unknown>";
 
@@ -258,7 +258,7 @@ getPathStringToElement(unsigned Element, std::string &Result) const {
         unsigned NumFieldElements = getElementCountRec(FieldType, false);
         if (Element < NumFieldElements) {
           Result += '.';
-          Result += VD->getName().str();
+          Result += VD->getBaseName().str();
           getPathStringToElementRec(FieldType, Element, Result);
           return VD;
         }
@@ -1065,7 +1065,7 @@ static SILInstruction *isSuperInitUse(UpcastInst *Inst) {
     if (auto *DTB = dyn_cast<DerivedToBaseExpr>(LocExpr->getArg()))
       if (auto *DRE = dyn_cast<DeclRefExpr>(DTB->getSubExpr()))
         if (DRE->getDecl()->isImplicit() &&
-            DRE->getDecl()->getName().str() == "self")
+            DRE->getDecl()->getBaseName() == "self")
           return inst;
   }
 

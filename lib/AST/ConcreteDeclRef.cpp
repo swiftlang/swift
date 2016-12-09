@@ -64,7 +64,7 @@ void ConcreteDeclRef::dump(raw_ostream &os) {
           if (c.isConcrete()) {
             c.getConcrete()->printName(os);
           } else {
-            os << "abstract:" << c.getAbstract()->getName();
+            os << "abstract:" << c.getAbstract()->getBaseName();
           }
         }
         os << ']';

@@ -447,7 +447,7 @@ void IRGenModule::emitSourceFile(SourceFile &SF, unsigned StartElem) {
 
   SF.forAllVisibleModules([&](swift::Module::ImportedModule import) {
     swift::Module *next = import.second;
-    if (next->getName() == SF.getParentModule()->getName())
+    if (next->getIdentifier() == SF.getParentModule()->getIdentifier())
       return;
 
     next->collectLinkLibraries([this](LinkLibrary linkLib) {
@@ -1651,7 +1651,7 @@ Address IRGenModule::getAddrOfSILGlobalVariable(SILGlobalVariable *var,
                         storageType, fixedSize, fixedAlignment);
     gvar = link.createVariable(*this, storageType, fixedAlignment,
                                DbgTy, SILLocation(var->getDecl()),
-                               var->getDecl()->getName().str());
+                               var->getDecl()->getBaseName().str());
   } else {
     // There is no VarDecl for a SILGlobalVariable, and thus also no context.
     DeclContext *DeclCtx = nullptr;

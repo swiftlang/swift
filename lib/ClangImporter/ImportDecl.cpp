@@ -157,7 +157,7 @@ static bool verifyNameMapping(MappedTypeNameKind NameMapping,
 /// C type.
 static std::pair<Type, StringRef>
 getSwiftStdlibType(const clang::TypedefNameDecl *D,
-                   Identifier Name,
+                   DeclName Name,
                    ClangImporter::Implementation &Impl,
                    bool *IsError, MappedTypeNameKind &NameMapping) {
   *IsError = false;
@@ -697,8 +697,8 @@ getAccessorDeclarationName(clang::ASTContext &Ctx,
                            const char *suffix) {
   std::string id;
   llvm::raw_string_ostream IdStream(id);
-  IdStream << "$" << structDecl->getName()
-           << "$" << fieldDecl->getName()
+  IdStream << "$" << structDecl->getBaseName()
+           << "$" << fieldDecl->getBaseName()
            << "$" << suffix;
 
   return clang::DeclarationName(&Ctx.Idents.get(IdStream.str()));
@@ -968,10 +968,12 @@ createValueConstructor(ClangImporter::Implementation &Impl,
   // Construct the set of parameters from the list of members.
   SmallVector<ParamDecl *, 8> valueParameters;
   for (auto var : members) {
-    Identifier argName = wantCtorParamNames ? var->getName() : Identifier();
+    Identifier argName = wantCtorParamNames ? var->getBaseName().getIdentifier()
+                                            : Identifier();
     auto param = new (context)
         ParamDecl(/*IsLet*/ true, SourceLoc(), SourceLoc(), argName,
-                  SourceLoc(), var->getName(), var->getType(), structDecl);
+                  SourceLoc(), var->getBaseName().getIdentifier(),
+                  var->getType(), structDecl);
     param->setInterfaceType(var->getInterfaceType());
     valueParameters.push_back(param);
   }
@@ -1308,7 +1310,8 @@ static FuncDecl *buildSubscriptSetterDecl(ClangImporter::Implementation &Impl,
 
   auto paramVarDecl =
       new (C) ParamDecl(/*isLet=*/false, SourceLoc(), SourceLoc(), Identifier(),
-                        loc, valueIndex->get(0)->getName(), elementTy, dc);
+                        loc, valueIndex->get(0)->getIdentifier(), elementTy,
+                        dc);
   paramVarDecl->setInterfaceType(elementInterfaceTy);
 
   auto valueIndicesPL = ParameterList::create(C, {paramVarDecl, index});
@@ -1801,7 +1804,7 @@ namespace {
     }
 
     ClassDecl *importCFClassType(const clang::TypedefNameDecl *decl,
-                                 Identifier className, CFPointeeInfo info,
+                                 DeclName className, CFPointeeInfo info,
                                  EffectiveClangContext effectiveContext);
 
     /// Mark the given declaration as the Swift 2 variant of a Swift 3
@@ -1839,13 +1842,13 @@ namespace {
     /// nullptr if unable.
     Decl *importSwiftNewtype(const clang::TypedefNameDecl *decl,
                              clang::SwiftNewtypeAttr *newtypeAttr,
-                             DeclContext *dc, Identifier name);
+                             DeclContext *dc, DeclName name);
 
     Decl *VisitTypedefNameDecl(const clang::TypedefNameDecl *Decl) {
       Optional<ImportedName> swift3Name;
       auto importedName = importFullName(Decl, swift3Name);
-      auto Name = importedName.getDeclName().getBaseName();
-      if (Name.empty())
+      auto Name = importedName.getDeclName();
+      if (!Name)
         return nullptr;
 
       // If we've been asked to produce a Swift 2 stub, handle it via a
@@ -1907,7 +1910,7 @@ namespace {
               typealias = Impl.createDeclWithClangNode<TypeAliasDecl>(
                             Decl, Accessibility::Public,
                             Impl.importSourceLoc(Decl->getLocStart()),
-                            Name,
+                            Name.getIdentifier(),
                             Impl.importSourceLoc(Decl->getLocation()),
                             TypeLoc::withoutLoc(
                               underlying->getDeclaredInterfaceType()),
@@ -1935,7 +1938,7 @@ namespace {
               typealias = Impl.createDeclWithClangNode<TypeAliasDecl>(
                             Decl, Accessibility::Public,
                             Impl.importSourceLoc(Decl->getLocStart()),
-                            Name,
+                            Name.getIdentifier(),
                             Impl.importSourceLoc(Decl->getLocation()),
                             TypeLoc::withoutLoc(
                               proto->getDeclaredInterfaceType()),
@@ -2008,7 +2011,7 @@ namespace {
       auto Result = Impl.createDeclWithClangNode<TypeAliasDecl>(Decl,
                                       Accessibility::Public,
                                       Impl.importSourceLoc(Decl->getLocStart()),
-                                      Name,
+                                      Name.getIdentifier(),
                                       Loc,
                                       TypeLoc::withoutLoc(SwiftType),
                                       /*genericparams*/nullptr, DC);
@@ -2054,7 +2057,7 @@ namespace {
     /// This builds the getter in a way that's compatible with switch
     /// statements. Changing the body here may require changing
     /// TypeCheckPattern.cpp as well.
-    Decl *importEnumCaseAlias(Identifier name,
+    Decl *importEnumCaseAlias(DeclName name,
                               const clang::EnumConstantDecl *alias,
                               ValueDecl *original,
                               const clang::EnumDecl *clangEnum,
@@ -2062,7 +2065,7 @@ namespace {
                               DeclContext *importIntoDC = nullptr);
 
     NominalTypeDecl *importAsOptionSetType(DeclContext *dc,
-                                           Identifier name,
+                                           DeclName name,
                                            const clang::EnumDecl *decl);
 
     Decl *VisitEnumDecl(const clang::EnumDecl *decl) {
@@ -2114,7 +2117,8 @@ namespace {
 
         auto Loc = Impl.importSourceLoc(decl->getLocation());
         auto structDecl = Impl.createDeclWithClangNode<StructDecl>(decl,
-          Accessibility::Public, Loc, name, Loc, None, nullptr, dc);
+          Accessibility::Public, Loc, name.getIdentifier(), Loc, None, nullptr,
+          dc);
         structDecl->computeType();
 
         ProtocolDecl *protocols[]
@@ -2151,7 +2155,7 @@ namespace {
           return nullptr;
 
         /// Basic information about the enum type we're building.
-        Identifier enumName = name;
+        DeclName enumName = name;
         DeclContext *enumDC = dc;
         SourceLoc loc = Impl.importSourceLoc(decl->getLocStart());
 
@@ -2168,8 +2172,8 @@ namespace {
                C.getProtocol(KnownProtocolKind::ErrorCodeProtocol))) {
           // Create the wrapper struct.
           errorWrapper = Impl.createDeclWithClangNode<StructDecl>(
-                           decl, Accessibility::Public, loc, name, loc,
-                           None, nullptr, dc);
+                           decl, Accessibility::Public, loc,
+                           name.getIdentifier(), loc, None, nullptr, dc);
           errorWrapper->computeType();
 
           // Add inheritance clause.
@@ -2224,7 +2228,7 @@ namespace {
 
         // Create the enumeration.
         auto enumDecl = Impl.createDeclWithClangNode<EnumDecl>(
-            decl, Accessibility::Public, loc, enumName,
+            decl, Accessibility::Public, loc, enumName.getIdentifier(),
             Impl.importSourceLoc(decl->getLocation()), None, nullptr, enumDC);
         enumDecl->computeType();
 
@@ -2381,7 +2385,7 @@ namespace {
           // context.
           if (errorWrapper) {
             auto enumeratorValue = cast<ValueDecl>(enumeratorDecl);
-            auto alias = importEnumCaseAlias(enumeratorValue->getName(),
+            auto alias = importEnumCaseAlias(enumeratorValue->getBaseName(),
                                              *ec,
                                              enumeratorValue,
                                              decl,
@@ -2460,7 +2464,7 @@ namespace {
       auto result = Impl.createDeclWithClangNode<StructDecl>(decl,
                                  Accessibility::Public,
                                  Impl.importSourceLoc(decl->getLocStart()),
-                                 name,
+                                 name.getIdentifier(),
                                  Impl.importSourceLoc(decl->getLocation()),
                                  None, nullptr, dc);
       result->computeType();
@@ -2650,7 +2654,7 @@ namespace {
       if (!importedName) return nullptr;
 
       auto name = importedName.getDeclName().getBaseName();
-      if (name.empty())
+      if (!name)
         return nullptr;
 
       switch (Impl.getEnumKind(clangEnum)) {
@@ -2910,7 +2914,14 @@ namespace {
       if (name && name.isSimpleName()) {
         assert(hasCustomName && "imported function with simple name?");
         // Just fill in empty argument labels.
-        name = DeclName(Impl.SwiftContext, name.getBaseName(), bodyParams);
+        switch (name.getKind()) {
+          case DeclNameKind::Normal:
+            name =DeclName(Impl.SwiftContext, name.getIdentifier(), bodyParams);
+            break;
+          case DeclNameKind::Subscript:
+            name = DeclName::createSubscript(Impl.SwiftContext, bodyParams);
+            break;
+        }
       }
 
       // FIXME: Poor location info.
@@ -3582,7 +3593,7 @@ namespace {
         for (auto fromGP : *objcClass->getGenericParams()) {
           // Create the new generic parameter.
           auto toGP = new (Impl.SwiftContext) GenericTypeParamDecl(
-              result, fromGP->getName(), SourceLoc(), fromGP->getDepth(),
+              result, fromGP->getIdentifier(), SourceLoc(), fromGP->getDepth(),
               fromGP->getIndex());
           toGP->setImplicit(true);
           toGP->setInherited(
@@ -3624,7 +3635,7 @@ namespace {
     }
 
     template <typename T, typename U>
-    T *resolveSwiftDeclImpl(const U *decl, Identifier name, Module *adapter) {
+    T *resolveSwiftDeclImpl(const U *decl, DeclName name, Module *adapter) {
       SmallVector<ValueDecl *, 4> results;
       adapter->lookupValue({}, name, NLKind::QualifiedLookup, results);
       T *found = nullptr;
@@ -3651,7 +3662,7 @@ namespace {
     }
 
     template <typename T, typename U>
-    T *resolveSwiftDecl(const U *decl, Identifier name,
+    T *resolveSwiftDecl(const U *decl, DeclName name,
                         ClangModuleUnit *clangModule) {
       if (auto adapter = clangModule->getAdapterModule())
         return resolveSwiftDeclImpl<T>(decl, name, adapter);
@@ -3668,7 +3679,7 @@ namespace {
     }
 
     template <typename T, typename U>
-    bool hasNativeSwiftDecl(const U *decl, Identifier name,
+    bool hasNativeSwiftDecl(const U *decl, DeclName name,
                             const DeclContext *dc, T *&swiftDecl) {
       if (!importer::hasNativeSwiftDecl(decl))
         return false;
@@ -3705,7 +3716,7 @@ namespace {
       if (swift3Name)
         return importSwift2TypeAlias(decl, importedName, *swift3Name);
 
-      Identifier name = importedName.getDeclName().getBaseName();
+      DeclName name = importedName.getDeclName().getBaseName();
 
       // FIXME: Figure out how to deal with incomplete protocols, since that
       // notion doesn't exist in Swift.
@@ -3738,7 +3749,7 @@ namespace {
                                    dc,
                                    Impl.importSourceLoc(decl->getLocStart()),
                                    Impl.importSourceLoc(decl->getLocation()),
-                                   name,
+                                   name.getIdentifier(),
                                    None);
       result->computeType();
       addObjCAttribute(result, Impl.importIdentifier(decl->getIdentifier()));
@@ -3801,7 +3812,8 @@ namespace {
 
         auto result = Impl.createDeclWithClangNode<ClassDecl>(decl,
                                                         Accessibility::Open,
-                                                        SourceLoc(), name,
+                                                        SourceLoc(),
+                                                        name.getIdentifier(),
                                                         SourceLoc(), None,
                                                         nullptr, dc);
         result->computeType();
@@ -3874,7 +3886,7 @@ namespace {
       auto result = Impl.createDeclWithClangNode<ClassDecl>(decl,
                                 Accessibility::Open,
                                 Impl.importSourceLoc(decl->getLocStart()),
-                                name,
+                                name.getIdentifier(),
                                 Impl.importSourceLoc(decl->getLocation()),
                                 None, nullptr, dc);
 
@@ -3931,7 +3943,7 @@ namespace {
       //
       // FIXME: Remove this once SILGen gets proper support for factory
       // initializers.
-      if (result->getName() ==
+      if (result->getBaseName() ==
           result->getASTContext().getIdentifier("OS_object")) {
         result->setForeignClassKind(ClassDecl::ForeignKind::RuntimeOnly);
       }
@@ -3954,7 +3966,7 @@ namespace {
       // Add inferred attributes.
 #define INFERRED_ATTRIBUTES(ModuleName, ClassName, AttributeSet)        \
       if (name.str().equals(#ClassName) &&                              \
-          result->getParentModule()->getName().str().equals(#ModuleName)) {  \
+          result->getParentModule()->getIdentifier().str().equals(#ModuleName)){ \
         using namespace inferred_attributes;                            \
         addInferredAttributes(result, AttributeSet);                    \
       }
@@ -4032,7 +4044,7 @@ namespace {
 
       Optional<ImportedName> swift3Name;
       auto name = importFullName(decl, swift3Name).getDeclName().getBaseName();
-      if (name.empty())
+      if (!name)
         return nullptr;
 
       if (shouldImportPropertyAsAccessors(decl))
@@ -4148,7 +4160,7 @@ namespace {
       auto importedName = importFullName(decl, swift3Name);
       auto name = importedName.getDeclName().getBaseName();
 
-      if (name.empty()) return nullptr;
+      if (!name) return nullptr;
 
       auto importedDecl = Impl.importDecl(decl->getClassInterface(),
                                           /*useSwift2Name=*/false);
@@ -4160,7 +4172,7 @@ namespace {
       typealias = Impl.createDeclWithClangNode<TypeAliasDecl>(
                     decl, Accessibility::Public,
                     Impl.importSourceLoc(decl->getLocStart()),
-                    name,
+                    name.getIdentifier(),
                     Impl.importSourceLoc(decl->getLocation()),
                     TypeLoc::withoutLoc(typeDecl->getDeclaredInterfaceType()),
                     /*genericparams=*/nullptr, dc);
@@ -4308,7 +4320,7 @@ static Type findCFSuperclass(ClangImporter::Implementation &impl,
 
 ClassDecl *
 SwiftDeclConverter::importCFClassType(const clang::TypedefNameDecl *decl,
-                                      Identifier className, CFPointeeInfo info,
+                                      DeclName className, CFPointeeInfo info,
                                       EffectiveClangContext effectiveContext) {
   auto dc = Impl.importDeclContextOf(decl, effectiveContext);
   if (!dc)
@@ -4320,8 +4332,8 @@ SwiftDeclConverter::importCFClassType(const clang::TypedefNameDecl *decl,
   // TODO: try to find a non-mutable type to use as the superclass.
 
   auto theClass = Impl.createDeclWithClangNode<ClassDecl>(
-      decl, Accessibility::Public, SourceLoc(), className, SourceLoc(), None,
-      nullptr, dc);
+      decl, Accessibility::Public, SourceLoc(), className.getIdentifier(),
+      SourceLoc(), None, nullptr, dc);
   theClass->computeType();
   theClass->setCircularityCheck(CircularityCheck::Checked);
   theClass->setSuperclass(superclass);
@@ -4401,7 +4413,7 @@ Decl *SwiftDeclConverter::importSwift2TypeAlias(const clang::NamedDecl *decl,
   // Create the type alias.
   auto alias = Impl.createDeclWithClangNode<TypeAliasDecl>(
       decl, Accessibility::Public, Impl.importSourceLoc(decl->getLocStart()),
-      swift2Name.getDeclName().getBaseName(),
+      swift2Name.getDeclName().getIdentifier(),
       Impl.importSourceLoc(decl->getLocation()),
       TypeLoc::withoutLoc(underlyingType), genericParams, dc);
   alias->computeType();
@@ -4421,7 +4433,7 @@ Decl *SwiftDeclConverter::importSwift2TypeAlias(const clang::NamedDecl *decl,
 Decl *
 SwiftDeclConverter::importSwiftNewtype(const clang::TypedefNameDecl *decl,
                                        clang::SwiftNewtypeAttr *newtypeAttr,
-                                       DeclContext *dc, Identifier name) {
+                                       DeclContext *dc, DeclName name) {
   // The only (current) difference between swift_newtype(struct) and
   // swift_newtype(enum), until we can get real enum support, is that enums
   // have no un-labeled inits(). This is because enums are to be considered
@@ -4444,7 +4456,8 @@ SwiftDeclConverter::importSwiftNewtype(const clang::TypedefNameDecl *decl,
   auto Loc = Impl.importSourceLoc(decl->getLocation());
 
   auto structDecl = Impl.createDeclWithClangNode<StructDecl>(
-      decl, Accessibility::Public, Loc, name, Loc, None, nullptr, dc);
+      decl, Accessibility::Public, Loc, name.getIdentifier(), Loc, None,
+      nullptr, dc);
   structDecl->computeType();
 
   // Import the type of the underlying storage
@@ -4547,7 +4560,7 @@ Decl *SwiftDeclConverter::importEnumCase(const clang::EnumConstantDecl *decl,
   auto &context = Impl.SwiftContext;
   Optional<ImportedName> swift3Name;
   auto name = importFullName(decl, swift3Name).getDeclName().getBaseName();
-  if (name.empty())
+  if (!name)
     return nullptr;
 
   if (swift3Name) {
@@ -4599,8 +4612,8 @@ Decl *SwiftDeclConverter::importEnumCase(const clang::EnumConstantDecl *decl,
     rawValueExpr->setNegative(SourceLoc());
 
   auto element = Impl.createDeclWithClangNode<EnumElementDecl>(
-      decl, Accessibility::Public, SourceLoc(), name, TypeLoc(), SourceLoc(),
-      rawValueExpr, theEnum);
+      decl, Accessibility::Public, SourceLoc(), name.getIdentifier(), TypeLoc(),
+      SourceLoc(), rawValueExpr, theEnum);
   insertResult.first->second = element;
 
   // Give the enum element the appropriate type.
@@ -4617,8 +4630,8 @@ SwiftDeclConverter::importOptionConstant(const clang::EnumConstantDecl *decl,
                                          NominalTypeDecl *theStruct) {
   Optional<ImportedName> swift3Name;
   ImportedName nameInfo = importFullName(decl, swift3Name);
-  Identifier name = nameInfo.getDeclName().getBaseName();
-  if (name.empty())
+  DeclName name = nameInfo.getDeclName().getBaseName();
+  if (!name)
     return nullptr;
 
   // Create the constant.
@@ -4650,10 +4663,10 @@ SwiftDeclConverter::importOptionConstant(const clang::EnumConstantDecl *decl,
 }
 
 Decl *SwiftDeclConverter::importEnumCaseAlias(
-    Identifier name, const clang::EnumConstantDecl *alias, ValueDecl *original,
+    DeclName name, const clang::EnumConstantDecl *alias, ValueDecl *original,
     const clang::EnumDecl *clangEnum, NominalTypeDecl *importedEnum,
     DeclContext *importIntoDC) {
-  if (name.empty())
+  if (!name)
     return nullptr;
 
   // Default the DeclContext to the enum type.
@@ -4679,7 +4692,7 @@ Decl *SwiftDeclConverter::importEnumCaseAlias(
 }
 
 NominalTypeDecl *
-SwiftDeclConverter::importAsOptionSetType(DeclContext *dc, Identifier name,
+SwiftDeclConverter::importAsOptionSetType(DeclContext *dc, DeclName name,
                                           const clang::EnumDecl *decl) {
   ASTContext &cxt = Impl.SwiftContext;
 
@@ -4694,7 +4707,8 @@ SwiftDeclConverter::importAsOptionSetType(DeclContext *dc, Identifier name,
 
   // Create a struct with the underlying type as a field.
   auto structDecl = Impl.createDeclWithClangNode<StructDecl>(
-      decl, Accessibility::Public, Loc, name, Loc, None, nullptr, dc);
+      decl, Accessibility::Public, Loc, name.getIdentifier(), Loc, None,
+      nullptr, dc);
   structDecl->computeType();
 
   ProtocolDecl *protocols[] = {cxt.getProtocol(KnownProtocolKind::OptionSet)};
@@ -4898,7 +4912,7 @@ SwiftDeclConverter::getImplicitProperty(ImportedName importedName,
       Impl.findLookupTable(*getClangSubmoduleForDecl(accessor));
   assert(lookupTable && "No lookup table?");
   bool foundAccessor = false;
-  for (auto entry : lookupTable->lookup(propertyName.str(),
+  for (auto entry : lookupTable->lookup(propertyName,
                                         importedName.getEffectiveContext())) {
     auto decl = entry.dyn_cast<clang::NamedDecl *>();
     if (!decl)
@@ -5733,7 +5747,7 @@ SwiftDeclConverter::importSubscript(Decl *decl,
   // Build the subscript declaration.
   auto &C = Impl.SwiftContext;
   auto bodyParams = getterThunk->getParameterList(1)->clone(C);
-  DeclName name(C, C.Id_subscript, {Identifier()});
+  DeclName name = DeclName::createSubscript(C, {Identifier()});
   auto subscript = Impl.createDeclWithClangNode<SubscriptDecl>(
       getter->getClangNode(), getOverridableAccessibility(dc), name,
       decl->getLoc(), bodyParams, decl->getLoc(),
@@ -6447,7 +6461,7 @@ void ClangImporter::Implementation::importAttributes(
   // Hack: mark any method named "print" with less than two parameters as
   // warn_unqualified_access.
   if (auto MD = dyn_cast<FuncDecl>(MappedDecl)) {
-    if (!MD->getName().empty() && MD->getName().str() == "print" &&
+    if (MD->getBaseName() && MD->getBaseName() == "print" &&
         MD->getDeclContext()->isTypeContext()) {
       auto *formalParams = MD->getParameterList(1);
       if (formalParams->size() <= 1) {
@@ -6950,7 +6964,7 @@ ClangImporter::Implementation::importDeclContextOf(
 }
 
 ValueDecl *
-ClangImporter::Implementation::createConstant(Identifier name, DeclContext *dc,
+ClangImporter::Implementation::createConstant(DeclName name, DeclContext *dc,
                                               Type type,
                                               const clang::APValue &value,
                                               ConstantConvertKind convertKind,
@@ -7013,7 +7027,7 @@ ClangImporter::Implementation::createConstant(Identifier name, DeclContext *dc,
 
 
 ValueDecl *
-ClangImporter::Implementation::createConstant(Identifier name, DeclContext *dc,
+ClangImporter::Implementation::createConstant(DeclName name, DeclContext *dc,
                                               Type type, StringRef value,
                                               ConstantConvertKind convertKind,
                                               bool isStatic,
@@ -7024,7 +7038,7 @@ ClangImporter::Implementation::createConstant(Identifier name, DeclContext *dc,
 
 
 ValueDecl *
-ClangImporter::Implementation::createConstant(Identifier name, DeclContext *dc,
+ClangImporter::Implementation::createConstant(DeclName name, DeclContext *dc,
                                               Type type, Expr *valueExpr,
                                               ConstantConvertKind convertKind,
                                               bool isStatic,
@@ -7283,7 +7297,7 @@ ClangImporter::Implementation::getSpecialTypedefKind(clang::TypedefNameDecl *dec
   return iter->second;
 }
 
-Identifier
+DeclName
 ClangImporter::getEnumConstantName(const clang::EnumConstantDecl *enumConstant){
   return Impl.importFullName(enumConstant, ImportNameVersion::Swift3)
       .getDeclName()

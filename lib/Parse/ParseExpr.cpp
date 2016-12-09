@@ -487,7 +487,7 @@ ParserResult<Expr> Parser::parseExprUnary(Diag<> Message, bool isExprBasic) {
   // Check if we have a unary '-' with number literal sub-expression, for
   // example, "-42" or "-1.25".
   if (auto *LE = dyn_cast<NumberLiteralExpr>(SubExpr.get())) {
-    if (Operator->hasName() && Operator->getName().getBaseName().str() == "-") {
+    if (Operator->hasName() && Operator->getName().getBaseName() == "-") {
       LE->setNegative(Operator->getLoc());
       return makeParserResult(LE);
     }
@@ -555,7 +555,7 @@ ParserResult<Expr> Parser::parseExprKeyPath() {
     }
 
     // Record the name we parsed.
-    names.push_back(name.getBaseName());
+    names.push_back(name.getIdentifier());
     nameLocs.push_back(nameLoc.getBaseNameLoc());
 
     // Handle code completion.
@@ -1918,8 +1918,8 @@ Expr *Parser::parseExprIdentifier() {
   
   Expr *E;
   if (D == nullptr) {
-    if (name.getBaseName().isEditorPlaceholder())
-      return parseExprEditorPlaceholder(IdentTok, name.getBaseName());
+    if (name.isEditorPlaceholder())
+      return parseExprEditorPlaceholder(IdentTok, name.getIdentifier());
 
     auto refKind = DeclRefKind::Ordinary;
     auto unresolved = new (Context) UnresolvedDeclRefExpr(name, refKind, loc);

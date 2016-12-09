@@ -295,7 +295,7 @@ static void diagnoseBinOpSplit(UnresolvedDeclRefExpr *UDRE,
 static bool diagnoseOperatorJuxtaposition(UnresolvedDeclRefExpr *UDRE,
                                     DeclContext *DC,
                                     TypeChecker &TC) {
-  Identifier name = UDRE->getName().getBaseName();
+  DeclName name = UDRE->getName().getBaseName();
   StringRef nameStr = name.str();
   if (!name.isOperator() || nameStr.size() < 2)
     return false;
@@ -609,7 +609,7 @@ TypeChecker::getSelfForInitDelegationInConstructor(DeclContext *DC,
     if (nestedArg->isSuperExpr())
       return ctorContext->getImplicitSelfDecl();
     if (auto declRef = dyn_cast<DeclRefExpr>(nestedArg))
-      if (declRef->getDecl()->getName() == Context.Id_self)
+      if (declRef->getDecl()->getBaseName() == Context.Id_self)
         return ctorContext->getImplicitSelfDecl();
   }
   return nullptr;
@@ -1218,13 +1218,13 @@ TypeExpr *PreCheckExpression::simplifyTypeExpr(Expr *E) {
     auto fn = binaryExpr->getFn();
     if (auto Overload = dyn_cast<OverloadedDeclRefExpr>(fn)) {
       for (auto Decl : Overload->getDecls())
-        if (Decl->getName().str() == "&") {
+        if (Decl->getBaseName() == "&") {
           isComposition = true;
           break;
         }
     } else if (auto *Decl = dyn_cast<UnresolvedDeclRefExpr>(fn)) {
       if (Decl->getName().isSimpleName() &&
-            Decl->getName().getBaseName().str() == "&")
+            Decl->getName().getBaseName() == "&")
         isComposition = true;
     }
 
@@ -2584,7 +2584,7 @@ void Solution::dump(raw_ostream &out) const {
       if (choice.getBaseType())
         out << choice.getBaseType()->getString() << ".";
         
-      out << choice.getDecl()->getName().str() << ": "
+      out << choice.getDecl()->getBaseName() << ": "
         << ovl.second.openedType->getString() << "\n";
       break;
 
@@ -2746,7 +2746,7 @@ void ConstraintSystem::print(raw_ostream &out) {
       case OverloadChoiceKind::DeclViaUnwrappedOptional:
         if (choice.getBaseType())
           out << choice.getBaseType()->getString() << ".";
-        out << choice.getDecl()->getName() << ": "
+        out << choice.getDecl()->getBaseName() << ": "
           << resolved->BoundType->getString() << " == "
           << resolved->ImpliedType->getString() << "\n";
         break;

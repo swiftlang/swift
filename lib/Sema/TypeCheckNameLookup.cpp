@@ -435,6 +435,11 @@ static unsigned getCallEditDistance(DeclName argName, DeclName paramName,
   // TODO: maybe ignore certain kinds of missing / present labels for the
   //   first argument label?
   // TODO: word-based rather than character-based?
+  if (argName.getKind() != paramName.getKind())
+    return UnreasonableCallEditDistance;
+  if (argName.isSpecialName())
+    return 0;
+  
   StringRef argBase = argName.getBaseName().str();
   StringRef paramBase = paramName.getBaseName().str();
 
@@ -563,7 +568,7 @@ diagnoseTypoCorrection(TypeChecker &tc, DeclNameLoc loc, ValueDecl *decl) {
     // of the function.
     if (var->isSelfParameter())
       return tc.diagnose(loc.getBaseNameLoc(), diag::note_typo_candidate,
-                         decl->getName().str());
+                         decl->getBaseName());
   }
 
   if (!decl->getLoc().isValid() && decl->getDeclContext()->isTypeContext()) {
@@ -577,11 +582,11 @@ diagnoseTypoCorrection(TypeChecker &tc, DeclNameLoc loc, ValueDecl *decl) {
                         "member");
 
       return tc.diagnose(parentDecl, diag::note_typo_candidate_implicit_member,
-                         decl->getName().str(), kind);
+                         decl->getBaseName(), kind);
     }
   }
 
-  return tc.diagnose(decl, diag::note_typo_candidate, decl->getName().str());
+  return tc.diagnose(decl, diag::note_typo_candidate, decl->getBaseName());
 }
 
 void TypeChecker::noteTypoCorrection(DeclName writtenName, DeclNameLoc loc,

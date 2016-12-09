@@ -127,7 +127,7 @@ void GenericParamList::print(llvm::raw_ostream &OS) {
     } else {
       OS << ", ";
     }
-    OS << P->getName();
+    OS << P->getBaseName();
     if (!P->getInherited().empty()) {
       OS << " : ";
       P->getInherited()[0].getType().print(OS);
@@ -186,11 +186,11 @@ getStorageKindName(AbstractStorageDecl::StorageKindTy storageKind) {
 }
 
 // Print a name.
-static void printName(raw_ostream &os, Identifier name) {
-  if (name.empty())
+static void printName(raw_ostream &os, DeclName name) {
+  if (!name)
     os << "<anonymous>";
   else
-    os << name.str();
+    os << name;
 }
 
 namespace {
@@ -1056,7 +1056,7 @@ static void printContext(raw_ostream &os, DeclContext *dc) {
 
   switch (dc->getContextKind()) {
   case DeclContextKind::Module:
-    printName(os, cast<Module>(dc)->getName());
+    printName(os, cast<Module>(dc)->getIdentifier());
     break;
 
   case DeclContextKind::FileUnit:
@@ -1079,13 +1079,13 @@ static void printContext(raw_ostream &os, DeclContext *dc) {
   }
 
   case DeclContextKind::GenericTypeDecl:
-    printName(os, cast<GenericTypeDecl>(dc)->getName());
+    printName(os, cast<GenericTypeDecl>(dc)->getBaseName());
     break;
 
   case DeclContextKind::ExtensionDecl:
     if (auto extendedTy = cast<ExtensionDecl>(dc)->getExtendedType()) {
       if (auto nominal = extendedTy->getAnyNominal()) {
-        printName(os, nominal->getName());
+        printName(os, nominal->getBaseName());
         break;
       }
     }
@@ -1697,7 +1697,7 @@ public:
   }
   void visitOverloadedDeclRefExpr(OverloadedDeclRefExpr *E) {
     printCommon(E, "overloaded_decl_ref_expr")
-      << " name=" << E->getDecls()[0]->getName()
+      << " name=" << E->getDecls()[0]->getBaseName()
       << " #decls=" << E->getDecls().size()
       << " specialized=" << (E->isSpecialized()? "yes" : "no")
       << " function_ref=" << getFunctionRefKindStr(E->getFunctionRefKind());
@@ -2201,7 +2201,7 @@ public:
   }
   void visitEnumIsCaseExpr(EnumIsCaseExpr *E) {
     printCommon(E, "enum_is_case_expr") << ' ' <<
-      E->getEnumElement()->getName() << "\n";
+      E->getEnumElement()->getBaseName() << "\n";
     printRec(E->getSubExpr());
     
   }
@@ -2511,7 +2511,7 @@ void ProtocolConformanceRef::dump(llvm::raw_ostream &out,
     getConcrete()->dump(out, indent);
   } else {
     out.indent(indent) << "(abstract_conformance protocol="
-                       << getAbstract()->getName() << ')';
+                       << getAbstract()->getBaseName() << ')';
   }
 }
 
@@ -2532,7 +2532,7 @@ void ProtocolConformance::dump() const {
 void ProtocolConformance::dump(llvm::raw_ostream &out, unsigned indent) const {
   auto printCommon = [&](StringRef kind) {
     out.indent(indent) << '(' << kind << "_conformance type=" << getType()
-                       << " protocol=" << getProtocol()->getName();
+                       << " protocol=" << getProtocol()->getBaseName();
   };
 
   switch (getKind()) {
@@ -2792,7 +2792,7 @@ namespace {
 
     void visitModuleType(ModuleType *T, StringRef label) {
       printCommon(T, label, "module_type");
-      printField("module", T->getModule()->getName());
+      printField("module", T->getModule()->getIdentifier());
       OS << ")";
     }
 

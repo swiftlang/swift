@@ -68,7 +68,7 @@ namespace {
     VarDecl * const Field;
 
     StringRef getFieldName() const {
-      return Field->getName().str();
+      return Field->getBaseName().str();
     }
     
     SILType getType(IRGenModule &IGM, SILType T) const {
@@ -87,7 +87,7 @@ namespace {
     VarDecl * const Field;
 
     StringRef getFieldName() const {
-      if (Field) return Field->getName().str();
+      if (Field) return Field->getBaseName().str();
       return "<unimported>";
     }
 

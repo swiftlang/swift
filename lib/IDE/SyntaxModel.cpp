@@ -815,7 +815,7 @@ bool ModelASTWalker::walkToDeclPre(Decl *D) {
     SN.Range = charSourceRangeFromSourceRange(SM, NTD->getSourceRange());
     SN.BodyRange = innerCharSourceRangeFromSourceRange(SM, NTD->getBraces());
     SourceLoc NRStart = NTD->getNameLoc();
-    SourceLoc NREnd = NRStart.getAdvancedLoc(NTD->getName().getLength());
+    SourceLoc NREnd = NRStart.getAdvancedLoc(NTD->getIdentifier().getLength());
     SN.NameRange = CharSourceRange(SM, NRStart, NREnd);
 
     for (const TypeLoc &TL : NTD->getInherited()) {
@@ -876,7 +876,7 @@ bool ModelASTWalker::walkToDeclPre(Decl *D) {
         SN.BodyRange = innerCharSourceRangeFromSourceRange(SM,
                                                            VD->getBracesRange());
       SourceLoc NRStart = VD->getNameLoc();
-      SourceLoc NREnd = NRStart.getAdvancedLoc(VD->getName().getLength());
+      SourceLoc NREnd = NRStart.getAdvancedLoc(VD->getBaseName().str().size());
       SN.NameRange = CharSourceRange(SM, NRStart, NREnd);
       SN.TypeRange = charSourceRangeFromSourceRange(SM,
                                         VD->getTypeSourceRangeForDiagnostics());
@@ -962,7 +962,7 @@ bool ModelASTWalker::walkToDeclPre(Decl *D) {
       // as members of the enum case decl. Walk them manually here so that they
       // end up as child nodes of enum case.
       for (auto *EnumElemD : EnumCaseD->getElements()) {
-        if (EnumElemD->getName().empty())
+        if (!EnumElemD->getBaseName())
           continue;
         SyntaxStructureNode SN;
         SN.Dcl = EnumElemD;
@@ -970,7 +970,7 @@ bool ModelASTWalker::walkToDeclPre(Decl *D) {
         SN.Range = charSourceRangeFromSourceRange(SM,
                                                   EnumElemD->getSourceRange());
         SN.NameRange = CharSourceRange(EnumElemD->getNameLoc(),
-                                       EnumElemD->getName().getLength());
+                                       EnumElemD->getBaseName().str().size());
         if (auto *E = EnumElemD->getRawValueExpr()) {
           SourceRange ElemRange = E->getSourceRange();
           SN.Elements.emplace_back(SyntaxStructureElementKind::InitExpr,
@@ -1039,7 +1039,7 @@ public:
       if (DRE->getRefKind() != DeclRefKind::Ordinary)
         return { true, E };
       if (!Fn(CharSourceRange(DRE->getSourceRange().Start,
-                              DRE->getName().getBaseName().getLength())))
+                              DRE->getName().getIdentifier().getLength())))
         return { false, nullptr };
     }
     return { true, E };

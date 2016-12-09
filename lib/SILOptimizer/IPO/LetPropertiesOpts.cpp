@@ -130,8 +130,8 @@ class InstructionsCloner : public SILClonerWithScopes<InstructionsCloner> {
 static raw_ostream &operator<<(raw_ostream &OS, const VarDecl &decl) {
   auto *Ty = dyn_cast<NominalTypeDecl>(decl.getDeclContext());
   if (Ty)
-    OS << Ty->getName() << "::";
-  OS << decl.getName();
+    OS << Ty->getBaseName() << "::";
+  OS << decl.getBaseName();
   return OS;
 }
 #endif
@@ -473,7 +473,7 @@ void LetPropertiesOpt::collectStructPropertiesAccess(StructInst *SI,
 
     NominalTypeLetProperties[structDecl] = LetProps;
     DEBUG(llvm::dbgs() << "Computed set of let properties for struct '"
-                       << structDecl->getName() << "'\n");
+                       << structDecl->getBaseName() << "'\n");
   }
 
   auto &Props = NominalTypeLetProperties[structDecl];

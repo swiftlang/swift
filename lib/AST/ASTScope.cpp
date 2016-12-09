@@ -2008,7 +2008,7 @@ void ASTScope::print(llvm::raw_ostream &out, unsigned level,
     } else {
       auto nominal = cast<NominalTypeDecl>(iterableDeclContext);
       printAddress(nominal);
-      out << " '" << nominal->getName() << "'";
+      out << " '" << nominal->getBaseName() << "'";
       printRange();
     }
     break;
