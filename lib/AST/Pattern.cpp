@@ -94,6 +94,36 @@ return cast<ID##Pattern>(this)->getSourceRange();
   llvm_unreachable("pattern type not handled!");
 }
 
+void Pattern::setDelayedInterfaceType(Type interfaceTy, DeclContext *dc) {
+  assert(interfaceTy->hasTypeParameter() && "Not an interface type");
+  Ty = interfaceTy;
+  ASTContext &ctx = interfaceTy->getASTContext();
+  ctx.DelayedPatternContexts[this] = dc;
+  PatternBits.hasInterfaceType = true;
+}
+
+Type Pattern::getType() const {
+  assert(hasType());
+
+  // If this pattern has an interface type, map it into the context type.
+  if (PatternBits.hasInterfaceType) {
+    ASTContext &ctx = Ty->getASTContext();
+
+    // Retrieve the generic environment to use for the mapping.
+    auto found = ctx.DelayedPatternContexts.find(this);
+    assert(found != ctx.DelayedPatternContexts.end());
+    auto dc = found->second;
+
+    if (auto genericEnv = dc->getGenericEnvironmentOfContext()) {
+      ctx.DelayedPatternContexts.erase(found);
+      Ty = genericEnv->mapTypeIntoContext(dc->getParentModule(), Ty);
+      PatternBits.hasInterfaceType = false;
+    }
+  }
+
+  return Ty;
+}
+
 /// getLoc - Return the caret location of the pattern.
 SourceLoc Pattern::getLoc() const {
   switch (getKind()) {

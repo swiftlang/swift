@@ -338,7 +338,7 @@ ParameterList *ModuleFile::readParameterList() {
   return ParameterList::create(getContext(), params);
 }
 
-Pattern *ModuleFile::maybeReadPattern() {
+Pattern *ModuleFile::maybeReadPattern(DeclContext *owningDC) {
   using namespace decls_block;
 
   SmallVector<uint64_t, 8> scratch;
@@ -348,20 +348,33 @@ Pattern *ModuleFile::maybeReadPattern() {
   if (next.Kind != llvm::BitstreamEntry::Record)
     return nullptr;
 
+  /// Local function to record the type of this pattern.
+  auto recordPatternType = [&](Pattern *pattern, Type type) {
+    if (type->hasTypeParameter())
+      pattern->setDelayedInterfaceType(type, owningDC);
+    else
+      pattern->setType(type);
+  };
+
   unsigned kind = DeclTypeCursor.readRecord(next.ID, scratch);
   switch (kind) {
   case decls_block::PAREN_PATTERN: {
     bool isImplicit;
     ParenPatternLayout::readRecord(scratch, isImplicit);
 
-    Pattern *subPattern = maybeReadPattern();
+    Pattern *subPattern = maybeReadPattern(owningDC);
     assert(subPattern);
 
     auto result = new (getContext()) ParenPattern(SourceLoc(),
                                                   subPattern,
                                                   SourceLoc(),
                                                   isImplicit);
-    result->setType(subPattern->getType());
+
+    if (Type interfaceType = subPattern->getDelayedInterfaceType())
+      result->setDelayedInterfaceType(ParenType::get(getContext(),
+                                                     interfaceType), owningDC);
+    else
+      result->setType(ParenType::get(getContext(), subPattern->getType()));
     restoreOffset.reset();
     return result;
   }
@@ -386,26 +399,26 @@ Pattern *ModuleFile::maybeReadPattern() {
       TuplePatternEltLayout::readRecord(scratch, labelID);
       Identifier label = getIdentifier(labelID);
 
-      Pattern *subPattern = maybeReadPattern();
+      Pattern *subPattern = maybeReadPattern(owningDC);
       assert(subPattern);
       elements.push_back(TuplePatternElt(label, SourceLoc(), subPattern));
     }
 
     auto result = TuplePattern::create(getContext(), SourceLoc(),
                                        elements, SourceLoc(), isImplicit);
-    result->setType(getType(tupleTypeID));
+    recordPatternType(result, getType(tupleTypeID));
     restoreOffset.reset();
     return result;
   }
   case decls_block::NAMED_PATTERN: {
     DeclID varID;
+    TypeID typeID;
     bool isImplicit;
-    NamedPatternLayout::readRecord(scratch, varID, isImplicit);
+    NamedPatternLayout::readRecord(scratch, varID, typeID, isImplicit);
 
     auto var = cast<VarDecl>(getDecl(varID));
     auto result = new (getContext()) NamedPattern(var, isImplicit);
-    if (var->hasType())
-      result->setType(var->getType());
+    recordPatternType(result, getType(typeID));
     restoreOffset.reset();
     return result;
   }
@@ -415,7 +428,7 @@ Pattern *ModuleFile::maybeReadPattern() {
 
     AnyPatternLayout::readRecord(scratch, typeID, isImplicit);
     auto result = new (getContext()) AnyPattern(SourceLoc(), isImplicit);
-    result->setType(getType(typeID));
+    recordPatternType(result, getType(typeID));
     restoreOffset.reset();
     return result;
   }
@@ -424,25 +437,27 @@ Pattern *ModuleFile::maybeReadPattern() {
     bool isImplicit;
 
     TypedPatternLayout::readRecord(scratch, typeID, isImplicit);
-    Pattern *subPattern = maybeReadPattern();
+    Pattern *subPattern = maybeReadPattern(owningDC);
     assert(subPattern);
 
-    TypeLoc typeInfo = TypeLoc::withoutLoc(getType(typeID));
-    auto result = new (getContext()) TypedPattern(subPattern, typeInfo,
+    auto result = new (getContext()) TypedPattern(subPattern, TypeLoc(),
                                                   isImplicit);
-    result->setType(typeInfo.getType());
+    recordPatternType(result, getType(typeID));
     restoreOffset.reset();
     return result;
   }
   case decls_block::VAR_PATTERN: {
     bool isImplicit, isLet;
     VarPatternLayout::readRecord(scratch, isLet, isImplicit);
-    Pattern *subPattern = maybeReadPattern();
+    Pattern *subPattern = maybeReadPattern(owningDC);
     assert(subPattern);
 
     auto result = new (getContext()) VarPattern(SourceLoc(), isLet, subPattern,
                                                 isImplicit);
-    result->setType(subPattern->getType());
+    if (Type interfaceType = subPattern->getDelayedInterfaceType())
+      result->setDelayedInterfaceType(interfaceType, owningDC);
+    else
+      result->setType(subPattern->getType());
     restoreOffset.reset();
     return result;
   }
@@ -2746,11 +2761,11 @@ Decl *ModuleFile::getDecl(DeclID DID, Optional<DeclContext *> ForcedContext) {
       return nullptr;
     }
 
+    auto dc = getDeclContext(contextID);
     auto binding =
       PatternBindingDecl::createDeserialized(ctx, SourceLoc(),
                                              StaticSpelling.getValue(),
-                                             SourceLoc(), numPatterns,
-                                             getDeclContext(contextID));
+                                             SourceLoc(), numPatterns, dc);
     binding->setEarlyAttrValidation(true);
     declOrOffset = binding;
 
@@ -2760,7 +2775,7 @@ Decl *ModuleFile::getDecl(DeclID DID, Optional<DeclContext *> ForcedContext) {
       binding->setImplicit();
 
     for (unsigned i = 0; i != numPatterns; ++i) {
-      auto pattern = maybeReadPattern();
+      auto pattern = maybeReadPattern(dc);
       assert(pattern);
       DeclContext *initContext = nullptr;
       if (!initContextIDs.empty())
