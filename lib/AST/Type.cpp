@@ -3909,10 +3909,3 @@ getRecursivePropertiesFromSubstitutions(ArrayRef<Substitution> Params) {
   }
   return props;
 }
-
-/// TODO: Transitional accessor for single-type boxes.
-CanType SILBoxType::getBoxedType() const {
-  assert(getLayout()->getFields().size() == 1
-         && "is not a single-field box");
-  return getFieldLoweredType(0);
-}
