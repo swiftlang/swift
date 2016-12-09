@@ -495,7 +495,7 @@ ConstraintSystem::SolverScope::~SolverScope() {
                                    numSavedBindings);
 
   // Move any remaining active constraints into the inactive list.
-  while (!cs.ActiveConstraints.empty()) {
+  if (!cs.ActiveConstraints.empty()) {
     for (auto &constraint : cs.ActiveConstraints) {
       constraint.setActive(false);
     }
@@ -2407,11 +2407,11 @@ bool ConstraintSystem::solveSimplified(
     case SolutionKind::Error:
       if (!failedConstraint)
         failedConstraint = constraint;
-      solverState->retiredConstraints.push_back(constraint);
+      solverState->retiredConstraints.push_front(constraint);
       break;
 
     case SolutionKind::Solved:
-      solverState->retiredConstraints.push_back(constraint);
+      solverState->retiredConstraints.push_front(constraint);
       break;
 
     case SolutionKind::Unsolved:

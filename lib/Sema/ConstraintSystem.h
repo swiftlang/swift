@@ -1017,7 +1017,8 @@ private:
     bool recordFixes = false;
 
     /// The list of constraints that have been retired along the
-    /// current path.
+    /// current path, this list is used in LIFO fasion when constaints
+    /// are added back to the circulation.
     ConstraintList retiredConstraints;
 
     /// The current set of generated constraints.
@@ -1513,7 +1514,7 @@ public:
     // Record this as a newly-generated constraint.
     if (solverState) {
       solverState->generatedConstraints.push_back(constraint);
-      solverState->retiredConstraints.push_back(constraint);
+      solverState->retiredConstraints.push_front(constraint);
     }
   }
 
@@ -1537,7 +1538,7 @@ public:
     InactiveConstraints.erase(constraint);
 
     if (solverState)
-      solverState->retiredConstraints.push_back(constraint);
+      solverState->retiredConstraints.push_front(constraint);
   }
 
   /// Retrieve the list of inactive constraints.
