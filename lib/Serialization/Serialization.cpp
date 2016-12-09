@@ -924,20 +924,12 @@ void Serializer::writePattern(const Pattern *pattern, DeclContext *owningDC) {
     writePattern(typed->getSubPattern(), owningDC);
     break;
   }
-  case PatternKind::Is: {
-    auto isa = cast<IsPattern>(pattern);
-
-    unsigned abbrCode = DeclTypeAbbrCodes[IsPatternLayout::Code];
-    IsPatternLayout::emitRecord(Out, ScratchRecord, abbrCode,
-                                 addTypeRef(isa->getCastTypeLoc().getType()),
-                                 isa->isImplicit());
-    break;
-  }
+  case PatternKind::Is:
   case PatternKind::EnumElement:
   case PatternKind::OptionalSome:
   case PatternKind::Bool:
   case PatternKind::Expr:
-    llvm_unreachable("FIXME: not implemented");
+    llvm_unreachable("Refutable patterns cannot be serialized");
 
   case PatternKind::Var: {
     auto var = cast<VarPattern>(pattern);

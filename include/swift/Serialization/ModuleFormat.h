@@ -54,7 +54,7 @@ const uint16_t VERSION_MAJOR = 0;
 /// in source control, you should also update the comment to briefly
 /// describe what change you made. The content of this comment isn't important;
 /// it just ensures a conflict if two people change the module format.
-const uint16_t VERSION_MINOR = 295; // Last change: pattern binding interface types
+const uint16_t VERSION_MINOR = 296; // Last change: remove isa pattern
 
 using DeclID = PointerEmbeddedInt<unsigned, 31>;
 using DeclIDField = BCFixed<31>;
@@ -1050,12 +1050,6 @@ namespace decls_block {
     TypeIDField, // associated type
     BCFixed<1>   // implicit?
     // The sub-pattern trails the record.
-  >;
-
-  using IsPatternLayout = BCRecordLayout<
-    ISA_PATTERN,
-    TypeIDField, // type
-    BCFixed<1>   // implicit?
   >;
 
   using VarPatternLayout = BCRecordLayout<
