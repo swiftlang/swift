@@ -116,7 +116,7 @@ static int demangleSTDIN(const swift::Demangle::DemangleOptions &options) {
   llvm::Regex maybeSymbol("(_T|" MANGLING_PREFIX_STR ")[_a-zA-Z0-9$]+");
 
   while (true) {
-    char *inputLine = NULL;
+    char *inputLine = nullptr;
     size_t size;
     if (getline(&inputLine, &size, stdin) == -1 || size <= 0) {
       if (errno == 0) {
