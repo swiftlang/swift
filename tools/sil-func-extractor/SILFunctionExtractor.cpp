@@ -59,7 +59,10 @@ static llvm::cl::opt<bool>
                    llvm::cl::desc("Emit locations during sil emission."));
 
 static llvm::cl::list<std::string>
-    FunctionNames("func", llvm::cl::desc("Function names to extract."));
+    CommandLineFunctionNames("func",
+                             llvm::cl::desc("Function names to extract."));
+static llvm::cl::opt<std::string> FunctionNameFile(
+    "func-file", llvm::cl::desc("File to load additional function names from"));
 
 static llvm::cl::opt<bool>
 EmitSIB("emit-sib",
@@ -119,9 +122,34 @@ static llvm::cl::opt<bool> AssumeUnqualifiedOwnershipWhenParsing(
 // without being given the address of a function in the main executable).
 void anchorForGetMainExecutable() {}
 
-template <typename Cmp>
-static bool stringInSortedArray(StringRef str, ArrayRef<std::string> list,
-                                Cmp &&cmp) {
+static void getFunctionNames(std::vector<std::string> &Names) {
+  std::copy(CommandLineFunctionNames.begin(), CommandLineFunctionNames.end(),
+            std::back_inserter(Names));
+
+  if (!FunctionNameFile.empty()) {
+    llvm::ErrorOr<std::unique_ptr<llvm::MemoryBuffer>> FileBufOrErr =
+        llvm::MemoryBuffer::getFileOrSTDIN(FunctionNameFile);
+    if (!FileBufOrErr) {
+      fprintf(stderr, "Error! Failed to open file: %s\n",
+              InputFilename.c_str());
+      exit(-1);
+    }
+    StringRef Buffer = FileBufOrErr.get()->getBuffer();
+    while (!Buffer.empty()) {
+      StringRef Token, NewBuffer;
+      std::tie(Token, NewBuffer) = llvm::getToken(Buffer, "\n");
+      if (Token.empty()) {
+        break;
+      }
+      Names.push_back(Token);
+      Buffer = NewBuffer;
+    }
+  }
+}
+
+static bool stringInSortedArray(
+    StringRef str, ArrayRef<std::string> list,
+    llvm::function_ref<bool(const std::string &, const std::string &)> &&cmp) {
   if (list.empty())
     return false;
   auto iter = std::lower_bound(list.begin(), list.end(), str, cmp);
@@ -282,47 +310,47 @@ int main(int argc, char **argv) {
       SL->getAll();
   }
 
-  if (!FunctionNames.empty()) {
-    // For efficient usage, we separate our names into two separate sorted
-    // lists, one of managled names, and one of unmangled names.
-    std::vector<std::string> Names;
-    std::copy(FunctionNames.begin(), FunctionNames.end(),
-              std::back_inserter(Names));
+  if (CommandLineFunctionNames.empty() && FunctionNameFile.empty())
+    return CI.getASTContext().hadError();
 
-    // First partition our function names into mangled/demangled arrays.
-    auto FirstDemangledName = std::partition(
-        Names.begin(), Names.end(), [](const std::string &Name) -> bool {
-          return StringRef(Name).startswith("_T");
-        });
+  // For efficient usage, we separate our names into two separate sorted
+  // lists, one of managled names, and one of unmangled names.
+  std::vector<std::string> Names;
+  getFunctionNames(Names);
 
-    // Then grab offsets to avoid any issues with iterator invalidation when we
-    // sort.
-    unsigned NumMangled = std::distance(Names.begin(), FirstDemangledName);
-    unsigned NumNames = Names.size();
+  // First partition our function names into mangled/demangled arrays.
+  auto FirstDemangledName = std::partition(
+      Names.begin(), Names.end(), [](const std::string &Name) -> bool {
+        return StringRef(Name).startswith("_T");
+      });
 
-    // Then sort the two partitioned arrays.
-    std::sort(Names.begin(), FirstDemangledName);
-    std::sort(FirstDemangledName, Names.end());
+  // Then grab offsets to avoid any issues with iterator invalidation when we
+  // sort.
+  unsigned NumMangled = std::distance(Names.begin(), FirstDemangledName);
+  unsigned NumNames = Names.size();
 
-    // Finally construct our ArrayRefs into the sorted std::vector for our
-    // mangled and demangled names.
-    ArrayRef<std::string> MangledNames(&*Names.begin(), NumMangled);
-    ArrayRef<std::string> DemangledNames(&*std::next(Names.begin(), NumMangled),
-                                         NumNames - NumMangled);
+  // Then sort the two partitioned arrays.
+  std::sort(Names.begin(), FirstDemangledName);
+  std::sort(FirstDemangledName, Names.end());
 
-    DEBUG(llvm::errs() << "MangledNames to keep:\n";
-          std::for_each(MangledNames.begin(), MangledNames.end(),
-                        [](const std::string &str) {
-                          llvm::errs() << "    " << str << '\n';
-                        }));
-    DEBUG(llvm::errs() << "DemangledNames to keep:\n";
-          std::for_each(DemangledNames.begin(), DemangledNames.end(),
-                        [](const std::string &str) {
-                          llvm::errs() << "    " << str << '\n';
-                        }));
+  // Finally construct our ArrayRefs into the sorted std::vector for our
+  // mangled and demangled names.
+  ArrayRef<std::string> MangledNames(&*Names.begin(), NumMangled);
+  ArrayRef<std::string> DemangledNames(&*std::next(Names.begin(), NumMangled),
+                                       NumNames - NumMangled);
 
-    removeUnwantedFunctions(CI.getSILModule(), MangledNames, DemangledNames);
-  }
+  DEBUG(llvm::errs() << "MangledNames to keep:\n";
+        std::for_each(MangledNames.begin(), MangledNames.end(),
+                      [](const std::string &str) {
+                        llvm::errs() << "    " << str << '\n';
+                      }));
+  DEBUG(llvm::errs() << "DemangledNames to keep:\n";
+        std::for_each(DemangledNames.begin(), DemangledNames.end(),
+                      [](const std::string &str) {
+                        llvm::errs() << "    " << str << '\n';
+                      }));
+
+  removeUnwantedFunctions(CI.getSILModule(), MangledNames, DemangledNames);
 
   if (EmitSIB) {
     llvm::SmallString<128> OutputFile;
@@ -343,8 +371,8 @@ int main(int argc, char **argv) {
 
     serialize(CI.getMainModule(), serializationOpts, CI.getSILModule());
   } else {
-    const StringRef OutputFile = OutputFilename.size() ?
-                                   StringRef(OutputFilename) : "-";
+    const StringRef OutputFile =
+        OutputFilename.size() ? StringRef(OutputFilename) : "-";
 
     if (OutputFile == "-") {
       CI.getSILModule()->print(llvm::outs(), EmitVerboseSIL, CI.getMainModule(),
@@ -353,14 +381,12 @@ int main(int argc, char **argv) {
       std::error_code EC;
       llvm::raw_fd_ostream OS(OutputFile, EC, llvm::sys::fs::F_None);
       if (EC) {
-        llvm::errs() << "while opening '" << OutputFile << "': "
-                     << EC.message() << '\n';
+        llvm::errs() << "while opening '" << OutputFile << "': " << EC.message()
+                     << '\n';
         return 1;
       }
       CI.getSILModule()->print(OS, EmitVerboseSIL, CI.getMainModule(),
                                EnableSILSortOutput, !DisableASTDump);
     }
   }
-
-  return CI.getASTContext().hadError();
 }
