@@ -440,10 +440,12 @@ namespace {
         // pointing at a generic TypeAliasDecl here. If we find a way to
         // handle generic TypeAliases elsewhere, this can just become a
         // call to BoundGenericType::get().
-        return cs.TC.applyUnboundGenericArguments(unbound, unboundDecl,
-                                                  SourceLoc(), cs.DC, arguments,
-                                                  /*isGenericSignature*/false,
-                                                  /*resolver*/nullptr);
+        return cs.TC.applyUnboundGenericArguments(
+                                             unbound, unboundDecl,
+                                             SourceLoc(), cs.DC, arguments,
+                                             /*options*/TypeResolutionOptions(),
+                                             /*resolver*/nullptr,
+                                             /*unsatisfiedDependency*/nullptr);
       }
       
       return type;

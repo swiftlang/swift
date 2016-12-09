@@ -5,19 +5,6 @@
 // See https://swift.org/LICENSE.txt for license information
 // See https://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
 
-// RUN: not --crash %target-swift-frontend %s -emit-ir
-let c
-let e}}typealias e:A{ a{
-typealias F=b:d
-class A}typealias f()class A
-}class T:Range<T>
-!(
-Slice.h{}} f{=(A{init(t:A{
-c
-{ a
-{}protocol A:d class A{for in.E =
-enum A{
-typealias e:B{init()typealias e=.B<T>
-print(
-{struct A
-f{ ^class a b=fS<T>:
+// RUN: not %target-swift-frontend %s -typecheck
+// REQUIRES: asserts
+struct d=typealias f=B)typealias B<T>:d typealias B<T>:B<T>
