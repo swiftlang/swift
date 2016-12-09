@@ -59,7 +59,10 @@ static llvm::cl::opt<bool>
                    llvm::cl::desc("Emit locations during sil emission."));
 
 static llvm::cl::list<std::string>
-    FunctionNames("func", llvm::cl::desc("Function names to extract."));
+    CommandLineFunctionNames("func",
+                             llvm::cl::desc("Function names to extract."));
+static llvm::cl::opt<std::string> FunctionNameFile(
+    "func-file", llvm::cl::desc("File to load additional function names from"));
 
 static llvm::cl::opt<bool>
 EmitSIB("emit-sib",
@@ -118,6 +121,31 @@ static llvm::cl::opt<bool> AssumeUnqualifiedOwnershipWhenParsing(
 // address of main, and some platforms can't implement getMainExecutable
 // without being given the address of a function in the main executable).
 void anchorForGetMainExecutable() {}
+
+static void getFunctionNames(std::vector<std::string> &Names) {
+  std::copy(CommandLineFunctionNames.begin(), CommandLineFunctionNames.end(),
+            std::back_inserter(Names));
+
+  if (!FunctionNameFile.empty()) {
+    llvm::ErrorOr<std::unique_ptr<llvm::MemoryBuffer>> FileBufOrErr =
+        llvm::MemoryBuffer::getFileOrSTDIN(FunctionNameFile);
+    if (!FileBufOrErr) {
+      fprintf(stderr, "Error! Failed to open file: %s\n",
+              InputFilename.c_str());
+      exit(-1);
+    }
+    StringRef Buffer = FileBufOrErr.get()->getBuffer();
+    while (!Buffer.empty()) {
+      StringRef Token, NewBuffer;
+      std::tie(Token, NewBuffer) = llvm::getToken(Buffer, "\n");
+      if (Token.empty()) {
+        break;
+      }
+      Names.push_back(Token);
+      Buffer = NewBuffer;
+    }
+  }
+}
 
 static bool stringInSortedArray(
     StringRef str, ArrayRef<std::string> list,
@@ -282,14 +310,13 @@ int main(int argc, char **argv) {
       SL->getAll();
   }
 
-  if (FunctionNames.empty())
+  if (CommandLineFunctionNames.empty() && FunctionNameFile.empty())
     return CI.getASTContext().hadError();
 
   // For efficient usage, we separate our names into two separate sorted
   // lists, one of managled names, and one of unmangled names.
   std::vector<std::string> Names;
-  std::copy(FunctionNames.begin(), FunctionNames.end(),
-            std::back_inserter(Names));
+  getFunctionNames(Names);
 
   // First partition our function names into mangled/demangled arrays.
   auto FirstDemangledName = std::partition(
@@ -324,45 +351,42 @@ int main(int argc, char **argv) {
                       }));
 
   removeUnwantedFunctions(CI.getSILModule(), MangledNames, DemangledNames);
-}
 
-if (EmitSIB) {
-  llvm::SmallString<128> OutputFile;
-  if (OutputFilename.size()) {
-    OutputFile = OutputFilename;
-  } else if (ModuleName.size()) {
-    OutputFile = ModuleName;
-    llvm::sys::path::replace_extension(OutputFile, SIB_EXTENSION);
-  } else {
-    OutputFile = CI.getMainModule()->getName().str();
-    llvm::sys::path::replace_extension(OutputFile, SIB_EXTENSION);
-  }
-
-  SerializationOptions serializationOpts;
-  serializationOpts.OutputPath = OutputFile.c_str();
-  serializationOpts.SerializeAllSIL = true;
-  serializationOpts.IsSIB = true;
-
-  serialize(CI.getMainModule(), serializationOpts, CI.getSILModule());
- } else {
-  const StringRef OutputFile = OutputFilename.size() ?
-    StringRef(OutputFilename) : "-";
-
-  if (OutputFile == "-") {
-    CI.getSILModule()->print(llvm::outs(), EmitVerboseSIL, CI.getMainModule(),
-                             EnableSILSortOutput, !DisableASTDump);
-  } else {
-    std::error_code EC;
-    llvm::raw_fd_ostream OS(OutputFile, EC, llvm::sys::fs::F_None);
-    if (EC) {
-      llvm::errs() << "while opening '" << OutputFile << "': "
-                   << EC.message() << '\n';
-      return 1;
+  if (EmitSIB) {
+    llvm::SmallString<128> OutputFile;
+    if (OutputFilename.size()) {
+      OutputFile = OutputFilename;
+    } else if (ModuleName.size()) {
+      OutputFile = ModuleName;
+      llvm::sys::path::replace_extension(OutputFile, SIB_EXTENSION);
+    } else {
+      OutputFile = CI.getMainModule()->getName().str();
+      llvm::sys::path::replace_extension(OutputFile, SIB_EXTENSION);
     }
-    CI.getSILModule()->print(OS, EmitVerboseSIL, CI.getMainModule(),
-                             EnableSILSortOutput, !DisableASTDump);
+
+    SerializationOptions serializationOpts;
+    serializationOpts.OutputPath = OutputFile.c_str();
+    serializationOpts.SerializeAllSIL = true;
+    serializationOpts.IsSIB = true;
+
+    serialize(CI.getMainModule(), serializationOpts, CI.getSILModule());
+  } else {
+    const StringRef OutputFile =
+        OutputFilename.size() ? StringRef(OutputFilename) : "-";
+
+    if (OutputFile == "-") {
+      CI.getSILModule()->print(llvm::outs(), EmitVerboseSIL, CI.getMainModule(),
+                               EnableSILSortOutput, !DisableASTDump);
+    } else {
+      std::error_code EC;
+      llvm::raw_fd_ostream OS(OutputFile, EC, llvm::sys::fs::F_None);
+      if (EC) {
+        llvm::errs() << "while opening '" << OutputFile << "': " << EC.message()
+                     << '\n';
+        return 1;
+      }
+      CI.getSILModule()->print(OS, EmitVerboseSIL, CI.getMainModule(),
+                               EnableSILSortOutput, !DisableASTDump);
+    }
   }
- }
-
-
 }
