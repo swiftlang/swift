@@ -6954,11 +6954,6 @@ void TypeChecker::validateDecl(ValueDecl *D, bool resolveTypeParams) {
     typeAlias->computeType();
 
     // Check generic parameters, if needed.
-    if (auto gp = typeAlias->getGenericParams()) {
-      gp->setOuterParameters(
-                     typeAlias->getDeclContext()->getGenericParamsOfContext());
-    }
-
     validateGenericTypeSignature(typeAlias);
     
     // Otherwise, perform the heavy lifting now.
@@ -6975,11 +6970,6 @@ void TypeChecker::validateDecl(ValueDecl *D, bool resolveTypeParams) {
     nominal->computeType();
 
     // Check generic parameters, if needed.
-    if (auto gp = nominal->getGenericParams()) {
-      gp->setOuterParameters(
-        nominal->getDeclContext()->getGenericParamsOfContext());
-    }
-
     validateGenericTypeSignature(nominal);
 
     checkInheritanceClause(D);
@@ -7032,9 +7022,6 @@ void TypeChecker::validateDecl(ValueDecl *D, bool resolveTypeParams) {
     (void) gp;
 
     validateGenericTypeSignature(proto);
-
-    assert(gp->getOuterParameters() ==
-           proto->getDeclContext()->getGenericParamsOfContext());
 
     // Record inherited protocols.
     resolveInheritedProtocols(proto);
