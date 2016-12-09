@@ -995,7 +995,7 @@ namespace {
 
 /// Conformance info for a witness table that can be directly generated.
 class DirectConformanceInfo : public ConformanceInfo {
-  friend class ProtocolInfo;
+  friend class swift::irgen::ProtocolInfo;
 
   const NormalProtocolConformance *RootConformance;
 public:
@@ -1015,7 +1015,7 @@ public:
 
 /// Conformance info for a witness table that is (or may be) dependent.
 class AccessorConformanceInfo : public ConformanceInfo {
-  friend class ProtocolInfo;
+  friend class swift::irgen::ProtocolInfo;
 
   const NormalProtocolConformance *Conformance;
 public:
