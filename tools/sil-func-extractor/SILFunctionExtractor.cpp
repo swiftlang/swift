@@ -119,9 +119,9 @@ static llvm::cl::opt<bool> AssumeUnqualifiedOwnershipWhenParsing(
 // without being given the address of a function in the main executable).
 void anchorForGetMainExecutable() {}
 
-template <typename Cmp>
-static bool stringInSortedArray(StringRef str, ArrayRef<std::string> list,
-                                Cmp &&cmp) {
+static bool stringInSortedArray(
+    StringRef str, ArrayRef<std::string> list,
+    llvm::function_ref<bool(const std::string &, const std::string &)> &&cmp) {
   if (list.empty())
     return false;
   auto iter = std::lower_bound(list.begin(), list.end(), str, cmp);
