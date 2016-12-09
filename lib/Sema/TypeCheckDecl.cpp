@@ -3495,8 +3495,7 @@ public:
       }
     }
 
-    if ((IsSecondPass && !IsFirstPass) ||
-        decl->getDeclContext()->getAsProtocolOrProtocolExtensionContext()) {
+    if (IsSecondPass && !IsFirstPass) {
       TC.checkUnsupportedProtocolType(decl);
       if (auto nominal = dyn_cast<NominalTypeDecl>(decl)) {
         TC.checkDeclCircularity(nominal);
@@ -4284,8 +4283,10 @@ public:
 
     if (IsSecondPass) {
       checkAccessibility(TC, PD);
-      for (auto member : PD->getMembers())
+      for (auto member : PD->getMembers()) {
+        TC.checkUnsupportedProtocolType(member);
         checkAccessibility(TC, member);
+      }
       TC.checkInheritanceClause(PD);
       return;
     }
