@@ -6,5 +6,4 @@
 // See https://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
 
 // RUN: not %target-swift-frontend %s -typecheck
-// REQUIRES: asserts
 {protocol e{typealias e enum b{case func a{{enum B:e

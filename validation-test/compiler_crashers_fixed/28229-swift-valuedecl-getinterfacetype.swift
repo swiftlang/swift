@@ -6,5 +6,4 @@
 // See https://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
 
 // RUN: not %target-swift-frontend %s -typecheck
-// REQUIRES: asserts
 protocol c{associatedtype e:a:protocol a{associatedtype a}func b:e.c
