@@ -35,7 +35,7 @@ class ANonObjCClass {}
 // CHECK-LABEL: @interface UseForward
 // CHECK-NEXT: - (void)definedAlready:(AFullyDefinedClass * _Nonnull)a;
 // CHECK-NEXT: - (void)a:(ZForwardClass1 * _Nonnull)a;
-// CHECK-NEXT: - (ZForwardClass2 * _Nonnull)b;
+// CHECK-NEXT: - (ZForwardClass2 * _Nonnull)b SWIFT_WARN_UNUSED_RESULT;
 // CHECK-NEXT: - (void)c:(ZForwardAliasClass * _Nonnull)c;
 // CHECK-NEXT: - (void)d:(id <ZForwardProtocol1> _Nonnull)d;
 // CHECK-NEXT: - (void)e:(Class <ZForwardProtocol2> _Nonnull)e;
