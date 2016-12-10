@@ -81,11 +81,7 @@ Type GenericTypeToArchetypeResolver::resolveGenericTypeParamType(
   if (gpDecl->isInvalid() || !GenericEnv)
     return ErrorType::get(gpDecl->getASTContext());
 
-  auto type = GenericEnv->getMappingIfPresent(gp);
-  if (!type)
-    return ErrorType::get(gpDecl->getASTContext());;
-
-  return *type;
+  return GenericEnv->mapTypeIntoContext(gp);
 }
 
 Type GenericTypeToArchetypeResolver::resolveDependentMemberType(
@@ -102,12 +98,6 @@ Type GenericTypeToArchetypeResolver::resolveSelfAssociatedType(
 }
 
 Type GenericTypeToArchetypeResolver::resolveTypeOfContext(DeclContext *dc) {
-  // FIXME: Fallback case.
-  if (!isa<ExtensionDecl>(dc) &&
-      dc->isGenericContext() &&
-      !dc->isValidGenericContext())
-    return dc->getSelfInterfaceType();
-
   return GenericEnvironment::mapTypeIntoContext(
       dc->getParentModule(), GenericEnv,
       dc->getSelfInterfaceType());

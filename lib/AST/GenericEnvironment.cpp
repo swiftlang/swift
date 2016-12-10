@@ -305,7 +305,8 @@ Type GenericEnvironment::mapTypeIntoContext(ModuleDecl *M, Type type) const {
 Type GenericEnvironment::mapTypeIntoContext(GenericTypeParamType *type) const {
   auto self = const_cast<GenericEnvironment *>(this);
   Type result = QueryInterfaceTypeSubstitutions(self)(type);
-  assert(result && "Missing context type for generic parameter");
+  if (!result)
+    return ErrorType::get(type);
   return result;
 }
 
