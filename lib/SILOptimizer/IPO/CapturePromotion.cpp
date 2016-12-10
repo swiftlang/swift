@@ -368,7 +368,7 @@ computeNewArgInterfaceTypes(SILFunction *F,
     auto paramBoxTy = param.getSILType().castTo<SILBoxType>();
     assert(paramBoxTy->getLayout()->getFields().size() == 1
            && "promoting compound box not implemented yet");
-    auto paramBoxedTy = paramBoxTy->getFieldType(0);
+    auto paramBoxedTy = paramBoxTy->getFieldType(F->getModule(), 0);
     auto &paramTL = F->getModule().Types.getTypeLowering(paramBoxedTy);
     ParameterConvention convention;
     if (paramTL.isPassedIndirectly()) {
@@ -485,7 +485,7 @@ ClosureCloner::populateCloned() {
       auto BoxTy = (*I)->getType().castTo<SILBoxType>();
       assert(BoxTy->getLayout()->getFields().size() == 1
              && "promoting compound box not implemented");
-      auto BoxedTy = BoxTy->getFieldType(0).getObjectType();
+      auto BoxedTy = BoxTy->getFieldType(Cloned->getModule(),0).getObjectType();
       SILValue MappedValue =
           ClonedEntryBB->createArgument(BoxedTy, (*I)->getDecl());
       BoxArgumentMap.insert(std::make_pair(*I, MappedValue));
@@ -797,7 +797,7 @@ examineAllocBoxInst(AllocBoxInst *ABI, ReachabilityInfo &RI,
       auto BoxTy = BoxArg->getType().castTo<SILBoxType>();
       assert(BoxTy->getLayout()->getFields().size() == 1
              && "promoting compound box not implemented yet");
-      if (BoxTy->getFieldType(0).isAddressOnly(M))
+      if (BoxTy->getFieldType(M, 0).isAddressOnly(M))
         return false;
 
       // Verify that this closure is known not to mutate the captured value; if

@@ -84,6 +84,24 @@ static bool isRequirement(Node::Kind kind) {
   }
 }
 
+static bool isFunctionAttr(Node::Kind kind) {
+  switch (kind) {
+    case Node::Kind::FunctionSignatureSpecialization:
+    case Node::Kind::GenericSpecialization:
+    case Node::Kind::GenericSpecializationNotReAbstracted:
+    case Node::Kind::ObjCAttribute:
+    case Node::Kind::NonObjCAttribute:
+    case Node::Kind::DynamicAttribute:
+    case Node::Kind::DirectMethodReferenceAttribute:
+    case Node::Kind::VTableAttribute:
+    case Node::Kind::PartialApplyForwarder:
+    case Node::Kind::PartialApplyObjCForwarder:
+      return true;
+    default:
+      return false;
+  }
+}
+
 } // anonymous namespace
 
 namespace swift {
@@ -104,48 +122,40 @@ NodePointer Demangler::demangleTopLevel() {
     Idx++;
   }
 
-  bool beforeSpecializtions = false;
-  for (const NodeWithPos &NWP : reversed(NodeStack)) {
-    switch (NWP.Node->getKind()) {
-      case Node::Kind::FunctionSignatureSpecialization:
-      case Node::Kind::GenericSpecialization:
-      case Node::Kind::GenericSpecializationNotReAbstracted:
-        topLevel->addChild(NWP.Node);
-        beforeSpecializtions = true;
-        break;
-      default:
-        break;
-    }
+  // Let a trailing '_' be part of the not demangled suffix. 
+  popNode(Node::Kind::FirstElementMarker);
+
+  size_t EndPos = (NodeStack.empty() ? 0 : NodeStack.back().Pos);
+
+  NodePointer Parent = topLevel;
+  while (NodePointer FuncAttr = popNode(isFunctionAttr)) {
+    Parent->addChild(FuncAttr);
+    if (FuncAttr->getKind() == Node::Kind::PartialApplyForwarder ||
+        FuncAttr->getKind() == Node::Kind::PartialApplyObjCForwarder)
+      Parent = FuncAttr;
   }
   for (const NodeWithPos &NWP : NodeStack) {
     NodePointer Nd = NWP.Node;
     switch (Nd->getKind()) {
-      case Node::Kind::FunctionSignatureSpecialization:
-      case Node::Kind::GenericSpecialization:
-      case Node::Kind::GenericSpecializationNotReAbstracted:
-        beforeSpecializtions = false;
-        break;
       case Node::Kind::Type:
-        topLevel->addChild(Nd->getFirstChild());
+        Parent->addChild(Nd->getFirstChild());
         break;
       case Node::Kind::Identifier:
-        if (beforeSpecializtions &&
-            StringRef(Nd->getText()).startswith("_T")) {
+        if (StringRef(Nd->getText()).startswith("_T")) {
           NodePointer Global = demangleSymbolAsNode(Nd->getText());
           if (Global && Global->getKind() == Node::Kind::Global) {
             for (NodePointer Child : *Global) {
-              topLevel->addChild(Child);
+              Parent->addChild(Child);
             }
             break;
           }
         }
         SWIFT_FALLTHROUGH;
       default:
-        topLevel->addChild(Nd);
+        Parent->addChild(Nd);
         break;
     }
   }
-  size_t EndPos = (NodeStack.empty() ? 0 : NodeStack.back().Pos);
   if (EndPos < Text.size()) {
     topLevel->addChild(NodeFactory::create(Node::Kind::Suffix,
                                            Text.substr(EndPos)));
@@ -176,6 +186,8 @@ NodePointer Demangler::demangleOperator() {
     case 'A': return demangleMultiSubstitutions();
     case 'B': return demangleBuiltinType();
     case 'C': return demangleNominalType(Node::Kind::Class);
+    case 'D': return createWithChild(Node::Kind::TypeMangling,
+                                     popNode(Node::Kind::Type));
     case 'E': return demangleExtensionContext();
     case 'F': return demanglePlainFunction();
     case 'G': return demangleBoundGenericType();
@@ -990,11 +1002,13 @@ NodePointer Demangler::popProtocolConformance() {
 NodePointer Demangler::demangleThunkOrSpecialization() {
   switch (char c = nextChar()) {
     case 'c': return createWithChild(Node::Kind::CurryThunk, popNode(isEntity));
-    case 'o': return swapWith(Node::Kind::ObjCAttribute);
-    case 'O': return swapWith(Node::Kind::NonObjCAttribute);
-    case 'D': return swapWith(Node::Kind::DynamicAttribute);
-    case 'd': return swapWith(Node::Kind::DirectMethodReferenceAttribute);
-    case 'V': return swapWith(Node::Kind::VTableAttribute);
+    case 'o': return NodeFactory::create(Node::Kind::ObjCAttribute);
+    case 'O': return NodeFactory::create(Node::Kind::NonObjCAttribute);
+    case 'D': return NodeFactory::create(Node::Kind::DynamicAttribute);
+    case 'd': return NodeFactory::create(Node::Kind::DirectMethodReferenceAttribute);
+    case 'V': return NodeFactory::create(Node::Kind::VTableAttribute);
+    case 'a': return NodeFactory::create(Node::Kind::PartialApplyObjCForwarder);
+    case 'A': return NodeFactory::create(Node::Kind::PartialApplyForwarder);
     case 'W': {
       NodePointer Entity = popNode(isEntity);
       NodePointer Conf = popProtocolConformance();
@@ -1011,10 +1025,6 @@ NodePointer Demangler::demangleThunkOrSpecialization() {
       Thunk = addChild(Thunk, popNode(Node::Kind::Type));
       return addChild(Thunk, Ty2);
     }
-    case 'A':
-      return createWithChild(Node::Kind::PartialApplyForwarder, popNode());
-    case 'a':
-      return createWithChild(Node::Kind::PartialApplyObjCForwarder, popNode());
     case'g':
       return demangleGenericSpecialization(Node::Kind::GenericSpecialization);
     case'G':
@@ -1241,10 +1251,10 @@ NodePointer Demangler::demangleWitness() {
                                 Conf, Name);
     }
     case 'T': {
-      NodePointer ProtoTy = createWithChild(Node::Kind::Type, popProtocol());
+      NodePointer ProtoTy = popNode(Node::Kind::Type);
       NodePointer Name = popNode(isDeclName);
       NodePointer Conf = popProtocolConformance();
-      return createWithChildren(Node::Kind::AssociatedTypeMetadataAccessor,
+      return createWithChildren(Node::Kind::AssociatedTypeWitnessTableAccessor,
                                 Conf, Name, ProtoTy);
     }
     default:
@@ -1335,6 +1345,8 @@ NodePointer Demangler::demangleSpecialType() {
       }
       return createType(boxTy);
     }
+    case 'e':
+      return createType(NodeFactory::create(Node::Kind::ErrorType, std::string()));
     default:
       return nullptr;
   }
@@ -1395,6 +1407,7 @@ NodePointer Demangler::demangleFunctionEntity() {
     case 'U': Args = TypeAndIndex; Kind = Node::Kind::ExplicitClosure; break;
     case 'u': Args = TypeAndIndex; Kind = Node::Kind::ImplicitClosure; break;
     case 'A': Args = Index; Kind = Node::Kind::DefaultArgumentInitializer; break;
+    case 'p': return demangleEntity(Node::Kind::GenericTypeParamDecl);
     default: return nullptr;
   }
 

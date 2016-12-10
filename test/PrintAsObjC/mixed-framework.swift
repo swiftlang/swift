@@ -22,7 +22,7 @@ import Foundation
 
 // CHECK-LABEL: @interface Dummy : NSNumber
 public class Dummy: NSNumber {
-  // CHECK: - (CIntAlias)getIntAlias;
+  // CHECK: - (CIntAlias)getIntAlias SWIFT_WARN_UNUSED_RESULT;
   public func getIntAlias() -> CIntAlias {
     let result: CInt = 0
     return result

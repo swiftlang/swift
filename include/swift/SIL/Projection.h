@@ -294,7 +294,7 @@ public:
     case ProjectionKind::Enum:
       return BaseType.getEnumElementType(getEnumElementDecl(BaseType), M);
     case ProjectionKind::Box:
-      return BaseType.castTo<SILBoxType>()->getFieldType(getIndex());
+      return BaseType.castTo<SILBoxType>()->getFieldType(M, getIndex());
     case ProjectionKind::Tuple:
       return BaseType.getTupleElementType(getIndex());
     case ProjectionKind::Upcast:

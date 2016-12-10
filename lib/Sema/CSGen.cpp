@@ -2690,7 +2690,7 @@ namespace {
         CS.addConstraint(ConstraintKind::Defaultable,
                          placeholderTy, TupleType::getEmpty(CS.getASTContext()),
                          locator);
-        E->setType(placeholderTy);
+        CS.setType(E, placeholderTy);
       }
       // NOTE: The type loc may be there but have failed to validate, in which
       // case we return the null type.
@@ -2803,10 +2803,11 @@ namespace {
       // For closures containing only a single expression, the body participates
       // in type checking.
       if (auto closure = dyn_cast<ClosureExpr>(expr)) {
+        auto &CS = CG.getConstraintSystem();
         if (closure->hasSingleExpressionBody()) {
           // Visit the closure itself, which produces a function type.
           auto funcTy = CG.visit(expr)->castTo<FunctionType>();
-          expr->setType(funcTy);
+          CS.setType(expr, funcTy);
         }
 
         return { true, expr };
@@ -2828,18 +2829,23 @@ namespace {
     /// generate constraints from the expression.
     Expr *walkToExprPost(Expr *expr) override {
       if (auto closure = dyn_cast<ClosureExpr>(expr)) {
-        // If the function type has an error in it, we don't want to solve the
-        // system.
-        if (closure->getType() &&
-            (closure->getType()->hasError() ||
-             closure->getType()->getCanonicalType()->hasError()))
-          return nullptr;
-
         if (closure->hasSingleExpressionBody()) {
+          auto &CS = CG.getConstraintSystem();
+          Type closureTy = closure->getType();
+
+          // If the function type has an error in it, we don't want to solve the
+          // system.
+          if (closureTy &&
+              (closureTy->hasError() ||
+               closureTy->getCanonicalType()->hasError()))
+            return nullptr;
+
+          CS.setType(closure, closureTy);
+
           // Visit the body. It's type needs to be convertible to the function's
           // return type.
-          auto resultTy = closure->getResultType();
-          auto bodyTy = closure->getSingleExpressionBody()->getType();
+          auto resultTy = closureTy->castTo<FunctionType>()->getResult();
+          Type bodyTy = closure->getSingleExpressionBody()->getType();
           CG.getConstraintSystem().setFavoredType(expr, bodyTy.getPointer());
           CG.getConstraintSystem()
             .addConstraint(ConstraintKind::Conversion, bodyTy,
@@ -2853,7 +2859,11 @@ namespace {
       }
 
       if (auto type = CG.visit(expr)) {
-        expr->setType(CG.getConstraintSystem().simplifyType(type));
+        auto &CS = CG.getConstraintSystem();
+        auto simplifiedType = CS.simplifyType(type);
+
+        CS.setType(expr, simplifiedType);
+
         return expr;
       }
 
@@ -2954,7 +2964,9 @@ Expr *ConstraintSystem::generateConstraintsShallow(Expr *expr) {
   
   this->optimizeConstraints(expr);
   
-  expr->setType(type);
+  auto &CS = CG.getConstraintSystem();
+  CS.setType(expr, type);
+
   return expr;
 }
 

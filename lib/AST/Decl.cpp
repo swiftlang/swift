@@ -2185,7 +2185,7 @@ ArrayRef<ProtocolDecl *>
 AbstractTypeParamDecl::getConformingProtocols() const {
   auto *dc = getDeclContext();
   if (!dc->isValidGenericContext())
-    return nullptr;
+    return {};
 
   auto contextTy = dc->mapTypeIntoContext(getDeclaredInterfaceType());
   if (auto *archetype = contextTy->getAs<ArchetypeType>())
@@ -2404,6 +2404,10 @@ ObjCClassKind ClassDecl::checkObjCAncestry() const {
     if (!CD->hasSuperclass())
       break;
     CD = CD->getSuperclass()->getClassOrBoundGenericClass();
+    // If we don't have a valid class here, we should have diagnosed
+    // elsewhere.
+    if (!CD)
+      break;
   }
 
   if (!isObjC)
@@ -2421,6 +2425,9 @@ ObjCClassKind ClassDecl::checkObjCAncestry() const {
 static StringRef mangleObjCRuntimeName(const NominalTypeDecl *nominal,
                                        llvm::SmallVectorImpl<char> &buffer) {
   {
+    // TODO: Mangling: Use new mangling scheme as soon as the ObjC runtime
+    // can demangle it.
+
     // Mangle the type.
     Mangle::Mangler mangler(false/*dwarf*/, false/*punycode*/);
 
@@ -3361,6 +3368,31 @@ void VarDecl::setType(Type t) {
   typeInContext = t;
   if (t && t->hasError())
     setInvalid();
+}
+
+Type VarDecl::computeTypeInContextSlow() const {
+  Type contextType = getInterfaceType();
+  if (!contextType) return Type();
+
+  // If we have a type parameter, we need to map into this context.
+  if (contextType->hasTypeParameter()) {
+    auto genericEnv =
+      getInnermostDeclContext()->getGenericEnvironmentOfContext();
+
+    // FIXME: Hack to degrade somewhat gracefully when we don't have a generic
+    // environment yet. We return an interface type, but at least we don't
+    // record it.
+    if (!genericEnv)
+      return contextType;
+
+    contextType = genericEnv->mapTypeIntoContext(getModuleContext(),
+                                                 contextType);
+  }
+
+  typeInContext = contextType;
+  if (typeInContext->hasError())
+    const_cast<VarDecl *>(this)->setInvalid();
+  return typeInContext;
 }
 
 void VarDecl::markInvalid() {

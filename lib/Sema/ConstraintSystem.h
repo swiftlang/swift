@@ -899,6 +899,13 @@ private:
   /// type in a disjunction constraint.
   llvm::DenseMap<Expr *, TypeBase *> FavoredTypes;
 
+  /// Maps expression types used within all portions of the constraint
+  /// system, instead of directly using the types on the expression
+  /// nodes themselves. This allows us to typecheck an expression and
+  /// run through various diagnostics passes without actually mutating
+  /// the types on the expression nodes.
+  llvm::DenseMap<Expr *, TypeBase *> ExprTypes;
+
   /// There can only be a single contextual type on the root of the expression
   /// being checked.  If specified, this holds its type along with the base
   /// expression, and the purpose of it.
@@ -1216,7 +1223,26 @@ public:
   void setFavoredType(Expr *E, TypeBase *T) {
     this->FavoredTypes[E] = T;
   }
- 
+
+  /// Set the type in our type map for a given expression. The side
+  /// map is used throughout the expression type checker in order to
+  /// avoid mutating expressions until we know we have successfully
+  /// type-checked them.
+  void setType(Expr *E, Type T) {
+    assert(T && "Expected non-null type!");
+
+    assert((ExprTypes.find(E) == ExprTypes.end() ||
+            ExprTypes.find(E)->second->isEqual(T) ||
+            ExprTypes.find(E)->second->hasTypeVariable()) &&
+           "Expected type to be set exactly once!");
+
+    ExprTypes[E] = T.getPointer();
+
+    // FIXME: Temporary until all references to expression types are
+    //        updated.
+    E->setType(T);
+  }
+
   void setContextualType(Expr *E, TypeLoc T, ContextualTypePurpose purpose) {
     contextualTypeNode = E;
     contextualType = T;

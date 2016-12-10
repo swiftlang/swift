@@ -3318,6 +3318,7 @@ DEFINE_EMPTY_CAN_TYPE_WRAPPER(SILFunctionType, Type)
 
 class SILBoxType;
 class SILLayout; // From SIL
+class SILModule; // From SIL
 typedef CanTypeWrapper<SILBoxType> CanSILBoxType;
 
 /// The SIL-only type for boxes, which represent a reference to a (non-class)
@@ -3347,25 +3348,16 @@ public:
     return llvm::makeArrayRef(getTrailingObjects<Substitution>(),
                               NumGenericArgs);
   }
-  CanType getFieldLoweredType(unsigned index) const {
-    auto fieldTy = getLayout()->getFields()[index].getLoweredType();
-    // Apply generic arguments if the layout is generic.
-    if (!getGenericArgs().empty()) {
-      auto substMap =
-       getLayout()->getGenericSignature()->getSubstitutionMap(getGenericArgs());
-      fieldTy = fieldTy.subst(substMap)->getCanonicalType();
-    }
-    return fieldTy;
-  }
-  SILType getFieldType(unsigned index) const; // In SILType.h
+  
+  // In SILType.h:
+  CanType getFieldLoweredType(SILModule &M, unsigned index) const;
+  SILType getFieldType(SILModule &M, unsigned index) const;
 
   // TODO: SILBoxTypes should be explicitly constructed in terms of specific
   // layouts. As a staging mechanism, we expose the old single-boxed-type
   // interface.
   
   static CanSILBoxType get(CanType BoxedType);
-  CanType getBoxedType() const; // In SILType.h
-  SILType getBoxedAddressType() const; // In SILType.h
 
   static bool classof(const TypeBase *T) {
     return T->getKind() == TypeKind::SILBox;

@@ -45,6 +45,8 @@ static DefaultArgumentKind getDefaultArgKind(Expr *init) {
   case MagicIdentifierLiteralExpr::DSOHandle:
     return DefaultArgumentKind::DSOHandle;
   }
+
+  llvm_unreachable("Unhandled MagicIdentifierLiteralExpr in switch.");
 }
 
 void Parser::DefaultArgumentInfo::setFunctionContext(AbstractFunctionDecl *AFD){

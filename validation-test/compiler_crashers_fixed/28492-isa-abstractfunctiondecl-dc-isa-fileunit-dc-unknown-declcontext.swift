@@ -5,11 +5,5 @@
 // See https://swift.org/LICENSE.txt for license information
 // See https://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
 
-// RUN: not --crash %target-swift-frontend %s -emit-ir
-protocol a
-protocol P
-protocol A}}guard let c
-class T:Range<T>:A protocolass B
-struct D:A{iB
-let f=nil a(){{
-gu
+// RUN: not %target-swift-frontend %s -emit-ir
+{lazy var E

@@ -75,6 +75,10 @@ bool IterativeTypeChecker::isQualifiedLookupInDeclContextSatisfied(
 
     if (auto superclass = classDecl->getSuperclass()) {
       if (auto superclassDecl = superclass->getAnyNominal()) {
+        // Hack.
+        if (superclassDecl == nominal)
+          return true;
+
         if (!isSatisfied(requestQualifiedLookupInDeclContext({ superclassDecl,
                                                                payload.Name,
                                                                payload.Loc })))

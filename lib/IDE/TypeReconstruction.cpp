@@ -14,6 +14,8 @@
 #include "swift/AST/Decl.h"
 #include "swift/AST/GenericSignature.h"
 #include "swift/AST/Mangle.h"
+#include "swift/Basic/Mangler.h"
+#include "swift/Basic/ManglingMacros.h"
 #include "swift/AST/NameLookup.h"
 #include "swift/Basic/Demangle.h"
 #include "swift/ClangImporter/ClangImporter.h"
@@ -1620,7 +1622,8 @@ static void VisitNodeLocalDeclName(
     Demangle::NodePointer &cur_node, VisitNodeResult &result,
     const VisitNodeResult &generic_context) { // set by GenericType case
   Demangle::NodePointer parent_node = nodes[nodes.size() - 2];
-  std::string remangledNode = Demangle::mangleNode(parent_node);
+  std::string remangledNode = Demangle::mangleNode(parent_node,
+                                                 NewMangling::useNewMangling());
   TypeDecl *decl = result._module.lookupLocalType(remangledNode);
   if (!decl)
     result._error = stringWithFormat("unable to lookup local type %s",
@@ -2162,7 +2165,8 @@ Decl *ide::getDeclFromUSR(ASTContext &context, StringRef USR,
   // This relies on USR generation being very close to symbol mangling; if we
   // need to support entities with customized USRs (e.g. extensions), we will
   // need to do something smarter here.
-  mangledName.replace(0, 2, "_T");
+  mangledName.replace(0, 2, NewMangling::useNewMangling() ?
+                             MANGLING_PREFIX_STR : "_T");
 
   return getDeclFromMangledSymbolName(context, mangledName, error);
 }

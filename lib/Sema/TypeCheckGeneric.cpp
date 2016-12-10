@@ -836,6 +836,8 @@ void TypeChecker::validateGenericTypeSignature(GenericTypeDecl *typeDecl) {
     return;
   }
 
+  gp->setOuterParameters(dc->getGenericParamsOfContext());
+
   prepareGenericParamList(gp, typeDecl);
 
   auto *env = checkGenericEnvironment(gp, dc, dc->getGenericSignatureOfContext(),
@@ -910,11 +912,13 @@ static std::string gatherGenericParamBindingsText(
   return result.str().str();
 }
 
-bool TypeChecker::checkGenericArguments(DeclContext *dc, SourceLoc loc,
-                                        SourceLoc noteLoc,
-                                        Type owner,
-                                        GenericSignature *genericSig,
-                                        const TypeSubstitutionMap &substitutions) {
+TypeChecker::CheckGenericArgsResult
+TypeChecker::checkGenericArguments(DeclContext *dc, SourceLoc loc,
+                                   SourceLoc noteLoc,
+                                   Type owner,
+                                   GenericSignature *genericSig,
+                                   const TypeSubstitutionMap &substitutions,
+                                   UnsatisfiedDependency *unsatisfiedDependency) {
   // Check each of the requirements.
   Module *module = dc->getParentModule();
   for (const auto &req : genericSig->getRequirements()) {
@@ -935,6 +939,14 @@ bool TypeChecker::checkGenericArguments(DeclContext *dc, SourceLoc loc,
 
     switch (req.getKind()) {
     case RequirementKind::Conformance: {
+      if (auto *classDecl = firstType->getClassOrBoundGenericClass()) {
+        // If we have a callback to report dependencies, do so.
+        // FIXME: Woefully inadequate.
+        if (unsatisfiedDependency &&
+            (*unsatisfiedDependency)(requestTypeCheckSuperclass(classDecl)))
+          return CheckGenericArgsResult::Unsatisfied;
+      }
+
       // Protocol conformance requirements.
       auto proto = secondType->castTo<ProtocolType>();
       // FIXME: This should track whether this should result in a private
@@ -943,7 +955,7 @@ bool TypeChecker::checkGenericArguments(DeclContext *dc, SourceLoc loc,
       // FIXME: Poor location information. How much better can we do here?
       if (!conformsToProtocol(firstType, proto->getDecl(), dc,
                               ConformanceCheckFlags::Used, loc)) {
-        return true;
+        return CheckGenericArgsResult::Error;
       }
 
       continue;
@@ -961,7 +973,7 @@ bool TypeChecker::checkGenericArguments(DeclContext *dc, SourceLoc loc,
                  gatherGenericParamBindingsText(
                    {req.getFirstType(), req.getSecondType()},
                    genericSig, substitutions));
-        return true;
+        return CheckGenericArgsResult::Error;
       }
       continue;
 
@@ -975,13 +987,13 @@ bool TypeChecker::checkGenericArguments(DeclContext *dc, SourceLoc loc,
                  gatherGenericParamBindingsText(
                    {req.getFirstType(), req.getSecondType()},
                    genericSig, substitutions));
-        return true;
+        return CheckGenericArgsResult::Error;
       }
       continue;
     }
   }
 
-  return false;
+  return CheckGenericArgsResult::Success;
 }
 
 Type TypeChecker::getWitnessType(Type type, ProtocolDecl *protocol,

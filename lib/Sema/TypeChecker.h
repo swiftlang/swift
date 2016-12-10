@@ -362,8 +362,8 @@ enum TypeResolutionFlags : unsigned {
   /// we're searching, rather than the entire context.
   TR_GenericSignature = 0x1000,
 
-  /// Whether this type is the referent of a global type alias.
-  TR_GlobalTypeAlias = 0x2000,
+  /// Whether an unavailable protocol can be referenced.
+  TR_AllowUnavailableProtocol = 0x2000,
 
   /// Whether this type is the value carried in an enum case.
   TR_EnumCase = 0x4000,
@@ -825,7 +825,8 @@ public:
   Type applyGenericArguments(Type type, TypeDecl *decl, SourceLoc loc,
                              DeclContext *dc, GenericIdentTypeRepr *generic,
                              TypeResolutionOptions options,
-                             GenericTypeResolver *resolver);
+                             GenericTypeResolver *resolver,
+                             UnsatisfiedDependency *unsatisfiedDependency);
 
   /// Apply generic arguments to the given type.
   ///
@@ -838,8 +839,7 @@ public:
   /// \param loc The source location for diagnostic reporting.
   /// \param dc The context where the arguments are applied.
   /// \param genericArgs The list of generic arguments to apply to the type.
-  /// \param isGenericSignature True if we are looking only in the generic
-  /// signature of the context.
+  /// \param options The type resolution context.
   /// \param resolver The generic type resolver.
   ///
   /// \returns A BoundGenericType bound to the given arguments, or null on
@@ -849,8 +849,9 @@ public:
   Type applyUnboundGenericArguments(Type type, GenericTypeDecl *decl,
                                     SourceLoc loc, DeclContext *dc,
                                     MutableArrayRef<TypeLoc> genericArgs,
-                                    bool isGenericSignature,
-                                    GenericTypeResolver *resolver);
+                                    TypeResolutionOptions options,
+                                    GenericTypeResolver *resolver,
+                                    UnsatisfiedDependency *unsatisfiedDependency);
 
   /// \brief Substitute the given base type into the type of the given nested type,
   /// producing the effective type that the nested type will have.
@@ -1083,6 +1084,12 @@ public:
                              GenericSignature *parentSig,
                              GenericTypeResolver *resolver);
 
+  enum class CheckGenericArgsResult : unsigned {
+    Success,
+    Error,
+    Unsatisfied
+  };
+
   /// Check the given set of generic arguments against the requirements in a
   /// generic signature.
   ///
@@ -1093,12 +1100,14 @@ public:
   /// \param genericSig The actual generic signature.
   /// \param substitutions Substitutions from interface types of the signature.
   ///
-  /// \returns true if an error occurred, false otherwise.
-  bool checkGenericArguments(DeclContext *dc, SourceLoc loc,
+  /// \returns a CheckGenericArgsResult.
+  CheckGenericArgsResult checkGenericArguments(
+                             DeclContext *dc, SourceLoc loc,
                              SourceLoc noteLoc,
                              Type owner,
                              GenericSignature *genericSig,
-                             const TypeSubstitutionMap &substitutions);
+                             const TypeSubstitutionMap &substitutions,
+                             UnsatisfiedDependency *unsatisfiedDependency);
 
   /// Resolve the superclass of the given class.
   void resolveSuperclass(ClassDecl *classDecl) override;
@@ -1137,13 +1146,6 @@ public:
   /// \brief Add the RawRepresentable, Equatable, and Hashable methods to an
   /// enum with a raw type.
   void addImplicitEnumConformances(EnumDecl *ED);
-
-  /// Ensure that the specified \c storage has accessors.
-  ///
-  /// \param wantMaterializeForSet Whether we need materializeForSet
-  /// synthesized.
-  void synthesizeAccessorsForStorage(AbstractStorageDecl *storage,
-                                     bool wantMaterializeForSet);
 
   /// The specified AbstractStorageDecl \c storage was just found to satisfy
   /// the protocol property \c requirement.  Ensure that it has the full

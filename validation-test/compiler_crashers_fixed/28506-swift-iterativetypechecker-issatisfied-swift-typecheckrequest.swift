@@ -5,12 +5,5 @@
 // See https://swift.org/LICENSE.txt for license information
 // See https://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
 
-// RUN: not --crash %target-swift-frontend %s -emit-ir
-class B:d<T{}class A:Range<A>:a{.a b<T=b:a()->:a{
-defer{typealias e
-protocol a
-protocol {{}}
-{{struct A{
-func a}typealias F
-}
-protoco
+// RUN: not %target-swift-frontend %s -emit-ir
+typealias e:A.d)class A:A}a

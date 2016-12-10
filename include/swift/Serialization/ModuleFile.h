@@ -428,7 +428,7 @@ private:
   /// Recursively reads a pattern from \c DeclTypeCursor.
   ///
   /// If the record at the cursor is not a pattern, returns null.
-  Pattern *maybeReadPattern();
+  Pattern *maybeReadPattern(DeclContext *owningDC);
 
   ParameterList *readParameterList();
   

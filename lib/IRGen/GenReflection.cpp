@@ -221,7 +221,8 @@ protected:
     // mangling in reflection metadata.
     auto boxTy = dyn_cast<SILBoxType>(type);
     if (boxTy && boxTy->getLayout()->getFields().size() == 1) {
-      mangler.mangleLegacyBoxType(boxTy->getFieldLoweredType(0));
+      mangler.mangleLegacyBoxType(
+        boxTy->getFieldLoweredType(IGM.getSILModule(), 0));
     } else {
       mangler.mangleType(type, 0);
     }

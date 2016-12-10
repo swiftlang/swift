@@ -3086,6 +3086,8 @@ Type TypeBase::getTypeOfMember(Module *module, const ValueDecl *member,
 
 Type TypeBase::getTypeOfMember(Module *module, Type memberType,
                                const DeclContext *memberDC) {
+  assert(memberType);
+
   // If the member is not part of a type, there's nothing to substitute.
   if (!memberDC->isTypeContext())
     return memberType;
@@ -3096,7 +3098,7 @@ Type TypeBase::getTypeOfMember(Module *module, Type memberType,
     return memberType;
 
   // Perform the substitutions.
-  return memberType.subst(module, substitutions, None);
+  return memberType.subst(module, substitutions, SubstFlags::UseErrorType);
 }
 
 Type TypeBase::adjustSuperclassMemberDeclType(const ValueDecl *decl,
@@ -3908,11 +3910,4 @@ getRecursivePropertiesFromSubstitutions(ArrayRef<Substitution> Params) {
     props |= param.getReplacement()->getRecursiveProperties();
   }
   return props;
-}
-
-/// TODO: Transitional accessor for single-type boxes.
-CanType SILBoxType::getBoxedType() const {
-  assert(getLayout()->getFields().size() == 1
-         && "is not a single-field box");
-  return getFieldLoweredType(0);
 }
