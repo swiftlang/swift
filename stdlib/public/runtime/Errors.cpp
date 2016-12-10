@@ -272,16 +272,3 @@ swift_deletedMethodError() {
   swift::fatalError(/* flags = */ 0,
                     "fatal error: call of deleted method\n");
 }
-
-// Define symbols to satisfy LLVM's Config/abi-breaking.h checks.
-// The Swift runtime uses some header-only content from LLVM's ADT classes,
-// which pulls in references to one of these symbols. Those symbols are
-// defined in LLVM's libSupport, but the Swift runtime does not link with
-// that library. Since the ABI checks are not relevant for the runtime,
-// define both symbols, essentially disabling the checks.
-#ifndef _MSC_VER
-namespace llvm {
-__attribute__((weak, visibility ("hidden"))) int EnableABIBreakingChecks;
-__attribute__((weak, visibility ("hidden"))) int DisableABIBreakingChecks;
-} // end namespace llvm
-#endif
