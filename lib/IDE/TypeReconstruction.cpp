@@ -218,6 +218,8 @@ public:
     case LookupKind::Crawler:
       return nullptr;
     }
+
+    llvm_unreachable("Unhandled LookupKind in switch.");
   }
 
   ConstString GetName() const {
@@ -238,6 +240,8 @@ public:
       builder.append(_module->getNameStr());
       return builder.str();
     }
+
+    llvm_unreachable("Unhandled LookupKind in switch.");
   }
 
   ~DeclsLookupSource() {}
@@ -310,6 +314,8 @@ public:
     case LookupKind::Extension:
       return (_extension._decl != nullptr) && (_extension._module != nullptr);
     }
+
+    llvm_unreachable("Unhandled LookupKind in switch.");
   }
 
   bool IsExtension() {
