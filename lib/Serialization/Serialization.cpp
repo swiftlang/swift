@@ -853,8 +853,22 @@ void Serializer::writeParameterList(const ParameterList *PL) {
 }
 
 
-void Serializer::writePattern(const Pattern *pattern) {
+void Serializer::writePattern(const Pattern *pattern, DeclContext *owningDC) {
   using namespace decls_block;
+
+  // Retrieve the type of the pattern.
+  auto getPatternType = [&] {
+    Type type = pattern->getType();
+
+    // If we have an owning context and a contextual type, map out to an
+    // interface type.
+    if (owningDC && type->hasArchetype()) {
+      type = owningDC->getGenericEnvironmentOfContext()->mapTypeOutOfContext(
+                                             owningDC->getParentModule(), type);
+    }
+
+    return type;
+  };
 
   assert(pattern && "null pattern");
   switch (pattern->getKind()) {
@@ -862,7 +876,7 @@ void Serializer::writePattern(const Pattern *pattern) {
     unsigned abbrCode = DeclTypeAbbrCodes[ParenPatternLayout::Code];
     ParenPatternLayout::emitRecord(Out, ScratchRecord, abbrCode,
                                    pattern->isImplicit());
-    writePattern(cast<ParenPattern>(pattern)->getSubPattern());
+    writePattern(cast<ParenPattern>(pattern)->getSubPattern(), owningDC);
     break;
   }
   case PatternKind::Tuple: {
@@ -870,7 +884,7 @@ void Serializer::writePattern(const Pattern *pattern) {
 
     unsigned abbrCode = DeclTypeAbbrCodes[TuplePatternLayout::Code];
     TuplePatternLayout::emitRecord(Out, ScratchRecord, abbrCode,
-                                   addTypeRef(tuple->getType()),
+                                   addTypeRef(getPatternType()),
                                    tuple->getNumElements(),
                                    tuple->isImplicit());
 
@@ -879,7 +893,7 @@ void Serializer::writePattern(const Pattern *pattern) {
       // FIXME: Default argument expressions?
       TuplePatternEltLayout::emitRecord(
         Out, ScratchRecord, abbrCode, addIdentifierRef(elt.getLabel()));
-      writePattern(elt.getPattern());
+      writePattern(elt.getPattern(), owningDC);
     }
     break;
   }
@@ -889,13 +903,14 @@ void Serializer::writePattern(const Pattern *pattern) {
     unsigned abbrCode = DeclTypeAbbrCodes[NamedPatternLayout::Code];
     NamedPatternLayout::emitRecord(Out, ScratchRecord, abbrCode,
                                    addDeclRef(named->getDecl()),
+                                   addTypeRef(getPatternType()),
                                    named->isImplicit());
     break;
   }
   case PatternKind::Any: {
     unsigned abbrCode = DeclTypeAbbrCodes[AnyPatternLayout::Code];
     AnyPatternLayout::emitRecord(Out, ScratchRecord, abbrCode,
-                                 addTypeRef(pattern->getType()),
+                                 addTypeRef(getPatternType()),
                                  pattern->isImplicit());
     break;
   }
@@ -904,25 +919,17 @@ void Serializer::writePattern(const Pattern *pattern) {
 
     unsigned abbrCode = DeclTypeAbbrCodes[TypedPatternLayout::Code];
     TypedPatternLayout::emitRecord(Out, ScratchRecord, abbrCode,
-                                   addTypeRef(typed->getType()),
+                                   addTypeRef(getPatternType()),
                                    typed->isImplicit());
-    writePattern(typed->getSubPattern());
+    writePattern(typed->getSubPattern(), owningDC);
     break;
   }
-  case PatternKind::Is: {
-    auto isa = cast<IsPattern>(pattern);
-
-    unsigned abbrCode = DeclTypeAbbrCodes[IsPatternLayout::Code];
-    IsPatternLayout::emitRecord(Out, ScratchRecord, abbrCode,
-                                 addTypeRef(isa->getCastTypeLoc().getType()),
-                                 isa->isImplicit());
-    break;
-  }
+  case PatternKind::Is:
   case PatternKind::EnumElement:
   case PatternKind::OptionalSome:
   case PatternKind::Bool:
   case PatternKind::Expr:
-    llvm_unreachable("FIXME: not implemented");
+    llvm_unreachable("Refutable patterns cannot be serialized");
 
   case PatternKind::Var: {
     auto var = cast<VarPattern>(pattern);
@@ -930,7 +937,7 @@ void Serializer::writePattern(const Pattern *pattern) {
     unsigned abbrCode = DeclTypeAbbrCodes[VarPatternLayout::Code];
     VarPatternLayout::emitRecord(Out, ScratchRecord, abbrCode, var->isLet(),
                                  var->isImplicit());
-    writePattern(var->getSubPattern());
+    writePattern(var->getSubPattern(), owningDC);
     break;
   }
   }
@@ -2261,8 +2268,12 @@ void Serializer::writeDecl(const Decl *D) {
                                      binding->getNumPatternEntries(),
         initContextIDs);
 
+    DeclContext *owningDC = nullptr;
+    if (binding->getDeclContext()->isTypeContext())
+      owningDC = binding->getDeclContext();
+
     for (auto entry : binding->getPatternList()) {
-      writePattern(entry.getPattern());
+      writePattern(entry.getPattern(), owningDC);
       // Ignore initializer; external clients don't need to know about it.
     }
 
@@ -2551,7 +2562,6 @@ void Serializer::writeDecl(const Decl *D) {
     verifyAttrSerializable(var);
 
     auto contextID = addDeclContextRef(var->getDeclContext());
-    Type type = var->hasType() ? var->getType() : nullptr;
 
     Accessors accessors = getAccessors(var);
     uint8_t rawAccessLevel =
@@ -2571,7 +2581,6 @@ void Serializer::writeDecl(const Decl *D) {
                           var->isLet(),
                           var->hasNonPatternBindingInit(),
                           (unsigned) accessors.Kind,
-                          addTypeRef(type),
                           addTypeRef(var->getInterfaceType()),
                           addDeclRef(accessors.Get),
                           addDeclRef(accessors.Set),
@@ -2590,11 +2599,7 @@ void Serializer::writeDecl(const Decl *D) {
     verifyAttrSerializable(param);
 
     auto contextID = addDeclContextRef(param->getDeclContext());
-    Type type, interfaceType;
-
-    if (param->hasType())
-      type = param->getType();
-    interfaceType = param->getInterfaceType();
+    Type interfaceType = param->getInterfaceType();
 
     unsigned abbrCode = DeclTypeAbbrCodes[ParamLayout::Code];
     ParamLayout::emitRecord(Out, ScratchRecord, abbrCode,
@@ -2602,7 +2607,6 @@ void Serializer::writeDecl(const Decl *D) {
                             addIdentifierRef(param->getName()),
                             contextID,
                             param->isLet(),
-                            addTypeRef(type),
                             addTypeRef(interfaceType));
     break;
   }

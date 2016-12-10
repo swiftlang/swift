@@ -233,6 +233,14 @@ private:
   /// automatically update when they are out of date.
   unsigned CurrentGeneration = 0;
 
+  friend class Pattern;
+
+  /// Mapping from patterns that store interface types that will be lazily
+  /// resolved to contextual types, to the declaration context in which the
+  /// pattern resides.
+  llvm::DenseMap<const Pattern *, DeclContext *>
+    DelayedPatternContexts;
+
 public:
   /// \brief Retrieve the allocator for the given arena.
   llvm::BumpPtrAllocator &
