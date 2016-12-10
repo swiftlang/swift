@@ -147,3 +147,17 @@ func sr2752(x: String?, y: String?) {
     y.map { _ in "" } ?? "\(xx)"
   }
 }
+
+// SR-3248 - Invalid diagnostic calling implicitly unwrapped closure
+var sr3248 : ((Int) -> ())!
+sr3248?(a: 2) // expected-error {{extraneous argument label 'a:' in call}}
+sr3248!(a: 2) // expected-error {{extraneous argument label 'a:' in call}}
+sr3248(a: 2)  // expected-error {{extraneous argument label 'a:' in call}}
+
+struct SR_3248 {
+    var callback: (([AnyObject]) -> Void)!
+}
+
+SR_3248().callback?("test") // expected-error {{cannot convert value of type 'String' to expected argument type '[AnyObject]'}}
+SR_3248().callback!("test") // expected-error {{cannot convert value of type 'String' to expected argument type '[AnyObject]'}}
+SR_3248().callback("test")  // expected-error {{cannot convert value of type 'String' to expected argument type '[AnyObject]'}}
