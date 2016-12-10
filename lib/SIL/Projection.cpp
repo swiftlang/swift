@@ -323,7 +323,7 @@ void Projection::getFirstLevelProjections(SILType Ty, SILModule &Mod,
       DEBUG(ProjectionPath X(Ty);
             assert(X.getMostDerivedType(Mod) == Ty);
             X.append(P);
-            assert(X.getMostDerivedType(Mod) == Box->getFieldType(field));
+            assert(X.getMostDerivedType(Mod) == Box->getFieldType(Mod, field));
             X.verify(Mod););
       (void)Box;
       Out.push_back(P);
