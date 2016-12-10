@@ -299,9 +299,7 @@ void TypeChecker::checkInheritanceClause(Decl *decl,
   }
 
   // Establish a default generic type resolver.
-  auto genericEnv =
-    decl->getInnermostDeclContext()->getGenericEnvironmentOfContext();
-  GenericTypeToArchetypeResolver defaultResolver(genericEnv);
+  GenericTypeToArchetypeResolver defaultResolver(decl->getInnermostDeclContext());
   if (!resolver)
     resolver = &defaultResolver;
 
