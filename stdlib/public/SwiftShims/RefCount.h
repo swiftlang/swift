@@ -44,7 +44,8 @@ typedef struct {
   
   The strong RC counts strong references to the object. When the strong RC 
   reaches zero the object is deinited, unowned reference reads become errors, 
-  and weak reference reads become nil.
+  and weak reference reads become nil. The strong RC is stored as an extra
+  count: when the physical field is 0 the logical value is 1.
 
   The unowned RC counts unowned references to the object. The unowned RC 
   also has an extra +1 on behalf of the strong references; this +1 is 
@@ -250,20 +251,20 @@ struct RefCountBitOffsets;
 // 32-bit out of line
 template <>
 struct RefCountBitOffsets<8> {
-  static const size_t UnownedRefCountShift = 0;
-  static const size_t UnownedRefCountBitCount = 32;
-  static const uint64_t UnownedRefCountMask = maskForField(UnownedRefCount);
-
-  static const size_t IsPinnedShift = shiftAfterField(UnownedRefCount); 
+  static const size_t IsPinnedShift = 0;
   static const size_t IsPinnedBitCount = 1; 
   static const uint64_t IsPinnedMask = maskForField(IsPinned);
 
-  static const size_t IsDeinitingShift = shiftAfterField(IsPinned);
+  static const size_t UnownedRefCountShift = shiftAfterField(IsPinned);
+  static const size_t UnownedRefCountBitCount = 31;
+  static const uint64_t UnownedRefCountMask = maskForField(UnownedRefCount);
+
+  static const size_t IsDeinitingShift = shiftAfterField(UnownedRefCount);
   static const size_t IsDeinitingBitCount = 1;
   static const uint64_t IsDeinitingMask = maskForField(IsDeiniting);
 
   static const size_t StrongExtraRefCountShift = shiftAfterField(IsDeiniting);
-  static const size_t StrongExtraRefCountBitCount = 29;
+  static const size_t StrongExtraRefCountBitCount = 30;
   static const uint64_t StrongExtraRefCountMask = maskForField(StrongExtraRefCount);
 
   static const size_t UseSlowRCShift = shiftAfterField(StrongExtraRefCount);
@@ -283,20 +284,20 @@ struct RefCountBitOffsets<8> {
 // 32-bit inline
 template <>
 struct RefCountBitOffsets<4> {
-  static const size_t UnownedRefCountShift = 0;
-  static const size_t UnownedRefCountBitCount = 8;
-  static const uint32_t UnownedRefCountMask = maskForField(UnownedRefCount);
-
-  static const size_t IsPinnedShift = shiftAfterField(UnownedRefCount); 
+  static const size_t IsPinnedShift = 0;
   static const size_t IsPinnedBitCount = 1; 
   static const uint32_t IsPinnedMask = maskForField(IsPinned);
 
-  static const size_t IsDeinitingShift = shiftAfterField(IsPinned);
+  static const size_t UnownedRefCountShift = shiftAfterField(IsPinned);
+  static const size_t UnownedRefCountBitCount = 7;
+  static const uint32_t UnownedRefCountMask = maskForField(UnownedRefCount);
+
+  static const size_t IsDeinitingShift = shiftAfterField(UnownedRefCount);
   static const size_t IsDeinitingBitCount = 1;
   static const uint32_t IsDeinitingMask = maskForField(IsDeiniting);
 
   static const size_t StrongExtraRefCountShift = shiftAfterField(IsDeiniting);
-  static const size_t StrongExtraRefCountBitCount = 21;
+  static const size_t StrongExtraRefCountBitCount = 22;
   static const uint32_t StrongExtraRefCountMask = maskForField(StrongExtraRefCount);
 
   static const size_t UseSlowRCShift = shiftAfterField(StrongExtraRefCount);
@@ -328,8 +329,6 @@ struct RefCountBitOffsets<4> {
                 UseSlowRCBitCount == sizeof(bits)*8,
                 "wrong bit count for RefCountBits refcount encoding");
 */
-# undef maskForField
-# undef shiftAfterField
 
 
 // Basic encoding of refcount and flag data into the object's header.
@@ -571,13 +570,83 @@ class RefCountBitsT {
   void decrementUnownedRefCount(uint32_t dec) {
     setUnownedRefCount(getUnownedRefCount() - dec);
   }
-  
+
+  LLVM_ATTRIBUTE_ALWAYS_INLINE
+  bool isUniquelyReferenced() {
+    static_assert(Offsets::IsPinnedBitCount +
+                  Offsets::UnownedRefCountBitCount +
+                  Offsets::IsDeinitingBitCount +
+                  Offsets::StrongExtraRefCountBitCount +
+                  Offsets::UseSlowRCBitCount == sizeof(bits)*8,
+                  "inspect isUniquelyReferenced after adding fields");
+
+    // isPinned: don't care
+    // Unowned: don't care (FIXME: should care and redo initForNotFreeing)
+    // IsDeiniting: false
+    // StrongExtra: 0
+    // UseSlowRC: false
+
+    // Compiler is clever enough to optimize this.
+    return
+      !getUseSlowRC() && !getIsDeiniting() && getStrongExtraRefCount() == 0;
+  }
+
+  LLVM_ATTRIBUTE_ALWAYS_INLINE
+  bool isUniquelyReferencedOrPinned() {
+    static_assert(Offsets::IsPinnedBitCount +
+                  Offsets::UnownedRefCountBitCount +
+                  Offsets::IsDeinitingBitCount +
+                  Offsets::StrongExtraRefCountBitCount +
+                  Offsets::UseSlowRCBitCount == sizeof(bits)*8,
+                  "inspect isUniquelyReferencedOrPinned after adding fields");
+
+    // isPinned: don't care
+    // Unowned: don't care (FIXME: should care and redo initForNotFreeing)
+    // IsDeiniting: false
+    // isPinned/StrongExtra: true/any OR false/0
+    // UseSlowRC: false
+
+    // Compiler is not clever enough to optimize this.
+    // return (isUniquelyReferenced() ||
+    //         (!getUseSlowRC() && !getIsDeiniting() && getIsPinned()));
+
+    // Bit twiddling solution:
+    // 1. Define the fields in this order:
+    //    bits that must be zero when not pinned | bits to ignore | IsPinned
+    // 2. Rotate IsPinned into the sign bit:
+    //    IsPinned | bits that must be zero when not pinned | bits to ignore
+    // 3. Perform a signed comparison against X = (1 << count of ignored bits).
+    //    IsPinned makes the value negative and thus less than X.
+    //    Zero in the must-be-zero bits makes the value less than X.
+    //    Non-zero and not pinned makes the value greater or equal to X.
+
+    // Count the ignored fields.
+    constexpr auto ignoredBitsCount =
+      Offsets::UnownedRefCountBitCount + Offsets::IsDeinitingBitCount;
+    // Make sure all fields are positioned as expected.
+    // -1 compensates for the rotation.
+    static_assert(Offsets::IsPinnedShift == 0, "IsPinned must be the LSB bit");
+    static_assert(
+      shiftAfterField(Offsets::UnownedRefCount)-1 <= ignoredBitsCount &&
+      shiftAfterField(Offsets::IsDeiniting)-1 <= ignoredBitsCount &&
+      Offsets::StrongExtraRefCountShift-1 >= ignoredBitsCount &&
+      Offsets::UseSlowRCShift-1 >= ignoredBitsCount,
+      "refcount bit layout incorrect for isUniquelyReferencedOrPinned");
+
+    BitsType X = BitsType(1) << ignoredBitsCount;
+    BitsType rotatedBits = ((bits >> 1) | (bits << (8*sizeof(bits) - 1)));
+    return SignedBitsType(rotatedBits) < SignedBitsType(X);
+  }
+
 # undef getFieldIn
 # undef setFieldIn
 # undef getField
 # undef setField
 # undef copyFieldFrom
 };
+
+# undef maskForField
+# undef shiftAfterField
 
 typedef RefCountBitsT<RefCountIsInline> InlineRefCountBits;
 
@@ -855,34 +924,22 @@ class RefCounts {
       return false;  // FIXME: implement side table path if useful
     
     assert(!bits.getIsDeiniting());
-    return bits.getStrongExtraRefCount() == 0;
+    return bits.isUniquelyReferenced();
   }
 
   // Return whether the reference count is exactly 1 or the pin flag
   // is set. Once deinit begins the reference count is undefined.
   bool isUniquelyReferencedOrPinned() const {
     auto bits = refCounts.load(fake_memory_order_consume);
-    if (bits.hasSideTable())
-      return false;  // FIXME: implement side table path if useful
+    // FIXME: implement side table path if useful
+    // In the meantime we don't check it here.
+    // bits.isUniquelyReferencedOrPinned() checks it too,
+    // and the compiler optimizer does better if this check is not here.
+    // if (bits.hasSideTable())
+    //   return false;
     
     assert(!bits.getIsDeiniting());
-    return (bits.getStrongExtraRefCount() == 0 || bits.getIsPinned());
-    
-    // FIXME: check if generated code is efficient.
-    // We can't use the old rotate implementation below because
-    // the strong refcount field is now biased.
-
-    // Rotating right by one sets the sign bit to the pinned bit. After
-    // rotation, the dealloc flag is the least significant bit followed by the
-    // reference count. A reference count of two or higher means that our value
-    // is bigger than 3 if the pinned bit is not set. If the pinned bit is set
-    // the value is negative.
-    // Note: Because we are using the sign bit for testing pinnedness it
-    // is important to do a signed comparison below.
-    // static_assert(RC_PINNED_FLAG == 1,
-    // "The pinned flag must be the lowest bit");
-    // auto rotateRightByOne = ((value >> 1) | (value << 31));
-    // return (int32_t)rotateRightByOne < (int32_t)RC_ONE;
+    return bits.isUniquelyReferencedOrPinned();
   }
 
   // Return true if the object has started deiniting.
