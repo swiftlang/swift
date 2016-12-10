@@ -2272,17 +2272,13 @@ Decl *ModuleFile::getDecl(DeclID DID, Optional<DeclContext *> ForcedContext) {
                                              isImplicit, rawAccessLevel);
 
     auto DC = ForcedContext ? *ForcedContext : getDeclContext(contextID);
-    auto underlyingType = TypeLoc::withoutLoc(getType(underlyingTypeID));
-
-    if (declOrOffset.isComplete())
-      return declOrOffset;
 
     auto genericParams = maybeReadGenericParams(DC);
     if (declOrOffset.isComplete())
       return declOrOffset;
 
     auto alias = createDecl<TypeAliasDecl>(SourceLoc(), getIdentifier(nameID),
-                                           SourceLoc(), underlyingType,
+                                           SourceLoc(), TypeLoc(),
                                            genericParams, DC);
     declOrOffset = alias;
 
@@ -2292,6 +2288,7 @@ Decl *ModuleFile::getDecl(DeclID DID, Optional<DeclContext *> ForcedContext) {
       alias->setGenericEnvironment(env);
     }
 
+    alias->setDeserializedUnderlyingType(getType(underlyingTypeID));
     alias->computeType();
 
     if (auto accessLevel = getActualAccessibility(rawAccessLevel)) {

@@ -2154,7 +2154,9 @@ TypeAliasDecl::TypeAliasDecl(SourceLoc TypeAliasLoc, Identifier Name,
                              SourceLoc NameLoc, TypeLoc UnderlyingTy,
                              GenericParamList *GenericParams, DeclContext *DC)
   : GenericTypeDecl(DeclKind::TypeAlias, DC, Name, NameLoc, {}, GenericParams),
-    AliasTy(nullptr), TypeAliasLoc(TypeAliasLoc), UnderlyingTy(UnderlyingTy) {}
+    AliasTy(nullptr), TypeAliasLoc(TypeAliasLoc), UnderlyingTy(UnderlyingTy) {
+  TypeAliasDeclBits.HasInterfaceUnderlyingType = false;
+}
 
 void TypeAliasDecl::computeType() {
   ASTContext &Ctx = getASTContext();
@@ -2179,6 +2181,22 @@ Type AbstractTypeParamDecl::getSuperclass() const {
 
   // FIXME: Assert that this is never queried.
   return nullptr;
+}
+
+Type TypeAliasDecl::computeUnderlyingContextType() const {
+  Type type = UnderlyingTy.getType();
+  if (auto genericEnv = getGenericEnvironmentOfContext()) {
+    type = genericEnv->mapTypeIntoContext(getParentModule(), type);
+    UnderlyingTy.setType(type);
+  }
+
+  return type;
+}
+
+void TypeAliasDecl::setDeserializedUnderlyingType(Type underlying) {
+  UnderlyingTy.setType(underlying);
+  if (underlying->hasTypeParameter())
+    TypeAliasDeclBits.HasInterfaceUnderlyingType = true;
 }
 
 ArrayRef<ProtocolDecl *>
