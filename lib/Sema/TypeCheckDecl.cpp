@@ -269,10 +269,14 @@ void TypeChecker::checkInheritanceClause(Decl *decl,
   DeclContext *DC;
   if (auto nominal = dyn_cast<NominalTypeDecl>(decl)) {
     DC = nominal;
-    options |= TR_GenericSignature | TR_InheritanceClause;
+    options |= (TR_GenericSignature |
+                TR_InheritanceClause |
+                TR_AllowUnavailableProtocol);
   } else if (auto ext = dyn_cast<ExtensionDecl>(decl)) {
     DC = ext;
-    options |= TR_GenericSignature | TR_InheritanceClause;
+    options |= (TR_GenericSignature |
+                TR_InheritanceClause |
+                TR_AllowUnavailableProtocol);
   } else if (isa<GenericTypeParamDecl>(decl)) {
     // For generic parameters, we want name lookup to look at just the
     // signature of the enclosing entity.
@@ -3854,40 +3858,40 @@ public:
         TC.validateDecl(TAD);
       
       TypeResolutionOptions options;
-      if (!TAD->getDeclContext()->isTypeContext())
-        options |= TR_GlobalTypeAlias;
       if (TAD->getFormalAccess() <= Accessibility::FilePrivate)
         options |= TR_KnownNonCascadingDependency;
 
-      bool invalid = false;
       if (TAD->getDeclContext()->isModuleScopeContext()) {
         IterativeTypeChecker ITC(TC);
         ITC.satisfy(requestResolveTypeDecl(TAD));
-      } else if (TC.validateType(TAD->getUnderlyingTypeLoc(), TAD, options)) {
-        TAD->setInvalid();
-        TAD->setInterfaceType(ErrorType::get(TC.Context));
-        TAD->getUnderlyingTypeLoc().setInvalidType(TC.Context);
-        invalid = true;
-      }
-
-      // We create TypeAliasTypes with invalid underlying types, so we
-      // need to propagate recursive properties now.
-      TAD->getAliasType()->setRecursiveProperties(
-                       TAD->getUnderlyingType()->getRecursiveProperties());
-
-      if (!invalid) {
-        // Map the alias type out of context; if it is not dependent,
-        // we'll keep the sugar.
-        Type interfaceTy = TAD->getAliasType();
-
-        // lldb creates global typealiases containing archetypes
-        // sometimes...
-        if (TAD->getUnderlyingType()->hasArchetype() &&
-            TAD->isGenericContext()) {
-          interfaceTy = ArchetypeBuilder::mapTypeOutOfContext(TAD, interfaceTy);
+      } else {
+        bool invalid = false;
+        if (TC.validateType(TAD->getUnderlyingTypeLoc(), TAD, options)) {
+          TAD->setInvalid();
+          TAD->setInterfaceType(ErrorType::get(TC.Context));
+          TAD->getUnderlyingTypeLoc().setInvalidType(TC.Context);
+          invalid = true;
         }
 
-        TAD->setInterfaceType(MetatypeType::get(interfaceTy, TC.Context));
+        // We create TypeAliasTypes with invalid underlying types, so we
+        // need to propagate recursive properties now.
+        TAD->getAliasType()->setRecursiveProperties(
+                         TAD->getUnderlyingType()->getRecursiveProperties());
+
+        if (!invalid) {
+          // Map the alias type out of context; if it is not dependent,
+          // we'll keep the sugar.
+          Type interfaceTy = TAD->getAliasType();
+
+          // lldb creates global typealiases containing archetypes
+          // sometimes...
+          if (TAD->getUnderlyingType()->hasArchetype() &&
+              TAD->isGenericContext()) {
+            interfaceTy = TAD->mapTypeOutOfContext(interfaceTy);
+          }
+
+          TAD->setInterfaceType(MetatypeType::get(interfaceTy, TC.Context));
+        }
       }
     }
 

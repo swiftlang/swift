@@ -5,9 +5,10 @@
 // See https://swift.org/LICENSE.txt for license information
 // See https://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
 
-// RUN: not --crash %target-swift-frontend %s -emit-ir
-:
-class T:Range<T>o)typealias e{func<T.p
-if(print{let bass B<A.c== A:f)typealias f:A>:d:A
-{}}
-proclas
+// RUN: not %target-swift-frontend %s -emit-ir
+func e={var _{}func a<a{
+struct B{
+{}class A:Range<A>:A:f=c
+protocol a{enum toypealias f=d:A{{enum A{var b:a(_(A
+switch{
+typealias e=B:

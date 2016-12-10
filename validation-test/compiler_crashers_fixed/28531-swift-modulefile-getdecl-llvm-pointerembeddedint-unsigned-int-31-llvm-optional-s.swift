@@ -5,7 +5,9 @@
 // See https://swift.org/LICENSE.txt for license information
 // See https://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
 
-// RUN: not --crash %target-swift-frontend %s -emit-ir
-super.s
-protocol A{struct b
-class d<T>:Range<b>
+// RUN: not %target-swift-frontend %s -emit-ir
+:
+class T:Range<T>o)typealias e{func<T.p
+if(print{let bass B<A.c== A:f)typealias f:A>:d:A
+{}}
+proclas

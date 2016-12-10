@@ -27,13 +27,18 @@ public protocol P {
 }
 
 public struct S<A: P> where A.T == S<A> {
+// expected-note@-1 {{type declared here}}
+// expected-error@-2 {{type 'S' references itself}}
   func f(a: A.T) {
     g(a: id(t: a))
+    // expected-error@-1 {{cannot convert value of type 'A.T' to expected argument type 'S<_>'}}
     _ = A.T.self
   }
 
   func g(a: S<A>) {
     f(a: id(t: a))
+    // expected-note@-1 {{expected an argument list of type '(a: A.T)'}}
+    // expected-error@-2 {{cannot invoke 'f' with an argument list of type '(a: S<A>)'}}
     _ = S<A>.self
   }
 
@@ -44,7 +49,7 @@ public struct S<A: P> where A.T == S<A> {
 
 protocol I {
   // FIXME: these are spurious
-  init() // expected-note 2{{protocol requires initializer 'init()' with type '()'}}
+  init() // expected-note {{protocol requires initializer 'init()' with type '()'}}
 }
 
 protocol PI {
@@ -52,6 +57,8 @@ protocol PI {
 }
 
 struct SI<A: PI> : I where A : I, A.T == SI<A> {
+// expected-note@-1 {{type declared here}}
+// expected-error@-2 {{type 'SI' references itself}}
   func ggg<T : I>(t: T.Type) -> T {
     return T()
   }
@@ -59,13 +66,11 @@ struct SI<A: PI> : I where A : I, A.T == SI<A> {
   func foo() {
     _ = A()
 
-    // FIXME: bogus errors
-    _ = A.T() // expected-error{{cannot invoke value of type 'SI<A>.Type' with argument list '()'}}
-    _ = SI<A>() // expected-error{{cannot invoke initializer for type 'SI<A>' with no arguments}}
+    _ = A.T()
+    _ = SI<A>()
 
-    // FIXME: Strange bug in unqualified lookup
-    _ = ggg(t: A.self) // expected-error{{use of unresolved identifier 'ggg'}}
-    _ = ggg(t: A.T.self) // expected-error{{use of unresolved identifier 'ggg'}}
+    _ = ggg(t: A.self)
+    _ = ggg(t: A.T.self)
 
     _ = self.ggg(t: A.self)
     _ = self.ggg(t: A.T.self)
