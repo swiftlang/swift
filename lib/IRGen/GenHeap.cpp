@@ -1554,7 +1554,8 @@ const TypeInfo *TypeConverter::convertBoxType(SILBoxType *T) {
   // TODO: Multi-field boxes
   assert(T->getLayout()->getFields().size() == 1
          && "multi-field boxes not implemented yet");
-  auto &eltTI = IGM.getTypeInfoForLowered(T->getFieldLoweredType(0));
+  auto &eltTI = IGM.getTypeInfoForLowered(
+    T->getFieldLoweredType(IGM.getSILModule(), 0));
   if (!eltTI.isFixedSize()) {
     if (!NonFixedBoxTI)
       NonFixedBoxTI = new NonFixedBoxTypeInfo(IGM);
@@ -1598,7 +1599,7 @@ const TypeInfo *TypeConverter::convertBoxType(SILBoxType *T) {
   // Produce a tailored box metadata for the type.
   assert(T->getLayout()->getFields().size() == 1
          && "multi-field boxes not implemented yet");
-  return new FixedBoxTypeInfo(IGM, T->getFieldType(0));
+  return new FixedBoxTypeInfo(IGM, T->getFieldType(IGM.getSILModule(), 0));
 }
 
 OwnedAddress
@@ -1609,9 +1610,9 @@ irgen::emitAllocateBox(IRGenFunction &IGF, CanSILBoxType boxType,
   assert(boxType->getLayout()->getFields().size() == 1
          && "multi-field boxes not implemented yet");
   return boxTI.allocate(IGF,
-                        boxType->getFieldType(0),
-                        boxInterfaceType->getFieldType(0),
-                        name);
+                      boxType->getFieldType(IGF.IGM.getSILModule(), 0),
+                      boxInterfaceType->getFieldType(IGF.IGM.getSILModule(), 0),
+                      name);
 }
 
 void irgen::emitDeallocateBox(IRGenFunction &IGF,
@@ -1620,7 +1621,8 @@ void irgen::emitDeallocateBox(IRGenFunction &IGF,
   auto &boxTI = IGF.getTypeInfoForLowered(boxType).as<BoxTypeInfo>();
   assert(boxType->getLayout()->getFields().size() == 1
          && "multi-field boxes not implemented yet");
-  return boxTI.deallocate(IGF, box, boxType->getFieldType(0));
+  return boxTI.deallocate(IGF, box,
+                          boxType->getFieldType(IGF.IGM.getSILModule(), 0));
 }
 
 Address irgen::emitProjectBox(IRGenFunction &IGF,
@@ -1629,7 +1631,8 @@ Address irgen::emitProjectBox(IRGenFunction &IGF,
   auto &boxTI = IGF.getTypeInfoForLowered(boxType).as<BoxTypeInfo>();
   assert(boxType->getLayout()->getFields().size() == 1
          && "multi-field boxes not implemented yet");
-  return boxTI.project(IGF, box, boxType->getFieldType(0));
+  return boxTI.project(IGF, box,
+                       boxType->getFieldType(IGF.IGM.getSILModule(), 0));
 }
 
 #define DEFINE_VALUE_OP(ID)                                           \
