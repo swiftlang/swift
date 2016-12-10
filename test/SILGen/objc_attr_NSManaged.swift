@@ -99,11 +99,11 @@ extension ProtoAdopter {
 
 // The vtable should not contain any entry points for getters and setters.
 // CHECK-LABEL: sil_vtable SwiftGizmo {
-// CHECK-NEXT: #SwiftGizmo.modifyX!1: _TFC19objc_attr_NSManaged10SwiftGizmo7modifyX
-// CHECK-NEXT: #SwiftGizmo.testFunc!1: _TFC19objc_attr_NSManaged10SwiftGizmo8testFunc
-// CHECK-NEXT:  #SwiftGizmo.init!initializer.1: _TFC19objc_attr_NSManaged10SwiftGizmoc
+// CHECK-NEXT:   #SwiftGizmo.modifyX!1: _TFC19objc_attr_NSManaged10SwiftGizmo7modifyX
+// CHECK-NEXT:   #SwiftGizmo.testFunc!1: _TFC19objc_attr_NSManaged10SwiftGizmo8testFunc
+// CHECK-NEXT:   #SwiftGizmo.deinit!deallocator:
 // CHECK-NEXT:   #SwiftGizmo.init!initializer.1: _TFC19objc_attr_NSManaged10SwiftGizmoc
-// CHECK-NEXT:  #SwiftGizmo.deinit!deallocator:
+// CHECK-NEXT:   #SwiftGizmo.init!initializer.1: _TFC19objc_attr_NSManaged10SwiftGizmoc
 // CHECK-NEXT: }
 
 // CHECK-LABEL: sil_vtable FinalGizmo {

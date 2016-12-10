@@ -560,8 +560,6 @@ void TypeChecker::checkInheritanceClause(Decl *decl,
   // Set the superclass.
   if (auto classDecl = dyn_cast<ClassDecl>(decl)) {
     classDecl->setSuperclass(superclassTy);
-    if (superclassTy)
-      resolveImplicitConstructors(superclassTy->getClassOrBoundGenericClass());
   } else if (auto enumDecl = dyn_cast<EnumDecl>(decl)) {
     enumDecl->setRawType(superclassTy);
   } else {
@@ -7859,10 +7857,6 @@ void TypeChecker::addImplicitConstructors(NominalTypeDecl *decl) {
   // for all of the superclass's designated initializers.
   // FIXME: Currently skipping generic classes.
   auto classDecl = cast<ClassDecl>(decl);
-  assert(!classDecl->hasSuperclass() ||
-         classDecl->getSuperclass()->getAnyNominal()->isInvalid() ||
-         classDecl->getSuperclass()->getAnyNominal()
-           ->addedImplicitInitializers());
   if (classDecl->hasSuperclass()) {
     bool canInheritInitializers = !FoundDesignatedInit;
 
@@ -7874,6 +7868,11 @@ void TypeChecker::addImplicitConstructors(NominalTypeDecl *decl) {
     }
 
     auto superclassTy = classDecl->getSuperclass();
+    auto *superclassDecl = superclassTy->getClassOrBoundGenericClass();
+    assert(superclassDecl && "Superclass of class is not a class?");
+    if (!superclassDecl->addedImplicitInitializers())
+      addImplicitConstructors(superclassDecl);
+
     auto ctors = lookupConstructors(classDecl, superclassTy,
                                     NameLookupFlags::IgnoreAccessibility);
 

@@ -2404,6 +2404,10 @@ ObjCClassKind ClassDecl::checkObjCAncestry() const {
     if (!CD->hasSuperclass())
       break;
     CD = CD->getSuperclass()->getClassOrBoundGenericClass();
+    // If we don't have a valid class here, we should have diagnosed
+    // elsewhere.
+    if (!CD)
+      break;
   }
 
   if (!isObjC)
