@@ -485,28 +485,46 @@ SILCombiner::recursivelyCollectARCUsers(UserListTy &Uses, ValueBase *Value) {
   return true;
 }
 
-void SILCombiner::eraseApply(FullApplySite FAS, const UserListTy &Users) {
-  // Make sure to release and destroy any owned or in-arguments.
+bool SILCombiner::eraseApply(FullApplySite FAS, const UserListTy &Users) {
+
+  // Compute the places where we have to insert release-instructions for the
+  // owned arguments. This must not be done before the result of the
+  // apply is destroyed. Therefore we compute the lifetime of the apply-result.
+  ValueLifetimeAnalysis VLA(FAS.getInstruction(), Users);
+  ValueLifetimeAnalysis::Frontier Frontier;
+  if (Users.empty()) {
+    // If the call does not have any ARC-uses or if there is no return value at
+    // all, we insert the argument release instructions right before the call.
+    Frontier.push_back(FAS.getInstruction());
+  } else {
+    if (!VLA.computeFrontier(Frontier, ValueLifetimeAnalysis::DontModifyCFG))
+      return false;
+  }
+
+  // Release and destroy any owned or in-arguments.
   auto FuncType = FAS.getOrigCalleeType();
   assert(FuncType->getParameters().size() == FAS.getNumArguments() &&
          "mismatching number of arguments");
-  for (int i = 0, e = FAS.getNumArguments(); i < e; ++i) {
-    SILParameterInfo PI = FuncType->getParameters()[i];
-    auto Arg = FAS.getArgument(i);
-    switch (PI.getConvention()) {
-      case ParameterConvention::Indirect_In:
-        Builder.createDestroyAddr(FAS.getLoc(), Arg);
-        break;
-      case ParameterConvention::Direct_Owned:
-        Builder.createReleaseValue(FAS.getLoc(), Arg, Atomicity::Atomic);
-        break;
-      case ParameterConvention::Indirect_In_Guaranteed:
-      case ParameterConvention::Indirect_Inout:
-      case ParameterConvention::Indirect_InoutAliasable:
-      case ParameterConvention::Direct_Unowned:
-      case ParameterConvention::Direct_Deallocating:
-      case ParameterConvention::Direct_Guaranteed:
-        break;
+  for (SILInstruction *FrontierInst : Frontier) {
+    Builder.setInsertionPoint(FrontierInst);
+    for (int i = 0, e = FAS.getNumArguments(); i < e; ++i) {
+      SILParameterInfo PI = FuncType->getParameters()[i];
+      auto Arg = FAS.getArgument(i);
+      switch (PI.getConvention()) {
+        case ParameterConvention::Indirect_In:
+          Builder.createDestroyAddr(FAS.getLoc(), Arg);
+          break;
+        case ParameterConvention::Direct_Owned:
+          Builder.createReleaseValue(FAS.getLoc(), Arg, Atomicity::Atomic);
+          break;
+        case ParameterConvention::Indirect_In_Guaranteed:
+        case ParameterConvention::Indirect_Inout:
+        case ParameterConvention::Indirect_InoutAliasable:
+        case ParameterConvention::Direct_Unowned:
+        case ParameterConvention::Direct_Deallocating:
+        case ParameterConvention::Direct_Guaranteed:
+          break;
+      }
     }
   }
 
@@ -517,6 +535,8 @@ void SILCombiner::eraseApply(FullApplySite FAS, const UserListTy &Users) {
 
   // And the Apply itself.
   eraseInstFromFunction(*FAS.getInstruction());
+
+  return true;
 }
 
 SILInstruction *
@@ -1112,8 +1132,8 @@ SILInstruction *SILCombiner::visitApplyInst(ApplyInst *AI) {
   if (SF && SF->getEffectsKind() < EffectsKind::ReadWrite) {
     UserListTy Users;
     if (recursivelyCollectARCUsers(Users, AI)) {
-      eraseApply(AI, Users);
-      return nullptr;
+      if (eraseApply(AI, Users))
+        return nullptr;
     }
     // We found a user that we can't handle.
   }
@@ -1129,8 +1149,8 @@ SILInstruction *SILCombiner::visitApplyInst(ApplyInst *AI) {
       UserListTy Users;
       // If the uninitialized array is only written into then it can be removed.
       if (recursivelyCollectARCUsers(Users, AI)) {
-        eraseApply(AI, Users);
-        return nullptr;
+        if (eraseApply(AI, Users))
+          return nullptr;
       }
     }
   }
@@ -1251,19 +1271,20 @@ SILInstruction *SILCombiner::visitTryApplyInst(TryApplyInst *AI) {
       SILBasicBlock *NormalBB = AI->getNormalBB();
       SILBasicBlock *ErrorBB = AI->getErrorBB();
       SILLocation Loc = AI->getLoc();
-      Builder.setInsertionPoint(BB);
-      Builder.setCurrentDebugScope(AI->getDebugScope());
-      eraseApply(AI, Users);
+      const SILDebugScope *DS = AI->getDebugScope();
+      if (eraseApply(AI, Users)) {
+        // Replace the try_apply with a cond_br false, which will be removed by
+        // SimplifyCFG. We don't want to modify the CFG in SILCombine.
+        Builder.setInsertionPoint(BB);
+        Builder.setCurrentDebugScope(DS);
+        auto *TrueLit = Builder.createIntegerLiteral(Loc,
+                  SILType::getBuiltinIntegerType(1, Builder.getASTContext()), 0);
+        Builder.createCondBranch(Loc, TrueLit, NormalBB, ErrorBB);
 
-      // Replace the try_apply with a cond_br false, which will be removed by
-      // SimplifyCFG. We don't want to modify the CFG in SILCombine.
-      auto *TrueLit = Builder.createIntegerLiteral(Loc,
-                SILType::getBuiltinIntegerType(1, Builder.getASTContext()), 0);
-      Builder.createCondBranch(Loc, TrueLit, NormalBB, ErrorBB);
-
-      NormalBB->eraseArgument(0);
-      ErrorBB->eraseArgument(0);
-      return nullptr;
+        NormalBB->eraseArgument(0);
+        ErrorBB->eraseArgument(0);
+        return nullptr;
+      }
     }
     // We found a user that we can't handle.
   }
