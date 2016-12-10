@@ -245,9 +245,8 @@ SWIFT_RT_ENTRY_IMPL_VISIBILITY
 extern "C"
 void SWIFT_RT_ENTRY_IMPL(swift_retain_n)(HeapObject *object, uint32_t n)
     SWIFT_CC(RegisterPreservingCC_IMPL) {
-  if (object) {
+  if (object)
     object->refCounts.increment(n);
-  }
 }
 
 SWIFT_RT_ENTRY_VISIBILITY
@@ -261,9 +260,8 @@ SWIFT_RT_ENTRY_IMPL_VISIBILITY
 extern "C"
 void SWIFT_RT_ENTRY_IMPL(swift_nonatomic_retain_n)(HeapObject *object, uint32_t n)
     SWIFT_CC(RegisterPreservingCC_IMPL) {
-  if (object) {
+  if (object)
     object->refCounts.incrementNonAtomic(n);
-  }
 }
 
 SWIFT_RT_ENTRY_VISIBILITY
@@ -386,9 +384,8 @@ HeapObject *swift::swift_tryPin(HeapObject *object)
 
   // Try to set the flag.  If this succeeds, the caller will be
   // responsible for clearing it.
-  if (object->refCounts.tryIncrementAndPin()) {
+  if (object->refCounts.tryIncrementAndPin())
     return object;
-  }
 
   // If setting the flag failed, it's because it was already set.
   // Return nil so that the object will be deallocated later.
@@ -415,9 +412,8 @@ HeapObject *swift::swift_nonatomic_tryPin(HeapObject *object)
 
   // Try to set the flag.  If this succeeds, the caller will be
   // responsible for clearing it.
-  if (object->refCounts.tryIncrementAndPinNonAtomic()) {
+  if (object->refCounts.tryIncrementAndPinNonAtomic())
     return object;
-  }
 
   // If setting the flag failed, it's because it was already set.
   // Return nil so that the object will be deallocated later.
@@ -451,7 +447,8 @@ bool swift_isDeallocating(HeapObject *object) {
 SWIFT_RT_ENTRY_IMPL_VISIBILITY
 extern "C"
 bool SWIFT_RT_ENTRY_IMPL(swift_isDeallocating)(HeapObject *object) {
-  if (!object) return false;
+  if (!object)
+    return false;
   return object->refCounts.isDeiniting();
 }
 
