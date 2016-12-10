@@ -166,10 +166,12 @@ typedef std::map<NodePtr, NodePtr> ParentMap;
 typedef std::vector<NodePtr> NodeVector;
 
 class SDKContext {
+  unsigned SIZE = 1024 * 1024;
   llvm::StringSet<> TextData;
   std::vector<std::unique_ptr<SDKNode>> OwnedNodes;
 
 public:
+  SDKContext() : OwnedNodes(SIZE) {}
   SDKNode* own(SDKNode *Node) {
     assert(Node);
     OwnedNodes.emplace_back(Node);
