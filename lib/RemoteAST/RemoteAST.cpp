@@ -701,6 +701,11 @@ protected:
     return getBuilder().getFailureAsResult<T>(Failure::Unknown);
   }
 
+  template <class T, class KindTy, class... ArgTys>
+  Result<T> fail(KindTy kind, ArgTys &&...args) {
+    return Result<T>::emplaceFailure(kind, std::forward<ArgTys>(args)...);
+  }
+
 private:
   virtual RemoteASTTypeBuilder &getBuilder() = 0;
   virtual MemoryReader &getReader() = 0;
@@ -716,11 +721,6 @@ private:
   IRGenContext *getIRGen() {
     if (!IRGen) IRGen = createIRGenContext();
     return IRGen.get();
-  }
-
-  template <class T, class KindTy, class... ArgTys>
-  Result<T> fail(KindTy kind, ArgTys &&...args) {
-    return Result<T>::emplaceFailure(kind, std::forward<ArgTys>(args)...);
   }
 
   Result<uint64_t>
