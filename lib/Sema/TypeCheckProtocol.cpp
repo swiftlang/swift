@@ -2856,6 +2856,11 @@ ResolveWitnessResult ConformanceChecker::resolveTypeWitnessViaLookup(
   SmallVector<std::pair<TypeDecl *, Type>, 2> viable;
   SmallVector<std::pair<TypeDecl *, NominalTypeDecl *>, 2> nonViable;
   for (auto candidate : candidates) {
+    // Skip nested generic types.
+    if (auto *genericDecl = dyn_cast<GenericTypeDecl>(candidate.first))
+      if (genericDecl->getGenericParams())
+        continue;
+
     // Check this type against the protocol requirements.
     if (auto checkResult = checkTypeWitness(TC, DC, assocType, 
                                             candidate.second)) {
