@@ -22,14 +22,15 @@
 #define DEBUG_TYPE "sil-optimizer"
 
 #include "swift/SILOptimizer/PassManager/Passes.h"
-#include "swift/SILOptimizer/PassManager/PassManager.h"
-#include "swift/SILOptimizer/PassManager/Transforms.h"
-#include "swift/SILOptimizer/Utils/Local.h"
-#include "swift/SILOptimizer/Analysis/Analysis.h"
 #include "swift/AST/ASTContext.h"
 #include "swift/AST/Module.h"
 #include "swift/SIL/SILModule.h"
+#include "swift/SILOptimizer/Analysis/Analysis.h"
+#include "swift/SILOptimizer/PassManager/PassManager.h"
+#include "swift/SILOptimizer/PassManager/Transforms.h"
+#include "swift/SILOptimizer/Utils/Local.h"
 #include "llvm/ADT/Statistic.h"
+#include "llvm/ADT/StringSwitch.h"
 #include "llvm/Support/CommandLine.h"
 #include "llvm/Support/Debug.h"
 #include "llvm/Support/ErrorOr.h"
@@ -524,129 +525,36 @@ void swift::runSILPassesForOnone(SILModule &Module) {
   }
 }
 
-#ifndef NDEBUG
-
-namespace {
-
-struct PMDescriptor {
-  llvm::SmallString<32> Id;
-  llvm::SmallString<32> ActionName;
-  Optional<unsigned> ActionCount;
-  std::vector<llvm::SmallString<32>> Passes;
-
-  explicit PMDescriptor(llvm::yaml::SequenceNode *Descriptor);
-  ~PMDescriptor() = default;
-  PMDescriptor(const PMDescriptor &) = delete;
-  PMDescriptor(PMDescriptor &&) = default;
-
-  static void
-  descriptorsForFile(StringRef Filename,
-                     llvm::SmallVectorImpl<PMDescriptor> &Descriptors);
-};
-
-} // end anonymous namespace
-
-void
-PMDescriptor::
-descriptorsForFile(StringRef Filename,
-                   llvm::SmallVectorImpl<PMDescriptor> &Descriptors) {
-  namespace yaml = llvm::yaml;
-
-  // Load the input file.
-  llvm::ErrorOr<std::unique_ptr<llvm::MemoryBuffer>> FileBufOrErr =
-    llvm::MemoryBuffer::getFileOrSTDIN(Filename);
-  if (!FileBufOrErr) {
-    llvm_unreachable("Failed to read yaml file");
-  }
-
-  StringRef Buffer = FileBufOrErr->get()->getBuffer();
-  llvm::SourceMgr SM;
-  yaml::Stream Stream(Buffer, SM);
-  yaml::document_iterator DI = Stream.begin();
-  assert(DI != Stream.end() && "Failed to read a document");
-  yaml::Node *N = DI->getRoot();
-  assert(N && "Failed to find a root");
-
-  auto *RootList = cast<yaml::SequenceNode>(N);
-
-  for (auto &PMDescriptorIter :
-       make_range(RootList->begin(), RootList->end())) {
-    PMDescriptor PM(cast<yaml::SequenceNode>(&PMDescriptorIter));
-    Descriptors.push_back(std::move(PM));
-  }
-}
-
-/// Our general format is as follows:
-///
-///   [
-///     [
-///       "PASS_MANAGER_ID",
-///       "run_n_times"|"run_to_fixed_point",
-///       count,
-///       "PASS1", "PASS2", ...
-///     ],
-///     ...
-///   ]
-///
-/// Where "id" is printed out when we process the action, "action" can be one of
-/// "run_n_times", "run_to_fixed_point" and "passes" is a list of passes to
-/// run. The names to use are the stringified versions of pass kinds.
-PMDescriptor::PMDescriptor(llvm::yaml::SequenceNode *Desc) {
-  namespace yaml = llvm::yaml;
-
-  yaml::SequenceNode::iterator DescIter = Desc->begin();
-  Id = cast<yaml::ScalarNode>(&*DescIter)->getRawValue();
-  ++DescIter;
-
-  ActionName = cast<yaml::ScalarNode>(&*DescIter)->getRawValue();
-  unsigned ActionSize = ActionName.size()-2;
-  ActionName = ActionName.substr(1, ActionSize);
-  ++DescIter;
-
-  auto *ActionCountValue = cast<yaml::ScalarNode>(&*DescIter);
-  APInt APCount(64, ActionCountValue->getRawValue(), 10);
-  ActionCount = APCount.getLimitedValue(UINT_MAX);
-  ++DescIter;
-
-  for (auto DescEnd = Desc->end(); DescIter != DescEnd; ++DescIter) {
-    StringRef PassName = cast<yaml::ScalarNode>(&*DescIter)->getRawValue();
-    unsigned Size = PassName.size()-2;
-    Passes.push_back(PassName.substr(1, Size));
-  }
-}
-
-#endif
-
 void swift::runSILOptimizationPassesWithFileSpecification(SILModule &Module,
                                                           StringRef FileName) {
-#ifndef NDEBUG
-  if (Module.getOptions().DisableSILPerfOptimizations)
-    return;
+  llvm_unreachable("not implemented: in transition");
+}
 
-  llvm::SmallVector<PMDescriptor, 4> Descriptors;
-  PMDescriptor::descriptorsForFile(FileName, Descriptors);
+PassKind swift::PassKindFromString(StringRef Name) {
+  return llvm::StringSwitch<PassKind>(Name)
+#define PASS(ID, NAME, DESCRIPTION) .Case(#ID, PassKind::ID)
+#include "swift/SILOptimizer/PassManager/Passes.def"
+      .Default(PassKind::invalidPassKind);
+}
 
-  for (auto &Desc : Descriptors) {
-    DEBUG(llvm::dbgs() << "Creating PM: " << Desc.Id << "\n");
-    SILPassManager PM(&Module, Desc.Id);
-
-    for (auto &P : Desc.Passes) {
-      DEBUG(llvm::dbgs() << "  Adding Pass: " << P << "\n");
-      PM.addPassForName(P);
-    }
-
-    if (Desc.ActionName.equals("run_n_times")) {
-      unsigned Count = Desc.ActionCount.getValue();
-      DEBUG(llvm::dbgs() << "    Running " << Count << " iterations...\n");
-      for (unsigned i = 0, e = Count; i < e; ++i) {
-        PM.runOneIteration();
-      }
-    } else if (Desc.ActionName.equals("run_to_fixed_point")) {
-      DEBUG(llvm::dbgs() << "    Running until fixed point...\n");
-      PM.run();
-    } else {
-      llvm_unreachable("unknown action");
-    }
+StringRef swift::PassKindName(PassKind Kind) {
+  switch (Kind) {
+#define PASS(ID, NAME, DESCRIPTION)                                            \
+  case PassKind::ID:                                                           \
+    return #NAME;
+#include "swift/SILOptimizer/PassManager/Passes.def"
+  case PassKind::invalidPassKind:
+    llvm_unreachable("Invalid pass kind?!");
   }
-#endif
+}
+
+StringRef swift::PassKindID(PassKind Kind) {
+  switch (Kind) {
+#define PASS(ID, NAME, DESCRIPTION)                                            \
+  case PassKind::ID:                                                           \
+    return #ID;
+#include "swift/SILOptimizer/PassManager/Passes.def"
+  case PassKind::invalidPassKind:
+    llvm_unreachable("Invalid pass kind?!");
+  }
 }

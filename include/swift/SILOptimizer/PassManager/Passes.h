@@ -69,6 +69,10 @@ namespace swift {
     invalidPassKind
   };
 
+  PassKind PassKindFromString(StringRef ID);
+  StringRef PassKindName(PassKind Kind);
+  StringRef PassKindID(PassKind Kind);
+
 #define PASS(ID, NAME, DESCRIPTION) SILTransform *create##ID();
 #include "Passes.def"
 

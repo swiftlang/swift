@@ -11,11 +11,12 @@
 //===----------------------------------------------------------------------===//
 
 #include "swift/SILOptimizer/Analysis/Analysis.h"
+#include "swift/SILOptimizer/PassManager/PassPipeline.h"
 #include "swift/SILOptimizer/PassManager/Passes.h"
-#include "llvm/Support/Casting.h"
 #include "llvm/ADT/ArrayRef.h"
 #include "llvm/ADT/DenseMap.h"
 #include "llvm/ADT/SmallVector.h"
+#include "llvm/Support/Casting.h"
 #include "llvm/Support/ErrorHandling.h"
 #include <vector>
 
@@ -33,6 +34,8 @@ class SILTransform;
 
 /// \brief The SIL pass manager.
 class SILPassManager {
+  using ExecutionKind = SILPassPipelinePlan::ExecutionKind;
+
   /// The module that the pass manager will transform.
   SILModule *Mod;
 
@@ -206,6 +209,30 @@ public:
   void verifyAnalyses(SILFunction *F) const {
     for (auto *A : Analysis) {
       A->verify(F);
+    }
+  }
+
+  void executePassPipelinePlan(const SILPassPipelinePlan &Plan) {
+    for (const SILPassPipeline &Pipeline : Plan.getPipelines()) {
+      setStageName(Pipeline.Name);
+      resetAndRemoveTransformations();
+      for (PassKind Kind : Plan.getPipelinePasses(Pipeline)) {
+        addPass(Kind);
+      }
+      execute(Pipeline.ExecutionKind);
+    }
+  }
+
+  void execute(ExecutionKind K) {
+    switch (K) {
+    case ExecutionKind::OneIteration:
+      runOneIteration();
+      break;
+    case ExecutionKind::UntilFixPoint:
+      run();
+      break;
+    case ExecutionKind::Invalid:
+      llvm_unreachable("Invalid execution kind?!");
     }
   }
 
