@@ -57,6 +57,45 @@ enum OptimizationLevelKind {
   HighLevel,
 };
 
+static void addCFGPrinterPipeline(SILPassManager &PM, StringRef Name) {
+  PM.setStageName(Name);
+  PM.resetAndRemoveTransformations();
+  PM.addCFGPrinter();
+  PM.runOneIteration();
+}
+
+static void addMandatoryDebugSerialization(SILPassManager &PM) {
+  PM.setStageName("Mandatory Debug Serialization");
+  PM.addOwnershipModelEliminator();
+  PM.addMandatoryInlining();
+  PM.run();
+}
+
+static void addOwnershipModelEliminatorPipeline(SILPassManager &PM) {
+  PM.setStageName("Ownership Model Eliminator");
+  PM.addOwnershipModelEliminator();
+  PM.runOneIteration();
+  PM.resetAndRemoveTransformations();
+}
+
+static void addMandatoryOptPipeline(SILPassManager &PM) {
+  PM.setStageName("Guaranteed Passes");
+  PM.addCapturePromotion();
+  PM.addAllocBoxToStack();
+  PM.addNoReturnFolding();
+  PM.addDefiniteInitialization();
+
+  PM.addMandatoryInlining();
+  PM.addPredictableMemoryOptimizations();
+  PM.addDiagnosticConstantPropagation();
+  PM.addGuaranteedARCOpts();
+  PM.addDiagnoseUnreachable();
+  PM.addEmitDFDiagnostics();
+  // Canonical swift requires all non cond_br critical edges to be split.
+  PM.addSplitNonCondBrCriticalEdges();
+  PM.run();
+}
+
 bool swift::runSILDiagnosticPasses(SILModule &Module) {
   // Verify the module, if required.
   if (Module.getOptions().VerifyAll)
@@ -72,50 +111,29 @@ bool swift::runSILDiagnosticPasses(SILModule &Module) {
   SILPassManager PM(&Module);
 
   if (SILViewSILGenCFG) {
-    PM.resetAndRemoveTransformations();
-    PM.addCFGPrinter();
-    PM.runOneIteration();
+    addCFGPrinterPipeline(PM, "SIL View SILGen CFG");
   }
 
   // If we are asked do debug serialization, instead of running all diagnostic
   // passes, just run mandatory inlining with dead transparent function cleanup
   // disabled.
   if (Module.getOptions().DebugSerialization) {
-    PM.addOwnershipModelEliminator();
-    PM.addMandatoryInlining();
-    PM.run();
+    addMandatoryDebugSerialization(PM);
     return Ctx.hadError();
   }
 
   // Lower all ownership instructions right after SILGen for now.
-  PM.addOwnershipModelEliminator();
-  PM.runOneIteration();
-  PM.resetAndRemoveTransformations();
+  addOwnershipModelEliminatorPipeline(PM);
 
   // Otherwise run the rest of diagnostics.
-  PM.addCapturePromotion();
-  PM.addAllocBoxToStack();
-  PM.addNoReturnFolding();
-  PM.addDefiniteInitialization();
+  addMandatoryOptPipeline(PM);
 
-  PM.addMandatoryInlining();
-  PM.addPredictableMemoryOptimizations();
-  PM.addDiagnosticConstantPropagation();
-  PM.addGuaranteedARCOpts();
-  PM.addDiagnoseUnreachable();
-  PM.addEmitDFDiagnostics();
-  // Canonical swift requires all non cond_br critical edges to be split.
-  PM.addSplitNonCondBrCriticalEdges();
-  PM.run();
+  if (SILViewGuaranteedCFG) {
+    addCFGPrinterPipeline(PM, "SIL View Guaranteed CFG");
+  }
 
   // Generate diagnostics.
   Module.setStage(SILStage::Canonical);
-
-  if (SILViewGuaranteedCFG) {
-    PM.resetAndRemoveTransformations();
-    PM.addCFGPrinter();
-    PM.runOneIteration();
-  }
 
   // Verify the module, if required.
   if (Module.getOptions().VerifyAll)
@@ -134,9 +152,7 @@ bool swift::runSILOwnershipEliminatorPass(SILModule &Module) {
   SILPassManager PM(&Module);
 
   // Lower all ownership instructions.
-  PM.addOwnershipModelEliminator();
-  PM.runOneIteration();
-  PM.resetAndRemoveTransformations();
+  addOwnershipModelEliminatorPipeline(PM);
 
   return Ctx.hadError();
 }
@@ -276,23 +292,14 @@ void AddSSAPasses(SILPassManager &PM, OptimizationLevelKind OpLevel) {
   PM.addRemovePins();
 }
 
+static void addPerfDebugSerializationPipeline(SILPassManager &PM) {
+  PM.setStageName("Performance Debug Serialization");
+  PM.addSILLinker();
+  PM.run();
+}
 
-void swift::runSILOptimizationPasses(SILModule &Module) {
-  // Verify the module, if required.
-  if (Module.getOptions().VerifyAll)
-    Module.verify();
-
-  if (Module.getOptions().DisableSILPerfOptimizations)
-    return;
-
-  if (Module.getOptions().DebugSerialization) {
-    SILPassManager PM(&Module);
-    PM.addSILLinker();
-    PM.run();
-    return;
-  }
-
-  SILPassManager PM(&Module, "EarlyModulePasses");
+static void addPerfEarlyModulePassPipeline(SILPassManager &PM) {
+  PM.setStageName("EarlyModulePasses");
 
   // Get rid of apparently dead functions as soon as possible so that
   // we do not spend time optimizing them.
@@ -301,8 +308,9 @@ void swift::runSILOptimizationPasses(SILModule &Module) {
   PM.addSILLinker();
   PM.run();
   PM.resetAndRemoveTransformations();
+}
 
-  // Run an iteration of the high-level SSA passes.
+static void addHighLevelEarlyLoopOptPipeline(SILPassManager &PM) {
   PM.setStageName("HighLevel+EarlyLoopOpt");
   // FIXME: update this to be a function pass.
   PM.addEagerSpecializer();
@@ -310,7 +318,9 @@ void swift::runSILOptimizationPasses(SILModule &Module) {
   AddHighLevelLoopOptPasses(PM);
   PM.runOneIteration();
   PM.resetAndRemoveTransformations();
+}
 
+static void addMidModulePassesStackPromotePassPipeline(SILPassManager &PM) {
   PM.setStageName("MidModulePasses+StackPromote");
   PM.addDeadFunctionElimination();
   PM.addSILLinker();
@@ -322,8 +332,9 @@ void swift::runSILOptimizationPasses(SILModule &Module) {
 
   PM.runOneIteration();
   PM.resetAndRemoveTransformations();
+}
 
-  // Run an iteration of the mid-level SSA passes.
+static void addMidLevelPassPipeline(SILPassManager &PM) {
   PM.setStageName("MidLevel");
   AddSSAPasses(PM, OptimizationLevelKind::MidLevel);
   
@@ -333,8 +344,9 @@ void swift::runSILOptimizationPasses(SILModule &Module) {
 
   PM.runOneIteration();
   PM.resetAndRemoveTransformations();
+}
 
-  // Perform lowering optimizations.
+static void addLoweringPassPipeline(SILPassManager &PM) {
   PM.setStageName("Lower");
   PM.addDeadFunctionElimination();
   PM.addDeadObjectElimination();
@@ -371,11 +383,9 @@ void swift::runSILOptimizationPasses(SILModule &Module) {
   // optimizer after this.
   PM.runOneIteration();
   PM.resetAndRemoveTransformations();
+}
 
-  // Run another iteration of the SSA optimizations to optimize the
-  // devirtualized inline caches and constants propagated into closures
-  // (CapturePropagation).
-
+static void addLowLevelPassPipeline(SILPassManager &PM) {
   PM.setStageName("LowLevel");
 
   // Should be after FunctionSignatureOpts and before the last inliner.
@@ -389,7 +399,9 @@ void swift::runSILOptimizationPasses(SILModule &Module) {
 
   PM.runOneIteration();
   PM.resetAndRemoveTransformations();
+}
 
+static void addLateLoopOptPassPipeline(SILPassManager &PM) {
   PM.setStageName("LateLoopOpt");
 
   // Delete dead code and drop the bodies of shared functions.
@@ -416,17 +428,58 @@ void swift::runSILOptimizationPasses(SILModule &Module) {
   PM.addAssumeSingleThreaded();
 
   PM.runOneIteration();
-
   PM.resetAndRemoveTransformations();
-  
-  // Has only an effect if the -gsil option is specified.
+}
+
+static void addSILDebugInfoGeneratorPipeline(SILPassManager &PM) {
   PM.addSILDebugInfoGenerator();
+  PM.runOneIteration();
+  PM.resetAndRemoveTransformations();
+}
+
+void swift::runSILOptimizationPasses(SILModule &Module) {
+  // Verify the module, if required.
+  if (Module.getOptions().VerifyAll)
+    Module.verify();
+
+  if (Module.getOptions().DisableSILPerfOptimizations)
+    return;
+
+  SILPassManager PM(&Module);
+
+  if (Module.getOptions().DebugSerialization) {
+    addPerfDebugSerializationPipeline(PM);
+    return;
+  }
+
+  // Eliminate immediately dead functions and then clone functions from the
+  // stdlib.
+  addPerfEarlyModulePassPipeline(PM);
+
+  // Then run an iteration of the high-level SSA passes.
+  addHighLevelEarlyLoopOptPipeline(PM);
+  addMidModulePassesStackPromotePassPipeline(PM);
+
+  // Run an iteration of the mid-level SSA passes.
+  addMidLevelPassPipeline(PM);
+
+  // Perform lowering optimizations.
+  addLoweringPassPipeline(PM);
+
+  // Run another iteration of the SSA optimizations to optimize the
+  // devirtualized inline caches and constants propagated into closures
+  // (CapturePropagation).
+  addLowLevelPassPipeline(PM);
+
+  addLateLoopOptPassPipeline(PM);
+
+  // Has only an effect if the -gsil option is specified.
+  addSILDebugInfoGeneratorPipeline(PM);
 
   // Call the CFG viewer.
   if (SILViewCFG) {
-    PM.addCFGPrinter();
+    addCFGPrinterPipeline(PM, "SIL Before IRGen View CFG");
   }
-  PM.runOneIteration();
 
   // Verify the module, if required.
   if (Module.getOptions().VerifyAll)
