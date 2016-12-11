@@ -2491,8 +2491,6 @@ bool TypeChecker::convertToType(Expr *&expr, Type type, DeclContext *dc,
   ConstraintSystem cs(*this, dc, ConstraintSystemFlags::AllowFixes);
   CleanupIllFormedExpressionRAII cleanup(Context, expr);
 
-  cs.cacheExprTypes(expr);
-
   // If there is a type that we're expected to convert to, add the conversion
   // constraint.
   cs.addConstraint(ConstraintKind::ExplicitConversion, expr->getType(), type,

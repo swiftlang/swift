@@ -2956,8 +2956,6 @@ Expr *ConstraintSystem::generateConstraintsShallow(Expr *expr) {
   // Sanitize the expression.
   expr = SanitizeExpr(getTypeChecker()).walkToExprPost(expr);
 
-  cacheExprTypes(expr);
-
   // Visit the top-level expression generating constraints.
   ConstraintGenerator cg(*this);
   auto type = cg.visit(expr);
