@@ -1,3 +1,5 @@
+#!/bin/bash
+
 # Find the transitive closure of overlay dependencies for a single overlay.
 # Runs the following command in a loop until the list stops growing:
 # xcrun -sdk macosx clang -arch x86_64 -x objective-c - -M -fmodules < <(echo '@import SceneKit;@import AppKit;')
@@ -10,7 +12,6 @@
 # Overlays that have a different name in Swift than in the output: Dispatch, ObjectiveC, XPC
 # XCTest is hardcoded because this method doesn't work for it.
 
-#!/bin/bash
 set -o pipefail
 set -e
 
@@ -22,15 +23,16 @@ function find_deps() {
     local ARCH_ARG=$3
 
     local PROGRAM=""
-    for overlay in $(echo $OVERLAY_ARG | sed "s/;/ /g"); do
+    # shellcheck disable=SC2013
+    for overlay in $(sed "s/;/ /g" <<< "$OVERLAY_ARG"); do
         regexp="ObjectiveC|objc|Dispatch|dispatch|XPC|xpc"
         if [[ ! $overlay =~ $regexp ]]; then
             PROGRAM+="@import $overlay;"
         fi
     done
 
-    local DEPS=$(xcrun -sdk $SDK_ARG clang -arch $ARCH_ARG -x objective-c - -M -fmodules < <(echo $PROGRAM) 2>&1)
-
+    local DEPS
+    DEPS=$(xcrun -sdk "$SDK_ARG" clang -arch "$ARCH_ARG" -x objective-c - -M -fmodules <<< "$PROGRAM" 2>&1)
     local ERROR_REGEX="(.*error:.*)"
     if [[ $DEPS =~ $ERROR_REGEX ]]; then
         echo "${BASH_REMATCH[1]}" >&2
@@ -39,9 +41,11 @@ function find_deps() {
 
     local REGEX="./Frameworks/(${OVERLAY_NAME_ALTERNATION}).framework/.*|.*/usr/include/(xpc|dispatch|os|objc|simd)/.*\.h"
 
+    # shellcheck disable=SC1004
     IFS='\
     '
     local USED_OVERLAYS=""
+    # shellcheck disable=SC2068
     for line in ${DEPS[@]}; do
         if [[ $line =~ $REGEX ]]; then
             if [[ ${BASH_REMATCH[1]} != "" ]]; then
@@ -59,11 +63,11 @@ function find_deps() {
     done
 
     # Remove last ;
-    if [[ ${#USED_OVERLAYS} > 0 ]]; then
+    if [[ ${#USED_OVERLAYS} -gt 0 ]]; then
         USED_OVERLAYS=${USED_OVERLAYS%?}
     fi
 
-    TRIMMED=$(echo $USED_OVERLAYS | tr ";" "\n" | sort | uniq | tr "\n" ";")
+    TRIMMED=$(tr ";" "\n" <<< "$USED_OVERLAYS" | sort | uniq | tr "\n" ";")
     echo "${TRIMMED%?}"
 }
 
@@ -100,8 +104,8 @@ if [[ $OVERLAY_ARG == "XCTest" ]]; then
     esac
 else
     while true; do
-        OUT=$(find_deps $LAST_OUT $SDK_ARG $ARCH_ARG)
-        if [[ $LAST_OUT == $OUT ]]; then
+        OUT=$(find_deps "$LAST_OUT" "$SDK_ARG" "$ARCH_ARG")
+        if [[ "$LAST_OUT" == "$OUT" ]]; then
             break
         fi
         LAST_OUT=$OUT
