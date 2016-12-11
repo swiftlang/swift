@@ -400,10 +400,29 @@ class alignas(1 << DeclAlignInBits) Decl {
 
   enum { NumTypeDeclBits = NumValueDeclBits + 1 };
   static_assert(NumTypeDeclBits <= 32, "fits in an unsigned");
-  
+
+  class GenericTypeDeclBitfields {
+    friend class GenericTypeDecl;
+    unsigned : NumTypeDeclBits;
+  };
+
+  enum { NumGenericTypeDeclBits = NumTypeDeclBits };
+  static_assert(NumGenericTypeDeclBits <= 32, "fits in an unsigned");
+
+  class TypeAliasDeclBitfields {
+    friend class TypeAliasDecl;
+    unsigned : NumGenericTypeDeclBits;
+
+    /// Whether the underlying type is an interface type that will be lazily
+    /// resolved to a context type.
+    unsigned HasInterfaceUnderlyingType : 1;
+  };
+  enum { NumTypeAliasDeclBits = NumGenericTypeDeclBits + 1 };
+  static_assert(NumTypeAliasDeclBits <= 32, "fits in an unsigned");
+
   class NominalTypeDeclBitFields {
     friend class NominalTypeDecl;
-    unsigned : NumTypeDeclBits;
+    unsigned : NumGenericTypeDeclBits;
     
     /// Whether or not the nominal type decl has delayed protocol or member
     /// declarations.
@@ -413,7 +432,7 @@ class alignas(1 << DeclAlignInBits) Decl {
     /// to this declaration.
     unsigned AddedImplicitInitializers : 1;
   };
-  enum { NumNominalTypeDeclBits = NumTypeDeclBits + 2 };
+  enum { NumNominalTypeDeclBits = NumGenericTypeDeclBits + 2 };
   static_assert(NumNominalTypeDeclBits <= 32, "fits in an unsigned");
 
   class ProtocolDeclBitfields {
@@ -566,6 +585,8 @@ protected:
     FuncDeclBitfields FuncDeclBits;
     ConstructorDeclBitfields ConstructorDeclBits;
     TypeDeclBitfields TypeDeclBits;
+    GenericTypeDeclBitfields GenericTypeDeclBits;
+    TypeAliasDeclBitfields TypeAliasDeclBits;
     NominalTypeDeclBitFields NominalTypeDeclBits;
     ProtocolDeclBitfields ProtocolDeclBits;
     ClassDeclBitfields ClassDeclBits;
@@ -2310,7 +2331,9 @@ class TypeAliasDecl : public GenericTypeDecl {
   mutable NameAliasType *AliasTy;
 
   SourceLoc TypeAliasLoc;           // The location of the 'typealias' keyword
-  TypeLoc UnderlyingTy;
+  mutable TypeLoc UnderlyingTy;
+
+  Type computeUnderlyingContextType() const;
 
 public:
   TypeAliasDecl(SourceLoc TypeAliasLoc, Identifier Name,
@@ -2323,6 +2346,9 @@ public:
   /// getUnderlyingType - Returns the underlying type, which is
   /// assumed to have been set.
   Type getUnderlyingType() const {
+    if (TypeAliasDeclBits.HasInterfaceUnderlyingType)
+      return computeUnderlyingContextType();
+
     assert(!UnderlyingTy.getType().isNull() &&
            "getting invalid underlying type");
     return UnderlyingTy.getType();
@@ -2333,10 +2359,25 @@ public:
   void computeType();
 
   /// \brief Determine whether this type alias has an underlying type.
-  bool hasUnderlyingType() const { return !UnderlyingTy.getType().isNull(); }
+  bool hasUnderlyingType() const {
+    return !UnderlyingTy.getType().isNull();
+  }
 
-  TypeLoc &getUnderlyingTypeLoc() { return UnderlyingTy; }
-  const TypeLoc &getUnderlyingTypeLoc() const { return UnderlyingTy; }
+  TypeLoc &getUnderlyingTypeLoc() {
+    if (TypeAliasDeclBits.HasInterfaceUnderlyingType)
+      (void)computeUnderlyingContextType();
+
+    return UnderlyingTy;
+  }
+  const TypeLoc &getUnderlyingTypeLoc() const {
+    if (TypeAliasDeclBits.HasInterfaceUnderlyingType)
+      (void)computeUnderlyingContextType();
+
+    return UnderlyingTy;
+  }
+
+  /// Set the underlying type after deserialization.
+  void setDeserializedUnderlyingType(Type type);
 
   /// getAliasType - Return the sugared version of this decl as a Type.
   NameAliasType *getAliasType() const { return AliasTy; }
