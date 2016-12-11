@@ -262,7 +262,7 @@ extension String.CharacterView : BidirectionalCollection {
     }
     
     let startIndexUTF16 = start._position
-    var usc0 = unicodeScalars[start].value, usc1: UInt32 = 0
+    let usc0 = unicodeScalars[start].value
     unicodeScalars.formIndex(after: &start)
 
     // Unicode flag emoji character pairs are a special case
@@ -279,32 +279,21 @@ extension String.CharacterView : BidirectionalCollection {
     let graphemeClusterBreakProperty =
         _UnicodeGraphemeClusterBreakPropertyTrie()
     let segmenter = _UnicodeExtendedGraphemeClusterSegmenter()
-
     var gcb0 = graphemeClusterBreakProperty.getPropertyRawValue(usc0)
-    var notJoined = true // zero width joiner used in family emojis
-    // e.g. http://emojipedia.org/family-man-woman-girl-girl/
-    let zeroWidthJoiner: UInt32 = 0x200d
 
     while start != end {
       // FIXME(performance): consider removing this "fast path".  A branch
       // that is hard to predict could be worse for performance than a few
       // loads from cache to fetch the property 'gcb1'.
-      if notJoined && segmenter.isBoundaryAfter(gcb0) {
+      if segmenter.isBoundaryAfter(gcb0) {
         break
       }
-      usc1 = unicodeScalars[start].value
-      let gcb1 = graphemeClusterBreakProperty.getPropertyRawValue(usc1)
-      if notJoined && segmenter.isBoundary(gcb0, gcb1) {
+      let gcb1 = graphemeClusterBreakProperty.getPropertyRawValue(
+        unicodeScalars[start].value)
+      if segmenter.isBoundary(gcb0, gcb1) {
         break
       }
       gcb0 = gcb1
-      notJoined = usc1 != zeroWidthJoiner
-      unicodeScalars.formIndex(after: &start)
-    }
-
-    // Skin tone modifiers http://unicode.org/reports/tr51/#Emoji_Modifiers_Table
-    let skinToneModifierMin: UInt32 = 0x1F3FB, skinToneModifierMax: UInt32 = 0x1F3FF
-    if usc1 >= skinToneModifierMin && usc1 <= skinToneModifierMax {
       unicodeScalars.formIndex(after: &start)
     }
 
@@ -329,24 +318,15 @@ extension String.CharacterView : BidirectionalCollection {
     var graphemeClusterStart = end
     
     unicodeScalars.formIndex(before: &graphemeClusterStart)
-    var usc0 = unicodeScalars[graphemeClusterStart].value
+    let usc0 = unicodeScalars[graphemeClusterStart].value
 
     // Unicode flag emoji character pairs are a special case
     let flagEmojiA: UInt32 = 0x1F1E6, flagEmojiZ: UInt32 = 0x1F1FF
-    if usc0 >= flagEmojiA {
-        if usc0 <= flagEmojiZ && graphemeClusterStart != start {
-            unicodeScalars.formIndex(before: &graphemeClusterStart)
-            let usc1 = unicodeScalars[graphemeClusterStart].value
-            if usc1 >= flagEmojiA && usc1 <= flagEmojiZ {
-                return endIndexUTF16 - graphemeClusterStart._position
-            }
-        }
-
-        // Also check for skin tone modifier
-        let skinToneModifierMin: UInt32 = 0x1F3FB, skinToneModifierMax: UInt32 = 0x1F3FF
-        if usc0 >= skinToneModifierMin && usc0 <= skinToneModifierMax && graphemeClusterStart != start {
-            unicodeScalars.formIndex(before: &graphemeClusterStart)
-            usc0 = unicodeScalars[graphemeClusterStart].value
+    if usc0 >= flagEmojiA && usc0 <= flagEmojiZ && graphemeClusterStart != start {
+        unicodeScalars.formIndex(before: &graphemeClusterStart)
+        let usc1 = unicodeScalars[graphemeClusterStart].value
+        if usc1 >= flagEmojiA && usc1 <= flagEmojiZ {
+            return endIndexUTF16 - graphemeClusterStart._position
         }
     }
 
@@ -356,13 +336,12 @@ extension String.CharacterView : BidirectionalCollection {
 
     var gcb0 = graphemeClusterBreakProperty.getPropertyRawValue(usc0)
     var graphemeClusterStartUTF16 = graphemeClusterStart._position
-    let zeroWidthJoiner: UInt32 = 0x200d
 
     while graphemeClusterStart != start {
       unicodeScalars.formIndex(before: &graphemeClusterStart)
-      let usc1 = unicodeScalars[graphemeClusterStart].value
-      let gcb1 = graphemeClusterBreakProperty.getPropertyRawValue(usc1)
-      if usc1 != zeroWidthJoiner && segmenter.isBoundary(gcb1, gcb0) {
+      let gcb1 = graphemeClusterBreakProperty.getPropertyRawValue(
+        unicodeScalars[graphemeClusterStart].value)
+      if segmenter.isBoundary(gcb1, gcb0) {
         break
       }
       gcb0 = gcb1

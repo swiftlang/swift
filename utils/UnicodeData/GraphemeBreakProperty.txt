@@ -1,10 +1,11 @@
-# GraphemeBreakProperty-8.0.0.txt
-# Date: 2015-02-13, 13:47:14 GMT [MD]
+# GraphemeBreakProperty-9.0.0.txt
+# Date: 2016-06-03, 22:23:55 GMT
+# © 2016 Unicode®, Inc.
+# Unicode and the Unicode Logo are registered trademarks of Unicode, Inc. in the U.S. and other countries.
+# For terms of use, see http://www.unicode.org/terms_of_use.html
 #
 # Unicode Character Database
-# Copyright (c) 1991-2015 Unicode, Inc.
-# For terms of use, see http://www.unicode.org/terms_of_use.html
-# For documentation, see http://www.unicode.org/reports/tr44/
+#   For documentation, see http://www.unicode.org/reports/tr44/
 
 # ================================================
 
@@ -14,6 +15,18 @@
 #  have the value Other (XX).
 
 # @missing: 0000..10FFFF; Other
+
+# ================================================
+
+0600..0605    ; Prepend # Cf   [6] ARABIC NUMBER SIGN..ARABIC NUMBER MARK ABOVE
+06DD          ; Prepend # Cf       ARABIC END OF AYAH
+070F          ; Prepend # Cf       SYRIAC ABBREVIATION MARK
+08E2          ; Prepend # Cf       ARABIC DISPUTED END OF AYAH
+0D4E          ; Prepend # Lo       MALAYALAM LETTER DOT REPH
+110BD         ; Prepend # Cf       KAITHI NUMBER SIGN
+111C2..111C3  ; Prepend # Lo   [2] SHARADA SIGN JIHVAMULIYA..SHARADA SIGN UPADHMANIYA
+
+# Total code points: 13
 
 # ================================================
 
@@ -34,10 +47,7 @@
 000E..001F    ; Control # Cc  [18] <control-000E>..<control-001F>
 007F..009F    ; Control # Cc  [33] <control-007F>..<control-009F>
 00AD          ; Control # Cf       SOFT HYPHEN
-0600..0605    ; Control # Cf   [6] ARABIC NUMBER SIGN..ARABIC NUMBER MARK ABOVE
 061C          ; Control # Cf       ARABIC LETTER MARK
-06DD          ; Control # Cf       ARABIC END OF AYAH
-070F          ; Control # Cf       SYRIAC ABBREVIATION MARK
 180E          ; Control # Cf       MONGOLIAN VOWEL SEPARATOR
 200B          ; Control # Cf       ZERO WIDTH SPACE
 200E..200F    ; Control # Cf   [2] LEFT-TO-RIGHT MARK..RIGHT-TO-LEFT MARK
@@ -51,17 +61,15 @@ D800..DFFF    ; Control # Cs [2048] <surrogate-D800>..<surrogate-DFFF>
 FEFF          ; Control # Cf       ZERO WIDTH NO-BREAK SPACE
 FFF0..FFF8    ; Control # Cn   [9] <reserved-FFF0>..<reserved-FFF8>
 FFF9..FFFB    ; Control # Cf   [3] INTERLINEAR ANNOTATION ANCHOR..INTERLINEAR ANNOTATION TERMINATOR
-110BD         ; Control # Cf       KAITHI NUMBER SIGN
 1BCA0..1BCA3  ; Control # Cf   [4] SHORTHAND FORMAT LETTER OVERLAP..SHORTHAND FORMAT UP STEP
 1D173..1D17A  ; Control # Cf   [8] MUSICAL SYMBOL BEGIN BEAM..MUSICAL SYMBOL END PHRASE
 E0000         ; Control # Cn       <reserved-E0000>
 E0001         ; Control # Cf       LANGUAGE TAG
 E0002..E001F  ; Control # Cn  [30] <reserved-E0002>..<reserved-E001F>
-E0020..E007F  ; Control # Cf  [96] TAG SPACE..CANCEL TAG
 E0080..E00FF  ; Control # Cn [128] <reserved-E0080>..<reserved-E00FF>
 E01F0..E0FFF  ; Control # Cn [3600] <reserved-E01F0>..<reserved-E0FFF>
 
-# Total code points: 6030
+# Total code points: 5925
 
 # ================================================
 
@@ -89,6 +97,7 @@ E01F0..E0FFF  ; Control # Cn [3600] <reserved-E01F0>..<reserved-E0FFF>
 0825..0827    ; Extend # Mn   [3] SAMARITAN VOWEL SIGN SHORT A..SAMARITAN VOWEL SIGN U
 0829..082D    ; Extend # Mn   [5] SAMARITAN VOWEL SIGN LONG I..SAMARITAN MARK NEQUDAA
 0859..085B    ; Extend # Mn   [3] MANDAIC AFFRICATION MARK..MANDAIC GEMINATION MARK
+08D4..08E1    ; Extend # Mn  [14] ARABIC SMALL HIGH WORD AR-RUB..ARABIC SMALL HIGH SIGN SAFHA
 08E3..0902    ; Extend # Mn  [32] ARABIC TURNED DAMMA BELOW..DEVANAGARI SIGN ANUSVARA
 093A          ; Extend # Mn       DEVANAGARI VOWEL SIGN OE
 093C          ; Extend # Mn       DEVANAGARI SIGN NUKTA
@@ -195,6 +204,7 @@ E01F0..E0FFF  ; Control # Cn [3600] <reserved-E01F0>..<reserved-E0FFF>
 17C9..17D3    ; Extend # Mn  [11] KHMER SIGN MUUSIKATOAN..KHMER SIGN BATHAMASAT
 17DD          ; Extend # Mn       KHMER SIGN ATTHACAN
 180B..180D    ; Extend # Mn   [3] MONGOLIAN FREE VARIATION SELECTOR ONE..MONGOLIAN FREE VARIATION SELECTOR THREE
+1885..1886    ; Extend # Mn   [2] MONGOLIAN LETTER ALI GALI BALUDA..MONGOLIAN LETTER ALI GALI THREE BALUDA
 18A9          ; Extend # Mn       MONGOLIAN LETTER ALI GALI DAGALGA
 1920..1922    ; Extend # Mn   [3] LIMBU VOWEL SIGN A..LIMBU VOWEL SIGN U
 1927..1928    ; Extend # Mn   [2] LIMBU VOWEL SIGN E..LIMBU VOWEL SIGN O
@@ -234,8 +244,8 @@ E01F0..E0FFF  ; Control # Cn [3600] <reserved-E01F0>..<reserved-E0FFF>
 1CF4          ; Extend # Mn       VEDIC TONE CANDRA ABOVE
 1CF8..1CF9    ; Extend # Mn   [2] VEDIC TONE RING ABOVE..VEDIC TONE DOUBLE RING ABOVE
 1DC0..1DF5    ; Extend # Mn  [54] COMBINING DOTTED GRAVE ACCENT..COMBINING UP TACK ABOVE
-1DFC..1DFF    ; Extend # Mn   [4] COMBINING DOUBLE INVERTED BREVE BELOW..COMBINING RIGHT ARROWHEAD AND DOWN ARROWHEAD BELOW
-200C..200D    ; Extend # Cf   [2] ZERO WIDTH NON-JOINER..ZERO WIDTH JOINER
+1DFB..1DFF    ; Extend # Mn   [5] COMBINING DELETION MARK..COMBINING RIGHT ARROWHEAD AND DOWN ARROWHEAD BELOW
+200C          ; Extend # Cf       ZERO WIDTH NON-JOINER
 20D0..20DC    ; Extend # Mn  [13] COMBINING LEFT HARPOON ABOVE..COMBINING FOUR DOTS ABOVE
 20DD..20E0    ; Extend # Me   [4] COMBINING ENCLOSING CIRCLE..COMBINING ENCLOSING CIRCLE BACKSLASH
 20E1          ; Extend # Mn       COMBINING LEFT RIGHT ARROW ABOVE
@@ -256,7 +266,7 @@ A802          ; Extend # Mn       SYLOTI NAGRI SIGN DVISVARA
 A806          ; Extend # Mn       SYLOTI NAGRI SIGN HASANTA
 A80B          ; Extend # Mn       SYLOTI NAGRI SIGN ANUSVARA
 A825..A826    ; Extend # Mn   [2] SYLOTI NAGRI VOWEL SIGN U..SYLOTI NAGRI VOWEL SIGN E
-A8C4          ; Extend # Mn       SAURASHTRA SIGN VIRAMA
+A8C4..A8C5    ; Extend # Mn   [2] SAURASHTRA SIGN VIRAMA..SAURASHTRA SIGN CANDRABINDU
 A8E0..A8F1    ; Extend # Mn  [18] COMBINING DEVANAGARI DIGIT ZERO..COMBINING DEVANAGARI SIGN AVAGRAHA
 A926..A92D    ; Extend # Mn   [8] KAYAH LI VOWEL UE..KAYAH LI TONE CALYA PLOPHU
 A947..A951    ; Extend # Mn  [11] REJANG VOWEL SIGN I..REJANG CONSONANT SIGN R
@@ -309,6 +319,7 @@ FF9E..FF9F    ; Extend # Lm   [2] HALFWIDTH KATAKANA VOICED SOUND MARK..HALFWIDT
 1122F..11231  ; Extend # Mn   [3] KHOJKI VOWEL SIGN U..KHOJKI VOWEL SIGN AI
 11234         ; Extend # Mn       KHOJKI SIGN ANUSVARA
 11236..11237  ; Extend # Mn   [2] KHOJKI SIGN NUKTA..KHOJKI SIGN SHADDA
+1123E         ; Extend # Mn       KHOJKI SIGN SUKUN
 112DF         ; Extend # Mn       KHUDAWADI SIGN ANUSVARA
 112E3..112EA  ; Extend # Mn   [8] KHUDAWADI VOWEL SIGN U..KHUDAWADI SIGN VIRAMA
 11300..11301  ; Extend # Mn   [2] GRANTHA SIGN COMBINING ANUSVARA ABOVE..GRANTHA SIGN CANDRABINDU
@@ -318,6 +329,9 @@ FF9E..FF9F    ; Extend # Lm   [2] HALFWIDTH KATAKANA VOICED SOUND MARK..HALFWIDT
 11357         ; Extend # Mc       GRANTHA AU LENGTH MARK
 11366..1136C  ; Extend # Mn   [7] COMBINING GRANTHA DIGIT ZERO..COMBINING GRANTHA DIGIT SIX
 11370..11374  ; Extend # Mn   [5] COMBINING GRANTHA LETTER A..COMBINING GRANTHA LETTER PA
+11438..1143F  ; Extend # Mn   [8] NEWA VOWEL SIGN U..NEWA VOWEL SIGN AI
+11442..11444  ; Extend # Mn   [3] NEWA SIGN VIRAMA..NEWA SIGN ANUSVARA
+11446         ; Extend # Mn       NEWA SIGN NUKTA
 114B0         ; Extend # Mc       TIRHUTA VOWEL SIGN AA
 114B3..114B8  ; Extend # Mn   [6] TIRHUTA VOWEL SIGN U..TIRHUTA VOWEL SIGN VOCALIC LL
 114BA         ; Extend # Mn       TIRHUTA VOWEL SIGN SHORT E
@@ -339,6 +353,13 @@ FF9E..FF9F    ; Extend # Lm   [2] HALFWIDTH KATAKANA VOICED SOUND MARK..HALFWIDT
 1171D..1171F  ; Extend # Mn   [3] AHOM CONSONANT SIGN MEDIAL LA..AHOM CONSONANT SIGN MEDIAL LIGATING RA
 11722..11725  ; Extend # Mn   [4] AHOM VOWEL SIGN I..AHOM VOWEL SIGN UU
 11727..1172B  ; Extend # Mn   [5] AHOM VOWEL SIGN AW..AHOM SIGN KILLER
+11C30..11C36  ; Extend # Mn   [7] BHAIKSUKI VOWEL SIGN I..BHAIKSUKI VOWEL SIGN VOCALIC L
+11C38..11C3D  ; Extend # Mn   [6] BHAIKSUKI VOWEL SIGN E..BHAIKSUKI SIGN ANUSVARA
+11C3F         ; Extend # Mn       BHAIKSUKI SIGN VIRAMA
+11C92..11CA7  ; Extend # Mn  [22] MARCHEN SUBJOINED LETTER KA..MARCHEN SUBJOINED LETTER ZA
+11CAA..11CB0  ; Extend # Mn   [7] MARCHEN SUBJOINED LETTER RA..MARCHEN VOWEL SIGN AA
+11CB2..11CB3  ; Extend # Mn   [2] MARCHEN VOWEL SIGN U..MARCHEN VOWEL SIGN E
+11CB5..11CB6  ; Extend # Mn   [2] MARCHEN SIGN ANUSVARA..MARCHEN SIGN CANDRABINDU
 16AF0..16AF4  ; Extend # Mn   [5] BASSA VAH COMBINING HIGH TONE..BASSA VAH COMBINING HIGH-LOW TONE
 16B30..16B36  ; Extend # Mn   [7] PAHAWH HMONG MARK CIM TUB..PAHAWH HMONG MARK CIM TAUM
 16F8F..16F92  ; Extend # Mn   [4] MIAO TONE RIGHT..MIAO TONE BELOW
@@ -356,10 +377,17 @@ FF9E..FF9F    ; Extend # Lm   [2] HALFWIDTH KATAKANA VOICED SOUND MARK..HALFWIDT
 1DA84         ; Extend # Mn       SIGNWRITING LOCATION HEAD NECK
 1DA9B..1DA9F  ; Extend # Mn   [5] SIGNWRITING FILL MODIFIER-2..SIGNWRITING FILL MODIFIER-6
 1DAA1..1DAAF  ; Extend # Mn  [15] SIGNWRITING ROTATION MODIFIER-2..SIGNWRITING ROTATION MODIFIER-16
+1E000..1E006  ; Extend # Mn   [7] COMBINING GLAGOLITIC LETTER AZU..COMBINING GLAGOLITIC LETTER ZHIVETE
+1E008..1E018  ; Extend # Mn  [17] COMBINING GLAGOLITIC LETTER ZEMLJA..COMBINING GLAGOLITIC LETTER HERU
+1E01B..1E021  ; Extend # Mn   [7] COMBINING GLAGOLITIC LETTER SHTA..COMBINING GLAGOLITIC LETTER YATI
+1E023..1E024  ; Extend # Mn   [2] COMBINING GLAGOLITIC LETTER YU..COMBINING GLAGOLITIC LETTER SMALL YUS
+1E026..1E02A  ; Extend # Mn   [5] COMBINING GLAGOLITIC LETTER YO..COMBINING GLAGOLITIC LETTER FITA
 1E8D0..1E8D6  ; Extend # Mn   [7] MENDE KIKAKUI COMBINING NUMBER TEENS..MENDE KIKAKUI COMBINING NUMBER MILLIONS
+1E944..1E94A  ; Extend # Mn   [7] ADLAM ALIF LENGTHENER..ADLAM NUKTA
+E0020..E007F  ; Extend # Cf  [96] TAG SPACE..CANCEL TAG
 E0100..E01EF  ; Extend # Mn [240] VARIATION SELECTOR-17..VARIATION SELECTOR-256
 
-# Total code points: 1610
+# Total code points: 1828
 
 # ================================================
 
@@ -482,6 +510,9 @@ ABEC          ; SpacingMark # Mc       MEETEI MAYEK LUM IYEK
 11347..11348  ; SpacingMark # Mc   [2] GRANTHA VOWEL SIGN EE..GRANTHA VOWEL SIGN AI
 1134B..1134D  ; SpacingMark # Mc   [3] GRANTHA VOWEL SIGN OO..GRANTHA SIGN VIRAMA
 11362..11363  ; SpacingMark # Mc   [2] GRANTHA VOWEL SIGN VOCALIC L..GRANTHA VOWEL SIGN VOCALIC LL
+11435..11437  ; SpacingMark # Mc   [3] NEWA VOWEL SIGN AA..NEWA VOWEL SIGN II
+11440..11441  ; SpacingMark # Mc   [2] NEWA VOWEL SIGN O..NEWA VOWEL SIGN AU
+11445         ; SpacingMark # Mc       NEWA SIGN VISARGA
 114B1..114B2  ; SpacingMark # Mc   [2] TIRHUTA VOWEL SIGN I..TIRHUTA VOWEL SIGN II
 114B9         ; SpacingMark # Mc       TIRHUTA VOWEL SIGN E
 114BB..114BC  ; SpacingMark # Mc   [2] TIRHUTA VOWEL SIGN AI..TIRHUTA VOWEL SIGN O
@@ -498,11 +529,16 @@ ABEC          ; SpacingMark # Mc       MEETEI MAYEK LUM IYEK
 116B6         ; SpacingMark # Mc       TAKRI SIGN VIRAMA
 11720..11721  ; SpacingMark # Mc   [2] AHOM VOWEL SIGN A..AHOM VOWEL SIGN AA
 11726         ; SpacingMark # Mc       AHOM VOWEL SIGN E
+11C2F         ; SpacingMark # Mc       BHAIKSUKI VOWEL SIGN AA
+11C3E         ; SpacingMark # Mc       BHAIKSUKI SIGN VISARGA
+11CA9         ; SpacingMark # Mc       MARCHEN SUBJOINED LETTER YA
+11CB1         ; SpacingMark # Mc       MARCHEN VOWEL SIGN I
+11CB4         ; SpacingMark # Mc       MARCHEN VOWEL SIGN O
 16F51..16F7E  ; SpacingMark # Mc  [46] MIAO SIGN ASPIRATION..MIAO VOWEL SIGN NG
 1D166         ; SpacingMark # Mc       MUSICAL SYMBOL COMBINING SPRECHGESANG STEM
 1D16D         ; SpacingMark # Mc       MUSICAL SYMBOL COMBINING AUGMENTATION DOT
 
-# Total code points: 330
+# Total code points: 341
 
 # ================================================
 
@@ -1332,5 +1368,64 @@ D76D..D787    ; LVT # Lo  [27] HANGUL SYLLABLE HYIG..HANGUL SYLLABLE HYIH
 D789..D7A3    ; LVT # Lo  [27] HANGUL SYLLABLE HIG..HANGUL SYLLABLE HIH
 
 # Total code points: 10773
+
+# ================================================
+
+261D          ; E_Base # So       WHITE UP POINTING INDEX
+26F9          ; E_Base # So       PERSON WITH BALL
+270A..270D    ; E_Base # So   [4] RAISED FIST..WRITING HAND
+1F385         ; E_Base # So       FATHER CHRISTMAS
+1F3C3..1F3C4  ; E_Base # So   [2] RUNNER..SURFER
+1F3CA..1F3CB  ; E_Base # So   [2] SWIMMER..WEIGHT LIFTER
+1F442..1F443  ; E_Base # So   [2] EAR..NOSE
+1F446..1F450  ; E_Base # So  [11] WHITE UP POINTING BACKHAND INDEX..OPEN HANDS SIGN
+1F46E         ; E_Base # So       POLICE OFFICER
+1F470..1F478  ; E_Base # So   [9] BRIDE WITH VEIL..PRINCESS
+1F47C         ; E_Base # So       BABY ANGEL
+1F481..1F483  ; E_Base # So   [3] INFORMATION DESK PERSON..DANCER
+1F485..1F487  ; E_Base # So   [3] NAIL POLISH..HAIRCUT
+1F4AA         ; E_Base # So       FLEXED BICEPS
+1F575         ; E_Base # So       SLEUTH OR SPY
+1F57A         ; E_Base # So       MAN DANCING
+1F590         ; E_Base # So       RAISED HAND WITH FINGERS SPLAYED
+1F595..1F596  ; E_Base # So   [2] REVERSED HAND WITH MIDDLE FINGER EXTENDED..RAISED HAND WITH PART BETWEEN MIDDLE AND RING FINGERS
+1F645..1F647  ; E_Base # So   [3] FACE WITH NO GOOD GESTURE..PERSON BOWING DEEPLY
+1F64B..1F64F  ; E_Base # So   [5] HAPPY PERSON RAISING ONE HAND..PERSON WITH FOLDED HANDS
+1F6A3         ; E_Base # So       ROWBOAT
+1F6B4..1F6B6  ; E_Base # So   [3] BICYCLIST..PEDESTRIAN
+1F6C0         ; E_Base # So       BATH
+1F918..1F91E  ; E_Base # So   [7] SIGN OF THE HORNS..HAND WITH INDEX AND MIDDLE FINGERS CROSSED
+1F926         ; E_Base # So       FACE PALM
+1F930         ; E_Base # So       PREGNANT WOMAN
+1F933..1F939  ; E_Base # So   [7] SELFIE..JUGGLING
+1F93C..1F93E  ; E_Base # So   [3] WRESTLERS..HANDBALL
+
+# Total code points: 79
+
+# ================================================
+
+1F3FB..1F3FF  ; E_Modifier # Sk   [5] EMOJI MODIFIER FITZPATRICK TYPE-1-2..EMOJI MODIFIER FITZPATRICK TYPE-6
+
+# Total code points: 5
+
+# ================================================
+
+200D          ; ZWJ # Cf       ZERO WIDTH JOINER
+
+# Total code points: 1
+
+# ================================================
+
+2764          ; Glue_After_Zwj # So       HEAVY BLACK HEART
+1F48B         ; Glue_After_Zwj # So       KISS MARK
+1F5E8         ; Glue_After_Zwj # So       LEFT SPEECH BUBBLE
+
+# Total code points: 3
+
+# ================================================
+
+1F466..1F469  ; E_Base_GAZ # So   [4] BOY..WOMAN
+
+# Total code points: 4
 
 # EOF
