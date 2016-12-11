@@ -420,8 +420,6 @@ namespace {
                                            CTP_CannotFail))
                   return nullptr;
 
-                cs.cacheExprTypes(refExpr);
-
                // Remove an outer function-conversion expression. This
                // happens when we end up referring to a witness for a
                // superclass conformance, and 'Self' differs.
@@ -435,10 +433,8 @@ namespace {
         }
 
         // Build a reference to the protocol requirement.
-        Expr *base =
-          cs.cacheType(TypeExpr::createImplicitHack(loc.getBaseNameLoc(),
-                                                    baseTy,
-                                                    ctx));
+        Expr *base = TypeExpr::createImplicitHack(loc.getBaseNameLoc(), baseTy,
+                                                  ctx);
 
         return buildMemberRef(base, openedType, SourceLoc(), decl,
                               loc, openedFnType->getResult(),
@@ -460,7 +456,6 @@ namespace {
         auto declRefExpr =
           new (ctx) DeclRefExpr(ConcreteDeclRef(ctx, decl, substitutions),
                                 loc, implicit, semantics, type);
-        cs.cacheType(declRefExpr);
         declRefExpr->setFunctionRefKind(functionRefKind);
         return declRefExpr;
       }
@@ -479,7 +474,6 @@ namespace {
         
       auto declRefExpr = new (ctx) DeclRefExpr(decl, loc, implicit, semantics,
                                                type);
-      cs.cacheType(declRefExpr);
       declRefExpr->setFunctionRefKind(functionRefKind);
       return declRefExpr;
     }
@@ -651,7 +645,6 @@ namespace {
 
       ASTContext &ctx = tc.Context;
       auto archetypeVal = new (ctx) OpaqueValueExpr(base->getLoc(), opaqueType);
-      cs.cacheType(archetypeVal);
 
       // Record the opened existential.
       OpenedExistentials.push_back({archetype, base, archetypeVal, depth});
@@ -695,7 +688,6 @@ namespace {
                                   record.ExistentialValue,
                                   record.OpaqueValue,
                                   result);
-      cs.cacheType(result);
 
       OpenedExistentials.pop_back();
       return true;
@@ -849,8 +841,7 @@ namespace {
         auto ref = new (context) DeclRefExpr(memberRef, memberLoc, Implicit);
         cs.setType(ref, refTy);
         ref->setFunctionRefKind(functionRefKind);
-        return cs.cacheType(new (context)
-                                DotSyntaxBaseIgnoredExpr(base, dotLoc, ref));
+        return new (context) DotSyntaxBaseIgnoredExpr(base, dotLoc, ref);
       }
 
       // Otherwise, we're referring to a member of a type.
@@ -931,7 +922,6 @@ namespace {
                  "Attempt to reference an instance member of a metatype");
           auto baseInstanceTy = base->getType()->getRValueInstanceType();
           base = new (context) UnevaluatedInstanceExpr(base, baseInstanceTy);
-          cs.cacheType(base);
           base->setImplicit();
         }
 
@@ -958,7 +948,6 @@ namespace {
       if (dynamicSelfFnType) {
         ref = new (context) CovariantFunctionConversionExpr(ref,
                                                             dynamicSelfFnType);
-        cs.cacheType(ref);
       }
 
       ApplyExpr *apply;
@@ -969,7 +958,6 @@ namespace {
         // Reference to an unbound instance method.
         Expr *result = new (context) DotSyntaxBaseIgnoredExpr(base, dotLoc,
                                                               ref);
-        cs.cacheType(result);
         closeExistential(result, /*force=*/openedExistential);
         return result;
       } else {
@@ -1413,8 +1401,8 @@ namespace {
                                    resultFnTy->getExtInfo());
 
       // Build the constructor reference.
-      return cs.cacheType(
-          new (ctx) OtherConstructorDeclRefExpr(ref, loc, implicit, resultTy));
+      return new (ctx) OtherConstructorDeclRefExpr(ref, loc, implicit,
+                                                   resultTy);
     }
 
     /// Bridge the given value (which is an error type) to NSError.
@@ -1438,17 +1426,15 @@ namespace {
       Expr *call = CallExpr::createImplicit(tc.Context, fnRef, { value }, { });
       if (tc.typeCheckExpressionShallow(call, dc))
         return nullptr;
-
-      cs.cacheType(call);
-
+    
       // The return type of _bridgeErrorToNSError is formally
       // 'AnyObject' to avoid stdlib-to-Foundation dependencies, but it's
       // really NSError.  Abuse CovariantReturnConversionExpr to fix this.
       auto nsErrorDecl = tc.Context.getNSErrorDecl();
       assert(nsErrorDecl && "Missing NSError?");
       Type nsErrorType = nsErrorDecl->getDeclaredInterfaceType();
-      return cs.cacheType(new (tc.Context)
-                              CovariantReturnConversionExpr(call, nsErrorType));
+      return new (tc.Context) CovariantReturnConversionExpr(call,
+                                                            nsErrorType);
     }
 
     /// Bridge the given value to its corresponding Objective-C object
@@ -1510,12 +1496,10 @@ namespace {
                                                 /*implicit*/ true,
                                                 AccessSemantics::Ordinary,
                                                 bridgeFnTy);
-
       fnRef->setFunctionRefKind(FunctionRefKind::SingleApply);
       Expr *call = CallExpr::createImplicit(tc.Context, fnRef, valueParen,
                                             { Identifier() });
       cs.setType(call, bridgeTy);
-      cs.cacheSubExprTypes(call);
       return call;
     }
 
@@ -1623,7 +1607,6 @@ namespace {
       if (tc.typeCheckExpressionShallow(call, dc))
         return nullptr;
 
-      cs.cacheExprTypes(call);
       return call;
     }
 
@@ -2072,7 +2055,6 @@ namespace {
                                        DeclNameLoc(expr->getStartLoc()),
                                        /*Implicit=*/true);
       bool failed = tc.typeCheckExpressionShallow(memberRef, cs.DC);
-      cs.cacheExprTypes(memberRef);
       assert(!failed && "Could not reference string interpolation witness");
       (void)failed;
 
@@ -2121,7 +2103,6 @@ namespace {
       // Call the init(stringInterpolation:) initializer with the arguments.
       ApplyExpr *apply = CallExpr::createImplicit(tc.Context, memberRef,
                                                   segments, names);
-      cs.cacheSubExprTypes(apply);
       expr->setSemanticExpr(finishApply(apply, openedType, locatorBuilder));
       return expr;
     }
@@ -2173,10 +2154,8 @@ namespace {
                               ConformanceCheckFlags::InExpression);
       assert(conformance && "object literal type conforms to protocol");
 
-      Expr *base =
-        cs.cacheType(TypeExpr::createImplicitHack(expr->getLoc(),
-                                                  conformingType,
-                                                  ctx));
+      Expr *base = TypeExpr::createImplicitHack(expr->getLoc(), conformingType,
+                                                ctx);
         
       SmallVector<Expr *, 4> args;
       if (!isa<TupleExpr>(expr->getArg()))
@@ -2327,9 +2306,8 @@ namespace {
 
       // The base expression is simply the metatype of the base type.
       // FIXME: This location info is bogus.
-      auto base =
-        cs.cacheType(TypeExpr::createImplicitHack(expr->getDotLoc(),
-                                                  baseTy, tc.Context));
+      auto base = TypeExpr::createImplicitHack(expr->getDotLoc(),
+                                               baseTy, tc.Context);
 
       // Build the member reference.
       bool isDynamic
@@ -2492,9 +2470,8 @@ namespace {
                                               baseMetaTy->getInstanceType());
           
           // FIXME: We're dropping side effects in the base here!
-          base =
-            cs.cacheType(TypeExpr::createImplicitHack(base->getLoc(), classTy,
-                                                      tc.Context));
+          base = TypeExpr::createImplicitHack(base->getLoc(), classTy, 
+                                              tc.Context);
         } else {
           // Bridge the base to its corresponding Objective-C object.
           base = bridgeToObjectiveC(base);
@@ -2541,10 +2518,9 @@ namespace {
         if (!toType->isLValueType() && baseTy->isLValueType())
           base = coerceToType(base, baseTy->getRValueType(), cs.getConstraintLocator(base));
 
-        return cs.cacheType(new (cs.getASTContext())
-                            TupleElementExpr(base, dotLoc,
-                                             selected.choice.getTupleIndex(),
-                                             nameLoc.getBaseNameLoc(), toType));
+        return new (cs.getASTContext()) TupleElementExpr(base, dotLoc,
+                                                         selected.choice.getTupleIndex(),
+                                                         nameLoc.getBaseNameLoc(), toType);
       }
 
       case OverloadChoiceKind::BaseType: {
@@ -2627,9 +2603,8 @@ namespace {
       // be nicer to re-use them.
 
       // FIXME: This location info is bogus.
-      Expr *typeRef =
-        cs.cacheType(TypeExpr::createImplicitHack(expr->getLoc(),
-                                                  arrayTy, tc.Context));
+      Expr *typeRef = TypeExpr::createImplicitHack(expr->getLoc(),
+                                                   arrayTy, tc.Context);
       DeclName name(tc.Context, tc.Context.Id_init,
                     { tc.Context.Id_arrayLiteral });
 
@@ -2653,14 +2628,13 @@ namespace {
       }
 
       Type argType = TupleType::get(typeElements, tc.Context);
-      Expr *arg = cs.cacheType(
-          TupleExpr::create(tc.Context, SourceLoc(),
-                            expr->getElements(),
-                            names,
-                            { },
-                            SourceLoc(), /*HasTrailingClosure=*/false,
-                            /*Implicit=*/true,
-                            argType));
+      Expr *arg = TupleExpr::create(tc.Context, SourceLoc(), 
+                                    expr->getElements(),
+                                    names,
+                                    { },
+                                    SourceLoc(), /*HasTrailingClosure=*/false,
+                                    /*Implicit=*/true,
+                                    argType);
       Expr *result = tc.callWitness(typeRef, dc, arrayProto, *conformance,
                                     name, arg, diag::array_protocol_broken);
       if (!result)
@@ -2697,9 +2671,8 @@ namespace {
       // It would be nicer to re-use them.
       // FIXME: Cache the name.
       // FIXME: This location info is bogus.
-      Expr *typeRef =
-        cs.cacheType(TypeExpr::createImplicitHack(expr->getLoc(),
-                                                  dictionaryTy, tc.Context));
+      Expr *typeRef = TypeExpr::createImplicitHack(expr->getLoc(),
+                                                   dictionaryTy, tc.Context);
 
       DeclName name(tc.Context, tc.Context.Id_init,
                     { tc.Context.Id_dictionaryLiteral });
@@ -2724,16 +2697,14 @@ namespace {
       }
 
       Type argType = TupleType::get(typeElements, tc.Context);
-      Expr *arg =
-        cs.cacheType(
-            TupleExpr::create(tc.Context, expr->getLBracketLoc(),
-                              expr->getElements(),
-                              names,
-                              { },
-                              expr->getRBracketLoc(),
-                              /*HasTrailingClosure=*/false,
-                              /*Implicit=*/false,
-                              argType));
+      Expr *arg = TupleExpr::create(tc.Context, expr->getLBracketLoc(),
+                                    expr->getElements(),
+                                    names,
+                                    { },
+                                    expr->getRBracketLoc(),
+                                    /*HasTrailingClosure=*/false,
+                                    /*Implicit=*/false,
+                                    argType);
 
       Expr *result = tc.callWitness(typeRef, dc, dictionaryProto,
                                     *conformance, name, arg,
@@ -3093,10 +3064,8 @@ namespace {
           continue;
         }
 
-        subExpr =
-          cs.cacheType(new (tc.Context) BindOptionalExpr(subExpr,
-                                                         fakeQuestionLoc,
-                                                         depth, valueType));
+        subExpr = new (tc.Context) BindOptionalExpr(subExpr, fakeQuestionLoc,
+                                                    depth, valueType);
         subExpr->setImplicit(true);
       }
       cast->setSubExpr(subExpr);
@@ -3110,29 +3079,22 @@ namespace {
           // If the innermost cast fails, the entire expression fails.  To
           // get this behavior, we have to bind and then re-inject the result.
           // (SILGen should know how to peephole this.)
-          result =
-            cs.cacheType(new (tc.Context) BindOptionalExpr(result,
-                                                           cast->getEndLoc(),
-                                                           failureDepth,
-                                                           destValueType));
+          result = new (tc.Context) BindOptionalExpr(result, cast->getEndLoc(),
+                                                     failureDepth,
+                                                     destValueType);
           result->setImplicit(true);
         }
 
         for (unsigned i = destOptionals.size(); i != 0; --i) {
           Type destType = destOptionals[i-1];
-          result =
-            cs.cacheType(new (tc.Context) InjectIntoOptionalExpr(result,
-                                                                 destType));
-          result =
-            cs.cacheType(new (tc.Context) OptionalEvaluationExpr(result,
-                                                                 destType));
+          result = new (tc.Context) InjectIntoOptionalExpr(result, destType);
+          result = new (tc.Context) OptionalEvaluationExpr(result, destType);
         }
 
       // Otherwise, we just need to capture the failure-depth binding.
       } else if (conditionalCast) {
-        result =
-          cs.cacheType(new (tc.Context) OptionalEvaluationExpr(result,
-                                                              finalResultType));
+        result = new (tc.Context) OptionalEvaluationExpr(result,
+                                                         finalResultType);
       }
 
       return result;
@@ -3289,9 +3251,9 @@ namespace {
         cs.setType(result, toType);
 
         // Wrap the result in an optional.
-        return cs.cacheType(new (tc.Context) InjectIntoOptionalExpr(
-                                result,
-                                OptionalType::get(toType)));
+        return new (tc.Context) InjectIntoOptionalExpr(
+                                  result,
+                                  OptionalType::get(toType));
       }
 
       // Valid casts.
@@ -3422,15 +3384,11 @@ namespace {
                                                   /*implicit*/true);
       Expr *callExpr = CallExpr::createImplicit(ctx, fnRef, { argExpr },
                                                 { Identifier() });
-
       bool invalid = tc.typeCheckExpression(callExpr, cs.DC,
                                             TypeLoc::withoutLoc(valueType),
                                             CTP_CannotFail);
       (void) invalid;
       assert(!invalid && "conversion cannot fail");
-
-      cs.cacheExprTypes(callExpr);
-
       E->setSemanticExpr(callExpr);
       return E;
     }
@@ -4040,10 +3998,9 @@ shouldApplyAddingLabelFixit(TuplePattern *tuplePattern, TupleType *fromTuple,
 /// Produce the caller-side default argument for this default argument, or
 /// null if the default argument will be provided by the callee.
 static std::pair<Expr *, DefaultArgumentKind>
-getCallerDefaultArg(ConstraintSystem &cs, DeclContext *dc,
+getCallerDefaultArg(TypeChecker &tc, DeclContext *dc,
                     SourceLoc loc, ConcreteDeclRef &owner,
                     unsigned index) {
-  auto &tc = cs.getTypeChecker();
   auto ownerFn = cast<AbstractFunctionDecl>(owner.getDecl());
   auto defArg = ownerFn->getDefaultArg(index);
   Expr *init = nullptr;
@@ -4057,7 +4014,7 @@ getCallerDefaultArg(ConstraintSystem &cs, DeclContext *dc,
   case DefaultArgumentKind::Inherited:
     // Update the owner to reflect inheritance here.
     owner = ownerFn->getOverriddenDecl();
-    return getCallerDefaultArg(cs, dc, loc, owner, index);
+    return getCallerDefaultArg(tc, dc, loc, owner, index);
 
   case DefaultArgumentKind::Column:
     init = new (tc.Context) MagicIdentifierLiteralExpr(
@@ -4110,9 +4067,6 @@ getCallerDefaultArg(ConstraintSystem &cs, DeclContext *dc,
                                         CTP_CannotFail);
   assert(!invalid && "conversion cannot fail");
   (void)invalid;
-
-  cs.cacheExprTypes(init);
-
   return {init, defArg.first};
 }
 
@@ -4194,7 +4148,7 @@ Expr *ExprRewriter::coerceTupleToTuple(Expr *expr, TupleType *fromTuple,
       toSugarFields.push_back(toElt);
 
       // Create a caller-side default argument, if we need one.
-      if (auto defArg = getCallerDefaultArg(cs, dc, expr->getLoc(),
+      if (auto defArg = getCallerDefaultArg(tc, dc, expr->getLoc(),
                                             callee, i).first) {
         callerDefaultArgs.push_back(defArg);
         sources[i] = TupleShuffleExpr::CallerDefaultInitialize;
@@ -4340,14 +4294,13 @@ Expr *ExprRewriter::coerceTupleToTuple(Expr *expr, TupleType *fromTuple,
   // Create the tuple shuffle.
   ArrayRef<int> mapping = tc.Context.AllocateCopy(sources);
   auto callerDefaultArgsCopy = tc.Context.AllocateCopy(callerDefaultArgs);
-  auto shuffle =
-    cs.cacheType(new (tc.Context) TupleShuffleExpr(
-                     expr, mapping,
-                     TupleShuffleExpr::SourceIsTuple,
-                     callee,
-                     tc.Context.AllocateCopy(variadicArgs),
-                     callerDefaultArgsCopy,
-                     toSugarType));
+  auto shuffle = new (tc.Context) TupleShuffleExpr(
+                                    expr, mapping,
+                                    TupleShuffleExpr::SourceIsTuple,
+                                    callee,
+                                    tc.Context.AllocateCopy(variadicArgs),
+                                    callerDefaultArgsCopy,
+                                    toSugarType);
   shuffle->setVarargsArrayType(arrayType);
   return shuffle;
 }
@@ -4439,14 +4392,13 @@ Expr *ExprRewriter::coerceScalarToTuple(Expr *expr, TupleType *toTuple,
   Type destSugarTy = hasInit? toTuple
                             : TupleType::get(sugarFields, tc.Context);
 
-  return cs.cacheType(
-      new (tc.Context) TupleShuffleExpr(expr,
-                                        tc.Context.AllocateCopy(elements),
-                                        TupleShuffleExpr::SourceIsScalar,
-                                        callee,
-                                        tc.Context.AllocateCopy(variadicArgs),
-                                     tc.Context.AllocateCopy(callerDefaultArgs),
-                                        destSugarTy));
+  return new (tc.Context) TupleShuffleExpr(expr,
+                            tc.Context.AllocateCopy(elements),
+                            TupleShuffleExpr::SourceIsScalar,
+                            callee,
+                            tc.Context.AllocateCopy(variadicArgs),
+                            tc.Context.AllocateCopy(callerDefaultArgs),
+                            destSugarTy);
 }
 
 /// Collect the conformances for all the protocols of an existential type.
@@ -4508,15 +4460,10 @@ Expr *ExprRewriter::coerceExistential(Expr *expr, Type toType,
   if (fromType->isAnyExistentialType()) {
     fromType = ArchetypeType::getAnyOpened(fromType);
     
-    auto *archetypeVal =
-      cs.cacheType(
-          new (ctx) OpaqueValueExpr(expr->getLoc(),
-                                    fromType));
+    auto archetypeVal = new (ctx) OpaqueValueExpr(expr->getLoc(), fromType);
     
-    auto *result =
-      cs.cacheType(new (ctx) ErasureExpr(archetypeVal, toType, conformances));
-    return cs.cacheType(
-        new (ctx) OpenExistentialExpr(expr, archetypeVal, result));
+    auto result = new (ctx) ErasureExpr(archetypeVal, toType, conformances);
+    return new (ctx) OpenExistentialExpr(expr, archetypeVal, result);
   }
 
   // If the type we are trying to coerce is a tuple, let's look through
@@ -4556,7 +4503,7 @@ Expr *ExprRewriter::coerceExistential(Expr *expr, Type toType,
     }
   }
 
-  return cs.cacheType(new (ctx) ErasureExpr(expr, toType, conformances));
+  return new (ctx) ErasureExpr(expr, toType, conformances);
 }
 
 static unsigned getOptionalBindDepth(const BoundGenericType *bgt) {
@@ -4628,8 +4575,7 @@ Expr *ExprRewriter::coerceOptionalToOptional(Expr *expr, Type toType,
         const Type &wrapped = isIUO ?
                                 Type(ImplicitlyUnwrappedOptionalType::get(t)) :
                                 Type(OptionalType::get(t));
-        expr =
-          cs.cacheType(new (tc.Context) InjectIntoOptionalExpr(expr, wrapped));
+        expr = new (tc.Context) InjectIntoOptionalExpr(expr, wrapped);
         diagnoseOptionalInjection(cast<InjectIntoOptionalExpr>(expr));
         diff--;
       }
@@ -4854,7 +4800,7 @@ Expr *ExprRewriter::coerceCallArguments(
       // Create a caller-side default argument, if we need one.
       Expr *defArg;
       DefaultArgumentKind defArgKind;
-      std::tie(defArg, defArgKind) = getCallerDefaultArg(cs, dc, arg->getLoc(),
+      std::tie(defArg, defArgKind) = getCallerDefaultArg(tc, dc, arg->getLoc(),
                                                          callee, paramIdx);
 
       // Note that we'll be doing a shuffle involving default arguments.
@@ -4924,13 +4870,11 @@ Expr *ExprRewriter::coerceCallArguments(
     assert(fromTupleExpr.size() == 1 && fromTupleExpr[0]);
     if (fromTupleExpr[0] != argParen->getSubExpr()) {
       bool argParenImplicit = argParen->isImplicit();
-      argParen =
-        cs.cacheType(new (tc.Context)
-                     ParenExpr(argParen->getLParenLoc(),
-                               fromTupleExpr[0],
-                               argParen->getRParenLoc(),
-                               argParen->hasTrailingClosure(),
-                               fromTupleExpr[0]->getType()));
+      argParen = new (tc.Context) ParenExpr(argParen->getLParenLoc(),
+                                            fromTupleExpr[0],
+                                            argParen->getRParenLoc(),
+                                            argParen->hasTrailingClosure(),
+                                            fromTupleExpr[0]->getType());
       if (argParenImplicit) {
         argParen->setImplicit();
       }
@@ -4975,14 +4919,13 @@ Expr *ExprRewriter::coerceCallArguments(
   // Create the tuple shuffle.
   ArrayRef<int> mapping = tc.Context.AllocateCopy(sources);
   auto callerDefaultArgsCopy = tc.Context.AllocateCopy(callerDefaultArgs);
-  auto *shuffle =
-    cs.cacheType(new (tc.Context) TupleShuffleExpr(
-                     arg, mapping,
-                     isSourceScalar,
-                     callee,
-                     tc.Context.AllocateCopy(variadicArgs),
-                     callerDefaultArgsCopy,
-                     paramType));
+  auto shuffle = new (tc.Context) TupleShuffleExpr(
+                                    arg, mapping,
+                                    isSourceScalar,
+                                    callee,
+                                    tc.Context.AllocateCopy(variadicArgs),
+                                    callerDefaultArgsCopy,
+                                    paramType);
   shuffle->setVarargsArrayType(sliceType);
   return shuffle;
 }
@@ -5021,12 +4964,10 @@ ClosureExpr *ExprRewriter::coerceClosureExprToVoid(ClosureExpr *closureExpr) {
   if (member.is<Stmt *>()) {
     auto returnStmt = cast<ReturnStmt>(member.get<Stmt *>());
     auto singleExpr = returnStmt->getResult();
-    auto voidExpr =
-      cs.cacheType(
-          TupleExpr::createEmpty(tc.Context,
-                                 singleExpr->getStartLoc(),
-                                 singleExpr->getEndLoc(),
-                                 /*implicit*/true));
+    auto voidExpr = TupleExpr::createEmpty(tc.Context,
+                                           singleExpr->getStartLoc(),
+                                           singleExpr->getEndLoc(),
+                                           /*implicit*/true);
     returnStmt->setResult(voidExpr);
 
     // For l-value types, reset to the object type. This might not be strictly
@@ -5175,8 +5116,7 @@ buildElementConversion(ExprRewriter &rewriter,
 
   // Build the conversion.
   ASTContext &ctx = rewriter.getConstraintSystem().getASTContext();
-  auto opaque =
-    rewriter.cs.cacheType(new (ctx) OpaqueValueExpr(srcLoc, srcType));
+  auto opaque = new (ctx) OpaqueValueExpr(srcLoc, srcType);
   auto conversion =
     rewriter.coerceToType(opaque, destType,
            locator.withPathElement(
@@ -5237,13 +5177,12 @@ Expr *ExprRewriter::coerceToType(Expr *expr, Type toType,
 
       // Extract the element.
       auto fromTuple = fromType->castTo<TupleType>();
-      expr =
-        cs.cacheType(
-            new (cs.getASTContext()) TupleElementExpr(expr,
-                                                      expr->getLoc(),
-                                                      0,
-                                                      expr->getLoc(),
-                                                 fromTuple->getElementType(0)));
+      expr = new (cs.getASTContext()) TupleElementExpr(
+                                        expr,
+                                        expr->getLoc(),
+                                        0,
+                                        expr->getLoc(),
+                                        fromTuple->getElementType(0));
       expr->setImplicit(true);
 
       // Coerce the element to the expected type.
@@ -5258,10 +5197,9 @@ Expr *ExprRewriter::coerceToType(Expr *expr, Type toType,
     case ConversionRestrictionKind::Superclass: {
       // Coercion from archetype to its (concrete) superclass.
       if (auto fromArchetype = fromType->getAs<ArchetypeType>()) {
-        expr =
-          cs.cacheType(
-              new (tc.Context) ArchetypeToSuperExpr(expr,
-                                               fromArchetype->getSuperclass()));
+        expr = new (tc.Context) ArchetypeToSuperExpr(
+                                  expr,
+                                  fromArchetype->getSuperclass());
 
         // If we are done succeeded, use the coerced result.
         if (expr->getType()->isEqual(toType)) {
@@ -5272,7 +5210,7 @@ Expr *ExprRewriter::coerceToType(Expr *expr, Type toType,
       }
       
       // Coercion from subclass to superclass.
-      return cs.cacheType(new (tc.Context) DerivedToBaseExpr(expr, toType));
+      return new (tc.Context) DerivedToBaseExpr(expr, toType);
     }
 
     case ConversionRestrictionKind::LValueToRValue: {
@@ -5281,8 +5219,7 @@ Expr *ExprRewriter::coerceToType(Expr *expr, Type toType,
       
       // Load from the lvalue.
       expr->propagateLValueAccessKind(AccessKind::Read);
-      expr = cs.cacheType(
-          new (tc.Context) LoadExpr(expr, fromType->getRValueType()));
+      expr = new (tc.Context) LoadExpr(expr, fromType->getRValueType());
 
       // Coerce the result.
       return coerceToType(expr, toType, locator);
@@ -5295,18 +5232,15 @@ Expr *ExprRewriter::coerceToType(Expr *expr, Type toType,
     case ConversionRestrictionKind::ClassMetatypeToAnyObject: {
       assert(tc.getLangOpts().EnableObjCInterop
              && "metatypes can only be cast to objects w/ objc runtime!");
-      return cs.cacheType(
-          new (tc.Context) ClassMetatypeToObjectExpr(expr, toType));
+      return new (tc.Context) ClassMetatypeToObjectExpr(expr, toType);
     }
     case ConversionRestrictionKind::ExistentialMetatypeToAnyObject: {
       assert(tc.getLangOpts().EnableObjCInterop
              && "metatypes can only be cast to objects w/ objc runtime!");
-      return cs.cacheType(
-          new (tc.Context) ExistentialMetatypeToObjectExpr(expr, toType));
+      return new (tc.Context) ExistentialMetatypeToObjectExpr(expr, toType);
     }
     case ConversionRestrictionKind::ProtocolMetatypeToProtocolClass: {
-      return cs.cacheType(
-          new (tc.Context) ProtocolMetatypeToObjectExpr(expr, toType));
+      return new (tc.Context) ProtocolMetatypeToObjectExpr(expr, toType);
     }
         
     case ConversionRestrictionKind::ValueToOptional: {
@@ -5318,8 +5252,7 @@ Expr *ExprRewriter::coerceToType(Expr *expr, Type toType,
       expr = coerceToType(expr, valueType, locator);
       if (!expr) return nullptr;
 
-      auto *result =
-        cs.cacheType(new (tc.Context) InjectIntoOptionalExpr(expr, toType));
+      auto *result = new (tc.Context) InjectIntoOptionalExpr(expr, toType);
       diagnoseOptionalInjection(result);
       return result;
     }
@@ -5347,10 +5280,8 @@ Expr *ExprRewriter::coerceToType(Expr *expr, Type toType,
                                          toType, locator, 0);
 
       // Form the upcast.
-      return
-        cs.cacheType(
-            new (tc.Context) CollectionUpcastConversionExpr(expr, toType,
-                                                            {}, conv));
+      return new (tc.Context) CollectionUpcastConversionExpr(expr, toType,
+                                                             {}, conv);
     }
 
     case ConversionRestrictionKind::HashableToAnyHashable: {
@@ -5371,8 +5302,8 @@ Expr *ExprRewriter::coerceToType(Expr *expr, Type toType,
                               (ConformanceCheckFlags::InExpression |
                                ConformanceCheckFlags::Used));
       assert(conformance && "must conform to Hashable");
-      return cs.cacheType(
-          new (tc.Context) AnyHashableErasureExpr(expr, toType, *conformance));
+      return new (tc.Context) AnyHashableErasureExpr(expr, toType,
+                                                     *conformance);
     }
 
     case ConversionRestrictionKind::DictionaryUpcast: {
@@ -5393,8 +5324,9 @@ Expr *ExprRewriter::coerceToType(Expr *expr, Type toType,
       Type sourceKey, sourceValue;
       std::tie(sourceKey, sourceValue) = *cs.isDictionaryType(expr->getType());
 
-      return cs.cacheType(new (tc.Context) CollectionUpcastConversionExpr(
-          expr, toType, keyConv, valueConv));
+      return new (tc.Context) CollectionUpcastConversionExpr(expr, toType,
+                                                             keyConv,
+                                                             valueConv);
     }
 
     case ConversionRestrictionKind::SetUpcast: {
@@ -5408,8 +5340,8 @@ Expr *ExprRewriter::coerceToType(Expr *expr, Type toType,
       auto conv = buildElementConversion(*this, expr->getLoc(), expr->getType(),
                                          toType, locator, 0);
 
-      return cs.cacheType(new (tc.Context) CollectionUpcastConversionExpr(
-          expr, toType, {}, conv));
+      return new (tc.Context) CollectionUpcastConversionExpr(expr, toType,
+                                                             {}, conv);
     }
 
     case ConversionRestrictionKind::InoutToPointer: {
@@ -5428,11 +5360,9 @@ Expr *ExprRewriter::coerceToType(Expr *expr, Type toType,
       }
 
       tc.requirePointerArgumentIntrinsics(expr->getLoc());
-      Expr *result =
-          cs.cacheType(new (tc.Context) InOutToPointerExpr(expr, unwrappedTy));
+      Expr *result = new (tc.Context) InOutToPointerExpr(expr, unwrappedTy);
       if (optionalKind != OTK_None)
-        result = cs.cacheType(new (tc.Context)
-                                  InjectIntoOptionalExpr(result, toType));
+        result = new (tc.Context) InjectIntoOptionalExpr(result, toType);
       return result;
     }
     
@@ -5443,11 +5373,9 @@ Expr *ExprRewriter::coerceToType(Expr *expr, Type toType,
         unwrappedTy = unwrapped;
 
       tc.requirePointerArgumentIntrinsics(expr->getLoc());
-      Expr *result =
-          cs.cacheType(new (tc.Context) ArrayToPointerExpr(expr, unwrappedTy));
+      Expr *result = new (tc.Context) ArrayToPointerExpr(expr, unwrappedTy);
       if (optionalKind != OTK_None)
-        result = cs.cacheType(new (tc.Context)
-                                  InjectIntoOptionalExpr(result, toType));
+        result = new (tc.Context) InjectIntoOptionalExpr(result, toType);
       return result;
     }
     
@@ -5458,11 +5386,9 @@ Expr *ExprRewriter::coerceToType(Expr *expr, Type toType,
         unwrappedTy = unwrapped;
 
       tc.requirePointerArgumentIntrinsics(expr->getLoc());
-      Expr *result =
-          cs.cacheType(new (tc.Context) StringToPointerExpr(expr, unwrappedTy));
+      Expr *result = new (tc.Context) StringToPointerExpr(expr, unwrappedTy);
       if (optionalKind != OTK_None)
-        result = cs.cacheType(new (tc.Context)
-                                  InjectIntoOptionalExpr(result, toType));
+        result = new (tc.Context) InjectIntoOptionalExpr(result, toType);
       return result;
     }
     
@@ -5473,27 +5399,25 @@ Expr *ExprRewriter::coerceToType(Expr *expr, Type toType,
       // Optional to optional.
       if (Type unwrappedFromTy = expr->getType()->getAnyOptionalObjectType()) {
         assert(unwrappedToTy && "converting optional to non-optional");
-        Expr *boundOptional = cs.cacheType(
-            new (tc.Context) BindOptionalExpr(expr, SourceLoc(),
-                                              /*depth*/ 0, unwrappedFromTy));
-        Expr *converted = cs.cacheType(new (tc.Context) PointerToPointerExpr(
-            boundOptional, unwrappedToTy));
-        Expr *rewrapped = cs.cacheType(
-            new (tc.Context) InjectIntoOptionalExpr(converted, toType));
-        return cs.cacheType(new (tc.Context)
-                                OptionalEvaluationExpr(rewrapped, toType));
+        Expr *boundOptional =
+          new (tc.Context) BindOptionalExpr(expr, SourceLoc(), /*depth*/0,
+                                            unwrappedFromTy);
+        Expr *converted =
+          new (tc.Context) PointerToPointerExpr(boundOptional, unwrappedToTy);
+        Expr *rewrapped =
+          new (tc.Context) InjectIntoOptionalExpr(converted, toType);
+        return new (tc.Context) OptionalEvaluationExpr(rewrapped, toType);
       }
 
       // Non-optional to optional.
       if (unwrappedToTy) {
-        Expr *converted = cs.cacheType(
-            new (tc.Context) PointerToPointerExpr(expr, unwrappedToTy));
-        return cs.cacheType(new (tc.Context)
-                                InjectIntoOptionalExpr(converted, toType));
+        Expr *converted =
+            new (tc.Context) PointerToPointerExpr(expr, unwrappedToTy);
+        return new (tc.Context) InjectIntoOptionalExpr(converted, toType);
       }
 
       // Non-optional to non-optional.
-      return cs.cacheType(new (tc.Context) PointerToPointerExpr(expr, toType));
+      return new (tc.Context) PointerToPointerExpr(expr, toType);
     }
 
     case ConversionRestrictionKind::BridgeToObjC: {
@@ -5511,8 +5435,8 @@ Expr *ExprRewriter::coerceToType(Expr *expr, Type toType,
       auto foreignClass = fromType->getClassOrBoundGenericClass();
       auto objcType = foreignClass->getAttrs().getAttribute<ObjCBridgedAttr>()
                         ->getObjCClass()->getDeclaredInterfaceType();
-      auto asObjCClass = cs.cacheType(
-          new (tc.Context) ForeignObjectConversionExpr(expr, objcType));
+      auto asObjCClass = new (tc.Context) ForeignObjectConversionExpr(expr,
+                                                                      objcType);
       return coerceToType(asObjCClass, toType, locator);
     }
 
@@ -5524,8 +5448,7 @@ Expr *ExprRewriter::coerceToType(Expr *expr, Type toType,
       if (!result)
         return nullptr;
 
-      return cs.cacheType(new (tc.Context)
-                              ForeignObjectConversionExpr(result, toType));
+      return new (tc.Context) ForeignObjectConversionExpr(result, toType);
     }
     }
   }
@@ -5535,13 +5458,12 @@ Expr *ExprRewriter::coerceToType(Expr *expr, Type toType,
     if (fromTuple->getNumElements() == 1 &&
         !fromTuple->getElement(0).isVararg() &&
         !toType->is<TupleType>()) {
-      expr = cs.cacheType(new (cs.getASTContext())
-          TupleElementExpr(
-              expr,
-              expr->getLoc(),
-              0,
-              expr->getLoc(),
-              fromTuple->getElementType(0)));
+      expr = new (cs.getASTContext()) TupleElementExpr(
+                                        expr,
+                                        expr->getLoc(),
+                                        0,
+                                        expr->getLoc(),
+                                        fromTuple->getElementType(0));
       expr->setImplicit(true);
       return expr;
     }
@@ -5557,9 +5479,8 @@ Expr *ExprRewriter::coerceToType(Expr *expr, Type toType,
       // an implicit lvalue to an inout argument.
       assert(toIO->getObjectType()->isEqual(fromLValue->getObjectType()));
       expr->propagateLValueAccessKind(AccessKind::ReadWrite);
-      return cs.cacheType(new (tc.Context)
-                              InOutExpr(expr->getStartLoc(), expr, toType,
-                                        /*isImplicit*/ true));
+      return new (tc.Context) InOutExpr(expr->getStartLoc(), expr,
+                                            toType, /*isImplicit*/true);
     }
 
     // If we're actually turning this into an lvalue tuple element, don't
@@ -5575,8 +5496,7 @@ Expr *ExprRewriter::coerceToType(Expr *expr, Type toType,
     if (performLoad) {
       // Load from the lvalue.
       expr->propagateLValueAccessKind(AccessKind::Read);
-      expr = cs.cacheType(new (tc.Context)
-                              LoadExpr(expr, fromLValue->getObjectType()));
+      expr = new (tc.Context) LoadExpr(expr, fromLValue->getObjectType());
 
       // Coerce the result.
       return coerceToType(expr, toType, locator);
@@ -5612,8 +5532,9 @@ Expr *ExprRewriter::coerceToType(Expr *expr, Type toType,
         
         // Coercion from archetype to its (concrete) superclass.
         if (auto fromArchetype = fromType->getAs<ArchetypeType>()) {
-          expr = cs.cacheType(new (tc.Context) ArchetypeToSuperExpr(
-              expr, fromArchetype->getSuperclass()));
+          expr = new (tc.Context) ArchetypeToSuperExpr(
+                                    expr,
+                                    fromArchetype->getSuperclass());
 
           // If we succeeded, use the coerced result.
           if (expr->getType()->isEqual(toType))
@@ -5621,7 +5542,7 @@ Expr *ExprRewriter::coerceToType(Expr *expr, Type toType,
         }
 
         // Coercion from subclass to superclass.
-        return cs.cacheType(new (tc.Context) DerivedToBaseExpr(expr, toType));
+        return new (tc.Context) DerivedToBaseExpr(expr, toType);
       }
     }
   }
@@ -5639,8 +5560,8 @@ Expr *ExprRewriter::coerceToType(Expr *expr, Type toType,
       // We'll set discriminator values on all the autoclosures in a
       // later pass.
       auto discriminator = AutoClosureExpr::InvalidDiscriminator;
-      auto closure = cs.cacheType(
-          new (tc.Context) AutoClosureExpr(expr, toType, discriminator, dc));
+      auto closure = new (tc.Context) AutoClosureExpr(expr, toType,
+                                                      discriminator, dc);
       closure->setParameterList(ParameterList::createEmpty(tc.Context));
 
       // Compute the capture list, now that we have analyzed the expression.
@@ -5678,8 +5599,7 @@ Expr *ExprRewriter::coerceToType(Expr *expr, Type toType,
 
       maybeDiagnoseUnsupportedFunctionConversion(tc, expr, toFunc);
 
-      return cs.cacheType(new (tc.Context)
-                              FunctionConversionExpr(expr, toType));
+      return new (tc.Context) FunctionConversionExpr(expr, toType);
     }
   }
 
@@ -5702,8 +5622,7 @@ Expr *ExprRewriter::coerceToType(Expr *expr, Type toType,
       expr = coerceToType(expr, valueType, locator);
       if (!expr) return nullptr;
 
-      auto *result =
-          cs.cacheType(new (tc.Context) InjectIntoOptionalExpr(expr, toType));
+      auto *result = new (tc.Context) InjectIntoOptionalExpr(expr, toType);
       diagnoseOptionalInjection(result);
       return result;
     }
@@ -5712,7 +5631,7 @@ Expr *ExprRewriter::coerceToType(Expr *expr, Type toType,
   // Coercion from one metatype to another.
   if (fromType->is<MetatypeType>()) {
     auto toMeta = toType->castTo<MetatypeType>();
-    return cs.cacheType(new (tc.Context) MetatypeConversionExpr(expr, toMeta));
+    return new (tc.Context) MetatypeConversionExpr(expr, toMeta);
   }
 
   // Look through ImplicitlyUnwrappedOptional<T> before coercing expression.
@@ -5723,8 +5642,7 @@ Expr *ExprRewriter::coerceToType(Expr *expr, Type toType,
 
   // Conversion to/from UnresolvedType.
   if (fromType->is<UnresolvedType>() || toType->is<UnresolvedType>())
-    return cs.cacheType(new (tc.Context)
-                            UnresolvedTypeConversionExpr(expr, toType));
+    return new (tc.Context) UnresolvedTypeConversionExpr(expr, toType);
 
   llvm_unreachable("Unhandled coercion");
 }
@@ -5808,8 +5726,8 @@ ExprRewriter::coerceObjectArgumentToType(Expr *expr,
   // Use InOutExpr to convert it to an explicit inout argument for the
   // receiver.
   expr->propagateLValueAccessKind(AccessKind::ReadWrite);
-  return cs.cacheType(new (ctx) InOutExpr(expr->getStartLoc(), expr, toType,
-                                          /*isImplicit*/ true));
+  return new (ctx) InOutExpr(expr->getStartLoc(), expr,
+                                 toType, /*isImplicit*/true);
 }
 
 Expr *ExprRewriter::convertLiteral(Expr *literal,
@@ -5874,9 +5792,8 @@ Expr *ExprRewriter::convertLiteral(Expr *literal,
 
     // Call the builtin conversion operation.
     // FIXME: Bogus location info.
-    Expr *base =
-      cs.cacheType(TypeExpr::createImplicitHack(literal->getLoc(), type,
-                                                tc.Context));
+    Expr *base = TypeExpr::createImplicitHack(literal->getLoc(), type,
+                                              tc.Context);
     Expr *result = tc.callWitness(base, dc,
                                   builtinProtocol, *builtinConformance,
                                   builtinLiteralFuncName,
@@ -5899,11 +5816,9 @@ Expr *ExprRewriter::convertLiteral(Expr *literal,
       literalType.get<Identifier>().empty()) {
     // If there is no argument to the constructor function, then just pass in
     // the empty tuple.
-    literal =
-      cs.cacheType(
-          TupleExpr::createEmpty(tc.Context, literal->getLoc(),
-                                 literal->getLoc(),
-                                 /*implicit*/!literal->getLoc().isValid()));
+    literal = TupleExpr::createEmpty(tc.Context, literal->getLoc(),
+                                     literal->getLoc(),
+                                     /*implicit*/!literal->getLoc().isValid());
   } else {
     // Otherwise, figure out the type of the constructor function and coerce to
     // it.
@@ -5994,9 +5909,6 @@ Expr *ExprRewriter::convertLiteralInPlace(Expr *literal,
                                              DeclNameLoc(base->getEndLoc()),
                                              /*Implicit=*/true);
     (void)tc.typeCheckExpression(unresolvedDot, dc);
-
-    cs.cacheExprTypes(unresolvedDot);
-
     ConcreteDeclRef builtinRef = unresolvedDot->getReferencedDecl();
     if (!builtinRef) {
       tc.diagnose(base->getLoc(), brokenBuiltinProtocolDiag);
@@ -6050,17 +5962,14 @@ Expr *ExprRewriter::convertLiteralInPlace(Expr *literal,
 
   // Form a reference to the conversion function.
   // FIXME: Bogus location info.
-  Expr *base =
-    cs.cacheType(TypeExpr::createImplicitHack(literal->getLoc(), type,
-                                              tc.Context));
+  Expr *base = TypeExpr::createImplicitHack(literal->getLoc(), type,
+                                            tc.Context);
   Expr *unresolvedDot = new (tc.Context) UnresolvedDotExpr(
                                            base, SourceLoc(),
                                            witness->getFullName(),
                                            DeclNameLoc(base->getEndLoc()),
                                            /*Implicit=*/true);
   (void)tc.typeCheckExpression(unresolvedDot, dc);
-  cs.cacheExprTypes(unresolvedDot);
-
   ConcreteDeclRef ref = unresolvedDot->getReferencedDecl();
   if (!ref) {
     tc.diagnose(base->getLoc(), brokenProtocolDiag);
@@ -6204,11 +6113,13 @@ Expr *ExprRewriter::finishApply(ApplyExpr *apply, Type openedType,
     // If we have a covariant result type, perform the conversion now.
     if (covariantResultType) {
       if (covariantResultType->is<FunctionType>())
-        result = cs.cacheType(new (tc.Context) CovariantFunctionConversionExpr(
-            result, covariantResultType));
+        result = new (tc.Context) CovariantFunctionConversionExpr(
+                                    result,
+                                    covariantResultType);
       else
-        result = cs.cacheType(new (tc.Context) CovariantReturnConversionExpr(
-            result, covariantResultType));
+        result = new (tc.Context) CovariantReturnConversionExpr(
+                                    result, 
+                                    covariantResultType);
     }
 
     // Extract all arguments.
@@ -6882,8 +6793,6 @@ Expr *TypeChecker::callWitness(Expr *base, DeclContext *dc,
   // Construct an empty constraint system and solution.
   ConstraintSystem cs(*this, dc, ConstraintSystemOptions());
 
-  cs.cacheExprTypes(base);
-
   // Find the witness we need to use.
   auto type = base->getType();
   assert(!type->hasTypeVariable() &&
@@ -6950,8 +6859,6 @@ Expr *TypeChecker::callWitness(Expr *base, DeclContext *dc,
                             /*trailingClosure=*/nullptr,
                             /*implicit=*/true);
   }
-
-  cs.cacheExprTypes(call);
 
   // Add the conversion from the argument to the function parameter type.
   cs.addConstraint(ConstraintKind::ArgumentTupleConversion,
@@ -7045,14 +6952,12 @@ static Expr *convertViaMember(const Solution &solution, Expr *expr,
                                             DeclNameLoc(expr->getLoc()),
                                             /*Implicit=*/true);
   bool failed = tc.typeCheckExpressionShallow(memberRef, cs.DC);
-  cs.cacheType(memberRef);
   assert(!failed && "Could not reference witness?");
   (void)failed;
 
   // Call the builtin method.
   expr = CallExpr::createImplicit(ctx, memberRef, { }, { });
   failed = tc.typeCheckExpressionShallow(expr, cs.DC);
-  cs.cacheType(expr);
   assert(!failed && "Could not call witness?");
   (void)failed;
 
