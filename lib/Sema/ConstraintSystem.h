@@ -1041,7 +1041,40 @@ private:
     #include "ConstraintSolverStats.def"
   };
 
+  class CacheExprTypes : public ASTWalker {
+    Expr *RootExpr;
+    ConstraintSystem &CS;
+    bool ExcludeRoot;
+
+  public:
+    CacheExprTypes(Expr *expr, ConstraintSystem &cs, bool excludeRoot)
+        : RootExpr(expr), CS(cs), ExcludeRoot(excludeRoot) {}
+
+    Expr *walkToExprPost(Expr *expr) override {
+      if (ExcludeRoot && expr == RootExpr)
+        return expr;
+
+      if (expr->getType())
+        CS.cacheType(expr);
+
+      return expr;
+    }
+  };
+
 public:
+  /// Cache the types of the given expression and all subexpressions.
+  void cacheExprTypes(Expr *expr) {
+    bool excludeRoot = false;
+    expr->walk(CacheExprTypes(expr, *this, excludeRoot));
+  }
+
+  /// Cache the types of the expressions under the given expression
+  /// (but not the type of the given expression).
+  void cacheSubExprTypes(Expr *expr) {
+    bool excludeRoot = true;
+    expr->walk(CacheExprTypes(expr, *this, excludeRoot));
+  }
+
   /// \brief The current solver state.
   ///
   /// This will be non-null when we're actively solving the constraint
@@ -1245,6 +1278,15 @@ public:
     // FIXME: Temporary until all references to expression types are
     //        updated.
     E->setType(T);
+  }
+
+  /// Cache the type of the expression argument and return that same
+  /// argument.
+  template <typename T>
+  T *cacheType(T *E) {
+    assert(E->getType() && "Expected a type!");
+    setType(E, E->getType());
+    return E;
   }
 
   void setContextualType(Expr *E, TypeLoc T, ContextualTypePurpose purpose) {
