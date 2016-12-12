@@ -204,10 +204,6 @@ struct ASTContext::Implementation {
                  std::vector<ASTContext::DelayedConformanceDiag>>
     DelayedConformanceDiags;
 
-  /// Conformance loaders for declarations that have them.
-  llvm::DenseMap<Decl *, std::pair<LazyMemberLoader *, uint64_t>>
-    ConformanceLoaders;
-
   /// Stores information about lazy deserialization of iterator declaration
   /// contexts, e.g., nominal type declarations and extension declarations.
   llvm::DenseMap<const IterableDeclContext *, LazyIterableDeclContextData *>
@@ -1486,21 +1482,6 @@ LazyIterableDeclContextData *ASTContext::getOrCreateLazyIterableContextData(
   contextData->loader = lazyLoader;
   Impl.LazyIterableDeclContexts[idc] = contextData;
   return contextData;
-}
-
-void ASTContext::recordConformanceLoader(Decl *decl, LazyMemberLoader *resolver,
-                                         uint64_t contextData) {
-  assert(Impl.ConformanceLoaders.count(decl) == 0 &&
-         "already recorded conformance loader");
-  Impl.ConformanceLoaders[decl] = { resolver, contextData };
-}
-
-std::pair<LazyMemberLoader *, uint64_t> ASTContext::takeConformanceLoader(
-                                          Decl *decl) {
-  auto known = Impl.ConformanceLoaders.find(decl);
-  auto result = known->second;
-  Impl.ConformanceLoaders.erase(known);
-  return result;
 }
 
 void ASTContext::addDelayedConformanceDiag(
