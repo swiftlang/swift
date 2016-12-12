@@ -1581,9 +1581,29 @@ extension BinaryInteger {
   public static func == <
     Other : BinaryInteger
   >(lhs: Self, rhs: Other) -> Bool {
-    return (lhs > 0) == (rhs > 0)
-      && Self(extendingOrTruncating: rhs) == lhs
-      && Other(extendingOrTruncating: lhs) == rhs
+    let lhsNegative = Self.isSigned && lhs < (0 as Self)
+    let rhsNegative = Other.isSigned && rhs < (0 as Other)
+
+    if lhsNegative != rhsNegative { return false }
+
+    // Here we know both values are non-negative, so if one type is strictly
+    // wider than the other we can convert to that type
+    if lhs.bitWidth < rhs.bitWidth {
+      return Other(extendingOrTruncating: lhs) == rhs
+    }
+    // same argument as above but in other direction
+    if lhs.bitWidth > rhs.bitWidth {
+      return lhs == Self(extendingOrTruncating: rhs)
+    }
+
+    // If the types are of the same width, though, like UInt and Int, and both
+    // values are non-negative, we should extend to the unsigned type.
+    // If the types are of the same signness and width, it does not matter
+    // to which the other gets converted.
+    if Self.isSigned {
+      return Other(extendingOrTruncating: lhs) == rhs
+    }
+    return lhs == Self(extendingOrTruncating: rhs)
   }
 
   /// Returns a Boolean value indicating whether the two given values are not
@@ -1623,9 +1643,11 @@ extension BinaryInteger {
   ///   - rhs: Another integer to compare.
   @_transparent
   public static func < <Other : BinaryInteger>(lhs: Self, rhs: Other) -> Bool {
-    let lhsSign = lhs < (0 as Self) ? -1 : lhs > (0 as Self) ? 1 : 0
-    let rhsSign = rhs < (0 as Other) ? -1 : rhs > (0 as Other) ? 1 : 0
-    if lhsSign != rhsSign { return lhsSign < rhsSign }
+    let lhsNegative = Self.isSigned && lhs < (0 as Self)
+    let rhsNegative = Other.isSigned && rhs < (0 as Other)
+    if lhsNegative != rhsNegative { return lhsNegative }
+
+    if lhs == (0 as Self) && rhs == (0 as Other) { return false }
 
     // if we get here, lhs and rhs have the same sign.  If they're
     // negative, then T and U are both signed types, and one of them can
