@@ -1139,6 +1139,7 @@ static void recordSelfContextType(AbstractFunctionDecl *func) {
 namespace {
 
 class AccessScopeChecker {
+  ASTContext &Context;
   const SourceFile *File;
   TypeChecker::TypeAccessScopeCacheMap &Cache;
 
@@ -1147,7 +1148,9 @@ protected:
 
   AccessScopeChecker(const DeclContext *useDC,
                      decltype(TypeChecker::TypeAccessScopeCache) &caches)
-      : File(useDC->getParentSourceFile()), Cache(caches[File]),
+      : Context(useDC->getASTContext()),
+        File(useDC->getParentSourceFile()),
+        Cache(caches[File]),
         Scope(AccessScope::getPublic()) {}
 
   bool visitDecl(ValueDecl *VD) {
@@ -1160,6 +1163,12 @@ protected:
       if (isa<AssociatedTypeDecl>(VD))
         return true;
     }
+
+    // Simulation for Swift 3 bug.
+    if (isa<TypeAliasDecl>(VD) &&
+        VD->getInterfaceType()->hasTypeParameter() &&
+        Context.isSwiftVersion3())
+      return true;
 
     auto cached = Cache.find(VD);
     if (cached != Cache.end()) {
