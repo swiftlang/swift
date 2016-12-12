@@ -316,6 +316,8 @@ private:
   bool initFuncDeclIndexSymbol(ValueDecl *D, IndexSymbol &Info);
   bool initCallRefIndexSymbol(Expr *CurrentE, Expr *ParentE, ValueDecl *D,
                               SourceLoc Loc, IndexSymbol &Info);
+  bool initVarRefIndexSymbols(Expr *CurrentE, ValueDecl *D, SourceLoc Loc,
+                              IndexSymbol &Info);
 
   std::pair<unsigned, unsigned> getLineCol(SourceLoc Loc) {
     if (Loc.isInvalid())
@@ -522,6 +524,12 @@ bool IndexSwiftASTWalker::startEntityRef(ValueDecl *D, SourceLoc Loc) {
 
     return startEntity(D, Info);
 
+  } else if (isa<AbstractStorageDecl>(D)) {
+    IndexSymbol Info;
+    if (initVarRefIndexSymbols(getCurrentExpr(), D, Loc, Info))
+      return false;
+
+    return startEntity(D, Info);
   } else {
     IndexSymbol Info;
     if (initIndexSymbol(D, Loc, /*IsRef=*/true, Info))
@@ -952,6 +960,29 @@ bool IndexSwiftASTWalker::initCallRefIndexSymbol(Expr *CurrentE, Expr *ParentE,
     }
   }
 
+  return false;
+}
+
+bool IndexSwiftASTWalker::initVarRefIndexSymbols(Expr *CurrentE, ValueDecl *D, SourceLoc Loc, IndexSymbol &Info) {
+
+  if (!(CurrentE->getReferencedDecl() == D))
+    return true;
+
+  if (initIndexSymbol(D, Loc, /*IsRef=*/true, Info))
+    return true;
+
+  AccessKind Kind = CurrentE->hasLValueAccessKind() ? CurrentE->getLValueAccessKind() : AccessKind::Read;
+  switch (Kind) {
+  case swift::AccessKind::Read:
+    Info.roles |= (unsigned)SymbolRole::Read;
+    break;
+  case swift::AccessKind::ReadWrite:
+    Info.roles |= (unsigned)SymbolRole::Read;
+    LLVM_FALLTHROUGH;
+  case swift::AccessKind::Write:
+    Info.roles |= (unsigned)SymbolRole::Write;
+  }
+  
   return false;
 }
 

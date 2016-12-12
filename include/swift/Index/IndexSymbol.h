@@ -111,6 +111,12 @@ struct IndexSymbol {
 
 SymbolKind getSymbolKindForDecl(const Decl *D);
 
+StringRef getSymbolKindString(SymbolKind K);
+
+void applyForEachSymbolSubKind(SymbolSubKindSet SubKinds,
+                               llvm::function_ref<void(SymbolSubKind)> Fn);
+void printSymbolSubKinds(SymbolSubKindSet SubKinds, raw_ostream &OS);
+
 } // end namespace index
 } // end namespace swift
 

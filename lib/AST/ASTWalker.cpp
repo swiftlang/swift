@@ -201,10 +201,29 @@ class Traversal : public ASTVisitor<Traversal, Expr*, Stmt*,
   }
 
   bool visitNominalTypeDecl(NominalTypeDecl *NTD) {
-    if (auto GPS = NTD->getGenericParams()) {
-      for (auto GP : GPS->getParams()) {
+    if (NTD->getGenericParams() &&
+        Walker.shouldWalkIntoGenericParams()) {
+      // Visit generic params
+      for (auto GP : NTD->getGenericParams()->getParams()) {
         if (doIt(GP))
           return true;
+        for(auto Inherit: GP->getInherited()) {
+          if (doIt(Inherit))
+            return true;
+        }
+      }
+      // Visit param conformance
+      for (auto &Req : NTD->getGenericParams()->getRequirements()) {
+        switch (Req.getKind()) {
+          case RequirementReprKind::SameType:
+            if (doIt(Req.getFirstTypeLoc()) || doIt(Req.getSecondTypeLoc()))
+              return true;
+            break;
+          case RequirementReprKind::TypeConstraint:
+            if (doIt(Req.getSubjectLoc()) || doIt(Req.getConstraintLoc()))
+              return true;
+            break;
+        }
       }
     }
 
@@ -237,7 +256,7 @@ class Traversal : public ASTVisitor<Traversal, Expr*, Stmt*,
     PrettyStackTraceDecl debugStack("walking into body of", AFD);
 #endif
     if (AFD->getGenericParams() &&
-        Walker.shouldWalkIntoFunctionGenericParams()) {
+        Walker.shouldWalkIntoGenericParams()) {
 
       // Visit generic params
       for (auto &P : AFD->getGenericParams()->getParams()) {
