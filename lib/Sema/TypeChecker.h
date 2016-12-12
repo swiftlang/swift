@@ -1480,9 +1480,6 @@ public:
   bool convertToType(Expr *&expr, Type type, DeclContext *dc,
                      Optional<Pattern*> typeFromPattern = None);
 
-  /// \brief Coerce the given expression to an rvalue, if it isn't already.
-  Expr *coerceToRValue(Expr *expr);
-
   /// \brief Coerce the given expression to materializable type, if it
   /// isn't already.
   Expr *coerceToMaterializable(Expr *expr);

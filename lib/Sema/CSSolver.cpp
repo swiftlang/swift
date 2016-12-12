@@ -1491,7 +1491,7 @@ bool ConstraintSystem::Candidate::solve() {
     if (CTP == CTP_CallArgument)
       constraintKind = ConstraintKind::ArgumentConversion;
 
-    cs.addConstraint(constraintKind, E->getType(), CT,
+    cs.addConstraint(constraintKind, cs.getType(E), CT,
                      cs.getConstraintLocator(E), /*isFavored=*/true);
   }
 
@@ -1896,7 +1896,7 @@ ConstraintSystem::solve(Expr *&expr,
       });
     }
 
-    addConstraint(constraintKind, expr->getType(), convertType,
+    addConstraint(constraintKind, getType(expr), convertType,
                   getConstraintLocator(expr), /*isFavored*/ true);
   }
 

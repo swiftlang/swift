@@ -1280,6 +1280,25 @@ public:
     E->setType(T);
   }
 
+  /// Check to see if we have a type for an expression.
+  bool hasType(Expr *E) {
+    return ExprTypes.find(E) != ExprTypes.end();
+  }
+
+  /// Get the type for an expression.
+  Type getType(Expr *E) {
+    // FIXME: Ideally this would be enabled but there are currently
+    // cases where we ask for types that are not set.
+
+    // assert(ExprTypes.find(E) != ExprTypes.end() &&
+    //        "Expected type to have been set!");
+
+    // FIXME: Temporary until all references to expression types are
+    // updated.
+    // return ExprTypes[E];
+    return E->getType();
+  }
+
   /// Cache the type of the expression argument and return that same
   /// argument.
   template <typename T>
@@ -1652,6 +1671,9 @@ private:
   void addTypeVariableConstraintsToWorkList(TypeVariableType *typeVar);
 
 public:
+
+  /// \brief Coerce the given expression to an rvalue, if it isn't already.
+  Expr *coerceToRValue(Expr *expr);
 
   /// \brief "Open" the given type by replacing any occurrences of generic
   /// parameter types and dependent member types with fresh type variables.
