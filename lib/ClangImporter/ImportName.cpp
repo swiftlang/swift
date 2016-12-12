@@ -926,7 +926,7 @@ bool NameImporter::shouldBeSwiftPrivate(const clang::NamedDecl *decl,
   return false;
 }
 
-Optional<ImportedErrorInfo> NameImporter::considerErrorImport(
+Optional<ForeignErrorConvention::Info> NameImporter::considerErrorImport(
     const clang::ObjCMethodDecl *clangDecl, StringRef &baseName,
     SmallVectorImpl<StringRef> &paramNames,
     ArrayRef<const clang::ParmVarDecl *> params, bool isInitializer,
@@ -1015,9 +1015,9 @@ Optional<ImportedErrorInfo> NameImporter::considerErrorImport(
     }
 
     bool replaceParamWithVoid = !adjustName && !expectsToRemoveError;
-    ImportedErrorInfo errorInfo {
-      *errorKind, isErrorOwned, index, replaceParamWithVoid
-    };
+    ForeignErrorConvention::Info errorInfo(
+        *errorKind, index, isErrorOwned,
+        (ForeignErrorConvention::IsReplaced_t)replaceParamWithVoid);
     return errorInfo;
   }
 
@@ -1544,7 +1544,7 @@ ImportedName NameImporter::importNameImpl(const clang::NamedDecl *D,
           baseName, argumentNames, params, method->getReturnType(),
           method->getDeclContext(), getNonNullArgs(method, params),
           result.getErrorInfo()
-              ? Optional<unsigned>(result.getErrorInfo()->ParamIndex)
+              ? Optional<unsigned>(result.getErrorInfo()->ErrorParameterIndex)
               : None,
           method->hasRelatedResultType(), method->isInstanceMethod(), *this);
     }

@@ -32,19 +32,6 @@ namespace swift {
 namespace importer {
 struct PlatformAvailability;
 
-/// Information about imported error parameters.
-struct ImportedErrorInfo {
-  ForeignErrorConvention::Kind Kind;
-  ForeignErrorConvention::IsOwned_t IsOwned;
-
-  /// The index of the error parameter.
-  unsigned ParamIndex;
-
-  /// Whether the parameter is being replaced with "void"
-  /// (vs. removed).
-  bool ReplaceParamWithVoid;
-};
-
 /// The kind of accessor that an entity will be imported as.
 enum class ImportedAccessorKind {
   None = 0,
@@ -88,24 +75,12 @@ class ImportedName {
   EffectiveClangContext effectiveContext;
 
   struct Info {
+    /// For names that map Objective-C error handling conventions into
+    /// throwing Swift methods, describes how the mapping is performed.
+    ForeignErrorConvention::Info errorInfo;
+
     /// The version of Swift this name corresponds to
     ImportNameVersion version;
-
-    /// Whether this name was explicitly specified via a Clang
-    /// swift_name attribute.
-    bool hasCustomName;
-
-    /// Whether this was one of a special class of Objective-C
-    /// initializers for which we drop the variadic argument rather
-    /// than refuse to import the initializer.
-    bool droppedVariadic;
-
-    /// Whether this is a global being imported as a member
-    bool importAsMember;
-
-    bool hasSelfIndex;
-
-    bool hasErrorInfo;
 
     /// What kind of accessor this name refers to, if any.
     ImportedAccessorKind accessorKind;
@@ -113,21 +88,34 @@ class ImportedName {
     /// For an initializer, the kind of initializer to import.
     CtorInitializerKind initKind;
 
-    /// For names that map Objective-C error handling conventions into
-    /// throwing Swift methods, describes how the mapping is performed.
-    ImportedErrorInfo errorInfo;
-
     /// For a declaration name that makes the declaration into an
     /// instance member, the index of the "Self" parameter.
     unsigned selfIndex;
 
+    /// Whether this name was explicitly specified via a Clang
+    /// swift_name attribute.
+    bool hasCustomName : 1;
+
+    /// Whether this was one of a special class of Objective-C
+    /// initializers for which we drop the variadic argument rather
+    /// than refuse to import the initializer.
+    bool droppedVariadic : 1;
+
+    /// Whether this is a global being imported as a member
+    bool importAsMember : 1;
+
+    bool hasSelfIndex : 1;
+
+    bool hasErrorInfo : 1;
+
     Info()
-        : version(), hasCustomName(false), droppedVariadic(false),
-          importAsMember(false), hasSelfIndex(false), hasErrorInfo(false),
-          accessorKind(ImportedAccessorKind::None),
-          initKind(CtorInitializerKind::Designated), errorInfo(),
-          selfIndex() {}
+        : errorInfo(), version(), accessorKind(ImportedAccessorKind::None),
+          initKind(CtorInitializerKind::Designated), selfIndex(),
+          hasCustomName(false), droppedVariadic(false), importAsMember(false),
+          hasSelfIndex(false), hasErrorInfo(false) {}
   } info;
+  static_assert(sizeof(Info) <= sizeof(void *) * 3,
+                "should be a handful of pointers");
 
 public:
   ImportedName() = default;
@@ -157,7 +145,7 @@ public:
 
   /// For names that map Objective-C error handling conventions into
   /// throwing Swift methods, describes how the mapping is performed.
-  Optional<ImportedErrorInfo> getErrorInfo() const {
+  Optional<ForeignErrorConvention::Info> getErrorInfo() const {
     if (info.hasErrorInfo)
       return info.errorInfo;
     return None;
@@ -217,7 +205,7 @@ public:
     llvm_unreachable("Invalid ImportedAccessorKind.");
   }
 };
-static_assert(sizeof(ImportedName) <= 8 * sizeof(void *),
+static_assert(sizeof(ImportedName) <= 6 * sizeof(void *),
               "should fit in a handful of pointers");
 
 /// Strips a trailing "Notification", if present. Returns {} if name doesn't end
@@ -315,7 +303,7 @@ private:
                          const clang::IdentifierInfo *proposedName,
                          const clang::TypedefNameDecl *cfTypedef);
 
-  Optional<ImportedErrorInfo>
+  Optional<ForeignErrorConvention::Info>
   considerErrorImport(const clang::ObjCMethodDecl *clangDecl,
                       StringRef &baseName,
                       SmallVectorImpl<StringRef> &paramNames,
