@@ -1392,16 +1392,10 @@ public:
 
   /// Get the type for an expression.
   Type getType(Expr *E) {
-    // FIXME: Ideally this would be enabled but there are currently
-    // cases where we ask for types that are not set.
-
-    // assert(ExprTypes.find(E) != ExprTypes.end() &&
-    //        "Expected type to have been set!");
-
-    // FIXME: Temporary until all references to expression types are
-    // updated.
-    // return ExprTypes[E];
-    return E->getType();
+    assert(hasType(E) && "Expected type to have been set!");
+    assert(ExprTypes[E]->isEqual(E->getType()) &&
+           "Expected type in map to be the same type in expression!");
+    return ExprTypes[E];
   }
 
   /// Cache the type of the expression argument and return that same
