@@ -907,7 +907,8 @@ public struct Data : ReferenceConvertible, Equatable, Hashable, RandomAccessColl
     
     public typealias Index = Int
     public typealias Indices = CountableRange<Int>
-    
+
+    @_versioned
     internal var _backing : _DataStorage
     
     // A standard or custom deallocator for `Data`.
