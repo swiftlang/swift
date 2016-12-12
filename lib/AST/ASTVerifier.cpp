@@ -1735,6 +1735,58 @@ struct ASTNodeBase {};
         var->getType().print(Out);
         abort();
       }
+
+      Type typeForAccessors =
+          var->getInterfaceType()->getReferenceStorageReferent();
+      typeForAccessors =
+          ArchetypeBuilder::mapTypeIntoContext(var->getDeclContext(),
+                                               typeForAccessors);
+      if (const FuncDecl *getter = var->getGetter()) {
+        if (getter->getParameterLists().back()->size() != 0) {
+          Out << "property getter has parameters\n";
+          abort();
+        }
+        Type getterResultType = getter->getResultInterfaceType();
+        getterResultType =
+            ArchetypeBuilder::mapTypeIntoContext(var->getDeclContext(),
+                                                 getterResultType);
+        if (!getterResultType->isEqual(typeForAccessors)) {
+          Out << "property and getter have mismatched types: '";
+          typeForAccessors.print(Out);
+          Out << "' vs. '";
+          getterResultType.print(Out);
+          Out << "'\n";
+          abort();
+        }
+      }
+
+      if (const FuncDecl *setter = var->getSetter()) {
+        if (!setter->getResultInterfaceType()->isVoid()) {
+          Out << "property setter has non-Void result type\n";
+          abort();
+        }
+        if (setter->getParameterLists().back()->size() == 0) {
+          Out << "property setter has no parameters\n";
+          abort();
+        }
+        if (setter->getParameterLists().back()->size() != 1) {
+          Out << "property setter has 2+ parameters\n";
+          abort();
+        }
+        const ParamDecl *param = setter->getParameterLists().back()->get(0);
+        Type paramType = param->getInterfaceType();
+        paramType = ArchetypeBuilder::mapTypeIntoContext(var->getDeclContext(),
+                                                         paramType);
+        if (!paramType->isEqual(typeForAccessors)) {
+          Out << "property and setter param have mismatched types: '";
+          typeForAccessors.print(Out);
+          Out << "' vs. '";
+          paramType.print(Out);
+          Out << "'\n";
+          abort();
+        }
+      }
+
       verifyCheckedBase(var);
     }
 
