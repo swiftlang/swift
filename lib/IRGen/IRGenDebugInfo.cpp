@@ -944,7 +944,7 @@ void IRGenDebugInfo::emitVariableDeclaration(
       assert(OffsetInBits+SizeInBits <= getSizeInBits(Var) && "pars > totum");
 
       // Add the piece DWARF expression.
-      Operands.push_back(llvm::dwarf::DW_OP_bit_piece);
+      Operands.push_back(llvm::dwarf::DW_OP_LLVM_fragment);
       Operands.push_back(OffsetInBits);
       Operands.push_back(SizeInBits);
     }
