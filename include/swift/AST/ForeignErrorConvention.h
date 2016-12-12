@@ -75,7 +75,10 @@ public:
          IsReplaced_t isReplaced)
         : TheKind(unsigned(kind)), ErrorIsOwned(bool(isOwned)),
           ErrorParameterIsReplaced(bool(isReplaced)),
-          ErrorParameterIndex(parameterIndex) {}
+          ErrorParameterIndex(parameterIndex) {
+      assert(parameterIndex == ErrorParameterIndex &&
+             "parameter index overflowed");
+    }
 
     Info() = default;
   };

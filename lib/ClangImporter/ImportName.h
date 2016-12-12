@@ -95,19 +95,19 @@ class ImportedName {
 
     /// Whether this name was explicitly specified via a Clang
     /// swift_name attribute.
-    bool hasCustomName : 1;
+    unsigned hasCustomName : 1;
 
     /// Whether this was one of a special class of Objective-C
     /// initializers for which we drop the variadic argument rather
     /// than refuse to import the initializer.
-    bool droppedVariadic : 1;
+    unsigned droppedVariadic : 1;
 
     /// Whether this is a global being imported as a member
-    bool importAsMember : 1;
+    unsigned importAsMember : 1;
 
-    bool hasSelfIndex : 1;
+    unsigned hasSelfIndex : 1;
 
-    bool hasErrorInfo : 1;
+    unsigned hasErrorInfo : 1;
 
     Info()
         : errorInfo(), selfIndex(), initKind(CtorInitializerKind::Designated),
@@ -115,8 +115,6 @@ class ImportedName {
           hasCustomName(false), droppedVariadic(false), importAsMember(false),
           hasSelfIndex(false), hasErrorInfo(false) {}
   } info;
-  static_assert(sizeof(Info) <= sizeof(void *) * 2,
-                "should be a handful of pointers");
 
 public:
   ImportedName() = default;
@@ -206,8 +204,6 @@ public:
     llvm_unreachable("Invalid ImportedAccessorKind.");
   }
 };
-static_assert(sizeof(ImportedName) <= 5 * sizeof(void *),
-              "should fit in a handful of pointers");
 
 /// Strips a trailing "Notification", if present. Returns {} if name doesn't end
 /// in "Notification", or it there would be nothing left.
