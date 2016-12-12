@@ -1573,10 +1573,6 @@ public:
   void setConformanceLoader(LazyMemberLoader *resolver, uint64_t contextData);
 
   DeclRange getMembers() const;
-  void setMemberLoader(LazyMemberLoader *resolver, uint64_t contextData);
-  bool hasLazyMembers() const {
-    return IterableDeclContext::isLazy();
-  }
 
   /// Determine whether this is a constrained extension, which adds additional
   /// requirements beyond those of the nominal type.
@@ -2672,6 +2668,8 @@ protected:
   friend class ProtocolType;
 
 public:
+  using GenericTypeDecl::getASTContext;
+
   DeclRange getMembers() const;
   SourceRange getBraces() const { return Braces; }
   
@@ -2691,11 +2689,6 @@ public:
   /// module?
   bool hasFixedLayout(ModuleDecl *M, ResilienceExpansion expansion) const;
 
-  void setMemberLoader(LazyMemberLoader *resolver, uint64_t contextData);
-  bool hasLazyMembers() const {
-    return IterableDeclContext::isLazy();
-  }
-  
   /// \brief Returns true if this decl contains delayed value or protocol
   /// declarations.
   bool hasDelayedMembers() const {

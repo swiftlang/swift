@@ -672,11 +672,6 @@ DeclRange NominalTypeDecl::getMembers() const {
   return IterableDeclContext::getMembers();
 }
 
-void NominalTypeDecl::setMemberLoader(LazyMemberLoader *resolver,
-                                      uint64_t contextData) {
-  IterableDeclContext::setLoader(resolver, contextData);
-}
-
 void NominalTypeDecl::setConformanceLoader(LazyMemberLoader *resolver,
                                            uint64_t contextData) {
   assert(!HaveConformanceLoader &&
@@ -744,11 +739,6 @@ void ExtensionDecl::setGenericParams(GenericParamList *params) {
 DeclRange ExtensionDecl::getMembers() const {
   loadAllMembers();
   return IterableDeclContext::getMembers();
-}
-
-void ExtensionDecl::setMemberLoader(LazyMemberLoader *resolver,
-                                    uint64_t contextData) {
-  IterableDeclContext::setLoader(resolver, contextData);
 }
 
 void ExtensionDecl::setConformanceLoader(LazyMemberLoader *resolver,

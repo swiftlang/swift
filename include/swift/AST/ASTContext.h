@@ -59,6 +59,7 @@ namespace swift {
   class ForeignRepresentationInfo;
   class FuncDecl;
   class InFlightDiagnostic;
+  class LazyIterableDeclContextData;
   class LazyResolver;
   class PatternBindingDecl;
   class PatternBindingInitializer;
@@ -692,6 +693,16 @@ public:
   /// \brief Retrieve the substitutions for a bound generic type, if known.
   Optional<ArrayRef<Substitution>>
   getSubstitutions(TypeBase *type, DeclContext *gpContext) const;
+
+  /// Get the lazy iterable context for the given iterable declaration context.
+  ///
+  /// \param lazyLoader If non-null, the lazy loader to use when creating the
+  /// iterable context data. The pointer must either be null or be consistent
+  /// across all calls for the same \p idc.
+  LazyIterableDeclContextData *getOrCreateLazyIterableContextData(
+                                              const IterableDeclContext *idc,
+                                              LazyMemberLoader *lazyLoader);
+
 
   /// Record a conformance loader and its context data for the given
   /// declaration.
