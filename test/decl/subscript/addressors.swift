@@ -227,3 +227,11 @@ struct RedundantMutableAddressors3 {
     mutableAddressWithNativeOwner { return (someValidAddress(), owner)  } // expected-error {{subscript already has a mutable addressor}}
   }
 }
+
+struct MutableSubscriptInDefaultGetter {
+  var owner: Int
+  subscript(index: Int) -> Int {
+    owner = 5 // expected-error{{cannot assign to property: 'self' is immutable}}
+    return 5
+  }
+}
