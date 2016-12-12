@@ -1016,11 +1016,6 @@ private:
     /// \brief Whether to record failures or not.
     bool recordFixes = false;
 
-    /// The list of constraints that have been retired along the
-    /// current path, this list is used in LIFO fasion when constaints
-    /// are added back to the circulation.
-    ConstraintList retiredConstraints;
-
     /// The current set of generated constraints.
     SmallVector<Constraint *, 4> generatedConstraints;
 
@@ -1049,6 +1044,28 @@ private:
     void registerScope(SolverScope *scope) {
       scopes.insert({ scope, std::make_pair(retiredConstraints.begin(),
                                             generatedConstraints.size()) });
+    }
+
+    /// \brief Check whether there are any retired constraints present.
+    bool hasRetiredConstraints() const {
+      return !retiredConstraints.empty();
+    }
+
+    /// \brief Mark given constraint as retired along current solver path.
+    ///
+    /// \param constraint The constraint to retire temporarily.
+    void retireConstraint(Constraint *constraint) {
+      retiredConstraints.push_front(constraint);
+    }
+
+    /// \brief Iterate over all of the retired constraints registered with
+    /// current solver state.
+    ///
+    /// \param processor The processor function to be applied to each of
+    /// the constraints retrieved.
+    void forEachRetired(std::function<void(Constraint &)> processor) {
+      for (auto &constraint : retiredConstraints)
+        processor(constraint);
     }
 
     /// \brief Restore all of the retired/generated constraints to the state
@@ -1088,6 +1105,11 @@ private:
     }
 
   private:
+    /// The list of constraints that have been retired along the
+    /// current path, this list is used in LIFO fasion when constaints
+    /// are added back to the circulation.
+    ConstraintList retiredConstraints;
+
     /// The collection which holds association between solver scope
     /// and position of the last retired constraint and number of
     /// constraints generated before registration of given scope,
@@ -1564,7 +1586,7 @@ public:
     // Record this as a newly-generated constraint.
     if (solverState) {
       solverState->generatedConstraints.push_back(constraint);
-      solverState->retiredConstraints.push_front(constraint);
+      solverState->retireConstraint(constraint);
     }
   }
 
@@ -1588,7 +1610,7 @@ public:
     InactiveConstraints.erase(constraint);
 
     if (solverState)
-      solverState->retiredConstraints.push_front(constraint);
+      solverState->retireConstraint(constraint);
   }
 
   /// Retrieve the list of inactive constraints.

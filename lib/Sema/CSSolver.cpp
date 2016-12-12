@@ -359,7 +359,7 @@ bool ConstraintSystem::simplify(bool ContinueAfterFailures) {
       }
 
       if (solverState)
-        solverState->retiredConstraints.push_front(constraint);
+        solverState->retireConstraint(constraint);
 
       CG.removeConstraint(constraint);
       break;
@@ -369,7 +369,7 @@ bool ConstraintSystem::simplify(bool ContinueAfterFailures) {
         ++solverState->NumSimplifiedConstraints;
 
         // This constraint has already been solved; retire it.
-        solverState->retiredConstraints.push_front(constraint);
+        solverState->retireConstraint(constraint);
       }
 
       // Remove the constraint from the constraint graph.
@@ -2396,11 +2396,11 @@ bool ConstraintSystem::solveSimplified(
     case SolutionKind::Error:
       if (!failedConstraint)
         failedConstraint = constraint;
-      solverState->retiredConstraints.push_front(constraint);
+      solverState->retireConstraint(constraint);
       break;
 
     case SolutionKind::Solved:
-      solverState->retiredConstraints.push_front(constraint);
+      solverState->retireConstraint(constraint);
       break;
 
     case SolutionKind::Unsolved:
