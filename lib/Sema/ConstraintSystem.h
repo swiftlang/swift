@@ -1016,13 +1016,6 @@ private:
     /// \brief Whether to record failures or not.
     bool recordFixes = false;
 
-    /// The list of constraints that have been retired along the
-    /// current path.
-    ConstraintList retiredConstraints;
-
-    /// The current set of generated constraints.
-    SmallVector<Constraint *, 4> generatedConstraints;
-
     /// \brief The set of type variable bindings that have changed while
     /// processing this constraint system.
     SavedTypeVariableBindings savedBindings;
@@ -1039,6 +1032,124 @@ private:
     // Statistics
     #define CS_STATISTIC(Name, Description) unsigned Name = 0;
     #include "ConstraintSolverStats.def"
+
+    /// \brief Register given scope to be tracked by the current solver state,
+    /// this helps to make sure that all of the retired/generated constraints
+    /// are dealt with correctly when the life time of the scope ends.
+    ///
+    /// \param scope The scope to associate with current solver state.
+    void registerScope(SolverScope *scope) {
+      scopes.insert({ scope, std::make_pair(retiredConstraints.begin(),
+                                            generatedConstraints.size()) });
+    }
+
+    /// \brief Check whether there are any retired constraints present.
+    bool hasRetiredConstraints() const {
+      return !retiredConstraints.empty();
+    }
+
+    /// \brief Mark given constraint as retired along current solver path.
+    ///
+    /// \param constraint The constraint to retire temporarily.
+    void retireConstraint(Constraint *constraint) {
+      retiredConstraints.push_front(constraint);
+    }
+
+    /// \brief Iterate over all of the retired constraints registered with
+    /// current solver state.
+    ///
+    /// \param processor The processor function to be applied to each of
+    /// the constraints retrieved.
+    void forEachRetired(std::function<void(Constraint &)> processor) {
+      for (auto &constraint : retiredConstraints)
+        processor(constraint);
+    }
+
+    /// \brief Add new "generated" constraint along the current solver path.
+    ///
+    /// \param constraint The newly generated constraint.
+    void addGeneratedConstraint(Constraint *constraint) {
+      generatedConstraints.push_back(constraint);
+    }
+
+    /// \brief Erase given constraint from the list of generated constraints
+    /// along the current solver path. Note that this operation doesn't
+    /// guarantee any ordering of the after it's application.
+    ///
+    /// \param constraint The constraint to erase.
+    void removeGeneratedConstraint(Constraint *constraint) {
+      size_t index = 0;
+      for (auto generated : generatedConstraints) {
+        if (generated == constraint) {
+          unsigned last = generatedConstraints.size() - 1;
+          auto lastConstraint = generatedConstraints[last];
+          if (lastConstraint == generated) {
+            generatedConstraints.pop_back();
+            break;
+          } else {
+            generatedConstraints[index] = lastConstraint;
+            generatedConstraints[last] = constraint;
+            generatedConstraints.pop_back();
+            break;
+          }
+        }
+        index++;
+      }
+    }
+
+    /// \brief Restore all of the retired/generated constraints to the state
+    /// before given scope. This is required because retired constraints have
+    /// to be re-introduced to the system in order of arrival (LIFO) and list
+    /// of the generated constraints has to be truncated back to the
+    /// original size.
+    ///
+    /// \param scope The solver scope to rollback.
+    void rollback(SolverScope *scope) {
+      auto entry = scopes.find(scope);
+      assert(entry != scopes.end() && "Unknown solver scope");
+
+      // Remove given scope from the circulation.
+      scopes.erase(scope);
+
+      // The position of last retired constraint before given scope.
+      ConstraintList::iterator lastRetiredPos;
+      // The original number of generated constraints before given scope.
+      unsigned numGenerated;
+
+      std::tie(lastRetiredPos, numGenerated) = entry->getSecond();
+
+      // Restore all of the retired constraints.
+      CS.InactiveConstraints.splice(CS.InactiveConstraints.end(),
+                                    retiredConstraints,
+                                    retiredConstraints.begin(), lastRetiredPos);
+
+      // And remove all of the generated constraints.
+      auto genStart = generatedConstraints.begin() + numGenerated,
+           genEnd = generatedConstraints.end();
+      for (auto genI = genStart; genI != genEnd; ++genI) {
+        CS.InactiveConstraints.erase(ConstraintList::iterator(*genI));
+      }
+
+      generatedConstraints.erase(genStart, genEnd);
+    }
+
+  private:
+    /// The list of constraints that have been retired along the
+    /// current path, this list is used in LIFO fasion when constaints
+    /// are added back to the circulation.
+    ConstraintList retiredConstraints;
+
+    /// The current set of generated constraints.
+    SmallVector<Constraint *, 4> generatedConstraints;
+
+    /// The collection which holds association between solver scope
+    /// and position of the last retired constraint and number of
+    /// constraints generated before registration of given scope,
+    /// this helps to rollback all of the constraints retired/generated
+    /// each of the registered scopes correct (LIFO) order.
+    llvm::SmallDenseMap<SolverScope *,
+                        std::pair<ConstraintList::iterator, unsigned>>
+        scopes;
   };
 
   class CacheExprTypes : public ASTWalker {
@@ -1125,12 +1236,6 @@ public:
 
     /// \brief The length of \c SavedBindings.
     unsigned numSavedBindings;
-
-    /// The length of generatedConstraints.
-    unsigned numGeneratedConstraints;
-
-    /// \brief The last retired constraint in the list.
-    ConstraintList::iterator firstRetired;
 
     /// \brief The length of \c ConstraintRestrictions.
     unsigned numConstraintRestrictions;
@@ -1512,8 +1617,8 @@ public:
 
     // Record this as a newly-generated constraint.
     if (solverState) {
-      solverState->generatedConstraints.push_back(constraint);
-      solverState->retiredConstraints.push_back(constraint);
+      solverState->addGeneratedConstraint(constraint);
+      solverState->retireConstraint(constraint);
     }
   }
 
@@ -1528,7 +1633,7 @@ public:
 
     // Record this as a newly-generated constraint.
     if (solverState)
-      solverState->generatedConstraints.push_back(constraint);
+      solverState->addGeneratedConstraint(constraint);
   }
 
   /// \brief Remove an inactive constraint from the current constraint graph.
@@ -1537,7 +1642,7 @@ public:
     InactiveConstraints.erase(constraint);
 
     if (solverState)
-      solverState->retiredConstraints.push_back(constraint);
+      solverState->retireConstraint(constraint);
   }
 
   /// Retrieve the list of inactive constraints.
