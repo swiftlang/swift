@@ -839,8 +839,8 @@ ERROR(member_shadows_global_function,none,
        DescriptiveDeclKind, DeclName))
 
 ERROR(instance_member_use_on_type,none,
-      "use of instance member %1 on type %0; "
-      "did you mean to use a value of type %0 instead?", (Type, DeclName))
+      "instance member %1 cannot be used on type %0; "
+      "did you mean to use a value of this type instead?", (Type, DeclName))
 ERROR(instance_member_in_initializer,none,
       "cannot use instance member %0 within property initializer; "
       "property initializers run before 'self' is available", (DeclName))
