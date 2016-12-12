@@ -33,13 +33,14 @@ namespace importer {
 struct PlatformAvailability;
 
 /// The kind of accessor that an entity will be imported as.
-enum class ImportedAccessorKind {
+enum class ImportedAccessorKind : unsigned {
   None = 0,
   PropertyGetter,
   PropertySetter,
   SubscriptGetter,
   SubscriptSetter,
 };
+enum { NumImportedAccessorKindBits = 3 };
 
 /// The name version
 enum class ImportNameVersion : unsigned {
@@ -79,18 +80,18 @@ class ImportedName {
     /// throwing Swift methods, describes how the mapping is performed.
     ForeignErrorConvention::Info errorInfo;
 
-    /// The version of Swift this name corresponds to
-    ImportNameVersion version;
-
-    /// What kind of accessor this name refers to, if any.
-    ImportedAccessorKind accessorKind;
+    /// For a declaration name that makes the declaration into an
+    /// instance member, the index of the "Self" parameter.
+    unsigned selfIndex;
 
     /// For an initializer, the kind of initializer to import.
     CtorInitializerKind initKind;
 
-    /// For a declaration name that makes the declaration into an
-    /// instance member, the index of the "Self" parameter.
-    unsigned selfIndex;
+    /// The version of Swift this name corresponds to
+    ImportNameVersion version : NumImportNameVersions;
+
+    /// What kind of accessor this name refers to, if any.
+    ImportedAccessorKind accessorKind : NumImportedAccessorKindBits;
 
     /// Whether this name was explicitly specified via a Clang
     /// swift_name attribute.
@@ -109,12 +110,12 @@ class ImportedName {
     bool hasErrorInfo : 1;
 
     Info()
-        : errorInfo(), version(), accessorKind(ImportedAccessorKind::None),
-          initKind(CtorInitializerKind::Designated), selfIndex(),
+        : errorInfo(), selfIndex(), initKind(CtorInitializerKind::Designated),
+          version(), accessorKind(ImportedAccessorKind::None),
           hasCustomName(false), droppedVariadic(false), importAsMember(false),
           hasSelfIndex(false), hasErrorInfo(false) {}
   } info;
-  static_assert(sizeof(Info) <= sizeof(void *) * 3,
+  static_assert(sizeof(Info) <= sizeof(void *) * 2,
                 "should be a handful of pointers");
 
 public:
@@ -205,7 +206,7 @@ public:
     llvm_unreachable("Invalid ImportedAccessorKind.");
   }
 };
-static_assert(sizeof(ImportedName) <= 6 * sizeof(void *),
+static_assert(sizeof(ImportedName) <= 5 * sizeof(void *),
               "should fit in a handful of pointers");
 
 /// Strips a trailing "Notification", if present. Returns {} if name doesn't end
