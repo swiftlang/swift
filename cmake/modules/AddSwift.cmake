@@ -772,12 +772,10 @@ function(_add_swift_library_single target name)
 
   if(SWIFTLIB_SINGLE_TARGET_LIBRARY)
     if(NOT "${SWIFT_${SWIFTLIB_SINGLE_SDK}_ICU_UC_INCLUDE}" STREQUAL "")
-      set_property(TARGET "${target}" APPEND_STRING
-          PROPERTY INCLUDE_DIRECTORIES "${SWIFT_${SWIFTLIB_SINGLE_SDK}_ICU_UC_INCLUDE}")
+      target_include_directories("${target}" SYSTEM PRIVATE "${SWIFT_${SWIFTLIB_SINGLE_SDK}_ICU_UC_INCLUDE}")
     endif()
     if(NOT "${SWIFT_${SWIFTLIB_SINGLE_SDK}_ICU_I18N_INCLUDE}" STREQUAL "")
-      set_property(TARGET "${target}" APPEND_STRING
-          PROPERTY INCLUDE_DIRECTORIES "${SWIFT_${SWIFTLIB_SINGLE_SDK}_ICU_I18N_INCLUDE}")
+      target_include_directories("${target}" SYSTEM PRIVATE "${SWIFT_${SWIFTLIB_SINGLE_SDK}_ICU_I18N_INCLUDE}")
     endif()
   endif()
 
