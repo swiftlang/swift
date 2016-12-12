@@ -2694,11 +2694,11 @@ namespace {
         CS.addConstraint(ConstraintKind::Defaultable,
                          placeholderTy, TupleType::getEmpty(CS.getASTContext()),
                          locator);
-        CS.setType(E, placeholderTy);
+        return placeholderTy;
       }
       // NOTE: The type loc may be there but have failed to validate, in which
       // case we return the null type.
-      return CS.getType(E);
+      return E->getType();
     }
 
     Type visitObjCSelectorExpr(ObjCSelectorExpr *E) {

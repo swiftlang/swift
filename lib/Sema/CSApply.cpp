@@ -1476,9 +1476,10 @@ namespace {
                                   (ConformanceCheckFlags::InExpression|
                                    ConformanceCheckFlags::Used))) {
         // Form the call.
-        return tc.callWitness(value, cs.DC, bridgedProto, *conformance,
-                              tc.Context.Id_bridgeToObjectiveC,
-                              { }, diag::broken_bridged_to_objc_protocol);
+        return cs.cacheType(
+            tc.callWitness(value, cs.DC, bridgedProto, *conformance,
+                           tc.Context.Id_bridgeToObjectiveC,
+                           { }, diag::broken_bridged_to_objc_protocol));
       }
       
       // If there is an Error conformance, try bridging as an error.
@@ -2066,8 +2067,9 @@ namespace {
 
       // Build a reference to the init(stringInterpolation:) initializer.
       // FIXME: This location info is bogus.
-      auto typeRef = TypeExpr::createImplicitHack(expr->getStartLoc(),
-                                                  type, tc.Context);
+      auto *typeRef =
+        cs.cacheType(TypeExpr::createImplicitHack(expr->getStartLoc(),
+                                                  type, tc.Context));
       Expr *memberRef =
         new (tc.Context) MemberRefExpr(typeRef,
                                        expr->getStartLoc(),
@@ -2107,6 +2109,7 @@ namespace {
             tc.Context, memberRef,
             { segment },
             { tc.Context.Id_stringInterpolationSegment });
+        cs.cacheType(apply->getArg());
 
         auto converted = finishApply(apply, openedType, locatorBuilder);
         if (!converted)
@@ -4640,15 +4643,17 @@ Expr *ExprRewriter::coerceOptionalToOptional(Expr *expr, Type toType,
     }
   }
 
-  expr = new (tc.Context) BindOptionalExpr(expr, expr->getSourceRange().End,
-                                           /*depth*/ 0, fromValueType);
+  expr =
+    cs.cacheType(new (tc.Context) BindOptionalExpr(expr,
+                                                   expr->getSourceRange().End,
+                                                   /*depth*/ 0, fromValueType));
   expr->setImplicit(true);
   expr = coerceToType(expr, toValueType, locator, typeFromPattern);
   if (!expr) return nullptr;
       
-  expr = new (tc.Context) InjectIntoOptionalExpr(expr, toType);
+  expr = cs.cacheType(new (tc.Context) InjectIntoOptionalExpr(expr, toType));
       
-  expr = new (tc.Context) OptionalEvaluationExpr(expr, toType);
+  expr = cs.cacheType(new (tc.Context) OptionalEvaluationExpr(expr, toType));
   expr->setImplicit(true);
   return expr;
 }
@@ -4957,12 +4962,13 @@ Expr *ExprRewriter::coerceCallArguments(
     if (anyChanged || !cs.getType(argTuple)->isEqual(argTupleType)) {
       auto EltNames = argTuple->getElementNames();
       auto EltNameLocs = argTuple->getElementNameLocs();
-      argTuple = TupleExpr::create(tc.Context, argTuple->getLParenLoc(),
-                                   fromTupleExpr, EltNames, EltNameLocs,
-                                   argTuple->getRParenLoc(),
-                                   argTuple->hasTrailingClosure(),
-                                   argTuple->isImplicit(),
-                                   argTupleType);
+      argTuple =
+        cs.cacheType(TupleExpr::create(tc.Context, argTuple->getLParenLoc(),
+                                       fromTupleExpr, EltNames, EltNameLocs,
+                                       argTuple->getRParenLoc(),
+                                       argTuple->hasTrailingClosure(),
+                                       argTuple->isImplicit(),
+                                       argTupleType));
       arg = argTuple;
     }
   }
@@ -5937,8 +5943,9 @@ Expr *ExprRewriter::convertLiteral(Expr *literal,
 
   // Convert the resulting expression to the final literal type.
   // FIXME: Bogus location info.
-  Expr *base = TypeExpr::createImplicitHack(literal->getLoc(), type,
-                                            tc.Context);
+  Expr *base =
+    cs.cacheType(TypeExpr::createImplicitHack(literal->getLoc(), type,
+                                              tc.Context));
   literal = tc.callWitness(base, dc,
                            protocol, *conformance, literalFuncName,
                            literal, brokenProtocolDiag);
@@ -5989,8 +5996,9 @@ Expr *ExprRewriter::convertLiteralInPlace(Expr *literal,
 
     // Form a reference to the builtin conversion function.
     // FIXME: Bogus location info.
-    Expr *base = TypeExpr::createImplicitHack(literal->getLoc(), type,
-                                              tc.Context);
+    Expr *base =
+      cs.cacheType(TypeExpr::createImplicitHack(literal->getLoc(), type,
+                                                tc.Context));
     Expr *unresolvedDot = new (tc.Context) UnresolvedDotExpr(
                                              base, SourceLoc(),
                                              witness->getFullName(),
@@ -6917,6 +6925,9 @@ Expr *TypeChecker::callWitness(Expr *base, DeclContext *dc,
   ConstraintSystem cs(*this, dc, ConstraintSystemOptions());
 
   cs.cacheExprTypes(base);
+  for (auto *e : arguments) {
+    cs.cacheExprTypes(e);
+  }
 
   // Find the witness we need to use.
   auto type = cs.getType(base);
