@@ -215,9 +215,7 @@ void removeUnwantedFunctions(SILModule *M, ArrayRef<std::string> MangledNames,
   }
 
   // Remove dead functions.
-  SILPassManager PM(M);
-  PM.addDeadFunctionElimination();
-  PM.run();
+  performSILDeadFunctionElimination(M);
 }
 
 int main(int argc, char **argv) {

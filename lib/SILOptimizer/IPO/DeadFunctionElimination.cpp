@@ -604,3 +604,9 @@ SILTransform *swift::createDeadFunctionElimination() {
 SILTransform *swift::createExternalFunctionDefinitionsElimination() {
   return new SILExternalFuncDefinitionsElimination();
 }
+
+void swift::performSILDeadFunctionElimination(SILModule *M) {
+  SILPassManager PM(M, "SIL Dead Function Elimination");
+  PM.addDeadFunctionElimination();
+  PM.runOneIteration();
+}
