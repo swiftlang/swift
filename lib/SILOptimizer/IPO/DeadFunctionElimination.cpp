@@ -606,7 +606,8 @@ SILTransform *swift::createExternalFunctionDefinitionsElimination() {
 }
 
 void swift::performSILDeadFunctionElimination(SILModule *M) {
-  SILPassManager PM(M, "SIL Dead Function Elimination");
-  PM.addDeadFunctionElimination();
-  PM.runOneIteration();
+  SILPassManager PM(M);
+  llvm::SmallVector<PassKind, 1> Pass = {PassKind::DeadFunctionElimination};
+  PM.executePassPipelinePlan(SILPassPipelinePlan::getPassPipelineForKinds(
+      SILPassPipelinePlan::ExecutionKind::UntilFixPoint, Pass));
 }

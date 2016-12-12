@@ -223,6 +223,7 @@ public:
     }
   }
 
+private:
   void execute(ExecutionKind K) {
     switch (K) {
     case ExecutionKind::OneIteration:
@@ -242,11 +243,6 @@ public:
   /// Add a pass with a given name.
   void addPassForName(StringRef Name);
 
-  // Each pass gets its own add-function.
-#define PASS(ID, NAME, DESCRIPTION) void add##ID();
-#include "Passes.def"
-
-private:
   /// Run the SIL module transform \p SMT over all the functions in
   /// the module.
   void runModulePass(SILModuleTransform *SMT);
