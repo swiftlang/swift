@@ -2083,7 +2083,6 @@ namespace {
 
       // Create a tuple containing all of the segments.
       SmallVector<Expr *, 4> segments;
-      SmallVector<TupleTypeElt, 4> typeElements;
       SmallVector<Identifier, 4> names;
       unsigned index = 0;
       ConstraintLocatorBuilder locatorBuilder(cs.getConstraintLocator(expr));
