@@ -1040,6 +1040,62 @@ private:
     // Statistics
     #define CS_STATISTIC(Name, Description) unsigned Name = 0;
     #include "ConstraintSolverStats.def"
+
+    /// \brief Register given scope to be tracked by the current solver state,
+    /// this helps to make sure that all of the retired/generated constraints
+    /// are dealt with correctly when the life time of the scope ends.
+    ///
+    /// \param scope The scope to associate with current solver state.
+    void registerScope(SolverScope *scope) {
+      scopes.insert({ scope, std::make_pair(retiredConstraints.begin(),
+                                            generatedConstraints.size()) });
+    }
+
+    /// \brief Restore all of the retired/generated constraints to the state
+    /// before given scope. This is required because retired constraints have
+    /// to be re-introduced to the system in order of arrival (LIFO) and list
+    /// of the generated constraints has to be truncated back to the
+    /// original size.
+    ///
+    /// \param scope The solver scope to rollback.
+    void rollback(SolverScope *scope) {
+      auto entry = scopes.find(scope);
+      assert(entry != scopes.end() && "Unknown solver scope");
+
+      // Remove given scope from the circulation.
+      scopes.erase(scope);
+
+      // The position of last retired constraint before given scope.
+      ConstraintList::iterator lastRetiredPos;
+      // The original number of generated constraints before given scope.
+      unsigned numGenerated;
+
+      std::tie(lastRetiredPos, numGenerated) = entry->getSecond();
+
+      // Restore all of the retired constraints.
+      CS.InactiveConstraints.splice(CS.InactiveConstraints.end(),
+                                    retiredConstraints,
+                                    retiredConstraints.begin(), lastRetiredPos);
+
+      // And remove all of the generated constraints.
+      auto genStart = generatedConstraints.begin() + numGenerated,
+           genEnd = generatedConstraints.end();
+      for (auto genI = genStart; genI != genEnd; ++genI) {
+        CS.InactiveConstraints.erase(ConstraintList::iterator(*genI));
+      }
+
+      generatedConstraints.erase(genStart, genEnd);
+    }
+
+  private:
+    /// The collection which holds association between solver scope
+    /// and position of the last retired constraint and number of
+    /// constraints generated before registration of given scope,
+    /// this helps to rollback all of the constraints retired/generated
+    /// each of the registered scopes correct (LIFO) order.
+    llvm::SmallDenseMap<SolverScope *,
+                        std::pair<ConstraintList::iterator, unsigned>>
+        scopes;
   };
 
   class CacheExprTypes : public ASTWalker {
@@ -1126,12 +1182,6 @@ public:
 
     /// \brief The length of \c SavedBindings.
     unsigned numSavedBindings;
-
-    /// The length of generatedConstraints.
-    unsigned numGeneratedConstraints;
-
-    /// \brief The last retired constraint in the list.
-    ConstraintList::iterator firstRetired;
 
     /// \brief The length of \c ConstraintRestrictions.
     unsigned numConstraintRestrictions;

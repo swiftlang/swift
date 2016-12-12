@@ -470,16 +470,15 @@ ConstraintSystem::SolverScope::SolverScope(ConstraintSystem &cs)
   resolvedOverloadSets = cs.resolvedOverloadSets;
   numTypeVariables = cs.TypeVariables.size();
   numSavedBindings = cs.solverState->savedBindings.size();
-  firstRetired = cs.solverState->retiredConstraints.begin();
   numConstraintRestrictions = cs.ConstraintRestrictions.size();
   numFixes = cs.Fixes.size();
   numDisjunctionChoices = cs.DisjunctionChoices.size();
   numOpenedTypes = cs.OpenedTypes.size();
   numOpenedExistentialTypes = cs.OpenedExistentialTypes.size();
   numDefaultedConstraints = cs.DefaultedConstraints.size();
-  numGeneratedConstraints = cs.solverState->generatedConstraints.size();
   PreviousScore = cs.CurrentScore;
 
+  cs.solverState->registerScope(this);
   ++cs.solverState->NumStatesExplored;
 }
 
@@ -503,20 +502,10 @@ ConstraintSystem::SolverScope::~SolverScope() {
                                   cs.ActiveConstraints);
   }
 
-  // Add the retired constraints back into circulation.
-  cs.InactiveConstraints.splice(cs.InactiveConstraints.end(), 
-                                cs.solverState->retiredConstraints,
-                                cs.solverState->retiredConstraints.begin(),
-                                firstRetired);
-
-  // Remove any constraints that were generated here.
-  auto &generatedConstraints = cs.solverState->generatedConstraints;
-  auto genStart = generatedConstraints.begin() + numGeneratedConstraints,
-       genEnd = generatedConstraints.end();
-  for (auto genI = genStart; genI != genEnd; ++genI) {
-    cs.InactiveConstraints.erase(ConstraintList::iterator(*genI));
-  }
-  generatedConstraints.erase(genStart, genEnd);
+  // Rollback all of the changes done to constraints by the current scope,
+  // e.g. add retired constraints back to the circulation and remove generated
+  // constraints introduced by the current scope.
+  cs.solverState->rollback(this);
 
   // Remove any constraint restrictions.
   truncate(cs.ConstraintRestrictions, numConstraintRestrictions);
