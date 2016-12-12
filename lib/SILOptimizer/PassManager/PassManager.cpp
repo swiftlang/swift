@@ -351,8 +351,8 @@ void SILPassManager::runPassOnFunction(SILFunctionTransform *SFT,
   ++NumPassesRun;
 }
 
-void SILPassManager::runFunctionPasses(PassList FuncTransforms) {
-
+void SILPassManager::
+runFunctionPasses(ArrayRef<SILFunctionTransform *> FuncTransforms) {
   if (FuncTransforms.empty())
     return;
 

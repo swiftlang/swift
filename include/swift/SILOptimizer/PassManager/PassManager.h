@@ -219,7 +219,6 @@ public:
 #define PASS(ID, NAME, DESCRIPTION) void add##ID();
 #include "Passes.def"
 
-  typedef llvm::ArrayRef<SILFunctionTransform *> PassList;
 private:
   /// Run the SIL module transform \p SMT over all the functions in
   /// the module.
@@ -231,7 +230,7 @@ private:
   /// Run the passes in \p FuncTransforms. Return true
   /// if the pass manager requested to stop the execution
   /// of the optimization cycle (this is a debug feature).
-  void runFunctionPasses(PassList FuncTransforms);
+  void runFunctionPasses(ArrayRef<SILFunctionTransform *> FuncTransforms);
 
   /// A helper function that returns (based on SIL stage and debug
   /// options) whether we should continue running passes.
