@@ -3612,6 +3612,10 @@ void VarDecl::emitLetToVarNoteIfSimple(DeclContext *UseDC) const {
     // If the problematic decl is 'self', then we might be trying to mutate
     // a property in a non-mutating method.
     auto FD = dyn_cast_or_null<FuncDecl>(UseDC->getInnermostMethodContext());
+
+    // If this is a subscript getter, don't suggest adding mutating.
+    if (FD->getAccessorStorageDecl()->getGetter() == FD) return;
+
     if (FD && !FD->isMutating() && !FD->isImplicit() && FD->isInstanceMember()&&
         !FD->getDeclContext()->getDeclaredInterfaceType()
                  ->hasReferenceSemantics()) {
