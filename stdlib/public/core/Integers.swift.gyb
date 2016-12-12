@@ -2034,10 +2034,27 @@ ${operatorComment(x.nonMaskingOperator)}
     return ${x.helper}(lhs, shift)
   }
 
+  @_transparent
+  public static func ${x.nonMaskingOperator} (_ lhs: Self, _ rhs: Int) -> Self {
+    return ${x.helper}(lhs, rhs)
+  }
+
+  @_transparent
+  public static func ${x.nonMaskingOperator}= <
+    Other : BinaryInteger
+  >(lhs: inout Self, rhs: Other) {
+    lhs = lhs ${x.nonMaskingOperator} rhs
+  }
+
+  @_transparent
+  public static func ${x.nonMaskingOperator}= (_ lhs: inout Self, _ rhs: Int) {
+    lhs = ${x.helper}(lhs, rhs)
+  }
+
 %   reversedOperator = x.operator.translate(maketrans('<>', '><'))
 %   isRightShift = '>' in x.operator
   @_transparent
-  internal static func ${x.helper} (_ lhs: Self, _ rhs: Int) -> Self {
+  internal static func ${x.helper}(_ lhs: Self, _ rhs: Int) -> Self {
     let overshiftR = Self.isSigned ? lhs &>> (Self.bitWidth - 1) : 0
     let overshiftL: Self = 0
     if _fastPath(rhs >= 0) {
@@ -2053,17 +2070,6 @@ ${operatorComment(x.nonMaskingOperator)}
     return lhs ${reversedOperator} -rhs
   }
 
-  @_transparent
-  public static func ${x.nonMaskingOperator}= (lhs: inout Self, rhs: Self) {
-    lhs = lhs ${x.nonMaskingOperator} rhs
-  }
-
-  @_transparent
-  public static func ${x.nonMaskingOperator}= <
-    Other : BinaryInteger
-  >(lhs: inout Self, rhs: Other) {
-    lhs = lhs ${x.nonMaskingOperator} rhs
-  }
 % end # maskingShifts
 }
 
