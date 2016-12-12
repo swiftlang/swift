@@ -237,55 +237,6 @@ public:
   }
 };
 
-/// A placeholder for either an array or a member loader.
-template <typename T>
-class LazyLoaderArray {
-  using LengthTy = llvm::PointerEmbeddedInt<size_t, 31>;
-  PointerUnion<LengthTy, LazyMemberLoader *> lengthOrLoader;
-  uint64_t data = 0;
-public:
-  explicit LazyLoaderArray() = default;
-
-  /*implicit*/ LazyLoaderArray(ArrayRef<T> members) {
-    *this = members;
-  }
-
-  LazyLoaderArray(LazyMemberLoader *loader, uint64_t contextData) {
-    setLoader(loader, contextData);
-  }
-
-  LazyLoaderArray &operator=(ArrayRef<T> members) {
-    lengthOrLoader = members.size();
-    data = reinterpret_cast<uint64_t>(members.data());
-    return *this;
-  }
-
-  void setLoader(LazyMemberLoader *loader, uint64_t contextData) {
-    lengthOrLoader = loader;
-    data = contextData;
-  }
-
-  ArrayRef<T> getArray() const {
-    assert(!isLazy());
-    return llvm::makeArrayRef(reinterpret_cast<T *>(data),
-                              lengthOrLoader.get<LengthTy>());
-  }
-
-  LazyMemberLoader *getLoader() const {
-    assert(isLazy());
-    return lengthOrLoader.get<LazyMemberLoader *>();
-  }
-
-  uint64_t getLoaderContextData() const {
-    assert(isLazy());
-    return data;
-  }
-
-  bool isLazy() const {
-    return lengthOrLoader.is<LazyMemberLoader *>();
-  }
-};
-
 }
 
 #endif // LLVM_SWIFT_AST_LAZYRESOLVER_H
