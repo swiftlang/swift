@@ -24,7 +24,11 @@
 #include "llvm/Object/ELF.h"
 #include "llvm/Support/CommandLine.h"
 
+#if defined(_WIN32)
+#include <io.h>
+#else
 #include <unistd.h>
+#endif
 
 #include <algorithm>
 #include <iostream>
