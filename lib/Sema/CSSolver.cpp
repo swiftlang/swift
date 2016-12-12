@@ -2410,7 +2410,7 @@ bool ConstraintSystem::solveSimplified(
     }
 
     // Record this as a generated constraint.
-    solverState->generatedConstraints.push_back(constraint);
+    solverState->addGeneratedConstraint(constraint);
 
     if (!solveRec(solutions, allowFreeTypeVariables)) {
       firstSolvedConstraint = constraint;

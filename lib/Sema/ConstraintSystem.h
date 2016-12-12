@@ -1016,9 +1016,6 @@ private:
     /// \brief Whether to record failures or not.
     bool recordFixes = false;
 
-    /// The current set of generated constraints.
-    SmallVector<Constraint *, 4> generatedConstraints;
-
     /// \brief The set of type variable bindings that have changed while
     /// processing this constraint system.
     SavedTypeVariableBindings savedBindings;
@@ -1068,6 +1065,38 @@ private:
         processor(constraint);
     }
 
+    /// \brief Add new "generated" constraint along the current solver path.
+    ///
+    /// \param constraint The newly generated constraint.
+    void addGeneratedConstraint(Constraint *constraint) {
+      generatedConstraints.push_back(constraint);
+    }
+
+    /// \brief Erase given constraint from the list of generated constraints
+    /// along the current solver path. Note that this operation doesn't
+    /// guarantee any ordering of the after it's application.
+    ///
+    /// \param constraint The constraint to erase.
+    void removeGeneratedConstraint(Constraint *constraint) {
+      size_t index = 0;
+      for (auto generated : generatedConstraints) {
+        if (generated == constraint) {
+          unsigned last = generatedConstraints.size() - 1;
+          auto lastConstraint = generatedConstraints[last];
+          if (lastConstraint == generated) {
+            generatedConstraints.pop_back();
+            break;
+          } else {
+            generatedConstraints[index] = lastConstraint;
+            generatedConstraints[last] = constraint;
+            generatedConstraints.pop_back();
+            break;
+          }
+        }
+        index++;
+      }
+    }
+
     /// \brief Restore all of the retired/generated constraints to the state
     /// before given scope. This is required because retired constraints have
     /// to be re-introduced to the system in order of arrival (LIFO) and list
@@ -1109,6 +1138,9 @@ private:
     /// current path, this list is used in LIFO fasion when constaints
     /// are added back to the circulation.
     ConstraintList retiredConstraints;
+
+    /// The current set of generated constraints.
+    SmallVector<Constraint *, 4> generatedConstraints;
 
     /// The collection which holds association between solver scope
     /// and position of the last retired constraint and number of
@@ -1585,7 +1617,7 @@ public:
 
     // Record this as a newly-generated constraint.
     if (solverState) {
-      solverState->generatedConstraints.push_back(constraint);
+      solverState->addGeneratedConstraint(constraint);
       solverState->retireConstraint(constraint);
     }
   }
@@ -1601,7 +1633,7 @@ public:
 
     // Record this as a newly-generated constraint.
     if (solverState)
-      solverState->generatedConstraints.push_back(constraint);
+      solverState->addGeneratedConstraint(constraint);
   }
 
   /// \brief Remove an inactive constraint from the current constraint graph.
