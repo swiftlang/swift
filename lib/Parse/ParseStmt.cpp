@@ -2448,30 +2448,16 @@ ParserResult<Stmt> Parser::parseStmtSwitch(LabeledStmtInfo LabelInfo) {
   SourceLoc lBraceLoc = consumeToken(tok::l_brace);
   SourceLoc rBraceLoc;
   
-  // Reject an empty 'switch'.
-  if (Tok.is(tok::r_brace))
-    diagnose(Tok.getLoc(), diag::empty_switch_stmt);
-
   // If there are non-case-label statements at the start of the switch body,
-  // raise an error and recover by parsing and discarding them.
+  // raise an error and recover by discarding them.
   bool DiagnosedNotCoveredStmt = false;
-  bool ErrorAtNotCoveredStmt = false;
   while (!Tok.is(tok::kw_case) && !Tok.is(tok::kw_default)
          && !Tok.is(tok::r_brace) && !Tok.is(tok::eof)) {
-    if (ErrorAtNotCoveredStmt) {
-      // Error recovery.
-      consumeToken();
-      continue;
-    }
     if (!DiagnosedNotCoveredStmt) {
       diagnose(Tok, diag::stmt_in_switch_not_covered_by_case);
       DiagnosedNotCoveredStmt = true;
     }
-    ASTNode NotCoveredStmt;
-    ParserStatus CurrStat = parseExprOrStmt(NotCoveredStmt);
-    if (CurrStat.isError())
-      ErrorAtNotCoveredStmt = true;
-    Status |= CurrStat;
+    skipSingle();
   }
   
   SmallVector<CaseStmt*, 8> cases;
@@ -2498,6 +2484,10 @@ ParserResult<Stmt> Parser::parseStmtSwitch(LabeledStmtInfo LabelInfo) {
                          diag::expected_rbrace_switch, lBraceLoc)) {
     Status.setIsParseError();
   }
+
+  // Reject an empty 'switch'.
+  if (!DiagnosedNotCoveredStmt && cases.empty())
+    diagnose(rBraceLoc, diag::empty_switch_stmt);
 
   return makeParserResult(
       Status, SwitchStmt::create(LabelInfo, SwitchLoc, SubjectExpr.get(),
