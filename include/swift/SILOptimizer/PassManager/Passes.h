@@ -44,6 +44,9 @@ namespace swift {
   /// user code.
   void performSILDiagnoseUnreachable(SILModule *M);
 
+  /// \brief Remove dead functions from \p M.
+  void performSILDeadFunctionElimination(SILModule *M);
+
   /// \brief Link a SILFunction declaration to the actual definition in the
   /// serialized modules.
   ///
