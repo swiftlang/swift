@@ -2343,10 +2343,8 @@ CanSILFunctionType SILGenFunction::buildThunkType(
   // Use the generic signature from the context if the thunk involves
   // generic parameters.
   CanGenericSignature genericSig;
-  GenericEnvironment *genericEnv = nullptr;
   if (expectedType->hasArchetype() || sourceType->hasArchetype()) {
     genericSig = F.getLoweredFunctionType()->getGenericSignature();
-    genericEnv = F.getGenericEnvironment();
     auto subsArray = F.getForwardingSubstitutions();
     subs.append(subsArray.begin(), subsArray.end());
 

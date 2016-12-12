@@ -4798,7 +4798,6 @@ Expr *ExprRewriter::coerceCallArguments(
   };
 
   auto &tc = getConstraintSystem().getTypeChecker();
-  bool anythingShuffled = false;
   SmallVector<TupleTypeElt, 4> toSugarFields;
   SmallVector<TupleTypeElt, 4> fromTupleExprFields(
                                  argTuple? argTuple->getNumElements() : 1);
@@ -4824,7 +4823,6 @@ Expr *ExprRewriter::coerceCallArguments(
       sliceType = tc.getArraySliceType(arg->getLoc(), paramBaseType);
       toSugarFields.push_back(
           TupleTypeElt(sliceType, param.Label, param.parameterFlags));
-      anythingShuffled = true;
       sources.push_back(TupleShuffleExpr::Variadic);
 
       // Convert the arguments.
@@ -4865,7 +4863,6 @@ Expr *ExprRewriter::coerceCallArguments(
                                                          callee, paramIdx);
 
       // Note that we'll be doing a shuffle involving default arguments.
-      anythingShuffled = true;
       toSugarFields.push_back(TupleTypeElt(
                                 param.isVariadic()
                                   ? tc.getArraySliceType(arg->getLoc(),
@@ -4892,9 +4889,6 @@ Expr *ExprRewriter::coerceCallArguments(
     // If the argument and parameter indices differ, or if the names differ,
     // this is a shuffle.
     sources.push_back(argIdx);
-    if (argIdx != paramIdx || getArgLabel(argIdx) != param.Label) {
-      anythingShuffled = true;
-    }
 
     // If the types exactly match, this is easy.
     auto paramType = param.Ty;
