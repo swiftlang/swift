@@ -186,18 +186,6 @@ _swift_release_dealloc(swift::HeapObject *object)
 
 namespace swift {
 
-// FIXME: some operations here should be memory_order_consume, 
-// but (1) the compiler doesn't support consume directly,
-// and (2) the compiler implements consume as acquire which
-// is unnecessarily slow on some of our CPUs.
-// Such operations are written here as fake_memory_order_consume.
-// We map them to memory_order_relaxed. This might leave us vulnerable to
-// compiler optimizations. In addition, the other dependency-tracking
-// annotations that would be required for real memory_order_consume
-// are not present.
-#define fake_memory_order_consume std::memory_order_relaxed
-
-
 // RefCountIsInline: refcount stored in an object
 // RefCountNotInline: refcount stored in an object's side table entry
 enum RefCountInlinedness { RefCountNotInline = false, RefCountIsInline = true };
@@ -777,7 +765,7 @@ class RefCounts {
 
   // Increment the reference count.
   void increment(uint32_t inc = 1) {
-    auto oldbits = refCounts.load(fake_memory_order_consume);
+    auto oldbits = refCounts.load(SWIFT_MEMORY_ORDER_CONSUME);
     RefCountBits newbits;
     do {
       newbits = oldbits;
@@ -789,7 +777,7 @@ class RefCounts {
   }
 
   void incrementNonAtomic(uint32_t inc = 1) {
-    auto oldbits = refCounts.load(fake_memory_order_consume);
+    auto oldbits = refCounts.load(SWIFT_MEMORY_ORDER_CONSUME);
     auto newbits = oldbits;
     bool fast = newbits.incrementStrongExtraRefCount(inc);
     if (!fast)
@@ -807,7 +795,7 @@ class RefCounts {
   //
   // Postcondition: the flag is set.
   bool tryIncrementAndPin() {
-    auto oldbits = refCounts.load(fake_memory_order_consume);
+    auto oldbits = refCounts.load(SWIFT_MEMORY_ORDER_CONSUME);
     RefCountBits newbits;
     do {
       // If the flag is already set, just fail.
@@ -826,7 +814,7 @@ class RefCounts {
   }
 
   bool tryIncrementAndPinNonAtomic() {
-    auto bits = refCounts.load(fake_memory_order_consume);
+    auto bits = refCounts.load(SWIFT_MEMORY_ORDER_CONSUME);
 
     // If the flag is already set, just fail.
     if (!bits.hasSideTable() && bits.getIsPinned())
@@ -843,7 +831,7 @@ class RefCounts {
 
   // Increment the reference count, unless the object is deiniting.
   bool tryIncrement() {
-    auto oldbits = refCounts.load(fake_memory_order_consume);
+    auto oldbits = refCounts.load(SWIFT_MEMORY_ORDER_CONSUME);
     RefCountBits newbits;
     do {
       if (!oldbits.hasSideTable() && oldbits.getIsDeiniting())
@@ -894,7 +882,7 @@ class RefCounts {
   //
   // Precondition: the reference count must be 1
   void decrementFromOneNonAtomic() {
-    auto bits = refCounts.load(fake_memory_order_consume);
+    auto bits = refCounts.load(SWIFT_MEMORY_ORDER_CONSUME);
     if (bits.hasSideTable())
       return bits.getSideTable()->decrementFromOneNonAtomic();
     
@@ -908,7 +896,7 @@ class RefCounts {
   // Return the reference count.
   // Once deinit begins the reference count is undefined.
   uint32_t getCount() const {
-    auto bits = refCounts.load(fake_memory_order_consume);
+    auto bits = refCounts.load(SWIFT_MEMORY_ORDER_CONSUME);
     if (bits.hasSideTable())
       return bits.getSideTable()->getCount();
     
@@ -919,7 +907,7 @@ class RefCounts {
   // Return whether the reference count is exactly 1.
   // Once deinit begins the reference count is undefined.
   bool isUniquelyReferenced() const {
-    auto bits = refCounts.load(fake_memory_order_consume);
+    auto bits = refCounts.load(SWIFT_MEMORY_ORDER_CONSUME);
     if (bits.hasSideTable())
       return false;  // FIXME: implement side table path if useful
     
@@ -930,7 +918,7 @@ class RefCounts {
   // Return whether the reference count is exactly 1 or the pin flag
   // is set. Once deinit begins the reference count is undefined.
   bool isUniquelyReferencedOrPinned() const {
-    auto bits = refCounts.load(fake_memory_order_consume);
+    auto bits = refCounts.load(SWIFT_MEMORY_ORDER_CONSUME);
     // FIXME: implement side table path if useful
     // In the meantime we don't check it here.
     // bits.isUniquelyReferencedOrPinned() checks it too,
@@ -944,7 +932,7 @@ class RefCounts {
 
   // Return true if the object has started deiniting.
   bool isDeiniting() const {
-    auto bits = refCounts.load(fake_memory_order_consume);
+    auto bits = refCounts.load(SWIFT_MEMORY_ORDER_CONSUME);
     if (bits.hasSideTable())
       return bits.getSideTable()->isDeiniting();
     else
@@ -959,7 +947,7 @@ class RefCounts {
   ///   unowned reference count is 1
   /// The object is assumed to be deiniting with no strong references already.
   bool canBeFreedNow() const {
-    auto bits = refCounts.load(fake_memory_order_consume);
+    auto bits = refCounts.load(SWIFT_MEMORY_ORDER_CONSUME);
     return (!bits.hasSideTable() &&
             bits.getIsDeiniting() &&
             bits.getStrongExtraRefCount() == 0 &&
@@ -1024,7 +1012,7 @@ class RefCounts {
   // the caller because the compiler can optimize this arrangement better.
   template <ClearPinnedFlag clearPinnedFlag, PerformDeinit performDeinit>
   bool doDecrement(uint32_t dec) {
-    auto oldbits = refCounts.load(fake_memory_order_consume);
+    auto oldbits = refCounts.load(SWIFT_MEMORY_ORDER_CONSUME);
     RefCountBits newbits;
     
     do {
@@ -1052,7 +1040,7 @@ class RefCounts {
   public:
   // Increment the unowned reference count.
   void incrementUnowned(uint32_t inc) {
-    auto oldbits = refCounts.load(fake_memory_order_consume);
+    auto oldbits = refCounts.load(SWIFT_MEMORY_ORDER_CONSUME);
     RefCountBits newbits;
     do {
       if (oldbits.hasSideTable())
@@ -1069,7 +1057,7 @@ class RefCounts {
   // Decrement the unowned reference count.
   // Return true if the caller should free the object.
   bool decrementUnownedShouldFree(uint32_t dec) {
-    auto oldbits = refCounts.load(fake_memory_order_consume);
+    auto oldbits = refCounts.load(SWIFT_MEMORY_ORDER_CONSUME);
     RefCountBits newbits;
     
     bool performFree;
@@ -1097,7 +1085,7 @@ class RefCounts {
   // Return unowned reference count.
   // Note that this is not equal to the number of outstanding unowned pointers.
   uint32_t getUnownedCount() const {
-    auto bits = refCounts.load(fake_memory_order_consume);
+    auto bits = refCounts.load(SWIFT_MEMORY_ORDER_CONSUME);
     if (bits.hasSideTable())
       return bits.getSideTable()->getUnownedCount();
     else 
@@ -1116,7 +1104,7 @@ class RefCounts {
 
   // Increment the weak reference count.
   void incrementWeak() {
-    auto oldbits = refCounts.load(fake_memory_order_consume);
+    auto oldbits = refCounts.load(SWIFT_MEMORY_ORDER_CONSUME);
     RefCountBits newbits;
     do {
       newbits = oldbits;
@@ -1128,7 +1116,7 @@ class RefCounts {
   }
   
   bool decrementWeakShouldCleanUp() {
-    auto oldbits = refCounts.load(fake_memory_order_consume);
+    auto oldbits = refCounts.load(SWIFT_MEMORY_ORDER_CONSUME);
     RefCountBits newbits;
 
     bool performFree;
@@ -1144,7 +1132,7 @@ class RefCounts {
   // Return weak reference count.
   // Note that this is not equal to the number of outstanding weak pointers.
   uint32_t getWeakCount() const {
-    auto bits = refCounts.load(fake_memory_order_consume);
+    auto bits = refCounts.load(SWIFT_MEMORY_ORDER_CONSUME);
     if (bits.hasSideTable()) {
       return bits.getSideTable()->getWeakCount();
     } else {
@@ -1309,7 +1297,7 @@ inline bool RefCounts<InlineRefCountBits>::doDecrementNonAtomic(uint32_t dec) {
   // Therefore there is no other thread that can be concurrently
   // manipulating this object's retain counts.
 
-  auto oldbits = refCounts.load(fake_memory_order_consume);
+  auto oldbits = refCounts.load(SWIFT_MEMORY_ORDER_CONSUME);
 
   // Use slow path if we can't guarantee atomicity.
   if (oldbits.hasSideTable() || oldbits.getUnownedRefCount() != 1)

@@ -12,10 +12,6 @@
 
 #include "swift/Runtime/HeapObject.h"
 
-// See note about memory_order_consume in SwiftShims/RefCount.h.
-#define fake_memory_order_consume std::memory_order_relaxed
-
-
 namespace swift {
 
 template <typename RefCountBits>
@@ -81,7 +77,7 @@ template bool RefCounts<SideTableRefCountBits>::tryIncrementSlow(SideTableRefCou
 template <>
 HeapObjectSideTableEntry* RefCounts<InlineRefCountBits>::allocateSideTable()
 {
-  auto oldbits = refCounts.load(fake_memory_order_consume);
+  auto oldbits = refCounts.load(SWIFT_MEMORY_ORDER_CONSUME);
   
   // Preflight failures before allocating a new side table.
   if (oldbits.hasSideTable()) {
