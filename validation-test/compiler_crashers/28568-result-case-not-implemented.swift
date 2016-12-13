@@ -7,6 +7,7 @@
 
 // RUN: not --crash %target-swift-frontend %s -emit-ir
 // REQUIRES: asserts
+// REQUIRES: deterministic-behavior
 {_{return 1 + 2
 A{
 }}
