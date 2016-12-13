@@ -3318,8 +3318,11 @@ namespace {
       //
       // FIXME: This is also computed when the constraint system is set up.
       auto destTy = cs.computeAssignDestType(expr->getDest(), expr->getLoc());
-      if (!destTy)
+      if (!destTy) {
+        cs.TC.diagnose(expr->getLoc(), diag::type_of_expression_is_ambiguous)
+          .highlight(expr->getSourceRange());
         return nullptr;
+      }
       expr->getDest()->propagateLValueAccessKind(AccessKind::Write);
 
       // Convert the source to the simplified destination type.

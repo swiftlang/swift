@@ -1409,6 +1409,22 @@ ConstraintSystem::matchTypes(Type type1, Type type2, ConstraintKind kind,
     case ConstraintKind::ArgumentConversion:
     case ConstraintKind::OperatorArgumentTupleConversion:
     case ConstraintKind::OperatorArgumentConversion:
+      if (type1->is<InOutType>() && typeVar2 &&
+          typeVar2->getImpl().canBeInOut()) {
+        // Upgrade type2 to an InOutType
+        auto inOutType1 = type1->getAs<InOutType>();
+        
+        unsigned typeVar3Options = typeVar2->getImpl().getOptions();
+        typeVar3Options &= ~TVO_CanBeInOut;
+        auto typeVar3 = createTypeVariable(getConstraintLocator(locator),
+                                           typeVar3Options);
+        auto inOutType3 = InOutType::get(typeVar3);
+        
+        addConstraint(ConstraintKind::Equal, typeVar2, inOutType3, locator);
+        return matchTypes(inOutType1->getObjectType(), typeVar3, kind, flags,
+                          locator);
+      }
+        
       // We couldn't solve this constraint. If only one of the types is a type
       // variable, perhaps we can do something with it below.
       if (typeVar1 && typeVar2) {

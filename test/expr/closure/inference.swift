@@ -38,3 +38,30 @@ var nestedClosuresWithBrokenInference = { f: Int in {} }
     // expected-error@-2 {{consecutive statements on a line must be separated by ';'}} {{44-44=;}}
     // expected-error@-3 {{expected expression}}
     // expected-error@-4 {{use of unresolved identifier 'f'}}
+
+// SR-1976/SR-3073: Inference of inout
+
+func sr1976<T>(_ closure: (inout T) -> Void) {
+}
+
+sr1976({ $0 += 2 })
+
+// SR-3073: UnresolvedDotExpr in single expression closure
+
+func sr3073<S, T>(_ closure:(inout S, T) -> ()) {}
+
+sr3073({ $0.number1 = $1 }) //expected-error {{type of expression is ambiguous without more context}}
+
+struct SR3073Lense<Whole, Part> {
+  let set: (inout Whole, Part) -> ()
+}
+
+struct SR3073 {
+  var number1: Int
+  
+  func lenses() {
+    let _: SR3073Lense<SR3073, Int> = SR3073Lense(
+      set: { $0.number1 = $1 }
+    )
+  }
+}

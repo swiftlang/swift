@@ -57,7 +57,7 @@ void TypeVariableType::Implementation::print(llvm::raw_ostream &OS) {
 }
 
 SavedTypeVariableBinding::SavedTypeVariableBinding(TypeVariableType *typeVar)
-  : TypeVarAndOptions(typeVar, typeVar->getImpl().Options),
+  : TypeVar(typeVar), TypeVarOptions(typeVar->getImpl().Options),
     ParentOrFixed(typeVar->getImpl().ParentOrFixed) { }
 
 void SavedTypeVariableBinding::restore() {
@@ -2667,6 +2667,8 @@ void ConstraintSystem::print(raw_ostream &out) {
     tv->getImpl().print(out);
     if (tv->getImpl().canBindToLValue())
       out << " [lvalue allowed]";
+    if (tv->getImpl().canBeInOut())
+      out << " [inout allowed]";
     if (tv->getImpl().mustBeMaterializable())
       out << " [must be materializable]";
     auto rep = getRepresentative(tv);
