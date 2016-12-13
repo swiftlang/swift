@@ -20,7 +20,7 @@
 #define _WITH_GETLINE
 #endif
 
-#if defined(_MSC_VER)
+#if defined(_WIN32)
 #define WIN32_LEAN_AND_MEAN
 // Avoid defining macro max(), min() which conflict with std::max(), std::min()
 #define NOMINMAX
@@ -36,7 +36,7 @@
 #include <cstdio>
 #include <cstdlib>
 #include <cstring>
-#if defined(__CYGWIN__) || defined(_MSC_VER)
+#if defined(__CYGWIN__) || defined(_WIN32)
 #include <sstream>
 #include <cmath>
 #define fmodl(lhs, rhs) std::fmod(lhs, rhs)
@@ -142,7 +142,7 @@ static inline locale_t getCLocale() {
   // as C locale.
   return nullptr;
 }
-#elif defined(__CYGWIN__) || defined(_MSC_VER)
+#elif defined(__CYGWIN__) || defined(_WIN32)
 // In Cygwin, getCLocale() is not used.
 #else
 static locale_t makeCLocale() {
@@ -160,7 +160,7 @@ static locale_t getCLocale() {
 
 #if defined(__APPLE__)
 #define swift_snprintf_l snprintf_l
-#elif defined(__CYGWIN__) || defined(_MSC_VER)
+#elif defined(__CYGWIN__) || defined(_WIN32)
 // In Cygwin, swift_snprintf_l() is not used.
 #else
 static int swift_snprintf_l(char *Str, size_t StrSize, locale_t Locale,
@@ -193,7 +193,7 @@ static uint64_t swift_floatingPointToString(char *Buffer, size_t BufferLength,
     Precision = std::numeric_limits<T>::max_digits10;
   }
 
-#if defined(__CYGWIN__) || defined(_MSC_VER)
+#if defined(__CYGWIN__) || defined(_WIN32)
   // Cygwin does not support uselocale(), but we can use the locale feature 
   // in stringstream object.
   std::ostringstream ValueStream;
@@ -262,7 +262,7 @@ extern "C" uint64_t swift_float80ToString(char *Buffer, size_t BufferLength,
 /// \returns Size of character data returned in \c LinePtr, or -1
 /// if an error occurred, or EOF was reached.
 ssize_t swift::swift_stdlib_readLine_stdin(unsigned char **LinePtr) {
-#if defined(_MSC_VER)
+#if defined(_WIN32)
   if (LinePtr == nullptr)
     return -1;
 
@@ -389,7 +389,7 @@ __muloti4(ti_int a, ti_int b, int* overflow)
 // lowered to instructions as though MSVC had generated.  There does not seem to
 // be a MSVC provided multiply with overflow detection that I can see, but this
 // avoids an unnecessary dependency on compiler-rt for a single function.
-#if (defined(__linux__) && defined(__arm__)) || defined(_MSC_VER)
+#if (defined(__linux__) && defined(__arm__)) || defined(_WIN32)
 // Similar to above, but with mulodi4.  Perhaps this is
 // something that shouldn't be done, and is a bandaid over
 // some other lower-level architecture issue that I'm
@@ -438,7 +438,7 @@ __mulodi4(di_int a, di_int b, int* overflow)
 }
 #endif
 
-#if defined(__CYGWIN__) || defined(_MSC_VER)
+#if defined(__CYGWIN__) || defined(_WIN32)
 // Cygwin does not support uselocale(), but we can use the locale feature 
 // in stringstream object.
 template <typename T>
@@ -512,7 +512,7 @@ const char *swift::_swift_stdlib_strtof_clocale(
 #endif
 
 void swift::_swift_stdlib_flockfile_stdout() {
-#if defined(_MSC_VER)
+#if defined(_WIN32)
   _lock_file(stdout);
 #else
   flockfile(stdout);
@@ -520,7 +520,7 @@ void swift::_swift_stdlib_flockfile_stdout() {
 }
 
 void swift::_swift_stdlib_funlockfile_stdout() {
-#if defined(_MSC_VER)
+#if defined(_WIN32)
   _unlock_file(stdout);
 #else
   funlockfile(stdout);
@@ -532,7 +532,7 @@ int swift::_swift_stdlib_putc_stderr(int C) {
 }
 
 size_t swift::_swift_stdlib_getHardwareConcurrency() {
-#if defined(_MSC_VER)
+#if defined(_WIN32)
   SYSTEM_INFO SystemInfo;
   GetSystemInfo(&SystemInfo);
   return SystemInfo.dwNumberOfProcessors;
