@@ -11,11 +11,12 @@
 //===----------------------------------------------------------------------===//
 
 #include "swift/SILOptimizer/Analysis/Analysis.h"
+#include "swift/SILOptimizer/PassManager/PassPipeline.h"
 #include "swift/SILOptimizer/PassManager/Passes.h"
-#include "llvm/Support/Casting.h"
 #include "llvm/ADT/ArrayRef.h"
 #include "llvm/ADT/DenseMap.h"
 #include "llvm/ADT/SmallVector.h"
+#include "llvm/Support/Casting.h"
 #include "llvm/Support/ErrorHandling.h"
 #include <vector>
 
@@ -33,6 +34,8 @@ class SILTransform;
 
 /// \brief The SIL pass manager.
 class SILPassManager {
+  using ExecutionKind = SILPassPipelinePlan::ExecutionKind;
+
   /// The module that the pass manager will transform.
   SILModule *Mod;
 
@@ -209,17 +212,37 @@ public:
     }
   }
 
+  void executePassPipelinePlan(const SILPassPipelinePlan &Plan) {
+    for (const SILPassPipeline &Pipeline : Plan.getPipelines()) {
+      setStageName(Pipeline.Name);
+      resetAndRemoveTransformations();
+      for (PassKind Kind : Plan.getPipelinePasses(Pipeline)) {
+        addPass(Kind);
+      }
+      execute(Pipeline.ExecutionKind);
+    }
+  }
+
+private:
+  void execute(ExecutionKind K) {
+    switch (K) {
+    case ExecutionKind::OneIteration:
+      runOneIteration();
+      break;
+    case ExecutionKind::UntilFixPoint:
+      run();
+      break;
+    case ExecutionKind::Invalid:
+      llvm_unreachable("Invalid execution kind?!");
+    }
+  }
+
   /// Add a pass of a specific kind.
   void addPass(PassKind Kind);
 
   /// Add a pass with a given name.
   void addPassForName(StringRef Name);
 
-  // Each pass gets its own add-function.
-#define PASS(ID, NAME, DESCRIPTION) void add##ID();
-#include "Passes.def"
-
-private:
   /// Run the SIL module transform \p SMT over all the functions in
   /// the module.
   void runModulePass(SILModuleTransform *SMT);
