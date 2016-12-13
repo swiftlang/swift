@@ -1764,6 +1764,13 @@ public:
   /// \brief Determine if the type in question is AnyHashable.
   bool isAnyHashableType(Type t);
 
+  /// Call Expr::propagateLValueAccessKind on the given expression,
+  /// using a custom accessor for the type on the expression which
+  /// reads the type from the ConstraintSystem expression type map.
+  void propagateLValueAccessKind(Expr *E,
+                                 AccessKind accessKind,
+                                 bool allowOverwrite = false);
+
 private:
   /// Introduce the constraints associated with the given type variable
   /// into the worklist.
