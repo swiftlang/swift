@@ -912,6 +912,29 @@ void ModuleFile::readGenericRequirements(
   }
 }
 
+uint64_t ModuleFile::allocateLazyGenericEnvironmentMap(
+                                                   TypeSubstitutionMap &&map) {
+  auto storedGenericEnvMap = new TypeSubstitutionMap(std::move(map));
+  GenericEnvironmentMaps.push_back(
+                    std::unique_ptr<TypeSubstitutionMap>(storedGenericEnvMap));
+  return reinterpret_cast<uint64_t>(storedGenericEnvMap);
+}
+
+void ModuleFile::readLazyGenericEnvironment(GenericTypeDecl *type) {
+  // Read the generic environment.
+  GenericSignature *genericSig;
+  TypeSubstitutionMap genericEnvMap;
+  std::tie(genericSig, genericEnvMap) =
+    readGenericEnvironmentPieces(DeclTypeCursor);
+
+  // Set up the lazy generic environment.
+  if (genericSig) {
+    type->setLazyGenericEnvironment(
+                   this, genericSig,
+                   allocateLazyGenericEnvironmentMap(std::move(genericEnvMap)));
+  }
+}
+
 std::pair<GenericSignature *, TypeSubstitutionMap>
 ModuleFile::readGenericEnvironmentPieces(
                              llvm::BitstreamCursor &Cursor,
@@ -2298,9 +2321,7 @@ Decl *ModuleFile::getDecl(DeclID DID, Optional<DeclContext *> ForcedContext) {
     declOrOffset = alias;
 
     if (genericParams) {
-      auto *env = maybeReadGenericEnvironment();
-      assert(env && "generic typealias without environment");
-      alias->setGenericEnvironment(env);
+      readLazyGenericEnvironment(alias);
     }
 
     alias->setDeserializedUnderlyingType(getType(underlyingTypeID));
@@ -2428,8 +2449,8 @@ Decl *ModuleFile::getDecl(DeclID DID, Optional<DeclContext *> ForcedContext) {
     if (isImplicit)
       theStruct->setImplicit();
 
-    auto *env = maybeReadGenericEnvironment();
-    theStruct->setGenericEnvironment(env);
+    // Read the generic environment.
+    readLazyGenericEnvironment(theStruct);
 
     theStruct->computeType();
 
@@ -2727,13 +2748,9 @@ Decl *ModuleFile::getDecl(DeclID DID, Optional<DeclContext *> ForcedContext) {
 
     // If there is a generic environment, lazily wire it up.
     if (genericSig) {
-      auto storedGenericEnvMap =
-        new TypeSubstitutionMap(std::move(genericEnvMap));
       fn->setLazyGenericEnvironment(
-                              this, genericSig,
-                              reinterpret_cast<uint64_t>(storedGenericEnvMap));
-      GenericEnvironmentMaps.push_back(
-                     std::unique_ptr<TypeSubstitutionMap>(storedGenericEnvMap));
+                  this, genericSig,
+                  allocateLazyGenericEnvironmentMap(std::move(genericEnvMap)));
     }
 
     SmallVector<ParameterList*, 2> paramLists;
@@ -2854,8 +2871,8 @@ Decl *ModuleFile::getDecl(DeclID DID, Optional<DeclContext *> ForcedContext) {
     if (auto genericParams = maybeReadGenericParams(DC))
       proto->setGenericParams(genericParams);
 
-    auto *env = maybeReadGenericEnvironment();
-    proto->setGenericEnvironment(env);
+    // Read the generic environment.
+    readLazyGenericEnvironment(proto);
 
     if (isImplicit)
       proto->setImplicit();
@@ -3030,8 +3047,8 @@ Decl *ModuleFile::getDecl(DeclID DID, Optional<DeclContext *> ForcedContext) {
     if (requiresStoredPropertyInits)
       theClass->setRequiresStoredPropertyInits(true);
 
-    auto *env = maybeReadGenericEnvironment();
-    theClass->setGenericEnvironment(env);
+    // Read the generic environment.
+    readLazyGenericEnvironment(theClass);
 
     theClass->computeType();
 
@@ -3086,8 +3103,8 @@ Decl *ModuleFile::getDecl(DeclID DID, Optional<DeclContext *> ForcedContext) {
       theEnum->setImplicit();
     theEnum->setRawType(getType(rawTypeID));
 
-    auto *env = maybeReadGenericEnvironment();
-    theEnum->setGenericEnvironment(env);
+    // Read the generic environment.
+    readLazyGenericEnvironment(theEnum);
 
     theEnum->computeType();
 
@@ -4342,6 +4359,8 @@ GenericEnvironment *ModuleFile::loadGenericEnvironment(const Decl *decl,
   GenericSignature *genericSig;
   if (auto func = dyn_cast<AbstractFunctionDecl>(decl))
     genericSig = func->getGenericSignature();
+  else if (auto type = dyn_cast<GenericTypeDecl>(decl))
+    genericSig = type->getGenericSignature();
   else
     llvm_unreachable("Cannot lazily deserialize generic environment");
 

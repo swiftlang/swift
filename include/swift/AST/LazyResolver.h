@@ -213,8 +213,15 @@ public:
   uint64_t genericEnvData = 0;
 };
 
+/// Context data for generic type declarations.
+class LazyGenericTypeData : public LazyContextData {
+public:
+  /// The context data used for loading the generic environment.
+  uint64_t genericEnvData = 0;
+};
+
 /// Context data for iterable decl contexts.
-class LazyIterableDeclContextData : public LazyContextData {
+class LazyIterableDeclContextData : public LazyGenericTypeData {
 public:
   /// The context data used for loading all of the members of the iterable
   /// context.

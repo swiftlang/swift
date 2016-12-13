@@ -449,6 +449,13 @@ private:
   void readGenericRequirements(SmallVectorImpl<Requirement> &requirements,
                                llvm::BitstreamCursor &Cursor);
 
+  /// Allocate a lazy generic environment map for use with lazily deserialized
+  /// generic environments.
+  uint64_t allocateLazyGenericEnvironmentMap(TypeSubstitutionMap &&map);
+
+  /// Set up a lazy generic environment for the given type.
+  void readLazyGenericEnvironment(GenericTypeDecl *type);
+
   /// Read the generic signature and type substitution map for a
   /// generic environment from \c Cursor.
   std::pair<GenericSignature *, TypeSubstitutionMap>

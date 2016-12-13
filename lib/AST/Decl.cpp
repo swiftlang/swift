@@ -2140,6 +2140,30 @@ void GenericTypeDecl::setGenericParams(GenericParamList *params) {
       Param->setDeclContext(this);
 }
 
+GenericEnvironment *
+GenericTypeDecl::getLazyGenericEnvironmentSlow() const {
+  assert(GenericSigOrEnv.is<GenericSignature *>() &&
+         "not a lazily deserialized generic environment");
+  auto contextData = getASTContext().getOrCreateLazyGenericTypeData(this,
+                                                                    nullptr);
+  auto genericEnv = contextData->loader->loadGenericEnvironment(
+                                            this, contextData->genericEnvData);
+  const_cast<GenericTypeDecl *>(this)->setGenericEnvironment(genericEnv);
+  ++NumLazyGenericEnvironmentsLoaded;
+  return genericEnv;
+}
+
+void GenericTypeDecl::setLazyGenericEnvironment(LazyMemberLoader *lazyLoader,
+                                                GenericSignature *genericSig,
+                                                uint64_t genericEnvData) {
+  assert(GenericSigOrEnv.isNull() && "already have a generic signature");
+  GenericSigOrEnv = genericSig;
+
+  auto contextData =
+    getASTContext().getOrCreateLazyGenericTypeData(this, lazyLoader);
+  contextData->genericEnvData = genericEnvData;
+  ++NumLazyGenericEnvironments;
+}
 
 TypeAliasDecl::TypeAliasDecl(SourceLoc TypeAliasLoc, Identifier Name,
                              SourceLoc NameLoc, TypeLoc UnderlyingTy,

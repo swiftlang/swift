@@ -703,11 +703,20 @@ public:
   LazyContextData *getOrCreateLazyContextData(const Decl *decl,
                                               LazyMemberLoader *lazyLoader);
 
+  /// Get the lazy function data for the given generic type.
+  ///
+  /// \param lazyLoader If non-null, the lazy loader to use when creating the
+  /// generic type data. The pointer must either be null or be consistent
+  /// across all calls for the same \p type.
+  LazyGenericTypeData *getOrCreateLazyGenericTypeData(
+                                                  const GenericTypeDecl *type,
+                                                  LazyMemberLoader *lazyLoader);
+
   /// Get the lazy function data for the given abstract function.
   ///
   /// \param lazyLoader If non-null, the lazy loader to use when creating the
   /// function data. The pointer must either be null or be consistent
-  /// across all calls for the same \p idc.
+  /// across all calls for the same \p func.
   LazyAbstractFunctionData *getOrCreateLazyFunctionContextData(
                                               const AbstractFunctionDecl *func,
                                               LazyMemberLoader *lazyLoader);

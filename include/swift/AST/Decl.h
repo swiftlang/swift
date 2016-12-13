@@ -2241,16 +2241,20 @@ public:
 class GenericTypeDecl : public TypeDecl, public DeclContext {
   GenericParamList *GenericParams = nullptr;
 
-  /// \brief The generic context of this type.
+  /// The generic signature or environment of this type.
   ///
-  /// This is the mapping between interface types and archetypes for the
-  /// generic parameters of this type.
-  GenericEnvironment *GenericEnv = nullptr;
+  /// When this function stores only a signature, the generic environment
+  /// will be lazily loaded.
+  mutable llvm::PointerUnion<GenericSignature *, GenericEnvironment *>
+    GenericSigOrEnv;
 
   /// \brief Whether or not the generic signature of the type declaration is
   /// currently being validated.
   // TODO: Merge into GenericSig bits.
   unsigned ValidatingGenericSignature = false;
+
+  /// Lazily populate the generic environment.
+  GenericEnvironment *getLazyGenericEnvironmentSlow() const;
 
 public:
   GenericTypeDecl(DeclKind K, DeclContext *DC,
@@ -2280,11 +2284,30 @@ public:
       return { };
   }
 
-  /// Retrieve the generic signature.
+  /// Retrieve the generic signature for this type.
   GenericSignature *getGenericSignature() const {
-    return GenericEnv ? GenericEnv->getGenericSignature() : nullptr;
+    if (auto genericEnv = GenericSigOrEnv.dyn_cast<GenericEnvironment *>())
+      return genericEnv->getGenericSignature();
+
+    if (auto genericSig = GenericSigOrEnv.dyn_cast<GenericSignature *>())
+      return genericSig;
+
+    return nullptr;
   }
-  
+
+  /// Retrieve the generic context for this type.
+  GenericEnvironment *getGenericEnvironment() const {
+    // Fast case: we already have a generic environment.
+    if (auto genericEnv = GenericSigOrEnv.dyn_cast<GenericEnvironment *>())
+      return genericEnv;
+
+    // If we only have a generic signature, build the generic environment.
+    if (GenericSigOrEnv.dyn_cast<GenericSignature *>())
+      return getLazyGenericEnvironmentSlow();
+
+    return nullptr;
+  }
+
   void setIsValidatingGenericSignature(bool validating=true) {
     ValidatingGenericSignature = validating;
   }
@@ -2293,16 +2316,21 @@ public:
     return ValidatingGenericSignature;
   }
 
-  /// Retrieve the generic context for this type.
-  GenericEnvironment *getGenericEnvironment() const { return GenericEnv; }
+  /// Set a lazy generic environment.
+  void setLazyGenericEnvironment(LazyMemberLoader *lazyLoader,
+                                 GenericSignature *genericSig,
+                                 uint64_t genericEnvData);
 
-  /// Set the generic context of this type.
-  void setGenericEnvironment(GenericEnvironment *env) {
-    assert(!this->GenericEnv && "already have generic context?");
-    this->GenericEnv = env;
+  /// Set the generic context of this function.
+  void setGenericEnvironment(GenericEnvironment *genericEnv) {
+    assert((GenericSigOrEnv.isNull() ||
+            getGenericSignature()->getCanonicalSignature() ==
+              genericEnv->getGenericSignature()->getCanonicalSignature()) &&
+           "set a generic environment with a different generic signature");
+    this->GenericSigOrEnv = genericEnv;
 
-    if (GenericEnv)
-      GenericEnv->setOwningDeclContext(this);
+    if (genericEnv)
+      genericEnv->setOwningDeclContext(this);
   }
 
   // Resolve ambiguity due to multiple base classes.

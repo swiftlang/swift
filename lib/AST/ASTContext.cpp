@@ -1483,6 +1483,14 @@ LazyContextData *ASTContext::getOrCreateLazyContextData(
     return contextData;
   }
 
+  // Create new lazy generic type data with the given loader.
+  if (isa<GenericTypeDecl>(decl)) {
+    auto *contextData = Allocate<LazyGenericTypeData>();
+    contextData->loader = lazyLoader;
+    Impl.LazyContexts[decl] = contextData;
+    return contextData;
+  }
+
   // Create new lazy function context data with the given loader.
   if (isa<AbstractFunctionDecl>(decl)) {
     auto *contextData = Allocate<LazyAbstractFunctionData>();
@@ -1514,6 +1522,11 @@ LazyAbstractFunctionData *ASTContext::getOrCreateLazyFunctionContextData(
                                                                 lazyLoader);
 }
 
+LazyGenericTypeData *ASTContext::getOrCreateLazyGenericTypeData(
+                                               const GenericTypeDecl *type,
+                                               LazyMemberLoader *lazyLoader) {
+  return (LazyGenericTypeData *)getOrCreateLazyContextData(type, lazyLoader);
+}
 void ASTContext::addDelayedConformanceDiag(
        NormalProtocolConformance *conformance,
        DelayedConformanceDiag fn) {
