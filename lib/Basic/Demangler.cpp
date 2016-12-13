@@ -89,6 +89,8 @@ static bool isFunctionAttr(Node::Kind kind) {
     case Node::Kind::FunctionSignatureSpecialization:
     case Node::Kind::GenericSpecialization:
     case Node::Kind::GenericSpecializationNotReAbstracted:
+    case Node::Kind::GenericPartialSpecialization:
+    case Node::Kind::GenericPartialSpecializationNotReAbstracted:
     case Node::Kind::ObjCAttribute:
     case Node::Kind::NonObjCAttribute:
     case Node::Kind::DynamicAttribute:
@@ -1030,6 +1032,20 @@ NodePointer Demangler::demangleThunkOrSpecialization() {
     case'G':
       return demangleGenericSpecialization(Node::Kind::
                                           GenericSpecializationNotReAbstracted);
+    case'p': {
+      NodePointer Spec = demangleSpecAttributes(Node::Kind::
+                                                GenericPartialSpecialization);
+      NodePointer Param = createWithChild(Node::Kind::GenericSpecializationParam,
+                                          popNode(Node::Kind::Type));
+      return addChild(Spec, Param);
+    }
+    case'P': {
+      NodePointer Spec = demangleSpecAttributes(Node::Kind::
+                                  GenericPartialSpecializationNotReAbstracted);
+      NodePointer Param = createWithChild(Node::Kind::GenericSpecializationParam,
+                                          popNode(Node::Kind::Type));
+      return addChild(Spec, Param);
+    }
     case'f':
       return demangleFunctionSpecialization();
     default:

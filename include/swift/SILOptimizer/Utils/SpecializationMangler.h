@@ -80,6 +80,22 @@ public:
   std::string mangle();
 };
 
+class PartialSpecializationMangler : public SpecializationMangler {
+
+  CanSILFunctionType SpecializedFnTy;
+  bool isReAbstracted;
+  
+public:
+  PartialSpecializationMangler(SILFunction *F,
+                               CanSILFunctionType SpecializedFnTy,
+                               IsFragile_t Fragile,
+                               bool isReAbstracted)
+    : SpecializationMangler(SpecializationPass::GenericSpecializer, Fragile, F),
+      SpecializedFnTy(SpecializedFnTy), isReAbstracted(isReAbstracted) {}
+
+  std::string mangle();
+};
+
 // The mangler for functions where arguments are specialized.
 class FunctionSignatureSpecializationMangler : public SpecializationMangler {
 

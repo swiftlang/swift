@@ -80,6 +80,17 @@ std::string GenericSpecializationMangler::mangle() {
 }
 
 //===----------------------------------------------------------------------===//
+//                         Partial Generic Specialization
+//===----------------------------------------------------------------------===//
+
+std::string PartialSpecializationMangler::mangle() {
+  beginMangling();
+  appendType(SpecializedFnTy);
+  appendSpecializationOperator(isReAbstracted ? "Tp" : "TP");
+  return finalize();
+}
+
+//===----------------------------------------------------------------------===//
 //                      Function Signature Optimizations
 //===----------------------------------------------------------------------===//
 
