@@ -2674,6 +2674,7 @@ namespace {
 
       expr->setSemanticExpr(result);
       cs.setType(expr, arrayTy);
+      cs.cacheSubExprTypes(expr);
 
       // If the array element type was defaulted, note that in the expression.
       if (solution.DefaultedConstraints.count(cs.getConstraintLocator(expr)))
@@ -2749,6 +2750,7 @@ namespace {
 
       expr->setSemanticExpr(result);
       cs.setType(expr, dictionaryTy);
+      cs.cacheSubExprTypes(expr);
 
       // If the dictionary key or value type was defaulted, note that in the
       // expression.
