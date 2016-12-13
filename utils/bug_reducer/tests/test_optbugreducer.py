@@ -96,8 +96,10 @@ class OptBugReducerTestCase(unittest.TestCase):
         ]
         args.extend(self.passes)
         output = subprocess.check_output(args).split("\n")
-        success_message = 'Found miscompiling passes: --bug-reducer-tester'
-        self.assertTrue(success_message in output)
+        success_messages = ['*** Found miscompiling passes!',
+                            '*** Final Passes: --bug-reducer-tester']
+        for msg in success_messages:
+            self.assertTrue(msg in output)
 
 if __name__ == '__main__':
     unittest.main()

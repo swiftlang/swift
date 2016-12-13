@@ -66,6 +66,7 @@ def maybe_abspath(x):
         return x
     return os.path.abspath(x)
 
+
 class SILOptInvoker(object):
 
     def __init__(self, args, tools, early_passes, extra_args):
@@ -89,15 +90,15 @@ class SILOptInvoker(object):
 
         # First emit an initial *.sib file. This ensures no matter if we have a
         # *.swiftmodule, *.sil, or *.sib file, we are always using *.sib.
-        self._invoke(args.input_file, self.get_suffixed_filename('initial'),
-                     [])
+        self._invoke(args.input_file, [],
+                     self.get_suffixed_filename('initial'))
         self.input_file = self.get_suffixed_filename('initial+early')
 
         # Finally, run the initial sil-opt invocation running the
         # early-passes. We will not run them again.
         self._invoke(self.get_suffixed_filename('initial'),
-                     self.input_file,
-                     early_passes)
+                     early_passes,
+                     self.input_file)
 
     def get_suffixed_filename(self, suffix):
         basename = self.base_input_file_stem + '_' + suffix
@@ -119,17 +120,22 @@ class SILOptInvoker(object):
             x.append("-module-name=%s" % self.module_name)
         return x
 
-    def _invoke(self, input_file, output_file, passes):
+    def _cmdline(self, input_file, passes, output_file='-'):
         base_args = self.base_args
-        base_args.extend([
-            input_file,
-            '-o', output_file])
+        base_args.extend([input_file, '-o', output_file])
         base_args.extend(self.extra_args)
         base_args.extend(passes)
-        return br_call(base_args)
+        return base_args
 
-    def invoke_with_passlist(self, output_filename, passes):
-        return self._invoke(self.input_file, output_filename, passes)
+    def _invoke(self, input_file, passes, output_filename):
+        cmdline = self._cmdline(input_file, passes, output_filename)
+        return br_call(cmdline)
+
+    def invoke_with_passlist(self, passes, output_filename):
+        return self._invoke(self.input_file, passes, output_filename)
+
+    def cmdline_with_passlist(self, passes):
+        return self._cmdline(self.input_file, passes)
 
 
 def get_silopt_invoker(args):
