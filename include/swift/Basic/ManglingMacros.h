@@ -24,7 +24,7 @@
 #define MANGLE_AS_STRING(M) STRINGIFY_MANGLING(M)
 
 /// The mangling prefix for the new mangling.
-#define MANGLING_PREFIX _S
+#define MANGLING_PREFIX _T0
 
 #define MANGLING_PREFIX_STR MANGLE_AS_STRING(MANGLING_PREFIX)
 
