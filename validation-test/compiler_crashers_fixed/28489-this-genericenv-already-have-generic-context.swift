@@ -5,5 +5,6 @@
 // See https://swift.org/LICENSE.txt for license information
 // See https://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
 
-// RUN: not --crash %target-swift-frontend %s -emit-ir
-extension A{init(){}typealias e:A{}}protocol A{init(){}typealias e
+// RUN: not %target-swift-frontend %s -emit-ir
+// REQUIRES: asserts
+guard{protocol a{init()typealias e=a{}typealias e

@@ -299,9 +299,7 @@ void TypeChecker::checkInheritanceClause(Decl *decl,
   }
 
   // Establish a default generic type resolver.
-  auto genericEnv =
-    decl->getInnermostDeclContext()->getGenericEnvironmentOfContext();
-  GenericTypeToArchetypeResolver defaultResolver(genericEnv);
+  GenericTypeToArchetypeResolver defaultResolver(decl->getInnermostDeclContext());
   if (!resolver)
     resolver = &defaultResolver;
 
@@ -3495,8 +3493,7 @@ public:
       }
     }
 
-    if ((IsSecondPass && !IsFirstPass) ||
-        decl->getDeclContext()->getAsProtocolOrProtocolExtensionContext()) {
+    if (IsSecondPass && !IsFirstPass) {
       TC.checkUnsupportedProtocolType(decl);
       if (auto nominal = dyn_cast<NominalTypeDecl>(decl)) {
         TC.checkDeclCircularity(nominal);
@@ -4284,8 +4281,10 @@ public:
 
     if (IsSecondPass) {
       checkAccessibility(TC, PD);
-      for (auto member : PD->getMembers())
+      for (auto member : PD->getMembers()) {
+        TC.checkUnsupportedProtocolType(member);
         checkAccessibility(TC, member);
+      }
       TC.checkInheritanceClause(PD);
       return;
     }

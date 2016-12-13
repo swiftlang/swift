@@ -2907,7 +2907,16 @@ static Type substType(
     llvm::PointerUnion<ModuleDecl *, const SubstitutionMap *> conformances,
     TypeSubstitutionFn substitutions,
     SubstOptions options) {
+
+  // FIXME: Change getTypeOfMember() to not pass GenericFunctionType here
+  if (!derivedType->hasArchetype() &&
+      !derivedType->hasTypeParameter() &&
+      !derivedType->is<GenericFunctionType>())
+    return derivedType;
+
   return derivedType.transform([&](Type type) -> Type {
+    // FIXME: Add SIL versions of mapTypeIntoContext() and
+    // mapTypeOutOfContext() and use them appropriately
     assert((options.contains(SubstFlags::AllowLoweredTypes) ||
             !isa<SILFunctionType>(type.getPointer())) &&
            "should not be doing AST type-substitution on a lowered SIL type;"
@@ -3177,12 +3186,14 @@ static bool transformSILParameter(SILParameterInfo &param, bool &changed,
 }
 
 Type Type::transform(llvm::function_ref<Type(Type)> fn) const {
-  // Transform this type node.
-  Type transformed = fn(*this);
+  if (!isa<ParenType>(getPointer())) {
+    // Transform this type node.
+    Type transformed = fn(*this);
 
-  // If the client changed the type, we're done.
-  if (!transformed || transformed.getPointer() != getPointer())
-    return transformed;
+    // If the client changed the type, we're done.
+    if (!transformed || transformed.getPointer() != getPointer())
+      return transformed;
+  }
 
   // Recursive into children of this type.
   TypeBase *base = getPointer();
