@@ -1758,14 +1758,68 @@ struct MyError : Error {
 sil @unknown : $@convention(thin) () -> ()
 sil [readonly] @readonly_throwing : $@convention(thin) (@owned ZZZ) -> (ZZZ, @error Error)
 
+sil [readonly] @readonly_owned : $@convention(thin) (@owned B) -> @owned B
+sil @returns_param : $@convention(thin) (@owned B) -> @owned B
+
+
+// CHECK-LABEL: sil @delete_readonly_insert_release_after_arc_uses_simple
+// CHECK:      apply
+// CHECK-NEXT: strong_retain
+// CHECK-NEXT: strong_release
+// CHECK-NEXT: return
+sil @delete_readonly_insert_release_after_arc_uses_simple : $@convention(thin) (@owned B) -> @owned B {
+bb0(%0 : $B):
+  %fu = function_ref @returns_param : $@convention(thin) (@owned B) -> @owned B
+  %ru = apply %fu(%0) : $@convention(thin) (@owned B) -> @owned B
+  %f = function_ref @readonly_owned : $@convention(thin) (@owned B) -> @owned B
+  %r = apply %f(%0) : $@convention(thin) (@owned B) -> @owned B
+  strong_retain %ru : $B // This is actually %0
+  strong_release %r : $B
+  return %0 : $B
+}
+
+// CHECK-LABEL: sil @delete_readonly_insert_release_after_arc_uses_multibb
+// CHECK:        apply
+// CHECK-NEXT:   cond_br
+// CHECK:      bb1:
+// CHECK-NEXT:   strong_retain
+// CHECK-NEXT:   strong_release
+// CHECK:      bb2:
+// CHECK-NEXT:   strong_retain
+// CHECK-NEXT:   strong_release
+// CHECK:      bb3:
+// CHECK-NEXT:   return
+sil @delete_readonly_insert_release_after_arc_uses_multibb : $@convention(thin) (@owned B) -> @owned B {
+bb0(%0 : $B):
+  %fu = function_ref @returns_param : $@convention(thin) (@owned B) -> @owned B
+  %ru = apply %fu(%0) : $@convention(thin) (@owned B) -> @owned B
+  %f = function_ref @readonly_owned : $@convention(thin) (@owned B) -> @owned B
+  %r = apply %f(%0) : $@convention(thin) (@owned B) -> @owned B
+  cond_br undef, bb1, bb2
+
+bb1:
+  strong_retain %ru : $B // This is actually %0
+  strong_release %r : $B
+  br bb3
+
+bb2:
+  strong_retain %ru : $B // This is actually %0
+  strong_release %r : $B
+  br bb3
+
+bb3:
+  return %0 : $B
+}
+
 //CHECK-LABEL: sil @test_delete_readonly_try_apply
 //CHECK:      bb0(%0 : $ZZZ):
-//CHECK-NEXT:   strong_release %0
 //CHECK-NEXT:   [[IL:%[0-9]+]] = integer_literal $Builtin.Int1, 0
 //CHECK-NEXT:   cond_br [[IL]], bb1, bb2
 //CHECK:      bb1:
+//CHECK-NEXT:   strong_release %0
 //CHECK-NEXT:   br bb3
 //CHECK:      bb2:
+//CHECK-NEXT:   strong_release %0
 //CHECK-NEXT:   br bb3
 //CHECK:      bb3:
 //CHECK:        return

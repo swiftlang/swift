@@ -740,23 +740,8 @@ void ConstraintGraph::removeEdge(Constraint *constraint) {
     }
   }
 
-  size_t index = 0;
-  for (auto generated : CS.solverState->generatedConstraints) {
-    if (generated == constraint) {
-      unsigned last = CS.solverState->generatedConstraints.size()-1;
-      auto lastConstraint = CS.solverState->generatedConstraints[last];
-      if (lastConstraint == generated) {
-        CS.solverState->generatedConstraints.pop_back();
-        break;
-      } else {
-        CS.solverState->generatedConstraints[index] = lastConstraint;
-        CS.solverState->generatedConstraints[last] = constraint;
-        CS.solverState->generatedConstraints.pop_back();
-        break;
-      }
-    }
-    index++;
-  }
+  if (CS.solverState)
+    CS.solverState->removeGeneratedConstraint(constraint);
 
   removeConstraint(constraint);
 }

@@ -150,17 +150,11 @@ void IterativeTypeChecker::diagnoseCircularReference(
   }
 
   // Now try to break the cycle.
-#ifndef NDEBUG
   bool brokeCycle = false;
-#endif
   for (const auto &request : reverse(requests)) {
-    if (breakCycle(request)) {
-#ifndef NDEBUG
-      brokeCycle = true;
-#endif
-      break;
-    }
+    brokeCycle |= breakCycle(request);
   }
 
   assert(brokeCycle && "Will the cycle be unbroken?");
+  (void) brokeCycle;
 }

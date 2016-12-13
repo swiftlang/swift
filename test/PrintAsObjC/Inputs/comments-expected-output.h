@@ -13,7 +13,7 @@ SWIFT_CLASS("_TtC8comments21A010_AttachToEntities")
   Aaa.  init().
 */
 - (nonnull instancetype)init OBJC_DESIGNATED_INITIALIZER;
-- (NSInteger)objectAtIndexedSubscript:(NSInteger)i;
+- (NSInteger)objectAtIndexedSubscript:(NSInteger)i SWIFT_WARN_UNUSED_RESULT;
 - (void)setObject:(NSInteger)newValue atIndexedSubscript:(NSInteger)i;
 /**
   Aaa.  v1.
@@ -23,7 +23,7 @@ SWIFT_CLASS("_TtC8comments21A010_AttachToEntities")
   Aaa.  v2.
 */
 SWIFT_CLASS_PROPERTY(@property (nonatomic, class, readonly) NSInteger v2;)
-+ (NSInteger)v2;
++ (NSInteger)v2 SWIFT_WARN_UNUSED_RESULT;
 @end
 
 
@@ -457,7 +457,7 @@ SWIFT_CLASS("_TtC8comments7Returns")
   returns:
   A number
 */
-- (NSInteger)f0;
+- (NSInteger)f0 SWIFT_WARN_UNUSED_RESULT;
 - (nonnull instancetype)init OBJC_DESIGNATED_INITIALIZER;
 @end
 

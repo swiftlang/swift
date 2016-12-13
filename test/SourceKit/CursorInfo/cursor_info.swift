@@ -604,16 +604,16 @@ func convention7(_: @convention(witness_method) ()->()) {}
 // CHECK68: source.lang.swift.decl.typealias (152:11-152:18)
 // CHECK68-NEXT: MyAlias
 // CHECK68-NEXT: s:11cursor_info7MyAlias
-// CHECK68-NEXT: MyAlias.Type
-// CHECK68: <Declaration>typealias MyAlias&lt;T, U&gt; = (<Type usr="{{.*}}">T</Type>, <Type usr="{{.*}}">U</Type>, <Type usr="{{.*}}">T</Type>, <Type usr="{{.*}}">U</Type>)</Declaration>
+// CHECK68-NEXT: (T, U, T, U).Type
+// CHECK68: <Declaration>typealias MyAlias&lt;T, U&gt; = (<Type usr="s:t11cursor_info1TMx">T</Type>, <Type usr="s:t11cursor_info1UMq_">U</Type>, <Type usr="s:t11cursor_info1TMx">T</Type>, <Type usr="s:t11cursor_info1UMq_">U</Type>)</Declaration>
 // CHECK68-NEXT: <decl.typealias><syntaxtype.keyword>typealias</syntaxtype.keyword> <decl.name>MyAlias</decl.name>&lt;<decl.generic_type_param usr="{{.*}}"><decl.generic_type_param.name>T</decl.generic_type_param.name></decl.generic_type_param>, <decl.generic_type_param usr="{{.*}}"><decl.generic_type_param.name>U</decl.generic_type_param.name></decl.generic_type_param>&gt; = <tuple>(<tuple.element><tuple.element.type><ref.generic_type_param usr="{{.*}}">T</ref.generic_type_param></tuple.element.type></tuple.element>, <tuple.element><tuple.element.type><ref.generic_type_param usr="{{.*}}">U</ref.generic_type_param></tuple.element.type></tuple.element>, <tuple.element><tuple.element.type><ref.generic_type_param usr="{{.*}}">T</ref.generic_type_param></tuple.element.type></tuple.element>, <tuple.element><tuple.element.type><ref.generic_type_param usr="{{.*}}">U</ref.generic_type_param></tuple.element.type></tuple.element>)</tuple></decl.typealias>
 
 // RUN: %sourcekitd-test -req=cursor -pos=153:28 %s -- -F %S/../Inputs/libIDE-mock-sdk -I %t.tmp %mcp_opt %s | %FileCheck %s -check-prefix=CHECK69
 // CHECK69: source.lang.swift.ref.typealias (152:11-152:18)
 // CHECK69-NEXT: MyAlias
 // CHECK69-NEXT: s:11cursor_info7MyAlias
-// CHECK69-NEXT: MyAlias.Type
-// CHECK69: <Declaration>typealias MyAlias&lt;T, U&gt; = (<Type usr="{{.*}}">T</Type>, <Type usr="{{.*}}">U</Type>, <Type usr="{{.*}}">T</Type>, <Type usr="{{.*}}">U</Type>)</Declaration>
+// CHECK69-NEXT: (T, U, T, U).Type
+// CHECK69: <Declaration>typealias MyAlias&lt;T, U&gt; = (<Type usr="s:t11cursor_info1TMx">T</Type>, <Type usr="s:t11cursor_info1UMq_">U</Type>, <Type usr="s:t11cursor_info1TMx">T</Type>, <Type usr="s:t11cursor_info1UMq_">U</Type>)</Declaration>
 // CHECK69-NEXT: <decl.typealias><syntaxtype.keyword>typealias</syntaxtype.keyword> <decl.name>MyAlias</decl.name>&lt;<decl.generic_type_param usr="{{.*}}"><decl.generic_type_param.name>T</decl.generic_type_param.name></decl.generic_type_param>, <decl.generic_type_param usr="{{.*}}"><decl.generic_type_param.name>U</decl.generic_type_param.name></decl.generic_type_param>&gt; = <tuple>(<tuple.element><tuple.element.type><ref.generic_type_param usr="{{.*}}">T</ref.generic_type_param></tuple.element.type></tuple.element>, <tuple.element><tuple.element.type><ref.generic_type_param usr="{{.*}}">U</ref.generic_type_param></tuple.element.type></tuple.element>, <tuple.element><tuple.element.type><ref.generic_type_param usr="{{.*}}">T</ref.generic_type_param></tuple.element.type></tuple.element>, <tuple.element><tuple.element.type><ref.generic_type_param usr="{{.*}}">U</ref.generic_type_param></tuple.element.type></tuple.element>)</tuple></decl.typealias>
 
 // RUN: %sourcekitd-test -req=cursor -pos=155:6 %s -- -F %S/../Inputs/libIDE-mock-sdk -I %t.tmp %mcp_opt %s | %FileCheck %s -check-prefix=CHECK70

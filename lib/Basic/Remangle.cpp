@@ -460,6 +460,15 @@ void Remangler::mangleGenericSpecializationNotReAbstracted(Node *node) {
   // Start another mangled name.
   Out << "__T";
 }
+
+void Remangler::mangleGenericPartialSpecialization(Node *node) {
+  unreachable("todo");
+}
+
+void Remangler::mangleGenericPartialSpecializationNotReAbstracted(Node *node) {
+  unreachable("todo");
+}
+
 void Remangler::mangleGenericSpecializationParam(Node *node) {
   // Should be a type followed by a series of protocol conformances.
   mangleChildNodes(node);
@@ -1666,6 +1675,10 @@ void Remangler::mangleReflectionMetadataAssocTypeDescriptor(Node *node) {
 
 void Remangler::mangleReflectionMetadataSuperclassDescriptor(Node *node) {
   Out << "MRc";
+}
+
+void Remangler::mangleGenericTypeParamDecl(Node *node) {
+  unreachable("todo");
 }
 
 void Remangler::mangleCurryThunk(Node *node, EntityContext &ctx) {

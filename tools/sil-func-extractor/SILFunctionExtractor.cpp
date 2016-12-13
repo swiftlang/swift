@@ -1,4 +1,4 @@
-//===--- SILExtract.cpp - SIL function extraction utility -----------------===//
+//===--- SILFunctionExtractor.cpp - SIL function extraction utility -------===//
 //
 // This source file is part of the Swift.org open source project
 //
@@ -24,6 +24,7 @@
 #include "swift/Basic/Demangle.h"
 #include "swift/Basic/LLVM.h"
 #include "swift/Basic/LLVMInitialize.h"
+#include "swift/Basic/ManglingMacros.h"
 #include "swift/Frontend/DiagnosticVerifier.h"
 #include "swift/Frontend/Frontend.h"
 #include "swift/Frontend/PrintingDiagnosticConsumer.h"
@@ -215,9 +216,7 @@ void removeUnwantedFunctions(SILModule *M, ArrayRef<std::string> MangledNames,
   }
 
   // Remove dead functions.
-  SILPassManager PM(M);
-  PM.addDeadFunctionElimination();
-  PM.run();
+  performSILDeadFunctionElimination(M);
 }
 
 int main(int argc, char **argv) {
@@ -321,7 +320,9 @@ int main(int argc, char **argv) {
   // First partition our function names into mangled/demangled arrays.
   auto FirstDemangledName = std::partition(
       Names.begin(), Names.end(), [](const std::string &Name) -> bool {
-        return StringRef(Name).startswith("_T");
+        StringRef NameRef(Name);
+        return NameRef.startswith("_T") ||
+               NameRef.startswith(MANGLING_PREFIX_STR);
       });
 
   // Then grab offsets to avoid any issues with iterator invalidation when we

@@ -14,6 +14,8 @@
 #include "swift/AST/Decl.h"
 #include "swift/AST/GenericSignature.h"
 #include "swift/AST/Mangle.h"
+#include "swift/Basic/Mangler.h"
+#include "swift/Basic/ManglingMacros.h"
 #include "swift/AST/NameLookup.h"
 #include "swift/Basic/Demangle.h"
 #include "swift/ClangImporter/ClangImporter.h"
@@ -216,6 +218,8 @@ public:
     case LookupKind::Crawler:
       return nullptr;
     }
+
+    llvm_unreachable("Unhandled LookupKind in switch.");
   }
 
   ConstString GetName() const {
@@ -236,6 +240,8 @@ public:
       builder.append(_module->getNameStr());
       return builder.str();
     }
+
+    llvm_unreachable("Unhandled LookupKind in switch.");
   }
 
   ~DeclsLookupSource() {}
@@ -308,6 +314,8 @@ public:
     case LookupKind::Extension:
       return (_extension._decl != nullptr) && (_extension._module != nullptr);
     }
+
+    llvm_unreachable("Unhandled LookupKind in switch.");
   }
 
   bool IsExtension() {
@@ -981,10 +989,8 @@ static void VisitNodeDestructor(
   }
 
   if (kind_type_result.HasSingleType()) {
-    bool found = false;
     const size_t n = FindNamedDecls(ast, StringRef("deinit"), kind_type_result);
     if (n == 1) {
-      found = true;
       kind_type_result._types[0] = FixCallingConv(
           kind_type_result._decls[0], kind_type_result._types[0].getPointer());
       result = kind_type_result;
@@ -992,6 +998,7 @@ static void VisitNodeDestructor(
       // I can't think of a reason why we would get more than one decl called
       // deinit here, but
       // just in case, if it is a function type, we should remember it.
+      bool found = false;
       const size_t num_kind_type_results = kind_type_result._types.size();
       for (size_t i = 0; i < num_kind_type_results && !found; ++i) {
         auto &identifier_type = kind_type_result._types[i];
@@ -1081,7 +1088,6 @@ static void VisitNodeExplicitClosure(
   // so we cannot really do a lot about them, other than make a function type
   // for whatever their advertised type is, and cross fingers
   VisitNodeResult function_result;
-  uint64_t index = UINT64_MAX;
   VisitNodeResult closure_type_result;
   VisitNodeResult module_result;
   Demangle::Node::iterator end = cur_node->end();
@@ -1102,7 +1108,6 @@ static void VisitNodeExplicitClosure(
       VisitNode(ast, nodes, function_result, generic_context);
       break;
     case Demangle::Node::Kind::Number:
-      index = (*pos)->getIndex();
       break;
     case Demangle::Node::Kind::Type:
       nodes.push_back((*pos));
@@ -1360,13 +1365,11 @@ static void VisitNodeFunctionType(
   VisitNodeResult arg_type_result;
   VisitNodeResult return_type_result;
   Demangle::Node::iterator end = cur_node->end();
-  bool is_in_class = false;
   bool throws = false;
   for (Demangle::Node::iterator pos = cur_node->begin(); pos != end; ++pos) {
     const Demangle::Node::Kind child_node_kind = (*pos)->getKind();
     switch (child_node_kind) {
     case Demangle::Node::Kind::Class: {
-      is_in_class = true;
       VisitNodeResult class_type_result;
       nodes.push_back(*pos);
       VisitNode(ast, nodes, class_type_result, generic_context);
@@ -1620,7 +1623,8 @@ static void VisitNodeLocalDeclName(
     Demangle::NodePointer &cur_node, VisitNodeResult &result,
     const VisitNodeResult &generic_context) { // set by GenericType case
   Demangle::NodePointer parent_node = nodes[nodes.size() - 2];
-  std::string remangledNode = Demangle::mangleNode(parent_node);
+  std::string remangledNode = Demangle::mangleNode(parent_node,
+                                                 NewMangling::useNewMangling());
   TypeDecl *decl = result._module.lookupLocalType(remangledNode);
   if (!decl)
     result._error = stringWithFormat("unable to lookup local type %s",
@@ -2162,7 +2166,8 @@ Decl *ide::getDeclFromUSR(ASTContext &context, StringRef USR,
   // This relies on USR generation being very close to symbol mangling; if we
   // need to support entities with customized USRs (e.g. extensions), we will
   // need to do something smarter here.
-  mangledName.replace(0, 2, "_T");
+  mangledName.replace(0, 2, NewMangling::useNewMangling() ?
+                             MANGLING_PREFIX_STR : "_T");
 
   return getDeclFromMangledSymbolName(context, mangledName, error);
 }

@@ -11,6 +11,7 @@
 //===----------------------------------------------------------------------===//
 
 #include "IRGenMangler.h"
+#include "swift/Basic/ManglingMacros.h"
 
 using namespace swift;
 using namespace irgen;
@@ -31,5 +32,20 @@ std::string IRGenMangler::mangleValueWitness(Type type, ValueWitness witness) {
       llvm_unreachable("not a function witness");
   }
   appendOperator("w", Code);
+  return finalize();
+}
+
+std::string IRGenMangler::manglePartialApplyForwarder(StringRef FuncName) {
+  if (FuncName.empty()) {
+    beginMangling();
+  } else {
+    if (FuncName.startswith(MANGLING_PREFIX_STR)) {
+      Buffer << FuncName;
+    } else {
+      beginMangling();
+      appendIdentifier(FuncName);
+    }
+  }
+  appendOperator("TA");
   return finalize();
 }

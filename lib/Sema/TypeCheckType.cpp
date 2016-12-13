@@ -455,7 +455,8 @@ Type TypeChecker::applyGenericArguments(Type type, TypeDecl *decl,
                                         SourceLoc loc, DeclContext *dc,
                                         GenericIdentTypeRepr *generic,
                                         TypeResolutionOptions options,
-                                        GenericTypeResolver *resolver) {
+                                        GenericTypeResolver *resolver,
+                                 UnsatisfiedDependency *unsatisfiedDependency) {
 
   if (type->hasError()) {
     generic->setInvalid();
@@ -509,7 +510,7 @@ Type TypeChecker::applyGenericArguments(Type type, TypeDecl *decl,
         .highlight(generic->getAngleBrackets());
     diagnose(decl, diag::generic_type_declared_here,
              decl->getName());
-    return nullptr;
+    return ErrorType::get(Context);
   }
 
   // In SIL mode, Optional<T> interprets T as a SIL type.
@@ -522,18 +523,31 @@ Type TypeChecker::applyGenericArguments(Type type, TypeDecl *decl,
           return nullptr;
 
         Type objectType = arg.getType();
+        if (!objectType)
+          return nullptr;
+
         return BoundGenericType::get(nominal, /*parent*/ Type(), objectType);
       }
     }  
+  }
+
+  // FIXME: More principled handling of circularity.
+  if (!genericDecl->getGenericSignature()) {
+    diagnose(loc, diag::recursive_type_reference,
+             genericDecl->getName());
+    diagnose(genericDecl, diag::type_declared_here);
+    return ErrorType::get(Context);
   }
 
   SmallVector<TypeLoc, 8> args;
   for (auto tyR : genericArgs)
     args.push_back(tyR);
 
-  bool isGenericSignature = options.contains(TR_GenericSignature);
   auto result = applyUnboundGenericArguments(type, genericDecl, loc, dc, args,
-                                             isGenericSignature, resolver);
+                                             options, resolver,
+                                             unsatisfiedDependency);
+  if (!result)
+    return result;
   bool isMutablePointer;
   if (isPointerToVoid(dc->getASTContext(), result, isMutablePointer)) {
     if (isMutablePointer)
@@ -549,8 +563,15 @@ Type TypeChecker::applyGenericArguments(Type type, TypeDecl *decl,
 /// Apply generic arguments to the given type.
 Type TypeChecker::applyUnboundGenericArguments(
     Type type, GenericTypeDecl *decl, SourceLoc loc, DeclContext *dc,
-    MutableArrayRef<TypeLoc> genericArgs, bool isGenericSignature,
-    GenericTypeResolver *resolver) {
+    MutableArrayRef<TypeLoc> genericArgs,
+    TypeResolutionOptions options,
+    GenericTypeResolver *resolver,
+    UnsatisfiedDependency *unsatisfiedDependency) {
+
+  options -= TR_SILType;
+  options -= TR_ImmediateFunctionInput;
+  options -= TR_FunctionInput;
+  options -= TR_AllowUnavailableProtocol;
 
   assert(genericArgs.size() == decl->getGenericParams()->size() &&
          "invalid arguments, use applyGenericArguments for diagnostic emitting");
@@ -560,15 +581,14 @@ Type TypeChecker::applyUnboundGenericArguments(
   if (!resolver)
     resolver = &defaultResolver;
 
-  TypeResolutionOptions options;
-  if (isGenericSignature)
-    options |= TR_GenericSignature;
-
   // Validate the generic arguments and capture just the types.
   SmallVector<Type, 4> genericArgTypes;
   for (auto &genericArg : genericArgs) {
     // Validate the generic argument.
-    if (validateType(genericArg, dc, options, resolver))
+    if (validateType(genericArg, dc, options, resolver, unsatisfiedDependency))
+      return ErrorType::get(Context);
+
+    if (!genericArg.getType())
       return nullptr;
 
     genericArgTypes.push_back(genericArg.getType());
@@ -617,41 +637,27 @@ Type TypeChecker::applyUnboundGenericArguments(
 
     // Check the generic arguments against the generic signature.
     auto genericSig = decl->getGenericSignature();
-    if (!decl->hasInterfaceType() ||
-        decl->isValidatingGenericSignature()) {
-      diagnose(loc, diag::recursive_type_reference,
-               decl->getName());
-      diagnose(noteLoc, diag::type_declared_here);
-      return nullptr;
-    }
 
     // Collect the complete set of generic arguments.
     assert(genericSig != nullptr);
     auto substitutions = BGT->getMemberSubstitutions(BGT->getDecl());
 
-    if (checkGenericArguments(dc, loc, noteLoc, UGT, genericSig,
-                              substitutions))
-      return nullptr;
+    auto result = checkGenericArguments(
+        dc, loc, noteLoc, UGT, genericSig,
+        substitutions, unsatisfiedDependency);
+    switch (result) {
+    case CheckGenericArgsResult::Success:
+      break;
+    case CheckGenericArgsResult::Error:
+      return ErrorType::get(Context);
+    case CheckGenericArgsResult::Unsatisfied:
+      return Type();
+    }
 
     useObjectiveCBridgeableConformancesOfArgs(dc, BGT);
   }
 
   return BGT;
-}
-
-static Type applyGenericTypeReprArgs(TypeChecker &TC, Type type,
-                                     TypeDecl *decl,
-                                     SourceLoc loc,
-                                     DeclContext *dc,
-                                     GenericIdentTypeRepr *generic,
-                                     TypeResolutionOptions options,
-                                     GenericTypeResolver *resolver) {
-
-  Type ty = TC.applyGenericArguments(type, decl, loc, dc, generic,
-                                     options, resolver);
-  if (!ty)
-    return ErrorType::get(TC.Context);
-  return ty;
 }
 
 /// \brief Diagnose a use of an unbound generic type.
@@ -686,14 +692,14 @@ static Type resolveTypeDecl(TypeChecker &TC, TypeDecl *typeDecl, SourceLoc loc,
   } else {
     // Validate the declaration.
     TC.validateDecl(typeDecl);
+  }
 
-    // FIXME: More principled handling of circularity.
-    if (!typeDecl->hasInterfaceType()) {
-      TC.diagnose(loc, diag::recursive_type_reference,
-                  typeDecl->getName());
-      TC.diagnose(typeDecl->getLoc(), diag::type_declared_here);
-      return ErrorType::get(TC.Context);
-    }
+  // FIXME: More principled handling of circularity.
+  if (!typeDecl->hasInterfaceType()) {
+    TC.diagnose(loc, diag::recursive_type_reference,
+                typeDecl->getName());
+    TC.diagnose(typeDecl->getLoc(), diag::type_declared_here);
+    return ErrorType::get(TC.Context);
   }
 
   // Resolve the type declaration to a specific type. How this occurs
@@ -719,8 +725,10 @@ static Type resolveTypeDecl(TypeChecker &TC, TypeDecl *typeDecl, SourceLoc loc,
 
   if (generic && !options.contains(TR_ResolveStructure)) {
     // Apply the generic arguments to the type.
-    type = applyGenericTypeReprArgs(TC, type, typeDecl, loc, dc, generic,
-                                    options, resolver);
+    type = TC.applyGenericArguments(type, typeDecl, loc, dc, generic,
+                                    options, resolver, unsatisfiedDependency);
+    if (!type)
+      return nullptr;
   }
 
   assert(type);
@@ -1155,7 +1163,7 @@ static Type resolveNestedIdentTypeComponent(
       auto conformance = TC.conformsToProtocol(parentTy, protocol, DC,
                                                conformanceOptions);
       if (!conformance || conformance->isAbstract()) {
-        return nullptr;
+        return ErrorType::get(TC.Context);
       }
 
       // FIXME: Establish that we need a type witness.
@@ -1172,9 +1180,9 @@ static Type resolveNestedIdentTypeComponent(
 
     // If there are generic arguments, apply them now.
     if (auto genComp = dyn_cast<GenericIdentTypeRepr>(comp)) {
-      memberType = applyGenericTypeReprArgs(
-          TC, memberType, typeDecl, comp->getIdLoc(), DC, genComp,
-          options, resolver);
+      memberType = TC.applyGenericArguments(
+          memberType, typeDecl, comp->getIdLoc(), DC, genComp,
+          options, resolver, unsatisfiedDependency);
 
       // Propagate failure.
       if (!memberType || memberType->hasError()) return memberType;
@@ -1243,7 +1251,6 @@ static Type resolveNestedIdentTypeComponent(
   }
 
   // If we didn't find anything, complain.
-  bool recovered = false;
   Type memberType;
   TypeDecl *member = nullptr;
   if (!memberTypes) {
@@ -1260,7 +1267,6 @@ static Type resolveNestedIdentTypeComponent(
       return ErrorType::get(TC.Context);
     }
 
-    recovered = true;
     memberType = ty;
     member = cast_or_null<TypeDecl>(comp->getBoundDecl());
   } else {
@@ -1287,9 +1293,9 @@ static Type resolveNestedIdentTypeComponent(
 
   // If there are generic arguments, apply them now.
   if (auto genComp = dyn_cast<GenericIdentTypeRepr>(comp))
-    memberType = applyGenericTypeReprArgs(
-        TC, memberType, member, comp->getIdLoc(), DC, genComp,
-        options, resolver);
+    memberType = TC.applyGenericArguments(
+        memberType, member, comp->getIdLoc(), DC, genComp,
+        options, resolver, unsatisfiedDependency);
 
   // If we found a reference to an associated type or other member type that
   // was marked invalid, just return ErrorType to silence downstream errors.
@@ -1417,19 +1423,18 @@ Type TypeChecker::resolveIdentifierType(
   if (result->is<FunctionType>())
     result = applyNonEscapingFromContext(DC, result, options);
 
+  // Check the availability of the type.
+
   // We allow a type to conform to a protocol that is less available than
   // the type itself. This enables a type to retroactively model or directly
   // conform to a protocol only available on newer OSes and yet still be used on
   // older OSes.
   // To support this, inside inheritance clauses we allow references to
   // protocols that are unavailable in the current type refinement context.
-  bool AllowPotentiallyUnavailableProtocol =
-      options.contains(TR_InheritanceClause);
 
-  // Check the availability of the type.
   if (!(options & TR_AllowUnavailable) &&
       diagnoseAvailability(IdType, DC, *this,
-                           AllowPotentiallyUnavailableProtocol)) {
+                           options.contains(TR_AllowUnavailableProtocol))) {
     Components.back()->setInvalid();
     return ErrorType::get(Context);
   }
@@ -2555,8 +2560,8 @@ Type TypeResolver::resolveDictionaryType(DictionaryTypeRepr *repr,
 
     if (!TC.applyUnboundGenericArguments(
             unboundTy, dictDecl, repr->getStartLoc(), DC, args,
-            options.contains(TR_GenericSignature), Resolver)) {
-      return ErrorType::get(TC.Context);
+            options, Resolver, UnsatisfiedDependency)) {
+      return nullptr;
     }
 
     // Check for _ObjectiveCBridgeable conformances in the key and value
@@ -2881,6 +2886,7 @@ Type TypeChecker::substMemberTypeWithBase(Module *module,
   // arguments; strip them off.
   if (auto *nominalDecl = dyn_cast<NominalTypeDecl>(member)) {
     auto memberType = nominalDecl->getDeclaredType();
+    assert(memberType);
 
     if (baseTy->is<ModuleType>())
       return memberType;
@@ -2902,7 +2908,9 @@ Type TypeChecker::substMemberTypeWithBase(Module *module,
     return memberType;
   } else {
     auto memberType = member->getDeclaredInterfaceType();
-    return baseTy->getTypeOfMember(module, member, this, memberType);
+    memberType = baseTy->getTypeOfMember(module, member, this, memberType);
+    assert(memberType);
+    return memberType;
   }
 }
 

@@ -33,6 +33,7 @@
 #include "clang/Lex/MacroInfo.h"
 #include "llvm/ADT/SmallString.h"
 #include "llvm/ADT/SmallPtrSet.h"
+#include "llvm/ADT/Statistic.h"
 #include "llvm/Support/raw_ostream.h"
 #include "swift/Basic/Range.h"
 #include "swift/Basic/StringExtras.h"
@@ -45,6 +46,13 @@
 #include <algorithm>
 
 using namespace swift;
+
+#define DEBUG_TYPE "Serialization"
+
+STATISTIC(NumLazyGenericEnvironments,
+          "# of lazily-deserialized generic environments known");
+STATISTIC(NumLazyGenericEnvironmentsLoaded,
+          "# of lazily-deserialized generic environments loaded");
 
 clang::SourceLocation ClangNode::getLocation() const {
   if (auto D = getAsDecl())
@@ -649,47 +657,29 @@ ImportDecl::findBestImportKind(ArrayRef<ValueDecl *> Decls) {
   return FirstKind;
 }
 
-template <typename T>
-static void
-loadAllConformances(const T *container,
-                    const LazyLoaderArray<ProtocolConformance*> &loaderInfo) {
-  if (!loaderInfo.isLazy())
-    return;
-
-  // Don't try to load conformances re-entrant-ly.
-  auto resolver = loaderInfo.getLoader();
-  auto contextData = loaderInfo.getLoaderContextData();
-  const_cast<LazyLoaderArray<ProtocolConformance*> &>(loaderInfo) = {};
-
-  SmallVector<ProtocolConformance *, 8> Conformances;
-  resolver->loadAllConformances(container, contextData, Conformances);
-  const_cast<T *>(container)->setConformances(
-                        container->getASTContext().AllocateCopy(Conformances));
-}
-
 DeclRange NominalTypeDecl::getMembers() const {
   loadAllMembers();
   return IterableDeclContext::getMembers();
 }
 
-void NominalTypeDecl::setMemberLoader(LazyMemberLoader *resolver,
-                                      uint64_t contextData) {
-  IterableDeclContext::setLoader(resolver, contextData);
-}
-
-void NominalTypeDecl::setConformanceLoader(LazyMemberLoader *resolver,
+void NominalTypeDecl::setConformanceLoader(LazyMemberLoader *lazyLoader,
                                            uint64_t contextData) {
-  assert(!HaveConformanceLoader &&
-         "Already have a conformance loader");
-  HaveConformanceLoader = true;
-  getASTContext().recordConformanceLoader(this, resolver, contextData);
+  assert(!NominalTypeDeclBits.HasLazyConformances &&
+         "Already have lazy conformances");
+  NominalTypeDeclBits.HasLazyConformances = true;
+
+  ASTContext &ctx = getASTContext();
+  auto contextInfo = ctx.getOrCreateLazyIterableContextData(this, lazyLoader);
+  contextInfo->allConformancesData = contextData;
 }
 
 std::pair<LazyMemberLoader *, uint64_t>
 NominalTypeDecl::takeConformanceLoaderSlow() {
-  assert(HaveConformanceLoader && "no conformance loader?");
-  HaveConformanceLoader = false;
-  return getASTContext().takeConformanceLoader(this);
+  assert(NominalTypeDeclBits.HasLazyConformances && "not lazy conformances");
+  NominalTypeDeclBits.HasLazyConformances = false;
+  auto contextInfo =
+    getASTContext().getOrCreateLazyIterableContextData(this, nullptr);
+  return { contextInfo->loader, contextInfo->allConformancesData };
 }
 
 ExtensionDecl::ExtensionDecl(SourceLoc extensionLoc,
@@ -708,7 +698,7 @@ ExtensionDecl::ExtensionDecl(SourceLoc extensionLoc,
   ExtensionDeclBits.Validated = false;
   ExtensionDeclBits.CheckedInheritanceClause = false;
   ExtensionDeclBits.DefaultAndMaxAccessLevel = 0;
-  ExtensionDeclBits.HaveConformanceLoader = false;
+  ExtensionDeclBits.HasLazyConformances = false;
 }
 
 ExtensionDecl *ExtensionDecl::create(ASTContext &ctx, SourceLoc extensionLoc,
@@ -741,29 +731,55 @@ void ExtensionDecl::setGenericParams(GenericParamList *params) {
   }
 }
 
+GenericEnvironment *
+ExtensionDecl::getLazyGenericEnvironmentSlow() const {
+  assert(GenericSigOrEnv.is<GenericSignature *>() &&
+         "not a lazily deserialized generic environment");
+  auto contextData = getASTContext().getOrCreateLazyIterableContextData(this,
+                                                                    nullptr);
+  auto genericEnv = contextData->loader->loadGenericEnvironment(
+                                            this, contextData->genericEnvData);
+  const_cast<ExtensionDecl *>(this)->setGenericEnvironment(genericEnv);
+  ++NumLazyGenericEnvironmentsLoaded;
+  return genericEnv;
+}
+
+void ExtensionDecl::setLazyGenericEnvironment(LazyMemberLoader *lazyLoader,
+                                              GenericSignature *genericSig,
+                                              uint64_t genericEnvData) {
+  assert(GenericSigOrEnv.isNull() && "already have a generic signature");
+  GenericSigOrEnv = genericSig;
+
+  auto contextData =
+    getASTContext().getOrCreateLazyIterableContextData(this, lazyLoader);
+  contextData->genericEnvData = genericEnvData;
+  ++NumLazyGenericEnvironments;
+}
+
 DeclRange ExtensionDecl::getMembers() const {
   loadAllMembers();
   return IterableDeclContext::getMembers();
 }
 
-void ExtensionDecl::setMemberLoader(LazyMemberLoader *resolver,
-                                    uint64_t contextData) {
-  IterableDeclContext::setLoader(resolver, contextData);
-}
-
-void ExtensionDecl::setConformanceLoader(LazyMemberLoader *resolver,
+void ExtensionDecl::setConformanceLoader(LazyMemberLoader *lazyLoader,
                                          uint64_t contextData) {
-  assert(!ExtensionDeclBits.HaveConformanceLoader && 
-         "Already have a conformance loader");
-  ExtensionDeclBits.HaveConformanceLoader = true;
-  getASTContext().recordConformanceLoader(this, resolver, contextData);
+  assert(!ExtensionDeclBits.HasLazyConformances && 
+         "Already have lazy conformances");
+  ExtensionDeclBits.HasLazyConformances = true;
+
+  ASTContext &ctx = getASTContext();
+  auto contextInfo = ctx.getOrCreateLazyIterableContextData(this, lazyLoader);
+  contextInfo->allConformancesData = contextData;
 }
 
 std::pair<LazyMemberLoader *, uint64_t>
 ExtensionDecl::takeConformanceLoaderSlow() {
-  assert(ExtensionDeclBits.HaveConformanceLoader && "no conformance loader?");
-  ExtensionDeclBits.HaveConformanceLoader = false;
-  return getASTContext().takeConformanceLoader(this);
+  assert(ExtensionDeclBits.HasLazyConformances && "no conformance loader?");
+  ExtensionDeclBits.HasLazyConformances = false;
+
+  auto contextInfo =
+    getASTContext().getOrCreateLazyIterableContextData(this, nullptr);
+  return { contextInfo->loader, contextInfo->allConformancesData };
 }
 
 bool ExtensionDecl::isConstrainedExtension() const {
@@ -2149,12 +2165,38 @@ void GenericTypeDecl::setGenericParams(GenericParamList *params) {
       Param->setDeclContext(this);
 }
 
+GenericEnvironment *
+GenericTypeDecl::getLazyGenericEnvironmentSlow() const {
+  assert(GenericSigOrEnv.is<GenericSignature *>() &&
+         "not a lazily deserialized generic environment");
+  auto contextData = getASTContext().getOrCreateLazyGenericTypeData(this,
+                                                                    nullptr);
+  auto genericEnv = contextData->loader->loadGenericEnvironment(
+                                            this, contextData->genericEnvData);
+  const_cast<GenericTypeDecl *>(this)->setGenericEnvironment(genericEnv);
+  ++NumLazyGenericEnvironmentsLoaded;
+  return genericEnv;
+}
+
+void GenericTypeDecl::setLazyGenericEnvironment(LazyMemberLoader *lazyLoader,
+                                                GenericSignature *genericSig,
+                                                uint64_t genericEnvData) {
+  assert(GenericSigOrEnv.isNull() && "already have a generic signature");
+  GenericSigOrEnv = genericSig;
+
+  auto contextData =
+    getASTContext().getOrCreateLazyGenericTypeData(this, lazyLoader);
+  contextData->genericEnvData = genericEnvData;
+  ++NumLazyGenericEnvironments;
+}
 
 TypeAliasDecl::TypeAliasDecl(SourceLoc TypeAliasLoc, Identifier Name,
                              SourceLoc NameLoc, TypeLoc UnderlyingTy,
                              GenericParamList *GenericParams, DeclContext *DC)
   : GenericTypeDecl(DeclKind::TypeAlias, DC, Name, NameLoc, {}, GenericParams),
-    AliasTy(nullptr), TypeAliasLoc(TypeAliasLoc), UnderlyingTy(UnderlyingTy) {}
+    AliasTy(nullptr), TypeAliasLoc(TypeAliasLoc), UnderlyingTy(UnderlyingTy) {
+  TypeAliasDeclBits.HasInterfaceUnderlyingType = false;
+}
 
 void TypeAliasDecl::computeType() {
   ASTContext &Ctx = getASTContext();
@@ -2179,6 +2221,22 @@ Type AbstractTypeParamDecl::getSuperclass() const {
 
   // FIXME: Assert that this is never queried.
   return nullptr;
+}
+
+Type TypeAliasDecl::computeUnderlyingContextType() const {
+  Type type = UnderlyingTy.getType();
+  if (auto genericEnv = getGenericEnvironmentOfContext()) {
+    type = genericEnv->mapTypeIntoContext(getParentModule(), type);
+    UnderlyingTy.setType(type);
+  }
+
+  return type;
+}
+
+void TypeAliasDecl::setDeserializedUnderlyingType(Type underlying) {
+  UnderlyingTy.setType(underlying);
+  if (underlying->hasTypeParameter())
+    TypeAliasDeclBits.HasInterfaceUnderlyingType = true;
 }
 
 ArrayRef<ProtocolDecl *>
@@ -2404,6 +2462,10 @@ ObjCClassKind ClassDecl::checkObjCAncestry() const {
     if (!CD->hasSuperclass())
       break;
     CD = CD->getSuperclass()->getClassOrBoundGenericClass();
+    // If we don't have a valid class here, we should have diagnosed
+    // elsewhere.
+    if (!CD)
+      break;
   }
 
   if (!isObjC)
@@ -2421,6 +2483,9 @@ ObjCClassKind ClassDecl::checkObjCAncestry() const {
 static StringRef mangleObjCRuntimeName(const NominalTypeDecl *nominal,
                                        llvm::SmallVectorImpl<char> &buffer) {
   {
+    // TODO: Mangling: Use new mangling scheme as soon as the ObjC runtime
+    // can demangle it.
+
     // Mangle the type.
     Mangle::Mangler mangler(false/*dwarf*/, false/*punycode*/);
 
@@ -2559,7 +2624,7 @@ ProtocolDecl::ProtocolDecl(DeclContext *DC, SourceLoc ProtocolLoc,
   ProtocolDeclBits.RequiresClass = false;
   ProtocolDeclBits.ExistentialConformsToSelfValid = false;
   ProtocolDeclBits.ExistentialConformsToSelf = false;
-  ProtocolDeclBits.KnownProtocol = 0;
+  KnownProtocol = 0;
   ProtocolDeclBits.Circularity
     = static_cast<unsigned>(CircularityCheck::Unchecked);
   HasMissingRequirements = false;
@@ -3363,6 +3428,31 @@ void VarDecl::setType(Type t) {
     setInvalid();
 }
 
+Type VarDecl::computeTypeInContextSlow() const {
+  Type contextType = getInterfaceType();
+  if (!contextType) return Type();
+
+  // If we have a type parameter, we need to map into this context.
+  if (contextType->hasTypeParameter()) {
+    auto genericEnv =
+      getInnermostDeclContext()->getGenericEnvironmentOfContext();
+
+    // FIXME: Hack to degrade somewhat gracefully when we don't have a generic
+    // environment yet. We return an interface type, but at least we don't
+    // record it.
+    if (!genericEnv)
+      return contextType;
+
+    contextType = genericEnv->mapTypeIntoContext(getModuleContext(),
+                                                 contextType);
+  }
+
+  typeInContext = contextType;
+  if (typeInContext->hasError())
+    const_cast<VarDecl *>(this)->setInvalid();
+  return typeInContext;
+}
+
 void VarDecl::markInvalid() {
   auto &Ctx = getASTContext();
   setType(ErrorType::get(Ctx));
@@ -3909,6 +3999,32 @@ SourceRange SubscriptDecl::getSourceRange() const {
   if (getBracesRange().isValid())
     return { getSubscriptLoc(), getBracesRange().End };
   return { getSubscriptLoc(), ElementTy.getSourceRange().End };
+}
+
+GenericEnvironment *
+AbstractFunctionDecl::getLazyGenericEnvironmentSlow() const {
+  assert(GenericSigOrEnv.is<GenericSignature *>() &&
+         "not a lazily deserialized generic environment");
+  auto contextData =
+    getASTContext().getOrCreateLazyFunctionContextData(this, nullptr);
+  auto genericEnv = contextData->loader->loadGenericEnvironment(
+                                            this, contextData->genericEnvData);
+  const_cast<AbstractFunctionDecl *>(this)->setGenericEnvironment(genericEnv);
+  ++NumLazyGenericEnvironmentsLoaded;
+  return genericEnv;
+}
+
+void AbstractFunctionDecl::setLazyGenericEnvironment(
+                                                 LazyMemberLoader *lazyLoader,
+                                                 GenericSignature *genericSig,
+                                                 uint64_t genericEnvData) {
+  assert(GenericSigOrEnv.isNull() && "already have a generic signature");
+  GenericSigOrEnv = genericSig;
+
+  auto contextData =
+    getASTContext().getOrCreateLazyFunctionContextData(this, lazyLoader);
+  contextData->genericEnvData = genericEnvData;
+  ++NumLazyGenericEnvironments;
 }
 
 Type AbstractFunctionDecl::computeInterfaceSelfType(bool isInitializingCtor,

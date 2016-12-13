@@ -2980,10 +2980,8 @@ RValue RValueEmitter::visitOptionalEvaluationExpr(OptionalEvaluationExpr *E,
                     JumpDest(failureBB, SGF.Cleanups.getCleanupsDepth(), E));
 
   SILValue NormalArgument;
-  bool hasEmittedResult = false;
   if (emitOptimizedOptionalEvaluation(E, NormalArgument, optInit, *this)) {
     // Already emitted code for this.
-    hasEmittedResult = true;
   } else if (isByAddress) {
     // Emit the operand into the temporary.
     SGF.emitExprInto(E->getSubExpr(), optInit);

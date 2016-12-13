@@ -1747,6 +1747,46 @@ class LoadBorrowInst : public UnaryInstructionBase<ValueKind::LoadBorrowInst> {
                              LValue->getType().getObjectType()) {}
 };
 
+/// Represents the begin scope of a borrowed value. Must be paired with an
+/// end_borrow instruction in its use-def list.
+class BeginBorrowInst
+    : public UnaryInstructionBase<ValueKind::BeginBorrowInst> {
+  friend class SILBuilder;
+
+  BeginBorrowInst(SILDebugLocation DebugLoc, SILValue LValue)
+      : UnaryInstructionBase(DebugLoc, LValue,
+                             LValue->getType().getObjectType()) {}
+};
+
+/// Represents a store of a borrowed value into an address. Returns the borrowed
+/// address. Must be paired with a end_borrow in its use-def list.
+class StoreBorrowInst : public SILInstruction {
+  friend class SILBuilder;
+
+public:
+  enum {
+    /// The source of the value being borrowed.
+    Src,
+    /// The destination of the borrowed value.
+    Dest
+  };
+
+private:
+  FixedOperandList<2> Operands;
+  StoreBorrowInst(SILDebugLocation DebugLoc, SILValue Src, SILValue Dest);
+
+public:
+  SILValue getSrc() const { return Operands[Src].get(); }
+  SILValue getDest() const { return Operands[Dest].get(); }
+
+  ArrayRef<Operand> getAllOperands() const { return Operands.asArray(); }
+  MutableArrayRef<Operand> getAllOperands() { return Operands.asArray(); }
+
+  static bool classof(const ValueBase *V) {
+    return V->getKind() == ValueKind::StoreBorrowInst;
+  }
+};
+
 /// Represents the end of a borrow scope for a value or address from another
 /// value or address.
 ///

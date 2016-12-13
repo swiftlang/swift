@@ -313,6 +313,9 @@ private:
   std::unique_ptr<GroupNameTable> GroupNamesMap;
   std::unique_ptr<SerializedDeclCommentTable> DeclCommentTable;
 
+  /// Saved type substitution maps for lazily-created generic environments.
+  std::vector<std::unique_ptr<TypeSubstitutionMap>> GenericEnvironmentMaps;
+
   struct ModuleBits {
     /// The decl ID of the main class in this module file, if it has one.
     unsigned EntryPointDeclID : 31;
@@ -428,7 +431,7 @@ private:
   /// Recursively reads a pattern from \c DeclTypeCursor.
   ///
   /// If the record at the cursor is not a pattern, returns null.
-  Pattern *maybeReadPattern();
+  Pattern *maybeReadPattern(DeclContext *owningDC);
 
   ParameterList *readParameterList();
   
@@ -446,7 +449,22 @@ private:
   void readGenericRequirements(SmallVectorImpl<Requirement> &requirements,
                                llvm::BitstreamCursor &Cursor);
 
-  /// Reads a GenericEnvironment from \c DeclTypeCursor.
+  /// Allocate a lazy generic environment map for use with lazily deserialized
+  /// generic environments.
+  uint64_t allocateLazyGenericEnvironmentMap(TypeSubstitutionMap &&map);
+
+  /// Set up a lazy generic environment for the given type or extension.
+  void readLazyGenericEnvironment(
+              llvm::PointerUnion<GenericTypeDecl *, ExtensionDecl *> typeOrExt);
+
+  /// Read the generic signature and type substitution map for a
+  /// generic environment from \c Cursor.
+  std::pair<GenericSignature *, TypeSubstitutionMap>
+  readGenericEnvironmentPieces(llvm::BitstreamCursor &Cursor,
+                               Optional<ArrayRef<Requirement>> optRequirements
+                                 = None);
+
+  /// Reads a GenericEnvironment from \c Cursor.
   ///
   /// The optional requirements are used to construct the signature without
   /// attempting to deserialize any requirements, such as when reading SIL.
@@ -656,6 +674,9 @@ public:
 
   virtual void finishNormalConformance(NormalProtocolConformance *conformance,
                                        uint64_t contextData) override;
+
+  GenericEnvironment *loadGenericEnvironment(const Decl *decl,
+                                             uint64_t contextData) override;
 
   Optional<StringRef> getGroupNameById(unsigned Id) const;
   Optional<StringRef> getSourceFileNameById(unsigned Id) const;

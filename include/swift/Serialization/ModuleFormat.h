@@ -54,7 +54,7 @@ const uint16_t VERSION_MAJOR = 0;
 /// in source control, you should also update the comment to briefly
 /// describe what change you made. The content of this comment isn't important;
 /// it just ensures a conflict if two people change the module format.
-const uint16_t VERSION_MINOR = 292; // Last change: SILBoxType layout
+const uint16_t VERSION_MINOR = 298; // Last change: Added {store,begin}_borrow
 
 using DeclID = PointerEmbeddedInt<unsigned, 31>;
 using DeclIDField = BCFixed<31>;
@@ -861,7 +861,6 @@ namespace decls_block {
     BCFixed<1>,   // isLet?
     BCFixed<1>,   // HasNonPatternBindingInit?
     StorageKindField,   // StorageKind
-    TypeIDField,  // type
     TypeIDField,  // interface type
     DeclIDField,  // getter
     DeclIDField,  // setter
@@ -881,7 +880,6 @@ namespace decls_block {
     IdentifierIDField, // parameter name
     DeclContextIDField,  // context decl
     BCFixed<1>,   // isLet?
-    TypeIDField,  // type
     TypeIDField  // interface type
   >;
 
@@ -1036,6 +1034,7 @@ namespace decls_block {
   using NamedPatternLayout = BCRecordLayout<
     NAMED_PATTERN,
     DeclIDField, // associated VarDecl
+    TypeIDField, // type
     BCFixed<1>   // implicit?
   >;
 
@@ -1051,12 +1050,6 @@ namespace decls_block {
     TypeIDField, // associated type
     BCFixed<1>   // implicit?
     // The sub-pattern trails the record.
-  >;
-
-  using IsPatternLayout = BCRecordLayout<
-    ISA_PATTERN,
-    TypeIDField, // type
-    BCFixed<1>   // implicit?
   >;
 
   using VarPatternLayout = BCRecordLayout<

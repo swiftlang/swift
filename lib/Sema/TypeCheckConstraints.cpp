@@ -2129,7 +2129,7 @@ Type ConstraintSystem::computeAssignDestType(Expr *dest, SourceLoc equalLoc) {
     return TupleType::get(destTupleTypes, ctx);
   }
 
-  Type destTy = simplifyType(dest->getType());
+  Type destTy = simplifyType(getType(dest));
   if (destTy->hasError() || destTy->getRValueType()->is<UnresolvedType>())
     return Type();
 
@@ -2394,33 +2394,6 @@ bool TypeChecker::isSubstitutableFor(Type type, ArchetypeType *archetype,
   return cs.solveSingle().hasValue();
 }
 
-Expr *TypeChecker::coerceToRValue(Expr *expr) {
-  // Can't load from an inout value.
-  if (auto *iot = expr->getType()->getAs<InOutType>()) {
-    // Emit a fixit if we can find the & expression that turned this into an
-    // inout.
-    if (auto addrOf =
-        dyn_cast<InOutExpr>(expr->getSemanticsProvidingExpr())) {
-      diagnose(expr->getLoc(), diag::load_of_explicit_lvalue,
-               iot->getObjectType())
-      .fixItRemove(SourceRange(addrOf->getLoc()));
-      return coerceToRValue(addrOf->getSubExpr());
-    } else {
-      diagnose(expr->getLoc(), diag::load_of_explicit_lvalue,
-               iot->getObjectType());
-      return expr;
-    }
-  }
-
-  // If we already have an rvalue, we're done, otherwise emit a load.
-  if (auto lvalueTy = expr->getType()->getAs<LValueType>()) {
-    expr->propagateLValueAccessKind(AccessKind::Read);
-    return new (Context) LoadExpr(expr, lvalueTy->getObjectType());
-  }
-
-  return expr;
-}
-
 Expr *TypeChecker::coerceToMaterializable(Expr *expr) {
   // If the type is already materializable, then we're already done.
   if (expr->getType()->isMaterializable())
@@ -2491,9 +2464,11 @@ bool TypeChecker::convertToType(Expr *&expr, Type type, DeclContext *dc,
   ConstraintSystem cs(*this, dc, ConstraintSystemFlags::AllowFixes);
   CleanupIllFormedExpressionRAII cleanup(Context, expr);
 
+  cs.cacheExprTypes(expr);
+
   // If there is a type that we're expected to convert to, add the conversion
   // constraint.
-  cs.addConstraint(ConstraintKind::ExplicitConversion, expr->getType(), type,
+  cs.addConstraint(ConstraintKind::ExplicitConversion, cs.getType(expr), type,
                    cs.getConstraintLocator(expr));
 
   if (getLangOpts().DebugConstraintSolver) {
@@ -2721,13 +2696,13 @@ void ConstraintSystem::print(raw_ostream &out) {
     out << "\n";
   }
 
-  if (solverState && !solverState->retiredConstraints.empty()) {
+  if (solverState && !solverState->hasRetiredConstraints()) {
     out << "\nRetired Constraints:\n";
-    for (auto &constraint : solverState->retiredConstraints) {
+    solverState->forEachRetired([&](Constraint &constraint) {
       out.indent(2);
       constraint.print(out, &getTypeChecker().Context.SourceMgr);
       out << "\n";
-    }
+    });
   }
 
   if (resolvedOverloadSets) {

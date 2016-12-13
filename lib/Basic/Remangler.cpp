@@ -601,7 +601,7 @@ void Remangler::mangleDeallocator(Node *node) {
 }
 
 void Remangler::mangleDeclContext(Node *node) {
-  unreachable("handled inline");
+  mangleSingleChildNode(node);
 }
 
 void Remangler::mangleDefaultArgumentInitializer(Node *node) {
@@ -762,7 +762,7 @@ void Remangler::mangleEnum(Node *node) {
 }
 
 void Remangler::mangleErrorType(Node *node) {
-  Buffer << "ERR";
+  Buffer << "Xe";
 }
 
 void Remangler::mangleExistentialMetatype(Node *node) {
@@ -944,6 +944,25 @@ void Remangler::mangleGenericProtocolWitnessTableInstantiationFunction(Node *nod
   Buffer << "WI";
 }
 
+void Remangler::mangleGenericPartialSpecialization(Node *node) {
+  for (NodePointer Child : *node) {
+    if (Child->getKind() == Node::Kind::GenericSpecializationParam) {
+      mangleChildNode(Child.get(), 0);
+      break;
+    }
+  }
+  Buffer << (node->getKind() ==
+        Node::Kind::GenericPartialSpecializationNotReAbstracted ? "TP" : "Tp");
+  for (NodePointer Child : *node) {
+    if (Child->getKind() != Node::Kind::GenericSpecializationParam)
+      mangle(Child.get());
+  }
+}
+
+void Remangler::mangleGenericPartialSpecializationNotReAbstracted(Node *node) {
+  mangleGenericPartialSpecialization(node);
+}
+
 void Remangler::mangleGenericSpecialization(Node *node) {
   bool FirstParam = true;
   for (NodePointer Child : *node) {
@@ -975,6 +994,11 @@ void Remangler::mangleGenericTypeMetadataPattern(Node *node) {
   Buffer << "MP";
 }
 
+void Remangler::mangleGenericTypeParamDecl(Node *node) {
+  mangleChildNodes(node);
+  Buffer << "fp";
+}
+
 void Remangler::mangleGetter(Node *node) {
   mangleChildNodes(node);
   Buffer << "fg";
@@ -989,6 +1013,8 @@ void Remangler::mangleGlobal(Node *node) {
       case Node::Kind::FunctionSignatureSpecialization:
       case Node::Kind::GenericSpecialization:
       case Node::Kind::GenericSpecializationNotReAbstracted:
+      case Node::Kind::GenericPartialSpecialization:
+      case Node::Kind::GenericPartialSpecializationNotReAbstracted:
       case Node::Kind::ObjCAttribute:
       case Node::Kind::NonObjCAttribute:
       case Node::Kind::DynamicAttribute:
@@ -1276,12 +1302,12 @@ void Remangler::mangleOwningMutableAddressor(Node *node) {
 }
 
 void Remangler::manglePartialApplyForwarder(Node *node) {
-  mangleChildNodes(node);
+  mangleChildNodesReversed(node);
   Buffer << "TA";
 }
 
 void Remangler::manglePartialApplyObjCForwarder(Node *node) {
-  mangleChildNodes(node);
+  mangleChildNodesReversed(node);
   Buffer << "Ta";
 }
 
@@ -1352,7 +1378,7 @@ void Remangler::mangleProtocolWitnessTableAccessor(Node *node) {
 void Remangler::mangleQualifiedArchetype(Node *node) {
   mangleChildNode(node, 1);
   Buffer << "Qq";
-  mangleIndex(node->getFirstChild().get());
+  mangleNumber(node->getFirstChild().get());
 }
 
 void Remangler::mangleReabstractionThunk(Node *node) {
@@ -1450,7 +1476,8 @@ void Remangler::mangleTypeList(Node *node) {
 }
 
 void Remangler::mangleTypeMangling(Node *node) {
-  unreachable("not used");
+  mangleSingleChildNode(node);
+  Buffer << 'D';
 }
 
 void Remangler::mangleTypeMetadata(Node *node) {
@@ -1470,7 +1497,9 @@ void Remangler::mangleTypeMetadataLazyCache(Node *node) {
 
 void Remangler::mangleUncurriedFunctionType(Node *node) {
   mangleFunctionSignature(node);
-  Buffer << "XU";
+  // Mangle as regular function type (there is no "uncurried function type"
+  // in the new mangling scheme).
+  Buffer << 'c';
 }
 
 void Remangler::mangleUnmanaged(Node *node) {

@@ -19,7 +19,7 @@
 #define SWIFT_BASIC_MALLOC_H
 
 #include <cassert>
-#if defined(_MSC_VER)
+#if defined(_WIN32)
 #include <malloc.h>
 #else
 #include <cstdlib>

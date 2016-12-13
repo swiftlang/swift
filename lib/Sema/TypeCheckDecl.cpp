@@ -269,10 +269,14 @@ void TypeChecker::checkInheritanceClause(Decl *decl,
   DeclContext *DC;
   if (auto nominal = dyn_cast<NominalTypeDecl>(decl)) {
     DC = nominal;
-    options |= TR_GenericSignature | TR_InheritanceClause;
+    options |= (TR_GenericSignature |
+                TR_InheritanceClause |
+                TR_AllowUnavailableProtocol);
   } else if (auto ext = dyn_cast<ExtensionDecl>(decl)) {
     DC = ext;
-    options |= TR_GenericSignature | TR_InheritanceClause;
+    options |= (TR_GenericSignature |
+                TR_InheritanceClause |
+                TR_AllowUnavailableProtocol);
   } else if (isa<GenericTypeParamDecl>(decl)) {
     // For generic parameters, we want name lookup to look at just the
     // signature of the enclosing entity.
@@ -295,9 +299,7 @@ void TypeChecker::checkInheritanceClause(Decl *decl,
   }
 
   // Establish a default generic type resolver.
-  auto genericEnv =
-    decl->getInnermostDeclContext()->getGenericEnvironmentOfContext();
-  GenericTypeToArchetypeResolver defaultResolver(genericEnv);
+  GenericTypeToArchetypeResolver defaultResolver(decl->getInnermostDeclContext());
   if (!resolver)
     resolver = &defaultResolver;
 
@@ -556,8 +558,6 @@ void TypeChecker::checkInheritanceClause(Decl *decl,
   // Set the superclass.
   if (auto classDecl = dyn_cast<ClassDecl>(decl)) {
     classDecl->setSuperclass(superclassTy);
-    if (superclassTy)
-      resolveImplicitConstructors(superclassTy->getClassOrBoundGenericClass());
   } else if (auto enumDecl = dyn_cast<EnumDecl>(decl)) {
     enumDecl->setRawType(superclassTy);
   } else {
@@ -1137,6 +1137,7 @@ static void recordSelfContextType(AbstractFunctionDecl *func) {
 namespace {
 
 class AccessScopeChecker {
+  ASTContext &Context;
   const SourceFile *File;
   TypeChecker::TypeAccessScopeCacheMap &Cache;
 
@@ -1145,7 +1146,9 @@ protected:
 
   AccessScopeChecker(const DeclContext *useDC,
                      decltype(TypeChecker::TypeAccessScopeCache) &caches)
-      : File(useDC->getParentSourceFile()), Cache(caches[File]),
+      : Context(useDC->getASTContext()),
+        File(useDC->getParentSourceFile()),
+        Cache(caches[File]),
         Scope(AccessScope::getPublic()) {}
 
   bool visitDecl(ValueDecl *VD) {
@@ -1158,6 +1161,12 @@ protected:
       if (isa<AssociatedTypeDecl>(VD))
         return true;
     }
+
+    // Simulation for Swift 3 bug.
+    if (isa<TypeAliasDecl>(VD) &&
+        VD->getInterfaceType()->hasTypeParameter() &&
+        Context.isSwiftVersion3())
+      return true;
 
     auto cached = Cache.find(VD);
     if (cached != Cache.end()) {
@@ -3484,8 +3493,7 @@ public:
       }
     }
 
-    if ((IsSecondPass && !IsFirstPass) ||
-        decl->getDeclContext()->getAsProtocolOrProtocolExtensionContext()) {
+    if (IsSecondPass && !IsFirstPass) {
       TC.checkUnsupportedProtocolType(decl);
       if (auto nominal = dyn_cast<NominalTypeDecl>(decl)) {
         TC.checkDeclCircularity(nominal);
@@ -3854,40 +3862,40 @@ public:
         TC.validateDecl(TAD);
       
       TypeResolutionOptions options;
-      if (!TAD->getDeclContext()->isTypeContext())
-        options |= TR_GlobalTypeAlias;
       if (TAD->getFormalAccess() <= Accessibility::FilePrivate)
         options |= TR_KnownNonCascadingDependency;
 
-      bool invalid = false;
       if (TAD->getDeclContext()->isModuleScopeContext()) {
         IterativeTypeChecker ITC(TC);
         ITC.satisfy(requestResolveTypeDecl(TAD));
-      } else if (TC.validateType(TAD->getUnderlyingTypeLoc(), TAD, options)) {
-        TAD->setInvalid();
-        TAD->setInterfaceType(ErrorType::get(TC.Context));
-        TAD->getUnderlyingTypeLoc().setInvalidType(TC.Context);
-        invalid = true;
-      }
-
-      // We create TypeAliasTypes with invalid underlying types, so we
-      // need to propagate recursive properties now.
-      TAD->getAliasType()->setRecursiveProperties(
-                       TAD->getUnderlyingType()->getRecursiveProperties());
-
-      if (!invalid) {
-        // Map the alias type out of context; if it is not dependent,
-        // we'll keep the sugar.
-        Type interfaceTy = TAD->getAliasType();
-
-        // lldb creates global typealiases containing archetypes
-        // sometimes...
-        if (TAD->getUnderlyingType()->hasArchetype() &&
-            TAD->isGenericContext()) {
-          interfaceTy = ArchetypeBuilder::mapTypeOutOfContext(TAD, interfaceTy);
+      } else {
+        bool invalid = false;
+        if (TC.validateType(TAD->getUnderlyingTypeLoc(), TAD, options)) {
+          TAD->setInvalid();
+          TAD->setInterfaceType(ErrorType::get(TC.Context));
+          TAD->getUnderlyingTypeLoc().setInvalidType(TC.Context);
+          invalid = true;
         }
 
-        TAD->setInterfaceType(MetatypeType::get(interfaceTy, TC.Context));
+        // We create TypeAliasTypes with invalid underlying types, so we
+        // need to propagate recursive properties now.
+        TAD->getAliasType()->setRecursiveProperties(
+                         TAD->getUnderlyingType()->getRecursiveProperties());
+
+        if (!invalid) {
+          // Map the alias type out of context; if it is not dependent,
+          // we'll keep the sugar.
+          Type interfaceTy = TAD->getAliasType();
+
+          // lldb creates global typealiases containing archetypes
+          // sometimes...
+          if (TAD->getUnderlyingType()->hasArchetype() &&
+              TAD->isGenericContext()) {
+            interfaceTy = TAD->mapTypeOutOfContext(interfaceTy);
+          }
+
+          TAD->setInterfaceType(MetatypeType::get(interfaceTy, TC.Context));
+        }
       }
     }
 
@@ -4273,8 +4281,10 @@ public:
 
     if (IsSecondPass) {
       checkAccessibility(TC, PD);
-      for (auto member : PD->getMembers())
+      for (auto member : PD->getMembers()) {
+        TC.checkUnsupportedProtocolType(member);
         checkAccessibility(TC, member);
+      }
       TC.checkInheritanceClause(PD);
       return;
     }
@@ -4522,7 +4532,12 @@ public:
     auto typeRepr = func->getBodyResultTypeLoc().getTypeRepr();
     if (!typeRepr)
       return false;
-      
+
+    // 'Self' on a property accessor is not dynamic 'Self'...even on a read-only
+    // property. We could implement it as such in the future.
+    if (func->isAccessor())
+      return false;
+
     return checkDynamicSelfReturn(func, typeRepr, 0);
   }
 
@@ -7855,10 +7870,6 @@ void TypeChecker::addImplicitConstructors(NominalTypeDecl *decl) {
   // for all of the superclass's designated initializers.
   // FIXME: Currently skipping generic classes.
   auto classDecl = cast<ClassDecl>(decl);
-  assert(!classDecl->hasSuperclass() ||
-         classDecl->getSuperclass()->getAnyNominal()->isInvalid() ||
-         classDecl->getSuperclass()->getAnyNominal()
-           ->addedImplicitInitializers());
   if (classDecl->hasSuperclass()) {
     bool canInheritInitializers = !FoundDesignatedInit;
 
@@ -7870,6 +7881,11 @@ void TypeChecker::addImplicitConstructors(NominalTypeDecl *decl) {
     }
 
     auto superclassTy = classDecl->getSuperclass();
+    auto *superclassDecl = superclassTy->getClassOrBoundGenericClass();
+    assert(superclassDecl && "Superclass of class is not a class?");
+    if (!superclassDecl->addedImplicitInitializers())
+      addImplicitConstructors(superclassDecl);
+
     auto ctors = lookupConstructors(classDecl, superclassTy,
                                     NameLookupFlags::IgnoreAccessibility);
 

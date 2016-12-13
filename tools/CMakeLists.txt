@@ -6,6 +6,7 @@ add_swift_tool_subdirectory(swift-demangle)
 add_swift_tool_subdirectory(lldb-moduleimport-test)
 add_swift_tool_subdirectory(sil-func-extractor)
 add_swift_tool_subdirectory(sil-nm)
+add_swift_tool_subdirectory(sil-passpipeline-dumper)
 add_swift_tool_subdirectory(swift-llvm-opt)
 add_swift_tool_subdirectory(swift-api-digester)
 

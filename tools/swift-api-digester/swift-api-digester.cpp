@@ -233,6 +233,8 @@ static StringRef getKeyContent(SDKContext &Ctx, KeyKind Kind) {
 #define KEY(NAME) case KeyKind::KK_##NAME: return Ctx.buffer(#NAME);
 #include "DigesterEnums.def"
   }
+
+  llvm_unreachable("Unhandled KeyKind in switch.");
 }
 
 // The node kind appearing in the tree that describes the content of the SDK
@@ -278,6 +280,8 @@ static raw_ostream &operator<<(raw_ostream &Out, const DeclKind Value) {
 #define DECL(X, PARENT) case DeclKind::X: return Out << #X;
 #include "swift/AST/DeclNodes.def"
   }
+
+  llvm_unreachable("Unhandled DeclKind in switch.");
 }
 
 struct SDKNodeInitInfo {
@@ -645,6 +649,8 @@ bool SDKNodeDecl::classof(const SDKNode *N) {
     case SDKNodeKind::TypeNameAlias:
       return false;
   }
+
+  llvm_unreachable("Unhandled SDKNodeKind in switch.");
 }
 
 void SDKNodeDecl::addDeclAttribute(SDKDeclAttrKind DAKind) {
@@ -939,6 +945,8 @@ bool SDKNode::operator==(const SDKNode &Other) const {
         hasSameChildren(Other);
     }
   }
+
+  llvm_unreachable("Unhanlded SDKNodeKind in switch.");
 }
 
 // The pretty printer of a tree of SDKNode
@@ -2984,6 +2992,8 @@ void DiagnosisEmitter::handle(const SDKNodeDecl *Node, NodeAnnotation Anno) {
       case Ownership::Unowned:   return Ctx.buffer("unowned");
       case Ownership::Unmanaged: return Ctx.buffer("unowned(unsafe)");
       }
+
+      llvm_unreachable("Unhandled Ownership in switch.");
     };
     auto *Count = UpdateMap.findUpdateCounterpart(Node)->getAs<SDKNodeDecl>();
     AttrChangedDecls.Diags.emplace_back(Node->getDeclKind(),

@@ -287,7 +287,8 @@ private:
 
   /// Erases an apply instruction including all it's uses \p.
   /// Inserts release/destroy instructions for all owner and in-parameters.
-  void eraseApply(FullApplySite FAS, const UserListTy &Users);
+  /// \return Returns true if successful.
+  bool eraseApply(FullApplySite FAS, const UserListTy &Users);
 
   /// Returns true if the results of a try_apply are not used.
   static bool isTryApplyResultNotUsed(UserListTy &AcceptedUses,
