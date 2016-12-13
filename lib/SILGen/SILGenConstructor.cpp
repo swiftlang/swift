@@ -887,15 +887,16 @@ void SILGenFunction::emitMemberInitializers(DeclContext *dc,
         // Get the substitutions for the constructor context.
         ArrayRef<Substitution> subs;
         auto *genericEnv = dc->getGenericEnvironmentOfContext();
-        if (genericEnv) {
-          DeclContext *typeDC = dc;
-          while (!typeDC->isTypeContext())
-            typeDC = typeDC->getParent();
 
+        DeclContext *typeDC = dc;
+        while (!typeDC->isTypeContext())
+          typeDC = typeDC->getParent();
+        auto typeGenericSig = typeDC->getGenericSignatureOfContext();
+
+        if (genericEnv && typeGenericSig) {
           // Generate a set of substitutions for the initialization function,
           // whose generic signature is that of the type context, and whose
           // replacement types are the archetypes of the initializer itself.
-          auto typeGenericSig = typeDC->getGenericSignatureOfContext();
           SmallVector<Substitution, 4> subsVec;
           typeGenericSig->getSubstitutions(
                        *SGM.SwiftModule,
