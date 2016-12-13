@@ -218,15 +218,15 @@ void Expr::propagateLValueAccessKind(AccessKind accessKind,
   /// A visitor class which walks an entire l-value expression.
   class PropagateAccessKind
        : public ExprVisitor<PropagateAccessKind, void, AccessKind> {
-#ifndef NDEBUG
     std::function<Type(Expr *)> GetType;
+#ifndef NDEBUG
     bool AllowOverwrite;
 #endif
   public:
     PropagateAccessKind(std::function<Type(Expr *)> getType,
-                        bool allowOverwrite)
+                        bool allowOverwrite) : GetType(getType)
 #ifndef NDEBUG
-      : GetType(getType), AllowOverwrite(allowOverwrite)
+                                               , AllowOverwrite(allowOverwrite)
 #endif
     {}
 
