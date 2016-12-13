@@ -5008,6 +5008,9 @@ public:
   }
 
   bool isGetter() const { return getAccessorKind() == AccessorKind::IsGetter; }
+  bool isComputedGetter() const {
+    return isGetter() && getAccessorStorageDecl()->getBracesRange().Start == this->getLoc(); 
+  }
   bool isSetter() const { return getAccessorKind() == AccessorKind::IsSetter; }
 
   /// isGetterOrSetter - Determine whether this is a getter or a setter vs.
