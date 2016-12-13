@@ -2435,34 +2435,6 @@ public struct ${Self}
 %     end
   }
 
-  @_transparent
-  public static func == (lhs: ${Self}, rhs: Int) -> Bool {
-%     if not signed:
-    if rhs < 0 { return false }
-%     end
-%     if bits < word_bits:
-    return Int(_truncatingBits: lhs._lowUWord) == rhs
-%     elif bits == word_bits:
-    return Bool(Builtin.cmp_eq_Int${bits}(lhs._value, rhs._value))
-%     else:
-    return lhs == ${Self}(_truncatingBits: rhs._lowUWord)
-%     end
-  }
-
-  @_transparent
-  public static func == (lhs: Int, rhs: ${Self}) -> Bool {
-%     if not signed:
-    if lhs < 0 { return false }
-%     end
-%     if bits < word_bits:
-    return lhs == Int(_truncatingBits: rhs._lowUWord)
-%     elif bits == word_bits:
-    return Bool(Builtin.cmp_eq_Int${bits}(lhs._value, rhs._value))
-%     else:
-    return ${Self}(_truncatingBits: lhs._lowUWord) == rhs
-%     end
-  }
-
 %     for Args in ['lhs: %s, rhs: Int' % Self, 'lhs: Int, rhs: %s' % Self]:
   @_transparent
   public static func > (${Args}) -> Bool {
@@ -2479,10 +2451,6 @@ public struct ${Self}
     return !(lhs < rhs)
   }
 
-  @_transparent
-  public static func != (${Args}) -> Bool {
-    return !(lhs == rhs)
-  }
 %     end
 
 %   else: # if Self != 'Int'
@@ -2504,10 +2472,6 @@ public struct ${Self}
     return !(lhs < rhs)
   }
 
-  @_transparent
-  public static func != (lhs: Int, rhs: Int) -> Bool {
-    return !(lhs == rhs)
-  }
 %   end # if Self != 'Int'
 
 // FIXME(integers): penging optimizer work on handling the case where the
