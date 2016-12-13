@@ -66,10 +66,9 @@ protected:
 class GenericSpecializationMangler : public SpecializationMangler {
 
   ArrayRef<Substitution> Subs;
+  bool isReAbstracted;
 
 public:
-
-  bool isReAbstracted;
 
   GenericSpecializationMangler(SILFunction *F,
                                ArrayRef<Substitution> Subs,
