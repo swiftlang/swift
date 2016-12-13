@@ -2490,7 +2490,11 @@ Decl *ModuleFile::getDecl(DeclID DID, Optional<DeclContext *> ForcedContext) {
     if (declOrOffset.isComplete())
       return declOrOffset;
 
-    auto *genericEnv = readGenericEnvironment(DeclTypeCursor);
+    // Read the generic environment.
+    GenericSignature *genericSig;
+    TypeSubstitutionMap genericEnvMap;
+    std::tie(genericSig, genericEnvMap) =
+      readGenericEnvironmentPieces(DeclTypeCursor);
 
     // Resolve the name ids.
     SmallVector<Identifier, 2> argNames;
@@ -2527,7 +2531,12 @@ Decl *ModuleFile::getDecl(DeclID DID, Optional<DeclContext *> ForcedContext) {
     auto interfaceType = getType(interfaceID);
     ctor->setInterfaceType(interfaceType);
 
-    ctor->setGenericEnvironment(genericEnv);
+    // If there is a generic environment, lazily wire it up.
+    if (genericSig) {
+      ctor->setLazyGenericEnvironment(
+                  this, genericSig,
+                  allocateLazyGenericEnvironmentMap(std::move(genericEnvMap)));
+    }
 
     // Set the initializer interface type of the constructor.
     auto allocType = ctor->getInterfaceType();
@@ -3328,7 +3337,9 @@ Decl *ModuleFile::getDecl(DeclID DID, Optional<DeclContext *> ForcedContext) {
     auto interfaceType = getType(interfaceID);
     dtor->setInterfaceType(interfaceType);
 
-    dtor->setGenericEnvironment(DC->getGenericEnvironmentOfContext());
+    if (auto genericSig = DC->getGenericSignatureOfContext()) {
+      dtor->setLazyGenericEnvironment(this, genericSig, /*contextData=*/1);
+    }
 
     if (isImplicit)
       dtor->setImplicit();
@@ -4352,6 +4363,13 @@ void ModuleFile::finishNormalConformance(NormalProtocolConformance *conformance,
 
 GenericEnvironment *ModuleFile::loadGenericEnvironment(const Decl *decl,
                                                        uint64_t contextData) {
+  // Destructors always inherit the generic environment of their context, so
+  // return that directly.
+  if (auto dtor = dyn_cast<DestructorDecl>(decl)) {
+    assert(contextData == 1 && "Not the expected generic environment");
+    return dtor->getDeclContext()->getGenericEnvironmentOfContext();
+  }
+
   // Dig out the pieces needed to load a generic environment.
   auto interfaceToArchetypes =
     reinterpret_cast<TypeSubstitutionMap *>(contextData);
