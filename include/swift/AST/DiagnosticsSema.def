@@ -2403,6 +2403,12 @@ NOTE(force_optional_to_any,none,
      "force-unwrap the value to avoid this warning", ())
 NOTE(silence_optional_to_any,none,
      "explicitly cast to Any with 'as Any' to silence this warning", ())
+WARNING(optional_in_string_interpolation_segment,none,
+        "string interpolation produces a debug description for an optional "
+        "value; did you mean to make this explicit?",
+        ())
+NOTE(silence_optional_in_interpolation_segment_call,none,
+     "use 'String(describing:)' to silence this warning", ())
 
 ERROR(invalid_noescape_use,none,
       "non-escaping %select{value|parameter}1 %0 may only be called",
