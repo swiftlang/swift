@@ -1335,11 +1335,10 @@ The types are the replacement types of the substitution list.
 
 ::
 
-  specialization ::= function-signature generic-signature 'TG' SPEC-INFO // Partial generic specialization
+  specialization ::= type 'Tp' SPEC-INFO // Partial generic specialization
+  specialization ::= type 'TP' SPEC-INFO // Partial generic specialization, not re-abstracted
 
-A type in the ``<function-signature>`` of a partial generic specialization
-can be ``Sn`` which means that the parameter type is the same as in the
-original function's signature.
+The type is the function type of the specialized function.
 
 ::
 

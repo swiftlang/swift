@@ -944,6 +944,25 @@ void Remangler::mangleGenericProtocolWitnessTableInstantiationFunction(Node *nod
   Buffer << "WI";
 }
 
+void Remangler::mangleGenericPartialSpecialization(Node *node) {
+  for (NodePointer Child : *node) {
+    if (Child->getKind() == Node::Kind::GenericSpecializationParam) {
+      mangleChildNode(Child.get(), 0);
+      break;
+    }
+  }
+  Buffer << (node->getKind() ==
+        Node::Kind::GenericPartialSpecializationNotReAbstracted ? "TP" : "Tp");
+  for (NodePointer Child : *node) {
+    if (Child->getKind() != Node::Kind::GenericSpecializationParam)
+      mangle(Child.get());
+  }
+}
+
+void Remangler::mangleGenericPartialSpecializationNotReAbstracted(Node *node) {
+  mangleGenericPartialSpecialization(node);
+}
+
 void Remangler::mangleGenericSpecialization(Node *node) {
   bool FirstParam = true;
   for (NodePointer Child : *node) {
@@ -994,6 +1013,8 @@ void Remangler::mangleGlobal(Node *node) {
       case Node::Kind::FunctionSignatureSpecialization:
       case Node::Kind::GenericSpecialization:
       case Node::Kind::GenericSpecializationNotReAbstracted:
+      case Node::Kind::GenericPartialSpecialization:
+      case Node::Kind::GenericPartialSpecializationNotReAbstracted:
       case Node::Kind::ObjCAttribute:
       case Node::Kind::NonObjCAttribute:
       case Node::Kind::DynamicAttribute:
