@@ -15,6 +15,7 @@ import json
 import os
 import platform
 import random
+import re
 import shutil
 import subprocess
 import unittest
@@ -96,10 +97,37 @@ class OptBugReducerTestCase(unittest.TestCase):
         ]
         args.extend(self.passes)
         output = subprocess.check_output(args).split("\n")
-        success_messages = ['*** Found miscompiling passes!',
-                            '*** Final Passes: --bug-reducer-tester']
-        for msg in success_messages:
-            self.assertTrue(msg in output)
+        self.assertTrue('*** Found miscompiling passes!' in output)
+        self.assertTrue('*** Final Passes: --bug-reducer-tester' in output)
+        re_end = 'testoptbugreducer_testbasic_initial'
+        output_file_re = re.compile('\*\*\* Final File: .*' + re_end)
+        output_matches = [1 for o in output if output_file_re.match(o) is not None]
+        self.assertEquals(sum(output_matches), 1)
+
+    def test_suffix_in_need_of_prefix(self):
+        name = 'testsuffixinneedofprefix'
+        result_code = self.run_swiftc_command(name)
+        assert result_code == 0, "Failed initial compilation"
+        args = [
+            self.reducer,
+            'opt',
+            self.build_dir,
+            self._get_sib_file_path(self._get_test_file_path(name)),
+            '--sdk=%s' % self.sdk,
+            '--module-cache=%s' % self.module_cache,
+            '--module-name=%s' % name,
+            '--work-dir=%s' % self.tmp_dir,
+            '--extra-arg=-bug-reducer-tester-target-func=closure_test_target'
+        ]
+        args.extend(self.passes)
+        output = subprocess.check_output(args).split("\n")
+        self.assertTrue('*** Found miscompiling passes!' in output)
+        self.assertTrue('*** Final Passes: --bug-reducer-tester' in output)
+        re_end = 'testoptbugreducer_testsuffixinneedofprefix_initial'
+        output_file_re = re.compile('\*\*\* Final File: .*' + re_end)
+        output_matches = [1 for o in output if output_file_re.match(o) is not None]
+        self.assertEquals(sum(output_matches), 0)
+
 
 if __name__ == '__main__':
     unittest.main()

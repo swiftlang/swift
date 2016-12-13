@@ -15,5 +15,3 @@ public func foo2() {
   foo1()
   foo3()
 }
-
-
