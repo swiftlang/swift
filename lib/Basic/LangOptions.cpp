@@ -50,6 +50,13 @@ static const StringRef SupportedConditionalCompilationEndianness[] = {
   "big"
 };
 
+static const StringRef SupportedConditionalCompilationEnvironment[] = {
+  "cygnus",
+  "gnu",
+  "msvc",
+  "itanium",
+};
+
 template <typename Type, size_t N>
 bool contains(const Type (&Array)[N], const Type &V) {
   return std::find(std::begin(Array), std::end(Array), V) != std::end(Array);
@@ -69,6 +76,11 @@ LangOptions::isPlatformConditionArchSupported(StringRef ArchName) {
 bool
 LangOptions::isPlatformConditionEndiannessSupported(StringRef Endianness) {
   return contains(SupportedConditionalCompilationEndianness, Endianness);
+}
+
+bool
+LangOptions::isPlatformConditionEnvironmentSupported(StringRef Environment) {
+  return contains(SupportedConditionalCompilationEnvironment, Environment);
 }
 
 StringRef
@@ -191,6 +203,24 @@ std::pair<bool, bool> LangOptions::setTarget(llvm::Triple triple) {
     break;
   default:
     llvm_unreachable("undefined architecture endianness");
+  }
+
+  // Set the "_environment" platform condition.
+  switch (Target.getEnvironment()) {
+  default: break;
+  case llvm::Triple::MSVC:
+    addPlatformConditionValue("_environment", "msvc");
+    break;
+  case llvm::Triple::Itanium:
+    addPlatformConditionValue("_environment", "itanium");
+    break;
+  case llvm::Triple::Cygnus:
+    addPlatformConditionValue("_environment", "cygnus");
+    break;
+  case llvm::Triple::GNU:
+    if (triple.isOSWindows())
+      addPlatformConditionValue("_environment", "gnu");
+    break;
   }
 
   // Set the "runtime" platform condition.

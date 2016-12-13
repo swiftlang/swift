@@ -247,6 +247,10 @@ namespace swift {
     /// a supported target endianness.
     static bool isPlatformConditionEndiannessSupported(StringRef endianness);
 
+    /// Returns true if the 'environment' platform condition argument represents
+    /// a supported target environment.
+    static bool isPlatformConditionEnvironmentSupported(StringRef Environment);
+
   private:
     llvm::SmallVector<std::pair<std::string, std::string>, 3>
         PlatformConditionValues;
