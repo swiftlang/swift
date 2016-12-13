@@ -266,7 +266,18 @@ getImplicitMemberReferenceAccessSemantics(Expr *base, VarDecl *member,
   return member->getAccessSemanticsFromContext(DC);
 }
 
+void ConstraintSystem::propagateLValueAccessKind(Expr *E,
+                                                 AccessKind accessKind,
+                                                 bool allowOverwrite) {
+  E->propagateLValueAccessKind(accessKind,
+                               [&](Expr *E) -> Type {
+                                 return getType(E);
+                               },
+                               allowOverwrite);
+}
+
 namespace {
+
   /// \brief Rewrites an expression by applying the solution of a constraint
   /// system to that expression.
   class ExprRewriter : public ExprVisitor<ExprRewriter, Expr *> {
@@ -688,8 +699,8 @@ namespace {
       // down to the original existential value.  Otherwise, propagateLVAK
       // will handle this.
       if (record.OpaqueValue->hasLValueAccessKind())
-        record.ExistentialValue->propagateLValueAccessKind(
-                                    record.OpaqueValue->getLValueAccessKind());
+        cs.propagateLValueAccessKind(record.ExistentialValue,
+                                  record.OpaqueValue->getLValueAccessKind());
 
       // Form the open-existential expression.
       result = new (tc.Context) OpenExistentialExpr(
@@ -2803,7 +2814,7 @@ namespace {
       // case (when we turn the inout into an UnsafePointer) than to try to
       // discover that we're in that case right now.
       if (!cs.getType(expr->getSubExpr())->is<UnresolvedType>())
-        expr->getSubExpr()->propagateLValueAccessKind(AccessKind::ReadWrite);
+        cs.propagateLValueAccessKind(expr->getSubExpr(), AccessKind::ReadWrite);
       auto objectTy = cs.getType(expr->getSubExpr())->getRValueType();
 
       // The type is simply inout of whatever the lvalue's object type was.
@@ -3322,7 +3333,7 @@ namespace {
       auto destTy = cs.computeAssignDestType(expr->getDest(), expr->getLoc());
       if (!destTy)
         return nullptr;
-      expr->getDest()->propagateLValueAccessKind(AccessKind::Write);
+      cs.propagateLValueAccessKind(expr->getDest(), AccessKind::Write);
 
       // Convert the source to the simplified destination type.
       auto locator =
@@ -5284,7 +5295,7 @@ Expr *ExprRewriter::coerceToType(Expr *expr, Type toType,
         break;
       
       // Load from the lvalue.
-      expr->propagateLValueAccessKind(AccessKind::Read);
+      cs.propagateLValueAccessKind(expr, AccessKind::Read);
       expr = cs.cacheType(
           new (tc.Context) LoadExpr(expr, fromType->getRValueType()));
 
@@ -5427,8 +5438,9 @@ Expr *ExprRewriter::coerceToType(Expr *expr, Type toType,
       if (pointerKind == PTK_UnsafePointer) {
         // Overwrite the l-value access kind to be read-only if we're
         // converting to a non-mutable pointer type.
-        cast<InOutExpr>(expr->getValueProvidingExpr())->getSubExpr()
-          ->propagateLValueAccessKind(AccessKind::Read, /*overwrite*/ true);
+        auto *E = cast<InOutExpr>(expr->getValueProvidingExpr())->getSubExpr();
+        cs.propagateLValueAccessKind(E,
+                                     AccessKind::Read, /*overwrite*/ true);
       }
 
       tc.requirePointerArgumentIntrinsics(expr->getLoc());
@@ -5560,7 +5572,7 @@ Expr *ExprRewriter::coerceToType(Expr *expr, Type toType,
       // In an 'inout' operator like "++i", the operand is converted from
       // an implicit lvalue to an inout argument.
       assert(toIO->getObjectType()->isEqual(fromLValue->getObjectType()));
-      expr->propagateLValueAccessKind(AccessKind::ReadWrite);
+      cs.propagateLValueAccessKind(expr, AccessKind::ReadWrite);
       return cs.cacheType(new (tc.Context)
                               InOutExpr(expr->getStartLoc(), expr, toType,
                                         /*isImplicit*/ true));
@@ -5578,7 +5590,7 @@ Expr *ExprRewriter::coerceToType(Expr *expr, Type toType,
 
     if (performLoad) {
       // Load from the lvalue.
-      expr->propagateLValueAccessKind(AccessKind::Read);
+      cs.propagateLValueAccessKind(expr, AccessKind::Read);
       expr = cs.cacheType(new (tc.Context)
                               LoadExpr(expr, fromLValue->getObjectType()));
 
@@ -5811,7 +5823,7 @@ ExprRewriter::coerceObjectArgumentToType(Expr *expr,
 
   // Use InOutExpr to convert it to an explicit inout argument for the
   // receiver.
-  expr->propagateLValueAccessKind(AccessKind::ReadWrite);
+  cs.propagateLValueAccessKind(expr, AccessKind::ReadWrite);
   return cs.cacheType(new (ctx) InOutExpr(expr->getStartLoc(), expr, toType,
                                           /*isImplicit*/ true));
 }
@@ -6600,7 +6612,7 @@ Expr *ConstraintSystem::coerceToRValue(Expr *expr) {
 
   // If we already have an rvalue, we're done, otherwise emit a load.
   if (auto lvalueTy = getType(expr)->getAs<LValueType>()) {
-    expr->propagateLValueAccessKind(AccessKind::Read);
+    propagateLValueAccessKind(expr, AccessKind::Read);
     return cacheType(new (getASTContext())
                          LoadExpr(expr, lvalueTy->getObjectType()));
   }
