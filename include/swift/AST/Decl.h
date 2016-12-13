@@ -4557,7 +4557,13 @@ protected:
   };
 
   GenericParamList *GenericParams;
-  GenericEnvironment *GenericEnv;
+
+  /// The generic signature or environment of this function.
+  ///
+  /// When this function stores only a signature, the generic environment
+  /// will be lazily loaded.
+  mutable llvm::PointerUnion<GenericSignature *, GenericEnvironment *>
+    GenericSigOrEnv;
 
   CaptureInfo Captures;
 
@@ -4572,8 +4578,7 @@ protected:
                        GenericParamList *GenericParams)
       : ValueDecl(Kind, Parent, Name, NameLoc),
         DeclContext(DeclContextKind::AbstractFunctionDecl, Parent),
-        Body(nullptr), GenericParams(nullptr), GenericEnv(nullptr),
-        ThrowsLoc(ThrowsLoc) {
+        Body(nullptr), GenericParams(nullptr), ThrowsLoc(ThrowsLoc) {
     setBodyKind(BodyKind::None);
     setGenericParams(GenericParams);
     AbstractFunctionDeclBits.NumParameterLists = NumParameterLists;
@@ -4590,26 +4595,53 @@ protected:
 
   void setGenericParams(GenericParamList *GenericParams);
 
-public:
+  /// Lazily populate the generic environment.
+  GenericEnvironment *getLazyGenericEnvironmentSlow() const;
 
+public:
   /// \brief Should this declaration be treated as if annotated with transparent
   /// attribute.
   bool isTransparent() const;
 
+  /// Retrieve the generic signature for this function.
   GenericSignature *getGenericSignature() const {
-    return GenericEnv ? GenericEnv->getGenericSignature() : nullptr;
+    if (auto genericEnv = GenericSigOrEnv.dyn_cast<GenericEnvironment *>())
+      return genericEnv->getGenericSignature();
+
+    if (auto genericSig = GenericSigOrEnv.dyn_cast<GenericSignature *>())
+      return genericSig;
+
+    return nullptr;
   }
 
   /// Retrieve the generic context for this function.
-  GenericEnvironment *getGenericEnvironment() const { return GenericEnv; }
+  GenericEnvironment *getGenericEnvironment() const {
+    // Fast case: we already have a generic environment.
+    if (auto genericEnv = GenericSigOrEnv.dyn_cast<GenericEnvironment *>())
+      return genericEnv;
+
+    // If we only have a generic signature, build the generic environment.
+    if (GenericSigOrEnv.dyn_cast<GenericSignature *>())
+      return getLazyGenericEnvironmentSlow();
+
+    return nullptr;
+  }
+
+  /// Set a lazy generic environment.
+  void setLazyGenericEnvironment(LazyMemberLoader *lazyLoader,
+                                 GenericSignature *genericSig,
+                                 uint64_t genericEnvData);
 
   /// Set the generic context of this function.
-  void setGenericEnvironment(GenericEnvironment *GenericEnv) {
-    assert(!this->GenericEnv && "already have generic context?");
-    this->GenericEnv = GenericEnv;
+  void setGenericEnvironment(GenericEnvironment *genericEnv) {
+    assert((GenericSigOrEnv.isNull() ||
+            getGenericSignature()->getCanonicalSignature() ==
+              genericEnv->getGenericSignature()->getCanonicalSignature()) &&
+           "set a generic environment with a different generic signature");
+    this->GenericSigOrEnv = genericEnv;
 
-    if (GenericEnv)
-      GenericEnv->setOwningDeclContext(this);
+    if (genericEnv)
+      genericEnv->setOwningDeclContext(this);
   }
 
   // Expose our import as member status

@@ -575,21 +575,6 @@ enum class IterableDeclContextKind : uint8_t {
   ExtensionDecl,
 };
 
-/// Context data for iterable decl contexts.
-class LazyIterableDeclContextData {
-public:
-  /// The lazy member loader for this context.
-  LazyMemberLoader *loader;
-
-  /// The context data used for loading all of the members of the iterable
-  /// context.
-  uint64_t memberData = 0;
-
-  /// The context data used for loading all of the conformances of the
-  /// iterable context.
-  uint64_t allConformancesData = 0;
-};
-
 /// A declaration context that tracks the declarations it (directly)
 /// owns and permits iteration over them.
 ///

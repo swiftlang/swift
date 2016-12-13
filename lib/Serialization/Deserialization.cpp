@@ -912,9 +912,11 @@ void ModuleFile::readGenericRequirements(
   }
 }
 
-GenericEnvironment *ModuleFile::readGenericEnvironment(
-    llvm::BitstreamCursor &Cursor,
-    Optional<ArrayRef<Requirement>> optRequirements) {
+std::pair<GenericSignature *, TypeSubstitutionMap>
+ModuleFile::readGenericEnvironmentPieces(
+                             llvm::BitstreamCursor &Cursor,
+                             Optional<ArrayRef<Requirement>> optRequirements) {
+
   using namespace decls_block;
 
   SmallVector<uint64_t, 8> scratch;
@@ -994,7 +996,7 @@ GenericEnvironment *ModuleFile::readGenericEnvironment(
   }
 
   if (paramTypes.empty())
-    return nullptr;
+    return { nullptr, TypeSubstitutionMap() };
 
   ArrayRef<Requirement> requirements;
   SmallVector<Requirement, 4> stackRequirements;
@@ -1013,8 +1015,21 @@ GenericEnvironment *ModuleFile::readGenericEnvironment(
 
   assert(!interfaceToArchetypeMap.empty() &&
          "no archetypes in generic function?");
+  return { signature, std::move(interfaceToArchetypeMap) };
+}
 
-  return GenericEnvironment::get(signature, interfaceToArchetypeMap);
+GenericEnvironment *ModuleFile::readGenericEnvironment(
+    llvm::BitstreamCursor &Cursor,
+    Optional<ArrayRef<Requirement>> optRequirements) {
+  // Read the separate parts of the generic environment.
+  GenericSignature *genericSig;
+  TypeSubstitutionMap interfaceToArchetypeMap;
+  std::tie(genericSig, interfaceToArchetypeMap) =
+    readGenericEnvironmentPieces(Cursor, optRequirements);
+
+  if (!genericSig) return nullptr;
+
+  return GenericEnvironment::get(genericSig, interfaceToArchetypeMap);
 }
 
 GenericEnvironment *ModuleFile::maybeReadGenericEnvironment() {
@@ -2646,7 +2661,11 @@ Decl *ModuleFile::getDecl(DeclID DID, Optional<DeclContext *> ForcedContext) {
     // DeclContext for now.
     GenericParamList *genericParams = maybeReadGenericParams(DC);
 
-    auto *genericEnv = readGenericEnvironment(DeclTypeCursor);
+    // Read the generic environment.
+    GenericSignature *genericSig;
+    TypeSubstitutionMap genericEnvMap;
+    std::tie(genericSig, genericEnvMap) =
+      readGenericEnvironmentPieces(DeclTypeCursor);
 
     auto staticSpelling = getActualStaticSpellingKind(rawStaticSpelling);
     if (!staticSpelling.hasValue()) {
@@ -2706,7 +2725,16 @@ Decl *ModuleFile::getDecl(DeclID DID, Optional<DeclContext *> ForcedContext) {
     auto interfaceType = getType(interfaceTypeID);
     fn->setInterfaceType(interfaceType);
 
-    fn->setGenericEnvironment(genericEnv);
+    // If there is a generic environment, lazily wire it up.
+    if (genericSig) {
+      auto storedGenericEnvMap =
+        new TypeSubstitutionMap(std::move(genericEnvMap));
+      fn->setLazyGenericEnvironment(
+                              this, genericSig,
+                              reinterpret_cast<uint64_t>(storedGenericEnvMap));
+      GenericEnvironmentMaps.push_back(
+                     std::unique_ptr<TypeSubstitutionMap>(storedGenericEnvMap));
+    }
 
     SmallVector<ParameterList*, 2> paramLists;
     for (unsigned i = 0, e = numParamPatterns; i != e; ++i)
@@ -4303,6 +4331,24 @@ void ModuleFile::finishNormalConformance(NormalProtocolConformance *conformance,
     conformance->setTypeWitness(typeWitness.first, typeWitness.second.first,
                                 typeWitness.second.second);
   }
+}
+
+GenericEnvironment *ModuleFile::loadGenericEnvironment(const Decl *decl,
+                                                       uint64_t contextData) {
+  // Dig out the pieces needed to load a generic environment.
+  auto interfaceToArchetypes =
+    reinterpret_cast<TypeSubstitutionMap *>(contextData);
+
+  GenericSignature *genericSig;
+  if (auto func = dyn_cast<AbstractFunctionDecl>(decl))
+    genericSig = func->getGenericSignature();
+  else
+    llvm_unreachable("Cannot lazily deserialize generic environment");
+
+  auto genericEnv = GenericEnvironment::get(genericSig, *interfaceToArchetypes);
+  
+  interfaceToArchetypes->clear();
+  return genericEnv;
 }
 
 static Optional<ForeignErrorConvention::Kind>

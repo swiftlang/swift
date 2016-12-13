@@ -204,10 +204,8 @@ struct ASTContext::Implementation {
                  std::vector<ASTContext::DelayedConformanceDiag>>
     DelayedConformanceDiags;
 
-  /// Stores information about lazy deserialization of iterator declaration
-  /// contexts, e.g., nominal type declarations and extension declarations.
-  llvm::DenseMap<const IterableDeclContext *, LazyIterableDeclContextData *>
-    LazyIterableDeclContexts;
+  /// Stores information about lazy deserialization of various declarations.
+  llvm::DenseMap<const Decl *, LazyContextData *> LazyContexts;
 
   /// Stored archetype builders for canonical generic signatures.
   llvm::DenseMap<std::pair<GenericSignature *, ModuleDecl *>,
@@ -1466,11 +1464,11 @@ ASTContext::getInheritedConformance(Type type, ProtocolConformance *inherited) {
   return result;
 }
 
-LazyIterableDeclContextData *ASTContext::getOrCreateLazyIterableContextData(
-                                                const IterableDeclContext *idc,
+LazyContextData *ASTContext::getOrCreateLazyContextData(
+                                                const Decl *decl,
                                                 LazyMemberLoader *lazyLoader) {
-  auto known = Impl.LazyIterableDeclContexts.find(idc);
-  if (known != Impl.LazyIterableDeclContexts.end()) {
+  auto known = Impl.LazyContexts.find(decl);
+  if (known != Impl.LazyContexts.end()) {
     // Make sure we didn't provide an incompatible lazy loader.
     assert(!lazyLoader || lazyLoader == known->second->loader);
     return known->second;
@@ -1478,10 +1476,42 @@ LazyIterableDeclContextData *ASTContext::getOrCreateLazyIterableContextData(
 
   // Create new lazy iterable context data with the given loader.
   assert(lazyLoader && "Queried lazy data for non-lazy iterable context");
-  auto *contextData = Allocate<LazyIterableDeclContextData>();
-  contextData->loader = lazyLoader;
-  Impl.LazyIterableDeclContexts[idc] = contextData;
-  return contextData;
+  if (isa<NominalTypeDecl>(decl) || isa<ExtensionDecl>(decl)) {
+    auto *contextData = Allocate<LazyIterableDeclContextData>();
+    contextData->loader = lazyLoader;
+    Impl.LazyContexts[decl] = contextData;
+    return contextData;
+  }
+
+  // Create new lazy function context data with the given loader.
+  if (isa<AbstractFunctionDecl>(decl)) {
+    auto *contextData = Allocate<LazyAbstractFunctionData>();
+    contextData->loader = lazyLoader;
+    Impl.LazyContexts[decl] = contextData;
+    return contextData;
+  }
+
+  llvm_unreachable("unhandled lazy context");
+}
+
+LazyIterableDeclContextData *ASTContext::getOrCreateLazyIterableContextData(
+                                            const IterableDeclContext *idc,
+                                            LazyMemberLoader *lazyLoader) {
+  if (auto ext = dyn_cast<ExtensionDecl>(idc)) {
+    return (LazyIterableDeclContextData *)getOrCreateLazyContextData(
+                                                              ext, lazyLoader);
+  }
+
+  auto nominal = cast<NominalTypeDecl>(idc);
+  return (LazyIterableDeclContextData *)getOrCreateLazyContextData(nominal,
+                                                                   lazyLoader);
+}
+
+LazyAbstractFunctionData *ASTContext::getOrCreateLazyFunctionContextData(
+                                               const AbstractFunctionDecl *func,
+                                               LazyMemberLoader *lazyLoader) {
+  return (LazyAbstractFunctionData *)getOrCreateLazyContextData(func,
+                                                                lazyLoader);
 }
 
 void ASTContext::addDelayedConformanceDiag(
