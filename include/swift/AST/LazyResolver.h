@@ -199,6 +199,38 @@ public:
   }
 };
 
+/// Context data for lazy deserialization.
+class LazyContextData {
+public:
+  /// The lazy member loader for this context.
+  LazyMemberLoader *loader;
+};
+
+/// Context data for abstract function declarations.
+class LazyAbstractFunctionData : public LazyContextData {
+public:
+  /// The context data used for loading the generic environment.
+  uint64_t genericEnvData = 0;
+};
+
+/// Context data for generic type declarations.
+class LazyGenericTypeData : public LazyContextData {
+public:
+  /// The context data used for loading the generic environment.
+  uint64_t genericEnvData = 0;
+};
+
+/// Context data for iterable decl contexts.
+class LazyIterableDeclContextData : public LazyGenericTypeData {
+public:
+  /// The context data used for loading all of the members of the iterable
+  /// context.
+  uint64_t memberData = 0;
+
+  /// The context data used for loading all of the conformances of the
+  /// iterable context.
+  uint64_t allConformancesData = 0;
+};
 
 /// A class that can lazily load members from a serialized format.
 class alignas(void*) LazyMemberLoader {
@@ -233,6 +265,12 @@ public:
   /// Returns the default definition type for \p ATD.
   virtual TypeLoc loadAssociatedTypeDefault(const AssociatedTypeDecl *ATD,
                                             uint64_t contextData) {
+    llvm_unreachable("unimplemented");
+  }
+
+  /// Returns the generic environment.
+  virtual GenericEnvironment *loadGenericEnvironment(const Decl *decl,
+                                                     uint64_t contextData) {
     llvm_unreachable("unimplemented");
   }
 };
