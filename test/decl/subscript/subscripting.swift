@@ -224,7 +224,23 @@ struct tuple_index {
   }
 }
 
+struct MutableSubscriptInImplicitGetter {
+  var value: Int
+  subscript(index: Int) -> Int {
+    value = 5 // expected-error{{cannot assign to property: 'self' is immutable}}
+    return 5
+  }
+}
 
+struct MutableSubscriptInExplicitGetter {
+  var value: Int
+  subscript(index: Int) -> Int {
+    get { // expected-note {{mark accessor 'mutating' to make 'self' mutable}}
+      value = 5 // expected-error{{cannot assign to property: 'self' is immutable}}
+      return 5
+    }
+  }
+}
 
 struct SubscriptTest1 {
   subscript(keyword:String) -> Bool { return true }  // expected-note 2 {{found this candidate}}
