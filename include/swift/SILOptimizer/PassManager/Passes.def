@@ -237,7 +237,9 @@ PASS(UnsafeGuaranteedPeephole, "unsafe-guaranteed-peephole",
      "Builtin.unsafeGuaranteed")
 PASS(UsePrespecialized, "use-prespecialized",
      "Use pre-specialized functions")
-PASS_RANGE(AllPasses, AADumper, UsePrespecialized)
+PASS(BugReducerTester, "bug-reducer-tester",
+     "Utility pass for testing sil-bug-reducer. Asserts when visits an apply that calls a specific function")
+PASS_RANGE(AllPasses, AADumper, BugReducerTester)
 
 #undef PASS
 #undef PASS_RANGE
