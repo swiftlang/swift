@@ -920,7 +920,8 @@ uint64_t ModuleFile::allocateLazyGenericEnvironmentMap(
   return reinterpret_cast<uint64_t>(storedGenericEnvMap);
 }
 
-void ModuleFile::readLazyGenericEnvironment(GenericTypeDecl *type) {
+void ModuleFile::readLazyGenericEnvironment(
+            llvm::PointerUnion<GenericTypeDecl *, ExtensionDecl *> typeOrExt) {
   // Read the generic environment.
   GenericSignature *genericSig;
   TypeSubstitutionMap genericEnvMap;
@@ -929,9 +930,13 @@ void ModuleFile::readLazyGenericEnvironment(GenericTypeDecl *type) {
 
   // Set up the lazy generic environment.
   if (genericSig) {
-    type->setLazyGenericEnvironment(
-                   this, genericSig,
-                   allocateLazyGenericEnvironmentMap(std::move(genericEnvMap)));
+    auto lazyMap = allocateLazyGenericEnvironmentMap(std::move(genericEnvMap));
+    if (auto type = typeOrExt.dyn_cast<GenericTypeDecl *>()) {
+      type->setLazyGenericEnvironment(this, genericSig, lazyMap);
+    } else {
+      auto ext = typeOrExt.get<ExtensionDecl *>();
+      ext->setLazyGenericEnvironment(this, genericSig, lazyMap);
+    }
   }
 }
 
@@ -3293,8 +3298,7 @@ Decl *ModuleFile::getDecl(DeclID DID, Optional<DeclContext *> ForcedContext) {
     GenericParamList *genericParams = maybeReadGenericParams(DC);
     extension->setGenericParams(genericParams);
 
-    auto *env = maybeReadGenericEnvironment();
-    extension->setGenericEnvironment(env);
+    readLazyGenericEnvironment(extension);
 
     extension->setMemberLoader(this, DeclTypeCursor.GetCurrentBitNo());
     skipRecord(DeclTypeCursor, decls_block::MEMBERS);
@@ -4379,6 +4383,8 @@ GenericEnvironment *ModuleFile::loadGenericEnvironment(const Decl *decl,
     genericSig = func->getGenericSignature();
   else if (auto type = dyn_cast<GenericTypeDecl>(decl))
     genericSig = type->getGenericSignature();
+  else if (auto ext = dyn_cast<ExtensionDecl>(decl))
+    genericSig = ext->getGenericSignature();
   else
     llvm_unreachable("Cannot lazily deserialize generic environment");
 

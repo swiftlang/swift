@@ -453,8 +453,9 @@ private:
   /// generic environments.
   uint64_t allocateLazyGenericEnvironmentMap(TypeSubstitutionMap &&map);
 
-  /// Set up a lazy generic environment for the given type.
-  void readLazyGenericEnvironment(GenericTypeDecl *type);
+  /// Set up a lazy generic environment for the given type or extension.
+  void readLazyGenericEnvironment(
+              llvm::PointerUnion<GenericTypeDecl *, ExtensionDecl *> typeOrExt);
 
   /// Read the generic signature and type substitution map for a
   /// generic environment from \c Cursor.

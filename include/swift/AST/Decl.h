@@ -1395,11 +1395,12 @@ class ExtensionDecl final : public Decl, public DeclContext,
   /// The generic parameters of the extension.
   GenericParamList *GenericParams = nullptr;
 
-  /// \brief The generic context of this extension.
+  /// The generic signature or environment of this extension.
   ///
-  /// This is the mapping between interface types and archetypes for the
-  /// generic parameters of this extension.
-  GenericEnvironment *GenericEnv = nullptr;
+  /// When this extension stores only a signature, the generic environment
+  /// will be lazily loaded.
+  mutable llvm::PointerUnion<GenericSignature *, GenericEnvironment *>
+    GenericSigOrEnv;
 
   MutableArrayRef<TypeLoc> Inherited;
 
@@ -1443,6 +1444,9 @@ class ExtensionDecl final : public Decl, public DeclContext,
   /// Slow path for \c takeConformanceLoader().
   std::pair<LazyMemberLoader *, uint64_t> takeConformanceLoaderSlow();
 
+  /// Lazily populate the generic environment.
+  GenericEnvironment *getLazyGenericEnvironmentSlow() const;
+
 public:
   using Decl::getASTContext;
 
@@ -1480,25 +1484,53 @@ public:
     TrailingWhere = trailingWhereClause;
   }
 
-  /// Retrieve the generic signature for this extension.
-  GenericSignature *getGenericSignature() const {
-    return GenericEnv ? GenericEnv->getGenericSignature() : nullptr;
+  /// Retrieve the generic requirements.
+  ArrayRef<Requirement> getGenericRequirements() const {
+    if (auto sig = getGenericSignature())
+      return sig->getRequirements();
+    else
+      return { };
   }
 
-  /// Retrieve the generic context for this extension.
-  GenericEnvironment *getGenericEnvironment() const { return GenericEnv; }
+  /// Retrieve the generic signature for this type.
+  GenericSignature *getGenericSignature() const {
+    if (auto genericEnv = GenericSigOrEnv.dyn_cast<GenericEnvironment *>())
+      return genericEnv->getGenericSignature();
+
+    if (auto genericSig = GenericSigOrEnv.dyn_cast<GenericSignature *>())
+      return genericSig;
+
+    return nullptr;
+  }
+
+  /// Retrieve the generic context for this type.
+  GenericEnvironment *getGenericEnvironment() const {
+    // Fast case: we already have a generic environment.
+    if (auto genericEnv = GenericSigOrEnv.dyn_cast<GenericEnvironment *>())
+      return genericEnv;
+
+    // If we only have a generic signature, build the generic environment.
+    if (GenericSigOrEnv.dyn_cast<GenericSignature *>())
+      return getLazyGenericEnvironmentSlow();
+
+    return nullptr;
+  }
+
+  /// Set a lazy generic environment.
+  void setLazyGenericEnvironment(LazyMemberLoader *lazyLoader,
+                                 GenericSignature *genericSig,
+                                 uint64_t genericEnvData);
 
   /// Set the generic context of this extension.
-  void setGenericEnvironment(GenericEnvironment *env) {
-    assert(!GenericEnv && "Already have generic context");
-    GenericEnv = env;
-
-    if (GenericEnv)
-      GenericEnv->setOwningDeclContext(this);
+  void setGenericEnvironment(GenericEnvironment *genericEnv) {
+    assert((GenericSigOrEnv.isNull() ||
+            getGenericSignature()->getCanonicalSignature() ==
+              genericEnv->getGenericSignature()->getCanonicalSignature()) &&
+           "set a generic environment with a different generic signature");
+    this->GenericSigOrEnv = genericEnv;
+    if (genericEnv)
+      genericEnv->setOwningDeclContext(this);
   }
-
-  /// Retrieve the generic requirements.
-  ArrayRef<Requirement> getGenericRequirements() const;
 
   /// Retrieve the type being extended.
   Type getExtendedType() const { return ExtendedType.getType(); }
@@ -6054,13 +6086,6 @@ inline bool ValueDecl::isImportAsMember() const {
   if (auto func = dyn_cast<AbstractFunctionDecl>(this))
     return func->isImportAsMember();
   return false;
-}
-
-inline ArrayRef<Requirement> ExtensionDecl::getGenericRequirements() const {
-  if (auto sig = getGenericSignature())
-    return sig->getRequirements();
-  else
-    return { };
 }
 
 inline bool Decl::isPotentiallyOverridable() const {

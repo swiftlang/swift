@@ -731,6 +731,31 @@ void ExtensionDecl::setGenericParams(GenericParamList *params) {
   }
 }
 
+GenericEnvironment *
+ExtensionDecl::getLazyGenericEnvironmentSlow() const {
+  assert(GenericSigOrEnv.is<GenericSignature *>() &&
+         "not a lazily deserialized generic environment");
+  auto contextData = getASTContext().getOrCreateLazyIterableContextData(this,
+                                                                    nullptr);
+  auto genericEnv = contextData->loader->loadGenericEnvironment(
+                                            this, contextData->genericEnvData);
+  const_cast<ExtensionDecl *>(this)->setGenericEnvironment(genericEnv);
+  ++NumLazyGenericEnvironmentsLoaded;
+  return genericEnv;
+}
+
+void ExtensionDecl::setLazyGenericEnvironment(LazyMemberLoader *lazyLoader,
+                                              GenericSignature *genericSig,
+                                              uint64_t genericEnvData) {
+  assert(GenericSigOrEnv.isNull() && "already have a generic signature");
+  GenericSigOrEnv = genericSig;
+
+  auto contextData =
+    getASTContext().getOrCreateLazyIterableContextData(this, lazyLoader);
+  contextData->genericEnvData = genericEnvData;
+  ++NumLazyGenericEnvironments;
+}
+
 DeclRange ExtensionDecl::getMembers() const {
   loadAllMembers();
   return IterableDeclContext::getMembers();
