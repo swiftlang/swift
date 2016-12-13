@@ -25,8 +25,8 @@ class ReduceMiscompilingPasses(list_reducer.ListReducer):
         print("Checking to see if '%s' compiles correctly" % suffix_joined)
 
         result = self.invoker.invoke_with_passlist(
-            self.invoker.get_suffixed_filename(suffix_hash),
-            suffix)
+            suffix,
+            self.invoker.get_suffixed_filename(suffix_hash))
 
         # Found a miscompile! Keep the suffix
         if result != 0:
@@ -51,8 +51,8 @@ class ReduceMiscompilingPasses(list_reducer.ListReducer):
         # passes.
         prefix_path = self.invoker.get_suffixed_filename(prefix_hash)
         result = self.invoker.invoke_with_passlist(
-            prefix_path,
-            prefix)
+            prefix,
+            prefix_path)
         if result != 0:
             print("Prefix maintains the predicate by itself. Returning keep "
                   "prefix")
@@ -71,8 +71,8 @@ class ReduceMiscompilingPasses(list_reducer.ListReducer):
         print("Checking to see if '%s' compiles correctly after the '%s' "
               "passes" % (suffix_joined, prefix_joined))
         result = self.invoker.invoke_with_passlist(
-            self.invoker.get_suffixed_filename(suffix_hash),
-            suffix)
+            suffix,
+            self.invoker.get_suffixed_filename(suffix_hash))
 
         # If we failed at this point, then the prefix is our new
         # baseline. Return keep suffix.
@@ -117,7 +117,7 @@ list of passes that the perf pipeline"""
 
     # Make sure that the base case /does/ crash.
     filename = sil_opt_invoker.get_suffixed_filename('base_case')
-    result = sil_opt_invoker.invoke_with_passlist(filename, passes)
+    result = sil_opt_invoker.invoke_with_passlist(passes, filename)
     # If we succeed, there is no further work to do.
     if result == 0:
         print("Success with PassList: %s" % (' '.join(passes)))
@@ -127,7 +127,11 @@ list of passes that the perf pipeline"""
     r = ReduceMiscompilingPasses(passes, sil_opt_invoker)
     if not r.reduce_list():
         print("Failed to find miscompiling pass list!")
-    print("Found miscompiling passes: %s" % (' '.join(r.target_list)))
+    cmdline = sil_opt_invoker.cmdline_with_passlist(r.target_list)
+    print("*** Found miscompiling passes!")
+    print("*** Final File: %s" % sil_opt_invoker.input_file)
+    print("*** Final Passes: %s" % (' '.join(r.target_list)))
+    print("*** Repro command line: %s" % (' '.join(cmdline)))
 
 
 def add_parser_arguments(parser):

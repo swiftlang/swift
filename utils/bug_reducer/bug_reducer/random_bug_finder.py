@@ -38,7 +38,7 @@ list of passes that the perf pipeline"""
         print("Running round %i/%i" % (count, max_count))
         random.shuffle(passes)
         filename = sil_opt_invoker.get_suffixed_filename(str(count))
-        result = sil_opt_invoker.invoke_with_passlist(filename, passes)
+        result = sil_opt_invoker.invoke_with_passlist(passes, filename)
         if result == 0:
             print("Success with PassList: %s" % (' '.join(passes)))
         else:

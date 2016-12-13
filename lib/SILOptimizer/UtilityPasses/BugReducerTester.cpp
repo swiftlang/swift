@@ -42,8 +42,9 @@ class BugReducerTester : public SILFunctionTransform {
         auto *Apply = dyn_cast<ApplyInst>(&II);
         if (!Apply)
           continue;
-        FullApplySite FAS(Apply);
-        if (!FAS || !FAS.getCalleeFunction()->getName().equals(FunctionTarget))
+        auto *FRI = dyn_cast<FunctionRefInst>(Apply->getCallee());
+        if (!FRI ||
+            !FRI->getReferencedFunction()->getName().equals(FunctionTarget))
           continue;
         llvm_unreachable("Found the target!");
       }

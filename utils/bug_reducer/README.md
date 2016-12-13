@@ -7,14 +7,14 @@ enable bugpoint to easily be ported to newer IRs.
 
 An example invocation would be:
 
-./swift/utils/bug-reducer/bug_reducer.py \
-    opt \
-    --sdk=$(xcrun --sdk macosx --toolchain default --show-sdk-path) \
-    --module-name=${MODULE_NAME} \
-    --work-dir=${PWD}/bug_reducer \
-    --module-cache=${PWD}/bug_reducer/module-cache \
-    ${SWIFT_BUILD_DIR} \
-    ${SIB_FILE}
+    ./swift/utils/bug-reducer/bug_reducer.py \
+        opt \
+        --sdk=$(xcrun --sdk macosx --toolchain default --show-sdk-path) \
+        --module-name=${MODULE_NAME} \
+        --work-dir=${PWD}/bug_reducer \
+        --module-cache=${PWD}/bug_reducer/module-cache \
+        ${SWIFT_BUILD_DIR} \
+        ${SIB_FILE}
 
 This is still very alpha and needs a lot of work including tests, so please do
 not expect it to work at all until tests are available. Once testing is
@@ -42,3 +42,47 @@ hopefully help fix them/add tests).
   any of its call sites, we can avoid having to create a shared function
   declaration in the other partition. We avoid this since creating shared
   function declarations is illegal in SIL.
+
+# High Level Example
+
+Imagine that I have a test case foo.swift that causes the optimizer to assert in
+the normal performance pipeline. I decide I want to use the bug_reducer to
+reduce the passes and or size of the test case. First I emit a SIB file with the
+performance optimizations disabled:
+
+    ${SWIFTC_CMDLINE} -emit-sib -Xllvm -disable-sil-optzns -O -o ${OUTPUT}.sib
+
+Then I invoke the bug reducer as follows:
+
+    ./swift/utils/bug-reducer/bug_reducer.py \
+        opt \
+        --sdk=$(xcrun --sdk macosx --toolchain default --show-sdk-path) \
+        --module-name=${MODULE_NAME} \
+        --work-dir=${PWD}/bug_reducer \
+        --module-cache=${PWD}/bug_reducer/module-cache \
+        ${SWIFT_BUILD_DIR} \
+        ${OUTPUT_SIB}
+
+Then the bug_reducer will first attempt to reduce the passes. Then (in a future
+version), it will attempt to reduce the test case by splitting the module
+up. The output will be look something like:
+
+    *** Found miscompiling passes!
+    *** Final File: ${FINAL_SIB_FILE}
+    *** Final Passes: ${FINAL_PASSES}
+    *** Repro command line: ${FULL_FINAL_REPRO_CMDLINE}
+
+Some notes:
+
+1. The final sib file produced _may be different_ than the sib file that you
+inputted. This is because the bug_reducer may have:
+
+    a. Created an intermediate optimized sib file with some of the passes applied
+    (this ensures that a module with only one pass can be provided)
+
+    b. (In a future version) Split the module into optimized and unoptimized parts
+       to reduce the code even further.
+
+2. Repro command line will be the actual final full command line used to
+   reproduce the crasher. You should be able to copy/paste the command line
+   directly into LLDB to reproduce. No further work is required.
