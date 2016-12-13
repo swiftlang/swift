@@ -6,5 +6,4 @@
 // See https://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
 
 // RUN: not %target-swift-frontend %s -typecheck
-// REQUIRES: asserts
 struct A<A{class a{protocol A{struct B{}class B<T where B:T>:a

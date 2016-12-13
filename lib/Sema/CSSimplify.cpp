@@ -646,7 +646,7 @@ matchCallArguments(ConstraintSystem &cs, ConstraintKind kind,
 
   // In the empty existential parameter case,
   // it's sufficient to simply match call arguments.
-  if (paramType->isEmptyExistentialComposition()) {
+  if (paramType->isAny()) {
     // Argument of the existential type can't be inout.
     if (argType->is<InOutType>())
       return ConstraintSystem::SolutionKind::Error;
@@ -1124,7 +1124,7 @@ ConstraintSystem::matchExistentialTypes(Type type1, Type type2,
     return SolutionKind::Error;
 
   // Conformance to 'Any' always holds.
-  if (type2->isEmptyExistentialComposition())
+  if (type2->isAny())
     return SolutionKind::Solved;
 
   // If the first type is a type variable or member thereof, there's nothing
@@ -1326,7 +1326,7 @@ ConstraintSystem::matchTypes(Type type1, Type type2, ConstraintKind kind,
         
         // For symmetry with overload resolution, penalize conversions to empty
         // existentials.
-        if (type2->isEmptyExistentialComposition())
+        if (type2->isAny())
           increaseScore(ScoreKind::SK_EmptyExistentialConversion);
         
         return SolutionKind::Solved;

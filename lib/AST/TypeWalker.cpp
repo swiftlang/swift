@@ -68,13 +68,6 @@ class Traversal : public TypeVisitor<Traversal, bool>
   }
   bool visitSubstitutableType(SubstitutableType *ty) { return false; }
 
-  bool visitSubstitutedType(SubstitutedType *ty) {
-    if (Walker.shouldVisitOriginalSubstitutedType())
-      if (doIt(ty->getOriginal()))
-        return true;
-    return doIt(ty->getReplacementType());
-  }
-
   bool visitDependentMemberType(DependentMemberType *ty) {
     return doIt(ty->getBase());
   }

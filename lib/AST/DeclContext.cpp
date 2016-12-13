@@ -40,7 +40,7 @@ ASTContext &DeclContext::getASTContext() const {
 }
 
 GenericTypeDecl *
-DeclContext::getAsGenericTypeOrGenericTypeExtensionContext() const {
+DeclContext::getAsTypeOrTypeExtensionContext() const {
   switch (getContextKind()) {
   case DeclContextKind::Module:
   case DeclContextKind::FileUnit:
@@ -78,32 +78,28 @@ DeclContext::getAsGenericTypeOrGenericTypeExtensionContext() const {
 /// extension thereof, return the NominalTypeDecl.
 NominalTypeDecl *DeclContext::
 getAsNominalTypeOrNominalTypeExtensionContext() const {
-  auto decl = getAsGenericTypeOrGenericTypeExtensionContext();
+  auto decl = getAsTypeOrTypeExtensionContext();
   return dyn_cast_or_null<NominalTypeDecl>(decl);
 }
 
 
 ClassDecl *DeclContext::getAsClassOrClassExtensionContext() const {
-  return dyn_cast_or_null<ClassDecl>(
-           getAsGenericTypeOrGenericTypeExtensionContext());
+  return dyn_cast_or_null<ClassDecl>(getAsTypeOrTypeExtensionContext());
 }
 
 EnumDecl *DeclContext::getAsEnumOrEnumExtensionContext() const {
-  return dyn_cast_or_null<EnumDecl>(
-           getAsGenericTypeOrGenericTypeExtensionContext());
+  return dyn_cast_or_null<EnumDecl>(getAsTypeOrTypeExtensionContext());
 }
 
 ProtocolDecl *DeclContext::getAsProtocolOrProtocolExtensionContext() const {
-  return dyn_cast_or_null<ProtocolDecl>(
-           getAsGenericTypeOrGenericTypeExtensionContext());
+  return dyn_cast_or_null<ProtocolDecl>(getAsTypeOrTypeExtensionContext());
 }
 
 ProtocolDecl *DeclContext::getAsProtocolExtensionContext() const {
   if (getContextKind() != DeclContextKind::ExtensionDecl)
     return nullptr;
 
-  return dyn_cast_or_null<ProtocolDecl>(
-           getAsGenericTypeOrGenericTypeExtensionContext());
+  return dyn_cast_or_null<ProtocolDecl>(getAsTypeOrTypeExtensionContext());
 }
 
 GenericTypeParamType *DeclContext::getProtocolSelfType() const {
@@ -210,9 +206,8 @@ GenericParamList *DeclContext::getGenericParamsOfContext() const {
       continue;
 
     case DeclContextKind::ExtensionDecl:
-      if (auto GP = cast<ExtensionDecl>(dc)->getGenericParams())
-        return GP;
-      continue;
+      // Extensions do not capture outer generic parameters.
+      return cast<ExtensionDecl>(dc)->getGenericParams();
     }
     llvm_unreachable("bad DeclContextKind");
   }
@@ -251,9 +246,8 @@ GenericSignature *DeclContext::getGenericSignatureOfContext() const {
 
     case DeclContextKind::ExtensionDecl: {
       auto ED = cast<ExtensionDecl>(dc);
-      if (auto genericSig = ED->getGenericSignature())
-        return genericSig;
-      continue;
+      // Extensions do not capture outer generic parameters.
+      return ED->getGenericSignature();
     }
     }
     llvm_unreachable("bad DeclContextKind");
@@ -292,9 +286,8 @@ GenericEnvironment *DeclContext::getGenericEnvironmentOfContext() const {
 
     case DeclContextKind::ExtensionDecl: {
       auto ED = cast<ExtensionDecl>(dc);
-      if (auto genericCtx = ED->getGenericEnvironment())
-        return genericCtx;
-      continue;
+      // Extensions do not capture outer generic parameters.
+      return ED->getGenericEnvironment();
     }
     }
     llvm_unreachable("bad DeclContextKind");
@@ -357,6 +350,11 @@ AbstractFunctionDecl *DeclContext::getInnermostMethodContext() {
   }
 }
 
+bool DeclContext::isTypeContext() const {
+  return isa<NominalTypeDecl>(this) ||
+         getContextKind() == DeclContextKind::ExtensionDecl;
+}
+
 DeclContext *DeclContext::getInnermostTypeContext() {
   DeclContext *Result = this;
   while (true) {
@@ -374,8 +372,14 @@ DeclContext *DeclContext::getInnermostTypeContext() {
     case DeclContextKind::FileUnit:
       return nullptr;
 
-    case DeclContextKind::ExtensionDecl:
     case DeclContextKind::GenericTypeDecl:
+      if (isa<TypeAliasDecl>(Result)) {
+        Result = Result->getParent();
+        continue;
+      }
+      return Result;
+
+    case DeclContextKind::ExtensionDecl:
       return Result;
     }
   }
@@ -461,17 +465,20 @@ bool DeclContext::isGenericContext() const {
     case DeclContextKind::AbstractFunctionDecl:
       if (cast<AbstractFunctionDecl>(dc)->getGenericParams())
         return true;
+      // Check parent context.
       continue;
 
     case DeclContextKind::GenericTypeDecl:
       if (cast<GenericTypeDecl>(dc)->getGenericParams())
         return true;
+      // Check parent context.
       continue;
 
     case DeclContextKind::ExtensionDecl:
       if (cast<ExtensionDecl>(dc)->getGenericParams())
         return true;
-      continue;
+      // Extensions do not capture outer generic parameters.
+      return false;
     }
     llvm_unreachable("bad decl context kind");
   }
@@ -518,7 +525,10 @@ ResilienceExpansion DeclContext::getResilienceExpansion() const {
       // we serialize the parent's body.
       if (AFD->getDeclContext()->isLocalContext())
         continue;
-      
+
+      if (AFD->isInvalid())
+        break;
+
       // If the function is not externally visible, we will not be serializing
       // its body.
       if (AFD->getEffectiveAccess() < Accessibility::Public)
@@ -824,10 +834,20 @@ unsigned DeclContext::printContext(raw_ostream &OS, unsigned indent) const {
   return Depth + 1;
 }
 
+ASTContext &IterableDeclContext::getASTContext() const {
+  switch (getIterableContextKind()) {
+  case IterableDeclContextKind::NominalTypeDecl:
+    return cast<NominalTypeDecl>(this)->getASTContext();
+
+  case IterableDeclContextKind::ExtensionDecl:
+    return cast<ExtensionDecl>(this)->getASTContext();
+  }
+}
+
 DeclRange IterableDeclContext::getMembers() const {
   loadAllMembers();
 
-  return DeclRange(FirstDecl, nullptr);
+  return DeclRange(FirstDeclAndLazyMembers.getPointer(), nullptr);
 }
 
 /// Add a member to this context.
@@ -837,8 +857,6 @@ void IterableDeclContext::addMember(Decl *member, Decl *Hint) {
 
   // Notify our parent declaration that we have added the member, which can
   // be used to update the lookup tables.
-  // FIXME: If only we had the notion of a "searchable" declaration
-  // context...
   switch (getIterableContextKind()) {
   case IterableDeclContextKind::NominalTypeDecl: {
     auto nominal = cast<NominalTypeDecl>(this);
@@ -877,28 +895,33 @@ void IterableDeclContext::addMemberSilently(Decl *member, Decl *hint) const {
     last->NextDecl = member;
     assert(last != member && "Simple cycle in decl list");
   } else {
-    FirstDecl = member;
+    FirstDeclAndLazyMembers.setPointer(member);
   }
   LastDeclAndKind.setPointer(member);
 }
 
-void IterableDeclContext::setLoader(LazyMemberLoader *loader, 
-                                    uint64_t contextData) {
-  LazyLoader = loader;
-  LazyLoaderContextData = contextData;
+void IterableDeclContext::setMemberLoader(LazyMemberLoader *loader,
+                                          uint64_t contextData) {
+  assert(!hasLazyMembers() && "already have lazy members");
+
+  ASTContext &ctx = getASTContext();
+  auto contextInfo = ctx.getOrCreateLazyIterableContextData(this, loader);
+  FirstDeclAndLazyMembers.setInt(true);
+  contextInfo->memberData = contextData;
 
   ++NumLazyIterableDeclContexts;
   ++NumUnloadedLazyIterableDeclContexts;
 }
 
 void IterableDeclContext::loadAllMembers() const {
-  if (!isLazy())
+  if (!hasLazyMembers())
     return;
 
   // Don't try to load all members re-entrant-ly.
-  auto resolver = getLoader();
-  auto contextData = getLoaderContextData();
-  LazyLoader = nullptr;
+  ASTContext &ctx = getASTContext();
+  auto contextInfo = ctx.getOrCreateLazyIterableContextData(this,
+                                                            /*loader=*/nullptr);
+  FirstDeclAndLazyMembers.setInt(false);
 
   const Decl *container = nullptr;
   switch (getIterableContextKind()) {
@@ -911,7 +934,8 @@ void IterableDeclContext::loadAllMembers() const {
     break;
   }
 
-  resolver->loadAllMembers(const_cast< Decl *>(container), contextData);
+  contextInfo->loader->loadAllMembers(const_cast<Decl *>(container),
+                                      contextInfo->memberData);
 
   --NumUnloadedLazyIterableDeclContexts;
 }

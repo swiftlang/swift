@@ -20,6 +20,7 @@
 #define SWIFT_ABI_METADATAVALUES_H
 
 #include "swift/AST/Ownership.h"
+#include "swift/Basic/Unreachable.h"
 
 #include <stdlib.h>
 #include <stdint.h>
@@ -379,6 +380,8 @@ public:
     case ProtocolDispatchStrategy::Swift:
       return true;
     }
+
+    swift_unreachable("Unhandled ProtocolDispatchStrategy in switch.");
   }
   
   /// Return the identifier if this is a special runtime-known protocol.

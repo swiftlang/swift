@@ -36,7 +36,7 @@ ConstraintGraph::~ConstraintGraph() {
   for (unsigned i = 0, n = TypeVariables.size(); i != n; ++i) {
     auto &impl = TypeVariables[i]->getImpl();
     delete impl.getGraphNode();
-    impl.setGraphNode(0);
+    impl.setGraphNode(nullptr);
   }
 }
 
@@ -319,7 +319,7 @@ void ConstraintGraph::removeNode(TypeVariableType *typeVar) {
   auto &impl = typeVar->getImpl();
   unsigned index = impl.getGraphIndex();
   delete impl.getGraphNode();
-  impl.setGraphNode(0);
+  impl.setGraphNode(nullptr);
 
   // Remove this type variable from the list.
   unsigned lastIndex = TypeVariables.size()-1;
@@ -740,23 +740,8 @@ void ConstraintGraph::removeEdge(Constraint *constraint) {
     }
   }
 
-  size_t index = 0;
-  for (auto generated : CS.solverState->generatedConstraints) {
-    if (generated == constraint) {
-      unsigned last = CS.solverState->generatedConstraints.size()-1;
-      auto lastConstraint = CS.solverState->generatedConstraints[last];
-      if (lastConstraint == generated) {
-        CS.solverState->generatedConstraints.pop_back();
-        break;
-      } else {
-        CS.solverState->generatedConstraints[index] = lastConstraint;
-        CS.solverState->generatedConstraints[last] = constraint;
-        CS.solverState->generatedConstraints.pop_back();
-        break;
-      }
-    }
-    index++;
-  }
+  if (CS.solverState)
+    CS.solverState->removeGeneratedConstraint(constraint);
 
   removeConstraint(constraint);
 }

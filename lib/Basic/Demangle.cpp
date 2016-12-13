@@ -325,6 +325,12 @@ public:
   ///
   /// \return true if the mangling succeeded
   NodePointer demangleTopLevel() {
+#ifndef NO_NEW_DEMANGLING
+    if (Mangled.str().startswith(MANGLING_PREFIX_STR)) {
+      NewMangling::Demangler D(Mangled.str());
+      return D.demangleTopLevel();
+    }
+#endif
     if (!Mangled.nextIf("_T"))
       return nullptr;
 
@@ -1915,6 +1921,50 @@ private:
         boxType->addChild(type);
         return boxType;
       }
+      if (Mangled.nextIf('B')) {
+        NodePointer signature;
+        if (Mangled.nextIf('G')) {
+          signature = demangleGenericSignature(/*pseudogeneric*/ false);
+          if (!signature)
+            return nullptr;
+        }
+        NodePointer layout = NodeFactory::create(Node::Kind::SILBoxLayout);
+        while (!Mangled.nextIf('_')) {
+          Node::Kind kind;
+          if (Mangled.nextIf('m'))
+            kind = Node::Kind::SILBoxMutableField;
+          else if (Mangled.nextIf('i'))
+            kind = Node::Kind::SILBoxImmutableField;
+          else
+            return nullptr;
+          
+          auto type = demangleType();
+          if (!type)
+            return nullptr;
+          auto field = NodeFactory::create(kind);
+          field->addChild(type);
+          layout->addChild(field);
+        }
+        NodePointer genericArgs;
+        if (signature) {
+          genericArgs = NodeFactory::create(Node::Kind::TypeList);
+          while (!Mangled.nextIf('_')) {
+            auto type = demangleType();
+            if (!type)
+              return nullptr;
+            genericArgs->addChild(type);
+          }
+        }
+        NodePointer boxType =
+          NodeFactory::create(Node::Kind::SILBoxTypeWithLayout);
+        boxType->addChild(layout);
+        if (signature) {
+          boxType->addChild(signature);
+          assert(genericArgs);
+          boxType->addChild(genericArgs);
+        }
+        return boxType;
+      }
     }
     if (c == 'K') {
       return demangleFunctionType(Node::Kind::AutoClosureType);
@@ -2359,6 +2409,7 @@ private:
     case Node::Kind::QualifiedArchetype:
     case Node::Kind::ReturnType:
     case Node::Kind::SILBoxType:
+    case Node::Kind::SILBoxTypeWithLayout:
     case Node::Kind::Structure:
     case Node::Kind::TupleElementName:
     case Node::Kind::Type:
@@ -2456,6 +2507,9 @@ private:
     case Node::Kind::ReabstractionThunk:
     case Node::Kind::ReabstractionThunkHelper:
     case Node::Kind::Setter:
+    case Node::Kind::SILBoxLayout:
+    case Node::Kind::SILBoxMutableField:
+    case Node::Kind::SILBoxImmutableField:
     case Node::Kind::SpecializationIsFragile:
     case Node::Kind::SpecializationPassID:
     case Node::Kind::Static:
@@ -2483,6 +2537,7 @@ private:
     case Node::Kind::ReflectionMetadataFieldDescriptor:
     case Node::Kind::ReflectionMetadataAssocTypeDescriptor:
     case Node::Kind::ReflectionMetadataSuperclassDescriptor:
+    case Node::Kind::GenericTypeParamDecl:
     case Node::Kind::ThrowsAnnotation:
     case Node::Kind::EmptyList:
     case Node::Kind::FirstElementMarker:
@@ -2899,6 +2954,7 @@ void NodePrinter::print(NodePointer pointer, bool asContext, bool suppressType) 
   case Node::Kind::Variable:
   case Node::Kind::Function:
   case Node::Kind::Subscript:
+  case Node::Kind::GenericTypeParamDecl:
     printEntity(true, true, "");
     return;
   case Node::Kind::ExplicitClosure:
@@ -3683,6 +3739,51 @@ void NodePrinter::print(NodePointer pointer, bool asContext, bool suppressType) 
     return;
   case Node::Kind::VariadicMarker:
     Printer << " variadic-marker ";
+    return;
+  case Node::Kind::SILBoxTypeWithLayout: {
+    assert(pointer->getNumChildren() == 1 || pointer->getNumChildren() == 3);
+    NodePointer layout = pointer->getChild(0);
+    assert(layout->getKind() == Node::Kind::SILBoxLayout);
+    NodePointer signature, genericArgs;
+    if (pointer->getNumChildren() == 3) {
+      signature = pointer->getChild(1);
+      assert(signature->getKind() == Node::Kind::DependentGenericSignature);
+      genericArgs = pointer->getChild(2);
+      assert(signature->getKind() == Node::Kind::TypeList);
+      
+      print(signature);
+      Printer << ' ';
+    }
+    print(layout);
+    if (genericArgs) {
+      Printer << " <";
+      for (unsigned i = 0, e = genericArgs->getNumChildren(); i < e; ++i) {
+        if (i > 0)
+          Printer << ", ";
+        print(genericArgs->getChild(i));
+      }
+      Printer << '>';
+    }
+    return;
+  }
+  case Node::Kind::SILBoxLayout:
+    Printer << '{';
+    for (unsigned i = 0; i < pointer->getNumChildren(); ++i) {
+      if (i > 0)
+        Printer << ',';
+      Printer << ' ';
+      print(pointer->getChild(i));
+    }
+    Printer << " }";
+    return;
+  case Node::Kind::SILBoxImmutableField:
+  case Node::Kind::SILBoxMutableField:
+    Printer << (pointer->getKind() == Node::Kind::SILBoxImmutableField
+      ? "let "
+      : "var ");
+    assert(pointer->getNumChildren() == 1
+           && pointer->getChild(0)->getKind() == Node::Kind::Type);
+    print(pointer->getChild(0));
     return;
   }
   unreachable("bad node kind!");

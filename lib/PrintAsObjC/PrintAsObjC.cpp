@@ -541,8 +541,14 @@ private:
           !isa<ProtocolDecl>(ctor->getDeclContext())) {
         os << " OBJC_DESIGNATED_INITIALIZER";
       }
-    } else if (isMistakableForInit(AFD->getObjCSelector())) {
-      os << " SWIFT_METHOD_FAMILY(none)";
+    } else {
+      if (isMistakableForInit(AFD->getObjCSelector())) {
+        os << " SWIFT_METHOD_FAMILY(none)";
+      }
+      if (!methodTy->getResult()->isVoid() &&
+          !AFD->getAttrs().hasAttribute<DiscardableResultAttr>()) {
+        os << " SWIFT_WARN_UNUSED_RESULT";
+      }
     }
 
     os << ";\n";
@@ -1453,11 +1459,6 @@ private:
     visitPart(PT->getSinglyDesugaredType(), optionalKind);
   }
 
-  void visitSubstitutedType(SubstitutedType *ST, 
-                            Optional<OptionalTypeKind> optionalKind) {
-    visitPart(ST->getSinglyDesugaredType(), optionalKind);
-  }
-
   void visitSyntaxSugarType(SyntaxSugarType *SST, 
                             Optional<OptionalTypeKind> optionalKind) {
     visitPart(SST->getSinglyDesugaredType(), optionalKind);
@@ -1590,10 +1591,6 @@ class ReferencedTypeFinder : public TypeVisitor<ReferencedTypeFinder> {
   void visitDependentMemberType(DependentMemberType *member) {
     // Appears in protocols and in generic ObjC classes.
     return;
-  }
-
-  void visitSubstitutedType(SubstitutedType *sub) {
-    visit(sub->getSinglyDesugaredType());
   }
 
   void visitAnyFunctionType(AnyFunctionType *fnTy) {
@@ -2120,6 +2117,11 @@ public:
            "# define SWIFT_NOESCAPE __attribute__((noescape))\n"
            "#else\n"
            "# define SWIFT_NOESCAPE\n"
+           "#endif\n"
+           "#if defined(__has_attribute) && __has_attribute(warn_unused_result)\n"
+           "# define SWIFT_WARN_UNUSED_RESULT __attribute__((warn_unused_result))\n"
+           "#else\n"
+           "# define SWIFT_WARN_UNUSED_RESULT\n"
            "#endif\n"
            "#if !defined(SWIFT_CLASS_EXTRA)\n"
            "# define SWIFT_CLASS_EXTRA\n"

@@ -253,7 +253,7 @@ RValue Transform::transform(RValue &&input,
     auto result = transform(std::move(input).getScalarValue(),
                             inputOrigType, inputSubstType,
                             outputOrigType, outputSubstType, ctxt);
-    return RValue(result, outputSubstType);
+    return RValue(SGF, Loc, outputSubstType, result);
   }
 
   // Okay, we have a tuple.  The output type will also be a tuple unless
@@ -317,7 +317,7 @@ RValue Transform::transform(RValue &&input,
     return RValue();
   }
 
-  return RValue(outputExpansion, outputTupleType);
+  return RValue::withPreExplodedElements(outputExpansion, outputTupleType);
 }
 
 // Single @objc protocol value metatypes can be converted to the ObjC
@@ -2343,10 +2343,8 @@ CanSILFunctionType SILGenFunction::buildThunkType(
   // Use the generic signature from the context if the thunk involves
   // generic parameters.
   CanGenericSignature genericSig;
-  GenericEnvironment *genericEnv = nullptr;
   if (expectedType->hasArchetype() || sourceType->hasArchetype()) {
     genericSig = F.getLoweredFunctionType()->getGenericSignature();
-    genericEnv = F.getGenericEnvironment();
     auto subsArray = F.getForwardingSubstitutions();
     subs.append(subsArray.begin(), subsArray.end());
 

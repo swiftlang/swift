@@ -1,5 +1,4 @@
 // RUN: %target-swift-frontend %s -typecheck
-// REQUIRES: asserts
 
 class B : Equatable {
   static func == (lhs: B, rhs: B) -> Bool { return true }

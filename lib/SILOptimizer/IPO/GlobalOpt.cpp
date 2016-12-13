@@ -25,6 +25,7 @@
 #include "llvm/Support/CommandLine.h"
 #include "llvm/Support/Debug.h"
 #include "swift/AST/Mangle.h"
+#include "swift/AST/ASTMangler.h"
 using namespace swift;
 
 namespace {
@@ -190,16 +191,24 @@ static void removeToken(SILValue Op) {
   }
 }
 
+static std::string mangleGetter(VarDecl *varDecl) {
+  Mangle::Mangler getterMangler;
+  getterMangler.append("_T");
+  getterMangler.mangleGlobalGetterEntity(varDecl);
+  std::string Old = getterMangler.finalize();
+
+  NewMangling::ASTMangler NewMangler;
+  std::string New = NewMangler.mangleGlobalGetterEntity(varDecl);
+
+  return NewMangling::selectMangling(Old, New);
+}
+
 /// Generate getter from the initialization code whose
 /// result is stored by a given store instruction.
 static SILFunction *genGetterFromInit(StoreInst *Store,
                                       SILGlobalVariable *SILG) {
   auto *varDecl = SILG->getDecl();
-
-  Mangle::Mangler getterMangler;
-  getterMangler.append("_T");
-  getterMangler.mangleGlobalGetterEntity(varDecl);
-  auto getterName = getterMangler.finalize();
+  auto getterName = mangleGetter(varDecl);
 
   // Check if a getter was generated already.
   if (auto *F = Store->getModule().lookUpFunction(getterName))
@@ -470,10 +479,7 @@ void SILGlobalOpt::placeInitializers(SILFunction *InitF,
 static SILFunction *genGetterFromInit(SILFunction *InitF, VarDecl *varDecl) {
   // Generate a getter from the global init function without side-effects.
 
-  Mangle::Mangler getterMangler;
-  getterMangler.append("_T");
-  getterMangler.mangleGlobalGetterEntity(varDecl);
-  auto getterName = getterMangler.finalize();
+  auto getterName = mangleGetter(varDecl);
 
   // Check if a getter was generated already.
   if (auto *F = InitF->getModule().lookUpFunction(getterName))

@@ -6,5 +6,4 @@
 // See https://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
 
 // RUN: not %target-swift-frontend %s -typecheck
-// REQUIRES: asserts
 class a<g{let C{class d<T where g:a{class a{func e{class A:a}}}protocol a{{{{}}}typealias a

@@ -1,3 +1,2 @@
 // RUN: not %target-sil-opt %s
-// REQUIRES: asserts
 func x:inout p<

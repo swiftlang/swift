@@ -19,6 +19,7 @@
 #include "swift/AST/AST.h"
 #include "swift/AST/GenericEnvironment.h"
 #include "swift/AST/Mangle.h"
+#include "swift/AST/ASTMangler.h"
 #include "swift/SIL/SILArgument.h"
 #include "swift/SIL/SILUndef.h"
 #include "swift/SIL/TypeLowering.h"
@@ -256,9 +257,9 @@ void SILGenFunction::emitValueConstructor(ConstructorDecl *ctor) {
 
   // If this is not a delegating constructor, emit member initializers.
   if (!isDelegating) {
-    auto *dc = ctor->getDeclContext();
-    auto *nominal = dc->getAsNominalTypeOrNominalTypeExtensionContext();
-    emitMemberInitializers(dc, selfDecl, nominal);
+    auto *typeDC = ctor->getDeclContext();
+    auto *nominal = typeDC->getAsNominalTypeOrNominalTypeExtensionContext();
+    emitMemberInitializers(ctor, selfDecl, nominal);
   }
 
   emitProfilerIncrement(ctor->getBody());
@@ -647,7 +648,7 @@ void SILGenFunction::emitClassConstructorInitializer(ConstructorDecl *ctor) {
     // Note that 'self' has been fully initialized at this point.
   } else {
     // Emit the member initializers.
-    emitMemberInitializers(dc, selfDecl, selfClassDecl);
+    emitMemberInitializers(ctor, selfDecl, selfClassDecl);
   }
 
   emitProfilerIncrement(ctor->getBody());
@@ -796,7 +797,10 @@ static SILValue getBehaviorInitStorageFn(SILGenFunction &gen,
   {
     Mangler m;
     m.mangleBehaviorInitThunk(behaviorVar);
-    behaviorInitName = m.finalize();
+    std::string Old = m.finalize();
+    NewMangling::ASTMangler NewMangler;
+    std::string New = NewMangler.mangleBehaviorInitThunk(behaviorVar);
+    behaviorInitName = NewMangling::selectMangling(Old, New);
   }
   
   SILFunction *thunkFn;
@@ -883,8 +887,34 @@ void SILGenFunction::emitMemberInitializers(DeclContext *dc,
         // Get the substitutions for the constructor context.
         ArrayRef<Substitution> subs;
         auto *genericEnv = dc->getGenericEnvironmentOfContext();
-        if (genericEnv) {
-          subs = genericEnv->getForwardingSubstitutions(SGM.SwiftModule);
+
+        DeclContext *typeDC = dc;
+        while (!typeDC->isTypeContext())
+          typeDC = typeDC->getParent();
+        auto typeGenericSig = typeDC->getGenericSignatureOfContext();
+
+        if (genericEnv && typeGenericSig) {
+          // Generate a set of substitutions for the initialization function,
+          // whose generic signature is that of the type context, and whose
+          // replacement types are the archetypes of the initializer itself.
+          SmallVector<Substitution, 4> subsVec;
+          typeGenericSig->getSubstitutions(
+                       *SGM.SwiftModule,
+                       [&](SubstitutableType *type) {
+                         if (auto gp = type->getAs<GenericTypeParamType>()) {
+                           return genericEnv->mapTypeIntoContext(gp);
+                         }
+
+                         return Type(type);
+                       },
+                       [](CanType dependentType,
+                           Type conformingReplacementType,
+                           ProtocolType *conformedProtocol) {
+                         return ProtocolConformanceRef(
+                                  conformedProtocol->getDecl());
+                       },
+                       subsVec);
+          subs = SGM.getASTContext().AllocateCopy(subsVec);
         }
 
         // Get the type of the initialization result, in terms

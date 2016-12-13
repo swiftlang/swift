@@ -549,7 +549,7 @@ resolveDeclRefExpr(UnresolvedDeclRefExpr *UDRE, DeclContext *DC) {
 
   ResultValues.clear();
   bool AllMemberRefs = true;
-  ValueDecl *Base = 0;
+  ValueDecl *Base = nullptr;
   for (auto Result : Lookup) {
     // Track the base for member declarations.
     if (Result.Base && !isa<ModuleDecl>(Result.Base)) {
@@ -937,8 +937,7 @@ bool PreCheckExpression::walkToClosureExprPre(ClosureExpr *closure) {
   options |= TR_InExpression;
   bool hadParameterError = false;
 
-  GenericTypeToArchetypeResolver resolver(
-      closure->getGenericEnvironmentOfContext());
+  GenericTypeToArchetypeResolver resolver(closure);
 
   if (TC.typeCheckParameterList(PL, DC, options, resolver)) {
     closure->setType(ErrorType::get(TC.Context));
@@ -1631,9 +1630,13 @@ getTypeOfExpressionWithoutApplying(Expr *&expr, DeclContext *dc,
   auto &solution = viable[0];
   Type exprType = solution.simplifyType(*this, expr->getType());
 
-  assert(exprType && !exprType->hasError() && "erroneous solution?");
-  assert(!exprType->hasTypeVariable() &&
+  assert(exprType && !exprType->hasTypeVariable() &&
          "free type variable with FreeTypeVariableBinding::GenericParameters?");
+
+  if (exprType->hasError()) {
+    recoverOriginalType();
+    return None;
+  }
 
   // Dig the declaration out of the solution.
   auto semanticExpr = expr->getSemanticsProvidingExpr();
@@ -2126,7 +2129,7 @@ Type ConstraintSystem::computeAssignDestType(Expr *dest, SourceLoc equalLoc) {
     return TupleType::get(destTupleTypes, ctx);
   }
 
-  Type destTy = simplifyType(dest->getType());
+  Type destTy = simplifyType(getType(dest));
   if (destTy->hasError() || destTy->getRValueType()->is<UnresolvedType>())
     return Type();
 
@@ -2391,33 +2394,6 @@ bool TypeChecker::isSubstitutableFor(Type type, ArchetypeType *archetype,
   return cs.solveSingle().hasValue();
 }
 
-Expr *TypeChecker::coerceToRValue(Expr *expr) {
-  // Can't load from an inout value.
-  if (auto *iot = expr->getType()->getAs<InOutType>()) {
-    // Emit a fixit if we can find the & expression that turned this into an
-    // inout.
-    if (auto addrOf =
-        dyn_cast<InOutExpr>(expr->getSemanticsProvidingExpr())) {
-      diagnose(expr->getLoc(), diag::load_of_explicit_lvalue,
-               iot->getObjectType())
-      .fixItRemove(SourceRange(addrOf->getLoc()));
-      return coerceToRValue(addrOf->getSubExpr());
-    } else {
-      diagnose(expr->getLoc(), diag::load_of_explicit_lvalue,
-               iot->getObjectType());
-      return expr;
-    }
-  }
-
-  // If we already have an rvalue, we're done, otherwise emit a load.
-  if (auto lvalueTy = expr->getType()->getAs<LValueType>()) {
-    expr->propagateLValueAccessKind(AccessKind::Read);
-    return new (Context) LoadExpr(expr, lvalueTy->getObjectType());
-  }
-
-  return expr;
-}
-
 Expr *TypeChecker::coerceToMaterializable(Expr *expr) {
   // If the type is already materializable, then we're already done.
   if (expr->getType()->isMaterializable())
@@ -2488,9 +2464,11 @@ bool TypeChecker::convertToType(Expr *&expr, Type type, DeclContext *dc,
   ConstraintSystem cs(*this, dc, ConstraintSystemFlags::AllowFixes);
   CleanupIllFormedExpressionRAII cleanup(Context, expr);
 
+  cs.cacheExprTypes(expr);
+
   // If there is a type that we're expected to convert to, add the conversion
   // constraint.
-  cs.addConstraint(ConstraintKind::ExplicitConversion, expr->getType(), type,
+  cs.addConstraint(ConstraintKind::ExplicitConversion, cs.getType(expr), type,
                    cs.getConstraintLocator(expr));
 
   if (getLangOpts().DebugConstraintSolver) {
@@ -2718,13 +2696,13 @@ void ConstraintSystem::print(raw_ostream &out) {
     out << "\n";
   }
 
-  if (solverState && !solverState->retiredConstraints.empty()) {
+  if (solverState && !solverState->hasRetiredConstraints()) {
     out << "\nRetired Constraints:\n";
-    for (auto &constraint : solverState->retiredConstraints) {
+    solverState->forEachRetired([&](Constraint &constraint) {
       out.indent(2);
       constraint.print(out, &getTypeChecker().Context.SourceMgr);
       out << "\n";
-    }
+    });
   }
 
   if (resolvedOverloadSets) {

@@ -5,8 +5,8 @@
 // Copyright (c) 2014 - 2016 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
-// See http://swift.org/LICENSE.txt for license information
-// See http://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
+// See https://swift.org/LICENSE.txt for license information
+// See https://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
 //
 //===----------------------------------------------------------------------===//
 
@@ -113,7 +113,7 @@ public:
                                              Type FromType, Type ToType,
                                              ModuleDecl *Module);
 
-  std::string mangleType(Type decl, const DeclContext *DC);
+  std::string mangleTypeForDebugger(Type decl, const DeclContext *DC);
 
   std::string mangleTypeAsUSR(Type type);
 
@@ -217,6 +217,8 @@ protected:
   void appendEntity(const ValueDecl *decl);
 
   void appendProtocolConformance(const ProtocolConformance *conformance);
+
+  static bool checkGenericParamsOrder(ArrayRef<GenericTypeParamType *> params);
 };
 
 } // end namespace NewMangling

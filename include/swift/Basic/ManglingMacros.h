@@ -5,8 +5,8 @@
 // Copyright (c) 2014 - 2016 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
-// See http://swift.org/LICENSE.txt for license information
-// See http://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
+// See https://swift.org/LICENSE.txt for license information
+// See https://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
 //
 //===----------------------------------------------------------------------===//
 
@@ -37,27 +37,29 @@
 
 #ifdef USE_NEW_MANGLING
 
-#define MANGLE_SYM(Ops) MANGLING_CONCAT2_IMPL(MANGLING_PREFIX, Ops)
 #define MANGLING_CONCAT2(a, b) MANGLING_CONCAT2_IMPL(a, b)
 #define MANGLING_CONCAT3(a, b, c) MANGLING_CONCAT3_IMPL(a, b, c)
+#define MANGLE_SYM(Ops) MANGLING_CONCAT2(MANGLING_PREFIX, Ops)
 #define SELECT_MANGLING(Old, New) New
 #define METADATA_MANGLING N
 #define METATYPE_MANGLING m
 #define EMPTY_TUPLE_MANGLING yt
 #define NO_ARGS_MANGLING yy
 #define FUNC_TYPE_MANGLING c
+#define OBJC_PARTIAL_APPLY_THUNK_MANGLING Ta
 
 #else
 
-#define MANGLE_SYM(Ops) MANGLING_CONCAT2_IMPL(_T, Ops)
 #define MANGLING_CONCAT2(a, b) MANGLING_CONCAT2_IMPL(b, a)
 #define MANGLING_CONCAT3(a, b, c) MANGLING_CONCAT3_IMPL(c, b, a)
+#define MANGLE_SYM(Ops) MANGLING_CONCAT2_IMPL(_T, Ops)
 #define SELECT_MANGLING(Old, New) Old
 #define METADATA_MANGLING M
 #define METATYPE_MANGLING M
 #define EMPTY_TUPLE_MANGLING T_
 #define NO_ARGS_MANGLING T_T_
 #define FUNC_TYPE_MANGLING F
+#define OBJC_PARTIAL_APPLY_THUNK_MANGLING PAo
 
 #endif
 
@@ -102,6 +104,9 @@
 
 #define PROTOCOL_DESCR_SYM(Ty) \
           MANGLE_SYM(MANGLING_CONCAT2(Ty, Mp))
+
+#define OBJC_PARTIAL_APPLY_THUNK_SYM \
+          MANGLE_SYM(OBJC_PARTIAL_APPLY_THUNK_MANGLING)
 
 #endif // SWIFT_BASIC_MANGLING_MACROS_H
 

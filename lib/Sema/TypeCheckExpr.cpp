@@ -492,28 +492,20 @@ static Expr *foldSequence(TypeChecker &TC, DeclContext *DC,
 }
 
 Type TypeChecker::getTypeOfRValue(ValueDecl *value, bool wantInterfaceType) {
-  validateDecl(value);
 
   Type type;
-  if (wantInterfaceType)
+  if (wantInterfaceType) {
+    if (!value->hasInterfaceType())
+      validateDecl(value);
     type = value->getInterfaceType();
-  else
-    type = cast<VarDecl>(value)->getType();
+  } else {
+    auto *var = cast<VarDecl>(value);
+    if (!var->hasType())
+      validateDecl(var);
+    type = var->getType();
+  }
 
-  // Uses of inout argument values are lvalues.
-  if (auto iot = type->getAs<InOutType>())
-    return iot->getObjectType();
-  
-  // Uses of values with lvalue type produce their rvalue.
-  if (auto LV = type->getAs<LValueType>())
-    return LV->getObjectType();
-
-  // Ignore 'unowned', 'weak' and @unmanaged qualification.
-  if (type->is<ReferenceStorageType>())
-    return type->getReferenceStorageReferent();
-
-  // No other transforms necessary.
-  return type;
+  return type->getLValueOrInOutObjectType()->getReferenceStorageReferent();
 }
 
 bool TypeChecker::requireOptionalIntrinsics(SourceLoc loc) {
@@ -602,6 +594,16 @@ Type TypeChecker::getUnopenedTypeOfReference(ValueDecl *value, Type baseType,
       return FunctionType::get(RFT->getInput(),
                                LValueType::get(RFT->getResult()),
                                RFT->getExtInfo());
+    }
+  }
+
+  // If we're dealing with contextual types, and we referenced this type from
+  // a different context, map the type.
+  if (!wantInterfaceType && requestedType->hasArchetype()) {
+    auto valueDC = value->getDeclContext();
+    if (valueDC != UseDC) {
+      Type mapped = valueDC->mapTypeOutOfContext(requestedType);
+      requestedType = UseDC->mapTypeIntoContext(mapped);
     }
   }
 

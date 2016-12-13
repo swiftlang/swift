@@ -409,7 +409,8 @@ emitRValueForDecl(SILLocation loc, ConcreteDeclRef declRef, Type ncRefType,
         Scalar = emitConversionToSemanticRValue(loc, Scalar,
                                                 getTypeLowering(refType));
         // emitConversionToSemanticRValue always produces a +1 strong result.
-        return RValue(emitManagedRValueWithCleanup(Scalar), refType);
+        return RValue(*this, loc,
+                      refType, emitManagedRValueWithCleanup(Scalar));
       }
 
       auto Result = ManagedValue::forUnmanaged(Scalar);
@@ -2979,10 +2980,8 @@ RValue RValueEmitter::visitOptionalEvaluationExpr(OptionalEvaluationExpr *E,
                     JumpDest(failureBB, SGF.Cleanups.getCleanupsDepth(), E));
 
   SILValue NormalArgument;
-  bool hasEmittedResult = false;
   if (emitOptimizedOptionalEvaluation(E, NormalArgument, optInit, *this)) {
     // Already emitted code for this.
-    hasEmittedResult = true;
   } else if (isByAddress) {
     // Emit the operand into the temporary.
     SGF.emitExprInto(E->getSubExpr(), optInit);
@@ -3270,7 +3269,9 @@ public:
                                         CanUnmanagedStorageType::get(refType));
     SILValue unowned = gen.B.createRefToUnmanaged(loc, owned, unownedType);
     
-    return RValue(ManagedValue::forUnmanaged(unowned), refType);
+    // A reference type should never be exploded.
+    return RValue::withPreExplodedElements(ManagedValue::forUnmanaged(unowned),
+                                           refType);
   }
 
   /// Compare 'this' lvalue and the 'rhs' lvalue (which is guaranteed to have

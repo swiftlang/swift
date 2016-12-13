@@ -217,6 +217,10 @@ namespace {
 
     /// @{ Type parsing.
     bool parseASTType(CanType &result);
+    bool parseASTType(CanType &result, SourceLoc &TypeLoc) {
+      TypeLoc = P.Tok.getLoc();
+      return parseASTType(result);
+    }
     bool parseSILType(SILType &Result,
                       GenericEnvironment *&genericEnv,
                       bool IsFuncDecl = false);
@@ -1277,48 +1281,6 @@ bool SILParser::parseSubstitutions(SmallVectorImpl<ParsedSubstitution> &parsed,
   return false;
 }
 
-/// Get ProtocolConformance for a replacement type.
-static ProtocolConformance*
-getConformanceOfReplacement(Parser &P, Type subReplacement,
-                            ProtocolDecl *proto) {
-  auto conformance = P.SF.getParentModule()->lookupConformance(
-                       subReplacement, proto, nullptr);
-  if (conformance && conformance->isConcrete())
-    return conformance->getConcrete();
-  return nullptr;
-}
-
-static bool isImpliedBy(ProtocolDecl *proto, ArrayRef<ProtocolDecl*> derived) {
-  for (auto derivedProto : derived) {
-    if (derivedProto == proto || derivedProto->inheritsFrom(proto))
-      return true;
-  }
-  return false;
-}
-
-static bool allowAbstractConformance(Parser &P, Type subReplacement,
-                                     ProtocolDecl *proto) {
-  if (!subReplacement->hasDependentProtocolConformances())
-    return false;
-
-  // AnyObject is implicitly conformed to by anything with a class bound.
-  if (proto->isSpecificProtocol(KnownProtocolKind::AnyObject) &&
-      subReplacement->isAnyClassReferenceType()) {
-    return true;
-  }
-
-  if (auto archetype = subReplacement->getAs<ArchetypeType>()) {
-    return isImpliedBy(proto, archetype->getConformsTo());
-  }
-
-  SmallVector<ProtocolDecl *, 4> existentialProtos;
-  if (subReplacement->isExistentialType(existentialProtos)) {
-    return isImpliedBy(proto, existentialProtos);
-  }
-
-  return false;
-}
-
 /// Collect conformances by looking up the conformance from replacement
 /// type and protocol decl.
 static bool getConformancesForSubstitution(Parser &P,
@@ -1326,22 +1288,17 @@ static bool getConformancesForSubstitution(Parser &P,
               Type subReplacement,
               SourceLoc loc,
               SmallVectorImpl<ProtocolConformanceRef> &conformances) {
+  auto M = P.SF.getParentModule();
+
   for (auto proto : protocols) {
-    // Try looking up a concrete conformance.
-    if (auto conformance =
-          getConformanceOfReplacement(P, subReplacement, proto)) {
-      conformances.push_back(ProtocolConformanceRef(conformance));
+    auto conformance = M->lookupConformance(subReplacement, proto, nullptr);
+    if (conformance) {
+      conformances.push_back(*conformance);
       continue;
     }
 
-    // If the replacement type has dependent conformances, we might be
-    // able to use an abstract conformance.
-    if (allowAbstractConformance(P, subReplacement, proto)) {
-      conformances.push_back(ProtocolConformanceRef(proto));
-      continue;
-    }
-
-    P.diagnose(loc, diag::sil_substitution_mismatch);
+    P.diagnose(loc, diag::sil_substitution_mismatch, subReplacement,
+               proto->getName());
     return true;
   }
 
@@ -1403,25 +1360,20 @@ bool getApplySubstitutionsFromParsed(
 }
 
 static ArrayRef<ProtocolConformanceRef>
-collectExistentialConformances(Parser &P,
-                               CanType conformingType, CanType protocolType) {
+collectExistentialConformances(Parser &P, CanType conformingType, SourceLoc loc,
+                               CanType protocolType) {
   SmallVector<ProtocolDecl *, 2> protocols;
   bool isExistential = protocolType->isAnyExistentialType(protocols);
   assert(isExistential);
   (void)isExistential;
   if (protocols.empty())
     return {};
-  
-  MutableArrayRef<ProtocolConformanceRef> conformances =
-    P.Context.AllocateUninitialized<ProtocolConformanceRef>(protocols.size());
-  
-  for (unsigned i : indices(protocols)) {
-    auto proto = protocols[i];
-    auto conformance = getConformanceOfReplacement(P, conformingType, proto);
-    conformances[i] = ProtocolConformanceRef(proto, conformance);
-  }
-  
-  return conformances;
+
+  SmallVector<ProtocolConformanceRef, 2> conformances;
+  getConformancesForSubstitution(P, protocols, conformingType,
+                                 loc, conformances);
+
+  return P.Context.AllocateCopy(conformances);
 }
 
 /// sil-loc ::= 'loc' string-literal ':' [0-9]+ ':' [0-9]+
@@ -2005,6 +1957,16 @@ bool SILParser::parseSILInstruction(SILBasicBlock *BB, SILBuilder &B) {
    break;
  }
 
+ case ValueKind::BeginBorrowInst: {
+   SourceLoc AddrLoc;
+
+   if (parseTypedValueRef(Val, AddrLoc, B) || parseSILDebugLocation(InstLoc, B))
+     return true;
+
+   ResultVal = B.createBeginBorrow(InstLoc, Val);
+   break;
+ }
+
  case ValueKind::LoadUnownedInst:
  case ValueKind::LoadWeakInst: {
    bool isTake = false;
@@ -2486,6 +2448,7 @@ bool SILParser::parseSILInstruction(SILBasicBlock *BB, SILBuilder &B) {
     break;
   }
 
+  case ValueKind::StoreBorrowInst:
   case ValueKind::AssignInst:
   case ValueKind::StoreUnownedInst:
   case ValueKind::StoreWeakInst: {
@@ -2514,6 +2477,13 @@ bool SILParser::parseSILInstruction(SILBasicBlock *BB, SILBuilder &B) {
       P.diagnose(addrLoc, diag::sil_operand_not_address,
                  "destination", OpcodeName);
       return true;
+    }
+
+    if (Opcode == ValueKind::StoreBorrowInst) {
+      SILType valueTy = addrVal->getType().getObjectType();
+      ResultVal = B.createStoreBorrow(
+          InstLoc, getLocalValue(from, valueTy, InstLoc, B), addrVal);
+      break;
     }
 
     if (Opcode == ValueKind::StoreUnownedInst) {
@@ -3568,10 +3538,11 @@ bool SILParser::parseSILInstruction(SILBasicBlock *BB, SILBuilder &B) {
   }
   case ValueKind::InitExistentialAddrInst: {
     CanType Ty;
+    SourceLoc TyLoc;
     if (parseTypedValueRef(Val, B) ||
         P.parseToken(tok::comma, diag::expected_tok_in_sil_instr, ",") ||
         P.parseToken(tok::sil_dollar, diag::expected_tok_in_sil_instr, "$") ||
-        parseASTType(Ty) ||
+        parseASTType(Ty, TyLoc) ||
         parseSILDebugLocation(InstLoc, B))
       return true;
     
@@ -3586,7 +3557,7 @@ bool SILParser::parseSILInstruction(SILBasicBlock *BB, SILBuilder &B) {
     
     // Collect conformances for the type.
     ArrayRef<ProtocolConformanceRef> conformances
-      = collectExistentialConformances(P, Ty,
+      = collectExistentialConformances(P, Ty, TyLoc,
                                        Val->getType().getSwiftRValueType());
     
     ResultVal = B.createInitExistentialAddr(InstLoc, Val, Ty, LoweredTy,
@@ -3596,17 +3567,18 @@ bool SILParser::parseSILInstruction(SILBasicBlock *BB, SILBuilder &B) {
   case ValueKind::AllocExistentialBoxInst: {
     SILType ExistentialTy;
     CanType ConcreteFormalTy;
+    SourceLoc TyLoc;
     
     if (parseSILType(ExistentialTy) ||
         P.parseToken(tok::comma, diag::expected_tok_in_sil_instr, ",") ||
         P.parseToken(tok::sil_dollar, diag::expected_tok_in_sil_instr, "$") ||
-        parseASTType(ConcreteFormalTy) ||
+        parseASTType(ConcreteFormalTy, TyLoc) ||
         parseSILDebugLocation(InstLoc, B))
       return true;
     
     // Collect conformances for the type.
     ArrayRef<ProtocolConformanceRef> conformances
-      = collectExistentialConformances(P, ConcreteFormalTy,
+      = collectExistentialConformances(P, ConcreteFormalTy, TyLoc,
                                        ExistentialTy.getSwiftRValueType());
     
     ResultVal = B.createAllocExistentialBox(InstLoc, ExistentialTy,
@@ -3617,17 +3589,19 @@ bool SILParser::parseSILInstruction(SILBasicBlock *BB, SILBuilder &B) {
   case ValueKind::InitExistentialRefInst: {
     CanType FormalConcreteTy;
     SILType ExistentialTy;
+    SourceLoc TyLoc;
+
     if (parseTypedValueRef(Val, B) ||
         P.parseToken(tok::colon, diag::expected_tok_in_sil_instr, ":") ||
         P.parseToken(tok::sil_dollar, diag::expected_tok_in_sil_instr, "$") ||
-        parseASTType(FormalConcreteTy) ||
+        parseASTType(FormalConcreteTy, TyLoc) ||
         P.parseToken(tok::comma, diag::expected_tok_in_sil_instr, ",") ||
         parseSILType(ExistentialTy) ||
         parseSILDebugLocation(InstLoc, B))
       return true;
     
     ArrayRef<ProtocolConformanceRef> conformances
-      = collectExistentialConformances(P, FormalConcreteTy,
+      = collectExistentialConformances(P, FormalConcreteTy, TyLoc,
                             ExistentialTy.getSwiftRValueType());
 
     // FIXME: Conformances in InitExistentialRefInst is currently not included
@@ -3638,10 +3612,11 @@ bool SILParser::parseSILInstruction(SILBasicBlock *BB, SILBuilder &B) {
     break;
   }
   case ValueKind::InitExistentialMetatypeInst: {
+    SourceLoc TyLoc;
     SILType ExistentialTy;
     if (parseTypedValueRef(Val, B) ||
         P.parseToken(tok::comma, diag::expected_tok_in_sil_instr, ",") ||
-        parseSILType(ExistentialTy) ||
+        parseSILType(ExistentialTy, TyLoc) ||
         parseSILDebugLocation(InstLoc, B))
       return true;
 
@@ -3654,7 +3629,7 @@ bool SILParser::parseSILInstruction(SILBasicBlock *BB, SILBuilder &B) {
     }
 
     ArrayRef<ProtocolConformanceRef> conformances
-      = collectExistentialConformances(P, formalConcreteType,
+      = collectExistentialConformances(P, formalConcreteType, TyLoc,
                             ExistentialTy.getSwiftRValueType());
     
     ResultVal = B.createInitExistentialMetatype(InstLoc, Val, ExistentialTy,
@@ -4388,9 +4363,8 @@ static NormalProtocolConformance *parseNormalProtocolConformance(Parser &P,
   // Calling lookupConformance on a BoundGenericType will return a specialized
   // conformance. We use UnboundGenericType to find the normal conformance.
   Type lookupTy = ConformingTy;
-  if (auto bound = dyn_cast<BoundGenericType>(lookupTy.getPointer()))
-    lookupTy = UnboundGenericType::get(bound->getDecl(), bound->getParent(),
-                                       P.Context);
+  if (auto bound = lookupTy->getAs<BoundGenericType>())
+    lookupTy = bound->getDecl()->getDeclaredType();
   auto lookup = P.SF.getParentModule()->lookupConformance(
                          lookupTy, proto, nullptr);
   if (!lookup) {

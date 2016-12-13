@@ -379,6 +379,16 @@ IdentifierID Serializer::addModuleRef(const Module *M) {
   return addIdentifierRef(M->getName());
 }
 
+SILLayoutID Serializer::addSILLayoutRef(SILLayout *layout) {
+  auto &id = SILLayouts[layout];
+  if (id != 0)
+    return id;
+  
+  id = ++LastSILLayoutID;
+  SILLayoutsToWrite.push(layout);
+  return id;
+}
+
 NormalConformanceID Serializer::addConformanceRef(
                       const NormalProtocolConformance *conformance) {
   assert(conformance->getDeclContext()->getParentModule() == M &&
@@ -476,6 +486,7 @@ void Serializer::writeBlockInfoBlock() {
   BLOCK_RECORD(index_block, DECL_CONTEXT_OFFSETS);
   BLOCK_RECORD(index_block, LOCAL_TYPE_DECLS);
   BLOCK_RECORD(index_block, NORMAL_CONFORMANCE_OFFSETS);
+  BLOCK_RECORD(index_block, SIL_LAYOUT_OFFSETS);
   BLOCK_RECORD(index_block, PRECEDENCE_GROUPS);
 
   BLOCK(SIL_BLOCK);
@@ -842,8 +853,22 @@ void Serializer::writeParameterList(const ParameterList *PL) {
 }
 
 
-void Serializer::writePattern(const Pattern *pattern) {
+void Serializer::writePattern(const Pattern *pattern, DeclContext *owningDC) {
   using namespace decls_block;
+
+  // Retrieve the type of the pattern.
+  auto getPatternType = [&] {
+    Type type = pattern->getType();
+
+    // If we have an owning context and a contextual type, map out to an
+    // interface type.
+    if (owningDC && type->hasArchetype()) {
+      type = owningDC->getGenericEnvironmentOfContext()->mapTypeOutOfContext(
+                                             owningDC->getParentModule(), type);
+    }
+
+    return type;
+  };
 
   assert(pattern && "null pattern");
   switch (pattern->getKind()) {
@@ -851,7 +876,7 @@ void Serializer::writePattern(const Pattern *pattern) {
     unsigned abbrCode = DeclTypeAbbrCodes[ParenPatternLayout::Code];
     ParenPatternLayout::emitRecord(Out, ScratchRecord, abbrCode,
                                    pattern->isImplicit());
-    writePattern(cast<ParenPattern>(pattern)->getSubPattern());
+    writePattern(cast<ParenPattern>(pattern)->getSubPattern(), owningDC);
     break;
   }
   case PatternKind::Tuple: {
@@ -859,7 +884,7 @@ void Serializer::writePattern(const Pattern *pattern) {
 
     unsigned abbrCode = DeclTypeAbbrCodes[TuplePatternLayout::Code];
     TuplePatternLayout::emitRecord(Out, ScratchRecord, abbrCode,
-                                   addTypeRef(tuple->getType()),
+                                   addTypeRef(getPatternType()),
                                    tuple->getNumElements(),
                                    tuple->isImplicit());
 
@@ -868,7 +893,7 @@ void Serializer::writePattern(const Pattern *pattern) {
       // FIXME: Default argument expressions?
       TuplePatternEltLayout::emitRecord(
         Out, ScratchRecord, abbrCode, addIdentifierRef(elt.getLabel()));
-      writePattern(elt.getPattern());
+      writePattern(elt.getPattern(), owningDC);
     }
     break;
   }
@@ -878,13 +903,14 @@ void Serializer::writePattern(const Pattern *pattern) {
     unsigned abbrCode = DeclTypeAbbrCodes[NamedPatternLayout::Code];
     NamedPatternLayout::emitRecord(Out, ScratchRecord, abbrCode,
                                    addDeclRef(named->getDecl()),
+                                   addTypeRef(getPatternType()),
                                    named->isImplicit());
     break;
   }
   case PatternKind::Any: {
     unsigned abbrCode = DeclTypeAbbrCodes[AnyPatternLayout::Code];
     AnyPatternLayout::emitRecord(Out, ScratchRecord, abbrCode,
-                                 addTypeRef(pattern->getType()),
+                                 addTypeRef(getPatternType()),
                                  pattern->isImplicit());
     break;
   }
@@ -893,25 +919,17 @@ void Serializer::writePattern(const Pattern *pattern) {
 
     unsigned abbrCode = DeclTypeAbbrCodes[TypedPatternLayout::Code];
     TypedPatternLayout::emitRecord(Out, ScratchRecord, abbrCode,
-                                   addTypeRef(typed->getType()),
+                                   addTypeRef(getPatternType()),
                                    typed->isImplicit());
-    writePattern(typed->getSubPattern());
+    writePattern(typed->getSubPattern(), owningDC);
     break;
   }
-  case PatternKind::Is: {
-    auto isa = cast<IsPattern>(pattern);
-
-    unsigned abbrCode = DeclTypeAbbrCodes[IsPatternLayout::Code];
-    IsPatternLayout::emitRecord(Out, ScratchRecord, abbrCode,
-                                 addTypeRef(isa->getCastTypeLoc().getType()),
-                                 isa->isImplicit());
-    break;
-  }
+  case PatternKind::Is:
   case PatternKind::EnumElement:
   case PatternKind::OptionalSome:
   case PatternKind::Bool:
   case PatternKind::Expr:
-    llvm_unreachable("FIXME: not implemented");
+    llvm_unreachable("Refutable patterns cannot be serialized");
 
   case PatternKind::Var: {
     auto var = cast<VarPattern>(pattern);
@@ -919,7 +937,7 @@ void Serializer::writePattern(const Pattern *pattern) {
     unsigned abbrCode = DeclTypeAbbrCodes[VarPatternLayout::Code];
     VarPatternLayout::emitRecord(Out, ScratchRecord, abbrCode, var->isLet(),
                                  var->isImplicit());
-    writePattern(var->getSubPattern());
+    writePattern(var->getSubPattern(), owningDC);
     break;
   }
   }
@@ -1011,6 +1029,42 @@ void Serializer::writeGenericEnvironment(
     writeGenericRequirements(env->getGenericSignature()->getRequirements(),
                              abbrCodes);
   }
+}
+
+void Serializer::writeSILLayout(SILLayout *layout) {
+  using namespace decls_block;
+  auto foundLayoutID = SILLayouts.find(layout);
+  assert(foundLayoutID != SILLayouts.end() && "layout not referenced properly");
+  auto layoutID = foundLayoutID->second;
+  assert(layoutID - 1 == SILLayoutOffsets.size());
+  SILLayoutOffsets.push_back(Out.GetCurrentBitNo());
+  
+  SmallVector<unsigned, 16> data;
+  // Save field types.
+  for (auto &field : layout->getFields()) {
+    unsigned typeRef = addTypeRef(field.getLoweredType());
+    // Set the high bit if mutable.
+    if (field.isMutable())
+      typeRef |= 0x80000000U;
+    data.push_back(typeRef);
+  }
+  
+  // Save generic params.
+  if (auto sig = layout->getGenericSignature()) {
+    for (auto param : sig->getGenericParams()) {
+      data.push_back(addTypeRef(param));
+    }
+  }
+  
+  unsigned abbrCode
+    = DeclTypeAbbrCodes[SILLayoutLayout::Code];
+
+  SILLayoutLayout::emitRecord(Out, ScratchRecord, abbrCode,
+                              layout->getFields().size(),
+                              data);
+  // Emit requirements.
+  if (auto sig = layout->getGenericSignature())
+    writeGenericRequirements(sig->getRequirements(), DeclTypeAbbrCodes);
 }
 
 void Serializer::writeNormalConformance(
@@ -2214,8 +2268,12 @@ void Serializer::writeDecl(const Decl *D) {
                                      binding->getNumPatternEntries(),
         initContextIDs);
 
+    DeclContext *owningDC = nullptr;
+    if (binding->getDeclContext()->isTypeContext())
+      owningDC = binding->getDeclContext();
+
     for (auto entry : binding->getPatternList()) {
-      writePattern(entry.getPattern());
+      writePattern(entry.getPattern(), owningDC);
       // Ignore initializer; external clients don't need to know about it.
     }
 
@@ -2297,8 +2355,15 @@ void Serializer::writeDecl(const Decl *D) {
     auto contextID = addDeclContextRef(typeAlias->getDeclContext());
 
     Type underlying;
-    if (typeAlias->hasUnderlyingType())
+    if (typeAlias->hasUnderlyingType()) {
       underlying = typeAlias->getUnderlyingType();
+      if (underlying->hasArchetype()) {
+        auto genericEnv = typeAlias->getGenericEnvironmentOfContext();
+        underlying = genericEnv->mapTypeOutOfContext(
+                                                typeAlias->getModuleContext(),
+                                                underlying);
+      }
+    }
 
     uint8_t rawAccessLevel =
       getRawStableAccessibility(typeAlias->getFormalAccess());
@@ -2504,7 +2569,6 @@ void Serializer::writeDecl(const Decl *D) {
     verifyAttrSerializable(var);
 
     auto contextID = addDeclContextRef(var->getDeclContext());
-    Type type = var->hasType() ? var->getType() : nullptr;
 
     Accessors accessors = getAccessors(var);
     uint8_t rawAccessLevel =
@@ -2524,7 +2588,6 @@ void Serializer::writeDecl(const Decl *D) {
                           var->isLet(),
                           var->hasNonPatternBindingInit(),
                           (unsigned) accessors.Kind,
-                          addTypeRef(type),
                           addTypeRef(var->getInterfaceType()),
                           addDeclRef(accessors.Get),
                           addDeclRef(accessors.Set),
@@ -2543,11 +2606,7 @@ void Serializer::writeDecl(const Decl *D) {
     verifyAttrSerializable(param);
 
     auto contextID = addDeclContextRef(param->getDeclContext());
-    Type type, interfaceType;
-
-    if (param->hasType())
-      type = param->getType();
-    interfaceType = param->getInterfaceType();
+    Type interfaceType = param->getInterfaceType();
 
     unsigned abbrCode = DeclTypeAbbrCodes[ParamLayout::Code];
     ParamLayout::emitRecord(Out, ScratchRecord, abbrCode,
@@ -2555,7 +2614,6 @@ void Serializer::writeDecl(const Decl *D) {
                             addIdentifierRef(param->getName()),
                             contextID,
                             param->isLet(),
-                            addTypeRef(type),
                             addTypeRef(interfaceType));
     break;
   }
@@ -2997,20 +3055,14 @@ void Serializer::writeType(Type ty) {
 
     SmallVector<IdentifierID, 4> nestedTypeNames;
     SmallVector<TypeID, 4> nestedTypes;
-    SmallVector<bool, 4> areArchetypes;
     for (auto next : archetypeTy->getAllNestedTypes()) {
       nestedTypeNames.push_back(addIdentifierRef(next.first));
-      nestedTypes.push_back(addTypeRef(next.second.getValue()));
-      areArchetypes.push_back(!next.second.isConcreteType());
+      nestedTypes.push_back(addTypeRef(next.second));
     }
 
     abbrCode = DeclTypeAbbrCodes[ArchetypeNestedTypeNamesLayout::Code];
     ArchetypeNestedTypeNamesLayout::emitRecord(Out, ScratchRecord, abbrCode,
                                                nestedTypeNames);
-
-    abbrCode = DeclTypeAbbrCodes[ArchetypeNestedTypesAreArchetypesLayout::Code];
-    ArchetypeNestedTypesAreArchetypesLayout::emitRecord(Out, ScratchRecord,
-                                                        abbrCode, areArchetypes);
 
     abbrCode = DeclTypeAbbrCodes[ArchetypeNestedTypesLayout::Code];
     ArchetypeNestedTypesLayout::emitRecord(Out, ScratchRecord, abbrCode,
@@ -3033,16 +3085,6 @@ void Serializer::writeType(Type ty) {
     }
     GenericTypeParamTypeLayout::emitRecord(Out, ScratchRecord, abbrCode,
                                            declIDOrDepth, indexPlusOne);
-    break;
-  }
-
-  case TypeKind::Substituted: {
-    auto subTy = cast<SubstitutedType>(ty.getPointer());
-
-    unsigned abbrCode = DeclTypeAbbrCodes[SubstitutedTypeLayout::Code];
-    SubstitutedTypeLayout::emitRecord(Out, ScratchRecord, abbrCode,
-                                      addTypeRef(subTy->getOriginal()),
-                                      addTypeRef(subTy->getReplacementType()));
     break;
   }
 
@@ -3104,8 +3146,14 @@ void Serializer::writeType(Type ty) {
     auto boxTy = cast<SILBoxType>(ty.getPointer());
 
     unsigned abbrCode = DeclTypeAbbrCodes[SILBoxTypeLayout::Code];
+    SILLayoutID layoutRef = addSILLayoutRef(boxTy->getLayout());
+    
+    SmallVector<TypeID, 4> genericArgs;
+    for (auto &arg : boxTy->getGenericArgs())
+      genericArgs.push_back(addTypeRef(arg.getReplacement()));
+    
     SILBoxTypeLayout::emitRecord(Out, ScratchRecord, abbrCode,
-                                 addTypeRef(boxTy->getBoxedType()));
+                                 layoutRef, genericArgs);
     break;
   }
       
@@ -3293,10 +3341,8 @@ void Serializer::writeAllDeclsAndTypes() {
   registerDeclTypeAbbr<InOutTypeLayout>();
   registerDeclTypeAbbr<ArchetypeTypeLayout>();
   registerDeclTypeAbbr<ArchetypeNestedTypeNamesLayout>();
-  registerDeclTypeAbbr<ArchetypeNestedTypesAreArchetypesLayout>();
   registerDeclTypeAbbr<ArchetypeNestedTypesLayout>();
   registerDeclTypeAbbr<ProtocolCompositionTypeLayout>();
-  registerDeclTypeAbbr<SubstitutedTypeLayout>();
   registerDeclTypeAbbr<BoundGenericTypeLayout>();
   registerDeclTypeAbbr<BoundGenericSubstitutionLayout>();
   registerDeclTypeAbbr<GenericFunctionTypeLayout>();
@@ -3370,6 +3416,8 @@ void Serializer::writeAllDeclsAndTypes() {
   registerDeclTypeAbbr<NormalProtocolConformanceIdLayout>();
   registerDeclTypeAbbr<ProtocolConformanceXrefLayout>();
 
+  registerDeclTypeAbbr<SILLayoutLayout>();
+
   registerDeclTypeAbbr<LocalDiscriminatorLayout>();
   registerDeclTypeAbbr<PrivateDiscriminatorLayout>();
   registerDeclTypeAbbr<MembersLayout>();
@@ -3409,10 +3457,17 @@ void Serializer::writeAllDeclsAndTypes() {
       NormalConformancesToWrite.pop();
       writeNormalConformance(next);
     }
+    
+    while (!SILLayoutsToWrite.empty()) {
+      auto next = SILLayoutsToWrite.front();
+      SILLayoutsToWrite.pop();
+      writeSILLayout(next);
+    }
   } while (!DeclsAndTypesToWrite.empty() ||
            !LocalDeclContextsToWrite.empty() ||
            !DeclContextsToWrite.empty() ||
-           !NormalConformancesToWrite.empty());
+           !NormalConformancesToWrite.empty() ||
+           !SILLayoutsToWrite.empty());
 }
 
 void Serializer::writeAllIdentifiers() {
@@ -4098,6 +4153,7 @@ void Serializer::writeAST(ModuleOrSourceFile DC) {
     writeOffsets(Offsets, DeclContextOffsets);
     writeOffsets(Offsets, LocalDeclContextOffsets);
     writeOffsets(Offsets, NormalConformanceOffsets);
+    writeOffsets(Offsets, SILLayoutOffsets);
 
     index_block::DeclListLayout DeclList(Out);
     writeDeclTable(DeclList, index_block::TOP_LEVEL_DECLS, topLevelDecls);

@@ -1312,6 +1312,7 @@ bool SILDeserializer::readSILInstruction(SILFunction *Fn, SILBasicBlock *BB,
   UNARY_INSTRUCTION(FixLifetime)
   UNARY_INSTRUCTION(CopyBlock)
   UNARY_INSTRUCTION(LoadBorrow)
+  UNARY_INSTRUCTION(BeginBorrow)
   REFCOUNTING_INSTRUCTION(StrongPin)
   REFCOUNTING_INSTRUCTION(StrongUnpin)
   REFCOUNTING_INSTRUCTION(StrongRetain)
@@ -1365,6 +1366,14 @@ bool SILDeserializer::readSILInstruction(SILFunction *Fn, SILBasicBlock *BB,
     auto Qualifier = StoreOwnershipQualifier(Attr);
     ResultVal = Builder.createStore(Loc, getLocalValue(ValID, ValType),
                                     getLocalValue(ValID2, addrType), Qualifier);
+    break;
+  }
+  case ValueKind::StoreBorrowInst: {
+    auto Ty = MF->getType(TyID);
+    SILType addrType = getSILType(Ty, (SILValueCategory)TyCategory);
+    SILType ValType = addrType.getObjectType();
+    ResultVal = Builder.createStoreBorrow(Loc, getLocalValue(ValID, ValType),
+                                          getLocalValue(ValID2, addrType));
     break;
   }
   case ValueKind::EndBorrowInst: {
@@ -2024,6 +2033,10 @@ SILGlobalVariable *SILDeserializer::readGlobalVar(StringRef Name) {
   if (!GlobalVarList)
     return nullptr;
 
+  // If we already deserialized this global variable, just return it.
+  if (auto *GV = SILMod.lookUpGlobalVariable(Name))
+    return GV;
+
   // Find Id for the given name.
   auto iter = GlobalVarList->find(Name);
   if (iter == GlobalVarList->end())
@@ -2080,6 +2093,15 @@ SILGlobalVariable *SILDeserializer::readGlobalVar(StringRef Name) {
 
   if (Callback) Callback->didDeserialize(MF->getAssociatedModule(), v);
   return v;
+}
+
+void SILDeserializer::getAllSILGlobalVariables() {
+  if (!GlobalVarList)
+    return;
+
+  for (auto Key : GlobalVarList->keys()) {
+    readGlobalVar(Key);
+  }
 }
 
 void SILDeserializer::getAllSILFunctions() {

@@ -318,6 +318,12 @@ std::string mangleNode(const NodePointer &root);
 
 std::string mangleNodeNew(const NodePointer &root);
 
+inline std::string mangleNode(const NodePointer &root, bool NewMangling) {
+  if (NewMangling)
+    return mangleNodeNew(root);
+  return mangleNode(root);
+}
+
 /// \brief Transform the node structure to a string.
 ///
 /// Typical usage:

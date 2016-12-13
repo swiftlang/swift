@@ -33,11 +33,6 @@ public:
   /// This method is called after visiting a type's children.
   virtual Action walkToTypePost(Type ty) { return Action::Continue; }
 
-  /// Controls whether the original type of a SubstitutedType is visited.
-  ///
-  /// By default, it is not.
-  virtual bool shouldVisitOriginalSubstitutedType() { return false; }
-
 protected:
   TypeWalker() = default;
   TypeWalker(const TypeWalker &) = default;

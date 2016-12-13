@@ -2048,10 +2048,6 @@ iterations with -O",
     parser.add_argument("--enable-sil-ownership",
                         help="Enable the SIL ownership model",
                         action='store_true')
-    parser.add_argument('--compilation-db',
-                        help='When configuring, have cmake emit a compilation '
-                        'database in $BUILD_DIR/compilation_commands.json',
-                        action='store_true')
 
     parser.add_argument(
         # Explicitly unavailable options here.

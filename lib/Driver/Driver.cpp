@@ -73,9 +73,7 @@ Driver::Driver(StringRef DriverExecutable,
   parseDriverKind(Args.slice(1));
 }
 
-Driver::~Driver() {
-  llvm::DeleteContainerSeconds(ToolChains);
-}
+Driver::~Driver() = default;
 
 void Driver::parseDriverKind(ArrayRef<const char *> Args) {
   // The default driver kind is determined by Name.
@@ -159,6 +157,39 @@ static void validateArgs(DiagnosticEngine &diags, const ArgList &Args) {
                    "-warnings-as-errors", "-suppress-warnings");
   }
 }
+
+/// Creates an appropriate ToolChain for a given driver and target triple.
+///
+/// This uses a std::unique_ptr instead of returning a toolchain by value
+/// because ToolChain has virtual methods.
+static std::unique_ptr<const ToolChain>
+makeToolChain(Driver &driver, const llvm::Triple &target) {
+  switch (target.getOS()) {
+  case llvm::Triple::Darwin:
+  case llvm::Triple::MacOSX:
+  case llvm::Triple::IOS:
+  case llvm::Triple::TvOS:
+  case llvm::Triple::WatchOS:
+    return llvm::make_unique<toolchains::Darwin>(driver, target);
+    break;
+  case llvm::Triple::Linux:
+    if (target.isAndroid()) {
+      return llvm::make_unique<toolchains::Android>(driver, target);
+    } else {
+      return llvm::make_unique<toolchains::GenericUnix>(driver, target);
+    }
+    break;
+  case llvm::Triple::FreeBSD:
+    return llvm::make_unique<toolchains::GenericUnix>(driver, target);
+    break;
+  case llvm::Triple::Win32:
+    return llvm::make_unique<toolchains::Cygwin>(driver, target);
+    break;
+  default:
+    return nullptr;
+  }
+}
+
 
 static void computeArgsHash(SmallString<32> &out, const DerivedArgList &args) {
   SmallVector<const Arg *, 32> interestingArgs;
@@ -475,7 +506,8 @@ std::unique_ptr<Compilation> Driver::buildCompilation(
   if (Diags.hadAnyError())
     return nullptr;
   
-  const ToolChain *TC = getToolChain(*ArgList);
+  std::unique_ptr<const ToolChain> TC =
+      makeToolChain(*this, llvm::Triple(DefaultTargetTriple));
   if (!TC) {
     Diags.diagnose(SourceLoc(), diag::error_unknown_target,
                    ArgList->getLastArg(options::OPT_target)->getValue());
@@ -2127,41 +2159,4 @@ void Driver::printHelp(bool ShowHidden) const {
 
   getOpts().PrintHelp(llvm::outs(), Name.c_str(), "Swift compiler",
                       IncludedFlagsBitmask, ExcludedFlagsBitmask);
-}
-
-static llvm::Triple computeTargetTriple(StringRef DefaultTargetTriple) {
-  return llvm::Triple(DefaultTargetTriple); 
-}
-
-const ToolChain *Driver::getToolChain(const ArgList &Args) const {
-  llvm::Triple Target = computeTargetTriple(DefaultTargetTriple);
-
-  ToolChain *&TC = ToolChains[Target.str()];
-  if (!TC) {
-    switch (Target.getOS()) {
-    case llvm::Triple::Darwin:
-    case llvm::Triple::MacOSX:
-    case llvm::Triple::IOS:
-    case llvm::Triple::TvOS:
-    case llvm::Triple::WatchOS:
-      TC = new toolchains::Darwin(*this, Target);
-      break;
-    case llvm::Triple::Linux:
-      if (Target.isAndroid()) {
-        TC = new toolchains::Android(*this, Target);
-      } else {
-        TC = new toolchains::GenericUnix(*this, Target);
-      }
-      break;
-    case llvm::Triple::FreeBSD:
-      TC = new toolchains::GenericUnix(*this, Target);
-      break;
-    case llvm::Triple::Win32:
-      TC = new toolchains::Cygwin(*this, Target);
-      break;
-    default:
-      TC = nullptr;
-    }
-  }
-  return TC;
 }

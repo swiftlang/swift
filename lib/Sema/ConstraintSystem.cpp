@@ -363,11 +363,6 @@ namespace {
       // Swift only supports rank-1 polymorphism.
       assert(!type->is<GenericFunctionType>());
 
-      // Preserve parens when opening types.
-      if (isa<ParenType>(type.getPointer())) {
-        return type;
-      }
-
       // Replace a generic type parameter with its corresponding type variable.
       if (auto genericParam = type->getAs<GenericTypeParamType>()) {
         auto known = replacements.find(genericParam->getCanonicalType());
@@ -440,10 +435,12 @@ namespace {
         // pointing at a generic TypeAliasDecl here. If we find a way to
         // handle generic TypeAliases elsewhere, this can just become a
         // call to BoundGenericType::get().
-        return cs.TC.applyUnboundGenericArguments(unbound, unboundDecl,
-                                                  SourceLoc(), cs.DC, arguments,
-                                                  /*isGenericSignature*/false,
-                                                  /*resolver*/nullptr);
+        return cs.TC.applyUnboundGenericArguments(
+                                             unbound, unboundDecl,
+                                             SourceLoc(), cs.DC, arguments,
+                                             /*options*/TypeResolutionOptions(),
+                                             /*resolver*/nullptr,
+                                             /*unsatisfiedDependency*/nullptr);
       }
       
       return type;
@@ -1054,7 +1051,7 @@ ConstraintSystem::getTypeOfMemberReference(
 
     // Refer to a member of the archetype directly.
     if (auto archetype = baseObjTy->getAs<ArchetypeType>()) {
-      Type memberTy = archetype->getNestedTypeValue(value->getName());
+      Type memberTy = archetype->getNestedType(value->getName());
       if (!isTypeReference)
         memberTy = MetatypeType::get(memberTy);
 
@@ -1513,7 +1510,7 @@ Type ConstraintSystem::simplifyType(Type type) {
 
     // If this is a dependent member type for which we end up simplifying
     // the base to a non-type-variable, perform lookup.
-    if (auto depMemTy = type->getAs<DependentMemberType>()) {
+    if (auto depMemTy = dyn_cast<DependentMemberType>(type.getPointer())) {
       // Simplify the base.
       Type newBase = simplifyType(depMemTy->getBase());
       if (!newBase) return type;
@@ -1586,7 +1583,7 @@ Type Solution::simplifyType(TypeChecker &tc, Type type) const {
 
     // If this is a dependent member type for which we end up simplifying
     // the base to a non-type-variable, perform lookup.
-    if (auto depMemTy = type->getAs<DependentMemberType>()) {
+    if (auto depMemTy = dyn_cast<DependentMemberType>(type.getPointer())) {
       // Simplify the base.
       Type newBase = simplifyType(tc, depMemTy->getBase());
       if (!newBase) return type;

@@ -6,7 +6,6 @@
 // See https://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
 
 // RUN: not %target-swift-frontend %s -typecheck
-// REQUIRES: asserts
 protocol A{typealias e
 func f:A
 protocol A{typealias A:f func f:e

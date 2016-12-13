@@ -381,7 +381,7 @@ static void doDynamicLookup(VisibleDeclConsumer &Consumer,
 
 namespace {
   typedef llvm::SmallPtrSet<TypeDecl *, 8> VisitedSet;
-}
+} // end anonymous namespace
 
 static DeclVisibilityKind getReasonForSuper(DeclVisibilityKind Reason) {
   switch (Reason) {
@@ -720,7 +720,8 @@ public:
     bool shouldSubst = !BaseTy->hasUnboundGenericType() &&
                        !isa<AnyMetatypeType>(BaseTy.getPointer()) &&
                        !BaseTy->isAnyExistentialType() &&
-                       !BaseTy->hasTypeVariable();
+                       !BaseTy->hasTypeVariable() &&
+                       VD->getDeclContext()->isTypeContext();
     ModuleDecl *M = DC->getParentModule();
 
     auto FoundSignature = VD->getOverloadSignature();
@@ -827,13 +828,10 @@ void swift::lookupVisibleDecls(VisibleDeclConsumer &Consumer,
         Consumer.foundDecl(const_cast<ParamDecl*>(AFD->getImplicitSelfDecl()),
                            DeclVisibilityKind::FunctionParameter);
 
-      if (AFD->getExtensionType()) {
-        ExtendedType = AFD->getExtensionType();
+      if (AFD->getDeclContext()->isTypeContext()) {
+        ExtendedType = AFD->getDeclContext()->getSelfTypeInContext();
         BaseDecl = AFD->getImplicitSelfDecl();
         DC = DC->getParent();
-
-        if (DC->getAsProtocolExtensionContext())
-          ExtendedType = DC->getSelfTypeInContext();
 
         if (auto *FD = dyn_cast<FuncDecl>(AFD))
           if (FD->isStatic())

@@ -916,9 +916,6 @@ public:
 
   /// Whether this is the AnyObject type.
   bool isAnyObject();
-  
-  /// Whether this is an empty existential composition ("{}").
-  bool isEmptyExistentialComposition();
 
   /// Whether this is an existential composition containing
   /// Error.
@@ -938,16 +935,6 @@ public:
   /// Return whether this type is or can be substituted for a bridgeable
   /// object type.
   TypeTraitResult canBeClass();
-  
-  /// Returns true if the type conforms to protocols using witnesses from the
-  /// environment or from within the value. Generic parameters and existentials
-  /// meet this criteria. In these cases we represent the
-  /// conformance as a null ProtocolConformance* pointer, because there is no
-  /// static conformance associated with the conforming type.
-  bool hasDependentProtocolConformances();
-
-  /// Retrieve the type declaration directly referenced by this type, if any.
-  TypeDecl *getDirectlyReferencedTypeDecl() const;
 
 private:
   // Make vanilla new/delete illegal for Types.
@@ -3331,6 +3318,7 @@ DEFINE_EMPTY_CAN_TYPE_WRAPPER(SILFunctionType, Type)
 
 class SILBoxType;
 class SILLayout; // From SIL
+class SILModule; // From SIL
 typedef CanTypeWrapper<SILBoxType> CanSILBoxType;
 
 /// The SIL-only type for boxes, which represent a reference to a (non-class)
@@ -3360,25 +3348,16 @@ public:
     return llvm::makeArrayRef(getTrailingObjects<Substitution>(),
                               NumGenericArgs);
   }
-  CanType getFieldLoweredType(unsigned index) const {
-    auto fieldTy = getLayout()->getFields()[index].getLoweredType();
-    // Apply generic arguments if the layout is generic.
-    if (!getGenericArgs().empty()) {
-      auto substMap =
-       getLayout()->getGenericSignature()->getSubstitutionMap(getGenericArgs());
-      fieldTy = fieldTy.subst(substMap)->getCanonicalType();
-    }
-    return fieldTy;
-  }
-  SILType getFieldType(unsigned index) const; // In SILType.h
+  
+  // In SILType.h:
+  CanType getFieldLoweredType(SILModule &M, unsigned index) const;
+  SILType getFieldType(SILModule &M, unsigned index) const;
 
   // TODO: SILBoxTypes should be explicitly constructed in terms of specific
   // layouts. As a staging mechanism, we expose the old single-boxed-type
   // interface.
   
   static CanSILBoxType get(CanType BoxedType);
-  CanType getBoxedType() const; // In SILType.h
-  SILType getBoxedAddressType() const; // In SILType.h
 
   static bool classof(const TypeBase *T) {
     return T->getKind() == TypeKind::SILBox;
@@ -3789,56 +3768,13 @@ class ArchetypeType final : public SubstitutableType,
     return getOpenedExistentialType() ? 1 : 0;
   }
 
-public:
-  /// A nested type. Either a dependent associated archetype, or a concrete
-  /// type (which may be a bound archetype from an outer context).
-  class NestedType {
-    llvm::PointerIntPair<TypeBase *, 1> TypeAndIsConcrete;
-    NestedType(Type type, bool isConcrete)
-      : TypeAndIsConcrete(type.getPointer(), isConcrete) {}
-  public:
-    NestedType() { assert(!*this && "empty nested type isn't false"); }
-    static NestedType forArchetype(ArchetypeType *archetype) {
-      return { archetype, false };
-    }
-    static NestedType forConcreteType(Type concrete) {
-      return { concrete, true };
-    }
-    operator bool() const { return TypeAndIsConcrete.getOpaqueValue() != 0; }
-    bool isConcreteType() const { return TypeAndIsConcrete.getInt(); }
-    Type getValue() const { return TypeAndIsConcrete.getPointer(); }
-
-    /// Check whether this nested type is a concrete type.
-    Type getAsConcreteType() const {
-      return (isConcreteType() ? getValue() : Type());
-    }
-
-    /// Assert that this nested type is a concrete type.
-    Type castToConcreteType() const {
-      assert(isConcreteType());
-      return getValue();
-    }
-
-    /// Check whether this nested type is an archetype.
-    ArchetypeType *getAsArchetype() const {
-      return (isConcreteType() ? nullptr : castToArchetype());
-    }
-
-    /// Assert that this nested type is an archetype.
-    ArchetypeType *castToArchetype() const {
-      assert(!isConcreteType());
-      return cast_or_null<ArchetypeType>(TypeAndIsConcrete.getPointer());
-    }
-  };
-  
-private:
   llvm::PointerUnion3<ArchetypeType *, TypeBase *,
                       GenericEnvironment *> ParentOrOpenedOrEnvironment;
   llvm::PointerUnion<AssociatedTypeDecl *, Identifier> AssocTypeOrName;
-  MutableArrayRef<std::pair<Identifier, NestedType>> NestedTypes;
+  MutableArrayRef<std::pair<Identifier, Type>> NestedTypes;
 
   void populateNestedTypes() const;
-  void resolveNestedType(std::pair<Identifier, NestedType> &nested) const;
+  void resolveNestedType(std::pair<Identifier, Type> &nested) const;
 
 public:
   /// getNew - Create a new nested archetype with the given associated type.
@@ -3936,18 +3872,14 @@ public:
   }
 
   /// \brief Retrieve the nested type with the given name.
-  NestedType getNestedType(Identifier Name) const;
+  Type getNestedType(Identifier Name) const;
 
   /// \brief Retrieve the nested type with the given name, if it's already
   /// known.
   ///
   /// This is an implementation detail used by the archetype builder.
-  Optional<NestedType> getNestedTypeIfKnown(Identifier Name) const;
+  Optional<Type> getNestedTypeIfKnown(Identifier Name) const;
 
-  Type getNestedTypeValue(Identifier Name) const {
-    return getNestedType(Name).getValue();
-  }
-  
   /// \brief Check if the archetype contains a nested type with the given name.
   bool hasNestedType(Identifier Name) const;
 
@@ -3956,7 +3888,7 @@ public:
   /// Useful only for debugging dumps; all other queries should attempt to
   /// find a particular nested type by name, directly, or look at the
   /// protocols to which this archetype conforms.
-  ArrayRef<std::pair<Identifier, NestedType>>
+  ArrayRef<std::pair<Identifier, Type>>
   getKnownNestedTypes(bool resolveTypes = true) const {
     return getAllNestedTypes(/*resolveTypes=*/false);
   }
@@ -3969,16 +3901,16 @@ public:
   ///
   /// FIXME: This operation should go away, because it breaks recursive
   /// protocol constraints.
-  ArrayRef<std::pair<Identifier, NestedType>>
+  ArrayRef<std::pair<Identifier, Type>>
   getAllNestedTypes(bool resolveTypes = true) const;
 
   /// \brief Set the nested types to a copy of the given array of
   /// archetypes.
   void setNestedTypes(ASTContext &Ctx,
-                      ArrayRef<std::pair<Identifier, NestedType>> Nested);
+                      ArrayRef<std::pair<Identifier, Type>> Nested);
 
   /// Register a nested type with the given name.
-  void registerNestedType(Identifier name, NestedType nested);
+  void registerNestedType(Identifier name, Type nested);
 
   /// isPrimary - Determine whether this is the archetype for a 'primary'
   /// archetype, e.g., one that is not nested within another archetype and is
@@ -4101,38 +4033,6 @@ BEGIN_CAN_TYPE_WRAPPER(GenericTypeParamType, SubstitutableType)
     return CanGenericTypeParamType(GenericTypeParamType::get(depth, index, C));
   }
 END_CAN_TYPE_WRAPPER(GenericTypeParamType, SubstitutableType)
-
-/// SubstitutedType - A type that has been substituted for some other type,
-/// which implies that the replacement type meets all of the requirements of
-/// the original type.
-class SubstitutedType : public TypeBase {
-  // SubstitutedTypes are never canonical.
-  explicit SubstitutedType(Type Original, Type Replacement,
-                           RecursiveTypeProperties properties)
-    : TypeBase(TypeKind::Substituted, nullptr, properties),
-      Original(Original), Replacement(Replacement) {}
-  
-  Type Original;
-  Type Replacement;
-  
-public:
-  static SubstitutedType *get(Type Original, Type Replacement,
-                              const ASTContext &C);
-  
-  /// \brief Retrieve the original type that is being replaced.
-  Type getOriginal() const { return Original; }
-  
-  /// \brief Retrieve the replacement type.
-  Type getReplacementType() const { return Replacement; }
-  
-  /// Remove one level of top-level sugar from this type.
-  TypeBase *getSinglyDesugaredType();
-
-  // Implement isa/cast/dyncast/etc.
-  static bool classof(const TypeBase *T) {
-    return T->getKind() == TypeKind::Substituted;
-  }
-};
 
 /// A type that refers to a member type of some type that is dependent on a
 /// generic parameter.
@@ -4616,11 +4516,6 @@ ParameterTypeFlags::fromParameterType(Type paramTy, bool isVariadic) {
 
 inline CanType Type::getCanonicalTypeOrNull() const {
   return isNull() ? CanType() : getPointer()->getCanonicalType();
-}
-
-inline bool TypeBase::hasDependentProtocolConformances() {
-  return is<SubstitutableType>() || is<GenericTypeParamType>()
-      || isAnyExistentialType();
 }
 
 #define TYPE(id, parent)

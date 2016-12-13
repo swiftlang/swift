@@ -2,6 +2,7 @@ set(UTILITYPASSES_SOURCES
   UtilityPasses/AADumper.cpp
   UtilityPasses/BasicCalleePrinter.cpp
   UtilityPasses/BasicInstructionPropertyDumper.cpp
+  UtilityPasses/BugReducerTester.cpp
   UtilityPasses/CallerAnalysisPrinter.cpp
   UtilityPasses/CFGPrinter.cpp
   UtilityPasses/ComputeDominanceInfo.cpp

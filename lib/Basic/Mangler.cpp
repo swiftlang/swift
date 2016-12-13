@@ -5,8 +5,8 @@
 // Copyright (c) 2014 - 2016 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
-// See http://swift.org/LICENSE.txt for license information
-// See http://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
+// See https://swift.org/LICENSE.txt for license information
+// See https://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
 //
 //===----------------------------------------------------------------------===//
 
@@ -78,6 +78,7 @@ static bool areTreesEqual(Demangle::NodePointer Old, Demangle::NodePointer New) 
       case Demangle::Node::Kind::ReflectionMetadataFieldDescriptor:
       case Demangle::Node::Kind::ReflectionMetadataAssocTypeDescriptor:
       case Demangle::Node::Kind::ReflectionMetadataSuperclassDescriptor:
+      case Demangle::Node::Kind::PartialApplyForwarder:
         return true;
       default:
         return false;
@@ -179,9 +180,12 @@ std::string NewMangling::selectMangling(const std::string &Old,
       std::string Remangled = mangleNodeNew(NewNode);
       if (New != Remangled) {
         bool isEqual = false;
-        if (containsDependentAssociatedTypeRef(NewNode)) {
+        if (containsDependentAssociatedTypeRef(NewNode) ||
+            // Does the mangling contain an identifier which is the name of
+            // an old-mangled function?
+            New.find("_T") != std::string::npos) {
           NodePointer RemangledNode = demangleSymbolAsNode(Remangled);
-          isEqual = areTreesEqual(RemangledNode, NewNode);
+          isEqual = areTreesEqual(NewNode, RemangledNode);
         }
         if (!isEqual) {
           llvm::errs() << "Remangling failed at #" << numCmp << ":\n"

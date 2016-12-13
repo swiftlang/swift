@@ -1539,22 +1539,25 @@ void importer::addEntryToLookupTable(SwiftLookupTable &table,
   }
 
   // If we have a name to import as, add this entry to the table.
-  if (auto importedName = nameImporter.importName(named, None)) {
-    table.addEntry(importedName.Imported, named, importedName.EffectiveContext);
+  if (auto importedName =
+          nameImporter.importName(named, ImportNameVersion::Swift3)) {
+    table.addEntry(importedName.getDeclName(), named,
+                   importedName.getEffectiveContext());
 
     // Also add the subscript entry, if needed.
     if (importedName.isSubscriptAccessor())
       table.addEntry(DeclName(nameImporter.getContext(),
                               nameImporter.getContext().Id_subscript,
                               ArrayRef<Identifier>()),
-                     named, importedName.EffectiveContext);
+                     named, importedName.getEffectiveContext());
 
     // Import the Swift 2 name of this entity, and record it as well if it is
     // different.
     if (auto swift2Name =
-            nameImporter.importName(named, ImportNameFlags::Swift2Name)) {
-      if (swift2Name.Imported != importedName.Imported)
-        table.addEntry(swift2Name.Imported, named, swift2Name.EffectiveContext);
+            nameImporter.importName(named, ImportNameVersion::Swift2)) {
+      if (swift2Name.getDeclName() != importedName.getDeclName())
+        table.addEntry(swift2Name.getDeclName(), named,
+                       swift2Name.getEffectiveContext());
     }
   } else if (auto category = dyn_cast<clang::ObjCCategoryDecl>(named)) {
     // If the category is invalid, don't add it.

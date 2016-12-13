@@ -92,15 +92,10 @@ Substitution Substitution::subst(Module *module,
       conformance = ProtocolConformanceRef(lookupResults.front());
     }
 
-    if (conformance) {
-      if (conformance->isConcrete())
-        conformancesChanged = true;
-      substConformances.push_back(*conformance);
-    } else {
-      assert(substReplacement->hasDependentProtocolConformances() &&
-             "couldn't find concrete conformance for concrete type?");
-      substConformances.push_back(ProtocolConformanceRef(proto));
-    }
+    assert(conformance);
+    if (conformance->isConcrete())
+      conformancesChanged = true;
+    substConformances.push_back(*conformance);
   }
   assert(substConformances.size() == Conformance.size());
 

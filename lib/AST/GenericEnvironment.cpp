@@ -40,6 +40,26 @@ GenericEnvironment::GenericEnvironment(
     addMapping(entry.first->castTo<GenericTypeParamType>(), entry.second);
 }
 
+void GenericEnvironment::setOwningDeclContext(DeclContext *newNowningDC) {
+  if (!OwningDC) {
+    OwningDC = newNowningDC;
+    return;
+  }
+
+  if (!newNowningDC || OwningDC == newNowningDC)
+    return;
+
+  // If we have found an outer context sharing the same generic environment,
+  // use that.
+  if (OwningDC->isChildContextOf(newNowningDC)) {
+    OwningDC = newNowningDC;
+    return;
+  }
+
+  // Otherwise, we have an inner context sharing the envirtonment.
+  assert(newNowningDC->isChildContextOf(OwningDC) && "Not an inner context");
+}
+
 void GenericEnvironment::addMapping(GenericParamKey key,
                                     Type contextType) {
   // Find the index into the parallel arrays of generic parameters and
@@ -150,8 +170,8 @@ Type GenericEnvironment::QueryInterfaceTypeSubstitutions::operator()(
 
       auto mutableSelf = const_cast<GenericEnvironment *>(self);
       contextType =
-        potentialArchetype->getTypeInContext(*mutableSelf->Builder, mutableSelf)
-          .getValue();
+        potentialArchetype->getTypeInContext(*mutableSelf->Builder,
+                                             mutableSelf);
 
       // FIXME: Redundant mapping from key -> index.
       if (self->getContextTypes()[index].isNull())
@@ -229,11 +249,12 @@ Type GenericEnvironment::QueryArchetypeToInterfaceSubstitutions::operator()(
 }
 
 Type GenericEnvironment::mapTypeIntoContext(ModuleDecl *M, Type type) const {
-  type = type.subst(M, QueryInterfaceTypeSubstitutions(this),
-                    SubstFlags::AllowLoweredTypes);
-  assert((!type->hasTypeParameter() || type->hasError()) &&
+  Type result = type.subst(M, QueryInterfaceTypeSubstitutions(this),
+                           (SubstFlags::AllowLoweredTypes|
+                            SubstFlags::UseErrorType));
+  assert((!result->hasTypeParameter() || result->hasError()) &&
          "not fully substituted");
-  return type;
+  return result;
 }
 
 Type GenericEnvironment::mapTypeIntoContext(GenericTypeParamType *type) const {

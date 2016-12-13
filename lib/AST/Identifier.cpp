@@ -22,7 +22,8 @@ using namespace swift;
 
 
 raw_ostream &llvm::operator<<(raw_ostream &OS, Identifier I) {
-  if (I.get() == 0) return OS << "_";
+  if (I.get() == nullptr)
+    return OS << "_";
   return OS << I.get();
 }
 

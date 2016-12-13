@@ -32,6 +32,7 @@ static bool isResolvableScope(ScopeKind SK) {
   case ScopeKind::ClassBody:
   case ScopeKind::ProtocolBody:
   case ScopeKind::TopLevel:
+  case ScopeKind::InheritanceClause:
     return false;
   case ScopeKind::FunctionBody:
   case ScopeKind::Generics:
@@ -47,14 +48,15 @@ static bool isResolvableScope(ScopeKind SK) {
   case ScopeKind::WhileVars:
     return true;
   }
+
+  llvm_unreachable("Unhandled ScopeKind in switch.");
 }
 
 Scope::Scope(Parser *P, ScopeKind SC, bool InactiveConfigBlock)
-  : SI(P->getScopeInfo()),
-    HTScope(SI.HT, SI.CurScope ? &SI.CurScope->HTScope : 0),
-    PrevScope(SI.CurScope),
-    PrevResolvableDepth(SI.ResolvableDepth),
-    Kind(SC), IsInactiveConfigBlock(InactiveConfigBlock) {
+    : SI(P->getScopeInfo()),
+      HTScope(SI.HT, SI.CurScope ? &SI.CurScope->HTScope : nullptr),
+      PrevScope(SI.CurScope), PrevResolvableDepth(SI.ResolvableDepth), Kind(SC),
+      IsInactiveConfigBlock(InactiveConfigBlock) {
   assert(PrevScope || Kind == ScopeKind::TopLevel);
   
   if (SI.CurScope) {

@@ -198,7 +198,11 @@ class alignas(1 << DeclContextAlignInBits) DeclContext {
   friend struct ::llvm::cast_convert_val;
   
   static DeclContext *castDeclToDeclContext(const Decl *D);
-  
+
+  /// If this DeclContext is a GenericType declaration or an
+  /// extension thereof, return the GenericTypeDecl.
+  GenericTypeDecl *getAsTypeOrTypeExtensionContext() const;
+
 public:
   DeclContext(DeclContextKind Kind, DeclContext *Parent)
     : ParentAndKind(Parent, Kind) {
@@ -232,19 +236,12 @@ public:
 
   /// \returns true if this is a type context, e.g., a struct, a class, an
   /// enum, a protocol, or an extension.
-  bool isTypeContext() const {
-    return getContextKind() == DeclContextKind::GenericTypeDecl ||
-           getContextKind() == DeclContextKind::ExtensionDecl;
-  }
+  bool isTypeContext() const;
 
   /// \brief Determine whether this is an extension context.
   bool isExtensionContext() const {
     return getContextKind() == DeclContextKind::ExtensionDecl;
   }
-
-  /// If this DeclContext is a GenericType declaration or an
-  /// extension thereof, return the GenericTypeDecl.
-  GenericTypeDecl *getAsGenericTypeOrGenericTypeExtensionContext() const;
 
   /// If this DeclContext is a NominalType declaration or an
   /// extension thereof, return the NominalTypeDecl.
@@ -584,26 +581,22 @@ enum class IterableDeclContextKind : uint8_t {
 /// Note that an iterable declaration context must inherit from both
 /// \c IterableDeclContext and \c DeclContext.
 class IterableDeclContext {
-  /// The first declaration in this context.
-  mutable Decl *FirstDecl = nullptr;
+  /// The first declaration in this context along with a bit indicating whether
+  /// the members of this context will be lazily produced.
+  mutable llvm::PointerIntPair<Decl *, 1, bool> FirstDeclAndLazyMembers;
 
   /// The last declaration in this context, used for efficient insertion,
   /// along with the kind of iterable declaration context.
   mutable llvm::PointerIntPair<Decl *, 2, IterableDeclContextKind> 
     LastDeclAndKind;
 
-  /// Lazy member loader, if any.
-  ///
-  /// FIXME: Can we collapse this storage into something?
-  mutable LazyMemberLoader *LazyLoader = nullptr;
-
-  /// Lazy member loader context data.
-  uint64_t LazyLoaderContextData = 0;
-
   template<class A, class B, class C>
   friend struct ::llvm::cast_convert_val;
 
   static IterableDeclContext *castDeclToIterableDeclContext(const Decl *D);
+
+  /// Retrieve the \c ASTContext in which this iterable context occurs.
+  ASTContext &getASTContext() const;
 
 public:
   IterableDeclContext(IterableDeclContextKind kind)
@@ -621,25 +614,13 @@ public:
   /// is inserted immediately after the hint.
   void addMember(Decl *member, Decl *hint = nullptr);
 
-  /// Retrieve the lazy member loader.
-  LazyMemberLoader *getLoader() const {
-    assert(isLazy());
-    return LazyLoader;
-  }
-
-  /// Retrieve the context data for the lazy member loader.
-  uint64_t getLoaderContextData() const {
-    assert(isLazy());
-    return LazyLoaderContextData;
-  }
-
   /// Check whether there are lazily-loaded members.
-  bool isLazy() const {
-    return LazyLoader != nullptr;
+  bool hasLazyMembers() const {
+    return FirstDeclAndLazyMembers.getInt();
   }  
 
-  /// Set the loader for lazily-loaded members.
-  void setLoader(LazyMemberLoader *loader, uint64_t contextData);
+  /// Setup the loader for lazily-loaded members.
+  void setMemberLoader(LazyMemberLoader *loader, uint64_t contextData);
 
   /// Load all of the members of this context.
   void loadAllMembers() const;

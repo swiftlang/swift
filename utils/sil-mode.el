@@ -73,7 +73,7 @@
                   'words) . font-lock-keyword-face)
 
    ;; SIL Instructions - Borrowing
-   '("load_borrow" . font-lock-keyword-face)
+   `(,(regexp-opt '("load_borrow" "begin_borrow" "store_borrow") 'words) . font-lock-keyword-face)
    '("\\(end_borrow\\) %[[:alnum:]] \\(from\\)" (1 font-lock-keyword-face) (2 font-lock-keyword-face))
 
    ;; SIL Instructions - Reference Counting.

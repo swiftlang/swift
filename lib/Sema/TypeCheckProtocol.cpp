@@ -657,7 +657,7 @@ static bool checkMutating(FuncDecl *requirement, FuncDecl *witness,
                           ValueDecl *witnessDecl) {
   // Witnesses in classes never have mutating conflicts.
   if (auto contextType =
-        witnessDecl->getDeclContext()->getDeclaredTypeInContext())
+        witnessDecl->getDeclContext()->getDeclaredInterfaceType())
     if (contextType->hasReferenceSemantics())
       return false;
   
@@ -1037,7 +1037,7 @@ RequirementEnvironment::RequirementEnvironment(
     conformanceSig = conformanceSig->getCanonicalSignature();
     allGenericParams.append(conformanceSig->getGenericParams().begin(),
                             conformanceSig->getGenericParams().end());
-    builder.addGenericSignature(conformanceSig, nullptr);
+    builder.addGenericSignature(conformanceSig);
     depth = allGenericParams.back()->getDepth() + 1;
   }
 
@@ -2263,14 +2263,13 @@ void ConformanceChecker::recordTypeWitness(AssociatedTypeDecl *assocType,
                                                     TypeLoc::withoutLoc(type),
                                                     /*genericparams*/nullptr, 
                                                     DC);
+    aliasDecl->setGenericEnvironment(DC->getGenericEnvironmentOfContext());
     aliasDecl->computeType();
 
     aliasDecl->getAliasType()->setRecursiveProperties(
         type->getRecursiveProperties());
 
-    Type interfaceTy = aliasDecl->getAliasType();
-    if (interfaceTy->hasArchetype())
-      interfaceTy = ArchetypeBuilder::mapTypeOutOfContext(DC, type);
+    auto interfaceTy = DC->mapTypeOutOfContext(aliasDecl->getAliasType());
     aliasDecl->setInterfaceType(MetatypeType::get(interfaceTy));
 
     aliasDecl->setImplicit();
@@ -2351,8 +2350,7 @@ static void diagnoseNoWitness(ValueDecl *Requirement, Type RequirementType,
 
   Accessibility Access = std::min(
     /* Access of the context */
-    Adopter
-      ->getAsGenericTypeOrGenericTypeExtensionContext()->getFormalAccess(),
+    Adopter->getAsNominalTypeOrNominalTypeExtensionContext()->getFormalAccess(),
     /* Access of the protocol */
     Requirement->getDeclContext()
       ->getAsProtocolOrProtocolExtensionContext()->getFormalAccess());
@@ -3052,7 +3050,7 @@ static Type getWitnessTypeForMatching(TypeChecker &tc,
   // Retrieve the set of substitutions to be applied to the witness.
   Type model = conformance->getType();
   TypeSubstitutionMap substitutions = model->getMemberSubstitutions(
-                                        witness->getDeclContext());
+                                        witness->getInnermostDeclContext());
   if (substitutions.empty())
     return witness->getInterfaceType();
 
@@ -3966,6 +3964,17 @@ void ConformanceChecker::resolveSingleTypeWitness(
   }
 }
 
+// Not all protocol members are requirements.
+static bool isRequirement(ValueDecl *requirement) {
+  if (auto *FD = dyn_cast<FuncDecl>(requirement))
+    if (FD->isAccessor())
+      return false;
+  if (isa<TypeAliasDecl>(requirement) ||
+      isa<NominalTypeDecl>(requirement))
+    return false;
+  return true;
+}
+
 void ConformanceChecker::resolveSingleWitness(ValueDecl *requirement) {
   assert(!isa<AssociatedTypeDecl>(requirement) && "Not a value witness");
   assert(!Conformance->hasWitness(requirement) && "Already resolved");
@@ -3985,12 +3994,7 @@ void ConformanceChecker::resolveSingleWitness(ValueDecl *requirement) {
     return;
   }
 
-  // If this is a getter/setter for a funcdecl, ignore it.
-  if (auto *FD = dyn_cast<FuncDecl>(requirement))
-    if (FD->isAccessor())
-      return;
-  // If this is a typealias, it does not need a witness check.
-  if (isa<TypeAliasDecl>(requirement))
+  if (!isRequirement(requirement))
     return;
 
   // Resolve all associated types before trying to resolve this witness.
@@ -4135,15 +4139,11 @@ void ConformanceChecker::checkConformance() {
       continue;
 
     // Associated type requirements handled above.
-    if (isa<AssociatedTypeDecl>(requirement))
+    if (isa<TypeDecl>(requirement))
       continue;
 
     // Type aliases don't have requirements themselves.
-    if (isa<TypeAliasDecl>(requirement))
-      continue;
-
-    // Nominal types nested inside protocols are not requirements.
-    if (isa<NominalTypeDecl>(requirement))
+    if (!isRequirement(requirement))
       continue;
 
     /// Local function to finalize the witness.
@@ -5100,7 +5100,7 @@ void TypeChecker::checkConformancesInContext(DeclContext *dc,
 
     // Complain about redundant conformances.
     diagnose(diag.Loc, diag::redundant_conformance,
-             dc->getDeclaredTypeInContext(),
+             dc->getDeclaredInterfaceType(),
              diag.Protocol->getName());
 
     // Special case: explain that 'RawRepresentable' conformance
@@ -5111,13 +5111,13 @@ void TypeChecker::checkConformancesInContext(DeclContext *dc,
           enumDecl->hasRawType()) {
         diagnose(enumDecl->getInherited()[0].getSourceRange().Start,
                  diag::enum_declares_rawrep_with_raw_type,
-                 dc->getDeclaredTypeInContext(), enumDecl->getRawType());
+                 dc->getDeclaredInterfaceType(), enumDecl->getRawType());
         continue;
       }
     }
 
     diagnose(existingDecl, diag::declared_protocol_conformance_here,
-             dc->getDeclaredTypeInContext(),
+             dc->getDeclaredInterfaceType(),
              static_cast<unsigned>(diag.ExistingKind),
              diag.Protocol->getName(),
              diag.ExistingExplicitProtocol->getName());
@@ -5471,14 +5471,20 @@ void TypeChecker::inferDefaultWitnesses(ProtocolDecl *proto) {
   DefaultWitnessChecker checker(*this, proto);
 
   for (auto *requirement : proto->getMembers()) {
-    if (isa<AssociatedTypeDecl>(requirement))
-      continue;
-
     if (requirement->isInvalid())
       continue;
 
-    if (auto *valueDecl = dyn_cast<ValueDecl>(requirement))
-      checker.resolveWitnessViaLookup(valueDecl);
+    auto *valueDecl = dyn_cast<ValueDecl>(requirement);
+    if (!valueDecl)
+      continue;
+
+    if (isa<TypeDecl>(valueDecl))
+      continue;
+
+    if (!isRequirement(valueDecl))
+      continue;
+
+    checker.resolveWitnessViaLookup(valueDecl);
   }
 }
 

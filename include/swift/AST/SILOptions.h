@@ -119,6 +119,9 @@ public:
 
   /// When parsing SIL, assume unqualified ownership.
   bool AssumeUnqualifiedOwnershipWhenParsing = false;
+
+  /// Assume that code will be executed in a single-threaded environment.
+  bool AssumeSingleThreaded = false;
 };
 
 } // end namespace swift

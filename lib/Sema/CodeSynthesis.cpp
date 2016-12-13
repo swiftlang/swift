@@ -248,7 +248,30 @@ bool needsToBeRegisteredAsExternalDecl(AbstractStorageDecl *storage) {
   return nominal->hasClangNode();
 }
 
+/// Mark the accessor as transparent if we can.
+///
+/// If the storage is inside a fixed-layout nominal type, we can mark the
+/// accessor as transparent, since in this case we just want it for abstraction
+/// purposes (i.e., to make access to the variable uniform and to be able to
+/// put the getter in a vtable).
+///
+/// If the storage is for a global stored property or a stored property of a
+/// resilient type, we are synthesizing accessors to present a resilient
+/// interface to the storage and they should not be transparent.
+static void maybeMarkTransparent(FuncDecl *accessor,
+                                 AbstractStorageDecl *storage,
+                                 TypeChecker &TC) {
+  auto *DC = storage->getDeclContext();
+  if (isa<ProtocolDecl>(DC))
+    return;
+
+  auto *nominal = DC->getAsNominalTypeOrNominalTypeExtensionContext();
+  if (nominal && nominal->hasFixedLayout())
+    accessor->getAttrs().add(new (TC.Context) TransparentAttr(IsImplicit));
+}
+
 static FuncDecl *createMaterializeForSetPrototype(AbstractStorageDecl *storage,
+                                                  FuncDecl *setter,
                                                   TypeChecker &TC) {
   auto &ctx = storage->getASTContext();
   SourceLoc loc = storage->getLoc();
@@ -291,19 +314,18 @@ static FuncDecl *createMaterializeForSetPrototype(AbstractStorageDecl *storage,
       params, TypeLoc::withoutLoc(retTy), DC);
   materializeForSet->setImplicit();
   
-  // materializeForSet is mutating and static if the setter is.
-  auto setter = storage->getSetter();
+  bool isStatic = storage->isStatic();
 
   // Open-code the setMutating() calculation since we might run before
   // the setter has been type checked. Also as a hack, always mark the
   // setter mutating if we're inside a protocol, because it seems some
   // things break otherwise -- the root cause should be fixed eventually.
   materializeForSet->setMutating(
-      setter->getDeclContext()->getAsProtocolOrProtocolExtensionContext() ||
+      storage->getDeclContext()->getAsProtocolOrProtocolExtensionContext() ||
       (!setter->getAttrs().hasAttribute<NonMutatingAttr>() &&
        !storage->isSetterNonMutating()));
 
-  materializeForSet->setStatic(setter->isStatic());
+  materializeForSet->setStatic(isStatic);
 
   // materializeForSet is final if the storage is.
   if (storage->isFinal())
@@ -327,6 +349,8 @@ static FuncDecl *createMaterializeForSetPrototype(AbstractStorageDecl *storage,
     asAvailableAs.push_back(setter);
   }
 
+  maybeMarkTransparent(materializeForSet, storage, TC);
+
   AvailabilityInference::applyInferredAvailableAttrs(materializeForSet,
                                                         asAvailableAs, ctx);
 
@@ -338,7 +362,7 @@ static FuncDecl *createMaterializeForSetPrototype(AbstractStorageDecl *storage,
   return materializeForSet;
 }
 
-void swift::convertStoredVarInProtocolToComputed(VarDecl *VD, TypeChecker &TC) {
+static void convertStoredVarInProtocolToComputed(VarDecl *VD, TypeChecker &TC) {
   auto *Get = createGetterPrototype(VD, TC);
   
   // Okay, we have both the getter and setter.  Set them in VD.
@@ -347,10 +371,6 @@ void swift::convertStoredVarInProtocolToComputed(VarDecl *VD, TypeChecker &TC) {
   // We've added some members to our containing class, add them to the members
   // list.
   addMemberToContextIfNeeded(Get, VD->getDeclContext());
-
-  // Type check the getter declaration.
-  TC.typeCheckDecl(VD->getGetter(), true);
-  TC.typeCheckDecl(VD->getGetter(), false);
 }
 
 
@@ -655,25 +675,6 @@ static void createPropertyStoreOrCallSuperclassSetter(FuncDecl *accessor,
                                              IsImplicit));
 }
 
-/// Mark the accessor as transparent if we can.
-///
-/// If the storage is inside a fixed-layout nominal type, we can mark the
-/// accessor as transparent, since in this case we just want it for abstraction
-/// purposes (i.e., to make access to the variable uniform and to be able to
-/// put the getter in a vtable).
-///
-/// If the storage is for a global stored property or a stored property of a
-/// resilient type, we are synthesizing accessors to present a resilient
-/// interface to the storage and they should not be transparent.
-static void maybeMarkTransparent(FuncDecl *accessor,
-                                 AbstractStorageDecl *storage,
-                                 TypeChecker &TC) {
-  auto *nominal = storage->getDeclContext()
-      ->getAsNominalTypeOrNominalTypeExtensionContext();
-  if (nominal && nominal->hasFixedLayout())
-    accessor->getAttrs().add(new (TC.Context) TransparentAttr(IsImplicit));
-}
-
 /// Synthesize the body of a trivial getter.  For a non-member vardecl or one
 /// which is not an override of a base class property, it performs a direct
 /// storage load.  For an override of a base member property, it chains up to
@@ -701,8 +702,6 @@ static void synthesizeTrivialSetter(FuncDecl *setter,
                                     AbstractStorageDecl *storage,
                                     VarDecl *valueVar,
                                     TypeChecker &TC) {
-  if (storage->isInvalid()) return;
-
   auto &ctx = TC.Context;
   SourceLoc loc = storage->getLoc();
 
@@ -747,48 +746,34 @@ static bool doesStorageNeedSetter(AbstractStorageDecl *storage) {
   llvm_unreachable("bad storage kind");
 }
 
-/// Add a materializeForSet accessor to the given declaration.
-static FuncDecl *addMaterializeForSet(AbstractStorageDecl *storage,
-                                      TypeChecker &TC) {
-  auto materializeForSet = createMaterializeForSetPrototype(storage, TC);
-  addMemberToContextIfNeeded(materializeForSet, storage->getDeclContext(),
-                             storage->getSetter());
-  storage->setMaterializeForSetFunc(materializeForSet);
-
-  TC.computeAccessibility(materializeForSet);
-
-  TC.validateDecl(materializeForSet);
-
-  return materializeForSet;
-}
-
 /// Add trivial accessors to a Stored or Addressed property.
-void swift::addTrivialAccessorsToStorage(AbstractStorageDecl *storage,
+static void addTrivialAccessorsToStorage(AbstractStorageDecl *storage,
                                          TypeChecker &TC) {
   assert(!storage->hasAccessorFunctions() && "already has accessors?");
+  auto *DC = storage->getDeclContext();
 
   // Create the getter.
   auto *getter = createGetterPrototype(storage, TC);
-  if (storage->hasAccessorFunctions()) return;
 
   // Create the setter.
   FuncDecl *setter = nullptr;
   ParamDecl *setterValueParam = nullptr;
-  if (doesStorageNeedSetter(storage)) {
+  if (doesStorageNeedSetter(storage))
     setter = createSetterPrototype(storage, setterValueParam, TC);
-    if (storage->hasAccessorFunctions()) return;
-  }
-  
+
+  FuncDecl *materializeForSet = nullptr;
+  if (setter && DC->getAsNominalTypeOrNominalTypeExtensionContext())
+    materializeForSet = createMaterializeForSetPrototype(storage, setter, TC);
+
   // Okay, we have both the getter and setter.  Set them in VD.
-  storage->addTrivialAccessors(getter, setter, nullptr);
+  storage->addTrivialAccessors(getter, setter, materializeForSet);
 
   bool isDynamic = (storage->isDynamic() && storage->isObjC());
   if (isDynamic)
     getter->getAttrs().add(new (TC.Context) DynamicAttr(IsImplicit));
 
-  // Synthesize and type-check the body of the getter.
+  // Synthesize the body of the getter.
   synthesizeTrivialGetter(getter, storage, TC);
-  TC.validateDecl(getter);
 
   if (setter) {
     if (isDynamic)
@@ -796,28 +781,15 @@ void swift::addTrivialAccessorsToStorage(AbstractStorageDecl *storage,
 
     // Synthesize and type-check the body of the setter.
     synthesizeTrivialSetter(setter, storage, setterValueParam, TC);
-    TC.validateDecl(setter);
   }
-
-  auto *DC = storage->getDeclContext();
 
   // We've added some members to our containing context, add them to
   // the right list.
   addMemberToContextIfNeeded(getter, DC);
   if (setter)
     addMemberToContextIfNeeded(setter, DC);
-
-  // If we're creating trivial accessors for a stored property of a
-  // nominal type, the stored property is either witnessing a
-  // protocol requirement or the nominal type is resilient. In both
-  // cases, we need to expose a materializeForSet.
-  //
-  // Global stored properties don't get a materializeForSet.
-  if (setter && DC->getAsNominalTypeOrNominalTypeExtensionContext()) {
-    FuncDecl *materializeForSet = addMaterializeForSet(storage, TC);
-    synthesizeMaterializeForSet(materializeForSet, storage, TC);
-    TC.typeCheckDecl(materializeForSet, false);
-  }
+  if (materializeForSet)
+    addMemberToContextIfNeeded(materializeForSet, DC);
 }
 
 /// Add a trivial setter and materializeForSet to a
@@ -834,56 +806,70 @@ synthesizeSetterForMutableAddressedStorage(AbstractStorageDecl *storage,
   // Synthesize and type-check the body of the setter.
   VarDecl *valueParamDecl = getFirstParamDecl(setter);
   synthesizeTrivialSetter(setter, storage, valueParamDecl, TC);
-  TC.typeCheckDecl(setter, true);
-  TC.typeCheckDecl(setter, false);
 }
 
-void TypeChecker::synthesizeAccessorsForStorage(AbstractStorageDecl *storage,
-                                                bool wantMaterializeForSet) {
-  // If the decl is stored, convert it to StoredWithTrivialAccessors
-  // by synthesizing the full set of accessors.
-  if (!storage->hasAccessorFunctions()) {
-    if (storage->getAttrs().hasAttribute<NSManagedAttr>())
-      maybeAddAccessorsToVariable(cast<VarDecl>(storage), *this);
-    else
-      addTrivialAccessorsToStorage(storage, *this);
-    return;
-  }
+/// Add a materializeForSet accessor to the given declaration.
+static FuncDecl *addMaterializeForSet(AbstractStorageDecl *storage,
+                                      TypeChecker &TC) {
+  auto materializeForSet = createMaterializeForSetPrototype(
+      storage, storage->getSetter(), TC);
+  addMemberToContextIfNeeded(materializeForSet, storage->getDeclContext(),
+                             storage->getSetter());
+  storage->setMaterializeForSetFunc(materializeForSet);
 
-  // If we want wantMaterializeForSet, create it now.
-  if (wantMaterializeForSet && !storage->getMaterializeForSetFunc()) {
-    FuncDecl *materializeForSet = addMaterializeForSet(storage, *this);
-    synthesizeMaterializeForSet(materializeForSet, storage, *this);
-    typeCheckDecl(materializeForSet, false);
-  }
+  return materializeForSet;
+}
+
+static void convertNSManagedStoredVarToComputed(VarDecl *VD, TypeChecker &TC) {
+  assert(VD->getStorageKind() == AbstractStorageDecl::Stored);
+
+  // Create the getter.
+  auto *Get = createGetterPrototype(VD, TC);
+
+  // Create the setter.
+  ParamDecl *SetValueDecl = nullptr;
+  auto *Set = createSetterPrototype(VD, SetValueDecl, TC);
+
+  // Okay, we have both the getter and setter.  Set them in VD.
+  VD->makeComputed(SourceLoc(), Get, Set, nullptr, SourceLoc());
+
+  // We've added some members to our containing class/extension, add them to
+  // the members list.
+  addMemberToContextIfNeeded(Get, VD->getDeclContext());
+  addMemberToContextIfNeeded(Set, VD->getDeclContext());
 }
 
 /// The specified AbstractStorageDecl was just found to satisfy a
 /// protocol property requirement.  Ensure that it has the full
-/// complement of accessors.
+/// complement of accessors, and validate them.
 void TypeChecker::synthesizeWitnessAccessorsForStorage(
                                              AbstractStorageDecl *requirement,
                                              AbstractStorageDecl *storage) {
+  // If the decl is stored, convert it to StoredWithTrivialAccessors
+  // by synthesizing the full set of accessors.
+  if (!storage->hasAccessorFunctions()) {
+    if (storage->getAttrs().hasAttribute<NSManagedAttr>())
+      convertNSManagedStoredVarToComputed(cast<VarDecl>(storage), *this);
+    else
+      addTrivialAccessorsToStorage(storage, *this);
+
+    if (auto getter = storage->getGetter())
+      validateDecl(getter);
+    if (auto setter = storage->getSetter())
+      validateDecl(setter);
+  }
+
   // @objc protocols don't need a materializeForSet since ObjC doesn't
   // have that concept.
   bool wantMaterializeForSet =
     !requirement->isObjC() && requirement->getSetter();
 
-  synthesizeAccessorsForStorage(storage, wantMaterializeForSet);
-}
+  // If we want wantMaterializeForSet, create it now.
+  if (wantMaterializeForSet && !storage->getMaterializeForSetFunc())
+    addMaterializeForSet(storage, *this);
 
-void swift::synthesizeMaterializeForSet(FuncDecl *materializeForSet,
-                                        AbstractStorageDecl *storage,
-                                        TypeChecker &TC) {
-  // The body is actually emitted by SILGen
-
-  maybeMarkTransparent(materializeForSet, storage, TC);
-
-  TC.typeCheckDecl(materializeForSet, true);
-  
-  // Register the accessor as an external decl if the storage was imported.
-  if (needsToBeRegisteredAsExternalDecl(storage))
-    TC.Context.addExternalDecl(materializeForSet);
+  if (auto materializeForSet = storage->getMaterializeForSetFunc())
+    validateDecl(materializeForSet);
 }
 
 /// Given a VarDecl with a willSet: and/or didSet: specifier, synthesize the
@@ -988,36 +974,6 @@ void swift::synthesizeObservingAccessors(VarDecl *VD, TypeChecker &TC) {
   }
 
   Set->setBody(BraceStmt::create(Ctx, Loc, SetterBody, Loc, true));
-
-  // Type check the body of the getter and setter.
-  TC.typeCheckDecl(Get, true);
-  TC.typeCheckDecl(Get, false);
-  TC.typeCheckDecl(Set, true);
-  TC.typeCheckDecl(Set, false);
-}
-
-static void convertNSManagedStoredVarToComputed(VarDecl *VD, TypeChecker &TC) {
-  assert(VD->getStorageKind() == AbstractStorageDecl::Stored);
-
-  // Create the getter.
-  auto *Get = createGetterPrototype(VD, TC);
-  if (VD->hasAccessorFunctions()) return;
-
-  // Create the setter.
-  ParamDecl *SetValueDecl = nullptr;
-  auto *Set = createSetterPrototype(VD, SetValueDecl, TC);
-  if (VD->hasAccessorFunctions()) return;
-
-  // Okay, we have both the getter and setter.  Set them in VD.
-  VD->makeComputed(SourceLoc(), Get, Set, nullptr, SourceLoc());
-
-  TC.validateDecl(Get);
-  TC.validateDecl(Set);
-
-  // We've added some members to our containing class/extension, add them to
-  // the members list.
-  addMemberToContextIfNeeded(Get, VD->getDeclContext());
-  addMemberToContextIfNeeded(Set, VD->getDeclContext());
 }
 
 namespace {
@@ -1070,7 +1026,6 @@ static FuncDecl *completeLazyPropertyGetter(VarDecl *VD, VarDecl *Storage,
   //     return tmp2
   //   }
   auto *Get = VD->getGetter();
-  TC.validateDecl(Get);
 
   SmallVector<ASTNode, 6> Body;
 
@@ -1513,8 +1468,7 @@ void TypeChecker::completePropertyBehaviorAccessors(VarDecl *VD,
   {
     auto getter = VD->getGetter();
     assert(getter);
-    validateDecl(getter);
-    
+
     Expr *selfExpr = makeSelfExpr(getter, ValueImpl->getGetter());
     
     auto implRef = ConcreteDeclRef(Context, ValueImpl, SelfContextSubs);
@@ -1547,8 +1501,6 @@ void TypeChecker::completePropertyBehaviorAccessors(VarDecl *VD,
   bodyStmts.clear();
   
   if (auto setter = VD->getSetter()) {
-    validateDecl(setter);
-
     Expr *selfExpr = makeSelfExpr(setter, ValueImpl->getSetter());
     auto implRef = ConcreteDeclRef(Context, ValueImpl, SelfContextSubs);
     auto implMemberExpr = new (Context) MemberRefExpr(selfExpr,
@@ -1583,8 +1535,6 @@ void TypeChecker::completeLazyVarImplementation(VarDecl *VD) {
          "variable not validated yet");
   assert(!VD->isStatic() && "Static vars are already lazy on their own");
 
-  maybeAddMaterializeForSet(VD, *this);
-
   // Create the storage property as an optional of VD's type.
   SmallString<64> NameBuf = VD->getName().str();
   NameBuf += ".storage";
@@ -1614,13 +1564,11 @@ void TypeChecker::completeLazyVarImplementation(VarDecl *VD) {
   addMemberToContextIfNeeded(PBD, VD->getDeclContext());
 
   // Now that we've got the storage squared away, synthesize the getter.
-  auto *Get = completeLazyPropertyGetter(VD, Storage, *this);
-  validateDecl(Get);
+  completeLazyPropertyGetter(VD, Storage, *this);
 
   // The setter just forwards on to storage without materializing the initial
   // value.
   auto *Set = VD->getSetter();
-  validateDecl(Set);
   VarDecl *SetValueDecl = getFirstParamDecl(Set);
   // FIXME: This is wrong for observed properties.
   synthesizeTrivialSetter(Set, Storage, SetValueDecl, *this);
@@ -1636,7 +1584,6 @@ void TypeChecker::completeLazyVarImplementation(VarDecl *VD) {
   Storage->setSetterAccessibility(Accessibility::Private);
 }
 
-
 /// Consider add a materializeForSet accessor to the given storage
 /// decl (which has accessors).
 void swift::maybeAddMaterializeForSet(AbstractStorageDecl *storage,
@@ -1649,9 +1596,6 @@ void swift::maybeAddMaterializeForSet(AbstractStorageDecl *storage,
 
   // Never add materializeForSet to readonly declarations.
   if (!storage->getSetter()) return;
-
-  // Don't bother if the declaration is invalid.
-  if (storage->isInvalid()) return;
 
   // We only need materializeForSet in type contexts.
   NominalTypeDecl *container = storage->getDeclContext()
@@ -1668,6 +1612,9 @@ void swift::maybeAddMaterializeForSet(AbstractStorageDecl *storage,
     assert(isa<NominalTypeDecl>(container));
     if (container->hasClangNode()) return;
   }
+
+  // @NSManaged properties don't need this.
+  if (storage->getAttrs().hasAttribute<NSManagedAttr>()) return;
 
   addMaterializeForSet(storage, TC);
 }
@@ -1841,14 +1788,18 @@ void swift::maybeAddAccessorsToVariable(VarDecl *var, TypeChecker &TC) {
 
     ParamDecl *newValueParam = nullptr;
     auto *setter = createSetterPrototype(var, newValueParam, TC);
-    var->makeComputed(SourceLoc(), getter, setter, nullptr, SourceLoc());
-    var->setIsBeingTypeChecked(false);
 
-    TC.validateDecl(getter);
-    TC.validateDecl(setter);
+    FuncDecl *materializeForSet = nullptr;
+    if (dc->getAsNominalTypeOrNominalTypeExtensionContext())
+      materializeForSet = createMaterializeForSetPrototype(var, setter, TC);
+
+    var->makeComputed(SourceLoc(), getter, setter, materializeForSet, SourceLoc());
+    var->setIsBeingTypeChecked(false);
 
     addMemberToContextIfNeeded(getter, dc);
     addMemberToContextIfNeeded(setter, dc);
+    if (materializeForSet)
+      addMemberToContextIfNeeded(materializeForSet, dc);
     return;
   }
 
@@ -2010,7 +1961,7 @@ ConstructorDecl *swift::createImplicitConstructor(TypeChecker &tc,
 /// Create a stub body that emits a fatal error message.
 static void createStubBody(TypeChecker &tc, ConstructorDecl *ctor) {
   auto unimplementedInitDecl = tc.Context.getUnimplementedInitializerDecl(&tc);
-  auto classDecl = ctor->getExtensionType()->getClassOrBoundGenericClass();
+  auto classDecl = ctor->getDeclContext()->getAsClassOrClassExtensionContext();
   if (!unimplementedInitDecl) {
     tc.diagnose(classDecl->getLoc(), diag::missing_unimplemented_init_runtime);
     return;

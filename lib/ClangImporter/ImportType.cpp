@@ -559,44 +559,68 @@ namespace {
                inner.Hint };
     }
 
+    /// Imports the type defined by \p objcTypeParamDecl.
+    ///
+    /// If the type parameter is not imported for some reason, returns \c None.
+    /// This is different from a failure; it means the caller should try
+    /// importing the underlying type instead.
+    Optional<ImportResult>
+    importObjCTypeParamDecl(const clang::ObjCTypeParamDecl *objcTypeParamDecl) {
+      // Pull the corresponding generic type parameter from the imported class.
+      const auto *typeParamContext = objcTypeParamDecl->getDeclContext();
+      GenericSignature *genericSig = nullptr;
+      GenericEnvironment *genericEnv = nullptr;
+      if (auto *category =
+            dyn_cast<clang::ObjCCategoryDecl>(typeParamContext)) {
+        auto ext = cast_or_null<ExtensionDecl>(Impl.importDecl(category,
+                                                               false));
+        if (!ext)
+          return ImportResult();
+        genericSig = ext->getGenericSignature();
+        genericEnv = ext->getGenericEnvironment();
+      } else if (auto *interface =
+          dyn_cast<clang::ObjCInterfaceDecl>(typeParamContext)) {
+        auto cls = cast_or_null<ClassDecl>(Impl.importDecl(interface,
+                                                           false));
+        if (!cls)
+          return ImportResult();
+        genericSig = cls->getGenericSignature();
+        genericEnv = cls->getGenericEnvironment();
+      }
+      unsigned index = objcTypeParamDecl->getIndex();
+      // Pull the generic param decl out of the imported class.
+      if (!genericSig) {
+        // The ObjC type param didn't get imported, possibly because it was
+        // suppressed. Treat it as a typedef.
+        return None;
+      }
+      if (index > genericSig->getGenericParams().size()) {
+        return ImportResult();
+      }
+      auto *paramDecl = genericSig->getGenericParams()[index];
+      return ImportResult(genericEnv->mapTypeIntoContext(paramDecl),
+                          ImportHint::ObjCPointer);
+    }
+
+    ImportResult VisitObjCTypeParamType(const clang::ObjCTypeParamType *type) {
+      // FIXME: This drops any added protocols on the floor, which is the whole
+      // point of ObjCTypeParamType. When not in Swift 3 compatibility mode, we
+      // should adjust the resulting type accordingly.
+      if (auto result = importObjCTypeParamDecl(type->getDecl()))
+        return result.getValue();
+      // Fall back to importing the desugared type, which uses the parameter's
+      // bound. This isn't perfect but it's better than dropping the type.
+      return Visit(type->getLocallyUnqualifiedSingleStepDesugaredType());
+    }
+
     ImportResult VisitTypedefType(const clang::TypedefType *type) {
       // If the underlying declaration is an Objective-C type parameter,
       // pull the corresponding generic type parameter from the imported class.
       if (auto *objcTypeParamDecl =
             dyn_cast<clang::ObjCTypeParamDecl>(type->getDecl())) {
-        const auto *typeParamContext = objcTypeParamDecl->getDeclContext();
-        GenericSignature *genericSig = nullptr;
-        GenericEnvironment *genericEnv = nullptr;
-        if (auto *category =
-              dyn_cast<clang::ObjCCategoryDecl>(typeParamContext)) {
-          auto ext = cast_or_null<ExtensionDecl>(Impl.importDecl(category,
-                                                                 false));
-          if (!ext)
-            return Type();
-          genericSig = ext->getGenericSignature();
-          genericEnv = ext->getGenericEnvironment();
-        } else if (auto *interface =
-            dyn_cast<clang::ObjCInterfaceDecl>(typeParamContext)) {
-          auto cls = cast_or_null<ClassDecl>(Impl.importDecl(interface,
-                                                             false));
-          if (!cls)
-            return Type();
-          genericSig = cls->getGenericSignature();
-          genericEnv = cls->getGenericEnvironment();
-        }
-        unsigned index = objcTypeParamDecl->getIndex();
-        // Pull the generic param decl out of the imported class.
-        if (!genericSig) {
-          // The ObjC type param didn't get imported, possibly because it was
-          // suppressed. Treat it as a typedef.
-          return Visit(objcTypeParamDecl->getUnderlyingType());
-        }
-        if (index > genericSig->getGenericParams().size()) {
-          return Type();
-        }
-        auto *paramDecl = genericSig->getGenericParams()[index];
-        return { genericEnv->mapTypeIntoContext(paramDecl),
-                 ImportHint::ObjCPointer };
+        if (auto result = importObjCTypeParamDecl(objcTypeParamDecl))
+          return result.getValue();
+        return Visit(type->getLocallyUnqualifiedSingleStepDesugaredType());
       }
 
       // Import the underlying declaration.
@@ -1602,7 +1626,9 @@ ParameterList *ClangImporter::Implementation::importFunctionParameterList(
     }
 
     // Figure out the name for this parameter.
-    Identifier bodyName = importFullName(param).Imported.getBaseName();
+    Identifier bodyName = importFullName(param, ImportNameVersion::Swift3)
+                              .getDeclName()
+                              .getBaseName();
 
     // Retrieve the argument name.
     Identifier name;
@@ -1859,7 +1885,7 @@ Type ClangImporter::Implementation::importMethodType(
   // Import the result type.
   CanType origSwiftResultTy;
   Type swiftResultTy;
-  auto errorInfo = importedName.ErrorInfo;
+  Optional<ImportedErrorInfo> errorInfo = importedName.getErrorInfo();
   if (isPropertyGetter) {
     swiftResultTy = importPropertyType(property, isFromSystemModule);
   } else {
@@ -2026,7 +2052,9 @@ Type ClangImporter::Implementation::importMethodType(
     }
 
     // Figure out the name for this parameter.
-    Identifier bodyName = importFullName(param).Imported.getBaseName();
+    Identifier bodyName = importFullName(param, ImportNameVersion::Swift3)
+                              .getDeclName()
+                              .getBaseName();
 
     // Figure out the name for this argument, which comes from the method name.
     Identifier name;
@@ -2079,7 +2107,7 @@ Type ClangImporter::Implementation::importMethodType(
     addEmptyTupleParameter(argNames[0]);
   }
 
-  if (importedName.HasCustomName && argNames.size() != swiftParams.size()) {
+  if (importedName.hasCustomName() && argNames.size() != swiftParams.size()) {
     // Note carefully: we're emitting a warning in the /Clang/ buffer.
     auto &srcMgr = getClangASTContext().getSourceManager();
     auto &rawDiagClient = Instance->getDiagnosticClient();
@@ -2255,7 +2283,7 @@ Decl *ClangImporter::Implementation::importDeclByName(StringRef name) {
   clang::LookupResult lookupResult(sema, clangName, clang::SourceLocation(),
                                    clang::Sema::LookupOrdinaryName);
   lookupResult.setAllowHidden(true);
-  if (!sema.LookupName(lookupResult, /*Scope=*/0)) {
+  if (!sema.LookupName(lookupResult, /*Scope=*/nullptr)) {
     return nullptr;
   }
 
@@ -2308,7 +2336,7 @@ static Type getNamedProtocolType(ClangImporter::Implementation &impl,
   clang::LookupResult lookupResult(sema, clangName, clang::SourceLocation(),
                                    clang::Sema::LookupObjCProtocolName);
   lookupResult.setAllowHidden(true);
-  if (!sema.LookupName(lookupResult, /*Scope=*/0))
+  if (!sema.LookupName(lookupResult, /*Scope=*/nullptr))
     return Type();
 
   for (auto decl : lookupResult) {

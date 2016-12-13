@@ -12,6 +12,7 @@
 
 #define DEBUG_TYPE "capture-prop"
 #include "swift/SILOptimizer/PassManager/Passes.h"
+#include "swift/SILOptimizer/Utils/SpecializationMangler.h"
 #include "swift/Basic/Demangle.h"
 #include "swift/SIL/Mangle.h"
 #include "swift/SIL/SILCloner.h"
@@ -72,15 +73,19 @@ static std::string getClonedName(PartialApplyInst *PAI, IsFragile_t Fragile,
 
   Mangle::Mangler M;
   auto P = SpecializationPass::CapturePropagation;
-  FunctionSignatureSpecializationMangler Mangler(P, M, Fragile, F);
+  FunctionSignatureSpecializationMangler OldMangler(P, M, Fragile, F);
+  NewMangling::FunctionSignatureSpecializationMangler NewMangler(P, Fragile, F);
 
   // We know that all arguments are literal insts.
   auto Args = PAI->getArguments();
-  for (unsigned i : indices(Args))
-    Mangler.setArgumentConstantProp(i, getConstant(Args[i]));
-  Mangler.mangle();
-
-  return M.finalize();
+  for (unsigned i : indices(Args)) {
+    OldMangler.setArgumentConstantProp(i, getConstant(Args[i]));
+    NewMangler.setArgumentConstantProp(i, getConstant(Args[i]));
+  }
+  OldMangler.mangle();
+  std::string Old = M.finalize();
+  std::string New = NewMangler.mangle();
+  return NewMangling::selectMangling(Old, New);
 }
 
 namespace {

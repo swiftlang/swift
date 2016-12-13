@@ -537,7 +537,8 @@ void SILGenFunction::emitArtificialTopLevel(ClassDecl *mainClass) {
     auto fnTy = UIApplicationMainFn->getLoweredFunctionType();
 
     // Get the class name as a string using NSStringFromClass.
-    CanType mainClassTy = mainClass->getDeclaredTypeInContext()->getCanonicalType();
+    CanType mainClassTy = mainClass->getDeclaredInterfaceType()
+        ->getCanonicalType();
     CanType mainClassMetaty = CanMetatypeType::get(mainClassTy,
                                                    MetatypeRepresentation::ObjC);
     ProtocolDecl *anyObjectProtocol =
@@ -546,7 +547,7 @@ void SILGenFunction::emitArtificialTopLevel(ClassDecl *mainClass) {
       *SGM.M.getSwiftModule()->lookupConformance(mainClassTy, anyObjectProtocol,
                                                 nullptr));
     CanType anyObjectTy = anyObjectProtocol
-      ->getDeclaredTypeInContext()
+      ->getDeclaredInterfaceType()
       ->getCanonicalType();
     CanType anyObjectMetaTy = CanExistentialMetatypeType::get(anyObjectTy,
                                                   MetatypeRepresentation::ObjC);

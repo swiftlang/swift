@@ -183,7 +183,7 @@ static void printFullContext(const DeclContext *Context, raw_ostream &Buffer) {
   case DeclContextKind::ExtensionDecl: {
     Type Ty = cast<ExtensionDecl>(Context)->getExtendedType();
     TypeBase *Base = Ty->getCanonicalType().getPointer();
-    const NominalTypeDecl *ExtNominal = 0;
+    const NominalTypeDecl *ExtNominal = nullptr;
     switch (Base->getKind()) {
       default:
         llvm_unreachable("unhandled context kind in SILPrint!");
@@ -1038,6 +1038,10 @@ public:
     *this << getIDAndType(LBI->getOperand());
   }
 
+  void visitBeginBorrowInst(BeginBorrowInst *LBI) {
+    *this << getIDAndType(LBI->getOperand());
+  }
+
   void printStoreOwnershipQualifier(StoreOwnershipQualifier Qualifier) {
     switch (Qualifier) {
     case StoreOwnershipQualifier::Unqualified:
@@ -1057,6 +1061,11 @@ public:
   void visitStoreInst(StoreInst *SI) {
     *this << getID(SI->getSrc()) << " to ";
     printStoreOwnershipQualifier(SI->getOwnershipQualifier());
+    *this << getIDAndType(SI->getDest());
+  }
+
+  void visitStoreBorrowInst(StoreBorrowInst *SI) {
+    *this << getID(SI->getSrc()) << " to ";
     *this << getIDAndType(SI->getDest());
   }
 

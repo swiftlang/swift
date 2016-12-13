@@ -14,6 +14,7 @@
 //
 //===----------------------------------------------------------------------===//
 
+#if !defined(__APPLE__)
 #include "swift/Basic/Lazy.h"
 #include "swift/Runtime/Config.h"
 #include "swift/Runtime/Debug.h"
@@ -283,3 +284,5 @@ swift::_swift_stdlib_unicode_strToLower(uint16_t *Destination,
 }
 
 swift::Lazy<ASCIICollation> ASCIICollation::theTable;
+#endif
+

@@ -244,3 +244,27 @@ bb4:
   %10 = tuple ()
   return %10 : $()
 }
+
+// CHECK-LABEL: dont_hoist_existential_meta_type
+// CHECK: bb0({{.*}}:
+// CHECK-NOT: existential_metatype
+// CHECK: bb1:
+// CHECK: existential_metatype
+// CHECK: cond_br
+// CHECK: bb2:
+sil @dont_hoist_existential_meta_type : $@convention(thin) (@in P) -> () {
+bb0(%0 : $*P):
+  %1 = alloc_stack $P
+  br bb1
+
+bb1:
+  copy_addr %0 to [initialization] %1 : $*P
+  %2 = existential_metatype $@thick P.Type, %1 : $*P
+  cond_br undef, bb1, bb2
+
+bb2:
+  dealloc_stack %1 : $*P
+  destroy_addr %0 : $*P
+  %52 = tuple ()
+  return %52 : $()
+}

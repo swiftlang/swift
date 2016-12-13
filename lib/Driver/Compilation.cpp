@@ -729,7 +729,7 @@ int Compilation::performSingleCommand(const Job *Cmd) {
   SmallVector<const char *, 128> Argv;
   Argv.push_back(Cmd->getExecutable());
   Argv.append(Cmd->getArguments().begin(), Cmd->getArguments().end());
-  Argv.push_back(0);
+  Argv.push_back(nullptr);
 
   const char *ExecPath = Cmd->getExecutable();
   const char **argv = Argv.data();

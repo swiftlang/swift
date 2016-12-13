@@ -14,6 +14,9 @@
 //
 //===----------------------------------------------------------------------===//
 
+#include "swift/Runtime/Config.h"
+
+#if SWIFT_OBJC_INTEROP
 #include "swift/Basic/Lazy.h"
 #include "swift/Runtime/Debug.h"
 #import <Foundation/Foundation.h>
@@ -93,3 +96,5 @@ _SwiftNSOperatingSystemVersion swift::_swift_stdlib_operatingSystemVersion() {
 
   return { version.majorVersion, version.minorVersion, version.patchVersion };
 }
+#endif
+

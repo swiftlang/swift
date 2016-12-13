@@ -539,6 +539,10 @@ bool ModuleFile::readIndexBlock(llvm::BitstreamCursor &cursor) {
         assert(blobData.empty());
         NormalConformances.assign(scratch.begin(), scratch.end());
         break;
+      case index_block::SIL_LAYOUT_OFFSETS:
+        assert(blobData.empty());
+        SILLayouts.assign(scratch.begin(), scratch.end());
+        break;
 
       default:
         // Unknown index kind, which this version of the compiler won't use.

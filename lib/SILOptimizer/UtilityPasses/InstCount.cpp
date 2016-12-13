@@ -151,8 +151,8 @@ class InstCount : public SILFunctionTransform {
     }
   }
 };
-} // end anonymous namespace
 
+} // end anonymous namespace
 
 SILTransform *swift::createInstCount() {
   return new InstCount();
@@ -160,6 +160,6 @@ SILTransform *swift::createInstCount() {
 
 void swift::performSILInstCount(SILModule *M) {
   SILPassManager PrinterPM(M);
-  PrinterPM.addInstCount();
-  PrinterPM.runOneIteration();
+  PrinterPM.executePassPipelinePlan(
+      SILPassPipelinePlan::getInstCountPassPipeline());
 }

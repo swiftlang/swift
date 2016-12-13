@@ -24,6 +24,13 @@ source code, tests, and commit messages. See also the `LLVM lexicon`_.
     CS literature. Directly stores its conforming protocols and nested
     archetypes, if any.
 
+  AST
+    "Abstract syntax tree", although in practice it's more of a directed graph.
+    A parsed representation of code used by a compiler.
+
+  bitcode
+    Serialized LLVM `IR`.
+
   canonical SIL
     SIL after the
     `mandatory passes <mandatory passes / mandatory optimizations>` have run.
@@ -83,6 +90,12 @@ source code, tests, and commit messages. See also the `LLVM lexicon`_.
     themselves. They can be compared across declarations but cannot be used
     directly from within the context.
 
+  IR
+    1. "intermediate representation": a generic term for a format representing
+       code in a way that is easy for a compiler or tool to manipulate.
+    2. "LLVM IR": a particular IR used by the LLVM libraries for optimization
+       and generation of machine code.
+
   IUO (implicitly unwrapped optional)
     A type like Optional, but it implicitly converts to its wrapped type. If
     the value is ``nil`` during such a conversion, the program traps just as
@@ -99,6 +112,9 @@ source code, tests, and commit messages. See also the `LLVM lexicon`_.
   LGTM
     "Looks good to me." Used in code review to indicate approval with no further
     comments.
+
+  LLVM IR
+    See `IR`.
 
   main module
     The module for the file or files currently being compiled.
@@ -197,6 +213,11 @@ source code, tests, and commit messages. See also the `LLVM lexicon`_.
     some sort of non-mandatory work that could be done that would improve the
     behavior of the compiler--it is not just a general statement that the code
     needs to be improved.
+
+    It's suspected that this term was originally "quality of life", written as
+    "Qol", referring to the experience of end users. At some point along its
+    history, the lowercase "L" was misinterpreted as an uppercase "i", and a
+    new meaning derived. Swift inherited this term from LLVM.
 
   Radar
     `Apple's bug-tracking system`__, or an issue reported on that system.

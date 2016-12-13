@@ -272,7 +272,7 @@ code for the target that is not the build machine:
 
 * ``%target-sil-opt``: run ``sil-opt`` for the target.
 
-* ``%target-sil-extract``: run ``sil-extract`` for the target.
+* ``%target-sil-func-extractor``: run ``sil-func-extractor`` for the target.
 
 * ``%target-swift-ide-test``: run ``swift-ide-test`` for the target.
 
@@ -344,7 +344,7 @@ When you can't use ``%target-*`` substitutions, you can use:
 
 * ``%sil-opt``: like ``%target-sil-opt`` for the build machine.
 
-* ``%sil-extract``: run ``%target-sil-extract`` for the build machine.
+* ``%sil-func-extractor``: run ``%target-sil-func-extractor`` for the build machine.
 
 * ``%lldb-moduleimport-test``: run ``lldb-moduleimport-test`` for the build
   machine in order simulate importing LLDB importing modules from the
