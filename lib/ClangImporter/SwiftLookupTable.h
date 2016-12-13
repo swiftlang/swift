@@ -62,17 +62,15 @@ public:
   };
 
 private:
-  Kind TheKind;
-
   union {
     const clang::DeclContext *DC;
     const clang::TypedefNameDecl *Typedef;
     struct {
       const char *Data;
-      unsigned Length;
     } Unresolved;
   };
-
+  Kind TheKind;
+  unsigned UnresolvedLength;
   
 public:
   EffectiveClangContext() : TheKind(DeclContext) {
@@ -107,7 +105,7 @@ public:
 
   EffectiveClangContext(StringRef unresolved) : TheKind(UnresolvedContext) {
     Unresolved.Data = unresolved.data();
-    Unresolved.Length = unresolved.size();
+    UnresolvedLength = unresolved.size();
   }
 
   /// Determine whether this effective Clang context was set.
@@ -132,9 +130,11 @@ public:
   /// Retrieve the unresolved context name.
   StringRef getUnresolvedName() const {
     assert(getKind() == UnresolvedContext);
-    return StringRef(Unresolved.Data, Unresolved.Length);
+    return StringRef(Unresolved.Data, UnresolvedLength);
   }
 };
+static_assert(sizeof(EffectiveClangContext) <= 2 * sizeof(void *),
+              "should fit in a couple pointers");
 
 class SwiftLookupTableReader;
 class SwiftLookupTableWriter;
