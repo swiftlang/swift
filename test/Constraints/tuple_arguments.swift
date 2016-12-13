@@ -1239,3 +1239,19 @@ do {
   sTwo.takesClosure({ (x, y) in }) // FIXME
   sTwo.takesClosure({ (x: Double, y: Double) in }) // FIXME
 }
+
+do {
+  let _: ((Int, Int)) -> () = { _ = $0 }
+  let _: ((Int, Int)) -> () = { _ = ($0.0, $0.1) }
+  let _: ((Int, Int)) -> () = { t in _ = (t.0, t.1) }
+
+  let _: ((Int, Int)) -> () = { _ = ($0, $1) } // FIXME
+  let _: ((Int, Int)) -> () = { t, u in _ = (t, u) } // FIXME
+
+  let _: (Int, Int) -> () = { _ = $0 } // FIXME
+  let _: (Int, Int) -> () = { _ = ($0.0, $0.1) } // FIXME
+  let _: (Int, Int) -> () = { t in _ = (t.0, t.1) } // FIXME
+
+  let _: (Int, Int) -> () = { _ = ($0, $1) }
+  let _: (Int, Int) -> () = { t, u in _ = (t, u) }
+}
