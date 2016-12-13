@@ -22,9 +22,9 @@ set(LLVM_OPTIONAL_SOURCES
 # Now in case we're cross-compiling from Darwin for another platform,
 # the find_package should still be executed.
 if(CMAKE_SYSTEM_NAME STREQUAL "Darwin")
-  set(icu_required, "REQUIRED")
+  set(icu_required "")
 else()
-  set(icu_required, "")
+  set(icu_required "REQUIRED")
 endif()
 
 find_package(ICU ${icu_required} COMPONENTS uc)
