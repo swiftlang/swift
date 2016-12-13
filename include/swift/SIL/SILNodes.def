@@ -184,7 +184,7 @@ ABSTRACT_VALUE(SILInstruction, ValueBase)
   // Metatypes
   INST(MetatypeInst, SILInstruction, metatype, None, DoesNotRelease)
   INST(ValueMetatypeInst, SILInstruction, value_metatype, None, DoesNotRelease)
-  INST(ExistentialMetatypeInst, SILInstruction, existential_metatype, None, DoesNotRelease)
+  INST(ExistentialMetatypeInst, SILInstruction, existential_metatype, MayRead, DoesNotRelease)
   INST(ObjCProtocolInst, SILInstruction, objc_protocol, None, DoesNotRelease)
 
   // Aggregate Types
