@@ -2034,10 +2034,14 @@ ${operatorComment(x.nonMaskingOperator)}
     return ${x.helper}(lhs, shift)
   }
 
+// FIXME(integers): uncommenting this overload results in a compiler not being
+// able to typecheck expression like `(int64 >> 8) & 0xFF`.
+#if false
   @_transparent
   public static func ${x.nonMaskingOperator} (_ lhs: Self, _ rhs: Int) -> Self {
     return ${x.helper}(lhs, rhs)
   }
+#endif
 
   @_transparent
   public static func ${x.nonMaskingOperator}= <
