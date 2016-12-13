@@ -41,7 +41,7 @@ function(get_test_dependencies SDK result_var_name)
 
   set(deps_binaries
       swift swift-ide-test sil-opt swift-llvm-opt swift-demangle
-      sil-func-extractor sil-nm
+      sil-func-extractor sil-nm sil-passpipeline-dumper
       lldb-moduleimport-test swift-reflection-dump swift-remoteast-test
       swift-api-digester)
   if(NOT SWIFT_BUILT_STANDALONE)
