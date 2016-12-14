@@ -2834,13 +2834,10 @@ namespace {
         OS << "=";
         OS << nestedType.first.str() << " ";
         if (!nestedType.second) {
-          PrintWithColorRAII(OS, TypeColor) << "unresolved";          
-        } else if (auto concrete = nestedType.second.getAsConcreteType()) {
-          PrintWithColorRAII(OS, TypeColor) << "concrete";
-          OS << "=" << concrete.getString();
+          PrintWithColorRAII(OS, TypeColor) << "<<unresolved>>";
         } else {
-          PrintWithColorRAII(OS, TypeColor) << "archetype";
-          OS << "=" << static_cast<void *>(nestedType.second.getAsArchetype());
+          PrintWithColorRAII(OS, TypeColor);
+          OS << "=" << nestedType.second.getString();
         }
         OS << ")";
       }
@@ -2855,13 +2852,6 @@ namespace {
       printField("index", T->getIndex());
       if (auto decl = T->getDecl())
         printField("decl", decl->printRef());
-      OS << ")";
-    }
-
-    void visitSubstitutedType(SubstitutedType *T, StringRef label) {
-      printCommon(T, label, "substituted_type");
-      printRec("original", T->getOriginal());
-      printRec("replacement", T->getReplacementType());
       OS << ")";
     }
 
@@ -3050,7 +3040,7 @@ namespace {
 
 #undef TRIVIAL_TYPE_PRINTER
   };
-}
+} // end anonymous namespace
 
 void Type::dump() const {
   // Make sure to print type variables.

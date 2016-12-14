@@ -21,9 +21,13 @@
 //
 //===----------------------------------------------------------------------===//
 
+#include "swift/Runtime/Config.h"
+
+#if SWIFT_OBJC_INTEROP
 #include "swift/Runtime/Debug.h"
 #include "swift/Runtime/ObjCBridge.h"
 #include "swift/Basic/Lazy.h"
+#include "swift/Basic/ManglingMacros.h"
 #include "ErrorObject.h"
 #include "Private.h"
 #include <dlfcn.h>
@@ -243,7 +247,8 @@ static const WitnessTable *getNSErrorConformanceToError() {
   // Swift source.
 
   auto TheWitnessTable = SWIFT_LAZY_CONSTANT(dlsym(RTLD_DEFAULT,
-                                   "_TWPCSo7CFErrors5Error10Foundation"));
+                  SELECT_MANGLING("_TWPCSo7CFErrors5Error10Foundation",
+                                  "_SSo7CFErrorCs5Error10FoundationWP")));
   assert(TheWitnessTable &&
          "Foundation overlay not loaded, or 'CFError : Error' conformance "
          "not available");
@@ -253,7 +258,8 @@ static const WitnessTable *getNSErrorConformanceToError() {
 
 static const HashableWitnessTable *getNSErrorConformanceToHashable() {
   auto TheWitnessTable = SWIFT_LAZY_CONSTANT(dlsym(RTLD_DEFAULT,
-                                   "__TWPCSo8NSObjects8Hashable10ObjectiveC"));
+                   SELECT_MANGLING("__TWPCSo8NSObjects8Hashable10ObjectiveC",
+                                   "__SSo8NSObjectCs8Hashable10ObjectiveCWP")));
   assert(TheWitnessTable &&
          "ObjectiveC overlay not loaded, or 'NSObject : Hashable' conformance "
          "not available");
@@ -498,7 +504,8 @@ swift::tryDynamicCastNSErrorToValue(OpaqueValue *dest,
   // protocol _ObjectiveCBridgeableError
   auto TheObjectiveCBridgeableError = SWIFT_LAZY_CONSTANT(
     reinterpret_cast<const ProtocolDescriptor *>(dlsym(RTLD_DEFAULT,
-                         "_TMp10Foundation26_ObjectiveCBridgeableError")));
+            SELECT_MANGLING("_TMp10Foundation26_ObjectiveCBridgeableError",
+                            "_S10Foundation26_ObjectiveCBridgeableErrorMp"))));
 
   // If the Foundation overlay isn't loaded, then NSErrors can't be bridged.
   if (!bridgeNSErrorToError || !TheObjectiveCBridgeableError)
@@ -592,3 +599,5 @@ extern "C" auto *_swift_willThrow = _swift_willThrow_;
 void swift::swift_willThrow(SwiftError *error) {
   return _swift_willThrow(error);
 }
+#endif
+

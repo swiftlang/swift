@@ -817,6 +817,7 @@ types where the metadata itself has unknown layout.)
   global ::= global 'TD'                 // dynamic dispatch thunk
   global ::= global 'Td'                 // direct method reference thunk
   global ::= global 'TV'                 // vtable override thunk
+  global ::= type 'D'                    // type mangling for the debugger. TODO: check if we really need this
   global ::= protocol-conformance entity 'TW' // protocol witness thunk
   global ::= context identifier identifier 'TB' // property behavior initializer thunk (not used currently)
   global ::= context identifier identifier 'Tb' // property behavior setter thunk (not used currently)
@@ -998,12 +999,17 @@ Types
   type ::= type 'Xu'                         // @unowned(unsafe) type
   type ::= type 'Xw'                         // @weak type
   type ::= impl-function-type 'XF'           // function implementation type (currently unused)
-  type ::= type 'Xb'                         // SIL @box type
+  type ::= type 'Xb'                         // SIL @box type (deprecated)
+  type ::= type-list 'Xx'                    // SIL box type
+  type ::= type-list type-list generic-signature 'XX'
+                                             // Generic SIL box type
   type ::= type 'XD'                         // dynamic self type
   type ::= type 'm'                          // metatype without representation
   type ::= type 'XM' METATYPE-REPR           // metatype with representation
   type ::= type 'Xp'                         // existential metatype without representation
   type ::= type 'Xm' METATYPE-REPR           // existential metatype with representation
+  type ::= 'Xe'                              // error or unresolved type
+
 
   FUNCTION-KIND ::= 'f'                      // @thin function type
   FUNCTION-KIND ::= 'U'                      // uncurried function type (currently not used) 
@@ -1329,11 +1335,10 @@ The types are the replacement types of the substitution list.
 
 ::
 
-  specialization ::= function-signature generic-signature 'TG' SPEC-INFO // Partial generic specialization
+  specialization ::= type 'Tp' SPEC-INFO // Partial generic specialization
+  specialization ::= type 'TP' SPEC-INFO // Partial generic specialization, not re-abstracted
 
-A type in the ``<function-signature>`` of a partial generic specialization
-can be ``Sn`` which means that the parameter type is the same as in the
-original function's signature.
+The type is the function type of the specialized function.
 
 ::
 

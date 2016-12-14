@@ -477,9 +477,10 @@ static SILValue simplifyBuiltin(BuiltinInst *BI) {
   switch (Builtin.ID) {
   default: break;
 
+  case BuiltinValueKind::ZExtOrBitCast:
   case BuiltinValueKind::SExtOrBitCast: {
     const SILValue &Op = Args[0];
-    // extOrBitCast_N_N(x) -> x
+    // [s|z]extOrBitCast_N_N(x) -> x
     if (Op->getType() == BI->getType())
       return Op;
   }

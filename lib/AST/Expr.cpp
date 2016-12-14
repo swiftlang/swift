@@ -111,7 +111,7 @@ namespace {
       return { E->getStartLoc(), E->getEndLoc() };
     }
   };
-}
+} // end anonymous namespace
 
 template <class T> static SourceRange getSourceRangeImpl(const T *E) {
   static_assert(isOverriddenFromExpr(&T::getSourceRange) ||
@@ -213,17 +213,20 @@ DeclRefExpr *Expr::getMemberOperatorRef() {
 
 /// Propagate l-value use information to children.
 void Expr::propagateLValueAccessKind(AccessKind accessKind,
+                                     std::function<Type(Expr *)> getType,
                                      bool allowOverwrite) {
   /// A visitor class which walks an entire l-value expression.
   class PropagateAccessKind
        : public ExprVisitor<PropagateAccessKind, void, AccessKind> {
+    std::function<Type(Expr *)> GetType;
 #ifndef NDEBUG
     bool AllowOverwrite;
 #endif
   public:
-    PropagateAccessKind(bool allowOverwrite)
+    PropagateAccessKind(std::function<Type(Expr *)> getType,
+                        bool allowOverwrite) : GetType(getType)
 #ifndef NDEBUG
-      : AllowOverwrite(allowOverwrite)
+                                               , AllowOverwrite(allowOverwrite)
 #endif
     {}
 
@@ -231,7 +234,7 @@ void Expr::propagateLValueAccessKind(AccessKind accessKind,
       assert((AllowOverwrite || !E->hasLValueAccessKind()) &&
              "l-value access kind has already been set");
 
-      assert(E->getType()->isAssignableType() &&
+      assert(GetType(E)->isAssignableType() &&
              "setting access kind on non-l-value");
       E->setLValueAccessKind(kind);
 
@@ -255,11 +258,11 @@ void Expr::propagateLValueAccessKind(AccessKind accessKind,
     }
 
     void visitMemberRefExpr(MemberRefExpr *E, AccessKind accessKind) {
-      if (!E->getBase()->getType()->isLValueType()) return;
+      if (!GetType(E->getBase())->isLValueType()) return;
       visit(E->getBase(), getBaseAccessKind(E->getMember(), accessKind));
     }
     void visitSubscriptExpr(SubscriptExpr *E, AccessKind accessKind) {
-      if (!E->getBase()->getType()->isLValueType()) return;
+      if (!GetType(E->getBase())->isLValueType()) return;
       visit(E->getBase(), getBaseAccessKind(E->getDecl(), accessKind));
     }
 
@@ -354,7 +357,7 @@ void Expr::propagateLValueAccessKind(AccessKind accessKind,
 #undef NON_LVALUE_EXPR
   };
 
-  PropagateAccessKind(allowOverwrite).visit(this, accessKind);
+  PropagateAccessKind(getType, allowOverwrite).visit(this, accessKind);
 }
 
 ConcreteDeclRef Expr::getReferencedDecl() const {

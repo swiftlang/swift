@@ -94,7 +94,7 @@ static clang::CanQualType getClangSelectorType(
 static clang::CanQualType getClangMetatypeType(
   const clang::ASTContext &clangCtx) {
   clang::QualType clangType =
-    clangCtx.getObjCObjectType(clangCtx.ObjCBuiltinClassTy, 0, 0);
+      clangCtx.getObjCObjectType(clangCtx.ObjCBuiltinClassTy, nullptr, 0);
   clangType = clangCtx.getObjCObjectPointerType(clangType);
   return clangCtx.getCanonicalType(clangType);
 }
@@ -102,7 +102,7 @@ static clang::CanQualType getClangMetatypeType(
 static clang::CanQualType getClangIdType(
   const clang::ASTContext &clangCtx) {
   clang::QualType clangType =
-    clangCtx.getObjCObjectType(clangCtx.ObjCBuiltinIdTy, 0, 0);
+      clangCtx.getObjCObjectType(clangCtx.ObjCBuiltinIdTy, nullptr, 0);
   clangType = clangCtx.getObjCObjectPointerType(clangType);
   return clangCtx.getCanonicalType(clangType);
 }

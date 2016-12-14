@@ -3097,6 +3097,10 @@ static void checkSwitch(TypeChecker &TC, const SwitchStmt *stmt) {
   // We want to warn about "case .Foo, .Bar where 1 != 100:" since the where
   // clause only applies to the second case, and this is surprising.
   for (auto cs : stmt->getCases()) {
+    // We forgot to do this in Swift 3
+    if (!TC.Context.isSwiftVersion3())
+      TC.checkUnsupportedProtocolType(cs);
+
     // The case statement can have multiple case items, each can have a where.
     // If we find a "where", and there is a preceding item without a where, and
     // if they are on the same source line, then warn.

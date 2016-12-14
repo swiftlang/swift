@@ -76,7 +76,7 @@ class MetadataSource {
     unsigned Index;
     if (!decodeNatural(it, end, Index))
       return nullptr;
-    return A.template createClosureBinding(Index);
+    return A.createClosureBinding(Index);
   }
 
   template <typename Allocator>
@@ -95,7 +95,7 @@ class MetadataSource {
     unsigned Index;
     if (!decodeNatural(it, end, Index))
       return nullptr;
-    return A.template createReferenceCapture(Index);
+    return A.createReferenceCapture(Index);
   }
 
   template <typename Allocator>
@@ -114,7 +114,7 @@ class MetadataSource {
     unsigned Index;
     if (!decodeNatural(it, end, Index))
       return nullptr;
-    return A.template createMetadataCapture(Index);
+    return A.createMetadataCapture(Index);
   }
 
   template <typename Allocator>
@@ -143,7 +143,7 @@ class MetadataSource {
 
     ++it;
 
-    return A.template createGenericArgument(Index, Source);
+    return A.createGenericArgument(Index, Source);
   }
 
   template <typename Allocator>
@@ -162,7 +162,7 @@ class MetadataSource {
     if (it == end || *it != '_')
       return nullptr;
 
-    return A.template createParent(Child);
+    return A.createParent(Child);
   }
 
   template <typename Allocator>
@@ -184,7 +184,7 @@ class MetadataSource {
         return decodeParent(A, it, end);
       case 'S':
         ++it;
-        return A.template createSelf();
+        return A.createSelf();
       default:
         return nullptr;
     }

@@ -184,3 +184,19 @@ protocol sr511 {
 
 associatedtype Foo = Int // expected-error {{associated types can only be defined in a protocol; define a type or introduce a 'typealias' to satisfy an associated type requirement}}
 
+// rdar://problem/29207581
+protocol P {
+  associatedtype A
+  static var isP : Bool { get }
+}
+
+protocol M {
+  associatedtype B : P
+}
+
+extension M {
+  func g<C : P>(in c_: C)
+  where Self.B == C.A, C.A.A : P { // *clearly* implies Self.B.A : P
+    _ = B.A.isP
+  }
+}

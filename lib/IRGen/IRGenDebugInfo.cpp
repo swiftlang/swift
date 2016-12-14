@@ -29,6 +29,7 @@
 #include "swift/Basic/Punycode.h"
 #include "swift/Basic/SourceManager.h"
 #include "swift/Basic/Version.h"
+#include "swift/Basic/ManglingMacros.h"
 #include "swift/ClangImporter/ClangImporter.h"
 #include "swift/SIL/SILArgument.h"
 #include "swift/SIL/SILBasicBlock.h"
@@ -362,7 +363,7 @@ void IRGenDebugInfo::setEntryPointLoc(IRBuilder &Builder) {
 }
 
 llvm::DIScope *IRGenDebugInfo::getOrCreateScope(const SILDebugScope *DS) {
-  if (DS == 0)
+  if (DS == nullptr)
     return MainFile;
 
   // Try to find it in the cache first.
@@ -1111,7 +1112,9 @@ llvm::DICompositeType *IRGenDebugInfo::createStructType(
   if (UniqueID.empty())
     assert(!Name.empty() && "no mangled name and no human readable name given");
   else
-    assert(UniqueID.size() > 2 && UniqueID[0] == '_' && UniqueID[1] == 'T' &&
+    assert(UniqueID.size() > 2 &&
+           (UniqueID.startswith("_T") ||
+              UniqueID.startswith(MANGLING_PREFIX_STR)) &&
            "UID is not a mangled name");
 #endif
 
@@ -1702,11 +1705,6 @@ llvm::DIType *IRGenDebugInfo::createType(DebugTypeInfo DbgTy,
                                DbgTy.size, DbgTy.align, DbgTy.getDeclContext());
     return DBuilder.createTypedef(getOrCreateType(AliasedDbgTy), MangledName,
                                   File, L.Line, File);
-  }
-
-  case TypeKind::Substituted: {
-    auto OrigTy = cast<SubstitutedType>(BaseTy)->getReplacementType();
-    return getOrCreateDesugaredType(OrigTy, DbgTy);
   }
 
   case TypeKind::Paren: {

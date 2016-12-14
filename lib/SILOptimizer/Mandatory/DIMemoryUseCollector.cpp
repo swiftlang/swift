@@ -60,7 +60,8 @@ DIMemoryObjectInfo::DIMemoryObjectInfo(SILInstruction *MI) {
   if (auto *ABI = dyn_cast<AllocBoxInst>(MemoryInst)) {
     assert(ABI->getBoxType()->getLayout()->getFields().size() == 1
            && "analyzing multi-field boxes not implemented");
-    MemorySILType = ABI->getBoxType()->getFieldType(0);
+    MemorySILType =
+      ABI->getBoxType()->getFieldType(getFunction().getModule(), 0);
   } else if (auto *ASI = dyn_cast<AllocStackInst>(MemoryInst)) {
     MemorySILType = ASI->getElementType();
   } else {
@@ -571,7 +572,8 @@ void ElementUseCollector::collectContainerUses(AllocBoxInst *ABI) {
 
     // Other uses of the container are considered escapes of the values.
     for (unsigned field : indices(ABI->getBoxType()->getLayout()->getFields()))
-      addElementUses(field, ABI->getBoxType()->getFieldType(field),
+      addElementUses(field,
+                     ABI->getBoxType()->getFieldType(ABI->getModule(), field),
                      User, DIUseKind::Escape);
   }
 }

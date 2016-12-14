@@ -497,7 +497,7 @@ private:
     return {};
   }
 };
-}
+} // end anonymous namespace
 
 static StringRef getTypeName(clang::QualType qt) {
   if (auto typedefTy = qt->getAs<clang::TypedefType>()) {

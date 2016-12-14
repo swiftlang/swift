@@ -27,7 +27,7 @@ namespace {
         llvm::sys::Process::SafelyCloseFileDescriptor(fd);
     }
   };
-}
+} // end anonymous namespace
 
 std::error_code swift::moveFileIfDifferent(const llvm::Twine &source,
                                            const llvm::Twine &destination) {

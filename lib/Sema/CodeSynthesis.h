@@ -49,19 +49,11 @@ void markAsObjC(TypeChecker &TC, ValueDecl *D,
 bool checkOverrides(TypeChecker &TC, ValueDecl *decl);
 
 // These are implemented in CodeSynthesis.cpp.
-void convertStoredVarInProtocolToComputed(VarDecl *VD, TypeChecker &TC);
 void synthesizeObservingAccessors(VarDecl *VD, TypeChecker &TC);
 void synthesizeSetterForMutableAddressedStorage(AbstractStorageDecl *storage,
                                                 TypeChecker &TC);
-void synthesizeMaterializeForSet(FuncDecl *materializeForSet,
-                                 AbstractStorageDecl *storage,
-                                 TypeChecker &TC);
 void maybeAddMaterializeForSet(AbstractStorageDecl *storage,
                                TypeChecker &TC);
-
-void addTrivialAccessorsToStorage(AbstractStorageDecl *storage,
-                                  TypeChecker &TC);
-
 void maybeAddAccessorsToVariable(VarDecl *var, TypeChecker &TC);
 
 /// \brief Describes the kind of implicit constructor that will be

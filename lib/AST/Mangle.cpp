@@ -56,7 +56,7 @@ namespace {
       return (out << '_');
     }
   };        
-}
+} // end anonymous namespace
 
 // Translates operator fixity to demangler operators.
 static Demangle::OperatorKind TranslateOperator(OperatorFixity fixity) {
@@ -568,7 +568,8 @@ void Mangler::mangleDeclType(const ValueDecl *decl,
                                      requirements, requirementsBuf);
 
   // Mangle the generic signature, if any.
-  if (!genericParams.empty() || !requirements.empty()) {
+  if ((!genericParams.empty() || !requirements.empty()) &&
+      checkGenericParamsOrder(genericParams)) {
     Buffer << 'u';
     mangleGenericSignatureParts(genericParams, initialParamDepth,
                                 requirements);
@@ -589,6 +590,24 @@ void Mangler::mangleConstrainedType(CanType type) {
     return;
   }
   mangleType(type, 0);
+}
+
+bool Mangler::
+checkGenericParamsOrder(ArrayRef<swift::GenericTypeParamType *> params) {
+  unsigned depth = 0;
+  unsigned count = 0;
+  for (auto param : params) {
+    if (param->getDepth() > depth) {
+      depth = param->getDepth();
+      count = 0;
+    } else if (param->getDepth() < depth) {
+      return false;
+    }
+    if (param->getIndex() != count)
+      return false;
+    count ++;
+  }
+  return true;
 }
 
 void Mangler::mangleGenericSignatureParts(
@@ -848,8 +867,6 @@ void Mangler::mangleType(Type type, unsigned uncurryLevel) {
 
   case TypeKind::Paren:
     return mangleSugaredType<ParenType>(type);
-  case TypeKind::Substituted:
-    return mangleSugaredType<SubstitutedType>(type);
   case TypeKind::ArraySlice: /* fallthrough */
   case TypeKind::Optional:
     return mangleSugaredType<SyntaxSugarType>(type);
@@ -1219,16 +1236,38 @@ void Mangler::mangleType(Type type, unsigned uncurryLevel) {
     return;
   }
 
-  case TypeKind::SILBox:
-    Buffer << 'X' << 'b';
-    mangleType(cast<SILBoxType>(tybase)->getBoxedType(),
-               uncurryLevel);
+  case TypeKind::SILBox: {
+    Buffer << 'X' << 'B';
+    auto boxTy = cast<SILBoxType>(tybase);
+    // TODO: Should layouts get substitutions?
+    auto layout = boxTy->getLayout();
+    if (auto sig = layout->getGenericSignature()) {
+      Buffer << 'G';
+      mangleGenericSignature(sig);
+    }
+    for (auto &field : layout->getFields()) {
+      Buffer << (field.isMutable() ? 'm' : 'i');
+      mangleType(field.getLoweredType(), 0);
+    }
+    Buffer << '_';
+    if (!boxTy->getGenericArgs().empty()) {
+      for (auto &arg : boxTy->getGenericArgs()) {
+        mangleType(arg.getReplacement(), 0);
+      }
+      Buffer << '_';
+    }
     return;
+  }
 
   case TypeKind::SILBlockStorage:
     llvm_unreachable("should never be mangled");
   }
   llvm_unreachable("bad type kind");
+}
+
+void Mangler::mangleLegacyBoxType(CanType fieldType) {
+  Buffer << 'X' << 'b';
+  mangleType(fieldType, 0);
 }
 
 /// Mangle a list of protocols.  Each protocol is a substitution
@@ -1592,7 +1631,7 @@ void Mangler::mangleEntity(const ValueDecl *decl,
                            unsigned uncurryLevel) {
   assert(!isa<ConstructorDecl>(decl));
   assert(!isa<DestructorDecl>(decl));
-  
+
   // entity ::= static? entity-kind context entity-name
   if (decl->isStatic())
     Buffer << 'Z';
@@ -1605,7 +1644,12 @@ void Mangler::mangleEntity(const ValueDecl *decl,
       return mangleAccessorEntity(accessorKind, func->getAddressorKind(),
                                   func->getAccessorStorageDecl());
   }
-  
+
+  // Avoid mangling nameless entity. This may happen in erroneous code as code
+  // completion.
+  if (!decl->hasName())
+    return;
+
   if (isa<VarDecl>(decl)) {
     Buffer << 'v';
   } else if (isa<SubscriptDecl>(decl)) {

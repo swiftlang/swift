@@ -36,7 +36,9 @@ decomposeInheritedClauseDecl(
     inheritanceClause = typeDecl->getInherited();
     if (auto nominal = dyn_cast<NominalTypeDecl>(typeDecl)) {
       dc = nominal;
-      options |= TR_GenericSignature | TR_InheritanceClause;
+      options |= (TR_GenericSignature |
+                  TR_InheritanceClause |
+                  TR_AllowUnavailableProtocol);
     } else {
       dc = typeDecl->getDeclContext();
 
@@ -62,7 +64,9 @@ decomposeInheritedClauseDecl(
     auto ext = decl.get<ExtensionDecl *>();
     inheritanceClause = ext->getInherited();
     dc = ext;
-    options |= TR_GenericSignature | TR_InheritanceClause;
+    options |= (TR_GenericSignature |
+                TR_InheritanceClause |
+                TR_AllowUnavailableProtocol);
   }
 
   return std::make_tuple(options, dc, inheritanceClause);
@@ -103,8 +107,9 @@ void IterativeTypeChecker::processResolveInheritedClauseEntry(
 
   // Validate the type of this inherited clause entry.
   // FIXME: Recursion into existing type checker.
-  PartialGenericTypeToArchetypeResolver resolver;
-  if (TC.validateType(*inherited, dc, options, &resolver)) {
+  GenericTypeToArchetypeResolver resolver(dc);
+  if (TC.validateType(*inherited, dc, options, &resolver,
+                      &unsatisfiedDependency)) {
     inherited->setInvalidType(getASTContext());
   }
 }
@@ -279,23 +284,23 @@ bool IterativeTypeChecker::breakCycleForInheritedProtocols(
 // Resolve a type declaration
 //===----------------------------------------------------------------------===//
 bool IterativeTypeChecker::isResolveTypeDeclSatisfied(TypeDecl *typeDecl) {
-  if (auto typeAliasDecl = dyn_cast<TypeAliasDecl>(typeDecl)) {
-    // If the underlying type was validated, we're done.
-    return typeAliasDecl->getUnderlyingTypeLoc().wasValidated();
-  }
+  auto *dc = typeDecl->getDeclContext();
 
-  if (auto typeParam = dyn_cast<AbstractTypeParamDecl>(typeDecl)) {
-    // FIXME: Deal with these.
-    return typeParam->getDeclContext()->isValidGenericContext();
-  }
-
-  // Module types are always fully resolved.
-  if (isa<ModuleDecl>(typeDecl))
+  if (typeDecl->hasInterfaceType())
     return true;
 
-  // Nominal types.
-  auto nominal = cast<NominalTypeDecl>(typeDecl);
-  return nominal->hasInterfaceType();
+  // If this request can *never* be satisfied due to recursion,
+  // return success and fail elsewhere.
+  if (auto nominal = dyn_cast<NominalTypeDecl>(dc)) {
+    if (nominal->isBeingTypeChecked())
+      return true;
+  } else if (auto ext = dyn_cast<ExtensionDecl>(dc)) {
+    if (ext->isBeingTypeChecked())
+      return true;
+  }
+
+  // Ok, we can try calling validateDecl().
+  return false;
 }
 
 void IterativeTypeChecker::processResolveTypeDecl(
@@ -308,20 +313,41 @@ void IterativeTypeChecker::processResolveTypeDecl(
         typeAliasDecl->computeType();
       
       TypeResolutionOptions options;
-      options |= TR_GlobalTypeAlias;
       if (typeAliasDecl->getFormalAccess() <= Accessibility::FilePrivate)
         options |= TR_KnownNonCascadingDependency;
 
       // Note: recursion into old type checker is okay when passing in an
       // unsatisfied-dependency callback.
-      if (TC.validateType(typeAliasDecl->getUnderlyingTypeLoc(),
-                          typeAliasDecl->getDeclContext(),
-                          options, nullptr, &unsatisfiedDependency)) {
+      GenericTypeToArchetypeResolver resolver(typeAliasDecl);
+      if (TC.validateType(typeAliasDecl->getUnderlyingTypeLoc(), typeAliasDecl,
+                          options, &resolver, &unsatisfiedDependency)) {
         typeAliasDecl->setInvalid();
         typeAliasDecl->setInterfaceType(ErrorType::get(getASTContext()));
         typeAliasDecl->getUnderlyingTypeLoc().setInvalidType(getASTContext());
       }
-      
+
+      if (typeAliasDecl->getUnderlyingTypeLoc().wasValidated()) {
+        // We create TypeAliasTypes with invalid underlying types, so we
+        // need to propagate recursive properties now.
+        typeAliasDecl->getAliasType()->setRecursiveProperties(
+                  typeAliasDecl->getUnderlyingType()->getRecursiveProperties());
+
+        // Map the alias type out of context; if it is not dependent,
+        // we'll keep the sugar.
+        Type interfaceTy = typeAliasDecl->getAliasType();
+
+        // lldb creates global typealiases containing archetypes
+        // sometimes...
+        if (typeAliasDecl->getUnderlyingType()->hasArchetype() &&
+            typeAliasDecl->isGenericContext()) {
+          interfaceTy = typeAliasDecl->mapTypeOutOfContext(interfaceTy);
+        }
+
+        typeAliasDecl->setInterfaceType(
+            MetatypeType::get(interfaceTy,
+                              typeDecl->getASTContext()));
+      }
+
       return;
     }
 

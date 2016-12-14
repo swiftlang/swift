@@ -44,6 +44,7 @@
 
 #define DEBUG_TYPE "sil-capture-promotion"
 #include "swift/SILOptimizer/PassManager/Passes.h"
+#include "swift/SILOptimizer/Utils/SpecializationMangler.h"
 #include "swift/SIL/Mangle.h"
 #include "swift/SIL/SILCloner.h"
 #include "swift/SIL/TypeSubstCloner.h"
@@ -82,7 +83,7 @@ public:
     uint64_t *Bits;
     unsigned NumBitWords; // Words per row.
 
-    ReachingBlockMatrix(): Bits(0), NumBitWords(0) {}
+    ReachingBlockMatrix() : Bits(nullptr), NumBitWords(0) {}
 
     bool empty() const { return !Bits; }
   };
@@ -96,7 +97,7 @@ public:
   }
   static void deallocateMatrix(ReachingBlockMatrix &M) {
     delete [] M.Bits;
-    M.Bits = 0;
+    M.Bits = nullptr;
     M.NumBitWords = 0;
   }
   static ReachingBlockSet allocateSet(unsigned NumBlocks) {
@@ -107,7 +108,7 @@ public:
   }
   static void deallocateSet(ReachingBlockSet &S) {
     delete [] S.Bits;
-    S.Bits = 0;
+    S.Bits = nullptr;
     S.NumBitWords = 0;
   }
 
@@ -116,7 +117,7 @@ private:
   unsigned NumBitWords;
 
 public:
-  ReachingBlockSet(): Bits(0), NumBitWords(0) {}
+  ReachingBlockSet() : Bits(nullptr), NumBitWords(0) {}
 
   ReachingBlockSet(unsigned BlockID, ReachingBlockMatrix &M)
     : Bits(&M.Bits[BlockID * M.NumBitWords]),
@@ -367,7 +368,7 @@ computeNewArgInterfaceTypes(SILFunction *F,
     auto paramBoxTy = param.getSILType().castTo<SILBoxType>();
     assert(paramBoxTy->getLayout()->getFields().size() == 1
            && "promoting compound box not implemented yet");
-    auto paramBoxedTy = paramBoxTy->getFieldType(0);
+    auto paramBoxedTy = paramBoxTy->getFieldType(F->getModule(), 0);
     auto &paramTL = F->getModule().Types.getTypeLowering(paramBoxedTy);
     ParameterConvention convention;
     if (paramTL.isPassedIndirectly()) {
@@ -387,7 +388,8 @@ static std::string getSpecializedName(SILFunction *F,
                                       IndicesSet &PromotableIndices) {
   Mangle::Mangler M;
   auto P = SpecializationPass::CapturePromotion;
-  FunctionSignatureSpecializationMangler FSSM(P, M, Fragile, F);
+  FunctionSignatureSpecializationMangler OldFSSM(P, M, Fragile, F);
+  NewMangling::FunctionSignatureSpecializationMangler NewFSSM(P, Fragile, F);
   CanSILFunctionType FTy = F->getLoweredFunctionType();
 
   ArrayRef<SILParameterInfo> Parameters = FTy->getParameters();
@@ -400,12 +402,14 @@ static std::string getSpecializedName(SILFunction *F,
     unsigned ArgIndex = Index + NumIndirectResults;
     if (!PromotableIndices.count(ArgIndex))
       continue;
-    FSSM.setArgumentBoxToValue(Index);
+    OldFSSM.setArgumentBoxToValue(Index);
+    NewFSSM.setArgumentBoxToValue(Index);
   }
 
-  FSSM.mangle();
-
-  return M.finalize();
+  OldFSSM.mangle();
+  std::string Old = M.finalize();
+  std::string New = NewFSSM.mangle();
+  return NewMangling::selectMangling(Old, New);
 }
 
 /// \brief Create the function corresponding to the clone of the original
@@ -481,7 +485,7 @@ ClosureCloner::populateCloned() {
       auto BoxTy = (*I)->getType().castTo<SILBoxType>();
       assert(BoxTy->getLayout()->getFields().size() == 1
              && "promoting compound box not implemented");
-      auto BoxedTy = BoxTy->getFieldType(0).getObjectType();
+      auto BoxedTy = BoxTy->getFieldType(Cloned->getModule(),0).getObjectType();
       SILValue MappedValue =
           ClonedEntryBB->createArgument(BoxedTy, (*I)->getDecl());
       BoxArgumentMap.insert(std::make_pair(*I, MappedValue));
@@ -793,7 +797,7 @@ examineAllocBoxInst(AllocBoxInst *ABI, ReachabilityInfo &RI,
       auto BoxTy = BoxArg->getType().castTo<SILBoxType>();
       assert(BoxTy->getLayout()->getFields().size() == 1
              && "promoting compound box not implemented yet");
-      if (BoxTy->getFieldType(0).isAddressOnly(M))
+      if (BoxTy->getFieldType(M, 0).isAddressOnly(M))
         return false;
 
       // Verify that this closure is known not to mutate the captured value; if

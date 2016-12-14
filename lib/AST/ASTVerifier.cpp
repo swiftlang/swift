@@ -451,11 +451,12 @@ struct ASTNodeBase {};
             Out << "AST verification error: archetype "
                 << archetype->getString() << " not allowed in this context\n";
 
-            auto knownDC = Ctx.ArchetypeContexts.find(parent);
-            if (knownDC != Ctx.ArchetypeContexts.end()) {
-              llvm::errs() << "archetype came from:\n";
-              knownDC->second->dumpContext();
-              llvm::errs() << "\n";
+            if (auto env = parent->getGenericEnvironment()) {
+              if (auto owningDC = env->getOwningDeclContext()) {
+                llvm::errs() << "archetype came from:\n";
+                owningDC->dumpContext();
+                llvm::errs() << "\n";
+              }
             }
 
             return true;
@@ -466,7 +467,7 @@ struct ASTNodeBase {};
             if (!nested.second)
               continue;
             
-            if (auto nestedType = nested.second.getAsConcreteType()) {
+            if (auto nestedType = nested.second) {
               if (nestedType->hasTypeParameter()) {
                 Out << "Nested type " << nested.first.str()
                     << " of archetype " << archetype->getString()
@@ -476,7 +477,7 @@ struct ASTNodeBase {};
               }
             }
 
-            verifyChecked(nested.second.getValue(), visitedArchetypes);
+            verifyChecked(nested.second, visitedArchetypes);
           }
         }
 
@@ -1497,7 +1498,6 @@ struct ASTNodeBase {};
         return TT->getElementType(i);
       };
 
-      unsigned varargsIndex = 0;
       Type varargsType;
       unsigned callerDefaultArgIndex = 0;
       for (unsigned i = 0, e = E->getElementMapping().size(); i != e; ++i) {
@@ -1505,7 +1505,6 @@ struct ASTNodeBase {};
         if (subElem == TupleShuffleExpr::DefaultInitialize)
           continue;
         if (subElem == TupleShuffleExpr::Variadic) {
-          varargsIndex = i;
           varargsType = TT->getElement(i).getVarargBaseTy();
           break;
         }
@@ -1736,6 +1735,58 @@ struct ASTNodeBase {};
         var->getType().print(Out);
         abort();
       }
+
+      Type typeForAccessors =
+          var->getInterfaceType()->getReferenceStorageReferent();
+      typeForAccessors =
+          ArchetypeBuilder::mapTypeIntoContext(var->getDeclContext(),
+                                               typeForAccessors);
+      if (const FuncDecl *getter = var->getGetter()) {
+        if (getter->getParameterLists().back()->size() != 0) {
+          Out << "property getter has parameters\n";
+          abort();
+        }
+        Type getterResultType = getter->getResultInterfaceType();
+        getterResultType =
+            ArchetypeBuilder::mapTypeIntoContext(var->getDeclContext(),
+                                                 getterResultType);
+        if (!getterResultType->isEqual(typeForAccessors)) {
+          Out << "property and getter have mismatched types: '";
+          typeForAccessors.print(Out);
+          Out << "' vs. '";
+          getterResultType.print(Out);
+          Out << "'\n";
+          abort();
+        }
+      }
+
+      if (const FuncDecl *setter = var->getSetter()) {
+        if (!setter->getResultInterfaceType()->isVoid()) {
+          Out << "property setter has non-Void result type\n";
+          abort();
+        }
+        if (setter->getParameterLists().back()->size() == 0) {
+          Out << "property setter has no parameters\n";
+          abort();
+        }
+        if (setter->getParameterLists().back()->size() != 1) {
+          Out << "property setter has 2+ parameters\n";
+          abort();
+        }
+        const ParamDecl *param = setter->getParameterLists().back()->get(0);
+        Type paramType = param->getInterfaceType();
+        paramType = ArchetypeBuilder::mapTypeIntoContext(var->getDeclContext(),
+                                                         paramType);
+        if (!paramType->isEqual(typeForAccessors)) {
+          Out << "property and setter param have mismatched types: '";
+          typeForAccessors.print(Out);
+          Out << "' vs. '";
+          paramType.print(Out);
+          Out << "'\n";
+          abort();
+        }
+      }
+
       verifyCheckedBase(var);
     }
 
@@ -2753,7 +2804,7 @@ struct ASTNodeBase {};
       }
     }
   };
-}
+} // end anonymous namespace
 
 void swift::verify(SourceFile &SF) {
 #if !(defined(NDEBUG) || defined(SWIFT_DISABLE_AST_VERIFIER))

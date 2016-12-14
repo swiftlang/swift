@@ -17,6 +17,7 @@
 #include "swift/Parse/Parser.h"
 #include "swift/AST/Attr.h"
 #include "swift/AST/Decl.h"
+#include "swift/Basic/Fallthrough.h"
 #include "swift/Basic/Version.h"
 #include "swift/Parse/Lexer.h"
 #include "swift/Parse/CodeCompletionCallbacks.h"
@@ -160,6 +161,8 @@ static bool isTerminatorForBraceItemListKind(const Token &Tok,
     return Tok.isNot(tok::pound_else) && Tok.isNot(tok::pound_endif) &&
            Tok.isNot(tok::pound_elseif);
   }
+
+  llvm_unreachable("Unhandled BraceItemListKind in switch.");
 }
 
 void Parser::consumeTopLevelDecl(ParserPosition BeginParserPosition,
@@ -519,6 +522,13 @@ ParserResult<Stmt> Parser::parseStmt() {
   (void)consumeIf(tok::kw_try, tryLoc);
   
   switch (Tok.getKind()) {
+  case tok::pound_line:
+  case tok::pound_sourceLocation:
+  case tok::pound_if:
+    assert((LabelInfo || tryLoc.isValid()) &&
+           "unlabeled directives should be handled earlier");
+    // Bailout, and let parseBraceItems() parse them.
+    SWIFT_FALLTHROUGH;
   default:
     diagnose(Tok, tryLoc.isValid() ? diag::expected_expr : diag::expected_stmt);
     return nullptr;
@@ -539,18 +549,6 @@ ParserResult<Stmt> Parser::parseStmt() {
     if (LabelInfo) diagnose(LabelInfo.Loc, diag::invalid_label_on_stmt);
     if (tryLoc.isValid()) diagnose(tryLoc, diag::try_on_stmt, Tok.getText());
     return parseStmtGuard();
-  case tok::pound_if:
-    if (LabelInfo) diagnose(LabelInfo.Loc, diag::invalid_label_on_stmt);
-    if (tryLoc.isValid()) diagnose(tryLoc, diag::try_on_stmt, Tok.getText());
-    return parseStmtIfConfig();
-  case tok::pound_line:
-    if (LabelInfo) diagnose(LabelInfo.Loc, diag::invalid_label_on_stmt);
-    if (tryLoc.isValid()) diagnose(tryLoc, diag::try_on_stmt, Tok.getText());
-    return parseLineDirective(true);
-  case tok::pound_sourceLocation:
-    if (LabelInfo) diagnose(LabelInfo.Loc, diag::invalid_label_on_stmt);
-    if (tryLoc.isValid()) diagnose(tryLoc, diag::try_on_stmt, Tok.getText());
-    return parseLineDirective(false);
   case tok::kw_while:
     if (tryLoc.isValid()) diagnose(tryLoc, diag::try_on_stmt, Tok.getText());
     return parseStmtWhile(LabelInfo);
@@ -1224,10 +1222,9 @@ ParserStatus Parser::parseStmtCondition(StmtCondition &Condition,
     
     // Handle code completion after the #.
     if (Tok.is(tok::pound) && peekToken().is(tok::code_complete)) {
-      auto PoundPos = consumeToken();
+      consumeToken(); // '#' token.
       auto CodeCompletionPos = consumeToken();
-      auto Expr = new (Context) CodeCompletionExpr(CharSourceRange(SourceMgr,
-                                           PoundPos, CodeCompletionPos));
+      auto Expr = new (Context) CodeCompletionExpr(CodeCompletionPos);
       if (CodeCompletion)
         CodeCompletion->completeAfterPound(Expr, ParentKind);
       result.push_back(Expr);
@@ -2133,7 +2130,6 @@ ParserResult<Stmt> Parser::parseStmtForCStyle(SourceLoc ForLoc,
 
   ParserStatus Status;
 
-  bool HaveFirst = false;
   ParserResult<Expr> First;
   SmallVector<Decl*, 2> FirstDecls;
   ParserResult<Expr> Second;
@@ -2169,7 +2165,6 @@ ParserResult<Stmt> Parser::parseStmtForCStyle(SourceLoc ForLoc,
     SmallVector<Expr *, 1> FirstExprs;
 
     // Parse the first expression.
-    HaveFirst = true;
     First = parseExpr(diag::expected_init_for_stmt);
     Status |= First;
     if (First.isNull() || First.hasCodeCompletion())
@@ -2453,30 +2448,16 @@ ParserResult<Stmt> Parser::parseStmtSwitch(LabeledStmtInfo LabelInfo) {
   SourceLoc lBraceLoc = consumeToken(tok::l_brace);
   SourceLoc rBraceLoc;
   
-  // Reject an empty 'switch'.
-  if (Tok.is(tok::r_brace))
-    diagnose(Tok.getLoc(), diag::empty_switch_stmt);
-
   // If there are non-case-label statements at the start of the switch body,
-  // raise an error and recover by parsing and discarding them.
+  // raise an error and recover by discarding them.
   bool DiagnosedNotCoveredStmt = false;
-  bool ErrorAtNotCoveredStmt = false;
   while (!Tok.is(tok::kw_case) && !Tok.is(tok::kw_default)
          && !Tok.is(tok::r_brace) && !Tok.is(tok::eof)) {
-    if (ErrorAtNotCoveredStmt) {
-      // Error recovery.
-      consumeToken();
-      continue;
-    }
     if (!DiagnosedNotCoveredStmt) {
       diagnose(Tok, diag::stmt_in_switch_not_covered_by_case);
       DiagnosedNotCoveredStmt = true;
     }
-    ASTNode NotCoveredStmt;
-    ParserStatus CurrStat = parseExprOrStmt(NotCoveredStmt);
-    if (CurrStat.isError())
-      ErrorAtNotCoveredStmt = true;
-    Status |= CurrStat;
+    skipSingle();
   }
   
   SmallVector<CaseStmt*, 8> cases;
@@ -2503,6 +2484,10 @@ ParserResult<Stmt> Parser::parseStmtSwitch(LabeledStmtInfo LabelInfo) {
                          diag::expected_rbrace_switch, lBraceLoc)) {
     Status.setIsParseError();
   }
+
+  // Reject an empty 'switch'.
+  if (!DiagnosedNotCoveredStmt && cases.empty())
+    diagnose(rBraceLoc, diag::empty_switch_stmt);
 
   return makeParserResult(
       Status, SwitchStmt::create(LabelInfo, SwitchLoc, SubjectExpr.get(),

@@ -1078,10 +1078,18 @@ static void profileArchetypeConstraints(
   for (auto proto : arch->getConformsTo()) {
     ID.AddPointer(proto);
   }
-  
+
+  // Skip nested types if this is an opened existential, since those
+  // won't resolve. Normally opened existentials cannot have nested
+  // types, but one case we missed compiled in Swift 3 so we support
+  // it here.
+  if (arch->getOpenedExistentialType()) {
+    return;
+  }
+
   // Recursively profile nested archetypes.
   for (auto nested : arch->getAllNestedTypes()) {
-    profileArchetypeConstraints(nested.second.getValue(), ID, seen);
+    profileArchetypeConstraints(nested.second, ID, seen);
   }
 }
 
@@ -1594,14 +1602,14 @@ TypeCacheEntry TypeConverter::convertAnyNominalType(CanType type,
     llvm_unreachable("classes are always considered dependent for now");
 
   case DeclKind::Enum: {
-    auto type = CanType(decl->getDeclaredTypeInContext());
+    auto type = decl->getDeclaredTypeInContext()->getCanonicalType();
     auto result = convertEnumType(key, type, cast<EnumDecl>(decl));
     overwriteForwardDecl(Cache, key, result);
     return result;
   }
 
   case DeclKind::Struct: {
-    auto type = CanType(decl->getDeclaredTypeInContext());
+    auto type = decl->getDeclaredTypeInContext()->getCanonicalType();
     auto result = convertStructType(key, type, cast<StructDecl>(decl));
     overwriteForwardDecl(Cache, key, result);
     return result;

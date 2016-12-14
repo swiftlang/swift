@@ -47,7 +47,7 @@ public:
   /// \returns The resolved generic type parameter type, which may be \c gp.
   virtual Type resolveGenericTypeParamType(GenericTypeParamType *gp) = 0;
 
-  /// Resolve a reference to a member within a dependent type.
+  /// Resolve a qualified reference to a type member within a dependent type.
   ///
   /// \param baseTy The base of the member access.
   /// \param baseRange The source range covering the base type.
@@ -60,7 +60,7 @@ public:
                                           SourceRange baseRange,
                                           ComponentIdentTypeRepr *ref) = 0;
 
-  /// Resolve a reference to an associated type within the 'Self' type
+  /// Resolve an unqualified reference to an associated type of the 'Self' type
   /// of a protocol.
   ///
   /// \param selfTy The base of the member access.
@@ -69,21 +69,15 @@ public:
   /// \returns A type that refers to the dependent member type, or an error
   /// type if such a reference is ill-formed.
   virtual Type resolveSelfAssociatedType(Type selfTy,
-                                         DeclContext *DC,
                                          AssociatedTypeDecl *assocType) = 0;
 
-  /// Retrieve the type when referring to the given context.
+  /// Resolve the self type within the given context.
   ///
   /// \param dc A context in which type checking occurs, which must be a type
   /// context (i.e., nominal type or extension thereof).
   ///
-  /// \param wantSelf Do we want the type of the context itself (the
-  /// existential type, for protocols) or the type of 'self' inside the
-  /// context (the 'Self' generic parameter, for protocols). Has no effect
-  /// for concrete types.
-  ///
   /// \returns the type of context.
-  virtual Type resolveTypeOfContext(DeclContext *dc, bool wantSelf=false) = 0;
+  virtual Type resolveTypeOfContext(DeclContext *dc) = 0;
 
   /// Retrieve the type when referring to the given type declaration within
   /// its context.
@@ -116,10 +110,9 @@ public:
                                           ComponentIdentTypeRepr *ref);
 
   virtual Type resolveSelfAssociatedType(Type selfTy,
-                                         DeclContext *DC,
                                          AssociatedTypeDecl *assocType);
 
-  virtual Type resolveTypeOfContext(DeclContext *dc, bool wantSelf=false);
+  virtual Type resolveTypeOfContext(DeclContext *dc);
 
   virtual Type resolveTypeOfDecl(TypeDecl *decl);
 
@@ -149,39 +142,9 @@ public:
                                           ComponentIdentTypeRepr *ref);
 
   virtual Type resolveSelfAssociatedType(Type selfTy,
-                                         DeclContext *DC,
                                          AssociatedTypeDecl *assocType);
 
-  virtual Type resolveTypeOfContext(DeclContext *dc, bool wantSelf=false);
-
-  virtual Type resolveTypeOfDecl(TypeDecl *decl);
-
-  virtual void recordParamType(ParamDecl *decl, Type ty);
-};
-
-/// Generic type resolver that maps any generic type parameter type that
-/// has an underlying archetype to its corresponding archetype.
-///
-/// This generic type resolver replaces generic type parameter types that
-/// have archetypes with their archetypes, and leaves all other generic
-/// type parameter types unchanged. It is used for the initial type-checks of
-/// generic functions (and other generic declarations).
-///
-/// FIXME: This is not a long-term solution.
-class PartialGenericTypeToArchetypeResolver : public GenericTypeResolver {
-public:
-  virtual Type resolveGenericTypeParamType(GenericTypeParamType *gp);
-
-  virtual Type resolveDependentMemberType(Type baseTy,
-                                          DeclContext *DC,
-                                          SourceRange baseRange,
-                                          ComponentIdentTypeRepr *ref);
-
-  virtual Type resolveSelfAssociatedType(Type selfTy,
-                                         DeclContext *DC,
-                                         AssociatedTypeDecl *assocType);
-
-  virtual Type resolveTypeOfContext(DeclContext *dc, bool wantSelf=false);
+  virtual Type resolveTypeOfContext(DeclContext *dc);
 
   virtual Type resolveTypeOfDecl(TypeDecl *decl);
 
@@ -211,10 +174,9 @@ public:
                                           ComponentIdentTypeRepr *ref);
 
   virtual Type resolveSelfAssociatedType(Type selfTy,
-                                         DeclContext *DC,
                                          AssociatedTypeDecl *assocType);
 
-  virtual Type resolveTypeOfContext(DeclContext *dc, bool wantSelf=false);
+  virtual Type resolveTypeOfContext(DeclContext *dc);
 
   virtual Type resolveTypeOfDecl(TypeDecl *decl);
 

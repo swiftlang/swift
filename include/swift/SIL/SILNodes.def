@@ -95,10 +95,12 @@ ABSTRACT_VALUE(SILInstruction, ValueBase)
   // Accessing memory
   INST(LoadInst, SILInstruction, load, MayRead, DoesNotRelease)
   INST(LoadBorrowInst, SILInstruction, load_borrow, MayRead, DoesNotRelease)
+  INST(BeginBorrowInst, SILInstruction, begin_borrow, MayHaveSideEffects, DoesNotRelease)
   INST(EndBorrowInst, SILInstruction, end_borrow, MayHaveSideEffects, DoesNotRelease)
   INST(LoadUnownedInst, SILInstruction, load_unowned, MayRead, DoesNotRelease)
   INST(LoadWeakInst, SILInstruction, load_weak, MayRead, DoesNotRelease)
   INST(StoreInst, SILInstruction, store, MayWrite, DoesNotRelease)
+  INST(StoreBorrowInst, SILInstruction, store_borrow, MayWrite, DoesNotRelease)
   INST(AssignInst, SILInstruction, assign, MayWrite, DoesNotRelease)
   INST(MarkUninitializedInst, SILInstruction, mark_uninitialized, None, DoesNotRelease)
   INST(MarkUninitializedBehaviorInst, SILInstruction, mark_uninitialized_behavior, None, DoesNotRelease)
@@ -182,7 +184,7 @@ ABSTRACT_VALUE(SILInstruction, ValueBase)
   // Metatypes
   INST(MetatypeInst, SILInstruction, metatype, None, DoesNotRelease)
   INST(ValueMetatypeInst, SILInstruction, value_metatype, None, DoesNotRelease)
-  INST(ExistentialMetatypeInst, SILInstruction, existential_metatype, None, DoesNotRelease)
+  INST(ExistentialMetatypeInst, SILInstruction, existential_metatype, MayRead, DoesNotRelease)
   INST(ObjCProtocolInst, SILInstruction, objc_protocol, None, DoesNotRelease)
 
   // Aggregate Types

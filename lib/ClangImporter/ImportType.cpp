@@ -1626,7 +1626,9 @@ ParameterList *ClangImporter::Implementation::importFunctionParameterList(
     }
 
     // Figure out the name for this parameter.
-    Identifier bodyName = importFullName(param).Imported.getBaseName();
+    Identifier bodyName = importFullName(param, ImportNameVersion::Swift3)
+                              .getDeclName()
+                              .getBaseName();
 
     // Retrieve the argument name.
     Identifier name;
@@ -1764,9 +1766,9 @@ DefaultArgumentKind ClangImporter::Implementation::inferDefaultArgument(
 /// Adjust the result type of a throwing function based on the
 /// imported error information.
 static Type
-adjustResultTypeForThrowingFunction(const ImportedErrorInfo &errorInfo,
+adjustResultTypeForThrowingFunction(ForeignErrorConvention::Info errorInfo,
                                     Type resultTy) {
-  switch (errorInfo.Kind) {
+  switch (errorInfo.TheKind) {
   case ForeignErrorConvention::ZeroResult:
   case ForeignErrorConvention::NonZeroResult:
     return TupleType::getEmpty(resultTy->getASTContext());
@@ -1788,30 +1790,31 @@ adjustResultTypeForThrowingFunction(const ImportedErrorInfo &errorInfo,
 /// Produce the foreign error convention from the imported error info,
 /// error parameter type, and original result type.
 static ForeignErrorConvention
-getForeignErrorInfo(const ImportedErrorInfo &errorInfo, CanType errorParamTy,
-                    CanType origResultTy) {
+getForeignErrorInfo(ForeignErrorConvention::Info errorInfo,
+                    CanType errorParamTy, CanType origResultTy) {
   assert(errorParamTy && "not fully initialized!");
   using FEC = ForeignErrorConvention;
-  auto ReplaceParamWithVoid = errorInfo.ReplaceParamWithVoid
+  auto ParamIndex = errorInfo.ErrorParameterIndex;
+  auto IsOwned = (FEC::IsOwned_t) errorInfo.ErrorIsOwned;
+  auto ReplaceParamWithVoid = errorInfo.ErrorParameterIsReplaced
                                 ? FEC::IsReplaced
                                 : FEC::IsNotReplaced;
-  switch (errorInfo.Kind) {
+  switch (errorInfo.TheKind) {
   case FEC::ZeroResult:
-    return FEC::getZeroResult(errorInfo.ParamIndex, errorInfo.IsOwned,
-                              ReplaceParamWithVoid, errorParamTy, origResultTy);
+    return FEC::getZeroResult(ParamIndex, IsOwned, ReplaceParamWithVoid,
+                              errorParamTy, origResultTy);
   case FEC::NonZeroResult:
-    return FEC::getNonZeroResult(errorInfo.ParamIndex, errorInfo.IsOwned,
-                                 ReplaceParamWithVoid, errorParamTy,
-                                 origResultTy);
+    return FEC::getNonZeroResult(ParamIndex, IsOwned, ReplaceParamWithVoid,
+                                 errorParamTy, origResultTy);
   case FEC::ZeroPreservedResult:
-    return FEC::getZeroPreservedResult(errorInfo.ParamIndex, errorInfo.IsOwned,
+    return FEC::getZeroPreservedResult(ParamIndex, IsOwned,
                                        ReplaceParamWithVoid, errorParamTy);
   case FEC::NilResult:
-    return FEC::getNilResult(errorInfo.ParamIndex, errorInfo.IsOwned,
-                             ReplaceParamWithVoid, errorParamTy);
+    return FEC::getNilResult(ParamIndex, IsOwned, ReplaceParamWithVoid,
+                             errorParamTy);
   case FEC::NonNilError:
-    return FEC::getNonNilError(errorInfo.ParamIndex, errorInfo.IsOwned,
-                               ReplaceParamWithVoid, errorParamTy);
+    return FEC::getNonNilError(ParamIndex, IsOwned, ReplaceParamWithVoid,
+                               errorParamTy);
   }
   llvm_unreachable("bad error convention");
 }
@@ -1883,7 +1886,8 @@ Type ClangImporter::Implementation::importMethodType(
   // Import the result type.
   CanType origSwiftResultTy;
   Type swiftResultTy;
-  auto errorInfo = importedName.ErrorInfo;
+  Optional<ForeignErrorConvention::Info> errorInfo =
+      importedName.getErrorInfo();
   if (isPropertyGetter) {
     swiftResultTy = importPropertyType(property, isFromSystemModule);
   } else {
@@ -1975,7 +1979,7 @@ Type ClangImporter::Implementation::importMethodType(
     auto param = params[paramIndex];
     auto paramTy = param->getType();
     if (paramTy->isVoidType()) {
-      assert(!errorInfo || paramIndex != errorInfo->ParamIndex);
+      assert(!errorInfo || paramIndex != errorInfo->ErrorParameterIndex);
       ++nameIndex;
       continue;
     }
@@ -2028,11 +2032,11 @@ Type ClangImporter::Implementation::importMethodType(
 
     // If this is the error parameter, remember it, but don't build it
     // into the parameter type.
-    if (errorInfo && paramIndex == errorInfo->ParamIndex) {
+    if (errorInfo && paramIndex == errorInfo->ErrorParameterIndex) {
       errorParamType = swiftParamTy->getCanonicalType();
 
       // ...unless we're supposed to replace it with ().
-      if (errorInfo->ReplaceParamWithVoid) {
+      if (errorInfo->ErrorParameterIsReplaced) {
         addEmptyTupleParameter(argNames[nameIndex]);
         ++nameIndex;
       }
@@ -2050,7 +2054,9 @@ Type ClangImporter::Implementation::importMethodType(
     }
 
     // Figure out the name for this parameter.
-    Identifier bodyName = importFullName(param).Imported.getBaseName();
+    Identifier bodyName = importFullName(param, ImportNameVersion::Swift3)
+                              .getDeclName()
+                              .getBaseName();
 
     // Figure out the name for this argument, which comes from the method name.
     Identifier name;
@@ -2082,9 +2088,10 @@ Type ClangImporter::Implementation::importMethodType(
     // Determine whether we have a default argument.
     if (kind == SpecialMethodKind::Regular ||
         kind == SpecialMethodKind::Constructor) {
-      bool isLastParameter = (paramIndex == params.size() - 1) ||
-        (paramIndex == params.size() - 2 &&
-         errorInfo && errorInfo->ParamIndex == params.size() - 1);
+      bool isLastParameter =
+          (paramIndex == params.size() - 1) ||
+          (paramIndex == params.size() - 2 && errorInfo &&
+           errorInfo->ErrorParameterIndex == params.size() - 1);
 
       auto defaultArg = inferDefaultArgument(
           param->getType(), optionalityOfParam, methodName.getBaseName(),
@@ -2103,7 +2110,7 @@ Type ClangImporter::Implementation::importMethodType(
     addEmptyTupleParameter(argNames[0]);
   }
 
-  if (importedName.HasCustomName && argNames.size() != swiftParams.size()) {
+  if (importedName.hasCustomName() && argNames.size() != swiftParams.size()) {
     // Note carefully: we're emitting a warning in the /Clang/ buffer.
     auto &srcMgr = getClangASTContext().getSourceManager();
     auto &rawDiagClient = Instance->getDiagnosticClient();
@@ -2279,7 +2286,7 @@ Decl *ClangImporter::Implementation::importDeclByName(StringRef name) {
   clang::LookupResult lookupResult(sema, clangName, clang::SourceLocation(),
                                    clang::Sema::LookupOrdinaryName);
   lookupResult.setAllowHidden(true);
-  if (!sema.LookupName(lookupResult, /*Scope=*/0)) {
+  if (!sema.LookupName(lookupResult, /*Scope=*/nullptr)) {
     return nullptr;
   }
 
@@ -2332,7 +2339,7 @@ static Type getNamedProtocolType(ClangImporter::Implementation &impl,
   clang::LookupResult lookupResult(sema, clangName, clang::SourceLocation(),
                                    clang::Sema::LookupObjCProtocolName);
   lookupResult.setAllowHidden(true);
-  if (!sema.LookupName(lookupResult, /*Scope=*/0))
+  if (!sema.LookupName(lookupResult, /*Scope=*/nullptr))
     return Type();
 
   for (auto decl : lookupResult) {

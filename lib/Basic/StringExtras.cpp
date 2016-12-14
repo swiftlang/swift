@@ -177,10 +177,8 @@ void WordIterator::computePrevPosition() const {
     --i;
 
   // If what we found is a plural suffix, keep going.
-  bool skippedPluralSuffix = false;
   unsigned effectiveEndPosition = Position;
   if (i > 0 && isPluralSuffix(String.slice(i, Position))) {
-    skippedPluralSuffix = true;
     effectiveEndPosition = i;
     while (i > 0 && !clang::isUppercase(String[i-1]) && String[i-1] != '_')
       --i;
@@ -996,7 +994,7 @@ static bool isVacuousPreposition(StringRef beforePreposition,
 
 namespace {
   typedef std::reverse_iterator<camel_case::WordIterator> ReverseWordIterator;
-}
+} // end anonymous namespace
 
 /// Find the last preposition in the given word.
 static ReverseWordIterator findLastPreposition(ReverseWordIterator first,

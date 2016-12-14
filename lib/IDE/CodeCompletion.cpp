@@ -1107,6 +1107,8 @@ CodeCompletionResult *CodeCompletionResultBuilder::takeResult() {
         CodeCompletionResult(*LiteralKind, SemanticContext, NumBytesToErase,
                              CCS, ExpectedTypeRelation);
   }
+
+  llvm_unreachable("Unhandled CodeCompletionResult in switch.");
 }
 
 void CodeCompletionResultBuilder::finishResult() {
@@ -1517,6 +1519,8 @@ protocolForLiteralKind(CodeCompletionLiteralKind kind) {
   case CodeCompletionLiteralKind::Tuple:
     llvm_unreachable("no such protocol kind");
   }
+
+  llvm_unreachable("Unhandled CodeCompletionLiteralKind in switch.");
 }
 
 /// Whether funcType has a single argument (not including defaulted arguments)
@@ -2195,6 +2199,8 @@ public:
           // these parameters.
           return true;
       }
+
+      llvm_unreachable("Unhandled DefaultArgumentKind in switch.");
     };
 
     // Do not desugar AFT->getInput(), as we want to treat (_: (a,b)) distinctly
@@ -2368,6 +2374,8 @@ public:
     case LookupKind::ImportFromModule:
       return false;
     }
+
+    llvm_unreachable("Unhandled LookupKind in switch.");
   }
 
   void addMethodCall(const FuncDecl *FD, DeclVisibilityKind Reason) {
@@ -4069,9 +4077,9 @@ public:
 
   void addAccessControl(const ValueDecl *VD,
                         CodeCompletionResultBuilder &Builder) {
-    assert(CurrDeclContext->getAsGenericTypeOrGenericTypeExtensionContext());
+    assert(CurrDeclContext->getAsNominalTypeOrNominalTypeExtensionContext());
     auto AccessibilityOfContext =
-      CurrDeclContext->getAsGenericTypeOrGenericTypeExtensionContext()
+      CurrDeclContext->getAsNominalTypeOrNominalTypeExtensionContext()
         ->getFormalAccess();
     auto Access = std::min(VD->getFormalAccess(), AccessibilityOfContext);
     // Only emit 'public', not needed otherwise.
@@ -4309,7 +4317,7 @@ public:
   }
 
   void getOverrideCompletions(SourceLoc Loc) {
-    if (!CurrDeclContext->getAsGenericTypeOrGenericTypeExtensionContext())
+    if (!CurrDeclContext->getAsNominalTypeOrNominalTypeExtensionContext())
       return;
 
     Type CurrTy = CurrDeclContext->getDeclaredTypeInContext();
@@ -5075,7 +5083,7 @@ void CodeCompletionCallbacksImpl::doneParsing() {
     if (isDynamicLookup(*ExprType))
       Lookup.setIsDynamicLookup();
 
-    CodeCompletionTypeContextAnalyzer TypeAnalyzer(CurDeclContext, ParsedExpr);
+    ::CodeCompletionTypeContextAnalyzer TypeAnalyzer(CurDeclContext, ParsedExpr);
     llvm::SmallVector<Type, 2> PossibleTypes;
     if (TypeAnalyzer.Analyze(PossibleTypes)) {
       Lookup.setExpectedTypes(PossibleTypes);
@@ -5089,7 +5097,7 @@ void CodeCompletionCallbacksImpl::doneParsing() {
     break;
 
   case CompletionKind::PostfixExprBeginning: {
-    CodeCompletionTypeContextAnalyzer Analyzer(CurDeclContext,
+    ::CodeCompletionTypeContextAnalyzer Analyzer(CurDeclContext,
                                                CodeCompleteTokenExpr);
     llvm::SmallVector<Type, 1> Types;
     if (Analyzer.Analyze(Types)) {
@@ -5111,7 +5119,7 @@ void CodeCompletionCallbacksImpl::doneParsing() {
   case CompletionKind::PostfixExprParen: {
     Lookup.setHaveLParen(true);
 
-    CodeCompletionTypeContextAnalyzer TypeAnalyzer(CurDeclContext,
+    ::CodeCompletionTypeContextAnalyzer TypeAnalyzer(CurDeclContext,
                                                    CodeCompleteTokenExpr);
     SmallVector<Type, 2> PossibleTypes;
     SmallVector<StringRef, 2> PossibleNames;
@@ -5332,8 +5340,10 @@ void CodeCompletionCallbacksImpl::doneParsing() {
                                    AccessPath, Request.NeedLeadingDot,
                                    SF.hasTestableImport(TheModule),
                                    Ctx.LangOpts.CodeCompleteInitsInPostfixExpr};
-        std::pair<decltype(ImportsSeen)::iterator, bool>
-        Result = ImportsSeen.insert(K);
+
+        using PairType = llvm::DenseSet<swift::ide::CodeCompletionCache::Key,
+            llvm::DenseMapInfo<CodeCompletionCache::Key>>::iterator;
+        std::pair<PairType, bool> Result = ImportsSeen.insert(K);
         if (!Result.second)
           return; // already handled.
 
@@ -5485,6 +5495,8 @@ void swift::ide::copyCodeCompletionResults(CodeCompletionResultSink &targetSink,
       case CodeCompletionDeclKind::GlobalVar:
         return false;
       }
+
+      llvm_unreachable("Unhandled CodeCompletionDeclKind in switch.");
     });
   } else {
     targetSink.Results.insert(targetSink.Results.end(),

@@ -93,3 +93,26 @@ struct G {
 // CHECK-LABEL: default_constructor.G.init (bar : Swift.Optional<Swift.Int32>)
 // CHECK-NEXT: sil hidden @_TFV19default_constructor1GC
 // CHECK-NOT: default_constructor.G.init ()
+
+struct H<T> {
+  var opt: T?
+
+  // CHECK-LABEL: sil hidden @_TFV19default_constructor1HCurfqd__GS0_x_ : $@convention(method) <T><U> (@in U, @thin H<T>.Type) -> @out H<T> {
+  // CHECK: [[INIT_FN:%[0-9]+]] = function_ref @_TIvV19default_constructor1H3optGSqx_i : $@convention(thin) <τ_0_0> () -> @out Optional<τ_0_0>
+  // CHECK-NEXT: [[OPT_T:%[0-9]+]] = alloc_stack $Optional<T>
+  // CHECK-NEXT: apply [[INIT_FN]]<T>([[OPT_T]]) : $@convention(thin) <τ_0_0> () -> @out Optional<τ_0_0>
+  init<U>(_: U) { }
+}
+
+// <rdar://problem/29605388> Member initializer for non-generic type with generic constructor doesn't compile
+
+struct I {
+  var x: Int = 0
+
+  // CHECK-LABEL: sil hidden @_TFV19default_constructor1ICurfxS0_ : $@convention(method) <T> (@in T, @thin I.Type) -> I {
+  // CHECK: [[INIT_FN:%[0-9]+]] = function_ref @_TIvV19default_constructor1I1xSii : $@convention(thin) () -> Int
+  // CHECK: [[RESULT:%[0-9]+]] = apply [[INIT_FN]]() : $@convention(thin) () -> Int
+  // CHECK: [[X_ADDR:%[0-9]+]] = struct_element_addr {{.*}} : $*I, #I.x
+  // CHECK: assign [[RESULT]] to [[X_ADDR]] : $*Int
+  init<T>(_: T) {}
+}

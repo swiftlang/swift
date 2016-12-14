@@ -59,6 +59,8 @@ namespace swift {
   class ForeignRepresentationInfo;
   class FuncDecl;
   class InFlightDiagnostic;
+  class LazyAbstractFunctionData;
+  class LazyIterableDeclContextData;
   class LazyResolver;
   class PatternBindingDecl;
   class PatternBindingInitializer;
@@ -203,10 +205,6 @@ public:
   /// The name of the SwiftShims module "SwiftShims".
   Identifier SwiftShimsModuleName;
 
-  /// Note: in non-NDEBUG builds, tracks the context of each primary
-  /// archetype type, which can be very useful for debugging.
-  llvm::DenseMap<ArchetypeType *, DeclContext *> ArchetypeContexts;
-
   // Define the set of known identifiers.
 #define IDENTIFIER_WITH_NAME(Name, IdStr) Identifier Id_##Name;
 #include "swift/AST/KnownIdentifiers.def"
@@ -236,6 +234,14 @@ private:
   /// a nominal type, keep track of the generation number they saw and will
   /// automatically update when they are out of date.
   unsigned CurrentGeneration = 0;
+
+  friend class Pattern;
+
+  /// Mapping from patterns that store interface types that will be lazily
+  /// resolved to contextual types, to the declaration context in which the
+  /// pattern resides.
+  llvm::DenseMap<const Pattern *, DeclContext *>
+    DelayedPatternContexts;
 
 public:
   /// \brief Retrieve the allocator for the given arena.
@@ -429,10 +435,7 @@ public:
 
   /// Retrieve the declaration of Swift.==(Int, Int) -> Bool.
   FuncDecl *getEqualIntDecl() const;
-
-  /// Retrieve the declaration of Array.append(element:)
-  FuncDecl *getArrayAppendElementDecl() const;
-
+  
   /// Retrieve the declaration of Swift._unimplementedInitializer.
   FuncDecl *getUnimplementedInitializerDecl(LazyResolver *resolver) const;
 
@@ -692,13 +695,40 @@ public:
   Optional<ArrayRef<Substitution>>
   getSubstitutions(TypeBase *type, DeclContext *gpContext) const;
 
-  /// Record a conformance loader and its context data for the given
-  /// declaration.
-  void recordConformanceLoader(Decl *decl, LazyMemberLoader *resolver,
-                               uint64_t contextData);
+  /// Get the lazy data for the given declaration.
+  ///
+  /// \param lazyLoader If non-null, the lazy loader to use when creating the
+  /// lazy data. The pointer must either be null or be consistent
+  /// across all calls for the same \p func.
+  LazyContextData *getOrCreateLazyContextData(const Decl *decl,
+                                              LazyMemberLoader *lazyLoader);
 
-  /// Take the conformance loader and context data for the given declaration.
-  std::pair<LazyMemberLoader *, uint64_t> takeConformanceLoader(Decl *decl);
+  /// Get the lazy function data for the given generic type.
+  ///
+  /// \param lazyLoader If non-null, the lazy loader to use when creating the
+  /// generic type data. The pointer must either be null or be consistent
+  /// across all calls for the same \p type.
+  LazyGenericTypeData *getOrCreateLazyGenericTypeData(
+                                                  const GenericTypeDecl *type,
+                                                  LazyMemberLoader *lazyLoader);
+
+  /// Get the lazy function data for the given abstract function.
+  ///
+  /// \param lazyLoader If non-null, the lazy loader to use when creating the
+  /// function data. The pointer must either be null or be consistent
+  /// across all calls for the same \p func.
+  LazyAbstractFunctionData *getOrCreateLazyFunctionContextData(
+                                              const AbstractFunctionDecl *func,
+                                              LazyMemberLoader *lazyLoader);
+
+  /// Get the lazy iterable context for the given iterable declaration context.
+  ///
+  /// \param lazyLoader If non-null, the lazy loader to use when creating the
+  /// iterable context data. The pointer must either be null or be consistent
+  /// across all calls for the same \p idc.
+  LazyIterableDeclContextData *getOrCreateLazyIterableContextData(
+                                              const IterableDeclContext *idc,
+                                              LazyMemberLoader *lazyLoader);
 
   /// \brief Returns memory usage of this ASTContext.
   size_t getTotalMemory() const;

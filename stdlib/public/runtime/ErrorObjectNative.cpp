@@ -60,7 +60,7 @@ static void _destroyErrorObject(HeapObject *obj) {
 
 /// Heap metadata for Error boxes.
 static const FullMetadata<HeapMetadata> ErrorMetadata{
-  HeapMetadataHeader{{_destroyErrorObject}, {&_TWVBo}},
+  HeapMetadataHeader{{_destroyErrorObject}, {&VALUE_WITNESS_SYM(Bo)}},
   Metadata{MetadataKind::ErrorObject},
 };
 

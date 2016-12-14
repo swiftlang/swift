@@ -25,6 +25,8 @@
 #include "SourceKit/SwiftLang/Factory.h"
 
 #include "swift/Basic/DemangleWrappers.h"
+#include "swift/Basic/ManglingMacros.h"
+#include "swift/Basic/Mangler.h"
 
 #include "llvm/ADT/ArrayRef.h"
 #include "llvm/ADT/SmallString.h"
@@ -1095,7 +1097,7 @@ static std::string mangleSimpleClass(StringRef moduleName,
   typeNode->addChild(classNode);
   typeManglingNode->addChild(typeNode);
   globalNode->addChild(typeManglingNode);
-  return mangleNode(globalNode);
+  return mangleNode(globalNode, swift::NewMangling::useNewMangling());
 }
 
 static sourcekitd_response_t

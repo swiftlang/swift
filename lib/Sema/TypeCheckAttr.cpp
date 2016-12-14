@@ -1612,7 +1612,7 @@ void TypeChecker::checkAutoClosureAttr(ParamDecl *PD, AutoClosureAttr *attr) {
 void TypeChecker::checkNoEscapeAttr(ParamDecl *PD, NoEscapeAttr *attr) {
   // The paramdecl should have function type.
   auto *FTy = PD->getType()->getAs<FunctionType>();
-  if (FTy == 0) {
+  if (FTy == nullptr) {
     diagnose(attr->getLocation(), diag::noescape_function_type);
     attr->setInvalid();
     return;

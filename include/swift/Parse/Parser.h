@@ -1001,7 +1001,8 @@ public:
 
   ParserResult<ParameterList> parseSingleParameterClause(
                           ParameterContextKind paramContext,
-                          SmallVectorImpl<Identifier> *namePieces = nullptr);
+                          SmallVectorImpl<Identifier> *namePieces = nullptr,
+                          DefaultArgumentInfo *defaultArgs = nullptr);
 
   ParserStatus parseFunctionArguments(SmallVectorImpl<Identifier> &NamePieces,
                                     SmallVectorImpl<ParameterList*> &BodyParams,
@@ -1014,9 +1015,6 @@ public:
                                       SourceLoc &throws,
                                       bool &rethrows,
                                       TypeRepr *&retType);
-  ParserStatus parseConstructorArguments(DeclName &FullName,
-                                         ParameterList *&BodyParams,
-                                         DefaultArgumentInfo &defaultArgs);
 
   //===--------------------------------------------------------------------===//
   // Pattern Parsing

@@ -1015,6 +1015,7 @@ void SILSerializer::writeSILInstruction(const SILInstruction &SI) {
   case ValueKind::IsNonnullInst:
   case ValueKind::LoadInst:
   case ValueKind::LoadBorrowInst:
+  case ValueKind::BeginBorrowInst:
   case ValueKind::LoadUnownedInst:
   case ValueKind::LoadWeakInst:
   case ValueKind::MarkUninitializedInst:
@@ -1292,6 +1293,7 @@ void SILSerializer::writeSILInstruction(const SILInstruction &SI) {
   case ValueKind::AssignInst:
   case ValueKind::CopyAddrInst:
   case ValueKind::StoreInst:
+  case ValueKind::StoreBorrowInst:
   case ValueKind::StoreUnownedInst:
   case ValueKind::StoreWeakInst: {
     SILValue operand, value;
@@ -1316,8 +1318,12 @@ void SILSerializer::writeSILInstruction(const SILInstruction &SI) {
       Attr = (CAI->isInitializationOfDest() << 1) | CAI->isTakeOfSrc();
       operand = cast<CopyAddrInst>(&SI)->getDest();
       value = cast<CopyAddrInst>(&SI)->getSrc();
-    } else
+    } else if (auto *SBI = dyn_cast<StoreBorrowInst>(&SI)) {
+      operand = SBI->getDest();
+      value = SBI->getSrc();
+    } else {
       llvm_unreachable("switch out of sync");
+    }
 
     unsigned abbrCode = SILAbbrCodes[SILOneValueOneOperandLayout::Code];
     SILOneValueOneOperandLayout::emitRecord(Out, ScratchRecord, abbrCode,

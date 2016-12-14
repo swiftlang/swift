@@ -1815,6 +1815,7 @@ bool Parser::isStartOfDecl() {
 void Parser::consumeDecl(ParserPosition BeginParserPosition,
                          ParseDeclOptions Flags,
                          bool IsTopLevel) {
+  SourceLoc CurrentLoc = Tok.getLoc();
   backtrackToPosition(BeginParserPosition);
   SourceLoc BeginLoc = Tok.getLoc();
   // Consume tokens up to code completion token.
@@ -1829,6 +1830,9 @@ void Parser::consumeDecl(ParserPosition BeginParserPosition,
   State->delayDecl(PersistentParserState::DelayedDeclKind::Decl, Flags.toRaw(),
                    CurDeclContext, { BeginLoc, EndLoc },
                    BeginParserPosition.PreviousLoc);
+
+  while (SourceMgr.isBeforeInBuffer(Tok.getLoc(), CurrentLoc))
+    consumeToken();
 
   if (IsTopLevel) {
     // Skip the rest of the file to prevent the parser from constructing the
@@ -2406,6 +2410,7 @@ ParserResult<ImportDecl> Parser::parseDeclImport(ParseDeclOptions Flags,
 /// \endverbatim
 ParserStatus Parser::parseInheritance(SmallVectorImpl<TypeLoc> &Inherited,
                                       SourceLoc *classRequirementLoc) {
+  Scope S(this, ScopeKind::InheritanceClause);
   consumeToken(tok::colon);
 
   // Clear out the class requirement location.
@@ -2515,8 +2520,15 @@ static ParserStatus parseIdentifierDeclName(Parser &P, Identifier &Result,
 
   default:
     P.checkForInputIncomplete();
-    if (!D.is(diag::invalid_diagnostic))
-      P.diagnose(P.Tok, D);
+    if (!D.is(diag::invalid_diagnostic)) {
+      if (P.Tok.isKeyword()) {
+        P.diagnose(P.Tok, diag::keyword_cant_be_identifier, P.Tok.getText());
+        P.diagnose(P.Tok, diag::backticks_to_escape)
+          .fixItReplace(P.Tok.getLoc(), "`" + P.Tok.getText().str() + "`");
+      } else {
+        P.diagnose(P.Tok, D);
+      }
+    }
     if (P.Tok.isKeyword() &&
         (P.peekToken().is(ResyncT1) || P.peekToken().is(ResyncT2) ||
          P.peekToken().is(ResyncT3) || P.peekToken().is(ResyncT4) ||
@@ -3776,7 +3788,8 @@ VarDecl *Parser::parseDeclVarGetSet(Pattern *pattern,
 
   // Parse getter and setter.
   ParsedAccessors accessors;
-  if (parseGetSet(Flags, /*Indices=*/0, TyLoc, accessors, StaticLoc, Decls))
+  if (parseGetSet(Flags, /*Indices=*/nullptr, TyLoc, accessors, StaticLoc,
+                  Decls))
     Invalid = true;
 
   // If we have an invalid case, bail out now.
@@ -3827,7 +3840,6 @@ void Parser::ParsedAccessors::record(Parser &P, AbstractStorageDecl *storage,
                                      SmallVectorImpl<Decl *> &decls) {
   auto flagInvalidAccessor = [&](FuncDecl *&func) {
     if (func) {
-      func->setInterfaceType(ErrorType::get(P.Context));
       func->setInvalid();
     }
   };
@@ -4792,6 +4804,9 @@ ParserStatus Parser::parseDeclEnumCase(ParseDeclOptions Flags,
     consumeIf(tok::period_prefix, DotLoc);
 
     const bool NameIsNotIdentifier = Tok.isNot(tok::identifier);
+    const bool NameIsKeyword = Tok.isKeyword();
+    StringRef TokText = Tok.getText();
+    SourceLoc TokLoc = Tok.getLoc();
     if (parseIdentifierDeclName(*this, Name, NameLoc, tok::l_paren,
                                 tok::kw_case, tok::colon, tok::r_brace,
                                 diag::invalid_diagnostic).isError()) {
@@ -4821,7 +4836,13 @@ ParserStatus Parser::parseDeclEnumCase(ParseDeclOptions Flags,
         Status.setIsParseError();
         return Status;
       }
-      diagnose(CaseLoc, diag::expected_identifier_in_decl, "enum 'case'");
+      if (NameIsKeyword) {
+        diagnose(TokLoc, diag::keyword_cant_be_identifier, TokText);
+        diagnose(TokLoc, diag::backticks_to_escape)
+          .fixItReplace(TokLoc, "`" + TokText.str() + "`");
+      } else {
+        diagnose(CaseLoc, diag::expected_identifier_in_decl, "enum 'case'");
+      }
     } else if (DotLoc.isValid()) {
       diagnose(DotLoc, diag::enum_case_dot_prefix)
         .fixItRemove(DotLoc);
@@ -5256,12 +5277,6 @@ ParserStatus Parser::parseDeclSubscript(ParseDeclOptions Flags,
   ParserStatus Status;
   SourceLoc SubscriptLoc = consumeToken(tok::kw_subscript);
 
-  // parameter-clause
-  if (Tok.isNot(tok::l_paren)) {
-    diagnose(Tok, diag::expected_lparen_subscript);
-    return makeParserError();
-  }
-
   SmallVector<Identifier, 4> argumentNames;
   ParserResult<ParameterList> Indices
     = parseSingleParameterClause(ParameterContextKind::Subscript,
@@ -5271,7 +5286,8 @@ ParserStatus Parser::parseDeclSubscript(ParseDeclOptions Flags,
   
   // '->'
   if (!Tok.is(tok::arrow)) {
-    diagnose(Tok, diag::expected_arrow_subscript);
+    if (!Indices.isParseError())
+      diagnose(Tok, diag::expected_arrow_subscript);
     return makeParserError();
   }
   SourceLoc ArrowLoc = consumeToken();
@@ -5364,16 +5380,15 @@ Parser::parseDeclInit(ParseDeclOptions Flags, DeclAttributes &Attributes) {
     return makeParserCodeCompletionStatus();
 
   // Parse the parameters.
-  // FIXME: handle code completion in Arguments.
   DefaultArgumentInfo DefaultArgs(/*inTypeContext*/true);
-  ParameterList *BodyPattern;
-  DeclName FullName;
-  ParserStatus SignatureStatus
-    = parseConstructorArguments(FullName, BodyPattern, DefaultArgs);
+  llvm::SmallVector<Identifier, 4> namePieces;
+  ParserResult<ParameterList> Params
+    = parseSingleParameterClause(ParameterContextKind::Initializer,
+                                 &namePieces, &DefaultArgs);
 
-  if (SignatureStatus.hasCodeCompletion() && !CodeCompletion) {
+  if (Params.hasCodeCompletion() && !CodeCompletion) {
     // Trigger delayed parsing, no need to continue.
-    return SignatureStatus;
+    return makeParserCodeCompletionStatus();
   }
 
   // Protocol initializer arguments may not have default values.
@@ -5400,12 +5415,13 @@ Parser::parseDeclInit(ParseDeclOptions Flags, DeclAttributes &Attributes) {
   }
   
   auto *SelfDecl = ParamDecl::createUnboundSelf(ConstructorLoc, CurDeclContext);
+  DeclName FullName(Context, Context.Id_init, namePieces);
 
   Scope S2(this, ScopeKind::ConstructorBody);
   auto *CD = new (Context) ConstructorDecl(FullName, ConstructorLoc,
                                            Failability, FailabilityLoc,
                                            throwsLoc.isValid(), throwsLoc,
-                                           SelfDecl, BodyPattern,
+                                           SelfDecl, Params.get(),
                                            GenericParams,
                                            CurDeclContext);
   
@@ -5419,16 +5435,16 @@ Parser::parseDeclInit(ParseDeclOptions Flags, DeclAttributes &Attributes) {
   DefaultArgs.setFunctionContext(CD);
 
   // Pass the function signature to code completion.
-  if (SignatureStatus.hasCodeCompletion())
+  if (Params.hasCodeCompletion())
     CodeCompletion->setDelayedParsedDecl(CD);
 
-  if (ConstructorsNotAllowed || SignatureStatus.isError()) {
+  if (ConstructorsNotAllowed || Params.isParseError()) {
     // Tell the type checker not to touch this constructor.
     CD->setInvalid();
   }
   
   addToScope(SelfDecl);
-  addParametersToScope(BodyPattern);
+  addParametersToScope(Params.get());
 
   // '{'
   if (Tok.is(tok::l_brace)) {

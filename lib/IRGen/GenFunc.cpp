@@ -105,6 +105,7 @@
 #include "ScalarTypeInfo.h"
 #include "GenFunc.h"
 #include "Signature.h"
+#include "IRGenMangler.h"
 
 using namespace swift;
 using namespace irgen;
@@ -700,13 +701,20 @@ static llvm::Function *emitPartialApplicationForwarder(IRGenModule &IGM,
   llvm::FunctionType *fwdTy = IGM.getFunctionType(outType, outAttrs);
   // Build a name for the thunk. If we're thunking a static function reference,
   // include its symbol name in the thunk name.
-  llvm::SmallString<20> thunkName;
-  thunkName += "_TPA";
+  llvm::SmallString<20> OldThunkName;
+  StringRef FnName;
+  OldThunkName += "_TPA";
   if (staticFnPtr) {
-    thunkName += '_';
-    thunkName += staticFnPtr->getName();
+    FnName = staticFnPtr->getName();
+    OldThunkName += '_';
+    OldThunkName += FnName;
   }
-  
+  IRGenMangler Mangler;
+  std::string NewThunkName = Mangler.manglePartialApplyForwarder(FnName);
+
+  std::string thunkName = NewMangling::selectMangling(OldThunkName.str(),
+                                                      NewThunkName);
+
   // FIXME: Maybe cache the thunk by function and closure types?.
   llvm::Function *fwd =
     llvm::Function::Create(fwdTy, llvm::Function::InternalLinkage,

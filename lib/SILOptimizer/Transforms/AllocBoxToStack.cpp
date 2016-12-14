@@ -14,6 +14,7 @@
 #include "swift/SILOptimizer/PassManager/Passes.h"
 #include "swift/SIL/Dominance.h"
 #include "swift/SIL/Mangle.h"
+#include "swift/SILOptimizer/Utils/SpecializationMangler.h"
 #include "swift/SIL/SILArgument.h"
 #include "swift/SIL/SILBuilder.h"
 #include "swift/SIL/SILCloner.h"
@@ -409,8 +410,8 @@ static bool rewriteAllocBoxAsAllocStack(AllocBoxInst *ABI,
   assert(ABI->getBoxType()->getLayout()->getFields().size() == 1
          && "rewriting multi-field box not implemented");
   auto *ASI = BuildAlloc.createAllocStack(ABI->getLoc(),
-                                          ABI->getBoxType()->getFieldType(0),
-                                          ABI->getVarInfo());
+                          ABI->getBoxType()->getFieldType(ABI->getModule(), 0),
+                          ABI->getVarInfo());
 
   // Replace all uses of the address of the box's contained value with
   // the address of the stack location.
@@ -435,7 +436,7 @@ static bool rewriteAllocBoxAsAllocStack(AllocBoxInst *ABI,
   assert(ABI->getBoxType()->getLayout()->getFields().size() == 1
          && "promoting multi-field box not implemented");
   auto &Lowering = ABI->getModule()
-    .getTypeLowering(ABI->getBoxType()->getFieldType(0));
+    .getTypeLowering(ABI->getBoxType()->getFieldType(ABI->getModule(), 0));
   auto Loc = CleanupLocation::get(ABI->getLoc());
 
   // For non-trivial types, insert destroys for each final release-like
@@ -521,11 +522,16 @@ static std::string getClonedName(SILFunction *F,
                                  ParamIndexList &PromotedParamIndices) {
   Mangle::Mangler M;
   auto P = SpecializationPass::AllocBoxToStack;
-  FunctionSignatureSpecializationMangler FSSM(P, M, Fragile, F);
-  for (unsigned i : PromotedParamIndices)
-    FSSM.setArgumentBoxToStack(i);
-  FSSM.mangle();
-  return M.finalize();
+  FunctionSignatureSpecializationMangler OldFSSM(P, M, Fragile, F);
+  NewMangling::FunctionSignatureSpecializationMangler NewFSSM(P, Fragile, F);
+  for (unsigned i : PromotedParamIndices) {
+    OldFSSM.setArgumentBoxToStack(i);
+    NewFSSM.setArgumentBoxToStack(i);
+  }
+  OldFSSM.mangle();
+  std::string Old = M.finalize();
+  std::string New = NewFSSM.mangle();
+  return NewMangling::selectMangling(Old, New);
 }
 
 /// \brief Create the function corresponding to the clone of the
@@ -547,7 +553,7 @@ PromotedParamCloner::initCloned(SILFunction *Orig, IsFragile_t Fragile,
       auto boxTy = param.getType()->castTo<SILBoxType>();
       assert(boxTy->getLayout()->getFields().size() == 1
              && "promoting compound box not implemented");
-      auto paramTy = boxTy->getFieldType(0);
+      auto paramTy = boxTy->getFieldType(Orig->getModule(), 0);
       auto promotedParam = SILParameterInfo(paramTy.getSwiftRValueType(),
                                   ParameterConvention::Indirect_InoutAliasable);
       ClonedInterfaceArgTys.push_back(promotedParam);
@@ -605,7 +611,7 @@ PromotedParamCloner::populateCloned() {
       auto boxTy = (*I)->getType().castTo<SILBoxType>();
       assert(boxTy->getLayout()->getFields().size() == 1
              && "promoting multi-field boxes not implemented yet");
-      auto promotedTy = boxTy->getFieldType(0);
+      auto promotedTy = boxTy->getFieldType(Cloned->getModule(), 0);
       auto *promotedArg =
           ClonedEntryBB->createArgument(promotedTy, (*I)->getDecl());
       PromotedParameters.insert(*I);

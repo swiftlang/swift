@@ -188,6 +188,11 @@ inline Iterator next_or_end(Iterator it, Iterator end) {
   return (it == end) ? end : std::next(it);
 }
 
+template <typename Iterator>
+inline Iterator prev_or_begin(Iterator it, Iterator begin) {
+  return (it == begin) ? begin : std::prev(it);
+}
+
 /// @}
 
 /// A range of iterators.
