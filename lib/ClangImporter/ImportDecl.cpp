@@ -6529,12 +6529,12 @@ ClangImporter::Implementation::importDeclImpl(const clang::NamedDecl *ClangDecl,
   auto finalizeDecl = [&](Decl *result) {
     importAttributes(ClangDecl, result);
 
-    // Hack to deal with unannotated Objective-C protocols. If the protocol
-    // comes from clang and is not annotated and the protocol requirement
-    // itself is not annotated, then infer availability of the requirement
-    // based on its types. This makes it possible for a type to conform to an
-    // Objective-C protocol that is missing annotations but whose requirements
-    // use types that are less available than the conforming type.
+    // Hack to deal with Objective-C protocols without availability annotation.
+    // If the protocol comes from clang and is not annotated and the protocol
+    // requirement itself is not annotated, then infer availability of the
+    // requirement based on its types. This makes it possible for a type to
+    // conform to an Objective-C protocol that is missing annotations but whose
+    // requirements use types that are less available than the conforming type.
     auto dc = result->getDeclContext();
     auto *proto = dyn_cast<ProtocolDecl>(dc);
     if (!proto || proto->getAttrs().hasAttribute<AvailableAttr>())
