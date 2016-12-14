@@ -3614,9 +3614,11 @@ void VarDecl::emitLetToVarNoteIfSimple(DeclContext *UseDC) const {
     auto FD = dyn_cast_or_null<FuncDecl>(UseDC->getInnermostMethodContext());
 
     if (FD && !FD->isMutating() && !FD->isImplicit() && FD->isInstanceMember()&&
-        !FD->isComputedGetter() &&
         !FD->getDeclContext()->getDeclaredInterfaceType()
                  ->hasReferenceSemantics()) {
+      // Do not suggest the fix it in implicit getters
+      if (FD->isGetter() && !FD->getAccessorKeywordLoc().isValid()) return;
+                   
       auto &d = getASTContext().Diags;
       d.diagnose(FD->getFuncLoc(), diag::change_to_mutating, FD->isAccessor())
        .fixItInsert(FD->getFuncLoc(), "mutating ");
