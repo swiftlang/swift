@@ -2090,7 +2090,7 @@ extension FixedWidthInteger {
 
 % for x in binaryArithmetic['Arithmetic']:
 %   callLabel = x.firstArg + ': ' if not x.firstArg == '_' else ''
-// FIXME(integers): penging optimizer work on handling the case where the
+// FIXME(integers): pending optimizer work on handling the case where the
 // boolean value is wrapped into a two-case enum and then immediately
 // unwrapped. <rdar://problem/29004429>
 // Uncomment this block and remove the corresponding one from the concrete
