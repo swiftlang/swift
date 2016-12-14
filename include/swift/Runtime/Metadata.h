@@ -1832,7 +1832,7 @@ using ObjCClassWrapperMetadata
 // is formally UB by C++11 language rules, we should be OK because neither
 // the processor model nor the optimizer can realistically reorder our uses
 // of 'consume'.
-#if __arm64__
+#if __arm64__ || __arm__
 #  define SWIFT_MEMORY_ORDER_CONSUME (std::memory_order_relaxed)
 #else
 #  define SWIFT_MEMORY_ORDER_CONSUME (std::memory_order_consume)
