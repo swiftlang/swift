@@ -1,67 +1,57 @@
+:orphan:
 
-# Debugging the Swift Compiler
+.. highlight:: none
 
-<!-- markdown-toc start - Don't edit this section. Run M-x markdown-toc-generate-toc again -->
-**Table of Contents**
+Debugging the Swift Compiler
+============================
 
-- [Abstract](#abstract)
-- [Printing the Intermediate Representations](#printing-the-intermediate-representations)
-- [Debugging on SIL Level](#debugging-on-sil-level)
-    - [Options for Dumping the SIL](#options-for-dumping-the-sil)
-    - [Dumping the SIL and other Data in LLDB](#dumping-the-sil-and-other-data-in-lldb)
-    - [Debugging and Profiling on SIL level](#debugging-and-profiling-on-sil-level)
-    - [Other Utilities](#other-utilities)
-    - [Using Breakpoints](#using-breakpoints)
-    - [LLDB Scripts](#lldb-scripts)
-    - [Reducing SIL test cases using bug_reducer](#reducing-sil-test-cases-using-bugreducer)
-- [Debugging Swift Executables](#debugging-swift-executables)
-    - [Determining the mangled name of a function in LLDB](#determining-the-mangled-name-of-a-function-in-lldb)
+.. contents::
 
-<!-- markdown-toc end -->
-
-## Abstract
+Abstract
+--------
 
 This document contains some useful information for debugging the
 Swift compiler and Swift compiler output.
 
-## Printing the Intermediate Representations
+Printing the Intermediate Representations
+-----------------------------------------
 
 The most important thing when debugging the compiler is to examine the IR.
 Here is how to dump the IR after the main phases of the Swift compiler
 (assuming you are compiling with optimizations enabled):
 
-* **Parser**. To print the AST after parsing::
+#. **Parser**. To print the AST after parsing::
 
-        swiftc -dump-ast -O file.swift
+    swiftc -dump-ast -O file.swift
 
-* **SILGen**. To print the SIL immediately after SILGen::
+#. **SILGen**. To print the SIL immediately after SILGen::
 
-        swiftc -emit-silgen -O file.swift
+    swiftc -emit-silgen -O file.swift
 
-* **Mandatory SIL passes**. To print the SIL after the mandatory passes::
+#. **Mandatory SIL passes**. To print the SIL after the mandatory passes::
 
-        swiftc -emit-sil -Onone file.swift
+    swiftc -emit-sil -Onone file.swift
 
   Well, this is not quite true, because the compiler is running some passes
   for -Onone after the mandatory passes, too. But for most purposes you will
   get what you want to see.
 
-* **Performance SIL passes**. To print the SIL after the complete SIL
+#. **Performance SIL passes**. To print the SIL after the complete SIL
    optimization pipeline::
 
-        swiftc -emit-sil -O file.swift
+    swiftc -emit-sil -O file.swift
 
-* **IRGen**. To print the LLVM IR after IR generation::
+#. **IRGen**. To print the LLVM IR after IR generation::
 
-        swiftc -emit-ir -Xfrontend -disable-llvm-optzns -O file.swift
+    swiftc -emit-ir -Xfrontend -disable-llvm-optzns -O file.swift
 
-* **LLVM passes**. To print the LLVM IR after LLVM passes::
+4. **LLVM passes**. To print the LLVM IR after LLVM passes::
 
-        swiftc -emit-ir -O file.swift
+    swiftc -emit-ir -O file.swift
 
-* **Code generation**. To print the final generated code::
+5. **Code generation**. To print the final generated code::
 
-        swiftc -S -O file.swift
+    swiftc -S -O file.swift
 
 Compilation stops at the phase where you print the output. So if you want to
 print the SIL *and* the LLVM IR, you have to run the compiler twice.
@@ -69,9 +59,11 @@ The output of all these dump options (except ``-dump-ast``) can be redirected
 with an additional ``-o <file>`` option.
 
 
-## Debugging on SIL Level
+Debugging on SIL Level
+~~~~~~~~~~~~~~~~~~~~~~
 
-### Options for Dumping the SIL
+Options for Dumping the SIL
+```````````````````````````
 
 Often it is not sufficient to dump the SIL at the beginning or end of the
 optimization pipeline.
@@ -90,7 +82,8 @@ function names (``-Xllvm -sil-print-only-function``/``s``) or by pass names
 (``-Xllvm -sil-print-before``/``after``/``around``).
 For details see ``PassManager.cpp``.
 
-### Dumping the SIL and other Data in LLDB
+Dumping the SIL and other Data in LLDB
+``````````````````````````````````````
 
 When debugging the Swift compiler with LLDB (or Xcode, of course), there is
 even a more powerful way to examine the data in the compiler, e.g. the SIL.
@@ -122,7 +115,8 @@ debugging press <CTRL>-C on the LLDB prompt.
 Note that this only works in Xcode if the PATH variable in the scheme's
 environment setting contains the path to the dot tool.
 
-### Debugging and Profiling on SIL level
+Debugging and Profiling on SIL level
+````````````````````````````````````
 
 The compiler provides a way to debug and profile on SIL level. To enable SIL
 debugging add the front-end option -gsil together with -g. Example::
@@ -137,14 +131,16 @@ For details see the SILDebugInfoGenerator pass.
 To enable SIL debugging and profiling for the Swift standard library, use
 the build-script-impl option ``--build-sil-debugging-stdlib``.
 
-### Other Utilities
+Other Utilities
+```````````````
 
 To view the CFG of a function (or code region) in a SIL file, you can use the
 script ``swift/utils/viewcfg``. It also works for LLVM IR files.
 The script reads the SIL (or LLVM IR) code from stdin and displays the dot
 graph file. Note: .dot files should be associated with the Graphviz app.
 
-### Using Breakpoints
+Using Breakpoints
+`````````````````
 
 LLDB has very powerful breakpoints, which can be utilized in many ways to debug
 the compiler and Swift executables. The examples in this section show the LLDB
@@ -220,7 +216,8 @@ we know to ignore swift_getGenericMetadata 84 times, i.e.::
 
     (lldb) br set -i 84 -n GlobalARCOpts::run
 
-### LLDB Scripts
+LLDB Scripts
+````````````
 
 LLDB has powerful capabilities of scripting in Python among other languages. An
 often overlooked, but very useful technique is the -s command to lldb. This
@@ -258,9 +255,10 @@ Then by running ``lldb test -s test.lldb``, lldb will:
 Using LLDB scripts can enable one to use complex debugger workflows without
 needing to retype the various commands perfectly every time.
 
-### Reducing SIL test cases using bug_reducer
+Reducing SIL test cases using bug_reducer
+`````````````````````````````````````````
 
-There is functionality provided in `./swift/utils/bug_reducer/bug_reducer.py` for
+There is functionality provided in ./swift/utils/bug_reducer/bug_reducer.py for
 reducing SIL test cases by:
 
 1. Producing intermediate sib files that only require some of the passes to
@@ -269,16 +267,18 @@ reducing SIL test cases by:
    partitioning a module into unoptimized and optimized modules.
 
 For more information and a high level example, see:
-`./swift/utils/bug_reducer/README.md`.
+./swift/utils/bug_reducer/README.md.
 
 
-## Debugging Swift Executables
+Debugging Swift Executables
+---------------------------
 
 One can use the previous tips for debugging the Swift compiler with Swift
 executables as well. Here are some additional useful techniques that one can use
 in Swift executables.
 
-### Determining the mangled name of a function in LLDB
+Determining the mangled name of a function in LLDB
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
 One problem that often comes up when debugging Swift code in LLDB is that LLDB
 shows the demangled name instead of the mangled name. This can lead to mistakes
